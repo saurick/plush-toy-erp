@@ -73,3 +73,18 @@ test('workflowTaskReason: done 优先展示普通完成说明且不标为异常'
     '已完成资料确认'
   )
 })
+
+test('workflowTaskReason: 系统撤回使用独立文案，不伪装成人工退回', () => {
+  assert.deepEqual(
+    getWorkflowTaskReasonMeta({
+      task_status_key: 'withdrawn',
+      blocked_reason: '来源单据已取消',
+      payload: { rejected_reason: '不应读取的旧退回原因' },
+    }),
+    {
+      kind: 'withdrawn',
+      label: '撤回原因',
+      value: '来源单据已取消',
+    }
+  )
+})

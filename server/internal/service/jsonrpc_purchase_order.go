@@ -18,7 +18,8 @@ func (d *jsonrpcDispatcher) handlePurchaseOrder(
 	if params != nil {
 		pm = params.AsMap()
 	}
-	if _, res := d.requireAdmin(ctx); res != nil {
+	claims, res := d.requireAdmin(ctx)
+	if res != nil {
 		return id, res, nil
 	}
 	if d.purchaseOrderUC == nil {
@@ -33,7 +34,7 @@ func (d *jsonrpcDispatcher) handlePurchaseOrder(
 		return d.handlePurchaseOrderDocument(ctx, method, id, pm)
 	case "close_purchase_order",
 		"cancel_purchase_order":
-		return d.handlePurchaseOrderLifecycle(ctx, method, id, pm)
+		return d.handlePurchaseOrderLifecycle(ctx, method, id, pm, claims.UserID)
 	case "list_purchase_order_items":
 		return d.handlePurchaseOrderItem(ctx, method, id, pm)
 	default:

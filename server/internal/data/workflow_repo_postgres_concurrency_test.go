@@ -892,7 +892,7 @@ func TestWorkflowPostgresMigrationShape(t *testing.T) {
 
 	for constraintName, requiredParts := range map[string][]string{
 		"workflow_tasks_status_allowed": {
-			"ready", "blocked", "done", "rejected",
+			"ready", "blocked", "done", "rejected", "withdrawn",
 		},
 		"workflow_tasks_process_anchors_paired": {
 			"process_instance_id", "process_node_instance_id",

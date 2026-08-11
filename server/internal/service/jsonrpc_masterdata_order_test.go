@@ -338,6 +338,30 @@ func (s *stubSalesOrderJSONRPCRepo) CancelSalesOrderWithActor(_ context.Context,
 	return &biz.SalesOrder{ID: id, OrderNo: "SO001", CustomerID: 1, OrderDate: time.Unix(1, 0), LifecycleStatus: biz.SalesOrderStatusCanceled}, nil
 }
 
+func (s *stubSalesOrderJSONRPCRepo) ApplySalesOrderLifecycleAction(
+	_ context.Context,
+	in *biz.SourceOrderLifecycleAction,
+	lifecycleStatus string,
+) (*biz.SalesOrder, error) {
+	s.lifecycleStatus = lifecycleStatus
+	if lifecycleStatus == biz.SalesOrderStatusCanceled {
+		s.cancelActorID = in.ActorID
+	}
+	return &biz.SalesOrder{
+		ID: in.ID, OrderNo: "SO001", CustomerID: 1, OrderDate: time.Unix(1, 0),
+		LifecycleStatus: lifecycleStatus, Version: in.ExpectedVersion + 1,
+		SettlementAction: &in.ActionKey, SettlementMode: optionalTestString(in.CloseMode),
+		SettlementReason: optionalTestString(in.Reason), SettledBy: &in.ActorID,
+	}, nil
+}
+
+func optionalTestString(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
+}
+
 func (s *stubSalesOrderJSONRPCRepo) AddSalesOrderItem(_ context.Context, in *biz.SalesOrderItemMutation) (*biz.SalesOrderItem, error) {
 	s.addedItem = in
 	return &biz.SalesOrderItem{ID: 1, SalesOrderID: in.SalesOrderID, LineNo: in.LineNo, ProductID: in.ProductID, ProductSkuID: in.ProductSkuID, UnitID: in.UnitID, OrderedQuantity: in.OrderedQuantity, LineStatus: biz.SalesOrderItemStatusOpen}, nil
@@ -1589,7 +1613,7 @@ func TestJsonrpcDispatcher_SalesOrderAPIRequiresEnabledModule(t *testing.T) {
 	if submitRes == nil || submitRes.Code != errcode.UnknownMethod.Code || repo.lifecycleStatus != "" {
 		t.Fatalf("direct sales submit must stay removed, res=%#v lifecycle=%s", submitRes, repo.lifecycleStatus)
 	}
-	_, enabledCancelRes, err := j.handleSalesOrder(ctx, "cancel_sales_order", "enabled-cancel", mustJSONRPCStruct(t, map[string]any{"id": float64(1)}))
+	_, enabledCancelRes, err := j.handleSalesOrder(ctx, "cancel_sales_order", "enabled-cancel", sourceOrderLifecycleTestParams(t, 1, 1, biz.SourceOrderActionCancel))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}

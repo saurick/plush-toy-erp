@@ -170,6 +170,10 @@ func (d *jsonrpcDispatcher) mapOutsourcingOrderError(ctx context.Context, err er
 	switch {
 	case errors.Is(err, biz.ErrOutsourcingOrderConflict):
 		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: errcode.ResourceVersionConflict.Message}
+	case errors.Is(err, biz.ErrIdempotencyConflict):
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
+	case errors.Is(err, biz.ErrSourceOrderNormalCloseIncomplete):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外合同尚未全部回货；若确定不再履行剩余数量，请改用短关闭并填写原因"}
 	case errors.Is(err, biz.ErrOutsourcingOrderIncomplete):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "加工合同信息不完整，请补齐甲乙方信息、预计回货日期和每条明细的加工项目后再提交或确认"}
 	case errors.Is(err, biz.ErrBadParam):
@@ -233,6 +237,11 @@ func outsourcingOrderToMap(item *biz.OutsourcingOrder) map[string]any {
 		"expected_return_date":    optionalUnix(item.ExpectedReturnDate),
 		"lifecycle_status":        item.LifecycleStatus,
 		"version":                 item.Version,
+		"settlement_action":       optionalStringValue(item.SettlementAction),
+		"settlement_mode":         optionalStringValue(item.SettlementMode),
+		"settlement_reason":       optionalStringValue(item.SettlementReason),
+		"settled_at":              optionalUnix(item.SettledAt),
+		"settled_by":              optionalIntValue(item.SettledBy),
 		"note":                    optionalStringValue(item.Note),
 		"created_at":              item.CreatedAt.Unix(),
 		"updated_at":              item.UpdatedAt.Unix(),

@@ -60,7 +60,7 @@ func (uc *ProcessRuntimeUsecase) WakeProcessWaitEventNode(ctx context.Context, i
 }
 
 func (uc *ProcessRuntimeUsecase) BlockProcessNodeInstance(ctx context.Context, in *ProcessNodeInstanceBlock, actorID int) (*ProcessNodeInstance, error) {
-	if uc == nil || uc.repo == nil || in == nil {
+	if uc == nil || uc.repo == nil || in == nil || actorID <= 0 {
 		return nil, ErrBadParam
 	}
 	normalized, err := normalizeProcessNodeInstanceBlock(*in)
@@ -68,6 +68,36 @@ func (uc *ProcessRuntimeUsecase) BlockProcessNodeInstance(ctx context.Context, i
 		return nil, err
 	}
 	return uc.blockActiveProcessNodeInstance(ctx, &normalized, actorID)
+}
+
+func (uc *ProcessRuntimeUsecase) ResumeProcessNodeInstance(ctx context.Context, in *ProcessNodeInstanceResume, actorID int) (*ProcessNodeInstance, error) {
+	if uc == nil || uc.repo == nil || in == nil || actorID <= 0 {
+		return nil, ErrBadParam
+	}
+	normalized := *in
+	normalized.Reason = strings.TrimSpace(normalized.Reason)
+	if normalized.ProcessInstanceID <= 0 || normalized.ProcessNodeInstanceID <= 0 || normalized.ExpectedVersion <= 0 ||
+		normalized.Reason == "" || len([]rune(normalized.Reason)) > 255 {
+		return nil, ErrBadParam
+	}
+	instance, err := uc.repo.GetProcessInstance(ctx, normalized.ProcessInstanceID)
+	if err != nil {
+		return nil, err
+	}
+	if instance.Status != ProcessStatusBlocked {
+		return nil, ErrProcessInstanceSettled
+	}
+	node, err := uc.repo.GetProcessNodeInstance(ctx, normalized.ProcessNodeInstanceID)
+	if err != nil {
+		return nil, err
+	}
+	if node.ProcessInstanceID != instance.ID || node.Status != ProcessNodeStatusBlocked {
+		return nil, ErrProcessNodeInstanceNotActive
+	}
+	if node.Version != normalized.ExpectedVersion {
+		return nil, ErrProcessNodeInstanceConflict
+	}
+	return uc.repo.ResumeProcessNodeAndInstance(ctx, &normalized, actorID)
 }
 
 func (uc *ProcessRuntimeUsecase) EscalateDueProcessNode(ctx context.Context, in *ProcessNodeDueAtEscalation, actorID int) (*ProcessNodeInstance, error) {
@@ -100,6 +130,8 @@ func (uc *ProcessRuntimeUsecase) EscalateDueProcessNode(ctx context.Context, in 
 		ProcessInstanceID:     instance.ID,
 		ProcessNodeInstanceID: node.ID,
 		ExpectedVersion:       node.Version,
+		BlockKind:             ProcessBlockKindOverdue,
+		ReasonCode:            "due_at_reached",
 		Reason:                "due_at reached",
 		Outcome:               outcome,
 	}, actorID)
@@ -118,6 +150,8 @@ func (uc *ProcessRuntimeUsecase) blockActiveProcessNodeInstance(ctx context.Cont
 		ProcessInstanceID:        instance.ID,
 		ProcessNodeInstanceID:    node.ID,
 		ExpectedVersion:          node.Version,
+		BlockKind:                in.BlockKind,
+		ReasonCode:               in.ReasonCode,
 		Reason:                   in.Reason,
 		Outcome:                  in.Outcome,
 		DomainCommandFingerprint: in.DomainCommandFingerprint,
@@ -177,7 +211,8 @@ func (uc *ProcessRuntimeUsecase) advanceAfterNodeCompletionWithPayload(
 			return err
 		}
 	}
-	return nil
+	_, err = uc.markProcessNodeRoutingCompleted(ctx, completedNode, actorID)
+	return err
 }
 
 func (uc *ProcessRuntimeUsecase) handleActivatedSequentialNode(ctx context.Context, activatedNode *ProcessNodeInstance, actorID int) error {
@@ -267,18 +302,55 @@ func (uc *ProcessRuntimeUsecase) completeEndNodeAndProcess(ctx context.Context, 
 	if endNode.Status != ProcessNodeStatusActive {
 		return ErrProcessNodeInstanceNotActive
 	}
-	if _, err := uc.repo.CompleteProcessNodeInstance(ctx, &ProcessNodeInstanceComplete{
+	completedEnd, err := uc.repo.CompleteProcessNodeInstance(ctx, &ProcessNodeInstanceComplete{
 		ID:                endNode.ID,
 		ProcessInstanceID: endNode.ProcessInstanceID,
 		ExpectedVersion:   endNode.Version,
 		Outcome:           ProcessStatusCompleted,
-	}, actorID); err != nil {
+	}, actorID)
+	if err != nil {
 		return err
 	}
-	_, err := uc.repo.CompleteProcessInstance(ctx, &ProcessInstanceComplete{
-		ID: endNode.ProcessInstanceID,
+	resolutionKind := processResolutionKindFromEndNode(completedEnd)
+	_, err = uc.repo.CompleteProcessInstance(ctx, &ProcessInstanceComplete{
+		ID:             endNode.ProcessInstanceID,
+		TerminalNodeID: completedEnd.ID,
+		ResolutionKind: resolutionKind,
 	}, actorID)
+	if err != nil {
+		return err
+	}
+	_, err = uc.markProcessNodeRoutingCompleted(ctx, completedEnd, actorID)
 	return err
+}
+
+func (uc *ProcessRuntimeUsecase) markProcessNodeRoutingCompleted(
+	ctx context.Context,
+	node *ProcessNodeInstance,
+	actorID int,
+) (*ProcessNodeInstance, error) {
+	if uc == nil || uc.repo == nil || node == nil || node.ID <= 0 || node.ProcessInstanceID <= 0 || actorID <= 0 {
+		return nil, ErrBadParam
+	}
+	if node.RoutingCompletedAt != nil {
+		return node, nil
+	}
+	return uc.repo.MarkProcessNodeRoutingCompleted(ctx, &ProcessNodeRoutingCompletion{
+		ProcessInstanceID:     node.ProcessInstanceID,
+		ProcessNodeInstanceID: node.ID,
+	}, actorID)
+}
+
+func processResolutionKindFromEndNode(endNode *ProcessNodeInstance) string {
+	if endNode == nil {
+		return ProcessResolutionSucceeded
+	}
+	switch strings.TrimSpace(endNode.NodeKey) {
+	case "sales_order_rejected_end", "purchase_order_rejected_end", "shipment_finance_rejected_end", "rejected_end":
+		return ProcessResolutionRejected
+	default:
+		return ProcessResolutionSucceeded
+	}
 }
 
 func (uc *ProcessRuntimeUsecase) activateNextNodesAfterCompletion(ctx context.Context, completedNode *ProcessNodeInstance, actorID int) ([]*ProcessNodeInstance, error) {
@@ -341,7 +413,7 @@ func (uc *ProcessRuntimeUsecase) activateNamedPolicyBranchNodeWithReason(ctx con
 	if err != nil {
 		return nil, err
 	}
-	return uc.activateNamedWaitingNode(ctx, completedNode.ProcessInstanceID, nextNodeKey, actorID)
+	return uc.activateNamedWaitingNode(ctx, completedNode.ProcessInstanceID, nextNodeKey, completedNode.ID, actorID)
 }
 
 func (uc *ProcessRuntimeUsecase) resolveNamedPolicyBranchNodeKey(ctx context.Context, completedNode *ProcessNodeInstance, branchPolicyKey string, reason string, actorID int) (string, error) {
@@ -387,7 +459,7 @@ func (uc *ProcessRuntimeUsecase) activateFanOutNodes(ctx context.Context, comple
 	}
 	activatedNodes := make([]*ProcessNodeInstance, 0, len(nodeKeys))
 	for _, nodeKey := range nodeKeys {
-		activatedNode, err := uc.activateNamedWaitingNode(ctx, completedNode.ProcessInstanceID, nodeKey, actorID)
+		activatedNode, err := uc.activateNamedWaitingNode(ctx, completedNode.ProcessInstanceID, nodeKey, completedNode.ID, actorID)
 		if err != nil {
 			return nil, err
 		}
@@ -441,9 +513,10 @@ func (uc *ProcessRuntimeUsecase) activateReturnToNodeAttempt(ctx context.Context
 		return nil, err
 	}
 	return uc.repo.ActivateProcessNodeInstance(ctx, &ProcessNodeInstanceActivate{
-		ID:                createdNode.ID,
-		ProcessInstanceID: createdNode.ProcessInstanceID,
-		ExpectedVersion:   createdNode.Version,
+		ID:                          createdNode.ID,
+		ProcessInstanceID:           createdNode.ProcessInstanceID,
+		ExpectedVersion:             createdNode.Version,
+		ActivatedFromNodeInstanceID: &completedNode.ID,
 	}, actorID)
 }
 
@@ -465,7 +538,7 @@ func (uc *ProcessRuntimeUsecase) reconcileReturnToNodeAttempt(ctx context.Contex
 		}
 	}
 	if routedAttempt != nil {
-		return uc.reconcileProcessNodeActivation(ctx, routedAttempt, actorID)
+		return uc.reconcileProcessNodeActivation(ctx, routedAttempt, completedNode.ID, actorID)
 	}
 	activatedNode, err := uc.activateReturnToNodeAttempt(ctx, completedNode, route, actorID)
 	if err == nil || (!errors.Is(err, ErrProcessInstanceExists) && !errors.Is(err, ErrProcessNodeInstanceConflict)) {
@@ -477,7 +550,7 @@ func (uc *ProcessRuntimeUsecase) reconcileReturnToNodeAttempt(ctx context.Contex
 	}
 	for _, node := range nodes {
 		if node != nil && node.ProcessInstanceID == completedNode.ProcessInstanceID && node.NodeKey == route.NodeKey && node.ID > completedNode.ID {
-			return uc.reconcileProcessNodeActivation(ctx, node, actorID)
+			return uc.reconcileProcessNodeActivation(ctx, node, completedNode.ID, actorID)
 		}
 	}
 	return nil, err
@@ -528,9 +601,10 @@ func (uc *ProcessRuntimeUsecase) activateJoinNodeIfReady(ctx context.Context, co
 		return nil, ErrProcessNodeInstanceConflict
 	}
 	return uc.repo.ActivateProcessNodeInstance(ctx, &ProcessNodeInstanceActivate{
-		ID:                targetNode.ID,
-		ProcessInstanceID: targetNode.ProcessInstanceID,
-		ExpectedVersion:   targetNode.Version,
+		ID:                          targetNode.ID,
+		ProcessInstanceID:           targetNode.ProcessInstanceID,
+		ExpectedVersion:             targetNode.Version,
+		ActivatedFromNodeInstanceID: &completedNode.ID,
 	}, actorID)
 }
 
@@ -561,11 +635,11 @@ func (uc *ProcessRuntimeUsecase) reconcileJoinNodeIfReady(ctx context.Context, c
 	if !ready {
 		return nil, nil
 	}
-	return uc.reconcileProcessNodeActivation(ctx, targetNode, actorID)
+	return uc.reconcileProcessNodeActivation(ctx, targetNode, completedNode.ID, actorID)
 }
 
-func (uc *ProcessRuntimeUsecase) activateNamedWaitingNode(ctx context.Context, processInstanceID int, nodeKey string, actorID int) (*ProcessNodeInstance, error) {
-	if uc == nil || uc.repo == nil || processInstanceID <= 0 || strings.TrimSpace(nodeKey) == "" {
+func (uc *ProcessRuntimeUsecase) activateNamedWaitingNode(ctx context.Context, processInstanceID int, nodeKey string, sourceNodeID int, actorID int) (*ProcessNodeInstance, error) {
+	if uc == nil || uc.repo == nil || processInstanceID <= 0 || strings.TrimSpace(nodeKey) == "" || sourceNodeID <= 0 {
 		return nil, ErrBadParam
 	}
 	nodes, err := uc.repo.ListProcessNodeInstances(ctx, processInstanceID)
@@ -589,9 +663,10 @@ func (uc *ProcessRuntimeUsecase) activateNamedWaitingNode(ctx context.Context, p
 		return nil, ErrProcessNodeInstanceConflict
 	}
 	return uc.repo.ActivateProcessNodeInstance(ctx, &ProcessNodeInstanceActivate{
-		ID:                target.ID,
-		ProcessInstanceID: target.ProcessInstanceID,
-		ExpectedVersion:   target.Version,
+		ID:                          target.ID,
+		ProcessInstanceID:           target.ProcessInstanceID,
+		ExpectedVersion:             target.Version,
+		ActivatedFromNodeInstanceID: &sourceNodeID,
 	}, actorID)
 }
 
@@ -615,9 +690,10 @@ func (uc *ProcessRuntimeUsecase) activateNextSequentialNode(ctx context.Context,
 			return nil, nil
 		}
 		return uc.repo.ActivateProcessNodeInstance(ctx, &ProcessNodeInstanceActivate{
-			ID:                next.ID,
-			ProcessInstanceID: next.ProcessInstanceID,
-			ExpectedVersion:   next.Version,
+			ID:                          next.ID,
+			ProcessInstanceID:           next.ProcessInstanceID,
+			ExpectedVersion:             next.Version,
+			ActivatedFromNodeInstanceID: &completedNode.ID,
 		}, actorID)
 	}
 	return nil, ErrProcessNodeInstanceNotFound
@@ -638,7 +714,7 @@ func (uc *ProcessRuntimeUsecase) reconcileNextSequentialNode(ctx context.Context
 		if index+1 >= len(nodes) || nodes[index+1] == nil {
 			return nil, nil
 		}
-		return uc.reconcileProcessNodeActivation(ctx, nodes[index+1], actorID)
+		return uc.reconcileProcessNodeActivation(ctx, nodes[index+1], completedNode.ID, actorID)
 	}
 	return nil, ErrProcessNodeInstanceNotFound
 }

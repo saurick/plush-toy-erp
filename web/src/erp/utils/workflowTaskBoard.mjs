@@ -25,6 +25,7 @@ export const TASK_BOARD_STATUS_OPTIONS = Object.freeze([
   { value: 'ready', label: '可执行' },
   { value: 'blocked', label: '阻塞' },
   { value: 'rejected', label: '退回' },
+  { value: 'withdrawn', label: '撤回' },
   { value: 'overdue', label: '已超时' },
   { value: 'dueSoon', label: '即将到期' },
   { value: 'done', label: '已完成' },
@@ -100,7 +101,7 @@ export const TASK_BOARD_LANE_DEFINITIONS = Object.freeze([
   {
     key: 'finished',
     title: '已结束',
-    description: '已完成或已退回的任务只保留查看和追溯。',
+    description: '已完成、已退回或已撤回的任务只保留查看和追溯。',
     actionLabel: '查看全部已结束任务',
     tagColor: 'green',
   },
@@ -133,6 +134,7 @@ const TASK_STATUS_META = Object.freeze({
   ready: { label: '可执行', color: 'blue' },
   blocked: { label: '阻塞', color: 'red' },
   rejected: { label: '退回', color: 'orange' },
+  withdrawn: { label: '已撤回', color: 'default' },
   done: { label: '已完成', color: 'green' },
 })
 

@@ -29,6 +29,25 @@ func activateProcessNodeForTest(t *testing.T, ctx context.Context, repo *process
 	return activated
 }
 
+func activateProcessNodeFromForTest(
+	t *testing.T,
+	ctx context.Context,
+	repo *processRuntimeRepo,
+	instance *biz.ProcessInstance,
+	node *biz.ProcessNodeInstance,
+	sourceNodeID int,
+) *biz.ProcessNodeInstance {
+	t.Helper()
+	activated, err := repo.ActivateProcessNodeInstance(ctx, &biz.ProcessNodeInstanceActivate{
+		ID: node.ID, ProcessInstanceID: instance.ID, ExpectedVersion: node.Version,
+		ActivatedFromNodeInstanceID: &sourceNodeID,
+	}, 7)
+	if err != nil {
+		t.Fatalf("activate process node from source fixture: %v", err)
+	}
+	return activated
+}
+
 func TestProcessRuntimeRepoCreateRejectsNonInitialStatuses(t *testing.T) {
 	ctx := context.Background()
 	client := enttest.Open(t, dialect.SQLite, "file:process_runtime_repo_initial_status?mode=memory&cache=shared&_fk=1")
@@ -266,7 +285,7 @@ func TestProcessRuntimeRepoCreateAndRead(t *testing.T) {
 		t.Fatalf("expected completed end node, got %#v", completedEndNode)
 	}
 	completedProcess, err := repo.CompleteProcessInstance(ctx, &biz.ProcessInstanceComplete{
-		ID: instance.ID,
+		ID: instance.ID, TerminalNodeID: completedEndNode.ID, ResolutionKind: biz.ProcessResolutionSucceeded,
 	}, 7)
 	if err != nil {
 		t.Fatalf("complete process failed: %v", err)
@@ -274,10 +293,10 @@ func TestProcessRuntimeRepoCreateAndRead(t *testing.T) {
 	if completedProcess.Status != biz.ProcessStatusCompleted || completedProcess.CompletedAt == nil {
 		t.Fatalf("expected completed process with completed_at, got %#v", completedProcess)
 	}
-	if _, err := repo.CompleteProcessInstance(ctx, &biz.ProcessInstanceComplete{
-		ID: instance.ID,
-	}, 7); !errors.Is(err, biz.ErrProcessInstanceSettled) {
-		t.Fatalf("expected settled process error, got %v", err)
+	if replayed, err := repo.CompleteProcessInstance(ctx, &biz.ProcessInstanceComplete{
+		ID: instance.ID, TerminalNodeID: completedEndNode.ID, ResolutionKind: biz.ProcessResolutionSucceeded,
+	}, 7); err != nil || replayed.ID != completedProcess.ID {
+		t.Fatalf("expected exact completion replay, process=%#v err=%v", replayed, err)
 	}
 	if _, err := repo.ActivateProcessNodeInstance(ctx, &biz.ProcessNodeInstanceActivate{
 		ID:                nodes[1].ID,
@@ -530,7 +549,7 @@ func TestProcessRuntimeRepoRejectsChangedCreateIntentForSameIdempotency(t *testi
 		Nodes: []biz.ProcessNodeInstanceCreate{
 			{
 				NodeKey:        "approve_order",
-				NodeType:       biz.ProcessNodeTypeHumanTask,
+				NodeType:       biz.ProcessNodeTypeEnd,
 				Attempt:        1,
 				Status:         biz.ProcessNodeStatusWaiting,
 				OwnerPoolKey:   &ownerPoolKey,
@@ -598,7 +617,9 @@ func TestProcessRuntimeRepoRejectsChangedCreateIntentForSameIdempotency(t *testi
 	}, 7); err != nil {
 		t.Fatalf("complete process node failed: %v", err)
 	}
-	if _, err := repo.CompleteProcessInstance(ctx, &biz.ProcessInstanceComplete{ID: first.ID}, 7); err != nil {
+	if _, err := repo.CompleteProcessInstance(ctx, &biz.ProcessInstanceComplete{
+		ID: first.ID, TerminalNodeID: nodes[0].ID, ResolutionKind: biz.ProcessResolutionSucceeded,
+	}, 7); err != nil {
 		t.Fatalf("complete process failed: %v", err)
 	}
 
@@ -753,10 +774,22 @@ func TestProcessRuntimeRepoBlockProcessNodeInstanceAndProcess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("claim blocked domain command failed: %v", err)
 	}
+	if _, err := repo.BlockProcessNodeAndInstance(ctx, &biz.ProcessNodeInstanceBlock{
+		ProcessInstanceID:        instance.ID,
+		ProcessNodeInstanceID:    activeNode.ID,
+		ExpectedVersion:          activeNode.Version,
+		Reason:                   "样衣资料缺失",
+		Outcome:                  "blocked",
+		DomainCommandFingerprint: &fingerprint,
+	}, 7); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("repository must reject missing normalized block metadata, got %v", err)
+	}
 	blockedNode, err := repo.BlockProcessNodeAndInstance(ctx, &biz.ProcessNodeInstanceBlock{
 		ProcessInstanceID:        instance.ID,
 		ProcessNodeInstanceID:    activeNode.ID,
 		ExpectedVersion:          activeNode.Version,
+		BlockKind:                biz.ProcessBlockKindManual,
+		ReasonCode:               "process_node_blocked",
 		Reason:                   "样衣资料缺失",
 		Outcome:                  "blocked",
 		DomainCommandFingerprint: &fingerprint,
@@ -780,6 +813,8 @@ func TestProcessRuntimeRepoBlockProcessNodeInstanceAndProcess(t *testing.T) {
 		ProcessInstanceID:     instance.ID,
 		ProcessNodeInstanceID: activeNode.ID,
 		ExpectedVersion:       activeNode.Version,
+		BlockKind:             biz.ProcessBlockKindManual,
+		ReasonCode:            "process_node_blocked",
 		Reason:                "重复阻塞",
 		Outcome:               "blocked",
 	}, 7); !errors.Is(err, biz.ErrProcessNodeInstanceConflict) {
@@ -791,6 +826,13 @@ func TestProcessRuntimeRepoBlockProcessNodeInstanceAndProcess(t *testing.T) {
 	}
 	if blockedProcess.Status != biz.ProcessStatusBlocked || blockedProcess.CompletedAt != nil {
 		t.Fatalf("expected blocked process without completed_at, got %#v", blockedProcess)
+	}
+	if blockedNode.BlockKind == nil || blockedProcess.BlockKind == nil || *blockedNode.BlockKind != *blockedProcess.BlockKind ||
+		blockedNode.BlockedReasonCode == nil || blockedProcess.BlockedReasonCode == nil || *blockedNode.BlockedReasonCode != *blockedProcess.BlockedReasonCode ||
+		blockedNode.BlockedReason == nil || blockedProcess.BlockedReason == nil || *blockedNode.BlockedReason != *blockedProcess.BlockedReason ||
+		blockedNode.BlockedAt == nil || blockedProcess.BlockedAt == nil || !blockedNode.BlockedAt.Equal(*blockedProcess.BlockedAt) ||
+		blockedNode.BlockedBy == nil || blockedProcess.BlockedBy == nil || *blockedNode.BlockedBy != *blockedProcess.BlockedBy {
+		t.Fatalf("process block summary must match persisted node evidence: node=%#v process=%#v", blockedNode, blockedProcess)
 	}
 }
 
@@ -823,14 +865,17 @@ func TestProcessRuntimeRepoBlockProcessNodeAndInstanceRollsBackNodeWhenProcessCa
 		t.Fatalf("create process failed: %v", err)
 	}
 	activeNode := activateProcessNodeForTest(t, ctx, repo, instance, nodes[0])
-	if _, err := repo.CompleteProcessInstance(ctx, &biz.ProcessInstanceComplete{ID: instance.ID}, 7); err != nil {
-		t.Fatalf("settle process fixture: %v", err)
-	}
+	client.ProcessInstance.UpdateOneID(instance.ID).
+		SetStatus(biz.ProcessStatusCompleted).
+		SetCompletedAt(time.Now()).
+		ExecX(ctx)
 
 	if _, err := repo.BlockProcessNodeAndInstance(ctx, &biz.ProcessNodeInstanceBlock{
 		ProcessInstanceID:     instance.ID,
 		ProcessNodeInstanceID: activeNode.ID,
 		ExpectedVersion:       activeNode.Version,
+		BlockKind:             biz.ProcessBlockKindManual,
+		ReasonCode:            "process_node_blocked",
 		Reason:                "must roll back",
 		Outcome:               "blocked",
 	}, 7); !errors.Is(err, biz.ErrProcessInstanceSettled) {

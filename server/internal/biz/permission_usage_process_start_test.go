@@ -9,8 +9,8 @@ func TestPermissionUsageCoversCanonicalProcessStartRequirements(t *testing.T) {
 	}{
 		{PermissionSalesOrderSubmit, "start_sales_order_acceptance_process"},
 		{PermissionSalesOrderRead, "start_sales_order_acceptance_process"},
-		{PermissionPurchaseOrderUpdate, "start_material_supply_purchase_order_process"},
-		{PermissionPurchaseOrderUpdate, "execute_material_supply_purchase_order_submit"},
+		{PermissionPurchaseOrderSubmit, "start_material_supply_purchase_order_process"},
+		{PermissionPurchaseOrderSubmit, "execute_material_supply_purchase_order_submit"},
 		{PermissionPurchaseOrderRead, "start_material_supply_purchase_order_process"},
 		{PermissionPurchaseOrderRead, "execute_material_supply_purchase_order_submit"},
 		{PermissionPurchaseReceiptCreate, "execute_material_supply_purchase_receipt_create"},

@@ -12,13 +12,20 @@ import (
 )
 
 type stubProcessRuntimeWorkflowSettlementRunner struct {
-	calls   chan processRuntimeWorkflowSettlementCall
-	results []*biz.ProcessLinkedWorkflowTaskReconcileResult
+	calls       chan processRuntimeWorkflowSettlementCall
+	results     []*biz.ProcessLinkedWorkflowTaskReconcileResult
+	nodeCalls   chan processRuntimeNodeSettlementCall
+	nodeResults []*biz.ProcessRuntimeNodeReconcileResult
 }
 
 type processRuntimeWorkflowSettlementCall struct {
 	afterID int
 	limit   int
+}
+
+type processRuntimeNodeSettlementCall struct {
+	afterNodeID int
+	limit       int
 }
 
 func (s *stubProcessRuntimeWorkflowSettlementRunner) ReconcilePendingLinkedWorkflowTasks(_ context.Context, afterID int, limit int) (*biz.ProcessLinkedWorkflowTaskReconcileResult, error) {
@@ -31,8 +38,21 @@ func (s *stubProcessRuntimeWorkflowSettlementRunner) ReconcilePendingLinkedWorkf
 	return &biz.ProcessLinkedWorkflowTaskReconcileResult{}, nil
 }
 
+func (s *stubProcessRuntimeWorkflowSettlementRunner) ReconcilePendingProcessRuntimeNodes(_ context.Context, afterNodeID int, limit int) (*biz.ProcessRuntimeNodeReconcileResult, error) {
+	s.nodeCalls <- processRuntimeNodeSettlementCall{afterNodeID: afterNodeID, limit: limit}
+	if len(s.nodeResults) > 0 {
+		result := s.nodeResults[0]
+		s.nodeResults = s.nodeResults[1:]
+		return result, nil
+	}
+	return &biz.ProcessRuntimeNodeReconcileResult{}, nil
+}
+
 func TestProcessRuntimeWorkflowReconcilerRunsImmediatelyAndStops(t *testing.T) {
-	runner := &stubProcessRuntimeWorkflowSettlementRunner{calls: make(chan processRuntimeWorkflowSettlementCall, 1)}
+	runner := &stubProcessRuntimeWorkflowSettlementRunner{
+		calls:     make(chan processRuntimeWorkflowSettlementCall, 1),
+		nodeCalls: make(chan processRuntimeNodeSettlementCall, 1),
+	}
 	reconciler := newProcessRuntimeWorkflowReconciler(runner, log.NewStdLogger(io.Discard))
 	reconciler.interval = time.Hour
 	reconciler.timeout = time.Second
@@ -49,6 +69,14 @@ func TestProcessRuntimeWorkflowReconcilerRunsImmediatelyAndStops(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("reconciler did not run immediately")
 	}
+	select {
+	case call := <-runner.nodeCalls:
+		if call.afterNodeID != 0 || call.limit != 7 {
+			t.Fatalf("node reconcile call = %#v, want after=0 limit=7", call)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("node reconciler did not run immediately")
+	}
 	stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	if err := reconciler.Stop(stopCtx); err != nil {
@@ -58,7 +86,8 @@ func TestProcessRuntimeWorkflowReconcilerRunsImmediatelyAndStops(t *testing.T) {
 
 func TestProcessRuntimeWorkflowReconcilerAdvancesPastFailedBatchAndWraps(t *testing.T) {
 	runner := &stubProcessRuntimeWorkflowSettlementRunner{
-		calls: make(chan processRuntimeWorkflowSettlementCall, 4),
+		calls:     make(chan processRuntimeWorkflowSettlementCall, 4),
+		nodeCalls: make(chan processRuntimeNodeSettlementCall, 4),
 		results: []*biz.ProcessLinkedWorkflowTaskReconcileResult{
 			{
 				Scanned:                   100,
@@ -71,6 +100,18 @@ func TestProcessRuntimeWorkflowReconcilerAdvancesPastFailedBatchAndWraps(t *test
 			{},
 			{Scanned: 1, Reconciled: 1, LastScannedWorkflowTaskID: 1},
 		},
+		nodeResults: []*biz.ProcessRuntimeNodeReconcileResult{
+			{
+				Scanned:                  100,
+				LastScannedProcessNodeID: 200,
+				Failures: []biz.ProcessRuntimeNodeReconcileFailure{{
+					ProcessNodeInstanceID: 1,
+				}},
+			},
+			{Scanned: 1, Reconciled: 1, LastScannedProcessNodeID: 201},
+			{},
+			{Scanned: 1, Reconciled: 1, LastScannedProcessNodeID: 1},
+		},
 	}
 	reconciler := newProcessRuntimeWorkflowReconciler(runner, log.NewStdLogger(io.Discard))
 	reconciler.timeout = time.Second
@@ -81,6 +122,7 @@ func TestProcessRuntimeWorkflowReconcilerAdvancesPastFailedBatchAndWraps(t *test
 	}
 
 	wantAfterIDs := []int{0, 100, 101, 0}
+	wantAfterNodeIDs := []int{0, 200, 201, 0}
 	for index, wantAfterID := range wantAfterIDs {
 		select {
 		case call := <-runner.calls:
@@ -89,6 +131,14 @@ func TestProcessRuntimeWorkflowReconcilerAdvancesPastFailedBatchAndWraps(t *test
 			}
 		default:
 			t.Fatalf("missing reconcile call %d", index)
+		}
+		select {
+		case call := <-runner.nodeCalls:
+			if call.afterNodeID != wantAfterNodeIDs[index] || call.limit != 100 {
+				t.Fatalf("node call %d = %#v, want after=%d limit=100", index, call, wantAfterNodeIDs[index])
+			}
+		default:
+			t.Fatalf("missing node reconcile call %d", index)
 		}
 	}
 }

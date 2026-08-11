@@ -43,6 +43,7 @@ func TestClassifyWorkflowTaskBoardLaneIsMutuallyExclusive(t *testing.T) {
 		{name: "ready at due boundary", status: "ready", dueAt: &dueSoon, want: WorkflowTaskBoardLaneDue},
 		{name: "blocked overdue stays exception", status: "blocked", dueAt: &overdue, want: WorkflowTaskBoardLaneException},
 		{name: "rejected is settled and stays finished", status: "rejected", dueAt: &overdue, want: WorkflowTaskBoardLaneFinished},
+		{name: "withdrawn is settled and stays finished", status: "withdrawn", dueAt: &overdue, want: WorkflowTaskBoardLaneFinished},
 		{name: "done overdue stays finished", status: "done", dueAt: &overdue, want: WorkflowTaskBoardLaneFinished},
 	}
 
@@ -59,6 +60,9 @@ func TestClassifyWorkflowTaskBoardLaneIsMutuallyExclusive(t *testing.T) {
 	}
 	if !IsTerminalWorkflowTaskStatus("rejected") {
 		t.Fatal("rejected must remain a terminal workflow status")
+	}
+	if !IsTerminalWorkflowTaskStatus("withdrawn") {
+		t.Fatal("withdrawn must be a terminal workflow status")
 	}
 	if _, err := ClassifyWorkflowTaskBoardLane(&WorkflowTask{TaskStatusKey: "unknown"}, snapshotAt); !errors.Is(err, ErrWorkflowTaskBoardStatus) {
 		t.Fatalf("unknown task status must fail closed, got %v", err)

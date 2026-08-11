@@ -68,7 +68,7 @@ v1 的 [`../mobile-role-tasks-v1/implemented-reference.html`](../mobile-role-tas
 ## 业务与权限边界
 
 - 原型只表达页面骨架、信息层级、导航、处理表单和反馈状态，不新增 API、RBAC、菜单、路由、schema、migration 或客户专属逻辑。
-- 列表中的 `todo / approval / risk / history` 是四类服务端查询视图的交互表达；`todo=ready+blocked`、`history=done+rejected`、`total=todo+history`，审批 / 风险 / 超时允许重叠且 `overdue<=risk`。`approval` 只在当前账号具备任一有效审批能力时显示；风险只有在有效监督权限下扩大为“跨岗风险”。正式运行时每个视图使用独立游标、数量快照与服务端时间，不在前端把已加载数组重新拼成第二套任务真源。
+- 列表中的 `todo / approval / risk / history` 是四类服务端查询视图的交互表达；`todo=ready+blocked`、`history=done+rejected+withdrawn`、`total=todo+history`，审批 / 风险 / 超时允许重叠且 `overdue<=risk`。`withdrawn` 只表达来源取消或受控恢复产生的系统撤回。`approval` 只在当前账号具备任一有效审批能力时显示；风险只有在有效监督权限下扩大为“跨岗风险”。正式运行时每个视图使用独立游标、数量快照与服务端时间，不在前端把已加载数组重新拼成第二套任务真源。
 - 可见不等于可处理。仅催办和只读样本用于评审 `canOperateTask` / `canUrgeTask` 的页面投影，不是新的权限真源。
 - 催办权不等于附件写入权。附件上传继续要求 `workflow.task.update` 和服务端 owner / assignee 范围；无上传权时不显示假“选择附件”控件。
 - Workflow task 的完成、阻塞、退回、解除阻塞或催办只更新协同任务，不等于库存、出货、质检、应收、应付、开票或付款事实过账。

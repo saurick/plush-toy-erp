@@ -135,6 +135,9 @@ func createProcessInstanceRowsInTx(
 			SetNillableActionSetKey(nodeIn.ActionSetKey).
 			SetPolicySnapshot(nodeIn.PolicySnapshot).
 			SetNillableDueAt(nodeIn.DueAt)
+		if actorID > 0 {
+			nodeBuilder.SetUpdatedBy(actorID)
+		}
 		node, err := nodeBuilder.Save(ctx)
 		if err != nil {
 			return nil, nil, err
@@ -494,10 +497,12 @@ func processNodeStatusCanEvolveFrom(initial string, current string) bool {
 	case biz.ProcessNodeStatusWaiting:
 		return current == biz.ProcessNodeStatusActive ||
 			current == biz.ProcessNodeStatusCompleted ||
-			current == biz.ProcessNodeStatusBlocked
+			current == biz.ProcessNodeStatusBlocked ||
+			current == biz.ProcessNodeStatusWithdrawn
 	case biz.ProcessNodeStatusActive:
 		return current == biz.ProcessNodeStatusCompleted ||
-			current == biz.ProcessNodeStatusBlocked
+			current == biz.ProcessNodeStatusBlocked ||
+			current == biz.ProcessNodeStatusWithdrawn
 	default:
 		return false
 	}
@@ -578,6 +583,46 @@ func (r *processRuntimeRepo) ListProcessNodeInstances(ctx context.Context, proce
 		out = append(out, entProcessNodeInstanceToBiz(row))
 	}
 	return out, nil
+}
+
+func (r *processRuntimeRepo) ListPendingProcessRuntimeNodeReconciliations(
+	ctx context.Context,
+	afterProcessNodeID int,
+	limit int,
+) ([]*biz.ProcessNodeInstance, error) {
+	if r == nil || r.data == nil || r.data.postgres == nil || afterProcessNodeID < 0 || limit < 1 ||
+		limit > biz.ProcessLinkedWorkflowTaskReconcileMaxLimit {
+		return nil, biz.ErrBadParam
+	}
+	rows, err := r.data.postgres.ProcessNodeInstance.Query().Where(
+		processnodeinstance.IDGT(afterProcessNodeID),
+		processnodeinstance.HasProcessInstanceWith(processinstance.Status(biz.ProcessStatusActive)),
+		processnodeinstance.Or(
+			processnodeinstance.And(
+				processnodeinstance.Status(biz.ProcessNodeStatusActive),
+				processnodeinstance.NodeTypeIn(biz.ProcessNodeTypeHumanTask, biz.ProcessNodeTypeApproval),
+				processnodeinstance.Not(processnodeinstance.HasWorkflowTasks()),
+			),
+			processnodeinstance.And(
+				processnodeinstance.Status(biz.ProcessNodeStatusActive),
+				processnodeinstance.NodeType(biz.ProcessNodeTypeDomainCommand),
+				processnodeinstance.DomainCommandResultHashNotNil(),
+			),
+			processnodeinstance.And(
+				processnodeinstance.Status(biz.ProcessNodeStatusCompleted),
+				processnodeinstance.NodeTypeIn(biz.ProcessNodeTypeDomainCommand, biz.ProcessNodeTypeEnd),
+				processnodeinstance.RoutingCompletedAtIsNil(),
+			),
+		),
+	).Order(ent.Asc(processnodeinstance.FieldID)).Limit(limit).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*biz.ProcessNodeInstance, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, entProcessNodeInstanceToBiz(row))
+	}
+	return result, nil
 }
 
 func (r *processRuntimeRepo) ClaimProcessNodeDomainCommand(ctx context.Context, in *biz.ProcessNodeDomainCommandClaim) (*biz.ProcessNodeInstance, error) {
@@ -717,7 +762,7 @@ func recordProcessNodeDomainCommandResultWithClient(
 		SetNillableDomainCommandEffectRefID(in.EffectRefID).
 		SetDomainCommandResultRecordedAt(now)
 	if actorID > 0 {
-		update.SetDomainCommandResultRecordedBy(actorID)
+		update.SetDomainCommandResultRecordedBy(actorID).SetUpdatedBy(actorID)
 	}
 	affected, err := update.Save(ctx)
 	if err != nil {
@@ -792,7 +837,7 @@ func markProcessNodeDomainCommandCompensatedWithClient(
 		SetDomainCommandCompensationHash(in.CompensationHash).
 		SetDomainCommandCompensatedAt(now)
 	if actorID > 0 {
-		update.SetDomainCommandCompensatedBy(actorID)
+		update.SetDomainCommandCompensatedBy(actorID).SetUpdatedBy(actorID)
 	}
 	affected, err := update.Save(ctx)
 	if err != nil {
@@ -883,7 +928,7 @@ func (r *processRuntimeRepo) RecoverProcessDomainCommandCompensation(
 		}
 		return nil, err
 	}
-	if instance.Status == biz.ProcessStatusCompleted {
+	if instance.Status != biz.ProcessStatusActive && instance.Status != biz.ProcessStatusBlocked && instance.Status != biz.ProcessStatusCompleted {
 		return nil, biz.ErrProcessDomainCommandRecoveryRequired
 	}
 	allNodes, err := tx.ProcessNodeInstance.Query().Where(
@@ -892,26 +937,54 @@ func (r *processRuntimeRepo) RecoverProcessDomainCommandCompensation(
 	if err != nil {
 		return nil, err
 	}
-	originIndex := -1
-	for index, node := range allNodes {
-		if node.Attempt != 1 || processRuntimeNodeUsesNonSequentialRouting(node) {
-			return nil, biz.ErrProcessDomainCommandRecoveryRequired
+	selectedPath := map[int]struct{}{origin.ID: {}}
+	for changed := true; changed; {
+		changed = false
+		for _, node := range allNodes {
+			if node.ActivatedFromNodeInstanceID == nil {
+				continue
+			}
+			if _, parentSelected := selectedPath[*node.ActivatedFromNodeInstanceID]; !parentSelected {
+				continue
+			}
+			if _, alreadySelected := selectedPath[node.ID]; alreadySelected {
+				continue
+			}
+			selectedPath[node.ID] = struct{}{}
+			changed = true
 		}
+	}
+	withdraw := make([]*ent.ProcessNodeInstance, 0, len(selectedPath))
+	for _, node := range allNodes {
+		_, selected := selectedPath[node.ID]
 		if node.ID == origin.ID {
-			originIndex = index
+			continue
 		}
-	}
-	if originIndex < 0 {
-		return nil, biz.ErrProcessNodeInstanceNotFound
-	}
-	nodes := allNodes[originIndex+1:]
-	withdraw := make([]*ent.ProcessNodeInstance, 0, len(nodes))
-	for _, node := range nodes {
-		if node.Status == biz.ProcessNodeStatusCompleted || processRuntimeNodeHasDomainEvidence(node) {
+		if !selected {
+			if node.Status == biz.ProcessNodeStatusActive || node.Status == biz.ProcessNodeStatusBlocked {
+				// A runnable node without a selected-edge chain is structurally invalid or corrupt
+				// evidence. Never guess its relationship from row order.
+				return nil, biz.ErrProcessDomainCommandRecoveryRequired
+			}
+			continue
+		}
+		switch node.Status {
+		case biz.ProcessNodeStatusWithdrawn:
+			continue
+		case biz.ProcessNodeStatusWaiting:
 			return nil, biz.ErrProcessDomainCommandRecoveryRequired
-		}
-		if node.Status == biz.ProcessNodeStatusWaiting || node.Status == biz.ProcessNodeStatusActive || node.Status == biz.ProcessNodeStatusBlocked {
+		case biz.ProcessNodeStatusActive, biz.ProcessNodeStatusBlocked:
+			if processRuntimeNodeHasDomainEvidence(node) {
+				return nil, biz.ErrProcessDomainCommandRecoveryRequired
+			}
 			withdraw = append(withdraw, node)
+		case biz.ProcessNodeStatusCompleted:
+			if node.NodeType == biz.ProcessNodeTypeDomainCommand &&
+				(node.DomainCommandEffectState == nil || (*node.DomainCommandEffectState != biz.ProcessDomainCommandEffectStateNone && *node.DomainCommandEffectState != biz.ProcessDomainCommandEffectStateCompensated)) {
+				return nil, biz.ErrProcessDomainCommandRecoveryRequired
+			}
+		default:
+			return nil, biz.ErrProcessDomainCommandRecoveryRequired
 		}
 	}
 	tasksByNode := make(map[int][]*ent.WorkflowTask, len(withdraw))
@@ -933,7 +1006,8 @@ func (r *processRuntimeRepo) RecoverProcessDomainCommandCompensation(
 		processnodeinstance.ID(origin.ID), processnodeinstance.Version(in.ExpectedVersion),
 		processnodeinstance.DomainCommandRecoveryDecisionIsNil(), processnodeinstance.DomainCommandRecoveryHashIsNil(),
 	).SetDomainCommandRecoveryDecision(in.Decision).SetDomainCommandRecoveryHash(in.RecoveryHash).
-		SetDomainCommandRecoveredAt(now).SetDomainCommandRecoveredBy(actorID).SetVersion(in.ExpectedVersion + 1).Save(ctx)
+		SetDomainCommandRecoveredAt(now).SetDomainCommandRecoveredBy(actorID).SetUpdatedBy(actorID).
+		SetVersion(in.ExpectedVersion + 1).Save(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -958,7 +1032,7 @@ func (r *processRuntimeRepo) RecoverProcessDomainCommandCompensation(
 			}
 			updated, updateErr := tx.WorkflowTask.Update().Where(
 				workflowtask.ID(task.ID), workflowtask.Version(task.Version), workflowtask.TaskStatusKey(task.TaskStatusKey),
-			).SetTaskStatusKey("rejected").SetBlockedReason(reason).SetCompletedAt(now).
+			).SetTaskStatusKey("withdrawn").SetBlockedReason(reason).SetCompletedAt(now).
 				SetUpdatedBy(actorID).SetVersion(task.Version + 1).Save(ctx)
 			if updateErr != nil {
 				return nil, updateErr
@@ -967,18 +1041,16 @@ func (r *processRuntimeRepo) RecoverProcessDomainCommandCompensation(
 				return nil, biz.ErrProcessNodeInstanceConflict
 			}
 			if _, eventErr := tx.WorkflowTaskEvent.Create().SetTaskID(task.ID).SetTaskVersion(task.Version + 1).
-				SetEventType("recovery_withdrawn").SetFromStatusKey(task.TaskStatusKey).SetToStatusKey("rejected").
+				SetEventType("recovery_withdrawn").SetFromStatusKey(task.TaskStatusKey).SetToStatusKey("withdrawn").
 				SetActorID(actorID).SetReason(reason).SetPayload(map[string]any{"recovery_decision": in.Decision}).Save(ctx); eventErr != nil {
 				return nil, eventErr
 			}
 		}
 		update := tx.ProcessNodeInstance.Update().Where(
 			processnodeinstance.ID(node.ID), processnodeinstance.Version(node.Version), processnodeinstance.Status(node.Status),
-		).SetStatus(biz.ProcessNodeStatusBlocked).SetOutcome(biz.ProcessDomainCommandRecoveryWithdrawnOutcome).
-			SetVersion(node.Version + 1)
-		if node.Status == biz.ProcessNodeStatusWaiting {
-			update.SetStartedAt(now)
-		}
+		).SetStatus(biz.ProcessNodeStatusWithdrawn).SetOutcome(biz.ProcessDomainCommandRecoveryWithdrawnOutcome).
+			SetCompletedAt(now).SetUpdatedBy(actorID).SetVersion(node.Version + 1).
+			ClearBlockKind().ClearBlockedReasonCode().ClearBlockedReason().ClearBlockedAt().ClearBlockedBy()
 		updated, updateErr := update.Save(ctx)
 		if updateErr != nil {
 			return nil, updateErr
@@ -987,14 +1059,25 @@ func (r *processRuntimeRepo) RecoverProcessDomainCommandCompensation(
 			return nil, biz.ErrProcessNodeInstanceConflict
 		}
 	}
-	updatedProcess, err := tx.ProcessInstance.Update().Where(
-		processinstance.ID(instance.ID), processinstance.StatusIn(biz.ProcessStatusActive, biz.ProcessStatusBlocked),
-	).SetStatus(biz.ProcessStatusBlocked).SetUpdatedBy(actorID).Save(ctx)
+	processUpdate := tx.ProcessInstance.Update().Where(
+		processinstance.ID(instance.ID),
+		processinstance.StatusIn(biz.ProcessStatusActive, biz.ProcessStatusBlocked, biz.ProcessStatusCompleted),
+	).SetStatus(biz.ProcessStatusCompleted).
+		SetResolutionKind(biz.ProcessResolutionCompensated).
+		SetResolutionReason(reason).
+		SetResolvedAt(now).
+		SetResolvedBy(actorID).
+		SetUpdatedBy(actorID).
+		ClearBlockKind().ClearBlockedReasonCode().ClearBlockedReason().ClearBlockedAt().ClearBlockedBy()
+	if instance.CompletedAt == nil {
+		processUpdate.SetCompletedAt(now)
+	}
+	updatedProcess, err := processUpdate.Save(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if updatedProcess != 1 {
-		return nil, biz.ErrProcessInstanceSettled
+		return nil, biz.ErrProcessNodeInstanceConflict
 	}
 	result, err := tx.ProcessNodeInstance.Get(ctx, origin.ID)
 	if err != nil {
@@ -1102,7 +1185,7 @@ func markProcessDomainCommandEffectsCompensatedWithClient(
 
 func (r *processRuntimeRepo) CompleteProcessNodeInstance(ctx context.Context, in *biz.ProcessNodeInstanceComplete, actorID int) (*biz.ProcessNodeInstance, error) {
 	if in == nil || in.ID <= 0 || in.ProcessInstanceID <= 0 || in.ExpectedVersion <= 0 ||
-		(in.ExpectedDomainCommandResultHash == nil) != (in.ExpectedDomainCommandEffectState == nil) {
+		(in.ExpectedDomainCommandResultHash == nil) != (in.ExpectedDomainCommandEffectState == nil) || actorID <= 0 {
 		return nil, biz.ErrBadParam
 	}
 	now := time.Now()
@@ -1115,6 +1198,7 @@ func (r *processRuntimeRepo) CompleteProcessNodeInstance(ctx context.Context, in
 		).
 		SetStatus(biz.ProcessNodeStatusCompleted).
 		SetCompletedAt(now).
+		SetUpdatedBy(actorID).
 		SetVersion(in.ExpectedVersion + 1)
 	if in.Outcome != "" {
 		update.SetOutcome(in.Outcome)
@@ -1164,31 +1248,115 @@ func (r *processRuntimeRepo) CompleteProcessNodeInstance(ctx context.Context, in
 }
 
 func (r *processRuntimeRepo) CompleteProcessInstance(ctx context.Context, in *biz.ProcessInstanceComplete, actorID int) (*biz.ProcessInstance, error) {
-	if in == nil || in.ID <= 0 {
+	if in == nil || in.ID <= 0 || in.TerminalNodeID <= 0 || actorID <= 0 || !validProcessResolutionKind(in.ResolutionKind) {
 		return nil, biz.ErrBadParam
 	}
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackEntTx(ctx, tx, r.log)
+	terminal, err := tx.ProcessNodeInstance.Query().Where(
+		processnodeinstance.ID(in.TerminalNodeID),
+		processnodeinstance.ProcessInstanceID(in.ID),
+		processnodeinstance.NodeType(biz.ProcessNodeTypeEnd),
+		processnodeinstance.Status(biz.ProcessNodeStatusCompleted),
+	).Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrProcessNodeInstanceNotFound
+		}
+		return nil, err
+	}
+	if terminal.ID != in.TerminalNodeID {
+		return nil, biz.ErrProcessNodeInstanceConflict
+	}
+	hasUnsettled, err := tx.ProcessNodeInstance.Query().Where(
+		processnodeinstance.ProcessInstanceID(in.ID),
+		processnodeinstance.StatusIn(biz.ProcessNodeStatusActive, biz.ProcessNodeStatusBlocked),
+	).Exist(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if hasUnsettled {
+		return nil, biz.ErrProcessNodeInstanceConflict
+	}
+	hasCompensatedEffect, err := tx.ProcessNodeInstance.Query().Where(
+		processnodeinstance.ProcessInstanceID(in.ID),
+		processnodeinstance.DomainCommandEffectState(biz.ProcessDomainCommandEffectStateCompensated),
+	).Exist(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if hasCompensatedEffect && in.ResolutionKind != biz.ProcessResolutionCompensated {
+		return nil, biz.ErrProcessDomainCommandRecoveryRequired
+	}
 	now := time.Now()
-	update := r.data.postgres.ProcessInstance.Update().
+	update := tx.ProcessInstance.Update().
 		Where(
 			processinstance.ID(in.ID),
 			processinstance.Status(biz.ProcessStatusActive),
 		).
 		SetStatus(biz.ProcessStatusCompleted).
-		SetCompletedAt(now)
-	if actorID > 0 {
-		update.SetUpdatedBy(actorID)
+		SetCompletedAt(now).
+		SetTerminalNodeInstanceID(in.TerminalNodeID).
+		SetResolutionKind(in.ResolutionKind).
+		SetResolvedAt(now).
+		SetResolvedBy(actorID).
+		SetUpdatedBy(actorID).
+		ClearBlockKind().
+		ClearBlockedReasonCode().
+		ClearBlockedReason().
+		ClearBlockedAt().
+		ClearBlockedBy()
+	if strings.TrimSpace(in.ResolutionReason) == "" {
+		update.ClearResolutionReason()
+	} else {
+		update.SetResolutionReason(strings.TrimSpace(in.ResolutionReason))
 	}
 	affected, err := update.Save(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if affected == 0 {
+		current, getErr := tx.ProcessInstance.Get(ctx, in.ID)
+		if getErr != nil {
+			if ent.IsNotFound(getErr) {
+				return nil, biz.ErrProcessInstanceNotFound
+			}
+			return nil, getErr
+		}
+		if current.Status == biz.ProcessStatusCompleted && current.TerminalNodeInstanceID != nil &&
+			*current.TerminalNodeInstanceID == in.TerminalNodeID && current.ResolutionKind != nil && *current.ResolutionKind == in.ResolutionKind {
+			if err := tx.Commit(); err != nil {
+				return nil, err
+			}
+			tx = nil
+			return entProcessInstanceToBiz(current), nil
+		}
 		if _, err := r.GetProcessInstance(ctx, in.ID); err != nil {
 			return nil, err
 		}
 		return nil, biz.ErrProcessInstanceSettled
 	}
-	return r.GetProcessInstance(ctx, in.ID)
+	row, err := tx.ProcessInstance.Get(ctx, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return entProcessInstanceToBiz(row), nil
+}
+
+func validProcessResolutionKind(value string) bool {
+	switch strings.TrimSpace(value) {
+	case biz.ProcessResolutionSucceeded, biz.ProcessResolutionRejected, biz.ProcessResolutionCancelled, biz.ProcessResolutionCompensated:
+		return true
+	default:
+		return false
+	}
 }
 
 func (r *processRuntimeRepo) RecordProcessInstanceLinkedBusinessRef(ctx context.Context, in *biz.ProcessInstanceLinkedBusinessRefRecord, actorID int) (*biz.ProcessInstance, error) {
@@ -1234,14 +1402,19 @@ func (r *processRuntimeRepo) RecordProcessInstanceLinkedBusinessRef(ctx context.
 	return nil, biz.ErrProcessNodeInstanceConflict
 }
 
-func blockProcessNodeInstanceWithClient(ctx context.Context, client *ent.Client, in *biz.ProcessNodeInstanceBlock) (*biz.ProcessNodeInstance, error) {
-	if in == nil || in.ProcessNodeInstanceID <= 0 || in.ProcessInstanceID <= 0 || in.ExpectedVersion <= 0 {
+func blockProcessNodeInstanceWithClient(ctx context.Context, client *ent.Client, in *biz.ProcessNodeInstanceBlock, actorID int) (*biz.ProcessNodeInstance, error) {
+	if in == nil || in.ProcessNodeInstanceID <= 0 || in.ProcessInstanceID <= 0 || in.ExpectedVersion <= 0 || actorID <= 0 {
 		return nil, biz.ErrBadParam
 	}
-	outcome := in.Outcome
-	if outcome == "" {
-		outcome = in.Reason
+	blockKind := strings.TrimSpace(in.BlockKind)
+	reasonCode := strings.TrimSpace(in.ReasonCode)
+	reason := strings.TrimSpace(in.Reason)
+	outcome := strings.TrimSpace(in.Outcome)
+	if blockKind == "" || reasonCode == "" || reason == "" || outcome == "" ||
+		len([]rune(reason)) > 255 || len(blockKind) > 64 || len(reasonCode) > 64 {
+		return nil, biz.ErrBadParam
 	}
+	now := time.Now()
 	update := client.ProcessNodeInstance.Update().
 		Where(
 			processnodeinstance.ID(in.ProcessNodeInstanceID),
@@ -1250,12 +1423,14 @@ func blockProcessNodeInstanceWithClient(ctx context.Context, client *ent.Client,
 			processnodeinstance.Version(in.ExpectedVersion),
 		).
 		SetStatus(biz.ProcessNodeStatusBlocked).
-		SetVersion(in.ExpectedVersion + 1)
-	if outcome != "" {
-		update.SetOutcome(outcome)
-	} else {
-		update.ClearOutcome()
-	}
+		SetBlockKind(blockKind).
+		SetBlockedReasonCode(reasonCode).
+		SetBlockedReason(reason).
+		SetBlockedAt(now).
+		SetBlockedBy(actorID).
+		SetUpdatedBy(actorID).
+		SetVersion(in.ExpectedVersion + 1).
+		SetOutcome(outcome)
 	if in.DomainCommandFingerprint != nil {
 		update.Where(processnodeinstance.DomainCommandFingerprint(*in.DomainCommandFingerprint))
 		update.SetDomainCommandFingerprint(*in.DomainCommandFingerprint)
@@ -1283,19 +1458,26 @@ func (r *processRuntimeRepo) BlockProcessNodeAndInstance(ctx context.Context, in
 	}
 	defer rollbackEntTx(ctx, tx, r.log)
 
-	blockedNode, err := blockProcessNodeInstanceWithClient(ctx, tx.Client(), in)
+	blockedNode, err := blockProcessNodeInstanceWithClient(ctx, tx.Client(), in, actorID)
 	if err != nil {
 		return nil, err
+	}
+	if blockedNode.BlockKind == nil || blockedNode.BlockedReasonCode == nil || blockedNode.BlockedReason == nil ||
+		blockedNode.BlockedAt == nil || blockedNode.BlockedBy == nil {
+		return nil, biz.ErrProcessNodeInstanceConflict
 	}
 	update := tx.ProcessInstance.Update().
 		Where(
 			processinstance.ID(in.ProcessInstanceID),
 			processinstance.Status(biz.ProcessStatusActive),
 		).
-		SetStatus(biz.ProcessStatusBlocked)
-	if actorID > 0 {
-		update.SetUpdatedBy(actorID)
-	}
+		SetStatus(biz.ProcessStatusBlocked).
+		SetBlockKind(*blockedNode.BlockKind).
+		SetBlockedReasonCode(*blockedNode.BlockedReasonCode).
+		SetBlockedReason(*blockedNode.BlockedReason).
+		SetBlockedAt(*blockedNode.BlockedAt).
+		SetBlockedBy(*blockedNode.BlockedBy).
+		SetUpdatedBy(actorID)
 	affected, err := update.Save(ctx)
 	if err != nil {
 		return nil, err
@@ -1321,18 +1503,29 @@ func (r *processRuntimeRepo) BlockProcessNodeAndInstance(ctx context.Context, in
 }
 
 func (r *processRuntimeRepo) BlockProcessInstance(ctx context.Context, in *biz.ProcessInstanceBlock, actorID int) (*biz.ProcessInstance, error) {
-	if in == nil || in.ID <= 0 {
+	if in == nil || in.ID <= 0 || actorID <= 0 {
 		return nil, biz.ErrBadParam
 	}
+	blockKind := strings.TrimSpace(in.BlockKind)
+	reasonCode := strings.TrimSpace(in.ReasonCode)
+	reason := strings.TrimSpace(in.Reason)
+	if blockKind == "" || reasonCode == "" || reason == "" ||
+		len(blockKind) > 64 || len(reasonCode) > 64 || len([]rune(reason)) > 255 {
+		return nil, biz.ErrBadParam
+	}
+	now := time.Now()
 	update := r.data.postgres.ProcessInstance.Update().
 		Where(
 			processinstance.ID(in.ID),
 			processinstance.Status(biz.ProcessStatusActive),
 		).
-		SetStatus(biz.ProcessStatusBlocked)
-	if actorID > 0 {
-		update.SetUpdatedBy(actorID)
-	}
+		SetStatus(biz.ProcessStatusBlocked).
+		SetBlockKind(blockKind).
+		SetBlockedReasonCode(reasonCode).
+		SetBlockedReason(reason).
+		SetBlockedAt(now).
+		SetBlockedBy(actorID).
+		SetUpdatedBy(actorID)
 	affected, err := update.Save(ctx)
 	if err != nil {
 		return nil, err
@@ -1346,12 +1539,131 @@ func (r *processRuntimeRepo) BlockProcessInstance(ctx context.Context, in *biz.P
 	return r.GetProcessInstance(ctx, in.ID)
 }
 
+func (r *processRuntimeRepo) ResumeProcessNodeAndInstance(
+	ctx context.Context,
+	in *biz.ProcessNodeInstanceResume,
+	actorID int,
+) (*biz.ProcessNodeInstance, error) {
+	if r == nil || r.data == nil || r.data.postgres == nil || in == nil || actorID <= 0 ||
+		in.ProcessInstanceID <= 0 || in.ProcessNodeInstanceID <= 0 || in.ExpectedVersion <= 0 ||
+		strings.TrimSpace(in.Reason) == "" || len([]rune(strings.TrimSpace(in.Reason))) > 255 {
+		return nil, biz.ErrBadParam
+	}
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackEntTx(ctx, tx, r.log)
+	instance, err := tx.ProcessInstance.Query().Where(
+		processinstance.ID(in.ProcessInstanceID),
+		processinstance.Status(biz.ProcessStatusBlocked),
+	).Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrProcessInstanceSettled
+		}
+		return nil, err
+	}
+	node, err := tx.ProcessNodeInstance.Query().Where(
+		processnodeinstance.ID(in.ProcessNodeInstanceID),
+		processnodeinstance.ProcessInstanceID(in.ProcessInstanceID),
+		processnodeinstance.Status(biz.ProcessNodeStatusBlocked),
+		processnodeinstance.Version(in.ExpectedVersion),
+	).Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrProcessNodeInstanceConflict
+		}
+		return nil, err
+	}
+	if node.BlockKind != nil && *node.BlockKind == biz.ProcessBlockKindDomainCommand {
+		return nil, biz.ErrProcessDomainCommandRecoveryRequired
+	}
+	hasOtherBlockedNode, err := tx.ProcessNodeInstance.Query().Where(
+		processnodeinstance.ProcessInstanceID(in.ProcessInstanceID),
+		processnodeinstance.IDNEQ(in.ProcessNodeInstanceID),
+		processnodeinstance.Status(biz.ProcessNodeStatusBlocked),
+	).Exist(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if hasOtherBlockedNode {
+		return nil, biz.ErrProcessNodeInstanceConflict
+	}
+	now := time.Now()
+	reason := strings.TrimSpace(in.Reason)
+	tasks, err := tx.WorkflowTask.Query().Where(
+		workflowtask.ProcessNodeInstanceID(in.ProcessNodeInstanceID),
+		workflowtask.TaskStatusKey("blocked"),
+	).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, task := range tasks {
+		updated, updateErr := tx.WorkflowTask.Update().Where(
+			workflowtask.ID(task.ID),
+			workflowtask.Version(task.Version),
+			workflowtask.TaskStatusKey("blocked"),
+		).SetTaskStatusKey("ready").ClearBlockedReason().ClearCompletedAt().
+			SetUpdatedBy(actorID).SetVersion(task.Version + 1).Save(ctx)
+		if updateErr != nil {
+			return nil, updateErr
+		}
+		if updated != 1 {
+			return nil, biz.ErrProcessNodeInstanceConflict
+		}
+		if _, eventErr := tx.WorkflowTaskEvent.Create().SetTaskID(task.ID).SetTaskVersion(task.Version + 1).
+			SetEventType("process_resumed").SetFromStatusKey("blocked").SetToStatusKey("ready").
+			SetActorID(actorID).SetReason(reason).Save(ctx); eventErr != nil {
+			return nil, eventErr
+		}
+	}
+	updatedNodeCount, err := tx.ProcessNodeInstance.Update().Where(
+		processnodeinstance.ID(node.ID),
+		processnodeinstance.Status(biz.ProcessNodeStatusBlocked),
+		processnodeinstance.Version(in.ExpectedVersion),
+	).SetStatus(biz.ProcessNodeStatusActive).
+		ClearBlockKind().ClearBlockedReasonCode().ClearBlockedReason().ClearBlockedAt().ClearBlockedBy().
+		SetResumeReason(reason).SetResumedAt(now).SetResumedBy(actorID).SetUpdatedBy(actorID).
+		SetVersion(in.ExpectedVersion + 1).Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if updatedNodeCount != 1 {
+		return nil, biz.ErrProcessNodeInstanceConflict
+	}
+	updatedProcessCount, err := tx.ProcessInstance.Update().Where(
+		processinstance.ID(instance.ID),
+		processinstance.Status(biz.ProcessStatusBlocked),
+	).SetStatus(biz.ProcessStatusActive).
+		ClearBlockKind().ClearBlockedReasonCode().ClearBlockedReason().ClearBlockedAt().ClearBlockedBy().
+		SetUpdatedBy(actorID).Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if updatedProcessCount != 1 {
+		return nil, biz.ErrProcessInstanceSettled
+	}
+	result, err := tx.ProcessNodeInstance.Get(ctx, node.ID)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return entProcessNodeInstanceToBiz(result), nil
+}
+
 func (r *processRuntimeRepo) ActivateProcessNodeInstance(ctx context.Context, in *biz.ProcessNodeInstanceActivate, actorID int) (*biz.ProcessNodeInstance, error) {
-	if in == nil || in.ID <= 0 || in.ProcessInstanceID <= 0 || in.ExpectedVersion <= 0 {
+	if in == nil || in.ID <= 0 || in.ProcessInstanceID <= 0 || in.ExpectedVersion <= 0 || actorID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	if in.ActivatedFromNodeInstanceID != nil && (*in.ActivatedFromNodeInstanceID <= 0 || *in.ActivatedFromNodeInstanceID == in.ID) {
 		return nil, biz.ErrBadParam
 	}
 	now := time.Now()
-	affected, err := r.data.postgres.ProcessNodeInstance.Update().
+	update := r.data.postgres.ProcessNodeInstance.Update().
 		Where(
 			processnodeinstance.ID(in.ID),
 			processnodeinstance.ProcessInstanceID(in.ProcessInstanceID),
@@ -1360,8 +1672,12 @@ func (r *processRuntimeRepo) ActivateProcessNodeInstance(ctx context.Context, in
 		).
 		SetStatus(biz.ProcessNodeStatusActive).
 		SetStartedAt(now).
-		SetVersion(in.ExpectedVersion + 1).
-		Save(ctx)
+		SetUpdatedBy(actorID).
+		SetVersion(in.ExpectedVersion + 1)
+	if in.ActivatedFromNodeInstanceID != nil {
+		update.SetActivatedFromNodeInstanceID(*in.ActivatedFromNodeInstanceID)
+	}
+	affected, err := update.Save(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -1372,6 +1688,38 @@ func (r *processRuntimeRepo) ActivateProcessNodeInstance(ctx context.Context, in
 		return nil, biz.ErrProcessNodeInstanceConflict
 	}
 	return r.GetProcessNodeInstance(ctx, in.ID)
+}
+
+func (r *processRuntimeRepo) MarkProcessNodeRoutingCompleted(
+	ctx context.Context,
+	in *biz.ProcessNodeRoutingCompletion,
+	actorID int,
+) (*biz.ProcessNodeInstance, error) {
+	if r == nil || r.data == nil || r.data.postgres == nil || in == nil || in.ProcessInstanceID <= 0 ||
+		in.ProcessNodeInstanceID <= 0 || actorID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	now := time.Now()
+	affected, err := r.data.postgres.ProcessNodeInstance.Update().Where(
+		processnodeinstance.ID(in.ProcessNodeInstanceID),
+		processnodeinstance.ProcessInstanceID(in.ProcessInstanceID),
+		processnodeinstance.StatusIn(biz.ProcessNodeStatusCompleted, biz.ProcessNodeStatusBlocked),
+		processnodeinstance.RoutingCompletedAtIsNil(),
+	).SetRoutingCompletedAt(now).SetRoutingCompletedBy(actorID).SetUpdatedBy(actorID).Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	current, err := r.GetProcessNodeInstance(ctx, in.ProcessNodeInstanceID)
+	if err != nil {
+		return nil, err
+	}
+	if current.ProcessInstanceID != in.ProcessInstanceID || current.RoutingCompletedAt == nil {
+		return nil, biz.ErrProcessNodeInstanceConflict
+	}
+	if affected == 0 && current.RoutingCompletedBy == nil {
+		return nil, biz.ErrProcessNodeInstanceConflict
+	}
+	return current, nil
 }
 
 func (r *processRuntimeRepo) CreateProcessNodeInstanceAttempt(ctx context.Context, in *biz.ProcessNodeInstanceAttemptCreate, actorID int) (*biz.ProcessNodeInstance, error) {
@@ -1406,6 +1754,9 @@ func (r *processRuntimeRepo) CreateProcessNodeInstanceAttempt(ctx context.Contex
 		SetNillableActionSetKey(normalized.ActionSetKey).
 		SetPolicySnapshot(normalized.PolicySnapshot).
 		SetNillableDueAt(normalized.DueAt)
+	if actorID > 0 {
+		builder.SetUpdatedBy(actorID)
+	}
 	row, err := builder.Save(ctx)
 	if err != nil {
 		if ent.IsConstraintError(err) {
@@ -1436,6 +1787,16 @@ func entProcessInstanceToBiz(row *ent.ProcessInstance) *biz.ProcessInstance {
 		Status:                 row.Status,
 		StartedAt:              row.StartedAt,
 		CompletedAt:            row.CompletedAt,
+		TerminalNodeInstanceID: row.TerminalNodeInstanceID,
+		ResolutionKind:         row.ResolutionKind,
+		ResolutionReason:       row.ResolutionReason,
+		ResolvedAt:             row.ResolvedAt,
+		ResolvedBy:             row.ResolvedBy,
+		BlockKind:              row.BlockKind,
+		BlockedReasonCode:      row.BlockedReasonCode,
+		BlockedReason:          row.BlockedReason,
+		BlockedAt:              row.BlockedAt,
+		BlockedBy:              row.BlockedBy,
 		CreatedBy:              row.CreatedBy,
 		UpdatedBy:              row.UpdatedBy,
 		CreatedAt:              row.CreatedAt,
@@ -1462,7 +1823,18 @@ func entProcessNodeInstanceToBiz(row *ent.ProcessNodeInstance) *biz.ProcessNodeI
 		DueAt:                         row.DueAt,
 		StartedAt:                     row.StartedAt,
 		CompletedAt:                   row.CompletedAt,
+		ActivatedFromNodeInstanceID:   row.ActivatedFromNodeInstanceID,
+		RoutingCompletedAt:            row.RoutingCompletedAt,
+		RoutingCompletedBy:            row.RoutingCompletedBy,
 		Outcome:                       row.Outcome,
+		BlockKind:                     row.BlockKind,
+		BlockedReasonCode:             row.BlockedReasonCode,
+		BlockedReason:                 row.BlockedReason,
+		BlockedAt:                     row.BlockedAt,
+		BlockedBy:                     row.BlockedBy,
+		ResumeReason:                  row.ResumeReason,
+		ResumedAt:                     row.ResumedAt,
+		ResumedBy:                     row.ResumedBy,
 		DomainCommandFingerprint:      row.DomainCommandFingerprint,
 		DomainCommandProtocolVersion:  row.DomainCommandProtocolVersion,
 		DomainCommandResultState:      row.DomainCommandResultState,
@@ -1482,6 +1854,7 @@ func entProcessNodeInstanceToBiz(row *ent.ProcessNodeInstance) *biz.ProcessNodeI
 		DomainCommandRecoveredAt:      row.DomainCommandRecoveredAt,
 		DomainCommandRecoveredBy:      row.DomainCommandRecoveredBy,
 		Version:                       row.Version,
+		UpdatedBy:                     row.UpdatedBy,
 		CreatedAt:                     row.CreatedAt,
 		UpdatedAt:                     row.UpdatedAt,
 	}

@@ -6,12 +6,13 @@ const TASK_BOARD_LANE_KEYS = Object.freeze([
 ])
 const UNSETTLED_TASK_STATUS_KEYS = new Set(['ready', 'blocked'])
 const ACTIVE_TASK_STATUS_KEYS = new Set(['ready'])
-const FINISHED_TASK_STATUS_KEYS = new Set(['done', 'rejected'])
+const FINISHED_TASK_STATUS_KEYS = new Set(['done', 'rejected', 'withdrawn'])
 const TASK_BOARD_STATUS_FILTER_KEYS = new Set([
   'all',
   'ready',
   'blocked',
   'rejected',
+  'withdrawn',
   'done',
   'overdue',
   'dueSoon',
@@ -91,7 +92,7 @@ function matchesKeyword(task = {}, keyword = '') {
     payload.record_title,
     payload.module_title,
   ]
-  if (['blocked', 'rejected'].includes(taskStatus(task))) {
+  if (['blocked', 'rejected', 'withdrawn'].includes(taskStatus(task))) {
     values.push(
       task.blocked_reason,
       payload.blocked_reason,

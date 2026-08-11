@@ -2,6 +2,8 @@ package data
 
 import (
 	"context"
+	"strings"
+	"time"
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
@@ -32,6 +34,10 @@ func NewPurchaseOrderRepo(d *Data, logger log.Logger) *purchaseOrderRepo {
 }
 
 var _ biz.PurchaseOrderRepo = (*purchaseOrderRepo)(nil)
+var _ biz.PurchaseOrderSubmitProcessCommandRepo = (*purchaseOrderRepo)(nil)
+var _ biz.PurchaseOrderApproveProcessCommandRepo = (*purchaseOrderRepo)(nil)
+var _ biz.PurchaseOrderRejectProcessCommandRepo = (*purchaseOrderRepo)(nil)
+var _ biz.PurchaseOrderLifecycleActionRepo = (*purchaseOrderRepo)(nil)
 
 func (r *purchaseOrderRepo) CreatePurchaseOrder(ctx context.Context, in *biz.PurchaseOrderMutation) (*biz.PurchaseOrder, error) {
 	row, err := r.data.postgres.PurchaseOrder.Create().
@@ -273,6 +279,88 @@ func (r *purchaseOrderRepo) ApprovePurchaseOrderForProcessCommand(
 	)
 }
 
+func (r *purchaseOrderRepo) RejectPurchaseOrderForProcessCommand(
+	ctx context.Context,
+	purchaseOrderID int,
+	command *biz.ProcessDomainCommandInput,
+	result *biz.ProcessDomainCommandResult,
+	actorID int,
+	reason string,
+) (*biz.PurchaseOrder, error) {
+	reason = strings.TrimSpace(reason)
+	if r == nil || r.data == nil || r.data.postgres == nil || purchaseOrderID <= 0 ||
+		command == nil || result == nil || actorID <= 0 || reason == "" || len([]rune(reason)) > 255 {
+		return nil, biz.ErrBadParam
+	}
+	record, err := biz.BuildProcessNodeDomainCommandResultRecord(command, result)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackEntTx(ctx, tx, r.log)
+	query := tx.PurchaseOrder.Query().Where(purchaseorder.ID(purchaseOrderID))
+	if r.data.sqlDialect == dialect.Postgres {
+		query = query.Where(func(selector *sql.Selector) { selector.ForUpdate() })
+	}
+	current, err := query.Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrPurchaseOrderNotFound
+		}
+		return nil, err
+	}
+	if current.LifecycleStatus != biz.PurchaseOrderStatusSubmitted {
+		return nil, biz.ErrBadParam
+	}
+	if err := validatePurchaseOrderSettlementDependencies(ctx, tx, purchaseOrderID, biz.PurchaseOrderStatusCanceled, true); err != nil {
+		return nil, err
+	}
+	if _, err := tx.PurchaseOrderItem.Update().Where(
+		purchaseorderitem.PurchaseOrderID(purchaseOrderID),
+		purchaseorderitem.LineStatus(biz.PurchaseOrderItemStatusOpen),
+	).SetLineStatus(biz.PurchaseOrderItemStatusCanceled).Save(ctx); err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	row, err := tx.PurchaseOrder.UpdateOneID(purchaseOrderID).
+		Where(purchaseorder.Version(current.Version), purchaseorder.LifecycleStatus(biz.PurchaseOrderStatusSubmitted)).
+		SetLifecycleStatus(biz.PurchaseOrderStatusCanceled).
+		SetVersion(current.Version + 1).
+		SetSettlementAction(biz.SourceOrderSettlementActionWorkflowReject).
+		ClearSettlementMode().
+		SetSettlementReason(reason).
+		SetSettledAt(now).
+		SetSettledBy(actorID).
+		Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrPurchaseOrderConflict
+		}
+		return nil, err
+	}
+	if err := markProcessDomainCommandEffectsCompensatedWithClient(
+		ctx,
+		tx.Client(),
+		[]string{biz.ProcessDomainCommandPurchaseOrderSubmit, biz.ProcessDomainCommandPurchaseOrderApprove},
+		"purchase_order",
+		purchaseOrderID,
+		reason,
+		actorID,
+	); err != nil {
+		return nil, err
+	}
+	if _, err := recordProcessNodeDomainCommandResultWithClient(ctx, tx.Client(), record, actorID); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return entPurchaseOrderToBiz(row), nil
+}
+
 func (r *purchaseOrderRepo) updatePurchaseOrderForProcessCommand(
 	ctx context.Context,
 	purchaseOrderID int,
@@ -355,7 +443,7 @@ func (r *purchaseOrderRepo) settlePurchaseOrderLifecycle(ctx context.Context, id
 	if !containsString(allowedCurrent, row.LifecycleStatus) {
 		return nil, biz.ErrBadParam
 	}
-	if err := validatePurchaseOrderSettlementDependencies(ctx, tx, id, lifecycleStatus); err != nil {
+	if err := validatePurchaseOrderSettlementDependencies(ctx, tx, id, lifecycleStatus, false); err != nil {
 		return nil, err
 	}
 	row, err = tx.PurchaseOrder.UpdateOneID(id).SetLifecycleStatus(lifecycleStatus).Save(ctx)
@@ -368,7 +456,186 @@ func (r *purchaseOrderRepo) settlePurchaseOrderLifecycle(ctx context.Context, id
 	return entPurchaseOrderToBiz(row), nil
 }
 
-func validatePurchaseOrderSettlementDependencies(ctx context.Context, tx *ent.Tx, purchaseOrderID int, lifecycleStatus string) error {
+func (r *purchaseOrderRepo) ApplyPurchaseOrderLifecycleAction(
+	ctx context.Context,
+	in *biz.SourceOrderLifecycleAction,
+	lifecycleStatus string,
+) (*biz.PurchaseOrder, error) {
+	if r == nil || r.data == nil || r.data.postgres == nil || in == nil ||
+		(lifecycleStatus != biz.PurchaseOrderStatusClosed && lifecycleStatus != biz.PurchaseOrderStatusCanceled) {
+		return nil, biz.ErrBadParam
+	}
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackEntTx(ctx, tx, r.log)
+	replayed, err := resolveSourceOrderLifecycleActionReplay(ctx, tx.Client(), "purchase_order", in)
+	if err != nil {
+		return nil, err
+	}
+	if replayed {
+		row, getErr := tx.PurchaseOrder.Get(ctx, in.ID)
+		if getErr != nil {
+			return nil, getErr
+		}
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+		tx = nil
+		return entPurchaseOrderToBiz(row), nil
+	}
+	query := tx.PurchaseOrder.Query().Where(purchaseorder.ID(in.ID))
+	if r.data.sqlDialect == dialect.Postgres {
+		query = query.Where(func(selector *sql.Selector) { selector.ForUpdate() })
+	}
+	current, err := query.Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrPurchaseOrderNotFound
+		}
+		return nil, err
+	}
+	if current.Version != in.ExpectedVersion {
+		return nil, biz.ErrPurchaseOrderConflict
+	}
+	if !biz.IsPurchaseOrderLifecycleTransitionAllowed(current.LifecycleStatus, lifecycleStatus) || current.LifecycleStatus == lifecycleStatus {
+		return nil, biz.ErrBadParam
+	}
+	if err := validatePurchaseOrderSettlementDependencies(ctx, tx, in.ID, lifecycleStatus, lifecycleStatus == biz.PurchaseOrderStatusCanceled); err != nil {
+		return nil, err
+	}
+	if lifecycleStatus == biz.PurchaseOrderStatusClosed && in.CloseMode == biz.SourceOrderCloseModeNormal {
+		if err := validatePurchaseOrderFullyReceived(ctx, tx.Client(), in.ID); err != nil {
+			return nil, err
+		}
+	}
+	now := time.Now()
+	lineStatus := biz.PurchaseOrderItemStatusClosed
+	if lifecycleStatus == biz.PurchaseOrderStatusCanceled {
+		lineStatus = biz.PurchaseOrderItemStatusCanceled
+	}
+	lineResults, err := purchaseOrderLifecycleLineResults(ctx, tx.Client(), in.ID, lineStatus)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := tx.PurchaseOrderItem.Update().Where(
+		purchaseorderitem.PurchaseOrderID(in.ID),
+		purchaseorderitem.LineStatus(biz.PurchaseOrderItemStatusOpen),
+	).SetLineStatus(lineStatus).Save(ctx); err != nil {
+		return nil, err
+	}
+	update := tx.PurchaseOrder.UpdateOneID(in.ID).
+		Where(purchaseorder.Version(in.ExpectedVersion), purchaseorder.LifecycleStatus(current.LifecycleStatus)).
+		SetLifecycleStatus(lifecycleStatus).
+		SetVersion(in.ExpectedVersion + 1).
+		SetSettlementAction(in.ActionKey).
+		SetSettledAt(now).
+		SetSettledBy(in.ActorID)
+	if in.CloseMode == "" {
+		update.ClearSettlementMode()
+	} else {
+		update.SetSettlementMode(in.CloseMode)
+	}
+	if in.Reason == "" {
+		update.ClearSettlementReason()
+	} else {
+		update.SetSettlementReason(in.Reason)
+	}
+	row, err := update.Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrPurchaseOrderConflict
+		}
+		return nil, err
+	}
+	if lifecycleStatus == biz.PurchaseOrderStatusCanceled {
+		if err := markProcessDomainCommandEffectsCompensatedWithClient(
+			ctx,
+			tx.Client(),
+			[]string{biz.ProcessDomainCommandPurchaseOrderSubmit, biz.ProcessDomainCommandPurchaseOrderApprove},
+			"purchase_order",
+			in.ID,
+			in.Reason,
+			in.ActorID,
+		); err != nil {
+			return nil, err
+		}
+		if err := resolveLinkedProcessForSourceCancellationWithClient(
+			ctx, tx.Client(), biz.ProcessKeyMaterialSupply, "purchase_order", in.ID, in.Reason, in.ActorID,
+		); err != nil {
+			return nil, err
+		}
+	}
+	if err := createSourceOrderLifecycleActionReceipt(ctx, tx.Client(), "purchase_order", current.LifecycleStatus, lifecycleStatus, in, lineResults); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return entPurchaseOrderToBiz(row), nil
+}
+
+func validatePurchaseOrderFullyReceived(ctx context.Context, client *ent.Client, purchaseOrderID int) error {
+	items, err := client.PurchaseOrderItem.Query().Where(
+		purchaseorderitem.PurchaseOrderID(purchaseOrderID),
+		purchaseorderitem.LineStatus(biz.PurchaseOrderItemStatusOpen),
+	).All(ctx)
+	if err != nil {
+		return err
+	}
+	if len(items) == 0 {
+		return nil
+	}
+	itemIDs := make([]int, 0, len(items))
+	for _, item := range items {
+		itemIDs = append(itemIDs, item.ID)
+	}
+	effective, err := purchaseOrderEffectiveReceivedQuantities(ctx, client, itemIDs, 0, 0)
+	if err != nil {
+		return err
+	}
+	for _, item := range items {
+		if effective[item.ID].Cmp(item.PurchasedQuantity) < 0 {
+			return biz.ErrSourceOrderNormalCloseIncomplete
+		}
+	}
+	return nil
+}
+
+func purchaseOrderLifecycleLineResults(ctx context.Context, client *ent.Client, purchaseOrderID int, terminalStatus string) ([]map[string]any, error) {
+	items, err := client.PurchaseOrderItem.Query().Where(
+		purchaseorderitem.PurchaseOrderID(purchaseOrderID),
+	).Order(ent.Asc(purchaseorderitem.FieldID)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(items) == 0 {
+		return []map[string]any{}, nil
+	}
+	itemIDs := make([]int, 0, len(items))
+	for _, item := range items {
+		itemIDs = append(itemIDs, item.ID)
+	}
+	fulfilledByItem, err := purchaseOrderEffectiveReceivedQuantities(ctx, client, itemIDs, 0, 0)
+	if err != nil {
+		return nil, err
+	}
+	results := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		finalStatus := item.LineStatus
+		if finalStatus == biz.PurchaseOrderItemStatusOpen {
+			finalStatus = terminalStatus
+		}
+		results = append(results, sourceOrderLineLifecycleResult(
+			item.ID, item.PurchasedQuantity, fulfilledByItem[item.ID], finalStatus,
+		))
+	}
+	return results, nil
+}
+
+func validatePurchaseOrderSettlementDependencies(ctx context.Context, tx *ent.Tx, purchaseOrderID int, lifecycleStatus string, resolveActiveProcess bool) error {
 	receiptQuery := tx.PurchaseReceipt.Query().Where(
 		purchasereceipt.HasItemsWith(
 			purchasereceiptitem.HasPurchaseOrderItemWith(purchaseorderitem.PurchaseOrderID(purchaseOrderID)),
@@ -401,7 +668,7 @@ func validatePurchaseOrderSettlementDependencies(ctx context.Context, tx *ent.Tx
 	if err != nil {
 		return err
 	}
-	if hasActiveProcess {
+	if hasActiveProcess && !resolveActiveProcess {
 		return biz.ErrPurchaseOrderLifecycleProcessDependency
 	}
 	return nil
@@ -844,6 +1111,11 @@ func entPurchaseOrderToBiz(row *ent.PurchaseOrder) *biz.PurchaseOrder {
 		ExpectedArrivalDate:     row.ExpectedArrivalDate,
 		LifecycleStatus:         row.LifecycleStatus,
 		Version:                 row.Version,
+		SettlementAction:        row.SettlementAction,
+		SettlementMode:          row.SettlementMode,
+		SettlementReason:        row.SettlementReason,
+		SettledAt:               row.SettledAt,
+		SettledBy:               row.SettledBy,
 		Note:                    row.Note,
 		CreatedAt:               row.CreatedAt,
 		UpdatedAt:               row.UpdatedAt,

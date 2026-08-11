@@ -84,12 +84,13 @@ function roleTaskCounts({
   blocked = 0,
   done = 0,
   rejected = 0,
+  withdrawn = 0,
   approval = 0,
   risk = 0,
   overdue = 0,
 } = {}) {
   const todo = ready + blocked
-  const history = done + rejected
+  const history = done + rejected + withdrawn
   return {
     approval,
     blocked,
@@ -101,6 +102,7 @@ function roleTaskCounts({
     risk,
     todo,
     total: todo + history,
+    withdrawn,
   }
 }
 

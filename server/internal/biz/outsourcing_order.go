@@ -46,6 +46,11 @@ type OutsourcingOrder struct {
 	ExpectedReturnDate    *time.Time
 	LifecycleStatus       string
 	Version               int
+	SettlementAction      *string
+	SettlementMode        *string
+	SettlementReason      *string
+	SettledAt             *time.Time
+	SettledBy             *int
 	Note                  *string
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
@@ -169,6 +174,10 @@ type OutsourcingOrderRepo interface {
 	ProcessIsUsableForOutsourcing(ctx context.Context, id int) (active bool, outsourcingEnabled bool, err error)
 }
 
+type OutsourcingOrderLifecycleActionRepo interface {
+	ApplyOutsourcingOrderLifecycleAction(ctx context.Context, in *SourceOrderLifecycleAction, lifecycleStatus string) (*OutsourcingOrder, error)
+}
+
 type OutsourcingOrderUsecase struct {
 	repo OutsourcingOrderRepo
 }
@@ -276,16 +285,56 @@ func (uc *OutsourcingOrderUsecase) SubmitOutsourcingOrder(ctx context.Context, i
 	return uc.changeOutsourcingOrderLifecycle(ctx, id, OutsourcingOrderStatusSubmitted)
 }
 
+func (uc *OutsourcingOrderUsecase) SubmitOutsourcingOrderWithAction(ctx context.Context, in *SourceOrderLifecycleAction) (*OutsourcingOrder, error) {
+	return uc.applyOutsourcingOrderLifecycleAction(ctx, in, SourceOrderActionSubmit, OutsourcingOrderStatusSubmitted)
+}
+
 func (uc *OutsourcingOrderUsecase) ConfirmOutsourcingOrder(ctx context.Context, id int) (*OutsourcingOrder, error) {
 	return uc.changeOutsourcingOrderLifecycle(ctx, id, OutsourcingOrderStatusConfirmed)
+}
+
+func (uc *OutsourcingOrderUsecase) ConfirmOutsourcingOrderWithAction(ctx context.Context, in *SourceOrderLifecycleAction) (*OutsourcingOrder, error) {
+	return uc.applyOutsourcingOrderLifecycleAction(ctx, in, SourceOrderActionConfirm, OutsourcingOrderStatusConfirmed)
 }
 
 func (uc *OutsourcingOrderUsecase) CloseOutsourcingOrder(ctx context.Context, id int) (*OutsourcingOrder, error) {
 	return uc.changeOutsourcingOrderLifecycle(ctx, id, OutsourcingOrderStatusClosed)
 }
 
+func (uc *OutsourcingOrderUsecase) CloseOutsourcingOrderWithAction(ctx context.Context, in *SourceOrderLifecycleAction) (*OutsourcingOrder, error) {
+	return uc.applyOutsourcingOrderLifecycleAction(ctx, in, SourceOrderActionClose, OutsourcingOrderStatusClosed)
+}
+
 func (uc *OutsourcingOrderUsecase) CancelOutsourcingOrder(ctx context.Context, id int) (*OutsourcingOrder, error) {
 	return uc.changeOutsourcingOrderLifecycle(ctx, id, OutsourcingOrderStatusCanceled)
+}
+
+func (uc *OutsourcingOrderUsecase) CancelOutsourcingOrderWithAction(ctx context.Context, in *SourceOrderLifecycleAction) (*OutsourcingOrder, error) {
+	return uc.applyOutsourcingOrderLifecycleAction(ctx, in, SourceOrderActionCancel, OutsourcingOrderStatusCanceled)
+}
+
+func (uc *OutsourcingOrderUsecase) applyOutsourcingOrderLifecycleAction(ctx context.Context, in *SourceOrderLifecycleAction, actionKey string, next string) (*OutsourcingOrder, error) {
+	if uc == nil || uc.repo == nil || in == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := NormalizeSourceOrderLifecycleAction(*in, actionKey)
+	if err != nil {
+		return nil, err
+	}
+	current, err := uc.repo.GetOutsourcingOrder(ctx, normalized.ID)
+	if err != nil {
+		return nil, err
+	}
+	if next == OutsourcingOrderStatusSubmitted || next == OutsourcingOrderStatusConfirmed {
+		if err := uc.validateContractReadyForConfirmation(ctx, current); err != nil {
+			return nil, err
+		}
+	}
+	repo, ok := uc.repo.(OutsourcingOrderLifecycleActionRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return repo.ApplyOutsourcingOrderLifecycleAction(ctx, &normalized, next)
 }
 
 func (uc *OutsourcingOrderUsecase) ListOutsourcingOrderItems(ctx context.Context, filter OutsourcingOrderItemFilter) ([]*OutsourcingOrderItem, int, error) {

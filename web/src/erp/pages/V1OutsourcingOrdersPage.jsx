@@ -44,6 +44,7 @@ import {
 } from '../components/business-list/businessListPreferences.mjs'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
+import SourceOrderLifecycleConfirmContent from '../components/business-list/SourceOrderLifecycleConfirmContent.jsx'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
 import OutsourcingOrderForm, {
@@ -187,6 +188,10 @@ import {
   isSourceBusinessActionResultUnknown,
   sourceBusinessActionNo,
 } from '../utils/sourceBusinessAction.mjs'
+import {
+  normalizeSourceOrderLifecycleReason,
+  prepareSourceOrderLifecycleAttempt,
+} from '../utils/sourceOrderLifecycleAction.mjs'
 import { matchesOperationalFactLifecycleResult } from '../utils/operationalFactLifecycle.mjs'
 import {
   FINANCE_BUSINESS_SOURCE_ACTIONS,
@@ -319,6 +324,7 @@ export default function V1OutsourcingOrdersPage() {
   const sourceFactRequestRef = useRef(0)
   const sourceFactInFlightRef = useRef(false)
   const sourceFactAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
+  const lifecycleInFlightRef = useRef(false)
   const financeSourceAttemptsRef = useRef(
     createSourceBusinessActionAttemptStore()
   )
@@ -2159,17 +2165,45 @@ export default function V1OutsourcingOrdersPage() {
   }
 
   const runLifecycleAction = async (action) => {
-    if (!selectedRow) return
-    const execute = async () => {
+    if (!selectedRow || lifecycleInFlightRef.current || saving) return
+    const execute = async (reason = '') => {
+      lifecycleInFlightRef.current = true
       setSaving(true)
+      let lifecycleAttempt = null
       try {
-        const updated = await action.run({ id: selectedRow.id })
+        lifecycleAttempt = prepareSourceOrderLifecycleAttempt({
+          action,
+          attemptStore: lifecycleAttemptsRef.current,
+          customerKey: activeCustomerKey,
+          reason,
+          record: selectedRow,
+        })
+        const updated = await action.run(lifecycleAttempt.attempt.params)
+        lifecycleAttemptsRef.current.settle(
+          lifecycleAttempt.scope,
+          lifecycleAttempt.attempt,
+          null
+        )
         setSelectedRow(updated)
         message.success(`${action.label}成功`)
         await Promise.all([loadOrders(), loadWorkflowTasks()])
       } catch (error) {
-        message.error(getActionErrorMessage(error, `${action.label}失败`))
+        const resultUnknown = lifecycleAttempt
+          ? lifecycleAttemptsRef.current.settle(
+              lifecycleAttempt.scope,
+              lifecycleAttempt.attempt,
+              error
+            )
+          : false
+        if (resultUnknown) {
+          message.warning(
+            '暂时无法确认合同是否处理成功，请刷新核对最新状态；内容不变时可安全重试'
+          )
+        } else {
+          message.error(getActionErrorMessage(error, `${action.label}失败`))
+        }
       } finally {
+        lifecycleInFlightRef.current = false
         setSaving(false)
       }
     }
@@ -2250,13 +2284,29 @@ export default function V1OutsourcingOrdersPage() {
     }
 
     if (action.confirmTitle) {
+      let reason = ''
       modal.confirm({
         title: action.confirmTitle,
-        content: action.confirmContent,
+        content: (
+          <SourceOrderLifecycleConfirmContent
+            action={action}
+            onReasonChange={(value) => {
+              reason = value
+            }}
+          />
+        ),
         okText: action.okText || '确认',
         cancelText: '取消',
         okButtonProps: { danger: action.danger },
-        onOk: execute,
+        onOk: () => {
+          try {
+            normalizeSourceOrderLifecycleReason(action, reason)
+          } catch (error) {
+            message.warning(error.message)
+            return Promise.reject()
+          }
+          return execute(reason)
+        },
       })
       return
     }

@@ -238,7 +238,7 @@ func TestWorkflowUsecase_CreateTaskRejectsSourceProducedGroups(t *testing.T) {
 }
 
 func TestWorkflowUsecase_CreateTaskOnlyAllowsReady(t *testing.T) {
-	for _, statusKey := range []string{"blocked", "done", "rejected", "unknown"} {
+	for _, statusKey := range []string{"blocked", "done", "rejected", "withdrawn", "unknown"} {
 		t.Run(statusKey, func(t *testing.T) {
 			repo := &stubWorkflowRepo{}
 			uc := NewWorkflowUsecase(repo)

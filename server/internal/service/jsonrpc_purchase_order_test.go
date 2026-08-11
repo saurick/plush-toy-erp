@@ -104,6 +104,29 @@ func (s *stubPurchaseOrderJSONRPCRepo) UpdatePurchaseOrderLifecycle(_ context.Co
 	return order, nil
 }
 
+func (s *stubPurchaseOrderJSONRPCRepo) ApplyPurchaseOrderLifecycleAction(
+	_ context.Context,
+	in *biz.SourceOrderLifecycleAction,
+	lifecycleStatus string,
+) (*biz.PurchaseOrder, error) {
+	s.lifecycleCalls++
+	order, ok := s.orders[in.ID]
+	if !ok {
+		return nil, biz.ErrPurchaseOrderNotFound
+	}
+	if order.Version != in.ExpectedVersion {
+		return nil, biz.ErrPurchaseOrderConflict
+	}
+	order.LifecycleStatus = lifecycleStatus
+	order.Version++
+	order.SettlementAction = &in.ActionKey
+	order.SettlementMode = optionalTestString(in.CloseMode)
+	order.SettlementReason = optionalTestString(in.Reason)
+	order.SettledBy = &in.ActorID
+	order.UpdatedAt = time.Unix(2, 0)
+	return order, nil
+}
+
 func (s *stubPurchaseOrderJSONRPCRepo) AddPurchaseOrderItem(_ context.Context, in *biz.PurchaseOrderItemMutation) (*biz.PurchaseOrderItem, error) {
 	id := s.nextItemID
 	s.nextItemID++
@@ -194,6 +217,7 @@ func TestJsonrpcDispatcher_PurchaseOrderAPISavesListsAndTransitions(t *testing.T
 		biz.PermissionPurchaseOrderCreate,
 		biz.PermissionPurchaseOrderRead,
 		biz.PermissionPurchaseOrderUpdate,
+		biz.PermissionPurchaseOrderCancel,
 	))
 	ctx := workflowJSONRPCAdminContext()
 
@@ -648,6 +672,7 @@ func TestJsonrpcDispatcher_PurchaseOrderAPIRequiresEnabledModule(t *testing.T) {
 		biz.PermissionPurchaseOrderCreate,
 		biz.PermissionPurchaseOrderRead,
 		biz.PermissionPurchaseOrderUpdate,
+		biz.PermissionPurchaseOrderCancel,
 	))
 	ctx := workflowJSONRPCAdminContext()
 	saveParams := mustJSONRPCStruct(t, map[string]any{

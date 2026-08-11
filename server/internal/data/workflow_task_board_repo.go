@@ -160,7 +160,7 @@ func loadWorkflowTaskBoard(ctx context.Context, client *ent.Client, query biz.Wo
 		tasks := make([]*biz.WorkflowTask, 0, len(rows))
 		for _, row := range rows {
 			task := entWorkflowTaskToBiz(row)
-			if laneKey == biz.WorkflowTaskBoardLaneFinished {
+			if laneKey == biz.WorkflowTaskBoardLaneFinished && task.TaskStatusKey != "withdrawn" {
 				task.BlockedReason = nil
 				delete(task.Payload, "blocked_reason")
 				delete(task.Payload, "rejected_reason")
@@ -251,7 +251,7 @@ func workflowTaskKeywordPredicate(keyword string) predicate.WorkflowTask {
 		workflowtask.OwnerRoleKeyContainsFold(keyword),
 		workflowTaskPayloadKeywordPredicate(keyword, "record_title", "module_title"),
 		workflowtask.And(
-			workflowtask.TaskStatusKeyIn("blocked", "rejected"),
+			workflowtask.TaskStatusKeyIn("blocked", "rejected", "withdrawn"),
 			workflowtask.Or(
 				workflowtask.BlockedReasonContainsFold(keyword),
 				workflowTaskPayloadKeywordPredicate(keyword, "blocked_reason", "rejected_reason"),
@@ -285,7 +285,7 @@ func workflowTaskBoardStatusFilterPredicate(filter biz.WorkflowTaskBoardQuery) (
 			workflowtask.DueAtGTE(filter.SnapshotAt),
 			workflowtask.DueAtLTE(filter.SnapshotAt.Add(biz.WorkflowTaskBoardDueWindow)),
 		), nil
-	case "ready", "blocked", "rejected", "done":
+	case "ready", "blocked", "rejected", "withdrawn", "done":
 		return workflowtask.TaskStatusKey(filter.Status), nil
 	default:
 		return nil, biz.ErrBadParam
@@ -319,7 +319,7 @@ func workflowTaskBoardLanePredicate(laneKey string, query biz.WorkflowTaskBoardQ
 	case biz.WorkflowTaskBoardLaneException:
 		return workflowtask.TaskStatusKey("blocked"), nil
 	case biz.WorkflowTaskBoardLaneFinished:
-		return workflowtask.TaskStatusKeyIn("done", "rejected"), nil
+		return workflowtask.TaskStatusKeyIn("done", "rejected", "withdrawn"), nil
 	case biz.WorkflowTaskBoardLaneDue:
 		return workflowtask.And(
 			workflowtask.TaskStatusKey("ready"),

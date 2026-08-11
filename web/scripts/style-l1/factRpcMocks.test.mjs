@@ -1693,6 +1693,7 @@ test('style-l1 workflow role task view mock applies role, view and cursor bounda
     risk: 1,
     todo: 2,
     total: 3,
+    withdrawn: 0,
   })
   assert.equal(firstTodoPage.result.data.risk_scope, 'supervised')
 

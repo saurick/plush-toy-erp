@@ -604,6 +604,54 @@ func (s *stubProcessRuntimeJSONRPCRepo) BlockProcessInstance(_ context.Context, 
 	return &biz.ProcessInstance{ID: in.ID, Status: biz.ProcessStatusBlocked}, nil
 }
 
+func (s *stubProcessRuntimeJSONRPCRepo) ResumeProcessNodeAndInstance(_ context.Context, in *biz.ProcessNodeInstanceResume, actorID int) (*biz.ProcessNodeInstance, error) {
+	if in == nil || in.ProcessInstanceID <= 0 || in.ProcessNodeInstanceID <= 0 || in.ExpectedVersion <= 0 || actorID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	if s.node == nil || s.node.ID != in.ProcessNodeInstanceID || s.node.ProcessInstanceID != in.ProcessInstanceID {
+		return nil, biz.ErrProcessNodeInstanceNotFound
+	}
+	if s.node.Status != biz.ProcessNodeStatusBlocked || s.node.Version != in.ExpectedVersion {
+		return nil, biz.ErrProcessNodeInstanceConflict
+	}
+	now := time.Now()
+	reason := in.Reason
+	out := *s.node
+	out.Status = biz.ProcessNodeStatusActive
+	out.BlockKind = nil
+	out.BlockedReasonCode = nil
+	out.BlockedReason = nil
+	out.BlockedAt = nil
+	out.BlockedBy = nil
+	out.ResumeReason = &reason
+	out.ResumedAt = &now
+	out.ResumedBy = &actorID
+	out.Version++
+	s.node = &out
+	if s.process != nil && s.process.ID == in.ProcessInstanceID {
+		s.process.Status = biz.ProcessStatusActive
+	}
+	return &out, nil
+}
+
+func (s *stubProcessRuntimeJSONRPCRepo) MarkProcessNodeRoutingCompleted(_ context.Context, in *biz.ProcessNodeRoutingCompletion, actorID int) (*biz.ProcessNodeInstance, error) {
+	if in == nil || in.ProcessInstanceID <= 0 || in.ProcessNodeInstanceID <= 0 || actorID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	if s.node == nil || s.node.ID != in.ProcessNodeInstanceID || s.node.ProcessInstanceID != in.ProcessInstanceID {
+		return nil, biz.ErrProcessNodeInstanceNotFound
+	}
+	if s.node.Status != biz.ProcessNodeStatusCompleted && s.node.Status != biz.ProcessNodeStatusBlocked {
+		return nil, biz.ErrProcessNodeInstanceConflict
+	}
+	if s.node.RoutingCompletedAt == nil {
+		now := time.Now()
+		s.node.RoutingCompletedAt = &now
+		s.node.RoutingCompletedBy = &actorID
+	}
+	return s.node, nil
+}
+
 func (s *stubProcessRuntimeJSONRPCRepo) CreateProcessNodeInstanceAttempt(_ context.Context, in *biz.ProcessNodeInstanceAttemptCreate, actorID int) (*biz.ProcessNodeInstance, error) {
 	s.createdAttempt = in
 	return nil, biz.ErrBadParam

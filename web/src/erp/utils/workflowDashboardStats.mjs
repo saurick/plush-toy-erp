@@ -738,6 +738,7 @@ export function buildWorkflowDashboardStats(tasks = [], options = {}) {
       if (statusKey === 'ready') accumulator.ready += 1
       if (statusKey === 'blocked') accumulator.blocked += 1
       if (statusKey === 'rejected') accumulator.rejected += 1
+      if (statusKey === 'withdrawn') accumulator.withdrawn += 1
       if (statusKey === 'done') accumulator.done += 1
       if (ACTIVE_TASK_STATUS_KEYS.has(statusKey)) {
         const dueStatus = getWorkflowTaskDueStatus(task, nowMs)
@@ -754,6 +755,7 @@ export function buildWorkflowDashboardStats(tasks = [], options = {}) {
       ready: 0,
       blocked: 0,
       rejected: 0,
+      withdrawn: 0,
       overdue: 0,
       dueSoon: 0,
       done: 0,
@@ -818,15 +820,16 @@ export function buildWorkflowDashboardStats(tasks = [], options = {}) {
         (alert) => alert.alert_type === 'shipment_pending'
       ),
       qcFailed: alerts.filter((alert) => alert.alert_type === 'qc_failed'),
-      financePending: alerts.filter((alert) =>
-        String(alert.task?.task_group || '').trim() ===
-          'shipment_finance_approval' ||
-        [
-          'finance_pending',
-          'payable_pending',
-          'reconciliation_pending',
-          'finance_overdue',
-        ].includes(alert.alert_type)
+      financePending: alerts.filter(
+        (alert) =>
+          String(alert.task?.task_group || '').trim() ===
+            'shipment_finance_approval' ||
+          [
+            'finance_pending',
+            'payable_pending',
+            'reconciliation_pending',
+            'finance_overdue',
+          ].includes(alert.alert_type)
       ),
       invoicePending: alerts.filter(
         (alert) => alert.alert_type === 'invoice_pending'

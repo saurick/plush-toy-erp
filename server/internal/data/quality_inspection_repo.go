@@ -203,7 +203,12 @@ func (r *inventoryRepo) SubmitQualityInspection(ctx context.Context, inspectionI
 		return nil, err
 	}
 	if lot.Status != biz.InventoryLotHold {
-		if err := updateInventoryLotStatus(ctx, tx, lotID, biz.InventoryLotHold); err != nil {
+		if err := updateInventoryLotStatus(ctx, tx, lotID, biz.InventoryLotHold, inventoryLotStatusEvidence{
+			ActionKey:           biz.InventoryLotActionHold,
+			Reason:              "提交质检后锁定批次",
+			ActorID:             optionalIntValueOrZero(row.InspectorID),
+			QualityInspectionID: row.ID,
+		}); err != nil {
 			return nil, err
 		}
 	}
@@ -320,7 +325,12 @@ func (r *inventoryRepo) CancelQualityInspection(ctx context.Context, inspectionI
 			return nil, err
 		}
 		if originalLotStatus != lot.Status {
-			if err := updateInventoryLotStatus(ctx, tx, lotID, originalLotStatus); err != nil {
+			if err := updateInventoryLotStatus(ctx, tx, lotID, originalLotStatus, inventoryLotStatusEvidence{
+				ActionKey:           biz.InventoryLotActionRestoreQualityCancel,
+				Reason:              qualityInspectionLotStatusReason(note, "质检取消后恢复批次状态"),
+				ActorID:             optionalIntValueOrZero(row.InspectorID),
+				QualityInspectionID: row.ID,
+			}); err != nil {
 				return nil, err
 			}
 		}
@@ -856,7 +866,22 @@ func (r *inventoryRepo) decideSubmittedQualityInspection(
 		return nil, err
 	}
 	if targetLotStatus != lot.Status {
-		if err := updateInventoryLotStatus(ctx, tx, lotID, targetLotStatus); err != nil {
+		actionKey := biz.InventoryLotActionRejectFromQuality
+		fallbackReason := "质检判定不合格"
+		switch in.Result {
+		case biz.QualityInspectionResultPass:
+			actionKey = biz.InventoryLotActionReleaseReinspect
+			fallbackReason = "复检合格后放行批次"
+		case biz.QualityInspectionResultConcession:
+			actionKey = biz.InventoryLotActionApproveConcession
+			fallbackReason = "让步接收后放行批次"
+		}
+		if err := updateInventoryLotStatus(ctx, tx, lotID, targetLotStatus, inventoryLotStatusEvidence{
+			ActionKey:           actionKey,
+			Reason:              qualityInspectionLotStatusReason(decisionNote, fallbackReason),
+			ActorID:             optionalIntValueOrZero(inspectorID),
+			QualityInspectionID: row.ID,
+		}); err != nil {
 			return nil, err
 		}
 	}
@@ -877,6 +902,15 @@ func (r *inventoryRepo) decideSubmittedQualityInspection(
 	}
 	tx = nil
 	return entQualityInspectionToBiz(row), nil
+}
+
+func qualityInspectionLotStatusReason(note *string, fallback string) string {
+	if note != nil {
+		if value := strings.TrimSpace(*note); value != "" {
+			return value
+		}
+	}
+	return fallback
 }
 
 func qualityInspectionDecisionMatches(row *ent.QualityInspection, in *biz.QualityInspectionDecision, targetStatus string) bool {

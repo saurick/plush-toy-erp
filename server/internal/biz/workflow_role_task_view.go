@@ -27,16 +27,17 @@ type WorkflowRoleTaskViewQuery struct {
 }
 
 type WorkflowRoleTaskViewCounts struct {
-	Ready    int
-	Blocked  int
-	Todo     int
-	Done     int
-	Rejected int
-	History  int
-	Total    int
-	Approval int
-	Risk     int
-	Overdue  int
+	Ready     int
+	Blocked   int
+	Todo      int
+	Done      int
+	Rejected  int
+	Withdrawn int
+	History   int
+	Total     int
+	Approval  int
+	Risk      int
+	Overdue   int
 }
 
 // IsConserved validates the mutually exclusive task-status partition. Approval,
@@ -49,6 +50,7 @@ func (counts WorkflowRoleTaskViewCounts) IsConserved() bool {
 		counts.Todo,
 		counts.Done,
 		counts.Rejected,
+		counts.Withdrawn,
 		counts.History,
 		counts.Total,
 		counts.Approval,
@@ -61,7 +63,7 @@ func (counts WorkflowRoleTaskViewCounts) IsConserved() bool {
 		}
 	}
 	return counts.Todo == counts.Ready+counts.Blocked &&
-		counts.History == counts.Done+counts.Rejected &&
+		counts.History == counts.Done+counts.Rejected+counts.Withdrawn &&
 		counts.Total == counts.Todo+counts.History &&
 		counts.Overdue <= counts.Risk
 }

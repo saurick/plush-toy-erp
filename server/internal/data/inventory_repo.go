@@ -2,9 +2,11 @@ package data
 
 import (
 	"context"
+	"crypto/sha256"
 	stdsql "database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"server/internal/biz"
@@ -15,6 +17,7 @@ import (
 	"server/internal/data/model/ent/bomitem"
 	"server/internal/data/model/ent/inventorybalance"
 	"server/internal/data/model/ent/inventorylot"
+	"server/internal/data/model/ent/inventorylotstatusevent"
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/predicate"
@@ -53,6 +56,7 @@ func NewInventoryRepo(d *Data, logger log.Logger) *inventoryRepo {
 
 var _ biz.InventoryRepo = (*inventoryRepo)(nil)
 var _ biz.InventoryWarehouseAccessRepo = (*inventoryRepo)(nil)
+var _ biz.InventoryLotStatusActionRepo = (*inventoryRepo)(nil)
 var _ biz.PurchaseReceiptCancellationActorRepo = (*inventoryRepo)(nil)
 var _ biz.PurchaseReceiptCreateProcessCommandRepo = (*inventoryRepo)(nil)
 var _ biz.InventoryPostInboundProcessCommandRepo = (*inventoryRepo)(nil)
@@ -157,7 +161,10 @@ func (r *inventoryRepo) GetInventoryLot(ctx context.Context, id int) (*biz.Inven
 }
 
 func (r *inventoryRepo) ChangeInventoryLotStatus(ctx context.Context, lotID int, newStatus string, reason string) (*biz.InventoryLot, error) {
-	_ = reason
+	reason = strings.TrimSpace(reason)
+	if reason == "" || len([]rune(reason)) > 255 {
+		return nil, biz.ErrBadParam
+	}
 	tx, err := r.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
@@ -182,8 +189,22 @@ func (r *inventoryRepo) ChangeInventoryLotStatus(ctx context.Context, lotID int,
 		return nil, biz.ErrBadParam
 	}
 	if lot.Status != newStatus {
-		if err := updateInventoryLotStatus(ctx, tx, lotID, newStatus); err != nil {
-			return nil, err
+		updatedCount, updateErr := tx.client.InventoryLot.Update().
+			Where(inventorylot.ID(lotID), inventorylot.Version(lot.Version), inventorylot.Status(lot.Status)).
+			SetStatus(newStatus).
+			SetVersion(lot.Version + 1).
+			SetStatusAction("internal_status_change").
+			SetStatusReason(reason).
+			SetStatusChangedAt(time.Now()).
+			Save(ctx)
+		if updateErr != nil {
+			if ent.IsNotFound(updateErr) {
+				return nil, biz.ErrInventoryLotConflict
+			}
+			return nil, updateErr
+		}
+		if updatedCount != 1 {
+			return nil, biz.ErrInventoryLotConflict
 		}
 		lot, err = tx.client.InventoryLot.Get(ctx, lotID)
 		if err != nil {
@@ -198,6 +219,129 @@ func (r *inventoryRepo) ChangeInventoryLotStatus(ctx context.Context, lotID int,
 	}
 	tx = nil
 	return entInventoryLotToBiz(lot), nil
+}
+
+func (r *inventoryRepo) ApplyInventoryLotStatusAction(
+	ctx context.Context,
+	in *biz.InventoryLotStatusAction,
+) (*biz.InventoryLot, error) {
+	if r == nil || r.data == nil || r.data.postgres == nil || in == nil || in.LotID <= 0 ||
+		in.ExpectedVersion <= 0 || in.ActorID <= 0 || in.IdempotencyKey == "" || len(in.IntentHash) != 64 {
+		return nil, biz.ErrBadParam
+	}
+	tx, err := r.beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	event, err := tx.client.InventoryLotStatusEvent.Query().Where(
+		inventorylotstatusevent.InventoryLotID(in.LotID),
+		inventorylotstatusevent.IdempotencyKey(in.IdempotencyKey),
+	).Only(ctx)
+	if err == nil {
+		if event.IntentHash != in.IntentHash || event.ActionKey != in.ActionKey || event.LotVersion != in.ExpectedVersion+1 ||
+			event.ActorID == nil || *event.ActorID != in.ActorID || event.Reason != in.Reason || event.ToStatus != in.TargetStatus ||
+			!sameOptionalPositiveInt(event.QualityInspectionID, in.QualityInspectionID) {
+			return nil, biz.ErrIdempotencyConflict
+		}
+		lot, getErr := tx.client.InventoryLot.Get(ctx, in.LotID)
+		if getErr != nil {
+			return nil, getErr
+		}
+		if err := tx.sqlTx.Commit(); err != nil {
+			return nil, err
+		}
+		tx = nil
+		return entInventoryLotToBiz(lot), nil
+	}
+	if err != nil && !ent.IsNotFound(err) {
+		return nil, err
+	}
+	if err := lockInventoryLot(ctx, tx, in.LotID); err != nil {
+		return nil, err
+	}
+	lot, err := tx.client.InventoryLot.Get(ctx, in.LotID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrInventoryLotNotFound
+		}
+		return nil, err
+	}
+	if lot.Version != in.ExpectedVersion {
+		return nil, biz.ErrInventoryLotConflict
+	}
+	if !inventoryLotNamedActionMatches(in.ActionKey, lot.Status, in.TargetStatus) {
+		return nil, biz.ErrBadParam
+	}
+	hasBalance, err := inventoryLotHasPositiveBalance(ctx, tx.client, in.LotID)
+	if err != nil {
+		return nil, err
+	}
+	if !corestatus.CanChangeInventoryLotStatus(lot.Status, in.TargetStatus, hasBalance) || lot.Status == in.TargetStatus {
+		return nil, biz.ErrBadParam
+	}
+	now := time.Now()
+	updatedCount, err := tx.client.InventoryLot.Update().
+		Where(inventorylot.ID(in.LotID), inventorylot.Version(in.ExpectedVersion), inventorylot.Status(lot.Status)).
+		SetStatus(in.TargetStatus).
+		SetVersion(in.ExpectedVersion + 1).
+		SetStatusAction(in.ActionKey).
+		SetStatusReason(in.Reason).
+		SetStatusChangedAt(now).
+		SetStatusChangedBy(in.ActorID).
+		Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrInventoryLotConflict
+		}
+		return nil, err
+	}
+	if updatedCount != 1 {
+		return nil, biz.ErrInventoryLotConflict
+	}
+	if _, err := tx.client.InventoryLotStatusEvent.Create().
+		SetInventoryLotID(in.LotID).
+		SetLotVersion(in.ExpectedVersion + 1).
+		SetActionKey(in.ActionKey).
+		SetFromStatus(lot.Status).
+		SetToStatus(in.TargetStatus).
+		SetReason(in.Reason).
+		SetIdempotencyKey(in.IdempotencyKey).
+		SetIntentHash(in.IntentHash).
+		SetActorID(in.ActorID).
+		SetNillableQualityInspectionID(optionalPositiveInt(in.QualityInspectionID)).
+		Save(ctx); err != nil {
+		if ent.IsConstraintError(err) {
+			return nil, biz.ErrIdempotencyConflict
+		}
+		return nil, err
+	}
+	row, err := tx.client.InventoryLot.Get(ctx, in.LotID)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.sqlTx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return entInventoryLotToBiz(row), nil
+}
+
+func inventoryLotNamedActionMatches(actionKey string, currentStatus string, targetStatus string) bool {
+	switch actionKey {
+	case biz.InventoryLotActionHold:
+		return currentStatus == biz.InventoryLotActive && targetStatus == biz.InventoryLotHold
+	case biz.InventoryLotActionRejectFromQuality:
+		return currentStatus == biz.InventoryLotHold && targetStatus == biz.InventoryLotRejected
+	case biz.InventoryLotActionReleaseReinspect:
+		return currentStatus == biz.InventoryLotHold && targetStatus == biz.InventoryLotActive
+	case biz.InventoryLotActionApproveConcession:
+		return currentStatus == biz.InventoryLotRejected && targetStatus == biz.InventoryLotActive
+	case biz.InventoryLotActionCloseZeroBalance:
+		return targetStatus == biz.InventoryLotDisabled && currentStatus != biz.InventoryLotDisabled
+	default:
+		return false
+	}
 }
 
 func (r *inventoryRepo) CreateInventoryTxn(ctx context.Context, in *biz.InventoryTxnCreate) (*biz.InventoryTxn, error) {
@@ -990,10 +1134,34 @@ func lockInventoryLot(ctx context.Context, tx *inventoryDBTx, lotID int) error {
 	return nil
 }
 
-func updateInventoryLotStatus(ctx context.Context, tx *inventoryDBTx, lotID int, status string) error {
-	p := inventorySQLPlaceholders(tx.dialect, 3)
-	query := fmt.Sprintf(`UPDATE inventory_lots SET status = %s, updated_at = %s WHERE id = %s`, p[0], p[1], p[2])
-	result, err := tx.sqlTx.ExecContext(ctx, query, status, time.Now(), lotID)
+type inventoryLotStatusEvidence struct {
+	ActionKey           string
+	Reason              string
+	ActorID             int
+	QualityInspectionID int
+}
+
+func updateInventoryLotStatus(ctx context.Context, tx *inventoryDBTx, lotID int, status string, evidence inventoryLotStatusEvidence) error {
+	evidence.ActionKey = strings.TrimSpace(evidence.ActionKey)
+	evidence.Reason = strings.TrimSpace(evidence.Reason)
+	if tx == nil || tx.client == nil || lotID <= 0 || evidence.ActionKey == "" || len(evidence.ActionKey) > 64 ||
+		evidence.Reason == "" || len([]rune(evidence.Reason)) > 255 || evidence.ActorID < 0 || evidence.QualityInspectionID < 0 {
+		return biz.ErrBadParam
+	}
+	current, err := tx.client.InventoryLot.Get(ctx, lotID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return biz.ErrInventoryLotNotFound
+		}
+		return err
+	}
+	if current.Status == status {
+		return nil
+	}
+	p := inventorySQLPlaceholders(tx.dialect, 8)
+	now := time.Now()
+	query := fmt.Sprintf(`UPDATE inventory_lots SET status = %s, version = version + 1, status_action = %s, status_reason = %s, status_changed_at = %s, status_changed_by = %s, updated_at = %s WHERE id = %s AND version = %s`, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7])
+	result, err := tx.sqlTx.ExecContext(ctx, query, status, evidence.ActionKey, evidence.Reason, now, optionalPositiveInt(evidence.ActorID), now, lotID, current.Version)
 	if err != nil {
 		return err
 	}
@@ -1002,9 +1170,36 @@ func updateInventoryLotStatus(ctx context.Context, tx *inventoryDBTx, lotID int,
 		return err
 	}
 	if affected == 0 {
-		return biz.ErrInventoryLotNotFound
+		return biz.ErrInventoryLotConflict
+	}
+	idempotencyKey := fmt.Sprintf("inventory-lot:%d:version:%d:%s", lotID, current.Version+1, evidence.ActionKey)
+	intent := fmt.Sprintf("%d|%d|%s|%s|%s|%d|%d", lotID, current.Version+1, current.Status, status, evidence.Reason, evidence.ActorID, evidence.QualityInspectionID)
+	hash := sha256.Sum256([]byte(intent))
+	builder := tx.client.InventoryLotStatusEvent.Create().
+		SetInventoryLotID(lotID).
+		SetLotVersion(current.Version + 1).
+		SetActionKey(evidence.ActionKey).
+		SetFromStatus(current.Status).
+		SetToStatus(status).
+		SetReason(evidence.Reason).
+		SetIdempotencyKey(idempotencyKey).
+		SetIntentHash(fmt.Sprintf("%x", hash)).
+		SetNillableActorID(optionalPositiveInt(evidence.ActorID)).
+		SetNillableQualityInspectionID(optionalPositiveInt(evidence.QualityInspectionID))
+	if _, err := builder.Save(ctx); err != nil {
+		if ent.IsConstraintError(err) {
+			return biz.ErrIdempotencyConflict
+		}
+		return err
 	}
 	return nil
+}
+
+func sameOptionalPositiveInt(actual *int, expected int) bool {
+	if expected <= 0 {
+		return actual == nil
+	}
+	return actual != nil && *actual == expected
 }
 
 func upsertInventoryBalanceDelta(ctx context.Context, tx *inventoryDBTx, key biz.InventoryBalanceKey, delta decimal.Decimal) error {
@@ -1736,6 +1931,11 @@ func entInventoryLotToBiz(row *ent.InventoryLot) *biz.InventoryLot {
 		DyeLotNo:        row.DyeLotNo,
 		ProductionLotNo: row.ProductionLotNo,
 		Status:          row.Status,
+		Version:         row.Version,
+		StatusAction:    row.StatusAction,
+		StatusReason:    row.StatusReason,
+		StatusChangedAt: row.StatusChangedAt,
+		StatusChangedBy: row.StatusChangedBy,
 		ReceivedAt:      row.ReceivedAt,
 		CreatedAt:       row.CreatedAt,
 		UpdatedAt:       row.UpdatedAt,

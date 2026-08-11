@@ -208,7 +208,7 @@ test("status architecture is target-only and separates delivery evidence", () =>
     "Chinese tree",
     chineseTree,
     "协同任务",
-    ["创建", "可执行", "阻塞", "已完成", "已退回"],
+    ["创建", "可执行", "阻塞", "已完成", "已退回", "已撤回"],
     ["待开始", "处理中", "已取消", "已关闭"],
   );
   requireUniqueLine(
@@ -237,7 +237,7 @@ test("status architecture is target-only and separates delivery evidence", () =>
     "English tree",
     englishTree,
     "task:",
-    ["create", "ready", "blocked", "done", "rejected"],
+    ["create", "ready", "blocked", "done", "rejected", "withdrawn"],
     ["pending", "processing", "cancelled", "closed"],
   );
   requireUniqueLine(

@@ -176,7 +176,7 @@ func TestCustomerConfigRecoverCompensatedProcessDomainCommandContract(t *testing
 	}
 }
 
-func TestCustomerConfigProcessRecoveryContextFailsClosedForBranchSnapshot(t *testing.T) {
+func TestCustomerConfigProcessRecoveryContextSupportsBranchSnapshot(t *testing.T) {
 	dispatcher, repo := newCustomerConfigTestDispatcherWithRuntimeRepo(nil, []string{biz.AdminRoleKey})
 	repo.processes[31] = &biz.ProcessInstance{
 		ID: 31, ProcessKey: biz.ProcessKeyFinancePaymentApproval, Status: biz.ProcessStatusBlocked,
@@ -196,8 +196,16 @@ func TestCustomerConfigProcessRecoveryContextFailsClosedForBranchSnapshot(t *tes
 		"branch-snapshot",
 		params,
 	)
-	if err != nil || result == nil || result.Code != errcode.ProcessDomainCommandRecoveryRequired.Code {
+	if err != nil || result == nil || result.Code != errcode.OK.Code {
 		t.Fatalf("result=%#v err=%v", result, err)
+	}
+	context := jsonRPCNestedMap(t, result, "process_context")
+	instance, ok := context["process_instance"].(map[string]any)
+	if !ok {
+		t.Fatalf("process instance missing: %#v", context)
+	}
+	if got := jsonRPCInt(t, instance, "id"); got != 31 {
+		t.Fatalf("process instance id=%d want=31", got)
 	}
 }
 
@@ -1189,6 +1197,68 @@ func (r *serviceProcessRuntimeRepo) BlockProcessNodeAndInstance(context.Context,
 
 func (r *serviceProcessRuntimeRepo) BlockProcessInstance(context.Context, *biz.ProcessInstanceBlock, int) (*biz.ProcessInstance, error) {
 	return nil, biz.ErrBadParam
+}
+
+func (r *serviceProcessRuntimeRepo) ResumeProcessNodeAndInstance(_ context.Context, in *biz.ProcessNodeInstanceResume, actorID int) (*biz.ProcessNodeInstance, error) {
+	if in == nil || in.ProcessInstanceID <= 0 || in.ProcessNodeInstanceID <= 0 || in.ExpectedVersion <= 0 || actorID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	item := r.nodes[in.ProcessNodeInstanceID]
+	instance := r.processes[in.ProcessInstanceID]
+	if item == nil {
+		return nil, biz.ErrProcessNodeInstanceNotFound
+	}
+	if instance == nil {
+		return nil, biz.ErrProcessInstanceNotFound
+	}
+	if item.ProcessInstanceID != in.ProcessInstanceID || item.Status != biz.ProcessNodeStatusBlocked || item.Version != in.ExpectedVersion {
+		return nil, biz.ErrProcessNodeInstanceConflict
+	}
+	if instance.Status != biz.ProcessStatusBlocked {
+		return nil, biz.ErrProcessInstanceSettled
+	}
+	now := time.Now()
+	reason := in.Reason
+	item.Status = biz.ProcessNodeStatusActive
+	item.BlockKind = nil
+	item.BlockedReasonCode = nil
+	item.BlockedReason = nil
+	item.BlockedAt = nil
+	item.BlockedBy = nil
+	item.ResumeReason = &reason
+	item.ResumedAt = &now
+	item.ResumedBy = &actorID
+	item.Version++
+	item.UpdatedAt = now
+	instance.Status = biz.ProcessStatusActive
+	instance.BlockKind = nil
+	instance.BlockedReasonCode = nil
+	instance.BlockedReason = nil
+	instance.BlockedAt = nil
+	instance.BlockedBy = nil
+	instance.UpdatedAt = now
+	return cloneServiceProcessNodeInstance(item), nil
+}
+
+func (r *serviceProcessRuntimeRepo) MarkProcessNodeRoutingCompleted(_ context.Context, in *biz.ProcessNodeRoutingCompletion, actorID int) (*biz.ProcessNodeInstance, error) {
+	if in == nil || in.ProcessInstanceID <= 0 || in.ProcessNodeInstanceID <= 0 || actorID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	item := r.nodes[in.ProcessNodeInstanceID]
+	if item == nil {
+		return nil, biz.ErrProcessNodeInstanceNotFound
+	}
+	if item.ProcessInstanceID != in.ProcessInstanceID ||
+		(item.Status != biz.ProcessNodeStatusCompleted && item.Status != biz.ProcessNodeStatusBlocked) {
+		return nil, biz.ErrProcessNodeInstanceConflict
+	}
+	if item.RoutingCompletedAt == nil {
+		now := time.Now()
+		item.RoutingCompletedAt = &now
+		item.RoutingCompletedBy = &actorID
+		item.UpdatedAt = now
+	}
+	return cloneServiceProcessNodeInstance(item), nil
 }
 
 func (r *serviceProcessRuntimeRepo) CreateProcessNodeInstanceAttempt(context.Context, *biz.ProcessNodeInstanceAttemptCreate, int) (*biz.ProcessNodeInstance, error) {
@@ -3733,7 +3803,7 @@ func TestCustomerConfigJSONRPCStartSalesOrderAcceptanceProcess(t *testing.T) {
 		t.Fatalf("runtime_boundary = %#v", boundary)
 	}
 	nodes, ok := data["nodes"].([]any)
-	if !ok || len(nodes) != 6 {
+	if !ok || len(nodes) != 7 {
 		t.Fatalf("nodes = %#v", data["nodes"])
 	}
 	firstNode, ok := nodes[0].(map[string]any)
@@ -3856,7 +3926,7 @@ func TestCustomerConfigJSONRPCExecuteSalesOrderAcceptanceSubmit(t *testing.T) {
 		t.Fatalf("completed_node = %#v", completedNode)
 	}
 	nodes, ok := executeData["nodes"].([]any)
-	if !ok || len(nodes) != 6 {
+	if !ok || len(nodes) != 7 {
 		t.Fatalf("nodes = %#v", executeData["nodes"])
 	}
 	firstNode, ok := nodes[0].(map[string]any)
@@ -3897,7 +3967,7 @@ func TestCustomerConfigJSONRPCExecuteSalesOrderAcceptanceSubmit(t *testing.T) {
 		t.Fatalf("replayed started_node = %#v", replayStartedNode)
 	}
 	replayNodes, ok := replayStartData["nodes"].([]any)
-	if !ok || len(replayNodes) != 6 {
+	if !ok || len(replayNodes) != 7 {
 		t.Fatalf("replayed nodes = %#v", replayStartData["nodes"])
 	}
 	replaySecondNode, ok := replayNodes[1].(map[string]any)

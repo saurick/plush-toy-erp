@@ -192,7 +192,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		}, nil
 
 	case "start_material_supply_purchase_order_process":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseOrderUpdate); res != nil {
+		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseOrderSubmit); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireSourceActionReadPermissions(ctx, "customer_config", method); res != nil {
@@ -2049,12 +2049,24 @@ func processInstanceToMap(item *biz.ProcessInstance) map[string]any {
 		"correlation_key":          optionalStringValue(item.CorrelationKey),
 		"idempotency_key":          item.IdempotencyKey,
 		"status":                   item.Status,
-		"started_at":               item.StartedAt.Unix(),
-		"completed_at":             optionalTimeUnix(item.CompletedAt),
-		"created_by":               optionalIntValue(item.CreatedBy),
-		"updated_by":               optionalIntValue(item.UpdatedBy),
-		"created_at":               item.CreatedAt.Unix(),
-		"updated_at":               item.UpdatedAt.Unix(),
+		"terminal_node_instance_id": optionalIntValue(
+			item.TerminalNodeInstanceID,
+		),
+		"resolution_kind":     optionalStringValue(item.ResolutionKind),
+		"resolution_reason":   optionalStringValue(item.ResolutionReason),
+		"resolved_at":         optionalTimeUnix(item.ResolvedAt),
+		"resolved_by":         optionalIntValue(item.ResolvedBy),
+		"block_kind":          optionalStringValue(item.BlockKind),
+		"blocked_reason_code": optionalStringValue(item.BlockedReasonCode),
+		"blocked_reason":      optionalStringValue(item.BlockedReason),
+		"blocked_at":          optionalTimeUnix(item.BlockedAt),
+		"blocked_by":          optionalIntValue(item.BlockedBy),
+		"started_at":          item.StartedAt.Unix(),
+		"completed_at":        optionalTimeUnix(item.CompletedAt),
+		"created_by":          optionalIntValue(item.CreatedBy),
+		"updated_by":          optionalIntValue(item.UpdatedBy),
+		"created_at":          item.CreatedAt.Unix(),
+		"updated_at":          item.UpdatedAt.Unix(),
 	}
 }
 
@@ -2077,7 +2089,20 @@ func processNodeInstanceToMap(item *biz.ProcessNodeInstance) map[string]any {
 		"due_at":                  optionalTimeUnix(item.DueAt),
 		"started_at":              optionalTimeUnix(item.StartedAt),
 		"completed_at":            optionalTimeUnix(item.CompletedAt),
-		"outcome":                 optionalStringValue(item.Outcome),
+		"activated_from_node_instance_id": optionalIntValue(
+			item.ActivatedFromNodeInstanceID,
+		),
+		"routing_completed_at": optionalTimeUnix(item.RoutingCompletedAt),
+		"routing_completed_by": optionalIntValue(item.RoutingCompletedBy),
+		"outcome":              optionalStringValue(item.Outcome),
+		"block_kind":           optionalStringValue(item.BlockKind),
+		"blocked_reason_code":  optionalStringValue(item.BlockedReasonCode),
+		"blocked_reason":       optionalStringValue(item.BlockedReason),
+		"blocked_at":           optionalTimeUnix(item.BlockedAt),
+		"blocked_by":           optionalIntValue(item.BlockedBy),
+		"resume_reason":        optionalStringValue(item.ResumeReason),
+		"resumed_at":           optionalTimeUnix(item.ResumedAt),
+		"resumed_by":           optionalIntValue(item.ResumedBy),
 		"domain_command_effect_state": optionalStringValue(
 			item.DomainCommandEffectState,
 		),

@@ -388,6 +388,11 @@ const mockTaskStates = [
   { key: 'blocked', label: '阻塞', summary: '被缺料、缺资料或异常卡住。' },
   { key: 'done', label: '已完成', summary: '完成条件已达到。' },
   { key: 'rejected', label: '已退回', summary: '需要回退处理。' },
+  {
+    key: 'withdrawn',
+    label: '已撤回',
+    summary: '来源取消或流程终止后由系统撤回。',
+  },
 ]
 
 const mockBusinessStates = [
@@ -685,7 +690,7 @@ function buildBusinessDashboardProjectionStats() {
 }
 
 function isMockTerminalWorkflowTask(task = {}) {
-  return ['done', 'rejected'].includes(
+  return ['done', 'rejected', 'withdrawn'].includes(
     String(task.task_status_key || '').trim()
   )
 }

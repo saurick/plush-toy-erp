@@ -81,6 +81,29 @@ func (s *stubOutsourcingOrderJSONRPCRepo) UpdateOutsourcingOrderLifecycle(_ cont
 	return order, nil
 }
 
+func (s *stubOutsourcingOrderJSONRPCRepo) ApplyOutsourcingOrderLifecycleAction(
+	_ context.Context,
+	in *biz.SourceOrderLifecycleAction,
+	lifecycleStatus string,
+) (*biz.OutsourcingOrder, error) {
+	s.lifecycleCalls++
+	order, ok := s.orders[in.ID]
+	if !ok {
+		return nil, biz.ErrOutsourcingOrderNotFound
+	}
+	if order.Version != in.ExpectedVersion {
+		return nil, biz.ErrOutsourcingOrderConflict
+	}
+	order.LifecycleStatus = lifecycleStatus
+	order.Version++
+	order.SettlementAction = &in.ActionKey
+	order.SettlementMode = optionalTestString(in.CloseMode)
+	order.SettlementReason = optionalTestString(in.Reason)
+	order.SettledBy = &in.ActorID
+	order.UpdatedAt = time.Unix(2, 0)
+	return order, nil
+}
+
 func (s *stubOutsourcingOrderJSONRPCRepo) SaveOutsourcingOrderWithItems(_ context.Context, id int, order *biz.OutsourcingOrderMutation, items []*biz.OutsourcingOrderItemSaveMutation) (*biz.OutsourcingOrderWithItems, error) {
 	s.saveCalls++
 	if s.saveErr != nil {
@@ -158,7 +181,9 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 		biz.PermissionOutsourcingOrderCreate,
 		biz.PermissionOutsourcingOrderRead,
 		biz.PermissionOutsourcingOrderUpdate,
+		biz.PermissionOutsourcingOrderSubmit,
 		biz.PermissionOutsourcingOrderConfirm,
+		biz.PermissionOutsourcingOrderClose,
 	))
 	ctx := workflowJSONRPCAdminContext()
 
@@ -290,13 +315,15 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 
 	for _, tc := range []struct {
 		method string
+		action string
 		want   string
 	}{
-		{method: "submit_outsourcing_order", want: biz.OutsourcingOrderStatusSubmitted},
-		{method: "confirm_outsourcing_order", want: biz.OutsourcingOrderStatusConfirmed},
-		{method: "close_outsourcing_order", want: biz.OutsourcingOrderStatusClosed},
+		{method: "submit_outsourcing_order", action: biz.SourceOrderActionSubmit, want: biz.OutsourcingOrderStatusSubmitted},
+		{method: "confirm_outsourcing_order", action: biz.SourceOrderActionConfirm, want: biz.OutsourcingOrderStatusConfirmed},
+		{method: "close_outsourcing_order", action: biz.SourceOrderActionClose, want: biz.OutsourcingOrderStatusClosed},
 	} {
-		_, lifecycleRes, err := j.handleOutsourcingOrder(ctx, tc.method, tc.method, mustJSONRPCStruct(t, map[string]any{"id": float64(orderID)}))
+		version := repo.orders[orderID].Version
+		_, lifecycleRes, err := j.handleOutsourcingOrder(ctx, tc.method, tc.method, sourceOrderLifecycleTestParams(t, orderID, version, tc.action))
 		if err != nil {
 			t.Fatalf("%s expected nil err, got %v", tc.method, err)
 		}
@@ -490,6 +517,7 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPIRequiresEnabledModule(t *testing.T
 		biz.PermissionOutsourcingOrderCreate,
 		biz.PermissionOutsourcingOrderRead,
 		biz.PermissionOutsourcingOrderUpdate,
+		biz.PermissionOutsourcingOrderSubmit,
 		biz.PermissionOutsourcingOrderConfirm,
 	))
 	ctx := workflowJSONRPCAdminContext()
@@ -537,7 +565,7 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPIRequiresEnabledModule(t *testing.T
 		t.Fatalf("expected enabled outsourcing_orders save OK, got %#v", saveRes)
 	}
 	orderID := jsonRPCInt(t, jsonRPCNestedMap(t, saveRes, "outsourcing_order"), "id")
-	_, submitRes, err := j.handleOutsourcingOrder(ctx, "submit_outsourcing_order", "enabled-submit", mustJSONRPCStruct(t, map[string]any{"id": float64(orderID)}))
+	_, submitRes, err := j.handleOutsourcingOrder(ctx, "submit_outsourcing_order", "enabled-submit", sourceOrderLifecycleTestParams(t, orderID, repo.orders[orderID].Version, biz.SourceOrderActionSubmit))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}

@@ -293,6 +293,7 @@ func processNodesFromCustomerConfigDefinition(processKey string, definition map[
 			"activate_sales_order",
 			"order_review",
 			"end",
+			"reject_sales_order",
 			"sales_order_rejected_end",
 		}) && !processNodeKeysMatch(nodes, []string{
 			"submit_sales_order",
@@ -301,6 +302,7 @@ func processNodesFromCustomerConfigDefinition(processKey string, definition map[
 			"engineering_data",
 			"order_review",
 			"end",
+			"reject_sales_order",
 			"sales_order_rejected_end",
 		}) {
 			return nil, ErrBadParam
@@ -312,6 +314,7 @@ func processNodesFromCustomerConfigDefinition(processKey string, definition map[
 			"purchase_order_approval",
 			"approve_purchase_order",
 			"end",
+			"reject_purchase_order",
 			"purchase_order_rejected_end",
 		}) && !processNodeKeysMatch(nodes, []string{
 			"submit_purchase_order",
@@ -321,6 +324,7 @@ func processNodesFromCustomerConfigDefinition(processKey string, definition map[
 			"incoming_qc",
 			"warehouse_inbound",
 			"end",
+			"reject_purchase_order",
 			"purchase_order_rejected_end",
 		}) {
 			return nil, ErrBadParam
@@ -370,6 +374,7 @@ func currentCustomerConfigProcessStartShape(processKey string, nodes []ProcessNo
 			"activate_sales_order",
 			"order_review",
 			"end",
+			"reject_sales_order",
 			"sales_order_rejected_end",
 		}) || processNodeKeysMatch(nodes, []string{
 			"submit_sales_order",
@@ -378,6 +383,7 @@ func currentCustomerConfigProcessStartShape(processKey string, nodes []ProcessNo
 			"engineering_data",
 			"order_review",
 			"end",
+			"reject_sales_order",
 			"sales_order_rejected_end",
 		})
 	case ProcessKeyMaterialSupply:
@@ -386,6 +392,7 @@ func currentCustomerConfigProcessStartShape(processKey string, nodes []ProcessNo
 			"purchase_order_approval",
 			"approve_purchase_order",
 			"end",
+			"reject_purchase_order",
 			"purchase_order_rejected_end",
 		})
 	case ProcessKeyFinishedGoodsDelivery:
@@ -450,6 +457,8 @@ func customerConfigDomainCommandNodeAllowed(processKey, businessRefType, nodeKey
 			return commandKey == ProcessDomainCommandSalesOrderSubmit
 		case "activate_sales_order":
 			return commandKey == ProcessDomainCommandSalesOrderActivate
+		case "reject_sales_order":
+			return commandKey == ProcessDomainCommandSalesOrderReject
 		default:
 			return false
 		}
@@ -459,6 +468,8 @@ func customerConfigDomainCommandNodeAllowed(processKey, businessRefType, nodeKey
 			return businessRefType == "purchase_order" && commandKey == ProcessDomainCommandPurchaseOrderSubmit
 		case "approve_purchase_order":
 			return businessRefType == "purchase_order" && commandKey == ProcessDomainCommandPurchaseOrderApprove
+		case "reject_purchase_order":
+			return businessRefType == "purchase_order" && commandKey == ProcessDomainCommandPurchaseOrderReject
 		case "purchase_receipt_source":
 			return businessRefType == "purchase_order" && commandKey == ProcessDomainCommandPurchaseReceiptCreate
 		case "incoming_qc":

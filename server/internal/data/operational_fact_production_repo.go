@@ -1963,7 +1963,7 @@ func (r *operationalFactRepo) postProductionReworkFact(ctx context.Context, in *
 		if err != nil {
 			return nil, err
 		}
-		if currentTask.TaskStatusKey != "done" && currentTask.TaskStatusKey != "rejected" {
+		if !biz.IsTerminalWorkflowTaskStatus(currentTask.TaskStatusKey) {
 			return nil, biz.ErrProductionExceptionTaskActive
 		}
 		rootPreview, err := loadProductionReworkRootWIP(ctx, tx.client, row.ID)

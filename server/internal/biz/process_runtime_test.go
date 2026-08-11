@@ -629,12 +629,28 @@ func (r *memProcessRuntimeRepo) BlockProcessNodeAndInstance(ctx context.Context,
 	}
 
 	r.blockedNode = in
-	r.blockedProcess = &ProcessInstanceBlock{ID: in.ProcessInstanceID}
+	r.blockedProcess = &ProcessInstanceBlock{
+		ID:         in.ProcessInstanceID,
+		BlockKind:  in.BlockKind,
+		ReasonCode: in.ReasonCode,
+		Reason:     in.Reason,
+	}
+	now := time.Now()
 	node.Status = ProcessNodeStatusBlocked
 	node.Outcome = &in.Outcome
+	node.BlockKind = &in.BlockKind
+	node.BlockedReasonCode = &in.ReasonCode
+	node.BlockedReason = &in.Reason
+	node.BlockedAt = &now
+	node.BlockedBy = &actorID
 	node.DomainCommandFingerprint = in.DomainCommandFingerprint
 	node.Version = in.ExpectedVersion + 1
 	r.process.Status = ProcessStatusBlocked
+	r.process.BlockKind = &in.BlockKind
+	r.process.BlockedReasonCode = &in.ReasonCode
+	r.process.BlockedReason = &in.Reason
+	r.process.BlockedAt = &now
+	r.process.BlockedBy = &actorID
 	return node, nil
 }
 
@@ -658,6 +674,65 @@ func (r *memProcessRuntimeRepo) BlockProcessInstance(ctx context.Context, in *Pr
 	return nil, ErrProcessInstanceNotFound
 }
 
+func (r *memProcessRuntimeRepo) ResumeProcessNodeAndInstance(_ context.Context, in *ProcessNodeInstanceResume, actorID int) (*ProcessNodeInstance, error) {
+	if in == nil || in.ProcessInstanceID <= 0 || in.ProcessNodeInstanceID <= 0 || in.ExpectedVersion <= 0 || actorID <= 0 {
+		return nil, ErrBadParam
+	}
+	node := r.memProcessNode(in.ProcessNodeInstanceID)
+	if node == nil {
+		return nil, ErrProcessNodeInstanceNotFound
+	}
+	if node.ProcessInstanceID != in.ProcessInstanceID || node.Status != ProcessNodeStatusBlocked || node.Version != in.ExpectedVersion {
+		return nil, ErrProcessNodeInstanceConflict
+	}
+	if r.process == nil || r.process.ID != in.ProcessInstanceID {
+		return nil, ErrProcessInstanceNotFound
+	}
+	if r.process.Status != ProcessStatusBlocked {
+		return nil, ErrProcessInstanceSettled
+	}
+	now := time.Now()
+	reason := in.Reason
+	node.Status = ProcessNodeStatusActive
+	node.BlockKind = nil
+	node.BlockedReasonCode = nil
+	node.BlockedReason = nil
+	node.BlockedAt = nil
+	node.BlockedBy = nil
+	node.ResumeReason = &reason
+	node.ResumedAt = &now
+	node.ResumedBy = &actorID
+	node.Version++
+	r.process.Status = ProcessStatusActive
+	r.process.BlockKind = nil
+	r.process.BlockedReasonCode = nil
+	r.process.BlockedReason = nil
+	r.process.BlockedAt = nil
+	r.process.BlockedBy = nil
+	return node, nil
+}
+
+func (r *memProcessRuntimeRepo) MarkProcessNodeRoutingCompleted(_ context.Context, in *ProcessNodeRoutingCompletion, actorID int) (*ProcessNodeInstance, error) {
+	if in == nil || in.ProcessInstanceID <= 0 || in.ProcessNodeInstanceID <= 0 || actorID <= 0 {
+		return nil, ErrBadParam
+	}
+	node := r.memProcessNode(in.ProcessNodeInstanceID)
+	if node == nil {
+		return nil, ErrProcessNodeInstanceNotFound
+	}
+	if node.ProcessInstanceID != in.ProcessInstanceID ||
+		(node.Status != ProcessNodeStatusCompleted && node.Status != ProcessNodeStatusBlocked) {
+		return nil, ErrProcessNodeInstanceConflict
+	}
+	if node.RoutingCompletedAt != nil {
+		return node, nil
+	}
+	now := time.Now()
+	node.RoutingCompletedAt = &now
+	node.RoutingCompletedBy = &actorID
+	return node, nil
+}
+
 func (r *memProcessRuntimeRepo) ActivateProcessNodeInstance(ctx context.Context, in *ProcessNodeInstanceActivate, actorID int) (*ProcessNodeInstance, error) {
 	r.activatedNode = in
 	for index, node := range r.nodes {
@@ -670,6 +745,7 @@ func (r *memProcessRuntimeRepo) ActivateProcessNodeInstance(ctx context.Context,
 		out := *node
 		out.Status = ProcessNodeStatusActive
 		out.Version = in.ExpectedVersion + 1
+		out.ActivatedFromNodeInstanceID = in.ActivatedFromNodeInstanceID
 		r.nodes[index] = &out
 		return &out, nil
 	}
@@ -2090,16 +2166,24 @@ func TestProcessRuntimeUsecaseStandardApprovalRejectionCompletesTerminalBranch(t
 		processKey     string
 		approvalKey    string
 		policyKey      string
+		rejectNodeKey  string
+		commandKey     string
+		outcome        string
+		businessRef    string
 		rejectedEndKey string
 	}{
 		{
 			name: "sales order", processKey: ProcessKeySalesOrderAcceptance,
 			approvalKey: "order_approval", policyKey: ProcessBranchPolicySalesOrderApproval,
+			rejectNodeKey: "reject_sales_order", commandKey: ProcessDomainCommandSalesOrderReject,
+			outcome: SalesOrderProcessCommandOutcomeRejected, businessRef: "sales_order",
 			rejectedEndKey: "sales_order_rejected_end",
 		},
 		{
 			name: "purchase order", processKey: ProcessKeyMaterialSupply,
 			approvalKey: "purchase_order_approval", policyKey: ProcessBranchPolicyPurchaseOrderApproval,
+			rejectNodeKey: "reject_purchase_order", commandKey: ProcessDomainCommandPurchaseOrderReject,
+			outcome: PurchaseOrderProcessCommandOutcomeRejected, businessRef: "purchase_order",
 			rejectedEndKey: "purchase_order_rejected_end",
 		},
 	}
@@ -2107,15 +2191,26 @@ func TestProcessRuntimeUsecaseStandardApprovalRejectionCompletesTerminalBranch(t
 		t.Run(testCase.name, func(t *testing.T) {
 			processID := 10
 			approvalNodeID := 20
-			rejectedEndID := 21
+			rejectNodeID := 21
+			rejectedEndID := 22
 			reason := "审批依据不满足"
 			processRepo := &memProcessRuntimeRepo{
-				process: &ProcessInstance{ID: processID, ProcessKey: testCase.processKey, Status: ProcessStatusActive},
+				process: &ProcessInstance{
+					ID: processID, ProcessKey: testCase.processKey, Status: ProcessStatusActive,
+					BusinessRefType: testCase.businessRef, BusinessRefID: 88,
+				},
 				nodes: []*ProcessNodeInstance{
 					{
 						ID: approvalNodeID, ProcessInstanceID: processID, NodeKey: testCase.approvalKey,
 						NodeType: ProcessNodeTypeApproval, Attempt: 1, Status: ProcessNodeStatusActive, Version: 1,
 						PolicySnapshot: map[string]any{"branch_policy_key": testCase.policyKey},
+					},
+					{
+						ID: rejectNodeID, ProcessInstanceID: processID, NodeKey: testCase.rejectNodeKey,
+						NodeType: ProcessNodeTypeDomainCommand, Attempt: 1, Status: ProcessNodeStatusWaiting, Version: 1,
+						PolicySnapshot: map[string]any{
+							"command_key": testCase.commandKey, "execute_after_approval": true,
+						},
 					},
 					{
 						ID: rejectedEndID, ProcessInstanceID: processID, NodeKey: testCase.rejectedEndKey,
@@ -2128,6 +2223,10 @@ func TestProcessRuntimeUsecaseStandardApprovalRejectionCompletesTerminalBranch(t
 				ProcessInstanceID: &processID, ProcessNodeInstanceID: &approvalNodeID,
 			}}
 			uc := NewProcessRuntimeUsecase(processRepo, workflowRepo)
+			handler := &stubProcessDomainCommandHandler{result: &ProcessDomainCommandResult{Outcome: testCase.outcome}}
+			if err := uc.RegisterDomainCommandHandler(testCase.commandKey, handler); err != nil {
+				t.Fatalf("register reject command: %v", err)
+			}
 			if err := RegisterExceptionApprovalProcessBranchPolicyHandlers(uc); err != nil {
 				t.Fatalf("register branch policies: %v", err)
 			}
@@ -2140,8 +2239,14 @@ func TestProcessRuntimeUsecaseStandardApprovalRejectionCompletesTerminalBranch(t
 			if processRepo.process.Status != ProcessStatusCompleted || processRepo.blockedProcess != nil {
 				t.Fatalf("rejection must terminate without blocking process=%#v blocked=%#v", processRepo.process, processRepo.blockedProcess)
 			}
-			if processRepo.nodes[1].Status != ProcessNodeStatusCompleted {
-				t.Fatalf("rejected end node=%#v", processRepo.nodes[1])
+			if processRepo.completedProcess == nil || processRepo.completedProcess.ResolutionKind != ProcessResolutionRejected {
+				t.Fatalf("rejection must persist rejected resolution, got %#v", processRepo.completedProcess)
+			}
+			if processRepo.nodes[1].Status != ProcessNodeStatusCompleted || handler.calls != 1 {
+				t.Fatalf("rejection command=%#v calls=%d", processRepo.nodes[1], handler.calls)
+			}
+			if processRepo.nodes[2].Status != ProcessNodeStatusCompleted {
+				t.Fatalf("rejected end node=%#v", processRepo.nodes[2])
 			}
 		})
 	}
@@ -4402,7 +4507,9 @@ func TestProcessRuntimeUsecaseBlockProcessNodeInstanceBlocksNodeAndProcess(t *te
 	if blockedNode.Status != ProcessNodeStatusBlocked || blockedNode.Outcome == nil || *blockedNode.Outcome != "blocked" {
 		t.Fatalf("expected blocked node outcome, got %#v", blockedNode)
 	}
-	if processRepo.blockedNode == nil || processRepo.blockedNode.Reason != "样衣资料缺失" || processRepo.blockedNode.Outcome != "blocked" {
+	if processRepo.blockedNode == nil || processRepo.blockedNode.BlockKind != ProcessBlockKindManual ||
+		processRepo.blockedNode.ReasonCode != "process_node_blocked" || processRepo.blockedNode.Reason != "样衣资料缺失" ||
+		processRepo.blockedNode.Outcome != "blocked" {
 		t.Fatalf("expected normalized block input, got %#v", processRepo.blockedNode)
 	}
 	if processRepo.blockedProcess == nil || processRepo.blockedProcess.ID != 10 {

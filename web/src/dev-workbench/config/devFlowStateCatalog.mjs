@@ -1139,9 +1139,10 @@ const FLOW_DEFINITIONS = [
       state('blocked', '阻塞'),
       state('done', '已完成'),
       state('rejected', '已退回'),
+      state('withdrawn', '已撤回'),
     ],
     initialStates: ['ready'],
-    terminalStates: ['done', 'rejected'],
+    terminalStates: ['done', 'rejected', 'withdrawn'],
     transitions: [
       transition('ready', 'blocked', {
         guard: '必须提供非空阻塞原因、version 和幂等键。',
@@ -1168,7 +1169,8 @@ const FLOW_DEFINITIONS = [
         factBoundary: 'workflow_only',
       }),
     ],
-    guard: 'task done 不等于 Fact posted；终态任务不重开。',
+    guard:
+      'task done 不等于 Fact posted；withdrawn 仅由来源取消、流程终止或上游补偿触发；终态任务不重开。',
     factBoundary: 'workflow_only',
     sourceRefs: [
       'server/internal/biz/workflow_metadata.go',
@@ -1179,7 +1181,7 @@ const FLOW_DEFINITIONS = [
       evidence(
         'code',
         'server/internal/biz/workflow_metadata.go',
-        '四状态 registry、唯一转换图、终态和动作权限。'
+        '五状态 registry、唯一公开转换图、系统撤回终态和动作权限。'
       ),
       evidence(
         'doc',
@@ -1285,15 +1287,16 @@ const FLOW_DEFINITIONS = [
     scopeKey: 'process_runtime',
     kind: 'runtime',
     label: 'ProcessRuntime 节点 attempt',
-    summary: '节点 attempt 从等待激活，随后完成或阻塞。',
+    summary: '节点 attempt 从等待激活，可完成、阻塞后恢复，或由运行时撤回。',
     states: [
       state('waiting', '等待中'),
       state('active', '运行中'),
       state('completed', '已完成'),
       state('blocked', '已阻塞'),
+      state('withdrawn', '已撤回'),
     ],
     initialStates: ['waiting'],
-    terminalStates: ['completed', 'blocked'],
+    terminalStates: ['completed', 'withdrawn'],
     transitions: [
       transition('waiting', 'active', {
         guard: '由 runtime 根据上游结果和冻结定义激活。',
@@ -1310,6 +1313,30 @@ const FLOW_DEFINITIONS = [
       transition('active', 'blocked', {
         guard: '阻塞原因、version 与领域命令 fingerprint 必须一致。',
         action: 'ProcessRuntimeUsecase.BlockProcessNodeAndInstance',
+        permission: [],
+        factBoundary: 'orchestration_only',
+      }),
+      transition('blocked', 'active', {
+        guard: '仅恢复原 attempt；必须记录恢复原因、操作者和 version。',
+        action: 'ProcessRuntimeUsecase.ResumeBlockedProcess',
+        permission: [],
+        factBoundary: 'orchestration_only',
+      }),
+      transition('waiting', 'withdrawn', {
+        guard: '仅来源取消、流程终止或上游补偿恢复可触发。',
+        action: 'ProcessRuntime internal withdrawal',
+        permission: [],
+        factBoundary: 'orchestration_only',
+      }),
+      transition('active', 'withdrawn', {
+        guard: '仅来源取消、流程终止或上游补偿恢复可触发。',
+        action: 'ProcessRuntime internal withdrawal',
+        permission: [],
+        factBoundary: 'orchestration_only',
+      }),
+      transition('blocked', 'withdrawn', {
+        guard: '仅来源取消、流程终止或上游补偿恢复可触发。',
+        action: 'ProcessRuntime internal withdrawal',
         permission: [],
         factBoundary: 'orchestration_only',
       }),
@@ -2623,6 +2650,11 @@ const salesProcessNodes = (includeEngineering) => [
     factBoundary: 'orchestration_only',
   }),
   processNode('end', 'end', '结束'),
+  processNode('reject_sales_order', 'domain_command', '驳回销售订单', {
+    action: 'SalesOrderUsecase.RejectSalesOrderForProcessCommand',
+    permission: ['workflow.task.reject'],
+    factBoundary: 'source_document_only',
+  }),
   processNode('sales_order_rejected_end', 'end', '销售订单审批驳回结束'),
 ]
 
@@ -2635,7 +2667,7 @@ const salesProcessEdges = (includeEngineering) => [
   ),
   processEdge(
     'order_approval',
-    'sales_order_rejected_end',
+    'reject_sales_order',
     'sales_order.approval_outcome'
   ),
   processEdge(
@@ -2646,6 +2678,7 @@ const salesProcessEdges = (includeEngineering) => [
     ? [processEdge('engineering_data', 'order_review')]
     : []),
   processEdge('order_review', 'end'),
+  processEdge('reject_sales_order', 'sales_order_rejected_end'),
 ]
 
 export const processDefinitions = Object.freeze(
@@ -2686,7 +2719,7 @@ export const processDefinitions = Object.freeze(
       nodes: [
         processNode('submit_purchase_order', 'domain_command', '提交采购订单', {
           action: 'PurchaseOrderUsecase.SubmitPurchaseOrderForProcessCommand',
-          permission: ['purchase.order.update'],
+          permission: ['purchase.order.submit'],
           factBoundary: 'source_document_only',
         }),
         processNode('purchase_order_approval', 'approval', '采购订单审批', {
@@ -2705,6 +2738,11 @@ export const processDefinitions = Object.freeze(
           }
         ),
         processNode('end', 'end', '结束'),
+        processNode('reject_purchase_order', 'domain_command', '驳回采购订单', {
+          action: 'PurchaseOrderUsecase.RejectPurchaseOrderForProcessCommand',
+          permission: ['workflow.task.reject'],
+          factBoundary: 'source_document_only',
+        }),
         processNode(
           'purchase_order_rejected_end',
           'end',
@@ -2720,10 +2758,11 @@ export const processDefinitions = Object.freeze(
         ),
         processEdge(
           'purchase_order_approval',
-          'purchase_order_rejected_end',
+          'reject_purchase_order',
           'purchase_order.approval_outcome'
         ),
         processEdge('approve_purchase_order', 'end'),
+        processEdge('reject_purchase_order', 'purchase_order_rejected_end'),
       ],
     },
     {

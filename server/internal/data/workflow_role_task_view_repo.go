@@ -133,7 +133,7 @@ func buildWorkflowRoleTaskEntQuery(
 			workflowtask.RequiredCapabilityKeyIn(biz.WorkflowApprovalCapabilityKeys()...),
 		)
 	case biz.WorkflowRoleTaskViewHistory:
-		dbQuery = dbQuery.Where(workflowtask.TaskStatusKeyIn("done", "rejected"))
+		dbQuery = dbQuery.Where(workflowtask.TaskStatusKeyIn("done", "rejected", "withdrawn"))
 	case biz.WorkflowRoleTaskViewRisk:
 		dbQuery = dbQuery.Where(workflowRoleTaskRiskPredicate(query.SnapshotAt))
 	}
@@ -152,7 +152,7 @@ func countWorkflowRoleTaskViews(
 	if err := buildWorkflowRoleTaskVisibilityEntQuery(
 		client, query, biz.WorkflowRoleTaskViewTodo,
 	).
-		Where(workflowtask.TaskStatusKeyIn("ready", "blocked", "done", "rejected")).
+		Where(workflowtask.TaskStatusKeyIn("ready", "blocked", "done", "rejected", "withdrawn")).
 		GroupBy(workflowtask.FieldTaskStatusKey).
 		Aggregate(ent.Count()).
 		Scan(ctx, &groupedStatuses); err != nil {
@@ -169,10 +169,12 @@ func countWorkflowRoleTaskViews(
 			counts.Done = grouped.Count
 		case "rejected":
 			counts.Rejected = grouped.Count
+		case "withdrawn":
+			counts.Withdrawn = grouped.Count
 		}
 	}
 	counts.Todo = counts.Ready + counts.Blocked
-	counts.History = counts.Done + counts.Rejected
+	counts.History = counts.Done + counts.Rejected + counts.Withdrawn
 	counts.Total = counts.Todo + counts.History
 
 	approval, err := buildWorkflowRoleTaskEntQuery(

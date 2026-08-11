@@ -16,7 +16,7 @@ func TestNormalizeCustomerProcessContractsExpandsCanonicalSalesVariants(t *testi
 		{
 			name:         "approval and PMC",
 			variant:      CustomerProcessVariantSalesApprovalPMC,
-			wantNodeKeys: []string{"submit_sales_order", "order_approval", "activate_sales_order", "order_review", "end", "sales_order_rejected_end"},
+			wantNodeKeys: []string{"submit_sales_order", "order_approval", "activate_sales_order", "order_review", "end", "reject_sales_order", "sales_order_rejected_end"},
 			wantPoolIndex: map[int]string{
 				1: BossRoleKey,
 				3: "order_review",
@@ -25,7 +25,7 @@ func TestNormalizeCustomerProcessContractsExpandsCanonicalSalesVariants(t *testi
 		{
 			name:         "approval engineering and PMC",
 			variant:      CustomerProcessVariantSalesApprovalEngineeringPMC,
-			wantNodeKeys: []string{"submit_sales_order", "order_approval", "activate_sales_order", "engineering_data", "order_review", "end", "sales_order_rejected_end"},
+			wantNodeKeys: []string{"submit_sales_order", "order_approval", "activate_sales_order", "engineering_data", "order_review", "end", "reject_sales_order", "sales_order_rejected_end"},
 			wantPoolIndex: map[int]string{
 				1: BossRoleKey,
 				3: "engineering_data",
@@ -82,6 +82,7 @@ func TestNormalizeCustomerProcessContractsKeepsEveryRegisteredCanonicalGraph(t *
 				{key: "activate_sales_order", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandSalesOrderActivate},
 				{key: "order_review", nodeType: ProcessNodeTypeHumanTask, ownerPool: "order_review"},
 				{key: "end", nodeType: ProcessNodeTypeEnd},
+				{key: "reject_sales_order", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandSalesOrderReject},
 				{key: "sales_order_rejected_end", nodeType: ProcessNodeTypeEnd},
 			},
 		},
@@ -95,6 +96,7 @@ func TestNormalizeCustomerProcessContractsKeepsEveryRegisteredCanonicalGraph(t *
 				{key: "engineering_data", nodeType: ProcessNodeTypeHumanTask, ownerPool: "engineering_data"},
 				{key: "order_review", nodeType: ProcessNodeTypeHumanTask, ownerPool: "order_review"},
 				{key: "end", nodeType: ProcessNodeTypeEnd},
+				{key: "reject_sales_order", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandSalesOrderReject},
 				{key: "sales_order_rejected_end", nodeType: ProcessNodeTypeEnd},
 			},
 		},
@@ -106,6 +108,7 @@ func TestNormalizeCustomerProcessContractsKeepsEveryRegisteredCanonicalGraph(t *
 				{key: "purchase_order_approval", nodeType: ProcessNodeTypeApproval, ownerPool: BossRoleKey, branchPolicy: ProcessBranchPolicyPurchaseOrderApproval},
 				{key: "approve_purchase_order", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandPurchaseOrderApprove},
 				{key: "end", nodeType: ProcessNodeTypeEnd},
+				{key: "reject_purchase_order", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandPurchaseOrderReject},
 				{key: "purchase_order_rejected_end", nodeType: ProcessNodeTypeEnd},
 			},
 		},
@@ -204,7 +207,7 @@ func TestNormalizeCustomerProcessContractsKeepsFactActionsOutsideApprovalRuntime
 		{
 			processKey: ProcessKeyMaterialSupply, variantKey: CustomerProcessVariantPurchaseOrderApproval,
 			businessRefType: "purchase_order",
-			wantNodeKeys:    []string{"submit_purchase_order", "purchase_order_approval", "approve_purchase_order", "end", "purchase_order_rejected_end"},
+			wantNodeKeys:    []string{"submit_purchase_order", "purchase_order_approval", "approve_purchase_order", "end", "reject_purchase_order", "purchase_order_rejected_end"},
 		},
 		{
 			processKey: ProcessKeyFinishedGoodsDelivery, variantKey: CustomerProcessVariantShipmentFinanceApproval,
@@ -250,7 +253,7 @@ func TestCurrentCustomerConfigProcessStartShapeRejectsApprovalGraphsWithoutRejec
 		{
 			name:       "sales current graph",
 			processKey: ProcessKeySalesOrderAcceptance,
-			nodes:      nodesFromKeys("submit_sales_order", "order_approval", "activate_sales_order", "order_review", "end", "sales_order_rejected_end"),
+			nodes:      nodesFromKeys("submit_sales_order", "order_approval", "activate_sales_order", "order_review", "end", "reject_sales_order", "sales_order_rejected_end"),
 			want:       true,
 		},
 		{

@@ -25,14 +25,15 @@ var workflowTaskBoardLaneKeys = []string{
 }
 
 var workflowTaskBoardFilterStatuses = map[string]struct{}{
-	"":         {},
-	"all":      {},
-	"ready":    {},
-	"blocked":  {},
-	"rejected": {},
-	"done":     {},
-	"overdue":  {},
-	"dueSoon":  {},
+	"":          {},
+	"all":       {},
+	"ready":     {},
+	"blocked":   {},
+	"rejected":  {},
+	"withdrawn": {},
+	"done":      {},
+	"overdue":   {},
+	"dueSoon":   {},
 }
 
 var workflowTaskBoardDueFilters = map[string]struct{}{
@@ -57,7 +58,7 @@ func ClassifyWorkflowTaskBoardLane(task *WorkflowTask, snapshotAt time.Time) (st
 	switch status {
 	case "blocked":
 		return WorkflowTaskBoardLaneException, nil
-	case "done", "rejected":
+	case "done", "rejected", "withdrawn":
 		return WorkflowTaskBoardLaneFinished, nil
 	case "ready":
 		if task.DueAt != nil && !task.DueAt.After(snapshotAt.Add(WorkflowTaskBoardDueWindow)) {

@@ -160,7 +160,7 @@ test('businessCollaborationTasks: 催办态只读取 workflow payload 快照', (
   })
 })
 
-test('businessCollaborationTasks: done/rejected 是终态协同任务，不扩展成事实层完成', () => {
+test('businessCollaborationTasks: 完成、退回与系统撤回都是终态协同任务，不扩展成事实层完成', () => {
   assert.equal(isBusinessCollaborationTaskTerminal(tasks[2]), true)
   assert.equal(isBusinessCollaborationTaskBlocking(tasks[2]), false)
   assert.equal(isBusinessCollaborationTaskTerminal(tasks[0]), false)
@@ -172,6 +172,13 @@ test('businessCollaborationTasks: done/rejected 是终态协同任务，不扩�
   assert.equal(isBusinessCollaborationTaskTerminal(rejectedTask), true)
   assert.equal(isBusinessCollaborationTaskBlocking(rejectedTask), true)
   assert.equal(getBusinessCollaborationTaskReason(rejectedTask), '资料退回补充')
+  const withdrawnTask = {
+    task_status_key: 'withdrawn',
+    blocked_reason: '来源单据已取消',
+    payload: {},
+  }
+  assert.equal(isBusinessCollaborationTaskTerminal(withdrawnTask), true)
+  assert.equal(isBusinessCollaborationTaskBlocking(withdrawnTask), false)
 })
 
 test('businessCollaborationTasks: 面板只展示前六条，避免撑开业务页局部入口', () => {

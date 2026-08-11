@@ -15,11 +15,9 @@ func (d *jsonrpcDispatcher) handleSalesOrderLifecycle(
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
 	case "close_sales_order":
-		return d.handleSalesOrderLifecycleAction(ctx, id, pm, biz.PermissionSalesOrderClose, d.salesOrderUC.CloseSalesOrder)
+		return d.handleSalesOrderLifecycleAction(ctx, id, pm, actorID, biz.PermissionSalesOrderClose, biz.SourceOrderActionClose, d.salesOrderUC.CloseSalesOrderWithAction)
 	case "cancel_sales_order":
-		return d.handleSalesOrderLifecycleAction(ctx, id, pm, biz.PermissionSalesOrderCancel, func(ctx context.Context, id int) (*biz.SalesOrder, error) {
-			return d.salesOrderUC.CancelSalesOrderWithActor(ctx, id, actorID)
-		})
+		return d.handleSalesOrderLifecycleAction(ctx, id, pm, actorID, biz.PermissionSalesOrderCancel, biz.SourceOrderActionCancel, d.salesOrderUC.CancelSalesOrderWithAction)
 	default:
 		return id, unknownSalesOrderResult(method), nil
 	}
@@ -29,8 +27,10 @@ func (d *jsonrpcDispatcher) handleSalesOrderLifecycleAction(
 	ctx context.Context,
 	id string,
 	pm map[string]any,
+	actorID int,
 	permission string,
-	action func(context.Context, int) (*biz.SalesOrder, error),
+	actionKey string,
+	action func(context.Context, *biz.SourceOrderLifecycleAction) (*biz.SalesOrder, error),
 ) (string, *v1.JsonrpcResult, error) {
 	if res := d.RequireAdminPermission(ctx, permission); res != nil {
 		return id, res, nil
@@ -38,6 +38,10 @@ func (d *jsonrpcDispatcher) handleSalesOrderLifecycleAction(
 	if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "sales_orders"); res != nil {
 		return id, res, nil
 	}
-	item, err := action(ctx, getInt(pm, "id", 0))
+	in, ok := sourceOrderLifecycleActionFromParams(pm, actionKey, actorID)
+	if !ok {
+		return id, invalidSourceOrderLifecycleParamsResult(), nil
+	}
+	item, err := action(ctx, in)
 	return id, salesOrderMutationResult(ctx, d, item, err), nil
 }

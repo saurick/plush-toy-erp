@@ -9,7 +9,7 @@ const WORKFLOW_TASK_BOARD_STATUS_KEYS_BY_LANE = Object.freeze({
   actionable: new Set(['ready']),
   exception: new Set(['blocked']),
   due: new Set(['ready']),
-  finished: new Set(['done', 'rejected']),
+  finished: new Set(['done', 'rejected', 'withdrawn']),
 })
 
 function isNonNegativeSafeInteger(value) {
@@ -85,7 +85,8 @@ export function requireWorkflowTaskBoardResponse(response, request = {}) {
       !Array.isArray(lane.tasks) ||
       lane.tasks.length > lane.limit ||
       lane.tasks.some((task) => {
-        if (!task || typeof task !== 'object' || Array.isArray(task)) return true
+        if (!task || typeof task !== 'object' || Array.isArray(task))
+          return true
         return (
           !Number.isSafeInteger(task.id) ||
           task.id <= 0 ||

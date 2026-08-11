@@ -245,7 +245,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	addBackend(PermissionCustomerConfigPublish, permissionMethods("customer_config", "publish_customer_config", "publish_approval_settings", "apply_approval_settings"), []string{"仍受配置校验、发布版本状态和禁止自我扩权限制"})
 	addBackend(PermissionCustomerConfigActivate, permissionMethods("customer_config", "activate_customer_config", "apply_approval_settings"), []string{"仍受发布版本状态和部署客户边界限制"})
 	addBackend(PermissionCustomerConfigRollback, permissionMethods("customer_config", "rollback_customer_config"), []string{"仍受可回滚 revision 和部署客户边界限制"})
-	addBackend(PermissionProcessRuntimeRecover, permissionMethods("customer_config", "recover_compensated_process_domain_command"), []string{"仅允许对已补偿且无已生效下游事实的 domain_command 执行确定性终止与撤回"})
+	addBackend(PermissionProcessRuntimeRecover, permissionMethods("customer_config", "recover_compensated_process_domain_command", "resume_blocked_process_node"), []string{"允许恢复已补偿异常命令，或在排除阻塞后恢复非领域命令节点；领域命令不得直接重放"})
 
 	// Shared ERP entries.
 	add(PermissionERPWorkbenchRead,
@@ -360,16 +360,19 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 		menuPermissionSurface("inbound", "purchase-order-source", "采购订单来源", "purchase-receipt-source-reference", "采购入库可读取的采购订单与明细", permissionControlSection, "允许查看", append(permissionMethods("purchase", "create_purchase_receipt_from_purchase_order", "add_purchase_receipt_item"), permissionMethods("customer_config", "start_material_supply_purchase_order_process")...), businessUsageConditions),
 	)
 	addMenu(PermissionPurchaseOrderCreate, "accessories-purchase", "purchase-orders", "采购订单", "create-purchase-order", "新建采购订单和表单", permissionControlButton, "显示并允许创建", permissionMethods("purchase_order", "save_purchase_order_with_items"), businessUsageConditions)
-	purchaseOrderUpdateMethods := append(
-		permissionMethods("purchase_order", "save_purchase_order_with_items", "close_purchase_order", "cancel_purchase_order"),
-		permissionMethods("customer_config", "start_material_supply_purchase_order_process", "execute_material_supply_purchase_order_submit")...,
-	)
-	addMenu(PermissionPurchaseOrderUpdate, "accessories-purchase", "purchase-orders", "采购订单", "edit-purchase-order", "编辑采购订单和提交审批", permissionControlForm, "显示并允许编辑和提交审批", purchaseOrderUpdateMethods, businessUsageConditions)
+	purchaseOrderUpdateMethods := permissionMethods("purchase_order", "save_purchase_order_with_items")
+	addMenu(PermissionPurchaseOrderUpdate, "accessories-purchase", "purchase-orders", "采购订单", "edit-purchase-order", "编辑采购订单", permissionControlForm, "显示并允许编辑", purchaseOrderUpdateMethods, businessUsageConditions)
+	addMenu(PermissionPurchaseOrderSubmit, "accessories-purchase", "purchase-order-actions", "订单动作", "submit-purchase-order", "提交采购审批", permissionControlButton, "显示并允许提交", append(permissionMethods("customer_config", "start_material_supply_purchase_order_process", "execute_material_supply_purchase_order_submit"), permissionMethods("purchase_order", "submit_purchase_order")...), businessUsageConditions)
+	addMenu(PermissionPurchaseOrderClose, "accessories-purchase", "purchase-order-actions", "订单动作", "close-purchase-order", "关闭采购订单", permissionControlButton, "显示并允许关闭", permissionMethods("purchase_order", "close_purchase_order"), businessUsageConditions)
+	addMenu(PermissionPurchaseOrderCancel, "accessories-purchase", "purchase-order-actions", "订单动作", "cancel-purchase-order", "取消采购订单", permissionControlButton, "显示并允许取消", permissionMethods("purchase_order", "cancel_purchase_order"), businessUsageConditions)
 
 	addMenu(PermissionOutsourcingOrderRead, "processing-contracts", "outsourcing-orders", "委外订单", "outsourcing-order-list", "委外订单列表和详情", permissionControlPage, "允许进入并查看", permissionMethods("outsourcing_order", "get_outsourcing_order", "list_outsourcing_orders", "list_outsourcing_order_items"), businessUsageConditions)
 	addMenu(PermissionOutsourcingOrderCreate, "processing-contracts", "outsourcing-orders", "委外订单", "create-outsourcing-order", "新建委外订单和表单", permissionControlButton, "显示并允许创建", permissionMethods("outsourcing_order", "save_outsourcing_order_with_items"), businessUsageConditions)
-	addMenu(PermissionOutsourcingOrderUpdate, "processing-contracts", "outsourcing-orders", "委外订单", "edit-outsourcing-order", "编辑委外订单和表单", permissionControlForm, "显示并允许编辑", permissionMethods("outsourcing_order", "save_outsourcing_order_with_items", "submit_outsourcing_order", "close_outsourcing_order", "cancel_outsourcing_order"), businessUsageConditions)
+	addMenu(PermissionOutsourcingOrderUpdate, "processing-contracts", "outsourcing-orders", "委外订单", "edit-outsourcing-order", "编辑委外订单和表单", permissionControlForm, "显示并允许编辑", permissionMethods("outsourcing_order", "save_outsourcing_order_with_items"), businessUsageConditions)
+	addMenu(PermissionOutsourcingOrderSubmit, "processing-contracts", "outsourcing-order-actions", "订单动作", "submit-outsourcing-order", "提交委外合同", permissionControlButton, "显示并允许提交", permissionMethods("outsourcing_order", "submit_outsourcing_order"), businessUsageConditions)
 	addMenu(PermissionOutsourcingOrderConfirm, "processing-contracts", "outsourcing-order-actions", "订单动作", "confirm-outsourcing-order", "确认委外下单", permissionControlButton, "显示并允许确认", permissionMethods("outsourcing_order", "confirm_outsourcing_order"), businessUsageConditions)
+	addMenu(PermissionOutsourcingOrderClose, "processing-contracts", "outsourcing-order-actions", "订单动作", "close-outsourcing-order", "关闭委外合同", permissionControlButton, "显示并允许关闭", permissionMethods("outsourcing_order", "close_outsourcing_order"), businessUsageConditions)
+	addMenu(PermissionOutsourcingOrderCancel, "processing-contracts", "outsourcing-order-actions", "订单动作", "cancel-outsourcing-order", "取消委外合同", permissionControlButton, "显示并允许取消", permissionMethods("outsourcing_order", "cancel_outsourcing_order"), businessUsageConditions)
 	addMenu(PermissionOutsourcingFactRead, "processing-contracts", "outsourcing-related-records", "关联委外记录", "outsourcing-fact-list", "委外发料和回货记录", permissionControlSection, "允许查看", permissionMethods("operational_fact", "list_outsourcing_facts", "get_outsourcing_return_disposition", "list_outsourcing_return_dispositions"), businessUsageConditions)
 	addMenu(PermissionOutsourcingMaterialIssueCreate, "processing-contracts", "outsourcing-fact-actions", "委外动作", "create-outsourcing-material-issue", "登记委外发料", permissionControlButton, "显示并允许登记", permissionMethods("operational_fact", "create_outsourcing_material_issue_from_order", "save_outsourcing_material_issue_draft"), businessUsageConditions)
 	addMenu(PermissionOutsourcingReturnReceiptCreate, "processing-contracts", "outsourcing-fact-actions", "委外动作", "create-outsourcing-return-receipt", "登记委外回货", permissionControlButton, "显示并允许登记", permissionMethods("operational_fact", "create_outsourcing_return_receipt_from_order", "save_outsourcing_return_receipt_draft"), businessUsageConditions)

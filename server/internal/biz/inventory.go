@@ -16,6 +16,7 @@ var (
 	ErrInventoryTxnNotFound                  = errors.New("inventory txn not found")
 	ErrInventoryBalanceNotFound              = errors.New("inventory balance not found")
 	ErrInventoryLotNotFound                  = errors.New("inventory lot not found")
+	ErrInventoryLotConflict                  = errors.New("inventory lot version conflict")
 	ErrBOMHeaderNotFound                     = errors.New("bom header not found")
 	ErrBOMItemNotFound                       = errors.New("bom item not found")
 	ErrBOMActiveImmutable                    = errors.New("active bom must be copied before edit")
@@ -127,6 +128,11 @@ type InventoryLot struct {
 	DyeLotNo        *string
 	ProductionLotNo *string
 	Status          string
+	Version         int
+	StatusAction    *string
+	StatusReason    *string
+	StatusChangedAt *time.Time
+	StatusChangedBy *int
 	ReceivedAt      *time.Time
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
@@ -179,6 +185,28 @@ type InventoryLotCreate struct {
 	ProductionLotNo *string
 	Status          string
 	ReceivedAt      *time.Time
+}
+
+const (
+	InventoryLotActionHold                  = "hold_lot"
+	InventoryLotActionRejectFromQuality     = "reject_lot_from_quality"
+	InventoryLotActionReleaseReinspect      = "release_lot_after_reinspection"
+	InventoryLotActionApproveConcession     = "approve_lot_concession"
+	InventoryLotActionCloseZeroBalance      = "close_zero_balance_lot"
+	InventoryLotActionRestoreQualityCancel  = "restore_lot_after_quality_cancel"
+	InventoryLotActionHoldQualityCorrection = "hold_lot_for_quality_correction"
+)
+
+type InventoryLotStatusAction struct {
+	LotID               int
+	ExpectedVersion     int
+	ActionKey           string
+	TargetStatus        string
+	Reason              string
+	IdempotencyKey      string
+	IntentHash          string
+	ActorID             int
+	QualityInspectionID int
 }
 
 type InventoryTxnCreate struct {
@@ -409,6 +437,10 @@ type InventoryLedgerRepo interface {
 	ListInventoryTxns(ctx context.Context, filter InventoryTxnFilter) ([]*InventoryTxn, int, error)
 }
 
+type InventoryLotStatusActionRepo interface {
+	ApplyInventoryLotStatusAction(ctx context.Context, in *InventoryLotStatusAction) (*InventoryLot, error)
+}
+
 type BOMRepo interface {
 	CreateBOMHeader(ctx context.Context, in *BOMHeaderCreate) (*BOMHeader, error)
 	CreateBOMItem(ctx context.Context, in *BOMItemCreate) (*BOMItem, error)
@@ -547,10 +579,70 @@ func (uc *InventoryUsecase) ChangeInventoryLotStatus(ctx context.Context, lotID 
 	}
 	newStatus = strings.ToUpper(strings.TrimSpace(newStatus))
 	reason = strings.TrimSpace(reason)
-	if !IsValidInventoryLotStatus(newStatus) {
+	if !IsValidInventoryLotStatus(newStatus) || reason == "" || len([]rune(reason)) > 255 {
 		return nil, ErrBadParam
 	}
 	return uc.repo.ChangeInventoryLotStatus(ctx, lotID, newStatus, reason)
+}
+
+func (uc *InventoryUsecase) HoldInventoryLot(ctx context.Context, in *InventoryLotStatusAction) (*InventoryLot, error) {
+	return uc.applyNamedInventoryLotStatusAction(ctx, in, InventoryLotActionHold, InventoryLotHold)
+}
+
+func (uc *InventoryUsecase) RejectInventoryLotFromQuality(ctx context.Context, in *InventoryLotStatusAction) (*InventoryLot, error) {
+	return uc.applyNamedInventoryLotStatusAction(ctx, in, InventoryLotActionRejectFromQuality, InventoryLotRejected)
+}
+
+func (uc *InventoryUsecase) ReleaseInventoryLotAfterReinspection(ctx context.Context, in *InventoryLotStatusAction) (*InventoryLot, error) {
+	return uc.applyNamedInventoryLotStatusAction(ctx, in, InventoryLotActionReleaseReinspect, InventoryLotActive)
+}
+
+func (uc *InventoryUsecase) ApproveInventoryLotConcession(ctx context.Context, in *InventoryLotStatusAction) (*InventoryLot, error) {
+	return uc.applyNamedInventoryLotStatusAction(ctx, in, InventoryLotActionApproveConcession, InventoryLotActive)
+}
+
+func (uc *InventoryUsecase) CloseZeroBalanceInventoryLot(ctx context.Context, in *InventoryLotStatusAction) (*InventoryLot, error) {
+	return uc.applyNamedInventoryLotStatusAction(ctx, in, InventoryLotActionCloseZeroBalance, InventoryLotDisabled)
+}
+
+func (uc *InventoryUsecase) applyNamedInventoryLotStatusAction(
+	ctx context.Context,
+	in *InventoryLotStatusAction,
+	actionKey string,
+	targetStatus string,
+) (*InventoryLot, error) {
+	if uc == nil || uc.repo == nil || in == nil {
+		return nil, ErrBadParam
+	}
+	normalized := *in
+	normalized.ActionKey = actionKey
+	normalized.TargetStatus = targetStatus
+	normalized.Reason = strings.TrimSpace(normalized.Reason)
+	normalized.IdempotencyKey = strings.TrimSpace(normalized.IdempotencyKey)
+	if normalized.LotID <= 0 || normalized.ExpectedVersion <= 0 || normalized.ActorID <= 0 ||
+		normalized.Reason == "" || len([]rune(normalized.Reason)) > 255 || normalized.IdempotencyKey == "" || len(normalized.IdempotencyKey) > 128 {
+		return nil, ErrBadParam
+	}
+	hash, err := processCanonicalSHA256(map[string]any{
+		"contract":              "inventory-lot-status-action/v1",
+		"lot_id":                normalized.LotID,
+		"expected_version":      normalized.ExpectedVersion,
+		"action_key":            normalized.ActionKey,
+		"target_status":         normalized.TargetStatus,
+		"reason":                normalized.Reason,
+		"idempotency_key":       normalized.IdempotencyKey,
+		"actor_id":              normalized.ActorID,
+		"quality_inspection_id": normalized.QualityInspectionID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	normalized.IntentHash = hash
+	repo, ok := uc.repo.(InventoryLotStatusActionRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return repo.ApplyInventoryLotStatusAction(ctx, &normalized)
 }
 
 func (uc *InventoryUsecase) CreateInventoryTxn(ctx context.Context, in *InventoryTxnCreate) (*InventoryTxn, error) {

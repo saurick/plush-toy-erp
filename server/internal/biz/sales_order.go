@@ -54,6 +54,11 @@ type SalesOrder struct {
 	PlannedDeliveryDate *time.Time
 	LifecycleStatus     string
 	Version             int
+	SettlementAction    *string
+	SettlementMode      *string
+	SettlementReason    *string
+	SettledAt           *time.Time
+	SettledBy           *int
 	Note                *string
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
@@ -171,6 +176,10 @@ type SalesOrderCancellationActorRepo interface {
 	CancelSalesOrderWithActor(ctx context.Context, id int, actorID int) (*SalesOrder, error)
 }
 
+type SalesOrderLifecycleActionRepo interface {
+	ApplySalesOrderLifecycleAction(ctx context.Context, in *SourceOrderLifecycleAction, lifecycleStatus string) (*SalesOrder, error)
+}
+
 type SalesOrderUsecase struct {
 	repo SalesOrderRepo
 }
@@ -244,8 +253,31 @@ func (uc *SalesOrderUsecase) CloseSalesOrder(ctx context.Context, id int) (*Sale
 	return uc.changeSalesOrderLifecycle(ctx, id, SalesOrderStatusClosed)
 }
 
+func (uc *SalesOrderUsecase) CloseSalesOrderWithAction(ctx context.Context, in *SourceOrderLifecycleAction) (*SalesOrder, error) {
+	return uc.applySalesOrderLifecycleAction(ctx, in, SourceOrderActionClose, SalesOrderStatusClosed)
+}
+
 func (uc *SalesOrderUsecase) CancelSalesOrder(ctx context.Context, id int) (*SalesOrder, error) {
 	return uc.changeSalesOrderLifecycle(ctx, id, SalesOrderStatusCanceled)
+}
+
+func (uc *SalesOrderUsecase) CancelSalesOrderWithAction(ctx context.Context, in *SourceOrderLifecycleAction) (*SalesOrder, error) {
+	return uc.applySalesOrderLifecycleAction(ctx, in, SourceOrderActionCancel, SalesOrderStatusCanceled)
+}
+
+func (uc *SalesOrderUsecase) applySalesOrderLifecycleAction(ctx context.Context, in *SourceOrderLifecycleAction, actionKey string, next string) (*SalesOrder, error) {
+	if uc == nil || uc.repo == nil || in == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := NormalizeSourceOrderLifecycleAction(*in, actionKey)
+	if err != nil {
+		return nil, err
+	}
+	repo, ok := uc.repo.(SalesOrderLifecycleActionRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return repo.ApplySalesOrderLifecycleAction(ctx, &normalized, next)
 }
 
 func (uc *SalesOrderUsecase) CancelSalesOrderWithActor(ctx context.Context, id int, actorID int) (*SalesOrder, error) {

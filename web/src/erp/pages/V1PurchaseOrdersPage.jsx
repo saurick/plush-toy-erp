@@ -21,6 +21,7 @@ import {
 } from '../components/business-list/ColumnOrderModal.jsx'
 import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
+import SourceOrderLifecycleConfirmContent from '../components/business-list/SourceOrderLifecycleConfirmContent.jsx'
 import {
   createBlankPurchaseLine,
   normalizePurchaseLineFormValue,
@@ -116,6 +117,11 @@ import {
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
 import { resolveExactRecordPage } from '../utils/businessPagination.mjs'
 import { resolveBusinessLifecycleActions } from '../utils/businessActionAvailability.mjs'
+import { createSourceBusinessActionAttemptStore } from '../utils/sourceBusinessAction.mjs'
+import {
+  normalizeSourceOrderLifecycleReason,
+  prepareSourceOrderLifecycleAttempt,
+} from '../utils/sourceOrderLifecycleAction.mjs'
 import { MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY } from '../utils/printWorkspace.js'
 import {
   LIFECYCLE_SCOPE,
@@ -869,14 +875,33 @@ export default function V1PurchaseOrdersPage() {
     }
   }
 
-  const runLifecycleAction = async (action, record) => {
+  const runLifecycleAction = async (action, record, reason = '') => {
     if (lifecycleInFlightRef.current || !action || !record) {
       return
     }
     lifecycleInFlightRef.current = true
     setSaving(true)
+    let lifecycleAttempt = null
     try {
-      const updated = await action.run({ id: record.id })
+      let params = { id: record.id }
+      if (action.sourceLifecycle) {
+        lifecycleAttempt = prepareSourceOrderLifecycleAttempt({
+          action,
+          attemptStore: lifecycleAttemptsRef.current,
+          customerKey: activeCustomerKey,
+          reason,
+          record,
+        })
+        params = lifecycleAttempt.attempt.params
+      }
+      const updated = await action.run(params)
+      if (lifecycleAttempt) {
+        lifecycleAttemptsRef.current.settle(
+          lifecycleAttempt.scope,
+          lifecycleAttempt.attempt,
+          null
+        )
+      }
       message.success(action.successMessage || `采购订单已${action.label}`)
       if (updated && action.returnsRecord !== false) {
         setSelectedOrder(updated)
@@ -897,7 +922,22 @@ export default function V1PurchaseOrdersPage() {
         )
       }
     } catch (error) {
-      message.error(getActionErrorMessage(error, `${action.label}采购订单失败`))
+      const resultUnknown = lifecycleAttempt
+        ? lifecycleAttemptsRef.current.settle(
+            lifecycleAttempt.scope,
+            lifecycleAttempt.attempt,
+            error
+          )
+        : false
+      if (resultUnknown) {
+        message.warning(
+          '暂时无法确认订单是否处理成功，请刷新核对最新状态；内容不变时可安全重试'
+        )
+      } else {
+        message.error(
+          getActionErrorMessage(error, `${action.label}采购订单失败`)
+        )
+      }
     } finally {
       lifecycleInFlightRef.current = false
       setSaving(false)
@@ -912,14 +952,30 @@ export default function V1PurchaseOrdersPage() {
       runLifecycleAction(action, record)
       return
     }
+    let reason = ''
     modal.confirm({
       centered: true,
       title: action.confirmTitle,
-      content: action.confirmContent,
+      content: (
+        <SourceOrderLifecycleConfirmContent
+          action={action}
+          onReasonChange={(value) => {
+            reason = value
+          }}
+        />
+      ),
       okText: action.okText || `确认${action.label}`,
       cancelText: '取消',
       okButtonProps: action.danger ? { danger: true } : undefined,
-      onOk: () => runLifecycleAction(action, record),
+      onOk: () => {
+        try {
+          normalizeSourceOrderLifecycleReason(action, reason)
+        } catch (error) {
+          message.warning(error.message)
+          return Promise.reject()
+        }
+        return runLifecycleAction(action, record, reason)
+      },
     })
   }
 
@@ -1263,8 +1319,7 @@ export default function V1PurchaseOrdersPage() {
           ),
         selectionReason: '请先选择一条采购订单',
         busyReason: '当前订单操作完成后可继续办理',
-        getUnavailableReason: (action) =>
-          `当前采购订单状态不能${action.label}`,
+        getUnavailableReason: (action) => `当前采购订单状态不能${action.label}`,
       }),
     [adminProfile, recordActionBusy, singleSelectedOrder]
   )
@@ -1405,9 +1460,7 @@ export default function V1PurchaseOrdersPage() {
             setSelectedOrder(record)
           },
         })}
-        onOpenRecord={
-          recordActionBusy ? undefined : openPurchaseOrderRecord
-        }
+        onOpenRecord={recordActionBusy ? undefined : openPurchaseOrderRecord}
         pagination={{
           current: pagination.current,
           pageSize: pagination.pageSize,

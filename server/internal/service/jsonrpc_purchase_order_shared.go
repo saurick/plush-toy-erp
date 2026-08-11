@@ -106,6 +106,10 @@ func (d *jsonrpcDispatcher) mapPurchaseOrderError(ctx context.Context, err error
 	switch {
 	case errors.Is(err, biz.ErrPurchaseOrderConflict):
 		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: errcode.ResourceVersionConflict.Message}
+	case errors.Is(err, biz.ErrIdempotencyConflict):
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
+	case errors.Is(err, biz.ErrSourceOrderNormalCloseIncomplete):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购订单尚未全部入库；若确定不再收货，请改用短关闭并填写原因"}
 	case errors.Is(err, biz.ErrBadParam):
 		l.Warnf("[purchase_order] invalid param err=%v", err)
 		return invalidParamResult()
@@ -220,6 +224,11 @@ func purchaseOrderToMap(item *biz.PurchaseOrder) map[string]any {
 		"expected_arrival_date":      optionalUnix(item.ExpectedArrivalDate),
 		"lifecycle_status":           item.LifecycleStatus,
 		"version":                    item.Version,
+		"settlement_action":          optionalStringValue(item.SettlementAction),
+		"settlement_mode":            optionalStringValue(item.SettlementMode),
+		"settlement_reason":          optionalStringValue(item.SettlementReason),
+		"settled_at":                 optionalUnix(item.SettledAt),
+		"settled_by":                 optionalIntValue(item.SettledBy),
 		"note":                       optionalStringValue(item.Note),
 		"created_at":                 item.CreatedAt.Unix(),
 		"updated_at":                 item.UpdatedAt.Unix(),

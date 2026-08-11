@@ -63,6 +63,7 @@ var workflowTaskStates = []WorkflowStateOption{
 	{Key: "blocked", Label: "阻塞", Summary: "被缺料、缺资料、未放行或异常等外部条件卡住。"},
 	{Key: "done", Label: "已完成", Summary: "当前任务的完成条件已经达到，可进入下游节点。"},
 	{Key: "rejected", Label: "已退回", Summary: "审批、检验或确认动作未通过，需要回退上一责任人。"},
+	{Key: "withdrawn", Label: "已撤回", Summary: "因来源取消、流程终止或上游补偿由系统撤回，不代表人工退回。"},
 }
 
 var workflowBusinessStates = []WorkflowStateOption{
@@ -153,7 +154,7 @@ func IsValidWorkflowTaskUrgeAction(action string) bool {
 
 func IsTerminalWorkflowTaskStatus(statusKey string) bool {
 	switch strings.TrimSpace(statusKey) {
-	case "done", "rejected":
+	case "done", "rejected", "withdrawn":
 		return true
 	default:
 		return false
@@ -161,7 +162,7 @@ func IsTerminalWorkflowTaskStatus(statusKey string) bool {
 }
 
 func WorkflowTerminalTaskStatusKeys() []string {
-	return []string{"done", "rejected"}
+	return []string{"done", "rejected", "withdrawn"}
 }
 
 func CanTransitionWorkflowTaskStatus(fromStatusKey, toStatusKey string) bool {

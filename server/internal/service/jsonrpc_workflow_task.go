@@ -1357,16 +1357,17 @@ func (d *jsonrpcDispatcher) queryWorkflowRoleTaskView(
 	}
 	if page.Counts != nil {
 		data["counts"] = map[string]any{
-			"ready":    page.Counts.Ready,
-			"blocked":  page.Counts.Blocked,
-			"todo":     page.Counts.Todo,
-			"done":     page.Counts.Done,
-			"rejected": page.Counts.Rejected,
-			"history":  page.Counts.History,
-			"total":    page.Counts.Total,
-			"approval": page.Counts.Approval,
-			"risk":     page.Counts.Risk,
-			"overdue":  page.Counts.Overdue,
+			"ready":     page.Counts.Ready,
+			"blocked":   page.Counts.Blocked,
+			"todo":      page.Counts.Todo,
+			"done":      page.Counts.Done,
+			"rejected":  page.Counts.Rejected,
+			"withdrawn": page.Counts.Withdrawn,
+			"history":   page.Counts.History,
+			"total":     page.Counts.Total,
+			"approval":  page.Counts.Approval,
+			"risk":      page.Counts.Risk,
+			"overdue":   page.Counts.Overdue,
 		}
 		data["risk_scope"] = riskScope
 	}

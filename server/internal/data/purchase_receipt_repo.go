@@ -769,7 +769,7 @@ func (r *inventoryRepo) cancelPostedPurchaseReceipt(ctx context.Context, receipt
 		if err != nil {
 			return nil, err
 		}
-		if err := settleDraftPurchaseReceiptCancellation(ctx, tx, receipt, items); err != nil {
+		if err := settleDraftPurchaseReceiptCancellation(ctx, tx, receipt, items, actorID); err != nil {
 			return nil, err
 		}
 		if err := updatePurchaseReceiptCancelled(ctx, tx, receipt.ID); err != nil {
@@ -894,6 +894,7 @@ func settleDraftPurchaseReceiptCancellation(
 	tx *inventoryDBTx,
 	receipt *ent.PurchaseReceipt,
 	items []*ent.PurchaseReceiptItem,
+	actorID int,
 ) error {
 	if tx == nil || tx.client == nil || receipt == nil || receipt.Status != biz.PurchaseReceiptStatusDraft {
 		return biz.ErrBadParam
@@ -1016,7 +1017,12 @@ func settleDraftPurchaseReceiptCancellation(
 					return biz.ErrBadParam
 				}
 				if originalStatus != lot.Status {
-					if err := updateInventoryLotStatus(ctx, tx, lot.ID, originalStatus); err != nil {
+					if err := updateInventoryLotStatus(ctx, tx, lot.ID, originalStatus, inventoryLotStatusEvidence{
+						ActionKey:           biz.InventoryLotActionRestoreQualityCancel,
+						Reason:              "采购收货单取消后恢复待检批次",
+						ActorID:             actorID,
+						QualityInspectionID: inspection.ID,
+					}); err != nil {
 						return err
 					}
 				}
@@ -1027,7 +1033,11 @@ func settleDraftPurchaseReceiptCancellation(
 		}
 	}
 	for _, lotID := range preparedLotIDs {
-		if err := updateInventoryLotStatus(ctx, tx, lotID, biz.InventoryLotDisabled); err != nil {
+		if err := updateInventoryLotStatus(ctx, tx, lotID, biz.InventoryLotDisabled, inventoryLotStatusEvidence{
+			ActionKey: biz.InventoryLotActionCloseZeroBalance,
+			Reason:    "采购收货单取消且批次余额为零",
+			ActorID:   actorID,
+		}); err != nil {
 			return err
 		}
 	}

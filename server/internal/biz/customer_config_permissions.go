@@ -138,7 +138,7 @@ func processDomainCommandRequiredPermission(commandKey string) string {
 	case ProcessDomainCommandSalesOrderSubmit:
 		return PermissionSalesOrderSubmit
 	case ProcessDomainCommandPurchaseOrderSubmit:
-		return PermissionPurchaseOrderUpdate
+		return PermissionPurchaseOrderSubmit
 	case ProcessDomainCommandPurchaseReceiptCreate:
 		return PermissionPurchaseReceiptCreate
 	case ProcessDomainCommandIncomingQualityGate, ProcessDomainCommandFinishedGoodsQualityDecide:

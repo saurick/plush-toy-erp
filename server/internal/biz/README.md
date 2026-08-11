@@ -21,6 +21,8 @@
 - repository interface 定义在 `biz`，实现位于 `data`；`biz` 不直接依赖 Ent、SQL 或数据库驱动。
 - 可复用的纯状态机、值对象、领域错误和计算规则进入 [`core`](../core/README.md)，UseCase、权限、幂等、事务编排和外部依赖仍留在 `biz / data` 主路径。
 - `WorkflowUsecase` 只维护协同任务和事件，Workflow task done 不等于 Fact posted；事实写入必须经过对应 Fact UseCase 或显式 ProcessRuntime 领域命令边界。
+- ProcessRuntime 的节点结算、路由回执、block / resume、来源取消撤回和补偿恢复只使用持久证据与 CAS；无法证明实际路径时失败关闭，不引入自由表达式或通用 BPMN 解释器。
+- 销售、采购和委外的高风险生命周期动作使用统一的版本、幂等、actor、原因 / 结清模式信封，但各领域仍在自己的 repository 事务内校验履约量、终结明细并保存回执。
 
 ## 相关入口
 

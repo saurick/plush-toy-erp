@@ -12,6 +12,7 @@ func isCustomerConfigRuntimeAccessMethod(method string) bool {
 	switch method {
 	case "get_process_recovery_context",
 		"recover_compensated_process_domain_command",
+		"resume_blocked_process_node",
 		"get_effective_session",
 		"explain_module_status",
 		"explain_process_definition":
@@ -73,6 +74,32 @@ func (d *jsonrpcDispatcher) handleCustomerConfigRuntimeAccess(
 			Code:    errcode.OK.Code,
 			Message: errcode.OK.Message,
 			Data:    newDataStruct(map[string]any{"recovered_node": processNodeInstanceToMap(item)}),
+		}, nil
+
+	case "resume_blocked_process_node":
+		if !customerConfigAllowsOnly(pm, "process_instance_id", "process_node_instance_id", "expected_version", "reason") {
+			return id, invalidParamResult(), nil
+		}
+		if res := d.RequireAdminPermission(ctx, biz.PermissionProcessRuntimeRecover); res != nil {
+			return id, res, nil
+		}
+		admin, res := d.CurrentAdmin(ctx)
+		if res != nil {
+			return id, res, nil
+		}
+		item, err := d.processRuntimeUC.ResumeProcessNodeInstance(ctx, &biz.ProcessNodeInstanceResume{
+			ProcessInstanceID:     getInt(pm, "process_instance_id", 0),
+			ProcessNodeInstanceID: getInt(pm, "process_node_instance_id", 0),
+			ExpectedVersion:       getInt(pm, "expected_version", 0),
+			Reason:                getString(pm, "reason"),
+		}, admin.ID)
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data:    newDataStruct(map[string]any{"resumed_node": processNodeInstanceToMap(item)}),
 		}, nil
 
 	case "get_effective_session":

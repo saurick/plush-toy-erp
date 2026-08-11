@@ -48,6 +48,11 @@ type PurchaseOrder struct {
 	ExpectedArrivalDate     *time.Time
 	LifecycleStatus         string
 	Version                 int
+	SettlementAction        *string
+	SettlementMode          *string
+	SettlementReason        *string
+	SettledAt               *time.Time
+	SettledBy               *int
 	Note                    *string
 	CreatedAt               time.Time
 	UpdatedAt               time.Time
@@ -190,6 +195,10 @@ type PurchaseOrderReceiptProgressRepo interface {
 	GetPurchaseOrderReceiptProgress(ctx context.Context, id int) (*PurchaseOrderReceiptProgress, error)
 }
 
+type PurchaseOrderLifecycleActionRepo interface {
+	ApplyPurchaseOrderLifecycleAction(ctx context.Context, in *SourceOrderLifecycleAction, lifecycleStatus string) (*PurchaseOrder, error)
+}
+
 type PurchaseOrderUsecase struct {
 	repo PurchaseOrderRepo
 }
@@ -298,8 +307,31 @@ func (uc *PurchaseOrderUsecase) ClosePurchaseOrder(ctx context.Context, id int) 
 	return uc.changePurchaseOrderLifecycle(ctx, id, PurchaseOrderStatusClosed)
 }
 
+func (uc *PurchaseOrderUsecase) ClosePurchaseOrderWithAction(ctx context.Context, in *SourceOrderLifecycleAction) (*PurchaseOrder, error) {
+	return uc.applyPurchaseOrderLifecycleAction(ctx, in, SourceOrderActionClose, PurchaseOrderStatusClosed)
+}
+
 func (uc *PurchaseOrderUsecase) CancelPurchaseOrder(ctx context.Context, id int) (*PurchaseOrder, error) {
 	return uc.changePurchaseOrderLifecycle(ctx, id, PurchaseOrderStatusCanceled)
+}
+
+func (uc *PurchaseOrderUsecase) CancelPurchaseOrderWithAction(ctx context.Context, in *SourceOrderLifecycleAction) (*PurchaseOrder, error) {
+	return uc.applyPurchaseOrderLifecycleAction(ctx, in, SourceOrderActionCancel, PurchaseOrderStatusCanceled)
+}
+
+func (uc *PurchaseOrderUsecase) applyPurchaseOrderLifecycleAction(ctx context.Context, in *SourceOrderLifecycleAction, actionKey string, next string) (*PurchaseOrder, error) {
+	if uc == nil || uc.repo == nil || in == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := NormalizeSourceOrderLifecycleAction(*in, actionKey)
+	if err != nil {
+		return nil, err
+	}
+	repo, ok := uc.repo.(PurchaseOrderLifecycleActionRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return repo.ApplyPurchaseOrderLifecycleAction(ctx, &normalized, next)
 }
 
 func (uc *PurchaseOrderUsecase) AddPurchaseOrderItem(ctx context.Context, in *PurchaseOrderItemMutation) (*PurchaseOrderItem, error) {

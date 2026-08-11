@@ -82,6 +82,28 @@ test('workflow task event presentation keeps unknown event keys out of user copy
   assert.doesNotMatch(item.actorLabel, /unknown_internal_role/u)
 })
 
+test('workflow task event presentation keeps system withdrawal distinct from rejection', () => {
+  const event = presentWorkflowTaskEvent({
+    event_type: 'source_cancelled_withdrawal',
+    from_status_key: 'ready',
+    to_status_key: 'withdrawn',
+    reason: '来源单据已取消',
+  })
+  assert.equal(event.label, '来源取消，任务已撤回')
+  assert.equal(event.transitionLabel, '待处理 → 已撤回')
+  assert.equal(event.reason, '来源单据已取消')
+
+  const items = buildWorkflowTaskResponsibilityItems({
+    owner_role_key: 'sales',
+    task_status_key: 'withdrawn',
+    blocked_reason: '来源单据已取消',
+  })
+  assert.equal(
+    items.find((item) => item.key === 'current-reason')?.label,
+    '当前撤回原因'
+  )
+})
+
 test('workflow task responsibility summary avoids exposing assignee ids', () => {
   const items = buildWorkflowTaskResponsibilityItems({
     owner_role_key: 'quality',

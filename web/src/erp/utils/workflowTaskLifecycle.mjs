@@ -1,6 +1,7 @@
 export const TERMINAL_WORKFLOW_TASK_STATUS_KEYS = Object.freeze([
   'done',
   'rejected',
+  'withdrawn',
 ])
 
 export const TERMINAL_TASK_STATUS_KEYS = new Set(

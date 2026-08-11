@@ -3,7 +3,7 @@ package biz
 import "testing"
 
 func TestWorkflowTaskStatusAvailabilityContract(t *testing.T) {
-	wantKnown := []string{"ready", "blocked", "done", "rejected"}
+	wantKnown := []string{"ready", "blocked", "done", "rejected", "withdrawn"}
 	states := WorkflowTaskStates()
 	if len(states) != len(wantKnown) {
 		t.Fatalf("workflow task status registry has %d keys, want %d", len(states), len(wantKnown))
@@ -32,7 +32,7 @@ func TestWorkflowTaskStatusAvailabilityContract(t *testing.T) {
 		}
 	}
 
-	wantTerminal := []string{"done", "rejected"}
+	wantTerminal := []string{"done", "rejected", "withdrawn"}
 	gotTerminal := WorkflowTerminalTaskStatusKeys()
 	if len(gotTerminal) != len(wantTerminal) {
 		t.Fatalf("terminal workflow task status registry has %d keys, want %d", len(gotTerminal), len(wantTerminal))
@@ -64,7 +64,7 @@ func TestWorkflowTaskTransitionContractIsTargetOnly(t *testing.T) {
 		},
 	}
 	statuses := []string{
-		"ready", "blocked", "done", "rejected",
+		"ready", "blocked", "done", "rejected", "withdrawn",
 		"pending", "processing", "cancelled", "closed",
 		"unknown", "",
 	}
@@ -81,7 +81,7 @@ func TestWorkflowTaskTransitionContractIsTargetOnly(t *testing.T) {
 func TestWorkflowTaskBreakGlassCannotBypassTransitionContract(t *testing.T) {
 	admin := &AdminUser{ID: 7, IsSuperAdmin: true}
 	assigneeID := admin.ID
-	for _, status := range []string{"pending", "blocked", "done", "rejected", "cancelled", "closed"} {
+	for _, status := range []string{"pending", "blocked", "done", "rejected", "withdrawn", "cancelled", "closed"} {
 		task := &WorkflowTask{TaskStatusKey: status, AssigneeID: &assigneeID}
 		if CanAdminHandleWorkflowTask(admin, task, "done") {
 			t.Errorf("break-glass admin must not complete task from %q", status)
@@ -103,7 +103,7 @@ func TestWorkflowTaskUrgeContractIsTargetOnly(t *testing.T) {
 			t.Errorf("assigned admin should be allowed to urge task from %q", status)
 		}
 	}
-	for _, status := range []string{"done", "rejected", "pending", "processing", "cancelled", "closed", "unknown", ""} {
+	for _, status := range []string{"done", "rejected", "withdrawn", "pending", "processing", "cancelled", "closed", "unknown", ""} {
 		task := &WorkflowTask{TaskStatusKey: status, AssigneeID: &assigneeID}
 		if CanAdminUrgeWorkflowTask(admin, task) {
 			t.Errorf("admin must not urge task from terminal or non-target status %q", status)
