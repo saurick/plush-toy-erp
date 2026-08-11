@@ -69,8 +69,8 @@ test("affected: docs-only changes stay at T1", () => {
     "scripts/qa/docs-inventory.test.mjs",
     "scripts/qa/yoyoosun-role-flow-handbook.test.mjs",
   ]);
-  assert.equal(plan.highestLevel, "T1");
-  assert.equal(plan.requiresFull, false);
+  assert.equal(plan.maxAffectedScope, "T1");
+  assert.equal(plan.localGate, "focused");
 });
 
 test("affected: project skill changes run the repository skill health gate", () => {
@@ -81,7 +81,7 @@ test("affected: project skill changes run the repository skill health gate", () 
 
   assert.deepEqual(ids(plan), ["diff-check", "docs-inventory", "skill-health"]);
   assert.equal(plan.followUps.length, 0);
-  assert.equal(plan.highestLevel, "T1");
+  assert.equal(plan.maxAffectedScope, "T1");
 });
 
 test("affected: customer raw-source README selects the fail-closed privacy boundary", () => {
@@ -98,7 +98,7 @@ test("affected: customer raw-source README selects the fail-closed privacy bound
       ),
     ),
   );
-  assert.equal(plan.highestLevel, "T6");
+  assert.equal(plan.maxAffectedScope, "T6");
 });
 
 test("affected: non-public customer config binary selects the privacy boundary", () => {
@@ -119,7 +119,7 @@ test("affected: non-public customer config binary selects the privacy boundary",
       item.args.includes("scripts/qa/customer-package-lint.test.mjs"),
     ),
   );
-  assert.equal(plan.highestLevel, "T6");
+  assert.equal(plan.maxAffectedScope, "T6");
 });
 
 test("affected: CI workflow changes run the repository CI contract", () => {
@@ -131,7 +131,7 @@ test("affected: CI workflow changes run the repository CI contract", () => {
     ),
   );
   assert(plan.followUps.some((item) => item.id === "remote-ci-enforcement"));
-  assert.equal(plan.requiresFull, false);
+  assert.equal(plan.localGate, "focused");
 });
 
 test("affected: release workflow changes run the immutable release contract", () => {
@@ -151,7 +151,7 @@ test("affected: release workflow changes run the immutable release contract", ()
     false,
   );
   assert(plan.followUps.some((item) => item.id === "remote-ci-enforcement"));
-  assert.equal(plan.requiresFull, false);
+  assert.equal(plan.localGate, "focused");
 });
 
 test("affected: broad canonical audit is non-blocking and explicit", () => {
@@ -173,7 +173,7 @@ test("affected: broad canonical audit is non-blocking and explicit", () => {
       (item) => item.id === "experimental-canonical-audit",
     ),
   );
-  assert.equal(auditPlan.requiresFull, false);
+  assert.equal(auditPlan.localGate, "focused");
 });
 
 test("affected: a web helper with a sibling test uses the focused test", () => {
@@ -199,7 +199,7 @@ test("affected: a web helper with a sibling test uses the focused test", () => {
     "--test",
   ]);
   assert.equal(ids(plan).includes("web-test"), false);
-  assert.equal(plan.highestLevel, "T5");
+  assert.equal(plan.maxAffectedScope, "T5");
 });
 
 test("affected: a page without a sibling test expands to web tests and browser follow-up", () => {
@@ -281,8 +281,8 @@ test("affected: schema catalog and generated data dictionary run drift checks", 
       ),
       file,
     );
-    assert.equal(plan.requiresFull, false, file);
-    assert.equal(plan.highestLevel, "T1", file);
+    assert.equal(plan.localGate, "focused", file);
+    assert.equal(plan.maxAffectedScope, "T1", file);
   }
 });
 
@@ -297,7 +297,7 @@ test("affected: schema-doc generator changes run server and projection tests", (
       item.args.includes("scripts/qa/schema-docs.test.mjs"),
     ),
   );
-  assert.equal(plan.requiresFull, false);
+  assert.equal(plan.localGate, "focused");
 });
 
 test("affected: business fact repo changes include the local PostgreSQL transaction gate", () => {
@@ -309,7 +309,7 @@ test("affected: business fact repo changes include the local PostgreSQL transact
   assert(ids(plan).includes("critical-pg-create"));
   assert(ids(plan).includes("critical-pg-migrate"));
   assert(ids(plan).includes("critical-pg-test"));
-  assert.equal(plan.highestLevel, "T7");
+  assert.equal(plan.maxAffectedScope, "T7");
 });
 
 test("affected: transactional workflow and customer repositories select critical PostgreSQL", () => {
@@ -339,7 +339,7 @@ test("affected: role task quantity contract always selects PostgreSQL and browse
       plan.followUps.some((item) => item.id === "browser-regression"),
       file,
     );
-    assert.equal(plan.highestLevel, "T7", file);
+    assert.equal(plan.maxAffectedScope, "T7", file);
   }
 });
 
@@ -351,11 +351,11 @@ test("affected: customer config changes select the T6 boundary suite", () => {
     },
   );
 
-  assert(plan.levels.includes("T6"));
+  assert(plan.affectedScopes.includes("T6"));
   const configCommand = plan.commands.find((item) =>
     item.args.includes("scripts/qa/customer-config-runtime-manifest.test.mjs"),
   );
-  assert.equal(configCommand?.level, "T6");
+  assert.equal(configCommand?.scope, "T6");
   assert(
     plan.commands.some((item) =>
       item.args.includes("config/customers/index.test.mjs"),
@@ -451,7 +451,7 @@ test("affected: QA shell scripts keep syntax proof and escalate without a siblin
     "diff-check",
     "full",
   ]);
-  assert.equal(noSibling.requiresFull, true);
+  assert.equal(noSibling.localGate, "full");
 
   const withSibling = buildAffectedPlan(["scripts/qa/db-guard.sh"], {
     root: ROOT,
@@ -471,7 +471,7 @@ test("affected: migration preflight SQL files run only their static fail-closed 
     "scripts/qa/customer-config-cutover-20260714055825.sql",
   ]) {
     const plan = buildAffectedPlan([file], { root: ROOT });
-    assert.equal(plan.requiresFull, false, file);
+    assert.equal(plan.localGate, "focused", file);
     assert.deepEqual(ids(plan), [
       "diff-check",
       "node-tests:scripts/qa/populated-upgrade-preflight.test.mjs",
@@ -485,7 +485,7 @@ test("affected: populated upgrade fixture runs the static PostgreSQL gate contra
     "scripts/qa/fixtures/net-weight-kg-to-g-20260714165115.sql",
   ]) {
     const plan = buildAffectedPlan([fixture], { root: ROOT });
-    assert.equal(plan.requiresFull, false, fixture);
+    assert.equal(plan.localGate, "focused", fixture);
     assert(
       plan.commands.some((item) =>
         item.args.includes("scripts/qa/critical-postgres-gate.test.mjs"),
@@ -538,8 +538,10 @@ test("affected: deployment changes conservatively select full plus release follo
   });
 
   assert.deepEqual(ids(plan), ["diff-check", "full"]);
-  assert.equal(plan.requiresFull, true);
-  assert.equal(plan.highestLevel, "T8");
+  assert.equal(plan.localGate, "full");
+  assert.equal(plan.maxAffectedScope, "T8");
+  assert(plan.affectedScopes.includes("T8"));
+  assert.equal(plan.commands.find((item) => item.id === "full")?.scope, "LOCAL_FULL");
   assert(plan.followUps.some((item) => item.id === "release-validation"));
 });
 
@@ -547,7 +549,10 @@ test("affected: unknown paths fail safe to full instead of silently skipping", (
   const plan = buildAffectedPlan(["unknown/new-tool.txt"], { root: ROOT });
 
   assert.deepEqual(ids(plan), ["diff-check", "full"]);
-  assert.equal(plan.requiresFull, true);
+  assert.equal(plan.localGate, "full");
+  assert.deepEqual(plan.affectedScopes, ["T0"]);
+  assert.equal(plan.maxAffectedScope, "T0");
+  assert.equal(plan.commands.find((item) => item.id === "full")?.scope, "LOCAL_FULL");
 });
 
 test("affected: full subsumes focused commands but keeps browser follow-up visible", () => {
@@ -570,4 +575,5 @@ test("affected: formatted plan keeps final clean HEAD preparation mandatory", ()
 
   assert.match(output, /prepare-push\.sh.*full 回执/u);
   assert.match(output, /affected 通过不代表发布或目标环境验收完成/u);
+  assert.match(output, /scopes=T0,T1 max_scope=T1 local_gate=focused/u);
 });

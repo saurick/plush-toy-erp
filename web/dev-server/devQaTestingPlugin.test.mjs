@@ -164,20 +164,20 @@ test('testing plan is read-only, relative and fails closed on identity drift', a
   const root = await project(t)
   const affected = {
     changedFiles: ['web/src/example.mjs'],
-    levels: ['T0', 'T3'],
-    highestLevel: 'T3',
-    requiresFull: false,
+    affectedScopes: ['T0', 'T3'],
+    maxAffectedScope: 'T3',
+    localGate: 'focused',
     commands: [
       {
         id: 'web',
-        level: 'T3',
+        scope: 'T3',
         label: 'Web test',
         bin: 'node',
         args: ['--test', 'web/src/example.test.mjs'],
         cwd: '.',
       },
     ],
-    followUps: [{ level: 'T5', text: '运行真实浏览器回归' }],
+    followUps: [{ scope: 'T5', text: '运行真实浏览器回归' }],
     prePushGate: 'bash scripts/qa/prepare-push.sh',
   }
   const service = createDevQaTestingService({
@@ -188,10 +188,14 @@ test('testing plan is read-only, relative and fails closed on identity drift', a
     now: () => new Date('2026-07-30T10:00:00.000Z'),
   })
   const plan = await service.plan()
+  assert.equal(plan.schemaVersion, 'plush.dev-qa-testing-plan/v2')
   assert.equal(plan.changedCount, 1)
+  assert.deepEqual(plan.affectedScopes, ['T0', 'T3'])
+  assert.equal(plan.maxAffectedScope, 'T3')
+  assert.equal(plan.localGate, 'focused')
   assert.equal(plan.commands[0].command.includes(root), false)
   assert.deepEqual(plan.followUps, [
-    { level: 'T5', text: '运行真实浏览器回归' },
+    { scope: 'T5', text: '运行真实浏览器回归' },
   ])
   assert.deepEqual(service.summary().hooks, READY_HOOKS)
 

@@ -1107,10 +1107,10 @@ export function buildCoverageEvidence({
   );
   domains.import = stageExecutions.import;
 
-  const requiredLevels = new Set(affectedPlan?.levels || []);
-  const gateRequired = (level) => requiredLevels.has(level);
-  const missingOrNotApplicable = (level, missingNote, notApplicableNote) =>
-    gateRequired(level)
+  const requiredScopes = new Set(affectedPlan?.affectedScopes || []);
+  const gateRequired = (scope) => requiredScopes.has(scope);
+  const missingOrNotApplicable = (scope, missingNote, notApplicableNote) =>
+    gateRequired(scope)
       ? missingRequiredGate(missingNote)
       : notApplicableGate(notApplicableNote);
   const t8 =
@@ -1199,13 +1199,13 @@ export function buildCoverageEvidence({
         "no-uat",
       ],
       affectedPlan: {
-        levels: [...requiredLevels],
-        highestLevel: affectedPlan?.highestLevel || "T0",
-        requiresFull: affectedPlan?.requiresFull === true,
+        affectedScopes: [...requiredScopes],
+        maxAffectedScope: affectedPlan?.maxAffectedScope || "T0",
+        localGate: affectedPlan?.localGate || "focused",
         changedFileCount: affectedPlan?.changedFiles?.length || 0,
-        followUps: (affectedPlan?.followUps || []).map(({ id, level }) => ({
+        followUps: (affectedPlan?.followUps || []).map(({ id, scope }) => ({
           id,
-          level,
+          scope,
         })),
       },
     },

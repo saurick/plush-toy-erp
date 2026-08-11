@@ -147,7 +147,9 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
 const COMMIT_PATTERN = /^[0-9a-f]{40,64}$/u
 const HASH_PATTERN = /^[0-9a-f]{64}$/u
-const LEVEL_PATTERN = /^T[0-8]$/u
+const AFFECTED_SCOPE_PATTERN = /^T[0-8]$/u
+const PLAN_COMMAND_SCOPE_PATTERN = /^(?:T[0-8]|LOCAL_FULL)$/u
+const LOCAL_GATE_VALUES = Object.freeze(['focused', 'full'])
 const IDEMPOTENCY_PATTERN =
   /^testing:(fast|role-access|field-linkage):([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/u
 const STATUS_META = Object.freeze({
@@ -387,11 +389,11 @@ export function getDevTestingGitHookStatusMeta(status) {
 function normalizePlanCommand(command) {
   assertExactKeys(
     command,
-    ['command', 'cwd', 'id', 'label', 'level'],
+    ['command', 'cwd', 'id', 'label', 'scope'],
     'testing plan command'
   )
   if (
-    !LEVEL_PATTERN.test(command.level) ||
+    !PLAN_COMMAND_SCOPE_PATTERN.test(command.scope) ||
     typeof command.cwd !== 'string' ||
     command.cwd.length < 1 ||
     command.cwd.startsWith('/') ||
@@ -401,7 +403,7 @@ function normalizePlanCommand(command) {
   }
   return {
     id: safeText(command.id, 'testing plan command id', 100),
-    level: command.level,
+    scope: command.scope,
     label: safeText(command.label, 'testing plan command label', 200),
     cwd: command.cwd,
     command: safeText(command.command, 'testing plan command text', 1000),
@@ -409,12 +411,12 @@ function normalizePlanCommand(command) {
 }
 
 function normalizePlanFollowUp(item) {
-  assertExactKeys(item, ['level', 'text'], 'testing plan follow-up')
-  if (!LEVEL_PATTERN.test(item.level)) {
+  assertExactKeys(item, ['scope', 'text'], 'testing plan follow-up')
+  if (!AFFECTED_SCOPE_PATTERN.test(item.scope)) {
     throw new Error('testing plan follow-up is invalid')
   }
   return {
-    level: item.level,
+    scope: item.scope,
     text: safeText(item.text, 'testing plan follow-up text', 1000),
   }
 }
@@ -423,29 +425,30 @@ export function normalizeDevTestingPlan(plan) {
   assertExactKeys(
     plan,
     [
+      'affectedScopes',
       'changedCount',
       'commands',
       'followUps',
       'generatedAt',
-      'highestLevel',
-      'levels',
+      'localGate',
+      'maxAffectedScope',
       'prePushGate',
       'repository',
-      'requiresFull',
       'schemaVersion',
     ],
     'testing plan'
   )
   if (
-    plan.schemaVersion !== 'plush.dev-qa-testing-plan/v1' ||
+    plan.schemaVersion !== 'plush.dev-qa-testing-plan/v2' ||
     !isIsoDate(plan.generatedAt) ||
     !Number.isSafeInteger(plan.changedCount) ||
     plan.changedCount < 0 ||
-    !Array.isArray(plan.levels) ||
-    plan.levels.length < 1 ||
-    !plan.levels.every((level) => LEVEL_PATTERN.test(level)) ||
-    !LEVEL_PATTERN.test(plan.highestLevel) ||
-    typeof plan.requiresFull !== 'boolean' ||
+    !Array.isArray(plan.affectedScopes) ||
+    plan.affectedScopes.length < 1 ||
+    !plan.affectedScopes.every((scope) => AFFECTED_SCOPE_PATTERN.test(scope)) ||
+    !AFFECTED_SCOPE_PATTERN.test(plan.maxAffectedScope) ||
+    plan.affectedScopes.at(-1) !== plan.maxAffectedScope ||
+    !LOCAL_GATE_VALUES.includes(plan.localGate) ||
     !Array.isArray(plan.commands) ||
     !Array.isArray(plan.followUps) ||
     plan.prePushGate !== 'bash scripts/qa/prepare-push.sh'
@@ -455,7 +458,7 @@ export function normalizeDevTestingPlan(plan) {
   return {
     ...plan,
     repository: normalizeRepository(plan.repository),
-    levels: [...plan.levels],
+    affectedScopes: [...plan.affectedScopes],
     commands: plan.commands.map(normalizePlanCommand),
     followUps: plan.followUps.map(normalizePlanFollowUp),
   }

@@ -428,12 +428,13 @@ function governance() {
 
 function gaps() {
   return {
-    schemaVersion: 'plush.quality-gate-gap-analysis/v1',
+    schemaVersion: 'plush.quality-gate-gap-analysis/v2',
     range: 'current',
     risk: 'all',
     changedCount: 18,
-    highestLevel: 'T5',
-    requiresFull: true,
+    affectedScopes: ['T0', 'T1', 'T5'],
+    maxAffectedScope: 'T5',
+    localGate: 'full',
     matched: true,
     categories: [
       {

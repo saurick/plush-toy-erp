@@ -667,11 +667,11 @@ function ValidationPlanPanel({ plan, loading, error, busy, onGenerate }) {
             </span>
             <span>
               <small>验证范围</small>
-              <b>{plan.levels.join(' · ')}</b>
+              <b>{plan.affectedScopes.join(' · ')}</b>
             </span>
             <span>
-              <small>最高层级</small>
-              <b>{plan.highestLevel}</b>
+              <small>最广受影响范围</small>
+              <b>{plan.maxAffectedScope}</b>
             </span>
             <span>
               <small>仓库身份</small>
@@ -688,7 +688,7 @@ function ValidationPlanPanel({ plan, loading, error, busy, onGenerate }) {
               />
             </span>
           </div>
-          {plan.requiresFull ? (
+          {plan.localGate === 'full' ? (
             <Alert
               showIcon
               type="warning"
@@ -704,7 +704,11 @@ function ValidationPlanPanel({ plan, loading, error, busy, onGenerate }) {
                   {plan.commands.map((command) => (
                     <li key={command.id}>
                       <span>
-                        [{command.level}] {command.label}
+                        [
+                        {command.scope === 'LOCAL_FULL'
+                          ? '本地完整门禁'
+                          : command.scope}
+                        ] {command.label}
                       </span>
                       <code>{command.command}</code>
                     </li>
@@ -719,8 +723,8 @@ function ValidationPlanPanel({ plan, loading, error, busy, onGenerate }) {
               {plan.followUps.length > 0 ? (
                 <ul>
                   {plan.followUps.map((item, index) => (
-                    <li key={`${item.level}-${index}`}>
-                      [{item.level}] {item.text}
+                    <li key={`${item.scope}-${index}`}>
+                      [{item.scope}] {item.text}
                     </li>
                   ))}
                 </ul>

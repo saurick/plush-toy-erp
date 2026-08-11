@@ -507,7 +507,7 @@ test("generic aggregate receipts cannot fabricate runtime acceptance", () => {
   ]);
 });
 
-test("coverage evidence freezes affected levels and leaves unexecuted gates open", () => {
+test("coverage evidence freezes affected scopes and leaves unexecuted gates open", () => {
   const stageExecutions = Object.fromEntries(
     BASELINE_STAGE_KEYS.map((key) => [key, passedExecution(key)]),
   );
@@ -560,10 +560,10 @@ test("coverage evidence freezes affected levels and leaves unexecuted gates open
     },
     affectedPlan: {
       changedFiles: ["server/internal/example.go", "web/src/example.mjs"],
-      levels: ["T0", "T2", "T5", "T7", "T8"],
-      highestLevel: "T8",
-      requiresFull: true,
-      followUps: [{ id: "browser", level: "T7" }],
+      affectedScopes: ["T0", "T2", "T5", "T7", "T8"],
+      maxAffectedScope: "T8",
+      localGate: "full",
+      followUps: [{ id: "browser", scope: "T7" }],
     },
   });
 
@@ -575,12 +575,17 @@ test("coverage evidence freezes affected levels and leaves unexecuted gates open
   assert.equal(evidence.gates.T7.status, "missing");
   assert.equal(evidence.gates.T8.status, "missing");
   assert.equal(evidence.collector.affectedPlan.changedFileCount, 2);
-  assert.deepEqual(evidence.collector.affectedPlan.levels, [
+  assert.deepEqual(evidence.collector.affectedPlan.affectedScopes, [
     "T0",
     "T2",
     "T5",
     "T7",
     "T8",
+  ]);
+  assert.equal(evidence.collector.affectedPlan.maxAffectedScope, "T8");
+  assert.equal(evidence.collector.affectedPlan.localGate, "full");
+  assert.deepEqual(evidence.collector.affectedPlan.followUps, [
+    { id: "browser", scope: "T7" },
   ]);
   const frontend = evidence.businessCoverage.domains.find(
     (domain) => domain.key === "frontend",

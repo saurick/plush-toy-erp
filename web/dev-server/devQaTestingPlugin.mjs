@@ -192,7 +192,7 @@ function publicPlanCommand(selected) {
   const body = [selected.bin, ...selected.args].map(shellQuote).join(' ')
   return {
     id: selected.id,
-    level: selected.level,
+    scope: selected.scope,
     label: selected.label,
     cwd: selected.cwd,
     command: selected.cwd === '.' ? body : `(cd ${selected.cwd} && ${body})`,
@@ -576,16 +576,16 @@ export function createDevQaTestingService({
         throw error
       }
       return {
-        schemaVersion: 'plush.dev-qa-testing-plan/v1',
+        schemaVersion: 'plush.dev-qa-testing-plan/v2',
         generatedAt: now().toISOString(),
         repository,
         changedCount: affected.changedFiles.length,
-        levels: affected.levels,
-        highestLevel: affected.highestLevel,
-        requiresFull: affected.requiresFull,
+        affectedScopes: affected.affectedScopes,
+        maxAffectedScope: affected.maxAffectedScope,
+        localGate: affected.localGate,
         commands: affected.commands.map(publicPlanCommand),
-        followUps: affected.followUps.map(({ level, text }) => ({
-          level,
+        followUps: affected.followUps.map(({ scope, text }) => ({
+          scope,
           text,
         })),
         prePushGate: affected.prePushGate,
