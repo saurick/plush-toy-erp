@@ -9,6 +9,7 @@ import {
 import AuthGuard from '@/common/auth/AuthGuard'
 import { getStoredAdminProfile } from '@/common/auth/auth'
 import { Loading } from '@/common/components/loading'
+import LegalNoticeGate from '@/common/legal/LegalNoticeGate'
 import {
   isDynamicImportLoadError,
   lazyWithDynamicImportRetry,
@@ -29,6 +30,9 @@ import { canOpenPrintWorkspaceFromWindowState } from './utils/printWorkspace.js'
 const lazyRoute = lazyWithDynamicImportRetry
 
 const AdminLoginPage = lazyRoute(() => import('@/pages/AdminLogin'))
+const LegalDocumentPage = lazyRoute(
+  () => import('@/common/legal/LegalDocumentPage')
+)
 const EntrySelectionPage = lazyRoute(() => import('./pages/EntrySelectionPage'))
 const BusinessDashboardPage = lazyRoute(
   () => import('./pages/BusinessDashboardPage')
@@ -263,7 +267,9 @@ function DesktopShellRoute() {
 
   return (
     <AuthGuard requireAdmin>
-      <ERPLayout />
+      <LegalNoticeGate>
+        <ERPLayout />
+      </LegalNoticeGate>
     </AuthGuard>
   )
 }
@@ -271,7 +277,9 @@ function DesktopShellRoute() {
 function MobileShellRoute() {
   return (
     <AuthGuard requireAdmin>
-      <MobileAppLayout />
+      <LegalNoticeGate>
+        <MobileAppLayout />
+      </LegalNoticeGate>
     </AuthGuard>
   )
 }
@@ -287,10 +295,20 @@ export default function ERPRouter() {
           <Route path="/" element={<RootEntryRedirect />} />
           <Route path="/admin-login" element={<AdminLoginPage />} />
           <Route
+            path="/legal/privacy"
+            element={<LegalDocumentPage documentKey="privacy" />}
+          />
+          <Route
+            path="/legal/system-rules"
+            element={<LegalDocumentPage documentKey="system-rules" />}
+          />
+          <Route
             path="/entry"
             element={
               <AuthGuard requireAdmin>
-                <EntrySelectionPage />
+                <LegalNoticeGate>
+                  <EntrySelectionPage />
+                </LegalNoticeGate>
               </AuthGuard>
             }
           />

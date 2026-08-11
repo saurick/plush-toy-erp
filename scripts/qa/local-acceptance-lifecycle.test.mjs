@@ -170,6 +170,21 @@ function fakeRuntime({ failAt = "", residual = "" } = {}) {
         ok: true,
         completedStages: 9,
         report: "output/dataset.json",
+        dataVersion: "2026.07.16-v5",
+        chainDataDigest: "a".repeat(64),
+        chainVerificationDigest: "b".repeat(64),
+        startedAt: "2026-07-28T00:01:00.000Z",
+        completedAt: "2026-07-28T00:02:00.000Z",
+        durationMs: 60_000,
+        stageTimings: [
+          {
+            key: "core",
+            status: "completed",
+            startedAt: "2026-07-28T00:01:00.000Z",
+            completedAt: "2026-07-28T00:01:01.000Z",
+            durationMs: 1_000,
+          },
+        ],
       });
     },
     async startWeb() {
@@ -255,6 +270,8 @@ test("local acceptance lifecycle runs read-only evidence before cloned real writ
     existing: [],
   });
   assert.equal(report.boundary.customerUAT, false);
+  assert.equal(report.evidence.dataset.durationMs, 60_000);
+  assert.equal(report.evidence.dataset.stageTimings[0].key, "core");
   assert.doesNotMatch(JSON.stringify(report), /password|postgres:\/\//iu);
 });
 

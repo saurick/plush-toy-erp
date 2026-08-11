@@ -17,6 +17,7 @@ import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 
+import BusinessFormSectionTitle from '../components/business-list/BusinessFormSectionTitle.jsx'
 import {
   cancelFinancePayment,
   createFinanceCreditNote,
@@ -1077,8 +1078,7 @@ export default function FinancePaymentsPage() {
         dataIndex: 'finance_fact_no',
         width: 190,
         render: (value) => value || '已关联财务记录',
-        exportValue: (record) =>
-          record?.finance_fact_no || '已关联财务记录',
+        exportValue: (record) => record?.finance_fact_no || '已关联财务记录',
       },
       {
         title: '来源类型',
@@ -1208,11 +1208,7 @@ export default function FinancePaymentsPage() {
       exportInFlightRef.current = false
       request.finish()
     }
-  }, [
-    beginLatestRequest,
-    creditExportColumns,
-    creditStatusFilter,
-  ])
+  }, [beginLatestRequest, creditExportColumns, creditStatusFilter])
   const paymentDetailLineItems = {
     title: '核销明细',
     items: Array.isArray(paymentDetail?.allocations)
@@ -1715,6 +1711,7 @@ export default function FinancePaymentsPage() {
           preserve={false}
           disabled={loading}
         >
+          <BusinessFormSectionTitle>往来与金额</BusinessFormSectionTitle>
           <Form.Item
             name="direction"
             label="收付款方向"
@@ -1751,33 +1748,28 @@ export default function FinancePaymentsPage() {
           >
             <Input maxLength={64} />
           </Form.Item>
-          <Space align="start" wrap>
-            <Form.Item
-              name="amount"
-              label="实收 / 实付金额"
-              rules={[
-                { required: true, message: '请填写金额' },
-                {
-                  validator: (_, value) =>
-                    isPositiveNumeric20Scale6Units(numeric20Scale6Units(value))
-                      ? Promise.resolve()
-                      : Promise.reject(new Error('金额必须大于 0')),
-                },
-              ]}
-            >
-              <Input inputMode="decimal" />
-            </Form.Item>
-            <Form.Item
-              name="currency"
-              label="币种"
-              rules={[{ required: true }]}
-            >
-              <Select options={CURRENCY_OPTIONS} style={{ width: 160 }} />
-            </Form.Item>
-            <Form.Item name="occurred_at" label="发生时间">
-              <Input type="datetime-local" />
-            </Form.Item>
-          </Space>
+          <Form.Item
+            name="amount"
+            label="实收 / 实付金额"
+            rules={[
+              { required: true, message: '请填写金额' },
+              {
+                validator: (_, value) =>
+                  isPositiveNumeric20Scale6Units(numeric20Scale6Units(value))
+                    ? Promise.resolve()
+                    : Promise.reject(new Error('金额必须大于 0')),
+              },
+            ]}
+          >
+            <Input inputMode="decimal" />
+          </Form.Item>
+          <Form.Item name="currency" label="币种" rules={[{ required: true }]}>
+            <Select options={CURRENCY_OPTIONS} />
+          </Form.Item>
+          <Form.Item name="occurred_at" label="发生时间">
+            <Input type="datetime-local" />
+          </Form.Item>
+          <BusinessFormSectionTitle>账户与凭据</BusinessFormSectionTitle>
           <Form.Item
             name="account_ref"
             label="收付款账户摘要"

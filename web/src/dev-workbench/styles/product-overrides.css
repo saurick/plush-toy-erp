@@ -230,10 +230,6 @@
     grid-template-columns: 1fr;
   }
 
-  .erp-dev-receipt-panel__grid {
-    grid-template-columns: 1fr;
-  }
-
   .erp-dev-docs-shell {
     grid-template-columns: 1fr;
     height: auto;
@@ -352,8 +348,6 @@
 
   .erp-dev-hub-header,
   .erp-dev-hub-toolbar,
-  .erp-dev-receipt-panel__head,
-  .erp-dev-receipt-card__head,
   .erp-dev-testing-header,
   .erp-dev-testing-reader__toolbar,
   .erp-dev-governance-header,
@@ -1213,9 +1207,7 @@
 
 [data-erp-theme='dark'] .erp-dev-hub-header,
 [data-erp-theme='dark'] .erp-dev-hub-shell,
-[data-erp-theme='dark'] .erp-dev-hub-card,
-[data-erp-theme='dark'] .erp-dev-receipt-panel,
-[data-erp-theme='dark'] .erp-dev-receipt-card {
+[data-erp-theme='dark'] .erp-dev-hub-card {
   border-color: var(--erp-border);
   background: var(--erp-surface-bg);
   color: var(--erp-text);
@@ -1269,11 +1261,7 @@
 [data-erp-theme='dark'] .erp-dev-hub-toolbar__note,
 [data-erp-theme='dark'] .erp-dev-hub-card__route,
 [data-erp-theme='dark'] .erp-dev-hub-card__source,
-[data-erp-theme='dark'] .erp-dev-hub-card__foot,
-[data-erp-theme='dark'] .erp-dev-receipt-panel__repository,
-[data-erp-theme='dark'] .erp-dev-receipt-card__profile,
-[data-erp-theme='dark'] .erp-dev-receipt-card__identity,
-[data-erp-theme='dark'] .erp-dev-receipt-panel__summary {
+[data-erp-theme='dark'] .erp-dev-hub-card__foot {
   color: var(--erp-text-muted);
 }
 

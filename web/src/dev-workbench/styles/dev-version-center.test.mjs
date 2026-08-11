@@ -37,10 +37,6 @@ test('CI/CD timing details keep a touch-friendly keyboard-visible trigger', () =
   )
   assert.match(
     css,
-    /[.]erp-dev-receipt-card__timings > summary \{[\s\S]*min-height: 44px;[\s\S]*padding: 8px 4px;/u
-  )
-  assert.match(
-    css,
     /[.]erp-dev-pipeline-timing__jobs > details > summary \{[\s\S]*min-height: 44px;/u
   )
   assert.match(css, /summary:focus-visible/u)

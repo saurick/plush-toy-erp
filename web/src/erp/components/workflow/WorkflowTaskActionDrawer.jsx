@@ -41,6 +41,10 @@ import {
   getWorkflowTaskDisplayName,
   isDisplayOnlyWorkflowTask,
 } from '../../utils/processRuntimePresentation.mjs'
+import {
+  buildWorkflowAssignmentSelectOptions,
+  flattenWorkflowAssignmentSelectOptions,
+} from '../../utils/workflowAssignmentSelectOptions.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import BusinessAttachmentModalButton from '../business-list/BusinessAttachmentModalButton.jsx'
@@ -257,29 +261,18 @@ export default function WorkflowTaskActionDrawer({
         approvedQuantity
       )
     : ''
-  const assignmentOptions = [
-    ...(assignmentAccess.can_return_to_pool
-      ? [
-          {
-            value: 'pool',
-            label: ownerRoleLabel
-              ? `暂不指定个人，退回共同待办（负责岗位：${ownerRoleLabel}）`
-              : '暂不指定个人，退回负责岗位共同待办',
-          },
-        ]
-      : []),
-    ...(Array.isArray(assignmentAccess.candidates)
-      ? assignmentAccess.candidates.map((candidate) => ({
-          value: candidate.admin_id,
-          label: `${candidate.username} · ${candidate.role_label || ownerRoleLabel}`,
-        }))
-      : []),
-  ]
+  const assignmentOptions = buildWorkflowAssignmentSelectOptions({
+    canReturnToPool: assignmentAccess.can_return_to_pool,
+    candidates: assignmentAccess.candidates,
+    ownerRoleLabel,
+  })
+  const assignmentTargets =
+    flattenWorkflowAssignmentSelectOptions(assignmentOptions)
   const assignmentTargetValid =
     actionMode !== 'assign' ||
-    assignmentOptions.some((option) => option.value === assignmentTarget)
+    assignmentTargets.some((option) => option.value === assignmentTarget)
   const assignmentTargetLabel =
-    assignmentOptions.find((option) => option.value === assignmentTarget)
+    assignmentTargets.find((option) => option.value === assignmentTarget)
       ?.label || ''
   const hasVisibleActionSelection = visibleActionModes.includes(actionMode)
   const canConfirm =

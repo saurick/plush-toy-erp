@@ -26,6 +26,7 @@ import {
 } from "./release-artifact-bundle.mjs";
 
 const commit = "a".repeat(40);
+const releaseVersion = "yoyoosun-20260810.1";
 const repoRoot = path.resolve(import.meta.dirname, "..", "..");
 
 function fixtureCommand(files, paths = []) {
@@ -105,6 +106,8 @@ test("release artifact CLI requires explicit execution and validates values", ()
       "--execute",
       "--ref",
       commit,
+      "--version",
+      releaseVersion,
       "--customer",
       "yoyoosun",
       "--out",
@@ -114,6 +117,7 @@ test("release artifact CLI requires explicit execution and validates values", ()
     {
       execute: true,
       ref: commit,
+      version: releaseVersion,
       customer: "yoyoosun",
       out: "output/releases/example",
       json: true,
@@ -477,7 +481,10 @@ test("release artifact builder normalizes the source hash and writes complete ch
             Os: "linux",
             Architecture: "amd64",
             Size: 128,
-            Config: { Env: [`GIT_SHA=${commit}`], Labels: {} },
+            Config: {
+              Env: [`GIT_SHA=${commit}`, `RELEASE_VERSION=${releaseVersion}`],
+              Labels: {},
+            },
           },
         ]);
       }
@@ -503,6 +510,7 @@ test("release artifact builder normalizes the source hash and writes complete ch
     const report = await buildReleaseArtifact(
       {
         ref: "HEAD",
+        version: releaseVersion,
         customer: "yoyoosun",
         out: "output/releases/fixture",
       },
@@ -510,6 +518,7 @@ test("release artifact builder normalizes the source hash and writes complete ch
         repoRoot: root,
         runSourceArchiveReleaseCheck: async () => ({
           commit,
+          releaseVersion,
           head: commit,
           ref: "HEAD",
           refIsHead: true,
@@ -545,6 +554,10 @@ test("release artifact builder normalizes the source hash and writes complete ch
     );
 
     assert.equal(manifest.sourceArchive.sha256, "9".repeat(64));
+    assert.equal(manifest.releaseVersion, releaseVersion);
+    assert(
+      manifest.images.every((image) => image.releaseVersion === releaseVersion),
+    );
     assert.equal(manifest.performance.build.cacheHitRateBasisPoints, 7_500);
     assert.equal(manifest.images.length, 2);
     assert(

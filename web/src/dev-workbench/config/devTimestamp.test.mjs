@@ -42,7 +42,6 @@ test('dev timestamp fails closed for ambiguous or timezone-free values', () => {
 
 test('workbench runtime evidence pages use semantic source-backed timestamps', () => {
   const contracts = [
-    ['../components/DevReceiptPanel.jsx', ['receipt.finishedAt']],
     [
       '../pages/DevQualityGatesPage.jsx',
       ['summary?.generatedAt', 'operation.createdAt', 'stage.startedAt'],

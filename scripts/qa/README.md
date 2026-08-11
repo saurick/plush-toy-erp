@@ -122,6 +122,20 @@ CI action 固定到审核过的 commit，工具链读取 `.n-node-version`、`we
 
 51 个正式验收目标统一登记在 `manual-acceptance-page-data-contract.mjs`。每页只能引用共享的 `role / source / task / facts / catalog` 阶段，不允许页面自带 builder、脚本或另一套 fixture；业务看板可以同时消费多个共享阶段，但不能另造页面数据。`manual-acceptance-dataset-runner.mjs` 直接消费相同的阶段入口。新增页面、probe 或入口发生漏登、重复或分叉时，readiness 合同测试会 fail closed。
 
+业务链回归统一从 `manual-acceptance-business-chain-contract.mjs` 读取观察台的同一份步骤目录：先选择业务链，再展开步骤绑定的责任、前置状态、动作、结果状态和 Fact，最后只把已登记的合法场景投影到现有阶段。当前 11 条业务链共登记 67 个步骤和 66 个场景；每条链固定包含正常主路径、阻塞 / 退回 / 恢复、无权限、错误状态、取消 / 调整 / 冲正、重复提交 / 幂等六类。无权限和错误状态等非法结果只由合同测试或受控浏览器动作证明，不会为了覆盖而写入非法数据库状态。这个合同不新增 writer，顶层 `manual-acceptance-dataset.mjs` 和现有串行 runner 仍是唯一整批造数入口。
+
+`/__dev/data-preparation` 直接读取该合同的可读投影，当前同时显示 11 条业务链、67 个步骤、66 个合法场景、9 个现有造数阶段和 51 个页面目标。页面里的业务链选择只用于展开核对，不创建局部 writer；“按最新业务链完整回归”每次都使用现有 lifecycle 建立新隔离批次，执行全部已登记合法场景，成功或失败后自动清理。规范 apply 回执记录造数总 `startedAt / completedAt / durationMs`，并对 9 个阶段分别记录同样的真实耗时；未开始的阶段保持空值，不能冒充 `0 ms`。
+
+计划和规范总回执同时保存 `chainDataDigest` 与 `chainVerificationDigest`。代码变化后按下表处理，不需要 Codex 定时同步平行清单：
+
+| 摘要比较                                   | 旧数据结论   | 现在做什么                                           |
+| ------------------------------------------ | ------------ | ---------------------------------------------------- |
+| 两个摘要都相同                             | 仍可用       | 继续原 QA 和人工回归                                 |
+| 数据摘要相同，验证摘要变化或旧验证摘要缺失 | 只需重新核验 | 保留数据，重跑合同测试、readiness 和受影响浏览器场景 |
+| 数据摘要变化或旧数据摘要缺失               | 必须重新造数 | 在专用验收库按现有 runner 建立新批，不覆盖旧回执     |
+
+上述三类判断适用于需要保留的同批数据；完整回归本身默认每次新建隔离批次，因此不会把旧数据库继续当作本次回归输入。旧回执仍保留用于比较对应旧计划和耗时，但不能证明最新代码已经回归。
+
 模拟数据沿用永绅原文件的简短习惯，例如款号与品名分开、规格写成“米白·小号”、材料写成“米白短毛绒”、环节写成“裁片 / 车缝 / 电绣”，备注用“分两批交货”“颜色按样板”这类日常说法。用户可见来源编号使用 `YS5-*`，岗位任务使用 `YS-V5-*`；模拟身份还由 `datasetKey / dataVersion / runId` 和报告统一证明。原文件只用于理解字段和用词，不直接导入真实行。
 
 | 阶段                                                     | 本地                                                                                                    | 133 试用库                                                                                                  |
@@ -136,6 +150,9 @@ CI action 固定到审核过的 commit，工具链读取 `.n-node-version`、`we
 
 ```bash
 node scripts/qa/manual-acceptance-dataset.mjs
+
+node scripts/qa/manual-acceptance-dataset.mjs \
+  --chain delivery_to_settlement
 
 node scripts/qa/manual-acceptance-catalog.mjs \
   --out output/qa/manual-acceptance/catalog

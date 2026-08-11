@@ -1,6 +1,9 @@
 import { setTimeout as delay } from 'node:timers/promises'
 import { styleRpcResult, unsupportedRpcMethod } from './rpcMockResult.mjs'
 
+const STYLE_L1_RELEASE_VERSION = 'yoyoosun-20260810-20c96d38-amd64'
+const STYLE_L1_GIT_SHA = '20c96d3819429361a35d2551b63b211f055de37e'
+
 export async function installSystemRpcMocks(page, context) {
   const {
     adminProfile,
@@ -16,6 +19,7 @@ export async function installSystemRpcMocks(page, context) {
     resolveDelayFromReferer,
     createMockAdminToken,
     nowUnix,
+    legalNoticeAcknowledged = true,
   } = context
   const availableRoles = [
     bossRole,
@@ -28,6 +32,48 @@ export async function installSystemRpcMocks(page, context) {
   const roleByKey = new Map(availableRoles.map((role) => [role.role_key, role]))
   const roleForParams = (params = {}) =>
     roleByKey.get(String(params?.role_key || '').trim()) || salesRole
+  const legalNoticeAcknowledgements = new Map()
+  const legalNoticeReceipt = (params = {}) => {
+    const noticeVersion = String(params.notice_version || '').trim()
+    const contentFingerprint = String(params.content_fingerprint || '').trim()
+    return {
+      noticeVersion,
+      contentFingerprint,
+      key: `${adminProfile.id}:${noticeVersion}:${contentFingerprint}`,
+    }
+  }
+  const legalNoticeStatusData = (receipt, acknowledgedAt = 0) => ({
+    notice_version: receipt.noticeVersion,
+    content_fingerprint: receipt.contentFingerprint,
+    acknowledged: acknowledgedAt > 0,
+    acknowledged_at: acknowledgedAt,
+  })
+
+  await page.route('**/rpc/system', async (route) => {
+    const body = route.request().postDataJSON() || {}
+    const { id = 'mock-id', method } = body
+    const data =
+      method === 'version'
+        ? {
+            version: STYLE_L1_RELEASE_VERSION,
+            release_version: STYLE_L1_RELEASE_VERSION,
+            git_sha: STYLE_L1_GIT_SHA,
+            git_sha_short: STYLE_L1_GIT_SHA.slice(0, 8),
+            formal: true,
+          }
+        : method === 'ping'
+          ? { pong: 'pong' }
+          : unsupportedRpcMethod('system', method)
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id,
+        result: styleRpcResult(data),
+      }),
+    })
+  })
 
   const assistantAdmin = {
     id: 2,
@@ -292,6 +338,31 @@ export async function installSystemRpcMocks(page, context) {
             }),
           },
         }
+        break
+      }
+      case 'legal_notice_status': {
+        const receipt = legalNoticeReceipt(params)
+        if (
+          legalNoticeAcknowledged === true &&
+          !legalNoticeAcknowledgements.has(receipt.key)
+        ) {
+          legalNoticeAcknowledgements.set(receipt.key, nowUnix())
+        }
+        data = legalNoticeStatusData(
+          receipt,
+          legalNoticeAcknowledgements.get(receipt.key) || 0
+        )
+        break
+      }
+      case 'acknowledge_legal_notice': {
+        const receipt = legalNoticeReceipt(params)
+        if (!legalNoticeAcknowledgements.has(receipt.key)) {
+          legalNoticeAcknowledgements.set(receipt.key, nowUnix())
+        }
+        data = legalNoticeStatusData(
+          receipt,
+          legalNoticeAcknowledgements.get(receipt.key)
+        )
         break
       }
       case 'audit_logs':

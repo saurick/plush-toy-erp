@@ -128,7 +128,7 @@ test('businessModules: 业务页菜单按毛绒业务收口且不依赖前端文
 
   assert.equal(businessSections.length, 10)
   assert(navLabels.includes('客户档案'))
-  assert(navLabels.includes('供应商档案'))
+  assert(navLabels.includes('供应商与加工厂'))
   assert(navLabels.includes('产品档案'))
   assert(navLabels.includes('材料档案'))
   assert(navLabels.includes('销售订单'))

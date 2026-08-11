@@ -1671,8 +1671,22 @@ test("production artifacts pin the verified Chromium build and async warmup", ()
   assert.match(dockerfile, /^ENV HOME=\/home\/app$/mu);
   assert.match(dockerfile, /^ARG GIT_SHA$/mu);
   assert.match(dockerfile, /^ENV GIT_SHA=\$\{GIT_SHA\}$/mu);
+  assert.match(dockerfile, /^ARG RELEASE_VERSION$/mu);
+  assert.match(dockerfile, /^ENV RELEASE_VERSION=\$\{RELEASE_VERSION\}$/mu);
+  assert.match(dockerfile, /^ENV VITE_GIT_SHA=\$\{GIT_SHA\}$/mu);
+  assert.match(
+    dockerfile,
+    /^ENV VITE_RELEASE_VERSION=\$\{RELEASE_VERSION\}$/mu,
+  );
   assert.match(webDockerfile, /^ARG GIT_SHA$/mu);
   assert.match(webDockerfile, /^ENV GIT_SHA=\$\{GIT_SHA\}$/mu);
+  assert.match(webDockerfile, /^ARG RELEASE_VERSION$/mu);
+  assert.match(webDockerfile, /^ENV RELEASE_VERSION=\$\{RELEASE_VERSION\}$/mu);
+  assert.match(webDockerfile, /^ENV VITE_GIT_SHA=\$\{GIT_SHA\}$/mu);
+  assert.match(
+    webDockerfile,
+    /^ENV VITE_RELEASE_VERSION=\$\{RELEASE_VERSION\}$/mu,
+  );
   assert.match(dockerfile, /useradd --system --uid 10001 --gid app/);
   assert.match(productionCompose, /seccomp=\.\/chromium-seccomp\.json/);
   assert.doesNotMatch(

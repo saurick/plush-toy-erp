@@ -170,18 +170,19 @@ func supplierToMap(item *biz.Supplier) map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"id":            item.ID,
-		"code":          item.Code,
-		"name":          item.Name,
-		"short_name":    optionalStringValue(item.ShortName),
-		"supplier_type": optionalStringValue(item.SupplierType),
-		"address":       optionalStringValue(item.Address),
-		"tax_no":        optionalStringValue(item.TaxNo),
-		"process_ids":   supplierProcessIDsToAny(item.ProcessIDs),
-		"is_active":     item.IsActive,
-		"note":          optionalStringValue(item.Note),
-		"created_at":    item.CreatedAt.Unix(),
-		"updated_at":    item.UpdatedAt.Unix(),
+		"id":              item.ID,
+		"code":            item.Code,
+		"name":            item.Name,
+		"short_name":      optionalStringValue(item.ShortName),
+		"supplier_type":   optionalStringValue(item.SupplierType),
+		"address":         optionalStringValue(item.Address),
+		"tax_no":          optionalStringValue(item.TaxNo),
+		"process_ids":     supplierProcessIDsToAny(item.ProcessIDs),
+		"primary_contact": contactToMap(item.PrimaryContact),
+		"is_active":       item.IsActive,
+		"note":            optionalStringValue(item.Note),
+		"created_at":      item.CreatedAt.Unix(),
+		"updated_at":      item.UpdatedAt.Unix(),
 	}
 }
 

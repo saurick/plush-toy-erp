@@ -18,6 +18,7 @@ import {
   buildOutsourcingOrderItemSourceValuesFromProduct,
   buildOutsourcingOrderItemSourceValuesFromProductSKU,
   buildOutsourcingOrderParams,
+  buildOutsourcingSupplierSnapshot,
   buildOutsourcingOrderSubjectSwitchValues,
   buildPurchaseOrderItemSourceValuesFromMaterial,
   contractPartySnapshotFromPrintTemplateDefaults,
@@ -2128,7 +2129,52 @@ test('FL_print_supplier_contact_snapshot__prefills_from_primary_supplier_contact
   )
 })
 
-test('FL_print_supplier_contact_snapshot__purchase_and_outsourcing_pages_fetch_supplier_contacts_before_save masterDataOrderView: purchase and outsourcing save paths enrich supplier snapshot from contacts API', () => {
+test('FL_outsourcing_contract_party_b_snapshot__preserves_contract_override masterDataOrderView: outsourcing supplier snapshot keeps master identity and contract party B values', () => {
+  const master = {
+    id: 8,
+    code: 'PRC-008',
+    name: '加工厂主档名称',
+    short_name: '主档简称',
+    address: '主档地址',
+    primary_contact: {
+      id: 18,
+      name: '主档联系人',
+      mobile: '13800000000',
+    },
+  }
+  assert.deepEqual(buildSupplierSnapshot(master), {
+    id: 8,
+    code: 'PRC-008',
+    name: '加工厂主档名称',
+    short_name: '主档简称',
+    contact_id: 18,
+    contact_name: '主档联系人',
+    contact_mobile: '13800000000',
+    address: '主档地址',
+  })
+  assert.deepEqual(
+    buildOutsourcingSupplierSnapshot(master, {
+      contact_id: 19,
+      contact_name: '本合同联系人',
+      contact_phone: '0769-123456',
+      address: '本合同交付地址',
+      signer_name: '乙方签约人',
+    }),
+    {
+      id: 8,
+      code: 'PRC-008',
+      name: '加工厂主档名称',
+      short_name: '主档简称',
+      contact_id: 19,
+      contact_name: '本合同联系人',
+      contact_phone: '0769-123456',
+      address: '本合同交付地址',
+      signer_name: '乙方签约人',
+    }
+  )
+})
+
+test('FL_print_supplier_contact_snapshot__purchase_and_outsourcing_pages_preserve_supplier_contacts masterDataOrderView: purchase save and outsourcing contract editing preserve supplier contact snapshots', () => {
   const purchasePageSource = readERPSource('../pages/V1PurchaseOrdersPage.jsx')
   const outsourcingPageSource = readERPSource(
     '../pages/V1OutsourcingOrdersPage.jsx'
@@ -2142,20 +2188,31 @@ test('FL_print_supplier_contact_snapshot__purchase_and_outsourcing_pages_fetch_s
     assert.doesNotMatch(source, /\blistContactsByOwner\s*\(/u)
     assert.match(source, /SUPPLIER_CONTACT_OWNER_TYPE/u)
     assert.match(source, /buildSupplierSnapshotWithContacts/u)
-    assert.match(
-      source,
-      /const supplierSnapshot = await resolveSupplierSnapshot\(supplier,\s*\{\s*notifyOnError:\s*true,\s*\}\)/u
-    )
-    assert.match(
-      source,
-      /message\.warning\(\s*`\$\{getActionErrorMessage\(error, '加载(?:供应商|加工厂)联系人'\)\}，将仅保存(?:供应商|加工厂)基本信息`\s*\)/u
-    )
     assert.doesNotMatch(
       source,
       /catch\s*\{\s*return baseSnapshot\s*\}/u,
       'contact load failure must not be silently swallowed'
     )
   }
+
+  assert.match(
+    purchasePageSource,
+    /const supplierSnapshot = await resolveSupplierSnapshot\(supplier,\s*\{\s*notifyOnError:\s*true,\s*\}\)/u
+  )
+  assert.match(
+    purchasePageSource,
+    /message\.warning\(\s*`\$\{getActionErrorMessage\(error, '加载供应商联系人'\)\}，将仅保存供应商基本信息`\s*\)/u
+  )
+  assert.match(outsourcingPageSource, /const loadSupplierContacts =/u)
+  assert.match(outsourcingPageSource, /buildOutsourcingSupplierSnapshot/u)
+  assert.doesNotMatch(
+    outsourcingPageSource,
+    /const supplierSnapshot = await resolveSupplierSnapshot/u
+  )
+  assert.match(
+    outsourcingPageSource,
+    /message\.warning\(getActionErrorMessage\(error, '加载加工厂联系人'\)\)/u
+  )
 
   assert.match(outsourcingFormSource, /onSupplierChange/u)
   assert.match(outsourcingFormSource, /onChange=\{onSupplierChange\}/u)

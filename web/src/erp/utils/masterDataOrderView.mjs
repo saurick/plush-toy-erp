@@ -824,22 +824,30 @@ export function buildSupplierSnapshot(supplier = {}) {
   if (!supplier?.id) {
     return {}
   }
+  const primaryContact =
+    supplier.primary_contact && typeof supplier.primary_contact === 'object'
+      ? supplier.primary_contact
+      : {}
   return compactParams({
     id: supplier.id,
     code: trimOptional(supplier.code),
     name: trimOptional(supplier.name),
     short_name: trimOptional(supplier.short_name),
+    contact_id: Number(primaryContact.id || 0) || undefined,
     contact_name:
       trimOptional(supplier.contact_name) ||
-      trimOptional(supplier.primary_contact_name),
+      trimOptional(supplier.primary_contact_name) ||
+      trimOptional(primaryContact.name),
     contact_phone:
       trimOptional(supplier.contact_phone) ||
       trimOptional(supplier.phone) ||
-      trimOptional(supplier.primary_contact_phone),
+      trimOptional(supplier.primary_contact_phone) ||
+      trimOptional(primaryContact.phone),
     contact_mobile:
       trimOptional(supplier.contact_mobile) ||
       trimOptional(supplier.mobile) ||
-      trimOptional(supplier.primary_contact_mobile),
+      trimOptional(supplier.primary_contact_mobile) ||
+      trimOptional(primaryContact.mobile),
     address: trimOptional(supplier.address),
   })
 }
@@ -855,12 +863,49 @@ export function buildSupplierSnapshotWithContacts(
   const primaryContact = selectPrimaryContact(contacts)
   return compactParams({
     ...baseSnapshot,
+    contact_id: Number(primaryContact.id || 0) || baseSnapshot.contact_id,
     contact_name:
       trimOptional(primaryContact.name) || baseSnapshot.contact_name,
     contact_phone:
       trimOptional(primaryContact.phone) || baseSnapshot.contact_phone,
     contact_mobile:
       trimOptional(primaryContact.mobile) || baseSnapshot.contact_mobile,
+  })
+}
+
+export function buildOutsourcingSupplierSnapshot(
+  supplier = {},
+  contractSnapshot = {}
+) {
+  const masterSnapshot = buildSupplierSnapshot(supplier)
+  const input =
+    contractSnapshot && typeof contractSnapshot === 'object'
+      ? contractSnapshot
+      : {}
+  const identity = masterSnapshot.id ? masterSnapshot : input
+  const snapshotValue = (key) =>
+    Object.prototype.hasOwnProperty.call(input, key)
+      ? input[key]
+      : masterSnapshot[key]
+  const hasContractContactOverride = [
+    'contact_id',
+    'contact_name',
+    'contact_phone',
+    'contact_mobile',
+  ].some((key) => Object.prototype.hasOwnProperty.call(input, key))
+  const contactValue = (key) =>
+    hasContractContactOverride ? input[key] : masterSnapshot[key]
+  return compactParams({
+    id: identity.id,
+    code: trimOptional(identity.code),
+    name: trimOptional(identity.name),
+    short_name: trimOptional(identity.short_name),
+    contact_id: Number(contactValue('contact_id') || 0) || undefined,
+    contact_name: trimOptional(contactValue('contact_name')),
+    contact_phone: trimOptional(contactValue('contact_phone')),
+    contact_mobile: trimOptional(contactValue('contact_mobile')),
+    address: trimOptional(snapshotValue('address')),
+    signer_name: trimOptional(snapshotValue('signer_name')),
   })
 }
 

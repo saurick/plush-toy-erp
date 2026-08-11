@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
+import { buildManualAcceptanceBusinessChainReviewPlan } from '../../../../scripts/qa/manual-acceptance-business-chain-contract.mjs'
+import { MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS } from '../../../../scripts/qa/manual-acceptance-dataset.mjs'
 import {
   DEV_DATA_PREPARATION_ACTION_API_PATH,
   DEV_DATA_PREPARATION_API_PREFIX,
@@ -30,6 +32,10 @@ const SCENARIO_OPERATION_RUN_ID = 'scenario_demo_20260729'
 const SCENARIO_DATASET_RUN_ID = '20260716-V5'
 const CREATED_AT = '2026-07-29T02:00:00.000Z'
 const UPDATED_AT = '2026-07-29T02:01:00.000Z'
+const ACCEPTANCE_PLAN = buildManualAcceptanceBusinessChainReviewPlan({
+  catalogTargetCount: 51,
+  datasetStageKeys: MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS,
+})
 
 function response(payload, ok = true) {
   return {
@@ -56,6 +62,11 @@ function operationFixture(overrides = {}) {
     },
     createdAt: CREATED_AT,
     updatedAt: UPDATED_AT,
+    timing: {
+      startedAt: null,
+      completedAt: null,
+      durationMs: null,
+    },
     events: [
       {
         at: CREATED_AT,
@@ -112,6 +123,55 @@ function scenarioOperationFixture(overrides = {}) {
   })
 }
 
+function fullOperationFixture(overrides = {}) {
+  const stageTimings = ACCEPTANCE_PLAN.dataStages.map(({ key }, index) => ({
+    key,
+    status: 'completed',
+    startedAt: `2026-07-29T02:00:${String(index).padStart(2, '0')}.000Z`,
+    completedAt: `2026-07-29T02:00:${String(index + 1).padStart(2, '0')}.000Z`,
+    durationMs: 1000,
+  }))
+  return operationFixture({
+    profileKey: DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance,
+    status: 'passed',
+    targetSummary: {
+      safeTarget: '专用隔离验收库',
+      targetFingerprint: 'e'.repeat(64),
+      preflightFingerprint: 'f'.repeat(64),
+      disposable: true,
+      automaticCleanup: true,
+    },
+    confirmationRequired: '',
+    terminal: true,
+    timing: {
+      startedAt: CREATED_AT,
+      completedAt: UPDATED_AT,
+      durationMs: 60_000,
+    },
+    readback: {
+      schemaVersion: 'plush.dev-data-preparation-readback/v1',
+      profileKey: DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance,
+      targetFingerprint: 'e'.repeat(64),
+      reportStatus: 'passed',
+      cleanupComplete: true,
+      residualDatabaseCount: 0,
+      dataVersion: '2026.07.16-v5',
+      chainDataDigest: ACCEPTANCE_PLAN.chainDataDigest,
+      chainVerificationDigest: ACCEPTANCE_PLAN.chainVerificationDigest,
+      chainCount: ACCEPTANCE_PLAN.chainCount,
+      stepCount: ACCEPTANCE_PLAN.stepCount,
+      scenarioCount: ACCEPTANCE_PLAN.scenarioCount,
+      dataStageCount: ACCEPTANCE_PLAN.dataStageCount,
+      catalogTargetCount: ACCEPTANCE_PLAN.catalogTargetCount,
+      datasetStartedAt: CREATED_AT,
+      datasetCompletedAt: UPDATED_AT,
+      datasetDurationMs: 60_000,
+      stageTimings,
+    },
+    ...overrides,
+  })
+}
+
 function summaryFixture() {
   return {
     schemaVersion: 'plush.dev-data-preparation-summary/v1',
@@ -122,6 +182,7 @@ function summaryFixture() {
       dirty: false,
       fingerprint: REPOSITORY_FINGERPRINT,
     },
+    acceptancePlan: ACCEPTANCE_PLAN,
     target: {
       coreDemo: {
         status: 'available',
@@ -311,6 +372,11 @@ test('summary contract requires three fixed profiles and fail-closed boundaries'
       }),
     /repository identity/u
   )
+  assert.equal(
+    validateDevDataPreparationSummary(summaryFixture()).acceptancePlan
+      .catalogTargetCount,
+    51
+  )
 })
 
 test('operation contract binds lowercase run identity and exact confirmation to the immutable plan', () => {
@@ -400,6 +466,26 @@ test('operation contract binds lowercase run identity and exact confirmation to 
         })
       ),
     /core demo readback/u
+  )
+})
+
+test('full regression readback requires current chain counts and real stage timings', () => {
+  const operation = fullOperationFixture()
+  assert.equal(
+    validateDevDataPreparationOperation(operation).readback.stageTimings.length,
+    9
+  )
+  assert.throws(
+    () =>
+      validateDevDataPreparationOperation(
+        fullOperationFixture({
+          readback: {
+            ...operation.readback,
+            datasetDurationMs: -1,
+          },
+        })
+      ),
+    /timing/u
   )
 })
 
@@ -553,6 +639,36 @@ test('refresh recovery resumes the newest nonterminal operation and preserves an
     terminal.id
   )
   assert.equal(selectRecoverableDataPreparationOperation([terminal]), null)
+
+  const fullAcceptanceReady = operationFixture({
+    id: '88888888-8888-4888-8888-888888888888',
+    profileKey: DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance,
+    updatedAt: '2026-07-29T02:01:00.000Z',
+  })
+  assert.equal(
+    selectRecoverableDataPreparationOperation(
+      [olderReady],
+      '',
+      DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance
+    ),
+    null
+  )
+  assert.equal(
+    selectRecoverableDataPreparationOperation(
+      [olderReady, fullAcceptanceReady],
+      '',
+      DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance
+    )?.id,
+    fullAcceptanceReady.id
+  )
+  assert.equal(
+    selectRecoverableDataPreparationOperation(
+      [fullAcceptanceReady, newerRunning],
+      '',
+      DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance
+    )?.id,
+    newerRunning.id
+  )
 })
 
 test('client reuses one CSRF session and only posts prepare or execute envelopes', async () => {
@@ -670,7 +786,7 @@ test('client surfaces only a bounded backend message on rejected requests', asyn
   )
 })
 
-test('page exposes one-click scenario preparation while retaining exact confirmation for other profiles', () => {
+test('page defaults to the latest business-chain regression while retaining daily integration profiles', () => {
   const pageSource = readFileSync(
     new URL('../pages/DevDataPreparationPage.jsx', import.meta.url),
     'utf8'
@@ -679,11 +795,20 @@ test('page exposes one-click scenario preparation while retaining exact confirma
   assert.match(pageSource, /profiles\.map/u)
   assert.match(pageSource, /生成业务场景测试数据/u)
   assert.match(pageSource, /确认生成业务场景测试数据/u)
-  assert.match(pageSource, /准备测试数据/u)
-  assert.match(pageSource, /检查目标是否可用/u)
-  assert.match(pageSource, /选择数据范围/u)
-  assert.match(pageSource, /核对计划并确认/u)
-  assert.match(pageSource, /查看结果/u)
+  assert.match(pageSource, /准备回归数据/u)
+  assert.match(pageSource, /确认完整回归能否开始/u)
+  assert.match(pageSource, /核对最新业务链与数据范围/u)
+  assert.match(pageSource, /准备并确认新批次/u)
+  assert.match(pageSource, /查看回执与耗时/u)
+  assert.match(pageSource, /AcceptancePlanReview/u)
+  assert.match(pageSource, /选择只影响计划下钻/u)
+  assert.match(pageSource, /代码变化后，旧数据怎么处理/u)
+  assert.match(pageSource, /实际执行：/u)
+  assert.match(pageSource, /stageTimings/u)
+  assert.match(
+    pageSource,
+    /useState\(\s*DEV_DATA_PREPARATION_PROFILE_KEYS\.fullAcceptance\s*\)/u
+  )
   assert.match(pageSource, /erp-dev-data-operation-technical/u)
   assert.match(pageSource, /erp-dev-data-history/u)
   assert.match(pageSource, /展开历史回执/u)
@@ -701,6 +826,10 @@ test('page exposes one-click scenario preparation while retaining exact confirma
     /<DevPageNav sourcePath=\{DEV_DATA_PREPARATION_SOURCE_PATH\}/u
   )
   assert.match(pageSource, /selectRecoverableDataPreparationOperation/u)
+  assert.match(
+    pageSource,
+    /selectRecoverableDataPreparationOperation\([\s\S]*?DEV_DATA_PREPARATION_PROFILE_KEYS\.fullAcceptance\s*\)/u
+  )
   assert.equal(pageSource.match(/<Input\b/gu)?.length, 1)
   assert.match(pageSource, /aria-label="不可变计划确认文本"/u)
   assert.doesNotMatch(pageSource, /<label\b/u)

@@ -50,8 +50,9 @@ function runCommand(command, args, { cwd, acceptedStatuses = [0] } = {}) {
 }
 
 export function parseDockerPushDigest(output) {
-  const matches = [...String(output || "").matchAll(new RegExp(DIGEST_PATTERN, "giu"))]
-    .map((match) => match[1].toLowerCase());
+  const matches = [
+    ...String(output || "").matchAll(new RegExp(DIGEST_PATTERN, "giu")),
+  ].map((match) => match[1].toLowerCase());
   const unique = [...new Set(matches)];
   if (unique.length !== 1) {
     throw new Error("docker push did not report one immutable digest");
@@ -68,21 +69,32 @@ function inspectImage(root, ref, run = runCommand) {
   return parsed[0];
 }
 
-function assertLoadedImage(image, source, gitSha) {
+function assertLoadedImage(image, source, gitSha, releaseVersion) {
   const embeddedSha = (image?.Config?.Env || [])
     .find((item) => item.startsWith("GIT_SHA="))
     ?.slice("GIT_SHA=".length);
+  const embeddedReleaseVersion = (image?.Config?.Env || [])
+    .find((item) => item.startsWith("RELEASE_VERSION="))
+    ?.slice("RELEASE_VERSION=".length);
   if (
     image?.Id !== source.contentId ||
     image?.Os !== "linux" ||
     image?.Architecture !== "amd64" ||
-    embeddedSha !== gitSha
+    embeddedSha !== gitSha ||
+    (releaseVersion !== undefined && embeddedReleaseVersion !== releaseVersion)
   ) {
     throw new Error(`loaded ${source.kind} image identity is invalid`);
   }
 }
 
-function existingDigest(root, targetTag, source, gitSha, run = runCommand) {
+function existingDigest(
+  root,
+  targetTag,
+  source,
+  gitSha,
+  releaseVersion,
+  run = runCommand,
+) {
   const probe = run("docker", ["manifest", "inspect", targetTag], {
     cwd: root,
     acceptedStatuses: [0, 1],
@@ -96,7 +108,7 @@ function existingDigest(root, targetTag, source, gitSha, run = runCommand) {
   }
   run("docker", ["pull", targetTag], { cwd: root });
   const existing = inspectImage(root, targetTag, run);
-  assertLoadedImage(existing, source, gitSha);
+  assertLoadedImage(existing, source, gitSha, releaseVersion);
   const repository = targetTag.slice(0, targetTag.lastIndexOf(":"));
   const digestRef = (existing.RepoDigests || []).find((item) =>
     item.startsWith(`${repository}@sha256:`),
@@ -112,23 +124,30 @@ function publishImage({
   artifactDir,
   source,
   gitSha,
+  releaseVersion,
   repository,
   run = runCommand,
 }) {
   const archive = path.join(artifactDir, source.archive.file);
   run("docker", ["load", "--input", archive], { cwd: root });
   const loaded = inspectImage(root, source.ref, run);
-  assertLoadedImage(loaded, source, gitSha);
+  assertLoadedImage(loaded, source, gitSha, releaseVersion);
   const targetTag = `${repository}:sha-${gitSha}`;
   const reusedDigest = existingDigest(
     root,
     targetTag,
     source,
     gitSha,
+    releaseVersion,
     run,
   );
   if (reusedDigest) {
-    return { kind: source.kind, repository, digest: reusedDigest, reused: true };
+    return {
+      kind: source.kind,
+      repository,
+      digest: reusedDigest,
+      reused: true,
+    };
   }
   run("docker", ["tag", source.ref, targetTag], { cwd: root });
   const pushed = run("docker", ["push", targetTag], { cwd: root });
@@ -137,13 +156,7 @@ function publishImage({
 }
 
 export function publishGitHubReleaseArtifact(
-  {
-    artifactDir,
-    strictTerminalPath,
-    version,
-    repository,
-    out,
-  },
+  { artifactDir, strictTerminalPath, version, repository, out },
   { root = process.cwd(), run = runCommand } = {},
 ) {
   if (!REPOSITORY_PATTERN.test(String(repository || ""))) {
@@ -159,12 +172,22 @@ export function publishGitHubReleaseArtifact(
     readFileSync(path.resolve(root, strictTerminalPath), "utf8"),
   );
   const gitSha = artifactManifest.git.commit;
+  const embeddedReleaseVersion = artifactManifest.releaseVersion;
+  if (
+    embeddedReleaseVersion !== undefined &&
+    embeddedReleaseVersion !== version
+  ) {
+    throw new Error(
+      "release artifact version does not match requested version",
+    );
+  }
   const images = artifactManifest.images.map((source) =>
     publishImage({
       root,
       artifactDir: resolvedArtifactDir,
       source,
       gitSha,
+      releaseVersion: embeddedReleaseVersion,
       repository: `ghcr.io/${normalizedRepository}-${source.kind}`,
       run,
     }),
@@ -234,7 +257,7 @@ function printHelp() {
 
 The caller must authenticate Docker to ghcr.io first. This adapter never accepts
 or logs a token. Existing sha tags are reused only when the pulled image config
-digest, platform and embedded GIT_SHA match the local immutable artifact.`);
+digest, platform, embedded release version and GIT_SHA match the local immutable artifact.`);
 }
 
 function main() {

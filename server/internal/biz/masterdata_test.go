@@ -249,6 +249,13 @@ func TestMasterDataUsecaseNormalizesCustomerSupplierAndContactInput(t *testing.T
 	if supplierInput.SupplierType == nil || *supplierInput.SupplierType != "material" {
 		t.Fatalf("expected supplier type trimmed, got %#v", supplierInput.SupplierType)
 	}
+	filter, err := normalizeMasterDataFilter(MasterDataFilter{SupplierTypes: []string{" outsourcing ", "mixed", "outsourcing"}})
+	if err != nil || len(filter.SupplierTypes) != 2 || filter.SupplierTypes[0] != "outsourcing" || filter.SupplierTypes[1] != "mixed" {
+		t.Fatalf("expected supplier type filter normalized, got %#v err=%v", filter.SupplierTypes, err)
+	}
+	if _, err := normalizeMasterDataFilter(MasterDataFilter{SupplierTypes: []string{"unknown"}}); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected unknown supplier type filter rejected, got %v", err)
+	}
 	category := " 填充 "
 	materialInput, err := normalizeMaterialMutation(MaterialMutation{Code: " M-001 ", Name: " PP 棉 ", Category: &category, DefaultUnitID: 10})
 	if err != nil {

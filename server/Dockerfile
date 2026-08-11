@@ -44,6 +44,10 @@ COPY config /config
 COPY scripts/dev-ports.mjs scripts/local-runtime-preflight-core.mjs /scripts/
 COPY scripts/build/apply-customer-web-config.mjs /scripts/build/apply-customer-web-config.mjs
 ARG ERP_CUSTOMER_PACKAGE=
+ARG GIT_SHA=
+ARG RELEASE_VERSION=
+ENV VITE_GIT_SHA=${GIT_SHA}
+ENV VITE_RELEASE_VERSION=${RELEASE_VERSION}
 RUN pnpm run build:committed && \
     node /scripts/build/apply-customer-web-config.mjs \
       --customer "${ERP_CUSTOMER_PACKAGE}" \
@@ -56,9 +60,11 @@ RUN pnpm run build:committed && \
 FROM --platform=$RUNTIMEPLATFORM ${WEB_RUNTIME_BASE_IMAGE} AS web-runtime
 
 ARG GIT_SHA
+ARG RELEASE_VERSION
 
 ENV NODE_ENV=production
 ENV GIT_SHA=${GIT_SHA}
+ENV RELEASE_VERSION=${RELEASE_VERSION}
 ENV HOST=0.0.0.0
 ENV APP_ID=desktop
 ENV PORT=5175
@@ -153,11 +159,13 @@ ENV HOME=/home/app
 
 ARG GIT_SHA
 ARG GIT_SHA_SHORT
+ARG RELEASE_VERSION
 ARG BUILD_TIME
 ARG IMAGE_TAG
 
 ENV GIT_SHA=${GIT_SHA}
 ENV GIT_SHA_SHORT=${GIT_SHA_SHORT}
+ENV RELEASE_VERSION=${RELEASE_VERSION}
 ENV BUILD_TIME=${BUILD_TIME}
 ENV IMAGE_TAG=${IMAGE_TAG}
 

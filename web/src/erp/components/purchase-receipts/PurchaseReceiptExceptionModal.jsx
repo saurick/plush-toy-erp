@@ -2,6 +2,7 @@ import React, { useEffect, useMemo } from 'react'
 import { Alert, Button, Form, Input, Modal, Select, Space } from 'antd'
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons'
 
+import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
 import { PURCHASE_RECEIPT_ADJUSTMENT_OPTIONS } from '../../utils/purchaseReceiptExceptionAction.mjs'
 import {
   isPositiveNumeric20Scale6Units,
@@ -97,6 +98,7 @@ export default function PurchaseReceiptExceptionModal({
         }
       />
       <Form form={form} layout="vertical" preserve={false} disabled={loading}>
+        <BusinessFormSectionTitle>整单信息</BusinessFormSectionTitle>
         <Space size={16} style={{ width: '100%' }} align="start">
           <Form.Item
             name={isReturn ? 'returned_at' : 'adjusted_at'}
@@ -116,6 +118,9 @@ export default function PurchaseReceiptExceptionModal({
             </Form.Item>
           ) : null}
         </Space>
+        <BusinessFormSectionTitle>
+          {isReturn ? '退货明细' : '调整明细'}
+        </BusinessFormSectionTitle>
         <Form.List name="items">
           {(fields, { add, remove }) => (
             <>
@@ -246,7 +251,8 @@ export default function PurchaseReceiptExceptionModal({
             </>
           )}
         </Form.List>
-        <Form.Item name="note" label="整单备注" style={{ marginTop: 16 }}>
+        <BusinessFormSectionTitle>整单备注</BusinessFormSectionTitle>
+        <Form.Item name="note" label="备注说明" style={{ marginTop: 16 }}>
           <Input.TextArea rows={3} maxLength={255} showCount />
         </Form.Item>
       </Form>

@@ -276,15 +276,20 @@ export async function runLocalAcceptanceLifecycle({
         warehouses: Number(result?.warehouses || 0),
       }),
     );
-    dataset = await stage(
-      "manual-dataset-apply",
-      () => runtime.applyManualDataset(identity.acceptanceDatabase),
-      (result) => ({
-        ok: result?.ok === true,
-        completedStages: Number(result?.completedStages || 0),
-        report: result?.report || "",
-      }),
-    );
+    try {
+      dataset = await stage(
+        "manual-dataset-apply",
+        () => runtime.applyManualDataset(identity.acceptanceDatabase),
+        (result) => ({
+          ok: result?.ok === true,
+          completedStages: Number(result?.completedStages || 0),
+          report: result?.report || "",
+        }),
+      );
+    } catch (error) {
+      dataset = error?.datasetEvidence || null;
+      throw error;
+    }
     await stage("web-start", async () => {
       await runtime.startWeb();
       webStarted = true;
@@ -1023,21 +1028,37 @@ function createDirectRuntime(context) {
           },
         },
       );
-      if (result.exitCode !== 0 || result.report?.ok !== true) {
-        throw new Error(
-          `manual acceptance dataset failed at ${result.report?.failedStage || "unknown stage"}`,
-        );
-      }
-      return {
-        ok: true,
+      const report = result.report;
+      const datasetEvidence = {
+        ok: report?.ok === true,
         completedStages: result.report.stages.filter(
           (item) => item.status === "completed",
         ).length,
-        report: relativeRepoPath(
-          context.repoRoot,
-          result.report.applyReportPath,
+        report: relativeRepoPath(context.repoRoot, report.applyReportPath),
+        dataVersion: report.dataVersion,
+        chainDataDigest: report.chainDataDigest,
+        chainVerificationDigest: report.chainVerificationDigest,
+        startedAt: report.startedAt,
+        completedAt: report.completedAt,
+        durationMs: report.durationMs,
+        stageTimings: report.stages.map(
+          ({ key, status, startedAt, completedAt, durationMs }) => ({
+            key,
+            status,
+            startedAt,
+            completedAt,
+            durationMs,
+          }),
         ),
       };
+      if (result.exitCode !== 0 || report?.ok !== true) {
+        const error = new Error(
+          `manual acceptance dataset failed at ${report?.failedStage || "unknown stage"}`,
+        );
+        error.datasetEvidence = datasetEvidence;
+        throw error;
+      }
+      return datasetEvidence;
     },
     async startWeb() {
       if (web) throw new Error("acceptance web is already running");

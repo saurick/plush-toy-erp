@@ -580,6 +580,7 @@
 
   .erp-business-action-form__section-title {
     grid-column: auto;
+    gap: 10px;
   }
 
   .erp-sales-order-lines-form {

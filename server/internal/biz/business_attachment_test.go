@@ -420,6 +420,43 @@ func TestBusinessAttachmentUploadRejectsInvalidProductImageContracts(t *testing.
 	}
 }
 
+func TestBusinessAttachmentPrintAppendixContract(t *testing.T) {
+	normalized, err := normalizeBusinessAttachmentUploadInput(BusinessAttachmentUploadInput{
+		OwnerType:      BusinessAttachmentOwnerOutsourcingOrder,
+		OwnerID:        7,
+		AttachmentType: BusinessAttachmentTypePrintAppendix,
+		FileName:       "合同附图.PNG",
+		MimeType:       "image/png",
+	})
+	if err != nil || normalized.AttachmentType != BusinessAttachmentTypePrintAppendix {
+		t.Fatalf("expected valid outsourcing print appendix, got %#v err=%v", normalized, err)
+	}
+	for _, tc := range []struct {
+		name  string
+		input BusinessAttachmentUploadInput
+		err   error
+	}{
+		{
+			name: "wrong owner",
+			input: BusinessAttachmentUploadInput{OwnerType: BusinessAttachmentOwnerSalesOrder, OwnerID: 7, AttachmentType: BusinessAttachmentTypePrintAppendix,
+				FileName: "合同附图.png", MimeType: "image/png"},
+			err: ErrBadParam,
+		},
+		{
+			name: "pdf is not printable appendix image",
+			input: BusinessAttachmentUploadInput{OwnerType: BusinessAttachmentOwnerOutsourcingOrder, OwnerID: 7, AttachmentType: BusinessAttachmentTypePrintAppendix,
+				FileName: "合同附图.pdf", MimeType: "application/pdf"},
+			err: ErrBusinessAttachmentMimeNotAllowed,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := normalizeBusinessAttachmentUploadInput(tc.input); !errors.Is(err, tc.err) {
+				t.Fatalf("error=%v want=%v", err, tc.err)
+			}
+		})
+	}
+}
+
 func TestBusinessAttachmentClearProductImageNormalizesAndRestrictsSlot(t *testing.T) {
 	repo := &stubBusinessAttachmentRepo{ownerExists: true}
 	uc := NewBusinessAttachmentUsecase(repo)

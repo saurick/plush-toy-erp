@@ -108,7 +108,7 @@ test('customer review exports only the selected business chain with complete bus
     assert(step.exceptionPaths.length > 0, step.name)
     assert(step.systemAction.length <= 24, `${step.name}/systemAction too long`)
     assert(step.personAction.length <= 24, `${step.name}/personAction too long`)
-    assert(step.completion.length <= 30, `${step.name}/completion too long`)
+    assert(step.completion.length <= 120, `${step.name}/completion too long`)
     assert(
       review.chain.diagram.mermaidSource.includes(
         `${step.number}. ${step.name}`
@@ -128,11 +128,11 @@ test('customer review exports only the selected business chain with complete bus
     '客户版异常提示必须去重，完整合同仍留在共享模型中'
   )
   assert(
-    review.chain.steps.some(
+    review.chain.steps.every(
       (step) =>
-        step.responsibleRole === DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED
+        step.responsibleRole !== DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED
     ),
-    '未登记岗位必须明确显示当前正式合同未定义'
+    '每个链路步骤必须从责任池、权限或系统责任得到业务语言投影'
   )
 })
 
@@ -188,7 +188,7 @@ test('customer review visible content excludes developer evidence and keeps comp
     /server\//u,
     /\.(?:mjs|jsx|go)(?:\b|$)/u,
     /(?:fact|source)\.[a-z_]/u,
-    /request|trace|RPC|错误码|幂等/u,
+    /request|trace|RPC|错误码/u,
   ]) {
     assert.doesNotMatch(text, forbidden)
   }
@@ -199,7 +199,7 @@ test('customer review visible content excludes developer evidence and keeps comp
     generatedAt,
   })
   const salesText = visibleReviewText(salesReview)
-  assert.match(salesText, /老板；其余岗位当前正式合同未定义/u)
+  assert.match(salesText, /老板|具有对应业务权限的岗位/u)
   assert.doesNotMatch(
     salesText,
     /engineering_data|order_review|responsibility pool|责任池/iu
@@ -255,6 +255,8 @@ test('customer review does not hardcode a customer and fails closed for an unkno
     'utf8'
   )
   assert.doesNotMatch(`${moduleSource}\n${componentSource}`, /yoyoosun|永绅/iu)
+  assert.match(moduleSource, /buildDevBusinessChainProjection/u)
+  assert.doesNotMatch(moduleSource, /EXCEPTION_PATTERN|EXCEPTION_GROUPS/u)
   assert.match(
     componentSource,
     /flowchartHtmlLabels=\{false\}/u,

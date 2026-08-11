@@ -21,6 +21,7 @@ let mockWorkflowTaskID = 1
 const mockWorkflowTasks = []
 const mockWorkflowBusinessStates = []
 const mockWorkflowMutationReceipts = new Map()
+const mockLegalNoticeAcknowledgements = new Map()
 
 function workflowMockRoleTaskReadAllowed(
   adminProfile,
@@ -1066,7 +1067,11 @@ export function setupJsonRpcMockServer() {
         })
       } else if (method === 'version') {
         responseBody = makeJsonRpcSuccess(id, {
-          version: { version: 'mock-1.0.0' },
+          version: 'mock-local',
+          release_version: 'mock-local',
+          git_sha: '20c96d3819429361a35d2551b63b211f055de37e',
+          git_sha_short: '20c96d38',
+          formal: true,
         })
       } else {
         responseBody = makeJsonRpcBizError(
@@ -1158,6 +1163,35 @@ export function setupJsonRpcMockServer() {
           jsonrpc: '2.0',
           id,
           result: makeBizResult(mockSuperAdminProfile),
+          error: '',
+        }
+      } else if (method === 'legal_notice_status') {
+        const receiptKey = `${params.notice_version || ''}:${params.content_fingerprint || ''}`
+        const acknowledgedAt = mockLegalNoticeAcknowledgements.get(receiptKey)
+        responseBody = {
+          jsonrpc: '2.0',
+          id,
+          result: makeBizResult({
+            notice_version: params.notice_version || '',
+            content_fingerprint: params.content_fingerprint || '',
+            acknowledged: Boolean(acknowledgedAt),
+            acknowledged_at: acknowledgedAt || 0,
+          }),
+          error: '',
+        }
+      } else if (method === 'acknowledge_legal_notice') {
+        const receiptKey = `${params.notice_version || ''}:${params.content_fingerprint || ''}`
+        const acknowledgedAt = Math.floor(Date.now() / 1000)
+        mockLegalNoticeAcknowledgements.set(receiptKey, acknowledgedAt)
+        responseBody = {
+          jsonrpc: '2.0',
+          id,
+          result: makeBizResult({
+            notice_version: params.notice_version || '',
+            content_fingerprint: params.content_fingerprint || '',
+            acknowledged: true,
+            acknowledged_at: acknowledgedAt,
+          }),
           error: '',
         }
       } else if (method === 'list') {

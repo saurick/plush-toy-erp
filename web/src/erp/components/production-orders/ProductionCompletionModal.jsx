@@ -10,6 +10,7 @@ import {
   Typography,
 } from 'antd'
 
+import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
 import {
   buildProductionCompletionChoices,
   buildProductionCompletionLotOptions,
@@ -142,6 +143,7 @@ export default function ProductionCompletionModal({
       cancelText="取消"
       confirmLoading={loading}
       destroyOnHidden
+      width={720}
       afterOpenChange={initializeOpenForm}
       onCancel={onCancel}
       onOk={submit}
@@ -195,7 +197,14 @@ export default function ProductionCompletionModal({
           },
         ]}
       />
-      <Form form={form} layout="vertical" preserve={false} disabled={loading}>
+      <Form
+        form={form}
+        className="erp-business-action-form"
+        layout="vertical"
+        preserve={false}
+        disabled={loading}
+      >
+        <BusinessFormSectionTitle>完工来源与数量</BusinessFormSectionTitle>
         <Form.Item
           name="production_order_item_id"
           label="生产明细"
@@ -263,11 +272,13 @@ export default function ProductionCompletionModal({
           </Form.Item>
         ) : null}
         {selectedChoice ? (
-          <Text type="secondary">
-            {selectedBatchChoice
-              ? `所选批次 ${selectedBatchChoice.quantity || '0'} / 已过账 ${selectedBatchChoice.posted || '0'} / 草稿 ${selectedBatchChoice.draft || '0'} / 剩余 ${selectedBatchChoice.remaining || '0'}`
-              : `计划 ${selectedChoice.planned || '0'} / 当前可完工上限 ${selectedChoice.acceptedPackaging || '0'} / 已过账 ${selectedChoice.posted || '0'} / 草稿 ${selectedChoice.draft || '0'}`}
-          </Text>
+          <div className="erp-business-source-summary">
+            <Text type="secondary">
+              {selectedBatchChoice
+                ? `所选批次 ${selectedBatchChoice.quantity || '0'} / 已过账 ${selectedBatchChoice.posted || '0'} / 草稿 ${selectedBatchChoice.draft || '0'} / 剩余 ${selectedBatchChoice.remaining || '0'}`
+                : `计划 ${selectedChoice.planned || '0'} / 当前可完工上限 ${selectedChoice.acceptedPackaging || '0'} / 已过账 ${selectedChoice.posted || '0'} / 草稿 ${selectedChoice.draft || '0'}`}
+            </Text>
+          </div>
         ) : null}
         <Form.Item
           name="quantity"
@@ -301,6 +312,7 @@ export default function ProductionCompletionModal({
         >
           <Input inputMode="decimal" maxLength={21} placeholder="例如：100" />
         </Form.Item>
+        <BusinessFormSectionTitle>入库仓库与批次</BusinessFormSectionTitle>
         <Form.Item
           name="warehouse_id"
           label="入库仓库"
@@ -375,7 +387,11 @@ export default function ProductionCompletionModal({
         >
           <Input type="datetime-local" />
         </Form.Item>
-        <Form.Item name="note" label="备注">
+        <Form.Item
+          className="erp-business-action-form__field--full"
+          name="note"
+          label="备注"
+        >
           <Input.TextArea rows={3} maxLength={255} showCount />
         </Form.Item>
       </Form>

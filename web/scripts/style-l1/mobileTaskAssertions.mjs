@@ -567,7 +567,7 @@ export function createMobileTaskAssertions(deps) {
       `${scenarioName} 我的页不应恢复已删除的重复任务指标: ${JSON.stringify(metrics)}`
     )
     assert(
-      metrics.cards.length === 2 &&
+      metrics.cards.length === 3 &&
         metrics.cards.some(
           (card) =>
             card.text.includes('账号岗位') &&
@@ -575,8 +575,15 @@ export function createMobileTaskAssertions(deps) {
             card.text.includes('电脑端 / 手机待办')
         ) &&
         metrics.cards.some((card) => card.text.includes('入口与安全')) &&
+        metrics.cards.some(
+          (card) =>
+            card.text.includes('系统信息') &&
+            card.text.includes('yoyoosun-20260810-20c96d38-amd64') &&
+            card.text.includes('20c96d38') &&
+            card.text.includes('前后台版本一致')
+        ) &&
         metrics.cards.every((card) => !card.text.includes('任务端')),
-      `${scenarioName} 我的页应展示真实可用入口和入口安全且不重复任务端身份: ${JSON.stringify(metrics)}`
+      `${scenarioName} 我的页应展示真实可用入口、入口安全和一致的系统版本且不重复任务端身份: ${JSON.stringify(metrics)}`
     )
     metrics.cards.forEach((card) => {
       assert(

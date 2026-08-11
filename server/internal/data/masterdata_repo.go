@@ -303,6 +303,9 @@ func (r *masterDataRepo) ListSuppliers(ctx context.Context, filter biz.MasterDat
 	} else if filter.ActiveOnly {
 		query = query.Where(supplier.IsActive(true))
 	}
+	if len(filter.SupplierTypes) > 0 {
+		query = query.Where(supplier.SupplierTypeIn(filter.SupplierTypes...))
+	}
 	total, err := query.Clone().Count(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -311,7 +314,45 @@ func (r *masterDataRepo) ListSuppliers(ctx context.Context, filter biz.MasterDat
 	if err != nil {
 		return nil, 0, err
 	}
-	return entSuppliersToBiz(rows), total, nil
+	items := entSuppliersToBiz(rows)
+	if err := r.populateSupplierPrimaryContacts(ctx, items); err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
+func (r *masterDataRepo) populateSupplierPrimaryContacts(ctx context.Context, suppliers []*biz.Supplier) error {
+	ownerIDs := make([]int, 0, len(suppliers))
+	supplierByID := make(map[int]*biz.Supplier, len(suppliers))
+	for _, item := range suppliers {
+		if item == nil || item.ID <= 0 {
+			continue
+		}
+		ownerIDs = append(ownerIDs, item.ID)
+		supplierByID[item.ID] = item
+	}
+	if len(ownerIDs) == 0 {
+		return nil
+	}
+	rows, err := r.data.postgres.Contact.Query().
+		Where(
+			contact.OwnerType(biz.ContactOwnerSupplier),
+			contact.OwnerIDIn(ownerIDs...),
+			contact.IsActive(true),
+		).
+		Order(ent.Desc(contact.FieldIsPrimary), ent.Asc(contact.FieldID)).
+		All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, row := range rows {
+		item := supplierByID[row.OwnerID]
+		if item == nil || item.PrimaryContact != nil {
+			continue
+		}
+		item.PrimaryContact = entContactToBiz(row)
+	}
+	return nil
 }
 
 func (r *masterDataRepo) SetSupplierActive(ctx context.Context, id int, active bool) (*biz.Supplier, error) {

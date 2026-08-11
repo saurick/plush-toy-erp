@@ -413,6 +413,7 @@ jobs:
           node scripts/deploy/release-artifact-bundle.mjs \
             --execute \
             --ref "$RELEASE_SHA" \
+            --version "$RELEASE_VERSION" \
             --customer "$RELEASE_CUSTOMER" \
             --out "output/releases/$RELEASE_SHA" \
             --json

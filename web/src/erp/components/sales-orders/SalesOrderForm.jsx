@@ -13,6 +13,7 @@ import {
 } from 'antd'
 
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
+import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
 import FieldWithUnitSuffix, {
   isQuantityTextWithinUnitPrecision,
   singleUnitSuffixTextFromOptions,
@@ -209,6 +210,7 @@ export function SalesOrderFormFields({
 
   return (
     <>
+      <BusinessFormSectionTitle>订单与客户</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field"
         label="订单号（自动）"
@@ -251,6 +253,7 @@ export function SalesOrderFormFields({
       >
         <Input allowClear autoComplete="off" />
       </Form.Item>
+      <BusinessFormSectionTitle>联系人与负责人</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field"
         label="业务员 / 跟单人"
@@ -326,6 +329,7 @@ export function SalesOrderFormFields({
       <Form.Item name="contact_title" hidden>
         <Input />
       </Form.Item>
+      <BusinessFormSectionTitle>结算与交付</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field"
         dependencies={['payment_term_days']}

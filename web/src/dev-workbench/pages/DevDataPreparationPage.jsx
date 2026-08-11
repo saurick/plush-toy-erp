@@ -18,6 +18,7 @@ import {
   List,
   Modal,
   Radio,
+  Select,
   Skeleton,
   Space,
   Tag,
@@ -69,6 +70,184 @@ function upsertOperation(operation, operations = []) {
   return [operation, ...nextOperations]
 }
 
+function formatDuration(durationMs) {
+  if (!Number.isFinite(durationMs)) return '尚未记录'
+  if (durationMs < 1000) return `${Math.round(durationMs)} 毫秒`
+  const seconds = durationMs / 1000
+  if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 1 : 0)} 秒`
+  const minutes = Math.floor(seconds / 60)
+  const remainder = Math.round(seconds % 60)
+  return `${minutes} 分 ${remainder} 秒`
+}
+
+function AcceptancePlanReview({ plan, selectedChainKey, onSelectChain }) {
+  const selectedChain = plan.chains.find(
+    (chain) => chain.key === selectedChainKey
+  )
+  const scenarioLabelByKey = new Map(
+    plan.scenarioKinds.map((scenario) => [scenario.key, scenario.label])
+  )
+  const stepItems = (selectedChain?.steps || []).map((step, index) => ({
+    key: step.key,
+    label: `${index + 1}. ${step.label}`,
+    children: (
+      <div className="erp-dev-data-chain-step">
+        <Text type="secondary">
+          {step.fromLabel} → {step.toLabel}
+        </Text>
+        <Descriptions
+          size="small"
+          bordered
+          column={{ xs: 1, lg: 2 }}
+          items={[
+            {
+              key: 'responsibility',
+              label: '责任岗位',
+              children: step.responsibleRole,
+            },
+            {
+              key: 'preconditions',
+              label: '前置状态',
+              children: step.preconditions.join('；'),
+            },
+            {
+              key: 'actions',
+              label: '允许动作',
+              children: step.actions.join('；'),
+            },
+            {
+              key: 'results',
+              label: '结果状态',
+              children: step.results.join('；'),
+            },
+            {
+              key: 'facts',
+              label: 'Fact',
+              children: step.facts.join('；'),
+            },
+            {
+              key: 'scenarios',
+              label: '本步骤合法场景',
+              children: (
+                <Space wrap size={[4, 4]}>
+                  {step.scenarioKinds.map((kind) => (
+                    <Tag key={kind}>{scenarioLabelByKey.get(kind) || kind}</Tag>
+                  ))}
+                </Space>
+              ),
+            },
+          ]}
+        />
+      </div>
+    ),
+  }))
+
+  return (
+    <div className="erp-dev-data-acceptance-plan">
+      <div
+        className="erp-dev-data-plan-counts"
+        aria-label="当前完整回归计划摘要"
+      >
+        {[
+          ['业务链', plan.chainCount],
+          ['链路步骤', plan.stepCount],
+          ['合法场景', plan.scenarioCount],
+          ['造数阶段', plan.dataStageCount],
+          ['页面目标', plan.catalogTargetCount],
+        ].map(([label, value]) => (
+          <div key={label}>
+            <strong>{value}</strong>
+            <span>{label}</span>
+          </div>
+        ))}
+      </div>
+      <div className="erp-dev-data-chain-toolbar">
+        <div>
+          <Text strong>选择业务链查看</Text>
+          <Text type="secondary">
+            选择只影响计划下钻；完整回归始终执行全部已登记合法场景。
+          </Text>
+        </div>
+        <Select
+          value={selectedChainKey}
+          aria-label="选择业务链查看步骤"
+          onChange={onSelectChain}
+          options={[
+            { value: '', label: '全部业务链' },
+            ...plan.chains.map((chain) => ({
+              value: chain.key,
+              label: chain.label,
+            })),
+          ]}
+        />
+      </div>
+      {selectedChain ? (
+        <section className="erp-dev-data-selected-chain">
+          <div>
+            <Title level={3}>{selectedChain.label}</Title>
+            <Paragraph>{selectedChain.summary}</Paragraph>
+            <Space wrap size={[4, 4]}>
+              {selectedChain.scenarioKinds.map((kind) => (
+                <Tag color="green" key={kind}>
+                  {scenarioLabelByKey.get(kind) || kind}
+                </Tag>
+              ))}
+            </Space>
+          </div>
+          <Collapse accordion items={stepItems} />
+        </section>
+      ) : (
+        <List
+          className="erp-dev-data-chain-list"
+          size="small"
+          dataSource={plan.chains}
+          renderItem={(chain) => (
+            <List.Item
+              actions={[
+                <Button
+                  key="inspect"
+                  type="link"
+                  onClick={() => onSelectChain(chain.key)}
+                >
+                  展开步骤
+                </Button>,
+              ]}
+            >
+              <List.Item.Meta
+                title={chain.label}
+                description={`${chain.summary}（${chain.stepCount} 步 / ${chain.scenarioCount} 类场景）`}
+              />
+            </List.Item>
+          )}
+        />
+      )}
+      <details className="erp-dev-data-reuse-rules">
+        <summary>代码变化后，旧数据怎么处理</summary>
+        <div className="erp-dev-data-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">结论</th>
+                <th scope="col">怎么判断</th>
+                <th scope="col">下一步</th>
+              </tr>
+            </thead>
+            <tbody>
+              {plan.reuseRules.map((rule) => (
+                <tr key={rule.status}>
+                  <th scope="row">{rule.label}</th>
+                  <td>{rule.condition}</td>
+                  <td>{rule.nextAction}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </div>
+  )
+}
+
 function WorkflowStep({ number, title, description, extra, children }) {
   return (
     <section
@@ -94,13 +273,18 @@ function WorkflowStep({ number, title, description, extra, children }) {
 
 function ProfileOption({ profile, selected, disabled, onSelect }) {
   const copy = DEV_DATA_PREPARATION_PROFILE_COPY[profile.key]
+  const className = [
+    'erp-dev-data-profile',
+    selected ? 'erp-dev-data-profile--selected' : '',
+    profile.key === DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance
+      ? 'erp-dev-data-profile--primary'
+      : 'erp-dev-data-profile--secondary',
+  ]
+    .filter(Boolean)
+    .join(' ')
   return (
     <div
-      className={
-        selected
-          ? 'erp-dev-data-profile erp-dev-data-profile--selected'
-          : 'erp-dev-data-profile'
-      }
+      className={className}
       onClick={() => {
         if (!disabled) onSelect(profile.key)
       }}
@@ -247,11 +431,23 @@ const READBACK_PRESENTATIONS = Object.freeze({
   }),
   [DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance]: (readback) => ({
     column: { xs: 1, sm: 3 },
+    notice:
+      '本回执证明当前代码合同下的本地技术回归与清理结果，不等于目标环境发布或客户 UAT。',
     items: [
       {
         key: 'report',
-        label: '50 项验收报告',
+        label: `${readback.catalogTargetCount} 项页面回归`,
         children: readback.reportStatus === 'passed' ? '通过' : '失败',
+      },
+      {
+        key: 'chains',
+        label: '业务链 / 步骤 / 场景',
+        children: `${readback.chainCount} / ${readback.stepCount} / ${readback.scenarioCount}`,
+      },
+      {
+        key: 'duration',
+        label: '造数总耗时',
+        children: formatDuration(readback.datasetDurationMs),
       },
       {
         key: 'cleanup',
@@ -279,7 +475,7 @@ function OperationIssues({ issues = [] }) {
   )
 }
 
-function OperationReadback({ operation }) {
+function OperationReadback({ operation, acceptancePlan }) {
   const { readback } = operation
   if (!readback) {
     return (
@@ -303,11 +499,60 @@ function OperationReadback({ operation }) {
       {presentation.notice ? (
         <Alert type="info" showIcon message={presentation.notice} />
       ) : null}
+      {readback.profileKey ===
+        DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance &&
+      readback.stageTimings.length > 0 ? (
+        <section
+          className="erp-dev-data-stage-timings"
+          aria-label="造数阶段耗时"
+        >
+          <div className="erp-dev-data-stage-timings__head">
+            <Text strong>9 个现有造数阶段</Text>
+            <Text type="secondary">
+              总耗时是墙钟时间；各阶段按唯一串行 runner 的真实开始和结束记录。
+            </Text>
+          </div>
+          <List
+            size="small"
+            dataSource={readback.stageTimings}
+            renderItem={(stage) => {
+              const definition = acceptancePlan?.dataStages.find(
+                (candidate) => candidate.key === stage.key
+              )
+              return (
+                <List.Item>
+                  <Space wrap>
+                    <Tag
+                      color={
+                        stage.status === 'completed'
+                          ? 'success'
+                          : stage.status === 'failed'
+                            ? 'error'
+                            : 'default'
+                      }
+                    >
+                      {stage.status === 'completed'
+                        ? '完成'
+                        : stage.status === 'failed'
+                          ? '失败'
+                          : '未开始'}
+                    </Tag>
+                    <Text>{definition?.label || stage.key}</Text>
+                    <Text type="secondary">
+                      {formatDuration(stage.durationMs)}
+                    </Text>
+                  </Space>
+                </List.Item>
+              )
+            }}
+          />
+        </section>
+      ) : null}
     </Space>
   )
 }
 
-function OperationDetail({ operation, compact = false }) {
+function OperationDetail({ operation, acceptancePlan, compact = false }) {
   const profileCopy = DEV_DATA_PREPARATION_PROFILE_COPY[operation.profileKey]
   const [technicalOpen, setTechnicalOpen] = useState(
     compact && operation.status === 'ready'
@@ -326,6 +571,9 @@ function OperationDetail({ operation, compact = false }) {
             action="开始于"
             missing="开始时间未证明"
           />
+          <Text type="secondary">
+            实际执行：{formatDuration(operation.timing.durationMs)}
+          </Text>
           <DevTimestamp
             value={operation.updatedAt}
             action={operationUpdateAction(operation)}
@@ -420,7 +668,10 @@ function OperationDetail({ operation, compact = false }) {
           </section>
           <section aria-label="终态读回">
             <Text strong>终态读回</Text>
-            <OperationReadback operation={operation} />
+            <OperationReadback
+              operation={operation}
+              acceptancePlan={acceptancePlan}
+            />
           </section>
         </>
       ) : null}
@@ -436,8 +687,9 @@ export default function DevDataPreparationPage() {
   const prepareIntentRef = useRef(null)
   const [summary, setSummary] = useState(null)
   const [selectedProfileKey, setSelectedProfileKey] = useState(
-    DEV_DATA_PREPARATION_PROFILE_KEYS.coreDemo
+    DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance
   )
+  const [selectedChainKey, setSelectedChainKey] = useState('')
   const [currentOperation, setCurrentOperation] = useState(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -472,7 +724,8 @@ export default function DevDataPreparationPage() {
       setSummary(nextSummary)
       const recoveredOperation = selectRecoverableDataPreparationOperation(
         nextSummary.operations,
-        currentOperationIdRef.current
+        currentOperationIdRef.current,
+        DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance
       )
       currentOperationIdRef.current = recoveredOperation?.id || ''
       setCurrentOperation(recoveredOperation)
@@ -658,7 +911,12 @@ export default function DevDataPreparationPage() {
         />
       </div>
     ),
-    children: <OperationDetail operation={operation} />,
+    children: (
+      <OperationDetail
+        operation={operation}
+        acceptancePlan={summary?.acceptancePlan}
+      />
+    ),
   }))
 
   return (
@@ -668,6 +926,8 @@ export default function DevDataPreparationPage() {
         '--dev-data-border': token.colorBorder,
         '--dev-data-primary': token.colorPrimary,
         '--dev-data-selected': token.colorPrimaryBg,
+        '--dev-data-surface': token.colorBgContainer,
+        '--dev-data-muted': token.colorTextSecondary,
       }}
     >
       <DevPageNav sourcePath={DEV_DATA_PREPARATION_SOURCE_PATH} />
@@ -681,10 +941,10 @@ export default function DevDataPreparationPage() {
               测试数据准备中心
             </Text>
             <Title level={1} className="erp-dev-hub-title">
-              准备测试数据
+              准备回归数据
             </Title>
             <Paragraph className="erp-dev-hub-summary">
-              按“检查目标—选择范围—核对计划—查看结果”完成一次受控准备。页面不接收自定义目标、命令或凭据。
+              默认按最新业务链合同建立完整回归新批次；先看合法步骤和场景，再确认执行并查看真实耗时。页面不接收自定义目标、命令或凭据。
             </Paragraph>
           </div>
         </div>
@@ -765,8 +1025,8 @@ export default function DevDataPreparationPage() {
           <div className="erp-dev-data-workflow">
             <WorkflowStep
               number="1"
-              title="检查目标是否可用"
-              description="先看结论；仓库 SHA、目标指纹等追踪信息按需展开。"
+              title="确认完整回归能否开始"
+              description="先看完整回归的 clean commit 与隔离库结论；其他联调目标只作次要参考。"
               extra={
                 <Tag>
                   {
@@ -833,10 +1093,24 @@ export default function DevDataPreparationPage() {
 
             <WorkflowStep
               number="2"
-              title="选择数据范围"
-              description="只选择最小够用的固定范围；测试数据不是每次验证都要重新生成。"
+              title="核对最新业务链与数据范围"
+              description="选择业务链，展开步骤绑定的责任、状态、动作、结果和 Fact；只查看已登记合法场景。"
               extra={<Text type="secondary">不支持自定义参数</Text>}
             >
+              <AcceptancePlanReview
+                plan={summary.acceptancePlan}
+                selectedChainKey={selectedChainKey}
+                onSelectChain={setSelectedChainKey}
+              />
+              <div className="erp-dev-data-profile-heading">
+                <div>
+                  <Text strong>选择本次准备方式</Text>
+                  <Text type="secondary">
+                    完整回归每次建立新隔离批次；共享基础和长期场景只用于日常联调。
+                  </Text>
+                </div>
+                <Tag color="green">完整回归优先</Tag>
+              </div>
               <Radio.Group
                 className="erp-dev-data-profile-group"
                 value={selectedProfileKey}
@@ -881,8 +1155,8 @@ export default function DevDataPreparationPage() {
 
             <WorkflowStep
               number="3"
-              title="核对计划并确认"
-              description="先核对目标、数据范围、退出方式和固定步骤；只有确认后才会写入。"
+              title="准备并确认新批次"
+              description="完整回归计划同时绑定当前业务链摘要、clean exact commit 和隔离目标；只有确认后才会写入。"
               extra={
                 currentOperation?.status === 'ready' ? (
                   <Button
@@ -918,6 +1192,7 @@ export default function DevDataPreparationPage() {
                   <OperationDetail
                     key={`${currentOperation.id}:${currentOperation.status}`}
                     operation={currentOperation}
+                    acceptancePlan={summary.acceptancePlan}
                     compact
                   />
                   {currentOperation.terminal &&
@@ -948,17 +1223,29 @@ export default function DevDataPreparationPage() {
               ) : (
                 <Empty
                   image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description="选择数据范围并准备计划后，在这里核对目标、批次、步骤和阻断。"
+                  description="核对业务链并准备新批次后，在这里确认目标、固定步骤和阻断。"
                 />
               )}
             </WorkflowStep>
 
             <WorkflowStep
               number="4"
-              title="查看结果"
-              description="终态回执不会被自动重试；历史结果只证明对应计划与目标。"
+              title="查看回执与耗时"
+              description="查看实际执行总耗时、完整回归的 9 个造数阶段耗时和自动清理读回；旧回执只证明对应旧计划。"
               extra={<Tag>{historyItems.length} 条回执</Tag>}
             >
+              {currentOperation?.terminal ? (
+                <section
+                  className="erp-dev-data-latest-result"
+                  aria-label="本次回执"
+                >
+                  <Text strong>本次回执</Text>
+                  <OperationDetail
+                    operation={currentOperation}
+                    acceptancePlan={summary.acceptancePlan}
+                  />
+                </section>
+              ) : null}
               {historyItems.length > 0 ? (
                 <details className="erp-dev-data-history">
                   <summary>展开历史回执（{historyItems.length}）</summary>

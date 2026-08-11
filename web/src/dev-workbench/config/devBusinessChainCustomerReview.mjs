@@ -1,7 +1,8 @@
 import { getPermissionCenterRoleName } from '../../erp/utils/permissionCenterAccess.mjs'
+import { buildDevBusinessChainProjection } from './devBusinessChainProjection.mjs'
 
 export const DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_VERSION =
-  'dev-business-chain-customer-review/v1'
+  'dev-business-chain-customer-review/v2'
 
 export const DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED = '当前正式合同未定义'
 
@@ -11,25 +12,15 @@ export const DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_COMPLETION_BOUNDARY =
 export const DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_FOOTER =
   '本文件用于业务需求校对，不单独证明已经实现、发布或经甲方验收。'
 
-const EXCEPTION_PATTERN =
-  /拒绝|驳回|退回|取消|返工|报废|让步|冲正|超领|拒收|隔离|调整|退货|失败|阻塞/u
-
-const EXCEPTION_GROUPS = Object.freeze([
-  /拒绝|驳回/u,
-  /退回/u,
-  /取消/u,
-  /返工/u,
-  /报废/u,
-  /让步/u,
-  /冲正/u,
-  /超领/u,
-  /拒收/u,
-  /隔离/u,
-  /调整/u,
-  /退货/u,
-  /失败/u,
-  /阻塞/u,
+const ATTENTION_SCENARIO_KINDS = new Set([
+  'interruption_recovery',
+  'unauthorized',
+  'wrong_state',
+  'correction',
+  'idempotency',
 ])
+
+const ATTENTION_EDGE_KINDS = new Set(['returns', 'reworks', 'reverses'])
 
 const CHAIN_KIND_LABELS = Object.freeze({
   primary: '业务主链',
@@ -108,95 +99,102 @@ function formatGeneratedAt(value) {
   return date.toISOString()
 }
 
-function collectProcessDefinitions(catalog, definitionKeys) {
-  const definitionByKey = new Map(
-    asArray(catalog?.processDefinitions).map((definition) => [
-      definition.key,
-      definition,
-    ])
-  )
-  return uniqueStrings(definitionKeys)
-    .map((key) => definitionByKey.get(key))
-    .filter(Boolean)
-}
-
 function formalRoleLabel(roleKey) {
   const label = getPermissionCenterRoleName({ role_key: roleKey })
   return label === '已配置岗位' ? '' : label
 }
 
-function processDefinitionKeysForNode(chain, node) {
-  const directKeys = uniqueStrings(node.processDefinitionKeys)
-  if (directKeys.length > 0) return directKeys
-  if (node.layer !== 'workflow_task') return []
-
-  const adjacentNodeKeys = new Set(
-    chain.edges
-      .filter((edge) => edge.from === node.key || edge.to === node.key)
-      .flatMap((edge) => [edge.from, edge.to])
-  )
-  const adjacentKeys = uniqueStrings(
-    chain.nodes
-      .filter(
-        (candidate) =>
-          adjacentNodeKeys.has(candidate.key) &&
-          candidate.layer === 'process_runtime'
-      )
-      .flatMap((candidate) => candidate.processDefinitionKeys)
-  )
-  if (adjacentKeys.length > 0) return adjacentKeys
-
-  return uniqueStrings(
-    chain.nodes.flatMap((candidate) => candidate.processDefinitionKeys)
-  )
-}
-
-function resolveResponsibleRole(catalog, chain, node) {
-  const explicitRoleKeys = uniqueStrings(node.responsibleRoleKeys)
-  const definitions = collectProcessDefinitions(
-    catalog,
-    processDefinitionKeysForNode(chain, node)
-  )
-  const ownerPools = uniqueStrings([
-    ...explicitRoleKeys,
-    ...(explicitRoleKeys.length > 0
-      ? []
-      : definitions.flatMap((definition) =>
-          asArray(definition.nodes).map((candidate) => candidate.ownerPool)
-        )),
-  ])
-  if (ownerPools.length === 0) {
-    return DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED
-  }
-
+function resolveResponsibleRole(projection) {
+  const ownerPools = uniqueStrings(projection.responsibility.ownerPoolKeys)
   const knownLabels = uniqueStrings(ownerPools.map(formalRoleLabel))
   const unknownCount = ownerPools.length - knownLabels.length
-  if (knownLabels.length === 0) {
-    return DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED
+  const modes = new Set(projection.responsibility.modes)
+  const labels = [...knownLabels]
+  if (
+    modes.has('human') &&
+    (projection.responsibility.capabilityKeys.length > 0 || unknownCount > 0)
+  ) {
+    labels.push('具有对应业务权限的岗位')
   }
-  return unknownCount > 0
-    ? `${knownLabels.join('、')}；其余岗位${DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED}`
-    : knownLabels.join('、')
+  if (modes.has('system')) labels.push('系统自动处理')
+  if (modes.has('derived')) labels.push('系统按已生效结果计算')
+  return (
+    uniqueStrings(labels).join('、') ||
+    DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED
+  )
 }
 
-function nodeAction(node) {
-  return `完成“${node.label}”对应的业务动作。`
+function nodeAction(chain, node) {
+  const adjacentSteps = chain.steps.filter(
+    (step) => step.fromNodeKey === node.key
+  )
+  const fallbackSteps = chain.steps.filter(
+    (step) => step.toNodeKey === node.key
+  )
+  const labels = uniqueStrings(
+    (adjacentSteps.length > 0 ? adjacentSteps : fallbackSteps).map(
+      (step) => step.label
+    )
+  )
+  return labels.length > 0
+    ? `按已登记步骤办理：${labels.join('；')}。`
+    : `核对“${node.label}”的已登记结果。`
 }
 
-function nodeTrigger(chain, node) {
+function describeStateRef(catalog, ref) {
+  const flow = asArray(catalog.flows).find(
+    (candidate) => candidate.key === ref.machineKey
+  )
+  const stateDefinition = asArray(flow?.states).find(
+    (candidate) => candidate.key === ref.stateKey
+  )
+  return flow && stateDefinition
+    ? `${flow.label}为“${stateDefinition.label}”`
+    : ''
+}
+
+function nodeTrigger(catalog, chain, node, projection) {
   const nodeByKey = new Map(
     chain.nodes.map((candidate) => [candidate.key, candidate])
   )
   const incoming = chain.edges.filter((edge) => edge.to === node.key)
-  if (incoming.length === 0) {
-    return `“${node.label}”满足进入条件；其他统一条件${DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED}。`
-  }
-  return uniqueStrings(
+  const stateConditions = uniqueStrings(
+    projection.steps.flatMap((step) =>
+      step.preconditionStateRefs.map((ref) => describeStateRef(catalog, ref))
+    )
+  )
+  const incomingConditions = uniqueStrings(
     incoming.map((edge) => {
       const source = nodeByKey.get(edge.from)
       return `${source?.label || '上一步'}：${edge.label}`
     })
-  ).join('；')
+  )
+  const conditions = [...incomingConditions, ...stateConditions]
+  if (conditions.length === 0) {
+    return `“${node.label}”满足进入条件；其他统一条件${DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED}。`
+  }
+  return uniqueStrings(conditions).join('；')
+}
+
+function nodeCompletion(catalog, projection, layer) {
+  const stateResults = uniqueStrings(
+    projection.steps.flatMap((step) =>
+      step.resultStateRefs.map((ref) => describeStateRef(catalog, ref))
+    )
+  )
+  const factResults = uniqueStrings(
+    projection.factKeys.map((factKey) => {
+      const fact = asArray(catalog.factDefinitions).find(
+        (candidate) => candidate.factKey === factKey
+      )
+      return fact ? `形成“${fact.label}”` : ''
+    })
+  )
+  const results = [...stateResults, ...factResults]
+  const visibleResults = results.slice(0, 3)
+  return results.length > 0
+    ? `${visibleResults.join('、')}${results.length > visibleResults.length ? '等已登记结果' : ''}；${layer.completion}`
+    : layer.completion
 }
 
 function nodeNext(chain, node) {
@@ -223,12 +221,31 @@ function escapeMermaid(value) {
     .replaceAll('\n', ' ')
 }
 
-function diagramToneForNode(node) {
+function isAttentionEdge(chain, edge) {
+  return (
+    ATTENTION_EDGE_KINDS.has(edge.kind) ||
+    asArray(edge.scenarioKeys).some((scenarioKey) =>
+      [...ATTENTION_SCENARIO_KINDS].some((kind) =>
+        scenarioKey.endsWith(`.${kind}`)
+      )
+    )
+  )
+}
+
+function diagramToneForNode(chain, node) {
   if (node.layer === 'workflow_task') return 'person'
   if (node.layer === 'fact_ledger' || node.layer === 'derived_result') {
     return 'result'
   }
-  if (EXCEPTION_PATTERN.test(node.label)) return 'attention'
+  if (
+    chain.edges.some(
+      (edge) =>
+        (edge.from === node.key || edge.to === node.key) &&
+        isAttentionEdge(chain, edge)
+    )
+  ) {
+    return 'attention'
+  }
   return 'normal'
 }
 
@@ -255,7 +272,7 @@ function buildChainDiagram(chain) {
     lines.push(
       `  ${ids.get(edge.from)} -->|"${escapeMermaid(edge.label)}"| ${ids.get(edge.to)}`
     )
-    if (EXCEPTION_PATTERN.test(edge.label)) {
+    if (isAttentionEdge(chain, edge)) {
       lines.push(
         `  linkStyle ${index} stroke:#c86b16,stroke-width:2px,color:#6f3500`
       )
@@ -263,7 +280,9 @@ function buildChainDiagram(chain) {
   })
   appendDiagramStyles(lines)
   chain.nodes.forEach((node) => {
-    lines.push(`  class ${ids.get(node.key)} ${diagramToneForNode(node)}`)
+    lines.push(
+      `  class ${ids.get(node.key)} ${diagramToneForNode(chain, node)}`
+    )
   })
   return Object.freeze({
     title: '先看图：业务怎么走',
@@ -313,102 +332,99 @@ function buildOverviewDiagram(catalog) {
   })
 
   return Object.freeze({
-    title: '先看图：十二条业务链怎样衔接',
+    title: '先看图：全部业务链怎样衔接',
     description: '四个分区只展示链与链的关系，不展开每条链的内部步骤。',
     mermaidSource: lines.join('\n'),
     legend: OVERVIEW_DIAGRAM_LEGEND,
   })
 }
 
-function stateExceptionPaths(catalog, machineKeys) {
-  const flowByKey = new Map(
-    asArray(catalog?.flows).map((flow) => [flow.key, flow])
+function describeTransition(catalog, ref) {
+  const flow = asArray(catalog.flows).find(
+    (candidate) => candidate.key === ref.machineKey
   )
-  return uniqueStrings(
-    uniqueStrings(machineKeys).flatMap((machineKey) => {
-      const flow = flowByKey.get(machineKey)
-      if (!flow) return []
-      const stateByKey = new Map(
-        asArray(flow.states).map((state) => [state.key, state.label])
-      )
-      return asArray(flow.transitions)
-        .map((transition) => {
-          const from = stateByKey.get(transition.from)
-          const to = stateByKey.get(transition.to)
-          if (!from || !to || !EXCEPTION_PATTERN.test(`${from}${to}`)) {
-            return ''
-          }
-          return `${flow.label}：${from} → ${to}`
-        })
-        .filter(Boolean)
-    })
+  const from = asArray(flow?.states).find(
+    (candidate) => candidate.key === ref.from
   )
+  const to = asArray(flow?.states).find((candidate) => candidate.key === ref.to)
+  if (!flow || !from || !to) return ''
+  return `${flow.label}：${from.label} → ${to.label}`
 }
 
-function processExceptionPaths(catalog, definitionKeys) {
-  return uniqueStrings(
-    collectProcessDefinitions(catalog, definitionKeys).flatMap((definition) => {
-      const nodeByKey = new Map(
-        asArray(definition.nodes).map((node) => [node.key, node.label])
-      )
-      return asArray(definition.edges)
-        .map((edge) => {
-          const from = nodeByKey.get(edge.from)
-          const to = nodeByKey.get(edge.to)
-          if (!from || !to || !EXCEPTION_PATTERN.test(`${from}${to}`)) {
-            return ''
-          }
-          return `${definition.label}：${from} → ${to}`
-        })
-        .filter(Boolean)
-    })
+function registeredExceptionEntries(catalog, chain, scenarios) {
+  const edgeByKey = new Map(chain.edges.map((edge) => [edge.key, edge]))
+  const nodeByKey = new Map(chain.nodes.map((node) => [node.key, node]))
+  const outgoingCounts = new Map(
+    chain.nodes.map((node) => [
+      node.key,
+      chain.edges.filter((edge) => edge.from === node.key).length,
+    ])
   )
-}
-
-function graphExceptionPaths(chain, node = null) {
-  const nodeByKey = new Map(
-    chain.nodes.map((candidate) => [candidate.key, candidate])
-  )
-  return uniqueStrings(
-    chain.edges
-      .filter((edge) => !node || edge.from === node.key || edge.to === node.key)
-      .map((edge) => {
-        const from = nodeByKey.get(edge.from)
-        const to = nodeByKey.get(edge.to)
-        const visibleText = `${from?.label || ''}${edge.label}${to?.label || ''}`
-        if (!EXCEPTION_PATTERN.test(visibleText)) return ''
-        return `${from?.label || '上一步'} → ${to?.label || '下一步'}：${edge.label}`
-      })
+  const entries = []
+  for (const scenario of scenarios) {
+    const edges = scenario.stepKeys
+      .map((stepKey) => edgeByKey.get(stepKey))
       .filter(Boolean)
-  )
+      .filter(
+        (edge) =>
+          scenario.kind !== 'happy_path' ||
+          isAttentionEdge(chain, edge) ||
+          (outgoingCounts.get(edge.from) || 0) > 1
+      )
+    for (const edge of edges) {
+      entries.push({
+        groupKey:
+          scenario.kind === 'happy_path'
+            ? `registered_branch/${edge.key}`
+            : scenario.kind,
+        text: `${scenario.kind === 'happy_path' ? '已登记业务分支' : scenario.label}：${nodeByKey.get(edge.from)?.label || '上一步'} → ${nodeByKey.get(edge.to)?.label || '下一步'}（${edge.label}）`,
+      })
+    }
+    if (scenario.kind === 'happy_path') continue
+    for (const ref of scenario.stateTransitionRefs) {
+      const text = describeTransition(catalog, ref)
+      if (text) {
+        entries.push({
+          groupKey: scenario.kind,
+          text: `${scenario.label}：${text}`,
+        })
+      }
+    }
+  }
+  const seen = new Set()
+  return entries.filter((entry) => {
+    if (!entry.text || seen.has(entry.text)) return false
+    seen.add(entry.text)
+    return true
+  })
 }
 
 function exceptionPathsForNode(catalog, chain, node) {
-  const paths = uniqueStrings([
-    ...graphExceptionPaths(chain, node),
-    ...stateExceptionPaths(catalog, node.machineKeys),
-    ...processExceptionPaths(
-      catalog,
-      processDefinitionKeysForNode(chain, node)
-    ),
-  ])
-  return paths.length > 0
-    ? Object.freeze(paths)
-    : Object.freeze([DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED])
+  const projection = buildDevBusinessChainProjection({
+    catalog,
+    chainKey: chain.key,
+    nodeKey: node.key,
+  })
+  const entries = registeredExceptionEntries(
+    catalog,
+    chain,
+    projection.scenarios
+  )
+  return Object.freeze(
+    entries.length > 0
+      ? entries.map((entry) => entry.text)
+      : [DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED]
+  )
 }
 
-function compactExceptionPaths(paths) {
+function compactExceptionPaths(entries) {
   const seenGroups = new Set()
   const compact = []
-  for (const path of uniqueStrings(paths)) {
-    const groups = EXCEPTION_GROUPS.flatMap((pattern, index) =>
-      pattern.test(path) ? [index] : []
-    )
-    if (groups.length === 0 || groups.every((group) => seenGroups.has(group))) {
-      continue
-    }
-    compact.push(path)
-    groups.forEach((group) => seenGroups.add(group))
+  for (const entry of entries) {
+    if (seenGroups.has(entry.groupKey)) continue
+    seenGroups.add(entry.groupKey)
+    compact.push(entry.text)
+    if (compact.length >= 6) break
   }
   return Object.freeze(
     compact.length > 0
@@ -425,32 +441,32 @@ function buildChainReview(catalog, chain) {
         `customer review does not support chain layer ${node.layer}`
       )
     }
+    const projection = buildDevBusinessChainProjection({
+      catalog,
+      chainKey: chain.key,
+      nodeKey: node.key,
+    })
     return {
       number: index + 1,
       name: node.label,
-      action: nodeAction(node),
-      responsibleRole: resolveResponsibleRole(catalog, chain, node),
-      trigger: nodeTrigger(chain, node),
+      action: nodeAction(chain, node),
+      responsibleRole: resolveResponsibleRole(projection),
+      trigger: nodeTrigger(catalog, chain, node, projection),
       systemAction: layer.systemAction,
       personAction: layer.personAction,
-      completion: layer.completion,
+      completion: nodeCompletion(catalog, projection, layer),
       next: nodeNext(chain, node),
       exceptionPaths: exceptionPathsForNode(catalog, chain, node),
     }
   })
-  const processKeys = uniqueStrings(
-    chain.nodes.flatMap((node) => node.processDefinitionKeys)
+  const exceptionEntries = registeredExceptionEntries(
+    catalog,
+    chain,
+    chain.acceptanceScenarios
   )
-  const exceptionPaths = uniqueStrings([
-    ...graphExceptionPaths(chain),
-    ...chain.nodes.flatMap((node) =>
-      stateExceptionPaths(catalog, node.machineKeys)
-    ),
-    ...processExceptionPaths(catalog, processKeys),
-  ])
   const normalizedExceptionPaths =
-    exceptionPaths.length > 0
-      ? exceptionPaths
+    exceptionEntries.length > 0
+      ? exceptionEntries.map((entry) => entry.text)
       : [DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED]
 
   return Object.freeze({
@@ -459,7 +475,7 @@ function buildChainReview(catalog, chain) {
     purpose: chain.summary,
     diagram: buildChainDiagram(chain),
     steps: freezeList(steps),
-    displayExceptionPaths: compactExceptionPaths(normalizedExceptionPaths),
+    displayExceptionPaths: compactExceptionPaths(exceptionEntries),
     exceptionPaths: Object.freeze(normalizedExceptionPaths),
   })
 }

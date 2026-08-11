@@ -15,9 +15,160 @@
 
 .erp-dev-data-profile-group {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   width: 100%;
+}
+
+.erp-dev-data-profile--primary {
+  grid-column: 1 / -1;
+  border-color: color-mix(
+    in srgb,
+    var(--dev-data-primary) 46%,
+    var(--dev-data-border)
+  );
+}
+
+.erp-dev-data-profile-heading,
+.erp-dev-data-chain-toolbar,
+.erp-dev-data-stage-timings__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.erp-dev-data-profile-heading {
+  margin: 20px 0 10px;
+}
+
+.erp-dev-data-profile-heading > div,
+.erp-dev-data-chain-toolbar > div,
+.erp-dev-data-stage-timings__head {
+  display: grid;
+  gap: 3px;
+}
+
+.erp-dev-data-acceptance-plan {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--dev-data-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--dev-data-selected) 42%, transparent);
+}
+
+.erp-dev-data-plan-counts {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.erp-dev-data-plan-counts > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--dev-data-border);
+  border-radius: 10px;
+  background: var(--dev-data-surface);
+}
+
+.erp-dev-data-plan-counts strong {
+  color: var(--dev-data-primary);
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.erp-dev-data-plan-counts span {
+  color: var(--dev-data-muted);
+}
+
+.erp-dev-data-chain-toolbar .ant-select {
+  width: min(360px, 100%);
+}
+
+.erp-dev-data-chain-list,
+.erp-dev-data-selected-chain,
+.erp-dev-data-reuse-rules,
+.erp-dev-data-stage-timings {
+  min-width: 0;
+  border: 1px solid var(--dev-data-border);
+  border-radius: 10px;
+  background: var(--dev-data-surface);
+}
+
+.erp-dev-data-chain-list .ant-list-item {
+  align-items: flex-start;
+  padding-inline: 14px;
+}
+
+.erp-dev-data-selected-chain {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.erp-dev-data-selected-chain h3,
+.erp-dev-data-selected-chain p {
+  margin-bottom: 6px;
+}
+
+.erp-dev-data-chain-step {
+  display: grid;
+  gap: 10px;
+}
+
+.erp-dev-data-chain-step .ant-descriptions-view,
+.erp-dev-data-table-wrap {
+  overflow-x: auto;
+}
+
+.erp-dev-data-reuse-rules > summary {
+  padding: 12px 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.erp-dev-data-table-wrap {
+  padding: 0 14px 14px;
+}
+
+.erp-dev-data-table-wrap table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+}
+
+.erp-dev-data-table-wrap th,
+.erp-dev-data-table-wrap td {
+  padding: 10px 12px;
+  border: 1px solid var(--dev-data-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.erp-dev-data-table-wrap thead th {
+  background: color-mix(in srgb, var(--dev-data-selected) 62%, transparent);
+}
+
+.erp-dev-data-stage-timings {
+  padding: 14px;
+}
+
+.erp-dev-data-stage-timings .ant-list-item {
+  padding-inline: 0;
+}
+
+.erp-dev-data-latest-result {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid var(--dev-data-border);
+  border-radius: 12px;
+  background: var(--dev-data-surface);
 }
 
 .erp-dev-data-profile {
@@ -129,14 +280,42 @@
 }
 
 @media (max-width: 1180px) {
-  .erp-dev-data-profile-group {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .erp-dev-data-plan-counts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 760px) {
-  .erp-dev-data-profile-group {
+  .erp-dev-data-page .erp-dev-data-profile-group {
+    display: grid;
     grid-template-columns: 1fr;
+    overflow: visible;
+    padding-bottom: 0;
+    white-space: normal;
+    scroll-snap-type: none;
+  }
+
+  .erp-dev-data-page .erp-dev-data-profile-group > .erp-dev-data-profile {
+    width: auto;
+    flex: none;
+  }
+
+  .erp-dev-data-profile--primary {
+    grid-column: auto;
+  }
+
+  .erp-dev-data-plan-counts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .erp-dev-data-chain-toolbar,
+  .erp-dev-data-profile-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .erp-dev-data-chain-toolbar .ant-select {
+    width: 100%;
   }
 
   .erp-dev-data-prepare-actions {

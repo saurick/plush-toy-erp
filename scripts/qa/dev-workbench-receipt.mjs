@@ -92,8 +92,7 @@ export function getDevWorkbenchGitContext(repoRoot) {
     ? run("git", ["merge-base", gitCommit, upstream], repoRoot)
     : "";
   return {
-    comparisonRange:
-      base && base !== gitCommit ? `${base}..${gitCommit}` : "",
+    comparisonRange: base && base !== gitCommit ? `${base}..${gitCommit}` : "",
     gitCommit,
     treeState: status ? "dirty" : "clean",
   };
@@ -235,7 +234,7 @@ export function buildDevWorkbenchReceipt({
   }
   if (status === "failed" && counts.failed === 0) {
     counts.failed = 1;
-    counts.executed = Math.max(counts.executed, 1);
+    counts.executed += 1;
   }
 
   const artifacts = artifactPaths.map((item) =>
@@ -371,6 +370,7 @@ export function validateDevWorkbenchReceipt(receipt) {
 }
 
 export function writeDevWorkbenchReceipt(outPath, receipt) {
+  validateDevWorkbenchReceipt(receipt);
   const absolutePath = path.resolve(outPath);
   mkdirSync(path.dirname(absolutePath), { recursive: true });
   const temporaryPath = `${absolutePath}.tmp-${process.pid}`;
@@ -386,18 +386,12 @@ export function defaultDevWorkbenchNotProven(gate) {
   if (gate === "release-rehearsal") {
     return ["target environment release", "customer UAT", "customer sign-off"];
   }
-  return [
-    "target environment release",
-    "customer UAT",
-    "customer sign-off",
-  ];
+  return ["target environment release", "customer UAT", "customer sign-off"];
 }
 
 function runCLI(argv) {
   if (argv.length !== 2 || argv[0] !== "validate") {
-    throw new Error(
-      "usage: dev-workbench-receipt.mjs validate <receipt.json>",
-    );
+    throw new Error("usage: dev-workbench-receipt.mjs validate <receipt.json>");
   }
   const receiptPath = path.resolve(argv[1]);
   const receipt = JSON.parse(readFileSync(receiptPath, "utf8"));

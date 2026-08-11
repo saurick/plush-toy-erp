@@ -442,21 +442,6 @@
   border-radius: 10px;
 }
 
-.erp-dev-receipt-card__timings {
-  margin-top: 10px;
-}
-
-.erp-dev-receipt-card__timings > summary {
-  display: inline-flex;
-  align-items: center;
-  width: fit-content;
-  min-height: 44px;
-  padding: 8px 4px;
-  margin-bottom: 10px;
-  cursor: pointer;
-  color: var(--ant-color-primary, #1677ff);
-}
-
 .erp-dev-pipeline-timing__jobs > details > summary {
   display: flex;
   align-items: center;
@@ -471,7 +456,6 @@
   padding: 4px 14px 14px;
 }
 
-.erp-dev-receipt-card__timings > summary:focus-visible,
 .erp-dev-pipeline-timing__details > summary:focus-visible,
 .erp-dev-pipeline-timing__jobs > details > summary:focus-visible {
   border-radius: 6px;

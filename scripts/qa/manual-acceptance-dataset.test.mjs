@@ -322,6 +322,7 @@ function fakeComponents({ onCall, override } = {}) {
 function runnerDeps(options = {}) {
   return {
     now: options.now || (() => new Date(GENERATED_AT)),
+    ...(options.monotonicNow ? { monotonicNow: options.monotonicNow } : {}),
     outputRoot:
       options.outputRoot ||
       path.join(
@@ -535,6 +536,16 @@ test("bundle emits local and 133 plans with identical target-free semantics", ()
   assert.equal(bundle.targets[1].target.backendURL, CUSTOMER_TRIAL_133_ORIGIN);
   assert.equal(bundle.targets[0].semanticDigest, bundle.semanticDigest);
   assert.equal(bundle.targets[1].semanticDigest, bundle.semanticDigest);
+  assert.match(bundle.chainDataDigest, /^[0-9a-f]{64}$/u);
+  assert.match(bundle.chainVerificationDigest, /^[0-9a-f]{64}$/u);
+  assert.equal(
+    bundle.targets[0].chainDataDigest,
+    bundle.targets[1].chainDataDigest,
+  );
+  assert.equal(
+    bundle.targets[0].chainVerificationDigest,
+    bundle.targets[1].chainVerificationDigest,
+  );
   assert.deepEqual(
     bundle.targets[0].semanticPlan,
     bundle.targets[1].semanticPlan,
@@ -624,6 +635,10 @@ test("semantic digest is stable across targets and clocks and legacy versions fa
 
 test("semantic plan locks the nine narrow stage contracts", () => {
   const plan = buildManualAcceptanceSemanticPlan();
+  assert.equal(plan.businessChain.chainCount, 11);
+  assert.equal(plan.businessChain.stepCount, 67);
+  assert.equal(plan.businessChain.scenarioCount, 66);
+  assert.match(plan.businessChain.chainDataDigest, /^[0-9a-f]{64}$/u);
   assert.deepEqual(plan.stageOrder, [...MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS]);
   assert.deepEqual(
     plan.stages.map((stage) => stage.key),
@@ -682,6 +697,13 @@ test("semantic plan locks the nine narrow stage contracts", () => {
   assert.deepEqual(Object.keys(MANUAL_ACCEPTANCE_DATASET_STAGE_CAPABILITIES), [
     ...MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS,
   ]);
+  for (const stage of plan.stages) {
+    assert.deepEqual(
+      stage.businessChainScenarioKeys,
+      plan.businessChain.stageScenarioKeys[stage.key] || [],
+      stage.key,
+    );
+  }
   assert.deepEqual(plan.runnerContract, {
     serial: true,
     failClosed: true,
@@ -873,6 +895,16 @@ test("semantic plan locks the nine narrow stage contracts", () => {
     "source-driven-operational-facts-v1",
   );
   assert.equal(facts.commands[1].genericApplyAllowed, false);
+  assert.deepEqual(
+    new Set(facts.commands[1].requiredChains),
+    new Set(plan.businessChain.dataPlan.chains.map((chain) => chain.chainKey)),
+  );
+  assert(
+    facts.commands[1].requiredChains.every(
+      (chainKey) => !chainKey.includes("-to-"),
+    ),
+    "facts stage must consume canonical business chain keys",
+  );
   assert.equal(facts.expected.inventoryBudgetRequired, true);
 
   const attachments = plan.stages.find((stage) => stage.key === "attachments");
@@ -987,7 +1019,22 @@ test("CLI defaults to a two-target dry-run and rejects implicit or production ap
     confirmation: "",
     targetAttestation: "",
     resumeReportPath: "",
+    chainKey: "",
   });
+  assert.equal(
+    parseManualAcceptanceDatasetArgs(["--chain", "delivery_to_settlement"])
+      .chainKey,
+    "delivery_to_settlement",
+  );
+  assert.throws(
+    () =>
+      parseManualAcceptanceDatasetArgs([
+        "--apply",
+        "--chain",
+        "delivery_to_settlement",
+      ]),
+    /read-only plan filter/u,
+  );
   assert.throws(
     () => parseManualAcceptanceDatasetArgs(["--apply"]),
     /requires explicit --target/u,
@@ -1055,16 +1102,31 @@ test("CLI defaults to a two-target dry-run and rejects implicit or production ap
     JSON.parse(result.text).semanticDigest,
     result.plan.semanticDigest,
   );
+
+  const selected = await runManualAcceptanceDatasetCli([
+    "--chain",
+    "delivery_to_settlement",
+  ]);
+  assert.equal(
+    selected.plan.selectedBusinessChain.chain.chainKey,
+    "delivery_to_settlement",
+  );
+  assert.equal(selected.plan.selectedBusinessChain.chain.scenarios.length, 6);
 });
 
 test("an executable plan records strict stage receipts serially", async () => {
   const plan = localApplyPlan();
   const calls = [];
+  let elapsed = -10;
   const report = await applyManualAcceptanceDataset(
     plan,
     localApplyBinding(plan),
     runnerDeps({
       now: () => new Date("2026-07-15T03:04:05.000Z"),
+      monotonicNow: () => {
+        elapsed += 10;
+        return elapsed;
+      },
       onCall(stageKey, invocation) {
         assert.equal(invocation.targetAdapter.alias, "local");
         assert.equal(invocation.businessInput.dataVersion, "2026.07.16-v5");
@@ -1080,7 +1142,16 @@ test("an executable plan records strict stage receipts serially", async () => {
   assert.equal(report.ok, true);
   assert.equal(report.failedStage, null);
   assert.equal(report.generatedAt, "2026-07-15T03:04:05.000Z");
+  assert.equal(report.startedAt, report.generatedAt);
+  assert.equal(report.completedAt, report.generatedAt);
+  assert.equal(report.durationMs, 190);
   assert.equal(report.cleanup, "retire/forward-only");
+  assert.equal(report.chainDataDigest, plan.chainDataDigest);
+  assert.equal(report.chainVerificationDigest, plan.chainVerificationDigest);
+  assert.equal(
+    report.businessChainContract,
+    plan.businessChainContract.contract,
+  );
   assert.equal(report.freshEmptyBaseline.status, "completed");
   assert.equal(report.freshEmptyBaseline.operation, "verified");
   assert.equal(report.freshEmptyBaseline.summary.records, 1);
@@ -1092,6 +1163,19 @@ test("an executable plan records strict stage receipts serially", async () => {
     ),
   );
   assert.ok(report.stages.every((stage) => stage.status === "completed"));
+  assert.ok(
+    report.stages.every(
+      (stage) =>
+        stage.startedAt === report.generatedAt &&
+        stage.completedAt === report.generatedAt &&
+        stage.durationMs === 10,
+    ),
+  );
+  assert.ok(
+    report.stages.every((stage) =>
+      Array.isArray(stage.businessChainScenarioKeys),
+    ),
+  );
   assert.ok(
     report.stages.every(
       (stage) =>
@@ -1810,6 +1894,28 @@ test("apply stops at the first failed stage and leaves later stages not started"
   assert.equal(
     report.stages[6].blockedReason.code,
     "delegated_fact_evidence_incomplete",
+  );
+  assert(Number.isFinite(report.durationMs));
+  assert(report.durationMs >= 0);
+  assert.ok(
+    report.stages
+      .slice(0, 7)
+      .every(
+        (stage) =>
+          stage.startedAt &&
+          stage.completedAt &&
+          Number.isFinite(stage.durationMs),
+      ),
+  );
+  assert.ok(
+    report.stages
+      .slice(7)
+      .every(
+        (stage) =>
+          stage.startedAt === null &&
+          stage.completedAt === null &&
+          stage.durationMs === null,
+      ),
   );
 });
 

@@ -240,12 +240,8 @@ function processColumns() {
       width: 170,
       sorter: (a, b) =>
         compareText(
-          PRODUCTION_ROUTE_OPERATION_LABELS[
-            a?.production_route_operation_code
-          ],
-          PRODUCTION_ROUTE_OPERATION_LABELS[
-            b?.production_route_operation_code
-          ]
+          PRODUCTION_ROUTE_OPERATION_LABELS[a?.production_route_operation_code],
+          PRODUCTION_ROUTE_OPERATION_LABELS[b?.production_route_operation_code]
         ),
       exportValue: (record) =>
         PRODUCTION_ROUTE_OPERATION_LABELS[
@@ -408,6 +404,35 @@ function baseColumns({ type, unitDisplay, processOptions }) {
             exportValue: (record) =>
               SUPPLIER_TYPE_LABELS[record?.supplier_type] ||
               (record?.supplier_type ? '供应商类型' : ''),
+          },
+          {
+            title: '主联系人',
+            exportTitle: '主联系人',
+            dataIndex: ['primary_contact', 'name'],
+            width: 140,
+            sorter: (a, b) =>
+              compareText(a?.primary_contact?.name, b?.primary_contact?.name),
+            render: (value) => value || '-',
+            exportValue: (record) => record?.primary_contact?.name || '',
+          },
+          {
+            title: '联系电话',
+            exportTitle: '联系电话',
+            dataIndex: ['primary_contact', 'mobile'],
+            width: 160,
+            sorter: (a, b) =>
+              compareText(
+                a?.primary_contact?.mobile || a?.primary_contact?.phone,
+                b?.primary_contact?.mobile || b?.primary_contact?.phone
+              ),
+            render: (_value, record) =>
+              record?.primary_contact?.mobile ||
+              record?.primary_contact?.phone ||
+              '-',
+            exportValue: (record) =>
+              record?.primary_contact?.mobile ||
+              record?.primary_contact?.phone ||
+              '',
           },
           {
             title: '经营 / 加工地址',

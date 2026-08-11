@@ -1,9 +1,5 @@
 import assert from "node:assert/strict";
-import {
-  mkdtempSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -13,6 +9,7 @@ import {
   buildDevWorkbenchReceipt,
   summarizeGateOutput,
   validateDevWorkbenchReceipt,
+  writeDevWorkbenchReceipt,
 } from "./dev-workbench-receipt.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "../..");
@@ -67,7 +64,10 @@ test("dev workbench receipt writes the complete v1 contract without secrets", ()
     });
     assert.equal(receipt.schemaVersion, DEV_WORKBENCH_RECEIPT_SCHEMA);
     assert.equal(receipt.artifacts[0], "artifact.txt");
-    assert.match(receipt.artifactDigests["artifact.txt"], /^sha256:[0-9a-f]{64}$/u);
+    assert.match(
+      receipt.artifactDigests["artifact.txt"],
+      /^sha256:[0-9a-f]{64}$/u,
+    );
     assert.match(receipt.environmentFingerprint, /^[0-9a-f]{64}$/u);
     assert.doesNotMatch(JSON.stringify(receipt), /\/Users\//u);
   });
@@ -105,6 +105,35 @@ test("dev workbench receipt never upgrades zero, skipped or failed execution to 
         }),
       /non-zero all-passed/u,
     );
+  });
+});
+
+test("dev workbench receipt counts a gate-level failure without corrupting test totals", () => {
+  withRepo((repoRoot) => {
+    const receipt = buildDevWorkbenchReceipt({
+      durationMs: 20,
+      finishedAt: "2026-07-28T01:00:00.020Z",
+      gate: "full",
+      gitContext,
+      metrics: {},
+      notProven: ["repository identity changed during gate"],
+      profile: "full",
+      repoRoot,
+      startedAt: "2026-07-28T01:00:00.000Z",
+      status: "failed",
+      summary: { executed: 2, passed: 2, failed: 0, skipped: 0 },
+    });
+
+    assert.deepEqual(
+      {
+        executed: receipt.executed,
+        passed: receipt.passed,
+        failed: receipt.failed,
+        skipped: receipt.skipped,
+      },
+      { executed: 3, passed: 2, failed: 1, skipped: 0 },
+    );
+    assert.equal(validateDevWorkbenchReceipt(receipt), receipt);
   });
 });
 
@@ -175,4 +204,30 @@ test("dev workbench receipt validation rejects extra fields and digest drift", (
       }),
     /artifacts and digests do not match/u,
   );
+});
+
+test("dev workbench receipt writer validates the final object before persisting", () => {
+  withRepo((repoRoot) => {
+    const outPath = path.join(repoRoot, "receipt.json");
+    const valid = buildDevWorkbenchReceipt({
+      durationMs: 10,
+      finishedAt: 20,
+      gate: "full",
+      gitContext,
+      metrics: {},
+      notProven: ["target environment release"],
+      profile: "full",
+      repoRoot,
+      startedAt: 10,
+      status: "passed",
+      summary: { executed: 1, passed: 1, failed: 0, skipped: 0 },
+    });
+    const invalid = { ...valid, status: "failed", failed: 1 };
+
+    assert.throws(
+      () => writeDevWorkbenchReceipt(outPath, invalid),
+      /result counts exceed executed/u,
+    );
+    assert.equal(existsSync(outPath), false);
+  });
 });

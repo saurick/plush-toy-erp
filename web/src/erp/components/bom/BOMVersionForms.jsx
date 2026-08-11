@@ -2,6 +2,7 @@ import React, { useCallback } from 'react'
 import { Button, Form, Input, Select, Space } from 'antd'
 
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
+import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
 import {
   dateInputNotAfterRule,
   dateInputNotBeforeRule,
@@ -127,6 +128,7 @@ export function BOMHeaderFormFields({
 
   return (
     <>
+      <BusinessFormSectionTitle>版本信息</BusinessFormSectionTitle>
       {includeProduct ? (
         <Form.Item
           className="erp-business-action-form__field"
@@ -203,6 +205,7 @@ export function BOMHeaderFormFields({
           }
         />
       </Form.Item>
+      <BusinessFormSectionTitle>订单与数量</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field"
         label="来源订单号"
@@ -234,6 +237,7 @@ export function BOMHeaderFormFields({
       >
         <Input allowClear autoComplete="off" disabled={disabled} />
       </Form.Item>
+      <BusinessFormSectionTitle>制表与说明</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field"
         label="制表日期"

@@ -170,6 +170,8 @@ func (d *jsonrpcDispatcher) mapOutsourcingOrderError(ctx context.Context, err er
 	switch {
 	case errors.Is(err, biz.ErrOutsourcingOrderConflict):
 		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: errcode.ResourceVersionConflict.Message}
+	case errors.Is(err, biz.ErrOutsourcingOrderIncomplete):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "加工合同信息不完整，请补齐甲乙方信息、预计回货日期和每条明细的加工项目后再提交或确认"}
 	case errors.Is(err, biz.ErrBadParam):
 		l.Warnf("[outsourcing_order] invalid param err=%v", err)
 		return invalidParamResult()

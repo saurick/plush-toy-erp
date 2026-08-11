@@ -5,6 +5,7 @@ import { DEV_FLOW_STATE_CATALOG } from '../config/devFlowStateCatalog.mjs'
 import {
   buildBusinessChainSelectOptions,
   buildFactDefinitionSelectOptions,
+  buildProcessDefinitionSelectOptions,
   buildStateDefinitionSelectOptions,
 } from './devFlowDefinitionSelectOptions.mjs'
 
@@ -58,6 +59,30 @@ test('fact definition select uses four explicit navigation groups with exact cov
         option.label === `${option.businessLabel} · ${option.machineKey}`
     )
   )
+})
+
+test('process definition select groups variants by stable process key with exact coverage', () => {
+  const options = buildProcessDefinitionSelectOptions(DEV_FLOW_STATE_CATALOG)
+
+  assert.deepEqual(
+    options.map((group) => group.label),
+    [
+      '销售订单受理 · 2',
+      '物料供应 · 1',
+      '成品交付 · 1',
+      '收付款审批 · 1',
+      '人工库存调整 · 1',
+      '生产异常决策 · 1',
+    ]
+  )
+  const items = flattenOptions(options)
+  assert.deepEqual(
+    items.map((option) => option.value),
+    DEV_FLOW_STATE_CATALOG.processDefinitions.map(
+      (definition) => definition.key
+    )
+  )
+  assert(items.every((option) => option.machineKey === option.value))
 })
 
 test('state definition select keeps scope boundaries and splits the long Fact group by domain', () => {

@@ -87,7 +87,6 @@ test("dev workbench boundary: source and styles live outside product directories
     "web/src/dev-workbench/pages/DevDrillRecoveryPage.jsx",
     "web/src/dev-workbench/pages/DevPermissionRelationshipsPage.jsx",
     "web/src/dev-workbench/components/DevPageNav.jsx",
-    "web/src/dev-workbench/components/DevReceiptPanel.jsx",
     "web/src/dev-workbench/config/devDataPreparation.mjs",
     "web/src/dev-workbench/config/devDatabaseMigration.mjs",
     "web/src/dev-workbench/config/devQualityGates.mjs",
@@ -171,7 +170,6 @@ test("dev workbench boundary: Node serve bridges are centralized outside browser
     "web/dev-server/devDeliveryBridgePlugin.mjs",
     "web/dev-server/devQaCoveragePlugin.mjs",
     "web/dev-server/devQualityGatePlugin.mjs",
-    "web/dev-server/devWorkbenchReceiptPlugin.mjs",
     "web/dev-server/devServerSecurity.mjs",
   ]) {
     assert.equal(

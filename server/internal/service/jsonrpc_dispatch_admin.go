@@ -354,6 +354,52 @@ func (d *jsonrpcDispatcher) handleAdmin(
 			}),
 		}, nil
 
+	case "legal_notice_status":
+		if res := rejectUnknownAdminParams(pm, "notice_version", "content_fingerprint"); res != nil {
+			return id, res, nil
+		}
+		status, err := d.adminManageUC.GetLegalNoticeStatus(
+			ctx,
+			getString(pm, "notice_version"),
+			getString(pm, "content_fingerprint"),
+		)
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{
+				"notice_version":      status.NoticeVersion,
+				"content_fingerprint": status.ContentFingerprint,
+				"acknowledged":        status.Acknowledged,
+				"acknowledged_at":     optionalTimeUnix(status.AcknowledgedAt),
+			}),
+		}, nil
+
+	case "acknowledge_legal_notice":
+		if res := rejectUnknownAdminParams(pm, "notice_version", "content_fingerprint"); res != nil {
+			return id, res, nil
+		}
+		status, err := d.adminManageUC.AcknowledgeLegalNotice(
+			ctx,
+			getString(pm, "notice_version"),
+			getString(pm, "content_fingerprint"),
+		)
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{
+				"notice_version":      status.NoticeVersion,
+				"content_fingerprint": status.ContentFingerprint,
+				"acknowledged":        status.Acknowledged,
+				"acknowledged_at":     optionalTimeUnix(status.AcknowledgedAt),
+			}),
+		}, nil
+
 	case "audit_logs":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemAuditRead); res != nil {
 			return id, res, nil

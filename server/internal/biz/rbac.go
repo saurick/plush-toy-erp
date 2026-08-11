@@ -826,7 +826,7 @@ var builtinAdminMenus = []AdminMenu{
 	{Key: "task-board", Label: "任务看板", Path: "/erp/task-board", RequiredAny: []string{PermissionWorkflowTaskRead}},
 	{Key: "business-dashboard", Label: "业务看板", Path: "/erp/business-dashboard", RequiredAny: []string{PermissionERPBusinessDashboardRead}},
 	{Key: "customers", Label: "客户档案", Path: "/erp/master/partners/customers", RequiredAny: []string{PermissionCustomerRead}},
-	{Key: "suppliers", Label: "供应商档案", Path: "/erp/master/partners/suppliers", RequiredAny: []string{PermissionSupplierRead}},
+	{Key: "suppliers", Label: "供应商与加工厂", Path: "/erp/master/partners/suppliers", RequiredAny: []string{PermissionSupplierRead}},
 	{Key: "products", Label: "产品档案", Path: "/erp/master/products", RequiredAny: []string{PermissionProductRead, PermissionProductSKURead}},
 	{Key: "materials", Label: "材料档案", Path: "/erp/master/materials", RequiredAny: []string{PermissionMaterialRead}},
 	{Key: "processes", Label: "工序档案", Path: "/erp/engineering/processes", RequiredAny: []string{PermissionProcessRead}},

@@ -32,13 +32,13 @@ export const businessModuleDefinitions = Object.freeze([
   {
     key: 'suppliers',
     sectionKey: 'master',
-    label: '供应商档案',
-    title: '供应商档案',
+    label: '供应商与加工厂',
+    title: '供应商与加工厂',
     path: '/erp/master/partners/suppliers',
     shortLabel: '供应商',
     pageKind: 'formal-v1',
     description:
-      '供应商档案用于维护供应商和加工厂交易主体；联系人请在供应商详情中维护。',
+      '在同一入口维护供应商与加工厂交易主体；类型、联系人和可加工工序在档案中统一维护。',
     primaryEntity: 'suppliers',
     boundary:
       '供应商和加工厂档案只维护交易主体资料；采购、委外和应付需到对应页面处理。',

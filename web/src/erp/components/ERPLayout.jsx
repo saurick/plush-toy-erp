@@ -10,6 +10,7 @@ import {
   FileTextOutlined,
   HomeOutlined,
   HistoryOutlined,
+  InfoCircleOutlined,
   InboxOutlined,
   LogoutOutlined,
   MenuOutlined,
@@ -17,6 +18,7 @@ import {
   QuestionCircleOutlined,
   ReloadOutlined,
   ScheduleOutlined,
+  SafetyCertificateOutlined,
   SettingOutlined,
   ShoppingCartOutlined,
   SwapOutlined,
@@ -48,7 +50,9 @@ import {
 import { authBus } from '@/common/auth/authBus'
 import { getActiveERPBrand } from '@/common/consts/brand'
 import { Loading } from '@/common/components/loading'
+import SystemVersionModal from '@/common/components/system-version/SystemVersionModal'
 import ERPThemeToggle from '@/common/components/theme/ERPThemeToggle'
+import useRuntimeBuildIdentity from '@/common/runtime/useRuntimeBuildIdentity'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -273,6 +277,7 @@ export default function ERPLayout() {
   const entryConfig = useMemo(() => getEntryConfig(), [])
   const [loggingOut, setLoggingOut] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [systemVersionOpen, setSystemVersionOpen] = useState(false)
   const [profileLoading, setProfileLoading] = useState(!getStoredAdminProfile())
   const [adminProfile, setAdminProfile] = useState(() =>
     getStoredAdminProfile()
@@ -289,6 +294,7 @@ export default function ERPLayout() {
   const [pageRefreshHandler, setPageRefreshHandler] = useState(null)
   const [pageLeaveGuard, setPageLeaveGuard] = useState(null)
   const [roleGuidedOpenKeys, setRoleGuidedOpenKeys] = useState([])
+  const runtimeBuildIdentity = useRuntimeBuildIdentity()
 
   const authRpc = useMemo(
     () =>
@@ -932,7 +938,7 @@ export default function ERPLayout() {
     }
   }
 
-  const handleNavigate = async (nextPath) => {
+  const handleNavigate = async (nextPath, navigateOptions) => {
     if (!nextPath) {
       setMobileNavOpen(false)
       return
@@ -961,11 +967,22 @@ export default function ERPLayout() {
           : []
       )
     }
-    navigate(nextPath)
+    navigate(nextPath, navigateOptions)
     setMobileNavOpen(false)
   }
 
   const handleAccountMenuClick = ({ key }) => {
+    if (key === 'privacy-and-rules') {
+      return handleNavigate('/legal/privacy', {
+        state: {
+          from: `${location.pathname}${location.search}${location.hash}`,
+        },
+      })
+    }
+    if (key === 'system-version') {
+      setSystemVersionOpen(true)
+      return undefined
+    }
     if (key === 'switch-entry') {
       return handleNavigate('/entry')
     }
@@ -1028,6 +1045,18 @@ export default function ERPLayout() {
   const displayUsername =
     adminProfile?.username || tokenAdmin?.username || 'admin'
   const accountMenuItems = [
+    {
+      key: 'privacy-and-rules',
+      icon: <SafetyCertificateOutlined />,
+      label: (
+        <span data-testid="desktop-privacy-rules-entry">隐私与使用规则</span>
+      ),
+    },
+    {
+      key: 'system-version',
+      icon: <InfoCircleOutlined />,
+      label: <span data-testid="desktop-system-version-entry">系统信息</span>,
+    },
     canSwitchToMobileTasks
       ? {
           key: 'switch-entry',
@@ -1093,137 +1122,144 @@ export default function ERPLayout() {
   }
 
   return (
-    <Layout
-      className="erp-admin-shell"
-      data-effective-session-source={effectiveSessionDiagnostic.source}
-      data-effective-session-mode={effectiveSessionDiagnostic.visibilityMode}
-      data-effective-session-data-scope={
-        effectiveSessionDiagnostic.dataRuntimeScope
-      }
-    >
-      <Sider width={320} className="erp-admin-sider">
-        {sideNav}
-      </Sider>
-
-      <Drawer
-        placement="left"
-        width={320}
-        open={mobileNavOpen}
-        onClose={() => setMobileNavOpen(false)}
-        className="erp-admin-drawer"
+    <>
+      <Layout
+        className="erp-admin-shell"
+        data-effective-session-source={effectiveSessionDiagnostic.source}
+        data-effective-session-mode={effectiveSessionDiagnostic.visibilityMode}
+        data-effective-session-data-scope={
+          effectiveSessionDiagnostic.dataRuntimeScope
+        }
       >
-        {sideNav}
-      </Drawer>
+        <Sider width={320} className="erp-admin-sider">
+          {sideNav}
+        </Sider>
 
-      <Layout>
-        <Header className="erp-admin-header">
-          <div className="erp-admin-header__row">
-            <Space align="start" size={16} className="erp-admin-header__left">
-              <Button
-                icon={<MenuOutlined />}
-                aria-label="打开导航菜单"
-                className="erp-admin-header__menu-button"
-                onClick={() => setMobileNavOpen(true)}
-              />
-              <div>
-                <div className="erp-admin-header__title">业务管理</div>
-              </div>
-            </Space>
+        <Drawer
+          placement="left"
+          width={320}
+          open={mobileNavOpen}
+          onClose={() => setMobileNavOpen(false)}
+          className="erp-admin-drawer"
+        >
+          {sideNav}
+        </Drawer>
 
-            <Space size={12} wrap className="erp-admin-header__right">
-              <Button
-                icon={<ReloadOutlined />}
-                loading={refreshingCurrentPage}
-                onClick={handleRefreshCurrentPage}
-              >
-                刷新当前页
-              </Button>
-              <ERPThemeToggle
-                className="erp-admin-header__theme-toggle"
-                variant="menu"
-              />
-              <div className="erp-admin-header__meta">
-                <Tag color={isSuperAdmin ? 'gold' : 'blue'}>{roleLabel}</Tag>
-                <Dropdown
-                  destroyOnHidden
-                  placement="bottomRight"
-                  trigger={['click']}
-                  menu={{
-                    items: accountMenuItems,
-                    onClick: handleAccountMenuClick,
-                  }}
-                >
-                  <Button
-                    icon={<UserOutlined />}
-                    loading={loggingOut}
-                    data-testid="desktop-account-menu-trigger"
-                    aria-label={`账号菜单：${displayUsername}`}
-                  >
-                    <span>{displayUsername}</span>
-                    <DownOutlined />
-                  </Button>
-                </Dropdown>
-              </div>
-            </Space>
-          </div>
-        </Header>
-
-        <Content className="erp-admin-content">
-          <div className="erp-admin-breadcrumb">
-            <Breadcrumb
-              items={[
-                { title: '业务管理' },
-                { title: currentEntry?.label || DEFAULT_DESKTOP_ENTRY.label },
-              ]}
-            />
-          </div>
-
-          {isLocalCustomerDesktopPreview ? (
-            <Alert
-              type="warning"
-              showIcon
-              data-local-customer-desktop-preview="true"
-              message="本地功能预览"
-              description="当前尚未启用客户业务设置，只能查看页面和功能；工作台、任务看板和业务数据暂时不能使用。"
-            />
-          ) : null}
-
-          {!hidePageHead ? (
-            <div className="erp-admin-page-head">
-              <div className="erp-admin-page-head__main">
-                <div className="erp-admin-page-head__title">
-                  {currentEntry?.label || DEFAULT_DESKTOP_ENTRY.label}
+        <Layout>
+          <Header className="erp-admin-header">
+            <div className="erp-admin-header__row">
+              <Space align="start" size={16} className="erp-admin-header__left">
+                <Button
+                  icon={<MenuOutlined />}
+                  aria-label="打开导航菜单"
+                  className="erp-admin-header__menu-button"
+                  onClick={() => setMobileNavOpen(true)}
+                />
+                <div>
+                  <div className="erp-admin-header__title">业务管理</div>
                 </div>
-                <Paragraph className="erp-admin-page-head__summary">
-                  {currentEntry?.description ||
-                    DEFAULT_DESKTOP_ENTRY.description}
-                </Paragraph>
-              </div>
-            </div>
-          ) : null}
+              </Space>
 
-          <div className="erp-admin-outlet">
-            {shouldBlockOutlet ? (
+              <Space size={12} wrap className="erp-admin-header__right">
+                <Button
+                  icon={<ReloadOutlined />}
+                  loading={refreshingCurrentPage}
+                  onClick={handleRefreshCurrentPage}
+                >
+                  刷新当前页
+                </Button>
+                <ERPThemeToggle
+                  className="erp-admin-header__theme-toggle"
+                  variant="menu"
+                />
+                <div className="erp-admin-header__meta">
+                  <Tag color={isSuperAdmin ? 'gold' : 'blue'}>{roleLabel}</Tag>
+                  <Dropdown
+                    destroyOnHidden
+                    placement="bottomRight"
+                    trigger={['click']}
+                    menu={{
+                      items: accountMenuItems,
+                      onClick: handleAccountMenuClick,
+                    }}
+                  >
+                    <Button
+                      icon={<UserOutlined />}
+                      loading={loggingOut}
+                      data-testid="desktop-account-menu-trigger"
+                      aria-label={`账号菜单：${displayUsername}`}
+                    >
+                      <span>{displayUsername}</span>
+                      <DownOutlined />
+                    </Button>
+                  </Dropdown>
+                </div>
+              </Space>
+            </div>
+          </Header>
+
+          <Content className="erp-admin-content">
+            <div className="erp-admin-breadcrumb">
+              <Breadcrumb
+                items={[
+                  { title: '业务管理' },
+                  { title: currentEntry?.label || DEFAULT_DESKTOP_ENTRY.label },
+                ]}
+              />
+            </div>
+
+            {isLocalCustomerDesktopPreview ? (
               <Alert
                 type="warning"
                 showIcon
-                message={
-                  noVisibleMenus ? '当前账号暂无可用页面' : '当前页面不可用'
-                }
-                description={
-                  noVisibleMenus
-                    ? '请确认当前账号已设置正确的岗位和可用页面。若刷新后仍无入口，请联系管理员。'
-                    : '正在返回当前账号可用的页面。'
-                }
+                data-local-customer-desktop-preview="true"
+                message="本地功能预览"
+                description="当前尚未启用客户业务设置，只能查看页面和功能；工作台、任务看板和业务数据暂时不能使用。"
               />
-            ) : shouldGuardProductCoreBusinessData ? (
-              <ProductCoreCapabilityReview currentEntry={currentEntry} />
-            ) : (
-              <Outlet context={outletContext} />
-            )}
-          </div>
-        </Content>
+            ) : null}
+
+            {!hidePageHead ? (
+              <div className="erp-admin-page-head">
+                <div className="erp-admin-page-head__main">
+                  <div className="erp-admin-page-head__title">
+                    {currentEntry?.label || DEFAULT_DESKTOP_ENTRY.label}
+                  </div>
+                  <Paragraph className="erp-admin-page-head__summary">
+                    {currentEntry?.description ||
+                      DEFAULT_DESKTOP_ENTRY.description}
+                  </Paragraph>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="erp-admin-outlet">
+              {shouldBlockOutlet ? (
+                <Alert
+                  type="warning"
+                  showIcon
+                  message={
+                    noVisibleMenus ? '当前账号暂无可用页面' : '当前页面不可用'
+                  }
+                  description={
+                    noVisibleMenus
+                      ? '请确认当前账号已设置正确的岗位和可用页面。若刷新后仍无入口，请联系管理员。'
+                      : '正在返回当前账号可用的页面。'
+                  }
+                />
+              ) : shouldGuardProductCoreBusinessData ? (
+                <ProductCoreCapabilityReview currentEntry={currentEntry} />
+              ) : (
+                <Outlet context={outletContext} />
+              )}
+            </div>
+          </Content>
+        </Layout>
       </Layout>
-    </Layout>
+      <SystemVersionModal
+        buildIdentity={runtimeBuildIdentity}
+        onClose={() => setSystemVersionOpen(false)}
+        open={systemVersionOpen}
+      />
+    </>
   )
 }

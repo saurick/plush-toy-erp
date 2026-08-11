@@ -70,27 +70,29 @@ export const DEV_DATA_PREPARATION_PROFILE_COPY = Object.freeze({
     ]),
   }),
   [DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance]: Object.freeze({
-    title: '完整验收数据',
+    title: '按最新业务链完整回归',
     shortTitle: 'Full Acceptance',
-    purpose: '在专用隔离库完成正式 Source / Fact API 与 50 项验收',
-    retention: '只接受 clean exact commit',
+    purpose: '按全部已登记业务链和合法场景，在新隔离库完成完整回归',
+    retention: '每次执行都建立新批次，只接受 clean exact commit',
     cleanup: '无论验收成功或失败都自动清理隔离库，不提供手工清理按钮。',
-    scope: '专用隔离库内的正式 Source / Fact API 与 50 项自动化验收。',
+    scope:
+      '全部已登记业务链、现有 9 个造数阶段、正式 Source / Fact API、页面回归与受控负向场景。',
     targetKey: 'fullAcceptance',
     targetTitle: '完整验收目标',
-    badgeLabel: '自动清理',
-    badgeColor: 'blue',
-    prepareButtonLabel: '准备不可变计划',
+    badgeLabel: '推荐 · 自动清理',
+    badgeColor: 'green',
+    prepareButtonLabel: '准备新批次',
     prepareDescription:
-      '预检通过后生成绑定 clean exact commit 的不可变计划，不会立即写入。',
+      '预检通过后生成绑定当前业务链合同与 clean exact commit 的新批次计划，不会立即写入。',
     confirmationDescription:
-      '完整验收将在专用隔离库执行；成功或失败后都必须完成自动清理读回。',
-    successDescription: '验收报告与自动清理读回已记录。',
+      '完整回归始终执行全部已登记合法场景；业务链选择只帮助核对计划。成功或失败后都必须完成自动清理读回。',
+    successDescription: '最新业务链回归、各阶段耗时与自动清理读回已记录。',
     cleanupBoundary: '成功或失败后自动清理',
     steps: Object.freeze([
       '确认 clean exact commit 与专用隔离库',
-      '通过正式 Source / Fact API 执行 50 项验收',
-      '记录报告并在成功或失败后自动清理隔离库',
+      '按当前业务链合同执行 9 个现有造数阶段和全部合法场景',
+      '运行现有完整 QA / 浏览器回归并记录总耗时与阶段耗时',
+      '成功或失败后自动清理隔离库并读回零残留',
     ]),
   }),
 })
@@ -158,6 +160,7 @@ const SCENARIO_DEMO_RUN_ID = '20260716-V5'
 const SCENARIO_DEMO_CATALOG_TARGET_COUNT = 50
 const SCENARIO_DEMO_CATALOG_READY_COUNT = 40
 const SCENARIO_DEMO_BROWSER_CHECKS_PENDING = 10
+const ACCEPTANCE_EXECUTION_SCOPE = 'all_registered_chains'
 
 function assertObject(value, field) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -238,6 +241,183 @@ function validateEvent(event) {
   }
   assertSafeText(event.message, 'data preparation event message')
   return event
+}
+
+function validateTiming(timing, { terminal }) {
+  assertExactKeys(
+    timing,
+    ['completedAt', 'durationMs', 'startedAt'],
+    'data preparation operation timing'
+  )
+  const started = timing.startedAt !== null
+  const completed = timing.completedAt !== null
+  if (
+    (started && !validTimestamp(timing.startedAt)) ||
+    (completed && !validTimestamp(timing.completedAt)) ||
+    (timing.durationMs !== null &&
+      (!Number.isFinite(timing.durationMs) || timing.durationMs < 0)) ||
+    (completed && !started) ||
+    (terminal && started && !completed) ||
+    (!started && timing.durationMs !== null) ||
+    (started && completed && timing.durationMs === null)
+  ) {
+    throw new Error('data preparation operation timing is invalid')
+  }
+  return timing
+}
+
+function validTimestamp(value) {
+  return (
+    typeof value === 'string' &&
+    Number.isFinite(Date.parse(value)) &&
+    new Date(value).toISOString() === value
+  )
+}
+
+function validateStringList(values, field) {
+  if (
+    !Array.isArray(values) ||
+    values.length < 1 ||
+    !values.every((value) => isSafeText(value, 300))
+  ) {
+    throw new Error(`${field} is invalid`)
+  }
+  return values
+}
+
+function validateAcceptancePlan(plan) {
+  assertExactKeys(
+    plan,
+    [
+      'catalogTargetCount',
+      'catalogVersion',
+      'chainCount',
+      'chainDataDigest',
+      'chainVerificationDigest',
+      'chains',
+      'contract',
+      'dataStageCount',
+      'dataStages',
+      'executionScope',
+      'freshBatchPerRun',
+      'reuseRules',
+      'scenarioCount',
+      'scenarioKinds',
+      'selectorAffectsExecution',
+      'sourceContract',
+      'stepCount',
+    ],
+    'data preparation acceptance plan'
+  )
+  if (
+    !isSafeText(plan.contract, 120) ||
+    !isSafeText(plan.sourceContract, 120) ||
+    !isSafeText(plan.catalogVersion, 120) ||
+    !HASH_PATTERN.test(String(plan.chainDataDigest || '')) ||
+    !HASH_PATTERN.test(String(plan.chainVerificationDigest || '')) ||
+    ![plan.chainCount, plan.stepCount, plan.scenarioCount, plan.dataStageCount]
+      .concat(plan.catalogTargetCount)
+      .every((value) => Number.isSafeInteger(value) && value > 0) ||
+    plan.selectorAffectsExecution !== false ||
+    plan.executionScope !== ACCEPTANCE_EXECUTION_SCOPE ||
+    plan.freshBatchPerRun !== true ||
+    !Array.isArray(plan.scenarioKinds) ||
+    !Array.isArray(plan.dataStages) ||
+    !Array.isArray(plan.reuseRules) ||
+    !Array.isArray(plan.chains)
+  ) {
+    throw new Error('data preparation acceptance plan is invalid')
+  }
+  for (const [field, entries] of [
+    ['scenario kind', plan.scenarioKinds],
+    ['data stage', plan.dataStages],
+  ]) {
+    entries.forEach((entry) => {
+      assertExactKeys(entry, ['key', 'label'], `acceptance ${field}`)
+      assertSafeText(entry.key, `acceptance ${field} key`, 120)
+      assertSafeText(entry.label, `acceptance ${field} label`, 120)
+    })
+  }
+  plan.reuseRules.forEach((rule) => {
+    assertExactKeys(
+      rule,
+      ['condition', 'label', 'nextAction', 'status'],
+      'acceptance reuse rule'
+    )
+    ;['condition', 'label', 'nextAction', 'status'].forEach((field) =>
+      assertSafeText(rule[field], `acceptance reuse rule ${field}`, 300)
+    )
+  })
+  let stepCount = 0
+  let scenarioCount = 0
+  plan.chains.forEach((chain) => {
+    assertExactKeys(
+      chain,
+      [
+        'key',
+        'label',
+        'scenarioCount',
+        'scenarioKinds',
+        'stepCount',
+        'steps',
+        'summary',
+      ],
+      'acceptance business chain'
+    )
+    assertSafeText(chain.key, 'acceptance business chain key', 120)
+    assertSafeText(chain.label, 'acceptance business chain label', 240)
+    assertSafeText(chain.summary, 'acceptance business chain summary', 500)
+    if (
+      !Number.isSafeInteger(chain.stepCount) ||
+      !Number.isSafeInteger(chain.scenarioCount) ||
+      !Array.isArray(chain.steps) ||
+      chain.steps.length !== chain.stepCount
+    ) {
+      throw new Error('acceptance business chain counts are invalid')
+    }
+    validateStringList(chain.scenarioKinds, 'acceptance scenario kinds')
+    stepCount += chain.stepCount
+    scenarioCount += chain.scenarioCount
+    chain.steps.forEach((step) => {
+      assertExactKeys(
+        step,
+        [
+          'actions',
+          'facts',
+          'fromLabel',
+          'key',
+          'label',
+          'preconditions',
+          'responsibleRole',
+          'results',
+          'scenarioKinds',
+          'toLabel',
+        ],
+        'acceptance business chain step'
+      )
+      ;['key', 'label', 'fromLabel', 'toLabel', 'responsibleRole'].forEach(
+        (field) => assertSafeText(step[field], `acceptance step ${field}`, 300)
+      )
+      ;[
+        'preconditions',
+        'actions',
+        'results',
+        'facts',
+        'scenarioKinds',
+      ].forEach((field) =>
+        validateStringList(step[field], `acceptance step ${field}`)
+      )
+    })
+  })
+  if (
+    plan.chains.length !== plan.chainCount ||
+    stepCount !== plan.stepCount ||
+    scenarioCount !== plan.scenarioCount ||
+    plan.dataStages.length !== plan.dataStageCount
+  ) {
+    throw new Error('data preparation acceptance plan totals are invalid')
+  }
+  return plan
 }
 
 function validateTargetIdentity(target, field) {
@@ -414,11 +594,23 @@ function validateReadback(readback, { profileKey, status, targetFingerprint }) {
   assertExactKeys(
     readback,
     [
+      'catalogTargetCount',
+      'chainCount',
+      'chainDataDigest',
+      'chainVerificationDigest',
       'cleanupComplete',
+      'dataStageCount',
+      'dataVersion',
+      'datasetCompletedAt',
+      'datasetDurationMs',
+      'datasetStartedAt',
       'profileKey',
       'reportStatus',
       'residualDatabaseCount',
+      'scenarioCount',
       'schemaVersion',
+      'stageTimings',
+      'stepCount',
       'targetFingerprint',
     ],
     'full acceptance readback'
@@ -427,10 +619,61 @@ function validateReadback(readback, { profileKey, status, targetFingerprint }) {
     !['passed', 'failed'].includes(readback.reportStatus) ||
     typeof readback.cleanupComplete !== 'boolean' ||
     !Number.isSafeInteger(readback.residualDatabaseCount) ||
-    readback.residualDatabaseCount < 0
+    readback.residualDatabaseCount < 0 ||
+    !HASH_PATTERN.test(String(readback.chainDataDigest || '')) ||
+    !HASH_PATTERN.test(String(readback.chainVerificationDigest || '')) ||
+    ![
+      readback.chainCount,
+      readback.stepCount,
+      readback.scenarioCount,
+      readback.dataStageCount,
+      readback.catalogTargetCount,
+    ].every((value) => Number.isSafeInteger(value) && value > 0) ||
+    !Array.isArray(readback.stageTimings)
   ) {
     throw new Error('full acceptance readback is invalid')
   }
+  const hasDatasetTiming = readback.datasetStartedAt !== null
+  if (
+    (hasDatasetTiming &&
+      (!validTimestamp(readback.datasetStartedAt) ||
+        !validTimestamp(readback.datasetCompletedAt) ||
+        !Number.isFinite(readback.datasetDurationMs) ||
+        readback.datasetDurationMs < 0 ||
+        !isSafeText(readback.dataVersion, 120) ||
+        readback.stageTimings.length !== readback.dataStageCount)) ||
+    (!hasDatasetTiming &&
+      (readback.datasetCompletedAt !== null ||
+        readback.datasetDurationMs !== null ||
+        readback.dataVersion !== null ||
+        readback.stageTimings.length !== 0)) ||
+    (readback.reportStatus === 'passed' && !hasDatasetTiming)
+  ) {
+    throw new Error('full acceptance dataset timing is invalid')
+  }
+  readback.stageTimings.forEach((stage) => {
+    assertExactKeys(
+      stage,
+      ['completedAt', 'durationMs', 'key', 'startedAt', 'status'],
+      'full acceptance stage timing'
+    )
+    const stageHasTiming = stage.status !== 'not_started'
+    if (
+      !isSafeText(stage.key, 120) ||
+      !['completed', 'failed', 'not_started'].includes(stage.status) ||
+      (stageHasTiming &&
+        (!validTimestamp(stage.startedAt) ||
+          !validTimestamp(stage.completedAt) ||
+          !Number.isFinite(stage.durationMs) ||
+          stage.durationMs < 0)) ||
+      (!stageHasTiming &&
+        (stage.startedAt !== null ||
+          stage.completedAt !== null ||
+          stage.durationMs !== null))
+    ) {
+      throw new Error('full acceptance stage timing is invalid')
+    }
+  })
   return readback
 }
 
@@ -450,6 +693,7 @@ export function validateDevDataPreparationOperation(operation) {
       'status',
       'targetSummary',
       'terminal',
+      'timing',
       'updatedAt',
     ],
     'data preparation operation'
@@ -501,6 +745,7 @@ export function validateDevDataPreparationOperation(operation) {
   )
   operation.events.forEach(validateEvent)
   operation.issues.forEach(validateIssue)
+  validateTiming(operation.timing, { terminal: operation.terminal })
   validateReadback(operation.readback, {
     profileKey: operation.profileKey,
     status: operation.status,
@@ -532,6 +777,7 @@ export function validateDevDataPreparationSummary(summary) {
     summary,
     [
       'boundaries',
+      'acceptancePlan',
       'generatedAt',
       'issues',
       'operations',
@@ -548,6 +794,7 @@ export function validateDevDataPreparationSummary(summary) {
     SUMMARY_TARGET_KEYS,
     'data preparation target'
   )
+  validateAcceptancePlan(summary.acceptancePlan)
   assertExactKeys(
     summary.boundaries,
     [
@@ -601,6 +848,28 @@ export function validateDevDataPreparationSummary(summary) {
     throw new Error('data preparation profile set is invalid')
   }
   summary.operations.forEach(validateDevDataPreparationOperation)
+  summary.operations.forEach((operation) => {
+    if (
+      operation.profileKey !== DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance
+    ) {
+      return
+    }
+    const { readback } = operation
+    if (
+      readback &&
+      (readback.chainDataDigest !== summary.acceptancePlan.chainDataDigest ||
+        readback.chainVerificationDigest !==
+          summary.acceptancePlan.chainVerificationDigest ||
+        readback.chainCount !== summary.acceptancePlan.chainCount ||
+        readback.stepCount !== summary.acceptancePlan.stepCount ||
+        readback.scenarioCount !== summary.acceptancePlan.scenarioCount ||
+        readback.dataStageCount !== summary.acceptancePlan.dataStageCount ||
+        readback.catalogTargetCount !==
+          summary.acceptancePlan.catalogTargetCount)
+    ) {
+      throw new Error('full acceptance readback does not match current plan')
+    }
+  })
   summary.issues.forEach(validateIssue)
 
   if (
@@ -838,7 +1107,8 @@ export function resolveDataPreparationExecutionConfirmation(
 
 export function selectRecoverableDataPreparationOperation(
   operations = [],
-  currentOperationId = ''
+  currentOperationId = '',
+  preferredProfileKey = ''
 ) {
   if (!Array.isArray(operations)) return null
   const currentOperation = operations.find(
@@ -846,13 +1116,21 @@ export function selectRecoverableDataPreparationOperation(
   )
   if (currentOperation) return currentOperation
 
+  const recoverableOperations = operations
+    .filter((operation) => operation?.terminal === false)
+    .toSorted(
+      (left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt)
+    )
+  if (!preferredProfileKey) return recoverableOperations[0] || null
+
   return (
-    operations
-      .filter((operation) => operation?.terminal === false)
-      .toSorted(
-        (left, right) =>
-          Date.parse(right.updatedAt) - Date.parse(left.updatedAt)
-      )[0] || null
+    recoverableOperations.find((operation) =>
+      ['launching', 'running'].includes(operation.status)
+    ) ||
+    recoverableOperations.find(
+      (operation) => operation.profileKey === preferredProfileKey
+    ) ||
+    null
   )
 }
 

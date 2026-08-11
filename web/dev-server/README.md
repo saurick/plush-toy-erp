@@ -4,19 +4,18 @@
 
 ## 职责
 
-| 模块 | 职责 |
-| --- | --- |
-| `devWorkbenchPlugins.mjs` | 聚合 development-serve 插件，供 `web/vite.shared.mjs` 单点注册 |
-| `devCustomerConfigPlugin.mjs` | 为本地客户调试提供受控配置和公开资源 |
-| `devCustomerImportDryRunPlugin.mjs` | 提供客户配置预检、Dry Run、runtime manifest 和发布准备读回 |
-| `devQaCoveragePlugin.mjs` | 执行固定覆盖率采集并提供脱敏 operation 状态 |
-| `devQualityGatePlugin.mjs` | 复用正式 full / strict runner 与回执，自动选择显式 loopback base 或本机托管 PostgreSQL，提供异步运行、取消、超时、清理读回和只读治理 |
-| `devWorkbenchReceiptPlugin.mjs` | 只读提供当前及历史质量回执 |
-| `devDataPreparationPlugin.mjs` | 执行登记的数据准备 profile |
-| `devDatabaseMigrationPlugin.mjs` | 提供本地共享开发库迁移的受控 operation service 和 HTTP 层，供页面与高层 CLI 复用 |
-| `devDatabaseMigrationRuntime.mjs` | 执行迁移 status、plan、备份恢复、apply、读回和重启 |
-| `devDeliveryBridgePlugin.mjs` | 提供不可变版本、固定目标 promotion 和受控 rollback Bridge |
-| `devServerSecurity.mjs` | 集中维护 loopback remote address 与 Host 校验 |
+| 模块                                | 职责                                                                                                                                 |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `devWorkbenchPlugins.mjs`           | 聚合 development-serve 插件，供 `web/vite.shared.mjs` 单点注册                                                                       |
+| `devCustomerConfigPlugin.mjs`       | 为本地客户调试提供受控配置和公开资源                                                                                                 |
+| `devCustomerImportDryRunPlugin.mjs` | 提供客户配置预检、Dry Run、runtime manifest 和发布准备读回                                                                           |
+| `devQaCoveragePlugin.mjs`           | 执行固定覆盖率采集并提供脱敏 operation 状态                                                                                          |
+| `devQualityGatePlugin.mjs`          | 复用正式 full / strict runner 与回执，自动选择显式 loopback base 或本机托管 PostgreSQL，提供异步运行、取消、超时、清理读回和只读治理 |
+| `devDataPreparationPlugin.mjs`      | 执行登记的数据准备 profile                                                                                                           |
+| `devDatabaseMigrationPlugin.mjs`    | 提供本地共享开发库迁移的受控 operation service 和 HTTP 层，供页面与高层 CLI 复用                                                     |
+| `devDatabaseMigrationRuntime.mjs`   | 执行迁移 status、plan、备份恢复、apply、读回和重启                                                                                   |
+| `devDeliveryBridgePlugin.mjs`       | 提供不可变版本、固定目标 promotion 和受控 rollback Bridge                                                                            |
+| `devServerSecurity.mjs`             | 集中维护 loopback remote address 与 Host 校验                                                                                        |
 
 测试与实现同目录放置。模块间使用 `./` 导入；仓库级 QA、部署和客户配置真源分别通过 `../../scripts/`、`../../config/` 读取，不在本目录复制实现。
 

@@ -34,6 +34,19 @@ test('outsourcing page has no retired sales-order foreign-key field', () => {
   assert.doesNotMatch(orderViewSource, /source_sales_order_id/u)
 })
 
+test('outsourcing contract keeps editable party B snapshot and checks it before lifecycle or print', () => {
+  assert.match(source, /supplier_types: \['outsourcing', 'mixed'\]/u)
+  assert.match(source, /buildOutsourcingSupplierSnapshot/u)
+  assert.match(source, /loadSupplierContacts/u)
+  assert.match(formSource, /合同乙方信息/u)
+  assert.match(formSource, /乙方联系人/u)
+  assert.match(formSource, /乙方签约人/u)
+  assert.match(source, /inspectOutsourcingContractReadiness/u)
+  assert.match(source, /buildOutsourcingContractConfirmationSummary/u)
+  assert.match(source, /loadBusinessAttachmentPrintAppendixSnapshots/u)
+  assert.doesNotMatch(source, /mergeSnapshotMissingFields/u)
+})
+
 test('outsourcing order source actions use exact capabilities and dedicated commands', () => {
   for (const permission of [
     'outsourcing.fact.read',

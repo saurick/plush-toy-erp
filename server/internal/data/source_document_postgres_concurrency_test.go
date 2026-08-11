@@ -239,12 +239,27 @@ func TestSourceDocumentPostgresSaveSubmitConcurrency(t *testing.T) {
 		realRepo := NewOutsourcingOrderRepo(data, logger)
 		realUC := biz.NewOutsourcingOrderUsecase(realRepo)
 		orderDate := time.Date(2026, 7, 10, 0, 0, 0, 0, time.UTC)
+		expectedReturnDate := orderDate.Add(7 * 24 * time.Hour)
+		processingItem := "脸*1"
 		originalQuantity := decimal.NewFromInt(10)
 
 		created, err := realUC.SaveOutsourcingOrderWithItems(ctx, 0, &biz.OutsourcingOrderMutation{
 			OutsourcingOrderNo: "OUT-PG-CONCURRENT-" + suffix,
 			SupplierID:         supplier.ID,
+			SupplierSnapshot: map[string]any{
+				"name":          "测试加工厂",
+				"contact_name":  "李厂长",
+				"contact_phone": "13900000000",
+				"address":       "加工园 1 号",
+			},
+			ContractPartySnapshot: map[string]any{
+				"buyerCompany": "永绅",
+				"buyerContact": "委外负责人",
+				"buyerPhone":   "13800000000",
+				"buyerAddress": "东莞茶山",
+			},
 			OrderDate:          orderDate,
+			ExpectedReturnDate: &expectedReturnDate,
 		}, []*biz.OutsourcingOrderItemSaveMutation{{
 			OutsourcingOrderItemMutation: biz.OutsourcingOrderItemMutation{
 				LineNo:              1,
@@ -253,6 +268,7 @@ func TestSourceDocumentPostgresSaveSubmitConcurrency(t *testing.T) {
 				ProcessID:           process.ID,
 				UnitID:              unit.ID,
 				OutsourcingQuantity: originalQuantity,
+				ProcessingItem:      &processingItem,
 			},
 		}})
 		if err != nil {

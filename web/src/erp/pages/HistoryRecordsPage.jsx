@@ -38,6 +38,7 @@ import {
   getAvailableHistorySources,
   normalizeHistoryRecords,
 } from '../utils/historyRecordCatalog.mjs'
+import { buildHistorySourceSelectOptions } from '../utils/historySourceSelectOptions.mjs'
 
 const { Text } = Typography
 
@@ -97,6 +98,10 @@ export default function HistoryRecordsPage() {
   const activeSource = useMemo(
     () => availableSources.find((source) => source.key === sourceKey) || null,
     [availableSources, sourceKey]
+  )
+  const sourceOptions = useMemo(
+    () => buildHistorySourceSelectOptions(availableSources),
+    [availableSources]
   )
 
   useEffect(() => {
@@ -240,10 +245,7 @@ export default function HistoryRecordsPage() {
             <SelectFilter
               aria-label="历史记录类型"
               value={activeSource?.key}
-              options={availableSources.map((source) => ({
-                value: source.key,
-                label: source.label,
-              }))}
+              options={sourceOptions}
               placeholder="选择记录类型"
               onChange={(nextSourceKey) => {
                 setSourceKey(nextSourceKey)

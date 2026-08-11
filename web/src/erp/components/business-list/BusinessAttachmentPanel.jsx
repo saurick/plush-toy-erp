@@ -41,6 +41,7 @@ import {
   resolveBusinessAttachmentWithdrawalMeta,
 } from '../../utils/businessAttachmentPresentation.mjs'
 import { resolveBusinessAttachmentPanelState } from '../../utils/businessAttachmentPanelState.mjs'
+import { PRINT_APPENDIX_ATTACHMENT_TYPE } from '../../utils/businessAttachmentPrintAppendix.mjs'
 
 const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024
 const MAX_ATTACHMENT_SIZE_LABEL = '5MB'
@@ -132,6 +133,14 @@ const ACCEPTED_ATTACHMENT_TYPES = [
   ...ACCEPTED_ATTACHMENT_MIME_TYPES,
   ...ACCEPTED_ATTACHMENT_EXTENSIONS,
 ].join(',')
+
+const PRINT_APPENDIX_MIME_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/gif',
+])
+const PRINT_APPENDIX_ACCEPT = [...PRINT_APPENDIX_MIME_TYPES].join(',')
 
 let pendingAttachmentID = 0
 
@@ -265,12 +274,14 @@ const BusinessAttachmentPanel = forwardRef(
       className = '',
       variant = 'section',
       allowPendingAttachmentsWithoutOwner = true,
+      enablePrintAppendixUpload = false,
       missingOwnerDescription,
       missingOwnerEmptyText,
     },
     ref
   ) => {
     const inputRef = useRef(null)
+    const printAppendixInputRef = useRef(null)
     const withdrawalReasonRef = useRef(null)
     const pendingAttachmentsRef = useRef([])
     const [attachments, setAttachments] = useState([])
@@ -366,7 +377,7 @@ const BusinessAttachmentPanel = forwardRef(
         await uploadBusinessAttachment({
           owner_type: ownerType,
           owner_id: targetOwnerId,
-          attachment_type: attachmentType,
+          attachment_type: item.attachment_type || attachmentType,
           slot_key: slotKey,
           file_name: item.file_name,
           mime_type: item.mime_type,
@@ -425,7 +436,10 @@ const BusinessAttachmentPanel = forwardRef(
       [normalizedOwnerId, ownerType, reload, uploadPreparedAttachment]
     )
 
-    async function handleFileChange(event) {
+    async function handleFileChange(
+      event,
+      requestedAttachmentType = attachmentType
+    ) {
       const files = Array.from(event.target.files || [])
       event.target.value = ''
       if (files.length <= 0) return
@@ -436,6 +450,13 @@ const BusinessAttachmentPanel = forwardRef(
         if (file.size > MAX_ATTACHMENT_SIZE) {
           message.warning(
             `${file.name} 超过 ${MAX_ATTACHMENT_SIZE_LABEL}，请压缩后再上传`
+          )
+        } else if (
+          requestedAttachmentType === PRINT_APPENDIX_ATTACHMENT_TYPE &&
+          !PRINT_APPENDIX_MIME_TYPES.has(mimeType)
+        ) {
+          message.warning(
+            `${file.name} 不是可打印的合同附图，请选择 PNG、JPEG、WEBP 或 GIF`
           )
         } else if (!ACCEPTED_ATTACHMENT_MIME_TYPES.has(mimeType)) {
           message.warning(`${file.name} 格式暂不支持，请转换后再上传`)
@@ -457,6 +478,7 @@ const BusinessAttachmentPanel = forwardRef(
             mime_type: inferMimeType(file),
             file_size: file.size,
             content_base64: await readFileAsBase64(file),
+            attachment_type: requestedAttachmentType,
           })
         }
 
@@ -701,15 +723,27 @@ const BusinessAttachmentPanel = forwardRef(
           </div>
           {canUpload ? (
             <>
-              <Button
-                type="primary"
-                icon={<UploadOutlined />}
-                loading={uploading}
-                disabled={uploadDisabled}
-                onClick={() => inputRef.current?.click()}
-              >
-                {uploadButtonText}
-              </Button>
+              <Space wrap>
+                {enablePrintAppendixUpload ? (
+                  <Button
+                    icon={<UploadOutlined />}
+                    loading={uploading}
+                    disabled={uploadDisabled}
+                    onClick={() => printAppendixInputRef.current?.click()}
+                  >
+                    选择合同附图
+                  </Button>
+                ) : null}
+                <Button
+                  type="primary"
+                  icon={<UploadOutlined />}
+                  loading={uploading}
+                  disabled={uploadDisabled}
+                  onClick={() => inputRef.current?.click()}
+                >
+                  {uploadButtonText}
+                </Button>
+              </Space>
               <input
                 ref={inputRef}
                 hidden
@@ -718,6 +752,18 @@ const BusinessAttachmentPanel = forwardRef(
                 accept={ACCEPTED_ATTACHMENT_TYPES}
                 onChange={handleFileChange}
               />
+              {enablePrintAppendixUpload ? (
+                <input
+                  ref={printAppendixInputRef}
+                  hidden
+                  multiple
+                  type="file"
+                  accept={PRINT_APPENDIX_ACCEPT}
+                  onChange={(event) =>
+                    handleFileChange(event, PRINT_APPENDIX_ATTACHMENT_TYPE)
+                  }
+                />
+              ) : null}
             </>
           ) : null}
         </div>
@@ -743,6 +789,9 @@ const BusinessAttachmentPanel = forwardRef(
                 description={
                   <Space size={6} wrap>
                     <Tag>{formatFileSize(item.file_size)}</Tag>
+                    {item.attachment_type === PRINT_APPENDIX_ATTACHMENT_TYPE ? (
+                      <Tag color="purple">合同附图</Tag>
+                    ) : null}
                     {item.__kind === 'pending' ? (
                       <Tag color="blue">保存后上传</Tag>
                     ) : (

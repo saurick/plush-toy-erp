@@ -114,6 +114,37 @@ func TestMasterDataRepoCustomerSupplierCRUD(t *testing.T) {
 	if loadedSupplier.Address == nil || *loadedSupplier.Address != address || len(loadedSupplier.ProcessIDs) != 1 || loadedSupplier.ProcessIDs[0] != processRow.ID {
 		t.Fatalf("expected supplier address and deduplicated process capability retained, got %#v", loadedSupplier)
 	}
+	contactPhone := "13800000000"
+	if _, err := uc.CreateContact(ctx, &biz.ContactMutation{
+		OwnerType: biz.ContactOwnerSupplier,
+		OwnerID:   supplier.ID,
+		Name:      "主联系人",
+		Mobile:    &contactPhone,
+		IsPrimary: true,
+	}); err != nil {
+		t.Fatalf("create supplier primary contact failed: %v", err)
+	}
+	outsourcingType := "outsourcing"
+	if _, err := uc.CreateSupplier(ctx, &biz.SupplierMutation{
+		Code:         "S-OUT-001",
+		Name:         "测试加工厂",
+		SupplierType: &outsourcingType,
+	}); err != nil {
+		t.Fatalf("create outsourcing supplier failed: %v", err)
+	}
+	materialSuppliers, materialTotal, err := uc.ListSuppliers(ctx, biz.MasterDataFilter{
+		SupplierTypes: []string{"material"},
+		Limit:         20,
+	})
+	if err != nil {
+		t.Fatalf("list material suppliers failed: %v", err)
+	}
+	if materialTotal != 1 || len(materialSuppliers) != 1 || materialSuppliers[0].ID != supplier.ID {
+		t.Fatalf("expected only material supplier, total=%d rows=%#v", materialTotal, materialSuppliers)
+	}
+	if materialSuppliers[0].PrimaryContact == nil || materialSuppliers[0].PrimaryContact.Name != "主联系人" {
+		t.Fatalf("expected supplier primary contact projected in list, got %#v", materialSuppliers[0].PrimaryContact)
+	}
 	clearedSupplier, err := uc.UpdateSupplier(ctx, supplier.ID, &biz.SupplierMutation{
 		Code:       "S-001",
 		Name:       "测试供应商",

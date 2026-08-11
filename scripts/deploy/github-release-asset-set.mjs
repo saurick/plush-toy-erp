@@ -39,13 +39,15 @@ const DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/u;
 
 function assertIdentity(sha, version) {
   if (!SHA_PATTERN.test(String(sha || ""))) throw new Error("sha is invalid");
-  if (!VERSION_PATTERN.test(String(version || ""))) throw new Error("version is invalid");
+  if (!VERSION_PATTERN.test(String(version || "")))
+    throw new Error("version is invalid");
 }
 
 function plainFile(file, label) {
   if (!existsSync(file)) throw new Error(`${label} is missing`);
   const stat = lstatSync(file);
-  if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`${label} must be a plain file`);
+  if (!stat.isFile() || stat.isSymbolicLink())
+    throw new Error(`${label} must be a plain file`);
   return stat;
 }
 
@@ -54,14 +56,17 @@ export function parseReleaseChecksums(source) {
   for (const line of String(source || "").split(/\r?\n/u)) {
     if (!line) continue;
     const match = line.match(/^([0-9a-f]{64})  ([A-Za-z0-9._-]+)$/u);
-    if (!match || entries.has(match[2])) throw new Error("release checksum catalog is malformed");
+    if (!match || entries.has(match[2]))
+      throw new Error("release checksum catalog is malformed");
     entries.set(match[2], match[1]);
   }
   if (
     entries.size !== CHECKSUM_PAYLOAD_NAMES.length ||
     CHECKSUM_PAYLOAD_NAMES.some((name) => !entries.has(name))
   ) {
-    throw new Error("release checksum catalog must cover every payload exactly once");
+    throw new Error(
+      "release checksum catalog must cover every payload exactly once",
+    );
   }
   return entries;
 }
@@ -76,7 +81,10 @@ export function finalizeReleaseChecksums(directory) {
   const target = path.join(root, "checksums.sha256");
   const temporary = `${target}.${process.pid}.tmp`;
   try {
-    writeFileSync(temporary, `${lines.join("\n")}\n`, { mode: 0o600, flag: "wx" });
+    writeFileSync(temporary, `${lines.join("\n")}\n`, {
+      mode: 0o600,
+      flag: "wx",
+    });
     renameSync(temporary, target);
   } finally {
     if (existsSync(temporary)) unlinkSync(temporary);
@@ -86,12 +94,22 @@ export function finalizeReleaseChecksums(directory) {
 
 function assertManifestIdentity(directory, sha, version) {
   const artifact = assertReleaseArtifactManifest(
-    JSON.parse(readFileSync(path.join(directory, "release-artifact.json"), "utf8")),
+    JSON.parse(
+      readFileSync(path.join(directory, "release-artifact.json"), "utf8"),
+    ),
   );
   const release = validateReleaseManifest(
-    JSON.parse(readFileSync(path.join(directory, "release-manifest.json"), "utf8")),
+    JSON.parse(
+      readFileSync(path.join(directory, "release-manifest.json"), "utf8"),
+    ),
   );
-  if (artifact.git.commit !== sha || release.gitSha !== sha || release.version !== version) {
+  if (
+    artifact.git.commit !== sha ||
+    release.gitSha !== sha ||
+    release.version !== version ||
+    (artifact.releaseVersion !== undefined &&
+      artifact.releaseVersion !== version)
+  ) {
     throw new Error("release assets do not match requested identity");
   }
   return { artifact, release };
@@ -115,7 +133,9 @@ export function inspectLocalReleaseAssets(directory, { sha, version }) {
     entries.some((entry) => !entry.isFile()) ||
     JSON.stringify(names) !== JSON.stringify([...RELEASE_ASSET_NAMES].sort())
   ) {
-    throw new Error("release directory must contain exactly the six public assets");
+    throw new Error(
+      "release directory must contain exactly the six public assets",
+    );
   }
   assertManifestIdentity(root, sha, version);
   const checksums = parseReleaseChecksums(
@@ -132,14 +152,19 @@ export function inspectLocalReleaseAssets(directory, { sha, version }) {
 }
 
 function flattenReleases(value) {
-  if (!Array.isArray(value)) throw new Error("GitHub release catalog must be an array");
+  if (!Array.isArray(value))
+    throw new Error("GitHub release catalog must be an array");
   return value.flatMap((item) => (Array.isArray(item) ? item : [item]));
 }
 
 export function analyzeReleaseCatalog({ releases, sha, version, localAssets }) {
   const identity = inspectReleaseIdentity({ releases, sha, version });
   if (identity.state === "missing") {
-    return Object.freeze({ state: "missing", releaseId: null, missingAssets: [...RELEASE_ASSET_NAMES] });
+    return Object.freeze({
+      state: "missing",
+      releaseId: null,
+      missingAssets: [...RELEASE_ASSET_NAMES],
+    });
   }
   const release = identity.release;
   const expected = new Map(localAssets.map((asset) => [asset.name, asset]));
@@ -205,7 +230,8 @@ export function inspectReleaseIdentity({ releases, sha, version }) {
 
 function expectedAssetsFromDownloaded(directory, sha, version) {
   const root = path.resolve(directory);
-  for (const name of SMALL_RELEASE_ASSET_NAMES) plainFile(path.join(root, name), name);
+  for (const name of SMALL_RELEASE_ASSET_NAMES)
+    plainFile(path.join(root, name), name);
   const { artifact } = assertManifestIdentity(root, sha, version);
   const checksums = parseReleaseChecksums(
     readFileSync(path.join(root, "checksums.sha256"), "utf8"),
@@ -213,14 +239,20 @@ function expectedAssetsFromDownloaded(directory, sha, version) {
   const descriptors = SMALL_RELEASE_ASSET_NAMES.map((name) =>
     assetDescriptor(path.join(root, name), name),
   );
-  for (const descriptor of descriptors.filter((item) => item.name !== "checksums.sha256")) {
+  for (const descriptor of descriptors.filter(
+    (item) => item.name !== "checksums.sha256",
+  )) {
     if (descriptor.digest !== `sha256:${checksums.get(descriptor.name)}`) {
-      throw new Error(`downloaded release checksum mismatch: ${descriptor.name}`);
+      throw new Error(
+        `downloaded release checksum mismatch: ${descriptor.name}`,
+      );
     }
   }
   for (const image of artifact.images) {
     if (checksums.get(image.archive.file) !== image.archive.sha256) {
-      throw new Error(`downloaded image checksum catalog mismatch: ${image.archive.file}`);
+      throw new Error(
+        `downloaded image checksum catalog mismatch: ${image.archive.file}`,
+      );
     }
     descriptors.push({
       name: image.archive.file,
@@ -231,18 +263,33 @@ function expectedAssetsFromDownloaded(directory, sha, version) {
   return descriptors.sort((left, right) => left.name.localeCompare(right.name));
 }
 
-export function verifyExistingPublishedRelease({ directory, releases, sha, version }) {
+export function verifyExistingPublishedRelease({
+  directory,
+  releases,
+  sha,
+  version,
+}) {
   const localAssets = expectedAssetsFromDownloaded(directory, sha, version);
   const result = analyzeReleaseCatalog({ releases, sha, version, localAssets });
   if (result.state !== "published" || result.missingAssets.length > 0) {
-    throw new Error("existing release is not a complete published immutable release");
+    throw new Error(
+      "existing release is not a complete published immutable release",
+    );
   }
   return result;
 }
 
 function parseArgs(argv) {
   const [command, ...rest] = argv;
-  const options = { command, directory: "", catalog: "", sha: "", version: "", githubOutput: "", json: false };
+  const options = {
+    command,
+    directory: "",
+    catalog: "",
+    sha: "",
+    version: "",
+    githubOutput: "",
+    json: false,
+  };
   for (let index = 0; index < rest.length; index += 1) {
     const arg = rest[index];
     if (arg === "--json") {
@@ -258,16 +305,30 @@ function parseArgs(argv) {
     };
     if (!mapping[arg]) throw new Error(`unknown argument: ${arg}`);
     const value = rest[index + 1];
-    if (!value || value.startsWith("--")) throw new Error(`${arg} requires a value`);
+    if (!value || value.startsWith("--"))
+      throw new Error(`${arg} requires a value`);
     options[mapping[arg]] = value;
     index += 1;
   }
-  if (!new Set(["finalize", "identity", "plan", "verify-existing", "verify-published"]).has(command)) {
-    throw new Error("expected finalize, identity, plan, verify-existing or verify-published");
+  if (
+    !new Set([
+      "finalize",
+      "identity",
+      "plan",
+      "verify-existing",
+      "verify-published",
+    ]).has(command)
+  ) {
+    throw new Error(
+      "expected finalize, identity, plan, verify-existing or verify-published",
+    );
   }
-  if (!options.sha || !options.version) throw new Error("--sha and --version are required");
-  if (command !== "identity" && !options.directory) throw new Error("--dir is required");
-  if (command !== "finalize" && !options.catalog) throw new Error("--catalog is required");
+  if (!options.sha || !options.version)
+    throw new Error("--sha and --version are required");
+  if (command !== "identity" && !options.directory)
+    throw new Error("--dir is required");
+  if (command !== "finalize" && !options.catalog)
+    throw new Error("--catalog is required");
   return options;
 }
 
@@ -285,7 +346,9 @@ function main() {
   const options = parseArgs(process.argv.slice(2));
   const directory = options.directory ? path.resolve(options.directory) : "";
   if (options.command === "identity") {
-    const releases = JSON.parse(readFileSync(path.resolve(options.catalog), "utf8"));
+    const releases = JSON.parse(
+      readFileSync(path.resolve(options.catalog), "utf8"),
+    );
     const identity = inspectReleaseIdentity({
       releases,
       sha: options.sha,
@@ -297,24 +360,36 @@ function main() {
       missingAssets: [],
     };
     writeOutputs(options.githubOutput, result);
-    console.log(options.json ? JSON.stringify({ status: "passed", ...result }, null, 2) : `[release-assets] state=${result.state}`);
+    console.log(
+      options.json
+        ? JSON.stringify({ status: "passed", ...result }, null, 2)
+        : `[release-assets] state=${result.state}`,
+    );
     return;
   }
   if (options.command === "finalize") finalizeReleaseChecksums(directory);
   const localAssets =
     options.command === "verify-existing"
       ? expectedAssetsFromDownloaded(directory, options.sha, options.version)
-      : inspectLocalReleaseAssets(directory, { sha: options.sha, version: options.version });
+      : inspectLocalReleaseAssets(directory, {
+          sha: options.sha,
+          version: options.version,
+        });
   let result = { state: "local", releaseId: null, missingAssets: [] };
   if (options.command !== "finalize") {
-    const releases = JSON.parse(readFileSync(path.resolve(options.catalog), "utf8"));
+    const releases = JSON.parse(
+      readFileSync(path.resolve(options.catalog), "utf8"),
+    );
     result = analyzeReleaseCatalog({
       releases,
       sha: options.sha,
       version: options.version,
       localAssets,
     });
-    if (options.command === "verify-existing" || options.command === "verify-published") {
+    if (
+      options.command === "verify-existing" ||
+      options.command === "verify-published"
+    ) {
       if (result.state !== "published" || result.missingAssets.length > 0) {
         throw new Error("release is not complete and published");
       }
@@ -322,11 +397,16 @@ function main() {
   }
   writeOutputs(options.githubOutput, result);
   const output = { status: "passed", ...result, assets: localAssets };
-  console.log(options.json ? JSON.stringify(output, null, 2) : `[release-assets] state=${result.state} missing=${result.missingAssets.length}`);
+  console.log(
+    options.json
+      ? JSON.stringify(output, null, 2)
+      : `[release-assets] state=${result.state} missing=${result.missingAssets.length}`,
+  );
 }
 
 const isDirectRun =
-  process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
+  process.argv[1] &&
+  pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
 
 if (isDirectRun) {
   try {

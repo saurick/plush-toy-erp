@@ -51,6 +51,8 @@ HTTP 路由：
 - `set_role_settings`
 - `set_phone`
 - `set_erp_column_order`
+- `legal_notice_status`
+- `acknowledge_legal_notice`
 - `audit_logs`
 - `set_disabled`
 - `revoke`
@@ -219,6 +221,15 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 - `user.list`
 - `user.set_disabled`
 - `user.reset_password`
+
+## 隐私规则知悉 API
+
+`admin.legal_notice_status` 与 `admin.acknowledge_legal_notice` 只接受：
+
+- `notice_version`：1–64 位稳定版本，只允许字母、数字、点、下划线和连字符。
+- `content_fingerprint`：16–64 位小写十六进制内容指纹。
+
+两者都只操作当前已登录且启用的管理员账号，不要求额外业务权限，也不能替其他账号确认。状态查询返回 `notice_version / content_fingerprint / acknowledged / acknowledged_at`；确认接口幂等复用相同回执。后端把账号 ID 和内容指纹组成精确审计事件 key，payload 只含账号 ID、账号名、规则版本、内容指纹和时间，不保存手机号、密码、token 或规则正文。“已阅读并知悉”只证明告知送达，不等于所有个人信息处理均以同意为依据。
 
 ## 鉴权规则
 

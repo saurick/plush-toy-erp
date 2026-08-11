@@ -33,7 +33,27 @@ test('dev flow state query keeps the active selection and task while removing in
     {
       changed: true,
       query:
-        'view=states&flow=source.production_exception_decision&state=APPROVED&task_id=42',
+        'view=states&flow=source.production_exception_decision&state=APPROVED&chain=production_exception&task_id=42',
+    }
+  )
+})
+
+test('dev flow state query preserves chain and node context in specialist views', () => {
+  assert.deepEqual(
+    canonicalize(
+      'view=facts&chain=delivery_to_settlement&node=shipped&fact=fact.shipment'
+    ),
+    {
+      changed: false,
+      query:
+        'view=facts&chain=delivery_to_settlement&node=shipped&fact=fact.shipment',
+    }
+  )
+  assert.deepEqual(
+    canonicalize('view=runtime&chain=all&node=retired&process=missing'),
+    {
+      changed: true,
+      query: 'view=runtime&chain=all&process=missing',
     }
   )
 })

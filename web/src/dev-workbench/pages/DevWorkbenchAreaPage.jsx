@@ -9,7 +9,6 @@ import { Link } from 'react-router-dom'
 import { Tag, Typography } from 'antd'
 import DevEntrySourceDetails from '../components/DevEntrySourceDetails.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
-import DevReceiptPanel from '../components/DevReceiptPanel.jsx'
 import { DEV_HUB_ITEMS } from '../config/devHub.mjs'
 import { DEV_WORKBENCH_AREA_KEYS } from '../config/devRoutes.mjs'
 
@@ -303,34 +302,27 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
             </ol>
           </section>
         ) : isQualityArea ? (
-          <>
-            <section
-              className="erp-dev-quality-start"
-              aria-labelledby="dev-quality-start-title"
-            >
-              <div className="erp-dev-quality-start__head">
-                <div>
-                  <Text className="erp-dev-quality-start__eyebrow">
-                    当前任务
-                  </Text>
-                  <Title level={2} id="dev-quality-start-title">
-                    先选要完成的事情
-                  </Title>
-                </div>
-                <Text type="secondary">
-                  测试数据不是每次都要准备；先判断本轮改动，再按需要进入数据准备。
-                </Text>
+          <section
+            className="erp-dev-quality-start"
+            aria-labelledby="dev-quality-start-title"
+          >
+            <div className="erp-dev-quality-start__head">
+              <div>
+                <Text className="erp-dev-quality-start__eyebrow">当前任务</Text>
+                <Title level={2} id="dev-quality-start-title">
+                  先选要完成的事情
+                </Title>
               </div>
-              <div className="erp-dev-quality-task-list">
-                {items.map((item) => (
-                  <QualityTaskEntry key={item.key} item={item} />
-                ))}
-              </div>
-            </section>
-            <DevReceiptPanel areaKey={areaKey} summaryFirst />
-          </>
-        ) : areaKey === DEV_WORKBENCH_AREA_KEYS.delivery ? (
-          <DevReceiptPanel areaKey={areaKey} />
+              <Text type="secondary">
+                测试数据不是每次都要准备；先判断本轮改动，再按需要进入数据准备。
+              </Text>
+            </div>
+            <div className="erp-dev-quality-task-list">
+              {items.map((item) => (
+                <QualityTaskEntry key={item.key} item={item} />
+              ))}
+            </div>
+          </section>
         ) : null}
         {!isQualityArea && !isProductEngineeringArea ? (
           <section

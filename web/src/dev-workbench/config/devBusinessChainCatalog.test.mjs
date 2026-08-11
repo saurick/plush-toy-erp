@@ -17,6 +17,12 @@ import {
   DEV_FLOW_STATE_CATALOG,
   processDefinitions,
 } from './devFlowStateCatalog.mjs'
+import {
+  DEV_BUSINESS_CHAIN_DATA_STAGE_KEYS,
+  DEV_BUSINESS_CHAIN_EVIDENCE_MODES,
+  DEV_BUSINESS_CHAIN_SCENARIO_KINDS,
+} from './devBusinessChainStepContracts.mjs'
+import { yoyoosunRoleFlowMatrix } from '../../../../config/customers/yoyoosun/roleFlowMatrix.mjs'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..')
 
@@ -187,6 +193,142 @@ test('business chain nodes and edges remain connected, read-only, and source-bac
       assert.ok(edge.action, `${chain.key}/${edge.key} action`)
       assert.ok(edge.factBoundary, `${chain.key}/${edge.key} boundary`)
       assert.ok(edge.sourceRefs.length > 0, `${chain.key}/${edge.key}`)
+    }
+  }
+})
+
+test('business chain steps bind formal responsibility, state, action, process, Fact, and registered scenarios', () => {
+  const flowByKey = new Map(
+    DEV_FLOW_STATE_CATALOG.flows.map((flow) => [flow.key, flow])
+  )
+  const processByKey = new Map(
+    processDefinitions.map((definition) => [definition.key, definition])
+  )
+  const factKeys = new Set(
+    DEV_FLOW_STATE_CATALOG.factDefinitions.map(
+      (definition) => definition.factKey
+    )
+  )
+  const roleProfiles = yoyoosunRoleFlowMatrix.roles
+
+  assert.equal(DEV_FLOW_STATE_CATALOG.businessChainCoverage.stepCount, 67)
+  assert.equal(DEV_FLOW_STATE_CATALOG.businessChainCoverage.scenarioCount, 66)
+  assert.equal(
+    DEV_FLOW_STATE_CATALOG.businessChainCoverage.stepContractComplete,
+    true
+  )
+  assert.equal(
+    DEV_FLOW_STATE_CATALOG.businessChainCoverage.scenarioContractComplete,
+    true
+  )
+
+  for (const chain of DEV_FLOW_STATE_CATALOG.businessChains) {
+    assert.equal(chain.steps.length, chain.edges.length, chain.key)
+    assert.deepEqual(
+      chain.acceptanceScenarios.map((scenario) => scenario.kind),
+      DEV_BUSINESS_CHAIN_SCENARIO_KINDS,
+      `${chain.key} scenario kinds`
+    )
+
+    const edgeKeys = new Set(chain.edges.map((edge) => edge.key))
+    for (const step of chain.steps) {
+      assert(edgeKeys.has(step.edgeKey), `${chain.key}/${step.key}`)
+      assert.equal(step.readOnly, true, `${chain.key}/${step.key}`)
+      assert.equal(
+        step.allowsActionExecution,
+        false,
+        `${chain.key}/${step.key}`
+      )
+      assert(step.actionRefs.length > 0, `${chain.key}/${step.key} actions`)
+      assert(step.scenarioKeys.length > 0, `${chain.key}/${step.key} scenarios`)
+      assert(
+        step.preconditionStateRefs.length > 0 ||
+          step.resultStateRefs.length > 0 ||
+          step.processNodeRefs.length > 0 ||
+          step.factKeys.length > 0,
+        `${chain.key}/${step.key} bindings`
+      )
+      for (const ref of step.stateTransitionRefs) {
+        const flow = flowByKey.get(ref.machineKey)
+        assert(flow, `${chain.key}/${step.key}/${ref.machineKey}`)
+        assert(
+          flow.transitions.some(
+            (transition) => transition.key === ref.transitionKey
+          ),
+          `${chain.key}/${step.key}/${ref.transitionKey}`
+        )
+      }
+      for (const ref of step.processNodeRefs) {
+        const definition = processByKey.get(ref.processDefinitionKey)
+        assert(
+          definition,
+          `${chain.key}/${step.key}/${ref.processDefinitionKey}`
+        )
+        assert(
+          definition.nodes.some((node) => node.key === ref.nodeKey),
+          `${chain.key}/${step.key}/${ref.nodeKey}`
+        )
+      }
+      step.factKeys.forEach((factKey) =>
+        assert(factKeys.has(factKey), `${chain.key}/${step.key}/${factKey}`)
+      )
+      if (step.responsibility.mode === 'human') {
+        assert(
+          step.responsibility.ownerPoolKeys.length > 0 ||
+            step.responsibility.capabilityKeys.length > 0,
+          `${chain.key}/${step.key} human responsibility`
+        )
+        const matchingRoles = roleProfiles.filter(
+          (role) =>
+            role.ownerPools.some((key) =>
+              step.responsibility.ownerPoolKeys.includes(key)
+            ) ||
+            role.capabilityKeys.some((key) =>
+              step.responsibility.capabilityKeys.includes(key)
+            )
+        )
+        assert(
+          matchingRoles.length > 0,
+          `${chain.key}/${step.key} has no yoyoosun role projection`
+        )
+      }
+    }
+
+    for (const scenario of chain.acceptanceScenarios) {
+      assert.equal(scenario.readOnly, true, scenario.key)
+      assert.equal(scenario.allowsActionExecution, false, scenario.key)
+      assert(scenario.stepKeys.length > 0, `${scenario.key} steps`)
+      assert(
+        scenario.stepKeys.every((key) => edgeKeys.has(key)),
+        `${scenario.key} step coverage`
+      )
+      assert(
+        scenario.evidenceModes.every((mode) =>
+          DEV_BUSINESS_CHAIN_EVIDENCE_MODES.includes(mode)
+        ),
+        `${scenario.key} evidence modes`
+      )
+      assert(
+        scenario.dataStageKeys.every((key) =>
+          DEV_BUSINESS_CHAIN_DATA_STAGE_KEYS.includes(key)
+        ),
+        `${scenario.key} data stages`
+      )
+      if (
+        scenario.responsibilityRefs.some(
+          (responsibility) => responsibility.mode === 'human'
+        )
+      ) {
+        assert(
+          scenario.dataStageKeys.includes('role'),
+          `${scenario.key} human role stage`
+        )
+      }
+      if (
+        ['unauthorized', 'wrong_state', 'idempotency'].includes(scenario.kind)
+      ) {
+        assert.equal(scenario.stepKeys.length, 1, scenario.key)
+      }
     }
   }
 })

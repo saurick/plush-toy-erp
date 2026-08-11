@@ -1,5 +1,12 @@
+import {
+  DEV_BUSINESS_CHAIN_DATA_STAGE_KEYS,
+  DEV_BUSINESS_CHAIN_EVIDENCE_MODES,
+  DEV_BUSINESS_CHAIN_SCENARIO_KINDS,
+  DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS,
+} from './devBusinessChainStepContracts.mjs'
+
 export const DEV_BUSINESS_CHAIN_CATALOG_VERSION =
-  'dev-business-chain-catalog/v1'
+  'dev-business-chain-catalog/v2'
 
 export const DEV_BUSINESS_CHAIN_OVERVIEW_KEY = 'all'
 
@@ -62,6 +69,11 @@ const CHAIN_KIND_SET = new Set(DEV_BUSINESS_CHAIN_KINDS)
 const CHAIN_LAYER_SET = new Set(DEV_BUSINESS_CHAIN_LAYERS)
 const EDGE_KIND_SET = new Set(DEV_BUSINESS_CHAIN_EDGE_KINDS)
 const RELATION_KIND_SET = new Set(DEV_BUSINESS_CHAIN_RELATION_KINDS)
+const SCENARIO_KIND_SET = new Set(DEV_BUSINESS_CHAIN_SCENARIO_KINDS)
+const EVIDENCE_MODE_SET = new Set(DEV_BUSINESS_CHAIN_EVIDENCE_MODES)
+const DATA_STAGE_KEY_SET = new Set(DEV_BUSINESS_CHAIN_DATA_STAGE_KEYS)
+const RESPONSIBILITY_MODE_SET = new Set(['human', 'system', 'derived'])
+const STATE_REF_PHASE_SET = new Set(['precondition', 'result'])
 
 const ARCHITECTURE_REF = 'docs/architecture/业务链与运行轨迹边界.md'
 const WORKFLOW_MAP_REF = 'docs/workflow/业务与协同流程地图.md'
@@ -72,6 +84,16 @@ const PROCESS_RUNTIME_REF = 'server/internal/biz/process_runtime.go'
 const uniqueStrings = (values) =>
   Object.freeze([
     ...new Set((Array.isArray(values) ? values : []).filter(Boolean)),
+  ])
+
+const uniqueBy = (values, keyOf) =>
+  Object.freeze([
+    ...new Map(
+      (Array.isArray(values) ? values : []).map((value) => [
+        keyOf(value),
+        value,
+      ])
+    ).values(),
   ])
 
 const chainNode = (key, label, layer, options = {}) => ({
@@ -1696,6 +1718,371 @@ function normalizeEdge(rawEdge, chainSourceRefs, nodeKeys) {
   return Object.freeze({ ...rawEdge, sourceRefs, readOnly: true })
 }
 
+function resolveStateRef(rawRef, flowByKey) {
+  const flow = flowByKey.get(rawRef?.machineKey)
+  if (!flow || !STATE_REF_PHASE_SET.has(rawRef?.phase)) {
+    throw new Error('business chain step references an invalid state')
+  }
+  const stateDefinition = flow.states.find(
+    (candidate) => candidate.key === rawRef.stateKey
+  )
+  if (!stateDefinition) {
+    throw new Error(
+      `business chain step references unknown state ${rawRef.machineKey}/${rawRef.stateKey}`
+    )
+  }
+  return Object.freeze({
+    machineKey: rawRef.machineKey,
+    stateKey: rawRef.stateKey,
+    phase: rawRef.phase,
+    label: stateDefinition.label,
+  })
+}
+
+function resolveTransitionRef(rawRef, flowByKey) {
+  const flow = flowByKey.get(rawRef?.machineKey)
+  const transition = flow?.transitions.find(
+    (candidate) => candidate.key === rawRef?.transitionKey
+  )
+  if (!flow || !transition) {
+    throw new Error(
+      `business chain step references unknown transition ${rawRef?.machineKey || 'missing'}/${rawRef?.transitionKey || 'missing'}`
+    )
+  }
+  return Object.freeze({
+    machineKey: rawRef.machineKey,
+    transitionKey: rawRef.transitionKey,
+    from: transition.from,
+    to: transition.to,
+    actionKey: transition.action,
+    capabilityKeys: uniqueStrings(transition.permission),
+    factBoundary: transition.factBoundary,
+    pathKinds: uniqueStrings(transition.pathKinds),
+  })
+}
+
+function resolveProcessNodeRef(rawRef, processByKey) {
+  const definition = processByKey.get(rawRef?.processDefinitionKey)
+  const node = definition?.nodes.find(
+    (candidate) => candidate.key === rawRef?.nodeKey
+  )
+  if (!definition || !node) {
+    throw new Error(
+      `business chain step references unknown process node ${rawRef?.processDefinitionKey || 'missing'}/${rawRef?.nodeKey || 'missing'}`
+    )
+  }
+  return Object.freeze({
+    processDefinitionKey: rawRef.processDefinitionKey,
+    processKey: definition.processKey,
+    nodeKey: rawRef.nodeKey,
+    ownerPoolKey: node.ownerPool || '',
+    actionKey: node.action || '',
+    capabilityKeys: uniqueStrings(node.permission),
+    factBoundary: node.factBoundary,
+  })
+}
+
+function transitionStateRef(ref, phase) {
+  return Object.freeze({
+    machineKey: ref.machineKey,
+    stateKey: phase === 'precondition' ? ref.from : ref.to,
+    phase,
+  })
+}
+
+function normalizeStepContract({
+  chainDefinition,
+  edge,
+  nodeByKey,
+  rawStep,
+  flowByKey,
+  processByKey,
+  factKeys,
+}) {
+  if (!rawStep || !RESPONSIBILITY_MODE_SET.has(rawStep.responsibilityMode)) {
+    throw new Error(`${chainDefinition.key}/${edge.key} has no step contract`)
+  }
+  const stateTransitionRefs = uniqueBy(
+    (rawStep.stateTransitionRefs || []).map((ref) =>
+      resolveTransitionRef(ref, flowByKey)
+    ),
+    (ref) => `${ref.machineKey}/${ref.transitionKey}`
+  )
+  const declaredStateRefs = uniqueBy(
+    (rawStep.stateRefs || []).map((ref) => resolveStateRef(ref, flowByKey)),
+    (ref) => `${ref.machineKey}/${ref.stateKey}/${ref.phase}`
+  )
+  const processNodeRefs = uniqueBy(
+    (rawStep.processNodeRefs || []).map((ref) =>
+      resolveProcessNodeRef(ref, processByKey)
+    ),
+    (ref) => `${ref.processDefinitionKey}/${ref.nodeKey}`
+  )
+  const fromNode = nodeByKey.get(edge.from)
+  const toNode = nodeByKey.get(edge.to)
+  const ownerPoolKeys = uniqueStrings([
+    ...(rawStep.ownerPoolKeys || []),
+    ...fromNode.responsibleRoleKeys,
+    ...toNode.responsibleRoleKeys,
+    ...processNodeRefs.map((ref) => ref.ownerPoolKey),
+  ])
+  const capabilityKeys = uniqueStrings([
+    ...(rawStep.capabilityKeys || []),
+    ...stateTransitionRefs.flatMap((ref) => ref.capabilityKeys),
+    ...processNodeRefs.flatMap((ref) => ref.capabilityKeys),
+  ])
+  if (
+    rawStep.responsibilityMode === 'human' &&
+    ownerPoolKeys.length === 0 &&
+    capabilityKeys.length === 0
+  ) {
+    throw new Error(
+      `${chainDefinition.key}/${edge.key} has an unresolved human responsibility`
+    )
+  }
+  const referencedFactKeys = uniqueStrings([
+    ...fromNode.factKeys,
+    ...toNode.factKeys,
+  ])
+  const unknownFactKeys = referencedFactKeys.filter((key) => !factKeys.has(key))
+  if (unknownFactKeys.length > 0) {
+    throw new Error(
+      `${chainDefinition.key}/${edge.key} references unknown facts: ${unknownFactKeys.join(', ')}`
+    )
+  }
+  const preconditionStateRefs = uniqueBy(
+    [
+      ...stateTransitionRefs.map((ref) =>
+        transitionStateRef(ref, 'precondition')
+      ),
+      ...declaredStateRefs.filter((ref) => ref.phase === 'precondition'),
+    ],
+    (ref) => `${ref.machineKey}/${ref.stateKey}`
+  )
+  const resultStateRefs = uniqueBy(
+    [
+      ...stateTransitionRefs.map((ref) => transitionStateRef(ref, 'result')),
+      ...declaredStateRefs.filter((ref) => ref.phase === 'result'),
+    ],
+    (ref) => `${ref.machineKey}/${ref.stateKey}`
+  )
+  if (
+    preconditionStateRefs.length === 0 &&
+    resultStateRefs.length === 0 &&
+    processNodeRefs.length === 0 &&
+    referencedFactKeys.length === 0
+  ) {
+    throw new Error(
+      `${chainDefinition.key}/${edge.key} does not bind a state, process node, or Fact`
+    )
+  }
+  const actionRefs = uniqueBy(
+    [
+      ...stateTransitionRefs
+        .filter((ref) => ref.actionKey)
+        .map((ref) =>
+          Object.freeze({
+            kind: 'state_transition',
+            key: ref.actionKey,
+            authorityKey: `${ref.machineKey}/${ref.transitionKey}`,
+          })
+        ),
+      ...processNodeRefs
+        .filter((ref) => ref.actionKey)
+        .map((ref) =>
+          Object.freeze({
+            kind: 'process_node',
+            key: ref.actionKey,
+            authorityKey: `${ref.processDefinitionKey}/${ref.nodeKey}`,
+          })
+        ),
+      Object.freeze({
+        kind: 'chain_relation',
+        key: edge.action,
+        authorityKey: edge.key,
+      }),
+    ],
+    (ref) => `${ref.kind}/${ref.authorityKey}/${ref.key}`
+  )
+  return {
+    key: edge.key,
+    edgeKey: edge.key,
+    fromNodeKey: edge.from,
+    toNodeKey: edge.to,
+    label: edge.label,
+    responsibility: Object.freeze({
+      mode: rawStep.responsibilityMode,
+      ownerPoolKeys,
+      capabilityKeys,
+    }),
+    preconditionStateRefs,
+    stateTransitionRefs,
+    processNodeRefs,
+    actionRefs,
+    resultStateRefs,
+    factKeys: referencedFactKeys,
+    factBoundary: edge.factBoundary,
+    sourceRefs: edge.sourceRefs,
+    readOnly: true,
+    allowsActionExecution: false,
+  }
+}
+
+const SCENARIO_META = Object.freeze({
+  happy_path: Object.freeze({
+    label: '正常主路径',
+    expectedOutcome: 'succeeds_and_reads_back',
+  }),
+  interruption_recovery: Object.freeze({
+    label: '阻塞、退回与恢复',
+    expectedOutcome: 'registered_interruption_then_recovery',
+  }),
+  unauthorized: Object.freeze({
+    label: '无权限',
+    expectedOutcome: 'rejected_without_side_effect',
+  }),
+  wrong_state: Object.freeze({
+    label: '错误状态',
+    expectedOutcome: 'rejected_without_side_effect',
+  }),
+  correction: Object.freeze({
+    label: '取消、调整或冲正',
+    expectedOutcome: 'correction_applied_with_audit',
+  }),
+  idempotency: Object.freeze({
+    label: '重复提交与幂等',
+    expectedOutcome: 'same_intent_replays_original_result',
+  }),
+})
+
+function scenarioStepKeys(profile, kind) {
+  if (kind === 'happy_path') return profile.happyStepKeys
+  if (kind === 'interruption_recovery') return profile.interruptionStepKeys
+  if (kind === 'correction') return profile.correctionStepKeys
+  if (kind === 'unauthorized') return [profile.protectedStepKey]
+  if (kind === 'wrong_state') return [profile.wrongStateStepKey]
+  return [profile.idempotentStepKey]
+}
+
+function scenarioExtraTransitionRefs(profile, kind, flowByKey) {
+  const rawRefs =
+    kind === 'interruption_recovery'
+      ? profile.interruptionTransitionRefs
+      : kind === 'correction'
+        ? profile.correctionTransitionRefs
+        : []
+  return rawRefs.map((ref) => resolveTransitionRef(ref, flowByKey))
+}
+
+function buildAcceptanceScenarios({
+  chainDefinition,
+  steps,
+  profile,
+  flowByKey,
+}) {
+  if (
+    !profile ||
+    !Array.isArray(profile.sourceRefs) ||
+    profile.sourceRefs.length === 0
+  ) {
+    throw new Error(`${chainDefinition.key} has no acceptance scenario profile`)
+  }
+  const stepByKey = new Map(steps.map((item) => [item.key, item]))
+  const browserKinds = new Set(profile.browserScenarioKinds || [])
+  const scenarios = DEV_BUSINESS_CHAIN_SCENARIO_KINDS.map((kind) => {
+    const meta = SCENARIO_META[kind]
+    const stepKeys = uniqueStrings(scenarioStepKeys(profile, kind))
+    if (stepKeys.length === 0 || stepKeys.some((key) => !stepByKey.has(key))) {
+      throw new Error(`${chainDefinition.key}/${kind} references unknown steps`)
+    }
+    const selectedSteps = stepKeys.map((key) => stepByKey.get(key))
+    const stateTransitionRefs = uniqueBy(
+      [
+        ...selectedSteps.flatMap((item) => item.stateTransitionRefs),
+        ...scenarioExtraTransitionRefs(profile, kind, flowByKey),
+      ],
+      (ref) => `${ref.machineKey}/${ref.transitionKey}`
+    )
+    const processNodeRefs = uniqueBy(
+      selectedSteps.flatMap((item) => item.processNodeRefs),
+      (ref) => `${ref.processDefinitionKey}/${ref.nodeKey}`
+    )
+    const evidenceModes = uniqueStrings([
+      'contract_test',
+      ...(kind === 'happy_path' || kind === 'correction' ? ['dataset'] : []),
+      ...(browserKinds.has(kind) ? ['browser'] : []),
+    ])
+    if (evidenceModes.some((mode) => !EVIDENCE_MODE_SET.has(mode))) {
+      throw new Error(
+        `${chainDefinition.key}/${kind} has an unknown evidence mode`
+      )
+    }
+    const dataStageKeys = uniqueStrings([
+      ...profile.dataStageKeys,
+      ...(selectedSteps.some((step) => step.responsibility.mode === 'human')
+        ? ['role']
+        : []),
+    ])
+    if (dataStageKeys.some((key) => !DATA_STAGE_KEY_SET.has(key))) {
+      throw new Error(
+        `${chainDefinition.key}/${kind} has an unknown data stage`
+      )
+    }
+    return Object.freeze({
+      key: `${chainDefinition.key}.${kind}`,
+      chainKey: chainDefinition.key,
+      kind,
+      label: meta.label,
+      expectedOutcome: meta.expectedOutcome,
+      stepKeys,
+      interruptionKinds:
+        kind === 'interruption_recovery'
+          ? uniqueStrings(profile.interruptionKinds)
+          : Object.freeze([]),
+      responsibilityRefs: Object.freeze(
+        selectedSteps.map((item) => item.responsibility)
+      ),
+      stateTransitionRefs,
+      processNodeRefs,
+      factKeys: uniqueStrings(selectedSteps.flatMap((item) => item.factKeys)),
+      evidenceModes,
+      dataStageKeys,
+      sourceRefs: uniqueStrings([
+        ...chainDefinition.sourceRefs,
+        ...profile.sourceRefs,
+      ]),
+      readOnly: true,
+      allowsActionExecution: false,
+    })
+  })
+  if (
+    scenarios.length !== SCENARIO_KIND_SET.size ||
+    scenarios.some((scenario) => !SCENARIO_KIND_SET.has(scenario.kind))
+  ) {
+    throw new Error(
+      `${chainDefinition.key} has incomplete acceptance scenarios`
+    )
+  }
+  const scenarioCoveredStepKeys = new Set(
+    scenarios
+      .filter((scenario) =>
+        ['happy_path', 'interruption_recovery', 'correction'].includes(
+          scenario.kind
+        )
+      )
+      .flatMap((scenario) => scenario.stepKeys)
+  )
+  const uncoveredStepKeys = steps
+    .map((item) => item.key)
+    .filter((key) => !scenarioCoveredStepKeys.has(key))
+  if (uncoveredStepKeys.length > 0) {
+    throw new Error(
+      `${chainDefinition.key} has steps outside registered paths: ${uncoveredStepKeys.join(', ')}`
+    )
+  }
+  return Object.freeze(scenarios)
+}
+
 function assertReachable(chainDefinition) {
   const reachable = new Set(chainDefinition.entryNodeKeys)
   const pending = [...chainDefinition.entryNodeKeys]
@@ -1718,7 +2105,7 @@ function assertReachable(chainDefinition) {
   }
 }
 
-function normalizeChain(rawChain, flowKeys, processByKey, factKeys) {
+function normalizeChain(rawChain, flowByKey, processByKey, factKeys) {
   if (
     !rawChain?.key ||
     !rawChain?.label ||
@@ -1734,7 +2121,13 @@ function normalizeChain(rawChain, flowKeys, processByKey, factKeys) {
   ])
   const nodes = Object.freeze(
     rawChain.nodes.map((node) =>
-      normalizeNode(node, sourceRefs, flowKeys, processByKey, factKeys)
+      normalizeNode(
+        node,
+        sourceRefs,
+        new Set(flowByKey.keys()),
+        processByKey,
+        factKeys
+      )
     )
   )
   const nodeKeys = new Set(nodes.map((node) => node.key))
@@ -1748,17 +2141,81 @@ function normalizeChain(rawChain, flowKeys, processByKey, factKeys) {
   ) {
     throw new Error(`${rawChain.key} has an invalid entry node`)
   }
-  const edges = Object.freeze(
+  const normalizedEdges = Object.freeze(
     rawChain.edges.map((edge) => normalizeEdge(edge, sourceRefs, nodeKeys))
   )
-  if (new Set(edges.map((edge) => edge.key)).size !== edges.length) {
+  if (
+    new Set(normalizedEdges.map((edge) => edge.key)).size !==
+    normalizedEdges.length
+  ) {
     throw new Error(`${rawChain.key} has duplicate edge keys`)
   }
+  const contractDefinition =
+    DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS[rawChain.key]
+  const rawSteps = contractDefinition?.steps || {}
+  const rawStepKeys = Object.keys(rawSteps)
+  const edgeKeys = normalizedEdges.map((edge) => edge.key)
+  const missingStepKeys = edgeKeys.filter((key) => !rawStepKeys.includes(key))
+  const unknownStepKeys = rawStepKeys.filter((key) => !edgeKeys.includes(key))
+  if (missingStepKeys.length > 0 || unknownStepKeys.length > 0) {
+    throw new Error(
+      `${rawChain.key} step contract mismatch: missing=${missingStepKeys.join(',')}; unknown=${unknownStepKeys.join(',')}`
+    )
+  }
+  const nodeByKey = new Map(nodes.map((node) => [node.key, node]))
+  const baseSteps = normalizedEdges.map((edge) =>
+    normalizeStepContract({
+      chainDefinition: { ...rawChain, sourceRefs },
+      edge,
+      nodeByKey,
+      rawStep: rawSteps[edge.key],
+      flowByKey,
+      processByKey,
+      factKeys,
+    })
+  )
+  const acceptanceScenarios = buildAcceptanceScenarios({
+    chainDefinition: { ...rawChain, sourceRefs },
+    steps: baseSteps,
+    profile: contractDefinition?.profile,
+    flowByKey,
+  })
+  const scenarioKeysByStep = new Map(
+    baseSteps.map((stepDefinition) => [
+      stepDefinition.key,
+      acceptanceScenarios
+        .filter((scenario) => scenario.stepKeys.includes(stepDefinition.key))
+        .map((scenario) => scenario.key),
+    ])
+  )
+  const steps = Object.freeze(
+    baseSteps.map((stepDefinition) =>
+      Object.freeze({
+        ...stepDefinition,
+        scenarioKeys: Object.freeze([
+          ...(scenarioKeysByStep.get(stepDefinition.key) || []),
+        ]),
+      })
+    )
+  )
+  const edges = Object.freeze(
+    normalizedEdges.map((edge) =>
+      Object.freeze({
+        ...edge,
+        stepKey: edge.key,
+        scenarioKeys: Object.freeze([
+          ...(scenarioKeysByStep.get(edge.key) || []),
+        ]),
+      })
+    )
+  )
   const normalized = Object.freeze({
     ...rawChain,
     entryNodeKeys,
     nodes,
     edges,
+    steps,
+    acceptanceScenarios,
     sourceRefs,
     readOnly: true,
     allowsActionExecution: false,
@@ -1780,7 +2237,8 @@ export function buildDevBusinessChainCatalog({
   const safeFactDefinitions = Array.isArray(factDefinitions)
     ? factDefinitions
     : []
-  const flowKeys = new Set(safeFlows.map((flow) => flow.key))
+  const flowByKey = new Map(safeFlows.map((flow) => [flow.key, flow]))
+  const flowKeys = new Set(flowByKey.keys())
   const processByKey = new Map(
     safeProcessDefinitions.map((definition) => [definition.key, definition])
   )
@@ -1789,6 +2247,19 @@ export function buildDevBusinessChainCatalog({
   )
   if (factKeys.size !== safeFactDefinitions.length) {
     throw new Error('business chain received duplicate fact definitions')
+  }
+  const definitionKeys = BUSINESS_CHAIN_DEFINITIONS.map((item) => item.key)
+  const contractKeys = Object.keys(DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS)
+  const missingContractKeys = definitionKeys.filter(
+    (key) => !contractKeys.includes(key)
+  )
+  const unknownContractKeys = contractKeys.filter(
+    (key) => !definitionKeys.includes(key)
+  )
+  if (missingContractKeys.length > 0 || unknownContractKeys.length > 0) {
+    throw new Error(
+      `business chain step contract coverage mismatch: missing=${missingContractKeys.join(',')}; unknown=${unknownContractKeys.join(',')}`
+    )
   }
   const unknownExclusions = Object.keys(
     DEV_BUSINESS_CHAIN_CROSS_CUTTING_EXCLUSIONS
@@ -1800,7 +2271,7 @@ export function buildDevBusinessChainCatalog({
   }
   const chains = Object.freeze(
     BUSINESS_CHAIN_DEFINITIONS.map((definition) =>
-      normalizeChain(definition, flowKeys, processByKey, factKeys)
+      normalizeChain(definition, flowByKey, processByKey, factKeys)
     )
   )
   if (new Set(chains.map((item) => item.key)).size !== chains.length) {
@@ -1863,6 +2334,24 @@ export function buildDevBusinessChainCatalog({
     )
   }
 
+  const scenarioKeys = uniqueStrings(
+    chains.flatMap((item) =>
+      item.acceptanceScenarios.map((scenario) => scenario.key)
+    )
+  )
+  const stepKeys = uniqueStrings(
+    chains.flatMap((item) =>
+      item.steps.map((stepDefinition) => `${item.key}/${stepDefinition.key}`)
+    )
+  )
+  const expectedScenarioCount =
+    chains.length * DEV_BUSINESS_CHAIN_SCENARIO_KINDS.length
+  if (scenarioKeys.length !== expectedScenarioCount) {
+    throw new Error(
+      `business chain acceptance scenarios are incomplete: expected=${expectedScenarioCount}; actual=${scenarioKeys.length}`
+    )
+  }
+
   return Object.freeze({
     version: DEV_BUSINESS_CHAIN_CATALOG_VERSION,
     readOnly: true,
@@ -1886,6 +2375,13 @@ export function buildDevBusinessChainCatalog({
       coveredProcessDefinitionKeys,
       requiredFactKeys,
       coveredFactKeys,
+      stepContractComplete: true,
+      stepCount: stepKeys.length,
+      scenarioContractComplete: true,
+      scenarioCount: scenarioKeys.length,
+      scenarioKinds: DEV_BUSINESS_CHAIN_SCENARIO_KINDS,
+      evidenceModes: DEV_BUSINESS_CHAIN_EVIDENCE_MODES,
+      dataStageKeys: DEV_BUSINESS_CHAIN_DATA_STAGE_KEYS,
     }),
   })
 }

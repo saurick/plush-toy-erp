@@ -793,6 +793,7 @@ export async function installOrderRpcMocks(page, context) {
     list_production_orders: new Set([
       'keyword',
       'status',
+      'lifecycle_scope',
       'date_field',
       'date_from',
       'date_to',

@@ -162,7 +162,7 @@ const desktopAccounts = [
       '任务看板',
       '业务看板',
       '客户档案',
-      '供应商档案',
+      '供应商与加工厂',
       '销售订单',
       '采购订单',
       '模板打印中心',
@@ -1192,11 +1192,7 @@ async function findVisibleMenuItem(page, label) {
   ) {
     await openMoreFunctions()
   }
-  assert.equal(
-    await item.count(),
-    1,
-    `左侧菜单必须且只能有一个“${label}”入口`
-  )
+  assert.equal(await item.count(), 1, `左侧菜单必须且只能有一个“${label}”入口`)
   const parentSubmenu = item.locator(
     'xpath=ancestor::li[contains(concat(" ", normalize-space(@class), " "), " ant-menu-submenu ")][1]'
   )
@@ -1521,12 +1517,10 @@ async function verifyMobileDeniedAccount(browser) {
         url.searchParams.get('reason') === 'mobile-role-unassigned',
       { timeout: 15_000 }
     )
-    await page
-      .getByText('当前账号未分配业务岗位', { exact: true })
-      .waitFor({
-        state: 'visible',
-        timeout: 15_000,
-      })
+    await page.getByText('当前账号未分配业务岗位', { exact: true }).waitFor({
+      state: 'visible',
+      timeout: 15_000,
+    })
     await page
       .getByText(
         '手机待办只向明确分配的业务岗位开放。您可以进入电脑端后台，或联系管理员分配业务岗位。',

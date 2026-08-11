@@ -163,6 +163,34 @@
   background: var(--erp-surface-bg, #fff);
 }
 
+.erp-dev-flow-chain-projection-context {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--erp-primary, #2b8a3e) 28%, white);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--erp-primary, #2b8a3e) 7%, white);
+}
+
+.erp-dev-flow-chain-projection-context > div:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.erp-dev-flow-chain-projection-context > div:first-child > span:last-child {
+  color: var(--erp-text-muted, #647067);
+  font-size: 12px;
+}
+
+.erp-dev-flow-chain-projection-context > .ant-space {
+  flex: 0 1 auto;
+  justify-content: flex-end;
+}
+
 .erp-dev-flow-memory article > .anticon {
   flex: 0 0 auto;
   margin-top: 2px;
@@ -2362,6 +2390,15 @@
 @media (max-width: 760px) {
   .erp-dev-flow-state-page {
     padding: 10px;
+  }
+
+  .erp-dev-flow-chain-projection-context {
+    display: grid;
+    align-items: stretch;
+  }
+
+  .erp-dev-flow-chain-projection-context > .ant-space {
+    justify-content: flex-start;
   }
 
   .erp-dev-flow-header {

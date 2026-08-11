@@ -3,6 +3,7 @@ import { CopyOutlined, DeleteOutlined } from '@ant-design/icons'
 import { Button, Form, Input, Select, Space } from 'antd'
 
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
+import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
 import FieldWithUnitSuffix, {
   isQuantityTextWithinUnitPrecision,
   unitPrecisionErrorMessage,
@@ -209,6 +210,7 @@ export function PurchaseOrderFormFields({
       <Form.Item name="supplier_snapshot" hidden>
         <Input />
       </Form.Item>
+      <BusinessFormSectionTitle>订单与供应商</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field"
         name="purchase_order_no"
@@ -275,9 +277,7 @@ export function PurchaseOrderFormFields({
           }
         />
       </Form.Item>
-      <div className="erp-business-action-form__section-title">
-        合同订购方信息
-      </div>
+      <BusinessFormSectionTitle>合同订购方信息</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field"
         name={['contract_party_snapshot', 'buyerCompany']}
@@ -313,6 +313,7 @@ export function PurchaseOrderFormFields({
       >
         <Input maxLength={64} />
       </Form.Item>
+      <BusinessFormSectionTitle>备注与附件</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field erp-business-action-form__field--full"
         name="note"

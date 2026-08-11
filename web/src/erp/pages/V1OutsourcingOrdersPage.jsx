@@ -7,7 +7,7 @@ import {
   PrinterOutlined,
   SettingOutlined,
 } from '@ant-design/icons'
-import { Button, Form, Input, Space, Tag } from 'antd'
+import { Alert, Button, Descriptions, Form, Input, Space, Tag } from 'antd'
 import {
   useNavigate,
   useOutletContext,
@@ -108,6 +108,7 @@ import {
   buildOutsourcingOrderSubjectSwitchValues,
   buildOutsourcingOrderItemParams,
   buildOutsourcingOrderParams,
+  buildOutsourcingSupplierSnapshot,
   buildSequentialDraftCode,
   contractPartySnapshotFromPrintTemplateDefaults,
   createBlankOutsourcingLine,
@@ -158,10 +159,8 @@ import {
   WORK_INSTRUCTION_TEMPLATE_KEY,
   buildWorkInstructionDraftFromOutsourcingOrder,
 } from '../data/engineeringPrintTemplates.mjs'
-import {
-  completeProcessingContractDraft,
-  mergeSnapshotMissingFields,
-} from '../utils/contractPrintDraftCompleteness.mjs'
+import { completeProcessingContractDraft } from '../utils/contractPrintDraftCompleteness.mjs'
+import { loadBusinessAttachmentPrintAppendixSnapshots } from '../utils/businessAttachmentPrintAppendix.mjs'
 import {
   DEFAULT_OUTSOURCING_ORDER_PAGINATION,
   OUTSOURCING_ORDER_DATE_FILTER_OPTIONS,
@@ -211,6 +210,10 @@ import {
   relatedDocumentRoute,
 } from '../utils/relatedDocumentNavigation.mjs'
 import { resolveExactRecordPage } from '../utils/businessPagination.mjs'
+import {
+  buildOutsourcingContractConfirmationSummary,
+  inspectOutsourcingContractReadiness,
+} from '../utils/outsourcingContractReadiness.mjs'
 import {
   LIFECYCLE_SCOPE,
   filterLifecycleStatusOptions,
@@ -279,6 +282,9 @@ export default function V1OutsourcingOrdersPage() {
   const [detailOrder, setDetailOrder] = useState(null)
   const orderAttachmentRef = useRef(null)
   const [suppliers, setSuppliers] = useState([])
+  const [supplierContacts, setSupplierContacts] = useState([])
+  const [supplierContactsLoading, setSupplierContactsLoading] = useState(false)
+  const supplierContactsRequestRef = useRef(0)
   const [products, setProducts] = useState([])
   const [productSKUs, setProductSKUs] = useState([])
   const [materials, setMaterials] = useState([])
@@ -445,7 +451,10 @@ export default function V1OutsourcingOrdersPage() {
         unitData,
         warehouseData,
       ] = await Promise.all([
-        listAllSuppliers({ active_only: true }),
+        listAllSuppliers({
+          active_only: true,
+          supplier_types: ['outsourcing', 'mixed'],
+        }),
         listAllProducts({ active_only: true }),
         listAllProductSKUs(),
         listAllMaterials({ active_only: true }),
@@ -1729,6 +1738,7 @@ export default function V1OutsourcingOrdersPage() {
         field: 'outsourcing_order_no',
       }),
       supplier_id: undefined,
+      supplier_snapshot: {},
       source_order_no: '',
       order_date: todayInputValue(),
       expected_return_date: '',
@@ -1739,6 +1749,7 @@ export default function V1OutsourcingOrdersPage() {
       note: '',
       items: [createBlankOutsourcingLine(1)],
     })
+    setSupplierContacts([])
     setModalOpen(true)
   }
 
@@ -1776,6 +1787,7 @@ export default function V1OutsourcingOrdersPage() {
                     )
                   : [createBlankOutsourcingLine(1)],
             })
+            loadSupplierContacts(record.supplier_id)
             setModalOpen(true)
           },
         }),
@@ -1821,6 +1833,7 @@ export default function V1OutsourcingOrdersPage() {
     orderAttachmentRef.current?.clearPendingAttachments()
     setModalOpen(false)
     setEditingRow(null)
+    setSupplierContacts([])
     form.resetFields()
   }
 
@@ -1927,6 +1940,21 @@ export default function V1OutsourcingOrdersPage() {
       ['items', fieldName, 'process_category_snapshot'],
       process.category || ''
     )
+    const supplierID = Number(form.getFieldValue('supplier_id') || 0)
+    const supplier = suppliers.find(
+      (item) => Number(item?.id || 0) === supplierID
+    )
+    const capabilityIDs = Array.isArray(supplier?.process_ids)
+      ? supplier.process_ids.map(Number)
+      : []
+    if (
+      capabilityIDs.length > 0 &&
+      !capabilityIDs.includes(Number(processID))
+    ) {
+      message.warning(
+        `“${supplier?.short_name || supplier?.name || '当前加工厂'}”档案中未登记“${process.name}”能力，请核对后再继续；本提示不会阻止保存。`
+      )
+    }
   }
 
   const handleUnitChange = (fieldName, unitID) => {
@@ -1946,43 +1974,84 @@ export default function V1OutsourcingOrdersPage() {
     })
   }
 
-  const resolveSupplierSnapshot = useCallback(
-    async (supplier, options = {}) => {
-      const baseSnapshot = buildSupplierSnapshot(supplier)
-      if (!supplier?.id) {
-        return baseSnapshot
+  const loadSupplierContacts = useCallback(async (supplierID) => {
+    const requestID = supplierContactsRequestRef.current + 1
+    supplierContactsRequestRef.current = requestID
+    if (!Number(supplierID || 0)) {
+      setSupplierContacts([])
+      setSupplierContactsLoading(false)
+      return []
+    }
+    setSupplierContactsLoading(true)
+    try {
+      const data = await listAllContactsByOwner({
+        owner_type: SUPPLIER_CONTACT_OWNER_TYPE,
+        owner_id: supplierID,
+        active_only: true,
+      })
+      const contacts = Array.isArray(data?.contacts) ? data.contacts : []
+      if (supplierContactsRequestRef.current === requestID) {
+        setSupplierContacts(contacts)
       }
-      try {
-        const data = await listAllContactsByOwner({
-          owner_type: SUPPLIER_CONTACT_OWNER_TYPE,
-          owner_id: supplier.id,
-          active_only: true,
-        })
-        return buildSupplierSnapshotWithContacts(supplier, data?.contacts || [])
-      } catch (error) {
-        if (options.notifyOnError) {
-          message.warning(
-            `${getActionErrorMessage(error, '加载加工厂联系人')}，将仅保存加工厂基本信息`
-          )
-        }
-        return baseSnapshot
+      return contacts
+    } catch (error) {
+      if (supplierContactsRequestRef.current === requestID) {
+        setSupplierContacts([])
+        message.warning(getActionErrorMessage(error, '加载加工厂联系人'))
       }
-    },
-    []
-  )
+      return []
+    } finally {
+      if (supplierContactsRequestRef.current === requestID) {
+        setSupplierContactsLoading(false)
+      }
+    }
+  }, [])
 
   const handleSupplierChange = (supplierID) => {
     const supplier = suppliers.find((item) => item.id === supplierID)
     form.setFieldValue('supplier_snapshot', buildSupplierSnapshot(supplier))
-    resolveSupplierSnapshot(supplier).then((snapshot) => {
+    setSupplierContacts([])
+    loadSupplierContacts(supplierID).then((contacts) => {
       if (
         String(form.getFieldValue('supplier_id') ?? '') !==
         String(supplierID ?? '')
       ) {
         return
       }
-      form.setFieldValue('supplier_snapshot', snapshot)
+      form.setFieldValue(
+        'supplier_snapshot',
+        buildSupplierSnapshotWithContacts(supplier, contacts)
+      )
     })
+  }
+
+  const handleSupplierContactNameChange = () => {
+    form.setFields([
+      { name: ['supplier_snapshot', 'contact_id'], value: undefined },
+      { name: ['supplier_snapshot', 'contact_phone'], value: '' },
+      { name: ['supplier_snapshot', 'contact_mobile'], value: '' },
+    ])
+  }
+
+  const handleSupplierContactSelect = (contact) => {
+    form.setFields([
+      {
+        name: ['supplier_snapshot', 'contact_id'],
+        value: Number(contact?.id || 0) || undefined,
+      },
+      {
+        name: ['supplier_snapshot', 'contact_name'],
+        value: contact?.name || '',
+      },
+      {
+        name: ['supplier_snapshot', 'contact_phone'],
+        value: contact?.phone || contact?.mobile || '',
+      },
+      {
+        name: ['supplier_snapshot', 'contact_mobile'],
+        value: contact?.mobile || '',
+      },
+    ])
   }
 
   const submitForm = async () => {
@@ -1995,9 +2064,10 @@ export default function V1OutsourcingOrdersPage() {
         const supplier = suppliers.find(
           (item) => item.id === values.supplier_id
         )
-        const supplierSnapshot = await resolveSupplierSnapshot(supplier, {
-          notifyOnError: true,
-        })
+        const supplierSnapshot = buildOutsourcingSupplierSnapshot(
+          supplier,
+          values.supplier_snapshot
+        )
         payload = buildOutsourcingOrderParams(
           {
             ...values,
@@ -2104,6 +2174,81 @@ export default function V1OutsourcingOrdersPage() {
       }
     }
 
+    if (['submit', 'confirm'].includes(action.key)) {
+      setSaving(true)
+      let summary
+      try {
+        const [items, attachments] = await Promise.all([
+          loadOrderItems(selectedRow),
+          listBusinessAttachments({
+            owner_type: 'outsourcing_order',
+            owner_id: selectedRow.id,
+          }),
+        ])
+        summary = buildOutsourcingContractConfirmationSummary(
+          selectedRow,
+          items,
+          Array.isArray(attachments)
+            ? attachments.filter((item) => !item?.withdrawn_at).length
+            : 0
+        )
+      } catch (error) {
+        message.error(getActionErrorMessage(error, '核对加工合同完整性'))
+        return
+      } finally {
+        setSaving(false)
+      }
+      if (!summary.complete) {
+        modal.warning({
+          title: '加工合同信息尚未齐全',
+          content: (
+            <Alert
+              showIcon
+              type="warning"
+              message="补齐以下内容后才能提交或确认下单"
+              description={summary.missing.join('、')}
+            />
+          ),
+          okText:
+            selectedRow.lifecycle_status === 'draft' ? '返回补充' : '我知道了',
+          onOk:
+            selectedRow.lifecycle_status === 'draft'
+              ? () => openEdit(selectedRow)
+              : undefined,
+        })
+        return
+      }
+      modal.confirm({
+        title: action.key === 'submit' ? '确认提交加工合同' : '确认下单',
+        content: (
+          <Descriptions bordered column={1} size="small">
+            <Descriptions.Item label="甲方">
+              {summary.buyerName}
+            </Descriptions.Item>
+            <Descriptions.Item label="乙方">
+              {summary.supplierName}
+            </Descriptions.Item>
+            <Descriptions.Item label="预计回货">
+              {formatUnixDate(summary.expectedReturnDate)}
+            </Descriptions.Item>
+            <Descriptions.Item label="加工明细">
+              {summary.lineCount} 条
+            </Descriptions.Item>
+            <Descriptions.Item label="合同金额">
+              {summary.totalAmountText}
+            </Descriptions.Item>
+            <Descriptions.Item label="附件">
+              {summary.attachmentCount} 个
+            </Descriptions.Item>
+          </Descriptions>
+        ),
+        okText: action.key === 'submit' ? '确认提交' : '确认下单',
+        cancelText: '返回核对',
+        onOk: execute,
+      })
+      return
+    }
+
     if (action.confirmTitle) {
       modal.confirm({
         title: action.confirmTitle,
@@ -2122,26 +2267,32 @@ export default function V1OutsourcingOrdersPage() {
     if (!selectedRow) return
     setPrintingAction(PROCESSING_CONTRACT_TEMPLATE_KEY)
     try {
-      const items = await loadOrderItems(selectedRow)
-      const supplier = suppliers.find(
-        (item) => item.id === selectedRow.supplier_id
-      )
-      const liveSupplierSnapshot =
-        typeof resolveSupplierSnapshot === 'function' && supplier
-          ? await resolveSupplierSnapshot(supplier)
-          : {}
-      const printRecord = {
-        ...selectedRow,
-        supplier_snapshot: mergeSnapshotMissingFields(
-          selectedRow.supplier_snapshot,
-          liveSupplierSnapshot
-        ),
-      }
-      const initialDraft = completeProcessingContractDraft(
-        buildProcessingContractDraftFromOutsourcingOrder(printRecord, items, {
-          printTemplateDefaults: processingPrintTemplateDefaults,
+      const [items, appendixImages] = await Promise.all([
+        loadOrderItems(selectedRow),
+        loadBusinessAttachmentPrintAppendixSnapshots(selectedRow.id, {
+          listAttachments: listBusinessAttachments,
+          downloadAttachment: downloadBusinessAttachment,
+        }),
+      ])
+      const readiness = inspectOutsourcingContractReadiness(selectedRow, items)
+      if (!readiness.complete) {
+        modal.warning({
+          title: '加工合同信息尚未齐全',
+          content: `请先补齐：${readiness.missing.join('、')}`,
+          okText: '我知道了',
         })
-      )
+        return
+      }
+      const initialDraft = completeProcessingContractDraft({
+        ...buildProcessingContractDraftFromOutsourcingOrder(
+          selectedRow,
+          items,
+          {
+            printTemplateDefaults: processingPrintTemplateDefaults,
+          }
+        ),
+        appendixImages,
+      })
       if (initialDraft.lines.length === 0) {
         message.warning('当前委外订单没有可打印的明细')
         return
@@ -2281,6 +2432,62 @@ export default function V1OutsourcingOrdersPage() {
   const dataColumns = useMemo(
     () => buildOutsourcingOrderColumns({ resolveSupplierName }),
     [resolveSupplierName]
+  )
+
+  const detailColumns = useMemo(
+    () => [
+      ...dataColumns,
+      {
+        key: 'buyer-company',
+        title: '委托单位（甲方）',
+        dataIndex: ['contract_party_snapshot', 'buyerCompany'],
+      },
+      {
+        key: 'buyer-contact',
+        title: '委托人',
+        dataIndex: ['contract_party_snapshot', 'buyerContact'],
+      },
+      {
+        key: 'buyer-phone',
+        title: '委托方电话',
+        dataIndex: ['contract_party_snapshot', 'buyerPhone'],
+      },
+      {
+        key: 'buyer-address',
+        title: '委托方地址',
+        dataIndex: ['contract_party_snapshot', 'buyerAddress'],
+      },
+      {
+        key: 'supplier-company',
+        title: '乙方单位',
+        dataIndex: ['supplier_snapshot', 'name'],
+        render: (value, record) =>
+          value || record?.supplier_snapshot?.short_name || '-',
+      },
+      {
+        key: 'supplier-contact',
+        title: '乙方联系人',
+        dataIndex: ['supplier_snapshot', 'contact_name'],
+      },
+      {
+        key: 'supplier-phone',
+        title: '乙方联系电话',
+        dataIndex: ['supplier_snapshot', 'contact_phone'],
+        render: (value, record) =>
+          value || record?.supplier_snapshot?.contact_mobile || '-',
+      },
+      {
+        key: 'supplier-address',
+        title: '乙方地址',
+        dataIndex: ['supplier_snapshot', 'address'],
+      },
+      {
+        key: 'supplier-signer',
+        title: '乙方签约人',
+        dataIndex: ['supplier_snapshot', 'signer_name'],
+      },
+    ],
+    [dataColumns]
   )
 
   const preferredColumnOrder = useMemo(
@@ -2766,7 +2973,7 @@ export default function V1OutsourcingOrdersPage() {
       {outsourcingOrderItemsPreview.modal}
 
       <BusinessRecordDetailsModal
-        columns={dataColumns}
+        columns={detailColumns}
         description="查看加工合同摘要和完整明细；草稿且具备编辑权限时，双击会直接进入编辑。"
         lineItems={
           canRead
@@ -2802,7 +3009,18 @@ export default function V1OutsourcingOrdersPage() {
         record={detailOrder}
         title="加工合同详情"
         onClose={() => setDetailOrder(null)}
-      />
+      >
+        {detailOrder?.id ? (
+          <BusinessAttachmentPanel
+            ownerType="outsourcing_order"
+            ownerId={detailOrder.id}
+            title="加工合同附件"
+            description="查看本合同归档附件；“合同附图”会在打开打印窗口时带入末尾。"
+            canUpload={false}
+            canWithdraw={false}
+          />
+        ) : null}
+      </BusinessRecordDetailsModal>
 
       <OutsourcingOrderSourceFactModal
         open={sourceFactOpen}
@@ -2921,6 +3139,10 @@ export default function V1OutsourcingOrdersPage() {
           form={form}
           supplierOptions={supplierOptions}
           onSupplierChange={handleSupplierChange}
+          supplierContacts={supplierContacts}
+          supplierContactsLoading={supplierContactsLoading}
+          onSupplierContactNameChange={handleSupplierContactNameChange}
+          onSupplierContactSelect={handleSupplierContactSelect}
           productOptions={productOptions}
           productSKUs={productSKUs}
           materialOptions={materialOptions}
@@ -2938,7 +3160,8 @@ export default function V1OutsourcingOrdersPage() {
               ownerType="outsourcing_order"
               ownerId={editingRow?.id}
               title="加工合同附件"
-              description="上传纸样、图纸、签回合同、加工要求或报价结算依据；附件不会改变库存、质检或应付记录。"
+              description="普通附件用于归档纸样、图纸、签回合同或报价依据；标记为合同附图的图片会在打开加工合同打印时冻结带入末尾。"
+              enablePrintAppendixUpload
               canUpload={canUpdate || canCreate}
               canWithdraw={canUpdate || canCreate}
               variant="inline"

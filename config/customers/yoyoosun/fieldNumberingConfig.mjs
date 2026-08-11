@@ -43,7 +43,7 @@ export const yoyoosunFieldNumberingConfig = Object.freeze({
     },
     {
       module: "suppliers",
-      label: "供应商档案",
+      label: "供应商与加工厂",
       candidates: Object.freeze([
         {
           key: "supplier_code",

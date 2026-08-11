@@ -143,7 +143,7 @@ export const ROLE_HELP_GUIDES = Object.freeze([
         title: '核对供应商和材料',
         description: '确认供应商、材料规格和单位可以被采购单正确引用。',
         path: '/erp/master/partners/suppliers',
-        actionLabel: '打开供应商档案',
+        actionLabel: '打开供应商与加工厂',
       },
       {
         title: '办理采购订单',

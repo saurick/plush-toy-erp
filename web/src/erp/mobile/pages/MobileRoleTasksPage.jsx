@@ -6,10 +6,11 @@ import React, {
   useRef,
   useState,
 } from 'react'
-import { useNavigate, useOutletContext } from 'react-router-dom'
+import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import '../mobileRoleTasks.css'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import useRuntimeBuildIdentity from '@/common/runtime/useRuntimeBuildIdentity'
 import { useERPWorkspace } from '../../context/ERPWorkspaceProvider'
 import { listWorkflowRoleTasks } from '../../api/workflowApi.mjs'
 import {
@@ -187,10 +188,12 @@ function createMobileRoleTaskViewCounters() {
 }
 
 export default function MobileRoleTasksPage() {
+  const location = useLocation()
   const navigate = useNavigate()
   const { activeRoleKey } = useERPWorkspace()
   const { adminProfile, canEnterDesktop, handleLogout, loggingOut } =
     useOutletContext() || {}
+  const runtimeBuildIdentity = useRuntimeBuildIdentity()
   const canMountCustomerTasks = canMountCustomerRuntime(adminProfile)
   const canViewApprovalInbox = canViewWorkflowApprovalInbox(adminProfile)
   const taskAccessIdentity =
@@ -1817,6 +1820,13 @@ export default function MobileRoleTasksPage() {
       filterItems={filterItems}
       filteredTasks={filteredTasks}
       handleLogout={handleLogout}
+      handleOpenLegalNotice={() =>
+        navigate('/legal/privacy', {
+          state: {
+            from: `${location.pathname}${location.search}${location.hash}`,
+          },
+        })
+      }
       handleMainScroll={handleMainScroll}
       handleSwitchEntry={() => navigate('/entry')}
       initialLoading={initialLoading}
@@ -1831,6 +1841,7 @@ export default function MobileRoleTasksPage() {
       riskTasks={riskTasks}
       riskScope={riskScope}
       roleLabel={roleLabel}
+      runtimeBuildIdentity={runtimeBuildIdentity}
       serverDataTime={serverDataTime}
       scrollContainerRef={scrollContainerRef}
       scrollMainToTop={scrollMainToTop}

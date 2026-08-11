@@ -612,10 +612,23 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
   },
   {
     caseId:
-      'FL_print_supplier_contact_snapshot__purchase_and_outsourcing_pages_fetch_supplier_contacts_before_save',
-    title: '采购和委外保存前读取供应商联系人以补齐打印快照',
+      'FL_print_supplier_contact_snapshot__purchase_and_outsourcing_pages_preserve_supplier_contacts',
+    title: '采购保存和委外合同编辑保留供应商联系人快照',
     fieldKeys: ['supplierContactSnapshot', 'supplierMasterSelection'],
     scenarioKey: 'supplier_contact_snapshot_prefilled',
+    layer: 'web',
+    testFile: 'web/src/erp/utils/masterDataOrderView.test.mjs',
+  },
+  {
+    caseId:
+      'FL_outsourcing_contract_party_b_snapshot__preserves_contract_override',
+    title: '委外合同乙方快照保留加工厂身份并采用本合同联系人和地址',
+    fieldKeys: [
+      'supplierMasterSelection',
+      'supplierContactSnapshot',
+      'processorContactAddress',
+    ],
+    scenarioKey: 'source_snapshot_retained',
     layer: 'web',
     testFile: 'web/src/erp/utils/masterDataOrderView.test.mjs',
   },

@@ -257,6 +257,8 @@ function startDevServer() {
         BROWSER: 'none',
         ERP_VITE_PORT: String(devServerPort),
         ERP_VITE_HMR_CLIENT_PORT: String(devServerPort),
+        VITE_RELEASE_VERSION: 'yoyoosun-20260810-20c96d38-amd64',
+        VITE_GIT_SHA: '20c96d3819429361a35d2551b63b211f055de37e',
       },
       detached: true,
       stdio: ['ignore', 'pipe', 'pipe'],

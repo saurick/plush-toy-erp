@@ -3,9 +3,11 @@ import {
   ArrowUpOutlined,
   BellOutlined,
   CheckSquareOutlined,
+  InfoCircleOutlined,
   InboxOutlined,
   LogoutOutlined,
   ReloadOutlined,
+  SafetyCertificateOutlined,
   SwapOutlined,
   UserOutlined,
 } from '@ant-design/icons'
@@ -52,6 +54,7 @@ export default function MobileTaskListScreen({
   filterItems,
   filteredTasks,
   handleLogout,
+  handleOpenLegalNotice,
   handleMainScroll,
   handleSwitchEntry,
   initialLoading,
@@ -66,6 +69,7 @@ export default function MobileTaskListScreen({
   riskTasks,
   riskScope,
   roleLabel,
+  runtimeBuildIdentity,
   serverDataTime,
   scrollContainerRef,
   scrollMainToTop,
@@ -746,6 +750,15 @@ export default function MobileTaskListScreen({
           ) : null}
           <button
             type="button"
+            data-testid="mobile-privacy-rules-entry"
+            className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700"
+            onClick={handleOpenLegalNotice}
+          >
+            <SafetyCertificateOutlined aria-hidden="true" />
+            隐私与使用规则
+          </button>
+          <button
+            type="button"
             data-testid="mobile-role-logout-button"
             className={`${mobileTheme.logoutButton} mt-3 w-full`}
             onClick={handleLogout}
@@ -754,6 +767,53 @@ export default function MobileTaskListScreen({
             <LogoutOutlined aria-hidden="true" />
             <span>{loggingOut ? '退出中' : '退出登录'}</span>
           </button>
+        </section>
+
+        <section
+          className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+          data-testid="mobile-system-version-card"
+        >
+          <div className="flex items-center gap-2">
+            <InfoCircleOutlined
+              className="text-emerald-700"
+              aria-hidden="true"
+            />
+            <h2 className="text-lg font-semibold text-slate-950">系统信息</h2>
+          </div>
+          <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+            <div className="rounded-xl bg-slate-50 px-3 py-3">
+              <dt className="text-slate-500">系统版本</dt>
+              <dd
+                className="mt-1 min-w-0 break-words font-semibold text-slate-950"
+                data-testid="mobile-system-version-value"
+              >
+                {runtimeBuildIdentity.status.systemVersion}
+              </dd>
+            </div>
+            <div className="rounded-xl bg-slate-50 px-3 py-3">
+              <dt className="text-slate-500">构建号</dt>
+              <dd className="mt-1 min-w-0 break-words font-semibold text-slate-950">
+                {runtimeBuildIdentity.web.gitSHAShort || '未标记'}
+              </dd>
+            </div>
+          </dl>
+          <div
+            className="mt-3 rounded-xl border border-slate-200 px-3 py-3 text-sm text-slate-700"
+            data-testid="mobile-system-version-status"
+          >
+            {runtimeBuildIdentity.status.label}
+          </div>
+          {runtimeBuildIdentity.status.key === 'unavailable' ? (
+            <button
+              type="button"
+              className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700"
+              onClick={runtimeBuildIdentity.retry}
+              disabled={runtimeBuildIdentity.loading}
+            >
+              <ReloadOutlined aria-hidden="true" />
+              {runtimeBuildIdentity.loading ? '核对中' : '重新核对版本'}
+            </button>
+          ) : null}
         </section>
       </section>
     )

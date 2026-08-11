@@ -16,11 +16,12 @@
 | 判断这次改动先看什么、还要检查什么、最容易误判什么     | [项目治理地图](项目治理地图.md)                                                                                                 | [当前真源与交接顺序](当前真源与交接顺序.md)、[模块实施治理](product/模块实施治理.md)、[自动化测试策略](product/自动化测试策略.md)、[AGENTS.md](../AGENTS.md)     |
 | 规划下一轮产品实现                                     | [产品完成路线图](product/产品完成路线图.md)                                                                                     | [产品能力进度台账](product/产品能力进度台账.md)、[模块实施治理](product/模块实施治理.md)、对应目录 README                                                        |
 | 查数据库表、字段和约束                                 | [数据库表数据字典](../server/docs/database/README.md)                                                                           | [Ent + Atlas 说明](../server/docs/ent.md)、Ent schema、Atlas migration；目标库另做 status 与结构读回                                                             |
-| 改菜单、页面、原型或信息密度                           | [web/README.md](../web/README.md)、[菜单与正式入口合同](product/菜单与正式入口合同.md)                                          | 对应原型 README、真实运行页、菜单 / 路由 / RBAC 代码和浏览器验证                                                                                                  |
+| 改菜单、页面、原型或信息密度                           | [web/README.md](../web/README.md)、[菜单与正式入口合同](product/菜单与正式入口合同.md)                                          | 对应原型 README、真实运行页、菜单 / 路由 / RBAC 代码和浏览器验证                                                                                                 |
 | 改 Workflow、状态、链 / 轨迹或 Fact 边界               | [状态 / Workflow / Fact 边界](architecture/状态工作流事实边界.md)、[业务链与运行轨迹边界](architecture/业务链与运行轨迹边界.md) | 相关 architecture 评审、[server/README.md](../server/README.md)、usecase / schema / test                                                                         |
 | 改客户资料、导入或交付资料                             | [新增甲方客户实施流程](product/新增甲方客户实施流程.md)、[客户实例策略](product/客户实例策略.md)                                | 目标客户受控交付资料、对应脚本说明与目标环境 evidence；私密 manifest 与原件不在 Product Core                                                                     |
 | 改部署、发布或低配运行口径                             | [部署约定](部署约定.md)                                                                                                         | [server/deploy/README.md](../server/deploy/README.md)、[prod Compose README](../server/deploy/compose/prod/README.md)、[scripts/README.md](../scripts/README.md) |
 | 改 CI、不可变制品、133 promotion、回滚或研发效能工作台 | [工程效能与交付自动化](engineering/README.md)                                                                                   | [CI/CD 设计](engineering/研发效能工作台与CI-CD设计.md)、[实施计划](engineering/研发效能工作台与CI-CD实施计划.md)、QA / deploy 脚本和 workflow                    |
+| 改个人信息告知、短信处理方、知悉回执或委托处理协议     | [安全与隐私](security/README.md)                                                                                                | 客户 `legalNotice` 配置、当前 auth / audit 代码、目标部署和已签署受控合同                                                                                        |
 | 查全量 Markdown 在哪里                                 | [文档清单](文档清单.md)                                                                                                         | 最近目录 README、`rg` 搜索和当前代码                                                                                                                             |
 
 只改正文、措辞或局部说明时，通常不需要更新全量清单；新增、删除、重命名、重分类或改变文档职责时，必须同步更新 `docs/文档清单.md` 和最近目录 README。
@@ -39,6 +40,7 @@
 | 部署与运行                             | 低配发布、Compose 主路径、迁移和发布门禁                        | [部署约定](部署约定.md)                                                                                                                                            |
 | 后端与数据字典                         | 服务运行、API、Ent / Atlas、数据库表与约束投影                  | [server/docs/README.md](../server/docs/README.md)、[数据库表数据字典](../server/docs/database/README.md)                                                           |
 | 工程效能与交付自动化                   | QA / CI 分层、不可变制品、测试环境 promotion、回滚和 DEV 工作台 | [engineering/README.md](engineering/README.md)                                                                                                                     |
+| 安全与隐私                             | 个人信息告知、知悉证据、系统使用规则和委托处理模板              | [security/README.md](security/README.md)                                                                                                                           |
 | 工作流 / 角色 / 财务 / 仓库 / 可观测性 | 专题设计和第一版业务说明                                        | [workflow](workflow/README.md)、[roles](roles/README.md)、[finance](finance/README.md)、[warehouse](warehouse/README.md)、[observability](observability/README.md) |
 | 归档                                   | 本项目历史证据和旧过程记录                                      | [archive](archive/README.md)                                                                                                                                       |
 
@@ -121,6 +123,7 @@
 - 架构评审：[architecture/README.md](architecture/README.md)
 - 客户资料：[新增甲方客户实施流程](product/新增甲方客户实施流程.md)、[客户实例策略](product/客户实例策略.md)
 - 工程效能与交付自动化：[engineering/README.md](engineering/README.md)
+- 安全与隐私：[security/README.md](security/README.md)
 - 归档：[archive/README.md](archive/README.md)
 - 后端总览：[server/README.md](../server/README.md)
 - 后端专题：[server/docs/README.md](../server/docs/README.md)

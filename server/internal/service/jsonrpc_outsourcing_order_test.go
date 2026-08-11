@@ -165,14 +165,21 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 	_, saveRes, err := j.handleOutsourcingOrder(ctx, "save_outsourcing_order_with_items", "1", mustJSONRPCStruct(t, map[string]any{
 		"outsourcing_order_no": "OUT-JSONRPC-001",
 		"supplier_id":          float64(1),
-		"supplier_snapshot":    map[string]any{"name": "加工厂"},
+		"supplier_snapshot": map[string]any{
+			"name":          "加工厂",
+			"contact_name":  "李厂长",
+			"contact_phone": "13900000000",
+			"address":       "加工园 1 号",
+		},
 		"contract_party_snapshot": map[string]any{
 			"buyerCompany": "永绅",
 			"buyerContact": "委外负责人",
 			"buyerPhone":   "13600000000",
+			"buyerAddress": "东莞茶山",
 		},
-		"source_order_no": "SO-JSONRPC-001",
-		"order_date":      "2026-06-17",
+		"source_order_no":      "SO-JSONRPC-001",
+		"order_date":           "2026-06-17",
+		"expected_return_date": "2026-06-24",
 		"items": []any{
 			map[string]any{
 				"line_no":                   float64(1),
@@ -184,6 +191,7 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 				"product_no_snapshot":       "PROD-JSONRPC",
 				"product_order_no_snapshot": " SO-JSONRPC-001 ",
 				"product_name_snapshot":     "半成品",
+				"processing_item":           "车缝加工",
 				"process_name_snapshot":     "车缝",
 				"process_category_snapshot": "委外车缝",
 				"unit_name_snapshot":        "只",
@@ -589,8 +597,21 @@ func outsourcingOrderJSONRPCSaveParams(t *testing.T, orderNo string) *structpb.S
 	return mustJSONRPCStruct(t, map[string]any{
 		"outsourcing_order_no": orderNo,
 		"supplier_id":          float64(1),
+		"supplier_snapshot": map[string]any{
+			"name":          "测试加工厂",
+			"contact_name":  "李厂长",
+			"contact_phone": "13900000000",
+			"address":       "加工园 1 号",
+		},
+		"contract_party_snapshot": map[string]any{
+			"buyerCompany": "永绅",
+			"buyerContact": "委外负责人",
+			"buyerPhone":   "13800000000",
+			"buyerAddress": "东莞茶山",
+		},
 		"source_order_no":      "SO-MODULE-GATE",
 		"order_date":           "2026-06-17",
+		"expected_return_date": "2026-06-24",
 		"items": []any{
 			map[string]any{
 				"line_no":               float64(1),
@@ -601,6 +622,7 @@ func outsourcingOrderJSONRPCSaveParams(t *testing.T, orderNo string) *structpb.S
 				"outsourcing_quantity":  "12.5",
 				"product_no_snapshot":   "PROD-MODULE-GATE",
 				"product_name_snapshot": "半成品",
+				"processing_item":       "脸*1",
 				"process_name_snapshot": "车缝",
 				"unit_name_snapshot":    "只",
 			},
@@ -675,6 +697,7 @@ func outsourcingOrderItemFromMutation(id int, orderID int, in *biz.OutsourcingOr
 		ProductNameSnapshot:     in.ProductNameSnapshot,
 		MaterialCodeSnapshot:    in.MaterialCodeSnapshot,
 		MaterialNameSnapshot:    in.MaterialNameSnapshot,
+		ProcessingItem:          in.ProcessingItem,
 		ProcessNameSnapshot:     in.ProcessNameSnapshot,
 		ProcessCategorySnapshot: in.ProcessCategorySnapshot,
 		UnitNameSnapshot:        in.UnitNameSnapshot,

@@ -19,7 +19,7 @@ type productModuleCatalogItem struct {
 
 var productModuleCatalog = map[string]productModuleCatalogItem{
 	"customers":           {Name: "客户档案", Layer: "MasterData", Maturity: "runtime_v1", PageKeys: []string{"customers"}},
-	"suppliers":           {Name: "供应商档案", Layer: "MasterData", Maturity: "runtime_v1", PageKeys: []string{"suppliers"}},
+	"suppliers":           {Name: "供应商与加工厂", Layer: "MasterData", Maturity: "runtime_v1", PageKeys: []string{"suppliers"}},
 	"products":            {Name: "产品档案", Layer: "MasterData", Maturity: "runtime_v1", PageKeys: []string{"products"}},
 	"materials":           {Name: "材料档案", Layer: "MasterData", Maturity: "runtime_v1", PageKeys: []string{"materials"}},
 	"processes":           {Name: "加工环节", Layer: "MasterData", Maturity: "runtime_v1", PageKeys: []string{"processes"}},

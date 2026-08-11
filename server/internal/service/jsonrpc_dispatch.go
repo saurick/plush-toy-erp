@@ -10,6 +10,7 @@ import (
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
+	"server/internal/buildinfo"
 	"server/internal/conf"
 	"server/internal/customertrialconfig"
 	"server/internal/devdbguard"
@@ -40,6 +41,7 @@ type jsonrpcDispatcher struct {
 	authSMS                authSMSRuntimeConfig
 	trialConfigEnabled     bool
 	localTestConfigEnabled bool
+	buildIdentity          buildinfo.Identity
 
 	adminReader biz.AdminAccountReader
 }
@@ -178,6 +180,7 @@ func newJSONRPCDispatcher(
 		authSMS:                authSMS,
 		trialConfigEnabled:     trialConfigEnabled,
 		localTestConfigEnabled: localTestConfigEnabled,
+		buildIdentity:          buildinfo.FromEnv(os.Getenv),
 		adminReader:            adminReader,
 	}
 }
@@ -322,7 +325,13 @@ func (r *jsonrpcDispatcher) handleSystem(
 		logger.Info("Jsonrpc.system.ping: success", "id", id)
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: data}, nil
 	case "version":
-		data := newDataStruct(map[string]any{"version": "1.0.0"})
+		data := newDataStruct(map[string]any{
+			"version":         r.buildIdentity.ReleaseVersion,
+			"release_version": r.buildIdentity.ReleaseVersion,
+			"git_sha":         r.buildIdentity.GitSHA,
+			"git_sha_short":   r.buildIdentity.GitSHAShort(),
+			"formal":          r.buildIdentity.IsFormal(),
+		})
 		logger.Info("Jsonrpc.system.version: success", "id", id)
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: data}, nil
 	default:

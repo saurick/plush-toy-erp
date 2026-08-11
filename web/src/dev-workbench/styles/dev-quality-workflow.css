@@ -100,7 +100,6 @@
 }
 
 .erp-dev-quality-task__details,
-.erp-dev-receipt-panel__details,
 .erp-dev-testing-header__context details,
 .erp-dev-testing-disclosure,
 .erp-dev-testing-validation-action__details,
@@ -120,7 +119,6 @@
 }
 
 .erp-dev-quality-task__details > summary,
-.erp-dev-receipt-panel__details > summary,
 .erp-dev-testing-header__context summary,
 .erp-dev-testing-validation-action__details > summary,
 .erp-dev-data-local-boundary > summary,
@@ -135,7 +133,6 @@
 }
 
 .erp-dev-quality-task__details[open] > summary,
-.erp-dev-receipt-panel__details[open] > summary,
 .erp-dev-testing-header__context details[open] > summary,
 .erp-dev-testing-validation-action__details[open] > summary,
 .erp-dev-data-local-boundary[open] > summary,
@@ -200,70 +197,6 @@
   color: #ffffff;
   outline: 3px solid rgb(15 118 110 / 0.16);
   text-decoration: none;
-}
-
-.erp-dev-quality-page .erp-dev-receipt-panel {
-  margin: 18px 0 0;
-  border-width: 1px 0 0;
-  border-color: #e2e8f0;
-  border-radius: 0;
-  background: transparent;
-  padding: 18px 2px 2px;
-  box-shadow: none;
-}
-
-.erp-dev-receipt-panel__decision {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  border-radius: 10px;
-  background: #f8fafc;
-  padding: 10px 12px;
-}
-
-.erp-dev-receipt-panel__decision > span:last-child {
-  display: grid;
-  gap: 2px;
-}
-
-.erp-dev-receipt-panel__decision-icon {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  border-radius: 999px;
-  background: #e2e8f0;
-  color: #475569;
-  font-size: 17px;
-}
-
-.erp-dev-receipt-panel__decision--passed {
-  background: #f0fdf4;
-}
-
-.erp-dev-receipt-panel__decision--passed .erp-dev-receipt-panel__decision-icon {
-  background: #dcfce7;
-  color: #15803d;
-}
-
-.erp-dev-receipt-panel__decision--blocked {
-  background: #fff7ed;
-}
-
-.erp-dev-receipt-panel__decision--blocked
-  .erp-dev-receipt-panel__decision-icon {
-  background: #ffedd5;
-  color: #c2410c;
-}
-
-.erp-dev-receipt-panel__details {
-  border-top: 1px dashed #cbd5e1;
-  padding-top: 10px;
-}
-
-.erp-dev-receipt-panel__details > .erp-dev-receipt-panel__repository {
-  margin: 10px 0 8px;
 }
 
 /* Testing: keep the recommended path visible and move inventories behind disclosure. */
@@ -961,7 +894,6 @@
 
 [data-erp-theme='dark'] .erp-dev-quality-start__head,
 [data-erp-theme='dark'] .erp-dev-quality-task + .erp-dev-quality-task,
-[data-erp-theme='dark'] .erp-dev-receipt-panel__details,
 [data-erp-theme='dark'] .erp-dev-testing-validation__title,
 [data-erp-theme='dark']
   .erp-dev-testing-validation-action
@@ -998,8 +930,7 @@
 [data-erp-theme='dark'] .erp-dev-quality-start__head h2.ant-typography,
 [data-erp-theme='dark'] .erp-dev-quality-task__copy h3.ant-typography,
 [data-erp-theme='dark'] .erp-dev-data-workflow-step__head h2.ant-typography,
-[data-erp-theme='dark'] .erp-dev-testing-disclosure > summary,
-[data-erp-theme='dark'] .erp-dev-receipt-panel__decision strong {
+[data-erp-theme='dark'] .erp-dev-testing-disclosure > summary {
   color: var(--erp-text);
 }
 
@@ -1012,7 +943,6 @@
 }
 
 [data-erp-theme='dark'] .erp-dev-quality-task__details > summary,
-[data-erp-theme='dark'] .erp-dev-receipt-panel__details > summary,
 [data-erp-theme='dark'] .erp-dev-testing-header__context summary,
 [data-erp-theme='dark'] .erp-dev-testing-validation-action__details > summary,
 [data-erp-theme='dark'] .erp-dev-data-local-boundary > summary,
@@ -1023,7 +953,6 @@
   color: var(--erp-text-muted);
 }
 
-[data-erp-theme='dark'] .erp-dev-receipt-panel__decision,
 [data-erp-theme='dark'] .erp-dev-testing-disclosure[open] > summary,
 [data-erp-theme='dark'] .erp-dev-data-local-boundary,
 [data-erp-theme='dark'] .erp-dev-data-operation-overview,
@@ -1036,12 +965,6 @@
 [data-erp-theme='dark'] .erp-dev-testing-validation-plan {
   border-color: #334155;
   background: #0f172a;
-}
-
-[data-erp-theme='dark'] .erp-dev-quality-page .erp-dev-receipt-panel {
-  border-color: var(--erp-border);
-  background: transparent;
-  box-shadow: none;
 }
 
 [data-erp-theme='dark'] .erp-dev-testing-closeout-heading,

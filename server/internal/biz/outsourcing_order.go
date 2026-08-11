@@ -30,6 +30,7 @@ var (
 	ErrOutsourcingOrderNotFound     = errors.New("outsourcing order not found")
 	ErrOutsourcingOrderItemNotFound = errors.New("outsourcing order item not found")
 	ErrOutsourcingOrderConflict     = errors.New("outsourcing order version conflict")
+	ErrOutsourcingOrderIncomplete   = errors.New("outsourcing order contract information incomplete")
 	ErrProcessInactive              = errors.New("process inactive")
 	ErrProcessNotOutsourcingEnabled = errors.New("process is not outsourcing enabled")
 )
@@ -312,7 +313,68 @@ func (uc *OutsourcingOrderUsecase) changeOutsourcingOrderLifecycle(ctx context.C
 	if current.LifecycleStatus == next {
 		return current, nil
 	}
+	if next == OutsourcingOrderStatusSubmitted || next == OutsourcingOrderStatusConfirmed {
+		if err := uc.validateContractReadyForConfirmation(ctx, current); err != nil {
+			return nil, err
+		}
+	}
 	return uc.repo.UpdateOutsourcingOrderLifecycle(ctx, id, next)
+}
+
+func (uc *OutsourcingOrderUsecase) validateContractReadyForConfirmation(ctx context.Context, order *OutsourcingOrder) error {
+	if order == nil || order.ExpectedReturnDate == nil {
+		return ErrOutsourcingOrderIncomplete
+	}
+	buyer := order.ContractPartySnapshot
+	if snapshotString(buyer, "buyerCompany") == "" ||
+		snapshotString(buyer, "buyerContact") == "" ||
+		snapshotString(buyer, "buyerPhone") == "" ||
+		snapshotString(buyer, "buyerAddress") == "" {
+		return ErrOutsourcingOrderIncomplete
+	}
+	supplier := order.SupplierSnapshot
+	if (snapshotString(supplier, "name") == "" && snapshotString(supplier, "short_name") == "") ||
+		snapshotString(supplier, "contact_name") == "" ||
+		(snapshotString(supplier, "contact_phone") == "" && snapshotString(supplier, "contact_mobile") == "") ||
+		snapshotString(supplier, "address") == "" {
+		return ErrOutsourcingOrderIncomplete
+	}
+
+	activeItemCount := 0
+	for offset := 0; ; offset += 200 {
+		items, total, err := uc.repo.ListOutsourcingOrderItems(ctx, OutsourcingOrderItemFilter{
+			OutsourcingOrderID: order.ID,
+			Limit:              200,
+			Offset:             offset,
+		})
+		if err != nil {
+			return err
+		}
+		for _, item := range items {
+			if item == nil || item.LineStatus == OutsourcingOrderItemStatusCanceled {
+				continue
+			}
+			activeItemCount++
+			if item.ProcessingItem == nil || strings.TrimSpace(*item.ProcessingItem) == "" {
+				return ErrOutsourcingOrderIncomplete
+			}
+		}
+		if offset+len(items) >= total || len(items) == 0 {
+			break
+		}
+	}
+	if activeItemCount == 0 {
+		return ErrOutsourcingOrderIncomplete
+	}
+	return nil
+}
+
+func snapshotString(snapshot map[string]any, key string) string {
+	value, ok := snapshot[key].(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(value)
 }
 
 func (uc *OutsourcingOrderUsecase) validateSupplierActive(ctx context.Context, id int) error {

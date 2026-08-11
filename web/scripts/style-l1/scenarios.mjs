@@ -1281,6 +1281,128 @@ export function createStyleL1Scenarios(deps) {
     },
   })
 
+  const assertClassifiedBusinessFormModal = async (
+    page,
+    {
+      buttonName,
+      titleText,
+      expectedHeadings,
+      scenarioName,
+      expectDark = false,
+    }
+  ) => {
+    const stableURL = page.url()
+    await page.getByRole('button', { name: buttonName }).click()
+    const modal = page
+      .locator('.erp-business-action-modal--form.ant-modal:visible')
+      .last()
+    await modal.waitFor({ state: 'visible', timeout: 10_000 })
+    await expectText(modal, titleText)
+
+    const metrics = await modal.evaluate((node) => {
+      const form = node.querySelector('.erp-business-action-form')
+      const formRect = form?.getBoundingClientRect()
+      const sections = Array.from(
+        form?.querySelectorAll('.erp-business-action-form__section-title') || []
+      ).map((section) => {
+        const rect = section.getBoundingClientRect()
+        const style = window.getComputedStyle(section)
+        const dividerStyle = window.getComputedStyle(section, '::after')
+        return {
+          text: String(section.textContent || '').trim(),
+          role: section.getAttribute('role') || '',
+          ariaLevel: section.getAttribute('aria-level') || '',
+          top: rect.top,
+          left: rect.left,
+          right: rect.right,
+          width: rect.width,
+          color: style.color,
+          dividerWidth: Number.parseFloat(dividerStyle.width || '0'),
+          dividerHeight: Number.parseFloat(dividerStyle.height || '0'),
+          dividerColor: dividerStyle.backgroundColor,
+        }
+      })
+      const modalBody = node.querySelector('.ant-modal-body')
+      return {
+        form: formRect
+          ? {
+              left: formRect.left,
+              right: formRect.right,
+              width: formRect.width,
+            }
+          : null,
+        sections,
+        modalOverflow: node.scrollWidth - node.clientWidth,
+        bodyOverflow: modalBody
+          ? modalBody.scrollWidth - modalBody.clientWidth
+          : 0,
+        documentOverflow:
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth,
+      }
+    })
+
+    assert.deepEqual(
+      metrics.sections.map((section) => section.text),
+      expectedHeadings,
+      `${scenarioName} 分区标题顺序错误`
+    )
+    assert(metrics.form, `${scenarioName} 缺少业务表单网格`)
+    assert(
+      metrics.sections.every(
+        (section, index) =>
+          section.role === 'heading' &&
+          section.ariaLevel === '3' &&
+          Math.abs(section.left - metrics.form.left) <= 1 &&
+          Math.abs(section.right - metrics.form.right) <= 1 &&
+          Math.abs(section.width - metrics.form.width) <= 2 &&
+          section.dividerWidth >= 24 &&
+          section.dividerHeight >= 1 &&
+          !['transparent', 'rgba(0, 0, 0, 0)'].includes(section.dividerColor) &&
+          Boolean(section.color) &&
+          (index === 0 || section.top > metrics.sections[index - 1].top)
+      ),
+      `${scenarioName} 分区标题语义、跨列、分隔线或顺序异常: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    assert(
+      metrics.modalOverflow <= 1 &&
+        metrics.bodyOverflow <= 1 &&
+        metrics.documentOverflow <= 1,
+      `${scenarioName} 表单或页面出现横向溢出: ${JSON.stringify(metrics)}`
+    )
+
+    const firstControl = modal
+      .locator(
+        'input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), [role="combobox"]:not([aria-disabled="true"])'
+      )
+      .first()
+    await firstControl.focus()
+    assert.equal(
+      await firstControl.evaluate(
+        (node) =>
+          node === document.activeElement ||
+          node.contains(document.activeElement)
+      ),
+      true,
+      `${scenarioName} 首个可编辑控件无法获得焦点`
+    )
+    if (expectDark) {
+      await assertDarkThemeContrast(page, {
+        scenarioName,
+        selector: '.erp-business-action-modal--form',
+      })
+    }
+    await assertNoHorizontalOverflow(page, scenarioName)
+    await modal.screenshot({
+      path: path.resolve(outputDir, `${scenarioName}.png`),
+    })
+    await page.keyboard.press('Escape')
+    await modal.waitFor({ state: 'hidden', timeout: 10_000 })
+    assert.equal(page.url(), stableURL, `${scenarioName} 关闭弹窗不应改写 URL`)
+  }
+
   return [
     ...createDevQualityGateScenarios({
       assert,
@@ -1818,6 +1940,55 @@ export function createStyleL1Scenarios(deps) {
         )
         await accountMenuTrigger.focus()
         await page.keyboard.press('Enter')
+        const desktopSystemVersionEntry = page.getByTestId(
+          'desktop-system-version-entry'
+        )
+        await desktopSystemVersionEntry.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        await desktopSystemVersionEntry.click()
+        const systemVersionModal = page.getByTestId('system-version-modal')
+        await systemVersionModal.waitFor({ state: 'visible', timeout: 10_000 })
+        await expectText(page, 'yoyoosun-20260810-20c96d38-amd64')
+        await expectText(page, '前后台版本一致')
+        const versionModalMetrics = await systemVersionModal.evaluate(
+          (node) => {
+            const rect = node.getBoundingClientRect()
+            return {
+              width: rect.width,
+              height: rect.height,
+              right: rect.right,
+              viewportWidth: window.innerWidth,
+              scrollWidth: document.documentElement.scrollWidth,
+              clientWidth: document.documentElement.clientWidth,
+            }
+          }
+        )
+        assert(
+          versionModalMetrics.width >= 480 &&
+            versionModalMetrics.height >= 260 &&
+            versionModalMetrics.right <=
+              versionModalMetrics.viewportWidth + 1 &&
+            versionModalMetrics.scrollWidth <=
+              versionModalMetrics.clientWidth + 1,
+          `系统信息弹窗尺寸或横向布局异常: ${JSON.stringify(versionModalMetrics)}`
+        )
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'demo-boss-system-version-modal-desktop.png'
+          ),
+          fullPage: false,
+        })
+        const systemVersionCloseButton = systemVersionModal
+          .locator('xpath=ancestor::div[contains(@class, "ant-modal-content")]')
+          .locator('.ant-modal-footer button')
+          .filter({ hasText: /关\s*闭/u })
+        await systemVersionCloseButton.focus()
+        await page.keyboard.press('Escape')
+        await systemVersionModal.waitFor({ state: 'hidden', timeout: 10_000 })
+        await accountMenuTrigger.click()
         const desktopEntrySwitch = page.getByTestId('desktop-work-entry-switch')
         await desktopEntrySwitch.waitFor({ state: 'visible', timeout: 10_000 })
         await expectText(page, '退出登录')
@@ -3291,8 +3462,9 @@ export function createStyleL1Scenarios(deps) {
             roleGraphMetrics.graphHeight >= 360 &&
             roleGraphMetrics.summaryColumns === 6 &&
             roleGraphMetrics.documentOverflow <= 1,
-          '权限关系页桌面导航、摘要和图形尺寸异常: ' +
-            JSON.stringify(roleGraphMetrics)
+          `权限关系页桌面导航、摘要和图形尺寸异常: ${JSON.stringify(
+            roleGraphMetrics
+          )}`
         )
         await modal.screenshot({
           path: path.resolve(
@@ -3314,7 +3486,7 @@ export function createStyleL1Scenarios(deps) {
           .allTextContents()
         assert(
           roleLabels.some((label) => label.trim() === '业务'),
-          '权限关系图岗位范围缺少业务: ' + JSON.stringify(roleLabels)
+          `权限关系图岗位范围缺少业务: ${JSON.stringify(roleLabels)}`
         )
         await roleDropdown
           .locator('.ant-select-item-option')
@@ -3350,7 +3522,7 @@ export function createStyleL1Scenarios(deps) {
           .allTextContents()
         assert(
           moduleLabels.some((label) => label.trim() === '仓储'),
-          '权限关系图功能范围缺少仓储: ' + JSON.stringify(moduleLabels)
+          `权限关系图功能范围缺少仓储: ${JSON.stringify(moduleLabels)}`
         )
         const moduleOption = moduleDropdown
           .locator('.ant-select-item-option')
@@ -3368,8 +3540,10 @@ export function createStyleL1Scenarios(deps) {
               moduleViewport.width + 1 &&
             moduleOptionBox.y + moduleOptionBox.height <=
               moduleViewport.height + 1,
-          '仓储选项应完整位于当前视口内: ' +
-            JSON.stringify({ moduleOptionBox, moduleViewport })
+          `仓储选项应完整位于当前视口内: ${JSON.stringify({
+            moduleOptionBox,
+            moduleViewport,
+          })}`
         )
         await page.mouse.click(
           moduleOptionBox.x + moduleOptionBox.width / 2,
@@ -3440,8 +3614,9 @@ export function createStyleL1Scenarios(deps) {
             Math.abs(
               fullscreenMetrics.bottom - fullscreenMetrics.viewportHeight
             ) <= 1,
-          '权限关系图全屏应覆盖完整浏览器视口: ' +
-            JSON.stringify(fullscreenMetrics)
+          `权限关系图全屏应覆盖完整浏览器视口: ${JSON.stringify(
+            fullscreenMetrics
+          )}`
         )
         await fullscreen.screenshot({
           path: path.resolve(
@@ -3515,8 +3690,9 @@ export function createStyleL1Scenarios(deps) {
             narrowMetrics.toolbarColumns === 1 &&
             narrowMetrics.summaryColumns === 2 &&
             narrowMetrics.documentOverflow <= 1,
-          '权限关系图窄屏应堆叠筛选并保持两列摘要: ' +
-            JSON.stringify(narrowMetrics)
+          `权限关系图窄屏应堆叠筛选并保持两列摘要: ${JSON.stringify(
+            narrowMetrics
+          )}`
         )
         await page.screenshot({
           path: path.resolve(
@@ -4332,7 +4508,7 @@ export function createStyleL1Scenarios(deps) {
         menus: [
           {
             key: 'suppliers',
-            label: '供应商档案',
+            label: '供应商与加工厂',
             path: '/erp/master/partners/suppliers',
             required_any: ['supplier.read'],
             required_all: [],
@@ -4361,7 +4537,7 @@ export function createStyleL1Scenarios(deps) {
         })
       },
       verify: async (page) => {
-        await expectHeading(page, '供应商档案')
+        await expectHeading(page, '供应商与加工厂')
         assert.equal(
           permissionSafeSupplierProcessRequests,
           0,
@@ -5201,7 +5377,7 @@ export function createStyleL1Scenarios(deps) {
           for (const label of [
             '模板打印中心',
             '客户档案',
-            '供应商档案',
+            '供应商与加工厂',
             '产品资料',
           ]) {
             assert(
@@ -12600,6 +12776,13 @@ export function createStyleL1Scenarios(deps) {
       themeMode: 'dark',
       viewport: { width: 1536, height: 900 },
       verify: async (page) => {
+        const legacyReceiptRequests = []
+        const recordLegacyReceiptRequest = (request) => {
+          if (new URL(request.url()).pathname === '/__dev/api/receipts') {
+            legacyReceiptRequests.push(request.url())
+          }
+        }
+        page.on('request', recordLegacyReceiptRequest)
         const areaPages = [
           {
             path: '/__dev/product-engineering',
@@ -12618,7 +12801,7 @@ export function createStyleL1Scenarios(deps) {
             path: '/__dev/quality',
             heading: '质量验证 / Quality Assurance',
             cardCount: 2,
-            secondaryLabels: ['改动验证', '测试数据'],
+            secondaryLabels: ['改动验证', '质量门禁', '测试数据'],
           },
           {
             path: '/__dev/delivery',
@@ -12672,9 +12855,6 @@ export function createStyleL1Scenarios(deps) {
               const tasks = Array.from(
                 document.querySelectorAll('.erp-dev-quality-task')
               )
-              const receiptDetails = document.querySelector(
-                '.erp-dev-receipt-panel__details'
-              )
               return {
                 taskCount: tasks.length,
                 taskTitles: tasks.map(
@@ -12693,7 +12873,9 @@ export function createStyleL1Scenarios(deps) {
                 taskHeights: tasks.map((task) =>
                   Math.round(task.getBoundingClientRect().height)
                 ),
-                receiptDetailsOpen: receiptDetails?.open || false,
+                legacyReceiptPanelCount: document.querySelectorAll(
+                  '.erp-dev-receipt-panel'
+                ).length,
                 scrollWidth: document.documentElement.scrollWidth,
                 clientWidth: document.documentElement.clientWidth,
               }
@@ -12711,10 +12893,10 @@ export function createStyleL1Scenarios(deps) {
             assert(
               qualityMetrics.taskCount === 2 &&
                 qualityMetrics.openTechnicalCount === 0 &&
-                qualityMetrics.receiptDetailsOpen === false &&
+                qualityMetrics.legacyReceiptPanelCount === 0 &&
                 qualityMetrics.taskHeights.every((height) => height <= 155) &&
                 qualityMetrics.scrollWidth <= qualityMetrics.clientWidth + 1,
-              `质量验证首页默认应隐藏技术来源、收敛任务高度且无横向溢出: ${JSON.stringify(qualityMetrics)}`
+              `质量验证首页应只保留任务分流、收敛任务高度且无横向溢出: ${JSON.stringify(qualityMetrics)}`
             )
             continue
           }
@@ -12788,6 +12970,9 @@ export function createStyleL1Scenarios(deps) {
             return {
               scrollWidth: document.documentElement.scrollWidth,
               clientWidth: document.documentElement.clientWidth,
+              legacyReceiptPanelCount: document.querySelectorAll(
+                '.erp-dev-receipt-panel'
+              ).length,
               technicalDetailsCount: document.querySelectorAll(
                 '.erp-dev-hub-grid .erp-dev-entry-source-details'
               ).length,
@@ -12828,6 +13013,11 @@ export function createStyleL1Scenarios(deps) {
             areaPage.cardCount,
             `工作台区域页入口数量异常: ${areaPage.path} ${JSON.stringify(metrics)}`
           )
+          assert.equal(
+            metrics.legacyReceiptPanelCount,
+            0,
+            `工作台区域入口页不应重复挂载通用质量回执: ${areaPage.path} ${JSON.stringify(metrics)}`
+          )
           assert(
             metrics.cards.every(
               (card) =>
@@ -12853,6 +13043,13 @@ export function createStyleL1Scenarios(deps) {
             `工作台区域页不应出现横向溢出: ${areaPage.path} ${JSON.stringify(metrics)}`
           )
         }
+
+        page.off('request', recordLegacyReceiptRequest)
+        assert.deepEqual(
+          legacyReceiptRequests,
+          [],
+          `工作台区域入口页不应请求已移除的通用回执接口: ${JSON.stringify(legacyReceiptRequests)}`
+        )
 
         await gotoScenarioPath(page, '/__dev/product-engineering', {
           waitUntil: 'domcontentloaded',
@@ -16873,6 +17070,129 @@ export function createStyleL1Scenarios(deps) {
             metrics.detailWidth >= 300 &&
             metrics.documentScrollWidth <= metrics.documentClientWidth + 2,
           `审计日志桌面布局尺寸异常: ${JSON.stringify(metrics)}`
+        )
+
+        const auditActionField = page
+          .locator('.erp-audit-field--wide')
+          .filter({ hasText: '操作类型' })
+        const auditActionSelect = auditActionField.locator('.ant-select')
+        await auditActionSelect.locator('.ant-select-selector').click()
+        const auditActionDropdown = page.locator('.ant-select-dropdown:visible')
+        await auditActionDropdown.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        const expectedAuditActionGroups = [
+          '系统管理',
+          '客户业务设置',
+          '系统准备',
+          '紧急任务处理',
+        ]
+        const observedAuditActionGroups = new Set()
+        const collectVisibleAuditActionGroups = async () => {
+          const labels = await auditActionDropdown
+            .locator('.ant-select-item-group')
+            .allTextContents()
+          for (const label of labels) {
+            observedAuditActionGroups.add(label.trim())
+          }
+        }
+        const auditActionListHolder = auditActionDropdown.locator(
+          '.rc-virtual-list-holder'
+        )
+        const auditActionScrollMetrics = await auditActionListHolder.evaluate(
+          (node) => ({
+            clientHeight: node.clientHeight,
+            scrollHeight: node.scrollHeight,
+          })
+        )
+        const auditActionMaxScrollTop = Math.max(
+          0,
+          auditActionScrollMetrics.scrollHeight -
+            auditActionScrollMetrics.clientHeight
+        )
+        const auditActionScrollStep = Math.max(
+          1,
+          Math.floor(auditActionScrollMetrics.clientHeight / 2)
+        )
+        for (
+          let scrollTop = 0;
+          scrollTop < auditActionMaxScrollTop;
+          scrollTop += auditActionScrollStep
+        ) {
+          await auditActionListHolder.evaluate((node, nextScrollTop) => {
+            node.scrollTop = nextScrollTop
+          }, scrollTop)
+          await page.waitForTimeout(50)
+          await collectVisibleAuditActionGroups()
+        }
+        await auditActionListHolder.evaluate((node, nextScrollTop) => {
+          node.scrollTop = nextScrollTop
+        }, auditActionMaxScrollTop)
+        await page.waitForTimeout(50)
+        await collectVisibleAuditActionGroups()
+        assert.deepEqual(
+          [...observedAuditActionGroups],
+          expectedAuditActionGroups
+        )
+        await auditActionListHolder.evaluate((node) => {
+          node.scrollTop = 0
+          node.dispatchEvent(new Event('scroll', { bubbles: true }))
+        })
+        await page.waitForTimeout(100)
+        await page.keyboard.press('Escape')
+        await auditActionDropdown.waitFor({
+          state: 'hidden',
+          timeout: 10_000,
+        })
+        await auditActionSelect.locator('.ant-select-selector').click()
+        await auditActionDropdown.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        await auditActionListHolder.evaluate((node) => {
+          node.scrollTop = 0
+          node.dispatchEvent(new Event('scroll', { bubbles: true }))
+        })
+        await page.waitForTimeout(100)
+        const employeeRoleChangeOption = auditActionDropdown
+          .locator('.ant-select-item-option')
+          .filter({ hasText: '员工岗位变更' })
+        await employeeRoleChangeOption.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        await employeeRoleChangeOption.click()
+        assert.equal(
+          String(
+            await auditActionSelect
+              .locator('.ant-select-selection-item')
+              .textContent()
+          ).trim(),
+          '员工岗位变更'
+        )
+        await auditActionSelect.locator('.ant-select-selector').click()
+        await auditActionDropdown.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        assert.equal(
+          String(
+            await auditActionSelect
+              .locator('.ant-select-selection-item')
+              .textContent()
+          ).trim(),
+          '员工岗位变更',
+          '重新打开操作类型下拉后必须保留已选操作'
+        )
+        await page.keyboard.press('Escape')
+        await auditActionDropdown.waitFor({
+          state: 'hidden',
+          timeout: 10_000,
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'system-audit-logs-desktop-action-groups'
         )
       },
     },
@@ -21932,6 +22252,316 @@ export function createStyleL1Scenarios(deps) {
       },
     },
     {
+      name: 'business-form-section-classification-readonly',
+      path: '/erp/sales/project-orders/sales-orders',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        const salesHeadings = ['订单与客户', '联系人与负责人', '结算与交付']
+        const paymentHeadings = ['往来与金额', '账户与凭据']
+
+        await expectHeading(page, '销售订单')
+        await assertClassifiedBusinessFormModal(page, {
+          buttonName: '新建订单',
+          titleText: '新建销售订单',
+          expectedHeadings: salesHeadings,
+          scenarioName: 'business-form-sections-sales-desktop',
+        })
+        await assertClassifiedBusinessFormModal(page, {
+          buttonName: '新建订单',
+          titleText: '新建销售订单',
+          expectedHeadings: salesHeadings,
+          scenarioName: 'business-form-sections-sales-desktop-reopen',
+        })
+
+        await gotoScenarioPath(page, '/erp/finance/payments', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '收付款与核销')
+        await assertClassifiedBusinessFormModal(page, {
+          buttonName: '登记收付款',
+          titleText: '登记收付款',
+          expectedHeadings: paymentHeadings,
+          scenarioName: 'business-form-sections-payment-desktop',
+        })
+
+        await page.setViewportSize({ width: 720, height: 900 })
+        await clickERPThemeOption(page, '暗色')
+        await gotoScenarioPath(page, '/erp/sales/project-orders/sales-orders', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '销售订单')
+        await assertERPThemeMode(page, {
+          scenarioName: 'business-form-sections-tablet-dark',
+          expectedMode: 'dark',
+          expectedEffectiveTheme: 'dark',
+        })
+        await assertClassifiedBusinessFormModal(page, {
+          buttonName: '新建订单',
+          titleText: '新建销售订单',
+          expectedHeadings: salesHeadings,
+          scenarioName: 'business-form-sections-sales-tablet-dark',
+          expectDark: true,
+        })
+
+        await gotoScenarioPath(page, '/erp/finance/payments', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '收付款与核销')
+        await assertClassifiedBusinessFormModal(page, {
+          buttonName: '登记收付款',
+          titleText: '登记收付款',
+          expectedHeadings: paymentHeadings,
+          scenarioName: 'business-form-sections-payment-tablet-dark',
+          expectDark: true,
+        })
+      },
+    },
+    {
+      name: 'history-source-selector-classification-readonly',
+      path: '/erp/history',
+      auth: 'admin',
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        pages: [
+          ...new Set([
+            ...customerRuntimeEffectiveSession.pages,
+            'history-records',
+          ]),
+        ],
+      },
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '历史记录中心')
+        const historySelect = page.getByRole('combobox', {
+          name: '历史记录类型',
+        })
+        const historySelectRoot = historySelect.locator(
+          'xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]'
+        )
+        await historySelectRoot.locator('.ant-select-selector').click()
+        const historyDropdown = page.locator('.ant-select-dropdown:visible')
+        await historyDropdown.waitFor({ state: 'visible', timeout: 10_000 })
+        assert.deepEqual(
+          await historyDropdown
+            .locator('.ant-select-item-group')
+            .allTextContents(),
+          ['基础资料', '业务单据与版本']
+        )
+        const expectedHistoryOptionLabels = [
+          '客户档案',
+          '供应商与加工厂',
+          '材料档案',
+          '产品档案',
+          '产品规格',
+          '加工环节',
+          '销售订单',
+          '采购订单',
+          '委外订单',
+          '生产订单',
+          'BOM 版本',
+        ]
+        const observedHistoryOptionLabels = []
+        const observedHistoryOptionLabelSet = new Set()
+        const collectVisibleHistoryOptions = async () => {
+          const labels = await historyDropdown
+            .locator('.ant-select-item-option')
+            .allTextContents()
+          for (const label of labels) {
+            const normalizedLabel = label.trim()
+            if (!observedHistoryOptionLabelSet.has(normalizedLabel)) {
+              observedHistoryOptionLabelSet.add(normalizedLabel)
+              observedHistoryOptionLabels.push(normalizedLabel)
+            }
+          }
+        }
+        const historyListHolder = historyDropdown.locator(
+          '.rc-virtual-list-holder'
+        )
+        const historyScrollMetrics = await historyListHolder.evaluate(
+          (node) => ({
+            clientHeight: node.clientHeight,
+            scrollHeight: node.scrollHeight,
+          })
+        )
+        const historyMaxScrollTop = Math.max(
+          0,
+          historyScrollMetrics.scrollHeight - historyScrollMetrics.clientHeight
+        )
+        const historyScrollStep = Math.max(
+          1,
+          Math.floor(historyScrollMetrics.clientHeight / 2)
+        )
+        for (
+          let scrollTop = 0;
+          scrollTop < historyMaxScrollTop;
+          scrollTop += historyScrollStep
+        ) {
+          await historyListHolder.evaluate((node, nextScrollTop) => {
+            node.scrollTop = nextScrollTop
+          }, scrollTop)
+          await page.waitForTimeout(50)
+          await collectVisibleHistoryOptions()
+        }
+        await historyListHolder.evaluate((node, nextScrollTop) => {
+          node.scrollTop = nextScrollTop
+        }, historyMaxScrollTop)
+        await page.waitForTimeout(50)
+        await collectVisibleHistoryOptions()
+        assert.deepEqual(
+          observedHistoryOptionLabels,
+          expectedHistoryOptionLabels,
+          '历史记录类型分组必须按正式顺序精确覆盖 11 个可读来源'
+        )
+        await historyListHolder.evaluate((node) => {
+          node.scrollTop = 0
+          node.dispatchEvent(new Event('scroll', { bubbles: true }))
+        })
+        await page.waitForTimeout(100)
+        await historySelect.press('Escape')
+        await historyDropdown.waitFor({ state: 'hidden', timeout: 10_000 })
+        await historySelectRoot.locator('.ant-select-selector').click()
+        await historyDropdown.waitFor({ state: 'visible', timeout: 10_000 })
+        await historyDropdown
+          .locator('.ant-select-item-option')
+          .filter({ hasText: '销售订单' })
+          .click()
+        await page.waitForFunction(
+          () =>
+            new URLSearchParams(window.location.search).get('source') ===
+            'sales_orders'
+        )
+        assert.equal(
+          String(
+            await historySelectRoot
+              .locator('.ant-select-selection-item')
+              .textContent()
+          ).trim(),
+          '销售订单'
+        )
+        await historySelectRoot.locator('.ant-select-selector').click()
+        await historyDropdown.waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          String(
+            await historySelectRoot
+              .locator('.ant-select-selection-item')
+              .textContent()
+          ).trim(),
+          '销售订单',
+          '重新打开历史来源下拉后必须保留 URL 对应选项'
+        )
+        await historySelect.press('Escape')
+        await historyDropdown.waitFor({ state: 'hidden', timeout: 10_000 })
+      },
+    },
+    {
+      name: 'workflow-assignment-selector-classification-readonly',
+      path: '/erp/task-board',
+      auth: 'admin',
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        pages: ['task-board'],
+        actions: [
+          'erp.workbench.read',
+          'workflow.task.read',
+          'workflow.task.update',
+          'workflow.task.complete',
+          'workflow.task.assign',
+        ],
+        workflow_visible_owner_role_keys_by_capability: {
+          'workflow.task.read': ['warehouse'],
+          'workflow.task.update': ['warehouse'],
+          'workflow.task.complete': ['warehouse'],
+        },
+      },
+      workflowTaskFixtures: [
+        {
+          id: 9811,
+          task_code: 'STYLE-L1-CLASSIFICATION-9811',
+          task_group: 'workflow-contract',
+          task_name: '下拉分类只读验收任务',
+          source_type: 'workflow-contract',
+          source_id: 9811,
+          source_no: 'CLASSIFICATION-9811',
+          task_status_key: 'ready',
+          owner_role_key: 'warehouse',
+          assignee_id: 1,
+          version: 1,
+          payload: { source_snapshot: 'unchanged' },
+        },
+      ],
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '任务看板')
+        const assignmentTaskCard = page
+          .locator('.erp-task-board-card')
+          .filter({ hasText: '下拉分类只读验收任务' })
+          .first()
+        await assignmentTaskCard.waitFor({ state: 'visible', timeout: 10_000 })
+        await assignmentTaskCard
+          .locator('.erp-task-board-card-meta')
+          .first()
+          .click()
+        const assignmentCurrentTask = page
+          .locator('.erp-task-center-current')
+          .filter({ hasText: '下拉分类只读验收任务' })
+          .first()
+        await assignmentCurrentTask
+          .getByRole('button', { name: '处理任务', exact: true })
+          .click()
+        const assignmentDrawer = page.locator('.erp-task-action-drawer')
+        await assignmentDrawer.waitFor({ state: 'visible', timeout: 10_000 })
+        await assignmentDrawer.getByRole('tab', { name: /选择处理/u }).click()
+        await assignmentDrawer.getByRole('radio', { name: /转交任务/u }).click()
+        const assignmentSelect = assignmentDrawer.getByRole('combobox', {
+          name: '转交去向',
+        })
+        await assignmentSelect.click()
+        const assignmentDropdown = page.locator('.ant-select-dropdown:visible')
+        await assignmentDropdown.waitFor({ state: 'visible', timeout: 10_000 })
+        assert.deepEqual(
+          await assignmentDropdown
+            .locator('.ant-select-item-group')
+            .allTextContents(),
+          ['岗位共同待办', '指定员工']
+        )
+        assert.equal(
+          await assignmentDropdown.locator('.ant-select-item-option').count(),
+          2,
+          '转交去向必须同时展示岗位共同待办和合格员工'
+        )
+        await assignmentSelect.press('Escape')
+        await assignmentDropdown.waitFor({ state: 'hidden', timeout: 10_000 })
+        await assignmentSelect.click()
+        await assignmentDropdown.waitFor({ state: 'visible', timeout: 10_000 })
+        await assignmentDropdown
+          .locator('.ant-select-item-option')
+          .filter({ hasText: 'warehouse-backup · 仓库' })
+          .click()
+        assert.equal(
+          String(
+            await assignmentDrawer
+              .locator('.erp-task-action-drawer__assignment')
+              .locator('.ant-select-selection-item')
+              .textContent()
+          ).trim(),
+          'warehouse-backup · 仓库'
+        )
+        await assignmentSelect
+          .locator(
+            'xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]'
+          )
+          .locator('.ant-select-selector')
+          .click()
+        await assignmentDropdown.waitFor({ state: 'visible', timeout: 10_000 })
+        await assignmentSelect.press('Escape')
+        await assignmentDropdown.waitFor({ state: 'hidden', timeout: 10_000 })
+        await assignmentDrawer.locator('.ant-drawer-close').click()
+        await assignmentDrawer.waitFor({ state: 'hidden', timeout: 10_000 })
+      },
+    },
+    {
       name: 'business-menu-groups-desktop',
       path: '/erp/sales/project-orders/sales-orders',
       auth: 'admin',
@@ -21946,7 +22576,7 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '业务看板')
         await expectText(page, '基础资料')
         await expectText(page, '客户档案')
-        await expectText(page, '供应商档案')
+        await expectText(page, '供应商与加工厂')
         await expectText(page, '产品档案')
         await expectText(page, '销售管理')
         await expectText(page, '销售订单')
@@ -22870,7 +23500,7 @@ export function createStyleL1Scenarios(deps) {
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '供应商档案')
+        await expectHeading(page, '供应商与加工厂')
         assert.equal(
           await page.locator('.erp-business-collaboration-task-panel').count(),
           0,
@@ -23132,7 +23762,7 @@ export function createStyleL1Scenarios(deps) {
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 320, height: 760 },
       verify: async (page) => {
-        await expectHeading(page, '供应商档案')
+        await expectHeading(page, '供应商与加工厂')
         await page
           .locator('.ant-table-row')
           .filter({ hasText: '样式供应商' })
@@ -23232,10 +23862,10 @@ export function createStyleL1Scenarios(deps) {
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '供应商档案')
+        await expectHeading(page, '供应商与加工厂')
         await verifyBusinessActionFormModal(page, {
           buttonName: '新建供应商',
-          titleText: '新建供应商档案',
+          titleText: '新建供应商或加工厂',
           minFieldCount: 5,
           screenshotName: 'textarea-show-count-supplier-form-modal',
           expectedTexts: ['备注', '联系人', '添加条目'],
