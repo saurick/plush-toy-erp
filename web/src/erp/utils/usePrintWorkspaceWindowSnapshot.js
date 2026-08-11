@@ -7,28 +7,30 @@ import {
 const SNAPSHOT_PERSIST_DELAY_MS = 320
 const SNAPSHOT_PERSIST_IDLE_TIMEOUT_MS = 1000
 const PRINT_WORKSPACE_PREPARING_TEXT = '正在准备打印模板...'
-const PRINT_WORKSPACE_FLUSH_ACTIVE_EDIT_EVENT =
-  'plush-print-workspace-flush-active-edit'
 
-function flushActiveContentEditable(documentLike) {
-  const activeElement = documentLike?.activeElement
-  if (!activeElement) {
-    return false
+function waitForPrintWorkspaceFrame(windowLike) {
+  return new Promise((resolve) => {
+    if (typeof windowLike?.requestAnimationFrame === 'function') {
+      windowLike.requestAnimationFrame(() => resolve())
+      return
+    }
+    if (typeof windowLike?.setTimeout === 'function') {
+      windowLike.setTimeout(resolve, 0)
+      return
+    }
+    resolve()
+  })
+}
+
+export async function preparePrintWorkspaceSnapshot({
+  windowLike,
+  beforeSnapshot,
+} = {}) {
+  if (typeof beforeSnapshot === 'function') {
+    await beforeSnapshot()
   }
-
-  const editableElement =
-    activeElement.isContentEditable === true
-      ? activeElement
-      : activeElement.closest?.('[contenteditable="true"]')
-  if (!editableElement) {
-    return false
-  }
-
-  const ownerWindow = editableElement.ownerDocument?.defaultView || window
-  editableElement.dispatchEvent(
-    new ownerWindow.CustomEvent(PRINT_WORKSPACE_FLUSH_ACTIVE_EDIT_EVENT)
-  )
-  return true
+  await waitForPrintWorkspaceFrame(windowLike)
+  await waitForPrintWorkspaceFrame(windowLike)
 }
 
 function syncClonedFormState(sourceDocument, clonedDocument) {
@@ -156,6 +158,7 @@ export default function usePrintWorkspaceWindowSnapshot({
   workspaceURL = '',
   observeNodeRef = null,
   suspended = false,
+  beforeSnapshot = null,
 }) {
   const persistTimerRef = useRef(0)
   const persistIdleRef = useRef(0)
@@ -184,6 +187,7 @@ export default function usePrintWorkspaceWindowSnapshot({
 
     const doc = observedNode.ownerDocument
     const win = doc.defaultView || window
+    let disposed = false
 
     const clearPersistHandles = () => {
       if (persistTimerRef.current) {
@@ -199,10 +203,16 @@ export default function usePrintWorkspaceWindowSnapshot({
       }
     }
 
-    const persistSnapshot = () => {
+    const persistSnapshot = async () => {
       persistTimerRef.current = 0
       persistIdleRef.current = 0
-      flushActiveContentEditable(doc)
+      await preparePrintWorkspaceSnapshot({
+        windowLike: win,
+        beforeSnapshot,
+      })
+      if (disposed) {
+        return
+      }
       const windowHTML = buildPrintWorkspaceWindowHTML(doc, workspaceURL)
       if (!windowHTML) {
         return
@@ -246,10 +256,18 @@ export default function usePrintWorkspaceWindowSnapshot({
     schedulePersist(0)
 
     return () => {
+      disposed = true
       clearPersistHandles()
       mutationObserver?.disconnect()
       doc.removeEventListener('input', handleInput, true)
       doc.removeEventListener('change', handleInput, true)
     }
-  }, [observeNodeRef, stateID, suspended, templateKey, workspaceURL])
+  }, [
+    beforeSnapshot,
+    observeNodeRef,
+    stateID,
+    suspended,
+    templateKey,
+    workspaceURL,
+  ])
 }

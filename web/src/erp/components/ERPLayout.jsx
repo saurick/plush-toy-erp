@@ -91,6 +91,7 @@ import {
   isLocalCustomerDesktopPreviewSession,
   loadProfileSyncReadWithRetry,
   resolveEffectiveSessionCustomerKey,
+  resolveEffectiveSessionPageAccess,
   shouldRedirectFromCurrentNavigation,
   shouldGuardCustomerBusinessPageRuntime,
 } from '../utils/adminProfileSync.mjs'
@@ -269,6 +270,25 @@ function normalizeMenuPaths(menus = []) {
   return [...selected]
 }
 
+function buildUnavailableCachedAdminProfile(profile) {
+  if (!profile || typeof profile !== 'object') {
+    return null
+  }
+  return attachUnavailableEffectiveSessionToAdminProfile({
+    id: profile.id,
+    username: profile.username,
+    phone: profile.phone,
+    is_super_admin: false,
+    roles: [],
+    permissions: [],
+    menus: [],
+    erp_preferences:
+      profile.erp_preferences && typeof profile.erp_preferences === 'object'
+        ? profile.erp_preferences
+        : { column_orders: {} },
+  })
+}
+
 export default function ERPLayout() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -377,6 +397,12 @@ export default function ERPLayout() {
     [location.pathname, routeNavigationSections]
   )
   const currentEntry = currentNavigationEntry.entry
+  const currentPageRequiresConfiguredCustomerRuntime =
+    currentEntry?.access !== 'authenticated' &&
+    resolveEffectiveSessionPageAccess(
+      adminProfile,
+      currentNavigationEntry.pageKey
+    ).reason !== 'system_page_rbac_scope'
 
   const loadProfile = useCallback(
     ({ showLoading = false } = {}) => {
@@ -454,20 +480,11 @@ export default function ERPLayout() {
                 throw sessionError
               }
               console.warn(
-                '客户有效配置同步失败，继续使用缓存投影或空投影',
+                '客户有效配置同步失败，当前业务投影已停用',
                 sessionError
               )
-              const cachedEffectiveSession =
-                adminProfileRef.current?.effective_session &&
-                typeof adminProfileRef.current.effective_session === 'object'
-                  ? adminProfileRef.current.effective_session
-                  : null
-              nextProfile = cachedEffectiveSession
-                ? attachEffectiveSessionToAdminProfile(
-                    nextProfile,
-                    cachedEffectiveSession
-                  )
-                : attachUnavailableEffectiveSessionToAdminProfile(nextProfile)
+              nextProfile =
+                attachUnavailableEffectiveSessionToAdminProfile(nextProfile)
             }
           }
           if (!isCurrentSync()) {
@@ -518,16 +535,32 @@ export default function ERPLayout() {
             return
           }
           if (syncErrorAction === 'keep_cached') {
-            console.warn('管理员权限同步失败，继续使用本地缓存 profile', error)
-            return
-          }
-          if (syncErrorAction === 'silent') {
-            return
-          }
-          if (!isAuthFailureCode(error?.code)) {
+            console.warn('管理员权限同步失败，缓存授权已停用', error)
+          } else if (
+            syncErrorAction !== 'silent' &&
+            !isAuthFailureCode(error?.code)
+          ) {
             profileSyncErrorNotifiedRef.current = true
             message.error(getActionErrorMessage(error, '加载账号权限'))
           }
+          const unavailableProfile = buildUnavailableCachedAdminProfile(
+            adminProfileRef.current
+          )
+          if (unavailableProfile) {
+            persistAuthMeta(
+              {
+                user_id: unavailableProfile.id,
+                username: unavailableProfile.username,
+                is_super_admin: false,
+                roles: [],
+                permissions: [],
+                menus: [],
+                erp_preferences: unavailableProfile.erp_preferences,
+              },
+              AUTH_SCOPE.ADMIN
+            )
+          }
+          setAdminProfile(unavailableProfile)
         } finally {
           if (isCurrentSync()) {
             if (showLoading) {
@@ -1111,7 +1144,10 @@ export default function ERPLayout() {
     )
   }
 
-  if (customerRuntimeUnavailable) {
+  if (
+    customerRuntimeUnavailable &&
+    currentPageRequiresConfiguredCustomerRuntime
+  ) {
     return (
       <CustomerRuntimeUnavailable
         loggingOut={loggingOut}

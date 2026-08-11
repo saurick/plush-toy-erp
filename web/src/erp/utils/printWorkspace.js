@@ -18,6 +18,10 @@ const PRINT_WORKSPACE_WINDOW_STATE_DB_VERSION = 1
 const PRINT_WORKSPACE_WINDOW_STATE_DB_STORE_NAME = 'states'
 const PRINT_WORKSPACE_STATE_QUERY_KEY = 'state'
 const PRINT_WORKSPACE_WINDOW_STATE_TTL_MS = 24 * 60 * 60 * 1000
+const PRINT_WORKSPACE_DRAFT_SNAPSHOT_VERSION = 1
+const PRINT_WORKSPACE_DRAFT_SNAPSHOT_TTL_MS = 24 * 60 * 60 * 1000
+const PRINT_WORKSPACE_DRAFT_STORAGE_KEY_PREFIX =
+  '__plush_erp_print_workspace_draft__:v2'
 const PRINT_WORKSPACE_SHELL_PATH = '/print-window-shell.html'
 const PRINT_WORKSPACE_INITIAL_DRAFT_WINDOW_NAME_PREFIX =
   '__plush_erp_print_initial_draft__:'
@@ -51,6 +55,43 @@ function normalizeTemplateKey(templateKey = '') {
 
 function normalizeStateID(stateID = '') {
   return String(stateID || '').trim()
+}
+
+function normalizeDraftScopePart(value, fallback) {
+  const normalized = String(value ?? '').trim() || fallback
+  return encodeURIComponent(normalized)
+}
+
+function resolvePrintWorkspaceDraftAccountKey(options = {}) {
+  const explicitAccountKey = String(options.accountKey ?? '').trim()
+  if (explicitAccountKey) {
+    return explicitAccountKey
+  }
+
+  const runtimeWindow =
+    options.windowLike || (typeof window !== 'undefined' ? window : null)
+  try {
+    return String(
+      runtimeWindow?.localStorage?.getItem('admin_user_id') || ''
+    ).trim()
+  } catch {
+    return ''
+  }
+}
+
+function resolvePrintWorkspaceDraftCustomerKey(options = {}) {
+  const explicitCustomerKey = String(options.customerKey ?? '').trim()
+  if (explicitCustomerKey) {
+    return explicitCustomerKey
+  }
+
+  const runtimeWindow =
+    options.windowLike || (typeof window !== 'undefined' ? window : null)
+  return String(
+    runtimeWindow?.__PLUSH_ERP_CUSTOMER_CONFIG__?.customerKey ||
+      runtimeWindow?.__PLUSH_ERP_CUSTOMER_CONFIG__?.brand?.customerKey ||
+      ''
+  ).trim()
 }
 
 export function resolveRuntimeCustomerPrintCompanyName(windowLike) {
@@ -101,12 +142,27 @@ export function buildPrintWorkspaceWindowStateStorageKey(stateID = '') {
   return `${PRINT_WORKSPACE_WINDOW_STATE_STORAGE_KEY_PREFIX}${normalizeStateID(stateID)}`
 }
 
-export function buildPrintWorkspaceDraftStorageKey(templateKey, stateID = '') {
+export function buildPrintWorkspaceDraftStorageKey(
+  templateKey,
+  stateID = '',
+  options = {}
+) {
   const normalizedTemplateKey = normalizeTemplateKey(templateKey)
   const normalizedStateID = normalizeStateID(stateID)
-  return normalizedStateID
-    ? `__plush_erp_print_workspace_draft__:${normalizedTemplateKey}:${normalizedStateID}`
-    : `__plush_erp_print_workspace_draft__:${normalizedTemplateKey}`
+  const customerScope = normalizeDraftScopePart(
+    resolvePrintWorkspaceDraftCustomerKey(options),
+    'product-core'
+  )
+  const accountScope = normalizeDraftScopePart(
+    resolvePrintWorkspaceDraftAccountKey(options),
+    'anonymous'
+  )
+  const templateScope = normalizeDraftScopePart(
+    normalizedTemplateKey,
+    'unknown-template'
+  )
+  const stateScope = normalizeDraftScopePart(normalizedStateID, 'shared')
+  return `${PRINT_WORKSPACE_DRAFT_STORAGE_KEY_PREFIX}:${customerScope}:${accountScope}:${templateScope}:${stateScope}`
 }
 
 function buildInitialDraftWindowNamePayload(templateKey, stateID, draft) {
@@ -137,10 +193,7 @@ export function readInitialPrintWorkspaceDraftFromWindowName(
     return null
   }
 
-  const cacheKey = buildPrintWorkspaceDraftStorageKey(
-    normalizedTemplateKey,
-    normalizedStateID
-  )
+  const cacheKey = `${normalizedTemplateKey}:${normalizedStateID}`
   const cachedDrafts = initialPrintWorkspaceDraftCache.get(targetWindow)
   if (cachedDrafts?.has(cacheKey)) {
     return cachedDrafts.get(cacheKey)
@@ -179,18 +232,10 @@ export function readInitialPrintWorkspaceDraftFromWindowName(
 function clearInitialPrintWorkspaceDraftCache(storageKey, windowLike) {
   const targetWindow =
     windowLike || (typeof window !== 'undefined' ? window : null)
-  const normalizedStorageKey = String(storageKey || '').trim()
-  if (!targetWindow || !normalizedStorageKey) {
+  if (!targetWindow || !String(storageKey || '').trim()) {
     return
   }
-
-  const cachedDrafts = initialPrintWorkspaceDraftCache.get(targetWindow)
-  if (!cachedDrafts?.delete(normalizedStorageKey)) {
-    return
-  }
-  if (cachedDrafts.size <= 0) {
-    initialPrintWorkspaceDraftCache.delete(targetWindow)
-  }
+  initialPrintWorkspaceDraftCache.delete(targetWindow)
 }
 
 export function isSupportedPrintWorkspaceTemplate(templateKey) {
@@ -497,11 +542,61 @@ export function persistPrintWorkspaceDraftSnapshot(
   }
 
   try {
-    storage.setItem(normalizedStorageKey, JSON.stringify(draft))
+    storage.setItem(
+      normalizedStorageKey,
+      JSON.stringify({
+        version: PRINT_WORKSPACE_DRAFT_SNAPSHOT_VERSION,
+        updatedAt: Date.now(),
+        draft,
+      })
+    )
     clearInitialPrintWorkspaceDraftCache(normalizedStorageKey, windowLike)
     return true
   } catch {
     return false
+  }
+}
+
+export function readPrintWorkspaceDraftSnapshot(storageKey, storageLike) {
+  const normalizedStorageKey = String(storageKey || '').trim()
+  const storage =
+    storageLike || (typeof window !== 'undefined' ? window.localStorage : null)
+  if (!normalizedStorageKey || !storage) {
+    return null
+  }
+
+  const removeInvalidSnapshot = () => {
+    try {
+      storage.removeItem(normalizedStorageKey)
+    } catch {
+      // 读取失败时保持 fail closed；清理只是尽力而为。
+    }
+  }
+
+  try {
+    const raw = storage.getItem(normalizedStorageKey)
+    if (!raw) {
+      return null
+    }
+    const payload = JSON.parse(raw)
+    const updatedAt = Number(payload?.updatedAt)
+    if (
+      Number(payload?.version) !== PRINT_WORKSPACE_DRAFT_SNAPSHOT_VERSION ||
+      !Number.isFinite(updatedAt) ||
+      updatedAt <= 0 ||
+      !Object.prototype.hasOwnProperty.call(payload, 'draft')
+    ) {
+      removeInvalidSnapshot()
+      return null
+    }
+    if (Date.now() - updatedAt > PRINT_WORKSPACE_DRAFT_SNAPSHOT_TTL_MS) {
+      removeInvalidSnapshot()
+      return null
+    }
+    return payload.draft
+  } catch {
+    removeInvalidSnapshot()
+    return null
   }
 }
 
@@ -555,14 +650,22 @@ export function openPrintWorkspaceWindow(
       }
       initialDraftStorageKey = buildPrintWorkspaceDraftStorageKey(
         templateKey,
-        stateID
-      )
-      try {
-        if (typeof window === 'undefined' || !window.localStorage) {
-          throw new Error('storage unavailable')
+        stateID,
+        {
+          customerKey: workspaceOptions.customerKey,
+          windowLike: typeof window !== 'undefined' ? window : null,
         }
-        window.localStorage.setItem(initialDraftStorageKey, serializedDraft)
-      } catch {
+      )
+      if (
+        typeof window === 'undefined' ||
+        !window.localStorage ||
+        !persistPrintWorkspaceDraftSnapshot(
+          initialDraftStorageKey,
+          initialDraft,
+          window.localStorage,
+          window
+        )
+      ) {
         initialDraftStorageKey = ''
         initialDraftWindowNamePayload = buildInitialDraftWindowNamePayload(
           templateKey,

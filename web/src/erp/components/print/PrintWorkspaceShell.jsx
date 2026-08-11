@@ -3,6 +3,12 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { renderPrintValue } from './printValue.mjs'
 
 const PRINT_WORKSPACE_PREPARING_MIN_MS = 280
+const DRAFT_PERSISTENCE_STATUS_TEXT = Object.freeze({
+  saving: '正在保存本窗口内容...',
+  saved: '本窗口内容已保存',
+  error: '本窗口内容未保存，请检查浏览器存储权限或空间',
+  unavailable: '本窗口内容不会自动保存',
+})
 
 function normalizeSearchText(value) {
   return String(value ?? '')
@@ -14,6 +20,7 @@ export default function PrintWorkspaceShell({
   title,
   sourceTag = '使用默认模板',
   statusText = '',
+  persistenceStatus = '',
   workspaceClassName = '',
   panelTip = '',
   panelActions = null,
@@ -107,6 +114,16 @@ export default function PrintWorkspaceShell({
           {statusText ? (
             <span className="erp-print-shell__toolbar-status">
               {statusText}
+            </span>
+          ) : null}
+          {DRAFT_PERSISTENCE_STATUS_TEXT[persistenceStatus] ? (
+            <span
+              className="erp-print-shell__toolbar-status"
+              data-print-draft-save-status={persistenceStatus}
+              role="status"
+              aria-live="polite"
+            >
+              {DRAFT_PERSISTENCE_STATUS_TEXT[persistenceStatus]}
             </span>
           ) : null}
         </div>

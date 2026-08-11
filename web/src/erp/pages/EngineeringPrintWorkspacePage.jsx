@@ -41,8 +41,8 @@ import {
   PRINT_WORKSPACE_ENTRY_SOURCE,
   buildPrintWorkspaceDraftStorageKey,
   buildRestorablePrintWorkspaceURL,
-  persistPrintWorkspaceDraftSnapshot,
   readInitialPrintWorkspaceDraftFromWindowName,
+  readPrintWorkspaceDraftSnapshot,
   resolvePrintWorkspaceDraftMode,
   resolvePrintWorkspaceEntrySource,
   resolvePrintWorkspaceStateID,
@@ -51,7 +51,9 @@ import {
   syncPrintPageMarginForPaper,
   watchPrintPageMarginForPaper,
 } from '../utils/printPageMargin.mjs'
-import usePrintWorkspaceWindowSnapshot from '../utils/usePrintWorkspaceWindowSnapshot.js'
+import usePrintWorkspaceWindowSnapshot, {
+  preparePrintWorkspaceSnapshot,
+} from '../utils/usePrintWorkspaceWindowSnapshot.js'
 import {
   runSilentPrintWorkspaceDraftUpdate,
   useFlushPrintWorkspaceDraftOnPageExit,
@@ -1081,15 +1083,10 @@ function loadDraft({
     return createEngineeringPrintDraft(templateKey, initialDraft)
   }
 
-  try {
-    const rawDraft = window.localStorage.getItem(storageKey) || ''
-    if (!rawDraft) {
-      return fallbackDraft
-    }
-    return createEngineeringPrintDraft(templateKey, JSON.parse(rawDraft))
-  } catch {
-    return fallbackDraft
-  }
+  const storedDraft = readPrintWorkspaceDraftSnapshot(storageKey)
+  return storedDraft
+    ? createEngineeringPrintDraft(templateKey, storedDraft)
+    : fallbackDraft
 }
 
 function MaterialDetailPaper({
@@ -2558,8 +2555,10 @@ export default function EngineeringPrintWorkspacePage() {
   )
   const businessInput = entrySource === PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS
   const draftStorageKey = workspaceStateID
-    ? buildPrintWorkspaceDraftStorageKey(templateKey, workspaceStateID)
-    : buildPrintWorkspaceDraftStorageKey(templateKey)
+    ? buildPrintWorkspaceDraftStorageKey(templateKey, workspaceStateID, {
+        customerKey,
+      })
+    : buildPrintWorkspaceDraftStorageKey(templateKey, '', { customerKey })
   const workspaceURL = useMemo(() => {
     if (!workspaceStateID || typeof window === 'undefined') {
       return ''
@@ -2581,15 +2580,18 @@ export default function EngineeringPrintWorkspacePage() {
   const [toolbarStatus, setToolbarStatus] = useState(
     businessInput ? '已从业务页带入打印草稿。' : '已加载默认样例。'
   )
-  const [draft, setDraft, flushDraft] = usePersistentPrintWorkspaceDraft(() =>
-    loadDraft({
-      templateKey,
-      storageKey: draftStorageKey,
-      forceFresh: resetDraftOnOpen,
-      workspaceStateID,
-      businessInput,
-    })
-  )
+  const [draft, setDraft, flushDraft, , persistenceStatus] =
+    usePersistentPrintWorkspaceDraft(
+      () =>
+        loadDraft({
+          templateKey,
+          storageKey: draftStorageKey,
+          forceFresh: resetDraftOnOpen,
+          workspaceStateID,
+          businessInput,
+        }),
+      draftStorageKey
+    )
   const [selectedMaterialLineIndex, setSelectedMaterialLineIndex] =
     useState(null)
   const [materialLineSelectionMode, setMaterialLineSelectionMode] =
@@ -2656,12 +2658,6 @@ export default function EngineeringPrintWorkspacePage() {
   useFlushPrintWorkspaceDraftOnPageExit(flushDraft)
 
   useEffect(() => {
-    if (draftStorageKey) {
-      persistPrintWorkspaceDraftSnapshot(draftStorageKey, draft)
-    }
-  }, [draft, draftStorageKey])
-
-  useEffect(() => {
     if (!paperRef.current) return undefined
     return watchPrintPageMarginForPaper(paperRef.current, {
       stageWrapElement: stageWrapRef.current,
@@ -2675,6 +2671,7 @@ export default function EngineeringPrintWorkspacePage() {
     workspaceURL,
     observeNodeRef: paperRef,
     suspended: pdfAction !== '',
+    beforeSnapshot: flushDraft,
   })
 
   useEffect(() => {
@@ -3136,18 +3133,14 @@ export default function EngineeringPrintWorkspacePage() {
   }
 
   const handleAppendixImagesChange = (images) => {
-    let persisted = true
-    setDraft((current) => {
+    const persisted = setDraft((current) => {
       const nextDraft = {
         ...current,
         appendixImages: normalizePrintAppendixImages(images),
       }
-      persisted =
-        !draftStorageKey ||
-        persistPrintWorkspaceDraftSnapshot(draftStorageKey, nextDraft)
       return nextDraft
     })
-    return persisted
+    return !draftStorageKey || persisted
   }
 
   const updateMaterialColumnLabel = (columnIndex, value) => {
@@ -3895,6 +3888,11 @@ export default function EngineeringPrintWorkspacePage() {
     try {
       setPdfAction('preview')
       setPdfActionStartedAt(Date.now())
+      await preparePrintWorkspaceSnapshot({
+        windowLike: window,
+        beforeSnapshot: flushDraft,
+      })
+      pdfPreviewPreloadRef.current = null
       syncPrintPageMarginForPaper(paperRef.current, {
         stageWrapElement: stageWrapRef.current,
         paperContinuedClass: 'erp-engineering-print-paper--continued',
@@ -3921,6 +3919,10 @@ export default function EngineeringPrintWorkspacePage() {
     try {
       setPdfAction('download')
       setPdfActionStartedAt(Date.now())
+      await preparePrintWorkspaceSnapshot({
+        windowLike: window,
+        beforeSnapshot: flushDraft,
+      })
       await downloadPdfFromElement(paperRef.current, {
         title: template.title,
         fileName: pdfFileName,
@@ -3936,7 +3938,11 @@ export default function EngineeringPrintWorkspacePage() {
     }
   }
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    await preparePrintWorkspaceSnapshot({
+      windowLike: window,
+      beforeSnapshot: flushDraft,
+    })
     if (paperRef.current) {
       syncPrintPageMarginForPaper(paperRef.current, {
         stageWrapElement: stageWrapRef.current,
@@ -4413,6 +4419,7 @@ export default function EngineeringPrintWorkspacePage() {
         title={template.title}
         sourceTag={businessInput ? '业务记录带值' : '使用默认模板'}
         statusText={toolbarStatus}
+        persistenceStatus={persistenceStatus}
         workspaceClassName="erp-engineering-print-workspace-shell"
         panelTip="左侧维护关键字段；右侧纸面可直接编辑，打印和 PDF 只输出右侧纸面。"
         panelActions={panelActions}

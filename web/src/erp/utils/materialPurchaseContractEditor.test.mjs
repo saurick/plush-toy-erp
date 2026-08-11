@@ -82,6 +82,24 @@ test('FL_material_purchase_amount__recomputes_amount_and_total_from_current_line
   assert.equal(totals.amountText, '161.60')
 })
 
+test('materialPurchaseContractEditor: 金额按十进制定点数四舍五入并精确合计', () => {
+  const firstLines = updateMaterialPurchaseLineCell(
+    [{ quantity: '1', unitPrice: '2.675', amount: '' }],
+    0,
+    'quantity',
+    '1'
+  )
+  assert.equal(firstLines[0].amount, '2.68')
+
+  const totals = computeMaterialPurchaseTotals([
+    ...firstLines,
+    { quantity: '0.1', unitPrice: '0.2', amount: '0.10' },
+    { quantity: '0.2', unitPrice: '0.3', amount: '0.20' },
+  ])
+  assert.equal(totals.quantityText, '1.3')
+  assert.equal(totals.amountText, '2.98')
+})
+
 test('FL_material_purchase_amount__keeps_manual_amount_snapshot materialPurchaseContractEditor: 初始化时优先保留已有采购金额快照', () => {
   const draft = buildMaterialPurchaseContractDraft({
     lines: [

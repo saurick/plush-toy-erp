@@ -17,6 +17,7 @@ import {
   persistPrintWorkspaceWindowHTML,
   persistPrintWorkspaceWindowState,
   persistPrintWorkspaceDraftSnapshot,
+  readPrintWorkspaceDraftSnapshot,
   readPrintWorkspaceWindowState,
   readInitialPrintWorkspaceDraftFromWindowName,
   resolvePrintWorkspaceStateID,
@@ -144,10 +145,32 @@ test('printWorkspace: 壳页 URL、窗口状态 key 与草稿 key 统一收口',
   assert.equal(
     buildPrintWorkspaceDraftStorageKey(
       MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
-      'window-3'
+      'window-3',
+      { customerKey: 'yoyoosun', accountKey: '42' }
     ),
-    '__plush_erp_print_workspace_draft__:material-purchase-contract:window-3'
+    '__plush_erp_print_workspace_draft__:v2:yoyoosun:42:material-purchase-contract:window-3'
   )
+})
+
+test('printWorkspace: 草稿 key 按客户、账号、模板和窗口隔离', () => {
+  const firstAccountKey = buildPrintWorkspaceDraftStorageKey(
+    MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+    'window-scope',
+    { customerKey: 'yoyoosun', accountKey: '10' }
+  )
+  const secondAccountKey = buildPrintWorkspaceDraftStorageKey(
+    MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+    'window-scope',
+    { customerKey: 'yoyoosun', accountKey: '11' }
+  )
+  const secondCustomerKey = buildPrintWorkspaceDraftStorageKey(
+    MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+    'window-scope',
+    { customerKey: 'reference-customer', accountKey: '10' }
+  )
+
+  assert.notEqual(firstAccountKey, secondAccountKey)
+  assert.notEqual(firstAccountKey, secondCustomerKey)
 })
 
 test('printWorkspace: 窗口状态持久化后可按 TTL 读取，过期时自动失效', () => {
@@ -336,6 +359,52 @@ test('printWorkspace: 草稿写入 localStorage 满额时不抛异常', () => {
   )
 })
 
+test('printWorkspace: 草稿只读取当前版本且超过 24 小时自动失效', () => {
+  const storage = new Map()
+  const originalNow = Date.now
+  const storageLike = {
+    setItem(key, value) {
+      storage.set(key, value)
+    },
+    getItem(key) {
+      return storage.get(key) || null
+    },
+    removeItem(key) {
+      storage.delete(key)
+    },
+  }
+  const storageKey = buildPrintWorkspaceDraftStorageKey(
+    MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+    'draft-ttl',
+    { customerKey: 'yoyoosun', accountKey: '42' }
+  )
+
+  Date.now = () => 1_000
+  try {
+    assert.equal(
+      persistPrintWorkspaceDraftSnapshot(
+        storageKey,
+        { contractNo: 'CG-001' },
+        storageLike
+      ),
+      true
+    )
+    assert.deepEqual(readPrintWorkspaceDraftSnapshot(storageKey, storageLike), {
+      contractNo: 'CG-001',
+    })
+
+    Date.now = () => 24 * 60 * 60 * 1000 + 1_001
+    assert.equal(readPrintWorkspaceDraftSnapshot(storageKey, storageLike), null)
+    assert.equal(storage.has(storageKey), false)
+
+    storage.set(storageKey, JSON.stringify({ contractNo: 'legacy-draft' }))
+    assert.equal(readPrintWorkspaceDraftSnapshot(storageKey, storageLike), null)
+    assert.equal(storage.has(storageKey), false)
+  } finally {
+    Date.now = originalNow
+  }
+})
+
 test('FL_print_workspace_window_snapshot__persists_current_html_snapshot printWorkspace: 工作台可把整窗 HTML 快照落到窗口状态里', async () => {
   const storage = new Map()
   const originalWindow = globalThis.window
@@ -479,14 +548,15 @@ test('printWorkspace: 业务页打开时会先写入当前窗口专属打印草�
       popup.openedURL,
       'http://127.0.0.1:4173/erp/print-workspace/material-purchase-contract?source=business&customer_key=yoyoosun&state=business-window-1'
     )
+    const draftStorageKey = buildPrintWorkspaceDraftStorageKey(
+      MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+      'business-window-1',
+      { customerKey: 'yoyoosun', windowLike: globalThis.window }
+    )
     assert.deepEqual(
-      JSON.parse(
-        storage.get(
-          buildPrintWorkspaceDraftStorageKey(
-            MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
-            'business-window-1'
-          )
-        )
+      readPrintWorkspaceDraftSnapshot(
+        draftStorageKey,
+        globalThis.window.localStorage
       ),
       initialDraft
     )
