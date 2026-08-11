@@ -18,7 +18,7 @@
 | --- | --- |
 | databaseBackupSize |  |
 | databaseBackupHash |  |
-| attachmentSnapshot |  |
+| attachmentSnapshot | included-in-database-backup |
 | storageLocationAlias |  |
 | encryptionEnabled |  |
 | retentionPolicy |  |

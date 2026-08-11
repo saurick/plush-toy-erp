@@ -128,7 +128,7 @@ test("backup restore rehearsal report shape stays compatible with release eviden
     '"backupCreated": true',
     '"restoreCompleted": true',
     "restoreTarget=$restore_target",
-    "steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status -> populated upgrade read-only audit -> customer config cutover read-only audit -> atlas migrate apply -> post-apply atlas status -> smoke query",
+    "steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status -> populated upgrade read-only audit -> customer config cutover read-only audit -> database constraint read-only audit -> atlas migrate apply -> post-apply atlas status -> smoke query",
     "populated-upgrade-preflight.sh",
     "auditing populated upgrade boundaries",
     "auditing customer config cutover boundaries",
@@ -148,11 +148,11 @@ test("backup restore rehearsal report shape stays compatible with release eviden
 
   assert.doesNotMatch(source, /cp "\$backup_file"/);
   assert.match(source, /sha256sum "\$backup_file"/);
-  assert.match(source, /atlas migrate status/);
-  assert.match(source, /atlas migrate apply/);
+  assert.match(source, /atlas_restore_migrate status/);
+  assert.match(source, /atlas_restore_migrate apply/);
   const populatedAudit = source.indexOf("--audit populated-upgrade");
   const cutoverAudit = source.indexOf("--audit customer-config-cutover");
-  const atlasApply = source.indexOf("atlas migrate apply");
+  const atlasApply = source.indexOf("atlas_restore_migrate apply");
   assert(populatedAudit >= 0, "populated upgrade audit must be explicit");
   assert(
     populatedAudit < cutoverAudit,
@@ -164,6 +164,32 @@ test("backup restore rehearsal report shape stays compatible with release eviden
   );
   assert.match(source, /information_schema\.tables/);
   assert.match(source, /docker rm -f "\$container_name"/);
+});
+
+test("backup restore rehearsal keeps credentials private and uses the full migration contract", () => {
+  const source = fs.readFileSync(scriptPath, "utf8");
+
+  assert.match(source, /^umask 077$/m);
+  assert.match(source, /postgres:18\.1/);
+  assert.doesNotMatch(source, /postgres:18(?:["'\s]|$)/);
+  assert.doesNotMatch(source, /postgresql@(?:16|17)/);
+  assert.match(source, /source_user" == "erp_backup"/);
+  assert.match(source, /restore_dsn="postgres:\/\/erp_migrator:/);
+  assert.match(
+    source,
+    /PGDATABASE="\$source_dsn" "\$pg_dump_bin"[\s\S]*--format=custom/,
+  );
+  assert.doesNotMatch(source, /"\$pg_dump_bin"\s+"\$source_dsn"/);
+  assert.match(source, /url = getenv\("ATLAS_DATABASE_URL"\)/);
+  assert.doesNotMatch(source, /--url "\$restore_dsn"/);
+  assert.match(source, /apply --dry-run --tx-mode all/);
+  assert.match(source, /ROLLBACK;/);
+  assert.match(source, /apply --lock-timeout 10s --tx-mode all/);
+  assert.match(source, /schema-readback\.sql/);
+  assert.match(source, /programmability_result/);
+  assert.match(source, /permissionReadbackStatus/);
+  assert.match(source, /mkdir -m 700 "\$run_dir"/);
+  assert.match(source, /chmod 600 "\$private_file"/);
 });
 
 test("backup restore rehearsal waits for the final postgres process before restore", () => {
