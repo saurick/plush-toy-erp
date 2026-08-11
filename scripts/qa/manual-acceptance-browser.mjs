@@ -759,7 +759,7 @@ async function acknowledgeLegalNoticeIfRequired(page, statusResponse) {
   return true;
 }
 
-async function loginFormalAccount(
+async function loginFormalAccountAttempt(
   browser,
   {
     baseURL,
@@ -834,9 +834,11 @@ async function loginFormalAccount(
       });
     }
     if (events.length > 0) {
-      throw new BrowserAcceptanceError(
+      const error = new BrowserAcceptanceError(
         `${account.username} 登录出现浏览器错误：${events.map((item) => item.message).join("；")}`,
       );
+      error.runtimeErrors = events.map((item) => ({ ...item }));
+      throw error;
     }
     return {
       storageState: await context.storageState(),
@@ -856,6 +858,45 @@ async function loginFormalAccount(
   } finally {
     await context.close();
   }
+}
+
+export function isRetryableFormalLoginRateLimitFailure(error) {
+  return isRetryableTargetRateLimitFailure({
+    passed: false,
+    runtimeErrors: Array.isArray(error?.runtimeErrors)
+      ? error.runtimeErrors
+      : [],
+  });
+}
+
+export async function runFormalLoginWithRateLimitRetry(
+  runAttempt,
+  {
+    waitImpl = wait,
+    maxAttempts = TARGET_RATE_LIMIT_MAX_ATTEMPTS,
+    retryDelayMs = TARGET_RATE_LIMIT_RETRY_DELAY_MS,
+  } = {},
+) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await runAttempt(attempt);
+    } catch (error) {
+      if (
+        !isRetryableFormalLoginRateLimitFailure(error) ||
+        attempt === maxAttempts
+      ) {
+        throw error;
+      }
+      await waitImpl(retryDelayMs * attempt);
+    }
+  }
+  throw new BrowserAcceptanceError("正式账号登录未执行");
+}
+
+async function loginFormalAccount(browser, options) {
+  return runFormalLoginWithRateLimitRetry(() =>
+    loginFormalAccountAttempt(browser, options),
+  );
 }
 
 async function readVisibleTextSummary(page) {

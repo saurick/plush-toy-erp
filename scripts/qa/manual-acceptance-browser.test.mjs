@@ -19,7 +19,9 @@ import {
   buildManualAcceptanceCurrentBatchReadiness,
   normalizeLocalBrowserURL,
   partitionTargetRuntimeEvents,
+  isRetryableFormalLoginRateLimitFailure,
   isRetryableTargetRateLimitFailure,
+  runFormalLoginWithRateLimitRetry,
   runTargetWithRateLimitRetry,
   summarizeManualAcceptance,
   parseManualAcceptanceBrowserArgs,
@@ -1386,6 +1388,74 @@ test("browser target retries only bounded pure HTTP 429 failures and retains evi
   assert.equal(attempts, 3);
   assert.equal(persistent.passed, false);
   assert.equal(persistent.rateLimitRetryEvidence.length, 3);
+});
+
+test("formal login retries only bounded pure HTTP 429 failures", async () => {
+  const rateLimited = Object.assign(new Error("formal login rate limited"), {
+    runtimeErrors: [
+      {
+        type: "response",
+        message: "429 http://127.0.0.1:15200/rpc/admin",
+      },
+      {
+        type: "console",
+        message:
+          "Failed to load resource: the server responded with a status of 429 (Too Many Requests)",
+      },
+    ],
+  });
+  assert.equal(isRetryableFormalLoginRateLimitFailure(rateLimited), true);
+
+  const mixedFailure = Object.assign(new Error("formal login failed"), {
+    runtimeErrors: [
+      ...rateLimited.runtimeErrors,
+      { type: "response", message: "500 http://127.0.0.1:15200/rpc/admin" },
+    ],
+  });
+  assert.equal(isRetryableFormalLoginRateLimitFailure(mixedFailure), false);
+
+  const waits = [];
+  let attempts = 0;
+  const recovered = await runFormalLoginWithRateLimitRetry(
+    async () => {
+      attempts += 1;
+      if (attempts === 1) throw rateLimited;
+      return { passed: true };
+    },
+    {
+      waitImpl: async (milliseconds) => waits.push(milliseconds),
+      retryDelayMs: 25,
+    },
+  );
+  assert.deepEqual(recovered, { passed: true });
+  assert.equal(attempts, 2);
+  assert.deepEqual(waits, [25]);
+
+  attempts = 0;
+  await assert.rejects(
+    runFormalLoginWithRateLimitRetry(
+      async () => {
+        attempts += 1;
+        throw mixedFailure;
+      },
+      { waitImpl: async () => {}, retryDelayMs: 0 },
+    ),
+    mixedFailure,
+  );
+  assert.equal(attempts, 1);
+
+  attempts = 0;
+  await assert.rejects(
+    runFormalLoginWithRateLimitRetry(
+      async () => {
+        attempts += 1;
+        throw rateLimited;
+      },
+      { waitImpl: async () => {}, maxAttempts: 3, retryDelayMs: 0 },
+    ),
+    rateLimited,
+  );
+  assert.equal(attempts, 3);
 });
 
 test("business summary totals use the visible client-facing counters", () => {
