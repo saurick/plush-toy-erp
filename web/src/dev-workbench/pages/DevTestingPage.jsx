@@ -22,6 +22,7 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import SearchInput from '@/common/components/SearchInput'
 import { message } from '@/common/utils/antdApp'
+import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTimestamp from '../components/DevTimestamp.jsx'
 import {
@@ -63,6 +64,7 @@ import {
   getDevTestingOperationPresentation,
   isDevTestingOperationActive,
 } from '../config/devTestingOperation.mjs'
+import useDevCustomerScope from '../hooks/useDevCustomerScope.mjs'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -993,6 +995,8 @@ function ValidationWorkspace({
   summary,
   summaryError,
   actionStarting,
+  customerScope,
+  customerReady,
   onGeneratePlan,
   onRunAction,
 }) {
@@ -1005,6 +1009,8 @@ function ValidationWorkspace({
     busy.active ||
     anyActive ||
     Boolean(actionStarting)
+  const customerSelectorDisabled =
+    busy.active || anyActive || Boolean(actionStarting)
 
   return (
     <section
@@ -1048,13 +1054,24 @@ function ValidationWorkspace({
         </div>
         <Tag>固定白名单</Tag>
       </div>
+      <DevCustomerScopeSelector
+        scope={customerScope}
+        onChange={customerScope.selectCustomer}
+        disabled={customerSelectorDisabled}
+        label="岗位权限检查甲方"
+        note="仅“岗位权限与任务可见性巡检”按甲方选择；当前永绅对应固定 yoyoosun 九岗位检查。"
+        invalidDescription="岗位权限与任务可见性巡检已停止；开发门禁与字段联动专项仍可独立运行。"
+      />
       <div className="erp-dev-testing-validation__actions">
         {DEV_TESTING_FIXED_ACTIONS.map((action) => (
           <ValidationActionCard
             key={action.key}
             action={action}
             operation={operations[action.key]}
-            disabled={actionsDisabled}
+            disabled={
+              actionsDisabled ||
+              (action.key === 'role-access' && !customerReady)
+            }
             starting={actionStarting === action.key}
             onRun={onRunAction}
           />
@@ -1363,6 +1380,12 @@ export default function DevTestingPage() {
   )
   const requestedView = searchParams.get(VIEW_QUERY_KEY) || ''
   const view = VIEW_VALUES.has(requestedView) ? requestedView : VIEW_TIERS
+  const customerScope = useDevCustomerScope({
+    searchParams,
+    setSearchParams,
+    normalize: view === VIEW_TIERS,
+  })
+  const customerReady = customerScope.status === 'ready'
   const isCloseoutView = view === VIEW_CLOSEOUT
   const isCoverageView = view === VIEW_COVERAGE
   const requestedDocumentRole =
@@ -1756,6 +1779,7 @@ export default function DevTestingPage() {
 
   const runTestingAction = async (action) => {
     if (
+      (action === 'role-access' && !customerReady) ||
       testingActionStarting ||
       !testingSummary ||
       testingSummaryError ||
@@ -1931,6 +1955,8 @@ export default function DevTestingPage() {
                 summary={testingSummary}
                 summaryError={testingSummaryError}
                 actionStarting={testingActionStarting}
+                customerScope={customerScope}
+                customerReady={customerReady}
                 onGeneratePlan={generateTestingPlan}
                 onRunAction={runTestingAction}
               />

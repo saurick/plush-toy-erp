@@ -249,6 +249,16 @@ test('devRecovery: 页面只读消费版本摘要，不创建第二套写动作'
   assert.match(source, /createDevDeliveryClient/u)
   assert.match(source, /client\.summary\(\)/u)
   assert.doesNotMatch(source, /client\.action|fetch\(|WebSocket|EventSource/u)
+  assert.match(source, /DevCustomerScopeSelector/u)
+  assert.match(source, /useDevCustomerScope/u)
+  assert.match(source, /buildDevCustomerSnapshotKey/u)
+  assert.match(source, /buildDevCustomerScopedRoute/u)
+  assert.match(source, /disabled=\{!customerReady\}/u)
+  assert.doesNotMatch(
+    source,
+    /loadDevSummarySnapshot\(\s*DEV_DELIVERY_SUMMARY_SNAPSHOT_KEY/u,
+    '演练状态缓存必须按甲方隔离'
+  )
   assert.match(source, /当前没有可冒充演练结果的正式回执/u)
   assert.match(source, /禁止对当前试用或正式环境临时注入故障/u)
 })

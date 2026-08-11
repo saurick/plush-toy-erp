@@ -1392,6 +1392,16 @@ test('devTesting: 页面提供独立的 P0/P1 固定动作与覆盖基线边界'
     /页面只复制仓库固定命令，不执行、不暂存、不提交/
   )
   assert.match(testingPageSource, /runTestingAction/)
+  assert.match(testingPageSource, /DevCustomerScopeSelector/u)
+  assert.match(testingPageSource, /useDevCustomerScope/u)
+  assert.match(testingPageSource, /normalize: view === VIEW_TIERS/u)
+  assert.match(testingPageSource, /label="岗位权限检查甲方"/u)
+  assert.match(
+    testingPageSource,
+    /action\.key === 'role-access' && !customerReady/u
+  )
+  assert.match(testingPageSource, /action === 'role-access' && !customerReady/u)
+  assert.match(testingPageSource, /开发门禁与字段联动专项仍可独立运行/u)
   assert.match(
     testingPageSource,
     /const actionsDisabled =\s*!summary \|\|\s*Boolean\(summaryError\)/

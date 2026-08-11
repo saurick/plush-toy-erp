@@ -48,10 +48,13 @@ import {
   getWorkflowTaskStatusMeta,
 } from '@/erp/utils/workflowTaskBoard.mjs'
 import { getPermissionCenterRoleName } from '../../erp/utils/permissionCenterAccess.mjs'
+import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
 import { buildDevBusinessChainProjection } from '../config/devBusinessChainProjection.mjs'
 import { buildDevBusinessChainCustomerReview } from '../config/devBusinessChainCustomerReview.mjs'
+import { DEV_CUSTOMER_QUERY_KEY } from '../config/devCustomerScope.mjs'
+import useDevCustomerScope from '../hooks/useDevCustomerScope.mjs'
 import DevBusinessChainCustomerReviewPrint from './DevBusinessChainCustomerReviewPrint.jsx'
 import {
   DEV_FLOW_STATE_TASK_RUNTIME_ASSOCIATION,
@@ -98,7 +101,10 @@ const SOURCE_PATH = 'docs/architecture/业务链与运行轨迹边界.md'
 const CATALOG_MODULE_PATH = '../config/devFlowStateCatalog.mjs'
 const CATALOG_MODULES = import.meta.glob('../config/devFlowStateCatalog.mjs')
 
-const KNOWN_QUERY_KEYS = new Set(Object.values(QUERY_KEYS))
+const KNOWN_QUERY_KEYS = new Set([
+  ...Object.values(QUERY_KEYS),
+  DEV_CUSTOMER_QUERY_KEY,
+])
 const VIEW_ITEMS = Object.freeze([
   {
     value: 'chain',
@@ -1418,6 +1424,7 @@ function BusinessChainOverviewView({
   onSelectChain,
   onOpenView,
   onPrintCustomerReview,
+  customerReviewReady,
 }) {
   const overview = catalog.businessChainOverview
   const chainByKey = useMemo(
@@ -1479,6 +1486,12 @@ function BusinessChainOverviewView({
           <Button
             type="primary"
             icon={<PrinterOutlined />}
+            disabled={!customerReviewReady}
+            title={
+              customerReviewReady
+                ? '导出所选甲方的配置预览校对稿'
+                : '先选择已登记且具备配置预览的甲方'
+            }
             onClick={onPrintCustomerReview}
           >
             导出甲方校对版
@@ -1684,6 +1697,7 @@ function BusinessChainView({
   onSelectNode,
   onOpenView,
   onPrintCustomerReview,
+  customerReviewReady,
 }) {
   const { runtime, runtimeProcessKey, matchingChain } = useBusinessChainRuntime(
     catalog,
@@ -1815,6 +1829,12 @@ function BusinessChainView({
           <Button
             type="primary"
             icon={<PrinterOutlined />}
+            disabled={!customerReviewReady}
+            title={
+              customerReviewReady
+                ? '导出所选甲方的配置预览校对稿'
+                : '先选择已登记且具备配置预览的甲方'
+            }
             onClick={onPrintCustomerReview}
           >
             导出甲方校对版
@@ -3337,7 +3357,7 @@ function invalidQueryMessages(searchParams, catalog) {
   const messages = []
   for (const key of new Set(searchParams.keys())) {
     if (!KNOWN_QUERY_KEYS.has(key)) messages.push(`未知 query 参数：${key}`)
-    if (searchParams.getAll(key).length > 1) {
+    if (key !== DEV_CUSTOMER_QUERY_KEY && searchParams.getAll(key).length > 1) {
       messages.push(`query 参数重复：${key}`)
     }
   }
@@ -3442,6 +3462,12 @@ export default function DevFlowStateObservatoryPage() {
   const activeSearchParams = queryCanonicalization.searchParams
   const requestedView = cleanText(activeSearchParams.get(QUERY_KEYS.view))
   const view = requestedView || DEFAULT_VIEW
+  const customerScope = useDevCustomerScope({
+    searchParams,
+    setSearchParams,
+    normalize: view === 'chain',
+  })
+  const customerReady = customerScope.status === 'ready'
   const requestedChainKey = cleanText(activeSearchParams.get(QUERY_KEYS.chain))
   const requestedNodeKey = cleanText(activeSearchParams.get(QUERY_KEYS.node))
   const requestedFlowKey = cleanText(activeSearchParams.get(QUERY_KEYS.flow))
@@ -3558,8 +3584,19 @@ export default function DevFlowStateObservatoryPage() {
     ) ||
     availableFactDefinitions[0] ||
     null
+  const customerOverlay = useMemo(() => {
+    if (!catalog || !customerReady) return null
+    return (
+      catalog.overlays.find(
+        (overlay) => overlay.customerKey === customerScope.customerKey
+      ) || null
+    )
+  }, [catalog, customerReady, customerScope.customerKey])
+  const customerReviewReady = Boolean(customerReady && customerOverlay)
   const customerReview = useMemo(() => {
-    if (!catalog || !valid || view !== 'chain') return null
+    if (!catalog || !valid || view !== 'chain' || !customerReviewReady) {
+      return null
+    }
     const chainKey = overviewSelected
       ? catalog.businessChainOverview.key
       : chain?.key
@@ -3568,11 +3605,14 @@ export default function DevFlowStateObservatoryPage() {
       catalog,
       chainKey,
       generatedAt: customerReviewGeneratedAt,
+      customerOverlay,
     })
   }, [
     catalog,
     chain?.key,
+    customerOverlay,
     customerReviewGeneratedAt,
+    customerReviewReady,
     overviewSelected,
     valid,
     view,
@@ -3666,6 +3706,7 @@ export default function DevFlowStateObservatoryPage() {
       ...patch,
     })
   const printCustomerReview = async () => {
+    if (!customerReviewReady || !customerReview) return
     setCustomerReviewGeneratedAt(new Date().toISOString())
     await new Promise((resolve) => {
       window.requestAnimationFrame(() => window.requestAnimationFrame(resolve))
@@ -3720,6 +3761,7 @@ export default function DevFlowStateObservatoryPage() {
             }
             onOpenView={openView}
             onPrintCustomerReview={printCustomerReview}
+            customerReviewReady={customerReviewReady}
           />
         )
       }
@@ -3737,6 +3779,7 @@ export default function DevFlowStateObservatoryPage() {
           onSelectNode={(key) => updateParams({ [QUERY_KEYS.node]: key })}
           onOpenView={openView}
           onPrintCustomerReview={printCustomerReview}
+          customerReviewReady={customerReviewReady}
         />
       )
     }
@@ -3848,6 +3891,25 @@ export default function DevFlowStateObservatoryPage() {
           <MemoryStrip />
         </details>
       </header>
+      {catalogState.status === 'ready' && catalog && view === 'chain' ? (
+        <>
+          <DevCustomerScopeSelector
+            scope={customerScope}
+            onChange={customerScope.selectCustomer}
+            label="甲方校对稿"
+            note="选择只绑定甲方校对稿的客户配置预览；通用业务链仍来自 Product Core，不代表配置已发布或甲方已验收。"
+            invalidDescription="当前甲方没有登记校对预览；甲方校对稿导出已停止，通用业务链与运行观察仍可使用。"
+          />
+          {customerReady && !customerOverlay ? (
+            <Alert
+              type="warning"
+              showIcon
+              message="所选甲方没有业务链配置预览"
+              description="甲方校对稿导出已停止；请先登记只读客户配置预览，不能用产品通用设计冒充客户版本。"
+            />
+          ) : null}
+        </>
+      ) : null}
       {catalogState.status === 'ready' && catalog ? (
         <details className="erp-dev-flow-definition-tools">
           <summary>

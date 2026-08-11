@@ -25,7 +25,9 @@ import {
   theme,
   Typography,
 } from 'antd'
+import { useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
+import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTimestamp from '../components/DevTimestamp.jsx'
 import {
@@ -38,6 +40,7 @@ import {
   resolveDataPreparationPrepareIntent,
   selectRecoverableDataPreparationOperation,
 } from '../config/devDataPreparation.mjs'
+import useDevCustomerScope from '../hooks/useDevCustomerScope.mjs'
 
 const { Paragraph, Text, Title } = Typography
 const POLL_INTERVAL_MS = 1500
@@ -681,6 +684,7 @@ function OperationDetail({ operation, acceptancePlan, compact = false }) {
 
 export default function DevDataPreparationPage() {
   const { token } = theme.useToken()
+  const [searchParams, setSearchParams] = useSearchParams()
   const client = useMemo(() => createDevDataPreparationClient(), [])
   const requestVersionRef = useRef(0)
   const currentOperationIdRef = useRef('')
@@ -689,6 +693,14 @@ export default function DevDataPreparationPage() {
   const [selectedProfileKey, setSelectedProfileKey] = useState(
     DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance
   )
+  const selectedIsScenarioDemo =
+    selectedProfileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo
+  const customerScope = useDevCustomerScope({
+    searchParams,
+    setSearchParams,
+    normalize: selectedIsScenarioDemo,
+  })
+  const customerReady = customerScope.status === 'ready'
   const [selectedChainKey, setSelectedChainKey] = useState('')
   const [currentOperation, setCurrentOperation] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -791,8 +803,6 @@ export default function DevDataPreparationPage() {
   )
   const selectedProfileCopy =
     DEV_DATA_PREPARATION_PROFILE_COPY[selectedProfileKey]
-  const selectedIsScenarioDemo =
-    selectedProfileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo
   const selectedTarget = summary?.target?.[selectedProfileCopy.targetKey]
   const repositoryBlocked =
     selectedProfile?.exactCleanCommitRequired === true &&
@@ -801,19 +811,21 @@ export default function DevDataPreparationPage() {
     (operation) =>
       operation.profileKey === selectedProfileKey && !operation.terminal
   )
+  const currentIsScenarioDemo =
+    currentOperation?.profileKey ===
+    DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo
   const canPrepare =
     Boolean(selectedProfile) &&
     selectedTarget?.status === 'available' &&
     !repositoryBlocked &&
     !hasActiveOperation &&
+    (!selectedIsScenarioDemo || customerReady) &&
     !loading
   const canExecuteCurrent =
     currentOperation?.status === 'ready' &&
     selectedTarget?.status === 'available' &&
-    !repositoryBlocked
-  const currentIsScenarioDemo =
-    currentOperation?.profileKey ===
-    DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo
+    !repositoryBlocked &&
+    (!currentIsScenarioDemo || customerReady)
   const currentExecutionConfirmation = currentOperation
     ? resolveDataPreparationExecutionConfirmation(
         currentOperation,
@@ -829,13 +841,16 @@ export default function DevDataPreparationPage() {
     setConfirmation('')
   }
 
-  const prepareBlockingReason = repositoryBlocked
-    ? '完整验收只接受 clean exact commit'
-    : selectedTarget?.status === 'blocked'
-      ? '固定目标预检已阻断，请先处理预检问题'
-      : hasActiveOperation
-        ? '该档位已有未结束 operation，请先等待终态'
-        : ''
+  const prepareBlockingReason =
+    selectedIsScenarioDemo && !customerReady
+      ? '先选择已登记甲方，再准备对应的固定业务场景数据'
+      : repositoryBlocked
+        ? '完整验收只接受 clean exact commit'
+        : selectedTarget?.status === 'blocked'
+          ? '固定目标预检已阻断，请先处理预检问题'
+          : hasActiveOperation
+            ? '该档位已有未结束 operation，请先等待终态'
+            : ''
 
   const handlePrepare = async () => {
     if (!canPrepare) return
@@ -870,6 +885,7 @@ export default function DevDataPreparationPage() {
 
   const handleExecute = async () => {
     if (
+      !canExecuteCurrent ||
       !currentOperation ||
       currentExecutionConfirmation !== currentOperation.confirmationRequired
     ) {
@@ -1127,6 +1143,16 @@ export default function DevDataPreparationPage() {
                   />
                 ))}
               </Radio.Group>
+              {selectedIsScenarioDemo ? (
+                <DevCustomerScopeSelector
+                  scope={customerScope}
+                  onChange={customerScope.selectCustomer}
+                  disabled={preparing || executing}
+                  label="业务场景甲方"
+                  note="仅业务场景演示数据按甲方选择；当前永绅对应固定 yoyoosun 场景批次，基础数据与完整回归保持产品通用。"
+                  invalidDescription="当前甲方没有登记固定场景数据；业务场景的准备与执行已停止，其他数据准备方式不受影响。"
+                />
+              ) : null}
               <div className="erp-dev-data-prepare-actions">
                 <div>
                   <Text strong>{selectedProfileCopy.title}</Text>
@@ -1310,6 +1336,9 @@ export default function DevDataPreparationPage() {
           />
           {currentIsScenarioDemo ? (
             <Descriptions size="small" column={1} bordered>
+              <Descriptions.Item label="甲方">
+                {customerScope.customer?.label || '未选择'}
+              </Descriptions.Item>
               <Descriptions.Item label="固定目标">
                 {currentOperation?.targetSummary.safeTarget || '未证明'}
               </Descriptions.Item>

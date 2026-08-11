@@ -27,6 +27,7 @@ import {
 } from 'antd'
 import { Link as RouterLink, useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
+import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
 import DevDeliveryTimestamp from '../components/DevDeliveryTimestamp.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevPipelineTimingPanel, {
@@ -34,6 +35,7 @@ import DevPipelineTimingPanel, {
   DevTimingBars,
 } from '../components/DevPipelineTimingPanel.jsx'
 import DevStaticGuidance from '../components/DevStaticGuidance.jsx'
+import { buildDevCustomerSnapshotKey } from '../config/devCustomerScope.mjs'
 import {
   DEV_DELIVERY_SOURCE_PATH,
   DEV_DELIVERY_SUMMARY_SNAPSHOT_KEY,
@@ -69,6 +71,7 @@ import {
   formatQualityGateDuration,
 } from '../config/devQualityGates.mjs'
 import { DEV_QUALITY_GATES_ROUTE } from '../config/devRoutes.mjs'
+import useDevCustomerScope from '../hooks/useDevCustomerScope.mjs'
 
 const { Link, Paragraph, Text, Title } = Typography
 const OPERATION_POLL_INTERVAL_MS = 1500
@@ -240,20 +243,41 @@ function ManualTakeoverGuide() {
 
 export default function DevVersionCenterPage() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const customerScope = useDevCustomerScope({
+    searchParams,
+    setSearchParams,
+  })
+  const customerReady = customerScope.status === 'ready'
+  const deliverySnapshotKey = customerReady
+    ? buildDevCustomerSnapshotKey(
+        DEV_DELIVERY_SUMMARY_SNAPSHOT_KEY,
+        customerScope.customerKey
+      )
+    : ''
   const requestedView =
     searchParams.get(DEV_VERSION_CENTER_VIEW_QUERY_KEY) || ''
   const activeView = resolveDevVersionCenterView(requestedView)
   const client = useMemo(() => createDevDeliveryClient(), [])
   const qualityGateClient = useMemo(() => createDevQualityGateClient(), [])
   const initialSnapshot = useMemo(
-    () => readDevSummarySnapshot(DEV_DELIVERY_SUMMARY_SNAPSHOT_KEY),
-    []
+    () =>
+      deliverySnapshotKey ? readDevSummarySnapshot(deliverySnapshotKey) : null,
+    [deliverySnapshotKey]
   )
-  const [summary, setSummary] = useState(initialSnapshot?.summary || null)
+  const [storedSummary, setStoredSummary] = useState(
+    initialSnapshot?.summary || null
+  )
+  const [summarySnapshotKey, setSummarySnapshotKey] =
+    useState(deliverySnapshotKey)
   const summaryRef = useRef(initialSnapshot?.summary || null)
-  const [initialLoading, setInitialLoading] = useState(!initialSnapshot)
+  const summarySnapshotKeyRef = useRef(deliverySnapshotKey)
+  const activeDeliverySnapshotKeyRef = useRef(deliverySnapshotKey)
+  activeDeliverySnapshotKeyRef.current = deliverySnapshotKey
+  const [initialLoading, setInitialLoading] = useState(
+    Boolean(deliverySnapshotKey && !initialSnapshot)
+  )
   const [refreshing, setRefreshing] = useState(false)
-  const [summaryFresh, setSummaryFresh] = useState(false)
+  const [storedSummaryFresh, setStoredSummaryFresh] = useState(false)
   const [checkedAt, setCheckedAt] = useState(initialSnapshot?.checkedAt || '')
   const [actionKey, setActionKey] = useState('')
   const [loadError, setLoadError] = useState('')
@@ -272,12 +296,17 @@ export default function DevVersionCenterPage() {
   const mutationInFlightRef = useRef(false)
   const refreshRequestRef = useRef(0)
   const qualityGateRequestRef = useRef(0)
+  const operationDetailRequestRef = useRef(0)
   const workspaceRef = useRef(null)
   const versionTableRef = useRef(null)
   const historyTableRef = useRef(null)
   const operationDetailTriggerRef = useRef(null)
   const operationDetailFocusRestoreTimerRef = useRef(null)
   const manualTakeoverTriggerRef = useRef(null)
+  const summaryInCurrentScope =
+    customerReady && summarySnapshotKey === deliverySnapshotKey
+  const summary = summaryInCurrentScope ? storedSummary : null
+  const summaryFresh = summaryInCurrentScope && storedSummaryFresh
 
   const restoreOperationDetailTriggerFocus = useCallback(() => {
     const trigger = operationDetailTriggerRef.current
@@ -305,6 +334,7 @@ export default function DevVersionCenterPage() {
   }, [])
 
   const closeOperationDetail = useCallback(() => {
+    operationDetailRequestRef.current += 1
     setOperationDetail(null)
     clearOperationDetailFocusRestoreTimer()
     // 快速关闭可能打断 Drawer 动画回调，仍在关闭截止后恢复原触发点。
@@ -351,77 +381,173 @@ export default function DevVersionCenterPage() {
     })
   }, [selectView])
 
-  const updateSummary = useCallback((update) => {
-    const { current } = summaryRef
-    const next = typeof update === 'function' ? update(current) : update
-    if (!next) return current
-    summaryRef.current = next
-    updateDevSummarySnapshot(DEV_DELIVERY_SUMMARY_SNAPSHOT_KEY, () => next)
-    setSummary(next)
-    return next
-  }, [])
+  const updateSummary = useCallback(
+    (update) => {
+      if (
+        !deliverySnapshotKey ||
+        activeDeliverySnapshotKeyRef.current !== deliverySnapshotKey ||
+        summarySnapshotKeyRef.current !== deliverySnapshotKey
+      ) {
+        return summaryRef.current
+      }
+      const { current } = summaryRef
+      const next = typeof update === 'function' ? update(current) : update
+      if (!next) return current
+      summaryRef.current = next
+      updateDevSummarySnapshot(deliverySnapshotKey, () => next)
+      setStoredSummary(next)
+      return next
+    },
+    [deliverySnapshotKey]
+  )
 
-  const refreshQualityGate = useCallback(async () => {
-    const requestId = qualityGateRequestRef.current + 1
-    qualityGateRequestRef.current = requestId
-    try {
-      const next = await qualityGateClient.summary()
-      if (qualityGateRequestRef.current !== requestId) return
-      setQualityGateSummary(next)
-      setQualityGateError('')
-    } catch {
-      if (qualityGateRequestRef.current !== requestId) return
-      setQualityGateError('严格门禁摘要暂时不可用')
-    }
-  }, [qualityGateClient])
+  const refreshQualityGate = useCallback(
+    async (requestedSnapshotKey) => {
+      if (
+        !requestedSnapshotKey ||
+        activeDeliverySnapshotKeyRef.current !== requestedSnapshotKey
+      ) {
+        return false
+      }
+      const requestId = qualityGateRequestRef.current + 1
+      qualityGateRequestRef.current = requestId
+      try {
+        const next = await qualityGateClient.summary()
+        if (
+          qualityGateRequestRef.current !== requestId ||
+          activeDeliverySnapshotKeyRef.current !== requestedSnapshotKey
+        ) {
+          return false
+        }
+        setQualityGateSummary(next)
+        setQualityGateError('')
+        return true
+      } catch {
+        if (
+          qualityGateRequestRef.current !== requestId ||
+          activeDeliverySnapshotKeyRef.current !== requestedSnapshotKey
+        ) {
+          return false
+        }
+        setQualityGateError('严格门禁摘要暂时不可用')
+        return false
+      }
+    },
+    [qualityGateClient]
+  )
 
   const refresh = useCallback(async () => {
-    refreshQualityGate()
+    const requestedSnapshotKey = deliverySnapshotKey
+    if (
+      !customerReady ||
+      !requestedSnapshotKey ||
+      activeDeliverySnapshotKeyRef.current !== requestedSnapshotKey
+    ) {
+      return false
+    }
+    refreshQualityGate(requestedSnapshotKey)
     const requestId = refreshRequestRef.current + 1
     refreshRequestRef.current = requestId
-    const hasVisibleSummary = Boolean(summaryRef.current)
+    const hasVisibleSummary = Boolean(
+      summarySnapshotKeyRef.current === requestedSnapshotKey &&
+        summaryRef.current
+    )
     setInitialLoading(!hasVisibleSummary)
     setRefreshing(hasVisibleSummary)
-    setSummaryFresh(false)
+    setStoredSummaryFresh(false)
     setLoadError('')
     try {
-      const snapshot = await loadDevSummarySnapshot(
-        DEV_DELIVERY_SUMMARY_SNAPSHOT_KEY,
-        () => client.summary()
+      const snapshot = await loadDevSummarySnapshot(requestedSnapshotKey, () =>
+        client.summary()
       )
-      if (refreshRequestRef.current !== requestId) return false
+      if (
+        refreshRequestRef.current !== requestId ||
+        activeDeliverySnapshotKeyRef.current !== requestedSnapshotKey
+      ) {
+        return false
+      }
+      summarySnapshotKeyRef.current = requestedSnapshotKey
       summaryRef.current = snapshot.summary
-      setSummary(snapshot.summary)
+      setSummarySnapshotKey(requestedSnapshotKey)
+      setStoredSummary(snapshot.summary)
       setCheckedAt(snapshot.checkedAt)
-      setSummaryFresh(true)
+      setStoredSummaryFresh(true)
       return true
     } catch (error) {
-      if (refreshRequestRef.current !== requestId) return false
+      if (
+        refreshRequestRef.current !== requestId ||
+        activeDeliverySnapshotKeyRef.current !== requestedSnapshotKey
+      ) {
+        return false
+      }
       setLoadError(error?.message || '版本中心状态读取失败')
       return false
     } finally {
-      if (refreshRequestRef.current === requestId) {
+      if (
+        refreshRequestRef.current === requestId &&
+        activeDeliverySnapshotKeyRef.current === requestedSnapshotKey
+      ) {
         setInitialLoading(false)
         setRefreshing(false)
       }
     }
-  }, [client, refreshQualityGate])
+  }, [client, customerReady, deliverySnapshotKey, refreshQualityGate])
 
   useEffect(() => {
+    refreshRequestRef.current += 1
+    qualityGateRequestRef.current += 1
+    operationDetailRequestRef.current += 1
+    const snapshot = deliverySnapshotKey
+      ? readDevSummarySnapshot(deliverySnapshotKey)
+      : null
+    summarySnapshotKeyRef.current = deliverySnapshotKey
+    summaryRef.current = snapshot?.summary || null
+    setSummarySnapshotKey(deliverySnapshotKey)
+    setStoredSummary(snapshot?.summary || null)
+    setCheckedAt(snapshot?.checkedAt || '')
+    setStoredSummaryFresh(false)
+    setLoadError('')
+    setQualityGateSummary(null)
+    setQualityGateError('')
+    setOperationPollError('')
+    setOperationDetail(null)
+    setOperationDetailLoading(false)
+    setReleaseModalOpen(false)
+    setConfirmOperation(null)
+    setConfirmationText('')
+
+    if (!customerReady) {
+      setInitialLoading(false)
+      setRefreshing(false)
+      return undefined
+    }
     refresh()
     return () => {
       refreshRequestRef.current += 1
       qualityGateRequestRef.current += 1
+      operationDetailRequestRef.current += 1
     }
-  }, [refresh])
+  }, [customerReady, deliverySnapshotKey, refresh])
 
   const performAction = useCallback(
     async (key, action, payload) => {
-      if (!summaryFresh || mutationInFlightRef.current) return false
+      const requestedSnapshotKey = deliverySnapshotKey
+      if (
+        !customerReady ||
+        !requestedSnapshotKey ||
+        activeDeliverySnapshotKeyRef.current !== requestedSnapshotKey ||
+        !summaryFresh ||
+        mutationInFlightRef.current
+      ) {
+        return false
+      }
       mutationInFlightRef.current = true
       setActionKey(key)
       try {
         await client.action(action, payload)
+        if (activeDeliverySnapshotKeyRef.current !== requestedSnapshotKey) {
+          return false
+        }
         message.success(
           action === 'dispatch-release'
             ? 'GitHub 发布任务已登记'
@@ -436,6 +562,9 @@ export default function DevVersionCenterPage() {
         await refresh()
         return true
       } catch (error) {
+        if (activeDeliverySnapshotKeyRef.current !== requestedSnapshotKey) {
+          return false
+        }
         message.error(error?.message || '操作未完成')
         await refresh()
         return false
@@ -444,7 +573,7 @@ export default function DevVersionCenterPage() {
         setActionKey('')
       }
     },
-    [client, refresh, summaryFresh]
+    [client, customerReady, deliverySnapshotKey, refresh, summaryFresh]
   )
 
   const repository = summary?.repository
@@ -614,16 +743,43 @@ export default function DevVersionCenterPage() {
   }
 
   const openOperationDetail = async (operation, trigger) => {
+    const requestedSnapshotKey = deliverySnapshotKey
+    if (
+      !summaryInCurrentScope ||
+      activeDeliverySnapshotKeyRef.current !== requestedSnapshotKey
+    ) {
+      return
+    }
+    const requestId = operationDetailRequestRef.current + 1
+    operationDetailRequestRef.current = requestId
     clearOperationDetailFocusRestoreTimer()
     operationDetailTriggerRef.current = trigger
     setOperationDetail(operation)
     setOperationDetailLoading(true)
     try {
-      setOperationDetail(await client.operation(operation.id))
+      const nextOperation = await client.operation(operation.id)
+      if (
+        operationDetailRequestRef.current !== requestId ||
+        activeDeliverySnapshotKeyRef.current !== requestedSnapshotKey
+      ) {
+        return
+      }
+      setOperationDetail(nextOperation)
     } catch (error) {
+      if (
+        operationDetailRequestRef.current !== requestId ||
+        activeDeliverySnapshotKeyRef.current !== requestedSnapshotKey
+      ) {
+        return
+      }
       message.error(error?.message || 'Operation 详情读取失败')
     } finally {
-      setOperationDetailLoading(false)
+      if (
+        operationDetailRequestRef.current === requestId &&
+        activeDeliverySnapshotKeyRef.current === requestedSnapshotKey
+      ) {
+        setOperationDetailLoading(false)
+      }
     }
   }
 
@@ -1081,6 +1237,7 @@ export default function DevVersionCenterPage() {
             <Button
               icon={<ReloadOutlined />}
               loading={refreshBusy}
+              disabled={!customerReady}
               onClick={refresh}
             >
               刷新状态
@@ -1139,6 +1296,14 @@ export default function DevVersionCenterPage() {
           </Text>
         </Space>
       </header>
+
+      <DevCustomerScopeSelector
+        scope={customerScope}
+        onChange={customerScope.selectCustomer}
+        disabled={isMutationRunning}
+        note="版本、部署与回滚只读取所选甲方的固定目标；当前永绅对应 test-133，不接受任意主机。"
+        invalidDescription="当前甲方没有登记发布目标；版本、部署、回滚与目标状态读取均已停止。"
+      />
 
       <main className="erp-dev-hub-shell erp-dev-version-shell">
         {loadError ? (

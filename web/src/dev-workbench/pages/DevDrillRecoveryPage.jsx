@@ -6,9 +6,14 @@ import {
   SafetyCertificateOutlined,
 } from '@ant-design/icons'
 import { Alert, Button, Card, Empty, Space, Tag, Typography } from 'antd'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
 import DevDeliveryTimestamp from '../components/DevDeliveryTimestamp.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
+import {
+  buildDevCustomerScopedRoute,
+  buildDevCustomerSnapshotKey,
+} from '../config/devCustomerScope.mjs'
 import {
   DEV_DELIVERY_SUMMARY_SNAPSHOT_KEY,
   DEV_VERSION_CENTER_ROUTE,
@@ -26,6 +31,7 @@ import {
   loadDevSummarySnapshot,
   readDevSummarySnapshot,
 } from '../config/devSummarySnapshot.mjs'
+import useDevCustomerScope from '../hooks/useDevCustomerScope.mjs'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -38,12 +44,19 @@ function OperationStatusTag({ status }) {
   return <Tag color={presentation.color}>{presentation.label}</Tag>
 }
 
-function DrillAction({ action, refreshing, onRefresh, onNavigate }) {
+function DrillAction({
+  action,
+  refreshing,
+  disabled = false,
+  onRefresh,
+  onNavigate,
+}) {
   if (action.type === 'refresh') {
     return (
       <Button
         icon={<ReloadOutlined />}
         loading={refreshing}
+        disabled={disabled}
         onClick={onRefresh}
       >
         {action.label}
@@ -52,7 +65,11 @@ function DrillAction({ action, refreshing, onRefresh, onNavigate }) {
   }
   if (action.type === 'route') {
     return (
-      <Button icon={<RightOutlined />} onClick={() => onNavigate(action.route)}>
+      <Button
+        icon={<RightOutlined />}
+        disabled={disabled}
+        onClick={() => onNavigate(action.route)}
+      >
         {action.label}
       </Button>
     )
@@ -66,7 +83,14 @@ function shouldOpenRecommendedDrill(recommended) {
   )
 }
 
-function DrillRow({ drill, recommended, refreshing, onRefresh, onNavigate }) {
+function DrillRow({
+  drill,
+  recommended,
+  refreshing,
+  disabled,
+  onRefresh,
+  onNavigate,
+}) {
   const evidence = drill.evidenceState
   const [open, setOpen] = useState(() =>
     shouldOpenRecommendedDrill(recommended)
@@ -146,6 +170,7 @@ function DrillRow({ drill, recommended, refreshing, onRefresh, onNavigate }) {
           <DrillAction
             action={drill.action}
             refreshing={refreshing}
+            disabled={disabled}
             onRefresh={onRefresh}
             onNavigate={onNavigate}
           />
@@ -157,57 +182,133 @@ function DrillRow({ drill, recommended, refreshing, onRefresh, onNavigate }) {
 
 export default function DevDrillRecoveryPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const customerScope = useDevCustomerScope({
+    searchParams,
+    setSearchParams,
+  })
+  const customerReady = customerScope.status === 'ready'
+  const deliverySnapshotKey = customerReady
+    ? buildDevCustomerSnapshotKey(
+        DEV_DELIVERY_SUMMARY_SNAPSHOT_KEY,
+        customerScope.customerKey
+      )
+    : ''
   const client = useMemo(() => createDevDeliveryClient(), [])
   const initialSnapshot = useMemo(
-    () => readDevSummarySnapshot(DEV_DELIVERY_SUMMARY_SNAPSHOT_KEY),
-    []
+    () =>
+      deliverySnapshotKey ? readDevSummarySnapshot(deliverySnapshotKey) : null,
+    [deliverySnapshotKey]
   )
-  const [summary, setSummary] = useState(initialSnapshot?.summary || null)
+  const [storedSummary, setStoredSummary] = useState(
+    initialSnapshot?.summary || null
+  )
+  const [summarySnapshotKey, setSummarySnapshotKey] =
+    useState(deliverySnapshotKey)
   const summaryRef = useRef(initialSnapshot?.summary || null)
+  const summarySnapshotKeyRef = useRef(deliverySnapshotKey)
+  const activeDeliverySnapshotKeyRef = useRef(deliverySnapshotKey)
+  activeDeliverySnapshotKeyRef.current = deliverySnapshotKey
   const [checkedAt, setCheckedAt] = useState(initialSnapshot?.checkedAt || '')
-  const [loading, setLoading] = useState(!initialSnapshot)
+  const [loading, setLoading] = useState(
+    Boolean(deliverySnapshotKey && !initialSnapshot)
+  )
   const [refreshing, setRefreshing] = useState(false)
-  const [fresh, setFresh] = useState(false)
+  const [storedSummaryFresh, setStoredSummaryFresh] = useState(false)
   const [loadError, setLoadError] = useState('')
   const requestRef = useRef(0)
+  const summaryInCurrentScope =
+    customerReady && summarySnapshotKey === deliverySnapshotKey
+  const summary = summaryInCurrentScope ? storedSummary : null
+  const fresh = summaryInCurrentScope && storedSummaryFresh
 
   const refresh = useCallback(async () => {
+    const requestedSnapshotKey = deliverySnapshotKey
+    if (
+      !customerReady ||
+      !requestedSnapshotKey ||
+      activeDeliverySnapshotKeyRef.current !== requestedSnapshotKey
+    ) {
+      return false
+    }
     const requestId = requestRef.current + 1
     requestRef.current = requestId
-    const hasVisibleSummary = Boolean(summaryRef.current)
+    const hasVisibleSummary = Boolean(
+      summarySnapshotKeyRef.current === requestedSnapshotKey &&
+        summaryRef.current
+    )
     setLoading(!hasVisibleSummary)
     setRefreshing(hasVisibleSummary)
-    setFresh(false)
+    setStoredSummaryFresh(false)
     setLoadError('')
     try {
-      const snapshot = await loadDevSummarySnapshot(
-        DEV_DELIVERY_SUMMARY_SNAPSHOT_KEY,
-        () => client.summary()
+      const snapshot = await loadDevSummarySnapshot(requestedSnapshotKey, () =>
+        client.summary()
       )
-      if (requestRef.current !== requestId) return false
+      if (
+        requestRef.current !== requestId ||
+        activeDeliverySnapshotKeyRef.current !== requestedSnapshotKey
+      ) {
+        return false
+      }
+      summarySnapshotKeyRef.current = requestedSnapshotKey
       summaryRef.current = snapshot.summary
-      setSummary(snapshot.summary)
+      setSummarySnapshotKey(requestedSnapshotKey)
+      setStoredSummary(snapshot.summary)
       setCheckedAt(snapshot.checkedAt)
-      setFresh(true)
+      setStoredSummaryFresh(true)
       return true
     } catch (error) {
-      if (requestRef.current !== requestId) return false
+      if (
+        requestRef.current !== requestId ||
+        activeDeliverySnapshotKeyRef.current !== requestedSnapshotKey
+      ) {
+        return false
+      }
       setLoadError(error?.message || '演练状态读取失败')
       return false
     } finally {
-      if (requestRef.current === requestId) {
+      if (
+        requestRef.current === requestId &&
+        activeDeliverySnapshotKeyRef.current === requestedSnapshotKey
+      ) {
         setLoading(false)
         setRefreshing(false)
       }
     }
-  }, [client])
+  }, [client, customerReady, deliverySnapshotKey])
 
   useEffect(() => {
+    requestRef.current += 1
+    const snapshot = deliverySnapshotKey
+      ? readDevSummarySnapshot(deliverySnapshotKey)
+      : null
+    summarySnapshotKeyRef.current = deliverySnapshotKey
+    summaryRef.current = snapshot?.summary || null
+    setSummarySnapshotKey(deliverySnapshotKey)
+    setStoredSummary(snapshot?.summary || null)
+    setCheckedAt(snapshot?.checkedAt || '')
+    setStoredSummaryFresh(false)
+    setLoadError('')
+
+    if (!customerReady) {
+      setLoading(false)
+      setRefreshing(false)
+      return undefined
+    }
     refresh()
     return () => {
       requestRef.current += 1
     }
-  }, [refresh])
+  }, [customerReady, deliverySnapshotKey, refresh])
+
+  const navigateWithinCustomerScope = useCallback(
+    (route) => {
+      if (!customerReady) return
+      navigate(buildDevCustomerScopedRoute(route, customerScope.customerKey))
+    },
+    [customerReady, customerScope.customerKey, navigate]
+  )
 
   const overview = useMemo(
     () => buildDevRecoveryOverview(summary || {}),
@@ -217,15 +318,17 @@ export default function DevDrillRecoveryPage() {
   const publicHealthy = overview.publicEntry?.status === 'passed'
   const runtimeProven = Boolean(overview.currentSha)
   const recoveryReady = targetHealthy && publicHealthy && runtimeProven
-  const statusText = loading
-    ? '正在读取最新状态'
-    : refreshing
-      ? `正在后台核对，当前显示 ${formatDevSummaryCheckedAt(checkedAt)} 的结果`
-      : fresh
-        ? `已核对 ${formatDevSummaryCheckedAt(checkedAt)}`
-        : checkedAt
-          ? `显示 ${formatDevSummaryCheckedAt(checkedAt)} 的上次结果`
-          : '尚未取得状态'
+  const statusText = !customerReady
+    ? '请选择已登记甲方'
+    : loading
+      ? '正在读取最新状态'
+      : refreshing
+        ? `正在后台核对，当前显示 ${formatDevSummaryCheckedAt(checkedAt)} 的结果`
+        : fresh
+          ? `已核对 ${formatDevSummaryCheckedAt(checkedAt)}`
+          : checkedAt
+            ? `显示 ${formatDevSummaryCheckedAt(checkedAt)} 的上次结果`
+            : '尚未取得状态'
   const recentOperations = overview.operations.slice(0, 3)
 
   return (
@@ -247,6 +350,7 @@ export default function DevDrillRecoveryPage() {
           <Button
             icon={<ReloadOutlined />}
             loading={loading || refreshing}
+            disabled={!customerReady}
             onClick={refresh}
           >
             刷新状态
@@ -256,6 +360,13 @@ export default function DevDrillRecoveryPage() {
           </Text>
         </Space>
       </header>
+
+      <DevCustomerScopeSelector
+        scope={customerScope}
+        onChange={customerScope.selectCustomer}
+        note="演练证据只读取所选甲方的固定交付目标；当前永绅与版本中心共享同一份客户隔离状态。"
+        invalidDescription="当前甲方没有登记交付目标；演练状态读取与版本中心跳转均已停止。"
+      />
 
       <main className="erp-dev-hub-shell erp-dev-recovery-shell">
         {loadError ? (
@@ -335,8 +446,9 @@ export default function DevDrillRecoveryPage() {
               <DrillAction
                 action={overview.next.action}
                 refreshing={loading || refreshing}
+                disabled={!customerReady}
                 onRefresh={refresh}
-                onNavigate={navigate}
+                onNavigate={navigateWithinCustomerScope}
               />
             ) : null}
           </div>
@@ -360,8 +472,9 @@ export default function DevDrillRecoveryPage() {
                 drill={drill}
                 recommended={drill.key === overview.next?.key}
                 refreshing={loading || refreshing}
+                disabled={!customerReady}
                 onRefresh={refresh}
-                onNavigate={navigate}
+                onNavigate={navigateWithinCustomerScope}
               />
             ))}
           </div>
@@ -373,7 +486,10 @@ export default function DevDrillRecoveryPage() {
             extra={
               <Button
                 type="link"
-                onClick={() => navigate(DEV_VERSION_CENTER_ROUTE)}
+                disabled={!customerReady}
+                onClick={() =>
+                  navigateWithinCustomerScope(DEV_VERSION_CENTER_ROUTE)
+                }
               >
                 查看全部
               </Button>
@@ -429,7 +545,10 @@ export default function DevDrillRecoveryPage() {
                 </Text>
                 <Button
                   type="link"
-                  onClick={() => navigate(DEV_VERSION_CENTER_ROUTE)}
+                  disabled={!customerReady}
+                  onClick={() =>
+                    navigateWithinCustomerScope(DEV_VERSION_CENTER_ROUTE)
+                  }
                 >
                   查看版本中心的人工接管说明
                 </Button>

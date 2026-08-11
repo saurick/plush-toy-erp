@@ -99,6 +99,35 @@ function formatGeneratedAt(value) {
   return date.toISOString()
 }
 
+function resolveCustomerReviewScope(customerOverlay) {
+  if (!customerOverlay) {
+    return Object.freeze({
+      designScope: '产品通用设计校对稿',
+      customerBinding: '未绑定客户发布版本',
+      releaseVersion: '未绑定发布版本',
+    })
+  }
+
+  const customerKey = String(customerOverlay.customerKey || '').trim()
+  const label = String(customerOverlay.label || '').trim()
+  if (
+    !customerKey ||
+    !label ||
+    customerOverlay.previewOnly !== true ||
+    customerOverlay.runtimeAuthority !== 'customer_preview_only' ||
+    customerOverlay.readOnly !== true ||
+    customerOverlay.allowsActionExecution !== false
+  ) {
+    throw new Error('customer review requires a read-only preview overlay')
+  }
+
+  return Object.freeze({
+    designScope: '客户配置预览校对稿',
+    customerBinding: `${label}（仅配置预览）`,
+    releaseVersion: '未绑定发布版本',
+  })
+}
+
 function formalRoleLabel(roleKey) {
   const label = getPermissionCenterRoleName({ role_key: roleKey })
   return label === '已配置岗位' ? '' : label
@@ -520,6 +549,7 @@ export function buildDevBusinessChainCustomerReview({
   catalog,
   chainKey,
   generatedAt = new Date(),
+  customerOverlay = null,
 }) {
   if (
     !catalog?.businessChainOverview?.key ||
@@ -541,13 +571,12 @@ export function buildDevBusinessChainCustomerReview({
     ? { overview: buildOverviewReview(catalog) }
     : { chain: buildChainReview(catalog, chain) }
   const subjectName = overviewSelected ? '业务链总览' : chain.label
+  const reviewScope = resolveCustomerReviewScope(customerOverlay)
 
   return Object.freeze({
     version: DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_VERSION,
     documentTitle: `业务链甲方校对版｜${subjectName}`,
-    designScope: '产品通用设计校对稿',
-    customerBinding: '未绑定客户发布版本',
-    releaseVersion: '未绑定发布版本',
+    ...reviewScope,
     generatedAt: formatGeneratedAt(generatedAt),
     applicableScope:
       '用于跨岗位、跨模块、状态和异常路径的业务需求校对；不包含真实业务记录、任务实例或业务凭证。',

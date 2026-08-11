@@ -4,6 +4,7 @@ import test from 'node:test'
 
 import { customerPackageCatalog } from '../../../../config/catalog/customerPackageCatalog.mjs'
 import {
+  DEFAULT_DEV_CUSTOMER_CONFIG_PAGE_KEY,
   DEFAULT_DEV_CUSTOMER_KEY,
   DEV_CUSTOMER_CONFIG_QA_COMMAND,
   DEV_CUSTOMER_CONFIG_REGISTRY,
@@ -163,20 +164,25 @@ test('devCustomerConfig: 汇总已接前端运行时的 yoyoosun 菜单配置', 
   assert(!summary.sections.some((section) => section.title === '采购/仓储'))
 })
 
-test('devCustomerConfig: 默认不自动进入任一客户包', () => {
+test('devCustomerConfig: 默认进入永绅客户包', () => {
   assert.equal(DEFAULT_DEV_CUSTOMER_KEY, '')
+  assert.equal(DEFAULT_DEV_CUSTOMER_CONFIG_PAGE_KEY, 'yoyoosun')
   assert.equal(readDevCustomerKeyFromSearch(''), '')
 
-  const overview = buildCustomerConfigDevOverview()
-  assert.equal(overview.status, 'missing')
-  assert.equal(overview.customerKey, '')
-  assert.equal(overview.requestedCustomerKey, '')
-  assert.equal(overview.sourceLabel, '未选择客户配置包')
+  const overview = buildCustomerConfigDevOverviewFromSearch('')
+  assert.equal(overview.status, 'ready')
+  assert.equal(overview.customerKey, 'yoyoosun')
+  assert.equal(overview.requestedCustomerKey, 'yoyoosun')
+  assert.equal(overview.sourceLabel, '客户配置包说明')
   assert.equal(overview.registeredCustomers.length, 1)
-  assert.equal(overview.blockedPieces[0].key, 'customer-package-not-selected')
-  assert.equal(overview.blockedPieces[0].title, '未选择客户配置包')
-  assert.equal(overview.blockedPieces[0].status, '未选择')
-  assert.match(overview.blockedPieces[0].boundary, /不会 fallback/)
+
+  const blankQueryOverview =
+    buildCustomerConfigDevOverviewFromSearch('?customer=')
+  assert.equal(blankQueryOverview.customerKey, 'yoyoosun')
+
+  const unscopedOverview = buildCustomerConfigDevOverview()
+  assert.equal(unscopedOverview.status, 'missing')
+  assert.equal(unscopedOverview.customerKey, '')
 })
 
 test('devCustomerConfig: query customer=yoyoosun 能解析到登记客户包', () => {

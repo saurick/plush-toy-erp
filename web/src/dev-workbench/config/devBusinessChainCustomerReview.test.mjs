@@ -136,6 +136,35 @@ test('customer review exports only the selected business chain with complete bus
   )
 })
 
+test('customer review binds a registered preview without claiming release or acceptance', () => {
+  const customerOverlay = DEV_FLOW_STATE_CATALOG.overlays.find(
+    (overlay) => overlay.customerKey === 'yoyoosun'
+  )
+  assert(customerOverlay)
+
+  const review = buildDevBusinessChainCustomerReview({
+    catalog: DEV_FLOW_STATE_CATALOG,
+    chainKey: 'production_exception',
+    generatedAt,
+    customerOverlay,
+  })
+
+  assert.equal(review.designScope, '客户配置预览校对稿')
+  assert.equal(review.customerBinding, `${customerOverlay.label}（仅配置预览）`)
+  assert.equal(review.releaseVersion, '未绑定发布版本')
+  assert.match(review.footer, /不单独证明已经实现、发布或经甲方验收/u)
+  assert.throws(
+    () =>
+      buildDevBusinessChainCustomerReview({
+        catalog: DEV_FLOW_STATE_CATALOG,
+        chainKey: 'production_exception',
+        generatedAt,
+        customerOverlay: { ...customerOverlay, previewOnly: false },
+      }),
+    /read-only preview overlay/u
+  )
+})
+
 test('customer review overview stays one-level and never expands all chain internals', () => {
   const review = buildDevBusinessChainCustomerReview({
     catalog: DEV_FLOW_STATE_CATALOG,
@@ -254,8 +283,21 @@ test('customer review does not hardcode a customer and fails closed for an unkno
     ),
     'utf8'
   )
+  const pageSource = readFileSync(
+    fileURLToPath(
+      new URL('../pages/DevFlowStateObservatoryPage.jsx', import.meta.url)
+    ),
+    'utf8'
+  )
   assert.doesNotMatch(`${moduleSource}\n${componentSource}`, /yoyoosun|永绅/iu)
   assert.match(moduleSource, /buildDevBusinessChainProjection/u)
+  assert.match(pageSource, /DevCustomerScopeSelector/u)
+  assert.match(pageSource, /DEV_CUSTOMER_QUERY_KEY/u)
+  assert.match(pageSource, /normalize: view === 'chain'/u)
+  assert.match(pageSource, /catalog\.overlays\.find/u)
+  assert.match(pageSource, /disabled=\{!customerReviewReady\}/u)
+  assert.match(pageSource, /通用业务链与运行观察仍可使用/u)
+  assert.match(pageSource, /customerOverlay/u)
   assert.doesNotMatch(moduleSource, /EXCEPTION_PATTERN|EXCEPTION_GROUPS/u)
   assert.match(
     componentSource,
