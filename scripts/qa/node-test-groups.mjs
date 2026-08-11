@@ -169,6 +169,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/qa/local-acceptance-lifecycle.test.mjs",
     "scripts/qa/manual-acceptance-account-scenarios.test.mjs",
     "scripts/qa/manual-acceptance-attachment-data.test.mjs",
+    "scripts/qa/manual-acceptance-business-chain-contract.test.mjs",
     "scripts/qa/manual-acceptance-capacity-pressure.test.mjs",
     "scripts/qa/manual-acceptance-catalog.test.mjs",
     "scripts/qa/manual-acceptance-customer-config.test.mjs",
