@@ -793,6 +793,8 @@ test("every allowlisted method is present in the current formal JSON-RPC dispatc
       "../../server/internal/service/jsonrpc_quality.go",
       "../../server/internal/service/jsonrpc_workflow_task.go",
       "../../server/internal/service/jsonrpc_customer_config.go",
+      "../../server/internal/service/jsonrpc_customer_config_lifecycle.go",
+      "../../server/internal/service/jsonrpc_customer_config_runtime_access.go",
       "../../server/internal/service/jsonrpc_customer_config_exception_process.go",
     ].map((relative) => readFile(new URL(relative, import.meta.url), "utf8")),
   );

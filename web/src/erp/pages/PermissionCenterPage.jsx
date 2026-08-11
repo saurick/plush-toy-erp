@@ -1,4 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react'
 import { useOutletContext } from 'react-router-dom'
 import {
   MenuOutlined,
@@ -58,6 +65,12 @@ import {
   isSameAdminAccount,
   normalizePermissionUsage,
 } from '../utils/permissionCenterAccess.mjs'
+import {
+  createPermissionCenterAdminDialogState,
+  nextPermissionCenterAdminPagination,
+  PERMISSION_CENTER_ADMIN_DIALOG,
+  permissionCenterAdminDialogReducer,
+} from '../utils/permissionCenterAdminDialog.mjs'
 import {
   buildLocalPermissionDraftAccess,
   getMenuPlacementMap,
@@ -1799,18 +1812,35 @@ export default function PermissionCenterPage() {
     current: 1,
     pageSize: DEFAULT_TABLE_PAGE_SIZE,
   })
-  const [createModalOpen, setCreateModalOpen] = useState(false)
-  const [editModalOpen, setEditModalOpen] = useState(false)
-  const [phoneModalOpen, setPhoneModalOpen] = useState(false)
-  const [resetModalOpen, setResetModalOpen] = useState(false)
-  const [statusModalOpen, setStatusModalOpen] = useState(false)
-  const [revokeModalOpen, setRevokeModalOpen] = useState(false)
-  const [editingAdmin, setEditingAdmin] = useState(null)
-  const [phoneAdmin, setPhoneAdmin] = useState(null)
-  const [resettingAdmin, setResettingAdmin] = useState(null)
-  const [statusActionAdmin, setStatusActionAdmin] = useState(null)
-  const [statusActionDisabled, setStatusActionDisabled] = useState(false)
-  const [revokingAdmin, setRevokingAdmin] = useState(null)
+  const [adminDialog, dispatchAdminDialog] = useReducer(
+    permissionCenterAdminDialogReducer,
+    undefined,
+    createPermissionCenterAdminDialogState
+  )
+  const createModalOpen =
+    adminDialog.kind === PERMISSION_CENTER_ADMIN_DIALOG.CREATE
+  const editModalOpen =
+    adminDialog.kind === PERMISSION_CENTER_ADMIN_DIALOG.EDIT_ROLES
+  const phoneModalOpen =
+    adminDialog.kind === PERMISSION_CENTER_ADMIN_DIALOG.EDIT_PHONE
+  const resetModalOpen =
+    adminDialog.kind === PERMISSION_CENTER_ADMIN_DIALOG.RESET_PASSWORD
+  const statusModalOpen =
+    adminDialog.kind === PERMISSION_CENTER_ADMIN_DIALOG.CHANGE_STATUS
+  const revokeModalOpen =
+    adminDialog.kind === PERMISSION_CENTER_ADMIN_DIALOG.REVOKE
+  const editingAdmin = editModalOpen ? adminDialog.admin : null
+  const phoneAdmin = phoneModalOpen ? adminDialog.admin : null
+  const resettingAdmin = resetModalOpen ? adminDialog.admin : null
+  const statusActionAdmin = statusModalOpen ? adminDialog.admin : null
+  const statusActionDisabled = statusModalOpen
+    ? adminDialog.statusDisabled
+    : false
+  const revokingAdmin = revokeModalOpen ? adminDialog.admin : null
+  const editingPhone = phoneModalOpen ? adminDialog.phone : ''
+  const setEditingPhone = useCallback((phone) => {
+    dispatchAdminDialog({ type: 'set_phone', phone })
+  }, [])
   const [selectedRoleKeys, setSelectedRoleKeys] = useState([])
   const [selectedRoleKey, setSelectedRoleKey] = useState('')
   const [selectedRolePermissionKeys, setSelectedRolePermissionKeys] = useState(
@@ -1838,7 +1868,6 @@ export default function PermissionCenterPage() {
     useState(false)
   const [approvalDiscardVersion, setApprovalDiscardVersion] = useState(0)
   const [approvalRefreshVersion, setApprovalRefreshVersion] = useState(0)
-  const [editingPhone, setEditingPhone] = useState('')
   const [createForm] = Form.useForm()
   const [resetForm] = Form.useForm()
   const [statusForm] = Form.useForm()
@@ -2756,13 +2785,16 @@ export default function PermissionCenterPage() {
   }, [filteredAdmins.length, tablePagination])
 
   const closeCreateModal = () => {
-    setCreateModalOpen(false)
+    dispatchAdminDialog({ type: 'close' })
     createForm.resetFields()
   }
 
   const openCreateModal = () => {
     createForm.setFieldsValue({ role_keys: [] })
-    setCreateModalOpen(true)
+    dispatchAdminDialog({
+      type: 'open',
+      kind: PERMISSION_CENTER_ADMIN_DIALOG.CREATE,
+    })
   }
 
   const openEditModal = (admin) => {
@@ -2781,14 +2813,16 @@ export default function PermissionCenterPage() {
       message.info(blockReason)
       return
     }
-    setEditingAdmin(admin)
     setSelectedRoleKeys(roleKeysForAdmin(admin))
-    setEditModalOpen(true)
+    dispatchAdminDialog({
+      type: 'open',
+      kind: PERMISSION_CENTER_ADMIN_DIALOG.EDIT_ROLES,
+      admin,
+    })
   }
 
   const closeEditModal = () => {
-    setEditModalOpen(false)
-    setEditingAdmin(null)
+    dispatchAdminDialog({ type: 'close' })
     setSelectedRoleKeys([])
   }
 
@@ -2811,15 +2845,16 @@ export default function PermissionCenterPage() {
       message.info(blockReason)
       return
     }
-    setPhoneAdmin(admin)
-    setEditingPhone(admin.phone || '')
-    setPhoneModalOpen(true)
+    dispatchAdminDialog({
+      type: 'open',
+      kind: PERMISSION_CENTER_ADMIN_DIALOG.EDIT_PHONE,
+      admin,
+      phone: admin.phone || '',
+    })
   }
 
   const closePhoneModal = () => {
-    setPhoneModalOpen(false)
-    setPhoneAdmin(null)
-    setEditingPhone('')
+    dispatchAdminDialog({ type: 'close' })
   }
 
   const openResetModal = (admin) => {
@@ -2841,14 +2876,16 @@ export default function PermissionCenterPage() {
       message.info(blockReason)
       return
     }
-    setResettingAdmin(admin)
     resetForm.resetFields()
-    setResetModalOpen(true)
+    dispatchAdminDialog({
+      type: 'open',
+      kind: PERMISSION_CENTER_ADMIN_DIALOG.RESET_PASSWORD,
+      admin,
+    })
   }
 
   const closeResetModal = () => {
-    setResetModalOpen(false)
-    setResettingAdmin(null)
+    dispatchAdminDialog({ type: 'close' })
     resetForm.resetFields()
   }
 
@@ -2883,7 +2920,9 @@ export default function PermissionCenterPage() {
           : '员工账号已创建'
       )
       closeCreateModal()
-      setTablePagination((prev) => ({ ...prev, current: 1 }))
+      setTablePagination((prev) =>
+        nextPermissionCenterAdminPagination(prev, 'create')
+      )
       await loadData()
     } catch (err) {
       message.error(getActionErrorMessage(err, '创建员工账号'))
@@ -3062,8 +3101,7 @@ export default function PermissionCenterPage() {
           : `已启用员工账号 ${admin.username}`
       )
       await loadData()
-      setStatusModalOpen(false)
-      setStatusActionAdmin(null)
+      dispatchAdminDialog({ type: 'close' })
       statusForm.resetFields()
     } catch (err) {
       message.error(getActionErrorMessage(err, '更新员工账号状态'))
@@ -3117,10 +3155,13 @@ export default function PermissionCenterPage() {
       return
     }
     const nextDisabled = !checkedEnabled
-    setStatusActionAdmin(admin)
-    setStatusActionDisabled(nextDisabled)
     statusForm.setFieldsValue({ reason: '' })
-    setStatusModalOpen(true)
+    dispatchAdminDialog({
+      type: 'open',
+      kind: PERMISSION_CENTER_ADMIN_DIALOG.CHANGE_STATUS,
+      admin,
+      statusDisabled: nextDisabled,
+    })
   }
 
   const revokeAdminAccount = async (values) => {
@@ -3155,8 +3196,7 @@ export default function PermissionCenterPage() {
           ? `账号已注销，${released} 项未完成待办已退回原岗位`
           : '账号已注销并保留历史记录'
       )
-      setRevokeModalOpen(false)
-      setRevokingAdmin(null)
+      dispatchAdminDialog({ type: 'close' })
       revokeForm.resetFields()
       await loadData()
     } catch (err) {
@@ -3381,9 +3421,12 @@ export default function PermissionCenterPage() {
                 disabled={Boolean(revokeBlockReason)}
                 onClick={() => {
                   if (currentAccount) return
-                  setRevokingAdmin(record)
                   revokeForm.resetFields()
-                  setRevokeModalOpen(true)
+                  dispatchAdminDialog({
+                    type: 'open',
+                    kind: PERMISSION_CENTER_ADMIN_DIALOG.REVOKE,
+                    admin: record,
+                  })
                 }}
               >
                 {revoked ? '已注销' : '离职注销'}
@@ -3503,7 +3546,8 @@ export default function PermissionCenterPage() {
                         </Text>
                         <Text strong>操作如何生效</Text>
                         <Text>
-                          岗位可用操作 = 系统允许 ∩ 模块已启用 ∩ 当前版本已开放 − 岗位撤销
+                          岗位可用操作 = 系统允许 ∩ 模块已启用 ∩ 当前版本已开放
+                          − 岗位撤销
                         </Text>
                         <Text type="secondary">
                           “∩”表示这些条件必须同时满足，“−”表示从结果中明确扣除。
@@ -4217,8 +4261,7 @@ export default function PermissionCenterPage() {
         title={statusActionDisabled ? '临时停用账号' : '恢复账号使用'}
         open={statusModalOpen}
         onCancel={() => {
-          setStatusModalOpen(false)
-          setStatusActionAdmin(null)
+          dispatchAdminDialog({ type: 'close' })
           statusForm.resetFields()
         }}
         onOk={() => statusForm.submit()}
@@ -4263,8 +4306,7 @@ export default function PermissionCenterPage() {
         title="离职注销账号"
         open={revokeModalOpen}
         onCancel={() => {
-          setRevokeModalOpen(false)
-          setRevokingAdmin(null)
+          dispatchAdminDialog({ type: 'close' })
           revokeForm.resetFields()
         }}
         onOk={() => revokeForm.submit()}

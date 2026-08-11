@@ -15831,7 +15831,7 @@ export function createStyleL1Scenarios(deps) {
           '财务',
           '从岗位详情进入员工账号时应按当前岗位筛选'
         )
-        await expectText(page, '命中 3/6 个员工账号')
+        await expectText(page, '命中 3/7 个员工账号')
         await page.getByRole('tab', { name: /岗位设置/u }).click()
         await page.getByRole('tab', { name: '可用功能' }).click()
         assert.equal(
@@ -16340,7 +16340,7 @@ export function createStyleL1Scenarios(deps) {
           `权限管理搜索结果不符合预期: ${filteredTableText}`
         )
         await adminSearch.fill('')
-        await expectText(page, '共 6 个员工账号')
+        await expectText(page, '共 7 个员工账号')
         await assertPaginationSizeChangerFocusStyle(page, {
           scenarioName: 'permission-center-desktop',
         })
@@ -16417,6 +16417,96 @@ export function createStyleL1Scenarios(deps) {
           true,
           '已注销账号不能再次执行注销或通过普通启停恢复'
         )
+      },
+    },
+    {
+      name: 'permission-center-admin-dialogs',
+      path: '/erp/system/permissions',
+      auth: 'admin',
+      viewport: { width: 1486, height: 1058 },
+      verify: async (page) => {
+        await expectHeading(page, '权限管理')
+        await page.getByRole('tab', { name: /员工账号/u }).click()
+        await expectText(page, '共 7 个员工账号')
+
+        await page.getByRole('button', { name: '创建员工账号' }).click()
+        const createModal = page
+          .locator('.ant-modal-content')
+          .filter({ hasText: '创建员工账号' })
+          .last()
+        await expectText(createModal, '初始密码')
+        await assertAdminRoleModalLayout(page, {
+          scenarioName: 'permission-center-admin-dialogs-create',
+          title: '创建员工账号',
+        })
+        await createModal.locator('.ant-modal-footer button').first().click()
+
+        const assistantRow = page.getByRole('row', { name: /assistant-admin/ })
+        await assistantRow.getByRole('button', { name: '分配岗位' }).click()
+        const roleModal = page
+          .locator('.ant-modal-content')
+          .filter({ hasText: '分配岗位：assistant-admin' })
+          .last()
+        await expectText(roleModal, '多个岗位会合并最终有效权限')
+        await roleModal.locator('.ant-modal-footer button').first().click()
+
+        await assistantRow.getByRole('button', { name: '修改手机号' }).click()
+        const phoneModal = page
+          .locator('.ant-modal-content')
+          .filter({ hasText: '修改登录手机号：assistant-admin' })
+          .last()
+        await phoneModal.locator('input').fill('13700137000')
+        await phoneModal.locator('.ant-modal-footer button').first().click()
+
+        await assistantRow.getByRole('button', { name: '重置密码' }).click()
+        const resetModal = page
+          .locator('.ant-modal-content')
+          .filter({ hasText: '重置密码：assistant-admin' })
+          .last()
+        await resetModal.getByText('新密码').waitFor()
+        await assertVisibleModalInputFocusStyle(page, {
+          scenarioName: 'permission-center-admin-dialogs-reset',
+          modalText: '重置密码：assistant-admin',
+        })
+        await resetModal
+          .locator('.ant-input-affix-wrapper input')
+          .fill('new-secret')
+        await resetModal.getByRole('button', { name: /重\s*置/u }).click()
+        await expectText(page, '已重置员工账号 assistant-admin 的密码')
+
+        await assistantRow.getByRole('switch').click()
+        const statusModal = page
+          .locator('.ant-modal-content')
+          .filter({ hasText: '临时停用账号' })
+          .last()
+        await expectText(statusModal, '将立即无法继续访问后台')
+        await statusModal.locator('.ant-modal-footer button').first().click()
+
+        await assistantRow.getByRole('button', { name: '离职注销' }).click()
+        const revokeModal = page
+          .locator('.ant-modal-content')
+          .filter({ hasText: '离职注销账号' })
+          .last()
+        await expectText(revokeModal, '未完成的个人待办将退回原负责岗位')
+        await revokeModal.locator('textarea').fill('员工离职')
+        await revokeModal.getByRole('button', { name: '确认注销' }).click()
+        await expectText(page, '账号已注销，1 项未完成待办已退回原岗位')
+
+        const revokedRow = page.getByRole('row', { name: /assistant-admin/ })
+        await expectText(revokedRow, '已注销')
+        assert.equal(
+          await revokedRow.getByRole('button', { name: '已注销' }).isDisabled(),
+          true,
+          '已注销账号不能重复注销'
+        )
+        await assertNoHorizontalOverflow(
+          page,
+          'permission-center-admin-dialogs'
+        )
+        await page.screenshot({
+          path: 'output/playwright/style-l1/permission-center-admin-dialogs.png',
+          fullPage: false,
+        })
       },
     },
     {

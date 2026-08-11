@@ -669,7 +669,7 @@ test('权限中心在权限行内区分菜单入口、页内操作、依赖和�
   assert.match(content, /aria-label="菜单与操作说明"/u)
   assert.match(
     content,
-    /岗位可用操作 = 系统允许 ∩ 模块已启用 ∩ 当前版本已开放 − 岗位撤销/u
+    /岗位可用操作 = 系统允许 ∩ 模块已启用 ∩ 当前版本已开放\s*− 岗位撤销/u
   )
   assert.match(content, /“∩”表示这些条件必须同时满足/u)
   assert.match(content, /员工有多个岗位时，系统先分别计算每个岗位，再合并结果/u)

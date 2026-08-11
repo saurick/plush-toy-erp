@@ -389,12 +389,15 @@ type InventoryTxnApplyResult struct {
 	IdempotentReplay bool
 }
 
-type InventoryRepo interface {
+type InventoryReferenceRepo interface {
 	GetSupplier(ctx context.Context, id int) (*Supplier, error)
 	MaterialIsActive(ctx context.Context, id int) (bool, error)
 	ProductIsActive(ctx context.Context, id int) (bool, error)
 	UnitIsActive(ctx context.Context, id int) (bool, error)
 	WarehouseIsActive(ctx context.Context, id int) (bool, error)
+}
+
+type InventoryLedgerRepo interface {
 	CreateInventoryLot(ctx context.Context, in *InventoryLotCreate) (*InventoryLot, error)
 	GetInventoryLot(ctx context.Context, id int) (*InventoryLot, error)
 	ChangeInventoryLotStatus(ctx context.Context, lotID int, newStatus string, reason string) (*InventoryLot, error)
@@ -404,6 +407,9 @@ type InventoryRepo interface {
 	ListInventoryBalances(ctx context.Context, filter InventoryBalanceFilter) ([]*InventoryBalance, int, error)
 	ListInventoryLots(ctx context.Context, filter InventoryLotFilter) ([]*InventoryLot, int, error)
 	ListInventoryTxns(ctx context.Context, filter InventoryTxnFilter) ([]*InventoryTxn, int, error)
+}
+
+type BOMRepo interface {
 	CreateBOMHeader(ctx context.Context, in *BOMHeaderCreate) (*BOMHeader, error)
 	CreateBOMItem(ctx context.Context, in *BOMItemCreate) (*BOMItem, error)
 	UpdateBOMDraftHeader(ctx context.Context, id int, in *BOMHeaderUpdate) (*BOMHeader, error)
@@ -417,6 +423,9 @@ type InventoryRepo interface {
 	CopyBOMVersion(ctx context.Context, sourceHeaderID int, in *BOMHeaderCreate) (*BOMVersionDetail, error)
 	ActivateBOMVersion(ctx context.Context, id int) (*BOMVersionDetail, error)
 	ArchiveBOMVersion(ctx context.Context, id int) (*BOMHeader, error)
+}
+
+type PurchaseReceiptRepo interface {
 	CreatePurchaseReceiptDraft(ctx context.Context, in *PurchaseReceiptCreate) (*PurchaseReceipt, error)
 	CreatePurchaseReceiptWithItems(ctx context.Context, in *PurchaseReceiptCreate, items []*PurchaseReceiptItemCreate) (*PurchaseReceipt, error)
 	ResolvePurchaseReceiptFromPurchaseOrderReplay(ctx context.Context, in *PurchaseReceiptFromPurchaseOrderCreate) (*PurchaseReceipt, bool, error)
@@ -427,6 +436,9 @@ type InventoryRepo interface {
 	CancelPostedPurchaseReceipt(ctx context.Context, receiptID int) (*PurchaseReceipt, error)
 	GetPurchaseReceipt(ctx context.Context, id int) (*PurchaseReceipt, error)
 	ListPurchaseReceipts(ctx context.Context, filter PurchaseReceiptFilter) ([]*PurchaseReceipt, int, error)
+}
+
+type PurchaseReturnRepo interface {
 	CreatePurchaseReturnDraft(ctx context.Context, in *PurchaseReturnCreate) (*PurchaseReturn, error)
 	ResolvePurchaseReturnReplay(ctx context.Context, in *PurchaseReturnCreate) (*PurchaseReturn, bool, error)
 	CreatePurchaseReturnWithItems(ctx context.Context, in *PurchaseReturnCreate, items []*PurchaseReturnItemCreate) (*PurchaseReturn, error)
@@ -435,6 +447,9 @@ type InventoryRepo interface {
 	CancelPostedPurchaseReturn(ctx context.Context, returnID int) (*PurchaseReturn, error)
 	GetPurchaseReturn(ctx context.Context, id int) (*PurchaseReturn, error)
 	ListPurchaseReturns(ctx context.Context, filter PurchaseReturnFilter) ([]*PurchaseReturn, int, error)
+}
+
+type PurchaseReceiptAdjustmentRepo interface {
 	CreatePurchaseReceiptAdjustmentDraft(ctx context.Context, in *PurchaseReceiptAdjustmentCreate) (*PurchaseReceiptAdjustment, error)
 	ResolvePurchaseReceiptAdjustmentReplay(ctx context.Context, in *PurchaseReceiptAdjustmentCreate) (*PurchaseReceiptAdjustment, bool, error)
 	CreatePurchaseReceiptAdjustmentWithItems(ctx context.Context, in *PurchaseReceiptAdjustmentCreate, items []*PurchaseReceiptAdjustmentItemCreate) (*PurchaseReceiptAdjustment, error)
@@ -443,6 +458,9 @@ type InventoryRepo interface {
 	CancelPostedPurchaseReceiptAdjustment(ctx context.Context, adjustmentID int) (*PurchaseReceiptAdjustment, error)
 	GetPurchaseReceiptAdjustment(ctx context.Context, id int) (*PurchaseReceiptAdjustment, error)
 	ListPurchaseReceiptAdjustments(ctx context.Context, filter PurchaseReceiptAdjustmentFilter) ([]*PurchaseReceiptAdjustment, int, error)
+}
+
+type QualityInspectionRepo interface {
 	CreateQualityInspectionDraft(ctx context.Context, in *QualityInspectionCreate) (*QualityInspection, error)
 	CreateFinishedGoodsQualityInspectionDraft(ctx context.Context, in *QualityInspectionCreate) (*QualityInspection, error)
 	SubmitQualityInspection(ctx context.Context, inspectionID int) (*QualityInspection, error)
@@ -452,6 +470,19 @@ type InventoryRepo interface {
 	GetQualityInspection(ctx context.Context, id int) (*QualityInspection, error)
 	ListQualityInspections(ctx context.Context, filter QualityInspectionFilter) ([]*QualityInspection, int, error)
 	EvaluatePurchaseReceiptQualityGate(ctx context.Context, receiptID int) (*PurchaseReceiptQualityGate, error)
+}
+
+// InventoryRepo is the compatibility aggregate accepted at the composition
+// root. Usecases and new adapters can name the smaller domain contracts above
+// instead of repeating this cross-domain method list.
+type InventoryRepo interface {
+	InventoryReferenceRepo
+	InventoryLedgerRepo
+	BOMRepo
+	PurchaseReceiptRepo
+	PurchaseReturnRepo
+	PurchaseReceiptAdjustmentRepo
+	QualityInspectionRepo
 }
 
 // InventoryWarehouseAccessRepo applies warehouse predicates before counting

@@ -549,7 +549,7 @@ type OperationalFactStatusMutation struct {
 	Reason          string
 }
 
-type OperationalFactRepo interface {
+type OperationalFactReferenceRepo interface {
 	CustomerIsActive(ctx context.Context, id int) (bool, error)
 	MaterialIsActive(ctx context.Context, id int) (bool, error)
 	ProductIsActive(ctx context.Context, id int) (bool, error)
@@ -557,32 +557,54 @@ type OperationalFactRepo interface {
 	SupplierIsActive(ctx context.Context, id int) (bool, error)
 	UnitIsActive(ctx context.Context, id int) (bool, error)
 	WarehouseIsActive(ctx context.Context, id int) (bool, error)
+}
+
+type ProductionFactRepo interface {
 	CreateProductionFactDraft(ctx context.Context, in *OperationalFactMutation) (*ProductionFact, error)
 	PostProductionFact(ctx context.Context, in *OperationalFactStatusMutation) (*ProductionFact, error)
 	CancelPostedProductionFact(ctx context.Context, in *OperationalFactStatusMutation) (*ProductionFact, error)
 	ListProductionFacts(ctx context.Context, filter OperationalFactFilter) ([]*ProductionFact, int, error)
+}
 
+type OutsourcingFactRepo interface {
 	CreateOutsourcingFactDraft(ctx context.Context, in *OperationalFactMutation) (*OutsourcingFact, error)
 	PostOutsourcingFact(ctx context.Context, in *OperationalFactStatusMutation) (*OutsourcingFact, error)
 	CancelPostedOutsourcingFact(ctx context.Context, in *OperationalFactStatusMutation) (*OutsourcingFact, error)
 	ListOutsourcingFacts(ctx context.Context, filter OperationalFactFilter) ([]*OutsourcingFact, int, error)
+}
 
+type ShipmentRepo interface {
 	CreateShipmentDraftWithItems(ctx context.Context, in *ShipmentCreateWithItems) (*Shipment, error)
 	ShipShipment(ctx context.Context, id int) (*Shipment, error)
 	CancelShippedShipment(ctx context.Context, id int) (*Shipment, error)
 	GetShipment(ctx context.Context, id int) (*Shipment, error)
 	ListShipments(ctx context.Context, filter OperationalFactFilter) ([]*Shipment, int, error)
+}
 
+type StockReservationRepo interface {
 	CreateStockReservation(ctx context.Context, in *StockReservationCreate) (*StockReservation, error)
 	CreateStockReservationFromSalesOrder(ctx context.Context, in *StockReservationFromSalesOrderCreate) (*StockReservation, error)
 	ReleaseStockReservation(ctx context.Context, id int) (*StockReservation, error)
 	ListStockReservations(ctx context.Context, filter OperationalFactFilter) ([]*StockReservation, int, error)
+}
 
+type FinanceFactRepo interface {
 	CreateFinanceFactDraft(ctx context.Context, in *FinanceFactCreate) (*FinanceFact, error)
 	PostFinanceFact(ctx context.Context, in *OperationalFactStatusMutation) (*FinanceFact, error)
 	SettleFinanceFact(ctx context.Context, in *OperationalFactStatusMutation) (*FinanceFact, error)
 	CancelPostedFinanceFact(ctx context.Context, in *OperationalFactStatusMutation) (*FinanceFact, error)
 	ListFinanceFacts(ctx context.Context, filter OperationalFactFilter) ([]*FinanceFact, int, error)
+}
+
+// OperationalFactRepo remains the composition-root aggregate while each fact
+// family exposes a narrow contract for focused usecases, adapters and tests.
+type OperationalFactRepo interface {
+	OperationalFactReferenceRepo
+	ProductionFactRepo
+	OutsourcingFactRepo
+	ShipmentRepo
+	StockReservationRepo
+	FinanceFactRepo
 }
 
 // ShipmentDraftSaveRepo is kept separate from the broad operational-fact

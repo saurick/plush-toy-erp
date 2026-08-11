@@ -419,8 +419,8 @@ test("chain and runtime trajectory documentation keeps chain, flow and evidence 
   }
 
   for (const required of [
-    "“流”描述系统应该怎样运转",
-    "“链”是把一次真实运行中已经持久化的对象和事件",
+    "业务链设计是完整业务过程的主骨架",
+    "运行轨迹则是把一次真实运行中已经持久化的对象和事件",
     "ProcessRuntime 业务轨迹",
     "单任务处理记录",
     "审批处理链",

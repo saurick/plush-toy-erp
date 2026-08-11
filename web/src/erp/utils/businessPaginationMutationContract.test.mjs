@@ -62,7 +62,6 @@ const productionOrderSource = readSource('../pages/V1ProductionOrdersPage.jsx')
 const purchaseReceiptSource = readSource('../pages/V1PurchaseReceiptsPage.jsx')
 const qualitySource = readSource('../pages/V1QualityInspectionsPage.jsx')
 const operationalFactsSource = readSource('../pages/OperationalFactsPage.jsx')
-const permissionCenterSource = readSource('../pages/PermissionCenterPage.jsx')
 const purchaseOperationPanelSource = readSource(
   '../components/purchase-orders/PurchaseOrderOperationPanel.jsx'
 )
@@ -280,65 +279,6 @@ test('shipment edits reload the current page while create-only flows return thei
     financeReconciliationCreate,
     /loadRows\(currentActiveKey\)/u
   )
-})
-
-test('permission-center create resets page one and row edits preserve the current page', () => {
-  const createMutation = sourceSlice(
-    permissionCenterSource,
-    'const createAdmin = async (values) => {',
-    'const saveAdminRoles'
-  )
-  assert.match(createMutation, /adminRpc\.call\('create'/u)
-  assert.match(
-    createMutation,
-    /setTablePagination\(\(prev\) => \(\{ \.\.\.prev, current: 1 \}\)\)/u
-  )
-  assert.ok(
-    createMutation.indexOf('setTablePagination') <
-      createMutation.indexOf('await loadData()'),
-    'page one must be selected before the created admin list is reloaded'
-  )
-
-  for (const editCase of [
-    [
-      '岗位编辑',
-      'const saveAdminRoles = async () => {',
-      'const saveAdminPhone',
-    ],
-    [
-      '手机号编辑',
-      'const saveAdminPhone = async () => {',
-      'const saveRolePermissions',
-    ],
-    [
-      '启停状态编辑',
-      'const applyAdminStatus = async (values) => {',
-      'const resetAdminPassword',
-    ],
-    [
-      '密码重置',
-      'const resetAdminPassword = async (values) => {',
-      'const onToggleAdminStatus',
-    ],
-    [
-      '账号注销',
-      'const revokeAdminAccount = async (values) => {',
-      'const columns =',
-    ],
-  ]) {
-    const [title, start, end] = editCase
-    const editMutation = sourceSlice(permissionCenterSource, start, end)
-    assert.match(
-      editMutation,
-      /await loadData\(\)/u,
-      `${title} must refresh rows`
-    )
-    assert.doesNotMatch(
-      editMutation,
-      /setTablePagination/u,
-      `${title} must preserve the current page`
-    )
-  }
 })
 
 test('purchase sort changes reset page one before applying the new server sort', () => {
