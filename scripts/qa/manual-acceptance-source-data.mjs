@@ -780,6 +780,8 @@ function buildBOMVersions(prefix, count, products, materials, anchorDate) {
             materialRef: material.code,
             quantity: (0.2 + (lineOffset % 7) * 0.15).toFixed(6),
             loss_rate: ((lineOffset % 4) * 0.02).toFixed(6),
+            production_operation_code:
+              lineOffset === 0 ? "FABRIC_PROCESSING" : undefined,
             position: ["面料", "填充", "五金配件", "包装", "标识"][
               lineOffset % 5
             ],
@@ -3107,6 +3109,8 @@ export function planBOMItemReconciliation({
       item.unit_id !== unitId ||
       Number(item.quantity) !== Number(planned.quantity) ||
       Number(item.loss_rate) !== Number(planned.loss_rate) ||
+      String(item.production_operation_code || "") !==
+        String(planned.production_operation_code || "") ||
       String(item.position || "") !== String(planned.position || "")
     ) {
       throw new CliError(
@@ -3395,6 +3399,7 @@ export function buildSourceDrivenFactReferences({
             unitId: bomItem.unit_id,
             quantity: bomItem.quantity,
             lossRate: bomItem.loss_rate,
+            productionOperationCode: bomItem.production_operation_code ?? null,
           })),
         },
       });
@@ -3859,6 +3864,7 @@ export async function applyManualAcceptanceSourceData(
           unitId: item.unit_id,
           quantity: item.quantity,
           lossRate: item.loss_rate,
+          productionOperationCode: item.production_operation_code ?? null,
         })),
       };
     }),

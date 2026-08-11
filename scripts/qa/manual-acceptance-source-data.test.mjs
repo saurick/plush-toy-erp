@@ -216,6 +216,20 @@ test("manual acceptance source plan reaches every agreed pagination threshold", 
       ["包装", "PACKAGING"],
     ],
   );
+  const routeProcesses = Object.fromEntries(
+    plan.records.processes
+      .filter((item) => item.production_route_operation_code)
+      .map((item) => [item.production_route_operation_code, item]),
+  );
+  assert.ok(
+    Object.values(routeProcesses).every((item) => item.isActive === true),
+  );
+  assert.equal(routeProcesses.FABRIC_PROCESSING.outsourcing_enabled, true);
+  assert.equal(routeProcesses.SEWING.inhouse_enabled, true);
+  assert.equal(routeProcesses.SEWING.outsourcing_enabled, true);
+  assert.equal(routeProcesses.HANDWORK.inhouse_enabled, true);
+  assert.equal(routeProcesses.HANDWORK.outsourcing_enabled, true);
+  assert.equal(routeProcesses.PACKAGING.inhouse_enabled, true);
   assert.equal(
     plan.records.salesOrders.length,
     DEFAULT_SOURCE_DATA_SCALE.salesOrders,
@@ -231,6 +245,15 @@ test("manual acceptance source plan reaches every agreed pagination threshold", 
   assert.equal(
     plan.records.bomVersions.length,
     DEFAULT_SOURCE_DATA_SCALE.bomVersions,
+  );
+  assert.ok(
+    plan.records.bomVersions.every(
+      (bom) =>
+        bom.items[0]?.production_operation_code === "FABRIC_PROCESSING" &&
+        bom.items
+          .slice(1)
+          .every((item) => item.production_operation_code === undefined),
+    ),
   );
   assert.ok(plan.records.customers.some((item) => item.contacts.length === 0));
   assert.ok(plan.records.customers.some((item) => item.contacts.length === 1));
@@ -1496,6 +1519,7 @@ test("source report exposes read-back candidates but blocks every Fact phase mis
             unit_id: 1005,
             quantity: "0.2",
             loss_rate: "0",
+            production_operation_code: "FABRIC_PROCESSING",
           },
         ],
       },
@@ -1547,6 +1571,11 @@ test("source report exposes read-back candidates but blocks every Fact phase mis
     sourceDrivenFacts.sourceCandidates.production.item.unitPrice,
     "12.50",
   );
+  assert.equal(
+    sourceDrivenFacts.sourceCandidates.production.bom.items[0]
+      .productionOperationCode,
+    "FABRIC_PROCESSING",
+  );
   assert.equal(sourceDrivenFacts.sourceCandidates.sales.order.customerId, 5001);
   assert.equal(
     sourceDrivenFacts.sourceCandidates.sales.order.paymentTermDays,
@@ -1593,6 +1622,7 @@ test("partial draft BOMs resume missing lines while settled BOMs fail closed", (
         quantity: "1.2",
         loss_rate: "0.03",
         position: "面料",
+        production_operation_code: "FABRIC_PROCESSING",
       },
       {
         materialRef: "M-2",
@@ -1609,6 +1639,7 @@ test("partial draft BOMs resume missing lines while settled BOMs fail closed", (
         quantity: "1.20",
         loss_rate: "0.030",
         position: "面料",
+        production_operation_code: "FABRIC_PROCESSING",
       },
     ],
     materialIds: new Map([
@@ -1630,6 +1661,16 @@ test("partial draft BOMs resume missing lines while settled BOMs fail closed", (
       planBOMItemReconciliation({
         ...input,
         actualItems: [{ ...input.actualItems[0], quantity: "9" }],
+      }),
+    /persisted BOM line differs/u,
+  );
+  assert.throws(
+    () =>
+      planBOMItemReconciliation({
+        ...input,
+        actualItems: [
+          { ...input.actualItems[0], production_operation_code: null },
+        ],
       }),
     /persisted BOM line differs/u,
   );
