@@ -117,8 +117,11 @@ export const EXCEPTION_BROWSER_ACCOUNTS = Object.freeze([
 ]);
 
 export const MANUAL_ACCEPTANCE_BROWSER_BOUNDARY = Object.freeze({
-  readOnly: true,
-  writesDatabase: false,
+  readOnly: false,
+  writesDatabase: true,
+  businessDataReadOnly: true,
+  writesBusinessData: false,
+  recordsLegalNoticeAcknowledgement: true,
   clicksBusinessWriteActions: false,
   callsBusinessMutationRPC: false,
   storesPasswordValue: false,
@@ -126,6 +129,7 @@ export const MANUAL_ACCEPTANCE_BROWSER_BOUNDARY = Object.freeze({
   storesAuthorizationHeader: false,
   allowedInteractions: Object.freeze([
     "login",
+    "legal_notice_acknowledgement",
     "route_navigation",
     "read_only_tab_navigation",
   ]),
@@ -337,9 +341,7 @@ export function buildManualAcceptanceBrowserPlan({ baseURL, backendURL } = {}) {
       requiresDataEvidence:
         target.isList ||
         ["print-preview", "print-workspace"].includes(target.group) ||
-        ["global-dashboard", "business-dashboard"].includes(
-          target.key,
-        ),
+        ["global-dashboard", "business-dashboard"].includes(target.key),
       ...(target.key === "business-dashboard"
         ? { dataEvidenceRequirements: dashboardRequirements }
         : {}),
@@ -727,6 +729,36 @@ async function fillLoginForm(
   await page.locator('input[type="password"]').fill(password);
 }
 
+function waitForLegalNoticeStatus(page) {
+  return page.waitForResponse(
+    (response) => {
+      if (!response.url().includes("/rpc/admin")) return false;
+      try {
+        return (
+          response.request().postDataJSON()?.method === "legal_notice_status"
+        );
+      } catch {
+        return false;
+      }
+    },
+    { timeout: LOGIN_TIMEOUT_MS },
+  );
+}
+
+async function acknowledgeLegalNoticeIfRequired(page, statusResponse) {
+  await statusResponse;
+  const gate = page.getByTestId("legal-notice-gate");
+  const acknowledge = page.getByTestId("legal-notice-acknowledge");
+  const required = await acknowledge
+    .waitFor({ state: "visible", timeout: 1_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!required) return false;
+  await acknowledge.click();
+  await gate.waitFor({ state: "hidden", timeout: LOGIN_TIMEOUT_MS });
+  return true;
+}
+
 async function loginFormalAccount(
   browser,
   {
@@ -759,6 +791,7 @@ async function loginFormalAccount(
       password,
       entryTarget,
     });
+    const legalNoticeStatus = waitForLegalNoticeStatus(page);
     await Promise.all([
       page.waitForURL((url) => url.pathname !== "/admin-login", {
         timeout: LOGIN_TIMEOUT_MS,
@@ -773,6 +806,10 @@ async function loginFormalAccount(
         waitUntil: "domcontentloaded",
       });
     }
+    const legalNoticeAcknowledged = await acknowledgeLegalNoticeIfRequired(
+      page,
+      legalNoticeStatus,
+    );
     await waitForReadablePage(page);
     const visibleText = await page.locator("body").innerText();
     if (
@@ -810,6 +847,7 @@ async function loginFormalAccount(
         passed: true,
         landingPath,
         verificationPath: new URL(page.url()).pathname,
+        legalNoticeAcknowledged,
         customerBrandVisible:
           visibleText.includes(COMPANY_NAME) ||
           visibleText.includes(SYSTEM_NAME),
@@ -989,9 +1027,7 @@ export function shipmentListReady(expectedCount) {
   const total = match ? Number(match[1]) : 0;
   const rows = [
     ...document.querySelectorAll(".ant-table-tbody > tr.ant-table-row"),
-  ].filter(
-    (row) => !row.classList?.contains("ant-table-placeholder"),
-  );
+  ].filter((row) => !row.classList?.contains("ant-table-placeholder"));
   return total === Number(expectedCount) && rows.length > 0;
 }
 
@@ -1355,9 +1391,7 @@ async function readDashboardEvidence(page, target, datasetBinding) {
         datasetBinding?.dataset?.baseline?.exactEmptyBusinessBaseline === true,
     });
     const openable = page
-      .locator(
-        ".erp-business-board-source-item--openable[data-target-path]",
-      )
+      .locator(".erp-business-board-source-item--openable[data-target-path]")
       .first();
     const expectedPath = requiredText(
       await openable.getAttribute("data-target-path"),
@@ -1474,9 +1508,7 @@ async function readMobileTaskEvidence(page, target, datasetBinding) {
   const taskCodePrefix = TASK_VISIBLE_CODE_PREFIX_BY_ROLE[target.roleKey];
   const visibleCurrentBatchTaskCount = async () =>
     page
-      .locator(
-        `.erp-mobile-list-item[data-task-code^="${taskCodePrefix}-"]`,
-      )
+      .locator(`.erp-mobile-list-item[data-task-code^="${taskCodePrefix}-"]`)
       .count();
   const readCurrentTotal = async (tabKey) => {
     const bodyText = await page.locator("body").innerText();
@@ -1493,8 +1525,7 @@ async function readMobileTaskEvidence(page, target, datasetBinding) {
     return largestTotalFromTexts([bodyText]);
   };
   const todoCount = await readCurrentTotal("todo");
-  const visibleTodoCurrentBatchTaskCount =
-    await visibleCurrentBatchTaskCount();
+  const visibleTodoCurrentBatchTaskCount = await visibleCurrentBatchTaskCount();
   await page.getByTestId("mobile-role-nav-done").click();
   await page.waitForFunction(
     () =>
@@ -1518,8 +1549,7 @@ async function readMobileTaskEvidence(page, target, datasetBinding) {
     { timeout: PAGE_TIMEOUT_MS },
   );
   const doneCount = await readCurrentTotal("done");
-  const visibleDoneCurrentBatchTaskCount =
-    await visibleCurrentBatchTaskCount();
+  const visibleDoneCurrentBatchTaskCount = await visibleCurrentBatchTaskCount();
   await page.getByTestId("mobile-role-nav-todo").click();
   return evaluateMobileCurrentBatchEvidence({
     roleKey: target.roleKey,
@@ -1590,7 +1620,12 @@ export function resolveCurrentBatchListFilter(
     datasetBinding?.dataset?.currentBatchIdentifiers?.[target.key] || "",
   ).trim();
   if (factIdentifier) {
-    return { mode: "exact_business_number", identifier: factIdentifier };
+    return {
+      mode: ["production-exceptions", "finance-payments"].includes(target.key)
+        ? "visible_exact_business_number"
+        : "exact_business_number",
+      identifier: factIdentifier,
+    };
   }
   throw new BrowserAcceptanceError(
     `${target.title} 没有可在页面核对的当前批次标识`,
@@ -1598,24 +1633,26 @@ export function resolveCurrentBatchListFilter(
 }
 
 async function filterVisibleListToCurrentBatch(page, target, filter) {
-  const candidates = page.locator(
-    'input[placeholder*="搜索"],input[placeholder^="操作人"]',
-  );
-  let search = null;
-  for (let index = 0; index < (await candidates.count()); index += 1) {
-    const candidate = candidates.nth(index);
-    if (await candidate.isVisible()) {
-      search = candidate;
-      break;
-    }
-  }
-  if (!search) {
-    throw new BrowserAcceptanceError(
-      `${target.title} 没有可用于当前批次核对的搜索框`,
+  if (filter.mode !== "visible_exact_business_number") {
+    const candidates = page.locator(
+      'input[placeholder*="搜索"],input[placeholder^="操作人"]',
     );
+    let search = null;
+    for (let index = 0; index < (await candidates.count()); index += 1) {
+      const candidate = candidates.nth(index);
+      if (await candidate.isVisible()) {
+        search = candidate;
+        break;
+      }
+    }
+    if (!search) {
+      throw new BrowserAcceptanceError(
+        `${target.title} 没有可用于当前批次核对的搜索框`,
+      );
+    }
+    await search.fill(filter.identifier);
+    await page.keyboard.press("Enter");
   }
-  await search.fill(filter.identifier);
-  await page.keyboard.press("Enter");
   const itemSelector = [
     ".ant-table-tbody > tr:not(.ant-table-placeholder)",
     ".erp-task-board-card",
@@ -1878,8 +1915,7 @@ async function readListEvidence(page, target, datasetBinding) {
   }
   if (target.key === "shipments") {
     if (
-      expectedShipments?.exactCount !==
-      MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT
+      expectedShipments?.exactCount !== MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT
     ) {
       throw new BrowserAcceptanceError(
         `出货数据报告必须精确包含 ${MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT} 张同批出货单`,
@@ -2167,7 +2203,12 @@ export function assertBoundSimulatedPrintReports(source, fact) {
       "打印验收只接受同一批次、同一运行配置的本机模拟业务记录",
     );
   }
-  const exactLongRecord = (records, identityField, label) => {
+  const exactLongRecord = (
+    records,
+    identityField,
+    label,
+    { preferredStatuses = [] } = {},
+  ) => {
     const matches = (Array.isArray(records) ? records : []).filter(
       (item) =>
         Array.isArray(item?.items) &&
@@ -2177,14 +2218,24 @@ export function assertBoundSimulatedPrintReports(source, fact) {
     if (matches.length === 0) {
       throw new BrowserAcceptanceError(`同批源数据缺少 25 行${label}打印样本`);
     }
-    const selected = matches
-      .slice()
-      .sort((left, right) =>
+    const statusPriority = new Map(
+      preferredStatuses.map((status, index) => [status, index]),
+    );
+    const selected = matches.slice().sort((left, right) => {
+      const leftPriority =
+        statusPriority.get(String(left?.status || "").toUpperCase()) ??
+        preferredStatuses.length;
+      const rightPriority =
+        statusPriority.get(String(right?.status || "").toUpperCase()) ??
+        preferredStatuses.length;
+      return (
+        leftPriority - rightPriority ||
         String(left[identityField]).localeCompare(
           String(right[identityField]),
           "zh-CN",
-        ),
-      )[0];
+        )
+      );
+    })[0];
     return {
       recordQuery: requiredText(
         selected[identityField],
@@ -2228,6 +2279,7 @@ export function assertBoundSimulatedPrintReports(source, fact) {
       ],
       "version",
       "产品结构版本",
+      { preferredStatuses: ["ACTIVE", "DRAFT"] },
     ),
   };
   return {
@@ -2619,25 +2671,22 @@ function currentBatchFactIdentifiers(factReport) {
     "production-exceptions": (() => {
       const decision = (records.productionExceptions || []).find(
         (item) =>
-          String(item?.decision_type || item?.decisionType || "").toUpperCase() ===
-            "OVER_ISSUE" &&
+          String(
+            item?.decision_type || item?.decisionType || "",
+          ).toUpperCase() === "OVER_ISSUE" &&
           String(item?.status || "").toUpperCase() === "APPROVED" &&
           String(
             item?.approval_task_code || item?.approvalTaskCode || "",
           ).startsWith("PROC-"),
       );
-      return String(
-        decision?.approval_task_code || decision?.approvalTaskCode || "",
-      );
+      return String(decision?.decision_no || decision?.decisionNo || "");
     })(),
     "shipping-release": (() => {
       const shipment = records.shipments.find(
         (item) =>
           String(item?.status || "").toUpperCase() === "SHIPPED" &&
           String(
-            item?.finance_release_status ||
-              item?.financeReleaseStatus ||
-              "",
+            item?.finance_release_status || item?.financeReleaseStatus || "",
           ).toUpperCase() === "APPROVED" &&
           Number(
             item?.finance_release_process_instance_id ||
@@ -2657,8 +2706,7 @@ function currentBatchFactIdentifiers(factReport) {
       );
       if (!shipment) return "";
       return String(
-        shipment.finance_approval_task_code ||
-          shipment.financeApprovalTaskCode,
+        shipment.finance_approval_task_code || shipment.financeApprovalTaskCode,
       );
     })(),
     outbound: firstCurrentBatchBusinessNo(records.stockReservations, [
@@ -2673,6 +2721,10 @@ function currentBatchFactIdentifiers(factReport) {
     payables: financeNo("PAYABLE"),
     receivables: financeNo("RECEIVABLE"),
     invoices: financeNo("INVOICE"),
+    "finance-payments": firstCurrentBatchBusinessNo(records.financePayments, [
+      "payment_no",
+      "paymentNo",
+    ]),
   };
 }
 

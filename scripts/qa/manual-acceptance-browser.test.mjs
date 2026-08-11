@@ -415,7 +415,10 @@ test("manual acceptance browser plan covers all 51 catalog targets and ten forma
     backendURL: "http://localhost:8300",
   });
 
-  assert.equal(plan.writesDatabase, false);
+  assert.equal(plan.writesDatabase, true);
+  assert.equal(plan.businessDataReadOnly, true);
+  assert.equal(plan.writesBusinessData, false);
+  assert.equal(plan.recordsLegalNoticeAcknowledgement, true);
   assert.equal(plan.clicksBusinessWriteActions, false);
   assert.equal(plan.summary.totalTargets, 51);
   assert.deepEqual(plan.summary, {
@@ -505,10 +508,13 @@ test("finance browser evidence binds page headers and representative values", ()
   assert.deepEqual(payable.forbiddenHeaders, ["账期"]);
 });
 
-test("manual acceptance browser boundary is explicitly read-only", () => {
+test("manual acceptance browser boundary isolates legal acknowledgement from business data", () => {
   assert.deepEqual(MANUAL_ACCEPTANCE_BROWSER_BOUNDARY, {
-    readOnly: true,
-    writesDatabase: false,
+    readOnly: false,
+    writesDatabase: true,
+    businessDataReadOnly: true,
+    writesBusinessData: false,
+    recordsLegalNoticeAcknowledgement: true,
     clicksBusinessWriteActions: false,
     callsBusinessMutationRPC: false,
     storesPasswordValue: false,
@@ -516,6 +522,7 @@ test("manual acceptance browser boundary is explicitly read-only", () => {
     storesAuthorizationHeader: false,
     allowedInteractions: [
       "login",
+      "legal_notice_acknowledgement",
       "route_navigation",
       "read_only_tab_navigation",
     ],
@@ -749,6 +756,36 @@ test("bound print inputs stay in the acceptance report root and match the curren
       financeFieldContract,
     }),
     assertBoundSimulatedPrintReports(source, fact),
+  );
+  const visibleBOMSource = {
+    ...source,
+    referenceRecords: {
+      ...source.referenceRecords,
+      bomVersions: [
+        {
+          version: "YS5-BOM-005-1",
+          status: "ARCHIVED",
+          items: Array.from({ length: 25 }),
+        },
+        {
+          version: "YS5-BOM-005-3",
+          status: "DRAFT",
+          items: Array.from({ length: 25 }),
+        },
+      ],
+    },
+  };
+  assert.equal(
+    assertBoundSimulatedPrintReports(visibleBOMSource, {
+      ...visibleBOMSource,
+      reportContract: "source-driven-operational-facts-v1",
+      referenceRecords: {
+        ...visibleBOMSource.referenceRecords,
+        financeFacts,
+      },
+      financeFieldContract,
+    }).printRecords.bomVersion.recordQuery,
+    "YS5-BOM-005-3",
   );
   assert.throws(
     () =>
@@ -1542,6 +1579,43 @@ test("page-data contract and readiness expose current-batch list identifiers", (
   );
 });
 
+test("no-search current-batch pages use only their exact visible business number", () => {
+  const plan = buildManualAcceptanceBrowserPlan({});
+  for (const [targetKey, identifier] of [
+    ["production-exceptions", "TEST-YS-260716V5-SCYC001"],
+    ["finance-payments", "TEST-YS-260716V5-SK903"],
+  ]) {
+    const target = plan.targets.find((item) => item.key === targetKey);
+    assert.ok(target);
+    assert.deepEqual(
+      resolveCurrentBatchListFilter(
+        target,
+        { dataStatus: "pass", actual: 1, probes: [] },
+        {
+          dataset: {
+            currentBatchIdentifiers: { [targetKey]: identifier },
+          },
+        },
+      ),
+      { mode: "visible_exact_business_number", identifier },
+    );
+  }
+
+  const customer = plan.targets.find((item) => item.key === "customers");
+  assert.deepEqual(
+    resolveCurrentBatchListFilter(
+      customer,
+      { dataStatus: "pass", actual: 1, probes: [] },
+      {
+        dataset: {
+          currentBatchIdentifiers: { customers: "YS5-KH-001" },
+        },
+      },
+    ),
+    { mode: "exact_business_number", identifier: "YS5-KH-001" },
+  );
+});
+
 test("task board binds task-code metadata to the exact current-batch total", () => {
   const taskBoard = buildManualAcceptanceBrowserPlan({}).targets.find(
     (target) => target.key === "task-board",
@@ -2094,6 +2168,12 @@ test("business print proof searches canonical current-batch records before exact
   assert.match(source, /await selectionControl\.click\(\)/u);
   assert.match(source, /selectionInput\.isChecked\(\)/u);
   assert.doesNotMatch(source, /force: true/u);
+  assert.match(source, /getByTestId\("legal-notice-acknowledge"\)/u);
+  assert.match(source, /gate\.waitFor\(\{ state: "hidden"/u);
+  assert.match(source, /legalNoticeAcknowledged/u);
+  assert.match(source, /filter\.mode !== "visible_exact_business_number"/u);
+  assert.match(source, /decision\?\.decision_no \|\| decision\?\.decisionNo/u);
+  assert.match(source, /records\.financePayments/u);
   assert.match(source, /attempt <= 3/u);
   assert.match(source, /search\.inputValue\(\)/u);
   assert.match(source, /const filteredRowsReady = await page/u);
@@ -2326,6 +2406,6 @@ test("plan mode needs no password and starts no browser", () => {
   assert.equal(result.status, 0, result.stderr);
   const plan = JSON.parse(result.stdout);
   assert.equal(plan.summary.totalTargets, 51);
-  assert.equal(plan.writesDatabase, false);
+  assert.equal(plan.writesDatabase, true);
   assert.equal(plan.formalAccounts.length, 10);
 });
