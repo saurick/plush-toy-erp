@@ -1204,6 +1204,7 @@ export function createStyleL1Scenarios(deps) {
       go: {
         status: 'collected',
         metrics: { statements: { covered: 91, total: 100 } },
+        evidence: ['output/qa/coverage/go.json'],
       },
       web: {
         status: 'collected',
@@ -14544,6 +14545,7 @@ export function createStyleL1Scenarios(deps) {
         await expectHeading(page, '质量验证工作台')
         await expectText(page, '本轮验证')
         await expectText(page, '专项检查库')
+        await expectText(page, 'Git 收口')
         await expectText(page, '证据与覆盖')
         await expectText(page, 'docs/product/自动化测试策略.md')
         const defaultMetrics = await page.evaluate(() => {
@@ -14577,6 +14579,21 @@ export function createStyleL1Scenarios(deps) {
             tierDisclosureOpen:
               document.querySelector('.erp-dev-testing-disclosure--tiers')
                 ?.open || false,
+            journeyStepCount: document.querySelectorAll(
+              '.erp-dev-testing-validation-journey > li'
+            ).length,
+            parallelJourneyCount: document.querySelectorAll(
+              '.erp-dev-testing-validation-journey [data-parallel-checks="true"]'
+            ).length,
+            validationActionCount: document.querySelectorAll(
+              '.erp-dev-testing-validation-action[data-action-key]'
+            ).length,
+            journeyColumns: getComputedStyle(
+              document.querySelector('.erp-dev-testing-validation-journey')
+            ).gridTemplateColumns,
+            actionColumns: getComputedStyle(
+              document.querySelector('.erp-dev-testing-validation__actions')
+            ).gridTemplateColumns,
             sidebarCount: document.querySelectorAll('.erp-dev-testing-sidebar')
               .length,
             filterCount: document.querySelectorAll('.erp-dev-testing-filter')
@@ -14609,12 +14626,17 @@ export function createStyleL1Scenarios(deps) {
         assert(
           defaultMetrics.sidebarCount === 0 &&
             defaultMetrics.filterCount === 0 &&
-            defaultMetrics.viewCount === 3 &&
+            defaultMetrics.viewCount === 4 &&
+            defaultMetrics.journeyStepCount === 3 &&
+            defaultMetrics.parallelJourneyCount === 1 &&
+            defaultMetrics.validationActionCount === 3 &&
+            defaultMetrics.journeyColumns.split(' ').length === 3 &&
+            defaultMetrics.actionColumns.split(' ').length === 1 &&
             defaultMetrics.role === null &&
             defaultMetrics.keyword === null &&
             Math.abs(defaultMetrics.shellWidth - defaultMetrics.readerWidth) <=
               2,
-          `验证层级默认态应全宽，只保留三个主视图且不显示无效来源筛选: ${JSON.stringify(defaultMetrics)}`
+          `验证层级默认态应全宽，保留四个主视图、三步判断与三项并列检查，且不显示无效来源筛选: ${JSON.stringify(defaultMetrics)}`
         )
         assert(
           defaultMetrics.tierCount >= 8,
@@ -14622,7 +14644,7 @@ export function createStyleL1Scenarios(deps) {
         )
         assert.equal(
           defaultMetrics.presetCount,
-          19,
+          17,
           `测试入口应渲染常用复制预设: ${JSON.stringify(defaultMetrics)}`
         )
         assert.deepEqual(
@@ -14659,17 +14681,40 @@ export function createStyleL1Scenarios(deps) {
             '客户配置前端投影 / Customer Config Projection',
             '前端错误提示边界 / Frontend Error Messages',
             '业务动作与字段链路 / Business Action & Field Boundaries',
-            '提交前 QA / Pre-commit QA',
-            '发版前严格 QA / Release QA',
           ].every((label) =>
             defaultMetrics.presetTexts.some((text) => text.includes(label))
           ),
-          `测试入口预设应覆盖前端、Workflow、试用角色、角色菜单与入口真源、试用账号 RBAC、真实登录 URL、试用模拟数据、V1 本地验收计划、移动端、客户配置、原型、文档治理、导入、错误提示、业务动作字段、提交和发版: ${JSON.stringify(defaultMetrics)}`
+          `测试入口预设应覆盖前端、Workflow、试用角色、角色菜单与入口真源、试用账号 RBAC、真实登录 URL、试用模拟数据、V1 本地验收计划、移动端、客户配置、原型、文档治理、导入、错误提示和业务动作字段: ${JSON.stringify(defaultMetrics)}`
         )
         assert(
           defaultMetrics.tierCopyButtonCount >= defaultMetrics.tierCount,
           `每个测试层级应提供复制按钮: ${JSON.stringify(defaultMetrics)}`
         )
+        await page.getByRole('button', { name: '生成本轮验证计划' }).click()
+        await page
+          .getByLabel('改动到验证建议的映射')
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        const planMetrics = await page.evaluate(() => ({
+          mapNodeCount: document.querySelectorAll(
+            '.erp-dev-testing-validation-plan__map > [role="listitem"]'
+          ).length,
+          mapColumns: getComputedStyle(
+            document.querySelector('.erp-dev-testing-validation-plan__map')
+          ).gridTemplateColumns,
+          technicalDetailsOpen:
+            document.querySelector('.erp-dev-testing-validation-plan__details')
+              ?.open || false,
+        }))
+        assert(
+          planMetrics.mapNodeCount === 3 &&
+            planMetrics.mapColumns.split(' ').length === 3 &&
+            planMetrics.technicalDetailsOpen === false,
+          `验证计划应先显示改动、范围和补证关系，并默认折叠技术身份: ${JSON.stringify(planMetrics)}`
+        )
+        await page.screenshot({
+          path: 'output/playwright/style-l1/dev-testing-tiers-dark-desktop.png',
+          fullPage: true,
+        })
         const faviconHref = await page.evaluate(() =>
           document.querySelector('link[rel~="icon"]')?.getAttribute('href')
         )
@@ -14878,7 +14923,7 @@ export function createStyleL1Scenarios(deps) {
           .locator('.erp-dev-testing-reader__toolbar .ant-segmented-item')
           .filter({ hasText: '专项检查库' })
           .click()
-        await expectText(page, 'pnpm style:l1')
+        await expectText(page, '三步定位，不通读命令墙')
         assert.equal(
           new URL(page.url()).searchParams.get('view'),
           'commands',
@@ -14918,6 +14963,18 @@ export function createStyleL1Scenarios(deps) {
             hasCommandPre: Boolean(
               document.querySelector('.erp-dev-testing-command-block pre')
             ),
+            commandDetailCount: document.querySelectorAll(
+              '.erp-dev-testing-command-block__details'
+            ).length,
+            openCommandDetailCount: document.querySelectorAll(
+              '.erp-dev-testing-command-block__details[open]'
+            ).length,
+            visibleCommandPreCount: document.querySelectorAll(
+              '.erp-dev-testing-command-block__details[open] pre'
+            ).length,
+            matrixHeaderCount: document.querySelectorAll(
+              '.erp-dev-testing-command-matrix__head'
+            ).length,
             minimumHeight: Math.min(...blockMetrics.map((item) => item.height)),
             clippedCount: blockMetrics.filter(
               (item) => item.height + 1 < item.scrollHeight
@@ -14928,8 +14985,14 @@ export function createStyleL1Scenarios(deps) {
           }
         })
         assert(
-          commandMetrics.commandBlocks > 0 && commandMetrics.hasCommandPre,
-          `测试入口命令视图应渲染命令块: ${JSON.stringify(commandMetrics)}`
+          commandMetrics.commandBlocks > 0 &&
+            commandMetrics.hasCommandPre &&
+            commandMetrics.commandDetailCount ===
+              commandMetrics.commandBlocks &&
+            commandMetrics.openCommandDetailCount === 0 &&
+            commandMetrics.visibleCommandPreCount === 0 &&
+            commandMetrics.matrixHeaderCount === 1,
+          `专项检查库应以决策矩阵展示用途，固定命令默认折叠: ${JSON.stringify(commandMetrics)}`
         )
         assert.deepEqual(
           commandMetrics.roleLabels,
@@ -15048,6 +15111,69 @@ export function createStyleL1Scenarios(deps) {
           path: 'output/playwright/style-l1/dev-testing-commands-dark-desktop.png',
           fullPage: true,
         })
+        await page
+          .locator('.erp-dev-testing-reader__toolbar .ant-segmented-item')
+          .filter({ hasText: 'Git 收口' })
+          .click()
+        await expectText(page, '四道收口检查')
+        const closeoutMetrics = await page.evaluate(() => {
+          const steps = [
+            ...document.querySelectorAll(
+              '.erp-dev-testing-closeout-steps > li'
+            ),
+          ]
+          const stepDetails = [
+            ...document.querySelectorAll(
+              '.erp-dev-testing-closeout-step__details'
+            ),
+          ]
+          return {
+            stepCount: steps.length,
+            stageKeys: steps.map((step) => step.getAttribute('data-stage')),
+            timelineColumns: getComputedStyle(
+              document.querySelector('.erp-dev-testing-closeout-steps')
+            ).gridTemplateColumns,
+            stepDetailCount: stepDetails.length,
+            openStepDetailCount: stepDetails.filter((detail) => detail.open)
+              .length,
+            hookHeaderCount: document.querySelectorAll(
+              '.erp-dev-testing-hook-list__head'
+            ).length,
+            commandDisclosureOpen:
+              document.querySelector(
+                '.erp-dev-testing-closeout-command-disclosure'
+              )?.open || false,
+          }
+        })
+        assert.deepEqual(
+          closeoutMetrics.stageKeys,
+          ['pre-commit', 'commit-msg', 'prepare-push', 'pre-push'],
+          `Git 收口时间线必须保持真实触发顺序: ${JSON.stringify(closeoutMetrics)}`
+        )
+        assert(
+          closeoutMetrics.stepCount === 4 &&
+            closeoutMetrics.timelineColumns.split(' ').length === 4 &&
+            closeoutMetrics.stepDetailCount === 4 &&
+            closeoutMetrics.openStepDetailCount === 0 &&
+            closeoutMetrics.hookHeaderCount === 1 &&
+            closeoutMetrics.commandDisclosureOpen === false,
+          `Git 收口桌面态应显示四阶段关系，并默认折叠边界和复制命令: ${JSON.stringify(closeoutMetrics)}`
+        )
+        await page
+          .locator('.erp-dev-testing-closeout-step__details > summary')
+          .first()
+          .click()
+        assert.equal(
+          await page
+            .locator('.erp-dev-testing-closeout-step__details[open]')
+            .count(),
+          1,
+          'Git 收口应允许按阶段展开边界与来源'
+        )
+        await page.screenshot({
+          path: 'output/playwright/style-l1/dev-testing-closeout-dark-desktop.png',
+          fullPage: true,
+        })
         await gotoScenarioPath(
           page,
           '/__dev/testing?view=docs&doc=scripts%2FREADME.md',
@@ -15092,6 +15218,10 @@ export function createStyleL1Scenarios(deps) {
       verify: async (page) => {
         await expectHeading(page, '质量验证工作台')
         await expectText(page, '执行脚本：')
+        await page
+          .locator('.erp-dev-testing-command-block__details > summary')
+          .first()
+          .click()
         const metrics = await page.evaluate(() => {
           const shell = document.querySelector('.erp-dev-testing-shell')
           const reader = document.querySelector('.erp-dev-testing-reader')
@@ -15102,9 +15232,14 @@ export function createStyleL1Scenarios(deps) {
           const preNodes = [
             ...document.querySelectorAll('.erp-dev-testing-command-block pre'),
           ]
+          const openPreNodes = [
+            ...document.querySelectorAll(
+              '.erp-dev-testing-command-block__details[open] pre'
+            ),
+          ]
           const actionButtons = [
             ...document.querySelectorAll(
-              '.erp-dev-testing-command-block__head button'
+              '.erp-dev-testing-command-block__actions button'
             ),
           ]
           const segmentedLabels = [
@@ -15150,7 +15285,14 @@ export function createStyleL1Scenarios(deps) {
             pageScrollWidth: document.documentElement.scrollWidth,
             pageClientWidth: document.documentElement.clientWidth,
             preCount: preNodes.length,
-            preOverflowSafe: preNodes.every((pre) => {
+            visiblePreCount: openPreNodes.length,
+            openDetailCount: document.querySelectorAll(
+              '.erp-dev-testing-command-block__details[open]'
+            ).length,
+            detailCount: document.querySelectorAll(
+              '.erp-dev-testing-command-block__details'
+            ).length,
+            preOverflowSafe: openPreNodes.every((pre) => {
               const style = getComputedStyle(pre)
               const block = pre.closest('.erp-dev-testing-command-block')
               return (
@@ -15171,12 +15313,15 @@ export function createStyleL1Scenarios(deps) {
         )
         assert(
           metrics.preCount === metrics.blockCount &&
+            metrics.detailCount === metrics.blockCount &&
+            metrics.openDetailCount === 1 &&
+            metrics.visiblePreCount === 1 &&
             metrics.preOverflowSafe &&
             metrics.toolsColumns.split(' ').length === 1 &&
             metrics.clippedSegmentedLabelCount === 0 &&
             Math.abs(metrics.shellWidth - metrics.readerWidth) <= 2 &&
             metrics.pageScrollWidth <= metrics.pageClientWidth + 1,
-          `移动端命令视图应全宽单列，长命令只在自身横向滚动: ${JSON.stringify(metrics)}`
+          `移动端命令视图应全宽单列，命令默认折叠且展开后只在自身横向滚动: ${JSON.stringify(metrics)}`
         )
         await page.screenshot({
           path: 'output/playwright/style-l1/dev-testing-commands-mobile.png',
@@ -15300,11 +15445,11 @@ export function createStyleL1Scenarios(deps) {
           page,
           '尚未采集可展示的覆盖证据；空值不是 0% / No coverage evidence collected'
         )
-        await expectButton(page, '一键采集覆盖率')
+        await expectButton(page, '采集本地覆盖基线')
         await expectButton(page, '复制备用命令')
         await expectButton(page, '重新读取')
-        await page.getByRole('button', { name: '一键采集覆盖率' }).click()
-        await expectText(page, '第 3/10 阶段 · Go 测试与代码覆盖')
+        await page.getByRole('button', { name: '采集本地覆盖基线' }).click()
+        await expectText(page, '第 3/11 阶段 · Go 测试与代码覆盖')
         assert.equal(
           coverageActionRequests,
           1,
@@ -15356,9 +15501,9 @@ export function createStyleL1Scenarios(deps) {
           `覆盖缺失移动态应全宽且不横向溢出: ${JSON.stringify(coverageMetrics)}`
         )
         assert(
-          coverageMetrics.segmentedColumns.split(' ').length === 3 &&
+          coverageMetrics.segmentedColumns.split(' ').length === 2 &&
             coverageMetrics.clippedSegmentedLabelCount === 0,
-          `三个测试主视图在移动端应使用三列: ${JSON.stringify(coverageMetrics)}`
+          `四个测试主视图在移动端应使用两列换行: ${JSON.stringify(coverageMetrics)}`
         )
       },
     },
@@ -15442,7 +15587,77 @@ export function createStyleL1Scenarios(deps) {
           page,
           '本轮承诺的 PostgreSQL、浏览器、readiness、目标环境和 UAT 分别要求 100%'
         )
-        await expectText(page, '0 tests executed 均不能算通过')
+        await expectText(page, '查看采集与判定规则')
+        const coverageMatrixMetrics = await page.evaluate(() => {
+          const firstRow = document.querySelector(
+            '.erp-dev-testing-coverage-grid .erp-dev-testing-coverage-card'
+          )
+          const evidenceDetails = [
+            ...document.querySelectorAll(
+              '.erp-dev-testing-coverage-card__details'
+            ),
+          ]
+          const metricTileStyles = [
+            ...document.querySelectorAll(
+              '.erp-dev-testing-coverage-card__metrics > span'
+            ),
+          ].map((tile) => {
+            const label = tile.querySelector(':scope > small')
+            const value = tile.querySelector(':scope > b')
+            return {
+              backgroundColor: getComputedStyle(tile).backgroundColor,
+              labelColor: label ? getComputedStyle(label).color : '',
+              valueColor: value ? getComputedStyle(value).color : '',
+            }
+          })
+          return {
+            matrixHeaderCount: document.querySelectorAll(
+              '.erp-dev-testing-coverage-matrix__head'
+            ).length,
+            rowCount: document.querySelectorAll(
+              '.erp-dev-testing-coverage-card'
+            ).length,
+            firstRowColumns: firstRow
+              ? getComputedStyle(firstRow).gridTemplateColumns
+              : '',
+            scopeColumnCount: document.querySelectorAll(
+              '.erp-dev-testing-coverage-scope-map > section'
+            ).length,
+            policyListCount: document.querySelectorAll(
+              '.erp-dev-testing-coverage-policy-list'
+            ).length,
+            identityDetailOpen:
+              document.querySelector(
+                '.erp-dev-testing-coverage-identity__details'
+              )?.open || false,
+            evidenceDetailCount: evidenceDetails.length,
+            openEvidenceDetailCount: evidenceDetails.filter(
+              (detail) => detail.open
+            ).length,
+            metricTileStyles,
+          }
+        })
+        assert(
+          coverageMatrixMetrics.matrixHeaderCount === 4 &&
+            coverageMatrixMetrics.rowCount > 0 &&
+            coverageMatrixMetrics.firstRowColumns.split(' ').length === 3 &&
+            coverageMatrixMetrics.scopeColumnCount === 2 &&
+            coverageMatrixMetrics.policyListCount === 1 &&
+            coverageMatrixMetrics.identityDetailOpen === false &&
+            coverageMatrixMetrics.evidenceDetailCount > 0 &&
+            coverageMatrixMetrics.openEvidenceDetailCount === 0,
+          `覆盖页应以三列证据矩阵展示独立结论，并默认折叠技术身份和证据路径: ${JSON.stringify(coverageMatrixMetrics)}`
+        )
+        assert(
+          coverageMatrixMetrics.metricTileStyles.length > 0 &&
+            coverageMatrixMetrics.metricTileStyles.every(
+              ({ backgroundColor, labelColor, valueColor }) =>
+                backgroundColor === 'rgb(32, 48, 71)' &&
+                labelColor === 'rgb(148, 163, 184)' &&
+                valueColor === 'rgb(229, 237, 245)'
+            ),
+          `暗色覆盖指标必须使用可读的局部底色与标签、数值颜色: ${JSON.stringify(coverageMatrixMetrics.metricTileStyles)}`
+        )
         assert.equal(
           await page
             .locator('.erp-dev-testing-coverage-card--blocked')
@@ -15483,7 +15698,7 @@ export function createStyleL1Scenarios(deps) {
           0,
           'N/A 门禁不能显示百分比'
         )
-        await page.getByRole('button', { name: '一键采集覆盖率' }).click()
+        await page.getByRole('button', { name: '采集本地覆盖基线' }).click()
         await expectText(page, '采集完成')
         await expectText(page, '覆盖采集完成，报告已绑定当前仓库身份')
         assert.equal(
@@ -15493,7 +15708,7 @@ export function createStyleL1Scenarios(deps) {
         )
         assert.equal(
           await page
-            .getByRole('button', { name: '一键采集覆盖率' })
+            .getByRole('button', { name: '采集本地覆盖基线' })
             .isEnabled(),
           true,
           '采集完成并读回终态后应恢复主按钮'

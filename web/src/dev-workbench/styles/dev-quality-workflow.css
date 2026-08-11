@@ -467,6 +467,7 @@
 
 .erp-dev-testing-closeout-steps {
   display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   overflow: hidden;
   margin: 0;
   border: 1px solid #d5e4dc;
@@ -477,18 +478,22 @@
 }
 
 .erp-dev-testing-closeout-steps > li {
+  position: relative;
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
+  grid-template-columns: 1fr;
   min-width: 0;
+  align-content: start;
   gap: 12px;
-  padding: 14px 16px;
+  padding: 14px;
 }
 
 .erp-dev-testing-closeout-steps > li + li {
-  border-top: 1px solid #e4ede7;
+  border-top: 0;
+  border-left: 1px solid #e4ede7;
 }
 
 .erp-dev-testing-closeout-step__number {
+  z-index: 1;
   display: grid;
   width: 30px;
   height: 30px;
@@ -508,7 +513,8 @@
 .erp-dev-testing-closeout-step__title {
   display: flex;
   min-width: 0;
-  align-items: center;
+  align-items: flex-start;
+  justify-content: space-between;
   flex-wrap: wrap;
   gap: 8px;
 }
@@ -560,7 +566,7 @@
   display: grid;
   overflow: hidden;
   border: 1px solid #d5e4dc;
-  border-radius: 12px;
+  border-radius: 0 0 12px 12px;
   background: #ffffff;
 }
 
@@ -613,6 +619,633 @@
 
 .erp-dev-testing-closeout-commands strong {
   color: #334155;
+}
+
+/* Testing visual language: relationships first, technical evidence on demand. */
+
+.erp-dev-testing-validation-journey {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
+  margin: 0;
+  border: 1px solid #d5e4dc;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 0;
+  list-style: none;
+}
+
+.erp-dev-testing-validation-journey > li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  min-width: 0;
+  align-content: start;
+  gap: 10px;
+  padding: 13px 14px;
+}
+
+.erp-dev-testing-validation-journey > li + li {
+  border-left: 1px solid #e4ede7;
+}
+
+.erp-dev-testing-validation-journey > li:not(:last-child)::after,
+.erp-dev-testing-validation-plan__map > span:not(:last-child)::after {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  right: -7px;
+  width: 13px;
+  height: 13px;
+  border-top: 1px solid #94a3b8;
+  border-right: 1px solid #94a3b8;
+  background: #ffffff;
+  content: '';
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.erp-dev-testing-validation-journey__number {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 999px;
+  background: #e8f7f4;
+  color: #0f766e;
+  font-weight: 800;
+}
+
+.erp-dev-testing-validation-journey > li > div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.erp-dev-testing-validation-journey strong {
+  color: #172033;
+}
+
+.erp-dev-testing-validation-journey small {
+  color: #64748b;
+  line-height: 1.45;
+}
+
+.erp-dev-testing-validation-journey__branches {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 3px;
+}
+
+.erp-dev-testing-validation-journey__branches span {
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 11px;
+  line-height: 1.35;
+  padding: 3px 7px;
+}
+
+.erp-dev-testing-validation-plan__map {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid #dbe7e0;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.erp-dev-testing-validation-plan__map > span {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 4px;
+  padding: 11px 13px;
+}
+
+.erp-dev-testing-validation-plan__map > span + span {
+  border-left: 1px solid #e4ede7;
+}
+
+.erp-dev-testing-validation-plan__map small,
+.erp-dev-testing-validation-plan__map em {
+  color: #64748b;
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.4;
+}
+
+.erp-dev-testing-validation-plan__map b {
+  color: #172033;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-testing-validation-plan__details,
+.erp-dev-testing-command-block__details,
+.erp-dev-testing-closeout-step__details,
+.erp-dev-testing-closeout-command-disclosure,
+.erp-dev-testing-coverage-boundary,
+.erp-dev-testing-coverage-card__details,
+.erp-dev-testing-coverage-identity__details {
+  min-width: 0;
+}
+
+.erp-dev-testing-validation-plan__details > summary,
+.erp-dev-testing-command-block__details > summary,
+.erp-dev-testing-closeout-step__details > summary,
+.erp-dev-testing-coverage-boundary > summary,
+.erp-dev-testing-coverage-card__details > summary,
+.erp-dev-testing-coverage-identity__details > summary {
+  width: fit-content;
+  color: #475569;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.erp-dev-testing-validation-plan__details[open] {
+  display: grid;
+  gap: 10px;
+  border-top: 1px dashed #cbd5e1;
+  padding-top: 10px;
+}
+
+.erp-dev-testing-validation-plan__identity {
+  grid-template-columns: minmax(100px, 0.6fr) minmax(220px, 1.4fr) minmax(
+      180px,
+      1fr
+    );
+}
+
+.erp-dev-testing-validation-action__timestamps {
+  margin-top: 6px;
+}
+
+.erp-dev-testing-command-guide {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid #dce8dd;
+  padding: 0 2px 12px;
+}
+
+.erp-dev-testing-command-guide h2.ant-typography {
+  margin: 2px 0 0;
+}
+
+.erp-dev-testing-command-guide ol {
+  display: grid;
+  min-width: min(100%, 560px);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.erp-dev-testing-command-guide li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  min-width: 0;
+  gap: 7px;
+  border-left: 1px solid #dce8dd;
+  padding: 3px 10px;
+}
+
+.erp-dev-testing-command-guide li > b {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 999px;
+  background: #e8f7f4;
+  color: #0f766e;
+  font-size: 12px;
+}
+
+.erp-dev-testing-command-guide li > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.erp-dev-testing-command-guide li strong {
+  color: #334155;
+  font-size: 13px;
+}
+
+.erp-dev-testing-command-guide li small {
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.erp-dev-testing-command-matrix__head,
+.erp-dev-testing-command-block {
+  display: grid;
+  grid-template-columns:
+    minmax(180px, 1fr) minmax(200px, 1.15fr) minmax(170px, 0.8fr)
+    minmax(180px, auto);
+  min-width: 0;
+}
+
+.erp-dev-testing-command-matrix__head {
+  gap: 12px;
+  border: 1px solid #d5e4dc;
+  border-bottom: 0;
+  border-radius: 12px 12px 0 0;
+  background: #f4f8f5;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 8px 12px;
+  margin-bottom: -12px;
+}
+
+.erp-dev-testing-command-list {
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid #d5e4dc;
+  border-radius: 0 0 12px 12px;
+  background: #ffffff;
+}
+
+.erp-dev-testing-command-block {
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 11px 12px;
+}
+
+.erp-dev-testing-command-block + .erp-dev-testing-command-block {
+  border-top: 1px solid #e4ede7;
+}
+
+.erp-dev-testing-command-block__purpose,
+.erp-dev-testing-command-block__source,
+.erp-dev-testing-command-block__scope {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.erp-dev-testing-command-block__purpose > span,
+.erp-dev-testing-command-block__source > span,
+.erp-dev-testing-command-block__scope > span {
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.erp-dev-testing-command-block__scope strong {
+  color: #334155;
+  font-size: 13px;
+}
+
+.erp-dev-testing-command-block__actions {
+  justify-self: end;
+}
+
+.erp-dev-testing-command-block__details {
+  grid-column: 1 / -1;
+}
+
+.erp-dev-testing-command-block__details[open] {
+  border-top: 1px dashed #cbd5e1;
+  padding-top: 9px;
+}
+
+.erp-dev-testing-command-block__details pre {
+  margin-top: 9px;
+  border-radius: 9px;
+}
+
+.erp-dev-testing-closeout-steps > li:not(:last-child)::after {
+  position: absolute;
+  z-index: 0;
+  top: 28px;
+  right: -18px;
+  width: 36px;
+  height: 2px;
+  background: #99c7bf;
+  content: '';
+}
+
+.erp-dev-testing-closeout-step__trigger.ant-tag {
+  width: fit-content;
+  max-width: 100%;
+  margin-inline-end: 0;
+  white-space: normal;
+}
+
+.erp-dev-testing-closeout-step__wiring {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-radius: 8px;
+  background: #f4f8f5;
+  color: #64748b;
+  font-size: 11px;
+  padding: 6px 8px;
+}
+
+.erp-dev-testing-closeout-step__wiring strong {
+  color: #334155;
+}
+
+.erp-dev-testing-closeout-step__details[open] {
+  display: grid;
+  gap: 7px;
+  margin-top: 2px;
+  border-top: 1px dashed #cbd5e1;
+  padding-top: 7px;
+}
+
+.erp-dev-testing-hook-list__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  border: 1px solid #d5e4dc;
+  border-bottom: 0;
+  border-radius: 12px 12px 0 0;
+  background: #f4f8f5;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 8px 14px;
+  margin-bottom: -10px;
+}
+
+.erp-dev-testing-closeout-command-disclosure {
+  overflow: hidden;
+  border: 1px solid #dce8dd;
+  border-radius: 12px;
+  background: #fbfdfc;
+}
+
+.erp-dev-testing-closeout-command-disclosure > summary {
+  display: flex;
+  min-height: 56px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #334155;
+  cursor: pointer;
+  list-style: none;
+  padding: 10px 14px;
+}
+
+.erp-dev-testing-closeout-command-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.erp-dev-testing-closeout-command-disclosure > summary > span:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.erp-dev-testing-closeout-command-disclosure > summary small,
+.erp-dev-testing-closeout-command-disclosure > summary > span:last-child {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.erp-dev-testing-closeout-command-disclosure[open] > summary {
+  border-bottom: 1px solid #dce8dd;
+  background: #f4faf7;
+}
+
+.erp-dev-testing-closeout-command-disclosure
+  .erp-dev-testing-closeout-commands {
+  padding: 12px;
+}
+
+.erp-dev-testing-coverage-actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.erp-dev-testing-coverage-heading {
+  display: flex;
+  min-width: 0;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid #dce8dd;
+  padding: 0 2px 12px;
+}
+
+.erp-dev-testing-coverage-heading > div {
+  min-width: 0;
+}
+
+.erp-dev-testing-coverage-heading h2.ant-typography,
+.erp-dev-testing-coverage-heading p.ant-typography {
+  margin: 0;
+}
+
+.erp-dev-testing-coverage-heading h2.ant-typography {
+  margin-top: 2px;
+}
+
+.erp-dev-testing-coverage-heading p.ant-typography {
+  margin-top: 3px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.erp-dev-testing-coverage-scope-map {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid #d5e4dc;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.erp-dev-testing-coverage-scope-map section {
+  min-width: 0;
+  padding: 10px 12px;
+}
+
+.erp-dev-testing-coverage-scope-map section + section {
+  border-left: 1px solid #e4ede7;
+}
+
+.erp-dev-testing-coverage-scope-map strong {
+  color: #334155;
+}
+
+.erp-dev-testing-coverage-scope-map ul {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.erp-dev-testing-coverage-boundary[open] > summary {
+  color: #0f766e;
+}
+
+.erp-dev-testing-coverage-boundary .ant-typography {
+  margin: 8px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.erp-dev-testing-coverage-identity {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.erp-dev-testing-coverage-identity__details {
+  grid-column: 1 / -1;
+}
+
+.erp-dev-testing-coverage-identity__details[open] {
+  border-top: 1px dashed #cbd5e1;
+  padding-top: 8px;
+}
+
+.erp-dev-testing-coverage-identity__details > span {
+  display: grid;
+  gap: 4px;
+  margin-top: 7px;
+}
+
+.erp-dev-testing-coverage-policy-list {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid #d5e4dc;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.erp-dev-testing-coverage-policy-list article {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.7fr) minmax(0, 1.8fr);
+  gap: 16px;
+  padding: 9px 12px;
+}
+
+.erp-dev-testing-coverage-policy-list article + article {
+  border-top: 1px solid #e4ede7;
+}
+
+.erp-dev-testing-coverage-policy-list strong {
+  color: #334155;
+}
+
+.erp-dev-testing-coverage-policy-list p {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.erp-dev-testing-coverage-matrix__head,
+.erp-dev-testing-coverage-card {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.8fr) minmax(250px, 1.15fr) minmax(
+      240px,
+      1.2fr
+    );
+  min-width: 0;
+  gap: 14px;
+}
+
+.erp-dev-testing-coverage-matrix__head {
+  border: 1px solid #d5e4dc;
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+  background: #f4f8f5;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 8px 12px;
+  margin-bottom: -12px;
+}
+
+.erp-dev-testing-coverage-grid,
+.erp-dev-testing-coverage-grid--code {
+  grid-template-columns: 1fr;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid #d5e4dc;
+  border-radius: 0 0 10px 10px;
+  background: #ffffff;
+}
+
+.erp-dev-testing-coverage-grid > .erp-dev-testing-coverage-card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.erp-dev-testing-coverage-grid
+  > .erp-dev-testing-coverage-card
+  + .erp-dev-testing-coverage-card {
+  border-top: 1px solid #e4ede7;
+}
+
+.erp-dev-testing-coverage-card {
+  align-items: start;
+  padding: 11px 12px;
+}
+
+.erp-dev-testing-coverage-card__head,
+.erp-dev-testing-coverage-card__reading,
+.erp-dev-testing-coverage-card__conclusion {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 7px;
+}
+
+.erp-dev-testing-coverage-card__head {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.erp-dev-testing-coverage-card__metrics {
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+}
+
+.erp-dev-testing-coverage-card__metrics > span {
+  padding: 5px 7px;
+}
+
+.erp-dev-testing-coverage-card__metrics b {
+  font-size: 14px;
+}
+
+.erp-dev-testing-coverage-card__no-reading,
+.erp-dev-testing-coverage-card__no-evidence {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.erp-dev-testing-coverage-card__details[open] {
+  border-top: 1px dashed #cbd5e1;
+  padding-top: 6px;
+}
+
+.erp-dev-testing-coverage-card__details[open]
+  .erp-dev-testing-coverage-card__evidence {
+  margin-top: 6px;
 }
 
 /* Data preparation: one connected workflow instead of independent cards. */
@@ -967,6 +1600,33 @@
   background: #0f172a;
 }
 
+[data-erp-theme='dark']
+  .erp-dev-testing-validation-plan__head
+  > .ant-btn-primary {
+  border-color: #1d4ed8;
+  background: #1d4ed8;
+  color: #fff;
+}
+
+[data-erp-theme='dark']
+  .erp-dev-testing-validation-plan__head
+  > .ant-btn-primary:not(:disabled):not(.ant-btn-disabled):hover,
+[data-erp-theme='dark']
+  .erp-dev-testing-validation-plan__head
+  > .ant-btn-primary:not(:disabled):not(.ant-btn-disabled):focus-visible {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #fff;
+}
+
+[data-erp-theme='dark']
+  .erp-dev-testing-validation-plan__head
+  > .ant-btn-primary:not(:disabled):not(.ant-btn-disabled):active {
+  border-color: #1e40af;
+  background: #1e40af;
+  color: #fff;
+}
+
 [data-erp-theme='dark'] .erp-dev-testing-closeout-heading,
 [data-erp-theme='dark'] .erp-dev-testing-closeout-steps > li + li,
 [data-erp-theme='dark'] .erp-dev-testing-hook-row + .erp-dev-testing-hook-row {
@@ -1005,6 +1665,233 @@
 
 [data-erp-theme='dark'] .erp-dev-testing-closeout-step__sources code {
   background: var(--erp-surface-bg-soft);
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-validation-journey,
+[data-erp-theme='dark'] .erp-dev-testing-validation-plan__map,
+[data-erp-theme='dark'] .erp-dev-testing-command-list,
+[data-erp-theme='dark'] .erp-dev-testing-coverage-scope-map,
+[data-erp-theme='dark'] .erp-dev-testing-coverage-policy-list,
+[data-erp-theme='dark'] .erp-dev-testing-coverage-grid {
+  border-color: var(--erp-border);
+  background: var(--erp-surface-bg);
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-validation-journey > li + li,
+[data-erp-theme='dark'] .erp-dev-testing-validation-plan__map > span + span,
+[data-erp-theme='dark']
+  .erp-dev-testing-command-block
+  + .erp-dev-testing-command-block,
+[data-erp-theme='dark'] .erp-dev-testing-coverage-scope-map section + section,
+[data-erp-theme='dark'] .erp-dev-testing-coverage-policy-list article + article,
+[data-erp-theme='dark']
+  .erp-dev-testing-coverage-grid
+  > .erp-dev-testing-coverage-card
+  + .erp-dev-testing-coverage-card {
+  border-color: var(--erp-border);
+}
+
+[data-erp-theme='dark']
+  .erp-dev-testing-validation-journey
+  > li:not(:last-child)::after,
+[data-erp-theme='dark']
+  .erp-dev-testing-validation-plan__map
+  > span:not(:last-child)::after {
+  border-color: var(--erp-border);
+  background: var(--erp-surface-bg);
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-validation-journey strong,
+[data-erp-theme='dark'] .erp-dev-testing-validation-plan__map b,
+[data-erp-theme='dark'] .erp-dev-testing-command-guide h2.ant-typography,
+[data-erp-theme='dark'] .erp-dev-testing-command-guide li strong,
+[data-erp-theme='dark'] .erp-dev-testing-command-block__scope strong,
+[data-erp-theme='dark'] .erp-dev-testing-closeout-step__wiring strong,
+[data-erp-theme='dark'] .erp-dev-testing-coverage-scope-map strong,
+[data-erp-theme='dark'] .erp-dev-testing-coverage-policy-list strong {
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-coverage-heading {
+  border-color: var(--erp-border);
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-coverage-heading h2.ant-typography {
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-coverage-heading p.ant-typography {
+  color: var(--erp-text-muted);
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-coverage-card__metrics > span {
+  background: var(--erp-interactive-bg-hover);
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-coverage-card__metrics > span > small {
+  color: var(--erp-text-muted);
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-coverage-card__metrics > span > b {
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark']
+  .erp-dev-testing-command-list
+  > .erp-dev-testing-command-block {
+  border-color: var(--erp-border);
+  background: transparent;
+  box-shadow: none;
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-validation-action {
+  box-shadow: inset 3px 0 0 #0f766e;
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-validation-action--success {
+  box-shadow: inset 3px 0 0 #16a34a;
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-validation-action--warning {
+  box-shadow: inset 3px 0 0 #d97706;
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-validation-action--danger {
+  box-shadow: inset 3px 0 0 #dc2626;
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-validation-journey small,
+[data-erp-theme='dark'] .erp-dev-testing-validation-plan__map small,
+[data-erp-theme='dark'] .erp-dev-testing-validation-plan__map em,
+[data-erp-theme='dark'] .erp-dev-testing-command-guide li small,
+[data-erp-theme='dark'] .erp-dev-testing-command-block__purpose > span,
+[data-erp-theme='dark'] .erp-dev-testing-command-block__source > span,
+[data-erp-theme='dark'] .erp-dev-testing-command-block__scope > span,
+[data-erp-theme='dark'] .erp-dev-testing-coverage-scope-map ul,
+[data-erp-theme='dark'] .erp-dev-testing-coverage-policy-list p,
+[data-erp-theme='dark'] .erp-dev-testing-coverage-card__no-reading,
+[data-erp-theme='dark'] .erp-dev-testing-coverage-card__no-evidence {
+  color: var(--erp-text-muted);
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-validation-journey__branches span {
+  border-color: #1e3a8a;
+  background: #172554;
+  color: #bfdbfe;
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-command-matrix__head,
+[data-erp-theme='dark'] .erp-dev-testing-hook-list__head,
+[data-erp-theme='dark'] .erp-dev-testing-coverage-matrix__head,
+[data-erp-theme='dark'] .erp-dev-testing-closeout-step__wiring {
+  border-color: var(--erp-border);
+  background: var(--erp-surface-bg-soft);
+  color: var(--erp-text-muted);
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-command-guide,
+[data-erp-theme='dark'] .erp-dev-testing-command-guide li,
+[data-erp-theme='dark'] .erp-dev-testing-validation-plan__details[open],
+[data-erp-theme='dark'] .erp-dev-testing-command-block__details[open],
+[data-erp-theme='dark'] .erp-dev-testing-closeout-step__details[open],
+[data-erp-theme='dark'] .erp-dev-testing-coverage-identity__details[open],
+[data-erp-theme='dark'] .erp-dev-testing-coverage-card__details[open] {
+  border-color: var(--erp-border);
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-closeout-command-disclosure {
+  border-color: var(--erp-border);
+  background: var(--erp-surface-bg);
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-closeout-command-disclosure > summary {
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark']
+  .erp-dev-testing-closeout-command-disclosure[open]
+  > summary {
+  border-color: var(--erp-border);
+  background: var(--erp-surface-bg-soft);
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-coverage-boundary .ant-typography {
+  color: var(--erp-text-muted);
+}
+
+[data-erp-theme='dark']
+  :where(
+    .erp-dev-testing-validation-plan__details,
+    .erp-dev-testing-command-block__details,
+    .erp-dev-testing-closeout-step__details,
+    .erp-dev-testing-coverage-boundary,
+    .erp-dev-testing-coverage-card__details,
+    .erp-dev-testing-coverage-identity__details
+  )
+  > summary {
+  color: var(--erp-text-muted);
+}
+
+[data-erp-theme='dark']
+  :where(
+    .erp-dev-testing-validation-plan__details,
+    .erp-dev-testing-command-block__details,
+    .erp-dev-testing-closeout-step__details,
+    .erp-dev-testing-coverage-boundary,
+    .erp-dev-testing-coverage-card__details,
+    .erp-dev-testing-coverage-identity__details
+  )[open]
+  > summary {
+  color: #5eead4;
+}
+
+@media screen and (max-width: 980px) {
+  .erp-dev-testing-command-matrix__head,
+  .erp-dev-testing-coverage-matrix__head {
+    display: none;
+  }
+
+  .erp-dev-testing-command-list,
+  .erp-dev-testing-coverage-grid,
+  .erp-dev-testing-coverage-grid--code {
+    border-radius: 12px;
+  }
+
+  .erp-dev-testing-command-block {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .erp-dev-testing-command-block__actions {
+    justify-self: start;
+  }
+
+  .erp-dev-testing-coverage-card {
+    grid-template-columns: minmax(180px, 0.7fr) minmax(0, 1.3fr);
+  }
+
+  .erp-dev-testing-coverage-card__conclusion {
+    grid-column: 1 / -1;
+  }
+
+  .erp-dev-testing-closeout-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .erp-dev-testing-closeout-steps > li:nth-child(3) {
+    border-top: 1px solid #e4ede7;
+    border-left: 0;
+  }
+
+  .erp-dev-testing-closeout-steps > li:nth-child(4) {
+    border-top: 1px solid #e4ede7;
+  }
+
+  .erp-dev-testing-closeout-steps > li:nth-child(2)::after {
+    display: none;
+  }
 }
 
 @media screen and (max-width: 767px) {
@@ -1059,6 +1946,62 @@
     width: 100%;
   }
 
+  .erp-dev-testing-validation-journey,
+  .erp-dev-testing-validation-plan__map,
+  .erp-dev-testing-command-guide ol,
+  .erp-dev-testing-command-block,
+  .erp-dev-testing-coverage-scope-map,
+  .erp-dev-testing-coverage-card,
+  .erp-dev-testing-coverage-policy-list article {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-dev-testing-validation-journey > li + li,
+  .erp-dev-testing-validation-plan__map > span + span,
+  .erp-dev-testing-coverage-scope-map section + section {
+    border-top: 1px solid #e4ede7;
+    border-left: 0;
+  }
+
+  .erp-dev-testing-validation-journey > li:not(:last-child)::after,
+  .erp-dev-testing-validation-plan__map > span:not(:last-child)::after {
+    top: auto;
+    right: 50%;
+    bottom: -7px;
+    transform: translateX(50%) rotate(135deg);
+  }
+
+  .erp-dev-testing-command-guide {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .erp-dev-testing-command-guide ol {
+    min-width: 0;
+  }
+
+  .erp-dev-testing-command-guide li {
+    border-top: 1px solid #dce8dd;
+    border-left: 0;
+    padding: 7px 2px;
+  }
+
+  .erp-dev-testing-command-block__actions,
+  .erp-dev-testing-command-block__actions .ant-space,
+  .erp-dev-testing-command-block__actions .ant-btn {
+    width: 100%;
+  }
+
+  .erp-dev-testing-command-block__actions .ant-space-item {
+    flex: 1 1 140px;
+  }
+
+  .erp-dev-testing-command-block__details,
+  .erp-dev-testing-coverage-card__conclusion {
+    grid-column: auto;
+  }
+
   .erp-dev-testing-disclosure > summary {
     align-items: flex-start;
   }
@@ -1068,7 +2011,8 @@
   }
 
   .erp-dev-testing-closeout-heading,
-  .erp-dev-testing-closeout-section__head {
+  .erp-dev-testing-closeout-section__head,
+  .erp-dev-testing-coverage-heading {
     align-items: stretch;
     flex-direction: column;
     gap: 6px;
@@ -1076,6 +2020,35 @@
 
   .erp-dev-testing-closeout-commands {
     grid-template-columns: 1fr;
+  }
+
+  .erp-dev-testing-closeout-steps {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-dev-testing-closeout-steps > li + li,
+  .erp-dev-testing-closeout-steps > li:nth-child(3),
+  .erp-dev-testing-closeout-steps > li:nth-child(4) {
+    border-top: 1px solid #e4ede7;
+    border-left: 0;
+  }
+
+  .erp-dev-testing-closeout-steps > li:not(:last-child)::after {
+    top: auto;
+    right: auto;
+    bottom: -18px;
+    left: 28px;
+    width: 2px;
+    height: 36px;
+  }
+
+  .erp-dev-testing-closeout-command-disclosure > summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .erp-dev-testing-closeout-command-disclosure > summary > span:last-child {
+    display: none;
   }
 
   .erp-dev-testing-closeout-commands article {
@@ -1089,6 +2062,22 @@
 
   .erp-dev-testing-closeout-view .ant-alert-action .ant-btn {
     min-height: 44px;
+  }
+
+  .erp-dev-testing-coverage-actions {
+    align-items: stretch;
+  }
+
+  .erp-dev-testing-coverage-actions .ant-btn {
+    width: 100%;
+  }
+
+  .erp-dev-testing-coverage-identity {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-dev-testing-coverage-identity__details {
+    grid-column: auto;
   }
 
   .erp-dev-data-workflow-step {
