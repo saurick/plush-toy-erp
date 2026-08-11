@@ -197,6 +197,7 @@ function sourceReport({ remote = false } = {}) {
           unitId: 1001,
           quantity: "1",
           lossRate: "0",
+          productionOperationCode: "FABRIC_PROCESSING",
         },
       ],
     },
@@ -288,6 +289,23 @@ function sourceReport({ remote = false } = {}) {
         runId: RUN_ID,
         sourceCandidates: {
           productionCandidates: [productionCandidate],
+          productionWIPOutsourcingCandidates: [3, 4].map((offset) => ({
+            productionCandidateOffset: offset,
+            order: {
+              id: 1310 + offset,
+              orderNo: `OS-WIP-${offset}`,
+              status: "CONFIRMED",
+            },
+            item: {
+              outsourcingOrderItemId: 1410 + offset,
+              subjectType: "MATERIAL",
+              subjectId: material.id,
+              materialId: material.id,
+              processId: 1501,
+              unitId: 1001,
+              quantity: "3",
+            },
+          })),
           outsourcingCandidates: [
             outsourcingMaterialCandidate,
             outsourcingProductCandidate,
@@ -699,6 +717,19 @@ test("plan is target-bound, source-driven, and prepares 54 receipts plus 45 fact
           candidate.route.customerInspectionRequired === false &&
           candidate.route.packagingVersionSnapshot === "试用验收包装版",
       ),
+  );
+  assert.deepEqual(
+    plan.productionCandidates
+      .map((candidate, offset) =>
+        candidate.fabricOutsourcing
+          ? [offset, candidate.fabricOutsourcing.item.quantity]
+          : null,
+      )
+      .filter(Boolean),
+    [
+      [3, "3"],
+      [4, "3"],
+    ],
   );
   assert.equal(plan.outsourcingCandidates.length, 45);
   assert.equal(plan.expectedMinimums.shipments, 47);

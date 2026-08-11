@@ -132,9 +132,7 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
     "id",
     "expected_version",
   ]),
-  "production_wip.get_production_wip": Object.freeze([
-    "production_order_id",
-  ]),
+  "production_wip.get_production_wip": Object.freeze(["production_order_id"]),
   "production_wip.execute_production_wip_action": Object.freeze([
     "action",
     "production_order_id",
@@ -144,12 +142,14 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
     "expected_version",
     "idempotency_key",
     "execution_mode",
+    "outsourcing_allocations",
     "quantity",
     "packaging_version_snapshot",
     "note",
   ]),
-  "operational_fact.list_production_order_material_requirements":
-    Object.freeze(["customer_key", "production_order_id"]),
+  "operational_fact.list_production_order_material_requirements": Object.freeze(
+    ["customer_key", "production_order_id"],
+  ),
   "operational_fact.submit_production_exception": Object.freeze([
     "customer_key",
     "decision_no",
@@ -170,12 +170,11 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
     "limit",
     "offset",
   ]),
-  "customer_config.start_production_exception_approval_process":
-    Object.freeze([
-      "customer_key",
-      "production_exception_id",
-      "idempotency_key",
-    ]),
+  "customer_config.start_production_exception_approval_process": Object.freeze([
+    "customer_key",
+    "production_exception_id",
+    "idempotency_key",
+  ]),
   "customer_config.get_production_exception_approval_process": Object.freeze([
     "customer_key",
     "production_exception_id",
@@ -367,7 +366,9 @@ function positiveID(value, name) {
 function nonNegativeInteger(value, name) {
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed) || parsed < 0) {
-    throw new SourceDrivenFactError(`${name} must be a non-negative safe integer`);
+    throw new SourceDrivenFactError(
+      `${name} must be a non-negative safe integer`,
+    );
   }
   return parsed;
 }
@@ -403,8 +404,7 @@ function formatQuantity(units) {
 
 function multiplyQuantities(left, right, name) {
   const product =
-    quantityUnits(left, `${name}.left`) *
-    quantityUnits(right, `${name}.right`);
+    quantityUnits(left, `${name}.left`) * quantityUnits(right, `${name}.right`);
   if (product % DECIMAL_FACTOR !== 0n) {
     throw new SourceDrivenFactError(
       `${name} must be exactly representable with at most ${DECIMAL_SCALE} places`,
@@ -538,28 +538,36 @@ function normalizeProduction(source) {
       "production.materialIssues must contain source BOM material budgets",
     );
   }
-  const materialIssues = source.materialIssues.map((record, index) => ({
-    materialId: positiveID(
-      record?.materialId,
-      `production.materialIssues[${index}].materialId`,
-    ),
-    unitId: positiveID(
-      record?.unitId,
-      `production.materialIssues[${index}].unitId`,
-    ),
-    warehouseId: positiveID(
-      record?.warehouseId,
-      `production.materialIssues[${index}].warehouseId`,
-    ),
-    lotId: positiveID(
-      record?.lotId,
-      `production.materialIssues[${index}].lotId`,
-    ),
-    quantity: quantity(
-      record?.quantity,
-      `production.materialIssues[${index}].quantity`,
-    ),
-  }));
+  const materialIssues = source.materialIssues.map((record, index) => {
+    const productionOperationCode = String(
+      record?.productionOperationCode || "",
+    )
+      .trim()
+      .toUpperCase();
+    return {
+      materialId: positiveID(
+        record?.materialId,
+        `production.materialIssues[${index}].materialId`,
+      ),
+      unitId: positiveID(
+        record?.unitId,
+        `production.materialIssues[${index}].unitId`,
+      ),
+      warehouseId: positiveID(
+        record?.warehouseId,
+        `production.materialIssues[${index}].warehouseId`,
+      ),
+      lotId: positiveID(
+        record?.lotId,
+        `production.materialIssues[${index}].lotId`,
+      ),
+      quantity: quantity(
+        record?.quantity,
+        `production.materialIssues[${index}].quantity`,
+      ),
+      ...(productionOperationCode ? { productionOperationCode } : {}),
+    };
+  });
   const materialKeys = materialIssues.map(
     (record) => `${record.materialId}:${record.unitId}`,
   );
@@ -568,6 +576,88 @@ function normalizeProduction(source) {
       "production.materialIssues must be unique by materialId and unitId",
     );
   }
+  const fabricBudgets = materialIssues.filter(
+    (record) => record.productionOperationCode === "FABRIC_PROCESSING",
+  );
+  let fabricOutsourcing;
+  if (route) {
+    if (fabricBudgets.length !== 1 || source?.fabricOutsourcing == null) {
+      throw new SourceDrivenFactError(
+        "routed production requires one registered FABRIC_PROCESSING outsourcing source",
+      );
+    }
+    const fabricBudget = fabricBudgets[0];
+    fabricOutsourcing = {
+      order: {
+        id: positiveID(
+          source.fabricOutsourcing?.order?.id,
+          "production.fabricOutsourcing.order.id",
+        ),
+        status: exactStatus(
+          source.fabricOutsourcing?.order?.status,
+          "CONFIRMED",
+          "production.fabricOutsourcing.order.status",
+        ),
+      },
+      item: {
+        id: positiveID(
+          source.fabricOutsourcing?.item?.id,
+          "production.fabricOutsourcing.item.id",
+        ),
+        materialId: positiveID(
+          source.fabricOutsourcing?.item?.materialId,
+          "production.fabricOutsourcing.item.materialId",
+        ),
+        unitId: positiveID(
+          source.fabricOutsourcing?.item?.unitId,
+          "production.fabricOutsourcing.item.unitId",
+        ),
+        quantity: quantity(
+          source.fabricOutsourcing?.item?.quantity,
+          "production.fabricOutsourcing.item.quantity",
+        ),
+      },
+      warehouseId: positiveID(
+        source.fabricOutsourcing?.warehouseId,
+        "production.fabricOutsourcing.warehouseId",
+      ),
+      lotId: positiveID(
+        source.fabricOutsourcing?.lotId,
+        "production.fabricOutsourcing.lotId",
+      ),
+      quantity: quantity(
+        source.fabricOutsourcing?.quantity,
+        "production.fabricOutsourcing.quantity",
+      ),
+    };
+    if (
+      fabricOutsourcing.item.materialId !== fabricBudget.materialId ||
+      fabricOutsourcing.item.unitId !== fabricBudget.unitId ||
+      fabricOutsourcing.warehouseId !== fabricBudget.warehouseId ||
+      fabricOutsourcing.lotId !== fabricBudget.lotId ||
+      quantityUnits(
+        fabricOutsourcing.item.quantity,
+        "production.fabricOutsourcing.item.quantity",
+      ) !== quantityUnits(fabricBudget.quantity, "production fabric budget") ||
+      quantityUnits(
+        fabricOutsourcing.quantity,
+        "production.fabricOutsourcing.quantity",
+      ) !== quantityUnits(fabricBudget.quantity, "production fabric budget")
+    ) {
+      throw new SourceDrivenFactError(
+        "production fabric outsourcing source does not match its BOM material budget and stock grain",
+      );
+    }
+  } else if (source?.fabricOutsourcing != null) {
+    throw new SourceDrivenFactError(
+      "route-less production cannot bind a fabric outsourcing source",
+    );
+  }
+  const directMaterialIssues = fabricOutsourcing
+    ? materialIssues.filter(
+        (record) => record.productionOperationCode !== "FABRIC_PROCESSING",
+      )
+    : materialIssues;
   let rework;
   if (source?.rework != null) {
     if (!route) {
@@ -600,6 +690,8 @@ function normalizeProduction(source) {
     ...(route ? { route } : {}),
     completion,
     materialIssues,
+    directMaterialIssues,
+    ...(fabricOutsourcing ? { fabricOutsourcing } : {}),
     ...(rework ? { rework } : {}),
   };
 }
@@ -753,14 +845,21 @@ export function manualAcceptanceBusinessNo({ dataVersion, code, sequence }) {
       "dataVersion must use YYYY.MM.DD-vN before a visible business number is generated",
     );
   }
-  const normalizedCode = requiredText(code, "business number code", 8).toUpperCase();
+  const normalizedCode = requiredText(
+    code,
+    "business number code",
+    8,
+  ).toUpperCase();
   if (!BUSINESS_NO_CODES.has(normalizedCode)) {
     throw new SourceDrivenFactError(
       `business number code ${normalizedCode} is not registered`,
     );
   }
   const normalizedSequence = String(sequence ?? "").trim();
-  if (!/^\d{1,6}$/u.test(normalizedSequence) || Number(normalizedSequence) <= 0) {
+  if (
+    !/^\d{1,6}$/u.test(normalizedSequence) ||
+    Number(normalizedSequence) <= 0
+  ) {
     throw new SourceDrivenFactError(
       "business number sequence must be a positive 1-6 digit value",
     );
@@ -774,6 +873,9 @@ function operationBusinessCode(label) {
   const materialIssue = label.match(/^production-issue-(\d{1,2})$/u);
   if (materialIssue) {
     return { code: "LL", line: materialIssue[1].padStart(2, "0") };
+  }
+  if (label === "production-fabric-outsourcing-issue") {
+    return { code: "WWFL", line: "99" };
   }
   const codeByLabel = {
     "production-order": "SC",
@@ -809,7 +911,8 @@ function operationInstanceSequence(instanceKey) {
   if (normalized === "PRIMARY") return "001";
   const trailing = normalized.match(/(?:^|-)(\d{1,3})$/u)?.[1];
   if (trailing && Number(trailing) > 0) return trailing.padStart(3, "0");
-  const derived = (Number.parseInt(stableHash(normalized).slice(0, 8), 16) % 999) + 1;
+  const derived =
+    (Number.parseInt(stableHash(normalized).slice(0, 8), 16) % 999) + 1;
   return String(derived).padStart(3, "0");
 }
 
@@ -849,7 +952,7 @@ function buildIdentities(identity, phases) {
         "production-release",
         source.item.id,
       ),
-      materialIssues: source.materialIssues.map((record, index) =>
+      materialIssues: source.directMaterialIssues.map((record, index) =>
         operationIdentity(
           identity,
           `production-issue-${index + 1}`,
@@ -858,6 +961,17 @@ function buildIdentities(identity, phases) {
           record.lotId,
         ),
       ),
+      ...(source.fabricOutsourcing
+        ? {
+            fabricIssue: operationIdentity(
+              identity,
+              "production-fabric-outsourcing-issue",
+              source.item.id,
+              source.fabricOutsourcing.item.id,
+              source.fabricOutsourcing.lotId,
+            ),
+          }
+        : {}),
       completion: operationIdentity(
         identity,
         "production-completion",
@@ -1015,8 +1129,7 @@ export function sourceDrivenFactConfirmation(plan) {
   ].join(":");
 }
 
-export const SOURCE_DRIVEN_FACT_CONFIRMATION =
-  `APPLY_SOURCE_DRIVEN_FACT_DATA:local-dev:${SOURCE_DRIVEN_FACT_DATA_VERSION}:${SOURCE_DRIVEN_FACT_RUN_ID}:PRIMARY:production+outsourcing+sales+purchase`;
+export const SOURCE_DRIVEN_FACT_CONFIRMATION = `APPLY_SOURCE_DRIVEN_FACT_DATA:local-dev:${SOURCE_DRIVEN_FACT_DATA_VERSION}:${SOURCE_DRIVEN_FACT_RUN_ID}:PRIMARY:production+outsourcing+sales+purchase`;
 
 export function buildSourceDrivenFactPlan(sourceReport, options = {}) {
   const { report, policy } = validateSourceReport(sourceReport);
@@ -1058,12 +1171,7 @@ export function buildSourceDrivenFactPlan(sourceReport, options = {}) {
           : {}),
       };
     }
-    return phase(
-      plannedSource(name),
-      normalize,
-      missingReason,
-      phaseOptions,
-    );
+    return phase(plannedSource(name), normalize, missingReason, phaseOptions);
   };
   const phases = {
     production: plannedPhase(
@@ -1101,8 +1209,7 @@ export function buildSourceDrivenFactPlan(sourceReport, options = {}) {
   const blocked = Object.entries(phases)
     .filter(
       ([name, value]) =>
-        value.status === "blocked" &&
-        enabledPhases.includes(name),
+        value.status === "blocked" && enabledPhases.includes(name),
     )
     .map(([name, value]) => ({ phase: name, reason: value.reason }));
   const identity = Object.freeze({
@@ -1358,7 +1465,9 @@ function requireResult(data, key, status, operation) {
 
 function processNodes(data, operation) {
   if (!Array.isArray(data?.nodes) || data.nodes.length === 0) {
-    throw new SourceDrivenFactError(`${operation} response missing process nodes`);
+    throw new SourceDrivenFactError(
+      `${operation} response missing process nodes`,
+    );
   }
   return data.nodes;
 }
@@ -1642,9 +1751,14 @@ export async function applyFinishedGoodsDeliveryProcess({
     );
   }
 
-  const contextData = await invoke(rpc, "workflow", "get_task_process_context", {
-    task_id: approvalTask.id,
-  });
+  const contextData = await invoke(
+    rpc,
+    "workflow",
+    "get_task_process_context",
+    {
+      task_id: approvalTask.id,
+    },
+  );
   const processContext = contextData?.process_context;
   if (!processContext || typeof processContext !== "object") {
     throw new SourceDrivenFactError(
@@ -1684,12 +1798,7 @@ export async function applyFinishedGoodsDeliveryProcess({
   );
   requireProcessNode(nodes, "end", ["completed"], "finished goods delivery");
   const releasedShipment = requireResult(
-    await invoke(
-      rpc,
-      "operational_fact",
-      "get_shipment",
-      { id: shipmentID },
-    ),
+    await invoke(rpc, "operational_fact", "get_shipment", { id: shipmentID }),
     "shipment",
     "DRAFT",
     "get_shipment",
@@ -1881,12 +1990,9 @@ function productionWIPIdempotencyKey(identity, label) {
 }
 
 async function readProductionWIP(rpc, productionOrderID) {
-  const aggregate = await invoke(
-    rpc,
-    "production_wip",
-    "get_production_wip",
-    { production_order_id: productionOrderID },
-  );
+  const aggregate = await invoke(rpc, "production_wip", "get_production_wip", {
+    production_order_id: productionOrderID,
+  });
   const operations = Array.isArray(aggregate?.production_order_operations)
     ? aggregate.production_order_operations
     : [];
@@ -1911,7 +2017,11 @@ async function readProductionWIP(rpc, productionOrderID) {
   return { aggregate, operations, batches, confirmations };
 }
 
-function exactNormalProductionWIPBatch(state, operationID, { optional = false } = {}) {
+function exactNormalProductionWIPBatch(
+  state,
+  operationID,
+  { optional = false } = {},
+) {
   const matches = state.batches.filter(
     (batch) =>
       Number(batch?.production_order_operation_id) === Number(operationID) &&
@@ -1928,12 +2038,7 @@ function exactNormalProductionWIPBatch(state, operationID, { optional = false } 
 }
 
 async function executeProductionWIPAction(rpc, params) {
-  return invoke(
-    rpc,
-    "production_wip",
-    "execute_production_wip_action",
-    params,
-  );
+  return invoke(rpc, "production_wip", "execute_production_wip_action", params);
 }
 
 async function passCurrentProductionWIPQualityGate(rpc, batchID) {
@@ -1999,7 +2104,14 @@ async function passCurrentProductionWIPQualityGate(rpc, batchID) {
   );
 }
 
-async function advanceProductionWIPRoute({ rpc, order, item, source, identity }) {
+async function advanceProductionWIPRoute({
+  rpc,
+  order,
+  item,
+  source,
+  identity,
+  fabricAllocation,
+}) {
   if (!source.route) return undefined;
   const orderID = positiveID(order?.id, "production WIP order.id");
   const itemID = positiveID(item?.id, "production WIP item.id");
@@ -2063,8 +2175,7 @@ async function advanceProductionWIPRoute({ rpc, order, item, source, identity })
             identity,
             "packaging:confirm",
           ),
-          packaging_version_snapshot:
-            source.route.packagingVersionSnapshot,
+          packaging_version_snapshot: source.route.packagingVersionSnapshot,
           note: SIMULATED_NOTE,
         });
         state = await readProductionWIP(rpc, orderID);
@@ -2084,11 +2195,30 @@ async function advanceProductionWIPRoute({ rpc, order, item, source, identity })
         break;
       }
       if (status === "PLANNED" && !batch.execution_mode) {
+        const fabricOperation =
+          String(operation.operation_code) === "FABRIC_PROCESSING";
+        if (fabricOperation && !fabricAllocation) {
+          throw new SourceDrivenFactError(
+            "FABRIC_PROCESSING is missing its registered outsourcing allocation",
+          );
+        }
         await executeProductionWIPAction(rpc, {
           action: "ASSIGN_EXECUTION",
           production_order_id: orderID,
           production_wip_batch_id: batch.id,
-          execution_mode: "IN_HOUSE",
+          execution_mode: fabricOperation ? "OUTSOURCED" : "IN_HOUSE",
+          ...(fabricOperation
+            ? {
+                outsourcing_allocations: [
+                  {
+                    outsourcing_order_item_id:
+                      fabricAllocation.outsourcingOrderItemId,
+                    production_order_material_requirement_id:
+                      fabricAllocation.productionMaterialRequirementId,
+                  },
+                ],
+              }
+            : {}),
           expected_version: positiveID(
             batch.version,
             "production WIP assignment version",
@@ -2100,7 +2230,9 @@ async function advanceProductionWIPRoute({ rpc, order, item, source, identity })
         });
       } else if (
         status === "PLANNED" &&
-        String(batch.execution_mode || "").toUpperCase() === "IN_HOUSE"
+        new Set(["IN_HOUSE", "OUTSOURCED"]).has(
+          String(batch.execution_mode || "").toUpperCase(),
+        )
       ) {
         await executeProductionWIPAction(rpc, {
           action: "START_OPERATION",
@@ -2127,6 +2259,20 @@ async function advanceProductionWIPRoute({ rpc, order, item, source, identity })
           idempotency_key: productionWIPIdempotencyKey(
             identity,
             `${operation.operation_code}:complete`,
+          ),
+        });
+      } else if (status === "OUTSOURCED") {
+        await executeProductionWIPAction(rpc, {
+          action: "RECEIVE_OUTSOURCING_RETURN",
+          production_order_id: orderID,
+          production_wip_batch_id: batch.id,
+          expected_version: positiveID(
+            batch.version,
+            "production WIP outsourcing return version",
+          ),
+          idempotency_key: productionWIPIdempotencyKey(
+            identity,
+            `${operation.operation_code}:return`,
           ),
         });
       } else if (status === "WAITING_QUALITY") {
@@ -2210,8 +2356,18 @@ async function applyProduction(plan, rpc) {
   );
   const matched = matchProductionRequirements(release, source);
   const materialIssues = [];
-  for (let index = 0; index < matched.requirements.length; index += 1) {
-    const { budget, requirement } = matched.requirements[index];
+  for (let index = 0; index < source.directMaterialIssues.length; index += 1) {
+    const budget = source.directMaterialIssues[index];
+    const requirement = matched.requirements.find(
+      (entry) =>
+        entry.budget.materialId === budget.materialId &&
+        entry.budget.unitId === budget.unitId,
+    )?.requirement;
+    if (!requirement) {
+      throw new SourceDrivenFactError(
+        `direct production material requirement ${budget.materialId}:${budget.unitId} is missing`,
+      );
+    }
     const operation = identity.materialIssues[index];
     materialIssues.push(
       await createPostFact({
@@ -2233,12 +2389,50 @@ async function applyProduction(plan, rpc) {
       }),
     );
   }
+  let fabricOutsourcingIssue;
+  let fabricAllocation;
+  if (source.fabricOutsourcing) {
+    const fabricBudget = source.materialIssues.find(
+      (record) => record.productionOperationCode === "FABRIC_PROCESSING",
+    );
+    const requirement = matched.requirements.find(
+      (entry) =>
+        entry.budget.materialId === fabricBudget.materialId &&
+        entry.budget.unitId === fabricBudget.unitId,
+    )?.requirement;
+    if (!requirement) {
+      throw new SourceDrivenFactError(
+        "fabric production material requirement is missing",
+      );
+    }
+    fabricOutsourcingIssue = await createPostFact({
+      rpc,
+      createMethod: "create_outsourcing_material_issue_from_order",
+      createParams: customerParams({
+        fact_no: identity.fabricIssue.businessNo,
+        outsourcing_order_id: source.fabricOutsourcing.order.id,
+        outsourcing_order_item_id: source.fabricOutsourcing.item.id,
+        warehouse_id: source.fabricOutsourcing.warehouseId,
+        lot_id: source.fabricOutsourcing.lotId,
+        quantity: source.fabricOutsourcing.quantity,
+        idempotency_key: identity.fabricIssue.idempotencyKey,
+        note: SIMULATED_NOTE,
+      }),
+      resultKey: "outsourcing_fact",
+      postMethod: "post_outsourcing_fact",
+    });
+    fabricAllocation = {
+      outsourcingOrderItemId: source.fabricOutsourcing.item.id,
+      productionMaterialRequirementId: requirement.id,
+    };
+  }
   const completionWIPBatch = await advanceProductionWIPRoute({
     rpc,
     order,
     item: matched.item,
     source,
     identity,
+    fabricAllocation,
   });
   const completion = await createPostFact({
     rpc,
@@ -2284,6 +2478,7 @@ async function applyProduction(plan, rpc) {
     ),
     item: matched.item,
     materialIssues,
+    ...(fabricOutsourcingIssue ? { fabricOutsourcingIssue } : {}),
     completion,
     ...(rework ? { rework } : {}),
   };
@@ -2654,7 +2849,10 @@ export async function applySourceDrivenFactPlan(
   { rpc, confirmation, targetConfirmation, targetAttestation } = {},
 ) {
   if (!plan || plan.mode !== "plan" || plan.applySupported !== true) {
-    throw new SourceDrivenFactError("an executable source-driven Fact plan is required", 2);
+    throw new SourceDrivenFactError(
+      "an executable source-driven Fact plan is required",
+      2,
+    );
   }
   if (confirmation !== sourceDrivenFactConfirmation(plan)) {
     throw new SourceDrivenFactError(

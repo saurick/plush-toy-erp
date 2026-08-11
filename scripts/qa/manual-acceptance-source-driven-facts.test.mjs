@@ -60,8 +60,16 @@ function sourceReport({ includeFacts = true, includePurchase = true } = {}) {
           warehouseId: 202,
           lotId: 203,
           quantity: "2",
+          productionOperationCode: "FABRIC_PROCESSING",
         },
       ],
+      fabricOutsourcing: {
+        order: { id: 311, status: "CONFIRMED" },
+        item: { id: 312, materialId: 201, unitId: 105, quantity: "2" },
+        warehouseId: 202,
+        lotId: 203,
+        quantity: "2",
+      },
       completion: {
         warehouseId: 204,
         newLotNo: "SIM-FG-20260715-V1",
@@ -176,8 +184,8 @@ function createRPC({
     production_order_operations: structuredClone(productionWIPOperations),
     production_wip_batches: structuredClone(productionWIPBatches),
     packaging_confirmations: [structuredClone(packagingConfirmation)],
-    quality_inspections: [...productionWIPQualities.values()].flatMap(
-      (items) => structuredClone(items),
+    quality_inspections: [...productionWIPQualities.values()].flatMap((items) =>
+      structuredClone(items),
     ),
   });
 
@@ -283,13 +291,29 @@ function createRPC({
         );
         if (params.action === "ASSIGN_EXECUTION") {
           assert.equal(batch.status, "PLANNED");
-          assert.equal(params.execution_mode, "IN_HOUSE");
+          if (operation.operation_code === "FABRIC_PROCESSING") {
+            assert.equal(params.execution_mode, "OUTSOURCED");
+            assert.deepEqual(params.outsourcing_allocations, [
+              {
+                outsourcing_order_item_id: 312,
+                production_order_material_requirement_id: 602,
+              },
+            ]);
+          } else {
+            assert.equal(params.execution_mode, "IN_HOUSE");
+            assert.equal(params.outsourcing_allocations, undefined);
+          }
           batch.execution_mode = params.execution_mode;
           batch.version += 1;
         } else if (params.action === "START_OPERATION") {
           assert.equal(batch.status, "PLANNED");
-          assert.equal(batch.execution_mode, "IN_HOUSE");
-          batch.status = "IN_PROGRESS";
+          assert.ok(
+            new Set(["IN_HOUSE", "OUTSOURCED"]).has(batch.execution_mode),
+          );
+          batch.status =
+            batch.execution_mode === "OUTSOURCED"
+              ? "OUTSOURCED"
+              : "IN_PROGRESS";
           batch.version += 1;
         } else if (params.action === "COMPLETE_OPERATION") {
           assert.equal(batch.status, "IN_PROGRESS");
@@ -306,6 +330,21 @@ function createRPC({
               },
             ]);
           }
+        } else if (params.action === "RECEIVE_OUTSOURCING_RETURN") {
+          assert.equal(batch.status, "OUTSOURCED");
+          assert.equal(operation.operation_code, "FABRIC_PROCESSING");
+          batch.status = "WAITING_QUALITY";
+          batch.version += 1;
+          productionWIPQualities.set(batch.id, [
+            {
+              id: nextID++,
+              production_wip_batch_id: batch.id,
+              gate_code: qualityGatesByOperation.get(
+                operation.operation_code,
+              )[0],
+              status: "DRAFT",
+            },
+          ]);
         } else if (params.action === "TRANSFER_TO_NEXT_OPERATION") {
           assert.equal(batch.status, "ACCEPTED");
           const target = productionWIPOperations.find(
@@ -338,8 +377,7 @@ function createRPC({
         return createRecord(
           "production_fact",
           {
-            production_wip_batch_id:
-              params.production_wip_batch_id ?? null,
+            production_wip_batch_id: params.production_wip_batch_id ?? null,
           },
           method,
         );
@@ -370,9 +408,8 @@ function createRPC({
           total: outsourcingQualityInspection ? 1 : 0,
         };
       case "list_production_stage_quality_inspections": {
-        const inspections = productionWIPQualities.get(
-          params.production_wip_batch_id,
-        ) || [];
+        const inspections =
+          productionWIPQualities.get(params.production_wip_batch_id) || [];
         return {
           quality_inspections: structuredClone(inspections),
           total: inspections.length,
@@ -814,8 +851,17 @@ test("phase-scoped apply executes the formal production chain and returns exact 
   assert.equal(report.instanceKey, "ROW-01");
   assert.deepEqual(report.enabledPhases, ["production"]);
   assert.equal(report.results.production.order.status, "RELEASED");
-  assert.equal(report.results.production.materialIssues.length, 1);
-  assert.equal(report.results.production.materialIssues[0].status, "POSTED");
+  assert.equal(report.results.production.materialIssues.length, 0);
+  assert.equal(
+    report.results.production.fabricOutsourcingIssue.status,
+    "POSTED",
+  );
+  assert.equal(
+    calls.some(
+      (call) => call.method === "create_production_material_issue_from_order",
+    ),
+    false,
+  );
   assert.equal(report.results.production.completion.status, "POSTED");
   assert.ok(report.results.production.completion.production_wip_batch_id > 0);
   assert.equal(report.results.production.rework.status, "POSTED");
@@ -831,7 +877,7 @@ test("phase-scoped apply executes the formal production chain and returns exact 
     [
       "ASSIGN_EXECUTION",
       "START_OPERATION",
-      "COMPLETE_OPERATION",
+      "RECEIVE_OUTSOURCING_RETURN",
       "TRANSFER_TO_NEXT_OPERATION",
       "ASSIGN_EXECUTION",
       "START_OPERATION",
@@ -861,6 +907,7 @@ test("route-less production remains supported but cannot request a rework source
   const report = sourceReport();
   delete report.referenceRecords.sourceDrivenFacts.production.route;
   delete report.referenceRecords.sourceDrivenFacts.production.rework;
+  delete report.referenceRecords.sourceDrivenFacts.production.fabricOutsourcing;
   const plan = buildSourceDrivenFactPlan(report, {
     instanceKey: "ROW-ROUTELESS",
     enabledPhases: ["production"],
@@ -883,6 +930,8 @@ test("route-less production remains supported but cannot request a rework source
 
   const invalidReport = sourceReport();
   delete invalidReport.referenceRecords.sourceDrivenFacts.production.route;
+  delete invalidReport.referenceRecords.sourceDrivenFacts.production
+    .fabricOutsourcing;
   const invalid = buildSourceDrivenFactPlan(invalidReport, {
     instanceKey: "ROW-INVALID-REWORK",
     enabledPhases: ["production"],
@@ -1063,7 +1112,7 @@ test("idempotent create responses already POSTED are reused without a second pos
     enabledPhases: ["production"],
   });
   const prepostedCreateMethods = new Set([
-    "create_production_material_issue_from_order",
+    "create_outsourcing_material_issue_from_order",
     "create_production_completion_from_order",
     "create_production_rework_from_completion",
   ]);
@@ -1075,11 +1124,18 @@ test("idempotent create responses already POSTED are reused without a second pos
     targetConfirmation: manualAcceptanceTargetConfirmation(plan),
   });
 
-  assert.equal(report.results.production.materialIssues[0].status, "POSTED");
+  assert.equal(
+    report.results.production.fabricOutsourcingIssue.status,
+    "POSTED",
+  );
   assert.equal(report.results.production.completion.status, "POSTED");
   assert.equal(report.results.production.rework.status, "POSTED");
   assert.equal(
     calls.some((call) => call.method === "post_production_fact"),
+    false,
+  );
+  assert.equal(
+    calls.some((call) => call.method === "post_outsourcing_fact"),
     false,
   );
 });
@@ -1129,9 +1185,7 @@ test("visible fact numbers are short, deterministic, unique, and versioned", () 
     identities.every(
       (identity) =>
         identity.businessNo.length <= 28 &&
-        /^TEST-YS-\d{6}V\d+-[A-Z]{2,5}\d{3,6}$/u.test(
-          identity.businessNo,
-        ) &&
+        /^TEST-YS-\d{6}V\d+-[A-Z]{2,5}\d{3,6}$/u.test(identity.businessNo) &&
         !/SIM-SDF|PRODUCTION|OUTSOURCING|RECONCILIATION|[A-F0-9]{12,}/u.test(
           identity.businessNo,
         ),

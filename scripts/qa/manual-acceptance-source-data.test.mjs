@@ -329,6 +329,29 @@ test("outsourcing source plans satisfy the current contract readiness boundary",
       true,
     );
   }
+  const routedContracts = plan.records.outsourcingOrders
+    .flatMap((order) => order.items.map((item) => ({ order, item })))
+    .filter(({ item }) =>
+      Number.isInteger(item.acceptanceProductionCandidateOffset),
+    );
+  assert.deepEqual(
+    routedContracts.map(({ item }) => [
+      item.acceptanceProductionCandidateOffset,
+      item.subject_type,
+      item.processRef,
+      item.outsourcing_quantity,
+    ]),
+    [
+      [3, "MATERIAL", "YS5-GX-001", "0.600000"],
+      [4, "MATERIAL", "YS5-GX-001", "0.600000"],
+    ],
+  );
+  assert.ok(
+    routedContracts.every(
+      ({ order }) =>
+        order.targetStatus === "CONFIRMED" && order.items.length === 1,
+    ),
+  );
 });
 
 test("versioned source plans use a stable date anchor and semantic digest across targets", () => {
@@ -1326,6 +1349,7 @@ test("persisted outsourcing lines retain exact formal source references", () => 
         subject_type: "PRODUCT",
         productRef: "P-1",
         processRef: "PROC-1",
+        acceptanceProductionCandidateOffset: 3,
       },
     ],
     actualItems: [
@@ -1359,6 +1383,7 @@ test("persisted outsourcing lines retain exact formal source references", () => 
       processId: 401,
       unitId: 301,
       quantity: "112",
+      acceptanceProductionCandidateOffset: 3,
     },
   ]);
   assert.throws(

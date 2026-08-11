@@ -59,6 +59,8 @@ export const DEFAULT_SOURCE_DATA_SCALE = Object.freeze({
   outsourcingOrders: 45,
   bomVersions: 45,
 });
+const ROUTED_PRODUCTION_SAMPLE_OFFSETS = Object.freeze([3, 4]);
+const ROUTED_PRODUCTION_PLANNED_QUANTITY = 3;
 export const SALES_ORDER_ACCEPTANCE_REPLAY_STATUSES = Object.freeze([
   Object.freeze(["DRAFT"]),
   Object.freeze(["DRAFT", "SUBMITTED"]),
@@ -813,6 +815,100 @@ function buildBOMVersions(prefix, count, products, materials, anchorDate) {
   return versions.slice(0, count);
 }
 
+function bindRoutedProductionOutsourcingContracts({
+  salesOrders,
+  outsourcingOrders,
+  bomVersions,
+  materials,
+  processes,
+}) {
+  const activeBOMByProduct = new Map(
+    bomVersions
+      .filter((record) => record.targetStatus === "ACTIVE")
+      .map((record) => [record.productRef, record]),
+  );
+  const productionCandidates = salesOrders
+    .filter((record) => record.targetStatus === "ACTIVE")
+    .flatMap((order) =>
+      order.items.flatMap((item) => {
+        const bom = activeBOMByProduct.get(item.productRef);
+        return bom ? [{ order, bom }] : [];
+      }),
+    );
+  const reservedOrders = outsourcingOrders.filter(
+    (record) =>
+      record.targetStatus === "CONFIRMED" && record.items.length === 1,
+  );
+  const fabricProcess = processes.find(
+    (record) =>
+      record.isActive &&
+      record.outsourcing_enabled &&
+      record.production_route_operation_code === "FABRIC_PROCESSING",
+  );
+  const materialByCode = new Map(
+    materials.map((record) => [record.code, record]),
+  );
+  if (
+    !fabricProcess ||
+    reservedOrders.length < ROUTED_PRODUCTION_SAMPLE_OFFSETS.length
+  ) {
+    throw new CliError(
+      "source plan cannot reserve the routed production fabric outsourcing contracts",
+      2,
+    );
+  }
+  for (const [
+    contractOffset,
+    productionCandidateOffset,
+  ] of ROUTED_PRODUCTION_SAMPLE_OFFSETS.entries()) {
+    const candidate = productionCandidates[productionCandidateOffset];
+    const fabricItems = candidate?.bom?.items?.filter(
+      (item) => item.production_operation_code === "FABRIC_PROCESSING",
+    );
+    if (!candidate || fabricItems?.length !== 1) {
+      throw new CliError(
+        `production candidate ${productionCandidateOffset} must have one FABRIC_PROCESSING material`,
+        2,
+      );
+    }
+    const fabricItem = fabricItems[0];
+    const material = materialByCode.get(fabricItem.materialRef);
+    if (!material) {
+      throw new CliError(
+        `production candidate ${productionCandidateOffset} fabric material is missing`,
+        2,
+      );
+    }
+    const quantity = (
+      Number(fabricItem.quantity) *
+      ROUTED_PRODUCTION_PLANNED_QUANTITY *
+      (1 + Number(fabricItem.loss_rate || 0))
+    ).toFixed(6);
+    const reservedOrder = reservedOrders[contractOffset];
+    const existing = reservedOrder.items[0];
+    reservedOrder.source_order_no = candidate.order.customer_order_no;
+    reservedOrder.items = [
+      {
+        line_no: 1,
+        subject_type: "MATERIAL",
+        materialRef: material.code,
+        processRef: fabricProcess.code,
+        material_code_snapshot: material.code,
+        material_name_snapshot: material.name,
+        processing_item: fabricItem.position || "面料",
+        process_name_snapshot: fabricProcess.name,
+        process_category_snapshot: fabricProcess.category,
+        outsourcing_quantity: quantity,
+        unit_price: existing.unit_price,
+        amount: (Number(quantity) * Number(existing.unit_price)).toFixed(2),
+        expected_return_date: existing.expected_return_date,
+        note: existing.note,
+        acceptanceProductionCandidateOffset: productionCandidateOffset,
+      },
+    ];
+  }
+}
+
 function assertBusinessCopy(value, pathName = "dataset") {
   if (value == null) return;
   if (typeof value === "string") {
@@ -920,6 +1016,13 @@ export function buildManualAcceptanceSourceDataPlan(options = {}) {
     materials,
     anchorDate,
   );
+  bindRoutedProductionOutsourcingContracts({
+    salesOrders,
+    outsourcingOrders,
+    bomVersions,
+    materials,
+    processes,
+  });
   const records = {
     customers,
     suppliers,
@@ -2696,6 +2799,12 @@ export function buildOutsourcingOrderLineReferences({
       processId: actual.process_id,
       unitId: actual.unit_id,
       quantity: actual.outsourcing_quantity,
+      ...(Number.isInteger(planned.acceptanceProductionCandidateOffset)
+        ? {
+            acceptanceProductionCandidateOffset:
+              planned.acceptanceProductionCandidateOffset,
+          }
+        : {}),
     };
   });
 }
@@ -3036,6 +3145,7 @@ async function createSourceDocuments({
         productRef: undefined,
         materialRef: undefined,
         processRef: undefined,
+        acceptanceProductionCandidateOffset: undefined,
       })),
     }),
   });
@@ -3406,6 +3516,7 @@ export function buildSourceDrivenFactReferences({
     }
   }
   const outsourcingCandidates = [];
+  const productionWIPOutsourcingCandidates = [];
   for (const orderPlan of plan.records.outsourcingOrders.filter(
     (record) => record.targetStatus === "CONFIRMED",
   )) {
@@ -3421,14 +3532,21 @@ export function buildSourceDrivenFactReferences({
     for (const item of sourceDocuments.outsourcingOrderItems.get(order.id) ||
       []) {
       if (!item?.outsourcingOrderItemId) continue;
-      outsourcingCandidates.push({
+      const candidate = {
         order: {
           id: order.id,
           orderNo: orderPlan.outsourcing_order_no,
           status: "CONFIRMED",
         },
         item,
-      });
+      };
+      outsourcingCandidates.push(candidate);
+      if (Number.isInteger(item.acceptanceProductionCandidateOffset)) {
+        productionWIPOutsourcingCandidates.push({
+          productionCandidateOffset: item.acceptanceProductionCandidateOffset,
+          ...candidate,
+        });
+      }
     }
   }
   const purchaseCandidates = [];
@@ -3475,6 +3593,7 @@ export function buildSourceDrivenFactReferences({
       ...(salesCandidate ? { sales: salesCandidate } : {}),
       ...(purchaseCandidate ? { purchase: purchaseCandidate } : {}),
       productionCandidates,
+      productionWIPOutsourcingCandidates,
       outsourcingCandidates,
       salesCandidates,
       purchaseCandidates,
@@ -3783,6 +3902,8 @@ export async function applyManualAcceptanceSourceData(
         code: record.code,
         id: refs.processes.get(record.code).id,
         name: record.name,
+        productionRouteOperationCode:
+          record.production_route_operation_code ?? null,
       })),
     salesOrders: plan.records.salesOrders
       .filter((record) => record.targetStatus === "ACTIVE")

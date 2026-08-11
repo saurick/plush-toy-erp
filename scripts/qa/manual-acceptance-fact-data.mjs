@@ -443,18 +443,46 @@ export function buildManualAcceptanceFactPlan(sourceReport) {
   if (!Array.isArray(warehouses) || warehouses.length < 2) {
     throw new CliError("source report must include at least two warehouses", 2);
   }
+  const productionWIPOutsourcingByOffset = new Map();
+  for (const candidate of sourceCandidates.productionWIPOutsourcingCandidates ||
+    []) {
+    const offset = Number(candidate?.productionCandidateOffset);
+    if (
+      !ROUTED_PRODUCTION_SAMPLE_OFFSETS.has(offset) ||
+      productionWIPOutsourcingByOffset.has(offset)
+    ) {
+      throw new CliError(
+        "source report has conflicting routed production outsourcing candidates",
+        2,
+      );
+    }
+    productionWIPOutsourcingByOffset.set(offset, candidate);
+  }
+  if (
+    [...ROUTED_PRODUCTION_SAMPLE_OFFSETS].some(
+      (offset) => !productionWIPOutsourcingByOffset.has(offset),
+    )
+  ) {
+    throw new CliError(
+      "source report is missing registered routed production outsourcing candidates",
+      2,
+    );
+  }
   const productionCandidates = allocateCandidates(
     sourceCandidates.productionCandidates,
     FACT_RUN_COUNT,
     "production",
     (item) => Array.isArray(item?.bom?.items) && item.bom.items.length > 0,
     3,
-  ).map((candidate, offset) => ({
-    ...candidate,
-    ...(ROUTED_PRODUCTION_SAMPLE_OFFSETS.has(offset)
-      ? { route: ROUTED_PRODUCTION_SAMPLE }
-      : {}),
-  }));
+  ).map((candidate, offset) => {
+    const fabricOutsourcing = productionWIPOutsourcingByOffset.get(offset);
+    return {
+      ...candidate,
+      ...(ROUTED_PRODUCTION_SAMPLE_OFFSETS.has(offset)
+        ? { route: ROUTED_PRODUCTION_SAMPLE, fabricOutsourcing }
+        : {}),
+    };
+  });
   const outsourcingCandidates = allocateOutsourcingPairs(
     sourceCandidates.outsourcingCandidates,
     FACT_RUN_COUNT,
@@ -1903,6 +1931,18 @@ async function readProductionPlan(rpc, sourcePlan, completionLotNo) {
       }),
     );
   }
+  const fabricOutsourcingFacts = sourcePlan.identities.production.fabricIssue
+    ? [
+        await exactRequired({
+          rpc,
+          domain: "operational_fact",
+          method: "list_outsourcing_facts",
+          listKey: "outsourcing_facts",
+          businessField: "fact_no",
+          businessNo: sourcePlan.identities.production.fabricIssue.businessNo,
+        }),
+      ]
+    : [];
   const lot = await exactRequired({
     rpc,
     domain: "inventory",
@@ -1929,6 +1969,7 @@ async function readProductionPlan(rpc, sourcePlan, completionLotNo) {
   return {
     order,
     facts,
+    fabricOutsourcingFacts,
     completion,
     lot,
     balances: balances.inventory_balances || [],
@@ -2146,6 +2187,18 @@ export function sourceDrivenPhaseIdentitySpecs(sourcePlan, phase) {
           statuses: ["POSTED"],
         }),
       ),
+      ...(identity.fabricIssue
+        ? [
+            phaseIdentitySpec({
+              domain: "operational_fact",
+              method: "list_outsourcing_facts",
+              listKey: "outsourcing_facts",
+              businessField: "fact_no",
+              identity: identity.fabricIssue,
+              statuses: ["POSTED"],
+            }),
+          ]
+        : []),
       phaseIdentitySpec({
         domain: "operational_fact",
         method: "list_production_facts",
@@ -2271,8 +2324,13 @@ export async function validateProductionPhasePartialRecords(
 ) {
   const source = sourcePlan.phases.production.source;
   const identity = sourcePlan.identities.production;
+  const directMaterialIssues = source.directMaterialIssues;
+  const fabricIssueCount = identity.fabricIssue ? 1 : 0;
   const expectedCount =
-    2 + source.materialIssues.length + (identity.rework ? 1 : 0);
+    2 +
+    directMaterialIssues.length +
+    fabricIssueCount +
+    (identity.rework ? 1 : 0);
   if (
     !Array.isArray(records) ||
     records.length < 1 ||
@@ -2326,10 +2384,10 @@ export async function validateProductionPhasePartialRecords(
   );
   const issueRecords = records.slice(
     1,
-    Math.min(records.length, 1 + source.materialIssues.length),
+    Math.min(records.length, 1 + directMaterialIssues.length),
   );
   for (let index = 0; index < issueRecords.length; index += 1) {
-    const budget = source.materialIssues[index];
+    const budget = directMaterialIssues[index];
     const requirement = requirements.find(
       (item) =>
         Number(item.material_id) === Number(budget.materialId) &&
@@ -2360,7 +2418,29 @@ export async function validateProductionPhasePartialRecords(
       new Set(["quantity"]),
     );
   }
-  const completion = records[1 + source.materialIssues.length];
+  const fabricIssue = records[1 + directMaterialIssues.length];
+  if (identity.fabricIssue && fabricIssue) {
+    assertRecordGrain(
+      identity.fabricIssue.businessNo,
+      fabricIssue,
+      {
+        fact_type: "MATERIAL_ISSUE",
+        subject_type: "MATERIAL",
+        subject_id: source.fabricOutsourcing.item.materialId,
+        warehouse_id: source.fabricOutsourcing.warehouseId,
+        unit_id: source.fabricOutsourcing.item.unitId,
+        lot_id: source.fabricOutsourcing.lotId,
+        quantity: source.fabricOutsourcing.quantity,
+        source_type: "OUTSOURCING_ORDER",
+        source_id: source.fabricOutsourcing.order.id,
+        source_line_id: source.fabricOutsourcing.item.id,
+        idempotency_key: identity.fabricIssue.idempotencyKey,
+      },
+      new Set(["quantity"]),
+    );
+  }
+  const completion =
+    records[1 + directMaterialIssues.length + fabricIssueCount];
   if (completion) {
     if (source.route) {
       positiveID(
@@ -2412,7 +2492,10 @@ export async function validateProductionPhaseRecords(rpc, sourcePlan, records) {
   const source = sourcePlan.phases.production.source;
   const identity = sourcePlan.identities.production;
   const expectedCount =
-    2 + source.materialIssues.length + (identity.rework ? 1 : 0);
+    2 +
+    source.directMaterialIssues.length +
+    (identity.fabricIssue ? 1 : 0) +
+    (identity.rework ? 1 : 0);
   if (!Array.isArray(records) || records.length !== expectedCount) {
     throw new CliError(
       `production phase must contain ${expectedCount} exact records`,
@@ -4601,9 +4684,55 @@ export async function runSourceDrivenFactStage(
           warehouseId: stock.warehouseId,
           lotId: stock.lotId,
           quantity: productionMaterialQuantity(item, plannedQuantity),
+          productionOperationCode: item.productionOperationCode ?? null,
         };
       }),
     };
+    if (candidate.fabricOutsourcing) {
+      const fabricItem = candidate.bom.items.find(
+        (item) => item.productionOperationCode === "FABRIC_PROCESSING",
+      );
+      const contractItem = candidate.fabricOutsourcing.item;
+      if (!fabricItem) {
+        throw new CliError(
+          `routed production ${offset} has no FABRIC_PROCESSING BOM requirement`,
+          2,
+        );
+      }
+      const expectedQuantity = productionMaterialQuantity(
+        fabricItem,
+        plannedQuantity,
+      );
+      if (
+        contractItem?.subjectType !== "MATERIAL" ||
+        Number(contractItem.materialId) !== Number(fabricItem.materialId) ||
+        Number(contractItem.unitId) !== Number(fabricItem.unitId) ||
+        Number(contractItem.quantity) !== Number(expectedQuantity)
+      ) {
+        throw new CliError(
+          `routed production ${offset} fabric outsourcing contract does not match its BOM requirement`,
+          2,
+        );
+      }
+      const stock = materialStock.get(
+        `${fabricItem.materialId}:${fabricItem.unitId}`,
+      );
+      production.fabricOutsourcing = {
+        order: candidate.fabricOutsourcing.order,
+        item: {
+          id: positiveID(
+            contractItem.outsourcingOrderItemId,
+            "production fabric outsourcing item.id",
+          ),
+          materialId: fabricItem.materialId,
+          unitId: fabricItem.unitId,
+          quantity: contractItem.quantity,
+        },
+        warehouseId: stock.warehouseId,
+        lotId: stock.lotId,
+        quantity: expectedQuantity,
+      };
+    }
     const sourcePlan = buildPlan(
       overrideReadyReport(sourceReport, ["production"]),
       {
@@ -4803,9 +4932,12 @@ export async function runSourceDrivenFactStage(
       ...lifecycle.productionFacts,
     ]),
     productionExceptions: [productionException],
-    outsourcingFacts: dedupeByID(
-      outsourcingReadback.flatMap((item) => item.facts),
-    ),
+    outsourcingFacts: dedupeByID([
+      ...productionReadback.flatMap(
+        (item) => item.fabricOutsourcingFacts || [],
+      ),
+      ...outsourcingReadback.flatMap((item) => item.facts),
+    ]),
     qualityInspections: dedupeByID(
       outsourcingReadback.map((item) => item.inspection),
     ),
