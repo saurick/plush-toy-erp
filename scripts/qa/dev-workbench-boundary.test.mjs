@@ -240,6 +240,13 @@ test("dev workbench boundary: imports from ERP stay on explicit read/API adapter
       ]),
     ],
     [
+      "web/src/dev-workbench/config/devPermissionNavigation.mjs",
+      new Set([
+        "../../erp/config/seedData.mjs",
+        "../../erp/config/roleGuidedNavigation.mjs",
+      ]),
+    ],
+    [
       "web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx",
       new Set([
         "@/erp/utils/workflowTaskEventPresentation.mjs",

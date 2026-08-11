@@ -26,6 +26,8 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { JsonRpc } from '@/common/utils/jsonRpc'
 import { getApprovalSettings } from '../../erp/api/approvalSettingsApi.mjs'
 import DevPageNav from '../components/DevPageNav.jsx'
+import DevPermissionNavigationOverview from '../components/DevPermissionNavigationOverview.jsx'
+import { buildPermissionRelationshipNavigationModel } from '../config/devPermissionNavigation.mjs'
 import {
   PERMISSION_RELATIONSHIP_ALL_MODULES,
   PERMISSION_RELATIONSHIP_VIEW_MODE,
@@ -253,6 +255,17 @@ export default function DevPermissionRelationshipsPage() {
       }),
     [accessByRoleKey, baseState, moduleKey, targetKey, viewMode]
   )
+  const navigationModel = useMemo(
+    () =>
+      buildPermissionRelationshipNavigationModel({
+        viewMode,
+        targetKey,
+        accounts: baseState.accounts,
+        roles: baseState.roles,
+        accessByRoleKey,
+      }),
+    [accessByRoleKey, baseState.accounts, baseState.roles, targetKey, viewMode]
+  )
 
   const changeViewMode = (nextMode) => {
     const nextOptions = buildPermissionRelationshipTargetOptions({
@@ -313,11 +326,11 @@ export default function DevPermissionRelationshipsPage() {
           </span>
           <div>
             <Text className="erp-dev-permission-relationships-eyebrow">
-              权限核对 · 当前后端 · 只读
+              权限核对 · 当前运行投影 · 只读
             </Text>
             <Title level={1}>权限关系 / Effective Access</Title>
             <Paragraph>
-              按岗位或账号查看最终可用功能、页面、仓库数据范围和审批责任，定位“为什么能用、为什么受限”。
+              按岗位或账号查看最终可用功能、页面、实际菜单、仓库数据范围和审批责任，定位“为什么能用、从哪里进入、为什么受限”。
             </Paragraph>
           </div>
         </div>
@@ -349,15 +362,15 @@ export default function DevPermissionRelationshipsPage() {
           type="info"
           showIcon
           message="这里只汇聚权限结果，不创建第二套权限真源"
-          description="数据来自当前后端已有的员工账号、岗位、最终功能解释、仓库范围和已启用审批设置；不包含任务、单据、流程运行或业务事实，也不在本页保存配置。"
+          description="数据来自当前后端已有的员工账号、岗位、最终功能解释、仓库范围和已启用审批设置，菜单位置复用正式前端投影；不包含任务、单据、流程运行或业务事实，也不在本页保存配置。"
         />
 
         <section className="erp-permission-relationship">
           <div className="erp-permission-relationship__intro">
             <div>
-              <Title level={2}>从账号到最终可用范围，一张图看清</Title>
+              <Title level={2}>从账号到最终可用范围，一页看清</Title>
               <Paragraph>
-                图和明细使用同一份汇聚结果；停用账号、停用岗位、超级管理员和部分读取失败会明确标识。
+                菜单、图和明细使用同一份最终页面结果；停用账号、停用岗位、超级管理员和部分读取失败会明确标识。
               </Paragraph>
             </div>
             <Tag color="blue">只读结果</Tag>
@@ -491,6 +504,11 @@ export default function DevPermissionRelationshipsPage() {
                 ))}
               </div>
 
+              <DevPermissionNavigationOverview
+                model={navigationModel}
+                loading={accessLoading}
+              />
+
               <div className="erp-permission-relationship__legend">
                 <Text type="secondary">图例</Text>
                 <Space wrap size={[6, 6]}>
@@ -574,7 +592,7 @@ export default function DevPermissionRelationshipsPage() {
                 type="info"
                 showIcon
                 message="关系图是只读结果，不是新的权限配置入口"
-                description="岗位功能、员工岗位、数据范围和审批责任仍在“系统管理 → 权限配置”维护；保存后返回本页刷新即可核对。"
+                description="岗位功能、员工岗位、菜单布局、数据范围和审批责任仍在“系统管理 → 权限配置”维护；保存后返回本页刷新即可核对。"
               />
             </>
           ) : null}

@@ -374,6 +374,8 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
     permissionRelationshipsItem?.guardrails?.join(' ') || '',
     /不汇入任务、单据、流程或业务事实/u
   )
+  assert.match(permissionRelationshipsItem?.truthSource || '', /正式菜单投影/u)
+  assert.match(permissionRelationshipsItem?.description || '', /实际侧栏/u)
 
   const testingItem = DEV_HUB_ITEMS.find((item) => item.key === 'testing')
   assert.equal(

@@ -67,9 +67,9 @@ const PRODUCT_ENGINEERING_ENTRY_PRESENTATION = Object.freeze({
     eyebrow: '权限核对',
     title: '账号为什么能使用这些功能？',
     description:
-      '按岗位或账号汇聚最终可用功能、页面、仓库范围和审批责任，查看每条结果来自哪里。',
+      '按岗位或账号汇聚最终可用功能、页面、实际侧栏、仓库范围和审批责任，查看每条结果来自哪里。',
     action: '核对权限关系',
-    boundary: '只读读取当前后端与已启用配置；不修改权限，不代表发布或验收',
+    boundary: '只读读取当前权限与菜单投影；不修改权限，不代表发布或验收',
   }),
   governance: Object.freeze({
     eyebrow: '规则与边界',

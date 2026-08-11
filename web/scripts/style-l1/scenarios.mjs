@@ -3397,7 +3397,7 @@ export function createStyleL1Scenarios(deps) {
         )
         const modal = page.locator('.erp-dev-permission-relationships-shell')
         await modal.waitFor({ state: 'visible', timeout: 10_000 })
-        await expectText(modal, '从账号到最终可用范围，一张图看清')
+        await expectText(modal, '从账号到最终可用范围，一页看清')
         await expectText(modal, '关系图是只读结果')
         await page.screenshot({
           path: path.resolve(
@@ -3433,6 +3433,10 @@ export function createStyleL1Scenarios(deps) {
           const summary = shell?.querySelector(
             '.erp-permission-relationship__summary'
           )
+          const navigation = shell?.querySelector('.erp-permission-navigation')
+          const navigationGrid = shell?.querySelector(
+            '.erp-permission-navigation__grid'
+          )
           const navRect = nav?.getBoundingClientRect()
           const shellRect = shell?.getBoundingClientRect()
           const viewportRect = graphViewport?.getBoundingClientRect()
@@ -3446,6 +3450,18 @@ export function createStyleL1Scenarios(deps) {
             summaryColumns: summary
               ? window.getComputedStyle(summary).gridTemplateColumns.split(' ')
                   .length
+              : 0,
+            navigationColumns: navigationGrid
+              ? window
+                  .getComputedStyle(navigationGrid)
+                  .gridTemplateColumns.split(' ').length
+              : 0,
+            navigationItems:
+              navigation?.querySelectorAll(
+                '.erp-permission-navigation__items li'
+              ).length || 0,
+            navigationOverflow: navigation
+              ? navigation.scrollWidth - navigation.clientWidth
               : 0,
             viewportWidth: window.innerWidth,
             viewportHeight: window.innerHeight,
@@ -3461,6 +3477,9 @@ export function createStyleL1Scenarios(deps) {
             roleGraphMetrics.graphWidth > 600 &&
             roleGraphMetrics.graphHeight >= 360 &&
             roleGraphMetrics.summaryColumns === 6 &&
+            roleGraphMetrics.navigationColumns === 3 &&
+            roleGraphMetrics.navigationItems > 0 &&
+            roleGraphMetrics.navigationOverflow <= 1 &&
             roleGraphMetrics.documentOverflow <= 1,
           `权限关系页桌面导航、摘要和图形尺寸异常: ${JSON.stringify(
             roleGraphMetrics
@@ -3503,20 +3522,32 @@ export function createStyleL1Scenarios(deps) {
           )
           .waitFor({ state: 'visible', timeout: 15_000 })
         await expectText(modal, '仓储')
+        const navigation = modal.locator('.erp-permission-navigation')
+        await expectText(navigation, '实际侧栏 / 可用菜单')
+        await expectText(navigation, '系统推荐')
+        await expectText(navigation, '客户档案')
+        await expectText(navigation, '销售订单')
+        await expectText(navigation, '库存台账')
+        await expectText(navigation, '岗位使用帮助')
+        const navigationTextBeforeModule = await navigation.innerText()
+        await navigation.screenshot({
+          path: path.resolve(
+            outputDir,
+            'dev-permission-relationships-menu-role-desktop.png'
+          ),
+        })
 
         const moduleSelect = modal.getByLabel('选择功能模块').first()
         await moduleSelect.evaluate((node) =>
           node.scrollIntoView({ block: 'center', inline: 'nearest' })
         )
         await moduleSelect.locator('.ant-select-selector').click()
-        const moduleDropdown = page
-          .locator('.ant-select-dropdown:visible')
-          .filter({ hasText: '仓储' })
+        const moduleDropdown = page.locator('.ant-select-dropdown:visible')
         await moduleDropdown.waitFor({ state: 'visible', timeout: 5000 })
-        await moduleDropdown
+        const moduleOptionContent = moduleDropdown
           .locator('.ant-select-item-option-content')
           .filter({ hasText: /^仓储$/u })
-          .waitFor({ state: 'visible', timeout: 5000 })
+        await moduleOptionContent.waitFor({ state: 'visible', timeout: 5000 })
         const moduleLabels = await moduleDropdown
           .locator('.ant-select-item-option-content')
           .allTextContents()
@@ -3526,7 +3557,7 @@ export function createStyleL1Scenarios(deps) {
         )
         const moduleOption = moduleDropdown
           .locator('.ant-select-item-option')
-          .filter({ hasText: '仓储' })
+          .filter({ hasText: /^仓储$/u })
         const moduleOptionBox = await moduleOption.boundingBox()
         const moduleViewport = page.viewportSize()
         assert(
@@ -3561,6 +3592,11 @@ export function createStyleL1Scenarios(deps) {
           .waitFor({ state: 'visible', timeout: 15_000 })
         await expectText(modal, '查看库存')
         await expectText(modal, '库存台账')
+        assert.equal(
+          await navigation.innerText(),
+          navigationTextBeforeModule,
+          '功能模块筛选不应把完整实际侧栏缩成局部菜单'
+        )
         await modal.locator('.erp-permission-relationship__graph').screenshot({
           path: path.resolve(
             outputDir,
@@ -3577,6 +3613,14 @@ export function createStyleL1Scenarios(deps) {
         await expectText(modal, '权限管理员')
         await expectText(modal, '业务')
         await expectText(modal, '财务')
+        await expectText(navigation, '多岗位合并（2）')
+        await expectText(navigation, '对账管理')
+        await navigation.screenshot({
+          path: path.resolve(
+            outputDir,
+            'dev-permission-relationships-menu-account-desktop.png'
+          ),
+        })
         await modal.screenshot({
           path: path.resolve(
             outputDir,
@@ -3664,6 +3708,13 @@ export function createStyleL1Scenarios(deps) {
           const summary = shell?.querySelector(
             '.erp-permission-relationship__summary'
           )
+          const navigation = shell?.querySelector('.erp-permission-navigation')
+          const navigationGrid = shell?.querySelector(
+            '.erp-permission-navigation__grid'
+          )
+          const navigationSections = shell?.querySelector(
+            '.erp-permission-navigation__sections'
+          )
           const rect = shell?.getBoundingClientRect()
           return {
             shellLeft: rect?.left || 0,
@@ -3677,6 +3728,19 @@ export function createStyleL1Scenarios(deps) {
               ? window.getComputedStyle(summary).gridTemplateColumns.split(' ')
                   .length
               : 0,
+            navigationColumns: navigationGrid
+              ? window
+                  .getComputedStyle(navigationGrid)
+                  .gridTemplateColumns.split(' ').length
+              : 0,
+            navigationSectionColumns: navigationSections
+              ? window
+                  .getComputedStyle(navigationSections)
+                  .gridTemplateColumns.split(' ').length
+              : 0,
+            navigationOverflow: navigation
+              ? navigation.scrollWidth - navigation.clientWidth
+              : 0,
             viewportWidth: window.innerWidth,
             documentOverflow:
               document.documentElement.scrollWidth -
@@ -3689,6 +3753,9 @@ export function createStyleL1Scenarios(deps) {
             narrowMetrics.shellWidth > 0 &&
             narrowMetrics.toolbarColumns === 1 &&
             narrowMetrics.summaryColumns === 2 &&
+            narrowMetrics.navigationColumns === 1 &&
+            narrowMetrics.navigationSectionColumns === 1 &&
+            narrowMetrics.navigationOverflow <= 1 &&
             narrowMetrics.documentOverflow <= 1,
           `权限关系图窄屏应堆叠筛选并保持两列摘要: ${JSON.stringify(
             narrowMetrics
