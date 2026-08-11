@@ -279,6 +279,35 @@ test("current V5 plans use short yoyoosun-style visible business numbers", () =>
   assert.match(plan.records.bomVersions[0].version, /^YS5-BOM-/u);
 });
 
+test("outsourcing source plans satisfy the current contract readiness boundary", () => {
+  const plan = buildManualAcceptanceSourceDataPlan({
+    runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+    dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+  });
+
+  for (const order of plan.records.outsourcingOrders) {
+    assert.ok(order.expected_return_date);
+    assert.ok(order.contract_party_snapshot.buyerCompany);
+    assert.ok(order.contract_party_snapshot.buyerContact);
+    assert.ok(order.contract_party_snapshot.buyerPhone);
+    assert.ok(order.contract_party_snapshot.buyerAddress);
+    assert.ok(
+      order.supplier_snapshot.name || order.supplier_snapshot.short_name,
+    );
+    assert.ok(order.supplier_snapshot.contact_name);
+    assert.ok(
+      order.supplier_snapshot.contact_phone ||
+        order.supplier_snapshot.contact_mobile,
+    );
+    assert.ok(order.supplier_snapshot.address);
+    assert.ok(order.items.length > 0);
+    assert.equal(
+      order.items.every((item) => Boolean(item.processing_item?.trim())),
+      true,
+    );
+  }
+});
+
 test("versioned source plans use a stable date anchor and semantic digest across targets", () => {
   const common = {
     runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
@@ -1163,7 +1192,9 @@ test("sales source replay accepts only the exact downstream ProcessRuntime lifec
     .slice(0, 6);
   const report = { steps: [] };
   const fetchImpl = async () => {
-    throw new Error("exact replay readback must not issue a lifecycle mutation");
+    throw new Error(
+      "exact replay readback must not issue a lifecycle mutation",
+    );
   };
 
   assert.equal(

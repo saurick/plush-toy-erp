@@ -670,10 +670,14 @@ function buildOutsourcingOrders(
   const activeProcesses = processes.filter(
     (item) => item.isActive && item.outsourcing_enabled,
   );
+  const processingItems = ["本体*1", "耳朵*2", "尾巴*1", "配件*1"];
   return Array.from({ length: count }, (_, offset) => {
     const index = offset + 1;
     const supplier =
       suppliers[(offset * 3 + 3) % Math.min(suppliers.length - 5, 45)];
+    const supplierContact =
+      supplier.contacts.find((contact) => contact.is_primary) ||
+      supplier.contacts[0];
     const sourceOrder = salesOrders[offset % salesOrders.length];
     const lines = Array.from(
       { length: lineCountFor(index) },
@@ -703,6 +707,8 @@ function buildOutsourcingOrders(
           product_name_snapshot: materialSubject ? undefined : product.name,
           material_code_snapshot: materialSubject ? material.code : undefined,
           material_name_snapshot: materialSubject ? material.name : undefined,
+          processing_item:
+            processingItems[(offset + lineOffset) % processingItems.length],
           process_name_snapshot: processItem.name,
           process_category_snapshot: processItem.category,
           outsourcing_quantity: String(quantity),
@@ -719,7 +725,15 @@ function buildOutsourcingOrders(
     return {
       outsourcing_order_no: `${prefix}-WW-${pad(index, 3)}`,
       supplierRef: supplier.code,
-      supplier_snapshot: { name: supplier.name, simulated_only: true },
+      supplier_snapshot: {
+        name: supplier.name,
+        short_name: supplier.short_name,
+        contact_name: supplierContact?.name || "演示联系人",
+        contact_phone: "0769-00000000",
+        address: "演示加工地址",
+        signer_name: supplierContact?.name || "演示联系人",
+        simulated_only: true,
+      },
       contract_party_snapshot: {
         buyerCompany: "永绅演示工厂",
         buyerContact: "生产部",
@@ -2331,9 +2345,7 @@ export async function advancePurchaseOrderLifecycleThroughProcess({
       ].join(":"),
       invoke: ({ actor, domain, method, params }) => {
         const actorToken =
-          actor === "source" || actor === "admin"
-            ? token
-            : roleTokens[actor];
+          actor === "source" || actor === "admin" ? token : roleTokens[actor];
         if (!actorToken) {
           throw new CliError(
             `no trial account can perform ${domain}.${method} as ${actor}`,
@@ -2353,9 +2365,7 @@ export async function advancePurchaseOrderLifecycleThroughProcess({
       approvalActorForRole: (roleKey) =>
         roleTokens[roleKey] ? roleKey : undefined,
     });
-    status = String(
-      result.purchaseOrder.lifecycle_status || "",
-    ).toUpperCase();
+    status = String(result.purchaseOrder.lifecycle_status || "").toUpperCase();
     report.steps.push({
       target: "material_supply",
       key: orderNo,
@@ -2992,6 +3002,7 @@ async function createSourceDocuments({
       "product_name_snapshot",
       "material_code_snapshot",
       "material_name_snapshot",
+      "processing_item",
       "process_name_snapshot",
       "process_category_snapshot",
       "unit_name_snapshot",
@@ -3790,11 +3801,7 @@ export async function applyManualAcceptanceSourceData(
           (candidate) => candidate.orderNo === record.order_no,
         );
         const status = String(order?.lifecycle_status || "").toUpperCase();
-        if (
-          !order?.id ||
-          !replay ||
-          !replay.allowedStatuses.includes(status)
-        ) {
+        if (!order?.id || !replay || !replay.allowedStatuses.includes(status)) {
           throw new CliError(
             `${record.order_no} process candidate is outside its exact forward-only replay states`,
           );
