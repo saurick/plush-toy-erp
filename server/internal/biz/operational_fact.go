@@ -653,11 +653,20 @@ type OperationalFactShipmentActorRepo interface {
 	ShipShipmentWithActor(ctx context.Context, id int, actorID int) (*Shipment, error)
 }
 
-// ProductionFactSourceTaskDependencyRepo lets the service apply the Workflow
-// module gate only to the production fact types that atomically create a
-// source task. The repository remains the truth for source classification.
-type ProductionFactSourceTaskDependencyRepo interface {
-	ProductionFactRequiresSourceTask(ctx context.Context, id int) (bool, error)
+// ProductionFactTransitionPolicy is the immutable server-side classification
+// used to authorize a production fact transition before mutating it.
+type ProductionFactTransitionPolicy struct {
+	FactType           string
+	Status             string
+	WasPosted          bool
+	RequiresSourceTask bool
+}
+
+// ProductionFactTransitionPolicyRepo keeps fact type, current status and
+// Workflow dependency classification in the repository truth. The service
+// uses the result to separate production reporting from warehouse inbound.
+type ProductionFactTransitionPolicyRepo interface {
+	GetProductionFactTransitionPolicy(ctx context.Context, id int) (*ProductionFactTransitionPolicy, error)
 }
 
 // ShipmentReleaseSourceRepo owns the DRAFT shipment lock and creates the
@@ -1098,15 +1107,29 @@ func (uc *OperationalFactUsecase) SubmitShipmentRelease(ctx context.Context, id 
 	return repo.SubmitShipmentRelease(ctx, id, actorID)
 }
 
-func (uc *OperationalFactUsecase) ProductionFactRequiresSourceTask(ctx context.Context, id int) (bool, error) {
+func (uc *OperationalFactUsecase) GetProductionFactTransitionPolicy(ctx context.Context, id int) (*ProductionFactTransitionPolicy, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
-		return false, ErrBadParam
+		return nil, ErrBadParam
 	}
-	repo, ok := uc.repo.(ProductionFactSourceTaskDependencyRepo)
+	repo, ok := uc.repo.(ProductionFactTransitionPolicyRepo)
 	if !ok {
-		return false, nil
+		return nil, ErrBadParam
 	}
-	return repo.ProductionFactRequiresSourceTask(ctx, id)
+	policy, err := repo.GetProductionFactTransitionPolicy(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if policy == nil {
+		return nil, ErrBadParam
+	}
+	if _, ok := productionFactTypes[policy.FactType]; !ok {
+		return nil, ErrBadParam
+	}
+	if _, ok := postedOperationalFactStatuses[policy.Status]; !ok {
+		return nil, ErrBadParam
+	}
+	copy := *policy
+	return &copy, nil
 }
 
 func (uc *OperationalFactUsecase) ValidateShipmentReleaseForShipping(ctx context.Context, id int) error {

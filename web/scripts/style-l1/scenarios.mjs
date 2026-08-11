@@ -5370,6 +5370,10 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
         await expectText(page, '当前账号有多个岗位')
+        await expectText(
+          page,
+          '这里仅切换说明内容，不会改变当前登录账号的岗位或权限'
+        )
         await expectText(page, '采购')
         await expectText(page, '正常办理案例')
         await expectText(page, '异常完成标准')

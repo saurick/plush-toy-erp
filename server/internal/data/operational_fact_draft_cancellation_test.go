@@ -42,9 +42,17 @@ func TestProductionOrderLinkedDraftFactsCancelWithoutInventory(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		policy, err := factUC.GetProductionFactTransitionPolicy(ctx, fact.ID)
+		if err != nil || policy.FactType != biz.ProductionFactFinishedGoodsReceipt || policy.Status != biz.OperationalFactStatusDraft || policy.WasPosted || policy.RequiresSourceTask {
+			t.Fatalf("draft completion transition policy=%#v err=%v", policy, err)
+		}
 		cancelled, err := factUC.CancelPostedProductionFact(ctx, operationalFactStatusMutation(fact.ID, fact.Version, f.actorID, "完工入库草稿作废"))
 		if err != nil || cancelled.Status != biz.OperationalFactStatusCancelled || cancelled.PostedAt != nil {
 			t.Fatalf("draft completion cancel=%#v err=%v", cancelled, err)
+		}
+		policy, err = factUC.GetProductionFactTransitionPolicy(ctx, fact.ID)
+		if err != nil || policy.Status != biz.OperationalFactStatusCancelled || policy.WasPosted {
+			t.Fatalf("cancelled draft completion transition policy=%#v err=%v", policy, err)
 		}
 		assertOperationalFactHasZeroInventoryTxns(t, ctx, f.client, biz.ProductionFactSourceType, fact.ID)
 		closeReason := "草稿事实已撤销"

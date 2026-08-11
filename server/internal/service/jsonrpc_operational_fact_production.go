@@ -87,24 +87,24 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		var permission string
+		var permissions []string
 		var modules []string
 		var save func(context.Context, *biz.ProductionFactDraftSave) (*biz.ProductionFact, error)
 		switch method {
 		case "save_production_material_issue_draft":
-			permission = biz.PermissionProductionMaterialIssueCreate
+			permissions = []string{biz.PermissionProductionMaterialIssueCreate}
 			modules = []string{"production", "production_orders"}
 			save = d.operationalFactUC.SaveProductionMaterialIssueDraft
 		case "save_production_completion_draft":
-			permission = biz.PermissionProductionCompletionCreate
+			permissions = []string{biz.PermissionProductionCompletionCreate, biz.PermissionWarehouseInboundConfirm}
 			modules = []string{"production", "production_orders"}
 			save = d.operationalFactUC.SaveProductionCompletionDraft
 		case "save_production_rework_from_completion_draft":
-			permission = biz.PermissionProductionReworkCreate
+			permissions = []string{biz.PermissionProductionReworkCreate}
 			modules = []string{"production", "production_orders", "quality_inspections", workflowModuleKeyTasks}
 			save = d.operationalFactUC.SaveProductionReworkFromCompletionDraft
 		}
-		if res := d.RequireAdminPermission(ctx, permission); res != nil {
+		if res := d.RequireAdminAnyPermission(ctx, permissions...); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
@@ -126,19 +126,26 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		if res := d.RequireAdminPermission(ctx, biz.PermissionProductionFactPost); res != nil {
+		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionProductionFactPost, biz.PermissionWarehouseInboundConfirm); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
 			return id, res, nil
 		}
 		factID := mutation.ID
-		requiresSourceTask, err := d.operationalFactUC.ProductionFactRequiresSourceTask(ctx, factID)
+		policy, err := d.operationalFactUC.GetProductionFactTransitionPolicy(ctx, factID)
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
+		permission := biz.PermissionProductionFactPost
+		if policy.FactType == biz.ProductionFactFinishedGoodsReceipt {
+			permission = biz.PermissionWarehouseInboundConfirm
+		}
+		if res := d.RequireAdminPermission(ctx, permission); res != nil {
+			return id, res, nil
+		}
 		modules := []string{"production"}
-		if requiresSourceTask {
+		if policy.RequiresSourceTask {
 			modules = append(modules, "production_orders", "quality_inspections", workflowModuleKeyTasks)
 		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), modules...); res != nil {
@@ -154,16 +161,24 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		if res := d.RequireAdminPermission(ctx, biz.PermissionProductionFactCancel); res != nil {
+		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionProductionFactCancel, biz.PermissionWarehouseInboundConfirm); res != nil {
 			return id, res, nil
 		}
 		factID := mutation.ID
-		requiresSourceTask, err := d.operationalFactUC.ProductionFactRequiresSourceTask(ctx, factID)
+		policy, err := d.operationalFactUC.GetProductionFactTransitionPolicy(ctx, factID)
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
+		permission := biz.PermissionProductionFactCancel
+		if policy.FactType == biz.ProductionFactFinishedGoodsReceipt &&
+			(policy.Status == biz.OperationalFactStatusPosted || policy.WasPosted) {
+			permission = biz.PermissionWarehouseInboundConfirm
+		}
+		if res := d.RequireAdminPermission(ctx, permission); res != nil {
+			return id, res, nil
+		}
 		modules := []string{"production"}
-		if requiresSourceTask {
+		if policy.RequiresSourceTask {
 			modules = append(modules, "production_orders", "quality_inspections", workflowModuleKeyTasks)
 		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), modules...); res != nil {

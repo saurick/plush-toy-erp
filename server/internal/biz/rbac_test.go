@@ -283,7 +283,7 @@ func TestBuiltinRoleOperationalFactPermissionProjection(t *testing.T) {
 	assertPermissionSetOmits(t, sales, PermissionProductionWIPAssign, PermissionProductionWIPExecute, PermissionProductionWIPRework)
 
 	warehouse := builtinRolePermissionSet(t, WarehouseRoleKey)
-	assertPermissionSetContains(t, warehouse, PermissionStockReservationCreate, PermissionStockReservationRelease)
+	assertPermissionSetContains(t, warehouse, PermissionStockReservationCreate, PermissionStockReservationRelease, PermissionProductionFactRead, PermissionProductionWIPRead, PermissionWarehouseInboundConfirm)
 	assertPermissionSetOmits(t, warehouse, PermissionProductionCompletionCreate, PermissionProductionMaterialIssueCreate, PermissionProductionFactPost, PermissionProductionFactCancel)
 
 	quality := builtinRolePermissionSet(t, QualityRoleKey)

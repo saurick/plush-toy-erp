@@ -50,7 +50,7 @@ func TestOutsourcingFactDraftSaveParamsRequireOccurredAtAndLotContract(t *testin
 func TestDraftSaveMethodsHaveExactSourceReadContracts(t *testing.T) {
 	expected := map[string][]string{
 		"save_production_material_issue_draft":         {biz.PermissionPMCPlanRead},
-		"save_production_completion_draft":             {biz.PermissionPMCPlanRead},
+		"save_production_completion_draft":             {biz.PermissionProductionWIPRead},
 		"save_production_rework_from_completion_draft": {biz.PermissionProductionFactRead, biz.PermissionPMCPlanRead},
 		"save_outsourcing_material_issue_draft":        {biz.PermissionOutsourcingOrderRead},
 		"save_outsourcing_return_receipt_draft":        {biz.PermissionOutsourcingOrderRead},

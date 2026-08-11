@@ -351,6 +351,10 @@ func TestOperationalFactUsecase_RejectsInactiveNewReferencesAndKeepsHistoricalAc
 	} else if cancelled.Status != biz.OperationalFactStatusCancelled {
 		t.Fatalf("expected cancelled production fact, got %s", cancelled.Status)
 	}
+	policy, err := uc.GetProductionFactTransitionPolicy(ctx, postedFact.ID)
+	if err != nil || policy.FactType != biz.ProductionFactFinishedGoodsReceipt || policy.Status != biz.OperationalFactStatusCancelled || !policy.WasPosted || policy.RequiresSourceTask {
+		t.Fatalf("cancelled posted completion transition policy=%#v err=%v", policy, err)
+	}
 	if released, err := uc.ReleaseStockReservation(ctx, reservation.ID); err != nil {
 		t.Fatalf("release reservation should not be blocked by inactive product: %v", err)
 	} else if released.Status != biz.StockReservationStatusReleased {

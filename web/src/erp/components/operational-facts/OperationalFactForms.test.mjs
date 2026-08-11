@@ -74,6 +74,20 @@ test('OperationalFactForms keeps outsourcing fact permissions exact', () => {
   )
 })
 
+test('OperationalFactForms separates production reporting from warehouse finished-goods inbound', () => {
+  assert.match(
+    source,
+    /productionPost:\s*\['production\.fact\.post', 'warehouse\.inbound\.confirm'\]/u
+  )
+  assert.match(source, /productionFactPostPermissions/u)
+  assert.match(source, /productionFactCancelPermissions/u)
+  assert.match(source, /FINISHED_GOODS_RECEIPT/u)
+  assert.match(
+    source,
+    /isFinishedGoodsReceipt\(record\)[\s\S]*\['warehouse\.inbound\.confirm'\]/u
+  )
+})
+
 test('OperationalFactForms formats fact decimals without Number rounding', () => {
   assert.match(source, /formatOperationalFactDecimal/u)
   assert.match(

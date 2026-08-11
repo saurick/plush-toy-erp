@@ -188,5 +188,238 @@ export function createProductionReworkScenarios(deps) {
         )
       },
     },
+    {
+      name: 'production-completion-warehouse-inbound-permissions-desktop',
+      path: '/erp/production/progress',
+      auth: 'admin',
+      viewport: { width: 1440, height: 900 },
+      adminProfile: {
+        username: 'style-l1-warehouse-inbound',
+        is_super_admin: false,
+        roles: [{ role_key: 'warehouse', name: '仓库' }],
+        permissions: [
+          'production.fact.read',
+          'production.wip.read',
+          'warehouse.inbound.confirm',
+        ],
+        menus: [
+          {
+            key: 'production-progress',
+            label: '生产进度',
+            path: '/erp/production/progress',
+            required_any: ['production.fact.read'],
+            required_all: [],
+          },
+        ],
+        erp_preferences: {
+          column_orders: {},
+        },
+      },
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        pages: ['production-progress'],
+        actions: [
+          'production.fact.read',
+          'production.wip.read',
+          'warehouse.inbound.confirm',
+        ],
+      },
+      verify: async (page) => {
+        await expectHeading(page, '生产进度')
+        await expectText(page, '生产岗位在这里维护领料、返工和待入库完工报告')
+
+        const draftCompletionRow = page
+          .locator(
+            '.erp-business-data-table-card .ant-table-tbody .ant-table-row'
+          )
+          .filter({ hasText: 'PROD-FACT-L1' })
+          .first()
+        await draftCompletionRow.click()
+        await draftCompletionRow
+          .and(page.locator('.ant-table-row-selected'))
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        const confirmInboundButton = page
+          .locator('button:visible')
+          .filter({ hasText: '确认成品入库' })
+          .last()
+        const withdrawDraftButton = page
+          .locator('button:visible')
+          .filter({ hasText: '作废完工报告' })
+          .last()
+        const visibleActionLabels = await page
+          .locator('button:visible')
+          .allInnerTexts()
+        assert(
+          (await confirmInboundButton.count()) > 0,
+          `仓库选择待入库完工报告后缺少确认入口: ${JSON.stringify(visibleActionLabels)}`
+        )
+        await confirmInboundButton.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        await withdrawDraftButton.waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(await confirmInboundButton.isEnabled(), true)
+        assert.equal(
+          await withdrawDraftButton.isDisabled(),
+          true,
+          '仓库可以确认待入库完工报告，但不能代替生产撤回报告'
+        )
+
+        const postedCompletionRow = page
+          .locator(
+            '.erp-business-data-table-card .ant-table-tbody .ant-table-row'
+          )
+          .filter({ hasText: 'PROD-FG-POSTED-L1' })
+          .first()
+        await postedCompletionRow.click()
+        await postedCompletionRow
+          .and(page.locator('.ant-table-row-selected'))
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        const reverseInboundButton = page
+          .locator('button:visible')
+          .filter({ hasText: '撤销成品入库' })
+          .last()
+        await reverseInboundButton.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        assert.equal(await reverseInboundButton.isEnabled(), true)
+        assert.equal(
+          await confirmInboundButton.isDisabled(),
+          true,
+          '已入库记录不能重复确认'
+        )
+
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'production-completion-warehouse-inbound-permissions-desktop.png'
+          ),
+          fullPage: true,
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'production-completion-warehouse-inbound-permissions-desktop'
+        )
+      },
+    },
+    {
+      name: 'production-completion-reporting-permissions-desktop',
+      path: '/erp/production/progress',
+      auth: 'admin',
+      viewport: { width: 1440, height: 900 },
+      adminProfile: {
+        username: 'style-l1-production-reporting',
+        is_super_admin: false,
+        roles: [{ role_key: 'production', name: '生产' }],
+        permissions: [
+          'production.fact.read',
+          'production.fact.post',
+          'production.fact.cancel',
+          'production.completion.create',
+          'production.wip.read',
+        ],
+        menus: [
+          {
+            key: 'production-progress',
+            label: '生产进度',
+            path: '/erp/production/progress',
+            required_any: ['production.fact.read'],
+            required_all: [],
+          },
+        ],
+        erp_preferences: {
+          column_orders: {},
+        },
+      },
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        pages: ['production-progress'],
+        actions: [
+          'production.fact.read',
+          'production.fact.post',
+          'production.fact.cancel',
+          'production.completion.create',
+          'production.wip.read',
+        ],
+      },
+      verify: async (page) => {
+        await expectHeading(page, '生产进度')
+        const draftCompletionRow = page
+          .locator(
+            '.erp-business-data-table-card .ant-table-tbody .ant-table-row'
+          )
+          .filter({ hasText: 'PROD-FACT-L1' })
+          .first()
+        await draftCompletionRow.click()
+        await draftCompletionRow
+          .and(page.locator('.ant-table-row-selected'))
+          .waitFor({ state: 'visible', timeout: 10_000 })
+
+        const confirmInboundButton = page
+          .locator('button:visible')
+          .filter({ hasText: '确认成品入库' })
+          .last()
+        const withdrawDraftButton = page
+          .locator('button:visible')
+          .filter({ hasText: '作废完工报告' })
+          .last()
+        await confirmInboundButton.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        await withdrawDraftButton.waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          await confirmInboundButton.isDisabled(),
+          true,
+          '生产提交完工报告后不能自行确认成品入库'
+        )
+        assert.equal(await withdrawDraftButton.isEnabled(), true)
+
+        await withdrawDraftButton.click()
+        const withdrawModal = page
+          .locator('.ant-modal:visible')
+          .filter({ hasText: '作废生产完工报告' })
+          .last()
+        await withdrawModal.waitFor({ state: 'visible', timeout: 10_000 })
+        await expectText(page, '完工报告尚未由仓库确认，作废不会变更成品库存')
+        await withdrawModal.screenshot({
+          path: path.resolve(
+            outputDir,
+            'production-completion-reporting-withdraw-desktop.png'
+          ),
+        })
+        await withdrawModal.getByRole('button', { name: '暂不取消' }).click()
+        await withdrawModal.waitFor({ state: 'hidden', timeout: 10_000 })
+
+        const postedCompletionRow = page
+          .locator(
+            '.erp-business-data-table-card .ant-table-tbody .ant-table-row'
+          )
+          .filter({ hasText: 'PROD-FG-POSTED-L1' })
+          .first()
+        await postedCompletionRow.click()
+        await postedCompletionRow
+          .and(page.locator('.ant-table-row-selected'))
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        const reverseInboundButton = page
+          .locator('button:visible')
+          .filter({ hasText: '撤销成品入库' })
+          .last()
+        await reverseInboundButton.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        assert.equal(
+          await reverseInboundButton.isDisabled(),
+          true,
+          '生产不能撤销仓库已经确认的成品入库'
+        )
+        await assertNoHorizontalOverflow(
+          page,
+          'production-completion-reporting-permissions-desktop'
+        )
+      },
+    },
   ]
 }

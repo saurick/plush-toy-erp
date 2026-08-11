@@ -51,7 +51,7 @@ var publicSourceActionReadPermissionContracts = []SourceActionReadPermissionCont
 	{Domain: "operational_fact", Method: "create_production_completion_from_order", Rules: sourceReadRules(PermissionPMCPlanRead)},
 	{Domain: "operational_fact", Method: "create_production_material_issue_from_order", Rules: sourceReadRules(PermissionPMCPlanRead)},
 	{Domain: "operational_fact", Method: "create_production_rework_from_completion", Rules: sourceReadRules(PermissionProductionFactRead, PermissionPMCPlanRead)},
-	{Domain: "operational_fact", Method: "save_production_completion_draft", Rules: sourceReadRules(PermissionPMCPlanRead)},
+	{Domain: "operational_fact", Method: "save_production_completion_draft", Rules: sourceReadRules(PermissionProductionWIPRead)},
 	{Domain: "operational_fact", Method: "save_production_material_issue_draft", Rules: sourceReadRules(PermissionPMCPlanRead)},
 	{Domain: "operational_fact", Method: "save_production_rework_from_completion_draft", Rules: sourceReadRules(PermissionProductionFactRead, PermissionPMCPlanRead)},
 	{Domain: "operational_fact", Method: "post_production_fact", Rules: sourceReadRules(PermissionProductionFactRead)},

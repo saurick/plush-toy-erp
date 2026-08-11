@@ -295,7 +295,7 @@ export function financeSettlementActionFor(factType) {
 export function buildOperationalFactViewConfigs() {
   return {
     production: {
-      title: '生产记录',
+      title: '生产记录与成品入库',
       listKey: 'production_facts',
       list: listProductionFacts,
       listAll: listAllProductionFacts,

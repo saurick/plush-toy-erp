@@ -377,11 +377,11 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '进度',
     pageKind: 'formal-v1',
     description:
-      '生产进度用于处理生产发料、成品入库和返工记录；所有记录必须从明确的业务来源生成。',
+      '生产进度用于处理生产发料、返工和待入库完工报告；生产提交完工报告，仓库核对实收后确认成品入库。',
     primaryEntity: 'production_facts',
     factSource: 'production_facts, inventory_txns',
     boundary:
-      '任务标记为完成不会自动生成生产发料、成品入库或返工记录；生产排程和异常也不会自动生成出货、应收或发票记录。',
+      '任务标记为完成不会自动生成生产发料、完工报告、成品入库或返工记录；完工报告草稿不变更库存，仓库确认入库后才写入库存。',
     sourceRefs: [
       'production_orders',
       'production_order_items',
@@ -390,12 +390,12 @@ export const businessModuleDefinitions = Object.freeze([
       'workflow_tasks',
     ],
     currentScope: [
-      '从已发布生产订单生成领料 / 完工草稿',
+      '从已发布生产订单生成领料草稿 / 待入库完工报告',
       '生产发料',
-      '成品入库',
+      '仓库核对并确认成品入库',
       '返工',
       '返工记录过账时原子生成生产异常待办',
-      '确认后更新库存，取消后生成撤销调整记录',
+      '仓库确认入库后更新成品库存，撤销后生成冲正记录',
     ],
   },
   {

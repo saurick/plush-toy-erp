@@ -453,6 +453,7 @@ test("customer-config-runtime-manifest: source action projections stay within Pr
   assert(entitlementsFor("pmc").has("production.wip.read"));
 
   assert(pages.warehouse.includes("inbound"));
+  assert(pages.warehouse.includes("production-progress"));
   const warehouse = entitlementsFor("warehouse");
   for (const key of [
     "purchase.return.read",
@@ -463,6 +464,9 @@ test("customer-config-runtime-manifest: source action projections stay within Pr
     "purchase.receipt.adjustment.create",
     "purchase.receipt.adjustment.post",
     "purchase.receipt.adjustment.cancel",
+    "production.fact.read",
+    "production.wip.read",
+    "warehouse.inbound.confirm",
   ]) {
     assert(warehouse.has(key), `warehouse must receive ${key}`);
   }

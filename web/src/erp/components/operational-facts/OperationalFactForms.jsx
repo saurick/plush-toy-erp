@@ -73,8 +73,8 @@ export const FINANCE_INVOICE_CATEGORY_LABELS = Object.freeze(
 
 export const ACTION_PERMISSIONS = Object.freeze({
   productionRead: ['production.fact.read'],
-  productionPost: ['production.fact.post'],
-  productionCancel: ['production.fact.cancel'],
+  productionPost: ['production.fact.post', 'warehouse.inbound.confirm'],
+  productionCancel: ['production.fact.cancel', 'warehouse.inbound.confirm'],
   outsourcingRead: ['outsourcing.fact.read'],
   outsourcingPost: ['outsourcing.fact.post'],
   outsourcingCancel: ['outsourcing.fact.cancel'],
@@ -88,6 +88,31 @@ export function hasAnyPermission(adminProfile, permissions = []) {
   return permissions.some((permission) =>
     hasActionPermission(adminProfile, permission)
   )
+}
+
+export function isFinishedGoodsReceipt(record = {}) {
+  return (
+    String(record?.fact_type || '')
+      .trim()
+      .toUpperCase() === 'FINISHED_GOODS_RECEIPT'
+  )
+}
+
+export function productionFactPostPermissions(record) {
+  if (!record) return ACTION_PERMISSIONS.productionPost
+  return isFinishedGoodsReceipt(record)
+    ? ['warehouse.inbound.confirm']
+    : ['production.fact.post']
+}
+
+export function productionFactCancelPermissions(record) {
+  if (!record) return ACTION_PERMISSIONS.productionCancel
+  const status = String(record?.status || '')
+    .trim()
+    .toUpperCase()
+  return isFinishedGoodsReceipt(record) && status === 'POSTED'
+    ? ['warehouse.inbound.confirm']
+    : ['production.fact.cancel']
 }
 
 export function statusTag(status) {

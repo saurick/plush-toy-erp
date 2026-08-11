@@ -915,11 +915,12 @@ func TestJsonrpcDispatcher_FinanceFactListUsesReadScope(t *testing.T) {
 func TestJsonrpcDispatcher_ProductionFactAPIRequiresEnabledModule(t *testing.T) {
 	ctx := workflowJSONRPCAdminContext()
 	admin := workflowJSONRPCAdmin(
-		[]string{biz.ProductionRoleKey},
+		[]string{biz.ProductionRoleKey, biz.WarehouseRoleKey},
 		biz.PermissionProductionCompletionCreate,
 		biz.PermissionProductionFactPost,
 		biz.PermissionProductionFactCancel,
 		biz.PermissionProductionFactRead,
+		biz.PermissionWarehouseInboundConfirm,
 		biz.PermissionPMCPlanRead,
 	)
 	repo := &productionModuleGateOperationalFactRepo{}
@@ -1024,6 +1025,126 @@ func TestJsonrpcDispatcher_ProductionFactAPIRequiresEnabledModule(t *testing.T) 
 	}
 	if repo.postProductionFactCalls != 1 || repo.cancelProductionFactCalls != 1 {
 		t.Fatalf("disabled production must not call post/cancel again, post=%d cancel=%d", repo.postProductionFactCalls, repo.cancelProductionFactCalls)
+	}
+}
+
+func TestJsonrpcDispatcher_ProductionCompletionSeparatesReportingFromWarehouseInbound(t *testing.T) {
+	ctx := workflowJSONRPCAdminContext()
+	activateEnabledProduction := func(dispatcher *jsonrpcDispatcher, revision string) {
+		t.Helper()
+		activateOperationalFactTestCustomerConfig(t, dispatcher, customerConfigPublishParamsWithRevisionAndModuleState(
+			t,
+			customerConfigPublishParams(t),
+			revision,
+			"production",
+			"enabled",
+		))
+	}
+
+	productionRepo := &productionModuleGateOperationalFactRepo{}
+	productionDispatcher := newOperationalFactJSONRPCTestDataWithRepo(t, workflowJSONRPCAdmin(
+		[]string{biz.ProductionRoleKey},
+		biz.PermissionProductionFactRead,
+		biz.PermissionProductionFactPost,
+		biz.PermissionProductionFactCancel,
+	), productionRepo)
+	activateEnabledProduction(productionDispatcher, "2026.08.11.production-completion-production")
+	_, deniedPost, err := productionDispatcher.handleOperationalFact(ctx, "post_production_fact", "production-cannot-confirm-inbound", mustJSONRPCStruct(t, map[string]any{
+		"id": 600, "expected_version": 1,
+	}))
+	if err != nil {
+		t.Fatalf("production completion post transport error: %v", err)
+	}
+	if deniedPost == nil || deniedPost.Code != errcode.PermissionDenied.Code || productionRepo.postProductionFactCalls != 0 {
+		t.Fatalf("production role confirmed finished-goods inbound: result=%#v calls=%d", deniedPost, productionRepo.postProductionFactCalls)
+	}
+	_, cancelledDraft, err := productionDispatcher.handleOperationalFact(ctx, "cancel_production_fact", "production-withdraws-draft-report", mustJSONRPCStruct(t, map[string]any{
+		"id": 600, "expected_version": 1, "reason": "完工数量填错，撤回重报",
+	}))
+	if err != nil {
+		t.Fatalf("production draft cancellation transport error: %v", err)
+	}
+	if cancelledDraft == nil || cancelledDraft.Code != errcode.OK.Code || productionRepo.cancelProductionFactCalls != 1 {
+		t.Fatalf("production role could not withdraw draft completion report: result=%#v calls=%d", cancelledDraft, productionRepo.cancelProductionFactCalls)
+	}
+
+	warehouseRepo := &productionModuleGateOperationalFactRepo{}
+	warehouseDispatcher := newOperationalFactJSONRPCTestDataWithRepo(t, workflowJSONRPCAdmin(
+		[]string{biz.WarehouseRoleKey},
+		biz.PermissionProductionFactRead,
+		biz.PermissionProductionWIPRead,
+		biz.PermissionWarehouseInboundConfirm,
+	), warehouseRepo)
+	activateEnabledProduction(warehouseDispatcher, "2026.08.11.production-completion-warehouse")
+	_, saved, err := warehouseDispatcher.handleOperationalFact(ctx, "save_production_completion_draft", "warehouse-checks-completion", mustJSONRPCStruct(t, map[string]any{
+		"id": 601, "expected_version": 1, "warehouse_id": 2, "new_lot_no": "FG-20260811-001",
+		"quantity": "8", "occurred_at": "2026-08-11T10:00:00Z", "note": "仓库实收核对",
+	}))
+	if err != nil {
+		t.Fatalf("warehouse completion draft save transport error: %v", err)
+	}
+	if saved == nil || saved.Code != errcode.OK.Code || warehouseRepo.saveProductionFactDraftCalls != 1 {
+		t.Fatalf("warehouse role could not check completion draft: result=%#v calls=%d", saved, warehouseRepo.saveProductionFactDraftCalls)
+	}
+	_, posted, err := warehouseDispatcher.handleOperationalFact(ctx, "post_production_fact", "warehouse-confirms-inbound", mustJSONRPCStruct(t, map[string]any{
+		"id": 601, "expected_version": 2,
+	}))
+	if err != nil {
+		t.Fatalf("warehouse inbound post transport error: %v", err)
+	}
+	if posted == nil || posted.Code != errcode.OK.Code || warehouseRepo.postProductionFactCalls != 1 {
+		t.Fatalf("warehouse role could not confirm finished-goods inbound: result=%#v calls=%d", posted, warehouseRepo.postProductionFactCalls)
+	}
+	_, reversed, err := warehouseDispatcher.handleOperationalFact(ctx, "cancel_production_fact", "warehouse-reverses-inbound", mustJSONRPCStruct(t, map[string]any{
+		"id": 601, "expected_version": 3, "reason": "实收批次核对有误",
+	}))
+	if err != nil {
+		t.Fatalf("warehouse inbound reversal transport error: %v", err)
+	}
+	if reversed == nil || reversed.Code != errcode.OK.Code || warehouseRepo.cancelProductionFactCalls != 1 {
+		t.Fatalf("warehouse role could not reverse finished-goods inbound: result=%#v calls=%d", reversed, warehouseRepo.cancelProductionFactCalls)
+	}
+
+	warehouseMaterialRepo := &productionModuleGateOperationalFactRepo{
+		factTypes: map[int]string{602: biz.ProductionFactMaterialIssue},
+	}
+	warehouseMaterialDispatcher := newOperationalFactJSONRPCTestDataWithRepo(t, workflowJSONRPCAdmin(
+		[]string{biz.WarehouseRoleKey},
+		biz.PermissionProductionFactRead,
+		biz.PermissionWarehouseInboundConfirm,
+	), warehouseMaterialRepo)
+	activateEnabledProduction(warehouseMaterialDispatcher, "2026.08.11.production-completion-warehouse-material")
+	_, deniedMaterial, err := warehouseMaterialDispatcher.handleOperationalFact(ctx, "post_production_fact", "warehouse-cannot-post-material-issue", mustJSONRPCStruct(t, map[string]any{
+		"id": 602, "expected_version": 1,
+	}))
+	if err != nil {
+		t.Fatalf("warehouse material issue post transport error: %v", err)
+	}
+	if deniedMaterial == nil || deniedMaterial.Code != errcode.PermissionDenied.Code || warehouseMaterialRepo.postProductionFactCalls != 0 {
+		t.Fatalf("warehouse inbound permission posted a material issue: result=%#v calls=%d", deniedMaterial, warehouseMaterialRepo.postProductionFactCalls)
+	}
+
+	productionMaterialRepo := &productionModuleGateOperationalFactRepo{
+		factTypes: map[int]string{603: biz.ProductionFactMaterialIssue},
+	}
+	productionMaterialDispatcher := newOperationalFactJSONRPCTestDataWithRepo(t, workflowJSONRPCAdmin(
+		[]string{biz.ProductionRoleKey},
+		biz.PermissionProductionFactRead,
+		biz.PermissionProductionFactPost,
+		biz.PermissionProductionFactCancel,
+	), productionMaterialRepo)
+	activateEnabledProduction(productionMaterialDispatcher, "2026.08.11.production-completion-production-material")
+	_, materialPosted, err := productionMaterialDispatcher.handleOperationalFact(ctx, "post_production_fact", "production-posts-material-issue", mustJSONRPCStruct(t, map[string]any{
+		"id": 603, "expected_version": 1,
+	}))
+	if err != nil || materialPosted == nil || materialPosted.Code != errcode.OK.Code {
+		t.Fatalf("production material issue post failed: result=%#v err=%v", materialPosted, err)
+	}
+	_, materialCancelled, err := productionMaterialDispatcher.handleOperationalFact(ctx, "cancel_production_fact", "production-cancels-material-issue", mustJSONRPCStruct(t, map[string]any{
+		"id": 603, "expected_version": 2, "reason": "领料登记有误",
+	}))
+	if err != nil || materialCancelled == nil || materialCancelled.Code != errcode.OK.Code {
+		t.Fatalf("production material issue cancellation failed: result=%#v err=%v", materialCancelled, err)
 	}
 }
 
@@ -2063,15 +2184,35 @@ type productionModuleGateOperationalFactRepo struct {
 	stubBusinessDashboardOperationalFactRepo
 	createProductionFactCalls          int
 	createProductionMaterialIssueCalls int
+	saveProductionFactDraftCalls       int
 	postProductionFactCalls            int
 	cancelProductionFactCalls          int
 	sourceTaskFactIDs                  map[int]bool
+	factTypes                          map[int]string
+	factStatuses                       map[int]string
+	postedFactIDs                      map[int]bool
 	lastProductionFactCreate           *biz.OperationalFactMutation
 	lastProductionMaterialIssueCreate  *biz.ProductionMaterialIssueFromOrderCreate
 }
 
-func (r *productionModuleGateOperationalFactRepo) ProductionFactRequiresSourceTask(_ context.Context, id int) (bool, error) {
-	return r.sourceTaskFactIDs[id], nil
+func (r *productionModuleGateOperationalFactRepo) GetProductionFactTransitionPolicy(_ context.Context, id int) (*biz.ProductionFactTransitionPolicy, error) {
+	factType := biz.ProductionFactFinishedGoodsReceipt
+	if r.sourceTaskFactIDs[id] {
+		factType = biz.ProductionFactRework
+	}
+	if value := r.factTypes[id]; value != "" {
+		factType = value
+	}
+	status := biz.OperationalFactStatusDraft
+	if value := r.factStatuses[id]; value != "" {
+		status = value
+	}
+	return &biz.ProductionFactTransitionPolicy{
+		FactType:           factType,
+		Status:             status,
+		WasPosted:          r.postedFactIDs[id],
+		RequiresSourceTask: r.sourceTaskFactIDs[id],
+	}, nil
 }
 
 func (r *productionModuleGateOperationalFactRepo) CreateProductionMaterialIssueFromOrder(_ context.Context, in *biz.ProductionMaterialIssueFromOrderCreate) (*biz.ProductionFact, error) {
@@ -2153,8 +2294,37 @@ func (r *productionModuleGateOperationalFactRepo) CreateProductionFactDraft(_ co
 	}, nil
 }
 
+func (r *productionModuleGateOperationalFactRepo) SaveProductionFactDraft(_ context.Context, in *biz.ProductionFactDraftSave) (*biz.ProductionFact, error) {
+	r.saveProductionFactDraftCalls++
+	now := time.Now()
+	return &biz.ProductionFact{
+		ID:          in.ID,
+		FactNo:      "PROD-MODULE-GATE",
+		FactType:    in.FactType,
+		Status:      biz.OperationalFactStatusDraft,
+		Version:     in.ExpectedVersion + 1,
+		SubjectType: biz.InventorySubjectProduct,
+		SubjectID:   1,
+		WarehouseID: in.WarehouseID,
+		UnitID:      1,
+		LotID:       in.LotID,
+		Quantity:    in.Quantity,
+		OccurredAt:  in.OccurredAt,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}, nil
+}
+
 func (r *productionModuleGateOperationalFactRepo) PostProductionFact(_ context.Context, in *biz.OperationalFactStatusMutation) (*biz.ProductionFact, error) {
 	r.postProductionFactCalls++
+	if r.factStatuses == nil {
+		r.factStatuses = map[int]string{}
+	}
+	if r.postedFactIDs == nil {
+		r.postedFactIDs = map[int]bool{}
+	}
+	r.factStatuses[in.ID] = biz.OperationalFactStatusPosted
+	r.postedFactIDs[in.ID] = true
 	now := time.Now()
 	actorID := in.ActorID
 	return &biz.ProductionFact{
@@ -2178,6 +2348,10 @@ func (r *productionModuleGateOperationalFactRepo) PostProductionFact(_ context.C
 
 func (r *productionModuleGateOperationalFactRepo) CancelPostedProductionFact(_ context.Context, in *biz.OperationalFactStatusMutation) (*biz.ProductionFact, error) {
 	r.cancelProductionFactCalls++
+	if r.factStatuses == nil {
+		r.factStatuses = map[int]string{}
+	}
+	r.factStatuses[in.ID] = biz.OperationalFactStatusCancelled
 	now := time.Now()
 	actorID := in.ActorID
 	reason := in.Reason

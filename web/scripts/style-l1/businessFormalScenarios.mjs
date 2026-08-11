@@ -4359,7 +4359,7 @@ export function createBusinessFormalScenarios(deps) {
         })
         await expectHeading(page, '生产进度')
         await expectText(page, 'PROD-FACT-L1')
-        await expectText(page, '生产发料、成品入库和返工记录')
+        await expectText(page, '生产岗位在这里维护领料、返工和待入库完工报告')
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-v1-production-progress',
         })
@@ -4379,21 +4379,21 @@ export function createBusinessFormalScenarios(deps) {
           .waitFor({ state: 'visible' })
         const cancelProductionDraftButton = await findSelectionActionButton(
           page,
-          '作废草稿'
+          '作废完工报告'
         )
         assert.equal(await cancelProductionDraftButton.isDisabled(), false)
         await cancelProductionDraftButton.click()
         const cancelProductionDraftModal = page
           .locator('.ant-modal:visible')
-          .filter({ hasText: '作废业务草稿' })
+          .filter({ hasText: '作废生产完工报告' })
         await cancelProductionDraftModal.waitFor({ state: 'visible' })
         await cancelProductionDraftModal
           .locator('textarea')
           .fill('L1 回归：确认未过账生产草稿可追溯作废')
         await cancelProductionDraftModal
-          .getByRole('button', { name: '确认取消' })
+          .getByRole('button', { name: '作废完工报告' })
           .click()
-        await expectText(page, '作废业务草稿已完成')
+        await expectText(page, '作废生产完工报告已完成')
         await assertNoHorizontalOverflow(
           page,
           'business-v1-production-progress'

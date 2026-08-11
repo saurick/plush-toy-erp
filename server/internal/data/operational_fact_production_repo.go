@@ -1628,18 +1628,23 @@ func (r *operationalFactRepo) CancelPostedProductionFact(ctx context.Context, in
 	return r.postProductionFact(ctx, in, true)
 }
 
-func (r *operationalFactRepo) ProductionFactRequiresSourceTask(ctx context.Context, id int) (bool, error) {
+func (r *operationalFactRepo) GetProductionFactTransitionPolicy(ctx context.Context, id int) (*biz.ProductionFactTransitionPolicy, error) {
 	if id <= 0 {
-		return false, biz.ErrBadParam
+		return nil, biz.ErrBadParam
 	}
 	row, err := r.data.postgres.ProductionFact.Get(ctx, id)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return false, biz.ErrProductionFactNotFound
+			return nil, biz.ErrProductionFactNotFound
 		}
-		return false, err
+		return nil, err
 	}
-	return isProductionReworkLinkedFactRow(row), nil
+	return &biz.ProductionFactTransitionPolicy{
+		FactType:           row.FactType,
+		Status:             row.Status,
+		WasPosted:          row.PostedAt != nil,
+		RequiresSourceTask: isProductionReworkLinkedFactRow(row),
+	}, nil
 }
 
 func (r *operationalFactRepo) ListProductionFacts(ctx context.Context, filter biz.OperationalFactFilter) ([]*biz.ProductionFact, int, error) {

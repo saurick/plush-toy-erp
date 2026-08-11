@@ -178,6 +178,7 @@ test('roleHelpContent: 永绅岗位帮助只指导已开放且有权限的动作
   const financeGuide = getRoleHelpGuide('finance')
   const pmcCopy = JSON.stringify(getRoleHelpGuide('pmc'))
   const warehouseCopy = JSON.stringify(getRoleHelpGuide('warehouse'))
+  const warehouseGuide = getRoleHelpGuide('warehouse')
   const productionGuide = getRoleHelpGuide('production')
 
   assert.match(financeCopy, /收付款核销/u)
@@ -194,7 +195,17 @@ test('roleHelpContent: 永绅岗位帮助只指导已开放且有权限的动作
   )
   assert.doesNotMatch(pmcCopy, /发布生产订单/u)
   assert.doesNotMatch(warehouseCopy, /盘点、调拨|人工调整/u)
+  assert.match(warehouseCopy, /生产提交完工报告不等于成品已经入库/u)
+  assert(
+    warehouseGuide.priorities.some(
+      (priority) => priority.path === '/erp/production/progress'
+    )
+  )
   assert.equal(productionGuide.label, '生产 / 委外')
+  assert.match(
+    JSON.stringify(productionGuide),
+    /完工报告交给仓库核对实收并确认入库/u
+  )
   assert(
     productionGuide.priorities.some(
       (priority) => priority.path === '/erp/purchase/processing-contracts'

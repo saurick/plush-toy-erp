@@ -799,11 +799,14 @@ SQL
 INSERT INTO roles (id, role_key, name, description, builtin, role_type, version, created_at, updated_at)
 VALUES
   (910004, 'boss', 'QA legacy dashboard boss', '', true, 'business_default', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-  (910005, 'pmc', 'QA legacy dashboard PMC', '', true, 'business_default', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+  (910005, 'pmc', 'QA legacy dashboard PMC', '', true, 'business_default', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+  (910006, 'warehouse', 'QA legacy warehouse', '', true, 'business_default', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 INSERT INTO permissions (id, permission_key, name, description, module, action, resource, builtin, created_at, updated_at)
 VALUES
   (910001, 'erp.dashboard.read', 'QA legacy shared dashboard', '', 'erp', 'read', 'dashboard', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-  (910002, 'process_runtime.recover', 'QA legacy process recovery', '', 'process_runtime', 'recover', 'domain_command', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+  (910002, 'process_runtime.recover', 'QA legacy process recovery', '', 'process_runtime', 'recover', 'domain_command', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+  (910003, 'production.fact.read', 'QA production fact read', '', 'production', 'read', 'fact', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+  (910004, 'production.wip.read', 'QA production WIP read', '', 'production', 'read', 'wip', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 INSERT INTO role_permissions (role_id, permission_id, created_at)
 VALUES
   (910003, 910001, CURRENT_TIMESTAMP),
@@ -839,6 +842,14 @@ SQL
   )"
   if [[ "$dashboard_permission_readback" != '0|3|2|2|1|1|1|1|0|admin:1,boss:6,pmc:5,qa_business_default:2,qa_custom:3' ]]; then
     echo "ERROR: dashboard, assignment and control-plane permission migration mismatch: ${dashboard_permission_readback:-empty}" >&2
+    exit 1
+  fi
+  warehouse_inbound_readback="$(
+    populated_psql -Atq -c \
+      "SELECT (SELECT version FROM roles WHERE id = 910006)::text || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id WHERE rp.role_id = 910006 AND p.permission_key IN ('production.fact.read', 'production.wip.read'))::text || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id WHERE rp.role_id = 910003 AND p.permission_key IN ('production.fact.read', 'production.wip.read'))::text"
+  )"
+  if [[ "$warehouse_inbound_readback" != '3|2|0' ]]; then
+    echo "ERROR: warehouse finished-goods inbound permission migration mismatch: ${warehouse_inbound_readback:-empty}" >&2
     exit 1
   fi
   migration_status_counts="$(

@@ -133,13 +133,13 @@ export default function ProductionCompletionModal({
     <Modal
       title={
         editing
-          ? '编辑完工入库草稿'
+          ? '核对待入库完工报告'
           : order?.status === 'CLOSED'
-            ? '登记返工补完工'
-            : '登记完工入库'
+            ? '登记返工补完工报告'
+            : '登记生产完工'
       }
       open={open}
-      okText={editing ? '保存草稿' : '生成完工记录'}
+      okText={editing ? '保存待入库草稿' : '生成待入库草稿'}
       cancelText="取消"
       confirmLoading={loading}
       destroyOnHidden
@@ -153,10 +153,10 @@ export default function ProductionCompletionModal({
         showIcon
         message={
           order?.status === 'CLOSED'
-            ? '当前订单已关闭，只能按已完成包装验收的成品返工补制批次登记补完工；过账后才会更新库存。'
+            ? '当前订单已关闭，只能按已完成包装验收的成品返工补制批次登记补完工报告；生成草稿不会更新库存，仍须仓库核对并确认入库。'
             : editing
-              ? '生产明细和完工来源批次保持不变；可修正入库仓库、批次、数量、时间和备注，保存后仍是草稿。'
-              : '系统会按生产订单明细和包装验收批次核对完工数量、产品、规格和单位；过账后才会更新库存。'
+              ? '生产明细和完工来源批次保持不变；可修正拟入库仓库、批次、数量、时间和备注，保存后仍是待入库草稿，不会更新库存。'
+              : '生产岗位只提交完工报告；系统会按生产订单和包装验收批次核对数量，生成待入库草稿。仓库核对实收后确认入库，届时才增加成品库存。'
         }
       />
       {blockedItems.length > 0 ? (
@@ -275,8 +275,8 @@ export default function ProductionCompletionModal({
           <div className="erp-business-source-summary">
             <Text type="secondary">
               {selectedBatchChoice
-                ? `所选批次 ${selectedBatchChoice.quantity || '0'} / 已过账 ${selectedBatchChoice.posted || '0'} / 草稿 ${selectedBatchChoice.draft || '0'} / 剩余 ${selectedBatchChoice.remaining || '0'}`
-                : `计划 ${selectedChoice.planned || '0'} / 当前可完工上限 ${selectedChoice.acceptedPackaging || '0'} / 已过账 ${selectedChoice.posted || '0'} / 草稿 ${selectedChoice.draft || '0'}`}
+                ? `所选批次 ${selectedBatchChoice.quantity || '0'} / 已入库 ${selectedBatchChoice.posted || '0'} / 待入库 ${selectedBatchChoice.draft || '0'} / 剩余 ${selectedBatchChoice.remaining || '0'}`
+                : `计划 ${selectedChoice.planned || '0'} / 当前可完工上限 ${selectedChoice.acceptedPackaging || '0'} / 已入库 ${selectedChoice.posted || '0'} / 待入库 ${selectedChoice.draft || '0'}`}
             </Text>
           </div>
         ) : null}
@@ -298,7 +298,7 @@ export default function ProductionCompletionModal({
                   ) {
                     return Promise.reject(
                       new Error(
-                        '本次数量不能超过所选包装验收批次扣减已过账和草稿后的剩余数量'
+                        '本次数量不能超过所选包装验收批次扣减已入库和待入库后的剩余数量'
                       )
                     )
                   }
@@ -312,11 +312,13 @@ export default function ProductionCompletionModal({
         >
           <Input inputMode="decimal" maxLength={21} placeholder="例如：100" />
         </Form.Item>
-        <BusinessFormSectionTitle>入库仓库与批次</BusinessFormSectionTitle>
+        <BusinessFormSectionTitle>
+          待核对的入库仓库与批次
+        </BusinessFormSectionTitle>
         <Form.Item
           name="warehouse_id"
-          label="入库仓库"
-          rules={[{ required: true, message: '请选择入库仓库' }]}
+          label="拟入库仓库"
+          rules={[{ required: true, message: '请选择拟入库仓库' }]}
         >
           <Select
             showSearch
@@ -327,8 +329,8 @@ export default function ProductionCompletionModal({
         </Form.Item>
         <Form.Item
           name="lot_selection"
-          label="入库批次方式"
-          rules={[{ required: true, message: '请选择入库批次方式' }]}
+          label="拟入库批次方式"
+          rules={[{ required: true, message: '请选择拟入库批次方式' }]}
         >
           <Radio.Group
             options={[
@@ -356,8 +358,8 @@ export default function ProductionCompletionModal({
         {lotSelection === SOURCE_INBOUND_LOT_SELECTION.EXISTING ? (
           <Form.Item
             name="lot_id"
-            label="已有入库批次"
-            rules={[{ required: true, message: '请选择已有入库批次' }]}
+            label="拟使用的已有入库批次"
+            rules={[{ required: true, message: '请选择拟使用的已有入库批次' }]}
           >
             <Select
               showSearch
