@@ -177,6 +177,7 @@ export default function V1PurchaseOrdersPage() {
   const [selectedRowKeys, setSelectedRowKeys] = useState([])
   const selectedRowKeysRef = useRef([])
   const lifecycleInFlightRef = useRef(false)
+  const lifecycleAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
   const [columnOrder, setColumnOrder] = useState(null)
   const [columnOrderOpen, setColumnOrderOpen] = useState(false)
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)

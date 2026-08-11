@@ -325,6 +325,7 @@ export default function V1OutsourcingOrdersPage() {
   const sourceFactInFlightRef = useRef(false)
   const sourceFactAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
   const lifecycleInFlightRef = useRef(false)
+  const lifecycleAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
   const financeSourceAttemptsRef = useRef(
     createSourceBusinessActionAttemptStore()
   )

@@ -302,6 +302,7 @@ export default function V1SalesOrdersPage() {
   const reservationBalanceRequestRef = useRef(0)
   const reservationInFlightRef = useRef(false)
   const lifecycleInFlightRef = useRef(false)
+  const lifecycleAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
   const reservationAttemptsRef = useRef(
     createSourceBusinessActionAttemptStore()
   )
