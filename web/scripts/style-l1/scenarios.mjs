@@ -12466,16 +12466,6 @@ export function createStyleL1Scenarios(deps) {
       mockAdminRpc: true,
       beforeNavigate: async (page) => {
         await installSummaryRoute(page)
-        await page.route('**/__dev/api/receipts', async (route) => {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              schemaVersion: 'plush.dev-workbench-receipts/v1',
-              receipts: [],
-            }),
-          })
-        })
       },
       verify: async (page) => {
         await page.evaluate(() => {
@@ -12550,7 +12540,7 @@ export function createStyleL1Scenarios(deps) {
           },
           {
             path: '/__dev/data-preparation',
-            heading: '准备测试数据',
+            heading: '准备回归数据',
             rootSelector: '.erp-dev-data-page',
             titlePrefix: '测试数据 · ',
           },
