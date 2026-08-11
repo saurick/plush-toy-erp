@@ -633,7 +633,15 @@ function taskReport(overrides = {}) {
       caseKey: "rejected",
       source: { id: 4, orderNo: "SO-RUNTIME-4" },
       task: { task_status_key: "rejected" },
-      processContext: { process_instance: { status: "blocked" } },
+      processContext: {
+        process_instance: { status: "completed" },
+        completed_nodes: [
+          {
+            node_key: "sales_order_rejected_end",
+            status: "completed",
+          },
+        ],
+      },
       evidenceClass: "formal_process_runtime",
     },
     {
@@ -1685,6 +1693,26 @@ test("apply reports may raise minimums while the shipment dataset stays exact", 
   missingScenario.coverage.scenariosByRoleTaskGroup.production.trial_production_work.outsourcing_return = 0;
   assert.throws(
     () => buildManualAcceptanceReadinessPlan({ taskReport: missingScenario }),
+    /岗位任务报告不是有效/u,
+  );
+  const retiredRejectedBlocked = structuredClone(taskReport());
+  retiredRejectedBlocked.runtimeEvidence.find(
+    (item) => item.caseKey === "rejected",
+  ).processContext.process_instance.status = "blocked";
+  assert.throws(
+    () =>
+      buildManualAcceptanceReadinessPlan({
+        taskReport: retiredRejectedBlocked,
+      }),
+    /岗位任务报告不是有效/u,
+  );
+  const missingRejectedEnd = structuredClone(taskReport());
+  missingRejectedEnd.runtimeEvidence.find(
+    (item) => item.caseKey === "rejected",
+  ).processContext.completed_nodes = [];
+  assert.throws(
+    () =>
+      buildManualAcceptanceReadinessPlan({ taskReport: missingRejectedEnd }),
     /岗位任务报告不是有效/u,
   );
   assert.throws(
