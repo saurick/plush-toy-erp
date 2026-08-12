@@ -572,12 +572,47 @@ func TestAuthorizeTemplatePDFRequestDoesNotTrustClaimsWithoutCurrentAdmin(t *tes
 func TestTemplatePDFChromeArgsKeepSandboxEnabled(t *testing.T) {
 	t.Parallel()
 
-	args := templatePDFChromeArgs("/tmp/plush-pdf-profile", 9222)
+	args := templatePDFChromeArgs("/tmp/plush-pdf-profile", 9222, false)
 	joined := strings.Join(args, "\n")
 	if strings.Contains(joined, "--no-sandbox") || strings.Contains(joined, "--disable-setuid-sandbox") {
 		t.Fatalf("Chrome sandbox must stay enabled: %v", args)
 	}
 	if !strings.Contains(joined, "--remote-debugging-address=127.0.0.1") {
 		t.Fatalf("Chrome debugging must stay loopback-only: %v", args)
+	}
+}
+
+func TestTemplatePDFChromeArgsAllowOnlyExplicitLinuxRootLocalFallback(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name         string
+		raw          string
+		effectiveUID int
+		goos         string
+		want         bool
+	}{
+		{name: "explicit Linux root", raw: "1", effectiveUID: 0, goos: "linux", want: true},
+		{name: "non-root", raw: "1", effectiveUID: 10001, goos: "linux"},
+		{name: "disabled", raw: "0", effectiveUID: 0, goos: "linux"},
+		{name: "unset", effectiveUID: 0, goos: "linux"},
+		{name: "non-Linux", raw: "1", effectiveUID: 0, goos: "darwin"},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := allowTemplatePDFLocalNoSandbox(tc.raw, tc.effectiveUID, tc.goos)
+			if got != tc.want {
+				t.Fatalf("allowTemplatePDFLocalNoSandbox(%q, %d, %q) = %v, want %v", tc.raw, tc.effectiveUID, tc.goos, got, tc.want)
+			}
+
+			args := templatePDFChromeArgs("/tmp/plush-pdf-profile", 9222, got)
+			hasNoSandbox := strings.Contains(strings.Join(args, "\n"), "--no-sandbox")
+			if hasNoSandbox != tc.want {
+				t.Fatalf("Chrome args no-sandbox = %v, want %v: %v", hasNoSandbox, tc.want, args)
+			}
+		})
 	}
 }

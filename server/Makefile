@@ -357,6 +357,10 @@ include $(DEV_PORTS_FILE)
 -include $(DEV_PORTS_LOCAL_FILE)
 export DEV_PROJECT_ID DEV_WEB_PORT DEV_HTTP_PORT DEV_GRPC_PORT DEV_STYLE_PORT DEV_AUX_PORT_START
 
+# Chromium refuses to start as root with its sandbox enabled. Only the local
+# Make entry opts in on Linux root shells; the server re-checks OS and euid.
+DEV_PDF_ALLOW_LOCAL_NO_SANDBOX := $(if $(and $(filter linux,$(GOHOSTOS)),$(filter 0,$(shell id -u 2>/dev/null))),1,0)
+
 # 当前项目本地 dev 会占用的端口；端口只用于诊断和查找候选进程，停止前必须校验进程 cwd 属于本仓库。
 DEV_PORTS := $(DEV_HTTP_PORT) $(DEV_GRPC_PORT)
 
@@ -379,6 +383,7 @@ dev_build:
 # run dev binary (stable path)
 run: export ERP_CUSTOMER_KEY ?= yoyoosun
 run: export ERP_ALLOW_LOCAL_TEST_CUSTOMER_CONFIG := 1
+run: export ERP_PDF_ALLOW_LOCAL_NO_SANDBOX := $(DEV_PDF_ALLOW_LOCAL_NO_SANDBOX)
 run: dev_preflight dev_build
 	@echo ">>> running: $(DEV_BIN) $(ARGS)"
 	@$(DEV_BIN) $(ARGS)
@@ -401,6 +406,7 @@ dev_stop: dev_ports_preflight
 # restart local dev binary after clearing stale listeners
 dev_restart: export ERP_CUSTOMER_KEY ?= yoyoosun
 dev_restart: export ERP_ALLOW_LOCAL_TEST_CUSTOMER_CONFIG := 1
+dev_restart: export ERP_PDF_ALLOW_LOCAL_NO_SANDBOX := $(DEV_PDF_ALLOW_LOCAL_NO_SANDBOX)
 dev_restart: dev_preflight
 	@$(MAKE) dev_stop
 	@$(MAKE) dev_build
