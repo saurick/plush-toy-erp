@@ -18,7 +18,7 @@ func (FinanceAllocation) Hooks() []ent.Hook {
 func (FinanceAllocation) Annotations() []schema.Annotation {
 	return []schema.Annotation{entsql.Annotation{Checks: map[string]string{
 		"finance_allocations_amount_positive": "amount > 0", "finance_allocations_status_allowed": "status IN ('POSTED', 'REVERSED')",
-		"finance_allocations_currency_allowed": "currency = 'CNY'", "finance_allocations_reversal_not_self": "reversal_of_allocation_id IS NULL OR reversal_of_allocation_id <> id",
+		"finance_allocations_currency_allowed": "currency IN ('USD', 'CNY', 'HKD')", "finance_allocations_reversal_not_self": "reversal_of_allocation_id IS NULL OR reversal_of_allocation_id <> id",
 	}}}
 }
 func (FinanceAllocation) Fields() []ent.Field {

@@ -117,7 +117,7 @@ func financeReceivableLeadCreateFromProcessCommand(ctx context.Context, uc *Oper
 	if err != nil {
 		return nil, err
 	}
-	if shipment == nil || shipment.Status != ShipmentStatusShipped || shipment.CustomerID == nil || *shipment.CustomerID <= 0 {
+	if shipment == nil || shipment.Status != ShipmentStatusShipped || shipment.CustomerID == nil || *shipment.CustomerID <= 0 || shipment.ShippedAt == nil {
 		return nil, ErrBadParam
 	}
 	factNo := processCommandStringFromPayload(in.Payload, financeReceivableLeadPayloadSourceNo)
@@ -147,6 +147,7 @@ func financeReceivableLeadCreateFromProcessCommand(ctx context.Context, uc *Oper
 		SourceType:       &sourceType,
 		SourceID:         &sourceID,
 		IdempotencyKey:   in.IdempotencyKey,
+		OccurredAt:       *shipment.ShippedAt,
 		Note:             processCommandOptionalStringPtrFromPayload(in.Payload, financeReceivableLeadPayloadNote),
 	})
 	if err != nil {

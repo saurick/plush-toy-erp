@@ -65,6 +65,16 @@ func SupplierID(v int) predicate.PurchaseOrder {
 	return predicate.PurchaseOrder(sql.FieldEQ(FieldSupplierID, v))
 }
 
+// Currency applies equality check predicate on the "currency" field. It's identical to CurrencyEQ.
+func Currency(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldCurrency, v))
+}
+
+// PaymentTermDays applies equality check predicate on the "payment_term_days" field. It's identical to PaymentTermDaysEQ.
+func PaymentTermDays(v int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldPaymentTermDays, v))
+}
+
 // SupplierPurchaseOrderNo applies equality check predicate on the "supplier_purchase_order_no" field. It's identical to SupplierPurchaseOrderNoEQ.
 func SupplierPurchaseOrderNo(v string) predicate.PurchaseOrder {
 	return predicate.PurchaseOrder(sql.FieldEQ(FieldSupplierPurchaseOrderNo, v))
@@ -213,6 +223,121 @@ func SupplierIDIn(vs ...int) predicate.PurchaseOrder {
 // SupplierIDNotIn applies the NotIn predicate on the "supplier_id" field.
 func SupplierIDNotIn(vs ...int) predicate.PurchaseOrder {
 	return predicate.PurchaseOrder(sql.FieldNotIn(FieldSupplierID, vs...))
+}
+
+// CurrencyEQ applies the EQ predicate on the "currency" field.
+func CurrencyEQ(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldCurrency, v))
+}
+
+// CurrencyNEQ applies the NEQ predicate on the "currency" field.
+func CurrencyNEQ(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNEQ(FieldCurrency, v))
+}
+
+// CurrencyIn applies the In predicate on the "currency" field.
+func CurrencyIn(vs ...string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIn(FieldCurrency, vs...))
+}
+
+// CurrencyNotIn applies the NotIn predicate on the "currency" field.
+func CurrencyNotIn(vs ...string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotIn(FieldCurrency, vs...))
+}
+
+// CurrencyGT applies the GT predicate on the "currency" field.
+func CurrencyGT(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldGT(FieldCurrency, v))
+}
+
+// CurrencyGTE applies the GTE predicate on the "currency" field.
+func CurrencyGTE(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldGTE(FieldCurrency, v))
+}
+
+// CurrencyLT applies the LT predicate on the "currency" field.
+func CurrencyLT(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldLT(FieldCurrency, v))
+}
+
+// CurrencyLTE applies the LTE predicate on the "currency" field.
+func CurrencyLTE(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldLTE(FieldCurrency, v))
+}
+
+// CurrencyContains applies the Contains predicate on the "currency" field.
+func CurrencyContains(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldContains(FieldCurrency, v))
+}
+
+// CurrencyHasPrefix applies the HasPrefix predicate on the "currency" field.
+func CurrencyHasPrefix(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldHasPrefix(FieldCurrency, v))
+}
+
+// CurrencyHasSuffix applies the HasSuffix predicate on the "currency" field.
+func CurrencyHasSuffix(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldHasSuffix(FieldCurrency, v))
+}
+
+// CurrencyEqualFold applies the EqualFold predicate on the "currency" field.
+func CurrencyEqualFold(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEqualFold(FieldCurrency, v))
+}
+
+// CurrencyContainsFold applies the ContainsFold predicate on the "currency" field.
+func CurrencyContainsFold(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldContainsFold(FieldCurrency, v))
+}
+
+// PaymentTermDaysEQ applies the EQ predicate on the "payment_term_days" field.
+func PaymentTermDaysEQ(v int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysNEQ applies the NEQ predicate on the "payment_term_days" field.
+func PaymentTermDaysNEQ(v int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNEQ(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysIn applies the In predicate on the "payment_term_days" field.
+func PaymentTermDaysIn(vs ...int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIn(FieldPaymentTermDays, vs...))
+}
+
+// PaymentTermDaysNotIn applies the NotIn predicate on the "payment_term_days" field.
+func PaymentTermDaysNotIn(vs ...int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotIn(FieldPaymentTermDays, vs...))
+}
+
+// PaymentTermDaysGT applies the GT predicate on the "payment_term_days" field.
+func PaymentTermDaysGT(v int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldGT(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysGTE applies the GTE predicate on the "payment_term_days" field.
+func PaymentTermDaysGTE(v int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldGTE(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysLT applies the LT predicate on the "payment_term_days" field.
+func PaymentTermDaysLT(v int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldLT(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysLTE applies the LTE predicate on the "payment_term_days" field.
+func PaymentTermDaysLTE(v int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldLTE(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysIsNil applies the IsNil predicate on the "payment_term_days" field.
+func PaymentTermDaysIsNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIsNull(FieldPaymentTermDays))
+}
+
+// PaymentTermDaysNotNil applies the NotNil predicate on the "payment_term_days" field.
+func PaymentTermDaysNotNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotNull(FieldPaymentTermDays))
 }
 
 // SupplierPurchaseOrderNoEQ applies the EQ predicate on the "supplier_purchase_order_no" field.

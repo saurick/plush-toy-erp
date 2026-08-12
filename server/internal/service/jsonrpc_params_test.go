@@ -19,6 +19,46 @@ func TestParseJSONRPCTimeRejectsInvalidCalendarDate(t *testing.T) {
 	}
 }
 
+func TestGetOptionalJSONRPCNonNegativeInt(t *testing.T) {
+	tests := []struct {
+		name   string
+		params map[string]any
+		want   *int
+		wantOK bool
+	}{
+		{name: "absent", params: map[string]any{}, wantOK: true},
+		{name: "null", params: map[string]any{"days": nil}, wantOK: true},
+		{name: "zero", params: map[string]any{"days": float64(0)}, want: jsonRPCIntPointer(0), wantOK: true},
+		{name: "positive", params: map[string]any{"days": float64(30)}, want: jsonRPCIntPointer(30), wantOK: true},
+		{name: "negative", params: map[string]any{"days": float64(-1)}},
+		{name: "fraction", params: map[string]any{"days": 30.5}},
+		{name: "string", params: map[string]any{"days": "30"}},
+		{name: "bool", params: map[string]any{"days": true}},
+		{name: "unsafe integer", params: map[string]any{"days": float64(9007199254740992)}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := getOptionalJSONRPCNonNegativeInt(tt.params, "days")
+			if ok != tt.wantOK {
+				t.Fatalf("ok=%v want=%v value=%v", ok, tt.wantOK, got)
+			}
+			if tt.want == nil {
+				if got != nil {
+					t.Fatalf("value=%v want nil", *got)
+				}
+				return
+			}
+			if got == nil || *got != *tt.want {
+				t.Fatalf("value=%v want=%d", got, *tt.want)
+			}
+		})
+	}
+}
+
+func jsonRPCIntPointer(value int) *int {
+	return &value
+}
+
 func TestGetOptionalJSONRPCDecimalStringPreservesPrecisionAndRejectsNumbers(t *testing.T) {
 	const maxNetWeight = "99999999999999.999999"
 	parsed, ok := getOptionalJSONRPCDecimalString(map[string]any{"weight": maxNetWeight}, "weight")

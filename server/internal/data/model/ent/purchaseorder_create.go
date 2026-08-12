@@ -34,6 +34,34 @@ func (_c *PurchaseOrderCreate) SetSupplierID(v int) *PurchaseOrderCreate {
 	return _c
 }
 
+// SetCurrency sets the "currency" field.
+func (_c *PurchaseOrderCreate) SetCurrency(v string) *PurchaseOrderCreate {
+	_c.mutation.SetCurrency(v)
+	return _c
+}
+
+// SetNillableCurrency sets the "currency" field if the given value is not nil.
+func (_c *PurchaseOrderCreate) SetNillableCurrency(v *string) *PurchaseOrderCreate {
+	if v != nil {
+		_c.SetCurrency(*v)
+	}
+	return _c
+}
+
+// SetPaymentTermDays sets the "payment_term_days" field.
+func (_c *PurchaseOrderCreate) SetPaymentTermDays(v int) *PurchaseOrderCreate {
+	_c.mutation.SetPaymentTermDays(v)
+	return _c
+}
+
+// SetNillablePaymentTermDays sets the "payment_term_days" field if the given value is not nil.
+func (_c *PurchaseOrderCreate) SetNillablePaymentTermDays(v *int) *PurchaseOrderCreate {
+	if v != nil {
+		_c.SetPaymentTermDays(*v)
+	}
+	return _c
+}
+
 // SetSupplierPurchaseOrderNo sets the "supplier_purchase_order_no" field.
 func (_c *PurchaseOrderCreate) SetSupplierPurchaseOrderNo(v string) *PurchaseOrderCreate {
 	_c.mutation.SetSupplierPurchaseOrderNo(v)
@@ -275,6 +303,10 @@ func (_c *PurchaseOrderCreate) ExecX(ctx context.Context) {
 
 // defaults sets the default values of the builder before save.
 func (_c *PurchaseOrderCreate) defaults() {
+	if _, ok := _c.mutation.Currency(); !ok {
+		v := purchaseorder.DefaultCurrency
+		_c.mutation.SetCurrency(v)
+	}
 	if _, ok := _c.mutation.LifecycleStatus(); !ok {
 		v := purchaseorder.DefaultLifecycleStatus
 		_c.mutation.SetLifecycleStatus(v)
@@ -309,6 +341,19 @@ func (_c *PurchaseOrderCreate) check() error {
 	if v, ok := _c.mutation.SupplierID(); ok {
 		if err := purchaseorder.SupplierIDValidator(v); err != nil {
 			return &ValidationError{Name: "supplier_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.supplier_id": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.Currency(); !ok {
+		return &ValidationError{Name: "currency", err: errors.New(`ent: missing required field "PurchaseOrder.currency"`)}
+	}
+	if v, ok := _c.mutation.Currency(); ok {
+		if err := purchaseorder.CurrencyValidator(v); err != nil {
+			return &ValidationError{Name: "currency", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.currency": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.PaymentTermDays(); ok {
+		if err := purchaseorder.PaymentTermDaysValidator(v); err != nil {
+			return &ValidationError{Name: "payment_term_days", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.payment_term_days": %w`, err)}
 		}
 	}
 	if v, ok := _c.mutation.SupplierPurchaseOrderNo(); ok {
@@ -398,6 +443,14 @@ func (_c *PurchaseOrderCreate) createSpec() (*PurchaseOrder, *sqlgraph.CreateSpe
 	if value, ok := _c.mutation.PurchaseOrderNo(); ok {
 		_spec.SetField(purchaseorder.FieldPurchaseOrderNo, field.TypeString, value)
 		_node.PurchaseOrderNo = value
+	}
+	if value, ok := _c.mutation.Currency(); ok {
+		_spec.SetField(purchaseorder.FieldCurrency, field.TypeString, value)
+		_node.Currency = value
+	}
+	if value, ok := _c.mutation.PaymentTermDays(); ok {
+		_spec.SetField(purchaseorder.FieldPaymentTermDays, field.TypeInt, value)
+		_node.PaymentTermDays = &value
 	}
 	if value, ok := _c.mutation.SupplierPurchaseOrderNo(); ok {
 		_spec.SetField(purchaseorder.FieldSupplierPurchaseOrderNo, field.TypeString, value)

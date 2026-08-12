@@ -21,6 +21,7 @@ BEGIN
        OR (payment_term = 'EOM_45'
          AND (payment_term_days IS NULL OR payment_term_days = 45))
        OR (payment_term = 'NET_DAYS' AND payment_term_days >= 0)
+       OR (payment_term = 'EOM_DAYS' AND payment_term_days > 0)
        OR (payment_term IS NULL AND payment_term_days >= 0)
      ), false);
   IF incompatible_count > 0 THEN
@@ -57,20 +58,33 @@ WITH canonical AS (
     canonical_days,
     CASE
       WHEN canonical_days = 0 THEN 'DUE_ON_OCCURRENCE'
-      ELSE 'NET_DAYS'
-    END AS canonical_term
+      ELSE 'EOM_DAYS'
+    END AS canonical_term,
+    CASE
+      WHEN canonical_days = 0 THEN occurred_at
+      ELSE (
+        date_trunc('month', occurred_at AT TIME ZONE 'UTC')
+        + INTERVAL '1 month'
+        - INTERVAL '1 day'
+        + (
+          occurred_at AT TIME ZONE 'UTC'
+          - date_trunc('day', occurred_at AT TIME ZONE 'UTC')
+        )
+        + canonical_days * INTERVAL '1 day'
+      ) AT TIME ZONE 'UTC'
+    END AS canonical_due_at
   FROM canonical
 )
 UPDATE finance_facts AS fact
    SET payment_term = ready.canonical_term,
        payment_term_days = ready.canonical_days,
-       due_at = ready.occurred_at + ready.canonical_days * INTERVAL '1 day'
+       due_at = ready.canonical_due_at
   FROM ready
  WHERE fact.id = ready.id
    AND (
      fact.payment_term IS DISTINCT FROM ready.canonical_term
      OR fact.payment_term_days IS DISTINCT FROM ready.canonical_days
-     OR fact.due_at IS DISTINCT FROM ready.occurred_at + ready.canonical_days * INTERVAL '1 day'
+     OR fact.due_at IS DISTINCT FROM ready.canonical_due_at
    );
 
 DO $plush_finance_fact_due_at_postcheck$
@@ -85,10 +99,22 @@ BEGIN
      AND (
        payment_term IS NULL
        OR payment_term_days IS NULL
-       OR payment_term NOT IN ('DUE_ON_OCCURRENCE', 'NET_DAYS')
+       OR payment_term NOT IN ('DUE_ON_OCCURRENCE', 'EOM_DAYS')
        OR (payment_term = 'DUE_ON_OCCURRENCE' AND payment_term_days <> 0)
-       OR (payment_term = 'NET_DAYS' AND payment_term_days <= 0)
-       OR due_at IS DISTINCT FROM occurred_at + payment_term_days * INTERVAL '1 day'
+       OR (payment_term = 'EOM_DAYS' AND payment_term_days <= 0)
+       OR due_at IS DISTINCT FROM CASE
+         WHEN payment_term_days = 0 THEN occurred_at
+         ELSE (
+           date_trunc('month', occurred_at AT TIME ZONE 'UTC')
+           + INTERVAL '1 month'
+           - INTERVAL '1 day'
+           + (
+             occurred_at AT TIME ZONE 'UTC'
+             - date_trunc('day', occurred_at AT TIME ZONE 'UTC')
+           )
+           + payment_term_days * INTERVAL '1 day'
+         ) AT TIME ZONE 'UTC'
+       END
      )
    )
    OR (

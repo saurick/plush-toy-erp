@@ -112,12 +112,15 @@ const FINANCE_COLUMN_KEYS_BY_FACT_TYPE = Object.freeze({
     'currency',
     'collection_type',
     'payment_term',
+    'due_at',
   ]),
   PAYABLE: Object.freeze([
     'counterparty',
     'amount',
     'fee_amount',
     'currency',
+    'payment_term',
+    'due_at',
   ]),
   INVOICE: Object.freeze([
     'counterparty',
@@ -509,6 +512,15 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
         financePaymentTermText(record, FINANCE_PAYMENT_TERM_LABELS),
       exportValue: (record) =>
         financePaymentTermText(record, FINANCE_PAYMENT_TERM_LABELS),
+    },
+    due_at: {
+      title: '到期日期',
+      dataIndex: 'due_at',
+      width: 120,
+      sorter: (left, right) =>
+        Number(left?.due_at || 0) - Number(right?.due_at || 0),
+      render: formatUnixDate,
+      exportValue: (record) => formatUnixDate(record?.due_at),
     },
     invoice_category: {
       title: '发票类别',

@@ -1279,6 +1279,8 @@ var (
 	OutsourcingOrdersColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "outsourcing_order_no", Type: field.TypeString, Size: 64},
+		{Name: "currency", Type: field.TypeString, Size: 16, Default: "CNY"},
+		{Name: "payment_term_days", Type: field.TypeInt, Nullable: true},
 		{Name: "supplier_snapshot", Type: field.TypeJSON, Nullable: true},
 		{Name: "contract_party_snapshot", Type: field.TypeJSON, Nullable: true},
 		{Name: "source_order_no", Type: field.TypeString, Nullable: true, Size: 128},
@@ -1304,7 +1306,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "outsourcing_orders_suppliers_outsourcing_orders",
-				Columns:    []*schema.Column{OutsourcingOrdersColumns[17]},
+				Columns:    []*schema.Column{OutsourcingOrdersColumns[19]},
 				RefColumns: []*schema.Column{SuppliersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1318,27 +1320,27 @@ var (
 			{
 				Name:    "outsourcingorder_supplier_id",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrdersColumns[17]},
+				Columns: []*schema.Column{OutsourcingOrdersColumns[19]},
 			},
 			{
 				Name:    "outsourcingorder_source_order_no",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrdersColumns[4]},
+				Columns: []*schema.Column{OutsourcingOrdersColumns[6]},
 			},
 			{
 				Name:    "outsourcingorder_lifecycle_status",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrdersColumns[7]},
+				Columns: []*schema.Column{OutsourcingOrdersColumns[9]},
 			},
 			{
 				Name:    "outsourcingorder_order_date",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrdersColumns[5]},
+				Columns: []*schema.Column{OutsourcingOrdersColumns[7]},
 			},
 			{
 				Name:    "outsourcingorder_expected_return_date",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrdersColumns[6]},
+				Columns: []*schema.Column{OutsourcingOrdersColumns[8]},
 			},
 		},
 	}
@@ -2788,6 +2790,8 @@ var (
 	PurchaseOrdersColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "purchase_order_no", Type: field.TypeString, Size: 64},
+		{Name: "currency", Type: field.TypeString, Size: 16, Default: "CNY"},
+		{Name: "payment_term_days", Type: field.TypeInt, Nullable: true},
 		{Name: "supplier_purchase_order_no", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "supplier_snapshot", Type: field.TypeJSON, Nullable: true},
 		{Name: "contract_party_snapshot", Type: field.TypeJSON, Nullable: true},
@@ -2813,7 +2817,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "purchase_orders_suppliers_purchase_orders",
-				Columns:    []*schema.Column{PurchaseOrdersColumns[17]},
+				Columns:    []*schema.Column{PurchaseOrdersColumns[19]},
 				RefColumns: []*schema.Column{SuppliersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -2827,27 +2831,27 @@ var (
 			{
 				Name:    "purchaseorder_supplier_id",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrdersColumns[17]},
+				Columns: []*schema.Column{PurchaseOrdersColumns[19]},
 			},
 			{
 				Name:    "purchaseorder_supplier_purchase_order_no",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrdersColumns[2]},
+				Columns: []*schema.Column{PurchaseOrdersColumns[4]},
 			},
 			{
 				Name:    "purchaseorder_lifecycle_status",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrdersColumns[7]},
+				Columns: []*schema.Column{PurchaseOrdersColumns[9]},
 			},
 			{
 				Name:    "purchaseorder_purchase_date",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrdersColumns[5]},
+				Columns: []*schema.Column{PurchaseOrdersColumns[7]},
 			},
 			{
 				Name:    "purchaseorder_expected_arrival_date",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrdersColumns[6]},
+				Columns: []*schema.Column{PurchaseOrdersColumns[8]},
 			},
 		},
 	}
@@ -3836,6 +3840,7 @@ var (
 	SalesOrdersColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "order_no", Type: field.TypeString, Size: 64},
+		{Name: "currency", Type: field.TypeString, Size: 16, Default: "CNY"},
 		{Name: "customer_order_no", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "customer_snapshot", Type: field.TypeJSON, Nullable: true},
 		{Name: "sales_owner", Type: field.TypeString, Nullable: true, Size: 128},
@@ -3865,7 +3870,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "sales_orders_customers_sales_orders",
-				Columns:    []*schema.Column{SalesOrdersColumns[21]},
+				Columns:    []*schema.Column{SalesOrdersColumns[22]},
 				RefColumns: []*schema.Column{CustomersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -3879,37 +3884,37 @@ var (
 			{
 				Name:    "salesorder_customer_id",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[21]},
+				Columns: []*schema.Column{SalesOrdersColumns[22]},
 			},
 			{
 				Name:    "salesorder_customer_order_no",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[2]},
+				Columns: []*schema.Column{SalesOrdersColumns[3]},
 			},
 			{
 				Name:    "salesorder_sales_owner",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[4]},
+				Columns: []*schema.Column{SalesOrdersColumns[5]},
 			},
 			{
 				Name:    "salesorder_payment_method",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[6]},
+				Columns: []*schema.Column{SalesOrdersColumns[7]},
 			},
 			{
 				Name:    "salesorder_lifecycle_status",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[11]},
+				Columns: []*schema.Column{SalesOrdersColumns[12]},
 			},
 			{
 				Name:    "salesorder_order_date",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[9]},
+				Columns: []*schema.Column{SalesOrdersColumns[10]},
 			},
 			{
 				Name:    "salesorder_planned_delivery_date",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[10]},
+				Columns: []*schema.Column{SalesOrdersColumns[11]},
 			},
 		},
 	}
@@ -4836,14 +4841,14 @@ func init() {
 	FinanceAllocationsTable.Annotation = &entsql.Annotation{}
 	FinanceAllocationsTable.Annotation.Checks = map[string]string{
 		"finance_allocations_amount_positive":   "amount > 0",
-		"finance_allocations_currency_allowed":  "currency = 'CNY'",
+		"finance_allocations_currency_allowed":  "currency IN ('USD', 'CNY', 'HKD')",
 		"finance_allocations_reversal_not_self": "reversal_of_allocation_id IS NULL OR reversal_of_allocation_id <> id",
 		"finance_allocations_status_allowed":    "status IN ('POSTED', 'REVERSED')",
 	}
 	FinanceCreditNotesTable.Annotation = &entsql.Annotation{}
 	FinanceCreditNotesTable.Annotation.Checks = map[string]string{
 		"finance_credit_notes_amount_positive":  "amount > 0",
-		"finance_credit_notes_currency_allowed": "currency = 'CNY'",
+		"finance_credit_notes_currency_allowed": "currency IN ('USD', 'CNY', 'HKD')",
 		"finance_credit_notes_intent_bundle":    "length(trim(idempotency_key)) BETWEEN 1 AND 128 AND length(idempotency_payload_hash) = 64",
 		"finance_credit_notes_reversal_bundle":  "((status = 'POSTED' AND reversal_of_credit_note_id IS NULL) OR (status = 'REVERSED' AND reversal_of_credit_note_id IS NOT NULL))",
 		"finance_credit_notes_status_allowed":   "status IN ('POSTED', 'REVERSED')",
@@ -4857,11 +4862,11 @@ func init() {
 		"finance_facts_cancel_audit_bundle":      "\n(\n  (status = 'CANCELLED'\n    AND cancelled_at IS NOT NULL AND cancelled_by IS NOT NULL\n    AND cancel_reason IS NOT NULL AND length(trim(cancel_reason)) BETWEEN 1 AND 255)\n  OR\n  (status <> 'CANCELLED'\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL)\n)",
 		"finance_facts_collection_type_allowed":  "collection_type IS NULL OR collection_type = 'ACCOUNTS_RECEIVABLE'",
 		"finance_facts_counterparty_allowed":     "counterparty_type IN ('CUSTOMER', 'SUPPLIER')",
-		"finance_facts_currency_allowed":         "currency = 'CNY'",
-		"finance_facts_due_at_bundle":            "\n(\n  (fact_type IN ('RECEIVABLE', 'PAYABLE')\n    AND payment_term IS NOT NULL\n    AND payment_term_days IS NOT NULL\n    AND due_at IS NOT NULL\n    AND ((payment_term = 'DUE_ON_OCCURRENCE' AND payment_term_days = 0 AND due_at = occurred_at)\n      OR (payment_term = 'NET_DAYS' AND payment_term_days > 0 AND due_at > occurred_at)))\n  OR\n  (fact_type NOT IN ('RECEIVABLE', 'PAYABLE')\n    AND payment_term IS NULL\n    AND payment_term_days IS NULL\n    AND due_at IS NULL)\n)",
+		"finance_facts_currency_allowed":         "currency IN ('USD', 'CNY', 'HKD')",
+		"finance_facts_due_at_bundle":            "\n(\n  (fact_type IN ('RECEIVABLE', 'PAYABLE')\n\tAND payment_term IS NOT NULL\n\tAND payment_term_days IS NOT NULL\n\tAND due_at IS NOT NULL\n\tAND ((payment_term = 'DUE_ON_OCCURRENCE' AND payment_term_days = 0 AND due_at = occurred_at)\n\t  OR (payment_term = 'EOM_DAYS' AND payment_term_days > 0 AND due_at > occurred_at)))\n  OR\n  (fact_type NOT IN ('RECEIVABLE', 'PAYABLE')\n    AND payment_term IS NULL\n    AND payment_term_days IS NULL\n    AND due_at IS NULL)\n)",
 		"finance_facts_fee_amount_nonnegative":   "fee_amount >= 0",
 		"finance_facts_invoice_category_allowed": "invoice_category IS NULL OR invoice_category IN ('NONE', 'EXPORT_GENERAL', 'VAT_GENERAL_1', 'VAT_SPECIAL_3', 'VAT_SPECIAL_13')",
-		"finance_facts_payment_term_allowed":     "payment_term IS NULL OR payment_term IN ('DUE_ON_OCCURRENCE', 'NET_DAYS')",
+		"finance_facts_payment_term_allowed":     "payment_term IS NULL OR payment_term IN ('DUE_ON_OCCURRENCE', 'EOM_DAYS')",
 		"finance_facts_payment_term_days_check":  "payment_term_days IS NULL OR payment_term_days >= 0",
 		"finance_facts_status_allowed":           "status IN ('DRAFT', 'POSTED', 'SETTLED', 'CANCELLED')",
 		"finance_facts_status_audit_bundle":      "\n(\n  (status = 'DRAFT'\n    AND posted_at IS NULL AND posted_by IS NULL\n    AND settled_at IS NULL AND settled_by IS NULL)\n  OR\n  (status = 'POSTED'\n    AND posted_at IS NOT NULL AND posted_by IS NOT NULL\n    AND settled_at IS NULL AND settled_by IS NULL)\n  OR\n  (status = 'SETTLED'\n    AND posted_at IS NOT NULL AND posted_by IS NOT NULL\n    AND settled_at IS NOT NULL AND settled_by IS NOT NULL)\n  OR\n  (status = 'CANCELLED'\n    AND settled_at IS NULL AND settled_by IS NULL\n    AND ((posted_at IS NULL AND posted_by IS NULL)\n      OR (posted_at IS NOT NULL AND posted_by IS NOT NULL)))\n)",
@@ -4872,7 +4877,7 @@ func init() {
 	FinancePaymentsTable.Annotation.Checks = map[string]string{
 		"finance_payments_amount_positive":      "amount > 0",
 		"finance_payments_counterparty_allowed": "counterparty_type IN ('CUSTOMER', 'SUPPLIER')",
-		"finance_payments_currency_allowed":     "currency = 'CNY'",
+		"finance_payments_currency_allowed":     "currency IN ('USD', 'CNY', 'HKD')",
 		"finance_payments_direction_allowed":    "direction IN ('RECEIPT', 'DISBURSEMENT')",
 		"finance_payments_direction_party_pair": "((direction = 'RECEIPT' AND counterparty_type = 'CUSTOMER') OR (direction = 'DISBURSEMENT' AND counterparty_type = 'SUPPLIER'))",
 		"finance_payments_intent_bundle":        "length(trim(idempotency_key)) BETWEEN 1 AND 128 AND length(idempotency_payload_hash) = 64",
@@ -4961,8 +4966,10 @@ func init() {
 	OutsourcingOrdersTable.ForeignKeys[0].RefTable = SuppliersTable
 	OutsourcingOrdersTable.Annotation = &entsql.Annotation{}
 	OutsourcingOrdersTable.Annotation.Checks = map[string]string{
-		"outsourcing_orders_lifecycle_status_allowed": "lifecycle_status IN ('draft', 'submitted', 'confirmed', 'closed', 'canceled')",
-		"outsourcing_orders_version_positive":         "version > 0",
+		"outsourcing_orders_currency_allowed":              "currency IN ('USD', 'CNY', 'HKD')",
+		"outsourcing_orders_lifecycle_status_allowed":      "lifecycle_status IN ('draft', 'submitted', 'confirmed', 'closed', 'canceled')",
+		"outsourcing_orders_payment_term_days_nonnegative": "payment_term_days IS NULL OR payment_term_days >= 0",
+		"outsourcing_orders_version_positive":              "version > 0",
 	}
 	OutsourcingOrderItemsTable.ForeignKeys[0].RefTable = MaterialsTable
 	OutsourcingOrderItemsTable.ForeignKeys[1].RefTable = OutsourcingOrdersTable
@@ -5187,8 +5194,10 @@ func init() {
 	PurchaseOrdersTable.ForeignKeys[0].RefTable = SuppliersTable
 	PurchaseOrdersTable.Annotation = &entsql.Annotation{}
 	PurchaseOrdersTable.Annotation.Checks = map[string]string{
-		"purchase_orders_lifecycle_status_allowed": "lifecycle_status IN ('draft', 'submitted', 'approved', 'closed', 'canceled')",
-		"purchase_orders_version_positive":         "version > 0",
+		"purchase_orders_currency_allowed":              "currency IN ('USD', 'CNY', 'HKD')",
+		"purchase_orders_lifecycle_status_allowed":      "lifecycle_status IN ('draft', 'submitted', 'approved', 'closed', 'canceled')",
+		"purchase_orders_payment_term_days_nonnegative": "payment_term_days IS NULL OR payment_term_days >= 0",
+		"purchase_orders_version_positive":              "version > 0",
 	}
 	PurchaseOrderItemsTable.ForeignKeys[0].RefTable = MaterialsTable
 	PurchaseOrderItemsTable.ForeignKeys[1].RefTable = PurchaseOrdersTable
@@ -5301,6 +5310,7 @@ func init() {
 	SalesOrdersTable.ForeignKeys[0].RefTable = CustomersTable
 	SalesOrdersTable.Annotation = &entsql.Annotation{}
 	SalesOrdersTable.Annotation.Checks = map[string]string{
+		"sales_orders_currency_allowed":         "currency IN ('USD', 'CNY', 'HKD')",
 		"sales_orders_lifecycle_status_allowed": "lifecycle_status IN ('draft', 'submitted', 'active', 'closed', 'canceled')",
 		"sales_orders_version_positive":         "version > 0",
 	}

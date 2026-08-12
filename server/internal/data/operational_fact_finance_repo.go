@@ -54,7 +54,12 @@ func findFinanceFactFromShipmentReplay(
 	client *ent.Client,
 	factType string,
 	in *biz.FinanceFactFromShipmentCreate,
+	expectedCurrency string,
 ) (*biz.FinanceFact, bool, error) {
+	expectedCurrency, ok := biz.NormalizeFinanceCurrency(expectedCurrency)
+	if !ok {
+		return nil, false, biz.ErrFinanceFactSourceInvalid
+	}
 	row, err := client.FinanceFact.Query().Where(financefact.IdempotencyKey(in.IdempotencyKey)).Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -64,10 +69,10 @@ func findFinanceFactFromShipmentReplay(
 	}
 	if row.FactNo != in.FactNo || row.FactType != factType ||
 		row.CounterpartyType != biz.FinanceCounterpartyCustomer || row.CounterpartyID == nil ||
-		!row.Amount.GreaterThan(decimal.Zero) || !row.FeeAmount.IsZero() || row.Currency != biz.FinanceCurrencyCNY ||
+		!row.Amount.GreaterThan(decimal.Zero) || !row.FeeAmount.IsZero() || row.Currency != expectedCurrency ||
 		row.SourceType == nil || *row.SourceType != biz.ShipmentSourceType || row.SourceID == nil || *row.SourceID != in.ShipmentID || row.SourceLineID != nil ||
 		!sameOptionalString(row.InvoiceCategory, in.InvoiceCategory) ||
-		!sameIdempotencyIntentTime(row.OccurredAtSpecified, row.OccurredAt, in.OccurredAtSpecified, in.OccurredAt) ||
+		(factType == biz.FinanceFactInvoice && !sameIdempotencyIntentTime(row.OccurredAtSpecified, row.OccurredAt, in.OccurredAtSpecified, in.OccurredAt)) ||
 		!sameOptionalString(row.Note, in.Note) {
 		return nil, true, biz.ErrIdempotencyConflict
 	}
@@ -88,6 +93,7 @@ func financeFactMatchesCreate(row *ent.FinanceFact, in *biz.FinanceFactCreate) b
 		sameOptionalString(row.CollectionType, in.CollectionType) &&
 		sameOptionalString(row.PaymentTerm, in.PaymentTerm) &&
 		sameOptionalInt(row.PaymentTermDays, in.PaymentTermDays) &&
+		sameOptionalTime(row.DueAt, in.DueAt) &&
 		sameOptionalString(row.InvoiceCategory, in.InvoiceCategory) &&
 		sameOptionalString(row.SourceType, in.SourceType) &&
 		sameOptionalInt(row.SourceID, in.SourceID) &&
@@ -126,6 +132,7 @@ func (r *operationalFactRepo) CreateFinanceFactDraft(ctx context.Context, in *bi
 		SetNillableCollectionType(in.CollectionType).
 		SetNillablePaymentTerm(in.PaymentTerm).
 		SetNillablePaymentTermDays(in.PaymentTermDays).
+		SetNillableDueAt(in.DueAt).
 		SetNillableInvoiceCategory(in.InvoiceCategory).
 		SetNillableSourceType(in.SourceType).
 		SetNillableSourceID(in.SourceID).
@@ -161,11 +168,15 @@ func (r *operationalFactRepo) CreateFinanceFactDraftFromShipment(
 		(factType == biz.FinanceFactInvoice && in.InvoiceCategory == nil) {
 		return nil, biz.ErrBadParam
 	}
-	_, err := r.data.postgres.Shipment.Get(ctx, in.ShipmentID)
+	previewParent, err := r.data.postgres.Shipment.Get(ctx, in.ShipmentID)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrShipmentNotFound
 		}
+		return nil, err
+	}
+	previewSourceOrder, err := shipmentFinanceSourceOrder(ctx, r.data.postgres, previewParent)
+	if err != nil {
 		return nil, err
 	}
 	tx, err := r.inv.beginInventoryDBTx(ctx)
@@ -174,7 +185,7 @@ func (r *operationalFactRepo) CreateFinanceFactDraftFromShipment(
 	}
 	defer rollbackInventoryDBTx(ctx, tx, r.log)
 
-	if replay, found, replayErr := findFinanceFactFromShipmentReplay(ctx, tx.client, factType, in); replayErr != nil || found {
+	if replay, found, replayErr := findFinanceFactFromShipmentReplay(ctx, tx.client, factType, in, previewSourceOrder.Currency); replayErr != nil || found {
 		if replayErr != nil {
 			return nil, replayErr
 		}
@@ -187,10 +198,21 @@ func (r *operationalFactRepo) CreateFinanceFactDraftFromShipment(
 	if err := lockOperationalFactRow(ctx, tx, "shipments", in.ShipmentID, biz.ErrShipmentNotFound); err != nil {
 		return nil, err
 	}
+	parent, err := tx.client.Shipment.Get(ctx, in.ShipmentID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrShipmentNotFound
+		}
+		return nil, err
+	}
+	sourceOrder, err := lockAndReadShipmentFinanceSourceOrder(ctx, tx, parent)
+	if err != nil {
+		return nil, err
+	}
 	// A concurrent exact-key request may have committed while this transaction
-	// waited for the shipment lock. Replay it before classifying the existing
-	// active source as a different-key conflict.
-	if replay, found, replayErr := findFinanceFactFromShipmentReplay(ctx, tx.client, factType, in); replayErr != nil || found {
+	// waited for the shipment and source-order locks. Replay it before classifying
+	// the existing active source as a different-key conflict.
+	if replay, found, replayErr := findFinanceFactFromShipmentReplay(ctx, tx.client, factType, in, sourceOrder.Currency); replayErr != nil || found {
 		if replayErr != nil {
 			return nil, replayErr
 		}
@@ -200,26 +222,31 @@ func (r *operationalFactRepo) CreateFinanceFactDraftFromShipment(
 		tx = nil
 		return replay, nil
 	}
-	parent, err := tx.client.Shipment.Get(ctx, in.ShipmentID)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return nil, biz.ErrShipmentNotFound
-		}
-		return nil, err
-	}
 	if parent.Status != biz.ShipmentStatusShipped || parent.CustomerID == nil || *parent.CustomerID <= 0 {
 		return nil, biz.ErrBadParam
 	}
-	amount, err := shipmentFinanceAmountFromSnapshots(ctx, tx.client, parent.ID)
+	amount, err := shipmentFinanceAmountFromSnapshots(ctx, tx.client, parent.ID, sourceOrder.Currency)
 	if err != nil {
 		return nil, err
 	}
 	var collectionType, paymentTerm *string
 	var paymentTermDays *int
+	var dueAt *time.Time
+	occurredAt := in.OccurredAt
+	occurredAtSpecified := in.OccurredAtSpecified
 	if factType == biz.FinanceFactReceivable {
+		if parent.ShippedAt == nil {
+			return nil, biz.ErrBadParam
+		}
 		collection := biz.FinanceCollectionAccountsReceivable
 		collectionType = &collection
-		paymentTerm, paymentTermDays, err = lockAndResolveShipmentFinancePaymentTermSnapshot(ctx, tx, parent)
+		paymentTerm, paymentTermDays, err = shipmentFinancePaymentTermSnapshotFromOrder(sourceOrder)
+		if err != nil {
+			return nil, err
+		}
+		occurredAt = parent.ShippedAt.UTC().Truncate(time.Microsecond)
+		occurredAtSpecified = true
+		dueAt, err = biz.FinanceFactDueAtFromDays(occurredAt, paymentTermDays)
 		if err != nil {
 			return nil, err
 		}
@@ -234,16 +261,17 @@ func (r *operationalFactRepo) CreateFinanceFactDraftFromShipment(
 		CounterpartyID:      &customerID,
 		Amount:              amount,
 		FeeAmount:           decimal.Zero,
-		Currency:            biz.FinanceCurrencyCNY,
+		Currency:            sourceOrder.Currency,
 		CollectionType:      collectionType,
 		PaymentTerm:         paymentTerm,
 		PaymentTermDays:     paymentTermDays,
+		DueAt:               dueAt,
 		InvoiceCategory:     in.InvoiceCategory,
 		SourceType:          &sourceType,
 		SourceID:            &shipmentID,
 		IdempotencyKey:      in.IdempotencyKey,
-		OccurredAt:          in.OccurredAt,
-		OccurredAtSpecified: in.OccurredAtSpecified,
+		OccurredAt:          occurredAt,
+		OccurredAtSpecified: occurredAtSpecified,
 		Note:                in.Note,
 	}
 	if _, found, sourceErr := findActiveFinanceFactBySource(ctx, tx.client, create); sourceErr != nil {
@@ -263,6 +291,7 @@ func (r *operationalFactRepo) CreateFinanceFactDraftFromShipment(
 		SetNillableCollectionType(create.CollectionType).
 		SetNillablePaymentTerm(create.PaymentTerm).
 		SetNillablePaymentTermDays(create.PaymentTermDays).
+		SetNillableDueAt(create.DueAt).
 		SetNillableInvoiceCategory(create.InvoiceCategory).
 		SetNillableSourceType(create.SourceType).
 		SetNillableSourceID(create.SourceID).
@@ -277,7 +306,7 @@ func (r *operationalFactRepo) CreateFinanceFactDraftFromShipment(
 				r.log.WithContext(ctx).Warnf("rollback shipment finance conflict failed err=%v", rollbackErr)
 			}
 			tx = nil
-			if replay, found, replayErr := findFinanceFactFromShipmentReplay(ctx, r.data.postgres, factType, in); replayErr != nil || found {
+			if replay, found, replayErr := findFinanceFactFromShipmentReplay(ctx, r.data.postgres, factType, in, sourceOrder.Currency); replayErr != nil || found {
 				return replay, replayErr
 			}
 			if _, found, sourceErr := findActiveFinanceFactBySource(ctx, r.data.postgres, create); sourceErr != nil {
@@ -352,6 +381,7 @@ func (r *operationalFactRepo) CreateFinanceFactDraftForProcessCommand(
 		SetNillableCollectionType(in.CollectionType).
 		SetNillablePaymentTerm(in.PaymentTerm).
 		SetNillablePaymentTermDays(in.PaymentTermDays).
+		SetNillableDueAt(in.DueAt).
 		SetNillableInvoiceCategory(in.InvoiceCategory).
 		SetNillableSourceType(in.SourceType).
 		SetNillableSourceID(in.SourceID).
@@ -408,7 +438,11 @@ func (r *operationalFactRepo) GetShipmentFinanceAmountSnapshot(
 	if parent.Status != biz.ShipmentStatusShipped || parent.CustomerID == nil || *parent.CustomerID <= 0 {
 		return decimal.Zero, biz.ErrBadParam
 	}
-	return shipmentFinanceAmountFromSnapshots(ctx, r.data.postgres, shipmentID)
+	sourceOrder, err := shipmentFinanceSourceOrder(ctx, r.data.postgres, parent)
+	if err != nil {
+		return decimal.Zero, err
+	}
+	return shipmentFinanceAmountFromSnapshots(ctx, r.data.postgres, shipmentID, sourceOrder.Currency)
 }
 
 func (r *operationalFactRepo) recoverFinanceFactProcessCommandReplayInTx(
@@ -461,14 +495,18 @@ func lockAndValidateFinanceFactShipmentSource(ctx context.Context, tx *inventory
 		}
 		return err
 	}
-	if parent.Status != biz.ShipmentStatusShipped || parent.CustomerID == nil || *parent.CustomerID <= 0 ||
+	if parent.Status != biz.ShipmentStatusShipped || parent.CustomerID == nil || *parent.CustomerID <= 0 || parent.ShippedAt == nil ||
 		in.CounterpartyType != biz.FinanceCounterpartyCustomer || in.CounterpartyID == nil || *in.CounterpartyID != *parent.CustomerID {
 		return biz.ErrBadParam
 	}
-	if in.SourceLineID != nil || in.Currency != biz.FinanceCurrencyCNY {
+	sourceOrder, err := lockAndReadShipmentFinanceSourceOrder(ctx, tx, parent)
+	if err != nil {
+		return err
+	}
+	if in.SourceLineID != nil || in.Currency != sourceOrder.Currency {
 		return biz.ErrFinanceFactShipmentAmountInvalid
 	}
-	amount, err := shipmentFinanceAmountFromSnapshots(ctx, tx.client, parent.ID)
+	amount, err := shipmentFinanceAmountFromSnapshots(ctx, tx.client, parent.ID, sourceOrder.Currency)
 	if err != nil {
 		return err
 	}
@@ -476,13 +514,20 @@ func lockAndValidateFinanceFactShipmentSource(ctx context.Context, tx *inventory
 		return biz.ErrFinanceFactShipmentAmountInvalid
 	}
 	collectionType := biz.FinanceCollectionAccountsReceivable
-	paymentTerm, paymentTermDays, err := lockAndResolveShipmentFinancePaymentTermSnapshot(ctx, tx, parent)
+	paymentTerm, paymentTermDays, err := shipmentFinancePaymentTermSnapshotFromOrder(sourceOrder)
+	if err != nil {
+		return err
+	}
+	occurredAt := parent.ShippedAt.UTC().Truncate(time.Microsecond)
+	dueAt, err := biz.FinanceFactDueAtFromDays(occurredAt, paymentTermDays)
 	if err != nil {
 		return err
 	}
 	if in.CollectionType == nil || *in.CollectionType != collectionType ||
 		!sameOptionalString(in.PaymentTerm, paymentTerm) ||
 		!sameOptionalInt(in.PaymentTermDays, paymentTermDays) ||
+		!sameOptionalTime(in.DueAt, dueAt) ||
+		!sameIdempotencyIntentTime(in.OccurredAtSpecified, in.OccurredAt, true, occurredAt) ||
 		in.InvoiceCategory != nil {
 		return biz.ErrBadParam
 	}
@@ -503,24 +548,24 @@ func (r *operationalFactRepo) GetShipmentPaymentTermDays(ctx context.Context, sh
 	if parent.Status != biz.ShipmentStatusShipped || parent.CustomerID == nil || *parent.CustomerID <= 0 {
 		return nil, biz.ErrBadParam
 	}
-	return shipmentFinancePaymentTermDaysFromSource(ctx, r.data.postgres, parent)
+	sourceOrder, err := shipmentFinanceSourceOrder(ctx, r.data.postgres, parent)
+	if err != nil {
+		return nil, err
+	}
+	return shipmentFinancePaymentTermDaysFromOrder(sourceOrder)
 }
 
-func lockAndResolveShipmentFinancePaymentTermSnapshot(ctx context.Context, tx *inventoryDBTx, parent *ent.Shipment) (*string, *int, error) {
+func lockAndReadShipmentFinanceSourceOrder(ctx context.Context, tx *inventoryDBTx, parent *ent.Shipment) (*ent.SalesOrder, error) {
 	if tx == nil || parent == nil || parent.SalesOrderID == nil || *parent.SalesOrderID <= 0 {
-		return nil, nil, biz.ErrFinanceFactSourceInvalid
+		return nil, biz.ErrFinanceFactSourceInvalid
 	}
 	if err := lockOperationalFactRow(ctx, tx, "sales_orders", *parent.SalesOrderID, biz.ErrFinanceFactSourceInvalid); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	days, err := shipmentFinancePaymentTermDaysFromSource(ctx, tx.client, parent)
-	if err != nil {
-		return nil, nil, err
-	}
-	return biz.FinancePaymentTermSnapshotFromDays(days)
+	return shipmentFinanceSourceOrder(ctx, tx.client, parent)
 }
 
-func shipmentFinancePaymentTermDaysFromSource(ctx context.Context, client *ent.Client, parent *ent.Shipment) (*int, error) {
+func shipmentFinanceSourceOrder(ctx context.Context, client *ent.Client, parent *ent.Shipment) (*ent.SalesOrder, error) {
 	if client == nil || parent == nil || parent.SalesOrderID == nil || *parent.SalesOrderID <= 0 || parent.CustomerID == nil || *parent.CustomerID <= 0 {
 		return nil, biz.ErrFinanceFactSourceInvalid
 	}
@@ -531,7 +576,15 @@ func shipmentFinancePaymentTermDaysFromSource(ctx context.Context, client *ent.C
 		}
 		return nil, err
 	}
-	if order.CustomerID != *parent.CustomerID {
+	currency, currencyOK := biz.NormalizeFinanceCurrency(order.Currency)
+	if order.CustomerID != *parent.CustomerID || !currencyOK || currency != order.Currency {
+		return nil, biz.ErrFinanceFactSourceInvalid
+	}
+	return order, nil
+}
+
+func shipmentFinancePaymentTermDaysFromOrder(order *ent.SalesOrder) (*int, error) {
+	if order == nil {
 		return nil, biz.ErrFinanceFactSourceInvalid
 	}
 	if order.PaymentTermDays == nil {
@@ -541,7 +594,19 @@ func shipmentFinancePaymentTermDaysFromSource(ctx context.Context, client *ent.C
 	return &days, nil
 }
 
-func shipmentFinanceAmountFromSnapshots(ctx context.Context, client *ent.Client, shipmentID int) (decimal.Decimal, error) {
+func shipmentFinancePaymentTermSnapshotFromOrder(order *ent.SalesOrder) (*string, *int, error) {
+	days, err := shipmentFinancePaymentTermDaysFromOrder(order)
+	if err != nil {
+		return nil, nil, err
+	}
+	return biz.FinancePaymentTermSnapshotFromDays(days)
+}
+
+func shipmentFinanceAmountFromSnapshots(ctx context.Context, client *ent.Client, shipmentID int, expectedCurrency string) (decimal.Decimal, error) {
+	expectedCurrency, currencyOK := biz.NormalizeFinanceCurrency(expectedCurrency)
+	if !currencyOK {
+		return decimal.Zero, biz.ErrFinanceFactShipmentAmountInvalid
+	}
 	items, err := client.ShipmentItem.Query().
 		Where(shipmentitem.ShipmentID(shipmentID)).
 		Order(ent.Asc(shipmentitem.FieldID)).
@@ -554,7 +619,7 @@ func shipmentFinanceAmountFromSnapshots(ctx context.Context, client *ent.Client,
 	}
 	amount := decimal.Zero
 	for _, item := range items {
-		if item.SalesOrderItemID == nil || item.AmountSnapshot == nil || !item.AmountSnapshot.GreaterThan(decimal.Zero) || item.CurrencySnapshot != biz.FinanceCurrencyCNY {
+		if item.SalesOrderItemID == nil || item.AmountSnapshot == nil || !item.AmountSnapshot.GreaterThan(decimal.Zero) || item.CurrencySnapshot != expectedCurrency {
 			return decimal.Zero, biz.ErrFinanceFactShipmentAmountInvalid
 		}
 		amount = amount.Add(*item.AmountSnapshot)
@@ -737,27 +802,42 @@ func (r *operationalFactRepo) listFinanceFacts(
 	return out, total, nil
 }
 
+func calculateFinanceFactOutstanding(
+	originalAmount decimal.Decimal,
+	allocatedAmount decimal.Decimal,
+	creditedAmount decimal.Decimal,
+) (decimal.Decimal, error) {
+	if !originalAmount.GreaterThan(decimal.Zero) || allocatedAmount.IsNegative() || creditedAmount.IsNegative() {
+		return decimal.Zero, biz.ErrBadParam
+	}
+	outstanding := originalAmount.Sub(allocatedAmount).Sub(creditedAmount)
+	if outstanding.IsNegative() {
+		return decimal.Zero, biz.ErrBadParam
+	}
+	return outstanding, nil
+}
+
 func financeFactOutstandingAmounts(
 	ctx context.Context,
 	client *ent.Client,
 	facts []*ent.FinanceFact,
 ) (map[int]decimal.Decimal, error) {
-	// Keep the read projection on the same netting rule used by payment and
-	// credit-note write guards: posted rows consume, reversing rows restore.
-	outstanding := make(map[int]decimal.Decimal, len(facts))
+	originalAmounts := make(map[int]decimal.Decimal, len(facts))
+	allocatedAmounts := make(map[int]decimal.Decimal, len(facts))
+	creditedAmounts := make(map[int]decimal.Decimal, len(facts))
 	factIDs := make([]int, 0, len(facts))
 	for _, fact := range facts {
 		if fact == nil || fact.ID <= 0 {
 			continue
 		}
-		if _, exists := outstanding[fact.ID]; exists {
+		if _, exists := originalAmounts[fact.ID]; exists {
 			continue
 		}
-		outstanding[fact.ID] = fact.Amount
+		originalAmounts[fact.ID] = fact.Amount
 		factIDs = append(factIDs, fact.ID)
 	}
 	if len(factIDs) == 0 {
-		return outstanding, nil
+		return map[int]decimal.Decimal{}, nil
 	}
 
 	allocations, err := client.FinanceAllocation.Query().
@@ -769,9 +849,9 @@ func financeFactOutstandingAmounts(
 	for _, allocation := range allocations {
 		switch allocation.Status {
 		case biz.FinanceAllocationStatusPosted:
-			outstanding[allocation.FinanceFactID] = outstanding[allocation.FinanceFactID].Sub(allocation.Amount)
+			allocatedAmounts[allocation.FinanceFactID] = allocatedAmounts[allocation.FinanceFactID].Add(allocation.Amount)
 		case biz.FinanceAllocationStatusReversed:
-			outstanding[allocation.FinanceFactID] = outstanding[allocation.FinanceFactID].Add(allocation.Amount)
+			allocatedAmounts[allocation.FinanceFactID] = allocatedAmounts[allocation.FinanceFactID].Sub(allocation.Amount)
 		}
 	}
 
@@ -784,15 +864,18 @@ func financeFactOutstandingAmounts(
 	for _, creditNote := range creditNotes {
 		switch creditNote.Status {
 		case "POSTED":
-			outstanding[creditNote.FinanceFactID] = outstanding[creditNote.FinanceFactID].Sub(creditNote.Amount)
+			creditedAmounts[creditNote.FinanceFactID] = creditedAmounts[creditNote.FinanceFactID].Add(creditNote.Amount)
 		case "REVERSED":
-			outstanding[creditNote.FinanceFactID] = outstanding[creditNote.FinanceFactID].Add(creditNote.Amount)
+			creditedAmounts[creditNote.FinanceFactID] = creditedAmounts[creditNote.FinanceFactID].Sub(creditNote.Amount)
 		}
 	}
-	for _, amount := range outstanding {
-		if amount.IsNegative() {
-			return nil, biz.ErrBadParam
+	outstanding := make(map[int]decimal.Decimal, len(originalAmounts))
+	for factID, originalAmount := range originalAmounts {
+		amount, err := calculateFinanceFactOutstanding(originalAmount, allocatedAmounts[factID], creditedAmounts[factID])
+		if err != nil {
+			return nil, err
 		}
+		outstanding[factID] = amount
 	}
 	return outstanding, nil
 }
@@ -1081,5 +1164,5 @@ func entFinanceFactToBiz(row *ent.FinanceFact) *biz.FinanceFact {
 		name := canceller.Username
 		cancellerName = &name
 	}
-	return &biz.FinanceFact{ID: row.ID, FactNo: row.FactNo, FactType: row.FactType, Status: row.Status, Version: row.Version, CounterpartyType: row.CounterpartyType, CounterpartyID: row.CounterpartyID, Amount: row.Amount, OutstandingAmount: row.Amount, FeeAmount: row.FeeAmount, Currency: row.Currency, CollectionType: row.CollectionType, PaymentTerm: row.PaymentTerm, PaymentTermDays: row.PaymentTermDays, InvoiceCategory: row.InvoiceCategory, SourceType: row.SourceType, SourceID: row.SourceID, SourceLineID: row.SourceLineID, IdempotencyKey: row.IdempotencyKey, OccurredAt: row.OccurredAt, PostedAt: row.PostedAt, PostedBy: row.PostedBy, PostedByName: posterName, SettledAt: row.SettledAt, SettledBy: row.SettledBy, SettledByName: settlerName, CancelledAt: row.CancelledAt, CancelledBy: row.CancelledBy, CancelledByName: cancellerName, CancelReason: row.CancelReason, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	return &biz.FinanceFact{ID: row.ID, FactNo: row.FactNo, FactType: row.FactType, Status: row.Status, Version: row.Version, CounterpartyType: row.CounterpartyType, CounterpartyID: row.CounterpartyID, Amount: row.Amount, OutstandingAmount: row.Amount, FeeAmount: row.FeeAmount, Currency: row.Currency, CollectionType: row.CollectionType, PaymentTerm: row.PaymentTerm, PaymentTermDays: row.PaymentTermDays, DueAt: row.DueAt, InvoiceCategory: row.InvoiceCategory, SourceType: row.SourceType, SourceID: row.SourceID, SourceLineID: row.SourceLineID, IdempotencyKey: row.IdempotencyKey, OccurredAt: row.OccurredAt, PostedAt: row.PostedAt, PostedBy: row.PostedBy, PostedByName: posterName, SettledAt: row.SettledAt, SettledBy: row.SettledBy, SettledByName: settlerName, CancelledAt: row.CancelledAt, CancelledBy: row.CancelledBy, CancelledByName: cancellerName, CancelReason: row.CancelReason, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 }

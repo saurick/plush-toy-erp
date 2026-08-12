@@ -29,6 +29,7 @@ type stubPurchaseOrderJSONRPCRepo struct {
 	progress       *biz.PurchaseOrderReceiptProgress
 	progressErr    error
 	progressCalls  int
+	supplierTerm   int
 }
 
 func newStubPurchaseOrderJSONRPCRepo() *stubPurchaseOrderJSONRPCRepo {
@@ -40,6 +41,7 @@ func newStubPurchaseOrderJSONRPCRepo() *stubPurchaseOrderJSONRPCRepo {
 		supplierActive: true,
 		materialActive: true,
 		unitActive:     true,
+		supplierTerm:   30,
 	}
 }
 
@@ -202,6 +204,10 @@ func (s *stubPurchaseOrderJSONRPCRepo) SupplierIsActive(context.Context, int) (b
 	return s.supplierActive, nil
 }
 
+func (s *stubPurchaseOrderJSONRPCRepo) SupplierDefaultPaymentTermDays(context.Context, int) (int, error) {
+	return s.supplierTerm, nil
+}
+
 func (s *stubPurchaseOrderJSONRPCRepo) MaterialIsActive(context.Context, int) (bool, error) {
 	return s.materialActive, nil
 }
@@ -224,6 +230,8 @@ func TestJsonrpcDispatcher_PurchaseOrderAPISavesListsAndTransitions(t *testing.T
 	_, saveRes, err := j.handlePurchaseOrder(ctx, "save_purchase_order_with_items", "1", mustJSONRPCStruct(t, map[string]any{
 		"purchase_order_no": "PO-JSONRPC-001",
 		"supplier_id":       float64(1),
+		"currency":          "USD",
+		"payment_term_days": float64(45),
 		"supplier_snapshot": map[string]any{"name": "布料供应商"},
 		"contract_party_snapshot": map[string]any{
 			"buyerCompany": "永绅",
@@ -260,6 +268,9 @@ func TestJsonrpcDispatcher_PurchaseOrderAPISavesListsAndTransitions(t *testing.T
 	}
 	if status := order["lifecycle_status"]; status != biz.PurchaseOrderStatusDraft {
 		t.Fatalf("expected draft purchase order, got %#v", status)
+	}
+	if order["currency"] != biz.FinanceCurrencyUSD || jsonRPCInt(t, order, "payment_term_days") != 45 {
+		t.Fatalf("expected USD/45 purchase contract response, got %#v", order)
 	}
 	if _, exists := order["item_count"]; exists {
 		t.Fatalf("save response must not claim an unloaded purchase order item count, got %#v", order)
@@ -339,6 +350,42 @@ func TestJsonrpcDispatcher_PurchaseOrderAPISavesListsAndTransitions(t *testing.T
 	_, removedApproveRes, err := j.handlePurchaseOrder(ctx, "approve_purchase_order", "approve-removed", mustJSONRPCStruct(t, map[string]any{"id": float64(orderID)}))
 	if err != nil || removedApproveRes == nil || removedApproveRes.Code != errcode.UnknownMethod.Code {
 		t.Fatalf("direct purchase approval must stay removed, res=%#v err=%v", removedApproveRes, err)
+	}
+}
+
+func TestJsonrpcDispatcher_PurchaseOrderAggregateRejectsUnknownFieldAndMalformedPaymentTerm(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		key   string
+		value any
+	}{
+		{name: "unknown top-level field", key: "unexpected_field", value: true},
+		{name: "malformed payment term", key: "payment_term_days", value: "30"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := newStubPurchaseOrderJSONRPCRepo()
+			j := newPurchaseOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin(
+				[]string{biz.PurchaseRoleKey},
+				biz.PermissionPurchaseOrderCreate,
+			))
+			params := map[string]any{
+				"purchase_order_no": "PO-PARSER-CONTRACT",
+				"supplier_id":       float64(1),
+				"currency":          biz.FinanceCurrencyCNY,
+				"purchase_date":     "2026-08-12",
+			}
+			params[tc.key] = tc.value
+
+			_, res, err := j.handlePurchaseOrder(
+				workflowJSONRPCAdminContext(),
+				"save_purchase_order_with_items",
+				tc.name,
+				mustJSONRPCStruct(t, params),
+			)
+			if err != nil || res == nil || res.Code != errcode.InvalidParam.Code || repo.saveCalls != 0 {
+				t.Fatalf("invalid aggregate input must fail before save: res=%#v err=%v calls=%d", res, err, repo.saveCalls)
+			}
+		})
 	}
 }
 
@@ -626,6 +673,8 @@ func TestJsonrpcDispatcher_PurchaseOrderDraftVersionContract(t *testing.T) {
 			"id":                float64(1),
 			"purchase_order_no": "PO-VERSION-CONTRACT",
 			"supplier_id":       float64(1),
+			"currency":          "HKD",
+			"payment_term_days": float64(30),
 			"purchase_date":     "2026-07-14",
 			"items": []any{map[string]any{
 				"id":                 float64(1),
@@ -811,6 +860,8 @@ func purchaseOrderFromMutation(id int, status string, in *biz.PurchaseOrderMutat
 		ID:                      id,
 		PurchaseOrderNo:         in.PurchaseOrderNo,
 		SupplierID:              in.SupplierID,
+		Currency:                in.Currency,
+		PaymentTermDays:         in.PaymentTermDays,
 		SupplierPurchaseOrderNo: in.SupplierPurchaseOrderNo,
 		SupplierSnapshot:        in.SupplierSnapshot,
 		ContractPartySnapshot:   in.ContractPartySnapshot,

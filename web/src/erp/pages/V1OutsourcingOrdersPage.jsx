@@ -1745,6 +1745,8 @@ export default function V1OutsourcingOrdersPage() {
         field: 'outsourcing_order_no',
       }),
       supplier_id: undefined,
+      currency: 'CNY',
+      payment_term_days: undefined,
       supplier_snapshot: {},
       source_order_no: '',
       order_date: currentBusinessDate(),
@@ -2017,6 +2019,21 @@ export default function V1OutsourcingOrdersPage() {
   const handleSupplierChange = (supplierID) => {
     const supplier = suppliers.find((item) => item.id === supplierID)
     form.setFieldValue('supplier_snapshot', buildSupplierSnapshot(supplier))
+    if (!editingRow?.id) {
+      const termDays = supplier?.default_payment_term_days
+      const normalizedTermDays = Number(termDays)
+      form.setFieldValue(
+        'payment_term_days',
+        termDays !== undefined &&
+          termDays !== null &&
+          termDays !== '' &&
+          Number.isFinite(normalizedTermDays) &&
+          Number.isInteger(normalizedTermDays) &&
+          normalizedTermDays >= 0
+          ? normalizedTermDays
+          : undefined
+      )
+    }
     setSupplierContacts([])
     loadSupplierContacts(supplierID).then((contacts) => {
       if (

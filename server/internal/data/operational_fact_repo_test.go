@@ -193,8 +193,8 @@ func TestOperationalFactUsecase_IdempotencyDistinguishesExplicitFactTimes(t *tes
 			name: "finance",
 			create: func(key string, at time.Time) (int, error) {
 				row, err := uc.CreateFinanceFactDraft(ctx, &biz.FinanceFactCreate{
-					FactNo: key, FactType: biz.FinanceFactPayable,
-					CounterpartyType: biz.FinanceCounterpartyOther,
+					FactNo: key, FactType: biz.FinanceFactReconciliation,
+					CounterpartyType: biz.FinanceCounterpartyCustomer,
 					Amount:           decimal.NewFromInt(1), IdempotencyKey: key, OccurredAt: at,
 				})
 				if err != nil {
@@ -1948,20 +1948,24 @@ func TestOperationalFactUsecase_ReceivableAndInvoiceRequireShippedShipment(t *te
 		t.Fatalf("receivable customer must match shipment truth, got %v", err)
 	}
 
+	paymentTermDays := 30
+	occurredAt := shipped.ShippedAt.UTC().Truncate(time.Microsecond)
+	dueAt := mustFinanceFactDueAt(t, occurredAt, paymentTermDays)
 	receivable, err := uc.CreateFinanceFactDraft(ctx, &biz.FinanceFactCreate{
 		FactNo:           "AR-SHIPPED-001",
 		FactType:         biz.FinanceFactReceivable,
 		CounterpartyType: biz.FinanceCounterpartyCustomer,
 		CounterpartyID:   &customer.ID,
 		Amount:           decimal.NewFromInt(100),
-		FeeAmount:        decimal.NewFromFloat(2.5),
-		Currency:         biz.FinanceCurrencyUSD,
+		Currency:         biz.FinanceCurrencyCNY,
 		CollectionType:   ptrString(biz.FinanceCollectionAccountsReceivable),
-		PaymentTerm:      ptrString(biz.FinancePaymentTermEOM30),
-		InvoiceCategory:  ptrString(biz.FinanceInvoiceCategoryNone),
+		PaymentTerm:      ptrString(biz.FinancePaymentTermEOMDays),
+		PaymentTermDays:  &paymentTermDays,
+		DueAt:            &dueAt,
 		SourceType:       &shipmentSourceType,
 		SourceID:         &shipment.ID,
 		IdempotencyKey:   "AR-SHIPPED-001",
+		OccurredAt:       occurredAt,
 	})
 	if err != nil {
 		t.Fatalf("create receivable from shipped shipment failed: %v", err)
@@ -1969,17 +1973,14 @@ func TestOperationalFactUsecase_ReceivableAndInvoiceRequireShippedShipment(t *te
 	if receivable.Status != biz.OperationalFactStatusDraft || receivable.SourceID == nil || *receivable.SourceID != shipment.ID {
 		t.Fatalf("unexpected receivable fact %#v", receivable)
 	}
-	if !receivable.FeeAmount.Equal(decimal.NewFromFloat(2.5)) || receivable.Currency != biz.FinanceCurrencyUSD {
-		t.Fatalf("expected receivable fee/currency persisted, got fee=%s currency=%s", receivable.FeeAmount, receivable.Currency)
+	if !receivable.FeeAmount.IsZero() || receivable.Currency != biz.FinanceCurrencyCNY {
+		t.Fatalf("expected CNY receivable without unsupported fees, got fee=%s currency=%s", receivable.FeeAmount, receivable.Currency)
 	}
 	if receivable.CollectionType == nil || *receivable.CollectionType != biz.FinanceCollectionAccountsReceivable {
 		t.Fatalf("expected receivable collection type persisted, got %#v", receivable.CollectionType)
 	}
-	if receivable.PaymentTerm == nil || *receivable.PaymentTerm != biz.FinancePaymentTermEOM30 || receivable.PaymentTermDays == nil || *receivable.PaymentTermDays != 30 {
-		t.Fatalf("expected receivable payment term persisted, got term=%#v days=%#v", receivable.PaymentTerm, receivable.PaymentTermDays)
-	}
-	if receivable.InvoiceCategory == nil || *receivable.InvoiceCategory != biz.FinanceInvoiceCategoryNone {
-		t.Fatalf("expected receivable invoice category persisted, got %#v", receivable.InvoiceCategory)
+	if receivable.PaymentTerm == nil || *receivable.PaymentTerm != biz.FinancePaymentTermEOMDays || receivable.PaymentTermDays == nil || *receivable.PaymentTermDays != paymentTermDays || receivable.DueAt == nil || !receivable.DueAt.Equal(dueAt) {
+		t.Fatalf("expected canonical receivable due bundle persisted, got term=%#v days=%#v due=%#v", receivable.PaymentTerm, receivable.PaymentTermDays, receivable.DueAt)
 	}
 	posted, err := uc.PostFinanceFact(ctx, operationalFactStatusMutation(receivable.ID, receivable.Version, actor.ID, ""))
 	if err != nil {

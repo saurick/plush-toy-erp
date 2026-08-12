@@ -43,6 +43,8 @@ func (r *purchaseOrderRepo) CreatePurchaseOrder(ctx context.Context, in *biz.Pur
 	row, err := r.data.postgres.PurchaseOrder.Create().
 		SetPurchaseOrderNo(in.PurchaseOrderNo).
 		SetSupplierID(in.SupplierID).
+		SetCurrency(in.Currency).
+		SetNillablePaymentTermDays(in.PaymentTermDays).
 		SetNillableSupplierPurchaseOrderNo(in.SupplierPurchaseOrderNo).
 		SetSupplierSnapshot(in.SupplierSnapshot).
 		SetContractPartySnapshot(in.ContractPartySnapshot).
@@ -61,6 +63,8 @@ func (r *purchaseOrderRepo) UpdatePurchaseOrder(ctx context.Context, id int, in 
 	update := r.data.postgres.PurchaseOrder.UpdateOneID(id).
 		SetPurchaseOrderNo(in.PurchaseOrderNo).
 		SetSupplierID(in.SupplierID).
+		SetCurrency(in.Currency).
+		SetNillablePaymentTermDays(in.PaymentTermDays).
 		SetSupplierSnapshot(in.SupplierSnapshot).
 		SetContractPartySnapshot(in.ContractPartySnapshot).
 		SetPurchaseDate(in.PurchaseDate)
@@ -831,6 +835,8 @@ func (r *purchaseOrderRepo) SavePurchaseOrderWithItems(ctx context.Context, id i
 			).
 			SetPurchaseOrderNo(in.PurchaseOrderNo).
 			SetSupplierID(in.SupplierID).
+			SetCurrency(in.Currency).
+			SetNillablePaymentTermDays(in.PaymentTermDays).
 			SetSupplierSnapshot(in.SupplierSnapshot).
 			SetContractPartySnapshot(in.ContractPartySnapshot).
 			SetPurchaseDate(in.PurchaseDate).
@@ -878,6 +884,8 @@ func (r *purchaseOrderRepo) SavePurchaseOrderWithItems(ctx context.Context, id i
 		orderRow, err = tx.PurchaseOrder.Create().
 			SetPurchaseOrderNo(in.PurchaseOrderNo).
 			SetSupplierID(in.SupplierID).
+			SetCurrency(in.Currency).
+			SetNillablePaymentTermDays(in.PaymentTermDays).
 			SetNillableSupplierPurchaseOrderNo(in.SupplierPurchaseOrderNo).
 			SetSupplierSnapshot(in.SupplierSnapshot).
 			SetContractPartySnapshot(in.ContractPartySnapshot).
@@ -1003,6 +1011,17 @@ func (r *purchaseOrderRepo) SupplierIsActive(ctx context.Context, id int) (bool,
 	return row.IsActive, nil
 }
 
+func (r *purchaseOrderRepo) SupplierDefaultPaymentTermDays(ctx context.Context, id int) (int, error) {
+	row, err := r.data.postgres.Supplier.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return 0, biz.ErrSupplierNotFound
+		}
+		return 0, err
+	}
+	return row.DefaultPaymentTermDays, nil
+}
+
 func (r *purchaseOrderRepo) MaterialIsActive(ctx context.Context, id int) (bool, error) {
 	row, err := r.data.postgres.Material.Query().
 		Where(material.ID(id)).
@@ -1104,6 +1123,8 @@ func entPurchaseOrderToBiz(row *ent.PurchaseOrder) *biz.PurchaseOrder {
 		ID:                      row.ID,
 		PurchaseOrderNo:         row.PurchaseOrderNo,
 		SupplierID:              row.SupplierID,
+		Currency:                row.Currency,
+		PaymentTermDays:         row.PaymentTermDays,
 		SupplierPurchaseOrderNo: row.SupplierPurchaseOrderNo,
 		SupplierSnapshot:        row.SupplierSnapshot,
 		ContractPartySnapshot:   row.ContractPartySnapshot,

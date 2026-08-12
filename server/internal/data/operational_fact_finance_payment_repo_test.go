@@ -423,6 +423,48 @@ func TestFinanceCreditNoteAndReversalPreserveOriginal(t *testing.T) {
 	}
 }
 
+func TestFinanceCreditNoteRejectsAdjustmentAfterSettlement(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "finance_credit_after_settlement")
+	customer := client.Customer.Create().SetCode("C-CREDIT-SETTLED").SetName("结清后红冲客户").SaveX(ctx)
+	creator := client.AdminUser.Create().SetUsername("finance-credit-settled-creator").SetPasswordHash("test-password-hash").SaveX(ctx)
+	approver := client.AdminUser.Create().SetUsername("finance-credit-settled-approver").SetPasswordHash("test-password-hash").SaveX(ctx)
+	poster := client.AdminUser.Create().SetUsername("finance-credit-settled-poster").SetPasswordHash("test-password-hash").SaveX(ctx)
+	fact := createPostedReceivableFinanceFactFixture(t, ctx, data, client, customer, "AR-CREDIT-SETTLED", 100)
+	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
+	uc := biz.NewOperationalFactUsecase(repo)
+	payment, err := uc.CreateFinancePayment(ctx, &biz.FinancePaymentCreate{
+		PaymentNo: "PAY-CREDIT-SETTLED", Direction: biz.FinancePaymentDirectionReceipt,
+		CounterpartyType: biz.FinanceCounterpartyCustomer, CounterpartyID: customer.ID,
+		Amount: decimal.NewFromInt(100), Currency: biz.FinanceCurrencyCNY,
+		AccountRef: "BANK-CREDIT-SETTLED", EvidenceRef: "FLOW-CREDIT-SETTLED",
+		IdempotencyKey: "PAY-CREDIT-SETTLED",
+	}, creator.ID)
+	if err != nil {
+		t.Fatalf("create settlement payment: %v", err)
+	}
+	payment = approveFinancePaymentForRepoTest(t, ctx, client, payment.ID, approver.ID)
+	if _, err := repo.postFinancePayment(ctx, &biz.FinancePaymentPost{
+		ID: payment.ID, ExpectedVersion: payment.Version,
+		Allocations: []biz.FinancePaymentAllocationInput{{FinanceFactID: fact.ID, Amount: decimal.NewFromInt(100)}},
+	}, poster.ID, nil, nil); err != nil {
+		t.Fatalf("post settlement payment: %v", err)
+	}
+	credit, err := uc.CreateFinanceCreditNote(ctx, &biz.FinanceCreditNoteCreate{
+		CreditNoteNo: "CN-CREDIT-SETTLED", FinanceFactID: fact.ID,
+		Amount: decimal.NewFromInt(30), Reason: "结清后退货折让", IdempotencyKey: "CN-CREDIT-SETTLED",
+	}, creator.ID)
+	if !errors.Is(err, biz.ErrBadParam) || credit != nil {
+		t.Fatalf("post-settlement credit=%#v err=%v want ErrBadParam", credit, err)
+	}
+	if got := client.FinanceFact.GetX(ctx, fact.ID); got.Status != biz.OperationalFactStatusSettled {
+		t.Fatalf("rejected credit changed settled fact status=%s", got.Status)
+	}
+	if count := client.FinanceCreditNote.Query().CountX(ctx); count != 0 {
+		t.Fatalf("rejected post-settlement credit left %d rows", count)
+	}
+}
+
 func TestFinanceFactCancellationRequiresPaymentAndCreditReversal(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "finance_fact_cancellation_dependencies")

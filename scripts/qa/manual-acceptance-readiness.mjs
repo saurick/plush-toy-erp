@@ -821,6 +821,7 @@ function normalizeFactReference(record, key, index) {
         "paymentTermDays",
         "payment_term_days",
       );
+      nullableValue("due_at", "dueAt", "due_at");
       nullableValue("invoice_category", "invoiceCategory", "invoice_category");
       nullableValue("cancelled_at", "cancelledAt", "cancelled_at");
       nullableValue(

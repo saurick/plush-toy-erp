@@ -43,19 +43,20 @@ type Customer struct {
 }
 
 type Supplier struct {
-	ID             int
-	Code           string
-	Name           string
-	ShortName      *string
-	SupplierType   *string
-	Address        *string
-	TaxNo          *string
-	ProcessIDs     []int
-	PrimaryContact *Contact
-	IsActive       bool
-	Note           *string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID                     int
+	Code                   string
+	Name                   string
+	ShortName              *string
+	SupplierType           *string
+	Address                *string
+	TaxNo                  *string
+	DefaultPaymentTermDays int
+	ProcessIDs             []int
+	PrimaryContact         *Contact
+	IsActive               bool
+	Note                   *string
+	CreatedAt              time.Time
+	UpdatedAt              time.Time
 }
 
 type Unit struct {
@@ -165,12 +166,13 @@ type CustomerMutation struct {
 }
 
 type SupplierMutation struct {
-	Code         string
-	Name         string
-	ShortName    *string
-	SupplierType *string
-	Address      *string
-	TaxNo        *string
+	Code                   string
+	Name                   string
+	ShortName              *string
+	SupplierType           *string
+	Address                *string
+	TaxNo                  *string
+	DefaultPaymentTermDays int
 	// Nil preserves existing capabilities on partial update; a non-nil empty
 	// slice explicitly clears the declared supplier-process relationships.
 	ProcessIDs []int
@@ -880,7 +882,7 @@ func normalizeSupplierMutation(in SupplierMutation) (SupplierMutation, error) {
 		}
 		in.ProcessIDs = normalizedIDs
 	}
-	if in.Code == "" || in.Name == "" {
+	if in.Code == "" || in.Name == "" || in.DefaultPaymentTermDays < 0 {
 		return SupplierMutation{}, ErrBadParam
 	}
 	return in, nil

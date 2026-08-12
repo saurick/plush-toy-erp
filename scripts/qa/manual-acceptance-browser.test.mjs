@@ -66,6 +66,7 @@ import {
   manualAcceptanceTaskBatchIdentity,
 } from "./manual-acceptance-task-data.mjs";
 import { inspectFinanceFieldContract } from "./manual-acceptance-finance-field-contract.mjs";
+import { formatUnixDate } from "../../web/src/erp/utils/masterDataOrderView.mjs";
 
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -96,14 +97,18 @@ function financeFieldFixture() {
       factType: "RECEIVABLE",
       status: "POSTED",
       collectionType: "ACCOUNTS_RECEIVABLE",
-      paymentTerm: "EOM_30",
+      paymentTerm: "EOM_DAYS",
       paymentTermDays: 30,
+      dueAt: 1_791_705_600,
     },
     {
       id: 92_001,
       factNo: "AP-FIELD-001",
       factType: "PAYABLE",
       status: "POSTED",
+      paymentTerm: "DUE_ON_OCCURRENCE",
+      paymentTermDays: 0,
+      dueAt: 1_789_113_600,
     },
     {
       id: 93_001,
@@ -495,20 +500,27 @@ test("finance browser evidence binds page headers and representative values", ()
   );
   const receivable = evaluateFinanceFieldBrowserEvidence({
     targetKey: "receivables",
-    headers: ["单号", "收款分类", "账期", "取消记录"],
-    rows: [["AR-FIELD-001", "应收款", "月结 30 天 / 30 天", "-"]],
+    headers: ["单号", "收款分类", "账期", "到期日期", "取消记录"],
+    rows: [
+      [
+        "AR-FIELD-001",
+        "应收款",
+        "月结 30 天",
+        formatUnixDate(1_791_705_600),
+        "-",
+      ],
+    ],
     representatives: financeFieldContract.representatives,
   });
   assert.equal(receivable.passed, true);
 
   const payable = evaluateFinanceFieldBrowserEvidence({
     targetKey: "payables",
-    headers: ["单号", "账期", "取消记录"],
-    rows: [["AP-FIELD-001", "历史未记录", "-"]],
+    headers: ["单号", "账期", "到期日期", "取消记录"],
+    rows: [["AP-FIELD-001", "发生即到期", formatUnixDate(1_789_113_600), "-"]],
     representatives: financeFieldContract.representatives,
   });
-  assert.equal(payable.passed, false);
-  assert.deepEqual(payable.forbiddenHeaders, ["账期"]);
+  assert.equal(payable.passed, true);
 });
 
 test("manual acceptance browser boundary isolates legal acknowledgement from business data", () => {

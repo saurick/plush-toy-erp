@@ -29,6 +29,7 @@ type stubOutsourcingOrderJSONRPCRepo struct {
 	lifecycleCalls     int
 	saveErr            error
 	saveCalls          int
+	supplierTerm       int
 }
 
 func newStubOutsourcingOrderJSONRPCRepo() *stubOutsourcingOrderJSONRPCRepo {
@@ -43,6 +44,7 @@ func newStubOutsourcingOrderJSONRPCRepo() *stubOutsourcingOrderJSONRPCRepo {
 		unitActive:         true,
 		processActive:      true,
 		processOutsourcing: true,
+		supplierTerm:       30,
 	}
 }
 
@@ -154,6 +156,10 @@ func (s *stubOutsourcingOrderJSONRPCRepo) SupplierIsActive(context.Context, int)
 	return s.supplierActive, nil
 }
 
+func (s *stubOutsourcingOrderJSONRPCRepo) SupplierDefaultPaymentTermDays(context.Context, int) (int, error) {
+	return s.supplierTerm, nil
+}
+
 func (s *stubOutsourcingOrderJSONRPCRepo) ProductIsActive(context.Context, int) (bool, error) {
 	return s.productActive, nil
 }
@@ -190,6 +196,8 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 	_, saveRes, err := j.handleOutsourcingOrder(ctx, "save_outsourcing_order_with_items", "1", mustJSONRPCStruct(t, map[string]any{
 		"outsourcing_order_no": "OUT-JSONRPC-001",
 		"supplier_id":          float64(1),
+		"currency":             "HKD",
+		"payment_term_days":    float64(45),
 		"supplier_snapshot": map[string]any{
 			"name":          "加工厂",
 			"contact_name":  "李厂长",
@@ -239,6 +247,9 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 	}
 	if status := order["lifecycle_status"]; status != biz.OutsourcingOrderStatusDraft {
 		t.Fatalf("expected draft outsourcing order, got %#v", status)
+	}
+	if order["currency"] != biz.FinanceCurrencyHKD || jsonRPCInt(t, order, "payment_term_days") != 45 {
+		t.Fatalf("expected HKD/45 outsourcing contract response, got %#v", order)
 	}
 	if _, exists := order["item_count"]; exists {
 		t.Fatalf("save response must not claim an unloaded outsourcing order item count, got %#v", order)
@@ -334,6 +345,42 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 		if got != tc.want {
 			t.Fatalf("%s expected status %s, got %#v", tc.method, tc.want, got)
 		}
+	}
+}
+
+func TestJsonrpcDispatcher_OutsourcingOrderAggregateRejectsUnknownFieldAndMalformedPaymentTerm(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		key   string
+		value any
+	}{
+		{name: "unknown top-level field", key: "unexpected_field", value: true},
+		{name: "malformed payment term", key: "payment_term_days", value: "30"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := newStubOutsourcingOrderJSONRPCRepo()
+			j := newOutsourcingOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin(
+				[]string{biz.PurchaseRoleKey},
+				biz.PermissionOutsourcingOrderCreate,
+			))
+			params := map[string]any{
+				"outsourcing_order_no": "OUT-PARSER-CONTRACT",
+				"supplier_id":          float64(1),
+				"currency":             biz.FinanceCurrencyCNY,
+				"order_date":           "2026-08-12",
+			}
+			params[tc.key] = tc.value
+
+			_, res, err := j.handleOutsourcingOrder(
+				workflowJSONRPCAdminContext(),
+				"save_outsourcing_order_with_items",
+				tc.name,
+				mustJSONRPCStruct(t, params),
+			)
+			if err != nil || res == nil || res.Code != errcode.InvalidParam.Code || repo.saveCalls != 0 {
+				t.Fatalf("invalid aggregate input must fail before save: res=%#v err=%v calls=%d", res, err, repo.saveCalls)
+			}
+		})
 	}
 }
 
@@ -469,6 +516,8 @@ func TestJsonrpcDispatcher_OutsourcingOrderDraftVersionContract(t *testing.T) {
 			"id":                   float64(1),
 			"outsourcing_order_no": "OUT-VERSION-CONTRACT",
 			"supplier_id":          float64(1),
+			"currency":             "USD",
+			"payment_term_days":    float64(30),
 			"order_date":           "2026-07-14",
 			"items": []any{map[string]any{
 				"id":                   float64(1),
@@ -695,6 +744,8 @@ func outsourcingOrderFromMutation(id int, status string, in *biz.OutsourcingOrde
 		ID:                    id,
 		OutsourcingOrderNo:    in.OutsourcingOrderNo,
 		SupplierID:            in.SupplierID,
+		Currency:              in.Currency,
+		PaymentTermDays:       in.PaymentTermDays,
 		SupplierSnapshot:      in.SupplierSnapshot,
 		ContractPartySnapshot: in.ContractPartySnapshot,
 		SourceOrderNo:         in.SourceOrderNo,

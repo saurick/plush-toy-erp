@@ -33,6 +33,7 @@ import {
   isDateInputBefore,
 } from '../../utils/dateRange.mjs'
 import {
+  BUSINESS_CURRENCY_OPTIONS,
   buildSalesOrderItemSourceValuesFromSKU,
   deriveSalesOrderItemAmount,
   paymentConditionCompleteness,
@@ -253,6 +254,14 @@ export function SalesOrderFormFields({
         name="customer_order_no"
       >
         <Input allowClear autoComplete="off" />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="币种"
+        name="currency"
+        rules={[{ required: true, message: '请选择币种' }]}
+      >
+        <Select options={BUSINESS_CURRENCY_OPTIONS} />
       </Form.Item>
       <BusinessFormSectionTitle>联系人与负责人</BusinessFormSectionTitle>
       <Form.Item

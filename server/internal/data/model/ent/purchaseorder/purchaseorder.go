@@ -18,6 +18,10 @@ const (
 	FieldPurchaseOrderNo = "purchase_order_no"
 	// FieldSupplierID holds the string denoting the supplier_id field in the database.
 	FieldSupplierID = "supplier_id"
+	// FieldCurrency holds the string denoting the currency field in the database.
+	FieldCurrency = "currency"
+	// FieldPaymentTermDays holds the string denoting the payment_term_days field in the database.
+	FieldPaymentTermDays = "payment_term_days"
 	// FieldSupplierPurchaseOrderNo holds the string denoting the supplier_purchase_order_no field in the database.
 	FieldSupplierPurchaseOrderNo = "supplier_purchase_order_no"
 	// FieldSupplierSnapshot holds the string denoting the supplier_snapshot field in the database.
@@ -75,6 +79,8 @@ var Columns = []string{
 	FieldID,
 	FieldPurchaseOrderNo,
 	FieldSupplierID,
+	FieldCurrency,
+	FieldPaymentTermDays,
 	FieldSupplierPurchaseOrderNo,
 	FieldSupplierSnapshot,
 	FieldContractPartySnapshot,
@@ -107,6 +113,12 @@ var (
 	PurchaseOrderNoValidator func(string) error
 	// SupplierIDValidator is a validator for the "supplier_id" field. It is called by the builders before save.
 	SupplierIDValidator func(int) error
+	// DefaultCurrency holds the default value on creation for the "currency" field.
+	DefaultCurrency string
+	// CurrencyValidator is a validator for the "currency" field. It is called by the builders before save.
+	CurrencyValidator func(string) error
+	// PaymentTermDaysValidator is a validator for the "payment_term_days" field. It is called by the builders before save.
+	PaymentTermDaysValidator func(int) error
 	// SupplierPurchaseOrderNoValidator is a validator for the "supplier_purchase_order_no" field. It is called by the builders before save.
 	SupplierPurchaseOrderNoValidator func(string) error
 	// DefaultLifecycleStatus holds the default value on creation for the "lifecycle_status" field.
@@ -151,6 +163,16 @@ func ByPurchaseOrderNo(opts ...sql.OrderTermOption) OrderOption {
 // BySupplierID orders the results by the supplier_id field.
 func BySupplierID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSupplierID, opts...).ToFunc()
+}
+
+// ByCurrency orders the results by the currency field.
+func ByCurrency(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCurrency, opts...).ToFunc()
+}
+
+// ByPaymentTermDays orders the results by the payment_term_days field.
+func ByPaymentTermDays(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPaymentTermDays, opts...).ToFunc()
 }
 
 // BySupplierPurchaseOrderNo orders the results by the supplier_purchase_order_no field.

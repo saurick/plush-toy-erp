@@ -23,6 +23,10 @@ type PurchaseOrder struct {
 	PurchaseOrderNo string `json:"purchase_order_no,omitempty"`
 	// SupplierID holds the value of the "supplier_id" field.
 	SupplierID int `json:"supplier_id,omitempty"`
+	// Currency holds the value of the "currency" field.
+	Currency string `json:"currency,omitempty"`
+	// PaymentTermDays holds the value of the "payment_term_days" field.
+	PaymentTermDays *int `json:"payment_term_days,omitempty"`
 	// SupplierPurchaseOrderNo holds the value of the "supplier_purchase_order_no" field.
 	SupplierPurchaseOrderNo *string `json:"supplier_purchase_order_no,omitempty"`
 	// SupplierSnapshot holds the value of the "supplier_snapshot" field.
@@ -97,9 +101,9 @@ func (*PurchaseOrder) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case purchaseorder.FieldSupplierSnapshot, purchaseorder.FieldContractPartySnapshot:
 			values[i] = new([]byte)
-		case purchaseorder.FieldID, purchaseorder.FieldSupplierID, purchaseorder.FieldVersion, purchaseorder.FieldSettledBy:
+		case purchaseorder.FieldID, purchaseorder.FieldSupplierID, purchaseorder.FieldPaymentTermDays, purchaseorder.FieldVersion, purchaseorder.FieldSettledBy:
 			values[i] = new(sql.NullInt64)
-		case purchaseorder.FieldPurchaseOrderNo, purchaseorder.FieldSupplierPurchaseOrderNo, purchaseorder.FieldLifecycleStatus, purchaseorder.FieldSettlementAction, purchaseorder.FieldSettlementMode, purchaseorder.FieldSettlementReason, purchaseorder.FieldNote:
+		case purchaseorder.FieldPurchaseOrderNo, purchaseorder.FieldCurrency, purchaseorder.FieldSupplierPurchaseOrderNo, purchaseorder.FieldLifecycleStatus, purchaseorder.FieldSettlementAction, purchaseorder.FieldSettlementMode, purchaseorder.FieldSettlementReason, purchaseorder.FieldNote:
 			values[i] = new(sql.NullString)
 		case purchaseorder.FieldPurchaseDate, purchaseorder.FieldExpectedArrivalDate, purchaseorder.FieldSettledAt, purchaseorder.FieldCreatedAt, purchaseorder.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -135,6 +139,19 @@ func (_m *PurchaseOrder) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field supplier_id", values[i])
 			} else if value.Valid {
 				_m.SupplierID = int(value.Int64)
+			}
+		case purchaseorder.FieldCurrency:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field currency", values[i])
+			} else if value.Valid {
+				_m.Currency = value.String
+			}
+		case purchaseorder.FieldPaymentTermDays:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field payment_term_days", values[i])
+			} else if value.Valid {
+				_m.PaymentTermDays = new(int)
+				*_m.PaymentTermDays = int(value.Int64)
 			}
 		case purchaseorder.FieldSupplierPurchaseOrderNo:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -289,6 +306,14 @@ func (_m *PurchaseOrder) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("supplier_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.SupplierID))
+	builder.WriteString(", ")
+	builder.WriteString("currency=")
+	builder.WriteString(_m.Currency)
+	builder.WriteString(", ")
+	if v := _m.PaymentTermDays; v != nil {
+		builder.WriteString("payment_term_days=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	if v := _m.SupplierPurchaseOrderNo; v != nil {
 		builder.WriteString("supplier_purchase_order_no=")

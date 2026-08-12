@@ -661,8 +661,9 @@ function createRPC({
             idempotency_key: params.idempotency_key,
             amount: "128.88",
             collection_type: "ACCOUNTS_RECEIVABLE",
-            payment_term: "EOM_30",
+            payment_term: "EOM_DAYS",
             payment_term_days: 30,
+            due_at: 1_791_705_600,
           },
           method,
         );
@@ -692,7 +693,13 @@ function createRPC({
       case "create_payable_from_purchase_receipt":
         return createRecord(
           "finance_fact",
-          { fact_no: params.fact_no, fact_type: "PAYABLE" },
+          {
+            fact_no: params.fact_no,
+            fact_type: "PAYABLE",
+            payment_term: "EOM_DAYS",
+            payment_term_days: 30,
+            due_at: 1_791_705_600,
+          },
           method,
         );
       case "create_reconciliation_from_finance_fact":

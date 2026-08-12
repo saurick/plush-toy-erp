@@ -546,6 +546,8 @@ func (r *outsourcingOrderRepo) SaveOutsourcingOrderWithItems(ctx context.Context
 			).
 			SetOutsourcingOrderNo(in.OutsourcingOrderNo).
 			SetSupplierID(in.SupplierID).
+			SetCurrency(in.Currency).
+			SetNillablePaymentTermDays(in.PaymentTermDays).
 			SetSupplierSnapshot(in.SupplierSnapshot).
 			SetContractPartySnapshot(in.ContractPartySnapshot).
 			SetOrderDate(in.OrderDate).
@@ -593,6 +595,8 @@ func (r *outsourcingOrderRepo) SaveOutsourcingOrderWithItems(ctx context.Context
 		orderRow, err = tx.OutsourcingOrder.Create().
 			SetOutsourcingOrderNo(in.OutsourcingOrderNo).
 			SetSupplierID(in.SupplierID).
+			SetCurrency(in.Currency).
+			SetNillablePaymentTermDays(in.PaymentTermDays).
 			SetSupplierSnapshot(in.SupplierSnapshot).
 			SetContractPartySnapshot(in.ContractPartySnapshot).
 			SetNillableSourceOrderNo(in.SourceOrderNo).
@@ -913,6 +917,17 @@ func (r *outsourcingOrderRepo) SupplierIsActive(ctx context.Context, id int) (bo
 	return row.IsActive, nil
 }
 
+func (r *outsourcingOrderRepo) SupplierDefaultPaymentTermDays(ctx context.Context, id int) (int, error) {
+	row, err := r.data.postgres.Supplier.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return 0, biz.ErrSupplierNotFound
+		}
+		return 0, err
+	}
+	return row.DefaultPaymentTermDays, nil
+}
+
 func (r *outsourcingOrderRepo) ProductIsActive(ctx context.Context, id int) (bool, error) {
 	row, err := r.data.postgres.Product.Query().
 		Where(product.ID(id)).
@@ -1090,6 +1105,8 @@ func entOutsourcingOrderToBiz(row *ent.OutsourcingOrder) *biz.OutsourcingOrder {
 		ID:                    row.ID,
 		OutsourcingOrderNo:    row.OutsourcingOrderNo,
 		SupplierID:            row.SupplierID,
+		Currency:              row.Currency,
+		PaymentTermDays:       row.PaymentTermDays,
 		SupplierSnapshot:      row.SupplierSnapshot,
 		ContractPartySnapshot: row.ContractPartySnapshot,
 		SourceOrderNo:         row.SourceOrderNo,

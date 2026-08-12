@@ -19,8 +19,10 @@ func (PurchaseOrder) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{
 			Checks: map[string]string{
-				"purchase_orders_lifecycle_status_allowed": "lifecycle_status IN ('draft', 'submitted', 'approved', 'closed', 'canceled')",
-				"purchase_orders_version_positive":         "version > 0",
+				"purchase_orders_lifecycle_status_allowed":      "lifecycle_status IN ('draft', 'submitted', 'approved', 'closed', 'canceled')",
+				"purchase_orders_version_positive":              "version > 0",
+				"purchase_orders_currency_allowed":              "currency IN ('USD', 'CNY', 'HKD')",
+				"purchase_orders_payment_term_days_nonnegative": "payment_term_days IS NULL OR payment_term_days >= 0",
 			},
 		},
 	}
@@ -33,6 +35,14 @@ func (PurchaseOrder) Fields() []ent.Field {
 			MaxLen(64),
 		field.Int("supplier_id").
 			Positive(),
+		field.String("currency").
+			NotEmpty().
+			Default("CNY").
+			MaxLen(16),
+		field.Int("payment_term_days").
+			Optional().
+			Nillable().
+			NonNegative(),
 		field.String("supplier_purchase_order_no").
 			Optional().
 			Nillable().

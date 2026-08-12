@@ -19,8 +19,10 @@ func (OutsourcingOrder) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{
 			Checks: map[string]string{
-				"outsourcing_orders_lifecycle_status_allowed": "lifecycle_status IN ('draft', 'submitted', 'confirmed', 'closed', 'canceled')",
-				"outsourcing_orders_version_positive":         "version > 0",
+				"outsourcing_orders_lifecycle_status_allowed":      "lifecycle_status IN ('draft', 'submitted', 'confirmed', 'closed', 'canceled')",
+				"outsourcing_orders_version_positive":              "version > 0",
+				"outsourcing_orders_currency_allowed":              "currency IN ('USD', 'CNY', 'HKD')",
+				"outsourcing_orders_payment_term_days_nonnegative": "payment_term_days IS NULL OR payment_term_days >= 0",
 			},
 		},
 	}
@@ -33,6 +35,14 @@ func (OutsourcingOrder) Fields() []ent.Field {
 			MaxLen(64),
 		field.Int("supplier_id").
 			Positive(),
+		field.String("currency").
+			NotEmpty().
+			Default("CNY").
+			MaxLen(16),
+		field.Int("payment_term_days").
+			Optional().
+			Nillable().
+			NonNegative(),
 		// Snapshot preserves contract-time display data; Supplier remains the master truth.
 		field.JSON("supplier_snapshot", map[string]any{}).
 			Optional(),

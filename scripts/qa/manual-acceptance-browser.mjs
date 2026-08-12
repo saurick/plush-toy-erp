@@ -19,6 +19,7 @@ import {
   buildManualAcceptancePageDataContract,
 } from "./manual-acceptance-page-data-contract.mjs";
 import { inspectFinanceFieldContract } from "./manual-acceptance-finance-field-contract.mjs";
+import { formatUnixDate } from "../../web/src/erp/utils/masterDataOrderView.mjs";
 import { dashboardHealthModules } from "../../web/src/erp/config/dashboardModules.mjs";
 import {
   MANUAL_ACCEPTANCE_DATASET_APPLY_REPORT_CONTRACT,
@@ -1844,23 +1845,33 @@ export function evaluateCurrentBatchListEvidence({
 const FINANCE_BROWSER_PAGE_CONTRACT = Object.freeze({
   receivables: Object.freeze({
     factType: "RECEIVABLE",
-    requiredHeaders: Object.freeze(["收款分类", "账期", "取消记录"]),
+    requiredHeaders: Object.freeze([
+      "收款分类",
+      "账期",
+      "到期日期",
+      "取消记录",
+    ]),
     forbiddenHeaders: Object.freeze(["发票类别"]),
   }),
   payables: Object.freeze({
     factType: "PAYABLE",
-    requiredHeaders: Object.freeze(["取消记录"]),
-    forbiddenHeaders: Object.freeze(["收款分类", "账期", "发票类别"]),
+    requiredHeaders: Object.freeze(["账期", "到期日期", "取消记录"]),
+    forbiddenHeaders: Object.freeze(["收款分类", "发票类别"]),
   }),
   invoices: Object.freeze({
     factType: "INVOICE",
     requiredHeaders: Object.freeze(["发票类别", "取消记录"]),
-    forbiddenHeaders: Object.freeze(["收款分类", "账期"]),
+    forbiddenHeaders: Object.freeze(["收款分类", "账期", "到期日期"]),
   }),
   reconciliation: Object.freeze({
     factType: "RECONCILIATION",
     requiredHeaders: Object.freeze(["取消记录"]),
-    forbiddenHeaders: Object.freeze(["收款分类", "账期", "发票类别"]),
+    forbiddenHeaders: Object.freeze([
+      "收款分类",
+      "账期",
+      "到期日期",
+      "发票类别",
+    ]),
   }),
 });
 
@@ -1895,20 +1906,29 @@ export function evaluateFinanceFieldBrowserEvidence({
   if (row && cellAt("取消记录") !== "-") {
     valueMismatches.push("非取消代表行的取消记录必须为 -");
   }
-  if (row && contract.factType === "RECEIVABLE") {
-    if (cellAt("收款分类") !== "应收款") {
+  if (row && ["RECEIVABLE", "PAYABLE"].includes(contract.factType)) {
+    if (contract.factType === "RECEIVABLE" && cellAt("收款分类") !== "应收款") {
       valueMismatches.push("应收收款分类未显示为应收款");
     }
-    const termLabels = {
-      CASH_ON_SHIPMENT: "出货即收",
-      EOM_30: "月结 30 天",
-      EOM_45: "月结 45 天",
-    };
-    const expectedTerm = representative.paymentTerm
-      ? `${termLabels[representative.paymentTerm] || "待核对"} / ${representative.paymentTermDays} 天`
-      : `自定义账期 / ${representative.paymentTermDays} 天`;
+    const expectedTerm =
+      representative.paymentTerm === "DUE_ON_OCCURRENCE" &&
+      representative.paymentTermDays === 0
+        ? "发生即到期"
+        : representative.paymentTerm === "EOM_DAYS" &&
+            Number.isSafeInteger(representative.paymentTermDays) &&
+            representative.paymentTermDays > 0
+          ? `月结 ${representative.paymentTermDays} 天`
+          : "待核对";
     if (cellAt("账期") !== expectedTerm) {
-      valueMismatches.push(`应收账期未显示为 ${expectedTerm}`);
+      valueMismatches.push(
+        `${contract.factType === "RECEIVABLE" ? "应收" : "应付"}账期未显示为 ${expectedTerm}`,
+      );
+    }
+    const expectedDueAt = formatUnixDate(representative.dueAt);
+    if (expectedDueAt === "-" || cellAt("到期日期") !== expectedDueAt) {
+      valueMismatches.push(
+        `${contract.factType === "RECEIVABLE" ? "应收" : "应付"}到期日期未显示为 ${expectedDueAt}`,
+      );
     }
   }
   if (row && contract.factType === "INVOICE") {

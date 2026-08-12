@@ -2522,12 +2522,36 @@ func init() {
 	outsourcingorderDescSupplierID := outsourcingorderFields[1].Descriptor()
 	// outsourcingorder.SupplierIDValidator is a validator for the "supplier_id" field. It is called by the builders before save.
 	outsourcingorder.SupplierIDValidator = outsourcingorderDescSupplierID.Validators[0].(func(int) error)
+	// outsourcingorderDescCurrency is the schema descriptor for currency field.
+	outsourcingorderDescCurrency := outsourcingorderFields[2].Descriptor()
+	// outsourcingorder.DefaultCurrency holds the default value on creation for the currency field.
+	outsourcingorder.DefaultCurrency = outsourcingorderDescCurrency.Default.(string)
+	// outsourcingorder.CurrencyValidator is a validator for the "currency" field. It is called by the builders before save.
+	outsourcingorder.CurrencyValidator = func() func(string) error {
+		validators := outsourcingorderDescCurrency.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(currency string) error {
+			for _, fn := range fns {
+				if err := fn(currency); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// outsourcingorderDescPaymentTermDays is the schema descriptor for payment_term_days field.
+	outsourcingorderDescPaymentTermDays := outsourcingorderFields[3].Descriptor()
+	// outsourcingorder.PaymentTermDaysValidator is a validator for the "payment_term_days" field. It is called by the builders before save.
+	outsourcingorder.PaymentTermDaysValidator = outsourcingorderDescPaymentTermDays.Validators[0].(func(int) error)
 	// outsourcingorderDescSourceOrderNo is the schema descriptor for source_order_no field.
-	outsourcingorderDescSourceOrderNo := outsourcingorderFields[4].Descriptor()
+	outsourcingorderDescSourceOrderNo := outsourcingorderFields[6].Descriptor()
 	// outsourcingorder.SourceOrderNoValidator is a validator for the "source_order_no" field. It is called by the builders before save.
 	outsourcingorder.SourceOrderNoValidator = outsourcingorderDescSourceOrderNo.Validators[0].(func(string) error)
 	// outsourcingorderDescLifecycleStatus is the schema descriptor for lifecycle_status field.
-	outsourcingorderDescLifecycleStatus := outsourcingorderFields[7].Descriptor()
+	outsourcingorderDescLifecycleStatus := outsourcingorderFields[9].Descriptor()
 	// outsourcingorder.DefaultLifecycleStatus holds the default value on creation for the lifecycle_status field.
 	outsourcingorder.DefaultLifecycleStatus = outsourcingorderDescLifecycleStatus.Default.(string)
 	// outsourcingorder.LifecycleStatusValidator is a validator for the "lifecycle_status" field. It is called by the builders before save.
@@ -2547,37 +2571,37 @@ func init() {
 		}
 	}()
 	// outsourcingorderDescVersion is the schema descriptor for version field.
-	outsourcingorderDescVersion := outsourcingorderFields[8].Descriptor()
+	outsourcingorderDescVersion := outsourcingorderFields[10].Descriptor()
 	// outsourcingorder.DefaultVersion holds the default value on creation for the version field.
 	outsourcingorder.DefaultVersion = outsourcingorderDescVersion.Default.(int)
 	// outsourcingorder.VersionValidator is a validator for the "version" field. It is called by the builders before save.
 	outsourcingorder.VersionValidator = outsourcingorderDescVersion.Validators[0].(func(int) error)
 	// outsourcingorderDescSettlementAction is the schema descriptor for settlement_action field.
-	outsourcingorderDescSettlementAction := outsourcingorderFields[9].Descriptor()
+	outsourcingorderDescSettlementAction := outsourcingorderFields[11].Descriptor()
 	// outsourcingorder.SettlementActionValidator is a validator for the "settlement_action" field. It is called by the builders before save.
 	outsourcingorder.SettlementActionValidator = outsourcingorderDescSettlementAction.Validators[0].(func(string) error)
 	// outsourcingorderDescSettlementMode is the schema descriptor for settlement_mode field.
-	outsourcingorderDescSettlementMode := outsourcingorderFields[10].Descriptor()
+	outsourcingorderDescSettlementMode := outsourcingorderFields[12].Descriptor()
 	// outsourcingorder.SettlementModeValidator is a validator for the "settlement_mode" field. It is called by the builders before save.
 	outsourcingorder.SettlementModeValidator = outsourcingorderDescSettlementMode.Validators[0].(func(string) error)
 	// outsourcingorderDescSettlementReason is the schema descriptor for settlement_reason field.
-	outsourcingorderDescSettlementReason := outsourcingorderFields[11].Descriptor()
+	outsourcingorderDescSettlementReason := outsourcingorderFields[13].Descriptor()
 	// outsourcingorder.SettlementReasonValidator is a validator for the "settlement_reason" field. It is called by the builders before save.
 	outsourcingorder.SettlementReasonValidator = outsourcingorderDescSettlementReason.Validators[0].(func(string) error)
 	// outsourcingorderDescSettledBy is the schema descriptor for settled_by field.
-	outsourcingorderDescSettledBy := outsourcingorderFields[13].Descriptor()
+	outsourcingorderDescSettledBy := outsourcingorderFields[15].Descriptor()
 	// outsourcingorder.SettledByValidator is a validator for the "settled_by" field. It is called by the builders before save.
 	outsourcingorder.SettledByValidator = outsourcingorderDescSettledBy.Validators[0].(func(int) error)
 	// outsourcingorderDescNote is the schema descriptor for note field.
-	outsourcingorderDescNote := outsourcingorderFields[14].Descriptor()
+	outsourcingorderDescNote := outsourcingorderFields[16].Descriptor()
 	// outsourcingorder.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	outsourcingorder.NoteValidator = outsourcingorderDescNote.Validators[0].(func(string) error)
 	// outsourcingorderDescCreatedAt is the schema descriptor for created_at field.
-	outsourcingorderDescCreatedAt := outsourcingorderFields[15].Descriptor()
+	outsourcingorderDescCreatedAt := outsourcingorderFields[17].Descriptor()
 	// outsourcingorder.DefaultCreatedAt holds the default value on creation for the created_at field.
 	outsourcingorder.DefaultCreatedAt = outsourcingorderDescCreatedAt.Default.(func() time.Time)
 	// outsourcingorderDescUpdatedAt is the schema descriptor for updated_at field.
-	outsourcingorderDescUpdatedAt := outsourcingorderFields[16].Descriptor()
+	outsourcingorderDescUpdatedAt := outsourcingorderFields[18].Descriptor()
 	// outsourcingorder.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	outsourcingorder.DefaultUpdatedAt = outsourcingorderDescUpdatedAt.Default.(func() time.Time)
 	// outsourcingorder.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -4896,12 +4920,36 @@ func init() {
 	purchaseorderDescSupplierID := purchaseorderFields[1].Descriptor()
 	// purchaseorder.SupplierIDValidator is a validator for the "supplier_id" field. It is called by the builders before save.
 	purchaseorder.SupplierIDValidator = purchaseorderDescSupplierID.Validators[0].(func(int) error)
+	// purchaseorderDescCurrency is the schema descriptor for currency field.
+	purchaseorderDescCurrency := purchaseorderFields[2].Descriptor()
+	// purchaseorder.DefaultCurrency holds the default value on creation for the currency field.
+	purchaseorder.DefaultCurrency = purchaseorderDescCurrency.Default.(string)
+	// purchaseorder.CurrencyValidator is a validator for the "currency" field. It is called by the builders before save.
+	purchaseorder.CurrencyValidator = func() func(string) error {
+		validators := purchaseorderDescCurrency.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(currency string) error {
+			for _, fn := range fns {
+				if err := fn(currency); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// purchaseorderDescPaymentTermDays is the schema descriptor for payment_term_days field.
+	purchaseorderDescPaymentTermDays := purchaseorderFields[3].Descriptor()
+	// purchaseorder.PaymentTermDaysValidator is a validator for the "payment_term_days" field. It is called by the builders before save.
+	purchaseorder.PaymentTermDaysValidator = purchaseorderDescPaymentTermDays.Validators[0].(func(int) error)
 	// purchaseorderDescSupplierPurchaseOrderNo is the schema descriptor for supplier_purchase_order_no field.
-	purchaseorderDescSupplierPurchaseOrderNo := purchaseorderFields[2].Descriptor()
+	purchaseorderDescSupplierPurchaseOrderNo := purchaseorderFields[4].Descriptor()
 	// purchaseorder.SupplierPurchaseOrderNoValidator is a validator for the "supplier_purchase_order_no" field. It is called by the builders before save.
 	purchaseorder.SupplierPurchaseOrderNoValidator = purchaseorderDescSupplierPurchaseOrderNo.Validators[0].(func(string) error)
 	// purchaseorderDescLifecycleStatus is the schema descriptor for lifecycle_status field.
-	purchaseorderDescLifecycleStatus := purchaseorderFields[7].Descriptor()
+	purchaseorderDescLifecycleStatus := purchaseorderFields[9].Descriptor()
 	// purchaseorder.DefaultLifecycleStatus holds the default value on creation for the lifecycle_status field.
 	purchaseorder.DefaultLifecycleStatus = purchaseorderDescLifecycleStatus.Default.(string)
 	// purchaseorder.LifecycleStatusValidator is a validator for the "lifecycle_status" field. It is called by the builders before save.
@@ -4921,37 +4969,37 @@ func init() {
 		}
 	}()
 	// purchaseorderDescVersion is the schema descriptor for version field.
-	purchaseorderDescVersion := purchaseorderFields[8].Descriptor()
+	purchaseorderDescVersion := purchaseorderFields[10].Descriptor()
 	// purchaseorder.DefaultVersion holds the default value on creation for the version field.
 	purchaseorder.DefaultVersion = purchaseorderDescVersion.Default.(int)
 	// purchaseorder.VersionValidator is a validator for the "version" field. It is called by the builders before save.
 	purchaseorder.VersionValidator = purchaseorderDescVersion.Validators[0].(func(int) error)
 	// purchaseorderDescSettlementAction is the schema descriptor for settlement_action field.
-	purchaseorderDescSettlementAction := purchaseorderFields[9].Descriptor()
+	purchaseorderDescSettlementAction := purchaseorderFields[11].Descriptor()
 	// purchaseorder.SettlementActionValidator is a validator for the "settlement_action" field. It is called by the builders before save.
 	purchaseorder.SettlementActionValidator = purchaseorderDescSettlementAction.Validators[0].(func(string) error)
 	// purchaseorderDescSettlementMode is the schema descriptor for settlement_mode field.
-	purchaseorderDescSettlementMode := purchaseorderFields[10].Descriptor()
+	purchaseorderDescSettlementMode := purchaseorderFields[12].Descriptor()
 	// purchaseorder.SettlementModeValidator is a validator for the "settlement_mode" field. It is called by the builders before save.
 	purchaseorder.SettlementModeValidator = purchaseorderDescSettlementMode.Validators[0].(func(string) error)
 	// purchaseorderDescSettlementReason is the schema descriptor for settlement_reason field.
-	purchaseorderDescSettlementReason := purchaseorderFields[11].Descriptor()
+	purchaseorderDescSettlementReason := purchaseorderFields[13].Descriptor()
 	// purchaseorder.SettlementReasonValidator is a validator for the "settlement_reason" field. It is called by the builders before save.
 	purchaseorder.SettlementReasonValidator = purchaseorderDescSettlementReason.Validators[0].(func(string) error)
 	// purchaseorderDescSettledBy is the schema descriptor for settled_by field.
-	purchaseorderDescSettledBy := purchaseorderFields[13].Descriptor()
+	purchaseorderDescSettledBy := purchaseorderFields[15].Descriptor()
 	// purchaseorder.SettledByValidator is a validator for the "settled_by" field. It is called by the builders before save.
 	purchaseorder.SettledByValidator = purchaseorderDescSettledBy.Validators[0].(func(int) error)
 	// purchaseorderDescNote is the schema descriptor for note field.
-	purchaseorderDescNote := purchaseorderFields[14].Descriptor()
+	purchaseorderDescNote := purchaseorderFields[16].Descriptor()
 	// purchaseorder.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	purchaseorder.NoteValidator = purchaseorderDescNote.Validators[0].(func(string) error)
 	// purchaseorderDescCreatedAt is the schema descriptor for created_at field.
-	purchaseorderDescCreatedAt := purchaseorderFields[15].Descriptor()
+	purchaseorderDescCreatedAt := purchaseorderFields[17].Descriptor()
 	// purchaseorder.DefaultCreatedAt holds the default value on creation for the created_at field.
 	purchaseorder.DefaultCreatedAt = purchaseorderDescCreatedAt.Default.(func() time.Time)
 	// purchaseorderDescUpdatedAt is the schema descriptor for updated_at field.
-	purchaseorderDescUpdatedAt := purchaseorderFields[16].Descriptor()
+	purchaseorderDescUpdatedAt := purchaseorderFields[18].Descriptor()
 	// purchaseorder.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	purchaseorder.DefaultUpdatedAt = purchaseorderDescUpdatedAt.Default.(func() time.Time)
 	// purchaseorder.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -6125,28 +6173,48 @@ func init() {
 	salesorderDescCustomerID := salesorderFields[1].Descriptor()
 	// salesorder.CustomerIDValidator is a validator for the "customer_id" field. It is called by the builders before save.
 	salesorder.CustomerIDValidator = salesorderDescCustomerID.Validators[0].(func(int) error)
+	// salesorderDescCurrency is the schema descriptor for currency field.
+	salesorderDescCurrency := salesorderFields[2].Descriptor()
+	// salesorder.DefaultCurrency holds the default value on creation for the currency field.
+	salesorder.DefaultCurrency = salesorderDescCurrency.Default.(string)
+	// salesorder.CurrencyValidator is a validator for the "currency" field. It is called by the builders before save.
+	salesorder.CurrencyValidator = func() func(string) error {
+		validators := salesorderDescCurrency.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(currency string) error {
+			for _, fn := range fns {
+				if err := fn(currency); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
 	// salesorderDescCustomerOrderNo is the schema descriptor for customer_order_no field.
-	salesorderDescCustomerOrderNo := salesorderFields[2].Descriptor()
+	salesorderDescCustomerOrderNo := salesorderFields[3].Descriptor()
 	// salesorder.CustomerOrderNoValidator is a validator for the "customer_order_no" field. It is called by the builders before save.
 	salesorder.CustomerOrderNoValidator = salesorderDescCustomerOrderNo.Validators[0].(func(string) error)
 	// salesorderDescSalesOwner is the schema descriptor for sales_owner field.
-	salesorderDescSalesOwner := salesorderFields[4].Descriptor()
+	salesorderDescSalesOwner := salesorderFields[5].Descriptor()
 	// salesorder.SalesOwnerValidator is a validator for the "sales_owner" field. It is called by the builders before save.
 	salesorder.SalesOwnerValidator = salesorderDescSalesOwner.Validators[0].(func(string) error)
 	// salesorderDescPaymentMethod is the schema descriptor for payment_method field.
-	salesorderDescPaymentMethod := salesorderFields[6].Descriptor()
+	salesorderDescPaymentMethod := salesorderFields[7].Descriptor()
 	// salesorder.PaymentMethodValidator is a validator for the "payment_method" field. It is called by the builders before save.
 	salesorder.PaymentMethodValidator = salesorderDescPaymentMethod.Validators[0].(func(string) error)
 	// salesorderDescPaymentTermDays is the schema descriptor for payment_term_days field.
-	salesorderDescPaymentTermDays := salesorderFields[7].Descriptor()
+	salesorderDescPaymentTermDays := salesorderFields[8].Descriptor()
 	// salesorder.PaymentTermDaysValidator is a validator for the "payment_term_days" field. It is called by the builders before save.
 	salesorder.PaymentTermDaysValidator = salesorderDescPaymentTermDays.Validators[0].(func(int) error)
 	// salesorderDescPriceConditionNote is the schema descriptor for price_condition_note field.
-	salesorderDescPriceConditionNote := salesorderFields[8].Descriptor()
+	salesorderDescPriceConditionNote := salesorderFields[9].Descriptor()
 	// salesorder.PriceConditionNoteValidator is a validator for the "price_condition_note" field. It is called by the builders before save.
 	salesorder.PriceConditionNoteValidator = salesorderDescPriceConditionNote.Validators[0].(func(string) error)
 	// salesorderDescLifecycleStatus is the schema descriptor for lifecycle_status field.
-	salesorderDescLifecycleStatus := salesorderFields[11].Descriptor()
+	salesorderDescLifecycleStatus := salesorderFields[12].Descriptor()
 	// salesorder.DefaultLifecycleStatus holds the default value on creation for the lifecycle_status field.
 	salesorder.DefaultLifecycleStatus = salesorderDescLifecycleStatus.Default.(string)
 	// salesorder.LifecycleStatusValidator is a validator for the "lifecycle_status" field. It is called by the builders before save.
@@ -6166,37 +6234,37 @@ func init() {
 		}
 	}()
 	// salesorderDescVersion is the schema descriptor for version field.
-	salesorderDescVersion := salesorderFields[12].Descriptor()
+	salesorderDescVersion := salesorderFields[13].Descriptor()
 	// salesorder.DefaultVersion holds the default value on creation for the version field.
 	salesorder.DefaultVersion = salesorderDescVersion.Default.(int)
 	// salesorder.VersionValidator is a validator for the "version" field. It is called by the builders before save.
 	salesorder.VersionValidator = salesorderDescVersion.Validators[0].(func(int) error)
 	// salesorderDescSettlementAction is the schema descriptor for settlement_action field.
-	salesorderDescSettlementAction := salesorderFields[13].Descriptor()
+	salesorderDescSettlementAction := salesorderFields[14].Descriptor()
 	// salesorder.SettlementActionValidator is a validator for the "settlement_action" field. It is called by the builders before save.
 	salesorder.SettlementActionValidator = salesorderDescSettlementAction.Validators[0].(func(string) error)
 	// salesorderDescSettlementMode is the schema descriptor for settlement_mode field.
-	salesorderDescSettlementMode := salesorderFields[14].Descriptor()
+	salesorderDescSettlementMode := salesorderFields[15].Descriptor()
 	// salesorder.SettlementModeValidator is a validator for the "settlement_mode" field. It is called by the builders before save.
 	salesorder.SettlementModeValidator = salesorderDescSettlementMode.Validators[0].(func(string) error)
 	// salesorderDescSettlementReason is the schema descriptor for settlement_reason field.
-	salesorderDescSettlementReason := salesorderFields[15].Descriptor()
+	salesorderDescSettlementReason := salesorderFields[16].Descriptor()
 	// salesorder.SettlementReasonValidator is a validator for the "settlement_reason" field. It is called by the builders before save.
 	salesorder.SettlementReasonValidator = salesorderDescSettlementReason.Validators[0].(func(string) error)
 	// salesorderDescSettledBy is the schema descriptor for settled_by field.
-	salesorderDescSettledBy := salesorderFields[17].Descriptor()
+	salesorderDescSettledBy := salesorderFields[18].Descriptor()
 	// salesorder.SettledByValidator is a validator for the "settled_by" field. It is called by the builders before save.
 	salesorder.SettledByValidator = salesorderDescSettledBy.Validators[0].(func(int) error)
 	// salesorderDescNote is the schema descriptor for note field.
-	salesorderDescNote := salesorderFields[18].Descriptor()
+	salesorderDescNote := salesorderFields[19].Descriptor()
 	// salesorder.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	salesorder.NoteValidator = salesorderDescNote.Validators[0].(func(string) error)
 	// salesorderDescCreatedAt is the schema descriptor for created_at field.
-	salesorderDescCreatedAt := salesorderFields[19].Descriptor()
+	salesorderDescCreatedAt := salesorderFields[20].Descriptor()
 	// salesorder.DefaultCreatedAt holds the default value on creation for the created_at field.
 	salesorder.DefaultCreatedAt = salesorderDescCreatedAt.Default.(func() time.Time)
 	// salesorderDescUpdatedAt is the schema descriptor for updated_at field.
-	salesorderDescUpdatedAt := salesorderFields[20].Descriptor()
+	salesorderDescUpdatedAt := salesorderFields[21].Descriptor()
 	// salesorder.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	salesorder.DefaultUpdatedAt = salesorderDescUpdatedAt.Default.(func() time.Time)
 	// salesorder.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

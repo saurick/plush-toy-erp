@@ -68,6 +68,7 @@ import {
   getBusinessPaginationParams,
 } from '../utils/businessPagination.mjs'
 import {
+  BUSINESS_CURRENCY_OPTIONS,
   compactParams,
   formatUnixDateTime,
   hasActionPermission,
@@ -95,10 +96,6 @@ const { Text } = Typography
 const PAYMENT_STORAGE_PREFIX = 'plush-erp:finance-payment:last:v1:'
 const FINANCE_PAYMENT_COLUMN_ORDER_KEY = 'finance-payments-records'
 const FINANCE_CREDIT_NOTE_COLUMN_ORDER_KEY = 'finance-credit-notes-records'
-const CURRENCY_OPTIONS = ['CNY', 'USD', 'HKD'].map((value) => ({
-  value,
-  label: value === 'CNY' ? '人民币' : value === 'USD' ? '美元' : '港币',
-}))
 const PAYMENT_STATUS_META = Object.freeze({
   DRAFT: ['待审批', 'blue'],
   APPROVED: ['已批准待核销', 'gold'],
@@ -1767,7 +1764,7 @@ export default function FinancePaymentsPage() {
             <Input inputMode="decimal" />
           </Form.Item>
           <Form.Item name="currency" label="币种" rules={[{ required: true }]}>
-            <Select options={CURRENCY_OPTIONS} />
+            <Select options={BUSINESS_CURRENCY_OPTIONS} />
           </Form.Item>
           <Form.Item name="occurred_at" label="发生时间">
             <Input type="datetime-local" />

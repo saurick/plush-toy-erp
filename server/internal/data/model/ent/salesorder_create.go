@@ -36,6 +36,20 @@ func (_c *SalesOrderCreate) SetCustomerID(v int) *SalesOrderCreate {
 	return _c
 }
 
+// SetCurrency sets the "currency" field.
+func (_c *SalesOrderCreate) SetCurrency(v string) *SalesOrderCreate {
+	_c.mutation.SetCurrency(v)
+	return _c
+}
+
+// SetNillableCurrency sets the "currency" field if the given value is not nil.
+func (_c *SalesOrderCreate) SetNillableCurrency(v *string) *SalesOrderCreate {
+	if v != nil {
+		_c.SetCurrency(*v)
+	}
+	return _c
+}
+
 // SetCustomerOrderNo sets the "customer_order_no" field.
 func (_c *SalesOrderCreate) SetCustomerOrderNo(v string) *SalesOrderCreate {
 	_c.mutation.SetCustomerOrderNo(v)
@@ -363,6 +377,10 @@ func (_c *SalesOrderCreate) ExecX(ctx context.Context) {
 
 // defaults sets the default values of the builder before save.
 func (_c *SalesOrderCreate) defaults() {
+	if _, ok := _c.mutation.Currency(); !ok {
+		v := salesorder.DefaultCurrency
+		_c.mutation.SetCurrency(v)
+	}
 	if _, ok := _c.mutation.LifecycleStatus(); !ok {
 		v := salesorder.DefaultLifecycleStatus
 		_c.mutation.SetLifecycleStatus(v)
@@ -397,6 +415,14 @@ func (_c *SalesOrderCreate) check() error {
 	if v, ok := _c.mutation.CustomerID(); ok {
 		if err := salesorder.CustomerIDValidator(v); err != nil {
 			return &ValidationError{Name: "customer_id", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.customer_id": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.Currency(); !ok {
+		return &ValidationError{Name: "currency", err: errors.New(`ent: missing required field "SalesOrder.currency"`)}
+	}
+	if v, ok := _c.mutation.Currency(); ok {
+		if err := salesorder.CurrencyValidator(v); err != nil {
+			return &ValidationError{Name: "currency", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.currency": %w`, err)}
 		}
 	}
 	if v, ok := _c.mutation.CustomerOrderNo(); ok {
@@ -506,6 +532,10 @@ func (_c *SalesOrderCreate) createSpec() (*SalesOrder, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.OrderNo(); ok {
 		_spec.SetField(salesorder.FieldOrderNo, field.TypeString, value)
 		_node.OrderNo = value
+	}
+	if value, ok := _c.mutation.Currency(); ok {
+		_spec.SetField(salesorder.FieldCurrency, field.TypeString, value)
+		_node.Currency = value
 	}
 	if value, ok := _c.mutation.CustomerOrderNo(); ok {
 		_spec.SetField(salesorder.FieldCustomerOrderNo, field.TypeString, value)

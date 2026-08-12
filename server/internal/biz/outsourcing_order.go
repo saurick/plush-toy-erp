@@ -39,6 +39,8 @@ type OutsourcingOrder struct {
 	ID                    int
 	OutsourcingOrderNo    string
 	SupplierID            int
+	Currency              string
+	PaymentTermDays       *int
 	SupplierSnapshot      map[string]any
 	ContractPartySnapshot map[string]any
 	SourceOrderNo         *string
@@ -93,6 +95,8 @@ type OutsourcingOrderMutation struct {
 	ExpectedVersion       int
 	OutsourcingOrderNo    string
 	SupplierID            int
+	Currency              string
+	PaymentTermDays       *int
 	SupplierSnapshot      map[string]any
 	ContractPartySnapshot map[string]any
 	SourceOrderNo         *string
@@ -223,12 +227,18 @@ func (uc *OutsourcingOrderUsecase) SaveOutsourcingOrderWithItems(ctx context.Con
 	if id == 0 {
 		order.ExpectedVersion = 0
 	}
-	normalizedOrder, err := normalizeOutsourcingOrderMutation(*order)
+	normalizedOrder, err := normalizeOutsourcingOrderMutation(*order, id == 0)
 	if err != nil {
 		return nil, err
 	}
 	if err := uc.validateSupplierActive(ctx, normalizedOrder.SupplierID); err != nil {
 		return nil, err
+	}
+	if id == 0 {
+		normalizedOrder.PaymentTermDays, err = resolveSourceOrderPaymentTermDays(ctx, uc.repo, normalizedOrder.SupplierID, normalizedOrder.PaymentTermDays)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	normalizedItems := make([]*OutsourcingOrderItemSaveMutation, 0, len(items))
@@ -493,8 +503,24 @@ func (uc *OutsourcingOrderUsecase) validateSubjectProcessAndUnit(ctx context.Con
 	return nil
 }
 
-func normalizeOutsourcingOrderMutation(in OutsourcingOrderMutation) (OutsourcingOrderMutation, error) {
+func normalizeOutsourcingOrderMutation(in OutsourcingOrderMutation, create bool) (OutsourcingOrderMutation, error) {
 	in.OutsourcingOrderNo = strings.TrimSpace(in.OutsourcingOrderNo)
+	var currencyOK bool
+	in.Currency, currencyOK = normalizeSourceOrderCurrency(in.Currency, create)
+	if !currencyOK {
+		return OutsourcingOrderMutation{}, ErrBadParam
+	}
+	if in.PaymentTermDays == nil {
+		if !create {
+			return OutsourcingOrderMutation{}, ErrBadParam
+		}
+	} else {
+		if *in.PaymentTermDays < 0 {
+			return OutsourcingOrderMutation{}, ErrBadParam
+		}
+		termDays := *in.PaymentTermDays
+		in.PaymentTermDays = &termDays
+	}
 	in.SourceOrderNo = normalizeOptionalString(in.SourceOrderNo)
 	in.Note = normalizeOptionalString(in.Note)
 	if in.SupplierSnapshot == nil {

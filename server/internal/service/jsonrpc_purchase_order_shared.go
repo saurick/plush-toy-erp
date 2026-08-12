@@ -18,7 +18,18 @@ func unknownPurchaseOrderResult(method string) *v1.JsonrpcResult {
 }
 
 func purchaseOrderMutationFromParams(pm map[string]any) (*biz.PurchaseOrderMutation, bool) {
+	if !sourceOrderAllowsOnly(pm,
+		"customer_key", "id", "expected_version", "purchase_order_no", "supplier_id", "currency",
+		"payment_term_days", "supplier_purchase_order_no", "supplier_snapshot", "contract_party_snapshot",
+		"purchase_date", "expected_arrival_date", "note", "items",
+	) {
+		return nil, false
+	}
 	purchaseDate, ok := getRequiredJSONRPCTime(pm, "purchase_date")
+	if !ok {
+		return nil, false
+	}
+	paymentTermDays, ok := getOptionalJSONRPCNonNegativeInt(pm, "payment_term_days")
 	if !ok {
 		return nil, false
 	}
@@ -29,6 +40,8 @@ func purchaseOrderMutationFromParams(pm map[string]any) (*biz.PurchaseOrderMutat
 	return &biz.PurchaseOrderMutation{
 		PurchaseOrderNo:         getString(pm, "purchase_order_no"),
 		SupplierID:              getInt(pm, "supplier_id", 0),
+		Currency:                getString(pm, "currency"),
+		PaymentTermDays:         paymentTermDays,
 		SupplierPurchaseOrderNo: getWorkflowStringPtr(pm, "supplier_purchase_order_no"),
 		SupplierSnapshot:        getMap(pm, "supplier_snapshot"),
 		ContractPartySnapshot:   getMap(pm, "contract_party_snapshot"),
@@ -217,6 +230,8 @@ func purchaseOrderToMap(item *biz.PurchaseOrder) map[string]any {
 		"id":                         item.ID,
 		"purchase_order_no":          item.PurchaseOrderNo,
 		"supplier_id":                item.SupplierID,
+		"currency":                   item.Currency,
+		"payment_term_days":          optionalIntValue(item.PaymentTermDays),
 		"supplier_purchase_order_no": optionalStringValue(item.SupplierPurchaseOrderNo),
 		"supplier_snapshot":          item.SupplierSnapshot,
 		"contract_party_snapshot":    item.ContractPartySnapshot,

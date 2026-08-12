@@ -49,6 +49,7 @@ func (r *salesOrderRepo) CreateSalesOrder(ctx context.Context, in *biz.SalesOrde
 	row, err := r.data.postgres.SalesOrder.Create().
 		SetOrderNo(in.OrderNo).
 		SetCustomerID(in.CustomerID).
+		SetCurrency(in.Currency).
 		SetNillableCustomerOrderNo(in.CustomerOrderNo).
 		SetCustomerSnapshot(in.CustomerSnapshot).
 		SetNillableSalesOwner(in.SalesOwner).
@@ -71,6 +72,7 @@ func (r *salesOrderRepo) UpdateSalesOrder(ctx context.Context, id int, in *biz.S
 	update := r.data.postgres.SalesOrder.UpdateOneID(id).
 		SetOrderNo(in.OrderNo).
 		SetCustomerID(in.CustomerID).
+		SetCurrency(in.Currency).
 		SetCustomerSnapshot(in.CustomerSnapshot).
 		SetContactSnapshot(in.ContactSnapshot).
 		SetOrderDate(in.OrderDate)
@@ -968,6 +970,7 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 			).
 			SetOrderNo(in.OrderNo).
 			SetCustomerID(in.CustomerID).
+			SetCurrency(in.Currency).
 			SetCustomerSnapshot(in.CustomerSnapshot).
 			SetContactSnapshot(in.ContactSnapshot).
 			SetOrderDate(in.OrderDate).
@@ -1035,6 +1038,7 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 		orderRow, err = tx.SalesOrder.Create().
 			SetOrderNo(in.OrderNo).
 			SetCustomerID(in.CustomerID).
+			SetCurrency(in.Currency).
 			SetNillableCustomerOrderNo(in.CustomerOrderNo).
 			SetCustomerSnapshot(in.CustomerSnapshot).
 			SetNillableSalesOwner(in.SalesOwner).
@@ -1264,6 +1268,7 @@ func entSalesOrderToBiz(row *ent.SalesOrder) *biz.SalesOrder {
 		ID:                  row.ID,
 		OrderNo:             row.OrderNo,
 		CustomerID:          row.CustomerID,
+		Currency:            row.Currency,
 		CustomerOrderNo:     row.CustomerOrderNo,
 		CustomerSnapshot:    row.CustomerSnapshot,
 		SalesOwner:          row.SalesOwner,

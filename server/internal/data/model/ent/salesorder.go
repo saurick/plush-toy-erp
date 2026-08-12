@@ -23,6 +23,8 @@ type SalesOrder struct {
 	OrderNo string `json:"order_no,omitempty"`
 	// CustomerID holds the value of the "customer_id" field.
 	CustomerID int `json:"customer_id,omitempty"`
+	// Currency holds the value of the "currency" field.
+	Currency string `json:"currency,omitempty"`
 	// CustomerOrderNo holds the value of the "customer_order_no" field.
 	CustomerOrderNo *string `json:"customer_order_no,omitempty"`
 	// CustomerSnapshot holds the value of the "customer_snapshot" field.
@@ -129,7 +131,7 @@ func (*SalesOrder) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case salesorder.FieldID, salesorder.FieldCustomerID, salesorder.FieldPaymentTermDays, salesorder.FieldVersion, salesorder.FieldSettledBy:
 			values[i] = new(sql.NullInt64)
-		case salesorder.FieldOrderNo, salesorder.FieldCustomerOrderNo, salesorder.FieldSalesOwner, salesorder.FieldPaymentMethod, salesorder.FieldPriceConditionNote, salesorder.FieldLifecycleStatus, salesorder.FieldSettlementAction, salesorder.FieldSettlementMode, salesorder.FieldSettlementReason, salesorder.FieldNote:
+		case salesorder.FieldOrderNo, salesorder.FieldCurrency, salesorder.FieldCustomerOrderNo, salesorder.FieldSalesOwner, salesorder.FieldPaymentMethod, salesorder.FieldPriceConditionNote, salesorder.FieldLifecycleStatus, salesorder.FieldSettlementAction, salesorder.FieldSettlementMode, salesorder.FieldSettlementReason, salesorder.FieldNote:
 			values[i] = new(sql.NullString)
 		case salesorder.FieldOrderDate, salesorder.FieldPlannedDeliveryDate, salesorder.FieldSettledAt, salesorder.FieldCreatedAt, salesorder.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -165,6 +167,12 @@ func (_m *SalesOrder) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field customer_id", values[i])
 			} else if value.Valid {
 				_m.CustomerID = int(value.Int64)
+			}
+		case salesorder.FieldCurrency:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field currency", values[i])
+			} else if value.Valid {
+				_m.Currency = value.String
 			}
 		case salesorder.FieldCustomerOrderNo:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -357,6 +365,9 @@ func (_m *SalesOrder) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("customer_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.CustomerID))
+	builder.WriteString(", ")
+	builder.WriteString("currency=")
+	builder.WriteString(_m.Currency)
 	builder.WriteString(", ")
 	if v := _m.CustomerOrderNo; v != nil {
 		builder.WriteString("customer_order_no=")

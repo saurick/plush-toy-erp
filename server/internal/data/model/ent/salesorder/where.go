@@ -65,6 +65,11 @@ func CustomerID(v int) predicate.SalesOrder {
 	return predicate.SalesOrder(sql.FieldEQ(FieldCustomerID, v))
 }
 
+// Currency applies equality check predicate on the "currency" field. It's identical to CurrencyEQ.
+func Currency(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldCurrency, v))
+}
+
 // CustomerOrderNo applies equality check predicate on the "customer_order_no" field. It's identical to CustomerOrderNoEQ.
 func CustomerOrderNo(v string) predicate.SalesOrder {
 	return predicate.SalesOrder(sql.FieldEQ(FieldCustomerOrderNo, v))
@@ -233,6 +238,71 @@ func CustomerIDIn(vs ...int) predicate.SalesOrder {
 // CustomerIDNotIn applies the NotIn predicate on the "customer_id" field.
 func CustomerIDNotIn(vs ...int) predicate.SalesOrder {
 	return predicate.SalesOrder(sql.FieldNotIn(FieldCustomerID, vs...))
+}
+
+// CurrencyEQ applies the EQ predicate on the "currency" field.
+func CurrencyEQ(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldCurrency, v))
+}
+
+// CurrencyNEQ applies the NEQ predicate on the "currency" field.
+func CurrencyNEQ(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNEQ(FieldCurrency, v))
+}
+
+// CurrencyIn applies the In predicate on the "currency" field.
+func CurrencyIn(vs ...string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIn(FieldCurrency, vs...))
+}
+
+// CurrencyNotIn applies the NotIn predicate on the "currency" field.
+func CurrencyNotIn(vs ...string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotIn(FieldCurrency, vs...))
+}
+
+// CurrencyGT applies the GT predicate on the "currency" field.
+func CurrencyGT(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGT(FieldCurrency, v))
+}
+
+// CurrencyGTE applies the GTE predicate on the "currency" field.
+func CurrencyGTE(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGTE(FieldCurrency, v))
+}
+
+// CurrencyLT applies the LT predicate on the "currency" field.
+func CurrencyLT(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLT(FieldCurrency, v))
+}
+
+// CurrencyLTE applies the LTE predicate on the "currency" field.
+func CurrencyLTE(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLTE(FieldCurrency, v))
+}
+
+// CurrencyContains applies the Contains predicate on the "currency" field.
+func CurrencyContains(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldContains(FieldCurrency, v))
+}
+
+// CurrencyHasPrefix applies the HasPrefix predicate on the "currency" field.
+func CurrencyHasPrefix(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldHasPrefix(FieldCurrency, v))
+}
+
+// CurrencyHasSuffix applies the HasSuffix predicate on the "currency" field.
+func CurrencyHasSuffix(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldHasSuffix(FieldCurrency, v))
+}
+
+// CurrencyEqualFold applies the EqualFold predicate on the "currency" field.
+func CurrencyEqualFold(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEqualFold(FieldCurrency, v))
+}
+
+// CurrencyContainsFold applies the ContainsFold predicate on the "currency" field.
+func CurrencyContainsFold(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldContainsFold(FieldCurrency, v))
 }
 
 // CustomerOrderNoEQ applies the EQ predicate on the "customer_order_no" field.

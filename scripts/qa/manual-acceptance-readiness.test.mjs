@@ -176,10 +176,14 @@ function factReferenceRecords(countOverrides = {}) {
     sourceType: "PRODUCTION_ORDER",
   });
   const paymentTerms = [
-    { paymentTerm: "CASH_ON_SHIPMENT", paymentTermDays: 0 },
-    { paymentTerm: "EOM_30", paymentTermDays: 30 },
-    { paymentTerm: "EOM_45", paymentTermDays: 45 },
-    { paymentTermDays: 60 },
+    {
+      paymentTerm: "DUE_ON_OCCURRENCE",
+      paymentTermDays: 0,
+      dueAt: 1_789_113_600,
+    },
+    { paymentTerm: "EOM_DAYS", paymentTermDays: 30, dueAt: 1_791_705_600 },
+    { paymentTerm: "EOM_DAYS", paymentTermDays: 45, dueAt: 1_793_001_600 },
+    { paymentTerm: "EOM_DAYS", paymentTermDays: 60, dueAt: 1_794_297_600 },
   ];
   const invoiceCategories = [
     "NONE",
@@ -204,9 +208,11 @@ function factReferenceRecords(countOverrides = {}) {
       sourceType: factType === "PAYABLE" ? "OUTSOURCING_FACT" : "SHIPMENT",
     }).map((item, index) => ({
       ...item,
-      ...(factType === "RECEIVABLE"
+      ...(["RECEIVABLE", "PAYABLE"].includes(factType)
         ? {
-            collectionType: "ACCOUNTS_RECEIVABLE",
+            ...(factType === "RECEIVABLE"
+              ? { collectionType: "ACCOUNTS_RECEIVABLE" }
+              : {}),
             ...paymentTerms[index % paymentTerms.length],
           }
         : {}),
@@ -890,6 +896,7 @@ function createReadinessFetch(runtimeOptions = {}) {
         collection_type: item.collectionType,
         payment_term: item.paymentTerm,
         payment_term_days: item.paymentTermDays,
+        due_at: item.dueAt,
         invoice_category: item.invoiceCategory,
         cancelled_at: item.cancelledAt,
         cancelled_by_name: item.cancelledByName,

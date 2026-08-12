@@ -34,7 +34,13 @@ func TestFinanceProcessCommandPostgresRecoversExactResultAndMarksCompensation(t 
 		t, ctx, processRepo, "finance.receivable_lead", "finance-result/"+suffix, payload,
 		biz.ShipmentSourceType, shipment.ID,
 	)
-	occurredAt := time.Now().UTC().Truncate(time.Microsecond)
+	if shipment.ShippedAt == nil {
+		t.Fatal("shipped shipment is missing shipped_at")
+	}
+	occurredAt := *shipment.ShippedAt
+	paymentTerm := biz.FinancePaymentTermEOMDays
+	paymentTermDays := 30
+	dueAt := mustFinanceFactDueAt(t, occurredAt, paymentTermDays)
 	collectionType := biz.FinanceCollectionAccountsReceivable
 	sourceType := biz.ShipmentSourceType
 	factIn := &biz.FinanceFactCreate{
@@ -45,6 +51,9 @@ func TestFinanceProcessCommandPostgresRecoversExactResultAndMarksCompensation(t 
 		Amount:              decimal.NewFromInt(20),
 		Currency:            "CNY",
 		CollectionType:      &collectionType,
+		PaymentTerm:         &paymentTerm,
+		PaymentTermDays:     &paymentTermDays,
+		DueAt:               &dueAt,
 		SourceType:          &sourceType,
 		SourceID:            &shipment.ID,
 		IdempotencyKey:      "finance-result/" + suffix,
@@ -92,6 +101,13 @@ func TestFinanceProcessCommandPostgresRejectsCancelledFactBeforeExactRecovery(t 
 	suffix := postgresTestSuffix()
 	factRepo, _, shipment, actor := prepareShipmentFinanceSource(t, ctx, data, client, "cancelled-recovery-"+suffix)
 	idempotencyKey := "finance-cancelled-recovery/" + suffix
+	if shipment.ShippedAt == nil {
+		t.Fatal("shipped shipment is missing shipped_at")
+	}
+	occurredAt := *shipment.ShippedAt
+	paymentTerm := biz.FinancePaymentTermEOMDays
+	paymentTermDays := 30
+	dueAt := mustFinanceFactDueAt(t, occurredAt, paymentTermDays)
 	collectionType := biz.FinanceCollectionAccountsReceivable
 	sourceType := biz.ShipmentSourceType
 	factIn := &biz.FinanceFactCreate{
@@ -102,10 +118,13 @@ func TestFinanceProcessCommandPostgresRejectsCancelledFactBeforeExactRecovery(t 
 		Amount:              decimal.NewFromInt(20),
 		Currency:            "CNY",
 		CollectionType:      &collectionType,
+		PaymentTerm:         &paymentTerm,
+		PaymentTermDays:     &paymentTermDays,
+		DueAt:               &dueAt,
 		SourceType:          &sourceType,
 		SourceID:            &shipment.ID,
 		IdempotencyKey:      idempotencyKey,
-		OccurredAt:          time.Now().UTC().Truncate(time.Microsecond),
+		OccurredAt:          occurredAt,
 		OccurredAtSpecified: true,
 	}
 

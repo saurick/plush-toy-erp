@@ -281,8 +281,8 @@ func TestInventoryPostgresFactTimeIdempotency(t *testing.T) {
 			name: "finance",
 			create: func(key string, at time.Time) (int, error) {
 				row, err := operationalUC.CreateFinanceFactDraft(ctx, &biz.FinanceFactCreate{
-					FactNo: key, FactType: biz.FinanceFactPayable,
-					CounterpartyType: biz.FinanceCounterpartyOther,
+					FactNo: key, FactType: biz.FinanceFactReconciliation,
+					CounterpartyType: biz.FinanceCounterpartyCustomer,
 					Amount:           decimal.NewFromInt(1), IdempotencyKey: key, OccurredAt: at,
 				})
 				if err != nil {

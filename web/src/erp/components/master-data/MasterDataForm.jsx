@@ -578,6 +578,23 @@ export function MasterDataFormFields({
           >
             <Input allowClear autoComplete="off" />
           </Form.Item>
+          <BusinessFormSectionTitle>结算条件</BusinessFormSectionTitle>
+          <Form.Item
+            className="erp-business-action-form__field"
+            extra="仅作为新建采购或委外订单的默认值；订单保存后不会随供应商档案变化。"
+            label="默认付款周期（天）"
+            name="default_payment_term_days"
+            rules={[
+              { required: true, message: '请填写默认付款周期' },
+              {
+                type: 'integer',
+                min: 0,
+                message: '默认付款周期必须为不小于 0 的整数',
+              },
+            ]}
+          >
+            <InputNumber min={0} precision={0} style={{ width: '100%' }} />
+          </Form.Item>
           <BusinessFormSectionTitle>加工能力</BusinessFormSectionTitle>
           <Form.Item
             className="erp-business-action-form__field erp-business-action-form__field--full"

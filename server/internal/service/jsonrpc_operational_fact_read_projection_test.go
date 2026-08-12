@@ -11,6 +11,12 @@ import (
 
 func TestOperationalFactReadProjectionMapsUseExactDecimalStrings(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
+	paymentTerm := biz.FinancePaymentTermEOMDays
+	paymentTermDays := 30
+	dueAt, err := biz.FinanceFactDueAtFromDays(now, &paymentTermDays)
+	if err != nil || dueAt == nil {
+		t.Fatalf("derive projection due_at error=%v", err)
+	}
 	originalAmount := decimal.RequireFromString("100.000001")
 	outstandingAmount := decimal.RequireFromString("99.876543")
 	factProjection := financeFactToAny(&biz.FinanceFact{
@@ -19,12 +25,24 @@ func TestOperationalFactReadProjectionMapsUseExactDecimalStrings(t *testing.T) {
 		FactType:          biz.FinanceFactReceivable,
 		Amount:            originalAmount,
 		OutstandingAmount: outstandingAmount,
+		PaymentTerm:       &paymentTerm,
+		PaymentTermDays:   &paymentTermDays,
 		OccurredAt:        now,
+		DueAt:             dueAt,
 		CreatedAt:         now,
 		UpdatedAt:         now,
 	})
 	if got := factProjection["outstanding_amount"]; got != outstandingAmount.String() {
 		t.Fatalf("finance fact outstanding_amount=%#v want=%q", got, outstandingAmount.String())
+	}
+	if got := factProjection["payment_term"]; got != paymentTerm {
+		t.Fatalf("finance fact payment_term=%#v want=%q", got, paymentTerm)
+	}
+	if got := factProjection["payment_term_days"]; got != paymentTermDays {
+		t.Fatalf("finance fact payment_term_days=%#v want=%d", got, paymentTermDays)
+	}
+	if got := factProjection["due_at"]; got != dueAt.Unix() {
+		t.Fatalf("finance fact due_at=%#v want=%d", got, dueAt.Unix())
 	}
 
 	paymentProjection := financePaymentToMap(&biz.FinancePayment{

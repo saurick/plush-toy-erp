@@ -18,6 +18,8 @@ const (
 	FieldOrderNo = "order_no"
 	// FieldCustomerID holds the string denoting the customer_id field in the database.
 	FieldCustomerID = "customer_id"
+	// FieldCurrency holds the string denoting the currency field in the database.
+	FieldCurrency = "currency"
 	// FieldCustomerOrderNo holds the string denoting the customer_order_no field in the database.
 	FieldCustomerOrderNo = "customer_order_no"
 	// FieldCustomerSnapshot holds the string denoting the customer_snapshot field in the database.
@@ -101,6 +103,7 @@ var Columns = []string{
 	FieldID,
 	FieldOrderNo,
 	FieldCustomerID,
+	FieldCurrency,
 	FieldCustomerOrderNo,
 	FieldCustomerSnapshot,
 	FieldSalesOwner,
@@ -137,6 +140,10 @@ var (
 	OrderNoValidator func(string) error
 	// CustomerIDValidator is a validator for the "customer_id" field. It is called by the builders before save.
 	CustomerIDValidator func(int) error
+	// DefaultCurrency holds the default value on creation for the "currency" field.
+	DefaultCurrency string
+	// CurrencyValidator is a validator for the "currency" field. It is called by the builders before save.
+	CurrencyValidator func(string) error
 	// CustomerOrderNoValidator is a validator for the "customer_order_no" field. It is called by the builders before save.
 	CustomerOrderNoValidator func(string) error
 	// SalesOwnerValidator is a validator for the "sales_owner" field. It is called by the builders before save.
@@ -189,6 +196,11 @@ func ByOrderNo(opts ...sql.OrderTermOption) OrderOption {
 // ByCustomerID orders the results by the customer_id field.
 func ByCustomerID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCustomerID, opts...).ToFunc()
+}
+
+// ByCurrency orders the results by the currency field.
+func ByCurrency(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCurrency, opts...).ToFunc()
 }
 
 // ByCustomerOrderNo orders the results by the customer_order_no field.

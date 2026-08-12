@@ -43,6 +43,7 @@ type SalesOrder struct {
 	ID                  int
 	OrderNo             string
 	CustomerID          int
+	Currency            string
 	CustomerOrderNo     *string
 	CustomerSnapshot    map[string]any
 	SalesOwner          *string
@@ -91,6 +92,7 @@ type SalesOrderMutation struct {
 	ExpectedVersion     int
 	OrderNo             string
 	CustomerID          int
+	Currency            string
 	CustomerOrderNo     *string
 	CustomerSnapshot    map[string]any
 	SalesOwner          *string
@@ -192,7 +194,7 @@ func (uc *SalesOrderUsecase) CreateSalesOrder(ctx context.Context, in *SalesOrde
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
 	}
-	normalized, err := normalizeSalesOrderMutation(*in)
+	normalized, err := normalizeSalesOrderMutation(*in, true)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +215,7 @@ func (uc *SalesOrderUsecase) UpdateSalesOrder(ctx context.Context, id int, in *S
 	if !corestatus.IsSalesOrderEditable(current.LifecycleStatus) {
 		return nil, ErrBadParam
 	}
-	normalized, err := normalizeSalesOrderMutation(*in)
+	normalized, err := normalizeSalesOrderMutation(*in, false)
 	if err != nil {
 		return nil, err
 	}
@@ -386,7 +388,7 @@ func (uc *SalesOrderUsecase) SaveSalesOrderWithItems(ctx context.Context, id int
 	if id == 0 {
 		order.ExpectedVersion = 0
 	}
-	normalizedOrder, err := normalizeSalesOrderMutation(*order)
+	normalizedOrder, err := normalizeSalesOrderMutation(*order, id == 0)
 	if err != nil {
 		return nil, err
 	}
@@ -526,9 +528,14 @@ func (uc *SalesOrderUsecase) validateProductAndUnitActive(ctx context.Context, p
 	return nil
 }
 
-func normalizeSalesOrderMutation(in SalesOrderMutation) (SalesOrderMutation, error) {
+func normalizeSalesOrderMutation(in SalesOrderMutation, create bool) (SalesOrderMutation, error) {
 	var err error
 	in.OrderNo = strings.TrimSpace(in.OrderNo)
+	var currencyOK bool
+	in.Currency, currencyOK = normalizeSourceOrderCurrency(in.Currency, create)
+	if !currencyOK {
+		return SalesOrderMutation{}, ErrBadParam
+	}
 	in.CustomerOrderNo = normalizeOptionalString(in.CustomerOrderNo)
 	in.SalesOwner = normalizeOptionalString(in.SalesOwner)
 	in.PaymentMethod = normalizeOptionalString(in.PaymentMethod)

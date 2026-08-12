@@ -126,7 +126,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 		item, err := d.operationalFactUC.CreateReconciliationFromFinanceFact(ctx, in)
 		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
 	case "post_finance_fact":
-		if !financeFactAllowsOnly(pm, "customer_key", "id", "expected_version") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "id", "expected_version") {
 			return id, invalidParamResult(), nil
 		}
 		mutation, ok := operationalFactStatusMutationFromParams(pm, actorID, false)
@@ -147,7 +147,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 		item, err := d.operationalFactUC.PostFinanceFact(ctx, mutation)
 		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
 	case "settle_finance_fact":
-		if !financeFactAllowsOnly(pm, "customer_key", "id", "expected_version") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "id", "expected_version") {
 			return id, invalidParamResult(), nil
 		}
 		mutation, ok := operationalFactStatusMutationFromParams(pm, actorID, false)
@@ -168,7 +168,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 		item, err := d.operationalFactUC.SettleFinanceFact(ctx, mutation)
 		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
 	case "cancel_finance_fact":
-		if !financeFactAllowsOnly(pm, "customer_key", "id", "expected_version", "reason") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "id", "expected_version", "reason") {
 			return id, invalidParamResult(), nil
 		}
 		scope, res := d.financeFactConfirmAccessScope(ctx)
@@ -250,24 +250,19 @@ func financeFactPermissionDeniedResult() *v1.JsonrpcResult {
 }
 
 func financeReceivableFromShipmentCreateFromParams(pm map[string]any) (*biz.FinanceFactFromShipmentCreate, bool) {
-	if !financeFactAllowsOnly(pm, "customer_key", "fact_no", "shipment_id", "idempotency_key", "occurred_at", "note") {
-		return nil, false
-	}
-	occurredAt, ok := getOptionalJSONRPCTime(pm, "occurred_at")
-	if !ok {
+	if !jsonRPCParamsAllowed(pm, "customer_key", "fact_no", "shipment_id", "idempotency_key", "note") {
 		return nil, false
 	}
 	return &biz.FinanceFactFromShipmentCreate{
 		FactNo:         getString(pm, "fact_no"),
 		ShipmentID:     getInt(pm, "shipment_id", 0),
 		IdempotencyKey: getString(pm, "idempotency_key"),
-		OccurredAt:     optionalTimeValue(occurredAt),
 		Note:           getWorkflowStringPtr(pm, "note"),
 	}, true
 }
 
 func financeInvoiceFromShipmentCreateFromParams(pm map[string]any) (*biz.FinanceFactFromShipmentCreate, bool) {
-	if !financeFactAllowsOnly(pm, "customer_key", "fact_no", "shipment_id", "idempotency_key", "occurred_at", "note", "invoice_category") {
+	if !jsonRPCParamsAllowed(pm, "customer_key", "fact_no", "shipment_id", "idempotency_key", "occurred_at", "note", "invoice_category") {
 		return nil, false
 	}
 	occurredAt, ok := getOptionalJSONRPCTime(pm, "occurred_at")
@@ -289,41 +284,31 @@ func financeInvoiceFromShipmentCreateFromParams(pm map[string]any) (*biz.Finance
 }
 
 func financeFactFromPurchaseReceiptCreateFromParams(pm map[string]any) (*biz.FinanceFactFromPurchaseReceiptCreate, bool) {
-	if !financeFactAllowsOnly(pm, "customer_key", "fact_no", "purchase_receipt_id", "idempotency_key", "occurred_at", "note") {
-		return nil, false
-	}
-	occurredAt, ok := getOptionalJSONRPCTime(pm, "occurred_at")
-	if !ok {
+	if !jsonRPCParamsAllowed(pm, "customer_key", "fact_no", "purchase_receipt_id", "idempotency_key", "note") {
 		return nil, false
 	}
 	return &biz.FinanceFactFromPurchaseReceiptCreate{
 		FactNo:            getString(pm, "fact_no"),
 		PurchaseReceiptID: getInt(pm, "purchase_receipt_id", 0),
 		IdempotencyKey:    getString(pm, "idempotency_key"),
-		OccurredAt:        optionalTimeValue(occurredAt),
 		Note:              getWorkflowStringPtr(pm, "note"),
 	}, true
 }
 
 func financeFactFromOutsourcingReturnCreateFromParams(pm map[string]any) (*biz.FinanceFactFromOutsourcingReturnCreate, bool) {
-	if !financeFactAllowsOnly(pm, "customer_key", "fact_no", "outsourcing_fact_id", "idempotency_key", "occurred_at", "note") {
-		return nil, false
-	}
-	occurredAt, ok := getOptionalJSONRPCTime(pm, "occurred_at")
-	if !ok {
+	if !jsonRPCParamsAllowed(pm, "customer_key", "fact_no", "outsourcing_fact_id", "idempotency_key", "note") {
 		return nil, false
 	}
 	return &biz.FinanceFactFromOutsourcingReturnCreate{
 		FactNo:            getString(pm, "fact_no"),
 		OutsourcingFactID: getInt(pm, "outsourcing_fact_id", 0),
 		IdempotencyKey:    getString(pm, "idempotency_key"),
-		OccurredAt:        optionalTimeValue(occurredAt),
 		Note:              getWorkflowStringPtr(pm, "note"),
 	}, true
 }
 
 func financeReconciliationFromFactCreateFromParams(pm map[string]any) (*biz.FinanceReconciliationFromFactCreate, bool) {
-	if !financeFactAllowsOnly(pm, "customer_key", "fact_no", "finance_fact_id", "idempotency_key", "occurred_at", "note") {
+	if !jsonRPCParamsAllowed(pm, "customer_key", "fact_no", "finance_fact_id", "idempotency_key", "occurred_at", "note") {
 		return nil, false
 	}
 	occurredAt, ok := getOptionalJSONRPCTime(pm, "occurred_at")
@@ -358,18 +343,5 @@ func financeFactToAny(item *biz.FinanceFact) map[string]any {
 	if item == nil {
 		return map[string]any{}
 	}
-	return map[string]any{"id": item.ID, "fact_no": item.FactNo, "fact_type": item.FactType, "status": item.Status, "version": item.Version, "counterparty_type": item.CounterpartyType, "counterparty_id": optionalIntToAny(item.CounterpartyID), "amount": item.Amount.String(), "outstanding_amount": item.OutstandingAmount.String(), "fee_amount": item.FeeAmount.String(), "currency": item.Currency, "collection_type": optionalStringToAny(item.CollectionType), "payment_term": optionalStringToAny(item.PaymentTerm), "payment_term_days": optionalIntToAny(item.PaymentTermDays), "invoice_category": optionalStringToAny(item.InvoiceCategory), "source_type": optionalStringToAny(item.SourceType), "source_id": optionalIntToAny(item.SourceID), "source_no": optionalStringToAny(item.SourceNo), "source_line_id": optionalIntToAny(item.SourceLineID), "idempotency_key": item.IdempotencyKey, "occurred_at": item.OccurredAt.Unix(), "posted_at": optionalUnix(item.PostedAt), "posted_by": optionalIntToAny(item.PostedBy), "posted_by_name": optionalStringToAny(item.PostedByName), "settled_at": optionalUnix(item.SettledAt), "settled_by": optionalIntToAny(item.SettledBy), "settled_by_name": optionalStringToAny(item.SettledByName), "cancelled_at": optionalUnix(item.CancelledAt), "cancelled_by": optionalIntToAny(item.CancelledBy), "cancelled_by_name": optionalStringToAny(item.CancelledByName), "cancel_reason": optionalStringToAny(item.CancelReason), "note": optionalStringToAny(item.Note), "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
-}
-
-func financeFactAllowsOnly(pm map[string]any, keys ...string) bool {
-	allowed := make(map[string]struct{}, len(keys))
-	for _, key := range keys {
-		allowed[key] = struct{}{}
-	}
-	for key := range pm {
-		if _, ok := allowed[key]; !ok {
-			return false
-		}
-	}
-	return true
+	return map[string]any{"id": item.ID, "fact_no": item.FactNo, "fact_type": item.FactType, "status": item.Status, "version": item.Version, "counterparty_type": item.CounterpartyType, "counterparty_id": optionalIntToAny(item.CounterpartyID), "amount": item.Amount.String(), "outstanding_amount": item.OutstandingAmount.String(), "fee_amount": item.FeeAmount.String(), "currency": item.Currency, "collection_type": optionalStringToAny(item.CollectionType), "payment_term": optionalStringToAny(item.PaymentTerm), "payment_term_days": optionalIntToAny(item.PaymentTermDays), "due_at": optionalUnix(item.DueAt), "invoice_category": optionalStringToAny(item.InvoiceCategory), "source_type": optionalStringToAny(item.SourceType), "source_id": optionalIntToAny(item.SourceID), "source_no": optionalStringToAny(item.SourceNo), "source_line_id": optionalIntToAny(item.SourceLineID), "idempotency_key": item.IdempotencyKey, "occurred_at": item.OccurredAt.Unix(), "posted_at": optionalUnix(item.PostedAt), "posted_by": optionalIntToAny(item.PostedBy), "posted_by_name": optionalStringToAny(item.PostedByName), "settled_at": optionalUnix(item.SettledAt), "settled_by": optionalIntToAny(item.SettledBy), "settled_by_name": optionalStringToAny(item.SettledByName), "cancelled_at": optionalUnix(item.CancelledAt), "cancelled_by": optionalIntToAny(item.CancelledBy), "cancelled_by_name": optionalStringToAny(item.CancelledByName), "cancel_reason": optionalStringToAny(item.CancelReason), "note": optionalStringToAny(item.Note), "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
 }

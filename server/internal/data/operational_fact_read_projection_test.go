@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"errors"
 	"io"
 	"testing"
 	"time"
@@ -11,6 +12,27 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/shopspring/decimal"
 )
+
+func TestCalculateFinanceFactOutstandingFailsClosed(t *testing.T) {
+	outstanding, err := calculateFinanceFactOutstanding(
+		decimal.NewFromInt(100),
+		decimal.NewFromInt(70),
+		decimal.NewFromInt(30),
+	)
+	if err != nil {
+		t.Fatalf("calculate exact zero outstanding: %v", err)
+	}
+	if !outstanding.IsZero() {
+		t.Fatalf("exact zero outstanding=%s", outstanding)
+	}
+	if _, err := calculateFinanceFactOutstanding(
+		decimal.NewFromInt(100),
+		decimal.NewFromInt(100),
+		decimal.NewFromInt(1),
+	); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("overconsumed outstanding error=%v want ErrBadParam", err)
+	}
+}
 
 func TestFinanceReadProjectionsPreserveExactOutstandingAmount(t *testing.T) {
 	ctx := context.Background()

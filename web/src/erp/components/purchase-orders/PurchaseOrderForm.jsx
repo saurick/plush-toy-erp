@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { CopyOutlined, DeleteOutlined } from '@ant-design/icons'
-import { Button, Form, Input, Select, Space } from 'antd'
+import { Button, Form, Input, InputNumber, Select, Space } from 'antd'
 
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
@@ -22,6 +22,7 @@ import {
   isDateInputBefore,
 } from '../../utils/dateRange.mjs'
 import {
+  BUSINESS_CURRENCY_OPTIONS,
   buildPurchaseOrderItemSourceValuesFromMaterial,
   summarizePurchaseOrderLines,
   unixToDateInputValue,
@@ -239,6 +240,30 @@ export function PurchaseOrderFormFields({
         label="供应商单号"
       >
         <Input maxLength={128} />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        name="currency"
+        label="币种"
+        rules={[{ required: true, message: '请选择币种' }]}
+      >
+        <Select options={BUSINESS_CURRENCY_OPTIONS} />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        extra="保存后冻结为本单付款条件，不随供应商档案后续调整。"
+        name="payment_term_days"
+        label="付款周期（天）"
+        rules={[
+          { required: true, message: '请填写付款周期' },
+          {
+            type: 'integer',
+            min: 0,
+            message: '付款周期必须为不小于 0 的整数',
+          },
+        ]}
+      >
+        <InputNumber min={0} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"

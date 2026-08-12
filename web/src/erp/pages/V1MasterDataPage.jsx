@@ -705,6 +705,9 @@ export default function V1MasterDataPage({ type }) {
     if (showContactForm) {
       createDefaults.contacts = [createEmptyContactRow()]
     }
+    if (effectiveType === 'suppliers') {
+      createDefaults.default_payment_term_days = 0
+    }
     if (Object.keys(createDefaults).length > 0) {
       recordForm.setFieldsValue(createDefaults)
     }

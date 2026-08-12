@@ -24,9 +24,8 @@ test('OperationalFactForms keeps read-model labels without a generic create payl
   for (const label of [
     '预收款',
     '应收款',
-    '出货即收',
-    '月结 30 天',
-    '月结 45 天',
+    '发生即到期',
+    '月结',
     '不开票',
     '出口普票',
     '1% 普票',
@@ -39,6 +38,14 @@ test('OperationalFactForms keeps read-model labels without a generic create payl
   assert.match(source, /FINANCE_PAYMENT_TERM_LABELS/u)
   assert.match(source, /FINANCE_INVOICE_CATEGORY_LABELS/u)
   assert.doesNotMatch(source, /STATUS_LABELS\[key\]\s*\|\|\s*key/u)
+  for (const legacyTerm of [
+    'CASH_ON_SHIPMENT',
+    'EOM_30',
+    'EOM_45',
+    'NET_DAYS',
+  ]) {
+    assert.doesNotMatch(source, new RegExp(legacyTerm, 'u'))
+  }
 
   for (const deadHelper of [
     'idempotencyKey',

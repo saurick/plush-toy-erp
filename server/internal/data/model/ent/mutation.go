@@ -33026,6 +33026,9 @@ type OutsourcingOrderMutation struct {
 	typ                     string
 	id                      *int
 	outsourcing_order_no    *string
+	currency                *string
+	payment_term_days       *int
+	addpayment_term_days    *int
 	supplier_snapshot       *map[string]interface{}
 	contract_party_snapshot *map[string]interface{}
 	source_order_no         *string
@@ -33222,6 +33225,112 @@ func (m *OutsourcingOrderMutation) OldSupplierID(ctx context.Context) (v int, er
 // ResetSupplierID resets all changes to the "supplier_id" field.
 func (m *OutsourcingOrderMutation) ResetSupplierID() {
 	m.supplier = nil
+}
+
+// SetCurrency sets the "currency" field.
+func (m *OutsourcingOrderMutation) SetCurrency(s string) {
+	m.currency = &s
+}
+
+// Currency returns the value of the "currency" field in the mutation.
+func (m *OutsourcingOrderMutation) Currency() (r string, exists bool) {
+	v := m.currency
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCurrency returns the old "currency" field's value of the OutsourcingOrder entity.
+// If the OutsourcingOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderMutation) OldCurrency(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCurrency is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCurrency requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCurrency: %w", err)
+	}
+	return oldValue.Currency, nil
+}
+
+// ResetCurrency resets all changes to the "currency" field.
+func (m *OutsourcingOrderMutation) ResetCurrency() {
+	m.currency = nil
+}
+
+// SetPaymentTermDays sets the "payment_term_days" field.
+func (m *OutsourcingOrderMutation) SetPaymentTermDays(i int) {
+	m.payment_term_days = &i
+	m.addpayment_term_days = nil
+}
+
+// PaymentTermDays returns the value of the "payment_term_days" field in the mutation.
+func (m *OutsourcingOrderMutation) PaymentTermDays() (r int, exists bool) {
+	v := m.payment_term_days
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPaymentTermDays returns the old "payment_term_days" field's value of the OutsourcingOrder entity.
+// If the OutsourcingOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderMutation) OldPaymentTermDays(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPaymentTermDays is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPaymentTermDays requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPaymentTermDays: %w", err)
+	}
+	return oldValue.PaymentTermDays, nil
+}
+
+// AddPaymentTermDays adds i to the "payment_term_days" field.
+func (m *OutsourcingOrderMutation) AddPaymentTermDays(i int) {
+	if m.addpayment_term_days != nil {
+		*m.addpayment_term_days += i
+	} else {
+		m.addpayment_term_days = &i
+	}
+}
+
+// AddedPaymentTermDays returns the value that was added to the "payment_term_days" field in this mutation.
+func (m *OutsourcingOrderMutation) AddedPaymentTermDays() (r int, exists bool) {
+	v := m.addpayment_term_days
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearPaymentTermDays clears the value of the "payment_term_days" field.
+func (m *OutsourcingOrderMutation) ClearPaymentTermDays() {
+	m.payment_term_days = nil
+	m.addpayment_term_days = nil
+	m.clearedFields[outsourcingorder.FieldPaymentTermDays] = struct{}{}
+}
+
+// PaymentTermDaysCleared returns if the "payment_term_days" field was cleared in this mutation.
+func (m *OutsourcingOrderMutation) PaymentTermDaysCleared() bool {
+	_, ok := m.clearedFields[outsourcingorder.FieldPaymentTermDays]
+	return ok
+}
+
+// ResetPaymentTermDays resets all changes to the "payment_term_days" field.
+func (m *OutsourcingOrderMutation) ResetPaymentTermDays() {
+	m.payment_term_days = nil
+	m.addpayment_term_days = nil
+	delete(m.clearedFields, outsourcingorder.FieldPaymentTermDays)
 }
 
 // SetSupplierSnapshot sets the "supplier_snapshot" field.
@@ -34050,12 +34159,18 @@ func (m *OutsourcingOrderMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *OutsourcingOrderMutation) Fields() []string {
-	fields := make([]string, 0, 17)
+	fields := make([]string, 0, 19)
 	if m.outsourcing_order_no != nil {
 		fields = append(fields, outsourcingorder.FieldOutsourcingOrderNo)
 	}
 	if m.supplier != nil {
 		fields = append(fields, outsourcingorder.FieldSupplierID)
+	}
+	if m.currency != nil {
+		fields = append(fields, outsourcingorder.FieldCurrency)
+	}
+	if m.payment_term_days != nil {
+		fields = append(fields, outsourcingorder.FieldPaymentTermDays)
 	}
 	if m.supplier_snapshot != nil {
 		fields = append(fields, outsourcingorder.FieldSupplierSnapshot)
@@ -34114,6 +34229,10 @@ func (m *OutsourcingOrderMutation) Field(name string) (ent.Value, bool) {
 		return m.OutsourcingOrderNo()
 	case outsourcingorder.FieldSupplierID:
 		return m.SupplierID()
+	case outsourcingorder.FieldCurrency:
+		return m.Currency()
+	case outsourcingorder.FieldPaymentTermDays:
+		return m.PaymentTermDays()
 	case outsourcingorder.FieldSupplierSnapshot:
 		return m.SupplierSnapshot()
 	case outsourcingorder.FieldContractPartySnapshot:
@@ -34157,6 +34276,10 @@ func (m *OutsourcingOrderMutation) OldField(ctx context.Context, name string) (e
 		return m.OldOutsourcingOrderNo(ctx)
 	case outsourcingorder.FieldSupplierID:
 		return m.OldSupplierID(ctx)
+	case outsourcingorder.FieldCurrency:
+		return m.OldCurrency(ctx)
+	case outsourcingorder.FieldPaymentTermDays:
+		return m.OldPaymentTermDays(ctx)
 	case outsourcingorder.FieldSupplierSnapshot:
 		return m.OldSupplierSnapshot(ctx)
 	case outsourcingorder.FieldContractPartySnapshot:
@@ -34209,6 +34332,20 @@ func (m *OutsourcingOrderMutation) SetField(name string, value ent.Value) error 
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetSupplierID(v)
+		return nil
+	case outsourcingorder.FieldCurrency:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCurrency(v)
+		return nil
+	case outsourcingorder.FieldPaymentTermDays:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPaymentTermDays(v)
 		return nil
 	case outsourcingorder.FieldSupplierSnapshot:
 		v, ok := value.(map[string]interface{})
@@ -34323,6 +34460,9 @@ func (m *OutsourcingOrderMutation) SetField(name string, value ent.Value) error 
 // this mutation.
 func (m *OutsourcingOrderMutation) AddedFields() []string {
 	var fields []string
+	if m.addpayment_term_days != nil {
+		fields = append(fields, outsourcingorder.FieldPaymentTermDays)
+	}
 	if m.addversion != nil {
 		fields = append(fields, outsourcingorder.FieldVersion)
 	}
@@ -34337,6 +34477,8 @@ func (m *OutsourcingOrderMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *OutsourcingOrderMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case outsourcingorder.FieldPaymentTermDays:
+		return m.AddedPaymentTermDays()
 	case outsourcingorder.FieldVersion:
 		return m.AddedVersion()
 	case outsourcingorder.FieldSettledBy:
@@ -34350,6 +34492,13 @@ func (m *OutsourcingOrderMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *OutsourcingOrderMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case outsourcingorder.FieldPaymentTermDays:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPaymentTermDays(v)
+		return nil
 	case outsourcingorder.FieldVersion:
 		v, ok := value.(int)
 		if !ok {
@@ -34372,6 +34521,9 @@ func (m *OutsourcingOrderMutation) AddField(name string, value ent.Value) error 
 // mutation.
 func (m *OutsourcingOrderMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(outsourcingorder.FieldPaymentTermDays) {
+		fields = append(fields, outsourcingorder.FieldPaymentTermDays)
+	}
 	if m.FieldCleared(outsourcingorder.FieldSupplierSnapshot) {
 		fields = append(fields, outsourcingorder.FieldSupplierSnapshot)
 	}
@@ -34416,6 +34568,9 @@ func (m *OutsourcingOrderMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *OutsourcingOrderMutation) ClearField(name string) error {
 	switch name {
+	case outsourcingorder.FieldPaymentTermDays:
+		m.ClearPaymentTermDays()
+		return nil
 	case outsourcingorder.FieldSupplierSnapshot:
 		m.ClearSupplierSnapshot()
 		return nil
@@ -34459,6 +34614,12 @@ func (m *OutsourcingOrderMutation) ResetField(name string) error {
 		return nil
 	case outsourcingorder.FieldSupplierID:
 		m.ResetSupplierID()
+		return nil
+	case outsourcingorder.FieldCurrency:
+		m.ResetCurrency()
+		return nil
+	case outsourcingorder.FieldPaymentTermDays:
+		m.ResetPaymentTermDays()
 		return nil
 	case outsourcingorder.FieldSupplierSnapshot:
 		m.ResetSupplierSnapshot()
@@ -69070,6 +69231,9 @@ type PurchaseOrderMutation struct {
 	typ                        string
 	id                         *int
 	purchase_order_no          *string
+	currency                   *string
+	payment_term_days          *int
+	addpayment_term_days       *int
 	supplier_purchase_order_no *string
 	supplier_snapshot          *map[string]interface{}
 	contract_party_snapshot    *map[string]interface{}
@@ -69266,6 +69430,112 @@ func (m *PurchaseOrderMutation) OldSupplierID(ctx context.Context) (v int, err e
 // ResetSupplierID resets all changes to the "supplier_id" field.
 func (m *PurchaseOrderMutation) ResetSupplierID() {
 	m.supplier = nil
+}
+
+// SetCurrency sets the "currency" field.
+func (m *PurchaseOrderMutation) SetCurrency(s string) {
+	m.currency = &s
+}
+
+// Currency returns the value of the "currency" field in the mutation.
+func (m *PurchaseOrderMutation) Currency() (r string, exists bool) {
+	v := m.currency
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCurrency returns the old "currency" field's value of the PurchaseOrder entity.
+// If the PurchaseOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseOrderMutation) OldCurrency(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCurrency is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCurrency requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCurrency: %w", err)
+	}
+	return oldValue.Currency, nil
+}
+
+// ResetCurrency resets all changes to the "currency" field.
+func (m *PurchaseOrderMutation) ResetCurrency() {
+	m.currency = nil
+}
+
+// SetPaymentTermDays sets the "payment_term_days" field.
+func (m *PurchaseOrderMutation) SetPaymentTermDays(i int) {
+	m.payment_term_days = &i
+	m.addpayment_term_days = nil
+}
+
+// PaymentTermDays returns the value of the "payment_term_days" field in the mutation.
+func (m *PurchaseOrderMutation) PaymentTermDays() (r int, exists bool) {
+	v := m.payment_term_days
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPaymentTermDays returns the old "payment_term_days" field's value of the PurchaseOrder entity.
+// If the PurchaseOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseOrderMutation) OldPaymentTermDays(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPaymentTermDays is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPaymentTermDays requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPaymentTermDays: %w", err)
+	}
+	return oldValue.PaymentTermDays, nil
+}
+
+// AddPaymentTermDays adds i to the "payment_term_days" field.
+func (m *PurchaseOrderMutation) AddPaymentTermDays(i int) {
+	if m.addpayment_term_days != nil {
+		*m.addpayment_term_days += i
+	} else {
+		m.addpayment_term_days = &i
+	}
+}
+
+// AddedPaymentTermDays returns the value that was added to the "payment_term_days" field in this mutation.
+func (m *PurchaseOrderMutation) AddedPaymentTermDays() (r int, exists bool) {
+	v := m.addpayment_term_days
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearPaymentTermDays clears the value of the "payment_term_days" field.
+func (m *PurchaseOrderMutation) ClearPaymentTermDays() {
+	m.payment_term_days = nil
+	m.addpayment_term_days = nil
+	m.clearedFields[purchaseorder.FieldPaymentTermDays] = struct{}{}
+}
+
+// PaymentTermDaysCleared returns if the "payment_term_days" field was cleared in this mutation.
+func (m *PurchaseOrderMutation) PaymentTermDaysCleared() bool {
+	_, ok := m.clearedFields[purchaseorder.FieldPaymentTermDays]
+	return ok
+}
+
+// ResetPaymentTermDays resets all changes to the "payment_term_days" field.
+func (m *PurchaseOrderMutation) ResetPaymentTermDays() {
+	m.payment_term_days = nil
+	m.addpayment_term_days = nil
+	delete(m.clearedFields, purchaseorder.FieldPaymentTermDays)
 }
 
 // SetSupplierPurchaseOrderNo sets the "supplier_purchase_order_no" field.
@@ -70094,12 +70364,18 @@ func (m *PurchaseOrderMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PurchaseOrderMutation) Fields() []string {
-	fields := make([]string, 0, 17)
+	fields := make([]string, 0, 19)
 	if m.purchase_order_no != nil {
 		fields = append(fields, purchaseorder.FieldPurchaseOrderNo)
 	}
 	if m.supplier != nil {
 		fields = append(fields, purchaseorder.FieldSupplierID)
+	}
+	if m.currency != nil {
+		fields = append(fields, purchaseorder.FieldCurrency)
+	}
+	if m.payment_term_days != nil {
+		fields = append(fields, purchaseorder.FieldPaymentTermDays)
 	}
 	if m.supplier_purchase_order_no != nil {
 		fields = append(fields, purchaseorder.FieldSupplierPurchaseOrderNo)
@@ -70158,6 +70434,10 @@ func (m *PurchaseOrderMutation) Field(name string) (ent.Value, bool) {
 		return m.PurchaseOrderNo()
 	case purchaseorder.FieldSupplierID:
 		return m.SupplierID()
+	case purchaseorder.FieldCurrency:
+		return m.Currency()
+	case purchaseorder.FieldPaymentTermDays:
+		return m.PaymentTermDays()
 	case purchaseorder.FieldSupplierPurchaseOrderNo:
 		return m.SupplierPurchaseOrderNo()
 	case purchaseorder.FieldSupplierSnapshot:
@@ -70201,6 +70481,10 @@ func (m *PurchaseOrderMutation) OldField(ctx context.Context, name string) (ent.
 		return m.OldPurchaseOrderNo(ctx)
 	case purchaseorder.FieldSupplierID:
 		return m.OldSupplierID(ctx)
+	case purchaseorder.FieldCurrency:
+		return m.OldCurrency(ctx)
+	case purchaseorder.FieldPaymentTermDays:
+		return m.OldPaymentTermDays(ctx)
 	case purchaseorder.FieldSupplierPurchaseOrderNo:
 		return m.OldSupplierPurchaseOrderNo(ctx)
 	case purchaseorder.FieldSupplierSnapshot:
@@ -70253,6 +70537,20 @@ func (m *PurchaseOrderMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetSupplierID(v)
+		return nil
+	case purchaseorder.FieldCurrency:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCurrency(v)
+		return nil
+	case purchaseorder.FieldPaymentTermDays:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPaymentTermDays(v)
 		return nil
 	case purchaseorder.FieldSupplierPurchaseOrderNo:
 		v, ok := value.(string)
@@ -70367,6 +70665,9 @@ func (m *PurchaseOrderMutation) SetField(name string, value ent.Value) error {
 // this mutation.
 func (m *PurchaseOrderMutation) AddedFields() []string {
 	var fields []string
+	if m.addpayment_term_days != nil {
+		fields = append(fields, purchaseorder.FieldPaymentTermDays)
+	}
 	if m.addversion != nil {
 		fields = append(fields, purchaseorder.FieldVersion)
 	}
@@ -70381,6 +70682,8 @@ func (m *PurchaseOrderMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *PurchaseOrderMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case purchaseorder.FieldPaymentTermDays:
+		return m.AddedPaymentTermDays()
 	case purchaseorder.FieldVersion:
 		return m.AddedVersion()
 	case purchaseorder.FieldSettledBy:
@@ -70394,6 +70697,13 @@ func (m *PurchaseOrderMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *PurchaseOrderMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case purchaseorder.FieldPaymentTermDays:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPaymentTermDays(v)
+		return nil
 	case purchaseorder.FieldVersion:
 		v, ok := value.(int)
 		if !ok {
@@ -70416,6 +70726,9 @@ func (m *PurchaseOrderMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *PurchaseOrderMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(purchaseorder.FieldPaymentTermDays) {
+		fields = append(fields, purchaseorder.FieldPaymentTermDays)
+	}
 	if m.FieldCleared(purchaseorder.FieldSupplierPurchaseOrderNo) {
 		fields = append(fields, purchaseorder.FieldSupplierPurchaseOrderNo)
 	}
@@ -70460,6 +70773,9 @@ func (m *PurchaseOrderMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *PurchaseOrderMutation) ClearField(name string) error {
 	switch name {
+	case purchaseorder.FieldPaymentTermDays:
+		m.ClearPaymentTermDays()
+		return nil
 	case purchaseorder.FieldSupplierPurchaseOrderNo:
 		m.ClearSupplierPurchaseOrderNo()
 		return nil
@@ -70503,6 +70819,12 @@ func (m *PurchaseOrderMutation) ResetField(name string) error {
 		return nil
 	case purchaseorder.FieldSupplierID:
 		m.ResetSupplierID()
+		return nil
+	case purchaseorder.FieldCurrency:
+		m.ResetCurrency()
+		return nil
+	case purchaseorder.FieldPaymentTermDays:
+		m.ResetPaymentTermDays()
 		return nil
 	case purchaseorder.FieldSupplierPurchaseOrderNo:
 		m.ResetSupplierPurchaseOrderNo()
@@ -90005,6 +90327,7 @@ type SalesOrderMutation struct {
 	typ                       string
 	id                        *int
 	order_no                  *string
+	currency                  *string
 	customer_order_no         *string
 	customer_snapshot         *map[string]interface{}
 	sales_owner               *string
@@ -90212,6 +90535,42 @@ func (m *SalesOrderMutation) OldCustomerID(ctx context.Context) (v int, err erro
 // ResetCustomerID resets all changes to the "customer_id" field.
 func (m *SalesOrderMutation) ResetCustomerID() {
 	m.customer = nil
+}
+
+// SetCurrency sets the "currency" field.
+func (m *SalesOrderMutation) SetCurrency(s string) {
+	m.currency = &s
+}
+
+// Currency returns the value of the "currency" field in the mutation.
+func (m *SalesOrderMutation) Currency() (r string, exists bool) {
+	v := m.currency
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCurrency returns the old "currency" field's value of the SalesOrder entity.
+// If the SalesOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SalesOrderMutation) OldCurrency(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCurrency is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCurrency requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCurrency: %w", err)
+	}
+	return oldValue.Currency, nil
+}
+
+// ResetCurrency resets all changes to the "currency" field.
+func (m *SalesOrderMutation) ResetCurrency() {
+	m.currency = nil
 }
 
 // SetCustomerOrderNo sets the "customer_order_no" field.
@@ -91365,12 +91724,15 @@ func (m *SalesOrderMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SalesOrderMutation) Fields() []string {
-	fields := make([]string, 0, 21)
+	fields := make([]string, 0, 22)
 	if m.order_no != nil {
 		fields = append(fields, salesorder.FieldOrderNo)
 	}
 	if m.customer != nil {
 		fields = append(fields, salesorder.FieldCustomerID)
+	}
+	if m.currency != nil {
+		fields = append(fields, salesorder.FieldCurrency)
 	}
 	if m.customer_order_no != nil {
 		fields = append(fields, salesorder.FieldCustomerOrderNo)
@@ -91441,6 +91803,8 @@ func (m *SalesOrderMutation) Field(name string) (ent.Value, bool) {
 		return m.OrderNo()
 	case salesorder.FieldCustomerID:
 		return m.CustomerID()
+	case salesorder.FieldCurrency:
+		return m.Currency()
 	case salesorder.FieldCustomerOrderNo:
 		return m.CustomerOrderNo()
 	case salesorder.FieldCustomerSnapshot:
@@ -91492,6 +91856,8 @@ func (m *SalesOrderMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldOrderNo(ctx)
 	case salesorder.FieldCustomerID:
 		return m.OldCustomerID(ctx)
+	case salesorder.FieldCurrency:
+		return m.OldCurrency(ctx)
 	case salesorder.FieldCustomerOrderNo:
 		return m.OldCustomerOrderNo(ctx)
 	case salesorder.FieldCustomerSnapshot:
@@ -91552,6 +91918,13 @@ func (m *SalesOrderMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCustomerID(v)
+		return nil
+	case salesorder.FieldCurrency:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCurrency(v)
 		return nil
 	case salesorder.FieldCustomerOrderNo:
 		v, ok := value.(string)
@@ -91866,6 +92239,9 @@ func (m *SalesOrderMutation) ResetField(name string) error {
 		return nil
 	case salesorder.FieldCustomerID:
 		m.ResetCustomerID()
+		return nil
+	case salesorder.FieldCurrency:
+		m.ResetCurrency()
 		return nil
 	case salesorder.FieldCustomerOrderNo:
 		m.ResetCustomerOrderNo()

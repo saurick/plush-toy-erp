@@ -2,7 +2,10 @@ import React from 'react'
 import { Tag } from 'antd'
 
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
-import { formatProductUnitNetWeight } from '../../utils/masterDataOrderView.mjs'
+import {
+  formatPaymentCondition,
+  formatProductUnitNetWeight,
+} from '../../utils/masterDataOrderView.mjs'
 import { compareNumeric20Scale6Values } from '../../utils/numeric20Scale6.mjs'
 import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
 
@@ -441,6 +444,21 @@ function baseColumns({ type, unitDisplay, processOptions }) {
             width: 240,
             sorter: (a, b) => compareText(a?.address, b?.address),
             render: (value) => value || '-',
+          },
+          {
+            title: '默认付款周期',
+            exportTitle: '默认付款周期',
+            dataIndex: 'default_payment_term_days',
+            width: 160,
+            sorter: (a, b) =>
+              Number(a?.default_payment_term_days || 0) -
+              Number(b?.default_payment_term_days || 0),
+            render: (value) =>
+              formatPaymentCondition({ payment_term_days: value }),
+            exportValue: (record) =>
+              formatPaymentCondition({
+                payment_term_days: record?.default_payment_term_days,
+              }),
           },
           {
             title: '可加工工序',

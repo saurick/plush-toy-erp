@@ -50,10 +50,16 @@ export const SALES_ORDER_ITEM_STATUS_LABELS = Object.freeze({
   canceled: '已取消',
 })
 
+export const BUSINESS_CURRENCY_OPTIONS = Object.freeze([
+  Object.freeze({ value: 'CNY', label: '人民币（CNY）' }),
+  Object.freeze({ value: 'USD', label: '美元（USD）' }),
+  Object.freeze({ value: 'HKD', label: '港币（HKD）' }),
+])
+
 export const DEFAULT_PAYMENT_CONDITIONS = Object.freeze([
-  Object.freeze({ method: '现结', termDays: 0 }),
-  Object.freeze({ method: '30天月结', termDays: 30 }),
-  Object.freeze({ method: '60天月结', termDays: 60 }),
+  Object.freeze({ method: '发生即到期', termDays: 0 }),
+  Object.freeze({ method: '月结 30 天', termDays: 30 }),
+  Object.freeze({ method: '月结 60 天', termDays: 60 }),
 ])
 
 export const PURCHASE_ORDER_STATUS_LABELS = Object.freeze({
@@ -188,6 +194,22 @@ export function hasActionPermission(admin = {}, permissionKey = '') {
 export function trimOptional(value) {
   const text = String(value ?? '').trim()
   return text || undefined
+}
+
+function normalizeSourceOrderCurrency(value, extra = {}) {
+  const currency = trimOptional(value)?.toUpperCase()
+  const id = Number(extra?.id)
+  const isEdit = Number.isFinite(id) && Number.isInteger(id) && id > 0
+  if (!currency && !isEdit) {
+    return 'CNY'
+  }
+  if (
+    !currency ||
+    !BUSINESS_CURRENCY_OPTIONS.some((option) => option.value === currency)
+  ) {
+    throw new Error('币种必须明确选择人民币、美元或港币')
+  }
+  return currency
 }
 
 export function normalizeOptionalDecimalString(value) {
@@ -601,8 +623,10 @@ export function buildPaymentConditionOptions(
     const normalizedDays = normalizeOptionalNonNegativeInteger(termDays)
     byMethod.set(value, {
       value,
-      label:
-        normalizedDays === undefined ? value : `${value} / ${normalizedDays}天`,
+      label: formatPaymentCondition({
+        payment_method: value,
+        payment_term_days: normalizedDays,
+      }),
       payment_term_days: normalizedDays,
     })
   }
@@ -670,14 +694,23 @@ export function formatPaymentCondition(record = {}) {
   const termDays = normalizeOptionalNonNegativeInteger(
     record?.payment_term_days
   )
+  const canonicalTermText =
+    termDays === undefined
+      ? undefined
+      : termDays === 0
+        ? '发生即到期'
+        : `月结 ${termDays} 天`
   if (method && termDays !== undefined) {
+    if (method === canonicalTermText) {
+      return canonicalTermText
+    }
     return `${method} / ${termDays}天`
   }
   if (method) {
     return method
   }
   if (termDays !== undefined) {
-    return `${termDays}天`
+    return canonicalTermText
   }
   return '-'
 }
@@ -1053,6 +1086,7 @@ export function buildSalesOrderParams(values = {}, extra = {}) {
   return compactParams({
     ...extra,
     order_no: trimOptional(values.order_no),
+    currency: normalizeSourceOrderCurrency(values.currency, extra),
     customer_id:
       values.customer_id === undefined ||
       values.customer_id === null ||
@@ -1243,12 +1277,16 @@ export function buildPurchaseOrderParams(values = {}, extra = {}) {
   return compactParams({
     ...extra,
     purchase_order_no: trimOptional(values.purchase_order_no),
+    currency: normalizeSourceOrderCurrency(values.currency, extra),
     supplier_id: Number(values.supplier_id || 0),
     supplier_purchase_order_no: trimOptional(values.supplier_purchase_order_no),
     supplier_snapshot: supplierSnapshot,
     contract_party_snapshot: buildOptionalContractPartySnapshotParam(values),
     purchase_date: trimOptional(values.purchase_date),
     expected_arrival_date: trimOptional(values.expected_arrival_date),
+    payment_term_days: normalizeOptionalNonNegativeInteger(
+      values.payment_term_days
+    ),
     note: trimOptional(values.note),
   })
 }
@@ -1277,6 +1315,7 @@ export function buildOutsourcingOrderParams(values = {}, extra = {}) {
   return compactParams({
     ...extra,
     outsourcing_order_no: trimOptional(values.outsourcing_order_no),
+    currency: normalizeSourceOrderCurrency(values.currency, extra),
     supplier_id: Number(values.supplier_id || 0),
     supplier_snapshot:
       values.supplier_snapshot && typeof values.supplier_snapshot === 'object'
@@ -1286,6 +1325,9 @@ export function buildOutsourcingOrderParams(values = {}, extra = {}) {
     source_order_no: trimOptional(values.source_order_no),
     order_date: trimOptional(values.order_date),
     expected_return_date: trimOptional(values.expected_return_date),
+    payment_term_days: normalizeOptionalNonNegativeInteger(
+      values.payment_term_days
+    ),
     note: trimOptional(values.note),
   })
 }

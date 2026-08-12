@@ -60,6 +60,20 @@ func (_u *SalesOrderUpdate) SetNillableCustomerID(v *int) *SalesOrderUpdate {
 	return _u
 }
 
+// SetCurrency sets the "currency" field.
+func (_u *SalesOrderUpdate) SetCurrency(v string) *SalesOrderUpdate {
+	_u.mutation.SetCurrency(v)
+	return _u
+}
+
+// SetNillableCurrency sets the "currency" field if the given value is not nil.
+func (_u *SalesOrderUpdate) SetNillableCurrency(v *string) *SalesOrderUpdate {
+	if v != nil {
+		_u.SetCurrency(*v)
+	}
+	return _u
+}
+
 // SetCustomerOrderNo sets the "customer_order_no" field.
 func (_u *SalesOrderUpdate) SetCustomerOrderNo(v string) *SalesOrderUpdate {
 	_u.mutation.SetCustomerOrderNo(v)
@@ -565,6 +579,11 @@ func (_u *SalesOrderUpdate) check() error {
 			return &ValidationError{Name: "customer_id", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.customer_id": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Currency(); ok {
+		if err := salesorder.CurrencyValidator(v); err != nil {
+			return &ValidationError{Name: "currency", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.currency": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.CustomerOrderNo(); ok {
 		if err := salesorder.CustomerOrderNoValidator(v); err != nil {
 			return &ValidationError{Name: "customer_order_no", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.customer_order_no": %w`, err)}
@@ -645,6 +664,9 @@ func (_u *SalesOrderUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	}
 	if value, ok := _u.mutation.OrderNo(); ok {
 		_spec.SetField(salesorder.FieldOrderNo, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Currency(); ok {
+		_spec.SetField(salesorder.FieldCurrency, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.CustomerOrderNo(); ok {
 		_spec.SetField(salesorder.FieldCustomerOrderNo, field.TypeString, value)
@@ -959,6 +981,20 @@ func (_u *SalesOrderUpdateOne) SetCustomerID(v int) *SalesOrderUpdateOne {
 func (_u *SalesOrderUpdateOne) SetNillableCustomerID(v *int) *SalesOrderUpdateOne {
 	if v != nil {
 		_u.SetCustomerID(*v)
+	}
+	return _u
+}
+
+// SetCurrency sets the "currency" field.
+func (_u *SalesOrderUpdateOne) SetCurrency(v string) *SalesOrderUpdateOne {
+	_u.mutation.SetCurrency(v)
+	return _u
+}
+
+// SetNillableCurrency sets the "currency" field if the given value is not nil.
+func (_u *SalesOrderUpdateOne) SetNillableCurrency(v *string) *SalesOrderUpdateOne {
+	if v != nil {
+		_u.SetCurrency(*v)
 	}
 	return _u
 }
@@ -1481,6 +1517,11 @@ func (_u *SalesOrderUpdateOne) check() error {
 			return &ValidationError{Name: "customer_id", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.customer_id": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Currency(); ok {
+		if err := salesorder.CurrencyValidator(v); err != nil {
+			return &ValidationError{Name: "currency", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.currency": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.CustomerOrderNo(); ok {
 		if err := salesorder.CustomerOrderNoValidator(v); err != nil {
 			return &ValidationError{Name: "customer_order_no", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.customer_order_no": %w`, err)}
@@ -1578,6 +1619,9 @@ func (_u *SalesOrderUpdateOne) sqlSave(ctx context.Context) (_node *SalesOrder, 
 	}
 	if value, ok := _u.mutation.OrderNo(); ok {
 		_spec.SetField(salesorder.FieldOrderNo, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Currency(); ok {
+		_spec.SetField(salesorder.FieldCurrency, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.CustomerOrderNo(); ok {
 		_spec.SetField(salesorder.FieldCustomerOrderNo, field.TypeString, value)

@@ -34,6 +34,34 @@ func (_c *OutsourcingOrderCreate) SetSupplierID(v int) *OutsourcingOrderCreate {
 	return _c
 }
 
+// SetCurrency sets the "currency" field.
+func (_c *OutsourcingOrderCreate) SetCurrency(v string) *OutsourcingOrderCreate {
+	_c.mutation.SetCurrency(v)
+	return _c
+}
+
+// SetNillableCurrency sets the "currency" field if the given value is not nil.
+func (_c *OutsourcingOrderCreate) SetNillableCurrency(v *string) *OutsourcingOrderCreate {
+	if v != nil {
+		_c.SetCurrency(*v)
+	}
+	return _c
+}
+
+// SetPaymentTermDays sets the "payment_term_days" field.
+func (_c *OutsourcingOrderCreate) SetPaymentTermDays(v int) *OutsourcingOrderCreate {
+	_c.mutation.SetPaymentTermDays(v)
+	return _c
+}
+
+// SetNillablePaymentTermDays sets the "payment_term_days" field if the given value is not nil.
+func (_c *OutsourcingOrderCreate) SetNillablePaymentTermDays(v *int) *OutsourcingOrderCreate {
+	if v != nil {
+		_c.SetPaymentTermDays(*v)
+	}
+	return _c
+}
+
 // SetSupplierSnapshot sets the "supplier_snapshot" field.
 func (_c *OutsourcingOrderCreate) SetSupplierSnapshot(v map[string]interface{}) *OutsourcingOrderCreate {
 	_c.mutation.SetSupplierSnapshot(v)
@@ -275,6 +303,10 @@ func (_c *OutsourcingOrderCreate) ExecX(ctx context.Context) {
 
 // defaults sets the default values of the builder before save.
 func (_c *OutsourcingOrderCreate) defaults() {
+	if _, ok := _c.mutation.Currency(); !ok {
+		v := outsourcingorder.DefaultCurrency
+		_c.mutation.SetCurrency(v)
+	}
 	if _, ok := _c.mutation.LifecycleStatus(); !ok {
 		v := outsourcingorder.DefaultLifecycleStatus
 		_c.mutation.SetLifecycleStatus(v)
@@ -309,6 +341,19 @@ func (_c *OutsourcingOrderCreate) check() error {
 	if v, ok := _c.mutation.SupplierID(); ok {
 		if err := outsourcingorder.SupplierIDValidator(v); err != nil {
 			return &ValidationError{Name: "supplier_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.supplier_id": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.Currency(); !ok {
+		return &ValidationError{Name: "currency", err: errors.New(`ent: missing required field "OutsourcingOrder.currency"`)}
+	}
+	if v, ok := _c.mutation.Currency(); ok {
+		if err := outsourcingorder.CurrencyValidator(v); err != nil {
+			return &ValidationError{Name: "currency", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.currency": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.PaymentTermDays(); ok {
+		if err := outsourcingorder.PaymentTermDaysValidator(v); err != nil {
+			return &ValidationError{Name: "payment_term_days", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.payment_term_days": %w`, err)}
 		}
 	}
 	if v, ok := _c.mutation.SourceOrderNo(); ok {
@@ -398,6 +443,14 @@ func (_c *OutsourcingOrderCreate) createSpec() (*OutsourcingOrder, *sqlgraph.Cre
 	if value, ok := _c.mutation.OutsourcingOrderNo(); ok {
 		_spec.SetField(outsourcingorder.FieldOutsourcingOrderNo, field.TypeString, value)
 		_node.OutsourcingOrderNo = value
+	}
+	if value, ok := _c.mutation.Currency(); ok {
+		_spec.SetField(outsourcingorder.FieldCurrency, field.TypeString, value)
+		_node.Currency = value
+	}
+	if value, ok := _c.mutation.PaymentTermDays(); ok {
+		_spec.SetField(outsourcingorder.FieldPaymentTermDays, field.TypeInt, value)
+		_node.PaymentTermDays = &value
 	}
 	if value, ok := _c.mutation.SupplierSnapshot(); ok {
 		_spec.SetField(outsourcingorder.FieldSupplierSnapshot, field.TypeJSON, value)

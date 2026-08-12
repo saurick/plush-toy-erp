@@ -178,6 +178,7 @@ func (r *masterDataRepo) CreateSupplier(ctx context.Context, in *biz.SupplierMut
 		SetNillableSupplierType(in.SupplierType).
 		SetNillableAddress(in.Address).
 		SetNillableTaxNo(in.TaxNo).
+		SetDefaultPaymentTermDays(in.DefaultPaymentTermDays).
 		SetNillableNote(in.Note)
 	if len(in.ProcessIDs) > 0 {
 		create.AddProcessCapabilityIDs(in.ProcessIDs...)
@@ -196,7 +197,8 @@ func (r *masterDataRepo) CreateSupplier(ctx context.Context, in *biz.SupplierMut
 func (r *masterDataRepo) UpdateSupplier(ctx context.Context, id int, in *biz.SupplierMutation) (*biz.Supplier, error) {
 	update := r.data.postgres.Supplier.UpdateOneID(id).
 		SetCode(in.Code).
-		SetName(in.Name)
+		SetName(in.Name).
+		SetDefaultPaymentTermDays(in.DefaultPaymentTermDays)
 	if in.ShortName == nil {
 		update.ClearShortName()
 	} else {
@@ -1127,6 +1129,7 @@ func createSupplierWithClient(ctx context.Context, client *ent.Client, in *biz.S
 		SetNillableSupplierType(in.SupplierType).
 		SetNillableAddress(in.Address).
 		SetNillableTaxNo(in.TaxNo).
+		SetDefaultPaymentTermDays(in.DefaultPaymentTermDays).
 		SetNillableNote(in.Note)
 	if len(in.ProcessIDs) > 0 {
 		create.AddProcessCapabilityIDs(in.ProcessIDs...)
@@ -1137,7 +1140,8 @@ func createSupplierWithClient(ctx context.Context, client *ent.Client, in *biz.S
 func updateSupplierWithClient(ctx context.Context, client *ent.Client, id int, in *biz.SupplierMutation) (*ent.Supplier, error) {
 	update := client.Supplier.UpdateOneID(id).
 		SetCode(in.Code).
-		SetName(in.Name)
+		SetName(in.Name).
+		SetDefaultPaymentTermDays(in.DefaultPaymentTermDays)
 	if in.ShortName == nil {
 		update.ClearShortName()
 	} else {
@@ -1360,18 +1364,19 @@ func entSupplierToBiz(row *ent.Supplier) *biz.Supplier {
 		}
 	}
 	return &biz.Supplier{
-		ID:           row.ID,
-		Code:         row.Code,
-		Name:         row.Name,
-		ShortName:    row.ShortName,
-		SupplierType: row.SupplierType,
-		Address:      row.Address,
-		TaxNo:        row.TaxNo,
-		ProcessIDs:   processIDs,
-		IsActive:     row.IsActive,
-		Note:         row.Note,
-		CreatedAt:    row.CreatedAt,
-		UpdatedAt:    row.UpdatedAt,
+		ID:                     row.ID,
+		Code:                   row.Code,
+		Name:                   row.Name,
+		ShortName:              row.ShortName,
+		SupplierType:           row.SupplierType,
+		Address:                row.Address,
+		TaxNo:                  row.TaxNo,
+		DefaultPaymentTermDays: row.DefaultPaymentTermDays,
+		ProcessIDs:             processIDs,
+		IsActive:               row.IsActive,
+		Note:                   row.Note,
+		CreatedAt:              row.CreatedAt,
+		UpdatedAt:              row.UpdatedAt,
 	}
 }
 

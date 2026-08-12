@@ -37,9 +37,8 @@ const COLLECTION_TYPE_OPTIONS = [
 ]
 
 const PAYMENT_TERM_OPTIONS = [
-  { label: '出货即收', value: 'CASH_ON_SHIPMENT', days: 0 },
-  { label: '月结 30 天', value: 'EOM_30', days: 30 },
-  { label: '月结 45 天', value: 'EOM_45', days: 45 },
+  { label: '发生即到期', value: 'DUE_ON_OCCURRENCE', days: 0 },
+  { label: '月结', value: 'EOM_DAYS' },
 ]
 
 const INVOICE_CATEGORY_OPTIONS = [

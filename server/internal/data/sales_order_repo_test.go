@@ -42,6 +42,7 @@ func TestSalesOrderRepoOrderLifecycleAndList(t *testing.T) {
 	order, err := uc.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
 		OrderNo:             "SO-001",
 		CustomerID:          customer.ID,
+		Currency:            biz.FinanceCurrencyUSD,
 		CustomerOrderNo:     &customerOrderNo,
 		CustomerSnapshot:    map[string]any{"name": customer.Name},
 		PaymentMethod:       &paymentMethod,
@@ -57,6 +58,9 @@ func TestSalesOrderRepoOrderLifecycleAndList(t *testing.T) {
 	if order.LifecycleStatus != biz.SalesOrderStatusDraft {
 		t.Fatalf("expected draft order, got %#v", order)
 	}
+	if order.Currency != biz.FinanceCurrencyUSD {
+		t.Fatalf("expected USD create currency persisted, got %#v", order)
+	}
 	if order.PaymentMethod == nil || *order.PaymentMethod != paymentMethod || order.PaymentTermDays == nil || *order.PaymentTermDays != paymentTermDays || order.PriceConditionNote == nil || *order.PriceConditionNote != priceConditionNote {
 		t.Fatalf("expected payment condition retained, got %#v", order)
 	}
@@ -65,6 +69,7 @@ func TestSalesOrderRepoOrderLifecycleAndList(t *testing.T) {
 	updated, err := uc.UpdateSalesOrder(ctx, order.ID, &biz.SalesOrderMutation{
 		OrderNo:          "SO-001-A",
 		CustomerID:       customer.ID,
+		Currency:         biz.FinanceCurrencyHKD,
 		CustomerSnapshot: map[string]any{"name": "updated"},
 		OrderDate:        orderDate,
 		Note:             &updatedNote,
@@ -74,6 +79,9 @@ func TestSalesOrderRepoOrderLifecycleAndList(t *testing.T) {
 	}
 	if updated.CustomerOrderNo != nil || updated.PaymentMethod != nil || updated.PaymentTermDays != nil || updated.PriceConditionNote != nil || updated.PlannedDeliveryDate != nil || updated.Note == nil || *updated.Note != updatedNote {
 		t.Fatalf("expected nullable fields updated and cleared, got %#v", updated)
+	}
+	if updated.Currency != biz.FinanceCurrencyHKD {
+		t.Fatalf("expected HKD update currency persisted, got %#v", updated)
 	}
 
 	list, total, err := uc.ListSalesOrders(ctx, biz.SalesOrderFilter{Keyword: "SO-001-A", Limit: 20})
@@ -95,6 +103,9 @@ func TestSalesOrderRepoOrderLifecycleAndList(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("create second sales order failed: %v", err)
+	}
+	if nextOrder.Currency != biz.FinanceCurrencyCNY {
+		t.Fatalf("expected omitted create currency to default CNY, got %#v", nextOrder)
 	}
 	datedList, datedTotal, err := uc.ListSalesOrders(ctx, biz.SalesOrderFilter{
 		DateField: "order_date",
@@ -332,6 +343,7 @@ func TestSalesOrderRepoSaveWithItemsUpdatesAndCancelsMissingOpenLines(t *testing
 	result, err := uc.SaveSalesOrderWithItems(ctx, order.Order.ID, &biz.SalesOrderMutation{
 		OrderNo:         "SO-TX-UPDATE-A",
 		CustomerID:      customer.ID,
+		Currency:        biz.FinanceCurrencyUSD,
 		OrderDate:       orderDate,
 		ExpectedVersion: order.Order.Version,
 	}, []*biz.SalesOrderItemSaveMutation{

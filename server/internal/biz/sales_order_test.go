@@ -193,6 +193,9 @@ func TestSalesOrderUsecaseCreateGuardsCustomer(t *testing.T) {
 	if order.LifecycleStatus != SalesOrderStatusDraft {
 		t.Fatalf("expected draft sales order, got %#v", order)
 	}
+	if repo.createdOrder.Currency != FinanceCurrencyCNY {
+		t.Fatalf("expected create-only CNY default, got %#v", repo.createdOrder)
+	}
 	if repo.createdOrder.OrderNo != "SO-001" || repo.createdOrder.CustomerOrderNo == nil || *repo.createdOrder.CustomerOrderNo != "PO-001" {
 		t.Fatalf("expected normalized order mutation, got %#v", repo.createdOrder)
 	}
@@ -222,6 +225,22 @@ func TestSalesOrderUsecaseCreateGuardsCustomer(t *testing.T) {
 	}
 	if _, err := uc.CreateSalesOrder(ctx, &SalesOrderMutation{OrderNo: "SO-003", CustomerID: 11, OrderDate: orderDate}); !errors.Is(err, ErrCustomerInactive) {
 		t.Fatalf("expected inactive customer rejected, got %v", err)
+	}
+}
+
+func TestSalesOrderCurrencyDefaultsOnlyOnCreate(t *testing.T) {
+	base := SalesOrderMutation{OrderNo: "SO-CURRENCY", CustomerID: 1, OrderDate: time.Date(2026, 8, 12, 0, 0, 0, 0, time.UTC)}
+	created, err := normalizeSalesOrderMutation(base, true)
+	if err != nil || created.Currency != FinanceCurrencyCNY {
+		t.Fatalf("expected create to default CNY, got mutation=%#v err=%v", created, err)
+	}
+	if _, err := normalizeSalesOrderMutation(base, false); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected update without currency rejected, got %v", err)
+	}
+	base.Currency = " hkd "
+	updated, err := normalizeSalesOrderMutation(base, false)
+	if err != nil || updated.Currency != FinanceCurrencyHKD {
+		t.Fatalf("expected explicit HKD update accepted, got mutation=%#v err=%v", updated, err)
 	}
 }
 
@@ -606,6 +625,7 @@ func TestSalesOrderUsecaseSaveWithItemsGuardsAndNormalizes(t *testing.T) {
 	result, err := uc.SaveSalesOrderWithItems(ctx, 1, &SalesOrderMutation{
 		OrderNo:         " SO-TX-001 ",
 		CustomerID:      1000,
+		Currency:        FinanceCurrencyUSD,
 		OrderDate:       orderDate,
 		ExpectedVersion: 1,
 	}, []*SalesOrderItemSaveMutation{
@@ -616,6 +636,9 @@ func TestSalesOrderUsecaseSaveWithItemsGuardsAndNormalizes(t *testing.T) {
 	}
 	if result.Order.OrderNo != "SO-TX-001" || repo.createdOrder.OrderNo != "SO-TX-001" {
 		t.Fatalf("expected normalized order, got result=%#v mutation=%#v", result.Order, repo.createdOrder)
+	}
+	if repo.createdOrder.Currency != FinanceCurrencyUSD {
+		t.Fatalf("expected explicit update currency preserved, got %#v", repo.createdOrder)
 	}
 	if len(repo.savedItems) != 1 || repo.savedItems[0].SalesOrderID != 1 {
 		t.Fatalf("expected item bound to order 1, got %#v", repo.savedItems)

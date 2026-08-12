@@ -23,6 +23,10 @@ type OutsourcingOrder struct {
 	OutsourcingOrderNo string `json:"outsourcing_order_no,omitempty"`
 	// SupplierID holds the value of the "supplier_id" field.
 	SupplierID int `json:"supplier_id,omitempty"`
+	// Currency holds the value of the "currency" field.
+	Currency string `json:"currency,omitempty"`
+	// PaymentTermDays holds the value of the "payment_term_days" field.
+	PaymentTermDays *int `json:"payment_term_days,omitempty"`
 	// SupplierSnapshot holds the value of the "supplier_snapshot" field.
 	SupplierSnapshot map[string]interface{} `json:"supplier_snapshot,omitempty"`
 	// ContractPartySnapshot holds the value of the "contract_party_snapshot" field.
@@ -97,9 +101,9 @@ func (*OutsourcingOrder) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case outsourcingorder.FieldSupplierSnapshot, outsourcingorder.FieldContractPartySnapshot:
 			values[i] = new([]byte)
-		case outsourcingorder.FieldID, outsourcingorder.FieldSupplierID, outsourcingorder.FieldVersion, outsourcingorder.FieldSettledBy:
+		case outsourcingorder.FieldID, outsourcingorder.FieldSupplierID, outsourcingorder.FieldPaymentTermDays, outsourcingorder.FieldVersion, outsourcingorder.FieldSettledBy:
 			values[i] = new(sql.NullInt64)
-		case outsourcingorder.FieldOutsourcingOrderNo, outsourcingorder.FieldSourceOrderNo, outsourcingorder.FieldLifecycleStatus, outsourcingorder.FieldSettlementAction, outsourcingorder.FieldSettlementMode, outsourcingorder.FieldSettlementReason, outsourcingorder.FieldNote:
+		case outsourcingorder.FieldOutsourcingOrderNo, outsourcingorder.FieldCurrency, outsourcingorder.FieldSourceOrderNo, outsourcingorder.FieldLifecycleStatus, outsourcingorder.FieldSettlementAction, outsourcingorder.FieldSettlementMode, outsourcingorder.FieldSettlementReason, outsourcingorder.FieldNote:
 			values[i] = new(sql.NullString)
 		case outsourcingorder.FieldOrderDate, outsourcingorder.FieldExpectedReturnDate, outsourcingorder.FieldSettledAt, outsourcingorder.FieldCreatedAt, outsourcingorder.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -135,6 +139,19 @@ func (_m *OutsourcingOrder) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field supplier_id", values[i])
 			} else if value.Valid {
 				_m.SupplierID = int(value.Int64)
+			}
+		case outsourcingorder.FieldCurrency:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field currency", values[i])
+			} else if value.Valid {
+				_m.Currency = value.String
+			}
+		case outsourcingorder.FieldPaymentTermDays:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field payment_term_days", values[i])
+			} else if value.Valid {
+				_m.PaymentTermDays = new(int)
+				*_m.PaymentTermDays = int(value.Int64)
 			}
 		case outsourcingorder.FieldSupplierSnapshot:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -289,6 +306,14 @@ func (_m *OutsourcingOrder) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("supplier_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.SupplierID))
+	builder.WriteString(", ")
+	builder.WriteString("currency=")
+	builder.WriteString(_m.Currency)
+	builder.WriteString(", ")
+	if v := _m.PaymentTermDays; v != nil {
+		builder.WriteString("payment_term_days=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("supplier_snapshot=")
 	builder.WriteString(fmt.Sprintf("%v", _m.SupplierSnapshot))

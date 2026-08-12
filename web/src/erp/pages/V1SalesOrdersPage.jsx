@@ -872,6 +872,7 @@ export default function V1SalesOrdersPage() {
         prefix: 'SO',
         field: 'order_no',
       }),
+      currency: 'CNY',
       order_date: currentBusinessDate(),
       items: [createBlankOrderLine(1, { unitID: defaultUnitID })],
     })

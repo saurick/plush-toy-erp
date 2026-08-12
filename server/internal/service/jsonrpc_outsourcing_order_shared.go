@@ -18,12 +18,14 @@ func unknownOutsourcingOrderResult(method string) *v1.JsonrpcResult {
 }
 
 func outsourcingOrderMutationFromParams(pm map[string]any) (*biz.OutsourcingOrderMutation, bool) {
-	if !outsourcingOrderAllowsOnly(pm,
+	if !sourceOrderAllowsOnly(pm,
 		"customer_key",
 		"id",
 		"expected_version",
 		"outsourcing_order_no",
 		"supplier_id",
+		"currency",
+		"payment_term_days",
 		"supplier_snapshot",
 		"contract_party_snapshot",
 		"source_order_no",
@@ -38,6 +40,10 @@ func outsourcingOrderMutationFromParams(pm map[string]any) (*biz.OutsourcingOrde
 	if !ok {
 		return nil, false
 	}
+	paymentTermDays, ok := getOptionalJSONRPCNonNegativeInt(pm, "payment_term_days")
+	if !ok {
+		return nil, false
+	}
 	expectedReturnDate, ok := getOptionalJSONRPCTime(pm, "expected_return_date")
 	if !ok {
 		return nil, false
@@ -45,6 +51,8 @@ func outsourcingOrderMutationFromParams(pm map[string]any) (*biz.OutsourcingOrde
 	return &biz.OutsourcingOrderMutation{
 		OutsourcingOrderNo:    getString(pm, "outsourcing_order_no"),
 		SupplierID:            getInt(pm, "supplier_id", 0),
+		Currency:              getString(pm, "currency"),
+		PaymentTermDays:       paymentTermDays,
 		SupplierSnapshot:      getMap(pm, "supplier_snapshot"),
 		ContractPartySnapshot: getMap(pm, "contract_party_snapshot"),
 		SourceOrderNo:         getWorkflowStringPtr(pm, "source_order_no"),
@@ -55,7 +63,7 @@ func outsourcingOrderMutationFromParams(pm map[string]any) (*biz.OutsourcingOrde
 }
 
 func outsourcingOrderItemMutationFromParams(pm map[string]any) (*biz.OutsourcingOrderItemMutation, bool) {
-	if !outsourcingOrderAllowsOnly(pm,
+	if !sourceOrderAllowsOnly(pm,
 		"id",
 		"outsourcing_order_id",
 		"line_no",
@@ -125,7 +133,7 @@ func outsourcingOrderItemMutationFromParams(pm map[string]any) (*biz.Outsourcing
 	}, true
 }
 
-func outsourcingOrderAllowsOnly(pm map[string]any, keys ...string) bool {
+func sourceOrderAllowsOnly(pm map[string]any, keys ...string) bool {
 	allowed := make(map[string]struct{}, len(keys))
 	for _, key := range keys {
 		allowed[key] = struct{}{}
@@ -230,6 +238,8 @@ func outsourcingOrderToMap(item *biz.OutsourcingOrder) map[string]any {
 		"id":                      item.ID,
 		"outsourcing_order_no":    item.OutsourcingOrderNo,
 		"supplier_id":             item.SupplierID,
+		"currency":                item.Currency,
+		"payment_term_days":       optionalIntValue(item.PaymentTermDays),
 		"supplier_snapshot":       item.SupplierSnapshot,
 		"contract_party_snapshot": item.ContractPartySnapshot,
 		"source_order_no":         optionalStringValue(item.SourceOrderNo),

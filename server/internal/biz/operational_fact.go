@@ -45,15 +45,12 @@ const (
 	FinanceFactReconciliation           = "RECONCILIATION"
 	FinanceCounterpartyCustomer         = "CUSTOMER"
 	FinanceCounterpartySupplier         = "SUPPLIER"
-	FinanceCounterpartyOther            = "OTHER"
 	FinanceCurrencyUSD                  = "USD"
 	FinanceCurrencyCNY                  = "CNY"
 	FinanceCurrencyHKD                  = "HKD"
-	FinanceCollectionAdvanceReceipt     = "ADVANCE_RECEIPT"
 	FinanceCollectionAccountsReceivable = "ACCOUNTS_RECEIVABLE"
-	FinancePaymentTermCashOnShipment    = "CASH_ON_SHIPMENT"
-	FinancePaymentTermEOM30             = "EOM_30"
-	FinancePaymentTermEOM45             = "EOM_45"
+	FinancePaymentTermDueOnOccurrence   = "DUE_ON_OCCURRENCE"
+	FinancePaymentTermEOMDays           = "EOM_DAYS"
 	FinanceInvoiceCategoryNone          = "NONE"
 	FinanceInvoiceCategoryExportGeneral = "EXPORT_GENERAL"
 	FinanceInvoiceCategoryVATGeneral1   = "VAT_GENERAL_1"
@@ -269,6 +266,7 @@ type FinanceFact struct {
 	CollectionType    *string
 	PaymentTerm       *string
 	PaymentTermDays   *int
+	DueAt             *time.Time
 	InvoiceCategory   *string
 	SourceType        *string
 	SourceID          *int
@@ -498,6 +496,7 @@ type FinanceFactCreate struct {
 	CollectionType      *string
 	PaymentTerm         *string
 	PaymentTermDays     *int
+	DueAt               *time.Time
 	InvoiceCategory     *string
 	SourceType          *string
 	SourceID            *int
@@ -1385,32 +1384,29 @@ var financeFactTypes = map[string]struct{}{
 	FinanceFactReconciliation: {},
 }
 
-var financeCounterpartyTypes = map[string]struct{}{
-	FinanceCounterpartyCustomer: {},
-	FinanceCounterpartySupplier: {},
-	FinanceCounterpartyOther:    {},
-}
-
 var financeCurrencies = map[string]struct{}{
 	FinanceCurrencyUSD: {},
 	FinanceCurrencyCNY: {},
 	FinanceCurrencyHKD: {},
 }
 
-var financeCollectionTypes = map[string]struct{}{
-	FinanceCollectionAdvanceReceipt:     {},
-	FinanceCollectionAccountsReceivable: {},
+// NormalizeFinanceCurrency keeps the deliberately small V1 currency set
+// consistent across source documents, finance facts and payments. Callers
+// that own a create-only default must apply it before this validation.
+func NormalizeFinanceCurrency(raw string) (string, bool) {
+	currency := strings.ToUpper(strings.TrimSpace(raw))
+	_, ok := financeCurrencies[currency]
+	return currency, ok
 }
 
-var financePaymentTerms = map[string]int{
-	FinancePaymentTermCashOnShipment: 0,
-	FinancePaymentTermEOM30:          30,
-	FinancePaymentTermEOM45:          45,
+func normalizeSourceOrderCurrency(raw string, create bool) (string, bool) {
+	if create && strings.TrimSpace(raw) == "" {
+		raw = FinanceCurrencyCNY
+	}
+	return NormalizeFinanceCurrency(raw)
 }
 
-// FinancePaymentTermSnapshotFromDays freezes the exact sales-order term.
-// Known terms keep their display code; non-standard terms intentionally keep
-// only the exact day count instead of being guessed into a different enum.
+// FinancePaymentTermSnapshotFromDays freezes the exact source-document term.
 func FinancePaymentTermSnapshotFromDays(days *int) (*string, *int, error) {
 	if days == nil {
 		return nil, nil, ErrFinanceFactPaymentTermMissing
@@ -1419,18 +1415,40 @@ func FinancePaymentTermSnapshotFromDays(days *int) (*string, *int, error) {
 	if dayCount < 0 {
 		return nil, nil, ErrBadParam
 	}
-	var term string
-	switch dayCount {
-	case 0:
-		term = FinancePaymentTermCashOnShipment
-	case 30:
-		term = FinancePaymentTermEOM30
-	case 45:
-		term = FinancePaymentTermEOM45
-	default:
-		return nil, &dayCount, nil
+	term := FinancePaymentTermEOMDays
+	if dayCount == 0 {
+		term = FinancePaymentTermDueOnOccurrence
 	}
 	return &term, &dayCount, nil
+}
+
+// FinanceFactDueAtFromDays derives the due timestamp from the locked source term.
+func FinanceFactDueAtFromDays(occurredAt time.Time, days *int) (*time.Time, error) {
+	if occurredAt.IsZero() || days == nil || *days < 0 {
+		return nil, ErrBadParam
+	}
+	canonicalOccurredAt := occurredAt.UTC().Truncate(time.Microsecond)
+	if *days == 0 {
+		return &canonicalOccurredAt, nil
+	}
+	dueAt := time.Date(
+		canonicalOccurredAt.Year(),
+		canonicalOccurredAt.Month()+1,
+		0,
+		canonicalOccurredAt.Hour(),
+		canonicalOccurredAt.Minute(),
+		canonicalOccurredAt.Second(),
+		canonicalOccurredAt.Nanosecond(),
+		time.UTC,
+	).AddDate(0, 0, *days)
+	return &dueAt, nil
+}
+
+func sameOptionalFinanceText(left, right *string) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	return *left == *right
 }
 
 var financeInvoiceCategories = map[string]struct{}{
@@ -1909,27 +1927,12 @@ func normalizeFinanceFactCreate(in *FinanceFactCreate) (*FinanceFactCreate, erro
 	if out.SourceLineID != nil && *out.SourceLineID <= 0 {
 		out.SourceLineID = nil
 	}
-	if out.Currency == "" {
-		out.Currency = "CNY"
-	}
-	if _, ok := financeCurrencies[out.Currency]; !ok {
+	var currencyOK bool
+	out.Currency, currencyOK = NormalizeFinanceCurrency(out.Currency)
+	if !currencyOK {
 		return nil, ErrBadParam
 	}
-	if out.CollectionType != nil {
-		if _, ok := financeCollectionTypes[*out.CollectionType]; !ok {
-			return nil, ErrBadParam
-		}
-	}
-	if out.PaymentTerm != nil {
-		defaultDays, ok := financePaymentTerms[*out.PaymentTerm]
-		if !ok {
-			return nil, ErrBadParam
-		}
-		if out.PaymentTermDays == nil {
-			out.PaymentTermDays = &defaultDays
-		}
-	}
-	if out.PaymentTermDays != nil && *out.PaymentTermDays < 0 {
+	if out.CollectionType != nil && *out.CollectionType != FinanceCollectionAccountsReceivable {
 		return nil, ErrBadParam
 	}
 	if out.InvoiceCategory != nil {
@@ -1940,7 +1943,7 @@ func normalizeFinanceFactCreate(in *FinanceFactCreate) (*FinanceFactCreate, erro
 	if _, ok := financeFactTypes[out.FactType]; !ok {
 		return nil, ErrBadParam
 	}
-	if _, ok := financeCounterpartyTypes[out.CounterpartyType]; !ok {
+	if out.CounterpartyType != FinanceCounterpartyCustomer && out.CounterpartyType != FinanceCounterpartySupplier {
 		return nil, ErrBadParam
 	}
 	if out.FactNo == "" {
@@ -1953,6 +1956,30 @@ func normalizeFinanceFactCreate(in *FinanceFactCreate) (*FinanceFactCreate, erro
 		return nil, ErrBadParam
 	}
 	out.OccurredAt, out.OccurredAtSpecified = normalizeIdempotencyIntentTime(out.OccurredAt)
+	switch out.FactType {
+	case FinanceFactReceivable, FinanceFactPayable:
+		if out.PaymentTermDays == nil {
+			return nil, ErrFinanceFactPaymentTermMissing
+		}
+		canonicalTerm, canonicalDays, err := FinancePaymentTermSnapshotFromDays(out.PaymentTermDays)
+		if err != nil || !sameOptionalFinanceText(out.PaymentTerm, canonicalTerm) {
+			return nil, ErrBadParam
+		}
+		dueAt, err := FinanceFactDueAtFromDays(out.OccurredAt, canonicalDays)
+		if err != nil {
+			return nil, err
+		}
+		if out.DueAt != nil && !out.DueAt.UTC().Truncate(time.Microsecond).Equal(*dueAt) {
+			return nil, ErrBadParam
+		}
+		out.PaymentTerm = canonicalTerm
+		out.PaymentTermDays = canonicalDays
+		out.DueAt = dueAt
+	default:
+		if out.PaymentTerm != nil || out.PaymentTermDays != nil || out.DueAt != nil {
+			return nil, ErrBadParam
+		}
+	}
 	return &out, nil
 }
 
@@ -2030,8 +2057,6 @@ func (uc *OperationalFactUsecase) validateFinanceCounterpartyActiveReferences(ct
 		return requireActiveReference(ctx, *in.CounterpartyID, uc.repo.CustomerIsActive, ErrCustomerInactive)
 	case FinanceCounterpartySupplier:
 		return requireActiveReference(ctx, *in.CounterpartyID, uc.repo.SupplierIsActive, ErrSupplierInactive)
-	case FinanceCounterpartyOther:
-		return nil
 	default:
 		return ErrBadParam
 	}

@@ -65,6 +65,16 @@ func SupplierID(v int) predicate.OutsourcingOrder {
 	return predicate.OutsourcingOrder(sql.FieldEQ(FieldSupplierID, v))
 }
 
+// Currency applies equality check predicate on the "currency" field. It's identical to CurrencyEQ.
+func Currency(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEQ(FieldCurrency, v))
+}
+
+// PaymentTermDays applies equality check predicate on the "payment_term_days" field. It's identical to PaymentTermDaysEQ.
+func PaymentTermDays(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEQ(FieldPaymentTermDays, v))
+}
+
 // SourceOrderNo applies equality check predicate on the "source_order_no" field. It's identical to SourceOrderNoEQ.
 func SourceOrderNo(v string) predicate.OutsourcingOrder {
 	return predicate.OutsourcingOrder(sql.FieldEQ(FieldSourceOrderNo, v))
@@ -213,6 +223,121 @@ func SupplierIDIn(vs ...int) predicate.OutsourcingOrder {
 // SupplierIDNotIn applies the NotIn predicate on the "supplier_id" field.
 func SupplierIDNotIn(vs ...int) predicate.OutsourcingOrder {
 	return predicate.OutsourcingOrder(sql.FieldNotIn(FieldSupplierID, vs...))
+}
+
+// CurrencyEQ applies the EQ predicate on the "currency" field.
+func CurrencyEQ(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEQ(FieldCurrency, v))
+}
+
+// CurrencyNEQ applies the NEQ predicate on the "currency" field.
+func CurrencyNEQ(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNEQ(FieldCurrency, v))
+}
+
+// CurrencyIn applies the In predicate on the "currency" field.
+func CurrencyIn(vs ...string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldIn(FieldCurrency, vs...))
+}
+
+// CurrencyNotIn applies the NotIn predicate on the "currency" field.
+func CurrencyNotIn(vs ...string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNotIn(FieldCurrency, vs...))
+}
+
+// CurrencyGT applies the GT predicate on the "currency" field.
+func CurrencyGT(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldGT(FieldCurrency, v))
+}
+
+// CurrencyGTE applies the GTE predicate on the "currency" field.
+func CurrencyGTE(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldGTE(FieldCurrency, v))
+}
+
+// CurrencyLT applies the LT predicate on the "currency" field.
+func CurrencyLT(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldLT(FieldCurrency, v))
+}
+
+// CurrencyLTE applies the LTE predicate on the "currency" field.
+func CurrencyLTE(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldLTE(FieldCurrency, v))
+}
+
+// CurrencyContains applies the Contains predicate on the "currency" field.
+func CurrencyContains(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldContains(FieldCurrency, v))
+}
+
+// CurrencyHasPrefix applies the HasPrefix predicate on the "currency" field.
+func CurrencyHasPrefix(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldHasPrefix(FieldCurrency, v))
+}
+
+// CurrencyHasSuffix applies the HasSuffix predicate on the "currency" field.
+func CurrencyHasSuffix(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldHasSuffix(FieldCurrency, v))
+}
+
+// CurrencyEqualFold applies the EqualFold predicate on the "currency" field.
+func CurrencyEqualFold(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEqualFold(FieldCurrency, v))
+}
+
+// CurrencyContainsFold applies the ContainsFold predicate on the "currency" field.
+func CurrencyContainsFold(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldContainsFold(FieldCurrency, v))
+}
+
+// PaymentTermDaysEQ applies the EQ predicate on the "payment_term_days" field.
+func PaymentTermDaysEQ(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEQ(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysNEQ applies the NEQ predicate on the "payment_term_days" field.
+func PaymentTermDaysNEQ(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNEQ(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysIn applies the In predicate on the "payment_term_days" field.
+func PaymentTermDaysIn(vs ...int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldIn(FieldPaymentTermDays, vs...))
+}
+
+// PaymentTermDaysNotIn applies the NotIn predicate on the "payment_term_days" field.
+func PaymentTermDaysNotIn(vs ...int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNotIn(FieldPaymentTermDays, vs...))
+}
+
+// PaymentTermDaysGT applies the GT predicate on the "payment_term_days" field.
+func PaymentTermDaysGT(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldGT(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysGTE applies the GTE predicate on the "payment_term_days" field.
+func PaymentTermDaysGTE(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldGTE(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysLT applies the LT predicate on the "payment_term_days" field.
+func PaymentTermDaysLT(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldLT(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysLTE applies the LTE predicate on the "payment_term_days" field.
+func PaymentTermDaysLTE(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldLTE(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysIsNil applies the IsNil predicate on the "payment_term_days" field.
+func PaymentTermDaysIsNil() predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldIsNull(FieldPaymentTermDays))
+}
+
+// PaymentTermDaysNotNil applies the NotNil predicate on the "payment_term_days" field.
+func PaymentTermDaysNotNil() predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNotNull(FieldPaymentTermDays))
 }
 
 // SupplierSnapshotIsNil applies the IsNil predicate on the "supplier_snapshot" field.

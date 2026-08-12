@@ -91,20 +91,20 @@ func (FinanceFact) Annotations() []schema.Annotation {
 				"finance_facts_counterparty_allowed":     "counterparty_type IN ('CUSTOMER', 'SUPPLIER')",
 				"finance_facts_amount_positive":          "amount > 0",
 				"finance_facts_fee_amount_nonnegative":   "fee_amount >= 0",
-				"finance_facts_currency_allowed":         "currency = 'CNY'",
+				"finance_facts_currency_allowed":         "currency IN ('USD', 'CNY', 'HKD')",
 				"finance_facts_collection_type_allowed":  "collection_type IS NULL OR collection_type = 'ACCOUNTS_RECEIVABLE'",
-				"finance_facts_payment_term_allowed":     "payment_term IS NULL OR payment_term IN ('DUE_ON_OCCURRENCE', 'NET_DAYS')",
+				"finance_facts_payment_term_allowed":     "payment_term IS NULL OR payment_term IN ('DUE_ON_OCCURRENCE', 'EOM_DAYS')",
 				"finance_facts_payment_term_days_check":  "payment_term_days IS NULL OR payment_term_days >= 0",
 				"finance_facts_invoice_category_allowed": "invoice_category IS NULL OR invoice_category IN ('NONE', 'EXPORT_GENERAL', 'VAT_GENERAL_1', 'VAT_SPECIAL_3', 'VAT_SPECIAL_13')",
 				"finance_facts_version_positive":         "version > 0",
 				"finance_facts_due_at_bundle": `
 (
   (fact_type IN ('RECEIVABLE', 'PAYABLE')
-    AND payment_term IS NOT NULL
-    AND payment_term_days IS NOT NULL
-    AND due_at IS NOT NULL
-    AND ((payment_term = 'DUE_ON_OCCURRENCE' AND payment_term_days = 0 AND due_at = occurred_at)
-      OR (payment_term = 'NET_DAYS' AND payment_term_days > 0 AND due_at > occurred_at)))
+	AND payment_term IS NOT NULL
+	AND payment_term_days IS NOT NULL
+	AND due_at IS NOT NULL
+	AND ((payment_term = 'DUE_ON_OCCURRENCE' AND payment_term_days = 0 AND due_at = occurred_at)
+	  OR (payment_term = 'EOM_DAYS' AND payment_term_days > 0 AND due_at > occurred_at)))
   OR
   (fact_type NOT IN ('RECEIVABLE', 'PAYABLE')
     AND payment_term IS NULL

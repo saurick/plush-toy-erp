@@ -438,10 +438,14 @@ function factStage() {
   const reservationStatuses = ["ACTIVE", "RELEASED"];
   const finance = [];
   const paymentTerms = [
-    { payment_term: "CASH_ON_SHIPMENT", payment_term_days: 0 },
-    { payment_term: "EOM_30", payment_term_days: 30 },
-    { payment_term: "EOM_45", payment_term_days: 45 },
-    { payment_term_days: 60 },
+    {
+      payment_term: "DUE_ON_OCCURRENCE",
+      payment_term_days: 0,
+      due_at: 1_789_113_600,
+    },
+    { payment_term: "EOM_DAYS", payment_term_days: 30, due_at: 1_791_705_600 },
+    { payment_term: "EOM_DAYS", payment_term_days: 45, due_at: 1_793_001_600 },
+    { payment_term: "EOM_DAYS", payment_term_days: 60, due_at: 1_794_297_600 },
   ];
   const invoiceCategories = [
     "NONE",
@@ -469,9 +473,11 @@ function factStage() {
         status,
         source_type: type === "RECONCILIATION" ? "FINANCE_FACT" : "SHIPMENT",
         source_id: 9000 + offset,
-        ...(type === "RECEIVABLE"
+        ...(["RECEIVABLE", "PAYABLE"].includes(type)
           ? {
-              collection_type: "ACCOUNTS_RECEIVABLE",
+              ...(type === "RECEIVABLE"
+                ? { collection_type: "ACCOUNTS_RECEIVABLE" }
+                : {}),
               ...paymentTerms[offset % paymentTerms.length],
             }
           : {}),

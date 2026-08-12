@@ -24,7 +24,7 @@ func (d *jsonrpcDispatcher) handleFinancePaymentV1(ctx context.Context, method, 
 	}
 	switch method {
 	case "create_finance_payment":
-		if !financeFactAllowsOnly(pm, "customer_key", "payment_no", "direction", "counterparty_type", "counterparty_id", "amount", "currency", "account_ref", "evidence_ref", "idempotency_key", "occurred_at") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "payment_no", "direction", "counterparty_type", "counterparty_id", "amount", "currency", "account_ref", "evidence_ref", "idempotency_key", "occurred_at") {
 			return id, invalidParamResult(), nil
 		}
 		amount, ok := getRequiredJSONRPCNumeric20Scale6(pm, "amount")
@@ -43,25 +43,25 @@ func (d *jsonrpcDispatcher) handleFinancePaymentV1(ctx context.Context, method, 
 		out, err := d.operationalFactUC.CreateFinancePayment(ctx, in, actorID)
 		return id, financePaymentResult(d, ctx, out, err), nil
 	case "cancel_finance_payment":
-		if !financeFactAllowsOnly(pm, "customer_key", "id", "expected_version", "reason") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "id", "expected_version", "reason") {
 			return id, invalidParamResult(), nil
 		}
 		out, err := d.operationalFactUC.CancelFinancePayment(ctx, &biz.FinancePaymentTransition{ID: getInt(pm, "id", 0), ExpectedVersion: getInt(pm, "expected_version", 0), Reason: getString(pm, "reason")}, actorID)
 		return id, financePaymentResult(d, ctx, out, err), nil
 	case "reverse_finance_payment":
-		if !financeFactAllowsOnly(pm, "customer_key", "id", "expected_version", "reason") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "id", "expected_version", "reason") {
 			return id, invalidParamResult(), nil
 		}
 		out, err := d.operationalFactUC.ReverseFinancePayment(ctx, &biz.FinancePaymentReverse{ID: getInt(pm, "id", 0), ExpectedVersion: getInt(pm, "expected_version", 0), Reason: getString(pm, "reason")}, actorID)
 		return id, financePaymentResult(d, ctx, out, err), nil
 	case "get_finance_payment":
-		if !financeFactAllowsOnly(pm, "customer_key", "id") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "id") {
 			return id, invalidParamResult(), nil
 		}
 		out, err := d.operationalFactUC.GetFinancePayment(ctx, getInt(pm, "id", 0))
 		return id, financePaymentResult(d, ctx, out, err), nil
 	case "list_finance_payments":
-		if !financeFactAllowsOnly(pm, "customer_key", "status", "direction", "counterparty_type", "counterparty_id", "limit", "offset") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "status", "direction", "counterparty_type", "counterparty_id", "limit", "offset") {
 			return id, invalidParamResult(), nil
 		}
 		items, total, err := d.operationalFactUC.ListFinancePayments(ctx, biz.FinancePaymentFilter{Status: getString(pm, "status"), Direction: getString(pm, "direction"), CounterpartyType: getString(pm, "counterparty_type"), CounterpartyID: getInt(pm, "counterparty_id", 0), Limit: getInt(pm, "limit", 50), Offset: getInt(pm, "offset", 0)})
@@ -74,13 +74,13 @@ func (d *jsonrpcDispatcher) handleFinancePaymentV1(ctx context.Context, method, 
 		}
 		return id, okData(map[string]any{"payments": out, "total": total, "limit": getInt(pm, "limit", 50), "offset": getInt(pm, "offset", 0)}), nil
 	case "get_finance_credit_note":
-		if !financeFactAllowsOnly(pm, "customer_key", "id") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "id") {
 			return id, invalidParamResult(), nil
 		}
 		out, err := d.operationalFactUC.GetFinanceCreditNote(ctx, getInt(pm, "id", 0))
 		return id, financeCreditNoteResult(d, ctx, out, err), nil
 	case "list_finance_credit_notes":
-		if !financeFactAllowsOnly(pm, "customer_key", "status", "finance_fact_id", "limit", "offset") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "status", "finance_fact_id", "limit", "offset") {
 			return id, invalidParamResult(), nil
 		}
 		limit, offset := getInt(pm, "limit", 50), getInt(pm, "offset", 0)
@@ -94,7 +94,7 @@ func (d *jsonrpcDispatcher) handleFinancePaymentV1(ctx context.Context, method, 
 		}
 		return id, okData(map[string]any{"credit_notes": out, "total": total, "limit": limit, "offset": offset}), nil
 	case "create_finance_credit_note":
-		if !financeFactAllowsOnly(pm, "customer_key", "credit_note_no", "finance_fact_id", "amount", "reason", "idempotency_key") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "credit_note_no", "finance_fact_id", "amount", "reason", "idempotency_key") {
 			return id, invalidParamResult(), nil
 		}
 		amount, ok := getRequiredJSONRPCNumeric20Scale6(pm, "amount")
@@ -122,7 +122,7 @@ func (d *jsonrpcDispatcher) handleFinancePaymentV1(ctx context.Context, method, 
 		out, err := d.operationalFactUC.CreateFinanceCreditNote(ctx, &biz.FinanceCreditNoteCreate{CreditNoteNo: getString(pm, "credit_note_no"), FinanceFactID: factID, Amount: amount, Reason: getString(pm, "reason"), IdempotencyKey: getString(pm, "idempotency_key")}, actorID)
 		return id, financeCreditNoteResult(d, ctx, out, err), nil
 	case "reverse_finance_credit_note":
-		if !financeFactAllowsOnly(pm, "customer_key", "credit_note_id", "credit_note_no", "reason", "idempotency_key") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "credit_note_id", "credit_note_no", "reason", "idempotency_key") {
 			return id, invalidParamResult(), nil
 		}
 		if res := d.requireAnySourceActionReadPermission(ctx, "operational_fact", method); res != nil {

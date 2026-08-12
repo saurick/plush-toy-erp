@@ -320,13 +320,14 @@ func normalizeFinancePaymentCreate(in FinancePaymentCreate) (FinancePaymentCreat
 	in.PaymentNo = strings.TrimSpace(in.PaymentNo)
 	in.Direction = strings.ToUpper(strings.TrimSpace(in.Direction))
 	in.CounterpartyType = strings.ToUpper(strings.TrimSpace(in.CounterpartyType))
-	in.Currency = strings.ToUpper(strings.TrimSpace(in.Currency))
 	in.AccountRef = strings.TrimSpace(in.AccountRef)
 	in.EvidenceRef = strings.TrimSpace(in.EvidenceRef)
 	in.IdempotencyKey = strings.TrimSpace(in.IdempotencyKey)
+	var currencyOK bool
+	in.Currency, currencyOK = NormalizeFinanceCurrency(in.Currency)
 	validPairing := (in.Direction == FinancePaymentDirectionReceipt && in.CounterpartyType == FinanceCounterpartyCustomer) ||
 		(in.Direction == FinancePaymentDirectionDisbursement && in.CounterpartyType == FinanceCounterpartySupplier)
-	if in.PaymentNo == "" || !validPairing || in.CounterpartyID <= 0 || !in.Amount.IsPositive() || (in.Currency != "CNY" && in.Currency != "USD" && in.Currency != "HKD") || in.AccountRef == "" || in.EvidenceRef == "" || in.IdempotencyKey == "" {
+	if in.PaymentNo == "" || !validPairing || in.CounterpartyID <= 0 || !in.Amount.IsPositive() || !currencyOK || in.AccountRef == "" || in.EvidenceRef == "" || in.IdempotencyKey == "" {
 		return FinancePaymentCreate{}, "", ErrBadParam
 	}
 	if len([]rune(in.PaymentNo)) > 64 || len([]rune(in.AccountRef)) > 128 ||

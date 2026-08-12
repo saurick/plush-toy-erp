@@ -607,6 +607,8 @@ export default function V1PurchaseOrdersPage() {
         field: 'purchase_order_no',
       }),
       supplier_id: undefined,
+      currency: 'CNY',
+      payment_term_days: undefined,
       supplier_purchase_order_no: '',
       purchase_date: todayInputValue(),
       expected_arrival_date: '',
@@ -647,6 +649,8 @@ export default function V1PurchaseOrdersPage() {
             form.setFieldsValue({
               purchase_order_no: record.purchase_order_no || '',
               supplier_id: record.supplier_id,
+              currency: record.currency,
+              payment_term_days: record.payment_term_days,
               supplier_purchase_order_no:
                 record.supplier_purchase_order_no || '',
               supplier_snapshot:
@@ -740,6 +744,21 @@ export default function V1PurchaseOrdersPage() {
   const handleSupplierChange = (supplierID) => {
     const supplier = suppliers.find((item) => item.id === supplierID)
     form.setFieldValue('supplier_snapshot', buildSupplierSnapshot(supplier))
+    if (!editingOrder?.id) {
+      const termDays = supplier?.default_payment_term_days
+      const normalizedTermDays = Number(termDays)
+      form.setFieldValue(
+        'payment_term_days',
+        termDays !== undefined &&
+          termDays !== null &&
+          termDays !== '' &&
+          Number.isFinite(normalizedTermDays) &&
+          Number.isInteger(normalizedTermDays) &&
+          normalizedTermDays >= 0
+          ? normalizedTermDays
+          : undefined
+      )
+    }
     resolveSupplierSnapshot(supplier).then((snapshot) => {
       if (
         String(form.getFieldValue('supplier_id') ?? '') !==

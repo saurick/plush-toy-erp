@@ -18,7 +18,19 @@ func unknownSalesOrderResult(method string) *v1.JsonrpcResult {
 }
 
 func salesOrderMutationFromParams(pm map[string]any) (*biz.SalesOrderMutation, bool) {
+	if !sourceOrderAllowsOnly(pm,
+		"customer_key", "id", "expected_version", "order_no", "customer_id", "currency",
+		"customer_order_no", "customer_snapshot", "sales_owner", "contact_snapshot",
+		"payment_method", "payment_term_days", "price_condition_note", "order_date",
+		"planned_delivery_date", "note", "items",
+	) {
+		return nil, false
+	}
 	orderDate, ok := getRequiredJSONRPCTime(pm, "order_date")
+	if !ok {
+		return nil, false
+	}
+	paymentTermDays, ok := getOptionalJSONRPCNonNegativeInt(pm, "payment_term_days")
 	if !ok {
 		return nil, false
 	}
@@ -29,12 +41,13 @@ func salesOrderMutationFromParams(pm map[string]any) (*biz.SalesOrderMutation, b
 	return &biz.SalesOrderMutation{
 		OrderNo:             getString(pm, "order_no"),
 		CustomerID:          getInt(pm, "customer_id", 0),
+		Currency:            getString(pm, "currency"),
 		CustomerOrderNo:     getWorkflowStringPtr(pm, "customer_order_no"),
 		CustomerSnapshot:    getMap(pm, "customer_snapshot"),
 		SalesOwner:          getWorkflowStringPtr(pm, "sales_owner"),
 		ContactSnapshot:     getMap(pm, "contact_snapshot"),
 		PaymentMethod:       getWorkflowStringPtr(pm, "payment_method"),
-		PaymentTermDays:     getOptionalNonNegativeInt(pm, "payment_term_days"),
+		PaymentTermDays:     paymentTermDays,
 		PriceConditionNote:  getWorkflowStringPtr(pm, "price_condition_note"),
 		OrderDate:           orderDate,
 		PlannedDeliveryDate: plannedDeliveryDate,
@@ -171,6 +184,7 @@ func salesOrderToMap(item *biz.SalesOrder) map[string]any {
 		"id":                    item.ID,
 		"order_no":              item.OrderNo,
 		"customer_id":           item.CustomerID,
+		"currency":              item.Currency,
 		"customer_order_no":     optionalStringValue(item.CustomerOrderNo),
 		"customer_snapshot":     item.CustomerSnapshot,
 		"sales_owner":           optionalStringValue(item.SalesOwner),
