@@ -212,6 +212,78 @@ test("db guard rejects editing an old migration as schema proof", async () => {
   });
 });
 
+test("index transition allows editing a local unpublished migration", async () => {
+  await withRepository(async (root) => {
+    const migration =
+      "server/internal/data/model/migrate/20260102000000_migrate.sql";
+    await write(root, migration, "ALTER TABLE items ADD COLUMN name text;\n");
+    await write(root, "server/internal/data/model/migrate/atlas.sum", "h1:local\n");
+    commitAll(root, "local unpublished migration");
+
+    await write(
+      root,
+      migration,
+      "ALTER TABLE items ADD COLUMN name text;\n-- local correction\n",
+    );
+    await write(root, "server/internal/data/model/migrate/atlas.sum", "h1:corrected\n");
+
+    const result = evaluateDbGuard({
+      root,
+      range: "HEAD^...HEAD",
+      indexTransition: true,
+    });
+    assert.equal(result.ok, true, JSON.stringify(result, null, 2));
+    assert.deepEqual(result.newMigrations, [migration]);
+  });
+});
+
+test("index transition still rejects editing a published migration", async () => {
+  await withRepository(async (root) => {
+    await write(
+      root,
+      "server/internal/data/model/migrate/20260101000000_migrate.sql",
+      "-- forbidden correction\nCREATE TABLE items (id bigint);\n",
+    );
+
+    const result = evaluateDbGuard({
+      root,
+      range: "HEAD...HEAD",
+      indexTransition: true,
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, "base-migration-modified");
+  });
+});
+
+test("index transition audits only risky migrations changed now", async () => {
+  await withRepository(async (root) => {
+    const migration =
+      "server/internal/data/model/migrate/20260102000000_drop_items.sql";
+    await write(root, migration, "DROP TABLE items;\n");
+    await write(root, "server/internal/data/model/migrate/atlas.sum", "h1:local\n");
+    commitAll(root, "local risky migration");
+
+    let result = evaluateDbGuardWithMigrationRisk({
+      root,
+      range: "HEAD^...HEAD",
+      indexTransition: true,
+    });
+    assert.equal(result.ok, true, JSON.stringify(result, null, 2));
+    assert.equal(result.skipped, true);
+
+    await write(root, migration, "DROP TABLE items;\n-- local correction\n");
+    await write(root, "server/internal/data/model/migrate/atlas.sum", "h1:corrected\n");
+    result = evaluateDbGuardWithMigrationRisk({
+      root,
+      range: "HEAD^...HEAD",
+      indexTransition: true,
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, "migration-risk-metadata-missing");
+    assert.deepEqual(result.files, [migration]);
+  });
+});
+
 test("db guard accepts a new migration only when atlas.sum also changes", async () => {
   await withRepository(async (root) => {
     await write(

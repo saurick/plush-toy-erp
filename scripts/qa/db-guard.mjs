@@ -1165,7 +1165,7 @@ function statementProvesRequirement(statement, requirement) {
   );
 }
 
-export function evaluateDbGuard({ root, range = "" }) {
+export function evaluateDbGuard({ root, range = "", indexTransition = false }) {
   const modelDir = path.join(root, "server/internal/data/model");
   try {
     runGit(root, ["rev-parse", "--show-toplevel"]);
@@ -1178,6 +1178,10 @@ export function evaluateDbGuard({ root, range = "" }) {
 
   const effectiveRange = range || resolveDefaultRange(root);
   if (effectiveRange) validateGitRange(root, effectiveRange);
+  const publicationEntries =
+    indexTransition && effectiveRange ? nameStatus(root, [effectiveRange]) : [];
+  const transitionRange = indexTransition ? "HEAD...HEAD" : effectiveRange;
+  if (transitionRange) validateGitRange(root, transitionRange);
   const programmability = evaluateDatabaseProgrammabilityPolicy(root);
   if (!programmability.ok) {
     return {
@@ -1187,7 +1191,7 @@ export function evaluateDbGuard({ root, range = "" }) {
   }
 
   const entries = [];
-  if (effectiveRange) entries.push(...nameStatus(root, [effectiveRange]));
+  if (transitionRange) entries.push(...nameStatus(root, [transitionRange]));
   entries.push(...nameStatus(root, []));
   entries.push(...nameStatus(root, ["--cached"]));
 
@@ -1219,16 +1223,44 @@ export function evaluateDbGuard({ root, range = "" }) {
     return { ok: true, skipped: true, range: effectiveRange, changedFiles: [] };
   }
 
-  const newMigrations = new Set(
+  const addedMigrations = new Set(
     entries
       .filter((entry) => entry.status === "A" && isMigrationSql(entry.path))
       .map((entry) => entry.path),
   );
+  const unpublishedMigrations = new Set(
+    publicationEntries
+      .filter((entry) => entry.status === "A" && isMigrationSql(entry.path))
+      .map((entry) => entry.path),
+  );
+  const modifiedUnpublishedMigrations = new Set(
+    entries
+      .filter(
+        (entry) =>
+          entry.status === "M" &&
+          isMigrationSql(entry.path) &&
+          unpublishedMigrations.has(entry.path),
+      )
+      .map((entry) => entry.path),
+  );
+  const newMigrations = new Set([
+    ...addedMigrations,
+    ...modifiedUnpublishedMigrations,
+  ]);
   const immutableMigrationChanges = [];
   for (const entry of entries) {
     const paths = [entry.path, entry.oldPath].filter(Boolean);
     if (!paths.some(isMigrationSql)) continue;
-    if (paths.some((file) => newMigrations.has(file))) continue;
+    if (entry.status === "A" && paths.some((file) => addedMigrations.has(file))) {
+      continue;
+    }
+    if (
+      indexTransition &&
+      entry.status === "M" &&
+      paths.every((file) => unpublishedMigrations.has(file))
+    ) {
+      continue;
+    }
     if (/^[MDRCT]/u.test(entry.status)) {
       immutableMigrationChanges.push(
         entry.oldPath ? `${entry.status}:${entry.oldPath}->${entry.path}` : `${entry.status}:${entry.path}`,
@@ -1246,7 +1278,7 @@ export function evaluateDbGuard({ root, range = "" }) {
 
   const schemaFiles = [...changedFiles].filter(isSchemaFile);
   const structuralSchemaFiles = schemaFiles.filter((file) =>
-    schemaDiffRequiresMigration(root, file, effectiveRange, untrackedFiles),
+    schemaDiffRequiresMigration(root, file, transitionRange, untrackedFiles),
   );
   const generatedEntChanged = [...changedFiles].some(isGeneratedEntFile);
   const schemaRequiresMigration = structuralSchemaFiles.length > 0;
@@ -1299,7 +1331,7 @@ export function evaluateDbGuard({ root, range = "" }) {
       const requirements = schemaDdlRequirements(
         root,
         file,
-        effectiveRange,
+        transitionRange,
         untrackedFiles,
         entries,
       );
@@ -1361,7 +1393,7 @@ export function evaluateDbGuardWithMigrationRisk(options) {
 
 function printHelp() {
   console.log(`用法:
-  node scripts/qa/db-guard.mjs
+  node scripts/qa/db-guard.mjs [--index-transition]
 
 环境变量:
   SKIP_DB_GUARD=1    跳过本地检查
@@ -1370,12 +1402,15 @@ function printHelp() {
 }
 
 function main() {
-  if (process.argv.slice(2).some((arg) => arg === "-h" || arg === "--help")) {
+  const args = process.argv.slice(2);
+  if (args.some((arg) => arg === "-h" || arg === "--help")) {
     printHelp();
     return;
   }
-  if (process.argv.length > 2) {
-    throw new Error(`[qa:db-guard] unsupported arguments: ${process.argv.slice(2).join(" ")}`);
+  const indexTransition = args.includes("--index-transition");
+  const unsupported = args.filter((arg) => arg !== "--index-transition");
+  if (unsupported.length > 0) {
+    throw new Error(`[qa:db-guard] unsupported arguments: ${unsupported.join(" ")}`);
   }
   if (process.env.SKIP_DB_GUARD === "1") {
     console.log("[qa:db-guard] SKIP_DB_GUARD=1，跳过");
@@ -1386,6 +1421,7 @@ function main() {
   const result = evaluateDbGuardWithMigrationRisk({
     root,
     range: process.env.QA_BASE_RANGE || "",
+    indexTransition,
   });
   if (!result.ok) {
     if (result.reason === "base-migration-modified") {
