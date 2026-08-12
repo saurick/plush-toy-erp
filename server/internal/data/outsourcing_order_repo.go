@@ -402,8 +402,12 @@ func (r *outsourcingOrderRepo) ApplyOutsourcingOrderLifecycleAction(
 			return nil, err
 		}
 	}
-	update := tx.client.OutsourcingOrder.UpdateOneID(in.ID).
-		Where(outsourcingorder.Version(in.ExpectedVersion), outsourcingorder.LifecycleStatus(current.LifecycleStatus)).
+	update := tx.client.OutsourcingOrder.Update().
+		Where(
+			outsourcingorder.ID(in.ID),
+			outsourcingorder.Version(in.ExpectedVersion),
+			outsourcingorder.LifecycleStatus(current.LifecycleStatus),
+		).
 		SetLifecycleStatus(lifecycleStatus).
 		SetVersion(in.ExpectedVersion + 1)
 	if lifecycleStatus == biz.OutsourcingOrderStatusClosed || lifecycleStatus == biz.OutsourcingOrderStatusCanceled {
@@ -419,11 +423,15 @@ func (r *outsourcingOrderRepo) ApplyOutsourcingOrderLifecycleAction(
 			update.SetSettlementReason(in.Reason)
 		}
 	}
-	row, err := update.Save(ctx)
+	affected, err := update.Save(ctx)
 	if err != nil {
-		if ent.IsNotFound(err) {
-			return nil, biz.ErrOutsourcingOrderConflict
-		}
+		return nil, err
+	}
+	if affected != 1 {
+		return nil, biz.ErrOutsourcingOrderConflict
+	}
+	row, err := tx.client.OutsourcingOrder.Get(ctx, in.ID)
+	if err != nil {
 		return nil, err
 	}
 	if err := createSourceOrderLifecycleActionReceipt(ctx, tx.client, "outsourcing_order", current.LifecycleStatus, lifecycleStatus, in, lineResults); err != nil {
