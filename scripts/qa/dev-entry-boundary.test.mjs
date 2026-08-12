@@ -1350,6 +1350,8 @@ test("dev entry boundary: Product Core 与客户开发入口共用同一 web pre
     "web/scripts/startWebDev.mjs",
     "web/scripts/startYoyoosunDev.mjs",
   ]) {
-    assert.match(read(script), /runWebRuntimePreflight/u, script);
+    const source = read(script);
+    assert.match(source, /runWebRuntimePreflight/u, script);
+    assert.match(source, /resolveDevBrowserLaunchEnv/u, script);
   }
 });

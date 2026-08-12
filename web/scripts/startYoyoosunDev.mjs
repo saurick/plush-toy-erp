@@ -15,6 +15,7 @@ import {
   normalizeAPIOrigin,
   runWebRuntimePreflight,
 } from '../../scripts/local-runtime-preflight.mjs'
+import { resolveDevBrowserLaunchEnv } from './openDevBrowser.js'
 
 const repoRoot = path.resolve(import.meta.dirname, '..', '..')
 const devPorts = loadDevPorts(repoRoot)
@@ -145,6 +146,7 @@ function runVite(options) {
   const child = spawn('pnpm', ['exec', 'vite', '--config', 'vite.config.mjs'], {
     env: {
       ...process.env,
+      ...resolveDevBrowserLaunchEnv(process.env),
       ERP_DEV_CUSTOMER_KEY: options.customer,
       ERP_VITE_PORT: options.port,
       ERP_VITE_HMR_CLIENT_PORT: options.port,
