@@ -450,6 +450,22 @@ test("manual acceptance source plan covers supported business lifecycle states",
     ].sort(),
     ["material", "mixed", "outsourcing"],
   );
+  assert.equal(
+    plan.records.suppliers.every(
+      (item) =>
+        Number.isInteger(item.default_payment_term_days) &&
+        item.default_payment_term_days >= 0,
+    ),
+    true,
+  );
+  assert.deepEqual(
+    [
+      ...new Set(
+        plan.records.suppliers.map((item) => item.default_payment_term_days),
+      ),
+    ].sort((left, right) => left - right),
+    [0, 30, 45, 60],
+  );
 });
 
 test("status counts preserve inactive false values", () => {
@@ -502,6 +518,23 @@ test("persisted source content comparison normalizes dates and decimals but reje
         fields: ["snapshot"],
       }),
     /snapshot differs from dataVersion planned content/u,
+  );
+
+  const supplier = buildManualAcceptanceSourceDataPlan({
+    runId: "SUPPLIER-TERM-DRIFT",
+  }).records.suppliers[0];
+  assert.throws(
+    () =>
+      assertPersistedSourceRecord({
+        label: `supplier ${supplier.code}`,
+        expected: supplier,
+        actual: {
+          ...supplier,
+          default_payment_term_days: supplier.default_payment_term_days + 1,
+        },
+        fields: ["default_payment_term_days"],
+      }),
+    /default_payment_term_days differs from dataVersion planned content/u,
   );
 });
 

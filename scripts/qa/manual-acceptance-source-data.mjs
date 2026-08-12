@@ -351,6 +351,7 @@ function buildSuppliers(prefix, count) {
       name,
       short_name: name,
       supplier_type: supplierType,
+      default_payment_term_days: [0, 30, 45, 60][offset % 4],
       note: longBusinessNote(index),
       isActive: index <= count - 5,
       contacts:
@@ -1574,6 +1575,7 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
         "name",
         "short_name",
         "supplier_type",
+        "default_payment_term_days",
         "tax_no",
         "note",
       ],
