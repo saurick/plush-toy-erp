@@ -54,6 +54,7 @@ import {
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
+import { BusinessHelpLabel } from '../components/help/BusinessContextHelp.jsx'
 import BusinessLineItemsSection from '../components/business-list/BusinessLineItemsSection.jsx'
 import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
 import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
@@ -371,7 +372,13 @@ const BOMLineItemsForm = React.memo(
                 </Form.Item>
                 <Form.Item
                   className="erp-line-item-field erp-line-item-field--quantity"
-                  label="损耗率"
+                  label={
+                    <BusinessHelpLabel
+                      itemKey="loss-rate"
+                      label="损耗率"
+                      pageKey="material-bom"
+                    />
+                  }
                   name={[field.name, 'loss_rate']}
                   rules={[{ required: true, message: '请填写损耗率' }]}
                 >
@@ -1273,6 +1280,7 @@ export default function BOMVersionsPage() {
     <BusinessPageLayout>
       <PageHeaderCard
         compact
+        helpKey="material-bom"
         title="物料清单（BOM）"
         description="维护产品工程资料版本、材料用量、损耗率和生效规则。"
         stats={[

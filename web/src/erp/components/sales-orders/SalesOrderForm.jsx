@@ -24,6 +24,7 @@ import FieldWithUnitSuffix, {
 import SourceImportPickerModal from '../business-list/SourceImportPickerModal.jsx'
 import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.jsx'
 import BusinessLineItemsSummaryValue from '../business-list/BusinessLineItemsSummaryValue.jsx'
+import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import {
   dateInputNotAfterRule,
@@ -876,7 +877,13 @@ export function SalesOrderItemsFormSection({
                             return (
                               <Form.Item
                                 className="erp-line-item-field erp-line-item-field--money"
-                                label="金额"
+                                label={
+                                  <BusinessHelpLabel
+                                    itemKey="line-amount"
+                                    label="金额"
+                                    pageKey="sales-orders"
+                                  />
+                                }
                               >
                                 <Input
                                   value={

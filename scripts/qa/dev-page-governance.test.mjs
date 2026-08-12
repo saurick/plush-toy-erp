@@ -39,6 +39,14 @@ const REQUIRED_SHARED_SCENARIOS = Object.freeze([
 ]);
 const GOVERNED_PAGE_CONTRACTS = Object.freeze([
   Object.freeze({
+    route: "/__dev/business-usability",
+    scenarioFile: "web/scripts/style-l1/devBusinessUsabilityScenarios.mjs",
+    scenarioNames: Object.freeze([
+      "dev-business-usability-desktop-light",
+      "dev-business-usability-mobile-dark",
+    ]),
+  }),
+  Object.freeze({
     route: "/__dev/drill-recovery",
     scenarioFile: "web/scripts/style-l1/devDrillRecoveryScenarios.mjs",
     scenarioNames: Object.freeze([

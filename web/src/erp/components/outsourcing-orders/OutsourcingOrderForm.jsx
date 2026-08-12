@@ -5,6 +5,7 @@ import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
 import BusinessLineItemsSection from '../business-list/BusinessLineItemsSection.jsx'
 import BusinessLineItemsSummaryValue from '../business-list/BusinessLineItemsSummaryValue.jsx'
+import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import FieldWithUnitSuffix, {
   isQuantityTextWithinUnitPrecision,
   unitPrecisionErrorMessage,
@@ -651,7 +652,13 @@ export default function OutsourcingOrderForm({
                 {({ getFieldValue }) => (
                   <Form.Item
                     className="erp-line-item-field erp-line-item-field--money"
-                    label="金额预览"
+                    label={
+                      <BusinessHelpLabel
+                        itemKey="outsourcing-line-amount"
+                        label="金额预览"
+                        pageKey="processing-contracts"
+                      />
+                    }
                     extra="仅供录入核对，保存时由系统按数量和单价核算。"
                   >
                     <Input

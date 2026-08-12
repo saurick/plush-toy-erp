@@ -6,7 +6,7 @@
     <link rel="icon" href="data:," />
     <meta
       name="prototype-source-revision"
-      content="d9165f1fabf8003b713d504dc419ddbf4fdc6221"
+      content="711961636c8a95c9968ccf7d235d1cbbec615a99"
     />
     <title>当前页面地图与交互样板 v3</title>
     <style>
@@ -857,7 +857,7 @@
           <p class="subtitle">
             对照当前路由、菜单和 24
             个业务模块重新整理。页面地图负责盘点，交互样板只演示共享列表与任务处理合同，不冒充
-            56 套完整业务页面。
+            57 套完整业务页面。
           </p>
         </div>
         <div class="header-actions">
@@ -933,12 +933,12 @@
                 <h2>当前页面地图</h2>
                 <p class="muted">
                   共
-                  <strong id="matrixCount">56</strong>
+                  <strong id="matrixCount">57</strong>
                   个可见页面或路由模式；不统计 redirect-only 和 wildcard
                   fallback。
                 </p>
               </div>
-              <span class="badge">源码基线 d9165f1fabf8</span>
+              <span class="badge">源码基线 711961636c8a</span>
             </div>
             <div class="panel-body">
               <div class="metric-strip" aria-label="页面范围统计">
@@ -949,7 +949,7 @@
                   <span>公共 / 移动 / 参数化</span><strong>7</strong>
                 </div>
                 <div class="metric">
-                  <span>开发工作台</span><strong>17</strong>
+                  <span>开发工作台</span><strong>18</strong>
                 </div>
                 <div class="metric">
                   <span>完整业务交互稿</span><strong>1</strong>
@@ -1775,6 +1775,15 @@
           "title": "业务链与运行观察",
           "path": "/__dev/status-flows",
           "summary": "只读观察业务链、Workflow、ProcessRuntime、Fact 和状态规则。",
+          "source": "DevWorkbenchRoutes.jsx"
+        },
+        {
+          "key": "dev-business-usability",
+          "scope": "development",
+          "group": "产品工程",
+          "title": "业务易用性",
+          "path": "/__dev/business-usability",
+          "summary": "只读检查页面任务、完成标准、交接和页内解释覆盖。",
           "source": "DevWorkbenchRoutes.jsx"
         },
         {

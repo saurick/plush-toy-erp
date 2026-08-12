@@ -1372,6 +1372,7 @@ export default function V1SalesOrdersPage() {
     <BusinessPageLayout className="erp-v1-sales-orders-page">
       <PageHeaderCard
         compact
+        helpKey="sales-orders"
         title="销售订单"
         description="维护客户订单承诺和订单明细；生效订单可在此预留库存，出货、应收、发票和收款仍需到对应业务页面处理。"
         stats={[

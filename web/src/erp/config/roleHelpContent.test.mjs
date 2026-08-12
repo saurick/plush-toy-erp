@@ -69,6 +69,18 @@ test('roleHelpContent: 覆盖九个业务岗位和系统管理员且正文各不
         item.answer.includes('同一菜单分组内的顺序')
     )
   )
+  assert(
+    ROLE_HELP_GUIDES.every((guide) =>
+      guide.questions.some(
+        (item) =>
+          item.question ===
+            '页面里的专业词、金额或自动带入内容看不懂怎么办？' &&
+          item.answer.includes('这页怎么用') &&
+          item.answer.includes('名称旁的问号') &&
+          item.answer.includes('直接显示')
+      )
+    )
+  )
 })
 
 test('roleHelpContent: 快捷入口全部来自当前正式导航', () => {

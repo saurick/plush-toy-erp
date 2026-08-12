@@ -22,6 +22,11 @@ const commonQuestions = Object.freeze([
     answer:
       '任务完成只表示协同事项已经处理。入库、出货、应收、应付等结果仍要回到对应业务页面确认，最终以业务记录状态为准。',
   },
+  {
+    question: '页面里的专业词、金额或自动带入内容看不懂怎么办？',
+    answer:
+      '先点页面右上角“这页怎么用”，查看当前任务、完成标准、办理顺序和交接对象；金额、比例、字段来源等局部内容可点名称旁的问号查看。不能操作的原因、高风险提醒和必须交给谁处理的事项会直接显示，不需要藏在问号里找。',
+  },
 ])
 
 export const ROLE_HELP_GUIDES = Object.freeze([
@@ -582,6 +587,7 @@ export const ROLE_HELP_GUIDES = Object.freeze([
       '只分配完成工作所需的岗位和页面，避免无关入口增加误操作。',
     ],
     questions: [
+      ...commonQuestions,
       {
         question: '员工登录后看不到页面怎么办？',
         answer:

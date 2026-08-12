@@ -87,6 +87,14 @@ const PRODUCT_ENGINEERING_ENTRY_PRESENTATION = Object.freeze({
     action: '查看业务链',
     boundary: '适合查当前节点、责任、事实与状态差异',
   }),
+  'business-usability': Object.freeze({
+    eyebrow: '员工易用性',
+    title: '员工能不能看懂、能不能自己完成？',
+    description:
+      '查看高频业务页是否说明了当前任务、完成标准、交接对象、专业名词、公式和字段来源。',
+    action: '检查业务易用性',
+    boundary: '只读复用页面说明；推荐岗位不是权限，覆盖状态不是客户验收',
+  }),
   docs: Object.freeze({
     eyebrow: '正式说明',
     title: '这项能力的正式说明写在哪里？',

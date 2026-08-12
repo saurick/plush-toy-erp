@@ -1616,6 +1616,7 @@ export default function V1QualityInspectionsPage() {
     <BusinessPageLayout className="erp-v1-quality-inspections-page">
       <PageHeaderCard
         compact
+        helpKey="quality-inspections"
         title="质量检验"
         description="质量检验集中办理采购到货、委外回货、出货关联成品和生产 WIP 分段关口的质量判定。生产 WIP 依次覆盖裁片、皮套、成品、针检、抽检及订单要求的客户验货，每张质检单只代表当前在制批次和当前关口。首次到货检验不合格可按来源行和部分数量办理退厂或补换；补换确认生成新的待收与待检记录，原收货不会因部分处置被整单取消。已入库后的不合格仍生成采购退货并形成库存追溯。"
         tags={[

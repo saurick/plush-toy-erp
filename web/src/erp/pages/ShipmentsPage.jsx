@@ -1538,6 +1538,7 @@ export default function ShipmentsPage() {
     <BusinessPageLayout className="erp-v1-shipments-page">
       <PageHeaderCard
         compact
+        helpKey="shipments"
         title="出货单"
         description="销售出货草稿需先完成品质检验与财务放行，并由仓库确认实际出货后才扣减库存。"
         tags={[

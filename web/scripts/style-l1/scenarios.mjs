@@ -7,6 +7,7 @@ import { getNavigationSections } from '../../src/erp/config/seedData.mjs'
 import { createBusinessFormalScenarios } from './businessFormalScenarios.mjs'
 import { createBusinessActionStabilityScenarios } from './businessActionStabilityScenarios.mjs'
 import { createBusinessRowItemsPreviewScenarios } from './businessRowItemsPreviewScenarios.mjs'
+import { createDevBusinessUsabilityScenarios } from './devBusinessUsabilityScenarios.mjs'
 import { createDevFlowStateObservatoryScenarios } from './devFlowStateObservatoryScenarios.mjs'
 import { createDevDrillRecoveryScenarios } from './devDrillRecoveryScenarios.mjs'
 import { createDevQualityGateScenarios } from './devQualityGateScenarios.mjs'
@@ -1422,6 +1423,15 @@ export function createStyleL1Scenarios(deps) {
     }),
     ...createDevDrillRecoveryScenarios({
       assert,
+      assertNoHorizontalOverflow,
+      clickERPThemeOption,
+      expectHeading,
+      outputDir,
+      path,
+    }),
+    ...createDevBusinessUsabilityScenarios({
+      assert,
+      assertDarkThemeContrast,
       assertNoHorizontalOverflow,
       clickERPThemeOption,
       expectHeading,
@@ -12594,6 +12604,12 @@ export function createStyleL1Scenarios(deps) {
             titlePrefix: '业务链观察 · ',
           },
           {
+            path: '/__dev/business-usability',
+            heading: '员工能不能看懂、能不能自己完成？',
+            rootSelector: '.erp-dev-business-usability-page',
+            titlePrefix: '业务易用性 · ',
+          },
+          {
             path: '/__dev/docs',
             heading: '开发文档查看器 / Dev Docs Viewer',
             rootSelector: '.erp-dev-docs-page',
@@ -12689,6 +12705,7 @@ export function createStyleL1Scenarios(deps) {
                 '.erp-dev-permission-relationships-header',
                 '.erp-dev-governance-header',
                 '.erp-dev-flow-header',
+                '.erp-dev-business-usability-header',
                 '.erp-dev-docs-header',
                 '.erp-dev-testing-header',
                 '.erp-dev-quality-header',
@@ -12703,6 +12720,7 @@ export function createStyleL1Scenarios(deps) {
                 '.erp-dev-permission-relationships-shell',
                 '.erp-dev-governance-shell',
                 '.erp-dev-flow-main',
+                '.erp-dev-business-usability-shell',
                 '.erp-dev-docs-shell',
                 '.erp-dev-testing-shell',
                 '.erp-dev-quality-shell',

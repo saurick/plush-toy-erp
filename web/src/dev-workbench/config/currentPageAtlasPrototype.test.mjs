@@ -47,11 +47,11 @@ test('currentPageAtlasPrototype: 页面矩阵与当前业务模块和桌面导�
     .map(toComparablePage)
     .sort((left, right) => left.key.localeCompare(right.key))
 
-  assert.equal(matrix.length, 56)
+  assert.equal(matrix.length, 57)
   assert.equal(new Set(matrix.map((item) => item.key)).size, matrix.length)
   assert.equal(matrix.filter((item) => item.scope === 'desktop').length, 32)
   assert.equal(matrix.filter((item) => item.scope === 'auxiliary').length, 7)
-  assert.equal(matrix.filter((item) => item.scope === 'development').length, 17)
+  assert.equal(matrix.filter((item) => item.scope === 'development').length, 18)
   assert.deepEqual(desktopPages, expectedDesktopPages)
 })
 
@@ -77,6 +77,7 @@ test('currentPageAtlasPrototype: 辅助与开发页面只登记当前真实路�
   ])
   assert.deepEqual(developmentPaths, [
     '/__dev',
+    '/__dev/business-usability',
     '/__dev/customer-config',
     '/__dev/data-preparation',
     '/__dev/database-migration',
@@ -99,13 +100,13 @@ test('currentPageAtlasPrototype: 辅助与开发页面只登记当前真实路�
 test('currentPageAtlasPrototype: 保持中性 To Implement 边界且不恢复退出能力', () => {
   assert.match(
     prototypeSource,
-    /name="prototype-source-revision"\s+content="d9165f1fabf8003b713d504dc419ddbf4fdc6221"/u
+    /name="prototype-source-revision"\s+content="711961636c8a95c9968ccf7d235d1cbbec615a99"/u
   )
   assert.match(prototypeSource, /待实现 \/ To Implement/u)
   assert.match(prototypeSource, /中性模拟数据/u)
   assert.match(prototypeSource, /not_proven/u)
   assert.match(readmeSource, /阶段：待实现 \/ To Implement/u)
-  assert.match(readmeSource, /“56 个页面”只表示当前路由盘点/u)
+  assert.match(readmeSource, /“57 个页面”只表示当前路由盘点/u)
   assert.doesNotMatch(
     prototypeSource,
     /客户退货（RMA）|\/erp\/sales\/customer-returns|永绅|yoyoosun/u

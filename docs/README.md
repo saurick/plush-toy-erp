@@ -111,6 +111,7 @@
 
 - 不再维护 `web/src/erp/docs/*.md`、`web/src/erp/config/docs.mjs` 或 `docRegistry`。
 - `/erp/help-center` 是当前单一岗位帮助入口，内容真源为 `web/src/erp/config/roleHelpContent.mjs`；它按当前有效岗位投影内容，只展示账号已开放的页面捷径，不设置独立业务权限码。
+- 高频业务页的“这页怎么用”和字段问号说明统一来自 `web/src/erp/config/businessUsabilityCatalog.mjs`，用于补充页面任务、完成标准、交接、公式和字段来源，不恢复第二个帮助中心，也不替代权限、岗位责任或业务链真源。`/__dev/business-usability` 只读检查这份目录的覆盖情况，不进入正式菜单或生产构建。
 - 旧 `/erp/docs/*`、`/erp/qa/*`、`/erp/source-readiness`、`/erp/mobile-workbenches` 和 `/erp/roles/*` 路径不再注册运行时路由、重定向或权限别名。
 - 正式文档继续保留在 `docs/`、`server/docs/`、`web/README.md`、`server/README.md` 等仓库文档入口，不复制或镜像到前端运行时页面。
 - 本地开发态可通过 `/__dev/governance` 按常见改动只读浏览 [项目治理地图](项目治理地图.md) 的第一份依据、同步检查和误判边界；内部分类与完整关系按需展开。该入口不进入 ERP 正式菜单，也不替代 Markdown 真源。

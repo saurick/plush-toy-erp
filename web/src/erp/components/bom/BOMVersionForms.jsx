@@ -3,6 +3,7 @@ import { Button, Form, Input, Select, Space } from 'antd'
 
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
+import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import {
   dateInputNotAfterRule,
   dateInputNotBeforeRule,
@@ -342,7 +343,13 @@ export function BOMItemFormFields({ materialOptions = [], unitOptions = [] }) {
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
-        label="损耗率"
+        label={
+          <BusinessHelpLabel
+            itemKey="loss-rate"
+            label="损耗率"
+            pageKey="material-bom"
+          />
+        }
         name="loss_rate"
         rules={[{ required: true, message: '请填写损耗率' }]}
       >

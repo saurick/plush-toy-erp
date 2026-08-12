@@ -13,6 +13,7 @@ import FieldWithUnitSuffix, {
 import SourceImportPickerModal from '../business-list/SourceImportPickerModal.jsx'
 import BusinessLineItemsSummaryValue from '../business-list/BusinessLineItemsSummaryValue.jsx'
 import BusinessLineItemsSection from '../business-list/BusinessLineItemsSection.jsx'
+import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import {
   dateInputNotAfterRule,
@@ -566,7 +567,13 @@ export function PurchaseOrderFormFields({
               <Form.Item
                 className="erp-line-item-field erp-line-item-field--money"
                 name={[field.name, 'amount']}
-                label="金额"
+                label={
+                  <BusinessHelpLabel
+                    itemKey="purchase-line-amount"
+                    label="金额"
+                    pageKey="accessories-purchase"
+                  />
+                }
               >
                 <Input placeholder="留空时根据数量和单价自动计算" />
               </Form.Item>

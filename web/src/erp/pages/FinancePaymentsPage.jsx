@@ -60,6 +60,7 @@ import {
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
+import { BusinessHelpLabel } from '../components/help/BusinessContextHelp.jsx'
 import ExceptionProcessRecoveryButton from '../components/workflow/ExceptionProcessRecoveryButton.jsx'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
@@ -1293,6 +1294,7 @@ export default function FinancePaymentsPage() {
     <BusinessPageLayout className="erp-finance-payments-page">
       <PageHeaderCard
         compact
+        helpKey="finance-payments"
         title="收付款与核销"
         description="登记真实收款或付款，按同一往来方和币种跨多张应收或应付核销；已过账记录通过冲销恢复未核销金额，红冲记录保留独立审计。"
         tags={[
@@ -1844,7 +1846,13 @@ export default function FinancePaymentsPage() {
                     </Form.Item>
                     <Form.Item
                       name={[field.name, 'amount']}
-                      label="本次核销金额"
+                      label={
+                        <BusinessHelpLabel
+                          itemKey="allocation-amount"
+                          label="本次核销金额"
+                          pageKey="finance-payments"
+                        />
+                      }
                       rules={[
                         {
                           validator: (_, value) =>

@@ -64,6 +64,7 @@ import {
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
+import { BusinessHelpLabel } from '../components/help/BusinessContextHelp.jsx'
 import InventoryOperationModal from '../components/inventory/InventoryOperationModal.jsx'
 import InventoryOperationRecordsModal from '../components/inventory/InventoryOperationRecordsModal.jsx'
 import ExceptionProcessRecoveryButton from '../components/workflow/ExceptionProcessRecoveryButton.jsx'
@@ -1667,7 +1668,13 @@ export default function V1InventoryLedgerPage() {
           formatQuantity(record?.active_reserved_quantity),
       },
       {
-        title: '可用量',
+        title: (
+          <BusinessHelpLabel
+            itemKey="available-quantity"
+            label="可用量"
+            pageKey="inventory"
+          />
+        ),
         exportTitle: '可用量',
         dataIndex: 'available_quantity',
         width: 130,
@@ -1793,6 +1800,7 @@ export default function V1InventoryLedgerPage() {
     <BusinessPageLayout className="erp-v1-inventory-ledger-page">
       <PageHeaderCard
         compact
+        helpKey="inventory"
         title="库存台账"
         description="可查询余额、批次和库存变动，也可从选中的真实库存余额登记盘点、调拨和经审批的人工调整；作业草稿只有过账后才会形成库存变动。"
         tags={[

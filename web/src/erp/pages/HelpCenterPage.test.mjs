@@ -29,6 +29,11 @@ test('HelpCenterPage: 使用当前账号岗位和已开放页面生成帮助', (
   assert.match(source, /当前账号有多个岗位/u)
   assert.match(source, /查看其他岗位说明/u)
   assert.match(source, /不会改变当前登录账号的岗位或权限/u)
+  assert.match(source, /业务页面里也能随手查看说明/u)
+  assert.match(source, /这页怎么用/u)
+  assert.match(source, /名称旁的问号/u)
+  assert.match(source, /高风险提醒/u)
+  assert.match(source, /仍会直接显示/u)
 })
 
 test('HelpCenterPage: 通用帮助由登录壳追加且不依赖业务权限项', () => {

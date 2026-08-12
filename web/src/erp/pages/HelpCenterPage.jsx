@@ -157,6 +157,13 @@ export default function HelpCenterPage() {
         />
       ) : null}
 
+      <Alert
+        type="info"
+        showIcon
+        message="业务页面里也能随手查看说明"
+        description="页面右上角的“这页怎么用”会说明当前任务、完成标准、办理顺序和交接对象；金额、比例、字段来源等局部内容可点名称旁的问号。不能操作的原因、高风险提醒和必须交给谁处理的事项仍会直接显示。"
+      />
+
       <section aria-labelledby="help-priorities-title">
         <div className="erp-help-center-section-head">
           <div>
