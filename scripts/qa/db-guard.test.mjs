@@ -284,6 +284,85 @@ test("index transition audits only risky migrations changed now", async () => {
   });
 });
 
+test("index transition does not require DDL when schema returns to publication truth", async () => {
+  await withRepository(async (root) => {
+    const publishedSchema = [
+      "package schema",
+      "func (Item) Annotations() []schema.Annotation {",
+      "  return []schema.Annotation{entsql.Annotation{Checks: map[string]string{",
+      '    "items_status_allowed": "status IN (\'active\')",',
+      "  }}}",
+      "}",
+      "",
+    ].join("\n");
+    await write(root, "server/internal/data/model/schema/item.go", publishedSchema);
+    commitAll(root, "published check");
+
+    await write(
+      root,
+      "server/internal/data/model/schema/item.go",
+      publishedSchema.replace("active", "inactive"),
+    );
+    commitAll(root, "local unpublished narrowing");
+    await write(root, "server/internal/data/model/schema/item.go", publishedSchema);
+
+    const result = evaluateDbGuard({
+      root,
+      range: "HEAD^...HEAD",
+      indexTransition: true,
+    });
+    assert.equal(result.ok, true, JSON.stringify(result, null, 2));
+    assert.deepEqual(result.newMigrations, []);
+  });
+});
+
+test("index transition still requires DDL for real schema changes beside a publication restore", async () => {
+  await withRepository(async (root) => {
+    const publishedSchema = [
+      "package schema",
+      "func (Item) Annotations() []schema.Annotation {",
+      "  return []schema.Annotation{entsql.Annotation{Checks: map[string]string{",
+      '    "items_status_allowed": "status IN (\'active\')",',
+      "  }}}",
+      "}",
+      "",
+    ].join("\n");
+    await write(root, "server/internal/data/model/schema/item.go", publishedSchema);
+    commitAll(root, "published check");
+
+    await write(
+      root,
+      "server/internal/data/model/schema/item.go",
+      publishedSchema.replace("active", "inactive"),
+    );
+    commitAll(root, "local unpublished narrowing");
+    await write(
+      root,
+      "server/internal/data/model/schema/item.go",
+      publishedSchema.replace(
+        "  }}}",
+        '    "items_quantity_nonnegative": "quantity >= 0",\n  }}}',
+      ),
+    );
+    await write(
+      root,
+      "server/internal/data/model/migrate/20260102000000_migrate.sql",
+      "ALTER TABLE items ADD COLUMN unrelated text;\n",
+    );
+    await write(root, "server/internal/data/model/migrate/atlas.sum", "h1:next\n");
+
+    const result = evaluateDbGuard({
+      root,
+      range: "HEAD^...HEAD",
+      indexTransition: true,
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, "schema-migration-proof-missing");
+    assert(result.proofs[0].missingTokens.includes("items_quantity_nonnegative"));
+    assert(!result.proofs[0].missingTokens.includes("items_status_allowed"));
+  });
+});
+
 test("db guard accepts a new migration only when atlas.sum also changes", async () => {
   await withRepository(async (root) => {
     await write(

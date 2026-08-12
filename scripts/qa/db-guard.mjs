@@ -577,6 +577,60 @@ function namedCheckExpressions(source) {
   return expressions;
 }
 
+function publicationEquivalentSchemaRequirements(
+  root,
+  file,
+  publicationRange,
+  requirements,
+) {
+  if (!publicationRange || requirements.length === 0) return requirements;
+
+  let publishedSource;
+  try {
+    publishedSource = baselineSource(root, file, publicationRange);
+  } catch {
+    // Added, renamed or otherwise unresolved publication paths stay strict.
+    return requirements;
+  }
+  const target = path.join(root, file);
+  if (!existsSync(target)) return requirements;
+
+  const currentSource = readFileSync(target, "utf8");
+  if (publishedSource === currentSource) return [];
+
+  const publishedChecks = namedCheckExpressions(publishedSource);
+  const currentChecks = namedCheckExpressions(currentSource);
+  const publishedFields = fieldBuilderChains(publishedSource);
+  const currentFields = fieldBuilderChains(currentSource);
+  const indexesUnchanged =
+    JSON.stringify(indexFieldGroups(publishedSource).sort()) ===
+    JSON.stringify(indexFieldGroups(currentSource).sort());
+  const publishedTable = schemaTableName(publishedSource, file);
+  const currentTable = schemaTableName(currentSource, file);
+
+  return requirements.filter((requirement) => {
+    const token = requirement.tokens.at(-1);
+    if (requirement.kind === "check") {
+      return !(
+        publishedChecks.has(token) === currentChecks.has(token) &&
+        publishedChecks.get(token) === currentChecks.get(token)
+      );
+    }
+    if (
+      requirement.kind === "column" &&
+      publishedFields.has(token) &&
+      currentFields.has(token)
+    ) {
+      return publishedFields.get(token) !== currentFields.get(token);
+    }
+    if (requirement.kind === "index" && indexesUnchanged) return false;
+    if (requirement.kind === "table" && requirement.operation === "rename-table") {
+      return publishedTable !== currentTable;
+    }
+    return true;
+  });
+}
+
 function dropUnchangedCheckOperations(
   root,
   baselineFile,
@@ -1277,9 +1331,29 @@ export function evaluateDbGuard({ root, range = "", indexTransition = false }) {
   }
 
   const schemaFiles = [...changedFiles].filter(isSchemaFile);
-  const structuralSchemaFiles = schemaFiles.filter((file) =>
-    schemaDiffRequiresMigration(root, file, transitionRange, untrackedFiles),
-  );
+  const schemaRequirements = new Map();
+  const structuralSchemaFiles = schemaFiles.filter((file) => {
+    if (!schemaDiffRequiresMigration(root, file, transitionRange, untrackedFiles)) {
+      return false;
+    }
+    const requirements = schemaDdlRequirements(
+      root,
+      file,
+      transitionRange,
+      untrackedFiles,
+      entries,
+    );
+    const netRequirements = indexTransition
+      ? publicationEquivalentSchemaRequirements(
+          root,
+          file,
+          effectiveRange,
+          requirements,
+        )
+      : requirements;
+    schemaRequirements.set(file, netRequirements);
+    return requirements.length === 0 || netRequirements.length > 0;
+  });
   const generatedEntChanged = [...changedFiles].some(isGeneratedEntFile);
   const schemaRequiresMigration = structuralSchemaFiles.length > 0;
   const needsMigration = schemaRequiresMigration || (generatedEntChanged && schemaFiles.length === 0);
@@ -1328,13 +1402,15 @@ export function evaluateDbGuard({ root, range = "", indexTransition = false }) {
         .join("\n"),
     );
     const proofs = structuralSchemaFiles.sort().map((file) => {
-      const requirements = schemaDdlRequirements(
-        root,
-        file,
-        transitionRange,
-        untrackedFiles,
-        entries,
-      );
+      const requirements =
+        schemaRequirements.get(file) ||
+        schemaDdlRequirements(
+          root,
+          file,
+          transitionRange,
+          untrackedFiles,
+          entries,
+        );
       const missingRequirements = requirements.filter(
         (requirement) =>
           !migrationStatements.some((statement) =>
