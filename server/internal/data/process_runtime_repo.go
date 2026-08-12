@@ -1288,7 +1288,9 @@ func (r *processRuntimeRepo) CompleteProcessInstance(ctx context.Context, in *bi
 	if err != nil {
 		return nil, err
 	}
-	if hasCompensatedEffect && in.ResolutionKind != biz.ProcessResolutionCompensated {
+	if hasCompensatedEffect &&
+		in.ResolutionKind != biz.ProcessResolutionCompensated &&
+		in.ResolutionKind != biz.ProcessResolutionRejected {
 		return nil, biz.ErrProcessDomainCommandRecoveryRequired
 	}
 	now := time.Now()

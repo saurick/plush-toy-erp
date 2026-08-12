@@ -476,6 +476,95 @@ func TestProcessRuntimeRepoMarksDomainResultCompensatedWithExactCAS(t *testing.T
 	}
 }
 
+func TestProcessRuntimeRepoRejectedResolutionAcceptsCompensatedPredecessor(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:process_runtime_repo_rejected_compensation?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+	repo := NewProcessRuntimeRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard))
+	instance, nodes, err := repo.CreateProcessInstance(ctx, &biz.ProcessInstanceCreate{
+		ProcessKey: biz.ProcessKeySalesOrderAcceptance, ProcessVersion: "v1", ConfigRevision: "rev-1", DefinitionHash: "sha256:definition",
+		BusinessRefType: "sales_order", BusinessRefID: 88, IdempotencyKey: "sales-order:88:rejected", Status: biz.ProcessStatusActive,
+		Nodes: []biz.ProcessNodeInstanceCreate{
+			{
+				NodeKey: "submit_sales_order", NodeType: biz.ProcessNodeTypeDomainCommand, Attempt: 1,
+				Status: biz.ProcessNodeStatusWaiting, PolicySnapshot: map[string]any{"command_key": biz.ProcessDomainCommandSalesOrderSubmit},
+			},
+			{NodeKey: "sales_order_rejected_end", NodeType: biz.ProcessNodeTypeEnd, Attempt: 1, Status: biz.ProcessNodeStatusWaiting},
+		},
+	}, 7)
+	if err != nil {
+		t.Fatalf("create rejected process fixture: %v", err)
+	}
+	command := activateProcessNodeForTest(t, ctx, repo, instance, nodes[0])
+	fingerprint := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	if _, err := repo.ClaimProcessNodeDomainCommand(ctx, &biz.ProcessNodeDomainCommandClaim{
+		ProcessInstanceID: instance.ID, ProcessNodeInstanceID: command.ID,
+		ExpectedVersion: command.Version, DomainCommandFingerprint: fingerprint,
+	}); err != nil {
+		t.Fatalf("claim predecessor command: %v", err)
+	}
+	refType, refID := "sales_order", 88
+	resultHash := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	if _, err := repo.RecordProcessNodeDomainCommandResult(ctx, &biz.ProcessNodeDomainCommandResultRecord{
+		ProcessInstanceID: instance.ID, ProcessNodeInstanceID: command.ID, ExpectedVersion: command.Version,
+		DomainCommandFingerprint: fingerprint, ProtocolVersion: biz.ProcessDomainCommandProtocolVersionCurrent,
+		ResultState: biz.ProcessDomainCommandResultStateSucceeded,
+		Result: map[string]any{
+			"outcome": biz.SalesOrderProcessCommandOutcomeSubmitted, "block_reason": "", "linked_business_refs": []any{},
+			"effect_state": biz.ProcessDomainCommandEffectStateApplied, "result_version": float64(1),
+		},
+		ResultHash: resultHash, EffectState: biz.ProcessDomainCommandEffectStateApplied,
+		EffectRefType: &refType, EffectRefID: &refID,
+	}, 7); err != nil {
+		t.Fatalf("record predecessor command result: %v", err)
+	}
+	applied := biz.ProcessDomainCommandEffectStateApplied
+	completedCommand, err := repo.CompleteProcessNodeInstance(ctx, &biz.ProcessNodeInstanceComplete{
+		ID: command.ID, ProcessInstanceID: instance.ID, ExpectedVersion: command.Version,
+		Outcome: biz.SalesOrderProcessCommandOutcomeSubmitted, DomainCommandFingerprint: &fingerprint,
+		ExpectedDomainCommandResultHash: &resultHash, ExpectedDomainCommandEffectState: &applied,
+	}, 7)
+	if err != nil {
+		t.Fatalf("complete predecessor command: %v", err)
+	}
+	mark, err := biz.BuildProcessNodeDomainCommandCompensationMark(completedCommand, "订单审批驳回")
+	if err != nil {
+		t.Fatalf("build predecessor compensation: %v", err)
+	}
+	compensated, err := repo.MarkProcessNodeDomainCommandCompensated(ctx, mark, 7)
+	if err != nil || compensated.Status != biz.ProcessNodeStatusCompleted || compensated.DomainCommandEffectState == nil ||
+		*compensated.DomainCommandEffectState != biz.ProcessDomainCommandEffectStateCompensated {
+		t.Fatalf("persist predecessor compensation, node=%#v err=%v", compensated, err)
+	}
+	end := activateProcessNodeFromForTest(t, ctx, repo, instance, nodes[1], completedCommand.ID)
+	completedEnd, err := repo.CompleteProcessNodeInstance(ctx, &biz.ProcessNodeInstanceComplete{
+		ID: end.ID, ProcessInstanceID: instance.ID, ExpectedVersion: end.Version, Outcome: "completed",
+	}, 7)
+	if err != nil {
+		t.Fatalf("complete rejected end: %v", err)
+	}
+	if _, err := repo.CompleteProcessInstance(ctx, &biz.ProcessInstanceComplete{
+		ID: instance.ID, TerminalNodeID: completedEnd.ID, ResolutionKind: biz.ProcessResolutionSucceeded,
+	}, 7); !errors.Is(err, biz.ErrProcessDomainCommandRecoveryRequired) {
+		t.Fatalf("successful resolution must not absorb compensated predecessor, got %v", err)
+	}
+	resolved, err := repo.CompleteProcessInstance(ctx, &biz.ProcessInstanceComplete{
+		ID: instance.ID, TerminalNodeID: completedEnd.ID, ResolutionKind: biz.ProcessResolutionRejected,
+	}, 7)
+	if err != nil || resolved.Status != biz.ProcessStatusCompleted || resolved.ResolutionKind == nil ||
+		*resolved.ResolutionKind != biz.ProcessResolutionRejected || resolved.TerminalNodeInstanceID == nil ||
+		*resolved.TerminalNodeInstanceID != completedEnd.ID {
+		t.Fatalf("complete explicit rejected resolution, process=%#v err=%v", resolved, err)
+	}
+	replayed, err := repo.CompleteProcessInstance(ctx, &biz.ProcessInstanceComplete{
+		ID: instance.ID, TerminalNodeID: completedEnd.ID, ResolutionKind: biz.ProcessResolutionRejected,
+	}, 7)
+	if err != nil || replayed.ID != resolved.ID || replayed.ResolutionKind == nil ||
+		*replayed.ResolutionKind != biz.ProcessResolutionRejected {
+		t.Fatalf("replay rejected resolution, process=%#v err=%v", replayed, err)
+	}
+}
+
 func TestProcessRuntimeRepoReturnsExistingProcessForSameIdempotency(t *testing.T) {
 	ctx := context.Background()
 	client := enttest.Open(t, dialect.SQLite, "file:process_runtime_repo_duplicate?mode=memory&cache=shared&_fk=1")
