@@ -1744,6 +1744,40 @@ test("task board binds task-code metadata to the exact current-batch total", () 
   );
 });
 
+test("task board waits for its loaded search control before current-batch filtering", async () => {
+  const source = await fs.readFile(scriptPath, "utf8");
+  const filterStart = source.indexOf(
+    "async function filterVisibleListToCurrentBatch",
+  );
+  const filterEnd = source.indexOf(
+    "export function evaluateCurrentBatchListEvidence",
+    filterStart,
+  );
+  const filterSource = source.slice(filterStart, filterEnd);
+  const taskBoardIndex = filterSource.indexOf('target.key === "task-board"');
+  const exactSearchIndex = filterSource.indexOf(
+    'getByPlaceholder("搜索任务", { exact: true })',
+  );
+  const visibleWaitIndex = filterSource.indexOf(
+    'state: "visible"',
+    exactSearchIndex,
+  );
+  const fillIndex = filterSource.indexOf(
+    "await search.fill(filter.identifier)",
+  );
+  assert.ok(filterStart >= 0);
+  assert.ok(filterEnd > filterStart);
+  assert.ok(taskBoardIndex >= 0);
+  assert.ok(exactSearchIndex > taskBoardIndex);
+  assert.ok(visibleWaitIndex > exactSearchIndex);
+  assert.ok(fillIndex > visibleWaitIndex);
+  assert.match(
+    filterSource,
+    /else \{[\s\S]*?input\[placeholder\*="搜索"\],input\[placeholder\^="操作人"\]/u,
+  );
+  assert.match(filterSource, /没有可用于当前批次核对的搜索框/u);
+});
+
 test("mobile current-batch proof requires an exact role source and a visible current-batch task", () => {
   const roleKey = "sales";
   const currentBatch = {

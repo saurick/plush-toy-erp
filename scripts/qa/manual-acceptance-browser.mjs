@@ -1689,15 +1689,23 @@ export function resolveCurrentBatchListFilter(
 
 async function filterVisibleListToCurrentBatch(page, target, filter) {
   if (filter.mode !== "visible_exact_business_number") {
-    const candidates = page.locator(
-      'input[placeholder*="搜索"],input[placeholder^="操作人"]',
-    );
     let search = null;
-    for (let index = 0; index < (await candidates.count()); index += 1) {
-      const candidate = candidates.nth(index);
-      if (await candidate.isVisible()) {
-        search = candidate;
-        break;
+    if (target.key === "task-board") {
+      search = page.getByPlaceholder("搜索任务", { exact: true });
+      await search.waitFor({
+        state: "visible",
+        timeout: PAGE_TIMEOUT_MS,
+      });
+    } else {
+      const candidates = page.locator(
+        'input[placeholder*="搜索"],input[placeholder^="操作人"]',
+      );
+      for (let index = 0; index < (await candidates.count()); index += 1) {
+        const candidate = candidates.nth(index);
+        if (await candidate.isVisible()) {
+          search = candidate;
+          break;
+        }
       }
     }
     if (!search) {
