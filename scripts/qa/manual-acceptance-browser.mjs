@@ -84,7 +84,7 @@ const PAGE_TIMEOUT_MS = 25_000;
 const AUTH_PACE_MS = 3_000;
 const TARGET_PACE_MS = 3_000;
 const TARGET_RATE_LIMIT_MAX_ATTEMPTS = 3;
-const TARGET_RATE_LIMIT_RETRY_DELAY_MS = 3_000;
+const TARGET_RATE_LIMIT_RETRY_DELAY_MS = 10_000;
 
 export const FORMAL_BROWSER_ACCOUNTS = Object.freeze([
   Object.freeze({ username: "demo_boss", roleKey: "boss" }),
