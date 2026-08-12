@@ -19,6 +19,7 @@ func unknownPurchaseResult(method string) *v1.JsonrpcResult {
 func purchaseReceiptFromPurchaseOrderCreateFromParams(pm map[string]any) (*biz.PurchaseReceiptFromPurchaseOrderCreate, bool) {
 	if !jsonRPCParamsAllowed(
 		pm,
+		"customer_key",
 		"purchase_order_id",
 		"receipt_no",
 		"warehouse_id",
@@ -49,6 +50,7 @@ func purchaseReceiptFromPurchaseOrderCreateFromParams(pm map[string]any) (*biz.P
 func purchaseReceiptItemCreateFromParams(pm map[string]any) (*biz.PurchaseReceiptItemCreate, bool) {
 	if !jsonRPCParamsAllowed(
 		pm,
+		"customer_key",
 		"receipt_id",
 		"material_id",
 		"warehouse_id",
