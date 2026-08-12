@@ -26,8 +26,8 @@ data:
     dsn: "postgres://postgres:change-this-prod-postgres-password@postgres:5432/plush_erp?sslmode=disable"
     maxOpenConns: 20
     maxIdleConns: 5
-    connMaxLifetime: 30m
-    connMaxIdleTime: 5m
+    connMaxLifetime: 1800s
+    connMaxIdleTime: 300s
     startupTimeout: 60s
 
   # 缓存服务

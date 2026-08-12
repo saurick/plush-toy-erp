@@ -12,9 +12,47 @@ import (
 	"server/internal/conf"
 	"server/internal/customertrialconfig"
 
+	"github.com/go-kratos/kratos/v2/config"
+	"github.com/go-kratos/kratos/v2/config/file"
+
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	oteltrace "go.opentelemetry.io/otel/trace"
 )
+
+func TestCommittedBootstrapConfigsUseProtobufDurations(t *testing.T) {
+	t.Parallel()
+
+	for _, path := range []string{
+		"../../configs/dev/config.yaml",
+		"../../configs/prod/config.yaml",
+	} {
+		path := path
+		t.Run(path, func(t *testing.T) {
+			t.Parallel()
+
+			cfg := config.New(config.WithSource(file.NewSource(path)))
+			t.Cleanup(func() { _ = cfg.Close() })
+			if err := cfg.Load(); err != nil {
+				t.Fatalf("load %s: %v", path, err)
+			}
+
+			var bootstrap conf.Bootstrap
+			if err := cfg.Scan(&bootstrap); err != nil {
+				t.Fatalf("scan %s: %v", path, err)
+			}
+			if bootstrap.Data == nil || bootstrap.Data.Postgres == nil {
+				t.Fatalf("%s has no postgres config", path)
+			}
+			postgres := bootstrap.Data.Postgres
+			if got := postgres.ConnMaxLifetime.AsDuration(); got != 30*time.Minute {
+				t.Fatalf("%s connMaxLifetime = %s, want 30m", path, got)
+			}
+			if got := postgres.ConnMaxIdleTime.AsDuration(); got != 5*time.Minute {
+				t.Fatalf("%s connMaxIdleTime = %s, want 5m", path, got)
+			}
+		})
+	}
+}
 
 func TestNormalizeTraceRatio(t *testing.T) {
 	t.Parallel()
