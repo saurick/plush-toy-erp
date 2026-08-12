@@ -1918,6 +1918,159 @@ async function advanceLifecycle({
   return status;
 }
 
+const SOURCE_ORDER_SHORT_CLOSE_REASON =
+  "验收样例：保留未履约源单的短关闭终态。";
+const SOURCE_ORDER_CANCEL_REASON = "验收样例：保留源单取消终态。";
+
+export async function applySourceOrderLifecycleAction({
+  plan,
+  token,
+  fetchImpl,
+  domain,
+  id,
+  method,
+  currentStatus,
+  expectedStatus,
+}) {
+  const sourceID = positiveSafeInteger(id, `${domain} id`);
+  const normalizedDomain = requiredText(domain, "source order domain");
+  const normalizedMethod = requiredText(method, "source order method");
+  const normalizedCurrentStatus = requiredText(
+    currentStatus,
+    `${normalizedDomain} current status`,
+  ).toUpperCase();
+  const normalizedExpectedStatus = requiredText(
+    expectedStatus,
+    `${normalizedDomain} expected status`,
+  ).toUpperCase();
+  const actionKey = normalizedMethod.split("_", 1)[0];
+  if (
+    !new Set(["submit", "confirm", "close", "cancel"]).has(actionKey) ||
+    !normalizedMethod.endsWith(`_${normalizedDomain}`)
+  ) {
+    throw new CliError(
+      `${normalizedDomain}.${normalizedMethod} is not a registered source order action`,
+    );
+  }
+
+  const readData = await rpcCall({
+    backendURL: plan.backendURL,
+    domain: normalizedDomain,
+    method: `get_${normalizedDomain}`,
+    params: { id: sourceID },
+    token,
+    fetchImpl,
+  });
+  const current = readData[normalizedDomain];
+  const readStatus = String(current?.lifecycle_status || "").toUpperCase();
+  if (
+    Number(current?.id) !== sourceID ||
+    readStatus !== normalizedCurrentStatus
+  ) {
+    throw new CliError(
+      `${normalizedDomain}.get_${normalizedDomain} id=${sourceID} expected ${normalizedCurrentStatus}, got ${readStatus || "invalid"}`,
+    );
+  }
+  const currentVersion = positiveSafeInteger(
+    current.version,
+    `${normalizedDomain} current version`,
+  );
+  const params = {
+    id: sourceID,
+    expected_version: currentVersion,
+    idempotency_key: [
+      "manual-acceptance-source",
+      plan.runId,
+      normalizedDomain,
+      sourceID,
+      normalizedMethod,
+      `v${currentVersion}`,
+    ].join(":"),
+    ...(actionKey === "close"
+      ? {
+          close_mode: "short",
+          reason: SOURCE_ORDER_SHORT_CLOSE_REASON,
+        }
+      : {}),
+    ...(actionKey === "cancel" ? { reason: SOURCE_ORDER_CANCEL_REASON } : {}),
+  };
+  const data = await rpcCall({
+    backendURL: plan.backendURL,
+    domain: normalizedDomain,
+    method: normalizedMethod,
+    params,
+    token,
+    fetchImpl,
+  });
+  requireLifecycleMutationStatus({
+    data,
+    resultKey: normalizedDomain,
+    domain: normalizedDomain,
+    id: sourceID,
+    method: normalizedMethod,
+    expectedStatus: normalizedExpectedStatus,
+  });
+  const updated = data[normalizedDomain];
+  const updatedVersion = positiveSafeInteger(
+    updated?.version,
+    `${normalizedDomain} updated version`,
+  );
+  if (Number(updated?.id) !== sourceID || updatedVersion <= currentVersion) {
+    throw new CliError(
+      `${normalizedDomain}.${normalizedMethod} id=${sourceID} returned a stale source document`,
+    );
+  }
+  return updated;
+}
+
+export async function advanceOutsourcingOrderLifecycle({
+  plan,
+  token,
+  fetchImpl,
+  item,
+  current,
+  target,
+  lifecycleActions,
+}) {
+  const sourceID = positiveSafeInteger(item?.id, "outsourcing order id");
+  let status = String(current || "DRAFT").toUpperCase();
+  const normalizedTarget = requiredText(
+    target,
+    "outsourcing order target status",
+  ).toUpperCase();
+  if (status === normalizedTarget) return status;
+  const targetPath = lifecycleActions[normalizedTarget] || [];
+  const currentIndex = targetPath.findIndex(
+    (step) => step.resultStatus === status,
+  );
+  const remaining =
+    currentIndex >= 0 ? targetPath.slice(currentIndex + 1) : targetPath;
+  if (new Set(["CLOSED", "CANCELED"]).has(status)) {
+    throw new CliError(
+      `outsourcing_order id=${sourceID} is terminal ${status}, expected ${normalizedTarget}`,
+    );
+  }
+  for (const step of remaining) {
+    const updated = await applySourceOrderLifecycleAction({
+      plan,
+      token,
+      fetchImpl,
+      domain: "outsourcing_order",
+      id: sourceID,
+      method: step.method,
+      currentStatus: status,
+      expectedStatus: step.resultStatus,
+    });
+    status = String(updated.lifecycle_status).toUpperCase();
+  }
+  if (status !== normalizedTarget) {
+    throw new CliError(
+      `outsourcing_order id=${sourceID} expected ${normalizedTarget}, got ${status}`,
+    );
+  }
+  return status;
+}
+
 function requireSalesOrderProcessTask(task, sourceID) {
   if (
     !task ||
@@ -2252,22 +2405,17 @@ export async function advanceSalesOrderLifecycleThroughProcess({
     );
   }
   if (target === "CANCELED") {
-    const data = await rpcCall({
-      backendURL: plan.backendURL,
-      domain: "sales_order",
-      method: "cancel_sales_order",
-      params: { id: sourceID },
+    const updated = await applySourceOrderLifecycleAction({
+      plan,
       token: roleTokens.sales || token,
       fetchImpl,
-    });
-    return requireLifecycleMutationStatus({
-      data,
-      resultKey: "sales_order",
       domain: "sales_order",
       id: sourceID,
       method: "cancel_sales_order",
+      currentStatus: status,
       expectedStatus: "CANCELED",
     });
+    return String(updated.lifecycle_status).toUpperCase();
   }
   if (!new Set(["SUBMITTED", "ACTIVE", "CLOSED"]).has(target)) {
     throw new CliError(`unsupported sales order target status ${target}`);
@@ -2370,22 +2518,17 @@ export async function advanceSalesOrderLifecycleThroughProcess({
   if (!completed) {
     throw new CliError(`${orderNo} process did not reach its end node`);
   }
-  const data = await rpcCall({
-    backendURL: plan.backendURL,
-    domain: "sales_order",
-    method: "close_sales_order",
-    params: { id: sourceID },
+  const updated = await applySourceOrderLifecycleAction({
+    plan,
     token: roleTokens.sales || token,
     fetchImpl,
-  });
-  return requireLifecycleMutationStatus({
-    data,
-    resultKey: "sales_order",
     domain: "sales_order",
     id: sourceID,
     method: "close_sales_order",
+    currentStatus: status,
     expectedStatus: "CLOSED",
   });
+  return String(updated.lifecycle_status).toUpperCase();
 }
 
 export async function advancePurchaseOrderLifecycleThroughProcess({
@@ -2414,22 +2557,17 @@ export async function advancePurchaseOrderLifecycleThroughProcess({
     );
   }
   if (target === "CANCELED") {
-    const data = await rpcCall({
-      backendURL: plan.backendURL,
-      domain: "purchase_order",
-      method: "cancel_purchase_order",
-      params: { id: sourceID },
+    const updated = await applySourceOrderLifecycleAction({
+      plan,
       token,
       fetchImpl,
-    });
-    return requireLifecycleMutationStatus({
-      data,
-      resultKey: "purchase_order",
       domain: "purchase_order",
       id: sourceID,
       method: "cancel_purchase_order",
+      currentStatus: status,
       expectedStatus: "CANCELED",
     });
+    return String(updated.lifecycle_status).toUpperCase();
   }
   if (!new Set(["SUBMITTED", "APPROVED", "CLOSED"]).has(target)) {
     throw new CliError(`unsupported purchase order target status ${target}`);
@@ -2486,22 +2624,17 @@ export async function advancePurchaseOrderLifecycleThroughProcess({
       `${orderNo} must be APPROVED before close; got ${status}`,
     );
   }
-  const data = await rpcCall({
-    backendURL: plan.backendURL,
-    domain: "purchase_order",
-    method: "close_purchase_order",
-    params: { id: sourceID },
+  const updated = await applySourceOrderLifecycleAction({
+    plan,
     token,
     fetchImpl,
-  });
-  return requireLifecycleMutationStatus({
-    data,
-    resultKey: "purchase_order",
     domain: "purchase_order",
     id: sourceID,
     method: "close_purchase_order",
+    currentStatus: status,
     expectedStatus: "CLOSED",
   });
+  return String(updated.lifecycle_status).toUpperCase();
 }
 
 export function requireLifecycleMutationStatus({
@@ -3089,6 +3222,11 @@ async function createSourceDocuments({
     resultKey: "outsourcing_order",
     listStatusKey: "lifecycle_status",
     lifecycleActions: outsourcingActions,
+    advanceLifecycleFn: (input) =>
+      advanceOutsourcingOrderLifecycle({
+        ...input,
+        lifecycleActions: outsourcingActions,
+      }),
     headerFields: [
       "outsourcing_order_no",
       "supplier_id",
