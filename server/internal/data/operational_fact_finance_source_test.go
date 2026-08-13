@@ -219,11 +219,12 @@ func TestOperationalFactRepoShipShipmentKeepsFinanceSnapshotsFromActiveSalesOrde
 		receivable.Currency != biz.FinanceCurrencyUSD || invoice.Currency != biz.FinanceCurrencyUSD {
 		t.Fatalf("derived finance facts receivable=%#v invoice=%#v, want 24 USD", receivable, invoice)
 	}
-	wantReceivableDueAt := mustFinanceFactDueAt(t, *shipment.ShippedAt, 60)
+	wantReceivableOccurredAt := shipment.ShippedAt.UTC().Truncate(time.Microsecond)
+	wantReceivableDueAt := mustFinanceFactDueAt(t, wantReceivableOccurredAt, 60)
 	if receivable.CollectionType == nil || *receivable.CollectionType != biz.FinanceCollectionAccountsReceivable ||
 		receivable.PaymentTerm == nil || *receivable.PaymentTerm != biz.FinancePaymentTermEOMDays ||
 		receivable.PaymentTermDays == nil || *receivable.PaymentTermDays != 60 || receivable.DueAt == nil || shipment.ShippedAt == nil ||
-		!receivable.OccurredAt.Equal(*shipment.ShippedAt) || !receivable.DueAt.Equal(wantReceivableDueAt) || receivable.InvoiceCategory != nil {
+		!receivable.OccurredAt.Equal(wantReceivableOccurredAt) || !receivable.DueAt.Equal(wantReceivableDueAt) || receivable.InvoiceCategory != nil {
 		t.Fatalf("derived receivable dimensions=%#v", receivable)
 	}
 	if invoice.InvoiceCategory == nil || *invoice.InvoiceCategory != biz.FinanceInvoiceCategoryVATSpecial13 ||
@@ -401,12 +402,13 @@ func TestOperationalFactRepoFinanceFromShipmentLifecycleAndCancellationGuardSQLi
 	if err != nil {
 		t.Fatalf("create receivable: %v", err)
 	}
-	wantDueAt := mustFinanceFactDueAt(t, *shipment.ShippedAt, 30)
+	wantOccurredAt := shipment.ShippedAt.UTC().Truncate(time.Microsecond)
+	wantDueAt := mustFinanceFactDueAt(t, wantOccurredAt, 30)
 	if created.Status != biz.OperationalFactStatusDraft || !created.Amount.Equal(decimal.NewFromInt(20)) || created.CounterpartyID == nil || *created.CounterpartyID != *shipment.CustomerID ||
 		created.CollectionType == nil || *created.CollectionType != biz.FinanceCollectionAccountsReceivable ||
 		created.PaymentTerm == nil || *created.PaymentTerm != biz.FinancePaymentTermEOMDays ||
 		created.PaymentTermDays == nil || *created.PaymentTermDays != 30 || created.DueAt == nil || shipment.ShippedAt == nil ||
-		!created.OccurredAt.Equal(*shipment.ShippedAt) || !created.DueAt.Equal(wantDueAt) || created.InvoiceCategory != nil {
+		!created.OccurredAt.Equal(wantOccurredAt) || !created.DueAt.Equal(wantDueAt) || created.InvoiceCategory != nil {
 		t.Fatalf("source-derived receivable=%#v", created)
 	}
 	replayed, err := uc.CreateReceivableFromShipment(ctx, input)
@@ -629,7 +631,8 @@ func createReceivableViaProcessCommandForTest(
 	if shipment.ShippedAt == nil {
 		t.Fatal("shipped shipment is missing shipped_at")
 	}
-	dueAt, err := biz.FinanceFactDueAtFromDays(*shipment.ShippedAt, paymentTermDays)
+	occurredAt := shipment.ShippedAt.UTC().Truncate(time.Microsecond)
+	dueAt, err := biz.FinanceFactDueAtFromDays(occurredAt, paymentTermDays)
 	if err != nil {
 		t.Fatalf("derive shipment due_at: %v", err)
 	}
@@ -661,7 +664,7 @@ func createReceivableViaProcessCommandForTest(
 		SourceType:          &sourceType,
 		SourceID:            &shipment.ID,
 		IdempotencyKey:      idempotencyKey,
-		OccurredAt:          *shipment.ShippedAt,
+		OccurredAt:          occurredAt,
 		OccurredAtSpecified: true,
 	}, command, actorID)
 	if err != nil {

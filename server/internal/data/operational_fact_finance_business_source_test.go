@@ -270,12 +270,13 @@ func runOutsourcingReturnPayable(t *testing.T, ctx context.Context, data *Data, 
 	if err != nil {
 		t.Fatalf("create payable from outsourcing return: %v", err)
 	}
-	wantDueAt := mustFinanceFactDueAt(t, returnFact.OccurredAt, orderTermDays)
+	wantOccurredAt := returnFact.OccurredAt.UTC().Truncate(time.Microsecond)
+	wantDueAt := mustFinanceFactDueAt(t, wantOccurredAt, orderTermDays)
 	if payable.CounterpartyID == nil || *payable.CounterpartyID != source.order.SupplierID || !payable.Amount.Equal(decimal.NewFromInt(24)) || payable.Currency != biz.FinanceCurrencyHKD ||
 		payable.SourceType == nil || *payable.SourceType != biz.OutsourcingFactSourceType || payable.SourceID == nil || *payable.SourceID != returnFact.ID ||
 		payable.PaymentTerm == nil || *payable.PaymentTerm != biz.FinancePaymentTermEOMDays ||
 		payable.PaymentTermDays == nil || *payable.PaymentTermDays != 10 || payable.DueAt == nil ||
-		!payable.OccurredAt.Equal(returnFact.OccurredAt) || !payable.DueAt.Equal(wantDueAt) {
+		!payable.OccurredAt.Equal(wantOccurredAt) || !payable.DueAt.Equal(wantDueAt) {
 		t.Fatalf("derived outsourcing payable = %#v", payable)
 	}
 	if _, err := operationalUC.CancelPostedOutsourcingFact(ctx, operationalFactStatusMutation(returnFact.ID, returnFact.Version, actor.ID, "委外回货已形成品质处置")); !errors.Is(err, biz.ErrOutsourcingReturnQualityDependency) {
