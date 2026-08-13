@@ -11,6 +11,7 @@ import path from "node:path";
 import test from "node:test";
 
 import {
+  parsePromotionControllerArgs,
   preparePromotion,
   readPromotionPlan,
 } from "./promotion-controller.mjs";
@@ -177,4 +178,63 @@ test("promotion preparation persists disk blocker as a terminal operation", asyn
     ),
     /192\.168|\/home\/simon|password|token/iu,
   );
+});
+
+test("promotion controller CLI exposes explicit terminal retry lineage", () => {
+  const options = parsePromotionControllerArgs([
+    "--release-manifest",
+    "output/releases/example/release-manifest.json",
+    "--target",
+    "test-133",
+    "--idempotency-key",
+    "promotion-retry-example",
+    "--retry-of-operation-id",
+    "123e4567-e89b-42d3-a456-426614174000",
+    "--json",
+  ]);
+  assert.equal(
+    options.retryOfOperationId,
+    "123e4567-e89b-42d3-a456-426614174000",
+  );
+  assert.equal(options.json, true);
+});
+
+test("explicit terminal retry creates a distinct ready operation lineage", async (t) => {
+  const data = fixture(t);
+  let preflightCalls = 0;
+  const common = {
+    repoRoot: data.root,
+    releaseManifestPath: data.releaseManifestPath,
+    targetKey: "test-133",
+    operationStore: data.store,
+  };
+  const first = await preparePromotion(
+    { ...common, idempotencyKey: IDEMPOTENCY_KEY },
+    {
+      runPreflight: () => {
+        preflightCalls += 1;
+        return targetPreflight(true);
+      },
+    },
+  );
+  const retry = await preparePromotion(
+    {
+      ...common,
+      idempotencyKey: `${IDEMPOTENCY_KEY}:retry-2`,
+      retryOfOperationId: first.operation.id,
+    },
+    {
+      runPreflight: () => {
+        preflightCalls += 1;
+        return targetPreflight(false);
+      },
+    },
+  );
+  assert.equal(first.operation.status, "blocked");
+  assert.equal(retry.operation.status, "ready");
+  assert.notEqual(retry.operation.id, first.operation.id);
+  assert.equal(retry.operation.attempt, 2);
+  assert.equal(retry.operation.retryOfOperationId, first.operation.id);
+  assert.equal(retry.operation.rootOperationId, first.operation.id);
+  assert.equal(preflightCalls, 2);
 });

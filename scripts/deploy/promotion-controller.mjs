@@ -178,11 +178,12 @@ export async function preparePromotion(
   }
 }
 
-function parseArgs(argv) {
+export function parsePromotionControllerArgs(argv) {
   const options = {
     releaseManifest: "",
     target: "",
     idempotencyKey: "",
+    retryOfOperationId: null,
     json: false,
     help: false,
   };
@@ -197,7 +198,12 @@ function parseArgs(argv) {
       continue;
     }
     if (
-      ["--release-manifest", "--target", "--idempotency-key"].includes(token)
+      [
+        "--release-manifest",
+        "--target",
+        "--idempotency-key",
+        "--retry-of-operation-id",
+      ].includes(token)
     ) {
       const value = argv[index + 1];
       if (!value || value.startsWith("--")) {
@@ -239,16 +245,18 @@ function isMainModule() {
 
 if (isMainModule()) {
   try {
-    const options = parseArgs(process.argv.slice(2));
+    const options = parsePromotionControllerArgs(process.argv.slice(2));
     if (options.help) {
       console.log(`Usage:
   node scripts/deploy/promotion-controller.mjs \\
     --release-manifest <release-manifest.json> \\
     --target test-133 \\
-    --idempotency-key <stable-random-key> [--json]
+    --idempotency-key <stable-random-key> \
+    [--retry-of-operation-id <terminal-operation-id>] [--json]
 
 This command prepares a fixed-target plan only. It never builds, transfers,
-migrates, deploys or retries a terminal operation.`);
+migrates or deploys. A terminal operation is retried only through an explicit
+--retry-of-operation-id lineage.`);
       process.exit(0);
     }
     const report = await preparePromotion({
@@ -256,6 +264,7 @@ migrates, deploys or retries a terminal operation.`);
       releaseManifestPath: options.releaseManifest,
       targetKey: options.target,
       idempotencyKey: options.idempotencyKey,
+      retryOfOperationId: options.retryOfOperationId,
     });
     console.log(
       options.json
