@@ -48,6 +48,28 @@ test("application, migration and backup roles have distinct ownership and grants
   assert.match(source, /database service roles must not inherit or SET ROLE/u);
 });
 
+test("runtime identity receives only the canonical Atlas revision read grant", () => {
+  assert.match(
+    source,
+    /GRANT USAGE ON SCHEMA atlas_schema_revisions TO erp_app, erp_backup/u,
+  );
+  assert.match(
+    source,
+    /GRANT SELECT ON TABLE atlas_schema_revisions\.atlas_schema_revisions TO erp_app/u,
+  );
+  assert.doesNotMatch(
+    source,
+    /GRANT SELECT ON ALL TABLES IN SCHEMA atlas_schema_revisions TO erp_app/u,
+  );
+  assert.match(source, /erp_app may not access % non-canonical Atlas tables/u);
+  assert.match(source, /atlas_revision_readable/u);
+  assert.match(source, /Atlas revision UPDATE/u);
+  assert.match(
+    source,
+    /INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER/u,
+  );
+});
+
 test("append-only grants and direct SQL permission probes stay enforced", () => {
   for (const table of [
     "inventory_txns",

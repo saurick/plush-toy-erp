@@ -38,7 +38,7 @@ HTTP transport 日志只记录 operation、JSON-RPC domain / method / id、结�
 - `debug.clear_business_chain_scenario`：按 debugRunId 预览或清理调试数据
 - `debug.clear_business_data`：清空本项目当前 SQL 连接中的 V1 主数据 / 订单、Workflow、Operational Fact、采购入库、库存、BOM、工序档案、委外源单、物料、成品、仓库和单位业务表
 
-`GET /readyz/runtime-identity` 是模拟验收写入前的窄化只读探针。调用方只提交目标身份摘要；服务端用当前 SQL 连接读取 `current_database()`，并在 133 范围同时绑定镜像 `GIT_SHA` 与 Atlas 最新 revision。成功只返回 `matched-v1` 证明，不返回数据库名、DSN、主机、用户或密码；旧服务、错误摘要、错误 release / migration 或查询失败均 fail closed。普通 `/healthz` 与 `/readyz` 合同不变。
+`GET /readyz/runtime-identity` 是模拟验收写入前的窄化只读探针。调用方只提交目标身份摘要；服务端用当前 SQL 连接读取 `current_database()`，并在 133 范围同时绑定镜像 `GIT_SHA` 与 Atlas 最新 revision。生产 `erp_app` 仅为此探针获得 `atlas_schema_revisions` schema 的 `USAGE` 和规范版本表 `atlas_schema_revisions.atlas_schema_revisions` 的 `SELECT`，不得写入该表或访问 schema 内其他表。成功只返回 `matched-v1` 证明，不返回数据库名、DSN、主机、用户或密码；旧服务、错误摘要、错误 release / migration 或查询失败均 fail closed。普通 `/healthz` 与 `/readyz` 合同不变。
 
 这三类写能力默认全部关闭：seed 需显式设置 `ERP_DEBUG_SEED_ENABLED=true`，按 debugRunId 清理需显式设置 `ERP_DEBUG_CLEANUP_ENABLED=true` 且保持 `ERP_DEBUG_CLEANUP_SCOPE=debug_run`。全量业务清空使用独立的 `ERP_DEBUG_BUSINESS_CLEAR_ENABLED=true`，只允许 `ERP_DEBUG_ENV=local|dev`；请求默认 `dryRun=true` 只统计范围，真正删除必须同时传入 `dryRun=false` 和精确确认短语 `CLEAR_ALL_PROJECT_BUSINESS_DATA`。业务数据清空不删除账号、权限、管理员偏好、配置和数据库结构，后端仍会校验管理员身份与 `debug.business.clear` 权限。
 

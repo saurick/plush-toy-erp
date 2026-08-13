@@ -176,9 +176,12 @@ DO $block$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'atlas_schema_revisions') THEN
     REVOKE ALL ON SCHEMA atlas_schema_revisions FROM PUBLIC, erp_app, erp_backup;
-    GRANT USAGE ON SCHEMA atlas_schema_revisions TO erp_backup;
+    GRANT USAGE ON SCHEMA atlas_schema_revisions TO erp_app, erp_backup;
     REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA atlas_schema_revisions
       FROM erp_app, erp_backup;
+    IF to_regclass('atlas_schema_revisions.atlas_schema_revisions') IS NOT NULL THEN
+      GRANT SELECT ON TABLE atlas_schema_revisions.atlas_schema_revisions TO erp_app;
+    END IF;
     GRANT SELECT ON ALL TABLES IN SCHEMA atlas_schema_revisions TO erp_backup;
   END IF;
 END
@@ -440,13 +443,41 @@ BEGIN
     RAISE EXCEPTION 'sequence permissions are invalid on % public sequences', invalid_count;
   END IF;
 
-  IF to_regclass('atlas_schema_revisions.atlas_schema_revisions') IS NOT NULL
-     AND has_table_privilege(
-       'erp_app',
-       'atlas_schema_revisions.atlas_schema_revisions',
-       'SELECT,INSERT,UPDATE,DELETE'
-     ) THEN
-    RAISE EXCEPTION 'erp_app must not access Atlas revisions';
+  IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'atlas_schema_revisions') THEN
+    IF NOT has_schema_privilege('erp_app', 'atlas_schema_revisions', 'USAGE') THEN
+      RAISE EXCEPTION 'erp_app must be able to resolve the Atlas revisions table';
+    END IF;
+  END IF;
+  IF to_regclass('atlas_schema_revisions.atlas_schema_revisions') IS NOT NULL AND (
+    NOT has_table_privilege(
+      'erp_app',
+      'atlas_schema_revisions.atlas_schema_revisions',
+      'SELECT'
+    )
+    OR has_table_privilege(
+      'erp_app',
+      'atlas_schema_revisions.atlas_schema_revisions',
+      'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER'
+    )
+  ) THEN
+    RAISE EXCEPTION 'erp_app Atlas revision permissions are invalid';
+  END IF;
+  SELECT count(*) INTO invalid_count
+  FROM pg_class AS atlas_object
+  JOIN pg_namespace AS namespace ON namespace.oid = atlas_object.relnamespace
+  WHERE namespace.nspname = 'atlas_schema_revisions'
+    AND atlas_object.relkind IN ('r', 'p', 'v', 'm', 'f')
+    AND atlas_object.relname <> 'atlas_schema_revisions'
+    AND (
+      has_table_privilege('erp_app', atlas_object.oid, 'SELECT')
+      OR has_table_privilege(
+        'erp_app',
+        atlas_object.oid,
+        'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER'
+      )
+    );
+  IF invalid_count <> 0 THEN
+    RAISE EXCEPTION 'erp_app may not access % non-canonical Atlas tables', invalid_count;
   END IF;
 END
 $verify$;
@@ -519,6 +550,12 @@ if psql -X --no-psqlrc --set ON_ERROR_STOP=1 \
   --tuples-only --no-align \
   --command "SELECT to_regclass('atlas_schema_revisions.atlas_schema_revisions') IS NOT NULL;" | \
   grep -qx 't'; then
+  atlas_revision_readable="$(PGPASSWORD="$POSTGRES_APP_PASSWORD" psql -X --no-psqlrc \
+    --set ON_ERROR_STOP=1 --username erp_app --dbname "$POSTGRES_DB" \
+    --tuples-only --no-align \
+    --command "SELECT EXISTS (SELECT 1 FROM atlas_schema_revisions.atlas_schema_revisions WHERE version IS NOT NULL)::text;")"
+  [[ "$atlas_revision_readable" == "true" ]] ||
+    fail "erp_app cannot read the canonical Atlas revision row"
   expect_permission_denied \
     "Atlas revision UPDATE" \
     "UPDATE atlas_schema_revisions.atlas_schema_revisions SET version = version WHERE false"
