@@ -97,7 +97,7 @@ async function run() {
 
   let browser
   try {
-    await waitUntilReady(`${baseURL}/readyz`, child)
+    await waitUntilReady(`${baseURL}/healthz`, child)
     browser = await chromium.launch({ headless: true })
     const page = await browser.newPage()
     const response = await page.goto(`${baseURL}/__dev`, {

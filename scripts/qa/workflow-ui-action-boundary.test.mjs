@@ -1335,10 +1335,21 @@ test("source document lifecycle confirmations keep fact boundaries visible", () 
       sourceName: "销售订单",
       actions: [
         {
-          key: "close",
+          key: "normal_close",
           requiredTokens: [
-            "停止",
+            "销售订单本身",
             "不会自动改变",
+            "出货",
+            "库存",
+            "财务",
+            "相关任务",
+          ],
+        },
+        {
+          key: "short_close",
+          requiredTokens: [
+            "尚未履行",
+            "不会自动取消或撤销",
             "出货",
             "库存",
             "财务",
@@ -1349,7 +1360,7 @@ test("source document lifecycle confirmations keep fact boundaries visible", () 
           key: "cancel",
           requiredTokens: [
             "销售订单本身",
-            "不会自动取消",
+            "不会自动取消或撤销",
             "出货",
             "库存",
             "财务",
@@ -1364,10 +1375,21 @@ test("source document lifecycle confirmations keep fact boundaries visible", () 
       sourceName: "采购订单",
       actions: [
         {
-          key: "close",
+          key: "normal_close",
           requiredTokens: [
-            "停止",
+            "采购订单本身",
             "不会自动改变",
+            "入库",
+            "质检",
+            "库存",
+            "财务",
+          ],
+        },
+        {
+          key: "short_close",
+          requiredTokens: [
+            "尚未收货",
+            "不会自动取消或撤销",
             "入库",
             "质检",
             "库存",
@@ -1378,7 +1400,7 @@ test("source document lifecycle confirmations keep fact boundaries visible", () 
           key: "cancel",
           requiredTokens: [
             "采购订单本身",
-            "不会自动撤销",
+            "不会自动取消或撤销",
             "入库",
             "质检",
             "库存",
@@ -1393,10 +1415,21 @@ test("source document lifecycle confirmations keep fact boundaries visible", () 
       sourceName: "加工合同",
       actions: [
         {
-          key: "close",
+          key: "normal_close",
           requiredTokens: [
-            "停止",
+            "加工合同本身",
             "不会自动改变",
+            "发料",
+            "回货",
+            "库存",
+            "财务记录",
+          ],
+        },
+        {
+          key: "short_close",
+          requiredTokens: [
+            "尚未完成",
+            "不会自动取消或撤销",
             "发料",
             "回货",
             "库存",
@@ -1407,7 +1440,7 @@ test("source document lifecycle confirmations keep fact boundaries visible", () 
           key: "cancel",
           requiredTokens: [
             "加工合同本身",
-            "不会自动撤销",
+            "不会自动取消或撤销",
             "发料",
             "回货",
             "财务记录",

@@ -14,7 +14,6 @@ import (
 	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/workflowbusinessstate"
 	"server/internal/data/model/ent/workflowtask"
-	"server/internal/data/model/ent/workflowtaskevent"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/shopspring/decimal"
@@ -336,12 +335,9 @@ func TestProductionReworkFromCompletionOwnsSourceQuantityAndReversal(t *testing.
 	}
 	legacyTaskCode := biz.WorkflowSourceTaskCode(biz.WorkflowSourceTaskProductionExceptionGroup, rework.ID)
 	legacyTask := f.client.WorkflowTask.Query().Where(workflowtask.TaskCode(legacyTaskCode)).OnlyX(ctx)
-	f.client.WorkflowTaskEvent.Delete().Where(workflowtaskevent.TaskID(legacyTask.ID)).ExecX(ctx)
-	f.client.WorkflowBusinessState.Delete().Where(
-		workflowbusinessstate.SourceType(biz.WorkflowSourceTaskProductionFactSourceType),
-		workflowbusinessstate.SourceID(rework.ID),
-	).ExecX(ctx)
-	f.client.WorkflowTask.DeleteOne(legacyTask).ExecX(ctx)
+	deleteWorkflowSourceTaskBundleForBackfillTest(
+		t, ctx, f.data, biz.WorkflowSourceTaskProductionFactSourceType, rework.ID, legacyTask.ID,
+	)
 	backfill, err := reconcileMissingWorkflowSourceTasksWithClient(ctx, f.client)
 	if err != nil || backfill.ProductionExceptionCreated != 1 {
 		t.Fatalf("backfill posted REWORK source task result=%#v err=%v", backfill, err)

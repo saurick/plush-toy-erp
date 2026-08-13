@@ -59,6 +59,7 @@ func TestSourceDocumentPostgresDraftVersionCAS(t *testing.T) {
 					OrderNo:         fmt.Sprintf("SO-CAS-%s-%s", attempt, suffix),
 					CustomerID:      customer.ID,
 					OrderDate:       orderDate,
+					Currency:        created.Order.Currency,
 					ExpectedVersion: created.Order.Version,
 				}, []*biz.SalesOrderItemSaveMutation{
 					{
@@ -138,6 +139,8 @@ func TestSourceDocumentPostgresDraftVersionCAS(t *testing.T) {
 					PurchaseOrderNo: "PO-CAS-" + attempt + "-" + suffix,
 					SupplierID:      supplier.ID,
 					PurchaseDate:    orderDate,
+					Currency:        created.Order.Currency,
+					PaymentTermDays: created.Order.PaymentTermDays,
 					ExpectedVersion: created.Order.Version,
 				}, []*biz.PurchaseOrderItemSaveMutation{
 					{
@@ -227,6 +230,8 @@ func TestSourceDocumentPostgresDraftVersionCAS(t *testing.T) {
 					OutsourcingOrderNo: "OUT-CAS-" + attempt + "-" + suffix,
 					SupplierID:         supplier.ID,
 					OrderDate:          orderDate,
+					Currency:           created.Order.Currency,
+					PaymentTermDays:    created.Order.PaymentTermDays,
 					ExpectedVersion:    created.Order.Version,
 				}, []*biz.OutsourcingOrderItemSaveMutation{
 					{

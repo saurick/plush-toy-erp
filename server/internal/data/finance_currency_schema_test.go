@@ -193,6 +193,56 @@ func TestFinanceDueAtPreflightKeepsLegacyInputsReadOnlyAndTargetsCanonicalEOM(t 
 	}
 }
 
+func TestSimulatedOutsourcingPayableMigrationKeepsHistoricalFallbackNarrow(t *testing.T) {
+	migration, err := os.ReadFile(filepath.Join("model", "migrate", "20260811000000_reconcile_simulated_outsourcing_payable_terms.sql"))
+	if err != nil {
+		t.Fatalf("read simulated outsourcing payable migration: %v", err)
+	}
+	content := strings.Join(strings.Fields(string(migration)), " ")
+	for _, fragment := range []string{
+		"target.fact_type = 'PAYABLE'",
+		"target.source_type = 'OUTSOURCING_FACT'",
+		"target.counterparty_type = 'SUPPLIER'",
+		"source_fact.source_type = 'OUTSOURCING_ORDER'",
+		"source_fact.supplier_id = source_order.supplier_id",
+		"source_order.supplier_snapshot ->> 'simulated_only' = 'true'",
+		"target.payment_term IS NULL",
+		"target.payment_term_days IS NULL",
+		"payment_term = 'CASH_ON_SHIPMENT'",
+		"payment_term_days = 0",
+	} {
+		if !strings.Contains(content, fragment) {
+			t.Fatalf("simulated payable migration missing narrow lineage fragment %q", fragment)
+		}
+	}
+	for _, forbidden := range []string{
+		"default_payment_term_days",
+		"FROM suppliers",
+		"JOIN suppliers",
+	} {
+		if strings.Contains(content, forbidden) {
+			t.Fatalf("simulated payable migration must not infer historical terms from current supplier defaults: %q", forbidden)
+		}
+	}
+
+	preflight, err := os.ReadFile(filepath.Join("..", "..", "..", "scripts", "qa", "finance-fact-due-at-preflight.sql"))
+	if err != nil {
+		t.Fatalf("read finance preflight: %v", err)
+	}
+	preflightContent := strings.Join(strings.Fields(string(preflight)), " ")
+	for _, fragment := range []string{
+		"fact_type = 'PAYABLE'",
+		"source_type = 'OUTSOURCING_FACT'",
+		"source_fact.source_type = 'OUTSOURCING_ORDER'",
+		"finance_facts.counterparty_id = source_order.supplier_id",
+		"source_order.supplier_snapshot ->> 'simulated_only' = 'true'",
+	} {
+		if !strings.Contains(preflightContent, fragment) {
+			t.Fatalf("finance preflight missing simulated payable lineage fragment %q", fragment)
+		}
+	}
+}
+
 func schemaCheck(target ent.Interface, name string) string {
 	for _, annotation := range target.Annotations() {
 		if sqlAnnotation, ok := annotation.(entsql.Annotation); ok {

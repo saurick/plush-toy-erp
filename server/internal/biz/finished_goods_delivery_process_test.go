@@ -3,6 +3,7 @@ package biz
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/shopspring/decimal"
 )
@@ -279,7 +280,9 @@ func (r *finishedGoodsDeliveryGoldenChainOperationalFactRepo) ShipShipment(_ con
 	if r.shipment == nil || r.shipment.ID != shipmentID {
 		return nil, ErrShipmentNotFound
 	}
+	shippedAt := time.Date(2026, time.August, 11, 10, 0, 0, 0, time.UTC)
 	r.shipment.Status = ShipmentStatusShipped
+	r.shipment.ShippedAt = &shippedAt
 	copied := *r.shipment
 	return &copied, nil
 }

@@ -150,8 +150,28 @@ func createPostedFinanceFactForCreditType(
 		fixtures := createFinanceBusinessSourceFixtures(t, ctx, client, "CREDIT-"+suffix)
 		supplier := createPurchaseOrderTestSupplier(t, ctx, client, "CREDIT-SUP-"+suffix, true)
 		inventoryUC := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+		paymentTermDays := 0
+		order := client.PurchaseOrder.Create().
+			SetPurchaseOrderNo("CREDIT-PO-" + suffix).
+			SetSupplierID(supplier.ID).
+			SetCurrency(biz.FinanceCurrencyCNY).
+			SetPaymentTermDays(paymentTermDays).
+			SetSupplierSnapshot(map[string]any{"name": supplier.Name}).
+			SetPurchaseDate(time.Now().UTC()).
+			SetLifecycleStatus(biz.PurchaseOrderStatusApproved).
+			SaveX(ctx)
 		unitPrice := decimal.NewFromInt(10)
 		amount := decimal.NewFromInt(10)
+		orderItem := client.PurchaseOrderItem.Create().
+			SetPurchaseOrderID(order.ID).
+			SetLineNo(1).
+			SetMaterialID(fixtures.materialID).
+			SetUnitID(fixtures.unitID).
+			SetPurchasedQuantity(decimal.NewFromInt(1)).
+			SetUnitPrice(unitPrice).
+			SetAmount(amount).
+			SetLineStatus(biz.PurchaseOrderItemStatusOpen).
+			SaveX(ctx)
 		lotNo := "CREDIT-LOT-" + suffix
 		receipt, err := inventoryUC.CreatePurchaseReceiptWithItems(ctx, &biz.PurchaseReceiptCreate{
 			ReceiptNo:    "CREDIT-RECEIPT-" + suffix,
@@ -159,13 +179,14 @@ func createPostedFinanceFactForCreditType(
 			SupplierName: supplier.Name,
 			ReceivedAt:   time.Now().UTC(),
 		}, []*biz.PurchaseReceiptItemCreate{{
-			MaterialID:  fixtures.materialID,
-			WarehouseID: fixtures.warehouseID,
-			UnitID:      fixtures.unitID,
-			LotNo:       &lotNo,
-			Quantity:    decimal.NewFromInt(1),
-			UnitPrice:   &unitPrice,
-			Amount:      &amount,
+			MaterialID:          fixtures.materialID,
+			WarehouseID:         fixtures.warehouseID,
+			UnitID:              fixtures.unitID,
+			PurchaseOrderItemID: &orderItem.ID,
+			LotNo:               &lotNo,
+			Quantity:            decimal.NewFromInt(1),
+			UnitPrice:           &unitPrice,
+			Amount:              &amount,
 		}})
 		if err != nil {
 			t.Fatalf("create payable source for credit type: %v", err)

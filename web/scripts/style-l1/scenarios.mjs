@@ -12405,14 +12405,20 @@ export function createStyleL1Scenarios(deps) {
           await page
             .locator('.erp-dev-hub-group-filter .ant-select-selector')
             .click()
-          await page.waitForFunction(() =>
-            Boolean(
-              document
-                .querySelector(
-                  '.erp-dev-hub-group-filter input[role="combobox"]'
-                )
-                ?.getAttribute('aria-activedescendant')
+          await page.waitForFunction(() => {
+            const combobox = document.querySelector(
+              '.erp-dev-hub-group-filter input[role="combobox"]'
             )
+            return (
+              combobox?.getAttribute('aria-expanded') === 'true' &&
+              Boolean(combobox.getAttribute('aria-activedescendant'))
+            )
+          })
+          await page.evaluate(
+            () =>
+              new Promise((resolve) => {
+                requestAnimationFrame(() => requestAnimationFrame(resolve))
+              })
           )
           for (let attempt = 0; attempt < 12; attempt += 1) {
             const activeId = await groupCombobox.getAttribute(
@@ -12423,6 +12429,26 @@ export function createStyleL1Scenarios(deps) {
             )
             if (activeIndex === targetIndex) {
               await groupCombobox.press('Enter')
+              await page.waitForFunction(
+                (label) => {
+                  const combobox = document.querySelector(
+                    '.erp-dev-hub-group-filter input[role="combobox"]'
+                  )
+                  const selected = document.querySelector(
+                    '.erp-dev-hub-group-filter .ant-select-selection-item'
+                  )
+                  const expanded =
+                    combobox?.getAttribute('aria-expanded') === 'true'
+                  const normalizedText = String(
+                    selected?.textContent ?? ''
+                  ).replace(/\s+/gu, '')
+                  return (
+                    expanded === false &&
+                    normalizedText === label.replace(/\s+/gu, '')
+                  )
+                },
+                targetLabel
+              )
               return
             }
             await groupCombobox.press('ArrowDown')

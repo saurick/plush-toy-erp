@@ -13,11 +13,32 @@ import test from 'node:test'
 
 import {
   DEV_DATABASE_MIGRATION_SOURCE_FILES,
+  SHARED_DEV_BACKUP_SOURCE_POLICY,
+  buildSharedDevBackupRehearsalArgs,
   createDevDatabaseMigrationRuntime,
   redactDatabaseMigrationDiagnostic,
 } from './devDatabaseMigrationRuntime.mjs'
 
 const BACKUP_ID = 'br-yoyoosun-20260729T080000+0800'
+
+test('database migration backup binds the narrow shared-dev source policy', () => {
+  const args = buildSharedDevBackupRehearsalArgs(
+    '019ff53e-e92a-7822-876b-d5702198b7e0'
+  )
+  assert.equal(SHARED_DEV_BACKUP_SOURCE_POLICY, 'shared-dev-session-read-only')
+  assert.deepEqual(args.slice(1, 5), [
+    '--environment',
+    'shared-dev',
+    '--source-policy',
+    'shared-dev-session-read-only',
+  ])
+  assert.deepEqual(args.slice(-4), [
+    '--backup-purpose',
+    'pre-migration',
+    '--out',
+    'output/dev-workbench/database-migration-backups',
+  ])
+})
 
 test('database migration source identity follows the centralized dev server paths', () => {
   assert(

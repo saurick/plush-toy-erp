@@ -107,6 +107,7 @@ func TestSourceDocumentPostgresSaveSubmitConcurrency(t *testing.T) {
 				OrderNo:         "SO-PG-MUTATED-" + suffix,
 				CustomerID:      customer.ID,
 				OrderDate:       orderDate,
+				Currency:        created.Order.Currency,
 				ExpectedVersion: created.Order.Version,
 			}, []*biz.SalesOrderItemSaveMutation{{
 				ID: created.Items[0].ID,
@@ -183,6 +184,8 @@ func TestSourceDocumentPostgresSaveSubmitConcurrency(t *testing.T) {
 				PurchaseOrderNo: "PO-PG-MUTATED-" + suffix,
 				SupplierID:      supplier.ID,
 				PurchaseDate:    purchaseDate,
+				Currency:        created.Order.Currency,
+				PaymentTermDays: created.Order.PaymentTermDays,
 				ExpectedVersion: created.Order.Version,
 			}, []*biz.PurchaseOrderItemSaveMutation{{
 				ID: created.Items[0].ID,
@@ -285,6 +288,8 @@ func TestSourceDocumentPostgresSaveSubmitConcurrency(t *testing.T) {
 				OutsourcingOrderNo: "OUT-PG-MUTATED-" + suffix,
 				SupplierID:         supplier.ID,
 				OrderDate:          orderDate,
+				Currency:           created.Order.Currency,
+				PaymentTermDays:    created.Order.PaymentTermDays,
 				ExpectedVersion:    created.Order.Version,
 			}, []*biz.OutsourcingOrderItemSaveMutation{{
 				ID: created.Items[0].ID,

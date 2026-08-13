@@ -299,7 +299,7 @@ export const GO_BUSINESS_SCENARIOS = Object.freeze({
 export const FIELD_LINKAGE_PRINT_CASE_IDS = Object.freeze([
   "FL_processing_contract_table_headers__paper_uses_shared_subject_aware_columns",
   "FL_print_supplier_contact_snapshot__prefills_from_primary_supplier_contact",
-  "FL_print_supplier_contact_snapshot__purchase_and_outsourcing_pages_fetch_supplier_contacts_before_save",
+  "FL_print_supplier_contact_snapshot__purchase_and_outsourcing_pages_preserve_supplier_contacts",
   "FL_material_purchase_print_dates__keeps_string_date_snapshots",
   "FL_material_purchase_unit__normalizes_unit_to_chinese_for_print",
   "FL_material_purchase_print_snapshot__does_not_fallback_to_raw_ids",

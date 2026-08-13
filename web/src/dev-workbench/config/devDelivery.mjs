@@ -97,6 +97,9 @@ const PIPELINE_LABELS = Object.freeze({
   'Start PostgreSQL only when selected': '按需启动 PostgreSQL',
   'Install full-gate system and Go tools': '安装完整门禁系统与 Go 工具',
   'Install locked Web dependencies when selected': '按需安装锁定的 Web 依赖',
+  'Audit production Web dependencies': '审计生产 Web 依赖',
+  'Audit production Web dependencies when selected':
+    '按需审计生产 Web 依赖',
   'Install and verify Chromium only for full':
     '仅在完整门禁安装并校验 Chromium',
   'Prove Ent and Atlas generation when selected':

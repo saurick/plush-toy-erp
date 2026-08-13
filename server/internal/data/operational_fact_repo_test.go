@@ -100,13 +100,21 @@ func TestOperationalFactRepo_FactCreationIdempotencyRequiresSamePayload(t *testi
 		t.Fatalf("outsourcing conflict error = %v, want ErrIdempotencyConflict", err)
 	}
 
+	financeOccurredAt := time.Date(2026, 7, 10, 9, 0, 0, 0, time.UTC)
+	financePaymentTermDays := 0
+	financeDueAt := financeOccurredAt
 	financeInput := &biz.FinanceFactCreate{
-		FactNo:           "FF-IDEMPOTENT-001",
-		FactType:         biz.FinanceFactReceivable,
-		CounterpartyType: biz.FinanceCounterpartyCustomer,
-		Amount:           decimal.NewFromInt(100),
-		Currency:         "CNY",
-		IdempotencyKey:   "FF-IDEMPOTENT-001",
+		FactNo:              "FF-IDEMPOTENT-001",
+		FactType:            biz.FinanceFactReceivable,
+		CounterpartyType:    biz.FinanceCounterpartyCustomer,
+		Amount:              decimal.NewFromInt(100),
+		Currency:            biz.FinanceCurrencyCNY,
+		PaymentTerm:         ptrString(biz.FinancePaymentTermDueOnOccurrence),
+		PaymentTermDays:     &financePaymentTermDays,
+		DueAt:               &financeDueAt,
+		IdempotencyKey:      "FF-IDEMPOTENT-001",
+		OccurredAt:          financeOccurredAt,
+		OccurredAtSpecified: true,
 	}
 	finance, err := repo.CreateFinanceFactDraft(ctx, financeInput)
 	if err != nil {
@@ -195,7 +203,8 @@ func TestOperationalFactUsecase_IdempotencyDistinguishesExplicitFactTimes(t *tes
 				row, err := uc.CreateFinanceFactDraft(ctx, &biz.FinanceFactCreate{
 					FactNo: key, FactType: biz.FinanceFactReconciliation,
 					CounterpartyType: biz.FinanceCounterpartyCustomer,
-					Amount:           decimal.NewFromInt(1), IdempotencyKey: key, OccurredAt: at,
+					Amount:           decimal.NewFromInt(1), Currency: biz.FinanceCurrencyCNY,
+					IdempotencyKey: key, OccurredAt: at,
 				})
 				if err != nil {
 					return 0, err
@@ -1868,6 +1877,9 @@ func TestOperationalFactUsecase_ReceivableAndInvoiceRequireShippedShipment(t *te
 
 	shipmentSourceType := biz.ShipmentSourceType
 	shippingReleaseSourceType := "SHIPPING-RELEASE"
+	immediatePaymentTermDays := 0
+	negativeOccurredAt := time.Date(2026, 7, 10, 9, 0, 0, 0, time.UTC)
+	negativeDueAt := negativeOccurredAt
 	customer, err := client.Customer.Create().
 		SetCode("C-FIN-SOURCE-INACTIVE").
 		SetName("已停用来源客户").
@@ -1894,7 +1906,12 @@ func TestOperationalFactUsecase_ReceivableAndInvoiceRequireShippedShipment(t *te
 		FactType:         biz.FinanceFactReceivable,
 		CounterpartyType: biz.FinanceCounterpartyCustomer,
 		Amount:           decimal.NewFromInt(100),
+		Currency:         biz.FinanceCurrencyCNY,
+		PaymentTerm:      ptrString(biz.FinancePaymentTermDueOnOccurrence),
+		PaymentTermDays:  &immediatePaymentTermDays,
+		DueAt:            &negativeDueAt,
 		IdempotencyKey:   "AR-MISSING-SOURCE",
+		OccurredAt:       negativeOccurredAt,
 	}); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("receivable without shipment source error = %v, want ErrBadParam", err)
 	}
@@ -1904,9 +1921,14 @@ func TestOperationalFactUsecase_ReceivableAndInvoiceRequireShippedShipment(t *te
 		FactType:         biz.FinanceFactReceivable,
 		CounterpartyType: biz.FinanceCounterpartyCustomer,
 		Amount:           decimal.NewFromInt(100),
+		Currency:         biz.FinanceCurrencyCNY,
+		PaymentTerm:      ptrString(biz.FinancePaymentTermDueOnOccurrence),
+		PaymentTermDays:  &immediatePaymentTermDays,
+		DueAt:            &negativeDueAt,
 		SourceType:       &shippingReleaseSourceType,
 		SourceID:         &shipment.ID,
 		IdempotencyKey:   "AR-WRONG-SOURCE",
+		OccurredAt:       negativeOccurredAt,
 	}); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("receivable from shipping release source error = %v, want ErrBadParam", err)
 	}
@@ -1916,9 +1938,14 @@ func TestOperationalFactUsecase_ReceivableAndInvoiceRequireShippedShipment(t *te
 		FactType:         biz.FinanceFactReceivable,
 		CounterpartyType: biz.FinanceCounterpartyCustomer,
 		Amount:           decimal.NewFromInt(100),
+		Currency:         biz.FinanceCurrencyCNY,
+		PaymentTerm:      ptrString(biz.FinancePaymentTermDueOnOccurrence),
+		PaymentTermDays:  &immediatePaymentTermDays,
+		DueAt:            &negativeDueAt,
 		SourceType:       &shipmentSourceType,
 		SourceID:         &shipment.ID,
 		IdempotencyKey:   "AR-DRAFT-SHIPMENT",
+		OccurredAt:       negativeOccurredAt,
 	}); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("receivable from draft shipment error = %v, want ErrBadParam", err)
 	}
@@ -1941,9 +1968,14 @@ func TestOperationalFactUsecase_ReceivableAndInvoiceRequireShippedShipment(t *te
 		CounterpartyType: biz.FinanceCounterpartyCustomer,
 		CounterpartyID:   &wrongCustomerID,
 		Amount:           decimal.NewFromInt(100),
+		Currency:         biz.FinanceCurrencyCNY,
+		PaymentTerm:      ptrString(biz.FinancePaymentTermDueOnOccurrence),
+		PaymentTermDays:  &immediatePaymentTermDays,
+		DueAt:            &negativeDueAt,
 		SourceType:       &shipmentSourceType,
 		SourceID:         &shipment.ID,
 		IdempotencyKey:   "AR-WRONG-CUSTOMER",
+		OccurredAt:       negativeOccurredAt,
 	}); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("receivable customer must match shipment truth, got %v", err)
 	}
@@ -2002,6 +2034,7 @@ func TestOperationalFactUsecase_ReceivableAndInvoiceRequireShippedShipment(t *te
 		CounterpartyType: biz.FinanceCounterpartyCustomer,
 		CounterpartyID:   &customer.ID,
 		Amount:           decimal.NewFromInt(100),
+		Currency:         biz.FinanceCurrencyCNY,
 		SourceType:       &shipmentSourceType,
 		SourceID:         &shipment.ID,
 		IdempotencyKey:   "INV-SHIPPED-001",
@@ -2038,12 +2071,16 @@ func TestOperationalFactUsecase_FinanceRejectsInactiveManualCounterparties(t *te
 	if err != nil {
 		t.Fatalf("create inactive supplier failed: %v", err)
 	}
+	inactivePayableTermDays := 0
+	inactivePayableOccurredAt := time.Date(2026, 7, 10, 9, 0, 0, 0, time.UTC)
+	inactivePayableDueAt := inactivePayableOccurredAt
 	if _, err := uc.CreateFinanceFactDraft(ctx, &biz.FinanceFactCreate{
 		FactNo:           "FIN-INACTIVE-CUSTOMER",
 		FactType:         biz.FinanceFactReconciliation,
 		CounterpartyType: biz.FinanceCounterpartyCustomer,
 		CounterpartyID:   &customer.ID,
 		Amount:           decimal.NewFromInt(100),
+		Currency:         biz.FinanceCurrencyCNY,
 		IdempotencyKey:   "FIN-INACTIVE-CUSTOMER",
 	}); !errors.Is(err, biz.ErrCustomerInactive) {
 		t.Fatalf("expected inactive customer rejected for manual finance fact, got %v", err)
@@ -2054,7 +2091,12 @@ func TestOperationalFactUsecase_FinanceRejectsInactiveManualCounterparties(t *te
 		CounterpartyType: biz.FinanceCounterpartySupplier,
 		CounterpartyID:   &supplier.ID,
 		Amount:           decimal.NewFromInt(100),
+		Currency:         biz.FinanceCurrencyCNY,
+		PaymentTerm:      ptrString(biz.FinancePaymentTermDueOnOccurrence),
+		PaymentTermDays:  &inactivePayableTermDays,
+		DueAt:            &inactivePayableDueAt,
 		IdempotencyKey:   "FIN-INACTIVE-SUPPLIER",
+		OccurredAt:       inactivePayableOccurredAt,
 	}); !errors.Is(err, biz.ErrSupplierInactive) {
 		t.Fatalf("expected inactive supplier rejected for manual finance fact, got %v", err)
 	}

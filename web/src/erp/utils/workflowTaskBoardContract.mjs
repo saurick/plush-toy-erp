@@ -85,8 +85,9 @@ export function requireWorkflowTaskBoardResponse(response, request = {}) {
       !Array.isArray(lane.tasks) ||
       lane.tasks.length > lane.limit ||
       lane.tasks.some((task) => {
-        if (!task || typeof task !== 'object' || Array.isArray(task))
+        if (!task || typeof task !== 'object' || Array.isArray(task)) {
           return true
+        }
         return (
           !Number.isSafeInteger(task.id) ||
           task.id <= 0 ||

@@ -55,7 +55,7 @@ export const PURCHASE_ORDER_LIFECYCLE_ACTIONS = [
     closeMode: 'normal',
     confirmTitle: '确认正常关闭采购订单',
     confirmContent:
-      '只有所有订单行都已足量入库，且没有待处理的入库草稿或审批流程时才能正常关闭。',
+      '正常关闭只结清采购订单本身；所有订单行须已足量入库，且不能有待处理的入库草稿或审批流程。不会自动改变已经登记的入库、质检、库存或财务记录。',
     okText: '确认正常关闭',
     run: closePurchaseOrder,
   },
@@ -71,7 +71,7 @@ export const PURCHASE_ORDER_LIFECYCLE_ACTIONS = [
     requiresReason: true,
     confirmTitle: '确认提前关闭采购订单',
     confirmContent:
-      '提前关闭会结清尚未收货的订单行；存在待处理的入库草稿或审批流程时仍会被阻止。',
+      '提前关闭会结清尚未收货的采购订单行；存在待处理的入库草稿或审批流程时仍会被阻止。不会自动取消或撤销已经登记的入库、质检、库存或财务记录。',
     reasonPlaceholder: '请填写未收完即关闭的业务原因',
     okText: '确认提前关闭',
     run: closePurchaseOrder,
@@ -88,7 +88,7 @@ export const PURCHASE_ORDER_LIFECYCLE_ACTIONS = [
     danger: true,
     confirmTitle: '确认取消采购订单',
     confirmContent:
-      '系统会同步结清可安全终止的审批流程；已有未取消的入库记录时会阻止取消。',
+      '取消只终止采购订单本身；系统会同步结清可安全终止的审批流程，已有未取消的入库记录时会阻止取消。不会自动取消或撤销已经登记的入库、质检、库存或财务记录。',
     reasonPlaceholder: '请填写取消采购订单的业务原因',
     okText: '确认取消',
     run: cancelPurchaseOrder,

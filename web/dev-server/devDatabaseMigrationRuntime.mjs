@@ -17,6 +17,8 @@ const execFileAsync = promisify(execFileCallback)
 const HASH_PATTERN = /^[0-9a-f]{64}$/u
 const COMMAND_TIMEOUT_MS = 15 * 60 * 1000
 const RUNTIME_WAIT_TIMEOUT_MS = 90 * 1000
+export const SHARED_DEV_BACKUP_SOURCE_POLICY =
+  'shared-dev-session-read-only'
 export const DEV_DATABASE_MIGRATION_SOURCE_FILES = Object.freeze([
   'scripts/local-migration.mjs',
   'scripts/local-migration-workflow.mjs',
@@ -118,6 +120,22 @@ export function parseMigrationPlanOutput(output) {
     maintenanceConfirmation: maintenance[1],
     outputHash: createHash('sha256').update(text).digest('hex'),
   }
+}
+
+export function buildSharedDevBackupRehearsalArgs(operationId) {
+  return [
+    'deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh',
+    '--environment',
+    'shared-dev',
+    '--source-policy',
+    SHARED_DEV_BACKUP_SOURCE_POLICY,
+    '--release-version',
+    `migration-${operationId}`,
+    '--backup-purpose',
+    'pre-migration',
+    '--out',
+    'output/dev-workbench/database-migration-backups',
+  ]
 }
 
 function walkRegularFiles(root, relativeDirectory) {
@@ -333,17 +351,7 @@ export function createDevDatabaseMigrationRuntime(projectRoot, apiOrigin) {
       }
       const result = await executeCommand(
         'bash',
-        [
-          'deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh',
-          '--environment',
-          'shared-dev',
-          '--release-version',
-          `migration-${operationId}`,
-          '--backup-purpose',
-          'pre-migration',
-          '--out',
-          'output/dev-workbench/database-migration-backups',
-        ],
+        buildSharedDevBackupRehearsalArgs(operationId),
         {
           cwd: root,
           env: { ...process.env, SOURCE_POSTGRES_DSN: sourceDsn },

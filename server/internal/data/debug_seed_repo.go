@@ -12,7 +12,6 @@ import (
 	"server/internal/data/model/ent/businessattachment"
 	"server/internal/data/model/ent/workflowbusinessstate"
 	"server/internal/data/model/ent/workflowtask"
-	"server/internal/data/model/ent/workflowtaskevent"
 
 	"entgo.io/ent/dialect"
 	"github.com/go-kratos/kratos/v2/log"
@@ -34,44 +33,73 @@ var _ biz.DebugRepo = (*debugSeedRepo)(nil)
 
 var debugBusinessDataClearTables = []string{
 	"business_attachments",
+	"workflow_business_states",
 	"workflow_task_events",
 	"workflow_tasks",
-	"workflow_business_states",
 	"process_node_instances",
 	"process_instances",
+	"contacts",
+	"finance_allocations",
+	"finance_credit_notes",
 	"finance_facts",
-	"stock_reservations",
-	"shipment_items",
-	"shipments",
+	"finance_payments",
+	"inventory_balances",
+	"inventory_lot_status_events",
+	"inventory_operation_items",
+	"inventory_operations",
+	"inventory_txns",
+	"outsourcing_facts",
+	"outsourcing_return_dispositions",
+	"production_exception_decisions",
+	"production_facts",
+	"production_order_events",
+	"production_packaging_confirmations",
+	"production_wip_events",
+	"production_wip_outsourcing_allocations",
 	"outsourcing_order_items",
 	"outsourcing_orders",
-	"outsourcing_facts",
-	"production_facts",
-	"quality_inspections",
+	"production_order_material_requirements",
+	"bom_items",
 	"purchase_receipt_adjustment_items",
 	"purchase_receipt_adjustments",
+	"purchase_rejection_dispositions",
 	"purchase_return_items",
 	"purchase_returns",
-	"purchase_receipt_items",
-	"purchase_receipts",
-	"inventory_balances",
-	"inventory_txns",
-	"inventory_lots",
-	"purchase_order_items",
-	"purchase_orders",
-	"sales_order_items",
-	"sales_orders",
-	"contacts",
-	"bom_items",
+	"quality_inspections",
+	"production_wip_batches",
+	"production_order_operations",
+	"production_order_items",
 	"bom_headers",
-	"product_skus",
-	"processes",
+	"production_orders",
+	"purchase_receipt_items",
+	"purchase_order_items",
 	"materials",
+	"purchase_orders",
+	"purchase_receipts",
+	"shipment_items",
+	"shipments",
+	"source_order_lifecycle_events",
+	"stock_reservations",
+	"inventory_lots",
+	"sales_order_items",
+	"product_skus",
 	"products",
-	"suppliers",
+	"sales_orders",
 	"customers",
-	"warehouses",
+	"supplier_process_capabilities",
+	"processes",
+	"suppliers",
 	"units",
+	"warehouses",
+}
+
+type debugBusinessDataClearDetachment struct {
+	tableName  string
+	columnName string
+}
+
+var debugBusinessDataClearDetachments = []debugBusinessDataClearDetachment{
+	{tableName: "production_wip_batches", columnName: "origin_rework_fact_id"},
 }
 
 func (r *debugSeedRepo) SeedBusinessChainDebugData(ctx context.Context, plan biz.DebugSeedPlan, actorID int) (*biz.DebugBusinessChainSeedResult, error) {
@@ -223,7 +251,7 @@ func createDebugWorkflowTask(ctx context.Context, tx *ent.Tx, plan biz.DebugTask
 }
 
 func (r *debugSeedRepo) CleanupBusinessChainDebugData(ctx context.Context, in biz.DebugBusinessChainCleanupInput) (*biz.DebugBusinessChainCleanupResult, error) {
-	if r == nil || r.data == nil || r.data.postgres == nil {
+	if r == nil || r.data == nil || r.data.postgres == nil || r.data.sqldb == nil {
 		return nil, biz.ErrBadParam
 	}
 	prefix, err := biz.DebugDocumentPrefix(in.DebugRunID, in.ScenarioKey)
@@ -249,12 +277,12 @@ func (r *debugSeedRepo) CleanupBusinessChainDebugData(ctx context.Context, in bi
 		return result, nil
 	}
 
-	tx, err := r.data.postgres.Tx(ctx)
+	tx, err := r.data.sqldb.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
-		rollbackEntTx(ctx, tx, r.log)
+		rollbackSQLTx(ctx, tx, r.log)
 	}()
 
 	taskIDs := make([]int, 0, len(matches.tasks))
@@ -262,24 +290,15 @@ func (r *debugSeedRepo) CleanupBusinessChainDebugData(ctx context.Context, in bi
 		taskIDs = append(taskIDs, row.ID)
 	}
 	if len(taskIDs) > 0 {
-		deletedAttachments, err := tx.BusinessAttachment.Delete().
-			Where(
-				businessattachment.OwnerType(biz.BusinessAttachmentOwnerWorkflowTask),
-				businessattachment.OwnerIDIn(taskIDs...),
-			).
-			Exec(ctx)
+		deletedAttachments, err := deleteDebugWorkflowTaskAttachments(ctx, tx, r.data.sqlDialect, taskIDs)
 		if err != nil {
 			return nil, err
 		}
-		deletedEvents, err := tx.WorkflowTaskEvent.Delete().
-			Where(workflowtaskevent.TaskIDIn(taskIDs...)).
-			Exec(ctx)
+		deletedEvents, err := deleteDebugRowsByIDs(ctx, tx, r.data.sqlDialect, "workflow_task_events", "task_id", taskIDs)
 		if err != nil {
 			return nil, err
 		}
-		if _, err := tx.WorkflowTask.Delete().
-			Where(workflowtask.IDIn(taskIDs...)).
-			Exec(ctx); err != nil {
+		if _, err := deleteDebugRowsByIDs(ctx, tx, r.data.sqlDialect, "workflow_tasks", "id", taskIDs); err != nil {
 			return nil, err
 		}
 		result.DeletedTaskEvents = deletedEvents
@@ -292,9 +311,7 @@ func (r *debugSeedRepo) CleanupBusinessChainDebugData(ctx context.Context, in bi
 		stateIDs = append(stateIDs, row.ID)
 	}
 	if len(stateIDs) > 0 {
-		deletedStates, err := tx.WorkflowBusinessState.Delete().
-			Where(workflowbusinessstate.IDIn(stateIDs...)).
-			Exec(ctx)
+		deletedStates, err := deleteDebugRowsByIDs(ctx, tx, r.data.sqlDialect, "workflow_business_states", "id", stateIDs)
 		if err != nil {
 			return nil, err
 		}
@@ -322,6 +339,66 @@ func (r *debugSeedRepo) CleanupBusinessChainDebugData(ctx context.Context, in bi
 	return result, nil
 }
 
+func deleteDebugWorkflowTaskAttachments(ctx context.Context, tx *stdsql.Tx, sqlDialect string, taskIDs []int) (int, error) {
+	if len(taskIDs) == 0 {
+		return 0, nil
+	}
+	args := make([]any, 0, len(taskIDs)+1)
+	args = append(args, biz.BusinessAttachmentOwnerWorkflowTask)
+	placeholders := make([]string, len(taskIDs))
+	for index, taskID := range taskIDs {
+		placeholders[index] = debugSQLPlaceholder(sqlDialect, index+2)
+		args = append(args, taskID)
+	}
+	query := fmt.Sprintf(
+		"DELETE FROM %s WHERE %s = %s AND %s IN (%s)",
+		quoteSQLIdentifier("business_attachments"),
+		quoteSQLIdentifier("owner_type"),
+		debugSQLPlaceholder(sqlDialect, 1),
+		quoteSQLIdentifier("owner_id"),
+		strings.Join(placeholders, ", "),
+	)
+	return execDebugDelete(ctx, tx, query, args...)
+}
+
+func deleteDebugRowsByIDs(ctx context.Context, tx *stdsql.Tx, sqlDialect, tableName, columnName string, ids []int) (int, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	args := make([]any, len(ids))
+	placeholders := make([]string, len(ids))
+	for index, id := range ids {
+		args[index] = id
+		placeholders[index] = debugSQLPlaceholder(sqlDialect, index+1)
+	}
+	query := fmt.Sprintf(
+		"DELETE FROM %s WHERE %s IN (%s)",
+		quoteSQLIdentifier(tableName),
+		quoteSQLIdentifier(columnName),
+		strings.Join(placeholders, ", "),
+	)
+	return execDebugDelete(ctx, tx, query, args...)
+}
+
+func execDebugDelete(ctx context.Context, tx *stdsql.Tx, query string, args ...any) (int, error) {
+	result, err := tx.ExecContext(ctx, query, args...)
+	if err != nil {
+		return 0, err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return int(affected), nil
+}
+
+func debugSQLPlaceholder(sqlDialect string, position int) string {
+	if sqlDialect == dialect.Postgres {
+		return fmt.Sprintf("$%d", position)
+	}
+	return "?"
+}
+
 func (r *debugSeedRepo) ClearBusinessData(ctx context.Context, in biz.DebugBusinessDataClearInput) (*biz.DebugBusinessDataClearResult, error) {
 	if r == nil || r.data == nil || r.data.sqldb == nil {
 		return nil, biz.ErrBadParam
@@ -338,6 +415,20 @@ func (r *debugSeedRepo) ClearBusinessData(ctx context.Context, in biz.DebugBusin
 		DryRun:        in.DryRun,
 		MatchedCounts: make(map[string]int),
 		DeletedCounts: make(map[string]int),
+	}
+	if !in.DryRun {
+		for _, detachment := range debugBusinessDataClearDetachments {
+			exists, err := debugBusinessDataTableExists(ctx, tx, r.data.sqlDialect, detachment.tableName)
+			if err != nil {
+				return nil, fmt.Errorf("检查业务表 %s 是否存在失败: %w", detachment.tableName, err)
+			}
+			if !exists {
+				continue
+			}
+			if err := detachDebugBusinessDataReference(ctx, tx, detachment); err != nil {
+				return nil, fmt.Errorf("解除业务表 %s 循环引用失败: %w", detachment.tableName, err)
+			}
+		}
 	}
 	for _, tableName := range debugBusinessDataClearTables {
 		exists, err := debugBusinessDataTableExists(ctx, tx, r.data.sqlDialect, tableName)
@@ -382,6 +473,25 @@ func (r *debugSeedRepo) ClearBusinessData(ctx context.Context, in biz.DebugBusin
 		"cleared_tables", result.ClearedTableNames,
 	)
 	return result, nil
+}
+
+func detachDebugBusinessDataReference(ctx context.Context, tx *stdsql.Tx, detachment debugBusinessDataClearDetachment) error {
+	_, err := tx.ExecContext(ctx, fmt.Sprintf(
+		"UPDATE %s SET %s = NULL WHERE %s IS NOT NULL",
+		quoteSQLIdentifier(detachment.tableName),
+		quoteSQLIdentifier(detachment.columnName),
+		quoteSQLIdentifier(detachment.columnName),
+	))
+	return err
+}
+
+func debugBusinessDataClearDetaches(tableName, columnName string) bool {
+	for _, detachment := range debugBusinessDataClearDetachments {
+		if detachment.tableName == tableName && detachment.columnName == columnName {
+			return true
+		}
+	}
+	return false
 }
 
 func countDebugBusinessDataTable(ctx context.Context, tx *stdsql.Tx, tableName string) (int, error) {

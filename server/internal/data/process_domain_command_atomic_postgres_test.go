@@ -188,6 +188,7 @@ func TestSalesProcessCommandPostgresRollsBackOnResultConflictAndFailsClosedForLe
 		row, createErr := salesRepo.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
 			OrderNo: "SO-ATOMIC-" + label + "-" + suffix, CustomerID: customer.ID,
 			CustomerSnapshot: map[string]any{"name": customer.Name}, ContactSnapshot: map[string]any{}, OrderDate: time.Now(),
+			Currency: biz.FinanceCurrencyCNY,
 		})
 		if createErr != nil {
 			t.Fatalf("create sales order %s: %v", label, createErr)

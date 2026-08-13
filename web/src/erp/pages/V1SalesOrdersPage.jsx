@@ -1139,7 +1139,7 @@ export default function V1SalesOrdersPage() {
         try {
           normalizeSourceOrderLifecycleReason(action, reason)
         } catch (error) {
-          message.warning(error.message)
+          message.warning(getActionErrorMessage(error, '校验业务原因'))
           return
         }
         return runLifecycleAction(action, order, reason)

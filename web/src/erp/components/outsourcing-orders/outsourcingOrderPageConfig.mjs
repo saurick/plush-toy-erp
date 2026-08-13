@@ -61,7 +61,7 @@ export const OUTSOURCING_ORDER_LIFECYCLE_ACTIONS = [
     closeMode: 'normal',
     confirmTitle: '确认正常关闭加工合同',
     confirmContent:
-      '只有合同数量已全部办理，且没有待处理的委外记录或在制批次时才能正常关闭。',
+      '正常关闭只结清加工合同本身；合同数量须已全部办理，且不能有待处理的委外记录或在制批次。不会自动改变已经登记的发料、回货、库存或财务记录。',
     okText: '确认正常关闭',
     run: closeOutsourcingOrder,
   },
@@ -77,7 +77,7 @@ export const OUTSOURCING_ORDER_LIFECYCLE_ACTIONS = [
     requiresReason: true,
     confirmTitle: '确认提前关闭加工合同',
     confirmContent:
-      '提前关闭会结清尚未完成的合同行；存在待处理的委外记录或在制批次时仍会被阻止。',
+      '提前关闭会结清尚未完成的加工合同行；存在待处理的委外记录或在制批次时仍会被阻止。不会自动取消或撤销已经登记的发料、回货、库存或财务记录。',
     reasonPlaceholder: '请填写未履完即关闭的业务原因',
     okText: '确认提前关闭',
     run: closeOutsourcingOrder,
@@ -94,7 +94,7 @@ export const OUTSOURCING_ORDER_LIFECYCLE_ACTIONS = [
     danger: true,
     confirmTitle: '确认取消加工合同',
     confirmContent:
-      '只有没有生效中的委外记录或在制批次时才能取消；系统不会把已过账事实静默撤销。',
+      '取消只终止加工合同本身；存在生效中的委外记录或在制批次时会阻止取消。不会自动取消或撤销已经登记的发料、回货、库存或财务记录。',
     reasonPlaceholder: '请填写取消加工合同的业务原因',
     okText: '确认取消',
     run: cancelOutsourcingOrder,

@@ -114,7 +114,7 @@ func TestNormalizeFactCreateTracksExplicitIntentTimes(t *testing.T) {
 	financeBase := &FinanceFactCreate{
 		FactNo: "FIN-TIME", FactType: FinanceFactReconciliation,
 		CounterpartyType: FinanceCounterpartyCustomer, Amount: decimal.NewFromInt(1),
-		IdempotencyKey: "finance-time",
+		Currency: FinanceCurrencyCNY, IdempotencyKey: "finance-time",
 	}
 	financeOmitted, err := normalizeFinanceFactCreate(financeBase)
 	if err != nil {

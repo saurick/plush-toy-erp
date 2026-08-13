@@ -13,6 +13,7 @@ import (
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
+	"server/internal/data/model/ent/businessattachment"
 	"server/internal/data/model/ent/workflowbusinessstate"
 	"server/internal/data/model/ent/workflowtask"
 	"server/internal/data/model/ent/workflowtaskevent"
@@ -265,7 +266,12 @@ func TestWorkflowPostgresAttachmentUploadRechecksTaskAfterConcurrentMutation(t *
 			case <-ctx.Done():
 				t.Fatalf("wait for guarded upload: %v", ctx.Err())
 			}
-			count, err := client.BusinessAttachment.Query().Count(ctx)
+			count, err := client.BusinessAttachment.Query().
+				Where(
+					businessattachment.OwnerType(biz.BusinessAttachmentOwnerWorkflowTask),
+					businessattachment.OwnerID(task.ID),
+				).
+				Count(ctx)
 			if err != nil || count != 0 {
 				t.Fatalf("stale authorized upload must insert zero rows: count=%d err=%v", count, err)
 			}

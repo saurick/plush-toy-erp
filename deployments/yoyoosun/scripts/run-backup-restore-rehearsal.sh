@@ -9,6 +9,7 @@ print_help() {
   bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh \
     --release-version local-dev-20260616 \
     --backup-purpose pre-migration \
+    --source-policy dedicated-backup \
     --out output/customers/yoyoosun/backup-restore-rehearsal \
     --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \
     --backend-url http://127.0.0.1:8300 \
@@ -16,7 +17,7 @@ print_help() {
 
 作用:
   对 SOURCE_POSTGRES_DSN 指向的库执行一次真实备份恢复演练：
-  1. 用 erp_backup 和本机 PostgreSQL 18.1 pg_dump 生成 custom dump 到 output/。
+  1. 用经过权限对账的 erp_backup 和本机 PostgreSQL 18.1 pg_dump 生成 custom dump 到 output/。
   2. 启动临时隔离 PostgreSQL 容器。
   3. 将 dump 恢复到临时库。
   4. 对恢复库先读取 migrationBefore，依次运行存量升级与客户配置切换只读审计，再执行 Atlas migration apply 和 migration status。
@@ -27,7 +28,8 @@ print_help() {
 边界:
   - 不读取、不提交真实 .env。
   - 不把 dump、secret、完整 DSN 或客户 raw rows 写入 git。
-  - SOURCE_POSTGRES_DSN 必须使用只读 erp_backup；恢复和 migration 由隔离库管理员 / erp_migrator 完成。
+  - 默认 SOURCE_POSTGRES_DSN 必须使用只读 erp_backup；恢复和 migration 由隔离库管理员 / erp_migrator 完成。
+  - shared-dev-session-read-only 只供本项目本地迁移入口备份已登记的 106 开发库，并强制当前源连接只读；不能用于目标或发布环境。
   - 默认拒绝把 192.168.0.133 测试 / 目标库当成本地 source，除非显式设置
     ERP_ALLOW_TEST_DB_AS_DEV=1 或 ALLOW_TARGET_DB_BACKUP_REHEARSAL=1。
 USAGE
@@ -45,6 +47,7 @@ pg_dump_bin="${PG_DUMP_BIN:-}"
 psql_bin="${PSQL_BIN:-}"
 atlas_required_version="${ATLAS_REQUIRED_VERSION:-v0.38.0}"
 source_env="SOURCE_POSTGRES_DSN"
+source_policy="dedicated-backup"
 backend_url=""
 web_url=""
 keep_container="0"
@@ -86,6 +89,10 @@ while [[ $# -gt 0 ]]; do
     ;;
   --source-env)
     source_env="${2:-}"
+    shift 2
+    ;;
+  --source-policy)
+    source_policy="${2:-}"
     shift 2
     ;;
   --backend-url)
@@ -137,13 +144,21 @@ if [[ -z "$source_dsn" ]]; then
   exit 1
 fi
 
+case "$source_policy" in
+dedicated-backup | shared-dev-session-read-only) ;;
+*)
+  echo "[backup-restore-rehearsal] --source-policy 只支持 dedicated-backup / shared-dev-session-read-only" >&2
+  exit 1
+  ;;
+esac
+
 if [[ "$source_dsn" == *"192.168.0.133"* && "${ERP_ALLOW_TEST_DB_AS_DEV:-}" != "1" && "${ALLOW_TARGET_DB_BACKUP_REHEARSAL:-}" != "1" ]]; then
   echo "[backup-restore-rehearsal] 拒绝默认使用 192.168.0.133 测试 / 目标库作为 source" >&2
   echo "[backup-restore-rehearsal] 如确需对目标库演练，显式设置 ALLOW_TARGET_DB_BACKUP_REHEARSAL=1" >&2
   exit 1
 fi
 
-for required_command in docker atlas curl sha256sum wc awk date jq; do
+for required_command in docker atlas curl sha256sum wc awk date jq python3; do
   if ! command -v "$required_command" >/dev/null 2>&1; then
     echo "[backup-restore-rehearsal] 缺少命令: $required_command" >&2
     exit 1
@@ -197,7 +212,75 @@ grep -Eq "(^|[[:space:]])${atlas_required_version}([[:space:]]|$)" <<<"$atlas_ve
   exit 1
 }
 
-source_identity="$(PGDATABASE="$source_dsn" "$psql_bin" -X --no-psqlrc -A -t -F '|' \
+source_pg_host=""
+source_pg_port=""
+source_pg_database=""
+source_pg_user=""
+source_pg_password=""
+source_pg_sslmode=""
+source_pg_options=""
+source_role_alias="erp_backup"
+source_pg_settings="$(
+  BACKUP_SOURCE_POSTGRES_DSN="$source_dsn" python3 - <<'PY'
+import os
+import shlex
+import urllib.parse
+
+raw = os.environ.get("BACKUP_SOURCE_POSTGRES_DSN", "").strip()
+parsed = urllib.parse.urlparse(raw)
+if parsed.scheme not in {"postgres", "postgresql"} or parsed.fragment:
+    raise SystemExit("[backup-restore-rehearsal] SOURCE_POSTGRES_DSN 格式无效")
+host = parsed.hostname or ""
+database = urllib.parse.unquote((parsed.path or "").lstrip("/"))
+user = urllib.parse.unquote(parsed.username or "")
+password = urllib.parse.unquote(parsed.password or "")
+try:
+    port = parsed.port or 5432
+except ValueError as error:
+    raise SystemExit("[backup-restore-rehearsal] SOURCE_POSTGRES_DSN 端口无效") from error
+query = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
+unexpected = sorted(set(query) - {"sslmode"})
+if unexpected or len(query.get("sslmode", [])) > 1:
+    raise SystemExit("[backup-restore-rehearsal] SOURCE_POSTGRES_DSN 含不支持的连接参数")
+sslmode = (query.get("sslmode") or ["disable"])[0]
+if sslmode not in {"disable", "allow", "prefer", "require", "verify-ca", "verify-full"}:
+    raise SystemExit("[backup-restore-rehearsal] SOURCE_POSTGRES_DSN sslmode 无效")
+if not host or not database or not user or not password:
+    raise SystemExit("[backup-restore-rehearsal] SOURCE_POSTGRES_DSN 目标或凭据不完整")
+
+for name, value in {
+    "source_pg_host": host,
+    "source_pg_port": str(port),
+    "source_pg_database": database,
+    "source_pg_user": user,
+    "source_pg_password": password,
+    "source_pg_sslmode": sslmode,
+}.items():
+    print(f"{name}={shlex.quote(value)}")
+PY
+)"
+eval "$source_pg_settings"
+unset source_pg_settings
+source_dsn=""
+unset "$source_env"
+
+if [[ "$source_policy" == "shared-dev-session-read-only" ]]; then
+  [[ "$environment" == "shared-dev" &&
+    "$source_pg_host" == "192.168.0.106" &&
+    "$source_pg_port" == "5432" &&
+    "$source_pg_database" == "plush_erp" ]] || {
+    echo "[backup-restore-rehearsal] shared-dev-session-read-only 只允许已登记的 192.168.0.106:5432/plush_erp shared-dev" >&2
+    exit 1
+  }
+  source_pg_options="-c default_transaction_read_only=on"
+  source_role_alias="shared-dev-configured-role"
+fi
+
+source_identity="$(PGHOST="$source_pg_host" PGPORT="$source_pg_port" \
+  PGDATABASE="$source_pg_database" PGUSER="$source_pg_user" \
+  PGPASSWORD="$source_pg_password" PGSSLMODE="$source_pg_sslmode" \
+  PGOPTIONS="$source_pg_options" \
+  "$psql_bin" -X --no-psqlrc -A -t -F '|' \
   --set ON_ERROR_STOP=1 \
   -c "
 SELECT
@@ -224,20 +307,28 @@ SELECT
         OR has_table_privilege(current_user, format('%I.%I', source_table.table_schema, source_table.table_name), 'TRUNCATE')
       )
   )
-FROM pg_roles AS role
+  FROM pg_roles AS role
 WHERE role.rolname = current_user;")"
 IFS='|' read -r source_user source_database source_postgres_version source_read_only \
   source_super source_createdb source_createrole source_bypassrls \
   source_database_create source_schema_create source_invalid_table_count \
   <<<"$source_identity"
-[[ "$source_user" == "erp_backup" && "$source_read_only" == "on" &&
-  "$source_super" == "f" && "$source_createdb" == "f" &&
-  "$source_createrole" == "f" && "$source_bypassrls" == "f" &&
-  "$source_database_create" == "f" && "$source_schema_create" == "f" &&
-  "$source_invalid_table_count" == "0" ]] || {
-  echo "[backup-restore-rehearsal] SOURCE_POSTGRES_DSN 必须使用经过权限对账的只读 erp_backup" >&2
+[[ "$source_user" == "$source_pg_user" &&
+  "$source_database" == "$source_pg_database" &&
+  "$source_read_only" == "on" ]] || {
+  echo "[backup-restore-rehearsal] 源库身份、目标或只读会话安全检查失败" >&2
   exit 1
 }
+if [[ "$source_policy" == "dedicated-backup" ]]; then
+  [[ "$source_user" == "erp_backup" &&
+    "$source_super" == "f" && "$source_createdb" == "f" &&
+    "$source_createrole" == "f" && "$source_bypassrls" == "f" &&
+    "$source_database_create" == "f" && "$source_schema_create" == "f" &&
+    "$source_invalid_table_count" == "0" ]] || {
+    echo "[backup-restore-rehearsal] SOURCE_POSTGRES_DSN 必须使用经过权限对账的只读 erp_backup" >&2
+    exit 1
+  }
+fi
 [[ "$source_postgres_version" =~ ^18[0-9]{4}$ ]] || {
   echo "[backup-restore-rehearsal] 源 PostgreSQL major 必须是 18" >&2
   exit 1
@@ -253,7 +344,11 @@ if [[ ! -e "$out_root" ]]; then
   mkdir -p "$out_root"
   chmod 700 "$out_root"
 fi
-[[ -d "$out_root" && ! -L "$out_root" && "$(stat -f '%u' "$out_root" 2>/dev/null || stat -c '%u' "$out_root")" == "$(id -u)" ]] || {
+out_root_owner_uid=""
+if ! out_root_owner_uid="$(stat -f '%u' "$out_root" 2>/dev/null)"; then
+  out_root_owner_uid="$(stat -c '%u' "$out_root")"
+fi
+[[ -d "$out_root" && ! -L "$out_root" && "$out_root_owner_uid" == "$(id -u)" ]] || {
   echo "[backup-restore-rehearsal] --out 必须是当前用户拥有的普通目录" >&2
   exit 1
 }
@@ -326,6 +421,7 @@ pgDumpVersion=$pg_dump_version
 psqlVersion=$psql_version
 sourcePostgresVersion=$source_postgres_version
 sourceDatabase=$source_database
+sourcePolicy=$source_policy
 atlasVersion=$atlas_required_version
 sourceEnv=$source_env
 sourceAlias=env:$source_env
@@ -333,7 +429,11 @@ outputDir=$run_dir
 EOF
 
 echo "[backup-restore-rehearsal] running pg_dump with $pg_dump_version"
-PGDATABASE="$source_dsn" "$pg_dump_bin" \
+PGHOST="$source_pg_host" PGPORT="$source_pg_port" \
+  PGDATABASE="$source_pg_database" PGUSER="$source_pg_user" \
+  PGPASSWORD="$source_pg_password" PGSSLMODE="$source_pg_sslmode" \
+  PGOPTIONS="$source_pg_options" \
+  "$pg_dump_bin" \
   --format=custom --no-owner --no-acl --file "$backup_file"
 
 backup_hash="$(sha256sum "$backup_file" | awk '{print $1}')"
@@ -525,7 +625,9 @@ SQL
   } >"$rehearsal_sql"
   chmod 600 "$rehearsal_sql"
   rehearsal_output="$run_dir/migration-rollback-rehearsal.out"
-  PGDATABASE="$restore_dsn" "$psql_bin" -X --no-psqlrc \
+  PGHOST=127.0.0.1 PGPORT="$restore_port" PGDATABASE="$restore_db" \
+    PGUSER=erp_migrator PGPASSWORD="$restore_migrator_pass" PGSSLMODE=disable \
+    "$psql_bin" -X --no-psqlrc \
     --set ON_ERROR_STOP=1 --file "$rehearsal_sql" >"$rehearsal_output"
   chmod 600 "$rehearsal_output"
   grep -Eq '^ROLLBACK$' "$rehearsal_output"
@@ -554,7 +656,10 @@ atlas_restore_schema >"$schema_readback_file"
 chmod 600 "$schema_readback_file"
 [[ -s "$schema_readback_file" ]]
 schema_readback_sha256="$(sha256sum "$schema_readback_file" | awk '{print $1}')"
-programmability_result="$(PGDATABASE="$restore_dsn" "$psql_bin" -X --no-psqlrc -A -t \
+programmability_result="$(PGHOST=127.0.0.1 PGPORT="$restore_port" \
+  PGDATABASE="$restore_db" PGUSER=erp_migrator \
+  PGPASSWORD="$restore_migrator_pass" PGSSLMODE=disable \
+  "$psql_bin" -X --no-psqlrc -A -t \
   --set ON_ERROR_STOP=1 -c "
 SELECT
   count(*) FILTER (WHERE object_kind = 'function')::text
@@ -652,7 +757,8 @@ populatedUpgradeAuditStatus=$populated_upgrade_audit_status
 customerConfigCutoverAuditStatus=$customer_config_cutover_audit_status
 databaseConstraintAuditStatus=$database_constraint_audit_status
 steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status -> populated upgrade read-only audit -> customer config cutover read-only audit -> database constraint read-only audit -> atlas migrate apply -> post-apply atlas status -> smoke query
-sourceRole=erp_backup
+sourcePolicy=$source_policy
+sourceRole=$source_role_alias
 restoreMigrationRole=erp_migrator
 rollbackRehearsalStatus=$rollback_rehearsal_status
 schemaReadbackSha256=$schema_readback_sha256
@@ -674,7 +780,8 @@ cat >"$backup_evidence" <<EOF
 | operatorRole | local-developer |
 | releaseVersion | $release_version |
 | migrationVersion | ${pre_migration_version:-unknown} |
-| sourceRole | erp_backup |
+| sourcePolicy | $source_policy |
+| sourceRole | $source_role_alias |
 | sourcePostgreSQLVersion | $source_postgres_version |
 | pgDumpVersion | $pg_dump_version |
 | restorePostgreSQLImage | $postgres_image |
@@ -740,7 +847,8 @@ cat >"$report_file" <<EOF
     "databaseBackupHash": "$backup_hash",
     "storageLocationAlias": "local-output-gitignored",
     "migrationVersion": "${pre_migration_version:-unknown}",
-    "sourceRole": "erp_backup",
+    "sourcePolicy": "$source_policy",
+    "sourceRole": "$source_role_alias",
     "sourcePostgreSQLVersion": "$source_postgres_version",
     "pgDumpVersion": "$pg_dump_version",
     "restorePostgreSQLImage": "$postgres_image",

@@ -283,6 +283,7 @@ func TestInventoryPostgresFactTimeIdempotency(t *testing.T) {
 				row, err := operationalUC.CreateFinanceFactDraft(ctx, &biz.FinanceFactCreate{
 					FactNo: key, FactType: biz.FinanceFactReconciliation,
 					CounterpartyType: biz.FinanceCounterpartyCustomer,
+					Currency:         biz.FinanceCurrencyCNY,
 					Amount:           decimal.NewFromInt(1), IdempotencyKey: key, OccurredAt: at,
 				})
 				if err != nil {

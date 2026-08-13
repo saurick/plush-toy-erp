@@ -207,7 +207,8 @@ echo "[qa:fast] 运行 server 快速检查"
 (
   cd "$ROOT_DIR/server"
   node "$ROOT_DIR/scripts/qa/run-test-gate.mjs" \
-    --kind go --label server-quick -- \
+    --kind go --label server-quick \
+    --exclude-skip-pattern "${CRITICAL_POSTGRES_TEST_PATTERN}|^TestTemplatePDFChromiumSecurityIntegration$" -- \
     go test -count=1 -json \
     -skip "${CRITICAL_POSTGRES_TEST_PATTERN}|^TestTemplatePDFChromiumSecurityIntegration$" \
     ./internal/... ./pkg/...

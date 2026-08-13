@@ -372,6 +372,7 @@ func TestProductionWIPAggregateReadRejectsConcessionDrift(t *testing.T) {
 	createProductionWIPRouteProcesses(t, ctx, f.client)
 	aggregate := releaseProductionWIPRoute(t, ctx, f, "MO-WIP-CONCESSION-READ", 10, false)
 	root := aggregate.Batches[0]
+	inspectedAt := time.Date(2026, time.August, 13, 8, 0, 0, 0, time.UTC).Truncate(time.Microsecond)
 	f.client.ProductionWIPBatch.UpdateOneID(root.ID).SetStatus(biz.ProductionWIPStatusWaitingQuality).AddVersion(1).SaveX(ctx)
 	f.client.QualityInspection.Create().
 		SetInspectionNo("WIP-CONCESSION-DRIFT").
@@ -384,6 +385,7 @@ func TestProductionWIPAggregateReadRejectsConcessionDrift(t *testing.T) {
 		SetSubjectID(root.ID).
 		SetStatus(biz.QualityInspectionStatusPassed).
 		SetResult(biz.QualityInspectionResultConcession).
+		SetInspectedAt(inspectedAt).
 		SaveX(ctx)
 	if _, err := f.uc.GetProductionWIP(ctx, aggregate.ProductionOrderID); !errors.Is(err, biz.ErrProductionWIPInvalidTransition) {
 		t.Fatalf("aggregate concession drift error = %v", err)

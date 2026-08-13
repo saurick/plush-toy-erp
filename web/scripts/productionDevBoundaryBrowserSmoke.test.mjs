@@ -11,6 +11,14 @@ test('production DEV boundary browser smoke uses built static app and a bounded 
   assert.match(source, /serveStaticApp\.mjs/u)
   assert.match(source, /validateDevAuxPort/u)
   assert.match(source, /STATIC_ROOT:\s*options\.buildDir/u)
+  assert.match(
+    source,
+    /waitUntilReady\(`\$\{baseURL\}\/healthz`,\s*child\)/u
+  )
+  assert.doesNotMatch(
+    source,
+    /waitUntilReady\(`\$\{baseURL\}\/readyz`,\s*child\)/u
+  )
   assert.match(source, /page\.goto\(`\$\{baseURL\}\/__dev`/u)
   assert.match(source, /result\.pathname,\s*'\/admin-login'/u)
   assert.match(source, /favicon-dev\.svg/u)

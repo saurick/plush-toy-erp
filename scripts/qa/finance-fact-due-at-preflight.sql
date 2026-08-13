@@ -129,6 +129,24 @@ BEGIN
        OR (payment_term = 'NET_DAYS' AND payment_term_days >= 0)
        OR (payment_term = 'EOM_DAYS' AND payment_term_days > 0)
        OR (payment_term IS NULL AND payment_term_days >= 0)
+       OR (
+         fact_type = 'PAYABLE'
+         AND payment_term IS NULL
+         AND payment_term_days IS NULL
+         AND source_type = 'OUTSOURCING_FACT'
+         AND counterparty_type = 'SUPPLIER'
+         AND EXISTS (
+           SELECT 1
+             FROM outsourcing_facts AS source_fact
+             JOIN outsourcing_orders AS source_order
+               ON source_order.id = source_fact.source_id
+            WHERE source_fact.id = finance_facts.source_id
+              AND source_fact.source_type = 'OUTSOURCING_ORDER'
+              AND source_fact.supplier_id = source_order.supplier_id
+              AND finance_facts.counterparty_id = source_order.supplier_id
+              AND source_order.supplier_snapshot ->> 'simulated_only' = 'true'
+         )
+       )
      ), false);
   IF incompatible_count > 0 THEN
     RAISE EXCEPTION 'finance_facts contains % receivable/payable rows whose payment term and day snapshot cannot be canonicalized exactly; reconcile them before applying the staged migration', incompatible_count;

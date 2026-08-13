@@ -381,7 +381,7 @@ export const businessModuleDefinitions = Object.freeze([
     primaryEntity: 'production_facts',
     factSource: 'production_facts, inventory_txns',
     boundary:
-      '任务标记为完成不会自动生成生产发料、完工报告、成品入库或返工记录；完工报告草稿不变更库存，仓库确认入库后才写入库存。',
+      '任务标记为完成不会自动生成生产发料、完工报告、成品入库或返工记录；完工报告草稿不变更库存，仓库确认入库后才更新成品库存结存。',
     sourceRefs: [
       'production_orders',
       'production_order_items',

@@ -56,8 +56,8 @@ export function multiplyNumeric20Scale6Values(left, right, fractionDigits = 2) {
     Math.min(SCALE_DIGITS * 2, Math.trunc(Number(fractionDigits) || 0))
   )
   const productUnits = BigInt(leftUnits) * BigInt(rightUnits)
-  const divisor = 10n ** BigInt(SCALE_DIGITS * 2 - safeFractionDigits)
-  const roundedUnits = (productUnits + divisor / 2n) / divisor
+  const divisor = BigInt(10) ** BigInt(SCALE_DIGITS * 2 - safeFractionDigits)
+  const roundedUnits = (productUnits + divisor / BigInt(2)) / divisor
   return fixedScaleTextFromUnits(roundedUnits.toString(), safeFractionDigits)
 }
 

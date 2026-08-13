@@ -628,10 +628,11 @@ func TestJsonrpcDispatcher_SaveCustomerWithContactsUsesAggregateUsecase(t *testi
 
 func TestJsonrpcDispatcher_SaveSupplierWithContactsRetainsAddressAndProcessCapabilities(t *testing.T) {
 	params := mustJSONRPCStruct(t, map[string]any{
-		"code":        "S-AGG",
-		"name":        "聚合加工厂",
-		"address":     "测试工业园 1 号",
-		"process_ids": []any{float64(3), float64(3)},
+		"code":                      "S-AGG",
+		"name":                      "聚合加工厂",
+		"address":                   "测试工业园 1 号",
+		"default_payment_term_days": float64(0),
+		"process_ids":               []any{float64(3), float64(3)},
 		"contacts": []any{
 			map[string]any{
 				"name":       "主联系人",
@@ -659,6 +660,9 @@ func TestJsonrpcDispatcher_SaveSupplierWithContactsRetainsAddressAndProcessCapab
 	}
 	if repo.savedSupplier == nil || repo.savedSupplier.Address == nil || *repo.savedSupplier.Address != "测试工业园 1 号" || len(repo.savedSupplier.ProcessIDs) != 1 || repo.savedSupplier.ProcessIDs[0] != 3 {
 		t.Fatalf("expected normalized supplier address and process capability forwarded, got %#v", repo.savedSupplier)
+	}
+	if repo.savedSupplier.DefaultPaymentTermDays != 0 {
+		t.Fatalf("expected supplier payment term forwarded, got %#v", repo.savedSupplier)
 	}
 	supplierData := res.Data.AsMap()["supplier"].(map[string]any)
 	if supplierData["address"] != "测试工业园 1 号" {

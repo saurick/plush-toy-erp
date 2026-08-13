@@ -3611,11 +3611,13 @@ func createFinishedGoodsDeliveryReceivableLeadActiveFixture(t *testing.T, runtim
 
 func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryReceivableLeadCreatesDraft(t *testing.T) {
 	customerID := 501
+	shippedAt := time.Now().UTC()
 	operationalFactRepo := &customerConfigShipmentOperationalFactRepo{
 		shipment: &biz.Shipment{
 			ID:         9001,
 			CustomerID: &customerID,
 			Status:     biz.ShipmentStatusShipped,
+			ShippedAt:  &shippedAt,
 		},
 	}
 	dispatcher, runtimeRepo := newCustomerConfigTestDispatcherWithOperationalFactAndRuntimeRepo(
@@ -3658,7 +3660,13 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryReceivableLeadCreatesD
 		operationalFactRepo.createdFinanceFact.SourceType == nil ||
 		*operationalFactRepo.createdFinanceFact.SourceType != biz.ShipmentSourceType ||
 		operationalFactRepo.createdFinanceFact.SourceID == nil ||
-		*operationalFactRepo.createdFinanceFact.SourceID != 9001 {
+		*operationalFactRepo.createdFinanceFact.SourceID != 9001 ||
+		operationalFactRepo.createdFinanceFact.PaymentTerm == nil ||
+		*operationalFactRepo.createdFinanceFact.PaymentTerm != biz.FinancePaymentTermEOMDays ||
+		operationalFactRepo.createdFinanceFact.PaymentTermDays == nil ||
+		*operationalFactRepo.createdFinanceFact.PaymentTermDays != 30 ||
+		operationalFactRepo.createdFinanceFact.DueAt == nil ||
+		!operationalFactRepo.createdFinanceFact.DueAt.After(shippedAt) {
 		t.Fatalf("unexpected receivable finance fact create input %#v", operationalFactRepo.createdFinanceFact)
 	}
 	if operationalFactRepo.postedFinanceFactID != 0 || operationalFactRepo.settledFinanceFactID != 0 || operationalFactRepo.cancelledFinanceFactID != 0 {

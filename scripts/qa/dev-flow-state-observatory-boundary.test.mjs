@@ -188,8 +188,9 @@ test("dev flow state observatory: long definition selects are grouped without ch
   );
   assert.match(page, /buildFactDefinitionSelectOptions\(scopedCatalog\)/u);
   assert.match(page, /buildStateDefinitionSelectOptions\(scopedCatalog\)/u);
+  assert.match(page, /buildProcessDefinitionSelectOptions\(scopedCatalog\)/u);
   assert.match(page, /optionRender=\{renderDefinitionSelectOption\}/u);
-  assert.match(page, /options=\{definitions\.map/u);
+  assert.match(page, /options=\{definitionOptions\}/u);
   assert.match(styles, /erp-dev-flow-definition-select-popup/u);
   assert.match(styles, /erp-dev-flow-definition-option__key/u);
 });

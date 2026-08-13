@@ -521,6 +521,7 @@ func TestPurchaseReturnPostgresOriginFKDeleteRules(t *testing.T) {
 		SetSupplierName("PG退货供应商").
 		SetStatus(biz.PurchaseReceiptStatusPosted).
 		SetReceivedAt(time.Date(2026, 4, 26, 16, 0, 0, 0, time.UTC)).
+		SetPostedAt(time.Date(2026, 4, 26, 16, 0, 0, 0, time.UTC)).
 		Save(ctx)
 	if err != nil {
 		t.Fatalf("create header-only receipt for return FK test failed: %v", err)

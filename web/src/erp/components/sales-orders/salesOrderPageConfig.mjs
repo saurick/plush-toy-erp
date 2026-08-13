@@ -48,7 +48,7 @@ export const SALES_ORDER_LIFECYCLE_ACTIONS = [
     closeMode: 'normal',
     confirmTitle: '确认正常关闭销售订单',
     confirmContent:
-      '只有所有订单行都已足量出货，且没有待处理的出货草稿、库存预留或生产单时才能正常关闭。',
+      '正常关闭只结清销售订单本身；所有订单行须已足量出货，且不能有待处理的出货草稿、库存预留或生产单。不会自动改变已经生成的出货、库存、财务记录或相关任务。',
     okText: '确认正常关闭',
     run: closeSalesOrder,
   },
@@ -64,7 +64,7 @@ export const SALES_ORDER_LIFECYCLE_ACTIONS = [
     requiresReason: true,
     confirmTitle: '确认提前关闭销售订单',
     confirmContent:
-      '提前关闭会结清尚未履行的订单行；已有待处理的出货草稿、库存预留或生产单时仍会被阻止。',
+      '提前关闭会结清尚未履行的销售订单行；已有待处理的出货草稿、库存预留或生产单时仍会被阻止。不会自动取消或撤销已经生成的出货、库存、财务记录或相关任务。',
     reasonPlaceholder: '请填写未履完即关闭的业务原因',
     okText: '确认提前关闭',
     run: closeSalesOrder,
@@ -81,7 +81,7 @@ export const SALES_ORDER_LIFECYCLE_ACTIONS = [
     danger: true,
     confirmTitle: '确认取消销售订单',
     confirmContent:
-      '系统会同步结清可安全终止的审批流程；已有未取消的出货、有效库存预留或生产单时会阻止取消。',
+      '取消只终止销售订单本身；系统会同步结清可安全终止的审批流程，已有未取消的出货、有效库存预留或生产单时会阻止取消。不会自动取消或撤销已经生成的出货、库存、财务记录或相关任务。',
     reasonPlaceholder: '请填写取消销售订单的业务原因',
     okText: '确认取消',
     run: cancelSalesOrder,

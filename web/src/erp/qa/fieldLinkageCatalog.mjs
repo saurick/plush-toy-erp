@@ -218,6 +218,14 @@ export const FIELD_LINKAGE_FIELD_CATALOG = [
     requiredScenarioKeys: ['master_record_profile_wired'],
   },
   {
+    fieldKey: 'supplierPaymentTermDays',
+    fieldLabel: '供应商默认付款周期',
+    category: '供应商主数据维护字段',
+    risk: 'P0',
+    docLabels: ['默认付款周期'],
+    requiredScenarioKeys: ['master_record_profile_wired'],
+  },
+  {
     fieldKey: 'productMasterSelection',
     fieldLabel: '产品主档选择',
     category: '主档引用 / 业务快照',
@@ -597,6 +605,15 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
       'FL_supplier_processing_profile__wires_address_and_process_capabilities',
     title: '供应商资料表单和列表接入经营地址与可加工工序',
     fieldKeys: ['supplierProcessingProfile'],
+    scenarioKey: 'master_record_profile_wired',
+    layer: 'web',
+    testFile: 'web/src/erp/utils/masterDataOrderView.test.mjs',
+  },
+  {
+    caseId:
+      'FL_supplier_payment_term__wires_explicit_create_edit_list_and_export',
+    title: '供应商默认付款周期接入新建、编辑、列表和导出',
+    fieldKeys: ['supplierPaymentTermDays'],
     scenarioKey: 'master_record_profile_wired',
     layer: 'web',
     testFile: 'web/src/erp/utils/masterDataOrderView.test.mjs',
