@@ -325,6 +325,36 @@ function composeCommand(context, args, label, env = process.env) {
   });
 }
 
+export function reconcileRehearsalDatabaseRoles(context) {
+  composeCommand(
+    context,
+    [
+      "exec",
+      "-T",
+      "postgres",
+      "/usr/local/bin/plush-database-roles",
+      "reconcile",
+    ],
+    "reconcile isolated release database roles",
+  );
+  composeCommand(
+    context,
+    [
+      "exec",
+      "-T",
+      "postgres",
+      "/usr/local/bin/plush-database-roles",
+      "verify",
+    ],
+    "verify isolated release database roles",
+  );
+  return {
+    status: "passed",
+    reconcile: "passed",
+    verify: "passed",
+  };
+}
+
 async function waitFor(check, label, timeoutMs = READY_TIMEOUT_MS) {
   const deadline = Date.now() + timeoutMs;
   let lastError;
@@ -1663,6 +1693,7 @@ export async function runLocalReleaseRehearsal(options = {}, runtime = {}) {
     },
     artifactVerification: null,
     migration: null,
+    databaseRoles: null,
     adminBootstrap: null,
     approvalEligibilityBootstrap: null,
     runtime: {},
@@ -1741,6 +1772,7 @@ export async function runLocalReleaseRehearsal(options = {}, runtime = {}) {
     bindReleaseRehearsalDatabaseIdentity(context, environment);
     receipt.environment.databaseIdentityBound = true;
     await runMigration(context, receipt);
+    receipt.databaseRoles = reconcileRehearsalDatabaseRoles(context);
     receipt.adminBootstrap = await bootstrapRehearsalAdmin(context);
     receipt.approvalEligibilityBootstrap =
       bootstrapRehearsalApprovalEligibility(context);

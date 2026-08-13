@@ -11,6 +11,7 @@ import {
   buildRehearsalEnvironment,
   formatRehearsalEnv,
   parseLocalRehearsalArgs,
+  reconcileRehearsalDatabaseRoles,
   runRehearsalCommand,
   runtimeIdentityDigest,
   selectRehearsalWorkbenchArtifact,
@@ -218,6 +219,67 @@ test("local release rehearsal creates a server-compatible ephemeral admin passwo
     assert.notEqual(password, "adminadmin");
     assert.doesNotMatch(password, /\s/u);
   }
+});
+
+test("local release rehearsal reconciles and verifies isolated database roles after migration", () => {
+  const calls = [];
+  const context = {
+    composeDir: "/private/tmp/release/server/deploy/compose/prod",
+    composeFile: "/private/tmp/release/server/deploy/compose/prod/compose.yml",
+    envFile: "/private/tmp/release/release.env",
+    project: "plush-release-example",
+    runCommand(input) {
+      calls.push(input);
+      return "database_permissions=verified\n";
+    },
+  };
+
+  assert.deepEqual(reconcileRehearsalDatabaseRoles(context), {
+    status: "passed",
+    reconcile: "passed",
+    verify: "passed",
+  });
+  assert.deepEqual(
+    calls.map(({ command, args, label }) => ({ command, args, label })),
+    [
+      {
+        command: "docker",
+        args: [
+          "compose",
+          "--project-name",
+          context.project,
+          "--env-file",
+          context.envFile,
+          "-f",
+          context.composeFile,
+          "exec",
+          "-T",
+          "postgres",
+          "/usr/local/bin/plush-database-roles",
+          "reconcile",
+        ],
+        label: "reconcile isolated release database roles",
+      },
+      {
+        command: "docker",
+        args: [
+          "compose",
+          "--project-name",
+          context.project,
+          "--env-file",
+          context.envFile,
+          "-f",
+          context.composeFile,
+          "exec",
+          "-T",
+          "postgres",
+          "/usr/local/bin/plush-database-roles",
+          "verify",
+        ],
+        label: "verify isolated release database roles",
+      },
+    ],
+  );
 });
 
 test("local release rehearsal bootstraps admin only through a verified no-port one-shot container", async () => {
