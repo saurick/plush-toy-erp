@@ -1320,6 +1320,18 @@ test("dev entry boundary: make dev_restart 先预检再停服并且不自动执�
     makefile,
     /dev_restart:\s+export ERP_ALLOW_LOCAL_TEST_CUSTOMER_CONFIG := 1/u,
   );
+  assert.match(
+    makefile,
+    /DEV_PDF_ALLOW_LOCAL_NO_SANDBOX := \$\(if \$\(and \$\(filter linux,\$\(GOHOSTOS\)\),\$\(filter 0,\$\(shell id -u 2>\/dev\/null\)\)\),1,0\)/u,
+  );
+  assert.match(
+    makefile,
+    /run:\s+export ERP_PDF_ALLOW_LOCAL_NO_SANDBOX := \$\(DEV_PDF_ALLOW_LOCAL_NO_SANDBOX\)/u,
+  );
+  assert.match(
+    makefile,
+    /dev_restart:\s+export ERP_PDF_ALLOW_LOCAL_NO_SANDBOX := \$\(DEV_PDF_ALLOW_LOCAL_NO_SANDBOX\)/u,
+  );
 });
 
 test("dev entry boundary: Product Core 与客户开发入口共用同一 web preflight", () => {
@@ -1338,6 +1350,8 @@ test("dev entry boundary: Product Core 与客户开发入口共用同一 web pre
     "web/scripts/startWebDev.mjs",
     "web/scripts/startYoyoosunDev.mjs",
   ]) {
-    assert.match(read(script), /runWebRuntimePreflight/u, script);
+    const source = read(script);
+    assert.match(source, /runWebRuntimePreflight/u, script);
+    assert.match(source, /resolveDevBrowserLaunchEnv/u, script);
   }
 });

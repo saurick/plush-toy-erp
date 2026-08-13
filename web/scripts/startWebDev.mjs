@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url'
 
 import { loadDevPorts } from '../../scripts/dev-ports.mjs'
 import { runWebRuntimePreflight } from '../../scripts/local-runtime-preflight.mjs'
+import { resolveDevBrowserLaunchEnv } from './openDevBrowser.js'
 
 const repoRoot = path.resolve(import.meta.dirname, '..', '..')
 const devPorts = loadDevPorts(repoRoot)
@@ -32,7 +33,11 @@ function runVite(viteArgs, apiOrigin) {
     'pnpm',
     ['exec', 'vite', '--config', 'vite.config.mjs', ...viteArgs],
     {
-      env: { ...process.env, API_ORIGIN: apiOrigin },
+      env: {
+        ...process.env,
+        ...resolveDevBrowserLaunchEnv(process.env),
+        API_ORIGIN: apiOrigin,
+      },
       stdio: 'inherit',
     }
   )

@@ -41,6 +41,7 @@ const (
 	maxTemplatePDFOutputBytes           = 32 << 20 // 32 MiB
 	defaultTemplatePDFRenderConcurrency = 4
 	defaultTemplatePDFQueueCapacity     = 2
+	templatePDFLocalNoSandboxEnv        = "ERP_PDF_ALLOW_LOCAL_NO_SANDBOX"
 	templatePDFRenderTimeout            = 30 * time.Second
 	templatePDFQueueWaitTimeout         = 15 * time.Second
 	templatePDFWarmupTimeout            = 15 * time.Second
@@ -997,7 +998,15 @@ func launchTemplatePDFChrome(ctx context.Context, chromeExecPath string) (*templ
 		return nil, "", fmt.Errorf("创建 Chrome 临时目录失败: %w", err)
 	}
 
-	args := templatePDFChromeArgs(userDataDir, debugPort)
+	args := templatePDFChromeArgs(
+		userDataDir,
+		debugPort,
+		allowTemplatePDFLocalNoSandbox(
+			os.Getenv(templatePDFLocalNoSandboxEnv),
+			os.Geteuid(),
+			runtime.GOOS,
+		),
+	)
 
 	cmd := exec.Command(chromeExecPath, args...)
 	cmd.Stdout = io.Discard
@@ -1027,8 +1036,8 @@ func launchTemplatePDFChrome(ctx context.Context, chromeExecPath string) (*templ
 	return runtime, wsURL, nil
 }
 
-func templatePDFChromeArgs(userDataDir string, debugPort int) []string {
-	return []string{
+func templatePDFChromeArgs(userDataDir string, debugPort int, allowLocalNoSandbox bool) []string {
+	args := []string{
 		"--headless",
 		"--disable-gpu",
 		"--hide-scrollbars",
@@ -1040,11 +1049,20 @@ func templatePDFChromeArgs(userDataDir string, debugPort int) []string {
 		"--disable-sync",
 		"--metrics-recording-only",
 		"--no-first-run",
+	}
+	if allowLocalNoSandbox {
+		args = append(args, "--no-sandbox")
+	}
+	return append(args,
 		"--remote-debugging-address=127.0.0.1",
 		fmt.Sprintf("--remote-debugging-port=%d", debugPort),
 		fmt.Sprintf("--user-data-dir=%s", userDataDir),
 		"about:blank",
-	}
+	)
+}
+
+func allowTemplatePDFLocalNoSandbox(raw string, effectiveUID int, goos string) bool {
+	return strings.TrimSpace(raw) == "1" && effectiveUID == 0 && strings.EqualFold(strings.TrimSpace(goos), "linux")
 }
 
 func (r *templatePDFChromeRuntime) Close() {

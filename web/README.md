@@ -53,6 +53,8 @@ pnpm start
 
 本地开发端口由仓库根目录 `config/dev-ports.env` 统一提供，Vite 主入口固定 `5175` 并启用 `strictPort`；被占用时应处理占用者或调整完整本机端口组，不能让主入口静默顺延。临时使用辅助端口时必须把 `ERP_VITE_PORT` 与 `ERP_VITE_HMR_CLIENT_PORT` 设为同一个值；只覆盖 Vite CLI 的 `--port` 会在启动期被拒绝，避免 HMR 连接旧端口后形成自动重载循环。`API_ORIGIN` 仍可显式覆盖，否则代理从同一清单的 HTTP `8300` 推导。
 
+Windows / WSL 下的 `pnpm start`、`pnpm start:frontend-only` 和 `pnpm start:yoyoosun` 通过同一受管浏览器入口打开页面。它只在 Chrome、Edge 或 Brave 中检查标题属于本项目的候选标签，并在地址栏精确匹配 `127.0.0.1` / `localhost` 与实际端口后激活、刷新该标签；窗口保持原有最大化或普通状态，只有已最小化时才恢复。未命中或 Windows UI Automation 不可用时回退到系统默认的新标签页。它不会输出浏览地址、关闭历史重复标签或读取其他标题标签的地址栏；显式 `BROWSER=none` 或自定义 `BROWSER` 始终优先。macOS 与原生 Linux 保留 Vite 的平台默认打开行为。
+
 `pnpm start` 默认先执行共享本地 runtime preflight：本机 `API_ORIGIN` 会先检查工作区 schema / versioned migration、开发库 Atlas status，再要求后端 `/healthz` 与 `/readyz` 同时通过；预检和 Vite 的 `/rpc`、`/templates` 代理共用同一 `API_ORIGIN`。预检只读，不会 apply migration。仅做不登录、不调 RPC 的前端布局调试时，可显式使用 `pnpm start:frontend-only`；该模式会标记为降级、非绿色证据，不能用来验证登录或业务页。如果 `API_ORIGIN` 指向外部环境，本地不会读取其数据库，但仍要求该环境 health / ready 通过，migration 由目标环境发布证据负责。
 
 桌面构建提供单端口岗位任务端主路径：
