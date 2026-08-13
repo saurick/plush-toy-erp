@@ -237,7 +237,12 @@ printf '%s end %s\n' "\${RUN_LABEL:-run}" "$phase" >> "$EVENT_LOG"
   writeExecutable(
     psqlBin,
     `#!/bin/sh
-printf '%s\n' 'psql-invocation' >> "$PSQL_LOG"
+if [ -n "\${PGPASSWORD:-}" ]; then
+  password_present=1
+else
+  password_present=0
+fi
+printf '%s\n' "host=\${PGHOST:-}|port=\${PGPORT:-}|database=\${PGDATABASE:-}|user=\${PGUSER:-}|password_present=$password_present|sslmode=\${PGSSLMODE:-}" >> "$PSQL_LOG"
 case "$*" in
   *"FROM pg_roles AS role"*)
     printf '%s|erp_migrator|127.0.0.1|5435|180001|f|f|f|f\n' "\${FAKE_POSTGRES_DB:-plush_erp}"
@@ -554,6 +559,10 @@ test("migrate_online V5 使用精确 env、project 与双 compose 文件并读�
       "validate",
       "status",
       "schema-readback",
+    ]);
+    assert.deepEqual(readLines(fixture.psqlLog), [
+      "host=127.0.0.1|port=55435|database=plush_erp_uat_20260716_v5|user=erp_migrator|password_present=1|sslmode=disable",
+      "host=127.0.0.1|port=55435|database=plush_erp_uat_20260716_v5|user=erp_migrator|password_present=1|sslmode=disable",
     ]);
     assert.match(result.stdout, /compose project: plush-toy-erp-v5/u);
     assert.doesNotMatch(result.stdout, /test-postgres-password/u);

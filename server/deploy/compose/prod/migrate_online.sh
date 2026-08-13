@@ -696,6 +696,21 @@ if [ -z "${DB_URL:-}" ]; then
   DB_URL="postgres://${DB_USER_ENC}:${DB_PASS_ENC}@${POSTGRES_HOST}:${POSTGRES_HOST_PORT}/${DB_NAME}?sslmode=disable"
 fi
 
+psql_target() {
+  if [ "$DB_URL_PROVIDED" -eq 1 ]; then
+    PGDATABASE="$DB_URL" "$PSQL_BIN" "$@"
+    return
+  fi
+
+  PGHOST="$POSTGRES_HOST" \
+    PGPORT="$POSTGRES_HOST_PORT" \
+    PGDATABASE="$DB_NAME" \
+    PGUSER="$DB_USER" \
+    PGPASSWORD="$DB_PASS_RAW" \
+    PGSSLMODE=disable \
+    "$PSQL_BIN" "$@"
+}
+
 if find "$MIG_DIR" -maxdepth 1 -type l -print -quit | grep -q .; then
   fail "migration 目录不得包含符号链接"
 fi
@@ -744,7 +759,7 @@ atlas_schema_inspect() {
 
 EXPECTED_DB_NAME=$(docker exec "$POSTGRES_CID" sh -lc 'printf "%s" "$POSTGRES_DB"')
 IDENTITY_ROW=$(
-  PGDATABASE="$DB_URL" "$PSQL_BIN" -X --no-psqlrc -A -t -F '|' \
+  psql_target -X --no-psqlrc -A -t -F '|' \
     --set ON_ERROR_STOP=1 -c "
 SELECT
   current_database(),
@@ -904,7 +919,7 @@ SQL
   } >"$rehearsal_sql"
 
   rehearsal_output=$MIGRATION_RUN_DIR/rollback-rehearsal.out
-  PGDATABASE="$DB_URL" "$PSQL_BIN" -X --no-psqlrc --set ON_ERROR_STOP=1 \
+  psql_target -X --no-psqlrc --set ON_ERROR_STOP=1 \
     --file "$rehearsal_sql" >"$rehearsal_output"
   grep -Eq '^ROLLBACK$' "$rehearsal_output" ||
     fail "migration 事务预演没有取得 ROLLBACK 回执"
@@ -915,7 +930,7 @@ SQL
 
 verify_programmability() {
   result=$(
-    PGDATABASE="$DB_URL" "$PSQL_BIN" -X --no-psqlrc -A -t \
+    psql_target -X --no-psqlrc -A -t \
       --set ON_ERROR_STOP=1 -c "
 SELECT
   count(*) FILTER (WHERE object_kind = 'function')::text
