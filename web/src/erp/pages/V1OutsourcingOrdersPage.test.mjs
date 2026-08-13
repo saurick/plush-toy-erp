@@ -34,6 +34,19 @@ test('outsourcing page has no retired sales-order foreign-key field', () => {
   assert.doesNotMatch(orderViewSource, /source_sales_order_id/u)
 })
 
+test('outsourcing contract keeps editable party B snapshot and checks it before lifecycle or print', () => {
+  assert.match(source, /supplier_types: \['outsourcing', 'mixed'\]/u)
+  assert.match(source, /buildOutsourcingSupplierSnapshot/u)
+  assert.match(source, /loadSupplierContacts/u)
+  assert.match(formSource, /合同乙方信息/u)
+  assert.match(formSource, /乙方联系人/u)
+  assert.match(formSource, /乙方签约人/u)
+  assert.match(source, /inspectOutsourcingContractReadiness/u)
+  assert.match(source, /buildOutsourcingContractConfirmationSummary/u)
+  assert.match(source, /loadBusinessAttachmentPrintAppendixSnapshots/u)
+  assert.doesNotMatch(source, /mergeSnapshotMissingFields/u)
+})
+
 test('outsourcing order source actions use exact capabilities and dedicated commands', () => {
   for (const permission of [
     'outsourcing.fact.read',
@@ -210,6 +223,11 @@ test('outsourcing record lifecycle uses exact permissions, canonical commands, a
   assert.match(source, /canCancelFact=\{canCancelOutsourcingFact\}/u)
   assert.match(source, /onPostFact=\{postSelectedOutsourcingFact\}/u)
   assert.match(source, /onCancelFact=\{cancelSelectedOutsourcingFact\}/u)
+  assert.match(
+    source,
+    /onOk: \(_close\) => \{\s+const reason = cancelReason\.trim\(\)/u
+  )
+  assert.doesNotMatch(source, /return Promise\.reject\(\)/u)
 })
 
 test('posted outsourcing returns expose source-bound quality inspection', () => {

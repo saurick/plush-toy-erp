@@ -48,9 +48,13 @@ import {
   getWorkflowTaskStatusMeta,
 } from '@/erp/utils/workflowTaskBoard.mjs'
 import { getPermissionCenterRoleName } from '../../erp/utils/permissionCenterAccess.mjs'
+import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
+import { buildDevBusinessChainProjection } from '../config/devBusinessChainProjection.mjs'
 import { buildDevBusinessChainCustomerReview } from '../config/devBusinessChainCustomerReview.mjs'
+import { DEV_CUSTOMER_QUERY_KEY } from '../config/devCustomerScope.mjs'
+import useDevCustomerScope from '../hooks/useDevCustomerScope.mjs'
 import DevBusinessChainCustomerReviewPrint from './DevBusinessChainCustomerReviewPrint.jsx'
 import {
   DEV_FLOW_STATE_TASK_RUNTIME_ASSOCIATION,
@@ -68,6 +72,7 @@ import {
 import {
   buildBusinessChainSelectOptions,
   buildFactDefinitionSelectOptions,
+  buildProcessDefinitionSelectOptions,
   buildStateDefinitionSelectOptions,
 } from './devFlowDefinitionSelectOptions.mjs'
 import {
@@ -96,7 +101,10 @@ const SOURCE_PATH = 'docs/architecture/业务链与运行轨迹边界.md'
 const CATALOG_MODULE_PATH = '../config/devFlowStateCatalog.mjs'
 const CATALOG_MODULES = import.meta.glob('../config/devFlowStateCatalog.mjs')
 
-const KNOWN_QUERY_KEYS = new Set(Object.values(QUERY_KEYS))
+const KNOWN_QUERY_KEYS = new Set([
+  ...Object.values(QUERY_KEYS),
+  DEV_CUSTOMER_QUERY_KEY,
+])
 const VIEW_ITEMS = Object.freeze([
   {
     value: 'chain',
@@ -341,6 +349,10 @@ function asArray(value) {
   return Array.isArray(value) ? value : []
 }
 
+function uniqueStrings(values) {
+  return [...new Set(asArray(values).filter(Boolean))]
+}
+
 function uniqueKeys(items, keyOf) {
   const keys = items.map(keyOf)
   return keys.length === new Set(keys).size && keys.every(Boolean)
@@ -408,8 +420,19 @@ function validateCatalog(moduleValue) {
         chain.readOnly !== true ||
         chain.allowsActionExecution !== false ||
         chain.runtimeAuthority !== 'design_projection_only' ||
+        asArray(chain.steps).length !== asArray(chain.edges).length ||
+        asArray(chain.acceptanceScenarios).length !== 6 ||
         !asArray(chain.nodes).every((node) => node.readOnly === true) ||
-        !asArray(chain.edges).every((edge) => edge.readOnly === true)
+        !asArray(chain.edges).every((edge) => edge.readOnly === true) ||
+        !asArray(chain.steps).every(
+          (step) =>
+            step.readOnly === true && step.allowsActionExecution === false
+        ) ||
+        !asArray(chain.acceptanceScenarios).every(
+          (scenario) =>
+            scenario.readOnly === true &&
+            scenario.allowsActionExecution === false
+        )
     ) ||
     factDefinitions.some(
       (definition) =>
@@ -706,6 +729,44 @@ function GuidanceDisclosure({ guidanceKey, title, summary, description }) {
         <p>{description}</p>
       </div>
     </details>
+  )
+}
+
+function BusinessChainProjectionContext({
+  projection,
+  onBackToChain,
+  onClearChainContext,
+}) {
+  if (!projection) return null
+  const nodeLabel = projection.node ? ` · ${projection.node.label}` : ''
+  return (
+    <section
+      className="erp-dev-flow-chain-projection-context"
+      data-chain-projection-context={projection.chain.key}
+    >
+      <div>
+        <Text className="erp-dev-flow-eyebrow">当前按业务链分类查看</Text>
+        <strong>
+          {projection.chain.label}
+          {nodeLabel}
+        </strong>
+        <span>
+          {projection.steps.length} 个相关步骤 · {projection.scenarios.length}{' '}
+          个已登记场景
+        </span>
+      </div>
+      <Space wrap>
+        {projection.responsibility.ownerPoolKeys.slice(0, 4).map((key) => (
+          <Tag key={key}>{getProcessOwnerPoolLabel(key)}</Tag>
+        ))}
+        <Button size="small" onClick={onBackToChain}>
+          回到链路步骤
+        </Button>
+        <Button size="small" onClick={onClearChainContext}>
+          查看全部定义
+        </Button>
+      </Space>
+    </section>
   )
 }
 
@@ -1363,6 +1424,7 @@ function BusinessChainOverviewView({
   onSelectChain,
   onOpenView,
   onPrintCustomerReview,
+  customerReviewReady,
 }) {
   const overview = catalog.businessChainOverview
   const chainByKey = useMemo(
@@ -1424,6 +1486,12 @@ function BusinessChainOverviewView({
           <Button
             type="primary"
             icon={<PrinterOutlined />}
+            disabled={!customerReviewReady}
+            title={
+              customerReviewReady
+                ? '导出所选甲方的配置预览校对稿'
+                : '先选择已登记且具备配置预览的甲方'
+            }
             onClick={onPrintCustomerReview}
           >
             导出甲方校对版
@@ -1629,6 +1697,7 @@ function BusinessChainView({
   onSelectNode,
   onOpenView,
   onPrintCustomerReview,
+  customerReviewReady,
 }) {
   const { runtime, runtimeProcessKey, matchingChain } = useBusinessChainRuntime(
     catalog,
@@ -1660,16 +1729,78 @@ function BusinessChainView({
       ),
     [catalog.processDefinitions]
   )
+  const nodeProjection = useMemo(
+    () =>
+      buildDevBusinessChainProjection({
+        catalog,
+        chainKey: chain.key,
+        nodeKey: node.key,
+      }),
+    [catalog, chain.key, node.key]
+  )
+  const factByKey = useMemo(
+    () =>
+      new Map(
+        catalog.factDefinitions.map((definition) => [
+          definition.factKey,
+          definition,
+        ])
+      ),
+    [catalog.factDefinitions]
+  )
   const layer = CHAIN_LAYER_PRESENTATION[node.layer]
   const nodePurpose =
+    outgoingRelations.map((edge) => edge.label).join('；') ||
     node.summary ||
-    '这个步骤负责连接当前业务对象与下一环节，详细规则以对应业务对象为准。'
+    '这个步骤负责承接当前业务结果，详细规则以对应业务对象为准。'
   const nextStepLabels = outgoingRelations
     .map((edge) => chain.nodes.find((item) => item.key === edge.to)?.label)
     .filter(Boolean)
-  const completionCopy = nextStepLabels.length
-    ? `${layer.completion} 接下来会衔接：${nextStepLabels.join('、')}。`
+  const resultStateLabels = uniqueStrings(
+    nodeProjection.steps.flatMap((step) =>
+      step.resultStateRefs.map((ref) => {
+        const flow = flowByKey.get(ref.machineKey)
+        const stateDefinition = flow?.states.find(
+          (candidate) => candidate.key === ref.stateKey
+        )
+        return stateDefinition
+          ? `${flow.label}进入“${stateDefinition.label}”`
+          : ''
+      })
+    )
+  )
+  const resultFactLabels = uniqueStrings(
+    nodeProjection.factKeys.map((key) => factByKey.get(key)?.label || '')
+  )
+  const completionParts = [
+    ...resultStateLabels,
+    ...(resultFactLabels.length > 0
+      ? [`关联 ${resultFactLabels.join('、')}`]
+      : []),
+    ...(nextStepLabels.length > 0
+      ? [`接下来衔接 ${nextStepLabels.join('、')}`]
+      : []),
+  ]
+  const completionCopy = completionParts.length
+    ? `${completionParts.join('；')}。`
     : layer.completion
+  const ownerPoolLabels = uniqueStrings(
+    nodeProjection.responsibility.ownerPoolKeys.map((key) =>
+      getPermissionCenterRoleName(key)
+    )
+  )
+  const responsibilityCopy = ownerPoolLabels.length
+    ? `${ownerPoolLabels.join('、')}；系统动作仍由正式领域服务执行。`
+    : nodeProjection.responsibility.modes.includes('human')
+      ? '由当前客户配置中具备本步骤正式权限的岗位办理。'
+      : nodeProjection.responsibility.modes.includes('derived')
+        ? '由系统根据已生效事实自动计算，不设置人工办理岗位。'
+        : '由系统按正式业务合同自动处理。'
+  const exceptionCopy = uniqueStrings(
+    nodeProjection.scenarios
+      .filter((scenario) => scenario.kind !== 'happy_path')
+      .map((scenario) => scenario.label)
+  ).join('、')
 
   return (
     <div className="erp-dev-flow-view-stack">
@@ -1684,6 +1815,10 @@ function BusinessChainView({
           <Text className="erp-dev-flow-eyebrow">一次只看一条业务链</Text>
           <Title level={2}>{chain.label}</Title>
           <Paragraph>{chain.summary}</Paragraph>
+          <Text type="secondary">
+            {chain.steps.length} 个链路步骤 · {chain.acceptanceScenarios.length}{' '}
+            个已登记合法场景
+          </Text>
         </div>
         <div className="erp-dev-flow-chain-heading__actions">
           <BusinessChainSelector
@@ -1694,6 +1829,12 @@ function BusinessChainView({
           <Button
             type="primary"
             icon={<PrinterOutlined />}
+            disabled={!customerReviewReady}
+            title={
+              customerReviewReady
+                ? '导出所选甲方的配置预览校对稿'
+                : '先选择已登记且具备配置预览的甲方'
+            }
             onClick={onPrintCustomerReview}
           >
             导出甲方校对版
@@ -1865,7 +2006,7 @@ function BusinessChainView({
             </section>
             <section>
               <h3>谁来处理</h3>
-              <p>{layer.responsibility}</p>
+              <p>{responsibilityCopy}</p>
             </section>
             <section>
               <h3>怎样算完成</h3>
@@ -1873,7 +2014,11 @@ function BusinessChainView({
             </section>
             <section>
               <h3>异常时怎么办</h3>
-              <p>{layer.exception}</p>
+              <p>
+                {exceptionCopy
+                  ? `只执行已登记的${exceptionCopy}场景；未登记组合不生成数据。`
+                  : layer.exception}
+              </p>
             </section>
           </div>
           <div className="erp-dev-flow-node-actions">
@@ -1988,12 +2133,15 @@ function BusinessChainView({
 }
 
 function WorkflowView({
+  projection,
   taskId,
   draft,
   selectedTask,
   onDraftChange,
   onClearTask,
   onSelectTask,
+  onBackToChain,
+  onClearChainContext,
 }) {
   const events = useWorkflowEvents(taskId)
   const model = buildWorkflowTaskEventTrailModel({
@@ -2008,6 +2156,11 @@ function WorkflowView({
         title="Workflow 管“人”"
         summary="任务 done 不等于业务事实发生"
         description="它回答谁负责、谁审批、谁接棒，以及为什么阻塞或退回。任务 done 只表示协同任务结束，不证明库存、出货、质检或财务事实已经发生。"
+      />
+      <BusinessChainProjectionContext
+        projection={projection}
+        onBackToChain={onBackToChain}
+        onClearChainContext={onClearChainContext}
       />
       <TaskFinder
         draft={draft}
@@ -2307,6 +2460,7 @@ function RuntimeUnlinkedTaskBoundary({ task, taskId }) {
 
 function RuntimeView({
   catalog,
+  projection,
   definition,
   taskId,
   draft,
@@ -2315,11 +2469,24 @@ function RuntimeView({
   onDraftChange,
   onClearTask,
   onSelectTask,
+  onBackToChain,
+  onClearChainContext,
 }) {
+  const definitions = projection
+    ? projection.processDefinitions
+    : catalog.processDefinitions
+  const scopedCatalog = useMemo(
+    () => ({ ...catalog, processDefinitions: definitions }),
+    [catalog, definitions]
+  )
   const searchProps = useDefinitionSelectSearch()
   const optionFilter = useMemo(
-    () => createDevFlowDefinitionOptionFilter(catalog, 'runtime'),
-    [catalog]
+    () => createDevFlowDefinitionOptionFilter(scopedCatalog, 'runtime'),
+    [scopedCatalog]
+  )
+  const definitionOptions = useMemo(
+    () => buildProcessDefinitionSelectOptions(scopedCatalog),
+    [scopedCatalog]
   )
   const association = getDevFlowStateTaskRuntimeAssociation(selectedTask)
   const runtime = useRuntimeContext(taskId, association)
@@ -2332,34 +2499,40 @@ function RuntimeView({
         summary="completed 不等于事实落账"
         description="它区分流程定义、流程 variant 和具体运行实例，回答走到哪里、走过什么、为何等待、失败或重试。ProcessRuntime completed 不等于业务事实已落账。"
       />
+      <BusinessChainProjectionContext
+        projection={projection}
+        onBackToChain={onBackToChain}
+        onClearChainContext={onClearChainContext}
+      />
       <section className="erp-dev-flow-definition-selector">
         <label htmlFor="dev-flow-process-select">选择流程定义</label>
-        <Select
-          id="dev-flow-process-select"
-          aria-label="选择流程定义"
-          showSearch
-          virtual={false}
-          {...searchProps}
-          filterOption={optionFilter}
-          notFoundContent="没有匹配的流程定义"
-          value={definition.key}
-          options={catalog.processDefinitions.map((item) => ({
-            value: item.key,
-            label: item.label,
-          }))}
-          onChange={onSelectDefinition}
-        />
+        {definition ? (
+          <Select
+            id="dev-flow-process-select"
+            aria-label="选择流程定义"
+            showSearch
+            virtual={false}
+            {...searchProps}
+            filterOption={optionFilter}
+            notFoundContent="没有匹配的流程定义"
+            value={definition.key}
+            options={definitionOptions}
+            optionRender={renderDefinitionSelectOption}
+            onChange={onSelectDefinition}
+          />
+        ) : (
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description="当前业务链步骤没有登记 ProcessRuntime；请到状态或 Fact 视图继续核对。"
+          />
+        )}
         <Text type="secondary">
-          当前登记{' '}
-          {
-            new Set(catalog.processDefinitions.map((item) => item.processKey))
-              .size
-          }{' '}
-          个流程 key、{catalog.processDefinitions.length} 个
-          variant；客户预览只代表设计选择。
+          当前范围登记{' '}
+          {new Set(definitions.map((item) => item.processKey)).size} 个流程
+          key、{definitions.length} 个 variant；客户预览只代表设计选择。
         </Text>
       </section>
-      <ProcessDefinitionCard definition={definition} />
+      {definition ? <ProcessDefinitionCard definition={definition} /> : null}
       <section className="erp-dev-flow-runtime-query">
         <div className="erp-dev-flow-section-heading">
           <div>
@@ -2506,15 +2679,30 @@ function RuntimeView({
   )
 }
 
-function FactsView({ catalog, fact, onSelectFact, onOpenState }) {
+function FactsView({
+  catalog,
+  projection,
+  fact,
+  onSelectFact,
+  onOpenState,
+  onBackToChain,
+  onClearChainContext,
+}) {
+  const definitions = projection
+    ? projection.factDefinitions
+    : catalog.factDefinitions
+  const scopedCatalog = useMemo(
+    () => ({ ...catalog, factDefinitions: definitions }),
+    [catalog, definitions]
+  )
   const searchProps = useDefinitionSelectSearch()
   const options = useMemo(
-    () => buildFactDefinitionSelectOptions(catalog),
-    [catalog]
+    () => buildFactDefinitionSelectOptions(scopedCatalog),
+    [scopedCatalog]
   )
   const optionFilter = useMemo(
-    () => createDevFlowDefinitionOptionFilter(catalog, 'facts'),
-    [catalog]
+    () => createDevFlowDefinitionOptionFilter(scopedCatalog, 'facts'),
+    [scopedCatalog]
   )
   return (
     <div className="erp-dev-flow-view-stack">
@@ -2523,6 +2711,11 @@ function FactsView({ catalog, fact, onSelectFact, onOpenState }) {
         title="Fact / Ledger 管“账”"
         summary="流程完成不能替代事实凭证"
         description="它回答什么业务结果已经正式生效、权威真源在哪里、凭证和纠正方式是什么。Workflow 或 ProcessRuntime 的完成状态都不能替代事实凭证。"
+      />
+      <BusinessChainProjectionContext
+        projection={projection}
+        onBackToChain={onBackToChain}
+        onClearChainContext={onClearChainContext}
       />
       <Alert
         showIcon
@@ -2835,23 +3028,28 @@ function StateTransitionCard({
 
 function StateRulesView({
   catalog,
+  projection,
   flow,
   state,
   onSelectFlow,
   onSelectState,
   onOpenView,
+  onBackToChain,
+  onClearChainContext,
 }) {
+  const flows = projection ? projection.flows : catalog.flows
+  const scopedCatalog = useMemo(() => ({ ...catalog, flows }), [catalog, flows])
   const [transitionFilter, setTransitionFilter] = useState(
     DEV_FLOW_STATE_TRANSITION_FILTERS.all
   )
   const searchProps = useDefinitionSelectSearch()
   const options = useMemo(
-    () => buildStateDefinitionSelectOptions(catalog),
-    [catalog]
+    () => buildStateDefinitionSelectOptions(scopedCatalog),
+    [scopedCatalog]
   )
   const optionFilter = useMemo(
-    () => createDevFlowDefinitionOptionFilter(catalog, 'stateOptions'),
-    [catalog]
+    () => createDevFlowDefinitionOptionFilter(scopedCatalog, 'stateOptions'),
+    [scopedCatalog]
   )
   const stateByKey = useMemo(
     () => new Map(flow.states.map((item) => [item.key, item])),
@@ -2935,6 +3133,11 @@ function StateRulesView({
         title="状态机管“规则”"
         summary="规则视图不是运行实例或事实凭证"
         description="它回答当前所选对象有哪些状态、允许怎样转换，以及取消、退回、冲正或返工后到哪里。这里只展示这个对象自己的合法转换，不把另一个对象的异常结果补造成它的状态；实际发生了什么仍回到任务、运行路径或已生效结果核对。"
+      />
+      <BusinessChainProjectionContext
+        projection={projection}
+        onBackToChain={onBackToChain}
+        onClearChainContext={onClearChainContext}
       />
       <section className="erp-dev-flow-definition-selector">
         <label htmlFor="dev-flow-state-select">选择状态对象</label>
@@ -3154,7 +3357,7 @@ function invalidQueryMessages(searchParams, catalog) {
   const messages = []
   for (const key of new Set(searchParams.keys())) {
     if (!KNOWN_QUERY_KEYS.has(key)) messages.push(`未知 query 参数：${key}`)
-    if (searchParams.getAll(key).length > 1) {
+    if (key !== DEV_CUSTOMER_QUERY_KEY && searchParams.getAll(key).length > 1) {
       messages.push(`query 参数重复：${key}`)
     }
   }
@@ -3168,6 +3371,17 @@ function invalidQueryMessages(searchParams, catalog) {
   const taskId = cleanText(searchParams.get(QUERY_KEYS.taskId))
   const chain = catalog.businessChains.find((item) => item.key === chainKey)
   const overviewSelected = chainKey === catalog.businessChainOverview.key
+  const chainNode =
+    chain && nodeKey
+      ? chain.nodes.find((item) => item.key === nodeKey) || null
+      : null
+  const chainProjection = chain
+    ? buildDevBusinessChainProjection({
+        catalog,
+        chainKey: chain.key,
+        nodeKey: chainNode?.key || '',
+      })
+    : null
   const flow = catalog.flows.find((item) => item.key === flowKey)
   const activeView = view || DEFAULT_VIEW
 
@@ -3190,10 +3404,17 @@ function invalidQueryMessages(searchParams, catalog) {
   if (nodeKey && overviewSelected) {
     messages.push('业务总图不接受单链节点参数')
   }
-  if (nodeKey && chain && !chain.nodes.some((item) => item.key === nodeKey)) {
+  if (nodeKey && chain && !chainNode) {
     messages.push(`业务链中不存在节点：${nodeKey}`)
   }
   if (flowKey && !flow) messages.push(`未知状态对象：${flowKey}`)
+  if (
+    flowKey &&
+    chainProjection &&
+    !chainProjection.machineKeys.includes(flowKey)
+  ) {
+    messages.push(`状态对象不属于所选业务链：${flowKey}`)
+  }
   if (stateKey && !flowKey) messages.push('状态 key 缺少所属状态对象')
   if (stateKey && flow && !flow.states.some((item) => item.key === stateKey)) {
     messages.push(`状态对象中不存在状态：${stateKey}`)
@@ -3205,10 +3426,24 @@ function invalidQueryMessages(searchParams, catalog) {
     messages.push(`未知流程 variant：${processKey}`)
   }
   if (
+    processKey &&
+    chainProjection &&
+    !chainProjection.processDefinitionKeys.includes(processKey)
+  ) {
+    messages.push(`流程定义不属于所选业务链：${processKey}`)
+  }
+  if (
     factKey &&
     !catalog.factDefinitions.some((item) => item.factKey === factKey)
   ) {
     messages.push(`未知 Fact Key：${factKey}`)
+  }
+  if (
+    factKey &&
+    chainProjection &&
+    !chainProjection.factKeys.includes(factKey)
+  ) {
+    messages.push(`Fact 不属于所选业务链：${factKey}`)
   }
   if (taskId && !parseDevFlowStateTaskIDReference(taskId)) {
     messages.push('task_id 必须是大于 0 的整数')
@@ -3227,6 +3462,12 @@ export default function DevFlowStateObservatoryPage() {
   const activeSearchParams = queryCanonicalization.searchParams
   const requestedView = cleanText(activeSearchParams.get(QUERY_KEYS.view))
   const view = requestedView || DEFAULT_VIEW
+  const customerScope = useDevCustomerScope({
+    searchParams,
+    setSearchParams,
+    normalize: view === 'chain',
+  })
+  const customerReady = customerScope.status === 'ready'
   const requestedChainKey = cleanText(activeSearchParams.get(QUERY_KEYS.chain))
   const requestedNodeKey = cleanText(activeSearchParams.get(QUERY_KEYS.node))
   const requestedFlowKey = cleanText(activeSearchParams.get(QUERY_KEYS.flow))
@@ -3306,26 +3547,56 @@ export default function DevFlowStateObservatoryPage() {
     ? chain.nodes.find((item) => item.key === requestedNodeKey) ||
       (!requestedNodeKey ? chain.nodes[0] : null)
     : null
-  const flow = catalog
-    ? catalog.flows.find((item) => item.key === requestedFlowKey) ||
-      (!requestedFlowKey ? catalog.flows[0] : null)
-    : null
+  const projectionNodeKey = requestedNodeKey && node ? node.key : ''
+  const chainProjection = useMemo(
+    () =>
+      catalog && chain
+        ? buildDevBusinessChainProjection({
+            catalog,
+            chainKey: chain.key,
+            nodeKey: projectionNodeKey,
+          })
+        : null,
+    [catalog, chain, projectionNodeKey]
+  )
+  const availableFlows = chainProjection?.flows || catalog?.flows || []
+  const availableProcessDefinitions =
+    chainProjection?.processDefinitions || catalog?.processDefinitions || []
+  const availableFactDefinitions =
+    chainProjection?.factDefinitions || catalog?.factDefinitions || []
+  const flow =
+    availableFlows.find((item) => item.key === requestedFlowKey) ||
+    availableFlows[0] ||
+    null
   const state =
     flow && requestedStateKey
       ? flow.states.find((item) => item.key === requestedStateKey)
       : null
-  const definition = catalog
-    ? catalog.processDefinitions.find(
-        (item) => item.key === requestedProcessKey
-      ) || (!requestedProcessKey ? catalog.processDefinitions[0] : null)
-    : null
-  const fact = catalog
-    ? catalog.factDefinitions.find(
-        (item) => item.factKey === requestedFactKey
-      ) || (!requestedFactKey ? catalog.factDefinitions[0] : null)
-    : null
+  const definition =
+    availableProcessDefinitions.find(
+      (item) => item.key === requestedProcessKey
+    ) ||
+    availableProcessDefinitions[0] ||
+    null
+  const fact =
+    availableFactDefinitions.find(
+      (item) => item.factKey === requestedFactKey
+    ) ||
+    availableFactDefinitions[0] ||
+    null
+  const customerOverlay = useMemo(() => {
+    if (!catalog || !customerReady) return null
+    return (
+      catalog.overlays.find(
+        (overlay) => overlay.customerKey === customerScope.customerKey
+      ) || null
+    )
+  }, [catalog, customerReady, customerScope.customerKey])
+  const customerReviewReady = Boolean(customerReady && customerOverlay)
   const customerReview = useMemo(() => {
-    if (!catalog || !valid || view !== 'chain') return null
+    if (!catalog || !valid || view !== 'chain' || !customerReviewReady) {
+      return null
+    }
     const chainKey = overviewSelected
       ? catalog.businessChainOverview.key
       : chain?.key
@@ -3334,11 +3605,14 @@ export default function DevFlowStateObservatoryPage() {
       catalog,
       chainKey,
       generatedAt: customerReviewGeneratedAt,
+      customerOverlay,
     })
   }, [
     catalog,
     chain?.key,
+    customerOverlay,
     customerReviewGeneratedAt,
+    customerReviewReady,
     overviewSelected,
     valid,
     view,
@@ -3354,13 +3628,21 @@ export default function DevFlowStateObservatoryPage() {
     if (view === 'chain' && !overviewSelected && !requestedNodeKey && node) {
       patch[QUERY_KEYS.node] = node.key
     }
-    if (view === 'states' && !requestedFlowKey && flow) {
+    if (view === 'states' && requestedFlowKey !== flow?.key && flow) {
       patch[QUERY_KEYS.flow] = flow.key
+      patch[QUERY_KEYS.state] = null
     }
-    if (view === 'runtime' && !requestedProcessKey && definition) {
+    if (
+      view === 'runtime' &&
+      requestedProcessKey !== definition?.key &&
+      definition
+    ) {
       patch[QUERY_KEYS.process] = definition.key
     }
-    if (view === 'facts' && !requestedFactKey && fact) {
+    if (view === 'runtime' && requestedProcessKey && !definition) {
+      patch[QUERY_KEYS.process] = null
+    }
+    if (view === 'facts' && requestedFactKey !== fact?.factKey && fact) {
       patch[QUERY_KEYS.fact] = fact.factKey
     }
     if (Object.keys(patch).length > 0) updateParams(patch, { replace: true })
@@ -3401,6 +3683,9 @@ export default function DevFlowStateObservatoryPage() {
     nextPatch[QUERY_KEYS.view] = nextView
     if (nextView === 'chain') {
       Object.assign(nextPatch, chainReturnRef.current)
+    } else if (requestedChainKey) {
+      nextPatch[QUERY_KEYS.chain] = requestedChainKey
+      nextPatch[QUERY_KEYS.node] = requestedNodeKey || null
     }
     for (const [key, value] of Object.entries(patch)) {
       if (allowedSelectionKeys.includes(key) || key === QUERY_KEYS.taskId) {
@@ -3409,7 +3694,19 @@ export default function DevFlowStateObservatoryPage() {
     }
     updateParams(nextPatch)
   }
+  const clearChainContext = () =>
+    updateParams({
+      [QUERY_KEYS.chain]: null,
+      [QUERY_KEYS.node]: null,
+    })
+  const openGlobalDefinitionView = (nextView, patch = {}) =>
+    openView(nextView, {
+      [QUERY_KEYS.chain]: null,
+      [QUERY_KEYS.node]: null,
+      ...patch,
+    })
   const printCustomerReview = async () => {
+    if (!customerReviewReady || !customerReview) return
     setCustomerReviewGeneratedAt(new Date().toISOString())
     await new Promise((resolve) => {
       window.requestAnimationFrame(() => window.requestAnimationFrame(resolve))
@@ -3446,7 +3743,7 @@ export default function DevFlowStateObservatoryPage() {
           : ''
 
   const renderView = () => {
-    if (!catalog || !flow || !definition || !fact) {
+    if (!catalog) {
       return null
     }
     if (view === 'chain') {
@@ -3464,6 +3761,7 @@ export default function DevFlowStateObservatoryPage() {
             }
             onOpenView={openView}
             onPrintCustomerReview={printCustomerReview}
+            customerReviewReady={customerReviewReady}
           />
         )
       }
@@ -3481,18 +3779,22 @@ export default function DevFlowStateObservatoryPage() {
           onSelectNode={(key) => updateParams({ [QUERY_KEYS.node]: key })}
           onOpenView={openView}
           onPrintCustomerReview={printCustomerReview}
+          customerReviewReady={customerReviewReady}
         />
       )
     }
     if (view === 'workflow') {
       return (
         <WorkflowView
+          projection={chainProjection}
           taskId={taskId}
           draft={taskDraft}
           selectedTask={selectedTask}
           onDraftChange={setTaskDraft}
           onClearTask={clearTask}
           onSelectTask={selectTask}
+          onBackToChain={() => openView('chain')}
+          onClearChainContext={clearChainContext}
         />
       )
     }
@@ -3500,6 +3802,7 @@ export default function DevFlowStateObservatoryPage() {
       return (
         <RuntimeView
           catalog={catalog}
+          projection={chainProjection}
           definition={definition}
           taskId={taskId}
           draft={taskDraft}
@@ -3510,6 +3813,8 @@ export default function DevFlowStateObservatoryPage() {
           onDraftChange={setTaskDraft}
           onClearTask={clearTask}
           onSelectTask={selectTask}
+          onBackToChain={() => openView('chain')}
+          onClearChainContext={clearChainContext}
         />
       )
     }
@@ -3517,6 +3822,7 @@ export default function DevFlowStateObservatoryPage() {
       return (
         <FactsView
           catalog={catalog}
+          projection={chainProjection}
           fact={fact}
           onSelectFact={(key) => updateParams({ [QUERY_KEYS.fact]: key })}
           onOpenState={(key) =>
@@ -3525,12 +3831,15 @@ export default function DevFlowStateObservatoryPage() {
               [QUERY_KEYS.state]: null,
             })
           }
+          onBackToChain={() => openView('chain')}
+          onClearChainContext={clearChainContext}
         />
       )
     }
     return (
       <StateRulesView
         catalog={catalog}
+        projection={chainProjection}
         flow={flow}
         state={state}
         onSelectFlow={(key) =>
@@ -3538,6 +3847,8 @@ export default function DevFlowStateObservatoryPage() {
         }
         onSelectState={(key) => updateParams({ [QUERY_KEYS.state]: key })}
         onOpenView={openView}
+        onBackToChain={() => openView('chain')}
+        onClearChainContext={clearChainContext}
       />
     )
   }
@@ -3580,6 +3891,25 @@ export default function DevFlowStateObservatoryPage() {
           <MemoryStrip />
         </details>
       </header>
+      {catalogState.status === 'ready' && catalog && view === 'chain' ? (
+        <>
+          <DevCustomerScopeSelector
+            scope={customerScope}
+            onChange={customerScope.selectCustomer}
+            label="甲方校对稿"
+            note="选择只绑定甲方校对稿的客户配置预览；通用业务链仍来自 Product Core，不代表配置已发布或甲方已验收。"
+            invalidDescription="当前甲方没有登记校对预览；甲方校对稿导出已停止，通用业务链与运行观察仍可使用。"
+          />
+          {customerReady && !customerOverlay ? (
+            <Alert
+              type="warning"
+              showIcon
+              message="所选甲方没有业务链配置预览"
+              description="甲方校对稿导出已停止；请先登记只读客户配置预览，不能用产品通用设计冒充客户版本。"
+            />
+          ) : null}
+        </>
+      ) : null}
       {catalogState.status === 'ready' && catalog ? (
         <details className="erp-dev-flow-definition-tools">
           <summary>
@@ -3592,7 +3922,7 @@ export default function DevFlowStateObservatoryPage() {
               const nextDraft = cleanText(keyword)
               if (nextDraft) setTaskDraft(nextDraft)
               setTaskLookupFocusRequest((current) => current + 1)
-              openView('workflow')
+              openGlobalDefinitionView('workflow')
             }}
             onOpen={(item) => {
               if (item.type === 'chain') {
@@ -3601,15 +3931,19 @@ export default function DevFlowStateObservatoryPage() {
                   [QUERY_KEYS.node]: item.nodeKey || null,
                 })
               } else if (item.type === 'runtime') {
-                openView('runtime', { [QUERY_KEYS.process]: item.key })
+                openGlobalDefinitionView('runtime', {
+                  [QUERY_KEYS.process]: item.key,
+                })
               } else if (item.type === 'facts') {
-                openView('facts', { [QUERY_KEYS.fact]: item.key })
+                openGlobalDefinitionView('facts', {
+                  [QUERY_KEYS.fact]: item.key,
+                })
               } else if (item.type === 'states') {
-                openView('states', {
+                openGlobalDefinitionView('states', {
                   [QUERY_KEYS.flow]: item.key,
                   [QUERY_KEYS.state]: null,
                 })
-              } else openView('workflow')
+              } else openGlobalDefinitionView('workflow')
             }}
           />
         </details>
@@ -3635,13 +3969,11 @@ export default function DevFlowStateObservatoryPage() {
         <ContextStrip
           view={view}
           chain={
-            view === 'chain'
-              ? overviewSelected
-                ? catalog.businessChainOverview
-                : chain
-              : null
+            view === 'chain' && overviewSelected
+              ? catalog.businessChainOverview
+              : chain
           }
-          node={view === 'chain' ? node : null}
+          node={view === 'chain' && overviewSelected ? null : node}
           selection={specialistSelection}
           canReturnToChain={valid && view !== 'chain'}
           onReturnChain={() => openView('chain')}

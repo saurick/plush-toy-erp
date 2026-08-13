@@ -4,8 +4,10 @@ package data
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"server/internal/biz"
@@ -76,10 +78,58 @@ type Data struct {
 }
 
 const (
-	postgresDriverName    = "pgx"
-	postgresReadyTimeout  = 60 * time.Second
-	postgresRetryInterval = 2 * time.Second
+	postgresDriverName             = "pgx"
+	defaultPostgresMaxOpenConns    = 20
+	defaultPostgresMaxIdleConns    = 5
+	defaultPostgresConnMaxLifetime = 30 * time.Minute
+	defaultPostgresConnMaxIdleTime = 5 * time.Minute
+	defaultPostgresStartupTimeout  = 60 * time.Second
+	postgresRetryInterval          = 2 * time.Second
 )
+
+type postgresPoolSettings struct {
+	maxOpenConns    int
+	maxIdleConns    int
+	connMaxLifetime time.Duration
+	connMaxIdleTime time.Duration
+	startupTimeout  time.Duration
+}
+
+func resolvePostgresPoolSettings(c *conf.Data_Postgres) (postgresPoolSettings, error) {
+	settings := postgresPoolSettings{
+		maxOpenConns:    defaultPostgresMaxOpenConns,
+		maxIdleConns:    defaultPostgresMaxIdleConns,
+		connMaxLifetime: defaultPostgresConnMaxLifetime,
+		connMaxIdleTime: defaultPostgresConnMaxIdleTime,
+		startupTimeout:  defaultPostgresStartupTimeout,
+	}
+	if c == nil {
+		return settings, errors.New("postgres config is required")
+	}
+	if c.MaxOpenConns > 0 {
+		settings.maxOpenConns = int(c.MaxOpenConns)
+	}
+	if c.MaxIdleConns > 0 {
+		settings.maxIdleConns = int(c.MaxIdleConns)
+	}
+	if c.ConnMaxLifetime != nil && c.ConnMaxLifetime.AsDuration() > 0 {
+		settings.connMaxLifetime = c.ConnMaxLifetime.AsDuration()
+	}
+	if c.ConnMaxIdleTime != nil && c.ConnMaxIdleTime.AsDuration() > 0 {
+		settings.connMaxIdleTime = c.ConnMaxIdleTime.AsDuration()
+	}
+	if c.StartupTimeout != nil && c.StartupTimeout.AsDuration() > 0 {
+		settings.startupTimeout = c.StartupTimeout.AsDuration()
+	}
+	if settings.maxIdleConns > settings.maxOpenConns {
+		return postgresPoolSettings{}, fmt.Errorf(
+			"postgres maxIdleConns (%d) must not exceed maxOpenConns (%d)",
+			settings.maxIdleConns,
+			settings.maxOpenConns,
+		)
+	}
+	return settings, nil
+}
 
 func postgresSQLSpanOptions() otelsql.SpanOptions {
 	// SQL text and bind args may contain customer data, credentials, or business payloads; keep them out of traces.
@@ -142,6 +192,16 @@ func NewDataForTesting(client *ent.Client, db *sql.DB) *Data {
 // NewData 由 wire 调用，用来统一管理资源和 cleanup。
 func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 	l := log.NewHelper(log.With(logger, "logger.name", "data"))
+	if c == nil {
+		return nil, nil, errors.New("data config is required")
+	}
+	settings, err := resolvePostgresPoolSettings(c.Postgres)
+	if err != nil {
+		return nil, nil, err
+	}
+	if strings.TrimSpace(c.Postgres.Dsn) == "" {
+		return nil, nil, errors.New("postgres dsn is required")
+	}
 
 	l.Info("init postgres(otelsql) start...")
 	db, err := otelsql.Open(
@@ -153,11 +213,24 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 		l.Errorf("failed to open postgres connection: %v", err)
 		return nil, nil, err
 	}
+	db.SetMaxOpenConns(settings.maxOpenConns)
+	db.SetMaxIdleConns(settings.maxIdleConns)
+	db.SetConnMaxLifetime(settings.connMaxLifetime)
+	db.SetConnMaxIdleTime(settings.connMaxIdleTime)
+	l.Infow(
+		"msg", "postgres pool configured",
+		"max_open_conns", settings.maxOpenConns,
+		"max_idle_conns", settings.maxIdleConns,
+		"conn_max_lifetime_seconds", int64(settings.connMaxLifetime/time.Second),
+		"conn_max_idle_time_seconds", int64(settings.connMaxIdleTime/time.Second),
+		"startup_timeout_seconds", int64(settings.startupTimeout/time.Second),
+	)
+
+	startupCtx, cancelStartup := context.WithTimeout(context.Background(), settings.startupTimeout)
+	defer cancelStartup()
 
 	// 启动兜底：给 Postgres 预留就绪窗口，避免重启后短暂不可达直接触发 panic。
-	pingCtx, cancelPing := context.WithTimeout(context.Background(), postgresReadyTimeout)
-	defer cancelPing()
-	if err := waitForPostgresReady(pingCtx, db, postgresRetryInterval, l); err != nil {
+	if err := waitForPostgresReady(startupCtx, db, postgresRetryInterval, l); err != nil {
 		_ = db.Close()
 		l.Errorf("postgres ping failed: %v", err)
 		return nil, nil, err
@@ -169,7 +242,7 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 		_ = db.Close()
 		return nil, nil, err
 	}
-	if err := validateActiveCustomerTrialConfig(context.Background(), db, trialConfigEnabled, c.Postgres.Dsn); err != nil {
+	if err := validateActiveCustomerTrialConfig(startupCtx, db, trialConfigEnabled, c.Postgres.Dsn); err != nil {
 		_ = db.Close()
 		return nil, nil, err
 	}
@@ -186,6 +259,14 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 	if c.Postgres.Debug {
 		postgresClient = postgresClient.Debug()
 	}
+	cleanup := func() {
+		if postgresClient != nil {
+			_ = postgresClient.Close()
+		}
+		if db != nil {
+			_ = db.Close()
+		}
+	}
 
 	data := &Data{
 		log:        l,
@@ -195,20 +276,13 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 		conf:       c,
 	}
 
-	if err := InitRBACIfNeeded(context.Background(), data, l); err != nil {
+	if err := InitRBACIfNeeded(startupCtx, data, l); err != nil {
+		cleanup()
 		return nil, nil, err
 	}
-	if err := InitAdminUsersIfNeeded(context.Background(), data, c, l); err != nil {
+	if err := InitAdminUsersIfNeeded(startupCtx, data, c, l); err != nil {
+		cleanup()
 		return nil, nil, err
-	}
-
-	cleanup := func() {
-		if postgresClient != nil {
-			_ = postgresClient.Close()
-		}
-		if db != nil {
-			_ = db.Close()
-		}
 	}
 
 	return data, cleanup, nil

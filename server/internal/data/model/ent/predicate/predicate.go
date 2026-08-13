@@ -57,6 +57,9 @@ type InventoryBalance func(*sql.Selector)
 // InventoryLot is the predicate function for inventorylot builders.
 type InventoryLot func(*sql.Selector)
 
+// InventoryLotStatusEvent is the predicate function for inventorylotstatusevent builders.
+type InventoryLotStatusEvent func(*sql.Selector)
+
 // InventoryOperation is the predicate function for inventoryoperation builders.
 type InventoryOperation func(*sql.Selector)
 
@@ -191,6 +194,9 @@ type Shipment func(*sql.Selector)
 
 // ShipmentItem is the predicate function for shipmentitem builders.
 type ShipmentItem func(*sql.Selector)
+
+// SourceOrderLifecycleEvent is the predicate function for sourceorderlifecycleevent builders.
+type SourceOrderLifecycleEvent func(*sql.Selector)
 
 // StockReservation is the predicate function for stockreservation builders.
 type StockReservation func(*sql.Selector)

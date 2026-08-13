@@ -27,6 +27,7 @@ func safeServerLogging(logger log.Logger) middleware.Middleware {
 			}
 
 			reply, err = handler(ctx, req)
+			sharedRuntimeMetricCounters.observeRPC(time.Since(start), err != nil)
 			var code int32
 			reason := ""
 			if serviceErr := kratoserrors.FromError(err); serviceErr != nil {

@@ -57,7 +57,7 @@ Options:
   --run-id <text>        Optional unique run suffix. Default timestamp.
   --help                 Print this help.
 
-The report-only path never calls a backend, writes business records, imports real customer
+The report-only path never calls a backend, writes formal business data, imports real customer
 data, creates schema or migrations, or turns customer acceptance into a completion blocker.`;
 
 class CliError extends Error {
@@ -272,7 +272,6 @@ function buildInputTemplate(options = {}) {
     writesDatabase: false,
     callsBackend: false,
     importsRealCustomerData: false,
-    createsBusinessRecords: false,
     downstreamReportOnlyWritesReports: true,
     downstreamApplyWritesDatabase: false,
     defaultBackendURL: DEFAULT_BACKEND_URL,
@@ -309,7 +308,7 @@ function buildInputTemplate(options = {}) {
         "PATH=/usr/local/bin:$PATH bash scripts/seed-core-demo-data.sh",
     },
     boundary:
-      "This template only prints prerequisites and commands. It does not write reports, call backend, login, import real customer data, write business_records, or create operational facts.",
+      "This template only prints prerequisites and commands. It does not write reports, call backend, login, import real customer data, write formal business data, or create operational facts.",
   };
 }
 
@@ -408,6 +407,17 @@ function normalizeShipmentItems(rawItems, fallback, salesOrderId) {
 function buildPlan(options) {
   const ids = ensureIDs(options);
   const prefix = `${SIMULATION_PREFIX}-${options.runId}`;
+  const financeOccurredAt = Math.floor(
+    Date.parse("2026-07-15T08:00:00.000Z") / 1000,
+  );
+  const financePaymentTermDays = options.paymentTermDays ?? 30;
+  const financePaymentTerm =
+    financePaymentTermDays === 0 ? "DUE_ON_OCCURRENCE" : "EOM_DAYS";
+  const financeDueAt =
+    financePaymentTermDays === 0
+      ? financeOccurredAt
+      : Math.floor(Date.parse("2026-07-31T08:00:00.000Z") / 1000) +
+        financePaymentTermDays * 24 * 60 * 60;
   const productionSampleType = options.productionSampleType || "REWORK";
   const productionSampleUsesMaterial =
     productionSampleType === "MATERIAL_ISSUE";
@@ -518,9 +528,10 @@ function buildPlan(options) {
         fee_amount: "2.50",
         currency: "CNY",
         collection_type: options.collectionType || "ACCOUNTS_RECEIVABLE",
-        payment_term: options.paymentTerm || "EOM_30",
-        payment_term_days: options.paymentTermDays ?? 30,
-        invoice_category: options.invoiceCategory || "VAT_GENERAL_1",
+        payment_term: financePaymentTerm,
+        payment_term_days: financePaymentTermDays,
+        due_at: financeDueAt,
+        occurred_at: financeOccurredAt,
         source_type: undefined,
         idempotency_key: `${prefix}:FINANCE:SETTLE`,
         note: "【试用】应收款：由已出货单产生，查看金额、来源和当前状态。",
@@ -534,10 +545,8 @@ function buildPlan(options) {
         amount: "36.80",
         fee_amount: "0.00",
         currency: "CNY",
-        collection_type: options.collectionType || "ACCOUNTS_RECEIVABLE",
-        payment_term: options.paymentTerm || "EOM_30",
-        payment_term_days: options.paymentTermDays ?? 30,
         invoice_category: options.invoiceCategory || "VAT_GENERAL_1",
+        occurred_at: financeOccurredAt,
         source_type: undefined,
         idempotency_key: `${prefix}:FINANCE:CANCEL`,
         note: "【试用】发票：由已出货单产生，查看金额、来源和当前状态。",
@@ -551,9 +560,7 @@ function buildPlan(options) {
         amount: "88.60",
         fee_amount: "1.20",
         currency: "CNY",
-        payment_term: options.paymentTerm || "EOM_30",
-        payment_term_days: options.paymentTermDays ?? 30,
-        invoice_category: options.invoiceCategory || "VAT_GENERAL_1",
+        occurred_at: financeOccurredAt,
         source_type: undefined,
         idempotency_key: `${prefix}:FINANCE:RECONCILIATION`,
         note: "【试用】对账记录：查看金额、往来说明和当前状态。",
@@ -568,9 +575,10 @@ function buildPlan(options) {
             amount: "268.80",
             fee_amount: "1.80",
             currency: "CNY",
-            payment_term: options.paymentTerm || "EOM_30",
-            payment_term_days: options.paymentTermDays ?? 30,
-            invoice_category: options.invoiceCategory || "VAT_GENERAL_1",
+            payment_term: financePaymentTerm,
+            payment_term_days: financePaymentTermDays,
+            due_at: financeDueAt,
+            occurred_at: financeOccurredAt,
             source_type: undefined,
             idempotency_key: `${prefix}:FINANCE:PAYABLE`,
             note: "【试用】供应商应付款：核对供应商、金额、账期、来源和当前状态。",

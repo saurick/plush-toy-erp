@@ -13,6 +13,9 @@ type purchaseOrderRepoStub struct {
 	orders         map[int]*PurchaseOrder
 	items          map[int]*PurchaseOrderItem
 	supplierActive map[int]bool
+	supplierTerms  map[int]int
+	supplierReads  int
+	supplierErr    error
 	materialActive map[int]bool
 	unitActive     map[int]bool
 	createdOrder   *PurchaseOrderMutation
@@ -96,6 +99,20 @@ func (s *purchaseOrderRepoStub) SupplierIsActive(_ context.Context, id int) (boo
 	return approved, nil
 }
 
+func (s *purchaseOrderRepoStub) SupplierDefaultPaymentTermDays(_ context.Context, id int) (int, error) {
+	s.supplierReads++
+	if s.supplierErr != nil {
+		return 0, s.supplierErr
+	}
+	if termDays, ok := s.supplierTerms[id]; ok {
+		return termDays, nil
+	}
+	if _, ok := s.supplierActive[id]; ok {
+		return 0, nil
+	}
+	return 0, ErrSupplierNotFound
+}
+
 func (s *purchaseOrderRepoStub) MaterialIsActive(_ context.Context, id int) (bool, error) {
 	approved, ok := s.materialActive[id]
 	if !ok {
@@ -114,7 +131,7 @@ func (s *purchaseOrderRepoStub) UnitIsActive(_ context.Context, id int) (bool, e
 
 func TestPurchaseOrderUsecaseCreateGuardsSupplier(t *testing.T) {
 	ctx := context.Background()
-	repo := &purchaseOrderRepoStub{supplierActive: map[int]bool{10: true, 11: false}}
+	repo := &purchaseOrderRepoStub{supplierActive: map[int]bool{10: true, 11: false}, supplierTerms: map[int]int{10: 30}}
 	uc := NewPurchaseOrderUsecase(repo)
 	orderDate := time.Date(2026, 5, 31, 0, 0, 0, 0, time.UTC)
 	supplierPurchaseOrderNo := "  PO-001 "
@@ -133,6 +150,9 @@ func TestPurchaseOrderUsecaseCreateGuardsSupplier(t *testing.T) {
 	if order.LifecycleStatus != PurchaseOrderStatusDraft {
 		t.Fatalf("expected draft purchase order, got %#v", order)
 	}
+	if repo.createdOrder.Currency != FinanceCurrencyCNY || repo.createdOrder.PaymentTermDays == nil || *repo.createdOrder.PaymentTermDays != 30 {
+		t.Fatalf("expected create to freeze CNY and supplier term 30, got %#v", repo.createdOrder)
+	}
 	if repo.createdOrder.PurchaseOrderNo != "PO-001" || repo.createdOrder.SupplierPurchaseOrderNo == nil || *repo.createdOrder.SupplierPurchaseOrderNo != "PO-001" {
 		t.Fatalf("expected normalized order mutation, got %#v", repo.createdOrder)
 	}
@@ -146,6 +166,49 @@ func TestPurchaseOrderUsecaseCreateGuardsSupplier(t *testing.T) {
 	beforePurchaseDate := orderDate.AddDate(0, 0, -1)
 	if _, err := uc.CreatePurchaseOrder(ctx, &PurchaseOrderMutation{PurchaseOrderNo: "PO-BAD-DATE", SupplierID: 10, PurchaseDate: orderDate, ExpectedArrivalDate: &beforePurchaseDate}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected expected arrival before purchase date rejected, got %v", err)
+	}
+}
+
+func TestPurchaseOrderCurrencyAndPaymentTermSnapshotContract(t *testing.T) {
+	ctx := context.Background()
+	repo := &purchaseOrderRepoStub{
+		orders:         map[int]*PurchaseOrder{1: {ID: 1, LifecycleStatus: PurchaseOrderStatusDraft}},
+		supplierActive: map[int]bool{10: true},
+		supplierTerms:  map[int]int{10: 60},
+	}
+	uc := NewPurchaseOrderUsecase(repo)
+	orderDate := time.Date(2026, 8, 12, 0, 0, 0, 0, time.UTC)
+	explicitTerm := 30
+	_, err := uc.CreatePurchaseOrder(ctx, &PurchaseOrderMutation{PurchaseOrderNo: "PO-USD", SupplierID: 10, Currency: " usd ", PaymentTermDays: &explicitTerm, PurchaseDate: orderDate})
+	if err != nil || repo.createdOrder.Currency != FinanceCurrencyUSD || repo.createdOrder.PaymentTermDays == nil || *repo.createdOrder.PaymentTermDays != 30 || repo.supplierReads != 0 {
+		t.Fatalf("expected explicit USD/30 preserved without supplier lookup, mutation=%#v reads=%d err=%v", repo.createdOrder, repo.supplierReads, err)
+	}
+	if _, err := uc.UpdatePurchaseOrder(ctx, 1, &PurchaseOrderMutation{PurchaseOrderNo: "PO-HKD", SupplierID: 10, Currency: FinanceCurrencyHKD, PaymentTermDays: &explicitTerm, PurchaseDate: orderDate}); err != nil {
+		t.Fatalf("expected explicit HKD/30 update accepted, got %v", err)
+	}
+	if repo.supplierReads != 0 {
+		t.Fatalf("update must not read live supplier default, reads=%d", repo.supplierReads)
+	}
+	if _, err := uc.UpdatePurchaseOrder(ctx, 1, &PurchaseOrderMutation{PurchaseOrderNo: "PO-MISSING", SupplierID: 10, Currency: FinanceCurrencyHKD, PurchaseDate: orderDate}); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected missing update term rejected, got %v", err)
+	}
+}
+
+func TestResolveSourceOrderPaymentTermDaysFailsClosed(t *testing.T) {
+	ctx := context.Background()
+	if _, err := resolveSourceOrderPaymentTermDays(ctx, struct{}{}, 10, nil); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected missing supplier default reader rejected, got %v", err)
+	}
+
+	readerErr := errors.New("supplier term unavailable")
+	repo := &purchaseOrderRepoStub{supplierErr: readerErr}
+	if _, err := resolveSourceOrderPaymentTermDays(ctx, repo, 10, nil); !errors.Is(err, readerErr) {
+		t.Fatalf("expected supplier reader error propagated, got %v", err)
+	}
+
+	repo = &purchaseOrderRepoStub{supplierTerms: map[int]int{10: -1}}
+	if _, err := resolveSourceOrderPaymentTermDays(ctx, repo, 10, nil); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected negative supplier default rejected, got %v", err)
 	}
 }
 
@@ -264,6 +327,7 @@ func TestPurchaseOrderUsecaseSaveWithItemsGuardsAndNormalizes(t *testing.T) {
 	uc := NewPurchaseOrderUsecase(repo)
 	orderDate := time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC)
 	qty := decimal.NewFromInt(6)
+	termDays := 30
 	productOrderNo := " SO-26001 "
 	productNo := " P-001 "
 	productName := " 坐姿小熊 "
@@ -271,6 +335,8 @@ func TestPurchaseOrderUsecaseSaveWithItemsGuardsAndNormalizes(t *testing.T) {
 	result, err := uc.SavePurchaseOrderWithItems(ctx, 1, &PurchaseOrderMutation{
 		PurchaseOrderNo: " PO-TX-001 ",
 		SupplierID:      1000,
+		Currency:        FinanceCurrencyHKD,
+		PaymentTermDays: &termDays,
 		PurchaseDate:    orderDate,
 		ExpectedVersion: 1,
 	}, []*PurchaseOrderItemSaveMutation{
@@ -292,6 +358,9 @@ func TestPurchaseOrderUsecaseSaveWithItemsGuardsAndNormalizes(t *testing.T) {
 	}
 	if len(repo.savedItems) != 1 || repo.savedItems[0].PurchaseOrderID != 1 {
 		t.Fatalf("expected item bound to order 1, got %#v", repo.savedItems)
+	}
+	if repo.createdOrder.Currency != FinanceCurrencyHKD || repo.createdOrder.PaymentTermDays == nil || *repo.createdOrder.PaymentTermDays != 30 {
+		t.Fatalf("expected explicit update currency/term preserved, got %#v", repo.createdOrder)
 	}
 	savedItem := repo.savedItems[0]
 	if savedItem.ProductOrderNoSnapshot == nil || *savedItem.ProductOrderNoSnapshot != "SO-26001" ||

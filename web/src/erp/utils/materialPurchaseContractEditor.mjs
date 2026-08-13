@@ -7,6 +7,13 @@ import {
   splitTableCellMerge,
 } from './detailCellMerge.mjs'
 import { normalizePrintAppendixImages } from './printAppendixImages.mjs'
+import {
+  formatNumeric20Scale6Summary,
+  multiplyNumeric20Scale6Values,
+  normalizeNumeric20Scale6,
+  numeric20Scale6Units,
+  sumNumeric20Scale6Values,
+} from './numeric20Scale6.mjs'
 
 export {
   findMergeAtCell,
@@ -139,32 +146,6 @@ const resolveAmountModeForColumn = (
   return 'auto'
 }
 
-const parseNumeric = (raw) => {
-  const text = String(raw ?? '')
-    .trim()
-    .replaceAll(',', '')
-    .replace(/[^\d.-]/g, '')
-  if (!text || text === '-' || text === '.' || text === '-.') {
-    return Number.NaN
-  }
-  const parsed = Number(text)
-  return Number.isFinite(parsed) ? parsed : Number.NaN
-}
-
-const formatTrimmedNumber = (numeric, fractionDigits = 3) => {
-  if (!Number.isFinite(numeric)) {
-    return ''
-  }
-  return numeric.toFixed(fractionDigits).replace(/\.?0+$/, '')
-}
-
-const formatAmountNumber = (numeric) => {
-  if (!Number.isFinite(numeric)) {
-    return ''
-  }
-  return numeric.toFixed(2)
-}
-
 const sanitizePositiveDecimalText = (
   raw,
   { fractionDigits = 2, preserveTrailingDot = false } = {}
@@ -215,31 +196,25 @@ const normalizeAmountText = (raw) => {
   const sanitized = sanitizePositiveDecimalText(raw, {
     fractionDigits: 2,
   })
-  return formatAmountNumber(parseNumeric(sanitized))
+  const normalized = normalizeNumeric20Scale6(sanitized)
+  return normalized ? formatNumeric20Scale6Summary(normalized, 2) : ''
 }
 
-const computeAmountText = (quantity, unitPrice) => {
-  const quantityValue = parseNumeric(quantity)
-  const unitPriceValue = parseNumeric(unitPrice)
-  if (!Number.isFinite(quantityValue) || !Number.isFinite(unitPriceValue)) {
-    return ''
-  }
-  return formatAmountNumber(quantityValue * unitPriceValue)
-}
+const normalizeLineDecimalText = (raw) =>
+  normalizeNumeric20Scale6(
+    sanitizePositiveDecimalText(raw, { fractionDigits: 3 })
+  )
+
+const computeAmountText = (quantity, unitPrice) =>
+  multiplyNumeric20Scale6Values(quantity, unitPrice, 2)
 
 export const normalizeMaterialPurchaseLine = (
   line = {},
   { amountMode = 'auto' } = {}
 ) => {
   const normalized = cloneLine(line)
-  normalized.unitPrice = formatTrimmedNumber(
-    parseNumeric(normalized.unitPrice),
-    3
-  )
-  normalized.quantity = formatTrimmedNumber(
-    parseNumeric(normalized.quantity),
-    3
-  )
+  normalized.unitPrice = normalizeLineDecimalText(normalized.unitPrice)
+  normalized.quantity = normalizeLineDecimalText(normalized.quantity)
   const computedAmount = computeAmountText(
     normalized.quantity,
     normalized.unitPrice
@@ -398,10 +373,8 @@ export const computeMaterialPurchaseTotals = (
   lines = [],
   { merges = [] } = {}
 ) => {
-  let quantityTotal = 0
-  let amountTotal = 0
-  let quantityHasValue = false
-  let amountHasValue = false
+  const quantityValues = []
+  const amountValues = []
 
   ;(Array.isArray(lines) ? lines : []).forEach((line, rowIndex) => {
     const quantity = isMaterialPurchaseCellHiddenByMerge(
@@ -409,28 +382,35 @@ export const computeMaterialPurchaseTotals = (
       rowIndex,
       'quantity'
     )
-      ? Number.NaN
-      : parseNumeric(line?.quantity)
-    if (Number.isFinite(quantity)) {
-      quantityTotal += quantity
-      quantityHasValue = true
+      ? ''
+      : String(line?.quantity ?? '')
+    if (numeric20Scale6Units(quantity) !== null) {
+      quantityValues.push(quantity)
     }
     const amount = isMaterialPurchaseCellHiddenByMerge(
       merges,
       rowIndex,
       'amount'
     )
-      ? Number.NaN
-      : parseNumeric(line?.amount)
-    if (Number.isFinite(amount)) {
-      amountTotal += amount
-      amountHasValue = true
+      ? ''
+      : String(line?.amount ?? '')
+    if (numeric20Scale6Units(amount) !== null) {
+      amountValues.push(amount)
     }
   })
 
   return {
-    quantityText: quantityHasValue ? formatTrimmedNumber(quantityTotal, 3) : '',
-    amountText: amountHasValue ? formatAmountNumber(amountTotal) : '',
+    quantityText:
+      quantityValues.length > 0
+        ? formatNumeric20Scale6Summary(sumNumeric20Scale6Values(quantityValues))
+        : '',
+    amountText:
+      amountValues.length > 0
+        ? formatNumeric20Scale6Summary(
+            sumNumeric20Scale6Values(amountValues),
+            2
+          )
+        : '',
   }
 }
 

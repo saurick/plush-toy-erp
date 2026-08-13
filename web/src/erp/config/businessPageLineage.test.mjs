@@ -136,17 +136,11 @@ const NON_LINEAGE_PAGE_LOCAL_CRUD_ACTIONS = Object.freeze([
 ])
 
 const NON_LINEAGE_CUSTOMER_CONFIG_ACTIONS = Object.freeze([
-  // Revision management and explanation do not touch business records.
+  // Revision management and explanation do not touch formal business data.
   // Process start and execute actions are deliberately not allowlisted.
   'activate_customer_config',
-  'apply_approval_settings',
   'check_customer_config_transition',
-  'explain_module_status',
-  'explain_process_definition',
-  'get_approval_settings',
   'get_effective_session',
-  'preview_approval_settings',
-  'publish_approval_settings',
   'publish_customer_config',
   'rollback_customer_config',
   'validate_customer_config',

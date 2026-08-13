@@ -151,17 +151,17 @@
   }
 }
 .erp-permission-modal.ant-modal,
-.erp-business-record-modal.ant-modal {
+.erp-business-entry-modal.ant-modal {
   max-width: calc(100vw - 32px);
 }
 
 .erp-permission-modal .ant-modal-content,
-.erp-business-record-modal .ant-modal-content {
+.erp-business-entry-modal .ant-modal-content {
   overflow: hidden;
 }
 
 .erp-permission-modal .ant-modal-title,
-.erp-business-record-modal .ant-modal-title {
+.erp-business-entry-modal .ant-modal-title {
   line-height: 1.35;
 }
 
@@ -182,7 +182,7 @@
 }
 
 .erp-permission-modal .ant-modal-body,
-.erp-business-record-modal .ant-modal-body {
+.erp-business-entry-modal .ant-modal-body {
   max-height: calc(100vh - 210px);
   overflow-x: hidden;
   overflow-y: auto;
@@ -355,11 +355,29 @@
 }
 
 .erp-business-action-form__section-title {
+  display: flex;
   grid-column: 1 / -1;
   min-width: 0;
+  align-items: center;
+  gap: 12px;
   color: #5d6a7a;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 750;
+  line-height: 22px;
+}
+
+.erp-business-action-form__section-title::after {
+  min-width: 24px;
+  height: 1px;
+  flex: 1 1 auto;
+  background: var(--erp-business-action-modal-divider, #d8e3dc);
+  content: '';
+}
+
+.erp-business-action-form__section-title-text {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow-wrap: anywhere;
 }
 
 .erp-business-action-form .ant-form-item-label {
@@ -493,6 +511,24 @@
   display: grid;
   gap: 12px;
   min-width: 0;
+}
+
+.erp-source-import-picker__toolbar {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.erp-source-import-picker__search.ant-input-affix-wrapper {
+  min-width: 0;
+  flex: 1 1 280px;
+}
+
+.erp-source-import-picker__clear-filter.ant-btn {
+  flex: 0 0 auto;
+  margin-inline-start: auto;
 }
 
 .erp-source-import-picker .ant-table-wrapper {
@@ -1025,6 +1061,11 @@
   border-radius: var(--erp-business-control-radius, 12px);
   background: var(--erp-business-action-field-bg, #ffffff);
   box-shadow: inset 0 1px 0 rgb(15 23 42 / 2%);
+}
+
+.erp-business-action-form :where(.ant-select-multiple),
+:where(.erp-business-action-form) .ant-select-multiple .ant-select-selector {
+  height: auto;
 }
 
 .erp-business-action-form

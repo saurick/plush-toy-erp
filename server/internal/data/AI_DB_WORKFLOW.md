@@ -23,6 +23,26 @@ CHECK/UNIQUE/FK 约束。
     ```
     *解释：此命令会自动运行 `atlas migrate diff` (根据你的 schema 变更生成 `.sql` 文件) 和 `ent generate` (更新 Go 客户端代码)。*
 
+    生成后必须审查新增 SQL。命中 `DROP TABLE` / `DROP COLUMN`、类型变更、
+    `SET NOT NULL`、带默认值的非空列、存量表已验证 CHECK/FK、高增长表索引、
+    DDL 与 DML 混合等风险时，在 migration 顶部填写以下元数据；普通低风险
+    migration 不需要机械添加：
+
+    ```sql
+    -- migration-risk: maintenance
+    -- affected-table: inventory_txns
+    -- expected-lock: ACCESS EXCLUSIVE
+    -- preflight: scripts/qa/database-constraint-preflight.sql
+    -- recovery: restore-backup-or-forward-fix
+    -- maintenance-required: true
+    ```
+
+    `preflight` 必须指向仓库中现存的只读 `scripts/qa/**` 文件；它只能盘点并
+    fail closed，不能静默修数据。默认迁移合同固定为 `tx-mode=all`，所以
+    `CREATE/DROP INDEX CONCURRENTLY`、`VACUUM`、`ALTER SYSTEM`、
+    `CREATE/DROP DATABASE` 不得进入普通 migration。确有需要时先建立独立的
+    非事务执行合同、状态读回和中断恢复方案，不能靠元数据绕过门禁。
+
 3.  **检查、预演、应用迁移**:
     登记共享开发库在人机终端只运行一个主入口：
     ```bash
@@ -119,9 +139,10 @@ CHECK/UNIQUE/FK 约束。
 
 ## 🛠 常见问题处理
 
-*   **Checksum Mismatch (校验和不匹配)**: 如果遇到此错误，请运行 `make migrate_hash`。
+*   **Checksum Mismatch (校验和不匹配)**: 先用 Git 恢复被改写的已有 migration SQL；禁止重新 hash 掩盖历史漂移。`make migrate_hash` 只允许在新增、尚未跟踪的 custom migration 后更新 `atlas.sum`，并会拒绝任何已跟踪 SQL diff。
+*   **Atlas 版本不一致**: 本地、CI 和发布统一使用 `v0.38.0`。`make data` / `make migrate_hash` 只检查版本，不再联网自动安装或静默替换 Atlas。
 *   **开发库只是落后于仓库已有 migration**: 登记共享开发库执行 `make migrate`，非交互环境执行同一次 operation 的 `migrate_prepare → migrate_execute`；不要因为“缺字段”就重新 `make data`，也不要跳版本。
-*   **Drift Detected / Duplicate Column (字段已存在)**: 这通常表示数据库曾被手动改过，或当前库状态已经偏离迁移历史；不要把它和“开发库单纯还没 apply 最新 migration”混为一谈。先做结构和 revision 对账；`migrate_set` 只能用于已经证明 SQL 效果完整存在、且有专项备份与修复证据的 revision 修复，不能用于跳过失败的数据门禁。
+*   **Drift Detected / Duplicate Column (字段已存在)**: 这通常表示数据库曾被手动改过，或当前库状态已经偏离迁移历史；不要把它和“开发库单纯还没 apply 最新 migration”混为一谈。先做结构和 revision 对账。通用 `make migrate_set` 已封闭；极少数“SQL 已完整执行但 revision 回执缺失”的异常只能另建一次性专项修复，绑定备份、schema 指纹、checksum、停写确认和修复后读回，不能用于跳过失败的数据门禁。
 
 ---
 **请严格遵守此流程以保证数据库完整性。**

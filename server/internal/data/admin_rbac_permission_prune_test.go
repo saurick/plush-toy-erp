@@ -22,7 +22,7 @@ func TestSeedBuiltinRBACPrunesStaleBuiltinPermissions(t *testing.T) {
 
 	for _, stmt := range []string{
 		`INSERT INTO permissions (id, permission_key, name, module, action, resource, builtin) VALUES
-			(1, 'business.record.delete', '删除业务记录', 'business', 'delete', 'business.record', true),
+			(1, 'stale.feature.delete', '删除失效功能', 'stale', 'delete', 'stale.feature', true),
 			(2, 'erp.help_center.read', '查看帮助中心', 'erp', 'read', 'erp.help_center', true),
 			(3, 'custom.local.debug', '本地自定义调试', 'custom', 'read', 'custom.local', false)`,
 		`INSERT INTO role_permissions (role_id, permission_id) VALUES
@@ -39,7 +39,7 @@ func TestSeedBuiltinRBACPrunesStaleBuiltinPermissions(t *testing.T) {
 		t.Fatalf("SeedBuiltinRBACIfNeeded() error = %v", err)
 	}
 
-	assertPermissionRowCount(t, ctx, db, "business.record.delete", 0)
+	assertPermissionRowCount(t, ctx, db, "stale.feature.delete", 0)
 	assertPermissionRowCount(t, ctx, db, "erp.help_center.read", 0)
 	assertPermissionRowCount(t, ctx, db, "custom.local.debug", 1)
 	assertPermissionRowCount(t, ctx, db, biz.PermissionERPWorkbenchRead, 1)
@@ -60,7 +60,7 @@ func TestListPermissionsHidesRowsOutsideRBACSource(t *testing.T) {
 
 	for _, stmt := range []string{
 		`INSERT INTO permissions (id, permission_key, name, module, action, resource, builtin) VALUES
-			(1, 'business.record.read', '查看业务记录', 'business', 'read', 'business.record', true),
+			(1, 'stale.feature.read', '查看失效功能', 'stale', 'read', 'stale.feature', true),
 			(2, 'workflow.task.read', '查看协同任务', 'workflow', 'read', 'workflow.task', true)`,
 	} {
 		if _, err := db.ExecContext(ctx, stmt); err != nil {
@@ -77,7 +77,7 @@ func TestListPermissionsHidesRowsOutsideRBACSource(t *testing.T) {
 	for _, permission := range permissions {
 		keys[permission.Key] = struct{}{}
 	}
-	if _, ok := keys["business.record.read"]; ok {
+	if _, ok := keys["stale.feature.read"]; ok {
 		t.Fatalf("stale permission must not be returned: %#v", permissions)
 	}
 	if _, ok := keys[biz.PermissionWorkflowTaskRead]; !ok {

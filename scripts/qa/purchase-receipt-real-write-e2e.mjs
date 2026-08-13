@@ -442,7 +442,7 @@ function createReport(options, runs) {
     boundaries: [
       "purchase receipt writes inventory facts through InventoryUsecase",
       "workflow task done is not treated as purchase_receipt posted",
-      "business_record_id is rejected by the new purchase API",
+      "undocumented source shortcut parameters are rejected by the purchase API",
       "public source-free receipt creation methods are retired as unknown methods",
       "PostgreSQL mode is local/test only and guarded by purchase-receipt-pg.sh",
     ],

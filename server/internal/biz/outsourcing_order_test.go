@@ -12,7 +12,11 @@ import (
 type outsourcingOrderRepoStub struct {
 	orders             map[int]*OutsourcingOrder
 	items              map[int]*OutsourcingOrderItem
+	itemsByOrder       map[int][]*OutsourcingOrderItem
 	supplierActive     map[int]bool
+	supplierTerms      map[int]int
+	supplierReads      int
+	supplierErr        error
 	productActive      map[int]bool
 	productSKUActive   map[int]bool
 	productSKUProduct  map[int]int
@@ -55,8 +59,18 @@ func (s *outsourcingOrderRepoStub) SaveOutsourcingOrderWithItems(_ context.Conte
 	}, nil
 }
 
-func (s *outsourcingOrderRepoStub) ListOutsourcingOrderItems(context.Context, OutsourcingOrderItemFilter) ([]*OutsourcingOrderItem, int, error) {
-	return nil, 0, nil
+func (s *outsourcingOrderRepoStub) ListOutsourcingOrderItems(_ context.Context, filter OutsourcingOrderItemFilter) ([]*OutsourcingOrderItem, int, error) {
+	items := s.itemsByOrder[filter.OutsourcingOrderID]
+	total := len(items)
+	start := filter.Offset
+	if start >= total {
+		return []*OutsourcingOrderItem{}, total, nil
+	}
+	end := start + filter.Limit
+	if end > total {
+		end = total
+	}
+	return items[start:end], total, nil
 }
 
 func (s *outsourcingOrderRepoStub) GetOutsourcingOrderItem(_ context.Context, id int) (*OutsourcingOrderItem, error) {
@@ -73,6 +87,20 @@ func (s *outsourcingOrderRepoStub) SupplierIsActive(_ context.Context, id int) (
 		return false, ErrSupplierNotFound
 	}
 	return active, nil
+}
+
+func (s *outsourcingOrderRepoStub) SupplierDefaultPaymentTermDays(_ context.Context, id int) (int, error) {
+	s.supplierReads++
+	if s.supplierErr != nil {
+		return 0, s.supplierErr
+	}
+	if termDays, ok := s.supplierTerms[id]; ok {
+		return termDays, nil
+	}
+	if _, ok := s.supplierActive[id]; ok {
+		return 0, nil
+	}
+	return 0, ErrSupplierNotFound
 }
 
 func (s *outsourcingOrderRepoStub) ProductIsActive(_ context.Context, id int) (bool, error) {
@@ -119,6 +147,7 @@ func TestOutsourcingOrderUsecaseSaveGuardsSupplierSubjectProcessAndUnit(t *testi
 	ctx := context.Background()
 	repo := &outsourcingOrderRepoStub{
 		supplierActive:     map[int]bool{1: true, 2: false},
+		supplierTerms:      map[int]int{1: 45},
 		productActive:      map[int]bool{10: true, 11: false},
 		productSKUActive:   map[int]bool{50: true, 51: false, 52: true, 53: true},
 		productSKUProduct:  map[int]int{50: 10, 51: 10, 52: 99, 53: 10},
@@ -169,6 +198,9 @@ func TestOutsourcingOrderUsecaseSaveGuardsSupplierSubjectProcessAndUnit(t *testi
 	}
 	if repo.savedOrder.OutsourcingOrderNo != "OUT-001" || !repo.savedItems[0].OutsourcingQuantity.Equal(qty) {
 		t.Fatalf("expected normalized saved mutation, got order=%#v items=%#v", repo.savedOrder, repo.savedItems)
+	}
+	if repo.savedOrder.Currency != FinanceCurrencyCNY || repo.savedOrder.PaymentTermDays == nil || *repo.savedOrder.PaymentTermDays != 45 {
+		t.Fatalf("expected create to freeze CNY and supplier term 45, got %#v", repo.savedOrder)
 	}
 	if repo.savedItems[0].ProductOrderNoSnapshot == nil || *repo.savedItems[0].ProductOrderNoSnapshot != "SO-26001" {
 		t.Fatalf("expected normalized product order no snapshot, got %#v", repo.savedItems[0].ProductOrderNoSnapshot)
@@ -255,14 +287,71 @@ func TestOutsourcingOrderUsecaseSaveGuardsSupplierSubjectProcessAndUnit(t *testi
 	}
 }
 
+func TestOutsourcingOrderCurrencyAndPaymentTermSnapshotContract(t *testing.T) {
+	ctx := context.Background()
+	termDays := 30
+	productID := 10
+	repo := &outsourcingOrderRepoStub{
+		orders:             map[int]*OutsourcingOrder{1: {ID: 1, LifecycleStatus: OutsourcingOrderStatusDraft}},
+		supplierActive:     map[int]bool{1: true},
+		supplierTerms:      map[int]int{1: 60},
+		productActive:      map[int]bool{10: true},
+		unitActive:         map[int]bool{20: true},
+		processActive:      map[int]bool{30: true},
+		processOutsourcing: map[int]bool{30: true},
+	}
+	uc := NewOutsourcingOrderUsecase(repo)
+	orderDate := time.Date(2026, 8, 12, 0, 0, 0, 0, time.UTC)
+	qty := decimal.NewFromInt(1)
+	items := []*OutsourcingOrderItemSaveMutation{{OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{LineNo: 1, SubjectType: OutsourcingOrderSubjectProduct, ProductID: &productID, ProcessID: 30, UnitID: 20, OutsourcingQuantity: qty}}}
+	_, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-USD", SupplierID: 1, Currency: " usd ", PaymentTermDays: &termDays, OrderDate: orderDate}, items)
+	if err != nil || repo.savedOrder.Currency != FinanceCurrencyUSD || repo.savedOrder.PaymentTermDays == nil || *repo.savedOrder.PaymentTermDays != 30 || repo.supplierReads != 0 {
+		t.Fatalf("expected explicit USD/30 create preserved without supplier lookup, mutation=%#v reads=%d err=%v", repo.savedOrder, repo.supplierReads, err)
+	}
+	items[0].ID = 0
+	_, err = uc.SaveOutsourcingOrderWithItems(ctx, 1, &OutsourcingOrderMutation{ExpectedVersion: 1, OutsourcingOrderNo: "OUT-HKD", SupplierID: 1, Currency: FinanceCurrencyHKD, PaymentTermDays: &termDays, OrderDate: orderDate}, items)
+	if err != nil || repo.supplierReads != 0 {
+		t.Fatalf("expected explicit update without supplier lookup, reads=%d err=%v", repo.supplierReads, err)
+	}
+	if _, err := normalizeOutsourcingOrderMutation(OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-MISSING", SupplierID: 1, Currency: FinanceCurrencyHKD, OrderDate: orderDate}, false); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected missing update term rejected, got %v", err)
+	}
+}
+
 func TestOutsourcingOrderUsecaseLifecycleGuards(t *testing.T) {
 	ctx := context.Background()
+	expectedReturnDate := time.Now().Add(24 * time.Hour)
+	completeOrder := func(id int, status string) *OutsourcingOrder {
+		return &OutsourcingOrder{
+			ID:                 id,
+			LifecycleStatus:    status,
+			ExpectedReturnDate: &expectedReturnDate,
+			ContractPartySnapshot: map[string]any{
+				"buyerCompany": "永绅",
+				"buyerContact": "委外负责人",
+				"buyerPhone":   "13800000000",
+				"buyerAddress": "东莞茶山",
+			},
+			SupplierSnapshot: map[string]any{
+				"name":          "测试加工厂",
+				"contact_name":  "李厂长",
+				"contact_phone": "13900000000",
+				"address":       "加工园 1 号",
+			},
+		}
+	}
+	processingItem := "脸*1"
 	repo := &outsourcingOrderRepoStub{
 		orders: map[int]*OutsourcingOrder{
-			1: {ID: 1, LifecycleStatus: OutsourcingOrderStatusDraft},
-			2: {ID: 2, LifecycleStatus: OutsourcingOrderStatusSubmitted},
-			3: {ID: 3, LifecycleStatus: OutsourcingOrderStatusConfirmed},
-			4: {ID: 4, LifecycleStatus: OutsourcingOrderStatusClosed},
+			1: completeOrder(1, OutsourcingOrderStatusDraft),
+			2: completeOrder(2, OutsourcingOrderStatusSubmitted),
+			3: completeOrder(3, OutsourcingOrderStatusConfirmed),
+			4: completeOrder(4, OutsourcingOrderStatusClosed),
+			5: {ID: 5, LifecycleStatus: OutsourcingOrderStatusDraft},
+		},
+		itemsByOrder: map[int][]*OutsourcingOrderItem{
+			1: {{ID: 1, OutsourcingOrderID: 1, ProcessingItem: &processingItem, LineStatus: OutsourcingOrderItemStatusOpen}},
+			2: {{ID: 2, OutsourcingOrderID: 2, ProcessingItem: &processingItem, LineStatus: OutsourcingOrderItemStatusOpen}},
 		},
 	}
 	uc := NewOutsourcingOrderUsecase(repo)
@@ -287,6 +376,9 @@ func TestOutsourcingOrderUsecaseLifecycleGuards(t *testing.T) {
 	}
 	if _, err := uc.CancelOutsourcingOrder(ctx, 4); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected settled order transition rejected, got %v", err)
+	}
+	if _, err := uc.SubmitOutsourcingOrder(ctx, 5); !errors.Is(err, ErrOutsourcingOrderIncomplete) {
+		t.Fatalf("expected incomplete contract submission rejected, got %v", err)
 	}
 	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 1, &OutsourcingOrderMutation{}, nil); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected missing version rejected, got %v", err)

@@ -116,8 +116,11 @@ for (const relativeFile of scanFiles) {
   if (hasForbiddenStageLabel(relativeFile)) {
     hits.push(`${relativeFile}:1: forbidden phase label in file path`);
   }
-  const content = fs.readFileSync(path.join(ROOT, relativeFile), "utf8");
-  content.split(/\r?\n/u).forEach((line, index) => {
+  const content = fs.readFileSync(path.join(ROOT, relativeFile));
+  if (content.includes(0)) {
+    continue;
+  }
+  content.toString("utf8").split(/\r?\n/u).forEach((line, index) => {
     if (hasForbiddenStageLabel(line)) {
       hits.push(`${relativeFile}:${index + 1}: ${line.trim()}`);
     }

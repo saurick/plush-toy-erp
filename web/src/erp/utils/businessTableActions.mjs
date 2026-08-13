@@ -3,6 +3,7 @@ import {
   applyEffectiveFieldPolicyFlags,
   resolveDefaultFieldPolicySurface as resolveAdminProfileFieldPolicySurface,
 } from './adminProfileSync.mjs'
+import { downloadCSVRows } from './csvExport.mjs'
 import { sanitizeModuleColumnOrder } from './moduleTableColumns.mjs'
 
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
@@ -58,40 +59,17 @@ export function getPreferredColumnOrder({
   return sanitizeModuleColumnOrder(readStoredColumnOrder(moduleKey), columns)
 }
 
-function csvEscape(value) {
-  const text = String(value ?? '')
-  if (/[",\n\r]/u.test(text)) {
-    return `"${text.replace(/"/g, '""')}"`
-  }
-  return text
-}
-
 export function downloadCSV({ filename, columns, rows }) {
   const visibleColumns = (Array.isArray(columns) ? columns : []).filter(
     (column) => column?.hiddenByEffectiveFieldPolicy !== true
   )
-  const header = visibleColumns.map((column) =>
-    csvEscape(getColumnLabel(column))
-  )
+  const header = visibleColumns.map((column) => getColumnLabel(column))
   const body = rows.map((row) =>
     visibleColumns.map((column) => {
-      const value =
-        typeof column.exportValue === 'function'
-          ? column.exportValue(row)
-          : row?.[column.dataIndex]
-      return csvEscape(value)
+      return typeof column.exportValue === 'function'
+        ? column.exportValue(row)
+        : row?.[column.dataIndex]
     })
   )
-  const csv = [header, ...body].map((line) => line.join(',')).join('\n')
-  const blob = new Blob([`\uFEFF${csv}`], {
-    type: 'text/csv;charset=utf-8;',
-  })
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = filename
-  document.body.appendChild(anchor)
-  anchor.click()
-  document.body.removeChild(anchor)
-  URL.revokeObjectURL(url)
+  downloadCSVRows({ filename, rows: [header, ...body] })
 }

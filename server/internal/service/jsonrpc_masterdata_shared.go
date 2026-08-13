@@ -54,10 +54,15 @@ func (d *jsonrpcDispatcher) handleMasterDataReference(
 }
 
 func masterDataFilterFromParams(pm map[string]any) biz.MasterDataFilter {
+	supplierTypes := getStringSlice(pm, "supplier_types")
+	if supplierType := getString(pm, "supplier_type"); supplierType != "" {
+		supplierTypes = append(supplierTypes, supplierType)
+	}
 	return biz.MasterDataFilter{
 		Keyword:        getString(pm, "keyword"),
 		ActiveOnly:     getBool(pm, "active_only", false),
 		LifecycleScope: getString(pm, "lifecycle_scope"),
+		SupplierTypes:  supplierTypes,
 		Limit:          getInt(pm, "limit", 50),
 		Offset:         getInt(pm, "offset", 0),
 	}

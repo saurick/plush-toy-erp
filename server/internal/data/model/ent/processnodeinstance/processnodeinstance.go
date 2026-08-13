@@ -40,8 +40,30 @@ const (
 	FieldStartedAt = "started_at"
 	// FieldCompletedAt holds the string denoting the completed_at field in the database.
 	FieldCompletedAt = "completed_at"
+	// FieldActivatedFromNodeInstanceID holds the string denoting the activated_from_node_instance_id field in the database.
+	FieldActivatedFromNodeInstanceID = "activated_from_node_instance_id"
+	// FieldRoutingCompletedAt holds the string denoting the routing_completed_at field in the database.
+	FieldRoutingCompletedAt = "routing_completed_at"
+	// FieldRoutingCompletedBy holds the string denoting the routing_completed_by field in the database.
+	FieldRoutingCompletedBy = "routing_completed_by"
 	// FieldOutcome holds the string denoting the outcome field in the database.
 	FieldOutcome = "outcome"
+	// FieldBlockKind holds the string denoting the block_kind field in the database.
+	FieldBlockKind = "block_kind"
+	// FieldBlockedReasonCode holds the string denoting the blocked_reason_code field in the database.
+	FieldBlockedReasonCode = "blocked_reason_code"
+	// FieldBlockedReason holds the string denoting the blocked_reason field in the database.
+	FieldBlockedReason = "blocked_reason"
+	// FieldBlockedAt holds the string denoting the blocked_at field in the database.
+	FieldBlockedAt = "blocked_at"
+	// FieldBlockedBy holds the string denoting the blocked_by field in the database.
+	FieldBlockedBy = "blocked_by"
+	// FieldResumeReason holds the string denoting the resume_reason field in the database.
+	FieldResumeReason = "resume_reason"
+	// FieldResumedAt holds the string denoting the resumed_at field in the database.
+	FieldResumedAt = "resumed_at"
+	// FieldResumedBy holds the string denoting the resumed_by field in the database.
+	FieldResumedBy = "resumed_by"
 	// FieldDomainCommandFingerprint holds the string denoting the domain_command_fingerprint field in the database.
 	FieldDomainCommandFingerprint = "domain_command_fingerprint"
 	// FieldDomainCommandProtocolVersion holds the string denoting the domain_command_protocol_version field in the database.
@@ -80,6 +102,8 @@ const (
 	FieldDomainCommandRecoveredBy = "domain_command_recovered_by"
 	// FieldVersion holds the string denoting the version field in the database.
 	FieldVersion = "version"
+	// FieldUpdatedBy holds the string denoting the updated_by field in the database.
+	FieldUpdatedBy = "updated_by"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -122,7 +146,18 @@ var Columns = []string{
 	FieldDueAt,
 	FieldStartedAt,
 	FieldCompletedAt,
+	FieldActivatedFromNodeInstanceID,
+	FieldRoutingCompletedAt,
+	FieldRoutingCompletedBy,
 	FieldOutcome,
+	FieldBlockKind,
+	FieldBlockedReasonCode,
+	FieldBlockedReason,
+	FieldBlockedAt,
+	FieldBlockedBy,
+	FieldResumeReason,
+	FieldResumedAt,
+	FieldResumedBy,
 	FieldDomainCommandFingerprint,
 	FieldDomainCommandProtocolVersion,
 	FieldDomainCommandResultState,
@@ -142,6 +177,7 @@ var Columns = []string{
 	FieldDomainCommandRecoveredAt,
 	FieldDomainCommandRecoveredBy,
 	FieldVersion,
+	FieldUpdatedBy,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -179,8 +215,24 @@ var (
 	FormProfileKeyValidator func(string) error
 	// ActionSetKeyValidator is a validator for the "action_set_key" field. It is called by the builders before save.
 	ActionSetKeyValidator func(string) error
+	// ActivatedFromNodeInstanceIDValidator is a validator for the "activated_from_node_instance_id" field. It is called by the builders before save.
+	ActivatedFromNodeInstanceIDValidator func(int) error
+	// RoutingCompletedByValidator is a validator for the "routing_completed_by" field. It is called by the builders before save.
+	RoutingCompletedByValidator func(int) error
 	// OutcomeValidator is a validator for the "outcome" field. It is called by the builders before save.
 	OutcomeValidator func(string) error
+	// BlockKindValidator is a validator for the "block_kind" field. It is called by the builders before save.
+	BlockKindValidator func(string) error
+	// BlockedReasonCodeValidator is a validator for the "blocked_reason_code" field. It is called by the builders before save.
+	BlockedReasonCodeValidator func(string) error
+	// BlockedReasonValidator is a validator for the "blocked_reason" field. It is called by the builders before save.
+	BlockedReasonValidator func(string) error
+	// BlockedByValidator is a validator for the "blocked_by" field. It is called by the builders before save.
+	BlockedByValidator func(int) error
+	// ResumeReasonValidator is a validator for the "resume_reason" field. It is called by the builders before save.
+	ResumeReasonValidator func(string) error
+	// ResumedByValidator is a validator for the "resumed_by" field. It is called by the builders before save.
+	ResumedByValidator func(int) error
 	// DomainCommandFingerprintValidator is a validator for the "domain_command_fingerprint" field. It is called by the builders before save.
 	DomainCommandFingerprintValidator func(string) error
 	// DomainCommandProtocolVersionValidator is a validator for the "domain_command_protocol_version" field. It is called by the builders before save.
@@ -211,6 +263,8 @@ var (
 	DefaultVersion int
 	// VersionValidator is a validator for the "version" field. It is called by the builders before save.
 	VersionValidator func(int) error
+	// UpdatedByValidator is a validator for the "updated_by" field. It is called by the builders before save.
+	UpdatedByValidator func(int) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
@@ -287,9 +341,64 @@ func ByCompletedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCompletedAt, opts...).ToFunc()
 }
 
+// ByActivatedFromNodeInstanceID orders the results by the activated_from_node_instance_id field.
+func ByActivatedFromNodeInstanceID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldActivatedFromNodeInstanceID, opts...).ToFunc()
+}
+
+// ByRoutingCompletedAt orders the results by the routing_completed_at field.
+func ByRoutingCompletedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRoutingCompletedAt, opts...).ToFunc()
+}
+
+// ByRoutingCompletedBy orders the results by the routing_completed_by field.
+func ByRoutingCompletedBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRoutingCompletedBy, opts...).ToFunc()
+}
+
 // ByOutcome orders the results by the outcome field.
 func ByOutcome(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldOutcome, opts...).ToFunc()
+}
+
+// ByBlockKind orders the results by the block_kind field.
+func ByBlockKind(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBlockKind, opts...).ToFunc()
+}
+
+// ByBlockedReasonCode orders the results by the blocked_reason_code field.
+func ByBlockedReasonCode(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBlockedReasonCode, opts...).ToFunc()
+}
+
+// ByBlockedReason orders the results by the blocked_reason field.
+func ByBlockedReason(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBlockedReason, opts...).ToFunc()
+}
+
+// ByBlockedAt orders the results by the blocked_at field.
+func ByBlockedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBlockedAt, opts...).ToFunc()
+}
+
+// ByBlockedBy orders the results by the blocked_by field.
+func ByBlockedBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBlockedBy, opts...).ToFunc()
+}
+
+// ByResumeReason orders the results by the resume_reason field.
+func ByResumeReason(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldResumeReason, opts...).ToFunc()
+}
+
+// ByResumedAt orders the results by the resumed_at field.
+func ByResumedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldResumedAt, opts...).ToFunc()
+}
+
+// ByResumedBy orders the results by the resumed_by field.
+func ByResumedBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldResumedBy, opts...).ToFunc()
 }
 
 // ByDomainCommandFingerprint orders the results by the domain_command_fingerprint field.
@@ -375,6 +484,11 @@ func ByDomainCommandRecoveredBy(opts ...sql.OrderTermOption) OrderOption {
 // ByVersion orders the results by the version field.
 func ByVersion(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldVersion, opts...).ToFunc()
+}
+
+// ByUpdatedBy orders the results by the updated_by field.
+func ByUpdatedBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUpdatedBy, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

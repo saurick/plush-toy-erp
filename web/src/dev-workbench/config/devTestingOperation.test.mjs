@@ -137,26 +137,47 @@ test('testing Git closeout copy stays fixed and explains the four boundaries', (
 
 test('testing plan accepts only relative commands and frozen identity', () => {
   const plan = normalizeDevTestingPlan({
-    schemaVersion: 'plush.dev-qa-testing-plan/v1',
+    schemaVersion: 'plush.dev-qa-testing-plan/v2',
     generatedAt: '2026-07-30T10:00:00.000Z',
     repository: REPOSITORY,
     changedCount: 2,
-    levels: ['T0', 'T3'],
-    highestLevel: 'T3',
-    requiresFull: false,
+    affectedScopes: ['T0', 'T3'],
+    maxAffectedScope: 'T3',
+    localGate: 'focused',
     commands: [
       {
         id: 'web',
-        level: 'T3',
+        scope: 'T3',
         label: 'Web test',
         cwd: '.',
         command: 'node --test web/src/example.test.mjs',
       },
     ],
-    followUps: [{ level: 'T5', text: '运行真实浏览器回归' }],
+    followUps: [{ scope: 'T5', text: '运行真实浏览器回归' }],
     prePushGate: 'bash scripts/qa/prepare-push.sh',
   })
   assert.equal(plan.changedCount, 2)
+  assert.throws(
+    () =>
+      normalizeDevTestingPlan({
+        ...plan,
+        schemaVersion: 'plush.dev-qa-testing-plan/v1',
+      }),
+    /testing plan is invalid/u
+  )
+  const fullPlan = normalizeDevTestingPlan({
+    ...plan,
+    localGate: 'full',
+    commands: [
+      {
+        ...plan.commands[0],
+        id: 'full',
+        scope: 'LOCAL_FULL',
+      },
+    ],
+  })
+  assert.equal(fullPlan.commands[0].scope, 'LOCAL_FULL')
+  assert.deepEqual(fullPlan.affectedScopes, ['T0', 'T3'])
   assert.throws(
     () =>
       normalizeDevTestingPlan({
@@ -201,13 +222,13 @@ test('testing client posts only action and idempotency key', async () => {
       }
       if (url === DEV_TESTING_OPERATION_PLAN_API_PATH) {
         return jsonResponse({
-          schemaVersion: 'plush.dev-qa-testing-plan/v1',
+          schemaVersion: 'plush.dev-qa-testing-plan/v2',
           generatedAt: '2026-07-30T10:00:00.000Z',
           repository: REPOSITORY,
           changedCount: 0,
-          levels: ['T0'],
-          highestLevel: 'T0',
-          requiresFull: false,
+          affectedScopes: ['T0'],
+          maxAffectedScope: 'T0',
+          localGate: 'focused',
           commands: [],
           followUps: [],
           prePushGate: 'bash scripts/qa/prepare-push.sh',

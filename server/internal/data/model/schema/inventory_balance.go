@@ -18,7 +18,9 @@ type InventoryBalance struct {
 func (InventoryBalance) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{Checks: map[string]string{
-			"inventory_balances_sku_subject_allowed": "product_sku_id IS NULL OR subject_type = 'PRODUCT'",
+			"inventory_balances_subject_type_allowed": "subject_type IN ('MATERIAL', 'PRODUCT')",
+			"inventory_balances_sku_subject_allowed":  "product_sku_id IS NULL OR subject_type = 'PRODUCT'",
+			"inventory_balances_quantity_nonnegative": "quantity >= 0",
 		}},
 	}
 }

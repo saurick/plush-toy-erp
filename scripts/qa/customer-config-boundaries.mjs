@@ -859,7 +859,6 @@ function validateYoyoosunImportConfig(config) {
     "executesImport",
     "executesRealImport",
     "canExecuteRealImport",
-    "writesBusinessRecords",
     "writesFacts",
     "writesInventoryFacts",
     "writesShipmentFacts",
@@ -1036,7 +1035,6 @@ function validateYoyoosunImportConfig(config) {
   );
   for (const forbidden of [
     "tenant_id",
-    "business_records",
     "product_skus",
     "purchase_orders",
     "outsourcing_facts",

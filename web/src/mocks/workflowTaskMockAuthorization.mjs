@@ -4,7 +4,7 @@ import {
   getWorkflowTaskActionStatusKey,
 } from '../erp/utils/workflowTaskActionContract.mjs'
 
-const TERMINAL_TASK_STATUS_KEYS = new Set(['done', 'rejected'])
+const TERMINAL_TASK_STATUS_KEYS = new Set(['done', 'rejected', 'withdrawn'])
 
 function normalizedRoleKeys(adminProfile = {}) {
   return new Set(

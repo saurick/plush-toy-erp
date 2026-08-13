@@ -7,7 +7,7 @@ export const dashboardModules = Object.freeze([
   },
   {
     key: 'suppliers',
-    title: '供应商档案',
+    title: '供应商与加工厂',
     path: '/erp/master/partners/suppliers',
   },
   {

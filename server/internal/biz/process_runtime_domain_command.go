@@ -722,12 +722,12 @@ func (uc *ProcessRuntimeUsecase) reconcileSettledDomainCommandNode(ctx context.C
 				return nil, err
 			}
 		}
-		return node, nil
+		return uc.markProcessNodeRoutingCompleted(ctx, node, actorID)
 	case ProcessNodeStatusBlocked:
 		if err := uc.ensureRejectedProcessBlocked(ctx, node.ProcessInstanceID, actorID); err != nil {
 			return nil, err
 		}
-		return node, nil
+		return uc.markProcessNodeRoutingCompleted(ctx, node, actorID)
 	default:
 		return nil, ErrProcessNodeInstanceNotActive
 	}

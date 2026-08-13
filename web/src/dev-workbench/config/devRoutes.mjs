@@ -9,6 +9,7 @@ export const DEV_DELIVERY_ROUTE = '/__dev/delivery'
 export const DEV_DOCS_ROUTE = '/__dev/docs'
 export const DEV_GOVERNANCE_ROUTE = '/__dev/governance'
 export const DEV_STATUS_FLOWS_ROUTE = '/__dev/status-flows'
+export const DEV_BUSINESS_USABILITY_ROUTE = '/__dev/business-usability'
 export const DEV_PROTOTYPES_ROUTE = '/__dev/prototypes'
 export const DEV_CUSTOMER_CONFIG_ROUTE = '/__dev/customer-config'
 export const DEV_DATABASE_MIGRATION_ROUTE = '/__dev/database-migration'
@@ -78,6 +79,12 @@ export const DEV_SECONDARY_NAV_ITEMS = Object.freeze([
     areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
     route: DEV_STATUS_FLOWS_ROUTE,
     label: '业务链观察',
+  }),
+  Object.freeze({
+    key: 'business-usability',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
+    route: DEV_BUSINESS_USABILITY_ROUTE,
+    label: '业务易用性',
   }),
   Object.freeze({
     key: 'docs',
@@ -162,6 +169,7 @@ export const DEV_PAGE_FAVICON_BY_ROUTE = Object.freeze({
   [DEV_DELIVERY_ROUTE]: '/favicon-dev.svg',
   [DEV_GOVERNANCE_ROUTE]: '/favicon-governance.svg',
   [DEV_STATUS_FLOWS_ROUTE]: '/favicon-dev.svg',
+  [DEV_BUSINESS_USABILITY_ROUTE]: '/favicon-dev.svg',
   [DEV_DOCS_ROUTE]: '/favicon-docs.svg',
   [DEV_TESTING_ROUTE]: '/favicon-testing.svg',
   [DEV_QUALITY_GATES_ROUTE]: '/favicon-testing.svg',

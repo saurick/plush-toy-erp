@@ -342,6 +342,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "inventory",
         "inbound",
         "quality-inspections",
+        "production-progress",
         "outbound",
         "shipments",
         "task-board",
@@ -364,6 +365,8 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "purchase.receipt.adjustment.create",
         "purchase.receipt.adjustment.post",
         "purchase.receipt.adjustment.cancel",
+        "production.fact.read",
+        "production.wip.read",
         "warehouse.inventory.read",
         "warehouse.inbound.read",
         "warehouse.inbound.confirm",
@@ -388,7 +391,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "purchase_to_inventory.warehouse_inbound",
       ]),
       guardrail:
-        "仓库执行入库、退货、入库调整与出货时必须走对应业务 usecase，不通过任务完成动作直接增减库存。当前 entitlement 仍不能办理 WIP / 委外回货登记。",
+        "仓库执行采购入库、成品入库、退货、入库调整与出货时必须走对应业务 usecase，不通过任务完成动作直接增减库存。仓库只核对待入库完工报告并确认实收，不能安排或执行 WIP，也不能代替生产提交完工报告。",
     }),
     Object.freeze({
       roleKey: "quality",
@@ -597,7 +600,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
       ]),
       printTemplates: Object.freeze(["processing-contract"]),
       guardrail:
-        "生产 / 委外负责加工合同源单和 WIP 安排、执行、移交及返工；不能代替品质判定、包材业务确认、成品入库、结算或付款事实。",
+        "生产 / 委外负责加工合同源单和 WIP 安排、执行、移交、返工及提交完工报告；完工报告只生成待入库草稿，不能代替品质判定、包材业务确认、仓库成品入库、结算或付款事实。",
     }),
   ]),
 });

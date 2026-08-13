@@ -235,6 +235,7 @@ test("pre-commit requires staged schema, migration, and atlas.sum as one change"
     installHookFixture(root);
     installDbGuardFixture(root);
     commit(root, "base");
+    const hookEnv = { ...process.env, QA_BASE_RANGE: "" };
 
     const schema = path.join(root, "server/internal/data/model/schema/item.go");
     writeFileSync(
@@ -247,6 +248,7 @@ test("pre-commit requires staged schema, migration, and atlas.sum as one change"
     const result = spawnSync("bash", ["scripts/git-hooks/pre-commit.sh"], {
       cwd: root,
       encoding: "utf8",
+      env: hookEnv,
     });
     assert.equal(result.status, 1, result.stderr || result.stdout);
     assert.match(result.stderr, /schema\/ent 结构变更但没有新增 migration/u);
@@ -276,6 +278,7 @@ test("pre-commit requires staged schema, migration, and atlas.sum as one change"
       {
         cwd: root,
         encoding: "utf8",
+        env: hookEnv,
       },
     );
     assert.equal(
@@ -444,8 +447,9 @@ test("pre-commit source contains no mutating formatter or git add", () => {
   assert.match(source, /git checkout-index --all/u);
   assert.match(source, /GIT_WORK_TREE="\$INDEX_ROOT"/u);
   assert.match(source, /SHFMT_CHECK=1/u);
-  assert.match(source, /SKIP_DB_GUARD=0 QA_BASE_RANGE=HEAD\.\.\.HEAD/u);
-  assert.match(source, /scripts\/qa\/db-guard\.sh/u);
+  assert.match(source, /SKIP_DB_GUARD=0/u);
+  assert.doesNotMatch(source, /\bQA_BASE_RANGE=/u);
+  assert.match(source, /scripts\/qa\/db-guard\.sh" --index-transition/u);
   assert.match(source, /scripts\/qa\/dev-page-governance\.test\.mjs/u);
   assert.doesNotMatch(source, /\bmake data\b|\bmigrate_apply\b/u);
 });

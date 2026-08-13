@@ -7,6 +7,7 @@ import {
   compareNumeric20Scale6Units,
   formatNumeric20Scale6,
   formatNumeric20Scale6Summary,
+  multiplyNumeric20Scale6Values,
   normalizeNumeric20Scale6,
   normalizePositiveNumeric20Scale6,
   numeric20Scale6TextFromUnits,
@@ -23,15 +24,15 @@ test('numeric(20,6) helper preserves the smallest and largest values exactly', (
   const maximum = '99999999999999.999999'
   assert.equal(numeric20Scale6Units(maximum), '99999999999999999999')
   assert.equal(normalizeNumeric20Scale6(maximum), maximum)
-  assert.equal(
-    numeric20Scale6TextFromUnits('99999999999999999999'),
-    maximum
-  )
+  assert.equal(numeric20Scale6TextFromUnits('99999999999999999999'), maximum)
 })
 
 test('numeric(20,6) scaled strings add, subtract and compare exactly', () => {
   const maximumUnits = numeric20Scale6Units('99999999999999.999999')
-  assert.equal(addNumeric20Scale6Units('1', maximumUnits), '100000000000000000000')
+  assert.equal(
+    addNumeric20Scale6Units('1', maximumUnits),
+    '100000000000000000000'
+  )
   assert.equal(
     subtractNumeric20Scale6Units(maximumUnits, '1'),
     '99999999999999999998'
@@ -71,14 +72,20 @@ test('numeric(20,6) raw values sort and summarize without Number rounding', () =
   )
   assert.equal(compareNumeric20Scale6Values('0.000001', '0.000002'), -1)
   assert.equal(
-    sumNumeric20Scale6Values([
-      '99999999999999.999999',
-      '0.000001',
-      'invalid',
-    ]),
+    sumNumeric20Scale6Values(['99999999999999.999999', '0.000001', 'invalid']),
     '100000000000000'
   )
   assert.equal(formatNumeric20Scale6Summary('0.000001', 2), '0.000001')
   assert.equal(formatNumeric20Scale6Summary('1.2', 3), '1.200')
   assert.equal(formatNumeric20Scale6Summary('0', 2), '0.00')
+})
+
+test('numeric(20,6) values multiply and round half-up without binary floating point drift', () => {
+  assert.equal(multiplyNumeric20Scale6Values('1', '2.675', 2), '2.68')
+  assert.equal(multiplyNumeric20Scale6Values('0.1', '0.2', 2), '0.02')
+  assert.equal(
+    multiplyNumeric20Scale6Values('99999999999999.999999', '2', 2),
+    '200000000000000.00'
+  )
+  assert.equal(multiplyNumeric20Scale6Values('invalid', '2', 2), '')
 })

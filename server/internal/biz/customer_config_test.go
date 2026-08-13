@@ -1226,7 +1226,7 @@ func TestCustomerConfigUsecaseBuildsProcessInstanceCreateFromActiveProcessDefini
 	if create.ModuleContractSnapshot["source"] != "active_customer_config" {
 		t.Fatalf("module contract snapshot = %#v", create.ModuleContractSnapshot)
 	}
-	if len(create.Nodes) != 6 {
+	if len(create.Nodes) != 7 {
 		t.Fatalf("nodes = %#v", create.Nodes)
 	}
 	if create.Nodes[0].NodeKey != "submit_sales_order" ||
@@ -1246,8 +1246,12 @@ func TestCustomerConfigUsecaseBuildsProcessInstanceCreateFromActiveProcessDefini
 	if create.Nodes[3].RequiredCapabilityKey == nil || *create.Nodes[3].RequiredCapabilityKey != PermissionWorkflowTaskComplete {
 		t.Fatalf("review capability = %#v", create.Nodes[3].RequiredCapabilityKey)
 	}
-	if create.Nodes[5].NodeKey != "sales_order_rejected_end" || create.Nodes[5].NodeType != ProcessNodeTypeEnd {
-		t.Fatalf("rejected end node = %#v", create.Nodes[5])
+	if create.Nodes[5].NodeKey != "reject_sales_order" ||
+		create.Nodes[5].PolicySnapshot["command_key"] != ProcessDomainCommandSalesOrderReject {
+		t.Fatalf("rejection command node = %#v", create.Nodes[5])
+	}
+	if create.Nodes[6].NodeKey != "sales_order_rejected_end" || create.Nodes[6].NodeType != ProcessNodeTypeEnd {
+		t.Fatalf("rejected end node = %#v", create.Nodes[6])
 	}
 
 	processRepo := &memProcessRuntimeRepo{}
@@ -1364,7 +1368,7 @@ func TestCustomerConfigUsecaseBuildsMaterialSupplyPurchaseOrderProcessInstanceCr
 	if create.BusinessRefType != "purchase_order" || create.BusinessRefID != 5001 {
 		t.Fatalf("business ref = %#v", create)
 	}
-	if len(create.Nodes) != 5 {
+	if len(create.Nodes) != 6 {
 		t.Fatalf("nodes = %#v", create.Nodes)
 	}
 	if create.Nodes[0].NodeKey != "submit_purchase_order" ||
@@ -1385,8 +1389,12 @@ func TestCustomerConfigUsecaseBuildsMaterialSupplyPurchaseOrderProcessInstanceCr
 	if create.Nodes[3].NodeKey != "end" || create.Nodes[3].NodeType != ProcessNodeTypeEnd {
 		t.Fatalf("purchase approval end node = %#v", create.Nodes[3])
 	}
-	if create.Nodes[4].NodeKey != "purchase_order_rejected_end" || create.Nodes[4].NodeType != ProcessNodeTypeEnd {
-		t.Fatalf("purchase rejection end node = %#v", create.Nodes[4])
+	if create.Nodes[4].NodeKey != "reject_purchase_order" ||
+		create.Nodes[4].PolicySnapshot["command_key"] != ProcessDomainCommandPurchaseOrderReject {
+		t.Fatalf("purchase rejection command node = %#v", create.Nodes[4])
+	}
+	if create.Nodes[5].NodeKey != "purchase_order_rejected_end" || create.Nodes[5].NodeType != ProcessNodeTypeEnd {
+		t.Fatalf("purchase rejection end node = %#v", create.Nodes[5])
 	}
 }
 

@@ -178,6 +178,7 @@ func (r *masterDataRepo) CreateSupplier(ctx context.Context, in *biz.SupplierMut
 		SetNillableSupplierType(in.SupplierType).
 		SetNillableAddress(in.Address).
 		SetNillableTaxNo(in.TaxNo).
+		SetDefaultPaymentTermDays(in.DefaultPaymentTermDays).
 		SetNillableNote(in.Note)
 	if len(in.ProcessIDs) > 0 {
 		create.AddProcessCapabilityIDs(in.ProcessIDs...)
@@ -196,7 +197,8 @@ func (r *masterDataRepo) CreateSupplier(ctx context.Context, in *biz.SupplierMut
 func (r *masterDataRepo) UpdateSupplier(ctx context.Context, id int, in *biz.SupplierMutation) (*biz.Supplier, error) {
 	update := r.data.postgres.Supplier.UpdateOneID(id).
 		SetCode(in.Code).
-		SetName(in.Name)
+		SetName(in.Name).
+		SetDefaultPaymentTermDays(in.DefaultPaymentTermDays)
 	if in.ShortName == nil {
 		update.ClearShortName()
 	} else {
@@ -303,6 +305,9 @@ func (r *masterDataRepo) ListSuppliers(ctx context.Context, filter biz.MasterDat
 	} else if filter.ActiveOnly {
 		query = query.Where(supplier.IsActive(true))
 	}
+	if len(filter.SupplierTypes) > 0 {
+		query = query.Where(supplier.SupplierTypeIn(filter.SupplierTypes...))
+	}
 	total, err := query.Clone().Count(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -311,7 +316,45 @@ func (r *masterDataRepo) ListSuppliers(ctx context.Context, filter biz.MasterDat
 	if err != nil {
 		return nil, 0, err
 	}
-	return entSuppliersToBiz(rows), total, nil
+	items := entSuppliersToBiz(rows)
+	if err := r.populateSupplierPrimaryContacts(ctx, items); err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
+func (r *masterDataRepo) populateSupplierPrimaryContacts(ctx context.Context, suppliers []*biz.Supplier) error {
+	ownerIDs := make([]int, 0, len(suppliers))
+	supplierByID := make(map[int]*biz.Supplier, len(suppliers))
+	for _, item := range suppliers {
+		if item == nil || item.ID <= 0 {
+			continue
+		}
+		ownerIDs = append(ownerIDs, item.ID)
+		supplierByID[item.ID] = item
+	}
+	if len(ownerIDs) == 0 {
+		return nil
+	}
+	rows, err := r.data.postgres.Contact.Query().
+		Where(
+			contact.OwnerType(biz.ContactOwnerSupplier),
+			contact.OwnerIDIn(ownerIDs...),
+			contact.IsActive(true),
+		).
+		Order(ent.Desc(contact.FieldIsPrimary), ent.Asc(contact.FieldID)).
+		All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, row := range rows {
+		item := supplierByID[row.OwnerID]
+		if item == nil || item.PrimaryContact != nil {
+			continue
+		}
+		item.PrimaryContact = entContactToBiz(row)
+	}
+	return nil
 }
 
 func (r *masterDataRepo) SetSupplierActive(ctx context.Context, id int, active bool) (*biz.Supplier, error) {
@@ -1086,6 +1129,7 @@ func createSupplierWithClient(ctx context.Context, client *ent.Client, in *biz.S
 		SetNillableSupplierType(in.SupplierType).
 		SetNillableAddress(in.Address).
 		SetNillableTaxNo(in.TaxNo).
+		SetDefaultPaymentTermDays(in.DefaultPaymentTermDays).
 		SetNillableNote(in.Note)
 	if len(in.ProcessIDs) > 0 {
 		create.AddProcessCapabilityIDs(in.ProcessIDs...)
@@ -1096,7 +1140,8 @@ func createSupplierWithClient(ctx context.Context, client *ent.Client, in *biz.S
 func updateSupplierWithClient(ctx context.Context, client *ent.Client, id int, in *biz.SupplierMutation) (*ent.Supplier, error) {
 	update := client.Supplier.UpdateOneID(id).
 		SetCode(in.Code).
-		SetName(in.Name)
+		SetName(in.Name).
+		SetDefaultPaymentTermDays(in.DefaultPaymentTermDays)
 	if in.ShortName == nil {
 		update.ClearShortName()
 	} else {
@@ -1319,18 +1364,19 @@ func entSupplierToBiz(row *ent.Supplier) *biz.Supplier {
 		}
 	}
 	return &biz.Supplier{
-		ID:           row.ID,
-		Code:         row.Code,
-		Name:         row.Name,
-		ShortName:    row.ShortName,
-		SupplierType: row.SupplierType,
-		Address:      row.Address,
-		TaxNo:        row.TaxNo,
-		ProcessIDs:   processIDs,
-		IsActive:     row.IsActive,
-		Note:         row.Note,
-		CreatedAt:    row.CreatedAt,
-		UpdatedAt:    row.UpdatedAt,
+		ID:                     row.ID,
+		Code:                   row.Code,
+		Name:                   row.Name,
+		ShortName:              row.ShortName,
+		SupplierType:           row.SupplierType,
+		Address:                row.Address,
+		TaxNo:                  row.TaxNo,
+		DefaultPaymentTermDays: row.DefaultPaymentTermDays,
+		ProcessIDs:             processIDs,
+		IsActive:               row.IsActive,
+		Note:                   row.Note,
+		CreatedAt:              row.CreatedAt,
+		UpdatedAt:              row.UpdatedAt,
 	}
 }
 

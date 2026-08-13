@@ -14,7 +14,7 @@
 - 这份覆盖矩阵是本项目自包含的 To Implement 设计清单；进入实现前必须按当前运行时菜单、[菜单与正式入口合同](../../菜单与正式入口合同.md)、schema、API、RBAC、migration 和测试重新复核。
 - 当前正式运行时菜单仍以 `web/src/erp/config/seedData.mjs`、`web/src/erp/config/businessModules.mjs`、部署注入的 `customer-config.js`、客户包源 `config/customers/yoyoosun/menuConfig.mjs` 和后端 RBAC 返回为准。
 - 第一批 / 第二批原型优先级只用于安排设计和实现顺序，不表示这些页面已经进入 Current，也不表示客户菜单必须全部启用。
-- 数据导入、系统配置、备份恢复、客户配置和 Legacy Archive 在本样板中保持“页面内容可评审”，不因此进入正式菜单、后端业务或生产构建。
+- 数据导入、系统配置、备份恢复和客户配置在本样板中保持“页面内容可评审”，不因此进入正式菜单、后端业务或生产构建。
 
 ## 边界
 

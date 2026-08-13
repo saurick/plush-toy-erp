@@ -67,6 +67,39 @@ export function buildBusinessChainSelectOptions(catalog) {
   return [selectOption(overview.key, overview.label), ...groups]
 }
 
+function processGroupLabel(definitions, processKey) {
+  const businessLabel = String(definitions[0]?.label || '')
+    .replace(/（[^）]*）$/u, '')
+    .trim()
+  return businessLabel || processKey
+}
+
+export function buildProcessDefinitionSelectOptions(catalog) {
+  const definitions = asArray(catalog?.processDefinitions)
+  const processKeys = [
+    ...new Set(definitions.map((definition) => definition.processKey)),
+  ]
+  const groups = processKeys.map((processKey) => {
+    const processDefinitions = definitions.filter(
+      (definition) => definition.processKey === processKey
+    )
+    return selectGroup(
+      `process:${processKey}`,
+      processGroupLabel(processDefinitions, processKey),
+      processDefinitions.map((definition) =>
+        selectOption(definition.key, definition.label, definition.key)
+      )
+    )
+  })
+  assertExactCoverage(
+    definitions,
+    groups,
+    (definition) => definition.key,
+    'process definition'
+  )
+  return groups
+}
+
 function factGroupDefinitions(catalog, group) {
   return asArray(catalog?.factDefinitions).filter(
     (definition) => definition.displayGroupKey === group.key
@@ -75,15 +108,14 @@ function factGroupDefinitions(catalog, group) {
 
 export function buildFactDefinitionSelectOptions(catalog) {
   const definitions = asArray(catalog?.factDefinitions)
-  const groups = asArray(catalog?.factDefinitionGroups).map((group) =>
-    selectGroup(
-      `fact:${group.key}`,
-      group.label,
-      factGroupDefinitions(catalog, group).map((definition) =>
-        selectOption(definition.factKey, definition.label, definition.factKey)
-      )
+  const groups = asArray(catalog?.factDefinitionGroups).flatMap((group) => {
+    const options = factGroupDefinitions(catalog, group).map((definition) =>
+      selectOption(definition.factKey, definition.label, definition.factKey)
     )
-  )
+    return options.length > 0
+      ? [selectGroup(`fact:${group.key}`, group.label, options)]
+      : []
+  })
   assertExactCoverage(
     definitions,
     groups,
@@ -127,13 +159,15 @@ export function buildStateDefinitionSelectOptions(catalog) {
           .map((candidate) =>
             selectOption(candidate.key, candidate.label, candidate.key)
           )
-        groups.push(
-          selectGroup(
-            `state:${flow.scopeKey}:${factGroup.key}`,
-            `${scope.label} · ${factGroup.label}`,
-            options
+        if (options.length > 0) {
+          groups.push(
+            selectGroup(
+              `state:${flow.scopeKey}:${factGroup.key}`,
+              `${scope.label} · ${factGroup.label}`,
+              options
+            )
           )
-        )
+        }
       }
       continue
     }
@@ -143,7 +177,9 @@ export function buildStateDefinitionSelectOptions(catalog) {
       .map((candidate) =>
         selectOption(candidate.key, candidate.label, candidate.key)
       )
-    groups.push(selectGroup(`state:${flow.scopeKey}`, scope.label, options))
+    if (options.length > 0) {
+      groups.push(selectGroup(`state:${flow.scopeKey}`, scope.label, options))
+    }
   }
 
   assertExactCoverage(flows, groups, (flow) => flow.key, 'state definition')

@@ -6,7 +6,7 @@
     {
       "sourceId": "freeze-customer-update",
       "sourceType": "Data Import Source",
-      "sourceKind": "business_records",
+      "sourceKind": "customer_source_snapshot",
       "moduleKey": "partners",
       "fileName": "sanitized-partners-freeze.json",
       "sheetName": "customers",
@@ -55,7 +55,7 @@
     {
       "sourceId": "freeze-contact-with-owner",
       "sourceType": "Data Import Source",
-      "sourceKind": "business_records",
+      "sourceKind": "customer_source_snapshot",
       "moduleKey": "partners",
       "fileName": "sanitized-contacts-freeze.json",
       "sheetName": "contacts",
@@ -73,7 +73,7 @@
     {
       "sourceId": "freeze-contact-missing-owner",
       "sourceType": "Data Import Source",
-      "sourceKind": "business_records",
+      "sourceKind": "customer_source_snapshot",
       "moduleKey": "partners",
       "fileName": "sanitized-contacts-freeze.json",
       "sheetName": null,
@@ -88,7 +88,7 @@
     {
       "sourceId": "freeze-sales-order-candidate",
       "sourceType": "Data Import Source",
-      "sourceKind": "business_records",
+      "sourceKind": "customer_source_snapshot",
       "moduleKey": "project-orders",
       "fileName": "sanitized-sales-orders-freeze.json",
       "sheetName": "orders",
@@ -105,7 +105,7 @@
     {
       "sourceId": "freeze-sales-order-item-candidate",
       "sourceType": "Data Import Source",
-      "sourceKind": "business_records",
+      "sourceKind": "customer_source_snapshot",
       "moduleKey": "project-orders",
       "fileName": "sanitized-sales-order-items-freeze.json",
       "sheetName": "order_items",
@@ -121,7 +121,7 @@
     {
       "sourceId": "freeze-sales-order-item-unknown-unit",
       "sourceType": "Data Import Source",
-      "sourceKind": "business_records",
+      "sourceKind": "customer_source_snapshot",
       "moduleKey": "project-orders",
       "fileName": "sanitized-sales-order-items-freeze.json",
       "sheetName": "order_items",
@@ -137,7 +137,7 @@
     {
       "sourceId": "freeze-product-reference",
       "sourceType": "Data Import Source",
-      "sourceKind": "business_records",
+      "sourceKind": "customer_source_snapshot",
       "moduleKey": "products",
       "fileName": "sanitized-products-freeze.json",
       "sheetName": "products",
@@ -247,7 +247,7 @@
     {
       "sourceId": "freeze-shipment-forbidden",
       "sourceType": "Data Import Source",
-      "sourceKind": "business_records",
+      "sourceKind": "customer_source_snapshot",
       "moduleKey": "shipping-release",
       "fileName": "sanitized-shipment-freeze.json",
       "sheetName": "shipment",
@@ -264,7 +264,7 @@
     {
       "sourceId": "freeze-inventory-forbidden",
       "sourceType": "Data Import Source",
-      "sourceKind": "business_records",
+      "sourceKind": "customer_source_snapshot",
       "moduleKey": "inventory",
       "fileName": "sanitized-inventory-freeze.json",
       "sheetName": "inventory",
@@ -280,7 +280,7 @@
     {
       "sourceId": "freeze-finance-forbidden",
       "sourceType": "Data Import Source",
-      "sourceKind": "business_records",
+      "sourceKind": "customer_source_snapshot",
       "moduleKey": "receivables",
       "fileName": "sanitized-finance-freeze.json",
       "sheetName": "finance",
@@ -297,7 +297,7 @@
     {
       "sourceId": "freeze-shipping-boundary",
       "sourceType": "Data Import Source",
-      "sourceKind": "business_records",
+      "sourceKind": "customer_source_snapshot",
       "moduleKey": "project-orders",
       "fileName": "sanitized-shipping-boundary-freeze.json",
       "sheetName": "orders",
@@ -313,7 +313,7 @@
     {
       "sourceId": "freeze-workflow-fact-boundary",
       "sourceType": "Data Import Source",
-      "sourceKind": "business_records",
+      "sourceKind": "customer_source_snapshot",
       "moduleKey": "workflow",
       "fileName": "sanitized-workflow-freeze.json",
       "sheetName": "workflow",

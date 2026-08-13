@@ -4,6 +4,7 @@ package ent
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"math"
 	"server/internal/data/model/ent/inventorylot"
@@ -30,6 +31,8 @@ type InventoryTxnQuery struct {
 	withUnit         *UnitQuery
 	withProductSku   *ProductSKUQuery
 	withInventoryLot *InventoryLotQuery
+	withReversals    *InventoryTxnQuery
+	withReversalOf   *InventoryTxnQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -147,6 +150,50 @@ func (_q *InventoryTxnQuery) QueryInventoryLot() *InventoryLotQuery {
 			sqlgraph.From(inventorytxn.Table, inventorytxn.FieldID, selector),
 			sqlgraph.To(inventorylot.Table, inventorylot.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, inventorytxn.InventoryLotTable, inventorytxn.InventoryLotColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryReversals chains the current query on the "reversals" edge.
+func (_q *InventoryTxnQuery) QueryReversals() *InventoryTxnQuery {
+	query := (&InventoryTxnClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(inventorytxn.Table, inventorytxn.FieldID, selector),
+			sqlgraph.To(inventorytxn.Table, inventorytxn.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, inventorytxn.ReversalsTable, inventorytxn.ReversalsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryReversalOf chains the current query on the "reversal_of" edge.
+func (_q *InventoryTxnQuery) QueryReversalOf() *InventoryTxnQuery {
+	query := (&InventoryTxnClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(inventorytxn.Table, inventorytxn.FieldID, selector),
+			sqlgraph.To(inventorytxn.Table, inventorytxn.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, inventorytxn.ReversalOfTable, inventorytxn.ReversalOfColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -350,6 +397,8 @@ func (_q *InventoryTxnQuery) Clone() *InventoryTxnQuery {
 		withUnit:         _q.withUnit.Clone(),
 		withProductSku:   _q.withProductSku.Clone(),
 		withInventoryLot: _q.withInventoryLot.Clone(),
+		withReversals:    _q.withReversals.Clone(),
+		withReversalOf:   _q.withReversalOf.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -397,6 +446,28 @@ func (_q *InventoryTxnQuery) WithInventoryLot(opts ...func(*InventoryLotQuery)) 
 		opt(query)
 	}
 	_q.withInventoryLot = query
+	return _q
+}
+
+// WithReversals tells the query-builder to eager-load the nodes that are connected to
+// the "reversals" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *InventoryTxnQuery) WithReversals(opts ...func(*InventoryTxnQuery)) *InventoryTxnQuery {
+	query := (&InventoryTxnClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withReversals = query
+	return _q
+}
+
+// WithReversalOf tells the query-builder to eager-load the nodes that are connected to
+// the "reversal_of" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *InventoryTxnQuery) WithReversalOf(opts ...func(*InventoryTxnQuery)) *InventoryTxnQuery {
+	query := (&InventoryTxnClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withReversalOf = query
 	return _q
 }
 
@@ -478,11 +549,13 @@ func (_q *InventoryTxnQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]
 	var (
 		nodes       = []*InventoryTxn{}
 		_spec       = _q.querySpec()
-		loadedTypes = [4]bool{
+		loadedTypes = [6]bool{
 			_q.withWarehouse != nil,
 			_q.withUnit != nil,
 			_q.withProductSku != nil,
 			_q.withInventoryLot != nil,
+			_q.withReversals != nil,
+			_q.withReversalOf != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -524,6 +597,19 @@ func (_q *InventoryTxnQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]
 	if query := _q.withInventoryLot; query != nil {
 		if err := _q.loadInventoryLot(ctx, query, nodes, nil,
 			func(n *InventoryTxn, e *InventoryLot) { n.Edges.InventoryLot = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withReversals; query != nil {
+		if err := _q.loadReversals(ctx, query, nodes,
+			func(n *InventoryTxn) { n.Edges.Reversals = []*InventoryTxn{} },
+			func(n *InventoryTxn, e *InventoryTxn) { n.Edges.Reversals = append(n.Edges.Reversals, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withReversalOf; query != nil {
+		if err := _q.loadReversalOf(ctx, query, nodes, nil,
+			func(n *InventoryTxn, e *InventoryTxn) { n.Edges.ReversalOf = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -652,6 +738,71 @@ func (_q *InventoryTxnQuery) loadInventoryLot(ctx context.Context, query *Invent
 	}
 	return nil
 }
+func (_q *InventoryTxnQuery) loadReversals(ctx context.Context, query *InventoryTxnQuery, nodes []*InventoryTxn, init func(*InventoryTxn), assign func(*InventoryTxn, *InventoryTxn)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*InventoryTxn)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(inventorytxn.FieldReversalOfTxnID)
+	}
+	query.Where(predicate.InventoryTxn(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(inventorytxn.ReversalsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.ReversalOfTxnID
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "reversal_of_txn_id" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "reversal_of_txn_id" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *InventoryTxnQuery) loadReversalOf(ctx context.Context, query *InventoryTxnQuery, nodes []*InventoryTxn, init func(*InventoryTxn), assign func(*InventoryTxn, *InventoryTxn)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*InventoryTxn)
+	for i := range nodes {
+		if nodes[i].ReversalOfTxnID == nil {
+			continue
+		}
+		fk := *nodes[i].ReversalOfTxnID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(inventorytxn.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "reversal_of_txn_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
 
 func (_q *InventoryTxnQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := _q.querySpec()
@@ -689,6 +840,9 @@ func (_q *InventoryTxnQuery) querySpec() *sqlgraph.QuerySpec {
 		}
 		if _q.withInventoryLot != nil {
 			_spec.Node.AddColumnOnce(inventorytxn.FieldLotID)
+		}
+		if _q.withReversalOf != nil {
+			_spec.Node.AddColumnOnce(inventorytxn.FieldReversalOfTxnID)
 		}
 	}
 	if ps := _q.predicates; len(ps) > 0 {

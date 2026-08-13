@@ -282,7 +282,8 @@ test("run smoke writes release-gate compatible report", async () => {
   assert.equal(report.summary.total, report.checks.length);
   assert.equal(report.summary.passed, report.checks.length);
   assert.equal(report.summary.failed, 0);
-  assert.equal(report.checks.length, 9);
+  assert.equal(report.checks.length, 10);
+  assert.ok(report.checks.some((check) => check.name === "web-readyz"));
   assert.ok(report.checks.some((check) => check.name === "server-healthz"));
   assert.ok(report.checks.some((check) => check.name === "server-readyz"));
   assert.ok(report.checks.some((check) => check.name === "mobile-role-route"));
@@ -587,18 +588,19 @@ test("run smoke keeps backend checks optional", async () => {
   const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
   assert.equal(report.endpointAlias, endpoint);
   assert.equal(report.backendEndpointAlias, undefined);
-  assert.equal(report.checks.length, 4);
+  assert.equal(report.checks.length, 5);
   assert.deepEqual(
     report.checks.map((check) => check.name),
     [
       "web-healthz",
+      "web-readyz",
       "login-page",
       "mobile-role-route",
       "auth-sms-capabilities",
     ],
   );
-  assert.equal(report.summary.total, 4);
-  assert.equal(report.summary.passed, 4);
+  assert.equal(report.summary.total, 5);
+  assert.equal(report.summary.passed, 5);
   assert.equal(report.summary.failed, 0);
 });
 

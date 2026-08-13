@@ -20,7 +20,7 @@
 - 当前唯一部署真源仍是 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`
 - 当前后端统一走 `8300`
 - 本地开发数据库默认命中 `192.168.0.106:5432/plush_erp`；`192.168.0.133:5435/plush_erp` 是测试 / 目标环境，不作为本地开发默认库
-- 当前管理员账号 / RBAC 表、工作流协同表、库存 / 采购 / 质检 / 生产 / 委外 / 出货 / 预留 / 财务事实表、`product_skus`、`purchase_orders`、`processes`、`outsourcing_orders` 和 V1 主数据 / 销售订单表已通过 Ent + Atlas 落地；旧普通 `users` 表和 `user` JSON-RPC 普通账号管理链路已退出，账号登录与岗位任务端统一使用 `admin_users`、角色和权限码；旧 `business_records / business_record_items / business_record_events` 表族已由 `20260612112337` migration 删除，普通 `business` JSON-RPC 不再提供旧记录查询或写入，只保留 `dashboard_stats`；采购订单、BOM、产品 / SKU、工序、采购入库、质量检验、库存、委外订单、生产进度、出货、应收、应付、发票、单笔核对、真实收付款、多来源核销和红冲均已有对应 JSON-RPC / RBAC / V1 页面或正式来源入口；余额视图按 ACTIVE `stock_reservations` 返回已预留和可用量，显式 SKU 贯通销售订单行、批次、库存、生产 / 委外、出货与预留，并以产品 + SKU + 仓库 + 单位 + 批次作为精确库存 grain。历史 `product_sku_id=NULL` 不自动回填或与任一 SKU 共池；BOM SKU 粒度、受控导入创建 SKU 和旧库存人工重分类仍待评审；具体目标库是否已 apply 以 `make migrate_status` 为准
+- 当前管理员账号 / RBAC 表、工作流协同表、库存 / 采购 / 质检 / 生产 / 委外 / 出货 / 预留 / 财务事实表、`product_skus`、`purchase_orders`、`processes`、`outsourcing_orders` 和 V1 主数据 / 销售订单表已通过 Ent + Atlas 落地；旧普通 `users` 表和 `user` JSON-RPC 普通账号管理链路已退出，账号登录与岗位任务端统一使用 `admin_users`、角色和权限码；业务看板统计使用只读 `dashboard_stats`；采购订单、BOM、产品 / SKU、工序、采购入库、质量检验、库存、委外订单、生产进度、出货、应收、应付、发票、单笔核对、真实收付款、多来源核销和红冲均已有对应 JSON-RPC / RBAC / V1 页面或正式来源入口；余额视图按 ACTIVE `stock_reservations` 返回已预留和可用量，显式 SKU 贯通销售订单行、批次、库存、生产 / 委外、出货与预留，并以产品 + SKU + 仓库 + 单位 + 批次作为精确库存 grain。历史 `product_sku_id=NULL` 不自动回填或与任一 SKU 共池；BOM SKU 粒度、受控导入创建 SKU 和旧库存人工重分类仍待评审；具体目标库是否已 apply 以 `make migrate_status` 为准
 - `出货单` 当前已作为 Shipment Fact V1 正式入口接入 `/erp/warehouse/shipments`，复用 `operational_fact` JSON-RPC 和 `shipment.*` RBAC；品质岗位可在启动财务放行前，从 `DRAFT` 出货单按产品 / SKU、仓库、批次送检粒度生成出货前成品检验，一旦发起就必须合格或让步接收后才能启动。`finished_goods_delivery` 启动事务锁定出货单并重验检验集合，随后直接创建 Shipment 财务 approval；审批同意由绑定领域命令写版本化 `APPROVED` 门禁，审批拒绝由命名领域命令写 `REJECTED` 门禁，两条分支分别结束流程且都不生成仓库放行任务。确认出货仍在独立事务重新核对 `APPROVED` 门禁、质检、来源数量、预留和可用库存，之后才写 `SHIPPED` 与库存 `OUT`。该可选质检侧链不启动 Workflow，也不替代生产完工质检主链；`出库管理` 已作为收窄的出货出库 / 库存预留 V1 入口复用 `shipments / stock_reservations`
 - 采购订单当前只表达采购承诺，不写库存、批次、应付、发票或付款事实；采购需求、采购订单余额、在途统计、采购合同审批、生产、委外、品质和财务后续仍按真实样本逐步拆；BOM Version 当前只维护工程版本、明细、复制、激活和归档，不生成采购需求、生产任务、库存事实或成本；加工环节 / processes 工序主数据只维护工序编号、名称、类别和可委外 / 可内制 / 需质检标记，不生成委外源单、生产任务、质检事实、库存流水或财务事实
 - Product Core 的来源动作已收口到正式源单或事实页：生产订单办理领料 / 完工 / 返工，委外合同办理发料 / 回货 / 质检 / 异常处置，采购入库办理退货 / 调整 / 应付；首次 IQC 拒绝可登记退回供应商 / 供应商补换处置并取消未入库收货，不写库存退货，补换新到货仍需独立来源。已出货来源生成应收 / 发票，真实收付款独立登记并按同往来方同币种分配到多条应收或应付，支持部分核销、冲正和红冲。来源、往来方、物料 / 产品、单位、批次和金额由后端派生，通用事实页不恢复无来源万能新增。yoyoosun 的本地跟踪配置与 133 较早 V5 技术试用必须和当前 HEAD 分开取证；当前财务岗位未获得收付款页面 / 权限，当前后续切片未整体重发，客户 UAT / 签收未完成
@@ -61,7 +61,7 @@ pnpm start
 
 默认地址：`http://localhost:5175`
 
-本地 `make dev` / `pnpm start` 的固定端口组以 [`config/dev-ports.env`](config/dev-ports.env) 为真源：主前端 `5175`、HTTP `8300`、gRPC `9300`，端口被占用时直接失败，不会静默顺延到其他项目。`start:yoyoosun`、`preview:yoyoosun` 等短生命周期入口从本项目独占辅助块 `15200-15299` 起探测，并始终输出实际 URL。确需本机整组覆盖时使用 ignored 的 `config/dev-ports.local.env`，必须同时填写完整端口组，避免前端、代理和后端漂移。
+本地 `make dev` / `pnpm start` 的固定端口组以 [`config/dev-ports.env`](config/dev-ports.env) 为真源：主前端 `5175`、后端 HTTP `8300`，端口被占用时直接失败，不会静默顺延到其他项目。`start:yoyoosun`、`preview:yoyoosun` 等短生命周期入口从本项目独占辅助块 `15200-15299` 起探测，并始终输出实际 URL。确需本机整组覆盖时使用 ignored 的 `config/dev-ports.local.env`，必须同时填写完整端口组，避免前端、代理和后端漂移。
 
 在 Windows / WSL 的 Chrome、Edge 或 Brave 中，`pnpm start` 与 `pnpm start:yoyoosun` 会优先激活并刷新同一 loopback 端口的已有项目标签页；只有首次打开、未找到精确端口标签或浏览器拒绝自动化时才新开标签页。显式 `BROWSER=none` 或其他 `BROWSER` 设置仍优先，不会被启动脚本覆盖。
 
@@ -101,7 +101,7 @@ docker build \
   -t plush-toy-erp-web:yoyoosun-dev .
 ```
 
-固定端口：前端 `5175`；生产 Compose 中后端 HTTP `127.0.0.1:8300`、后端 gRPC `127.0.0.1:9300` 只绑定宿主机 loopback，浏览器业务流量通过前端容器 `/rpc` 反代进入 Docker 网络内的 `app-server:8300`。
+固定端口：前端 `5175`；生产 Compose 中后端 HTTP `127.0.0.1:8300` 只绑定宿主机 loopback，浏览器业务流量通过前端容器 `/rpc` 反代进入 Docker 网络内的 `app-server:8300`。
 
 ### 后端
 
@@ -114,7 +114,6 @@ make run
 默认端口：
 
 - HTTP：`8300`
-- gRPC：`9300`
 - 本地开发 PostgreSQL：`192.168.0.106:5432/plush_erp`
 - 测试 / 目标环境 PostgreSQL：`192.168.0.133:5435/plush_erp`，只在显式测试服发布、测试服回归或目标环境验收时使用
 
@@ -187,4 +186,4 @@ pnpm style:l1
   恢复唯一 ready operation 或重新准备后确认，不会再直接因缺内部 token 失败。
   只有携带完整内部确认的调用才进入高层服务复用的底层 plan / apply 守卫。启动
   命令仍不会自动 apply，133 / 生产继续走正式发布流程
-- 工作流协同和通用业务记录已进入 Ent schema v1；后续细分业务专表仍必须先稳定字段关系，再改 `/Users/simon/projects/plush-toy-erp/server/internal/data/model/schema/*.go`
+- 工作流协同与各领域事实分别使用自己的 Ent schema；后续新增或调整领域对象仍必须先稳定字段关系，再改 `/Users/simon/projects/plush-toy-erp/server/internal/data/model/schema/*.go`

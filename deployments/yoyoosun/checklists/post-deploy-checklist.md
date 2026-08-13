@@ -8,6 +8,7 @@
 - [ ] server `/healthz` 返回 ok。
 - [ ] server `/readyz` 返回 ready。
 - [ ] web `/healthz` 返回 ok。
+- [ ] web `/readyz` 返回 ready；后端不可用时能在限定时间内返回 503。
 - [ ] Nginx / HTTPS 如启用则访问正常。
 
 ## Migration

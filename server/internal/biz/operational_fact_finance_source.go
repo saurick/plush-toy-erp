@@ -27,23 +27,19 @@ var (
 // Supplier, amount, currency and source linkage are resolved while the posted
 // purchase receipt is locked by the repository transaction.
 type FinanceFactFromPurchaseReceiptCreate struct {
-	FactNo              string
-	PurchaseReceiptID   int
-	IdempotencyKey      string
-	OccurredAt          time.Time
-	OccurredAtSpecified bool
-	Note                *string
+	FactNo            string
+	PurchaseReceiptID int
+	IdempotencyKey    string
+	Note              *string
 }
 
 // FinanceFactFromOutsourcingReturnCreate contains only operator-owned fields.
 // The payable is derived from one posted outsourcing return receipt.
 type FinanceFactFromOutsourcingReturnCreate struct {
-	FactNo              string
-	OutsourcingFactID   int
-	IdempotencyKey      string
-	OccurredAt          time.Time
-	OccurredAtSpecified bool
-	Note                *string
+	FactNo            string
+	OutsourcingFactID int
+	IdempotencyKey    string
+	Note              *string
 }
 
 // FinanceReconciliationFromFactCreate is the deliberately small V1 single-
@@ -113,7 +109,7 @@ func normalizeFinanceFactFromPurchaseReceiptCreate(in *FinanceFactFromPurchaseRe
 		return nil, ErrBadParam
 	}
 	out := *in
-	if err := normalizeFinanceSourceCommand(&out.FactNo, &out.IdempotencyKey, &out.OccurredAt, &out.OccurredAtSpecified, &out.Note, out.PurchaseReceiptID); err != nil {
+	if err := normalizeFinanceSourceCommand(&out.FactNo, &out.IdempotencyKey, &out.Note, out.PurchaseReceiptID); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -124,7 +120,7 @@ func normalizeFinanceFactFromOutsourcingReturnCreate(in *FinanceFactFromOutsourc
 		return nil, ErrBadParam
 	}
 	out := *in
-	if err := normalizeFinanceSourceCommand(&out.FactNo, &out.IdempotencyKey, &out.OccurredAt, &out.OccurredAtSpecified, &out.Note, out.OutsourcingFactID); err != nil {
+	if err := normalizeFinanceSourceCommand(&out.FactNo, &out.IdempotencyKey, &out.Note, out.OutsourcingFactID); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -135,21 +131,20 @@ func normalizeFinanceReconciliationFromFactCreate(in *FinanceReconciliationFromF
 		return nil, ErrBadParam
 	}
 	out := *in
-	if err := normalizeFinanceSourceCommand(&out.FactNo, &out.IdempotencyKey, &out.OccurredAt, &out.OccurredAtSpecified, &out.Note, out.FinanceFactID); err != nil {
+	if err := normalizeFinanceSourceCommand(&out.FactNo, &out.IdempotencyKey, &out.Note, out.FinanceFactID); err != nil {
 		return nil, err
 	}
+	out.OccurredAt, out.OccurredAtSpecified = normalizeIdempotencyIntentTime(out.OccurredAt)
 	return &out, nil
 }
 
 func normalizeFinanceSourceCommand(
 	factNo *string,
 	idempotencyKey *string,
-	occurredAt *time.Time,
-	occurredAtSpecified *bool,
 	note **string,
 	sourceID int,
 ) error {
-	if factNo == nil || idempotencyKey == nil || occurredAt == nil || occurredAtSpecified == nil || note == nil || sourceID <= 0 {
+	if factNo == nil || idempotencyKey == nil || note == nil || sourceID <= 0 {
 		return ErrBadParam
 	}
 	*factNo = strings.TrimSpace(*factNo)
@@ -159,6 +154,5 @@ func normalizeFinanceSourceCommand(
 		return ErrBadParam
 	}
 	*idempotencyKey = key.String()
-	*occurredAt, *occurredAtSpecified = normalizeIdempotencyIntentTime(*occurredAt)
 	return nil
 }

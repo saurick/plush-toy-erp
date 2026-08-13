@@ -239,7 +239,7 @@ test('routed completion fails closed until packaging is accepted and packaging m
   assert.match(page, /productionWipCompletionEligibility/u)
   assert.match(page, /hasRoutedItem \? getProductionWip\(orderID\)/u)
   assert.match(page, /eligibleItems\.length === 0/u)
-  assert.match(page, /暂不能登记完工入库/u)
+  assert.match(page, /暂不能登记生产完工/u)
   assert.match(page, /工序状态已变化/u)
   assert.match(page, /productionWipBatchID:\s*payload\.production_wip_batch_id/u)
   assert.match(
@@ -268,10 +268,12 @@ test('production order page exposes authoritative finished-goods rework progress
   assert.match(reworkProgressModal, /补完工已过账/u)
 })
 
-test('production page explains fixed sewing-before-handwork and layered facts', () => {
+test('production page explains fixed sewing-before-handwork and warehouse inbound handoff', () => {
   assert.match(page, /布料加工、车缝、手工、包装依次办理/u)
   assert.match(page, /先车缝、后手工/u)
-  assert.match(page, /工序完工、品质判定与最终完工入库分层办理/u)
+  assert.match(page, /生产岗位提交完工报告后，由仓库核对并确认成品入库/u)
+  assert.match(page, /只有仓库确认时才增加库存/u)
+  assert.match(page, /请由仓库核对并确认成品入库/u)
 })
 
 test('production completion keeps unknown attempts and links to filtered records', () => {

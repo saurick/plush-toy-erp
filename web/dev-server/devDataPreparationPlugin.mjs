@@ -26,6 +26,10 @@ import {
   transitionDataPreparationOperation,
 } from '../../scripts/qa/dev-data-preparation-operation-store.mjs'
 import { readRepositoryIdentity } from '../../scripts/qa/lib/repository-identity.mjs'
+import { buildManualAcceptanceBusinessChainReviewPlan } from '../../scripts/qa/manual-acceptance-business-chain-contract.mjs'
+import { MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS } from '../../scripts/qa/manual-acceptance-dataset.mjs'
+import { buildManualAcceptancePageDataContract } from '../../scripts/qa/manual-acceptance-page-data-contract.mjs'
+import { CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION } from '../../scripts/qa/manual-acceptance-target-policy.mjs'
 import {
   isLoopbackHostHeader,
   isLoopbackRemoteAddress,
@@ -63,12 +67,30 @@ const DATABASE_TARGET_MODULE_URL = pathToFileURL(
 ).href
 let databaseTargetModulePromise
 
+const MANUAL_ACCEPTANCE_REVIEW_PLAN =
+  buildManualAcceptanceBusinessChainReviewPlan({
+    catalogTargetCount: buildManualAcceptancePageDataContract().targetCount,
+    datasetStageKeys: MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS,
+  })
+
 function loadDatabaseTargetModule() {
   databaseTargetModulePromise ||= import(DATABASE_TARGET_MODULE_URL)
   return databaseTargetModulePromise
 }
 
 export const DEV_DATA_PREPARATION_PROFILES = Object.freeze([
+  Object.freeze({
+    key: 'full-acceptance',
+    title: '按最新业务链完整回归',
+    purpose: '在新隔离库运行全部已登记业务链、合法场景与现有完整验收生命周期',
+    writesDatabase: true,
+    dataRetention: 'ephemeral',
+    cleanupMode: 'automatic',
+    exactCleanCommitRequired: true,
+    requiredEnvironment: Object.freeze([
+      LOCAL_ACCEPTANCE_DATABASE_BASE_URL_ENV,
+    ]),
+  }),
   Object.freeze({
     key: 'core-demo',
     title: 'Product Core 基础测试数据',
@@ -89,18 +111,6 @@ export const DEV_DATA_PREPARATION_PROFILES = Object.freeze([
     cleanupMode: 'forward-only',
     exactCleanCommitRequired: false,
     requiredEnvironment: Object.freeze(['登记本地开发库', '本机 8300 后端']),
-  }),
-  Object.freeze({
-    key: 'full-acceptance',
-    title: '本地完整技术验收',
-    purpose: '在专用数据库运行现有完整验收生命周期并自动清理',
-    writesDatabase: true,
-    dataRetention: 'ephemeral',
-    cleanupMode: 'automatic',
-    exactCleanCommitRequired: true,
-    requiredEnvironment: Object.freeze([
-      LOCAL_ACCEPTANCE_DATABASE_BASE_URL_ENV,
-    ]),
   }),
 ])
 
@@ -336,7 +346,7 @@ function redactError(error) {
       'credential'
     )
     .replace(/\/(?:Users|home|private|var|tmp)\/[^\s:]+/gu, '<local-path>')
-    .replace(/[\u0000-\u001f\u007f]+/gu, ' ')
+    .replace(/\p{Cc}+/gu, ' ')
     .replace(/\s+/gu, ' ')
     .trim()
     .slice(0, 400)
@@ -450,8 +460,21 @@ async function fullAcceptancePlanFingerprint(stdout, repository, runId) {
     throw new Error('full acceptance lifecycle plan identity is invalid')
   }
   return hashDataPreparationPlan({
-    schemaVersion: 'plush.dev-data-preparation-full-plan/v1',
+    schemaVersion: 'plush.dev-data-preparation-full-plan/v2',
     plan,
+    acceptanceIdentity: {
+      contract: MANUAL_ACCEPTANCE_REVIEW_PLAN.contract,
+      sourceContract: MANUAL_ACCEPTANCE_REVIEW_PLAN.sourceContract,
+      catalogVersion: MANUAL_ACCEPTANCE_REVIEW_PLAN.catalogVersion,
+      chainDataDigest: MANUAL_ACCEPTANCE_REVIEW_PLAN.chainDataDigest,
+      chainVerificationDigest:
+        MANUAL_ACCEPTANCE_REVIEW_PLAN.chainVerificationDigest,
+      chainCount: MANUAL_ACCEPTANCE_REVIEW_PLAN.chainCount,
+      stepCount: MANUAL_ACCEPTANCE_REVIEW_PLAN.stepCount,
+      scenarioCount: MANUAL_ACCEPTANCE_REVIEW_PLAN.scenarioCount,
+      dataStageCount: MANUAL_ACCEPTANCE_REVIEW_PLAN.dataStageCount,
+      catalogTargetCount: MANUAL_ACCEPTANCE_REVIEW_PLAN.catalogTargetCount,
+    },
   })
 }
 
@@ -543,7 +566,68 @@ async function readPrivateReceipt(file, maxBytes = 256 * 1024) {
   }
 }
 
-function validateAcceptanceReceipt(receipt, operation) {
+function validReceiptTimestamp(value) {
+  return (
+    typeof value === 'string' &&
+    Number.isFinite(Date.parse(value)) &&
+    new Date(value).toISOString() === value
+  )
+}
+
+function validateDatasetTiming(dataset, receiptStatus) {
+  if (!dataset) {
+    if (receiptStatus === 'passed') {
+      throw new Error('passed acceptance receipt is missing dataset evidence')
+    }
+    return null
+  }
+  const expectedStageKeys = MANUAL_ACCEPTANCE_REVIEW_PLAN.dataStages.map(
+    (stage) => stage.key
+  )
+  if (
+    typeof dataset.ok !== 'boolean' ||
+    dataset.dataVersion !== CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION ||
+    dataset.chainDataDigest !== MANUAL_ACCEPTANCE_REVIEW_PLAN.chainDataDigest ||
+    dataset.chainVerificationDigest !==
+      MANUAL_ACCEPTANCE_REVIEW_PLAN.chainVerificationDigest ||
+    !validReceiptTimestamp(dataset.startedAt) ||
+    !validReceiptTimestamp(dataset.completedAt) ||
+    !Number.isFinite(dataset.durationMs) ||
+    dataset.durationMs < 0 ||
+    !Array.isArray(dataset.stageTimings) ||
+    dataset.stageTimings.length !== expectedStageKeys.length
+  ) {
+    throw new Error('acceptance dataset timing evidence is invalid')
+  }
+  dataset.stageTimings.forEach((stage, index) => {
+    const hasTiming = stage.status === 'completed' || stage.status === 'failed'
+    if (
+      stage.key !== expectedStageKeys[index] ||
+      !['completed', 'failed', 'not_started'].includes(stage.status) ||
+      (hasTiming &&
+        (!validReceiptTimestamp(stage.startedAt) ||
+          !validReceiptTimestamp(stage.completedAt) ||
+          !Number.isFinite(stage.durationMs) ||
+          stage.durationMs < 0)) ||
+      (!hasTiming &&
+        (stage.startedAt !== null ||
+          stage.completedAt !== null ||
+          stage.durationMs !== null))
+    ) {
+      throw new Error('acceptance dataset stage timing is invalid')
+    }
+  })
+  if (
+    receiptStatus === 'passed' &&
+    (dataset.ok !== true ||
+      dataset.stageTimings.some((stage) => stage.status !== 'completed'))
+  ) {
+    throw new Error('passed acceptance receipt has incomplete dataset evidence')
+  }
+  return dataset
+}
+
+export function validateAcceptanceReceipt(receipt, operation) {
   if (
     !receipt ||
     receipt.schemaVersion !== 'plush-local-acceptance-lifecycle/v1' ||
@@ -555,6 +639,10 @@ function validateAcceptanceReceipt(receipt, operation) {
   ) {
     throw new Error('acceptance receipt identity is invalid')
   }
+  const dataset = validateDatasetTiming(
+    receipt.evidence?.dataset,
+    receipt.status
+  )
   return {
     schemaVersion: 'plush.dev-data-preparation-readback/v1',
     profileKey: 'full-acceptance',
@@ -562,6 +650,42 @@ function validateAcceptanceReceipt(receipt, operation) {
     reportStatus: receipt.status,
     cleanupComplete: receipt.cleanup.complete,
     residualDatabaseCount: receipt.cleanup.residualDatabases.length,
+    dataVersion: dataset?.dataVersion || null,
+    chainDataDigest: MANUAL_ACCEPTANCE_REVIEW_PLAN.chainDataDigest,
+    chainVerificationDigest:
+      MANUAL_ACCEPTANCE_REVIEW_PLAN.chainVerificationDigest,
+    chainCount: MANUAL_ACCEPTANCE_REVIEW_PLAN.chainCount,
+    stepCount: MANUAL_ACCEPTANCE_REVIEW_PLAN.stepCount,
+    scenarioCount: MANUAL_ACCEPTANCE_REVIEW_PLAN.scenarioCount,
+    dataStageCount: MANUAL_ACCEPTANCE_REVIEW_PLAN.dataStageCount,
+    catalogTargetCount: MANUAL_ACCEPTANCE_REVIEW_PLAN.catalogTargetCount,
+    datasetStartedAt: dataset?.startedAt || null,
+    datasetCompletedAt: dataset?.completedAt || null,
+    datasetDurationMs: dataset?.durationMs ?? null,
+    stageTimings: dataset?.stageTimings || [],
+  }
+}
+
+function operationTiming(operation) {
+  const startedAt = operation.events.find((event) =>
+    ['launching', 'running'].includes(event.status)
+  )?.at
+  const completedAt = DATA_PREPARATION_TERMINAL_STATUSES.includes(
+    operation.status
+  )
+    ? [...operation.events]
+        .reverse()
+        .find((event) =>
+          DATA_PREPARATION_TERMINAL_STATUSES.includes(event.status)
+        )?.at || operation.updatedAt
+    : null
+  return {
+    startedAt: startedAt || null,
+    completedAt,
+    durationMs:
+      startedAt && completedAt
+        ? Math.max(0, Date.parse(completedAt) - Date.parse(startedAt))
+        : null,
   }
 }
 
@@ -585,6 +709,7 @@ function publicOperation(operation) {
     targetSummary: operation.targetSummary,
     createdAt: operation.createdAt,
     updatedAt: operation.updatedAt,
+    timing: operationTiming(operation),
     events: operation.events,
     issues: operation.issues,
     readback: operation.readback,
@@ -904,6 +1029,7 @@ export function createDevDataPreparationService({
       generatedAt: now().toISOString(),
       repository: repositoryResult,
       target,
+      acceptancePlan: MANUAL_ACCEPTANCE_REVIEW_PLAN,
       profiles: DEV_DATA_PREPARATION_PROFILES,
       operations: listDataPreparationOperations(store, { limit: 50 }).map(
         publicOperation

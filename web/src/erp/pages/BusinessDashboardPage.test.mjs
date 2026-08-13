@@ -18,8 +18,14 @@ test('business dashboard remains valid JSX', async () => {
 
 test('business dashboard loads business totals and account-visible collaboration independently', () => {
   assert.match(source, /Promise\.allSettled/u)
-  assert.match(source, /getBusinessDashboardStats\(\)/u)
-  assert.match(source, /getWorkflowTaskBoard\(\{ limit: 1, offset: 0 \}\)/u)
+  assert.match(
+    source,
+    /getBusinessDashboardStats\(\{\}, \{ signal: request\.signal \}\)/u
+  )
+  assert.match(
+    source,
+    /getWorkflowTaskBoard\([\s\S]*?\{ limit: 1, offset: 0 \},[\s\S]*?\{ signal: request\.signal \}[\s\S]*?\)/u
+  )
   assert.match(source, /dashboardResult\.status === 'fulfilled'/u)
   assert.match(source, /workflowResult\.status === 'fulfilled'/u)
   assert.match(
@@ -32,6 +38,42 @@ test('business dashboard loads business totals and account-visible collaboration
   )
   assert.doesNotMatch(source, /listWorkflowTasks/u)
   assert.doesNotMatch(source, /buildWorkflowDashboardStats/u)
+})
+
+test('business dashboard only applies the latest account-scoped response', () => {
+  const loaderStart = source.indexOf(
+    'const loadDashboardStats = useCallback(async () =>'
+  )
+  const loaderEnd = source.indexOf('useEffect(() => {', loaderStart)
+  const loaderSource = source.slice(loaderStart, loaderEnd)
+  const refreshSetupEnd = loaderSource.indexOf('try {')
+  const refreshSetupSource = loaderSource.slice(0, refreshSetupEnd)
+
+  assert.ok(refreshSetupEnd > 0, 'dashboard loader must keep its request body')
+  assert.match(
+    source,
+    /import useLatestRequestCoordinator from ['"]\.\.\/hooks\/useLatestRequestCoordinator\.js['"]/u
+  )
+  assert.match(
+    source,
+    /const beginLatestRequest = useLatestRequestCoordinator\(\)/u
+  )
+  assert.match(
+    source,
+    /const request = beginLatestRequest\('business-dashboard'\)/u
+  )
+  assert.match(source, /if \(!adminProfile\?\.id\)/u)
+  assert.match(source, /if \(!request\.isCurrent\(\)\) \{\s*return false/u)
+  assert.match(
+    source,
+    /finally \{\s*if \(request\.isCurrent\(\)\) \{\s*setLoading\(false\)\s*request\.finish\(\)/u
+  )
+  assert.match(
+    source,
+    /useEffect\(\(\) => \{\s*setModuleStats\(\[\]\)[\s\S]*?setWorkflowLoadError\(false\)\s*\}, \[adminProfile\]\)/u
+  )
+  assert.doesNotMatch(refreshSetupSource, /setModuleStats\(\[\]\)/u)
+  assert.doesNotMatch(source, /mountedRef|loadPromiseRef/u)
 })
 
 test('business dashboard separates three data totals from collaboration risk', () => {

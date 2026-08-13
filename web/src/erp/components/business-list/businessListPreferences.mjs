@@ -1,5 +1,6 @@
 import { getColumnLabel } from './ColumnOrderModal.jsx'
 import { applyEffectiveFieldPolicyFlags } from '../../utils/adminProfileSync.mjs'
+import { downloadCSVRows } from '../../utils/csvExport.mjs'
 import { sanitizeModuleColumnOrder } from '../../utils/moduleTableColumns.mjs'
 
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
@@ -43,32 +44,14 @@ export function getPreferredColumnOrder({
   return sanitizeModuleColumnOrder(readStoredColumnOrder(moduleKey), columns)
 }
 
-function csvEscape(value) {
-  const text = String(value ?? '')
-  return /[",\n\r]/u.test(text) ? `"${text.replace(/"/g, '""')}"` : text
-}
-
 export function downloadBusinessCSV({ filename, columns, rows }) {
-  const header = columns.map((column) => csvEscape(getColumnLabel(column)))
+  const header = columns.map((column) => getColumnLabel(column))
   const body = rows.map((row) =>
     columns.map((column) => {
-      const value =
-        typeof column.exportValue === 'function'
-          ? column.exportValue(row)
-          : row?.[column.dataIndex]
-      return csvEscape(value)
+      return typeof column.exportValue === 'function'
+        ? column.exportValue(row)
+        : row?.[column.dataIndex]
     })
   )
-  const csv = [header, ...body].map((line) => line.join(',')).join('\n')
-  const blob = new Blob([`\uFEFF${csv}`], {
-    type: 'text/csv;charset=utf-8',
-  })
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = filename
-  document.body.appendChild(anchor)
-  anchor.click()
-  anchor.remove()
-  URL.revokeObjectURL(url)
+  downloadCSVRows({ filename, rows: [header, ...body] })
 }

@@ -23,6 +23,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/shopspring/decimal"
 )
 
 type outsourcingOrderRepo struct {
@@ -38,6 +39,7 @@ func NewOutsourcingOrderRepo(d *Data, logger log.Logger) *outsourcingOrderRepo {
 }
 
 var _ biz.OutsourcingOrderRepo = (*outsourcingOrderRepo)(nil)
+var _ biz.OutsourcingOrderLifecycleActionRepo = (*outsourcingOrderRepo)(nil)
 
 func (r *outsourcingOrderRepo) GetOutsourcingOrder(ctx context.Context, id int) (*biz.OutsourcingOrder, error) {
 	row, err := r.data.postgres.OutsourcingOrder.Get(ctx, id)
@@ -278,6 +280,252 @@ func (r *outsourcingOrderRepo) UpdateOutsourcingOrderLifecycle(ctx context.Conte
 	return entOutsourcingOrderToBiz(row), nil
 }
 
+func (r *outsourcingOrderRepo) ApplyOutsourcingOrderLifecycleAction(
+	ctx context.Context,
+	in *biz.SourceOrderLifecycleAction,
+	lifecycleStatus string,
+) (*biz.OutsourcingOrder, error) {
+	if r == nil || r.data == nil || r.data.postgres == nil || in == nil || !biz.IsValidOutsourcingOrderStatus(lifecycleStatus) {
+		return nil, biz.ErrBadParam
+	}
+	dependencyBatchIDs, err := outsourcingOrderWIPDependencyBatchIDs(ctx, r.data.postgres, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := (&inventoryRepo{data: r.data, log: r.log}).beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	replayed, err := resolveSourceOrderLifecycleActionReplay(ctx, tx.client, "outsourcing_order", in)
+	if err != nil {
+		return nil, err
+	}
+	if replayed {
+		row, getErr := tx.client.OutsourcingOrder.Get(ctx, in.ID)
+		if getErr != nil {
+			return nil, getErr
+		}
+		if err := tx.sqlTx.Commit(); err != nil {
+			return nil, err
+		}
+		tx = nil
+		return entOutsourcingOrderToBiz(row), nil
+	}
+	for _, batchID := range dependencyBatchIDs {
+		if err := lockOperationalFactRow(ctx, tx, "production_wip_batches", batchID, biz.ErrProductionWIPOutsourcingSourceDependency); err != nil {
+			return nil, err
+		}
+	}
+	if err := lockOperationalFactRow(ctx, tx, "outsourcing_orders", in.ID, biz.ErrOutsourcingOrderNotFound); err != nil {
+		return nil, err
+	}
+	current, err := tx.client.OutsourcingOrder.Get(ctx, in.ID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrOutsourcingOrderNotFound
+		}
+		return nil, err
+	}
+	if current.Version != in.ExpectedVersion {
+		return nil, biz.ErrOutsourcingOrderConflict
+	}
+	if !biz.IsOutsourcingOrderLifecycleTransitionAllowed(current.LifecycleStatus, lifecycleStatus) || current.LifecycleStatus == lifecycleStatus {
+		return nil, biz.ErrBadParam
+	}
+	if err := requireStableOutsourcingOrderWIPDependencySet(ctx, tx.client, in.ID, dependencyBatchIDs); err != nil {
+		return nil, err
+	}
+	if lifecycleStatus == biz.OutsourcingOrderStatusCanceled && len(dependencyBatchIDs) > 0 {
+		return nil, biz.ErrProductionWIPOutsourcingSourceDependency
+	}
+	if lifecycleStatus == biz.OutsourcingOrderStatusClosed && len(dependencyBatchIDs) > 0 {
+		batches, err := tx.client.ProductionWIPBatch.Query().Where(productionwipbatch.IDIn(dependencyBatchIDs...)).All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if len(batches) != len(dependencyBatchIDs) {
+			return nil, biz.ErrProductionWIPOutsourcingSourceDependency
+		}
+		for _, batch := range batches {
+			if batch.Status != biz.ProductionWIPStatusAccepted && batch.Status != biz.ProductionWIPStatusRejected && batch.Status != biz.ProductionWIPStatusCancelled {
+				return nil, biz.ErrProductionWIPOutsourcingSourceDependency
+			}
+		}
+	}
+	if lifecycleStatus == biz.OutsourcingOrderStatusClosed {
+		hasUnsettledFacts, err := tx.client.OutsourcingFact.Query().Where(
+			outsourcingfact.SourceType(biz.OutsourcingOrderSourceType),
+			outsourcingfact.SourceID(in.ID),
+			outsourcingfact.StatusNotIn(biz.OperationalFactStatusPosted, biz.OperationalFactStatusCancelled),
+		).Exist(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if hasUnsettledFacts {
+			return nil, biz.ErrOutsourcingOrderFactDependency
+		}
+		if in.CloseMode == biz.SourceOrderCloseModeNormal {
+			if err := validateOutsourcingOrderFullySettled(ctx, tx.client, in.ID); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if lifecycleStatus == biz.OutsourcingOrderStatusCanceled {
+		hasActiveFacts, err := tx.client.OutsourcingFact.Query().Where(
+			outsourcingfact.SourceType(biz.OutsourcingOrderSourceType),
+			outsourcingfact.SourceID(in.ID),
+			outsourcingfact.StatusNEQ(biz.OperationalFactStatusCancelled),
+		).Exist(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if hasActiveFacts {
+			return nil, biz.ErrOutsourcingOrderFactDependency
+		}
+	}
+	now := time.Now()
+	lineResults := []map[string]any{}
+	if lifecycleStatus == biz.OutsourcingOrderStatusClosed || lifecycleStatus == biz.OutsourcingOrderStatusCanceled {
+		lineStatus := biz.OutsourcingOrderItemStatusClosed
+		if lifecycleStatus == biz.OutsourcingOrderStatusCanceled {
+			lineStatus = biz.OutsourcingOrderItemStatusCanceled
+		}
+		lineResults, err = outsourcingOrderLifecycleLineResults(ctx, tx.client, in.ID, lineStatus)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := tx.client.OutsourcingOrderItem.Update().Where(
+			outsourcingorderitem.OutsourcingOrderID(in.ID),
+			outsourcingorderitem.LineStatus(biz.OutsourcingOrderItemStatusOpen),
+		).SetLineStatus(lineStatus).Save(ctx); err != nil {
+			return nil, err
+		}
+	}
+	update := tx.client.OutsourcingOrder.Update().
+		Where(
+			outsourcingorder.ID(in.ID),
+			outsourcingorder.Version(in.ExpectedVersion),
+			outsourcingorder.LifecycleStatus(current.LifecycleStatus),
+		).
+		SetLifecycleStatus(lifecycleStatus).
+		SetVersion(in.ExpectedVersion + 1)
+	if lifecycleStatus == biz.OutsourcingOrderStatusClosed || lifecycleStatus == biz.OutsourcingOrderStatusCanceled {
+		update.SetSettlementAction(in.ActionKey).SetSettledAt(now).SetSettledBy(in.ActorID)
+		if in.CloseMode == "" {
+			update.ClearSettlementMode()
+		} else {
+			update.SetSettlementMode(in.CloseMode)
+		}
+		if in.Reason == "" {
+			update.ClearSettlementReason()
+		} else {
+			update.SetSettlementReason(in.Reason)
+		}
+	}
+	affected, err := update.Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if affected != 1 {
+		return nil, biz.ErrOutsourcingOrderConflict
+	}
+	row, err := tx.client.OutsourcingOrder.Get(ctx, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	if err := createSourceOrderLifecycleActionReceipt(ctx, tx.client, "outsourcing_order", current.LifecycleStatus, lifecycleStatus, in, lineResults); err != nil {
+		return nil, err
+	}
+	if err := tx.sqlTx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return entOutsourcingOrderToBiz(row), nil
+}
+
+func validateOutsourcingOrderFullySettled(ctx context.Context, client *ent.Client, outsourcingOrderID int) error {
+	items, err := client.OutsourcingOrderItem.Query().Where(
+		outsourcingorderitem.OutsourcingOrderID(outsourcingOrderID),
+		outsourcingorderitem.LineStatus(biz.OutsourcingOrderItemStatusOpen),
+	).All(ctx)
+	if err != nil {
+		return err
+	}
+	if len(items) == 0 {
+		return nil
+	}
+	itemIDs := make([]int, 0, len(items))
+	for _, item := range items {
+		itemIDs = append(itemIDs, item.ID)
+	}
+	facts, err := client.OutsourcingFact.Query().Where(
+		outsourcingfact.FactType(biz.OutsourcingFactReturnReceipt),
+		outsourcingfact.SourceType(biz.OutsourcingOrderSourceType),
+		outsourcingfact.SourceID(outsourcingOrderID),
+		outsourcingfact.SourceLineIDIn(itemIDs...),
+		outsourcingfact.Status(biz.OperationalFactStatusPosted),
+	).All(ctx)
+	if err != nil {
+		return err
+	}
+	settledByItem := make(map[int]decimal.Decimal, len(items))
+	for _, fact := range facts {
+		if fact.SourceLineID != nil {
+			settledByItem[*fact.SourceLineID] = settledByItem[*fact.SourceLineID].Add(fact.Quantity)
+		}
+	}
+	for _, item := range items {
+		if settledByItem[item.ID].Cmp(item.OutsourcingQuantity) < 0 {
+			return biz.ErrSourceOrderNormalCloseIncomplete
+		}
+	}
+	return nil
+}
+
+func outsourcingOrderLifecycleLineResults(ctx context.Context, client *ent.Client, outsourcingOrderID int, terminalStatus string) ([]map[string]any, error) {
+	items, err := client.OutsourcingOrderItem.Query().Where(
+		outsourcingorderitem.OutsourcingOrderID(outsourcingOrderID),
+	).Order(ent.Asc(outsourcingorderitem.FieldID)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(items) == 0 {
+		return []map[string]any{}, nil
+	}
+	itemIDs := make([]int, 0, len(items))
+	for _, item := range items {
+		itemIDs = append(itemIDs, item.ID)
+	}
+	facts, err := client.OutsourcingFact.Query().Where(
+		outsourcingfact.FactType(biz.OutsourcingFactReturnReceipt),
+		outsourcingfact.SourceType(biz.OutsourcingOrderSourceType),
+		outsourcingfact.SourceID(outsourcingOrderID),
+		outsourcingfact.SourceLineIDIn(itemIDs...),
+		outsourcingfact.Status(biz.OperationalFactStatusPosted),
+	).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	fulfilledByItem := make(map[int]decimal.Decimal, len(items))
+	for _, fact := range facts {
+		if fact.SourceLineID != nil {
+			fulfilledByItem[*fact.SourceLineID] = fulfilledByItem[*fact.SourceLineID].Add(fact.Quantity)
+		}
+	}
+	results := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		finalStatus := item.LineStatus
+		if finalStatus == biz.OutsourcingOrderItemStatusOpen {
+			finalStatus = terminalStatus
+		}
+		results = append(results, sourceOrderLineLifecycleResult(
+			item.ID, item.OutsourcingQuantity, fulfilledByItem[item.ID], finalStatus,
+		))
+	}
+	return results, nil
+}
+
 func (r *outsourcingOrderRepo) SaveOutsourcingOrderWithItems(ctx context.Context, id int, in *biz.OutsourcingOrderMutation, items []*biz.OutsourcingOrderItemSaveMutation) (*biz.OutsourcingOrderWithItems, error) {
 	tx, err := r.data.postgres.Tx(ctx)
 	if err != nil {
@@ -306,6 +554,8 @@ func (r *outsourcingOrderRepo) SaveOutsourcingOrderWithItems(ctx context.Context
 			).
 			SetOutsourcingOrderNo(in.OutsourcingOrderNo).
 			SetSupplierID(in.SupplierID).
+			SetCurrency(in.Currency).
+			SetNillablePaymentTermDays(in.PaymentTermDays).
 			SetSupplierSnapshot(in.SupplierSnapshot).
 			SetContractPartySnapshot(in.ContractPartySnapshot).
 			SetOrderDate(in.OrderDate).
@@ -353,6 +603,8 @@ func (r *outsourcingOrderRepo) SaveOutsourcingOrderWithItems(ctx context.Context
 		orderRow, err = tx.OutsourcingOrder.Create().
 			SetOutsourcingOrderNo(in.OutsourcingOrderNo).
 			SetSupplierID(in.SupplierID).
+			SetCurrency(in.Currency).
+			SetNillablePaymentTermDays(in.PaymentTermDays).
 			SetSupplierSnapshot(in.SupplierSnapshot).
 			SetContractPartySnapshot(in.ContractPartySnapshot).
 			SetNillableSourceOrderNo(in.SourceOrderNo).
@@ -673,6 +925,17 @@ func (r *outsourcingOrderRepo) SupplierIsActive(ctx context.Context, id int) (bo
 	return row.IsActive, nil
 }
 
+func (r *outsourcingOrderRepo) SupplierDefaultPaymentTermDays(ctx context.Context, id int) (int, error) {
+	row, err := r.data.postgres.Supplier.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return 0, biz.ErrSupplierNotFound
+		}
+		return 0, err
+	}
+	return row.DefaultPaymentTermDays, nil
+}
+
 func (r *outsourcingOrderRepo) ProductIsActive(ctx context.Context, id int) (bool, error) {
 	row, err := r.data.postgres.Product.Query().
 		Where(product.ID(id)).
@@ -850,6 +1113,8 @@ func entOutsourcingOrderToBiz(row *ent.OutsourcingOrder) *biz.OutsourcingOrder {
 		ID:                    row.ID,
 		OutsourcingOrderNo:    row.OutsourcingOrderNo,
 		SupplierID:            row.SupplierID,
+		Currency:              row.Currency,
+		PaymentTermDays:       row.PaymentTermDays,
 		SupplierSnapshot:      row.SupplierSnapshot,
 		ContractPartySnapshot: row.ContractPartySnapshot,
 		SourceOrderNo:         row.SourceOrderNo,
@@ -857,6 +1122,11 @@ func entOutsourcingOrderToBiz(row *ent.OutsourcingOrder) *biz.OutsourcingOrder {
 		ExpectedReturnDate:    row.ExpectedReturnDate,
 		LifecycleStatus:       row.LifecycleStatus,
 		Version:               row.Version,
+		SettlementAction:      row.SettlementAction,
+		SettlementMode:        row.SettlementMode,
+		SettlementReason:      row.SettlementReason,
+		SettledAt:             row.SettledAt,
+		SettledBy:             row.SettledBy,
 		Note:                  row.Note,
 		CreatedAt:             row.CreatedAt,
 		UpdatedAt:             row.UpdatedAt,

@@ -21,7 +21,7 @@ usage() {
 
   POPULATED_UPGRADE_DATABASE_URL='<postgres-dsn>' \
     sh scripts/qa/populated-upgrade-preflight.sh \
-    --audit customer-config-cutover \
+    --audit database-constraints \
     --database-url-env POPULATED_UPGRADE_DATABASE_URL [--psql-bin <path>]
 
 行为:
@@ -29,6 +29,7 @@ usage() {
   --audit populated-upgrade 检查 20260714055504 的目标约束、待删除字段，
                             以及 WIP 20260717035245 -> 20260717043625 委外关联切换。
   --audit customer-config-cutover 检查 20260714055825 的显式切换前置条件。
+  --audit database-constraints 检查关键库存、采购、质检和附件约束的存量数据。
   audit 只接受上述固定值；默认 populated-upgrade。
   不修改业务数据、不执行 migration，也不输出数据库连接串。
 EOF
@@ -105,8 +106,11 @@ populated-upgrade)
 customer-config-cutover)
   SQL_FILE="$SCRIPT_DIR/customer-config-cutover-20260714055825.sql"
   ;;
+database-constraints)
+  SQL_FILE="$SCRIPT_DIR/database-constraint-preflight.sql"
+  ;;
 *)
-  echo "ERROR: --audit 仅支持 populated-upgrade 或 customer-config-cutover" >&2
+  echo "ERROR: --audit 仅支持 populated-upgrade、customer-config-cutover 或 database-constraints" >&2
   exit 1
   ;;
 esac

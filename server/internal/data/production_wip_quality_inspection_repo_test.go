@@ -232,11 +232,13 @@ func TestProductionWIPQualityInspectionRejectsPersistedConcessionOnReadAndAdvanc
 		biz.ProductionWIPQualityGateFinishedGoods,
 		biz.ProductionWIPQualityGateNeedle,
 	})
+	inspectedAt := time.Date(2026, time.August, 13, 8, 0, 0, 0, time.UTC).Truncate(time.Microsecond)
 	if _, err := f.data.sqldb.ExecContext(
 		f.ctx,
-		"UPDATE quality_inspections SET status = ?, result = ? WHERE id = ?",
+		"UPDATE quality_inspections SET status = ?, result = ?, inspected_at = ? WHERE id = ?",
 		biz.QualityInspectionStatusPassed,
 		biz.QualityInspectionResultConcession,
+		inspectedAt,
 		fixture.inspection.ID,
 	); err != nil {
 		t.Fatalf("seed persisted WIP concession: %v", err)

@@ -31,6 +31,7 @@ const devPageSources = [
   'DevPermissionRelationshipsPage.jsx',
   'DevGovernancePage.jsx',
   'DevFlowStateObservatoryPage.jsx',
+  'DevBusinessUsabilityPage.jsx',
   'DevDocsPage.jsx',
   'DevTestingPage.jsx',
   'DevQualityGatesPage.jsx',
@@ -94,6 +95,10 @@ test('devHub: every dev route exposes a distinct browser title', () => {
   assert.equal(
     resolveDevPageTitle('/__dev/status-flows', 'Plush Toy ERP'),
     '业务链观察 · Plush Toy ERP'
+  )
+  assert.equal(
+    resolveDevPageTitle('/__dev/business-usability', 'Plush Toy ERP'),
+    '业务易用性 · Plush Toy ERP'
   )
   assert.equal(
     resolveDevPageTitle('/__dev/quality', 'Plush Toy ERP'),
@@ -164,6 +169,7 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
       ['product-engineering', '权限关系'],
       ['product-engineering', '改动指南'],
       ['product-engineering', '业务链观察'],
+      ['product-engineering', '业务易用性'],
       ['product-engineering', '开发文档'],
       ['product-engineering', '产品原型'],
       ['quality', '改动验证'],
@@ -205,6 +211,10 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
   )
   assert.equal(
     resolveDevWorkbenchAreaKey('/__dev/status-flows'),
+    'product-engineering'
+  )
+  assert.equal(
+    resolveDevWorkbenchAreaKey('/__dev/business-usability'),
     'product-engineering'
   )
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/testing'), 'quality')
@@ -275,8 +285,8 @@ test('devHub: every tool has one registered area and the overview derives stages
   assert.match(devHubPageSource, /item\.areaKey === stage\.key/u)
 })
 
-test('devHub: fourteen dev pages share the backend-style workspace shell', () => {
-  assert.equal(devPageSources.length, 14)
+test('devHub: fifteen dev pages share the backend-style workspace shell', () => {
+  assert.equal(devPageSources.length, 15)
   devPageSources.forEach((source) => {
     assert.match(source, /erp-dev-workspace-page/u)
     assert.match(source, /<DevPageNav/u)
@@ -315,6 +325,7 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
       '/__dev/permission-relationships',
       '/__dev/governance',
       '/__dev/status-flows',
+      '/__dev/business-usability',
       '/__dev/docs',
       '/__dev/testing',
       '/__dev/quality-gates',
@@ -374,6 +385,22 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
     permissionRelationshipsItem?.guardrails?.join(' ') || '',
     /不汇入任务、单据、流程或业务事实/u
   )
+  assert.match(permissionRelationshipsItem?.truthSource || '', /正式菜单投影/u)
+  assert.match(permissionRelationshipsItem?.description || '', /实际侧栏/u)
+
+  const businessUsabilityItem = DEV_HUB_ITEMS.find(
+    (item) => item.key === 'business-usability'
+  )
+  assert.equal(
+    businessUsabilityItem?.source,
+    'web/src/erp/config/businessUsabilityCatalog.mjs'
+  )
+  assert.match(businessUsabilityItem?.truthSource || '', /岗位帮助内容/u)
+  assert.match(
+    businessUsabilityItem?.guardrails?.join(' ') || '',
+    /不复制权限与岗位责任/u
+  )
+  assert.match(businessUsabilityItem?.description || '', /不代表实际权限/u)
 
   const testingItem = DEV_HUB_ITEMS.find((item) => item.key === 'testing')
   assert.equal(
@@ -452,7 +479,7 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
 test('devHub: summary records dev-only boundary', () => {
   const summary = buildDevHubSummary()
 
-  assert.equal(summary.entryCount, 13)
+  assert.equal(summary.entryCount, 14)
   assert.equal(summary.groupCount, 8)
   assert(summary.guardrailCount >= 9)
   assert.equal(summary.devOnly, true)

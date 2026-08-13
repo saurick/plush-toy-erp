@@ -218,6 +218,14 @@ export const FIELD_LINKAGE_FIELD_CATALOG = [
     requiredScenarioKeys: ['master_record_profile_wired'],
   },
   {
+    fieldKey: 'supplierPaymentTermDays',
+    fieldLabel: '供应商默认付款周期',
+    category: '供应商主数据维护字段',
+    risk: 'P0',
+    docLabels: ['默认付款周期'],
+    requiredScenarioKeys: ['master_record_profile_wired'],
+  },
+  {
     fieldKey: 'productMasterSelection',
     fieldLabel: '产品主档选择',
     category: '主档引用 / 业务快照',
@@ -358,7 +366,7 @@ export const FIELD_LINKAGE_FIELD_CATALOG = [
   {
     fieldKey: 'sourceNo',
     fieldLabel: '来源单号',
-    category: '通用业务记录快照',
+    category: '来源单据快照',
     risk: 'P0',
     docLabels: ['来源单号'],
     requiredScenarioKeys: [
@@ -603,6 +611,15 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
   },
   {
     caseId:
+      'FL_supplier_payment_term__wires_explicit_create_edit_list_and_export',
+    title: '供应商默认付款周期接入新建、编辑、列表和导出',
+    fieldKeys: ['supplierPaymentTermDays'],
+    scenarioKey: 'master_record_profile_wired',
+    layer: 'web',
+    testFile: 'web/src/erp/utils/masterDataOrderView.test.mjs',
+  },
+  {
+    caseId:
       'FL_print_supplier_contact_snapshot__prefills_from_primary_supplier_contact',
     title: '打印草稿供应商联系人快照从主供应商联系人带出',
     fieldKeys: ['supplierContactSnapshot'],
@@ -612,10 +629,23 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
   },
   {
     caseId:
-      'FL_print_supplier_contact_snapshot__purchase_and_outsourcing_pages_fetch_supplier_contacts_before_save',
-    title: '采购和委外保存前读取供应商联系人以补齐打印快照',
+      'FL_print_supplier_contact_snapshot__purchase_and_outsourcing_pages_preserve_supplier_contacts',
+    title: '采购保存和委外合同编辑保留供应商联系人快照',
     fieldKeys: ['supplierContactSnapshot', 'supplierMasterSelection'],
     scenarioKey: 'supplier_contact_snapshot_prefilled',
+    layer: 'web',
+    testFile: 'web/src/erp/utils/masterDataOrderView.test.mjs',
+  },
+  {
+    caseId:
+      'FL_outsourcing_contract_party_b_snapshot__preserves_contract_override',
+    title: '委外合同乙方快照保留加工厂身份并采用本合同联系人和地址',
+    fieldKeys: [
+      'supplierMasterSelection',
+      'supplierContactSnapshot',
+      'processorContactAddress',
+    ],
+    scenarioKey: 'source_snapshot_retained',
     layer: 'web',
     testFile: 'web/src/erp/utils/masterDataOrderView.test.mjs',
   },

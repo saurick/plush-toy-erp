@@ -9,7 +9,7 @@ import {
   Space,
   Typography,
 } from 'antd'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import {
   AUTH_SCOPE,
   getStoredAdminProfile,
@@ -465,6 +465,11 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
                     }}
                   />
                 </Form.Item>
+                <div className="erp-login-sms-privacy-note">
+                  手机号仅用于登录验证。获取验证码前，可查看
+                  <Link to="/legal/privacy">个人信息处理规则</Link>
+                  中的短信处理方和保存说明。
+                </div>
                 <Form.Item label="验证码" required>
                   <Space.Compact
                     className="erp-login-sms-code-compact"
@@ -517,6 +522,12 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
               </Button>
             </Form.Item>
           </Form>
+          <nav className="erp-login-legal-links" aria-label="隐私与使用规则">
+            <span>使用系统前可查阅</span>
+            <Link to="/legal/privacy">个人信息处理规则</Link>
+            <span aria-hidden="true">·</span>
+            <Link to="/legal/system-rules">系统使用规则</Link>
+          </nav>
         </Space>
       </Card>
     </div>

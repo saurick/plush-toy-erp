@@ -34,6 +34,15 @@ test('workflowTaskBoardContract: 接受四泳道互斥且计数守恒的响应',
   )
 })
 
+test('workflowTaskBoardContract: 系统撤回任务属于已结束泳道', () => {
+  const response = overviewResponse()
+  response.lanes[3].tasks[0].task_status_key = 'withdrawn'
+  assert.equal(
+    requireWorkflowTaskBoardResponse(response, { limit: 5, offset: 0 }),
+    response
+  )
+})
+
 test('workflowTaskBoardContract: 畸形成功响应 fail closed', () => {
   const invalidResponses = [
     { ...overviewResponse(), total: 5 },
@@ -54,7 +63,10 @@ test('workflowTaskBoardContract: 畸形成功响应 fail closed', () => {
       ...overviewResponse(),
       lanes: overviewResponse().lanes.map((lane, index) =>
         index === 0
-          ? { ...lane, tasks: [{ id: 1, version: 1, task_status_key: 'pending' }] }
+          ? {
+              ...lane,
+              tasks: [{ id: 1, version: 1, task_status_key: 'pending' }],
+            }
           : lane
       ),
     },
@@ -62,7 +74,10 @@ test('workflowTaskBoardContract: 畸形成功响应 fail closed', () => {
       ...overviewResponse(),
       lanes: overviewResponse().lanes.map((lane, index) =>
         index === 1
-          ? { ...lane, tasks: [{ id: 2, version: 1, task_status_key: 'rejected' }] }
+          ? {
+              ...lane,
+              tasks: [{ id: 2, version: 1, task_status_key: 'rejected' }],
+            }
           : lane
       ),
     },

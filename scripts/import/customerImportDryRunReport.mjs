@@ -128,7 +128,7 @@ ${conflictList}
 
 ## No real import
 
-No real import is executed by this dry-run package. The tool does not connect to a database, does not write formal V1 tables, does not write \`business_records\`, does not create SQL, and does not modify schema, API, UI, seedData, or docs registry. \`canExecuteRealImport\` is always \`false\`.
+No real import is executed by this dry-run package. The tool does not connect to a database, does not write formal V1 tables, does not create SQL, and does not modify schema, API, UI, seedData, or docs registry. \`canExecuteRealImport\` is always \`false\`.
 
 ## Next manual review steps
 

@@ -29,6 +29,7 @@ type stubOutsourcingOrderJSONRPCRepo struct {
 	lifecycleCalls     int
 	saveErr            error
 	saveCalls          int
+	supplierTerm       int
 }
 
 func newStubOutsourcingOrderJSONRPCRepo() *stubOutsourcingOrderJSONRPCRepo {
@@ -43,6 +44,7 @@ func newStubOutsourcingOrderJSONRPCRepo() *stubOutsourcingOrderJSONRPCRepo {
 		unitActive:         true,
 		processActive:      true,
 		processOutsourcing: true,
+		supplierTerm:       30,
 	}
 }
 
@@ -77,6 +79,29 @@ func (s *stubOutsourcingOrderJSONRPCRepo) UpdateOutsourcingOrderLifecycle(_ cont
 		return nil, biz.ErrOutsourcingOrderNotFound
 	}
 	order.LifecycleStatus = lifecycleStatus
+	order.UpdatedAt = time.Unix(2, 0)
+	return order, nil
+}
+
+func (s *stubOutsourcingOrderJSONRPCRepo) ApplyOutsourcingOrderLifecycleAction(
+	_ context.Context,
+	in *biz.SourceOrderLifecycleAction,
+	lifecycleStatus string,
+) (*biz.OutsourcingOrder, error) {
+	s.lifecycleCalls++
+	order, ok := s.orders[in.ID]
+	if !ok {
+		return nil, biz.ErrOutsourcingOrderNotFound
+	}
+	if order.Version != in.ExpectedVersion {
+		return nil, biz.ErrOutsourcingOrderConflict
+	}
+	order.LifecycleStatus = lifecycleStatus
+	order.Version++
+	order.SettlementAction = &in.ActionKey
+	order.SettlementMode = optionalTestString(in.CloseMode)
+	order.SettlementReason = optionalTestString(in.Reason)
+	order.SettledBy = &in.ActorID
 	order.UpdatedAt = time.Unix(2, 0)
 	return order, nil
 }
@@ -131,6 +156,10 @@ func (s *stubOutsourcingOrderJSONRPCRepo) SupplierIsActive(context.Context, int)
 	return s.supplierActive, nil
 }
 
+func (s *stubOutsourcingOrderJSONRPCRepo) SupplierDefaultPaymentTermDays(context.Context, int) (int, error) {
+	return s.supplierTerm, nil
+}
+
 func (s *stubOutsourcingOrderJSONRPCRepo) ProductIsActive(context.Context, int) (bool, error) {
 	return s.productActive, nil
 }
@@ -158,21 +187,32 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 		biz.PermissionOutsourcingOrderCreate,
 		biz.PermissionOutsourcingOrderRead,
 		biz.PermissionOutsourcingOrderUpdate,
+		biz.PermissionOutsourcingOrderSubmit,
 		biz.PermissionOutsourcingOrderConfirm,
+		biz.PermissionOutsourcingOrderClose,
 	))
 	ctx := workflowJSONRPCAdminContext()
 
 	_, saveRes, err := j.handleOutsourcingOrder(ctx, "save_outsourcing_order_with_items", "1", mustJSONRPCStruct(t, map[string]any{
 		"outsourcing_order_no": "OUT-JSONRPC-001",
 		"supplier_id":          float64(1),
-		"supplier_snapshot":    map[string]any{"name": "加工厂"},
+		"currency":             "HKD",
+		"payment_term_days":    float64(45),
+		"supplier_snapshot": map[string]any{
+			"name":          "加工厂",
+			"contact_name":  "李厂长",
+			"contact_phone": "13900000000",
+			"address":       "加工园 1 号",
+		},
 		"contract_party_snapshot": map[string]any{
 			"buyerCompany": "永绅",
 			"buyerContact": "委外负责人",
 			"buyerPhone":   "13600000000",
+			"buyerAddress": "东莞茶山",
 		},
-		"source_order_no": "SO-JSONRPC-001",
-		"order_date":      "2026-06-17",
+		"source_order_no":      "SO-JSONRPC-001",
+		"order_date":           "2026-06-17",
+		"expected_return_date": "2026-06-24",
 		"items": []any{
 			map[string]any{
 				"line_no":                   float64(1),
@@ -184,6 +224,7 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 				"product_no_snapshot":       "PROD-JSONRPC",
 				"product_order_no_snapshot": " SO-JSONRPC-001 ",
 				"product_name_snapshot":     "半成品",
+				"processing_item":           "车缝加工",
 				"process_name_snapshot":     "车缝",
 				"process_category_snapshot": "委外车缝",
 				"unit_name_snapshot":        "只",
@@ -206,6 +247,9 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 	}
 	if status := order["lifecycle_status"]; status != biz.OutsourcingOrderStatusDraft {
 		t.Fatalf("expected draft outsourcing order, got %#v", status)
+	}
+	if order["currency"] != biz.FinanceCurrencyHKD || jsonRPCInt(t, order, "payment_term_days") != 45 {
+		t.Fatalf("expected HKD/45 outsourcing contract response, got %#v", order)
 	}
 	if _, exists := order["item_count"]; exists {
 		t.Fatalf("save response must not claim an unloaded outsourcing order item count, got %#v", order)
@@ -282,13 +326,15 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 
 	for _, tc := range []struct {
 		method string
+		action string
 		want   string
 	}{
-		{method: "submit_outsourcing_order", want: biz.OutsourcingOrderStatusSubmitted},
-		{method: "confirm_outsourcing_order", want: biz.OutsourcingOrderStatusConfirmed},
-		{method: "close_outsourcing_order", want: biz.OutsourcingOrderStatusClosed},
+		{method: "submit_outsourcing_order", action: biz.SourceOrderActionSubmit, want: biz.OutsourcingOrderStatusSubmitted},
+		{method: "confirm_outsourcing_order", action: biz.SourceOrderActionConfirm, want: biz.OutsourcingOrderStatusConfirmed},
+		{method: "close_outsourcing_order", action: biz.SourceOrderActionClose, want: biz.OutsourcingOrderStatusClosed},
 	} {
-		_, lifecycleRes, err := j.handleOutsourcingOrder(ctx, tc.method, tc.method, mustJSONRPCStruct(t, map[string]any{"id": float64(orderID)}))
+		version := repo.orders[orderID].Version
+		_, lifecycleRes, err := j.handleOutsourcingOrder(ctx, tc.method, tc.method, sourceOrderLifecycleTestParams(t, orderID, version, tc.action))
 		if err != nil {
 			t.Fatalf("%s expected nil err, got %v", tc.method, err)
 		}
@@ -299,6 +345,42 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 		if got != tc.want {
 			t.Fatalf("%s expected status %s, got %#v", tc.method, tc.want, got)
 		}
+	}
+}
+
+func TestJsonrpcDispatcher_OutsourcingOrderAggregateRejectsUnknownFieldAndMalformedPaymentTerm(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		key   string
+		value any
+	}{
+		{name: "unknown top-level field", key: "unexpected_field", value: true},
+		{name: "malformed payment term", key: "payment_term_days", value: "30"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := newStubOutsourcingOrderJSONRPCRepo()
+			j := newOutsourcingOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin(
+				[]string{biz.PurchaseRoleKey},
+				biz.PermissionOutsourcingOrderCreate,
+			))
+			params := map[string]any{
+				"outsourcing_order_no": "OUT-PARSER-CONTRACT",
+				"supplier_id":          float64(1),
+				"currency":             biz.FinanceCurrencyCNY,
+				"order_date":           "2026-08-12",
+			}
+			params[tc.key] = tc.value
+
+			_, res, err := j.handleOutsourcingOrder(
+				workflowJSONRPCAdminContext(),
+				"save_outsourcing_order_with_items",
+				tc.name,
+				mustJSONRPCStruct(t, params),
+			)
+			if err != nil || res == nil || res.Code != errcode.InvalidParam.Code || repo.saveCalls != 0 {
+				t.Fatalf("invalid aggregate input must fail before save: res=%#v err=%v calls=%d", res, err, repo.saveCalls)
+			}
+		})
 	}
 }
 
@@ -434,6 +516,8 @@ func TestJsonrpcDispatcher_OutsourcingOrderDraftVersionContract(t *testing.T) {
 			"id":                   float64(1),
 			"outsourcing_order_no": "OUT-VERSION-CONTRACT",
 			"supplier_id":          float64(1),
+			"currency":             "USD",
+			"payment_term_days":    float64(30),
 			"order_date":           "2026-07-14",
 			"items": []any{map[string]any{
 				"id":                   float64(1),
@@ -482,6 +566,7 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPIRequiresEnabledModule(t *testing.T
 		biz.PermissionOutsourcingOrderCreate,
 		biz.PermissionOutsourcingOrderRead,
 		biz.PermissionOutsourcingOrderUpdate,
+		biz.PermissionOutsourcingOrderSubmit,
 		biz.PermissionOutsourcingOrderConfirm,
 	))
 	ctx := workflowJSONRPCAdminContext()
@@ -529,7 +614,7 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPIRequiresEnabledModule(t *testing.T
 		t.Fatalf("expected enabled outsourcing_orders save OK, got %#v", saveRes)
 	}
 	orderID := jsonRPCInt(t, jsonRPCNestedMap(t, saveRes, "outsourcing_order"), "id")
-	_, submitRes, err := j.handleOutsourcingOrder(ctx, "submit_outsourcing_order", "enabled-submit", mustJSONRPCStruct(t, map[string]any{"id": float64(orderID)}))
+	_, submitRes, err := j.handleOutsourcingOrder(ctx, "submit_outsourcing_order", "enabled-submit", sourceOrderLifecycleTestParams(t, orderID, repo.orders[orderID].Version, biz.SourceOrderActionSubmit))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
@@ -589,8 +674,21 @@ func outsourcingOrderJSONRPCSaveParams(t *testing.T, orderNo string) *structpb.S
 	return mustJSONRPCStruct(t, map[string]any{
 		"outsourcing_order_no": orderNo,
 		"supplier_id":          float64(1),
+		"supplier_snapshot": map[string]any{
+			"name":          "测试加工厂",
+			"contact_name":  "李厂长",
+			"contact_phone": "13900000000",
+			"address":       "加工园 1 号",
+		},
+		"contract_party_snapshot": map[string]any{
+			"buyerCompany": "永绅",
+			"buyerContact": "委外负责人",
+			"buyerPhone":   "13800000000",
+			"buyerAddress": "东莞茶山",
+		},
 		"source_order_no":      "SO-MODULE-GATE",
 		"order_date":           "2026-06-17",
+		"expected_return_date": "2026-06-24",
 		"items": []any{
 			map[string]any{
 				"line_no":               float64(1),
@@ -601,6 +699,7 @@ func outsourcingOrderJSONRPCSaveParams(t *testing.T, orderNo string) *structpb.S
 				"outsourcing_quantity":  "12.5",
 				"product_no_snapshot":   "PROD-MODULE-GATE",
 				"product_name_snapshot": "半成品",
+				"processing_item":       "脸*1",
 				"process_name_snapshot": "车缝",
 				"unit_name_snapshot":    "只",
 			},
@@ -645,6 +744,8 @@ func outsourcingOrderFromMutation(id int, status string, in *biz.OutsourcingOrde
 		ID:                    id,
 		OutsourcingOrderNo:    in.OutsourcingOrderNo,
 		SupplierID:            in.SupplierID,
+		Currency:              in.Currency,
+		PaymentTermDays:       in.PaymentTermDays,
 		SupplierSnapshot:      in.SupplierSnapshot,
 		ContractPartySnapshot: in.ContractPartySnapshot,
 		SourceOrderNo:         in.SourceOrderNo,
@@ -675,6 +776,7 @@ func outsourcingOrderItemFromMutation(id int, orderID int, in *biz.OutsourcingOr
 		ProductNameSnapshot:     in.ProductNameSnapshot,
 		MaterialCodeSnapshot:    in.MaterialCodeSnapshot,
 		MaterialNameSnapshot:    in.MaterialNameSnapshot,
+		ProcessingItem:          in.ProcessingItem,
 		ProcessNameSnapshot:     in.ProcessNameSnapshot,
 		ProcessCategorySnapshot: in.ProcessCategorySnapshot,
 		UnitNameSnapshot:        in.UnitNameSnapshot,

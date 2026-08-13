@@ -257,6 +257,8 @@ function startDevServer() {
         BROWSER: 'none',
         ERP_VITE_PORT: String(devServerPort),
         ERP_VITE_HMR_CLIENT_PORT: String(devServerPort),
+        VITE_RELEASE_VERSION: 'yoyoosun-20260810-20c96d38-amd64',
+        VITE_GIT_SHA: '20c96d3819429361a35d2551b63b211f055de37e',
       },
       detached: true,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -4082,8 +4084,7 @@ async function assertPermissionChecklistItemLayout(page, { scenarioName }) {
       checklistScrollWidth: checklist?.scrollWidth || 0,
       checklistClientWidth: checklist?.clientWidth || 0,
       wrapperCount: wrappers.length,
-      hasStaleBusinessRecord: bodyText.includes('business.record.'),
-      hasStaleHelpCenter: bodyText.includes('erp.help_center.read'),
+      hasRetiredPermissionKey: bodyText.includes('erp.help_center.read'),
       wrappers: wrappers.map(readWrapper),
     }
   })
@@ -4092,7 +4093,7 @@ async function assertPermissionChecklistItemLayout(page, { scenarioName }) {
     `${scenarioName} 未找到权限复选项: ${JSON.stringify(metrics)}`
   )
   assert(
-    !metrics.hasStaleBusinessRecord && !metrics.hasStaleHelpCenter,
+    !metrics.hasRetiredPermissionKey,
     `${scenarioName} 不应显示已退出的旧权限码: ${JSON.stringify(metrics)}`
   )
   assert(

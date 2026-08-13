@@ -197,7 +197,9 @@ func (_c *WorkflowTaskEventCreate) Mutation() *WorkflowTaskEventMutation {
 
 // Save creates the WorkflowTaskEvent in the database.
 func (_c *WorkflowTaskEventCreate) Save(ctx context.Context) (*WorkflowTaskEvent, error) {
-	_c.defaults()
+	if err := _c.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, _c.sqlSave, _c.mutation, _c.hooks)
 }
 
@@ -224,11 +226,15 @@ func (_c *WorkflowTaskEventCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (_c *WorkflowTaskEventCreate) defaults() {
+func (_c *WorkflowTaskEventCreate) defaults() error {
 	if _, ok := _c.mutation.CreatedAt(); !ok {
+		if workflowtaskevent.DefaultCreatedAt == nil {
+			return fmt.Errorf("ent: uninitialized workflowtaskevent.DefaultCreatedAt (forgotten import ent/runtime?)")
+		}
 		v := workflowtaskevent.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

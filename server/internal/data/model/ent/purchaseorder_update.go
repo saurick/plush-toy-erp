@@ -58,6 +58,47 @@ func (_u *PurchaseOrderUpdate) SetNillableSupplierID(v *int) *PurchaseOrderUpdat
 	return _u
 }
 
+// SetCurrency sets the "currency" field.
+func (_u *PurchaseOrderUpdate) SetCurrency(v string) *PurchaseOrderUpdate {
+	_u.mutation.SetCurrency(v)
+	return _u
+}
+
+// SetNillableCurrency sets the "currency" field if the given value is not nil.
+func (_u *PurchaseOrderUpdate) SetNillableCurrency(v *string) *PurchaseOrderUpdate {
+	if v != nil {
+		_u.SetCurrency(*v)
+	}
+	return _u
+}
+
+// SetPaymentTermDays sets the "payment_term_days" field.
+func (_u *PurchaseOrderUpdate) SetPaymentTermDays(v int) *PurchaseOrderUpdate {
+	_u.mutation.ResetPaymentTermDays()
+	_u.mutation.SetPaymentTermDays(v)
+	return _u
+}
+
+// SetNillablePaymentTermDays sets the "payment_term_days" field if the given value is not nil.
+func (_u *PurchaseOrderUpdate) SetNillablePaymentTermDays(v *int) *PurchaseOrderUpdate {
+	if v != nil {
+		_u.SetPaymentTermDays(*v)
+	}
+	return _u
+}
+
+// AddPaymentTermDays adds value to the "payment_term_days" field.
+func (_u *PurchaseOrderUpdate) AddPaymentTermDays(v int) *PurchaseOrderUpdate {
+	_u.mutation.AddPaymentTermDays(v)
+	return _u
+}
+
+// ClearPaymentTermDays clears the value of the "payment_term_days" field.
+func (_u *PurchaseOrderUpdate) ClearPaymentTermDays() *PurchaseOrderUpdate {
+	_u.mutation.ClearPaymentTermDays()
+	return _u
+}
+
 // SetSupplierPurchaseOrderNo sets the "supplier_purchase_order_no" field.
 func (_u *PurchaseOrderUpdate) SetSupplierPurchaseOrderNo(v string) *PurchaseOrderUpdate {
 	_u.mutation.SetSupplierPurchaseOrderNo(v)
@@ -168,6 +209,113 @@ func (_u *PurchaseOrderUpdate) SetNillableVersion(v *int) *PurchaseOrderUpdate {
 // AddVersion adds value to the "version" field.
 func (_u *PurchaseOrderUpdate) AddVersion(v int) *PurchaseOrderUpdate {
 	_u.mutation.AddVersion(v)
+	return _u
+}
+
+// SetSettlementAction sets the "settlement_action" field.
+func (_u *PurchaseOrderUpdate) SetSettlementAction(v string) *PurchaseOrderUpdate {
+	_u.mutation.SetSettlementAction(v)
+	return _u
+}
+
+// SetNillableSettlementAction sets the "settlement_action" field if the given value is not nil.
+func (_u *PurchaseOrderUpdate) SetNillableSettlementAction(v *string) *PurchaseOrderUpdate {
+	if v != nil {
+		_u.SetSettlementAction(*v)
+	}
+	return _u
+}
+
+// ClearSettlementAction clears the value of the "settlement_action" field.
+func (_u *PurchaseOrderUpdate) ClearSettlementAction() *PurchaseOrderUpdate {
+	_u.mutation.ClearSettlementAction()
+	return _u
+}
+
+// SetSettlementMode sets the "settlement_mode" field.
+func (_u *PurchaseOrderUpdate) SetSettlementMode(v string) *PurchaseOrderUpdate {
+	_u.mutation.SetSettlementMode(v)
+	return _u
+}
+
+// SetNillableSettlementMode sets the "settlement_mode" field if the given value is not nil.
+func (_u *PurchaseOrderUpdate) SetNillableSettlementMode(v *string) *PurchaseOrderUpdate {
+	if v != nil {
+		_u.SetSettlementMode(*v)
+	}
+	return _u
+}
+
+// ClearSettlementMode clears the value of the "settlement_mode" field.
+func (_u *PurchaseOrderUpdate) ClearSettlementMode() *PurchaseOrderUpdate {
+	_u.mutation.ClearSettlementMode()
+	return _u
+}
+
+// SetSettlementReason sets the "settlement_reason" field.
+func (_u *PurchaseOrderUpdate) SetSettlementReason(v string) *PurchaseOrderUpdate {
+	_u.mutation.SetSettlementReason(v)
+	return _u
+}
+
+// SetNillableSettlementReason sets the "settlement_reason" field if the given value is not nil.
+func (_u *PurchaseOrderUpdate) SetNillableSettlementReason(v *string) *PurchaseOrderUpdate {
+	if v != nil {
+		_u.SetSettlementReason(*v)
+	}
+	return _u
+}
+
+// ClearSettlementReason clears the value of the "settlement_reason" field.
+func (_u *PurchaseOrderUpdate) ClearSettlementReason() *PurchaseOrderUpdate {
+	_u.mutation.ClearSettlementReason()
+	return _u
+}
+
+// SetSettledAt sets the "settled_at" field.
+func (_u *PurchaseOrderUpdate) SetSettledAt(v time.Time) *PurchaseOrderUpdate {
+	_u.mutation.SetSettledAt(v)
+	return _u
+}
+
+// SetNillableSettledAt sets the "settled_at" field if the given value is not nil.
+func (_u *PurchaseOrderUpdate) SetNillableSettledAt(v *time.Time) *PurchaseOrderUpdate {
+	if v != nil {
+		_u.SetSettledAt(*v)
+	}
+	return _u
+}
+
+// ClearSettledAt clears the value of the "settled_at" field.
+func (_u *PurchaseOrderUpdate) ClearSettledAt() *PurchaseOrderUpdate {
+	_u.mutation.ClearSettledAt()
+	return _u
+}
+
+// SetSettledBy sets the "settled_by" field.
+func (_u *PurchaseOrderUpdate) SetSettledBy(v int) *PurchaseOrderUpdate {
+	_u.mutation.ResetSettledBy()
+	_u.mutation.SetSettledBy(v)
+	return _u
+}
+
+// SetNillableSettledBy sets the "settled_by" field if the given value is not nil.
+func (_u *PurchaseOrderUpdate) SetNillableSettledBy(v *int) *PurchaseOrderUpdate {
+	if v != nil {
+		_u.SetSettledBy(*v)
+	}
+	return _u
+}
+
+// AddSettledBy adds value to the "settled_by" field.
+func (_u *PurchaseOrderUpdate) AddSettledBy(v int) *PurchaseOrderUpdate {
+	_u.mutation.AddSettledBy(v)
+	return _u
+}
+
+// ClearSettledBy clears the value of the "settled_by" field.
+func (_u *PurchaseOrderUpdate) ClearSettledBy() *PurchaseOrderUpdate {
+	_u.mutation.ClearSettledBy()
 	return _u
 }
 
@@ -297,6 +445,16 @@ func (_u *PurchaseOrderUpdate) check() error {
 			return &ValidationError{Name: "supplier_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.supplier_id": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Currency(); ok {
+		if err := purchaseorder.CurrencyValidator(v); err != nil {
+			return &ValidationError{Name: "currency", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.currency": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.PaymentTermDays(); ok {
+		if err := purchaseorder.PaymentTermDaysValidator(v); err != nil {
+			return &ValidationError{Name: "payment_term_days", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.payment_term_days": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.SupplierPurchaseOrderNo(); ok {
 		if err := purchaseorder.SupplierPurchaseOrderNoValidator(v); err != nil {
 			return &ValidationError{Name: "supplier_purchase_order_no", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.supplier_purchase_order_no": %w`, err)}
@@ -310,6 +468,26 @@ func (_u *PurchaseOrderUpdate) check() error {
 	if v, ok := _u.mutation.Version(); ok {
 		if err := purchaseorder.VersionValidator(v); err != nil {
 			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.version": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SettlementAction(); ok {
+		if err := purchaseorder.SettlementActionValidator(v); err != nil {
+			return &ValidationError{Name: "settlement_action", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.settlement_action": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SettlementMode(); ok {
+		if err := purchaseorder.SettlementModeValidator(v); err != nil {
+			return &ValidationError{Name: "settlement_mode", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.settlement_mode": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SettlementReason(); ok {
+		if err := purchaseorder.SettlementReasonValidator(v); err != nil {
+			return &ValidationError{Name: "settlement_reason", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.settlement_reason": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SettledBy(); ok {
+		if err := purchaseorder.SettledByValidator(v); err != nil {
+			return &ValidationError{Name: "settled_by", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.settled_by": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.Note(); ok {
@@ -337,6 +515,18 @@ func (_u *PurchaseOrderUpdate) sqlSave(ctx context.Context) (_node int, err erro
 	}
 	if value, ok := _u.mutation.PurchaseOrderNo(); ok {
 		_spec.SetField(purchaseorder.FieldPurchaseOrderNo, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Currency(); ok {
+		_spec.SetField(purchaseorder.FieldCurrency, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.PaymentTermDays(); ok {
+		_spec.SetField(purchaseorder.FieldPaymentTermDays, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedPaymentTermDays(); ok {
+		_spec.AddField(purchaseorder.FieldPaymentTermDays, field.TypeInt, value)
+	}
+	if _u.mutation.PaymentTermDaysCleared() {
+		_spec.ClearField(purchaseorder.FieldPaymentTermDays, field.TypeInt)
 	}
 	if value, ok := _u.mutation.SupplierPurchaseOrderNo(); ok {
 		_spec.SetField(purchaseorder.FieldSupplierPurchaseOrderNo, field.TypeString, value)
@@ -373,6 +563,39 @@ func (_u *PurchaseOrderUpdate) sqlSave(ctx context.Context) (_node int, err erro
 	}
 	if value, ok := _u.mutation.AddedVersion(); ok {
 		_spec.AddField(purchaseorder.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.SettlementAction(); ok {
+		_spec.SetField(purchaseorder.FieldSettlementAction, field.TypeString, value)
+	}
+	if _u.mutation.SettlementActionCleared() {
+		_spec.ClearField(purchaseorder.FieldSettlementAction, field.TypeString)
+	}
+	if value, ok := _u.mutation.SettlementMode(); ok {
+		_spec.SetField(purchaseorder.FieldSettlementMode, field.TypeString, value)
+	}
+	if _u.mutation.SettlementModeCleared() {
+		_spec.ClearField(purchaseorder.FieldSettlementMode, field.TypeString)
+	}
+	if value, ok := _u.mutation.SettlementReason(); ok {
+		_spec.SetField(purchaseorder.FieldSettlementReason, field.TypeString, value)
+	}
+	if _u.mutation.SettlementReasonCleared() {
+		_spec.ClearField(purchaseorder.FieldSettlementReason, field.TypeString)
+	}
+	if value, ok := _u.mutation.SettledAt(); ok {
+		_spec.SetField(purchaseorder.FieldSettledAt, field.TypeTime, value)
+	}
+	if _u.mutation.SettledAtCleared() {
+		_spec.ClearField(purchaseorder.FieldSettledAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.SettledBy(); ok {
+		_spec.SetField(purchaseorder.FieldSettledBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSettledBy(); ok {
+		_spec.AddField(purchaseorder.FieldSettledBy, field.TypeInt, value)
+	}
+	if _u.mutation.SettledByCleared() {
+		_spec.ClearField(purchaseorder.FieldSettledBy, field.TypeInt)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(purchaseorder.FieldNote, field.TypeString, value)
@@ -505,6 +728,47 @@ func (_u *PurchaseOrderUpdateOne) SetNillableSupplierID(v *int) *PurchaseOrderUp
 	return _u
 }
 
+// SetCurrency sets the "currency" field.
+func (_u *PurchaseOrderUpdateOne) SetCurrency(v string) *PurchaseOrderUpdateOne {
+	_u.mutation.SetCurrency(v)
+	return _u
+}
+
+// SetNillableCurrency sets the "currency" field if the given value is not nil.
+func (_u *PurchaseOrderUpdateOne) SetNillableCurrency(v *string) *PurchaseOrderUpdateOne {
+	if v != nil {
+		_u.SetCurrency(*v)
+	}
+	return _u
+}
+
+// SetPaymentTermDays sets the "payment_term_days" field.
+func (_u *PurchaseOrderUpdateOne) SetPaymentTermDays(v int) *PurchaseOrderUpdateOne {
+	_u.mutation.ResetPaymentTermDays()
+	_u.mutation.SetPaymentTermDays(v)
+	return _u
+}
+
+// SetNillablePaymentTermDays sets the "payment_term_days" field if the given value is not nil.
+func (_u *PurchaseOrderUpdateOne) SetNillablePaymentTermDays(v *int) *PurchaseOrderUpdateOne {
+	if v != nil {
+		_u.SetPaymentTermDays(*v)
+	}
+	return _u
+}
+
+// AddPaymentTermDays adds value to the "payment_term_days" field.
+func (_u *PurchaseOrderUpdateOne) AddPaymentTermDays(v int) *PurchaseOrderUpdateOne {
+	_u.mutation.AddPaymentTermDays(v)
+	return _u
+}
+
+// ClearPaymentTermDays clears the value of the "payment_term_days" field.
+func (_u *PurchaseOrderUpdateOne) ClearPaymentTermDays() *PurchaseOrderUpdateOne {
+	_u.mutation.ClearPaymentTermDays()
+	return _u
+}
+
 // SetSupplierPurchaseOrderNo sets the "supplier_purchase_order_no" field.
 func (_u *PurchaseOrderUpdateOne) SetSupplierPurchaseOrderNo(v string) *PurchaseOrderUpdateOne {
 	_u.mutation.SetSupplierPurchaseOrderNo(v)
@@ -615,6 +879,113 @@ func (_u *PurchaseOrderUpdateOne) SetNillableVersion(v *int) *PurchaseOrderUpdat
 // AddVersion adds value to the "version" field.
 func (_u *PurchaseOrderUpdateOne) AddVersion(v int) *PurchaseOrderUpdateOne {
 	_u.mutation.AddVersion(v)
+	return _u
+}
+
+// SetSettlementAction sets the "settlement_action" field.
+func (_u *PurchaseOrderUpdateOne) SetSettlementAction(v string) *PurchaseOrderUpdateOne {
+	_u.mutation.SetSettlementAction(v)
+	return _u
+}
+
+// SetNillableSettlementAction sets the "settlement_action" field if the given value is not nil.
+func (_u *PurchaseOrderUpdateOne) SetNillableSettlementAction(v *string) *PurchaseOrderUpdateOne {
+	if v != nil {
+		_u.SetSettlementAction(*v)
+	}
+	return _u
+}
+
+// ClearSettlementAction clears the value of the "settlement_action" field.
+func (_u *PurchaseOrderUpdateOne) ClearSettlementAction() *PurchaseOrderUpdateOne {
+	_u.mutation.ClearSettlementAction()
+	return _u
+}
+
+// SetSettlementMode sets the "settlement_mode" field.
+func (_u *PurchaseOrderUpdateOne) SetSettlementMode(v string) *PurchaseOrderUpdateOne {
+	_u.mutation.SetSettlementMode(v)
+	return _u
+}
+
+// SetNillableSettlementMode sets the "settlement_mode" field if the given value is not nil.
+func (_u *PurchaseOrderUpdateOne) SetNillableSettlementMode(v *string) *PurchaseOrderUpdateOne {
+	if v != nil {
+		_u.SetSettlementMode(*v)
+	}
+	return _u
+}
+
+// ClearSettlementMode clears the value of the "settlement_mode" field.
+func (_u *PurchaseOrderUpdateOne) ClearSettlementMode() *PurchaseOrderUpdateOne {
+	_u.mutation.ClearSettlementMode()
+	return _u
+}
+
+// SetSettlementReason sets the "settlement_reason" field.
+func (_u *PurchaseOrderUpdateOne) SetSettlementReason(v string) *PurchaseOrderUpdateOne {
+	_u.mutation.SetSettlementReason(v)
+	return _u
+}
+
+// SetNillableSettlementReason sets the "settlement_reason" field if the given value is not nil.
+func (_u *PurchaseOrderUpdateOne) SetNillableSettlementReason(v *string) *PurchaseOrderUpdateOne {
+	if v != nil {
+		_u.SetSettlementReason(*v)
+	}
+	return _u
+}
+
+// ClearSettlementReason clears the value of the "settlement_reason" field.
+func (_u *PurchaseOrderUpdateOne) ClearSettlementReason() *PurchaseOrderUpdateOne {
+	_u.mutation.ClearSettlementReason()
+	return _u
+}
+
+// SetSettledAt sets the "settled_at" field.
+func (_u *PurchaseOrderUpdateOne) SetSettledAt(v time.Time) *PurchaseOrderUpdateOne {
+	_u.mutation.SetSettledAt(v)
+	return _u
+}
+
+// SetNillableSettledAt sets the "settled_at" field if the given value is not nil.
+func (_u *PurchaseOrderUpdateOne) SetNillableSettledAt(v *time.Time) *PurchaseOrderUpdateOne {
+	if v != nil {
+		_u.SetSettledAt(*v)
+	}
+	return _u
+}
+
+// ClearSettledAt clears the value of the "settled_at" field.
+func (_u *PurchaseOrderUpdateOne) ClearSettledAt() *PurchaseOrderUpdateOne {
+	_u.mutation.ClearSettledAt()
+	return _u
+}
+
+// SetSettledBy sets the "settled_by" field.
+func (_u *PurchaseOrderUpdateOne) SetSettledBy(v int) *PurchaseOrderUpdateOne {
+	_u.mutation.ResetSettledBy()
+	_u.mutation.SetSettledBy(v)
+	return _u
+}
+
+// SetNillableSettledBy sets the "settled_by" field if the given value is not nil.
+func (_u *PurchaseOrderUpdateOne) SetNillableSettledBy(v *int) *PurchaseOrderUpdateOne {
+	if v != nil {
+		_u.SetSettledBy(*v)
+	}
+	return _u
+}
+
+// AddSettledBy adds value to the "settled_by" field.
+func (_u *PurchaseOrderUpdateOne) AddSettledBy(v int) *PurchaseOrderUpdateOne {
+	_u.mutation.AddSettledBy(v)
+	return _u
+}
+
+// ClearSettledBy clears the value of the "settled_by" field.
+func (_u *PurchaseOrderUpdateOne) ClearSettledBy() *PurchaseOrderUpdateOne {
+	_u.mutation.ClearSettledBy()
 	return _u
 }
 
@@ -757,6 +1128,16 @@ func (_u *PurchaseOrderUpdateOne) check() error {
 			return &ValidationError{Name: "supplier_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.supplier_id": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Currency(); ok {
+		if err := purchaseorder.CurrencyValidator(v); err != nil {
+			return &ValidationError{Name: "currency", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.currency": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.PaymentTermDays(); ok {
+		if err := purchaseorder.PaymentTermDaysValidator(v); err != nil {
+			return &ValidationError{Name: "payment_term_days", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.payment_term_days": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.SupplierPurchaseOrderNo(); ok {
 		if err := purchaseorder.SupplierPurchaseOrderNoValidator(v); err != nil {
 			return &ValidationError{Name: "supplier_purchase_order_no", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.supplier_purchase_order_no": %w`, err)}
@@ -770,6 +1151,26 @@ func (_u *PurchaseOrderUpdateOne) check() error {
 	if v, ok := _u.mutation.Version(); ok {
 		if err := purchaseorder.VersionValidator(v); err != nil {
 			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.version": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SettlementAction(); ok {
+		if err := purchaseorder.SettlementActionValidator(v); err != nil {
+			return &ValidationError{Name: "settlement_action", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.settlement_action": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SettlementMode(); ok {
+		if err := purchaseorder.SettlementModeValidator(v); err != nil {
+			return &ValidationError{Name: "settlement_mode", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.settlement_mode": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SettlementReason(); ok {
+		if err := purchaseorder.SettlementReasonValidator(v); err != nil {
+			return &ValidationError{Name: "settlement_reason", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.settlement_reason": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SettledBy(); ok {
+		if err := purchaseorder.SettledByValidator(v); err != nil {
+			return &ValidationError{Name: "settled_by", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.settled_by": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.Note(); ok {
@@ -815,6 +1216,18 @@ func (_u *PurchaseOrderUpdateOne) sqlSave(ctx context.Context) (_node *PurchaseO
 	if value, ok := _u.mutation.PurchaseOrderNo(); ok {
 		_spec.SetField(purchaseorder.FieldPurchaseOrderNo, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.Currency(); ok {
+		_spec.SetField(purchaseorder.FieldCurrency, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.PaymentTermDays(); ok {
+		_spec.SetField(purchaseorder.FieldPaymentTermDays, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedPaymentTermDays(); ok {
+		_spec.AddField(purchaseorder.FieldPaymentTermDays, field.TypeInt, value)
+	}
+	if _u.mutation.PaymentTermDaysCleared() {
+		_spec.ClearField(purchaseorder.FieldPaymentTermDays, field.TypeInt)
+	}
 	if value, ok := _u.mutation.SupplierPurchaseOrderNo(); ok {
 		_spec.SetField(purchaseorder.FieldSupplierPurchaseOrderNo, field.TypeString, value)
 	}
@@ -850,6 +1263,39 @@ func (_u *PurchaseOrderUpdateOne) sqlSave(ctx context.Context) (_node *PurchaseO
 	}
 	if value, ok := _u.mutation.AddedVersion(); ok {
 		_spec.AddField(purchaseorder.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.SettlementAction(); ok {
+		_spec.SetField(purchaseorder.FieldSettlementAction, field.TypeString, value)
+	}
+	if _u.mutation.SettlementActionCleared() {
+		_spec.ClearField(purchaseorder.FieldSettlementAction, field.TypeString)
+	}
+	if value, ok := _u.mutation.SettlementMode(); ok {
+		_spec.SetField(purchaseorder.FieldSettlementMode, field.TypeString, value)
+	}
+	if _u.mutation.SettlementModeCleared() {
+		_spec.ClearField(purchaseorder.FieldSettlementMode, field.TypeString)
+	}
+	if value, ok := _u.mutation.SettlementReason(); ok {
+		_spec.SetField(purchaseorder.FieldSettlementReason, field.TypeString, value)
+	}
+	if _u.mutation.SettlementReasonCleared() {
+		_spec.ClearField(purchaseorder.FieldSettlementReason, field.TypeString)
+	}
+	if value, ok := _u.mutation.SettledAt(); ok {
+		_spec.SetField(purchaseorder.FieldSettledAt, field.TypeTime, value)
+	}
+	if _u.mutation.SettledAtCleared() {
+		_spec.ClearField(purchaseorder.FieldSettledAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.SettledBy(); ok {
+		_spec.SetField(purchaseorder.FieldSettledBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSettledBy(); ok {
+		_spec.AddField(purchaseorder.FieldSettledBy, field.TypeInt, value)
+	}
+	if _u.mutation.SettledByCleared() {
+		_spec.ClearField(purchaseorder.FieldSettledBy, field.TypeInt)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(purchaseorder.FieldNote, field.TypeString, value)

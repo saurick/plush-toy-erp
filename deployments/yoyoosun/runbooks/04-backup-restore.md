@@ -4,8 +4,7 @@
 
 | 范围 | 说明 | 是否提交到 Git |
 | --- | --- | --- |
-| PostgreSQL | 业务数据库 | 否 |
-| 附件目录 | 上传文件、模板相关附件 | 否 |
+| PostgreSQL | 业务数据库；当前业务附件正文也存于 `business_attachments.content`，随整库备份 | 否 |
 | 受控 `.env` 指纹 | 只记录 hash，不记录明文 | 可记录 hash |
 | release evidence | 发布审计资料 | 可入库，必须脱敏 |
 | import / dry-run report | 导入报告摘要 | 可入库，不能含 raw rows |
@@ -15,21 +14,23 @@
 - 发布前：必须备份。
 - migration apply 前：必须备份。
 - 真实导入 apply 前：必须备份；当前 yoyoosun 真实导入未开放。
-- 日常：按客户环境容量和业务节奏制定每日 / 每周策略。
+- 日常目标：每日整库备份到本地受控目录，通过 `age` 加密后复制到独立挂载的异地目录，保留 35 天；每周从异地加密副本做一次临时库真实恢复。
+
+仓库已提供 `scripts/deploy/scheduled-postgres-backup.sh`、`scripts/deploy/verify-scheduled-postgres-backup.sh` 和 [`systemd` 安装模板](../systemd/README.md)。只有目标机已安装 timer、手工首跑通过、异地副本读回且恢复报告为 `passed`，才可宣称日常备份已启用；本地代码存在不等于目标机已安装。
 
 ## 备份步骤
 
-1. 确认数据库和附件目录位置。
-2. 生成数据库备份到受控备份目录。
-3. 计算 hash、大小和时间。
-4. 如启用加密，确认加密状态和 key alias。
+1. 确认数据库、本地备份目录、独立异地挂载目录和 `age` recipient；异地目录已按 systemd 安装说明写入固定挂载标记，且与本地目录不在同一文件系统。
+2. 使用只读 `erp_backup` 生成数据库备份到受控备份目录。
+3. 计算本地 dump 的 hash、大小和时间。
+4. 使用 `age` 公钥加密异地副本，并计算加密文件 hash；identity 不与异地副本同存。
 5. 记录 backup evidence，不记录下载链接或 secret。
 6. 定期抽样恢复到测试库。
 
 本地 / 试用前最小恢复演练入口：
 
 ```bash
-SOURCE_POSTGRES_DSN="$(cd server && make print_db_url)" \
+SOURCE_POSTGRES_DSN='<postgres://erp_backup:...@host:port/database?sslmode=...>' \
   bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh \
     --release-version <release-version> \
     --backup-purpose pre-migration \
@@ -46,7 +47,7 @@ SOURCE_POSTGRES_DSN="$(cd server && make print_db_url)" \
 1. 选择 backup id，并确认 hash。
 2. 准备隔离恢复环境或明确恢复窗口。
 3. 恢复数据库。
-4. 恢复附件目录。
+4. 业务附件随 PostgreSQL 一起恢复；当前没有独立运行时附件目录。
 5. 记录恢复后的 migrationBefore。
 6. 在隔离库执行 populated upgrade read-only audit；发现 blocker 时停止，不执行 apply。
 7. 执行 customer config cutover read-only audit；发现遗留流程实例或任务配置 revision 锚点时停止，由人工治理，不执行自动 DML。
@@ -70,7 +71,7 @@ SOURCE_POSTGRES_DSN="$(cd server && make print_db_url)" \
 
 | 指标 | 当前建议 |
 | --- | --- |
-| RPO | 发布 / migration 前为 0；日常按客户备份策略确认 |
+| RPO | 发布 / migration 前为 0；日常名义周期为 24 小时，恢复检查按 36 小时 freshness 上限阻断，实际值以目标 timer 和最新成功备份时间为准 |
 | RTO | 先以单机恢复演练结果为准，未演练前不得承诺固定时长 |
 
 ## 禁止

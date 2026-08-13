@@ -30,6 +30,7 @@ import {
   scenarioDemoExecutionCommand,
   scenarioDemoPlanCommand,
   unresolvedDataPreparationOutcomeBlocksExecution,
+  validateAcceptanceReceipt,
   validateDevDataPreparationAction,
 } from './devDataPreparationPlugin.mjs'
 
@@ -351,6 +352,11 @@ test('core demo prepares an immutable plan, reuses idempotency, executes asynchr
     },
     stableUpsert: true,
     cleanupSupported: false,
+  })
+  assert.deepEqual(passed.timing, {
+    startedAt: '2026-07-29T02:03:04.000Z',
+    completedAt: '2026-07-29T02:03:04.000Z',
+    durationMs: 0,
   })
   assert.deepEqual(
     calls
@@ -705,6 +711,95 @@ test('full acceptance prepare freezes the fixed lifecycle plan without executing
   )
   assert.equal(lifecycleCalls.length, 1)
   assert.equal(lifecycleCalls[0].args.includes('--execute'), false)
+  const summary = await service.summary()
+  assert.deepEqual(
+    {
+      chains: summary.acceptancePlan.chainCount,
+      steps: summary.acceptancePlan.stepCount,
+      scenarios: summary.acceptancePlan.scenarioCount,
+      stages: summary.acceptancePlan.dataStageCount,
+      targets: summary.acceptancePlan.catalogTargetCount,
+    },
+    { chains: 11, steps: 67, scenarios: 66, stages: 9, targets: 51 }
+  )
+  assert.equal(summary.acceptancePlan.selectorAffectsExecution, false)
+  assert.equal(summary.acceptancePlan.freshBatchPerRun, true)
+})
+
+test('full acceptance receipt binds the latest chain contract and nine stage timings', async (t) => {
+  const fixture = createFixture(t)
+  const service = createDevDataPreparationService({
+    projectRoot: fixture.root,
+    operationStore: fixture.store,
+    commandRunner: successfulRunner([]),
+    readRepositoryState: async () => REPOSITORY,
+    environment: { LOCAL_ACCEPTANCE_DATABASE_BASE_URL: FULL_DSN },
+  })
+  const { acceptancePlan } = await service.summary()
+  const operation = {
+    repository: REPOSITORY,
+    runId: 'd260729020304_01020304',
+    targetSummary: { targetFingerprint: 'e'.repeat(64) },
+  }
+  const stageTimings = acceptancePlan.dataStages.map(({ key }, index) => ({
+    key,
+    status: 'completed',
+    startedAt: `2026-07-29T02:03:${String(index).padStart(2, '0')}.000Z`,
+    completedAt: `2026-07-29T02:03:${String(index + 1).padStart(2, '0')}.000Z`,
+    durationMs: 1000,
+  }))
+  const readback = validateAcceptanceReceipt(
+    {
+      schemaVersion: 'plush-local-acceptance-lifecycle/v1',
+      commit: REPOSITORY.commit,
+      runID: operation.runId,
+      status: 'passed',
+      cleanup: { complete: true, residualDatabases: [] },
+      evidence: {
+        dataset: {
+          ok: true,
+          dataVersion: '2026.07.16-v5',
+          chainDataDigest: acceptancePlan.chainDataDigest,
+          chainVerificationDigest: acceptancePlan.chainVerificationDigest,
+          startedAt: '2026-07-29T02:03:00.000Z',
+          completedAt: '2026-07-29T02:04:00.000Z',
+          durationMs: 60_000,
+          stageTimings,
+        },
+      },
+    },
+    operation
+  )
+  assert.equal(readback.datasetDurationMs, 60_000)
+  assert.equal(readback.stageTimings.length, 9)
+  assert.equal(readback.catalogTargetCount, 51)
+  assert.throws(
+    () =>
+      validateAcceptanceReceipt(
+        {
+          schemaVersion: 'plush-local-acceptance-lifecycle/v1',
+          commit: REPOSITORY.commit,
+          runID: operation.runId,
+          status: 'passed',
+          cleanup: { complete: true, residualDatabases: [] },
+          evidence: {
+            dataset: {
+              ...readback,
+              ok: true,
+              dataVersion: '2026.07.16-v5',
+              chainDataDigest: '0'.repeat(64),
+              chainVerificationDigest: acceptancePlan.chainVerificationDigest,
+              startedAt: '2026-07-29T02:03:00.000Z',
+              completedAt: '2026-07-29T02:04:00.000Z',
+              durationMs: 60_000,
+              stageTimings,
+            },
+          },
+        },
+        operation
+      ),
+    /timing evidence/u
+  )
 })
 
 test('execution lock is atomic across dev server processes', (t) => {
@@ -940,7 +1035,7 @@ test('failed command receipts redact credentials and full DSNs', async (t) => {
     serialized,
     /hunter2|admin:secret|password|postgres:\/\/admin|dsn=|\/(?:home|private|tmp|var)\//iu
   )
-  assert.doesNotMatch(failed.issues[0].message, /[\u0000-\u001f\u007f]/u)
+  assert.doesNotMatch(failed.issues[0].message, /\p{Cc}/u)
   const persisted = readFileSync(
     path.join(fixture.store, 'operations', `${prepared.operation.id}.json`),
     'utf8'
@@ -1165,6 +1260,12 @@ test('profile metadata states retention, cleanup, and browser-safe requirements 
     ),
     [
       {
+        key: 'full-acceptance',
+        dataRetention: 'ephemeral',
+        cleanupMode: 'automatic',
+        exactCleanCommitRequired: true,
+      },
+      {
         key: 'core-demo',
         dataRetention: 'long-lived',
         cleanupMode: 'not-supported',
@@ -1175,12 +1276,6 @@ test('profile metadata states retention, cleanup, and browser-safe requirements 
         dataRetention: 'long-lived',
         cleanupMode: 'forward-only',
         exactCleanCommitRequired: false,
-      },
-      {
-        key: 'full-acceptance',
-        dataRetention: 'ephemeral',
-        cleanupMode: 'automatic',
-        exactCleanCommitRequired: true,
       },
     ]
   )

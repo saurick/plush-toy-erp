@@ -93,6 +93,10 @@ import {
   numeric20Scale6Units,
 } from '../utils/numeric20Scale6.mjs'
 import {
+  currentBusinessDate,
+  unixSecondsToBusinessDate,
+} from '../utils/businessDate.mjs'
+import {
   resolveRelatedRecordActionAvailability,
   resolveShipmentActionAvailability,
 } from '../utils/operationalActionAvailability.mjs'
@@ -119,7 +123,7 @@ import {
   searchParamPositiveInt,
   searchParamText,
 } from '../utils/routeQuery.mjs'
-import { businessRecordInventoryRouteFor } from '../utils/businessSourceNavigation.mjs'
+import { businessSourceInventoryRouteFor } from '../utils/businessSourceNavigation.mjs'
 import {
   canOpenRelatedDocumentPath,
   clearLinkedDocumentParams,
@@ -210,9 +214,7 @@ function shipmentFormValues(shipment = {}) {
     customer_snapshot: shipment.customer_snapshot || '',
     idempotency_key: shipment.idempotency_key || '',
     planned_ship_at:
-      plannedShipAt > 0
-        ? new Date(plannedShipAt * 1000).toISOString().slice(0, 10)
-        : '',
+      plannedShipAt > 0 ? unixSecondsToBusinessDate(plannedShipAt) : '',
     total_net_weight_g: shipment.total_net_weight_g,
     note: shipment.note || '',
   }
@@ -396,7 +398,7 @@ export default function ShipmentsPage() {
             fields: ['sales_order_no'],
           }
         ),
-        inventory: businessRecordInventoryRouteFor(
+        inventory: businessSourceInventoryRouteFor(
           'shipments',
           selectedRow.id,
           { keyword: selectedRow.shipment_no, source: 'shipment' }
@@ -1047,7 +1049,7 @@ export default function ShipmentsPage() {
       customer_id: undefined,
       customer_snapshot: '',
       idempotency_key: idempotencyKey('shipment'),
-      planned_ship_at: new Date().toISOString().slice(0, 10),
+      planned_ship_at: currentBusinessDate(),
       items: [createBlankShipmentItem()],
     })
     setShipmentModal({ mode: 'create', shipment: null })
@@ -1455,7 +1457,7 @@ export default function ShipmentsPage() {
   const { exporting, exportRows } = useBusinessListExport({
     requestKey: 'shipments-export',
     loadRows: loadExportRows,
-    filename: `出货单-${new Date().toISOString().slice(0, 10)}.csv`,
+    filename: `出货单-${currentBusinessDate()}.csv`,
     columns: exportColumns,
     recordLabel: '出货单',
   })
@@ -1536,6 +1538,7 @@ export default function ShipmentsPage() {
     <BusinessPageLayout className="erp-v1-shipments-page">
       <PageHeaderCard
         compact
+        helpKey="shipments"
         title="出货单"
         description="销售出货草稿需先完成品质检验与财务放行，并由仓库确认实际出货后才扣减库存。"
         tags={[

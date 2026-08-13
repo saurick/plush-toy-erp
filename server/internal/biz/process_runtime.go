@@ -59,10 +59,21 @@ const (
 	ProcessStatusCompleted = "completed"
 	ProcessStatusBlocked   = "blocked"
 
+	ProcessResolutionSucceeded   = "succeeded"
+	ProcessResolutionRejected    = "rejected"
+	ProcessResolutionCancelled   = "cancelled"
+	ProcessResolutionCompensated = "compensated"
+
 	ProcessNodeStatusWaiting   = "waiting"
 	ProcessNodeStatusActive    = "active"
 	ProcessNodeStatusCompleted = "completed"
 	ProcessNodeStatusBlocked   = "blocked"
+	ProcessNodeStatusWithdrawn = "withdrawn"
+
+	ProcessBlockKindManual        = "manual"
+	ProcessBlockKindDomainCommand = "domain_command"
+	ProcessBlockKindOverdue       = "overdue"
+	ProcessBlockKindRejection     = "rejection_without_route"
 
 	ProcessNodeTypeHumanTask     = "human_task"
 	ProcessNodeTypeApproval      = "approval"
@@ -100,6 +111,16 @@ type ProcessInstance struct {
 	Status                 string
 	StartedAt              time.Time
 	CompletedAt            *time.Time
+	TerminalNodeInstanceID *int
+	ResolutionKind         *string
+	ResolutionReason       *string
+	ResolvedAt             *time.Time
+	ResolvedBy             *int
+	BlockKind              *string
+	BlockedReasonCode      *string
+	BlockedReason          *string
+	BlockedAt              *time.Time
+	BlockedBy              *int
 	CreatedBy              *int
 	UpdatedBy              *int
 	CreatedAt              time.Time
@@ -121,7 +142,18 @@ type ProcessNodeInstance struct {
 	DueAt                         *time.Time
 	StartedAt                     *time.Time
 	CompletedAt                   *time.Time
+	ActivatedFromNodeInstanceID   *int
+	RoutingCompletedAt            *time.Time
+	RoutingCompletedBy            *int
 	Outcome                       *string
+	BlockKind                     *string
+	BlockedReasonCode             *string
+	BlockedReason                 *string
+	BlockedAt                     *time.Time
+	BlockedBy                     *int
+	ResumeReason                  *string
+	ResumedAt                     *time.Time
+	ResumedBy                     *int
 	DomainCommandFingerprint      *string
 	DomainCommandProtocolVersion  *int
 	DomainCommandResultState      *string
@@ -141,6 +173,7 @@ type ProcessNodeInstance struct {
 	DomainCommandRecoveredAt      *time.Time
 	DomainCommandRecoveredBy      *int
 	Version                       int
+	UpdatedBy                     *int
 	CreatedAt                     time.Time
 	UpdatedAt                     time.Time
 }
@@ -256,6 +289,8 @@ type ProcessNodeInstanceBlock struct {
 	ProcessInstanceID        int
 	ProcessNodeInstanceID    int
 	ExpectedVersion          int
+	BlockKind                string
+	ReasonCode               string
 	Reason                   string
 	Outcome                  string
 	DomainCommandFingerprint *string
@@ -355,17 +390,36 @@ type ProcessNodeDomainCommandClaim struct {
 }
 
 type ProcessInstanceComplete struct {
-	ID int
+	ID               int
+	TerminalNodeID   int
+	ResolutionKind   string
+	ResolutionReason string
 }
 
 type ProcessInstanceBlock struct {
-	ID int
+	ID         int
+	BlockKind  string
+	ReasonCode string
+	Reason     string
+}
+
+type ProcessNodeInstanceResume struct {
+	ProcessInstanceID     int
+	ProcessNodeInstanceID int
+	ExpectedVersion       int
+	Reason                string
 }
 
 type ProcessNodeInstanceActivate struct {
-	ID                int
-	ProcessInstanceID int
-	ExpectedVersion   int
+	ID                          int
+	ProcessInstanceID           int
+	ExpectedVersion             int
+	ActivatedFromNodeInstanceID *int
+}
+
+type ProcessNodeRoutingCompletion struct {
+	ProcessInstanceID     int
+	ProcessNodeInstanceID int
 }
 
 type ProcessNodeInstanceAttemptCreate struct {
@@ -394,7 +448,9 @@ type ProcessRuntimeRepo interface {
 	RecordProcessInstanceLinkedBusinessRef(ctx context.Context, in *ProcessInstanceLinkedBusinessRefRecord, actorID int) (*ProcessInstance, error)
 	BlockProcessNodeAndInstance(ctx context.Context, in *ProcessNodeInstanceBlock, actorID int) (*ProcessNodeInstance, error)
 	BlockProcessInstance(ctx context.Context, in *ProcessInstanceBlock, actorID int) (*ProcessInstance, error)
+	ResumeProcessNodeAndInstance(ctx context.Context, in *ProcessNodeInstanceResume, actorID int) (*ProcessNodeInstance, error)
 	ActivateProcessNodeInstance(ctx context.Context, in *ProcessNodeInstanceActivate, actorID int) (*ProcessNodeInstance, error)
+	MarkProcessNodeRoutingCompleted(ctx context.Context, in *ProcessNodeRoutingCompletion, actorID int) (*ProcessNodeInstance, error)
 	CreateProcessNodeInstanceAttempt(ctx context.Context, in *ProcessNodeInstanceAttemptCreate, actorID int) (*ProcessNodeInstance, error)
 }
 
@@ -563,7 +619,7 @@ func (uc *ProcessRuntimeUsecase) StartProcessInstance(ctx context.Context, in *P
 
 	switch firstNode.Status {
 	case ProcessNodeStatusWaiting:
-		activatedNode, err := uc.reconcileProcessNodeActivation(ctx, firstNode, actorID)
+		activatedNode, err := uc.reconcileProcessNodeActivation(ctx, firstNode, 0, actorID)
 		if err != nil {
 			return nil, err
 		}

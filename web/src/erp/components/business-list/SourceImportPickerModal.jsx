@@ -14,6 +14,18 @@ import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
 
 const { Text } = Typography
 const SELECTED_SUMMARY_VISIBLE_LIMIT = 2
+const INTERACTIVE_ROW_TARGET_SELECTOR = [
+  'button',
+  'a',
+  'input',
+  'label',
+  'select',
+  'textarea',
+  '[role="button"]',
+  '[role="link"]',
+  '[role="checkbox"]',
+  '[role="radio"]',
+].join(', ')
 
 function normalizeText(value) {
   return String(value ?? '')
@@ -43,6 +55,10 @@ function toggleKey(keys, key, multiple) {
   return currentKeys.includes(key)
     ? currentKeys.filter((item) => item !== key)
     : [...currentKeys, key]
+}
+
+function isInteractiveRowTarget(target) {
+  return Boolean(target?.closest?.(INTERACTIVE_ROW_TARGET_SELECTOR))
 }
 
 function defaultSelectedLabel(row = {}) {
@@ -141,9 +157,34 @@ export default function SourceImportPickerModal({
     [getKey, rows]
   )
 
+  useEffect(() => {
+    if (selectedRowKeys.length === 0) return
+    setSelectedRowSnapshotsByKey((current) => {
+      let changed = false
+      const next = new Map(current)
+      selectedRowKeys.forEach((key) => {
+        const normalizedKey = String(key)
+        const currentRow = rowsByKey.get(normalizedKey)
+        if (currentRow && current.get(normalizedKey) !== currentRow) {
+          next.set(normalizedKey, currentRow)
+          changed = true
+        }
+      })
+      return changed ? next : current
+    })
+  }, [rowsByKey, selectedRowKeys])
+
   const selectedRows = selectedRowKeys
     .map((key) => selectedRowSnapshotsByKey.get(String(key)))
     .filter(Boolean)
+  const hasInvalidSelectedRows =
+    typeof isRowDisabled === 'function' &&
+    selectedRows.some((row) => isRowDisabled(row))
+  const canImport =
+    !loading &&
+    !importDisabled &&
+    selectedRows.length > 0 &&
+    !hasInvalidSelectedRows
 
   useEffect(() => {
     const totalRows = serverPagination ? serverTotal : filteredRows.length
@@ -195,6 +236,11 @@ export default function SourceImportPickerModal({
       ? [...rawKeyword].slice(0, searchMaxLength).join('')
       : rawKeyword
     setKeyword(nextKeyword)
+    setCurrentPage(1)
+  }
+
+  const clearFilters = () => {
+    setKeyword('')
     setCurrentPage(1)
   }
 
@@ -259,7 +305,7 @@ export default function SourceImportPickerModal({
   }, [columns, getRowDisabledReason])
 
   const handleImport = () => {
-    if (selectedRows.length === 0) return
+    if (!canImport) return
     onImport?.(selectedRows)
   }
 
@@ -292,11 +338,7 @@ export default function SourceImportPickerModal({
               </Button>
             ) : null}
             <Button onClick={onCancel}>{cancelText}</Button>
-            <Button
-              type="primary"
-              disabled={loading || importDisabled || selectedRows.length === 0}
-              onClick={handleImport}
-            >
+            <Button type="primary" disabled={!canImport} onClick={handleImport}>
               {importText}
             </Button>
           </div>
@@ -307,16 +349,30 @@ export default function SourceImportPickerModal({
       maskClosable={false}
     >
       <div className="erp-source-import-picker">
-        <SearchInput
-          allowClear
-          value={keyword}
-          onChange={handleKeywordChange}
-          placeholder={searchPlaceholder}
-          aria-label={searchAccessibleLabel}
-          title={searchAccessibleLabel}
-        />
+        <div className="erp-source-import-picker__toolbar">
+          <SearchInput
+            allowClear
+            className="erp-source-import-picker__search"
+            value={keyword}
+            onChange={handleKeywordChange}
+            placeholder={searchPlaceholder}
+            aria-label={searchAccessibleLabel}
+            title={searchAccessibleLabel}
+          />
+          <Button
+            className="erp-source-import-picker__clear-filter"
+            disabled={keyword.length === 0}
+            onClick={clearFilters}
+          >
+            清空筛选
+          </Button>
+        </div>
         <div className="erp-source-import-picker__selection">
-          <div className="erp-source-import-picker__selection-items">
+          <div
+            className="erp-source-import-picker__selection-items"
+            aria-atomic="true"
+            aria-live="polite"
+          >
             {selectedSummaryItems.length > 0 ? (
               <>
                 <Text type="secondary">
@@ -371,6 +427,9 @@ export default function SourceImportPickerModal({
                     </Tag>
                   </Popover>
                 ) : null}
+                {hasInvalidSelectedRows ? (
+                  <Text type="danger">所选来源已不可导入，请清空后重选</Text>
+                ) : null}
               </>
             ) : (
               <Text type="secondary">未选择{selectedNoun}</Text>
@@ -381,6 +440,7 @@ export default function SourceImportPickerModal({
               className="erp-source-import-picker__clear-selection"
               type="link"
               size="small"
+              title={`清空已选${selectedNoun}`}
               onClick={clearSelection}
             >
               清空已选
@@ -413,7 +473,8 @@ export default function SourceImportPickerModal({
               : ''
           }
           onRow={(row) => ({
-            onClick: () => {
+            onClick: (event) => {
+              if (isInteractiveRowTarget(event.target)) return
               if (typeof isRowDisabled === 'function' && isRowDisabled(row)) {
                 return
               }

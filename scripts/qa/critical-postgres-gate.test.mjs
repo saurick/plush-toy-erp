@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
@@ -10,6 +18,54 @@ const repoRoot = path.resolve(import.meta.dirname, '..', '..')
 function read(relativePath) {
   return readFileSync(path.join(repoRoot, relativePath), 'utf8')
 }
+
+function helperBackedPostgresTests() {
+  const dataDirectory = path.join(repoRoot, 'server/internal/data')
+  return readdirSync(dataDirectory, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith('_test.go'))
+    .flatMap((entry) => {
+      const source = readFileSync(path.join(dataDirectory, entry.name), 'utf8')
+      const functions = [...source.matchAll(/^func (?:\([^\n]+\) )?\w+\(/gmu)]
+      return functions.flatMap((match, index) => {
+        const testName = match[0].match(/^func (Test\w+)\(/u)?.[1]
+        if (!testName) return []
+        const end = functions[index + 1]?.index ?? source.length
+        const body = source.slice(match.index, end)
+        return body.includes('openPurchaseReceiptPostgresTestData(t)') ? [testName] : []
+      })
+    })
+    .sort()
+}
+
+test('critical PostgreSQL registry covers every purchase-receipt helper-backed test', () => {
+  const criticalTestConfig = read('scripts/qa/critical-postgres-tests.sh')
+  const patternSource = criticalTestConfig.match(
+    /CRITICAL_POSTGRES_TEST_PATTERN='([^']+)'/u,
+  )?.[1]
+  assert.ok(patternSource, 'critical PostgreSQL shared pattern must be declared')
+  const criticalPattern = new RegExp(patternSource, 'u')
+  const helperBackedTests = helperBackedPostgresTests()
+  const newlyCoveredTests = [
+    'TestDatabaseGovernancePostgresInventoryConstraints',
+    'TestDatabaseGovernancePostgresPurchaseStatusConstraints',
+    'TestDatabaseGovernancePostgresQualityAndAttachmentConstraints',
+    'TestDatabaseGovernanceWorkflowTaskEventHookRejectsMutation',
+    'TestInventoryLotStatusPostgresQualityDecisionWritesNamedEvidence',
+    'TestOutsourcingNormalClosePostgresCountsOnlyReturnReceipts',
+    'TestSourceOrderLifecyclePostgresCancellationResolvesActiveProcessAndKeepsLineEvidence',
+    'TestSourceOrderLifecyclePostgresNormalAndShortCloseContracts',
+  ]
+
+  for (const testName of newlyCoveredTests) {
+    assert(helperBackedTests.includes(testName), `${testName} must remain helper-backed`)
+    assert.equal(criticalPattern.test(testName), true, testName)
+  }
+  assert.deepEqual(
+    helperBackedTests.filter((testName) => !criticalPattern.test(testName)),
+    [],
+    'every helper-backed PostgreSQL test must be owned by the critical gate',
+  )
+})
 
 test('full and strict require the isolated PostgreSQL critical transaction gate', () => {
   const full = read('scripts/qa/full.sh')

@@ -841,7 +841,7 @@ async function applyScenarioDemo({
       !/units=1\b/u.test(stdout) ||
       !/warehouses=4\b/u.test(stdout) ||
       !/scenario_references=true\b/u.test(stdout) ||
-      !/no_business_records=true\b/u.test(stdout) ||
+      !/exact_allowlist=true\b/u.test(stdout) ||
       !/no_direct_fact_posting=true\b/u.test(stdout)
     ) {
       throw new ScenarioDemoError(

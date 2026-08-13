@@ -3,6 +3,9 @@ import { DEV_DOCS_ROUTE, DEV_PRODUCT_CORE_ROUTE } from './devRoutes.mjs'
 export { DEV_PRODUCT_CORE_ROUTE }
 
 export const DEV_PRODUCT_CORE_SOURCE_PATH = 'docs/product/产品能力进度台账.md'
+export const DEV_PRODUCT_CORE_DOCS_HREF = `${DEV_DOCS_ROUTE}?path=${encodeURIComponent(
+  DEV_PRODUCT_CORE_SOURCE_PATH
+)}`
 export const DEV_PRODUCT_CORE_MEMBERSHIP_ALL = 'all'
 export const DEV_PRODUCT_CORE_MEMBERSHIP_ORDER = Object.freeze([
   'entered',
@@ -34,9 +37,7 @@ export const DEV_PRODUCT_CORE_STATUS_PRESENTATION = Object.freeze({
   }),
 })
 
-const STATUS_HEADING = '## 状态口径'
 const CAPABILITY_HEADING = '## 能力状态'
-const EVIDENCE_HEADING = '## 证据入口'
 
 export function isDevProductCoreEnabled(env = import.meta.env) {
   return env?.DEV === true
@@ -107,13 +108,6 @@ function splitMarkdownTableRow(row = '') {
   return cells
 }
 
-function isSeparatorRow(cells = []) {
-  return (
-    cells.length > 0 &&
-    cells.every((cell) => /^:?-{3,}:?$/.test(String(cell || '').trim()))
-  )
-}
-
 function extractMarkdownSection(source = '', heading = '') {
   const lines = String(source || '').split(/\r?\n/)
   const startIndex = lines.findIndex((line) => line.trim() === heading)
@@ -140,9 +134,10 @@ function parseMarkdownTable(source = '', heading = '') {
     stripMarkdownInline
   )
   const separator = splitMarkdownTableRow(sectionLines[headerIndex + 1] || '')
-  if (!isSeparatorRow(separator) || separator.length !== headers.length) {
-    return []
-  }
+  const hasValidSeparator =
+    separator.length === headers.length &&
+    separator.every((cell) => /^:?-{3,}:?$/.test(cell.trim()))
+  if (!hasValidSeparator) return []
 
   const rows = []
   for (let index = headerIndex + 2; index < sectionLines.length; index += 1) {
@@ -173,57 +168,6 @@ function presentationForStatus(status = '') {
   )
 }
 
-function normalizeRepoPath(path = '', baseDir = 'docs/product') {
-  const rawPath = String(path || '')
-    .split('#')[0]
-    .split('?')[0]
-    .trim()
-  if (!rawPath || /^(?:[a-z]+:|\/)/i.test(rawPath)) return ''
-
-  const segments = rawPath.startsWith('docs/')
-    ? rawPath.split('/')
-    : [...baseDir.split('/'), ...rawPath.split('/')]
-  const normalized = []
-  segments.forEach((segment) => {
-    if (!segment || segment === '.') return
-    if (segment === '..') {
-      normalized.pop()
-      return
-    }
-    normalized.push(segment)
-  })
-  const resolved = normalized.join('/')
-  return resolved.endsWith('.md') ? resolved : ''
-}
-
-function parseMarkdownLinks(value = '') {
-  return [...String(value || '').matchAll(/\[([^\]]+)\]\(([^)]+)\)/g)]
-    .map((match) => {
-      const path = normalizeRepoPath(match[2])
-      if (!path) return null
-      return {
-        label: stripMarkdownInline(match[1]),
-        path,
-        devDocsHref: `${DEV_DOCS_ROUTE}?path=${encodeURIComponent(path)}`,
-      }
-    })
-    .filter(Boolean)
-}
-
-export function parseProductCoreStatusDefinitions(source = '') {
-  return parseMarkdownTable(source, STATUS_HEADING).map((row) => {
-    const status = row['产品状态'] || ''
-    const presentation = presentationForStatus(status)
-    return {
-      key: presentation.key,
-      status,
-      membership: presentation.membership,
-      shortDescription: presentation.shortDescription,
-      meaning: row['含义'] || '',
-    }
-  })
-}
-
 export function parseProductCoreCapabilities(source = '') {
   return parseMarkdownTable(source, CAPABILITY_HEADING).map((row, index) => {
     const status = row['状态'] || ''
@@ -240,27 +184,6 @@ export function parseProductCoreCapabilities(source = '') {
       boundary: row['主要边界 / 下一步'] || '',
     }
   })
-}
-
-export function parseProductCoreEvidenceEntries(source = '') {
-  return extractMarkdownSection(source, EVIDENCE_HEADING)
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.startsWith('- '))
-    .map((line, index) => {
-      const rawContent = line.slice(2).trim()
-      const colonIndex = rawContent.search(/[：:]/)
-      return {
-        key: `evidence-${String(index + 1).padStart(2, '0')}`,
-        label: stripMarkdownInline(
-          colonIndex >= 0 ? rawContent.slice(0, colonIndex) : rawContent
-        ),
-        description: stripMarkdownInline(
-          colonIndex >= 0 ? rawContent.slice(colonIndex + 1) : rawContent
-        ),
-        links: parseMarkdownLinks(rawContent),
-      }
-    })
 }
 
 export function normalizeProductCoreMembership(value = '') {

@@ -1147,7 +1147,7 @@ async function defaultBaselineComponent(invocation, deps) {
         exactEmptyBusinessBaseline: true,
         checkedBusinessObjectKinds:
           MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES.length,
-        zeroBusinessRecords: Object.values(verified.zeroCounts).every(
+        allTrackedCountsZero: Object.values(verified.zeroCounts).every(
           (count) => count === 0,
         ),
         units: verified.core.units,
@@ -1571,7 +1571,7 @@ function assertReusableBaseline(execution, report) {
   const validSummary =
     report.contract === "manual-acceptance-empty-baseline-report-v1" &&
     report.summary?.exactEmptyBusinessBaseline === true &&
-    report.summary?.zeroBusinessRecords === true &&
+    report.summary?.allTrackedCountsZero === true &&
     report.summary?.checkedBusinessObjectKinds ===
       MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES.length;
   if (!currentCore || !validZeroCounts || !validCore || !validSummary) {

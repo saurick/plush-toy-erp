@@ -125,8 +125,14 @@ func (r *workflowRepo) ListPendingLinkedWorkflowTaskSettlements(ctx context.Cont
 			workflowtask.UpdatedByNotNil(),
 			workflowtask.HasProcessInstanceWith(processinstance.StatusEQ(biz.ProcessStatusActive)),
 			workflowtask.HasProcessNodeInstanceWith(
-				processnodeinstance.StatusEQ(biz.ProcessNodeStatusActive),
 				processnodeinstance.NodeTypeIn(biz.ProcessNodeTypeHumanTask, biz.ProcessNodeTypeApproval),
+				processnodeinstance.Or(
+					processnodeinstance.Status(biz.ProcessNodeStatusActive),
+					processnodeinstance.And(
+						processnodeinstance.Status(biz.ProcessNodeStatusCompleted),
+						processnodeinstance.RoutingCompletedAtIsNil(),
+					),
+				),
 			),
 		).
 		Order(ent.Asc(workflowtask.FieldID)).
@@ -482,7 +488,7 @@ func (r *workflowRepo) UpdateWorkflowTaskStatus(ctx context.Context, in *biz.Wor
 			workflowtask.IDEQ(in.ID),
 			workflowtask.VersionEQ(expectedVersion),
 			workflowtask.TaskStatusKeyEQ(current.TaskStatusKey),
-			workflowtask.TaskStatusKeyNotIn("done", "rejected"),
+			workflowtask.TaskStatusKeyNotIn("done", "rejected", "withdrawn"),
 		).
 		SetTaskStatusKey(in.TaskStatusKey).
 		SetPayload(in.Payload).
@@ -652,7 +658,7 @@ func (r *workflowRepo) UrgeWorkflowTask(ctx context.Context, in *biz.WorkflowTas
 			workflowtask.IDEQ(in.ID),
 			workflowtask.VersionEQ(expectedVersion),
 			workflowtask.TaskStatusKeyEQ(current.TaskStatusKey),
-			workflowtask.TaskStatusKeyNotIn("done", "rejected"),
+			workflowtask.TaskStatusKeyNotIn("done", "rejected", "withdrawn"),
 		).
 		SetPayload(nextPayload).
 		AddUrgeCount(1).
@@ -797,7 +803,7 @@ func (r *workflowRepo) ReassignWorkflowTask(
 		workflowtask.IDEQ(in.ID),
 		workflowtask.VersionEQ(expectedVersion),
 		workflowtask.TaskStatusKeyEQ(current.TaskStatusKey),
-		workflowtask.TaskStatusKeyNotIn("done", "rejected"),
+		workflowtask.TaskStatusKeyNotIn("done", "rejected", "withdrawn"),
 	}
 	if current.AssigneeID == nil {
 		predicates = append(predicates, workflowtask.AssigneeIDIsNil())
@@ -1516,7 +1522,7 @@ func ensureActiveWorkflowTaskInTx(
 			workflowtask.SourceID(in.SourceID),
 			workflowtask.TaskGroup(in.TaskGroup),
 			workflowtask.OwnerRoleKey(in.OwnerRoleKey),
-			workflowtask.TaskStatusKeyNotIn("done", "rejected"),
+			workflowtask.TaskStatusKeyNotIn("done", "rejected", "withdrawn"),
 		).
 		Order(ent.Asc(workflowtask.FieldID)).
 		First(ctx)
@@ -1530,7 +1536,7 @@ func ensureActiveWorkflowTaskInTx(
 					workflowtask.IDEQ(existing.ID),
 					workflowtask.VersionEQ(existing.Version),
 					workflowtask.TaskStatusKeyEQ(existing.TaskStatusKey),
-					workflowtask.TaskStatusKeyNotIn("done", "rejected"),
+					workflowtask.TaskStatusKeyNotIn("done", "rejected", "withdrawn"),
 				).
 				SetPayload(in.Payload).
 				SetNillableOwnerPoolKey(in.OwnerPoolKey).
@@ -1639,7 +1645,7 @@ func entWorkflowTaskToBiz(row *ent.WorkflowTask) *biz.WorkflowTask {
 		payload[key] = value
 	}
 	blockedReason := row.BlockedReason
-	if row.TaskStatusKey != "blocked" && row.TaskStatusKey != "rejected" {
+	if row.TaskStatusKey != "blocked" && row.TaskStatusKey != "rejected" && row.TaskStatusKey != "withdrawn" {
 		blockedReason = nil
 		delete(payload, "blocked_reason")
 		delete(payload, "rejected_reason")

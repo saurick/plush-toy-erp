@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 import {
+  DEV_PRODUCT_CORE_DOCS_HREF,
   DEV_PRODUCT_CORE_MEMBERSHIP_ALL,
   DEV_PRODUCT_CORE_ROUTE,
   DEV_PRODUCT_CORE_SOURCE_PATH,
@@ -11,8 +12,6 @@ import {
   isDevProductCoreEnabled,
   normalizeProductCoreMembership,
   parseProductCoreCapabilities,
-  parseProductCoreEvidenceEntries,
-  parseProductCoreStatusDefinitions,
 } from './devProductCore.mjs'
 
 const ledgerSource = readFileSync(
@@ -31,6 +30,10 @@ const styleSource = readFileSync(
 test('devProductCore: route and source stay inside the DEV-only workbench', () => {
   assert.equal(DEV_PRODUCT_CORE_ROUTE, '/__dev/product-core')
   assert.equal(DEV_PRODUCT_CORE_SOURCE_PATH, 'docs/product/产品能力进度台账.md')
+  assert.equal(
+    DEV_PRODUCT_CORE_DOCS_HREF,
+    '/__dev/docs?path=docs%2Fproduct%2F%E4%BA%A7%E5%93%81%E8%83%BD%E5%8A%9B%E8%BF%9B%E5%BA%A6%E5%8F%B0%E8%B4%A6.md'
+  )
   assert.equal(isDevProductCoreEnabled({ DEV: true }), true)
   assert.equal(isDevProductCoreEnabled({ DEV: false }), false)
   assert.equal(isDevProductCoreEnabled({}), false)
@@ -38,21 +41,6 @@ test('devProductCore: route and source stay inside the DEV-only workbench', () =
   assert.match(
     pageSource,
     /import\.meta\.glob\(\s*'\.\.\/\.\.\/\.\.\/\.\.\/docs\/product\/产品能力进度台账\.md'/u
-  )
-})
-
-test('devProductCore: status definitions preserve the ledger wording and readable membership', () => {
-  assert.deepEqual(
-    parseProductCoreStatusDefinitions(ledgerSource).map((item) => [
-      item.status,
-      item.membership,
-    ]),
-    [
-      ['待办', '尚未进入'],
-      ['实现中', '部分进入'],
-      ['可试用', '已进入内核'],
-      ['暂不做', '当前不纳入'],
-    ]
   )
 })
 
@@ -81,9 +69,18 @@ test('devProductCore: all 15 capability rows derive from the unique ledger', () 
         item.boundary
     )
   )
+  assert.deepEqual(
+    [...new Map(capabilities.map((item) => [item.status, item.membership]))],
+    [
+      ['可试用', '已进入内核'],
+      ['实现中', '部分进入'],
+      ['待办', '尚未进入'],
+      ['暂不做', '当前不纳入'],
+    ]
+  )
 })
 
-test('devProductCore: filters distinguish entered, partial and unavailable capabilities', () => {
+test('devProductCore: filters distinguish membership and readable keywords', () => {
   const capabilities = parseProductCoreCapabilities(ledgerSource)
 
   assert.equal(
@@ -112,39 +109,17 @@ test('devProductCore: filters distinguish entered, partial and unavailable capab
   )
 })
 
-test('devProductCore: evidence links resolve back into the shared document viewer', () => {
-  const evidence = parseProductCoreEvidenceEntries(ledgerSource)
-  const links = evidence.flatMap((item) => item.links)
-
-  assert.equal(evidence.length, 6)
-  assert(links.length >= 7)
-  assert(
-    links.every(
-      (link) =>
-        link.path.endsWith('.md') &&
-        link.devDocsHref.startsWith('/__dev/docs?path=')
-    )
-  )
-  assert(
-    links.some(
-      (link) => link.path === 'docs/architecture/状态工作流事实边界.md'
-    )
-  )
-  assert(
-    evidence.some(
-      (item) => item.label === '客户可见、发布、UAT、签收和差异决定'
-    )
-  )
-})
-
-test('devProductCore: page keeps filters in the URL and mobile controls touch friendly', () => {
+test('devProductCore: page is one searchable table with a mobile row layout', () => {
   assert.match(pageSource, /searchParams\.get\('status'\)/u)
   assert.match(pageSource, /searchParams\.get\('q'\)/u)
   assert.match(pageSource, /aria-pressed=\{isActive\}/u)
+  assert.match(pageSource, /<table className="erp-dev-product-core-table">/u)
+  assert.match(pageSource, /<caption>当前 Product Core 能力与边界<\/caption>/u)
+  assert.match(pageSource, /data-label="当前可用范围"/u)
   assert.match(pageSource, /进入 Product Core 不等于已发布或已验收/u)
+  assert.doesNotMatch(pageSource, /parseProductCoreEvidenceEntries/u)
+  assert.doesNotMatch(pageSource, /erp-dev-product-core-status-help/u)
   assert.match(styleSource, /@media \(max-width: 767px\)/u)
-  assert.match(
-    styleSource,
-    /\.erp-dev-product-core-filter\s*\{[\s\S]*?min-height:\s*68px/u
-  )
+  assert.match(styleSource, /\.erp-dev-product-core-table td::before/u)
+  assert.match(styleSource, /\.erp-dev-product-core-filter:focus-visible/u)
 })

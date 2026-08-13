@@ -106,6 +106,13 @@ const expectedProcessNodes = {
       ['workflow.task.complete'],
     ],
     ['end', 'end', '结束', null, []],
+    [
+      'reject_sales_order',
+      'domain_command',
+      '驳回销售订单',
+      'SalesOrderUsecase.RejectSalesOrderForProcessCommand',
+      ['workflow.task.reject'],
+    ],
     ['sales_order_rejected_end', 'end', '销售订单审批驳回结束', null, []],
   ],
   'sales_order_acceptance/approval_engineering_pmc': [
@@ -139,6 +146,13 @@ const expectedProcessNodes = {
       ['workflow.task.complete'],
     ],
     ['end', 'end', '结束', null, []],
+    [
+      'reject_sales_order',
+      'domain_command',
+      '驳回销售订单',
+      'SalesOrderUsecase.RejectSalesOrderForProcessCommand',
+      ['workflow.task.reject'],
+    ],
     ['sales_order_rejected_end', 'end', '销售订单审批驳回结束', null, []],
   ],
   'material_supply/purchase_order_approval': [
@@ -147,7 +161,7 @@ const expectedProcessNodes = {
       'domain_command',
       '提交采购订单',
       'PurchaseOrderUsecase.SubmitPurchaseOrderForProcessCommand',
-      ['purchase.order.update'],
+      ['purchase.order.submit'],
     ],
     [
       'purchase_order_approval',
@@ -164,6 +178,13 @@ const expectedProcessNodes = {
       ['workflow.task.approve'],
     ],
     ['end', 'end', '结束', null, []],
+    [
+      'reject_purchase_order',
+      'domain_command',
+      '驳回采购订单',
+      'PurchaseOrderUsecase.RejectPurchaseOrderForProcessCommand',
+      ['workflow.task.reject'],
+    ],
     ['purchase_order_rejected_end', 'end', '采购订单审批驳回结束', null, []],
   ],
   'finished_goods_delivery/shipment_finance_approval': [
@@ -322,23 +343,26 @@ const expectedProcessEdges = {
   'sales_order_acceptance/approval_pmc': [
     ['submit_sales_order', 'order_approval'],
     ['order_approval', 'activate_sales_order'],
-    ['order_approval', 'sales_order_rejected_end'],
+    ['order_approval', 'reject_sales_order'],
     ['activate_sales_order', 'order_review'],
     ['order_review', 'end'],
+    ['reject_sales_order', 'sales_order_rejected_end'],
   ],
   'sales_order_acceptance/approval_engineering_pmc': [
     ['submit_sales_order', 'order_approval'],
     ['order_approval', 'activate_sales_order'],
-    ['order_approval', 'sales_order_rejected_end'],
+    ['order_approval', 'reject_sales_order'],
     ['activate_sales_order', 'engineering_data'],
     ['engineering_data', 'order_review'],
     ['order_review', 'end'],
+    ['reject_sales_order', 'sales_order_rejected_end'],
   ],
   'material_supply/purchase_order_approval': [
     ['submit_purchase_order', 'purchase_order_approval'],
     ['purchase_order_approval', 'approve_purchase_order'],
-    ['purchase_order_approval', 'purchase_order_rejected_end'],
+    ['purchase_order_approval', 'reject_purchase_order'],
     ['approve_purchase_order', 'end'],
+    ['reject_purchase_order', 'purchase_order_rejected_end'],
   ],
   'finished_goods_delivery/shipment_finance_approval': [
     ['shipment_finance_approval', 'shipment_finance_release'],

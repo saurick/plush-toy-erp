@@ -1,8 +1,11 @@
 package server
 
 import (
+	"encoding/base64"
 	"strings"
 	"testing"
+
+	"golang.org/x/net/html"
 )
 
 func TestValidateTemplatePDFHTMLAllowsStaticDocumentAndEmbeddedImage(t *testing.T) {
@@ -67,12 +70,46 @@ func TestValidateTemplatePDFHTMLRejectsActiveAndExternalContent(t *testing.T) {
 	}
 }
 
-func TestValidateTemplatePDFHTMLAllowsManyImagesAndLargeSingleImage(t *testing.T) {
-	largeImage := strings.Repeat("A", 8<<20)
-	images := strings.Repeat(`<img src="data:image/png;base64,iVBORw0KGgo=">`, 128)
-	htmlDocument := `<html><body><img src="data:image/jpeg;base64,` + largeImage + `">` + images + `</body></html>`
-	if err := validateTemplatePDFHTML(htmlDocument); err != nil {
-		t.Fatalf("large single image and many images should pass within the document budget: %v", err)
+func TestValidateTemplatePDFHTMLAllowsImagesWithinBounds(t *testing.T) {
+	images := strings.Repeat(`<img src="data:image/png;base64,iVBORw0KGgo=">`, maxTemplatePDFEmbeddedImageCount)
+	if err := validateTemplatePDFHTML(`<html><body>` + images + `</body></html>`); err != nil {
+		t.Fatalf("images within count and byte budgets should pass: %v", err)
+	}
+}
+
+func TestValidateTemplatePDFHTMLRejectsTooManyImages(t *testing.T) {
+	images := strings.Repeat(`<img src="data:image/png;base64,iVBORw0KGgo=">`, maxTemplatePDFEmbeddedImageCount+1)
+	if err := validateTemplatePDFHTML(`<html><body>` + images + `</body></html>`); err == nil {
+		t.Fatal("image count above the configured limit must be rejected")
+	}
+}
+
+func TestValidateTemplatePDFHTMLRejectsLargeSingleImageBeforeDecode(t *testing.T) {
+	encoded := base64.StdEncoding.EncodeToString(make([]byte, maxTemplatePDFEmbeddedImageBytes+1))
+	state := &templatePDFHTMLValidationState{}
+	if err := validateTemplatePDFDataImage("data:image/png;base64,"+encoded, state); err == nil {
+		t.Fatal("single image above the configured limit must be rejected")
+	}
+	if state.imageBytes != 0 || state.imageCount != 0 {
+		t.Fatalf("rejected image changed state: %+v", state)
+	}
+}
+
+func TestValidateTemplatePDFHTMLRejectsExcessiveDOMNodes(t *testing.T) {
+	root := &html.Node{Type: html.DocumentNode}
+	for index := 0; index < maxTemplatePDFDOMNodeCount; index++ {
+		child := &html.Node{Type: html.ElementNode, Data: "div"}
+		root.AppendChild(child)
+	}
+	if err := validateTemplatePDFHTMLNode(root, &templatePDFHTMLValidationState{}); err == nil {
+		t.Fatal("DOM above the configured node limit must be rejected")
+	}
+}
+
+func TestValidateTemplatePDFCSSRejectsAggregateAboveLimit(t *testing.T) {
+	state := &templatePDFHTMLValidationState{cssBytes: maxTemplatePDFCSSBytes - 1}
+	if err := validateTemplatePDFCSS("ab", state); err == nil {
+		t.Fatal("aggregate CSS above the configured limit must be rejected")
 	}
 }
 

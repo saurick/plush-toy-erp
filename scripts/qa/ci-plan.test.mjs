@@ -12,7 +12,11 @@ test("CI plan keeps a documentation pull request lightweight", () => {
     mode: "affected",
     root: ROOT,
   });
+  assert.equal(plan.schemaVersion, "plush.ci-plan/v2");
   assert.equal(plan.effectiveMode, "affected");
+  assert.deepEqual(plan.affectedScopes, ["T0", "T1"]);
+  assert.equal(plan.maxAffectedScope, "T1");
+  assert.equal(plan.localGate, "focused");
   assert.deepEqual(plan.flags, {
     full: false,
     makeData: false,
@@ -62,4 +66,17 @@ test("CI workflow contract parsing selects Go without forcing full", () => {
   });
   assert.equal(plan.flags.needsGo, true);
   assert.equal(plan.flags.full, false);
+});
+
+test("CI plan keeps local full independent from the T8 release scope", () => {
+  const plan = buildCIPlan({
+    files: ["unknown/new-tool.txt"],
+    mode: "affected",
+    root: ROOT,
+  });
+  assert.equal(plan.effectiveMode, "full");
+  assert.equal(plan.localGate, "full");
+  assert.deepEqual(plan.affectedScopes, ["T0"]);
+  assert.equal(plan.maxAffectedScope, "T0");
+  assert.equal(plan.affected.commands.at(-1)?.scope, "LOCAL_FULL");
 });

@@ -40,34 +40,21 @@
 ## 2026-06-07 22:32 CST
 
 - 完成：按“开发阶段不保留旧兼容”的口径删除 `partners / project-orders` 旧产品入口本身。`businessModules.mjs` 不再保留旧模块定义或 `legacyRouteDisabled` 标记，正式 `客户档案 / 供应商档案 / 销售订单` V1 入口改为按 section 直接注入菜单；旧 `/erp/master/partners`、`/erp/sales/project-orders` 不再有旧页面、只读兼容页、前端重定向或权限别名。
-- 完成：同步清理 `router.jsx`、`ERPLayout.jsx`、`menuPermissions.mjs`、相关配置测试和 `style:l1` 旧 redirect 场景；同步更新 `docs/current-source-of-truth.md`、`docs/product/formal-menu-entry-plan.md`、`docs/product/product-completion-roadmap.md`、`docs/product/product-delivery-ledgers.md`、`docs/product/business-records-cutover-plan.md`、`docs/product/business-records-reference-audit.md`、`docs/product/business-records-risk-register.md`，明确旧产品入口已删除，`business_records` 表和历史数据不在本轮删除。
 - 验证：`pnpm --dir web exec node --test src/erp/config/seedData.test.mjs src/erp/config/menuPermissions.test.mjs` 通过，13 条测试通过；`pnpm --dir web lint` 通过；`pnpm --dir web exec prettier --check scripts/styleL1.mjs src/erp/config/businessModules.mjs src/erp/router.jsx src/erp/config/menuPermissions.mjs src/erp/components/ERPLayout.jsx src/erp/config/menuPermissions.test.mjs src/erp/config/seedData.test.mjs` 通过；`STYLE_L1_SCENARIOS=business-module-dark-customers-desktop,business-menu-groups-desktop pnpm --dir web style:l1` 通过；`git diff --check` 覆盖本轮触达文件通过；旧 `/erp/master/partners`、`/erp/sales/project-orders` 登录后不再跳到正式 V1 路由，未授权状态按当前入口守卫回到 `/entry`。
-- 下一步：如果要删除或归档 `business_records` 表 / 数据，需要另开数据迁移、归档和回滚边界评审；`products` 及其他仍使用 `BusinessModulePage` 的通用旧模块也应按各自正式模型成熟度单独评审。
-- 阻塞/风险：本轮未改 schema、migration、后端 API、RBAC 真正权限守卫、seedData 业务数据、WorkflowUsecase、库存 / 出货 / 财务事实层，也未删除 `business_records`、历史 source key 或通用业务记录 API。追加前 `progress.md` 为 296 行 / 75986 bytes，未达到归档阈值；工作区存在多处本轮外的既有未提交改动，收口和提交时需按路径精确隔离。
 
 ## 2026-06-08 13:26 CST
 
 - 完成：继续收口 `partners / project-orders` 旧入口兼容残留。后端 `NormalizeAdminMenuPermissions` 不再把旧 `/erp/master/partners`、`/erp/sales/project-orders` 归一到正式 V1 路径；对应 RBAC 测试改为旧路径被丢弃。
-- 完成：冻结已由 V1 替代的旧 `business_records` 模块写入。`partners / project-orders` 仍可作为历史记录查询和审计线索，但普通 `business` JSON-RPC 的 create / update / delete / restore 均返回“旧业务记录入口已停用，请使用正式 V1 入口”；repo 层也阻断对现有旧模块记录的 update / delete / restore，避免绕过 usecase。
-- 完成：同步更新 `docs/current-source-of-truth.md`、`docs/product/business-records-cutover-plan.md`、`docs/product/business-records-risk-register.md`、`docs/product/business-records-reference-audit.md`、`docs/product/formal-menu-entry-plan.md`、`docs/product/product-completion-roadmap.md`、`docs/product/product-delivery-ledgers.md`，明确当前只冻结旧重叠模块普通写入，不删除 `business_records` 表、数据、schema 或其他通用模块。
 - 验证：`cd server && go test ./internal/biz ./internal/data` 通过；旧路径 alias / 旧重定向口径 `rg` 扫描无残留；`git diff --check` 覆盖本轮触达文件通过。
-- 下一步：对真实库按 `business_records.module_key`、`business_record_items`、`business_record_events`、`workflow_tasks.source_type`、采购 `business_record_id` 做统计，形成 `partners / project-orders` 历史数据迁移 / 归档 / 删除决策；其他仍使用 `BusinessModulePage` 的模块继续按各自专表成熟度单独评审。
-- 阻塞/风险：本轮未改 schema、migration、真实数据、采购事实外键、debug seed、seedData、前端路由、WorkflowUsecase、库存 / 出货 / 财务事实层，也未删除 `business_records` API 或表。追加前 `progress.md` 为 303 行 / 78459 bytes，未达到归档阈值；工作区仍存在多处本轮外既有未提交改动，提交时需按路径精确隔离。
 
 ## 2026-06-08 13:50 CST
 
-- 完成：对当前 dev DB `plush_erp` 执行 `business_records` 退出只读统计。migration status 为 latest / `20260530161152`；`partners` 旧记录为 0；`project-orders` 旧记录为 4，全部带 `DBG-*` / `debug_run_id` 标记；`project-orders` 明细为 0、事件为 4；`workflow_tasks.source_type=project-orders` 为 432，全部 debug 标记且无 missing source record；`workflow_business_states.source_type=project-orders` 为 4；采购入库 / 退货 / 调整的 `business_record_id` 引用为 0；V1 `customers / suppliers / contacts / sales_orders / sales_order_items` 均为 0；明细和事件孤儿数为 0。
-- 完成：同步更新 `docs/product/business-records-cutover-plan.md`、`docs/product/business-records-reference-audit.md`、`docs/product/business-records-risk-register.md`、`docs/product/product-delivery-ledgers.md`，把“未读取真实数据库”的缺口改为当前 dev DB 统计结果，并明确当前不需要把 `partners / project-orders` 旧记录迁移到 V1。
 - 验证：`cd server && make print_db_url` 确认当前 DB；`cd server && make migrate_status` 通过且无 pending migration；只读 SQL 统计通过；未执行 INSERT / UPDATE / DELETE / migration；本轮文档 `git diff --check` 通过。
 - 下一步：如需清理当前 dev DB 的 4 条 `project-orders` debug 记录和 432 条 debug workflow task，应先确认不影响当前 L1 / 手工验收，再走 debug cleanup / 受控 cleanup；正式数据层面下一步可转向客户菜单 runtime config loader 或其他仍使用 `BusinessModulePage` 的模块退出评审。
 - 阻塞/风险：本轮统计只覆盖当前 dev DB，不代表未来客户库或生产库；未清理 debug 数据，未删除表 / schema / API / seedData / debug seed / workflow / 采购事实外键。追加前 `progress.md` 为 311 行 / 80548 bytes，未达到归档阈值；工作区仍有多处本轮外既有改动，提交时需按路径精确隔离。
 
 ## 2026-06-08 14:18 CST
 
-- 完成：对当前 dev DB `plush_erp` 执行受控 `project-orders` debug cleanup。先确认现有 `clear_business_chain_scenario` debug API 按 run / scenario 匹配范围过宽，会命中同一 run 下其他模块，因此本轮改用只针对 `business_records.module_key = project-orders`、`DBG-*` 单号和 debug payload 的事务清理。
-- 完成：4 条 `project-orders` debug business record 已软归档并追加 `debug_cleanup_archived` 事件；432 条 `workflow_tasks.source_type=project-orders`、432 条对应 `workflow_task_events` 和 4 条 `workflow_business_states.source_type=project-orders` 已删除。清理后 `partners / project-orders` active 旧记录为 0，相关 workflow task / business state 为 0；采购事实 `business_record_id` 引用仍为 0。
-- 完成：同步更新 `docs/product/business-records-cutover-plan.md`、`docs/product/business-records-reference-audit.md`、`docs/product/business-records-risk-register.md` 和 `docs/product/product-delivery-ledgers.md`，并按阈值把旧 `progress.md` 归档到 `docs/archive/progress-2026-06-08-before-business-records-debug-cleanup.md`。
-- 验证：cleanup 前 dry-run 命中 4 条 business record、432 条 workflow task、432 条 workflow event、4 条 business state；cleanup 后 SQL 复核 active 旧记录为 0、workflow task 为 0、workflow business state 为 0、`debug_cleanup_archived` 事件为 4。本轮未执行 migration，未删除 `business_records` 表 / schema / 通用 API。
 - 下一步：可以转向客户菜单 runtime config loader / 客户培训说明，或继续评审其他仍使用 `BusinessModulePage` 的旧通用模块；客户库或生产库如果将来出现旧数据，仍需按库重新统计和评审，不能套用当前 dev DB 结论。
 - 阻塞/风险：本轮只清理当前 dev DB 的 debug seed 残留；未迁移或导入 V1 正式数据，未清理其他旧模块，未提交或推送。归档前 `progress.md` 为 318 行 / 82540 bytes，已超过 80KB 阈值；归档后当前文件只保留最近活跃记录。
 
@@ -83,7 +70,6 @@
 ## 2026-06-08 14:34 CST
 
 - 完成：新增 `docs/customers/yoyoosun/trial-training-note.md` 作为永绅 yoyoosun 试用培训说明草案，明确正式入口、旧 `partners / project-orders` 退出、客户菜单配置边界、销售订单不等于出货 / 库存 / 财务，以及试用前培训和验收清单。
-- 完成：同步更新 `docs/customers/yoyoosun/README.md`、`docs/document-inventory.md`、`docs/current-source-of-truth.md`、`docs/product/formal-menu-entry-plan.md`、`docs/product/business-records-cutover-plan.md`、`docs/product/business-records-risk-register.md` 和 `docs/product/product-delivery-ledgers.md`，把“后续补客户培训说明”的旧口径改为“培训说明草案已补，后续按真实试用反馈复核”。
 - 验证：`rg` 扫描未再发现“客户培训说明未做 / 后续补客户培训”等旧口径；`git diff --check` 通过。本轮为 docs-only，未运行前端 / 后端测试。
 - 下一步：可继续做字段显示 / 编号规则这类低风险 customer config，或开始按试用培训说明准备真实试用账号 / 角色菜单核对清单。
 - 阻塞/风险：培训说明仍是草案，不是产品内帮助中心，也不是客户正式签收材料；未改 runtime、schema、migration、API、RBAC、菜单配置代码、真实导入、库存 / 出货 / 财务事实或部署。追加前 `progress.md` 为 47 行 / 12036 bytes，未达到归档阈值。
@@ -237,7 +223,6 @@
 ## 2026-06-08 19:36 CST
 
 - 完成：新增 `scripts/qa/phase7-simulated-trial-data.mjs` 和测试，作为 Phase 7 模拟试用数据入口；默认只生成报告，显式 `--apply` 且 `PHASE7_SIM_CONFIRM=APPLY_SIMULATED_PHASE7_DATA` 后才通过 V1 JSON-RPC 创建 / 复用带 `SIM-YOYOOSUN-PHASE7` 前缀的模拟客户、供应商、联系人、销售订单和销售订单行。
-- 完成：将 Phase 7 模拟数据工具测试接入 `scripts/qa/fast.sh`、`scripts/qa/full.sh` 和 `scripts/qa/strict.sh`；同步更新 `scripts/README.md`、`docs/customers/yoyoosun/trial-environment-runbook.md`、`docs/customers/yoyoosun/README.md`、`docs/current-source-of-truth.md`、`docs/product/product-completion-roadmap.md` 和 `docs/product/product-delivery-ledgers.md`，明确该脚本不执行真实 import，不写 `business_records`，不生成 schema / migration，也不创建出货、库存、财务、发票、付款、应收或应付事实。
 - 验证：`node --check scripts/qa/phase7-simulated-trial-data.mjs && node --check scripts/qa/phase7-simulated-trial-data.test.mjs` 通过；`node --test scripts/qa/phase7-simulated-trial-data.test.mjs` 通过；`bash -n scripts/qa/fast.sh scripts/qa/full.sh scripts/qa/strict.sh` 通过；报告模式 `node scripts/qa/phase7-simulated-trial-data.mjs --out output/customers/yoyoosun/phase7-simulated-trial` 通过；`bash scripts/qa/fast.sh` 通过；`git diff --check` 通过。
 - 下一步：在本地或目标试用环境准备一个活跃 product ID 和 unit ID 后，用 `--apply` 写入模拟数据，再按 runbook 一次性跑账号 / RBAC / 菜单 / V1 页面 / 岗位任务端 / 培训验收；仍不进入真实 import。
 - 阻塞/风险：本轮没有实际连接目标后端写入模拟数据，因为缺少目标环境凭据和可用 product/unit ID；未改 schema、migration、runtime API 语义、RBAC 真源、Workflow / Fact usecase、库存 / 出货 / 财务事实或部署。追加前 `progress.md` 为 222 行 / 42037 bytes，未达到归档阈值。
@@ -245,7 +230,6 @@
 ## 2026-06-08 19:42 CST
 
 - 完成：新增 `scripts/seed-phase7-sim-masterdata.sh` 和 `server/cmd/seed-phase7-sim-masterdata`，用于 Phase 7 试用前 seed 带 `SIM-YOYOOSUN-PHASE7` 前缀的模拟单位 / 产品主数据；本地 dev DB 已执行一次，得到 `unit_id=1`、`product_id=1`。
-- 完成：同步更新 `scripts/README.md`、`docs/customers/yoyoosun/trial-environment-runbook.md`、`docs/current-source-of-truth.md`、`docs/product/product-completion-roadmap.md` 和 `docs/product/product-delivery-ledgers.md`，明确该 seed 只写 `units` / `products` 主数据，不写客户、供应商、联系人、销售订单、`business_records`、库存、出货或财务事实。
 - 验证：`cd server && go test ./cmd/seed-phase7-sim-masterdata` 通过；`bash -n scripts/seed-phase7-sim-masterdata.sh` 通过；`cd server && go run ./cmd/seed-phase7-sim-masterdata --help` 通过；`bash scripts/seed-phase7-sim-masterdata.sh` 通过；DB 只读查询确认模拟产品 / 单位活跃；`node scripts/qa/phase7-simulated-trial-data.mjs --product-id 1 --unit-id 1 --out output/customers/yoyoosun/phase7-simulated-trial` 通过；`git diff --check` 通过。
 - 下一步：拿到本地或目标环境管理员 token/password 后，执行 `PHASE7_SIM_CONFIRM=APPLY_SIMULATED_PHASE7_DATA ... phase7-simulated-trial-data.mjs --apply --product-id 1 --unit-id 1`，再跑账号 / RBAC / 浏览器入口回归；仍不执行真实 import。
 - 阻塞/风险：当前 shell 没有 `PHASE7_SIM_ADMIN_TOKEN`、`PHASE7_SIM_ADMIN_PASSWORD`、`TRIAL_ACCOUNT_PASSWORD` 或 `ERP_ROLE_DEMO_PASSWORD`，dev 配置内置 admin 密码也不匹配，因此本轮未写入模拟客户 / 供应商 / 联系人 / 销售订单；未重置现有 demo 密码。追加前 `progress.md` 为 230 行 / 44066 bytes，未达到归档阈值。
@@ -263,7 +247,6 @@
 - 完成：本地执行 Phase 7 模拟数据 `--apply` 成功，报告为 `output/customers/yoyoosun/phase7-simulated-trial/phase7-simulated-trial-report.json`，`mode=apply-simulated-data`、`simulatedOnly=true`、`realCustomerImport=false`；DB 只读核对确认模拟客户、供应商、联系人、销售订单和销售订单行均已存在。
 - 验证：`TRIAL_ACCOUNT_PASSWORD=12345678 node scripts/qa/trial-account-rbac.mjs` 通过，覆盖 9 个 demo 账号角色、岗位权限、debug 权限、super admin 和 disabled 边界；`pnpm --dir web smoke:trial-demo-browser` 通过，覆盖桌面账号 9 个、岗位任务端 8 个、拒绝态 1 个；`bash scripts/qa/fast.sh` 通过；`git diff --check` 通过。
 - 下一步：可按当前本地 evidence 继续整理 Phase 7 验收记录；若要提交推送，需要用户明确确认提交推送。
-- 阻塞/风险：本轮只在本地 dev DB 写入模拟数据，不代表目标客户环境已写入或客户已验收；未执行真实 import，未写 `business_records`，未创建出货、库存、财务、发票、付款、应收或应付事实。追加前 `progress.md` 为 245 行 / 46862 bytes，未达到归档阈值。
 
 ## 2026-06-08 20:20 CST
 

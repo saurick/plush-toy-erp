@@ -52,3 +52,11 @@ test('bomApi: copy-source suggestions can read every BOM version page', () => {
     /listAllPaginatedRecords\(\s*listBOMVersions,\s*params,\s*'bom_versions'/u
   )
 })
+
+test('bomApi: detail reads forward request cancellation options', () => {
+  assert.match(
+    source,
+    /export async function getBOMVersion\(params = \{\}, options = \{\}\)/u
+  )
+  assert.match(source, /call\(\s*'get_bom_version',\s*params,\s*options\s*\)/u)
+})

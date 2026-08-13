@@ -7,7 +7,6 @@
 - `docs/archive/progress-2026-06-15-before-final-bom-closeout.md`：归档截至 2026-06-15 22:42 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 428 行 / 83344 bytes，超过 80KB 阈值；本轮 BOM Version、JSON-RPC service 迁移和全量验收提交前先保留完整现场，再收缩当前入口。
 - `docs/archive/progress-2026-06-02-before-print-template-defer.md`：归档 2026-05-31 至 2026-06-02 10:28 的旧过程记录。归档原因：原 `progress.md` 达到 386 行 / 80696 bytes，超过 80KB 阈值。
 - `docs/archive/progress-2026-06-05-before-mobile-task-redesign.md`：归档截至 2026-06-04 22:04 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 375 行 / 80895 bytes，超过 80KB 阈值；本轮移动端任务页改版前先保留完整现场，再收缩当前入口。
-- `docs/archive/progress-2026-06-08-before-business-records-debug-cleanup.md`：归档截至 2026-06-08 13:50 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 318 行 / 82540 bytes，超过 80KB 阈值；本轮旧 `project-orders` debug cleanup 前先保留完整现场，再收缩当前入口。
 - `docs/archive/progress-2026-06-09-before-brand-config.md`：归档 2026-06-08 21:08 CST 至 2026-06-08 23:07 CST 的过程记录。归档原因：当前 `progress.md` 达到 383 行 / 80205 bytes，超过 80KB 阈值；本轮前端品牌客户配置化前先保留完整现场，再收缩当前入口。
 - `docs/archive/progress-2026-06-10-before-style-l1-stabilization.md`：归档 2026-06-08 23:55 CST 至 2026-06-10 17:34 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 378 行 / 82385 bytes，超过 80KB 阈值；本轮修完整 `style:l1` 稳定性前先保留完整现场，再收缩当前入口。
 - `docs/archive/progress-2026-06-11-before-ui-simplification-rules.md`：归档截至 2026-06-11 14:06 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 395 行 / 80005 bytes，接近并按项目约定视为达到 80KB 归档边界；本轮补 UI 极简不改语义规则前先保留完整现场，再收缩当前入口。
@@ -435,7 +434,6 @@
 - 完成：修正 `operational-fact-simulated-closure.mjs` 的财务事实来源，`RECEIVABLE / INVOICE` 创建时带 `source_type=SHIPMENT` 和已发货 shipment id；修正 `mobile-workflow-simulated-closure.mjs` 的 run-id 长度上限，避免生成超过 `workflow_tasks.task_code` 64 字符的任务编码。
 - 验证：本地 DB 目标为 `192.168.0.106:5432/plush_erp`；数据覆盖统计显示 `customers/suppliers/contacts/products/product_skus/materials/bom_headers/bom_items/sales_orders/sales_order_items/purchase_orders/purchase_order_items/shipments/shipment_items/production_facts/outsourcing_facts/stock_reservations/finance_facts/workflow_tasks/workflow_task_events/workflow_business_states/inventory_txns/inventory_balances` 均有数据；`go test ./internal/data -run 'TestDebugSeedRepo_ClearBusinessDataDeletesCurrentProjectBusinessTables|TestDebugSeedRepo_SeedAndCleanupBusinessChainDebugData'`、`node --test scripts/qa/operational-fact-simulated-closure.test.mjs scripts/qa/mobile-workflow-simulated-closure.test.mjs` 通过。
 - 下一步：如需进一步做到每个 formal-shell 页面都有专属业务行而不是共享 Workflow / Fact 上下文，需要按对应领域 usecase 逐页补正式 API；不能把壳页模拟数据写成已实现事实。
-- 阻塞/风险：本轮只重建本地 dev DB 模拟数据，不导入真实 yoyoosun 客户数据，不写 `business_records`，不改 schema / migration；formal-shell 页面仍是当前产品边界内的壳页或投影页，不能等同完整领域事实已实现。
 
 ## 2026-06-16 22:32 CST
 

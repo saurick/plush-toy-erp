@@ -113,7 +113,7 @@ export default function HelpCenterPage() {
           {guides.length > 1 ? (
             <div className="erp-help-center-role-picker">
               <label htmlFor="erp-help-center-role-select">
-                <Text type="secondary">切换岗位帮助</Text>
+                <Text type="secondary">查看其他岗位说明</Text>
               </label>
               <Select
                 id="erp-help-center-role-select"
@@ -153,9 +153,16 @@ export default function HelpCenterPage() {
           type="info"
           showIcon
           message="当前账号有多个岗位"
-          description={`现在显示“${selectedGuide.label}”的办理说明。开始工作前请先选择本次实际办理岗位，采购和财务等职责不要混在同一张单据里操作。`}
+          description={`现在显示“${selectedGuide.label}”的办理说明。这里仅切换说明内容，不会改变当前登录账号的岗位或权限；实际可办理动作仍以当前账号权限为准。`}
         />
       ) : null}
+
+      <Alert
+        type="info"
+        showIcon
+        message="业务页面里也能随手查看说明"
+        description="页面右上角的“这页怎么用”会说明当前任务、完成标准、办理顺序和交接对象；金额、比例、字段来源等局部内容可点名称旁的问号。不能操作的原因、高风险提醒和必须交给谁处理的事项仍会直接显示。"
+      />
 
       <section aria-labelledby="help-priorities-title">
         <div className="erp-help-center-section-head">

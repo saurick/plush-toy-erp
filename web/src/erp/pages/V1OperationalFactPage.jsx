@@ -7,10 +7,10 @@ const PAGE_CONFIGS = Object.freeze({
     initialActiveKey: 'production',
     enabledViews: ['production'],
     pageSummary:
-      '生产进度当前可查看和处理生产发料、成品入库和返工记录；任务标记为完成不会自动修改库存或出货记录。',
+      '生产岗位在这里维护领料、返工和待入库完工报告；仓库核对完工报告后确认成品入库。只有仓库确认时才增加成品库存，任务完成不会自动修改库存。',
     viewOverrides: {
       production: {
-        title: '生产发料 / 入库记录',
+        title: '生产记录 / 成品入库',
       },
     },
   },

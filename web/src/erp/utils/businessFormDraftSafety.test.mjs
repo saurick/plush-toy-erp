@@ -67,6 +67,10 @@ test('master-data edit fails closed when dependent contacts cannot be read', () 
   )
 
   assert.match(loadContacts, /加载联系人[\s\S]*?return null/u)
+  assert.doesNotMatch(
+    loadContacts,
+    /if \(!request\.isCurrent\(\)\) \{\s*return \[\]/u
+  )
   assert.match(
     openEdit,
     /!Array\.isArray\(recordContacts\)[\s\S]*?return[\s\S]*?setEditingRecord\(record\)/u

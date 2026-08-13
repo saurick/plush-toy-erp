@@ -547,19 +547,21 @@ func (r *operationalFactRepo) CreateFinanceCreditNote(ctx context.Context, in *b
 	if err != nil {
 		return nil, err
 	}
-	if fact.Status != biz.OperationalFactStatusPosted && fact.Status != biz.OperationalFactStatusSettled {
+	if fact.Status != biz.OperationalFactStatusPosted {
 		return nil, biz.ErrBadParam
 	}
 	if fact.FactType != biz.FinanceFactReceivable && fact.FactType != biz.FinanceFactPayable {
 		return nil, biz.ErrBadParam
 	}
-	outstanding, err := financeFactOutstanding(ctx, tx.client, fact.ID, fact.Amount)
+	outstandingAmounts, err := financeFactOutstandingAmounts(ctx, tx.client, []*ent.FinanceFact{fact})
 	if err != nil {
 		return nil, err
 	}
+	outstanding := outstandingAmounts[fact.ID]
 	if in.Amount.GreaterThan(outstanding) {
 		return nil, biz.ErrBadParam
 	}
+	settledAfterCredit := in.Amount.Equal(outstanding)
 	row, err := tx.client.FinanceCreditNote.Create().SetCreditNoteNo(in.CreditNoteNo).SetFinanceFactID(fact.ID).SetAmount(in.Amount).SetCurrency(fact.Currency).SetStatus("POSTED").SetReason(in.Reason).SetIdempotencyKey(in.IdempotencyKey).SetIdempotencyPayloadHash(payloadHash).SetCreatedBy(actorID).Save(ctx)
 	if err != nil {
 		if ent.IsConstraintError(err) {
@@ -573,10 +575,8 @@ func (r *operationalFactRepo) CreateFinanceCreditNote(ctx context.Context, in *b
 		}
 		return nil, err
 	}
-	if in.Amount.Equal(outstanding) {
-		if err := setFinanceFactSettlement(ctx, tx, fact.ID, true, actorID); err != nil {
-			return nil, err
-		}
+	if err := setFinanceFactSettlement(ctx, tx, fact.ID, settledAfterCredit, actorID); err != nil {
+		return nil, err
 	}
 	out, err := financeCreditNoteWithFact(ctx, tx.client, row)
 	if err != nil {

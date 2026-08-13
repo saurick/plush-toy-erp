@@ -43,18 +43,20 @@ type Customer struct {
 }
 
 type Supplier struct {
-	ID           int
-	Code         string
-	Name         string
-	ShortName    *string
-	SupplierType *string
-	Address      *string
-	TaxNo        *string
-	ProcessIDs   []int
-	IsActive     bool
-	Note         *string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID                     int
+	Code                   string
+	Name                   string
+	ShortName              *string
+	SupplierType           *string
+	Address                *string
+	TaxNo                  *string
+	DefaultPaymentTermDays int
+	ProcessIDs             []int
+	PrimaryContact         *Contact
+	IsActive               bool
+	Note                   *string
+	CreatedAt              time.Time
+	UpdatedAt              time.Time
 }
 
 type Unit struct {
@@ -164,12 +166,13 @@ type CustomerMutation struct {
 }
 
 type SupplierMutation struct {
-	Code         string
-	Name         string
-	ShortName    *string
-	SupplierType *string
-	Address      *string
-	TaxNo        *string
+	Code                   string
+	Name                   string
+	ShortName              *string
+	SupplierType           *string
+	Address                *string
+	TaxNo                  *string
+	DefaultPaymentTermDays int
 	// Nil preserves existing capabilities on partial update; a non-nil empty
 	// slice explicitly clears the declared supplier-process relationships.
 	ProcessIDs []int
@@ -251,6 +254,7 @@ type MasterDataFilter struct {
 	Keyword        string
 	ActiveOnly     bool
 	LifecycleScope string
+	SupplierTypes  []string
 	Limit          int
 	Offset         int
 }
@@ -878,7 +882,7 @@ func normalizeSupplierMutation(in SupplierMutation) (SupplierMutation, error) {
 		}
 		in.ProcessIDs = normalizedIDs
 	}
-	if in.Code == "" || in.Name == "" {
+	if in.Code == "" || in.Name == "" || in.DefaultPaymentTermDays < 0 {
 		return SupplierMutation{}, ErrBadParam
 	}
 	return in, nil
@@ -1046,6 +1050,24 @@ func normalizeMasterDataFilter(in MasterDataFilter) (MasterDataFilter, error) {
 	in.LifecycleScope, scopeOK = NormalizeLifecycleScope(in.LifecycleScope)
 	if !scopeOK {
 		return MasterDataFilter{}, ErrBadParam
+	}
+	if in.SupplierTypes != nil {
+		normalizedTypes := make([]string, 0, len(in.SupplierTypes))
+		seenTypes := make(map[string]struct{}, len(in.SupplierTypes))
+		for _, value := range in.SupplierTypes {
+			normalizedType := strings.ToLower(strings.TrimSpace(value))
+			switch normalizedType {
+			case "material", "outsourcing", "service", "mixed":
+			default:
+				return MasterDataFilter{}, ErrBadParam
+			}
+			if _, exists := seenTypes[normalizedType]; exists {
+				continue
+			}
+			seenTypes[normalizedType] = struct{}{}
+			normalizedTypes = append(normalizedTypes, normalizedType)
+		}
+		in.SupplierTypes = normalizedTypes
 	}
 	if in.Limit <= 0 || in.Limit > 200 {
 		in.Limit = 50

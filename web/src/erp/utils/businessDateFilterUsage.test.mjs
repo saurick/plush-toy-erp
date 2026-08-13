@@ -10,6 +10,18 @@ const businessListLayoutPath = resolve(
   __dirname,
   '../components/business-list/BusinessListLayout.jsx'
 )
+const businessDateUsageCases = [
+  [
+    '../components/purchase-orders/purchaseOrderPageConfig.mjs',
+    'currentBusinessDate',
+  ],
+  ['../data/processingContractTemplate.mjs', 'unixSecondsToBusinessDate'],
+  ['../pages/OperationalFactsPage.jsx', 'currentBusinessDate'],
+  ['../pages/V1OutsourcingOrdersPage.jsx', 'currentBusinessDate'],
+  ['../pages/V1ProductionOrdersPage.jsx', 'currentBusinessDate'],
+  ['../pages/V1PurchaseOrdersPage.jsx', 'currentBusinessDate'],
+  ['../pages/V1SalesOrdersPage.jsx', 'currentBusinessDate'],
+]
 
 function listPageFiles(rootDir) {
   return readdirSync(rootDir, { withFileTypes: true }).flatMap((entry) => {
@@ -137,4 +149,16 @@ test('业务当前操作条不渲染页面级边界说明', () => {
     false,
     'SelectionActionBar should not render page-level boundaryText in the shared current-operation row'
   )
+})
+
+test('业务日期默认值和导出文件名使用上海业务日', () => {
+  for (const [relativePath, helperName] of businessDateUsageCases) {
+    const source = readFileSync(resolve(__dirname, relativePath), 'utf8')
+    assert.equal(
+      source.includes('toISOString().slice(0, 10)'),
+      false,
+      `${relativePath} must not derive the business date from UTC`
+    )
+    assert.match(source, new RegExp(`\\b${helperName}\\(`, 'u'))
+  }
 })

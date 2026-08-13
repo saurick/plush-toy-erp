@@ -65,10 +65,29 @@ test('read-only attachment panels do not expose a fake upload control', () => {
   )
 })
 
+test('outsourcing attachment panel exposes a typed contract-image upload without changing normal evidence uploads', () => {
+  const panelSource = readFileSync(
+    new URL(
+      '../components/business-list/BusinessAttachmentPanel.jsx',
+      import.meta.url
+    ),
+    'utf8'
+  )
+  const pageSource = readFileSync(
+    new URL('../pages/V1OutsourcingOrdersPage.jsx', import.meta.url),
+    'utf8'
+  )
+
+  assert.match(panelSource, /PRINT_APPENDIX_ATTACHMENT_TYPE/u)
+  assert.match(panelSource, /选择合同附图/u)
+  assert.match(panelSource, /item\.attachment_type \|\| attachmentType/u)
+  assert.match(pageSource, /enablePrintAppendixUpload/u)
+})
+
 test('remaining direct attachment panels stay inside form-backed business modals', () => {
   const modalWrappers = [
     ['<BusinessFormModal', '</BusinessFormModal>'],
-    ['<BusinessRecordDetailsModal', '</BusinessRecordDetailsModal>'],
+    ['<BusinessDetailsModal', '</BusinessDetailsModal>'],
   ]
   for (const relativePath of formModalAttachmentEntrypoints) {
     const source = readFileSync(new URL(relativePath, import.meta.url), 'utf8')
@@ -94,10 +113,10 @@ test('remaining direct attachment panels stay inside form-backed business modals
   }
 })
 
-test('BusinessRecordDetailsModal remains a read-only BusinessFormModal wrapper', () => {
+test('BusinessDetailsModal remains a read-only BusinessFormModal wrapper', () => {
   const source = readFileSync(
     new URL(
-      '../components/business-list/BusinessRecordDetailsModal.jsx',
+      '../components/business-list/BusinessDetailsModal.jsx',
       import.meta.url
     ),
     'utf8'

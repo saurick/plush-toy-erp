@@ -40,7 +40,6 @@ export const yoyoosunImportConfig = Object.freeze({
     executesImport: false,
     executesRealImport: false,
     canExecuteRealImport: false,
-    writesBusinessRecords: false,
     writesFacts: false,
     writesInventoryFacts: false,
     writesShipmentFacts: false,
@@ -190,7 +189,6 @@ export const yoyoosunImportConfig = Object.freeze({
       source: "config/customers/yoyoosun/importConfig.mjs",
       appliesTo: Object.freeze([
         "tenant_id",
-        "business_records",
         "product_skus",
         "purchase_orders",
         "shipments",
@@ -200,7 +198,7 @@ export const yoyoosunImportConfig = Object.freeze({
       ]),
       productCoreImpact: "none",
       guardrail:
-        "任何自动写入 schema、business_records、库存、出货、预留、财务或 workflow/fact 混淆都必须保持禁止。",
+        "任何自动写入 schema、库存、出货、预留、财务或 workflow/fact 混淆都必须保持禁止。",
     },
   ]),
   sourceSheetGroups: Object.freeze([
@@ -455,7 +453,6 @@ export const yoyoosunImportConfig = Object.freeze({
   ]),
   forbiddenAutoImportTargets: Object.freeze([
     "tenant_id",
-    "business_records",
     "product_skus",
     "purchase_orders",
     "outsourcing_facts",

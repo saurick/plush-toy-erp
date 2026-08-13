@@ -134,7 +134,7 @@ export const HISTORY_RECORD_SOURCES = Object.freeze([
   }),
   masterSource({
     key: 'suppliers',
-    label: '供应商档案',
+    label: '供应商与加工厂',
     menuPath: '/erp/master/partners/suppliers',
     responseKey: 'suppliers',
     readPermissions: ['supplier.read'],

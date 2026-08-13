@@ -339,6 +339,13 @@ func newSalesOrderAcceptanceContract(variantKey string, includeEngineering bool)
 			"sales_order_review",
 		),
 		ProcessNodeInstanceCreate{NodeKey: "end", NodeType: ProcessNodeTypeEnd},
+		customerDomainCommandNode(
+			"reject_sales_order",
+			"",
+			PermissionWorkflowTaskReject,
+			ProcessDomainCommandSalesOrderReject,
+			"SalesOrderUsecase.RejectSalesOrderForProcessCommand",
+		),
 		ProcessNodeInstanceCreate{NodeKey: "sales_order_rejected_end", NodeType: ProcessNodeTypeEnd},
 	)
 	return customerProcessContract{
@@ -381,7 +388,7 @@ func newMaterialSupplyContract() customerProcessContract {
 			customerDomainCommandNode(
 				"submit_purchase_order",
 				"",
-				PermissionPurchaseOrderUpdate,
+				PermissionPurchaseOrderSubmit,
 				ProcessDomainCommandPurchaseOrderSubmit,
 				"PurchaseOrderUsecase.SubmitPurchaseOrderForProcessCommand",
 			),
@@ -394,6 +401,13 @@ func newMaterialSupplyContract() customerProcessContract {
 				"PurchaseOrderUsecase.ApprovePurchaseOrder",
 			),
 			{NodeKey: "end", NodeType: ProcessNodeTypeEnd},
+			customerDomainCommandNode(
+				"reject_purchase_order",
+				"",
+				PermissionWorkflowTaskReject,
+				ProcessDomainCommandPurchaseOrderReject,
+				"PurchaseOrderUsecase.RejectPurchaseOrderForProcessCommand",
+			),
 			{NodeKey: "purchase_order_rejected_end", NodeType: ProcessNodeTypeEnd},
 		},
 	}
@@ -655,7 +669,9 @@ func customerDomainCommandNode(nodeKey, ownerPoolKey, capabilityKey, commandKey,
 		},
 	}
 	if commandKey == ProcessDomainCommandSalesOrderActivate ||
+		commandKey == ProcessDomainCommandSalesOrderReject ||
 		commandKey == ProcessDomainCommandPurchaseOrderApprove ||
+		commandKey == ProcessDomainCommandPurchaseOrderReject ||
 		commandKey == ProcessDomainCommandShipmentFinanceRelease ||
 		commandKey == ProcessDomainCommandShipmentFinanceReject ||
 		commandKey == ProcessDomainCommandFinancePaymentApprove ||

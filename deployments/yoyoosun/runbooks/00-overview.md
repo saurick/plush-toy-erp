@@ -9,7 +9,7 @@
 | 服务 | 当前口径 | 说明 |
 | --- | --- | --- |
 | `postgres` | PostgreSQL | 业务数据库和 migration 目标 |
-| `app-server` | backend HTTP `8300`, gRPC `9300` | JSON-RPC、鉴权、领域 usecase、健康检查 |
+| `app-server` | backend HTTP `8300` | JSON-RPC、鉴权、领域 usecase、健康检查 |
 | `web-desktop` | static web `5175` | 桌面后台和 `/m/<role>/tasks` 岗位任务端统一入口 |
 | `jaeger` | tracing | 低配环境可按正式方案评审后关闭或保留 |
 
@@ -20,7 +20,7 @@
 | 类型 | 建议受控位置 | 是否入 Git |
 | --- | --- | --- |
 | PostgreSQL 数据目录 | `/data/plush-toy-erp-yoyoosun/postgres` | 否 |
-| 上传附件目录 | `/data/plush-toy-erp-yoyoosun/files` | 否 |
+| 业务附件正文 | PostgreSQL `business_attachments.content`，随整库备份 | 否 |
 | 生产 `.env` | `/secure/path/yoyoosun/.env` 或等价受控目录 | 否 |
 | 备份文件 | `/var/backups/plush-toy-erp-yoyoosun` 或外部备份存储 | 否 |
 | release evidence | `deployments/yoyoosun/evidence/releases/<date>/` | 可入库，必须脱敏 |

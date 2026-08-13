@@ -242,12 +242,27 @@ func TestMasterDataUsecaseNormalizesCustomerSupplierAndContactInput(t *testing.T
 		t.Fatalf("expected negative customer payment term rejected, got %v", err)
 	}
 	supplierType := " material "
-	supplierInput, err := normalizeSupplierMutation(SupplierMutation{Code: " S-001 ", Name: " 供应商 ", SupplierType: &supplierType})
+	supplierInput, err := normalizeSupplierMutation(SupplierMutation{
+		Code:                   " S-001 ",
+		Name:                   " 供应商 ",
+		SupplierType:           &supplierType,
+		DefaultPaymentTermDays: 30,
+	})
 	if err != nil {
 		t.Fatalf("expected supplier mutation valid, got %v", err)
 	}
-	if supplierInput.SupplierType == nil || *supplierInput.SupplierType != "material" {
-		t.Fatalf("expected supplier type trimmed, got %#v", supplierInput.SupplierType)
+	if supplierInput.SupplierType == nil || *supplierInput.SupplierType != "material" || supplierInput.DefaultPaymentTermDays != 30 {
+		t.Fatalf("expected supplier type and payment term normalized, got %#v", supplierInput)
+	}
+	if _, err := normalizeSupplierMutation(SupplierMutation{Code: "S-002", Name: "供应商", DefaultPaymentTermDays: -1}); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected negative supplier payment term rejected, got %v", err)
+	}
+	filter, err := normalizeMasterDataFilter(MasterDataFilter{SupplierTypes: []string{" outsourcing ", "mixed", "outsourcing"}})
+	if err != nil || len(filter.SupplierTypes) != 2 || filter.SupplierTypes[0] != "outsourcing" || filter.SupplierTypes[1] != "mixed" {
+		t.Fatalf("expected supplier type filter normalized, got %#v err=%v", filter.SupplierTypes, err)
+	}
+	if _, err := normalizeMasterDataFilter(MasterDataFilter{SupplierTypes: []string{"unknown"}}); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected unknown supplier type filter rejected, got %v", err)
 	}
 	category := " 填充 "
 	materialInput, err := normalizeMaterialMutation(MaterialMutation{Code: " M-001 ", Name: " PP 棉 ", Category: &category, DefaultUnitID: 10})

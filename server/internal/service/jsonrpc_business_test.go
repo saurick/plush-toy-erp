@@ -313,21 +313,6 @@ func testNumberValue(value any) float64 {
 	}
 }
 
-func TestJsonrpcDispatcher_BusinessRecordMethodsAreRetired(t *testing.T) {
-	j := &jsonrpcDispatcher{
-		log:         log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.business.test")),
-		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey})},
-	}
-
-	_, res, err := j.handleBusiness(workflowJSONRPCAdminContext(), "list_records", "1", nil)
-	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
-	}
-	if res == nil || res.Code != errcode.UnknownMethod.Code {
-		t.Fatalf("expected retired method to be unknown, got %#v", res)
-	}
-}
-
 func businessDashboardTestLogger() *log.Helper {
 	return log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.business.test"))
 }

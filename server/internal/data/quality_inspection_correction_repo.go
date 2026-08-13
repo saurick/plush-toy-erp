@@ -53,7 +53,12 @@ func (r *inventoryRepo) CreateQualityInspectionCorrection(ctx context.Context, i
 			return nil, err
 		}
 		originalLotStatus = lot.Status
-		if err := updateInventoryLotStatus(ctx, tx, lot.ID, biz.InventoryLotHold); err != nil {
+		if err := updateInventoryLotStatus(ctx, tx, lot.ID, biz.InventoryLotHold, inventoryLotStatusEvidence{
+			ActionKey:           biz.InventoryLotActionHoldQualityCorrection,
+			Reason:              in.Reason,
+			ActorID:             actorID,
+			QualityInspectionID: original.ID,
+		}); err != nil {
 			return nil, err
 		}
 	}

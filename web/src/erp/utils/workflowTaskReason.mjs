@@ -21,6 +21,13 @@ export function getWorkflowTaskReasonMeta(task = {}) {
   const completionSummary =
     cleanText(task.completion_summary) || cleanText(payload.completion_summary)
 
+  if (statusKey === 'withdrawn') {
+    return {
+      kind: 'withdrawn',
+      label: '撤回原因',
+      value: blockedReason || businessReason,
+    }
+  }
   if (statusKey === 'rejected') {
     return {
       kind: 'rejected',

@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react'
 import { Alert, Descriptions, Form, Input, Modal, Radio, Select } from 'antd'
 
+import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
 import {
   inventoryLotOption,
   warehouseOptionFromRecord,
@@ -223,7 +224,14 @@ export default function OutsourcingOrderSourceFactModal({
           },
         ]}
       />
-      <Form form={form} layout="vertical" preserve={false} disabled={loading}>
+      <Form
+        form={form}
+        className="erp-business-action-form"
+        layout="vertical"
+        preserve={false}
+        disabled={loading}
+      >
+        <BusinessFormSectionTitle>仓库与批次</BusinessFormSectionTitle>
         <Form.Item
           name="warehouse_id"
           label="仓库"
@@ -303,6 +311,7 @@ export default function OutsourcingOrderSourceFactModal({
             <Input maxLength={64} placeholder="填写本次回货的新批次号" />
           </Form.Item>
         ) : null}
+        <BusinessFormSectionTitle>数量与时间</BusinessFormSectionTitle>
         <Form.Item
           name="quantity"
           label="本次办理数量"
@@ -339,7 +348,11 @@ export default function OutsourcingOrderSourceFactModal({
         >
           <Input type="datetime-local" />
         </Form.Item>
-        <Form.Item name="note" label="备注">
+        <Form.Item
+          className="erp-business-action-form__field--full"
+          name="note"
+          label="备注"
+        >
           <Input.TextArea rows={3} maxLength={255} showCount />
         </Form.Item>
       </Form>

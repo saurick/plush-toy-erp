@@ -170,7 +170,6 @@ web_tests=(
   "$ROOT_DIR/web/src/erp/config/seedData.test.mjs"
   "$ROOT_DIR/web/src/erp/config/workflowStatus.test.mjs"
   "$ROOT_DIR/web/src/dev-workbench/config/devHub.test.mjs"
-  "$ROOT_DIR/web/src/dev-workbench/config/devReceipts.test.mjs"
   "$ROOT_DIR/web/src/dev-workbench/config/devCoverageOperation.test.mjs"
   "$ROOT_DIR/web/src/dev-workbench/config/devTestingOperation.test.mjs"
   "$ROOT_DIR/web/src/dev-workbench/config/devTesting.test.mjs"
@@ -186,7 +185,7 @@ web_tests=(
   "$ROOT_DIR/web/scripts/mobileAuthLoginRouteSmoke.test.mjs"
   "$ROOT_DIR/web/scripts/purchaseReceiptRealWriteBrowserE2E.test.mjs"
   "$ROOT_DIR/web/dev-server/devServerSecurity.test.mjs"
-  "$ROOT_DIR/web/dev-server/devWorkbenchReceiptPlugin.test.mjs"
+  "$ROOT_DIR/web/dev-server/devWorkbenchPlugins.test.mjs"
   "$ROOT_DIR/web/dev-server/devQaCoveragePlugin.test.mjs"
   "$ROOT_DIR/web/dev-server/devQaTestingPlugin.test.mjs"
   "$ROOT_DIR/web/dev-server/devDataPreparationPlugin.test.mjs"
@@ -208,7 +207,8 @@ echo "[qa:fast] 运行 server 快速检查"
 (
   cd "$ROOT_DIR/server"
   node "$ROOT_DIR/scripts/qa/run-test-gate.mjs" \
-    --kind go --label server-quick -- \
+    --kind go --label server-quick \
+    --exclude-skip-pattern "${CRITICAL_POSTGRES_TEST_PATTERN}|^TestTemplatePDFChromiumSecurityIntegration$" -- \
     go test -count=1 -json \
     -skip "${CRITICAL_POSTGRES_TEST_PATTERN}|^TestTemplatePDFChromiumSecurityIntegration$" \
     ./internal/... ./pkg/...

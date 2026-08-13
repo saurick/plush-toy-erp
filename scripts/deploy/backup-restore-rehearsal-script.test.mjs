@@ -28,6 +28,7 @@ test("backup restore rehearsal script help is runnable", () => {
   assert.match(result.stdout, /SOURCE_POSTGRES_DSN/);
   assert.match(result.stdout, /backup-restore-report\.json/);
   assert.match(result.stdout, /--evidence-dir/);
+  assert.match(result.stdout, /--source-policy dedicated-backup/);
   assert.match(
     result.stdout,
     /不把 dump、secret、完整 DSN 或客户 raw rows 写入 git/,
@@ -112,6 +113,7 @@ test("backup restore rehearsal report shape stays compatible with release eviden
     '"commandSummary": "command-summary.txt"',
     '"databaseBackupSize": $backup_size',
     '"databaseBackupHash": "$backup_hash"',
+    '"sourcePolicy": "$source_policy"',
     '"migrationVersion": "${pre_migration_version:-unknown}"',
     '"migrationBeforeApply": "${pre_migration_version:-unknown}"',
     '"pendingFiles": "${pending_files:-unknown}"',
@@ -128,7 +130,8 @@ test("backup restore rehearsal report shape stays compatible with release eviden
     '"backupCreated": true',
     '"restoreCompleted": true',
     "restoreTarget=$restore_target",
-    "steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status -> populated upgrade read-only audit -> customer config cutover read-only audit -> atlas migrate apply -> post-apply atlas status -> smoke query",
+    "sourcePolicy=$source_policy",
+    "steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status -> populated upgrade read-only audit -> customer config cutover read-only audit -> database constraint read-only audit -> atlas migrate apply -> post-apply atlas status -> smoke query",
     "populated-upgrade-preflight.sh",
     "auditing populated upgrade boundaries",
     "auditing customer config cutover boundaries",
@@ -148,11 +151,11 @@ test("backup restore rehearsal report shape stays compatible with release eviden
 
   assert.doesNotMatch(source, /cp "\$backup_file"/);
   assert.match(source, /sha256sum "\$backup_file"/);
-  assert.match(source, /atlas migrate status/);
-  assert.match(source, /atlas migrate apply/);
+  assert.match(source, /atlas_restore_migrate status/);
+  assert.match(source, /atlas_restore_migrate apply/);
   const populatedAudit = source.indexOf("--audit populated-upgrade");
   const cutoverAudit = source.indexOf("--audit customer-config-cutover");
-  const atlasApply = source.indexOf("atlas migrate apply");
+  const atlasApply = source.indexOf("atlas_restore_migrate apply");
   assert(populatedAudit >= 0, "populated upgrade audit must be explicit");
   assert(
     populatedAudit < cutoverAudit,
@@ -164,6 +167,127 @@ test("backup restore rehearsal report shape stays compatible with release eviden
   );
   assert.match(source, /information_schema\.tables/);
   assert.match(source, /docker rm -f "\$container_name"/);
+});
+
+test("backup restore rehearsal keeps credentials private and uses the full migration contract", () => {
+  const source = fs.readFileSync(scriptPath, "utf8");
+
+  assert.match(source, /^umask 077$/m);
+  assert.match(source, /postgres:18\.1/);
+  assert.doesNotMatch(source, /postgres:18(?:["'\s]|$)/);
+  assert.doesNotMatch(source, /postgresql@(?:16|17)/);
+  assert.match(source, /source_user" == "erp_backup"/);
+  assert.match(source, /source_policy="dedicated-backup"/);
+  assert.match(source, /restore_dsn="postgres:\/\/erp_migrator:/);
+  assert.match(
+    source,
+    /PGHOST="\$source_pg_host" PGPORT="\$source_pg_port"[\s\S]*PGDATABASE="\$source_pg_database" PGUSER="\$source_pg_user"[\s\S]*PGPASSWORD="\$source_pg_password" PGSSLMODE="\$source_pg_sslmode"[\s\S]*"\$pg_dump_bin"[\s\S]*--format=custom/,
+  );
+  assert.match(source, /BACKUP_SOURCE_POSTGRES_DSN="\$source_dsn" python3/);
+  assert.match(source, /source_dsn=""[\s\S]*unset "\$source_env"/);
+  assert.doesNotMatch(source, /PGDATABASE="\$source_dsn"/);
+  assert.doesNotMatch(source, /"\$pg_dump_bin"\s+"\$source_dsn"/);
+  assert.match(source, /url = getenv\("ATLAS_DATABASE_URL"\)/);
+  assert.doesNotMatch(source, /--url "\$restore_dsn"/);
+  assert.match(source, /apply --dry-run --tx-mode all/);
+  assert.match(source, /ROLLBACK;/);
+  assert.match(source, /apply --lock-timeout 10s --tx-mode all/);
+  assert.match(source, /schema-readback\.sql/);
+  assert.match(source, /programmability_result/);
+  assert.match(source, /permissionReadbackStatus/);
+  assert.match(source, /mkdir -m 700 "\$run_dir"/);
+  assert.match(source, /chmod 600 "\$private_file"/);
+});
+
+test("backup restore rehearsal scopes the shared development source exception", () => {
+  const source = fs.readFileSync(scriptPath, "utf8");
+  const sharedPolicyStart = source.indexOf(
+    'if [[ "$source_policy" == "shared-dev-session-read-only" ]]',
+  );
+  const sourceIdentityStart = source.indexOf(
+    'source_identity="',
+    sharedPolicyStart,
+  );
+  const dedicatedPolicyStart = source.indexOf(
+    'if [[ "$source_policy" == "dedicated-backup" ]]',
+    sourceIdentityStart,
+  );
+  const postgresMajorStart = source.indexOf(
+    '[[ "$source_postgres_version"',
+    dedicatedPolicyStart,
+  );
+
+  assert(sharedPolicyStart >= 0);
+  assert(sourceIdentityStart > sharedPolicyStart);
+  assert(dedicatedPolicyStart > sourceIdentityStart);
+  assert(postgresMajorStart > dedicatedPolicyStart);
+  const sharedPolicyBlock = source.slice(
+    sharedPolicyStart,
+    sourceIdentityStart,
+  );
+  const dedicatedPolicyBlock = source.slice(
+    dedicatedPolicyStart,
+    postgresMajorStart,
+  );
+
+  assert.match(
+    sharedPolicyBlock,
+    /source_policy" == "shared-dev-session-read-only"[\s\S]*environment" == "shared-dev"[\s\S]*source_pg_host" == "192\.168\.0\.106"[\s\S]*source_pg_port" == "5432"[\s\S]*source_pg_database" == "plush_erp"/,
+  );
+  assert.match(
+    sharedPolicyBlock,
+    /source_pg_options="-c default_transaction_read_only=on"/,
+  );
+  assert.doesNotMatch(
+    sharedPolicyBlock,
+    /source_(?:super|createdb|createrole|bypassrls)|CREATE ROLE|ALTER ROLE|source_pg_user=/,
+  );
+  assert.match(
+    source,
+    /PGOPTIONS="\$source_pg_options"[\s\S]*"\$psql_bin"/,
+  );
+  assert.match(
+    source,
+    /PGOPTIONS="\$source_pg_options"[\s\S]*"\$pg_dump_bin"/,
+  );
+  assert.match(
+    dedicatedPolicyBlock,
+    /source_policy" == "dedicated-backup"[\s\S]*source_user" == "erp_backup"[\s\S]*source_super" == "f"[\s\S]*source_createdb" == "f"[\s\S]*source_createrole" == "f"[\s\S]*source_bypassrls" == "f"[\s\S]*source_database_create" == "f"[\s\S]*source_schema_create" == "f"[\s\S]*source_invalid_table_count" == "0"/,
+  );
+  assert.match(source, /"sourcePolicy": "\$source_policy"/);
+  assert.match(source, /"sourceRole": "\$source_role_alias"/);
+});
+
+test("backup restore rehearsal resolves output ownership without concatenating failed stat output", () => {
+  const source = fs.readFileSync(scriptPath, "utf8");
+  const bsdAttempt =
+    'if ! out_root_owner_uid="$(stat -f \'%u\' "$out_root" 2>/dev/null)"; then';
+  const gnuFallback =
+    'out_root_owner_uid="$(stat -c \'%u\' "$out_root")"';
+  const ownerGate =
+    '[[ -d "$out_root" && ! -L "$out_root" && "$out_root_owner_uid" == "$(id -u)" ]]';
+  const bsdAttemptIndex = source.indexOf(bsdAttempt);
+  const gnuFallbackIndex = source.indexOf(gnuFallback, bsdAttemptIndex);
+  const conditionalEndIndex = source.indexOf("\nfi", gnuFallbackIndex);
+  const ownerGateIndex = source.indexOf(ownerGate, conditionalEndIndex);
+
+  assert(bsdAttemptIndex >= 0, "BSD stat must be captured by the conditional");
+  assert(
+    gnuFallbackIndex > bsdAttemptIndex,
+    "GNU stat must overwrite the failed BSD attempt output",
+  );
+  assert(
+    conditionalEndIndex > gnuFallbackIndex,
+    "GNU fallback must remain inside the conditional",
+  );
+  assert(
+    ownerGateIndex > conditionalEndIndex,
+    "the directory gate must compare only the resolved owner UID",
+  );
+  assert.doesNotMatch(
+    source,
+    /stat -f '%u' "\$out_root"[^\n]*\|\| stat -c '%u' "\$out_root"/,
+  );
 });
 
 test("backup restore rehearsal waits for the final postgres process before restore", () => {

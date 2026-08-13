@@ -19,7 +19,7 @@ export function buildCIPlan({ files, mode, root = process.cwd() }) {
   if (!MODES.has(mode)) throw new Error("mode must be affected or full");
   const affected = buildAffectedPlan(files, { root });
   const commandTexts = affected.commands.map(commandText);
-  const full = mode === "full" || affected.requiresFull;
+  const full = mode === "full" || affected.localGate === "full";
   const changedWeb = affected.changedFiles.some((file) => file.startsWith("web/"));
   const changedServer = affected.changedFiles.some((file) => file.startsWith("server/"));
   const workflowContractNeedsGo = commandTexts.some((value) =>
@@ -46,12 +46,13 @@ export function buildCIPlan({ files, mode, root = process.cwd() }) {
       /(?:critical-pg|postgres|populated-upgrade)/u.test(command.id),
     );
   return Object.freeze({
-    schemaVersion: "plush.ci-plan/v1",
+    schemaVersion: "plush.ci-plan/v2",
     requestedMode: mode,
     effectiveMode: full ? "full" : "affected",
     changedFiles: affected.changedFiles,
-    highestLevel: affected.highestLevel,
-    requiresFull: affected.requiresFull,
+    affectedScopes: affected.affectedScopes,
+    maxAffectedScope: affected.maxAffectedScope,
+    localGate: affected.localGate,
     flags: Object.freeze({
       full,
       makeData,

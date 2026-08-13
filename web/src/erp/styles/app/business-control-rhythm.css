@@ -238,22 +238,22 @@ body
   line-height: calc(var(--erp-control-height) - 2px);
 }
 
-.erp-business-record-form :where(.ant-input),
-.erp-business-record-form :where(.ant-input-affix-wrapper),
-.erp-business-record-form .ant-input-number,
-.erp-business-record-form .ant-picker,
-.erp-business-record-form .ant-select-selector,
+.erp-business-entry-form :where(.ant-input),
+.erp-business-entry-form :where(.ant-input-affix-wrapper),
+.erp-business-entry-form .ant-input-number,
+.erp-business-entry-form .ant-picker,
+.erp-business-entry-form .ant-select-selector,
 .erp-permission-modal :where(.ant-input),
 .erp-permission-modal :where(.ant-input-affix-wrapper),
 .erp-permission-modal .ant-select-selector,
 .erp-business-status-reason-modal :where(.ant-input),
 .erp-business-status-reason-modal :where(.ant-input-affix-wrapper),
-.erp-business-record-form textarea.ant-input,
+.erp-business-entry-form textarea.ant-input,
 .erp-business-status-reason-modal textarea.ant-input {
   border-radius: var(--erp-business-control-radius, 12px);
 }
 
-.erp-business-record-form
+.erp-business-entry-form
   :where(
     .ant-input,
     .ant-input-affix-wrapper,
@@ -268,7 +268,7 @@ body
   background-color: var(--erp-modal-control-background, #fff);
 }
 
-.erp-business-record-form
+.erp-business-entry-form
   :where(
     .ant-input,
     .ant-input-affix-wrapper,
@@ -283,7 +283,7 @@ body
   border-color: var(--erp-modal-control-hover, #bfbfbf);
 }
 
-.erp-business-record-form :where(.ant-input),
+.erp-business-entry-form :where(.ant-input),
 .erp-permission-modal :where(.ant-input),
 .erp-business-status-reason-modal :where(.ant-input) {
   min-height: 32px;
@@ -291,7 +291,7 @@ body
   line-height: 22px;
 }
 
-.erp-business-record-form :where(input.ant-input:not([type='hidden'])),
+.erp-business-entry-form :where(input.ant-input:not([type='hidden'])),
 .erp-permission-modal :where(input.ant-input:not([type='hidden'])),
 .erp-business-status-reason-modal :where(input.ant-input:not([type='hidden'])) {
   height: 32px;
@@ -299,7 +299,7 @@ body
   line-height: 30px;
 }
 
-.erp-business-record-form
+.erp-business-entry-form
   :where(.ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper)),
 .erp-permission-modal
   :where(.ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper)),
@@ -309,7 +309,7 @@ body
   padding-block: 0;
 }
 
-.erp-business-record-form .ant-input-affix-wrapper :where(input.ant-input),
+.erp-business-entry-form .ant-input-affix-wrapper :where(input.ant-input),
 .erp-permission-modal .ant-input-affix-wrapper :where(input.ant-input),
 .erp-business-status-reason-modal
   .ant-input-affix-wrapper
@@ -328,9 +328,9 @@ body
   background-color: transparent;
 }
 
-.erp-business-record-form .ant-input-number,
-.erp-business-record-form .ant-picker,
-.erp-business-record-form .ant-select-selector,
+.erp-business-entry-form .ant-input-number,
+.erp-business-entry-form .ant-picker,
+.erp-business-entry-form .ant-select-selector,
 .erp-permission-modal :where(.ant-input-affix-wrapper),
 .erp-permission-modal .ant-select-selector {
   min-height: 32px;
@@ -340,14 +340,14 @@ body
   border-radius: var(--erp-business-control-radius, 12px);
 }
 
-.erp-business-record-form textarea.ant-input,
+.erp-business-entry-form textarea.ant-input,
 .erp-business-status-reason-modal textarea.ant-input {
   min-height: 74px;
   border-color: var(--erp-modal-control-border, #d9d9d9);
   background: var(--erp-modal-control-background, #fff);
 }
 
-.erp-business-record-form textarea.ant-input:hover,
+.erp-business-entry-form textarea.ant-input:hover,
 .erp-business-status-reason-modal textarea.ant-input:hover {
   border-color: var(--erp-modal-control-hover, #bfbfbf);
 }

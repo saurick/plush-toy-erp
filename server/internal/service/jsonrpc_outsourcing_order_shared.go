@@ -18,12 +18,14 @@ func unknownOutsourcingOrderResult(method string) *v1.JsonrpcResult {
 }
 
 func outsourcingOrderMutationFromParams(pm map[string]any) (*biz.OutsourcingOrderMutation, bool) {
-	if !outsourcingOrderAllowsOnly(pm,
+	if !sourceOrderAllowsOnly(pm,
 		"customer_key",
 		"id",
 		"expected_version",
 		"outsourcing_order_no",
 		"supplier_id",
+		"currency",
+		"payment_term_days",
 		"supplier_snapshot",
 		"contract_party_snapshot",
 		"source_order_no",
@@ -38,6 +40,10 @@ func outsourcingOrderMutationFromParams(pm map[string]any) (*biz.OutsourcingOrde
 	if !ok {
 		return nil, false
 	}
+	paymentTermDays, ok := getOptionalJSONRPCNonNegativeInt(pm, "payment_term_days")
+	if !ok {
+		return nil, false
+	}
 	expectedReturnDate, ok := getOptionalJSONRPCTime(pm, "expected_return_date")
 	if !ok {
 		return nil, false
@@ -45,6 +51,8 @@ func outsourcingOrderMutationFromParams(pm map[string]any) (*biz.OutsourcingOrde
 	return &biz.OutsourcingOrderMutation{
 		OutsourcingOrderNo:    getString(pm, "outsourcing_order_no"),
 		SupplierID:            getInt(pm, "supplier_id", 0),
+		Currency:              getString(pm, "currency"),
+		PaymentTermDays:       paymentTermDays,
 		SupplierSnapshot:      getMap(pm, "supplier_snapshot"),
 		ContractPartySnapshot: getMap(pm, "contract_party_snapshot"),
 		SourceOrderNo:         getWorkflowStringPtr(pm, "source_order_no"),
@@ -55,7 +63,7 @@ func outsourcingOrderMutationFromParams(pm map[string]any) (*biz.OutsourcingOrde
 }
 
 func outsourcingOrderItemMutationFromParams(pm map[string]any) (*biz.OutsourcingOrderItemMutation, bool) {
-	if !outsourcingOrderAllowsOnly(pm,
+	if !sourceOrderAllowsOnly(pm,
 		"id",
 		"outsourcing_order_id",
 		"line_no",
@@ -125,7 +133,7 @@ func outsourcingOrderItemMutationFromParams(pm map[string]any) (*biz.Outsourcing
 	}, true
 }
 
-func outsourcingOrderAllowsOnly(pm map[string]any, keys ...string) bool {
+func sourceOrderAllowsOnly(pm map[string]any, keys ...string) bool {
 	allowed := make(map[string]struct{}, len(keys))
 	for _, key := range keys {
 		allowed[key] = struct{}{}
@@ -170,6 +178,12 @@ func (d *jsonrpcDispatcher) mapOutsourcingOrderError(ctx context.Context, err er
 	switch {
 	case errors.Is(err, biz.ErrOutsourcingOrderConflict):
 		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: errcode.ResourceVersionConflict.Message}
+	case errors.Is(err, biz.ErrIdempotencyConflict):
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
+	case errors.Is(err, biz.ErrSourceOrderNormalCloseIncomplete):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外合同尚未全部回货；若确定不再履行剩余数量，请改用短关闭并填写原因"}
+	case errors.Is(err, biz.ErrOutsourcingOrderIncomplete):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "加工合同信息不完整，请补齐甲乙方信息、预计回货日期和每条明细的加工项目后再提交或确认"}
 	case errors.Is(err, biz.ErrBadParam):
 		l.Warnf("[outsourcing_order] invalid param err=%v", err)
 		return invalidParamResult()
@@ -224,6 +238,8 @@ func outsourcingOrderToMap(item *biz.OutsourcingOrder) map[string]any {
 		"id":                      item.ID,
 		"outsourcing_order_no":    item.OutsourcingOrderNo,
 		"supplier_id":             item.SupplierID,
+		"currency":                item.Currency,
+		"payment_term_days":       optionalIntValue(item.PaymentTermDays),
 		"supplier_snapshot":       item.SupplierSnapshot,
 		"contract_party_snapshot": item.ContractPartySnapshot,
 		"source_order_no":         optionalStringValue(item.SourceOrderNo),
@@ -231,6 +247,11 @@ func outsourcingOrderToMap(item *biz.OutsourcingOrder) map[string]any {
 		"expected_return_date":    optionalUnix(item.ExpectedReturnDate),
 		"lifecycle_status":        item.LifecycleStatus,
 		"version":                 item.Version,
+		"settlement_action":       optionalStringValue(item.SettlementAction),
+		"settlement_mode":         optionalStringValue(item.SettlementMode),
+		"settlement_reason":       optionalStringValue(item.SettlementReason),
+		"settled_at":              optionalUnix(item.SettledAt),
+		"settled_by":              optionalIntValue(item.SettledBy),
 		"note":                    optionalStringValue(item.Note),
 		"created_at":              item.CreatedAt.Unix(),
 		"updated_at":              item.UpdatedAt.Unix(),

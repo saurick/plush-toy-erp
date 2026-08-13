@@ -9,6 +9,7 @@ import {
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import { currentBusinessDate } from '../utils/businessDate.mjs'
 import {
   BusinessActionTooltip,
   BusinessDataTable,
@@ -1167,7 +1168,7 @@ export default function V1ProductionOrdersPage() {
       )
       if (hasRoutedItem && !canReadProductionWip) {
         modal.warning({
-          title: '暂不能核对工序入库条件',
+          title: '暂不能核对生产完工条件',
           content:
             '当前账号没有查看生产工序的权限，无法核对路线明细是否完成包装并确认包材，请联系管理员调整岗位权限。',
         })
@@ -1195,10 +1196,10 @@ export default function V1ProductionOrdersPage() {
         })
       if (eligibleItems.length === 0) {
         modal.warning({
-          title: '暂不能登记完工入库',
+          title: '暂不能登记生产完工',
           content:
             productionCompletionBlockerText(blockedItems) ||
-            '当前没有可登记完工入库的生产明细。',
+            '当前没有可登记生产完工的生产明细。',
         })
         return
       }
@@ -1221,7 +1222,7 @@ export default function V1ProductionOrdersPage() {
       setCompletionOpen(true)
     } catch (error) {
       if (completionContextRequestRef.current === requestID) {
-        message.error(getActionErrorMessage(error, '加载完工入库详情'))
+        message.error(getActionErrorMessage(error, '加载生产完工详情'))
       }
     } finally {
       if (completionContextRequestRef.current === requestID) {
@@ -1259,7 +1260,7 @@ export default function V1ProductionOrdersPage() {
         customer_key: activeCustomerKey || undefined,
       }
     } catch (error) {
-      message.error(getActionErrorMessage(error, '办理完工入库'))
+      message.error(getActionErrorMessage(error, '办理生产完工'))
       return
     }
     completionInFlightRef.current = true
@@ -1278,7 +1279,7 @@ export default function V1ProductionOrdersPage() {
             completionContext.order.id
           )
         } catch (error) {
-          message.error(getActionErrorMessage(error, '复核完工入库条件'))
+          message.error(getActionErrorMessage(error, '复核生产完工条件'))
           return
         }
         const eligibility = productionWipCompletionEligibility(
@@ -1341,15 +1342,15 @@ export default function V1ProductionOrdersPage() {
       try {
         await refreshProductionSources(completionContext.order.id)
       } catch (error) {
-        message.warning(getActionErrorMessage(error, '刷新完工入库结果'))
+        message.warning(getActionErrorMessage(error, '刷新生产完工结果'))
       }
       completionContextRequestRef.current += 1
       setCompletionOpen(false)
       setCompletionContext(EMPTY_COMPLETION_CONTEXT)
       message.success(
         confirmedByReread
-          ? `已重新读取并确认${completionContext.order.status === PRODUCTION_ORDER_STATUS.CLOSED ? '返工补完工' : '完工'}草稿，请到生产记录核对并过账`
-          : `${completionContext.order.status === PRODUCTION_ORDER_STATUS.CLOSED ? '返工补完工' : '完工'}记录草稿已生成，请到生产记录核对并过账`
+          ? `已重新读取并确认${completionContext.order.status === PRODUCTION_ORDER_STATUS.CLOSED ? '返工补完工' : '生产完工'}报告草稿，请由仓库核对并确认成品入库`
+          : `${completionContext.order.status === PRODUCTION_ORDER_STATUS.CLOSED ? '返工补完工' : '生产完工'}报告草稿已生成，请由仓库核对并确认成品入库`
       )
     } finally {
       completionInFlightRef.current = false
@@ -1543,7 +1544,7 @@ export default function V1ProductionOrdersPage() {
   const { exporting, exportRows } = useBusinessListExport({
     requestKey: 'production-orders-export',
     loadRows: loadExportOrders,
-    filename: `生产订单-${new Date().toISOString().slice(0, 10)}.csv`,
+    filename: `生产订单-${currentBusinessDate()}.csv`,
     columns: exportColumns,
     recordLabel: '生产订单',
   })
@@ -1562,8 +1563,9 @@ export default function V1ProductionOrdersPage() {
   return (
     <BusinessPageLayout>
       <PageHeaderCard
+        helpKey="production-orders"
         title="生产订单"
-        description="维护生产计划单；标准路线按布料加工、车缝、手工、包装依次办理，特别是先车缝、后手工。工序完工、品质判定与最终完工入库分层办理，库存仍以生产记录过账结果为准。"
+        description="维护生产计划单；标准路线按布料加工、车缝、手工、包装依次办理，特别是先车缝、后手工。生产岗位提交完工报告后，由仓库核对并确认成品入库；只有仓库确认时才增加库存。"
         stats={[{ key: 'total', label: '符合条件', value: total }]}
       />
       <BusinessOperationPanel
@@ -1748,7 +1750,7 @@ export default function V1ProductionOrdersPage() {
               >
                 {selected?.status === PRODUCTION_ORDER_STATUS.CLOSED
                   ? '登记返工补完工'
-                  : '登记完工入库'}
+                  : '登记生产完工'}
               </Button>
             </BusinessActionTooltip>
           ) : null}

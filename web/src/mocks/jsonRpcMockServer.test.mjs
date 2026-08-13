@@ -44,7 +44,7 @@ test('workflow mock keeps the terminal and version CAS contract aligned with the
     const metadata = await workflowCall('metadata', {})
     assert.deepEqual(
       metadata.result.data.task_states.map((item) => item.key),
-      ['ready', 'blocked', 'done', 'rejected']
+      ['ready', 'blocked', 'done', 'rejected', 'withdrawn']
     )
 
     const taskBoard = await workflowCall('get_task_board', {

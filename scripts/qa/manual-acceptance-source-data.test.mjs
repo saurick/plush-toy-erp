@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
   DEFAULT_SOURCE_DATA_SCALE,
   MANUAL_ACCEPTANCE_CORE_UNIT_CODE,
   MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES,
+  advanceOutsourcingOrderLifecycle,
   advanceSalesOrderLifecycleThroughProcess,
   applyManualAcceptanceSourceData,
+  applySourceOrderLifecycleAction,
   assertPersistedSourceRecord,
   buildOutsourcingOrderLineReferences,
   buildPurchaseOrderLineReferences,
@@ -216,6 +219,20 @@ test("manual acceptance source plan reaches every agreed pagination threshold", 
       ["包装", "PACKAGING"],
     ],
   );
+  const routeProcesses = Object.fromEntries(
+    plan.records.processes
+      .filter((item) => item.production_route_operation_code)
+      .map((item) => [item.production_route_operation_code, item]),
+  );
+  assert.ok(
+    Object.values(routeProcesses).every((item) => item.isActive === true),
+  );
+  assert.equal(routeProcesses.FABRIC_PROCESSING.outsourcing_enabled, true);
+  assert.equal(routeProcesses.SEWING.inhouse_enabled, true);
+  assert.equal(routeProcesses.SEWING.outsourcing_enabled, true);
+  assert.equal(routeProcesses.HANDWORK.inhouse_enabled, true);
+  assert.equal(routeProcesses.HANDWORK.outsourcing_enabled, true);
+  assert.equal(routeProcesses.PACKAGING.inhouse_enabled, true);
   assert.equal(
     plan.records.salesOrders.length,
     DEFAULT_SOURCE_DATA_SCALE.salesOrders,
@@ -231,6 +248,15 @@ test("manual acceptance source plan reaches every agreed pagination threshold", 
   assert.equal(
     plan.records.bomVersions.length,
     DEFAULT_SOURCE_DATA_SCALE.bomVersions,
+  );
+  assert.ok(
+    plan.records.bomVersions.every(
+      (bom) =>
+        bom.items[0]?.production_operation_code === "FABRIC_PROCESSING" &&
+        bom.items
+          .slice(1)
+          .every((item) => item.production_operation_code === undefined),
+    ),
   );
   assert.ok(plan.records.customers.some((item) => item.contacts.length === 0));
   assert.ok(plan.records.customers.some((item) => item.contacts.length === 1));
@@ -277,6 +303,58 @@ test("current V5 plans use short yoyoosun-style visible business numbers", () =>
     "YS5-WW-001",
   );
   assert.match(plan.records.bomVersions[0].version, /^YS5-BOM-/u);
+});
+
+test("outsourcing source plans satisfy the current contract readiness boundary", () => {
+  const plan = buildManualAcceptanceSourceDataPlan({
+    runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+    dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+  });
+
+  for (const order of plan.records.outsourcingOrders) {
+    assert.ok(order.expected_return_date);
+    assert.ok(order.contract_party_snapshot.buyerCompany);
+    assert.ok(order.contract_party_snapshot.buyerContact);
+    assert.ok(order.contract_party_snapshot.buyerPhone);
+    assert.ok(order.contract_party_snapshot.buyerAddress);
+    assert.ok(
+      order.supplier_snapshot.name || order.supplier_snapshot.short_name,
+    );
+    assert.ok(order.supplier_snapshot.contact_name);
+    assert.ok(
+      order.supplier_snapshot.contact_phone ||
+        order.supplier_snapshot.contact_mobile,
+    );
+    assert.ok(order.supplier_snapshot.address);
+    assert.ok(order.items.length > 0);
+    assert.equal(
+      order.items.every((item) => Boolean(item.processing_item?.trim())),
+      true,
+    );
+  }
+  const routedContracts = plan.records.outsourcingOrders
+    .flatMap((order) => order.items.map((item) => ({ order, item })))
+    .filter(({ item }) =>
+      Number.isInteger(item.acceptanceProductionCandidateOffset),
+    );
+  assert.deepEqual(
+    routedContracts.map(({ item }) => [
+      item.acceptanceProductionCandidateOffset,
+      item.subject_type,
+      item.processRef,
+      item.outsourcing_quantity,
+    ]),
+    [
+      [3, "MATERIAL", "YS5-GX-001", "0.600000"],
+      [4, "MATERIAL", "YS5-GX-001", "0.600000"],
+    ],
+  );
+  assert.ok(
+    routedContracts.every(
+      ({ order }) =>
+        order.targetStatus === "CONFIRMED" && order.items.length === 1,
+    ),
+  );
 });
 
 test("versioned source plans use a stable date anchor and semantic digest across targets", () => {
@@ -375,6 +453,22 @@ test("manual acceptance source plan covers supported business lifecycle states",
     ].sort(),
     ["material", "mixed", "outsourcing"],
   );
+  assert.equal(
+    plan.records.suppliers.every(
+      (item) =>
+        Number.isInteger(item.default_payment_term_days) &&
+        item.default_payment_term_days >= 0,
+    ),
+    true,
+  );
+  assert.deepEqual(
+    [
+      ...new Set(
+        plan.records.suppliers.map((item) => item.default_payment_term_days),
+      ),
+    ].sort((left, right) => left - right),
+    [0, 30, 45, 60],
+  );
 });
 
 test("status counts preserve inactive false values", () => {
@@ -427,6 +521,23 @@ test("persisted source content comparison normalizes dates and decimals but reje
         fields: ["snapshot"],
       }),
     /snapshot differs from dataVersion planned content/u,
+  );
+
+  const supplier = buildManualAcceptanceSourceDataPlan({
+    runId: "SUPPLIER-TERM-DRIFT",
+  }).records.suppliers[0];
+  assert.throws(
+    () =>
+      assertPersistedSourceRecord({
+        label: `supplier ${supplier.code}`,
+        expected: supplier,
+        actual: {
+          ...supplier,
+          default_payment_term_days: supplier.default_payment_term_days + 1,
+        },
+        fields: ["default_payment_term_days"],
+      }),
+    /default_payment_term_days differs from dataVersion planned content/u,
   );
 });
 
@@ -1015,6 +1126,286 @@ test("lifecycle mutations reject malformed or stale success payloads", () => {
   );
 });
 
+test("source-order actions reread the current version and send the exact formal envelope", async () => {
+  const plan = buildLocalSourceMutationPlan({
+    runId: "SOURCE-ACTION",
+    dataVersion: "SOURCE-ACTION",
+  });
+  const cases = [
+    ["sales_order", "close_sales_order", "ACTIVE", "CLOSED"],
+    ["sales_order", "cancel_sales_order", "DRAFT", "CANCELED"],
+    ["purchase_order", "close_purchase_order", "APPROVED", "CLOSED"],
+    ["purchase_order", "cancel_purchase_order", "DRAFT", "CANCELED"],
+    ["outsourcing_order", "submit_outsourcing_order", "DRAFT", "SUBMITTED"],
+    [
+      "outsourcing_order",
+      "confirm_outsourcing_order",
+      "SUBMITTED",
+      "CONFIRMED",
+    ],
+    ["outsourcing_order", "close_outsourcing_order", "CONFIRMED", "CLOSED"],
+    ["outsourcing_order", "cancel_outsourcing_order", "DRAFT", "CANCELED"],
+  ];
+
+  for (const [
+    offset,
+    [domain, method, currentStatus, expectedStatus],
+  ] of cases.entries()) {
+    const id = 401 + offset;
+    const version = 7 + offset;
+    const methods = [];
+    const fetchImpl = async (_url, init) => {
+      const body = JSON.parse(init.body);
+      methods.push(body.method);
+      if (body.method === `get_${domain}`) {
+        assert.deepEqual(body.params, {
+          customer_key: "yoyoosun",
+          id,
+        });
+        return ok({
+          [domain]: {
+            id,
+            lifecycle_status: currentStatus,
+            version,
+          },
+        });
+      }
+      assert.equal(body.method, method);
+      assert.equal(body.params.id, id);
+      assert.equal(body.params.expected_version, version);
+      assert.equal(
+        body.params.idempotency_key,
+        [
+          "manual-acceptance-source",
+          plan.runId,
+          domain,
+          id,
+          method,
+          `v${version}`,
+        ].join(":"),
+      );
+      if (method.startsWith("close_")) {
+        assert.equal(body.params.close_mode, "short");
+        assert.match(body.params.reason, /验收样例/u);
+      } else if (method.startsWith("cancel_")) {
+        assert.equal(Object.hasOwn(body.params, "close_mode"), false);
+        assert.match(body.params.reason, /验收样例/u);
+      } else {
+        assert.equal(Object.hasOwn(body.params, "close_mode"), false);
+        assert.equal(Object.hasOwn(body.params, "reason"), false);
+      }
+      return ok({
+        [domain]: {
+          id,
+          lifecycle_status: expectedStatus,
+          version: version + 1,
+        },
+      });
+    };
+
+    const updated = await applySourceOrderLifecycleAction({
+      plan,
+      token: "token-source",
+      fetchImpl,
+      domain,
+      id,
+      method,
+      currentStatus,
+      expectedStatus,
+    });
+    assert.equal(updated.lifecycle_status, expectedStatus);
+    assert.equal(updated.version, version + 1);
+    assert.deepEqual(methods, [`get_${domain}`, method]);
+  }
+});
+
+test("sales CLOSED fixtures finish their ProcessRuntime before the formal short close", async () => {
+  const plan = buildLocalSourceMutationPlan({
+    runId: "SALES-CLOSE",
+    dataVersion: "SALES-CLOSE",
+  });
+  const methods = [];
+  const task = {
+    id: 77,
+    version: 3,
+    task_code: "source-order-end-77",
+    task_group: "order_approval",
+    source_type: "sales_order",
+    source_id: 42,
+    task_status_key: "done",
+    owner_role_key: "boss",
+    process_instance_id: 101,
+    process_node_instance_id: 202,
+  };
+  const fetchImpl = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    methods.push(body.method);
+    if (body.method === "list_tasks") {
+      return ok({ tasks: [task], total: 1 });
+    }
+    if (body.method === "get_task_process_context") {
+      return ok({
+        process_context: {
+          source: { type: "sales_order", id: 42 },
+          process_instance: {
+            id: 101,
+            process_key: "sales_order_acceptance",
+            status: "completed",
+          },
+          nodes: [],
+          current_nodes: [],
+          completed_nodes: [],
+        },
+      });
+    }
+    if (body.method === "get_sales_order") {
+      return ok({
+        sales_order: {
+          id: 42,
+          lifecycle_status: "ACTIVE",
+          version: 9,
+        },
+      });
+    }
+    if (body.method === "close_sales_order") {
+      assert.equal(init.headers.Authorization, "Bearer token-sales");
+      assert.equal(body.params.expected_version, 9);
+      assert.equal(body.params.close_mode, "short");
+      assert.match(body.params.reason, /验收样例/u);
+      return ok({
+        sales_order: {
+          id: 42,
+          lifecycle_status: "CLOSED",
+          version: 10,
+        },
+      });
+    }
+    throw new Error(`unexpected method ${body.method}`);
+  };
+
+  assert.equal(
+    await advanceSalesOrderLifecycleThroughProcess({
+      plan,
+      record: { order_no: "SO-CLOSE-42", targetStatus: "CLOSED" },
+      item: { id: 42, lifecycle_status: "ACTIVE", version: 8 },
+      token: "token-admin",
+      roleTokens: { sales: "token-sales" },
+      fetchImpl,
+      report: { steps: [] },
+    }),
+    "CLOSED",
+  );
+  assert.deepEqual(methods, [
+    "list_tasks",
+    "list_tasks",
+    "get_task_process_context",
+    "get_sales_order",
+    "close_sales_order",
+  ]);
+});
+
+test("outsourcing actions consume a fresh version at every registered step", async () => {
+  const plan = buildLocalSourceMutationPlan({
+    runId: "OUTSOURCE-STEPS",
+    dataVersion: "OUTSOURCE-STEPS",
+  });
+  const lifecycleActions = {
+    CLOSED: [
+      { method: "submit_outsourcing_order", resultStatus: "SUBMITTED" },
+      { method: "confirm_outsourcing_order", resultStatus: "CONFIRMED" },
+      { method: "close_outsourcing_order", resultStatus: "CLOSED" },
+    ],
+  };
+  const states = [
+    { lifecycle_status: "DRAFT", version: 2 },
+    { lifecycle_status: "SUBMITTED", version: 3 },
+    { lifecycle_status: "CONFIRMED", version: 4 },
+  ];
+  const expectedVersions = [];
+  let readIndex = 0;
+  const fetchImpl = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    if (body.method === "get_outsourcing_order") {
+      const state = states[readIndex];
+      readIndex += 1;
+      return ok({ outsourcing_order: { id: 61, ...state } });
+    }
+    const step = lifecycleActions.CLOSED[expectedVersions.length];
+    assert.equal(body.method, step.method);
+    expectedVersions.push(body.params.expected_version);
+    return ok({
+      outsourcing_order: {
+        id: 61,
+        lifecycle_status: step.resultStatus,
+        version: body.params.expected_version + 1,
+      },
+    });
+  };
+
+  assert.equal(
+    await advanceOutsourcingOrderLifecycle({
+      plan,
+      token: "token-production",
+      fetchImpl,
+      item: { id: 61, lifecycle_status: "DRAFT", version: 2 },
+      current: "DRAFT",
+      target: "CLOSED",
+      lifecycleActions,
+    }),
+    "CLOSED",
+  );
+  assert.deepEqual(expectedVersions, [2, 3, 4]);
+  assert.equal(readIndex, 3);
+});
+
+test("outsourcing uses its bounded walker while BOM keeps the generic lifecycle path", () => {
+  const source = readFileSync(
+    new URL("./manual-acceptance-source-data.mjs", import.meta.url),
+    "utf8",
+  );
+  const sourceDocuments = source.slice(
+    source.indexOf("async function createSourceDocuments"),
+    source.indexOf("async function createBOMVersions"),
+  );
+  const salesLifecycle = source.slice(
+    source.indexOf(
+      "export async function advanceSalesOrderLifecycleThroughProcess",
+    ),
+    source.indexOf(
+      "export async function advancePurchaseOrderLifecycleThroughProcess",
+    ),
+  );
+  const purchaseLifecycle = source.slice(
+    source.indexOf(
+      "export async function advancePurchaseOrderLifecycleThroughProcess",
+    ),
+    source.indexOf("export function requireLifecycleMutationStatus"),
+  );
+  const bomVersions = source.slice(
+    source.indexOf("async function createBOMVersions"),
+    source.indexOf("function sortedReferenceWarehouses"),
+  );
+  assert.equal(
+    [...salesLifecycle.matchAll(/await applySourceOrderLifecycleAction\(\{/gu)]
+      .length,
+    2,
+  );
+  assert.equal(
+    [
+      ...purchaseLifecycle.matchAll(
+        /await applySourceOrderLifecycleAction\(\{/gu,
+      ),
+    ].length,
+    2,
+  );
+  assert.match(
+    sourceDocuments,
+    /advanceLifecycleFn: \(input\) =>\s+advanceOutsourcingOrderLifecycle/u,
+  );
+  assert.match(bomVersions, /await advanceLifecycle\(\{/u);
+  assert.doesNotMatch(bomVersions, /applySourceOrderLifecycleAction/u);
+});
+
 test("sales source lifecycle uses the formal acceptance process instead of removed direct methods", async () => {
   const plan = buildLocalSourceMutationPlan({
     runId: "FORMAL-SALES",
@@ -1097,6 +1488,7 @@ test("sales source lifecycle uses the formal acceptance process instead of remov
         sales_order: {
           id: 42,
           lifecycle_status: statusReads === 1 ? "SUBMITTED" : "ACTIVE",
+          version: statusReads + 1,
         },
       });
     }
@@ -1163,7 +1555,9 @@ test("sales source replay accepts only the exact downstream ProcessRuntime lifec
     .slice(0, 6);
   const report = { steps: [] };
   const fetchImpl = async () => {
-    throw new Error("exact replay readback must not issue a lifecycle mutation");
+    throw new Error(
+      "exact replay readback must not issue a lifecycle mutation",
+    );
   };
 
   assert.equal(
@@ -1272,6 +1666,7 @@ test("persisted outsourcing lines retain exact formal source references", () => 
         subject_type: "PRODUCT",
         productRef: "P-1",
         processRef: "PROC-1",
+        acceptanceProductionCandidateOffset: 3,
       },
     ],
     actualItems: [
@@ -1305,6 +1700,7 @@ test("persisted outsourcing lines retain exact formal source references", () => 
       processId: 401,
       unitId: 301,
       quantity: "112",
+      acceptanceProductionCandidateOffset: 3,
     },
   ]);
   assert.throws(
@@ -1465,6 +1861,7 @@ test("source report exposes read-back candidates but blocks every Fact phase mis
             unit_id: 1005,
             quantity: "0.2",
             loss_rate: "0",
+            production_operation_code: "FABRIC_PROCESSING",
           },
         ],
       },
@@ -1516,6 +1913,11 @@ test("source report exposes read-back candidates but blocks every Fact phase mis
     sourceDrivenFacts.sourceCandidates.production.item.unitPrice,
     "12.50",
   );
+  assert.equal(
+    sourceDrivenFacts.sourceCandidates.production.bom.items[0]
+      .productionOperationCode,
+    "FABRIC_PROCESSING",
+  );
   assert.equal(sourceDrivenFacts.sourceCandidates.sales.order.customerId, 5001);
   assert.equal(
     sourceDrivenFacts.sourceCandidates.sales.order.paymentTermDays,
@@ -1562,6 +1964,7 @@ test("partial draft BOMs resume missing lines while settled BOMs fail closed", (
         quantity: "1.2",
         loss_rate: "0.03",
         position: "面料",
+        production_operation_code: "FABRIC_PROCESSING",
       },
       {
         materialRef: "M-2",
@@ -1578,6 +1981,7 @@ test("partial draft BOMs resume missing lines while settled BOMs fail closed", (
         quantity: "1.20",
         loss_rate: "0.030",
         position: "面料",
+        production_operation_code: "FABRIC_PROCESSING",
       },
     ],
     materialIds: new Map([
@@ -1599,6 +2003,16 @@ test("partial draft BOMs resume missing lines while settled BOMs fail closed", (
       planBOMItemReconciliation({
         ...input,
         actualItems: [{ ...input.actualItems[0], quantity: "9" }],
+      }),
+    /persisted BOM line differs/u,
+  );
+  assert.throws(
+    () =>
+      planBOMItemReconciliation({
+        ...input,
+        actualItems: [
+          { ...input.actualItems[0], production_operation_code: null },
+        ],
       }),
     /persisted BOM line differs/u,
   );

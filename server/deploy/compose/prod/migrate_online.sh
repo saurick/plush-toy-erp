@@ -14,10 +14,14 @@ COMPOSE_ENV_FILE=$(printenv COMPOSE_ENV_FILE 2>/dev/null || true)
 SERVER_ROOT=$(CDPATH='' cd -- "$SCRIPT_DIR/../../.." && pwd -P)
 MIG_DIR="${MIG_DIR:-$SERVER_ROOT/internal/data/model/migrate}"
 ATLAS_BIN="${ATLAS_BIN:-/usr/local/bin/atlas}"
+ATLAS_REQUIRED_VERSION="${ATLAS_REQUIRED_VERSION:-v0.38.0}"
 POSTGRES_SERVICE="${POSTGRES_SERVICE:-postgres}"
 APP_SERVICE="${APP_SERVICE:-app-server}"
 POSTGRES_HOST="${POSTGRES_HOST:-127.0.0.1}"
 MIGRATION_LOCK_FILE="${MIGRATION_LOCK_FILE:-/run/lock/plush-toy-erp/atlas-migrate.lock}"
+EXPECTED_MIGRATION_SEQUENCE_SHA256=$(printenv EXPECTED_MIGRATION_SEQUENCE_SHA256 2>/dev/null || true)
+RELEASE_SHA=$(printenv RELEASE_SHA 2>/dev/null || true)
+APPLICATION_IMAGE_DIGEST=$(printenv APPLICATION_IMAGE_DIGEST 2>/dev/null || true)
 
 POPULATED_UPGRADE_PREFLIGHT=$(printenv POPULATED_UPGRADE_PREFLIGHT 2>/dev/null || true)
 [ -n "$POPULATED_UPGRADE_PREFLIGHT" ] ||
@@ -31,6 +35,7 @@ fi
 
 APPLY_MODE=0
 STATUS_ONLY=0
+RECONCILE_PERMISSIONS=0
 TRIAL_MODE=0
 TRIAL_COMPOSE_PROJECT=plush-toy-erp-v5
 TRIAL_POSTGRES_DB=plush_erp_uat_20260716_v5
@@ -52,12 +57,13 @@ fail() {
 usage() {
   cat <<'EOF'
 用法:
-  sh migrate_online.sh [--apply] [--status-only] [--help]
+  sh migrate_online.sh [--apply] [--status-only] [--reconcile-permissions] [--help]
 
 行为:
-  默认执行: status + 055504 存量升级审计 + 055825 客户配置切换审计 + dry-run
-  --apply:  执行上述两项只读审计 + dry-run + 正式 apply
+  默认执行: 目录冻结/校验 + status + 三项只读审计 + dry-run + 事务回滚预演
+  --apply:  在停写确认后 reconcile 权限，再执行上述检查 + tx-mode=all apply + 完整读回
   --status-only: 仅查看当前迁移状态
+  --reconcile-permissions: 停写窗口内先对账角色/Owner/Grant，再执行所选只读或 apply 流程
 
 可选环境变量:
   COMPOSE_FILE   compose 文件路径（默认同目录 compose.yml）
@@ -70,6 +76,8 @@ usage() {
   POSTGRES_SERVICE  compose 里的 Postgres 服务名（默认 postgres）
   APP_SERVICE    compose 里的后端服务名（默认 app-server）；正式 apply 时必须已停止
   ATLAS_BIN      宿主机 Atlas 二进制路径（默认 /usr/local/bin/atlas）
+  ATLAS_REQUIRED_VERSION
+                 固定 Atlas 版本（默认 v0.38.0）
   POSTGRES_HOST  宿主机访问 PostgreSQL 的地址（默认 127.0.0.1）
   POSTGRES_HOST_PORT  宿主机映射的 PostgreSQL 端口（未设置时从容器端口绑定推导）
   MIGRATION_LOCK_FILE 迁移整段串行锁文件（默认 /run/lock/plush-toy-erp/atlas-migrate.lock）
@@ -80,6 +88,10 @@ usage() {
                  migration 只读审计脚本（默认仓库 scripts/qa 入口）
   MIGRATION_MAINTENANCE_CONFIRMED
                  正式 apply 必须显式设为 1，确认已进入停写维护窗口
+  EXPECTED_MIGRATION_SEQUENCE_SHA256
+                 Release manifest 中的 migration sequence hash；提供时必须与冻结目录一致
+  RELEASE_SHA / APPLICATION_IMAGE_DIGEST
+                 可选的固定发布身份，只写入脱敏 migration receipt
 EOF
 }
 
@@ -90,6 +102,9 @@ while [ $# -gt 0 ]; do
     ;;
   --status-only)
     STATUS_ONLY=1
+    ;;
+  --reconcile-permissions)
+    RECONCILE_PERMISSIONS=1
     ;;
   --help | -h)
     usage
@@ -103,6 +118,10 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
+
+if [ "$APPLY_MODE" -eq 1 ] && [ "$STATUS_ONLY" -eq 1 ]; then
+  fail "--apply 与 --status-only 不能同时使用"
+fi
 
 if [ ! -f "$COMPOSE_FILE" ]; then
   echo "ERROR: compose 文件不存在: $COMPOSE_FILE" >&2
@@ -231,14 +250,30 @@ validate_trial_compose_inputs() {
   require_trial_env_value POSTGRES_DB plush_erp_uat_20260716_v5
   require_trial_env_value ERP_ALLOW_CUSTOMER_TRIAL_CONFIG 1
   require_trial_env_value ERP_CUSTOMER_TRIAL_TARGET customer-trial-133
+  trial_admin_password=$(trial_env_value POSTGRES_PASSWORD)
+  trial_app_password=$(trial_env_value POSTGRES_APP_PASSWORD)
+  trial_migrator_password=$(trial_env_value POSTGRES_MIGRATOR_PASSWORD)
+  trial_backup_password=$(trial_env_value POSTGRES_BACKUP_PASSWORD)
+  for role_password in "$trial_app_password" "$trial_migrator_password" "$trial_backup_password"; do
+    case "$role_password" in
+    "" | *[!A-Za-z0-9._~-]*) fail "customer-trial-133 数据库角色密码必须是 20-128 位 URL-safe 值" ;;
+    esac
+    [ "${#role_password}" -ge 20 ] && [ "${#role_password}" -le 128 ] ||
+      fail "customer-trial-133 数据库角色密码必须是 20-128 位 URL-safe 值"
+  done
+  [ "$trial_app_password" != "$trial_migrator_password" ] &&
+    [ "$trial_app_password" != "$trial_backup_password" ] &&
+    [ "$trial_migrator_password" != "$trial_backup_password" ] &&
+    [ "$trial_admin_password" != "$trial_app_password" ] &&
+    [ "$trial_admin_password" != "$trial_migrator_password" ] &&
+    [ "$trial_admin_password" != "$trial_backup_password" ] ||
+    fail "customer-trial-133 管理员、应用、迁移和备份密码必须彼此不同"
   require_trial_env_value POSTGRES_BIND_ADDR 127.0.0.1
   require_trial_env_value APP_HTTP_BIND_ADDR 127.0.0.1
-  require_trial_env_value APP_GRPC_BIND_ADDR 127.0.0.1
   require_trial_env_value WEB_DESKTOP_BIND_ADDR 127.0.0.1
   for port_contract in \
     POSTGRES_PORT=55435 \
     APP_HTTP_PORT=8315 \
-    APP_GRPC_PORT=9315 \
     WEB_DESKTOP_PORT=5185 \
     JAEGER_5775_PORT=45775 \
     JAEGER_6831_PORT=46831 \
@@ -284,6 +319,24 @@ if ! command -v "$ATLAS_BIN" >/dev/null 2>&1; then
   echo "ERROR: 未找到宿主机 Atlas: $ATLAS_BIN" >&2
   echo "请先在服务器安装 Atlas 到 /usr/local/bin/atlas，不要使用 arigaio/atlas 容器执行线上迁移。" >&2
   exit 1
+fi
+
+ATLAS_VERSION_OUTPUT=$("$ATLAS_BIN" version 2>&1) || fail "无法读取 Atlas 版本"
+printf '%s\n' "$ATLAS_VERSION_OUTPUT" |
+  grep -Eq "(^|[[:space:]])${ATLAS_REQUIRED_VERSION}([[:space:]]|$)" ||
+  fail "Atlas 版本必须固定为 ${ATLAS_REQUIRED_VERSION}"
+
+for required_command in "$PSQL_BIN" jq; do
+  command -v "$required_command" >/dev/null 2>&1 ||
+    fail "缺少 migration 必需命令: $required_command"
+done
+
+if command -v sha256sum >/dev/null 2>&1; then
+  SHA256_TOOL=sha256sum
+elif command -v shasum >/dev/null 2>&1; then
+  SHA256_TOOL="shasum -a 256"
+else
+  fail "缺少 sha256sum 或 shasum"
 fi
 
 if ! command -v flock >/dev/null 2>&1; then
@@ -407,6 +460,101 @@ exec 9>>"$MIGRATION_LOCK_FILE"
 flock 9
 echo "==> 已取得 migration 串行锁"
 
+[ -z "$EXPECTED_MIGRATION_SEQUENCE_SHA256" ] ||
+  printf '%s' "$EXPECTED_MIGRATION_SEQUENCE_SHA256" | grep -Eq '^[0-9a-f]{64}$' ||
+  fail "EXPECTED_MIGRATION_SEQUENCE_SHA256 格式非法"
+[ -z "$RELEASE_SHA" ] || printf '%s' "$RELEASE_SHA" | grep -Eq '^[0-9a-f]{40}$' ||
+  fail "RELEASE_SHA 必须是 40 位小写 Git SHA"
+[ -z "$APPLICATION_IMAGE_DIGEST" ] ||
+  printf '%s' "$APPLICATION_IMAGE_DIGEST" | grep -Eq '^sha256:[0-9a-f]{64}$' ||
+  fail "APPLICATION_IMAGE_DIGEST 必须是 sha256 digest"
+
+hash_stdin() {
+  if [ "$SHA256_TOOL" = "sha256sum" ]; then
+    sha256sum | awk '{print $1}'
+  else
+    shasum -a 256 | awk '{print $1}'
+  fi
+}
+
+hash_file() {
+  if [ "$SHA256_TOOL" = "sha256sum" ]; then
+    sha256sum "$1" | awk '{print $1}'
+  else
+    shasum -a 256 "$1" | awk '{print $1}'
+  fi
+}
+
+MIGRATION_RUN_DIR=$(mktemp -d "$lock_dir/migration-run.XXXXXX") ||
+  fail "无法创建私有 migration 工作目录"
+chmod 700 "$MIGRATION_RUN_DIR"
+MIGRATION_SNAPSHOT_DIR=$MIGRATION_RUN_DIR/migrations
+mkdir -m 700 "$MIGRATION_SNAPSHOT_DIR"
+RECEIPT_DIR=$lock_dir/receipts
+mkdir -p "$RECEIPT_DIR"
+chmod 700 "$RECEIPT_DIR"
+RECEIPT_FILE=$RECEIPT_DIR/$(date -u +%Y%m%dT%H%M%SZ)-$$.receipt
+STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+MIGRATION_OUTCOME=not_applied
+MIGRATION_SEQUENCE_SHA256=unknown
+ATLAS_SUM_SHA256=unknown
+PRE_VERSION=unknown
+POST_VERSION=unknown
+PENDING_COUNT=unknown
+DATABASE_SYSTEM_IDENTIFIER=unknown
+DATABASE_NAME_RECEIPT=unknown
+DATABASE_USER_RECEIPT=unknown
+DATABASE_SERVER_ADDRESS=unknown
+DATABASE_SERVER_PORT=unknown
+POSTGRES_VERSION_RECEIPT=unknown
+PREFLIGHT_RESULT=not_run
+ROLLBACK_REHEARSAL_RESULT=not_run
+APPLY_RESULT=not_run
+SCHEMA_READBACK_RESULT=not_run
+PROGRAMMABILITY_RESULT=not_run
+PERMISSION_RESULT=not_run
+
+finalize_migration_run() {
+  exit_code=$?
+  trap - EXIT INT TERM
+  set +e
+  FINISHED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  RECEIPT_TMP=$RECEIPT_FILE.tmp
+  cat >"$RECEIPT_TMP" <<EOF
+schema_version=plush.migration-receipt/v1
+outcome=$MIGRATION_OUTCOME
+release_sha=${RELEASE_SHA:-unknown}
+application_image_digest=${APPLICATION_IMAGE_DIGEST:-unknown}
+database_system_identifier=$DATABASE_SYSTEM_IDENTIFIER
+database_name=$DATABASE_NAME_RECEIPT
+database_user=$DATABASE_USER_RECEIPT
+server_address=$DATABASE_SERVER_ADDRESS
+server_port=$DATABASE_SERVER_PORT
+atlas_version=$ATLAS_REQUIRED_VERSION
+postgresql_version=$POSTGRES_VERSION_RECEIPT
+migration_sequence_sha256=$MIGRATION_SEQUENCE_SHA256
+atlas_sum_sha256=$ATLAS_SUM_SHA256
+pre_version=$PRE_VERSION
+post_version=$POST_VERSION
+pending_count=$PENDING_COUNT
+preflight_result=$PREFLIGHT_RESULT
+rollback_rehearsal_result=$ROLLBACK_REHEARSAL_RESULT
+apply_result=$APPLY_RESULT
+schema_readback_result=$SCHEMA_READBACK_RESULT
+programmability_result=$PROGRAMMABILITY_RESULT
+permission_result=$PERMISSION_RESULT
+started_at=$STARTED_AT
+finished_at=$FINISHED_AT
+EOF
+  chmod 600 "$RECEIPT_TMP"
+  mv "$RECEIPT_TMP" "$RECEIPT_FILE"
+  rm -rf -- "$MIGRATION_RUN_DIR"
+  printf '==> migration receipt: %s\n' "$RECEIPT_FILE"
+  exit "$exit_code"
+}
+trap finalize_migration_run EXIT INT TERM
+
 compose() {
   if docker compose version >/dev/null 2>&1; then
     if [ "$TRIAL_MODE" -eq 1 ]; then
@@ -450,11 +598,11 @@ if [ "$TRIAL_MODE" -eq 1 ]; then
   if [ -n "$APP_CID" ]; then
     validate_trial_container_identity "$APP_CID" "plush-toy-erp-v5-server" app-server
   fi
-elif [ "$APPLY_MODE" -eq 1 ]; then
+elif [ "$APPLY_MODE" -eq 1 ] || [ "$RECONCILE_PERMISSIONS" -eq 1 ]; then
   APP_CID=$(compose ps -q "$APP_SERVICE" 2>/dev/null | head -n1 || true)
 fi
 
-if [ "$APPLY_MODE" -eq 1 ]; then
+if [ "$APPLY_MODE" -eq 1 ] || [ "$RECONCILE_PERMISSIONS" -eq 1 ]; then
   if [ "${MIGRATION_MAINTENANCE_CONFIRMED:-}" != "1" ]; then
     echo "ERROR: 正式 migration apply 必须先停止业务写入，并设置 MIGRATION_MAINTENANCE_CONFIRMED=1。" >&2
     exit 1
@@ -510,17 +658,25 @@ if [ -z "${POSTGRES_CID:-}" ]; then
   exit 1
 fi
 
+if [ "$APPLY_MODE" -eq 1 ] || [ "$RECONCILE_PERMISSIONS" -eq 1 ]; then
+  echo "==> 对账数据库角色、Owner 和 Grant"
+  docker exec "$POSTGRES_CID" /usr/local/bin/plush-database-roles reconcile
+else
+  docker exec "$POSTGRES_CID" /usr/local/bin/plush-database-roles verify
+fi
+PERMISSION_RESULT=verified
+
 if [ -z "${DB_URL:-}" ]; then
   if [ "$TRIAL_MODE" -eq 1 ]; then
     DB_NAME=$TRIAL_RUNTIME_DB_NAME
   else
     DB_NAME=$(docker exec "$POSTGRES_CID" sh -lc 'printf "%s" "$POSTGRES_DB"')
   fi
-  DB_PASS_RAW=$(docker exec "$POSTGRES_CID" sh -lc 'printf "%s" "$POSTGRES_PASSWORD"')
-  DB_USER=$(docker exec "$POSTGRES_CID" sh -lc 'printf "%s" "$POSTGRES_USER"')
+  DB_PASS_RAW=$(docker exec "$POSTGRES_CID" sh -lc 'printf "%s" "$POSTGRES_MIGRATOR_PASSWORD"')
+  DB_USER=erp_migrator
 
   if [ -z "${DB_NAME:-}" ] || [ -z "${DB_PASS_RAW:-}" ] || [ -z "${DB_USER:-}" ]; then
-    echo "ERROR: 无法从 Postgres 容器读取 POSTGRES_DB / POSTGRES_PASSWORD / POSTGRES_USER" >&2
+    echo "ERROR: 无法从 Postgres 容器读取 POSTGRES_DB / POSTGRES_MIGRATOR_PASSWORD" >&2
     exit 1
   fi
 
@@ -535,9 +691,89 @@ if [ -z "${DB_URL:-}" ]; then
   DB_URL="postgres://${DB_USER_ENC}:${DB_PASS_ENC}@${POSTGRES_HOST}:${POSTGRES_HOST_PORT}/${DB_NAME}?sslmode=disable"
 fi
 
-atlas_run() {
-  "$ATLAS_BIN" "$@"
+if find "$MIG_DIR" -maxdepth 1 -type l -print -quit | grep -q .; then
+  fail "migration 目录不得包含符号链接"
+fi
+cp "$MIG_DIR"/*.sql "$MIGRATION_SNAPSHOT_DIR/"
+cp "$MIG_DIR/atlas.sum" "$MIGRATION_SNAPSHOT_DIR/atlas.sum"
+
+MIGRATION_SEQUENCE_SHA256=$(
+  find "$MIGRATION_SNAPSHOT_DIR" -maxdepth 1 -type f -name '*.sql' -print |
+    LC_ALL=C sort |
+    while IFS= read -r migration_file; do
+      relative_path=server/internal/data/model/migrate/$(basename -- "$migration_file")
+      printf '%s\0' "$relative_path"
+      cat "$migration_file"
+      printf '\0'
+    done |
+    hash_stdin
+)
+ATLAS_SUM_SHA256=$(hash_file "$MIGRATION_SNAPSHOT_DIR/atlas.sum")
+if [ -n "$EXPECTED_MIGRATION_SEQUENCE_SHA256" ] &&
+  [ "$MIGRATION_SEQUENCE_SHA256" != "$EXPECTED_MIGRATION_SEQUENCE_SHA256" ]; then
+  fail "冻结 migration 序列与 Release manifest 不一致"
+fi
+
+ATLAS_CONFIG_FILE=$MIGRATION_RUN_DIR/atlas.hcl
+cat >"$ATLAS_CONFIG_FILE" <<EOF
+env "runtime" {
+  url = getenv("ATLAS_DATABASE_URL")
+  migration {
+    dir = "file://$MIGRATION_SNAPSHOT_DIR"
+  }
 }
+EOF
+chmod 600 "$ATLAS_CONFIG_FILE"
+
+atlas_migrate() {
+  ATLAS_DATABASE_URL="$DB_URL" "$ATLAS_BIN" migrate "$@" \
+    --config "file://$ATLAS_CONFIG_FILE" --env runtime \
+    --dir "file://$MIGRATION_SNAPSHOT_DIR"
+}
+
+atlas_schema_inspect() {
+  ATLAS_DATABASE_URL="$DB_URL" "$ATLAS_BIN" schema inspect \
+    --config "file://$ATLAS_CONFIG_FILE" --env runtime \
+    --exclude atlas_schema_revisions --format '{{ sql . }}'
+}
+
+EXPECTED_DB_NAME=$(docker exec "$POSTGRES_CID" sh -lc 'printf "%s" "$POSTGRES_DB"')
+IDENTITY_ROW=$(
+  PGDATABASE="$DB_URL" "$PSQL_BIN" -X --no-psqlrc -A -t -F '|' \
+    --set ON_ERROR_STOP=1 -c "
+SELECT
+  current_database(),
+  current_user,
+  COALESCE(inet_server_addr()::text, 'local'),
+  COALESCE(inet_server_port()::text, 'local'),
+  current_setting('server_version_num'),
+  role.rolsuper,
+  role.rolcreatedb,
+  role.rolcreaterole,
+  role.rolbypassrls
+FROM pg_roles AS role
+WHERE role.rolname = current_user;"
+)
+[ "$(printf '%s\n' "$IDENTITY_ROW" | wc -l | awk '{print $1}')" = "1" ] ||
+  fail "目标数据库身份输出无法识别"
+DATABASE_NAME_RECEIPT=$(printf '%s' "$IDENTITY_ROW" | awk -F'|' '{print $1}')
+DATABASE_USER_RECEIPT=$(printf '%s' "$IDENTITY_ROW" | awk -F'|' '{print $2}')
+DATABASE_SERVER_ADDRESS=$(printf '%s' "$IDENTITY_ROW" | awk -F'|' '{print $3}')
+DATABASE_SERVER_PORT=$(printf '%s' "$IDENTITY_ROW" | awk -F'|' '{print $4}')
+POSTGRES_VERSION_RECEIPT=$(printf '%s' "$IDENTITY_ROW" | awk -F'|' '{print $5}')
+ROLE_FLAGS=$(printf '%s' "$IDENTITY_ROW" | awk -F'|' '{print $6 "|" $7 "|" $8 "|" $9}')
+[ "$DATABASE_NAME_RECEIPT" = "$EXPECTED_DB_NAME" ] ||
+  fail "目标数据库名称与 Compose 合同不一致"
+[ "$DATABASE_USER_RECEIPT" = "erp_migrator" ] ||
+  fail "migration 必须使用 erp_migrator"
+[ "$ROLE_FLAGS" = "f|f|f|f" ] ||
+  fail "erp_migrator 不得拥有 superuser/createdb/createrole/bypassrls"
+printf '%s' "$POSTGRES_VERSION_RECEIPT" | grep -Eq '^18[0-9]{4}$' ||
+  fail "目标 PostgreSQL major 必须是 18"
+DATABASE_SYSTEM_IDENTIFIER=$(docker exec "$POSTGRES_CID" sh -ceu \
+  'psql -X --no-psqlrc -A -t -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT system_identifier FROM pg_control_system()"')
+printf '%s' "$DATABASE_SYSTEM_IDENTIFIER" | grep -Eq '^[0-9]+$' ||
+  fail "无法读取目标 PostgreSQL system_identifier"
 
 run_migration_preflight() {
   audit=$1
@@ -557,6 +793,160 @@ run_migration_preflight() {
     --username "$DB_USER"
 }
 
+read_status_json() {
+  status_file=$1
+  atlas_migrate status --format '{{ json . }}' >"$status_file"
+  jq -e '
+    (.Status | type == "string") and
+    (.Current | type == "string") and
+    (.Next | type == "string") and
+    (.Available | type == "array") and
+    (.Applied | type == "array")
+  ' "$status_file" >/dev/null || fail "Atlas migration status JSON 无法识别"
+}
+
+status_current_version() {
+  jq -r '.Current // ""' "$1"
+}
+
+status_pending_count() {
+  jq -r '((.Available // []) | length) - ((.Applied // []) | length)' "$1"
+}
+
+print_status_summary() {
+  status_file=$1
+  status_value=$(jq -r '.Status' "$status_file")
+  current_value=$(status_current_version "$status_file")
+  pending_value=$(status_pending_count "$status_file")
+  [ -n "$current_value" ] || current_value=none
+  printf 'Migration Status: %s\n' "$status_value"
+  printf '  -- Current Version: %s\n' "$current_value"
+  printf '  -- Pending Files:   %s\n' "$pending_value"
+}
+
+write_pending_versions() {
+  jq -r '
+    (.Applied // [] | map(.Version)) as $applied
+    | (.Available // [])[]?.Version as $version
+    | select(($applied | index($version)) == null)
+    | $version
+  ' "$1" >"$2"
+  while IFS= read -r version; do
+    printf '%s' "$version" | grep -Eq '^[0-9]{14}$' ||
+      fail "Atlas pending migration version 格式非法"
+  done <"$2"
+}
+
+assert_rehearsal_safe() {
+  migration_file=$1
+  visible_sql=$MIGRATION_RUN_DIR/visible-sql.tmp
+  sed -E '/^[[:space:]]*--/d; s/--.*$//' "$migration_file" >"$visible_sql"
+  if grep -Eiq '\b(CREATE|DROP)[[:space:]]+INDEX[[:space:]]+CONCURRENTLY\b' "$visible_sql"; then
+    fail "pending migration 包含 concurrent index，必须走独立非事务 runbook"
+  fi
+  if grep -Eiq '\b(VACUUM|ALTER[[:space:]]+SYSTEM)\b|\b(CREATE|DROP)[[:space:]]+DATABASE\b|\bCOPY\b.*\bPROGRAM\b' "$visible_sql"; then
+    fail "pending migration 含不能安全回滚预演的数据库操作"
+  fi
+  if grep -Eiq '^[[:space:]]*(COMMIT|ROLLBACK|END[[:space:]]+TRANSACTION)\b' "$visible_sql"; then
+    fail "pending migration 不得自行控制事务"
+  fi
+}
+
+run_rollback_rehearsal() {
+  pending_versions_file=$1
+  rehearsal_sql=$MIGRATION_RUN_DIR/rollback-rehearsal.sql
+  : >"$rehearsal_sql"
+  chmod 600 "$rehearsal_sql"
+  {
+    printf '%s\n' 'BEGIN;'
+    printf "%s\n" "SET LOCAL lock_timeout = '5s';"
+    printf "%s\n" "SET LOCAL statement_timeout = '120s';"
+    while IFS= read -r version; do
+      matches=$(find "$MIGRATION_SNAPSHOT_DIR" -maxdepth 1 -type f -name "${version}_*.sql" -print)
+      [ "$(printf '%s\n' "$matches" | awk 'NF {count++} END {print count + 0}')" = "1" ] ||
+        fail "pending migration 未唯一匹配冻结 SQL: $version"
+      assert_rehearsal_safe "$matches"
+      printf '\n-- rehearsal: %s\n' "$(basename -- "$matches")"
+      cat "$matches"
+      printf '\n'
+    done <"$pending_versions_file"
+    cat <<'SQL'
+SELECT
+  'database_programmability='
+  || count(*) FILTER (WHERE object_kind = 'function')::text
+  || '|'
+  || count(*) FILTER (WHERE object_kind = 'procedure')::text
+  || '|'
+  || count(*) FILTER (WHERE object_kind = 'trigger')::text
+FROM (
+  SELECT CASE routine.prokind WHEN 'p' THEN 'procedure' ELSE 'function' END AS object_kind
+  FROM pg_proc AS routine
+  JOIN pg_namespace AS namespace ON namespace.oid = routine.pronamespace
+  WHERE namespace.nspname <> 'information_schema'
+    AND namespace.nspname !~ '^pg_'
+    AND routine.prokind IN ('f', 'p')
+  UNION ALL
+  SELECT 'trigger'
+  FROM pg_trigger AS trigger
+  JOIN pg_class AS relation ON relation.oid = trigger.tgrelid
+  JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+  WHERE namespace.nspname <> 'information_schema'
+    AND namespace.nspname !~ '^pg_'
+    AND NOT trigger.tgisinternal
+) AS forbidden_object;
+ROLLBACK;
+SQL
+  } >"$rehearsal_sql"
+
+  rehearsal_output=$MIGRATION_RUN_DIR/rollback-rehearsal.out
+  PGDATABASE="$DB_URL" "$PSQL_BIN" -X --no-psqlrc --set ON_ERROR_STOP=1 \
+    --file "$rehearsal_sql" >"$rehearsal_output"
+  grep -Eq '^ROLLBACK$' "$rehearsal_output" ||
+    fail "migration 事务预演没有取得 ROLLBACK 回执"
+  grep -Eq 'database_programmability=0\|0\|0' "$rehearsal_output" ||
+    fail "migration 事务预演产生了禁止的数据库可编程对象"
+  ROLLBACK_REHEARSAL_RESULT=passed
+}
+
+verify_programmability() {
+  result=$(
+    PGDATABASE="$DB_URL" "$PSQL_BIN" -X --no-psqlrc -A -t \
+      --set ON_ERROR_STOP=1 -c "
+SELECT
+  count(*) FILTER (WHERE object_kind = 'function')::text
+  || '|'
+  || count(*) FILTER (WHERE object_kind = 'procedure')::text
+  || '|'
+  || count(*) FILTER (WHERE object_kind = 'trigger')::text
+FROM (
+  SELECT CASE routine.prokind WHEN 'p' THEN 'procedure' ELSE 'function' END AS object_kind
+  FROM pg_proc AS routine
+  JOIN pg_namespace AS namespace ON namespace.oid = routine.pronamespace
+  WHERE namespace.nspname <> 'information_schema'
+    AND namespace.nspname !~ '^pg_'
+    AND routine.prokind IN ('f', 'p')
+  UNION ALL
+  SELECT 'trigger'
+  FROM pg_trigger AS trigger
+  JOIN pg_class AS relation ON relation.oid = trigger.tgrelid
+  JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+  WHERE namespace.nspname <> 'information_schema'
+    AND namespace.nspname !~ '^pg_'
+    AND NOT trigger.tgisinternal
+) AS forbidden_object;"
+  )
+  [ "$result" = "0|0|0" ] || fail "数据库含自定义 Function、Procedure 或非内部 Trigger"
+  PROGRAMMABILITY_RESULT=passed
+}
+
+capture_schema_readback() {
+  schema_file=$MIGRATION_RUN_DIR/schema-readback.sql
+  atlas_schema_inspect >"$schema_file"
+  [ -s "$schema_file" ] || fail "数据库 schema readback 为空"
+  schema_hash=$(hash_file "$schema_file")
+  SCHEMA_READBACK_RESULT="captured:$schema_hash"
+}
+
 echo "==> 迁移目录: $MIG_DIR"
 echo "==> compose 文件: $COMPOSE_FILE"
 if [ "$TRIAL_MODE" -eq 1 ]; then
@@ -565,27 +955,98 @@ if [ "$TRIAL_MODE" -eq 1 ]; then
   echo "==> compose project: $TRIAL_COMPOSE_PROJECT"
 fi
 echo "==> Postgres 容器: $POSTGRES_CID"
-echo "==> Atlas: $ATLAS_BIN"
+echo "==> Atlas: $ATLAS_BIN ($ATLAS_REQUIRED_VERSION)"
+echo "==> migration sequence: $MIGRATION_SEQUENCE_SHA256"
 
-echo "==> [1/5] 查看当前迁移状态"
-atlas_run migrate status --dir "file://$MIG_DIR" --url "$DB_URL"
+echo "==> [1/8] 校验冻结 migration 目录"
+"$ATLAS_BIN" migrate validate --dir "file://$MIGRATION_SNAPSHOT_DIR"
+
+echo "==> [2/8] 查看当前迁移状态"
+PRE_STATUS_FILE=$MIGRATION_RUN_DIR/pre-status.json
+read_status_json "$PRE_STATUS_FILE"
+print_status_summary "$PRE_STATUS_FILE"
+PRE_VERSION=$(status_current_version "$PRE_STATUS_FILE")
+[ -n "$PRE_VERSION" ] || PRE_VERSION=none
+PENDING_COUNT=$(status_pending_count "$PRE_STATUS_FILE")
+printf '%s' "$PENDING_COUNT" | grep -Eq '^[0-9]+$' || fail "pending migration 数量非法"
+APPLY_NEEDED=0
+[ "$PENDING_COUNT" -eq 0 ] || APPLY_NEEDED=1
+PENDING_VERSIONS_FILE=$MIGRATION_RUN_DIR/pending-versions.txt
+write_pending_versions "$PRE_STATUS_FILE" "$PENDING_VERSIONS_FILE"
 
 if [ "$STATUS_ONLY" -eq 1 ]; then
+  verify_programmability
+  capture_schema_readback
+  POST_VERSION=$PRE_VERSION
   exit 0
 fi
 
-echo "==> [2/5] 只读审计 20260714055504 存量升级边界"
+PREFLIGHT_RESULT=failed
+echo "==> [3/8] 只读审计 20260714055504 存量升级边界"
 run_migration_preflight populated-upgrade
 
-echo "==> [3/5] 只读审计 20260714055825 客户配置切换边界"
+echo "==> [4/8] 只读审计 20260714055825 客户配置切换边界"
 run_migration_preflight customer-config-cutover
 
-echo "==> [4/5] dry-run 预演"
-atlas_run migrate apply --dry-run --dir "file://$MIG_DIR" --url "$DB_URL"
+echo "==> [5/8] 只读审计关键数据库约束存量边界"
+run_migration_preflight database-constraints
+PREFLIGHT_RESULT=passed
+
+echo "==> [6/8] tx-mode=all dry-run"
+DRY_RUN_FILE=$MIGRATION_RUN_DIR/dry-run.sql
+atlas_migrate apply --dry-run --tx-mode all >"$DRY_RUN_FILE"
+cat "$DRY_RUN_FILE"
+
+if [ "$PENDING_COUNT" -gt 0 ]; then
+  echo "==> [7/8] pending SQL 事务回滚预演"
+  run_rollback_rehearsal "$PENDING_VERSIONS_FILE"
+  MIGRATION_OUTCOME=rolled_back
+else
+  echo "==> [7/8] 无 pending migration，跳过事务回滚预演"
+  ROLLBACK_REHEARSAL_RESULT=not_required
+fi
 
 if [ "$APPLY_MODE" -eq 1 ]; then
-  echo "==> [5/5] 正式执行迁移"
-  atlas_run migrate apply --dir "file://$MIG_DIR" --url "$DB_URL"
+  if [ "$PENDING_COUNT" -gt 0 ]; then
+    echo "==> [8/8] tx-mode=all 正式执行迁移"
+    MIGRATION_OUTCOME=committed_unverified
+    APPLY_RESULT=attempted_once
+    PGOPTIONS="${PGOPTIONS:+$PGOPTIONS }-c lock_timeout=5s -c statement_timeout=120s" \
+      atlas_migrate apply --lock-timeout 10s --tx-mode all
+    APPLY_RESULT=executed_once
+  else
+    echo "==> [8/8] 数据库已是最新版本，不重复 apply"
+    APPLY_RESULT=not_required
+  fi
+
+  POST_STATUS_FILE=$MIGRATION_RUN_DIR/post-status.json
+  read_status_json "$POST_STATUS_FILE"
+  print_status_summary "$POST_STATUS_FILE"
+  POST_VERSION=$(status_current_version "$POST_STATUS_FILE")
+  POST_PENDING_COUNT=$(status_pending_count "$POST_STATUS_FILE")
+  POST_STATUS=$(jq -r '.Status' "$POST_STATUS_FILE")
+  POST_NEXT=$(jq -r '.Next' "$POST_STATUS_FILE")
+  POST_LATEST=$(jq -r '.Available[-1].Version // ""' "$POST_STATUS_FILE")
+  [ "$POST_STATUS" = "OK" ] && [ "$POST_PENDING_COUNT" = "0" ] &&
+    [ "$POST_VERSION" = "$POST_LATEST" ] &&
+    [ "$POST_NEXT" = "Already at latest version" ] ||
+    fail "migration apply 后 status 未证明 pending=0"
+  PENDING_COUNT=0
+
+  docker exec "$POSTGRES_CID" /usr/local/bin/plush-database-roles reconcile
+  PERMISSION_RESULT=verified
+  verify_programmability
+  capture_schema_readback
+  if [ "$APPLY_NEEDED" -eq 1 ]; then
+    MIGRATION_OUTCOME=committed_verified
+    echo "==> migration committed_verified current=$POST_VERSION pending=0"
+  else
+    MIGRATION_OUTCOME=not_applied
+    echo "==> migration not_applied current=$POST_VERSION pending=0"
+  fi
 else
-  echo "==> 未执行正式迁移。传入 --apply 可一键落库。"
+  POST_VERSION=$PRE_VERSION
+  verify_programmability
+  capture_schema_readback
+  echo "==> 未执行正式迁移；dry-run 与事务回滚预演已完成。"
 fi

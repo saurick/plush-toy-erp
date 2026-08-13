@@ -13,6 +13,7 @@ import {
 } from 'antd'
 
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
+import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
 import FieldWithUnitSuffix, {
   isQuantityTextWithinUnitPrecision,
   singleUnitSuffixTextFromOptions,
@@ -23,6 +24,7 @@ import FieldWithUnitSuffix, {
 import SourceImportPickerModal from '../business-list/SourceImportPickerModal.jsx'
 import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.jsx'
 import BusinessLineItemsSummaryValue from '../business-list/BusinessLineItemsSummaryValue.jsx'
+import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import {
   dateInputNotAfterRule,
@@ -31,6 +33,7 @@ import {
   isDateInputBefore,
 } from '../../utils/dateRange.mjs'
 import {
+  BUSINESS_CURRENCY_OPTIONS,
   buildSalesOrderItemSourceValuesFromSKU,
   deriveSalesOrderItemAmount,
   paymentConditionCompleteness,
@@ -209,6 +212,7 @@ export function SalesOrderFormFields({
 
   return (
     <>
+      <BusinessFormSectionTitle>订单与客户</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field"
         label="订单号（自动）"
@@ -251,6 +255,15 @@ export function SalesOrderFormFields({
       >
         <Input allowClear autoComplete="off" />
       </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="币种"
+        name="currency"
+        rules={[{ required: true, message: '请选择币种' }]}
+      >
+        <Select options={BUSINESS_CURRENCY_OPTIONS} />
+      </Form.Item>
+      <BusinessFormSectionTitle>联系人与负责人</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field"
         label="业务员 / 跟单人"
@@ -326,6 +339,7 @@ export function SalesOrderFormFields({
       <Form.Item name="contact_title" hidden>
         <Input />
       </Form.Item>
+      <BusinessFormSectionTitle>结算与交付</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field"
         dependencies={['payment_term_days']}
@@ -872,7 +886,13 @@ export function SalesOrderItemsFormSection({
                             return (
                               <Form.Item
                                 className="erp-line-item-field erp-line-item-field--money"
-                                label="金额"
+                                label={
+                                  <BusinessHelpLabel
+                                    itemKey="line-amount"
+                                    label="金额"
+                                    pageKey="sales-orders"
+                                  />
+                                }
                               >
                                 <Input
                                   value={

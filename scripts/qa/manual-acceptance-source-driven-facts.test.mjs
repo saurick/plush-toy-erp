@@ -60,8 +60,16 @@ function sourceReport({ includeFacts = true, includePurchase = true } = {}) {
           warehouseId: 202,
           lotId: 203,
           quantity: "2",
+          productionOperationCode: "FABRIC_PROCESSING",
         },
       ],
+      fabricOutsourcing: {
+        order: { id: 311, status: "CONFIRMED" },
+        item: { id: 312, materialId: 201, unitId: 105, quantity: "2" },
+        warehouseId: 202,
+        lotId: 203,
+        quantity: "2",
+      },
       completion: {
         warehouseId: 204,
         newLotNo: "SIM-FG-20260715-V1",
@@ -176,8 +184,8 @@ function createRPC({
     production_order_operations: structuredClone(productionWIPOperations),
     production_wip_batches: structuredClone(productionWIPBatches),
     packaging_confirmations: [structuredClone(packagingConfirmation)],
-    quality_inspections: [...productionWIPQualities.values()].flatMap(
-      (items) => structuredClone(items),
+    quality_inspections: [...productionWIPQualities.values()].flatMap((items) =>
+      structuredClone(items),
     ),
   });
 
@@ -283,13 +291,29 @@ function createRPC({
         );
         if (params.action === "ASSIGN_EXECUTION") {
           assert.equal(batch.status, "PLANNED");
-          assert.equal(params.execution_mode, "IN_HOUSE");
+          if (operation.operation_code === "FABRIC_PROCESSING") {
+            assert.equal(params.execution_mode, "OUTSOURCED");
+            assert.deepEqual(params.outsourcing_allocations, [
+              {
+                outsourcing_order_item_id: 312,
+                production_order_material_requirement_id: 602,
+              },
+            ]);
+          } else {
+            assert.equal(params.execution_mode, "IN_HOUSE");
+            assert.equal(params.outsourcing_allocations, undefined);
+          }
           batch.execution_mode = params.execution_mode;
           batch.version += 1;
         } else if (params.action === "START_OPERATION") {
           assert.equal(batch.status, "PLANNED");
-          assert.equal(batch.execution_mode, "IN_HOUSE");
-          batch.status = "IN_PROGRESS";
+          assert.ok(
+            new Set(["IN_HOUSE", "OUTSOURCED"]).has(batch.execution_mode),
+          );
+          batch.status =
+            batch.execution_mode === "OUTSOURCED"
+              ? "OUTSOURCED"
+              : "IN_PROGRESS";
           batch.version += 1;
         } else if (params.action === "COMPLETE_OPERATION") {
           assert.equal(batch.status, "IN_PROGRESS");
@@ -306,6 +330,21 @@ function createRPC({
               },
             ]);
           }
+        } else if (params.action === "RECEIVE_OUTSOURCING_RETURN") {
+          assert.equal(batch.status, "OUTSOURCED");
+          assert.equal(operation.operation_code, "FABRIC_PROCESSING");
+          batch.status = "WAITING_QUALITY";
+          batch.version += 1;
+          productionWIPQualities.set(batch.id, [
+            {
+              id: nextID++,
+              production_wip_batch_id: batch.id,
+              gate_code: qualityGatesByOperation.get(
+                operation.operation_code,
+              )[0],
+              status: "DRAFT",
+            },
+          ]);
         } else if (params.action === "TRANSFER_TO_NEXT_OPERATION") {
           assert.equal(batch.status, "ACCEPTED");
           const target = productionWIPOperations.find(
@@ -338,8 +377,7 @@ function createRPC({
         return createRecord(
           "production_fact",
           {
-            production_wip_batch_id:
-              params.production_wip_batch_id ?? null,
+            production_wip_batch_id: params.production_wip_batch_id ?? null,
           },
           method,
         );
@@ -370,9 +408,8 @@ function createRPC({
           total: outsourcingQualityInspection ? 1 : 0,
         };
       case "list_production_stage_quality_inspections": {
-        const inspections = productionWIPQualities.get(
-          params.production_wip_batch_id,
-        ) || [];
+        const inspections =
+          productionWIPQualities.get(params.production_wip_batch_id) || [];
         return {
           quality_inspections: structuredClone(inspections),
           total: inspections.length,
@@ -515,6 +552,20 @@ function createRPC({
               status: "waiting",
               version: 1,
             },
+            {
+              id: nextID++,
+              node_key: "shipment_finance_reject",
+              node_type: "domain_command",
+              status: "waiting",
+              version: 1,
+            },
+            {
+              id: nextID++,
+              node_key: "shipment_finance_rejected_end",
+              node_type: "end",
+              status: "waiting",
+              version: 1,
+            },
           ];
           shipmentFinanceApprovalTask = {
             id: nextID++,
@@ -610,8 +661,9 @@ function createRPC({
             idempotency_key: params.idempotency_key,
             amount: "128.88",
             collection_type: "ACCOUNTS_RECEIVABLE",
-            payment_term: "EOM_30",
+            payment_term: "EOM_DAYS",
             payment_term_days: 30,
+            due_at: 1_791_705_600,
           },
           method,
         );
@@ -641,7 +693,13 @@ function createRPC({
       case "create_payable_from_purchase_receipt":
         return createRecord(
           "finance_fact",
-          { fact_no: params.fact_no, fact_type: "PAYABLE" },
+          {
+            fact_no: params.fact_no,
+            fact_type: "PAYABLE",
+            payment_term: "EOM_DAYS",
+            payment_term_days: 30,
+            due_at: 1_791_705_600,
+          },
           method,
         );
       case "create_reconciliation_from_finance_fact":
@@ -662,7 +720,11 @@ function createRPC({
         throw new Error(`unexpected RPC ${domain}.${method}`);
     }
   };
-  return { calls, rpc };
+  return {
+    calls,
+    rpc,
+    getDeliveryNodes: () => structuredClone(deliveryNodes || []),
+  };
 }
 
 test("plan is no-write and missing source-driven references are explicitly blocked", () => {
@@ -738,6 +800,8 @@ test("every allowlisted method is present in the current formal JSON-RPC dispatc
       "../../server/internal/service/jsonrpc_quality.go",
       "../../server/internal/service/jsonrpc_workflow_task.go",
       "../../server/internal/service/jsonrpc_customer_config.go",
+      "../../server/internal/service/jsonrpc_customer_config_lifecycle.go",
+      "../../server/internal/service/jsonrpc_customer_config_runtime_access.go",
       "../../server/internal/service/jsonrpc_customer_config_exception_process.go",
     ].map((relative) => readFile(new URL(relative, import.meta.url), "utf8")),
   );
@@ -814,8 +878,17 @@ test("phase-scoped apply executes the formal production chain and returns exact 
   assert.equal(report.instanceKey, "ROW-01");
   assert.deepEqual(report.enabledPhases, ["production"]);
   assert.equal(report.results.production.order.status, "RELEASED");
-  assert.equal(report.results.production.materialIssues.length, 1);
-  assert.equal(report.results.production.materialIssues[0].status, "POSTED");
+  assert.equal(report.results.production.materialIssues.length, 0);
+  assert.equal(
+    report.results.production.fabricOutsourcingIssue.status,
+    "POSTED",
+  );
+  assert.equal(
+    calls.some(
+      (call) => call.method === "create_production_material_issue_from_order",
+    ),
+    false,
+  );
   assert.equal(report.results.production.completion.status, "POSTED");
   assert.ok(report.results.production.completion.production_wip_batch_id > 0);
   assert.equal(report.results.production.rework.status, "POSTED");
@@ -831,7 +904,7 @@ test("phase-scoped apply executes the formal production chain and returns exact 
     [
       "ASSIGN_EXECUTION",
       "START_OPERATION",
-      "COMPLETE_OPERATION",
+      "RECEIVE_OUTSOURCING_RETURN",
       "TRANSFER_TO_NEXT_OPERATION",
       "ASSIGN_EXECUTION",
       "START_OPERATION",
@@ -861,6 +934,7 @@ test("route-less production remains supported but cannot request a rework source
   const report = sourceReport();
   delete report.referenceRecords.sourceDrivenFacts.production.route;
   delete report.referenceRecords.sourceDrivenFacts.production.rework;
+  delete report.referenceRecords.sourceDrivenFacts.production.fabricOutsourcing;
   const plan = buildSourceDrivenFactPlan(report, {
     instanceKey: "ROW-ROUTELESS",
     enabledPhases: ["production"],
@@ -883,6 +957,8 @@ test("route-less production remains supported but cannot request a rework source
 
   const invalidReport = sourceReport();
   delete invalidReport.referenceRecords.sourceDrivenFacts.production.route;
+  delete invalidReport.referenceRecords.sourceDrivenFacts.production
+    .fabricOutsourcing;
   const invalid = buildSourceDrivenFactPlan(invalidReport, {
     instanceKey: "ROW-INVALID-REWORK",
     enabledPhases: ["production"],
@@ -935,7 +1011,7 @@ test("sales apply keeps quality, finance release, shipping, and receivable on th
     instanceKey: "ROW-SALES-RELEASE",
     enabledPhases: ["sales"],
   });
-  const { calls, rpc } = createRPC();
+  const { calls, rpc, getDeliveryNodes } = createRPC();
 
   const report = await applySourceDrivenFactPlan(plan, {
     rpc,
@@ -949,6 +1025,16 @@ test("sales apply keeps quality, finance release, shipping, and receivable on th
     "APPROVED",
   );
   assert.equal(report.results.sales.qualityInspection.status, "PASSED");
+  assert.deepEqual(
+    getDeliveryNodes().map((node) => [node.node_key, node.status]),
+    [
+      ["shipment_finance_approval", "completed"],
+      ["shipment_finance_release", "completed"],
+      ["end", "completed"],
+      ["shipment_finance_reject", "waiting"],
+      ["shipment_finance_rejected_end", "waiting"],
+    ],
+  );
   assert.equal(
     report.results.sales.approvalTask.required_capability_key,
     "workflow.task.approve",
@@ -1063,7 +1149,7 @@ test("idempotent create responses already POSTED are reused without a second pos
     enabledPhases: ["production"],
   });
   const prepostedCreateMethods = new Set([
-    "create_production_material_issue_from_order",
+    "create_outsourcing_material_issue_from_order",
     "create_production_completion_from_order",
     "create_production_rework_from_completion",
   ]);
@@ -1075,11 +1161,18 @@ test("idempotent create responses already POSTED are reused without a second pos
     targetConfirmation: manualAcceptanceTargetConfirmation(plan),
   });
 
-  assert.equal(report.results.production.materialIssues[0].status, "POSTED");
+  assert.equal(
+    report.results.production.fabricOutsourcingIssue.status,
+    "POSTED",
+  );
   assert.equal(report.results.production.completion.status, "POSTED");
   assert.equal(report.results.production.rework.status, "POSTED");
   assert.equal(
     calls.some((call) => call.method === "post_production_fact"),
+    false,
+  );
+  assert.equal(
+    calls.some((call) => call.method === "post_outsourcing_fact"),
     false,
   );
 });
@@ -1129,9 +1222,7 @@ test("visible fact numbers are short, deterministic, unique, and versioned", () 
     identities.every(
       (identity) =>
         identity.businessNo.length <= 28 &&
-        /^TEST-YS-\d{6}V\d+-[A-Z]{2,5}\d{3,6}$/u.test(
-          identity.businessNo,
-        ) &&
+        /^TEST-YS-\d{6}V\d+-[A-Z]{2,5}\d{3,6}$/u.test(identity.businessNo) &&
         !/SIM-SDF|PRODUCTION|OUTSOURCING|RECONCILIATION|[A-F0-9]{12,}/u.test(
           identity.businessNo,
         ),

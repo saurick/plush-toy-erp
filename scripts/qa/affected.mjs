@@ -10,7 +10,18 @@ import { collectGitChangedFiles } from "./lib/git-range.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = path.resolve(SCRIPT_DIR, "../..");
-const LEVEL_ORDER = ["T0", "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8"];
+const AFFECTED_SCOPE_ORDER = [
+  "T0",
+  "T1",
+  "T2",
+  "T3",
+  "T4",
+  "T5",
+  "T6",
+  "T7",
+  "T8",
+];
+const LOCAL_FULL_SCOPE = "LOCAL_FULL";
 const CUSTOMER_SOURCE_BOUNDARY_TEST =
   "scripts/qa/customer-source-repository-boundary.test.mjs";
 const DEV_PAGE_GOVERNANCE_TEST = "scripts/qa/dev-page-governance.test.mjs";
@@ -149,15 +160,17 @@ const FIXED_COMMANDS = {
     ["critical_transactions_pg_test"],
     "server",
   ),
-  full: command("full", "T8", "运行推送前全量质量门禁并生成脱敏回执", "node", [
-    "scripts/qa/run-gate-with-receipt.mjs",
-    "--gate",
+  full: command(
     "full",
-  ]),
+    LOCAL_FULL_SCOPE,
+    "运行推送前全量质量门禁并生成脱敏回执",
+    "node",
+    ["scripts/qa/run-gate-with-receipt.mjs", "--gate", "full"],
+  ),
 };
 
-function command(id, level, label, bin, args, cwd = ".") {
-  return { id, level, label, bin, args, cwd };
+function command(id, scope, label, bin, args, cwd = ".") {
+  return { id, scope, label, bin, args, cwd };
 }
 
 function normalizeFile(file) {
@@ -182,6 +195,20 @@ function uniqueSorted(values) {
   return [...new Set([...values].map(normalizeFile).filter(Boolean))].sort();
 }
 
+function isAffectedScope(scope) {
+  return AFFECTED_SCOPE_ORDER.includes(scope);
+}
+
+function commandScopeOrder(scope) {
+  return scope === LOCAL_FULL_SCOPE
+    ? AFFECTED_SCOPE_ORDER.length
+    : AFFECTED_SCOPE_ORDER.indexOf(scope);
+}
+
+function scopeLabel(scope) {
+  return scope === LOCAL_FULL_SCOPE ? "本地完整门禁" : scope;
+}
+
 function addReason(state, id, reason) {
   if (!state.reasons.has(id)) {
     state.reasons.set(id, new Set());
@@ -193,7 +220,9 @@ function addFixed(state, key, reason) {
   const selected = FIXED_COMMANDS[key];
   state.commands.set(selected.id, selected);
   addReason(state, selected.id, reason);
-  state.levels.add(selected.level);
+  if (isAffectedScope(selected.scope)) {
+    state.affectedScopes.add(selected.scope);
+  }
 }
 
 function siblingTestCandidates(file) {
@@ -215,17 +244,17 @@ function listTests(root, relativeDirectory) {
     .sort();
 }
 
-function addNodeTests(state, files, reason, level) {
+function addNodeTests(state, files, reason, scope) {
   const normalized = uniqueSorted(files);
   if (normalized.length === 0) {
     return;
   }
   const id = `node-tests:${normalized.join(",")}`;
-  const commandLevel =
-    level || (normalized.some((file) => file.startsWith("web/")) ? "T5" : "T1");
+  const commandScope =
+    scope || (normalized.some((file) => file.startsWith("web/")) ? "T5" : "T1");
   state.commands.set(
     id,
-    command(id, commandLevel, "运行直接关联的 Node 测试", "node", [
+    command(id, commandScope, "运行直接关联的 Node 测试", "node", [
       "scripts/qa/run-test-gate.mjs",
       "--kind",
       "node",
@@ -238,7 +267,7 @@ function addNodeTests(state, files, reason, level) {
     ]),
   );
   addReason(state, id, reason);
-  state.levels.add(commandLevel);
+  state.affectedScopes.add(commandScope);
 }
 
 function addSyntaxCheck(state, file) {
@@ -259,12 +288,12 @@ function addShellCheck(state, file) {
   addReason(state, id, file);
 }
 
-function addFollowUp(state, id, level, text, reason) {
+function addFollowUp(state, id, scope, text, reason) {
   if (!state.followUps.has(id)) {
-    state.followUps.set(id, { id, level, text, reasons: new Set() });
+    state.followUps.set(id, { id, scope, text, reasons: new Set() });
   }
   state.followUps.get(id).reasons.add(reason);
-  state.levels.add(level);
+  state.affectedScopes.add(scope);
 }
 
 function isDocumentation(file) {
@@ -336,9 +365,9 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
   const state = {
     commands: new Map(),
     followUps: new Map(),
-    levels: new Set(["T0"]),
+    affectedScopes: new Set(["T0"]),
     reasons: new Map(),
-    requiresFull: false,
+    localGate: "focused",
     webNeedsAllTests: false,
   };
   const directTests = new Set();
@@ -388,7 +417,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
       file.startsWith("scripts/lib/") ||
       /^scripts\/qa\/(?:fast|full|strict)\.sh$/u.test(file)
     ) {
-      state.requiresFull = true;
+      state.localGate = "full";
       addReason(state, "full", file);
       continue;
     }
@@ -416,7 +445,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
       /(?:^|\/)Dockerfile$/u.test(file) ||
       /(?:^|\/)compose[^/]*\.ya?ml$/u.test(file)
     ) {
-      state.requiresFull = true;
+      state.localGate = "full";
       addReason(state, "full", file);
       addFollowUp(
         state,
@@ -560,7 +589,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
         if (fs.existsSync(path.join(root, file))) {
           directTests.add(file);
         } else {
-          state.requiresFull = true;
+          state.localGate = "full";
           addReason(state, "full", file);
         }
       } else {
@@ -622,7 +651,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
         if (fs.existsSync(path.join(root, file))) {
           directTests.add(file);
         } else {
-          state.requiresFull = true;
+          state.localGate = "full";
           addReason(state, "full", file);
         }
       } else if (file.endsWith(".mjs")) {
@@ -630,7 +659,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
           fs.existsSync(path.join(root, candidate)),
         );
         if (siblingTests.length === 0) {
-          state.requiresFull = true;
+          state.localGate = "full";
           addReason(state, "full", file);
         } else {
           siblingTests.forEach((candidate) => directTests.add(candidate));
@@ -642,7 +671,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
         if (fs.existsSync(path.join(root, sibling))) {
           directTests.add(sibling);
         } else {
-          state.requiresFull = true;
+          state.localGate = "full";
           addReason(state, "full", file);
         }
       }
@@ -653,20 +682,20 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
       if (fs.existsSync(path.join(root, file))) {
         directTests.add(file);
       } else {
-        state.requiresFull = true;
+        state.localGate = "full";
         addReason(state, "full", file);
       }
       continue;
     }
 
-    state.requiresFull = true;
+    state.localGate = "full";
     addReason(state, "full", file);
   }
 
-  if (state.requiresFull) {
+  if (state.localGate === "full") {
     const fullReasons = [...(state.reasons.get("full") || [])];
     const retainedCommands = [...state.commands].filter(
-      ([, selected]) => selected.level === "T0",
+      ([, selected]) => selected.scope === "T0",
     );
     const retainedReasons = new Map(
       retainedCommands.map(([id]) => [
@@ -699,27 +728,29 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
       reasons: [...(state.reasons.get(selected.id) || [])].sort(),
     }))
     .sort((left, right) => {
-      const levelDifference =
-        LEVEL_ORDER.indexOf(left.level) - LEVEL_ORDER.indexOf(right.level);
-      return levelDifference || left.id.localeCompare(right.id);
+      const scopeDifference =
+        commandScopeOrder(left.scope) - commandScopeOrder(right.scope);
+      return scopeDifference || left.id.localeCompare(right.id);
     });
   const followUps = [...state.followUps.values()]
     .map((item) => ({ ...item, reasons: [...item.reasons].sort() }))
     .sort(
       (left, right) =>
-        LEVEL_ORDER.indexOf(left.level) - LEVEL_ORDER.indexOf(right.level),
+        AFFECTED_SCOPE_ORDER.indexOf(left.scope) -
+        AFFECTED_SCOPE_ORDER.indexOf(right.scope),
     );
-  const levels = [...state.levels].sort(
-    (left, right) => LEVEL_ORDER.indexOf(left) - LEVEL_ORDER.indexOf(right),
+  const affectedScopes = [...state.affectedScopes].sort(
+    (left, right) =>
+      AFFECTED_SCOPE_ORDER.indexOf(left) - AFFECTED_SCOPE_ORDER.indexOf(right),
   );
 
   return {
     changedFiles,
-    levels,
-    highestLevel: levels.at(-1) || "T0",
+    affectedScopes,
+    maxAffectedScope: affectedScopes.at(-1) || "T0",
     commands,
     followUps,
-    requiresFull: state.requiresFull,
+    localGate: state.localGate,
     prePushGate: "bash scripts/qa/prepare-push.sh",
   };
 }
@@ -759,7 +790,7 @@ export function formatCommand(selected, root = DEFAULT_ROOT) {
 
 export function formatPlan(plan, { root = DEFAULT_ROOT } = {}) {
   const lines = [
-    `[qa:affected] files=${plan.changedFiles.length} levels=${plan.levels.join(",")} highest=${plan.highestLevel}`,
+    `[qa:affected] files=${plan.changedFiles.length} scopes=${plan.affectedScopes.join(",")} max_scope=${plan.maxAffectedScope} local_gate=${plan.localGate}`,
   ];
   if (plan.changedFiles.length === 0) {
     lines.push("[qa:affected] 未检测到改动；仅保留静态 diff 检查。");
@@ -769,13 +800,13 @@ export function formatPlan(plan, { root = DEFAULT_ROOT } = {}) {
   }
   lines.push("[qa:affected] commands:");
   plan.commands.forEach((selected, index) => {
-    lines.push(`  ${index + 1}. [${selected.level}] ${selected.label}`);
+    lines.push(`  ${index + 1}. [${scopeLabel(selected.scope)}] ${selected.label}`);
     lines.push(`     ${formatCommand(selected, root)}`);
   });
   if (plan.followUps.length > 0) {
     lines.push("[qa:affected] required follow-ups:");
     plan.followUps.forEach((item) =>
-      lines.push(`  - [${item.level}] ${item.text}`),
+      lines.push(`  - [${item.scope}] ${item.text}`),
     );
   }
   lines.push(

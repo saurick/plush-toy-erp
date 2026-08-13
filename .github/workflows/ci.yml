@@ -319,6 +319,10 @@ jobs:
           npm install --global pnpm@10.13.1
           pnpm config set store-dir "$PNPM_STORE_PATH"
           pnpm install --frozen-lockfile
+      - name: Audit production Web dependencies when selected
+        if: needs.plan.outputs.needs_web == 'true'
+        working-directory: web
+        run: pnpm audit --prod --audit-level high --registry=https://registry.npmjs.org
       - name: Install and verify Chromium only for full
         if: needs.plan.outputs.needs_chromium == 'true'
         working-directory: web

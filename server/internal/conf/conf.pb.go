@@ -93,7 +93,6 @@ func (x *Bootstrap) GetLog() *Log {
 type Server struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Http          *Server_HTTP           `protobuf:"bytes,1,opt,name=http,proto3" json:"http,omitempty"`
-	Grpc          *Server_GRPC           `protobuf:"bytes,2,opt,name=grpc,proto3" json:"grpc,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -131,13 +130,6 @@ func (*Server) Descriptor() ([]byte, []int) {
 func (x *Server) GetHttp() *Server_HTTP {
 	if x != nil {
 		return x.Http
-	}
-	return nil
-}
-
-func (x *Server) GetGrpc() *Server_GRPC {
-	if x != nil {
-		return x.Grpc
 	}
 	return nil
 }
@@ -350,77 +342,22 @@ func (x *Server_HTTP) GetTimeout() *durationpb.Duration {
 	return nil
 }
 
-type Server_GRPC struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Network       string                 `protobuf:"bytes,1,opt,name=network,proto3" json:"network,omitempty"`
-	Addr          string                 `protobuf:"bytes,2,opt,name=addr,proto3" json:"addr,omitempty"`
-	Timeout       *durationpb.Duration   `protobuf:"bytes,3,opt,name=timeout,proto3" json:"timeout,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Server_GRPC) Reset() {
-	*x = Server_GRPC{}
-	mi := &file_conf_conf_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Server_GRPC) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Server_GRPC) ProtoMessage() {}
-
-func (x *Server_GRPC) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_conf_proto_msgTypes[6]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Server_GRPC.ProtoReflect.Descriptor instead.
-func (*Server_GRPC) Descriptor() ([]byte, []int) {
-	return file_conf_conf_proto_rawDescGZIP(), []int{1, 1}
-}
-
-func (x *Server_GRPC) GetNetwork() string {
-	if x != nil {
-		return x.Network
-	}
-	return ""
-}
-
-func (x *Server_GRPC) GetAddr() string {
-	if x != nil {
-		return x.Addr
-	}
-	return ""
-}
-
-func (x *Server_GRPC) GetTimeout() *durationpb.Duration {
-	if x != nil {
-		return x.Timeout
-	}
-	return nil
-}
-
 type Data_Postgres struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Dsn           string                 `protobuf:"bytes,1,opt,name=dsn,proto3" json:"dsn,omitempty"`
-	Debug         bool                   `protobuf:"varint,2,opt,name=debug,proto3" json:"debug,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Dsn             string                 `protobuf:"bytes,1,opt,name=dsn,proto3" json:"dsn,omitempty"`
+	Debug           bool                   `protobuf:"varint,2,opt,name=debug,proto3" json:"debug,omitempty"`
+	MaxOpenConns    int32                  `protobuf:"varint,3,opt,name=maxOpenConns,proto3" json:"maxOpenConns,omitempty"`
+	MaxIdleConns    int32                  `protobuf:"varint,4,opt,name=maxIdleConns,proto3" json:"maxIdleConns,omitempty"`
+	ConnMaxLifetime *durationpb.Duration   `protobuf:"bytes,5,opt,name=connMaxLifetime,proto3" json:"connMaxLifetime,omitempty"`
+	ConnMaxIdleTime *durationpb.Duration   `protobuf:"bytes,6,opt,name=connMaxIdleTime,proto3" json:"connMaxIdleTime,omitempty"`
+	StartupTimeout  *durationpb.Duration   `protobuf:"bytes,7,opt,name=startupTimeout,proto3" json:"startupTimeout,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *Data_Postgres) Reset() {
 	*x = Data_Postgres{}
-	mi := &file_conf_conf_proto_msgTypes[7]
+	mi := &file_conf_conf_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -432,7 +369,7 @@ func (x *Data_Postgres) String() string {
 func (*Data_Postgres) ProtoMessage() {}
 
 func (x *Data_Postgres) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_conf_proto_msgTypes[7]
+	mi := &file_conf_conf_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -462,6 +399,41 @@ func (x *Data_Postgres) GetDebug() bool {
 	return false
 }
 
+func (x *Data_Postgres) GetMaxOpenConns() int32 {
+	if x != nil {
+		return x.MaxOpenConns
+	}
+	return 0
+}
+
+func (x *Data_Postgres) GetMaxIdleConns() int32 {
+	if x != nil {
+		return x.MaxIdleConns
+	}
+	return 0
+}
+
+func (x *Data_Postgres) GetConnMaxLifetime() *durationpb.Duration {
+	if x != nil {
+		return x.ConnMaxLifetime
+	}
+	return nil
+}
+
+func (x *Data_Postgres) GetConnMaxIdleTime() *durationpb.Duration {
+	if x != nil {
+		return x.ConnMaxIdleTime
+	}
+	return nil
+}
+
+func (x *Data_Postgres) GetStartupTimeout() *durationpb.Duration {
+	if x != nil {
+		return x.StartupTimeout
+	}
+	return nil
+}
+
 type Data_Etcd struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Hosts         []string               `protobuf:"bytes,1,rep,name=hosts,proto3" json:"hosts,omitempty"`
@@ -471,7 +443,7 @@ type Data_Etcd struct {
 
 func (x *Data_Etcd) Reset() {
 	*x = Data_Etcd{}
-	mi := &file_conf_conf_proto_msgTypes[8]
+	mi := &file_conf_conf_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -483,7 +455,7 @@ func (x *Data_Etcd) String() string {
 func (*Data_Etcd) ProtoMessage() {}
 
 func (x *Data_Etcd) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_conf_proto_msgTypes[8]
+	mi := &file_conf_conf_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -518,7 +490,7 @@ type Data_Auth struct {
 
 func (x *Data_Auth) Reset() {
 	*x = Data_Auth{}
-	mi := &file_conf_conf_proto_msgTypes[9]
+	mi := &file_conf_conf_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -530,7 +502,7 @@ func (x *Data_Auth) String() string {
 func (*Data_Auth) ProtoMessage() {}
 
 func (x *Data_Auth) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_conf_proto_msgTypes[9]
+	mi := &file_conf_conf_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -584,7 +556,7 @@ type Data_Auth_Admin struct {
 
 func (x *Data_Auth_Admin) Reset() {
 	*x = Data_Auth_Admin{}
-	mi := &file_conf_conf_proto_msgTypes[10]
+	mi := &file_conf_conf_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -596,7 +568,7 @@ func (x *Data_Auth_Admin) String() string {
 func (*Data_Auth_Admin) ProtoMessage() {}
 
 func (x *Data_Auth_Admin) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_conf_proto_msgTypes[10]
+	mi := &file_conf_conf_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -635,7 +607,7 @@ type Data_Auth_SMS struct {
 
 func (x *Data_Auth_SMS) Reset() {
 	*x = Data_Auth_SMS{}
-	mi := &file_conf_conf_proto_msgTypes[11]
+	mi := &file_conf_conf_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -647,7 +619,7 @@ func (x *Data_Auth_SMS) String() string {
 func (*Data_Auth_SMS) ProtoMessage() {}
 
 func (x *Data_Auth_SMS) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_conf_proto_msgTypes[11]
+	mi := &file_conf_conf_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -681,7 +653,7 @@ type Trace_Jaeger struct {
 
 func (x *Trace_Jaeger) Reset() {
 	*x = Trace_Jaeger{}
-	mi := &file_conf_conf_proto_msgTypes[12]
+	mi := &file_conf_conf_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -693,7 +665,7 @@ func (x *Trace_Jaeger) String() string {
 func (*Trace_Jaeger) ProtoMessage() {}
 
 func (x *Trace_Jaeger) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_conf_proto_msgTypes[12]
+	mi := &file_conf_conf_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -740,25 +712,25 @@ const file_conf_conf_proto_rawDesc = "" +
 	"\x06server\x18\x01 \x01(\v2\x12.kratos.api.ServerR\x06server\x12$\n" +
 	"\x04data\x18\x02 \x01(\v2\x10.kratos.api.DataR\x04data\x12'\n" +
 	"\x05trace\x18\x03 \x01(\v2\x11.kratos.api.TraceR\x05trace\x12!\n" +
-	"\x03log\x18\x04 \x01(\v2\x0f.kratos.api.LogR\x03log\"\xb8\x02\n" +
+	"\x03log\x18\x04 \x01(\v2\x0f.kratos.api.LogR\x03log\"\xa6\x01\n" +
 	"\x06Server\x12+\n" +
-	"\x04http\x18\x01 \x01(\v2\x17.kratos.api.Server.HTTPR\x04http\x12+\n" +
-	"\x04grpc\x18\x02 \x01(\v2\x17.kratos.api.Server.GRPCR\x04grpc\x1ai\n" +
+	"\x04http\x18\x01 \x01(\v2\x17.kratos.api.Server.HTTPR\x04http\x1ai\n" +
 	"\x04HTTP\x12\x18\n" +
 	"\anetwork\x18\x01 \x01(\tR\anetwork\x12\x12\n" +
 	"\x04addr\x18\x02 \x01(\tR\x04addr\x123\n" +
-	"\atimeout\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\atimeout\x1ai\n" +
-	"\x04GRPC\x12\x18\n" +
-	"\anetwork\x18\x01 \x01(\tR\anetwork\x12\x12\n" +
-	"\x04addr\x18\x02 \x01(\tR\x04addr\x123\n" +
-	"\atimeout\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\atimeout\"\xfa\x03\n" +
+	"\atimeout\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\atimeoutJ\x04\b\x02\x10\x03\"\x90\x06\n" +
 	"\x04Data\x125\n" +
 	"\bpostgres\x18\x01 \x01(\v2\x19.kratos.api.Data.PostgresR\bpostgres\x12)\n" +
 	"\x04etcd\x18\x02 \x01(\v2\x15.kratos.api.Data.EtcdR\x04etcd\x12)\n" +
-	"\x04auth\x18\x03 \x01(\v2\x15.kratos.api.Data.AuthR\x04auth\x1a2\n" +
+	"\x04auth\x18\x03 \x01(\v2\x15.kratos.api.Data.AuthR\x04auth\x1a\xc7\x02\n" +
 	"\bPostgres\x12\x10\n" +
 	"\x03dsn\x18\x01 \x01(\tR\x03dsn\x12\x14\n" +
-	"\x05debug\x18\x02 \x01(\bR\x05debug\x1a\x1c\n" +
+	"\x05debug\x18\x02 \x01(\bR\x05debug\x12\"\n" +
+	"\fmaxOpenConns\x18\x03 \x01(\x05R\fmaxOpenConns\x12\"\n" +
+	"\fmaxIdleConns\x18\x04 \x01(\x05R\fmaxIdleConns\x12C\n" +
+	"\x0fconnMaxLifetime\x18\x05 \x01(\v2\x19.google.protobuf.DurationR\x0fconnMaxLifetime\x12C\n" +
+	"\x0fconnMaxIdleTime\x18\x06 \x01(\v2\x19.google.protobuf.DurationR\x0fconnMaxIdleTime\x12A\n" +
+	"\x0estartupTimeout\x18\a \x01(\v2\x19.google.protobuf.DurationR\x0estartupTimeout\x1a\x1c\n" +
 	"\x04Etcd\x12\x14\n" +
 	"\x05hosts\x18\x01 \x03(\tR\x05hosts\x1a\x8c\x02\n" +
 	"\x04Auth\x12\x1c\n" +
@@ -792,7 +764,7 @@ func file_conf_conf_proto_rawDescGZIP() []byte {
 	return file_conf_conf_proto_rawDescData
 }
 
-var file_conf_conf_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_conf_conf_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_conf_conf_proto_goTypes = []any{
 	(*Bootstrap)(nil),           // 0: kratos.api.Bootstrap
 	(*Server)(nil),              // 1: kratos.api.Server
@@ -800,14 +772,13 @@ var file_conf_conf_proto_goTypes = []any{
 	(*Trace)(nil),               // 3: kratos.api.Trace
 	(*Log)(nil),                 // 4: kratos.api.Log
 	(*Server_HTTP)(nil),         // 5: kratos.api.Server.HTTP
-	(*Server_GRPC)(nil),         // 6: kratos.api.Server.GRPC
-	(*Data_Postgres)(nil),       // 7: kratos.api.Data.Postgres
-	(*Data_Etcd)(nil),           // 8: kratos.api.Data.Etcd
-	(*Data_Auth)(nil),           // 9: kratos.api.Data.Auth
-	(*Data_Auth_Admin)(nil),     // 10: kratos.api.Data.Auth.Admin
-	(*Data_Auth_SMS)(nil),       // 11: kratos.api.Data.Auth.SMS
-	(*Trace_Jaeger)(nil),        // 12: kratos.api.Trace.Jaeger
-	(*durationpb.Duration)(nil), // 13: google.protobuf.Duration
+	(*Data_Postgres)(nil),       // 6: kratos.api.Data.Postgres
+	(*Data_Etcd)(nil),           // 7: kratos.api.Data.Etcd
+	(*Data_Auth)(nil),           // 8: kratos.api.Data.Auth
+	(*Data_Auth_Admin)(nil),     // 9: kratos.api.Data.Auth.Admin
+	(*Data_Auth_SMS)(nil),       // 10: kratos.api.Data.Auth.SMS
+	(*Trace_Jaeger)(nil),        // 11: kratos.api.Trace.Jaeger
+	(*durationpb.Duration)(nil), // 12: google.protobuf.Duration
 }
 var file_conf_conf_proto_depIdxs = []int32{
 	1,  // 0: kratos.api.Bootstrap.server:type_name -> kratos.api.Server
@@ -815,20 +786,21 @@ var file_conf_conf_proto_depIdxs = []int32{
 	3,  // 2: kratos.api.Bootstrap.trace:type_name -> kratos.api.Trace
 	4,  // 3: kratos.api.Bootstrap.log:type_name -> kratos.api.Log
 	5,  // 4: kratos.api.Server.http:type_name -> kratos.api.Server.HTTP
-	6,  // 5: kratos.api.Server.grpc:type_name -> kratos.api.Server.GRPC
-	7,  // 6: kratos.api.Data.postgres:type_name -> kratos.api.Data.Postgres
-	8,  // 7: kratos.api.Data.etcd:type_name -> kratos.api.Data.Etcd
-	9,  // 8: kratos.api.Data.auth:type_name -> kratos.api.Data.Auth
-	12, // 9: kratos.api.Trace.jaeger:type_name -> kratos.api.Trace.Jaeger
-	13, // 10: kratos.api.Server.HTTP.timeout:type_name -> google.protobuf.Duration
-	13, // 11: kratos.api.Server.GRPC.timeout:type_name -> google.protobuf.Duration
-	10, // 12: kratos.api.Data.Auth.admin:type_name -> kratos.api.Data.Auth.Admin
-	11, // 13: kratos.api.Data.Auth.sms:type_name -> kratos.api.Data.Auth.SMS
-	14, // [14:14] is the sub-list for method output_type
-	14, // [14:14] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	6,  // 5: kratos.api.Data.postgres:type_name -> kratos.api.Data.Postgres
+	7,  // 6: kratos.api.Data.etcd:type_name -> kratos.api.Data.Etcd
+	8,  // 7: kratos.api.Data.auth:type_name -> kratos.api.Data.Auth
+	11, // 8: kratos.api.Trace.jaeger:type_name -> kratos.api.Trace.Jaeger
+	12, // 9: kratos.api.Server.HTTP.timeout:type_name -> google.protobuf.Duration
+	12, // 10: kratos.api.Data.Postgres.connMaxLifetime:type_name -> google.protobuf.Duration
+	12, // 11: kratos.api.Data.Postgres.connMaxIdleTime:type_name -> google.protobuf.Duration
+	12, // 12: kratos.api.Data.Postgres.startupTimeout:type_name -> google.protobuf.Duration
+	9,  // 13: kratos.api.Data.Auth.admin:type_name -> kratos.api.Data.Auth.Admin
+	10, // 14: kratos.api.Data.Auth.sms:type_name -> kratos.api.Data.Auth.SMS
+	15, // [15:15] is the sub-list for method output_type
+	15, // [15:15] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_conf_conf_proto_init() }
@@ -842,7 +814,7 @@ func file_conf_conf_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_conf_conf_proto_rawDesc), len(file_conf_conf_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

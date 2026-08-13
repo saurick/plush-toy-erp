@@ -24,6 +24,7 @@ import {
   Typography,
 } from 'antd'
 import SharedSearchInput from '@/common/components/SearchInput'
+import { BusinessPageHelpTrigger } from '../help/BusinessContextHelp.jsx'
 import {
   DATE_INPUT_DISPLAY_FORMAT,
   DATE_INPUT_VALUE_FORMAT,
@@ -455,6 +456,7 @@ export function BusinessPageLayout({ children, className = '' }) {
 export function PageHeaderCard({
   title,
   description,
+  helpKey = '',
   tags = null,
   stats = [],
   compact = false,
@@ -471,7 +473,10 @@ export function PageHeaderCard({
       <div className="erp-business-page-header-card__grid erp-business-module-hero__grid">
         <div className="erp-business-page-header-card__main erp-business-module-hero__main">
           <div>
-            <h1>{title}</h1>
+            <div className="erp-business-page-header-card__title-row">
+              <h1>{title}</h1>
+              <BusinessPageHelpTrigger pageKey={helpKey} />
+            </div>
             <p>{description}</p>
           </div>
           {tags ? (

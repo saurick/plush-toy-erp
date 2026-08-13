@@ -100,6 +100,31 @@ func Status(v string) predicate.InventoryLot {
 	return predicate.InventoryLot(sql.FieldEQ(FieldStatus, v))
 }
 
+// Version applies equality check predicate on the "version" field. It's identical to VersionEQ.
+func Version(v int) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldEQ(FieldVersion, v))
+}
+
+// StatusAction applies equality check predicate on the "status_action" field. It's identical to StatusActionEQ.
+func StatusAction(v string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldEQ(FieldStatusAction, v))
+}
+
+// StatusReason applies equality check predicate on the "status_reason" field. It's identical to StatusReasonEQ.
+func StatusReason(v string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldEQ(FieldStatusReason, v))
+}
+
+// StatusChangedAt applies equality check predicate on the "status_changed_at" field. It's identical to StatusChangedAtEQ.
+func StatusChangedAt(v time.Time) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldEQ(FieldStatusChangedAt, v))
+}
+
+// StatusChangedBy applies equality check predicate on the "status_changed_by" field. It's identical to StatusChangedByEQ.
+func StatusChangedBy(v int) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldEQ(FieldStatusChangedBy, v))
+}
+
 // ReceivedAt applies equality check predicate on the "received_at" field. It's identical to ReceivedAtEQ.
 func ReceivedAt(v time.Time) predicate.InventoryLot {
 	return predicate.InventoryLot(sql.FieldEQ(FieldReceivedAt, v))
@@ -680,6 +705,296 @@ func StatusContainsFold(v string) predicate.InventoryLot {
 	return predicate.InventoryLot(sql.FieldContainsFold(FieldStatus, v))
 }
 
+// VersionEQ applies the EQ predicate on the "version" field.
+func VersionEQ(v int) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldEQ(FieldVersion, v))
+}
+
+// VersionNEQ applies the NEQ predicate on the "version" field.
+func VersionNEQ(v int) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldNEQ(FieldVersion, v))
+}
+
+// VersionIn applies the In predicate on the "version" field.
+func VersionIn(vs ...int) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldIn(FieldVersion, vs...))
+}
+
+// VersionNotIn applies the NotIn predicate on the "version" field.
+func VersionNotIn(vs ...int) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldNotIn(FieldVersion, vs...))
+}
+
+// VersionGT applies the GT predicate on the "version" field.
+func VersionGT(v int) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldGT(FieldVersion, v))
+}
+
+// VersionGTE applies the GTE predicate on the "version" field.
+func VersionGTE(v int) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldGTE(FieldVersion, v))
+}
+
+// VersionLT applies the LT predicate on the "version" field.
+func VersionLT(v int) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldLT(FieldVersion, v))
+}
+
+// VersionLTE applies the LTE predicate on the "version" field.
+func VersionLTE(v int) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldLTE(FieldVersion, v))
+}
+
+// StatusActionEQ applies the EQ predicate on the "status_action" field.
+func StatusActionEQ(v string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldEQ(FieldStatusAction, v))
+}
+
+// StatusActionNEQ applies the NEQ predicate on the "status_action" field.
+func StatusActionNEQ(v string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldNEQ(FieldStatusAction, v))
+}
+
+// StatusActionIn applies the In predicate on the "status_action" field.
+func StatusActionIn(vs ...string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldIn(FieldStatusAction, vs...))
+}
+
+// StatusActionNotIn applies the NotIn predicate on the "status_action" field.
+func StatusActionNotIn(vs ...string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldNotIn(FieldStatusAction, vs...))
+}
+
+// StatusActionGT applies the GT predicate on the "status_action" field.
+func StatusActionGT(v string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldGT(FieldStatusAction, v))
+}
+
+// StatusActionGTE applies the GTE predicate on the "status_action" field.
+func StatusActionGTE(v string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldGTE(FieldStatusAction, v))
+}
+
+// StatusActionLT applies the LT predicate on the "status_action" field.
+func StatusActionLT(v string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldLT(FieldStatusAction, v))
+}
+
+// StatusActionLTE applies the LTE predicate on the "status_action" field.
+func StatusActionLTE(v string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldLTE(FieldStatusAction, v))
+}
+
+// StatusActionContains applies the Contains predicate on the "status_action" field.
+func StatusActionContains(v string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldContains(FieldStatusAction, v))
+}
+
+// StatusActionHasPrefix applies the HasPrefix predicate on the "status_action" field.
+func StatusActionHasPrefix(v string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldHasPrefix(FieldStatusAction, v))
+}
+
+// StatusActionHasSuffix applies the HasSuffix predicate on the "status_action" field.
+func StatusActionHasSuffix(v string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldHasSuffix(FieldStatusAction, v))
+}
+
+// StatusActionIsNil applies the IsNil predicate on the "status_action" field.
+func StatusActionIsNil() predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldIsNull(FieldStatusAction))
+}
+
+// StatusActionNotNil applies the NotNil predicate on the "status_action" field.
+func StatusActionNotNil() predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldNotNull(FieldStatusAction))
+}
+
+// StatusActionEqualFold applies the EqualFold predicate on the "status_action" field.
+func StatusActionEqualFold(v string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldEqualFold(FieldStatusAction, v))
+}
+
+// StatusActionContainsFold applies the ContainsFold predicate on the "status_action" field.
+func StatusActionContainsFold(v string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldContainsFold(FieldStatusAction, v))
+}
+
+// StatusReasonEQ applies the EQ predicate on the "status_reason" field.
+func StatusReasonEQ(v string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldEQ(FieldStatusReason, v))
+}
+
+// StatusReasonNEQ applies the NEQ predicate on the "status_reason" field.
+func StatusReasonNEQ(v string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldNEQ(FieldStatusReason, v))
+}
+
+// StatusReasonIn applies the In predicate on the "status_reason" field.
+func StatusReasonIn(vs ...string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldIn(FieldStatusReason, vs...))
+}
+
+// StatusReasonNotIn applies the NotIn predicate on the "status_reason" field.
+func StatusReasonNotIn(vs ...string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldNotIn(FieldStatusReason, vs...))
+}
+
+// StatusReasonGT applies the GT predicate on the "status_reason" field.
+func StatusReasonGT(v string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldGT(FieldStatusReason, v))
+}
+
+// StatusReasonGTE applies the GTE predicate on the "status_reason" field.
+func StatusReasonGTE(v string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldGTE(FieldStatusReason, v))
+}
+
+// StatusReasonLT applies the LT predicate on the "status_reason" field.
+func StatusReasonLT(v string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldLT(FieldStatusReason, v))
+}
+
+// StatusReasonLTE applies the LTE predicate on the "status_reason" field.
+func StatusReasonLTE(v string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldLTE(FieldStatusReason, v))
+}
+
+// StatusReasonContains applies the Contains predicate on the "status_reason" field.
+func StatusReasonContains(v string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldContains(FieldStatusReason, v))
+}
+
+// StatusReasonHasPrefix applies the HasPrefix predicate on the "status_reason" field.
+func StatusReasonHasPrefix(v string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldHasPrefix(FieldStatusReason, v))
+}
+
+// StatusReasonHasSuffix applies the HasSuffix predicate on the "status_reason" field.
+func StatusReasonHasSuffix(v string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldHasSuffix(FieldStatusReason, v))
+}
+
+// StatusReasonIsNil applies the IsNil predicate on the "status_reason" field.
+func StatusReasonIsNil() predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldIsNull(FieldStatusReason))
+}
+
+// StatusReasonNotNil applies the NotNil predicate on the "status_reason" field.
+func StatusReasonNotNil() predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldNotNull(FieldStatusReason))
+}
+
+// StatusReasonEqualFold applies the EqualFold predicate on the "status_reason" field.
+func StatusReasonEqualFold(v string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldEqualFold(FieldStatusReason, v))
+}
+
+// StatusReasonContainsFold applies the ContainsFold predicate on the "status_reason" field.
+func StatusReasonContainsFold(v string) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldContainsFold(FieldStatusReason, v))
+}
+
+// StatusChangedAtEQ applies the EQ predicate on the "status_changed_at" field.
+func StatusChangedAtEQ(v time.Time) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldEQ(FieldStatusChangedAt, v))
+}
+
+// StatusChangedAtNEQ applies the NEQ predicate on the "status_changed_at" field.
+func StatusChangedAtNEQ(v time.Time) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldNEQ(FieldStatusChangedAt, v))
+}
+
+// StatusChangedAtIn applies the In predicate on the "status_changed_at" field.
+func StatusChangedAtIn(vs ...time.Time) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldIn(FieldStatusChangedAt, vs...))
+}
+
+// StatusChangedAtNotIn applies the NotIn predicate on the "status_changed_at" field.
+func StatusChangedAtNotIn(vs ...time.Time) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldNotIn(FieldStatusChangedAt, vs...))
+}
+
+// StatusChangedAtGT applies the GT predicate on the "status_changed_at" field.
+func StatusChangedAtGT(v time.Time) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldGT(FieldStatusChangedAt, v))
+}
+
+// StatusChangedAtGTE applies the GTE predicate on the "status_changed_at" field.
+func StatusChangedAtGTE(v time.Time) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldGTE(FieldStatusChangedAt, v))
+}
+
+// StatusChangedAtLT applies the LT predicate on the "status_changed_at" field.
+func StatusChangedAtLT(v time.Time) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldLT(FieldStatusChangedAt, v))
+}
+
+// StatusChangedAtLTE applies the LTE predicate on the "status_changed_at" field.
+func StatusChangedAtLTE(v time.Time) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldLTE(FieldStatusChangedAt, v))
+}
+
+// StatusChangedAtIsNil applies the IsNil predicate on the "status_changed_at" field.
+func StatusChangedAtIsNil() predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldIsNull(FieldStatusChangedAt))
+}
+
+// StatusChangedAtNotNil applies the NotNil predicate on the "status_changed_at" field.
+func StatusChangedAtNotNil() predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldNotNull(FieldStatusChangedAt))
+}
+
+// StatusChangedByEQ applies the EQ predicate on the "status_changed_by" field.
+func StatusChangedByEQ(v int) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldEQ(FieldStatusChangedBy, v))
+}
+
+// StatusChangedByNEQ applies the NEQ predicate on the "status_changed_by" field.
+func StatusChangedByNEQ(v int) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldNEQ(FieldStatusChangedBy, v))
+}
+
+// StatusChangedByIn applies the In predicate on the "status_changed_by" field.
+func StatusChangedByIn(vs ...int) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldIn(FieldStatusChangedBy, vs...))
+}
+
+// StatusChangedByNotIn applies the NotIn predicate on the "status_changed_by" field.
+func StatusChangedByNotIn(vs ...int) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldNotIn(FieldStatusChangedBy, vs...))
+}
+
+// StatusChangedByGT applies the GT predicate on the "status_changed_by" field.
+func StatusChangedByGT(v int) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldGT(FieldStatusChangedBy, v))
+}
+
+// StatusChangedByGTE applies the GTE predicate on the "status_changed_by" field.
+func StatusChangedByGTE(v int) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldGTE(FieldStatusChangedBy, v))
+}
+
+// StatusChangedByLT applies the LT predicate on the "status_changed_by" field.
+func StatusChangedByLT(v int) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldLT(FieldStatusChangedBy, v))
+}
+
+// StatusChangedByLTE applies the LTE predicate on the "status_changed_by" field.
+func StatusChangedByLTE(v int) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldLTE(FieldStatusChangedBy, v))
+}
+
+// StatusChangedByIsNil applies the IsNil predicate on the "status_changed_by" field.
+func StatusChangedByIsNil() predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldIsNull(FieldStatusChangedBy))
+}
+
+// StatusChangedByNotNil applies the NotNil predicate on the "status_changed_by" field.
+func StatusChangedByNotNil() predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldNotNull(FieldStatusChangedBy))
+}
+
 // ReceivedAtEQ applies the EQ predicate on the "received_at" field.
 func ReceivedAtEQ(v time.Time) predicate.InventoryLot {
 	return predicate.InventoryLot(sql.FieldEQ(FieldReceivedAt, v))
@@ -1055,6 +1370,29 @@ func HasStockReservations() predicate.InventoryLot {
 func HasStockReservationsWith(preds ...predicate.StockReservation) predicate.InventoryLot {
 	return predicate.InventoryLot(func(s *sql.Selector) {
 		step := newStockReservationsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasStatusEvents applies the HasEdge predicate on the "status_events" edge.
+func HasStatusEvents() predicate.InventoryLot {
+	return predicate.InventoryLot(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, StatusEventsTable, StatusEventsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasStatusEventsWith applies the HasEdge predicate on the "status_events" edge with a given conditions (other predicates).
+func HasStatusEventsWith(preds ...predicate.InventoryLotStatusEvent) predicate.InventoryLot {
+	return predicate.InventoryLot(func(s *sql.Selector) {
+		step := newStatusEventsStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"testing"
+	"time"
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
@@ -42,9 +43,17 @@ func TestProductionOrderLinkedDraftFactsCancelWithoutInventory(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		policy, err := factUC.GetProductionFactTransitionPolicy(ctx, fact.ID)
+		if err != nil || policy.FactType != biz.ProductionFactFinishedGoodsReceipt || policy.Status != biz.OperationalFactStatusDraft || policy.WasPosted || policy.RequiresSourceTask {
+			t.Fatalf("draft completion transition policy=%#v err=%v", policy, err)
+		}
 		cancelled, err := factUC.CancelPostedProductionFact(ctx, operationalFactStatusMutation(fact.ID, fact.Version, f.actorID, "完工入库草稿作废"))
 		if err != nil || cancelled.Status != biz.OperationalFactStatusCancelled || cancelled.PostedAt != nil {
 			t.Fatalf("draft completion cancel=%#v err=%v", cancelled, err)
+		}
+		policy, err = factUC.GetProductionFactTransitionPolicy(ctx, fact.ID)
+		if err != nil || policy.Status != biz.OperationalFactStatusCancelled || policy.WasPosted {
+			t.Fatalf("cancelled draft completion transition policy=%#v err=%v", policy, err)
 		}
 		assertOperationalFactHasZeroInventoryTxns(t, ctx, f.client, biz.ProductionFactSourceType, fact.ID)
 		closeReason := "草稿事实已撤销"
@@ -158,9 +167,11 @@ func TestDraftOutsourcingReturnCancellationBlocksActiveQualityAndFinance(t *test
 		SetSourceType(biz.QualityInspectionSourceOutsourcingFact).SetSourceID(fact.ID).SaveX(ctx)
 	actor := client.AdminUser.Create().SetUsername("out-draft-dependency-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
 	supplierID := source.order.SupplierID
+	occurredAt := time.Date(2026, time.August, 12, 10, 0, 0, 0, time.UTC)
 	finance := client.FinanceFact.Create().SetFactNo("FIN-OUT-DRAFT-DEPENDENCY").SetFactType(biz.FinanceFactPayable).
 		SetStatus(biz.OperationalFactStatusDraft).SetCounterpartyType(biz.FinanceCounterpartySupplier).SetCounterpartyID(supplierID).
 		SetAmount(decimal.NewFromInt(1)).SetFeeAmount(decimal.Zero).SetCurrency(biz.FinanceCurrencyCNY).
+		SetPaymentTerm(biz.FinancePaymentTermDueOnOccurrence).SetPaymentTermDays(0).SetOccurredAt(occurredAt).SetDueAt(occurredAt).
 		SetSourceType(biz.OutsourcingFactSourceType).SetSourceID(fact.ID).SetIdempotencyKey("fin-out-draft-dependency").SaveX(ctx)
 	if _, err := uc.CancelPostedOutsourcingFact(ctx, operationalFactStatusMutation(fact.ID, fact.Version, actor.ID, "委外回货草稿作废")); !errors.Is(err, biz.ErrOutsourcingReturnQualityDependency) {
 		t.Fatalf("active quality dependency error=%v", err)
@@ -261,10 +272,16 @@ func TestFormalSourceFinanceDraftCancellationAuditsAndReplaysExactly(t *testing.
 		{biz.FinanceFactReconciliation, biz.FinanceFactSourceType, biz.FinanceCounterpartyCustomer},
 	}
 	for index, test := range types {
-		row := client.FinanceFact.Create().SetFactNo("FIN-DRAFT-CANCEL-" + test.factType + "-" + test.sourceType).
+		occurredAt := time.Date(2026, time.August, 12, 10, index, 0, 0, time.UTC)
+		create := client.FinanceFact.Create().SetFactNo("FIN-DRAFT-CANCEL-" + test.factType + "-" + test.sourceType).
 			SetFactType(test.factType).SetStatus(biz.OperationalFactStatusDraft).SetCounterpartyType(test.counterpartyType).
 			SetAmount(decimal.NewFromInt(1)).SetFeeAmount(decimal.Zero).SetCurrency(biz.FinanceCurrencyCNY).
-			SetSourceType(test.sourceType).SetSourceID(1000 + index).SetIdempotencyKey("fin-draft-cancel-" + test.factType + "-" + test.sourceType).SaveX(ctx)
+			SetOccurredAt(occurredAt).SetSourceType(test.sourceType).SetSourceID(1000 + index).
+			SetIdempotencyKey("fin-draft-cancel-" + test.factType + "-" + test.sourceType)
+		if test.factType == biz.FinanceFactReceivable || test.factType == biz.FinanceFactPayable {
+			create.SetPaymentTerm(biz.FinancePaymentTermDueOnOccurrence).SetPaymentTermDays(0).SetDueAt(occurredAt)
+		}
+		row := create.SaveX(ctx)
 		cancelled, err := repo.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(row.ID, row.Version, actor.ID, "来源草稿作废"))
 		if err != nil || cancelled.Status != biz.OperationalFactStatusCancelled || cancelled.PostedAt != nil || cancelled.SettledAt != nil ||
 			cancelled.CancelledAt == nil || cancelled.CancelledBy == nil || *cancelled.CancelledBy != actor.ID || cancelled.CancelReason == nil {
@@ -285,9 +302,12 @@ func TestFormalSourceFinanceDraftCancellationAuditsAndReplaysExactly(t *testing.
 	if _, err := repo.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(firstCancelledID, firstCancelledVersion, otherActor.ID, "来源草稿作废")); !errors.Is(err, biz.ErrIdempotencyConflict) {
 		t.Fatalf("changed finance draft cancel actor error=%v", err)
 	}
+	manualOccurredAt := time.Date(2026, time.August, 12, 10, 5, 0, 0, time.UTC)
 	manual := client.FinanceFact.Create().SetFactNo("FIN-MANUAL-DRAFT-NO-CANCEL").SetFactType(biz.FinanceFactPayable).
 		SetStatus(biz.OperationalFactStatusDraft).SetCounterpartyType(biz.FinanceCounterpartySupplier).
 		SetAmount(decimal.NewFromInt(1)).SetFeeAmount(decimal.Zero).SetCurrency(biz.FinanceCurrencyCNY).
+		SetPaymentTerm(biz.FinancePaymentTermDueOnOccurrence).SetPaymentTermDays(0).
+		SetOccurredAt(manualOccurredAt).SetDueAt(manualOccurredAt).
 		SetIdempotencyKey("fin-manual-draft-no-cancel").SaveX(ctx)
 	if _, err := repo.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(manual.ID, manual.Version, actor.ID, "手工草稿不得走来源作废")); !errors.Is(err, biz.ErrFinanceFactSourceInvalid) {
 		t.Fatalf("manual finance draft cancellation error=%v", err)
@@ -297,9 +317,12 @@ func TestFormalSourceFinanceDraftCancellationAuditsAndReplaysExactly(t *testing.
 		t.Fatalf("finance draft cancellations wrote inventory transactions: before=%d after=%d", beforeTxns, got)
 	}
 
+	sourceOccurredAt := time.Date(2026, time.August, 12, 10, 6, 0, 0, time.UTC)
 	source := client.FinanceFact.Create().SetFactNo("FIN-DRAFT-WITH-RECON").SetFactType(biz.FinanceFactPayable).
 		SetStatus(biz.OperationalFactStatusDraft).SetCounterpartyType(biz.FinanceCounterpartySupplier).
 		SetAmount(decimal.NewFromInt(1)).SetFeeAmount(decimal.Zero).SetCurrency(biz.FinanceCurrencyCNY).
+		SetPaymentTerm(biz.FinancePaymentTermDueOnOccurrence).SetPaymentTermDays(0).
+		SetOccurredAt(sourceOccurredAt).SetDueAt(sourceOccurredAt).
 		SetSourceType(biz.PurchaseReceiptSourceType).SetSourceID(9999).SetIdempotencyKey("fin-draft-with-recon").SaveX(ctx)
 	child := client.FinanceFact.Create().SetFactNo("FIN-DRAFT-RECON-CHILD").SetFactType(biz.FinanceFactReconciliation).
 		SetStatus(biz.OperationalFactStatusDraft).SetCounterpartyType(biz.FinanceCounterpartySupplier).

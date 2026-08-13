@@ -94,18 +94,18 @@ func exceptionApprovalProcessBranchPolicyRegistrations() []exceptionApprovalProc
 	return []exceptionApprovalProcessBranchPolicyRegistration{
 		{
 			key:          ProcessBranchPolicySalesOrderApproval,
-			nextNodeKeys: []string{"activate_sales_order", "sales_order_rejected_end"},
+			nextNodeKeys: []string{"activate_sales_order", "reject_sales_order"},
 			handler: approvalOutcomeBranchPolicyHandler{
 				approveNodeKey: "activate_sales_order",
-				rejectNodeKey:  "sales_order_rejected_end",
+				rejectNodeKey:  "reject_sales_order",
 			},
 		},
 		{
 			key:          ProcessBranchPolicyPurchaseOrderApproval,
-			nextNodeKeys: []string{"approve_purchase_order", "purchase_order_rejected_end"},
+			nextNodeKeys: []string{"approve_purchase_order", "reject_purchase_order"},
 			handler: approvalOutcomeBranchPolicyHandler{
 				approveNodeKey: "approve_purchase_order",
-				rejectNodeKey:  "purchase_order_rejected_end",
+				rejectNodeKey:  "reject_purchase_order",
 			},
 		},
 		{

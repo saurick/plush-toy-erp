@@ -18,7 +18,18 @@ func unknownPurchaseOrderResult(method string) *v1.JsonrpcResult {
 }
 
 func purchaseOrderMutationFromParams(pm map[string]any) (*biz.PurchaseOrderMutation, bool) {
+	if !sourceOrderAllowsOnly(pm,
+		"customer_key", "id", "expected_version", "purchase_order_no", "supplier_id", "currency",
+		"payment_term_days", "supplier_purchase_order_no", "supplier_snapshot", "contract_party_snapshot",
+		"purchase_date", "expected_arrival_date", "note", "items",
+	) {
+		return nil, false
+	}
 	purchaseDate, ok := getRequiredJSONRPCTime(pm, "purchase_date")
+	if !ok {
+		return nil, false
+	}
+	paymentTermDays, ok := getOptionalJSONRPCNonNegativeInt(pm, "payment_term_days")
 	if !ok {
 		return nil, false
 	}
@@ -29,6 +40,8 @@ func purchaseOrderMutationFromParams(pm map[string]any) (*biz.PurchaseOrderMutat
 	return &biz.PurchaseOrderMutation{
 		PurchaseOrderNo:         getString(pm, "purchase_order_no"),
 		SupplierID:              getInt(pm, "supplier_id", 0),
+		Currency:                getString(pm, "currency"),
+		PaymentTermDays:         paymentTermDays,
 		SupplierPurchaseOrderNo: getWorkflowStringPtr(pm, "supplier_purchase_order_no"),
 		SupplierSnapshot:        getMap(pm, "supplier_snapshot"),
 		ContractPartySnapshot:   getMap(pm, "contract_party_snapshot"),
@@ -106,6 +119,10 @@ func (d *jsonrpcDispatcher) mapPurchaseOrderError(ctx context.Context, err error
 	switch {
 	case errors.Is(err, biz.ErrPurchaseOrderConflict):
 		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: errcode.ResourceVersionConflict.Message}
+	case errors.Is(err, biz.ErrIdempotencyConflict):
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
+	case errors.Is(err, biz.ErrSourceOrderNormalCloseIncomplete):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购订单尚未全部入库；若确定不再收货，请改用短关闭并填写原因"}
 	case errors.Is(err, biz.ErrBadParam):
 		l.Warnf("[purchase_order] invalid param err=%v", err)
 		return invalidParamResult()
@@ -213,6 +230,8 @@ func purchaseOrderToMap(item *biz.PurchaseOrder) map[string]any {
 		"id":                         item.ID,
 		"purchase_order_no":          item.PurchaseOrderNo,
 		"supplier_id":                item.SupplierID,
+		"currency":                   item.Currency,
+		"payment_term_days":          optionalIntValue(item.PaymentTermDays),
 		"supplier_purchase_order_no": optionalStringValue(item.SupplierPurchaseOrderNo),
 		"supplier_snapshot":          item.SupplierSnapshot,
 		"contract_party_snapshot":    item.ContractPartySnapshot,
@@ -220,6 +239,11 @@ func purchaseOrderToMap(item *biz.PurchaseOrder) map[string]any {
 		"expected_arrival_date":      optionalUnix(item.ExpectedArrivalDate),
 		"lifecycle_status":           item.LifecycleStatus,
 		"version":                    item.Version,
+		"settlement_action":          optionalStringValue(item.SettlementAction),
+		"settlement_mode":            optionalStringValue(item.SettlementMode),
+		"settlement_reason":          optionalStringValue(item.SettlementReason),
+		"settled_at":                 optionalUnix(item.SettledAt),
+		"settled_by":                 optionalIntValue(item.SettledBy),
 		"note":                       optionalStringValue(item.Note),
 		"created_at":                 item.CreatedAt.Unix(),
 		"updated_at":                 item.UpdatedAt.Unix(),

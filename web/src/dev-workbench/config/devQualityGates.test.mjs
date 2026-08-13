@@ -22,6 +22,7 @@ import {
   getQualityGateFlowSegments,
   getQualityGateStageLabel,
   getQualityGateStatusMeta,
+  normalizeDevQualityGateGaps,
   normalizeDevQualityGateSummary,
   parseQualityGateSearch,
   projectCurrentQualityGateProof,
@@ -124,6 +125,31 @@ function summary(overrides = {}) {
     ...overrides,
   }
 }
+
+test('quality gap protocol separates affected scopes from the local gate', () => {
+  const gaps = normalizeDevQualityGateGaps({
+    schemaVersion: 'plush.quality-gate-gap-analysis/v2',
+    range: 'current',
+    risk: 'all',
+    changedCount: 1,
+    affectedScopes: ['T0', 'T5'],
+    maxAffectedScope: 'T5',
+    localGate: 'full',
+    matched: false,
+    categories: [],
+    boundaries: ['本地门禁不等于发布证据'],
+  })
+  assert.deepEqual(gaps.affectedScopes, ['T0', 'T5'])
+  assert.equal(gaps.localGate, 'full')
+  assert.throws(
+    () =>
+      normalizeDevQualityGateGaps({
+        ...gaps,
+        schemaVersion: 'plush.quality-gate-gap-analysis/v1',
+      }),
+    /quality gaps are invalid/u
+  )
+})
 
 function receipt(overrides = {}) {
   return {

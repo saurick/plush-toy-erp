@@ -16,7 +16,6 @@
 ### Trace 链路追踪 / Trace
 
 - HTTP JSON-RPC 路由已接入 tracing middleware
-- gRPC 服务已接入 tracing middleware
 - 自定义健康检查和静态路由已走统一观测包装，会补 span、recover 和收尾日志
 - `biz.auth`、`biz.useradmin` 等关键 usecase 已显式创建 span
 - SQL tracing 保留 SQL span 的耗时、错误和链路关系，但不记录 SQL text、语句模板、bind args 或 SQL 参数值，避免客户、账号、手机号、业务 payload 或密码哈希进入 Jaeger。
@@ -54,9 +53,9 @@
 
 - `/readyz` 失败时虽然已有结构化日志，但响应体仍是简单文本
 - JSON-RPC 入口日志仍以文本 `Infof/Warnf` 为主，字段化程度一般
-- 当前 `request_id` 自动生成只覆盖 HTTP 链路，gRPC 和异步任务还没有统一 request id 策略
+- 当前 `request_id` 自动生成只覆盖 HTTP 链路，异步任务还没有统一 request id 策略
 - ProcessRuntime 后台对账没有 HTTP request_id；它依靠持久化 task / process / node ID 定位，当前也没有独立告警或 durable outbox 指标
-- HTTP / gRPC 已有服务级 BBR 限流，但密码登录尚无按账号 fingerprint 和可信来源的共享限速；多副本部署不能把单进程内存计数器当成完整防爆破能力
+- HTTP 已有服务级 BBR 限流，但密码登录尚无按账号 fingerprint 和可信来源的共享限速；多副本部署不能把单进程内存计数器当成完整防爆破能力
 
 ## 对当前部署路径的影响
 
@@ -64,7 +63,7 @@
 
 - Compose 当前保留 PostgreSQL `healthcheck`
 - 业务容器默认依赖 `/healthz`、`/readyz` 作为发布后 smoke 检查入口
-- Compose 默认同时拉起 Jaeger，便于本地和单机部署查看 trace；Jaeger 宿主机端口默认只绑定 `127.0.0.1`，远程查看优先使用 SSH tunnel。
+- Compose 默认同时拉起 Jaeger，便于本地和单机部署临时排查 trace；Jaeger 宿主机端口默认只绑定 `127.0.0.1`，远程查看优先使用 SSH tunnel。当前单机 Jaeger 不是长期审计或业务事实存储，发布结论仍以固定制品、迁移回读、健康检查和业务 smoke 证据为准。
 
 ## 后续常见补法
 

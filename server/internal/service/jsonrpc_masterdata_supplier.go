@@ -105,16 +105,42 @@ func supplierMutationFromParams(pm map[string]any) (*biz.SupplierMutation, bool)
 	if !ok {
 		return nil, false
 	}
+	defaultPaymentTermDays, ok := supplierPaymentTermDaysFromParams(pm)
+	if !ok {
+		return nil, false
+	}
 	return &biz.SupplierMutation{
-		Code:         getString(pm, "code"),
-		Name:         getString(pm, "name"),
-		ShortName:    getWorkflowStringPtr(pm, "short_name"),
-		SupplierType: getWorkflowStringPtr(pm, "supplier_type"),
-		Address:      getWorkflowStringPtr(pm, "address"),
-		TaxNo:        getWorkflowStringPtr(pm, "tax_no"),
-		ProcessIDs:   processIDs,
-		Note:         getWorkflowStringPtr(pm, "note"),
+		Code:                   getString(pm, "code"),
+		Name:                   getString(pm, "name"),
+		ShortName:              getWorkflowStringPtr(pm, "short_name"),
+		SupplierType:           getWorkflowStringPtr(pm, "supplier_type"),
+		Address:                getWorkflowStringPtr(pm, "address"),
+		TaxNo:                  getWorkflowStringPtr(pm, "tax_no"),
+		DefaultPaymentTermDays: defaultPaymentTermDays,
+		ProcessIDs:             processIDs,
+		Note:                   getWorkflowStringPtr(pm, "note"),
 	}, true
+}
+
+func supplierPaymentTermDaysFromParams(pm map[string]any) (int, bool) {
+	raw, exists := pm["default_payment_term_days"]
+	if !exists || raw == nil {
+		return 0, false
+	}
+	switch value := raw.(type) {
+	case float64:
+		if math.Trunc(value) != value || value < 0 || value > float64(math.MaxInt) {
+			return 0, false
+		}
+		return int(value), true
+	case int:
+		if value < 0 {
+			return 0, false
+		}
+		return value, true
+	default:
+		return 0, false
+	}
 }
 
 func supplierProcessIDsFromParams(pm map[string]any) ([]int, bool) {
@@ -170,18 +196,20 @@ func supplierToMap(item *biz.Supplier) map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"id":            item.ID,
-		"code":          item.Code,
-		"name":          item.Name,
-		"short_name":    optionalStringValue(item.ShortName),
-		"supplier_type": optionalStringValue(item.SupplierType),
-		"address":       optionalStringValue(item.Address),
-		"tax_no":        optionalStringValue(item.TaxNo),
-		"process_ids":   supplierProcessIDsToAny(item.ProcessIDs),
-		"is_active":     item.IsActive,
-		"note":          optionalStringValue(item.Note),
-		"created_at":    item.CreatedAt.Unix(),
-		"updated_at":    item.UpdatedAt.Unix(),
+		"id":                        item.ID,
+		"code":                      item.Code,
+		"name":                      item.Name,
+		"short_name":                optionalStringValue(item.ShortName),
+		"supplier_type":             optionalStringValue(item.SupplierType),
+		"address":                   optionalStringValue(item.Address),
+		"tax_no":                    optionalStringValue(item.TaxNo),
+		"default_payment_term_days": item.DefaultPaymentTermDays,
+		"process_ids":               supplierProcessIDsToAny(item.ProcessIDs),
+		"primary_contact":           contactToMap(item.PrimaryContact),
+		"is_active":                 item.IsActive,
+		"note":                      optionalStringValue(item.Note),
+		"created_at":                item.CreatedAt.Unix(),
+		"updated_at":                item.UpdatedAt.Unix(),
 	}
 }
 

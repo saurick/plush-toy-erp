@@ -62,7 +62,7 @@ Apply credentials:
   order, and sales order item permissions.
 
 This script is trial simulated/demo tooling only. It never executes real customer import,
-never writes business_records directly, never creates schema or migrations, and never
+never writes formal business data directly, never creates schema or migrations, and never
 creates shipment, inventory, finance, invoice, payment, receivable, or payable facts.`;
 
 class CliError extends Error {
@@ -203,7 +203,6 @@ function buildInputTemplate(options = {}) {
     writesDatabase: false,
     callsBackend: false,
     importsRealCustomerData: false,
-    createsBusinessRecords: false,
     createsShipmentInventoryFinanceFacts: false,
     downstreamReportOnlyWritesReports: true,
     downstreamApplyWritesDatabase: true,
@@ -238,7 +237,7 @@ function buildInputTemplate(options = {}) {
         "PATH=/usr/local/bin:$PATH bash scripts/seed-trial-sim-masterdata.sh",
     },
     boundary:
-      "This template only prints prerequisites and commands. It does not write reports, call backend, login, import real customer data, write business_records, create schema/migrations, or create shipment/inventory/finance facts.",
+      "This template only prints prerequisites and commands. It does not write reports, call backend, login, import real customer data, write formal business data, create schema/migrations, or create shipment/inventory/finance facts.",
   };
 }
 
@@ -756,7 +755,6 @@ async function writeReport({ options, dataset, results }) {
     dataset,
     results,
     noDirectDatabaseWrite: true,
-    noBusinessRecordsWrite: true,
     noSchemaOrMigrationChange: true,
     noShipmentInventoryFinanceFacts: true,
   };

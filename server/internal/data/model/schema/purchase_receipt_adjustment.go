@@ -20,6 +20,8 @@ type PurchaseReceiptAdjustment struct {
 func (PurchaseReceiptAdjustment) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{Checks: map[string]string{
+			"purchase_receipt_adjustments_status_allowed": "status IN ('DRAFT', 'POSTED', 'CANCELLED')",
+			"purchase_receipt_adjustments_posted_shape":   "((status = 'DRAFT' AND posted_at IS NULL) OR (status = 'POSTED' AND posted_at IS NOT NULL) OR status = 'CANCELLED')",
 			"purchase_receipt_adjustments_idempotency_bundle_complete": `
 (
   (

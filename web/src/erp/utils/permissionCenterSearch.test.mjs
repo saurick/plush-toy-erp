@@ -116,10 +116,9 @@ test('permissionCenterSearch: 管理员状态筛选只按 account_status 三态�
     [1]
   )
   assert.deepEqual(
-    filterAdminRecords(
-      [{ id: 5, is_super_admin: false, disabled: false }],
-      { status: ADMIN_STATUS_FILTERS.ACTIVE }
-    ),
+    filterAdminRecords([{ id: 5, is_super_admin: false, disabled: false }], {
+      status: ADMIN_STATUS_FILTERS.ACTIVE,
+    }),
     [],
     '缺少 account_status 时不得用 disabled 猜测账号仍为启用'
   )
@@ -137,7 +136,7 @@ test('permissionCenterSearch: 权限搜索保留分组层级并支持按分组�
         },
         {
           key: 'supplier.read',
-          label: '供应商档案',
+          label: '供应商与加工厂',
           description: '查看供应商资料',
         },
       ],
@@ -169,7 +168,7 @@ test('permissionCenterSearch: 权限搜索保留分组层级并支持按分组�
       items: [
         {
           key: 'supplier.read',
-          label: '供应商档案',
+          label: '供应商与加工厂',
           description: '查看供应商资料',
         },
       ],

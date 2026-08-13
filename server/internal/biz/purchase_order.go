@@ -41,6 +41,8 @@ type PurchaseOrder struct {
 	ID                      int
 	PurchaseOrderNo         string
 	SupplierID              int
+	Currency                string
+	PaymentTermDays         *int
 	SupplierPurchaseOrderNo *string
 	SupplierSnapshot        map[string]any
 	ContractPartySnapshot   map[string]any
@@ -48,6 +50,11 @@ type PurchaseOrder struct {
 	ExpectedArrivalDate     *time.Time
 	LifecycleStatus         string
 	Version                 int
+	SettlementAction        *string
+	SettlementMode          *string
+	SettlementReason        *string
+	SettledAt               *time.Time
+	SettledBy               *int
 	Note                    *string
 	CreatedAt               time.Time
 	UpdatedAt               time.Time
@@ -82,6 +89,8 @@ type PurchaseOrderMutation struct {
 	ExpectedVersion         int
 	PurchaseOrderNo         string
 	SupplierID              int
+	Currency                string
+	PaymentTermDays         *int
 	SupplierPurchaseOrderNo *string
 	SupplierSnapshot        map[string]any
 	ContractPartySnapshot   map[string]any
@@ -190,6 +199,14 @@ type PurchaseOrderReceiptProgressRepo interface {
 	GetPurchaseOrderReceiptProgress(ctx context.Context, id int) (*PurchaseOrderReceiptProgress, error)
 }
 
+type PurchaseOrderLifecycleActionRepo interface {
+	ApplyPurchaseOrderLifecycleAction(ctx context.Context, in *SourceOrderLifecycleAction, lifecycleStatus string) (*PurchaseOrder, error)
+}
+
+type SupplierDefaultPaymentTermDaysReader interface {
+	SupplierDefaultPaymentTermDays(ctx context.Context, supplierID int) (int, error)
+}
+
 type PurchaseOrderUsecase struct {
 	repo PurchaseOrderRepo
 }
@@ -202,11 +219,15 @@ func (uc *PurchaseOrderUsecase) CreatePurchaseOrder(ctx context.Context, in *Pur
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
 	}
-	normalized, err := normalizePurchaseOrderMutation(*in)
+	normalized, err := normalizePurchaseOrderMutation(*in, true)
 	if err != nil {
 		return nil, err
 	}
 	if err := uc.validateSupplierActive(ctx, normalized.SupplierID); err != nil {
+		return nil, err
+	}
+	normalized.PaymentTermDays, err = resolveSourceOrderPaymentTermDays(ctx, uc.repo, normalized.SupplierID, normalized.PaymentTermDays)
+	if err != nil {
 		return nil, err
 	}
 	return uc.repo.CreatePurchaseOrder(ctx, &normalized)
@@ -223,7 +244,7 @@ func (uc *PurchaseOrderUsecase) UpdatePurchaseOrder(ctx context.Context, id int,
 	if !corestatus.IsPurchaseOrderEditable(current.LifecycleStatus) {
 		return nil, ErrBadParam
 	}
-	normalized, err := normalizePurchaseOrderMutation(*in)
+	normalized, err := normalizePurchaseOrderMutation(*in, false)
 	if err != nil {
 		return nil, err
 	}
@@ -298,8 +319,31 @@ func (uc *PurchaseOrderUsecase) ClosePurchaseOrder(ctx context.Context, id int) 
 	return uc.changePurchaseOrderLifecycle(ctx, id, PurchaseOrderStatusClosed)
 }
 
+func (uc *PurchaseOrderUsecase) ClosePurchaseOrderWithAction(ctx context.Context, in *SourceOrderLifecycleAction) (*PurchaseOrder, error) {
+	return uc.applyPurchaseOrderLifecycleAction(ctx, in, SourceOrderActionClose, PurchaseOrderStatusClosed)
+}
+
 func (uc *PurchaseOrderUsecase) CancelPurchaseOrder(ctx context.Context, id int) (*PurchaseOrder, error) {
 	return uc.changePurchaseOrderLifecycle(ctx, id, PurchaseOrderStatusCanceled)
+}
+
+func (uc *PurchaseOrderUsecase) CancelPurchaseOrderWithAction(ctx context.Context, in *SourceOrderLifecycleAction) (*PurchaseOrder, error) {
+	return uc.applyPurchaseOrderLifecycleAction(ctx, in, SourceOrderActionCancel, PurchaseOrderStatusCanceled)
+}
+
+func (uc *PurchaseOrderUsecase) applyPurchaseOrderLifecycleAction(ctx context.Context, in *SourceOrderLifecycleAction, actionKey string, next string) (*PurchaseOrder, error) {
+	if uc == nil || uc.repo == nil || in == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := NormalizeSourceOrderLifecycleAction(*in, actionKey)
+	if err != nil {
+		return nil, err
+	}
+	repo, ok := uc.repo.(PurchaseOrderLifecycleActionRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return repo.ApplyPurchaseOrderLifecycleAction(ctx, &normalized, next)
 }
 
 func (uc *PurchaseOrderUsecase) AddPurchaseOrderItem(ctx context.Context, in *PurchaseOrderItemMutation) (*PurchaseOrderItem, error) {
@@ -390,12 +434,18 @@ func (uc *PurchaseOrderUsecase) SavePurchaseOrderWithItems(ctx context.Context, 
 	if id == 0 {
 		order.ExpectedVersion = 0
 	}
-	normalizedOrder, err := normalizePurchaseOrderMutation(*order)
+	normalizedOrder, err := normalizePurchaseOrderMutation(*order, id == 0)
 	if err != nil {
 		return nil, err
 	}
 	if err := uc.validateSupplierActive(ctx, normalizedOrder.SupplierID); err != nil {
 		return nil, err
+	}
+	if id == 0 {
+		normalizedOrder.PaymentTermDays, err = resolveSourceOrderPaymentTermDays(ctx, uc.repo, normalizedOrder.SupplierID, normalizedOrder.PaymentTermDays)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	normalizedItems := make([]*PurchaseOrderItemSaveMutation, 0, len(items))
@@ -521,8 +571,24 @@ func (uc *PurchaseOrderUsecase) validateMaterialAndUnitActive(ctx context.Contex
 	return nil
 }
 
-func normalizePurchaseOrderMutation(in PurchaseOrderMutation) (PurchaseOrderMutation, error) {
+func normalizePurchaseOrderMutation(in PurchaseOrderMutation, create bool) (PurchaseOrderMutation, error) {
 	in.PurchaseOrderNo = strings.TrimSpace(in.PurchaseOrderNo)
+	var currencyOK bool
+	in.Currency, currencyOK = normalizeSourceOrderCurrency(in.Currency, create)
+	if !currencyOK {
+		return PurchaseOrderMutation{}, ErrBadParam
+	}
+	if in.PaymentTermDays == nil {
+		if !create {
+			return PurchaseOrderMutation{}, ErrBadParam
+		}
+	} else {
+		if *in.PaymentTermDays < 0 {
+			return PurchaseOrderMutation{}, ErrBadParam
+		}
+		termDays := *in.PaymentTermDays
+		in.PaymentTermDays = &termDays
+	}
 	in.SupplierPurchaseOrderNo = normalizeOptionalString(in.SupplierPurchaseOrderNo)
 	in.Note = normalizeOptionalString(in.Note)
 	if in.SupplierSnapshot == nil {
@@ -538,6 +604,28 @@ func normalizePurchaseOrderMutation(in PurchaseOrderMutation) (PurchaseOrderMuta
 		return PurchaseOrderMutation{}, err
 	}
 	return in, nil
+}
+
+func resolveSourceOrderPaymentTermDays(ctx context.Context, repo any, supplierID int, explicit *int) (*int, error) {
+	if explicit != nil {
+		if *explicit < 0 {
+			return nil, ErrBadParam
+		}
+		termDays := *explicit
+		return &termDays, nil
+	}
+	reader, ok := repo.(SupplierDefaultPaymentTermDaysReader)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	termDays, err := reader.SupplierDefaultPaymentTermDays(ctx, supplierID)
+	if err != nil {
+		return nil, err
+	}
+	if termDays < 0 {
+		return nil, ErrBadParam
+	}
+	return &termDays, nil
 }
 
 func normalizePurchaseOrderItemMutation(in PurchaseOrderItemMutation) (PurchaseOrderItemMutation, error) {

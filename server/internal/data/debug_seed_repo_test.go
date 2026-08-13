@@ -8,6 +8,7 @@ import (
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
+	entmigrate "server/internal/data/model/ent/migrate"
 	"server/internal/data/model/ent/workflowbusinessstate"
 	"server/internal/data/model/ent/workflowtask"
 
@@ -17,6 +18,21 @@ import (
 func TestDebugSeedRepo_CleanupDryRunDoesNotMutateAndCleanupOnlyDebugData(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "debug_seed_repo")
+	regularTask := client.WorkflowTask.Create().
+		SetTaskCode("REGULAR-TASK-001").
+		SetTaskGroup("regular").
+		SetTaskName("普通业务任务").
+		SetSourceType("sales_order").
+		SetSourceID(9001).
+		SetTaskStatusKey("ready").
+		SetOwnerRoleKey("sales").
+		SaveX(ctx)
+	regularEvent := client.WorkflowTaskEvent.Create().
+		SetTaskID(regularTask.ID).
+		SetTaskVersion(regularTask.Version).
+		SetEventType("created").
+		SetToStatusKey("ready").
+		SaveX(ctx)
 
 	repo := NewDebugSeedRepo(
 		data,
@@ -75,7 +91,7 @@ func TestDebugSeedRepo_CleanupDryRunDoesNotMutateAndCleanupOnlyDebugData(t *test
 		t.Fatalf("cleanup failed: %v", err)
 	}
 	if len(cleanup.ArchivedRecords) != 0 {
-		t.Fatalf("expected no archived business records, got %#v", cleanup.ArchivedRecords)
+		t.Fatalf("expected no archived debug rows, got %#v", cleanup.ArchivedRecords)
 	}
 	if len(cleanup.DeletedTasks) != beforeTasks || cleanup.DeletedBusinessStates != beforeStates {
 		t.Fatalf("unexpected cleanup task/state counts %#v", cleanup)
@@ -83,8 +99,14 @@ func TestDebugSeedRepo_CleanupDryRunDoesNotMutateAndCleanupOnlyDebugData(t *test
 	if after := countDebugTasks(t, ctx, client, prefix); after != 0 {
 		t.Fatalf("expected debug tasks deleted, got %d", after)
 	}
-	if events, err := client.WorkflowTaskEvent.Query().Count(ctx); err != nil || events != 0 {
-		t.Fatalf("expected workflow task events deleted, count=%d err=%v", events, err)
+	if _, err := client.WorkflowTask.Get(ctx, regularTask.ID); err != nil {
+		t.Fatalf("expected non-debug workflow task preserved: %v", err)
+	}
+	if _, err := client.WorkflowTaskEvent.Get(ctx, regularEvent.ID); err != nil {
+		t.Fatalf("expected non-debug workflow task event preserved: %v", err)
+	}
+	if events, err := client.WorkflowTaskEvent.Query().Count(ctx); err != nil || events != 1 {
+		t.Fatalf("expected only non-debug workflow task event preserved, count=%d err=%v", events, err)
 	}
 }
 
@@ -175,7 +197,7 @@ func TestDebugSeedRepo_ClearBusinessDataDeletesCurrentProjectBusinessTables(t *t
 		result.DeletedCounts["processes"] == 0 {
 		t.Fatalf("unexpected clear result %#v", result)
 	}
-	assertProjectBusinessTablesEmpty(t, ctx, client)
+	assertProjectBusinessTablesEmpty(t, ctx, data)
 }
 
 func TestDebugBusinessDataClearIncludesProcessRuntimeBeforeSourceDocuments(t *testing.T) {
@@ -192,6 +214,70 @@ func TestDebugBusinessDataClearIncludesProcessRuntimeBeforeSourceDocuments(t *te
 		index["process_node_instances"] >= index["process_instances"] ||
 		index["process_instances"] >= index["sales_orders"] {
 		t.Fatalf("process runtime cleanup order is unsafe: %#v", index)
+	}
+}
+
+func TestDebugBusinessDataClearClassifiesEveryGeneratedTableAndKeepsForeignKeyOrder(t *testing.T) {
+	preserved := map[string]struct{}{
+		"access_entitlements": {}, "admin_sessions": {}, "admin_users": {}, "admin_user_roles": {},
+		"customer_config_revisions": {}, "deployment_module_states": {}, "permissions": {},
+		"roles": {}, "role_data_scopes": {}, "role_permissions": {}, "role_profiles": {},
+		"runtime_audit_events": {}, "runtime_markers": {}, "work_pools": {}, "work_pool_memberships": {},
+	}
+	clearIndex := make(map[string]int, len(debugBusinessDataClearTables))
+	for index, tableName := range debugBusinessDataClearTables {
+		if _, exists := clearIndex[tableName]; exists {
+			t.Fatalf("business clear allowlist contains duplicate table %s", tableName)
+		}
+		clearIndex[tableName] = index
+	}
+	generated := make(map[string]struct{}, len(entmigrate.Tables))
+	usedDetachments := make(map[debugBusinessDataClearDetachment]bool, len(debugBusinessDataClearDetachments))
+	for _, table := range entmigrate.Tables {
+		generated[table.Name] = struct{}{}
+		_, cleared := clearIndex[table.Name]
+		_, kept := preserved[table.Name]
+		if cleared == kept {
+			t.Fatalf("generated table %s must be classified exactly once as business-clear or preserved", table.Name)
+		}
+		if !cleared {
+			continue
+		}
+		for _, foreignKey := range table.ForeignKeys {
+			if foreignKey.RefTable == nil || foreignKey.RefTable.Name == table.Name {
+				continue
+			}
+			parentIndex, parentCleared := clearIndex[foreignKey.RefTable.Name]
+			if !parentCleared {
+				continue
+			}
+			detached := false
+			if len(foreignKey.Columns) == 1 && debugBusinessDataClearDetaches(table.Name, foreignKey.Columns[0].Name) {
+				if !foreignKey.Columns[0].Nullable {
+					t.Fatalf("business clear detachment %s.%s must remain nullable", table.Name, foreignKey.Columns[0].Name)
+				}
+				usedDetachments[debugBusinessDataClearDetachment{tableName: table.Name, columnName: foreignKey.Columns[0].Name}] = true
+				detached = true
+			}
+			if !detached && clearIndex[table.Name] >= parentIndex {
+				t.Fatalf("business clear order must delete child %s before parent %s", table.Name, foreignKey.RefTable.Name)
+			}
+		}
+	}
+	for tableName := range clearIndex {
+		if _, ok := generated[tableName]; !ok {
+			t.Fatalf("business clear allowlist contains unknown generated table %s", tableName)
+		}
+	}
+	for tableName := range preserved {
+		if _, ok := generated[tableName]; !ok {
+			t.Fatalf("preserved table classification contains unknown generated table %s", tableName)
+		}
+	}
+	for _, detachment := range debugBusinessDataClearDetachments {
+		if !usedDetachments[detachment] {
+			t.Fatalf("business clear detachment no longer matches a generated foreign key: %#v", detachment)
+		}
 	}
 }
 
@@ -247,56 +333,15 @@ func createDebugOutsourcingOrderWithProcess(t *testing.T, ctx context.Context, c
 	}
 }
 
-func assertProjectBusinessTablesEmpty(t *testing.T, ctx context.Context, client *ent.Client) {
+func assertProjectBusinessTablesEmpty(t *testing.T, ctx context.Context, data *Data) {
 	t.Helper()
-	checks := []struct {
-		name  string
-		count func(context.Context) (int, error)
-	}{
-		{"workflow_tasks", client.WorkflowTask.Query().Count},
-		{"workflow_task_events", client.WorkflowTaskEvent.Query().Count},
-		{"workflow_business_states", client.WorkflowBusinessState.Query().Count},
-		{"finance_facts", client.FinanceFact.Query().Count},
-		{"stock_reservations", client.StockReservation.Query().Count},
-		{"shipment_items", client.ShipmentItem.Query().Count},
-		{"shipments", client.Shipment.Query().Count},
-		{"outsourcing_order_items", client.OutsourcingOrderItem.Query().Count},
-		{"outsourcing_orders", client.OutsourcingOrder.Query().Count},
-		{"outsourcing_facts", client.OutsourcingFact.Query().Count},
-		{"production_facts", client.ProductionFact.Query().Count},
-		{"quality_inspections", client.QualityInspection.Query().Count},
-		{"purchase_receipt_adjustments", client.PurchaseReceiptAdjustment.Query().Count},
-		{"purchase_receipt_adjustment_items", client.PurchaseReceiptAdjustmentItem.Query().Count},
-		{"purchase_returns", client.PurchaseReturn.Query().Count},
-		{"purchase_return_items", client.PurchaseReturnItem.Query().Count},
-		{"purchase_receipts", client.PurchaseReceipt.Query().Count},
-		{"purchase_receipt_items", client.PurchaseReceiptItem.Query().Count},
-		{"inventory_balances", client.InventoryBalance.Query().Count},
-		{"inventory_txns", client.InventoryTxn.Query().Count},
-		{"inventory_lots", client.InventoryLot.Query().Count},
-		{"purchase_orders", client.PurchaseOrder.Query().Count},
-		{"purchase_order_items", client.PurchaseOrderItem.Query().Count},
-		{"sales_orders", client.SalesOrder.Query().Count},
-		{"sales_order_items", client.SalesOrderItem.Query().Count},
-		{"contacts", client.Contact.Query().Count},
-		{"bom_headers", client.BOMHeader.Query().Count},
-		{"bom_items", client.BOMItem.Query().Count},
-		{"product_skus", client.ProductSKU.Query().Count},
-		{"processes", client.Process.Query().Count},
-		{"materials", client.Material.Query().Count},
-		{"products", client.Product.Query().Count},
-		{"suppliers", client.Supplier.Query().Count},
-		{"customers", client.Customer.Query().Count},
-		{"warehouses", client.Warehouse.Query().Count},
-		{"units", client.Unit.Query().Count},
-	}
-	for _, check := range checks {
-		count, err := check.count(ctx)
-		if err != nil {
-			t.Fatalf("count %s failed: %v", check.name, err)
+	for _, tableName := range debugBusinessDataClearTables {
+		var count int
+		if err := data.sqldb.QueryRowContext(ctx, "SELECT COUNT(*) FROM "+quoteSQLIdentifier(tableName)).Scan(&count); err != nil {
+			t.Fatalf("count %s failed: %v", tableName, err)
 		}
 		if count != 0 {
-			t.Fatalf("expected %s empty, got %d", check.name, count)
+			t.Fatalf("expected %s empty, got %d", tableName, count)
 		}
 	}
 }

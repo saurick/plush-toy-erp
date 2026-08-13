@@ -17,6 +17,7 @@ const WORKFLOW_TASK_STATUS_KEYS = new Set([
   'blocked',
   'done',
   'rejected',
+  'withdrawn',
 ])
 const WORKFLOW_TASK_MUTATION_STATUS_BY_OPERATION = Object.freeze({
   complete: 'done',
@@ -43,7 +44,7 @@ const WORKFLOW_ROLE_TASK_QUERY_KEYS = new Set([
 ])
 const WORKFLOW_ROLE_TASK_STATUS_KEYS_BY_VIEW = Object.freeze({
   todo: new Set(['ready', 'blocked']),
-  history: new Set(['done', 'rejected']),
+  history: new Set(['done', 'rejected', 'withdrawn']),
   risk: new Set(['ready', 'blocked']),
   approval: new Set(['ready', 'blocked']),
 })
@@ -58,6 +59,7 @@ const WORKFLOW_ROLE_TASK_COUNT_KEYS = Object.freeze([
   'risk',
   'todo',
   'total',
+  'withdrawn',
 ])
 const WORKFLOW_ROLE_TASK_RESPONSE_KEYS = Object.freeze([
   'has_more',
@@ -161,7 +163,7 @@ function isWorkflowRoleTaskCountSummary(value) {
         (key) => Number.isSafeInteger(value[key]) && value[key] >= 0
       ) &&
       value.todo === value.ready + value.blocked &&
-      value.history === value.done + value.rejected &&
+      value.history === value.done + value.rejected + value.withdrawn &&
       value.total === value.todo + value.history &&
       value.overdue <= value.risk
   )

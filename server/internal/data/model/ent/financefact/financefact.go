@@ -40,6 +40,8 @@ const (
 	FieldPaymentTerm = "payment_term"
 	// FieldPaymentTermDays holds the string denoting the payment_term_days field in the database.
 	FieldPaymentTermDays = "payment_term_days"
+	// FieldDueAt holds the string denoting the due_at field in the database.
+	FieldDueAt = "due_at"
 	// FieldInvoiceCategory holds the string denoting the invoice_category field in the database.
 	FieldInvoiceCategory = "invoice_category"
 	// FieldSourceType holds the string denoting the source_type field in the database.
@@ -120,6 +122,7 @@ var Columns = []string{
 	FieldCollectionType,
 	FieldPaymentTerm,
 	FieldPaymentTermDays,
+	FieldDueAt,
 	FieldInvoiceCategory,
 	FieldSourceType,
 	FieldSourceID,
@@ -282,6 +285,11 @@ func ByPaymentTerm(opts ...sql.OrderTermOption) OrderOption {
 // ByPaymentTermDays orders the results by the payment_term_days field.
 func ByPaymentTermDays(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPaymentTermDays, opts...).ToFunc()
+}
+
+// ByDueAt orders the results by the due_at field.
+func ByDueAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDueAt, opts...).ToFunc()
 }
 
 // ByInvoiceCategory orders the results by the invoice_category field.

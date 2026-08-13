@@ -69,7 +69,7 @@ test('shipment page exposes exact upstream and downstream record routes', () => 
   assert.match(source, />\s*相关单据\s*<DownOutlined \/>/u)
   assert.match(
     source,
-    /businessRecordInventoryRouteFor\(\s*'shipments',\s*selectedRow\.id,/u
+    /businessSourceInventoryRouteFor\(\s*'shipments',\s*selectedRow\.id,/u
   )
   assert.match(source, /sales_order_id:\s*selectedRow\.sales_order_id/u)
   assert.match(source, /source_type:\s*'SHIPMENT'/u)

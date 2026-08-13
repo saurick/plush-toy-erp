@@ -155,7 +155,6 @@
 
 ## 2026-07-03 后台入口菜单投影有效性收口
 
-- 完成：继续当前 active goal 的 review findings 驱动口径，处理后台入口访问判断只看 `adminProfile.menus.length` 的缺口。`entryConfig.hasDesktopEntryAccess` 现在会先通过 `resolveMenuPermissionKey` 把字符串菜单和对象菜单归一成当前有效菜单权限项；未知路径、旧业务记录重叠入口等无效菜单不会让 mobile-only 岗位账号因为陈旧 desktop 记忆进入后台。super admin 仍保留产品核心审阅入口，普通账号仍按菜单投影收窄。本轮不改后端 RBAC 真源、不改客户配置 active revision、不改路由结构、不开放 `__dev` 正式菜单。
 - 验证：`node --test web/src/erp/config/entryConfig.test.mjs web/src/erp/config/menuPermissions.test.mjs web/src/erp/utils/adminProfileSync.test.mjs` 通过 42 个测试，仍有既有 `MODULE_TYPELESS_PACKAGE_JSON` warning；`node --check web/src/erp/config/entryConfig.mjs && node --check web/src/erp/config/entryConfig.test.mjs` 通过；`/usr/local/bin/pnpm --dir web exec eslint --ext .mjs src/erp/config/entryConfig.mjs src/erp/config/entryConfig.test.mjs src/erp/config/menuPermissions.mjs src/erp/config/menuPermissions.test.mjs src/erp/utils/adminProfileSync.mjs src/erp/utils/adminProfileSync.test.mjs` 通过；`node scripts/qa/multi-client-role-workflow-priority-audit.mjs --json` 返回 `ok: true`、`readOnly: true`、`releaseReady: false`，目标环境证据仍保持外部缺口。本轮未改样式或页面布局，未跑 `style:l1`。
 - 下一步：继续按 review findings 推进普通 admin / 正式客户真实浏览器菜单 smoke、客户配置 active revision 读回、Workflow action/RBAC/usecase parity、移动端真实动作和打印历史缺值链路。
 - 阻塞/风险：本轮只证明后台入口访问判断不再把无效菜单投影当成桌面入口权限；未证明真实账号登录、真实浏览器菜单导航、后端 RBAC 写操作、目标环境 active revision、生产发布、真实客户导入、客户签收、备份恢复或回滚演练。当前工作区仍有大量未提交改动；本轮未提交、未推送、未 stash、未清理。

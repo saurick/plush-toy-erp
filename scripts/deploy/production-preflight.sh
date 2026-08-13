@@ -266,6 +266,9 @@ required_keys=(
   TZ
   POSTGRES_DSN
   POSTGRES_PASSWORD
+  POSTGRES_APP_PASSWORD
+  POSTGRES_MIGRATOR_PASSWORD
+  POSTGRES_BACKUP_PASSWORD
   POSTGRES_DB
   POSTGRES_USER
   POSTGRES_DATA_DIR
@@ -275,7 +278,6 @@ required_keys=(
   TRACE_RATIO
   WEB_API_ORIGIN
   APP_HTTP_BIND_ADDR
-  APP_GRPC_BIND_ADDR
   WEB_DESKTOP_BIND_ADDR
   APP_JWT_SECRET
   APP_AUTH_SMS_MODE
@@ -358,7 +360,7 @@ if [[ "$mode" == "example" ]]; then
   ok "example 模式仅检查结构，不作为生产放行"
 else
   placeholder_pattern='(change-this|placeholder|replace-with|<release-tag>|example\.invalid)'
-  for key in POSTGRES_DSN POSTGRES_PASSWORD APP_JWT_SECRET APP_IMAGE WEB_IMAGE POSTGRES_IMAGE JAEGER_IMAGE POSTGRES_DATA_DIR WEB_API_ORIGIN; do
+  for key in POSTGRES_DSN POSTGRES_PASSWORD POSTGRES_APP_PASSWORD POSTGRES_MIGRATOR_PASSWORD POSTGRES_BACKUP_PASSWORD APP_JWT_SECRET APP_IMAGE WEB_IMAGE POSTGRES_IMAGE JAEGER_IMAGE POSTGRES_DATA_DIR WEB_API_ORIGIN; do
     value="$(value_of "$key")"
     if grep -Eiq "$placeholder_pattern" <<<"$value"; then
       fail "$key 仍包含 placeholder"
@@ -381,9 +383,13 @@ else
   jaeger_bind_addr="$(value_of JAEGER_BIND_ADDR)"
   postgres_bind_addr="$(value_of POSTGRES_BIND_ADDR)"
   app_http_bind_addr="$(value_of APP_HTTP_BIND_ADDR)"
-  app_grpc_bind_addr="$(value_of APP_GRPC_BIND_ADDR)"
   web_desktop_bind_addr="$(value_of WEB_DESKTOP_BIND_ADDR)"
   postgres_dsn="$(value_of POSTGRES_DSN)"
+  postgres_password="$(value_of POSTGRES_PASSWORD)"
+  postgres_app_password="$(value_of POSTGRES_APP_PASSWORD)"
+  postgres_migrator_password="$(value_of POSTGRES_MIGRATOR_PASSWORD)"
+  postgres_backup_password="$(value_of POSTGRES_BACKUP_PASSWORD)"
+  postgres_user="$(value_of POSTGRES_USER)"
   app_admin_password="$(value_of APP_ADMIN_PASSWORD)"
   bootstrap_admin_once="$(value_of BOOTSTRAP_ADMIN_ONCE)"
   trace_ratio="$(value_of TRACE_RATIO)"
@@ -392,6 +398,22 @@ else
   postgres_data_dir="$(value_of POSTGRES_DATA_DIR)"
   postgres_database="$(value_of POSTGRES_DB)"
   project_slug="$(value_of PROJECT_SLUG)"
+
+  for role_password in "$postgres_app_password" "$postgres_migrator_password" "$postgres_backup_password"; do
+    [[ "$role_password" =~ ^[A-Za-z0-9._~-]{20,128}$ ]] || fail "数据库角色密码必须是 20-128 位 URL-safe 值"
+  done
+  [[ "$postgres_app_password" != "$postgres_migrator_password" &&
+    "$postgres_app_password" != "$postgres_backup_password" &&
+    "$postgres_migrator_password" != "$postgres_backup_password" &&
+    "$postgres_password" != "$postgres_app_password" &&
+    "$postgres_password" != "$postgres_migrator_password" &&
+    "$postgres_password" != "$postgres_backup_password" ]] ||
+    fail "数据库管理员、应用、迁移和备份密码必须彼此不同"
+  [[ "$postgres_user" != "erp_app" && "$postgres_user" != "erp_migrator" && "$postgres_user" != "erp_backup" ]] ||
+    fail "POSTGRES_USER 只能用于容器初始化管理员，不能复用业务角色"
+  expected_postgres_dsn="postgres://erp_app:${postgres_app_password}@postgres:5432/${postgres_database}?sslmode=disable"
+  [[ "$postgres_dsn" == "$expected_postgres_dsn" ]] ||
+    fail "POSTGRES_DSN 必须精确使用 erp_app、POSTGRES_APP_PASSWORD、postgres:5432 和 POSTGRES_DB"
 
   [[ "$erp_customer_key" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || fail "ERP_CUSTOMER_KEY 必须是稳定小写 customer key"
   [[ "$erp_customer_key" != "current" ]] || fail "ERP_CUSTOMER_KEY 不能使用旧 current 别名"
@@ -469,14 +491,13 @@ PY
     [[ "$erp_customer_key" == "yoyoosun" ]] || fail "远端验收客户配置只允许 ERP_CUSTOMER_KEY=yoyoosun"
     [[ "$project_slug" == "plush-toy-erp-v5" ]] || fail "customer-trial-133 必须使用独立 PROJECT_SLUG=plush-toy-erp-v5"
     [[ "$postgres_database" == "plush_erp_uat_20260716_v5" ]] || fail "customer-trial-133 必须使用独立 POSTGRES_DB=plush_erp_uat_20260716_v5"
-    [[ "$postgres_dsn" =~ ^postgres(ql)?://[^/@]+:[^@/]+@postgres:5432/plush_erp_uat_20260716_v5\?sslmode=disable$ ]] || fail "远端验收客户配置 POSTGRES_DSN 必须精确指向单一 postgres:5432/plush_erp_uat_20260716_v5，且只能使用 sslmode=disable"
+    [[ "$postgres_dsn" =~ ^postgres://erp_app:[A-Za-z0-9._~-]{20,128}@postgres:5432/plush_erp_uat_20260716_v5\?sslmode=disable$ ]] || fail "远端验收客户配置 POSTGRES_DSN 必须由 erp_app 精确指向单一 postgres:5432/plush_erp_uat_20260716_v5"
     [[ "$postgres_data_dir" == "/home/simon/plush-toy-erp-v5/data/postgres" ]] || fail "customer-trial-133 必须使用独立 POSTGRES_DATA_DIR=/home/simon/plush-toy-erp-v5/data/postgres"
     [[ "$migration_lock_file" == "/home/simon/plush-toy-erp-v5/run/atlas-migrate.lock" ]] || fail "customer-trial-133 必须使用独立 MIGRATION_LOCK_FILE=/home/simon/plush-toy-erp-v5/run/atlas-migrate.lock"
     [[ "$web_desktop_bind_addr" == "127.0.0.1" ]] || fail "customer-trial-133 前端宿主机端口必须绑定 WEB_DESKTOP_BIND_ADDR=127.0.0.1"
     for trial_port in \
       POSTGRES_PORT=55435 \
       APP_HTTP_PORT=8315 \
-      APP_GRPC_PORT=9315 \
       WEB_DESKTOP_PORT=5185 \
       JAEGER_5775_PORT=45775 \
       JAEGER_6831_PORT=46831 \
@@ -516,7 +537,6 @@ PY
   [[ "$erp_pdf_warmup" == "async" ]] || fail "ERP_PDF_WARMUP 生产发布必须显式为 async；off 只允许故障隔离，不能作为 release-ready 配置"
   [[ "$postgres_bind_addr" == "127.0.0.1" ]] || fail "POSTGRES_BIND_ADDR 必须为 127.0.0.1，避免 PostgreSQL 暴露到公网或办公网"
   [[ "$app_http_bind_addr" == "127.0.0.1" ]] || fail "APP_HTTP_BIND_ADDR 必须为 127.0.0.1，外部流量应先进入前端 / 网关"
-  [[ "$app_grpc_bind_addr" == "127.0.0.1" ]] || fail "APP_GRPC_BIND_ADDR 必须为 127.0.0.1，避免 gRPC 直接暴露到公网或办公网"
   [[ "$web_desktop_bind_addr" == "0.0.0.0" || "$web_desktop_bind_addr" == "127.0.0.1" ]] || fail "WEB_DESKTOP_BIND_ADDR 只允许 0.0.0.0 或 127.0.0.1"
   [[ "$jaeger_bind_addr" == "127.0.0.1" ]] || fail "JAEGER_BIND_ADDR 必须为 127.0.0.1，避免 Jaeger 暴露到公网或办公网"
   [[ "$postgres_dsn" == postgres://* || "$postgres_dsn" == postgresql://* ]] || fail "POSTGRES_DSN 必须是 postgres/postgresql URL"
@@ -554,8 +574,13 @@ fi
 grep -q 'JAEGER_BIND_ADDR:-127.0.0.1' "$compose_file" || fail "Compose Jaeger 端口必须默认绑定 127.0.0.1"
 grep -q 'POSTGRES_BIND_ADDR:-127.0.0.1' "$compose_file" || fail "Compose PostgreSQL 端口必须默认绑定 127.0.0.1"
 grep -q 'APP_HTTP_BIND_ADDR:-127.0.0.1' "$compose_file" || fail "Compose app HTTP 端口必须默认绑定 127.0.0.1"
-grep -q 'APP_GRPC_BIND_ADDR:-127.0.0.1' "$compose_file" || fail "Compose app gRPC 端口必须默认绑定 127.0.0.1"
 grep -q 'WEB_DESKTOP_BIND_ADDR:-0.0.0.0' "$compose_file" || fail "Compose web desktop 端口必须显式消费 WEB_DESKTOP_BIND_ADDR，并默认绑定 0.0.0.0"
+grep -q 'database_roles.sh:/docker-entrypoint-initdb.d/20-database-roles.sh:ro' "$compose_file" || fail "Compose 必须为 fresh database 挂载角色初始化脚本"
+grep -q 'database_roles.sh:/usr/local/bin/plush-database-roles:ro' "$compose_file" || fail "Compose 必须挂载可重复执行的数据库权限对账脚本"
+grep -q 'POSTGRES_DSN: "postgres://erp_app:' "$compose_file" || fail "Compose app-server 必须固定使用 erp_app"
+for role_password_key in POSTGRES_APP_PASSWORD POSTGRES_MIGRATOR_PASSWORD POSTGRES_BACKUP_PASSWORD; do
+  grep -q "${role_password_key}:" "$compose_file" || fail "Compose PostgreSQL 缺少 $role_password_key"
+done
 if grep -Eq '^[[:space:]]+APP_ADMIN_PASSWORD[[:space:]]*:' "$compose_file"; then
   fail "Compose steady app-server 不得映射 APP_ADMIN_PASSWORD"
 fi
@@ -724,7 +749,6 @@ if [[ "$runtime_check" -eq 1 ]]; then
     for runtime_port_contract in \
       postgres:5432/tcp=55435 \
       app-server:8300/tcp=8315 \
-      app-server:9300/tcp=9315 \
       web-desktop:5175/tcp=5185 \
       jaeger:5775/udp=45775 \
       jaeger:6831/udp=46831 \
@@ -765,7 +789,7 @@ if [[ "$runtime_check" -eq 1 ]]; then
     runtime_app_dsn_count="$(printf '%s\n' "$runtime_trial_app_env" | awk -F= '$1 == "POSTGRES_DSN" { count++ } END { print count + 0 }')"
     runtime_app_dsn="$(printf '%s\n' "$runtime_trial_app_env" | awk -F= '$1 == "POSTGRES_DSN" { value = $0; sub(/^[^=]*=/, "", value) } END { print value }')"
     [[ "$runtime_app_dsn_count" == "1" ]] || fail "customer-trial-133 运行态 app-server 必须只有一个 POSTGRES_DSN"
-    [[ "$runtime_app_dsn" =~ ^postgres(ql)?://[^/@]+:[^@/]+@postgres:5432/plush_erp_uat_20260716_v5\?sslmode=disable$ ]] || fail "customer-trial-133 运行态 app-server POSTGRES_DSN 必须精确指向 V5 独立数据库"
+    [[ "$runtime_app_dsn" =~ ^postgres://erp_app:[A-Za-z0-9._~-]{20,128}@postgres:5432/plush_erp_uat_20260716_v5\?sslmode=disable$ ]] || fail "customer-trial-133 运行态 app-server POSTGRES_DSN 必须使用 erp_app 精确指向 V5 独立数据库"
     unset runtime_trial_app_env runtime_app_dsn
     ok "customer-trial-133 运行态容器名、project、端口、PostgreSQL 挂载和 app 试用身份一致"
   fi

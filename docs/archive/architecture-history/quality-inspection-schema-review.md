@@ -27,7 +27,6 @@
 | 后续 RBAC 权限码建议。 | 不做 `available_quantity / hold_quantity / reserved_quantity`，不做 `stock_reservations`，不做 `warehouse_locations`。 |
 | 下一轮最小落地路线。 | 不做生产质检、成品质检、委外质检，不接前端、JSON-RPC/API 或帮助中心。 |
 
-本轮也不新增完整采购订单 / 采购合同 / 审批流，不迁移旧 `business_records`，不删除或替换 `business_records`，不对 `192.168.0.106:5432/plush_erp` 执行 `migrate_apply`，不做真实分区 migration，不做几十亿级压测。
 
 ## 2. 为什么 Phase 2D-C1 不够
 

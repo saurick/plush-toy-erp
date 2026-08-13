@@ -65,6 +65,16 @@ func SupplierID(v int) predicate.OutsourcingOrder {
 	return predicate.OutsourcingOrder(sql.FieldEQ(FieldSupplierID, v))
 }
 
+// Currency applies equality check predicate on the "currency" field. It's identical to CurrencyEQ.
+func Currency(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEQ(FieldCurrency, v))
+}
+
+// PaymentTermDays applies equality check predicate on the "payment_term_days" field. It's identical to PaymentTermDaysEQ.
+func PaymentTermDays(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEQ(FieldPaymentTermDays, v))
+}
+
 // SourceOrderNo applies equality check predicate on the "source_order_no" field. It's identical to SourceOrderNoEQ.
 func SourceOrderNo(v string) predicate.OutsourcingOrder {
 	return predicate.OutsourcingOrder(sql.FieldEQ(FieldSourceOrderNo, v))
@@ -88,6 +98,31 @@ func LifecycleStatus(v string) predicate.OutsourcingOrder {
 // Version applies equality check predicate on the "version" field. It's identical to VersionEQ.
 func Version(v int) predicate.OutsourcingOrder {
 	return predicate.OutsourcingOrder(sql.FieldEQ(FieldVersion, v))
+}
+
+// SettlementAction applies equality check predicate on the "settlement_action" field. It's identical to SettlementActionEQ.
+func SettlementAction(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEQ(FieldSettlementAction, v))
+}
+
+// SettlementMode applies equality check predicate on the "settlement_mode" field. It's identical to SettlementModeEQ.
+func SettlementMode(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEQ(FieldSettlementMode, v))
+}
+
+// SettlementReason applies equality check predicate on the "settlement_reason" field. It's identical to SettlementReasonEQ.
+func SettlementReason(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEQ(FieldSettlementReason, v))
+}
+
+// SettledAt applies equality check predicate on the "settled_at" field. It's identical to SettledAtEQ.
+func SettledAt(v time.Time) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEQ(FieldSettledAt, v))
+}
+
+// SettledBy applies equality check predicate on the "settled_by" field. It's identical to SettledByEQ.
+func SettledBy(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEQ(FieldSettledBy, v))
 }
 
 // Note applies equality check predicate on the "note" field. It's identical to NoteEQ.
@@ -188,6 +223,121 @@ func SupplierIDIn(vs ...int) predicate.OutsourcingOrder {
 // SupplierIDNotIn applies the NotIn predicate on the "supplier_id" field.
 func SupplierIDNotIn(vs ...int) predicate.OutsourcingOrder {
 	return predicate.OutsourcingOrder(sql.FieldNotIn(FieldSupplierID, vs...))
+}
+
+// CurrencyEQ applies the EQ predicate on the "currency" field.
+func CurrencyEQ(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEQ(FieldCurrency, v))
+}
+
+// CurrencyNEQ applies the NEQ predicate on the "currency" field.
+func CurrencyNEQ(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNEQ(FieldCurrency, v))
+}
+
+// CurrencyIn applies the In predicate on the "currency" field.
+func CurrencyIn(vs ...string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldIn(FieldCurrency, vs...))
+}
+
+// CurrencyNotIn applies the NotIn predicate on the "currency" field.
+func CurrencyNotIn(vs ...string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNotIn(FieldCurrency, vs...))
+}
+
+// CurrencyGT applies the GT predicate on the "currency" field.
+func CurrencyGT(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldGT(FieldCurrency, v))
+}
+
+// CurrencyGTE applies the GTE predicate on the "currency" field.
+func CurrencyGTE(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldGTE(FieldCurrency, v))
+}
+
+// CurrencyLT applies the LT predicate on the "currency" field.
+func CurrencyLT(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldLT(FieldCurrency, v))
+}
+
+// CurrencyLTE applies the LTE predicate on the "currency" field.
+func CurrencyLTE(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldLTE(FieldCurrency, v))
+}
+
+// CurrencyContains applies the Contains predicate on the "currency" field.
+func CurrencyContains(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldContains(FieldCurrency, v))
+}
+
+// CurrencyHasPrefix applies the HasPrefix predicate on the "currency" field.
+func CurrencyHasPrefix(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldHasPrefix(FieldCurrency, v))
+}
+
+// CurrencyHasSuffix applies the HasSuffix predicate on the "currency" field.
+func CurrencyHasSuffix(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldHasSuffix(FieldCurrency, v))
+}
+
+// CurrencyEqualFold applies the EqualFold predicate on the "currency" field.
+func CurrencyEqualFold(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEqualFold(FieldCurrency, v))
+}
+
+// CurrencyContainsFold applies the ContainsFold predicate on the "currency" field.
+func CurrencyContainsFold(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldContainsFold(FieldCurrency, v))
+}
+
+// PaymentTermDaysEQ applies the EQ predicate on the "payment_term_days" field.
+func PaymentTermDaysEQ(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEQ(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysNEQ applies the NEQ predicate on the "payment_term_days" field.
+func PaymentTermDaysNEQ(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNEQ(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysIn applies the In predicate on the "payment_term_days" field.
+func PaymentTermDaysIn(vs ...int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldIn(FieldPaymentTermDays, vs...))
+}
+
+// PaymentTermDaysNotIn applies the NotIn predicate on the "payment_term_days" field.
+func PaymentTermDaysNotIn(vs ...int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNotIn(FieldPaymentTermDays, vs...))
+}
+
+// PaymentTermDaysGT applies the GT predicate on the "payment_term_days" field.
+func PaymentTermDaysGT(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldGT(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysGTE applies the GTE predicate on the "payment_term_days" field.
+func PaymentTermDaysGTE(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldGTE(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysLT applies the LT predicate on the "payment_term_days" field.
+func PaymentTermDaysLT(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldLT(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysLTE applies the LTE predicate on the "payment_term_days" field.
+func PaymentTermDaysLTE(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldLTE(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysIsNil applies the IsNil predicate on the "payment_term_days" field.
+func PaymentTermDaysIsNil() predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldIsNull(FieldPaymentTermDays))
+}
+
+// PaymentTermDaysNotNil applies the NotNil predicate on the "payment_term_days" field.
+func PaymentTermDaysNotNil() predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNotNull(FieldPaymentTermDays))
 }
 
 // SupplierSnapshotIsNil applies the IsNil predicate on the "supplier_snapshot" field.
@@ -478,6 +628,331 @@ func VersionLT(v int) predicate.OutsourcingOrder {
 // VersionLTE applies the LTE predicate on the "version" field.
 func VersionLTE(v int) predicate.OutsourcingOrder {
 	return predicate.OutsourcingOrder(sql.FieldLTE(FieldVersion, v))
+}
+
+// SettlementActionEQ applies the EQ predicate on the "settlement_action" field.
+func SettlementActionEQ(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEQ(FieldSettlementAction, v))
+}
+
+// SettlementActionNEQ applies the NEQ predicate on the "settlement_action" field.
+func SettlementActionNEQ(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNEQ(FieldSettlementAction, v))
+}
+
+// SettlementActionIn applies the In predicate on the "settlement_action" field.
+func SettlementActionIn(vs ...string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldIn(FieldSettlementAction, vs...))
+}
+
+// SettlementActionNotIn applies the NotIn predicate on the "settlement_action" field.
+func SettlementActionNotIn(vs ...string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNotIn(FieldSettlementAction, vs...))
+}
+
+// SettlementActionGT applies the GT predicate on the "settlement_action" field.
+func SettlementActionGT(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldGT(FieldSettlementAction, v))
+}
+
+// SettlementActionGTE applies the GTE predicate on the "settlement_action" field.
+func SettlementActionGTE(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldGTE(FieldSettlementAction, v))
+}
+
+// SettlementActionLT applies the LT predicate on the "settlement_action" field.
+func SettlementActionLT(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldLT(FieldSettlementAction, v))
+}
+
+// SettlementActionLTE applies the LTE predicate on the "settlement_action" field.
+func SettlementActionLTE(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldLTE(FieldSettlementAction, v))
+}
+
+// SettlementActionContains applies the Contains predicate on the "settlement_action" field.
+func SettlementActionContains(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldContains(FieldSettlementAction, v))
+}
+
+// SettlementActionHasPrefix applies the HasPrefix predicate on the "settlement_action" field.
+func SettlementActionHasPrefix(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldHasPrefix(FieldSettlementAction, v))
+}
+
+// SettlementActionHasSuffix applies the HasSuffix predicate on the "settlement_action" field.
+func SettlementActionHasSuffix(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldHasSuffix(FieldSettlementAction, v))
+}
+
+// SettlementActionIsNil applies the IsNil predicate on the "settlement_action" field.
+func SettlementActionIsNil() predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldIsNull(FieldSettlementAction))
+}
+
+// SettlementActionNotNil applies the NotNil predicate on the "settlement_action" field.
+func SettlementActionNotNil() predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNotNull(FieldSettlementAction))
+}
+
+// SettlementActionEqualFold applies the EqualFold predicate on the "settlement_action" field.
+func SettlementActionEqualFold(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEqualFold(FieldSettlementAction, v))
+}
+
+// SettlementActionContainsFold applies the ContainsFold predicate on the "settlement_action" field.
+func SettlementActionContainsFold(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldContainsFold(FieldSettlementAction, v))
+}
+
+// SettlementModeEQ applies the EQ predicate on the "settlement_mode" field.
+func SettlementModeEQ(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEQ(FieldSettlementMode, v))
+}
+
+// SettlementModeNEQ applies the NEQ predicate on the "settlement_mode" field.
+func SettlementModeNEQ(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNEQ(FieldSettlementMode, v))
+}
+
+// SettlementModeIn applies the In predicate on the "settlement_mode" field.
+func SettlementModeIn(vs ...string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldIn(FieldSettlementMode, vs...))
+}
+
+// SettlementModeNotIn applies the NotIn predicate on the "settlement_mode" field.
+func SettlementModeNotIn(vs ...string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNotIn(FieldSettlementMode, vs...))
+}
+
+// SettlementModeGT applies the GT predicate on the "settlement_mode" field.
+func SettlementModeGT(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldGT(FieldSettlementMode, v))
+}
+
+// SettlementModeGTE applies the GTE predicate on the "settlement_mode" field.
+func SettlementModeGTE(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldGTE(FieldSettlementMode, v))
+}
+
+// SettlementModeLT applies the LT predicate on the "settlement_mode" field.
+func SettlementModeLT(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldLT(FieldSettlementMode, v))
+}
+
+// SettlementModeLTE applies the LTE predicate on the "settlement_mode" field.
+func SettlementModeLTE(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldLTE(FieldSettlementMode, v))
+}
+
+// SettlementModeContains applies the Contains predicate on the "settlement_mode" field.
+func SettlementModeContains(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldContains(FieldSettlementMode, v))
+}
+
+// SettlementModeHasPrefix applies the HasPrefix predicate on the "settlement_mode" field.
+func SettlementModeHasPrefix(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldHasPrefix(FieldSettlementMode, v))
+}
+
+// SettlementModeHasSuffix applies the HasSuffix predicate on the "settlement_mode" field.
+func SettlementModeHasSuffix(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldHasSuffix(FieldSettlementMode, v))
+}
+
+// SettlementModeIsNil applies the IsNil predicate on the "settlement_mode" field.
+func SettlementModeIsNil() predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldIsNull(FieldSettlementMode))
+}
+
+// SettlementModeNotNil applies the NotNil predicate on the "settlement_mode" field.
+func SettlementModeNotNil() predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNotNull(FieldSettlementMode))
+}
+
+// SettlementModeEqualFold applies the EqualFold predicate on the "settlement_mode" field.
+func SettlementModeEqualFold(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEqualFold(FieldSettlementMode, v))
+}
+
+// SettlementModeContainsFold applies the ContainsFold predicate on the "settlement_mode" field.
+func SettlementModeContainsFold(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldContainsFold(FieldSettlementMode, v))
+}
+
+// SettlementReasonEQ applies the EQ predicate on the "settlement_reason" field.
+func SettlementReasonEQ(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEQ(FieldSettlementReason, v))
+}
+
+// SettlementReasonNEQ applies the NEQ predicate on the "settlement_reason" field.
+func SettlementReasonNEQ(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNEQ(FieldSettlementReason, v))
+}
+
+// SettlementReasonIn applies the In predicate on the "settlement_reason" field.
+func SettlementReasonIn(vs ...string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldIn(FieldSettlementReason, vs...))
+}
+
+// SettlementReasonNotIn applies the NotIn predicate on the "settlement_reason" field.
+func SettlementReasonNotIn(vs ...string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNotIn(FieldSettlementReason, vs...))
+}
+
+// SettlementReasonGT applies the GT predicate on the "settlement_reason" field.
+func SettlementReasonGT(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldGT(FieldSettlementReason, v))
+}
+
+// SettlementReasonGTE applies the GTE predicate on the "settlement_reason" field.
+func SettlementReasonGTE(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldGTE(FieldSettlementReason, v))
+}
+
+// SettlementReasonLT applies the LT predicate on the "settlement_reason" field.
+func SettlementReasonLT(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldLT(FieldSettlementReason, v))
+}
+
+// SettlementReasonLTE applies the LTE predicate on the "settlement_reason" field.
+func SettlementReasonLTE(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldLTE(FieldSettlementReason, v))
+}
+
+// SettlementReasonContains applies the Contains predicate on the "settlement_reason" field.
+func SettlementReasonContains(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldContains(FieldSettlementReason, v))
+}
+
+// SettlementReasonHasPrefix applies the HasPrefix predicate on the "settlement_reason" field.
+func SettlementReasonHasPrefix(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldHasPrefix(FieldSettlementReason, v))
+}
+
+// SettlementReasonHasSuffix applies the HasSuffix predicate on the "settlement_reason" field.
+func SettlementReasonHasSuffix(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldHasSuffix(FieldSettlementReason, v))
+}
+
+// SettlementReasonIsNil applies the IsNil predicate on the "settlement_reason" field.
+func SettlementReasonIsNil() predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldIsNull(FieldSettlementReason))
+}
+
+// SettlementReasonNotNil applies the NotNil predicate on the "settlement_reason" field.
+func SettlementReasonNotNil() predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNotNull(FieldSettlementReason))
+}
+
+// SettlementReasonEqualFold applies the EqualFold predicate on the "settlement_reason" field.
+func SettlementReasonEqualFold(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEqualFold(FieldSettlementReason, v))
+}
+
+// SettlementReasonContainsFold applies the ContainsFold predicate on the "settlement_reason" field.
+func SettlementReasonContainsFold(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldContainsFold(FieldSettlementReason, v))
+}
+
+// SettledAtEQ applies the EQ predicate on the "settled_at" field.
+func SettledAtEQ(v time.Time) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEQ(FieldSettledAt, v))
+}
+
+// SettledAtNEQ applies the NEQ predicate on the "settled_at" field.
+func SettledAtNEQ(v time.Time) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNEQ(FieldSettledAt, v))
+}
+
+// SettledAtIn applies the In predicate on the "settled_at" field.
+func SettledAtIn(vs ...time.Time) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldIn(FieldSettledAt, vs...))
+}
+
+// SettledAtNotIn applies the NotIn predicate on the "settled_at" field.
+func SettledAtNotIn(vs ...time.Time) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNotIn(FieldSettledAt, vs...))
+}
+
+// SettledAtGT applies the GT predicate on the "settled_at" field.
+func SettledAtGT(v time.Time) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldGT(FieldSettledAt, v))
+}
+
+// SettledAtGTE applies the GTE predicate on the "settled_at" field.
+func SettledAtGTE(v time.Time) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldGTE(FieldSettledAt, v))
+}
+
+// SettledAtLT applies the LT predicate on the "settled_at" field.
+func SettledAtLT(v time.Time) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldLT(FieldSettledAt, v))
+}
+
+// SettledAtLTE applies the LTE predicate on the "settled_at" field.
+func SettledAtLTE(v time.Time) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldLTE(FieldSettledAt, v))
+}
+
+// SettledAtIsNil applies the IsNil predicate on the "settled_at" field.
+func SettledAtIsNil() predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldIsNull(FieldSettledAt))
+}
+
+// SettledAtNotNil applies the NotNil predicate on the "settled_at" field.
+func SettledAtNotNil() predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNotNull(FieldSettledAt))
+}
+
+// SettledByEQ applies the EQ predicate on the "settled_by" field.
+func SettledByEQ(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEQ(FieldSettledBy, v))
+}
+
+// SettledByNEQ applies the NEQ predicate on the "settled_by" field.
+func SettledByNEQ(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNEQ(FieldSettledBy, v))
+}
+
+// SettledByIn applies the In predicate on the "settled_by" field.
+func SettledByIn(vs ...int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldIn(FieldSettledBy, vs...))
+}
+
+// SettledByNotIn applies the NotIn predicate on the "settled_by" field.
+func SettledByNotIn(vs ...int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNotIn(FieldSettledBy, vs...))
+}
+
+// SettledByGT applies the GT predicate on the "settled_by" field.
+func SettledByGT(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldGT(FieldSettledBy, v))
+}
+
+// SettledByGTE applies the GTE predicate on the "settled_by" field.
+func SettledByGTE(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldGTE(FieldSettledBy, v))
+}
+
+// SettledByLT applies the LT predicate on the "settled_by" field.
+func SettledByLT(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldLT(FieldSettledBy, v))
+}
+
+// SettledByLTE applies the LTE predicate on the "settled_by" field.
+func SettledByLTE(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldLTE(FieldSettledBy, v))
+}
+
+// SettledByIsNil applies the IsNil predicate on the "settled_by" field.
+func SettledByIsNil() predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldIsNull(FieldSettledBy))
+}
+
+// SettledByNotNil applies the NotNil predicate on the "settled_by" field.
+func SettledByNotNil() predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNotNull(FieldSettledBy))
 }
 
 // NoteEQ applies the EQ predicate on the "note" field.

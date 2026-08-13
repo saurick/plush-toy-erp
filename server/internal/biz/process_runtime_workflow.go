@@ -13,6 +13,10 @@ type ProcessLinkedWorkflowTaskSettlementCandidateRepo interface {
 	ListPendingLinkedWorkflowTaskSettlements(ctx context.Context, afterWorkflowTaskID int, limit int) ([]*WorkflowTask, error)
 }
 
+type ProcessRuntimeNodeReconciliationCandidateRepo interface {
+	ListPendingProcessRuntimeNodeReconciliations(ctx context.Context, afterProcessNodeID int, limit int) ([]*ProcessNodeInstance, error)
+}
+
 type ProcessLinkedWorkflowTaskReconcileFailure struct {
 	WorkflowTaskID        int
 	ProcessInstanceID     int
@@ -25,6 +29,19 @@ type ProcessLinkedWorkflowTaskReconcileResult struct {
 	Reconciled                int
 	LastScannedWorkflowTaskID int
 	Failures                  []ProcessLinkedWorkflowTaskReconcileFailure
+}
+
+type ProcessRuntimeNodeReconcileFailure struct {
+	ProcessInstanceID     int
+	ProcessNodeInstanceID int
+	Err                   error
+}
+
+type ProcessRuntimeNodeReconcileResult struct {
+	Scanned                  int
+	Reconciled               int
+	LastScannedProcessNodeID int
+	Failures                 []ProcessRuntimeNodeReconcileFailure
 }
 
 // ReconcilePendingLinkedWorkflowTasks closes only the durable gap where a
@@ -93,6 +110,111 @@ func (uc *ProcessRuntimeUsecase) ReconcilePendingLinkedWorkflowTasks(
 		result.Reconciled++
 	}
 	return result, nil
+}
+
+// ReconcilePendingProcessRuntimeNodes repairs runtime-owned commit gaps without
+// re-running a domain side effect. Candidate rows must already contain durable
+// evidence or be an active human/end node whose next action is idempotent.
+func (uc *ProcessRuntimeUsecase) ReconcilePendingProcessRuntimeNodes(
+	ctx context.Context,
+	afterProcessNodeID int,
+	limit int,
+) (*ProcessRuntimeNodeReconcileResult, error) {
+	if uc == nil || uc.repo == nil || afterProcessNodeID < 0 || limit < 1 || limit > ProcessLinkedWorkflowTaskReconcileMaxLimit {
+		return nil, ErrBadParam
+	}
+	candidateRepo, ok := uc.repo.(ProcessRuntimeNodeReconciliationCandidateRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	nodes, err := candidateRepo.ListPendingProcessRuntimeNodeReconciliations(ctx, afterProcessNodeID, limit)
+	if err != nil {
+		return nil, err
+	}
+	if len(nodes) > limit {
+		return nil, ErrBadParam
+	}
+	lastScannedNodeID := afterProcessNodeID
+	for _, node := range nodes {
+		if node == nil {
+			continue
+		}
+		if node.ID <= lastScannedNodeID {
+			return nil, ErrBadParam
+		}
+		lastScannedNodeID = node.ID
+	}
+	result := &ProcessRuntimeNodeReconcileResult{
+		Scanned:                  len(nodes),
+		LastScannedProcessNodeID: lastScannedNodeID,
+		Failures:                 make([]ProcessRuntimeNodeReconcileFailure, 0),
+	}
+	for _, node := range nodes {
+		failure := ProcessRuntimeNodeReconcileFailure{}
+		if node != nil {
+			failure.ProcessInstanceID = node.ProcessInstanceID
+			failure.ProcessNodeInstanceID = node.ID
+		}
+		if node == nil || node.ID <= 0 || node.ProcessInstanceID <= 0 {
+			failure.Err = ErrBadParam
+			result.Failures = append(result.Failures, failure)
+			continue
+		}
+		instance, getErr := uc.repo.GetProcessInstance(ctx, node.ProcessInstanceID)
+		if getErr != nil {
+			failure.Err = getErr
+			result.Failures = append(result.Failures, failure)
+			continue
+		}
+		actorID := processRuntimeReconciliationActor(instance, node)
+		if actorID <= 0 {
+			failure.Err = ErrBadParam
+			result.Failures = append(result.Failures, failure)
+			continue
+		}
+		var reconcileErr error
+		switch {
+		case node.Status == ProcessNodeStatusActive && (node.NodeType == ProcessNodeTypeHumanTask || node.NodeType == ProcessNodeTypeApproval):
+			reconcileErr = uc.reconcileActivatedSequentialNode(ctx, node, actorID)
+		case node.Status == ProcessNodeStatusActive && node.NodeType == ProcessNodeTypeDomainCommand:
+			if node.DomainCommandFingerprint == nil {
+				reconcileErr = ErrProcessDomainCommandRecoveryRequired
+			} else {
+				_, reconcileErr = uc.settleActiveProcessDomainCommandResult(ctx, node, *node.DomainCommandFingerprint, actorID)
+			}
+		case node.Status == ProcessNodeStatusCompleted && node.NodeType == ProcessNodeTypeDomainCommand:
+			if node.DomainCommandFingerprint == nil || node.Version <= 1 {
+				reconcileErr = ErrProcessDomainCommandRecoveryRequired
+			} else {
+				_, reconcileErr = uc.reconcileSettledDomainCommandNode(ctx, node, node.Version-1, *node.DomainCommandFingerprint, actorID)
+			}
+		case node.Status == ProcessNodeStatusCompleted && node.NodeType == ProcessNodeTypeEnd:
+			reconcileErr = uc.ensureProcessInstanceCompleted(ctx, node.ProcessInstanceID, actorID)
+		default:
+			reconcileErr = ErrProcessNodeInstanceConflict
+		}
+		if reconcileErr != nil {
+			failure.Err = reconcileErr
+			result.Failures = append(result.Failures, failure)
+			continue
+		}
+		result.Reconciled++
+	}
+	return result, nil
+}
+
+func processRuntimeReconciliationActor(instance *ProcessInstance, node *ProcessNodeInstance) int {
+	for _, actor := range []*int{
+		node.UpdatedBy,
+		node.DomainCommandResultRecordedBy,
+		instance.UpdatedBy,
+		instance.CreatedBy,
+	} {
+		if actor != nil && *actor > 0 {
+			return *actor
+		}
+	}
+	return 0
 }
 
 func (uc *ProcessRuntimeUsecase) CreateLinkedWorkflowTask(ctx context.Context, in *ProcessLinkedWorkflowTaskCreate, actorID int) (*WorkflowTask, error) {
@@ -485,9 +607,13 @@ func (uc *ProcessRuntimeUsecase) settleRejectedProcessAfterNodeCompletion(
 				err = uc.handleActivatedSequentialNodeWithPayload(ctx, activatedNode, actorID, commandPayload)
 			}
 		} else {
-			return uc.ensureRejectedProcessBlocked(ctx, completedNode.ProcessInstanceID, actorID)
+			err = uc.ensureRejectedProcessBlocked(ctx, completedNode.ProcessInstanceID, actorID)
 		}
 	}
+	if err != nil {
+		return err
+	}
+	_, err = uc.markProcessNodeRoutingCompleted(ctx, completedNode, actorID)
 	return err
 }
 
@@ -503,7 +629,11 @@ func (uc *ProcessRuntimeUsecase) reconcileLinkedWorkflowTaskCompletion(
 		return ErrBadParam
 	}
 	if taskStatusKey == "rejected" && !processRejectedNodeHasExplicitRoute(completedNode) {
-		return uc.ensureRejectedProcessBlocked(ctx, completedNode.ProcessInstanceID, actorID)
+		if err := uc.ensureRejectedProcessBlocked(ctx, completedNode.ProcessInstanceID, actorID); err != nil {
+			return err
+		}
+		_, err := uc.markProcessNodeRoutingCompleted(ctx, completedNode, actorID)
+		return err
 	}
 	activatedNodes, err := uc.reconcileNextNodesAfterCompletion(ctx, completedNode, reason, actorID)
 	if err != nil {
@@ -514,7 +644,8 @@ func (uc *ProcessRuntimeUsecase) reconcileLinkedWorkflowTaskCompletion(
 			return err
 		}
 	}
-	return nil
+	_, err = uc.markProcessNodeRoutingCompleted(ctx, completedNode, actorID)
+	return err
 }
 
 func (uc *ProcessRuntimeUsecase) reconcileNextNodesAfterCompletion(ctx context.Context, completedNode *ProcessNodeInstance, reason string, actorID int) ([]*ProcessNodeInstance, error) {
@@ -535,7 +666,7 @@ func (uc *ProcessRuntimeUsecase) reconcileNextNodesAfterCompletion(ctx context.C
 		if err != nil {
 			return nil, err
 		}
-		node, err := uc.reconcileNamedProcessNode(ctx, completedNode.ProcessInstanceID, nodeKey, actorID)
+		node, err := uc.reconcileNamedProcessNode(ctx, completedNode.ProcessInstanceID, nodeKey, completedNode.ID, actorID)
 		if err != nil {
 			return nil, err
 		}
@@ -548,7 +679,7 @@ func (uc *ProcessRuntimeUsecase) reconcileNextNodesAfterCompletion(ctx context.C
 	if len(fanOutNodeKeys) > 0 {
 		nodes := make([]*ProcessNodeInstance, 0, len(fanOutNodeKeys))
 		for _, nodeKey := range fanOutNodeKeys {
-			node, err := uc.reconcileNamedProcessNode(ctx, completedNode.ProcessInstanceID, nodeKey, actorID)
+			node, err := uc.reconcileNamedProcessNode(ctx, completedNode.ProcessInstanceID, nodeKey, completedNode.ID, actorID)
 			if err != nil {
 				return nil, err
 			}
@@ -574,8 +705,8 @@ func (uc *ProcessRuntimeUsecase) reconcileNextNodesAfterCompletion(ctx context.C
 	return []*ProcessNodeInstance{node}, nil
 }
 
-func (uc *ProcessRuntimeUsecase) reconcileNamedProcessNode(ctx context.Context, processInstanceID int, nodeKey string, actorID int) (*ProcessNodeInstance, error) {
-	if uc == nil || uc.repo == nil || processInstanceID <= 0 || strings.TrimSpace(nodeKey) == "" {
+func (uc *ProcessRuntimeUsecase) reconcileNamedProcessNode(ctx context.Context, processInstanceID int, nodeKey string, sourceNodeID int, actorID int) (*ProcessNodeInstance, error) {
+	if uc == nil || uc.repo == nil || processInstanceID <= 0 || strings.TrimSpace(nodeKey) == "" || sourceNodeID <= 0 {
 		return nil, ErrBadParam
 	}
 	nodes, err := uc.repo.ListProcessNodeInstances(ctx, processInstanceID)
@@ -595,21 +726,25 @@ func (uc *ProcessRuntimeUsecase) reconcileNamedProcessNode(ctx context.Context, 
 	if target == nil {
 		return nil, ErrProcessNodeInstanceNotFound
 	}
-	return uc.reconcileProcessNodeActivation(ctx, target, actorID)
+	return uc.reconcileProcessNodeActivation(ctx, target, sourceNodeID, actorID)
 }
 
-func (uc *ProcessRuntimeUsecase) reconcileProcessNodeActivation(ctx context.Context, node *ProcessNodeInstance, actorID int) (*ProcessNodeInstance, error) {
-	if node == nil || node.ID <= 0 || node.ProcessInstanceID <= 0 {
+func (uc *ProcessRuntimeUsecase) reconcileProcessNodeActivation(ctx context.Context, node *ProcessNodeInstance, sourceNodeID int, actorID int) (*ProcessNodeInstance, error) {
+	if node == nil || node.ID <= 0 || node.ProcessInstanceID <= 0 || sourceNodeID < 0 {
 		return nil, ErrBadParam
 	}
 	if node.Status != ProcessNodeStatusWaiting {
 		return node, nil
 	}
-	activated, err := uc.repo.ActivateProcessNodeInstance(ctx, &ProcessNodeInstanceActivate{
+	activate := &ProcessNodeInstanceActivate{
 		ID:                node.ID,
 		ProcessInstanceID: node.ProcessInstanceID,
 		ExpectedVersion:   node.Version,
-	}, actorID)
+	}
+	if sourceNodeID > 0 {
+		activate.ActivatedFromNodeInstanceID = &sourceNodeID
+	}
+	activated, err := uc.repo.ActivateProcessNodeInstance(ctx, activate, actorID)
 	if err == nil || !errors.Is(err, ErrProcessNodeInstanceConflict) {
 		return activated, err
 	}
@@ -656,7 +791,32 @@ func (uc *ProcessRuntimeUsecase) ensureProcessInstanceCompleted(ctx context.Cont
 	if instance.Status != ProcessStatusActive {
 		return ErrProcessInstanceSettled
 	}
-	_, err = uc.repo.CompleteProcessInstance(ctx, &ProcessInstanceComplete{ID: processInstanceID}, actorID)
+	nodes, err := uc.repo.ListProcessNodeInstances(ctx, processInstanceID)
+	if err != nil {
+		return err
+	}
+	var completedEnd *ProcessNodeInstance
+	for _, node := range nodes {
+		if node == nil || node.NodeType != ProcessNodeTypeEnd || node.Status != ProcessNodeStatusCompleted {
+			continue
+		}
+		if completedEnd != nil {
+			return ErrProcessNodeInstanceConflict
+		}
+		completedEnd = node
+	}
+	if completedEnd == nil {
+		return ErrProcessNodeInstanceNotFound
+	}
+	_, err = uc.repo.CompleteProcessInstance(ctx, &ProcessInstanceComplete{
+		ID:             processInstanceID,
+		TerminalNodeID: completedEnd.ID,
+		ResolutionKind: processResolutionKindFromEndNode(completedEnd),
+	}, actorID)
+	if err == nil {
+		_, err = uc.markProcessNodeRoutingCompleted(ctx, completedEnd, actorID)
+		return err
+	}
 	if !errors.Is(err, ErrProcessInstanceSettled) {
 		return err
 	}
@@ -667,14 +827,20 @@ func (uc *ProcessRuntimeUsecase) ensureProcessInstanceCompleted(ctx context.Cont
 	if instance.Status != ProcessStatusCompleted {
 		return err
 	}
-	return nil
+	_, err = uc.markProcessNodeRoutingCompleted(ctx, completedEnd, actorID)
+	return err
 }
 
 func (uc *ProcessRuntimeUsecase) ensureRejectedProcessBlocked(ctx context.Context, processInstanceID int, actorID int) error {
 	if uc == nil || uc.repo == nil || processInstanceID <= 0 {
 		return ErrBadParam
 	}
-	if _, err := uc.repo.BlockProcessInstance(ctx, &ProcessInstanceBlock{ID: processInstanceID}, actorID); err != nil {
+	if _, err := uc.repo.BlockProcessInstance(ctx, &ProcessInstanceBlock{
+		ID:         processInstanceID,
+		BlockKind:  ProcessBlockKindRejection,
+		ReasonCode: "rejected_without_route",
+		Reason:     "审批已拒绝，但当前流程未配置退回或终止分支",
+	}, actorID); err != nil {
 		if !errors.Is(err, ErrProcessInstanceSettled) {
 			return err
 		}

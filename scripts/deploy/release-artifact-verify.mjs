@@ -45,12 +45,7 @@ function inspectLoadedImage(imageRef, repoRoot, runCommand) {
   return parsed[0];
 }
 
-function readImageArchiveJson(
-  archivePath,
-  member,
-  repoRoot,
-  runCommand,
-) {
+function readImageArchiveJson(archivePath, member, repoRoot, runCommand) {
   const raw = runCommand({
     command: "tar",
     args: ["-xOf", archivePath, member],
@@ -96,8 +91,7 @@ export function inspectPortableImageArchiveIdentity(
     runCommand,
   );
   if (
-    sha256Text(archiveConfig.raw) !==
-    image.contentId.slice("sha256:".length)
+    sha256Text(archiveConfig.raw) !== image.contentId.slice("sha256:".length)
   ) {
     throw new VerificationError(
       `${image.kind} image archive config checksum does not match`,
@@ -118,8 +112,7 @@ export function inspectPortableImageArchiveIdentity(
       `${image.kind} image archive manifest identity is invalid`,
     );
   }
-  const manifestMember =
-    `blobs/sha256/${manifestDigest.slice("sha256:".length)}`;
+  const manifestMember = `blobs/sha256/${manifestDigest.slice("sha256:".length)}`;
   const archiveManifest = readImageArchiveJson(
     archivePath,
     manifestMember,
@@ -198,13 +191,18 @@ export function verifyReleaseArtifact(
       const embeddedGitSha = (inspected?.Config?.Env || [])
         .find((item) => item.startsWith("GIT_SHA="))
         ?.slice("GIT_SHA=".length);
+      const embeddedReleaseVersion = (inspected?.Config?.Env || [])
+        .find((item) => item.startsWith("RELEASE_VERSION="))
+        ?.slice("RELEASE_VERSION=".length);
       if (
         ![image.contentId, archiveIdentity.manifestDigest].includes(
           inspected?.Id,
         ) ||
         inspected?.Os !== "linux" ||
         inspected?.Architecture !== "amd64" ||
-        embeddedGitSha !== manifest.git.commit
+        embeddedGitSha !== manifest.git.commit ||
+        (manifest.releaseVersion !== undefined &&
+          embeddedReleaseVersion !== manifest.releaseVersion)
       ) {
         throw new VerificationError(
           `${image.kind} loaded image identity does not match manifest`,
@@ -216,6 +214,9 @@ export function verifyReleaseArtifact(
         archiveManifestDigest: archiveIdentity.manifestDigest,
         loadedImageId: inspected.Id,
         gitSha: embeddedGitSha,
+        ...(manifest.releaseVersion !== undefined
+          ? { releaseVersion: embeddedReleaseVersion }
+          : {}),
         platform: `${inspected.Os}/${inspected.Architecture}`,
       });
     }
@@ -224,6 +225,9 @@ export function verifyReleaseArtifact(
     schemaVersion: "plush-release-artifact-verification/v1",
     passed: true,
     commit: manifest.git.commit,
+    ...(manifest.releaseVersion !== undefined
+      ? { releaseVersion: manifest.releaseVersion }
+      : {}),
     customer: manifest.customer,
     manifestFile: path.basename(absoluteManifest),
     checks: {
@@ -277,8 +281,8 @@ Usage:
   node scripts/deploy/release-artifact-verify.mjs --manifest output/releases/<sha>/release-artifact.json [--load] [--json]
 
 Without --load, verifies the manifest, SBOM and archive checksums. With --load,
-also loads both archives and proves image content IDs, linux/amd64 platform and
-embedded GIT_SHA. It does not start services or contact a target environment.`;
+also loads both archives and proves image content IDs, linux/amd64 platform,
+embedded release version and GIT_SHA. It does not start services or contact a target environment.`;
 
 function isMainModule() {
   try {

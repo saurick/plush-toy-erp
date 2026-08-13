@@ -4,6 +4,7 @@ import {
   isPositiveNumeric20Scale6Units,
   numeric20Scale6Units,
 } from './numeric20Scale6.mjs'
+import { unixSecondsToBusinessDate } from './businessDate.mjs'
 
 export const PRODUCTION_ORDER_STATUS = Object.freeze({
   DRAFT: 'DRAFT',
@@ -316,7 +317,7 @@ export function createProductionOrderAttemptStore() {
 
 export function unixToDateInput(value) {
   if (!positiveSafeInteger(value)) return ''
-  return new Date(value * 1000).toISOString().slice(0, 10)
+  return unixSecondsToBusinessDate(value)
 }
 
 export function dateInputToUnix(value) {

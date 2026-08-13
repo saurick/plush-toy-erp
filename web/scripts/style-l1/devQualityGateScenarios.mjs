@@ -428,12 +428,13 @@ function governance() {
 
 function gaps() {
   return {
-    schemaVersion: 'plush.quality-gate-gap-analysis/v1',
+    schemaVersion: 'plush.quality-gate-gap-analysis/v2',
     range: 'current',
     risk: 'all',
     changedCount: 18,
-    highestLevel: 'T5',
-    requiresFull: true,
+    affectedScopes: ['T0', 'T1', 'T5'],
+    maxAffectedScope: 'T5',
+    localGate: 'full',
     matched: true,
     categories: [
       {
@@ -778,6 +779,196 @@ export function createDevQualityGateScenarios({
           .waitFor()
         metrics = await qualityGeometry(page)
         assert.equal(metrics.managedDiagramCount, 1, JSON.stringify(metrics))
+        const managedViewer = managedGuide.locator('.erp-markdown-mermaid')
+        const managedToolbar = managedViewer.locator(
+          '.erp-markdown-mermaid__toolbar'
+        )
+        const managedInitial = await managedViewer.evaluate((shell) => {
+          const toolbar = shell.querySelector('.erp-markdown-mermaid__toolbar')
+          const viewport = shell.querySelector(
+            '.erp-markdown-mermaid__viewport'
+          )
+          const canvas = shell.querySelector('.erp-markdown-mermaid__canvas')
+          const buttons = [
+            ...shell.querySelectorAll('.erp-markdown-mermaid__tool'),
+          ]
+          const readAction = (button) =>
+            button.getAttribute('data-mermaid-zoom-action') ||
+            button.getAttribute('data-mermaid-fullscreen-action') ||
+            ''
+          return {
+            actions: buttons.map(readAction),
+            centerHits: buttons.map((button) => {
+              const rect = button.getBoundingClientRect()
+              const hit = document.elementFromPoint(
+                rect.left + rect.width / 2,
+                rect.top + rect.height / 2
+              )
+              return hit === button || button.contains(hit)
+            }),
+            toolBoxes: buttons.map((button) => {
+              const rect = button.getBoundingClientRect()
+              return { width: rect.width, height: rect.height }
+            }),
+            toolbarDisplay: toolbar
+              ? window.getComputedStyle(toolbar).display
+              : '',
+            toolbarWrap: toolbar
+              ? window.getComputedStyle(toolbar).flexWrap
+              : '',
+            viewportOverflowX: viewport
+              ? window.getComputedStyle(viewport).overflowX
+              : '',
+            canvasWidth: canvas?.getBoundingClientRect().width || 0,
+            zoom: canvas?.getAttribute('data-mermaid-zoom') || '',
+          }
+        })
+        assert.deepEqual(
+          managedInitial.actions,
+          ['fit', 'fit-height', 'zoom-out', 'zoom-in', 'reset', 'open'],
+          JSON.stringify(managedInitial)
+        )
+        assert(
+          managedInitial.centerHits.every(Boolean),
+          `托管数据库图工具按钮中心必须分别命中自身：${JSON.stringify(
+            managedInitial
+          )}`
+        )
+        assert(
+          managedInitial.toolBoxes.every(
+            ({ width, height }) => width >= 31 && height >= 31
+          ),
+          `托管数据库图工具按钮必须保留可点击尺寸：${JSON.stringify(
+            managedInitial
+          )}`
+        )
+        assert.equal(managedInitial.toolbarDisplay, 'flex')
+        assert.equal(managedInitial.toolbarWrap, 'wrap')
+        assert.equal(managedInitial.viewportOverflowX, 'auto')
+        assert.equal(managedInitial.zoom, '100')
+        await managedToolbar
+          .locator('[data-mermaid-zoom-action="zoom-in"]')
+          .click()
+        await page.waitForFunction(
+          () =>
+            document
+              .querySelector(
+                '.erp-dev-quality-managed-database .erp-markdown-mermaid__canvas'
+              )
+              ?.getAttribute('data-mermaid-zoom') === '120'
+        )
+        const managedZoomed = await managedViewer.evaluate((shell) => {
+          const canvas = shell.querySelector('.erp-markdown-mermaid__canvas')
+          return {
+            canvasWidth: canvas?.getBoundingClientRect().width || 0,
+            zoom: canvas?.getAttribute('data-mermaid-zoom') || '',
+          }
+        })
+        assert.equal(managedZoomed.zoom, '120')
+        assert(
+          managedZoomed.canvasWidth > managedInitial.canvasWidth,
+          `托管数据库图放大后画布宽度必须增加：${JSON.stringify({
+            managedInitial,
+            managedZoomed,
+          })}`
+        )
+        await managedViewer.screenshot({
+          path: path.join(
+            outputDir,
+            'dev-quality-gates-managed-database-zoom-120-desktop.png'
+          ),
+          animations: 'disabled',
+        })
+        await managedToolbar
+          .locator('[data-mermaid-zoom-action="reset"]')
+          .click()
+        const fullscreenOpenButton = managedToolbar.locator(
+          '[data-mermaid-fullscreen-action="open"]'
+        )
+        await fullscreenOpenButton.click()
+        await page.waitForFunction(
+          () =>
+            document
+              .querySelector(
+                '.erp-dev-quality-managed-database .erp-markdown-mermaid'
+              )
+              ?.getAttribute('data-mermaid-fullscreen') === 'true'
+        )
+        await page.waitForFunction(
+          () =>
+            document.activeElement?.getAttribute(
+              'data-mermaid-fullscreen-action'
+            ) === 'close'
+        )
+        const managedFullscreen = await managedViewer.evaluate((shell) => {
+          const rect = shell.getBoundingClientRect()
+          const toolbar = shell.querySelector('.erp-markdown-mermaid__toolbar')
+          const style = window.getComputedStyle(shell)
+          return {
+            position: style.position,
+            left: rect.left,
+            top: rect.top,
+            right: rect.right,
+            bottom: rect.bottom,
+            viewportWidth: window.innerWidth,
+            viewportHeight: window.innerHeight,
+            toolbarClientWidth: toolbar?.clientWidth || 0,
+            toolbarScrollWidth: toolbar?.scrollWidth || 0,
+            bodyOverflow: document.body.style.overflow,
+            focusedAction:
+              document.activeElement?.getAttribute(
+                'data-mermaid-fullscreen-action'
+              ) || '',
+          }
+        })
+        assert.equal(managedFullscreen.position, 'fixed')
+        assert(
+          Math.abs(managedFullscreen.left) <= 1 &&
+            Math.abs(managedFullscreen.top) <= 1 &&
+            Math.abs(
+              managedFullscreen.right - managedFullscreen.viewportWidth
+            ) <= 1 &&
+            Math.abs(
+              managedFullscreen.bottom - managedFullscreen.viewportHeight
+            ) <= 1,
+          `托管数据库图全屏必须覆盖视口：${JSON.stringify(managedFullscreen)}`
+        )
+        assert(
+          managedFullscreen.toolbarScrollWidth <=
+            managedFullscreen.toolbarClientWidth + 1,
+          `托管数据库图全屏工具条不得溢出：${JSON.stringify(managedFullscreen)}`
+        )
+        assert.equal(managedFullscreen.bodyOverflow, 'hidden')
+        assert.equal(managedFullscreen.focusedAction, 'close')
+        await managedViewer.screenshot({
+          path: path.join(
+            outputDir,
+            'dev-quality-gates-managed-database-fullscreen-desktop.png'
+          ),
+          animations: 'disabled',
+        })
+        await page.keyboard.press('Escape')
+        await page.waitForFunction(
+          () =>
+            document
+              .querySelector(
+                '.erp-dev-quality-managed-database .erp-markdown-mermaid'
+              )
+              ?.getAttribute('data-mermaid-fullscreen') === 'false'
+        )
+        await page.waitForFunction(
+          () =>
+            document.activeElement?.getAttribute(
+              'data-mermaid-fullscreen-action'
+            ) === 'open'
+        )
+        assert.equal(
+          await fullscreenOpenButton.evaluate(
+            (button) => document.activeElement === button
+          ),
+          true,
+          '托管数据库图退出全屏后必须把焦点还给全屏入口'
+        )
         await managedGuide.screenshot({
           path: path.join(
             outputDir,
@@ -928,6 +1119,66 @@ export function createDevQualityGateScenarios({
         await page.getByText('未执行', { exact: true }).first().waitFor()
         await page.getByText('最长阶段', { exact: true }).waitFor()
         await page.getByText('终态证明', { exact: true }).waitFor()
+        const managedGuide = page.locator('.erp-dev-quality-managed-database')
+        await managedGuide
+          .getByText('查看本机托管数据库的静态运行与清理流程', {
+            exact: true,
+          })
+          .click()
+        const managedViewer = managedGuide.locator(
+          '.erp-markdown-mermaid[data-mermaid-status="rendered"]'
+        )
+        await managedViewer.waitFor()
+        const mobileViewer = await managedViewer.evaluate((shell) => {
+          const shellRect = shell.getBoundingClientRect()
+          const toolbar = shell.querySelector('.erp-markdown-mermaid__toolbar')
+          const buttons = [
+            ...shell.querySelectorAll('.erp-markdown-mermaid__tool'),
+          ]
+          const toolBackground = buttons[0]
+            ? window.getComputedStyle(buttons[0]).backgroundColor
+            : ''
+          return {
+            shellRight: shellRect.right,
+            viewportWidth: window.innerWidth,
+            toolbarClientWidth: toolbar?.clientWidth || 0,
+            toolbarScrollWidth: toolbar?.scrollWidth || 0,
+            actionCount: buttons.length,
+            toolBackground,
+            toolBoxes: buttons.map((button) => {
+              const rect = button.getBoundingClientRect()
+              return { width: rect.width, height: rect.height }
+            }),
+          }
+        })
+        assert.equal(mobileViewer.actionCount, 6, JSON.stringify(mobileViewer))
+        assert(
+          mobileViewer.toolBoxes.every(
+            ({ width, height }) => width >= 31 && height >= 31
+          ),
+          `移动端托管数据库图工具按钮必须保持可点击尺寸：${JSON.stringify(
+            mobileViewer
+          )}`
+        )
+        assert(
+          mobileViewer.toolbarScrollWidth <=
+            mobileViewer.toolbarClientWidth + 1,
+          `移动端托管数据库图工具条不得横向溢出：${JSON.stringify(
+            mobileViewer
+          )}`
+        )
+        assert(
+          mobileViewer.shellRight <= mobileViewer.viewportWidth + 1,
+          JSON.stringify(mobileViewer)
+        )
+        assert.notEqual(mobileViewer.toolBackground, 'rgba(0, 0, 0, 0)')
+        await managedGuide.screenshot({
+          path: path.join(
+            outputDir,
+            'dev-quality-gates-managed-database-guide-mobile-390.png'
+          ),
+          animations: 'disabled',
+        })
         await page.screenshot({
           path: path.join(outputDir, 'dev-quality-gates-run-mobile-390.png'),
           fullPage: true,

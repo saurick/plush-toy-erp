@@ -4,6 +4,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import {
+  BUSINESS_CURRENCY_OPTIONS,
   OUTSOURCING_ORDER_SUBJECT_TYPES,
   V1_ROUTE_PATHS,
   buildPaymentConditionOptions,
@@ -18,6 +19,7 @@ import {
   buildOutsourcingOrderItemSourceValuesFromProduct,
   buildOutsourcingOrderItemSourceValuesFromProductSKU,
   buildOutsourcingOrderParams,
+  buildOutsourcingSupplierSnapshot,
   buildOutsourcingOrderSubjectSwitchValues,
   buildPurchaseOrderItemSourceValuesFromMaterial,
   contractPartySnapshotFromPrintTemplateDefaults,
@@ -341,12 +343,13 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
       contact_name: ' 李四 ',
       contact_phone: ' 0574-123456 ',
       contact_email: ' buyer@example.com ',
-      payment_method: ' 30天月结 ',
+      payment_method: ' 月结 30 天 ',
       payment_term_days: '30',
       price_condition_note: ' 账期改短，单价已核对 ',
     }),
     {
       order_no: 'SO001',
+      currency: 'CNY',
       customer_id: 3,
       customer_snapshot: { id: 3, name: '客户 A' },
       sales_owner: '张三',
@@ -355,7 +358,7 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
         phone: '0574-123456',
         email: 'buyer@example.com',
       },
-      payment_method: '30天月结',
+      payment_method: '月结 30 天',
       payment_term_days: 30,
       price_condition_note: '账期改短，单价已核对',
       order_date: '2026-05-31',
@@ -460,6 +463,7 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
     }),
     {
       purchase_order_no: 'PO001',
+      currency: 'CNY',
       supplier_id: 7,
       supplier_snapshot: { id: 7, name: '供应商 A' },
       contract_party_snapshot: {
@@ -524,6 +528,7 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
     }),
     {
       outsourcing_order_no: 'OUT-001',
+      currency: 'CNY',
       supplier_id: 7,
       supplier_snapshot: { id: 7, name: '加工厂 A' },
       contract_party_snapshot: {
@@ -595,19 +600,61 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
 
 test('masterDataOrderView: payment condition options keep zero-day defaults and saved values', () => {
   const options = buildPaymentConditionOptions([
-    { default_payment_method: ' 45天月结 ', default_payment_term_days: '45' },
+    {
+      default_payment_method: ' 月结 45 天 ',
+      default_payment_term_days: '45',
+    },
   ])
 
-  assert.equal(resolvePaymentTermDays('现结', options), 0)
-  assert.equal(resolvePaymentTermDays('45天月结', options), 45)
-  assert.equal(formatPaymentCondition({ payment_term_days: 0 }), '0天')
+  assert.equal(resolvePaymentTermDays('发生即到期', options), 0)
+  assert.equal(resolvePaymentTermDays('月结 45 天', options), 45)
+  assert.equal(formatPaymentCondition({ payment_term_days: 0 }), '发生即到期')
   assert.equal(
     formatPaymentCondition({
-      payment_method: '30天月结',
+      payment_method: '月结 30 天',
       payment_term_days: 30,
     }),
-    '30天月结 / 30天'
+    '月结 30 天'
   )
+})
+
+test('masterDataOrderView: source orders share finite currency and explicit term contracts', () => {
+  assert.deepEqual(BUSINESS_CURRENCY_OPTIONS, [
+    { value: 'CNY', label: '人民币（CNY）' },
+    { value: 'USD', label: '美元（USD）' },
+    { value: 'HKD', label: '港币（HKD）' },
+  ])
+
+  assert.equal(buildSalesOrderParams({}).currency, 'CNY')
+  assert.equal(buildSalesOrderParams({ currency: ' usd ' }).currency, 'USD')
+  assert.deepEqual(
+    buildPurchaseOrderParams(
+      { currency: 'hkd', payment_term_days: '30' },
+      { id: 7 }
+    ),
+    {
+      id: 7,
+      currency: 'HKD',
+      supplier_id: 0,
+      supplier_snapshot: {},
+      payment_term_days: 30,
+    }
+  )
+  assert.equal(
+    buildOutsourcingOrderParams(
+      { currency: 'cny', payment_term_days: 0 },
+      { id: 8 }
+    ).payment_term_days,
+    0
+  )
+  for (const build of [
+    buildSalesOrderParams,
+    buildPurchaseOrderParams,
+    buildOutsourcingOrderParams,
+  ]) {
+    assert.throws(() => build({}, { id: 1 }), /币种必须明确选择/u)
+    assert.throws(() => build({ currency: 'EUR' }), /币种必须明确选择/u)
+  }
 })
 
 test('FL_outsourcing_subject_switch__clears_other_subject_and_snapshots masterDataOrderView: 加工对象切换清理主体残值但保留独立来源订单号', () => {
@@ -1169,6 +1216,7 @@ test('FL_outsourcing_return_date__retains_expected_return_date_snapshot masterDa
     }),
     {
       outsourcing_order_no: 'OUT-RET-001',
+      currency: 'CNY',
       supplier_id: 7,
       supplier_snapshot: { id: 7, name: '加工厂 A' },
       source_order_no: 'SO-RET-001',
@@ -1381,6 +1429,7 @@ test('FL_sales_order_order_no__retains_order_no_snapshot masterDataOrderView: sa
     }),
     {
       order_no: 'SO-20260618-010',
+      currency: 'CNY',
       customer_id: 3,
       customer_snapshot: {},
       contact_snapshot: {},
@@ -1802,6 +1851,7 @@ test('FL_sales_order_customer_snapshot__retains_customer_snapshot masterDataOrde
     }),
     {
       order_no: 'SO-CUST-001',
+      currency: 'CNY',
       customer_id: 3,
       customer_snapshot: {
         id: 3,
@@ -1847,6 +1897,7 @@ test('FL_sales_order_customer_master_selection__syncs_customer_snapshot masterDa
     }),
     {
       order_no: 'SO-CUST-002',
+      currency: 'CNY',
       customer_id: 4,
       customer_snapshot: {
         id: 4,
@@ -1910,6 +1961,7 @@ test('FL_sales_order_customer_master_selection__clears_customer_snapshot masterD
     }),
     {
       order_no: 'SO-CUST-003',
+      currency: 'CNY',
       customer_snapshot: {},
       contact_snapshot: {},
     }
@@ -1941,6 +1993,7 @@ test('FL_sales_order_partner_contacts__syncs_contact_snapshot masterDataOrderVie
     }),
     {
       order_no: 'SO-CONTACT-001',
+      currency: 'CNY',
       customer_id: 3,
       customer_snapshot: { id: 3, name: '客户 A' },
       contact_snapshot: {
@@ -1982,6 +2035,7 @@ test('FL_sales_order_partner_contacts__clears_contact_snapshot masterDataOrderVi
     }),
     {
       order_no: 'SO-CONTACT-002',
+      currency: 'CNY',
       customer_id: 3,
       customer_snapshot: { id: 3, name: '客户 A' },
       contact_snapshot: {},
@@ -2019,6 +2073,7 @@ test('FL_purchase_supplier_master_selection__syncs_supplier_snapshot masterDataO
     }),
     {
       purchase_order_no: 'PO-SUP-001',
+      currency: 'CNY',
       supplier_id: 7,
       supplier_snapshot: {
         id: '7',
@@ -2037,6 +2092,7 @@ test('FL_purchase_supplier_master_selection__syncs_supplier_snapshot masterDataO
     buildPurchaseOrderParams(
       {
         purchase_order_no: 'PO-SUP-EDIT-001',
+        currency: 'HKD',
         supplier_id: '7',
         supplier_snapshot: {},
       },
@@ -2048,6 +2104,7 @@ test('FL_purchase_supplier_master_selection__syncs_supplier_snapshot masterDataO
     {
       id: 12,
       purchase_order_no: 'PO-SUP-EDIT-001',
+      currency: 'HKD',
       supplier_id: 7,
       supplier_snapshot: supplierSnapshot,
     },
@@ -2071,6 +2128,7 @@ test('FL_purchase_supplier_master_selection__syncs_supplier_snapshot masterDataO
     }),
     {
       outsourcing_order_no: 'OUT-SUP-001',
+      currency: 'CNY',
       supplier_id: 8,
       supplier_snapshot: {
         id: 8,
@@ -2128,7 +2186,52 @@ test('FL_print_supplier_contact_snapshot__prefills_from_primary_supplier_contact
   )
 })
 
-test('FL_print_supplier_contact_snapshot__purchase_and_outsourcing_pages_fetch_supplier_contacts_before_save masterDataOrderView: purchase and outsourcing save paths enrich supplier snapshot from contacts API', () => {
+test('FL_outsourcing_contract_party_b_snapshot__preserves_contract_override masterDataOrderView: outsourcing supplier snapshot keeps master identity and contract party B values', () => {
+  const master = {
+    id: 8,
+    code: 'PRC-008',
+    name: '加工厂主档名称',
+    short_name: '主档简称',
+    address: '主档地址',
+    primary_contact: {
+      id: 18,
+      name: '主档联系人',
+      mobile: '13800000000',
+    },
+  }
+  assert.deepEqual(buildSupplierSnapshot(master), {
+    id: 8,
+    code: 'PRC-008',
+    name: '加工厂主档名称',
+    short_name: '主档简称',
+    contact_id: 18,
+    contact_name: '主档联系人',
+    contact_mobile: '13800000000',
+    address: '主档地址',
+  })
+  assert.deepEqual(
+    buildOutsourcingSupplierSnapshot(master, {
+      contact_id: 19,
+      contact_name: '本合同联系人',
+      contact_phone: '0769-123456',
+      address: '本合同交付地址',
+      signer_name: '乙方签约人',
+    }),
+    {
+      id: 8,
+      code: 'PRC-008',
+      name: '加工厂主档名称',
+      short_name: '主档简称',
+      contact_id: 19,
+      contact_name: '本合同联系人',
+      contact_phone: '0769-123456',
+      address: '本合同交付地址',
+      signer_name: '乙方签约人',
+    }
+  )
+})
+
+test('FL_print_supplier_contact_snapshot__purchase_and_outsourcing_pages_preserve_supplier_contacts masterDataOrderView: purchase save and outsourcing contract editing preserve supplier contact snapshots', () => {
   const purchasePageSource = readERPSource('../pages/V1PurchaseOrdersPage.jsx')
   const outsourcingPageSource = readERPSource(
     '../pages/V1OutsourcingOrdersPage.jsx'
@@ -2142,20 +2245,31 @@ test('FL_print_supplier_contact_snapshot__purchase_and_outsourcing_pages_fetch_s
     assert.doesNotMatch(source, /\blistContactsByOwner\s*\(/u)
     assert.match(source, /SUPPLIER_CONTACT_OWNER_TYPE/u)
     assert.match(source, /buildSupplierSnapshotWithContacts/u)
-    assert.match(
-      source,
-      /const supplierSnapshot = await resolveSupplierSnapshot\(supplier,\s*\{\s*notifyOnError:\s*true,\s*\}\)/u
-    )
-    assert.match(
-      source,
-      /message\.warning\(\s*`\$\{getActionErrorMessage\(error, '加载(?:供应商|加工厂)联系人'\)\}，将仅保存(?:供应商|加工厂)基本信息`\s*\)/u
-    )
     assert.doesNotMatch(
       source,
       /catch\s*\{\s*return baseSnapshot\s*\}/u,
       'contact load failure must not be silently swallowed'
     )
   }
+
+  assert.match(
+    purchasePageSource,
+    /const supplierSnapshot = await resolveSupplierSnapshot\(supplier,\s*\{\s*notifyOnError:\s*true,\s*\}\)/u
+  )
+  assert.match(
+    purchasePageSource,
+    /message\.warning\(\s*`\$\{getActionErrorMessage\(error, '加载供应商联系人'\)\}，将仅保存供应商基本信息`\s*\)/u
+  )
+  assert.match(outsourcingPageSource, /const loadSupplierContacts =/u)
+  assert.match(outsourcingPageSource, /buildOutsourcingSupplierSnapshot/u)
+  assert.doesNotMatch(
+    outsourcingPageSource,
+    /const supplierSnapshot = await resolveSupplierSnapshot/u
+  )
+  assert.match(
+    outsourcingPageSource,
+    /message\.warning\(getActionErrorMessage\(error, '加载加工厂联系人'\)\)/u
+  )
 
   assert.match(outsourcingFormSource, /onSupplierChange/u)
   assert.match(outsourcingFormSource, /onChange=\{onSupplierChange\}/u)
@@ -2234,6 +2348,30 @@ test('FL_supplier_processing_profile__wires_address_and_process_capabilities mas
   assert.match(columnsSource, /dataIndex: 'process_ids'/u)
 })
 
+test('FL_supplier_payment_term__wires_explicit_create_edit_list_and_export masterDataOrderView: 供应商付款周期完整回显并显式保存', () => {
+  const pageSource = readERPSource('../pages/V1MasterDataPage.jsx')
+  const formSource = readERPSource(
+    '../components/master-data/MasterDataForm.jsx'
+  )
+  const columnsSource = readERPSource(
+    '../components/master-data/masterDataColumns.jsx'
+  )
+
+  assert.deepEqual(buildMasterDataParams({ default_payment_term_days: 30 }), {
+    default_payment_term_days: 30,
+  })
+  assert.match(
+    pageSource,
+    /effectiveType === 'suppliers'[\s\S]*?createDefaults\.default_payment_term_days = 0/u
+  )
+  assert.match(formSource, /label="默认付款周期（天）"/u)
+  assert.match(formSource, /name="default_payment_term_days"/u)
+  assert.match(formSource, /required: true/u)
+  assert.match(formSource, /不会随供应商档案变化/u)
+  assert.match(columnsSource, /dataIndex: 'default_payment_term_days'/u)
+  assert.match(columnsSource, /exportValue:[\s\S]*?default_payment_term_days/u)
+})
+
 test('FL_sales_order_source_no__retains_customer_order_no_snapshot masterDataOrderView: sales order params retain customer source no', () => {
   assert.deepEqual(
     buildSalesOrderParams({
@@ -2244,6 +2382,7 @@ test('FL_sales_order_source_no__retains_customer_order_no_snapshot masterDataOrd
     }),
     {
       order_no: 'SO-SRC-001',
+      currency: 'CNY',
       customer_id: 3,
       customer_order_no: 'CUS-PO-001',
       customer_snapshot: {},
@@ -2275,6 +2414,7 @@ test('FL_sales_order_source_no__prefills_customer_order_no_from_blank masterData
     }),
     {
       order_no: 'SO-SRC-002',
+      currency: 'CNY',
       customer_id: 3,
       customer_order_no: 'CUS-PO-002',
       customer_snapshot: {},
@@ -2299,6 +2439,7 @@ test('FL_sales_order_source_no__clears_customer_order_no_on_source_clear masterD
   )
   assert.deepEqual(params, {
     order_no: 'SO-SRC-003',
+    currency: 'CNY',
     customer_id: 3,
     customer_snapshot: {},
     contact_snapshot: {},
@@ -2315,6 +2456,7 @@ test('FL_sales_order_order_date__retains_signing_date_snapshot masterDataOrderVi
   })
   assert.deepEqual(params, {
     order_no: 'SO-DATE-001',
+    currency: 'CNY',
     customer_id: 3,
     customer_snapshot: {},
     contact_snapshot: {},

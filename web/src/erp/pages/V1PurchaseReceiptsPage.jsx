@@ -50,7 +50,7 @@ import {
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessAttachmentModalButton from '../components/business-list/BusinessAttachmentModalButton.jsx'
-import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
+import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
 import PurchaseReceiptExceptionModal from '../components/purchase-receipts/PurchaseReceiptExceptionModal.jsx'
 import PurchaseReceiptExceptionRecordsModal from '../components/purchase-receipts/PurchaseReceiptExceptionRecordsModal.jsx'
@@ -63,6 +63,7 @@ import {
   trimOptional,
   V1_ROUTE_PATHS,
 } from '../utils/masterDataOrderView.mjs'
+import { currentBusinessDate } from '../utils/businessDate.mjs'
 import { formatQuantity } from '../utils/businessLineItems.mjs'
 import {
   comparePurchaseReceiptQuantityTotals,
@@ -547,12 +548,7 @@ export default function V1PurchaseReceiptsPage() {
         request.finish()
       }
     }
-  }, [
-    beginLatestRequest,
-    pagination,
-    receiptListParams,
-    routeReceiptID,
-  ])
+  }, [beginLatestRequest, pagination, receiptListParams, routeReceiptID])
 
   const clearRouteContext = useCallback(
     (keys) => {
@@ -964,7 +960,7 @@ export default function V1PurchaseReceiptsPage() {
   const { exporting, exportRows } = useBusinessListExport({
     requestKey: 'purchase-receipts-export',
     loadRows: loadExportRows,
-    filename: `采购入库-${new Date().toISOString().slice(0, 10)}.csv`,
+    filename: `采购入库-${currentBusinessDate()}.csv`,
     columns: exportColumns,
     recordLabel: '采购入库单',
   })
@@ -998,6 +994,7 @@ export default function V1PurchaseReceiptsPage() {
     <BusinessPageLayout className="erp-v1-purchase-receipts-page">
       <PageHeaderCard
         compact
+        helpKey="inbound"
         title="入库管理"
         description="入库管理查看从已审核采购订单生成的入库草稿，并继续办理收货、质检、退货、调整和确认过账；页面不提供脱离采购来源的手工入库明细。"
         tags={[
@@ -1494,7 +1491,7 @@ export default function V1PurchaseReceiptsPage() {
       />
       {receiptItemsPreview.modal}
 
-      <BusinessRecordDetailsModal
+      <BusinessDetailsModal
         columns={visibleColumns}
         description="查看采购入库单头、状态、数量汇总和完整材料明细。"
         lineItems={{

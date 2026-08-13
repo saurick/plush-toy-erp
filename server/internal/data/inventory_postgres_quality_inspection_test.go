@@ -154,6 +154,7 @@ func TestQualityInspectionPostgresShapeAndFlow(t *testing.T) {
 		SetSupplierName("PG质检供应商").
 		SetStatus(biz.PurchaseReceiptStatusPosted).
 		SetReceivedAt(time.Date(2026, 4, 26, 13, 0, 0, 0, time.UTC)).
+		SetPostedAt(time.Date(2026, 4, 26, 13, 0, 0, 0, time.UTC)).
 		Save(ctx)
 	if err != nil {
 		t.Fatalf("create header receipt for postgres quality FK test failed: %v", err)

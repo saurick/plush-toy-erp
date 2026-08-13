@@ -9,6 +9,7 @@ import (
 	"server/internal/biz"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/enttest"
+	"server/internal/data/model/ent/sourceorderlifecycleevent"
 
 	"entgo.io/ent/dialect"
 	"github.com/go-kratos/kratos/v2/log"
@@ -42,7 +43,7 @@ func TestOutsourcingOrderRepoProductAndMaterialSubjects(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create process: %v", err)
 	}
-	supplier, err := client.Supplier.Create().SetCode("SUP-OUT-SUBJECT").SetName("外协加工厂").SetSupplierType("outsourcing").Save(ctx)
+	supplier, err := client.Supplier.Create().SetCode("SUP-OUT-SUBJECT").SetName("外协加工厂").SetSupplierType("outsourcing").SetDefaultPaymentTermDays(45).Save(ctx)
 	if err != nil {
 		t.Fatalf("create supplier: %v", err)
 	}
@@ -87,6 +88,9 @@ func TestOutsourcingOrderRepoProductAndMaterialSubjects(t *testing.T) {
 	if len(created.Items) != 1 || created.Items[0].SubjectType != biz.OutsourcingOrderSubjectProduct || created.Items[0].ProductID == nil || *created.Items[0].ProductID != product.ID || created.Items[0].ProductSKUID == nil || *created.Items[0].ProductSKUID != productSKU.ID || created.Items[0].MaterialID != nil {
 		t.Fatalf("unexpected saved product subject: %#v", created.Items)
 	}
+	if created.Order.Currency != biz.FinanceCurrencyCNY || created.Order.PaymentTermDays == nil || *created.Order.PaymentTermDays != 45 {
+		t.Fatalf("expected create to freeze CNY and supplier term 45, got %#v", created.Order)
+	}
 	productLine := created.Items[0]
 	if productLine.ProductNoSnapshot == nil || *productLine.ProductNoSnapshot != product.Code ||
 		productLine.SKUCodeSnapshot == nil || *productLine.SKUCodeSnapshot != productSKU.SkuCode ||
@@ -105,9 +109,12 @@ func TestOutsourcingOrderRepoProductAndMaterialSubjects(t *testing.T) {
 
 	staleMaterialCode := "STALE-MATERIAL-CODE"
 	staleMaterialName := "客户端伪造材料名"
+	updatedTermDays := 60
 	updated, err := uc.SaveOutsourcingOrderWithItems(ctx, created.Order.ID, &biz.OutsourcingOrderMutation{
 		OutsourcingOrderNo: created.Order.OutsourcingOrderNo,
 		SupplierID:         supplier.ID,
+		Currency:           biz.FinanceCurrencyUSD,
+		PaymentTermDays:    &updatedTermDays,
 		OrderDate:          orderDate,
 		ExpectedVersion:    created.Order.Version,
 	}, []*biz.OutsourcingOrderItemSaveMutation{{
@@ -139,6 +146,9 @@ func TestOutsourcingOrderRepoProductAndMaterialSubjects(t *testing.T) {
 	}
 	if len(updated.Items) != 1 {
 		t.Fatalf("expected one updated item, got %#v", updated.Items)
+	}
+	if updated.Order.Currency != biz.FinanceCurrencyUSD || updated.Order.PaymentTermDays == nil || *updated.Order.PaymentTermDays != 60 {
+		t.Fatalf("expected explicit USD/60 update persisted, got %#v", updated.Order)
 	}
 	line := updated.Items[0]
 	if line.SubjectType != biz.OutsourcingOrderSubjectMaterial || line.ProductID != nil || line.ProductSKUID != nil || line.SKUCodeSnapshot != nil || line.MaterialID == nil || *line.MaterialID != material.ID {
@@ -193,5 +203,101 @@ func TestOutsourcingProductNoSnapshotPrefersStyleNo(t *testing.T) {
 	withoutStyle := outsourcingProductNoSnapshot(&ent.Product{Code: "PRODUCT-002"})
 	if withoutStyle == nil || *withoutStyle != "PRODUCT-002" {
 		t.Fatalf("outsourcingProductNoSnapshot() = %v, want product code fallback", withoutStyle)
+	}
+}
+
+func TestOutsourcingOrderLifecycleActionUsesExistingInventoryTransaction(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "outsourcing_order_lifecycle_existing_tx")
+	uc := biz.NewOutsourcingOrderUsecase(NewOutsourcingOrderRepo(data, log.NewStdLogger(io.Discard)))
+
+	actor := client.AdminUser.Create().
+		SetUsername("outsourcing-lifecycle-actor").
+		SetPasswordHash("test-password-hash").
+		SaveX(ctx)
+	unit := createTestUnit(t, ctx, client, "OUT-TX-U")
+	material := createTestMaterial(t, ctx, client, unit.ID, "OUT-TX-M")
+	process := client.Process.Create().
+		SetCode("OUT-TX-P").
+		SetName("事务内委外工序").
+		SetCategory("面料加工").
+		SetOutsourcingEnabled(true).
+		SaveX(ctx)
+	supplier := client.Supplier.Create().
+		SetCode("OUT-TX-S").
+		SetName("事务内委外供应商").
+		SetSupplierType("outsourcing").
+		SetDefaultPaymentTermDays(30).
+		SaveX(ctx)
+	orderDate := time.Date(2026, 8, 12, 0, 0, 0, 0, time.UTC)
+	expectedReturnDate := orderDate.AddDate(0, 0, 7)
+	order := client.OutsourcingOrder.Create().
+		SetOutsourcingOrderNo("OUT-TX-001").
+		SetSupplierID(supplier.ID).
+		SetCurrency(biz.FinanceCurrencyCNY).
+		SetPaymentTermDays(30).
+		SetSupplierSnapshot(map[string]any{
+			"name":          supplier.Name,
+			"contact_name":  "供应商联系人",
+			"contact_phone": "13800000000",
+			"address":       "测试供应商地址",
+		}).
+		SetContractPartySnapshot(map[string]any{
+			"buyerCompany": "测试甲方",
+			"buyerContact": "采购员",
+			"buyerPhone":   "13900000000",
+			"buyerAddress": "测试甲方地址",
+		}).
+		SetOrderDate(orderDate).
+		SetExpectedReturnDate(expectedReturnDate).
+		SaveX(ctx)
+	client.OutsourcingOrderItem.Create().
+		SetOutsourcingOrderID(order.ID).
+		SetLineNo(1).
+		SetSubjectType(biz.OutsourcingOrderSubjectMaterial).
+		SetMaterialID(material.ID).
+		SetProcessID(process.ID).
+		SetUnitID(unit.ID).
+		SetProcessingItem("面料裁片").
+		SetOutsourcingQuantity(decimal.NewFromInt(10)).
+		SaveX(ctx)
+
+	action := &biz.SourceOrderLifecycleAction{
+		ID:              order.ID,
+		ExpectedVersion: order.Version,
+		IdempotencyKey:  "outsourcing-submit-existing-tx",
+		ActorID:         actor.ID,
+	}
+	submitted, err := uc.SubmitOutsourcingOrderWithAction(ctx, action)
+	if err != nil {
+		t.Fatalf("submit outsourcing order through existing transaction: %v", err)
+	}
+	if submitted.LifecycleStatus != biz.OutsourcingOrderStatusSubmitted || submitted.Version != order.Version+1 {
+		t.Fatalf("submitted outsourcing order = %#v", submitted)
+	}
+	stored := client.OutsourcingOrder.GetX(ctx, order.ID)
+	if stored.LifecycleStatus != biz.OutsourcingOrderStatusSubmitted || stored.Version != order.Version+1 {
+		t.Fatalf("stored outsourcing order = %#v", stored)
+	}
+	eventQuery := client.SourceOrderLifecycleEvent.Query().Where(
+		sourceorderlifecycleevent.SourceType("outsourcing_order"),
+		sourceorderlifecycleevent.SourceID(order.ID),
+		sourceorderlifecycleevent.IdempotencyKey(action.IdempotencyKey),
+	)
+	event := eventQuery.OnlyX(ctx)
+	if event.ActionKey != biz.SourceOrderActionSubmit || event.FromStatus != biz.OutsourcingOrderStatusDraft ||
+		event.ToStatus != biz.OutsourcingOrderStatusSubmitted || event.SourceVersion != order.Version+1 {
+		t.Fatalf("outsourcing lifecycle receipt = %#v", event)
+	}
+
+	replayed, err := uc.SubmitOutsourcingOrderWithAction(ctx, action)
+	if err != nil {
+		t.Fatalf("replay outsourcing submit: %v", err)
+	}
+	if replayed.ID != order.ID || replayed.LifecycleStatus != biz.OutsourcingOrderStatusSubmitted || replayed.Version != order.Version+1 {
+		t.Fatalf("replayed outsourcing order = %#v", replayed)
+	}
+	if count := eventQuery.CountX(ctx); count != 1 {
+		t.Fatalf("outsourcing lifecycle receipt count = %d, want 1", count)
 	}
 }

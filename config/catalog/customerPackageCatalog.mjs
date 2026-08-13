@@ -13,7 +13,7 @@ export const customerPackageCatalog = Object.freeze({
   }),
   modules: Object.freeze([
     { key: "customers", label: "客户档案", layer: "MasterData" },
-    { key: "suppliers", label: "供应商档案", layer: "MasterData" },
+    { key: "suppliers", label: "供应商与加工厂", layer: "MasterData" },
     { key: "products", label: "产品档案", layer: "MasterData" },
     { key: "materials", label: "材料档案", layer: "MasterData" },
     { key: "processes", label: "加工环节", layer: "MasterData" },
@@ -73,7 +73,7 @@ export const customerPackageCatalog = Object.freeze({
     },
     {
       key: "suppliers",
-      label: "供应商档案",
+      label: "供应商与加工厂",
       requiredCapabilityKeys: ["supplier.read", "contact.read"],
     },
     {

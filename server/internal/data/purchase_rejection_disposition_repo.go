@@ -201,7 +201,7 @@ func (r *inventoryRepo) CancelPurchaseRejectionDisposition(ctx context.Context, 
 		if err != nil {
 			return nil, err
 		}
-		if err := settleDraftPurchaseReceiptCancellation(ctx, tx, replacement, items); err != nil {
+		if err := settleDraftPurchaseReceiptCancellation(ctx, tx, replacement, items, in.ActorID); err != nil {
 			return nil, err
 		}
 		if err := updatePurchaseReceiptCancelled(ctx, tx, replacement.ID); err != nil {

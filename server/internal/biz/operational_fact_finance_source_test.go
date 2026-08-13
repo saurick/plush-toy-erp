@@ -4,51 +4,32 @@ import (
 	"context"
 	"errors"
 	"testing"
-
-	"github.com/shopspring/decimal"
+	"time"
 )
 
-func TestOperationalFactUsecaseFinanceFromShipmentOwnsFactFields(t *testing.T) {
-	customerID := 51
-	currency := FinanceCurrencyCNY
-	firstAmount := decimal.RequireFromString("100.25")
-	secondAmount := decimal.RequireFromString("24.75")
+func TestOperationalFactUsecaseFinanceFromShipmentNormalizesOperatorFields(t *testing.T) {
+	note := "  客户确认  "
 	repo := &financeFromShipmentRepoStub{
 		productionCompletionRepoStub: &productionCompletionRepoStub{},
-		shipment: &Shipment{
-			ID:         91,
-			Status:     ShipmentStatusShipped,
-			CustomerID: &customerID,
-			Items: []*ShipmentItem{
-				{AmountSnapshot: &firstAmount, CurrencySnapshot: &currency},
-				{AmountSnapshot: &secondAmount, CurrencySnapshot: &currency},
-			},
-		},
+		createdResult:                &FinanceFact{ID: 1, FactNo: "AR-SHIPMENT-001", FactType: FinanceFactReceivable},
 	}
 	uc := NewOperationalFactUsecase(repo)
 
 	fact, err := uc.CreateReceivableFromShipment(context.Background(), &FinanceFactFromShipmentCreate{
 		FactNo:         " AR-SHIPMENT-001 ",
 		ShipmentID:     91,
-		IdempotencyKey: "test-test-test",
+		IdempotencyKey: " test-test-test ",
+		Note:           &note,
 	})
 	if err != nil {
 		t.Fatalf("CreateReceivableFromShipment error = %v", err)
 	}
-	if fact == nil || repo.createdFinance == nil {
-		t.Fatalf("fact=%#v created=%#v", fact, repo.createdFinance)
+	if fact == nil || fact.ID != 1 || repo.createdSource == nil {
+		t.Fatalf("fact=%#v source=%#v", fact, repo.createdSource)
 	}
-	created := repo.createdFinance
-	if created.FactNo != "AR-SHIPMENT-001" || created.FactType != FinanceFactReceivable || created.CounterpartyType != FinanceCounterpartyCustomer || created.CounterpartyID == nil || *created.CounterpartyID != customerID {
-		t.Fatalf("source-derived receivable identity = %#v", created)
-	}
-	if !created.Amount.Equal(decimal.NewFromInt(125)) || !created.FeeAmount.IsZero() || created.Currency != FinanceCurrencyCNY {
-		t.Fatalf("source-derived receivable amount = %#v", created)
-	}
-	if created.SourceType == nil || *created.SourceType != ShipmentSourceType || created.SourceID == nil || *created.SourceID != 91 || created.SourceLineID != nil {
-		t.Fatalf("source-derived receivable linkage = %#v", created)
-	}
-	if repo.createdFactType != FinanceFactReceivable || repo.createdSource == nil || repo.createdSource.FactNo != "AR-SHIPMENT-001" || repo.createdSource.OccurredAtSpecified || repo.createdSource.OccurredAt.IsZero() {
+	if repo.createdFactType != FinanceFactReceivable || repo.createdSource.FactNo != "AR-SHIPMENT-001" ||
+		repo.createdSource.ShipmentID != 91 || repo.createdSource.IdempotencyKey != "test-test-test" ||
+		repo.createdSource.Note == nil || *repo.createdSource.Note != "客户确认" {
 		t.Fatalf("normalized source request type=%q input=%#v", repo.createdFactType, repo.createdSource)
 	}
 }
@@ -85,10 +66,10 @@ func TestFinancePaymentTermSnapshotFromDays(t *testing.T) {
 		wantErr  error
 	}{
 		{name: "missing", wantErr: ErrFinanceFactPaymentTermMissing},
-		{name: "cash", days: processTestIntPtr(0), wantTerm: stringTestPtr(FinancePaymentTermCashOnShipment), wantDays: processTestIntPtr(0)},
-		{name: "thirty", days: processTestIntPtr(30), wantTerm: stringTestPtr(FinancePaymentTermEOM30), wantDays: processTestIntPtr(30)},
-		{name: "forty five", days: processTestIntPtr(45), wantTerm: stringTestPtr(FinancePaymentTermEOM45), wantDays: processTestIntPtr(45)},
-		{name: "custom sixty", days: processTestIntPtr(60), wantDays: processTestIntPtr(60)},
+		{name: "due on occurrence", days: processTestIntPtr(0), wantTerm: stringTestPtr(FinancePaymentTermDueOnOccurrence), wantDays: processTestIntPtr(0)},
+		{name: "thirty", days: processTestIntPtr(30), wantTerm: stringTestPtr(FinancePaymentTermEOMDays), wantDays: processTestIntPtr(30)},
+		{name: "forty five", days: processTestIntPtr(45), wantTerm: stringTestPtr(FinancePaymentTermEOMDays), wantDays: processTestIntPtr(45)},
+		{name: "custom sixty", days: processTestIntPtr(60), wantTerm: stringTestPtr(FinancePaymentTermEOMDays), wantDays: processTestIntPtr(60)},
 		{name: "negative", days: processTestIntPtr(-1), wantErr: ErrBadParam},
 	}
 	for _, tt := range tests {
@@ -98,6 +79,57 @@ func TestFinancePaymentTermSnapshotFromDays(t *testing.T) {
 				t.Fatalf("term=%#v days=%#v err=%v", term, days, err)
 			}
 		})
+	}
+}
+
+func TestFinanceFactDueAtFromDaysUsesCanonicalMonthEnd(t *testing.T) {
+	tests := []struct {
+		name       string
+		occurredAt time.Time
+		days       int
+		want       time.Time
+	}{
+		{
+			name:       "due on occurrence canonicalizes to UTC microseconds",
+			occurredAt: time.Date(2026, time.August, 11, 23, 45, 0, 123456789, time.FixedZone("CST", 8*60*60)),
+			days:       0,
+			want:       time.Date(2026, time.August, 11, 15, 45, 0, 123456000, time.UTC),
+		},
+		{
+			name:       "positive days start from canonical UTC month end",
+			occurredAt: time.Date(2026, time.August, 11, 23, 45, 0, 123456789, time.FixedZone("CST", 8*60*60)),
+			days:       30,
+			want:       time.Date(2026, time.September, 30, 15, 45, 0, 123456000, time.UTC),
+		},
+		{
+			name:       "leap year month end",
+			occurredAt: time.Date(2028, time.February, 10, 8, 30, 0, 999, time.UTC),
+			days:       1,
+			want:       time.Date(2028, time.March, 1, 8, 30, 0, 0, time.UTC),
+		},
+		{
+			name:       "december rolls into next year",
+			occurredAt: time.Date(2026, time.December, 15, 9, 0, 0, 0, time.UTC),
+			days:       45,
+			want:       time.Date(2027, time.February, 14, 9, 0, 0, 0, time.UTC),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dueAt, err := FinanceFactDueAtFromDays(tt.occurredAt, &tt.days)
+			if err != nil || dueAt == nil || !dueAt.Equal(tt.want) {
+				t.Fatalf("dueAt=%v want=%v err=%v", dueAt, tt.want, err)
+			}
+		})
+	}
+	if _, err := FinanceFactDueAtFromDays(time.Time{}, processTestIntPtr(1)); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("zero occurrence error=%v", err)
+	}
+	if _, err := FinanceFactDueAtFromDays(time.Now(), nil); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("missing days error=%v", err)
+	}
+	if _, err := FinanceFactDueAtFromDays(time.Now(), processTestIntPtr(-1)); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("negative days error=%v", err)
 	}
 }
 
@@ -144,8 +176,7 @@ func TestOperationalFactUsecaseSettleFinanceFactAllowsOnlyBalanceTypes(t *testin
 
 type financeFromShipmentRepoStub struct {
 	*productionCompletionRepoStub
-	shipment        *Shipment
-	createdFinance  *FinanceFactCreate
+	createdResult   *FinanceFact
 	createdSource   *FinanceFactFromShipmentCreate
 	createdFactType string
 	financeToRead   *FinanceFact
@@ -156,41 +187,19 @@ func (r *financeFromShipmentRepoStub) CreateFinanceFactDraftFromShipment(_ conte
 	copy := *in
 	r.createdSource = &copy
 	r.createdFactType = factType
-	if r.shipment == nil || r.shipment.CustomerID == nil {
-		return nil, ErrShipmentNotFound
+	if r.createdResult == nil {
+		return nil, ErrBadParam
 	}
-	amount := decimal.Zero
-	for _, item := range r.shipment.Items {
-		amount = amount.Add(*item.AmountSnapshot)
-	}
-	sourceType := ShipmentSourceType
-	shipmentID := r.shipment.ID
-	create := &FinanceFactCreate{
-		FactNo: copy.FactNo, FactType: factType, CounterpartyType: FinanceCounterpartyCustomer,
-		CounterpartyID: r.shipment.CustomerID, Amount: amount, FeeAmount: decimal.Zero, Currency: FinanceCurrencyCNY,
-		InvoiceCategory: copy.InvoiceCategory, SourceType: &sourceType, SourceID: &shipmentID,
-		IdempotencyKey: copy.IdempotencyKey, OccurredAt: copy.OccurredAt, OccurredAtSpecified: copy.OccurredAtSpecified, Note: copy.Note,
-	}
-	return r.CreateFinanceFactDraft(context.Background(), create)
+	result := *r.createdResult
+	return &result, nil
 }
 
 func (r *financeFromShipmentRepoStub) GetShipment(context.Context, int) (*Shipment, error) {
-	if r.shipment == nil {
-		return nil, ErrShipmentNotFound
-	}
-	return r.shipment, nil
+	return nil, ErrShipmentNotFound
 }
 
-func (r *financeFromShipmentRepoStub) CreateFinanceFactDraft(_ context.Context, in *FinanceFactCreate) (*FinanceFact, error) {
-	copy := *in
-	r.createdFinance = &copy
-	return &FinanceFact{
-		FactNo: copy.FactNo, FactType: copy.FactType, Status: OperationalFactStatusDraft,
-		CounterpartyType: copy.CounterpartyType, CounterpartyID: copy.CounterpartyID,
-		Amount: copy.Amount, FeeAmount: copy.FeeAmount, Currency: copy.Currency,
-		InvoiceCategory: copy.InvoiceCategory, SourceType: copy.SourceType, SourceID: copy.SourceID,
-		IdempotencyKey: copy.IdempotencyKey,
-	}, nil
+func (r *financeFromShipmentRepoStub) CreateFinanceFactDraft(context.Context, *FinanceFactCreate) (*FinanceFact, error) {
+	return nil, ErrBadParam
 }
 
 func (r *financeFromShipmentRepoStub) GetFinanceFact(context.Context, int) (*FinanceFact, error) {

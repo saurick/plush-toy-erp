@@ -105,12 +105,18 @@ export function createDevDrillRecoveryScenarios({
           )
           const drill = document.querySelector('.erp-dev-recovery-row')
           const nav = document.querySelector('.erp-dev-workspace-nav')
+          const customerScope = document.querySelector(
+            '.erp-dev-customer-scope'
+          )
           return {
             summaryColumns: summary
               ? getComputedStyle(summary).gridTemplateColumns
               : '',
             drillWidth: Math.round(drill?.getBoundingClientRect().width || 0),
             navPosition: nav ? getComputedStyle(nav).position : '',
+            customerScopeHeight: customerScope
+              ? Math.round(customerScope.getBoundingClientRect().height)
+              : null,
             viewportWidth: window.innerWidth,
             documentWidth: document.documentElement.scrollWidth,
             documentHeight: document.documentElement.scrollHeight,
@@ -124,8 +130,14 @@ export function createDevDrillRecoveryScenarios({
         assert.equal(metrics.openCount, 0)
         assert(metrics.documentWidth <= metrics.viewportWidth + 2)
         assert(
-          metrics.documentHeight < 2700,
-          `移动端信息应保持可扫描，当前高度 ${metrics.documentHeight}px`
+          metrics.customerScopeHeight > 0 && metrics.customerScopeHeight < 200,
+          `移动端甲方范围选择器高度异常，当前高度 ${metrics.customerScopeHeight}px`
+        )
+        const coreDocumentHeight =
+          metrics.documentHeight - metrics.customerScopeHeight
+        assert(
+          coreDocumentHeight < 2700,
+          `移动端核心信息应保持可扫描，当前总高度 ${metrics.documentHeight}px，核心内容 ${coreDocumentHeight}px，甲方范围 ${metrics.customerScopeHeight}px`
         )
         await assertNoHorizontalOverflow(page, 'dev-drill-recovery-mobile-dark')
         await page.locator('.erp-dev-recovery-catalog').scrollIntoViewIfNeeded()
@@ -154,9 +166,11 @@ export function createDevDrillRecoveryScenarios({
           }
         })
         assert.equal(detailMetrics.actionDirection, 'column')
+        const expandedCoreDocumentHeight =
+          detailMetrics.documentHeight - metrics.customerScopeHeight
         assert(
-          detailMetrics.documentHeight < 3200,
-          `移动端展开详情后仍应可读，当前高度 ${detailMetrics.documentHeight}px`
+          expandedCoreDocumentHeight < 3200,
+          `移动端展开详情后仍应可读，当前总高度 ${detailMetrics.documentHeight}px，核心内容 ${expandedCoreDocumentHeight}px，甲方范围 ${metrics.customerScopeHeight}px`
         )
         await assertNoHorizontalOverflow(
           page,

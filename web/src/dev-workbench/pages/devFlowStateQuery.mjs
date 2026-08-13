@@ -17,10 +17,23 @@ export const DEV_FLOW_STATE_VIEW_SELECTION_QUERY_KEYS = Object.freeze({
     DEV_FLOW_STATE_QUERY_KEYS.chain,
     DEV_FLOW_STATE_QUERY_KEYS.node,
   ]),
-  workflow: Object.freeze([]),
-  runtime: Object.freeze([DEV_FLOW_STATE_QUERY_KEYS.process]),
-  facts: Object.freeze([DEV_FLOW_STATE_QUERY_KEYS.fact]),
+  workflow: Object.freeze([
+    DEV_FLOW_STATE_QUERY_KEYS.chain,
+    DEV_FLOW_STATE_QUERY_KEYS.node,
+  ]),
+  runtime: Object.freeze([
+    DEV_FLOW_STATE_QUERY_KEYS.chain,
+    DEV_FLOW_STATE_QUERY_KEYS.node,
+    DEV_FLOW_STATE_QUERY_KEYS.process,
+  ]),
+  facts: Object.freeze([
+    DEV_FLOW_STATE_QUERY_KEYS.chain,
+    DEV_FLOW_STATE_QUERY_KEYS.node,
+    DEV_FLOW_STATE_QUERY_KEYS.fact,
+  ]),
   states: Object.freeze([
+    DEV_FLOW_STATE_QUERY_KEYS.chain,
+    DEV_FLOW_STATE_QUERY_KEYS.node,
     DEV_FLOW_STATE_QUERY_KEYS.flow,
     DEV_FLOW_STATE_QUERY_KEYS.state,
   ]),
@@ -57,9 +70,8 @@ export function canonicalizeDevFlowStateSearchParams(value) {
     if (!allowedSelectionKeys.includes(key)) next.delete(key)
   }
   if (
-    view === 'chain' &&
     cleanText(next.get(DEV_FLOW_STATE_QUERY_KEYS.chain)) ===
-      DEV_FLOW_STATE_OVERVIEW_CHAIN_KEY
+    DEV_FLOW_STATE_OVERVIEW_CHAIN_KEY
   ) {
     next.delete(DEV_FLOW_STATE_QUERY_KEYS.node)
   }

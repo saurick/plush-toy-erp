@@ -350,7 +350,6 @@
 
 ## 2026-06-17 16:57 CST Operational Fact 正式业务入口批量接入
 
-- 完成：将 `委外订单`、`生产进度`、`出库管理`、`应收管理`、`应付管理`、`发票管理` 和 `对账管理` 从正式入口壳切换为收窄 Operational Fact V1 页面，复用 `production_facts / outsourcing_facts / shipments / stock_reservations / finance_facts` 与 `operational_fact` JSON-RPC，不恢复旧 `business_records`。
 - 完成：`OperationalFactsPage` 抽成可配置工作台，正式业务入口按模块收窄 tab、标题、创建按钮、默认 fact_type 和列表过滤；`finance_facts` 列表过滤补 `fact_type`，前后端测试和 `style:l1` mock / 断言同步覆盖。
 - 完成：同步 `README.md`、`docs/当前真源与交接顺序.md`、正式产品入口计划、正式菜单运行时拆分清单和产品能力证据详情；当前仍是入口壳的页面只剩 `生产排程`、`生产异常`、`出货放行`。
 - 验证：`cd server && go test ./internal/biz ./internal/data ./internal/service -count=1`、`node --check web/scripts/styleL1.mjs && node --check web/src/erp/api/operationalFactApi.test.mjs`、全量无 fix `pnpm -C web exec eslint --ext .js --ext .jsx src/`、`pnpm -C web css`、`pnpm -C web test`（334 tests）、`STYLE_L1_BASE_URL=http://localhost:5175 STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1` 和 `git diff --check` 均通过；L1 已覆盖委外、生产进度、出库、应收、应付、发票、对账正式入口，并额外覆盖 Operational Fact modal 的桌面暗色和 390px 移动盒模型。

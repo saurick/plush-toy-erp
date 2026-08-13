@@ -61,6 +61,10 @@ const (
 	EdgeProductSku = "product_sku"
 	// EdgeInventoryLot holds the string denoting the inventory_lot edge name in mutations.
 	EdgeInventoryLot = "inventory_lot"
+	// EdgeReversals holds the string denoting the reversals edge name in mutations.
+	EdgeReversals = "reversals"
+	// EdgeReversalOf holds the string denoting the reversal_of edge name in mutations.
+	EdgeReversalOf = "reversal_of"
 	// Table holds the table name of the inventorytxn in the database.
 	Table = "inventory_txns"
 	// WarehouseTable is the table that holds the warehouse relation/edge.
@@ -91,6 +95,14 @@ const (
 	InventoryLotInverseTable = "inventory_lots"
 	// InventoryLotColumn is the table column denoting the inventory_lot relation/edge.
 	InventoryLotColumn = "lot_id"
+	// ReversalsTable is the table that holds the reversals relation/edge.
+	ReversalsTable = "inventory_txns"
+	// ReversalsColumn is the table column denoting the reversals relation/edge.
+	ReversalsColumn = "reversal_of_txn_id"
+	// ReversalOfTable is the table that holds the reversal_of relation/edge.
+	ReversalOfTable = "inventory_txns"
+	// ReversalOfColumn is the table column denoting the reversal_of relation/edge.
+	ReversalOfColumn = "reversal_of_txn_id"
 )
 
 // Columns holds all SQL columns for inventorytxn fields.
@@ -300,6 +312,27 @@ func ByInventoryLotField(field string, opts ...sql.OrderTermOption) OrderOption 
 		sqlgraph.OrderByNeighborTerms(s, newInventoryLotStep(), sql.OrderByField(field, opts...))
 	}
 }
+
+// ByReversalsCount orders the results by reversals count.
+func ByReversalsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newReversalsStep(), opts...)
+	}
+}
+
+// ByReversals orders the results by reversals terms.
+func ByReversals(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newReversalsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByReversalOfField orders the results by reversal_of field.
+func ByReversalOfField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newReversalOfStep(), sql.OrderByField(field, opts...))
+	}
+}
 func newWarehouseStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -326,5 +359,19 @@ func newInventoryLotStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(InventoryLotInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, InventoryLotTable, InventoryLotColumn),
+	)
+}
+func newReversalsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(Table, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, ReversalsTable, ReversalsColumn),
+	)
+}
+func newReversalOfStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(Table, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, ReversalOfTable, ReversalOfColumn),
 	)
 }

@@ -38,8 +38,8 @@ import {
   buildPrintWorkspaceDraftStorageKey,
   PRINT_WORKSPACE_DRAFT_MODE,
   PRINT_WORKSPACE_ENTRY_SOURCE,
-  persistPrintWorkspaceDraftSnapshot,
   readInitialPrintWorkspaceDraftFromWindowName,
+  readPrintWorkspaceDraftSnapshot,
   resolvePrintWorkspaceEntrySource,
   resolvePrintWorkspaceStateID,
   resolvePrintWorkspaceDraftMode,
@@ -54,17 +54,17 @@ import {
   watchPrintPageMarginForPaper,
 } from '../utils/printPageMargin.mjs'
 import { normalizePrintAppendixImages } from '../utils/printAppendixImages.mjs'
-import usePrintWorkspaceWindowSnapshot from '../utils/usePrintWorkspaceWindowSnapshot.js'
+import usePrintWorkspaceWindowSnapshot, {
+  preparePrintWorkspaceSnapshot,
+} from '../utils/usePrintWorkspaceWindowSnapshot.js'
 import {
   useFlushPrintWorkspaceDraftOnPageExit,
   usePersistentPrintWorkspaceDraft,
 } from '../utils/usePersistentPrintWorkspaceDraft.js'
 
-const DRAFT_STORAGE_KEY = '__plush_erp_processing_contract_print_draft__'
-
 function loadDraft({
   forceFresh = false,
-  storageKey = DRAFT_STORAGE_KEY,
+  storageKey = '',
   workspaceStateID = '',
   businessInput = false,
 } = {}) {
@@ -90,19 +90,13 @@ function loadDraft({
       : normalizeProcessingContractDraft(initialDraft)
   }
 
-  try {
-    const raw = window.localStorage.getItem(storageKey) || ''
-    if (!raw) {
-      return fallbackDraft
-    }
-
-    const parsed = JSON.parse(raw)
-    return businessInput
-      ? createProcessingContractBusinessDraft(parsed)
-      : normalizeProcessingContractDraft(parsed)
-  } catch {
+  const storedDraft = readPrintWorkspaceDraftSnapshot(storageKey)
+  if (!storedDraft) {
     return fallbackDraft
   }
+  return businessInput
+    ? createProcessingContractBusinessDraft(storedDraft)
+    : normalizeProcessingContractDraft(storedDraft)
 }
 
 function formatExportFileName() {
@@ -149,9 +143,12 @@ export default function ProcessingContractPrintWorkspacePage() {
   const draftStorageKey = workspaceStateID
     ? buildPrintWorkspaceDraftStorageKey(
         PROCESSING_CONTRACT_TEMPLATE_KEY,
-        workspaceStateID
+        workspaceStateID,
+        { customerKey }
       )
-    : DRAFT_STORAGE_KEY
+    : buildPrintWorkspaceDraftStorageKey(PROCESSING_CONTRACT_TEMPLATE_KEY, '', {
+        customerKey,
+      })
   const workspaceURL = useMemo(() => {
     if (!workspaceStateID || typeof window === 'undefined') {
       return ''
@@ -163,14 +160,16 @@ export default function ProcessingContractPrintWorkspacePage() {
       stateID: workspaceStateID,
     })
   }, [customerKey, entrySource, workspaceStateID])
-  const [contract, setContract, flushContractDraft] =
-    usePersistentPrintWorkspaceDraft(() =>
-      loadDraft({
-        forceFresh: resetDraftOnOpen,
-        storageKey: draftStorageKey,
-        workspaceStateID,
-        businessInput: entrySource === PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
-      })
+  const [contract, setContract, flushContractDraft, , persistenceStatus] =
+    usePersistentPrintWorkspaceDraft(
+      () =>
+        loadDraft({
+          forceFresh: resetDraftOnOpen,
+          storageKey: draftStorageKey,
+          workspaceStateID,
+          businessInput: entrySource === PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
+        }),
+      draftStorageKey
     )
   const [rowSelectionMode, setRowSelectionMode] = useState(false)
   const [selectedLineIndex, setSelectedLineIndex] = useState(null)
@@ -222,10 +221,6 @@ export default function ProcessingContractPrintWorkspacePage() {
   useFlushPrintWorkspaceDraftOnPageExit(flushContractDraft)
 
   useEffect(() => {
-    persistPrintWorkspaceDraftSnapshot(draftStorageKey, contract)
-  }, [contract, draftStorageKey])
-
-  useEffect(() => {
     if (!paperRef.current) {
       return undefined
     }
@@ -242,6 +237,7 @@ export default function ProcessingContractPrintWorkspacePage() {
     workspaceURL,
     observeNodeRef: paperRef,
     suspended: busyAction !== '',
+    beforeSnapshot: flushContractDraft,
   })
 
   useEffect(() => {
@@ -330,18 +326,14 @@ export default function ProcessingContractPrintWorkspacePage() {
   }
 
   const handleAppendixImagesChange = (images) => {
-    let persisted = true
-    setContract((current) => {
+    const persisted = setContract((current) => {
       const nextContract = {
         ...current,
         appendixImages: normalizePrintAppendixImages(images),
       }
-      persisted =
-        !draftStorageKey ||
-        persistPrintWorkspaceDraftSnapshot(draftStorageKey, nextContract)
       return nextContract
     })
-    return persisted
+    return !draftStorageKey || persisted
   }
 
   const handleToggleRowSelectionMode = () => {
@@ -457,13 +449,17 @@ export default function ProcessingContractPrintWorkspacePage() {
       return
     }
 
-    syncPrintPageMarginForPaper(paperRef.current, {
-      stageWrapElement: stageWrapRef.current,
-      paperContinuedClass: 'erp-processing-contract-paper--continued',
-    })
     setBusyActionStartedAt(Date.now())
     setBusyAction(actionKey)
     try {
+      await preparePrintWorkspaceSnapshot({
+        windowLike: window,
+        beforeSnapshot: flushContractDraft,
+      })
+      syncPrintPageMarginForPaper(paperRef.current, {
+        stageWrapElement: stageWrapRef.current,
+        paperContinuedClass: 'erp-processing-contract-paper--continued',
+      })
       await runner()
     } catch (error) {
       message.error(getActionErrorMessage(error, '生成 PDF'))
@@ -537,7 +533,11 @@ export default function ProcessingContractPrintWorkspacePage() {
       })
     })
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    await preparePrintWorkspaceSnapshot({
+      windowLike: window,
+      beforeSnapshot: flushContractDraft,
+    })
     syncPrintPageMarginForPaper(paperRef.current, {
       stageWrapElement: stageWrapRef.current,
       paperContinuedClass: 'erp-processing-contract-paper--continued',
@@ -851,6 +851,7 @@ export default function ProcessingContractPrintWorkspacePage() {
             ? '正在下载 PDF...'
             : toolbarStatus
       }
+      persistenceStatus={persistenceStatus}
       panelTip="左侧修改会立即显示在右侧合同中；普通末尾图片自动两张一行，长图自动整行，每张可切换排版，打印时只输出右侧合同。"
       prepareSignature={`${draftStorageKey}:${resetDraftOnOpen ? 'fresh' : 'restore'}`}
       panelActions={

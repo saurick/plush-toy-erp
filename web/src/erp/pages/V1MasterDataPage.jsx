@@ -27,6 +27,7 @@ import {
   BusinessPageLayout,
   PageHeaderCard,
   SearchInput,
+  SelectFilter,
   SelectionActionBar,
   SelectionClearAction,
   ToolbarButton,
@@ -40,7 +41,7 @@ import {
   writeStoredColumnOrder,
 } from '../components/business-list/businessListPreferences.mjs'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
-import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
+import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
 import {
@@ -76,6 +77,7 @@ import {
   inferProductDefaultUnitID,
   resolvePaymentTermDays,
 } from '../utils/masterDataOrderView.mjs'
+import { currentBusinessDate } from '../utils/businessDate.mjs'
 import {
   applyModuleColumnOrder,
   sanitizeModuleColumnOrder,
@@ -160,6 +162,12 @@ export default function V1MasterDataPage({ type }) {
   const [lifecycleScope, setLifecycleScope] = useState(() =>
     lifecycleScopeFromSearchParams(searchParams)
   )
+  const [supplierTypeFilter, setSupplierTypeFilter] = useState(() => {
+    const requestedType = searchParams.get('supplier_type') || ''
+    return SUPPLIER_TYPE_OPTIONS.some((item) => item.value === requestedType)
+      ? requestedType
+      : ''
+  })
   const [records, setRecords] = useState([])
   const [total, setTotal] = useState(0)
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
@@ -220,10 +228,7 @@ export default function V1MasterDataPage({ type }) {
     config.permissions.contactDisable
   )
   const canSyncContacts =
-    canReadContacts &&
-    canCreateContact &&
-    canUpdateContact &&
-    canDisableContact
+    canReadContacts && canCreateContact && canUpdateContact && canDisableContact
   const showContactForm =
     supportsContacts && canSyncContacts && Boolean(config.saveWithContacts)
   const productOptions = useMemo(
@@ -386,7 +391,7 @@ export default function V1MasterDataPage({ type }) {
           { signal: request.signal }
         )
         if (!request.isCurrent()) {
-          return []
+          return null
         }
         const nextContacts = Array.isArray(result?.contacts)
           ? result.contacts
@@ -517,8 +522,11 @@ export default function V1MasterDataPage({ type }) {
     () => ({
       keyword,
       lifecycle_scope: lifecycleScope,
+      ...(effectiveType === 'suppliers' && supplierTypeFilter
+        ? { supplier_types: [supplierTypeFilter] }
+        : {}),
     }),
-    [keyword, lifecycleScope]
+    [effectiveType, keyword, lifecycleScope, supplierTypeFilter]
   )
 
   const loadRecords = useCallback(async () => {
@@ -625,16 +633,20 @@ export default function V1MasterDataPage({ type }) {
   }, [effectiveType])
 
   const hasActiveFilters = Boolean(
-    keyword.trim() || lifecycleScope !== LIFECYCLE_SCOPE.CURRENT
+    keyword.trim() ||
+      lifecycleScope !== LIFECYCLE_SCOPE.CURRENT ||
+      (effectiveType === 'suppliers' && supplierTypeFilter)
   )
   const clearFilters = useCallback(() => {
     setKeyword('')
     setLifecycleScope(LIFECYCLE_SCOPE.CURRENT)
+    setSupplierTypeFilter('')
     const nextParams = withLifecycleScopeSearchParam(
       searchParams,
       LIFECYCLE_SCOPE.CURRENT
     )
     nextParams.delete('keyword')
+    nextParams.delete('supplier_type')
     setSearchParams(nextParams, { replace: true })
     resetBusinessPaginationCurrent(setPagination)
   }, [searchParams, setSearchParams])
@@ -692,6 +704,9 @@ export default function V1MasterDataPage({ type }) {
     }
     if (showContactForm) {
       createDefaults.contacts = [createEmptyContactRow()]
+    }
+    if (effectiveType === 'suppliers') {
+      createDefaults.default_payment_term_days = 0
     }
     if (Object.keys(createDefaults).length > 0) {
       recordForm.setFieldsValue(createDefaults)
@@ -956,7 +971,7 @@ export default function V1MasterDataPage({ type }) {
   const { exporting, exportRows: exportRecords } = useBusinessListExport({
     requestKey: `master-data-export:${effectiveType}`,
     loadRows: loadExportRecords,
-    filename: `${config.title}-筛选结果-${new Date().toISOString().slice(0, 10)}.csv`,
+    filename: `${config.title}-筛选结果-${currentBusinessDate()}.csv`,
     columns: orderedRecordColumns,
     recordLabel: `${entityLabel}记录`,
   })
@@ -1031,6 +1046,27 @@ export default function V1MasterDataPage({ type }) {
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />
+            {effectiveType === 'suppliers' ? (
+              <SelectFilter
+                aria-label="供应商与加工厂类型"
+                value={supplierTypeFilter}
+                options={[
+                  { label: '全部类型', value: '' },
+                  ...SUPPLIER_TYPE_OPTIONS,
+                ]}
+                onChange={(nextType) => {
+                  setSupplierTypeFilter(nextType)
+                  const nextParams = new URLSearchParams(searchParams)
+                  if (nextType) {
+                    nextParams.set('supplier_type', nextType)
+                  } else {
+                    nextParams.delete('supplier_type')
+                  }
+                  setSearchParams(nextParams, { replace: true })
+                  resetBusinessPaginationCurrent(setPagination)
+                }}
+              />
+            ) : null}
           </>
         }
         actions={
@@ -1263,7 +1299,7 @@ export default function V1MasterDataPage({ type }) {
         </Form>
       </BusinessFormModal>
 
-      <BusinessRecordDetailsModal
+      <BusinessDetailsModal
         columns={recordColumns}
         description="当前账号为只读查看；如需维护，请由具备相应权限的岗位办理。"
         open={Boolean(detailRecord)}

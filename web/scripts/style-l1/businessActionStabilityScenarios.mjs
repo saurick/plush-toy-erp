@@ -850,6 +850,107 @@ export function createBusinessActionStabilityScenarios(deps) {
           )
         }
 
+        await selectBusinessRow(page, 'SO-ACTION-ACTIVE')
+        const lifecycleMoreButton = page
+          .locator('.erp-business-module-current-action')
+          .first()
+          .locator('[data-business-action-key="lifecycle-more"]')
+        await lifecycleMoreButton.click()
+        const lifecycleMenu = page
+          .locator('.ant-dropdown:not(.ant-dropdown-hidden)')
+          .filter({ hasText: '状态变更' })
+          .last()
+        await lifecycleMenu.getByRole('menuitem', { name: /提前关闭/u }).click()
+        const closeDialog = page.getByRole('dialog', {
+          name: '确认提前关闭销售订单',
+        })
+        await closeDialog.waitFor({ state: 'visible', timeout: 5_000 })
+        const closeReason = closeDialog.getByRole('textbox', {
+          name: '业务原因',
+        })
+        assert.equal(await closeReason.getAttribute('maxlength'), '255')
+        assert.equal(
+          await closeReason.getAttribute('placeholder'),
+          '请填写未履完即关闭的业务原因'
+        )
+        await closeDialog.getByRole('button', { name: '确认提前关闭' }).click()
+        await page
+          .getByText('请填写业务原因', { exact: true })
+          .last()
+          .waitFor({ state: 'visible', timeout: 5_000 })
+        await closeDialog.waitFor({ state: 'visible', timeout: 5_000 })
+        await closeReason.fill('客户缩减本批需求，未交数量不再继续履行')
+        await screenshot(
+          page,
+          path,
+          outputDir,
+          'business-action-stability-sales-short-close-reason-desktop.png'
+        )
+        await page.setViewportSize({ width: 390, height: 844 })
+        const closeDialogElement = await closeDialog.elementHandle()
+        assert(closeDialogElement, '销售订单提前关闭弹窗节点应存在')
+        await page.waitForFunction(
+          (element) =>
+            element
+              .getAnimations({ subtree: true })
+              .every(
+                (animation) =>
+                  !['pending', 'running'].includes(animation.playState)
+              ),
+          closeDialogElement,
+          { timeout: 5_000 }
+        )
+        const narrowDialogMetrics = await closeDialog.evaluate(
+          async (element) => {
+            await new Promise((resolve) =>
+              window.requestAnimationFrame(() =>
+                window.requestAnimationFrame(resolve)
+              )
+            )
+            const rect = element.getBoundingClientRect()
+            const style = window.getComputedStyle(element)
+            return {
+              left: rect.left,
+              right: rect.right,
+              top: rect.top,
+              bottom: rect.bottom,
+              width: rect.width,
+              height: rect.height,
+              viewportWidth: window.innerWidth,
+              viewportHeight: window.innerHeight,
+              pageOverflow:
+                document.documentElement.scrollWidth -
+                document.documentElement.clientWidth,
+              computedWidth: style.width,
+              computedMaxWidth: style.maxWidth,
+              transform: style.transform,
+              transition: style.transition,
+            }
+          }
+        )
+        assert(
+          narrowDialogMetrics.left >= 0 &&
+            narrowDialogMetrics.right <= narrowDialogMetrics.viewportWidth &&
+            narrowDialogMetrics.top >= 0 &&
+            narrowDialogMetrics.bottom <= narrowDialogMetrics.viewportHeight &&
+            narrowDialogMetrics.pageOverflow <= 1,
+          `销售订单提前关闭弹窗应完整留在窄屏视口内: ${JSON.stringify(
+            narrowDialogMetrics
+          )}`
+        )
+        await screenshot(
+          page,
+          path,
+          outputDir,
+          'business-action-stability-sales-short-close-reason-mobile.png'
+        )
+        await page
+          .locator('.ant-modal-confirm-btns .ant-btn-default')
+          .last()
+          .click()
+        await closeDialog.waitFor({ state: 'hidden', timeout: 5_000 })
+        await page.setViewportSize({ width: 1440, height: 900 })
+
         await page
           .locator('.erp-business-module-current-action')
           .first()

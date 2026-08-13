@@ -213,6 +213,7 @@ export function getDevFlowStateHumanActionLabel(value) {
     [/activate/iu, '生效'],
     [/approve|pass/iu, '批准或通过'],
     [/release/iu, '放行'],
+    [/withdraw/iu, '撤回'],
     [/confirm/iu, '确认'],
     [/post/iu, '过账'],
     [/complete|finish/iu, '完成'],

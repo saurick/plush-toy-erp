@@ -388,12 +388,13 @@ export function buildQualityGateGapAnalysis({
     categories = categories.filter((category) => category.highRisk);
   }
   return Object.freeze({
-    schemaVersion: "plush.quality-gate-gap-analysis/v1",
+    schemaVersion: "plush.quality-gate-gap-analysis/v2",
     range,
     risk,
     changedCount: changedFiles.length,
-    highestLevel: affected.highestLevel,
-    requiresFull: affected.requiresFull,
+    affectedScopes: affected.affectedScopes,
+    maxAffectedScope: affected.maxAffectedScope,
+    localGate: affected.localGate,
     matched: categories.length > 0,
     categories,
     boundaries: Object.freeze([
@@ -409,7 +410,7 @@ export function buildQualityGateComplexityCandidates({
   operations,
   receipts,
   repository,
-  requiresFull,
+  localGate,
 }) {
   const candidates = [];
   for (const profile of ["full", "strict"]) {
@@ -428,7 +429,7 @@ export function buildQualityGateComplexityCandidates({
       });
     }
   }
-  if (requiresFull && changedFiles.length > 0 && changedFiles.length <= 3) {
+  if (localGate === "full" && changedFiles.length > 0 && changedFiles.length <= 3) {
     candidates.push({
       key: "narrow-change-full",
       gateKeys: ["full"],
@@ -501,7 +502,7 @@ export function buildQualityGateGovernance({
   const affected = buildAffectedPlan(changedFiles, { root });
   const risks = deriveQualityGateRisks(changedFiles);
   const relevantGateKeys = new Set([
-    ...(affected.requiresFull ? ["full"] : []),
+    ...(affected.localGate === "full" ? ["full"] : []),
     ...risks.flatMap((risk) => risk.gates),
   ]);
   const complexity = buildQualityGateComplexityCandidates({
@@ -509,7 +510,7 @@ export function buildQualityGateGovernance({
     operations,
     receipts,
     repository,
-    requiresFull: affected.requiresFull,
+    localGate: affected.localGate,
   });
   const attentionKeys = new Set(complexity.flatMap((item) => item.gateKeys));
   const keyword = String(q || "")

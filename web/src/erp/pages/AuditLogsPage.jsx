@@ -27,6 +27,7 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError, JsonRpc } from '@/common/utils/jsonRpc'
 import { DateInput } from '../components/business-list/BusinessListLayout.jsx'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
+import { buildAuditActionSelectOptions } from '../utils/auditActionSelectOptions.mjs'
 import { buildAuditLogParams } from '../utils/auditLogParams.mjs'
 
 const { Paragraph, Text, Title } = Typography
@@ -143,13 +144,7 @@ const sourceOptions = [
   { label: '紧急任务处理', value: 'workflow' },
 ]
 
-const actionOptions = [
-  { label: '全部操作', value: '' },
-  ...Object.entries(actionMetaMap).map(([value, meta]) => ({
-    label: meta.label,
-    value,
-  })),
-]
+const actionOptions = buildAuditActionSelectOptions(actionMetaMap)
 
 const quickLocateActions = [
   { key: 'admin_user.password.reset', icon: <KeyOutlined /> },

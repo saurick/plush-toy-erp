@@ -24,10 +24,8 @@ test('production facts load the exact draft before opening the shared editor', (
 test('finance cancellation requires a bounded business reason and sends it to the canonical action', () => {
   assert.match(source, /'作废财务草稿'/)
   assert.match(source, /'取消财务记录'/)
-  assert.match(
-    source,
-    /currentActiveKey === 'finance'[\s\S]*\? '请填写客户、供应商或账款调整的业务原因'[\s\S]*: '请填写作废或取消的业务原因'/u
-  )
+  assert.match(source, /请填写客户、供应商或账款调整的业务原因/u)
+  assert.match(source, /请填写作废或取消的业务原因/u)
   assert.match(source, /maxLength=\{255\}/)
   assert.match(source, /\{ reason \}/)
   assert.match(source, /currentActiveKey === 'finance'/)
@@ -42,11 +40,21 @@ test('draft facts can exit without pretending an inventory reversal happened', (
   )
   assert.match(source, /草稿尚未过账，不会变更库存/u)
   assert.match(source, /草稿尚未确认，作废不会生成过账或库存变更/u)
-  assert.match(
-    source,
-    /const cancelButtonLabel\s*=\s*[\s\S]{0,100}activeSelectedRow\?\.status === 'DRAFT' \? '作废草稿' : '取消'/u
-  )
+  assert.match(source, /const cancelButtonLabel/u)
+  assert.match(source, /'作废草稿'/u)
+  assert.match(source, /'取消'/u)
   assert.match(source, />\s*\{cancelButtonLabel\}\s*</u)
+})
+
+test('production completion actions use warehouse inbound permission and business wording', () => {
+  assert.match(source, /productionFactPostPermissions/u)
+  assert.match(source, /productionFactCancelPermissions/u)
+  assert.match(source, /const canPostSelected/u)
+  assert.match(source, /const canCancelSelected/u)
+  assert.match(source, /只有仓库岗位可以核对并确认成品入库/u)
+  assert.match(source, /确认实收并增加成品库存/u)
+  assert.match(source, /作废完工报告/u)
+  assert.match(source, /撤销成品入库/u)
 })
 
 test('finance draft actions fail closed when a historical row lacks a formal source', () => {

@@ -62,6 +62,13 @@ export function assertERPResolvedVitePorts({
   }
 }
 
+export function resolveERPViteCacheDir(rootDir, appId, mode, serverPort) {
+  if (mode === 'development') {
+    return resolve(rootDir, '.vite-cache', appId, String(serverPort))
+  }
+  return resolve(rootDir, 'build', '.vite-cache', appId)
+}
+
 const createDevOrigin = (port) => `http://${DEV_HOST}:${port}`
 
 const normalizeDevLocalUrl = (url, port) => {
@@ -198,11 +205,11 @@ export function createERPViteConfig(appId) {
           '.sass',
         ],
       },
-      cacheDir: resolve(
+      cacheDir: resolveERPViteCacheDir(
         ROOT_DIR,
-        mode === 'development'
-          ? `.vite-cache/${app.id}`
-          : `build/.vite-cache/${app.id}`
+        app.id,
+        mode,
+        serverPort
       ),
       server: {
         host: '0.0.0.0',

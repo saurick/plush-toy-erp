@@ -87,7 +87,6 @@ test("dev workbench boundary: source and styles live outside product directories
     "web/src/dev-workbench/pages/DevDrillRecoveryPage.jsx",
     "web/src/dev-workbench/pages/DevPermissionRelationshipsPage.jsx",
     "web/src/dev-workbench/components/DevPageNav.jsx",
-    "web/src/dev-workbench/components/DevReceiptPanel.jsx",
     "web/src/dev-workbench/config/devDataPreparation.mjs",
     "web/src/dev-workbench/config/devDatabaseMigration.mjs",
     "web/src/dev-workbench/config/devQualityGates.mjs",
@@ -171,7 +170,6 @@ test("dev workbench boundary: Node serve bridges are centralized outside browser
     "web/dev-server/devDeliveryBridgePlugin.mjs",
     "web/dev-server/devQaCoveragePlugin.mjs",
     "web/dev-server/devQualityGatePlugin.mjs",
-    "web/dev-server/devWorkbenchReceiptPlugin.mjs",
     "web/dev-server/devServerSecurity.mjs",
   ]) {
     assert.equal(
@@ -207,7 +205,7 @@ test("dev workbench boundary: primary navigation is fixed to four areas", () => 
       { key: "delivery", route: "/__dev/delivery" },
     ],
   );
-  assert.equal(DEV_SECONDARY_NAV_ITEMS.length, 13);
+  assert.equal(DEV_SECONDARY_NAV_ITEMS.length, 14);
   assert(
     DEV_SECONDARY_NAV_ITEMS.every(
       (item) =>
@@ -232,13 +230,29 @@ test("dev workbench boundary: imports from ERP stay on explicit read/API adapter
     "../../erp/utils/permissionModuleLabels.mjs",
     "../../erp/config/printTemplates.mjs",
     "../../erp/config/workflowStatus.mjs",
+    "../../erp/config/businessUsabilityCatalog.mjs",
+    "../../erp/config/roleHelpContent.mjs",
   ]);
   const allowedERPImportsByFile = new Map([
+    [
+      "web/src/dev-workbench/config/currentPageAtlasPrototype.test.mjs",
+      new Set([
+        "../../erp/config/businessModules.mjs",
+        "../../erp/config/seedData.mjs",
+      ]),
+    ],
     [
       "web/src/dev-workbench/pages/DevCustomerConfigPage.jsx",
       new Set([
         "@/erp/config/businessModules.mjs",
         "@/erp/config/seedData.mjs",
+      ]),
+    ],
+    [
+      "web/src/dev-workbench/config/devPermissionNavigation.mjs",
+      new Set([
+        "../../erp/config/seedData.mjs",
+        "../../erp/config/roleGuidedNavigation.mjs",
       ]),
     ],
     [

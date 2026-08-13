@@ -45,6 +45,7 @@ test('workflowRoleTaskMock: cursor reads all 350 todo rows without a 200 row cap
         risk: 0,
         todo: 350,
         total: 350,
+        withdrawn: 0,
       })
       assert.equal(page.risk_scope, 'role')
     } else {
@@ -119,6 +120,7 @@ test('workflowRoleTaskMock: first-page counts use full projection beyond the pag
     risk: 3,
     todo: 4,
     total: 5,
+    withdrawn: 0,
   })
   assert.equal(page.risk_scope, 'supervised')
 })

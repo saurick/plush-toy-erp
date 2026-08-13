@@ -42,6 +42,26 @@ const (
 	FieldStartedAt = "started_at"
 	// FieldCompletedAt holds the string denoting the completed_at field in the database.
 	FieldCompletedAt = "completed_at"
+	// FieldTerminalNodeInstanceID holds the string denoting the terminal_node_instance_id field in the database.
+	FieldTerminalNodeInstanceID = "terminal_node_instance_id"
+	// FieldResolutionKind holds the string denoting the resolution_kind field in the database.
+	FieldResolutionKind = "resolution_kind"
+	// FieldResolutionReason holds the string denoting the resolution_reason field in the database.
+	FieldResolutionReason = "resolution_reason"
+	// FieldResolvedAt holds the string denoting the resolved_at field in the database.
+	FieldResolvedAt = "resolved_at"
+	// FieldResolvedBy holds the string denoting the resolved_by field in the database.
+	FieldResolvedBy = "resolved_by"
+	// FieldBlockKind holds the string denoting the block_kind field in the database.
+	FieldBlockKind = "block_kind"
+	// FieldBlockedReasonCode holds the string denoting the blocked_reason_code field in the database.
+	FieldBlockedReasonCode = "blocked_reason_code"
+	// FieldBlockedReason holds the string denoting the blocked_reason field in the database.
+	FieldBlockedReason = "blocked_reason"
+	// FieldBlockedAt holds the string denoting the blocked_at field in the database.
+	FieldBlockedAt = "blocked_at"
+	// FieldBlockedBy holds the string denoting the blocked_by field in the database.
+	FieldBlockedBy = "blocked_by"
 	// FieldCreatedBy holds the string denoting the created_by field in the database.
 	FieldCreatedBy = "created_by"
 	// FieldUpdatedBy holds the string denoting the updated_by field in the database.
@@ -89,6 +109,16 @@ var Columns = []string{
 	FieldStatus,
 	FieldStartedAt,
 	FieldCompletedAt,
+	FieldTerminalNodeInstanceID,
+	FieldResolutionKind,
+	FieldResolutionReason,
+	FieldResolvedAt,
+	FieldResolvedBy,
+	FieldBlockKind,
+	FieldBlockedReasonCode,
+	FieldBlockedReason,
+	FieldBlockedAt,
+	FieldBlockedBy,
 	FieldCreatedBy,
 	FieldUpdatedBy,
 	FieldCreatedAt,
@@ -132,6 +162,22 @@ var (
 	StatusValidator func(string) error
 	// DefaultStartedAt holds the default value on creation for the "started_at" field.
 	DefaultStartedAt func() time.Time
+	// TerminalNodeInstanceIDValidator is a validator for the "terminal_node_instance_id" field. It is called by the builders before save.
+	TerminalNodeInstanceIDValidator func(int) error
+	// ResolutionKindValidator is a validator for the "resolution_kind" field. It is called by the builders before save.
+	ResolutionKindValidator func(string) error
+	// ResolutionReasonValidator is a validator for the "resolution_reason" field. It is called by the builders before save.
+	ResolutionReasonValidator func(string) error
+	// ResolvedByValidator is a validator for the "resolved_by" field. It is called by the builders before save.
+	ResolvedByValidator func(int) error
+	// BlockKindValidator is a validator for the "block_kind" field. It is called by the builders before save.
+	BlockKindValidator func(string) error
+	// BlockedReasonCodeValidator is a validator for the "blocked_reason_code" field. It is called by the builders before save.
+	BlockedReasonCodeValidator func(string) error
+	// BlockedReasonValidator is a validator for the "blocked_reason" field. It is called by the builders before save.
+	BlockedReasonValidator func(string) error
+	// BlockedByValidator is a validator for the "blocked_by" field. It is called by the builders before save.
+	BlockedByValidator func(int) error
 	// CreatedByValidator is a validator for the "created_by" field. It is called by the builders before save.
 	CreatedByValidator func(int) error
 	// UpdatedByValidator is a validator for the "updated_by" field. It is called by the builders before save.
@@ -215,6 +261,56 @@ func ByStartedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByCompletedAt orders the results by the completed_at field.
 func ByCompletedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCompletedAt, opts...).ToFunc()
+}
+
+// ByTerminalNodeInstanceID orders the results by the terminal_node_instance_id field.
+func ByTerminalNodeInstanceID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTerminalNodeInstanceID, opts...).ToFunc()
+}
+
+// ByResolutionKind orders the results by the resolution_kind field.
+func ByResolutionKind(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldResolutionKind, opts...).ToFunc()
+}
+
+// ByResolutionReason orders the results by the resolution_reason field.
+func ByResolutionReason(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldResolutionReason, opts...).ToFunc()
+}
+
+// ByResolvedAt orders the results by the resolved_at field.
+func ByResolvedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldResolvedAt, opts...).ToFunc()
+}
+
+// ByResolvedBy orders the results by the resolved_by field.
+func ByResolvedBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldResolvedBy, opts...).ToFunc()
+}
+
+// ByBlockKind orders the results by the block_kind field.
+func ByBlockKind(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBlockKind, opts...).ToFunc()
+}
+
+// ByBlockedReasonCode orders the results by the blocked_reason_code field.
+func ByBlockedReasonCode(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBlockedReasonCode, opts...).ToFunc()
+}
+
+// ByBlockedReason orders the results by the blocked_reason field.
+func ByBlockedReason(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBlockedReason, opts...).ToFunc()
+}
+
+// ByBlockedAt orders the results by the blocked_at field.
+func ByBlockedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBlockedAt, opts...).ToFunc()
+}
+
+// ByBlockedBy orders the results by the blocked_by field.
+func ByBlockedBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBlockedBy, opts...).ToFunc()
 }
 
 // ByCreatedBy orders the results by the created_by field.

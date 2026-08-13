@@ -58,7 +58,7 @@ test("local acceptance lifecycle keeps the cloned-write report inside the except
 });
 
 test("local acceptance lifecycle reserves the web port from the canonical auxiliary range", async () => {
-  const candidates = [8300, 15_210, 44_001, 44_001, 44_002];
+  const candidates = [8300, 15_210, 44_001];
   const roots = [];
   const result = await allocateLocalAcceptancePorts("/repo", {
     loadPorts(repoRoot) {
@@ -72,7 +72,6 @@ test("local acceptance lifecycle reserves the web port from the canonical auxili
   assert.deepEqual(roots, ["/repo"]);
   assert.deepEqual(result, {
     httpPort: 44_001,
-    grpcPort: 44_002,
     webPort: 15_210,
   });
   assert.deepEqual(candidates, []);
@@ -170,6 +169,21 @@ function fakeRuntime({ failAt = "", residual = "" } = {}) {
         ok: true,
         completedStages: 9,
         report: "output/dataset.json",
+        dataVersion: "2026.07.16-v5",
+        chainDataDigest: "a".repeat(64),
+        chainVerificationDigest: "b".repeat(64),
+        startedAt: "2026-07-28T00:01:00.000Z",
+        completedAt: "2026-07-28T00:02:00.000Z",
+        durationMs: 60_000,
+        stageTimings: [
+          {
+            key: "core",
+            status: "completed",
+            startedAt: "2026-07-28T00:01:00.000Z",
+            completedAt: "2026-07-28T00:01:01.000Z",
+            durationMs: 1_000,
+          },
+        ],
       });
     },
     async startWeb() {
@@ -255,6 +269,8 @@ test("local acceptance lifecycle runs read-only evidence before cloned real writ
     existing: [],
   });
   assert.equal(report.boundary.customerUAT, false);
+  assert.equal(report.evidence.dataset.durationMs, 60_000);
+  assert.equal(report.evidence.dataset.stageTimings[0].key, "core");
   assert.doesNotMatch(JSON.stringify(report), /password|postgres:\/\//iu);
 });
 

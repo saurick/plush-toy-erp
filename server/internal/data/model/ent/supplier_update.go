@@ -140,6 +140,27 @@ func (_u *SupplierUpdate) ClearTaxNo() *SupplierUpdate {
 	return _u
 }
 
+// SetDefaultPaymentTermDays sets the "default_payment_term_days" field.
+func (_u *SupplierUpdate) SetDefaultPaymentTermDays(v int) *SupplierUpdate {
+	_u.mutation.ResetDefaultPaymentTermDays()
+	_u.mutation.SetDefaultPaymentTermDays(v)
+	return _u
+}
+
+// SetNillableDefaultPaymentTermDays sets the "default_payment_term_days" field if the given value is not nil.
+func (_u *SupplierUpdate) SetNillableDefaultPaymentTermDays(v *int) *SupplierUpdate {
+	if v != nil {
+		_u.SetDefaultPaymentTermDays(*v)
+	}
+	return _u
+}
+
+// AddDefaultPaymentTermDays adds value to the "default_payment_term_days" field.
+func (_u *SupplierUpdate) AddDefaultPaymentTermDays(v int) *SupplierUpdate {
+	_u.mutation.AddDefaultPaymentTermDays(v)
+	return _u
+}
+
 // SetIsActive sets the "is_active" field.
 func (_u *SupplierUpdate) SetIsActive(v bool) *SupplierUpdate {
 	_u.mutation.SetIsActive(v)
@@ -397,6 +418,11 @@ func (_u *SupplierUpdate) check() error {
 			return &ValidationError{Name: "tax_no", err: fmt.Errorf(`ent: validator failed for field "Supplier.tax_no": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.DefaultPaymentTermDays(); ok {
+		if err := supplier.DefaultPaymentTermDaysValidator(v); err != nil {
+			return &ValidationError{Name: "default_payment_term_days", err: fmt.Errorf(`ent: validator failed for field "Supplier.default_payment_term_days": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := supplier.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "Supplier.note": %w`, err)}
@@ -446,6 +472,12 @@ func (_u *SupplierUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.TaxNoCleared() {
 		_spec.ClearField(supplier.FieldTaxNo, field.TypeString)
+	}
+	if value, ok := _u.mutation.DefaultPaymentTermDays(); ok {
+		_spec.SetField(supplier.FieldDefaultPaymentTermDays, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedDefaultPaymentTermDays(); ok {
+		_spec.AddField(supplier.FieldDefaultPaymentTermDays, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.IsActive(); ok {
 		_spec.SetField(supplier.FieldIsActive, field.TypeBool, value)
@@ -767,6 +799,27 @@ func (_u *SupplierUpdateOne) ClearTaxNo() *SupplierUpdateOne {
 	return _u
 }
 
+// SetDefaultPaymentTermDays sets the "default_payment_term_days" field.
+func (_u *SupplierUpdateOne) SetDefaultPaymentTermDays(v int) *SupplierUpdateOne {
+	_u.mutation.ResetDefaultPaymentTermDays()
+	_u.mutation.SetDefaultPaymentTermDays(v)
+	return _u
+}
+
+// SetNillableDefaultPaymentTermDays sets the "default_payment_term_days" field if the given value is not nil.
+func (_u *SupplierUpdateOne) SetNillableDefaultPaymentTermDays(v *int) *SupplierUpdateOne {
+	if v != nil {
+		_u.SetDefaultPaymentTermDays(*v)
+	}
+	return _u
+}
+
+// AddDefaultPaymentTermDays adds value to the "default_payment_term_days" field.
+func (_u *SupplierUpdateOne) AddDefaultPaymentTermDays(v int) *SupplierUpdateOne {
+	_u.mutation.AddDefaultPaymentTermDays(v)
+	return _u
+}
+
 // SetIsActive sets the "is_active" field.
 func (_u *SupplierUpdateOne) SetIsActive(v bool) *SupplierUpdateOne {
 	_u.mutation.SetIsActive(v)
@@ -1037,6 +1090,11 @@ func (_u *SupplierUpdateOne) check() error {
 			return &ValidationError{Name: "tax_no", err: fmt.Errorf(`ent: validator failed for field "Supplier.tax_no": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.DefaultPaymentTermDays(); ok {
+		if err := supplier.DefaultPaymentTermDaysValidator(v); err != nil {
+			return &ValidationError{Name: "default_payment_term_days", err: fmt.Errorf(`ent: validator failed for field "Supplier.default_payment_term_days": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := supplier.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "Supplier.note": %w`, err)}
@@ -1103,6 +1161,12 @@ func (_u *SupplierUpdateOne) sqlSave(ctx context.Context) (_node *Supplier, err 
 	}
 	if _u.mutation.TaxNoCleared() {
 		_spec.ClearField(supplier.FieldTaxNo, field.TypeString)
+	}
+	if value, ok := _u.mutation.DefaultPaymentTermDays(); ok {
+		_spec.SetField(supplier.FieldDefaultPaymentTermDays, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedDefaultPaymentTermDays(); ok {
+		_spec.AddField(supplier.FieldDefaultPaymentTermDays, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.IsActive(); ok {
 		_spec.SetField(supplier.FieldIsActive, field.TypeBool, value)

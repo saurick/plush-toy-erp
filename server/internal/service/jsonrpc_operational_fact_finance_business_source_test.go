@@ -46,10 +46,15 @@ func TestFinanceBusinessSourceParamsRejectDerivedFields(t *testing.T) {
 			if !tt.parse(tt.base) {
 				t.Fatalf("valid source command rejected: %#v", tt.base)
 			}
-			for _, derived := range []string{
+			derivedFields := []string{
 				"fact_type", "counterparty_type", "counterparty_id", "amount", "fee_amount", "currency",
+				"collection_type", "payment_term", "payment_term_days", "due_at", "invoice_category",
 				"source_type", "source_id", "source_line_id", "supplier_id",
-			} {
+			}
+			if tt.name != "single reconciliation" {
+				derivedFields = append(derivedFields, "occurred_at")
+			}
+			for _, derived := range derivedFields {
 				params := make(map[string]any, len(tt.base)+1)
 				for key, value := range tt.base {
 					params[key] = value
@@ -60,6 +65,34 @@ func TestFinanceBusinessSourceParamsRejectDerivedFields(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestFinanceShipmentParamsKeepOccurrenceOwnedByTheCorrectSource(t *testing.T) {
+	receivable := map[string]any{
+		"customer_key":    biz.DefaultCustomerKey,
+		"fact_no":         "AR-SHIPMENT",
+		"shipment_id":     float64(10),
+		"idempotency_key": "AR-SHIPMENT",
+	}
+	if _, ok := financeReceivableFromShipmentCreateFromParams(receivable); !ok {
+		t.Fatalf("canonical receivable params rejected: %#v", receivable)
+	}
+	receivable["occurred_at"] = "2026-08-12T10:00:00Z"
+	if _, ok := financeReceivableFromShipmentCreateFromParams(receivable); ok {
+		t.Fatal("receivable must derive occurred_at from the locked shipped shipment")
+	}
+
+	invoice := map[string]any{
+		"customer_key":     biz.DefaultCustomerKey,
+		"fact_no":          "INV-SHIPMENT",
+		"shipment_id":      float64(10),
+		"idempotency_key":  "INV-SHIPMENT",
+		"invoice_category": biz.FinanceInvoiceCategoryNone,
+		"occurred_at":      "2026-08-12T10:00:00Z",
+	}
+	if _, ok := financeInvoiceFromShipmentCreateFromParams(invoice); !ok {
+		t.Fatal("invoice must retain its explicit occurrence input")
 	}
 }
 

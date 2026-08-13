@@ -147,7 +147,7 @@ cat >"$output_dir/backup-evidence.md" <<EOF
 | --- | --- |
 | databaseBackupSize | 待填写 |
 | databaseBackupHash | 待填写 |
-| attachmentSnapshot | 待填写 |
+| attachmentSnapshot | included-in-database-backup |
 | storageLocationAlias | 待填写 |
 | encryptionEnabled | 待填写 |
 | retentionPolicy | 待填写 |

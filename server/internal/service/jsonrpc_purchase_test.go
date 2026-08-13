@@ -405,29 +405,46 @@ func TestPurchaseReceiptFilterFromParamsForwardsContextFilters(t *testing.T) {
 
 func TestPurchaseReceiptRetrySafeParamsRejectClientPayloadHash(t *testing.T) {
 	fromOrder := map[string]any{
-		"purchase_order_id":        float64(1),
-		"receipt_no":               "PR-CLIENT-HASH",
-		"warehouse_id":             float64(2),
-		"idempotency_key":          "receipt-attempt-1",
-		"idempotency_payload_hash": "client-controlled",
+		"customer_key":      biz.DefaultCustomerKey,
+		"purchase_order_id": float64(1),
+		"receipt_no":        "PR-CLIENT-HASH",
+		"warehouse_id":      float64(2),
+		"idempotency_key":   "receipt-attempt-1",
 	}
+	if _, ok := purchaseReceiptFromPurchaseOrderCreateFromParams(fromOrder); !ok {
+		t.Fatal("create-from-order must accept the control-plane customer_key")
+	}
+	fromOrder["idempotency_payload_hash"] = "client-controlled"
 	if _, ok := purchaseReceiptFromPurchaseOrderCreateFromParams(fromOrder); ok {
 		t.Fatal("create-from-order must reject client idempotency_payload_hash")
 	}
+	delete(fromOrder, "idempotency_payload_hash")
+	fromOrder["unexpected"] = true
+	if _, ok := purchaseReceiptFromPurchaseOrderCreateFromParams(fromOrder); ok {
+		t.Fatal("create-from-order must reject unrelated parameters")
+	}
 
 	item := map[string]any{
-		"receipt_id":               float64(1),
-		"material_id":              float64(2),
-		"warehouse_id":             float64(3),
-		"unit_id":                  float64(4),
-		"quantity":                 "1",
-		"idempotency_key":          "item-attempt-1",
-		"idempotency_payload_hash": "client-controlled",
+		"customer_key":    biz.DefaultCustomerKey,
+		"receipt_id":      float64(1),
+		"material_id":     float64(2),
+		"warehouse_id":    float64(3),
+		"unit_id":         float64(4),
+		"quantity":        "1",
+		"idempotency_key": "item-attempt-1",
 	}
+	if _, ok := purchaseReceiptItemCreateFromParams(item); !ok {
+		t.Fatal("add receipt item must accept the control-plane customer_key")
+	}
+	item["idempotency_payload_hash"] = "client-controlled"
 	if _, ok := purchaseReceiptItemCreateFromParams(item); ok {
 		t.Fatal("add receipt item must reject client idempotency_payload_hash")
 	}
-
+	delete(item, "idempotency_payload_hash")
+	item["unexpected"] = true
+	if _, ok := purchaseReceiptItemCreateFromParams(item); ok {
+		t.Fatal("add receipt item must reject unrelated parameters")
+	}
 }
 
 func TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnly(t *testing.T) {
@@ -641,12 +658,14 @@ func TestJsonrpcDispatcher_PurchaseReceiptSourceMethodsRequirePurchaseOrderRead(
 	captureRepo := &purchaseReceiptSourceCaptureRepo{InventoryRepo: baseRepo}
 
 	createParams := mustJSONRPCStruct(t, map[string]any{
+		"customer_key":      biz.DefaultCustomerKey,
 		"purchase_order_id": float64(createSourceItem.PurchaseOrderID),
 		"receipt_no":        "PR-SOURCE-PERMISSION",
 		"warehouse_id":      float64(fixtures.warehouseID),
 		"idempotency_key":   "jsonrpc-source-permission-create",
 	})
 	addParams := mustJSONRPCStruct(t, map[string]any{
+		"customer_key":           biz.DefaultCustomerKey,
 		"receipt_id":             float64(linkedReceipt.ID),
 		"material_id":            float64(fixtures.materialID),
 		"warehouse_id":           float64(fixtures.warehouseID),

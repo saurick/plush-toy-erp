@@ -17,6 +17,7 @@ const WORKFLOW_TASK_STATUS_KEYS = new Set([
   'blocked',
   'done',
   'rejected',
+  'withdrawn',
 ])
 
 function normalizedText(value) {
@@ -129,7 +130,9 @@ export function buildWorkflowRoleTaskPageMock({
           return ['ready', 'blocked'].includes(task.task_status_key)
         }
         if (viewKey === 'history') {
-          return ['done', 'rejected'].includes(task.task_status_key)
+          return ['done', 'rejected', 'withdrawn'].includes(
+            task.task_status_key
+          )
         }
         if (viewKey === 'approval') {
           return (
@@ -175,8 +178,11 @@ export function buildWorkflowRoleTaskPageMock({
           const rejected = roleVisibleTasks.filter(
             (task) => task.task_status_key === 'rejected'
           ).length
+          const withdrawn = roleVisibleTasks.filter(
+            (task) => task.task_status_key === 'withdrawn'
+          ).length
           const todo = ready + blocked
-          const history = done + rejected
+          const history = done + rejected + withdrawn
           const riskTasks = visibleForView('risk')
           return {
             approval: visibleForView('approval').length,
@@ -196,6 +202,7 @@ export function buildWorkflowRoleTaskPageMock({
             risk: riskTasks.length,
             todo,
             total: todo + history,
+            withdrawn,
           }
         })()
       : null

@@ -45,8 +45,30 @@ type ProcessNodeInstance struct {
 	StartedAt *time.Time `json:"started_at,omitempty"`
 	// CompletedAt holds the value of the "completed_at" field.
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
+	// ActivatedFromNodeInstanceID holds the value of the "activated_from_node_instance_id" field.
+	ActivatedFromNodeInstanceID *int `json:"activated_from_node_instance_id,omitempty"`
+	// RoutingCompletedAt holds the value of the "routing_completed_at" field.
+	RoutingCompletedAt *time.Time `json:"routing_completed_at,omitempty"`
+	// RoutingCompletedBy holds the value of the "routing_completed_by" field.
+	RoutingCompletedBy *int `json:"routing_completed_by,omitempty"`
 	// Outcome holds the value of the "outcome" field.
 	Outcome *string `json:"outcome,omitempty"`
+	// BlockKind holds the value of the "block_kind" field.
+	BlockKind *string `json:"block_kind,omitempty"`
+	// BlockedReasonCode holds the value of the "blocked_reason_code" field.
+	BlockedReasonCode *string `json:"blocked_reason_code,omitempty"`
+	// BlockedReason holds the value of the "blocked_reason" field.
+	BlockedReason *string `json:"blocked_reason,omitempty"`
+	// BlockedAt holds the value of the "blocked_at" field.
+	BlockedAt *time.Time `json:"blocked_at,omitempty"`
+	// BlockedBy holds the value of the "blocked_by" field.
+	BlockedBy *int `json:"blocked_by,omitempty"`
+	// ResumeReason holds the value of the "resume_reason" field.
+	ResumeReason *string `json:"resume_reason,omitempty"`
+	// ResumedAt holds the value of the "resumed_at" field.
+	ResumedAt *time.Time `json:"resumed_at,omitempty"`
+	// ResumedBy holds the value of the "resumed_by" field.
+	ResumedBy *int `json:"resumed_by,omitempty"`
 	// DomainCommandFingerprint holds the value of the "domain_command_fingerprint" field.
 	DomainCommandFingerprint *string `json:"domain_command_fingerprint,omitempty"`
 	// DomainCommandProtocolVersion holds the value of the "domain_command_protocol_version" field.
@@ -85,6 +107,8 @@ type ProcessNodeInstance struct {
 	DomainCommandRecoveredBy *int `json:"domain_command_recovered_by,omitempty"`
 	// Version holds the value of the "version" field.
 	Version int `json:"version,omitempty"`
+	// UpdatedBy holds the value of the "updated_by" field.
+	UpdatedBy *int `json:"updated_by,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -133,11 +157,11 @@ func (*ProcessNodeInstance) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case processnodeinstance.FieldPolicySnapshot, processnodeinstance.FieldDomainCommandResult, processnodeinstance.FieldDomainCommandCompensation:
 			values[i] = new([]byte)
-		case processnodeinstance.FieldID, processnodeinstance.FieldProcessInstanceID, processnodeinstance.FieldAttempt, processnodeinstance.FieldDomainCommandProtocolVersion, processnodeinstance.FieldDomainCommandEffectRefID, processnodeinstance.FieldDomainCommandResultRecordedBy, processnodeinstance.FieldDomainCommandCompensatedBy, processnodeinstance.FieldDomainCommandRecoveredBy, processnodeinstance.FieldVersion:
+		case processnodeinstance.FieldID, processnodeinstance.FieldProcessInstanceID, processnodeinstance.FieldAttempt, processnodeinstance.FieldActivatedFromNodeInstanceID, processnodeinstance.FieldRoutingCompletedBy, processnodeinstance.FieldBlockedBy, processnodeinstance.FieldResumedBy, processnodeinstance.FieldDomainCommandProtocolVersion, processnodeinstance.FieldDomainCommandEffectRefID, processnodeinstance.FieldDomainCommandResultRecordedBy, processnodeinstance.FieldDomainCommandCompensatedBy, processnodeinstance.FieldDomainCommandRecoveredBy, processnodeinstance.FieldVersion, processnodeinstance.FieldUpdatedBy:
 			values[i] = new(sql.NullInt64)
-		case processnodeinstance.FieldNodeKey, processnodeinstance.FieldNodeType, processnodeinstance.FieldStatus, processnodeinstance.FieldOwnerPoolKey, processnodeinstance.FieldRequiredCapabilityKey, processnodeinstance.FieldFormProfileKey, processnodeinstance.FieldActionSetKey, processnodeinstance.FieldOutcome, processnodeinstance.FieldDomainCommandFingerprint, processnodeinstance.FieldDomainCommandResultState, processnodeinstance.FieldDomainCommandResultHash, processnodeinstance.FieldDomainCommandEffectState, processnodeinstance.FieldDomainCommandEffectRefType, processnodeinstance.FieldDomainCommandCompensationHash, processnodeinstance.FieldDomainCommandRecoveryDecision, processnodeinstance.FieldDomainCommandRecoveryHash:
+		case processnodeinstance.FieldNodeKey, processnodeinstance.FieldNodeType, processnodeinstance.FieldStatus, processnodeinstance.FieldOwnerPoolKey, processnodeinstance.FieldRequiredCapabilityKey, processnodeinstance.FieldFormProfileKey, processnodeinstance.FieldActionSetKey, processnodeinstance.FieldOutcome, processnodeinstance.FieldBlockKind, processnodeinstance.FieldBlockedReasonCode, processnodeinstance.FieldBlockedReason, processnodeinstance.FieldResumeReason, processnodeinstance.FieldDomainCommandFingerprint, processnodeinstance.FieldDomainCommandResultState, processnodeinstance.FieldDomainCommandResultHash, processnodeinstance.FieldDomainCommandEffectState, processnodeinstance.FieldDomainCommandEffectRefType, processnodeinstance.FieldDomainCommandCompensationHash, processnodeinstance.FieldDomainCommandRecoveryDecision, processnodeinstance.FieldDomainCommandRecoveryHash:
 			values[i] = new(sql.NullString)
-		case processnodeinstance.FieldDueAt, processnodeinstance.FieldStartedAt, processnodeinstance.FieldCompletedAt, processnodeinstance.FieldDomainCommandResultRecordedAt, processnodeinstance.FieldDomainCommandCompensatedAt, processnodeinstance.FieldDomainCommandRecoveredAt, processnodeinstance.FieldCreatedAt, processnodeinstance.FieldUpdatedAt:
+		case processnodeinstance.FieldDueAt, processnodeinstance.FieldStartedAt, processnodeinstance.FieldCompletedAt, processnodeinstance.FieldRoutingCompletedAt, processnodeinstance.FieldBlockedAt, processnodeinstance.FieldResumedAt, processnodeinstance.FieldDomainCommandResultRecordedAt, processnodeinstance.FieldDomainCommandCompensatedAt, processnodeinstance.FieldDomainCommandRecoveredAt, processnodeinstance.FieldCreatedAt, processnodeinstance.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -247,12 +271,89 @@ func (_m *ProcessNodeInstance) assignValues(columns []string, values []any) erro
 				_m.CompletedAt = new(time.Time)
 				*_m.CompletedAt = value.Time
 			}
+		case processnodeinstance.FieldActivatedFromNodeInstanceID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field activated_from_node_instance_id", values[i])
+			} else if value.Valid {
+				_m.ActivatedFromNodeInstanceID = new(int)
+				*_m.ActivatedFromNodeInstanceID = int(value.Int64)
+			}
+		case processnodeinstance.FieldRoutingCompletedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field routing_completed_at", values[i])
+			} else if value.Valid {
+				_m.RoutingCompletedAt = new(time.Time)
+				*_m.RoutingCompletedAt = value.Time
+			}
+		case processnodeinstance.FieldRoutingCompletedBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field routing_completed_by", values[i])
+			} else if value.Valid {
+				_m.RoutingCompletedBy = new(int)
+				*_m.RoutingCompletedBy = int(value.Int64)
+			}
 		case processnodeinstance.FieldOutcome:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field outcome", values[i])
 			} else if value.Valid {
 				_m.Outcome = new(string)
 				*_m.Outcome = value.String
+			}
+		case processnodeinstance.FieldBlockKind:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field block_kind", values[i])
+			} else if value.Valid {
+				_m.BlockKind = new(string)
+				*_m.BlockKind = value.String
+			}
+		case processnodeinstance.FieldBlockedReasonCode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field blocked_reason_code", values[i])
+			} else if value.Valid {
+				_m.BlockedReasonCode = new(string)
+				*_m.BlockedReasonCode = value.String
+			}
+		case processnodeinstance.FieldBlockedReason:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field blocked_reason", values[i])
+			} else if value.Valid {
+				_m.BlockedReason = new(string)
+				*_m.BlockedReason = value.String
+			}
+		case processnodeinstance.FieldBlockedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field blocked_at", values[i])
+			} else if value.Valid {
+				_m.BlockedAt = new(time.Time)
+				*_m.BlockedAt = value.Time
+			}
+		case processnodeinstance.FieldBlockedBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field blocked_by", values[i])
+			} else if value.Valid {
+				_m.BlockedBy = new(int)
+				*_m.BlockedBy = int(value.Int64)
+			}
+		case processnodeinstance.FieldResumeReason:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field resume_reason", values[i])
+			} else if value.Valid {
+				_m.ResumeReason = new(string)
+				*_m.ResumeReason = value.String
+			}
+		case processnodeinstance.FieldResumedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field resumed_at", values[i])
+			} else if value.Valid {
+				_m.ResumedAt = new(time.Time)
+				*_m.ResumedAt = value.Time
+			}
+		case processnodeinstance.FieldResumedBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field resumed_by", values[i])
+			} else if value.Valid {
+				_m.ResumedBy = new(int)
+				*_m.ResumedBy = int(value.Int64)
 			}
 		case processnodeinstance.FieldDomainCommandFingerprint:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -388,6 +489,13 @@ func (_m *ProcessNodeInstance) assignValues(columns []string, values []any) erro
 			} else if value.Valid {
 				_m.Version = int(value.Int64)
 			}
+		case processnodeinstance.FieldUpdatedBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field updated_by", values[i])
+			} else if value.Valid {
+				_m.UpdatedBy = new(int)
+				*_m.UpdatedBy = int(value.Int64)
+			}
 		case processnodeinstance.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -499,9 +607,64 @@ func (_m *ProcessNodeInstance) String() string {
 		builder.WriteString(v.Format(time.ANSIC))
 	}
 	builder.WriteString(", ")
+	if v := _m.ActivatedFromNodeInstanceID; v != nil {
+		builder.WriteString("activated_from_node_instance_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.RoutingCompletedAt; v != nil {
+		builder.WriteString("routing_completed_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.RoutingCompletedBy; v != nil {
+		builder.WriteString("routing_completed_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
 	if v := _m.Outcome; v != nil {
 		builder.WriteString("outcome=")
 		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.BlockKind; v != nil {
+		builder.WriteString("block_kind=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.BlockedReasonCode; v != nil {
+		builder.WriteString("blocked_reason_code=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.BlockedReason; v != nil {
+		builder.WriteString("blocked_reason=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.BlockedAt; v != nil {
+		builder.WriteString("blocked_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.BlockedBy; v != nil {
+		builder.WriteString("blocked_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.ResumeReason; v != nil {
+		builder.WriteString("resume_reason=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ResumedAt; v != nil {
+		builder.WriteString("resumed_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.ResumedBy; v != nil {
+		builder.WriteString("resumed_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")
 	if v := _m.DomainCommandFingerprint; v != nil {
@@ -592,6 +755,11 @@ func (_m *ProcessNodeInstance) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("version=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Version))
+	builder.WriteString(", ")
+	if v := _m.UpdatedBy; v != nil {
+		builder.WriteString("updated_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(_m.CreatedAt.Format(time.ANSIC))

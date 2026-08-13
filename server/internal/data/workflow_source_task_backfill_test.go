@@ -11,6 +11,69 @@ import (
 	"server/internal/data/model/ent/workflowtaskevent"
 )
 
+func deleteWorkflowSourceTaskBundleForBackfillTest(
+	t *testing.T,
+	ctx context.Context,
+	data *Data,
+	sourceType string,
+	sourceID int,
+	taskID int,
+) {
+	t.Helper()
+	if data == nil || data.postgres == nil || data.sqldb == nil || sourceType == "" || sourceID <= 0 || taskID <= 0 {
+		t.Fatal("invalid workflow source task backfill fixture")
+	}
+	stateIDs, err := data.postgres.WorkflowBusinessState.Query().Where(
+		workflowbusinessstate.SourceType(sourceType),
+		workflowbusinessstate.SourceID(sourceID),
+	).IDs(ctx)
+	if err != nil {
+		t.Fatalf("resolve workflow source business state: %v", err)
+	}
+	if len(stateIDs) != 1 {
+		t.Fatalf("workflow source business state count=%d, want=1", len(stateIDs))
+	}
+
+	// Backfill tests deliberately synthesize a historical missing bundle. Raw
+	// deletion is restricted to these exact IDs so normal immutable event hooks
+	// and application deletion paths remain enforced.
+	tx, err := data.sqldb.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("begin workflow source backfill fixture transaction: %v", err)
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+	deletedEvents, err := deleteDebugRowsByIDs(ctx, tx, data.sqlDialect, "workflow_task_events", "task_id", []int{taskID})
+	if err != nil {
+		t.Fatalf("delete workflow source task events: %v", err)
+	}
+	if deletedEvents == 0 {
+		t.Fatal("workflow source task event count=0, want>0")
+	}
+	deletedStates, err := deleteDebugRowsByIDs(ctx, tx, data.sqlDialect, "workflow_business_states", "id", stateIDs)
+	if err != nil {
+		t.Fatalf("delete workflow source business state: %v", err)
+	}
+	if deletedStates != 1 {
+		t.Fatalf("deleted workflow source business states=%d, want=1", deletedStates)
+	}
+	deletedTasks, err := deleteDebugRowsByIDs(ctx, tx, data.sqlDialect, "workflow_tasks", "id", []int{taskID})
+	if err != nil {
+		t.Fatalf("delete workflow source task: %v", err)
+	}
+	if deletedTasks != 1 {
+		t.Fatalf("deleted workflow source tasks=%d, want=1", deletedTasks)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("commit workflow source backfill fixture transaction: %v", err)
+	}
+	committed = true
+}
+
 func TestWorkflowSourceTaskBackfillRecreatesReleasedProductionOrderBundle(t *testing.T) {
 	ctx := context.Background()
 	f := openProductionOrderRepoTest(t, "workflow_source_backfill_production")
@@ -28,12 +91,9 @@ func TestWorkflowSourceTaskBackfillRecreatesReleasedProductionOrderBundle(t *tes
 	}
 	taskCode := biz.WorkflowSourceTaskCode(biz.WorkflowSourceTaskProductionSchedulingGroup, released.Order.ID)
 	task := f.client.WorkflowTask.Query().Where(workflowtask.TaskCode(taskCode)).OnlyX(ctx)
-	f.client.WorkflowTaskEvent.Delete().Where(workflowtaskevent.TaskID(task.ID)).ExecX(ctx)
-	f.client.WorkflowBusinessState.Delete().Where(
-		workflowbusinessstate.SourceType(biz.WorkflowSourceTaskProductionOrderSourceType),
-		workflowbusinessstate.SourceID(released.Order.ID),
-	).ExecX(ctx)
-	f.client.WorkflowTask.DeleteOne(task).ExecX(ctx)
+	deleteWorkflowSourceTaskBundleForBackfillTest(
+		t, ctx, f.data, biz.WorkflowSourceTaskProductionOrderSourceType, released.Order.ID, task.ID,
+	)
 
 	result, err := reconcileMissingWorkflowSourceTasksWithClient(ctx, f.client)
 	if err != nil {

@@ -152,7 +152,7 @@ function validatePrintTemplateDefaults(config, schema = customerPackageSchema) {
     );
     assert(
       item.supplierDefaults == null,
-      `${itemPath}.supplierDefaults must not override supplier snapshots from business records`,
+      `${itemPath}.supplierDefaults must not override supplier snapshots from source documents`,
     );
   });
 }

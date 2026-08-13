@@ -2,6 +2,8 @@ package data
 
 import (
 	"context"
+	"strings"
+	"time"
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
@@ -14,12 +16,14 @@ import (
 	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/shipment"
+	"server/internal/data/model/ent/shipmentitem"
 	"server/internal/data/model/ent/stockreservation"
 	"server/internal/data/model/ent/unit"
 
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/shopspring/decimal"
 )
 
 type salesOrderRepo struct {
@@ -36,12 +40,16 @@ func NewSalesOrderRepo(d *Data, logger log.Logger) *salesOrderRepo {
 
 var _ biz.SalesOrderRepo = (*salesOrderRepo)(nil)
 var _ biz.SalesOrderSubmitProcessCommandRepo = (*salesOrderRepo)(nil)
+var _ biz.SalesOrderActivateProcessCommandRepo = (*salesOrderRepo)(nil)
+var _ biz.SalesOrderRejectProcessCommandRepo = (*salesOrderRepo)(nil)
 var _ biz.SalesOrderCancellationActorRepo = (*salesOrderRepo)(nil)
+var _ biz.SalesOrderLifecycleActionRepo = (*salesOrderRepo)(nil)
 
 func (r *salesOrderRepo) CreateSalesOrder(ctx context.Context, in *biz.SalesOrderMutation) (*biz.SalesOrder, error) {
 	row, err := r.data.postgres.SalesOrder.Create().
 		SetOrderNo(in.OrderNo).
 		SetCustomerID(in.CustomerID).
+		SetCurrency(in.Currency).
 		SetNillableCustomerOrderNo(in.CustomerOrderNo).
 		SetCustomerSnapshot(in.CustomerSnapshot).
 		SetNillableSalesOwner(in.SalesOwner).
@@ -64,6 +72,7 @@ func (r *salesOrderRepo) UpdateSalesOrder(ctx context.Context, id int, in *biz.S
 	update := r.data.postgres.SalesOrder.UpdateOneID(id).
 		SetOrderNo(in.OrderNo).
 		SetCustomerID(in.CustomerID).
+		SetCurrency(in.Currency).
 		SetCustomerSnapshot(in.CustomerSnapshot).
 		SetContactSnapshot(in.ContactSnapshot).
 		SetOrderDate(in.OrderDate)
@@ -275,6 +284,246 @@ func (r *salesOrderRepo) CancelSalesOrderWithActor(ctx context.Context, id int, 
 	return r.cancelSalesOrderLifecycle(ctx, id, actorID)
 }
 
+func (r *salesOrderRepo) ApplySalesOrderLifecycleAction(
+	ctx context.Context,
+	in *biz.SourceOrderLifecycleAction,
+	lifecycleStatus string,
+) (*biz.SalesOrder, error) {
+	if r == nil || r.data == nil || r.data.postgres == nil || in == nil ||
+		(lifecycleStatus != biz.SalesOrderStatusClosed && lifecycleStatus != biz.SalesOrderStatusCanceled) {
+		return nil, biz.ErrBadParam
+	}
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackEntTx(ctx, tx, r.log)
+	replayed, err := resolveSourceOrderLifecycleActionReplay(ctx, tx.Client(), "sales_order", in)
+	if err != nil {
+		return nil, err
+	}
+	if replayed {
+		row, getErr := tx.SalesOrder.Get(ctx, in.ID)
+		if getErr != nil {
+			return nil, getErr
+		}
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+		tx = nil
+		return entSalesOrderToBiz(row), nil
+	}
+	query := tx.SalesOrder.Query().Where(salesorder.ID(in.ID))
+	if r.data.sqlDialect == dialect.Postgres {
+		query = query.Where(func(selector *sql.Selector) { selector.ForUpdate() })
+	}
+	current, err := query.Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrSalesOrderNotFound
+		}
+		return nil, err
+	}
+	if current.Version != in.ExpectedVersion {
+		return nil, biz.ErrSalesOrderConflict
+	}
+	if !biz.IsSalesOrderLifecycleTransitionAllowed(current.LifecycleStatus, lifecycleStatus) || current.LifecycleStatus == lifecycleStatus {
+		return nil, biz.ErrBadParam
+	}
+	if lifecycleStatus == biz.SalesOrderStatusCanceled {
+		if err := validateSalesOrderCancellationDependencies(ctx, tx, in.ID, true); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := validateSalesOrderCloseDependencies(ctx, tx, in.ID); err != nil {
+			return nil, err
+		}
+		if in.CloseMode == biz.SourceOrderCloseModeNormal {
+			if err := validateSalesOrderFullyShipped(ctx, tx, in.ID); err != nil {
+				return nil, err
+			}
+		}
+	}
+	now := time.Now()
+	lineStatus := biz.SalesOrderItemStatusClosed
+	if lifecycleStatus == biz.SalesOrderStatusCanceled {
+		lineStatus = biz.SalesOrderItemStatusCanceled
+	}
+	lineResults, err := salesOrderLifecycleLineResults(ctx, tx.Client(), in.ID, lineStatus)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := tx.SalesOrderItem.Update().Where(
+		salesorderitem.SalesOrderID(in.ID),
+		salesorderitem.LineStatus(biz.SalesOrderItemStatusOpen),
+	).SetLineStatus(lineStatus).Save(ctx); err != nil {
+		return nil, err
+	}
+	update := tx.SalesOrder.UpdateOneID(in.ID).
+		Where(salesorder.Version(in.ExpectedVersion), salesorder.LifecycleStatus(current.LifecycleStatus)).
+		SetLifecycleStatus(lifecycleStatus).
+		SetVersion(in.ExpectedVersion + 1).
+		SetSettlementAction(in.ActionKey).
+		SetSettledAt(now).
+		SetSettledBy(in.ActorID)
+	if in.CloseMode == "" {
+		update.ClearSettlementMode()
+	} else {
+		update.SetSettlementMode(in.CloseMode)
+	}
+	if in.Reason == "" {
+		update.ClearSettlementReason()
+	} else {
+		update.SetSettlementReason(in.Reason)
+	}
+	row, err := update.Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrSalesOrderConflict
+		}
+		return nil, err
+	}
+	if lifecycleStatus == biz.SalesOrderStatusCanceled {
+		reason := in.Reason
+		if err := markProcessDomainCommandEffectsCompensatedWithClient(
+			ctx,
+			tx.Client(),
+			[]string{biz.ProcessDomainCommandSalesOrderSubmit, biz.ProcessDomainCommandSalesOrderActivate},
+			"sales_order",
+			in.ID,
+			reason,
+			in.ActorID,
+		); err != nil {
+			return nil, err
+		}
+		if err := resolveLinkedProcessForSourceCancellationWithClient(
+			ctx, tx.Client(), biz.ProcessKeySalesOrderAcceptance, "sales_order", in.ID, reason, in.ActorID,
+		); err != nil {
+			return nil, err
+		}
+	}
+	if err := createSourceOrderLifecycleActionReceipt(ctx, tx.Client(), "sales_order", current.LifecycleStatus, lifecycleStatus, in, lineResults); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return entSalesOrderToBiz(row), nil
+}
+
+func validateSalesOrderCloseDependencies(ctx context.Context, tx *ent.Tx, salesOrderID int) error {
+	hasDraftShipment, err := tx.Shipment.Query().Where(
+		shipment.SalesOrderID(salesOrderID),
+		shipment.Status(biz.ShipmentStatusDraft),
+	).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if hasDraftShipment {
+		return biz.ErrSalesOrderCancellationShipmentDependency
+	}
+	hasReservation, err := tx.StockReservation.Query().Where(
+		stockreservation.SalesOrderID(salesOrderID),
+		stockreservation.Status(biz.StockReservationStatusActive),
+	).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if hasReservation {
+		return biz.ErrSalesOrderCancellationReservationDependency
+	}
+	hasOpenProduction, err := tx.ProductionOrder.Query().Where(
+		productionorder.StatusIn(biz.ProductionOrderStatusDraft, biz.ProductionOrderStatusReleased),
+		productionorder.HasItemsWith(
+			productionorderitem.HasSalesOrderItemWith(salesorderitem.SalesOrderID(salesOrderID)),
+		),
+	).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if hasOpenProduction {
+		return biz.ErrSalesOrderCancellationProductionDependency
+	}
+	return nil
+}
+
+func validateSalesOrderFullyShipped(ctx context.Context, tx *ent.Tx, salesOrderID int) error {
+	items, err := tx.SalesOrderItem.Query().Where(
+		salesorderitem.SalesOrderID(salesOrderID),
+		salesorderitem.LineStatus(biz.SalesOrderItemStatusOpen),
+	).All(ctx)
+	if err != nil {
+		return err
+	}
+	if len(items) == 0 {
+		return nil
+	}
+	itemIDs := make([]int, 0, len(items))
+	for _, item := range items {
+		itemIDs = append(itemIDs, item.ID)
+	}
+	shipmentItems, err := tx.ShipmentItem.Query().Where(
+		shipmentitem.SalesOrderItemIDIn(itemIDs...),
+		shipmentitem.HasShipmentWith(shipment.Status(biz.ShipmentStatusShipped)),
+	).All(ctx)
+	if err != nil {
+		return err
+	}
+	shippedByItem := make(map[int]decimal.Decimal, len(items))
+	for _, item := range shipmentItems {
+		if item.SalesOrderItemID != nil {
+			shippedByItem[*item.SalesOrderItemID] = shippedByItem[*item.SalesOrderItemID].Add(item.Quantity)
+		}
+	}
+	for _, item := range items {
+		if shippedByItem[item.ID].Cmp(item.OrderedQuantity) < 0 {
+			return biz.ErrSourceOrderNormalCloseIncomplete
+		}
+	}
+	return nil
+}
+
+func salesOrderLifecycleLineResults(ctx context.Context, client *ent.Client, salesOrderID int, terminalStatus string) ([]map[string]any, error) {
+	items, err := client.SalesOrderItem.Query().Where(
+		salesorderitem.SalesOrderID(salesOrderID),
+	).Order(ent.Asc(salesorderitem.FieldID)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(items) == 0 {
+		return []map[string]any{}, nil
+	}
+	itemIDs := make([]int, 0, len(items))
+	for _, item := range items {
+		itemIDs = append(itemIDs, item.ID)
+	}
+	shipmentItems, err := client.ShipmentItem.Query().Where(
+		shipmentitem.SalesOrderItemIDIn(itemIDs...),
+		shipmentitem.HasShipmentWith(shipment.Status(biz.ShipmentStatusShipped)),
+	).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	fulfilledByItem := make(map[int]decimal.Decimal, len(items))
+	for _, item := range shipmentItems {
+		if item.SalesOrderItemID != nil {
+			fulfilledByItem[*item.SalesOrderItemID] = fulfilledByItem[*item.SalesOrderItemID].Add(item.Quantity)
+		}
+	}
+	results := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		finalStatus := item.LineStatus
+		if finalStatus == biz.SalesOrderItemStatusOpen {
+			finalStatus = terminalStatus
+		}
+		results = append(results, sourceOrderLineLifecycleResult(
+			item.ID, item.OrderedQuantity, fulfilledByItem[item.ID], finalStatus,
+		))
+	}
+	return results, nil
+}
+
 func (r *salesOrderRepo) SubmitSalesOrderForProcessCommand(
 	ctx context.Context,
 	salesOrderID int,
@@ -384,6 +633,88 @@ func (r *salesOrderRepo) ActivateSalesOrderForProcessCommand(
 	return entSalesOrderToBiz(row), nil
 }
 
+func (r *salesOrderRepo) RejectSalesOrderForProcessCommand(
+	ctx context.Context,
+	salesOrderID int,
+	command *biz.ProcessDomainCommandInput,
+	result *biz.ProcessDomainCommandResult,
+	actorID int,
+	reason string,
+) (*biz.SalesOrder, error) {
+	reason = strings.TrimSpace(reason)
+	if r == nil || r.data == nil || r.data.postgres == nil || salesOrderID <= 0 ||
+		command == nil || result == nil || actorID <= 0 || reason == "" || len([]rune(reason)) > 255 {
+		return nil, biz.ErrBadParam
+	}
+	record, err := biz.BuildProcessNodeDomainCommandResultRecord(command, result)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackEntTx(ctx, tx, r.log)
+	query := tx.SalesOrder.Query().Where(salesorder.ID(salesOrderID))
+	if r.data.sqlDialect == dialect.Postgres {
+		query = query.Where(func(selector *sql.Selector) { selector.ForUpdate() })
+	}
+	current, err := query.Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrSalesOrderNotFound
+		}
+		return nil, err
+	}
+	if current.LifecycleStatus != biz.SalesOrderStatusSubmitted {
+		return nil, biz.ErrBadParam
+	}
+	if err := validateSalesOrderCancellationDependencies(ctx, tx, salesOrderID, true); err != nil {
+		return nil, err
+	}
+	if _, err := tx.SalesOrderItem.Update().Where(
+		salesorderitem.SalesOrderID(salesOrderID),
+		salesorderitem.LineStatus(biz.SalesOrderItemStatusOpen),
+	).SetLineStatus(biz.SalesOrderItemStatusCanceled).Save(ctx); err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	row, err := tx.SalesOrder.UpdateOneID(salesOrderID).
+		Where(salesorder.Version(current.Version), salesorder.LifecycleStatus(biz.SalesOrderStatusSubmitted)).
+		SetLifecycleStatus(biz.SalesOrderStatusCanceled).
+		SetVersion(current.Version + 1).
+		SetSettlementAction(biz.SourceOrderSettlementActionWorkflowReject).
+		ClearSettlementMode().
+		SetSettlementReason(reason).
+		SetSettledAt(now).
+		SetSettledBy(actorID).
+		Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrSalesOrderConflict
+		}
+		return nil, err
+	}
+	if err := markProcessDomainCommandEffectsCompensatedWithClient(
+		ctx,
+		tx.Client(),
+		[]string{biz.ProcessDomainCommandSalesOrderSubmit, biz.ProcessDomainCommandSalesOrderActivate},
+		"sales_order",
+		salesOrderID,
+		reason,
+		actorID,
+	); err != nil {
+		return nil, err
+	}
+	if _, err := recordProcessNodeDomainCommandResultWithClient(ctx, tx.Client(), record, actorID); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return entSalesOrderToBiz(row), nil
+}
+
 func (r *salesOrderRepo) cancelSalesOrderLifecycle(ctx context.Context, id int, actorID int) (*biz.SalesOrder, error) {
 	allowedCurrent := salesOrderLifecyclePredecessors(biz.SalesOrderStatusCanceled)
 	if len(allowedCurrent) == 0 {
@@ -411,7 +742,7 @@ func (r *salesOrderRepo) cancelSalesOrderLifecycle(ctx context.Context, id int, 
 	if !containsString(allowedCurrent, row.LifecycleStatus) {
 		return nil, biz.ErrBadParam
 	}
-	if err := validateSalesOrderCancellationDependencies(ctx, tx, id); err != nil {
+	if err := validateSalesOrderCancellationDependencies(ctx, tx, id, false); err != nil {
 		return nil, err
 	}
 	row, err = tx.SalesOrder.UpdateOneID(id).
@@ -437,7 +768,7 @@ func (r *salesOrderRepo) cancelSalesOrderLifecycle(ctx context.Context, id int, 
 	return entSalesOrderToBiz(row), nil
 }
 
-func validateSalesOrderCancellationDependencies(ctx context.Context, tx *ent.Tx, salesOrderID int) error {
+func validateSalesOrderCancellationDependencies(ctx context.Context, tx *ent.Tx, salesOrderID int, resolveActiveProcess bool) error {
 	hasShipment, err := tx.Shipment.Query().Where(
 		shipment.SalesOrderID(salesOrderID),
 		shipment.StatusNEQ(biz.ShipmentStatusCancelled),
@@ -479,7 +810,7 @@ func validateSalesOrderCancellationDependencies(ctx context.Context, tx *ent.Tx,
 	if err != nil {
 		return err
 	}
-	if hasActiveProcess {
+	if hasActiveProcess && !resolveActiveProcess {
 		return biz.ErrSalesOrderCancellationProcessDependency
 	}
 	return nil
@@ -639,6 +970,7 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 			).
 			SetOrderNo(in.OrderNo).
 			SetCustomerID(in.CustomerID).
+			SetCurrency(in.Currency).
 			SetCustomerSnapshot(in.CustomerSnapshot).
 			SetContactSnapshot(in.ContactSnapshot).
 			SetOrderDate(in.OrderDate).
@@ -706,6 +1038,7 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 		orderRow, err = tx.SalesOrder.Create().
 			SetOrderNo(in.OrderNo).
 			SetCustomerID(in.CustomerID).
+			SetCurrency(in.Currency).
 			SetNillableCustomerOrderNo(in.CustomerOrderNo).
 			SetCustomerSnapshot(in.CustomerSnapshot).
 			SetNillableSalesOwner(in.SalesOwner).
@@ -935,6 +1268,7 @@ func entSalesOrderToBiz(row *ent.SalesOrder) *biz.SalesOrder {
 		ID:                  row.ID,
 		OrderNo:             row.OrderNo,
 		CustomerID:          row.CustomerID,
+		Currency:            row.Currency,
 		CustomerOrderNo:     row.CustomerOrderNo,
 		CustomerSnapshot:    row.CustomerSnapshot,
 		SalesOwner:          row.SalesOwner,
@@ -946,6 +1280,11 @@ func entSalesOrderToBiz(row *ent.SalesOrder) *biz.SalesOrder {
 		PlannedDeliveryDate: row.PlannedDeliveryDate,
 		LifecycleStatus:     row.LifecycleStatus,
 		Version:             row.Version,
+		SettlementAction:    row.SettlementAction,
+		SettlementMode:      row.SettlementMode,
+		SettlementReason:    row.SettlementReason,
+		SettledAt:           row.SettledAt,
+		SettledBy:           row.SettledBy,
 		Note:                row.Note,
 		CreatedAt:           row.CreatedAt,
 		UpdatedAt:           row.UpdatedAt,

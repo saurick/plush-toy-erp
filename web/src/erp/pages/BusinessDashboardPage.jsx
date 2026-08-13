@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Card, Space, Spin, Table, Typography } from 'antd'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { getBusinessDashboardStats } from '../api/businessDashboardApi.mjs'
 import { getWorkflowTaskBoard } from '../api/workflowApi.mjs'
+import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import useWorkflowTaskActionAccess from '../hooks/useWorkflowTaskActionAccess.js'
 import {
   DASHBOARD_TRUTH_KINDS,
@@ -44,7 +45,7 @@ const DATA_BOUNDARIES = Object.freeze([
       '销售、采购、生产与委外等订单或合同，用于记录业务发起或约定，后续仍需按流程办理。',
   },
   {
-    key: 'business-record',
+    key: 'business-overview',
     title: '办理结果',
     description: '入库、质检、库存、出货和财务等已经完成的业务记录。',
   },
@@ -160,24 +161,30 @@ export default function BusinessDashboardPage() {
   const [taskBoard, setTaskBoard] = useState(null)
   const [taskBoardReady, setTaskBoardReady] = useState(false)
   const [workflowLoadError, setWorkflowLoadError] = useState(false)
-  const mountedRef = useRef(false)
-  const loadPromiseRef = useRef(null)
   const navigate = useNavigate()
   const outletContext = useOutletContext()
+  const adminProfile = outletContext?.adminProfile || null
+  const beginLatestRequest = useLatestRequestCoordinator()
 
   const loadDashboardStats = useCallback(async () => {
-    if (loadPromiseRef.current) {
-      return loadPromiseRef.current
+    const request = beginLatestRequest('business-dashboard')
+    if (!adminProfile?.id) {
+      setLoading(false)
+      request.finish()
+      return false
     }
 
     setLoading(true)
-    const request = (async () => {
+    try {
       const [dashboardResult, workflowResult] = await Promise.allSettled([
-        getBusinessDashboardStats(),
-        getWorkflowTaskBoard({ limit: 1, offset: 0 }),
+        getBusinessDashboardStats({}, { signal: request.signal }),
+        getWorkflowTaskBoard(
+          { limit: 1, offset: 0 },
+          { signal: request.signal }
+        ),
       ])
 
-      if (!mountedRef.current) {
+      if (!request.isCurrent()) {
         return false
       }
 
@@ -213,26 +220,24 @@ export default function BusinessDashboardPage() {
         dashboardResult.status === 'fulfilled' &&
         workflowResult.status === 'fulfilled'
       )
-    })()
-
-    loadPromiseRef.current = request
-
-    try {
-      return await request
     } finally {
-      loadPromiseRef.current = null
-      if (mountedRef.current) {
+      if (request.isCurrent()) {
         setLoading(false)
+        request.finish()
       }
     }
-  }, [])
+  }, [adminProfile, beginLatestRequest])
 
   useEffect(() => {
-    mountedRef.current = true
+    setModuleStats([])
+    setDashboardLoadError(false)
+    setTaskBoard(null)
+    setTaskBoardReady(false)
+    setWorkflowLoadError(false)
+  }, [adminProfile])
+
+  useEffect(() => {
     loadDashboardStats()
-    return () => {
-      mountedRef.current = false
-    }
   }, [loadDashboardStats])
 
   useEffect(() => {
@@ -244,7 +249,7 @@ export default function BusinessDashboardPage() {
     [moduleStats]
   )
   const summary = useMemo(() => buildDashboardSummary(moduleRows), [moduleRows])
-  const isSuperAdmin = outletContext?.adminProfile?.is_super_admin === true
+  const isSuperAdmin = adminProfile?.is_super_admin === true
   const allowedMenuPaths = useMemo(
     () =>
       new Set(
@@ -256,10 +261,10 @@ export default function BusinessDashboardPage() {
   )
   const taskEntryAdminProfile = useMemo(
     () => ({
-      ...(outletContext?.adminProfile || {}),
+      ...(adminProfile || {}),
       menus: [...allowedMenuPaths],
     }),
-    [allowedMenuPaths, outletContext?.adminProfile]
+    [adminProfile, allowedMenuPaths]
   )
   const businessSourceRows = useMemo(
     () =>
@@ -270,7 +275,7 @@ export default function BusinessDashboardPage() {
             isSuperAdmin || allowedMenuPaths.has(source.path)
           const canOpen =
             rbacAllowsPath &&
-            effectiveSessionAllowsPage(outletContext?.adminProfile, pageKey, {
+            effectiveSessionAllowsPage(adminProfile, pageKey, {
               isLocalDev: false,
               isSuperAdmin,
             })
@@ -281,7 +286,7 @@ export default function BusinessDashboardPage() {
           }
         })
       ),
-    [allowedMenuPaths, isSuperAdmin, moduleRows, outletContext?.adminProfile]
+    [adminProfile, allowedMenuPaths, isSuperAdmin, moduleRows]
   )
   const collaborationRisk = taskBoardReady
     ? Number(taskBoard?.counts?.exception || 0) +

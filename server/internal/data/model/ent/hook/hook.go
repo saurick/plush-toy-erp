@@ -212,6 +212,18 @@ func (f InventoryLotFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.InventoryLotMutation", m)
 }
 
+// The InventoryLotStatusEventFunc type is an adapter to allow the use of ordinary
+// function as InventoryLotStatusEvent mutator.
+type InventoryLotStatusEventFunc func(context.Context, *ent.InventoryLotStatusEventMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f InventoryLotStatusEventFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.InventoryLotStatusEventMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.InventoryLotStatusEventMutation", m)
+}
+
 // The InventoryOperationFunc type is an adapter to allow the use of ordinary
 // function as InventoryOperation mutator.
 type InventoryOperationFunc func(context.Context, *ent.InventoryOperationMutation) (ent.Value, error)
@@ -750,6 +762,18 @@ func (f ShipmentItemFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ShipmentItemMutation", m)
+}
+
+// The SourceOrderLifecycleEventFunc type is an adapter to allow the use of ordinary
+// function as SourceOrderLifecycleEvent mutator.
+type SourceOrderLifecycleEventFunc func(context.Context, *ent.SourceOrderLifecycleEventMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f SourceOrderLifecycleEventFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.SourceOrderLifecycleEventMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.SourceOrderLifecycleEventMutation", m)
 }
 
 // The StockReservationFunc type is an adapter to allow the use of ordinary

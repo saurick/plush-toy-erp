@@ -140,7 +140,6 @@
 
 ## 2026-06-21 权限中心旧权限清理与权限项排版
 
-- 完成：后端权限列表只返回 `server/internal/biz/rbac.go` 当前内置权限；RBAC seed 会清理已退出的旧内置 `permissions` 行和对应 `role_permissions` 绑定，避免 `business.record.*`、`erp.help_center.read` 等历史残留继续出现在权限中心。
 - 完成：权限中心权限项改为“中文名称 + 单独权限码”两行展示，并补齐 `outsourcing`、`shipment` 模块中文标题；L1 增加权限项不横向溢出、不显示旧权限码的浏览器断言。
 - 完成：`docs/roles/角色权限矩阵第一版.md` 同步权限中心只展示当前 RBAC 真源、旧内置权限由 seed 和列表接口收口的口径。
 - 验证：追加前 `progress.md` 为 139 行、20207 字节，未达到归档阈值；已执行 `go test ./internal/data -run 'TestSeedBuiltinRBACPrunesStaleBuiltinPermissions|TestListPermissionsHidesRowsOutsideRBACSource|TestLoadAdminRBAC'`、`go test ./internal/biz ./internal/data ./internal/service`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=permission-center-loading-state,permission-center-desktop pnpm --dir web style:l1`、`git diff --check`，均通过。
@@ -307,7 +306,6 @@
 
 ## 2026-06-21 当前真源索引瘦身
 
-- 完成：将 `docs/当前真源与交接顺序.md` 的“当前业务保存层交接摘录”从长流水改为 10 行摘要表，保留旧 `business_records` 退出、MasterData / Source Document、Inventory / Purchase / Quality / BOM / Outsourcing、Operational Fact、Workflow、生命周期动作、删除 / 归档引用检查边界、RBAC / 菜单、yoyoosun 导入和产品化交付等高风险判断，并把详情导向产品能力台账、证据详情、模块边界和对应专题文档。
 - 完成：将“前端文档与开发验收入口”改为 dev-only 入口路由表，集中说明仓库正式文档、旧产品内 docs 退出、正式 ERP 菜单、`/__dev/docs`、`/__dev/testing`、`/__dev/prototypes`、`/__dev/capability-ledger`、`/__dev/customer-config` 和主题 / 打印预览边界；未新增文档、metadata、frontmatter 或 Mermaid 图。
 - 验证：追加前 `progress.md` 为 306 行、51913 字节，未达到归档阈值；`docs/当前真源与交接顺序.md` 瘦身后为 159 行、18956 字节；已执行 `git diff --check`、旧长流水关键词反查、目标标题 / dev-only 入口 / 台账链接扫描、目标链接文件存在性检查和 `cd web && node --test src/erp/utils/businessModuleNavigation.test.mjs`，均通过。
 - 下一步：后续能力细节、运行时证据和长条目继续写入 `docs/product/产品能力进度台账.md`、`docs/product/产品能力证据详情.md`、`web/README.md` 或专题文档；当前真源索引只保留阅读顺序、禁区和高风险摘要。

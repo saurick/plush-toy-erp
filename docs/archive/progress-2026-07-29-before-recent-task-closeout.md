@@ -124,7 +124,6 @@
 
 
 
-页面：两页统一使用 `BusinessOperationPanel`、`SelectionActionBar`、`BusinessDataTable`、`BusinessFormModal` 和 `BusinessRecordDetailsModal`；支持单击选中、双击详情、稳定分页、操作边界提示、加载 / 空态 / 失败恢复。任一客户、供应商、产品、仓库或批次参考接口失败不再清空核心业务记录。没有改 Workflow / Fact 分层、Source 状态机、RBAC、schema / migration 或客户专属规则，也没有新增退款、换货、银行流水、总账或税控语义。
 
 
 

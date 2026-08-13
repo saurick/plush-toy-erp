@@ -85,7 +85,7 @@ fi
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
 
-DEFAULT_QA_BROWSER_SCENARIOS="root-redirect-desktop,dev-all-pages-mobile,dev-workbench-wide-layout,dev-hub-dark-desktop,dev-drill-recovery-desktop-light,dev-drill-recovery-mobile-dark"
+DEFAULT_QA_BROWSER_SCENARIOS="root-redirect-desktop,dev-all-pages-mobile,dev-workbench-wide-layout,dev-hub-dark-desktop,dev-drill-recovery-desktop-light,dev-drill-recovery-mobile-dark,dev-business-usability-desktop-light,dev-business-usability-mobile-dark"
 
 # ROOT_DIR pins the shared PostgreSQL contract; ShellCheck scans it separately.
 # shellcheck disable=SC1091
@@ -200,7 +200,8 @@ qa_full_server() {
     make populated_upgrade_pg_test
   ERP_PDF_CHROMIUM_INTEGRATION=1 \
     node "$ROOT_DIR/scripts/qa/run-test-gate.mjs" \
-    --kind go --label server-all -- \
+    --kind go --label server-all \
+    --exclude-skip-pattern "$CRITICAL_POSTGRES_TEST_PATTERN" -- \
     go test -count=1 -json -skip "$CRITICAL_POSTGRES_TEST_PATTERN" ./...
   make build
 }

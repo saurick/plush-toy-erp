@@ -276,15 +276,20 @@ export async function runLocalAcceptanceLifecycle({
         warehouses: Number(result?.warehouses || 0),
       }),
     );
-    dataset = await stage(
-      "manual-dataset-apply",
-      () => runtime.applyManualDataset(identity.acceptanceDatabase),
-      (result) => ({
-        ok: result?.ok === true,
-        completedStages: Number(result?.completedStages || 0),
-        report: result?.report || "",
-      }),
-    );
+    try {
+      dataset = await stage(
+        "manual-dataset-apply",
+        () => runtime.applyManualDataset(identity.acceptanceDatabase),
+        (result) => ({
+          ok: result?.ok === true,
+          completedStages: Number(result?.completedStages || 0),
+          report: result?.report || "",
+        }),
+      );
+    } catch (error) {
+      dataset = error?.datasetEvidence || null;
+      throw error;
+    }
     await stage("web-start", async () => {
       await runtime.startWeb();
       webStarted = true;
@@ -494,8 +499,7 @@ export async function allocateLocalAcceptancePorts(
     );
   };
   const httpPort = await allocateDistinctPort("HTTP");
-  const grpcPort = await allocateDistinctPort("gRPC");
-  return { httpPort, grpcPort, webPort };
+  return { httpPort, webPort };
 }
 
 export async function allocateLocalAcceptanceWebEndpoint(
@@ -832,7 +836,6 @@ function createDirectRuntime(context) {
           ERP_DEBUG_CLEANUP_ENABLED: "false",
           ERP_DEBUG_BUSINESS_CLEAR_ENABLED: "false",
           DEV_HTTP_PORT: String(context.httpPort),
-          DEV_GRPC_PORT: String(context.grpcPort),
         },
         logPath: path.join(context.outputDir, `backend-${databaseName}.log`),
         label: "acceptance backend",
@@ -1023,21 +1026,37 @@ function createDirectRuntime(context) {
           },
         },
       );
-      if (result.exitCode !== 0 || result.report?.ok !== true) {
-        throw new Error(
-          `manual acceptance dataset failed at ${result.report?.failedStage || "unknown stage"}`,
-        );
-      }
-      return {
-        ok: true,
+      const report = result.report;
+      const datasetEvidence = {
+        ok: report?.ok === true,
         completedStages: result.report.stages.filter(
           (item) => item.status === "completed",
         ).length,
-        report: relativeRepoPath(
-          context.repoRoot,
-          result.report.applyReportPath,
+        report: relativeRepoPath(context.repoRoot, report.applyReportPath),
+        dataVersion: report.dataVersion,
+        chainDataDigest: report.chainDataDigest,
+        chainVerificationDigest: report.chainVerificationDigest,
+        startedAt: report.startedAt,
+        completedAt: report.completedAt,
+        durationMs: report.durationMs,
+        stageTimings: report.stages.map(
+          ({ key, status, startedAt, completedAt, durationMs }) => ({
+            key,
+            status,
+            startedAt,
+            completedAt,
+            durationMs,
+          }),
         ),
       };
+      if (result.exitCode !== 0 || report?.ok !== true) {
+        const error = new Error(
+          `manual acceptance dataset failed at ${report?.failedStage || "unknown stage"}`,
+        );
+        error.datasetEvidence = datasetEvidence;
+        throw error;
+      }
+      return datasetEvidence;
     },
     async startWeb() {
       if (web) throw new Error("acceptance web is already running");
@@ -1213,8 +1232,7 @@ async function buildDirectContext({
       "local acceptance lifecycle output must stay in the repository",
     );
   }
-  const { httpPort, grpcPort, webPort } =
-    await allocateLocalAcceptancePorts(repoRoot);
+  const { httpPort, webPort } = await allocateLocalAcceptancePorts(repoRoot);
   mkdirSync(outputDir, { recursive: true, mode: 0o700 });
   return Object.freeze({
     repoRoot,
@@ -1236,7 +1254,6 @@ async function buildDirectContext({
     backendURL: `http://127.0.0.1:${httpPort}`,
     webURL: `http://127.0.0.1:${webPort}`,
     httpPort,
-    grpcPort,
     webPort,
     adminPassword: randomSecret(),
     rolePassword: randomSecret(),

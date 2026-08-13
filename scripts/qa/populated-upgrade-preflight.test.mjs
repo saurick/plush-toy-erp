@@ -18,6 +18,10 @@ const cutoverSqlPath = path.join(
   repoRoot,
   "scripts/qa/customer-config-cutover-20260714055825.sql",
 );
+const constraintSqlPath = path.join(
+  repoRoot,
+  "scripts/qa/database-constraint-preflight.sql",
+);
 
 function writeExecutable(filePath, source) {
   fs.writeFileSync(filePath, source, "utf8");
@@ -39,6 +43,7 @@ function createFixture() {
       'printf \'docker:%s\\n\' "$*" >> "$INVOCATION_LOG"',
       "payload=$(cat)",
       'case "$payload" in',
+      "  *plush_database_constraint_preflight*) audit=database-constraints ;;",
       "  *plush_customer_config_cutover*) audit=customer-config-cutover ;;",
       "  *plush_populated_upgrade*) audit=populated-upgrade ;;",
       "  *) audit=unknown ;;",
@@ -71,6 +76,7 @@ function createFixture() {
       'if [ "$dbname_set" -eq 1 ]; then printf \'dbname:set\\n\' >> "$INVOCATION_LOG"; fi',
       "payload=$(cat)",
       'case "$payload" in',
+      "  *plush_database_constraint_preflight*) audit=database-constraints ;;",
       "  *plush_customer_config_cutover*) audit=customer-config-cutover ;;",
       "  *plush_populated_upgrade*) audit=populated-upgrade ;;",
       "  *) audit=unknown ;;",
@@ -165,12 +171,39 @@ test("customer config cutover SQL is revision-aware, read-only, and covers both 
   assert.doesNotMatch(source, /public\.atlas_schema_revisions/u);
 });
 
+test("database constraint SQL is read-only and covers the target business invariants", () => {
+  const source = fs.readFileSync(constraintSqlPath, "utf8");
+  for (const required of [
+    "BEGIN TRANSACTION READ ONLY",
+    "plush_database_constraint_preflight",
+    "inventory_txns",
+    "reversal_of_txn_id",
+    "inventory_balances",
+    "quantity < 0",
+    "inventory_lots",
+    "purchase_receipts",
+    "purchase_returns",
+    "purchase_receipt_adjustments",
+    "quality_inspections",
+    "business_attachments",
+    "octet_length(content) <> file_size",
+    "sha256 !~ '^[0-9a-f]{64}$'",
+  ]) {
+    assert(source.includes(required), "missing constraint boundary: " + required);
+  }
+  assert.doesNotMatch(
+    source,
+    /\b(?:INSERT|UPDATE|DELETE|ALTER|DROP|CREATE|TRUNCATE|COPY)\b/iu,
+  );
+});
+
 test("populated upgrade preflight help declares read-only scope", () => {
   const result = runScript(["--help"]);
   assert.equal(result.status, 0, result.stdout + "\n" + result.stderr);
   assert.match(result.stdout, /只读检查/u);
   assert.match(result.stdout, /populated-upgrade/u);
   assert.match(result.stdout, /customer-config-cutover/u);
+  assert.match(result.stdout, /database-constraints/u);
   assert.match(result.stdout, /WIP 20260717035245 -> 20260717043625/u);
   assert.match(result.stdout, /固定值/u);
   assert.match(result.stdout, /不修改业务数据/u);
@@ -242,6 +275,31 @@ test("populated upgrade preflight passes the named DSN as an explicit redacted p
   }
 });
 
+test("database constraint preflight selects only the fixed read-only SQL", () => {
+  const fixture = createFixture();
+  try {
+    const result = runScript(
+      [
+        "--audit",
+        "database-constraints",
+        "--docker-container",
+        "postgres-test",
+        "--database",
+        "plush_erp",
+        "--username",
+        "erp_migrator",
+      ],
+      fixture.env,
+    );
+    assert.equal(result.status, 0, result.stdout + "\n" + result.stderr);
+    assert.match(result.stdout, /audit=database-constraints/u);
+    const invocation = fs.readFileSync(fixture.invocationLog, "utf8");
+    assert.match(invocation, /audit:database-constraints/u);
+  } finally {
+    fs.rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
 test("migration preflight rejects unknown audits before invoking docker or psql", () => {
   const fixture = createFixture();
   try {
@@ -260,7 +318,7 @@ test("migration preflight rejects unknown audits before invoking docker or psql"
     assert.notEqual(result.status, 0);
     assert.match(
       result.stderr,
-      /--audit 仅支持 populated-upgrade 或 customer-config-cutover/u,
+      /--audit 仅支持 populated-upgrade、customer-config-cutover 或 database-constraints/u,
     );
     assert.equal(fs.existsSync(fixture.invocationLog), false);
   } finally {

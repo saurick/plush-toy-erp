@@ -24,7 +24,10 @@ test('DevCustomerConfigPage test apply uses canonical publish and transition CAS
   assert.match(pageSource, /assertEffectiveCustomerConfigIdentity\(/)
   assert.match(pageSource, /assertLocalBackendCustomerContext\(/)
   assert.match(pageSource, /用对应客户配置重新启动后端/)
-  assert.match(pageSource, /const effectiveSession = await getEffectiveSession\(\)/)
+  assert.match(
+    pageSource,
+    /const effectiveSession = await getEffectiveSession\(\)/
+  )
   assert.doesNotMatch(
     pageSource,
     /getEffectiveSession\(\{\s*customer_key:\s*manifest\.customer_key/u
@@ -44,4 +47,15 @@ test('DevCustomerConfigPage test apply uses canonical publish and transition CAS
   assert.match(pageSource, /importSummary\.testApply\.note/)
   assert.doesNotMatch(pageSource, /publishSkipped/)
   assert.doesNotMatch(pageSource, /catch \(publishError\)/)
+})
+
+test('DevCustomerConfigPage normalizes a bare route to the default customer query', () => {
+  assert.match(
+    pageSource,
+    /nextParams\.set\(\s*DEV_CUSTOMER_CONFIG_QUERY_KEY,\s*DEFAULT_DEV_CUSTOMER_CONFIG_PAGE_KEY\s*\)/u
+  )
+  assert.match(
+    pageSource,
+    /setSearchParams\(nextParams, \{ replace: true \}\)/u
+  )
 })

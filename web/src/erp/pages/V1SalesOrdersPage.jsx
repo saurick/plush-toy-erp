@@ -17,6 +17,7 @@ import {
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import { currentBusinessDate } from '../utils/businessDate.mjs'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
   BusinessActionTooltip,
@@ -38,7 +39,8 @@ import {
   ColumnOrderModal,
 } from '../components/business-list/ColumnOrderModal.jsx'
 import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
-import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
+import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
+import SourceOrderLifecycleConfirmContent from '../components/business-list/SourceOrderLifecycleConfirmContent.jsx'
 import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
 import SalesOrderReservationModal from '../components/sales-orders/SalesOrderReservationModal.jsx'
 import {
@@ -148,6 +150,10 @@ import {
   createSourceBusinessActionAttemptStore,
   sourceBusinessActionNo,
 } from '../utils/sourceBusinessAction.mjs'
+import {
+  normalizeSourceOrderLifecycleReason,
+  prepareSourceOrderLifecycleAttempt,
+} from '../utils/sourceOrderLifecycleAction.mjs'
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
 
 const CUSTOMER_CONTACT_OWNER_TYPE = 'CUSTOMER'
@@ -296,6 +302,7 @@ export default function V1SalesOrdersPage() {
   const reservationBalanceRequestRef = useRef(0)
   const reservationInFlightRef = useRef(false)
   const lifecycleInFlightRef = useRef(false)
+  const lifecycleAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
   const reservationAttemptsRef = useRef(
     createSourceBusinessActionAttemptStore()
   )
@@ -627,12 +634,7 @@ export default function V1SalesOrdersPage() {
         request.finish()
       }
     }
-  }, [
-    beginLatestRequest,
-    orderListParams,
-    pagination,
-    routeSalesOrderID,
-  ])
+  }, [beginLatestRequest, orderListParams, pagination, routeSalesOrderID])
 
   useEffect(() => {
     loadCustomers()
@@ -870,7 +872,8 @@ export default function V1SalesOrdersPage() {
         prefix: 'SO',
         field: 'order_no',
       }),
-      order_date: new Date().toISOString().slice(0, 10),
+      currency: 'CNY',
+      order_date: currentBusinessDate(),
       items: [createBlankOrderLine(1, { unitID: defaultUnitID })],
     })
     rememberPaymentCondition({})
@@ -1050,27 +1053,59 @@ export default function V1SalesOrdersPage() {
     }
   }
 
-  const runLifecycleAction = async (action, order) => {
+  const runLifecycleAction = async (action, order, reason = '') => {
     if (lifecycleInFlightRef.current || !action || !order) {
       return
     }
     lifecycleInFlightRef.current = true
     setSaving(true)
+    let lifecycleAttempt = null
     try {
-      const updated = await action.run({
+      let params = {
         id: order.id,
         sales_order_id: order.id,
         order_no: order.order_no,
         business_ref_no: order.order_no,
         customer_key: activeCustomerKey || undefined,
-      })
+      }
+      if (action.sourceLifecycle) {
+        lifecycleAttempt = prepareSourceOrderLifecycleAttempt({
+          action,
+          attemptStore: lifecycleAttemptsRef.current,
+          customerKey: activeCustomerKey,
+          reason,
+          record: order,
+        })
+        params = lifecycleAttempt.attempt.params
+      }
+      const updated = await action.run(params)
+      if (lifecycleAttempt) {
+        lifecycleAttemptsRef.current.settle(
+          lifecycleAttempt.scope,
+          lifecycleAttempt.attempt,
+          null
+        )
+      }
       message.success(action.successMessage || `销售订单已${action.label}`)
       const nextSelectedOrder =
         action.returnsRecord === false ? order : updated || order
       setSelectedOrder(nextSelectedOrder)
       await loadOrders()
     } catch (error) {
-      message.error(getActionErrorMessage(error, `${action.label}销售订单`))
+      const resultUnknown = lifecycleAttempt
+        ? lifecycleAttemptsRef.current.settle(
+            lifecycleAttempt.scope,
+            lifecycleAttempt.attempt,
+            error
+          )
+        : false
+      if (resultUnknown) {
+        message.warning(
+          '暂时无法确认订单是否处理成功，请刷新核对最新状态；内容不变时可安全重试'
+        )
+      } else {
+        message.error(getActionErrorMessage(error, `${action.label}销售订单`))
+      }
     } finally {
       lifecycleInFlightRef.current = false
       setSaving(false)
@@ -1085,14 +1120,30 @@ export default function V1SalesOrdersPage() {
       runLifecycleAction(action, order)
       return
     }
+    let reason = ''
     modal.confirm({
       centered: true,
       title: action.confirmTitle,
-      content: action.confirmContent,
+      content: (
+        <SourceOrderLifecycleConfirmContent
+          action={action}
+          onReasonChange={(value) => {
+            reason = value
+          }}
+        />
+      ),
       okText: action.okText || `确认${action.label}`,
       cancelText: '取消',
       okButtonProps: action.danger ? { danger: true } : undefined,
-      onOk: () => runLifecycleAction(action, order),
+      onOk: (_close) => {
+        try {
+          normalizeSourceOrderLifecycleReason(action, reason)
+        } catch (error) {
+          message.warning(getActionErrorMessage(error, '校验业务原因'))
+          return
+        }
+        return runLifecycleAction(action, order, reason)
+      },
     })
   }
 
@@ -1183,10 +1234,7 @@ export default function V1SalesOrdersPage() {
     async ({ signal }) => {
       const routeSelectedID = Number(routeSalesOrderID || 0)
       if (routeSelectedID > 0) {
-        const order = await getSalesOrder(
-          { id: routeSelectedID },
-          { signal }
-        )
+        const order = await getSalesOrder({ id: routeSelectedID }, { signal })
         return order ? [order] : []
       }
       const result = await listAllSalesOrders(orderListParams, { signal })
@@ -1197,7 +1245,7 @@ export default function V1SalesOrdersPage() {
   const { exporting, exportRows: exportOrders } = useBusinessListExport({
     requestKey: 'sales-orders-export',
     loadRows: loadExportOrders,
-    filename: `销售订单-${new Date().toISOString().slice(0, 10)}.csv`,
+    filename: `销售订单-${currentBusinessDate()}.csv`,
     columns: visibleOrderDataColumns,
     recordLabel: '销售订单',
   })
@@ -1265,8 +1313,7 @@ export default function V1SalesOrdersPage() {
         ),
       selectionReason: '请先选择一条销售订单',
       busyReason: '当前订单操作完成后可继续办理',
-      getUnavailableReason: (action) =>
-        `当前销售订单状态不能${action.label}`,
+      getUnavailableReason: (action) => `当前销售订单状态不能${action.label}`,
     })
   }, [adminProfile, saving, selectedOrder])
   const {
@@ -1326,6 +1373,7 @@ export default function V1SalesOrdersPage() {
     <BusinessPageLayout className="erp-v1-sales-orders-page">
       <PageHeaderCard
         compact
+        helpKey="sales-orders"
         title="销售订单"
         description="维护客户订单承诺和订单明细；生效订单可在此预留库存，出货、应收、发票和收款仍需到对应业务页面处理。"
         stats={[
@@ -1503,9 +1551,7 @@ export default function V1SalesOrdersPage() {
           <BusinessActionTooltip
             disabled={!selectedOrder || saving}
             disabledReason={
-              saving
-                ? '当前订单操作完成后可查看详情'
-                : '请先选择一条销售订单'
+              saving ? '当前订单操作完成后可查看详情' : '请先选择一条销售订单'
             }
           >
             <Button
@@ -1636,7 +1682,7 @@ export default function V1SalesOrdersPage() {
 
       {salesOrderItemsPreview.modal}
 
-      <BusinessRecordDetailsModal
+      <BusinessDetailsModal
         columns={orderDataColumns}
         description="查看订单摘要和完整明细；草稿且具备编辑权限时，双击会直接进入编辑。"
         lineItems={

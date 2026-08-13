@@ -2787,7 +2787,12 @@ export async function applySalesOrderAcceptanceRuntimeEvidence({
     byKey.task_blocked.task.task_status_key !== "blocked" ||
     byKey.task_blocked.processContext.process_instance.status !== "active" ||
     byKey.rejected.task.task_status_key !== "rejected" ||
-    byKey.rejected.processContext.process_instance.status !== "blocked" ||
+    byKey.rejected.processContext.process_instance.status !== "completed" ||
+    !byKey.rejected.processContext.completed_nodes.some(
+      (node) =>
+        node.node_key === "sales_order_rejected_end" &&
+        node.status === "completed",
+    ) ||
     byKey.completed.processContext.process_instance.status !== "completed"
   ) {
     throw new CliError(

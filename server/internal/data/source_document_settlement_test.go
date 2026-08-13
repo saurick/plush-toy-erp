@@ -116,7 +116,17 @@ func TestPurchaseOrderSettlementReceiptAndProcessRules(t *testing.T) {
 			order := client.PurchaseOrder.Create().SetPurchaseOrderNo(no).SetSupplierID(supplier.ID).SetSupplierSnapshot(map[string]any{"name": "supplier"}).SetPurchaseDate(time.Now().UTC()).SetLifecycleStatus(biz.PurchaseOrderStatusApproved).SaveX(ctx)
 			item := client.PurchaseOrderItem.Create().SetPurchaseOrderID(order.ID).SetLineNo(1).SetMaterialID(fixtures.materialID).SetUnitID(fixtures.unitID).SetPurchasedQuantity(decimal.NewFromInt(10)).SaveX(ctx)
 			if tt.receipt != "" {
-				receipt := client.PurchaseReceipt.Create().SetReceiptNo("RECEIPT-" + no).SetSupplierID(supplier.ID).SetSupplierName("supplier").SetStatus(tt.receipt).SetReceivedAt(time.Now().UTC()).SaveX(ctx)
+				receivedAt := time.Date(2026, time.August, 13, 9, index, 0, 0, time.UTC).Truncate(time.Microsecond)
+				create := client.PurchaseReceipt.Create().
+					SetReceiptNo("RECEIPT-" + no).
+					SetSupplierID(supplier.ID).
+					SetSupplierName("supplier").
+					SetStatus(tt.receipt).
+					SetReceivedAt(receivedAt)
+				if tt.receipt == biz.PurchaseReceiptStatusPosted {
+					create.SetPostedAt(receivedAt)
+				}
+				receipt := create.SaveX(ctx)
 				client.PurchaseReceiptItem.Create().SetReceiptID(receipt.ID).SetMaterialID(fixtures.materialID).SetWarehouseID(fixtures.warehouseID).SetUnitID(fixtures.unitID).SetPurchaseOrderItemID(item.ID).SetQuantity(decimal.NewFromInt(1)).SaveX(ctx)
 			}
 			if tt.process != "" {

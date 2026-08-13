@@ -62,6 +62,28 @@ func (QualityInspection) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{
 			Checks: map[string]string{
+				"quality_inspections_status_allowed": "status IN ('DRAFT', 'SUBMITTED', 'PASSED', 'REJECTED', 'CANCELLED')",
+				"quality_inspections_result_allowed": "result IS NULL OR result IN ('PASS', 'REJECT', 'CONCESSION')",
+				"quality_inspections_lifecycle_shape": `
+(
+  (
+    status IN ('DRAFT', 'SUBMITTED', 'CANCELLED')
+    AND result IS NULL
+    AND inspected_at IS NULL
+  )
+  OR
+  (
+    status = 'PASSED'
+    AND result IN ('PASS', 'CONCESSION')
+    AND inspected_at IS NOT NULL
+  )
+  OR
+  (
+    status = 'REJECTED'
+    AND result = 'REJECT'
+    AND inspected_at IS NOT NULL
+  )
+)`,
 				"quality_inspections_source_shape": `
 (
   (
@@ -221,6 +243,8 @@ func (QualityInspection) Fields() []ent.Field {
 
 func (QualityInspection) Edges() []ent.Edge {
 	return []ent.Edge{
+		edge.To("inventory_lot_status_events", InventoryLotStatusEvent.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.From("purchase_receipt", PurchaseReceipt.Type).
 			Ref("quality_inspections").
 			Field("purchase_receipt_id").

@@ -4,7 +4,6 @@
 
 Phase 2C 只解决“材料采购到货后如何入库并进入库存事实”的最小闭环，不扩展完整采购、应付、发票、付款、生产、委外、品质或财务。
 
-推荐采用方案 B：新增 `purchase_receipts / purchase_receipt_items` 作为采购入库专表真源，`business_records / business_record_items` 继续保留为通用单据快照和兼容层。采购入库专表负责驱动 `inventory_lots -> inventory_txns -> inventory_balances`，库存历史事实仍以 `inventory_txns` 为唯一真源。
 
 ## Phase 2C 边界
 
@@ -13,33 +12,26 @@ Phase 2C 只解决“材料采购到货后如何入库并进入库存事实”�
 | 做 | 采购入库草稿、入库行、过账入库、批次创建 / 复用、库存流水、库存余额、取消冲正、幂等。 |
 | 不做 | 完整采购订单、采购合同审批、应付账款、发票、付款、财务核销、生产领料、委外发料、品质检验完整模块。 |
 | 不新增 | `product_styles`、`warehouse_locations`、`stock_reservations`、供应商主数据、财务表、生产表、委外表、品质表。 |
-| 不改 | 前端页面、帮助中心、旧 `business_records` 数据迁移、真实分区 migration。 |
 
 Phase 2C 是 Phase 2A / 2B 的业务来源接入层，不推翻已有库存模型：
 
 - `inventory_txns` 继续是库存历史事实真源。
 - `inventory_balances` 继续是当前余额 / 查询加速表。
 - `inventory_lots` 继续是批次身份和追溯真源。
-- `business_records / business_record_items` 继续是通用单据快照和兼容层。
 
 ## 是否新增采购入库专表
 
 | 方案 | 做法 | 优点 | 缺点 | 结论 |
 | --- | --- | --- | --- | --- |
-| 方案 A | 继续只用 `business_records / business_record_items`，入库时从通用快照行直接写库存流水。 | 改动最小，不增加专表；兼容现有通用页面。 | 通用表数量 / 金额仍是 float，材料 / 仓库 / 单位 / 批次没有强外键；难以承接取消冲正、重复入库防护、未来应付或采购追溯；库存来源行不够稳定。 | 不推荐作为 Phase 2C 主路径，可作为历史快照兼容层继续保留。 |
 | 方案 B | 新增 `purchase_receipts / purchase_receipt_items`，通用单据只保存快照，专表作为采购入库来源真源。 | 入库来源行有稳定 ID，可直接作为 `inventory_txns.source_id/source_line_id`；数量和金额可用 decimal；能自然承接批次、过账、取消冲正和未来采购 / 应付扩展。 | 新增两张表和 usecase，复杂度高于方案 A；需要保持和通用快照的边界清楚。 | 推荐。复杂度仍可控，且与库存事实闭环、批次追溯、未来采购和应付更一致。 |
 
 推荐方案 B，但本轮只落采购入库最小事实，不向采购订单、应付或供应商主数据扩展。
 
-## 与 business_records 的关系
 
 | 关系 | 口径 |
 | --- | --- |
-| `business_records` | 继续保存通用单据快照、打印 / 调试 / 兼容字段和旧入口数据，不替代采购入库专表。 |
 | `purchase_receipts` | 采购入库专表头，作为入库过账、取消冲正和库存来源追溯的业务真源。 |
-| 关联方式 | `purchase_receipts.business_record_id` nullable，指向可选通用快照；没有快照时也允许独立创建采购入库专表记录。 |
 | 库存来源 | `inventory_txns.source_type/source_id/source_line_id` 指向采购入库专表，不指向通用快照。 |
-| 历史数据 | 本轮不迁移旧 `business_records`；旧记录后续如需补录采购入库，必须按明确规则新建采购入库专表记录。 |
 
 ## 采购入库如何驱动库存
 
@@ -111,7 +103,6 @@ flowchart LR
 | --- | --- | --- |
 | `id` | bigint | 主键。 |
 | `receipt_no` | varchar(64) | 入库单号，唯一。 |
-| `business_record_id` | bigint nullable | 可选关联通用快照。 |
 | `supplier_name` | varchar(255) | 最小闭环先保存供应商名称快照，不强制供应商主表。 |
 | `status` | varchar(32) | `DRAFT / POSTED / CANCELLED`。 |
 | `received_at` | timestamptz | 到货 / 入库业务日期。 |
@@ -141,7 +132,6 @@ flowchart LR
 
 | 表 | 约束 / 索引 |
 | --- | --- |
-| `purchase_receipts` | `receipt_no` unique；`business_record_id` index；`supplier_name` index；`status` index；`received_at` index。 |
 | `purchase_receipt_items` | `receipt_id` index；`material_id` index；`warehouse_id` index；`lot_id` index；`receipt_id + source_line_no` 在 `source_line_no IS NOT NULL AND source_line_no <> ''` 范围内唯一。 |
 | `purchase_receipt_items` DB check | `quantity > 0`；`unit_price IS NULL OR unit_price >= 0`；`amount IS NULL OR amount >= 0`。 |
 
@@ -169,7 +159,6 @@ flowchart LR
 
 ## 推荐落地方案
 
-推荐落地方案 B：新增 `purchase_receipts / purchase_receipt_items`，`business_records` 继续作为快照和兼容层。
 
 原因：
 

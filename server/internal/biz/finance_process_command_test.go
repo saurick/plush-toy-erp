@@ -5,18 +5,21 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/shopspring/decimal"
 )
 
 func TestFinanceProcessDomainCommandReceivableLeadBindsUsecase(t *testing.T) {
 	ctx := context.Background()
+	shippedAt := time.Date(2026, time.August, 11, 10, 0, 0, 0, time.UTC)
 	operationalFactRepo := &financeProcessOperationalFactRepoStub{
 		paymentTermDays: processTestIntPtr(60),
 		shipment: &Shipment{
 			ID:         9001,
 			CustomerID: processTestIntPtr(501),
 			Status:     ShipmentStatusShipped,
+			ShippedAt:  &shippedAt,
 		},
 	}
 	processRepo := &memProcessRuntimeRepo{
@@ -87,9 +90,13 @@ func TestFinanceProcessDomainCommandReceivableLeadBindsUsecase(t *testing.T) {
 		operationalFactRepo.createdFinanceFact.IdempotencyKey != "process:10:node:20:receivable-lead" ||
 		operationalFactRepo.createdFinanceFact.CollectionType == nil ||
 		*operationalFactRepo.createdFinanceFact.CollectionType != FinanceCollectionAccountsReceivable ||
-		operationalFactRepo.createdFinanceFact.PaymentTerm != nil ||
+		operationalFactRepo.createdFinanceFact.PaymentTerm == nil ||
+		*operationalFactRepo.createdFinanceFact.PaymentTerm != FinancePaymentTermEOMDays ||
 		operationalFactRepo.createdFinanceFact.PaymentTermDays == nil ||
 		*operationalFactRepo.createdFinanceFact.PaymentTermDays != 60 ||
+		operationalFactRepo.createdFinanceFact.DueAt == nil ||
+		!operationalFactRepo.createdFinanceFact.DueAt.Equal(time.Date(2026, time.August, 31, 10, 0, 0, 0, time.UTC).AddDate(0, 0, 60)) ||
+		!operationalFactRepo.createdFinanceFact.OccurredAt.Equal(shippedAt) ||
 		operationalFactRepo.createdFinanceFact.InvoiceCategory != nil {
 		t.Fatalf("unexpected finance fact create input %#v", operationalFactRepo.createdFinanceFact)
 	}
@@ -296,6 +303,7 @@ func (r *financeProcessOperationalFactRepoStub) CreateFinanceFactDraft(_ context
 		CollectionType:   copied.CollectionType,
 		PaymentTerm:      copied.PaymentTerm,
 		PaymentTermDays:  copied.PaymentTermDays,
+		DueAt:            copied.DueAt,
 		InvoiceCategory:  copied.InvoiceCategory,
 		SourceType:       copied.SourceType,
 		SourceID:         copied.SourceID,

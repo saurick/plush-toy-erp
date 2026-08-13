@@ -28,7 +28,7 @@ Options:
   --out <path>        Required. Output directory for extracted local evidence.
   --help              Print this help.
 
-This tool extracts local Excel source files into import-prep evidence only. It never connects to a database, reads server config, writes formal tables, writes business_records, generates SQL, generates migrations, or executes a real import.`;
+This tool extracts local Excel source files into import-prep evidence only. It never connects to a database, reads server config, writes formal tables, generates SQL, generates migrations, or executes a real import.`;
 
 export const OUTPUT_FILES = [
   "source-snapshot.extracted.json",
@@ -1480,7 +1480,7 @@ function buildExtractionReport({
     "## 结论 / Decision",
     "",
     "- 本报告只说明客户原始 Excel 已提取为本地导入前 evidence。",
-    "- 输出不写数据库、不写 `business_records`、不执行真实导入。",
+    "- 输出不写数据库、不写正式业务表、不执行真实导入。",
     "- `canExecuteRealImport` 固定为 `false`，后续必须经过 dry-run、人工 review、备份和客户确认。",
     "",
     "## 输入 / Inputs",

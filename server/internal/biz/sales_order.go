@@ -43,6 +43,7 @@ type SalesOrder struct {
 	ID                  int
 	OrderNo             string
 	CustomerID          int
+	Currency            string
 	CustomerOrderNo     *string
 	CustomerSnapshot    map[string]any
 	SalesOwner          *string
@@ -54,6 +55,11 @@ type SalesOrder struct {
 	PlannedDeliveryDate *time.Time
 	LifecycleStatus     string
 	Version             int
+	SettlementAction    *string
+	SettlementMode      *string
+	SettlementReason    *string
+	SettledAt           *time.Time
+	SettledBy           *int
 	Note                *string
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
@@ -86,6 +92,7 @@ type SalesOrderMutation struct {
 	ExpectedVersion     int
 	OrderNo             string
 	CustomerID          int
+	Currency            string
 	CustomerOrderNo     *string
 	CustomerSnapshot    map[string]any
 	SalesOwner          *string
@@ -171,6 +178,10 @@ type SalesOrderCancellationActorRepo interface {
 	CancelSalesOrderWithActor(ctx context.Context, id int, actorID int) (*SalesOrder, error)
 }
 
+type SalesOrderLifecycleActionRepo interface {
+	ApplySalesOrderLifecycleAction(ctx context.Context, in *SourceOrderLifecycleAction, lifecycleStatus string) (*SalesOrder, error)
+}
+
 type SalesOrderUsecase struct {
 	repo SalesOrderRepo
 }
@@ -183,7 +194,7 @@ func (uc *SalesOrderUsecase) CreateSalesOrder(ctx context.Context, in *SalesOrde
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
 	}
-	normalized, err := normalizeSalesOrderMutation(*in)
+	normalized, err := normalizeSalesOrderMutation(*in, true)
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +215,7 @@ func (uc *SalesOrderUsecase) UpdateSalesOrder(ctx context.Context, id int, in *S
 	if !corestatus.IsSalesOrderEditable(current.LifecycleStatus) {
 		return nil, ErrBadParam
 	}
-	normalized, err := normalizeSalesOrderMutation(*in)
+	normalized, err := normalizeSalesOrderMutation(*in, false)
 	if err != nil {
 		return nil, err
 	}
@@ -244,8 +255,31 @@ func (uc *SalesOrderUsecase) CloseSalesOrder(ctx context.Context, id int) (*Sale
 	return uc.changeSalesOrderLifecycle(ctx, id, SalesOrderStatusClosed)
 }
 
+func (uc *SalesOrderUsecase) CloseSalesOrderWithAction(ctx context.Context, in *SourceOrderLifecycleAction) (*SalesOrder, error) {
+	return uc.applySalesOrderLifecycleAction(ctx, in, SourceOrderActionClose, SalesOrderStatusClosed)
+}
+
 func (uc *SalesOrderUsecase) CancelSalesOrder(ctx context.Context, id int) (*SalesOrder, error) {
 	return uc.changeSalesOrderLifecycle(ctx, id, SalesOrderStatusCanceled)
+}
+
+func (uc *SalesOrderUsecase) CancelSalesOrderWithAction(ctx context.Context, in *SourceOrderLifecycleAction) (*SalesOrder, error) {
+	return uc.applySalesOrderLifecycleAction(ctx, in, SourceOrderActionCancel, SalesOrderStatusCanceled)
+}
+
+func (uc *SalesOrderUsecase) applySalesOrderLifecycleAction(ctx context.Context, in *SourceOrderLifecycleAction, actionKey string, next string) (*SalesOrder, error) {
+	if uc == nil || uc.repo == nil || in == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := NormalizeSourceOrderLifecycleAction(*in, actionKey)
+	if err != nil {
+		return nil, err
+	}
+	repo, ok := uc.repo.(SalesOrderLifecycleActionRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return repo.ApplySalesOrderLifecycleAction(ctx, &normalized, next)
 }
 
 func (uc *SalesOrderUsecase) CancelSalesOrderWithActor(ctx context.Context, id int, actorID int) (*SalesOrder, error) {
@@ -354,7 +388,7 @@ func (uc *SalesOrderUsecase) SaveSalesOrderWithItems(ctx context.Context, id int
 	if id == 0 {
 		order.ExpectedVersion = 0
 	}
-	normalizedOrder, err := normalizeSalesOrderMutation(*order)
+	normalizedOrder, err := normalizeSalesOrderMutation(*order, id == 0)
 	if err != nil {
 		return nil, err
 	}
@@ -494,9 +528,14 @@ func (uc *SalesOrderUsecase) validateProductAndUnitActive(ctx context.Context, p
 	return nil
 }
 
-func normalizeSalesOrderMutation(in SalesOrderMutation) (SalesOrderMutation, error) {
+func normalizeSalesOrderMutation(in SalesOrderMutation, create bool) (SalesOrderMutation, error) {
 	var err error
 	in.OrderNo = strings.TrimSpace(in.OrderNo)
+	var currencyOK bool
+	in.Currency, currencyOK = normalizeSourceOrderCurrency(in.Currency, create)
+	if !currencyOK {
+		return SalesOrderMutation{}, ErrBadParam
+	}
 	in.CustomerOrderNo = normalizeOptionalString(in.CustomerOrderNo)
 	in.SalesOwner = normalizeOptionalString(in.SalesOwner)
 	in.PaymentMethod = normalizeOptionalString(in.PaymentMethod)

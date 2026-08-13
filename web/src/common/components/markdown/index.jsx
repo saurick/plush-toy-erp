@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowsAltOutlined,
   ColumnHeightOutlined,
@@ -10,6 +10,8 @@ import {
 } from '@ant-design/icons'
 import { Remarkable } from 'remarkable'
 import RemarkableReactRenderer from 'remarkable-react'
+
+import './mermaid.css'
 
 const MERMAID_FONT_FAMILY =
   '"PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
@@ -121,7 +123,9 @@ export function MermaidDiagram({
     MERMAID_ZOOM.defaultValue
   )
   const [fullscreenOpen, setFullscreenOpen] = useState(false)
+  const fullscreenOpenRef = useRef(null)
   const fullscreenExitRef = useRef(null)
+  const fullscreenReturnFocusRef = useRef(null)
   const viewportRef = useRef(null)
   const canvasRef = useRef(null)
   const [renderState, setRenderState] = useState({
@@ -129,6 +133,14 @@ export function MermaidDiagram({
     svg: '',
     error: '',
   })
+  const restoreFullscreenFocus = useCallback((returnFocusElement) => {
+    window.setTimeout(() => {
+      const focusTarget = fullscreenOpenRef.current || returnFocusElement
+      if (focusTarget?.isConnected && typeof focusTarget.focus === 'function') {
+        focusTarget.focus()
+      }
+    }, 0)
+  }, [])
 
   const activeZoom = fullscreenOpen ? fullscreenZoom : zoom
   const zoomPercent = Math.round(activeZoom * 100)
@@ -145,6 +157,7 @@ export function MermaidDiagram({
     }
 
     const previousOverflow = document.body.style.overflow
+    const returnFocusElement = fullscreenReturnFocusRef.current
     document.body.style.overflow = 'hidden'
     const closeOnEscape = (event) => {
       if (event.key === 'Escape') {
@@ -159,8 +172,9 @@ export function MermaidDiagram({
     return () => {
       document.body.style.overflow = previousOverflow
       document.removeEventListener('keydown', closeOnEscape, true)
+      restoreFullscreenFocus(returnFocusElement)
     }
-  }, [fullscreenOpen])
+  }, [fullscreenOpen, restoreFullscreenFocus])
 
   useEffect(() => {
     const source = String(chart || '').trim()
@@ -267,6 +281,8 @@ export function MermaidDiagram({
   }
 
   const openFullscreen = () => {
+    fullscreenReturnFocusRef.current =
+      typeof document === 'undefined' ? null : document.activeElement
     setFullscreenZoom(MERMAID_ZOOM.defaultValue)
     setFullscreenOpen(true)
   }
@@ -371,6 +387,7 @@ export function MermaidDiagram({
               </button>
             ) : (
               <button
+                ref={fullscreenOpenRef}
                 type="button"
                 className="erp-markdown-mermaid__tool"
                 data-mermaid-fullscreen-action="open"

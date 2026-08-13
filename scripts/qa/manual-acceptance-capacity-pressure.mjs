@@ -12,6 +12,19 @@ import { assertDisposableDatabaseTarget } from "./database-target.mjs";
 export const CONFIRM_PHRASE = "RUN_ISOLATED_MANUAL_ACCEPTANCE_PRESSURE";
 const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
 const execFileAsync = promisify(execFile);
+const RUNTIME_METRIC_NAMES = Object.freeze([
+  "plush_erp_go_goroutines",
+  "plush_erp_go_heap_alloc_bytes",
+  "plush_erp_db_connections_open",
+  "plush_erp_db_connections_in_use",
+  "plush_erp_db_wait_total",
+  "plush_erp_pdf_render_active",
+  "plush_erp_pdf_admitted",
+  "plush_erp_pdf_queued",
+  "plush_erp_pdf_warmup_ready",
+  "plush_erp_pdf_chrome_starts_total",
+  "plush_erp_attachment_relation_bytes",
+]);
 
 export const PRESSURE_PROFILES = Object.freeze({
   capacity: Object.freeze([
@@ -56,7 +69,9 @@ export const PRESSURE_PROFILES = Object.freeze({
     Object.freeze({
       key: "soak",
       concurrency: 20,
-      requests: 5000,
+      // 20 workers each wait 400 ms between requests: 90k requests hold the
+      // steady phase for at least 30 minutes before response latency is added.
+      requests: 90000,
       pacingMs: 400,
     }),
     Object.freeze({
@@ -118,6 +133,76 @@ export function normalizeLoopbackURL(value) {
   return url.origin;
 }
 
+export function resolvePsqlBin(env = process.env) {
+  return String(env?.PSQL_BIN || "psql").trim() || "psql";
+}
+
+export function parseRuntimeMetrics(text) {
+  const expected = new Set(RUNTIME_METRIC_NAMES);
+  const metrics = {};
+  for (const line of String(text || "").split(/\r?\n/u)) {
+    if (!line || line.startsWith("#")) continue;
+    const [name, rawValue, ...extra] = line.trim().split(/\s+/u);
+    if (!expected.has(name) || extra.length > 0) continue;
+    const value = Number(rawValue);
+    if (Number.isFinite(value)) metrics[name] = value;
+  }
+  for (const name of RUNTIME_METRIC_NAMES) {
+    if (!Number.isFinite(metrics[name])) {
+      throw new Error(`runtime metrics missing ${name}`);
+    }
+  }
+  return metrics;
+}
+
+async function readRuntimeMetrics(baseURL) {
+  const response = await fetch(`${baseURL}/metrics`, {
+    headers: { accept: "text/plain" },
+    signal: AbortSignal.timeout(2000),
+  });
+  if (!response.ok)
+    throw new Error(`runtime metrics returned ${response.status}`);
+  return parseRuntimeMetrics(await response.text());
+}
+
+function startRuntimeMetricsSampler(baseURL) {
+  const samples = [];
+  let stopped = false;
+  const run = async (force = false) => {
+    if (stopped && !force) return;
+    try {
+      samples.push({
+        at: new Date().toISOString(),
+        ...(await readRuntimeMetrics(baseURL)),
+      });
+    } catch (error) {
+      samples.push({ at: new Date().toISOString(), error: error.message });
+    }
+  };
+  const timer = setInterval(run, 1000);
+  timer.unref();
+  void run();
+  return async () => {
+    stopped = true;
+    clearInterval(timer);
+    await run(true);
+    const valid = samples.filter((item) => !item.error);
+    const maximum = Object.fromEntries(
+      RUNTIME_METRIC_NAMES.map((name) => [
+        name,
+        Math.max(0, ...valid.map((item) => Number(item[name] || 0))),
+      ]),
+    );
+    return {
+      sampleCount: samples.length,
+      sampleErrors: samples.filter((item) => item.error).length,
+      first: valid.at(0) || null,
+      last: valid.at(-1) || null,
+      maximum,
+    };
+  };
+}
+
 export function selectCapacityIdempotencyTask(
   tasks = [],
   { sourceType, sourceID } = {},
@@ -146,7 +231,7 @@ export function selectCapacityIdempotencyTask(
 
 async function readDatabaseStats(databaseURL) {
   const { stdout } = await execFileAsync(
-    "/opt/homebrew/opt/libpq/bin/psql",
+    resolvePsqlBin(),
     [
       databaseURL,
       "-Atc",
@@ -159,7 +244,7 @@ async function readDatabaseStats(databaseURL) {
 
 async function readIdempotencyReceipt(databaseURL, taskID, idempotencyKey) {
   const { stdout } = await execFileAsync(
-    "/opt/homebrew/opt/libpq/bin/psql",
+    resolvePsqlBin(),
     [
       databaseURL,
       "-Atc",
@@ -182,8 +267,8 @@ async function readIdempotencyReceipt(databaseURL, taskID, idempotencyKey) {
 function startDatabaseSampler(databaseURL) {
   const samples = [];
   let stopped = false;
-  const run = async () => {
-    if (stopped) return;
+  const run = async (force = false) => {
+    if (stopped && !force) return;
     try {
       samples.push({
         at: new Date().toISOString(),
@@ -194,11 +279,12 @@ function startDatabaseSampler(databaseURL) {
     }
   };
   const timer = setInterval(run, 1000);
+  timer.unref();
   void run();
   return async () => {
     stopped = true;
     clearInterval(timer);
-    await run();
+    await run(true);
     const valid = samples.filter((item) => !item.error);
     return {
       sampleCount: samples.length,
@@ -477,10 +563,7 @@ export async function runIsolatedPressure({
     params: { customer_key: "yoyoosun" },
     token: admin.token,
   });
-  if (
-    !session.ok ||
-    !session.data.session?.source
-  ) {
+  if (!session.ok || !session.data.session?.source) {
     throw new Error("customer config session identity is required");
   }
 
@@ -542,6 +625,7 @@ export async function runIsolatedPressure({
 
   const databaseBefore = await readDatabaseStats(databaseURL);
   const stopDatabaseSampler = startDatabaseSampler(databaseURL);
+  const stopRuntimeMetricsSampler = startRuntimeMetricsSampler(baseURL);
   const levels = [];
   for (const level of levelsToRun) {
     levels.push(
@@ -584,8 +668,7 @@ export async function runIsolatedPressure({
       "same-batch simulated trial_pmc_work idempotency probe task is missing",
     );
   }
-  const idempotencyKey =
-    `capacity-idempotency-${databaseName}-${task.id}-${Date.now()}`;
+  const idempotencyKey = `capacity-idempotency-${databaseName}-${task.id}-${Date.now()}`;
   const runIdempotencyRequest = () =>
     rpc({
       baseURL,
@@ -648,6 +731,7 @@ export async function runIsolatedPressure({
     );
   }
   const databaseSampling = await stopDatabaseSampler();
+  const runtimeSampling = await stopRuntimeMetricsSampler();
   const databaseAfter = await readDatabaseStats(databaseURL);
   const execution = await readExecutionIdentity();
   const expectedDatabaseDelta =
@@ -709,6 +793,9 @@ export async function runIsolatedPressure({
       after: databaseAfter,
       sampling: databaseSampling,
     },
+    runtime: {
+      sampling: runtimeSampling,
+    },
     passed:
       levels.every((item) => item.acceptance === true) &&
       eventualFailures.length === 0 &&
@@ -723,6 +810,7 @@ export async function runIsolatedPressure({
       recovery?.key === "recovery" &&
       recovery?.acceptance === true &&
       databaseSampling.sampleErrors === 0 &&
+      runtimeSampling.sampleErrors === 0 &&
       databaseSampling.maxDeadlocks === 0 &&
       databaseSampling.maxConflicts === 0 &&
       Number(databaseBefore.workflow_tasks) >= 5000 &&

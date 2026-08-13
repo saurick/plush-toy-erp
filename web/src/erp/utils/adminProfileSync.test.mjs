@@ -174,7 +174,7 @@ test('ERPLayout: 客户构建在有效会话完成前不渲染产品核心页面
   )
   assert.match(
     source,
-    /if \(customerRuntimeUnavailable\) \{[\s\S]*?<CustomerRuntimeUnavailable/u
+    /if \(\s*customerRuntimeUnavailable &&\s*currentPageRequiresConfiguredCustomerRuntime\s*\) \{[\s\S]*?<CustomerRuntimeUnavailable/u
   )
   assert.match(
     source,
@@ -191,6 +191,35 @@ test('ERPLayout: 客户构建在有效会话完成前不渲染产品核心页面
   assert.match(
     source,
     /isLocalCustomerDesktopPreview &&[\s\S]*?LOCAL_CUSTOMER_PREVIEW_GUARDED_PAGE_KEYS\.has/u
+  )
+})
+
+test('ERPLayout: profile 或 effective session 同步失败时不复用缓存授权投影', () => {
+  const source = readERPLayoutSource()
+
+  assert.doesNotMatch(source, /const cachedEffectiveSession/u)
+  assert.doesNotMatch(source, /继续使用缓存投影/u)
+  assert.doesNotMatch(source, /继续使用本地缓存 profile/u)
+  assert.match(
+    source,
+    /客户有效配置同步失败，当前业务投影已停用[\s\S]*?nextProfile =\s*attachUnavailableEffectiveSessionToAdminProfile\(nextProfile\)/u
+  )
+  assert.match(
+    source,
+    /const unavailableProfile = buildUnavailableCachedAdminProfile\(\s*adminProfileRef\.current\s*\)[\s\S]*?is_super_admin: false[\s\S]*?roles: \[\][\s\S]*?permissions: \[\][\s\S]*?menus: \[\][\s\S]*?setAdminProfile\(unavailableProfile\)/u
+  )
+})
+
+test('ERPLayout: 系统页只按本次 admin.me 的 RBAC 判断，不借客户业务投影放行', () => {
+  const source = readERPLayoutSource()
+
+  assert.match(
+    source,
+    /const currentPageRequiresConfiguredCustomerRuntime =[\s\S]*?currentEntry\?\.access !== 'authenticated'[\s\S]*?resolveEffectiveSessionPageAccess\([\s\S]*?\.reason !== 'system_page_rbac_scope'/u
+  )
+  assert.match(
+    source,
+    /customerRuntimeUnavailable &&\s*currentPageRequiresConfiguredCustomerRuntime/u
   )
 })
 
@@ -225,7 +254,7 @@ test('adminProfileSync: 当前管理员会话不可用时要求重新登录', ()
   }
 })
 
-test('adminProfileSync: 有缓存 profile 时后台同步失败不打扰用户', () => {
+test('adminProfileSync: 有缓存 profile 时后台同步失败走静默失败关闭分支', () => {
   assert.equal(
     getAdminProfileSyncErrorAction(
       { code: RpcErrorCode.INTERNAL },

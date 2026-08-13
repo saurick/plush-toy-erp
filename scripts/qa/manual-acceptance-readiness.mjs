@@ -821,6 +821,7 @@ function normalizeFactReference(record, key, index) {
         "paymentTermDays",
         "payment_term_days",
       );
+      nullableValue("due_at", "dueAt", "due_at");
       nullableValue("invoice_category", "invoiceCategory", "invoice_category");
       nullableValue("cancelled_at", "cancelledAt", "cancelled_at");
       nullableValue(
@@ -1106,7 +1107,14 @@ function validateTaskReport(report) {
     runtimeEvidenceByCase.get("rejected")?.task?.task_status_key ===
       "rejected" &&
     runtimeEvidenceByCase.get("rejected")?.processContext?.process_instance
-      ?.status === "blocked" &&
+      ?.status === "completed" &&
+    runtimeEvidenceByCase
+      .get("rejected")
+      ?.processContext?.completed_nodes?.some(
+        (node) =>
+          node?.node_key === "sales_order_rejected_end" &&
+          node?.status === "completed",
+      ) &&
     runtimeEvidenceByCase.get("completed")?.processContext?.process_instance
       ?.status === "completed";
   if (

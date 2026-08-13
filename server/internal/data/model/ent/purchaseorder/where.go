@@ -65,6 +65,16 @@ func SupplierID(v int) predicate.PurchaseOrder {
 	return predicate.PurchaseOrder(sql.FieldEQ(FieldSupplierID, v))
 }
 
+// Currency applies equality check predicate on the "currency" field. It's identical to CurrencyEQ.
+func Currency(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldCurrency, v))
+}
+
+// PaymentTermDays applies equality check predicate on the "payment_term_days" field. It's identical to PaymentTermDaysEQ.
+func PaymentTermDays(v int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldPaymentTermDays, v))
+}
+
 // SupplierPurchaseOrderNo applies equality check predicate on the "supplier_purchase_order_no" field. It's identical to SupplierPurchaseOrderNoEQ.
 func SupplierPurchaseOrderNo(v string) predicate.PurchaseOrder {
 	return predicate.PurchaseOrder(sql.FieldEQ(FieldSupplierPurchaseOrderNo, v))
@@ -88,6 +98,31 @@ func LifecycleStatus(v string) predicate.PurchaseOrder {
 // Version applies equality check predicate on the "version" field. It's identical to VersionEQ.
 func Version(v int) predicate.PurchaseOrder {
 	return predicate.PurchaseOrder(sql.FieldEQ(FieldVersion, v))
+}
+
+// SettlementAction applies equality check predicate on the "settlement_action" field. It's identical to SettlementActionEQ.
+func SettlementAction(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldSettlementAction, v))
+}
+
+// SettlementMode applies equality check predicate on the "settlement_mode" field. It's identical to SettlementModeEQ.
+func SettlementMode(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldSettlementMode, v))
+}
+
+// SettlementReason applies equality check predicate on the "settlement_reason" field. It's identical to SettlementReasonEQ.
+func SettlementReason(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldSettlementReason, v))
+}
+
+// SettledAt applies equality check predicate on the "settled_at" field. It's identical to SettledAtEQ.
+func SettledAt(v time.Time) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldSettledAt, v))
+}
+
+// SettledBy applies equality check predicate on the "settled_by" field. It's identical to SettledByEQ.
+func SettledBy(v int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldSettledBy, v))
 }
 
 // Note applies equality check predicate on the "note" field. It's identical to NoteEQ.
@@ -188,6 +223,121 @@ func SupplierIDIn(vs ...int) predicate.PurchaseOrder {
 // SupplierIDNotIn applies the NotIn predicate on the "supplier_id" field.
 func SupplierIDNotIn(vs ...int) predicate.PurchaseOrder {
 	return predicate.PurchaseOrder(sql.FieldNotIn(FieldSupplierID, vs...))
+}
+
+// CurrencyEQ applies the EQ predicate on the "currency" field.
+func CurrencyEQ(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldCurrency, v))
+}
+
+// CurrencyNEQ applies the NEQ predicate on the "currency" field.
+func CurrencyNEQ(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNEQ(FieldCurrency, v))
+}
+
+// CurrencyIn applies the In predicate on the "currency" field.
+func CurrencyIn(vs ...string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIn(FieldCurrency, vs...))
+}
+
+// CurrencyNotIn applies the NotIn predicate on the "currency" field.
+func CurrencyNotIn(vs ...string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotIn(FieldCurrency, vs...))
+}
+
+// CurrencyGT applies the GT predicate on the "currency" field.
+func CurrencyGT(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldGT(FieldCurrency, v))
+}
+
+// CurrencyGTE applies the GTE predicate on the "currency" field.
+func CurrencyGTE(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldGTE(FieldCurrency, v))
+}
+
+// CurrencyLT applies the LT predicate on the "currency" field.
+func CurrencyLT(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldLT(FieldCurrency, v))
+}
+
+// CurrencyLTE applies the LTE predicate on the "currency" field.
+func CurrencyLTE(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldLTE(FieldCurrency, v))
+}
+
+// CurrencyContains applies the Contains predicate on the "currency" field.
+func CurrencyContains(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldContains(FieldCurrency, v))
+}
+
+// CurrencyHasPrefix applies the HasPrefix predicate on the "currency" field.
+func CurrencyHasPrefix(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldHasPrefix(FieldCurrency, v))
+}
+
+// CurrencyHasSuffix applies the HasSuffix predicate on the "currency" field.
+func CurrencyHasSuffix(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldHasSuffix(FieldCurrency, v))
+}
+
+// CurrencyEqualFold applies the EqualFold predicate on the "currency" field.
+func CurrencyEqualFold(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEqualFold(FieldCurrency, v))
+}
+
+// CurrencyContainsFold applies the ContainsFold predicate on the "currency" field.
+func CurrencyContainsFold(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldContainsFold(FieldCurrency, v))
+}
+
+// PaymentTermDaysEQ applies the EQ predicate on the "payment_term_days" field.
+func PaymentTermDaysEQ(v int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysNEQ applies the NEQ predicate on the "payment_term_days" field.
+func PaymentTermDaysNEQ(v int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNEQ(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysIn applies the In predicate on the "payment_term_days" field.
+func PaymentTermDaysIn(vs ...int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIn(FieldPaymentTermDays, vs...))
+}
+
+// PaymentTermDaysNotIn applies the NotIn predicate on the "payment_term_days" field.
+func PaymentTermDaysNotIn(vs ...int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotIn(FieldPaymentTermDays, vs...))
+}
+
+// PaymentTermDaysGT applies the GT predicate on the "payment_term_days" field.
+func PaymentTermDaysGT(v int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldGT(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysGTE applies the GTE predicate on the "payment_term_days" field.
+func PaymentTermDaysGTE(v int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldGTE(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysLT applies the LT predicate on the "payment_term_days" field.
+func PaymentTermDaysLT(v int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldLT(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysLTE applies the LTE predicate on the "payment_term_days" field.
+func PaymentTermDaysLTE(v int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldLTE(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysIsNil applies the IsNil predicate on the "payment_term_days" field.
+func PaymentTermDaysIsNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIsNull(FieldPaymentTermDays))
+}
+
+// PaymentTermDaysNotNil applies the NotNil predicate on the "payment_term_days" field.
+func PaymentTermDaysNotNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotNull(FieldPaymentTermDays))
 }
 
 // SupplierPurchaseOrderNoEQ applies the EQ predicate on the "supplier_purchase_order_no" field.
@@ -478,6 +628,331 @@ func VersionLT(v int) predicate.PurchaseOrder {
 // VersionLTE applies the LTE predicate on the "version" field.
 func VersionLTE(v int) predicate.PurchaseOrder {
 	return predicate.PurchaseOrder(sql.FieldLTE(FieldVersion, v))
+}
+
+// SettlementActionEQ applies the EQ predicate on the "settlement_action" field.
+func SettlementActionEQ(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldSettlementAction, v))
+}
+
+// SettlementActionNEQ applies the NEQ predicate on the "settlement_action" field.
+func SettlementActionNEQ(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNEQ(FieldSettlementAction, v))
+}
+
+// SettlementActionIn applies the In predicate on the "settlement_action" field.
+func SettlementActionIn(vs ...string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIn(FieldSettlementAction, vs...))
+}
+
+// SettlementActionNotIn applies the NotIn predicate on the "settlement_action" field.
+func SettlementActionNotIn(vs ...string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotIn(FieldSettlementAction, vs...))
+}
+
+// SettlementActionGT applies the GT predicate on the "settlement_action" field.
+func SettlementActionGT(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldGT(FieldSettlementAction, v))
+}
+
+// SettlementActionGTE applies the GTE predicate on the "settlement_action" field.
+func SettlementActionGTE(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldGTE(FieldSettlementAction, v))
+}
+
+// SettlementActionLT applies the LT predicate on the "settlement_action" field.
+func SettlementActionLT(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldLT(FieldSettlementAction, v))
+}
+
+// SettlementActionLTE applies the LTE predicate on the "settlement_action" field.
+func SettlementActionLTE(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldLTE(FieldSettlementAction, v))
+}
+
+// SettlementActionContains applies the Contains predicate on the "settlement_action" field.
+func SettlementActionContains(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldContains(FieldSettlementAction, v))
+}
+
+// SettlementActionHasPrefix applies the HasPrefix predicate on the "settlement_action" field.
+func SettlementActionHasPrefix(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldHasPrefix(FieldSettlementAction, v))
+}
+
+// SettlementActionHasSuffix applies the HasSuffix predicate on the "settlement_action" field.
+func SettlementActionHasSuffix(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldHasSuffix(FieldSettlementAction, v))
+}
+
+// SettlementActionIsNil applies the IsNil predicate on the "settlement_action" field.
+func SettlementActionIsNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIsNull(FieldSettlementAction))
+}
+
+// SettlementActionNotNil applies the NotNil predicate on the "settlement_action" field.
+func SettlementActionNotNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotNull(FieldSettlementAction))
+}
+
+// SettlementActionEqualFold applies the EqualFold predicate on the "settlement_action" field.
+func SettlementActionEqualFold(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEqualFold(FieldSettlementAction, v))
+}
+
+// SettlementActionContainsFold applies the ContainsFold predicate on the "settlement_action" field.
+func SettlementActionContainsFold(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldContainsFold(FieldSettlementAction, v))
+}
+
+// SettlementModeEQ applies the EQ predicate on the "settlement_mode" field.
+func SettlementModeEQ(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldSettlementMode, v))
+}
+
+// SettlementModeNEQ applies the NEQ predicate on the "settlement_mode" field.
+func SettlementModeNEQ(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNEQ(FieldSettlementMode, v))
+}
+
+// SettlementModeIn applies the In predicate on the "settlement_mode" field.
+func SettlementModeIn(vs ...string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIn(FieldSettlementMode, vs...))
+}
+
+// SettlementModeNotIn applies the NotIn predicate on the "settlement_mode" field.
+func SettlementModeNotIn(vs ...string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotIn(FieldSettlementMode, vs...))
+}
+
+// SettlementModeGT applies the GT predicate on the "settlement_mode" field.
+func SettlementModeGT(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldGT(FieldSettlementMode, v))
+}
+
+// SettlementModeGTE applies the GTE predicate on the "settlement_mode" field.
+func SettlementModeGTE(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldGTE(FieldSettlementMode, v))
+}
+
+// SettlementModeLT applies the LT predicate on the "settlement_mode" field.
+func SettlementModeLT(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldLT(FieldSettlementMode, v))
+}
+
+// SettlementModeLTE applies the LTE predicate on the "settlement_mode" field.
+func SettlementModeLTE(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldLTE(FieldSettlementMode, v))
+}
+
+// SettlementModeContains applies the Contains predicate on the "settlement_mode" field.
+func SettlementModeContains(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldContains(FieldSettlementMode, v))
+}
+
+// SettlementModeHasPrefix applies the HasPrefix predicate on the "settlement_mode" field.
+func SettlementModeHasPrefix(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldHasPrefix(FieldSettlementMode, v))
+}
+
+// SettlementModeHasSuffix applies the HasSuffix predicate on the "settlement_mode" field.
+func SettlementModeHasSuffix(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldHasSuffix(FieldSettlementMode, v))
+}
+
+// SettlementModeIsNil applies the IsNil predicate on the "settlement_mode" field.
+func SettlementModeIsNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIsNull(FieldSettlementMode))
+}
+
+// SettlementModeNotNil applies the NotNil predicate on the "settlement_mode" field.
+func SettlementModeNotNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotNull(FieldSettlementMode))
+}
+
+// SettlementModeEqualFold applies the EqualFold predicate on the "settlement_mode" field.
+func SettlementModeEqualFold(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEqualFold(FieldSettlementMode, v))
+}
+
+// SettlementModeContainsFold applies the ContainsFold predicate on the "settlement_mode" field.
+func SettlementModeContainsFold(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldContainsFold(FieldSettlementMode, v))
+}
+
+// SettlementReasonEQ applies the EQ predicate on the "settlement_reason" field.
+func SettlementReasonEQ(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldSettlementReason, v))
+}
+
+// SettlementReasonNEQ applies the NEQ predicate on the "settlement_reason" field.
+func SettlementReasonNEQ(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNEQ(FieldSettlementReason, v))
+}
+
+// SettlementReasonIn applies the In predicate on the "settlement_reason" field.
+func SettlementReasonIn(vs ...string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIn(FieldSettlementReason, vs...))
+}
+
+// SettlementReasonNotIn applies the NotIn predicate on the "settlement_reason" field.
+func SettlementReasonNotIn(vs ...string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotIn(FieldSettlementReason, vs...))
+}
+
+// SettlementReasonGT applies the GT predicate on the "settlement_reason" field.
+func SettlementReasonGT(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldGT(FieldSettlementReason, v))
+}
+
+// SettlementReasonGTE applies the GTE predicate on the "settlement_reason" field.
+func SettlementReasonGTE(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldGTE(FieldSettlementReason, v))
+}
+
+// SettlementReasonLT applies the LT predicate on the "settlement_reason" field.
+func SettlementReasonLT(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldLT(FieldSettlementReason, v))
+}
+
+// SettlementReasonLTE applies the LTE predicate on the "settlement_reason" field.
+func SettlementReasonLTE(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldLTE(FieldSettlementReason, v))
+}
+
+// SettlementReasonContains applies the Contains predicate on the "settlement_reason" field.
+func SettlementReasonContains(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldContains(FieldSettlementReason, v))
+}
+
+// SettlementReasonHasPrefix applies the HasPrefix predicate on the "settlement_reason" field.
+func SettlementReasonHasPrefix(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldHasPrefix(FieldSettlementReason, v))
+}
+
+// SettlementReasonHasSuffix applies the HasSuffix predicate on the "settlement_reason" field.
+func SettlementReasonHasSuffix(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldHasSuffix(FieldSettlementReason, v))
+}
+
+// SettlementReasonIsNil applies the IsNil predicate on the "settlement_reason" field.
+func SettlementReasonIsNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIsNull(FieldSettlementReason))
+}
+
+// SettlementReasonNotNil applies the NotNil predicate on the "settlement_reason" field.
+func SettlementReasonNotNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotNull(FieldSettlementReason))
+}
+
+// SettlementReasonEqualFold applies the EqualFold predicate on the "settlement_reason" field.
+func SettlementReasonEqualFold(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEqualFold(FieldSettlementReason, v))
+}
+
+// SettlementReasonContainsFold applies the ContainsFold predicate on the "settlement_reason" field.
+func SettlementReasonContainsFold(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldContainsFold(FieldSettlementReason, v))
+}
+
+// SettledAtEQ applies the EQ predicate on the "settled_at" field.
+func SettledAtEQ(v time.Time) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldSettledAt, v))
+}
+
+// SettledAtNEQ applies the NEQ predicate on the "settled_at" field.
+func SettledAtNEQ(v time.Time) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNEQ(FieldSettledAt, v))
+}
+
+// SettledAtIn applies the In predicate on the "settled_at" field.
+func SettledAtIn(vs ...time.Time) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIn(FieldSettledAt, vs...))
+}
+
+// SettledAtNotIn applies the NotIn predicate on the "settled_at" field.
+func SettledAtNotIn(vs ...time.Time) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotIn(FieldSettledAt, vs...))
+}
+
+// SettledAtGT applies the GT predicate on the "settled_at" field.
+func SettledAtGT(v time.Time) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldGT(FieldSettledAt, v))
+}
+
+// SettledAtGTE applies the GTE predicate on the "settled_at" field.
+func SettledAtGTE(v time.Time) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldGTE(FieldSettledAt, v))
+}
+
+// SettledAtLT applies the LT predicate on the "settled_at" field.
+func SettledAtLT(v time.Time) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldLT(FieldSettledAt, v))
+}
+
+// SettledAtLTE applies the LTE predicate on the "settled_at" field.
+func SettledAtLTE(v time.Time) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldLTE(FieldSettledAt, v))
+}
+
+// SettledAtIsNil applies the IsNil predicate on the "settled_at" field.
+func SettledAtIsNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIsNull(FieldSettledAt))
+}
+
+// SettledAtNotNil applies the NotNil predicate on the "settled_at" field.
+func SettledAtNotNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotNull(FieldSettledAt))
+}
+
+// SettledByEQ applies the EQ predicate on the "settled_by" field.
+func SettledByEQ(v int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldSettledBy, v))
+}
+
+// SettledByNEQ applies the NEQ predicate on the "settled_by" field.
+func SettledByNEQ(v int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNEQ(FieldSettledBy, v))
+}
+
+// SettledByIn applies the In predicate on the "settled_by" field.
+func SettledByIn(vs ...int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIn(FieldSettledBy, vs...))
+}
+
+// SettledByNotIn applies the NotIn predicate on the "settled_by" field.
+func SettledByNotIn(vs ...int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotIn(FieldSettledBy, vs...))
+}
+
+// SettledByGT applies the GT predicate on the "settled_by" field.
+func SettledByGT(v int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldGT(FieldSettledBy, v))
+}
+
+// SettledByGTE applies the GTE predicate on the "settled_by" field.
+func SettledByGTE(v int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldGTE(FieldSettledBy, v))
+}
+
+// SettledByLT applies the LT predicate on the "settled_by" field.
+func SettledByLT(v int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldLT(FieldSettledBy, v))
+}
+
+// SettledByLTE applies the LTE predicate on the "settled_by" field.
+func SettledByLTE(v int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldLTE(FieldSettledBy, v))
+}
+
+// SettledByIsNil applies the IsNil predicate on the "settled_by" field.
+func SettledByIsNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIsNull(FieldSettledBy))
+}
+
+// SettledByNotNil applies the NotNil predicate on the "settled_by" field.
+func SettledByNotNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotNull(FieldSettledBy))
 }
 
 // NoteEQ applies the EQ predicate on the "note" field.

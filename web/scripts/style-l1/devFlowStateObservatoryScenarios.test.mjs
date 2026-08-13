@@ -23,6 +23,7 @@ test('dev flow state observatory L1 scenarios cover read-only boundaries', () =>
       'dev-flow-state-observatory-invalid-deep-link',
       'dev-flow-state-observatory-task-lookup',
       'dev-flow-state-observatory-mobile-dark',
+      'dev-flow-state-observatory-runtime-selector-readonly',
     ]
   )
   assert(
@@ -80,4 +81,12 @@ test('dev flow state observatory L1 scenarios cover read-only boundaries', () =>
   assert.equal(scenarios[8].themeMode, 'dark')
   assert.match(scenarios[8].path, /chain=all/u)
   assert.doesNotMatch(scenarios[8].path, /node=/u)
+  assert.deepEqual(scenarios[9].viewport, { width: 1440, height: 900 })
+  assert.match(scenarios[9].path, /view=runtime/u)
+  assert.match(
+    scenarios[9].path,
+    /process=sales_order_acceptance%2Fapproval_pmc/u
+  )
+  assert.doesNotMatch(scenarios[9].path, /[?&](chain|node|flow|state|fact)=/u)
+  assert.equal(Object.hasOwn(scenarios[9], 'auth'), false)
 })

@@ -20,7 +20,14 @@ type InventoryTxn struct {
 func (InventoryTxn) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{Checks: map[string]string{
-			"inventory_txns_sku_subject_allowed": "product_sku_id IS NULL OR subject_type = 'PRODUCT'",
+			"inventory_txns_subject_type_allowed":   "subject_type IN ('MATERIAL', 'PRODUCT')",
+			"inventory_txns_sku_subject_allowed":    "product_sku_id IS NULL OR subject_type = 'PRODUCT'",
+			"inventory_txns_txn_type_allowed":       "txn_type IN ('IN', 'OUT', 'ADJUST_IN', 'ADJUST_OUT', 'TRANSFER_IN', 'TRANSFER_OUT', 'REVERSAL')",
+			"inventory_txns_direction_allowed":      "direction IN (-1, 1)",
+			"inventory_txns_quantity_positive":      "quantity > 0",
+			"inventory_txns_direction_matches_type": "((txn_type IN ('IN', 'ADJUST_IN', 'TRANSFER_IN') AND direction = 1) OR (txn_type IN ('OUT', 'ADJUST_OUT', 'TRANSFER_OUT') AND direction = -1) OR txn_type = 'REVERSAL')",
+			"inventory_txns_reversal_shape":         "((txn_type = 'REVERSAL') = (reversal_of_txn_id IS NOT NULL))",
+			"inventory_txns_reversal_not_self":      "reversal_of_txn_id IS NULL OR reversal_of_txn_id <> id",
 		}},
 	}
 }
@@ -140,6 +147,14 @@ func (InventoryTxn) Edges() []ent.Edge {
 		edge.From("inventory_lot", InventoryLot.Type).
 			Ref("inventory_txns").
 			Field("lot_id").
+			Unique().
+			Immutable().
+			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("reversals", InventoryTxn.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.From("reversal_of", InventoryTxn.Type).
+			Ref("reversals").
+			Field("reversal_of_txn_id").
 			Unique().
 			Immutable().
 			Annotations(entsql.OnDelete(entsql.NoAction)),

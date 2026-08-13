@@ -45,6 +45,7 @@ const (
 
 const (
 	BusinessAttachmentTypeProductImage          = "product_image"
+	BusinessAttachmentTypePrintAppendix         = "print_appendix"
 	BusinessAttachmentProductImageSlotPrimary   = "primary"
 	BusinessAttachmentProductImageSlotSecondary = "secondary"
 )
@@ -124,6 +125,14 @@ var allowedBusinessAttachmentFileTypes = map[string]map[string]struct{}{
 }
 
 var allowedBusinessAttachmentProductImageFileTypes = map[string]map[string]struct{}{
+	".jpeg": {"image/jpeg": {}},
+	".jpg":  {"image/jpeg": {}},
+	".png":  {"image/png": {}},
+	".webp": {"image/webp": {}},
+}
+
+var allowedBusinessAttachmentPrintAppendixFileTypes = map[string]map[string]struct{}{
+	".gif":  {"image/gif": {}},
 	".jpeg": {"image/jpeg": {}},
 	".jpg":  {"image/jpeg": {}},
 	".png":  {"image/png": {}},
@@ -457,7 +466,12 @@ func normalizeBusinessAttachmentUploadInput(in BusinessAttachmentUploadInput) (B
 
 	isProductOwner := in.OwnerType == BusinessAttachmentOwnerProduct
 	isProductImage := in.AttachmentType == BusinessAttachmentTypeProductImage
+	isPrintAppendix := in.AttachmentType == BusinessAttachmentTypePrintAppendix
 	if isProductOwner != isProductImage {
+		return in, ErrBadParam
+	}
+	if isPrintAppendix &&
+		(in.OwnerType != BusinessAttachmentOwnerOutsourcingOrder || in.SlotKey != nil) {
 		return in, ErrBadParam
 	}
 
@@ -469,7 +483,9 @@ func normalizeBusinessAttachmentUploadInput(in BusinessAttachmentUploadInput) (B
 		if !isBusinessAttachmentProductImageFileTypeAllowed(in.FileName, in.MimeType) {
 			return in, ErrBusinessAttachmentProductImageMimeNotAllowed
 		}
-	} else if !isBusinessAttachmentFileTypeAllowed(in.FileName, in.MimeType) {
+	} else if isPrintAppendix && !isBusinessAttachmentPrintAppendixFileTypeAllowed(in.FileName, in.MimeType) {
+		return in, ErrBusinessAttachmentMimeNotAllowed
+	} else if !isPrintAppendix && !isBusinessAttachmentFileTypeAllowed(in.FileName, in.MimeType) {
 		return in, ErrBusinessAttachmentMimeNotAllowed
 	}
 
@@ -502,6 +518,15 @@ func isBusinessAttachmentFileTypeAllowed(fileName string, mimeType string) bool 
 
 func isBusinessAttachmentProductImageFileTypeAllowed(fileName string, mimeType string) bool {
 	allowedMIMETypes, ok := allowedBusinessAttachmentProductImageFileTypes[strings.ToLower(filepath.Ext(fileName))]
+	if !ok {
+		return false
+	}
+	_, ok = allowedMIMETypes[mimeType]
+	return ok
+}
+
+func isBusinessAttachmentPrintAppendixFileTypeAllowed(fileName string, mimeType string) bool {
+	allowedMIMETypes, ok := allowedBusinessAttachmentPrintAppendixFileTypes[strings.ToLower(filepath.Ext(fileName))]
 	if !ok {
 		return false
 	}

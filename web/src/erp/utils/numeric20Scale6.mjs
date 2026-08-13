@@ -18,10 +18,11 @@ export function numeric20Scale6Units(value) {
   const integerText = match[1].replace(/^0+(?=\d)/u, '')
   if (integerText.length > 14) return null
 
-  const units = `${integerText}${(match[2] || '').padEnd(SCALE_DIGITS, '0')}`.replace(
-    /^0+(?=\d)/u,
-    ''
-  )
+  const units =
+    `${integerText}${(match[2] || '').padEnd(SCALE_DIGITS, '0')}`.replace(
+      /^0+(?=\d)/u,
+      ''
+    )
   return compareUnitText(units, MAX_UNITS) <= 0 ? units : null
 }
 
@@ -33,6 +34,31 @@ export function numeric20Scale6TextFromUnits(value) {
     padded.slice(0, -SCALE_DIGITS).replace(/^0+(?=\d)/u, '') || '0'
   const fractionText = padded.slice(-SCALE_DIGITS).replace(/0+$/u, '')
   return fractionText ? `${integerText}.${fractionText}` : integerText
+}
+
+function fixedScaleTextFromUnits(value, fractionDigits) {
+  const units = String(value ?? '')
+  if (!/^\d+$/u.test(units)) return ''
+  if (fractionDigits <= 0) return units.replace(/^0+(?=\d)/u, '')
+  const padded = units.padStart(fractionDigits + 1, '0')
+  const integerText =
+    padded.slice(0, -fractionDigits).replace(/^0+(?=\d)/u, '') || '0'
+  return `${integerText}.${padded.slice(-fractionDigits)}`
+}
+
+export function multiplyNumeric20Scale6Values(left, right, fractionDigits = 2) {
+  const leftUnits = numeric20Scale6Units(left)
+  const rightUnits = numeric20Scale6Units(right)
+  if (leftUnits === null || rightUnits === null) return ''
+
+  const safeFractionDigits = Math.max(
+    0,
+    Math.min(SCALE_DIGITS * 2, Math.trunc(Number(fractionDigits) || 0))
+  )
+  const productUnits = BigInt(leftUnits) * BigInt(rightUnits)
+  const divisor = BigInt(10) ** BigInt(SCALE_DIGITS * 2 - safeFractionDigits)
+  const roundedUnits = (productUnits + divisor / BigInt(2)) / divisor
+  return fixedScaleTextFromUnits(roundedUnits.toString(), safeFractionDigits)
 }
 
 function normalizedUnitText(value) {
@@ -113,9 +139,7 @@ export function subtractNumeric20Scale6Units(left, right) {
 export function minNumeric20Scale6Units(left, right) {
   const comparison = compareUnitText(left, right)
   if (comparison === null) return null
-  return comparison <= 0
-    ? normalizedUnitText(left)
-    : normalizedUnitText(right)
+  return comparison <= 0 ? normalizedUnitText(left) : normalizedUnitText(right)
 }
 
 export function isPositiveNumeric20Scale6Units(value) {
@@ -141,19 +165,13 @@ export function formatNumeric20Scale6(value) {
 export function sumNumeric20Scale6Values(values = []) {
   const totalUnits = (Array.isArray(values) ? values : []).reduce(
     (total, value) =>
-      addNumeric20Scale6Units(
-        total,
-        numeric20Scale6Units(value) ?? ZERO_UNITS
-      ),
+      addNumeric20Scale6Units(total, numeric20Scale6Units(value) ?? ZERO_UNITS),
     ZERO_UNITS
   )
   return numeric20Scale6TextFromUnits(totalUnits)
 }
 
-export function formatNumeric20Scale6Summary(
-  value,
-  minimumFractionDigits = 0
-) {
+export function formatNumeric20Scale6Summary(value, minimumFractionDigits = 0) {
   const canonical = String(value ?? '').trim()
   const match = /^(\d+)(?:\.(\d{1,6}))?$/u.exec(canonical)
   const safeMinimum = Math.max(

@@ -1,0 +1,210 @@
+.erp-business-page-header-card__title-row {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-bottom: 6px;
+}
+
+.erp-business-page-header-card__title-row h1 {
+  margin-bottom: 0;
+}
+
+.erp-business-page-help-trigger.ant-btn {
+  min-height: 32px;
+  border: 1px solid var(--erp-border, #dfe9e1);
+  border-radius: 999px;
+  color: var(--erp-primary, #2b8a3e);
+  background: var(--erp-primary-soft, #f0f8f2);
+  font-weight: 600;
+}
+
+.erp-business-page-help-trigger.ant-btn:hover,
+.erp-business-page-help-trigger.ant-btn:focus-visible {
+  border-color: var(--erp-interactive-border-hover, #84b68e);
+  color: var(--erp-primary-strong, #237234);
+  background: var(--erp-interactive-bg-hover, #e8f4eb);
+}
+
+.erp-business-page-help-modal .ant-modal-content {
+  border: 1px solid var(--erp-modal-border, #dfe9e1);
+  background: var(--erp-modal-bg, #fff);
+}
+
+.erp-business-page-help {
+  display: grid;
+  gap: 20px;
+  color: var(--erp-text, #1f2937);
+}
+
+.erp-business-page-help section,
+.erp-business-page-help p {
+  min-width: 0;
+}
+
+.erp-business-page-help section > .ant-typography-secondary {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.erp-business-page-help h4.ant-typography,
+.erp-business-page-help h5.ant-typography {
+  margin: 0;
+  color: var(--erp-text, #1f2937);
+}
+
+.erp-business-page-help p {
+  margin: 0;
+  color: var(--erp-text-muted, #64748b);
+  line-height: 1.7;
+}
+
+.erp-business-page-help__outcomes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.erp-business-page-help__outcomes > section {
+  border: 1px solid var(--erp-border, #dfe9e1);
+  border-radius: 10px;
+  background: var(--erp-surface-bg-soft, #f7faf8);
+  padding: 12px 14px;
+}
+
+.erp-business-page-help__flow,
+.erp-business-page-help__explanations {
+  display: grid;
+  gap: 12px;
+}
+
+.erp-business-page-help__flow ol {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  gap: 10px;
+  list-style: none;
+}
+
+.erp-business-page-help__flow li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+}
+
+.erp-business-page-help__flow li > span {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--erp-primary, #2b8a3e);
+  font-weight: 700;
+}
+
+.erp-business-page-help__explanations > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.erp-business-help-explanation {
+  min-width: 0;
+  border: 1px solid var(--erp-border, #dfe9e1);
+  border-radius: 10px;
+  background: var(--erp-surface-bg, #fff);
+  padding: 12px 14px;
+}
+
+.erp-business-help-explanation__heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.erp-business-help-explanation__heading .ant-tag {
+  flex: 0 0 auto;
+  margin-inline-end: 0;
+}
+
+.erp-business-help-explanation__heading strong {
+  min-width: 0;
+  color: var(--erp-text, #1f2937);
+}
+
+.erp-business-help-explanation dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  margin: 10px 0 0;
+  gap: 6px 10px;
+  color: var(--erp-text-muted, #64748b);
+  font-size: 13px;
+}
+
+.erp-business-help-explanation dt {
+  color: var(--erp-text-subtle, #64748b);
+  font-weight: 600;
+}
+
+.erp-business-help-explanation dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-business-help-label {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 2px;
+}
+
+.erp-business-inline-help-trigger.ant-btn {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--erp-text-muted, #64748b);
+}
+
+.erp-business-inline-help-trigger.ant-btn:hover,
+.erp-business-inline-help-trigger.ant-btn:focus-visible {
+  color: var(--erp-primary, #2b8a3e);
+  background: var(--erp-interactive-bg-hover, #edf7ef);
+}
+
+.erp-business-inline-help-popover {
+  max-width: min(420px, calc(100vw - 32px));
+}
+
+.erp-business-inline-help-popover .erp-business-help-explanation {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+@media (max-width: 767px) {
+  .erp-business-page-help__outcomes,
+  .erp-business-page-help__explanations > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .erp-business-page-help-modal .ant-modal-footer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .erp-business-page-help-modal .ant-modal-footer .ant-btn {
+    width: 100%;
+    margin-inline-start: 0;
+  }
+}

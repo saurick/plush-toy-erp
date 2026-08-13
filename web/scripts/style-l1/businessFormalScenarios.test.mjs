@@ -274,16 +274,20 @@ test('business-core destructive draft actions confirm through visible popconfirm
   )
 })
 
-test('production draft cancellation uses the current reason-required modal', () => {
+test('production completion report cancellation uses the current reason-required modal', () => {
   const startIndex = source.indexOf('const cancelProductionDraftButton')
   const interaction = source.slice(startIndex, startIndex + 1_300)
 
   assert.ok(startIndex >= 0)
-  assert.match(interaction, /hasText: '作废业务草稿'/u)
+  assert.match(interaction, /'作废完工报告'/u)
+  assert.match(interaction, /hasText: '作废生产完工报告'/u)
   assert.match(interaction, /\.locator\('textarea'\)/u)
   assert.match(interaction, /L1 回归：确认未过账生产草稿可追溯作废/u)
-  assert.match(interaction, /getByRole\('button', \{ name: '确认取消' \}\)/u)
-  assert.match(interaction, /expectText\(page, '作废业务草稿已完成'\)/u)
+  assert.match(
+    interaction,
+    /getByRole\('button', \{ name: '作废完工报告' \}\)/u
+  )
+  assert.match(interaction, /expectText\(page, '作废生产完工报告已完成'\)/u)
   assert.doesNotMatch(interaction, /confirmVisiblePopconfirm/u)
 })
 

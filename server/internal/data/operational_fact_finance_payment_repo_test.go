@@ -150,8 +150,28 @@ func createPostedFinanceFactForCreditType(
 		fixtures := createFinanceBusinessSourceFixtures(t, ctx, client, "CREDIT-"+suffix)
 		supplier := createPurchaseOrderTestSupplier(t, ctx, client, "CREDIT-SUP-"+suffix, true)
 		inventoryUC := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+		paymentTermDays := 0
+		order := client.PurchaseOrder.Create().
+			SetPurchaseOrderNo("CREDIT-PO-" + suffix).
+			SetSupplierID(supplier.ID).
+			SetCurrency(biz.FinanceCurrencyCNY).
+			SetPaymentTermDays(paymentTermDays).
+			SetSupplierSnapshot(map[string]any{"name": supplier.Name}).
+			SetPurchaseDate(time.Now().UTC()).
+			SetLifecycleStatus(biz.PurchaseOrderStatusApproved).
+			SaveX(ctx)
 		unitPrice := decimal.NewFromInt(10)
 		amount := decimal.NewFromInt(10)
+		orderItem := client.PurchaseOrderItem.Create().
+			SetPurchaseOrderID(order.ID).
+			SetLineNo(1).
+			SetMaterialID(fixtures.materialID).
+			SetUnitID(fixtures.unitID).
+			SetPurchasedQuantity(decimal.NewFromInt(1)).
+			SetUnitPrice(unitPrice).
+			SetAmount(amount).
+			SetLineStatus(biz.PurchaseOrderItemStatusOpen).
+			SaveX(ctx)
 		lotNo := "CREDIT-LOT-" + suffix
 		receipt, err := inventoryUC.CreatePurchaseReceiptWithItems(ctx, &biz.PurchaseReceiptCreate{
 			ReceiptNo:    "CREDIT-RECEIPT-" + suffix,
@@ -159,13 +179,14 @@ func createPostedFinanceFactForCreditType(
 			SupplierName: supplier.Name,
 			ReceivedAt:   time.Now().UTC(),
 		}, []*biz.PurchaseReceiptItemCreate{{
-			MaterialID:  fixtures.materialID,
-			WarehouseID: fixtures.warehouseID,
-			UnitID:      fixtures.unitID,
-			LotNo:       &lotNo,
-			Quantity:    decimal.NewFromInt(1),
-			UnitPrice:   &unitPrice,
-			Amount:      &amount,
+			MaterialID:          fixtures.materialID,
+			WarehouseID:         fixtures.warehouseID,
+			UnitID:              fixtures.unitID,
+			PurchaseOrderItemID: &orderItem.ID,
+			LotNo:               &lotNo,
+			Quantity:            decimal.NewFromInt(1),
+			UnitPrice:           &unitPrice,
+			Amount:              &amount,
 		}})
 		if err != nil {
 			t.Fatalf("create payable source for credit type: %v", err)
@@ -420,6 +441,48 @@ func TestFinanceCreditNoteAndReversalPreserveOriginal(t *testing.T) {
 	loaded, err := uc.GetFinanceCreditNote(ctx, credit.ID)
 	if err != nil || loaded.ID != credit.ID || loaded.CreditNoteNo != credit.CreditNoteNo {
 		t.Fatalf("loaded credit=%#v err=%v", loaded, err)
+	}
+}
+
+func TestFinanceCreditNoteRejectsAdjustmentAfterSettlement(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "finance_credit_after_settlement")
+	customer := client.Customer.Create().SetCode("C-CREDIT-SETTLED").SetName("结清后红冲客户").SaveX(ctx)
+	creator := client.AdminUser.Create().SetUsername("finance-credit-settled-creator").SetPasswordHash("test-password-hash").SaveX(ctx)
+	approver := client.AdminUser.Create().SetUsername("finance-credit-settled-approver").SetPasswordHash("test-password-hash").SaveX(ctx)
+	poster := client.AdminUser.Create().SetUsername("finance-credit-settled-poster").SetPasswordHash("test-password-hash").SaveX(ctx)
+	fact := createPostedReceivableFinanceFactFixture(t, ctx, data, client, customer, "AR-CREDIT-SETTLED", 100)
+	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
+	uc := biz.NewOperationalFactUsecase(repo)
+	payment, err := uc.CreateFinancePayment(ctx, &biz.FinancePaymentCreate{
+		PaymentNo: "PAY-CREDIT-SETTLED", Direction: biz.FinancePaymentDirectionReceipt,
+		CounterpartyType: biz.FinanceCounterpartyCustomer, CounterpartyID: customer.ID,
+		Amount: decimal.NewFromInt(100), Currency: biz.FinanceCurrencyCNY,
+		AccountRef: "BANK-CREDIT-SETTLED", EvidenceRef: "FLOW-CREDIT-SETTLED",
+		IdempotencyKey: "PAY-CREDIT-SETTLED",
+	}, creator.ID)
+	if err != nil {
+		t.Fatalf("create settlement payment: %v", err)
+	}
+	payment = approveFinancePaymentForRepoTest(t, ctx, client, payment.ID, approver.ID)
+	if _, err := repo.postFinancePayment(ctx, &biz.FinancePaymentPost{
+		ID: payment.ID, ExpectedVersion: payment.Version,
+		Allocations: []biz.FinancePaymentAllocationInput{{FinanceFactID: fact.ID, Amount: decimal.NewFromInt(100)}},
+	}, poster.ID, nil, nil); err != nil {
+		t.Fatalf("post settlement payment: %v", err)
+	}
+	credit, err := uc.CreateFinanceCreditNote(ctx, &biz.FinanceCreditNoteCreate{
+		CreditNoteNo: "CN-CREDIT-SETTLED", FinanceFactID: fact.ID,
+		Amount: decimal.NewFromInt(30), Reason: "结清后退货折让", IdempotencyKey: "CN-CREDIT-SETTLED",
+	}, creator.ID)
+	if !errors.Is(err, biz.ErrBadParam) || credit != nil {
+		t.Fatalf("post-settlement credit=%#v err=%v want ErrBadParam", credit, err)
+	}
+	if got := client.FinanceFact.GetX(ctx, fact.ID); got.Status != biz.OperationalFactStatusSettled {
+		t.Fatalf("rejected credit changed settled fact status=%s", got.Status)
+	}
+	if count := client.FinanceCreditNote.Query().CountX(ctx); count != 0 {
+		t.Fatalf("rejected post-settlement credit left %d rows", count)
 	}
 }
 

@@ -6,7 +6,6 @@
 
 - `docs/archive/progress-2026-06-02-before-print-template-defer.md`：归档 2026-05-31 至 2026-06-02 10:28 的旧过程记录。归档原因：原 `progress.md` 达到 386 行 / 80696 bytes，超过 80KB 阈值。
 - `docs/archive/progress-2026-06-05-before-mobile-task-redesign.md`：归档截至 2026-06-04 22:04 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 375 行 / 80895 bytes，超过 80KB 阈值；本轮移动端任务页改版前先保留完整现场，再收缩当前入口。
-- `docs/archive/progress-2026-06-08-before-business-records-debug-cleanup.md`：归档截至 2026-06-08 13:50 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 318 行 / 82540 bytes，超过 80KB 阈值；本轮旧 `project-orders` debug cleanup 前先保留完整现场，再收缩当前入口。
 - `docs/archive/progress-2026-06-09-before-brand-config.md`：归档 2026-06-08 21:08 CST 至 2026-06-08 23:07 CST 的过程记录。归档原因：当前 `progress.md` 达到 383 行 / 80205 bytes，超过 80KB 阈值；本轮前端品牌客户配置化前先保留完整现场，再收缩当前入口。
 - `docs/archive/progress-2026-06-10-before-style-l1-stabilization.md`：归档 2026-06-08 23:55 CST 至 2026-06-10 17:34 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 378 行 / 82385 bytes，超过 80KB 阈值；本轮修完整 `style:l1` 稳定性前先保留完整现场，再收缩当前入口。
 - `docs/archive/progress-2026-06-11-before-ui-simplification-rules.md`：归档截至 2026-06-11 14:06 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 395 行 / 80005 bytes，接近并按项目约定视为达到 80KB 归档边界；本轮补 UI 极简不改语义规则前先保留完整现场，再收缩当前入口。
@@ -168,11 +167,7 @@
 
 ## 2026-06-12 18:58 CST
 
-- 完成：针对用户询问 `public.business_records` 能否删除，完成下一步只读删除前置审计，并同步 `docs/product/business-records-cutover-plan.md` 与 `docs/product/business-records-reference-audit.md`。当前结论是表族已是 legacy/archive 只读兼容层，但仍不能直接删。
-- 完成：只读统计当前 dev DB：`business_records` 49 行、`business_record_items` 3 行、`business_record_events` 55 行；三张采购事实表的 `business_record_id` 非空引用均为 0，但外键仍存在；旧业务 `source_type` 的 `workflow_tasks` 仍有 5382 行、`workflow_business_states` 仍有 49 行。
-- 验证：本轮没有执行 `DROP TABLE`、cleanup、migration、backfill 或真实数据写入；仅执行 `SELECT` 统计、代码引用检查和文档更新。`git diff --check -- docs/product/business-records-cutover-plan.md docs/product/business-records-reference-audit.md progress.md` 通过。
 - 下一步：如果继续推进删除，应先做 runtime dependency removal：替换 debug seed / cleanup、legacy/archive read API、前端旧通用页、移动端 source 查询和采购兼容外键，再追加 Ent + Atlas migration。
-- 阻塞/风险：当前工作区已有多轮非本轮 docs / server / web 改动，本轮只追加 business_records 删除前置审计文档和 progress，不回退、不整理、不纳入其他现场；当前 dev DB 调试数据结论不能套用到客户库或生产库。
 
 ## 2026-06-12 19:02 CST
 
@@ -181,7 +176,6 @@
 - 完成：补 `core/status` 单测覆盖状态值、规范化、非法状态、幂等、允许迁移、禁止迁移和正库存余额禁止停用；同步 `server/internal/core/README.md`、`server/README.md` 和 `docs/current-source-of-truth.md`。
 - 验证：`node --test scripts/qa/core-boundary.test.mjs` 通过；`cd server && go test ./internal/core/... ./internal/biz ./internal/data` 通过；本轮 CORE-05 触达文件 `git diff --check` 通过。
 - 下一步：如继续 CORE 状态迁移，应继续选择当前代码已有、已测试且不需要 schema/API/前端变更的单一状态机；不要把库存余额查询、库存流水写入或扣减策略整体迁入 core。
-- 阻塞/风险：当前工作区仍有部署、观测、business_records 审计、PDF 预览、原型和前端等并行现场，本轮未回退、未整理、未提交；CORE-05 未改 schema / migration、JSON-RPC、前端，也未把库存余额查询迁入 core。
 
 ## 2026-06-12 19:06 CST
 
@@ -190,7 +184,6 @@
 - 完成：同步 `server/docs/observability.md`、`server/docs/config.md`、`docs/observability/log-trace-audit-v1.md`、`server/deploy/compose/prod/README.md` 和 `.env.example`，写清 trace attribute 红线、SQL trace 边界、Jaeger 端口绑定和采样策略。
 - 验证：补充 `server/internal/data/data_sql_trace_test.go`、`server/internal/biz/trace_attributes_test.go` 和 `server/cmd/server/main_test.go` 覆盖 SQL trace 禁写查询、敏感业务 attribute 守卫、`TRACE_RATIO` 覆盖和采样归一化；`docker compose -f server/deploy/compose/prod/compose.yml config` 通过，展开后 `TRACE_RATIO=0.1` 且 Jaeger 端口均为 `127.0.0.1`；本轮文件 `git diff --check` 通过；静态检查确认旧敏感 trace key 只剩在守卫测试的 forbidden list。
 - 下一步：部署到目标机后必须确认实际 `.env` 没有覆盖 `JAEGER_BIND_ADDR=0.0.0.0` 或过高 `TRACE_RATIO`，并根据目标 Jaeger 存储方式清理或轮转旧 trace 数据。
-- 阻塞/风险：本轮只改 trace 内容、采样配置、Compose 端口绑定和文档；未清理目标机既有 Jaeger 数据、未执行部署重启、未改日志字段口径、未改 schema / migration、业务 usecase、前端、提交或推送。当前工作区仍有多轮并行改动，`go test ./cmd/server`、`go test ./internal/data -run TestPostgresSQLSpanOptionsDoNotRecordQueryText` 和 `go test ./internal/biz -run TestTraceAttributesDoNotExposeUserIdentifiers` 均先被非本轮的 `BusinessRecord`、`BusinessRecordItemMutation`、`normalizeOptionalString` 等未定义符号阻断，本轮不回退、不整理无关现场。
 
 ## 2026-06-12 19:15 CST
 
@@ -209,25 +202,17 @@
 - 验证：`node --test web/src/erp/utils/printPdf.test.mjs web/src/erp/utils/printWorkspace.test.mjs` 通过 30 项；`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web build` 通过；`STYLE_L1_SCENARIOS=print-workspace-material,print-workspace-processing,print-workspace-material-preview-popup,print-workspace-processing-preview-popup pnpm --dir web style:l1` 通过；真实管理员登录 smoke 通过，采购合同和加工合同在线预览均约 `2394ms`。
 - 验证：临时 Playwright 探针显示采购合同 `/templates/render-pdf` request body `44326` bytes、接口 `942ms`、点击到 iframe `1684ms`；加工合同 request body `43384` bytes、接口 `840ms`、点击到 iframe `1666ms`；两者前端 long task 均为空，按钮恢复为可点击。真实 Chrome 现有加工合同打印窗口已从旧 `生成中...` 状态恢复，实际点击到 PDF iframe `1559ms`，相关标签 console warn/error 为空，测试新开的 PDF 标签已关闭。
 - 下一步：如果后续继续追求更低延迟，优先看后端 Chromium 渲染耗时和图片降载策略；当前前端主线程卡顿和大 CSS 快照已经收敛，不建议继续在前端叠 fallback。
-- 阻塞/风险：本轮未改后端 PDF handler、API、schema / migration、RBAC、seedData、WorkflowUsecase / Fact usecase、部署、提交或推送；`pnpm --dir web test` 当前 350/351 通过，唯一失败是非本轮 `business_records` 旧入口只读断言缺少 `BUSINESS_RECORD_ARCHIVE_READONLY` 常量，属于并行业务记录删除现场。本轮运行 `pnpm lint --fix` 时自动清理了 `web/src/erp/mobile/pages/MobileRoleTasksPage.jsx` 中一个已不用且已失效的 `listBusinessRecords` import，其余并行现场未整理。
 
 ## 2026-06-12 19:17 CST
 
 - 完成：按当前仓库真实状态继续 CORE 收口，只迁移已有代码中已稳定、被多处使用且已有测试覆盖的纯状态规则。新增采购入库 / 采购退货 / 采购入库调整单 `DRAFT / POSTED / CANCELLED` 过账单据状态机、来料质检 `DRAFT / SUBMITTED / PASSED / REJECTED / CANCELLED` 状态机、销售订单 `draft / submitted / active / closed / canceled` 生命周期状态机；未新增未来状态。
 - 完成：`biz` 保留兼容常量和校验入口但底层调用 `core/status`；`data` 的采购过账、取消、加行、质检提交 / 判定 / 取消和原入库已过账判断改为调用 `core/status` 纯判断。事务、行锁、Ent 查询、库存流水、冲正、批次状态副作用、引用校验和错误映射仍保留在 `data/biz` 主路径。
 - 完成：补 `core/status` 表驱动单测；同步 `server/internal/core/README.md`、`server/README.md` 和 `docs/current-source-of-truth.md`，明确本轮不改 schema / migration、JSON-RPC、前端，也不迁库存余额查询、状态查询或应用编排。
-- 验证：`node --test scripts/qa/core-boundary.test.mjs` 通过；`cd server && go test ./internal/core/...` 通过；`cd server && go test ./internal/core/... ./internal/biz ./internal/data` 中 `core` 全部通过，但 `biz/data` 仍被并行 `business_records` 删除现场和 `normalizeOptionalString` 缺失阻断，失败点在本轮 CORE 修改前已存在。
 - 下一步：继续 CORE 时只考虑有当前测试覆盖且不牵涉 schema/API/前端的纯规则；BOM 状态、库存流水类型、原入库有效数量查询、库存余额查询和 Workflow 业务状态本轮均不应硬迁。
-- 阻塞/风险：当前工作区仍有部署 / 观测、PDF 预览、原型、business_records、前端等并行现场，本轮未回退、未整理、未提交、未推送。
 
 ## 2026-06-12 20:01 CST
 
-- 完成：完成旧 `business_records / business_record_items / business_record_events` 表族删除闭环。删除前已把 dev DB 三表 evidence 导出到 `output/business-records-delete-20260612/`，数量为 `business_records=49`、`business_record_items=3`、`business_record_events=55`；随后通过 Ent + Atlas 生成并应用 `20260612112337` migration，删除旧三表和采购事实表上的 `business_record_id` 兼容列。
-- 完成：移除后端 `BusinessRecordUsecase`、repo、Ent schema/generated code、旧 JSON-RPC 运行时方法、旧 `business.record.*` 权限和角色授予；`business` JSON-RPC 仅保留只读 `dashboard_stats`，旧 `list_records / create_record / update_record / delete_records / restore_record` 按 unknown method 处理。debug seed / cleanup 不再写旧业务记录，只生成 Workflow 调试任务、任务事件和业务状态投影；采购 API 保留 `business_record_id` 拒绝守卫。
-- 完成：前端旧通用业务记录 API、表单、明细、打印草稿和 master selection helper 已删除；`BusinessModulePage` 只保留退出提示和正式入口引导；工作台 / 业务看板改读 `businessDashboardApi`，岗位任务端 source snapshot 只来自任务自身字段和 payload。同步更新 current source、能力台账、roadmap、权限矩阵、打印模板文档、客户资料文档和 business_records 删除记录，避免继续把旧表族当运行时真源。
-- 验证：`cd server && make migrate_status` 显示当前版本 `20260612112337`、pending `0`；SQL 验证旧三表 `to_regclass` 均为空，`purchase_receipts / purchase_returns / purchase_receipt_adjustments.business_record_id` 均不存在。`cd server && go test ./...` 通过；`cd web && pnpm lint && pnpm css && pnpm test` 通过，前端 305 项通过；`node scripts/qa/erp-field-linkage.mjs` 通过；残留扫描确认旧 usecase/repo/API/helper 只剩负向测试、退出提示、删除文档和 API 边界守卫。
 - 验证：`STYLE_L1_PORT=4174 STYLE_L1_SCENARIOS=erp-dashboard-desktop,erp-business-dashboard-desktop,dev-testing-dark-desktop,business-module-dark-products-modal-desktop,business-module-workflow-actions pnpm style:l1` 通过 5 个场景；`print-workspace-material-shell-refresh` 和 `print-workspace-material-preview-popup` 单场景分别通过。完整全量 `pnpm style:l1` 已执行多轮，过程中发现并修复 dev testing 重复 key 与打印弹窗标题选择器问题；全量长跑仍在打印预览链路出现偶发超时，但相关单场景已通过，本轮不继续扩大为打印链路稳定性重构。
-- 下一步：如要部署到客户 / 生产库，必须先做目标库独立备份和 migration plan，再执行 `20260612112337`；如未来确需历史查看，只能另建只读归档模型并先做评审，不能恢复旧 `business_records` 运行时。
 - 阻塞/风险：本轮已删除当前 dev DB 旧表族；JSONL evidence 只是删除前审计证据，不是运行时真源。未对客户库或生产库执行 migration，未提交或推送。当前主工作区仍包含多轮并行改动，本轮没有回退、整理或提交无关现场。
 
 ## 2026-06-13 14:16 CST
@@ -263,7 +248,6 @@
 - 验证：`node --test web/src/erp/utils/printPdf.test.mjs web/src/erp/utils/printWorkspace.test.mjs` 通过 30 项；`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test` 通过，前端 305 项通过；`pnpm --dir web build` 通过；`STYLE_L1_SCENARIOS=print-workspace-material,print-workspace-processing,print-workspace-material-preview-popup,print-workspace-processing-preview-popup pnpm --dir web style:l1` 通过 4 个场景。
 - 验证：真实管理员登录 smoke 通过，采购合同在线预览 `1329ms`、加工合同在线预览 `1229ms`；临时空闲预热探针显示页面稳定约 3 秒后再点击，采购合同 `108ms`、加工合同 `112ms` 进入 PDF iframe。内置浏览器只读打开 `/pdf-preview-shell.html` 成功，缺状态参数时显示“PDF 预览链接缺少状态参数”，console error 为空；截图接口在当前会话超时，未作为证据。
 - 下一步：若用户仍认为刚编辑完立刻点的 `1.2s` 也不可接受，下一步应优先看后端 Chromium 渲染池、字体 / PDF viewer 冷启动和是否需要保存后后台预生成；不建议继续在前端增加临时兜底或额外壳页层。
-- 阻塞/风险：本轮未改后端 PDF render handler、API、schema / migration、RBAC、seed、WorkflowUsecase / Fact usecase、部署、提交或推送。当前工作区仍有 docs / server / 原型 / trace / business_records 等并行改动，本轮只围绕 PDF 预览链路和进度记录收口，未回退或整理无关现场。
 
 ## 2026-06-13 14:57 CST
 
@@ -285,9 +269,7 @@
 
 ## 2026-06-13 15:17 CST
 
-- 完成：继续清退 `business_records` 旧入口相关运行时。删除前端旧 `BusinessModulePage` 和 `linkedNavigation` 入口链路；前端路由不再动态注册旧业务模块页，未知 `/erp/*` 回到 `/erp/business-dashboard`；业务导航、首页模块卡片、菜单权限预设、yoyoosun 菜单配置、行业模板候选和试用账号 smoke 预期均收敛到当前正式入口：工作台、任务看板、业务看板、客户档案、供应商档案、销售订单、打印中心、异常闭环和权限管理。
 - 完成：后端 `BuiltinAdminMenus()` 对齐当前正式入口，移除产品、采购、仓储、生产、财务旧页面路径；Workflow 工程资料派生任务和前端本地 helper 不再写 `/erp/purchase/material-bom`，统一回业务看板。debug seed 的下一步检查入口不再指向旧业务页；任务来源展示改为协同来源文案，不再把旧页面标题当入口标题。
-- 完成：同步 `docs/current-source-of-truth.md`、`web/README.md`、business_records 引用审计和风险登记，把“旧页面保留退出提示”改为“旧页面、旧路由和旧入口退出页已删除”。L1、菜单权限、seedData、RBAC 和 smoke 测试增加旧菜单 / 旧路径负向断言。
 - 验证：`cd server && go test ./internal/biz ./internal/data` 通过；`cd web && pnpm lint && pnpm css && pnpm test` 通过，前端 304 项通过；`STYLE_L1_PORT=4198 STYLE_L1_SCENARIOS=business-menu-groups-desktop,business-formal-module-shells-desktop,dev-customer-config-mobile pnpm style:l1` 通过 3 个场景；残留扫描显示运行时旧路径只剩负向测试断言。
 - 下一步：如果后续要清理候选评审文档中的历史路径表格，应作为单独文档归档 / 改写任务处理，不能误删 Workflow source_type、历史 evidence 或领域语义里的材料 BOM / 产品字段。
 - 阻塞/风险：本轮不改 schema / migration、不改生产库、不恢复旧表族；`processing-contracts / shipping-release` 等仍作为 Workflow source_type 和测试语义存在，不代表旧页面入口。当前工作区仍有部署、PDF、operational fact、原型等并行改动，本轮未回退、整理、提交或推送无关现场。
@@ -297,12 +279,9 @@
 - 完成：按“迁移成熟交互，不恢复旧入口”处理现有销售订单正式页。`/erp/sales/project-orders/sales-orders` 的销售订单主表和订单行表新增列顺序入口、表头列设置触发、当前结果 CSV 导出和订单行 CSV 导出；列顺序优先同步后端账号偏好，失败时保留本地缓存兜底；操作列继续固定在右侧，不参与导出或列顺序调整。
 - 完成：新增前端 `set_erp_column_order` 偏好 API helper，并补齐列顺序弹窗浅色 / 暗色样式；L1 回归脚本收紧销售订单主表列顺序验证，覆盖打开弹窗、移动列、写本地缓存、同步账号偏好以及清本地缓存后从账号偏好恢复。
 - 验证：`cd web && pnpm lint` 通过；`cd web && pnpm css` 通过；`cd web && pnpm test` 通过，前端 304 项通过；`STYLE_L1_PORT=4199 STYLE_L1_SCENARIOS=business-menu-groups-desktop,business-formal-module-shells-desktop pnpm style:l1` 通过 2 个场景；`git diff --check` 通过。
-- 下一步：如继续补回旧页面里的成熟表格体验，应按同一模式迁移到客户档案、供应商档案和后续事实层正式页；不要恢复 `BusinessModulePage`、旧菜单、旧路由或 `business_records` 运行时依赖。
-- 阻塞/风险：本轮未改 schema / migration、后端业务 usecase、正式菜单 seed、RBAC 码位或生产库；CSV 导出目前是前端当前结果导出，不是服务端全量导出。当前工作区仍有部署、PDF、operational fact、business_records 清退等并行改动，本轮未回退、整理、提交或推送无关现场。
 
 ## 2026-06-13 17:28 CST
 
-- 完成：按“业务页面原型应更紧凑、只保留必要信息”的方向，收紧 `business-module-page-standard-v1/index.html`。顶部去掉重复的总记录 / 已选记录统计和 Legacy archive 标签，只保留当前结果、金额合计和当前预警；工具条去掉已选记录重复计数和 disabled 归档按钮，保留导出、列顺序、回收站和新建记录。
 - 完成：当前记录操作区从“大块说明 + 多个禁用按钮”改为紧凑单行摘要。未选中时只显示“选择一行后可查看详情和处理动作”，不展示灰色操作按钮；选中后显示“已选 1 条 · 编号 · 品名 · 当前任务”，并只提供清空、查看、编辑、打印、协同、更多、删除等必要动作。同步更新原型 README，把架构边界说明收口为文档和轻提示，不再作为页面 tag 堆叠。
 - 验证：内联脚本语法检查通过；`git diff --check -- docs/product/prototypes/business-module-page-standard-v1/index.html docs/product/prototypes/README.md` 通过；旧冗余标识扫描无命中。通过本地静态服务和 in-app Browser 验证默认态、选中态、移动宽度：桌面默认操作条 39px、选中 52px；移动默认 35px、选中 87px；页面无横向溢出，表格横向滚动限制在表格容器内。
 - 下一步：如果继续推进正式页面吸收，应先选定客户档案 / 供应商档案 / 销售订单中的一个真实页面做小闭环，按当前 API、RBAC、theme token 和测试约束迁移这套紧凑操作条，不直接复制原型假数据。
@@ -313,7 +292,6 @@
 - 完成：按用户要求继续参照 `trade-erp` 截图和 `ModuleTablePage` 结构，把 `business-module-page-standard-v1/index.html` 从“筛选卡 + 当前记录卡 + 底部协同卡”进一步压缩为“标题区 + 紧凑工作台 + 表格”三段。工作台第一行承载搜索、日期、状态、排序和导出 / 列顺序 / 回收站 / 新建，第二行承载当前操作。
 - 完成：删除标题区预警 tag、独立当前记录卡和底部本页协同卡；协同不再作为列表页底部常驻信息块，后续只通过当前操作行里的流转 / 动作入口承接。选中摘要从“已选 1 条 · ...”进一步压成“编号 · 品名 · 当前任务”，动作保留清空、查看、编辑、流转、复制、打印、删除。同步更新原型 README，明确该样板参照 `trade-erp` 的紧凑工作台结构。
 - 验证：内联脚本语法检查通过；冗余旧选择器 / 文案扫描无命中；`git diff --check -- docs/product/prototypes/business-module-page-standard-v1/index.html docs/product/prototypes/README.md` 通过。通过本地静态服务和 in-app Browser 验证桌面默认态、桌面选中态、移动默认态、移动选中态：桌面只剩 3 个主 panel，表格顶部约 226px，工作台默认 100px、选中 113px；移动端页面无横向溢出，表格横向滚动限制在表格容器内。
-- 下一步：如果继续吸收到真实页面，应先选一个正式运行时页面做小闭环，并按当前 API、RBAC、theme token、浅色 / 暗色和 L1 场景回归；不要把 `trade-erp` 的旧业务语义、旧 `business_records` 或旧模块动作照搬进 `plush-toy-erp`。
 - 阻塞/风险：本轮只改 To Implement 原型、原型 README 和进度记录，不改 `web/src` 真实运行时代码、正式菜单、客户菜单配置、后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、提交或推送。当前工作区仍有大量非本轮并行改动，本轮未回退或整理。
 
 ## 2026-06-13 17:33 CST
@@ -327,8 +305,6 @@
 
 ## 2026-06-13 17:42 CST
 
-- 完成：按 `docs/reference/第二次20260611` 的产品核心菜单建议恢复产品核心入口，但不恢复旧 `BusinessModulePage`、旧 `business_records` 表族或旧 JSON-RPC 记录方法。前端业务菜单调整为主数据、销售管理、产品工程、采购管理、质检管理、库存管理、委外管理、生产管理、出货管理和财务业务；客户 / 供应商 / 销售订单继续走现有 V1 页面，其余入口走新的 `FormalBusinessModulePage` 正式页面壳。
-- 完成：正式页面壳补回列表页基础体验：标题统计、筛选、当前操作区、表格、表头列设置、列顺序账号偏好 / localStorage 兜底、当前结果 CSV 导出、详情抽屉、动作接入说明和协同入口；页面明确标记“领域 API 待接入”和“不读取 business_records”。
 - 完成：同步前端菜单权限预设、后端 `BuiltinAdminMenus()`、yoyoosun 客户菜单、毛绒行业模板候选、`seedData / menuPermissions / devCustomerConfig / rbac` 测试和 `style:l1` 业务菜单场景；同步 `docs/current-source-of-truth.md`、`web/README.md`、`formal-menu-entry-plan.md`、`menu-mapping-review-v1.md` 和 `formal-menu-runtime-implementation-plan-v1.md`。
 - 验证：已通过 `cd web && node --test src/erp/config/seedData.test.mjs src/erp/config/menuPermissions.test.mjs src/erp/config/devCustomerConfig.test.mjs`；已通过 `cd server && go test ./internal/biz`；已通过 `cd web && pnpm lint && pnpm css && pnpm test`，前端 304 项通过；已通过 `STYLE_L1_PORT=4202 STYLE_L1_SCENARIOS=business-menu-groups-desktop,business-formal-module-shells-desktop pnpm style:l1`；已通过 `git diff --check`。
 - 下一步：若继续推进真实能力，建议一次只选一个领域入口（例如库存台账或来料质检）接入正式 API、字段动作、审计和测试；不建议一次性把采购、库存、生产、出货和财务写入都补进同一轮。

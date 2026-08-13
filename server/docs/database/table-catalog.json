@@ -315,6 +315,16 @@
       "writeBoundary": "仅由库存 repo 在创建、过账、取消或冲正 inventory_txns 的同一事务中更新。"
     },
     {
+      "name": "inventory_lot_status_events",
+      "title": "库存批次状态事件",
+      "domain": "inventory-quality",
+      "kind": "Fact",
+      "purpose": "追加保存命名批次动作的前后状态、版本、原因、actor、幂等键和关联质检证据。",
+      "boundary": "事件证明批次质量状态如何变化，不代表库存数量增减；数量仍以 inventory_txns 和 inventory_balances 为准。",
+      "lifecycle": "按批次 version 和幂等键只追加；同一版本只允许一个已登记动作，不更新、不删除。",
+      "writeBoundary": "InventoryUsecase 或 Quality/Inventory repo 在批次状态 CAS 的同一事务中写入。"
+    },
+    {
       "name": "inventory_lots",
       "title": "库存批次",
       "domain": "inventory-quality",
@@ -781,6 +791,16 @@
       "writeBoundary": "OperationalFactUsecase/repo 创建出货聚合时写入。"
     },
     {
+      "name": "source_order_lifecycle_events",
+      "title": "来源订单生命周期回执",
+      "domain": "sales-purchase",
+      "kind": "SourceDocument",
+      "purpose": "追加保存销售、采购和委外订单强动作的版本、幂等意图及逐行结算结果。",
+      "boundary": "回执证明某次关闭或取消及逐行剩余量，不替代来源订单当前状态，也不构成履约 Fact。",
+      "lifecycle": "按来源类型、来源 ID 和幂等键只追加；同一意图精确重放，变更意图冲突，不更新、不删除。",
+      "writeBoundary": "各来源订单 repo 在锁定源单、终结 open 行并更新单头的同一事务中写入。"
+    },
+    {
       "name": "stock_reservations",
       "title": "库存预留",
       "domain": "inventory-quality",
@@ -858,7 +878,7 @@
       "kind": "Workflow",
       "purpose": "保存岗位任务箱、责任池、角色、处理人、状态、截止时间和来源引用。",
       "boundary": "任务 done 只证明协同办理完成，不等于任何 Source Document 生效或 Fact 过账。",
-      "lifecycle": "创建固定 ready；ready 可转 blocked、done、rejected；blocked 可恢复到 ready；done 和 rejected 终态不重开；无业务删除。",
+      "lifecycle": "创建固定 ready；ready 可转 blocked、done、rejected；blocked 可恢复到 ready；来源取消或受控恢复可内部转 withdrawn；done、rejected、withdrawn 终态不重开；无业务删除。",
       "writeBoundary": "WorkflowUsecase 创建和办理；ProcessRuntime 为 human_task 或 approval 节点创建并结算 linked task。"
     },
     {

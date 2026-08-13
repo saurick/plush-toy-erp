@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
+import path from 'node:path'
 import test from 'node:test'
 
 import {
   assertERPResolvedVitePorts,
+  resolveERPViteCacheDir,
   resolveERPDevServerPort,
   resolveERPHMRClientPort,
 } from './vite.shared.mjs'
@@ -50,5 +52,39 @@ test('resolved Vite CLI overrides cannot desynchronize HMR and listener ports', 
         hmrClientPort: 5175,
       }),
     /must match; set ERP_VITE_PORT and ERP_VITE_HMR_CLIENT_PORT/u
+  )
+})
+
+test('development Vite optimizer caches are isolated by app and listener port', () => {
+  const rootDir = path.resolve('/repo/web')
+  const localCache = resolveERPViteCacheDir(
+    rootDir,
+    'desktop',
+    'development',
+    15200
+  )
+  const gateCache = resolveERPViteCacheDir(
+    rootDir,
+    'desktop',
+    'development',
+    15201
+  )
+
+  assert.equal(
+    localCache,
+    path.join(rootDir, '.vite-cache', 'desktop', '15200')
+  )
+  assert.equal(
+    gateCache,
+    path.join(rootDir, '.vite-cache', 'desktop', '15201')
+  )
+  assert.notEqual(localCache, gateCache)
+  assert.equal(
+    resolveERPViteCacheDir(rootDir, 'desktop', 'production', 15200),
+    path.join(rootDir, 'build', '.vite-cache', 'desktop')
+  )
+  assert.equal(
+    resolveERPViteCacheDir(rootDir, 'desktop', 'production', 15201),
+    path.join(rootDir, 'build', '.vite-cache', 'desktop')
   )
 })

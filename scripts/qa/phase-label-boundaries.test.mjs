@@ -64,3 +64,14 @@ test("ignores historical and generated paths", () => {
   });
   assert.equal(result.status, 0, result.stderr);
 });
+
+test("ignores extensionless binary artifacts", () => {
+  const result = runFixture({
+    server: Buffer.concat([
+      Buffer.from([0]),
+      Buffer.from("Phase" + " 8 binary payload"),
+    ]),
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /\[phase-label-boundaries\] ok/u);
+});

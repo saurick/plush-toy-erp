@@ -259,6 +259,80 @@ func (_u *ProcessNodeInstanceUpdate) ClearCompletedAt() *ProcessNodeInstanceUpda
 	return _u
 }
 
+// SetActivatedFromNodeInstanceID sets the "activated_from_node_instance_id" field.
+func (_u *ProcessNodeInstanceUpdate) SetActivatedFromNodeInstanceID(v int) *ProcessNodeInstanceUpdate {
+	_u.mutation.ResetActivatedFromNodeInstanceID()
+	_u.mutation.SetActivatedFromNodeInstanceID(v)
+	return _u
+}
+
+// SetNillableActivatedFromNodeInstanceID sets the "activated_from_node_instance_id" field if the given value is not nil.
+func (_u *ProcessNodeInstanceUpdate) SetNillableActivatedFromNodeInstanceID(v *int) *ProcessNodeInstanceUpdate {
+	if v != nil {
+		_u.SetActivatedFromNodeInstanceID(*v)
+	}
+	return _u
+}
+
+// AddActivatedFromNodeInstanceID adds value to the "activated_from_node_instance_id" field.
+func (_u *ProcessNodeInstanceUpdate) AddActivatedFromNodeInstanceID(v int) *ProcessNodeInstanceUpdate {
+	_u.mutation.AddActivatedFromNodeInstanceID(v)
+	return _u
+}
+
+// ClearActivatedFromNodeInstanceID clears the value of the "activated_from_node_instance_id" field.
+func (_u *ProcessNodeInstanceUpdate) ClearActivatedFromNodeInstanceID() *ProcessNodeInstanceUpdate {
+	_u.mutation.ClearActivatedFromNodeInstanceID()
+	return _u
+}
+
+// SetRoutingCompletedAt sets the "routing_completed_at" field.
+func (_u *ProcessNodeInstanceUpdate) SetRoutingCompletedAt(v time.Time) *ProcessNodeInstanceUpdate {
+	_u.mutation.SetRoutingCompletedAt(v)
+	return _u
+}
+
+// SetNillableRoutingCompletedAt sets the "routing_completed_at" field if the given value is not nil.
+func (_u *ProcessNodeInstanceUpdate) SetNillableRoutingCompletedAt(v *time.Time) *ProcessNodeInstanceUpdate {
+	if v != nil {
+		_u.SetRoutingCompletedAt(*v)
+	}
+	return _u
+}
+
+// ClearRoutingCompletedAt clears the value of the "routing_completed_at" field.
+func (_u *ProcessNodeInstanceUpdate) ClearRoutingCompletedAt() *ProcessNodeInstanceUpdate {
+	_u.mutation.ClearRoutingCompletedAt()
+	return _u
+}
+
+// SetRoutingCompletedBy sets the "routing_completed_by" field.
+func (_u *ProcessNodeInstanceUpdate) SetRoutingCompletedBy(v int) *ProcessNodeInstanceUpdate {
+	_u.mutation.ResetRoutingCompletedBy()
+	_u.mutation.SetRoutingCompletedBy(v)
+	return _u
+}
+
+// SetNillableRoutingCompletedBy sets the "routing_completed_by" field if the given value is not nil.
+func (_u *ProcessNodeInstanceUpdate) SetNillableRoutingCompletedBy(v *int) *ProcessNodeInstanceUpdate {
+	if v != nil {
+		_u.SetRoutingCompletedBy(*v)
+	}
+	return _u
+}
+
+// AddRoutingCompletedBy adds value to the "routing_completed_by" field.
+func (_u *ProcessNodeInstanceUpdate) AddRoutingCompletedBy(v int) *ProcessNodeInstanceUpdate {
+	_u.mutation.AddRoutingCompletedBy(v)
+	return _u
+}
+
+// ClearRoutingCompletedBy clears the value of the "routing_completed_by" field.
+func (_u *ProcessNodeInstanceUpdate) ClearRoutingCompletedBy() *ProcessNodeInstanceUpdate {
+	_u.mutation.ClearRoutingCompletedBy()
+	return _u
+}
+
 // SetOutcome sets the "outcome" field.
 func (_u *ProcessNodeInstanceUpdate) SetOutcome(v string) *ProcessNodeInstanceUpdate {
 	_u.mutation.SetOutcome(v)
@@ -276,6 +350,180 @@ func (_u *ProcessNodeInstanceUpdate) SetNillableOutcome(v *string) *ProcessNodeI
 // ClearOutcome clears the value of the "outcome" field.
 func (_u *ProcessNodeInstanceUpdate) ClearOutcome() *ProcessNodeInstanceUpdate {
 	_u.mutation.ClearOutcome()
+	return _u
+}
+
+// SetBlockKind sets the "block_kind" field.
+func (_u *ProcessNodeInstanceUpdate) SetBlockKind(v string) *ProcessNodeInstanceUpdate {
+	_u.mutation.SetBlockKind(v)
+	return _u
+}
+
+// SetNillableBlockKind sets the "block_kind" field if the given value is not nil.
+func (_u *ProcessNodeInstanceUpdate) SetNillableBlockKind(v *string) *ProcessNodeInstanceUpdate {
+	if v != nil {
+		_u.SetBlockKind(*v)
+	}
+	return _u
+}
+
+// ClearBlockKind clears the value of the "block_kind" field.
+func (_u *ProcessNodeInstanceUpdate) ClearBlockKind() *ProcessNodeInstanceUpdate {
+	_u.mutation.ClearBlockKind()
+	return _u
+}
+
+// SetBlockedReasonCode sets the "blocked_reason_code" field.
+func (_u *ProcessNodeInstanceUpdate) SetBlockedReasonCode(v string) *ProcessNodeInstanceUpdate {
+	_u.mutation.SetBlockedReasonCode(v)
+	return _u
+}
+
+// SetNillableBlockedReasonCode sets the "blocked_reason_code" field if the given value is not nil.
+func (_u *ProcessNodeInstanceUpdate) SetNillableBlockedReasonCode(v *string) *ProcessNodeInstanceUpdate {
+	if v != nil {
+		_u.SetBlockedReasonCode(*v)
+	}
+	return _u
+}
+
+// ClearBlockedReasonCode clears the value of the "blocked_reason_code" field.
+func (_u *ProcessNodeInstanceUpdate) ClearBlockedReasonCode() *ProcessNodeInstanceUpdate {
+	_u.mutation.ClearBlockedReasonCode()
+	return _u
+}
+
+// SetBlockedReason sets the "blocked_reason" field.
+func (_u *ProcessNodeInstanceUpdate) SetBlockedReason(v string) *ProcessNodeInstanceUpdate {
+	_u.mutation.SetBlockedReason(v)
+	return _u
+}
+
+// SetNillableBlockedReason sets the "blocked_reason" field if the given value is not nil.
+func (_u *ProcessNodeInstanceUpdate) SetNillableBlockedReason(v *string) *ProcessNodeInstanceUpdate {
+	if v != nil {
+		_u.SetBlockedReason(*v)
+	}
+	return _u
+}
+
+// ClearBlockedReason clears the value of the "blocked_reason" field.
+func (_u *ProcessNodeInstanceUpdate) ClearBlockedReason() *ProcessNodeInstanceUpdate {
+	_u.mutation.ClearBlockedReason()
+	return _u
+}
+
+// SetBlockedAt sets the "blocked_at" field.
+func (_u *ProcessNodeInstanceUpdate) SetBlockedAt(v time.Time) *ProcessNodeInstanceUpdate {
+	_u.mutation.SetBlockedAt(v)
+	return _u
+}
+
+// SetNillableBlockedAt sets the "blocked_at" field if the given value is not nil.
+func (_u *ProcessNodeInstanceUpdate) SetNillableBlockedAt(v *time.Time) *ProcessNodeInstanceUpdate {
+	if v != nil {
+		_u.SetBlockedAt(*v)
+	}
+	return _u
+}
+
+// ClearBlockedAt clears the value of the "blocked_at" field.
+func (_u *ProcessNodeInstanceUpdate) ClearBlockedAt() *ProcessNodeInstanceUpdate {
+	_u.mutation.ClearBlockedAt()
+	return _u
+}
+
+// SetBlockedBy sets the "blocked_by" field.
+func (_u *ProcessNodeInstanceUpdate) SetBlockedBy(v int) *ProcessNodeInstanceUpdate {
+	_u.mutation.ResetBlockedBy()
+	_u.mutation.SetBlockedBy(v)
+	return _u
+}
+
+// SetNillableBlockedBy sets the "blocked_by" field if the given value is not nil.
+func (_u *ProcessNodeInstanceUpdate) SetNillableBlockedBy(v *int) *ProcessNodeInstanceUpdate {
+	if v != nil {
+		_u.SetBlockedBy(*v)
+	}
+	return _u
+}
+
+// AddBlockedBy adds value to the "blocked_by" field.
+func (_u *ProcessNodeInstanceUpdate) AddBlockedBy(v int) *ProcessNodeInstanceUpdate {
+	_u.mutation.AddBlockedBy(v)
+	return _u
+}
+
+// ClearBlockedBy clears the value of the "blocked_by" field.
+func (_u *ProcessNodeInstanceUpdate) ClearBlockedBy() *ProcessNodeInstanceUpdate {
+	_u.mutation.ClearBlockedBy()
+	return _u
+}
+
+// SetResumeReason sets the "resume_reason" field.
+func (_u *ProcessNodeInstanceUpdate) SetResumeReason(v string) *ProcessNodeInstanceUpdate {
+	_u.mutation.SetResumeReason(v)
+	return _u
+}
+
+// SetNillableResumeReason sets the "resume_reason" field if the given value is not nil.
+func (_u *ProcessNodeInstanceUpdate) SetNillableResumeReason(v *string) *ProcessNodeInstanceUpdate {
+	if v != nil {
+		_u.SetResumeReason(*v)
+	}
+	return _u
+}
+
+// ClearResumeReason clears the value of the "resume_reason" field.
+func (_u *ProcessNodeInstanceUpdate) ClearResumeReason() *ProcessNodeInstanceUpdate {
+	_u.mutation.ClearResumeReason()
+	return _u
+}
+
+// SetResumedAt sets the "resumed_at" field.
+func (_u *ProcessNodeInstanceUpdate) SetResumedAt(v time.Time) *ProcessNodeInstanceUpdate {
+	_u.mutation.SetResumedAt(v)
+	return _u
+}
+
+// SetNillableResumedAt sets the "resumed_at" field if the given value is not nil.
+func (_u *ProcessNodeInstanceUpdate) SetNillableResumedAt(v *time.Time) *ProcessNodeInstanceUpdate {
+	if v != nil {
+		_u.SetResumedAt(*v)
+	}
+	return _u
+}
+
+// ClearResumedAt clears the value of the "resumed_at" field.
+func (_u *ProcessNodeInstanceUpdate) ClearResumedAt() *ProcessNodeInstanceUpdate {
+	_u.mutation.ClearResumedAt()
+	return _u
+}
+
+// SetResumedBy sets the "resumed_by" field.
+func (_u *ProcessNodeInstanceUpdate) SetResumedBy(v int) *ProcessNodeInstanceUpdate {
+	_u.mutation.ResetResumedBy()
+	_u.mutation.SetResumedBy(v)
+	return _u
+}
+
+// SetNillableResumedBy sets the "resumed_by" field if the given value is not nil.
+func (_u *ProcessNodeInstanceUpdate) SetNillableResumedBy(v *int) *ProcessNodeInstanceUpdate {
+	if v != nil {
+		_u.SetResumedBy(*v)
+	}
+	return _u
+}
+
+// AddResumedBy adds value to the "resumed_by" field.
+func (_u *ProcessNodeInstanceUpdate) AddResumedBy(v int) *ProcessNodeInstanceUpdate {
+	_u.mutation.AddResumedBy(v)
+	return _u
+}
+
+// ClearResumedBy clears the value of the "resumed_by" field.
+func (_u *ProcessNodeInstanceUpdate) ClearResumedBy() *ProcessNodeInstanceUpdate {
+	_u.mutation.ClearResumedBy()
 	return _u
 }
 
@@ -679,6 +927,33 @@ func (_u *ProcessNodeInstanceUpdate) AddVersion(v int) *ProcessNodeInstanceUpdat
 	return _u
 }
 
+// SetUpdatedBy sets the "updated_by" field.
+func (_u *ProcessNodeInstanceUpdate) SetUpdatedBy(v int) *ProcessNodeInstanceUpdate {
+	_u.mutation.ResetUpdatedBy()
+	_u.mutation.SetUpdatedBy(v)
+	return _u
+}
+
+// SetNillableUpdatedBy sets the "updated_by" field if the given value is not nil.
+func (_u *ProcessNodeInstanceUpdate) SetNillableUpdatedBy(v *int) *ProcessNodeInstanceUpdate {
+	if v != nil {
+		_u.SetUpdatedBy(*v)
+	}
+	return _u
+}
+
+// AddUpdatedBy adds value to the "updated_by" field.
+func (_u *ProcessNodeInstanceUpdate) AddUpdatedBy(v int) *ProcessNodeInstanceUpdate {
+	_u.mutation.AddUpdatedBy(v)
+	return _u
+}
+
+// ClearUpdatedBy clears the value of the "updated_by" field.
+func (_u *ProcessNodeInstanceUpdate) ClearUpdatedBy() *ProcessNodeInstanceUpdate {
+	_u.mutation.ClearUpdatedBy()
+	return _u
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *ProcessNodeInstanceUpdate) SetUpdatedAt(v time.Time) *ProcessNodeInstanceUpdate {
 	_u.mutation.SetUpdatedAt(v)
@@ -820,9 +1095,49 @@ func (_u *ProcessNodeInstanceUpdate) check() error {
 			return &ValidationError{Name: "action_set_key", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.action_set_key": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ActivatedFromNodeInstanceID(); ok {
+		if err := processnodeinstance.ActivatedFromNodeInstanceIDValidator(v); err != nil {
+			return &ValidationError{Name: "activated_from_node_instance_id", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.activated_from_node_instance_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.RoutingCompletedBy(); ok {
+		if err := processnodeinstance.RoutingCompletedByValidator(v); err != nil {
+			return &ValidationError{Name: "routing_completed_by", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.routing_completed_by": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Outcome(); ok {
 		if err := processnodeinstance.OutcomeValidator(v); err != nil {
 			return &ValidationError{Name: "outcome", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.outcome": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.BlockKind(); ok {
+		if err := processnodeinstance.BlockKindValidator(v); err != nil {
+			return &ValidationError{Name: "block_kind", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.block_kind": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.BlockedReasonCode(); ok {
+		if err := processnodeinstance.BlockedReasonCodeValidator(v); err != nil {
+			return &ValidationError{Name: "blocked_reason_code", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.blocked_reason_code": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.BlockedReason(); ok {
+		if err := processnodeinstance.BlockedReasonValidator(v); err != nil {
+			return &ValidationError{Name: "blocked_reason", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.blocked_reason": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.BlockedBy(); ok {
+		if err := processnodeinstance.BlockedByValidator(v); err != nil {
+			return &ValidationError{Name: "blocked_by", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.blocked_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ResumeReason(); ok {
+		if err := processnodeinstance.ResumeReasonValidator(v); err != nil {
+			return &ValidationError{Name: "resume_reason", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.resume_reason": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ResumedBy(); ok {
+		if err := processnodeinstance.ResumedByValidator(v); err != nil {
+			return &ValidationError{Name: "resumed_by", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.resumed_by": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.DomainCommandFingerprint(); ok {
@@ -893,6 +1208,11 @@ func (_u *ProcessNodeInstanceUpdate) check() error {
 	if v, ok := _u.mutation.Version(); ok {
 		if err := processnodeinstance.VersionValidator(v); err != nil {
 			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.version": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.UpdatedBy(); ok {
+		if err := processnodeinstance.UpdatedByValidator(v); err != nil {
+			return &ValidationError{Name: "updated_by", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.updated_by": %w`, err)}
 		}
 	}
 	if _u.mutation.ProcessInstanceCleared() && len(_u.mutation.ProcessInstanceIDs()) > 0 {
@@ -976,11 +1296,89 @@ func (_u *ProcessNodeInstanceUpdate) sqlSave(ctx context.Context) (_node int, er
 	if _u.mutation.CompletedAtCleared() {
 		_spec.ClearField(processnodeinstance.FieldCompletedAt, field.TypeTime)
 	}
+	if value, ok := _u.mutation.ActivatedFromNodeInstanceID(); ok {
+		_spec.SetField(processnodeinstance.FieldActivatedFromNodeInstanceID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedActivatedFromNodeInstanceID(); ok {
+		_spec.AddField(processnodeinstance.FieldActivatedFromNodeInstanceID, field.TypeInt, value)
+	}
+	if _u.mutation.ActivatedFromNodeInstanceIDCleared() {
+		_spec.ClearField(processnodeinstance.FieldActivatedFromNodeInstanceID, field.TypeInt)
+	}
+	if value, ok := _u.mutation.RoutingCompletedAt(); ok {
+		_spec.SetField(processnodeinstance.FieldRoutingCompletedAt, field.TypeTime, value)
+	}
+	if _u.mutation.RoutingCompletedAtCleared() {
+		_spec.ClearField(processnodeinstance.FieldRoutingCompletedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.RoutingCompletedBy(); ok {
+		_spec.SetField(processnodeinstance.FieldRoutingCompletedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedRoutingCompletedBy(); ok {
+		_spec.AddField(processnodeinstance.FieldRoutingCompletedBy, field.TypeInt, value)
+	}
+	if _u.mutation.RoutingCompletedByCleared() {
+		_spec.ClearField(processnodeinstance.FieldRoutingCompletedBy, field.TypeInt)
+	}
 	if value, ok := _u.mutation.Outcome(); ok {
 		_spec.SetField(processnodeinstance.FieldOutcome, field.TypeString, value)
 	}
 	if _u.mutation.OutcomeCleared() {
 		_spec.ClearField(processnodeinstance.FieldOutcome, field.TypeString)
+	}
+	if value, ok := _u.mutation.BlockKind(); ok {
+		_spec.SetField(processnodeinstance.FieldBlockKind, field.TypeString, value)
+	}
+	if _u.mutation.BlockKindCleared() {
+		_spec.ClearField(processnodeinstance.FieldBlockKind, field.TypeString)
+	}
+	if value, ok := _u.mutation.BlockedReasonCode(); ok {
+		_spec.SetField(processnodeinstance.FieldBlockedReasonCode, field.TypeString, value)
+	}
+	if _u.mutation.BlockedReasonCodeCleared() {
+		_spec.ClearField(processnodeinstance.FieldBlockedReasonCode, field.TypeString)
+	}
+	if value, ok := _u.mutation.BlockedReason(); ok {
+		_spec.SetField(processnodeinstance.FieldBlockedReason, field.TypeString, value)
+	}
+	if _u.mutation.BlockedReasonCleared() {
+		_spec.ClearField(processnodeinstance.FieldBlockedReason, field.TypeString)
+	}
+	if value, ok := _u.mutation.BlockedAt(); ok {
+		_spec.SetField(processnodeinstance.FieldBlockedAt, field.TypeTime, value)
+	}
+	if _u.mutation.BlockedAtCleared() {
+		_spec.ClearField(processnodeinstance.FieldBlockedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.BlockedBy(); ok {
+		_spec.SetField(processnodeinstance.FieldBlockedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedBlockedBy(); ok {
+		_spec.AddField(processnodeinstance.FieldBlockedBy, field.TypeInt, value)
+	}
+	if _u.mutation.BlockedByCleared() {
+		_spec.ClearField(processnodeinstance.FieldBlockedBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.ResumeReason(); ok {
+		_spec.SetField(processnodeinstance.FieldResumeReason, field.TypeString, value)
+	}
+	if _u.mutation.ResumeReasonCleared() {
+		_spec.ClearField(processnodeinstance.FieldResumeReason, field.TypeString)
+	}
+	if value, ok := _u.mutation.ResumedAt(); ok {
+		_spec.SetField(processnodeinstance.FieldResumedAt, field.TypeTime, value)
+	}
+	if _u.mutation.ResumedAtCleared() {
+		_spec.ClearField(processnodeinstance.FieldResumedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.ResumedBy(); ok {
+		_spec.SetField(processnodeinstance.FieldResumedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedResumedBy(); ok {
+		_spec.AddField(processnodeinstance.FieldResumedBy, field.TypeInt, value)
+	}
+	if _u.mutation.ResumedByCleared() {
+		_spec.ClearField(processnodeinstance.FieldResumedBy, field.TypeInt)
 	}
 	if value, ok := _u.mutation.DomainCommandFingerprint(); ok {
 		_spec.SetField(processnodeinstance.FieldDomainCommandFingerprint, field.TypeString, value)
@@ -1110,6 +1508,15 @@ func (_u *ProcessNodeInstanceUpdate) sqlSave(ctx context.Context) (_node int, er
 	}
 	if value, ok := _u.mutation.AddedVersion(); ok {
 		_spec.AddField(processnodeinstance.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.UpdatedBy(); ok {
+		_spec.SetField(processnodeinstance.FieldUpdatedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedUpdatedBy(); ok {
+		_spec.AddField(processnodeinstance.FieldUpdatedBy, field.TypeInt, value)
+	}
+	if _u.mutation.UpdatedByCleared() {
+		_spec.ClearField(processnodeinstance.FieldUpdatedBy, field.TypeInt)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(processnodeinstance.FieldUpdatedAt, field.TypeTime, value)
@@ -1437,6 +1844,80 @@ func (_u *ProcessNodeInstanceUpdateOne) ClearCompletedAt() *ProcessNodeInstanceU
 	return _u
 }
 
+// SetActivatedFromNodeInstanceID sets the "activated_from_node_instance_id" field.
+func (_u *ProcessNodeInstanceUpdateOne) SetActivatedFromNodeInstanceID(v int) *ProcessNodeInstanceUpdateOne {
+	_u.mutation.ResetActivatedFromNodeInstanceID()
+	_u.mutation.SetActivatedFromNodeInstanceID(v)
+	return _u
+}
+
+// SetNillableActivatedFromNodeInstanceID sets the "activated_from_node_instance_id" field if the given value is not nil.
+func (_u *ProcessNodeInstanceUpdateOne) SetNillableActivatedFromNodeInstanceID(v *int) *ProcessNodeInstanceUpdateOne {
+	if v != nil {
+		_u.SetActivatedFromNodeInstanceID(*v)
+	}
+	return _u
+}
+
+// AddActivatedFromNodeInstanceID adds value to the "activated_from_node_instance_id" field.
+func (_u *ProcessNodeInstanceUpdateOne) AddActivatedFromNodeInstanceID(v int) *ProcessNodeInstanceUpdateOne {
+	_u.mutation.AddActivatedFromNodeInstanceID(v)
+	return _u
+}
+
+// ClearActivatedFromNodeInstanceID clears the value of the "activated_from_node_instance_id" field.
+func (_u *ProcessNodeInstanceUpdateOne) ClearActivatedFromNodeInstanceID() *ProcessNodeInstanceUpdateOne {
+	_u.mutation.ClearActivatedFromNodeInstanceID()
+	return _u
+}
+
+// SetRoutingCompletedAt sets the "routing_completed_at" field.
+func (_u *ProcessNodeInstanceUpdateOne) SetRoutingCompletedAt(v time.Time) *ProcessNodeInstanceUpdateOne {
+	_u.mutation.SetRoutingCompletedAt(v)
+	return _u
+}
+
+// SetNillableRoutingCompletedAt sets the "routing_completed_at" field if the given value is not nil.
+func (_u *ProcessNodeInstanceUpdateOne) SetNillableRoutingCompletedAt(v *time.Time) *ProcessNodeInstanceUpdateOne {
+	if v != nil {
+		_u.SetRoutingCompletedAt(*v)
+	}
+	return _u
+}
+
+// ClearRoutingCompletedAt clears the value of the "routing_completed_at" field.
+func (_u *ProcessNodeInstanceUpdateOne) ClearRoutingCompletedAt() *ProcessNodeInstanceUpdateOne {
+	_u.mutation.ClearRoutingCompletedAt()
+	return _u
+}
+
+// SetRoutingCompletedBy sets the "routing_completed_by" field.
+func (_u *ProcessNodeInstanceUpdateOne) SetRoutingCompletedBy(v int) *ProcessNodeInstanceUpdateOne {
+	_u.mutation.ResetRoutingCompletedBy()
+	_u.mutation.SetRoutingCompletedBy(v)
+	return _u
+}
+
+// SetNillableRoutingCompletedBy sets the "routing_completed_by" field if the given value is not nil.
+func (_u *ProcessNodeInstanceUpdateOne) SetNillableRoutingCompletedBy(v *int) *ProcessNodeInstanceUpdateOne {
+	if v != nil {
+		_u.SetRoutingCompletedBy(*v)
+	}
+	return _u
+}
+
+// AddRoutingCompletedBy adds value to the "routing_completed_by" field.
+func (_u *ProcessNodeInstanceUpdateOne) AddRoutingCompletedBy(v int) *ProcessNodeInstanceUpdateOne {
+	_u.mutation.AddRoutingCompletedBy(v)
+	return _u
+}
+
+// ClearRoutingCompletedBy clears the value of the "routing_completed_by" field.
+func (_u *ProcessNodeInstanceUpdateOne) ClearRoutingCompletedBy() *ProcessNodeInstanceUpdateOne {
+	_u.mutation.ClearRoutingCompletedBy()
+	return _u
+}
+
 // SetOutcome sets the "outcome" field.
 func (_u *ProcessNodeInstanceUpdateOne) SetOutcome(v string) *ProcessNodeInstanceUpdateOne {
 	_u.mutation.SetOutcome(v)
@@ -1454,6 +1935,180 @@ func (_u *ProcessNodeInstanceUpdateOne) SetNillableOutcome(v *string) *ProcessNo
 // ClearOutcome clears the value of the "outcome" field.
 func (_u *ProcessNodeInstanceUpdateOne) ClearOutcome() *ProcessNodeInstanceUpdateOne {
 	_u.mutation.ClearOutcome()
+	return _u
+}
+
+// SetBlockKind sets the "block_kind" field.
+func (_u *ProcessNodeInstanceUpdateOne) SetBlockKind(v string) *ProcessNodeInstanceUpdateOne {
+	_u.mutation.SetBlockKind(v)
+	return _u
+}
+
+// SetNillableBlockKind sets the "block_kind" field if the given value is not nil.
+func (_u *ProcessNodeInstanceUpdateOne) SetNillableBlockKind(v *string) *ProcessNodeInstanceUpdateOne {
+	if v != nil {
+		_u.SetBlockKind(*v)
+	}
+	return _u
+}
+
+// ClearBlockKind clears the value of the "block_kind" field.
+func (_u *ProcessNodeInstanceUpdateOne) ClearBlockKind() *ProcessNodeInstanceUpdateOne {
+	_u.mutation.ClearBlockKind()
+	return _u
+}
+
+// SetBlockedReasonCode sets the "blocked_reason_code" field.
+func (_u *ProcessNodeInstanceUpdateOne) SetBlockedReasonCode(v string) *ProcessNodeInstanceUpdateOne {
+	_u.mutation.SetBlockedReasonCode(v)
+	return _u
+}
+
+// SetNillableBlockedReasonCode sets the "blocked_reason_code" field if the given value is not nil.
+func (_u *ProcessNodeInstanceUpdateOne) SetNillableBlockedReasonCode(v *string) *ProcessNodeInstanceUpdateOne {
+	if v != nil {
+		_u.SetBlockedReasonCode(*v)
+	}
+	return _u
+}
+
+// ClearBlockedReasonCode clears the value of the "blocked_reason_code" field.
+func (_u *ProcessNodeInstanceUpdateOne) ClearBlockedReasonCode() *ProcessNodeInstanceUpdateOne {
+	_u.mutation.ClearBlockedReasonCode()
+	return _u
+}
+
+// SetBlockedReason sets the "blocked_reason" field.
+func (_u *ProcessNodeInstanceUpdateOne) SetBlockedReason(v string) *ProcessNodeInstanceUpdateOne {
+	_u.mutation.SetBlockedReason(v)
+	return _u
+}
+
+// SetNillableBlockedReason sets the "blocked_reason" field if the given value is not nil.
+func (_u *ProcessNodeInstanceUpdateOne) SetNillableBlockedReason(v *string) *ProcessNodeInstanceUpdateOne {
+	if v != nil {
+		_u.SetBlockedReason(*v)
+	}
+	return _u
+}
+
+// ClearBlockedReason clears the value of the "blocked_reason" field.
+func (_u *ProcessNodeInstanceUpdateOne) ClearBlockedReason() *ProcessNodeInstanceUpdateOne {
+	_u.mutation.ClearBlockedReason()
+	return _u
+}
+
+// SetBlockedAt sets the "blocked_at" field.
+func (_u *ProcessNodeInstanceUpdateOne) SetBlockedAt(v time.Time) *ProcessNodeInstanceUpdateOne {
+	_u.mutation.SetBlockedAt(v)
+	return _u
+}
+
+// SetNillableBlockedAt sets the "blocked_at" field if the given value is not nil.
+func (_u *ProcessNodeInstanceUpdateOne) SetNillableBlockedAt(v *time.Time) *ProcessNodeInstanceUpdateOne {
+	if v != nil {
+		_u.SetBlockedAt(*v)
+	}
+	return _u
+}
+
+// ClearBlockedAt clears the value of the "blocked_at" field.
+func (_u *ProcessNodeInstanceUpdateOne) ClearBlockedAt() *ProcessNodeInstanceUpdateOne {
+	_u.mutation.ClearBlockedAt()
+	return _u
+}
+
+// SetBlockedBy sets the "blocked_by" field.
+func (_u *ProcessNodeInstanceUpdateOne) SetBlockedBy(v int) *ProcessNodeInstanceUpdateOne {
+	_u.mutation.ResetBlockedBy()
+	_u.mutation.SetBlockedBy(v)
+	return _u
+}
+
+// SetNillableBlockedBy sets the "blocked_by" field if the given value is not nil.
+func (_u *ProcessNodeInstanceUpdateOne) SetNillableBlockedBy(v *int) *ProcessNodeInstanceUpdateOne {
+	if v != nil {
+		_u.SetBlockedBy(*v)
+	}
+	return _u
+}
+
+// AddBlockedBy adds value to the "blocked_by" field.
+func (_u *ProcessNodeInstanceUpdateOne) AddBlockedBy(v int) *ProcessNodeInstanceUpdateOne {
+	_u.mutation.AddBlockedBy(v)
+	return _u
+}
+
+// ClearBlockedBy clears the value of the "blocked_by" field.
+func (_u *ProcessNodeInstanceUpdateOne) ClearBlockedBy() *ProcessNodeInstanceUpdateOne {
+	_u.mutation.ClearBlockedBy()
+	return _u
+}
+
+// SetResumeReason sets the "resume_reason" field.
+func (_u *ProcessNodeInstanceUpdateOne) SetResumeReason(v string) *ProcessNodeInstanceUpdateOne {
+	_u.mutation.SetResumeReason(v)
+	return _u
+}
+
+// SetNillableResumeReason sets the "resume_reason" field if the given value is not nil.
+func (_u *ProcessNodeInstanceUpdateOne) SetNillableResumeReason(v *string) *ProcessNodeInstanceUpdateOne {
+	if v != nil {
+		_u.SetResumeReason(*v)
+	}
+	return _u
+}
+
+// ClearResumeReason clears the value of the "resume_reason" field.
+func (_u *ProcessNodeInstanceUpdateOne) ClearResumeReason() *ProcessNodeInstanceUpdateOne {
+	_u.mutation.ClearResumeReason()
+	return _u
+}
+
+// SetResumedAt sets the "resumed_at" field.
+func (_u *ProcessNodeInstanceUpdateOne) SetResumedAt(v time.Time) *ProcessNodeInstanceUpdateOne {
+	_u.mutation.SetResumedAt(v)
+	return _u
+}
+
+// SetNillableResumedAt sets the "resumed_at" field if the given value is not nil.
+func (_u *ProcessNodeInstanceUpdateOne) SetNillableResumedAt(v *time.Time) *ProcessNodeInstanceUpdateOne {
+	if v != nil {
+		_u.SetResumedAt(*v)
+	}
+	return _u
+}
+
+// ClearResumedAt clears the value of the "resumed_at" field.
+func (_u *ProcessNodeInstanceUpdateOne) ClearResumedAt() *ProcessNodeInstanceUpdateOne {
+	_u.mutation.ClearResumedAt()
+	return _u
+}
+
+// SetResumedBy sets the "resumed_by" field.
+func (_u *ProcessNodeInstanceUpdateOne) SetResumedBy(v int) *ProcessNodeInstanceUpdateOne {
+	_u.mutation.ResetResumedBy()
+	_u.mutation.SetResumedBy(v)
+	return _u
+}
+
+// SetNillableResumedBy sets the "resumed_by" field if the given value is not nil.
+func (_u *ProcessNodeInstanceUpdateOne) SetNillableResumedBy(v *int) *ProcessNodeInstanceUpdateOne {
+	if v != nil {
+		_u.SetResumedBy(*v)
+	}
+	return _u
+}
+
+// AddResumedBy adds value to the "resumed_by" field.
+func (_u *ProcessNodeInstanceUpdateOne) AddResumedBy(v int) *ProcessNodeInstanceUpdateOne {
+	_u.mutation.AddResumedBy(v)
+	return _u
+}
+
+// ClearResumedBy clears the value of the "resumed_by" field.
+func (_u *ProcessNodeInstanceUpdateOne) ClearResumedBy() *ProcessNodeInstanceUpdateOne {
+	_u.mutation.ClearResumedBy()
 	return _u
 }
 
@@ -1857,6 +2512,33 @@ func (_u *ProcessNodeInstanceUpdateOne) AddVersion(v int) *ProcessNodeInstanceUp
 	return _u
 }
 
+// SetUpdatedBy sets the "updated_by" field.
+func (_u *ProcessNodeInstanceUpdateOne) SetUpdatedBy(v int) *ProcessNodeInstanceUpdateOne {
+	_u.mutation.ResetUpdatedBy()
+	_u.mutation.SetUpdatedBy(v)
+	return _u
+}
+
+// SetNillableUpdatedBy sets the "updated_by" field if the given value is not nil.
+func (_u *ProcessNodeInstanceUpdateOne) SetNillableUpdatedBy(v *int) *ProcessNodeInstanceUpdateOne {
+	if v != nil {
+		_u.SetUpdatedBy(*v)
+	}
+	return _u
+}
+
+// AddUpdatedBy adds value to the "updated_by" field.
+func (_u *ProcessNodeInstanceUpdateOne) AddUpdatedBy(v int) *ProcessNodeInstanceUpdateOne {
+	_u.mutation.AddUpdatedBy(v)
+	return _u
+}
+
+// ClearUpdatedBy clears the value of the "updated_by" field.
+func (_u *ProcessNodeInstanceUpdateOne) ClearUpdatedBy() *ProcessNodeInstanceUpdateOne {
+	_u.mutation.ClearUpdatedBy()
+	return _u
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *ProcessNodeInstanceUpdateOne) SetUpdatedAt(v time.Time) *ProcessNodeInstanceUpdateOne {
 	_u.mutation.SetUpdatedAt(v)
@@ -2011,9 +2693,49 @@ func (_u *ProcessNodeInstanceUpdateOne) check() error {
 			return &ValidationError{Name: "action_set_key", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.action_set_key": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ActivatedFromNodeInstanceID(); ok {
+		if err := processnodeinstance.ActivatedFromNodeInstanceIDValidator(v); err != nil {
+			return &ValidationError{Name: "activated_from_node_instance_id", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.activated_from_node_instance_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.RoutingCompletedBy(); ok {
+		if err := processnodeinstance.RoutingCompletedByValidator(v); err != nil {
+			return &ValidationError{Name: "routing_completed_by", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.routing_completed_by": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Outcome(); ok {
 		if err := processnodeinstance.OutcomeValidator(v); err != nil {
 			return &ValidationError{Name: "outcome", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.outcome": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.BlockKind(); ok {
+		if err := processnodeinstance.BlockKindValidator(v); err != nil {
+			return &ValidationError{Name: "block_kind", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.block_kind": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.BlockedReasonCode(); ok {
+		if err := processnodeinstance.BlockedReasonCodeValidator(v); err != nil {
+			return &ValidationError{Name: "blocked_reason_code", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.blocked_reason_code": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.BlockedReason(); ok {
+		if err := processnodeinstance.BlockedReasonValidator(v); err != nil {
+			return &ValidationError{Name: "blocked_reason", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.blocked_reason": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.BlockedBy(); ok {
+		if err := processnodeinstance.BlockedByValidator(v); err != nil {
+			return &ValidationError{Name: "blocked_by", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.blocked_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ResumeReason(); ok {
+		if err := processnodeinstance.ResumeReasonValidator(v); err != nil {
+			return &ValidationError{Name: "resume_reason", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.resume_reason": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ResumedBy(); ok {
+		if err := processnodeinstance.ResumedByValidator(v); err != nil {
+			return &ValidationError{Name: "resumed_by", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.resumed_by": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.DomainCommandFingerprint(); ok {
@@ -2084,6 +2806,11 @@ func (_u *ProcessNodeInstanceUpdateOne) check() error {
 	if v, ok := _u.mutation.Version(); ok {
 		if err := processnodeinstance.VersionValidator(v); err != nil {
 			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.version": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.UpdatedBy(); ok {
+		if err := processnodeinstance.UpdatedByValidator(v); err != nil {
+			return &ValidationError{Name: "updated_by", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.updated_by": %w`, err)}
 		}
 	}
 	if _u.mutation.ProcessInstanceCleared() && len(_u.mutation.ProcessInstanceIDs()) > 0 {
@@ -2184,11 +2911,89 @@ func (_u *ProcessNodeInstanceUpdateOne) sqlSave(ctx context.Context) (_node *Pro
 	if _u.mutation.CompletedAtCleared() {
 		_spec.ClearField(processnodeinstance.FieldCompletedAt, field.TypeTime)
 	}
+	if value, ok := _u.mutation.ActivatedFromNodeInstanceID(); ok {
+		_spec.SetField(processnodeinstance.FieldActivatedFromNodeInstanceID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedActivatedFromNodeInstanceID(); ok {
+		_spec.AddField(processnodeinstance.FieldActivatedFromNodeInstanceID, field.TypeInt, value)
+	}
+	if _u.mutation.ActivatedFromNodeInstanceIDCleared() {
+		_spec.ClearField(processnodeinstance.FieldActivatedFromNodeInstanceID, field.TypeInt)
+	}
+	if value, ok := _u.mutation.RoutingCompletedAt(); ok {
+		_spec.SetField(processnodeinstance.FieldRoutingCompletedAt, field.TypeTime, value)
+	}
+	if _u.mutation.RoutingCompletedAtCleared() {
+		_spec.ClearField(processnodeinstance.FieldRoutingCompletedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.RoutingCompletedBy(); ok {
+		_spec.SetField(processnodeinstance.FieldRoutingCompletedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedRoutingCompletedBy(); ok {
+		_spec.AddField(processnodeinstance.FieldRoutingCompletedBy, field.TypeInt, value)
+	}
+	if _u.mutation.RoutingCompletedByCleared() {
+		_spec.ClearField(processnodeinstance.FieldRoutingCompletedBy, field.TypeInt)
+	}
 	if value, ok := _u.mutation.Outcome(); ok {
 		_spec.SetField(processnodeinstance.FieldOutcome, field.TypeString, value)
 	}
 	if _u.mutation.OutcomeCleared() {
 		_spec.ClearField(processnodeinstance.FieldOutcome, field.TypeString)
+	}
+	if value, ok := _u.mutation.BlockKind(); ok {
+		_spec.SetField(processnodeinstance.FieldBlockKind, field.TypeString, value)
+	}
+	if _u.mutation.BlockKindCleared() {
+		_spec.ClearField(processnodeinstance.FieldBlockKind, field.TypeString)
+	}
+	if value, ok := _u.mutation.BlockedReasonCode(); ok {
+		_spec.SetField(processnodeinstance.FieldBlockedReasonCode, field.TypeString, value)
+	}
+	if _u.mutation.BlockedReasonCodeCleared() {
+		_spec.ClearField(processnodeinstance.FieldBlockedReasonCode, field.TypeString)
+	}
+	if value, ok := _u.mutation.BlockedReason(); ok {
+		_spec.SetField(processnodeinstance.FieldBlockedReason, field.TypeString, value)
+	}
+	if _u.mutation.BlockedReasonCleared() {
+		_spec.ClearField(processnodeinstance.FieldBlockedReason, field.TypeString)
+	}
+	if value, ok := _u.mutation.BlockedAt(); ok {
+		_spec.SetField(processnodeinstance.FieldBlockedAt, field.TypeTime, value)
+	}
+	if _u.mutation.BlockedAtCleared() {
+		_spec.ClearField(processnodeinstance.FieldBlockedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.BlockedBy(); ok {
+		_spec.SetField(processnodeinstance.FieldBlockedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedBlockedBy(); ok {
+		_spec.AddField(processnodeinstance.FieldBlockedBy, field.TypeInt, value)
+	}
+	if _u.mutation.BlockedByCleared() {
+		_spec.ClearField(processnodeinstance.FieldBlockedBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.ResumeReason(); ok {
+		_spec.SetField(processnodeinstance.FieldResumeReason, field.TypeString, value)
+	}
+	if _u.mutation.ResumeReasonCleared() {
+		_spec.ClearField(processnodeinstance.FieldResumeReason, field.TypeString)
+	}
+	if value, ok := _u.mutation.ResumedAt(); ok {
+		_spec.SetField(processnodeinstance.FieldResumedAt, field.TypeTime, value)
+	}
+	if _u.mutation.ResumedAtCleared() {
+		_spec.ClearField(processnodeinstance.FieldResumedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.ResumedBy(); ok {
+		_spec.SetField(processnodeinstance.FieldResumedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedResumedBy(); ok {
+		_spec.AddField(processnodeinstance.FieldResumedBy, field.TypeInt, value)
+	}
+	if _u.mutation.ResumedByCleared() {
+		_spec.ClearField(processnodeinstance.FieldResumedBy, field.TypeInt)
 	}
 	if value, ok := _u.mutation.DomainCommandFingerprint(); ok {
 		_spec.SetField(processnodeinstance.FieldDomainCommandFingerprint, field.TypeString, value)
@@ -2318,6 +3123,15 @@ func (_u *ProcessNodeInstanceUpdateOne) sqlSave(ctx context.Context) (_node *Pro
 	}
 	if value, ok := _u.mutation.AddedVersion(); ok {
 		_spec.AddField(processnodeinstance.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.UpdatedBy(); ok {
+		_spec.SetField(processnodeinstance.FieldUpdatedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedUpdatedBy(); ok {
+		_spec.AddField(processnodeinstance.FieldUpdatedBy, field.TypeInt, value)
+	}
+	if _u.mutation.UpdatedByCleared() {
+		_spec.ClearField(processnodeinstance.FieldUpdatedBy, field.TypeInt)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(processnodeinstance.FieldUpdatedAt, field.TypeTime, value)

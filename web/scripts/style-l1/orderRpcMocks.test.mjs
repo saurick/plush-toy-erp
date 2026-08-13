@@ -148,6 +148,28 @@ test('purchase order mocks preserve filters, total and requested slices', async 
   assert.equal(unrelatedItems.result.data.limit, 200)
 })
 
+test('production order list mock accepts the current page filters and returns its fixture', async () => {
+  const call = await orderMockHarness('**/rpc/production_order')
+  const response = await call('list_production_orders', {
+    keyword: '',
+    status: '',
+    lifecycle_scope: 'current',
+    date_field: 'planned_start_at',
+    date_from: null,
+    date_to: null,
+    sort_by: 'updated_at',
+    sort_direction: 'desc',
+    limit: 20,
+    offset: 0,
+  })
+
+  assert.equal(response.result.code, 0)
+  assert.equal(
+    response.result.data.production_orders[0].order_no,
+    'MO-STYLE-L1-20260713'
+  )
+})
+
 test('production WIP mock always returns the nullable finished-goods rework lineage contract', async () => {
   const call = await orderMockHarness('**/rpc/production_wip')
   const initial = await call('get_production_wip', {

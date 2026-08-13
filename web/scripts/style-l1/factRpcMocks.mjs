@@ -2286,7 +2286,7 @@ export async function installFactRpcMocks(page, context) {
       resultMessage = message
     }
     const isTerminalTask = (task) =>
-      ['done', 'rejected', 'cancelled', 'closed'].includes(
+      ['done', 'rejected', 'withdrawn', 'cancelled', 'closed'].includes(
         String(task?.task_status_key || '').trim()
       )
     switch (method) {
@@ -2525,7 +2525,7 @@ export async function installFactRpcMocks(page, context) {
             Number(nowUnix())
           : Number(nowUnix())
         const beforeID = cursor ? Number(cursor) : 0
-        const terminalStatuses = new Set(['done', 'rejected'])
+        const terminalStatuses = new Set(['done', 'rejected', 'withdrawn'])
         const isRiskTask = (task) =>
           task.task_status_key === 'blocked' ||
           (Number(task.due_at || 0) > 0 && Number(task.due_at) < snapshotAt) ||
@@ -2610,8 +2610,11 @@ export async function installFactRpcMocks(page, context) {
                   const rejected = historyTasks.filter(
                     (task) => task.task_status_key === 'rejected'
                   ).length
+                  const withdrawn = historyTasks.filter(
+                    (task) => task.task_status_key === 'withdrawn'
+                  ).length
                   const todo = ready + blocked
-                  const history = done + rejected
+                  const history = done + rejected + withdrawn
                   const riskTasks = workflowTasks.filter((task) =>
                     matchesView(task, 'risk')
                   )
@@ -2632,6 +2635,7 @@ export async function installFactRpcMocks(page, context) {
                     risk: riskTasks.length,
                     todo,
                     total: todo + history,
+                    withdrawn,
                   }
                 })(),
                 risk_scope: supervisorRiskAllowed ? 'supervised' : 'role',

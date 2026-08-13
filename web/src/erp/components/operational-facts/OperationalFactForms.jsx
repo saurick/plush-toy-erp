@@ -37,9 +37,8 @@ const COLLECTION_TYPE_OPTIONS = [
 ]
 
 const PAYMENT_TERM_OPTIONS = [
-  { label: '出货即收', value: 'CASH_ON_SHIPMENT', days: 0 },
-  { label: '月结 30 天', value: 'EOM_30', days: 30 },
-  { label: '月结 45 天', value: 'EOM_45', days: 45 },
+  { label: '发生即到期', value: 'DUE_ON_OCCURRENCE', days: 0 },
+  { label: '月结', value: 'EOM_DAYS' },
 ]
 
 const INVOICE_CATEGORY_OPTIONS = [
@@ -73,8 +72,8 @@ export const FINANCE_INVOICE_CATEGORY_LABELS = Object.freeze(
 
 export const ACTION_PERMISSIONS = Object.freeze({
   productionRead: ['production.fact.read'],
-  productionPost: ['production.fact.post'],
-  productionCancel: ['production.fact.cancel'],
+  productionPost: ['production.fact.post', 'warehouse.inbound.confirm'],
+  productionCancel: ['production.fact.cancel', 'warehouse.inbound.confirm'],
   outsourcingRead: ['outsourcing.fact.read'],
   outsourcingPost: ['outsourcing.fact.post'],
   outsourcingCancel: ['outsourcing.fact.cancel'],
@@ -88,6 +87,31 @@ export function hasAnyPermission(adminProfile, permissions = []) {
   return permissions.some((permission) =>
     hasActionPermission(adminProfile, permission)
   )
+}
+
+export function isFinishedGoodsReceipt(record = {}) {
+  return (
+    String(record?.fact_type || '')
+      .trim()
+      .toUpperCase() === 'FINISHED_GOODS_RECEIPT'
+  )
+}
+
+export function productionFactPostPermissions(record) {
+  if (!record) return ACTION_PERMISSIONS.productionPost
+  return isFinishedGoodsReceipt(record)
+    ? ['warehouse.inbound.confirm']
+    : ['production.fact.post']
+}
+
+export function productionFactCancelPermissions(record) {
+  if (!record) return ACTION_PERMISSIONS.productionCancel
+  const status = String(record?.status || '')
+    .trim()
+    .toUpperCase()
+  return isFinishedGoodsReceipt(record) && status === 'POSTED'
+    ? ['warehouse.inbound.confirm']
+    : ['production.fact.cancel']
 }
 
 export function statusTag(status) {

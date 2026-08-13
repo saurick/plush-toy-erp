@@ -450,6 +450,9 @@ func auditPayloadTargetValue(payload map[string]any, key string) string {
 }
 
 func runtimeAuditActionLabelAndRisk(eventKey string) (string, string) {
+	if strings.HasPrefix(strings.TrimSpace(eventKey), legalNoticeReceiptEventPrefix) {
+		return "隐私与使用规则知悉", "normal"
+	}
 	switch strings.TrimSpace(eventKey) {
 	case "admin_user.create":
 		return "新建管理员", "warning"
@@ -501,6 +504,9 @@ func runtimeAuditSummary(event RuntimeAuditEvent) string {
 		target = "-"
 	}
 	after, _ := event.Payload["after"].(map[string]any)
+	if strings.HasPrefix(strings.TrimSpace(event.EventKey), legalNoticeReceiptEventPrefix) {
+		return actor + " 确认已阅读并知悉规则版本 " + target
+	}
 	switch event.EventKey {
 	case "admin_user.password.reset":
 		return actor + " 重置了 " + target + " 的密码"

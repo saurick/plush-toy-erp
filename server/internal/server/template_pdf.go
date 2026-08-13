@@ -3,7 +3,6 @@ package server
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -37,14 +36,17 @@ import (
 )
 
 const (
-	maxTemplatePDFRequestBody           = 128 << 20 // 128 MiB
-	maxTemplateHTMLSize                 = 96 << 20  // 96 MiB
+	maxTemplatePDFRequestBody           = 32 << 20 // 32 MiB
+	maxTemplateHTMLSize                 = 24 << 20 // 24 MiB
+	maxTemplatePDFOutputBytes           = 32 << 20 // 32 MiB
 	defaultTemplatePDFRenderConcurrency = 4
+	defaultTemplatePDFQueueCapacity     = 2
 	templatePDFLocalNoSandboxEnv        = "ERP_PDF_ALLOW_LOCAL_NO_SANDBOX"
 	templatePDFRenderTimeout            = 30 * time.Second
 	templatePDFQueueWaitTimeout         = 15 * time.Second
 	templatePDFWarmupTimeout            = 15 * time.Second
 	templatePDFWarmupWaitTimeout        = 15 * time.Second
+	templatePDFShutdownWaitTimeout      = 2 * time.Second
 	templatePDFViewportWidth            = 1440
 	templatePDFViewportHeight           = 900
 )
@@ -55,7 +57,10 @@ var (
 )
 
 var sharedTemplatePDFChromeManager = newTemplatePDFChromeManager(launchTemplatePDFChrome)
-var sharedTemplatePDFRenderGate = newTemplatePDFRenderGate(resolveTemplatePDFRenderConcurrency(os.Getenv("ERP_PDF_RENDER_CONCURRENCY")))
+var sharedTemplatePDFRenderGate = newTemplatePDFRenderGate(
+	resolveTemplatePDFRenderConcurrency(os.Getenv("ERP_PDF_RENDER_CONCURRENCY")),
+	resolveTemplatePDFQueueCapacity(os.Getenv("ERP_PDF_QUEUE_CAPACITY")),
+)
 var sharedTemplatePDFWarmupState = newTemplatePDFWarmupState()
 
 const templatePDFWarmupHTML = `<!doctype html>
@@ -109,7 +114,8 @@ type templatePDFAccessGuard interface {
 }
 
 type templatePDFRenderGate struct {
-	slots chan struct{}
+	renderSlots    chan struct{}
+	admissionSlots chan struct{}
 }
 
 type templatePDFChromeLauncher func(ctx context.Context, chromeExecPath string) (*templatePDFChromeRuntime, string, error)
@@ -148,12 +154,16 @@ type templatePDFWarmupState struct {
 
 // CleanupTemplatePDFResources 在进程退出前显式回收共享 Chromium，避免调试端口和临时目录残留。
 func CleanupTemplatePDFResources() {
+	ctx, cancel := context.WithTimeout(context.Background(), templatePDFShutdownWaitTimeout)
+	_, _ = sharedTemplatePDFWarmupState.WaitIfRunning(ctx)
+	cancel()
 	sharedTemplatePDFChromeManager.Close()
 }
 
 // StartTemplatePDFWarmupAsync 在服务启动后后台跑通一次 PDF 渲染；readyz 会在预热完成前保持未就绪。
-func StartTemplatePDFWarmupAsync(logger log.Logger) {
+func StartTemplatePDFWarmupAsync(ctx context.Context, logger log.Logger) {
 	sharedTemplatePDFWarmupState.StartAsync(
+		ctx,
 		logger,
 		resolveTemplatePDFWarmupEnabled(os.Getenv("ERP_PDF_WARMUP")),
 		warmupTemplatePDFResources,
@@ -165,6 +175,7 @@ func newTemplatePDFWarmupState() *templatePDFWarmupState {
 }
 
 func (s *templatePDFWarmupState) StartAsync(
+	parent context.Context,
 	logger log.Logger,
 	enabled bool,
 	run func(ctx context.Context) error,
@@ -178,6 +189,9 @@ func (s *templatePDFWarmupState) StartAsync(
 	if run == nil {
 		run = warmupTemplatePDFResources
 	}
+	if parent == nil {
+		parent = context.Background()
+	}
 	if !s.beginRun() {
 		return
 	}
@@ -189,7 +203,7 @@ func (s *templatePDFWarmupState) StartAsync(
 	)
 
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), templatePDFWarmupTimeout)
+		ctx, cancel := context.WithTimeout(parent, templatePDFWarmupTimeout)
 		defer cancel()
 
 		startedAt := time.Now()
@@ -303,34 +317,85 @@ func (s *templatePDFWarmupState) WaitIfRunning(ctx context.Context) (time.Durati
 	}
 }
 
-func newTemplatePDFRenderGate(limit int) *templatePDFRenderGate {
-	if limit < 1 {
-		limit = defaultTemplatePDFRenderConcurrency
+func newTemplatePDFRenderGate(renderLimit int, queueCapacity int) *templatePDFRenderGate {
+	if renderLimit < 1 {
+		renderLimit = defaultTemplatePDFRenderConcurrency
 	}
+	if queueCapacity < 0 {
+		queueCapacity = defaultTemplatePDFQueueCapacity
+	}
+	admissionLimit := renderLimit + queueCapacity
 	return &templatePDFRenderGate{
-		slots: make(chan struct{}, limit),
+		renderSlots:    make(chan struct{}, renderLimit),
+		admissionSlots: make(chan struct{}, admissionLimit),
 	}
 }
 
 func (g *templatePDFRenderGate) Limit() int {
-	if g == nil || g.slots == nil {
+	if g == nil || g.renderSlots == nil {
 		return defaultTemplatePDFRenderConcurrency
 	}
-	return cap(g.slots)
+	return cap(g.renderSlots)
+}
+
+func (g *templatePDFRenderGate) QueueCapacity() int {
+	if g == nil || g.admissionSlots == nil {
+		return defaultTemplatePDFQueueCapacity
+	}
+	return cap(g.admissionSlots) - g.Limit()
+}
+
+func (g *templatePDFRenderGate) Active() int {
+	if g == nil || g.renderSlots == nil {
+		return 0
+	}
+	return len(g.renderSlots)
+}
+
+func (g *templatePDFRenderGate) Admitted() int {
+	if g == nil || g.admissionSlots == nil {
+		return 0
+	}
+	return len(g.admissionSlots)
+}
+
+func (g *templatePDFRenderGate) Queued() int {
+	queued := g.Admitted() - g.Active()
+	if queued < 0 {
+		return 0
+	}
+	return queued
+}
+
+func (g *templatePDFRenderGate) TryAdmit() (release func(), ok bool) {
+	if g == nil || g.admissionSlots == nil {
+		return func() {}, true
+	}
+	select {
+	case g.admissionSlots <- struct{}{}:
+		var once sync.Once
+		return func() {
+			once.Do(func() {
+				<-g.admissionSlots
+			})
+		}, true
+	default:
+		return nil, false
+	}
 }
 
 func (g *templatePDFRenderGate) Acquire(ctx context.Context) (release func(), wait time.Duration, err error) {
-	if g == nil || g.slots == nil {
+	if g == nil || g.renderSlots == nil {
 		return func() {}, 0, nil
 	}
 
 	start := time.Now()
 	select {
-	case g.slots <- struct{}{}:
+	case g.renderSlots <- struct{}{}:
 		var once sync.Once
 		return func() {
 			once.Do(func() {
-				<-g.slots
+				<-g.renderSlots
 			})
 		}, time.Since(start), nil
 	case <-ctx.Done():
@@ -350,6 +415,18 @@ func resolveTemplatePDFRenderConcurrency(raw string) int {
 	return limit
 }
 
+func resolveTemplatePDFQueueCapacity(raw string) int {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return defaultTemplatePDFQueueCapacity
+	}
+	capacity, err := strconv.Atoi(value)
+	if err != nil || capacity < 0 {
+		return defaultTemplatePDFQueueCapacity
+	}
+	return capacity
+}
+
 func resolveTemplatePDFWarmupEnabled(rawMode string) bool {
 	mode := strings.ToLower(strings.TrimSpace(rawMode))
 	switch mode {
@@ -365,6 +442,12 @@ func resolveTemplatePDFWarmupEnabled(rawMode string) bool {
 }
 
 func warmupTemplatePDFResources(ctx context.Context) error {
+	releaseAdmission, admitted := sharedTemplatePDFRenderGate.TryAdmit()
+	if !admitted {
+		return errTemplatePDFRenderBusy
+	}
+	defer releaseAdmission()
+
 	releaseRenderSlot, _, err := sharedTemplatePDFRenderGate.Acquire(ctx)
 	if err != nil {
 		return err
@@ -423,6 +506,34 @@ func registerTemplatePDFHandler(
 			})
 			return
 		}
+		if r.ContentLength > maxTemplatePDFRequestBody {
+			span.SetStatus(codes.Error, "request body too large")
+			writeJSON(w, stdhttp.StatusRequestEntityTooLarge, map[string]any{
+				"code":    errcode.PayloadTooLarge.Code,
+				"message": errTemplatePDFPayloadTooLarge.Error(),
+			})
+			return
+		}
+
+		releaseAdmission, admitted := sharedTemplatePDFRenderGate.TryAdmit()
+		if !admitted {
+			sharedRuntimeMetricCounters.pdfAdmissionRejected.Add(1)
+			span.SetStatus(codes.Error, "render admission full")
+			l.Warnw(
+				"msg", "template pdf render admission full",
+				"request_id", requestID,
+				"trace_id", traceID,
+				"render_concurrency", sharedTemplatePDFRenderGate.Limit(),
+				"queue_capacity", sharedTemplatePDFRenderGate.QueueCapacity(),
+			)
+			writeJSON(w, stdhttp.StatusTooManyRequests, map[string]any{
+				"code":    errcode.TemplateRenderBusy.Code,
+				"message": errTemplatePDFRenderBusy.Error(),
+			})
+			return
+		}
+		sharedRuntimeMetricCounters.pdfAdmitted.Add(1)
+		defer releaseAdmission()
 
 		req, err := parseRenderTemplatePDFRequest(r)
 		if err != nil {
@@ -475,6 +586,8 @@ func registerTemplatePDFHandler(
 			attribute.String("template_pdf.template_key", req.TemplateKey),
 			attribute.Int("template_pdf.html_size", len(req.HTML)),
 			attribute.Int("template_pdf.render_concurrency", sharedTemplatePDFRenderGate.Limit()),
+			attribute.Int("template_pdf.queue_capacity", sharedTemplatePDFRenderGate.QueueCapacity()),
+			attribute.Int("template_pdf.admitted", sharedTemplatePDFRenderGate.Admitted()),
 		)
 
 		warmupWaitCtx, warmupWaitCancel := context.WithTimeout(ctx, templatePDFWarmupWaitTimeout)
@@ -498,6 +611,7 @@ func registerTemplatePDFHandler(
 		defer queueCancel()
 		releaseRenderSlot, queueWait, err := sharedTemplatePDFRenderGate.Acquire(queueCtx)
 		if err != nil {
+			sharedRuntimeMetricCounters.pdfQueueTimeouts.Add(1)
 			span.RecordError(err)
 			span.SetAttributes(attribute.Int64("template_pdf.queue_wait_ms", queueWait.Milliseconds()))
 			span.SetStatus(codes.Error, "render queue busy")
@@ -521,11 +635,13 @@ func registerTemplatePDFHandler(
 		renderCtx, cancel := context.WithTimeout(ctx, templatePDFRenderTimeout)
 		defer cancel()
 
+		renderStartedAt := time.Now()
 		pdfBytes, err := renderTemplateHTMLToPDF(
 			renderCtx,
 			req.HTML,
 			resolveTemplatePDFScale(req.TemplateKey),
 		)
+		sharedRuntimeMetricCounters.observePDFRender(time.Since(renderStartedAt), len(pdfBytes), err)
 		if err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "render pdf failed")
@@ -590,19 +706,9 @@ func parseRenderTemplatePDFRequest(r *stdhttp.Request) (*renderTemplatePDFReques
 		_ = r.Body.Close()
 	}()
 
-	body, err := readTemplatePDFRequestBody(r.Body, maxTemplatePDFRequestBody)
+	req, err := decodeRenderTemplatePDFRequest(r.Body, maxTemplatePDFRequestBody)
 	if err != nil {
 		return nil, err
-	}
-
-	var req renderTemplatePDFRequest
-	decoder := json.NewDecoder(bytes.NewReader(body))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&req); err != nil {
-		return nil, errors.New("请求 JSON 非法")
-	}
-	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
-		return nil, errors.New("请求 JSON 非法")
 	}
 
 	req.HTML = strings.TrimSpace(req.HTML)
@@ -620,21 +726,37 @@ func parseRenderTemplatePDFRequest(r *stdhttp.Request) (*renderTemplatePDFReques
 	req.FileName = strings.TrimSpace(req.FileName)
 	req.TemplateKey = strings.TrimSpace(req.TemplateKey)
 
-	return &req, nil
+	return req, nil
 }
 
-func readTemplatePDFRequestBody(reader io.Reader, maxBytes int64) ([]byte, error) {
-	body, err := io.ReadAll(io.LimitReader(reader, maxBytes+1))
-	if err != nil {
-		return nil, errors.New("读取请求体失败")
-	}
-	if len(body) == 0 {
+func decodeRenderTemplatePDFRequest(reader io.Reader, maxBytes int64) (*renderTemplatePDFRequest, error) {
+	if reader == nil || maxBytes < 1 {
 		return nil, errors.New("请求体为空")
 	}
-	if int64(len(body)) > maxBytes {
+	limited := &io.LimitedReader{R: reader, N: maxBytes + 1}
+	decoder := json.NewDecoder(limited)
+	decoder.DisallowUnknownFields()
+
+	var req renderTemplatePDFRequest
+	if err := decoder.Decode(&req); err != nil {
+		if limited.N <= 0 {
+			return nil, errTemplatePDFPayloadTooLarge
+		}
+		if errors.Is(err, io.EOF) {
+			return nil, errors.New("请求体为空")
+		}
+		return nil, errors.New("请求 JSON 非法")
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		if limited.N <= 0 {
+			return nil, errTemplatePDFPayloadTooLarge
+		}
+		return nil, errors.New("请求 JSON 非法")
+	}
+	if limited.N <= 0 {
 		return nil, errTemplatePDFPayloadTooLarge
 	}
-	return body, nil
+	return &req, nil
 }
 
 func runtimeTemplatePDFCustomerKey() string {
@@ -703,8 +825,6 @@ func resolveTemplatePDFScale(templateKey string) float64 {
 }
 
 func renderTemplateHTMLToPDF(ctx context.Context, htmlDoc string, printScale float64) ([]byte, error) {
-	dataURL := "data:text/html;base64," + base64.StdEncoding.EncodeToString([]byte(htmlDoc))
-
 	chromeExecPath, err := resolveTemplatePDFChromeExecPath(os.Getenv("ERP_PDF_CHROME_PATH"), exec.LookPath)
 	if err != nil {
 		return nil, err
@@ -749,7 +869,18 @@ func renderTemplateHTMLToPDF(ctx context.Context, htmlDoc string, printScale flo
 				false,
 			).Do(ctx)
 		}),
-		chromedp.Navigate(dataURL),
+		chromedp.Navigate("about:blank"),
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			frameTree, err := page.GetFrameTree().Do(ctx)
+			if err != nil {
+				return err
+			}
+			if frameTree == nil || frameTree.Frame == nil {
+				return errors.New("无法取得打印页面")
+			}
+			return page.SetDocumentContent(frameTree.Frame.ID, htmlDoc).Do(ctx)
+		}),
+		chromedp.WaitReady("body", chromedp.ByQuery),
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			return emulation.SetEmulatedMedia().WithMedia("print").Do(ctx)
 		}),
@@ -777,6 +908,9 @@ func renderTemplateHTMLToPDF(ctx context.Context, htmlDoc string, printScale flo
 	}
 	if len(pdfBytes) == 0 {
 		return nil, errors.New("生成结果为空")
+	}
+	if len(pdfBytes) > maxTemplatePDFOutputBytes {
+		return nil, errors.New("生成的 PDF 超出大小限制")
 	}
 	return pdfBytes, nil
 }
@@ -849,6 +983,7 @@ func (m *templatePDFChromeManager) Acquire(ctx context.Context, chromeExecPath s
 	}
 	m.runtime = runtime
 	m.wsURL = wsURL
+	sharedRuntimeMetricCounters.pdfChromeStarts.Add(1)
 	return runtime, wsURL, nil
 }
 
@@ -907,7 +1042,6 @@ func templatePDFChromeArgs(userDataDir string, debugPort int, allowLocalNoSandbo
 		"--disable-gpu",
 		"--hide-scrollbars",
 		"--mute-audio",
-		"--disable-dev-shm-usage",
 		"--disable-background-networking",
 		"--disable-component-update",
 		"--disable-default-apps",

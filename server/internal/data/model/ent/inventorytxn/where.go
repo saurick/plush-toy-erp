@@ -751,26 +751,6 @@ func ReversalOfTxnIDNotIn(vs ...int) predicate.InventoryTxn {
 	return predicate.InventoryTxn(sql.FieldNotIn(FieldReversalOfTxnID, vs...))
 }
 
-// ReversalOfTxnIDGT applies the GT predicate on the "reversal_of_txn_id" field.
-func ReversalOfTxnIDGT(v int) predicate.InventoryTxn {
-	return predicate.InventoryTxn(sql.FieldGT(FieldReversalOfTxnID, v))
-}
-
-// ReversalOfTxnIDGTE applies the GTE predicate on the "reversal_of_txn_id" field.
-func ReversalOfTxnIDGTE(v int) predicate.InventoryTxn {
-	return predicate.InventoryTxn(sql.FieldGTE(FieldReversalOfTxnID, v))
-}
-
-// ReversalOfTxnIDLT applies the LT predicate on the "reversal_of_txn_id" field.
-func ReversalOfTxnIDLT(v int) predicate.InventoryTxn {
-	return predicate.InventoryTxn(sql.FieldLT(FieldReversalOfTxnID, v))
-}
-
-// ReversalOfTxnIDLTE applies the LTE predicate on the "reversal_of_txn_id" field.
-func ReversalOfTxnIDLTE(v int) predicate.InventoryTxn {
-	return predicate.InventoryTxn(sql.FieldLTE(FieldReversalOfTxnID, v))
-}
-
 // ReversalOfTxnIDIsNil applies the IsNil predicate on the "reversal_of_txn_id" field.
 func ReversalOfTxnIDIsNil() predicate.InventoryTxn {
 	return predicate.InventoryTxn(sql.FieldIsNull(FieldReversalOfTxnID))
@@ -1080,6 +1060,52 @@ func HasInventoryLot() predicate.InventoryTxn {
 func HasInventoryLotWith(preds ...predicate.InventoryLot) predicate.InventoryTxn {
 	return predicate.InventoryTxn(func(s *sql.Selector) {
 		step := newInventoryLotStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasReversals applies the HasEdge predicate on the "reversals" edge.
+func HasReversals() predicate.InventoryTxn {
+	return predicate.InventoryTxn(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, ReversalsTable, ReversalsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasReversalsWith applies the HasEdge predicate on the "reversals" edge with a given conditions (other predicates).
+func HasReversalsWith(preds ...predicate.InventoryTxn) predicate.InventoryTxn {
+	return predicate.InventoryTxn(func(s *sql.Selector) {
+		step := newReversalsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasReversalOf applies the HasEdge predicate on the "reversal_of" edge.
+func HasReversalOf() predicate.InventoryTxn {
+	return predicate.InventoryTxn(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, ReversalOfTable, ReversalOfColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasReversalOfWith applies the HasEdge predicate on the "reversal_of" edge with a given conditions (other predicates).
+func HasReversalOfWith(preds ...predicate.InventoryTxn) predicate.InventoryTxn {
+	return predicate.InventoryTxn(func(s *sql.Selector) {
+		step := newReversalOfStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

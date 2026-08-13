@@ -146,7 +146,6 @@
 
 ## 2026-07-03 正式业务壳和来料质检表名 / 状态 key 投影收口
 
-- 完成：继续按 review findings 处理用户可见 raw key 泄漏。Formal 业务壳的“主事实 / 真源、来源表、领域表待评审、business_records”等用户可见字段改为“当前业务范围、关联业务、后端规则待接入、旧业务记录壳”等业务口径，正式模块配置中的表名式入口、英文状态机说明和 `warehouse_inbound done / purchase_receipt posted / REVERSAL` 等工程文案改为业务可读说明；来料质检页头不再展示 `quality_inspections` 或 `SUBMITTED / HOLD / ACTIVE / REJECTED`，改为“质检判定、批次冻结 / 可用 / 不可用”。内部 `primaryEntity / factSource / sourceRefs`、API 返回字段和测试 mock 仍保留机器 key，不改变 schema、后端 usecase、JSON-RPC、RBAC 或质检事实写入。
 - 验证：`node --test web/src/erp/utils/userVisibleTechnicalFields.test.mjs scripts/qa/frontend-error-message-boundary.test.mjs web/src/erp/config/menuPermissions.test.mjs` 通过 53 个测试；`/usr/local/bin/pnpm --dir web exec eslint --ext .jsx --ext .mjs src/erp/pages/FormalBusinessModulePage.jsx src/erp/pages/V1QualityInspectionsPage.jsx src/erp/config/businessModules.mjs src/erp/utils/userVisibleTechnicalFields.test.mjs scripts/style-l1/businessFormalScenarios.mjs` 通过；`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop /usr/local/bin/pnpm --dir web style:l1` 通过 1 个正式业务壳场景，覆盖库存、来料质检、委外、财务等相邻可见文案。首次 L1 发现来料质检页仍可见 `quality_inspections`，已修正页头并补静态守卫后重跑通过；L1 仍有既有 `MODULE_TYPELESS_PACKAGE_JSON` warning。
 - 下一步：继续按 review findings 推进菜单权限投影与 effective session 实际入口一致性、任务端真实造数 / 真实动作 smoke、客户配置规则 / 策略 / 扩展点运行时边界、打印真实业务带值入口和字段链路缺值回补。
 - 阻塞/风险：本轮只证明 Formal 业务壳、正式模块配置和来料质检页头的前端用户可见投影、静态守卫和本地 L1 场景；不证明真实账号登录、真实后端 RBAC 拒绝路径、真实后端写入、质检事实闭环、打印模板闭环、目标环境 active revision、生产发布、真实客户导入、客户签收、备份恢复或回滚演练。当前工作区仍有大量未提交改动，未提交、未推送、未 stash、未清理。

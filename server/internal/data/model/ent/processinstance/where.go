@@ -120,6 +120,56 @@ func CompletedAt(v time.Time) predicate.ProcessInstance {
 	return predicate.ProcessInstance(sql.FieldEQ(FieldCompletedAt, v))
 }
 
+// TerminalNodeInstanceID applies equality check predicate on the "terminal_node_instance_id" field. It's identical to TerminalNodeInstanceIDEQ.
+func TerminalNodeInstanceID(v int) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldEQ(FieldTerminalNodeInstanceID, v))
+}
+
+// ResolutionKind applies equality check predicate on the "resolution_kind" field. It's identical to ResolutionKindEQ.
+func ResolutionKind(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldEQ(FieldResolutionKind, v))
+}
+
+// ResolutionReason applies equality check predicate on the "resolution_reason" field. It's identical to ResolutionReasonEQ.
+func ResolutionReason(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldEQ(FieldResolutionReason, v))
+}
+
+// ResolvedAt applies equality check predicate on the "resolved_at" field. It's identical to ResolvedAtEQ.
+func ResolvedAt(v time.Time) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldEQ(FieldResolvedAt, v))
+}
+
+// ResolvedBy applies equality check predicate on the "resolved_by" field. It's identical to ResolvedByEQ.
+func ResolvedBy(v int) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldEQ(FieldResolvedBy, v))
+}
+
+// BlockKind applies equality check predicate on the "block_kind" field. It's identical to BlockKindEQ.
+func BlockKind(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldEQ(FieldBlockKind, v))
+}
+
+// BlockedReasonCode applies equality check predicate on the "blocked_reason_code" field. It's identical to BlockedReasonCodeEQ.
+func BlockedReasonCode(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldEQ(FieldBlockedReasonCode, v))
+}
+
+// BlockedReason applies equality check predicate on the "blocked_reason" field. It's identical to BlockedReasonEQ.
+func BlockedReason(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldEQ(FieldBlockedReason, v))
+}
+
+// BlockedAt applies equality check predicate on the "blocked_at" field. It's identical to BlockedAtEQ.
+func BlockedAt(v time.Time) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldEQ(FieldBlockedAt, v))
+}
+
+// BlockedBy applies equality check predicate on the "blocked_by" field. It's identical to BlockedByEQ.
+func BlockedBy(v int) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldEQ(FieldBlockedBy, v))
+}
+
 // CreatedBy applies equality check predicate on the "created_by" field. It's identical to CreatedByEQ.
 func CreatedBy(v int) predicate.ProcessInstance {
 	return predicate.ProcessInstance(sql.FieldEQ(FieldCreatedBy, v))
@@ -958,6 +1008,631 @@ func CompletedAtIsNil() predicate.ProcessInstance {
 // CompletedAtNotNil applies the NotNil predicate on the "completed_at" field.
 func CompletedAtNotNil() predicate.ProcessInstance {
 	return predicate.ProcessInstance(sql.FieldNotNull(FieldCompletedAt))
+}
+
+// TerminalNodeInstanceIDEQ applies the EQ predicate on the "terminal_node_instance_id" field.
+func TerminalNodeInstanceIDEQ(v int) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldEQ(FieldTerminalNodeInstanceID, v))
+}
+
+// TerminalNodeInstanceIDNEQ applies the NEQ predicate on the "terminal_node_instance_id" field.
+func TerminalNodeInstanceIDNEQ(v int) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNEQ(FieldTerminalNodeInstanceID, v))
+}
+
+// TerminalNodeInstanceIDIn applies the In predicate on the "terminal_node_instance_id" field.
+func TerminalNodeInstanceIDIn(vs ...int) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldIn(FieldTerminalNodeInstanceID, vs...))
+}
+
+// TerminalNodeInstanceIDNotIn applies the NotIn predicate on the "terminal_node_instance_id" field.
+func TerminalNodeInstanceIDNotIn(vs ...int) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNotIn(FieldTerminalNodeInstanceID, vs...))
+}
+
+// TerminalNodeInstanceIDGT applies the GT predicate on the "terminal_node_instance_id" field.
+func TerminalNodeInstanceIDGT(v int) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldGT(FieldTerminalNodeInstanceID, v))
+}
+
+// TerminalNodeInstanceIDGTE applies the GTE predicate on the "terminal_node_instance_id" field.
+func TerminalNodeInstanceIDGTE(v int) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldGTE(FieldTerminalNodeInstanceID, v))
+}
+
+// TerminalNodeInstanceIDLT applies the LT predicate on the "terminal_node_instance_id" field.
+func TerminalNodeInstanceIDLT(v int) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldLT(FieldTerminalNodeInstanceID, v))
+}
+
+// TerminalNodeInstanceIDLTE applies the LTE predicate on the "terminal_node_instance_id" field.
+func TerminalNodeInstanceIDLTE(v int) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldLTE(FieldTerminalNodeInstanceID, v))
+}
+
+// TerminalNodeInstanceIDIsNil applies the IsNil predicate on the "terminal_node_instance_id" field.
+func TerminalNodeInstanceIDIsNil() predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldIsNull(FieldTerminalNodeInstanceID))
+}
+
+// TerminalNodeInstanceIDNotNil applies the NotNil predicate on the "terminal_node_instance_id" field.
+func TerminalNodeInstanceIDNotNil() predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNotNull(FieldTerminalNodeInstanceID))
+}
+
+// ResolutionKindEQ applies the EQ predicate on the "resolution_kind" field.
+func ResolutionKindEQ(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldEQ(FieldResolutionKind, v))
+}
+
+// ResolutionKindNEQ applies the NEQ predicate on the "resolution_kind" field.
+func ResolutionKindNEQ(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNEQ(FieldResolutionKind, v))
+}
+
+// ResolutionKindIn applies the In predicate on the "resolution_kind" field.
+func ResolutionKindIn(vs ...string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldIn(FieldResolutionKind, vs...))
+}
+
+// ResolutionKindNotIn applies the NotIn predicate on the "resolution_kind" field.
+func ResolutionKindNotIn(vs ...string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNotIn(FieldResolutionKind, vs...))
+}
+
+// ResolutionKindGT applies the GT predicate on the "resolution_kind" field.
+func ResolutionKindGT(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldGT(FieldResolutionKind, v))
+}
+
+// ResolutionKindGTE applies the GTE predicate on the "resolution_kind" field.
+func ResolutionKindGTE(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldGTE(FieldResolutionKind, v))
+}
+
+// ResolutionKindLT applies the LT predicate on the "resolution_kind" field.
+func ResolutionKindLT(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldLT(FieldResolutionKind, v))
+}
+
+// ResolutionKindLTE applies the LTE predicate on the "resolution_kind" field.
+func ResolutionKindLTE(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldLTE(FieldResolutionKind, v))
+}
+
+// ResolutionKindContains applies the Contains predicate on the "resolution_kind" field.
+func ResolutionKindContains(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldContains(FieldResolutionKind, v))
+}
+
+// ResolutionKindHasPrefix applies the HasPrefix predicate on the "resolution_kind" field.
+func ResolutionKindHasPrefix(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldHasPrefix(FieldResolutionKind, v))
+}
+
+// ResolutionKindHasSuffix applies the HasSuffix predicate on the "resolution_kind" field.
+func ResolutionKindHasSuffix(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldHasSuffix(FieldResolutionKind, v))
+}
+
+// ResolutionKindIsNil applies the IsNil predicate on the "resolution_kind" field.
+func ResolutionKindIsNil() predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldIsNull(FieldResolutionKind))
+}
+
+// ResolutionKindNotNil applies the NotNil predicate on the "resolution_kind" field.
+func ResolutionKindNotNil() predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNotNull(FieldResolutionKind))
+}
+
+// ResolutionKindEqualFold applies the EqualFold predicate on the "resolution_kind" field.
+func ResolutionKindEqualFold(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldEqualFold(FieldResolutionKind, v))
+}
+
+// ResolutionKindContainsFold applies the ContainsFold predicate on the "resolution_kind" field.
+func ResolutionKindContainsFold(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldContainsFold(FieldResolutionKind, v))
+}
+
+// ResolutionReasonEQ applies the EQ predicate on the "resolution_reason" field.
+func ResolutionReasonEQ(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldEQ(FieldResolutionReason, v))
+}
+
+// ResolutionReasonNEQ applies the NEQ predicate on the "resolution_reason" field.
+func ResolutionReasonNEQ(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNEQ(FieldResolutionReason, v))
+}
+
+// ResolutionReasonIn applies the In predicate on the "resolution_reason" field.
+func ResolutionReasonIn(vs ...string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldIn(FieldResolutionReason, vs...))
+}
+
+// ResolutionReasonNotIn applies the NotIn predicate on the "resolution_reason" field.
+func ResolutionReasonNotIn(vs ...string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNotIn(FieldResolutionReason, vs...))
+}
+
+// ResolutionReasonGT applies the GT predicate on the "resolution_reason" field.
+func ResolutionReasonGT(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldGT(FieldResolutionReason, v))
+}
+
+// ResolutionReasonGTE applies the GTE predicate on the "resolution_reason" field.
+func ResolutionReasonGTE(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldGTE(FieldResolutionReason, v))
+}
+
+// ResolutionReasonLT applies the LT predicate on the "resolution_reason" field.
+func ResolutionReasonLT(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldLT(FieldResolutionReason, v))
+}
+
+// ResolutionReasonLTE applies the LTE predicate on the "resolution_reason" field.
+func ResolutionReasonLTE(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldLTE(FieldResolutionReason, v))
+}
+
+// ResolutionReasonContains applies the Contains predicate on the "resolution_reason" field.
+func ResolutionReasonContains(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldContains(FieldResolutionReason, v))
+}
+
+// ResolutionReasonHasPrefix applies the HasPrefix predicate on the "resolution_reason" field.
+func ResolutionReasonHasPrefix(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldHasPrefix(FieldResolutionReason, v))
+}
+
+// ResolutionReasonHasSuffix applies the HasSuffix predicate on the "resolution_reason" field.
+func ResolutionReasonHasSuffix(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldHasSuffix(FieldResolutionReason, v))
+}
+
+// ResolutionReasonIsNil applies the IsNil predicate on the "resolution_reason" field.
+func ResolutionReasonIsNil() predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldIsNull(FieldResolutionReason))
+}
+
+// ResolutionReasonNotNil applies the NotNil predicate on the "resolution_reason" field.
+func ResolutionReasonNotNil() predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNotNull(FieldResolutionReason))
+}
+
+// ResolutionReasonEqualFold applies the EqualFold predicate on the "resolution_reason" field.
+func ResolutionReasonEqualFold(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldEqualFold(FieldResolutionReason, v))
+}
+
+// ResolutionReasonContainsFold applies the ContainsFold predicate on the "resolution_reason" field.
+func ResolutionReasonContainsFold(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldContainsFold(FieldResolutionReason, v))
+}
+
+// ResolvedAtEQ applies the EQ predicate on the "resolved_at" field.
+func ResolvedAtEQ(v time.Time) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldEQ(FieldResolvedAt, v))
+}
+
+// ResolvedAtNEQ applies the NEQ predicate on the "resolved_at" field.
+func ResolvedAtNEQ(v time.Time) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNEQ(FieldResolvedAt, v))
+}
+
+// ResolvedAtIn applies the In predicate on the "resolved_at" field.
+func ResolvedAtIn(vs ...time.Time) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldIn(FieldResolvedAt, vs...))
+}
+
+// ResolvedAtNotIn applies the NotIn predicate on the "resolved_at" field.
+func ResolvedAtNotIn(vs ...time.Time) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNotIn(FieldResolvedAt, vs...))
+}
+
+// ResolvedAtGT applies the GT predicate on the "resolved_at" field.
+func ResolvedAtGT(v time.Time) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldGT(FieldResolvedAt, v))
+}
+
+// ResolvedAtGTE applies the GTE predicate on the "resolved_at" field.
+func ResolvedAtGTE(v time.Time) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldGTE(FieldResolvedAt, v))
+}
+
+// ResolvedAtLT applies the LT predicate on the "resolved_at" field.
+func ResolvedAtLT(v time.Time) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldLT(FieldResolvedAt, v))
+}
+
+// ResolvedAtLTE applies the LTE predicate on the "resolved_at" field.
+func ResolvedAtLTE(v time.Time) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldLTE(FieldResolvedAt, v))
+}
+
+// ResolvedAtIsNil applies the IsNil predicate on the "resolved_at" field.
+func ResolvedAtIsNil() predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldIsNull(FieldResolvedAt))
+}
+
+// ResolvedAtNotNil applies the NotNil predicate on the "resolved_at" field.
+func ResolvedAtNotNil() predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNotNull(FieldResolvedAt))
+}
+
+// ResolvedByEQ applies the EQ predicate on the "resolved_by" field.
+func ResolvedByEQ(v int) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldEQ(FieldResolvedBy, v))
+}
+
+// ResolvedByNEQ applies the NEQ predicate on the "resolved_by" field.
+func ResolvedByNEQ(v int) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNEQ(FieldResolvedBy, v))
+}
+
+// ResolvedByIn applies the In predicate on the "resolved_by" field.
+func ResolvedByIn(vs ...int) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldIn(FieldResolvedBy, vs...))
+}
+
+// ResolvedByNotIn applies the NotIn predicate on the "resolved_by" field.
+func ResolvedByNotIn(vs ...int) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNotIn(FieldResolvedBy, vs...))
+}
+
+// ResolvedByGT applies the GT predicate on the "resolved_by" field.
+func ResolvedByGT(v int) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldGT(FieldResolvedBy, v))
+}
+
+// ResolvedByGTE applies the GTE predicate on the "resolved_by" field.
+func ResolvedByGTE(v int) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldGTE(FieldResolvedBy, v))
+}
+
+// ResolvedByLT applies the LT predicate on the "resolved_by" field.
+func ResolvedByLT(v int) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldLT(FieldResolvedBy, v))
+}
+
+// ResolvedByLTE applies the LTE predicate on the "resolved_by" field.
+func ResolvedByLTE(v int) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldLTE(FieldResolvedBy, v))
+}
+
+// ResolvedByIsNil applies the IsNil predicate on the "resolved_by" field.
+func ResolvedByIsNil() predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldIsNull(FieldResolvedBy))
+}
+
+// ResolvedByNotNil applies the NotNil predicate on the "resolved_by" field.
+func ResolvedByNotNil() predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNotNull(FieldResolvedBy))
+}
+
+// BlockKindEQ applies the EQ predicate on the "block_kind" field.
+func BlockKindEQ(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldEQ(FieldBlockKind, v))
+}
+
+// BlockKindNEQ applies the NEQ predicate on the "block_kind" field.
+func BlockKindNEQ(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNEQ(FieldBlockKind, v))
+}
+
+// BlockKindIn applies the In predicate on the "block_kind" field.
+func BlockKindIn(vs ...string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldIn(FieldBlockKind, vs...))
+}
+
+// BlockKindNotIn applies the NotIn predicate on the "block_kind" field.
+func BlockKindNotIn(vs ...string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNotIn(FieldBlockKind, vs...))
+}
+
+// BlockKindGT applies the GT predicate on the "block_kind" field.
+func BlockKindGT(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldGT(FieldBlockKind, v))
+}
+
+// BlockKindGTE applies the GTE predicate on the "block_kind" field.
+func BlockKindGTE(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldGTE(FieldBlockKind, v))
+}
+
+// BlockKindLT applies the LT predicate on the "block_kind" field.
+func BlockKindLT(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldLT(FieldBlockKind, v))
+}
+
+// BlockKindLTE applies the LTE predicate on the "block_kind" field.
+func BlockKindLTE(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldLTE(FieldBlockKind, v))
+}
+
+// BlockKindContains applies the Contains predicate on the "block_kind" field.
+func BlockKindContains(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldContains(FieldBlockKind, v))
+}
+
+// BlockKindHasPrefix applies the HasPrefix predicate on the "block_kind" field.
+func BlockKindHasPrefix(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldHasPrefix(FieldBlockKind, v))
+}
+
+// BlockKindHasSuffix applies the HasSuffix predicate on the "block_kind" field.
+func BlockKindHasSuffix(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldHasSuffix(FieldBlockKind, v))
+}
+
+// BlockKindIsNil applies the IsNil predicate on the "block_kind" field.
+func BlockKindIsNil() predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldIsNull(FieldBlockKind))
+}
+
+// BlockKindNotNil applies the NotNil predicate on the "block_kind" field.
+func BlockKindNotNil() predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNotNull(FieldBlockKind))
+}
+
+// BlockKindEqualFold applies the EqualFold predicate on the "block_kind" field.
+func BlockKindEqualFold(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldEqualFold(FieldBlockKind, v))
+}
+
+// BlockKindContainsFold applies the ContainsFold predicate on the "block_kind" field.
+func BlockKindContainsFold(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldContainsFold(FieldBlockKind, v))
+}
+
+// BlockedReasonCodeEQ applies the EQ predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeEQ(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldEQ(FieldBlockedReasonCode, v))
+}
+
+// BlockedReasonCodeNEQ applies the NEQ predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeNEQ(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNEQ(FieldBlockedReasonCode, v))
+}
+
+// BlockedReasonCodeIn applies the In predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeIn(vs ...string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldIn(FieldBlockedReasonCode, vs...))
+}
+
+// BlockedReasonCodeNotIn applies the NotIn predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeNotIn(vs ...string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNotIn(FieldBlockedReasonCode, vs...))
+}
+
+// BlockedReasonCodeGT applies the GT predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeGT(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldGT(FieldBlockedReasonCode, v))
+}
+
+// BlockedReasonCodeGTE applies the GTE predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeGTE(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldGTE(FieldBlockedReasonCode, v))
+}
+
+// BlockedReasonCodeLT applies the LT predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeLT(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldLT(FieldBlockedReasonCode, v))
+}
+
+// BlockedReasonCodeLTE applies the LTE predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeLTE(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldLTE(FieldBlockedReasonCode, v))
+}
+
+// BlockedReasonCodeContains applies the Contains predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeContains(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldContains(FieldBlockedReasonCode, v))
+}
+
+// BlockedReasonCodeHasPrefix applies the HasPrefix predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeHasPrefix(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldHasPrefix(FieldBlockedReasonCode, v))
+}
+
+// BlockedReasonCodeHasSuffix applies the HasSuffix predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeHasSuffix(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldHasSuffix(FieldBlockedReasonCode, v))
+}
+
+// BlockedReasonCodeIsNil applies the IsNil predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeIsNil() predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldIsNull(FieldBlockedReasonCode))
+}
+
+// BlockedReasonCodeNotNil applies the NotNil predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeNotNil() predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNotNull(FieldBlockedReasonCode))
+}
+
+// BlockedReasonCodeEqualFold applies the EqualFold predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeEqualFold(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldEqualFold(FieldBlockedReasonCode, v))
+}
+
+// BlockedReasonCodeContainsFold applies the ContainsFold predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeContainsFold(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldContainsFold(FieldBlockedReasonCode, v))
+}
+
+// BlockedReasonEQ applies the EQ predicate on the "blocked_reason" field.
+func BlockedReasonEQ(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldEQ(FieldBlockedReason, v))
+}
+
+// BlockedReasonNEQ applies the NEQ predicate on the "blocked_reason" field.
+func BlockedReasonNEQ(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNEQ(FieldBlockedReason, v))
+}
+
+// BlockedReasonIn applies the In predicate on the "blocked_reason" field.
+func BlockedReasonIn(vs ...string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldIn(FieldBlockedReason, vs...))
+}
+
+// BlockedReasonNotIn applies the NotIn predicate on the "blocked_reason" field.
+func BlockedReasonNotIn(vs ...string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNotIn(FieldBlockedReason, vs...))
+}
+
+// BlockedReasonGT applies the GT predicate on the "blocked_reason" field.
+func BlockedReasonGT(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldGT(FieldBlockedReason, v))
+}
+
+// BlockedReasonGTE applies the GTE predicate on the "blocked_reason" field.
+func BlockedReasonGTE(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldGTE(FieldBlockedReason, v))
+}
+
+// BlockedReasonLT applies the LT predicate on the "blocked_reason" field.
+func BlockedReasonLT(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldLT(FieldBlockedReason, v))
+}
+
+// BlockedReasonLTE applies the LTE predicate on the "blocked_reason" field.
+func BlockedReasonLTE(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldLTE(FieldBlockedReason, v))
+}
+
+// BlockedReasonContains applies the Contains predicate on the "blocked_reason" field.
+func BlockedReasonContains(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldContains(FieldBlockedReason, v))
+}
+
+// BlockedReasonHasPrefix applies the HasPrefix predicate on the "blocked_reason" field.
+func BlockedReasonHasPrefix(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldHasPrefix(FieldBlockedReason, v))
+}
+
+// BlockedReasonHasSuffix applies the HasSuffix predicate on the "blocked_reason" field.
+func BlockedReasonHasSuffix(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldHasSuffix(FieldBlockedReason, v))
+}
+
+// BlockedReasonIsNil applies the IsNil predicate on the "blocked_reason" field.
+func BlockedReasonIsNil() predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldIsNull(FieldBlockedReason))
+}
+
+// BlockedReasonNotNil applies the NotNil predicate on the "blocked_reason" field.
+func BlockedReasonNotNil() predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNotNull(FieldBlockedReason))
+}
+
+// BlockedReasonEqualFold applies the EqualFold predicate on the "blocked_reason" field.
+func BlockedReasonEqualFold(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldEqualFold(FieldBlockedReason, v))
+}
+
+// BlockedReasonContainsFold applies the ContainsFold predicate on the "blocked_reason" field.
+func BlockedReasonContainsFold(v string) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldContainsFold(FieldBlockedReason, v))
+}
+
+// BlockedAtEQ applies the EQ predicate on the "blocked_at" field.
+func BlockedAtEQ(v time.Time) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldEQ(FieldBlockedAt, v))
+}
+
+// BlockedAtNEQ applies the NEQ predicate on the "blocked_at" field.
+func BlockedAtNEQ(v time.Time) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNEQ(FieldBlockedAt, v))
+}
+
+// BlockedAtIn applies the In predicate on the "blocked_at" field.
+func BlockedAtIn(vs ...time.Time) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldIn(FieldBlockedAt, vs...))
+}
+
+// BlockedAtNotIn applies the NotIn predicate on the "blocked_at" field.
+func BlockedAtNotIn(vs ...time.Time) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNotIn(FieldBlockedAt, vs...))
+}
+
+// BlockedAtGT applies the GT predicate on the "blocked_at" field.
+func BlockedAtGT(v time.Time) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldGT(FieldBlockedAt, v))
+}
+
+// BlockedAtGTE applies the GTE predicate on the "blocked_at" field.
+func BlockedAtGTE(v time.Time) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldGTE(FieldBlockedAt, v))
+}
+
+// BlockedAtLT applies the LT predicate on the "blocked_at" field.
+func BlockedAtLT(v time.Time) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldLT(FieldBlockedAt, v))
+}
+
+// BlockedAtLTE applies the LTE predicate on the "blocked_at" field.
+func BlockedAtLTE(v time.Time) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldLTE(FieldBlockedAt, v))
+}
+
+// BlockedAtIsNil applies the IsNil predicate on the "blocked_at" field.
+func BlockedAtIsNil() predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldIsNull(FieldBlockedAt))
+}
+
+// BlockedAtNotNil applies the NotNil predicate on the "blocked_at" field.
+func BlockedAtNotNil() predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNotNull(FieldBlockedAt))
+}
+
+// BlockedByEQ applies the EQ predicate on the "blocked_by" field.
+func BlockedByEQ(v int) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldEQ(FieldBlockedBy, v))
+}
+
+// BlockedByNEQ applies the NEQ predicate on the "blocked_by" field.
+func BlockedByNEQ(v int) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNEQ(FieldBlockedBy, v))
+}
+
+// BlockedByIn applies the In predicate on the "blocked_by" field.
+func BlockedByIn(vs ...int) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldIn(FieldBlockedBy, vs...))
+}
+
+// BlockedByNotIn applies the NotIn predicate on the "blocked_by" field.
+func BlockedByNotIn(vs ...int) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNotIn(FieldBlockedBy, vs...))
+}
+
+// BlockedByGT applies the GT predicate on the "blocked_by" field.
+func BlockedByGT(v int) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldGT(FieldBlockedBy, v))
+}
+
+// BlockedByGTE applies the GTE predicate on the "blocked_by" field.
+func BlockedByGTE(v int) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldGTE(FieldBlockedBy, v))
+}
+
+// BlockedByLT applies the LT predicate on the "blocked_by" field.
+func BlockedByLT(v int) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldLT(FieldBlockedBy, v))
+}
+
+// BlockedByLTE applies the LTE predicate on the "blocked_by" field.
+func BlockedByLTE(v int) predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldLTE(FieldBlockedBy, v))
+}
+
+// BlockedByIsNil applies the IsNil predicate on the "blocked_by" field.
+func BlockedByIsNil() predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldIsNull(FieldBlockedBy))
+}
+
+// BlockedByNotNil applies the NotNil predicate on the "blocked_by" field.
+func BlockedByNotNil() predicate.ProcessInstance {
+	return predicate.ProcessInstance(sql.FieldNotNull(FieldBlockedBy))
 }
 
 // CreatedByEQ applies the EQ predicate on the "created_by" field.

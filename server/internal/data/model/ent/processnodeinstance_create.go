@@ -172,6 +172,48 @@ func (_c *ProcessNodeInstanceCreate) SetNillableCompletedAt(v *time.Time) *Proce
 	return _c
 }
 
+// SetActivatedFromNodeInstanceID sets the "activated_from_node_instance_id" field.
+func (_c *ProcessNodeInstanceCreate) SetActivatedFromNodeInstanceID(v int) *ProcessNodeInstanceCreate {
+	_c.mutation.SetActivatedFromNodeInstanceID(v)
+	return _c
+}
+
+// SetNillableActivatedFromNodeInstanceID sets the "activated_from_node_instance_id" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableActivatedFromNodeInstanceID(v *int) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetActivatedFromNodeInstanceID(*v)
+	}
+	return _c
+}
+
+// SetRoutingCompletedAt sets the "routing_completed_at" field.
+func (_c *ProcessNodeInstanceCreate) SetRoutingCompletedAt(v time.Time) *ProcessNodeInstanceCreate {
+	_c.mutation.SetRoutingCompletedAt(v)
+	return _c
+}
+
+// SetNillableRoutingCompletedAt sets the "routing_completed_at" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableRoutingCompletedAt(v *time.Time) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetRoutingCompletedAt(*v)
+	}
+	return _c
+}
+
+// SetRoutingCompletedBy sets the "routing_completed_by" field.
+func (_c *ProcessNodeInstanceCreate) SetRoutingCompletedBy(v int) *ProcessNodeInstanceCreate {
+	_c.mutation.SetRoutingCompletedBy(v)
+	return _c
+}
+
+// SetNillableRoutingCompletedBy sets the "routing_completed_by" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableRoutingCompletedBy(v *int) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetRoutingCompletedBy(*v)
+	}
+	return _c
+}
+
 // SetOutcome sets the "outcome" field.
 func (_c *ProcessNodeInstanceCreate) SetOutcome(v string) *ProcessNodeInstanceCreate {
 	_c.mutation.SetOutcome(v)
@@ -182,6 +224,118 @@ func (_c *ProcessNodeInstanceCreate) SetOutcome(v string) *ProcessNodeInstanceCr
 func (_c *ProcessNodeInstanceCreate) SetNillableOutcome(v *string) *ProcessNodeInstanceCreate {
 	if v != nil {
 		_c.SetOutcome(*v)
+	}
+	return _c
+}
+
+// SetBlockKind sets the "block_kind" field.
+func (_c *ProcessNodeInstanceCreate) SetBlockKind(v string) *ProcessNodeInstanceCreate {
+	_c.mutation.SetBlockKind(v)
+	return _c
+}
+
+// SetNillableBlockKind sets the "block_kind" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableBlockKind(v *string) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetBlockKind(*v)
+	}
+	return _c
+}
+
+// SetBlockedReasonCode sets the "blocked_reason_code" field.
+func (_c *ProcessNodeInstanceCreate) SetBlockedReasonCode(v string) *ProcessNodeInstanceCreate {
+	_c.mutation.SetBlockedReasonCode(v)
+	return _c
+}
+
+// SetNillableBlockedReasonCode sets the "blocked_reason_code" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableBlockedReasonCode(v *string) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetBlockedReasonCode(*v)
+	}
+	return _c
+}
+
+// SetBlockedReason sets the "blocked_reason" field.
+func (_c *ProcessNodeInstanceCreate) SetBlockedReason(v string) *ProcessNodeInstanceCreate {
+	_c.mutation.SetBlockedReason(v)
+	return _c
+}
+
+// SetNillableBlockedReason sets the "blocked_reason" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableBlockedReason(v *string) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetBlockedReason(*v)
+	}
+	return _c
+}
+
+// SetBlockedAt sets the "blocked_at" field.
+func (_c *ProcessNodeInstanceCreate) SetBlockedAt(v time.Time) *ProcessNodeInstanceCreate {
+	_c.mutation.SetBlockedAt(v)
+	return _c
+}
+
+// SetNillableBlockedAt sets the "blocked_at" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableBlockedAt(v *time.Time) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetBlockedAt(*v)
+	}
+	return _c
+}
+
+// SetBlockedBy sets the "blocked_by" field.
+func (_c *ProcessNodeInstanceCreate) SetBlockedBy(v int) *ProcessNodeInstanceCreate {
+	_c.mutation.SetBlockedBy(v)
+	return _c
+}
+
+// SetNillableBlockedBy sets the "blocked_by" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableBlockedBy(v *int) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetBlockedBy(*v)
+	}
+	return _c
+}
+
+// SetResumeReason sets the "resume_reason" field.
+func (_c *ProcessNodeInstanceCreate) SetResumeReason(v string) *ProcessNodeInstanceCreate {
+	_c.mutation.SetResumeReason(v)
+	return _c
+}
+
+// SetNillableResumeReason sets the "resume_reason" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableResumeReason(v *string) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetResumeReason(*v)
+	}
+	return _c
+}
+
+// SetResumedAt sets the "resumed_at" field.
+func (_c *ProcessNodeInstanceCreate) SetResumedAt(v time.Time) *ProcessNodeInstanceCreate {
+	_c.mutation.SetResumedAt(v)
+	return _c
+}
+
+// SetNillableResumedAt sets the "resumed_at" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableResumedAt(v *time.Time) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetResumedAt(*v)
+	}
+	return _c
+}
+
+// SetResumedBy sets the "resumed_by" field.
+func (_c *ProcessNodeInstanceCreate) SetResumedBy(v int) *ProcessNodeInstanceCreate {
+	_c.mutation.SetResumedBy(v)
+	return _c
+}
+
+// SetNillableResumedBy sets the "resumed_by" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableResumedBy(v *int) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetResumedBy(*v)
 	}
 	return _c
 }
@@ -436,6 +590,20 @@ func (_c *ProcessNodeInstanceCreate) SetNillableVersion(v *int) *ProcessNodeInst
 	return _c
 }
 
+// SetUpdatedBy sets the "updated_by" field.
+func (_c *ProcessNodeInstanceCreate) SetUpdatedBy(v int) *ProcessNodeInstanceCreate {
+	_c.mutation.SetUpdatedBy(v)
+	return _c
+}
+
+// SetNillableUpdatedBy sets the "updated_by" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableUpdatedBy(v *int) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetUpdatedBy(*v)
+	}
+	return _c
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (_c *ProcessNodeInstanceCreate) SetCreatedAt(v time.Time) *ProcessNodeInstanceCreate {
 	_c.mutation.SetCreatedAt(v)
@@ -603,9 +771,49 @@ func (_c *ProcessNodeInstanceCreate) check() error {
 			return &ValidationError{Name: "action_set_key", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.action_set_key": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.ActivatedFromNodeInstanceID(); ok {
+		if err := processnodeinstance.ActivatedFromNodeInstanceIDValidator(v); err != nil {
+			return &ValidationError{Name: "activated_from_node_instance_id", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.activated_from_node_instance_id": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.RoutingCompletedBy(); ok {
+		if err := processnodeinstance.RoutingCompletedByValidator(v); err != nil {
+			return &ValidationError{Name: "routing_completed_by", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.routing_completed_by": %w`, err)}
+		}
+	}
 	if v, ok := _c.mutation.Outcome(); ok {
 		if err := processnodeinstance.OutcomeValidator(v); err != nil {
 			return &ValidationError{Name: "outcome", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.outcome": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.BlockKind(); ok {
+		if err := processnodeinstance.BlockKindValidator(v); err != nil {
+			return &ValidationError{Name: "block_kind", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.block_kind": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.BlockedReasonCode(); ok {
+		if err := processnodeinstance.BlockedReasonCodeValidator(v); err != nil {
+			return &ValidationError{Name: "blocked_reason_code", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.blocked_reason_code": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.BlockedReason(); ok {
+		if err := processnodeinstance.BlockedReasonValidator(v); err != nil {
+			return &ValidationError{Name: "blocked_reason", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.blocked_reason": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.BlockedBy(); ok {
+		if err := processnodeinstance.BlockedByValidator(v); err != nil {
+			return &ValidationError{Name: "blocked_by", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.blocked_by": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.ResumeReason(); ok {
+		if err := processnodeinstance.ResumeReasonValidator(v); err != nil {
+			return &ValidationError{Name: "resume_reason", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.resume_reason": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.ResumedBy(); ok {
+		if err := processnodeinstance.ResumedByValidator(v); err != nil {
+			return &ValidationError{Name: "resumed_by", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.resumed_by": %w`, err)}
 		}
 	}
 	if v, ok := _c.mutation.DomainCommandFingerprint(); ok {
@@ -679,6 +887,11 @@ func (_c *ProcessNodeInstanceCreate) check() error {
 	if v, ok := _c.mutation.Version(); ok {
 		if err := processnodeinstance.VersionValidator(v); err != nil {
 			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.version": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.UpdatedBy(); ok {
+		if err := processnodeinstance.UpdatedByValidator(v); err != nil {
+			return &ValidationError{Name: "updated_by", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.updated_by": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
@@ -764,9 +977,53 @@ func (_c *ProcessNodeInstanceCreate) createSpec() (*ProcessNodeInstance, *sqlgra
 		_spec.SetField(processnodeinstance.FieldCompletedAt, field.TypeTime, value)
 		_node.CompletedAt = &value
 	}
+	if value, ok := _c.mutation.ActivatedFromNodeInstanceID(); ok {
+		_spec.SetField(processnodeinstance.FieldActivatedFromNodeInstanceID, field.TypeInt, value)
+		_node.ActivatedFromNodeInstanceID = &value
+	}
+	if value, ok := _c.mutation.RoutingCompletedAt(); ok {
+		_spec.SetField(processnodeinstance.FieldRoutingCompletedAt, field.TypeTime, value)
+		_node.RoutingCompletedAt = &value
+	}
+	if value, ok := _c.mutation.RoutingCompletedBy(); ok {
+		_spec.SetField(processnodeinstance.FieldRoutingCompletedBy, field.TypeInt, value)
+		_node.RoutingCompletedBy = &value
+	}
 	if value, ok := _c.mutation.Outcome(); ok {
 		_spec.SetField(processnodeinstance.FieldOutcome, field.TypeString, value)
 		_node.Outcome = &value
+	}
+	if value, ok := _c.mutation.BlockKind(); ok {
+		_spec.SetField(processnodeinstance.FieldBlockKind, field.TypeString, value)
+		_node.BlockKind = &value
+	}
+	if value, ok := _c.mutation.BlockedReasonCode(); ok {
+		_spec.SetField(processnodeinstance.FieldBlockedReasonCode, field.TypeString, value)
+		_node.BlockedReasonCode = &value
+	}
+	if value, ok := _c.mutation.BlockedReason(); ok {
+		_spec.SetField(processnodeinstance.FieldBlockedReason, field.TypeString, value)
+		_node.BlockedReason = &value
+	}
+	if value, ok := _c.mutation.BlockedAt(); ok {
+		_spec.SetField(processnodeinstance.FieldBlockedAt, field.TypeTime, value)
+		_node.BlockedAt = &value
+	}
+	if value, ok := _c.mutation.BlockedBy(); ok {
+		_spec.SetField(processnodeinstance.FieldBlockedBy, field.TypeInt, value)
+		_node.BlockedBy = &value
+	}
+	if value, ok := _c.mutation.ResumeReason(); ok {
+		_spec.SetField(processnodeinstance.FieldResumeReason, field.TypeString, value)
+		_node.ResumeReason = &value
+	}
+	if value, ok := _c.mutation.ResumedAt(); ok {
+		_spec.SetField(processnodeinstance.FieldResumedAt, field.TypeTime, value)
+		_node.ResumedAt = &value
+	}
+	if value, ok := _c.mutation.ResumedBy(); ok {
+		_spec.SetField(processnodeinstance.FieldResumedBy, field.TypeInt, value)
+		_node.ResumedBy = &value
 	}
 	if value, ok := _c.mutation.DomainCommandFingerprint(); ok {
 		_spec.SetField(processnodeinstance.FieldDomainCommandFingerprint, field.TypeString, value)
@@ -843,6 +1100,10 @@ func (_c *ProcessNodeInstanceCreate) createSpec() (*ProcessNodeInstance, *sqlgra
 	if value, ok := _c.mutation.Version(); ok {
 		_spec.SetField(processnodeinstance.FieldVersion, field.TypeInt, value)
 		_node.Version = value
+	}
+	if value, ok := _c.mutation.UpdatedBy(); ok {
+		_spec.SetField(processnodeinstance.FieldUpdatedBy, field.TypeInt, value)
+		_node.UpdatedBy = &value
 	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(processnodeinstance.FieldCreatedAt, field.TypeTime, value)

@@ -19,8 +19,8 @@ const productionTrialLockFile =
 const expectedMigration = "20260715161753";
 const expectedRelease = "a".repeat(40);
 const adminPassword = "FreshAdmin9!";
-const postgresDSN =
-  "postgres://postgres:test-production-password@postgres:5432/plush_erp_bootstrap_test?sslmode=disable";
+const postgresAppPassword = "test-app-password-12345";
+const postgresDSN = `postgres://erp_app:${postgresAppPassword}@postgres:5432/plush_erp_bootstrap_test?sslmode=disable`;
 const fixtureScratchRoot = path.join(repoRoot, "output", "qa-tmp");
 // Aggregate Node tests run files concurrently; this only gives fixture scheduling headroom.
 const fixtureProcessTimeoutMs = 30_000;
@@ -153,6 +153,9 @@ exec /usr/bin/mktemp "$template"
       "TZ=Asia/Shanghai",
       `POSTGRES_DSN=${postgresDSN}`,
       "POSTGRES_PASSWORD=test-production-password",
+      `POSTGRES_APP_PASSWORD=${postgresAppPassword}`,
+      "POSTGRES_MIGRATOR_PASSWORD=test-migrator-password-123",
+      "POSTGRES_BACKUP_PASSWORD=test-backup-password-123",
       `POSTGRES_DB=${expectedDatabase}`,
       "POSTGRES_USER=postgres",
       "POSTGRES_DATA_DIR=/data/plush-toy-erp/postgres",
@@ -162,7 +165,6 @@ exec /usr/bin/mktemp "$template"
       "TRACE_RATIO=0.1",
       "WEB_API_ORIGIN=http://app-server:8300",
       "APP_HTTP_BIND_ADDR=127.0.0.1",
-      "APP_GRPC_BIND_ADDR=127.0.0.1",
       "WEB_DESKTOP_BIND_ADDR=0.0.0.0",
       `APP_JWT_SECRET=${"j".repeat(40)}`,
       "APP_AUTH_SMS_MODE=disabled",
@@ -528,7 +530,7 @@ function configureTrialFixture(fixture) {
     APP_AUTH_SMS_ALIYUN_ACCESS_KEY_SECRET: "fixture-access-key-secret",
     APP_AUTH_SMS_ALIYUN_SIGN_NAME: "fixture-sign-name",
     APP_AUTH_SMS_ALIYUN_TEMPLATE_CODE: "fixture-template-code",
-    POSTGRES_DSN: `postgres://postgres:test-production-password@postgres:5432/${trialDatabase}?sslmode=disable`,
+    POSTGRES_DSN: `postgres://erp_app:${postgresAppPassword}@postgres:5432/${trialDatabase}?sslmode=disable`,
     POSTGRES_DB: trialDatabase,
     POSTGRES_DATA_DIR: fixture.trialDataDir,
     MIGRATION_LOCK_FILE: fixture.trialLockFile,
@@ -536,7 +538,6 @@ function configureTrialFixture(fixture) {
     ERP_CUSTOMER_TRIAL_TARGET: "customer-trial-133",
     POSTGRES_PORT: "55435",
     APP_HTTP_PORT: "8315",
-    APP_GRPC_PORT: "9315",
     WEB_DESKTOP_BIND_ADDR: "127.0.0.1",
     WEB_DESKTOP_PORT: "5185",
     JAEGER_5775_PORT: "45775",
@@ -1146,7 +1147,9 @@ test("bootstrap production admin rejects shared temporary lock roots before dock
     "/dev/shm/plush-bootstrap/atlas-migrate.lock",
   ]) {
     const fixture = writeFixture(t);
-    replaceEnvValues(fixture.envFile, { MIGRATION_LOCK_FILE: migrationLockFile });
+    replaceEnvValues(fixture.envFile, {
+      MIGRATION_LOCK_FILE: migrationLockFile,
+    });
 
     const result = runHelper(fixture);
 
@@ -1198,7 +1201,7 @@ test("bootstrap production admin accepts only one exact internal PostgreSQL DSN 
   });
   const userResult = runHelper(userFixture);
   assert.notEqual(userResult.status, 0);
-  assert.match(userResult.stderr, /POSTGRES_DSN user 与 POSTGRES_USER 不一致/u);
+  assert.match(userResult.stderr, /POSTGRES_DSN 必须使用 erp_app/u);
   assert.equal(fs.existsSync(userFixture.dockerLog), false);
   assertSecretSafe(userResult, userFixture);
 });
@@ -1444,7 +1447,10 @@ test("bootstrap production admin retains locks when a failed compose run has no 
   assert.match(result.stderr, /一次性 app-server bootstrap 容器启动失败/u);
   assert.match(result.stderr, /容器发现、身份复核或清理不确定/u);
   assert.doesNotMatch(result.stderr, /advisory lock 无法证明已释放/u);
-  assert.equal(fs.existsSync(path.join(fixture.stateDir, "advisory-lock")), true);
+  assert.equal(
+    fs.existsSync(path.join(fixture.stateDir, "advisory-lock")),
+    true,
+  );
   assert.equal(fs.existsSync(path.join(fixture.stateDir, "started")), false);
   assert.equal(fs.existsSync(bootstrapLockPath(fixture)), true);
   assertSecretSafe(result, fixture);
@@ -1474,7 +1480,10 @@ test("bootstrap production admin accepts an already verified --rm container disa
   assert.match(result.stdout, /status=complete/u);
   assert.equal(fs.existsSync(path.join(fixture.stateDir, "removed")), true);
   assert.equal(fs.existsSync(path.join(fixture.stateDir, "stopped")), false);
-  assert.equal(fs.existsSync(path.join(fixture.stateDir, "advisory-lock")), false);
+  assert.equal(
+    fs.existsSync(path.join(fixture.stateDir, "advisory-lock")),
+    false,
+  );
   assert.equal(fs.existsSync(bootstrapLockPath(fixture)), false);
   assertSecretSafe(result, fixture);
 });
@@ -1490,7 +1499,10 @@ test("bootstrap production admin does not confuse Docker inspect failure with ve
   assert.match(result.stderr, /容器无法清理/u);
   assert.match(result.stderr, /容器发现、身份复核或清理不确定/u);
   assert.equal(fs.existsSync(path.join(fixture.stateDir, "removed")), false);
-  assert.equal(fs.existsSync(path.join(fixture.stateDir, "advisory-lock")), true);
+  assert.equal(
+    fs.existsSync(path.join(fixture.stateDir, "advisory-lock")),
+    true,
+  );
   assert.equal(fs.existsSync(bootstrapLockPath(fixture)), true);
   assertSecretSafe(result, fixture);
 });

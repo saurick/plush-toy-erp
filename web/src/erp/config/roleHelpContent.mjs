@@ -22,6 +22,11 @@ const commonQuestions = Object.freeze([
     answer:
       '任务完成只表示协同事项已经处理。入库、出货、应收、应付等结果仍要回到对应业务页面确认，最终以业务记录状态为准。',
   },
+  {
+    question: '页面里的专业词、金额或自动带入内容看不懂怎么办？',
+    answer:
+      '先点页面右上角“这页怎么用”，查看当前任务、完成标准、办理顺序和交接对象；金额、比例、字段来源等局部内容可点名称旁的问号查看。不能操作的原因、高风险提醒和必须交给谁处理的事项会直接显示，不需要藏在问号里找。',
+  },
 ])
 
 export const ROLE_HELP_GUIDES = Object.freeze([
@@ -143,7 +148,7 @@ export const ROLE_HELP_GUIDES = Object.freeze([
         title: '核对供应商和材料',
         description: '确认供应商、材料规格和单位可以被采购单正确引用。',
         path: '/erp/master/partners/suppliers',
-        actionLabel: '打开供应商档案',
+        actionLabel: '打开供应商与加工厂',
       },
       {
         title: '办理采购订单',
@@ -191,7 +196,7 @@ export const ROLE_HELP_GUIDES = Object.freeze([
     label: '生产 / 委外',
     headline: '围绕生产和委外来源推进工序、检验、领料和完工。',
     summary:
-      '生产岗位帮助覆盖生产订单、工序推进、异常处理、领料和完工入库衔接。',
+      '生产岗位帮助覆盖生产订单、工序推进、异常处理、领料和完工报告；成品入库由仓库核对实收后确认。',
     priorities: [
       {
         title: '查看生产订单',
@@ -201,7 +206,7 @@ export const ROLE_HELP_GUIDES = Object.freeze([
       },
       {
         title: '跟进生产进度',
-        description: '办理领料、完工和返工来源记录。',
+        description: '办理领料、提交完工报告和返工来源记录。',
         path: '/erp/production/progress',
         actionLabel: '打开生产进度',
       },
@@ -222,12 +227,12 @@ export const ROLE_HELP_GUIDES = Object.freeze([
       '确认生产订单已发布，物料需求和工序路线正确。',
       '按在制批次推进布料加工、车缝、手工和包装。',
       '需要检验的节点先发起质检，出现问题时记录返工来源。',
-      '从明确来源办理领料、完工或委外发料与回货，并回到生产记录确认。',
+      '从明确来源办理领料、提交完工报告或办理委外发料与回货；完工报告交仓库核对入库。',
     ],
     completion:
-      '对应生产或委外记录已正式确认，数量和当前状态可查，并已交给品质或仓库继续核对。',
+      '生产领料或返工记录已正式确认；完工报告已生成待入库草稿并交给仓库，数量和当前状态可查。',
     handoff:
-      '缺料交给 PMC 和采购，检验交给品质，完工入库交给仓库；异常处理结果要回到来源生产记录核对。',
+      '缺料交给 PMC 和采购，检验交给品质，完工报告交给仓库核对实收并确认入库；异常处理结果要回到来源生产记录核对。',
     exception: {
       title: '缺料、检验失败或委外回货异常',
       trigger:
@@ -244,7 +249,7 @@ export const ROLE_HELP_GUIDES = Object.freeze([
     },
     cautions: [
       '生产订单发布、工序完成或任务完成都不等于库存已经变化。',
-      '领料和完工必须从明确的生产订单来源生成并确认。',
+      '领料和完工报告必须从明确的生产订单来源生成；生产提交完工不等于成品已经入库。',
       '返工记录与异常待办要分别核对，不能只处理其中一处。',
     ],
     questions: commonQuestions,
@@ -254,13 +259,19 @@ export const ROLE_HELP_GUIDES = Object.freeze([
     label: '仓库',
     headline: '按来源办理收货、入库、库存和实际出货。',
     summary:
-      '仓库岗位帮助聚焦入库确认、批次状态、库存可用量、出货放行和实际出库。',
+      '仓库岗位帮助聚焦采购与成品入库确认、批次状态、库存可用量、出货放行和实际出库。',
     priorities: [
       {
         title: '办理入库',
         description: '从采购来源核对收货、待检和入库状态。',
         path: '/erp/warehouse/inbound',
         actionLabel: '打开入库管理',
+      },
+      {
+        title: '确认成品入库',
+        description: '核对生产完工报告、实收数量、仓库和批次后确认入库。',
+        path: '/erp/production/progress',
+        actionLabel: '打开生产记录',
       },
       {
         title: '核对库存',
@@ -278,13 +289,14 @@ export const ROLE_HELP_GUIDES = Object.freeze([
     workflow: [
       '核对采购来源、实收数量、仓库和批次。',
       '需要检验的到料先等待品质判定，再确认入库。',
+      '在生产记录中选择待入库完工报告，核对实收数量、仓库和批次后确认成品入库。',
       '备货时查看已预留和可用量，不只看库存总数。',
       '出货前核对放行、检验和来源数量，确认发货后再检查库存变化。',
     ],
     completion:
-      '入库场景能看到正式库存变化；出货场景能看到已发货状态和相应库存变化。只有满足其中对应结果，才算本次仓库办理完成。',
+      '采购或成品入库场景能看到正式库存变化；出货场景能看到已发货状态和相应库存变化。只有满足其中对应结果，才算本次仓库办理完成。',
     handoff:
-      '收货异常交给采购和品质；可用库存、备货和实际发货结果及时反馈给 PMC 与销售。',
+      '采购收货异常交给采购和品质，成品实收差异退回生产核对；可用库存、备货和实际发货结果及时反馈给 PMC 与销售。',
     exception: {
       title: '实收、检验或库存条件不满足',
       trigger: '实收与来源不符、尚未检验、判定不合格，或出货可用量不足时。',
@@ -298,6 +310,7 @@ export const ROLE_HELP_GUIDES = Object.freeze([
     },
     cautions: [
       '出货放行只表示可以继续发货，不等于已经出库。',
+      '生产提交完工报告不等于成品已经入库，只有仓库确认后才增加库存。',
       '释放预留不会增加库存总量，确认发货才会扣减库存。',
       '来源、批次或数量不一致时先停下核对，不要用其他记录补平差异。',
     ],
@@ -574,6 +587,7 @@ export const ROLE_HELP_GUIDES = Object.freeze([
       '只分配完成工作所需的岗位和页面，避免无关入口增加误操作。',
     ],
     questions: [
+      ...commonQuestions,
       {
         question: '员工登录后看不到页面怎么办？',
         answer:

@@ -25,6 +25,7 @@ import { runSourceArchiveReleaseCheck } from "./source-archive-release-check.mjs
 
 const SCHEMA_VERSION = "plush-release-artifact/v1";
 const CUSTOMER_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+const VERSION_PATTERN = /^[0-9A-Za-z](?:[0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$/u;
 const COMMIT_PATTERN = /^[a-f0-9]{40}$/u;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
 const IMAGE_ID_PATTERN = /^sha256:[a-f0-9]{64}$/u;
@@ -635,7 +636,7 @@ function scanImageMetadata(image) {
   };
 }
 
-function assertReleaseImage(image, imageRef, commit) {
+function assertReleaseImage(image, imageRef, commit, releaseVersion) {
   if (
     !IMAGE_ID_PATTERN.test(String(image?.Id || "")) ||
     image?.Os !== "linux" ||
@@ -653,6 +654,14 @@ function assertReleaseImage(image, imageRef, commit) {
       `release image GIT_SHA does not match commit: ${imageRef}`,
     );
   }
+  const embeddedReleaseVersion = (image?.Config?.Env || [])
+    .find((entry) => entry.startsWith("RELEASE_VERSION="))
+    ?.slice("RELEASE_VERSION=".length);
+  if (embeddedReleaseVersion !== releaseVersion) {
+    throw new ReleaseArtifactError(
+      `release image RELEASE_VERSION does not match: ${imageRef}`,
+    );
+  }
 }
 
 async function imageArtifact({
@@ -660,6 +669,7 @@ async function imageArtifact({
   sourceRef,
   fixedRef,
   commit,
+  releaseVersion,
   repoRoot,
   outputDir,
   runCommand,
@@ -672,7 +682,7 @@ async function imageArtifact({
     label: `tag immutable ${kind} image`,
   });
   const image = inspectImage(fixedRef, repoRoot, runCommand);
-  assertReleaseImage(image, fixedRef, commit);
+  assertReleaseImage(image, fixedRef, commit, releaseVersion);
   const metadataSecretScan = scanImageMetadata(image);
   const tarFile = `${kind}-image.tar`;
   const tarPath = path.join(outputDir, tarFile);
@@ -684,6 +694,7 @@ async function imageArtifact({
     contentId: image.Id,
     platform: `${image.Os}/${image.Architecture}`,
     gitSha: commit,
+    releaseVersion,
     sizeBytes: Number(image.Size || 0),
     archive: {
       file: tarFile,
@@ -738,6 +749,9 @@ export function assertReleaseArtifactManifest(manifest) {
       Number.isSafeInteger(buildPerformance.cacheHitRateBasisPoints) &&
       buildPerformance.cacheHitRateBasisPoints >= 0 &&
       buildPerformance.cacheHitRateBasisPoints <= 10_000);
+  const releaseVersion = manifest?.releaseVersion;
+  const optionalReleaseVersion =
+    releaseVersion === undefined || VERSION_PATTERN.test(releaseVersion);
   if (
     manifest?.schemaVersion !== SCHEMA_VERSION ||
     manifest?.passed !== true ||
@@ -756,6 +770,7 @@ export function assertReleaseArtifactManifest(manifest) {
     !SHA256_PATTERN.test(String(manifest?.sbom?.sha256 || "")) ||
     !Array.isArray(manifest?.images) ||
     manifest.images.length !== 2 ||
+    !optionalReleaseVersion ||
     !optionalBuildPerformance
   ) {
     throw new ReleaseArtifactError("release artifact manifest is invalid");
@@ -779,6 +794,9 @@ export function assertReleaseArtifactManifest(manifest) {
       !["server", "web"].includes(image?.kind) ||
       !IMAGE_ID_PATTERN.test(String(image?.contentId || "")) ||
       image?.gitSha !== manifest.git.commit ||
+      (releaseVersion === undefined
+        ? image?.releaseVersion !== undefined
+        : image?.releaseVersion !== releaseVersion) ||
       image?.platform !== "linux/amd64" ||
       !SHA256_PATTERN.test(String(image?.archive?.sha256 || "")) ||
       !Number.isSafeInteger(image?.archive?.sizeBytes) ||
@@ -814,12 +832,16 @@ export async function buildReleaseArtifact(options = {}, runtime = {}) {
     {
       customer,
       ref: options.ref || "HEAD",
+      version: options.version,
       mode: "release",
       docker: true,
     },
     { repoRoot },
   );
   const commit = sourceReport.commit;
+  const releaseVersion = String(
+    options.version || sourceReport.releaseVersion || commit.slice(0, 12),
+  ).trim();
   if (
     sourceReport.formalEvidenceEligible !== true ||
     sourceReport.releaseCheckPassed !== true ||
@@ -829,6 +851,9 @@ export async function buildReleaseArtifact(options = {}, runtime = {}) {
     throw new ReleaseArtifactError(
       "source archive release check did not produce eligible Docker evidence",
     );
+  }
+  if (!VERSION_PATTERN.test(releaseVersion)) {
+    throw new ReleaseArtifactError("release version is invalid");
   }
   const finalDir = resolveReleaseOutput(repoRoot, options.out, commit);
   if (existsSync(finalDir)) {
@@ -884,6 +909,7 @@ export async function buildReleaseArtifact(options = {}, runtime = {}) {
         sourceRef: sourceServer,
         fixedRef: `plush-toy-erp-server:${fixedSuffix}`,
         commit,
+        releaseVersion,
         repoRoot,
         outputDir: temporaryDir,
         runCommand,
@@ -894,6 +920,7 @@ export async function buildReleaseArtifact(options = {}, runtime = {}) {
         sourceRef: sourceWeb,
         fixedRef: `plush-toy-erp-web:${fixedSuffix}`,
         commit,
+        releaseVersion,
         repoRoot,
         outputDir: temporaryDir,
         runCommand,
@@ -905,6 +932,7 @@ export async function buildReleaseArtifact(options = {}, runtime = {}) {
       passed: true,
       createdAt,
       customer,
+      releaseVersion,
       git: {
         commit,
         head: sourceReport.head,
@@ -1023,7 +1051,7 @@ export function parseReleaseArtifactArgs(argv) {
       options.help = true;
       continue;
     }
-    if (["--customer", "--ref", "--out"].includes(token)) {
+    if (["--customer", "--ref", "--out", "--version"].includes(token)) {
       const value = argv[index + 1];
       if (!value || value.startsWith("--")) {
         throw new ReleaseArtifactError(`missing value for ${token}`);
@@ -1040,10 +1068,10 @@ export function parseReleaseArtifactArgs(argv) {
 const USAGE = `Immutable release artifact bundle
 
 Usage:
-  node scripts/deploy/release-artifact-bundle.mjs --execute [--ref HEAD] [--customer yoyoosun] [--out output/releases/<sha>] [--json]
+  node scripts/deploy/release-artifact-bundle.mjs --execute --version <version> [--ref HEAD] [--customer yoyoosun] [--out output/releases/<sha>] [--json]
 
 The command requires a clean current HEAD. It builds linux/amd64 images only from
-the committed git archive, embeds the exact 40-character SHA, records image content
+the committed git archive, embeds the human release version plus exact 40-character SHA, records image content
 IDs, saves zstd level-3 loadable image archives, writes a CycloneDX dependency SBOM,
 migration sequence and customer-config source fingerprints, and fails on populated
 sensitive image metadata. It does not push images, contact 133, deploy, migrate a

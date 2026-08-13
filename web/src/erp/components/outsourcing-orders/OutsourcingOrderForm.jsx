@@ -1,9 +1,19 @@
 import React, { useCallback } from 'react'
 import { CopyOutlined, DeleteOutlined } from '@ant-design/icons'
-import { Button, Form, Input, Select, Space } from 'antd'
+import {
+  AutoComplete,
+  Button,
+  Form,
+  Input,
+  InputNumber,
+  Select,
+  Space,
+} from 'antd'
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
+import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
 import BusinessLineItemsSection from '../business-list/BusinessLineItemsSection.jsx'
 import BusinessLineItemsSummaryValue from '../business-list/BusinessLineItemsSummaryValue.jsx'
+import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import FieldWithUnitSuffix, {
   isQuantityTextWithinUnitPrecision,
   unitPrecisionErrorMessage,
@@ -18,6 +28,7 @@ import {
   isDateInputBefore,
 } from '../../utils/dateRange.mjs'
 import {
+  BUSINESS_CURRENCY_OPTIONS,
   OUTSOURCING_ORDER_SUBJECT_TYPES,
   createBlankOutsourcingLine,
   deriveOutsourcingOrderItemAmount,
@@ -45,10 +56,6 @@ function getNextLineNo(lines = []) {
       return Number.isFinite(lineNo) ? Math.max(maxValue, lineNo) : maxValue
     }, 0) + 1
   )
-}
-
-export function todayInputValue() {
-  return new Date().toISOString().slice(0, 10)
 }
 
 export function supplierLabel(supplier = {}) {
@@ -100,6 +107,10 @@ export default function OutsourcingOrderForm({
   form,
   supplierOptions,
   onSupplierChange,
+  supplierContacts = [],
+  supplierContactsLoading = false,
+  onSupplierContactNameChange,
+  onSupplierContactSelect,
   productOptions,
   productSKUs = [],
   materialOptions,
@@ -133,6 +144,7 @@ export default function OutsourcingOrderForm({
       preserve={false}
       className="erp-business-action-form"
     >
+      <BusinessFormSectionTitle>合同与加工厂</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field"
         name="outsourcing_order_no"
@@ -144,7 +156,7 @@ export default function OutsourcingOrderForm({
       <Form.Item
         className="erp-business-action-form__field"
         name="supplier_id"
-        label="加工厂"
+        label="加工厂（乙方）"
         rules={[{ required: true, message: '请选择加工厂' }]}
       >
         <Select
@@ -160,6 +172,30 @@ export default function OutsourcingOrderForm({
         label="来源订单号"
       >
         <Input maxLength={128} placeholder="如产品订单编号 / 销售订单号" />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        name="currency"
+        label="币种"
+        rules={[{ required: true, message: '请选择币种' }]}
+      >
+        <Select options={BUSINESS_CURRENCY_OPTIONS} />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        extra="保存后冻结为本单付款条件，不随加工厂档案后续调整。"
+        name="payment_term_days"
+        label="付款周期（天）"
+        rules={[
+          { required: true, message: '请填写付款周期' },
+          {
+            type: 'integer',
+            min: 0,
+            message: '付款周期必须为不小于 0 的整数',
+          },
+        ]}
+      >
+        <InputNumber min={0} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
@@ -197,9 +233,7 @@ export default function OutsourcingOrderForm({
           }
         />
       </Form.Item>
-      <div className="erp-business-action-form__section-title">
-        合同委托方信息
-      </div>
+      <BusinessFormSectionTitle>合同委托方信息</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field"
         name={['contract_party_snapshot', 'buyerCompany']}
@@ -235,6 +269,81 @@ export default function OutsourcingOrderForm({
       >
         <Input maxLength={64} />
       </Form.Item>
+      <BusinessFormSectionTitle>合同乙方信息</BusinessFormSectionTitle>
+      <Form.Item name={['supplier_snapshot', 'id']} hidden>
+        <Input />
+      </Form.Item>
+      <Form.Item name={['supplier_snapshot', 'code']} hidden>
+        <Input />
+      </Form.Item>
+      <Form.Item name={['supplier_snapshot', 'short_name']} hidden>
+        <Input />
+      </Form.Item>
+      <Form.Item name={['supplier_snapshot', 'contact_id']} hidden>
+        <Input />
+      </Form.Item>
+      <Form.Item name={['supplier_snapshot', 'contact_mobile']} hidden>
+        <Input />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        name={['supplier_snapshot', 'name']}
+        label="乙方单位"
+        extra="单位名称随所选加工厂带入并冻结在当前合同中。"
+      >
+        <Input readOnly />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        name={['supplier_snapshot', 'contact_name']}
+        label="乙方联系人"
+        extra="可从加工厂联系人中选择，也可按本合同直接填写。"
+      >
+        <AutoComplete
+          allowClear
+          autoComplete="off"
+          loading={supplierContactsLoading}
+          maxLength={128}
+          options={supplierContacts.map((contact) => ({
+            value: contact.name,
+            label: [
+              contact.name,
+              contact.title,
+              contact.mobile || contact.phone,
+            ]
+              .filter(Boolean)
+              .join(' / '),
+            contact,
+          }))}
+          onChange={onSupplierContactNameChange}
+          onSelect={(_value, option) =>
+            onSupplierContactSelect?.(option?.contact)
+          }
+          placeholder="选择或填写乙方联系人"
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        name={['supplier_snapshot', 'contact_phone']}
+        label="乙方联系电话"
+      >
+        <Input maxLength={64} placeholder="座机或手机" />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        name={['supplier_snapshot', 'address']}
+        label="乙方地址"
+      >
+        <Input maxLength={512} />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        name={['supplier_snapshot', 'signer_name']}
+        label="乙方签约人"
+      >
+        <Input maxLength={64} />
+      </Form.Item>
+      <BusinessFormSectionTitle>备注与附件</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field erp-business-action-form__field--full"
         name="note"
@@ -576,7 +685,13 @@ export default function OutsourcingOrderForm({
                 {({ getFieldValue }) => (
                   <Form.Item
                     className="erp-line-item-field erp-line-item-field--money"
-                    label="金额预览"
+                    label={
+                      <BusinessHelpLabel
+                        itemKey="outsourcing-line-amount"
+                        label="金额预览"
+                        pageKey="processing-contracts"
+                      />
+                    }
                     extra="仅供录入核对，保存时由系统按数量和单价核算。"
                   >
                     <Input

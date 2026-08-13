@@ -7,7 +7,14 @@ import { fileURLToPath } from "node:url";
 import { verifyGoTestJson } from "./verify-go-test-json.mjs";
 import { verifyNodeTestSummary } from "./verify-node-test-summary.mjs";
 
-export function evaluateTestGate({ kind, status, stdout = "", stderr = "", error }) {
+export function evaluateTestGate({
+  kind,
+  status,
+  stdout = "",
+  stderr = "",
+  error,
+  excludedSkipPattern = "",
+}) {
   if (error) throw error;
   if (status !== 0) {
     return { ok: false, reason: "child-exit", exitCode: status ?? 1 };
@@ -16,7 +23,7 @@ export function evaluateTestGate({ kind, status, stdout = "", stderr = "", error
     kind === "node"
       ? verifyNodeTestSummary(`${stdout}\n${stderr}`)
       : kind === "go"
-        ? verifyGoTestJson(stdout)
+        ? verifyGoTestJson(stdout, [], { excludedSkipPattern })
         : null;
   if (!result) throw new Error(`unsupported test kind: ${kind}`);
   return { ok: result.ok, reason: result.ok ? "complete" : "invalid-summary", result };
@@ -27,15 +34,16 @@ export function formatIncompleteSummary(kind, result) {
     return `tests=${result.tests ?? "missing"} pass=${result.pass ?? "missing"} fail=${result.fail ?? "missing"} cancelled=${result.cancelled ?? "missing"} skipped=${result.skipped ?? "missing"} todo=${result.todo ?? "missing"}`;
   }
   if (kind === "go") {
-    return `run=${result.run} pass=${result.pass} fail=${result.fail} skip=${result.skip} unresolved=${result.unresolvedTests.length}`;
+    return `run=${result.run} pass=${result.pass} fail=${result.fail} skip=${result.skip} excluded=${result.excluded ?? 0} unresolved=${result.unresolvedTests.length}`;
   }
   throw new Error(`unsupported test kind: ${kind}`);
 }
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const separator = argv.indexOf("--");
   if (separator < 0) throw new Error("expected -- before the test command");
-  const options = { kind: "", label: "" };
+  const options = { kind: "", label: "", excludedSkipPattern: "" };
+  let excludedSkipPatternSeen = false;
   for (let index = 0; index < separator; index += 1) {
     const arg = argv[index];
     if (arg === "--kind" || arg === "--label") {
@@ -44,18 +52,57 @@ function parseArgs(argv) {
       options[arg.slice(2)] = value;
       continue;
     }
+    if (arg === "--exclude-skip-pattern") {
+      if (excludedSkipPatternSeen) {
+        throw new Error("--exclude-skip-pattern may be provided only once");
+      }
+      const value = argv[++index];
+      if (!value || index >= separator) {
+        throw new Error("--exclude-skip-pattern requires a value");
+      }
+      options.excludedSkipPattern = value;
+      excludedSkipPatternSeen = true;
+      continue;
+    }
     throw new Error(`unsupported argument: ${arg}`);
   }
   if (!new Set(["node", "go"]).has(options.kind)) {
     throw new Error("--kind must be node or go");
   }
   if (!options.label) throw new Error("--label is required");
+  if (excludedSkipPatternSeen && options.kind !== "go") {
+    throw new Error("--exclude-skip-pattern is supported only for --kind go");
+  }
+  if (excludedSkipPatternSeen) {
+    try {
+      new RegExp(options.excludedSkipPattern, "u");
+    } catch {
+      throw new Error("--exclude-skip-pattern must be a valid regex");
+    }
+  }
   const command = argv[separator + 1];
   if (!command) throw new Error("test command is required");
   return { ...options, command, args: argv.slice(separator + 2) };
 }
 
-function main() {
+function writeStream(stream, content) {
+  return new Promise((resolve, reject) => {
+    stream.write(content, (error) => {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
+}
+
+export async function emitCapturedOutput(
+  { stdout = "", stderr = "" },
+  write = writeStream,
+) {
+  if (stdout) await write(process.stdout, stdout);
+  if (stderr) await write(process.stderr, stderr);
+}
+
+async function main() {
   const options = parseArgs(process.argv.slice(2));
   const child = spawnSync(options.command, options.args, {
     cwd: process.cwd(),
@@ -63,14 +110,14 @@ function main() {
     env: process.env,
     maxBuffer: 256 * 1024 * 1024,
   });
-  process.stdout.write(child.stdout || "");
-  process.stderr.write(child.stderr || "");
+  await emitCapturedOutput(child);
   const outcome = evaluateTestGate({
     kind: options.kind,
     status: child.status,
     stdout: child.stdout,
     stderr: child.stderr,
     error: child.error,
+    excludedSkipPattern: options.excludedSkipPattern,
   });
   if (!outcome.ok) {
     const summary = outcome.result
@@ -89,16 +136,14 @@ function main() {
     );
   } else {
     console.log(
-      `[qa:test-gate] label=${options.label} status=complete run=${result.run} pass=${result.pass} fail=${result.fail} skip=${result.skip}`,
+      `[qa:test-gate] label=${options.label} status=complete run=${result.run} pass=${result.pass} fail=${result.fail} skip=${result.skip} excluded=${result.excluded ?? 0}`,
     );
   }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try {
-    main();
-  } catch (error) {
+  main().catch((error) => {
     console.error(`[qa:test-gate] ${error.message}`);
     process.exitCode = 1;
-  }
+  });
 }

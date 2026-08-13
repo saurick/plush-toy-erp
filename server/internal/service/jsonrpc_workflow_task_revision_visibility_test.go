@@ -169,6 +169,7 @@ func TestWorkflowMobileRoleTaskFirstPageReturnsAuthoritativeCounts(t *testing.T)
 	if !ok || counts["ready"] != float64(8) || counts["blocked"] != float64(4) ||
 		counts["todo"] != float64(12) || counts["done"] != float64(2) ||
 		counts["rejected"] != float64(1) || counts["history"] != float64(3) ||
+		counts["withdrawn"] != float64(0) ||
 		counts["total"] != float64(15) || counts["approval"] != float64(0) ||
 		counts["risk"] != float64(4) || counts["overdue"] != float64(2) {
 		t.Fatalf("counts=%#v", counts)

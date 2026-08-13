@@ -68,7 +68,6 @@
 
 ## 2026-07-02 试用模拟数据 no-write 准备复核
 
-- 完成：继续当前本地闭环，不扩张 release evidence。复核 `trial-simulated-data` 的无密码 no-write 入口：输入模板明确只打印 report-only / apply simulated data 前置，report-only 只生成本地 ignored 输出，模拟数据仍标记为 `simulatedOnly=true`、`realCustomerImport=false`，不登录、不调用后端、不写数据库、不创建 `business_records`，也不生成出货、库存或财务事实。
 - 验证：追加前 `progress.md` 为 97 行 / 23,637 bytes，未达到 600 行或 80KB 归档阈值；`node scripts/qa/trial-simulated-data.mjs --print-input-template` 返回 `writesReports=false / writesDatabase=false / callsBackend=false / importsRealCustomerData=false / createsShipmentInventoryFinanceFacts=false`；`node scripts/qa/trial-simulated-data.mjs --out output/customers/yoyoosun/trial-simulated-data-no-write` 生成 report-only 报告，摘要为 `mode=report-only / simulatedOnly=true / realCustomerImport=false`；`node --test scripts/qa/trial-simulated-data.test.mjs` 通过 9 项；`node --test web/src/erp/config/devTesting.test.mjs scripts/qa/dev-entry-boundary.test.mjs scripts/qa/trial-role-entry-docs.test.mjs` 通过 15 项，确认 `/__dev/testing`、脚本 README、自动化测试策略和 yoyoosun 试用手册仍指向当前 no-write / apply 边界。
 - 下一步：继续无密码路径时，优先选择客户配置控制台 no-write 诊断、字段链路守卫、错误提示或一个明确目标页面 L1；如果要真正写入试用模拟数据，需要本地后端、演示账号密码、活跃产品 / 单位 ID，并显式设置 `TRIAL_SIM_CONFIRM=APPLY_SIMULATED_TRIAL_DATA`。
 - 阻塞/风险：本轮只生成 ignored report-only 输出并验证本地合同，不读取密码、不登录、不调用 JSON-RPC、不写数据库、不执行真实 import、不创建真实客户数据、不写出货 / 库存 / 财务事实、不做客户配置发布 / 激活 / 回滚、不做目标环境 release evidence、生产部署、备份恢复、回滚演练、客户签收、提交或推送。

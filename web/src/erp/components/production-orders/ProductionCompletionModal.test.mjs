@@ -10,7 +10,7 @@ const source = readFileSync(
 test('production completion edit keeps source line and WIP batch locked', () => {
   assert.match(source, /mode = 'create'/u)
   assert.match(source, /excludeFactID/u)
-  assert.match(source, /编辑完工入库草稿/u)
+  assert.match(source, /核对待入库完工报告/u)
   assert.ok((source.match(/disabled=\{editing\}/gu)?.length || 0) >= 2)
   assert.match(source, /initialValues\?\.production_order_item_id/u)
   assert.match(source, /initialValues\?\.production_wip_batch_id/u)
@@ -63,7 +63,7 @@ test('production completion resets stale lot fields on open, line and mode chang
 })
 
 test('production completion requires one bounded lot input and handles validation locally', () => {
-  assert.match(source, /请选择已有入库批次/u)
+  assert.match(source, /请选择拟使用的已有入库批次/u)
   assert.match(source, /请填写本次完工的新批次号/u)
   assert.match(source, /max: 64/u)
   assert.match(source, /if \(!error\?\.errorFields\) throw error/u)
@@ -77,8 +77,8 @@ test('production completion defaults and validates against the current completio
   )
   assert.match(source, /完工来源批次/u)
   assert.match(source, /所选批次/u)
-  assert.match(source, /已过账/u)
-  assert.match(source, /草稿/u)
+  assert.match(source, /已入库/u)
+  assert.match(source, /待入库/u)
   assert.match(source, /compareProductionCompletionQuantity/u)
   assert.match(source, /不能超过所选包装验收批次/u)
   assert.doesNotMatch(source, /包装已合格/u)

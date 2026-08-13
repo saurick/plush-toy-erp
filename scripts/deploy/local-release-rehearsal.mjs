@@ -147,7 +147,6 @@ export async function allocateRehearsalPorts() {
   for (const key of [
     "postgres",
     "appHttp",
-    "appGrpc",
     "web",
     "jaeger5778",
     "jaegerUi",
@@ -216,8 +215,6 @@ export function buildRehearsalEnvironment({
     POSTGRES_PORT: ports.postgres,
     APP_HTTP_BIND_ADDR: "127.0.0.1",
     APP_HTTP_PORT: ports.appHttp,
-    APP_GRPC_BIND_ADDR: "127.0.0.1",
-    APP_GRPC_PORT: ports.appGrpc,
     WEB_DESKTOP_BIND_ADDR: "127.0.0.1",
     WEB_DESKTOP_PORT: ports.web,
     JAEGER_BIND_ADDR: "127.0.0.1",

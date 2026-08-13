@@ -27,7 +27,7 @@ export const CUSTOMER_TRIAL_133_MIN_MIGRATION = "20260714165115";
 export const CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION = "2026.07.16-v5";
 export const CURRENT_MANUAL_ACCEPTANCE_RUN_ID = "20260716-V5";
 export const LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION =
-  "yoyoosun-customer-package-v7.local-a074adc259102458.runtime-v1";
+  "yoyoosun-customer-package-v7.local-d05ec61cc4ea9cee.runtime-v1";
 export const LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION =
   "local-customer-package-test-apply";
 export const LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE = "local_test_apply";

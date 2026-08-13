@@ -5,11 +5,14 @@
 - [ ] 备份脚本或运维命令已确认。
 - [ ] 备份目录存在。
 - [ ] 数据库备份生成。
-- [ ] 附件目录备份或快照生成，如当前启用附件。
+- [ ] 已确认业务附件正文位于 PostgreSQL，随本次整库备份覆盖；没有虚构独立附件目录。
 - [ ] 备份 hash 已记录。
 - [ ] 备份大小已记录。
 - [ ] 备份加密状态已记录。
 - [ ] 备份存储位置只记录 alias，不记录真实 access key。
+- [ ] 异地目录存在同名 dump 与 checksum，且 hash 复核一致。
+- [ ] 异地目录固定挂载标记有效，且与本地备份目录不在同一文件系统；挂载缺失时任务会失败而不是回写本地盘。
+- [ ] `latest-status.env` 为 `passed`，systemd failed unit / `BACKUP_FAILURE` 已接入宿主监控。
 - [ ] 备份文件未提交到 Git。
 
 ## 恢复演练
@@ -19,6 +22,7 @@
 - [ ] 已执行 `run-backup-restore-rehearsal.sh` 或等价真实恢复命令。
 - [ ] 已在 restored DB 上依次执行 populated upgrade 与 customer config cutover read-only audit；任一审计失败时未执行 migration apply。
 - [ ] 恢复后 migration status 正常。
+- [ ] 每周恢复检查使用异地副本，报告为 `plush.scheduled-backup-restore-check/v2` 且 `status=passed`。
 - [ ] 恢复后 smoke query 通过。
 - [ ] 恢复后 web / server 健康检查通过。
 - [ ] `command-summary.txt` 已生成，只记录脱敏命令摘要，不包含完整 DSN、secret、dump 内容或客户 raw rows。

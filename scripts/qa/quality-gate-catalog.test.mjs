@@ -107,6 +107,10 @@ test("gap analysis distinguishes current proof, stale result and release or UAT 
     risk: "all",
     root,
   });
+  assert.equal(analysis.schemaVersion, "plush.quality-gate-gap-analysis/v2");
+  assert(analysis.affectedScopes.includes("T5"));
+  assert.equal(analysis.maxAffectedScope, "T5");
+  assert.equal(analysis.localGate, "focused");
   assert.equal(analysis.matched, true);
   assert.equal(analysis.categories[0].key, "frontend");
   assert(
@@ -146,7 +150,7 @@ test("complexity signals remain objective and preserve high-risk layering", () =
     operations: [],
     receipts: {},
     repository,
-    requiresFull: true,
+    localGate: "full",
   });
   assert(candidates.some((item) => item.key === "narrow-change-full"));
   assert(

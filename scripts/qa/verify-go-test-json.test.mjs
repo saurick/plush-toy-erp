@@ -39,6 +39,48 @@ test("go test JSON proof rejects zero matches and all-skipped suites", () => {
   assert.deepEqual(skipped.skippedTests, ["TestPurchaseReturnPostgresFlow/subtest"]);
 });
 
+test("go test JSON proof excludes only exact caller-declared partition skips", () => {
+  const result = verifyGoTestJson(
+    lines([
+      { Action: "run", Test: "TestOrdinaryFlow" },
+      { Action: "pass", Test: "TestOrdinaryFlow" },
+      { Action: "run", Test: "TestPurchaseReturnPostgresFlow" },
+      { Action: "skip", Test: "TestPurchaseReturnPostgresFlow" },
+    ]),
+    [],
+    { excludedSkipPattern: "^TestPurchaseReturnPostgresFlow$" },
+  );
+  assert.equal(result.ok, true);
+  assert.deepEqual(
+    { run: result.run, pass: result.pass, skip: result.skip, excluded: result.excluded },
+    { run: 1, pass: 1, skip: 0, excluded: 1 },
+  );
+  assert.deepEqual(result.excludedTests, ["TestPurchaseReturnPostgresFlow"]);
+});
+
+test("go test JSON proof still rejects a skipped test outside the exact exclusion", () => {
+  const result = verifyGoTestJson(
+    lines([
+      { Action: "run", Test: "TestOrdinaryFlow" },
+      { Action: "pass", Test: "TestOrdinaryFlow" },
+      { Action: "run", Test: "TestUnexpectedSkip" },
+      { Action: "skip", Test: "TestUnexpectedSkip" },
+    ]),
+    [],
+    { excludedSkipPattern: "^TestPurchaseReturnPostgresFlow$" },
+  );
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.skippedTests, ["TestUnexpectedSkip"]);
+  assert.equal(result.excluded, 0);
+});
+
+test("go test JSON proof rejects an invalid exclusion regex", () => {
+  assert.throws(
+    () => verifyGoTestJson("", [], { excludedSkipPattern: "[" }),
+    /invalid excluded skip pattern/u,
+  );
+});
+
 test("go test JSON proof rejects malformed output", () => {
   assert.throws(() => verifyGoTestJson("not-json", []), /invalid JSON at line 1/u);
 });

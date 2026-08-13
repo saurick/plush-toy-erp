@@ -2,6 +2,7 @@ import React from 'react'
 import { Form, Input, InputNumber, Radio, Select } from 'antd'
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import FieldWithUnitSuffix from '../business-list/FieldWithUnitSuffix.jsx'
+import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import {
   compactParams,
   trimOptional,
@@ -25,10 +26,6 @@ export function positiveInt(value) {
   return Number.isFinite(numeric) && numeric > 0
     ? Math.trunc(numeric)
     : undefined
-}
-
-export function todayInputValue() {
-  return new Date().toISOString().slice(0, 10)
 }
 
 export function buildInspectionParams(values = {}) {
@@ -169,7 +166,13 @@ export function QualityInspectionDecisionForm({
           </Form.Item>
           <Form.Item
             className="erp-business-action-form__field erp-business-action-form__field--full"
-            label="估算不良比例"
+            label={
+              <BusinessHelpLabel
+                itemKey="defect-rate"
+                label="估算不良比例"
+                pageKey="quality-inspections"
+              />
+            }
             name="defect_rate_selection"
             rules={[{ required: true, message: '请选择估算不良比例' }]}
             extra="按当前来源单据估算，不需要逐件计数；该比例不会自动换算成退货数量。"

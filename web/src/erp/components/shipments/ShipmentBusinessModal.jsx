@@ -16,6 +16,7 @@ import {
 
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import BusinessAttachmentPanel from '../business-list/BusinessAttachmentPanel.jsx'
+import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
 import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.jsx'
 import SourceImportPickerModal from '../business-list/SourceImportPickerModal.jsx'
@@ -93,6 +94,7 @@ function ShipmentFormFields({
 }) {
   return (
     <>
+      <BusinessFormSectionTitle>单据与客户</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field"
         label="出货单号（自动）"
@@ -148,6 +150,7 @@ function ShipmentFormFields({
       <Form.Item name="idempotency_key" hidden rules={[{ required: true }]}>
         <Input disabled={disabled} />
       </Form.Item>
+      <BusinessFormSectionTitle>计划与附件</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field"
         label="计划出货日期"

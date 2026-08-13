@@ -44,6 +44,10 @@ func (r *operationalFactRepo) CreateShipmentDraftWithItems(ctx context.Context, 
 	if err != nil {
 		return nil, err
 	}
+	sourceCurrency, err := shipmentSourceOrderCurrency(ctx, tx.client, shipmentIn.SalesOrderID)
+	if err != nil {
+		return nil, err
+	}
 
 	row, err := tx.client.Shipment.Create().
 		SetShipmentNo(shipmentIn.ShipmentNo).
@@ -70,7 +74,7 @@ func (r *operationalFactRepo) CreateShipmentDraftWithItems(ctx context.Context, 
 		return nil, err
 	}
 	for _, item := range in.Items {
-		if _, err := createShipmentItem(ctx, tx.client, row.ID, shipmentIn.SalesOrderID, item); err != nil {
+		if _, err := createShipmentItem(ctx, tx.client, row.ID, shipmentIn.SalesOrderID, sourceCurrency, item); err != nil {
 			return nil, err
 		}
 	}
@@ -119,6 +123,10 @@ func (r *operationalFactRepo) SaveShipmentDraftWithItems(ctx context.Context, in
 	if err != nil {
 		return nil, err
 	}
+	sourceCurrency, err := shipmentSourceOrderCurrency(ctx, tx.client, resolved.SalesOrderID)
+	if err != nil {
+		return nil, err
+	}
 	if err := replaceShipmentDraftHeader(ctx, tx, current, resolved, in.ExpectedVersion); err != nil {
 		return nil, err
 	}
@@ -126,7 +134,7 @@ func (r *operationalFactRepo) SaveShipmentDraftWithItems(ctx context.Context, in
 		return nil, err
 	}
 	for _, item := range in.Items {
-		if _, err := createShipmentItem(ctx, tx.client, current.ID, resolved.SalesOrderID, item); err != nil {
+		if _, err := createShipmentItem(ctx, tx.client, current.ID, resolved.SalesOrderID, sourceCurrency, item); err != nil {
 			return nil, err
 		}
 	}
@@ -436,11 +444,32 @@ func (r *operationalFactRepo) ValidateShipmentReleaseForShipping(ctx context.Con
 	}
 }
 
-func createShipmentItem(ctx context.Context, client *ent.Client, shipmentID int, salesOrderID *int, in *biz.ShipmentItemCreate) (*ent.ShipmentItem, error) {
+func shipmentSourceOrderCurrency(ctx context.Context, client *ent.Client, salesOrderID *int) (*string, error) {
+	if salesOrderID == nil {
+		return nil, nil
+	}
+	if client == nil || *salesOrderID <= 0 {
+		return nil, biz.ErrShipmentSourceMismatch
+	}
+	order, err := client.SalesOrder.Get(ctx, *salesOrderID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrShipmentSourceMismatch
+		}
+		return nil, err
+	}
+	currency, ok := biz.NormalizeFinanceCurrency(order.Currency)
+	if !ok || currency != order.Currency {
+		return nil, biz.ErrShipmentSourceMismatch
+	}
+	return &currency, nil
+}
+
+func createShipmentItem(ctx context.Context, client *ent.Client, shipmentID int, salesOrderID *int, sourceCurrency *string, in *biz.ShipmentItemCreate) (*ent.ShipmentItem, error) {
 	if err := validateOperationalFactSKUAndLot(ctx, client, biz.InventorySubjectProduct, in.ProductID, in.ProductSkuID, in.LotID); err != nil {
 		return nil, err
 	}
-	unitPriceSnapshot, amountSnapshot, currencySnapshot, err := shipmentItemFinanceSnapshots(ctx, client, salesOrderID, in)
+	unitPriceSnapshot, amountSnapshot, currencySnapshot, err := shipmentItemFinanceSnapshots(ctx, client, salesOrderID, sourceCurrency, in)
 	if err != nil {
 		return nil, err
 	}
@@ -464,12 +493,13 @@ func shipmentItemFinanceSnapshots(
 	ctx context.Context,
 	client *ent.Client,
 	salesOrderID *int,
+	sourceCurrency *string,
 	in *biz.ShipmentItemCreate,
 ) (*decimal.Decimal, *decimal.Decimal, *string, error) {
 	if in == nil || in.SalesOrderItemID == nil {
 		return nil, nil, nil, nil
 	}
-	if salesOrderID == nil || *salesOrderID <= 0 {
+	if salesOrderID == nil || *salesOrderID <= 0 || sourceCurrency == nil {
 		return nil, nil, nil, biz.ErrShipmentSourceMismatch
 	}
 	item, err := client.SalesOrderItem.Get(ctx, *in.SalesOrderItemID)
@@ -484,14 +514,19 @@ func shipmentItemFinanceSnapshots(
 		!item.OrderedQuantity.GreaterThan(decimal.Zero) {
 		return nil, nil, nil, biz.ErrShipmentSourceMismatch
 	}
-	return shipmentFinanceSnapshotsFromSalesOrderItem(item, in.Quantity)
+	return shipmentFinanceSnapshotsFromSalesOrderItem(item, in.Quantity, *sourceCurrency)
 }
 
 func shipmentFinanceSnapshotsFromSalesOrderItem(
 	item *ent.SalesOrderItem,
 	quantity decimal.Decimal,
+	currency string,
 ) (*decimal.Decimal, *decimal.Decimal, *string, error) {
 	if item == nil || !item.OrderedQuantity.GreaterThan(decimal.Zero) || !quantity.GreaterThan(decimal.Zero) {
+		return nil, nil, nil, biz.ErrShipmentSourceMismatch
+	}
+	currency, ok := biz.NormalizeFinanceCurrency(currency)
+	if !ok {
 		return nil, nil, nil, biz.ErrShipmentSourceMismatch
 	}
 	var unitPriceSnapshot *decimal.Decimal
@@ -511,7 +546,9 @@ func shipmentFinanceSnapshotsFromSalesOrderItem(
 		value := item.UnitPrice.Mul(quantity).Round(6)
 		amountSnapshot = &value
 	}
-	currency := biz.FinanceCurrencyCNY
+	if amountSnapshot != nil && !amountSnapshot.GreaterThan(decimal.Zero) {
+		return nil, nil, nil, biz.ErrShipmentSourceMismatch
+	}
 	return unitPriceSnapshot, amountSnapshot, &currency, nil
 }
 
@@ -1331,6 +1368,7 @@ type shipmentSourceQuantityState struct {
 	shippedByLine     map[int]decimal.Decimal
 	currentByLine     map[int]decimal.Decimal
 	sourceItemsByLine map[int]*ent.SalesOrderItem
+	sourceCurrency    string
 }
 
 func newShipmentSourceQuantityState() *shipmentSourceQuantityState {
@@ -1371,6 +1409,11 @@ func validateShipmentSourceAndQuantity(ctx context.Context, tx *inventoryDBTx, p
 	if parent.CustomerID == nil || *parent.CustomerID != order.CustomerID {
 		return nil, biz.ErrShipmentSourceMismatch
 	}
+	sourceCurrency, ok := biz.NormalizeFinanceCurrency(order.Currency)
+	if !ok || sourceCurrency != order.Currency {
+		return nil, biz.ErrShipmentSourceMismatch
+	}
+	state.sourceCurrency = sourceCurrency
 
 	quantityBySourceLine := make(map[int]decimal.Decimal, len(items))
 	for _, item := range items {
@@ -1446,23 +1489,126 @@ func freezeShipmentFinanceSnapshots(
 	if parent.SalesOrderID == nil {
 		return nil
 	}
+	itemsBySourceLine := make(map[int][]*ent.ShipmentItem)
+	lineIDs := make([]int, 0, len(items))
 	for _, item := range items {
 		if item == nil || item.SalesOrderItemID == nil {
 			return biz.ErrShipmentSourceMismatch
 		}
-		sourceItem := sourceQuantity.sourceItemsByLine[*item.SalesOrderItemID]
+		lineID := *item.SalesOrderItemID
+		if _, exists := itemsBySourceLine[lineID]; !exists {
+			lineIDs = append(lineIDs, lineID)
+		}
+		itemsBySourceLine[lineID] = append(itemsBySourceLine[lineID], item)
+	}
+	priorAmounts, invalidPriorAmounts, err := shippedShipmentFinanceAmountsBySourceLine(ctx, tx.client, lineIDs, sourceQuantity.sourceCurrency)
+	if err != nil {
+		return err
+	}
+	sort.Ints(lineIDs)
+	for _, lineID := range lineIDs {
+		sourceItem := sourceQuantity.sourceItemsByLine[lineID]
 		if sourceItem == nil {
 			return biz.ErrShipmentSourceMismatch
 		}
-		unitPriceSnapshot, amountSnapshot, currencySnapshot, err := shipmentFinanceSnapshotsFromSalesOrderItem(sourceItem, item.Quantity)
-		if err != nil {
-			return err
+		lineItems := itemsBySourceLine[lineID]
+		sort.Slice(lineItems, func(i, j int) bool { return lineItems[i].ID < lineItems[j].ID })
+
+		var finalBatchAmount *decimal.Decimal
+		isFinalBatch := sourceQuantity.shippedByLine[lineID].Add(sourceQuantity.currentByLine[lineID]).Equal(sourceQuantity.orderedByLine[lineID])
+		if isFinalBatch {
+			sourceAmount := salesOrderItemFinanceAmount(sourceItem)
+			if sourceAmount != nil {
+				if !sourceAmount.GreaterThan(decimal.Zero) {
+					return biz.ErrShipmentSourceMismatch
+				}
+				if invalidPriorAmounts[lineID] {
+					return biz.ErrShipmentSourceMismatch
+				}
+				value := sourceAmount.Sub(priorAmounts[lineID]).Round(6)
+				if !value.GreaterThan(decimal.Zero) {
+					return biz.ErrShipmentSourceMismatch
+				}
+				finalBatchAmount = &value
+			}
 		}
-		if err := updateShipmentItemFinanceSnapshots(ctx, tx, item.ID, unitPriceSnapshot, amountSnapshot, currencySnapshot); err != nil {
-			return err
+
+		allocated := decimal.Zero
+		for index, item := range lineItems {
+			unitPriceSnapshot, amountSnapshot, currencySnapshot, err := shipmentFinanceSnapshotsFromSalesOrderItem(sourceItem, item.Quantity, sourceQuantity.sourceCurrency)
+			if err != nil {
+				return err
+			}
+			if finalBatchAmount != nil && index == len(lineItems)-1 {
+				value := finalBatchAmount.Sub(allocated).Round(6)
+				if !value.GreaterThan(decimal.Zero) {
+					return biz.ErrShipmentSourceMismatch
+				}
+				amountSnapshot = &value
+			}
+			if amountSnapshot != nil && !amountSnapshot.GreaterThan(decimal.Zero) {
+				return biz.ErrShipmentSourceMismatch
+			}
+			if amountSnapshot != nil {
+				allocated = allocated.Add(*amountSnapshot)
+			}
+			if err := updateShipmentItemFinanceSnapshots(ctx, tx, item.ID, unitPriceSnapshot, amountSnapshot, currencySnapshot); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
+}
+
+func salesOrderItemFinanceAmount(item *ent.SalesOrderItem) *decimal.Decimal {
+	if item == nil {
+		return nil
+	}
+	if item.Amount != nil {
+		value := item.Amount.Round(6)
+		return &value
+	}
+	if item.UnitPrice != nil {
+		value := item.OrderedQuantity.Mul(*item.UnitPrice).Round(6)
+		return &value
+	}
+	return nil
+}
+
+func shippedShipmentFinanceAmountsBySourceLine(
+	ctx context.Context,
+	client *ent.Client,
+	lineIDs []int,
+	expectedCurrency string,
+) (map[int]decimal.Decimal, map[int]bool, error) {
+	amounts := make(map[int]decimal.Decimal, len(lineIDs))
+	invalid := make(map[int]bool)
+	expectedCurrency, currencyOK := biz.NormalizeFinanceCurrency(expectedCurrency)
+	if client == nil || !currencyOK {
+		return nil, nil, biz.ErrShipmentSourceMismatch
+	}
+	if len(lineIDs) == 0 {
+		return amounts, invalid, nil
+	}
+	rows, err := client.ShipmentItem.Query().Where(
+		shipmentitem.SalesOrderItemIDIn(lineIDs...),
+		shipmentitem.HasShipmentWith(shipment.Status(biz.ShipmentStatusShipped)),
+	).All(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, row := range rows {
+		if row.SalesOrderItemID == nil {
+			continue
+		}
+		lineID := *row.SalesOrderItemID
+		if row.AmountSnapshot == nil || !row.AmountSnapshot.GreaterThan(decimal.Zero) || row.CurrencySnapshot != expectedCurrency {
+			invalid[lineID] = true
+			continue
+		}
+		amounts[lineID] = amounts[lineID].Add(*row.AmountSnapshot)
+	}
+	return amounts, invalid, nil
 }
 
 func updateShipmentItemFinanceSnapshots(

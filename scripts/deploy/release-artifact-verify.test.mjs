@@ -8,6 +8,7 @@ import test from "node:test";
 import { verifyReleaseArtifact } from "./release-artifact-verify.mjs";
 
 const commit = "a".repeat(40);
+const releaseVersion = "yoyoosun-20260810.1";
 
 function sha(value) {
   return crypto.createHash("sha256").update(value).digest("hex");
@@ -33,6 +34,7 @@ function writeFixture() {
       ),
       platform: "linux/amd64",
       gitSha: commit,
+      releaseVersion,
       archive: {
         file: `${kind}.tar`,
         sizeBytes: Buffer.byteLength(content),
@@ -45,6 +47,7 @@ function writeFixture() {
     schemaVersion: "plush-release-artifact/v1",
     passed: true,
     customer: "yoyoosun",
+    releaseVersion,
     git: { commit, head: commit, worktreeClean: true },
     sourceArchive: {
       secretScan: "passed",
@@ -133,13 +136,12 @@ test("release artifact verifier validates loaded image identity", () => {
         return [
           item.ref,
           {
-            Id:
-              index === 0
-                ? archiveIdentity.manifestDigest
-                : item.contentId,
+            Id: index === 0 ? archiveIdentity.manifestDigest : item.contentId,
             Os: "linux",
             Architecture: "amd64",
-            Config: { Env: [`GIT_SHA=${commit}`] },
+            Config: {
+              Env: [`GIT_SHA=${commit}`, `RELEASE_VERSION=${releaseVersion}`],
+            },
           },
         ];
       }),
@@ -161,8 +163,7 @@ test("release artifact verifier validates loaded image identity", () => {
             if (member === "manifest.json") {
               return JSON.stringify([
                 {
-                  Config:
-                    `blobs/sha256/${image.contentId.slice("sha256:".length)}`,
+                  Config: `blobs/sha256/${image.contentId.slice("sha256:".length)}`,
                   RepoTags: [image.ref],
                 },
               ]);
@@ -196,6 +197,10 @@ test("release artifact verifier validates loaded image identity", () => {
     );
     assert.equal(report.checks.loadedImageIdentity, "passed");
     assert.equal(report.images.length, 2);
+    assert.equal(report.releaseVersion, releaseVersion);
+    assert(
+      report.images.every((image) => image.releaseVersion === releaseVersion),
+    );
     assert.equal(
       report.images[0].loadedImageId,
       archiveIdentityByKind.get("server").manifestDigest,

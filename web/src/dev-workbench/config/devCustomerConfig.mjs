@@ -4,15 +4,22 @@ import { yoyoosunMenuConfig } from '../../../../config/customers/yoyoosun/menuCo
 import { customerPackageCatalog } from '../../../../config/catalog/customerPackageCatalog.mjs'
 import { DEV_CUSTOMER_CONFIG_ROUTE } from './devCustomerConfigRoute.mjs'
 import {
+  DEFAULT_DEV_CUSTOMER_SCOPE_KEY,
+  DEV_CUSTOMER_QUERY_KEY,
+  DEV_CUSTOMER_SCOPE_REGISTRY,
+} from './devCustomerScope.mjs'
+import {
   printTemplateCatalog,
   printTemplateStats,
 } from '../../erp/config/printTemplates.mjs'
 
 export { DEV_CUSTOMER_CONFIG_ROUTE }
-export const DEV_CUSTOMER_CONFIG_QUERY_KEY = 'customer'
+export const DEV_CUSTOMER_CONFIG_QUERY_KEY = DEV_CUSTOMER_QUERY_KEY
 export const DEV_CUSTOMER_CONFIG_RELEASE_BATCH_QUERY_KEY = 'release'
 export const DEV_CUSTOMER_CONFIG_VIEW_QUERY_KEY = 'view'
 export const DEFAULT_DEV_CUSTOMER_KEY = ''
+export const DEFAULT_DEV_CUSTOMER_CONFIG_PAGE_KEY =
+  DEFAULT_DEV_CUSTOMER_SCOPE_KEY
 export const DEV_CUSTOMER_CONFIG_SOURCE_PATH =
   'config/customers/yoyoosun/README.md'
 export const DEV_CUSTOMER_MENU_CONFIG_SOURCE_PATH =
@@ -46,7 +53,7 @@ export const DEV_CUSTOMER_CONFIG_RELEASE_READINESS_TEMPLATE_COMMAND =
 export const DEV_CUSTOMER_CONFIG_REGISTRY = Object.freeze({
   yoyoosun: Object.freeze({
     customerKey: 'yoyoosun',
-    label: '永绅 yoyoosun',
+    label: DEV_CUSTOMER_SCOPE_REGISTRY.yoyoosun.label,
     sourcePath: DEV_CUSTOMER_CONFIG_SOURCE_PATH,
     menuConfig: yoyoosunMenuConfig,
     menuConfigSourcePath: DEV_CUSTOMER_MENU_CONFIG_SOURCE_PATH,
@@ -151,7 +158,6 @@ const BOUNDARY_LABELS = Object.freeze({
   changesRuntimeLoader: '修改运行时 loader',
   executesImport: '执行导入',
   executesRealImport: '执行真实导入',
-  writesBusinessRecords: '写 business_records',
   writesFacts: '写事实层',
   writesInventoryFacts: '写库存事实',
   writesShipmentFacts: '写出货事实',
@@ -696,8 +702,7 @@ export function buildCustomerPackagePreviewSummary(
     publishEnabled: config.sourcePolicy?.publishEnabled === true,
     activateEnabled: config.sourcePolicy?.activateEnabled === true,
     rollbackEnabled: config.sourcePolicy?.rollbackEnabled === true,
-    localTestApplyEnabled:
-      config.sourcePolicy?.localTestApplyEnabled === true,
+    localTestApplyEnabled: config.sourcePolicy?.localTestApplyEnabled === true,
     workflowCount: workflows.length,
     workflowNodeCount: countPackageNodes(workflows),
     workflows: workflows.map((workflow) => ({
@@ -1010,11 +1015,9 @@ function resolveCustomerConfigTestApplyAvailability(
           0 ||
         Number(customerPackageSummary.unregisteredCommandBindingCount || 0) >
           0 ||
-        Number(
-          customerPackageSummary.unregisteredExtensionBindingCount || 0
-        ) > 0 ||
-        Number(customerPackageSummary.moduleStateUnknownOverrideCount || 0) >
-          0,
+        Number(customerPackageSummary.unregisteredExtensionBindingCount || 0) >
+          0 ||
+        Number(customerPackageSummary.moduleStateUnknownOverrideCount || 0) > 0,
       message: '策略、命令、扩展点或模块登记检查未通过',
     },
   ]
@@ -2209,6 +2212,9 @@ export function buildCustomerConfigDevOverview({
 
 export function buildCustomerConfigDevOverviewFromSearch(searchParams = '') {
   return buildCustomerConfigDevOverview({
-    customerKey: readDevCustomerKeyFromSearch(searchParams),
+    customerKey: readDevCustomerKeyFromSearch(
+      searchParams,
+      DEFAULT_DEV_CUSTOMER_CONFIG_PAGE_KEY
+    ),
   })
 }

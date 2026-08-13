@@ -24,6 +24,7 @@ import { findBrokenLocalMarkdownLinks } from "../qa/lib/markdown-links.mjs";
 const DEFAULT_CUSTOMER = "yoyoosun";
 const DEFAULT_REF = "HEAD";
 const CUSTOMER_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+const VERSION_PATTERN = /^[0-9A-Za-z](?:[0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$/u;
 const MODES = new Set(["plan", "light", "release"]);
 const MAX_COMMAND_DIAGNOSTIC_CHARS = 4096;
 const BUILDKIT_CACHE_MODES = new Set(["builder", "gha"]);
@@ -92,7 +93,7 @@ const USAGE = `Source archive release check
 Usage:
   node scripts/deploy/source-archive-release-check.mjs
   node scripts/deploy/source-archive-release-check.mjs --light [--ref HEAD]
-  node scripts/deploy/source-archive-release-check.mjs --execute [--docker] [--ref HEAD]
+  node scripts/deploy/source-archive-release-check.mjs --execute [--docker] [--ref HEAD] [--version <version>]
 
 Modes:
   plan       Default. Read Git metadata and print the committed-tree release plan.
@@ -104,6 +105,7 @@ Modes:
 Options:
   --customer <key>  Customer Web package key. Defaults to yoyoosun.
   --ref <commit>    Committed Git tree to archive. Defaults to HEAD.
+  --version <value> Human-readable release version embedded with the exact Git SHA.
   --light           Run the lightweight archive extraction check.
   --execute         Run the clean-worktree release check.
   --docker          With --execute, build both Web and server Docker images.
@@ -162,7 +164,7 @@ export function parseCliArgs(argv) {
       options.docker = true;
       continue;
     }
-    if (token === "--customer" || token === "--ref") {
+    if (token === "--customer" || token === "--ref" || token === "--version") {
       const value = argv[index + 1];
       if (!value || value.startsWith("--")) {
         throw new ReleaseCheckError(`missing value for ${token}`);
@@ -642,6 +644,7 @@ function buildBakeDefinition({
   archiveRoot,
   customer,
   gitState,
+  releaseVersion,
   webImage,
   serverImage,
   cacheMode,
@@ -654,6 +657,7 @@ function buildBakeDefinition({
     args: {
       ERP_CUSTOMER_PACKAGE: customer,
       GIT_SHA: gitState.commit,
+      RELEASE_VERSION: releaseVersion,
     },
   };
   const withCache = (target, scope) => ({
@@ -694,6 +698,7 @@ async function runReleaseBuilds({
   archiveRoot,
   customer,
   gitState,
+  releaseVersion,
   docker,
   buildCommand,
   resolvePnpm,
@@ -737,6 +742,7 @@ async function runReleaseBuilds({
           archiveRoot,
           customer,
           gitState,
+          releaseVersion,
           webImage,
           serverImage,
           cacheMode,
@@ -806,6 +812,11 @@ async function runReleaseBuilds({
     command: pnpmBin,
     args: ["build:all"],
     cwd: path.join(archiveRoot, "web"),
+    env: {
+      ...environment,
+      VITE_GIT_SHA: gitState.commit,
+      VITE_RELEASE_VERSION: releaseVersion,
+    },
     label: "build production Web assets",
     stdio: "inherit",
   });
@@ -869,6 +880,12 @@ export async function runSourceArchiveReleaseCheck(options = {}, runtime = {}) {
 
   const repoRoot = runtime.repoRoot || process.cwd();
   const gitState = readGitState(repoRoot, normalized.ref);
+  const releaseVersion = String(
+    normalized.version || gitState.shortCommit,
+  ).trim();
+  if (!VERSION_PATTERN.test(releaseVersion)) {
+    throw new ReleaseCheckError("release version is invalid");
+  }
   const repositoryBoundary = inspectCommittedCustomerBoundary({
     repoRoot: gitState.repoRoot,
     commit: gitState.commit,
@@ -884,6 +901,7 @@ export async function runSourceArchiveReleaseCheck(options = {}, runtime = {}) {
     customer: normalized.customer,
     ref: gitState.ref,
     commit: gitState.commit,
+    releaseVersion,
     head: gitState.head,
     refIsHead: gitState.refIsHead,
     worktreeClean: gitState.clean,
@@ -957,6 +975,7 @@ export async function runSourceArchiveReleaseCheck(options = {}, runtime = {}) {
       archiveRoot: archive.archiveRoot,
       customer: normalized.customer,
       gitState,
+      releaseVersion,
       docker: normalized.docker,
       buildCommand,
       resolvePnpm: runtime.resolveProjectPnpm || resolveProjectPnpm,
@@ -977,7 +996,7 @@ export async function runSourceArchiveReleaseCheck(options = {}, runtime = {}) {
 
 function printHumanReport(report) {
   console.log(
-    `source archive release check: mode=${report.mode}, commit=${report.commit}, clean=${report.worktreeClean}`,
+    `source archive release check: mode=${report.mode}, version=${report.releaseVersion}, commit=${report.commit}, clean=${report.worktreeClean}`,
   );
   console.log(`formalEvidenceEligible: ${report.formalEvidenceEligible}`);
   for (const item of report.plan) {

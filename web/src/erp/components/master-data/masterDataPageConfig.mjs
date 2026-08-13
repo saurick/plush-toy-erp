@@ -76,7 +76,8 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
       '维护客户交易主体和联系人；订单、出货、库存和财务记录请到对应业务页面处理。',
   },
   suppliers: {
-    title: '供应商档案',
+    title: '供应商与加工厂',
+    createTitleLabel: '供应商或加工厂',
     ownerType: 'SUPPLIER',
     entityKey: 'supplier',
     recordKey: 'suppliers',
@@ -100,7 +101,7 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     draftCodePrefix: 'SUP',
     formBoundary: '只维护交易主体资料，不在此写采购、库存、质检或财务记录。',
     summary:
-      '维护供应商和加工厂交易主体；采购入库、质检、库存和财务记录请到对应业务页面处理。',
+      '在同一入口维护供应商与加工厂交易主体、主联系人和可加工工序；采购、委外、质检、库存和财务记录请到对应业务页面处理。',
   },
   materials: {
     title: '材料档案',

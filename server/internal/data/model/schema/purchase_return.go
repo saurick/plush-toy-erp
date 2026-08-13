@@ -20,6 +20,8 @@ type PurchaseReturn struct {
 func (PurchaseReturn) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{Checks: map[string]string{
+			"purchase_returns_status_allowed": "status IN ('DRAFT', 'POSTED', 'CANCELLED')",
+			"purchase_returns_posted_shape":   "((status = 'DRAFT' AND posted_at IS NULL) OR (status = 'POSTED' AND posted_at IS NOT NULL) OR status = 'CANCELLED')",
 			"purchase_returns_idempotency_bundle_complete": `
 (
   (

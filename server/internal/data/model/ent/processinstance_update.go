@@ -241,6 +241,227 @@ func (_u *ProcessInstanceUpdate) ClearCompletedAt() *ProcessInstanceUpdate {
 	return _u
 }
 
+// SetTerminalNodeInstanceID sets the "terminal_node_instance_id" field.
+func (_u *ProcessInstanceUpdate) SetTerminalNodeInstanceID(v int) *ProcessInstanceUpdate {
+	_u.mutation.ResetTerminalNodeInstanceID()
+	_u.mutation.SetTerminalNodeInstanceID(v)
+	return _u
+}
+
+// SetNillableTerminalNodeInstanceID sets the "terminal_node_instance_id" field if the given value is not nil.
+func (_u *ProcessInstanceUpdate) SetNillableTerminalNodeInstanceID(v *int) *ProcessInstanceUpdate {
+	if v != nil {
+		_u.SetTerminalNodeInstanceID(*v)
+	}
+	return _u
+}
+
+// AddTerminalNodeInstanceID adds value to the "terminal_node_instance_id" field.
+func (_u *ProcessInstanceUpdate) AddTerminalNodeInstanceID(v int) *ProcessInstanceUpdate {
+	_u.mutation.AddTerminalNodeInstanceID(v)
+	return _u
+}
+
+// ClearTerminalNodeInstanceID clears the value of the "terminal_node_instance_id" field.
+func (_u *ProcessInstanceUpdate) ClearTerminalNodeInstanceID() *ProcessInstanceUpdate {
+	_u.mutation.ClearTerminalNodeInstanceID()
+	return _u
+}
+
+// SetResolutionKind sets the "resolution_kind" field.
+func (_u *ProcessInstanceUpdate) SetResolutionKind(v string) *ProcessInstanceUpdate {
+	_u.mutation.SetResolutionKind(v)
+	return _u
+}
+
+// SetNillableResolutionKind sets the "resolution_kind" field if the given value is not nil.
+func (_u *ProcessInstanceUpdate) SetNillableResolutionKind(v *string) *ProcessInstanceUpdate {
+	if v != nil {
+		_u.SetResolutionKind(*v)
+	}
+	return _u
+}
+
+// ClearResolutionKind clears the value of the "resolution_kind" field.
+func (_u *ProcessInstanceUpdate) ClearResolutionKind() *ProcessInstanceUpdate {
+	_u.mutation.ClearResolutionKind()
+	return _u
+}
+
+// SetResolutionReason sets the "resolution_reason" field.
+func (_u *ProcessInstanceUpdate) SetResolutionReason(v string) *ProcessInstanceUpdate {
+	_u.mutation.SetResolutionReason(v)
+	return _u
+}
+
+// SetNillableResolutionReason sets the "resolution_reason" field if the given value is not nil.
+func (_u *ProcessInstanceUpdate) SetNillableResolutionReason(v *string) *ProcessInstanceUpdate {
+	if v != nil {
+		_u.SetResolutionReason(*v)
+	}
+	return _u
+}
+
+// ClearResolutionReason clears the value of the "resolution_reason" field.
+func (_u *ProcessInstanceUpdate) ClearResolutionReason() *ProcessInstanceUpdate {
+	_u.mutation.ClearResolutionReason()
+	return _u
+}
+
+// SetResolvedAt sets the "resolved_at" field.
+func (_u *ProcessInstanceUpdate) SetResolvedAt(v time.Time) *ProcessInstanceUpdate {
+	_u.mutation.SetResolvedAt(v)
+	return _u
+}
+
+// SetNillableResolvedAt sets the "resolved_at" field if the given value is not nil.
+func (_u *ProcessInstanceUpdate) SetNillableResolvedAt(v *time.Time) *ProcessInstanceUpdate {
+	if v != nil {
+		_u.SetResolvedAt(*v)
+	}
+	return _u
+}
+
+// ClearResolvedAt clears the value of the "resolved_at" field.
+func (_u *ProcessInstanceUpdate) ClearResolvedAt() *ProcessInstanceUpdate {
+	_u.mutation.ClearResolvedAt()
+	return _u
+}
+
+// SetResolvedBy sets the "resolved_by" field.
+func (_u *ProcessInstanceUpdate) SetResolvedBy(v int) *ProcessInstanceUpdate {
+	_u.mutation.ResetResolvedBy()
+	_u.mutation.SetResolvedBy(v)
+	return _u
+}
+
+// SetNillableResolvedBy sets the "resolved_by" field if the given value is not nil.
+func (_u *ProcessInstanceUpdate) SetNillableResolvedBy(v *int) *ProcessInstanceUpdate {
+	if v != nil {
+		_u.SetResolvedBy(*v)
+	}
+	return _u
+}
+
+// AddResolvedBy adds value to the "resolved_by" field.
+func (_u *ProcessInstanceUpdate) AddResolvedBy(v int) *ProcessInstanceUpdate {
+	_u.mutation.AddResolvedBy(v)
+	return _u
+}
+
+// ClearResolvedBy clears the value of the "resolved_by" field.
+func (_u *ProcessInstanceUpdate) ClearResolvedBy() *ProcessInstanceUpdate {
+	_u.mutation.ClearResolvedBy()
+	return _u
+}
+
+// SetBlockKind sets the "block_kind" field.
+func (_u *ProcessInstanceUpdate) SetBlockKind(v string) *ProcessInstanceUpdate {
+	_u.mutation.SetBlockKind(v)
+	return _u
+}
+
+// SetNillableBlockKind sets the "block_kind" field if the given value is not nil.
+func (_u *ProcessInstanceUpdate) SetNillableBlockKind(v *string) *ProcessInstanceUpdate {
+	if v != nil {
+		_u.SetBlockKind(*v)
+	}
+	return _u
+}
+
+// ClearBlockKind clears the value of the "block_kind" field.
+func (_u *ProcessInstanceUpdate) ClearBlockKind() *ProcessInstanceUpdate {
+	_u.mutation.ClearBlockKind()
+	return _u
+}
+
+// SetBlockedReasonCode sets the "blocked_reason_code" field.
+func (_u *ProcessInstanceUpdate) SetBlockedReasonCode(v string) *ProcessInstanceUpdate {
+	_u.mutation.SetBlockedReasonCode(v)
+	return _u
+}
+
+// SetNillableBlockedReasonCode sets the "blocked_reason_code" field if the given value is not nil.
+func (_u *ProcessInstanceUpdate) SetNillableBlockedReasonCode(v *string) *ProcessInstanceUpdate {
+	if v != nil {
+		_u.SetBlockedReasonCode(*v)
+	}
+	return _u
+}
+
+// ClearBlockedReasonCode clears the value of the "blocked_reason_code" field.
+func (_u *ProcessInstanceUpdate) ClearBlockedReasonCode() *ProcessInstanceUpdate {
+	_u.mutation.ClearBlockedReasonCode()
+	return _u
+}
+
+// SetBlockedReason sets the "blocked_reason" field.
+func (_u *ProcessInstanceUpdate) SetBlockedReason(v string) *ProcessInstanceUpdate {
+	_u.mutation.SetBlockedReason(v)
+	return _u
+}
+
+// SetNillableBlockedReason sets the "blocked_reason" field if the given value is not nil.
+func (_u *ProcessInstanceUpdate) SetNillableBlockedReason(v *string) *ProcessInstanceUpdate {
+	if v != nil {
+		_u.SetBlockedReason(*v)
+	}
+	return _u
+}
+
+// ClearBlockedReason clears the value of the "blocked_reason" field.
+func (_u *ProcessInstanceUpdate) ClearBlockedReason() *ProcessInstanceUpdate {
+	_u.mutation.ClearBlockedReason()
+	return _u
+}
+
+// SetBlockedAt sets the "blocked_at" field.
+func (_u *ProcessInstanceUpdate) SetBlockedAt(v time.Time) *ProcessInstanceUpdate {
+	_u.mutation.SetBlockedAt(v)
+	return _u
+}
+
+// SetNillableBlockedAt sets the "blocked_at" field if the given value is not nil.
+func (_u *ProcessInstanceUpdate) SetNillableBlockedAt(v *time.Time) *ProcessInstanceUpdate {
+	if v != nil {
+		_u.SetBlockedAt(*v)
+	}
+	return _u
+}
+
+// ClearBlockedAt clears the value of the "blocked_at" field.
+func (_u *ProcessInstanceUpdate) ClearBlockedAt() *ProcessInstanceUpdate {
+	_u.mutation.ClearBlockedAt()
+	return _u
+}
+
+// SetBlockedBy sets the "blocked_by" field.
+func (_u *ProcessInstanceUpdate) SetBlockedBy(v int) *ProcessInstanceUpdate {
+	_u.mutation.ResetBlockedBy()
+	_u.mutation.SetBlockedBy(v)
+	return _u
+}
+
+// SetNillableBlockedBy sets the "blocked_by" field if the given value is not nil.
+func (_u *ProcessInstanceUpdate) SetNillableBlockedBy(v *int) *ProcessInstanceUpdate {
+	if v != nil {
+		_u.SetBlockedBy(*v)
+	}
+	return _u
+}
+
+// AddBlockedBy adds value to the "blocked_by" field.
+func (_u *ProcessInstanceUpdate) AddBlockedBy(v int) *ProcessInstanceUpdate {
+	_u.mutation.AddBlockedBy(v)
+	return _u
+}
+
+// ClearBlockedBy clears the value of the "blocked_by" field.
+func (_u *ProcessInstanceUpdate) ClearBlockedBy() *ProcessInstanceUpdate {
+	_u.mutation.ClearBlockedBy()
+	return _u
+}
+
 // SetCreatedBy sets the "created_by" field.
 func (_u *ProcessInstanceUpdate) SetCreatedBy(v int) *ProcessInstanceUpdate {
 	_u.mutation.ResetCreatedBy()
@@ -471,6 +692,46 @@ func (_u *ProcessInstanceUpdate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "ProcessInstance.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.TerminalNodeInstanceID(); ok {
+		if err := processinstance.TerminalNodeInstanceIDValidator(v); err != nil {
+			return &ValidationError{Name: "terminal_node_instance_id", err: fmt.Errorf(`ent: validator failed for field "ProcessInstance.terminal_node_instance_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ResolutionKind(); ok {
+		if err := processinstance.ResolutionKindValidator(v); err != nil {
+			return &ValidationError{Name: "resolution_kind", err: fmt.Errorf(`ent: validator failed for field "ProcessInstance.resolution_kind": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ResolutionReason(); ok {
+		if err := processinstance.ResolutionReasonValidator(v); err != nil {
+			return &ValidationError{Name: "resolution_reason", err: fmt.Errorf(`ent: validator failed for field "ProcessInstance.resolution_reason": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ResolvedBy(); ok {
+		if err := processinstance.ResolvedByValidator(v); err != nil {
+			return &ValidationError{Name: "resolved_by", err: fmt.Errorf(`ent: validator failed for field "ProcessInstance.resolved_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.BlockKind(); ok {
+		if err := processinstance.BlockKindValidator(v); err != nil {
+			return &ValidationError{Name: "block_kind", err: fmt.Errorf(`ent: validator failed for field "ProcessInstance.block_kind": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.BlockedReasonCode(); ok {
+		if err := processinstance.BlockedReasonCodeValidator(v); err != nil {
+			return &ValidationError{Name: "blocked_reason_code", err: fmt.Errorf(`ent: validator failed for field "ProcessInstance.blocked_reason_code": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.BlockedReason(); ok {
+		if err := processinstance.BlockedReasonValidator(v); err != nil {
+			return &ValidationError{Name: "blocked_reason", err: fmt.Errorf(`ent: validator failed for field "ProcessInstance.blocked_reason": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.BlockedBy(); ok {
+		if err := processinstance.BlockedByValidator(v); err != nil {
+			return &ValidationError{Name: "blocked_by", err: fmt.Errorf(`ent: validator failed for field "ProcessInstance.blocked_by": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.CreatedBy(); ok {
 		if err := processinstance.CreatedByValidator(v); err != nil {
 			return &ValidationError{Name: "created_by", err: fmt.Errorf(`ent: validator failed for field "ProcessInstance.created_by": %w`, err)}
@@ -552,6 +813,75 @@ func (_u *ProcessInstanceUpdate) sqlSave(ctx context.Context) (_node int, err er
 	}
 	if _u.mutation.CompletedAtCleared() {
 		_spec.ClearField(processinstance.FieldCompletedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.TerminalNodeInstanceID(); ok {
+		_spec.SetField(processinstance.FieldTerminalNodeInstanceID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedTerminalNodeInstanceID(); ok {
+		_spec.AddField(processinstance.FieldTerminalNodeInstanceID, field.TypeInt, value)
+	}
+	if _u.mutation.TerminalNodeInstanceIDCleared() {
+		_spec.ClearField(processinstance.FieldTerminalNodeInstanceID, field.TypeInt)
+	}
+	if value, ok := _u.mutation.ResolutionKind(); ok {
+		_spec.SetField(processinstance.FieldResolutionKind, field.TypeString, value)
+	}
+	if _u.mutation.ResolutionKindCleared() {
+		_spec.ClearField(processinstance.FieldResolutionKind, field.TypeString)
+	}
+	if value, ok := _u.mutation.ResolutionReason(); ok {
+		_spec.SetField(processinstance.FieldResolutionReason, field.TypeString, value)
+	}
+	if _u.mutation.ResolutionReasonCleared() {
+		_spec.ClearField(processinstance.FieldResolutionReason, field.TypeString)
+	}
+	if value, ok := _u.mutation.ResolvedAt(); ok {
+		_spec.SetField(processinstance.FieldResolvedAt, field.TypeTime, value)
+	}
+	if _u.mutation.ResolvedAtCleared() {
+		_spec.ClearField(processinstance.FieldResolvedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.ResolvedBy(); ok {
+		_spec.SetField(processinstance.FieldResolvedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedResolvedBy(); ok {
+		_spec.AddField(processinstance.FieldResolvedBy, field.TypeInt, value)
+	}
+	if _u.mutation.ResolvedByCleared() {
+		_spec.ClearField(processinstance.FieldResolvedBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.BlockKind(); ok {
+		_spec.SetField(processinstance.FieldBlockKind, field.TypeString, value)
+	}
+	if _u.mutation.BlockKindCleared() {
+		_spec.ClearField(processinstance.FieldBlockKind, field.TypeString)
+	}
+	if value, ok := _u.mutation.BlockedReasonCode(); ok {
+		_spec.SetField(processinstance.FieldBlockedReasonCode, field.TypeString, value)
+	}
+	if _u.mutation.BlockedReasonCodeCleared() {
+		_spec.ClearField(processinstance.FieldBlockedReasonCode, field.TypeString)
+	}
+	if value, ok := _u.mutation.BlockedReason(); ok {
+		_spec.SetField(processinstance.FieldBlockedReason, field.TypeString, value)
+	}
+	if _u.mutation.BlockedReasonCleared() {
+		_spec.ClearField(processinstance.FieldBlockedReason, field.TypeString)
+	}
+	if value, ok := _u.mutation.BlockedAt(); ok {
+		_spec.SetField(processinstance.FieldBlockedAt, field.TypeTime, value)
+	}
+	if _u.mutation.BlockedAtCleared() {
+		_spec.ClearField(processinstance.FieldBlockedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.BlockedBy(); ok {
+		_spec.SetField(processinstance.FieldBlockedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedBlockedBy(); ok {
+		_spec.AddField(processinstance.FieldBlockedBy, field.TypeInt, value)
+	}
+	if _u.mutation.BlockedByCleared() {
+		_spec.ClearField(processinstance.FieldBlockedBy, field.TypeInt)
 	}
 	if value, ok := _u.mutation.CreatedBy(); ok {
 		_spec.SetField(processinstance.FieldCreatedBy, field.TypeInt, value)
@@ -895,6 +1225,227 @@ func (_u *ProcessInstanceUpdateOne) ClearCompletedAt() *ProcessInstanceUpdateOne
 	return _u
 }
 
+// SetTerminalNodeInstanceID sets the "terminal_node_instance_id" field.
+func (_u *ProcessInstanceUpdateOne) SetTerminalNodeInstanceID(v int) *ProcessInstanceUpdateOne {
+	_u.mutation.ResetTerminalNodeInstanceID()
+	_u.mutation.SetTerminalNodeInstanceID(v)
+	return _u
+}
+
+// SetNillableTerminalNodeInstanceID sets the "terminal_node_instance_id" field if the given value is not nil.
+func (_u *ProcessInstanceUpdateOne) SetNillableTerminalNodeInstanceID(v *int) *ProcessInstanceUpdateOne {
+	if v != nil {
+		_u.SetTerminalNodeInstanceID(*v)
+	}
+	return _u
+}
+
+// AddTerminalNodeInstanceID adds value to the "terminal_node_instance_id" field.
+func (_u *ProcessInstanceUpdateOne) AddTerminalNodeInstanceID(v int) *ProcessInstanceUpdateOne {
+	_u.mutation.AddTerminalNodeInstanceID(v)
+	return _u
+}
+
+// ClearTerminalNodeInstanceID clears the value of the "terminal_node_instance_id" field.
+func (_u *ProcessInstanceUpdateOne) ClearTerminalNodeInstanceID() *ProcessInstanceUpdateOne {
+	_u.mutation.ClearTerminalNodeInstanceID()
+	return _u
+}
+
+// SetResolutionKind sets the "resolution_kind" field.
+func (_u *ProcessInstanceUpdateOne) SetResolutionKind(v string) *ProcessInstanceUpdateOne {
+	_u.mutation.SetResolutionKind(v)
+	return _u
+}
+
+// SetNillableResolutionKind sets the "resolution_kind" field if the given value is not nil.
+func (_u *ProcessInstanceUpdateOne) SetNillableResolutionKind(v *string) *ProcessInstanceUpdateOne {
+	if v != nil {
+		_u.SetResolutionKind(*v)
+	}
+	return _u
+}
+
+// ClearResolutionKind clears the value of the "resolution_kind" field.
+func (_u *ProcessInstanceUpdateOne) ClearResolutionKind() *ProcessInstanceUpdateOne {
+	_u.mutation.ClearResolutionKind()
+	return _u
+}
+
+// SetResolutionReason sets the "resolution_reason" field.
+func (_u *ProcessInstanceUpdateOne) SetResolutionReason(v string) *ProcessInstanceUpdateOne {
+	_u.mutation.SetResolutionReason(v)
+	return _u
+}
+
+// SetNillableResolutionReason sets the "resolution_reason" field if the given value is not nil.
+func (_u *ProcessInstanceUpdateOne) SetNillableResolutionReason(v *string) *ProcessInstanceUpdateOne {
+	if v != nil {
+		_u.SetResolutionReason(*v)
+	}
+	return _u
+}
+
+// ClearResolutionReason clears the value of the "resolution_reason" field.
+func (_u *ProcessInstanceUpdateOne) ClearResolutionReason() *ProcessInstanceUpdateOne {
+	_u.mutation.ClearResolutionReason()
+	return _u
+}
+
+// SetResolvedAt sets the "resolved_at" field.
+func (_u *ProcessInstanceUpdateOne) SetResolvedAt(v time.Time) *ProcessInstanceUpdateOne {
+	_u.mutation.SetResolvedAt(v)
+	return _u
+}
+
+// SetNillableResolvedAt sets the "resolved_at" field if the given value is not nil.
+func (_u *ProcessInstanceUpdateOne) SetNillableResolvedAt(v *time.Time) *ProcessInstanceUpdateOne {
+	if v != nil {
+		_u.SetResolvedAt(*v)
+	}
+	return _u
+}
+
+// ClearResolvedAt clears the value of the "resolved_at" field.
+func (_u *ProcessInstanceUpdateOne) ClearResolvedAt() *ProcessInstanceUpdateOne {
+	_u.mutation.ClearResolvedAt()
+	return _u
+}
+
+// SetResolvedBy sets the "resolved_by" field.
+func (_u *ProcessInstanceUpdateOne) SetResolvedBy(v int) *ProcessInstanceUpdateOne {
+	_u.mutation.ResetResolvedBy()
+	_u.mutation.SetResolvedBy(v)
+	return _u
+}
+
+// SetNillableResolvedBy sets the "resolved_by" field if the given value is not nil.
+func (_u *ProcessInstanceUpdateOne) SetNillableResolvedBy(v *int) *ProcessInstanceUpdateOne {
+	if v != nil {
+		_u.SetResolvedBy(*v)
+	}
+	return _u
+}
+
+// AddResolvedBy adds value to the "resolved_by" field.
+func (_u *ProcessInstanceUpdateOne) AddResolvedBy(v int) *ProcessInstanceUpdateOne {
+	_u.mutation.AddResolvedBy(v)
+	return _u
+}
+
+// ClearResolvedBy clears the value of the "resolved_by" field.
+func (_u *ProcessInstanceUpdateOne) ClearResolvedBy() *ProcessInstanceUpdateOne {
+	_u.mutation.ClearResolvedBy()
+	return _u
+}
+
+// SetBlockKind sets the "block_kind" field.
+func (_u *ProcessInstanceUpdateOne) SetBlockKind(v string) *ProcessInstanceUpdateOne {
+	_u.mutation.SetBlockKind(v)
+	return _u
+}
+
+// SetNillableBlockKind sets the "block_kind" field if the given value is not nil.
+func (_u *ProcessInstanceUpdateOne) SetNillableBlockKind(v *string) *ProcessInstanceUpdateOne {
+	if v != nil {
+		_u.SetBlockKind(*v)
+	}
+	return _u
+}
+
+// ClearBlockKind clears the value of the "block_kind" field.
+func (_u *ProcessInstanceUpdateOne) ClearBlockKind() *ProcessInstanceUpdateOne {
+	_u.mutation.ClearBlockKind()
+	return _u
+}
+
+// SetBlockedReasonCode sets the "blocked_reason_code" field.
+func (_u *ProcessInstanceUpdateOne) SetBlockedReasonCode(v string) *ProcessInstanceUpdateOne {
+	_u.mutation.SetBlockedReasonCode(v)
+	return _u
+}
+
+// SetNillableBlockedReasonCode sets the "blocked_reason_code" field if the given value is not nil.
+func (_u *ProcessInstanceUpdateOne) SetNillableBlockedReasonCode(v *string) *ProcessInstanceUpdateOne {
+	if v != nil {
+		_u.SetBlockedReasonCode(*v)
+	}
+	return _u
+}
+
+// ClearBlockedReasonCode clears the value of the "blocked_reason_code" field.
+func (_u *ProcessInstanceUpdateOne) ClearBlockedReasonCode() *ProcessInstanceUpdateOne {
+	_u.mutation.ClearBlockedReasonCode()
+	return _u
+}
+
+// SetBlockedReason sets the "blocked_reason" field.
+func (_u *ProcessInstanceUpdateOne) SetBlockedReason(v string) *ProcessInstanceUpdateOne {
+	_u.mutation.SetBlockedReason(v)
+	return _u
+}
+
+// SetNillableBlockedReason sets the "blocked_reason" field if the given value is not nil.
+func (_u *ProcessInstanceUpdateOne) SetNillableBlockedReason(v *string) *ProcessInstanceUpdateOne {
+	if v != nil {
+		_u.SetBlockedReason(*v)
+	}
+	return _u
+}
+
+// ClearBlockedReason clears the value of the "blocked_reason" field.
+func (_u *ProcessInstanceUpdateOne) ClearBlockedReason() *ProcessInstanceUpdateOne {
+	_u.mutation.ClearBlockedReason()
+	return _u
+}
+
+// SetBlockedAt sets the "blocked_at" field.
+func (_u *ProcessInstanceUpdateOne) SetBlockedAt(v time.Time) *ProcessInstanceUpdateOne {
+	_u.mutation.SetBlockedAt(v)
+	return _u
+}
+
+// SetNillableBlockedAt sets the "blocked_at" field if the given value is not nil.
+func (_u *ProcessInstanceUpdateOne) SetNillableBlockedAt(v *time.Time) *ProcessInstanceUpdateOne {
+	if v != nil {
+		_u.SetBlockedAt(*v)
+	}
+	return _u
+}
+
+// ClearBlockedAt clears the value of the "blocked_at" field.
+func (_u *ProcessInstanceUpdateOne) ClearBlockedAt() *ProcessInstanceUpdateOne {
+	_u.mutation.ClearBlockedAt()
+	return _u
+}
+
+// SetBlockedBy sets the "blocked_by" field.
+func (_u *ProcessInstanceUpdateOne) SetBlockedBy(v int) *ProcessInstanceUpdateOne {
+	_u.mutation.ResetBlockedBy()
+	_u.mutation.SetBlockedBy(v)
+	return _u
+}
+
+// SetNillableBlockedBy sets the "blocked_by" field if the given value is not nil.
+func (_u *ProcessInstanceUpdateOne) SetNillableBlockedBy(v *int) *ProcessInstanceUpdateOne {
+	if v != nil {
+		_u.SetBlockedBy(*v)
+	}
+	return _u
+}
+
+// AddBlockedBy adds value to the "blocked_by" field.
+func (_u *ProcessInstanceUpdateOne) AddBlockedBy(v int) *ProcessInstanceUpdateOne {
+	_u.mutation.AddBlockedBy(v)
+	return _u
+}
+
+// ClearBlockedBy clears the value of the "blocked_by" field.
+func (_u *ProcessInstanceUpdateOne) ClearBlockedBy() *ProcessInstanceUpdateOne {
+	_u.mutation.ClearBlockedBy()
+	return _u
+}
+
 // SetCreatedBy sets the "created_by" field.
 func (_u *ProcessInstanceUpdateOne) SetCreatedBy(v int) *ProcessInstanceUpdateOne {
 	_u.mutation.ResetCreatedBy()
@@ -1138,6 +1689,46 @@ func (_u *ProcessInstanceUpdateOne) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "ProcessInstance.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.TerminalNodeInstanceID(); ok {
+		if err := processinstance.TerminalNodeInstanceIDValidator(v); err != nil {
+			return &ValidationError{Name: "terminal_node_instance_id", err: fmt.Errorf(`ent: validator failed for field "ProcessInstance.terminal_node_instance_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ResolutionKind(); ok {
+		if err := processinstance.ResolutionKindValidator(v); err != nil {
+			return &ValidationError{Name: "resolution_kind", err: fmt.Errorf(`ent: validator failed for field "ProcessInstance.resolution_kind": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ResolutionReason(); ok {
+		if err := processinstance.ResolutionReasonValidator(v); err != nil {
+			return &ValidationError{Name: "resolution_reason", err: fmt.Errorf(`ent: validator failed for field "ProcessInstance.resolution_reason": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ResolvedBy(); ok {
+		if err := processinstance.ResolvedByValidator(v); err != nil {
+			return &ValidationError{Name: "resolved_by", err: fmt.Errorf(`ent: validator failed for field "ProcessInstance.resolved_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.BlockKind(); ok {
+		if err := processinstance.BlockKindValidator(v); err != nil {
+			return &ValidationError{Name: "block_kind", err: fmt.Errorf(`ent: validator failed for field "ProcessInstance.block_kind": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.BlockedReasonCode(); ok {
+		if err := processinstance.BlockedReasonCodeValidator(v); err != nil {
+			return &ValidationError{Name: "blocked_reason_code", err: fmt.Errorf(`ent: validator failed for field "ProcessInstance.blocked_reason_code": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.BlockedReason(); ok {
+		if err := processinstance.BlockedReasonValidator(v); err != nil {
+			return &ValidationError{Name: "blocked_reason", err: fmt.Errorf(`ent: validator failed for field "ProcessInstance.blocked_reason": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.BlockedBy(); ok {
+		if err := processinstance.BlockedByValidator(v); err != nil {
+			return &ValidationError{Name: "blocked_by", err: fmt.Errorf(`ent: validator failed for field "ProcessInstance.blocked_by": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.CreatedBy(); ok {
 		if err := processinstance.CreatedByValidator(v); err != nil {
 			return &ValidationError{Name: "created_by", err: fmt.Errorf(`ent: validator failed for field "ProcessInstance.created_by": %w`, err)}
@@ -1236,6 +1827,75 @@ func (_u *ProcessInstanceUpdateOne) sqlSave(ctx context.Context) (_node *Process
 	}
 	if _u.mutation.CompletedAtCleared() {
 		_spec.ClearField(processinstance.FieldCompletedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.TerminalNodeInstanceID(); ok {
+		_spec.SetField(processinstance.FieldTerminalNodeInstanceID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedTerminalNodeInstanceID(); ok {
+		_spec.AddField(processinstance.FieldTerminalNodeInstanceID, field.TypeInt, value)
+	}
+	if _u.mutation.TerminalNodeInstanceIDCleared() {
+		_spec.ClearField(processinstance.FieldTerminalNodeInstanceID, field.TypeInt)
+	}
+	if value, ok := _u.mutation.ResolutionKind(); ok {
+		_spec.SetField(processinstance.FieldResolutionKind, field.TypeString, value)
+	}
+	if _u.mutation.ResolutionKindCleared() {
+		_spec.ClearField(processinstance.FieldResolutionKind, field.TypeString)
+	}
+	if value, ok := _u.mutation.ResolutionReason(); ok {
+		_spec.SetField(processinstance.FieldResolutionReason, field.TypeString, value)
+	}
+	if _u.mutation.ResolutionReasonCleared() {
+		_spec.ClearField(processinstance.FieldResolutionReason, field.TypeString)
+	}
+	if value, ok := _u.mutation.ResolvedAt(); ok {
+		_spec.SetField(processinstance.FieldResolvedAt, field.TypeTime, value)
+	}
+	if _u.mutation.ResolvedAtCleared() {
+		_spec.ClearField(processinstance.FieldResolvedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.ResolvedBy(); ok {
+		_spec.SetField(processinstance.FieldResolvedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedResolvedBy(); ok {
+		_spec.AddField(processinstance.FieldResolvedBy, field.TypeInt, value)
+	}
+	if _u.mutation.ResolvedByCleared() {
+		_spec.ClearField(processinstance.FieldResolvedBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.BlockKind(); ok {
+		_spec.SetField(processinstance.FieldBlockKind, field.TypeString, value)
+	}
+	if _u.mutation.BlockKindCleared() {
+		_spec.ClearField(processinstance.FieldBlockKind, field.TypeString)
+	}
+	if value, ok := _u.mutation.BlockedReasonCode(); ok {
+		_spec.SetField(processinstance.FieldBlockedReasonCode, field.TypeString, value)
+	}
+	if _u.mutation.BlockedReasonCodeCleared() {
+		_spec.ClearField(processinstance.FieldBlockedReasonCode, field.TypeString)
+	}
+	if value, ok := _u.mutation.BlockedReason(); ok {
+		_spec.SetField(processinstance.FieldBlockedReason, field.TypeString, value)
+	}
+	if _u.mutation.BlockedReasonCleared() {
+		_spec.ClearField(processinstance.FieldBlockedReason, field.TypeString)
+	}
+	if value, ok := _u.mutation.BlockedAt(); ok {
+		_spec.SetField(processinstance.FieldBlockedAt, field.TypeTime, value)
+	}
+	if _u.mutation.BlockedAtCleared() {
+		_spec.ClearField(processinstance.FieldBlockedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.BlockedBy(); ok {
+		_spec.SetField(processinstance.FieldBlockedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedBlockedBy(); ok {
+		_spec.AddField(processinstance.FieldBlockedBy, field.TypeInt, value)
+	}
+	if _u.mutation.BlockedByCleared() {
+		_spec.ClearField(processinstance.FieldBlockedBy, field.TypeInt)
 	}
 	if value, ok := _u.mutation.CreatedBy(); ok {
 		_spec.SetField(processinstance.FieldCreatedBy, field.TypeInt, value)

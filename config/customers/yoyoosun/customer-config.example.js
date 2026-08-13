@@ -7,6 +7,23 @@ window.__PLUSH_ERP_CUSTOMER_CONFIG__ = Object.freeze({
     systemName: "业务管理",
     faviconHref: "/customer-assets/yoyoosun/favicon-yoyoosun.svg",
   }),
+  legalNotice: Object.freeze({
+    noticeVersion: "2026-08-11.1",
+    effectiveDate: "2026-08-11",
+    controllerName: "东莞市永绅玩具有限公司",
+    contactChannel: "请联系本单位系统管理员或人事、信息化负责人。",
+    storageLocation: "本单位指定的中国境内私有化部署环境。",
+    crossBorderRule:
+      "默认不向中华人民共和国境外提供个人信息；确需跨境时，由本单位另行履行评估、告知和必要授权程序。",
+    processors: Object.freeze([
+      Object.freeze({
+        name: "阿里云短信服务",
+        purpose: "发送登录验证码",
+        dataCategories: "手机号、验证码发送状态",
+        condition: "仅在本单位启用短信登录且用户主动获取验证码时",
+      }),
+    ]),
+  }),
   desktopMenu: Object.freeze({
     presentation: "role_guided",
     hiddenItemKeys: Object.freeze([]),

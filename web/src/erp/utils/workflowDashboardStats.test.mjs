@@ -217,10 +217,7 @@ test('dashboardTaskDisplay: 普通任务只进入正式来源页，不进入保�
     ],
   ]
 
-  assert.equal(
-    shippingReleaseEntryPath,
-    ''
-  )
+  assert.equal(shippingReleaseEntryPath, '')
   assert.equal(productionSchedulingEntryPath, '')
   assert.equal(productionExceptionEntryPath, '')
   assert.equal(payloadEntryPath, '')
@@ -238,28 +235,31 @@ test('workflowDashboardStats: 统计任务状态和 due_at 计算态', () => {
       task({ id: 4, due_at: NOW_SEC - 60 }),
       task({ id: 5, due_at: NOW_SEC + 60 * 60 }),
       task({ id: 6, task_status_key: 'done', due_at: NOW_SEC - 60 }),
+      task({ id: 7, task_status_key: 'withdrawn', due_at: NOW_SEC - 60 }),
     ],
     { nowMs: NOW_MS }
   )
 
-  assert.equal(stats.total, 6)
+  assert.equal(stats.total, 7)
   assert.equal(stats.ready, 3)
   assert.equal(stats.blocked, 1)
   assert.equal(stats.rejected, 1)
+  assert.equal(stats.withdrawn, 1)
   assert.equal(stats.overdue, 1)
   assert.equal(stats.dueSoon, 1)
   assert.equal(stats.done, 1)
   assert.equal(stats.active, 4)
-  assert.equal(stats.roleDistribution.sales, 6)
+  assert.equal(stats.roleDistribution.sales, 7)
 })
 
 test('workflowDashboardStats: 终态任务不产生超时预警', () => {
-  const terminalTasks = ['done', 'rejected'].map((statusKey, index) =>
-    task({
-      id: index + 1,
-      task_status_key: statusKey,
-      due_at: NOW_SEC - 60,
-    })
+  const terminalTasks = ['done', 'rejected', 'withdrawn'].map(
+    (statusKey, index) =>
+      task({
+        id: index + 1,
+        task_status_key: statusKey,
+        due_at: NOW_SEC - 60,
+      })
   )
 
   terminalTasks.forEach((item) => {

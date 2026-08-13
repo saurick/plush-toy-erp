@@ -11,10 +11,9 @@ var processDomainCommandRecoveryBusinessRefTypes = map[string]string{
 	ProcessKeyProductionExceptionApproval: "production_exception_decision",
 }
 
-// GetProcessDomainCommandRecoveryContext returns only process snapshots that
-// the current recovery transaction can handle safely. Process definitions are
-// immutable per instance, so historical linear snapshots may remain
-// recoverable even when the current definition uses branches.
+// GetProcessDomainCommandRecoveryContext applies the same scope policy used by
+// the mutation. Recovery follows runtime evidence, so unselected graph branches
+// do not make a current canonical instance unrecoverable.
 func (uc *ProcessRuntimeUsecase) GetProcessDomainCommandRecoveryContext(
 	ctx context.Context,
 	processInstanceID int,
@@ -84,20 +83,20 @@ func validateProcessDomainCommandRecoveryScope(instance *ProcessInstance, nodes 
 	if !ok || strings.TrimSpace(instance.BusinessRefType) != expectedBusinessRefType || instance.BusinessRefID <= 0 {
 		return ErrProcessDomainCommandRecoveryRequired
 	}
-	if instance.Status != ProcessStatusActive && instance.Status != ProcessStatusBlocked {
+	if instance.Status != ProcessStatusActive && instance.Status != ProcessStatusBlocked && instance.Status != ProcessStatusCompleted {
 		return ErrProcessDomainCommandRecoveryRequired
 	}
 	for _, node := range nodes {
-		if node == nil || node.ProcessInstanceID != instance.ID || node.Attempt != 1 ||
-			ProcessRuntimePolicyUsesNonSequentialRouting(node.PolicySnapshot) {
+		if node == nil || node.ProcessInstanceID != instance.ID || node.Attempt <= 0 {
 			return ErrProcessDomainCommandRecoveryRequired
 		}
 	}
 	return nil
 }
 
-// ProcessRuntimePolicyUsesNonSequentialRouting is the shared fail-closed
-// boundary for the current linear-only compensation recovery transaction.
+// ProcessRuntimePolicyUsesNonSequentialRouting remains available for callers
+// that need to classify graph shape; recovery no longer rejects the whole
+// instance merely because an immutable definition contains branches.
 func ProcessRuntimePolicyUsesNonSequentialRouting(policy map[string]any) bool {
 	for _, key := range []string{
 		"branch_policy_key", "fan_out_node_keys", "join_node_key", "join_policy",

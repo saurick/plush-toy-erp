@@ -21,6 +21,7 @@ func (SalesOrder) Annotations() []schema.Annotation {
 			Checks: map[string]string{
 				"sales_orders_lifecycle_status_allowed": "lifecycle_status IN ('draft', 'submitted', 'active', 'closed', 'canceled')",
 				"sales_orders_version_positive":         "version > 0",
+				"sales_orders_currency_allowed":         "currency IN ('USD', 'CNY', 'HKD')",
 			},
 		},
 	}
@@ -33,6 +34,10 @@ func (SalesOrder) Fields() []ent.Field {
 			MaxLen(64),
 		field.Int("customer_id").
 			Positive(),
+		field.String("currency").
+			NotEmpty().
+			Default("CNY").
+			MaxLen(16),
 		field.String("customer_order_no").
 			Optional().
 			Nillable().
@@ -69,6 +74,11 @@ func (SalesOrder) Fields() []ent.Field {
 		field.Int("version").
 			Positive().
 			Default(1),
+		field.String("settlement_action").Optional().Nillable().MaxLen(32),
+		field.String("settlement_mode").Optional().Nillable().MaxLen(32),
+		field.String("settlement_reason").Optional().Nillable().MaxLen(255),
+		field.Time("settled_at").Optional().Nillable(),
+		field.Int("settled_by").Optional().Nillable().Positive(),
 		field.String("note").
 			Optional().
 			Nillable().

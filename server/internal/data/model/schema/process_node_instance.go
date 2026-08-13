@@ -19,9 +19,9 @@ func (ProcessNodeInstance) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{Checks: map[string]string{
 			"process_node_instances_type_allowed":     "node_type IN ('human_task', 'approval', 'domain_command', 'wait_event', 'end')",
-			"process_node_instances_status_allowed":   "status IN ('waiting', 'active', 'completed', 'blocked')",
+			"process_node_instances_status_allowed":   "status IN ('waiting', 'active', 'completed', 'blocked', 'withdrawn')",
 			"process_node_instances_version_positive": "version > 0",
-			"process_node_instances_lifecycle_bundle": "((status = 'waiting' AND started_at IS NULL AND completed_at IS NULL) OR (status = 'active' AND started_at IS NOT NULL AND completed_at IS NULL) OR (status = 'completed' AND started_at IS NOT NULL AND completed_at IS NOT NULL) OR (status = 'blocked' AND started_at IS NOT NULL AND completed_at IS NULL))",
+			"process_node_instances_lifecycle_bundle": "((status = 'waiting' AND started_at IS NULL AND completed_at IS NULL) OR (status = 'active' AND started_at IS NOT NULL AND completed_at IS NULL) OR (status = 'completed' AND started_at IS NOT NULL AND completed_at IS NOT NULL) OR (status = 'blocked' AND started_at IS NOT NULL AND completed_at IS NULL) OR (status = 'withdrawn' AND completed_at IS NOT NULL))",
 			"process_node_instances_recovery_bundle":  "((domain_command_recovery_decision IS NULL AND domain_command_recovery_hash IS NULL AND domain_command_recovered_at IS NULL AND domain_command_recovered_by IS NULL) OR (domain_command_recovery_decision = 'terminate_and_withdraw_downstream' AND domain_command_recovery_hash IS NOT NULL AND length(domain_command_recovery_hash) = 64 AND domain_command_recovered_at IS NOT NULL AND domain_command_recovered_by IS NOT NULL AND node_type = 'domain_command' AND status = 'completed' AND domain_command_effect_state = 'compensated' AND domain_command_result_hash IS NOT NULL AND domain_command_compensation_hash IS NOT NULL))",
 		}},
 	}
@@ -71,10 +71,51 @@ func (ProcessNodeInstance) Fields() []ent.Field {
 		field.Time("completed_at").
 			Optional().
 			Nillable(),
+		field.Int("activated_from_node_instance_id").
+			Optional().
+			Nillable().
+			Positive(),
+		field.Time("routing_completed_at").
+			Optional().
+			Nillable(),
+		field.Int("routing_completed_by").
+			Optional().
+			Nillable().
+			Positive(),
 		field.String("outcome").
 			Optional().
 			Nillable().
 			MaxLen(64),
+		field.String("block_kind").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.String("blocked_reason_code").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.String("blocked_reason").
+			Optional().
+			Nillable().
+			MaxLen(255),
+		field.Time("blocked_at").
+			Optional().
+			Nillable(),
+		field.Int("blocked_by").
+			Optional().
+			Nillable().
+			Positive(),
+		field.String("resume_reason").
+			Optional().
+			Nillable().
+			MaxLen(255),
+		field.Time("resumed_at").
+			Optional().
+			Nillable(),
+		field.Int("resumed_by").
+			Optional().
+			Nillable().
+			Positive(),
 		field.String("domain_command_fingerprint").
 			Optional().
 			Nillable().
@@ -147,6 +188,10 @@ func (ProcessNodeInstance) Fields() []ent.Field {
 		field.Int("version").
 			Default(1).
 			Positive(),
+		field.Int("updated_by").
+			Optional().
+			Nillable().
+			Positive(),
 		field.Time("created_at").
 			Default(time.Now).
 			Immutable(),
@@ -172,6 +217,7 @@ func (ProcessNodeInstance) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("process_instance_id", "node_key", "attempt").Unique(),
 		index.Fields("process_instance_id", "status"),
+		index.Fields("process_instance_id", "activated_from_node_instance_id"),
 		index.Fields("owner_pool_key", "status"),
 		index.Fields("required_capability_key", "status"),
 		index.Fields("domain_command_effect_ref_type", "domain_command_effect_ref_id"),

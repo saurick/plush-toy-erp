@@ -78,7 +78,7 @@ import {
   ColumnOrderModal,
 } from '../components/business-list/ColumnOrderModal.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
-import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
+import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import QualityInspectionPurchaseReturnModal from '../components/quality-inspections/QualityInspectionPurchaseReturnModal.jsx'
 import PurchaseRejectionDispositionModal from '../components/quality-inspections/PurchaseRejectionDispositionModal.jsx'
@@ -90,7 +90,6 @@ import {
   buildDecisionParams,
   buildInspectionParams,
   positiveInt,
-  todayInputValue,
 } from '../components/quality-inspections/QualityInspectionForms.jsx'
 import {
   buildQualityInspectionDataColumns,
@@ -114,6 +113,7 @@ import {
   trimOptional,
   V1_ROUTE_PATHS,
 } from '../utils/masterDataOrderView.mjs'
+import { currentBusinessDate } from '../utils/businessDate.mjs'
 import {
   createBusinessTablePagination,
   getBusinessPaginationParams,
@@ -1097,7 +1097,9 @@ export default function V1QualityInspectionsPage() {
       decisionForm.setFieldsValue({
         result: inspectionModal?.mode === 'pass' ? 'PASS' : undefined,
         inspected_at:
-          inspectionModal?.mode === 'cancel' ? undefined : todayInputValue(),
+          inspectionModal?.mode === 'cancel'
+            ? undefined
+            : currentBusinessDate(),
         defect_rate_selection: undefined,
         defect_rate_custom_percent: undefined,
         decision_note: '',
@@ -1556,32 +1558,23 @@ export default function V1QualityInspectionsPage() {
   const loadExportQualityInspections = useCallback(
     async ({ signal }) => {
       const routeSelectedID = Number(routeQualityInspectionID || 0)
-      if (
-        routeSelectedID > 0 &&
-        inspectionTypeFilter !== 'PRODUCTION_STAGE'
-      ) {
+      if (routeSelectedID > 0 && inspectionTypeFilter !== 'PRODUCTION_STAGE') {
         const inspection = await getQualityInspection({ id: routeSelectedID })
         return inspection ? [inspection] : []
       }
       const data = await loadQualityInspectionList({ signal, all: true })
       const exportRows = data?.quality_inspections
       return routeSelectedID > 0 && Array.isArray(exportRows)
-        ? exportRows.filter(
-            (item) => Number(item?.id || 0) === routeSelectedID
-          )
+        ? exportRows.filter((item) => Number(item?.id || 0) === routeSelectedID)
         : exportRows
     },
-    [
-      inspectionTypeFilter,
-      loadQualityInspectionList,
-      routeQualityInspectionID,
-    ]
+    [inspectionTypeFilter, loadQualityInspectionList, routeQualityInspectionID]
   )
   const { exporting, exportRows: exportQualityInspections } =
     useBusinessListExport({
       requestKey: 'quality-inspections-export',
       loadRows: loadExportQualityInspections,
-      filename: `质量检验-${new Date().toISOString().slice(0, 10)}.csv`,
+      filename: `质量检验-${currentBusinessDate()}.csv`,
       columns: exportColumns,
       recordLabel: '质检单',
     })
@@ -1623,6 +1616,7 @@ export default function V1QualityInspectionsPage() {
     <BusinessPageLayout className="erp-v1-quality-inspections-page">
       <PageHeaderCard
         compact
+        helpKey="quality-inspections"
         title="质量检验"
         description="质量检验集中办理采购到货、委外回货、出货关联成品和生产 WIP 分段关口的质量判定。生产 WIP 依次覆盖裁片、皮套、成品、针检、抽检及订单要求的客户验货，每张质检单只代表当前在制批次和当前关口。首次到货检验不合格可按来源行和部分数量办理退厂或补换；补换确认生成新的待收与待检记录，原收货不会因部分处置被整单取消。已入库后的不合格仍生成采购退货并形成库存追溯。"
         tags={[
@@ -1986,9 +1980,7 @@ export default function V1QualityInspectionsPage() {
             <>
               <BusinessActionTooltip
                 disabled={
-                  !selectedRow ||
-                  selectedRow.status !== 'SUBMITTED' ||
-                  saving
+                  !selectedRow || selectedRow.status !== 'SUBMITTED' || saving
                 }
                 disabledReason={
                   !selectedRow
@@ -2007,9 +1999,7 @@ export default function V1QualityInspectionsPage() {
                   className="erp-business-module-status-action"
                   icon={<CheckCircleOutlined />}
                   disabled={
-                    !selectedRow ||
-                    selectedRow.status !== 'SUBMITTED' ||
-                    saving
+                    !selectedRow || selectedRow.status !== 'SUBMITTED' || saving
                   }
                   onClick={() => openDecision('pass', selectedRow)}
                 >
@@ -2018,9 +2008,7 @@ export default function V1QualityInspectionsPage() {
               </BusinessActionTooltip>
               <BusinessActionTooltip
                 disabled={
-                  !selectedRow ||
-                  selectedRow.status !== 'SUBMITTED' ||
-                  saving
+                  !selectedRow || selectedRow.status !== 'SUBMITTED' || saving
                 }
                 disabledReason={
                   !selectedRow
@@ -2039,9 +2027,7 @@ export default function V1QualityInspectionsPage() {
                   className="erp-business-module-status-action"
                   icon={<StopOutlined />}
                   disabled={
-                    !selectedRow ||
-                    selectedRow.status !== 'SUBMITTED' ||
-                    saving
+                    !selectedRow || selectedRow.status !== 'SUBMITTED' || saving
                   }
                   onClick={() => openDecision('reject', selectedRow)}
                 >
@@ -2213,7 +2199,7 @@ export default function V1QualityInspectionsPage() {
         onChanged={() => loadRows()}
       />
 
-      <BusinessRecordDetailsModal
+      <BusinessDetailsModal
         columns={visibleDataColumns}
         description="查看当前质检单的来源、批次、检验状态和判定结果；如需提交、判定或取消，请使用列表上方的当前操作区。"
         open={Boolean(detailInspection)}
@@ -2230,7 +2216,7 @@ export default function V1QualityInspectionsPage() {
           canWithdraw={false}
           variant="inline"
         />
-      </BusinessRecordDetailsModal>
+      </BusinessDetailsModal>
 
       <BusinessFormModal
         title={modalTitle}

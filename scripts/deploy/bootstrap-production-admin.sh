@@ -617,7 +617,7 @@ cp "$env_file" "$env_snapshot"
 normalized_env="$(mktemp)"
 normalize_env_file "$env_snapshot" "$normalized_env"
 
-for key in PROJECT_SLUG APP_IMAGE POSTGRES_DSN POSTGRES_DB POSTGRES_USER MIGRATION_LOCK_FILE APP_ADMIN_USERNAME BOOTSTRAP_ADMIN_ONCE ERP_ALLOW_CUSTOMER_TRIAL_CONFIG ERP_CUSTOMER_TRIAL_TARGET; do
+for key in PROJECT_SLUG APP_IMAGE POSTGRES_DSN POSTGRES_APP_PASSWORD POSTGRES_MIGRATOR_PASSWORD POSTGRES_BACKUP_PASSWORD POSTGRES_DB POSTGRES_USER MIGRATION_LOCK_FILE APP_ADMIN_USERNAME BOOTSTRAP_ADMIN_ONCE ERP_ALLOW_CUSTOMER_TRIAL_CONFIG ERP_CUSTOMER_TRIAL_TARGET; do
   require_single_env_key "$key" "$normalized_env"
 done
 [[ "$(env_key_count APP_ADMIN_PASSWORD "$normalized_env")" -eq 0 ]] || fail "steady env 文件不得声明 APP_ADMIN_PASSWORD，包括空值"
@@ -625,6 +625,7 @@ done
 project_slug="$(env_value_of PROJECT_SLUG "$normalized_env")"
 app_image="$(env_value_of APP_IMAGE "$normalized_env")"
 postgres_dsn="$(env_value_of POSTGRES_DSN "$normalized_env")"
+postgres_app_password="$(env_value_of POSTGRES_APP_PASSWORD "$normalized_env")"
 postgres_db="$(env_value_of POSTGRES_DB "$normalized_env")"
 postgres_user="$(env_value_of POSTGRES_USER "$normalized_env")"
 migration_lock_file="$(env_value_of MIGRATION_LOCK_FILE "$normalized_env")"
@@ -641,7 +642,10 @@ erp_customer_trial_target="$(env_value_of ERP_CUSTOMER_TRIAL_TARGET "$normalized
 postgres_dsn_pattern="^postgres(ql)?://([^:/?#@]+):([^/?#@]+)@postgres:5432/${expected_database}\\?sslmode=disable$"
 [[ "$postgres_dsn" =~ $postgres_dsn_pattern ]] || fail "POSTGRES_DSN 必须精确为单一 postgres[ql]://user:pass@postgres:5432/$expected_database?sslmode=disable，禁止额外 query、multi-host 或 fallback"
 dsn_user="${BASH_REMATCH[2]}"
-[[ "$dsn_user" == "$postgres_user" ]] || fail "POSTGRES_DSN user 与 POSTGRES_USER 不一致"
+dsn_password="${BASH_REMATCH[3]}"
+[[ "$dsn_user" == "erp_app" ]] || fail "POSTGRES_DSN 必须使用 erp_app"
+[[ "$dsn_password" == "$postgres_app_password" ]] || fail "POSTGRES_DSN 密码必须与 POSTGRES_APP_PASSWORD 一致"
+[[ "$postgres_user" != "$dsn_user" ]] || fail "POSTGRES_USER 初始化管理员不得复用 erp_app"
 
 expected_confirmation="BOOTSTRAP_PRODUCTION_ADMIN:${project_slug}:${expected_database}:${admin_username}:${expected_migration}:${expected_release}"
 [[ "$confirmation" == "$expected_confirmation" ]] || fail "确认串不匹配；必须传入 --confirm $expected_confirmation"

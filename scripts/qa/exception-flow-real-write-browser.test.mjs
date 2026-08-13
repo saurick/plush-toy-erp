@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -17,6 +18,31 @@ const REPORT =
 const CONFIRMATION = exceptionFlowConfirmation({
   backendURL: BACKEND_URL,
   databaseName: DATABASE_NAME,
+});
+
+test("exception-flow task search follows the current page placeholder contract", () => {
+  const runnerSource = readFileSync(
+    new URL("./exception-flow-real-write-browser.mjs", import.meta.url),
+    "utf8",
+  );
+  const dashboardSource = readFileSync(
+    new URL("../../web/src/erp/pages/DashboardPage.jsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(dashboardSource, /placeholder="搜索任务"/u);
+  assert.match(
+    dashboardSource,
+    /searchHint="可搜索：任务、单号、来源、处理原因"/u,
+  );
+  assert.match(
+    runnerSource,
+    /getByPlaceholder\("搜索任务", \{ exact: true \}\)/u,
+  );
+  assert.doesNotMatch(
+    runnerSource,
+    /getByPlaceholder\("搜索任务、单号、来源、处理原因"/u,
+  );
 });
 
 function validArgs(...extra) {

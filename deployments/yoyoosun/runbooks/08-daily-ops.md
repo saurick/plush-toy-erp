@@ -3,7 +3,7 @@
 ## 每日
 
 1. 检查 server `/healthz`、`/readyz`。
-2. 检查 web `/healthz`。
+2. 检查 web `/healthz` 和 `/readyz`；前者只证明静态进程存活，后者同时证明后端可用。
 3. 检查 `docker compose ps` 是否有异常重启。
 4. 检查磁盘使用率。
 5. 检查最近备份任务状态。

@@ -518,7 +518,9 @@ jq -e -s '
 
 source_sha256="$(jq -r '.sourceArchive.sha256' "$incoming/release-artifact.json")"
 sbom_sha256="$(jq -r '.sbom.sha256' "$incoming/release-artifact.json")"
-[[ "$source_sha256" =~ $sha256_pattern && "$sbom_sha256" =~ $sha256_pattern ]] ||
+migration_sequence_sha256="$(jq -r '.migration.sequenceSha256' "$incoming/release-artifact.json")"
+[[ "$source_sha256" =~ $sha256_pattern && "$sbom_sha256" =~ $sha256_pattern &&
+  "$migration_sequence_sha256" =~ $sha256_pattern ]] ||
   fail "release artifact checksums are invalid"
 [[ "$(sha256sum "$incoming/source.tar" | awk '{print $1}')" == "$source_sha256" ]] ||
   fail "source archive checksum does not match"
@@ -760,19 +762,29 @@ compose=(
   --compose-override "$compose_override" \
   >>"$log_file" 2>&1
 
+enter_stage maintenance_window
+"${clean_env[@]}" "${compose[@]}" stop app-server web-desktop \
+  >>"$log_file" 2>&1
+"${clean_env[@]}" "${compose[@]}" up -d --no-build --pull never postgres \
+  >>"$log_file" 2>&1
+postgres_deadline=$((SECONDS + 120))
+while true; do
+  postgres_cid="$("${clean_env[@]}" "${compose[@]}" ps -q postgres 2>/dev/null || true)"
+  postgres_health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$postgres_cid" 2>/dev/null || true)"
+  [[ "$postgres_health" == "healthy" ]] && break
+  ((SECONDS < postgres_deadline)) || fail "PostgreSQL 配置重建后未恢复 healthy"
+  sleep 2
+done
+
 enter_stage migration_plan
 "${clean_env[@]}" \
   "COMPOSE_OVERRIDE_FILE=$compose_override" \
   "COMPOSE_ENV_FILE=$runtime_env" \
-  sh "$migrate_script" --status-only >>"$log_file" 2>&1
-"${clean_env[@]}" \
-  "COMPOSE_OVERRIDE_FILE=$compose_override" \
-  "COMPOSE_ENV_FILE=$runtime_env" \
-  sh "$migrate_script" >>"$log_file" 2>&1
-
-enter_stage maintenance_window
-"${clean_env[@]}" "${compose[@]}" stop app-server web-desktop \
-  >>"$log_file" 2>&1
+  "MIGRATION_MAINTENANCE_CONFIRMED=1" \
+  "EXPECTED_MIGRATION_SEQUENCE_SHA256=$migration_sequence_sha256" \
+  "RELEASE_SHA=$release_sha" \
+  "APPLICATION_IMAGE_DIGEST=$server_content_id" \
+  sh "$migrate_script" --reconcile-permissions >>"$log_file" 2>&1
 
 enter_stage migration_apply_started
 migration_apply_started=1
@@ -780,12 +792,18 @@ migration_apply_started=1
   "COMPOSE_OVERRIDE_FILE=$compose_override" \
   "COMPOSE_ENV_FILE=$runtime_env" \
   "MIGRATION_MAINTENANCE_CONFIRMED=1" \
+  "EXPECTED_MIGRATION_SEQUENCE_SHA256=$migration_sequence_sha256" \
+  "RELEASE_SHA=$release_sha" \
+  "APPLICATION_IMAGE_DIGEST=$server_content_id" \
   sh "$migrate_script" --apply >>"$log_file" 2>&1
 
 enter_stage migration_applied
 "${clean_env[@]}" \
   "COMPOSE_OVERRIDE_FILE=$compose_override" \
   "COMPOSE_ENV_FILE=$runtime_env" \
+  "EXPECTED_MIGRATION_SEQUENCE_SHA256=$migration_sequence_sha256" \
+  "RELEASE_SHA=$release_sha" \
+  "APPLICATION_IMAGE_DIGEST=$server_content_id" \
   sh "$migrate_script" --status-only >>"$log_file" 2>&1
 
 enter_stage compose_start

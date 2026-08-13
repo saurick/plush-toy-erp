@@ -98,6 +98,24 @@ test("migration makefile separates interactive run from explicit non-interactive
   }
 });
 
+test("migration generation pins Atlas and closes checksum/revision escape hatches", async () => {
+  const source = await readFile(makefileURL, "utf8");
+  assert.match(source, /ATLAS_VERSION \?= v0\.38\.0/u);
+  assert.match(source, /atlas_check:/u);
+  assert.match(source, /Atlas 版本必须是 \$\(ATLAS_VERSION\)/u);
+  assert.match(source, /ent_migrate: atlas_check/u);
+  assert.match(source, /migrate_hash: atlas_check/u);
+  assert.match(source, /git diff --name-only -- internal\/data\/model\/migrate/u);
+  assert.match(source, /git diff --cached --name-only -- internal\/data\/model\/migrate/u);
+  assert.match(source, /migrate_hash 只用于新增 custom migration/u);
+  assert.doesNotMatch(source, /curl\s+-sSf\s+https:\/\/atlasgo\.sh/u);
+
+  const migrateSet = targetBody(source, "migrate_set", ".PHONY: ent_generate");
+  assert.match(migrateSet, /make migrate_set 已封闭/u);
+  assert.doesNotMatch(migrateSet, /atlas migrate set/u);
+  assert.doesNotMatch(migrateSet, /\$\$DB_URL/u);
+});
+
 test("shared-development migration targets preserve terminal receipts without tracing confirmations", async () => {
   const source = await readFile(makefileURL, "utf8");
   const bodies = [

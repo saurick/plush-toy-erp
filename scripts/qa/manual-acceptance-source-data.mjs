@@ -59,6 +59,8 @@ export const DEFAULT_SOURCE_DATA_SCALE = Object.freeze({
   outsourcingOrders: 45,
   bomVersions: 45,
 });
+const ROUTED_PRODUCTION_SAMPLE_OFFSETS = Object.freeze([3, 4]);
+const ROUTED_PRODUCTION_PLANNED_QUANTITY = 3;
 export const SALES_ORDER_ACCEPTANCE_REPLAY_STATUSES = Object.freeze([
   Object.freeze(["DRAFT"]),
   Object.freeze(["DRAFT", "SUBMITTED"]),
@@ -349,6 +351,7 @@ function buildSuppliers(prefix, count) {
       name,
       short_name: name,
       supplier_type: supplierType,
+      default_payment_term_days: [0, 30, 45, 60][offset % 4],
       note: longBusinessNote(index),
       isActive: index <= count - 5,
       contacts:
@@ -670,10 +673,14 @@ function buildOutsourcingOrders(
   const activeProcesses = processes.filter(
     (item) => item.isActive && item.outsourcing_enabled,
   );
+  const processingItems = ["本体*1", "耳朵*2", "尾巴*1", "配件*1"];
   return Array.from({ length: count }, (_, offset) => {
     const index = offset + 1;
     const supplier =
       suppliers[(offset * 3 + 3) % Math.min(suppliers.length - 5, 45)];
+    const supplierContact =
+      supplier.contacts.find((contact) => contact.is_primary) ||
+      supplier.contacts[0];
     const sourceOrder = salesOrders[offset % salesOrders.length];
     const lines = Array.from(
       { length: lineCountFor(index) },
@@ -703,6 +710,8 @@ function buildOutsourcingOrders(
           product_name_snapshot: materialSubject ? undefined : product.name,
           material_code_snapshot: materialSubject ? material.code : undefined,
           material_name_snapshot: materialSubject ? material.name : undefined,
+          processing_item:
+            processingItems[(offset + lineOffset) % processingItems.length],
           process_name_snapshot: processItem.name,
           process_category_snapshot: processItem.category,
           outsourcing_quantity: String(quantity),
@@ -719,7 +728,15 @@ function buildOutsourcingOrders(
     return {
       outsourcing_order_no: `${prefix}-WW-${pad(index, 3)}`,
       supplierRef: supplier.code,
-      supplier_snapshot: { name: supplier.name, simulated_only: true },
+      supplier_snapshot: {
+        name: supplier.name,
+        short_name: supplier.short_name,
+        contact_name: supplierContact?.name || "演示联系人",
+        contact_phone: "0769-00000000",
+        address: "演示加工地址",
+        signer_name: supplierContact?.name || "演示联系人",
+        simulated_only: true,
+      },
       contract_party_snapshot: {
         buyerCompany: "永绅演示工厂",
         buyerContact: "生产部",
@@ -766,6 +783,8 @@ function buildBOMVersions(prefix, count, products, materials, anchorDate) {
             materialRef: material.code,
             quantity: (0.2 + (lineOffset % 7) * 0.15).toFixed(6),
             loss_rate: ((lineOffset % 4) * 0.02).toFixed(6),
+            production_operation_code:
+              lineOffset === 0 ? "FABRIC_PROCESSING" : undefined,
             position: ["面料", "填充", "五金配件", "包装", "标识"][
               lineOffset % 5
             ],
@@ -795,6 +814,100 @@ function buildBOMVersions(prefix, count, products, materials, anchorDate) {
     }
   }
   return versions.slice(0, count);
+}
+
+function bindRoutedProductionOutsourcingContracts({
+  salesOrders,
+  outsourcingOrders,
+  bomVersions,
+  materials,
+  processes,
+}) {
+  const activeBOMByProduct = new Map(
+    bomVersions
+      .filter((record) => record.targetStatus === "ACTIVE")
+      .map((record) => [record.productRef, record]),
+  );
+  const productionCandidates = salesOrders
+    .filter((record) => record.targetStatus === "ACTIVE")
+    .flatMap((order) =>
+      order.items.flatMap((item) => {
+        const bom = activeBOMByProduct.get(item.productRef);
+        return bom ? [{ order, bom }] : [];
+      }),
+    );
+  const reservedOrders = outsourcingOrders.filter(
+    (record) =>
+      record.targetStatus === "CONFIRMED" && record.items.length === 1,
+  );
+  const fabricProcess = processes.find(
+    (record) =>
+      record.isActive &&
+      record.outsourcing_enabled &&
+      record.production_route_operation_code === "FABRIC_PROCESSING",
+  );
+  const materialByCode = new Map(
+    materials.map((record) => [record.code, record]),
+  );
+  if (
+    !fabricProcess ||
+    reservedOrders.length < ROUTED_PRODUCTION_SAMPLE_OFFSETS.length
+  ) {
+    throw new CliError(
+      "source plan cannot reserve the routed production fabric outsourcing contracts",
+      2,
+    );
+  }
+  for (const [
+    contractOffset,
+    productionCandidateOffset,
+  ] of ROUTED_PRODUCTION_SAMPLE_OFFSETS.entries()) {
+    const candidate = productionCandidates[productionCandidateOffset];
+    const fabricItems = candidate?.bom?.items?.filter(
+      (item) => item.production_operation_code === "FABRIC_PROCESSING",
+    );
+    if (!candidate || fabricItems?.length !== 1) {
+      throw new CliError(
+        `production candidate ${productionCandidateOffset} must have one FABRIC_PROCESSING material`,
+        2,
+      );
+    }
+    const fabricItem = fabricItems[0];
+    const material = materialByCode.get(fabricItem.materialRef);
+    if (!material) {
+      throw new CliError(
+        `production candidate ${productionCandidateOffset} fabric material is missing`,
+        2,
+      );
+    }
+    const quantity = (
+      Number(fabricItem.quantity) *
+      ROUTED_PRODUCTION_PLANNED_QUANTITY *
+      (1 + Number(fabricItem.loss_rate || 0))
+    ).toFixed(6);
+    const reservedOrder = reservedOrders[contractOffset];
+    const existing = reservedOrder.items[0];
+    reservedOrder.source_order_no = candidate.order.customer_order_no;
+    reservedOrder.items = [
+      {
+        line_no: 1,
+        subject_type: "MATERIAL",
+        materialRef: material.code,
+        processRef: fabricProcess.code,
+        material_code_snapshot: material.code,
+        material_name_snapshot: material.name,
+        processing_item: fabricItem.position || "面料",
+        process_name_snapshot: fabricProcess.name,
+        process_category_snapshot: fabricProcess.category,
+        outsourcing_quantity: quantity,
+        unit_price: existing.unit_price,
+        amount: (Number(quantity) * Number(existing.unit_price)).toFixed(2),
+        expected_return_date: existing.expected_return_date,
+        note: existing.note,
+        acceptanceProductionCandidateOffset: productionCandidateOffset,
+      },
+    ];
+  }
 }
 
 function assertBusinessCopy(value, pathName = "dataset") {
@@ -904,6 +1017,13 @@ export function buildManualAcceptanceSourceDataPlan(options = {}) {
     materials,
     anchorDate,
   );
+  bindRoutedProductionOutsourcingContracts({
+    salesOrders,
+    outsourcingOrders,
+    bomVersions,
+    materials,
+    processes,
+  });
   const records = {
     customers,
     suppliers,
@@ -1455,6 +1575,7 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
         "name",
         "short_name",
         "supplier_type",
+        "default_payment_term_days",
         "tax_no",
         "note",
       ],
@@ -1797,6 +1918,159 @@ async function advanceLifecycle({
   return status;
 }
 
+const SOURCE_ORDER_SHORT_CLOSE_REASON =
+  "验收样例：保留未履约源单的短关闭终态。";
+const SOURCE_ORDER_CANCEL_REASON = "验收样例：保留源单取消终态。";
+
+export async function applySourceOrderLifecycleAction({
+  plan,
+  token,
+  fetchImpl,
+  domain,
+  id,
+  method,
+  currentStatus,
+  expectedStatus,
+}) {
+  const sourceID = positiveSafeInteger(id, `${domain} id`);
+  const normalizedDomain = requiredText(domain, "source order domain");
+  const normalizedMethod = requiredText(method, "source order method");
+  const normalizedCurrentStatus = requiredText(
+    currentStatus,
+    `${normalizedDomain} current status`,
+  ).toUpperCase();
+  const normalizedExpectedStatus = requiredText(
+    expectedStatus,
+    `${normalizedDomain} expected status`,
+  ).toUpperCase();
+  const actionKey = normalizedMethod.split("_", 1)[0];
+  if (
+    !new Set(["submit", "confirm", "close", "cancel"]).has(actionKey) ||
+    !normalizedMethod.endsWith(`_${normalizedDomain}`)
+  ) {
+    throw new CliError(
+      `${normalizedDomain}.${normalizedMethod} is not a registered source order action`,
+    );
+  }
+
+  const readData = await rpcCall({
+    backendURL: plan.backendURL,
+    domain: normalizedDomain,
+    method: `get_${normalizedDomain}`,
+    params: { id: sourceID },
+    token,
+    fetchImpl,
+  });
+  const current = readData[normalizedDomain];
+  const readStatus = String(current?.lifecycle_status || "").toUpperCase();
+  if (
+    Number(current?.id) !== sourceID ||
+    readStatus !== normalizedCurrentStatus
+  ) {
+    throw new CliError(
+      `${normalizedDomain}.get_${normalizedDomain} id=${sourceID} expected ${normalizedCurrentStatus}, got ${readStatus || "invalid"}`,
+    );
+  }
+  const currentVersion = positiveSafeInteger(
+    current.version,
+    `${normalizedDomain} current version`,
+  );
+  const params = {
+    id: sourceID,
+    expected_version: currentVersion,
+    idempotency_key: [
+      "manual-acceptance-source",
+      plan.runId,
+      normalizedDomain,
+      sourceID,
+      normalizedMethod,
+      `v${currentVersion}`,
+    ].join(":"),
+    ...(actionKey === "close"
+      ? {
+          close_mode: "short",
+          reason: SOURCE_ORDER_SHORT_CLOSE_REASON,
+        }
+      : {}),
+    ...(actionKey === "cancel" ? { reason: SOURCE_ORDER_CANCEL_REASON } : {}),
+  };
+  const data = await rpcCall({
+    backendURL: plan.backendURL,
+    domain: normalizedDomain,
+    method: normalizedMethod,
+    params,
+    token,
+    fetchImpl,
+  });
+  requireLifecycleMutationStatus({
+    data,
+    resultKey: normalizedDomain,
+    domain: normalizedDomain,
+    id: sourceID,
+    method: normalizedMethod,
+    expectedStatus: normalizedExpectedStatus,
+  });
+  const updated = data[normalizedDomain];
+  const updatedVersion = positiveSafeInteger(
+    updated?.version,
+    `${normalizedDomain} updated version`,
+  );
+  if (Number(updated?.id) !== sourceID || updatedVersion <= currentVersion) {
+    throw new CliError(
+      `${normalizedDomain}.${normalizedMethod} id=${sourceID} returned a stale source document`,
+    );
+  }
+  return updated;
+}
+
+export async function advanceOutsourcingOrderLifecycle({
+  plan,
+  token,
+  fetchImpl,
+  item,
+  current,
+  target,
+  lifecycleActions,
+}) {
+  const sourceID = positiveSafeInteger(item?.id, "outsourcing order id");
+  let status = String(current || "DRAFT").toUpperCase();
+  const normalizedTarget = requiredText(
+    target,
+    "outsourcing order target status",
+  ).toUpperCase();
+  if (status === normalizedTarget) return status;
+  const targetPath = lifecycleActions[normalizedTarget] || [];
+  const currentIndex = targetPath.findIndex(
+    (step) => step.resultStatus === status,
+  );
+  const remaining =
+    currentIndex >= 0 ? targetPath.slice(currentIndex + 1) : targetPath;
+  if (new Set(["CLOSED", "CANCELED"]).has(status)) {
+    throw new CliError(
+      `outsourcing_order id=${sourceID} is terminal ${status}, expected ${normalizedTarget}`,
+    );
+  }
+  for (const step of remaining) {
+    const updated = await applySourceOrderLifecycleAction({
+      plan,
+      token,
+      fetchImpl,
+      domain: "outsourcing_order",
+      id: sourceID,
+      method: step.method,
+      currentStatus: status,
+      expectedStatus: step.resultStatus,
+    });
+    status = String(updated.lifecycle_status).toUpperCase();
+  }
+  if (status !== normalizedTarget) {
+    throw new CliError(
+      `outsourcing_order id=${sourceID} expected ${normalizedTarget}, got ${status}`,
+    );
+  }
+  return status;
+}
+
 function requireSalesOrderProcessTask(task, sourceID) {
   if (
     !task ||
@@ -2131,22 +2405,17 @@ export async function advanceSalesOrderLifecycleThroughProcess({
     );
   }
   if (target === "CANCELED") {
-    const data = await rpcCall({
-      backendURL: plan.backendURL,
-      domain: "sales_order",
-      method: "cancel_sales_order",
-      params: { id: sourceID },
+    const updated = await applySourceOrderLifecycleAction({
+      plan,
       token: roleTokens.sales || token,
       fetchImpl,
-    });
-    return requireLifecycleMutationStatus({
-      data,
-      resultKey: "sales_order",
       domain: "sales_order",
       id: sourceID,
       method: "cancel_sales_order",
+      currentStatus: status,
       expectedStatus: "CANCELED",
     });
+    return String(updated.lifecycle_status).toUpperCase();
   }
   if (!new Set(["SUBMITTED", "ACTIVE", "CLOSED"]).has(target)) {
     throw new CliError(`unsupported sales order target status ${target}`);
@@ -2249,22 +2518,17 @@ export async function advanceSalesOrderLifecycleThroughProcess({
   if (!completed) {
     throw new CliError(`${orderNo} process did not reach its end node`);
   }
-  const data = await rpcCall({
-    backendURL: plan.backendURL,
-    domain: "sales_order",
-    method: "close_sales_order",
-    params: { id: sourceID },
+  const updated = await applySourceOrderLifecycleAction({
+    plan,
     token: roleTokens.sales || token,
     fetchImpl,
-  });
-  return requireLifecycleMutationStatus({
-    data,
-    resultKey: "sales_order",
     domain: "sales_order",
     id: sourceID,
     method: "close_sales_order",
+    currentStatus: status,
     expectedStatus: "CLOSED",
   });
+  return String(updated.lifecycle_status).toUpperCase();
 }
 
 export async function advancePurchaseOrderLifecycleThroughProcess({
@@ -2293,22 +2557,17 @@ export async function advancePurchaseOrderLifecycleThroughProcess({
     );
   }
   if (target === "CANCELED") {
-    const data = await rpcCall({
-      backendURL: plan.backendURL,
-      domain: "purchase_order",
-      method: "cancel_purchase_order",
-      params: { id: sourceID },
+    const updated = await applySourceOrderLifecycleAction({
+      plan,
       token,
       fetchImpl,
-    });
-    return requireLifecycleMutationStatus({
-      data,
-      resultKey: "purchase_order",
       domain: "purchase_order",
       id: sourceID,
       method: "cancel_purchase_order",
+      currentStatus: status,
       expectedStatus: "CANCELED",
     });
+    return String(updated.lifecycle_status).toUpperCase();
   }
   if (!new Set(["SUBMITTED", "APPROVED", "CLOSED"]).has(target)) {
     throw new CliError(`unsupported purchase order target status ${target}`);
@@ -2331,9 +2590,7 @@ export async function advancePurchaseOrderLifecycleThroughProcess({
       ].join(":"),
       invoke: ({ actor, domain, method, params }) => {
         const actorToken =
-          actor === "source" || actor === "admin"
-            ? token
-            : roleTokens[actor];
+          actor === "source" || actor === "admin" ? token : roleTokens[actor];
         if (!actorToken) {
           throw new CliError(
             `no trial account can perform ${domain}.${method} as ${actor}`,
@@ -2353,9 +2610,7 @@ export async function advancePurchaseOrderLifecycleThroughProcess({
       approvalActorForRole: (roleKey) =>
         roleTokens[roleKey] ? roleKey : undefined,
     });
-    status = String(
-      result.purchaseOrder.lifecycle_status || "",
-    ).toUpperCase();
+    status = String(result.purchaseOrder.lifecycle_status || "").toUpperCase();
     report.steps.push({
       target: "material_supply",
       key: orderNo,
@@ -2369,22 +2624,17 @@ export async function advancePurchaseOrderLifecycleThroughProcess({
       `${orderNo} must be APPROVED before close; got ${status}`,
     );
   }
-  const data = await rpcCall({
-    backendURL: plan.backendURL,
-    domain: "purchase_order",
-    method: "close_purchase_order",
-    params: { id: sourceID },
+  const updated = await applySourceOrderLifecycleAction({
+    plan,
     token,
     fetchImpl,
-  });
-  return requireLifecycleMutationStatus({
-    data,
-    resultKey: "purchase_order",
     domain: "purchase_order",
     id: sourceID,
     method: "close_purchase_order",
+    currentStatus: status,
     expectedStatus: "CLOSED",
   });
+  return String(updated.lifecycle_status).toUpperCase();
 }
 
 export function requireLifecycleMutationStatus({
@@ -2684,6 +2934,12 @@ export function buildOutsourcingOrderLineReferences({
       processId: actual.process_id,
       unitId: actual.unit_id,
       quantity: actual.outsourcing_quantity,
+      ...(Number.isInteger(planned.acceptanceProductionCandidateOffset)
+        ? {
+            acceptanceProductionCandidateOffset:
+              planned.acceptanceProductionCandidateOffset,
+          }
+        : {}),
     };
   });
 }
@@ -2966,6 +3222,11 @@ async function createSourceDocuments({
     resultKey: "outsourcing_order",
     listStatusKey: "lifecycle_status",
     lifecycleActions: outsourcingActions,
+    advanceLifecycleFn: (input) =>
+      advanceOutsourcingOrderLifecycle({
+        ...input,
+        lifecycleActions: outsourcingActions,
+      }),
     headerFields: [
       "outsourcing_order_no",
       "supplier_id",
@@ -2992,6 +3253,7 @@ async function createSourceDocuments({
       "product_name_snapshot",
       "material_code_snapshot",
       "material_name_snapshot",
+      "processing_item",
       "process_name_snapshot",
       "process_category_snapshot",
       "unit_name_snapshot",
@@ -3023,6 +3285,7 @@ async function createSourceDocuments({
         productRef: undefined,
         materialRef: undefined,
         processRef: undefined,
+        acceptanceProductionCandidateOffset: undefined,
       })),
     }),
   });
@@ -3096,6 +3359,8 @@ export function planBOMItemReconciliation({
       item.unit_id !== unitId ||
       Number(item.quantity) !== Number(planned.quantity) ||
       Number(item.loss_rate) !== Number(planned.loss_rate) ||
+      String(item.production_operation_code || "") !==
+        String(planned.production_operation_code || "") ||
       String(item.position || "") !== String(planned.position || "")
     ) {
       throw new CliError(
@@ -3384,12 +3649,14 @@ export function buildSourceDrivenFactReferences({
             unitId: bomItem.unit_id,
             quantity: bomItem.quantity,
             lossRate: bomItem.loss_rate,
+            productionOperationCode: bomItem.production_operation_code ?? null,
           })),
         },
       });
     }
   }
   const outsourcingCandidates = [];
+  const productionWIPOutsourcingCandidates = [];
   for (const orderPlan of plan.records.outsourcingOrders.filter(
     (record) => record.targetStatus === "CONFIRMED",
   )) {
@@ -3405,14 +3672,21 @@ export function buildSourceDrivenFactReferences({
     for (const item of sourceDocuments.outsourcingOrderItems.get(order.id) ||
       []) {
       if (!item?.outsourcingOrderItemId) continue;
-      outsourcingCandidates.push({
+      const candidate = {
         order: {
           id: order.id,
           orderNo: orderPlan.outsourcing_order_no,
           status: "CONFIRMED",
         },
         item,
-      });
+      };
+      outsourcingCandidates.push(candidate);
+      if (Number.isInteger(item.acceptanceProductionCandidateOffset)) {
+        productionWIPOutsourcingCandidates.push({
+          productionCandidateOffset: item.acceptanceProductionCandidateOffset,
+          ...candidate,
+        });
+      }
     }
   }
   const purchaseCandidates = [];
@@ -3459,6 +3733,7 @@ export function buildSourceDrivenFactReferences({
       ...(salesCandidate ? { sales: salesCandidate } : {}),
       ...(purchaseCandidate ? { purchase: purchaseCandidate } : {}),
       productionCandidates,
+      productionWIPOutsourcingCandidates,
       outsourcingCandidates,
       salesCandidates,
       purchaseCandidates,
@@ -3767,6 +4042,8 @@ export async function applyManualAcceptanceSourceData(
         code: record.code,
         id: refs.processes.get(record.code).id,
         name: record.name,
+        productionRouteOperationCode:
+          record.production_route_operation_code ?? null,
       })),
     salesOrders: plan.records.salesOrders
       .filter((record) => record.targetStatus === "ACTIVE")
@@ -3790,11 +4067,7 @@ export async function applyManualAcceptanceSourceData(
           (candidate) => candidate.orderNo === record.order_no,
         );
         const status = String(order?.lifecycle_status || "").toUpperCase();
-        if (
-          !order?.id ||
-          !replay ||
-          !replay.allowedStatuses.includes(status)
-        ) {
+        if (!order?.id || !replay || !replay.allowedStatuses.includes(status)) {
           throw new CliError(
             `${record.order_no} process candidate is outside its exact forward-only replay states`,
           );
@@ -3852,6 +4125,7 @@ export async function applyManualAcceptanceSourceData(
           unitId: item.unit_id,
           quantity: item.quantity,
           lossRate: item.loss_rate,
+          productionOperationCode: item.production_operation_code ?? null,
         })),
       };
     }),

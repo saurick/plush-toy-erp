@@ -2,8 +2,6 @@
 server:
   http:
     addr: "0.0.0.0:8300"
-  grpc:
-    addr: "0.0.0.0:9300"
 
 data:
   database:
@@ -22,4 +20,4 @@ debug:
 
 pdf:
   chrome_path: "/usr/bin/chromium"
-  render_concurrency: 2
+  render_concurrency: 4

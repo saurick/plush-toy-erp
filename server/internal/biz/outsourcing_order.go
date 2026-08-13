@@ -30,6 +30,7 @@ var (
 	ErrOutsourcingOrderNotFound     = errors.New("outsourcing order not found")
 	ErrOutsourcingOrderItemNotFound = errors.New("outsourcing order item not found")
 	ErrOutsourcingOrderConflict     = errors.New("outsourcing order version conflict")
+	ErrOutsourcingOrderIncomplete   = errors.New("outsourcing order contract information incomplete")
 	ErrProcessInactive              = errors.New("process inactive")
 	ErrProcessNotOutsourcingEnabled = errors.New("process is not outsourcing enabled")
 )
@@ -38,6 +39,8 @@ type OutsourcingOrder struct {
 	ID                    int
 	OutsourcingOrderNo    string
 	SupplierID            int
+	Currency              string
+	PaymentTermDays       *int
 	SupplierSnapshot      map[string]any
 	ContractPartySnapshot map[string]any
 	SourceOrderNo         *string
@@ -45,6 +48,11 @@ type OutsourcingOrder struct {
 	ExpectedReturnDate    *time.Time
 	LifecycleStatus       string
 	Version               int
+	SettlementAction      *string
+	SettlementMode        *string
+	SettlementReason      *string
+	SettledAt             *time.Time
+	SettledBy             *int
 	Note                  *string
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
@@ -87,6 +95,8 @@ type OutsourcingOrderMutation struct {
 	ExpectedVersion       int
 	OutsourcingOrderNo    string
 	SupplierID            int
+	Currency              string
+	PaymentTermDays       *int
 	SupplierSnapshot      map[string]any
 	ContractPartySnapshot map[string]any
 	SourceOrderNo         *string
@@ -168,6 +178,10 @@ type OutsourcingOrderRepo interface {
 	ProcessIsUsableForOutsourcing(ctx context.Context, id int) (active bool, outsourcingEnabled bool, err error)
 }
 
+type OutsourcingOrderLifecycleActionRepo interface {
+	ApplyOutsourcingOrderLifecycleAction(ctx context.Context, in *SourceOrderLifecycleAction, lifecycleStatus string) (*OutsourcingOrder, error)
+}
+
 type OutsourcingOrderUsecase struct {
 	repo OutsourcingOrderRepo
 }
@@ -213,12 +227,18 @@ func (uc *OutsourcingOrderUsecase) SaveOutsourcingOrderWithItems(ctx context.Con
 	if id == 0 {
 		order.ExpectedVersion = 0
 	}
-	normalizedOrder, err := normalizeOutsourcingOrderMutation(*order)
+	normalizedOrder, err := normalizeOutsourcingOrderMutation(*order, id == 0)
 	if err != nil {
 		return nil, err
 	}
 	if err := uc.validateSupplierActive(ctx, normalizedOrder.SupplierID); err != nil {
 		return nil, err
+	}
+	if id == 0 {
+		normalizedOrder.PaymentTermDays, err = resolveSourceOrderPaymentTermDays(ctx, uc.repo, normalizedOrder.SupplierID, normalizedOrder.PaymentTermDays)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	normalizedItems := make([]*OutsourcingOrderItemSaveMutation, 0, len(items))
@@ -275,16 +295,56 @@ func (uc *OutsourcingOrderUsecase) SubmitOutsourcingOrder(ctx context.Context, i
 	return uc.changeOutsourcingOrderLifecycle(ctx, id, OutsourcingOrderStatusSubmitted)
 }
 
+func (uc *OutsourcingOrderUsecase) SubmitOutsourcingOrderWithAction(ctx context.Context, in *SourceOrderLifecycleAction) (*OutsourcingOrder, error) {
+	return uc.applyOutsourcingOrderLifecycleAction(ctx, in, SourceOrderActionSubmit, OutsourcingOrderStatusSubmitted)
+}
+
 func (uc *OutsourcingOrderUsecase) ConfirmOutsourcingOrder(ctx context.Context, id int) (*OutsourcingOrder, error) {
 	return uc.changeOutsourcingOrderLifecycle(ctx, id, OutsourcingOrderStatusConfirmed)
+}
+
+func (uc *OutsourcingOrderUsecase) ConfirmOutsourcingOrderWithAction(ctx context.Context, in *SourceOrderLifecycleAction) (*OutsourcingOrder, error) {
+	return uc.applyOutsourcingOrderLifecycleAction(ctx, in, SourceOrderActionConfirm, OutsourcingOrderStatusConfirmed)
 }
 
 func (uc *OutsourcingOrderUsecase) CloseOutsourcingOrder(ctx context.Context, id int) (*OutsourcingOrder, error) {
 	return uc.changeOutsourcingOrderLifecycle(ctx, id, OutsourcingOrderStatusClosed)
 }
 
+func (uc *OutsourcingOrderUsecase) CloseOutsourcingOrderWithAction(ctx context.Context, in *SourceOrderLifecycleAction) (*OutsourcingOrder, error) {
+	return uc.applyOutsourcingOrderLifecycleAction(ctx, in, SourceOrderActionClose, OutsourcingOrderStatusClosed)
+}
+
 func (uc *OutsourcingOrderUsecase) CancelOutsourcingOrder(ctx context.Context, id int) (*OutsourcingOrder, error) {
 	return uc.changeOutsourcingOrderLifecycle(ctx, id, OutsourcingOrderStatusCanceled)
+}
+
+func (uc *OutsourcingOrderUsecase) CancelOutsourcingOrderWithAction(ctx context.Context, in *SourceOrderLifecycleAction) (*OutsourcingOrder, error) {
+	return uc.applyOutsourcingOrderLifecycleAction(ctx, in, SourceOrderActionCancel, OutsourcingOrderStatusCanceled)
+}
+
+func (uc *OutsourcingOrderUsecase) applyOutsourcingOrderLifecycleAction(ctx context.Context, in *SourceOrderLifecycleAction, actionKey string, next string) (*OutsourcingOrder, error) {
+	if uc == nil || uc.repo == nil || in == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := NormalizeSourceOrderLifecycleAction(*in, actionKey)
+	if err != nil {
+		return nil, err
+	}
+	current, err := uc.repo.GetOutsourcingOrder(ctx, normalized.ID)
+	if err != nil {
+		return nil, err
+	}
+	if next == OutsourcingOrderStatusSubmitted || next == OutsourcingOrderStatusConfirmed {
+		if err := uc.validateContractReadyForConfirmation(ctx, current); err != nil {
+			return nil, err
+		}
+	}
+	repo, ok := uc.repo.(OutsourcingOrderLifecycleActionRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return repo.ApplyOutsourcingOrderLifecycleAction(ctx, &normalized, next)
 }
 
 func (uc *OutsourcingOrderUsecase) ListOutsourcingOrderItems(ctx context.Context, filter OutsourcingOrderItemFilter) ([]*OutsourcingOrderItem, int, error) {
@@ -312,7 +372,68 @@ func (uc *OutsourcingOrderUsecase) changeOutsourcingOrderLifecycle(ctx context.C
 	if current.LifecycleStatus == next {
 		return current, nil
 	}
+	if next == OutsourcingOrderStatusSubmitted || next == OutsourcingOrderStatusConfirmed {
+		if err := uc.validateContractReadyForConfirmation(ctx, current); err != nil {
+			return nil, err
+		}
+	}
 	return uc.repo.UpdateOutsourcingOrderLifecycle(ctx, id, next)
+}
+
+func (uc *OutsourcingOrderUsecase) validateContractReadyForConfirmation(ctx context.Context, order *OutsourcingOrder) error {
+	if order == nil || order.ExpectedReturnDate == nil {
+		return ErrOutsourcingOrderIncomplete
+	}
+	buyer := order.ContractPartySnapshot
+	if snapshotString(buyer, "buyerCompany") == "" ||
+		snapshotString(buyer, "buyerContact") == "" ||
+		snapshotString(buyer, "buyerPhone") == "" ||
+		snapshotString(buyer, "buyerAddress") == "" {
+		return ErrOutsourcingOrderIncomplete
+	}
+	supplier := order.SupplierSnapshot
+	if (snapshotString(supplier, "name") == "" && snapshotString(supplier, "short_name") == "") ||
+		snapshotString(supplier, "contact_name") == "" ||
+		(snapshotString(supplier, "contact_phone") == "" && snapshotString(supplier, "contact_mobile") == "") ||
+		snapshotString(supplier, "address") == "" {
+		return ErrOutsourcingOrderIncomplete
+	}
+
+	activeItemCount := 0
+	for offset := 0; ; offset += 200 {
+		items, total, err := uc.repo.ListOutsourcingOrderItems(ctx, OutsourcingOrderItemFilter{
+			OutsourcingOrderID: order.ID,
+			Limit:              200,
+			Offset:             offset,
+		})
+		if err != nil {
+			return err
+		}
+		for _, item := range items {
+			if item == nil || item.LineStatus == OutsourcingOrderItemStatusCanceled {
+				continue
+			}
+			activeItemCount++
+			if item.ProcessingItem == nil || strings.TrimSpace(*item.ProcessingItem) == "" {
+				return ErrOutsourcingOrderIncomplete
+			}
+		}
+		if offset+len(items) >= total || len(items) == 0 {
+			break
+		}
+	}
+	if activeItemCount == 0 {
+		return ErrOutsourcingOrderIncomplete
+	}
+	return nil
+}
+
+func snapshotString(snapshot map[string]any, key string) string {
+	value, ok := snapshot[key].(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(value)
 }
 
 func (uc *OutsourcingOrderUsecase) validateSupplierActive(ctx context.Context, id int) error {
@@ -382,8 +503,24 @@ func (uc *OutsourcingOrderUsecase) validateSubjectProcessAndUnit(ctx context.Con
 	return nil
 }
 
-func normalizeOutsourcingOrderMutation(in OutsourcingOrderMutation) (OutsourcingOrderMutation, error) {
+func normalizeOutsourcingOrderMutation(in OutsourcingOrderMutation, create bool) (OutsourcingOrderMutation, error) {
 	in.OutsourcingOrderNo = strings.TrimSpace(in.OutsourcingOrderNo)
+	var currencyOK bool
+	in.Currency, currencyOK = normalizeSourceOrderCurrency(in.Currency, create)
+	if !currencyOK {
+		return OutsourcingOrderMutation{}, ErrBadParam
+	}
+	if in.PaymentTermDays == nil {
+		if !create {
+			return OutsourcingOrderMutation{}, ErrBadParam
+		}
+	} else {
+		if *in.PaymentTermDays < 0 {
+			return OutsourcingOrderMutation{}, ErrBadParam
+		}
+		termDays := *in.PaymentTermDays
+		in.PaymentTermDays = &termDays
+	}
 	in.SourceOrderNo = normalizeOptionalString(in.SourceOrderNo)
 	in.Note = normalizeOptionalString(in.Note)
 	if in.SupplierSnapshot == nil {

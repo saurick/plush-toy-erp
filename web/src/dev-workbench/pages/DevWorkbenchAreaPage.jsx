@@ -9,7 +9,6 @@ import { Link } from 'react-router-dom'
 import { Tag, Typography } from 'antd'
 import DevEntrySourceDetails from '../components/DevEntrySourceDetails.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
-import DevReceiptPanel from '../components/DevReceiptPanel.jsx'
 import { DEV_HUB_ITEMS } from '../config/devHub.mjs'
 import { DEV_WORKBENCH_AREA_KEYS } from '../config/devRoutes.mjs'
 
@@ -68,9 +67,9 @@ const PRODUCT_ENGINEERING_ENTRY_PRESENTATION = Object.freeze({
     eyebrow: '权限核对',
     title: '账号为什么能使用这些功能？',
     description:
-      '按岗位或账号汇聚最终可用功能、页面、仓库范围和审批责任，查看每条结果来自哪里。',
+      '按岗位或账号汇聚最终可用功能、页面、实际侧栏、仓库范围和审批责任，查看每条结果来自哪里。',
     action: '核对权限关系',
-    boundary: '只读读取当前后端与已启用配置；不修改权限，不代表发布或验收',
+    boundary: '只读读取当前权限与菜单投影；不修改权限，不代表发布或验收',
   }),
   governance: Object.freeze({
     eyebrow: '规则与边界',
@@ -87,6 +86,14 @@ const PRODUCT_ENGINEERING_ENTRY_PRESENTATION = Object.freeze({
       '沿一条业务链查看来源单据、协同任务、运行路径、事实结果和状态规则怎样衔接。',
     action: '查看业务链',
     boundary: '适合查当前节点、责任、事实与状态差异',
+  }),
+  'business-usability': Object.freeze({
+    eyebrow: '员工易用性',
+    title: '员工能不能看懂、能不能自己完成？',
+    description:
+      '查看高频业务页是否说明了当前任务、完成标准、交接对象、专业名词、公式和字段来源。',
+    action: '检查业务易用性',
+    boundary: '只读复用页面说明；推荐岗位不是权限，覆盖状态不是客户验收',
   }),
   docs: Object.freeze({
     eyebrow: '正式说明',
@@ -303,34 +310,27 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
             </ol>
           </section>
         ) : isQualityArea ? (
-          <>
-            <section
-              className="erp-dev-quality-start"
-              aria-labelledby="dev-quality-start-title"
-            >
-              <div className="erp-dev-quality-start__head">
-                <div>
-                  <Text className="erp-dev-quality-start__eyebrow">
-                    当前任务
-                  </Text>
-                  <Title level={2} id="dev-quality-start-title">
-                    先选要完成的事情
-                  </Title>
-                </div>
-                <Text type="secondary">
-                  测试数据不是每次都要准备；先判断本轮改动，再按需要进入数据准备。
-                </Text>
+          <section
+            className="erp-dev-quality-start"
+            aria-labelledby="dev-quality-start-title"
+          >
+            <div className="erp-dev-quality-start__head">
+              <div>
+                <Text className="erp-dev-quality-start__eyebrow">当前任务</Text>
+                <Title level={2} id="dev-quality-start-title">
+                  先选要完成的事情
+                </Title>
               </div>
-              <div className="erp-dev-quality-task-list">
-                {items.map((item) => (
-                  <QualityTaskEntry key={item.key} item={item} />
-                ))}
-              </div>
-            </section>
-            <DevReceiptPanel areaKey={areaKey} summaryFirst />
-          </>
-        ) : areaKey === DEV_WORKBENCH_AREA_KEYS.delivery ? (
-          <DevReceiptPanel areaKey={areaKey} />
+              <Text type="secondary">
+                测试数据不是每次都要准备；先判断本轮改动，再按需要进入数据准备。
+              </Text>
+            </div>
+            <div className="erp-dev-quality-task-list">
+              {items.map((item) => (
+                <QualityTaskEntry key={item.key} item={item} />
+              ))}
+            </div>
+          </section>
         ) : null}
         {!isQualityArea && !isProductEngineeringArea ? (
           <section

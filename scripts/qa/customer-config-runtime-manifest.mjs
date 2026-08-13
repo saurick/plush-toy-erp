@@ -971,7 +971,7 @@ function printTemplateDefaultsFromPackage(config) {
     sales_order_print_template_enabled: false,
     templates,
     guardrail:
-      "Customer package print defaults provide customer-specific buyer party display defaults through the reviewed customer_config effective session projection; supplier snapshots still come from business records.",
+      "Customer package print defaults provide customer-specific buyer party display defaults through the reviewed customer_config effective session projection; supplier snapshots still come from source documents.",
   };
 }
 

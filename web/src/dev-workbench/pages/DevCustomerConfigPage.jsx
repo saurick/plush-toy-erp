@@ -34,6 +34,7 @@ import {
   resolveCustomerConfigApplyTransitionAction,
 } from '@/erp/api/customerConfigTransition.mjs'
 import {
+  DEFAULT_DEV_CUSTOMER_CONFIG_PAGE_KEY,
   DEV_CUSTOMER_CONFIG_QUERY_KEY,
   DEV_CUSTOMER_CONFIG_RELEASE_BATCH_QUERY_KEY,
   DEV_CUSTOMER_CONFIG_SOURCE_PATH,
@@ -2058,6 +2059,14 @@ export default function DevCustomerConfigPage() {
   useEffect(() => {
     const nextParams = new URLSearchParams(searchParamsKey)
     let changed = false
+
+    if (!String(nextParams.get(DEV_CUSTOMER_CONFIG_QUERY_KEY) || '').trim()) {
+      nextParams.set(
+        DEV_CUSTOMER_CONFIG_QUERY_KEY,
+        DEFAULT_DEV_CUSTOMER_CONFIG_PAGE_KEY
+      )
+      changed = true
+    }
 
     if (
       (activeView !== VIEW_PREFLIGHT ||

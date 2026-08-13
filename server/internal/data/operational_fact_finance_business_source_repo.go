@@ -2,6 +2,8 @@ package data
 
 import (
 	"context"
+	"sort"
+	"time"
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
@@ -9,6 +11,8 @@ import (
 	"server/internal/data/model/ent/outsourcingfact"
 	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/outsourcingorderitem"
+	"server/internal/data/model/ent/purchaseorder"
+	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/purchasereceiptadjustment"
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
@@ -47,12 +51,12 @@ func (r *operationalFactRepo) CreatePayableFromPurchaseReceipt(
 	if receipt.Status != biz.PurchaseReceiptStatusPosted || receipt.SupplierID == nil || *receipt.SupplierID <= 0 {
 		return nil, biz.ErrBadParam
 	}
-	activeSupplier, err := tx.client.Supplier.Query().Where(supplier.ID(*receipt.SupplierID), supplier.IsActive(true)).Exist(ctx)
+	sourceSnapshot, err := lockAndReadPurchaseReceiptPayableSource(ctx, tx, receipt)
 	if err != nil {
 		return nil, err
 	}
-	if !activeSupplier {
-		return nil, biz.ErrSupplierInactive
+	if _, err := lockAndReadFinanceSupplier(ctx, tx, *receipt.SupplierID); err != nil {
+		return nil, err
 	}
 	amount, err := purchaseReceiptPayableAmount(ctx, tx.client, receipt.ID)
 	if err != nil {
@@ -61,6 +65,15 @@ func (r *operationalFactRepo) CreatePayableFromPurchaseReceipt(
 	sourceType := biz.PurchaseReceiptSourceType
 	sourceID := receipt.ID
 	supplierID := *receipt.SupplierID
+	paymentTerm, paymentTermDays, err := biz.FinancePaymentTermSnapshotFromDays(sourceSnapshot.paymentTermDays)
+	if err != nil {
+		return nil, err
+	}
+	occurredAt := receipt.ReceivedAt.UTC().Truncate(time.Microsecond)
+	dueAt, err := biz.FinanceFactDueAtFromDays(occurredAt, paymentTermDays)
+	if err != nil {
+		return nil, err
+	}
 	create := &biz.FinanceFactCreate{
 		FactNo:              in.FactNo,
 		FactType:            biz.FinanceFactPayable,
@@ -68,12 +81,15 @@ func (r *operationalFactRepo) CreatePayableFromPurchaseReceipt(
 		CounterpartyID:      &supplierID,
 		Amount:              amount,
 		FeeAmount:           decimal.Zero,
-		Currency:            biz.FinanceCurrencyCNY,
+		Currency:            sourceSnapshot.currency,
+		PaymentTerm:         paymentTerm,
+		PaymentTermDays:     paymentTermDays,
+		DueAt:               dueAt,
 		SourceType:          &sourceType,
 		SourceID:            &sourceID,
 		IdempotencyKey:      in.IdempotencyKey,
-		OccurredAt:          in.OccurredAt,
-		OccurredAtSpecified: in.OccurredAtSpecified,
+		OccurredAt:          occurredAt,
+		OccurredAtSpecified: true,
 		Note:                in.Note,
 	}
 	return r.insertDerivedFinanceFactAndCommit(ctx, tx, create)
@@ -135,12 +151,12 @@ func (r *operationalFactRepo) CreatePayableFromOutsourcingReturn(
 	if err := requireAcceptedOutsourcingReturnQuality(ctx, tx.client, fact.ID); err != nil {
 		return nil, err
 	}
-	activeSupplier, err := tx.client.Supplier.Query().Where(supplier.ID(order.SupplierID), supplier.IsActive(true)).Exist(ctx)
-	if err != nil {
+	if _, err := lockAndReadFinanceSupplier(ctx, tx, order.SupplierID); err != nil {
 		return nil, err
 	}
-	if !activeSupplier {
-		return nil, biz.ErrSupplierInactive
+	currency, paymentTermDays, err := financePayableOrderSnapshot(order.Currency, order.PaymentTermDays)
+	if err != nil {
+		return nil, err
 	}
 	amount, err := outsourcingReturnPayableAmount(item, fact.Quantity)
 	if err != nil {
@@ -149,6 +165,15 @@ func (r *operationalFactRepo) CreatePayableFromOutsourcingReturn(
 	sourceType := biz.OutsourcingFactSourceType
 	sourceID := fact.ID
 	supplierID := order.SupplierID
+	paymentTerm, paymentTermDays, err := biz.FinancePaymentTermSnapshotFromDays(paymentTermDays)
+	if err != nil {
+		return nil, err
+	}
+	occurredAt := fact.OccurredAt.UTC().Truncate(time.Microsecond)
+	dueAt, err := biz.FinanceFactDueAtFromDays(occurredAt, paymentTermDays)
+	if err != nil {
+		return nil, err
+	}
 	create := &biz.FinanceFactCreate{
 		FactNo:              in.FactNo,
 		FactType:            biz.FinanceFactPayable,
@@ -156,15 +181,145 @@ func (r *operationalFactRepo) CreatePayableFromOutsourcingReturn(
 		CounterpartyID:      &supplierID,
 		Amount:              amount,
 		FeeAmount:           decimal.Zero,
-		Currency:            biz.FinanceCurrencyCNY,
+		Currency:            currency,
+		PaymentTerm:         paymentTerm,
+		PaymentTermDays:     paymentTermDays,
+		DueAt:               dueAt,
 		SourceType:          &sourceType,
 		SourceID:            &sourceID,
 		IdempotencyKey:      in.IdempotencyKey,
-		OccurredAt:          in.OccurredAt,
-		OccurredAtSpecified: in.OccurredAtSpecified,
+		OccurredAt:          occurredAt,
+		OccurredAtSpecified: true,
 		Note:                in.Note,
 	}
 	return r.insertDerivedFinanceFactAndCommit(ctx, tx, create)
+}
+
+func lockAndReadFinanceSupplier(ctx context.Context, tx *inventoryDBTx, supplierID int) (*ent.Supplier, error) {
+	if tx == nil || tx.client == nil || supplierID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	if err := lockOperationalFactRow(ctx, tx, "suppliers", supplierID, biz.ErrSupplierNotFound); err != nil {
+		return nil, err
+	}
+	row, err := tx.client.Supplier.Query().Where(supplier.ID(supplierID)).Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrSupplierNotFound
+		}
+		return nil, err
+	}
+	if !row.IsActive {
+		return nil, biz.ErrSupplierInactive
+	}
+	return row, nil
+}
+
+type financePayableSourceSnapshot struct {
+	currency        string
+	paymentTermDays *int
+}
+
+func lockAndReadPurchaseReceiptPayableSource(
+	ctx context.Context,
+	tx *inventoryDBTx,
+	receipt *ent.PurchaseReceipt,
+) (*financePayableSourceSnapshot, error) {
+	if tx == nil || tx.client == nil || receipt == nil || receipt.ID <= 0 || receipt.SupplierID == nil || *receipt.SupplierID <= 0 {
+		return nil, biz.ErrFinanceFactSourceInvalid
+	}
+	receiptItems, err := tx.client.PurchaseReceiptItem.Query().
+		Where(purchasereceiptitem.ReceiptID(receipt.ID)).
+		Order(ent.Asc(purchasereceiptitem.FieldID)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(receiptItems) == 0 {
+		return nil, biz.ErrFinanceFactSourceInvalid
+	}
+	itemIDs := make([]int, 0, len(receiptItems))
+	receiptItemsBySourceID := make(map[int][]*ent.PurchaseReceiptItem, len(receiptItems))
+	for _, receiptItem := range receiptItems {
+		if receiptItem.PurchaseOrderItemID == nil || *receiptItem.PurchaseOrderItemID <= 0 {
+			return nil, biz.ErrFinanceFactSourceInvalid
+		}
+		itemID := *receiptItem.PurchaseOrderItemID
+		if _, exists := receiptItemsBySourceID[itemID]; !exists {
+			itemIDs = append(itemIDs, itemID)
+		}
+		receiptItemsBySourceID[itemID] = append(receiptItemsBySourceID[itemID], receiptItem)
+	}
+	sort.Ints(itemIDs)
+
+	orderIDs := make([]int, 0, len(itemIDs))
+	orderIDSet := make(map[int]struct{}, len(itemIDs))
+	for _, itemID := range itemIDs {
+		if err := lockOperationalFactRow(ctx, tx, "purchase_order_items", itemID, biz.ErrFinanceFactSourceInvalid); err != nil {
+			return nil, err
+		}
+		orderItem, err := tx.client.PurchaseOrderItem.Query().Where(purchaseorderitem.ID(itemID)).Only(ctx)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return nil, biz.ErrFinanceFactSourceInvalid
+			}
+			return nil, err
+		}
+		if orderItem.PurchaseOrderID <= 0 {
+			return nil, biz.ErrFinanceFactSourceInvalid
+		}
+		for _, receiptItem := range receiptItemsBySourceID[itemID] {
+			if receiptItem.MaterialID != orderItem.MaterialID || receiptItem.UnitID != orderItem.UnitID {
+				return nil, biz.ErrFinanceFactSourceInvalid
+			}
+		}
+		if _, exists := orderIDSet[orderItem.PurchaseOrderID]; !exists {
+			orderIDSet[orderItem.PurchaseOrderID] = struct{}{}
+			orderIDs = append(orderIDs, orderItem.PurchaseOrderID)
+		}
+	}
+	sort.Ints(orderIDs)
+
+	var snapshot *financePayableSourceSnapshot
+	for _, orderID := range orderIDs {
+		if err := lockOperationalFactRow(ctx, tx, "purchase_orders", orderID, biz.ErrFinanceFactSourceInvalid); err != nil {
+			return nil, err
+		}
+		order, err := tx.client.PurchaseOrder.Query().Where(purchaseorder.ID(orderID)).Only(ctx)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return nil, biz.ErrFinanceFactSourceInvalid
+			}
+			return nil, err
+		}
+		if order.SupplierID != *receipt.SupplierID {
+			return nil, biz.ErrFinanceFactSourceInvalid
+		}
+		currency, paymentTermDays, err := financePayableOrderSnapshot(order.Currency, order.PaymentTermDays)
+		if err != nil {
+			return nil, err
+		}
+		if snapshot == nil {
+			snapshot = &financePayableSourceSnapshot{currency: currency, paymentTermDays: paymentTermDays}
+			continue
+		}
+		if snapshot.currency != currency || !sameOptionalInt(snapshot.paymentTermDays, paymentTermDays) {
+			return nil, biz.ErrFinanceFactSourceInvalid
+		}
+	}
+	if snapshot == nil {
+		return nil, biz.ErrFinanceFactSourceInvalid
+	}
+	return snapshot, nil
+}
+
+func financePayableOrderSnapshot(currency string, paymentTermDays *int) (string, *int, error) {
+	normalizedCurrency, currencyOK := biz.NormalizeFinanceCurrency(currency)
+	if !currencyOK || normalizedCurrency != currency || paymentTermDays == nil || *paymentTermDays < 0 {
+		return "", nil, biz.ErrFinanceFactSourceInvalid
+	}
+	days := *paymentTermDays
+	return normalizedCurrency, &days, nil
 }
 
 func requireAcceptedOutsourcingReturnQuality(ctx context.Context, client *ent.Client, outsourcingFactID int) error {
@@ -282,6 +437,9 @@ func (r *operationalFactRepo) insertDerivedFinanceFactAndCommit(
 		SetAmount(in.Amount).
 		SetFeeAmount(in.FeeAmount).
 		SetCurrency(in.Currency).
+		SetNillablePaymentTerm(in.PaymentTerm).
+		SetNillablePaymentTermDays(in.PaymentTermDays).
+		SetNillableDueAt(in.DueAt).
 		SetNillableSourceType(in.SourceType).
 		SetNillableSourceID(in.SourceID).
 		SetIdempotencyKey(in.IdempotencyKey).
@@ -345,9 +503,9 @@ func purchaseReceiptPayableAmount(ctx context.Context, client *ent.Client, recei
 		if item.PurchaseReceiptItemID == nil || itemByID[*item.PurchaseReceiptItemID] == nil {
 			return decimal.Zero, biz.ErrFinanceFactSourceAmountInvalid
 		}
-		amount := unitPriceByID[*item.PurchaseReceiptItemID].Mul(item.Quantity)
-		if item.Amount != nil {
-			amount = *item.Amount
+		amount := unitPriceByID[*item.PurchaseReceiptItemID].Mul(item.Quantity).Round(6)
+		if item.Amount != nil && !item.Amount.Equal(amount) {
+			return decimal.Zero, biz.ErrFinanceFactSourceAmountInvalid
 		}
 		total = total.Sub(amount)
 	}
@@ -365,7 +523,7 @@ func purchaseReceiptPayableAmount(ctx context.Context, client *ent.Client, recei
 		if !ok {
 			return decimal.Zero, biz.ErrFinanceFactSourceAmountInvalid
 		}
-		delta := price.Mul(item.Quantity)
+		delta := price.Mul(item.Quantity).Round(6)
 		switch item.AdjustType {
 		case biz.PurchaseReceiptAdjustmentQuantityIncrease:
 			total = total.Add(delta)
@@ -390,9 +548,9 @@ func purchaseReceiptItemMoney(item *ent.PurchaseReceiptItem) (decimal.Decimal, d
 		return decimal.Zero, decimal.Zero, biz.ErrFinanceFactSourceAmountInvalid
 	}
 	if item.UnitPrice != nil {
-		amount := item.Quantity.Mul(*item.UnitPrice)
-		if item.Amount != nil {
-			amount = *item.Amount
+		amount := item.Quantity.Mul(*item.UnitPrice).Round(6)
+		if item.Amount != nil && !item.Amount.Equal(amount) {
+			return decimal.Zero, decimal.Zero, biz.ErrFinanceFactSourceAmountInvalid
 		}
 		return amount, *item.UnitPrice, nil
 	}

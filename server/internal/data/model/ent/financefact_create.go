@@ -158,6 +158,20 @@ func (_c *FinanceFactCreate) SetNillablePaymentTermDays(v *int) *FinanceFactCrea
 	return _c
 }
 
+// SetDueAt sets the "due_at" field.
+func (_c *FinanceFactCreate) SetDueAt(v time.Time) *FinanceFactCreate {
+	_c.mutation.SetDueAt(v)
+	return _c
+}
+
+// SetNillableDueAt sets the "due_at" field if the given value is not nil.
+func (_c *FinanceFactCreate) SetNillableDueAt(v *time.Time) *FinanceFactCreate {
+	if v != nil {
+		_c.SetDueAt(*v)
+	}
+	return _c
+}
+
 // SetInvoiceCategory sets the "invoice_category" field.
 func (_c *FinanceFactCreate) SetInvoiceCategory(v string) *FinanceFactCreate {
 	_c.mutation.SetInvoiceCategory(v)
@@ -740,6 +754,10 @@ func (_c *FinanceFactCreate) createSpec() (*FinanceFact, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.PaymentTermDays(); ok {
 		_spec.SetField(financefact.FieldPaymentTermDays, field.TypeInt, value)
 		_node.PaymentTermDays = &value
+	}
+	if value, ok := _c.mutation.DueAt(); ok {
+		_spec.SetField(financefact.FieldDueAt, field.TypeTime, value)
+		_node.DueAt = &value
 	}
 	if value, ok := _c.mutation.InvoiceCategory(); ok {
 		_spec.SetField(financefact.FieldInvoiceCategory, field.TypeString, value)

@@ -19,7 +19,7 @@ import (
 func TestWorkflowRoleTaskViewCountsConservationContract(t *testing.T) {
 	valid := biz.WorkflowRoleTaskViewCounts{
 		Ready: 2, Blocked: 1, Todo: 3,
-		Done: 4, Rejected: 1, History: 5, Total: 8,
+		Done: 4, Rejected: 1, Withdrawn: 2, History: 7, Total: 10,
 		Approval: 6, Risk: 9, Overdue: 3,
 	}
 	if !valid.IsConserved() {
@@ -241,7 +241,7 @@ func TestWorkflowRoleTaskViewCountsConserveForAllNineMobileRoles(t *testing.T) {
 		biz.PMCRoleKey,
 		biz.EngineeringRoleKey,
 	}
-	statuses := []string{"ready", "blocked", "done", "rejected"}
+	statuses := []string{"ready", "blocked", "done", "rejected", "withdrawn"}
 	for roleIndex, roleKey := range roleKeys {
 		for statusIndex, status := range statuses {
 			if _, err := client.WorkflowTask.Create().
@@ -260,7 +260,7 @@ func TestWorkflowRoleTaskViewCountsConserveForAllNineMobileRoles(t *testing.T) {
 	}
 	want := biz.WorkflowRoleTaskViewCounts{
 		Ready: 1, Blocked: 1, Todo: 2,
-		Done: 1, Rejected: 1, History: 2, Total: 4,
+		Done: 1, Rejected: 1, Withdrawn: 1, History: 3, Total: 5,
 		Risk: 1,
 	}
 	for _, roleKey := range roleKeys {

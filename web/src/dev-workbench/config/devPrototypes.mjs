@@ -133,6 +133,19 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
       '用于逐菜单核对页面内容覆盖，并映射到现有列表页、详情页、表单页、动作浮层、工作台、报表、导入和移动任务样板；不是正式菜单承诺。',
   },
   {
+    key: 'current-page-atlas-v3',
+    title: '当前页面地图与交互样板 v3',
+    type: 'HTML',
+    statuses: [DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT],
+    directory: 'current-page-atlas-v3/',
+    assetPath: 'current-page-atlas-v3/index.html',
+    readmePath: 'current-page-atlas-v3/README.md',
+    description:
+      '按当前路由、菜单和 24 个业务模块登记 56 个可见页面或路由模式，并用一个中性销售订单样板验证列表、详情、当前记录任务、权限、恢复和键盘交互。',
+    appliesTo:
+      '用于全页面盘点和共享交互评审；页面地图不冒充 56 套完整业务原型，不改变正式菜单、RBAC、Workflow / Fact 或客户配置。',
+  },
+  {
     key: 'task-command-center',
     title: '任务中心样板',
     type: 'HTML',
@@ -197,7 +210,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     description:
       '把业务管理菜单收敛为业务对象总控：按链路选择对象、查看风险、进入标准业务页或详情页。',
     appliesTo:
-      '业务管理类总入口、业务看板下钻、正式入口壳和同类业务对象选择可参照；不恢复 business_records，不承诺未接 API 已完成。',
+      '业务管理类总入口、业务看板下钻、正式入口壳和同类业务对象选择可参照；未接 API 仍保持待实现状态。',
   },
   {
     key: 'business-management-center-redesign-reference',
@@ -263,7 +276,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     description:
       '保留标题摘要、少量筛选、表格和当前记录操作条；协同入口不作为所有标准页的默认固定栏。',
     appliesTo:
-      '客户档案、供应商档案、产品、销售订单、采购订单、加工合同 / 委外下单、入库通知 / 检验 / 入库、库存、待出货 / 出货放行、出库、生产排单、生产进度、延期 / 返工 / 异常、品质检验、对账 / 结算、待付款 / 应付提醒、应收 / 开票登记和发票登记等同类列表页可参照列表骨架；不默认挂载协同入口。',
+      '客户档案、供应商与加工厂、产品、销售订单、采购订单、加工合同 / 委外下单、入库通知 / 检验 / 入库、库存、待出货 / 出货放行、出库、生产排单、生产进度、延期 / 返工 / 异常、品质检验、对账 / 结算、待付款 / 应付提醒、应收 / 开票登记和发票登记等同类列表页可参照列表骨架；不默认挂载协同入口。',
   },
   {
     key: 'print-template-center',

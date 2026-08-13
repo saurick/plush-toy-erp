@@ -86,7 +86,7 @@ func main() {
 	}
 
 	fmt.Printf("trial simulated masterdata seed completed prefix=%s unit_id=%d product_id=%d\n", simulationPrefix, unitID, productID)
-	fmt.Println("simulated_only=true real_customer_import=false no_business_records=true no_shipment_inventory_finance_facts=true")
+	fmt.Println("simulated_only=true real_customer_import=false no_shipment_inventory_finance_facts=true")
 }
 
 func upsertUnit(ctx context.Context, db *sql.DB, code, name string) (int, error) {

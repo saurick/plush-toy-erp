@@ -70,11 +70,57 @@ func TestOperationalFactUsecaseCreateProductionCompletionRejectsInvalidSource(t 
 	}
 }
 
+func TestOperationalFactUsecaseProductionTransitionPolicyUsesRepositoryTruth(t *testing.T) {
+	repo := &productionCompletionRepoStub{transitionPolicy: &ProductionFactTransitionPolicy{
+		FactType:           ProductionFactFinishedGoodsReceipt,
+		Status:             OperationalFactStatusPosted,
+		WasPosted:          true,
+		RequiresSourceTask: false,
+	}}
+	policy, err := NewOperationalFactUsecase(repo).GetProductionFactTransitionPolicy(context.Background(), 41)
+	if err != nil {
+		t.Fatalf("GetProductionFactTransitionPolicy error = %v", err)
+	}
+	if policy == nil || policy.FactType != ProductionFactFinishedGoodsReceipt || policy.Status != OperationalFactStatusPosted || !policy.WasPosted || policy.RequiresSourceTask {
+		t.Fatalf("transition policy = %#v", policy)
+	}
+	policy.Status = OperationalFactStatusCancelled
+	if repo.transitionPolicy.Status != OperationalFactStatusPosted || repo.transitionPolicyID != 41 {
+		t.Fatalf("repository transition policy was not treated as immutable: policy=%#v id=%d", repo.transitionPolicy, repo.transitionPolicyID)
+	}
+}
+
+func TestOperationalFactUsecaseProductionTransitionPolicyFailsClosed(t *testing.T) {
+	tests := []struct {
+		name   string
+		policy *ProductionFactTransitionPolicy
+	}{
+		{name: "missing policy"},
+		{name: "unknown fact type", policy: &ProductionFactTransitionPolicy{FactType: "UNKNOWN", Status: OperationalFactStatusDraft}},
+		{name: "unknown status", policy: &ProductionFactTransitionPolicy{FactType: ProductionFactFinishedGoodsReceipt, Status: "UNKNOWN"}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			repo := &productionCompletionRepoStub{transitionPolicy: test.policy}
+			if _, err := NewOperationalFactUsecase(repo).GetProductionFactTransitionPolicy(context.Background(), 41); !errors.Is(err, ErrBadParam) {
+				t.Fatalf("GetProductionFactTransitionPolicy error = %v", err)
+			}
+		})
+	}
+}
+
 type productionCompletionRepoStub struct {
-	source       *ProductionOrderItem
-	sourceErr    error
-	resolveCalls int
-	created      *OperationalFactMutation
+	source             *ProductionOrderItem
+	sourceErr          error
+	resolveCalls       int
+	created            *OperationalFactMutation
+	transitionPolicy   *ProductionFactTransitionPolicy
+	transitionPolicyID int
+}
+
+func (r *productionCompletionRepoStub) GetProductionFactTransitionPolicy(_ context.Context, id int) (*ProductionFactTransitionPolicy, error) {
+	r.transitionPolicyID = id
+	return r.transitionPolicy, nil
 }
 
 func (r *productionCompletionRepoStub) ResolveProductionCompletionSource(_ context.Context, productionOrderID, productionOrderItemID int) (*ProductionOrderItem, error) {

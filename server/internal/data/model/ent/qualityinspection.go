@@ -86,6 +86,8 @@ type QualityInspection struct {
 
 // QualityInspectionEdges holds the relations/edges for other nodes in the graph.
 type QualityInspectionEdges struct {
+	// InventoryLotStatusEvents holds the value of the inventory_lot_status_events edge.
+	InventoryLotStatusEvents []*InventoryLotStatusEvent `json:"inventory_lot_status_events,omitempty"`
 	// PurchaseReceipt holds the value of the purchase_receipt edge.
 	PurchaseReceipt *PurchaseReceipt `json:"purchase_receipt,omitempty"`
 	// PurchaseReceiptItem holds the value of the purchase_receipt_item edge.
@@ -102,7 +104,16 @@ type QualityInspectionEdges struct {
 	PurchaseReturns []*PurchaseReturn `json:"purchase_returns,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [7]bool
+	loadedTypes [8]bool
+}
+
+// InventoryLotStatusEventsOrErr returns the InventoryLotStatusEvents value or an error if the edge
+// was not loaded in eager-loading.
+func (e QualityInspectionEdges) InventoryLotStatusEventsOrErr() ([]*InventoryLotStatusEvent, error) {
+	if e.loadedTypes[0] {
+		return e.InventoryLotStatusEvents, nil
+	}
+	return nil, &NotLoadedError{edge: "inventory_lot_status_events"}
 }
 
 // PurchaseReceiptOrErr returns the PurchaseReceipt value or an error if the edge
@@ -110,7 +121,7 @@ type QualityInspectionEdges struct {
 func (e QualityInspectionEdges) PurchaseReceiptOrErr() (*PurchaseReceipt, error) {
 	if e.PurchaseReceipt != nil {
 		return e.PurchaseReceipt, nil
-	} else if e.loadedTypes[0] {
+	} else if e.loadedTypes[1] {
 		return nil, &NotFoundError{label: purchasereceipt.Label}
 	}
 	return nil, &NotLoadedError{edge: "purchase_receipt"}
@@ -121,7 +132,7 @@ func (e QualityInspectionEdges) PurchaseReceiptOrErr() (*PurchaseReceipt, error)
 func (e QualityInspectionEdges) PurchaseReceiptItemOrErr() (*PurchaseReceiptItem, error) {
 	if e.PurchaseReceiptItem != nil {
 		return e.PurchaseReceiptItem, nil
-	} else if e.loadedTypes[1] {
+	} else if e.loadedTypes[2] {
 		return nil, &NotFoundError{label: purchasereceiptitem.Label}
 	}
 	return nil, &NotLoadedError{edge: "purchase_receipt_item"}
@@ -132,7 +143,7 @@ func (e QualityInspectionEdges) PurchaseReceiptItemOrErr() (*PurchaseReceiptItem
 func (e QualityInspectionEdges) InventoryLotOrErr() (*InventoryLot, error) {
 	if e.InventoryLot != nil {
 		return e.InventoryLot, nil
-	} else if e.loadedTypes[2] {
+	} else if e.loadedTypes[3] {
 		return nil, &NotFoundError{label: inventorylot.Label}
 	}
 	return nil, &NotLoadedError{edge: "inventory_lot"}
@@ -143,7 +154,7 @@ func (e QualityInspectionEdges) InventoryLotOrErr() (*InventoryLot, error) {
 func (e QualityInspectionEdges) ProductionWipBatchOrErr() (*ProductionWIPBatch, error) {
 	if e.ProductionWipBatch != nil {
 		return e.ProductionWipBatch, nil
-	} else if e.loadedTypes[3] {
+	} else if e.loadedTypes[4] {
 		return nil, &NotFoundError{label: productionwipbatch.Label}
 	}
 	return nil, &NotLoadedError{edge: "production_wip_batch"}
@@ -154,7 +165,7 @@ func (e QualityInspectionEdges) ProductionWipBatchOrErr() (*ProductionWIPBatch, 
 func (e QualityInspectionEdges) MaterialOrErr() (*Material, error) {
 	if e.Material != nil {
 		return e.Material, nil
-	} else if e.loadedTypes[4] {
+	} else if e.loadedTypes[5] {
 		return nil, &NotFoundError{label: material.Label}
 	}
 	return nil, &NotLoadedError{edge: "material"}
@@ -165,7 +176,7 @@ func (e QualityInspectionEdges) MaterialOrErr() (*Material, error) {
 func (e QualityInspectionEdges) WarehouseOrErr() (*Warehouse, error) {
 	if e.Warehouse != nil {
 		return e.Warehouse, nil
-	} else if e.loadedTypes[5] {
+	} else if e.loadedTypes[6] {
 		return nil, &NotFoundError{label: warehouse.Label}
 	}
 	return nil, &NotLoadedError{edge: "warehouse"}
@@ -174,7 +185,7 @@ func (e QualityInspectionEdges) WarehouseOrErr() (*Warehouse, error) {
 // PurchaseReturnsOrErr returns the PurchaseReturns value or an error if the edge
 // was not loaded in eager-loading.
 func (e QualityInspectionEdges) PurchaseReturnsOrErr() ([]*PurchaseReturn, error) {
-	if e.loadedTypes[6] {
+	if e.loadedTypes[7] {
 		return e.PurchaseReturns, nil
 	}
 	return nil, &NotLoadedError{edge: "purchase_returns"}
@@ -409,6 +420,11 @@ func (_m *QualityInspection) assignValues(columns []string, values []any) error 
 // This includes values selected through modifiers, order, etc.
 func (_m *QualityInspection) Value(name string) (ent.Value, error) {
 	return _m.selectValues.Get(name)
+}
+
+// QueryInventoryLotStatusEvents queries the "inventory_lot_status_events" edge of the QualityInspection entity.
+func (_m *QualityInspection) QueryInventoryLotStatusEvents() *InventoryLotStatusEventQuery {
+	return NewQualityInspectionClient(_m.config).QueryInventoryLotStatusEvents(_m)
 }
 
 // QueryPurchaseReceipt queries the "purchase_receipt" edge of the QualityInspection entity.

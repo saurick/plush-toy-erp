@@ -24,12 +24,15 @@ test('finance pages project only fields that belong to their fact type', () => {
     'currency',
     'collection_type',
     'payment_term',
+    'due_at',
   ])
   assert.deepEqual(financeColumnKeys('PAYABLE'), [
     'counterparty',
     'amount',
     'fee_amount',
     'currency',
+    'payment_term',
+    'due_at',
   ])
   assert.deepEqual(financeColumnKeys('INVOICE'), [
     'counterparty',
@@ -46,6 +49,10 @@ test('finance pages project only fields that belong to their fact type', () => {
   assert.match(source, /RECEIVABLE: '客户'/u)
   assert.match(source, /PAYABLE: '供应商'/u)
   assert.match(source, /INVOICE: '客户'/u)
+  assert.match(
+    source,
+    /due_at:\s*\{[\s\S]*?title: '到期日期'[\s\S]*?render: formatUnixDate[\s\S]*?formatUnixDate\(record\?\.due_at\)/u
+  )
   assert.doesNotMatch(
     source,
     /dataIndex:\s*'(?:source_type|source_id|source_line_id|idempotency_key)'/u

@@ -645,6 +645,7 @@ unit_net_weight_g IS NULL OR unit_net_weight_g > 0
 | <code>supplier_type</code> | <code>varchar(32)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>address</code> | <code>varchar(512)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>tax_no</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | 敏感 | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
+| <code>default_payment_term_days</code> | <code>bigint</code> | <code>int</code> | 非空 | <code>0</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>is_active</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>true</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>note</code> | <code>varchar(255)</code> | <code>string</code> | 可空 | — | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
 | <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |

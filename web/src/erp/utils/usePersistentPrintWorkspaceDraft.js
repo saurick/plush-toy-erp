@@ -39,15 +39,23 @@ export function usePersistentPrintWorkspaceDraft(
   draftStorageKey
 ) {
   const [draft, setDraftState] = useState(initialDraft)
+  const [persistenceStatus, setPersistenceStatus] = useState(
+    draftStorageKey ? 'saving' : 'unavailable'
+  )
   const draftRef = useRef(draft)
 
   const persistDraft = useCallback(
     (nextDraft = draftRef.current) => {
       if (!draftStorageKey || typeof window === 'undefined') {
+        setPersistenceStatus('unavailable')
         return false
       }
-      persistPrintWorkspaceDraftSnapshot(draftStorageKey, nextDraft)
-      return true
+      const saved = persistPrintWorkspaceDraftSnapshot(
+        draftStorageKey,
+        nextDraft
+      )
+      setPersistenceStatus(saved ? 'saved' : 'error')
+      return saved
     },
     [draftStorageKey]
   )
@@ -56,25 +64,24 @@ export function usePersistentPrintWorkspaceDraft(
     (nextDraft) => {
       const resolvedDraft = resolveNextDraft(nextDraft, draftRef.current)
       draftRef.current = resolvedDraft
-      persistDraft(resolvedDraft)
+      const persisted = persistDraft(resolvedDraft)
       if (silentDraftUpdateDepth > 0) {
-        return resolvedDraft
+        return persisted
       }
       setDraftState(resolvedDraft)
-      return resolvedDraft
+      return persisted
     },
     [persistDraft]
   )
 
-  useEffect(() => {
-    persistDraft(draftRef.current)
-  }, [draft, persistDraft])
-
   const flushDraft = useCallback(() => {
-    persistDraft(draftRef.current)
+    setDraftState((currentDraft) =>
+      currentDraft === draftRef.current ? currentDraft : draftRef.current
+    )
+    return persistDraft(draftRef.current)
   }, [persistDraft])
 
-  return [draft, setDraft, flushDraft, draftRef]
+  return [draft, setDraft, flushDraft, draftRef, persistenceStatus]
 }
 
 export function useFlushPrintWorkspaceDraftOnPageExit(flushDraft) {

@@ -8,6 +8,8 @@ import test from "node:test";
 import {
   evaluateDatabaseProgrammabilityPolicy,
   evaluateDbGuard,
+  evaluateDbGuardWithMigrationRisk,
+  evaluateMigrationRiskPolicy,
 } from "./db-guard.mjs";
 
 function git(root, args) {
@@ -210,6 +212,157 @@ test("db guard rejects editing an old migration as schema proof", async () => {
   });
 });
 
+test("index transition allows editing a local unpublished migration", async () => {
+  await withRepository(async (root) => {
+    const migration =
+      "server/internal/data/model/migrate/20260102000000_migrate.sql";
+    await write(root, migration, "ALTER TABLE items ADD COLUMN name text;\n");
+    await write(root, "server/internal/data/model/migrate/atlas.sum", "h1:local\n");
+    commitAll(root, "local unpublished migration");
+
+    await write(
+      root,
+      migration,
+      "ALTER TABLE items ADD COLUMN name text;\n-- local correction\n",
+    );
+    await write(root, "server/internal/data/model/migrate/atlas.sum", "h1:corrected\n");
+
+    const result = evaluateDbGuard({
+      root,
+      range: "HEAD^...HEAD",
+      indexTransition: true,
+    });
+    assert.equal(result.ok, true, JSON.stringify(result, null, 2));
+    assert.deepEqual(result.newMigrations, [migration]);
+  });
+});
+
+test("index transition still rejects editing a published migration", async () => {
+  await withRepository(async (root) => {
+    await write(
+      root,
+      "server/internal/data/model/migrate/20260101000000_migrate.sql",
+      "-- forbidden correction\nCREATE TABLE items (id bigint);\n",
+    );
+
+    const result = evaluateDbGuard({
+      root,
+      range: "HEAD...HEAD",
+      indexTransition: true,
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, "base-migration-modified");
+  });
+});
+
+test("index transition audits only risky migrations changed now", async () => {
+  await withRepository(async (root) => {
+    const migration =
+      "server/internal/data/model/migrate/20260102000000_drop_items.sql";
+    await write(root, migration, "DROP TABLE items;\n");
+    await write(root, "server/internal/data/model/migrate/atlas.sum", "h1:local\n");
+    commitAll(root, "local risky migration");
+
+    let result = evaluateDbGuardWithMigrationRisk({
+      root,
+      range: "HEAD^...HEAD",
+      indexTransition: true,
+    });
+    assert.equal(result.ok, true, JSON.stringify(result, null, 2));
+    assert.equal(result.skipped, true);
+
+    await write(root, migration, "DROP TABLE items;\n-- local correction\n");
+    await write(root, "server/internal/data/model/migrate/atlas.sum", "h1:corrected\n");
+    result = evaluateDbGuardWithMigrationRisk({
+      root,
+      range: "HEAD^...HEAD",
+      indexTransition: true,
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, "migration-risk-metadata-missing");
+    assert.deepEqual(result.files, [migration]);
+  });
+});
+
+test("index transition does not require DDL when schema returns to publication truth", async () => {
+  await withRepository(async (root) => {
+    const publishedSchema = [
+      "package schema",
+      "func (Item) Annotations() []schema.Annotation {",
+      "  return []schema.Annotation{entsql.Annotation{Checks: map[string]string{",
+      '    "items_status_allowed": "status IN (\'active\')",',
+      "  }}}",
+      "}",
+      "",
+    ].join("\n");
+    await write(root, "server/internal/data/model/schema/item.go", publishedSchema);
+    commitAll(root, "published check");
+
+    await write(
+      root,
+      "server/internal/data/model/schema/item.go",
+      publishedSchema.replace("active", "inactive"),
+    );
+    commitAll(root, "local unpublished narrowing");
+    await write(root, "server/internal/data/model/schema/item.go", publishedSchema);
+
+    const result = evaluateDbGuard({
+      root,
+      range: "HEAD^...HEAD",
+      indexTransition: true,
+    });
+    assert.equal(result.ok, true, JSON.stringify(result, null, 2));
+    assert.deepEqual(result.newMigrations, []);
+  });
+});
+
+test("index transition still requires DDL for real schema changes beside a publication restore", async () => {
+  await withRepository(async (root) => {
+    const publishedSchema = [
+      "package schema",
+      "func (Item) Annotations() []schema.Annotation {",
+      "  return []schema.Annotation{entsql.Annotation{Checks: map[string]string{",
+      '    "items_status_allowed": "status IN (\'active\')",',
+      "  }}}",
+      "}",
+      "",
+    ].join("\n");
+    await write(root, "server/internal/data/model/schema/item.go", publishedSchema);
+    commitAll(root, "published check");
+
+    await write(
+      root,
+      "server/internal/data/model/schema/item.go",
+      publishedSchema.replace("active", "inactive"),
+    );
+    commitAll(root, "local unpublished narrowing");
+    await write(
+      root,
+      "server/internal/data/model/schema/item.go",
+      publishedSchema.replace(
+        "  }}}",
+        '    "items_quantity_nonnegative": "quantity >= 0",\n  }}}',
+      ),
+    );
+    await write(
+      root,
+      "server/internal/data/model/migrate/20260102000000_migrate.sql",
+      "ALTER TABLE items ADD COLUMN unrelated text;\n",
+    );
+    await write(root, "server/internal/data/model/migrate/atlas.sum", "h1:next\n");
+
+    const result = evaluateDbGuard({
+      root,
+      range: "HEAD^...HEAD",
+      indexTransition: true,
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, "schema-migration-proof-missing");
+    assert(result.proofs[0].missingTokens.includes("items_quantity_nonnegative"));
+    assert(!result.proofs[0].missingTokens.includes("items_status_allowed"));
+  });
+});
+
 test("db guard accepts a new migration only when atlas.sum also changes", async () => {
   await withRepository(async (root) => {
     await write(
@@ -230,6 +383,102 @@ test("db guard accepts a new migration only when atlas.sum also changes", async 
     await write(root, "server/internal/data/model/migrate/atlas.sum", "h1:next\n");
     result = evaluateDbGuard({ root, range: "HEAD...HEAD" });
     assert.equal(result.ok, true);
+  });
+});
+
+test("migration risk policy requires actionable metadata for destructive DDL", async () => {
+  await withRepository(async (root) => {
+    const migration =
+      "server/internal/data/model/migrate/20260102000000_drop_items.sql";
+    await write(root, migration, "DROP TABLE items;\n");
+
+    const result = evaluateMigrationRiskPolicy({ root, files: [migration] });
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, "migration-risk-metadata-missing");
+    assert.deepEqual(result.violations[0].reasons, ["drop-table"]);
+    assert(result.violations[0].missing.includes("preflight"));
+    assert(result.violations[0].missing.includes("recovery"));
+  });
+});
+
+test("migration risk policy accepts complete bounded metadata", async () => {
+  await withRepository(async (root) => {
+    const migration =
+      "server/internal/data/model/migrate/20260102000000_drop_items.sql";
+    const preflight = "scripts/qa/drop-items-preflight.sql";
+    await write(root, preflight, "SELECT count(*) FROM items;\n");
+    await write(
+      root,
+      migration,
+      [
+        "-- migration-risk: maintenance",
+        "-- affected-table: items",
+        "-- expected-lock: ACCESS EXCLUSIVE",
+        `-- preflight: ${preflight}`,
+        "-- recovery: restore-backup-or-forward-fix",
+        "-- maintenance-required: true",
+        "DROP TABLE items;",
+        "",
+      ].join("\n"),
+    );
+
+    assert.deepEqual(evaluateMigrationRiskPolicy({ root, files: [migration] }), {
+      ok: true,
+    });
+  });
+});
+
+test("migration risk policy rejects transaction-incompatible SQL even with metadata", async () => {
+  await withRepository(async (root) => {
+    const migration =
+      "server/internal/data/model/migrate/20260102000000_online.sql";
+    await write(
+      root,
+      migration,
+      "CREATE INDEX CONCURRENTLY idx_items_id ON items (id);\n",
+    );
+
+    const result = evaluateMigrationRiskPolicy({ root, files: [migration] });
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, "transaction-incompatible-migration");
+    assert.deepEqual(result.files, [migration]);
+  });
+});
+
+test("migration risk policy leaves bounded data-only migrations alone", async () => {
+  await withRepository(async (root) => {
+    const migration =
+      "server/internal/data/model/migrate/20260102000000_backfill.sql";
+    await write(
+      root,
+      migration,
+      "UPDATE roles SET version = version + 1 WHERE false;\n",
+    );
+
+    assert.deepEqual(evaluateMigrationRiskPolicy({ root, files: [migration] }), {
+      ok: true,
+    });
+  });
+});
+
+test("composed db guard blocks a structurally valid risky migration without metadata", async () => {
+  await withRepository(async (root) => {
+    await rm(path.join(root, "server/internal/data/model/schema/item.go"));
+    await write(
+      root,
+      "server/internal/data/model/migrate/20260102000000_drop_items.sql",
+      "DROP TABLE items;\n",
+    );
+    await write(root, "server/internal/data/model/migrate/atlas.sum", "h1:next\n");
+
+    const structural = evaluateDbGuard({ root, range: "HEAD...HEAD" });
+    assert.equal(structural.ok, true, JSON.stringify(structural, null, 2));
+    const composed = evaluateDbGuardWithMigrationRisk({
+      root,
+      range: "HEAD...HEAD",
+    });
+    assert.equal(composed.ok, false);
+    assert.equal(composed.reason, "migration-risk-metadata-missing");
   });
 });
 

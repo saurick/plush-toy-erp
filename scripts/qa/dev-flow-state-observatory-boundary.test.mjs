@@ -186,10 +186,11 @@ test("dev flow state observatory: long definition selects are grouped without ch
     stateOptions.flatMap((group) => group.options).length,
     catalog.flows.length,
   );
-  assert.match(page, /buildFactDefinitionSelectOptions\(catalog\)/u);
-  assert.match(page, /buildStateDefinitionSelectOptions\(catalog\)/u);
+  assert.match(page, /buildFactDefinitionSelectOptions\(scopedCatalog\)/u);
+  assert.match(page, /buildStateDefinitionSelectOptions\(scopedCatalog\)/u);
+  assert.match(page, /buildProcessDefinitionSelectOptions\(scopedCatalog\)/u);
   assert.match(page, /optionRender=\{renderDefinitionSelectOption\}/u);
-  assert.match(page, /options=\{catalog\.processDefinitions\.map/u);
+  assert.match(page, /options=\{definitionOptions\}/u);
   assert.match(styles, /erp-dev-flow-definition-select-popup/u);
   assert.match(styles, /erp-dev-flow-definition-option__key/u);
 });
@@ -293,8 +294,15 @@ test("dev flow state observatory: pasted business text search is local, grouped,
   assert.match(page, /focus\(\{ preventScroll: true \}\)/u);
   assert.match(
     page,
-    /onOpenTaskLookup=\{\(keyword\) => \{[\s\S]{0,260}?setTaskDraft\(nextDraft\)[\s\S]{0,220}?openView\('workflow'\)/u,
+    /onOpenTaskLookup=\{\(keyword\) => \{[\s\S]{0,260}?setTaskDraft\(nextDraft\)[\s\S]{0,220}?openGlobalDefinitionView\('workflow'\)/u,
   );
+  assert.match(
+    page,
+    /const openGlobalDefinitionView = \(nextView, patch = \{\}\) =>[\s\S]{0,180}?\[QUERY_KEYS\.chain\]: null,[\s\S]{0,80}?\[QUERY_KEYS\.node\]: null/u,
+  );
+  assert.match(page, /openGlobalDefinitionView\('runtime'/u);
+  assert.match(page, /openGlobalDefinitionView\('facts'/u);
+  assert.match(page, /openGlobalDefinitionView\('states'/u);
 });
 
 test("dev flow state observatory: deep links clear stale selections, fail closed for invalid values, and keep chain return context", () => {
@@ -328,15 +336,36 @@ test("dev flow state observatory: deep links clear stale selections, fail closed
   assert.match(page, /query 参数重复/u);
   assert.match(page, /未知或过期业务链/u);
   assert.match(page, /未知 Fact Key/u);
+  assert.match(page, /状态对象不属于所选业务链/u);
+  assert.match(page, /流程定义不属于所选业务链/u);
+  assert.match(page, /Fact 不属于所选业务链/u);
   assert.match(page, /task_id 必须是大于 0 的整数/u);
   assert.match(page, /无效或过期深链接，已按 fail closed 停止加载/u);
   assert.match(page, /业务总图不接受单链节点参数/u);
   assert.match(page, /视图不接受参数/u);
   assert.match(page, /SELECTION_QUERY_KEYS\.map\(\(key\) => \[key, null\]\)/u);
   assert.match(page, /chainReturnRef\.current/u);
+  assert.match(page, /buildDevBusinessChainProjection/u);
+  assert.match(page, /nodeKey: chainNode\?\.key \|\| ''/u);
+  assert.match(
+    page,
+    /const projectionNodeKey = requestedNodeKey && node \? node\.key : ''/u,
+  );
+  assert.match(page, /nodeKey: projectionNodeKey/u);
+  assert.match(page, /data-chain-projection-context/u);
+  assert.match(page, /查看全部定义/u);
+  assert.match(page, /未登记组合不生成数据/u);
   assert.match(page, /恢复到业务总图/u);
   assert.match(page, /chain: catalog\.businessChainOverview\.key/u);
   assert.match(page, /<ContextStrip[\s\S]{0,420}?onReturnChain/u);
+  assert.match(
+    page,
+    /chain=\{\s*view === 'chain' && overviewSelected\s*\? catalog\.businessChainOverview\s*: chain\s*\}/u,
+  );
+  assert.match(
+    page,
+    /node=\{view === 'chain' && overviewSelected \? null : node\}/u,
+  );
   assert.match(page, /返回业务链/u);
   assert.match(page, /data-selected-chain-node/u);
   assert.match(page, /data-business-chain-overview/u);
@@ -367,8 +396,9 @@ test("dev flow state observatory: customer review print is generated from the sh
   assert.match(page, /data-flow-state-view=\{view\}/u);
   assert.match(model, /catalog\.businessChains/u);
   assert.match(model, /catalog\.businessChainOverview/u);
-  assert.match(model, /catalog\?\.processDefinitions/u);
-  assert.match(model, /catalog\?\.flows/u);
+  assert.match(model, /buildDevBusinessChainProjection/u);
+  assert.match(model, /chain\.acceptanceScenarios/u);
+  assert.doesNotMatch(model, /EXCEPTION_PATTERN|EXCEPTION_GROUPS/u);
   assert.doesNotMatch(model, /const BUSINESS_CHAIN_DEFINITIONS/u);
   assert.match(printView, /data-customer-review-print-root/u);
   for (const copy of [

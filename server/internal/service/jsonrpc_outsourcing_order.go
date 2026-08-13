@@ -18,7 +18,8 @@ func (d *jsonrpcDispatcher) handleOutsourcingOrder(
 	if params != nil {
 		pm = params.AsMap()
 	}
-	if _, res := d.requireAdmin(ctx); res != nil {
+	claims, res := d.requireAdmin(ctx)
+	if res != nil {
 		return id, res, nil
 	}
 	if d.outsourcingOrderUC == nil {
@@ -34,7 +35,7 @@ func (d *jsonrpcDispatcher) handleOutsourcingOrder(
 		"confirm_outsourcing_order",
 		"close_outsourcing_order",
 		"cancel_outsourcing_order":
-		return d.handleOutsourcingOrderLifecycle(ctx, method, id, pm)
+		return d.handleOutsourcingOrderLifecycle(ctx, method, id, pm, claims.UserID)
 	case "list_outsourcing_order_items":
 		return d.handleOutsourcingOrderItem(ctx, method, id, pm)
 	default:

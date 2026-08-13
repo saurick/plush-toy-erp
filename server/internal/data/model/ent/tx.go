@@ -46,6 +46,8 @@ type Tx struct {
 	InventoryBalance *InventoryBalanceClient
 	// InventoryLot is the client for interacting with the InventoryLot builders.
 	InventoryLot *InventoryLotClient
+	// InventoryLotStatusEvent is the client for interacting with the InventoryLotStatusEvent builders.
+	InventoryLotStatusEvent *InventoryLotStatusEventClient
 	// InventoryOperation is the client for interacting with the InventoryOperation builders.
 	InventoryOperation *InventoryOperationClient
 	// InventoryOperationItem is the client for interacting with the InventoryOperationItem builders.
@@ -136,6 +138,8 @@ type Tx struct {
 	Shipment *ShipmentClient
 	// ShipmentItem is the client for interacting with the ShipmentItem builders.
 	ShipmentItem *ShipmentItemClient
+	// SourceOrderLifecycleEvent is the client for interacting with the SourceOrderLifecycleEvent builders.
+	SourceOrderLifecycleEvent *SourceOrderLifecycleEventClient
 	// StockReservation is the client for interacting with the StockReservation builders.
 	StockReservation *StockReservationClient
 	// Supplier is the client for interacting with the Supplier builders.
@@ -302,6 +306,7 @@ func (tx *Tx) init() {
 	tx.FinancePayment = NewFinancePaymentClient(tx.config)
 	tx.InventoryBalance = NewInventoryBalanceClient(tx.config)
 	tx.InventoryLot = NewInventoryLotClient(tx.config)
+	tx.InventoryLotStatusEvent = NewInventoryLotStatusEventClient(tx.config)
 	tx.InventoryOperation = NewInventoryOperationClient(tx.config)
 	tx.InventoryOperationItem = NewInventoryOperationItemClient(tx.config)
 	tx.InventoryTxn = NewInventoryTxnClient(tx.config)
@@ -347,6 +352,7 @@ func (tx *Tx) init() {
 	tx.SalesOrderItem = NewSalesOrderItemClient(tx.config)
 	tx.Shipment = NewShipmentClient(tx.config)
 	tx.ShipmentItem = NewShipmentItemClient(tx.config)
+	tx.SourceOrderLifecycleEvent = NewSourceOrderLifecycleEventClient(tx.config)
 	tx.StockReservation = NewStockReservationClient(tx.config)
 	tx.Supplier = NewSupplierClient(tx.config)
 	tx.Unit = NewUnitClient(tx.config)

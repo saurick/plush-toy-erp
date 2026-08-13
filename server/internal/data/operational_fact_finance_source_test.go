@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"sync"
 	"testing"
@@ -15,6 +16,15 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/shopspring/decimal"
 )
+
+func mustFinanceFactDueAt(t *testing.T, occurredAt time.Time, days int) time.Time {
+	t.Helper()
+	dueAt, err := biz.FinanceFactDueAtFromDays(occurredAt, &days)
+	if err != nil || dueAt == nil {
+		t.Fatalf("derive finance due_at occurred_at=%v days=%d error=%v", occurredAt, days, err)
+	}
+	return *dueAt
+}
 
 func TestOperationalFactRepoShipmentItemFinanceSnapshotsComeFromSalesOrderLine(t *testing.T) {
 	ctx := context.Background()
@@ -124,7 +134,7 @@ func TestOperationalFactRepoShipShipmentKeepsFinanceSnapshotsFromActiveSalesOrde
 	salesUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, logger))
 	paymentTermDays := 60
 	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
-		OrderNo: "SO-SNAPSHOT-REFRESH", CustomerID: customer.ID, OrderDate: time.Now().UTC(), PaymentTermDays: &paymentTermDays,
+		OrderNo: "SO-SNAPSHOT-REFRESH", CustomerID: customer.ID, OrderDate: time.Now().UTC(), Currency: biz.FinanceCurrencyUSD, PaymentTermDays: &paymentTermDays,
 	})
 	if err != nil {
 		t.Fatalf("create sales order: %v", err)
@@ -169,8 +179,9 @@ func TestOperationalFactRepoShipShipmentKeepsFinanceSnapshotsFromActiveSalesOrde
 	if err != nil {
 		t.Fatalf("create shipment draft: %v", err)
 	}
-	if shipment.Items[0].AmountSnapshot == nil || !shipment.Items[0].AmountSnapshot.Equal(decimal.NewFromInt(24)) {
-		t.Fatalf("active-order shipment amount snapshot=%#v, want 24", shipment.Items[0].AmountSnapshot)
+	if shipment.Items[0].AmountSnapshot == nil || !shipment.Items[0].AmountSnapshot.Equal(decimal.NewFromInt(24)) ||
+		shipment.Items[0].CurrencySnapshot == nil || *shipment.Items[0].CurrencySnapshot != biz.FinanceCurrencyUSD {
+		t.Fatalf("active-order shipment finance snapshot=%#v, want 24 USD", shipment.Items[0])
 	}
 	inventoryRepo := NewInventoryRepo(data, logger)
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
@@ -188,8 +199,9 @@ func TestOperationalFactRepoShipShipmentKeepsFinanceSnapshotsFromActiveSalesOrde
 	}
 	shippedItem := shipment.Items[0]
 	if shippedItem.UnitPriceSnapshot == nil || !shippedItem.UnitPriceSnapshot.Equal(updatedUnitPrice) ||
-		shippedItem.AmountSnapshot == nil || !shippedItem.AmountSnapshot.Equal(decimal.NewFromInt(24)) {
-		t.Fatalf("shipped finance snapshots=%#v, want unit price 12 and amount 24", shippedItem)
+		shippedItem.AmountSnapshot == nil || !shippedItem.AmountSnapshot.Equal(decimal.NewFromInt(24)) ||
+		shippedItem.CurrencySnapshot == nil || *shippedItem.CurrencySnapshot != biz.FinanceCurrencyUSD {
+		t.Fatalf("shipped finance snapshots=%#v, want unit price 12 and amount 24 USD", shippedItem)
 	}
 	receivable, err := operationalUC.CreateReceivableFromShipment(ctx, &biz.FinanceFactFromShipmentCreate{
 		FactNo: "AR-SNAPSHOT-REFRESH", ShipmentID: shipment.ID, IdempotencyKey: "ar-snapshot-refresh",
@@ -203,16 +215,27 @@ func TestOperationalFactRepoShipShipmentKeepsFinanceSnapshotsFromActiveSalesOrde
 	if err != nil {
 		t.Fatalf("create invoice: %v", err)
 	}
-	if !receivable.Amount.Equal(decimal.NewFromInt(24)) || !invoice.Amount.Equal(decimal.NewFromInt(24)) {
-		t.Fatalf("derived finance amounts receivable=%s invoice=%s, want 24", receivable.Amount, invoice.Amount)
+	if !receivable.Amount.Equal(decimal.NewFromInt(24)) || !invoice.Amount.Equal(decimal.NewFromInt(24)) ||
+		receivable.Currency != biz.FinanceCurrencyUSD || invoice.Currency != biz.FinanceCurrencyUSD {
+		t.Fatalf("derived finance facts receivable=%#v invoice=%#v, want 24 USD", receivable, invoice)
 	}
+	wantReceivableOccurredAt := shipment.ShippedAt.UTC().Truncate(time.Microsecond)
+	wantReceivableDueAt := mustFinanceFactDueAt(t, wantReceivableOccurredAt, 60)
 	if receivable.CollectionType == nil || *receivable.CollectionType != biz.FinanceCollectionAccountsReceivable ||
-		receivable.PaymentTerm != nil || receivable.PaymentTermDays == nil || *receivable.PaymentTermDays != 60 || receivable.InvoiceCategory != nil {
+		receivable.PaymentTerm == nil || *receivable.PaymentTerm != biz.FinancePaymentTermEOMDays ||
+		receivable.PaymentTermDays == nil || *receivable.PaymentTermDays != 60 || receivable.DueAt == nil || shipment.ShippedAt == nil ||
+		!receivable.OccurredAt.Equal(wantReceivableOccurredAt) || !receivable.DueAt.Equal(wantReceivableDueAt) || receivable.InvoiceCategory != nil {
 		t.Fatalf("derived receivable dimensions=%#v", receivable)
 	}
 	if invoice.InvoiceCategory == nil || *invoice.InvoiceCategory != biz.FinanceInvoiceCategoryVATSpecial13 ||
 		invoice.CollectionType != nil || invoice.PaymentTerm != nil || invoice.PaymentTermDays != nil {
 		t.Fatalf("derived invoice dimensions=%#v", invoice)
+	}
+	replayed, err := operationalUC.CreateReceivableFromShipment(ctx, &biz.FinanceFactFromShipmentCreate{
+		FactNo: "AR-SNAPSHOT-REFRESH", ShipmentID: shipment.ID, IdempotencyKey: "ar-snapshot-refresh",
+	})
+	if err != nil || replayed.ID != receivable.ID || replayed.Currency != biz.FinanceCurrencyUSD {
+		t.Fatalf("USD receivable replay=%#v err=%v", replayed, err)
 	}
 	listed, total, err := operationalUC.ListFinanceFacts(ctx, biz.OperationalFactFilter{
 		SourceType: biz.ShipmentSourceType,
@@ -228,6 +251,147 @@ func TestOperationalFactRepoShipShipmentKeepsFinanceSnapshotsFromActiveSalesOrde
 	}
 }
 
+func TestOperationalFactRepoFinalShipmentAbsorbsFinanceRoundingTail(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "shipment_finance_rounding_tail")
+	unit := createTestUnit(t, ctx, client, "PCS-ROUNDING-TAIL")
+	product := createTestProduct(t, ctx, client, unit.ID, "PRD-ROUNDING-TAIL")
+	warehouse := createTestWarehouse(t, ctx, client, "WH-ROUNDING-TAIL")
+	customer := createSalesOrderTestCustomer(t, ctx, client, "C-ROUNDING-TAIL", true)
+	logger := log.NewStdLogger(io.Discard)
+	salesUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, logger))
+	paymentTermDays := 30
+	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
+		OrderNo: "SO-ROUNDING-TAIL", CustomerID: customer.ID, OrderDate: time.Now().UTC(), PaymentTermDays: &paymentTermDays,
+	})
+	if err != nil {
+		t.Fatalf("create sales order: %v", err)
+	}
+	orderedQuantity := decimal.RequireFromString("3.5")
+	unitPrice := decimal.RequireFromString("0.333333")
+	lineAmount := decimal.RequireFromString("1.166666")
+	orderItem, err := salesUC.AddSalesOrderItem(ctx, &biz.SalesOrderItemMutation{
+		SalesOrderID: order.ID, LineNo: 1, ProductID: product.ID, UnitID: unit.ID,
+		OrderedQuantity: orderedQuantity, UnitPrice: &unitPrice, Amount: &lineAmount,
+	})
+	if err != nil {
+		t.Fatalf("create sales order item: %v", err)
+	}
+	if _, err := salesUC.SubmitSalesOrder(ctx, order.ID); err != nil {
+		t.Fatalf("submit sales order: %v", err)
+	}
+	if _, err := salesUC.ActivateSalesOrder(ctx, order.ID); err != nil {
+		t.Fatalf("activate sales order: %v", err)
+	}
+	inventoryRepo := NewInventoryRepo(data, logger)
+	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType: biz.InventorySubjectProduct, SubjectID: product.ID, WarehouseID: warehouse.ID,
+		TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: decimal.NewFromInt(4), UnitID: unit.ID,
+		SourceType: "TEST_SHIPMENT_ROUNDING_TAIL", IdempotencyKey: "inventory-shipment-rounding-tail",
+	}); err != nil {
+		t.Fatalf("seed inventory: %v", err)
+	}
+	repo := NewOperationalFactRepo(data, logger)
+	operationalUC := biz.NewOperationalFactUsecase(repo)
+	quantities := []decimal.Decimal{
+		decimal.RequireFromString("0.5"),
+		decimal.RequireFromString("0.5"),
+		decimal.RequireFromString("2.5"),
+	}
+	wantAmounts := []decimal.Decimal{
+		decimal.RequireFromString("0.166667"),
+		decimal.RequireFromString("0.166667"),
+		decimal.RequireFromString("0.833332"),
+	}
+	total := decimal.Zero
+	for index, quantity := range quantities {
+		shipmentNo := fmt.Sprintf("SHP-ROUNDING-TAIL-%d", index+1)
+		shipment, err := operationalUC.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
+			Shipment: &biz.ShipmentCreate{
+				ShipmentNo: shipmentNo, SalesOrderID: &order.ID, CustomerID: &customer.ID, IdempotencyKey: shipmentNo,
+			},
+			Items: []*biz.ShipmentItemCreate{{
+				SalesOrderItemID: &orderItem.ID, ProductID: product.ID, WarehouseID: warehouse.ID,
+				UnitID: unit.ID, Quantity: quantity,
+			}},
+		})
+		if err != nil {
+			t.Fatalf("create shipment %d: %v", index+1, err)
+		}
+		submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, shipment.ID)
+		shipment, err = operationalUC.ShipShipment(ctx, shipment.ID)
+		if err != nil {
+			t.Fatalf("ship shipment %d: %v", index+1, err)
+		}
+		amount := shipment.Items[0].AmountSnapshot
+		if amount == nil || !amount.Equal(wantAmounts[index]) {
+			t.Fatalf("shipment %d amount snapshot=%v want=%s", index+1, amount, wantAmounts[index])
+		}
+		total = total.Add(*amount)
+	}
+	if !total.Equal(lineAmount) {
+		t.Fatalf("split shipment amount total=%s want sales-order amount=%s", total, lineAmount)
+	}
+}
+
+func TestShipmentFinanceAmountRejectsSnapshotCurrencyMismatch(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "shipment_finance_currency_mismatch")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	customer := createSalesOrderTestCustomer(t, ctx, client, "C-CURRENCY-MISMATCH", true)
+	paymentTermDays := 30
+	order := client.SalesOrder.Create().
+		SetOrderNo("SO-CURRENCY-MISMATCH").
+		SetCustomerID(customer.ID).
+		SetCustomerSnapshot(map[string]any{"name": customer.Name}).
+		SetContactSnapshot(map[string]any{}).
+		SetOrderDate(time.Now().UTC()).
+		SetCurrency(biz.FinanceCurrencyCNY).
+		SetPaymentTermDays(paymentTermDays).
+		SetLifecycleStatus(biz.SalesOrderStatusActive).
+		SaveX(ctx)
+	amount := decimal.NewFromInt(20)
+	orderItem := client.SalesOrderItem.Create().
+		SetSalesOrderID(order.ID).
+		SetLineNo(1).
+		SetProductID(fixtures.productID).
+		SetUnitID(fixtures.unitID).
+		SetOrderedQuantity(decimal.NewFromInt(2)).
+		SetUnitPrice(decimal.NewFromInt(10)).
+		SetAmount(amount).
+		SetLineStatus(biz.SalesOrderItemStatusOpen).
+		SaveX(ctx)
+	shippedAt := time.Date(2026, time.January, 2, 3, 4, 5, 0, time.UTC)
+	shipment := client.Shipment.Create().
+		SetShipmentNo("SHP-CURRENCY-MISMATCH").
+		SetSalesOrderID(order.ID).
+		SetCustomerID(customer.ID).
+		SetStatus(biz.ShipmentStatusShipped).
+		SetShippedAt(shippedAt).
+		SetIdempotencyKey("SHP-CURRENCY-MISMATCH").
+		SaveX(ctx)
+	client.ShipmentItem.Create().
+		SetShipmentID(shipment.ID).
+		SetSalesOrderItemID(orderItem.ID).
+		SetProductID(fixtures.productID).
+		SetWarehouseID(fixtures.warehouseID).
+		SetUnitID(fixtures.unitID).
+		SetQuantity(decimal.NewFromInt(2)).
+		SetUnitPriceSnapshot(decimal.NewFromInt(10)).
+		SetAmountSnapshot(amount).
+		SetCurrencySnapshot(biz.FinanceCurrencyHKD).
+		SaveX(ctx)
+	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
+	if _, err := repo.GetShipmentFinanceAmountSnapshot(ctx, shipment.ID); !errors.Is(err, biz.ErrFinanceFactShipmentAmountInvalid) {
+		t.Fatalf("mismatched shipment snapshot currency error=%v", err)
+	}
+	if _, err := biz.NewOperationalFactUsecase(repo).CreateReceivableFromShipment(ctx, &biz.FinanceFactFromShipmentCreate{
+		FactNo: "AR-CURRENCY-MISMATCH", ShipmentID: shipment.ID, IdempotencyKey: "AR-CURRENCY-MISMATCH",
+	}); !errors.Is(err, biz.ErrFinanceFactShipmentAmountInvalid) {
+		t.Fatalf("mismatched shipment snapshot created receivable: %v", err)
+	}
+}
+
 func TestOperationalFactRepoFinanceFromShipmentLifecycleAndCancellationGuardSQLite(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "shipment_finance_lifecycle")
@@ -238,10 +402,13 @@ func TestOperationalFactRepoFinanceFromShipmentLifecycleAndCancellationGuardSQLi
 	if err != nil {
 		t.Fatalf("create receivable: %v", err)
 	}
+	wantOccurredAt := shipment.ShippedAt.UTC().Truncate(time.Microsecond)
+	wantDueAt := mustFinanceFactDueAt(t, wantOccurredAt, 30)
 	if created.Status != biz.OperationalFactStatusDraft || !created.Amount.Equal(decimal.NewFromInt(20)) || created.CounterpartyID == nil || *created.CounterpartyID != *shipment.CustomerID ||
 		created.CollectionType == nil || *created.CollectionType != biz.FinanceCollectionAccountsReceivable ||
-		created.PaymentTerm == nil || *created.PaymentTerm != biz.FinancePaymentTermEOM30 ||
-		created.PaymentTermDays == nil || *created.PaymentTermDays != 30 || created.InvoiceCategory != nil {
+		created.PaymentTerm == nil || *created.PaymentTerm != biz.FinancePaymentTermEOMDays ||
+		created.PaymentTermDays == nil || *created.PaymentTermDays != 30 || created.DueAt == nil || shipment.ShippedAt == nil ||
+		!created.OccurredAt.Equal(wantOccurredAt) || !created.DueAt.Equal(wantDueAt) || created.InvoiceCategory != nil {
 		t.Fatalf("source-derived receivable=%#v", created)
 	}
 	replayed, err := uc.CreateReceivableFromShipment(ctx, input)
@@ -330,6 +497,13 @@ func TestOperationalFactRepoFinanceProcessShipmentRevalidatesAmountSnapshotsSQLi
 	if err != nil {
 		t.Fatalf("build shipment payment term snapshot: %v", err)
 	}
+	if shipment.ShippedAt == nil {
+		t.Fatal("shipped shipment is missing shipped_at")
+	}
+	dueAt, err := biz.FinanceFactDueAtFromDays(*shipment.ShippedAt, paymentTermDays)
+	if err != nil {
+		t.Fatalf("derive shipment due_at: %v", err)
+	}
 	_, err = repo.CreateFinanceFactDraftForProcessCommand(ctx, &biz.FinanceFactCreate{
 		FactNo:              "AR-PROCESS-SNAPSHOT-RECHECK",
 		FactType:            biz.FinanceFactReceivable,
@@ -340,10 +514,11 @@ func TestOperationalFactRepoFinanceProcessShipmentRevalidatesAmountSnapshotsSQLi
 		CollectionType:      &collectionType,
 		PaymentTerm:         paymentTerm,
 		PaymentTermDays:     paymentTermDays,
+		DueAt:               dueAt,
 		SourceType:          &sourceType,
 		SourceID:            &shipment.ID,
 		IdempotencyKey:      idempotencyKey,
-		OccurredAt:          time.Now().UTC().Truncate(time.Microsecond),
+		OccurredAt:          *shipment.ShippedAt,
 		OccurredAtSpecified: true,
 	}, command, actor.ID)
 	if !errors.Is(err, biz.ErrFinanceFactShipmentAmountInvalid) {
@@ -392,9 +567,15 @@ func TestOperationalFactRepoSettleRejectsInvoice(t *testing.T) {
 	if _, err := repo.SettleFinanceFact(ctx, operationalFactStatusMutation(postedInvoice.ID, postedInvoice.Version, actor.ID, "")); !errors.Is(err, biz.ErrFinanceFactSettlementNotAllowed) {
 		t.Fatalf("invoice settle error=%v", err)
 	}
+	guardTerm := biz.FinancePaymentTermDueOnOccurrence
+	guardDays := 0
+	guardOccurredAt := time.Now().UTC().Truncate(time.Microsecond)
+	guardDueAt := guardOccurredAt
 	sourceLessReceivable, err := repo.CreateFinanceFactDraft(ctx, &biz.FinanceFactCreate{
-		FactNo: "AR-SOURCELESS-GUARD", FactType: biz.FinanceFactReceivable, CounterpartyType: biz.FinanceCounterpartyOther,
-		Amount: decimal.NewFromInt(1), Currency: biz.FinanceCurrencyCNY, IdempotencyKey: "ar-sourceless-guard",
+		FactNo: "AR-SOURCELESS-GUARD", FactType: biz.FinanceFactReceivable, CounterpartyType: biz.FinanceCounterpartyCustomer,
+		CounterpartyID: shipment.CustomerID, Amount: decimal.NewFromInt(1), Currency: biz.FinanceCurrencyCNY,
+		PaymentTerm: &guardTerm, PaymentTermDays: &guardDays, DueAt: &guardDueAt,
+		IdempotencyKey: "ar-sourceless-guard", OccurredAt: guardOccurredAt, OccurredAtSpecified: true,
 	})
 	if err != nil {
 		t.Fatalf("create source-less receivable fixture: %v", err)
@@ -447,6 +628,14 @@ func createReceivableViaProcessCommandForTest(
 	if err != nil {
 		t.Fatalf("build shipment payment term snapshot: %v", err)
 	}
+	if shipment.ShippedAt == nil {
+		t.Fatal("shipped shipment is missing shipped_at")
+	}
+	occurredAt := shipment.ShippedAt.UTC().Truncate(time.Microsecond)
+	dueAt, err := biz.FinanceFactDueAtFromDays(occurredAt, paymentTermDays)
+	if err != nil {
+		t.Fatalf("derive shipment due_at: %v", err)
+	}
 	processRepo := NewProcessRuntimeRepo(data, log.NewStdLogger(io.Discard))
 	command := claimedPostgresProcessCommandForBusinessRef(
 		t,
@@ -471,10 +660,11 @@ func createReceivableViaProcessCommandForTest(
 		CollectionType:      &collectionType,
 		PaymentTerm:         paymentTerm,
 		PaymentTermDays:     paymentTermDays,
+		DueAt:               dueAt,
 		SourceType:          &sourceType,
 		SourceID:            &shipment.ID,
 		IdempotencyKey:      idempotencyKey,
-		OccurredAt:          time.Now().UTC().Truncate(time.Microsecond),
+		OccurredAt:          occurredAt,
 		OccurredAtSpecified: true,
 	}, command, actorID)
 	if err != nil {
@@ -574,6 +764,21 @@ func runFinanceProcessShipmentCancelRace(t *testing.T, ctx context.Context, data
 	)
 	collectionType := biz.FinanceCollectionAccountsReceivable
 	sourceType := biz.ShipmentSourceType
+	paymentTermDays, err := repo.GetShipmentPaymentTermDays(ctx, shipment.ID)
+	if err != nil {
+		t.Fatalf("read shipment payment term: %v", err)
+	}
+	paymentTerm, paymentTermDays, err := biz.FinancePaymentTermSnapshotFromDays(paymentTermDays)
+	if err != nil {
+		t.Fatalf("build shipment payment term snapshot: %v", err)
+	}
+	if shipment.ShippedAt == nil {
+		t.Fatal("shipped shipment is missing shipped_at")
+	}
+	dueAt, err := biz.FinanceFactDueAtFromDays(*shipment.ShippedAt, paymentTermDays)
+	if err != nil {
+		t.Fatalf("derive shipment due_at: %v", err)
+	}
 	factInput := &biz.FinanceFactCreate{
 		FactNo:              "AR-PROCESS-RACE-" + suffix,
 		FactType:            biz.FinanceFactReceivable,
@@ -582,10 +787,13 @@ func runFinanceProcessShipmentCancelRace(t *testing.T, ctx context.Context, data
 		Amount:              decimal.NewFromInt(20),
 		Currency:            biz.FinanceCurrencyCNY,
 		CollectionType:      &collectionType,
+		PaymentTerm:         paymentTerm,
+		PaymentTermDays:     paymentTermDays,
+		DueAt:               dueAt,
 		SourceType:          &sourceType,
 		SourceID:            &shipment.ID,
 		IdempotencyKey:      idempotencyKey,
-		OccurredAt:          time.Now().UTC().Truncate(time.Microsecond),
+		OccurredAt:          *shipment.ShippedAt,
 		OccurredAtSpecified: true,
 	}
 	start := make(chan struct{})

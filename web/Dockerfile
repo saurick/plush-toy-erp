@@ -25,6 +25,11 @@ COPY scripts ./scripts
 WORKDIR /app/web
 
 ARG ERP_CUSTOMER_PACKAGE=
+ARG GIT_SHA=
+ARG RELEASE_VERSION=
+
+ENV VITE_GIT_SHA=${GIT_SHA}
+ENV VITE_RELEASE_VERSION=${RELEASE_VERSION}
 
 # CI has already generated and checked the committed error-code projection.
 # The Web-only image builder consumes that projection and does not install Go.
@@ -37,9 +42,11 @@ RUN pnpm build:committed && \
 FROM ${RUNTIME_BASE_IMAGE} AS runtime
 
 ARG GIT_SHA
+ARG RELEASE_VERSION
 
 ENV NODE_ENV=production
 ENV GIT_SHA=${GIT_SHA}
+ENV RELEASE_VERSION=${RELEASE_VERSION}
 ENV HOST=0.0.0.0
 ENV APP_ID=desktop
 ENV PORT=5175

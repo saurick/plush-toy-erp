@@ -138,7 +138,6 @@ export function createSyntheticSourceFixture(options = {}) {
         canExecuteRealImport: false,
         createsTenant: false,
         changesSchema: false,
-        writesBusinessRecords: false,
         writesFacts: false,
       },
       sources: [

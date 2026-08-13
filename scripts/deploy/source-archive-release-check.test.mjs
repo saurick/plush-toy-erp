@@ -159,14 +159,25 @@ test("parseCliArgs keeps plan light and release modes explicit", () => {
     help: false,
   });
   assert.equal(parseCliArgs(["--light"]).mode, "light");
-  assert.deepEqual(parseCliArgs(["--execute", "--docker", "--ref", "main"]), {
-    customer: "yoyoosun",
-    ref: "main",
-    mode: "release",
-    docker: true,
-    json: false,
-    help: false,
-  });
+  assert.deepEqual(
+    parseCliArgs([
+      "--execute",
+      "--docker",
+      "--ref",
+      "main",
+      "--version",
+      "release-20260810",
+    ]),
+    {
+      customer: "yoyoosun",
+      ref: "main",
+      version: "release-20260810",
+      mode: "release",
+      docker: true,
+      json: false,
+      help: false,
+    },
+  );
   assert.throws(() => parseCliArgs(["--docker"]), /requires --execute/);
   assert.throws(
     () => parseCliArgs(["--light", "--execute"]),
@@ -618,6 +629,7 @@ test("Docker release mode compiles Web and Go once through one shared graph", as
       assert.deepEqual(target.platforms, ["linux/amd64"]);
       assert.equal(target.args.ERP_CUSTOMER_PACKAGE, report.customer);
       assert.equal(target.args.GIT_SHA, report.commit);
+      assert.equal(target.args.RELEASE_VERSION, report.releaseVersion);
       assert.equal(target.dockerfile, "server/Dockerfile");
       assert.deepEqual(target["cache-from"], [
         `type=gha,scope=plush-release-${target.target === "web-runtime" ? "web" : "server"}-v1`,

@@ -17,6 +17,7 @@ import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 
+import BusinessFormSectionTitle from '../components/business-list/BusinessFormSectionTitle.jsx'
 import {
   cancelFinancePayment,
   createFinanceCreditNote,
@@ -58,7 +59,8 @@ import {
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
-import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
+import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
+import { BusinessHelpLabel } from '../components/help/BusinessContextHelp.jsx'
 import ExceptionProcessRecoveryButton from '../components/workflow/ExceptionProcessRecoveryButton.jsx'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
@@ -66,6 +68,7 @@ import {
   getBusinessPaginationParams,
 } from '../utils/businessPagination.mjs'
 import {
+  BUSINESS_CURRENCY_OPTIONS,
   compactParams,
   formatUnixDateTime,
   hasActionPermission,
@@ -82,6 +85,7 @@ import {
   isPositiveNumeric20Scale6Units,
   numeric20Scale6Units,
 } from '../utils/numeric20Scale6.mjs'
+import { currentBusinessDate } from '../utils/businessDate.mjs'
 import {
   validateFinanceAllocationDraft,
   validateFinanceCreditDraft,
@@ -92,10 +96,6 @@ const { Text } = Typography
 const PAYMENT_STORAGE_PREFIX = 'plush-erp:finance-payment:last:v1:'
 const FINANCE_PAYMENT_COLUMN_ORDER_KEY = 'finance-payments-records'
 const FINANCE_CREDIT_NOTE_COLUMN_ORDER_KEY = 'finance-credit-notes-records'
-const CURRENCY_OPTIONS = ['CNY', 'USD', 'HKD'].map((value) => ({
-  value,
-  label: value === 'CNY' ? '人民币' : value === 'USD' ? '美元' : '港币',
-}))
 const PAYMENT_STATUS_META = Object.freeze({
   DRAFT: ['待审批', 'blue'],
   APPROVED: ['已批准待核销', 'gold'],
@@ -1077,8 +1077,7 @@ export default function FinancePaymentsPage() {
         dataIndex: 'finance_fact_no',
         width: 190,
         render: (value) => value || '已关联财务记录',
-        exportValue: (record) =>
-          record?.finance_fact_no || '已关联财务记录',
+        exportValue: (record) => record?.finance_fact_no || '已关联财务记录',
       },
       {
         title: '来源类型',
@@ -1157,7 +1156,7 @@ export default function FinancePaymentsPage() {
         return
       }
       downloadBusinessListCSV({
-        filename: `收付款记录-${new Date().toISOString().slice(0, 10)}.csv`,
+        filename: `收付款记录-${currentBusinessDate()}.csv`,
         columns: paymentExportColumns,
         rows,
       })
@@ -1195,7 +1194,7 @@ export default function FinancePaymentsPage() {
         return
       }
       downloadBusinessListCSV({
-        filename: `红冲记录-${new Date().toISOString().slice(0, 10)}.csv`,
+        filename: `红冲记录-${currentBusinessDate()}.csv`,
         columns: creditExportColumns,
         rows,
       })
@@ -1208,11 +1207,7 @@ export default function FinancePaymentsPage() {
       exportInFlightRef.current = false
       request.finish()
     }
-  }, [
-    beginLatestRequest,
-    creditExportColumns,
-    creditStatusFilter,
-  ])
+  }, [beginLatestRequest, creditExportColumns, creditStatusFilter])
   const paymentDetailLineItems = {
     title: '核销明细',
     items: Array.isArray(paymentDetail?.allocations)
@@ -1296,6 +1291,7 @@ export default function FinancePaymentsPage() {
     <BusinessPageLayout className="erp-finance-payments-page">
       <PageHeaderCard
         compact
+        helpKey="finance-payments"
         title="收付款与核销"
         description="登记真实收款或付款，按同一往来方和币种跨多张应收或应付核销；已过账记录通过冲销恢复未核销金额，红冲记录保留独立审计。"
         tags={[
@@ -1715,6 +1711,7 @@ export default function FinancePaymentsPage() {
           preserve={false}
           disabled={loading}
         >
+          <BusinessFormSectionTitle>往来与金额</BusinessFormSectionTitle>
           <Form.Item
             name="direction"
             label="收付款方向"
@@ -1751,33 +1748,28 @@ export default function FinancePaymentsPage() {
           >
             <Input maxLength={64} />
           </Form.Item>
-          <Space align="start" wrap>
-            <Form.Item
-              name="amount"
-              label="实收 / 实付金额"
-              rules={[
-                { required: true, message: '请填写金额' },
-                {
-                  validator: (_, value) =>
-                    isPositiveNumeric20Scale6Units(numeric20Scale6Units(value))
-                      ? Promise.resolve()
-                      : Promise.reject(new Error('金额必须大于 0')),
-                },
-              ]}
-            >
-              <Input inputMode="decimal" />
-            </Form.Item>
-            <Form.Item
-              name="currency"
-              label="币种"
-              rules={[{ required: true }]}
-            >
-              <Select options={CURRENCY_OPTIONS} style={{ width: 160 }} />
-            </Form.Item>
-            <Form.Item name="occurred_at" label="发生时间">
-              <Input type="datetime-local" />
-            </Form.Item>
-          </Space>
+          <Form.Item
+            name="amount"
+            label="实收 / 实付金额"
+            rules={[
+              { required: true, message: '请填写金额' },
+              {
+                validator: (_, value) =>
+                  isPositiveNumeric20Scale6Units(numeric20Scale6Units(value))
+                    ? Promise.resolve()
+                    : Promise.reject(new Error('金额必须大于 0')),
+              },
+            ]}
+          >
+            <Input inputMode="decimal" />
+          </Form.Item>
+          <Form.Item name="currency" label="币种" rules={[{ required: true }]}>
+            <Select options={BUSINESS_CURRENCY_OPTIONS} />
+          </Form.Item>
+          <Form.Item name="occurred_at" label="发生时间">
+            <Input type="datetime-local" />
+          </Form.Item>
+          <BusinessFormSectionTitle>账户与凭据</BusinessFormSectionTitle>
           <Form.Item
             name="account_ref"
             label="收付款账户摘要"
@@ -1851,7 +1843,13 @@ export default function FinancePaymentsPage() {
                     </Form.Item>
                     <Form.Item
                       name={[field.name, 'amount']}
-                      label="本次核销金额"
+                      label={
+                        <BusinessHelpLabel
+                          itemKey="allocation-amount"
+                          label="本次核销金额"
+                          pageKey="finance-payments"
+                        />
+                      }
                       rules={[
                         {
                           validator: (_, value) =>
@@ -2024,7 +2022,7 @@ export default function FinancePaymentsPage() {
           </Form.Item>
         </Form>
       </BusinessFormModal>
-      <BusinessRecordDetailsModal
+      <BusinessDetailsModal
         open={Boolean(paymentDetail)}
         title="收付款详情"
         description="收付款来源、核销明细与当前状态均以系统最新记录为准。"
@@ -2033,7 +2031,7 @@ export default function FinancePaymentsPage() {
         lineItems={paymentDetailLineItems}
         onClose={() => setPaymentDetail(null)}
       />
-      <BusinessRecordDetailsModal
+      <BusinessDetailsModal
         open={Boolean(creditDetail)}
         title="红冲详情"
         description="红冲保留来源应收或应付、原金额和当前未核销金额。"

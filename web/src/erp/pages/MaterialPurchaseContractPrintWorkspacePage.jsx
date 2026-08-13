@@ -13,9 +13,6 @@ import {
   resolvePrintWorkspaceCustomerKey,
 } from '../utils/printWorkspace.js'
 
-const MATERIAL_PURCHASE_DRAFT_STORAGE_KEY =
-  '__plush_erp_material_purchase_contract_print_draft__'
-
 export default function MaterialPurchaseContractPrintWorkspacePage() {
   const [searchParams] = useSearchParams()
   const outletContext = useOutletContext()
@@ -34,9 +31,12 @@ export default function MaterialPurchaseContractPrintWorkspacePage() {
   const draftStorageKey = workspaceStateID
     ? buildPrintWorkspaceDraftStorageKey(
         'material-purchase-contract',
-        workspaceStateID
+        workspaceStateID,
+        { customerKey }
       )
-    : MATERIAL_PURCHASE_DRAFT_STORAGE_KEY
+    : buildPrintWorkspaceDraftStorageKey('material-purchase-contract', '', {
+        customerKey,
+      })
   const workspaceURL = useMemo(() => {
     if (!workspaceStateID || typeof window === 'undefined') {
       return ''

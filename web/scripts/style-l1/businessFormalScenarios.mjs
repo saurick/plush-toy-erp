@@ -1763,9 +1763,7 @@ export function createBusinessFormalScenarios(deps) {
             )
             const currentOperationPanel = Array.from(
               currentWorkspace?.children || []
-            ).find((node) =>
-              node.matches?.('.erp-business-operation-panel')
-            )
+            ).find((node) => node.matches?.('.erp-business-operation-panel'))
             const currentOperationPanelRect =
               currentOperationPanel?.getBoundingClientRect()
             const currentWorkspaceRowGap = currentWorkspace
@@ -1783,9 +1781,7 @@ export function createBusinessFormalScenarios(deps) {
               '审批状态',
               '业务状态',
             ].filter((label) =>
-              currentOperationPanel?.querySelector(
-                `[aria-label="${label}"]`
-              )
+              currentOperationPanel?.querySelector(`[aria-label="${label}"]`)
             )
             const currentActionVisible = String(
               currentOperationPanel?.textContent || ''
@@ -1793,8 +1789,7 @@ export function createBusinessFormalScenarios(deps) {
             const clearSelectionButton = Array.from(
               currentOperationPanel?.querySelectorAll('button') || []
             ).find(
-              (button) =>
-                String(button.textContent || '').trim() === '清空已选'
+              (button) => String(button.textContent || '').trim() === '清空已选'
             )
             const selectionActionBar = currentOperationPanel?.querySelector(
               '.erp-business-selection-action-bar'
@@ -1951,9 +1946,7 @@ export function createBusinessFormalScenarios(deps) {
           'business-production-exceptions-decisions-tab',
           '处置申请'
         )
-        await page
-          .getByRole('button', { name: /列顺序/u })
-          .click()
+        await page.getByRole('button', { name: /列顺序/u }).click()
         const decisionColumnOrderDialog = page.getByRole('dialog', {
           name: '调整列表列顺序',
         })
@@ -1981,9 +1974,7 @@ export function createBusinessFormalScenarios(deps) {
           'business-production-exceptions-tasks-tab',
           '待审批'
         )
-        await page
-          .getByRole('button', { name: /列顺序/u })
-          .click()
+        await page.getByRole('button', { name: /列顺序/u }).click()
         const taskColumnOrderDialog = page.getByRole('dialog', {
           name: '调整列表列顺序',
         })
@@ -2106,6 +2097,166 @@ export function createBusinessFormalScenarios(deps) {
       },
     },
     {
+      name: 'supplier-processing-multi-select-layout-desktop',
+      path: '/erp/master/partners/suppliers',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        const processFixtures = [
+          ['PROC-EMBROIDERY-L1', '面部电绣', '电脑绣花'],
+          ['PROC-LASER-L1', '耳片激光', '激光裁切'],
+          ['PROC-TRANSFER-L1', '图案热转印', '热转印'],
+          ['PROC-SEWING-L1', '本体车缝', '车缝'],
+          ['PROC-STUFFING-L1', '本体充棉', '充棉'],
+          ['PROC-CUTTING-L1', '面料裁片', '裁床'],
+          ['PROC-INSPECTION-L1', '外观查货', '查货'],
+          ['PROC-PACKAGING-L1', '成品包装', '包装'],
+        ].map(([code, name, category], index) => ({
+          id: index + 101,
+          code,
+          name,
+          category,
+          outsourcing_enabled: true,
+          inhouse_enabled: true,
+          quality_required: false,
+          sort_order: (index + 1) * 10,
+          is_active: true,
+        }))
+
+        await page.route('**/rpc/masterdata', async (route) => {
+          const body = route.request().postDataJSON() || {}
+          if (body.method !== 'list_processes') {
+            await route.fallback()
+            return
+          }
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: body.id || 'supplier-process-layout',
+              result: {
+                code: 0,
+                message: 'OK',
+                data: {
+                  processes: processFixtures,
+                  total: processFixtures.length,
+                  limit: 100,
+                  offset: 0,
+                },
+              },
+            }),
+          })
+        })
+        await page.reload({ waitUntil: 'domcontentloaded' })
+        await expectHeading(page, '供应商与加工厂')
+        await page.getByRole('button', { name: '新建供应商' }).click()
+
+        const modal = page
+          .locator('.erp-business-action-modal--form.ant-modal:visible')
+          .last()
+        await modal.waitFor({ state: 'visible', timeout: 10_000 })
+        const processField = modal
+          .locator('.ant-form-item')
+          .filter({ hasText: '可加工工序' })
+          .first()
+        await processField.locator('.ant-select').click()
+        const unselectedOptions = page.locator(
+          '.ant-select-dropdown:visible .ant-select-item-option:not(.ant-select-item-option-disabled):not(.ant-select-item-option-selected)'
+        )
+        for (let index = 0; index < processFixtures.length; index += 1) {
+          await unselectedOptions.first().click()
+        }
+        await page.keyboard.press('Escape')
+
+        const readLayout = () =>
+          processField.evaluate((node) => {
+            const toRect = (element) => {
+              const rect = element?.getBoundingClientRect()
+              return rect
+                ? {
+                    top: rect.top,
+                    right: rect.right,
+                    bottom: rect.bottom,
+                    left: rect.left,
+                    width: rect.width,
+                    height: rect.height,
+                  }
+                : null
+            }
+            const selector = node.querySelector('.ant-select-selector')
+            const extra = node.querySelector('.ant-form-item-extra')
+            const tags = Array.from(
+              node.querySelectorAll('.ant-select-selection-item')
+            ).map(toRect)
+            return {
+              field: {
+                clientWidth: node.clientWidth,
+                scrollWidth: node.scrollWidth,
+              },
+              selector: toRect(selector),
+              extra: toRect(extra),
+              tags,
+            }
+          })
+
+        const assertLayout = (metrics, state) => {
+          assert.equal(
+            metrics.tags.length,
+            processFixtures.length,
+            `${state} 应显示全部已选工序: ${JSON.stringify(metrics)}`
+          )
+          assert(
+            metrics.selector && metrics.selector.height > 36,
+            `${state} 多选框应随标签换行增高: ${JSON.stringify(metrics)}`
+          )
+          assert(
+            metrics.tags.every(
+              (tag) =>
+                tag &&
+                tag.left >= metrics.selector.left - 1 &&
+                tag.right <= metrics.selector.right + 1 &&
+                tag.top >= metrics.selector.top - 1 &&
+                tag.bottom <= metrics.selector.bottom + 1
+            ),
+            `${state} 已选标签不得越过多选框边界: ${JSON.stringify(metrics)}`
+          )
+          assert(
+            metrics.extra &&
+              metrics.extra.top >= metrics.selector.bottom - 1 &&
+              metrics.tags.every((tag) => tag.bottom <= metrics.extra.top + 1),
+            `${state} 多选标签不得覆盖字段说明: ${JSON.stringify(metrics)}`
+          )
+          assert(
+            metrics.field.scrollWidth <= metrics.field.clientWidth + 1,
+            `${state} 多选字段不得产生横向溢出: ${JSON.stringify(metrics)}`
+          )
+        }
+
+        const desktopMetrics = await readLayout()
+        assertLayout(desktopMetrics, '供应商多选桌面态')
+        await modal.screenshot({
+          path: path.join(
+            outputDir,
+            'supplier-processing-multi-select-selected-desktop.png'
+          ),
+        })
+
+        await page.setViewportSize({ width: 720, height: 900 })
+        await page.waitForTimeout(180)
+        const narrowMetrics = await readLayout()
+        assertLayout(narrowMetrics, '供应商多选窄屏态')
+        await modal.screenshot({
+          path: path.join(
+            outputDir,
+            'supplier-processing-multi-select-layout-narrow.png'
+          ),
+        })
+        await closeBusinessFormModal(page, modal)
+      },
+    },
+    {
       name: 'business-core-pages-desktop',
       path: '/erp/master/partners/suppliers',
       auth: 'admin',
@@ -2143,7 +2294,7 @@ export function createBusinessFormalScenarios(deps) {
       ],
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '供应商档案')
+        await expectHeading(page, '供应商与加工厂')
         await expectButton(page, '新建供应商')
         await expectText(page, '当前操作')
         await assertCurrentOperationBarCompact(page, {
@@ -2161,13 +2312,13 @@ export function createBusinessFormalScenarios(deps) {
         })
         await assertBusinessFormModalKeyboardRecovery(page, {
           triggerName: '新建供应商',
-          titleText: '新建供应商档案',
+          titleText: '新建供应商或加工厂',
           scenarioName: 'business-v1-suppliers',
         })
         await assertNoHorizontalOverflow(page, 'business-standard-suppliers')
         await verifyBusinessActionFormModal(page, {
           buttonName: '新建供应商',
-          titleText: '新建供应商档案',
+          titleText: '新建供应商或加工厂',
           minFieldCount: 5,
           screenshotName: 'business-v1-suppliers-form-modal',
           expectedTexts: [
@@ -4208,7 +4359,7 @@ export function createBusinessFormalScenarios(deps) {
         })
         await expectHeading(page, '生产进度')
         await expectText(page, 'PROD-FACT-L1')
-        await expectText(page, '生产发料、成品入库和返工记录')
+        await expectText(page, '生产岗位在这里维护领料、返工和待入库完工报告')
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-v1-production-progress',
         })
@@ -4228,21 +4379,21 @@ export function createBusinessFormalScenarios(deps) {
           .waitFor({ state: 'visible' })
         const cancelProductionDraftButton = await findSelectionActionButton(
           page,
-          '作废草稿'
+          '作废完工报告'
         )
         assert.equal(await cancelProductionDraftButton.isDisabled(), false)
         await cancelProductionDraftButton.click()
         const cancelProductionDraftModal = page
           .locator('.ant-modal:visible')
-          .filter({ hasText: '作废业务草稿' })
+          .filter({ hasText: '作废生产完工报告' })
         await cancelProductionDraftModal.waitFor({ state: 'visible' })
         await cancelProductionDraftModal
           .locator('textarea')
           .fill('L1 回归：确认未过账生产草稿可追溯作废')
         await cancelProductionDraftModal
-          .getByRole('button', { name: '确认取消' })
+          .getByRole('button', { name: '作废完工报告' })
           .click()
-        await expectText(page, '作废业务草稿已完成')
+        await expectText(page, '作废生产完工报告已完成')
         await assertNoHorizontalOverflow(
           page,
           'business-v1-production-progress'

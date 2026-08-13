@@ -14,6 +14,7 @@ const STALE_PRODUCTION_EXCEPTION_PROCESS_PATH =
   '&process=production_exception_approval%2Fexception_decision_approval'
 const SALES_ORDER_STATE_RULES_PATH = `${DEV_FLOW_STATE_OBSERVATORY_PATH}?view=states&flow=source.sales_order`
 const PRODUCTION_FACT_STATE_RULES_PATH = `${DEV_FLOW_STATE_OBSERVATORY_PATH}?view=states&flow=fact.production`
+const PROCESS_RUNTIME_SELECTOR_PATH = `${DEV_FLOW_STATE_OBSERVATORY_PATH}?view=runtime&process=sales_order_acceptance%2Fapproval_pmc`
 const TASK_LOOKUP_PATH = DEFAULT_CHAIN_PATH
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 const READ_ONLY_WORKFLOW_METHODS = new Set([
@@ -1170,22 +1171,57 @@ export function createDevFlowStateObservatoryScenarios({
           name: '选择流程定义',
         })
         await runtimeSelector.waitFor({ state: 'visible', timeout: 10_000 })
-        await runtimeSelector
-          .locator(
-            'xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]'
-          )
-          .locator('.ant-select-selector')
-          .click()
+        const runtimeSelectRoot = runtimeSelector.locator(
+          'xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]'
+        )
+        const runtimeProcessKey = new URL(page.url()).searchParams.get(
+          'process'
+        )
+        const runtimeLabel = String(
+          await runtimeSelectRoot
+            .locator('.ant-select-selection-item')
+            .textContent()
+        ).trim()
+        await runtimeSelectRoot.locator('.ant-select-selector').click()
         const runtimeDropdown = page.locator('.ant-select-dropdown:visible')
         await runtimeDropdown.waitFor({ state: 'visible', timeout: 10_000 })
-        assert.equal(
-          await runtimeDropdown.locator('.ant-select-item-group').count(),
-          0,
-          '只有 7 条的流程定义保持稳定业务顺序，不制造单项分组'
+        await waitForDefinitionSelectPopupSettled(page, 6)
+        assert.deepEqual(
+          await runtimeDropdown
+            .locator('.ant-select-item-group')
+            .allTextContents(),
+          [
+            '销售订单受理 · 2',
+            '物料供应 · 1',
+            '成品交付 · 1',
+            '收付款审批 · 1',
+            '人工库存调整 · 1',
+            '生产异常决策 · 1',
+          ]
         )
         assert.equal(
           await runtimeDropdown.locator('.ant-select-item-option').count(),
-          7
+          7,
+          '流程定义分组必须精确覆盖 7 条正式定义'
+        )
+        await runtimeSelector.press('Escape')
+        await runtimeDropdown.waitFor({ state: 'hidden', timeout: 10_000 })
+        await runtimeSelectRoot.locator('.ant-select-selector').click()
+        await runtimeDropdown.waitFor({ state: 'visible', timeout: 10_000 })
+        await waitForDefinitionSelectPopupSettled(page, 6)
+        assert.equal(
+          String(
+            await runtimeSelectRoot
+              .locator('.ant-select-selection-item')
+              .textContent()
+          ).trim(),
+          runtimeLabel,
+          '关闭并重新打开流程定义下拉后必须保留当前业务选项'
+        )
+        assert.equal(
+          new URL(page.url()).searchParams.get('process'),
+          runtimeProcessKey,
+          '关闭并重新打开流程定义下拉不得改写运行路径深链接'
         )
         await runtimeSelector.press('Escape')
         await runtimeDropdown.waitFor({ state: 'hidden', timeout: 10_000 })
@@ -2750,6 +2786,150 @@ export function createDevFlowStateObservatoryScenarios({
           facts: factMetrics,
           writeRequests,
         })
+      },
+    },
+    {
+      name: 'dev-flow-state-observatory-runtime-selector-readonly',
+      path: PROCESS_RUNTIME_SELECTOR_PATH,
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        startNoWriteAudit(page, writeRequestsByPage)
+      },
+      verify: async (page) => {
+        await waitForCatalog(page)
+        const runtimeView = page.locator('[data-flow-state-view="runtime"]')
+        await runtimeView.waitFor({ state: 'visible', timeout: 10_000 })
+        const initialParams = new URL(page.url()).searchParams
+        assert.equal(initialParams.get('view'), 'runtime')
+        assert.equal(
+          initialParams.get('process'),
+          'sales_order_acceptance/approval_pmc'
+        )
+        for (const key of ['chain', 'node', 'flow', 'state', 'fact']) {
+          assert.equal(
+            initialParams.has(key),
+            false,
+            `独立运行路径下拉场景不得引入 ${key}`
+          )
+        }
+
+        const runtimeSelector = page.getByRole('combobox', {
+          name: '选择流程定义',
+        })
+        await runtimeSelector.waitFor({ state: 'visible', timeout: 10_000 })
+        await runtimeSelector.focus()
+        assert.equal(
+          await runtimeSelector.evaluate(
+            (node) => document.activeElement === node
+          ),
+          true,
+          '流程定义下拉必须可通过键盘获得焦点'
+        )
+        const runtimeSelectRoot = runtimeSelector.locator(
+          'xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]'
+        )
+        await runtimeSelectRoot.locator('.ant-select-selector').click()
+        const runtimeDropdown = page.locator('.ant-select-dropdown:visible')
+        await runtimeDropdown.waitFor({ state: 'visible', timeout: 10_000 })
+        await runtimeDropdown
+          .locator('.ant-select-item-group')
+          .nth(5)
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        const expectedGroups = [
+          '销售订单受理 · 2',
+          '物料供应 · 1',
+          '成品交付 · 1',
+          '收付款审批 · 1',
+          '人工库存调整 · 1',
+          '生产异常决策 · 1',
+        ]
+        assert.deepEqual(
+          await runtimeDropdown
+            .locator('.ant-select-item-group')
+            .allTextContents(),
+          expectedGroups
+        )
+        assert.equal(
+          await runtimeDropdown.locator('.ant-select-item-option').count(),
+          7,
+          '独立运行路径下拉必须精确覆盖 7 条正式流程定义'
+        )
+        assert.equal(
+          await runtimeDropdown
+            .locator('.erp-dev-flow-definition-option__key')
+            .count(),
+          7,
+          '每条流程定义必须保留机器键'
+        )
+        await runtimeSelector.press('Escape')
+        await runtimeDropdown.waitFor({ state: 'hidden', timeout: 10_000 })
+
+        await runtimeSelectRoot.locator('.ant-select-selector').click()
+        await runtimeDropdown.waitFor({ state: 'visible', timeout: 10_000 })
+        await runtimeDropdown
+          .locator('.ant-select-item-group')
+          .nth(5)
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        await runtimeDropdown
+          .locator('.ant-select-item-option')
+          .filter({ hasText: '销售订单受理（审批 + PMC）' })
+          .click()
+        await page.waitForFunction(
+          (expected) =>
+            new URLSearchParams(window.location.search).get('process') ===
+            expected,
+          'sales_order_acceptance/approval_pmc'
+        )
+        const selectedLabel = String(
+          await runtimeSelectRoot
+            .locator('.ant-select-selection-item')
+            .textContent()
+        ).trim()
+        assert.match(selectedLabel, /销售订单受理（审批 \+ PMC）/u)
+
+        await runtimeSelectRoot.locator('.ant-select-selector').click()
+        await runtimeDropdown.waitFor({ state: 'visible', timeout: 10_000 })
+        await runtimeDropdown
+          .locator('.ant-select-item-group')
+          .nth(5)
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        assert.deepEqual(
+          await runtimeDropdown
+            .locator('.ant-select-item-group')
+            .allTextContents(),
+          expectedGroups
+        )
+        assert.equal(
+          String(
+            await runtimeSelectRoot
+              .locator('.ant-select-selection-item')
+              .textContent()
+          ).trim(),
+          selectedLabel,
+          '关闭并重新打开后必须保留已选流程定义'
+        )
+        assert.equal(
+          new URL(page.url()).searchParams.get('process'),
+          'sales_order_acceptance/approval_pmc',
+          '关闭并重新打开不得改写流程定义深链接'
+        )
+        await page.screenshot({
+          path: 'output/playwright/style-l1/dev-flow-state-observatory-runtime-selector-groups.png',
+          fullPage: true,
+          animations: 'disabled',
+        })
+        await runtimeSelector.press('Escape')
+        await runtimeDropdown.waitFor({ state: 'hidden', timeout: 10_000 })
+        await assertNoHorizontalOverflow(
+          page,
+          'dev-flow-state-observatory-runtime-selector-readonly'
+        )
+        const writeRequests = writeRequestsByPage.get(page) || []
+        assert.deepEqual(
+          writeRequests,
+          [],
+          '独立运行路径下拉浏览不得发出写请求'
+        )
       },
     },
   ]

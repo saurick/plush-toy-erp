@@ -21,7 +21,6 @@ export const plushIndustryTemplateConfig = Object.freeze({
     changesWorkflowFactRules: false,
     changesRuntimeMenuLoader: false,
     executesImport: false,
-    writesBusinessRecords: false,
     writesFacts: false,
   }),
   defaultRoles: Object.freeze([
@@ -225,7 +224,7 @@ export const plushIndustryTemplateConfig = Object.freeze({
     },
     {
       module: "suppliers",
-      label: "供应商档案",
+      label: "供应商与加工厂",
       classification: "industry_default_candidate",
       fields: Object.freeze(["supplier_code", "supplier_type", "contact"]),
       deferred: Object.freeze(["supplier_material_scope", "settlement_note"]),
@@ -330,7 +329,6 @@ export const plushIndustryTemplateConfig = Object.freeze({
     ]),
     forbiddenAutoTargets: Object.freeze([
       "tenant_id",
-      "business_records",
       "product_skus",
       "purchase_orders",
       "shipments",

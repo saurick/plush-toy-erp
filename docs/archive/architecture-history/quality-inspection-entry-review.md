@@ -29,7 +29,6 @@ Phase 2D-C 本轮只评审来料质检入口、批次状态和冻结库存边界
 | 不接前端 | 不改桌面、移动端、菜单、JSON-RPC/API 或权限守卫。 |
 | 不改帮助中心 | 不改前端帮助中心和运行时说明。 |
 
-本轮也不新增 `quality_inspections`、`inventory_adjustments`、`stock_reservations`、`warehouse_locations`、供应商主数据、完整采购订单 / 合同 / 审批流、生产、委外、财务，不迁移旧 `business_records`，不删除或替换 `business_records`，不对 `192.168.0.106:5432/plush_erp` 执行 `migrate_apply`，不做真实分区 migration 和几十亿级压测。
 
 ## 2. 毛绒玩具工厂来料质检场景
 
@@ -135,7 +134,6 @@ Phase 2D-C 本轮只评审来料质检入口、批次状态和冻结库存边界
 | 质检不合格后退给供应商 | 应走 `purchase_returns`，继续由采购退货写 `inventory_txns.OUT` 并扣减余额。 |
 | `purchase_returns` 是否应引用 `inspection_id` | 长期看可以引用，便于从退货追溯到质检判定。 |
 | 本轮是否需要这个字段 | 不需要。本轮不新增 `quality_inspections`，因此也不应提前给采购退货加 `inspection_id`。 |
-| 不加字段如何追溯 | Phase 2D-C1 之前只能通过 `purchase_returns.note / purchase_return_items.note`、`source_line_no` 或关联通用 `business_records` 说明质检来源；这只是过渡，不替代后续质检单真源。 |
 | 后续如何处理 | 如果 Phase 2D-C2 落 `quality_inspections`，再评审 `purchase_returns.inspection_id` 或独立关联表，避免现在建空引用。 |
 
 采购退货可从 HOLD / REJECTED 批次扣减，但这必须是明确的业务例外：禁止普通领用，不禁止把不合格物退回供应商。

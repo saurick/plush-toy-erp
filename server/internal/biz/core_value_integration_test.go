@@ -112,9 +112,9 @@ func TestNormalizeFactCreateTracksExplicitIntentTimes(t *testing.T) {
 	}
 
 	financeBase := &FinanceFactCreate{
-		FactNo: "FIN-TIME", FactType: FinanceFactReceivable,
-		CounterpartyType: FinanceCounterpartyOther, Amount: decimal.NewFromInt(1),
-		IdempotencyKey: "finance-time",
+		FactNo: "FIN-TIME", FactType: FinanceFactReconciliation,
+		CounterpartyType: FinanceCounterpartyCustomer, Amount: decimal.NewFromInt(1),
+		Currency: FinanceCurrencyCNY, IdempotencyKey: "finance-time",
 	}
 	financeOmitted, err := normalizeFinanceFactCreate(financeBase)
 	if err != nil {
@@ -338,10 +338,10 @@ func TestNormalizeOperationalFactInputsUseCoreValueGuards(t *testing.T) {
 		FactType:         FinanceFactReceivable,
 		CounterpartyType: FinanceCounterpartyCustomer,
 		Amount:           decimal.NewFromInt(100),
-		FeeAmount:        decimal.NewFromFloat(1.5),
-		Currency:         " hkd ",
+		Currency:         " cny ",
 		CollectionType:   ptrString(" accounts_receivable "),
-		PaymentTerm:      ptrString(" eom_45 "),
+		PaymentTerm:      ptrString(" eom_days "),
+		PaymentTermDays:  processTestIntPtr(45),
 		InvoiceCategory:  ptrString(" vat_special_13 "),
 		IdempotencyKey:   "  FINANCE:1:create  ",
 		OccurredAt:       time.Now(),
@@ -353,17 +353,35 @@ func TestNormalizeOperationalFactInputsUseCoreValueGuards(t *testing.T) {
 	if normalizedFinance.IdempotencyKey != "FINANCE:1:create" {
 		t.Fatalf("expected finance idempotency key trimmed, got %q", normalizedFinance.IdempotencyKey)
 	}
-	if normalizedFinance.Currency != FinanceCurrencyHKD {
-		t.Fatalf("expected finance currency normalized to HKD, got %q", normalizedFinance.Currency)
+	if normalizedFinance.Currency != FinanceCurrencyCNY {
+		t.Fatalf("expected finance currency normalized to CNY, got %q", normalizedFinance.Currency)
 	}
 	if normalizedFinance.CollectionType == nil || *normalizedFinance.CollectionType != FinanceCollectionAccountsReceivable {
 		t.Fatalf("expected collection type normalized, got %#v", normalizedFinance.CollectionType)
 	}
-	if normalizedFinance.PaymentTerm == nil || *normalizedFinance.PaymentTerm != FinancePaymentTermEOM45 {
+	if normalizedFinance.PaymentTerm == nil || *normalizedFinance.PaymentTerm != FinancePaymentTermEOMDays {
 		t.Fatalf("expected payment term normalized, got %#v", normalizedFinance.PaymentTerm)
 	}
+	finance.FeeAmount = decimal.NewFromInt(1)
+	normalizedFinanceWithFee, err := normalizeFinanceFactCreate(finance)
+	if err != nil {
+		t.Fatalf("normalize finance fact with fee error=%v", err)
+	}
+	if !normalizedFinanceWithFee.FeeAmount.Equal(decimal.NewFromInt(1)) {
+		t.Fatalf("expected same-currency finance fee preserved, got %s", normalizedFinanceWithFee.FeeAmount)
+	}
+	finance.FeeAmount = decimal.Zero
 	if normalizedFinance.PaymentTermDays == nil || *normalizedFinance.PaymentTermDays != 45 {
-		t.Fatalf("expected payment term days auto-filled to 45, got %#v", normalizedFinance.PaymentTermDays)
+		t.Fatalf("expected payment term days retained at 45, got %#v", normalizedFinance.PaymentTermDays)
+	}
+	canonicalOccurredAt := finance.OccurredAt.UTC().Truncate(time.Microsecond)
+	wantDueAt := time.Date(
+		canonicalOccurredAt.Year(), canonicalOccurredAt.Month()+1, 0,
+		canonicalOccurredAt.Hour(), canonicalOccurredAt.Minute(), canonicalOccurredAt.Second(),
+		canonicalOccurredAt.Nanosecond(), time.UTC,
+	).AddDate(0, 0, 45)
+	if normalizedFinance.DueAt == nil || !normalizedFinance.DueAt.Equal(wantDueAt) {
+		t.Fatalf("expected due_at derived from occurrence and terms, got %#v", normalizedFinance.DueAt)
 	}
 	if normalizedFinance.InvoiceCategory == nil || *normalizedFinance.InvoiceCategory != FinanceInvoiceCategoryVATSpecial13 {
 		t.Fatalf("expected invoice category normalized, got %#v", normalizedFinance.InvoiceCategory)
@@ -383,16 +401,20 @@ func TestNormalizeOperationalFactInputsUseCoreValueGuards(t *testing.T) {
 		t.Fatalf("expected unsupported finance currency rejected, got %v", err)
 	}
 	finance.Currency = FinanceCurrencyCNY
-	finance.PaymentTerm = ptrString(FinancePaymentTermCashOnShipment)
+	finance.PaymentTerm = ptrString(FinancePaymentTermDueOnOccurrence)
 	finance.PaymentTermDays = nil
+	if _, err := normalizeFinanceFactCreate(finance); !errors.Is(err, ErrFinanceFactPaymentTermMissing) {
+		t.Fatalf("expected missing due-on-occurrence days rejected, got %v", err)
+	}
+	finance.PaymentTermDays = processTestIntPtr(0)
 	normalizedFinance, err = normalizeFinanceFactCreate(finance)
 	if err != nil {
-		t.Fatalf("normalize cash-on-shipment finance fact error = %v", err)
+		t.Fatalf("normalize due-on-occurrence finance fact error = %v", err)
 	}
 	if normalizedFinance.PaymentTermDays == nil || *normalizedFinance.PaymentTermDays != 0 {
-		t.Fatalf("expected cash-on-shipment days 0, got %#v", normalizedFinance.PaymentTermDays)
+		t.Fatalf("expected due-on-occurrence days 0, got %#v", normalizedFinance.PaymentTermDays)
 	}
-	finance.PaymentTerm = ptrString("NET_90")
+	finance.PaymentTerm = ptrString("NET_DAYS")
 	if _, err := normalizeFinanceFactCreate(finance); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected unsupported finance payment term rejected, got %v", err)
 	}

@@ -197,6 +197,7 @@ function sourceReport({ remote = false } = {}) {
           unitId: 1001,
           quantity: "1",
           lossRate: "0",
+          productionOperationCode: "FABRIC_PROCESSING",
         },
       ],
     },
@@ -288,6 +289,23 @@ function sourceReport({ remote = false } = {}) {
         runId: RUN_ID,
         sourceCandidates: {
           productionCandidates: [productionCandidate],
+          productionWIPOutsourcingCandidates: [3, 4].map((offset) => ({
+            productionCandidateOffset: offset,
+            order: {
+              id: 1310 + offset,
+              orderNo: `OS-WIP-${offset}`,
+              status: "CONFIRMED",
+            },
+            item: {
+              outsourcingOrderItemId: 1410 + offset,
+              subjectType: "MATERIAL",
+              subjectId: material.id,
+              materialId: material.id,
+              processId: 1501,
+              unitId: 1001,
+              quantity: "3",
+            },
+          })),
           outsourcingCandidates: [
             outsourcingMaterialCandidate,
             outsourcingProductCandidate,
@@ -420,10 +438,14 @@ function factStage() {
   const reservationStatuses = ["ACTIVE", "RELEASED"];
   const finance = [];
   const paymentTerms = [
-    { payment_term: "CASH_ON_SHIPMENT", payment_term_days: 0 },
-    { payment_term: "EOM_30", payment_term_days: 30 },
-    { payment_term: "EOM_45", payment_term_days: 45 },
-    { payment_term_days: 60 },
+    {
+      payment_term: "DUE_ON_OCCURRENCE",
+      payment_term_days: 0,
+      due_at: 1_789_113_600,
+    },
+    { payment_term: "EOM_DAYS", payment_term_days: 30, due_at: 1_791_705_600 },
+    { payment_term: "EOM_DAYS", payment_term_days: 45, due_at: 1_793_001_600 },
+    { payment_term: "EOM_DAYS", payment_term_days: 60, due_at: 1_794_297_600 },
   ];
   const invoiceCategories = [
     "NONE",
@@ -451,9 +473,11 @@ function factStage() {
         status,
         source_type: type === "RECONCILIATION" ? "FINANCE_FACT" : "SHIPMENT",
         source_id: 9000 + offset,
-        ...(type === "RECEIVABLE"
+        ...(["RECEIVABLE", "PAYABLE"].includes(type)
           ? {
-              collection_type: "ACCOUNTS_RECEIVABLE",
+              ...(type === "RECEIVABLE"
+                ? { collection_type: "ACCOUNTS_RECEIVABLE" }
+                : {}),
               ...paymentTerms[offset % paymentTerms.length],
             }
           : {}),
@@ -699,6 +723,19 @@ test("plan is target-bound, source-driven, and prepares 54 receipts plus 45 fact
           candidate.route.customerInspectionRequired === false &&
           candidate.route.packagingVersionSnapshot === "试用验收包装版",
       ),
+  );
+  assert.deepEqual(
+    plan.productionCandidates
+      .map((candidate, offset) =>
+        candidate.fabricOutsourcing
+          ? [offset, candidate.fabricOutsourcing.item.quantity]
+          : null,
+      )
+      .filter(Boolean),
+    [
+      [3, "3"],
+      [4, "3"],
+    ],
   );
   assert.equal(plan.outsourcingCandidates.length, 45);
   assert.equal(plan.expectedMinimums.shipments, 47);

@@ -32,6 +32,9 @@ func TestPurchaseOrderRepoSaveLifecycleAndReceiptLink(t *testing.T) {
 	material := createTestMaterial(t, ctx, client, unit.ID, "MAT-PO-001")
 	warehouse := createTestWarehouse(t, ctx, client, "WH-PO-001")
 	supplier := createPurchaseOrderTestSupplier(t, ctx, client, "SUP-PO-001", true)
+	if _, err := client.Supplier.UpdateOneID(supplier.ID).SetDefaultPaymentTermDays(30).Save(ctx); err != nil {
+		t.Fatalf("set supplier payment term: %v", err)
+	}
 	purchaseDate := time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC)
 	expectedArrival := purchaseDate.AddDate(0, 0, 7)
 	qty := decimal.NewFromInt(10)
@@ -69,11 +72,30 @@ func TestPurchaseOrderRepoSaveLifecycleAndReceiptLink(t *testing.T) {
 	if result.Order.LifecycleStatus != biz.PurchaseOrderStatusDraft || len(result.Items) != 1 {
 		t.Fatalf("expected draft purchase order with one line, got %#v", result)
 	}
+	if result.Order.Currency != biz.FinanceCurrencyCNY || result.Order.PaymentTermDays == nil || *result.Order.PaymentTermDays != 30 {
+		t.Fatalf("expected create to freeze CNY and supplier term 30, got %#v", result.Order)
+	}
 	line := result.Items[0]
 	if line.ProductOrderNoSnapshot == nil || *line.ProductOrderNoSnapshot != productOrderNo ||
 		line.ProductNoSnapshot == nil || *line.ProductNoSnapshot != productNo ||
 		line.ProductNameSnapshot == nil || *line.ProductNameSnapshot != productName {
 		t.Fatalf("expected product snapshots persisted, got %#v", line)
+	}
+	updatedTermDays := 60
+	updated, err := uc.UpdatePurchaseOrder(ctx, result.Order.ID, &biz.PurchaseOrderMutation{
+		PurchaseOrderNo:     result.Order.PurchaseOrderNo,
+		SupplierID:          supplier.ID,
+		Currency:            biz.FinanceCurrencyHKD,
+		PaymentTermDays:     &updatedTermDays,
+		SupplierSnapshot:    result.Order.SupplierSnapshot,
+		PurchaseDate:        purchaseDate,
+		ExpectedArrivalDate: &expectedArrival,
+	})
+	if err != nil {
+		t.Fatalf("update purchase currency/term failed: %v", err)
+	}
+	if updated.Currency != biz.FinanceCurrencyHKD || updated.PaymentTermDays == nil || *updated.PaymentTermDays != 60 {
+		t.Fatalf("expected explicit HKD/60 update persisted, got %#v", updated)
 	}
 
 	if _, err := uc.SubmitPurchaseOrder(ctx, result.Order.ID); err != nil {

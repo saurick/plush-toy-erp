@@ -62,21 +62,22 @@ func TestProcessRuntimeRecoveryTerminatesAndWithdrawsSafeDownstream(t *testing.T
 		t.Fatalf("unexpected recovered origin %#v", recovered)
 	}
 	persistedDownstream, err := processRepo.GetProcessNodeInstance(ctx, downstream.ID)
-	if err != nil || persistedDownstream.Status != biz.ProcessNodeStatusBlocked || persistedDownstream.Outcome == nil ||
+	if err != nil || persistedDownstream.Status != biz.ProcessNodeStatusWithdrawn || persistedDownstream.Outcome == nil ||
 		*persistedDownstream.Outcome != biz.ProcessDomainCommandRecoveryWithdrawnOutcome {
 		t.Fatalf("downstream not withdrawn node=%#v err=%v", persistedDownstream, err)
 	}
 	persistedTask, err := workflowRepo.GetWorkflowTask(ctx, task.ID)
-	if err != nil || persistedTask.TaskStatusKey != "rejected" || persistedTask.BlockedReason == nil || persistedTask.Version != task.Version+1 {
+	if err != nil || persistedTask.TaskStatusKey != "withdrawn" || persistedTask.BlockedReason == nil || persistedTask.Version != task.Version+1 {
 		t.Fatalf("linked task not withdrawn task=%#v err=%v", persistedTask, err)
 	}
 	persistedBlockedTask, err := workflowRepo.GetWorkflowTask(ctx, blockedTask.ID)
-	if err != nil || persistedBlockedTask.TaskStatusKey != "rejected" || persistedBlockedTask.Version != blockedTask.Version+1 {
+	if err != nil || persistedBlockedTask.TaskStatusKey != "withdrawn" || persistedBlockedTask.Version != blockedTask.Version+1 {
 		t.Fatalf("linked blocked task not withdrawn task=%#v err=%v", persistedBlockedTask, err)
 	}
 	instanceAfter, err := processRepo.GetProcessInstance(ctx, instance.ID)
-	if err != nil || instanceAfter.Status != biz.ProcessStatusBlocked {
-		t.Fatalf("process must remain blocked instance=%#v err=%v", instanceAfter, err)
+	if err != nil || instanceAfter.Status != biz.ProcessStatusCompleted || instanceAfter.ResolutionKind == nil ||
+		*instanceAfter.ResolutionKind != biz.ProcessResolutionCompensated {
+		t.Fatalf("process must settle as compensated instance=%#v err=%v", instanceAfter, err)
 	}
 	eventCount, err := client.WorkflowTaskEvent.Query().Where(
 		workflowtaskevent.TaskID(task.ID), workflowtaskevent.EventType("recovery_withdrawn"),
@@ -113,8 +114,8 @@ func TestProcessRuntimeRecoveryTerminatesAndWithdrawsSafeDownstream(t *testing.T
 	}
 }
 
-func TestProcessRuntimeRecoveryRejectsUnsafeDownstreamEvidence(t *testing.T) {
-	for _, status := range []string{biz.ProcessNodeStatusCompleted, biz.ProcessNodeStatusActive} {
+func TestProcessRuntimeRecoveryRejectsUnsafeActiveDownstreamEvidence(t *testing.T) {
+	for _, status := range []string{biz.ProcessNodeStatusActive} {
 		t.Run(status, func(t *testing.T) {
 			ctx := context.Background()
 			client := enttest.Open(t, dialect.SQLite, "file:process_runtime_recovery_unsafe_"+status+"?mode=memory&cache=shared&_fk=1")
@@ -129,7 +130,7 @@ func TestProcessRuntimeRecoveryRejectsUnsafeDownstreamEvidence(t *testing.T) {
 					t.Fatalf("complete unsafe downstream: %v", err)
 				}
 			} else {
-				futureCommand = activateProcessNodeForTest(t, ctx, processRepo, instance, futureCommand)
+				futureCommand = activateProcessNodeFromForTest(t, ctx, processRepo, instance, futureCommand, origin.ID)
 				fingerprint := "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
 				if _, err := processRepo.ClaimProcessNodeDomainCommand(ctx, &biz.ProcessNodeDomainCommandClaim{
 					ProcessInstanceID: instance.ID, ProcessNodeInstanceID: futureCommand.ID,
@@ -154,7 +155,7 @@ func TestProcessRuntimeRecoveryRejectsUnsafeDownstreamEvidence(t *testing.T) {
 	}
 }
 
-func TestProcessRuntimeRecoveryWithdrawsWaitingLinearDownstream(t *testing.T) {
+func TestProcessRuntimeRecoveryLeavesUnselectedWaitingNodeUntouched(t *testing.T) {
 	ctx := context.Background()
 	client := enttest.Open(t, dialect.SQLite, "file:process_runtime_recovery_waiting?mode=memory&cache=shared&_fk=1")
 	defer mustCloseEntClient(t, client)
@@ -169,13 +170,12 @@ func TestProcessRuntimeRecoveryWithdrawsWaitingLinearDownstream(t *testing.T) {
 		t.Fatalf("withdraw waiting downstream: %v", err)
 	}
 	persisted, err := processRepo.GetProcessNodeInstance(ctx, downstream.ID)
-	if err != nil || persisted.Status != biz.ProcessNodeStatusBlocked || persisted.StartedAt == nil || persisted.Outcome == nil ||
-		*persisted.Outcome != biz.ProcessDomainCommandRecoveryWithdrawnOutcome {
-		t.Fatalf("waiting downstream not withdrawn node=%#v err=%v", persisted, err)
+	if err != nil || persisted.Status != biz.ProcessNodeStatusWaiting || persisted.StartedAt != nil || persisted.Outcome != nil {
+		t.Fatalf("unselected waiting node changed node=%#v err=%v", persisted, err)
 	}
 }
 
-func TestProcessRuntimeRecoveryFailsClosedForNonSequentialTopology(t *testing.T) {
+func TestProcessRuntimeRecoveryAllowsUnselectedNonSequentialTopology(t *testing.T) {
 	ctx := context.Background()
 	client := enttest.Open(t, dialect.SQLite, "file:process_runtime_recovery_branch?mode=memory&cache=shared&_fk=1")
 	defer mustCloseEntClient(t, client)
@@ -188,8 +188,8 @@ func TestProcessRuntimeRecoveryFailsClosedForNonSequentialTopology(t *testing.T)
 		Decision:           biz.ProcessDomainCommandRecoveryTerminateAndWithdraw,
 		ExpectedResultHash: resultHash, ExpectedCompensationHash: compensationHash,
 	}, 9)
-	if !errors.Is(err, biz.ErrProcessDomainCommandRecoveryRequired) {
-		t.Fatalf("non-sequential recovery must fail closed, got %v", err)
+	if err != nil {
+		t.Fatalf("unselected graph topology must not block recovery: %v", err)
 	}
 }
 
@@ -243,7 +243,7 @@ func createCompletedCompensatedRecoveryFixture(
 	downstream := nodes[1]
 	futureCommand := nodes[2]
 	if activateDownstream {
-		downstream = activateProcessNodeForTest(t, ctx, repo, instance, downstream)
+		downstream = activateProcessNodeFromForTest(t, ctx, repo, instance, downstream, origin.ID)
 	}
 	compensationHash := "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
 	if _, err := repo.MarkProcessNodeDomainCommandCompensated(ctx, &biz.ProcessNodeDomainCommandCompensationMark{

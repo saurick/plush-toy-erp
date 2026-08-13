@@ -19,7 +19,9 @@ import {
   buildManualAcceptanceCurrentBatchReadiness,
   normalizeLocalBrowserURL,
   partitionTargetRuntimeEvents,
+  isRetryableFormalLoginRateLimitFailure,
   isRetryableTargetRateLimitFailure,
+  runFormalLoginWithRateLimitRetry,
   runTargetWithRateLimitRetry,
   summarizeManualAcceptance,
   parseManualAcceptanceBrowserArgs,
@@ -28,7 +30,7 @@ import {
   resolveManualAcceptanceDatasetReportRoot,
   runManualAcceptanceBrowser,
   readBusinessSummaryTotal,
-  readMobileLoadedTaskCount,
+  readMobileTaskTotal,
   resolveCurrentBatchListFilter,
   shipmentListReady,
   evaluateBusinessDashboardEvidence,
@@ -42,6 +44,7 @@ import {
   evaluateCurrentBatchListEvidence,
   evaluateMobileCurrentBatchEvidence,
   buildPrintWorkspaceDataEvidence,
+  currentBatchFactIdentifiers,
   getManualAcceptanceBrowserHelp,
   verifyManualAcceptanceBrowserDatasetBinding,
   verifyManualAcceptanceDatasetApplyReportBinding,
@@ -63,6 +66,7 @@ import {
   manualAcceptanceTaskBatchIdentity,
 } from "./manual-acceptance-task-data.mjs";
 import { inspectFinanceFieldContract } from "./manual-acceptance-finance-field-contract.mjs";
+import { formatUnixDate } from "../../web/src/erp/utils/masterDataOrderView.mjs";
 
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -93,14 +97,18 @@ function financeFieldFixture() {
       factType: "RECEIVABLE",
       status: "POSTED",
       collectionType: "ACCOUNTS_RECEIVABLE",
-      paymentTerm: "EOM_30",
+      paymentTerm: "EOM_DAYS",
       paymentTermDays: 30,
+      dueAt: 1_791_705_600,
     },
     {
       id: 92_001,
       factNo: "AP-FIELD-001",
       factType: "PAYABLE",
       status: "POSTED",
+      paymentTerm: "DUE_ON_OCCURRENCE",
+      paymentTermDays: 0,
+      dueAt: 1_789_113_600,
     },
     {
       id: 93_001,
@@ -242,7 +250,7 @@ async function datasetApplyEvidenceFixture() {
       exactEmptyBusinessBaseline: true,
       checkedBusinessObjectKinds:
         MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES.length,
-      zeroBusinessRecords: true,
+      allTrackedCountsZero: true,
       units: 1,
       warehouses: 4,
     },
@@ -415,7 +423,10 @@ test("manual acceptance browser plan covers all 51 catalog targets and ten forma
     backendURL: "http://localhost:8300",
   });
 
-  assert.equal(plan.writesDatabase, false);
+  assert.equal(plan.writesDatabase, true);
+  assert.equal(plan.businessDataReadOnly, true);
+  assert.equal(plan.writesBusinessData, false);
+  assert.equal(plan.recordsLegalNoticeAcknowledgement, true);
   assert.equal(plan.clicksBusinessWriteActions, false);
   assert.equal(plan.summary.totalTargets, 51);
   assert.deepEqual(plan.summary, {
@@ -489,26 +500,36 @@ test("finance browser evidence binds page headers and representative values", ()
   );
   const receivable = evaluateFinanceFieldBrowserEvidence({
     targetKey: "receivables",
-    headers: ["单号", "收款分类", "账期", "取消记录"],
-    rows: [["AR-FIELD-001", "应收款", "月结 30 天 / 30 天", "-"]],
+    headers: ["单号", "收款分类", "账期", "到期日期", "取消记录"],
+    rows: [
+      [
+        "AR-FIELD-001",
+        "应收款",
+        "月结 30 天",
+        formatUnixDate(1_791_705_600),
+        "-",
+      ],
+    ],
     representatives: financeFieldContract.representatives,
   });
   assert.equal(receivable.passed, true);
 
   const payable = evaluateFinanceFieldBrowserEvidence({
     targetKey: "payables",
-    headers: ["单号", "账期", "取消记录"],
-    rows: [["AP-FIELD-001", "历史未记录", "-"]],
+    headers: ["单号", "账期", "到期日期", "取消记录"],
+    rows: [["AP-FIELD-001", "发生即到期", formatUnixDate(1_789_113_600), "-"]],
     representatives: financeFieldContract.representatives,
   });
-  assert.equal(payable.passed, false);
-  assert.deepEqual(payable.forbiddenHeaders, ["账期"]);
+  assert.equal(payable.passed, true);
 });
 
-test("manual acceptance browser boundary is explicitly read-only", () => {
+test("manual acceptance browser boundary isolates legal acknowledgement from business data", () => {
   assert.deepEqual(MANUAL_ACCEPTANCE_BROWSER_BOUNDARY, {
-    readOnly: true,
-    writesDatabase: false,
+    readOnly: false,
+    writesDatabase: true,
+    businessDataReadOnly: true,
+    writesBusinessData: false,
+    recordsLegalNoticeAcknowledgement: true,
     clicksBusinessWriteActions: false,
     callsBusinessMutationRPC: false,
     storesPasswordValue: false,
@@ -516,6 +537,7 @@ test("manual acceptance browser boundary is explicitly read-only", () => {
     storesAuthorizationHeader: false,
     allowedInteractions: [
       "login",
+      "legal_notice_acknowledgement",
       "route_navigation",
       "read_only_tab_navigation",
     ],
@@ -749,6 +771,36 @@ test("bound print inputs stay in the acceptance report root and match the curren
       financeFieldContract,
     }),
     assertBoundSimulatedPrintReports(source, fact),
+  );
+  const visibleBOMSource = {
+    ...source,
+    referenceRecords: {
+      ...source.referenceRecords,
+      bomVersions: [
+        {
+          version: "YS5-BOM-005-1",
+          status: "ARCHIVED",
+          items: Array.from({ length: 25 }),
+        },
+        {
+          version: "YS5-BOM-005-3",
+          status: "DRAFT",
+          items: Array.from({ length: 25 }),
+        },
+      ],
+    },
+  };
+  assert.equal(
+    assertBoundSimulatedPrintReports(visibleBOMSource, {
+      ...visibleBOMSource,
+      reportContract: "source-driven-operational-facts-v1",
+      referenceRecords: {
+        ...visibleBOMSource.referenceRecords,
+        financeFacts,
+      },
+      financeFieldContract,
+    }).printRecords.bomVersion.recordQuery,
+    "YS5-BOM-005-3",
   );
   assert.throws(
     () =>
@@ -1338,6 +1390,24 @@ test("browser target retries only bounded pure HTTP 429 failures and retains evi
   );
 
   attempts = 0;
+  const defaultWaits = [];
+  const recoveredAfterDefaultWindow = await runTargetWithRateLimitRetry(
+    async () => {
+      attempts += 1;
+      return attempts < 3
+        ? rateLimited
+        : { passed: true, runtimeErrors: [], dataEvidence: { proven: true } };
+    },
+    {
+      waitImpl: async (milliseconds) => defaultWaits.push(milliseconds),
+    },
+  );
+  assert.equal(attempts, 3);
+  assert.deepEqual(defaultWaits, [10_000, 20_000]);
+  assert.equal(recoveredAfterDefaultWindow.passed, true);
+  assert.equal(recoveredAfterDefaultWindow.rateLimitRetryEvidence.length, 2);
+
+  attempts = 0;
   const persistent = await runTargetWithRateLimitRetry(
     async () => {
       attempts += 1;
@@ -1348,6 +1418,74 @@ test("browser target retries only bounded pure HTTP 429 failures and retains evi
   assert.equal(attempts, 3);
   assert.equal(persistent.passed, false);
   assert.equal(persistent.rateLimitRetryEvidence.length, 3);
+});
+
+test("formal login retries only bounded pure HTTP 429 failures", async () => {
+  const rateLimited = Object.assign(new Error("formal login rate limited"), {
+    runtimeErrors: [
+      {
+        type: "response",
+        message: "429 http://127.0.0.1:15200/rpc/admin",
+      },
+      {
+        type: "console",
+        message:
+          "Failed to load resource: the server responded with a status of 429 (Too Many Requests)",
+      },
+    ],
+  });
+  assert.equal(isRetryableFormalLoginRateLimitFailure(rateLimited), true);
+
+  const mixedFailure = Object.assign(new Error("formal login failed"), {
+    runtimeErrors: [
+      ...rateLimited.runtimeErrors,
+      { type: "response", message: "500 http://127.0.0.1:15200/rpc/admin" },
+    ],
+  });
+  assert.equal(isRetryableFormalLoginRateLimitFailure(mixedFailure), false);
+
+  const waits = [];
+  let attempts = 0;
+  const recovered = await runFormalLoginWithRateLimitRetry(
+    async () => {
+      attempts += 1;
+      if (attempts === 1) throw rateLimited;
+      return { passed: true };
+    },
+    {
+      waitImpl: async (milliseconds) => waits.push(milliseconds),
+      retryDelayMs: 25,
+    },
+  );
+  assert.deepEqual(recovered, { passed: true });
+  assert.equal(attempts, 2);
+  assert.deepEqual(waits, [25]);
+
+  attempts = 0;
+  await assert.rejects(
+    runFormalLoginWithRateLimitRetry(
+      async () => {
+        attempts += 1;
+        throw mixedFailure;
+      },
+      { waitImpl: async () => {}, retryDelayMs: 0 },
+    ),
+    mixedFailure,
+  );
+  assert.equal(attempts, 1);
+
+  attempts = 0;
+  await assert.rejects(
+    runFormalLoginWithRateLimitRetry(
+      async () => {
+        attempts += 1;
+        throw rateLimited;
+      },
+      { waitImpl: async () => {}, maxAttempts: 3, retryDelayMs: 0 },
+    ),
+    rateLimited,
+  );
+  assert.equal(attempts, 3);
 });
 
 test("business summary totals use the visible client-facing counters", () => {
@@ -1542,6 +1680,43 @@ test("page-data contract and readiness expose current-batch list identifiers", (
   );
 });
 
+test("no-search current-batch pages use only their exact visible business number", () => {
+  const plan = buildManualAcceptanceBrowserPlan({});
+  for (const [targetKey, identifier] of [
+    ["production-exceptions", "TEST-YS-260716V5-SCYC001"],
+    ["finance-payments", "TEST-YS-260716V5-SK903"],
+  ]) {
+    const target = plan.targets.find((item) => item.key === targetKey);
+    assert.ok(target);
+    assert.deepEqual(
+      resolveCurrentBatchListFilter(
+        target,
+        { dataStatus: "pass", actual: 1, probes: [] },
+        {
+          dataset: {
+            currentBatchIdentifiers: { [targetKey]: identifier },
+          },
+        },
+      ),
+      { mode: "visible_exact_business_number", identifier },
+    );
+  }
+
+  const customer = plan.targets.find((item) => item.key === "customers");
+  assert.deepEqual(
+    resolveCurrentBatchListFilter(
+      customer,
+      { dataStatus: "pass", actual: 1, probes: [] },
+      {
+        dataset: {
+          currentBatchIdentifiers: { customers: "YS5-KH-001" },
+        },
+      },
+    ),
+    { mode: "exact_business_number", identifier: "YS5-KH-001" },
+  );
+});
+
 test("task board binds task-code metadata to the exact current-batch total", () => {
   const taskBoard = buildManualAcceptanceBrowserPlan({}).targets.find(
     (target) => target.key === "task-board",
@@ -1585,6 +1760,40 @@ test("task board binds task-code metadata to the exact current-batch total", () 
       .minimumSatisfied,
     false,
   );
+});
+
+test("task board waits for its loaded search control before current-batch filtering", async () => {
+  const source = await fs.readFile(scriptPath, "utf8");
+  const filterStart = source.indexOf(
+    "async function filterVisibleListToCurrentBatch",
+  );
+  const filterEnd = source.indexOf(
+    "export function evaluateCurrentBatchListEvidence",
+    filterStart,
+  );
+  const filterSource = source.slice(filterStart, filterEnd);
+  const taskBoardIndex = filterSource.indexOf('target.key === "task-board"');
+  const exactSearchIndex = filterSource.indexOf(
+    'getByPlaceholder("搜索任务", { exact: true })',
+  );
+  const visibleWaitIndex = filterSource.indexOf(
+    'state: "visible"',
+    exactSearchIndex,
+  );
+  const fillIndex = filterSource.indexOf(
+    "await search.fill(filter.identifier)",
+  );
+  assert.ok(filterStart >= 0);
+  assert.ok(filterEnd > filterStart);
+  assert.ok(taskBoardIndex >= 0);
+  assert.ok(exactSearchIndex > taskBoardIndex);
+  assert.ok(visibleWaitIndex > exactSearchIndex);
+  assert.ok(fillIndex > visibleWaitIndex);
+  assert.match(
+    filterSource,
+    /else \{[\s\S]*?input\[placeholder\*="搜索"\],input\[placeholder\^="操作人"\]/u,
+  );
+  assert.match(filterSource, /没有可用于当前批次核对的搜索框/u);
 });
 
 test("mobile current-batch proof requires an exact role source and a visible current-batch task", () => {
@@ -1686,7 +1895,7 @@ test("dashboard data evidence fails closed for empty or unavailable sources", ()
   );
 });
 
-test("dashboard task evidence requires a visible code from the exact current batch", () => {
+test("dashboard task evidence binds the visible page to the exact current batch", () => {
   const currentBatch = {
     dataStatus: "pass",
     actual: 18,
@@ -1712,13 +1921,14 @@ test("dashboard task evidence requires a visible code from the exact current bat
     { length: 18 },
     (_, index) => `YS-V5-LD-${String(index + 1).padStart(2, "0")}`,
   );
+  const currentPageTaskCodes = exactTaskCodes.slice(0, 8);
   assert.equal(
     evaluateDashboardTaskCurrentBatchEvidence({
       evidence: base,
       currentBatch,
       roleKey: "boss",
       visibleTaskCodes: ["YS-V5-LD-01"],
-      currentBatchTaskCodes: exactTaskCodes,
+      currentBatchTaskCodes: currentPageTaskCodes,
     }).minimumSatisfied,
     true,
   );
@@ -1728,7 +1938,7 @@ test("dashboard task evidence requires a visible code from the exact current bat
       currentBatch,
       roleKey: "boss",
       visibleTaskCodes: ["OLD-LD-01"],
-      currentBatchTaskCodes: exactTaskCodes,
+      currentBatchTaskCodes: currentPageTaskCodes,
     }).minimumSatisfied,
     false,
   );
@@ -1738,7 +1948,7 @@ test("dashboard task evidence requires a visible code from the exact current bat
       currentBatch,
       roleKey: "boss",
       visibleTaskCodes: ["YS-V5-LD-01"],
-      currentBatchTaskCodes: exactTaskCodes.slice(0, 17),
+      currentBatchTaskCodes: [],
     }).minimumSatisfied,
     false,
   );
@@ -1777,7 +1987,7 @@ test("dashboard task evidence requires a visible code from the exact current bat
     true,
   );
   for (const invalidCodes of [
-    exceptionCodes.slice(0, 3),
+    [],
     [...exceptionCodes, "YS-V5-SC-05"],
     [exceptionCodes[0], exceptionCodes[0], ...exceptionCodes.slice(2)],
   ]) {
@@ -1981,23 +2191,76 @@ test("print preview and current-batch source minimum evidence fail closed", () =
   assert.equal(mismatchedCatalogMinimum.minimumSatisfied, false);
 });
 
-test("mobile task totals use the active tab's loaded summary even without a collapse toggle", () => {
-  assert.equal(readMobileLoadedTaskCount("todo", "已加载 18 条待处理"), 18);
-  assert.equal(readMobileLoadedTaskCount("done", "已加载 2 条已办"), 2);
-  assert.equal(readMobileLoadedTaskCount("done", "已加载 18 条待处理"), 0);
+test("mobile task totals use the current tab's canonical aria label", () => {
+  assert.equal(readMobileTaskTotal("todo", "全部，共 18 条"), 18);
+  assert.equal(
+    readMobileTaskTotal("done", "已办任务共 23 条，当前已加载 20 条"),
+    23,
+  );
+  assert.equal(readMobileTaskTotal("done", "全部，共 18 条"), null);
+  assert.equal(readMobileTaskTotal("todo", "已加载 18 条待处理"), null);
 });
 
 test("mobile task evidence waits for each lazy-loaded tab before reading zero", async () => {
   const source = await fs.readFile(scriptPath, "utf8");
   assert.match(source, /mobile-role-scroll/u);
   assert.match(source, /getAttribute\("aria-busy"\) === "false"/u);
-  assert.match(
-    source,
-    /mobile-role-nav-done[\s\S]{0,900}waitForActiveViewLoaded\(\)[\s\S]{0,500}readCurrentTotal\("done"\)/u,
+  const doneNavigationIndex = source.indexOf(
+    'getByTestId("mobile-role-nav-done")',
   );
-  assert.match(
-    source,
-    /loadedTodoCount \+ Number\(match\[1\] \|\| 0\) >= requiredMinimum/u,
+  const doneLoadedIndex = source.indexOf(
+    "await waitForActiveViewLoaded();",
+    doneNavigationIndex,
+  );
+  const doneTotalIndex = source.indexOf(
+    'readCurrentTotal("done")',
+    doneLoadedIndex,
+  );
+  assert.ok(doneNavigationIndex >= 0);
+  assert.ok(doneLoadedIndex > doneNavigationIndex);
+  assert.ok(doneTotalIndex > doneLoadedIndex);
+  assert.match(source, /mobile-role-filter-all/u);
+  assert.match(source, /mobile-role-done-count/u);
+  assert.match(source, /todoTotal \+ Number\(doneTotalMatch\[1\] \|\| 0\)/u);
+  assert.doesNotMatch(source, /已加载\\s\*\(\\d\+\)\\s\*条已办/u);
+});
+
+test("production order identifier prefers current visible records", () => {
+  const identifiers = currentBatchFactIdentifiers({
+    referenceRecords: {
+      shipments: [],
+      productionOrders: [
+        { order_no: "TEST-CLOSED", status: "CLOSED" },
+        { order_no: "TEST-DRAFT", status: "DRAFT" },
+        { order_no: "TEST-RELEASED", status: "RELEASED" },
+        { order_no: "TEST-CANCELLED", status: "CANCELLED" },
+      ],
+    },
+  });
+  assert.equal(identifiers["production-orders"], "TEST-RELEASED");
+  assert.equal(
+    currentBatchFactIdentifiers({
+      referenceRecords: {
+        shipments: [],
+        productionOrders: [
+          { order_no: "TEST-CLOSED", status: "CLOSED" },
+          { order_no: "TEST-DRAFT", status: "DRAFT" },
+        ],
+      },
+    })["production-orders"],
+    "TEST-DRAFT",
+  );
+  assert.equal(
+    currentBatchFactIdentifiers({
+      referenceRecords: {
+        shipments: [],
+        productionOrders: [
+          { order_no: "TEST-CLOSED", status: "CLOSED" },
+          { order_no: "TEST-CANCELLED", status: "CANCELLED" },
+        ],
+      },
+    })["production-orders"],
+    null,
   );
 });
 
@@ -2094,6 +2357,12 @@ test("business print proof searches canonical current-batch records before exact
   assert.match(source, /await selectionControl\.click\(\)/u);
   assert.match(source, /selectionInput\.isChecked\(\)/u);
   assert.doesNotMatch(source, /force: true/u);
+  assert.match(source, /getByTestId\("legal-notice-acknowledge"\)/u);
+  assert.match(source, /gate\.waitFor\(\{ state: "hidden"/u);
+  assert.match(source, /legalNoticeAcknowledged/u);
+  assert.match(source, /filter\.mode !== "visible_exact_business_number"/u);
+  assert.match(source, /decision\?\.decision_no \|\| decision\?\.decisionNo/u);
+  assert.match(source, /records\.financePayments/u);
   assert.match(source, /attempt <= 3/u);
   assert.match(source, /search\.inputValue\(\)/u);
   assert.match(source, /const filteredRowsReady = await page/u);
@@ -2326,6 +2595,6 @@ test("plan mode needs no password and starts no browser", () => {
   assert.equal(result.status, 0, result.stderr);
   const plan = JSON.parse(result.stdout);
   assert.equal(plan.summary.totalTargets, 51);
-  assert.equal(plan.writesDatabase, false);
+  assert.equal(plan.writesDatabase, true);
   assert.equal(plan.formalAccounts.length, 10);
 });

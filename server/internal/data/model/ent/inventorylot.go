@@ -36,6 +36,16 @@ type InventoryLot struct {
 	ProductionLotNo *string `json:"production_lot_no,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
+	// Version holds the value of the "version" field.
+	Version int `json:"version,omitempty"`
+	// StatusAction holds the value of the "status_action" field.
+	StatusAction *string `json:"status_action,omitempty"`
+	// StatusReason holds the value of the "status_reason" field.
+	StatusReason *string `json:"status_reason,omitempty"`
+	// StatusChangedAt holds the value of the "status_changed_at" field.
+	StatusChangedAt *time.Time `json:"status_changed_at,omitempty"`
+	// StatusChangedBy holds the value of the "status_changed_by" field.
+	StatusChangedBy *int `json:"status_changed_by,omitempty"`
 	// ReceivedAt holds the value of the "received_at" field.
 	ReceivedAt *time.Time `json:"received_at,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -72,9 +82,11 @@ type InventoryLotEdges struct {
 	ShipmentItems []*ShipmentItem `json:"shipment_items,omitempty"`
 	// StockReservations holds the value of the stock_reservations edge.
 	StockReservations []*StockReservation `json:"stock_reservations,omitempty"`
+	// StatusEvents holds the value of the status_events edge.
+	StatusEvents []*InventoryLotStatusEvent `json:"status_events,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [11]bool
+	loadedTypes [12]bool
 }
 
 // InventoryTxnsOrErr returns the InventoryTxns value or an error if the edge
@@ -178,16 +190,25 @@ func (e InventoryLotEdges) StockReservationsOrErr() ([]*StockReservation, error)
 	return nil, &NotLoadedError{edge: "stock_reservations"}
 }
 
+// StatusEventsOrErr returns the StatusEvents value or an error if the edge
+// was not loaded in eager-loading.
+func (e InventoryLotEdges) StatusEventsOrErr() ([]*InventoryLotStatusEvent, error) {
+	if e.loadedTypes[11] {
+		return e.StatusEvents, nil
+	}
+	return nil, &NotLoadedError{edge: "status_events"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*InventoryLot) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case inventorylot.FieldID, inventorylot.FieldSubjectID, inventorylot.FieldProductSkuID:
+		case inventorylot.FieldID, inventorylot.FieldSubjectID, inventorylot.FieldProductSkuID, inventorylot.FieldVersion, inventorylot.FieldStatusChangedBy:
 			values[i] = new(sql.NullInt64)
-		case inventorylot.FieldSubjectType, inventorylot.FieldLotNo, inventorylot.FieldSupplierLotNo, inventorylot.FieldColorNo, inventorylot.FieldDyeLotNo, inventorylot.FieldProductionLotNo, inventorylot.FieldStatus:
+		case inventorylot.FieldSubjectType, inventorylot.FieldLotNo, inventorylot.FieldSupplierLotNo, inventorylot.FieldColorNo, inventorylot.FieldDyeLotNo, inventorylot.FieldProductionLotNo, inventorylot.FieldStatus, inventorylot.FieldStatusAction, inventorylot.FieldStatusReason:
 			values[i] = new(sql.NullString)
-		case inventorylot.FieldReceivedAt, inventorylot.FieldCreatedAt, inventorylot.FieldUpdatedAt:
+		case inventorylot.FieldStatusChangedAt, inventorylot.FieldReceivedAt, inventorylot.FieldCreatedAt, inventorylot.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -268,6 +289,40 @@ func (_m *InventoryLot) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field status", values[i])
 			} else if value.Valid {
 				_m.Status = value.String
+			}
+		case inventorylot.FieldVersion:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field version", values[i])
+			} else if value.Valid {
+				_m.Version = int(value.Int64)
+			}
+		case inventorylot.FieldStatusAction:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field status_action", values[i])
+			} else if value.Valid {
+				_m.StatusAction = new(string)
+				*_m.StatusAction = value.String
+			}
+		case inventorylot.FieldStatusReason:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field status_reason", values[i])
+			} else if value.Valid {
+				_m.StatusReason = new(string)
+				*_m.StatusReason = value.String
+			}
+		case inventorylot.FieldStatusChangedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field status_changed_at", values[i])
+			} else if value.Valid {
+				_m.StatusChangedAt = new(time.Time)
+				*_m.StatusChangedAt = value.Time
+			}
+		case inventorylot.FieldStatusChangedBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field status_changed_by", values[i])
+			} else if value.Valid {
+				_m.StatusChangedBy = new(int)
+				*_m.StatusChangedBy = int(value.Int64)
 			}
 		case inventorylot.FieldReceivedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -356,6 +411,11 @@ func (_m *InventoryLot) QueryStockReservations() *StockReservationQuery {
 	return NewInventoryLotClient(_m.config).QueryStockReservations(_m)
 }
 
+// QueryStatusEvents queries the "status_events" edge of the InventoryLot entity.
+func (_m *InventoryLot) QueryStatusEvents() *InventoryLotStatusEventQuery {
+	return NewInventoryLotClient(_m.config).QueryStatusEvents(_m)
+}
+
 // Update returns a builder for updating this InventoryLot.
 // Note that you need to call InventoryLot.Unwrap() before calling this method if this InventoryLot
 // was returned from a transaction, and the transaction was committed or rolled back.
@@ -415,6 +475,29 @@ func (_m *InventoryLot) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)
+	builder.WriteString(", ")
+	builder.WriteString("version=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Version))
+	builder.WriteString(", ")
+	if v := _m.StatusAction; v != nil {
+		builder.WriteString("status_action=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.StatusReason; v != nil {
+		builder.WriteString("status_reason=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.StatusChangedAt; v != nil {
+		builder.WriteString("status_changed_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.StatusChangedBy; v != nil {
+		builder.WriteString("status_changed_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	if v := _m.ReceivedAt; v != nil {
 		builder.WriteString("received_at=")

@@ -11,6 +11,8 @@
 - 调用 `biz` 层 usecase
 - 把结果包装回协议层返回结构
 
+销售、采购和委外的关闭 / 取消接口只解析统一的强动作参数并注入当前登录 actor；正常结清、短结、逐行履约与流程撤回规则仍由 `biz / data` 执行。Workflow 的公开任务动作不接受 `withdrawn`，该状态只由来源取消或受控恢复的内部事务写入；读取接口负责把它作为独立系统撤回终态返回，不能折算成人工 `rejected`。
+
 JSON-RPC dispatcher 继续按职责拆文件维护：
 
 - `jsonrpc_dispatch.go`：dispatcher 构造、入口日志、URL 分发和 `system` 域。
@@ -19,7 +21,7 @@ JSON-RPC dispatcher 继续按职责拆文件维护：
 - `jsonrpc_dispatch_admin.go`：后台管理员、角色、权限和控制面审计入口。
 - `jsonrpc_dispatch_helpers.go`：协议参数解析、敏感参数脱敏和 `structpb` 包装 helper。
 
-如果后续新增 gRPC / HTTP DTO 转换逻辑，也建议继续把协议细节留在 `service` 层，不要回灌到 `biz`。
+如果后续新增 HTTP DTO 转换逻辑，也建议继续把协议细节留在 `service` 层，不要回灌到 `biz`。
 
 补充说明见：
 

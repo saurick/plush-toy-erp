@@ -20,7 +20,13 @@ export class JsonRpcMock {
         return {
           code: 0,
           message: 'OK',
-          version: { version: 'mock-1.0.0' },
+          data: {
+            version: 'mock-local',
+            release_version: 'mock-local',
+            git_sha: '20c96d3819429361a35d2551b63b211f055de37e',
+            git_sha_short: '20c96d38',
+            formal: true,
+          },
         }
       }
     }

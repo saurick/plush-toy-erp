@@ -63,7 +63,8 @@ import {
   BusinessListToolbarActions,
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
-import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
+import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
+import { BusinessHelpLabel } from '../components/help/BusinessContextHelp.jsx'
 import InventoryOperationModal from '../components/inventory/InventoryOperationModal.jsx'
 import InventoryOperationRecordsModal from '../components/inventory/InventoryOperationRecordsModal.jsx'
 import ExceptionProcessRecoveryButton from '../components/workflow/ExceptionProcessRecoveryButton.jsx'
@@ -74,6 +75,7 @@ import {
   hasActionPermission,
   trimOptional,
 } from '../utils/masterDataOrderView.mjs'
+import { currentBusinessDate } from '../utils/businessDate.mjs'
 import {
   businessSourceRouteFor,
   sourceRouteFor,
@@ -1666,7 +1668,13 @@ export default function V1InventoryLedgerPage() {
           formatQuantity(record?.active_reserved_quantity),
       },
       {
-        title: '可用量',
+        title: (
+          <BusinessHelpLabel
+            itemKey="available-quantity"
+            label="可用量"
+            pageKey="inventory"
+          />
+        ),
         exportTitle: '可用量',
         dataIndex: 'available_quantity',
         width: 130,
@@ -1705,7 +1713,7 @@ export default function V1InventoryLedgerPage() {
   const { exporting, exportRows } = useBusinessListExport({
     requestKey: `inventory-export:${activeView}`,
     loadRows: loadExportRows,
-    filename: `库存明细-${new Date().toISOString().slice(0, 10)}.csv`,
+    filename: `库存明细-${currentBusinessDate()}.csv`,
     columns: exportColumns,
     recordLabel: `${activeLabel}记录`,
   })
@@ -1792,6 +1800,7 @@ export default function V1InventoryLedgerPage() {
     <BusinessPageLayout className="erp-v1-inventory-ledger-page">
       <PageHeaderCard
         compact
+        helpKey="inventory"
         title="库存台账"
         description="可查询余额、批次和库存变动，也可从选中的真实库存余额登记盘点、调拨和经审批的人工调整；作业草稿只有过账后才会形成库存变动。"
         tags={[
@@ -2297,7 +2306,7 @@ export default function V1InventoryLedgerPage() {
         />
       </Card>
       {columnOrderModal}
-      <BusinessRecordDetailsModal
+      <BusinessDetailsModal
         columns={visibleColumns}
         description="当前弹窗只用于库存查询和追溯，不会修改库存、批次状态、预留或变动记录。"
         open={Boolean(detailRecord)}

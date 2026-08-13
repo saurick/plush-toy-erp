@@ -1,4 +1,5 @@
 import {
+  DEV_BUSINESS_USABILITY_ROUTE,
   DEV_CUSTOMER_CONFIG_ROUTE,
   DEV_DATABASE_MIGRATION_ROUTE,
   DEV_DATA_PREPARATION_ROUTE,
@@ -46,16 +47,17 @@ export const DEV_HUB_ITEMS = Object.freeze([
     group: '权限治理 / Access Governance',
     route: DEV_PERMISSION_RELATIONSHIPS_ROUTE,
     source: 'docs/product/配置与权限策略.md',
-    truthSource: '员工账号、岗位、最终权限解释、仓库范围与已启用审批设置',
+    truthSource:
+      '员工账号、岗位、最终权限解释、正式菜单投影、仓库范围与已启用审批设置',
     status: '只读运行投影 / Read-only projection',
     guardrails: Object.freeze([
-      '只读复用现有后端权限真源 / Existing backend truth only',
+      '只读复用现有权限与菜单投影 / Existing access and menu projection only',
       '不汇入任务、单据、流程或业务事实 / Permission relationships only',
       '不在本页写权限 / No permission writes',
       '不进生产构建 / No prod build',
     ]),
     description:
-      '按岗位或账号查看最终可用功能、页面、仓库数据范围和审批责任，定位为什么能用或为什么受限；配置仍回到正式权限页维护。',
+      '按岗位或账号查看最终可用功能、页面、实际侧栏、仓库数据范围和审批责任，定位为什么能用、从哪里进入或为什么受限；配置仍回到正式权限页维护。',
   }),
   Object.freeze({
     key: 'governance',
@@ -91,6 +93,24 @@ export const DEV_HUB_ITEMS = Object.freeze([
     ]),
     description:
       '从 11 条业务链总图下钻来源单据、责任任务、运行路径、事实台账和状态规则；只读观察，不创建第二套运行真源。',
+  }),
+  Object.freeze({
+    key: 'business-usability',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
+    title: '业务易用性 / Business Usability',
+    group: '产品治理 / Product Governance',
+    route: DEV_BUSINESS_USABILITY_ROUTE,
+    source: 'web/src/erp/config/businessUsabilityCatalog.mjs',
+    truthSource: '正式业务页面目录、业务链目录与岗位帮助内容',
+    status: '只读覆盖检查 / Read-only coverage',
+    guardrails: Object.freeze([
+      '统一解释目录 / Shared explanation catalog',
+      '不复制权限与岗位责任 / No duplicate access or role truth',
+      '不写业务状态 / No business writes',
+      '不进生产构建 / No prod build',
+    ]),
+    description:
+      '查看员工在各业务页面能否直接看懂任务、完成标准、办理顺序、字段来源和计算口径；岗位只用于帮助内容推荐，不代表实际权限。',
   }),
   Object.freeze({
     key: 'docs',

@@ -1,4 +1,5 @@
 import { normalizePrintAppendixImages } from '../utils/printAppendixImages.mjs'
+import { unixSecondsToBusinessDate } from '../utils/businessDate.mjs'
 
 export const PROCESSING_CONTRACT_TEMPLATE_KEY = 'processing-contract'
 export const PROCESSING_CONTRACT_DRAFT_VERSION = 4
@@ -135,7 +136,7 @@ export const processingContractTemplateMeta = {
     '合同编号、下单日期、回货日期、加工方名称和委托单位保留在当前合同中，不会修改加工厂或公司资料。',
     '加工项目、工序类别、单价、委托加工数量和金额保留在当前合同中；加工项目记录部位或内容，工序类别来自工序档案，金额默认按数量 × 单价计算，也可手工修改。',
     '来货要求、合同约定、结算方式属于正式合同正文，不应只留在帮助文档里口头说明。',
-    '末尾附图上传后按当前顺序显示在合同最后，并随当前 PDF 或打印件一起输出。',
+    '委外订单中标记为合同附图的图片会在打开打印窗口时冻结带入末尾；窗口内新增或调整后按当前顺序随 PDF 或打印件输出。',
   ],
   fieldRequirements: [
     {
@@ -148,8 +149,9 @@ export const processingContractTemplateMeta = {
     {
       key: 'processor_snapshot',
       label: '加工方资料',
-      source: '供应商 / 加工厂资料或合同草稿',
-      boundary: '打印时修改内容不会改变供应商或加工厂资料',
+      source: '委外订单保存的乙方合同快照',
+      boundary:
+        '打开打印时不会用当前供应商 / 加工厂档案覆盖历史合同；打印窗口中的修改也不会改动业务单据或供应商 / 加工厂档案',
     },
     {
       key: 'processing_line_snapshots',
@@ -161,9 +163,9 @@ export const processingContractTemplateMeta = {
     {
       key: 'appendix_image_snapshots',
       label: '末尾附图',
-      source: '当前打印窗口添加的图片',
+      source: '委外订单合同附图附件或当前打印窗口添加的图片',
       boundary:
-        '图片数量不设业务上限；普通图片自动两张一行，长图自动整行，可逐张切换排版；只随当前草稿、PDF / 打印输出，不替代正式附件归档',
+        '订单附件只读取未撤销且显式标记为合同附图的图片；普通附件不进入纸面。不另设业务规则数量，但单次 PDF 的正文和末尾附图合计最多 32 张内嵌图片；窗口内调整只随当前草稿、PDF / 打印输出，不回写附件归档',
     },
     {
       key: 'contract_clauses',
@@ -547,7 +549,7 @@ function formatProcessingDraftDate(value) {
   if (!Number.isFinite(timestamp) || timestamp <= 0) {
     return normalizeText(value)
   }
-  return new Date(timestamp * 1000).toISOString().slice(0, 10)
+  return unixSecondsToBusinessDate(timestamp)
 }
 
 function processingPrintPartyDefaults(printTemplateDefaults = {}) {
@@ -650,6 +652,7 @@ export function buildProcessingContractDraftFromOutsourcingOrder(
       normalizeText(supplierSnapshot.contact_phone) ||
       normalizeText(supplierSnapshot.contact_mobile),
     supplierAddress: normalizeText(supplierSnapshot.address),
+    supplierSigner: normalizeText(supplierSnapshot.signer_name),
     ...processingPrintPartyDefaults(printTemplateDefaults),
     ...processingContractPartySnapshot(order),
     orderDateText: formatProcessingDraftDate(order.order_date),

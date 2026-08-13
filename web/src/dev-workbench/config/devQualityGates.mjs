@@ -63,6 +63,8 @@ const UUID_PATTERN =
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/u
 const HASH_PATTERN = /^[0-9a-f]{64}$/u
 const STRUCTURED_ID_PATTERN = /^[a-z][a-z0-9_]{1,63}$/u
+const AFFECTED_SCOPE_PATTERN = /^T[0-8]$/u
+const LOCAL_GATE_VALUES = Object.freeze(['focused', 'full'])
 const IDEMPOTENCY_PATTERN =
   /^quality-gate:(full|strict):([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/u
 const OPERATION_STATUSES = Object.freeze([
@@ -578,22 +580,31 @@ export function normalizeDevQualityGateGaps(value) {
   assertExactKeys(
     value,
     [
+      'affectedScopes',
       'boundaries',
       'categories',
       'changedCount',
-      'highestLevel',
+      'localGate',
       'matched',
+      'maxAffectedScope',
       'range',
-      'requiresFull',
       'risk',
       'schemaVersion',
     ],
     'quality gaps'
   )
   if (
-    value.schemaVersion !== 'plush.quality-gate-gap-analysis/v1' ||
+    value.schemaVersion !== 'plush.quality-gate-gap-analysis/v2' ||
     !DEV_QUALITY_GATE_GAP_RANGES.includes(value.range) ||
     !DEV_QUALITY_GATE_GAP_RISKS.includes(value.risk) ||
+    !Array.isArray(value.affectedScopes) ||
+    value.affectedScopes.length < 1 ||
+    !value.affectedScopes.every((scope) =>
+      AFFECTED_SCOPE_PATTERN.test(scope)
+    ) ||
+    !AFFECTED_SCOPE_PATTERN.test(value.maxAffectedScope) ||
+    value.affectedScopes.at(-1) !== value.maxAffectedScope ||
+    !LOCAL_GATE_VALUES.includes(value.localGate) ||
     !Array.isArray(value.categories) ||
     !Array.isArray(value.boundaries)
   ) {
@@ -601,6 +612,7 @@ export function normalizeDevQualityGateGaps(value) {
   }
   return {
     ...value,
+    affectedScopes: [...value.affectedScopes],
     categories: value.categories.map((category) => ({
       ...category,
       label: safeText(category.label, 'gap label'),

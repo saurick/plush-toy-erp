@@ -81,7 +81,26 @@ func TestOutsourcingReturnToVendorBlockedByActivePayable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	client.FinanceFact.Create().SetFactNo("AP-OUT-DISPOSITION-BLOCK").SetFactType(biz.FinanceFactPayable).SetStatus(biz.OperationalFactStatusDraft).SetCounterpartyType(biz.FinanceCounterpartyOther).SetAmount(decimal.NewFromInt(1)).SetSourceType(biz.OutsourcingFactSourceType).SetSourceID(fact.ID).SetIdempotencyKey("ap-out-disposition-block").SaveX(ctx)
+	if fact.SupplierID == nil {
+		t.Fatal("posted outsourcing return must retain its supplier")
+	}
+	client.FinanceFact.Create().
+		SetFactNo("AP-OUT-DISPOSITION-BLOCK").
+		SetFactType(biz.FinanceFactPayable).
+		SetStatus(biz.OperationalFactStatusDraft).
+		SetCounterpartyType(biz.FinanceCounterpartySupplier).
+		SetCounterpartyID(*fact.SupplierID).
+		SetAmount(decimal.NewFromInt(1)).
+		SetCurrency(biz.FinanceCurrencyCNY).
+		SetPaymentTerm(biz.FinancePaymentTermDueOnOccurrence).
+		SetPaymentTermDays(0).
+		SetDueAt(fact.OccurredAt).
+		SetSourceType(biz.OutsourcingFactSourceType).
+		SetSourceID(fact.ID).
+		SetIdempotencyKey("ap-out-disposition-block").
+		SetOccurredAt(fact.OccurredAt).
+		SetOccurredAtSpecified(true).
+		SaveX(ctx)
 	if _, err := factUC.PostOutsourcingReturnDisposition(ctx, &biz.OutsourcingReturnDispositionMutation{ID: created.ID, ExpectedVersion: created.Version, ActorID: actor.ID}); !errors.Is(err, biz.ErrOutsourcingReturnFinanceDependency) {
 		t.Fatalf("active payable err=%v", err)
 	}

@@ -18,6 +18,7 @@ import {
   optionalContactPhoneRule,
 } from '../../utils/contactValidation.mjs'
 import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
+import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
 import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.jsx'
 import FieldWithUnitSuffix from '../business-list/FieldWithUnitSuffix.jsx'
 import { productSKUParentFieldContract } from './productSKUParentField.mjs'
@@ -313,6 +314,7 @@ export function MasterDataFormFields({
   if (type === 'product_skus') {
     return (
       <>
+        <BusinessFormSectionTitle>归属与编号</BusinessFormSectionTitle>
         <Form.Item
           className="erp-business-action-form__field"
           extra={productSKUParentField.helpText}
@@ -362,6 +364,7 @@ export function MasterDataFormFields({
         >
           <Input allowClear autoComplete="off" />
         </Form.Item>
+        <BusinessFormSectionTitle>规格属性</BusinessFormSectionTitle>
         <Form.Item
           className="erp-business-action-form__field"
           label="颜色"
@@ -390,6 +393,7 @@ export function MasterDataFormFields({
         >
           <Input allowClear autoComplete="off" />
         </Form.Item>
+        <BusinessFormSectionTitle>计量与附件</BusinessFormSectionTitle>
         <DefaultUnitSelect
           form={form}
           requiredWhenWeightField="unit_net_weight_g"
@@ -408,6 +412,7 @@ export function MasterDataFormFields({
   if (type === 'processes') {
     return (
       <>
+        <BusinessFormSectionTitle>基本资料</BusinessFormSectionTitle>
         <Form.Item
           className="erp-business-action-form__field"
           label="环节编号（自动）"
@@ -443,6 +448,7 @@ export function MasterDataFormFields({
             placeholder="从行业默认类别选择，或直接输入新类别"
           />
         </Form.Item>
+        <BusinessFormSectionTitle>路线与加工能力</BusinessFormSectionTitle>
         <Form.Item
           className="erp-business-action-form__field"
           label="标准生产路线位置"
@@ -507,6 +513,9 @@ export function MasterDataFormFields({
 
   return (
     <>
+      {type === 'customers' || type === 'suppliers' ? (
+        <BusinessFormSectionTitle>基本资料</BusinessFormSectionTitle>
+      ) : null}
       <Form.Item
         className="erp-business-action-form__field"
         label="编号（自动）"
@@ -563,6 +572,31 @@ export function MasterDataFormFields({
             />
           </Form.Item>
           <Form.Item
+            className="erp-business-action-form__field"
+            label="税号"
+            name="tax_no"
+          >
+            <Input allowClear autoComplete="off" />
+          </Form.Item>
+          <BusinessFormSectionTitle>结算条件</BusinessFormSectionTitle>
+          <Form.Item
+            className="erp-business-action-form__field"
+            extra="仅作为新建采购或委外订单的默认值；订单保存后不会随供应商档案变化。"
+            label="默认付款周期（天）"
+            name="default_payment_term_days"
+            rules={[
+              { required: true, message: '请填写默认付款周期' },
+              {
+                type: 'integer',
+                min: 0,
+                message: '默认付款周期必须为不小于 0 的整数',
+              },
+            ]}
+          >
+            <InputNumber min={0} precision={0} style={{ width: '100%' }} />
+          </Form.Item>
+          <BusinessFormSectionTitle>加工能力</BusinessFormSectionTitle>
+          <Form.Item
             className="erp-business-action-form__field erp-business-action-form__field--full"
             extra="记录该加工厂声明可承接的工序，用于资料查询；具体订单仍需逐行选择工序。"
             label="可加工工序"
@@ -582,6 +616,14 @@ export function MasterDataFormFields({
       ) : null}
       {type === 'customers' ? (
         <>
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="税号"
+            name="tax_no"
+          >
+            <Input allowClear autoComplete="off" />
+          </Form.Item>
+          <BusinessFormSectionTitle>结算方式</BusinessFormSectionTitle>
           <Form.Item
             className="erp-business-action-form__field"
             dependencies={['default_payment_term_days']}
@@ -658,7 +700,7 @@ export function MasterDataFormFields({
             unitLoading={unitLoading}
           />
         </>
-      ) : (
+      ) : type === 'customers' || type === 'suppliers' ? null : (
         <Form.Item
           className="erp-business-action-form__field"
           label="税号"

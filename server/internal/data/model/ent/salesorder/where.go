@@ -65,6 +65,11 @@ func CustomerID(v int) predicate.SalesOrder {
 	return predicate.SalesOrder(sql.FieldEQ(FieldCustomerID, v))
 }
 
+// Currency applies equality check predicate on the "currency" field. It's identical to CurrencyEQ.
+func Currency(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldCurrency, v))
+}
+
 // CustomerOrderNo applies equality check predicate on the "customer_order_no" field. It's identical to CustomerOrderNoEQ.
 func CustomerOrderNo(v string) predicate.SalesOrder {
 	return predicate.SalesOrder(sql.FieldEQ(FieldCustomerOrderNo, v))
@@ -108,6 +113,31 @@ func LifecycleStatus(v string) predicate.SalesOrder {
 // Version applies equality check predicate on the "version" field. It's identical to VersionEQ.
 func Version(v int) predicate.SalesOrder {
 	return predicate.SalesOrder(sql.FieldEQ(FieldVersion, v))
+}
+
+// SettlementAction applies equality check predicate on the "settlement_action" field. It's identical to SettlementActionEQ.
+func SettlementAction(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldSettlementAction, v))
+}
+
+// SettlementMode applies equality check predicate on the "settlement_mode" field. It's identical to SettlementModeEQ.
+func SettlementMode(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldSettlementMode, v))
+}
+
+// SettlementReason applies equality check predicate on the "settlement_reason" field. It's identical to SettlementReasonEQ.
+func SettlementReason(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldSettlementReason, v))
+}
+
+// SettledAt applies equality check predicate on the "settled_at" field. It's identical to SettledAtEQ.
+func SettledAt(v time.Time) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldSettledAt, v))
+}
+
+// SettledBy applies equality check predicate on the "settled_by" field. It's identical to SettledByEQ.
+func SettledBy(v int) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldSettledBy, v))
 }
 
 // Note applies equality check predicate on the "note" field. It's identical to NoteEQ.
@@ -208,6 +238,71 @@ func CustomerIDIn(vs ...int) predicate.SalesOrder {
 // CustomerIDNotIn applies the NotIn predicate on the "customer_id" field.
 func CustomerIDNotIn(vs ...int) predicate.SalesOrder {
 	return predicate.SalesOrder(sql.FieldNotIn(FieldCustomerID, vs...))
+}
+
+// CurrencyEQ applies the EQ predicate on the "currency" field.
+func CurrencyEQ(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldCurrency, v))
+}
+
+// CurrencyNEQ applies the NEQ predicate on the "currency" field.
+func CurrencyNEQ(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNEQ(FieldCurrency, v))
+}
+
+// CurrencyIn applies the In predicate on the "currency" field.
+func CurrencyIn(vs ...string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIn(FieldCurrency, vs...))
+}
+
+// CurrencyNotIn applies the NotIn predicate on the "currency" field.
+func CurrencyNotIn(vs ...string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotIn(FieldCurrency, vs...))
+}
+
+// CurrencyGT applies the GT predicate on the "currency" field.
+func CurrencyGT(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGT(FieldCurrency, v))
+}
+
+// CurrencyGTE applies the GTE predicate on the "currency" field.
+func CurrencyGTE(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGTE(FieldCurrency, v))
+}
+
+// CurrencyLT applies the LT predicate on the "currency" field.
+func CurrencyLT(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLT(FieldCurrency, v))
+}
+
+// CurrencyLTE applies the LTE predicate on the "currency" field.
+func CurrencyLTE(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLTE(FieldCurrency, v))
+}
+
+// CurrencyContains applies the Contains predicate on the "currency" field.
+func CurrencyContains(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldContains(FieldCurrency, v))
+}
+
+// CurrencyHasPrefix applies the HasPrefix predicate on the "currency" field.
+func CurrencyHasPrefix(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldHasPrefix(FieldCurrency, v))
+}
+
+// CurrencyHasSuffix applies the HasSuffix predicate on the "currency" field.
+func CurrencyHasSuffix(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldHasSuffix(FieldCurrency, v))
+}
+
+// CurrencyEqualFold applies the EqualFold predicate on the "currency" field.
+func CurrencyEqualFold(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEqualFold(FieldCurrency, v))
+}
+
+// CurrencyContainsFold applies the ContainsFold predicate on the "currency" field.
+func CurrencyContainsFold(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldContainsFold(FieldCurrency, v))
 }
 
 // CustomerOrderNoEQ applies the EQ predicate on the "customer_order_no" field.
@@ -773,6 +868,331 @@ func VersionLT(v int) predicate.SalesOrder {
 // VersionLTE applies the LTE predicate on the "version" field.
 func VersionLTE(v int) predicate.SalesOrder {
 	return predicate.SalesOrder(sql.FieldLTE(FieldVersion, v))
+}
+
+// SettlementActionEQ applies the EQ predicate on the "settlement_action" field.
+func SettlementActionEQ(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldSettlementAction, v))
+}
+
+// SettlementActionNEQ applies the NEQ predicate on the "settlement_action" field.
+func SettlementActionNEQ(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNEQ(FieldSettlementAction, v))
+}
+
+// SettlementActionIn applies the In predicate on the "settlement_action" field.
+func SettlementActionIn(vs ...string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIn(FieldSettlementAction, vs...))
+}
+
+// SettlementActionNotIn applies the NotIn predicate on the "settlement_action" field.
+func SettlementActionNotIn(vs ...string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotIn(FieldSettlementAction, vs...))
+}
+
+// SettlementActionGT applies the GT predicate on the "settlement_action" field.
+func SettlementActionGT(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGT(FieldSettlementAction, v))
+}
+
+// SettlementActionGTE applies the GTE predicate on the "settlement_action" field.
+func SettlementActionGTE(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGTE(FieldSettlementAction, v))
+}
+
+// SettlementActionLT applies the LT predicate on the "settlement_action" field.
+func SettlementActionLT(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLT(FieldSettlementAction, v))
+}
+
+// SettlementActionLTE applies the LTE predicate on the "settlement_action" field.
+func SettlementActionLTE(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLTE(FieldSettlementAction, v))
+}
+
+// SettlementActionContains applies the Contains predicate on the "settlement_action" field.
+func SettlementActionContains(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldContains(FieldSettlementAction, v))
+}
+
+// SettlementActionHasPrefix applies the HasPrefix predicate on the "settlement_action" field.
+func SettlementActionHasPrefix(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldHasPrefix(FieldSettlementAction, v))
+}
+
+// SettlementActionHasSuffix applies the HasSuffix predicate on the "settlement_action" field.
+func SettlementActionHasSuffix(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldHasSuffix(FieldSettlementAction, v))
+}
+
+// SettlementActionIsNil applies the IsNil predicate on the "settlement_action" field.
+func SettlementActionIsNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIsNull(FieldSettlementAction))
+}
+
+// SettlementActionNotNil applies the NotNil predicate on the "settlement_action" field.
+func SettlementActionNotNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotNull(FieldSettlementAction))
+}
+
+// SettlementActionEqualFold applies the EqualFold predicate on the "settlement_action" field.
+func SettlementActionEqualFold(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEqualFold(FieldSettlementAction, v))
+}
+
+// SettlementActionContainsFold applies the ContainsFold predicate on the "settlement_action" field.
+func SettlementActionContainsFold(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldContainsFold(FieldSettlementAction, v))
+}
+
+// SettlementModeEQ applies the EQ predicate on the "settlement_mode" field.
+func SettlementModeEQ(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldSettlementMode, v))
+}
+
+// SettlementModeNEQ applies the NEQ predicate on the "settlement_mode" field.
+func SettlementModeNEQ(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNEQ(FieldSettlementMode, v))
+}
+
+// SettlementModeIn applies the In predicate on the "settlement_mode" field.
+func SettlementModeIn(vs ...string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIn(FieldSettlementMode, vs...))
+}
+
+// SettlementModeNotIn applies the NotIn predicate on the "settlement_mode" field.
+func SettlementModeNotIn(vs ...string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotIn(FieldSettlementMode, vs...))
+}
+
+// SettlementModeGT applies the GT predicate on the "settlement_mode" field.
+func SettlementModeGT(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGT(FieldSettlementMode, v))
+}
+
+// SettlementModeGTE applies the GTE predicate on the "settlement_mode" field.
+func SettlementModeGTE(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGTE(FieldSettlementMode, v))
+}
+
+// SettlementModeLT applies the LT predicate on the "settlement_mode" field.
+func SettlementModeLT(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLT(FieldSettlementMode, v))
+}
+
+// SettlementModeLTE applies the LTE predicate on the "settlement_mode" field.
+func SettlementModeLTE(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLTE(FieldSettlementMode, v))
+}
+
+// SettlementModeContains applies the Contains predicate on the "settlement_mode" field.
+func SettlementModeContains(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldContains(FieldSettlementMode, v))
+}
+
+// SettlementModeHasPrefix applies the HasPrefix predicate on the "settlement_mode" field.
+func SettlementModeHasPrefix(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldHasPrefix(FieldSettlementMode, v))
+}
+
+// SettlementModeHasSuffix applies the HasSuffix predicate on the "settlement_mode" field.
+func SettlementModeHasSuffix(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldHasSuffix(FieldSettlementMode, v))
+}
+
+// SettlementModeIsNil applies the IsNil predicate on the "settlement_mode" field.
+func SettlementModeIsNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIsNull(FieldSettlementMode))
+}
+
+// SettlementModeNotNil applies the NotNil predicate on the "settlement_mode" field.
+func SettlementModeNotNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotNull(FieldSettlementMode))
+}
+
+// SettlementModeEqualFold applies the EqualFold predicate on the "settlement_mode" field.
+func SettlementModeEqualFold(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEqualFold(FieldSettlementMode, v))
+}
+
+// SettlementModeContainsFold applies the ContainsFold predicate on the "settlement_mode" field.
+func SettlementModeContainsFold(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldContainsFold(FieldSettlementMode, v))
+}
+
+// SettlementReasonEQ applies the EQ predicate on the "settlement_reason" field.
+func SettlementReasonEQ(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldSettlementReason, v))
+}
+
+// SettlementReasonNEQ applies the NEQ predicate on the "settlement_reason" field.
+func SettlementReasonNEQ(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNEQ(FieldSettlementReason, v))
+}
+
+// SettlementReasonIn applies the In predicate on the "settlement_reason" field.
+func SettlementReasonIn(vs ...string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIn(FieldSettlementReason, vs...))
+}
+
+// SettlementReasonNotIn applies the NotIn predicate on the "settlement_reason" field.
+func SettlementReasonNotIn(vs ...string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotIn(FieldSettlementReason, vs...))
+}
+
+// SettlementReasonGT applies the GT predicate on the "settlement_reason" field.
+func SettlementReasonGT(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGT(FieldSettlementReason, v))
+}
+
+// SettlementReasonGTE applies the GTE predicate on the "settlement_reason" field.
+func SettlementReasonGTE(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGTE(FieldSettlementReason, v))
+}
+
+// SettlementReasonLT applies the LT predicate on the "settlement_reason" field.
+func SettlementReasonLT(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLT(FieldSettlementReason, v))
+}
+
+// SettlementReasonLTE applies the LTE predicate on the "settlement_reason" field.
+func SettlementReasonLTE(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLTE(FieldSettlementReason, v))
+}
+
+// SettlementReasonContains applies the Contains predicate on the "settlement_reason" field.
+func SettlementReasonContains(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldContains(FieldSettlementReason, v))
+}
+
+// SettlementReasonHasPrefix applies the HasPrefix predicate on the "settlement_reason" field.
+func SettlementReasonHasPrefix(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldHasPrefix(FieldSettlementReason, v))
+}
+
+// SettlementReasonHasSuffix applies the HasSuffix predicate on the "settlement_reason" field.
+func SettlementReasonHasSuffix(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldHasSuffix(FieldSettlementReason, v))
+}
+
+// SettlementReasonIsNil applies the IsNil predicate on the "settlement_reason" field.
+func SettlementReasonIsNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIsNull(FieldSettlementReason))
+}
+
+// SettlementReasonNotNil applies the NotNil predicate on the "settlement_reason" field.
+func SettlementReasonNotNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotNull(FieldSettlementReason))
+}
+
+// SettlementReasonEqualFold applies the EqualFold predicate on the "settlement_reason" field.
+func SettlementReasonEqualFold(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEqualFold(FieldSettlementReason, v))
+}
+
+// SettlementReasonContainsFold applies the ContainsFold predicate on the "settlement_reason" field.
+func SettlementReasonContainsFold(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldContainsFold(FieldSettlementReason, v))
+}
+
+// SettledAtEQ applies the EQ predicate on the "settled_at" field.
+func SettledAtEQ(v time.Time) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldSettledAt, v))
+}
+
+// SettledAtNEQ applies the NEQ predicate on the "settled_at" field.
+func SettledAtNEQ(v time.Time) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNEQ(FieldSettledAt, v))
+}
+
+// SettledAtIn applies the In predicate on the "settled_at" field.
+func SettledAtIn(vs ...time.Time) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIn(FieldSettledAt, vs...))
+}
+
+// SettledAtNotIn applies the NotIn predicate on the "settled_at" field.
+func SettledAtNotIn(vs ...time.Time) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotIn(FieldSettledAt, vs...))
+}
+
+// SettledAtGT applies the GT predicate on the "settled_at" field.
+func SettledAtGT(v time.Time) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGT(FieldSettledAt, v))
+}
+
+// SettledAtGTE applies the GTE predicate on the "settled_at" field.
+func SettledAtGTE(v time.Time) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGTE(FieldSettledAt, v))
+}
+
+// SettledAtLT applies the LT predicate on the "settled_at" field.
+func SettledAtLT(v time.Time) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLT(FieldSettledAt, v))
+}
+
+// SettledAtLTE applies the LTE predicate on the "settled_at" field.
+func SettledAtLTE(v time.Time) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLTE(FieldSettledAt, v))
+}
+
+// SettledAtIsNil applies the IsNil predicate on the "settled_at" field.
+func SettledAtIsNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIsNull(FieldSettledAt))
+}
+
+// SettledAtNotNil applies the NotNil predicate on the "settled_at" field.
+func SettledAtNotNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotNull(FieldSettledAt))
+}
+
+// SettledByEQ applies the EQ predicate on the "settled_by" field.
+func SettledByEQ(v int) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldSettledBy, v))
+}
+
+// SettledByNEQ applies the NEQ predicate on the "settled_by" field.
+func SettledByNEQ(v int) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNEQ(FieldSettledBy, v))
+}
+
+// SettledByIn applies the In predicate on the "settled_by" field.
+func SettledByIn(vs ...int) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIn(FieldSettledBy, vs...))
+}
+
+// SettledByNotIn applies the NotIn predicate on the "settled_by" field.
+func SettledByNotIn(vs ...int) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotIn(FieldSettledBy, vs...))
+}
+
+// SettledByGT applies the GT predicate on the "settled_by" field.
+func SettledByGT(v int) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGT(FieldSettledBy, v))
+}
+
+// SettledByGTE applies the GTE predicate on the "settled_by" field.
+func SettledByGTE(v int) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGTE(FieldSettledBy, v))
+}
+
+// SettledByLT applies the LT predicate on the "settled_by" field.
+func SettledByLT(v int) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLT(FieldSettledBy, v))
+}
+
+// SettledByLTE applies the LTE predicate on the "settled_by" field.
+func SettledByLTE(v int) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLTE(FieldSettledBy, v))
+}
+
+// SettledByIsNil applies the IsNil predicate on the "settled_by" field.
+func SettledByIsNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIsNull(FieldSettledBy))
+}
+
+// SettledByNotNil applies the NotNil predicate on the "settled_by" field.
+func SettledByNotNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotNull(FieldSettledBy))
 }
 
 // NoteEQ applies the EQ predicate on the "note" field.

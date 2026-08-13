@@ -248,7 +248,7 @@ func shipmentReleaseTaskForCancellation(
 		return nil, true, biz.ErrIdempotencyConflict
 	}
 	switch strings.TrimSpace(current.TaskStatusKey) {
-	case "done", "rejected":
+	case "done", "rejected", "withdrawn":
 		return current, true, nil
 	default:
 		return nil, true, biz.ErrShipmentCancellationTaskActive

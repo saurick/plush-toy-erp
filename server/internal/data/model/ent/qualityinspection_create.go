@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"server/internal/data/model/ent/inventorylot"
+	"server/internal/data/model/ent/inventorylotstatusevent"
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/productionwipbatch"
 	"server/internal/data/model/ent/purchasereceipt"
@@ -398,6 +399,21 @@ func (_c *QualityInspectionCreate) SetNillableUpdatedAt(v *time.Time) *QualityIn
 	return _c
 }
 
+// AddInventoryLotStatusEventIDs adds the "inventory_lot_status_events" edge to the InventoryLotStatusEvent entity by IDs.
+func (_c *QualityInspectionCreate) AddInventoryLotStatusEventIDs(ids ...int) *QualityInspectionCreate {
+	_c.mutation.AddInventoryLotStatusEventIDs(ids...)
+	return _c
+}
+
+// AddInventoryLotStatusEvents adds the "inventory_lot_status_events" edges to the InventoryLotStatusEvent entity.
+func (_c *QualityInspectionCreate) AddInventoryLotStatusEvents(v ...*InventoryLotStatusEvent) *QualityInspectionCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddInventoryLotStatusEventIDs(ids...)
+}
+
 // SetPurchaseReceipt sets the "purchase_receipt" edge to the PurchaseReceipt entity.
 func (_c *QualityInspectionCreate) SetPurchaseReceipt(v *PurchaseReceipt) *QualityInspectionCreate {
 	return _c.SetPurchaseReceiptID(v.ID)
@@ -741,6 +757,22 @@ func (_c *QualityInspectionCreate) createSpec() (*QualityInspection, *sqlgraph.C
 	if value, ok := _c.mutation.UpdatedAt(); ok {
 		_spec.SetField(qualityinspection.FieldUpdatedAt, field.TypeTime, value)
 		_node.UpdatedAt = value
+	}
+	if nodes := _c.mutation.InventoryLotStatusEventsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   qualityinspection.InventoryLotStatusEventsTable,
+			Columns: []string{qualityinspection.InventoryLotStatusEventsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorylotstatusevent.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.PurchaseReceiptIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

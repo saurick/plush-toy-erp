@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -39,6 +40,7 @@ const (
 	runtimeIdentityProofValue    = "matched-v1"
 	runtimeIdentityDatabaseScope = "database-v1"
 	runtimeIdentityReleaseScope  = "release-v1"
+	readinessDependencyTimeout   = time.Second
 )
 
 type templatePDFWarmupReadiness interface {
@@ -248,6 +250,18 @@ func registerHealthRoutes(
 	pdfWarmup templatePDFWarmupReadiness,
 ) {
 	healthLogger := log.NewHelper(log.With(logger, "logger.name", "server.http.health"))
+	var readinessLogMu sync.Mutex
+	lastReadinessLogState := ""
+	shouldLogReadinessState := func(state string) (previous string, changed bool) {
+		readinessLogMu.Lock()
+		defer readinessLogMu.Unlock()
+		previous = lastReadinessLogState
+		if previous == state {
+			return previous, false
+		}
+		lastReadinessLogState = state
+		return previous, true
+	}
 
 	srv.Handle("/ping", newObservedHTTPHandler(logger, tp, "server.http.ping", func(ctx context.Context, w stdhttp.ResponseWriter, r *stdhttp.Request) {
 		writePlainText(w, stdhttp.StatusOK, "pong")
@@ -291,16 +305,21 @@ func registerHealthRoutes(
 
 	srv.Handle("/readyz", newObservedHTTPHandler(logger, tp, "server.http.readyz", func(ctx context.Context, w stdhttp.ResponseWriter, r *stdhttp.Request) {
 		if postgres != nil {
-			if err := postgres.PingContext(ctx); err != nil {
-				healthLogger.WithContext(ctx).Warnw(
-					"msg", "dependency not ready",
-					"operation", "server.http.readyz",
-					"component", "postgres",
-					"status", stdhttp.StatusServiceUnavailable,
-					"request_id", requestIDFromRequest(r),
-					"trace_id", traceIDFromContext(ctx),
-					"error", err.Error(),
-				)
+			pingCtx, cancelPing := context.WithTimeout(ctx, readinessDependencyTimeout)
+			err := postgres.PingContext(pingCtx)
+			cancelPing()
+			if err != nil {
+				if _, changed := shouldLogReadinessState("postgres_not_ready"); changed {
+					healthLogger.WithContext(ctx).Warnw(
+						"msg", "dependency not ready",
+						"operation", "server.http.readyz",
+						"component", "postgres",
+						"status", stdhttp.StatusServiceUnavailable,
+						"request_id", requestIDFromRequest(r),
+						"trace_id", traceIDFromContext(ctx),
+						"error", err.Error(),
+					)
+				}
 				writePlainText(w, stdhttp.StatusServiceUnavailable, "postgres not ready")
 				return
 			}
@@ -323,12 +342,22 @@ func registerHealthRoutes(
 				if err != nil {
 					logFields = append(logFields, "error", err.Error())
 				}
-				healthLogger.WithContext(ctx).Warnw(logFields...)
+				if _, changed := shouldLogReadinessState("pdf_warmup_not_ready"); changed {
+					healthLogger.WithContext(ctx).Warnw(logFields...)
+				}
 				writePlainText(w, stdhttp.StatusServiceUnavailable, body)
 				return
 			}
 		}
 
+		if previous, changed := shouldLogReadinessState("ready"); changed && previous != "" {
+			healthLogger.WithContext(ctx).Infow(
+				"msg", "dependencies ready",
+				"operation", "server.http.readyz",
+				"request_id", requestIDFromRequest(r),
+				"trace_id", traceIDFromContext(ctx),
+			)
+		}
 		writePlainText(w, stdhttp.StatusOK, "ready")
 	}))
 }

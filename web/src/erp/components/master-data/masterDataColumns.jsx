@@ -2,7 +2,10 @@ import React from 'react'
 import { Tag } from 'antd'
 
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
-import { formatProductUnitNetWeight } from '../../utils/masterDataOrderView.mjs'
+import {
+  formatPaymentCondition,
+  formatProductUnitNetWeight,
+} from '../../utils/masterDataOrderView.mjs'
 import { compareNumeric20Scale6Values } from '../../utils/numeric20Scale6.mjs'
 import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
 
@@ -240,12 +243,8 @@ function processColumns() {
       width: 170,
       sorter: (a, b) =>
         compareText(
-          PRODUCTION_ROUTE_OPERATION_LABELS[
-            a?.production_route_operation_code
-          ],
-          PRODUCTION_ROUTE_OPERATION_LABELS[
-            b?.production_route_operation_code
-          ]
+          PRODUCTION_ROUTE_OPERATION_LABELS[a?.production_route_operation_code],
+          PRODUCTION_ROUTE_OPERATION_LABELS[b?.production_route_operation_code]
         ),
       exportValue: (record) =>
         PRODUCTION_ROUTE_OPERATION_LABELS[
@@ -410,12 +409,56 @@ function baseColumns({ type, unitDisplay, processOptions }) {
               (record?.supplier_type ? '供应商类型' : ''),
           },
           {
+            title: '主联系人',
+            exportTitle: '主联系人',
+            dataIndex: ['primary_contact', 'name'],
+            width: 140,
+            sorter: (a, b) =>
+              compareText(a?.primary_contact?.name, b?.primary_contact?.name),
+            render: (value) => value || '-',
+            exportValue: (record) => record?.primary_contact?.name || '',
+          },
+          {
+            title: '联系电话',
+            exportTitle: '联系电话',
+            dataIndex: ['primary_contact', 'mobile'],
+            width: 160,
+            sorter: (a, b) =>
+              compareText(
+                a?.primary_contact?.mobile || a?.primary_contact?.phone,
+                b?.primary_contact?.mobile || b?.primary_contact?.phone
+              ),
+            render: (_value, record) =>
+              record?.primary_contact?.mobile ||
+              record?.primary_contact?.phone ||
+              '-',
+            exportValue: (record) =>
+              record?.primary_contact?.mobile ||
+              record?.primary_contact?.phone ||
+              '',
+          },
+          {
             title: '经营 / 加工地址',
             exportTitle: '经营 / 加工地址',
             dataIndex: 'address',
             width: 240,
             sorter: (a, b) => compareText(a?.address, b?.address),
             render: (value) => value || '-',
+          },
+          {
+            title: '默认付款周期',
+            exportTitle: '默认付款周期',
+            dataIndex: 'default_payment_term_days',
+            width: 160,
+            sorter: (a, b) =>
+              Number(a?.default_payment_term_days || 0) -
+              Number(b?.default_payment_term_days || 0),
+            render: (value) =>
+              formatPaymentCondition({ payment_term_days: value }),
+            exportValue: (record) =>
+              formatPaymentCondition({
+                payment_term_days: record?.default_payment_term_days,
+              }),
           },
           {
             title: '可加工工序',

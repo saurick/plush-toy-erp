@@ -13,7 +13,7 @@ function dataOf(result) {
   return result?.data || {}
 }
 
-export async function getBusinessDashboardStats(params = {}) {
-  const result = await businessRpc.call('dashboard_stats', params)
+export async function getBusinessDashboardStats(params = {}, options = {}) {
+  const result = await businessRpc.call('dashboard_stats', params, options)
   return requireBusinessDashboardStatsResponse(dataOf(result))
 }

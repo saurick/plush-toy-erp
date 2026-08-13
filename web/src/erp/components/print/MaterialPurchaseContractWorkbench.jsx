@@ -38,14 +38,16 @@ import {
 } from '../../utils/printPdf.mjs'
 import {
   MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
-  persistPrintWorkspaceDraftSnapshot,
   readInitialPrintWorkspaceDraftFromWindowName,
+  readPrintWorkspaceDraftSnapshot,
 } from '../../utils/printWorkspace.js'
 import {
   syncPrintPageMarginForPaper,
   watchPrintPageMarginForPaper,
 } from '../../utils/printPageMargin.mjs'
-import usePrintWorkspaceWindowSnapshot from '../../utils/usePrintWorkspaceWindowSnapshot.js'
+import usePrintWorkspaceWindowSnapshot, {
+  preparePrintWorkspaceSnapshot,
+} from '../../utils/usePrintWorkspaceWindowSnapshot.js'
 import {
   runSilentPrintWorkspaceDraftUpdate,
   useFlushPrintWorkspaceDraftOnPageExit,
@@ -252,20 +254,13 @@ function loadDraft(template, storageKey, options = {}) {
   if (initialDraft) {
     return buildDraft(initialDraft)
   }
-  try {
-    const rawDraft = window.localStorage.getItem(storageKey) || ''
-    if (!rawDraft) {
-      return businessInput
-        ? buildMaterialPurchaseContractBusinessDraft({}, template?.sample)
-        : fallbackDraft
-    }
-    const parsedDraft = JSON.parse(rawDraft)
-    return buildDraft(parsedDraft)
-  } catch {
+  const storedDraft = readPrintWorkspaceDraftSnapshot(storageKey)
+  if (!storedDraft) {
     return businessInput
       ? buildMaterialPurchaseContractBusinessDraft({}, template?.sample)
       : fallbackDraft
   }
+  return buildDraft(storedDraft)
 }
 
 function resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag) {
@@ -288,13 +283,16 @@ export default function MaterialPurchaseContractWorkbench({
   businessInput = false,
   customerKey = '',
 }) {
-  const [draft, setDraft, flushDraft] = usePersistentPrintWorkspaceDraft(() =>
-    loadDraft(template, draftStorageKey, {
-      forceFresh: resetDraftOnOpen,
-      workspaceStateID,
-      businessInput,
-    })
-  )
+  const [draft, setDraft, flushDraft, , persistenceStatus] =
+    usePersistentPrintWorkspaceDraft(
+      () =>
+        loadDraft(template, draftStorageKey, {
+          forceFresh: resetDraftOnOpen,
+          workspaceStateID,
+          businessInput,
+        }),
+      draftStorageKey
+    )
   const [formulaVisible, setFormulaVisible] = useState(false)
   const [rowSelectionMode, setRowSelectionMode] = useState(false)
   const [selectedRowIndex, setSelectedRowIndex] = useState(null)
@@ -342,13 +340,6 @@ export default function MaterialPurchaseContractWorkbench({
   useFlushPrintWorkspaceDraftOnPageExit(flushDraft)
 
   useEffect(() => {
-    if (!draftStorageKey || typeof window === 'undefined') {
-      return
-    }
-    persistPrintWorkspaceDraftSnapshot(draftStorageKey, draft)
-  }, [draft, draftStorageKey])
-
-  useEffect(() => {
     if (!paperRef.current) {
       return undefined
     }
@@ -365,6 +356,7 @@ export default function MaterialPurchaseContractWorkbench({
     workspaceURL,
     observeNodeRef: paperRef,
     suspended: pdfAction !== '',
+    beforeSnapshot: flushDraft,
   })
 
   useEffect(() => {
@@ -432,18 +424,14 @@ export default function MaterialPurchaseContractWorkbench({
   }
 
   const handleAppendixImagesChange = (images) => {
-    let persisted = true
-    setDraft((currentDraft) => {
+    const persisted = setDraft((currentDraft) => {
       const nextDraft = {
         ...currentDraft,
         appendixImages: normalizePrintAppendixImages(images),
       }
-      persisted =
-        !draftStorageKey ||
-        persistPrintWorkspaceDraftSnapshot(draftStorageKey, nextDraft)
       return nextDraft
     })
-    return persisted
+    return !draftStorageKey || persisted
   }
 
   const handleLineCommit = (rowIndex, columnKey, nextValue, options = {}) => {
@@ -667,10 +655,14 @@ export default function MaterialPurchaseContractWorkbench({
     if (!paperRef.current) {
       return
     }
-    syncPrintRuntimeMargin()
     setPdfActionStartedAt(Date.now())
     setPdfAction('preview')
     try {
+      await preparePrintWorkspaceSnapshot({
+        windowLike: window,
+        beforeSnapshot: flushDraft,
+      })
+      syncPrintRuntimeMargin()
       await openPdfPreviewFromElement(paperRef.current, {
         title: '采购合同 PDF 预览',
         fileName: buildPdfFileName(),
@@ -692,10 +684,14 @@ export default function MaterialPurchaseContractWorkbench({
     if (!paperRef.current) {
       return
     }
-    syncPrintRuntimeMargin()
     setPdfActionStartedAt(Date.now())
     setPdfAction('download')
     try {
+      await preparePrintWorkspaceSnapshot({
+        windowLike: window,
+        beforeSnapshot: flushDraft,
+      })
+      syncPrintRuntimeMargin()
       await downloadPdfFromElement(paperRef.current, {
         title: '采购合同 PDF 预览',
         fileName: buildPdfFileName(),
@@ -713,15 +709,16 @@ export default function MaterialPurchaseContractWorkbench({
     }
   }
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    await preparePrintWorkspaceSnapshot({
+      windowLike: window,
+      beforeSnapshot: flushDraft,
+    })
     syncPrintRuntimeMargin()
     window.print()
   }
 
   const handleResetDraft = () => {
-    if (draftStorageKey && typeof window !== 'undefined') {
-      window.localStorage.removeItem(draftStorageKey)
-    }
     setDraft(buildMaterialPurchaseContractDraft(template?.sample))
     setFormulaVisible(false)
     setRowSelectionMode(false)
@@ -985,6 +982,7 @@ export default function MaterialPurchaseContractWorkbench({
       title="采购合同"
       sourceTag={sourceTag}
       statusText={toolbarStatus}
+      persistenceStatus={persistenceStatus}
       panelTip="提示：左侧字段与右侧采购合同双向同步；普通末尾图片自动两张一行，长图自动整行，每张可切换排版，并随 PDF / 打印一起输出。"
       prepareSignature={`${draftStorageKey}:${resetDraftOnOpen ? 'fresh' : 'restore'}`}
       panelActions={

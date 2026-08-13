@@ -5,6 +5,7 @@ const TASK_STATUS_LABELS = Object.freeze({
   blocked: '已阻塞',
   done: '已完成',
   rejected: '已退回',
+  withdrawn: '已撤回',
 })
 
 const EVENT_PRESENTATIONS = Object.freeze({
@@ -53,6 +54,16 @@ const EVENT_PRESENTATIONS = Object.freeze({
     categoryLabel: '责任流转',
     label: '已退回负责岗位共同待办',
     tone: 'info',
+  },
+  recovery_withdrawn: {
+    categoryLabel: '恢复',
+    label: '任务已由系统撤回',
+    tone: 'neutral',
+  },
+  source_cancelled_withdrawal: {
+    categoryLabel: '进度',
+    label: '来源取消，任务已撤回',
+    tone: 'neutral',
   },
 })
 
@@ -118,6 +129,13 @@ function statusChangedPresentation(event, approvalTask) {
       categoryLabel: '异常',
       label: approvalTask ? '审批已退回' : '任务已退回',
       tone: 'danger',
+    }
+  }
+  if (toStatusKey === 'withdrawn') {
+    return {
+      categoryLabel: '进度',
+      label: '任务已由系统撤回',
+      tone: 'neutral',
     }
   }
   if (toStatusKey === 'ready') {
@@ -240,7 +258,9 @@ export function buildWorkflowTaskResponsibilityItems(task = {}) {
       label:
         normalizedText(task.task_status_key) === 'rejected'
           ? '当前退回原因'
-          : '当前阻塞原因',
+          : normalizedText(task.task_status_key) === 'withdrawn'
+            ? '当前撤回原因'
+            : '当前阻塞原因',
       value: currentReason,
     })
   }

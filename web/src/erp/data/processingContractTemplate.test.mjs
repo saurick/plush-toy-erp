@@ -314,6 +314,7 @@ test('processingContractTemplate: 委外订单按加工合同源单带入工序�
         contact_name: ' 李厂长 ',
         contact_mobile: ' 13900000000 ',
         address: ' 宁波加工园 ',
+        signer_name: ' 李经理 ',
       },
       source_order_no: ' SO-26017 ',
       order_date: 1781654400,
@@ -345,6 +346,7 @@ test('processingContractTemplate: 委外订单按加工合同源单带入工序�
   assert.equal(draft.supplierContact, '李厂长')
   assert.equal(draft.supplierPhone, '13900000000')
   assert.equal(draft.supplierAddress, '宁波加工园')
+  assert.equal(draft.supplierSigner, '李经理')
   assert.equal(draft.orderDateText, '2026-06-17')
   assert.equal(draft.returnDateText, '2026-06-24')
   assert.equal(draft.buyerSignDateText, '2026-06-17')

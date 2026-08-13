@@ -94,6 +94,14 @@ test('workflowTaskBoard: 状态文案和原因从任务或 payload 收口', () =
     }),
     '退回原因'
   )
+  assert.deepEqual(
+    getWorkflowTaskStatusMeta({ task_status_key: 'withdrawn' }),
+    { label: '已撤回', color: 'default' }
+  )
+  assert.equal(
+    getWorkflowTaskReasonLabel({ task_status_key: 'withdrawn' }),
+    '撤回原因'
+  )
 })
 
 test('workflowTaskBoard: 主状态与时间风险独立展示且各最多一个', () => {

@@ -243,6 +243,26 @@ func (_u *FinanceFactUpdate) ClearPaymentTermDays() *FinanceFactUpdate {
 	return _u
 }
 
+// SetDueAt sets the "due_at" field.
+func (_u *FinanceFactUpdate) SetDueAt(v time.Time) *FinanceFactUpdate {
+	_u.mutation.SetDueAt(v)
+	return _u
+}
+
+// SetNillableDueAt sets the "due_at" field if the given value is not nil.
+func (_u *FinanceFactUpdate) SetNillableDueAt(v *time.Time) *FinanceFactUpdate {
+	if v != nil {
+		_u.SetDueAt(*v)
+	}
+	return _u
+}
+
+// ClearDueAt clears the value of the "due_at" field.
+func (_u *FinanceFactUpdate) ClearDueAt() *FinanceFactUpdate {
+	_u.mutation.ClearDueAt()
+	return _u
+}
+
 // SetInvoiceCategory sets the "invoice_category" field.
 func (_u *FinanceFactUpdate) SetInvoiceCategory(v string) *FinanceFactUpdate {
 	_u.mutation.SetInvoiceCategory(v)
@@ -841,6 +861,12 @@ func (_u *FinanceFactUpdate) sqlSave(ctx context.Context) (_node int, err error)
 	if _u.mutation.PaymentTermDaysCleared() {
 		_spec.ClearField(financefact.FieldPaymentTermDays, field.TypeInt)
 	}
+	if value, ok := _u.mutation.DueAt(); ok {
+		_spec.SetField(financefact.FieldDueAt, field.TypeTime, value)
+	}
+	if _u.mutation.DueAtCleared() {
+		_spec.ClearField(financefact.FieldDueAt, field.TypeTime)
+	}
 	if value, ok := _u.mutation.InvoiceCategory(); ok {
 		_spec.SetField(financefact.FieldInvoiceCategory, field.TypeString, value)
 	}
@@ -1230,6 +1256,26 @@ func (_u *FinanceFactUpdateOne) AddPaymentTermDays(v int) *FinanceFactUpdateOne 
 // ClearPaymentTermDays clears the value of the "payment_term_days" field.
 func (_u *FinanceFactUpdateOne) ClearPaymentTermDays() *FinanceFactUpdateOne {
 	_u.mutation.ClearPaymentTermDays()
+	return _u
+}
+
+// SetDueAt sets the "due_at" field.
+func (_u *FinanceFactUpdateOne) SetDueAt(v time.Time) *FinanceFactUpdateOne {
+	_u.mutation.SetDueAt(v)
+	return _u
+}
+
+// SetNillableDueAt sets the "due_at" field if the given value is not nil.
+func (_u *FinanceFactUpdateOne) SetNillableDueAt(v *time.Time) *FinanceFactUpdateOne {
+	if v != nil {
+		_u.SetDueAt(*v)
+	}
+	return _u
+}
+
+// ClearDueAt clears the value of the "due_at" field.
+func (_u *FinanceFactUpdateOne) ClearDueAt() *FinanceFactUpdateOne {
+	_u.mutation.ClearDueAt()
 	return _u
 }
 
@@ -1860,6 +1906,12 @@ func (_u *FinanceFactUpdateOne) sqlSave(ctx context.Context) (_node *FinanceFact
 	}
 	if _u.mutation.PaymentTermDaysCleared() {
 		_spec.ClearField(financefact.FieldPaymentTermDays, field.TypeInt)
+	}
+	if value, ok := _u.mutation.DueAt(); ok {
+		_spec.SetField(financefact.FieldDueAt, field.TypeTime, value)
+	}
+	if _u.mutation.DueAtCleared() {
+		_spec.ClearField(financefact.FieldDueAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.InvoiceCategory(); ok {
 		_spec.SetField(financefact.FieldInvoiceCategory, field.TypeString, value)

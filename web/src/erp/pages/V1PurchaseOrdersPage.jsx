@@ -8,6 +8,7 @@ import {
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import { currentBusinessDate } from '../utils/businessDate.mjs'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
   BusinessDataTable,
@@ -20,7 +21,8 @@ import {
   ColumnOrderModal,
 } from '../components/business-list/ColumnOrderModal.jsx'
 import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
-import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
+import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
+import SourceOrderLifecycleConfirmContent from '../components/business-list/SourceOrderLifecycleConfirmContent.jsx'
 import {
   createBlankPurchaseLine,
   normalizePurchaseLineFormValue,
@@ -116,6 +118,11 @@ import {
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
 import { resolveExactRecordPage } from '../utils/businessPagination.mjs'
 import { resolveBusinessLifecycleActions } from '../utils/businessActionAvailability.mjs'
+import { createSourceBusinessActionAttemptStore } from '../utils/sourceBusinessAction.mjs'
+import {
+  normalizeSourceOrderLifecycleReason,
+  prepareSourceOrderLifecycleAttempt,
+} from '../utils/sourceOrderLifecycleAction.mjs'
 import { MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY } from '../utils/printWorkspace.js'
 import {
   LIFECYCLE_SCOPE,
@@ -170,6 +177,7 @@ export default function V1PurchaseOrdersPage() {
   const [selectedRowKeys, setSelectedRowKeys] = useState([])
   const selectedRowKeysRef = useRef([])
   const lifecycleInFlightRef = useRef(false)
+  const lifecycleAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
   const [columnOrder, setColumnOrder] = useState(null)
   const [columnOrderOpen, setColumnOrderOpen] = useState(false)
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
@@ -599,6 +607,8 @@ export default function V1PurchaseOrdersPage() {
         field: 'purchase_order_no',
       }),
       supplier_id: undefined,
+      currency: 'CNY',
+      payment_term_days: undefined,
       supplier_purchase_order_no: '',
       purchase_date: todayInputValue(),
       expected_arrival_date: '',
@@ -639,6 +649,8 @@ export default function V1PurchaseOrdersPage() {
             form.setFieldsValue({
               purchase_order_no: record.purchase_order_no || '',
               supplier_id: record.supplier_id,
+              currency: record.currency,
+              payment_term_days: record.payment_term_days,
               supplier_purchase_order_no:
                 record.supplier_purchase_order_no || '',
               supplier_snapshot:
@@ -732,6 +744,21 @@ export default function V1PurchaseOrdersPage() {
   const handleSupplierChange = (supplierID) => {
     const supplier = suppliers.find((item) => item.id === supplierID)
     form.setFieldValue('supplier_snapshot', buildSupplierSnapshot(supplier))
+    if (!editingOrder?.id) {
+      const termDays = supplier?.default_payment_term_days
+      const normalizedTermDays = Number(termDays)
+      form.setFieldValue(
+        'payment_term_days',
+        termDays !== undefined &&
+          termDays !== null &&
+          termDays !== '' &&
+          Number.isFinite(normalizedTermDays) &&
+          Number.isInteger(normalizedTermDays) &&
+          normalizedTermDays >= 0
+          ? normalizedTermDays
+          : undefined
+      )
+    }
     resolveSupplierSnapshot(supplier).then((snapshot) => {
       if (
         String(form.getFieldValue('supplier_id') ?? '') !==
@@ -869,14 +896,33 @@ export default function V1PurchaseOrdersPage() {
     }
   }
 
-  const runLifecycleAction = async (action, record) => {
+  const runLifecycleAction = async (action, record, reason = '') => {
     if (lifecycleInFlightRef.current || !action || !record) {
       return
     }
     lifecycleInFlightRef.current = true
     setSaving(true)
+    let lifecycleAttempt = null
     try {
-      const updated = await action.run({ id: record.id })
+      let params = { id: record.id }
+      if (action.sourceLifecycle) {
+        lifecycleAttempt = prepareSourceOrderLifecycleAttempt({
+          action,
+          attemptStore: lifecycleAttemptsRef.current,
+          customerKey: activeCustomerKey,
+          reason,
+          record,
+        })
+        params = lifecycleAttempt.attempt.params
+      }
+      const updated = await action.run(params)
+      if (lifecycleAttempt) {
+        lifecycleAttemptsRef.current.settle(
+          lifecycleAttempt.scope,
+          lifecycleAttempt.attempt,
+          null
+        )
+      }
       message.success(action.successMessage || `采购订单已${action.label}`)
       if (updated && action.returnsRecord !== false) {
         setSelectedOrder(updated)
@@ -897,7 +943,22 @@ export default function V1PurchaseOrdersPage() {
         )
       }
     } catch (error) {
-      message.error(getActionErrorMessage(error, `${action.label}采购订单失败`))
+      const resultUnknown = lifecycleAttempt
+        ? lifecycleAttemptsRef.current.settle(
+            lifecycleAttempt.scope,
+            lifecycleAttempt.attempt,
+            error
+          )
+        : false
+      if (resultUnknown) {
+        message.warning(
+          '暂时无法确认订单是否处理成功，请刷新核对最新状态；内容不变时可安全重试'
+        )
+      } else {
+        message.error(
+          getActionErrorMessage(error, `${action.label}采购订单失败`)
+        )
+      }
     } finally {
       lifecycleInFlightRef.current = false
       setSaving(false)
@@ -912,14 +973,30 @@ export default function V1PurchaseOrdersPage() {
       runLifecycleAction(action, record)
       return
     }
+    let reason = ''
     modal.confirm({
       centered: true,
       title: action.confirmTitle,
-      content: action.confirmContent,
+      content: (
+        <SourceOrderLifecycleConfirmContent
+          action={action}
+          onReasonChange={(value) => {
+            reason = value
+          }}
+        />
+      ),
       okText: action.okText || `确认${action.label}`,
       cancelText: '取消',
       okButtonProps: action.danger ? { danger: true } : undefined,
-      onOk: () => runLifecycleAction(action, record),
+      onOk: (_close) => {
+        try {
+          normalizeSourceOrderLifecycleReason(action, reason)
+        } catch (error) {
+          message.warning(getActionErrorMessage(error, '校验业务原因'))
+          return
+        }
+        return runLifecycleAction(action, record, reason)
+      },
     })
   }
 
@@ -1028,7 +1105,7 @@ export default function V1PurchaseOrdersPage() {
   const { exporting, exportRows: exportOrders } = useBusinessListExport({
     requestKey: 'purchase-orders-export',
     loadRows: loadExportOrders,
-    filename: `采购订单-${new Date().toISOString().slice(0, 10)}.csv`,
+    filename: `采购订单-${currentBusinessDate()}.csv`,
     columns: visibleDataColumns,
     recordLabel: '采购订单',
   })
@@ -1263,8 +1340,7 @@ export default function V1PurchaseOrdersPage() {
           ),
         selectionReason: '请先选择一条采购订单',
         busyReason: '当前订单操作完成后可继续办理',
-        getUnavailableReason: (action) =>
-          `当前采购订单状态不能${action.label}`,
+        getUnavailableReason: (action) => `当前采购订单状态不能${action.label}`,
       }),
     [adminProfile, recordActionBusy, singleSelectedOrder]
   )
@@ -1279,6 +1355,7 @@ export default function V1PurchaseOrdersPage() {
   return (
     <BusinessPageLayout className="erp-v1-purchase-orders-page">
       <PageHeaderCard
+        helpKey="accessories-purchase"
         title="采购订单"
         description="维护供应商采购承诺；采购入库、退货、质检或应付请到对应业务页面处理。"
         stats={stats}
@@ -1405,9 +1482,7 @@ export default function V1PurchaseOrdersPage() {
             setSelectedOrder(record)
           },
         })}
-        onOpenRecord={
-          recordActionBusy ? undefined : openPurchaseOrderRecord
-        }
+        onOpenRecord={recordActionBusy ? undefined : openPurchaseOrderRecord}
         pagination={{
           current: pagination.current,
           pageSize: pagination.pageSize,
@@ -1420,7 +1495,7 @@ export default function V1PurchaseOrdersPage() {
 
       {purchaseOrderItemsPreview.modal}
 
-      <BusinessRecordDetailsModal
+      <BusinessDetailsModal
         columns={dataColumns}
         description="查看采购订单摘要和完整明细；草稿且具备编辑权限时，双击会直接进入编辑。"
         lineItems={

@@ -41,6 +41,9 @@ const DevGovernancePage = lazyRoute(
 const DevFlowStateObservatoryPage = lazyRoute(
   () => import('./pages/DevFlowStateObservatoryPage.jsx')
 )
+const DevBusinessUsabilityPage = lazyRoute(
+  () => import('./pages/DevBusinessUsabilityPage.jsx')
+)
 const DevPrototypesPage = lazyRoute(
   () => import('./pages/DevPrototypesPage.jsx')
 )
@@ -124,6 +127,10 @@ export default function DevWorkbenchRoutes() {
           <Route
             path="status-flows"
             element={<DevFlowStateObservatoryPage />}
+          />
+          <Route
+            path="business-usability"
+            element={<DevBusinessUsabilityPage />}
           />
           <Route path="docs" element={<DevDocsPage />} />
           <Route path="testing" element={<DevTestingPage />} />

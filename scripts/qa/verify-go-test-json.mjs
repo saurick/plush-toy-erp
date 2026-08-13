@@ -2,7 +2,21 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-export function verifyGoTestJson(content, requiredPrefixes = []) {
+function compileExcludedSkipPattern(source) {
+  if (!source) return null;
+  try {
+    return new RegExp(source, "u");
+  } catch {
+    throw new Error("[qa:go-test-json] invalid excluded skip pattern");
+  }
+}
+
+export function verifyGoTestJson(
+  content,
+  requiredPrefixes = [],
+  { excludedSkipPattern = "" } = {},
+) {
+  const excludedSkipRegex = compileExcludedSkipPattern(excludedSkipPattern);
   const events = [];
   for (const [index, line] of String(content).split("\n").entries()) {
     if (!line.trim()) continue;
@@ -19,44 +33,62 @@ export function verifyGoTestJson(content, requiredPrefixes = []) {
   const displayByIdentity = new Map(testEvents.map((event) => [identity(event), display(event)]));
   const eventsFor = (action) => testEvents.filter((event) => event.Action === action);
   const runEvents = eventsFor("run");
-  const runTests = new Set(runEvents.map(identity));
   const passedTests = new Set(eventsFor("pass").map(identity));
-  const skippedIdentities = new Set(eventsFor("skip").map(identity));
+  const skippedEvents = eventsFor("skip");
+  const excludedSkippedIdentities = new Set(
+    skippedEvents
+      .filter((event) => excludedSkipRegex?.test(event.Test))
+      .map(identity),
+  );
+  const skippedIdentities = new Set(
+    skippedEvents
+      .filter((event) => !excludedSkippedIdentities.has(identity(event)))
+      .map(identity),
+  );
   const failedIdentities = new Set(eventsFor("fail").map(identity));
+  const eligibleRunEvents = runEvents.filter(
+    (event) => !excludedSkippedIdentities.has(identity(event)),
+  );
+  const eligibleRunTests = new Set(eligibleRunEvents.map(identity));
   const skippedTests = [...skippedIdentities].map((key) => displayByIdentity.get(key)).sort();
+  const excludedTests = [...excludedSkippedIdentities]
+    .map((key) => displayByIdentity.get(key))
+    .sort();
   const failedTests = [...failedIdentities].map((key) => displayByIdentity.get(key)).sort();
-  const unresolvedIdentities = [...runTests].filter(
+  const unresolvedIdentities = [...eligibleRunTests].filter(
     (key) =>
       !passedTests.has(key) && !skippedIdentities.has(key) && !failedIdentities.has(key),
   );
   const unresolvedTests = unresolvedIdentities
     .map((key) => displayByIdentity.get(key))
     .sort();
-  const passedRunCount = [...runTests].filter((key) => passedTests.has(key)).length;
+  const passedRunCount = [...eligibleRunTests].filter((key) => passedTests.has(key)).length;
 
   const missingPrefixes = requiredPrefixes.filter(
-    (prefix) => !runEvents.some((event) => event.Test.startsWith(prefix)),
+    (prefix) => !eligibleRunEvents.some((event) => event.Test.startsWith(prefix)),
   );
   const prefixesWithoutPass = requiredPrefixes.filter((prefix) => {
-    const selected = runEvents.filter((event) => event.Test.startsWith(prefix));
+    const selected = eligibleRunEvents.filter((event) => event.Test.startsWith(prefix));
     return selected.length > 0 && !selected.some((event) => passedTests.has(identity(event)));
   });
 
   return {
     ok:
-      runTests.size > 0 &&
+      eligibleRunTests.size > 0 &&
       missingPrefixes.length === 0 &&
       prefixesWithoutPass.length === 0 &&
       skippedTests.length === 0 &&
       failedTests.length === 0 &&
       unresolvedTests.length === 0,
-    run: runTests.size,
+    run: eligibleRunTests.size,
     pass: passedRunCount,
     skip: skippedTests.length,
+    excluded: excludedTests.length,
     fail: failedTests.length,
     missingPrefixes,
     prefixesWithoutPass,
     skippedTests,
+    excludedTests,
     failedTests,
     unresolvedTests,
   };

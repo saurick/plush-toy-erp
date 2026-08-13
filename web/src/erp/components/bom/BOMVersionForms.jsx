@@ -2,6 +2,8 @@ import React, { useCallback } from 'react'
 import { Button, Form, Input, Select, Space } from 'antd'
 
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
+import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
+import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import {
   dateInputNotAfterRule,
   dateInputNotBeforeRule,
@@ -12,12 +14,11 @@ import {
   BOM_PRODUCTION_OPERATION_OPTIONS,
   normalizeBOMProductionOperationCode,
 } from '../../utils/bomProductionOperation.mjs'
+import { unixSecondsToBusinessDate } from '../../utils/businessDate.mjs'
 
 export function unixToDateInputValue(value) {
   if (!value) return ''
-  const date = new Date(Number(value) * 1000)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toISOString().slice(0, 10)
+  return unixSecondsToBusinessDate(value)
 }
 
 function dateInputToParam(value) {
@@ -127,6 +128,7 @@ export function BOMHeaderFormFields({
 
   return (
     <>
+      <BusinessFormSectionTitle>版本信息</BusinessFormSectionTitle>
       {includeProduct ? (
         <Form.Item
           className="erp-business-action-form__field"
@@ -203,6 +205,7 @@ export function BOMHeaderFormFields({
           }
         />
       </Form.Item>
+      <BusinessFormSectionTitle>订单与数量</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field"
         label="来源订单号"
@@ -234,6 +237,7 @@ export function BOMHeaderFormFields({
       >
         <Input allowClear autoComplete="off" disabled={disabled} />
       </Form.Item>
+      <BusinessFormSectionTitle>制表与说明</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field"
         label="制表日期"
@@ -339,7 +343,13 @@ export function BOMItemFormFields({ materialOptions = [], unitOptions = [] }) {
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
-        label="损耗率"
+        label={
+          <BusinessHelpLabel
+            itemKey="loss-rate"
+            label="损耗率"
+            pageKey="material-bom"
+          />
+        }
         name="loss_rate"
         rules={[{ required: true, message: '请填写损耗率' }]}
       >

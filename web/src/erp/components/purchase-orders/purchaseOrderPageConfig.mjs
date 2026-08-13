@@ -3,6 +3,7 @@ import {
   closePurchaseOrder,
 } from '../../api/masterDataOrderApi.mjs'
 import { submitPurchaseOrderApprovalProcess } from '../../api/customerConfigApi.mjs'
+import { currentBusinessDate } from '../../utils/businessDate.mjs'
 import { isDraftSourceDocument } from '../../utils/sourceDocumentEditing.mjs'
 import { buildPurchaseInboundDraftPreviewRows } from '../../utils/purchaseOrderInboundPreview.mjs'
 import {
@@ -37,32 +38,58 @@ export const PURCHASE_ORDER_LIFECYCLE_ACTIONS = [
   {
     key: 'submit',
     label: '提交',
-    permission: 'purchase.order.update',
+    permission: 'purchase.order.submit',
     nextStatus: 'submitted',
     run: submitPurchaseOrderApprovalProcess,
     returnsRecord: false,
     successMessage: '采购订单已提交，已进入统一审批箱',
   },
   {
-    key: 'close',
-    label: '关闭',
-    permission: 'purchase.order.update',
+    key: 'normal_close',
+    label: '正常关闭',
+    permission: 'purchase.order.close',
     nextStatus: 'closed',
-    confirmTitle: '确认关闭采购订单',
+    sourceLifecycle: true,
+    sourceType: 'purchase_order',
+    commandKey: 'close',
+    closeMode: 'normal',
+    confirmTitle: '确认正常关闭采购订单',
     confirmContent:
-      '关闭只会停止这张采购订单继续执行；已登记的入库、质检、库存或财务记录不会自动改变。',
-    okText: '确认关闭',
+      '正常关闭只结清采购订单本身；所有订单行须已足量入库，且不能有待处理的入库草稿或审批流程。不会自动改变已经登记的入库、质检、库存或财务记录。',
+    okText: '确认正常关闭',
+    run: closePurchaseOrder,
+  },
+  {
+    key: 'short_close',
+    label: '提前关闭',
+    permission: 'purchase.order.close',
+    nextStatus: 'closed',
+    sourceLifecycle: true,
+    sourceType: 'purchase_order',
+    commandKey: 'close',
+    closeMode: 'short',
+    requiresReason: true,
+    confirmTitle: '确认提前关闭采购订单',
+    confirmContent:
+      '提前关闭会结清尚未收货的采购订单行；存在待处理的入库草稿或审批流程时仍会被阻止。不会自动取消或撤销已经登记的入库、质检、库存或财务记录。',
+    reasonPlaceholder: '请填写未收完即关闭的业务原因',
+    okText: '确认提前关闭',
     run: closePurchaseOrder,
   },
   {
     key: 'cancel',
     label: '取消',
-    permission: 'purchase.order.update',
+    permission: 'purchase.order.cancel',
     nextStatus: 'canceled',
+    sourceLifecycle: true,
+    sourceType: 'purchase_order',
+    commandKey: 'cancel',
+    requiresReason: true,
     danger: true,
     confirmTitle: '确认取消采购订单',
     confirmContent:
-      '取消只会终止这张采购订单本身；已登记的入库、质检、库存或财务记录不会自动撤销。',
+      '取消只终止采购订单本身；系统会同步结清可安全终止的审批流程，已有未取消的入库记录时会阻止取消。不会自动取消或撤销已经登记的入库、质检、库存或财务记录。',
+    reasonPlaceholder: '请填写取消采购订单的业务原因',
     okText: '确认取消',
     run: cancelPurchaseOrder,
   },
@@ -76,7 +103,7 @@ export const PURCHASE_ORDER_RELATED_MENU_ITEMS = [
 ]
 
 export function todayInputValue() {
-  return new Date().toISOString().slice(0, 10)
+  return currentBusinessDate()
 }
 
 export function workflowPayloadOf(task = {}) {

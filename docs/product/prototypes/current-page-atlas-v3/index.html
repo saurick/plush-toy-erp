@@ -1,0 +1,2545 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:," />
+    <meta
+      name="prototype-source-revision"
+      content="711961636c8a95c9968ccf7d235d1cbbec615a99"
+    />
+    <title>当前页面地图与交互样板 v3</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f3f6fa;
+        --surface: #ffffff;
+        --surface-soft: #f7f9fc;
+        --surface-raised: #ffffff;
+        --text: #172033;
+        --muted: #667085;
+        --line: #dfe5ec;
+        --line-strong: #c8d1dc;
+        --brand: #176b5b;
+        --brand-strong: #0f5548;
+        --brand-soft: #e6f5f1;
+        --info: #285fa8;
+        --info-soft: #eaf2fc;
+        --warn: #9a5a00;
+        --warn-soft: #fff4dc;
+        --danger: #b42318;
+        --danger-soft: #fef0ef;
+        --focus: #2f79c8;
+        --shadow: 0 12px 32px rgb(20 36 60 / 8%);
+        --radius: 12px;
+      }
+
+      html[data-theme="dark"] {
+        color-scheme: dark;
+        --bg: #0f1724;
+        --surface: #172132;
+        --surface-soft: #1c293b;
+        --surface-raised: #202e42;
+        --text: #edf2f7;
+        --muted: #a8b3c3;
+        --line: #334258;
+        --line-strong: #485a72;
+        --brand: #5fc5ad;
+        --brand-strong: #8ad8c5;
+        --brand-soft: #173f38;
+        --info: #8bb8ee;
+        --info-soft: #1a3556;
+        --warn: #efbd65;
+        --warn-soft: #493617;
+        --danger: #ff9b92;
+        --danger-soft: #4c2324;
+        --focus: #87bfff;
+        --shadow: 0 18px 45px rgb(0 0 0 / 28%);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        min-width: 320px;
+        background: var(--bg);
+      }
+
+      body {
+        min-width: 320px;
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          "PingFang SC",
+          "Microsoft YaHei",
+          sans-serif;
+        line-height: 1.5;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        color: inherit;
+        font: inherit;
+      }
+
+      button,
+      select,
+      input[type="date"],
+      input[type="search"],
+      input[type="text"],
+      textarea {
+        border: 1px solid var(--line-strong);
+        border-radius: 9px;
+        background: var(--surface);
+      }
+
+      button {
+        min-height: 36px;
+        cursor: pointer;
+        padding: 7px 12px;
+      }
+
+      button:hover:not(:disabled) {
+        border-color: var(--brand);
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.52;
+      }
+
+      :focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--focus) 38%, transparent);
+        outline-offset: 2px;
+      }
+
+      .skip-link {
+        position: fixed;
+        top: 8px;
+        left: 8px;
+        z-index: 100;
+        transform: translateY(-160%);
+        border-radius: 8px;
+        background: var(--surface);
+        color: var(--text);
+        padding: 8px 12px;
+      }
+
+      .skip-link:focus {
+        transform: none;
+      }
+
+      .app-shell {
+        width: min(1480px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 20px 0 44px;
+      }
+
+      .app-header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 18px;
+        align-items: start;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+        box-shadow: var(--shadow);
+        padding: 18px 20px;
+      }
+
+      .eyebrow {
+        margin: 0 0 4px;
+        color: var(--brand);
+        font-size: 12px;
+        font-weight: 750;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 7px;
+        font-size: clamp(22px, 2.8vw, 32px);
+        line-height: 1.2;
+      }
+
+      h2 {
+        margin-bottom: 8px;
+        font-size: 20px;
+      }
+
+      h3 {
+        margin-bottom: 6px;
+        font-size: 16px;
+      }
+
+      .subtitle,
+      .muted {
+        color: var(--muted);
+      }
+
+      .subtitle {
+        max-width: 880px;
+        margin-bottom: 0;
+      }
+
+      .header-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: flex-end;
+      }
+
+      .button-primary {
+        border-color: var(--brand);
+        background: var(--brand);
+        color: #fff;
+        font-weight: 700;
+      }
+
+      html[data-theme="dark"] .button-primary {
+        color: #0b211c;
+      }
+
+      .prototype-note {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+        margin-top: 14px;
+        border: 1px solid color-mix(in srgb, var(--warn) 35%, var(--line));
+        border-radius: var(--radius);
+        background: var(--warn-soft);
+        padding: 12px 14px;
+      }
+
+      .badge {
+        display: inline-flex;
+        width: max-content;
+        max-width: 100%;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--surface-soft);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+        padding: 3px 8px;
+      }
+
+      .badge-implement {
+        border-color: color-mix(in srgb, var(--info) 42%, var(--line));
+        background: var(--info-soft);
+        color: var(--info);
+      }
+
+      .badge-warning {
+        border-color: color-mix(in srgb, var(--warn) 38%, var(--line));
+        background: var(--warn-soft);
+        color: var(--warn);
+      }
+
+      .view-tabs {
+        display: flex;
+        gap: 8px;
+        margin: 16px 0;
+        overflow-x: auto;
+        padding: 2px;
+      }
+
+      .view-tab {
+        flex: 0 0 auto;
+        border-color: var(--line);
+        background: var(--surface);
+        color: var(--muted);
+        font-weight: 700;
+      }
+
+      .view-tab[aria-selected="true"] {
+        border-color: var(--brand);
+        background: var(--brand-soft);
+        color: var(--brand-strong);
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+        box-shadow: var(--shadow);
+        overflow: clip;
+      }
+
+      .panel + .panel {
+        margin-top: 14px;
+      }
+
+      .panel-head {
+        display: flex;
+        gap: 16px;
+        align-items: start;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--line);
+        background: var(--surface-soft);
+        padding: 16px 18px;
+      }
+
+      .panel-head p {
+        margin-bottom: 0;
+      }
+
+      .panel-body {
+        padding: 18px;
+      }
+
+      .metric-strip {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+
+      .metric {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--surface-soft);
+        padding: 12px;
+      }
+
+      .metric span {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .metric strong {
+        display: block;
+        margin-top: 4px;
+        font-size: 22px;
+      }
+
+      .toolbar {
+        display: grid;
+        grid-template-columns: minmax(220px, 1.2fr) minmax(160px, 0.6fr) auto;
+        gap: 10px;
+        align-items: end;
+        margin-bottom: 14px;
+      }
+
+      .toolbar-sample {
+        grid-template-columns: minmax(220px, 1.2fr) 160px 170px auto;
+      }
+
+      .field {
+        display: grid;
+        gap: 5px;
+        min-width: 0;
+      }
+
+      .field > span,
+      .field > label {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 650;
+      }
+
+      .field input,
+      .field select,
+      .field textarea {
+        width: 100%;
+        min-height: 38px;
+        padding: 7px 10px;
+      }
+
+      .field textarea {
+        min-height: 92px;
+        resize: vertical;
+      }
+
+      .toolbar-actions,
+      .selection-actions,
+      .pagination {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .atlas-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.7fr) minmax(280px, 0.8fr);
+        gap: 14px;
+        align-items: start;
+      }
+
+      .table-wrap {
+        width: 100%;
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--surface);
+        font-size: 13px;
+      }
+
+      .atlas-layout .table-wrap table {
+        min-width: 720px;
+      }
+
+      #sampleContent .table-wrap table {
+        min-width: 860px;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 10px 12px;
+        text-align: left;
+        vertical-align: middle;
+      }
+
+      th {
+        background: var(--surface-soft);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 750;
+        white-space: nowrap;
+      }
+
+      tbody tr:last-child td {
+        border-bottom: 0;
+      }
+
+      tbody tr[data-selected="true"] {
+        background: var(--brand-soft);
+      }
+
+      .path {
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+        overflow-wrap: anywhere;
+      }
+
+      .text-button {
+        min-height: auto;
+        border: 0;
+        background: transparent;
+        color: var(--info);
+        font-weight: 700;
+        padding: 2px;
+        text-align: left;
+      }
+
+      .detail-card {
+        position: sticky;
+        top: 12px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--surface-soft);
+        padding: 16px;
+      }
+
+      .detail-card dl,
+      .record-grid {
+        display: grid;
+        grid-template-columns: max-content minmax(0, 1fr);
+        gap: 8px 14px;
+        margin: 14px 0 0;
+      }
+
+      dt {
+        color: var(--muted);
+      }
+
+      dd {
+        min-width: 0;
+        margin: 0;
+        overflow-wrap: anywhere;
+      }
+
+      .boundary {
+        margin: 14px 0 0;
+        border-left: 3px solid var(--brand);
+        background: var(--surface);
+        color: var(--muted);
+        padding: 10px 12px;
+      }
+
+      .selection-bar {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        justify-content: space-between;
+        margin: 12px 0;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--surface-soft);
+        padding: 10px 12px;
+      }
+
+      .access-alert,
+      .error-alert,
+      .empty-state,
+      .loading-state {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--surface-soft);
+        padding: 20px;
+        text-align: center;
+      }
+
+      .access-alert {
+        margin-bottom: 12px;
+        border-color: color-mix(in srgb, var(--warn) 36%, var(--line));
+        background: var(--warn-soft);
+        color: var(--warn);
+      }
+
+      .error-alert {
+        border-color: color-mix(in srgb, var(--danger) 36%, var(--line));
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+
+      .skeleton {
+        height: 12px;
+        margin: 10px auto;
+        border-radius: 999px;
+        background: linear-gradient(
+          90deg,
+          var(--line) 0%,
+          var(--surface-raised) 48%,
+          var(--line) 100%
+        );
+        background-size: 200% 100%;
+        animation: shimmer 1.1s linear infinite;
+      }
+
+      @keyframes shimmer {
+        to {
+          background-position: -200% 0;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+
+      .pagination {
+        justify-content: flex-end;
+        margin-top: 12px;
+      }
+
+      .page-indicator {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      details.column-settings {
+        position: relative;
+      }
+
+      details.column-settings > summary {
+        display: inline-flex;
+        min-height: 36px;
+        align-items: center;
+        border: 1px solid var(--line-strong);
+        border-radius: 9px;
+        background: var(--surface);
+        cursor: pointer;
+        list-style: none;
+        padding: 7px 12px;
+      }
+
+      details.column-settings > summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .column-menu {
+        position: absolute;
+        right: 0;
+        z-index: 6;
+        display: grid;
+        width: 220px;
+        gap: 8px;
+        margin-top: 6px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--surface-raised);
+        box-shadow: var(--shadow);
+        padding: 12px;
+      }
+
+      .column-menu label {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .state-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .state-card {
+        min-height: 120px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--surface-soft);
+        padding: 14px;
+        text-align: left;
+      }
+
+      .state-card[aria-pressed="true"] {
+        border-color: var(--brand);
+        background: var(--brand-soft);
+      }
+
+      .state-card strong,
+      .state-card span {
+        display: block;
+      }
+
+      .state-card span {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .layer {
+        position: fixed;
+        inset: 0;
+        z-index: 30;
+        display: grid;
+        place-items: center;
+        background: rgb(8 15 26 / 62%);
+        padding: 24px;
+      }
+
+      .layer[hidden] {
+        display: none;
+      }
+
+      .dialog,
+      .drawer,
+      .palette {
+        width: min(720px, 100%);
+        max-height: min(760px, calc(100vh - 48px));
+        border: 1px solid var(--line-strong);
+        border-radius: 14px;
+        background: var(--surface-raised);
+        box-shadow: 0 28px 80px rgb(0 0 0 / 34%);
+        overflow: auto;
+      }
+
+      .drawer-layer {
+        place-items: stretch end;
+        padding: 0;
+      }
+
+      .drawer {
+        width: min(520px, 100%);
+        max-height: 100vh;
+        border-radius: 14px 0 0 14px;
+      }
+
+      .dialog-head,
+      .dialog-foot {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 16px;
+      }
+
+      .dialog-head {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        border-bottom: 1px solid var(--line);
+        background: var(--surface-raised);
+      }
+
+      .dialog-head h2 {
+        margin: 0;
+      }
+
+      .dialog-foot {
+        position: sticky;
+        bottom: 0;
+        justify-content: flex-end;
+        border-top: 1px solid var(--line);
+        background: var(--surface-raised);
+      }
+
+      .dialog-body {
+        padding: 16px;
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .form-error {
+        min-height: 20px;
+        margin: 10px 0 0;
+        color: var(--danger);
+        font-size: 13px;
+      }
+
+      .palette {
+        width: min(680px, 100%);
+      }
+
+      .palette-search {
+        width: 100%;
+        min-height: 46px;
+        border: 0;
+        border-bottom: 1px solid var(--line);
+        border-radius: 0;
+        background: var(--surface-raised);
+        padding: 10px 16px;
+      }
+
+      .palette-results {
+        display: grid;
+        max-height: 440px;
+        overflow: auto;
+        padding: 8px;
+      }
+
+      .palette-result {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+        border: 0;
+        background: transparent;
+        padding: 10px;
+        text-align: left;
+      }
+
+      .palette-result:hover,
+      .palette-result:focus-visible {
+        background: var(--brand-soft);
+      }
+
+      .toast {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        z-index: 60;
+        max-width: min(420px, calc(100% - 36px));
+        border: 1px solid var(--line-strong);
+        border-radius: 10px;
+        background: var(--surface-raised);
+        box-shadow: var(--shadow);
+        padding: 12px 14px;
+      }
+
+      .toast[hidden] {
+        display: none;
+      }
+
+      @media (max-width: 1080px) {
+        .metric-strip,
+        .state-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .toolbar,
+        .toolbar-sample,
+        .atlas-layout {
+          grid-template-columns: 1fr;
+        }
+
+        .detail-card {
+          position: static;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .app-shell {
+          width: min(100% - 20px, 1480px);
+          padding-top: 10px;
+        }
+
+        .app-header,
+        .prototype-note,
+        .panel-head,
+        .selection-bar {
+          grid-template-columns: 1fr;
+        }
+
+        .app-header,
+        .panel-head,
+        .selection-bar {
+          display: grid;
+        }
+
+        .header-actions,
+        .toolbar-actions,
+        .selection-actions {
+          justify-content: stretch;
+        }
+
+        .header-actions button,
+        .toolbar-actions button,
+        .selection-actions button,
+        .column-settings,
+        .column-settings > summary {
+          width: 100%;
+        }
+
+        .metric-strip,
+        .state-grid,
+        .form-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .panel-body {
+          padding: 12px;
+        }
+
+        .layer {
+          padding: 10px;
+        }
+
+        .drawer {
+          border-radius: 0;
+        }
+
+        .record-grid,
+        .detail-card dl {
+          grid-template-columns: 1fr;
+          gap: 3px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#mainContent">跳到主要内容</a>
+    <div id="app" class="app-shell">
+      <header class="app-header">
+        <div>
+          <p class="eyebrow">Product Core · To Implement</p>
+          <h1>当前页面地图与交互样板 v3</h1>
+          <p class="subtitle">
+            对照当前路由、菜单和 24
+            个业务模块重新整理。页面地图负责盘点，交互样板只演示共享列表与任务处理合同，不冒充
+            57 套完整业务页面。
+          </p>
+        </div>
+        <div class="header-actions">
+          <button
+            id="paletteButton"
+            type="button"
+            aria-keyshortcuts="Control+K Meta+K"
+          >
+            搜索页面 <span aria-hidden="true">⌘K</span>
+          </button>
+          <button
+            id="themeButton"
+            type="button"
+            aria-label="切换浅色或暗色主题"
+          >
+            切换暗色
+          </button>
+        </div>
+      </header>
+
+      <section class="prototype-note" aria-label="原型边界">
+        <span class="badge badge-implement">待实现 / To Implement</span>
+        <div>
+          <strong>中性模拟数据，不接生产 API。</strong>
+          <span class="muted"
+            >任务处理只产生原型回执；Workflow
+            完成不等于库存、出货或财务事实生效。</span
+          >
+        </div>
+        <span class="badge badge-warning">not_proven</span>
+      </section>
+
+      <nav class="view-tabs" role="tablist" aria-label="原型主视图">
+        <button
+          class="view-tab"
+          type="button"
+          role="tab"
+          aria-selected="true"
+          aria-controls="atlasView"
+          data-view="atlas"
+        >
+          页面地图
+        </button>
+        <button
+          class="view-tab"
+          type="button"
+          role="tab"
+          aria-selected="false"
+          aria-controls="sampleView"
+          data-view="sample"
+          tabindex="-1"
+        >
+          交互样板
+        </button>
+        <button
+          class="view-tab"
+          type="button"
+          role="tab"
+          aria-selected="false"
+          aria-controls="stateView"
+          data-view="states"
+          tabindex="-1"
+        >
+          状态实验
+        </button>
+      </nav>
+
+      <main id="mainContent" tabindex="-1">
+        <section id="atlasView" role="tabpanel" aria-label="页面地图">
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>当前页面地图</h2>
+                <p class="muted">
+                  共
+                  <strong id="matrixCount">57</strong>
+                  个可见页面或路由模式；不统计 redirect-only 和 wildcard
+                  fallback。
+                </p>
+              </div>
+              <span class="badge">源码基线 711961636c8a</span>
+            </div>
+            <div class="panel-body">
+              <div class="metric-strip" aria-label="页面范围统计">
+                <div class="metric">
+                  <span>桌面正式入口</span><strong>32</strong>
+                </div>
+                <div class="metric">
+                  <span>公共 / 移动 / 参数化</span><strong>7</strong>
+                </div>
+                <div class="metric">
+                  <span>开发工作台</span><strong>18</strong>
+                </div>
+                <div class="metric">
+                  <span>完整业务交互稿</span><strong>1</strong>
+                </div>
+              </div>
+
+              <div class="toolbar">
+                <label class="field">
+                  <span>搜索页面、路径或说明</span>
+                  <input
+                    id="atlasSearch"
+                    type="search"
+                    placeholder="例如：供应商、出货、/__dev/testing"
+                  />
+                </label>
+                <label class="field">
+                  <span>页面范围</span>
+                  <select id="scopeFilter">
+                    <option value="all">全部范围</option>
+                    <option value="desktop">桌面正式入口</option>
+                    <option value="auxiliary">公共 / 移动 / 参数化</option>
+                    <option value="development">开发工作台</option>
+                  </select>
+                </label>
+                <div class="toolbar-actions">
+                  <button id="atlasReset" type="button">清空筛选</button>
+                </div>
+              </div>
+
+              <div class="atlas-layout">
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th scope="col">页面</th>
+                        <th scope="col">分组</th>
+                        <th scope="col">路径</th>
+                        <th scope="col">范围</th>
+                      </tr>
+                    </thead>
+                    <tbody id="atlasRows"></tbody>
+                  </table>
+                </div>
+                <aside
+                  id="atlasDetail"
+                  class="detail-card"
+                  aria-live="polite"
+                ></aside>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <section id="sampleView" role="tabpanel" aria-label="交互样板" hidden>
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>销售订单 · 共享列表交互样板</h2>
+                <p class="muted">
+                  仅用来验证列表、选择、详情、任务和弹窗合同；模拟保存不会写入业务数据。
+                </p>
+              </div>
+              <span class="badge badge-warning">中性模拟数据</span>
+            </div>
+            <div class="panel-body">
+              <div class="toolbar toolbar-sample">
+                <label class="field">
+                  <span>关键词</span>
+                  <input
+                    id="recordSearch"
+                    type="search"
+                    placeholder="订单号、客户或产品"
+                  />
+                </label>
+                <label class="field">
+                  <span>状态</span>
+                  <select id="recordStatus">
+                    <option value="all">全部状态</option>
+                    <option value="草稿">草稿</option>
+                    <option value="已提交">已提交</option>
+                    <option value="已确认">已确认</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>交期</span>
+                  <input id="recordDate" type="date" />
+                </label>
+                <div class="toolbar-actions">
+                  <button id="recordReset" type="button">重置</button>
+                  <details class="column-settings">
+                    <summary>列设置</summary>
+                    <div class="column-menu">
+                      <strong>可见列</strong>
+                      <label
+                        ><input type="checkbox" data-column="product" checked />
+                        产品</label
+                      >
+                      <label
+                        ><input
+                          type="checkbox"
+                          data-column="quantity"
+                          checked
+                        />
+                        数量</label
+                      >
+                      <label
+                        ><input type="checkbox" data-column="amount" checked />
+                        金额</label
+                      >
+                    </div>
+                  </details>
+                  <button
+                    id="createButton"
+                    class="button-primary"
+                    type="button"
+                  >
+                    新建销售订单
+                  </button>
+                </div>
+              </div>
+
+              <div id="accessAlert" class="access-alert" hidden>
+                当前原型状态为“无权限”：可以理解页面用途，但不能新建、选择记录、查看详情或处理任务。
+              </div>
+              <div id="sampleContent"></div>
+            </div>
+          </article>
+        </section>
+
+        <section id="stateView" role="tabpanel" aria-label="状态实验" hidden>
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>状态与恢复路径</h2>
+                <p class="muted">
+                  选择状态后会同步到“交互样板”。每个异常状态都提供清楚的恢复方式。
+                </p>
+              </div>
+              <button id="openSampleButton" type="button">查看交互样板</button>
+            </div>
+            <div class="panel-body">
+              <div class="state-grid">
+                <button
+                  class="state-card"
+                  type="button"
+                  data-state="normal"
+                  aria-pressed="true"
+                >
+                  <strong>默认态</strong
+                  ><span>筛选、单选、分页、详情和关联任务正常工作。</span>
+                </button>
+                <button
+                  class="state-card"
+                  type="button"
+                  data-state="loading"
+                  aria-pressed="false"
+                >
+                  <strong>加载中</strong
+                  ><span>保留页面上下文，禁用可能重复提交的动作。</span>
+                </button>
+                <button
+                  class="state-card"
+                  type="button"
+                  data-state="empty"
+                  aria-pressed="false"
+                >
+                  <strong>空数据</strong
+                  ><span>明确当前筛选无结果，并允许重置筛选。</span>
+                </button>
+                <button
+                  class="state-card"
+                  type="button"
+                  data-state="error"
+                  aria-pressed="false"
+                >
+                  <strong>读取失败</strong
+                  ><span>展示可理解错误和原位重试，不透传技术异常。</span>
+                </button>
+                <button
+                  class="state-card"
+                  type="button"
+                  data-state="no-permission"
+                  aria-pressed="false"
+                >
+                  <strong>无权限</strong
+                  ><span>所有业务动作不可执行，前端隐藏不是后端授权。</span>
+                </button>
+                <button
+                  class="state-card"
+                  type="button"
+                  data-state="long-text"
+                  aria-pressed="false"
+                >
+                  <strong>长文本</strong
+                  ><span>验证长客户名、产品名和大金额的换行与滚动。</span>
+                </button>
+              </div>
+            </div>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <div>
+      <div
+        id="createLayer"
+        class="layer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="createTitle"
+        hidden
+      >
+        <section class="dialog">
+          <header class="dialog-head">
+            <h2 id="createTitle">新建销售订单（交互样板）</h2>
+            <button
+              type="button"
+              data-close-layer
+              aria-label="关闭新建销售订单弹窗"
+            >
+              关闭
+            </button>
+          </header>
+          <div class="dialog-body">
+            <div class="form-grid">
+              <label class="field"
+                ><span>客户名称 *</span
+                ><input id="createCustomer" type="text" autocomplete="off"
+              /></label>
+              <label class="field"
+                ><span>预计交期 *</span><input id="createDate" type="date"
+              /></label>
+              <label class="field"
+                ><span>产品名称 *</span
+                ><input id="createProduct" type="text" autocomplete="off"
+              /></label>
+              <label class="field"
+                ><span>数量 *</span
+                ><input
+                  id="createQuantity"
+                  type="text"
+                  inputmode="decimal"
+                  value="100"
+              /></label>
+            </div>
+            <p class="boundary">
+              保存只生成原型提示，不调用
+              API，也不会生成出货、库存、应收、发票或收付款记录。
+            </p>
+            <p id="createError" class="form-error" role="alert"></p>
+          </div>
+          <footer class="dialog-foot">
+            <button type="button" data-close-layer>取消</button>
+            <button id="saveCreate" class="button-primary" type="button">
+              保存模拟结果
+            </button>
+          </footer>
+        </section>
+      </div>
+
+      <div
+        id="detailLayer"
+        class="layer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="detailTitle"
+        hidden
+      >
+        <section class="dialog">
+          <header class="dialog-head">
+            <h2 id="detailTitle">销售订单详情</h2>
+            <button
+              type="button"
+              data-close-layer
+              aria-label="关闭销售订单详情"
+            >
+              关闭
+            </button>
+          </header>
+          <div id="detailBody" class="dialog-body"></div>
+          <footer class="dialog-foot">
+            <button type="button" data-close-layer>返回列表</button>
+          </footer>
+        </section>
+      </div>
+
+      <div
+        id="taskLayer"
+        class="layer drawer-layer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="taskTitle"
+        hidden
+      >
+        <section class="drawer">
+          <header class="dialog-head">
+            <h2 id="taskTitle">处理当前记录关联任务</h2>
+            <button
+              type="button"
+              data-close-layer
+              aria-label="关闭任务处理面板"
+            >
+              关闭
+            </button>
+          </header>
+          <div class="dialog-body">
+            <div id="taskContext"></div>
+            <fieldset>
+              <legend>选择处理结果</legend>
+              <label
+                ><input
+                  type="radio"
+                  name="taskAction"
+                  value="complete"
+                  checked
+                />
+                完成当前协同任务</label
+              ><br />
+              <label
+                ><input type="radio" name="taskAction" value="block" />
+                标记阻塞</label
+              ><br />
+              <label
+                ><input type="radio" name="taskAction" value="reject" />
+                退回发起方</label
+              >
+            </fieldset>
+            <label class="field" style="margin-top: 14px"
+              ><span>原因或反馈</span
+              ><textarea
+                id="taskReason"
+                placeholder="阻塞或退回时必须填写具体原因"
+              ></textarea>
+            </label>
+            <p id="taskError" class="form-error" role="alert"></p>
+            <p class="boundary">
+              原型回执只表达 Workflow
+              协同结果，不生成库存、出货、生产或财务事实。
+            </p>
+          </div>
+          <footer class="dialog-foot">
+            <button type="button" data-close-layer>取消</button>
+            <button id="submitTask" class="button-primary" type="button">
+              提交模拟回执
+            </button>
+          </footer>
+        </section>
+      </div>
+
+      <div
+        id="paletteLayer"
+        class="layer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="paletteTitle"
+        hidden
+      >
+        <section class="palette">
+          <header class="dialog-head">
+            <h2 id="paletteTitle">搜索当前页面地图</h2>
+            <button type="button" data-close-layer aria-label="关闭页面搜索">
+              关闭
+            </button>
+          </header>
+          <input
+            id="paletteSearch"
+            class="palette-search"
+            type="search"
+            placeholder="输入页面名称、路径或分组"
+            autocomplete="off"
+          />
+          <div id="paletteResults" class="palette-results"></div>
+        </section>
+      </div>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+    <script id="prototype-page-matrix" type="application/json">
+      [
+        {
+          "key": "global-dashboard",
+          "scope": "desktop",
+          "group": "看板中心",
+          "title": "工作台",
+          "path": "/erp/dashboard",
+          "summary": "聚合今日待办、阻塞交接、当前处理和业务状态摘要。",
+          "source": "seedData.mjs"
+        },
+        {
+          "key": "task-board",
+          "scope": "desktop",
+          "group": "看板中心",
+          "title": "任务看板",
+          "path": "/erp/task-board",
+          "summary": "按办理状态查看待处理、处理中、阻塞、退回和超时任务。",
+          "source": "seedData.mjs"
+        },
+        {
+          "key": "business-dashboard",
+          "scope": "desktop",
+          "group": "看板中心",
+          "title": "业务看板",
+          "path": "/erp/business-dashboard",
+          "summary": "按业务记录、部门待处理和风险预警看整体运行状态。",
+          "source": "seedData.mjs"
+        },
+        {
+          "key": "print-center",
+          "scope": "desktop",
+          "group": "运营工具",
+          "title": "模板打印中心",
+          "path": "/erp/print-center",
+          "summary": "统一查看合同、物料明细、色卡和作业指导书等固定打印模板。",
+          "source": "seedData.mjs"
+        },
+        {
+          "key": "permission-center",
+          "scope": "desktop",
+          "group": "系统管理",
+          "title": "权限管理",
+          "path": "/erp/system/permissions",
+          "summary": "集中管理员工账号、岗位、功能权限、菜单和审批责任。",
+          "source": "seedData.mjs"
+        },
+        {
+          "key": "system-audit-logs",
+          "scope": "desktop",
+          "group": "系统管理",
+          "title": "系统操作记录",
+          "path": "/erp/system/audit-logs",
+          "summary": "只读查看系统管理操作记录。",
+          "source": "seedData.mjs"
+        },
+        {
+          "key": "history-records",
+          "scope": "desktop",
+          "group": "历史查询",
+          "title": "历史记录中心",
+          "path": "/erp/history",
+          "summary": "只读查询有权查看的已关闭、已取消、已归档和已停用记录。",
+          "source": "seedData.mjs"
+        },
+        {
+          "key": "help-center",
+          "scope": "desktop",
+          "group": "使用帮助",
+          "title": "岗位使用帮助",
+          "path": "/erp/help-center",
+          "summary": "根据当前账号的岗位查看工作重点、办理顺序、交接和常见问题。",
+          "source": "seedData.mjs"
+        },
+        {
+          "key": "customers",
+          "scope": "desktop",
+          "group": "基础资料",
+          "title": "客户档案",
+          "path": "/erp/master/partners/customers",
+          "summary": "客户档案用于维护客户交易主体；联系人请在客户详情中维护。",
+          "boundary": "客户档案只维护交易主体资料；销售订单、出货、应收和收款需到对应页面处理。",
+          "source": "businessModules.mjs"
+        },
+        {
+          "key": "suppliers",
+          "scope": "desktop",
+          "group": "基础资料",
+          "title": "供应商与加工厂",
+          "path": "/erp/master/partners/suppliers",
+          "summary": "在同一入口维护供应商与加工厂交易主体；类型、联系人和可加工工序在档案中统一维护。",
+          "boundary": "供应商和加工厂档案只维护交易主体资料；采购、委外和应付需到对应页面处理。",
+          "source": "businessModules.mjs"
+        },
+        {
+          "key": "products",
+          "scope": "desktop",
+          "group": "基础资料",
+          "title": "产品档案",
+          "path": "/erp/master/products",
+          "summary": "维护产品规格、颜色、尺码、条码、客户规格编号和包装版本。",
+          "boundary": "产品档案只维护产品和规格资料；库存、物料清单、订单、生产和出货需到对应页面处理。",
+          "source": "businessModules.mjs"
+        },
+        {
+          "key": "materials",
+          "scope": "desktop",
+          "group": "基础资料",
+          "title": "材料档案",
+          "path": "/erp/master/materials",
+          "summary": "维护材料基础资料；采购、库存、质检和物料清单用量请到对应页面处理。",
+          "boundary": "材料档案只维护材料资料；采购订单、库存余额、来料质检和物料清单用量需到对应页面处理。",
+          "source": "businessModules.mjs"
+        },
+        {
+          "key": "sales-orders",
+          "scope": "desktop",
+          "group": "销售管理",
+          "title": "销售订单",
+          "path": "/erp/sales/project-orders/sales-orders",
+          "summary": "销售订单记录客户订单承诺；出货、库存和财务处理请到对应页面完成。",
+          "boundary": "销售订单不会自动生成出货单、库存变动、应收、发票或收付款记录。",
+          "source": "businessModules.mjs"
+        },
+        {
+          "key": "material-bom",
+          "scope": "desktop",
+          "group": "产品工程",
+          "title": "物料清单（BOM）",
+          "path": "/erp/purchase/material-bom",
+          "summary": "维护产品结构、材料用量、损耗和版本状态。",
+          "boundary": "维护物料清单不会直接生成采购需求、采购入库或库存数量。",
+          "source": "businessModules.mjs"
+        },
+        {
+          "key": "processes",
+          "scope": "desktop",
+          "group": "产品工程",
+          "title": "加工环节",
+          "path": "/erp/engineering/processes",
+          "summary": "维护委外订单和质检可引用的少量标准环节。",
+          "boundary": "加工环节不会自动生成委外订单、生产任务、发料、回货、库存或质检记录。",
+          "source": "businessModules.mjs"
+        },
+        {
+          "key": "accessories-purchase",
+          "scope": "desktop",
+          "group": "采购管理",
+          "title": "采购订单",
+          "path": "/erp/purchase/accessories",
+          "summary": "维护供应商采购承诺和采购明细。",
+          "boundary": "采购订单不会自动生成采购收货、入库、退货或应付记录。",
+          "source": "businessModules.mjs"
+        },
+        {
+          "key": "inbound",
+          "scope": "desktop",
+          "group": "库存管理",
+          "title": "入库管理",
+          "path": "/erp/warehouse/inbound",
+          "summary": "从已审核采购订单生成的入库草稿继续办理收货、质检和入库确认。",
+          "boundary": "任务标记为完成不等于采购入库已经过账；请以入库单状态为准。",
+          "source": "businessModules.mjs"
+        },
+        {
+          "key": "quality-inspections",
+          "scope": "desktop",
+          "group": "质检管理",
+          "title": "质量检验",
+          "path": "/erp/production/quality-inspections",
+          "summary": "办理采购来料、委外回货、生产工序和出货前成品检验。",
+          "boundary": "质检状态变化不会自行增减库存总量。",
+          "source": "businessModules.mjs"
+        },
+        {
+          "key": "inventory",
+          "scope": "desktop",
+          "group": "库存管理",
+          "title": "库存台账",
+          "path": "/erp/warehouse/inventory",
+          "summary": "查看库存余额、已预留、可用量、批次和变动记录。",
+          "boundary": "库存数量以已确认的入库、出库和调整记录为准。",
+          "source": "businessModules.mjs"
+        },
+        {
+          "key": "processing-contracts",
+          "scope": "desktop",
+          "group": "委外管理",
+          "title": "委外订单",
+          "path": "/erp/purchase/processing-contracts",
+          "summary": "维护加工合同、工序明细、加工厂承诺和打印内容。",
+          "boundary": "确认加工合同不等于发料、回货、质检或应付已经完成。",
+          "source": "businessModules.mjs"
+        },
+        {
+          "key": "production-orders",
+          "scope": "desktop",
+          "group": "生产管理",
+          "title": "生产订单",
+          "path": "/erp/production/orders",
+          "summary": "维护生产计划与固定工序路线并办理 WIP。",
+          "boundary": "生产订单、工序路线和 WIP 流转都不等于库存事实。",
+          "source": "businessModules.mjs"
+        },
+        {
+          "key": "production-scheduling",
+          "scope": "desktop",
+          "group": "生产管理",
+          "title": "生产排程",
+          "path": "/erp/production/scheduling",
+          "summary": "处理生产订单发布时生成的 PMC 待办。",
+          "boundary": "完成排程任务不会代写领料、完工或库存记录。",
+          "source": "businessModules.mjs"
+        },
+        {
+          "key": "production-progress",
+          "scope": "desktop",
+          "group": "生产管理",
+          "title": "生产进度",
+          "path": "/erp/production/progress",
+          "summary": "处理生产发料、成品入库和返工记录。",
+          "boundary": "任务完成不会自动生成生产或库存事实。",
+          "source": "businessModules.mjs"
+        },
+        {
+          "key": "production-exceptions",
+          "scope": "desktop",
+          "group": "生产管理",
+          "title": "生产异常处置",
+          "path": "/erp/production/exceptions",
+          "summary": "办理报废、在制让步和超领申请。",
+          "boundary": "审批只表达决定，必须在精确异常来源上显式执行。",
+          "source": "businessModules.mjs"
+        },
+        {
+          "key": "shipping-release",
+          "scope": "desktop",
+          "group": "出货管理",
+          "title": "出货放行",
+          "path": "/erp/warehouse/shipping-release",
+          "summary": "财务办理版本化出货审批。",
+          "boundary": "财务审批不代表已经出货、扣减库存或生成应收。",
+          "source": "businessModules.mjs"
+        },
+        {
+          "key": "outbound",
+          "scope": "desktop",
+          "group": "出货管理",
+          "title": "出库管理",
+          "path": "/erp/warehouse/outbound",
+          "summary": "办理出货单确认和库存预留。",
+          "boundary": "出货放行和任务完成不等于实际出库。",
+          "source": "businessModules.mjs"
+        },
+        {
+          "key": "shipments",
+          "scope": "desktop",
+          "group": "出货管理",
+          "title": "出货单",
+          "path": "/erp/warehouse/shipments",
+          "summary": "维护出货信息和明细。",
+          "boundary": "只有确认发货后才记录实际出货和库存出库。",
+          "source": "businessModules.mjs"
+        },
+        {
+          "key": "reconciliation",
+          "scope": "desktop",
+          "group": "财务管理",
+          "title": "对账管理",
+          "path": "/erp/finance/reconciliation",
+          "summary": "记录单笔业务核对结果。",
+          "boundary": "对账记录不会自动生成付款、应收、应付、发票或会计凭证。",
+          "source": "businessModules.mjs"
+        },
+        {
+          "key": "receivables",
+          "scope": "desktop",
+          "group": "财务管理",
+          "title": "应收管理",
+          "path": "/erp/finance/receivables",
+          "summary": "记录已出货业务产生的应收款项。",
+          "boundary": "应收只从已出货出货单生成。",
+          "source": "businessModules.mjs"
+        },
+        {
+          "key": "payables",
+          "scope": "desktop",
+          "group": "财务管理",
+          "title": "应付管理",
+          "path": "/erp/finance/payables",
+          "summary": "记录来源明确的应付款项。",
+          "boundary": "应付不表示付款审批、付款、总账或费用报销已经完成。",
+          "source": "businessModules.mjs"
+        },
+        {
+          "key": "finance-payments",
+          "scope": "desktop",
+          "group": "财务管理",
+          "title": "收付款与核销",
+          "path": "/erp/finance/payments",
+          "summary": "登记真实收款或付款，并核销应收或应付。",
+          "boundary": "冲销和红冲保留审计，不提供物理删除。",
+          "source": "businessModules.mjs"
+        },
+        {
+          "key": "invoices",
+          "scope": "desktop",
+          "group": "财务管理",
+          "title": "发票管理",
+          "path": "/erp/finance/invoices",
+          "summary": "记录已出货业务的开票情况。",
+          "boundary": "系统中的发票记录不等于税控开票已经完成。",
+          "source": "businessModules.mjs"
+        },
+        {
+          "key": "admin-login",
+          "scope": "auxiliary",
+          "group": "公共入口",
+          "title": "后台登录",
+          "path": "/admin-login",
+          "summary": "统一承接后台与岗位任务端登录。",
+          "source": "router.jsx"
+        },
+        {
+          "key": "entry-selection",
+          "scope": "auxiliary",
+          "group": "公共入口",
+          "title": "入口选择",
+          "path": "/entry",
+          "summary": "登录后选择后台管理或岗位任务端。",
+          "source": "router.jsx"
+        },
+        {
+          "key": "legal-privacy",
+          "scope": "auxiliary",
+          "group": "规则与隐私",
+          "title": "隐私说明",
+          "path": "/legal/privacy",
+          "summary": "公开展示隐私与信息处理说明。",
+          "source": "router.jsx"
+        },
+        {
+          "key": "legal-system-rules",
+          "scope": "auxiliary",
+          "group": "规则与隐私",
+          "title": "系统使用规则",
+          "path": "/legal/system-rules",
+          "summary": "公开展示系统使用规则。",
+          "source": "router.jsx"
+        },
+        {
+          "key": "print-preview",
+          "scope": "auxiliary",
+          "group": "打印辅助",
+          "title": "模板预览",
+          "path": "/erp/print-center/:templateKey",
+          "summary": "按模板 key 查看纸面预览。",
+          "source": "router.jsx"
+        },
+        {
+          "key": "print-workspace",
+          "scope": "auxiliary",
+          "group": "打印辅助",
+          "title": "打印工作区",
+          "path": "/erp/print-workspace/:templateKey",
+          "summary": "编辑当前打印草稿并进入浏览器打印。",
+          "source": "router.jsx"
+        },
+        {
+          "key": "mobile-role-tasks",
+          "scope": "auxiliary",
+          "group": "岗位任务端",
+          "title": "岗位任务端",
+          "path": "/m/:roleKey/tasks",
+          "summary": "9 个岗位共用一个任务页面模式；最终可见岗位由账号授权和客户投影决定。",
+          "source": "router.jsx"
+        },
+        {
+          "key": "dev-home",
+          "scope": "development",
+          "group": "开发总览",
+          "title": "开发工作台总览",
+          "path": "/__dev",
+          "summary": "按改动、验证和交付进入开发任务。",
+          "source": "DevWorkbenchRoutes.jsx"
+        },
+        {
+          "key": "dev-product-engineering",
+          "scope": "development",
+          "group": "开发总览",
+          "title": "产品工程",
+          "path": "/__dev/product-engineering",
+          "summary": "选择内核、权限、规则、业务链、文档和原型入口。",
+          "source": "DevWorkbenchRoutes.jsx"
+        },
+        {
+          "key": "dev-quality",
+          "scope": "development",
+          "group": "开发总览",
+          "title": "质量验证",
+          "path": "/__dev/quality",
+          "summary": "选择验证、门禁和测试数据任务。",
+          "source": "DevWorkbenchRoutes.jsx"
+        },
+        {
+          "key": "dev-delivery",
+          "scope": "development",
+          "group": "开发总览",
+          "title": "交付运行",
+          "path": "/__dev/delivery",
+          "summary": "选择客户配置、迁移、发布和恢复任务。",
+          "source": "DevWorkbenchRoutes.jsx"
+        },
+        {
+          "key": "dev-product-core",
+          "scope": "development",
+          "group": "产品工程",
+          "title": "产品内核",
+          "path": "/__dev/product-core",
+          "summary": "只读查看当前 Product Core 能力和边界。",
+          "source": "DevWorkbenchRoutes.jsx"
+        },
+        {
+          "key": "dev-permission-relationships",
+          "scope": "development",
+          "group": "产品工程",
+          "title": "权限关系",
+          "path": "/__dev/permission-relationships",
+          "summary": "只读查看账号、岗位、页面、仓库范围和审批责任。",
+          "source": "DevWorkbenchRoutes.jsx"
+        },
+        {
+          "key": "dev-governance",
+          "scope": "development",
+          "group": "产品工程",
+          "title": "改动指南",
+          "path": "/__dev/governance",
+          "summary": "按常见改动查看应读真源和边界。",
+          "source": "DevWorkbenchRoutes.jsx"
+        },
+        {
+          "key": "dev-status-flows",
+          "scope": "development",
+          "group": "产品工程",
+          "title": "业务链与运行观察",
+          "path": "/__dev/status-flows",
+          "summary": "只读观察业务链、Workflow、ProcessRuntime、Fact 和状态规则。",
+          "source": "DevWorkbenchRoutes.jsx"
+        },
+        {
+          "key": "dev-business-usability",
+          "scope": "development",
+          "group": "产品工程",
+          "title": "业务易用性",
+          "path": "/__dev/business-usability",
+          "summary": "只读检查页面任务、完成标准、交接和页内解释覆盖。",
+          "source": "DevWorkbenchRoutes.jsx"
+        },
+        {
+          "key": "dev-docs",
+          "scope": "development",
+          "group": "产品工程",
+          "title": "开发文档",
+          "path": "/__dev/docs",
+          "summary": "查看当前工作区 Markdown。",
+          "source": "DevWorkbenchRoutes.jsx"
+        },
+        {
+          "key": "dev-testing",
+          "scope": "development",
+          "group": "质量验证",
+          "title": "改动验证",
+          "path": "/__dev/testing",
+          "summary": "生成 affected 计划并查看专项检查、Git 收口和覆盖证据。",
+          "source": "DevWorkbenchRoutes.jsx"
+        },
+        {
+          "key": "dev-quality-gates",
+          "scope": "development",
+          "group": "质量验证",
+          "title": "质量门禁",
+          "path": "/__dev/quality-gates",
+          "summary": "运行和核对 full / strict 门禁回执。",
+          "source": "DevWorkbenchRoutes.jsx"
+        },
+        {
+          "key": "dev-data-preparation",
+          "scope": "development",
+          "group": "质量验证",
+          "title": "测试数据",
+          "path": "/__dev/data-preparation",
+          "summary": "检查和准备固定验收数据。",
+          "source": "DevWorkbenchRoutes.jsx"
+        },
+        {
+          "key": "dev-prototypes",
+          "scope": "development",
+          "group": "产品工程",
+          "title": "产品原型",
+          "path": "/__dev/prototypes",
+          "summary": "浏览 HTML、PNG 和截图原型资产。",
+          "source": "DevWorkbenchRoutes.jsx"
+        },
+        {
+          "key": "dev-customer-config",
+          "scope": "development",
+          "group": "交付运行",
+          "title": "客户配置",
+          "path": "/__dev/customer-config",
+          "summary": "预检客户配置包并查看受控应用入口。",
+          "source": "DevWorkbenchRoutes.jsx"
+        },
+        {
+          "key": "dev-database-migration",
+          "scope": "development",
+          "group": "交付运行",
+          "title": "数据库迁移",
+          "path": "/__dev/database-migration",
+          "summary": "准备、执行和读回共享开发库迁移。",
+          "source": "DevWorkbenchRoutes.jsx"
+        },
+        {
+          "key": "dev-version-center",
+          "scope": "development",
+          "group": "交付运行",
+          "title": "版本发布",
+          "path": "/__dev/version-center",
+          "summary": "核对 exact-SHA Release、部署和回滚。",
+          "source": "DevWorkbenchRoutes.jsx"
+        },
+        {
+          "key": "dev-drill-recovery",
+          "scope": "development",
+          "group": "交付运行",
+          "title": "演练与恢复",
+          "path": "/__dev/drill-recovery",
+          "summary": "查看演练优先级、证据和安全接管入口。",
+          "source": "DevWorkbenchRoutes.jsx"
+        }
+      ]
+    </script>
+
+    <script>
+      (() => {
+        "use strict";
+
+        const PAGE_MATRIX = JSON.parse(
+          document.getElementById("prototype-page-matrix").textContent,
+        );
+        const SCOPE_LABELS = {
+          desktop: "桌面正式入口",
+          auxiliary: "公共 / 移动 / 参数化",
+          development: "开发工作台",
+        };
+        const BASE_RECORDS = [
+          {
+            id: "SO-DEMO-001",
+            customer: "示例客户 A",
+            product: "经典毛绒公仔 A",
+            quantity: 1200,
+            amount: 86400,
+            status: "已提交",
+            date: "2026-08-18",
+          },
+          {
+            id: "SO-DEMO-002",
+            customer: "示例客户 B",
+            product: "节日系列挂件 B",
+            quantity: 800,
+            amount: 39200,
+            status: "草稿",
+            date: "2026-08-22",
+          },
+          {
+            id: "SO-DEMO-003",
+            customer: "示例客户 C",
+            product: "礼赠玩偶组合 C",
+            quantity: 3600,
+            amount: 315600,
+            status: "已确认",
+            date: "2026-09-02",
+          },
+          {
+            id: "SO-DEMO-004",
+            customer: "示例客户 D",
+            product: "迷你公仔 D",
+            quantity: 450,
+            amount: 24750,
+            status: "已提交",
+            date: "2026-09-08",
+          },
+        ];
+        const LONG_TEXT_RECORDS = BASE_RECORDS.map((record, index) =>
+          index === 0
+            ? {
+                ...record,
+                customer:
+                  "示例客户 A（用于验证非常长的客户主体名称在窄屏和表格中的换行表现）",
+                product:
+                  "经典毛绒公仔 A · 超长规格名称 · 多配色 · 多包装版本 · 中性样例",
+                amount: 987654321.88,
+              }
+            : record,
+        );
+        const TASKS_BY_RECORD = {
+          "SO-DEMO-001": {
+            id: "TASK-DEMO-001",
+            title: "核对订单交期与交接信息",
+            role: "业务",
+            source: "SO-DEMO-001",
+          },
+          "SO-DEMO-003": {
+            id: "TASK-DEMO-003",
+            title: "补充已确认订单的生产交接说明",
+            role: "PMC",
+            source: "SO-DEMO-003",
+          },
+        };
+
+        const state = {
+          view: "atlas",
+          selectedPageKey: "sales-orders",
+          atlasQuery: "",
+          atlasScope: "all",
+          pageState: "normal",
+          recordQuery: "",
+          recordStatus: "all",
+          recordDate: "",
+          selectedRecordId: "SO-DEMO-001",
+          page: 1,
+          pageSize: 2,
+          columns: { product: true, quantity: true, amount: true },
+          taskReceipts: {},
+          activeLayer: null,
+          layerTrigger: null,
+        };
+
+        const $ = (selector, root = document) => root.querySelector(selector);
+        const $$ = (selector, root = document) =>
+          Array.from(root.querySelectorAll(selector));
+        const escapeHtml = (value) =>
+          String(value ?? "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
+        const formatAmount = (value) =>
+          new Intl.NumberFormat("zh-CN", {
+            style: "currency",
+            currency: "CNY",
+            minimumFractionDigits: 2,
+          }).format(value);
+
+        function showToast(message) {
+          const toast = $("#toast");
+          toast.textContent = message;
+          toast.hidden = false;
+          clearTimeout(showToast.timer);
+          showToast.timer = setTimeout(() => {
+            toast.hidden = true;
+          }, 3200);
+        }
+
+        function setTheme(theme) {
+          const next = theme === "dark" ? "dark" : "light";
+          document.documentElement.dataset.theme = next;
+          $("#themeButton").textContent =
+            next === "dark" ? "切换浅色" : "切换暗色";
+          try {
+            localStorage.setItem("current_page_atlas_theme", next);
+          } catch (_error) {}
+        }
+
+        function switchView(view, { focus = false } = {}) {
+          state.view = view;
+          $$(".view-tab").forEach((tab) => {
+            const selected = tab.dataset.view === view;
+            tab.setAttribute("aria-selected", String(selected));
+            tab.tabIndex = selected ? 0 : -1;
+            if (selected && focus) tab.focus();
+          });
+          $("#atlasView").hidden = view !== "atlas";
+          $("#sampleView").hidden = view !== "sample";
+          $("#stateView").hidden = view !== "states";
+          if (view === "atlas") renderAtlas();
+          if (view === "sample") renderSample();
+          if (view === "states") renderStateCards();
+        }
+
+        function getFilteredPages() {
+          const query = state.atlasQuery.trim().toLowerCase();
+          return PAGE_MATRIX.filter((page) => {
+            const scopeMatches =
+              state.atlasScope === "all" || page.scope === state.atlasScope;
+            const text = [
+              page.title,
+              page.path,
+              page.group,
+              page.summary,
+              page.boundary,
+              page.source,
+            ]
+              .join(" ")
+              .toLowerCase();
+            return scopeMatches && (!query || text.includes(query));
+          });
+        }
+
+        function renderAtlas() {
+          const pages = getFilteredPages();
+          if (!pages.some((page) => page.key === state.selectedPageKey)) {
+            state.selectedPageKey = pages[0]?.key || "";
+          }
+          const rows = $("#atlasRows");
+          rows.innerHTML = pages.length
+            ? pages
+                .map(
+                  (page) => `
+                    <tr data-selected="${page.key === state.selectedPageKey}">
+                      <td><button type="button" class="text-button" data-page-key="${escapeHtml(page.key)}">${escapeHtml(page.title)}</button></td>
+                      <td>${escapeHtml(page.group)}</td>
+                      <td class="path">${escapeHtml(page.path)}</td>
+                      <td><span class="badge">${escapeHtml(SCOPE_LABELS[page.scope])}</span></td>
+                    </tr>
+                  `,
+                )
+                .join("")
+            : '<tr><td colspan="4"><div class="empty-state">没有匹配页面。请清空筛选或换一个关键词。</div></td></tr>';
+          $$(".text-button[data-page-key]", rows).forEach((button) => {
+            button.addEventListener("click", () => {
+              state.selectedPageKey = button.dataset.pageKey;
+              renderAtlas();
+            });
+          });
+          const selected = PAGE_MATRIX.find(
+            (page) => page.key === state.selectedPageKey,
+          );
+          $("#atlasDetail").innerHTML = selected
+            ? `
+                <span class="badge">${escapeHtml(SCOPE_LABELS[selected.scope])}</span>
+                <h3 style="margin-top: 12px">${escapeHtml(selected.title)}</h3>
+                <p class="path">${escapeHtml(selected.path)}</p>
+                <p>${escapeHtml(selected.summary)}</p>
+                ${selected.boundary ? `<p class="boundary">${escapeHtml(selected.boundary)}</p>` : ""}
+                <dl>
+                  <dt>分组</dt><dd>${escapeHtml(selected.group)}</dd>
+                  <dt>登记来源</dt><dd class="path">${escapeHtml(selected.source)}</dd>
+                  <dt>原型状态</dt><dd>页面地图已核对；业务交互仍以当前代码和测试为准</dd>
+                </dl>
+              `
+            : '<h3>没有匹配页面</h3><p class="muted">清空筛选后继续查看。</p>';
+        }
+
+        function getVisibleRecords() {
+          const source =
+            state.pageState === "long-text" ? LONG_TEXT_RECORDS : BASE_RECORDS;
+          if (state.pageState === "empty") return [];
+          const query = state.recordQuery.trim().toLowerCase();
+          return source.filter((record) => {
+            const queryMatches =
+              !query ||
+              [record.id, record.customer, record.product]
+                .join(" ")
+                .toLowerCase()
+                .includes(query);
+            const statusMatches =
+              state.recordStatus === "all" ||
+              record.status === state.recordStatus;
+            const dateMatches =
+              !state.recordDate || record.date === state.recordDate;
+            return queryMatches && statusMatches && dateMatches;
+          });
+        }
+
+        function renderSample() {
+          const denied = state.pageState === "no-permission";
+          $("#accessAlert").hidden = !denied;
+          $("#createButton").disabled = denied || state.pageState === "loading";
+          $("#createButton").textContent = denied
+            ? "无权限新建"
+            : "新建销售订单";
+          $("#recordSearch").disabled = state.pageState === "loading";
+          $("#recordStatus").disabled = state.pageState === "loading";
+          $("#recordDate").disabled = state.pageState === "loading";
+          const content = $("#sampleContent");
+
+          if (state.pageState === "loading") {
+            content.innerHTML =
+              '<div class="loading-state" aria-live="polite"><strong>正在读取销售订单</strong><div class="skeleton" style="width: 88%"></div><div class="skeleton" style="width: 72%"></div><div class="skeleton" style="width: 81%"></div></div>';
+            return;
+          }
+          if (state.pageState === "error") {
+            content.innerHTML =
+              '<div class="error-alert" role="alert"><strong>销售订单暂时无法读取</strong><p>请检查本地服务后重试；原型不展示原始技术异常。</p><button id="retryButton" type="button">重新读取</button></div>';
+            $("#retryButton").addEventListener("click", () =>
+              setPageState("normal"),
+            );
+            return;
+          }
+
+          const records = getVisibleRecords();
+          const pageCount = Math.max(
+            1,
+            Math.ceil(records.length / state.pageSize),
+          );
+          state.page = Math.min(state.page, pageCount);
+          const start = (state.page - 1) * state.pageSize;
+          const pageRecords = records.slice(start, start + state.pageSize);
+          if (!records.some((record) => record.id === state.selectedRecordId)) {
+            state.selectedRecordId = pageRecords[0]?.id || "";
+          }
+          const selected = records.find(
+            (record) => record.id === state.selectedRecordId,
+          );
+          const task = selected ? TASKS_BY_RECORD[selected.id] : null;
+          const receipt = task ? state.taskReceipts[task.id] : null;
+
+          const columnHead = [
+            state.columns.product ? '<th scope="col">产品</th>' : "",
+            state.columns.quantity ? '<th scope="col">数量</th>' : "",
+            state.columns.amount ? '<th scope="col">金额</th>' : "",
+          ].join("");
+          const tableRows = pageRecords
+            .map(
+              (record) => `
+                <tr data-record-id="${record.id}" data-selected="${record.id === state.selectedRecordId}">
+                  <td><input type="radio" name="recordSelection" value="${record.id}" aria-label="选择订单 ${record.id}" ${record.id === state.selectedRecordId ? "checked" : ""} ${denied ? "disabled" : ""} /></td>
+                  <td><strong>${escapeHtml(record.id)}</strong><br /><span class="muted">交期 ${escapeHtml(record.date)}</span></td>
+                  <td>${escapeHtml(record.customer)}</td>
+                  ${state.columns.product ? `<td>${escapeHtml(record.product)}</td>` : ""}
+                  ${state.columns.quantity ? `<td>${record.quantity.toLocaleString("zh-CN")}</td>` : ""}
+                  ${state.columns.amount ? `<td>${formatAmount(record.amount)}</td>` : ""}
+                  <td><span class="badge">${escapeHtml(record.status)}</span></td>
+                  <td><button type="button" data-detail-id="${record.id}" ${denied ? "disabled" : ""}>查看详情</button></td>
+                </tr>
+              `,
+            )
+            .join("");
+
+          content.innerHTML = `
+            ${
+              records.length === 0
+                ? '<div class="empty-state"><strong>当前筛选没有销售订单</strong><p class="muted">可以重置筛选后继续查看中性样例。</p><button id="emptyReset" type="button">重置筛选</button></div>'
+                : `
+              <div class="selection-bar">
+                <div><strong>${selected ? `已选择 ${escapeHtml(selected.id)}` : "请选择一条记录"}</strong><div class="muted">列表使用单选；详情只从显式入口打开。</div></div>
+                <div class="selection-actions">
+                  <button id="selectedDetailButton" type="button" ${!selected || denied ? "disabled" : ""}>查看所选详情</button>
+                  <button id="taskButton" type="button" ${!task || denied || receipt ? "disabled" : ""} ${!task ? "hidden" : ""}>${receipt ? "任务已有模拟回执" : "处理关联任务"}</button>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table aria-label="销售订单中性模拟列表">
+                  <thead><tr><th scope="col">选择</th><th scope="col">订单</th><th scope="col">客户</th>${columnHead}<th scope="col">状态</th><th scope="col">操作</th></tr></thead>
+                  <tbody>${tableRows}</tbody>
+                </table>
+              </div>
+              <div class="pagination" aria-label="分页">
+                <button id="previousPage" type="button" ${state.page <= 1 ? "disabled" : ""}>上一页</button>
+                <span class="page-indicator">第 ${state.page} / ${pageCount} 页 · 共 ${records.length} 条</span>
+                <button id="nextPage" type="button" ${state.page >= pageCount ? "disabled" : ""}>下一页</button>
+              </div>
+            `
+            }
+          `;
+
+          $("#emptyReset")?.addEventListener("click", resetRecordFilters);
+          $$('input[name="recordSelection"]', content).forEach((radio) => {
+            radio.addEventListener("change", () => {
+              state.selectedRecordId = radio.value;
+              renderSample();
+            });
+          });
+          $$("tr[data-record-id]", content).forEach((row) => {
+            row.addEventListener("click", (event) => {
+              if (denied || event.target.closest("button, input")) return;
+              state.selectedRecordId = row.dataset.recordId;
+              renderSample();
+            });
+          });
+          $$("[data-detail-id]", content).forEach((button) => {
+            button.addEventListener("click", () =>
+              openRecordDetail(button.dataset.detailId, button),
+            );
+          });
+          $("#selectedDetailButton")?.addEventListener("click", (event) =>
+            openRecordDetail(state.selectedRecordId, event.currentTarget),
+          );
+          $("#taskButton")?.addEventListener("click", (event) =>
+            openTaskDrawer(event.currentTarget),
+          );
+          $("#previousPage")?.addEventListener("click", () => {
+            state.page -= 1;
+            renderSample();
+          });
+          $("#nextPage")?.addEventListener("click", () => {
+            state.page += 1;
+            renderSample();
+          });
+        }
+
+        function resetRecordFilters() {
+          state.recordQuery = "";
+          state.recordStatus = "all";
+          state.recordDate = "";
+          state.page = 1;
+          $("#recordSearch").value = "";
+          $("#recordStatus").value = "all";
+          $("#recordDate").value = "";
+          renderSample();
+        }
+
+        function setPageState(next) {
+          state.pageState = next;
+          state.page = 1;
+          $$(".state-card").forEach((card) =>
+            card.setAttribute(
+              "aria-pressed",
+              String(card.dataset.state === next),
+            ),
+          );
+          if (state.view === "sample") renderSample();
+          if (state.view === "states") renderStateCards();
+        }
+
+        function renderStateCards() {
+          $$(".state-card").forEach((card) =>
+            card.setAttribute(
+              "aria-pressed",
+              String(card.dataset.state === state.pageState),
+            ),
+          );
+        }
+
+        function getFocusable(layer) {
+          return $$(
+            'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [href], [tabindex]:not([tabindex="-1"])',
+            layer,
+          ).filter(
+            (element) => !element.hidden && element.getClientRects().length > 0,
+          );
+        }
+
+        function openLayer(layerId, trigger) {
+          const layer = document.getElementById(layerId);
+          if (!layer || !layer.hidden) return;
+          state.activeLayer = layer;
+          state.layerTrigger = trigger || document.activeElement;
+          layer.hidden = false;
+          $("#app").setAttribute("inert", "");
+          $("#app").setAttribute("aria-hidden", "true");
+          document.body.style.overflow = "hidden";
+          requestAnimationFrame(() => getFocusable(layer)[0]?.focus());
+        }
+
+        function closeLayer(layer = state.activeLayer) {
+          if (!layer) return;
+          layer.hidden = true;
+          $("#app").removeAttribute("inert");
+          $("#app").removeAttribute("aria-hidden");
+          document.body.style.overflow = "";
+          const trigger = state.layerTrigger;
+          state.activeLayer = null;
+          state.layerTrigger = null;
+          requestAnimationFrame(() => trigger?.focus?.());
+        }
+
+        function openRecordDetail(recordId, trigger) {
+          const record = (
+            state.pageState === "long-text" ? LONG_TEXT_RECORDS : BASE_RECORDS
+          ).find((item) => item.id === recordId);
+          if (!record || state.pageState === "no-permission") return;
+          $("#detailBody").innerHTML = `
+            <div class="record-grid">
+              <dt>销售订单</dt><dd>${escapeHtml(record.id)}</dd>
+              <dt>客户</dt><dd>${escapeHtml(record.customer)}</dd>
+              <dt>产品</dt><dd>${escapeHtml(record.product)}</dd>
+              <dt>数量</dt><dd>${record.quantity.toLocaleString("zh-CN")}</dd>
+              <dt>金额</dt><dd>${formatAmount(record.amount)}</dd>
+              <dt>状态</dt><dd>${escapeHtml(record.status)}</dd>
+              <dt>预计交期</dt><dd>${escapeHtml(record.date)}</dd>
+            </div>
+            <p class="boundary">销售订单只记录客户订单承诺；它不会自动生成出货单、库存变动、应收、发票或收付款记录。</p>
+          `;
+          openLayer("detailLayer", trigger);
+        }
+
+        function openTaskDrawer(trigger) {
+          const task = TASKS_BY_RECORD[state.selectedRecordId];
+          if (!task || state.pageState === "no-permission") return;
+          $("#taskContext").innerHTML = `
+            <span class="badge">当前记录关联任务</span>
+            <h3 style="margin-top: 12px">${escapeHtml(task.title)}</h3>
+            <div class="record-grid">
+              <dt>任务编号</dt><dd>${escapeHtml(task.id)}</dd>
+              <dt>来源记录</dt><dd>${escapeHtml(task.source)}</dd>
+              <dt>责任岗位</dt><dd>${escapeHtml(task.role)}</dd>
+            </div>
+          `;
+          $("#taskReason").value = "";
+          $("#taskError").textContent = "";
+          $('input[name="taskAction"][value="complete"]').checked = true;
+          openLayer("taskLayer", trigger);
+        }
+
+        function renderPalette(query = "") {
+          const keyword = query.trim().toLowerCase();
+          const pages = PAGE_MATRIX.filter(
+            (page) =>
+              !keyword ||
+              [page.title, page.path, page.group, page.summary]
+                .join(" ")
+                .toLowerCase()
+                .includes(keyword),
+          ).slice(0, 18);
+          $("#paletteResults").innerHTML = pages.length
+            ? pages
+                .map(
+                  (page) =>
+                    `<button type="button" class="palette-result" data-palette-key="${escapeHtml(page.key)}"><span><strong>${escapeHtml(page.title)}</strong><br /><span class="path">${escapeHtml(page.path)}</span></span><span class="badge">${escapeHtml(SCOPE_LABELS[page.scope])}</span></button>`,
+                )
+                .join("")
+            : '<div class="empty-state">没有匹配页面。</div>';
+          $$("[data-palette-key]").forEach((button) => {
+            button.addEventListener("click", () => {
+              state.selectedPageKey = button.dataset.paletteKey;
+              state.atlasQuery = "";
+              state.atlasScope = "all";
+              $("#atlasSearch").value = "";
+              $("#scopeFilter").value = "all";
+              closeLayer($("#paletteLayer"));
+              switchView("atlas");
+              renderAtlas();
+            });
+          });
+        }
+
+        $$(".view-tab").forEach((tab, index, tabs) => {
+          tab.addEventListener("click", () => switchView(tab.dataset.view));
+          tab.addEventListener("keydown", (event) => {
+            const keys = ["ArrowLeft", "ArrowRight", "Home", "End"];
+            if (!keys.includes(event.key)) return;
+            event.preventDefault();
+            let nextIndex = index;
+            if (event.key === "ArrowLeft")
+              nextIndex = (index - 1 + tabs.length) % tabs.length;
+            if (event.key === "ArrowRight")
+              nextIndex = (index + 1) % tabs.length;
+            if (event.key === "Home") nextIndex = 0;
+            if (event.key === "End") nextIndex = tabs.length - 1;
+            switchView(tabs[nextIndex].dataset.view, { focus: true });
+          });
+        });
+
+        $("#themeButton").addEventListener("click", () =>
+          setTheme(
+            document.documentElement.dataset.theme === "dark"
+              ? "light"
+              : "dark",
+          ),
+        );
+        $("#paletteButton").addEventListener("click", (event) => {
+          $("#paletteSearch").value = "";
+          renderPalette("");
+          openLayer("paletteLayer", event.currentTarget);
+          requestAnimationFrame(() => $("#paletteSearch").focus());
+        });
+        $("#paletteSearch").addEventListener("input", (event) =>
+          renderPalette(event.target.value),
+        );
+
+        $("#atlasSearch").addEventListener("input", (event) => {
+          state.atlasQuery = event.target.value;
+          renderAtlas();
+        });
+        $("#scopeFilter").addEventListener("change", (event) => {
+          state.atlasScope = event.target.value;
+          renderAtlas();
+        });
+        $("#atlasReset").addEventListener("click", () => {
+          state.atlasQuery = "";
+          state.atlasScope = "all";
+          $("#atlasSearch").value = "";
+          $("#scopeFilter").value = "all";
+          renderAtlas();
+        });
+
+        $("#recordSearch").addEventListener("input", (event) => {
+          state.recordQuery = event.target.value;
+          state.page = 1;
+          renderSample();
+        });
+        $("#recordStatus").addEventListener("change", (event) => {
+          state.recordStatus = event.target.value;
+          state.page = 1;
+          renderSample();
+        });
+        $("#recordDate").addEventListener("change", (event) => {
+          state.recordDate = event.target.value;
+          state.page = 1;
+          renderSample();
+        });
+        $("#recordReset").addEventListener("click", resetRecordFilters);
+        $$("[data-column]").forEach((checkbox) => {
+          checkbox.addEventListener("change", () => {
+            state.columns[checkbox.dataset.column] = checkbox.checked;
+            renderSample();
+          });
+        });
+        $("#createButton").addEventListener("click", (event) => {
+          if (state.pageState === "no-permission") return;
+          $("#createCustomer").value = "";
+          $("#createDate").value = "";
+          $("#createProduct").value = "";
+          $("#createQuantity").value = "100";
+          $("#createError").textContent = "";
+          openLayer("createLayer", event.currentTarget);
+          requestAnimationFrame(() => $("#createCustomer").focus());
+        });
+        $("#saveCreate").addEventListener("click", () => {
+          const customer = $("#createCustomer").value.trim();
+          const date = $("#createDate").value;
+          const product = $("#createProduct").value.trim();
+          const quantity = Number($("#createQuantity").value);
+          if (
+            !customer ||
+            !date ||
+            !product ||
+            !Number.isFinite(quantity) ||
+            quantity <= 0
+          ) {
+            $("#createError").textContent =
+              "请完整填写客户、交期、产品和大于 0 的数量。";
+            return;
+          }
+          closeLayer($("#createLayer"));
+          showToast("已生成模拟保存结果；未调用 API，也未写入业务数据。");
+        });
+        $("#submitTask").addEventListener("click", () => {
+          const task = TASKS_BY_RECORD[state.selectedRecordId];
+          const action = $('input[name="taskAction"]:checked')?.value;
+          const reason = $("#taskReason").value.trim();
+          if (!task) return;
+          if (["block", "reject"].includes(action) && !reason) {
+            $("#taskError").textContent = "阻塞或退回必须填写具体原因。";
+            $("#taskReason").focus();
+            return;
+          }
+          state.taskReceipts[task.id] = { action, reason };
+          closeLayer($("#taskLayer"));
+          renderSample();
+          showToast("已生成 Workflow 模拟回执；没有写入任何业务事实。");
+        });
+        $$("[data-close-layer]").forEach((button) =>
+          button.addEventListener("click", () =>
+            closeLayer(button.closest(".layer")),
+          ),
+        );
+        $$(".state-card").forEach((card) =>
+          card.addEventListener("click", () =>
+            setPageState(card.dataset.state),
+          ),
+        );
+        $("#openSampleButton").addEventListener("click", () =>
+          switchView("sample"),
+        );
+
+        document.addEventListener("keydown", (event) => {
+          if (
+            (event.metaKey || event.ctrlKey) &&
+            event.key.toLowerCase() === "k"
+          ) {
+            event.preventDefault();
+            if (state.activeLayer) closeLayer();
+            $("#paletteSearch").value = "";
+            renderPalette("");
+            openLayer("paletteLayer", $("#paletteButton"));
+            requestAnimationFrame(() => $("#paletteSearch").focus());
+            return;
+          }
+          if (!state.activeLayer) return;
+          if (event.key === "Escape") {
+            event.preventDefault();
+            closeLayer();
+            return;
+          }
+          if (event.key !== "Tab") return;
+          const focusable = getFocusable(state.activeLayer);
+          if (!focusable.length) return;
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+          }
+        });
+
+        let savedTheme = "light";
+        try {
+          savedTheme =
+            localStorage.getItem("current_page_atlas_theme") || "light";
+        } catch (_error) {}
+        setTheme(savedTheme);
+        $("#matrixCount").textContent = String(PAGE_MATRIX.length);
+        renderAtlas();
+        renderSample();
+        renderStateCards();
+      })();
+    </script>
+  </body>
+</html>

@@ -18,7 +18,19 @@ func unknownSalesOrderResult(method string) *v1.JsonrpcResult {
 }
 
 func salesOrderMutationFromParams(pm map[string]any) (*biz.SalesOrderMutation, bool) {
+	if !sourceOrderAllowsOnly(pm,
+		"customer_key", "id", "expected_version", "order_no", "customer_id", "currency",
+		"customer_order_no", "customer_snapshot", "sales_owner", "contact_snapshot",
+		"payment_method", "payment_term_days", "price_condition_note", "order_date",
+		"planned_delivery_date", "note", "items",
+	) {
+		return nil, false
+	}
 	orderDate, ok := getRequiredJSONRPCTime(pm, "order_date")
+	if !ok {
+		return nil, false
+	}
+	paymentTermDays, ok := getOptionalJSONRPCNonNegativeInt(pm, "payment_term_days")
 	if !ok {
 		return nil, false
 	}
@@ -29,12 +41,13 @@ func salesOrderMutationFromParams(pm map[string]any) (*biz.SalesOrderMutation, b
 	return &biz.SalesOrderMutation{
 		OrderNo:             getString(pm, "order_no"),
 		CustomerID:          getInt(pm, "customer_id", 0),
+		Currency:            getString(pm, "currency"),
 		CustomerOrderNo:     getWorkflowStringPtr(pm, "customer_order_no"),
 		CustomerSnapshot:    getMap(pm, "customer_snapshot"),
 		SalesOwner:          getWorkflowStringPtr(pm, "sales_owner"),
 		ContactSnapshot:     getMap(pm, "contact_snapshot"),
 		PaymentMethod:       getWorkflowStringPtr(pm, "payment_method"),
-		PaymentTermDays:     getOptionalNonNegativeInt(pm, "payment_term_days"),
+		PaymentTermDays:     paymentTermDays,
 		PriceConditionNote:  getWorkflowStringPtr(pm, "price_condition_note"),
 		OrderDate:           orderDate,
 		PlannedDeliveryDate: plannedDeliveryDate,
@@ -108,6 +121,10 @@ func (d *jsonrpcDispatcher) mapSalesOrderError(ctx context.Context, err error) *
 	switch {
 	case errors.Is(err, biz.ErrSalesOrderConflict):
 		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: errcode.ResourceVersionConflict.Message}
+	case errors.Is(err, biz.ErrIdempotencyConflict):
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
+	case errors.Is(err, biz.ErrSourceOrderNormalCloseIncomplete):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "销售订单尚未全部出货；若确定不再履行剩余数量，请改用短关闭并填写原因"}
 	case errors.Is(err, biz.ErrBadParam):
 		l.Warnf("[sales_order] invalid param err=%v", err)
 		return invalidParamResult()
@@ -167,6 +184,7 @@ func salesOrderToMap(item *biz.SalesOrder) map[string]any {
 		"id":                    item.ID,
 		"order_no":              item.OrderNo,
 		"customer_id":           item.CustomerID,
+		"currency":              item.Currency,
 		"customer_order_no":     optionalStringValue(item.CustomerOrderNo),
 		"customer_snapshot":     item.CustomerSnapshot,
 		"sales_owner":           optionalStringValue(item.SalesOwner),
@@ -178,6 +196,11 @@ func salesOrderToMap(item *biz.SalesOrder) map[string]any {
 		"planned_delivery_date": optionalTimeUnix(item.PlannedDeliveryDate),
 		"lifecycle_status":      item.LifecycleStatus,
 		"version":               item.Version,
+		"settlement_action":     optionalStringValue(item.SettlementAction),
+		"settlement_mode":       optionalStringValue(item.SettlementMode),
+		"settlement_reason":     optionalStringValue(item.SettlementReason),
+		"settled_at":            optionalTimeUnix(item.SettledAt),
+		"settled_by":            optionalIntValue(item.SettledBy),
 		"note":                  optionalStringValue(item.Note),
 		"created_at":            item.CreatedAt.Unix(),
 		"updated_at":            item.UpdatedAt.Unix(),

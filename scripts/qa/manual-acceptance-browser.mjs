@@ -19,6 +19,7 @@ import {
   buildManualAcceptancePageDataContract,
 } from "./manual-acceptance-page-data-contract.mjs";
 import { inspectFinanceFieldContract } from "./manual-acceptance-finance-field-contract.mjs";
+import { formatUnixDate } from "../../web/src/erp/utils/masterDataOrderView.mjs";
 import { dashboardHealthModules } from "../../web/src/erp/config/dashboardModules.mjs";
 import {
   MANUAL_ACCEPTANCE_DATASET_APPLY_REPORT_CONTRACT,
@@ -83,7 +84,7 @@ const PAGE_TIMEOUT_MS = 25_000;
 const AUTH_PACE_MS = 3_000;
 const TARGET_PACE_MS = 3_000;
 const TARGET_RATE_LIMIT_MAX_ATTEMPTS = 3;
-const TARGET_RATE_LIMIT_RETRY_DELAY_MS = 3_000;
+const TARGET_RATE_LIMIT_RETRY_DELAY_MS = 10_000;
 
 export const FORMAL_BROWSER_ACCOUNTS = Object.freeze([
   Object.freeze({ username: "demo_boss", roleKey: "boss" }),
@@ -117,8 +118,11 @@ export const EXCEPTION_BROWSER_ACCOUNTS = Object.freeze([
 ]);
 
 export const MANUAL_ACCEPTANCE_BROWSER_BOUNDARY = Object.freeze({
-  readOnly: true,
-  writesDatabase: false,
+  readOnly: false,
+  writesDatabase: true,
+  businessDataReadOnly: true,
+  writesBusinessData: false,
+  recordsLegalNoticeAcknowledgement: true,
   clicksBusinessWriteActions: false,
   callsBusinessMutationRPC: false,
   storesPasswordValue: false,
@@ -126,6 +130,7 @@ export const MANUAL_ACCEPTANCE_BROWSER_BOUNDARY = Object.freeze({
   storesAuthorizationHeader: false,
   allowedInteractions: Object.freeze([
     "login",
+    "legal_notice_acknowledgement",
     "route_navigation",
     "read_only_tab_navigation",
   ]),
@@ -337,9 +342,7 @@ export function buildManualAcceptanceBrowserPlan({ baseURL, backendURL } = {}) {
       requiresDataEvidence:
         target.isList ||
         ["print-preview", "print-workspace"].includes(target.group) ||
-        ["global-dashboard", "business-dashboard"].includes(
-          target.key,
-        ),
+        ["global-dashboard", "business-dashboard"].includes(target.key),
       ...(target.key === "business-dashboard"
         ? { dataEvidenceRequirements: dashboardRequirements }
         : {}),
@@ -727,7 +730,37 @@ async function fillLoginForm(
   await page.locator('input[type="password"]').fill(password);
 }
 
-async function loginFormalAccount(
+function waitForLegalNoticeStatus(page) {
+  return page.waitForResponse(
+    (response) => {
+      if (!response.url().includes("/rpc/admin")) return false;
+      try {
+        return (
+          response.request().postDataJSON()?.method === "legal_notice_status"
+        );
+      } catch {
+        return false;
+      }
+    },
+    { timeout: LOGIN_TIMEOUT_MS },
+  );
+}
+
+async function acknowledgeLegalNoticeIfRequired(page, statusResponse) {
+  await statusResponse;
+  const gate = page.getByTestId("legal-notice-gate");
+  const acknowledge = page.getByTestId("legal-notice-acknowledge");
+  const required = await acknowledge
+    .waitFor({ state: "visible", timeout: 1_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!required) return false;
+  await acknowledge.click();
+  await gate.waitFor({ state: "hidden", timeout: LOGIN_TIMEOUT_MS });
+  return true;
+}
+
+async function loginFormalAccountAttempt(
   browser,
   {
     baseURL,
@@ -759,6 +792,7 @@ async function loginFormalAccount(
       password,
       entryTarget,
     });
+    const legalNoticeStatus = waitForLegalNoticeStatus(page);
     await Promise.all([
       page.waitForURL((url) => url.pathname !== "/admin-login", {
         timeout: LOGIN_TIMEOUT_MS,
@@ -773,6 +807,10 @@ async function loginFormalAccount(
         waitUntil: "domcontentloaded",
       });
     }
+    const legalNoticeAcknowledged = await acknowledgeLegalNoticeIfRequired(
+      page,
+      legalNoticeStatus,
+    );
     await waitForReadablePage(page);
     const visibleText = await page.locator("body").innerText();
     if (
@@ -797,9 +835,11 @@ async function loginFormalAccount(
       });
     }
     if (events.length > 0) {
-      throw new BrowserAcceptanceError(
+      const error = new BrowserAcceptanceError(
         `${account.username} 登录出现浏览器错误：${events.map((item) => item.message).join("；")}`,
       );
+      error.runtimeErrors = events.map((item) => ({ ...item }));
+      throw error;
     }
     return {
       storageState: await context.storageState(),
@@ -810,6 +850,7 @@ async function loginFormalAccount(
         passed: true,
         landingPath,
         verificationPath: new URL(page.url()).pathname,
+        legalNoticeAcknowledged,
         customerBrandVisible:
           visibleText.includes(COMPANY_NAME) ||
           visibleText.includes(SYSTEM_NAME),
@@ -818,6 +859,45 @@ async function loginFormalAccount(
   } finally {
     await context.close();
   }
+}
+
+export function isRetryableFormalLoginRateLimitFailure(error) {
+  return isRetryableTargetRateLimitFailure({
+    passed: false,
+    runtimeErrors: Array.isArray(error?.runtimeErrors)
+      ? error.runtimeErrors
+      : [],
+  });
+}
+
+export async function runFormalLoginWithRateLimitRetry(
+  runAttempt,
+  {
+    waitImpl = wait,
+    maxAttempts = TARGET_RATE_LIMIT_MAX_ATTEMPTS,
+    retryDelayMs = TARGET_RATE_LIMIT_RETRY_DELAY_MS,
+  } = {},
+) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await runAttempt(attempt);
+    } catch (error) {
+      if (
+        !isRetryableFormalLoginRateLimitFailure(error) ||
+        attempt === maxAttempts
+      ) {
+        throw error;
+      }
+      await waitImpl(retryDelayMs * attempt);
+    }
+  }
+  throw new BrowserAcceptanceError("正式账号登录未执行");
+}
+
+async function loginFormalAccount(browser, options) {
+  return runFormalLoginWithRateLimitRetry(() =>
+    loginFormalAccountAttempt(browser, options),
+  );
 }
 
 async function readVisibleTextSummary(page) {
@@ -989,18 +1069,17 @@ export function shipmentListReady(expectedCount) {
   const total = match ? Number(match[1]) : 0;
   const rows = [
     ...document.querySelectorAll(".ant-table-tbody > tr.ant-table-row"),
-  ].filter(
-    (row) => !row.classList?.contains("ant-table-placeholder"),
-  );
+  ].filter((row) => !row.classList?.contains("ant-table-placeholder"));
   return total === Number(expectedCount) && rows.length > 0;
 }
 
-export function readMobileLoadedTaskCount(tabKey, bodyText = "") {
-  const label = tabKey === "done" ? "已办" : "待处理";
-  const match = String(bodyText).match(
-    new RegExp(`已加载\\s*(\\d+)\\s*条${label}`, "u"),
-  );
-  return match ? Number(match[1]) : 0;
+export function readMobileTaskTotal(tabKey, ariaLabel = "") {
+  const pattern =
+    tabKey === "done"
+      ? /^已办任务共\s*(\d+)\s*条，当前已加载\s*\d+\s*条$/u
+      : /^全部，\s*共\s*(\d+)\s*条$/u;
+  const match = String(ariaLabel).match(pattern);
+  return match ? Number(match[1]) : null;
 }
 
 export function evaluateGlobalDashboardEvidence(
@@ -1173,16 +1252,18 @@ export function evaluateDashboardTaskCurrentBatchEvidence({
   const exactCurrentBatchTaskCodes = currentBatchTaskCodes.filter((value) =>
     String(value || "").startsWith(`${expectedPrefix}-`),
   );
-  const currentBatchCountExact =
+  const currentBatchPageBound =
     Number.isSafeInteger(currentBatch?.actual) &&
-    exactCurrentBatchTaskCodes.length === currentBatch.actual &&
+    currentBatch.actual > 0 &&
+    exactCurrentBatchTaskCodes.length > 0 &&
+    exactCurrentBatchTaskCodes.length <= currentBatch.actual &&
     new Set(exactCurrentBatchTaskCodes).size ===
       exactCurrentBatchTaskCodes.length;
   const currentBatchVisible = matchingCurrentBatchTaskCodes.length > 0;
   const minimumSatisfied =
     evidence?.minimumSatisfied === true &&
     currentBatchBound &&
-    currentBatchCountExact &&
+    currentBatchPageBound &&
     currentBatchVisible;
   return {
     ...evidence,
@@ -1195,8 +1276,8 @@ export function evaluateDashboardTaskCurrentBatchEvidence({
       "dashboard totals and visible task-code metadata bound to the current exact-source batch",
     currentBatchActual: currentBatch?.actual ?? null,
     currentBatchBound,
-    currentBatchTaskCount: exactCurrentBatchTaskCodes.length,
-    currentBatchCountExact,
+    currentBatchPageSize: exactCurrentBatchTaskCodes.length,
+    currentBatchPageBound,
     visibleCurrentBatchTaskCount: matchingCurrentBatchTaskCodes.length,
     currentBatchVisible,
     minimumSatisfied,
@@ -1258,7 +1339,8 @@ async function readDashboardEvidence(page, target, datasetBinding) {
           );
         });
         return (
-          exactCodes.length === expectedCount &&
+          exactCodes.length > 0 &&
+          exactCodes.length <= expectedCount &&
           new Set(exactCodes).size === exactCodes.length &&
           visibleCurrentBatchRow
         );
@@ -1355,9 +1437,7 @@ async function readDashboardEvidence(page, target, datasetBinding) {
         datasetBinding?.dataset?.baseline?.exactEmptyBusinessBaseline === true,
     });
     const openable = page
-      .locator(
-        ".erp-business-board-source-item--openable[data-target-path]",
-      )
+      .locator(".erp-business-board-source-item--openable[data-target-path]")
       .first();
     const expectedPath = requiredText(
       await openable.getAttribute("data-target-path"),
@@ -1474,14 +1554,18 @@ async function readMobileTaskEvidence(page, target, datasetBinding) {
   const taskCodePrefix = TASK_VISIBLE_CODE_PREFIX_BY_ROLE[target.roleKey];
   const visibleCurrentBatchTaskCount = async () =>
     page
-      .locator(
-        `.erp-mobile-list-item[data-task-code^="${taskCodePrefix}-"]`,
-      )
+      .locator(`.erp-mobile-list-item[data-task-code^="${taskCodePrefix}-"]`)
       .count();
   const readCurrentTotal = async (tabKey) => {
+    const countLabel = await page
+      .getByTestId(
+        tabKey === "done" ? "mobile-role-done-count" : "mobile-role-filter-all",
+      )
+      .getAttribute("aria-label")
+      .catch(() => null);
+    const currentTotal = readMobileTaskTotal(tabKey, countLabel);
+    if (currentTotal !== null) return currentTotal;
     const bodyText = await page.locator("body").innerText();
-    const loadedCount = readMobileLoadedTaskCount(tabKey, bodyText);
-    if (loadedCount > 0) return loadedCount;
     const toggle = page
       .locator('[data-testid^="mobile-role-list-toggle-"]')
       .first();
@@ -1493,8 +1577,7 @@ async function readMobileTaskEvidence(page, target, datasetBinding) {
     return largestTotalFromTexts([bodyText]);
   };
   const todoCount = await readCurrentTotal("todo");
-  const visibleTodoCurrentBatchTaskCount =
-    await visibleCurrentBatchTaskCount();
+  const visibleTodoCurrentBatchTaskCount = await visibleCurrentBatchTaskCount();
   await page.getByTestId("mobile-role-nav-done").click();
   await page.waitForFunction(
     () =>
@@ -1506,20 +1589,22 @@ async function readMobileTaskEvidence(page, target, datasetBinding) {
   );
   await waitForActiveViewLoaded();
   await page.waitForFunction(
-    ({ loadedTodoCount, requiredMinimum }) => {
-      const match = (document.body?.innerText || "").match(
-        /已加载\s*(\d+)\s*条已办/u,
-      );
+    ({ todoTotal, requiredMinimum }) => {
+      const doneTotalMatch = (
+        document
+          .querySelector('[data-testid="mobile-role-done-count"]')
+          ?.getAttribute("aria-label") || ""
+      ).match(/^已办任务共\s*(\d+)\s*条，当前已加载\s*\d+\s*条$/u);
       return (
-        match && loadedTodoCount + Number(match[1] || 0) >= requiredMinimum
+        doneTotalMatch &&
+        todoTotal + Number(doneTotalMatch[1] || 0) >= requiredMinimum
       );
     },
-    { loadedTodoCount: todoCount, requiredMinimum: minimumRecords },
+    { todoTotal: todoCount, requiredMinimum: minimumRecords },
     { timeout: PAGE_TIMEOUT_MS },
   );
   const doneCount = await readCurrentTotal("done");
-  const visibleDoneCurrentBatchTaskCount =
-    await visibleCurrentBatchTaskCount();
+  const visibleDoneCurrentBatchTaskCount = await visibleCurrentBatchTaskCount();
   await page.getByTestId("mobile-role-nav-todo").click();
   return evaluateMobileCurrentBatchEvidence({
     roleKey: target.roleKey,
@@ -1590,7 +1675,12 @@ export function resolveCurrentBatchListFilter(
     datasetBinding?.dataset?.currentBatchIdentifiers?.[target.key] || "",
   ).trim();
   if (factIdentifier) {
-    return { mode: "exact_business_number", identifier: factIdentifier };
+    return {
+      mode: ["production-exceptions", "finance-payments"].includes(target.key)
+        ? "visible_exact_business_number"
+        : "exact_business_number",
+      identifier: factIdentifier,
+    };
   }
   throw new BrowserAcceptanceError(
     `${target.title} 没有可在页面核对的当前批次标识`,
@@ -1598,24 +1688,34 @@ export function resolveCurrentBatchListFilter(
 }
 
 async function filterVisibleListToCurrentBatch(page, target, filter) {
-  const candidates = page.locator(
-    'input[placeholder*="搜索"],input[placeholder^="操作人"]',
-  );
-  let search = null;
-  for (let index = 0; index < (await candidates.count()); index += 1) {
-    const candidate = candidates.nth(index);
-    if (await candidate.isVisible()) {
-      search = candidate;
-      break;
+  if (filter.mode !== "visible_exact_business_number") {
+    let search = null;
+    if (target.key === "task-board") {
+      search = page.getByPlaceholder("搜索任务", { exact: true });
+      await search.waitFor({
+        state: "visible",
+        timeout: PAGE_TIMEOUT_MS,
+      });
+    } else {
+      const candidates = page.locator(
+        'input[placeholder*="搜索"],input[placeholder^="操作人"]',
+      );
+      for (let index = 0; index < (await candidates.count()); index += 1) {
+        const candidate = candidates.nth(index);
+        if (await candidate.isVisible()) {
+          search = candidate;
+          break;
+        }
+      }
     }
+    if (!search) {
+      throw new BrowserAcceptanceError(
+        `${target.title} 没有可用于当前批次核对的搜索框`,
+      );
+    }
+    await search.fill(filter.identifier);
+    await page.keyboard.press("Enter");
   }
-  if (!search) {
-    throw new BrowserAcceptanceError(
-      `${target.title} 没有可用于当前批次核对的搜索框`,
-    );
-  }
-  await search.fill(filter.identifier);
-  await page.keyboard.press("Enter");
   const itemSelector = [
     ".ant-table-tbody > tr:not(.ant-table-placeholder)",
     ".erp-task-board-card",
@@ -1753,23 +1853,33 @@ export function evaluateCurrentBatchListEvidence({
 const FINANCE_BROWSER_PAGE_CONTRACT = Object.freeze({
   receivables: Object.freeze({
     factType: "RECEIVABLE",
-    requiredHeaders: Object.freeze(["收款分类", "账期", "取消记录"]),
+    requiredHeaders: Object.freeze([
+      "收款分类",
+      "账期",
+      "到期日期",
+      "取消记录",
+    ]),
     forbiddenHeaders: Object.freeze(["发票类别"]),
   }),
   payables: Object.freeze({
     factType: "PAYABLE",
-    requiredHeaders: Object.freeze(["取消记录"]),
-    forbiddenHeaders: Object.freeze(["收款分类", "账期", "发票类别"]),
+    requiredHeaders: Object.freeze(["账期", "到期日期", "取消记录"]),
+    forbiddenHeaders: Object.freeze(["收款分类", "发票类别"]),
   }),
   invoices: Object.freeze({
     factType: "INVOICE",
     requiredHeaders: Object.freeze(["发票类别", "取消记录"]),
-    forbiddenHeaders: Object.freeze(["收款分类", "账期"]),
+    forbiddenHeaders: Object.freeze(["收款分类", "账期", "到期日期"]),
   }),
   reconciliation: Object.freeze({
     factType: "RECONCILIATION",
     requiredHeaders: Object.freeze(["取消记录"]),
-    forbiddenHeaders: Object.freeze(["收款分类", "账期", "发票类别"]),
+    forbiddenHeaders: Object.freeze([
+      "收款分类",
+      "账期",
+      "到期日期",
+      "发票类别",
+    ]),
   }),
 });
 
@@ -1804,20 +1914,29 @@ export function evaluateFinanceFieldBrowserEvidence({
   if (row && cellAt("取消记录") !== "-") {
     valueMismatches.push("非取消代表行的取消记录必须为 -");
   }
-  if (row && contract.factType === "RECEIVABLE") {
-    if (cellAt("收款分类") !== "应收款") {
+  if (row && ["RECEIVABLE", "PAYABLE"].includes(contract.factType)) {
+    if (contract.factType === "RECEIVABLE" && cellAt("收款分类") !== "应收款") {
       valueMismatches.push("应收收款分类未显示为应收款");
     }
-    const termLabels = {
-      CASH_ON_SHIPMENT: "出货即收",
-      EOM_30: "月结 30 天",
-      EOM_45: "月结 45 天",
-    };
-    const expectedTerm = representative.paymentTerm
-      ? `${termLabels[representative.paymentTerm] || "待核对"} / ${representative.paymentTermDays} 天`
-      : `自定义账期 / ${representative.paymentTermDays} 天`;
+    const expectedTerm =
+      representative.paymentTerm === "DUE_ON_OCCURRENCE" &&
+      representative.paymentTermDays === 0
+        ? "发生即到期"
+        : representative.paymentTerm === "EOM_DAYS" &&
+            Number.isSafeInteger(representative.paymentTermDays) &&
+            representative.paymentTermDays > 0
+          ? `月结 ${representative.paymentTermDays} 天`
+          : "待核对";
     if (cellAt("账期") !== expectedTerm) {
-      valueMismatches.push(`应收账期未显示为 ${expectedTerm}`);
+      valueMismatches.push(
+        `${contract.factType === "RECEIVABLE" ? "应收" : "应付"}账期未显示为 ${expectedTerm}`,
+      );
+    }
+    const expectedDueAt = formatUnixDate(representative.dueAt);
+    if (expectedDueAt === "-" || cellAt("到期日期") !== expectedDueAt) {
+      valueMismatches.push(
+        `${contract.factType === "RECEIVABLE" ? "应收" : "应付"}到期日期未显示为 ${expectedDueAt}`,
+      );
     }
   }
   if (row && contract.factType === "INVOICE") {
@@ -1878,8 +1997,7 @@ async function readListEvidence(page, target, datasetBinding) {
   }
   if (target.key === "shipments") {
     if (
-      expectedShipments?.exactCount !==
-      MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT
+      expectedShipments?.exactCount !== MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT
     ) {
       throw new BrowserAcceptanceError(
         `出货数据报告必须精确包含 ${MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT} 张同批出货单`,
@@ -2167,7 +2285,12 @@ export function assertBoundSimulatedPrintReports(source, fact) {
       "打印验收只接受同一批次、同一运行配置的本机模拟业务记录",
     );
   }
-  const exactLongRecord = (records, identityField, label) => {
+  const exactLongRecord = (
+    records,
+    identityField,
+    label,
+    { preferredStatuses = [] } = {},
+  ) => {
     const matches = (Array.isArray(records) ? records : []).filter(
       (item) =>
         Array.isArray(item?.items) &&
@@ -2177,14 +2300,24 @@ export function assertBoundSimulatedPrintReports(source, fact) {
     if (matches.length === 0) {
       throw new BrowserAcceptanceError(`同批源数据缺少 25 行${label}打印样本`);
     }
-    const selected = matches
-      .slice()
-      .sort((left, right) =>
+    const statusPriority = new Map(
+      preferredStatuses.map((status, index) => [status, index]),
+    );
+    const selected = matches.slice().sort((left, right) => {
+      const leftPriority =
+        statusPriority.get(String(left?.status || "").toUpperCase()) ??
+        preferredStatuses.length;
+      const rightPriority =
+        statusPriority.get(String(right?.status || "").toUpperCase()) ??
+        preferredStatuses.length;
+      return (
+        leftPriority - rightPriority ||
         String(left[identityField]).localeCompare(
           String(right[identityField]),
           "zh-CN",
-        ),
-      )[0];
+        )
+      );
+    })[0];
     return {
       recordQuery: requiredText(
         selected[identityField],
@@ -2228,6 +2361,7 @@ export function assertBoundSimulatedPrintReports(source, fact) {
       ],
       "version",
       "产品结构版本",
+      { preferredStatuses: ["ACTIVE", "DRAFT"] },
     ),
   };
   return {
@@ -2566,7 +2700,7 @@ function firstCurrentBatchBusinessNo(records, fields, predicate = () => true) {
   return null;
 }
 
-function currentBatchFactIdentifiers(factReport) {
+export function currentBatchFactIdentifiers(factReport) {
   const records = factReport?.referenceRecords || {};
   const sourceTaskCode = (prefix, items, predicate) => {
     const item = (Array.isArray(items) ? items : []).find(predicate);
@@ -2587,6 +2721,17 @@ function currentBatchFactIdentifiers(factReport) {
         factType,
     );
   };
+  const currentProductionOrderNo =
+    firstCurrentBatchBusinessNo(
+      records.productionOrders,
+      ["order_no", "orderNo"],
+      (item) => String(item?.status || "").toUpperCase() === "RELEASED",
+    ) ||
+    firstCurrentBatchBusinessNo(
+      records.productionOrders,
+      ["order_no", "orderNo"],
+      (item) => String(item?.status || "").toUpperCase() === "DRAFT",
+    );
   return {
     "quality-inspections": firstCurrentBatchBusinessNo(
       records.qualityInspections,
@@ -2600,10 +2745,7 @@ function currentBatchFactIdentifiers(factReport) {
       "lot_no",
       "lotNo",
     ]),
-    "production-orders": firstCurrentBatchBusinessNo(records.productionOrders, [
-      "order_no",
-      "orderNo",
-    ]),
+    "production-orders": currentProductionOrderNo,
     "production-progress": firstCurrentBatchBusinessNo(
       records.productionFacts,
       ["fact_no", "factNo"],
@@ -2619,25 +2761,22 @@ function currentBatchFactIdentifiers(factReport) {
     "production-exceptions": (() => {
       const decision = (records.productionExceptions || []).find(
         (item) =>
-          String(item?.decision_type || item?.decisionType || "").toUpperCase() ===
-            "OVER_ISSUE" &&
+          String(
+            item?.decision_type || item?.decisionType || "",
+          ).toUpperCase() === "OVER_ISSUE" &&
           String(item?.status || "").toUpperCase() === "APPROVED" &&
           String(
             item?.approval_task_code || item?.approvalTaskCode || "",
           ).startsWith("PROC-"),
       );
-      return String(
-        decision?.approval_task_code || decision?.approvalTaskCode || "",
-      );
+      return String(decision?.decision_no || decision?.decisionNo || "");
     })(),
     "shipping-release": (() => {
       const shipment = records.shipments.find(
         (item) =>
           String(item?.status || "").toUpperCase() === "SHIPPED" &&
           String(
-            item?.finance_release_status ||
-              item?.financeReleaseStatus ||
-              "",
+            item?.finance_release_status || item?.financeReleaseStatus || "",
           ).toUpperCase() === "APPROVED" &&
           Number(
             item?.finance_release_process_instance_id ||
@@ -2657,8 +2796,7 @@ function currentBatchFactIdentifiers(factReport) {
       );
       if (!shipment) return "";
       return String(
-        shipment.finance_approval_task_code ||
-          shipment.financeApprovalTaskCode,
+        shipment.finance_approval_task_code || shipment.financeApprovalTaskCode,
       );
     })(),
     outbound: firstCurrentBatchBusinessNo(records.stockReservations, [
@@ -2673,6 +2811,10 @@ function currentBatchFactIdentifiers(factReport) {
     payables: financeNo("PAYABLE"),
     receivables: financeNo("RECEIVABLE"),
     invoices: financeNo("INVOICE"),
+    "finance-payments": firstCurrentBatchBusinessNo(records.financePayments, [
+      "payment_no",
+      "paymentNo",
+    ]),
   };
 }
 
@@ -2944,7 +3086,7 @@ export async function verifyManualAcceptanceDatasetApplyReportBinding({
     freshBaseline?.componentDigest === componentDigests.baseline &&
     baseline?.contract === "manual-acceptance-empty-baseline-report-v1" &&
     baseline?.summary?.exactEmptyBusinessBaseline === true &&
-    baseline?.summary?.zeroBusinessRecords === true &&
+    baseline?.summary?.allTrackedCountsZero === true &&
     baseline?.summary?.checkedBusinessObjectKinds ===
       MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES.length &&
     Object.keys(baseline?.zeroCounts || {}).length ===

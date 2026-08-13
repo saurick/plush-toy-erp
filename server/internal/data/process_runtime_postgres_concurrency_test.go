@@ -303,7 +303,7 @@ func TestProcessRuntimePostgresConcurrentLinkedBusinessRefsAreNotLost(t *testing
 func TestProcessRuntimePostgresAtomicBlockRollsBackNodeWhenProcessSettled(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	data, _ := openPurchaseReceiptPostgresTestData(t)
+	data, client := openPurchaseReceiptPostgresTestData(t)
 	repo := NewProcessRuntimeRepo(data, log.NewStdLogger(io.Discard))
 	suffix := postgresTestSuffix()
 	instance, nodes, err := repo.CreateProcessInstance(ctx, &biz.ProcessInstanceCreate{
@@ -324,14 +324,23 @@ func TestProcessRuntimePostgresAtomicBlockRollsBackNodeWhenProcessSettled(t *tes
 		t.Fatalf("create atomic block fixture: %v", err)
 	}
 	activeNode := activateProcessNodeForTest(t, ctx, repo, instance, nodes[0])
-	if _, err := repo.CompleteProcessInstance(ctx, &biz.ProcessInstanceComplete{ID: instance.ID}, 7); err != nil {
-		t.Fatalf("settle process before atomic block: %v", err)
+	// Build the concurrent stale-state fixture below the guarded repository API:
+	// CompleteProcessInstance now correctly refuses to settle while a node is
+	// active, but BlockProcessNodeAndInstance must still roll back if another
+	// writer has already settled the process between reads.
+	if err := client.ProcessInstance.UpdateOneID(instance.ID).
+		SetStatus(biz.ProcessStatusCompleted).
+		SetCompletedAt(time.Now().UTC()).
+		Exec(ctx); err != nil {
+		t.Fatalf("settle process fixture before atomic block: %v", err)
 	}
 
 	if _, err := repo.BlockProcessNodeAndInstance(ctx, &biz.ProcessNodeInstanceBlock{
 		ProcessInstanceID:     instance.ID,
 		ProcessNodeInstanceID: activeNode.ID,
 		ExpectedVersion:       activeNode.Version,
+		BlockKind:             biz.ProcessBlockKindManual,
+		ReasonCode:            "process_node_blocked",
 		Reason:                "must roll back",
 		Outcome:               "blocked",
 	}, 7); !errors.Is(err, biz.ErrProcessInstanceSettled) {

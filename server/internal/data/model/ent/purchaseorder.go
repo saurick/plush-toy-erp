@@ -23,6 +23,10 @@ type PurchaseOrder struct {
 	PurchaseOrderNo string `json:"purchase_order_no,omitempty"`
 	// SupplierID holds the value of the "supplier_id" field.
 	SupplierID int `json:"supplier_id,omitempty"`
+	// Currency holds the value of the "currency" field.
+	Currency string `json:"currency,omitempty"`
+	// PaymentTermDays holds the value of the "payment_term_days" field.
+	PaymentTermDays *int `json:"payment_term_days,omitempty"`
 	// SupplierPurchaseOrderNo holds the value of the "supplier_purchase_order_no" field.
 	SupplierPurchaseOrderNo *string `json:"supplier_purchase_order_no,omitempty"`
 	// SupplierSnapshot holds the value of the "supplier_snapshot" field.
@@ -37,6 +41,16 @@ type PurchaseOrder struct {
 	LifecycleStatus string `json:"lifecycle_status,omitempty"`
 	// Version holds the value of the "version" field.
 	Version int `json:"version,omitempty"`
+	// SettlementAction holds the value of the "settlement_action" field.
+	SettlementAction *string `json:"settlement_action,omitempty"`
+	// SettlementMode holds the value of the "settlement_mode" field.
+	SettlementMode *string `json:"settlement_mode,omitempty"`
+	// SettlementReason holds the value of the "settlement_reason" field.
+	SettlementReason *string `json:"settlement_reason,omitempty"`
+	// SettledAt holds the value of the "settled_at" field.
+	SettledAt *time.Time `json:"settled_at,omitempty"`
+	// SettledBy holds the value of the "settled_by" field.
+	SettledBy *int `json:"settled_by,omitempty"`
 	// Note holds the value of the "note" field.
 	Note *string `json:"note,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -87,11 +101,11 @@ func (*PurchaseOrder) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case purchaseorder.FieldSupplierSnapshot, purchaseorder.FieldContractPartySnapshot:
 			values[i] = new([]byte)
-		case purchaseorder.FieldID, purchaseorder.FieldSupplierID, purchaseorder.FieldVersion:
+		case purchaseorder.FieldID, purchaseorder.FieldSupplierID, purchaseorder.FieldPaymentTermDays, purchaseorder.FieldVersion, purchaseorder.FieldSettledBy:
 			values[i] = new(sql.NullInt64)
-		case purchaseorder.FieldPurchaseOrderNo, purchaseorder.FieldSupplierPurchaseOrderNo, purchaseorder.FieldLifecycleStatus, purchaseorder.FieldNote:
+		case purchaseorder.FieldPurchaseOrderNo, purchaseorder.FieldCurrency, purchaseorder.FieldSupplierPurchaseOrderNo, purchaseorder.FieldLifecycleStatus, purchaseorder.FieldSettlementAction, purchaseorder.FieldSettlementMode, purchaseorder.FieldSettlementReason, purchaseorder.FieldNote:
 			values[i] = new(sql.NullString)
-		case purchaseorder.FieldPurchaseDate, purchaseorder.FieldExpectedArrivalDate, purchaseorder.FieldCreatedAt, purchaseorder.FieldUpdatedAt:
+		case purchaseorder.FieldPurchaseDate, purchaseorder.FieldExpectedArrivalDate, purchaseorder.FieldSettledAt, purchaseorder.FieldCreatedAt, purchaseorder.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -125,6 +139,19 @@ func (_m *PurchaseOrder) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field supplier_id", values[i])
 			} else if value.Valid {
 				_m.SupplierID = int(value.Int64)
+			}
+		case purchaseorder.FieldCurrency:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field currency", values[i])
+			} else if value.Valid {
+				_m.Currency = value.String
+			}
+		case purchaseorder.FieldPaymentTermDays:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field payment_term_days", values[i])
+			} else if value.Valid {
+				_m.PaymentTermDays = new(int)
+				*_m.PaymentTermDays = int(value.Int64)
 			}
 		case purchaseorder.FieldSupplierPurchaseOrderNo:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -173,6 +200,41 @@ func (_m *PurchaseOrder) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field version", values[i])
 			} else if value.Valid {
 				_m.Version = int(value.Int64)
+			}
+		case purchaseorder.FieldSettlementAction:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field settlement_action", values[i])
+			} else if value.Valid {
+				_m.SettlementAction = new(string)
+				*_m.SettlementAction = value.String
+			}
+		case purchaseorder.FieldSettlementMode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field settlement_mode", values[i])
+			} else if value.Valid {
+				_m.SettlementMode = new(string)
+				*_m.SettlementMode = value.String
+			}
+		case purchaseorder.FieldSettlementReason:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field settlement_reason", values[i])
+			} else if value.Valid {
+				_m.SettlementReason = new(string)
+				*_m.SettlementReason = value.String
+			}
+		case purchaseorder.FieldSettledAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field settled_at", values[i])
+			} else if value.Valid {
+				_m.SettledAt = new(time.Time)
+				*_m.SettledAt = value.Time
+			}
+		case purchaseorder.FieldSettledBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field settled_by", values[i])
+			} else if value.Valid {
+				_m.SettledBy = new(int)
+				*_m.SettledBy = int(value.Int64)
 			}
 		case purchaseorder.FieldNote:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -245,6 +307,14 @@ func (_m *PurchaseOrder) String() string {
 	builder.WriteString("supplier_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.SupplierID))
 	builder.WriteString(", ")
+	builder.WriteString("currency=")
+	builder.WriteString(_m.Currency)
+	builder.WriteString(", ")
+	if v := _m.PaymentTermDays; v != nil {
+		builder.WriteString("payment_term_days=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
 	if v := _m.SupplierPurchaseOrderNo; v != nil {
 		builder.WriteString("supplier_purchase_order_no=")
 		builder.WriteString(*v)
@@ -269,6 +339,31 @@ func (_m *PurchaseOrder) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("version=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Version))
+	builder.WriteString(", ")
+	if v := _m.SettlementAction; v != nil {
+		builder.WriteString("settlement_action=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.SettlementMode; v != nil {
+		builder.WriteString("settlement_mode=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.SettlementReason; v != nil {
+		builder.WriteString("settlement_reason=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.SettledAt; v != nil {
+		builder.WriteString("settled_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.SettledBy; v != nil {
+		builder.WriteString("settled_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	if v := _m.Note; v != nil {
 		builder.WriteString("note=")

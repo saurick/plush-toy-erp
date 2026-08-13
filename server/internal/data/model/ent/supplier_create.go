@@ -92,6 +92,20 @@ func (_c *SupplierCreate) SetNillableTaxNo(v *string) *SupplierCreate {
 	return _c
 }
 
+// SetDefaultPaymentTermDays sets the "default_payment_term_days" field.
+func (_c *SupplierCreate) SetDefaultPaymentTermDays(v int) *SupplierCreate {
+	_c.mutation.SetDefaultPaymentTermDays(v)
+	return _c
+}
+
+// SetNillableDefaultPaymentTermDays sets the "default_payment_term_days" field if the given value is not nil.
+func (_c *SupplierCreate) SetNillableDefaultPaymentTermDays(v *int) *SupplierCreate {
+	if v != nil {
+		_c.SetDefaultPaymentTermDays(*v)
+	}
+	return _c
+}
+
 // SetIsActive sets the "is_active" field.
 func (_c *SupplierCreate) SetIsActive(v bool) *SupplierCreate {
 	_c.mutation.SetIsActive(v)
@@ -243,6 +257,10 @@ func (_c *SupplierCreate) ExecX(ctx context.Context) {
 
 // defaults sets the default values of the builder before save.
 func (_c *SupplierCreate) defaults() {
+	if _, ok := _c.mutation.DefaultPaymentTermDays(); !ok {
+		v := supplier.DefaultDefaultPaymentTermDays
+		_c.mutation.SetDefaultPaymentTermDays(v)
+	}
 	if _, ok := _c.mutation.IsActive(); !ok {
 		v := supplier.DefaultIsActive
 		_c.mutation.SetIsActive(v)
@@ -293,6 +311,14 @@ func (_c *SupplierCreate) check() error {
 	if v, ok := _c.mutation.TaxNo(); ok {
 		if err := supplier.TaxNoValidator(v); err != nil {
 			return &ValidationError{Name: "tax_no", err: fmt.Errorf(`ent: validator failed for field "Supplier.tax_no": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.DefaultPaymentTermDays(); !ok {
+		return &ValidationError{Name: "default_payment_term_days", err: errors.New(`ent: missing required field "Supplier.default_payment_term_days"`)}
+	}
+	if v, ok := _c.mutation.DefaultPaymentTermDays(); ok {
+		if err := supplier.DefaultPaymentTermDaysValidator(v); err != nil {
+			return &ValidationError{Name: "default_payment_term_days", err: fmt.Errorf(`ent: validator failed for field "Supplier.default_payment_term_days": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.IsActive(); !ok {
@@ -358,6 +384,10 @@ func (_c *SupplierCreate) createSpec() (*Supplier, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.TaxNo(); ok {
 		_spec.SetField(supplier.FieldTaxNo, field.TypeString, value)
 		_node.TaxNo = &value
+	}
+	if value, ok := _c.mutation.DefaultPaymentTermDays(); ok {
+		_spec.SetField(supplier.FieldDefaultPaymentTermDays, field.TypeInt, value)
+		_node.DefaultPaymentTermDays = value
 	}
 	if value, ok := _c.mutation.IsActive(); ok {
 		_spec.SetField(supplier.FieldIsActive, field.TypeBool, value)

@@ -9,6 +9,7 @@ import {
   FileSearchOutlined,
   PushpinFilled,
   PushpinOutlined,
+  QuestionCircleOutlined,
   RightOutlined,
   SafetyCertificateOutlined,
 } from '@ant-design/icons'
@@ -77,6 +78,7 @@ const ICON_BY_KEY = {
   prototypes: <AppstoreOutlined />,
   'customer-config': <DeploymentUnitOutlined />,
   'status-flows': <ApartmentOutlined />,
+  'business-usability': <QuestionCircleOutlined />,
   'database-migration': <DatabaseOutlined />,
   'version-center': <DeploymentUnitOutlined />,
   'drill-recovery': <ExperimentOutlined />,

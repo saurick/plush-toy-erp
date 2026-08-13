@@ -253,10 +253,19 @@ func normalizeProcessInstanceLinkedBusinessRefRecord(in *ProcessInstanceLinkedBu
 }
 
 func normalizeProcessNodeInstanceBlock(in ProcessNodeInstanceBlock) (ProcessNodeInstanceBlock, error) {
+	in.BlockKind = strings.TrimSpace(in.BlockKind)
+	in.ReasonCode = strings.TrimSpace(in.ReasonCode)
 	in.Reason = strings.TrimSpace(in.Reason)
 	in.Outcome = strings.TrimSpace(in.Outcome)
-	if in.ProcessInstanceID <= 0 || in.ProcessNodeInstanceID <= 0 || in.ExpectedVersion <= 0 || in.Reason == "" {
+	if in.ProcessInstanceID <= 0 || in.ProcessNodeInstanceID <= 0 || in.ExpectedVersion <= 0 || in.Reason == "" ||
+		len(in.BlockKind) > 64 || len(in.ReasonCode) > 64 || len([]rune(in.Reason)) > 255 {
 		return ProcessNodeInstanceBlock{}, ErrBadParam
+	}
+	if in.BlockKind == "" {
+		in.BlockKind = ProcessBlockKindManual
+	}
+	if in.ReasonCode == "" {
+		in.ReasonCode = "process_node_blocked"
 	}
 	if in.Outcome == "" {
 		in.Outcome = "blocked"
@@ -713,7 +722,7 @@ func normalizeProcessNodeStatus(status string) string {
 
 func IsKnownProcessNodeStatus(status string) bool {
 	switch status {
-	case ProcessNodeStatusWaiting, ProcessNodeStatusActive, ProcessNodeStatusCompleted, ProcessNodeStatusBlocked:
+	case ProcessNodeStatusWaiting, ProcessNodeStatusActive, ProcessNodeStatusCompleted, ProcessNodeStatusBlocked, ProcessNodeStatusWithdrawn:
 		return true
 	default:
 		return false
@@ -726,7 +735,7 @@ func IsCreatableProcessNodeStatus(status string) bool {
 
 func isSettledProcessNodeStatus(status string) bool {
 	switch status {
-	case ProcessNodeStatusCompleted:
+	case ProcessNodeStatusCompleted, ProcessNodeStatusWithdrawn:
 		return true
 	default:
 		return false

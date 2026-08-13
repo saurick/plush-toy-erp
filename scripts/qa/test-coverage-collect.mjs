@@ -299,7 +299,7 @@ export const GO_BUSINESS_SCENARIOS = Object.freeze({
 export const FIELD_LINKAGE_PRINT_CASE_IDS = Object.freeze([
   "FL_processing_contract_table_headers__paper_uses_shared_subject_aware_columns",
   "FL_print_supplier_contact_snapshot__prefills_from_primary_supplier_contact",
-  "FL_print_supplier_contact_snapshot__purchase_and_outsourcing_pages_fetch_supplier_contacts_before_save",
+  "FL_print_supplier_contact_snapshot__purchase_and_outsourcing_pages_preserve_supplier_contacts",
   "FL_material_purchase_print_dates__keeps_string_date_snapshots",
   "FL_material_purchase_unit__normalizes_unit_to_chinese_for_print",
   "FL_material_purchase_print_snapshot__does_not_fallback_to_raw_ids",
@@ -788,7 +788,7 @@ function fieldLinkageFailureRecords(note) {
   return { frontend: failure, print: failure };
 }
 
-export function fieldLinkageBusinessRecords({
+export function fieldLinkageCoverageRecords({
   artifact,
   commandResult,
   repository,
@@ -1107,10 +1107,10 @@ export function buildCoverageEvidence({
   );
   domains.import = stageExecutions.import;
 
-  const requiredLevels = new Set(affectedPlan?.levels || []);
-  const gateRequired = (level) => requiredLevels.has(level);
-  const missingOrNotApplicable = (level, missingNote, notApplicableNote) =>
-    gateRequired(level)
+  const requiredScopes = new Set(affectedPlan?.affectedScopes || []);
+  const gateRequired = (scope) => requiredScopes.has(scope);
+  const missingOrNotApplicable = (scope, missingNote, notApplicableNote) =>
+    gateRequired(scope)
       ? missingRequiredGate(missingNote)
       : notApplicableGate(notApplicableNote);
   const t8 =
@@ -1199,13 +1199,13 @@ export function buildCoverageEvidence({
         "no-uat",
       ],
       affectedPlan: {
-        levels: [...requiredLevels],
-        highestLevel: affectedPlan?.highestLevel || "T0",
-        requiresFull: affectedPlan?.requiresFull === true,
+        affectedScopes: [...requiredScopes],
+        maxAffectedScope: affectedPlan?.maxAffectedScope || "T0",
+        localGate: affectedPlan?.localGate || "focused",
         changedFileCount: affectedPlan?.changedFiles?.length || 0,
-        followUps: (affectedPlan?.followUps || []).map(({ id, level }) => ({
+        followUps: (affectedPlan?.followUps || []).map(({ id, scope }) => ({
           id,
-          level,
+          scope,
         })),
       },
     },
@@ -1462,7 +1462,7 @@ export async function collectBaselineEvidence({
     };
 
     const fieldArtifact = readJsonIfPresent(staging.fieldLinkageEvidence);
-    const fieldLinkage = fieldLinkageBusinessRecords({
+    const fieldLinkage = fieldLinkageCoverageRecords({
       artifact: fieldArtifact,
       commandResult: results["field-linkage"],
       repository: expectedRepository,

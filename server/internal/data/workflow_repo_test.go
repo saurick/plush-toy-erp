@@ -21,7 +21,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func TestWorkflowRepoListsOnlyTerminalTasksWithActiveProcessNodes(t *testing.T) {
+func TestWorkflowRepoListsTerminalTasksWithUnsettledProcessNodeRouting(t *testing.T) {
 	ctx := context.Background()
 	client := enttest.Open(t, dialect.SQLite, "file:workflow_process_settlement_candidates?mode=memory&cache=shared&_fk=1")
 	defer mustCloseEntClient(t, client)
@@ -94,11 +94,21 @@ func TestWorkflowRepoListsOnlyTerminalTasksWithActiveProcessNodes(t *testing.T) 
 		ExpectedVersion:   node.Version,
 		Outcome:           "APPROVED",
 	}, 17); err != nil {
-		t.Fatalf("settle process node: %v", err)
+		t.Fatalf("complete process node before routing receipt: %v", err)
+	}
+	candidates, err = workflowRepo.ListPendingLinkedWorkflowTaskSettlements(ctx, 0, 10)
+	if err != nil || len(candidates) != 1 || candidates[0].ID != task.ID {
+		t.Fatalf("completed-but-unrouted node must remain a candidate, candidates=%#v err=%v", candidates, err)
+	}
+	if _, err := processRepo.MarkProcessNodeRoutingCompleted(ctx, &biz.ProcessNodeRoutingCompletion{
+		ProcessInstanceID:     instance.ID,
+		ProcessNodeInstanceID: node.ID,
+	}, 17); err != nil {
+		t.Fatalf("mark process node routing completed: %v", err)
 	}
 	candidates, err = workflowRepo.ListPendingLinkedWorkflowTaskSettlements(ctx, 0, 10)
 	if err != nil || len(candidates) != 0 {
-		t.Fatalf("settled node must leave candidate set, candidates=%#v err=%v", candidates, err)
+		t.Fatalf("routed node must leave candidate set, candidates=%#v err=%v", candidates, err)
 	}
 }
 

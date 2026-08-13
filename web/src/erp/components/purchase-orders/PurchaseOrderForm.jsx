@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { CopyOutlined, DeleteOutlined } from '@ant-design/icons'
-import { Button, Form, Input, Select, Space } from 'antd'
+import { Button, Form, Input, InputNumber, Select, Space } from 'antd'
 
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
+import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
 import FieldWithUnitSuffix, {
   isQuantityTextWithinUnitPrecision,
   unitPrecisionErrorMessage,
@@ -12,6 +13,7 @@ import FieldWithUnitSuffix, {
 import SourceImportPickerModal from '../business-list/SourceImportPickerModal.jsx'
 import BusinessLineItemsSummaryValue from '../business-list/BusinessLineItemsSummaryValue.jsx'
 import BusinessLineItemsSection from '../business-list/BusinessLineItemsSection.jsx'
+import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import {
   dateInputNotAfterRule,
@@ -20,6 +22,7 @@ import {
   isDateInputBefore,
 } from '../../utils/dateRange.mjs'
 import {
+  BUSINESS_CURRENCY_OPTIONS,
   buildPurchaseOrderItemSourceValuesFromMaterial,
   summarizePurchaseOrderLines,
   unixToDateInputValue,
@@ -209,6 +212,7 @@ export function PurchaseOrderFormFields({
       <Form.Item name="supplier_snapshot" hidden>
         <Input />
       </Form.Item>
+      <BusinessFormSectionTitle>订单与供应商</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field"
         name="purchase_order_no"
@@ -236,6 +240,30 @@ export function PurchaseOrderFormFields({
         label="供应商单号"
       >
         <Input maxLength={128} />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        name="currency"
+        label="币种"
+        rules={[{ required: true, message: '请选择币种' }]}
+      >
+        <Select options={BUSINESS_CURRENCY_OPTIONS} />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        extra="保存后冻结为本单付款条件，不随供应商档案后续调整。"
+        name="payment_term_days"
+        label="付款周期（天）"
+        rules={[
+          { required: true, message: '请填写付款周期' },
+          {
+            type: 'integer',
+            min: 0,
+            message: '付款周期必须为不小于 0 的整数',
+          },
+        ]}
+      >
+        <InputNumber min={0} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
@@ -275,9 +303,7 @@ export function PurchaseOrderFormFields({
           }
         />
       </Form.Item>
-      <div className="erp-business-action-form__section-title">
-        合同订购方信息
-      </div>
+      <BusinessFormSectionTitle>合同订购方信息</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field"
         name={['contract_party_snapshot', 'buyerCompany']}
@@ -313,6 +339,7 @@ export function PurchaseOrderFormFields({
       >
         <Input maxLength={64} />
       </Form.Item>
+      <BusinessFormSectionTitle>备注与附件</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field erp-business-action-form__field--full"
         name="note"
@@ -565,7 +592,13 @@ export function PurchaseOrderFormFields({
               <Form.Item
                 className="erp-line-item-field erp-line-item-field--money"
                 name={[field.name, 'amount']}
-                label="金额"
+                label={
+                  <BusinessHelpLabel
+                    itemKey="purchase-line-amount"
+                    label="金额"
+                    pageKey="accessories-purchase"
+                  />
+                }
               >
                 <Input placeholder="留空时根据数量和单价自动计算" />
               </Form.Item>
