@@ -190,6 +190,9 @@ export function buildRehearsalEnvironment({
   workspace,
   ports,
   postgresPassword,
+  postgresAppPassword,
+  postgresMigratorPassword,
+  postgresBackupPassword,
   jwtSecret,
 }) {
   assertReleaseArtifactManifest(manifest);
@@ -198,6 +201,18 @@ export function buildRehearsalEnvironment({
   const serverImage = manifest.images.find((item) => item.kind === "server");
   const webImage = manifest.images.find((item) => item.kind === "web");
   const encodedPassword = encodeURIComponent(postgresPassword);
+  const databasePasswords = {
+    POSTGRES_PASSWORD: postgresPassword,
+    POSTGRES_APP_PASSWORD: postgresAppPassword,
+    POSTGRES_MIGRATOR_PASSWORD: postgresMigratorPassword,
+    POSTGRES_BACKUP_PASSWORD: postgresBackupPassword,
+  };
+  if (new Set(Object.values(databasePasswords)).size !== 4) {
+    throw new RehearsalError(
+      "preflight",
+      "release rehearsal database role passwords must be distinct",
+    );
+  }
   const values = {
     PROJECT_SLUG: project,
     ERP_CUSTOMER_KEY: manifest.customer,
@@ -206,7 +221,7 @@ export function buildRehearsalEnvironment({
     POSTGRES_IMAGE: "postgres:18.1",
     JAEGER_IMAGE: "jaegertracing/all-in-one:1.76.0",
     TZ: "Asia/Shanghai",
-    POSTGRES_PASSWORD: postgresPassword,
+    ...databasePasswords,
     POSTGRES_DB: database,
     POSTGRES_USER: "postgres",
     POSTGRES_DSN: `postgres://postgres:${encodedPassword}@postgres:5432/${database}?sslmode=disable`,
@@ -1576,6 +1591,9 @@ export async function runLocalReleaseRehearsal(options = {}, runtime = {}) {
   }
   const ports = await allocateRehearsalPorts();
   const postgresPassword = randomSecret(30);
+  const postgresAppPassword = randomSecret(30);
+  const postgresMigratorPassword = randomSecret(30);
+  const postgresBackupPassword = randomSecret(30);
   const jwtSecret = randomSecret(48);
   const adminPassword = buildRehearsalAdminPassword();
   const envFile = path.join(workspace, "release.env");
@@ -1585,6 +1603,9 @@ export async function runLocalReleaseRehearsal(options = {}, runtime = {}) {
     workspace,
     ports,
     postgresPassword,
+    postgresAppPassword,
+    postgresMigratorPassword,
+    postgresBackupPassword,
     jwtSecret,
   });
   writeFileSync(envFile, formatRehearsalEnv(environment.values), {

@@ -147,6 +147,9 @@ test("local release rehearsal environment binds isolated database fixed images a
     workspace: "/private/tmp/release",
     ports,
     postgresPassword: "postgres-password",
+    postgresAppPassword: "app-password",
+    postgresMigratorPassword: "migrator-password",
+    postgresBackupPassword: "backup-password",
     jwtSecret: "jwt-secret",
   });
   assert.equal(built.database, "plush_erp_release_release_20260728");
@@ -156,6 +159,12 @@ test("local release rehearsal environment binds isolated database fixed images a
   );
   assert.equal(built.values.WEB_IMAGE, `plush-toy-erp-web:yoyoosun-${commit}`);
   assert.equal(built.values.POSTGRES_IMAGE, "postgres:18.1");
+  assert.equal(built.values.POSTGRES_APP_PASSWORD, "app-password");
+  assert.equal(
+    built.values.POSTGRES_MIGRATOR_PASSWORD,
+    "migrator-password",
+  );
+  assert.equal(built.values.POSTGRES_BACKUP_PASSWORD, "backup-password");
   assert.equal(built.values.JAEGER_IMAGE, "jaegertracing/all-in-one:1.76.0");
   assert.equal(built.values.ERP_DEBUG_ENV, "prod");
   assert.equal(built.values.ERP_DEBUG_SEED_ENABLED, "false");
@@ -176,9 +185,27 @@ test("local release rehearsal environment binds isolated database fixed images a
         workspace: "/private/tmp/release",
         ports,
         postgresPassword: "postgres-password",
+        postgresAppPassword: "app-password",
+        postgresMigratorPassword: "migrator-password",
+        postgresBackupPassword: "backup-password",
         jwtSecret: "jwt-secret",
       }),
     /run id is invalid/u,
+  );
+  assert.throws(
+    () =>
+      buildRehearsalEnvironment({
+        manifest,
+        runId: "release_20260728",
+        workspace: "/private/tmp/release",
+        ports,
+        postgresPassword: "postgres-password",
+        postgresAppPassword: "app-password",
+        postgresMigratorPassword: "app-password",
+        postgresBackupPassword: "backup-password",
+        jwtSecret: "jwt-secret",
+      }),
+    /database role passwords must be distinct/u,
   );
 });
 
