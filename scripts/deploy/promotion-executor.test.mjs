@@ -19,8 +19,8 @@ const PROMOTION_STAGES = [
   "image_load_and_readback",
   "fresh_backup_and_restore_check",
   "env_and_static_preflight",
-  "migration_plan",
   "maintenance_window",
+  "migration_plan",
   "migration_apply_started",
   "migration_applied",
   "compose_start",
@@ -173,6 +173,49 @@ test("failed and unknown receipts cannot masquerade as passed", () => {
   assert.equal(
     validateRemotePromotionReceipt(failed, expected).status,
     "failed",
+  );
+  const migrationPlanIndex = PROMOTION_STAGES.indexOf("migration_plan");
+  const migrationPlanFailure = receipt({
+    status: "failed",
+    stage: "migration_plan",
+    issueCode: "promotion_failed_before_migration",
+    timings: PROMOTION_STAGES.slice(0, migrationPlanIndex + 1).map(
+      (id, index) => ({
+        id,
+        status: index === migrationPlanIndex ? "failed" : "passed",
+        durationMs: 1_000,
+      }),
+    ),
+    checks: {
+      releaseIdentity: false,
+      health: false,
+      ready: false,
+      basicSmoke: false,
+      publicEntry: false,
+    },
+    migration: {
+      automaticDownMigration: false,
+      applyStarted: false,
+    },
+  });
+  assert.equal(
+    validateRemotePromotionReceipt(migrationPlanFailure, expected).status,
+    "failed",
+  );
+  assert.throws(
+    () =>
+      validateRemotePromotionReceipt(
+        {
+          ...migrationPlanFailure,
+          timings: [
+            ...migrationPlanFailure.timings.slice(0, -2),
+            migrationPlanFailure.timings.at(-1),
+            migrationPlanFailure.timings.at(-2),
+          ],
+        },
+        expected,
+      ),
+    /timing contract/u,
   );
   const earlyFailure = receipt({
     status: "failed",

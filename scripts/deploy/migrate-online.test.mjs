@@ -85,10 +85,15 @@ function createFixture({ useSystemFlock = false } = {}) {
     "TRIAL_COMPOSE_ENV_FILE=/home/simon/plush-toy-erp-v5/runtime/.env.customer-trial-133";
   const productionMigrateDirContract =
     "TRIAL_MIG_DIR=$SERVER_ROOT/internal/data/model/migrate";
-  const productionAtlasContract = "TRIAL_ATLAS_BIN=/usr/local/bin/atlas";
+  const productionAtlasContract =
+    "TRIAL_ATLAS_BIN=/home/simon/plush-toy-erp-v5/tools/atlas/v0.38.0/atlas";
   const productionPreflightContract =
     "TRIAL_POPULATED_UPGRADE_PREFLIGHT=$SERVER_ROOT/../scripts/qa/populated-upgrade-preflight.sh";
   let fixtureMigrateSource = fs.readFileSync(migrateScript, "utf8");
+  assert.match(
+    fixtureMigrateSource,
+    /ATLAS_BIN="\$\{ATLAS_BIN:-\/usr\/local\/bin\/atlas\}"/u,
+  );
   assert.match(fixtureMigrateSource, new RegExp(productionDataContract, "u"));
   assert.match(fixtureMigrateSource, new RegExp(productionLockContract, "u"));
   fixtureMigrateSource = fixtureMigrateSource

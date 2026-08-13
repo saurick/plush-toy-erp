@@ -82,6 +82,8 @@ migration_lock=/home/simon/plush-toy-erp-v5/run/atlas-migrate.lock
 minimum_available_bytes=32212254720
 public_endpoint=https://admin.yoyoosun.net
 public_network=plush-toy-erp-v5_default
+trial_atlas_bin=/home/simon/plush-toy-erp-v5/tools/atlas/v0.38.0/atlas
+trial_atlas_required_version=v0.38.0
 
 status=passed
 blockers=()
@@ -177,6 +179,14 @@ done
 for required_file in "$runtime_env" "$compose_base" "$compose_override"; do
   plain_file "$required_file" || block target_file_invalid
 done
+if ! plain_file "$trial_atlas_bin" ||
+  [[ ! -x "$trial_atlas_bin" ]] ||
+  [[ "$(stat -c '%u' "$trial_atlas_bin" 2>/dev/null || true)" != "$(id -u)" ]]; then
+  block target_atlas_tooling_invalid
+elif ! "$trial_atlas_bin" version 2>&1 |
+  grep -Eq "(^|[[:space:]])$trial_atlas_required_version([[:space:]]|$)"; then
+  block target_atlas_tooling_invalid
+fi
 
 root_available_bytes="$(df -B1 --output=avail / | awk 'NR==2 {print $1}')"
 [[ "$root_available_bytes" =~ ^[0-9]+$ ]] || {

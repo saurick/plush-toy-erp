@@ -44,7 +44,7 @@ TRIAL_MIGRATION_LOCK_FILE=/home/simon/plush-toy-erp-v5/run/atlas-migrate.lock
 TRIAL_COMPOSE_OVERRIDE_FILE=$SCRIPT_DIR/compose.customer-trial-133.yml
 TRIAL_COMPOSE_ENV_FILE=/home/simon/plush-toy-erp-v5/runtime/.env.customer-trial-133
 TRIAL_MIG_DIR=$SERVER_ROOT/internal/data/model/migrate
-TRIAL_ATLAS_BIN=/usr/local/bin/atlas
+TRIAL_ATLAS_BIN=/home/simon/plush-toy-erp-v5/tools/atlas/v0.38.0/atlas
 TRIAL_PSQL_BIN=psql
 TRIAL_POPULATED_UPGRADE_PREFLIGHT=$SERVER_ROOT/../scripts/qa/populated-upgrade-preflight.sh
 TRIAL_RUNTIME_DB_NAME=""
@@ -75,7 +75,8 @@ usage() {
   MIG_DIR        迁移目录（默认 server/internal/data/model/migrate）
   POSTGRES_SERVICE  compose 里的 Postgres 服务名（默认 postgres）
   APP_SERVICE    compose 里的后端服务名（默认 app-server）；正式 apply 时必须已停止
-  ATLAS_BIN      宿主机 Atlas 二进制路径（默认 /usr/local/bin/atlas）
+  ATLAS_BIN      宿主机 Atlas 二进制路径（普通部署默认 /usr/local/bin/atlas；
+                 customer-trial-133 固定使用目标根目录内的 v0.38.0，拒绝覆盖）
   ATLAS_REQUIRED_VERSION
                  固定 Atlas 版本（默认 v0.38.0）
   POSTGRES_HOST  宿主机访问 PostgreSQL 的地址（默认 127.0.0.1）
@@ -317,7 +318,11 @@ fi
 
 if ! command -v "$ATLAS_BIN" >/dev/null 2>&1; then
   echo "ERROR: 未找到宿主机 Atlas: $ATLAS_BIN" >&2
-  echo "请先在服务器安装 Atlas 到 /usr/local/bin/atlas，不要使用 arigaio/atlas 容器执行线上迁移。" >&2
+  if [ "$TRIAL_MODE" -eq 1 ]; then
+    echo "请先通过正式发布流程准备 customer-trial-133 固定 Atlas v0.38.0，不要覆盖系统 Atlas 或使用容器执行线上迁移。" >&2
+  else
+    echo "请先在服务器安装 Atlas 到 /usr/local/bin/atlas，不要使用 arigaio/atlas 容器执行线上迁移。" >&2
+  fi
   exit 1
 fi
 

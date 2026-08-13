@@ -312,6 +312,19 @@ test("remote target preflight script is read-only and contains no build command"
   assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /target_rsync_unavailable/u);
   assert.match(
     REMOTE_TARGET_PREFLIGHT_SCRIPT,
+    /trial_atlas_bin=\/home\/simon\/plush-toy-erp-v5\/tools\/atlas\/v0[.]38[.]0\/atlas/u,
+  );
+  assert.match(
+    REMOTE_TARGET_PREFLIGHT_SCRIPT,
+    /trial_atlas_required_version=v0[.]38[.]0/u,
+  );
+  assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /stat -c '%u'/u);
+  assert.match(
+    REMOTE_TARGET_PREFLIGHT_SCRIPT,
+    /target_atlas_tooling_invalid/u,
+  );
+  assert.match(
+    REMOTE_TARGET_PREFLIGHT_SCRIPT,
     /target_archive_tooling_unavailable/u,
   );
   assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /retention_mode=preview_only/u);
