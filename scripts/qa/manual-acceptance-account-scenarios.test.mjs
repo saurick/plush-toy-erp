@@ -308,7 +308,7 @@ function createBackend({
           permissions: permissionOptionsTransform(permissionOptions()),
           warehouse_scope_options: [1, 2, 3, 4].map((id) => ({
             id,
-            code: `YS5-CK-0${id}`,
+            code: `YS6-CK-0${id}`,
             name: `仓库 ${id}`,
           })),
         },
@@ -461,8 +461,8 @@ test("report-only plan keeps ten formal accounts and describes three clear scena
   assert.equal(plan.realCustomerImport, false);
   assert.equal(plan.directSQL, false);
   assert.equal(plan.target, "local-dev");
-  assert.equal(plan.dataVersion, "2026.07.16-v5");
-  assert.equal(plan.runId, "20260716-V5");
+  assert.equal(plan.dataVersion, "2026.08.15-v6");
+  assert.equal(plan.runId, "20260815-V6");
   assert.deepEqual(plan.protectedAccounts, FORMAL_DEMO_ACCOUNTS);
   assert.equal(plan.protectedAccounts.length, 10);
   assert.equal(plan.scenarios.length, 3);
@@ -692,7 +692,7 @@ test("local SQL runtime is accepted only through the shared debug-disabled polic
   );
   assert.equal(report.runtime.target, "local-dev");
   assert.equal(report.runtime.environment, "sql");
-  assert.equal(report.runtime.dataVersion, "2026.07.16-v5");
+  assert.equal(report.runtime.dataVersion, "2026.08.15-v6");
 });
 
 test("registered 133 target reconciles the same three scenario accounts without changing role permissions", async () => {
@@ -711,8 +711,8 @@ test("registered 133 target reconciles the same three scenario accounts without 
   const plan = buildManualAcceptanceAccountScenarioPlan({
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
     target: CUSTOMER_TRIAL_133_TARGET,
-    dataVersion: "2026.07.16-v5",
-    runId: "20260716-V5",
+    dataVersion: "2026.08.15-v6",
+    runId: "20260815-V6",
     auditMinimum: 30,
   });
   const report = await applyManualAcceptanceAccountScenarios(plan, {
@@ -727,8 +727,8 @@ test("registered 133 target reconciles the same three scenario accounts without 
   });
 
   assert.equal(report.target, CUSTOMER_TRIAL_133_TARGET);
-  assert.equal(report.dataVersion, "2026.07.16-v5");
-  assert.equal(report.runId, "20260716-V5");
+  assert.equal(report.dataVersion, "2026.08.15-v6");
+  assert.equal(report.runId, "20260815-V6");
   assert.equal(report.roleDataScopeBaseline.mode, "reconcile");
   assert.equal(report.roleDataScopeBaseline.updated, 2);
   assert.equal(rolePermissionCalls(backend).length, 0);
@@ -755,8 +755,8 @@ test("fresh registered 133 target creates the exact ten formal accounts before s
   const plan = buildManualAcceptanceAccountScenarioPlan({
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
     target: CUSTOMER_TRIAL_133_TARGET,
-    dataVersion: "2026.07.16-v5",
-    runId: "20260716-V5",
+    dataVersion: "2026.08.15-v6",
+    runId: "20260815-V6",
   });
   const options = {
     password: "demo-pass",
@@ -869,8 +869,8 @@ test("fresh registered 133 target requires the exact formal-account confirmation
   const plan = buildManualAcceptanceAccountScenarioPlan({
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
     target: CUSTOMER_TRIAL_133_TARGET,
-    dataVersion: "2026.07.16-v5",
-    runId: "20260716-V5",
+    dataVersion: "2026.08.15-v6",
+    runId: "20260815-V6",
   });
 
   await assert.rejects(
@@ -898,8 +898,8 @@ test("registered 133 target rejects the old active configuration before account 
   const plan = buildManualAcceptanceAccountScenarioPlan({
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
     target: CUSTOMER_TRIAL_133_TARGET,
-    dataVersion: "2026.07.16-v5",
-    runId: "20260716-V5",
+    dataVersion: "2026.08.15-v6",
+    runId: "20260815-V6",
   });
 
   await assert.rejects(
@@ -941,8 +941,8 @@ test("registered 133 target rejects local-only public and shared admin/demo pass
   const plan = buildManualAcceptanceAccountScenarioPlan({
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
     target: CUSTOMER_TRIAL_133_TARGET,
-    dataVersion: "2026.07.16-v5",
-    runId: "20260716-V5",
+    dataVersion: "2026.08.15-v6",
+    runId: "20260815-V6",
   });
   for (const [password, adminPassword, expected] of [
     ["12345678", "guard-pass", /local-only public password/u],
@@ -1278,8 +1278,8 @@ test("CLI help points only to the dedicated current local acceptance database", 
     help.text,
     /--database-name plush_erp_acceptance_20260728_delivery_dev/u,
   );
-  assert.match(help.text, /--data-version 2026\.07\.16-v5/u);
-  assert.match(help.text, /--run-id 20260716-V5/u);
+  assert.match(help.text, /--data-version 2026\.08\.15-v6/u);
+  assert.match(help.text, /--run-id 20260815-V6/u);
   assert.doesNotMatch(help.text, /127\.0\.0\.1:8300/u);
 });
 

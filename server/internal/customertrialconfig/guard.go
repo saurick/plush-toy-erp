@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"server/internal/biz"
+	"server/internal/manualacceptance"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -16,18 +17,21 @@ const (
 	ExpectedTarget      = "customer-trial-133"
 	ExpectedCustomerKey = "yoyoosun"
 
+	expectedHost = "postgres"
+	expectedPort = "5432"
+)
+
+var (
+	contract       = manualacceptance.Current()
 	ProductVersion = biz.CustomerConfigTrialProductVersion
 	ApplyPurpose   = biz.CustomerConfigTrialApplyPurpose
 	DatasetVersion = biz.CustomerConfigTrialDatasetVersion
-	Revision       = "yoyoosun-customer-trial-133-package-v7.runtime-manifest-v1"
-	// PreviousActiveRevision is admitted only by the startup readback during
-	// the V5-to-V7 activation window. Publish and transition classifiers still
+	Revision       = contract.CustomerTrial133.ConfigRevision
+	// PreviousActiveRevision is admitted only by startup readback during the
+	// V6-to-V8 activation window. Publish and transition classifiers still
 	// accept Revision only, so the previous identity cannot become a write alias.
-	PreviousActiveRevision = "yoyoosun-customer-trial-133-package-v5.runtime-manifest-v1"
-
-	expectedDatabase = "plush_erp_uat_20260716_v5"
-	expectedHost     = "postgres"
-	expectedPort     = "5432"
+	PreviousActiveRevision = contract.CustomerTrial133.PreviousConfigRevision
+	expectedDatabase       = contract.CustomerTrial133.DatabaseName
 )
 
 // ResolveGate validates the complete runtime boundary and reports whether the

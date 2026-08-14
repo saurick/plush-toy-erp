@@ -789,7 +789,7 @@ if [[ "$runtime_check" -eq 1 ]]; then
     runtime_app_dsn_count="$(printf '%s\n' "$runtime_trial_app_env" | awk -F= '$1 == "POSTGRES_DSN" { count++ } END { print count + 0 }')"
     runtime_app_dsn="$(printf '%s\n' "$runtime_trial_app_env" | awk -F= '$1 == "POSTGRES_DSN" { value = $0; sub(/^[^=]*=/, "", value) } END { print value }')"
     [[ "$runtime_app_dsn_count" == "1" ]] || fail "customer-trial-133 运行态 app-server 必须只有一个 POSTGRES_DSN"
-    [[ "$runtime_app_dsn" =~ ^postgres://erp_app:[A-Za-z0-9._~-]{20,128}@postgres:5432/plush_erp_uat_20260716_v5\?sslmode=disable$ ]] || fail "customer-trial-133 运行态 app-server POSTGRES_DSN 必须使用 erp_app 精确指向 V5 独立数据库"
+    [[ "$runtime_app_dsn" =~ ^postgres://erp_app:[A-Za-z0-9._~-]{20,128}@postgres:5432/plush_erp_uat_20260716_v5\?sslmode=disable$ ]] || fail "customer-trial-133 运行态 app-server POSTGRES_DSN 必须使用 erp_app 精确指向登记的试用数据库"
     unset runtime_trial_app_env runtime_app_dsn
     ok "customer-trial-133 运行态容器名、project、端口、PostgreSQL 挂载和 app 试用身份一致"
   fi

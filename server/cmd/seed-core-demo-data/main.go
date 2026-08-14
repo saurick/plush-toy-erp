@@ -15,6 +15,7 @@ import (
 
 	"server/internal/data"
 	"server/internal/devdbguard"
+	"server/internal/manualacceptance"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -38,8 +39,8 @@ var scenarioDemoReferenceDatabases = map[string]struct{}{
 func main() {
 	confPath := flag.String("conf", "./configs/dev/config.yaml", "config yaml path")
 	prefix := flag.String("prefix", data.CoreDemoSeedPrefix, "simulated seed code prefix; must start with SIM-")
-	referencesOnly := flag.Bool("references-only", false, "seed only the exact V5 acceptance unit and four warehouses")
-	scenarioReferences := flag.Bool("scenario-references", false, "seed only the exact V5 unit and four warehouses in a registered long-lived development database")
+	referencesOnly := flag.Bool("references-only", false, "seed only the exact current acceptance units and four warehouses")
+	scenarioReferences := flag.Bool("scenario-references", false, "seed only the exact current units and four warehouses in a registered long-lived development database")
 	expectedDatabase := flag.String("expected-database", "", "exact guarded database; required with --references-only or --scenario-references")
 	confirmation := flag.String("confirm", "", "exact non-secret reference confirmation; required with --references-only or --scenario-references")
 	allowProd := flag.Bool("allow-prod", false, "allow seeding when config path or environment looks like production")
@@ -146,7 +147,8 @@ func validateScenarioDemoReferenceTarget(dsn, expectedDatabase, confirmation str
 	if _, ok := scenarioDemoReferenceDatabases[expectedDatabase]; !ok {
 		return fmt.Errorf("scenario-references expected database must be a registered long-lived development database")
 	}
-	expectedConfirmation := "SEED_SCENARIO_DEMO_CORE_REFERENCES:scenario-demo:" + expectedDatabase + ":2026.07.16-v5:20260716-V5"
+	contract := manualacceptance.Current()
+	expectedConfirmation := "SEED_SCENARIO_DEMO_CORE_REFERENCES:scenario-demo:" + expectedDatabase + ":" + contract.DataVersion + ":" + contract.RunID
 	if confirmation != expectedConfirmation {
 		return fmt.Errorf("scenario-references confirmation must equal %s", expectedConfirmation)
 	}
@@ -181,7 +183,8 @@ func validateManualAcceptanceReferenceTarget(dsn, expectedDatabase, confirmation
 	if len(matches) != 2 || strings.HasSuffix(matches[1], "_browser_actions") {
 		return fmt.Errorf("references-only expected database must match plush_erp_acceptance_<run-id>_dev")
 	}
-	expectedConfirmation := "SEED_MANUAL_ACCEPTANCE_CORE_REFERENCES:local-dev:" + expectedDatabase + ":2026.07.16-v5:20260716-V5"
+	contract := manualacceptance.Current()
+	expectedConfirmation := "SEED_MANUAL_ACCEPTANCE_CORE_REFERENCES:local-dev:" + expectedDatabase + ":" + contract.DataVersion + ":" + contract.RunID
 	if confirmation != expectedConfirmation {
 		return fmt.Errorf("references-only confirmation must equal %s", expectedConfirmation)
 	}

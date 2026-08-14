@@ -25,6 +25,11 @@ export const DATA_PREPARATION_PROFILE_KEYS = Object.freeze([
   "scenario-demo",
   "full-acceptance",
 ]);
+export const DATA_PREPARATION_TARGET_KEYS = Object.freeze([
+  "local-development",
+  "customer-trial-133",
+  "isolated-local",
+]);
 export const DATA_PREPARATION_TERMINAL_STATUSES = Object.freeze([
   "passed",
   "failed",
@@ -114,27 +119,78 @@ function validateRepository(value) {
 }
 
 function validateTargetSummary(value) {
-  assertExactKeys(
-    value,
-    [
-      "automaticCleanup",
-      "disposable",
-      "preflightFingerprint",
-      "safeTarget",
-      "targetFingerprint",
-    ],
-    "target summary",
-  );
+  const legacyKeys = [
+    "automaticCleanup",
+    "disposable",
+    "preflightFingerprint",
+    "safeTarget",
+    "targetFingerprint",
+  ];
+  const currentKeys = [...legacyKeys, "targetKey"];
+  const evidenceKeys = [
+    ...currentKeys,
+    "customerConfigRevision",
+    "databaseName",
+    "datasetRunId",
+    "datasetVersion",
+    "migrationVersion",
+    "releaseSha",
+    "rollbackPoint",
+    "semanticDigest",
+  ];
+  const actualKeys = Object.keys(value || {}).sort();
+  const matches = (keys) => {
+    const expected = [...keys].sort();
+    return (
+      actualKeys.length === expected.length &&
+      actualKeys.every((key, index) => key === expected[index])
+    );
+  };
+  if (!matches(legacyKeys) && !matches(currentKeys) && !matches(evidenceKeys)) {
+    throw new Error("target summary contains unsupported fields");
+  }
   assertSafeText(value.safeTarget, "target summary", 300);
   if (
     typeof value.automaticCleanup !== "boolean" ||
     typeof value.disposable !== "boolean" ||
     !HASH_PATTERN.test(value.preflightFingerprint) ||
-    !HASH_PATTERN.test(value.targetFingerprint)
+    !HASH_PATTERN.test(value.targetFingerprint) ||
+    (value.targetKey !== undefined &&
+      !DATA_PREPARATION_TARGET_KEYS.includes(value.targetKey)) ||
+    (matches(evidenceKeys) &&
+      (!/^[0-9a-f]{40}$/u.test(value.releaseSha) ||
+        !/^[a-z][a-z0-9_-]{0,62}$/u.test(value.databaseName) ||
+        !/^20(?:[0-9]{6}|[0-9]{12})$|^verified-during-lifecycle$/u.test(
+          value.migrationVersion,
+        ) ||
+        !/^20[0-9]{2}[.][0-9]{2}[.][0-9]{2}-v[0-9]+$/u.test(
+          value.datasetVersion,
+        ) ||
+        !/^[0-9]{8}-V[0-9]+$/u.test(value.datasetRunId) ||
+        !HASH_PATTERN.test(value.semanticDigest)))
   ) {
     throw new Error("target summary is invalid");
   }
+  if (matches(evidenceKeys)) {
+    assertSafeText(
+      value.customerConfigRevision,
+      "customer config revision",
+      240,
+    );
+    assertSafeText(value.rollbackPoint, "rollback point", 240);
+  }
   return value;
+}
+
+function inferredTargetKey(profileKey) {
+  if (profileKey === "full-acceptance") return "isolated-local";
+  return "local-development";
+}
+
+function operationTargetKey(operation) {
+  return (
+    operation.targetSummary.targetKey || inferredTargetKey(operation.profileKey)
+  );
 }
 
 function validateIssue(value) {
@@ -161,7 +217,7 @@ function validateEvent(value) {
   return value;
 }
 
-function validateReadback(value, profileKey) {
+function validateReadback(value, profileKey, targetSummary) {
   if (value === null) return value;
   if (profileKey === "core-demo") {
     assertExactKeys(
@@ -208,33 +264,52 @@ function validateReadback(value, profileKey) {
     return value;
   }
   if (profileKey === "scenario-demo") {
-    assertExactKeys(
-      value,
-      [
-        "browserChecksPending",
-        "catalogReadyCount",
-        "catalogTargetCount",
-        "cleanupSupported",
-        "dataVersion",
-        "datasetKey",
-        "factCount",
-        "manualAcceptanceCompleted",
-        "processRuntimeCount",
-        "profileKey",
-        "replayMode",
-        "runId",
-        "schemaVersion",
-        "sourceDocumentCount",
-        "targetFingerprint",
-      ],
-      "scenario demo readback",
-    );
+    const legacyKeys = [
+      "browserChecksPending",
+      "catalogReadyCount",
+      "catalogTargetCount",
+      "cleanupSupported",
+      "dataVersion",
+      "datasetKey",
+      "factCount",
+      "manualAcceptanceCompleted",
+      "processRuntimeCount",
+      "profileKey",
+      "replayMode",
+      "runId",
+      "schemaVersion",
+      "sourceDocumentCount",
+      "targetFingerprint",
+    ];
+    const currentKeys = [
+      ...legacyKeys,
+      "customerConfigRevision",
+      "databaseName",
+      "migrationVersion",
+      "release",
+      "semanticDigest",
+      "stageCount",
+      "targetEnvironment",
+      "targetKey",
+    ];
+    const remoteCurrentKeys = [...currentKeys, "backupReceipt"];
+    const keys = Object.keys(value).sort();
+    const expected = (candidate) => [...candidate].sort();
+    const legacy =
+      JSON.stringify(keys) === JSON.stringify(expected(legacyKeys));
+    const current =
+      JSON.stringify(keys) === JSON.stringify(expected(currentKeys));
+    const remoteCurrent =
+      JSON.stringify(keys) === JSON.stringify(expected(remoteCurrentKeys));
+    if (!legacy && !current && !remoteCurrent) {
+      throw new Error("scenario demo readback contains unsupported fields");
+    }
     if (
       value.schemaVersion !== "plush.dev-data-preparation-readback/v1" ||
       value.profileKey !== profileKey ||
       value.datasetKey !== "yoyoosun-manual-acceptance" ||
-      value.dataVersion !== "2026.07.16-v5" ||
-      value.runId !== "20260716-V5" ||
+      value.dataVersion !== "2026.08.15-v6" ||
+      value.runId !== "20260815-V6" ||
       !HASH_PATTERN.test(value.targetFingerprint) ||
       !Number.isSafeInteger(value.sourceDocumentCount) ||
       value.sourceDocumentCount < 1 ||
@@ -242,8 +317,8 @@ function validateReadback(value, profileKey) {
       value.processRuntimeCount < 1 ||
       !Number.isSafeInteger(value.factCount) ||
       value.factCount < 1 ||
-      value.catalogReadyCount !== 40 ||
-      value.catalogTargetCount !== 50 ||
+      value.catalogReadyCount !== 41 ||
+      value.catalogTargetCount !== 51 ||
       value.browserChecksPending !== 10 ||
       value.catalogReadyCount + value.browserChecksPending !==
         value.catalogTargetCount ||
@@ -253,16 +328,91 @@ function validateReadback(value, profileKey) {
     ) {
       throw new Error("scenario demo readback is invalid");
     }
+    if (
+      (current || remoteCurrent) &&
+      (value.targetKey !== targetSummary?.targetKey ||
+        !DATA_PREPARATION_TARGET_KEYS.includes(value.targetKey) ||
+        !["local-development", "customer-trial-133"].includes(
+          value.targetEnvironment,
+        ) ||
+        !/^[0-9a-f]{40}$/u.test(value.release) ||
+        !/^20[0-9]{12}$/u.test(value.migrationVersion) ||
+        !HASH_PATTERN.test(value.semanticDigest) ||
+        value.stageCount !== 9 ||
+        typeof value.databaseName !== "string" ||
+        value.databaseName.length < 1 ||
+        typeof value.customerConfigRevision !== "string" ||
+        value.customerConfigRevision.length < 1)
+    ) {
+      throw new Error("scenario demo target readback is invalid");
+    }
+    if (
+      (value.targetKey === "customer-trial-133" && !remoteCurrent) ||
+      (value.targetKey !== "customer-trial-133" && remoteCurrent)
+    ) {
+      throw new Error("scenario demo backup receipt target is invalid");
+    }
+    if (remoteCurrent) {
+      assertExactKeys(
+        value.backupReceipt,
+        [
+          "backupAlias",
+          "containsCredentials",
+          "containsPaths",
+          "containsSecrets",
+          "createdAt",
+          "databaseName",
+          "migrationVersion",
+          "releaseSha",
+          "schemaVersion",
+          "sha256",
+          "sizeBytes",
+          "status",
+        ],
+        "scenario demo backup receipt",
+      );
+      if (
+        value.backupReceipt.schemaVersion !==
+          "plush.customer-trial-133-data-backup/v1" ||
+        value.backupReceipt.status !== "passed" ||
+        value.backupReceipt.backupAlias !== targetSummary.rollbackPoint ||
+        value.backupReceipt.releaseSha !== targetSummary.releaseSha ||
+        value.backupReceipt.databaseName !== targetSummary.databaseName ||
+        value.backupReceipt.migrationVersion !==
+          targetSummary.migrationVersion ||
+        !HASH_PATTERN.test(value.backupReceipt.sha256) ||
+        !Number.isSafeInteger(value.backupReceipt.sizeBytes) ||
+        value.backupReceipt.sizeBytes < 1 ||
+        Number.isNaN(Date.parse(value.backupReceipt.createdAt)) ||
+        value.backupReceipt.containsSecrets !== false ||
+        value.backupReceipt.containsCredentials !== false ||
+        value.backupReceipt.containsPaths !== false
+      ) {
+        throw new Error("scenario demo backup receipt is invalid");
+      }
+    }
     return value;
   }
   assertExactKeys(
     value,
     [
+      "catalogTargetCount",
+      "chainCount",
+      "chainDataDigest",
+      "chainVerificationDigest",
       "cleanupComplete",
+      "dataStageCount",
+      "dataVersion",
+      "datasetCompletedAt",
+      "datasetDurationMs",
+      "datasetStartedAt",
       "profileKey",
       "reportStatus",
       "residualDatabaseCount",
+      "scenarioCount",
       "schemaVersion",
+      "stageTimings",
+      "stepCount",
       "targetFingerprint",
     ],
     "full acceptance readback",
@@ -274,9 +424,49 @@ function validateReadback(value, profileKey) {
     typeof value.cleanupComplete !== "boolean" ||
     !Number.isSafeInteger(value.residualDatabaseCount) ||
     value.residualDatabaseCount < 0 ||
-    !HASH_PATTERN.test(value.targetFingerprint)
+    !HASH_PATTERN.test(value.targetFingerprint) ||
+    !HASH_PATTERN.test(value.chainDataDigest) ||
+    !HASH_PATTERN.test(value.chainVerificationDigest) ||
+    ![
+      value.chainCount,
+      value.stepCount,
+      value.scenarioCount,
+      value.dataStageCount,
+      value.catalogTargetCount,
+    ].every((count) => Number.isSafeInteger(count) && count > 0) ||
+    !Array.isArray(value.stageTimings)
   ) {
     throw new Error("full acceptance readback is invalid");
+  }
+  const hasDatasetTiming = value.datasetStartedAt !== null;
+  if (
+    (hasDatasetTiming &&
+      (Number.isNaN(Date.parse(value.datasetStartedAt)) ||
+        Number.isNaN(Date.parse(value.datasetCompletedAt)) ||
+        !Number.isFinite(value.datasetDurationMs) ||
+        value.datasetDurationMs < 0 ||
+        typeof value.dataVersion !== "string" ||
+        value.stageTimings.length !== value.dataStageCount)) ||
+    (!hasDatasetTiming &&
+      (value.datasetCompletedAt !== null ||
+        value.datasetDurationMs !== null ||
+        value.dataVersion !== null ||
+        value.stageTimings.length !== 0))
+  ) {
+    throw new Error("full acceptance dataset timing is invalid");
+  }
+  for (const stage of value.stageTimings) {
+    assertExactKeys(
+      stage,
+      ["completedAt", "durationMs", "key", "startedAt", "status"],
+      "full acceptance stage timing",
+    );
+    if (
+      typeof stage.key !== "string" ||
+      !["completed", "failed", "not_started"].includes(stage.status)
+    ) {
+      throw new Error("full acceptance stage timing is invalid");
+    }
   }
   return value;
 }
@@ -325,7 +515,22 @@ export function validateDataPreparationOperation(operation) {
   validateTargetSummary(operation.targetSummary);
   operation.issues.forEach(validateIssue);
   operation.events.forEach(validateEvent);
-  validateReadback(operation.readback, operation.profileKey);
+  validateReadback(
+    operation.readback,
+    operation.profileKey,
+    operation.targetSummary,
+  );
+  const targetKey = operationTargetKey(operation);
+  if (
+    (operation.profileKey === "core-demo" &&
+      targetKey !== "local-development") ||
+    (operation.profileKey === "full-acceptance" &&
+      targetKey !== "isolated-local") ||
+    (operation.profileKey === "scenario-demo" &&
+      !["local-development", "customer-trial-133"].includes(targetKey))
+  ) {
+    throw new Error("operation target/profile binding is invalid");
+  }
   const last = operation.events.at(-1);
   if (
     operation.createdAt !== operation.events[0].at ||
@@ -716,7 +921,7 @@ export function transitionDataPreparationOperation(
     readback:
       readback === undefined
         ? current.readback
-        : validateReadback(readback, current.profileKey),
+        : validateReadback(readback, current.profileKey, current.targetSummary),
   });
   writePrivateJSON(operationFile(store, operationId), next, {
     overwrite: true,

@@ -146,7 +146,7 @@ func TestCoreCodeNamespacePatternUsesDefaultBusinessCodes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("coreCodeNamespacePattern(warehouse) error = %v", err)
 	}
-	if unitPattern != "YS5-DW-%" || warehousePattern != "YS5-CK-%" {
+	if unitPattern != "YS6-DW-%" || warehousePattern != "YS6-CK-%" {
 		t.Fatalf("unexpected reference namespaces unit=%q warehouse=%q", unitPattern, warehousePattern)
 	}
 	if strings.Contains(unitPattern+warehousePattern, data.CoreDemoSeedPrefix) {
@@ -196,9 +196,9 @@ func boundaryValues(dataset data.CoreDemoReferenceSeedDataset) []driver.Value {
 	values := []driver.Value{
 		unitPattern,
 		warehousePattern,
-		dataset.Units[0].Code,
-		dataset.Units[0].Name,
-		dataset.Units[0].Precision,
+	}
+	for _, unit := range dataset.Units {
+		values = append(values, unit.Code, unit.Name, unit.Precision)
 	}
 	for _, warehouse := range dataset.Warehouses {
 		values = append(values, warehouse.Code, warehouse.Name, warehouse.Type)
@@ -231,9 +231,11 @@ func expectBoundary(mock sqlmock.Sqlmock, dataset data.CoreDemoReferenceSeedData
 }
 
 func expectReferenceUpserts(mock sqlmock.Sqlmock, dataset data.CoreDemoReferenceSeedDataset) {
-	mock.ExpectQuery(`INSERT INTO units`).
-		WithArgs(dataset.Units[0].Code, dataset.Units[0].Name, dataset.Units[0].Precision).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(11))
+	for index, unit := range dataset.Units {
+		mock.ExpectQuery(`INSERT INTO units`).
+			WithArgs(unit.Code, unit.Name, unit.Precision).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(11 + index))
+	}
 	for index, warehouse := range dataset.Warehouses {
 		mock.ExpectQuery(`INSERT INTO warehouses`).
 			WithArgs(warehouse.Code, warehouse.Name, warehouse.Type).
@@ -326,7 +328,7 @@ func TestBootstrapManualAcceptanceCoreRollsBackFailedExactReadback(t *testing.T)
 	mock.ExpectBegin()
 	expectBoundary(mock, dataset, coreBoundary{})
 	expectReferenceUpserts(mock, dataset)
-	expectBoundary(mock, dataset, coreBoundary{unitTotal: 1, unitExact: 1, warehouseTotal: 3, warehouseExact: 3})
+	expectBoundary(mock, dataset, coreBoundary{unitTotal: int64(len(dataset.Units)), unitExact: int64(len(dataset.Units)), warehouseTotal: 3, warehouseExact: 3})
 	mock.ExpectRollback()
 	mock.ExpectClose()
 
@@ -348,7 +350,7 @@ func TestBootstrapManualAcceptanceCoreIsIdempotentWithExactReadback(t *testing.T
 	}
 	opts := validOptions()
 	dataset := data.DefaultCoreDemoReferenceSeedDataset()
-	exact := coreBoundary{unitTotal: 1, unitExact: 1, warehouseTotal: 4, warehouseExact: 4}
+	exact := coreBoundary{unitTotal: int64(len(dataset.Units)), unitExact: int64(len(dataset.Units)), warehouseTotal: 4, warehouseExact: 4}
 	for run := 0; run < 2; run++ {
 		expectDatabasePreflight(t, mock, opts, opts.expectedMigrationVersion, exactTrialSnapshot(t), 1)
 		mock.ExpectBegin()
@@ -368,7 +370,7 @@ func TestBootstrapManualAcceptanceCoreIsIdempotentWithExactReadback(t *testing.T
 		if err != nil {
 			t.Fatalf("bootstrapManualAcceptanceCore() run %d error = %v", run+1, err)
 		}
-		if len(result.unitIDs) != 1 || len(result.warehouseIDs) != 4 {
+		if len(result.unitIDs) != len(dataset.Units) || len(result.warehouseIDs) != 4 {
 			t.Fatalf("unexpected run %d result: %#v", run+1, result)
 		}
 		if result.unitIDs[dataset.Units[0].Code] != 11 {

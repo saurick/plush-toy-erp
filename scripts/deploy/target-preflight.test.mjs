@@ -41,6 +41,18 @@ function remoteReport(overrides = {}) {
     COMPOSE_STATUS: "passed",
     DATABASE_STATUS: "passed",
     DATABASE_NAME: "plush_erp_uat_20260716_v5",
+    MIGRATION_VERSION: "20260728100514",
+    ACTIVE_CONFIG_REVISION:
+      "yoyoosun-customer-trial-133-package-v7.runtime-manifest-v1",
+    ACTIVE_CONFIG_PRODUCT_VERSION: "customer-trial-133-test-2026.07.16-v5",
+    ACTIVE_DATASET_VERSION: "2026.07.16-v5",
+    DEBUG_ENV: "prod",
+    DEBUG_SEED_ENABLED: "false",
+    DEBUG_SEED_ALLOWED: "false",
+    DEBUG_CLEANUP_ENABLED: "false",
+    DEBUG_CLEANUP_ALLOWED: "false",
+    DEBUG_BUSINESS_CLEAR_ENABLED: "false",
+    DEBUG_BUSINESS_CLEAR_ALLOWED: "false",
     SERVER_SHA: SHA,
     WEB_SHA: SHA,
     SERVER_HEALTH: "passed",
@@ -80,6 +92,21 @@ test("target preflight parser returns bounded redacted evidence", () => {
   const report = parseRemoteTargetPreflight(remoteReport());
   assert.equal(report.status, "passed");
   assert.equal(report.runtime.serverSha, SHA);
+  assert.equal(report.runtime.migrationVersion, "20260728100514");
+  assert.deepEqual(report.runtime.activeCustomerConfig, {
+    revision: "yoyoosun-customer-trial-133-package-v7.runtime-manifest-v1",
+    productVersion: "customer-trial-133-test-2026.07.16-v5",
+    datasetVersion: "2026.07.16-v5",
+  });
+  assert.deepEqual(report.runtime.debug, {
+    environment: "prod",
+    seedEnabled: false,
+    seedAllowed: false,
+    cleanupEnabled: false,
+    cleanupAllowed: false,
+    businessDataClearEnabled: false,
+    businessDataClearAllowed: false,
+  });
   assert.equal(report.publicEntry.gitSha, SHA);
   assert.equal(report.publicEntry.endpoint, "https://admin.yoyoosun.net");
   assert.equal(report.backup.freshBackupRequiredForPromotion, true);
@@ -111,6 +138,13 @@ test("target preflight parser fails closed on identity and blocker drift", () =>
   assert.throws(
     () => parseRemoteTargetPreflight(remoteReport({ HOSTNAME: "other" })),
     /identity/u,
+  );
+  assert.throws(
+    () =>
+      parseRemoteTargetPreflight(
+        remoteReport({ DEBUG_CLEANUP_ALLOWED: "true" }),
+      ),
+    /debug cleanup allowed must be false/u,
   );
   assert.throws(
     () =>
@@ -156,6 +190,20 @@ test("target preflight parser fails closed on identity and blocker drift", () =>
   );
   assert.equal(partial.status, "blocked");
   assert.equal(partial.runtime.webSha, "unknown");
+  assert.throws(
+    () =>
+      parseRemoteTargetPreflight(
+        remoteReport({ MIGRATION_VERSION: "2026-07-28" }),
+      ),
+    /migration version/u,
+  );
+  assert.throws(
+    () =>
+      parseRemoteTargetPreflight(
+        remoteReport({ ACTIVE_CONFIG_REVISION: "secret/value" }),
+      ),
+    /customer config revision/u,
+  );
 });
 
 test("target preflight uses only fixed SSH destination and streamed script", () => {
@@ -319,10 +367,7 @@ test("remote target preflight script is read-only and contains no build command"
     /trial_atlas_required_version=v0[.]38[.]0/u,
   );
   assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /stat -c '%u'/u);
-  assert.match(
-    REMOTE_TARGET_PREFLIGHT_SCRIPT,
-    /target_atlas_tooling_invalid/u,
-  );
+  assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /target_atlas_tooling_invalid/u);
   assert.match(
     REMOTE_TARGET_PREFLIGHT_SCRIPT,
     /target_archive_tooling_unavailable/u,
@@ -343,4 +388,12 @@ test("remote target preflight script is read-only and contains no build command"
     /target_public_entry_sha_mismatch/u,
   );
   assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /fresh pre-migration/u);
+  assert.match(
+    REMOTE_TARGET_PREFLIGHT_SCRIPT,
+    /SELECT version FROM atlas_schema_revisions[.]atlas_schema_revisions/u,
+  );
+  assert.match(
+    REMOTE_TARGET_PREFLIGHT_SCRIPT,
+    /jsonb_extract_path_text\(compiled_snapshot, 'datasetVersion'\)/u,
+  );
 });

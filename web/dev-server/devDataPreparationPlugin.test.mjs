@@ -15,6 +15,10 @@ import {
   transitionDataPreparationOperation,
 } from '../../scripts/qa/dev-data-preparation-operation-store.mjs'
 import {
+  buildManualAcceptanceSemanticPlan,
+  digestManualAcceptanceSemanticPlan,
+} from '../../scripts/qa/manual-acceptance-dataset.mjs'
+import {
   coreDemoExecutionCommands,
   coreDemoPreflightCommand,
   coreDemoTargetCommand,
@@ -46,7 +50,17 @@ const FULL_DSN =
 const SCENARIO_TARGET_FINGERPRINT = createHash('sha256')
   .update('postgres://192.168.0.106:5432/plush_erp')
   .digest('hex')
-const IDEMPOTENCY_KEY = 'data-preparation:123e4567-e89b-42d3-a456-426614174000'
+const SCENARIO_SEMANTIC_DIGEST = digestManualAcceptanceSemanticPlan(
+  buildManualAcceptanceSemanticPlan()
+)
+const IDEMPOTENCY_KEY =
+  'data-preparation:prepare:core-demo:local-development:123e4567-e89b-42d3-a456-426614174000'
+const SCENARIO_IDEMPOTENCY_KEY =
+  'data-preparation:prepare:scenario-demo:local-development:223e4567-e89b-42d3-a456-426614174000'
+const SCENARIO_REMOTE_IDEMPOTENCY_KEY =
+  'data-preparation:prepare:scenario-demo:customer-trial-133:423e4567-e89b-42d3-a456-426614174000'
+const FULL_IDEMPOTENCY_KEY =
+  'data-preparation:prepare:full-acceptance:isolated-local:323e4567-e89b-42d3-a456-426614174000'
 
 function createFixture(t) {
   const root = mkdtempSync(path.join(os.tmpdir(), 'dev-data-preparation-'))
@@ -62,12 +76,15 @@ function fixedRandom() {
 }
 
 async function waitForOperation(service, operationId, expected) {
+  let latest
   for (let attempt = 0; attempt < 30; attempt += 1) {
-    const operation = service.readOperation(operationId)
-    if (operation.status === expected) return operation
+    latest = service.readOperation(operationId)
+    if (latest.status === expected) return latest
     await new Promise((resolve) => setImmediate(resolve))
   }
-  throw new Error(`operation did not reach ${expected}`)
+  throw new Error(
+    `operation did not reach ${expected}: ${latest?.status || 'missing'} ${JSON.stringify(latest?.issues || [])}`
+  )
 }
 
 function successfulRunner(calls) {
@@ -114,7 +131,7 @@ function successfulRunner(calls) {
     if (args.at(-1)?.endsWith('seed-core-demo-data.sh')) {
       return {
         stdout:
-          'core demo seed completed prefix=SIM-PLUSH-CORE units=4 materials=8 products=4 warehouses=4 processes=9 bom_headers=2\n',
+          'core demo seed completed prefix=SIM-PLUSH-CORE units=11 materials=8 products=4 warehouses=4 processes=9 bom_headers=2\n',
         stderr: '',
       }
     }
@@ -143,6 +160,7 @@ test('action contract rejects unknown profiles, shell/path/DSN fields, and loose
       action: 'prepare',
       payload: {
         profileKey: 'core-demo',
+        targetKey: 'local-development',
         idempotencyKey: IDEMPOTENCY_KEY,
       },
     }).payload.profileKey,
@@ -153,7 +171,8 @@ test('action contract rejects unknown profiles, shell/path/DSN fields, and loose
       action: 'prepare',
       payload: {
         profileKey: 'scenario-demo',
-        idempotencyKey: IDEMPOTENCY_KEY,
+        targetKey: 'local-development',
+        idempotencyKey: SCENARIO_IDEMPOTENCY_KEY,
       },
     }).payload.profileKey,
     'scenario-demo'
@@ -161,21 +180,25 @@ test('action contract rejects unknown profiles, shell/path/DSN fields, and loose
   for (const payload of [
     {
       profileKey: 'core-demo',
+      targetKey: 'local-development',
       idempotencyKey: IDEMPOTENCY_KEY,
       command: 'rm',
     },
     {
       profileKey: 'core-demo',
+      targetKey: 'local-development',
       idempotencyKey: IDEMPOTENCY_KEY,
       path: '/tmp/output',
     },
     {
       profileKey: 'core-demo',
+      targetKey: 'local-development',
       idempotencyKey: IDEMPOTENCY_KEY,
       databaseURL: FULL_DSN,
     },
     {
       profileKey: 'other',
+      targetKey: 'local-development',
       idempotencyKey: IDEMPOTENCY_KEY,
     },
   ]) {
@@ -236,7 +259,10 @@ test('fixed profile commands cannot receive browser shell, path, DSN, or API ori
   })
   assert.deepEqual(
     scenarioDemoExecutionCommand(root, {
-      targetSummary: { preflightFingerprint: 'c'.repeat(64) },
+      targetSummary: {
+        targetKey: 'local-development',
+        preflightFingerprint: 'c'.repeat(64),
+      },
     }),
     {
       command: process.execPath,
@@ -300,6 +326,7 @@ test('core demo prepares an immutable plan, reuses idempotency, executes asynchr
     action: 'prepare',
     payload: {
       profileKey: 'core-demo',
+      targetKey: 'local-development',
       idempotencyKey: IDEMPOTENCY_KEY,
     },
   }
@@ -343,7 +370,7 @@ test('core demo prepares an immutable plan, reuses idempotency, executes asynchr
     preflight: 'passed',
     roleAccounts: 10,
     core: {
-      units: 4,
+      units: 11,
       materials: 8,
       products: 4,
       warehouses: 4,
@@ -373,7 +400,7 @@ test('core demo prepares an immutable plan, reuses idempotency, executes asynchr
   )
 })
 
-test('scenario demo binds the fixed V5 plan, needs no browser credential input, and stores exact readback', async (t) => {
+test('scenario demo binds the fixed V6 plan, needs no browser credential input, and stores exact readback', async (t) => {
   const fixture = createFixture(t)
   const calls = []
   const planDigest = 'd'.repeat(64)
@@ -389,19 +416,27 @@ test('scenario demo binds the fixed V5 plan, needs no browser credential input, 
     ) {
       return {
         stdout: JSON.stringify({
-          schemaVersion: 'plush.scenario-demo-plan/v1',
+          schemaVersion: 'plush.scenario-demo-plan/v2',
           profileKey: 'scenario-demo',
+          targetAlias: 'scenario-demo',
           datasetKey: 'yoyoosun-manual-acceptance',
-          dataVersion: '2026.07.16-v5',
-          runId: '20260716-V5',
+          dataVersion: '2026.08.15-v6',
+          runId: '20260815-V6',
+          semanticDigest: SCENARIO_SEMANTIC_DIGEST,
           backendURL: 'http://127.0.0.1:8300',
           databaseName: 'plush_erp',
+          migrationVersion: '20260728100514',
           repository: REPOSITORY,
           target: {
             targetFingerprint: SCENARIO_TARGET_FINGERPRINT,
             disposable: false,
-            registeredDevelopmentPostgresOnly: true,
+            registeredTargetOnly: true,
             loopbackBackendOnly: true,
+          },
+          canonicalRunner: {
+            stageCount: 9,
+            semanticDigest: SCENARIO_SEMANTIC_DIGEST,
+            persistentBaseline: true,
           },
           execution: {
             replayMode: 'exact-create-or-readback',
@@ -409,8 +444,12 @@ test('scenario demo binds the fixed V5 plan, needs no browser credential input, 
             cleanupSupported: false,
             cleanupMode: 'forward-only',
             directBusinessSQL: false,
-            auditMinimum: 30,
             manualAcceptanceCompleted: false,
+          },
+          runtime: {
+            configRevision:
+              'yoyoosun-customer-package-v7.local-d05ec61cc4ea9cee.runtime-v1',
+            configProductVersion: 'local-customer-package-test-apply',
           },
           planDigest,
         }),
@@ -438,21 +477,30 @@ test('scenario demo binds the fixed V5 plan, needs no browser credential input, 
       assert.equal(options.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD, undefined)
       assert.equal(
         options.env.SCENARIO_DEMO_CONFIRM,
-        `APPLY_SCENARIO_DEMO:plush_erp:2026.07.16-v5:20260716-V5:${planDigest}`
+        `APPLY_SCENARIO_DEMO:scenario-demo:plush_erp:2026.08.15-v6:20260815-V6:${planDigest}`
       )
       return {
         stdout: JSON.stringify({
           schemaVersion: 'plush.dev-data-preparation-readback/v1',
           profileKey: 'scenario-demo',
+          targetKey: 'local-development',
+          targetEnvironment: 'local-development',
           targetFingerprint: SCENARIO_TARGET_FINGERPRINT,
+          databaseName: 'plush_erp',
+          release: REPOSITORY.commit,
+          migrationVersion: '20260728100514',
+          customerConfigRevision:
+            'yoyoosun-customer-package-v7.local-d05ec61cc4ea9cee.runtime-v1',
           datasetKey: 'yoyoosun-manual-acceptance',
-          dataVersion: '2026.07.16-v5',
-          runId: '20260716-V5',
+          dataVersion: '2026.08.15-v6',
+          runId: '20260815-V6',
+          semanticDigest: SCENARIO_SEMANTIC_DIGEST,
+          stageCount: 9,
           sourceDocumentCount: 135,
           processRuntimeCount: 5,
           factCount: 500,
-          catalogReadyCount: 40,
-          catalogTargetCount: 50,
+          catalogReadyCount: 41,
+          catalogTargetCount: 51,
           browserChecksPending: 10,
           manualAcceptanceCompleted: false,
           cleanupSupported: false,
@@ -476,7 +524,8 @@ test('scenario demo binds the fixed V5 plan, needs no browser credential input, 
     action: 'prepare',
     payload: {
       profileKey: 'scenario-demo',
-      idempotencyKey: `${IDEMPOTENCY_KEY}:scenario`,
+      targetKey: 'local-development',
+      idempotencyKey: SCENARIO_IDEMPOTENCY_KEY,
     },
   })
   assert.equal(
@@ -496,8 +545,8 @@ test('scenario demo binds the fixed V5 plan, needs no browser credential input, 
     prepared.operation.id,
     'passed'
   )
-  assert.equal(passed.readback.runId, '20260716-V5')
-  assert.equal(passed.readback.catalogReadyCount, 40)
+  assert.equal(passed.readback.runId, '20260815-V6')
+  assert.equal(passed.readback.catalogReadyCount, 41)
   assert.equal(passed.readback.browserChecksPending, 10)
   assert.equal(passed.readback.cleanupSupported, false)
   assert.equal(passed.readback.manualAcceptanceCompleted, false)
@@ -508,6 +557,200 @@ test('scenario demo binds the fixed V5 plan, needs no browser credential input, 
     ).length,
     1
   )
+})
+
+test('133 scenario creates and verifies a fresh target-bound backup before canonical apply', async (t) => {
+  const fixture = createFixture(t)
+  const order = []
+  const planDigest = '8'.repeat(64)
+  const migrationVersion = '20260728100514'
+  const databaseName = 'plush_erp_uat_20260716_v5'
+  const configRevision =
+    'yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1'
+  const configProductVersion = 'customer-trial-133-test-2026.08.15-v6'
+  const targetFingerprint = hashDataPreparationPlan({
+    targetAlias: 'customer-trial-133',
+    databaseName,
+    release: REPOSITORY.commit,
+    migration: migrationVersion,
+  })
+  const preflight = {
+    status: 'passed',
+    target: 'test-133',
+    trialTarget: 'customer-trial-133',
+    customer: 'yoyoosun',
+    remote: {
+      runtime: {
+        serverSha: REPOSITORY.commit,
+        webSha: REPOSITORY.commit,
+        databaseName,
+        migrationVersion,
+        activeCustomerConfig: {
+          revision: configRevision,
+          productVersion: configProductVersion,
+          datasetVersion: '2026.08.15-v6',
+        },
+        debug: {
+          environment: 'prod',
+          seedEnabled: false,
+          seedAllowed: false,
+          cleanupEnabled: false,
+          cleanupAllowed: false,
+          businessDataClearEnabled: false,
+          businessDataClearAllowed: false,
+        },
+        serverHealth: 'passed',
+        serverReady: 'passed',
+        webHealth: 'passed',
+      },
+      publicEntry: { status: 'passed', gitSha: REPOSITORY.commit },
+      backup: { tooling: 'passed' },
+    },
+  }
+  const commandRunner = async (command, args, options) => {
+    assert.equal(command, process.execPath)
+    assert.match(args[0], /scenario-demo-data[.]mjs$/u)
+    const apply = args.includes('--apply')
+    order.push(apply ? 'apply' : 'plan')
+    assert.equal(args.includes('--target'), true)
+    assert.equal(args[args.indexOf('--target') + 1], 'customer-trial-133')
+    assert.equal(
+      args.some((value) => /trial-role|trial-admin/iu.test(String(value))),
+      false
+    )
+    if (!apply) {
+      return {
+        stdout: JSON.stringify({
+          schemaVersion: 'plush.scenario-demo-plan/v2',
+          profileKey: 'scenario-demo',
+          targetAlias: 'customer-trial-133',
+          datasetKey: 'yoyoosun-manual-acceptance',
+          dataVersion: '2026.08.15-v6',
+          runId: '20260815-V6',
+          semanticDigest: SCENARIO_SEMANTIC_DIGEST,
+          backendURL: 'http://127.0.0.1:18375',
+          databaseName,
+          migrationVersion,
+          repository: REPOSITORY,
+          target: {
+            targetFingerprint,
+            disposable: false,
+            registeredTargetOnly: true,
+            loopbackBackendOnly: true,
+          },
+          canonicalRunner: {
+            stageCount: 9,
+            semanticDigest: SCENARIO_SEMANTIC_DIGEST,
+            persistentBaseline: true,
+          },
+          execution: {
+            replayMode: 'exact-create-or-readback',
+            dataRetention: 'long-lived',
+            cleanupSupported: false,
+            cleanupMode: 'forward-only',
+            directBusinessSQL: false,
+            manualAcceptanceCompleted: false,
+          },
+          runtime: {
+            configRevision,
+            configProductVersion,
+          },
+          planDigest,
+        }),
+        stderr: '',
+      }
+    }
+    assert.equal(options.env.MANUAL_ACCEPTANCE_PASSWORD, 'trial-role')
+    assert.equal(options.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD, 'trial-admin')
+    return {
+      stdout: JSON.stringify({
+        schemaVersion: 'plush.dev-data-preparation-readback/v1',
+        profileKey: 'scenario-demo',
+        targetKey: 'customer-trial-133',
+        targetEnvironment: 'customer-trial-133',
+        targetFingerprint,
+        databaseName,
+        release: REPOSITORY.commit,
+        migrationVersion,
+        customerConfigRevision: configRevision,
+        datasetKey: 'yoyoosun-manual-acceptance',
+        dataVersion: '2026.08.15-v6',
+        runId: '20260815-V6',
+        semanticDigest: SCENARIO_SEMANTIC_DIGEST,
+        stageCount: 9,
+        sourceDocumentCount: 135,
+        processRuntimeCount: 5,
+        factCount: 500,
+        catalogReadyCount: 41,
+        catalogTargetCount: 51,
+        browserChecksPending: 10,
+        manualAcceptanceCompleted: false,
+        cleanupSupported: false,
+        replayMode: 'exact-create-or-readback',
+      }),
+      stderr: '',
+    }
+  }
+  const service = createDevDataPreparationService({
+    projectRoot: fixture.root,
+    operationStore: fixture.store,
+    commandRunner,
+    readRepositoryState: async () => REPOSITORY,
+    readCustomerTrialPreflight: async () => preflight,
+    createCustomerTrialBackup: async (identity) => {
+      order.push('backup')
+      return {
+        schemaVersion: 'plush.customer-trial-133-data-backup/v1',
+        status: 'passed',
+        backupAlias: identity.backupAlias,
+        releaseSha: identity.releaseSha,
+        databaseName,
+        migrationVersion: identity.migrationVersion,
+        sha256: '7'.repeat(64),
+        sizeBytes: 4096,
+        createdAt: '2026-07-29T02:03:04.000Z',
+        containsSecrets: false,
+        containsCredentials: false,
+        containsPaths: false,
+      }
+    },
+    environment: {
+      CUSTOMER_TRIAL_133_ADMIN_PASSWORD: 'trial-admin',
+      CUSTOMER_TRIAL_133_ROLE_PASSWORD: 'trial-role',
+    },
+    now: () => new Date('2026-07-29T02:03:04.000Z'),
+    random: fixedRandom,
+  })
+  const prepared = await service.act({
+    action: 'prepare',
+    payload: {
+      profileKey: 'scenario-demo',
+      targetKey: 'customer-trial-133',
+      idempotencyKey: SCENARIO_REMOTE_IDEMPOTENCY_KEY,
+    },
+  })
+  assert.equal(prepared.operation.targetSummary.releaseSha, REPOSITORY.commit)
+  assert.equal(prepared.operation.targetSummary.databaseName, databaseName)
+  assert.match(prepared.operation.targetSummary.rollbackPoint, /^pre-data-/u)
+
+  await service.act({
+    action: 'execute',
+    payload: {
+      operationId: prepared.operation.id,
+      confirmation: prepared.operation.confirmationRequired,
+    },
+  })
+  const passed = await waitForOperation(
+    service,
+    prepared.operation.id,
+    'passed'
+  )
+  assert.deepEqual(order.slice(-2), ['backup', 'apply'])
+  assert.equal(
+    passed.readback.backupReceipt.backupAlias,
+    prepared.operation.targetSummary.rollbackPoint
+  )
+  assert.equal(passed.readback.backupReceipt.sizeBytes, 4096)
 })
 
 test('concurrent services atomically claim one idempotency key and return one operation', async (t) => {
@@ -535,6 +778,7 @@ test('concurrent services atomically claim one idempotency key and return one op
     action: 'prepare',
     payload: {
       profileKey: 'core-demo',
+      targetKey: 'local-development',
       idempotencyKey: IDEMPOTENCY_KEY,
     },
   }
@@ -569,6 +813,7 @@ test('core demo target is fixed to registered 106 development databases and neve
       action: 'prepare',
       payload: {
         profileKey: 'core-demo',
+        targetKey: 'local-development',
         idempotencyKey: IDEMPOTENCY_KEY,
       },
     }),
@@ -626,6 +871,7 @@ test('core demo rejects malformed registered-family aliases', async (t) => {
       action: 'prepare',
       payload: {
         profileKey: 'core-demo',
+        targetKey: 'local-development',
         idempotencyKey: IDEMPOTENCY_KEY,
       },
     }),
@@ -647,7 +893,8 @@ test('full acceptance requires server-only database environment and exact clean 
       action: 'prepare',
       payload: {
         profileKey: 'full-acceptance',
-        idempotencyKey: IDEMPOTENCY_KEY,
+        targetKey: 'isolated-local',
+        idempotencyKey: FULL_IDEMPOTENCY_KEY,
       },
     }),
     /environment/u
@@ -659,7 +906,8 @@ test('full acceptance requires server-only database environment and exact clean 
     action: 'prepare',
     payload: {
       profileKey: 'core-demo',
-      idempotencyKey: `${IDEMPOTENCY_KEY}:core`,
+      targetKey: 'local-development',
+      idempotencyKey: IDEMPOTENCY_KEY,
     },
   })
   assert.equal(corePrepared.operation.status, 'ready')
@@ -675,7 +923,8 @@ test('full acceptance requires server-only database environment and exact clean 
       action: 'prepare',
       payload: {
         profileKey: 'full-acceptance',
-        idempotencyKey: `${IDEMPOTENCY_KEY}:dirty`,
+        targetKey: 'isolated-local',
+        idempotencyKey: FULL_IDEMPOTENCY_KEY,
       },
     }),
     /exact clean/u
@@ -698,7 +947,8 @@ test('full acceptance prepare freezes the fixed lifecycle plan without executing
     action: 'prepare',
     payload: {
       profileKey: 'full-acceptance',
-      idempotencyKey: IDEMPOTENCY_KEY,
+      targetKey: 'isolated-local',
+      idempotencyKey: FULL_IDEMPOTENCY_KEY,
     },
   })
   assert.equal(prepared.operation.status, 'ready')
@@ -724,6 +974,31 @@ test('full acceptance prepare freezes the fixed lifecycle plan without executing
   )
   assert.equal(summary.acceptancePlan.selectorAffectsExecution, false)
   assert.equal(summary.acceptancePlan.freshBatchPerRun, true)
+  assert.deepEqual(
+    {
+      dataVersion: summary.datasetContract.dataVersion,
+      runId: summary.datasetContract.runId,
+      unitCount: summary.datasetContract.unitCount,
+      warehouseCount: summary.datasetContract.warehouseCount,
+      simulatedOnly: summary.datasetContract.simulatedOnly,
+      realCustomerImport: summary.datasetContract.realCustomerImport,
+      trialDatabase: summary.datasetContract.customerTrial133.databaseName,
+      trialDatabaseLifecycle:
+        summary.datasetContract.customerTrial133.databaseLifecycle,
+    },
+    {
+      dataVersion: '2026.08.15-v6',
+      runId: '20260815-V6',
+      unitCount: 11,
+      warehouseCount: 4,
+      simulatedOnly: true,
+      realCustomerImport: false,
+      trialDatabase: 'plush_erp_uat_20260716_v5',
+      trialDatabaseLifecycle: 'long-lived-registered-target',
+    }
+  )
+  assert.equal(summary.target.coreDemo.databaseName, 'plush_erp')
+  assert.equal(summary.target.coreDemo.migrationVersion, '20260729')
 })
 
 test('full acceptance receipt binds the latest chain contract and nine stage timings', async (t) => {
@@ -758,7 +1033,7 @@ test('full acceptance receipt binds the latest chain contract and nine stage tim
       evidence: {
         dataset: {
           ok: true,
-          dataVersion: '2026.07.16-v5',
+          dataVersion: '2026.08.15-v6',
           chainDataDigest: acceptancePlan.chainDataDigest,
           chainVerificationDigest: acceptancePlan.chainVerificationDigest,
           startedAt: '2026-07-29T02:03:00.000Z',
@@ -786,7 +1061,7 @@ test('full acceptance receipt binds the latest chain contract and nine stage tim
             dataset: {
               ...readback,
               ok: true,
-              dataVersion: '2026.07.16-v5',
+              dataVersion: '2026.08.15-v6',
               chainDataDigest: '0'.repeat(64),
               chainVerificationDigest: acceptancePlan.chainVerificationDigest,
               startedAt: '2026-07-29T02:03:00.000Z',
@@ -965,6 +1240,19 @@ test('scenario-demo allows only a newer explicit same-target replay after an unk
         ...unknown,
         targetSummary: {
           ...targetSummary,
+          targetKey: 'customer-trial-133',
+          targetFingerprint: 'e'.repeat(64),
+        },
+      },
+    ]),
+    false
+  )
+  assert.equal(
+    unresolvedDataPreparationOutcomeBlocksExecution(candidate, [
+      {
+        ...unknown,
+        targetSummary: {
+          ...targetSummary,
           targetFingerprint: 'e'.repeat(64),
         },
       },
@@ -1015,6 +1303,7 @@ test('failed command receipts redact credentials and full DSNs', async (t) => {
     action: 'prepare',
     payload: {
       profileKey: 'core-demo',
+      targetKey: 'local-development',
       idempotencyKey: IDEMPOTENCY_KEY,
     },
   })
@@ -1067,6 +1356,7 @@ test('core demo records partial completion when a later fixed seed step fails', 
     action: 'prepare',
     payload: {
       profileKey: 'core-demo',
+      targetKey: 'local-development',
       idempotencyKey: IDEMPOTENCY_KEY,
     },
   })
@@ -1107,6 +1397,7 @@ test('repository identity requires an exact 40-character commit', async (t) => {
       action: 'prepare',
       payload: {
         profileKey: 'core-demo',
+        targetKey: 'local-development',
         idempotencyKey: IDEMPOTENCY_KEY,
       },
     }),
@@ -1193,6 +1484,7 @@ test('middleware enforces loopback, same-origin CSRF, strict JSON, and request s
     action: 'prepare',
     payload: {
       profileKey: 'core-demo',
+      targetKey: 'local-development',
       idempotencyKey: IDEMPOTENCY_KEY,
     },
   })
@@ -1223,6 +1515,7 @@ test('middleware enforces loopback, same-origin CSRF, strict JSON, and request s
       action: 'prepare',
       payload: {
         profileKey: 'core-demo',
+        targetKey: 'local-development',
         idempotencyKey: IDEMPOTENCY_KEY,
         shell: 'bash',
       },
@@ -1283,8 +1576,8 @@ test('profile metadata states retention, cleanup, and browser-safe requirements 
     ({ key }) => key === 'scenario-demo'
   )
   assert.deepEqual(scenario.requiredEnvironment, [
-    '登记本地开发库',
-    '本机 8300 后端',
+    '登记本地开发库与本机 8300 后端',
+    '登记 133 试用库、固定隧道与带外证明',
   ])
   assert.equal(
     scenario.requiredEnvironment.some((value) =>

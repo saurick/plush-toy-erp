@@ -14,7 +14,7 @@ print_help() {
     --admin-password-env MANUAL_ACCEPTANCE_ADMIN_PASSWORD \
     --demo-password-env MANUAL_ACCEPTANCE_PASSWORD \
     --sms-phone-env MANUAL_ACCEPTANCE_SMS_PHONE \
-    --customer-config-revision yoyoosun-customer-package-v7.runtime-manifest-v1 \
+    --customer-config-revision yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1 \
     --admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN
 
 Input template only:
@@ -67,7 +67,7 @@ print_input_template() {
   ],
   "commands": [
     "bash deployments/yoyoosun/scripts/run-smoke.sh --endpoint https://erp.example.invalid --backend-url https://api.example.invalid --release-version <release-version> --environment customer-trial --report deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/smoke-test-report.json --admin-username admin --admin-password-env MANUAL_ACCEPTANCE_ADMIN_PASSWORD --demo-password-env MANUAL_ACCEPTANCE_PASSWORD --sms-phone-env MANUAL_ACCEPTANCE_SMS_PHONE",
-    "CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' bash deployments/yoyoosun/scripts/run-smoke.sh --endpoint https://erp.example.invalid --backend-url https://api.example.invalid --release-version <release-version> --environment customer-trial --report deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/smoke-test-report.json --admin-username admin --admin-password-env MANUAL_ACCEPTANCE_ADMIN_PASSWORD --demo-password-env MANUAL_ACCEPTANCE_PASSWORD --sms-phone-env MANUAL_ACCEPTANCE_SMS_PHONE --customer-config-revision yoyoosun-customer-package-v7.runtime-manifest-v1 --admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN"
+    "CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' bash deployments/yoyoosun/scripts/run-smoke.sh --endpoint https://erp.example.invalid --backend-url https://api.example.invalid --release-version <release-version> --environment customer-trial --report deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/smoke-test-report.json --admin-username admin --admin-password-env MANUAL_ACCEPTANCE_ADMIN_PASSWORD --demo-password-env MANUAL_ACCEPTANCE_PASSWORD --sms-phone-env MANUAL_ACCEPTANCE_SMS_PHONE --customer-config-revision yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1 --admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN"
   ],
   "requiredReadbackEvidence": [
     "check name=auth-sms-capabilities, target=jsonrpc:auth.capabilities, expectedMode=provider, enabled=true, mockDelivery=false, responseBodyStored=false",
@@ -229,7 +229,7 @@ const valid =
   contract?.customerCode === "yoyoosun" &&
   contract?.target?.key === "customer-trial-133" &&
   contract?.target?.database === "plush_erp_uat_20260716_v5" &&
-  contract?.target?.datasetVersion === "2026.07.16-v5" &&
+  contract?.target?.datasetVersion === "2026.08.15-v6" &&
   username.test(admin?.username || "") &&
   envKey.test(admin?.environmentVariable || "") &&
   envKey.test(demo?.environmentVariable || "") &&

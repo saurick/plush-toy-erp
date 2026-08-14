@@ -19,19 +19,31 @@ import {
   approvePurchaseOrderThroughProcess,
   submitPurchaseOrderThroughProcess,
 } from "./purchase-order-approval-process.mjs";
+import {
+  MANUAL_ACCEPTANCE_CORE_CONTRACT,
+  MANUAL_ACCEPTANCE_CORE_SEMANTIC_DIGEST,
+  MANUAL_ACCEPTANCE_CORE_UNITS,
+  MANUAL_ACCEPTANCE_CORE_WAREHOUSES,
+  MANUAL_ACCEPTANCE_PRIMARY_UNIT,
+} from "./manual-acceptance-core-contract.mjs";
 
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
 const DEFAULT_OUT_DIR = "output/qa/manual-acceptance/source-data";
 const SIMULATION_PREFIX = "SIM-YOYOOSUN-UAT";
 const CONFIRM_PHRASE = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA";
 const CUSTOMER_KEY = "yoyoosun";
-export const MANUAL_ACCEPTANCE_CORE_UNIT_CODE = "YS5-DW-01";
-export const MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES = Object.freeze({
-  material: "YS5-CK-01",
-  product: "YS5-CK-02",
-  qualityHold: "YS5-CK-03",
-  workInProcess: "YS5-CK-04",
-});
+export const MANUAL_ACCEPTANCE_CORE_UNIT_CODE =
+  MANUAL_ACCEPTANCE_PRIMARY_UNIT.code;
+export const MANUAL_ACCEPTANCE_CORE_UNIT_CODES = Object.freeze(
+  Object.fromEntries(
+    MANUAL_ACCEPTANCE_CORE_UNITS.map((item) => [item.key, item.code]),
+  ),
+);
+export const MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES = Object.freeze(
+  Object.fromEntries(
+    MANUAL_ACCEPTANCE_CORE_WAREHOUSES.map((item) => [item.key, item.code]),
+  ),
+);
 const REQUIRED_SOURCE_MODULES = Object.freeze([
   "customers",
   "suppliers",
@@ -131,16 +143,25 @@ export function resolveManualAcceptanceCoreReferences({ units, warehouses }) {
   if (!Array.isArray(units) || !Array.isArray(warehouses)) {
     throw new CliError("core unit and warehouse queries must return arrays", 2);
   }
-  const unit = requireUniqueCoreRecord(
-    units,
-    MANUAL_ACCEPTANCE_CORE_UNIT_CODE,
-    "core units",
+  const unitsByKey = Object.freeze(
+    Object.fromEntries(
+      MANUAL_ACCEPTANCE_CORE_UNITS.map((definition) => [
+        definition.key,
+        requireUniqueCoreRecord(units, definition.code, "core units"),
+      ]),
+    ),
   );
-  const selectedWarehouses = Object.values(
-    MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES,
-  ).map((code) => requireUniqueCoreRecord(warehouses, code, "core warehouses"));
+  const selectedUnits = MANUAL_ACCEPTANCE_CORE_UNITS.map(
+    (definition) => unitsByKey[definition.key],
+  );
+  const selectedWarehouses = MANUAL_ACCEPTANCE_CORE_WAREHOUSES.map(
+    (definition) =>
+      requireUniqueCoreRecord(warehouses, definition.code, "core warehouses"),
+  );
   return Object.freeze({
-    unit,
+    unit: unitsByKey[MANUAL_ACCEPTANCE_CORE_CONTRACT.primaryUnitKey],
+    units: Object.freeze(selectedUnits),
+    unitsByKey,
     warehouse: selectedWarehouses[0],
     warehouses: Object.freeze(selectedWarehouses),
   });
@@ -200,6 +221,7 @@ function sourceSemanticDigest({
   prefix,
   records,
   salesOrderAcceptanceReplay,
+  unitUsage,
 }) {
   return createHash("sha256")
     .update(
@@ -208,8 +230,10 @@ function sourceSemanticDigest({
         dataVersion,
         runId,
         prefix,
+        coreSemanticDigest: MANUAL_ACCEPTANCE_CORE_SEMANTIC_DIGEST,
         records,
         salesOrderAcceptanceReplay,
+        unitUsage,
       }),
     )
     .digest("hex");
@@ -383,20 +407,22 @@ function buildSuppliers(prefix, count) {
 
 function buildMaterials(prefix, count) {
   const templates = [
-    ["短毛绒", "面料", "58 英寸 / 280g", "米白"],
-    ["提花布", "面料", "57 英寸", "浅粉"],
-    ["网布", "面料", "60 英寸", "黑色"],
-    ["填充棉", "填充", "A级 PP棉", "白色"],
-    ["眼睛", "胶件", "12mm", "黑色"],
-    ["绣花线", "绣花线", "120D", "咖色"],
-    ["洗水标", "洗水标", "白底黑字", "白色"],
-    ["外箱", "包装", "12只装", "牛皮色"],
-    ["丝带", "辅料", "10mm", "浅蓝"],
-    ["钥匙圈", "五金", "25mm", "银色"],
+    ["短毛绒", "面料", "58 英寸 / 280g", "米白", "yard"],
+    ["提花布", "面料", "57 英寸", "浅粉", "chineseYard"],
+    ["网布", "面料", "60 英寸", "黑色", "sheet"],
+    ["填充棉", "填充", "A级 PP棉", "白色", "kilogram"],
+    ["眼睛", "胶件", "12mm", "黑色", "pair"],
+    ["绣花线", "绣花线", "120D", "咖色", "strip"],
+    ["洗水标", "洗水标", "白底黑字", "白色", "sheet"],
+    ["外箱", "包装", "12只装", "牛皮色", "piece"],
+    ["丝带", "辅料", "10mm", "浅蓝", "strip"],
+    ["钥匙圈", "五金", "25mm", "银色", "pcs"],
+    ["定型海绵", "填充", "20mm", "白色", "block"],
   ];
   return Array.from({ length: count }, (_, offset) => {
     const index = offset + 1;
-    const [label, category, spec, color] = templates[offset % templates.length];
+    const [label, category, spec, color, unitKey] =
+      templates[offset % templates.length];
     const group = Math.floor(offset / templates.length) + 1;
     const displayColor =
       group === 1
@@ -409,6 +435,7 @@ function buildMaterials(prefix, count) {
       category,
       spec,
       color: displayColor,
+      unitKey,
       isActive: index <= count - 6,
     };
   });
@@ -439,12 +466,14 @@ function buildProducts(prefix, count, skusPerProduct) {
   ];
   const colors = ["米白", "浅粉", "雾蓝"];
   const sizes = ["小号", "中号", "大号"];
+  const unitKeys = ["piece", "set", "pcs", "individual"];
   return Array.from({ length: count }, (_, offset) => {
     const index = offset + 1;
     const product = {
       code: `${prefix}-CP-${pad(index, 3)}`,
       name: animals[offset % animals.length],
       style_no: `${27000 + index}${index % 4 === 0 ? "-1" : "#"}`,
+      unitKey: unitKeys[offset % unitKeys.length],
       isActive: index <= count - 2,
     };
     product.skus = Array.from({ length: skusPerProduct }, (_, skuOffset) => ({
@@ -554,6 +583,7 @@ function buildSalesOrders(prefix, count, customers, products, anchorDate) {
           line_no: lineOffset + 1,
           productRef: lineProduct.code,
           skuRef: sku.sku_code,
+          unitKey: lineProduct.unitKey,
           product_code_snapshot: lineProduct.style_no,
           product_name_snapshot: lineProduct.name,
           color_snapshot: sku.color,
@@ -621,6 +651,7 @@ function buildPurchaseOrders(
         return {
           line_no: lineOffset + 1,
           materialRef: material.code,
+          unitKey: material.unitKey,
           material_code_snapshot: material.code,
           material_name_snapshot: material.name,
           color_snapshot: material.color,
@@ -703,6 +734,7 @@ function buildOutsourcingOrders(
           productRef: materialSubject ? undefined : product.code,
           materialRef: materialSubject ? material.code : undefined,
           processRef: processItem.code,
+          unitKey: materialSubject ? material.unitKey : product.unitKey,
           product_no_snapshot: materialSubject ? undefined : product.style_no,
           product_order_no_snapshot: materialSubject
             ? undefined
@@ -781,6 +813,7 @@ function buildBOMVersions(prefix, count, products, materials, anchorDate) {
             ];
           return {
             materialRef: material.code,
+            unitKey: material.unitKey,
             quantity: (0.2 + (lineOffset % 7) * 0.15).toFixed(6),
             loss_rate: ((lineOffset % 4) * 0.02).toFixed(6),
             production_operation_code:
@@ -814,6 +847,64 @@ function buildBOMVersions(prefix, count, products, materials, anchorDate) {
     }
   }
   return versions.slice(0, count);
+}
+
+function buildUnitUsage(records) {
+  const usage = Object.fromEntries(
+    MANUAL_ACCEPTANCE_CORE_UNITS.map((unit) => [
+      unit.key,
+      {
+        key: unit.key,
+        code: unit.code,
+        name: unit.name,
+        masterData: 0,
+        salesOrderLines: 0,
+        purchaseOrderLines: 0,
+        outsourcingOrderLines: 0,
+        bomItems: 0,
+        businessReferences: 0,
+      },
+    ]),
+  );
+  const add = (unitKey, field) => {
+    if (!usage[unitKey]) {
+      throw new CliError(`dataset references unknown unit key ${unitKey}`, 2);
+    }
+    usage[unitKey][field] += 1;
+    if (field !== "masterData") usage[unitKey].businessReferences += 1;
+  };
+  records.materials.forEach((record) => add(record.unitKey, "masterData"));
+  records.products.forEach((record) => {
+    add(record.unitKey, "masterData");
+    record.skus.forEach(() => add(record.unitKey, "masterData"));
+  });
+  records.salesOrders.flatMap((record) => record.items).forEach((item) =>
+    add(item.unitKey, "salesOrderLines"),
+  );
+  records.purchaseOrders.flatMap((record) => record.items).forEach((item) =>
+    add(item.unitKey, "purchaseOrderLines"),
+  );
+  records.outsourcingOrders.flatMap((record) => record.items).forEach((item) =>
+    add(item.unitKey, "outsourcingOrderLines"),
+  );
+  records.bomVersions.flatMap((record) => record.items).forEach((item) =>
+    add(item.unitKey, "bomItems"),
+  );
+  const entries = Object.values(usage);
+  const missing = entries.filter((item) => item.businessReferences === 0);
+  if (missing.length > 0) {
+    throw new CliError(
+      `dataset units lack business references: ${missing
+        .map((item) => item.name)
+        .join(", ")}`,
+      2,
+    );
+  }
+  return Object.freeze(
+    Object.fromEntries(
+      entries.map((item) => [item.key, Object.freeze({ ...item })]),
+    ),
+  );
 }
 
 function bindRoutedProductionOutsourcingContracts({
@@ -893,6 +984,7 @@ function bindRoutedProductionOutsourcingContracts({
         line_no: 1,
         subject_type: "MATERIAL",
         materialRef: material.code,
+        unitKey: material.unitKey,
         processRef: fabricProcess.code,
         material_code_snapshot: material.code,
         material_name_snapshot: material.name,
@@ -957,7 +1049,7 @@ export function buildManualAcceptanceSourceDataPlan(options = {}) {
   for (const [key, minimum] of Object.entries({
     customers: 6,
     suppliers: 6,
-    materials: 7,
+    materials: 11,
     products: 3,
     processes: 4,
   })) {
@@ -1037,6 +1129,7 @@ export function buildManualAcceptanceSourceDataPlan(options = {}) {
   };
   const salesOrderAcceptanceReplay =
     buildSalesOrderAcceptanceReplayContract(salesOrders);
+  const unitUsage = buildUnitUsage(records);
   const plan = {
     scope: "manual-acceptance-source-data",
     customerKey: CUSTOMER_KEY,
@@ -1053,6 +1146,8 @@ export function buildManualAcceptanceSourceDataPlan(options = {}) {
     databaseName: targetPolicy.databaseName,
     scale,
     records,
+    coreSemanticDigest: MANUAL_ACCEPTANCE_CORE_SEMANTIC_DIGEST,
+    unitUsage,
     salesOrderAcceptanceReplay,
     semanticDigest: sourceSemanticDigest({
       datasetKey: targetPolicy.datasetKey,
@@ -1061,6 +1156,7 @@ export function buildManualAcceptanceSourceDataPlan(options = {}) {
       prefix,
       records,
       salesOrderAcceptanceReplay,
+      unitUsage,
     }),
     cleanup: {
       mode: "lifecycle-and-disable",
@@ -1605,7 +1701,7 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
     units,
     warehouses,
   });
-  const { unit, warehouse } = coreReferences;
+  const { unit, unitsByKey, warehouse } = coreReferences;
 
   const materials = mapBy(
     await listAll({
@@ -1619,7 +1715,11 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
     "code",
   );
   for (const record of plan.records.materials) {
-    const expected = { ...record, default_unit_id: unit.id };
+    const { unitKey, ...material } = record;
+    const expected = {
+      ...material,
+      default_unit_id: unitsByKey[unitKey].id,
+    };
     if (materials.has(record.code)) {
       assertPersistedSourceRecord({
         label: `material ${record.code}`,
@@ -1671,10 +1771,11 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
     "code",
   );
   for (const record of plan.records.products) {
+    const { unitKey, ...productRecord } = record;
     const expected = {
-      ...record,
+      ...productRecord,
       skus: undefined,
-      default_unit_id: unit.id,
+      default_unit_id: unitsByKey[unitKey].id,
     };
     if (!products.has(record.code)) {
       const data = await rpcCall({
@@ -1737,7 +1838,7 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
       const expected = {
         ...sku,
         product_id: product.id,
-        default_unit_id: unit.id,
+        default_unit_id: unitsByKey[record.unitKey].id,
       };
       if (skus.has(sku.sku_code)) {
         assertPersistedSourceRecord({
@@ -2790,7 +2891,7 @@ export function buildSalesOrderLineReferences({
   actualItems,
   productIds,
   skuIds,
-  unitId,
+  unitIdsByKey,
 }) {
   if (
     !Array.isArray(actualItems) ||
@@ -2807,11 +2908,12 @@ export function buildSalesOrderLineReferences({
     const actual = actualByLine.get(Number(planned.line_no));
     const expectedProductId = productIds.get(planned.productRef);
     const expectedSkuId = skuIds.get(planned.skuRef);
+    const expectedUnitId = unitIdsByKey[planned.unitKey];
     if (
       !actual?.id ||
       actual.product_id !== expectedProductId ||
       actual.product_sku_id !== expectedSkuId ||
-      actual.unit_id !== unitId
+      actual.unit_id !== expectedUnitId
     ) {
       throw new CliError(
         `${orderNo} line ${planned.line_no} does not match its persisted product, SKU, or unit reference`,
@@ -2838,7 +2940,7 @@ export function buildPurchaseOrderLineReferences({
   plannedItems,
   actualItems,
   materialIds,
-  unitId,
+  unitIdsByKey,
 }) {
   if (
     !Array.isArray(actualItems) ||
@@ -2854,10 +2956,11 @@ export function buildPurchaseOrderLineReferences({
   return plannedItems.map((planned) => {
     const actual = actualByLine.get(Number(planned.line_no));
     const expectedMaterialId = materialIds.get(planned.materialRef);
+    const expectedUnitId = unitIdsByKey[planned.unitKey];
     if (
       !actual?.id ||
       actual.material_id !== expectedMaterialId ||
-      actual.unit_id !== unitId ||
+      actual.unit_id !== expectedUnitId ||
       String(actual.line_status || "").toUpperCase() !== "OPEN"
     ) {
       throw new CliError(
@@ -2883,7 +2986,7 @@ export function buildOutsourcingOrderLineReferences({
   productIds,
   materialIds,
   processIds,
-  unitId,
+  unitIdsByKey,
 }) {
   if (
     !Array.isArray(actualItems) ||
@@ -2906,13 +3009,14 @@ export function buildOutsourcingOrderLineReferences({
       ? materialIds.get(planned.materialRef)
       : undefined;
     const expectedProcessId = processIds.get(planned.processRef);
+    const expectedUnitId = unitIdsByKey[planned.unitKey];
     if (
       !actual?.id ||
       String(actual.subject_type || "").toUpperCase() !== subjectType ||
       (actual.product_id ?? undefined) !== expectedProductId ||
       (actual.material_id ?? undefined) !== expectedMaterialId ||
       actual.process_id !== expectedProcessId ||
-      actual.unit_id !== unitId ||
+      actual.unit_id !== expectedUnitId ||
       String(actual.line_status || "").toUpperCase() !== "OPEN"
     ) {
       throw new CliError(
@@ -2952,6 +3056,9 @@ async function createSourceDocuments({
   fetchImpl,
   report,
 }) {
+  const unitIdsByKey = Object.fromEntries(
+    Object.entries(refs.unitsByKey).map(([key, item]) => [key, item.id]),
+  );
   const sales = mapBy(
     await listAll({
       plan,
@@ -3025,11 +3132,11 @@ async function createSourceDocuments({
       customerRef: undefined,
       productRef: undefined,
       targetStatus: undefined,
-      items: record.items.map((item) => ({
+      items: record.items.map(({ unitKey, ...item }) => ({
         ...item,
         product_id: refs.products.get(item.productRef).id,
         product_sku_id: refs.skus.get(item.skuRef).id,
-        unit_id: refs.unit.id,
+        unit_id: unitIdsByKey[unitKey],
         productRef: undefined,
         skuRef: undefined,
       })),
@@ -3064,7 +3171,7 @@ async function createSourceDocuments({
         actualItems: data.sales_order_items,
         productIds,
         skuIds,
-        unitId: refs.unit.id,
+        unitIdsByKey,
       }),
     );
   }
@@ -3139,10 +3246,10 @@ async function createSourceDocuments({
       supplier_id: refs.suppliers.get(record.supplierRef).id,
       supplierRef: undefined,
       targetStatus: undefined,
-      items: record.items.map((item) => ({
+      items: record.items.map(({ unitKey, ...item }) => ({
         ...item,
         material_id: refs.materials.get(item.materialRef).id,
-        unit_id: refs.unit.id,
+        unit_id: unitIdsByKey[unitKey],
         materialRef: undefined,
       })),
     }),
@@ -3176,7 +3283,7 @@ async function createSourceDocuments({
         plannedItems: record.items,
         actualItems: data.purchase_order_items,
         materialIds,
-        unitId: refs.unit.id,
+        unitIdsByKey,
       }),
     );
   }
@@ -3271,7 +3378,7 @@ async function createSourceDocuments({
       supplier_id: refs.suppliers.get(record.supplierRef).id,
       supplierRef: undefined,
       targetStatus: undefined,
-      items: record.items.map((item) => ({
+      items: record.items.map(({ unitKey, ...item }) => ({
         ...item,
         product_id: item.productRef
           ? refs.products.get(item.productRef).id
@@ -3280,8 +3387,8 @@ async function createSourceDocuments({
           ? refs.materials.get(item.materialRef).id
           : undefined,
         process_id: refs.processes.get(item.processRef).id,
-        unit_id: refs.unit.id,
-        unit_name_snapshot: refs.unit.name,
+        unit_id: unitIdsByKey[unitKey],
+        unit_name_snapshot: refs.unitsByKey[unitKey].name,
         productRef: undefined,
         materialRef: undefined,
         processRef: undefined,
@@ -3318,7 +3425,7 @@ async function createSourceDocuments({
         processIds: new Map(
           [...refs.processes].map(([code, item]) => [code, item.id]),
         ),
-        unitId: refs.unit.id,
+        unitIdsByKey,
       }),
     );
   }
@@ -3338,7 +3445,7 @@ export function planBOMItemReconciliation({
   plannedItems,
   actualItems,
   materialIds,
-  unitId,
+  unitIdsByKey,
 }) {
   const plannedByMaterial = new Map(
     plannedItems.map((item) => [materialIds.get(item.materialRef), item]),
@@ -3356,7 +3463,7 @@ export function planBOMItemReconciliation({
       throw new CliError(`${version} has an unexpected or duplicate BOM line`);
     }
     if (
-      item.unit_id !== unitId ||
+      item.unit_id !== unitIdsByKey[planned.unitKey] ||
       Number(item.quantity) !== Number(planned.quantity) ||
       Number(item.loss_rate) !== Number(planned.loss_rate) ||
       String(item.production_operation_code || "") !==
@@ -3395,6 +3502,9 @@ async function createBOMVersions({ plan, tokens, refs, fetchImpl, report }) {
   const materialIds = new Map(
     [...refs.materials].map(([code, item]) => [code, item.id]),
   );
+  const unitIdsByKey = Object.fromEntries(
+    Object.entries(refs.unitsByKey).map(([key, item]) => [key, item.id]),
+  );
   const details = new Map();
   for (const record of plan.records.bomVersions) {
     let bom = existing.get(record.version);
@@ -3409,10 +3519,10 @@ async function createBOMVersions({ plan, tokens, refs, fetchImpl, report }) {
           product_id: refs.products.get(record.productRef).id,
           productRef: undefined,
           targetStatus: undefined,
-          items: record.items.map((item) => ({
+          items: record.items.map(({ unitKey, ...item }) => ({
             ...item,
             material_id: materialIds.get(item.materialRef),
-            unit_id: refs.unit.id,
+            unit_id: unitIdsByKey[unitKey],
             materialRef: undefined,
           })),
         },
@@ -3469,7 +3579,7 @@ async function createBOMVersions({ plan, tokens, refs, fetchImpl, report }) {
       plannedItems: record.items,
       actualItems: detail.items,
       materialIds,
-      unitId: refs.unit.id,
+      unitIdsByKey,
     });
     if (
       String(detail.status || "").toUpperCase() === "DRAFT" &&
@@ -3492,11 +3602,12 @@ async function createBOMVersions({ plan, tokens, refs, fetchImpl, report }) {
           targetStatus: undefined,
           items: record.items.map((item) => {
             const materialId = materialIds.get(item.materialRef);
+            const { unitKey, ...persistedItem } = item;
             return {
-              ...item,
+              ...persistedItem,
               id: existingByMaterial.get(materialId)?.id,
               material_id: materialId,
-              unit_id: refs.unit.id,
+              unit_id: unitIdsByKey[unitKey],
               materialRef: undefined,
             };
           }),
@@ -3525,7 +3636,7 @@ async function createBOMVersions({ plan, tokens, refs, fetchImpl, report }) {
       plannedItems: record.items,
       actualItems: detail?.items,
       materialIds,
-      unitId: refs.unit.id,
+      unitIdsByKey,
     });
     if (
       verified.missing.length > 0 ||
@@ -3923,6 +4034,8 @@ export async function applyManualAcceptanceSourceData(
     prefix: plan.prefix,
     anchorDate: plan.anchorDate,
     semanticDigest: plan.semanticDigest,
+    coreSemanticDigest: plan.coreSemanticDigest,
+    unitUsage: plan.unitUsage,
     backendURL: plan.backendURL,
     databaseName: plan.databaseName,
     scale: plan.scale,
@@ -3970,6 +4083,9 @@ export async function applyManualAcceptanceSourceData(
   report.summary = summarizeSteps(report.steps);
   report.referenceIds = {
     unitId: refs.unit.id,
+    unitIds: Object.fromEntries(
+      Object.entries(refs.unitsByKey).map(([key, item]) => [key, item.id]),
+    ),
     warehouseId: refs.warehouse.id,
     customerIds: [...refs.customers.values()].map((item) => item.id),
     supplierIds: [...refs.suppliers.values()].map((item) => item.id),
@@ -3986,6 +4102,16 @@ export async function applyManualAcceptanceSourceData(
       bomVersions,
     }),
     unit: { id: refs.unit.id, code: refs.unit.code, name: refs.unit.name },
+    units: MANUAL_ACCEPTANCE_CORE_UNITS.map((definition) => {
+      const item = refs.unitsByKey[definition.key];
+      return {
+        key: definition.key,
+        id: item.id,
+        code: item.code,
+        name: item.name,
+        precision: item.precision,
+      };
+    }),
     warehouse: {
       id: refs.warehouse.id,
       code: refs.warehouse.code,
@@ -4016,6 +4142,10 @@ export async function applyManualAcceptanceSourceData(
         code: record.code,
         id: refs.materials.get(record.code).id,
         name: record.name,
+        unitKey: record.unitKey,
+        unitId: refs.unitsByKey[record.unitKey].id,
+        unitCode: refs.unitsByKey[record.unitKey].code,
+        unitName: refs.unitsByKey[record.unitKey].name,
       })),
     products: plan.records.products
       .filter((record) => record.isActive)
@@ -4023,6 +4153,10 @@ export async function applyManualAcceptanceSourceData(
         code: record.code,
         id: refs.products.get(record.code).id,
         name: record.name,
+        unitKey: record.unitKey,
+        unitId: refs.unitsByKey[record.unitKey].id,
+        unitCode: refs.unitsByKey[record.unitKey].code,
+        unitName: refs.unitsByKey[record.unitKey].name,
       })),
     skus: plan.records.products.flatMap((product) =>
       product.skus
@@ -4034,6 +4168,10 @@ export async function applyManualAcceptanceSourceData(
           productCode: product.code,
           productId: refs.products.get(product.code).id,
           productName: product.name,
+          unitKey: product.unitKey,
+          unitId: refs.unitsByKey[product.unitKey].id,
+          unitCode: refs.unitsByKey[product.unitKey].code,
+          unitName: refs.unitsByKey[product.unitKey].name,
         })),
     ),
     processes: plan.records.processes
@@ -4211,6 +4349,7 @@ export async function verifyManualAcceptanceSourceData(
       "is_active",
       plan.scale.customers,
       ["TRUE", "FALSE"],
+      "code",
     ],
     [
       "suppliers",
@@ -4221,6 +4360,7 @@ export async function verifyManualAcceptanceSourceData(
       "is_active",
       plan.scale.suppliers,
       ["TRUE", "FALSE"],
+      "code",
     ],
     [
       "materials",
@@ -4231,6 +4371,18 @@ export async function verifyManualAcceptanceSourceData(
       "is_active",
       plan.scale.materials,
       ["TRUE", "FALSE"],
+      "code",
+    ],
+    [
+      "products",
+      tokens.engineering,
+      "masterdata",
+      "list_products",
+      "products",
+      "is_active",
+      plan.scale.products,
+      ["TRUE", "FALSE"],
+      "code",
     ],
     [
       "product_skus",
@@ -4241,6 +4393,7 @@ export async function verifyManualAcceptanceSourceData(
       "is_active",
       plan.scale.products * plan.scale.skusPerProduct,
       ["TRUE", "FALSE"],
+      "sku_code",
     ],
     [
       "processes",
@@ -4251,6 +4404,7 @@ export async function verifyManualAcceptanceSourceData(
       "is_active",
       plan.scale.processes,
       ["TRUE", "FALSE"],
+      "code",
     ],
     [
       "sales_orders",
@@ -4261,6 +4415,7 @@ export async function verifyManualAcceptanceSourceData(
       "lifecycle_status",
       plan.scale.salesOrders,
       ["DRAFT", "SUBMITTED", "ACTIVE", "CLOSED", "CANCELED"],
+      "order_no",
     ],
     [
       "purchase_orders",
@@ -4271,6 +4426,7 @@ export async function verifyManualAcceptanceSourceData(
       "lifecycle_status",
       plan.scale.purchaseOrders,
       ["DRAFT", "SUBMITTED", "APPROVED", "CLOSED", "CANCELED"],
+      "purchase_order_no",
     ],
     [
       "outsourcing_orders",
@@ -4281,6 +4437,7 @@ export async function verifyManualAcceptanceSourceData(
       "lifecycle_status",
       plan.scale.outsourcingOrders,
       ["DRAFT", "SUBMITTED", "CONFIRMED", "CLOSED", "CANCELED"],
+      "outsourcing_order_no",
     ],
     [
       "bom_versions",
@@ -4291,6 +4448,7 @@ export async function verifyManualAcceptanceSourceData(
       "status",
       plan.scale.bomVersions,
       ["DRAFT", "ACTIVE", "ARCHIVED"],
+      "version",
     ],
   ];
   const datasets = [];
@@ -4303,8 +4461,9 @@ export async function verifyManualAcceptanceSourceData(
     statusKey,
     minimum,
     expectedStatuses,
+    identifierKey,
   ] of specs) {
-    const items = await listAll({
+    const allItems = await listAll({
       plan,
       token,
       domain,
@@ -4312,6 +4471,9 @@ export async function verifyManualAcceptanceSourceData(
       listKey,
       fetchImpl,
     });
+    const items = allItems.filter((item) =>
+      String(item?.[identifierKey] || "").startsWith(`${plan.prefix}-`),
+    );
     const counts = statusCounts(items, statusKey);
     const missingStatuses = expectedStatuses.filter(
       (status) => !counts[status],
@@ -4342,8 +4504,16 @@ export async function verifyManualAcceptanceSourceData(
         fetchImpl,
         params: { keyword: "", active_only: true },
       });
-      const unitId = unitRows[0]?.id;
-      if (!unitId) detailErrors.push("active unit is missing");
+      const unitIdsByKey = Object.fromEntries(
+        MANUAL_ACCEPTANCE_CORE_UNITS.map((definition) => [
+          definition.key,
+          requireUniqueCoreRecord(
+            unitRows,
+            definition.code,
+            "core units",
+          ).id,
+        ]),
+      );
       for (const header of items) {
         const planned = plannedByVersion.get(header.version);
         try {
@@ -4363,7 +4533,7 @@ export async function verifyManualAcceptanceSourceData(
             plannedItems: planned.items,
             actualItems: detail?.items,
             materialIds,
-            unitId,
+            unitIdsByKey,
           });
           if (
             result.missing.length > 0 ||
@@ -4399,6 +4569,8 @@ export async function verifyManualAcceptanceSourceData(
     prefix: plan.prefix,
     anchorDate: plan.anchorDate,
     semanticDigest: plan.semanticDigest,
+    coreSemanticDigest: plan.coreSemanticDigest,
+    unitUsage: plan.unitUsage,
     backendURL: plan.backendURL,
     databaseName: plan.databaseName,
     simulatedOnly: true,
@@ -4460,20 +4632,20 @@ function usage() {
 
 写入本地开发环境：
   MANUAL_ACCEPTANCE_SIM_CONFIRM=${CONFIRM_PHRASE} \\
-  MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260728_delivery_dev \\
+  MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.08.15-v6:20260815-V6:plush_erp_acceptance_20260728_delivery_dev \\
   MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \\
   MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \\
     node scripts/qa/manual-acceptance-source-data.mjs --apply \\
       --target local-dev \\
       --backend-url http://127.0.0.1:8310 \\
       --database-name plush_erp_acceptance_20260728_delivery_dev \\
-      --data-version 2026.07.16-v5 \\
-      --run-id 20260716-V5 \\
-      --out output/qa/manual-acceptance/datasets/2026.07.16-v5/local/source
+      --data-version 2026.08.15-v6 \\
+      --run-id 20260815-V6 \\
+      --out output/qa/manual-acceptance/datasets/2026.08.15-v6/local/source
 
 写入已登记的 133 客户试用环境还必须显式提供：
   --target customer-trial-133 --backend-url http://127.0.0.1:18375 \\
-  --data-version 2026.07.16-v5 --run-id 20260716-V5
+  --data-version 2026.08.15-v6 --run-id 20260815-V6
 并设置绑定 target / dataVersion / runId 的 MANUAL_ACCEPTANCE_TARGET_CONFIRM，
 以及包含精确 origin/customer/release/migration/debug 开关的
 MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON。
@@ -4485,8 +4657,8 @@ MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON。
       --target local-dev \\
       --backend-url http://127.0.0.1:8310 \\
       --database-name plush_erp_acceptance_20260728_delivery_dev \\
-      --data-version 2026.07.16-v5 \\
-      --run-id 20260716-V5
+      --data-version 2026.08.15-v6 \\
+      --run-id 20260815-V6
 
 默认生成：60 客户、60 供应商、80 材料、20 产品/60 规格、30 加工环节、
 45 销售订单、45 采购订单、45 委外订单、45 BOM 版本。

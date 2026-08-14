@@ -13,11 +13,86 @@
   height: 100%;
 }
 
+.erp-dev-data-environment-contract {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--dev-data-border);
+  border-radius: 12px;
+  background: var(--dev-data-surface);
+}
+
+.erp-dev-data-environment-contract > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.erp-dev-data-environment-contract__heading {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.erp-dev-data-environment-contract h2.ant-typography {
+  margin: 0;
+  font-size: 18px;
+}
+
+.erp-dev-data-environment-contract__targets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.erp-dev-data-environment-contract__targets article {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+  padding: 12px;
+  border: 1px solid var(--dev-data-border);
+  border-radius: 10px;
+}
+
+.erp-dev-data-environment-contract__targets article > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.erp-dev-data-environment-contract__targets .ant-typography {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .erp-dev-data-profile-group {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   width: 100%;
+}
+
+.erp-dev-data-target-choice {
+  width: 100%;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--dev-data-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--dev-data-selected) 42%, transparent);
+}
+
+.erp-dev-data-target-choice__heading {
+  display: grid;
+  gap: 3px;
+}
+
+.erp-dev-data-target-choice .ant-radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
 }
 
 .erp-dev-data-profile--primary {
@@ -286,6 +361,14 @@
 }
 
 @media (max-width: 760px) {
+  .erp-dev-data-environment-contract > header {
+    flex-direction: column;
+  }
+
+  .erp-dev-data-environment-contract__targets {
+    grid-template-columns: 1fr;
+  }
+
   .erp-dev-data-page .erp-dev-data-profile-group {
     display: grid;
     grid-template-columns: 1fr;

@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   DEFAULT_SOURCE_DATA_SCALE,
   MANUAL_ACCEPTANCE_CORE_UNIT_CODE,
+  MANUAL_ACCEPTANCE_CORE_UNIT_CODES,
   MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES,
   advanceOutsourcingOrderLifecycle,
   advanceSalesOrderLifecycleThroughProcess,
@@ -143,7 +144,9 @@ test("core references use exact stable business codes instead of environment ord
   const references = resolveManualAcceptanceCoreReferences({
     units: [
       { id: 99, code: "OTHER-UNIT" },
-      { id: 11, code: MANUAL_ACCEPTANCE_CORE_UNIT_CODE },
+      ...Object.values(MANUAL_ACCEPTANCE_CORE_UNIT_CODES).map(
+        (code, index) => ({ id: 11 + index, code }),
+      ),
     ],
     warehouses: [
       { id: 99, code: "OTHER-WH" },
@@ -155,6 +158,7 @@ test("core references use exact stable business codes instead of environment ord
   });
 
   assert.equal(references.unit.id, 11);
+  assert.equal(references.units.length, 11);
   assert.equal(references.warehouse.id, 11);
   assert.deepEqual(
     references.warehouses.map((item) => item.id),
@@ -284,25 +288,25 @@ test("manual acceptance source plan reaches every agreed pagination threshold", 
   assert.ok(plan.records.bomVersions.some((item) => item.items.length === 25));
 });
 
-test("current V5 plans use short yoyoosun-style visible business numbers", () => {
+test("current V6 plans use short yoyoosun-style visible business numbers", () => {
   const plan = buildManualAcceptanceSourceDataPlan({
     runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
     dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
   });
-  assert.equal(plan.prefix, "YS5");
-  assert.equal(plan.records.customers[0].code, "YS5-KH-001");
-  assert.equal(plan.records.suppliers[0].code, "YS5-GYS-001");
-  assert.equal(plan.records.materials[0].code, "YS5-WL-001");
-  assert.equal(plan.records.products[0].code, "YS5-CP-001");
-  assert.equal(plan.records.products[0].skus[0].sku_code, "YS5-GG-001-01");
-  assert.equal(plan.records.processes[0].code, "YS5-GX-001");
-  assert.equal(plan.records.salesOrders[0].order_no, "YS5-XD-001");
-  assert.equal(plan.records.purchaseOrders[0].purchase_order_no, "YS5-CG-001");
+  assert.equal(plan.prefix, "YS6");
+  assert.equal(plan.records.customers[0].code, "YS6-KH-001");
+  assert.equal(plan.records.suppliers[0].code, "YS6-GYS-001");
+  assert.equal(plan.records.materials[0].code, "YS6-WL-001");
+  assert.equal(plan.records.products[0].code, "YS6-CP-001");
+  assert.equal(plan.records.products[0].skus[0].sku_code, "YS6-GG-001-01");
+  assert.equal(plan.records.processes[0].code, "YS6-GX-001");
+  assert.equal(plan.records.salesOrders[0].order_no, "YS6-XD-001");
+  assert.equal(plan.records.purchaseOrders[0].purchase_order_no, "YS6-CG-001");
   assert.equal(
     plan.records.outsourcingOrders[0].outsourcing_order_no,
-    "YS5-WW-001",
+    "YS6-WW-001",
   );
-  assert.match(plan.records.bomVersions[0].version, /^YS5-BOM-/u);
+  assert.match(plan.records.bomVersions[0].version, /^YS6-BOM-/u);
 });
 
 test("outsourcing source plans satisfy the current contract readiness boundary", () => {
@@ -345,8 +349,8 @@ test("outsourcing source plans satisfy the current contract readiness boundary",
       item.outsourcing_quantity,
     ]),
     [
-      [3, "MATERIAL", "YS5-GX-001", "0.600000"],
-      [4, "MATERIAL", "YS5-GX-001", "0.600000"],
+      [3, "MATERIAL", "YS6-GX-001", "0.600000"],
+      [4, "MATERIAL", "YS6-GX-001", "0.600000"],
     ],
   );
   assert.ok(
@@ -369,7 +373,7 @@ test("versioned source plans use a stable date anchor and semantic digest across
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
   });
 
-  assert.equal(localPlan.anchorDate, "2026-07-16");
+  assert.equal(localPlan.anchorDate, "2026-08-15");
   assert.equal(remotePlan.anchorDate, localPlan.anchorDate);
   assert.equal(remotePlan.semanticDigest, localPlan.semanticDigest);
   assert.equal(localPlan.semanticDigest.length, 64);
@@ -678,8 +682,8 @@ test("CLI help points only to the dedicated current local acceptance database", 
     help.text,
     /--database-name plush_erp_acceptance_20260728_delivery_dev/u,
   );
-  assert.match(help.text, /--data-version 2026\.07\.16-v5/u);
-  assert.match(help.text, /--run-id 20260716-V5/u);
+  assert.match(help.text, /--data-version 2026\.08\.15-v6/u);
+  assert.match(help.text, /--run-id 20260815-V6/u);
   assert.doesNotMatch(help.text, /127\.0\.0\.1:8300/u);
 });
 
@@ -1547,8 +1551,8 @@ test("sales source replay accepts only the exact downstream ProcessRuntime lifec
     target: "scenario-demo",
     backendURL: "http://127.0.0.1:8300",
     databaseName: "plush_erp",
-    dataVersion: "2026.07.16-v5",
-    runId: "20260716-V5",
+    dataVersion: "2026.08.15-v6",
+    runId: "20260815-V6",
   });
   const candidates = plan.records.salesOrders
     .filter((record) => record.targetStatus === "DRAFT")
@@ -1607,6 +1611,7 @@ test("persisted sales order lines retain exact IDs for linked reservations and s
         line_no: 1,
         productRef: "P-1",
         skuRef: "SKU-1",
+        unitKey: "piece",
         product_name_snapshot: "【试用】产品 1",
         color_snapshot: "米白",
         ordered_quantity: "120",
@@ -1630,7 +1635,7 @@ test("persisted sales order lines retain exact IDs for linked reservations and s
     ],
     productIds: new Map([["P-1", 101]]),
     skuIds: new Map([["SKU-1", 201]]),
-    unitId: 301,
+    unitIdsByKey: { piece: 301 },
   };
 
   assert.deepEqual(buildSalesOrderLineReferences(input), [
@@ -1666,6 +1671,7 @@ test("persisted outsourcing lines retain exact formal source references", () => 
         subject_type: "PRODUCT",
         productRef: "P-1",
         processRef: "PROC-1",
+        unitKey: "piece",
         acceptanceProductionCandidateOffset: 3,
       },
     ],
@@ -1686,7 +1692,7 @@ test("persisted outsourcing lines retain exact formal source references", () => 
     productIds: new Map([["P-1", 101]]),
     materialIds: new Map(),
     processIds: new Map([["PROC-1", 401]]),
-    unitId: 301,
+    unitIdsByKey: { piece: 301 },
   };
 
   assert.deepEqual(buildOutsourcingOrderLineReferences(input), [
@@ -1720,6 +1726,7 @@ test("persisted purchase lines retain exact formal source references", () => {
       {
         line_no: 1,
         materialRef: "M-1",
+        unitKey: "piece",
       },
     ],
     actualItems: [
@@ -1735,7 +1742,7 @@ test("persisted purchase lines retain exact formal source references", () => {
       },
     ],
     materialIds: new Map([["M-1", 501]]),
-    unitId: 301,
+    unitIdsByKey: { piece: 301 },
   };
 
   assert.deepEqual(buildPurchaseOrderLineReferences(input), [
@@ -1961,6 +1968,7 @@ test("partial draft BOMs resume missing lines while settled BOMs fail closed", (
     plannedItems: [
       {
         materialRef: "M-1",
+        unitKey: "piece",
         quantity: "1.2",
         loss_rate: "0.03",
         position: "面料",
@@ -1968,6 +1976,7 @@ test("partial draft BOMs resume missing lines while settled BOMs fail closed", (
       },
       {
         materialRef: "M-2",
+        unitKey: "piece",
         quantity: "2",
         loss_rate: "0",
         position: "填充",
@@ -1988,7 +1997,7 @@ test("partial draft BOMs resume missing lines while settled BOMs fail closed", (
       ["M-1", 101],
       ["M-2", 102],
     ]),
-    unitId: 301,
+    unitIdsByKey: { piece: 301 },
   };
 
   const result = planBOMItemReconciliation(input);

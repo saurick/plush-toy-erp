@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "plush.manual-acceptance-contract/v6",
+  "datasetKey": "yoyoosun-manual-acceptance",
+  "dataVersion": "2026.08.15-v6",
+  "runId": "20260815-V6",
+  "anchorDateUtc": "2026-08-15T12:00:00.000Z",
+  "visiblePrefix": "YS6",
+  "simulatedOnly": true,
+  "realCustomerImport": false,
+  "sourceNormalization": {
+    "trimWhitespace": true,
+    "preserveCase": true,
+    "distinctPairs": [
+      ["Y", "码"],
+      ["PCS", "件"],
+      ["PCS", "个"],
+      ["件", "个"],
+      ["kg", "千克"]
+    ]
+  },
+  "primaryUnitKey": "piece",
+  "units": [
+    { "key": "piece", "code": "YS6-DW-01", "name": "件", "sourceLabel": "件", "precision": 0 },
+    { "key": "yard", "code": "YS6-DW-02", "name": "Y", "sourceLabel": "Y", "precision": 6 },
+    { "key": "set", "code": "YS6-DW-03", "name": "套", "sourceLabel": "套", "precision": 0 },
+    { "key": "pcs", "code": "YS6-DW-04", "name": "PCS", "sourceLabel": "PCS", "precision": 0 },
+    { "key": "pair", "code": "YS6-DW-05", "name": "对", "sourceLabel": "对", "precision": 0 },
+    { "key": "sheet", "code": "YS6-DW-06", "name": "片", "sourceLabel": "片", "precision": 0 },
+    { "key": "chineseYard", "code": "YS6-DW-07", "name": "码", "sourceLabel": "码", "precision": 6 },
+    { "key": "individual", "code": "YS6-DW-08", "name": "个", "sourceLabel": "个", "precision": 0 },
+    { "key": "strip", "code": "YS6-DW-09", "name": "条", "sourceLabel": "条", "precision": 0 },
+    { "key": "kilogram", "code": "YS6-DW-10", "name": "kg", "sourceLabel": "kg", "precision": 3 },
+    { "key": "block", "code": "YS6-DW-11", "name": "块", "sourceLabel": "块", "precision": 0 }
+  ],
+  "warehouses": [
+    { "key": "material", "code": "YS6-CK-01", "name": "原料仓", "type": "RAW_MATERIAL" },
+    { "key": "product", "code": "YS6-CK-02", "name": "成品仓", "type": "FINISHED_GOODS" },
+    { "key": "qualityHold", "code": "YS6-CK-03", "name": "待检仓", "type": "QC_HOLD" },
+    { "key": "workInProcess", "code": "YS6-CK-04", "name": "在制仓", "type": "WORK_IN_PROCESS" }
+  ],
+  "customerTrial133": {
+    "target": "customer-trial-133",
+    "databaseName": "plush_erp_uat_20260716_v5",
+    "databaseLifecycle": "long-lived-registered-target",
+    "minimumMigration": "20260714165115",
+    "configRevision": "yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1",
+    "configProductVersion": "customer-trial-133-test-2026.08.15-v6",
+    "previousConfigRevision": "yoyoosun-customer-trial-133-package-v7.runtime-manifest-v1"
+  }
+}

@@ -4,6 +4,7 @@ import { Button, theme } from 'antd'
 import { Link, useLocation } from 'react-router-dom'
 import ERPThemeToggle from '@/common/components/theme/ERPThemeToggle'
 import { message } from '@/common/utils/antdApp'
+import DevEnvironmentEvidencePanel from './DevEnvironmentEvidencePanel.jsx'
 import {
   DEV_DOCS_ROUTE,
   DEV_WORKSPACE_NAV_ITEMS,
@@ -67,119 +68,125 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
   }
 
   return (
-    <nav
-      ref={navRef}
-      aria-label="开发页面导航"
-      className="erp-dev-workspace-nav"
-      style={{
-        '--dev-nav-border': token.colorBorder,
-        '--dev-nav-bg': token.colorBgContainer,
-        '--dev-nav-active-bg': token.colorPrimaryBg,
-        '--dev-nav-active-border': token.colorPrimary,
-        '--dev-nav-secondary': token.colorTextSecondary,
-      }}
-    >
-      <div className="erp-dev-workspace-nav__brand">
-        <span className="erp-dev-workspace-nav__brand-mark" aria-hidden="true">
-          D
-        </span>
-        <span className="erp-dev-workspace-nav__brand-copy">
-          <strong>研发效能工作台</strong>
-          <small>Engineering Delivery Workbench</small>
-        </span>
-      </div>
-      <div
-        className="erp-dev-workspace-nav__routes"
-        aria-label="开发工作台页面"
+    <>
+      <nav
+        ref={navRef}
+        aria-label="开发页面导航"
+        className="erp-dev-workspace-nav"
+        style={{
+          '--dev-nav-border': token.colorBorder,
+          '--dev-nav-bg': token.colorBgContainer,
+          '--dev-nav-active-bg': token.colorPrimaryBg,
+          '--dev-nav-active-border': token.colorPrimary,
+          '--dev-nav-secondary': token.colorTextSecondary,
+        }}
       >
-        <div className="erp-dev-workspace-nav__primary">
-          {DEV_WORKSPACE_NAV_ITEMS.map((item) => {
-            const isExact = currentPathname === item.route
-            const isContext = currentAreaKey === item.key && !isExact
-            return (
-              <Link
-                ref={isExact ? currentRouteRef : undefined}
-                to={item.route}
-                key={item.route}
-                className={[
-                  'erp-dev-workspace-nav__route',
-                  isExact ? 'erp-dev-workspace-nav__route--active' : '',
-                  isContext ? 'erp-dev-workspace-nav__route--context' : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-                aria-current={isExact ? 'page' : undefined}
-              >
-                <span
-                  className="erp-dev-workspace-nav__route-mark"
-                  aria-hidden="true"
-                >
-                  {item.label.slice(0, 1)}
-                </span>
-                <span>{item.label}</span>
-                <small>{item.description}</small>
-              </Link>
-            )
-          })}
-        </div>
-        {secondaryItems.length > 0 ? (
-          <div
-            className="erp-dev-workspace-nav__secondary"
-            role="group"
-            aria-label={`${currentAreaLabel}工作入口`}
+        <div className="erp-dev-workspace-nav__brand">
+          <span
+            className="erp-dev-workspace-nav__brand-mark"
+            aria-hidden="true"
           >
-            <span className="erp-dev-workspace-nav__secondary-title">
-              {currentAreaLabel}入口
-            </span>
-            {secondaryItems.map((item) => {
-              const isActive = currentPathname === item.route
+            D
+          </span>
+          <span className="erp-dev-workspace-nav__brand-copy">
+            <strong>研发效能工作台</strong>
+            <small>Engineering Delivery Workbench</small>
+          </span>
+        </div>
+        <div
+          className="erp-dev-workspace-nav__routes"
+          aria-label="开发工作台页面"
+        >
+          <div className="erp-dev-workspace-nav__primary">
+            {DEV_WORKSPACE_NAV_ITEMS.map((item) => {
+              const isExact = currentPathname === item.route
+              const isContext = currentAreaKey === item.key && !isExact
               return (
                 <Link
-                  ref={isActive ? currentRouteRef : undefined}
+                  ref={isExact ? currentRouteRef : undefined}
                   to={item.route}
                   key={item.route}
-                  className={
-                    isActive
-                      ? 'erp-dev-workspace-nav__secondary-route erp-dev-workspace-nav__secondary-route--active'
-                      : 'erp-dev-workspace-nav__secondary-route'
-                  }
-                  aria-current={isActive ? 'page' : undefined}
+                  className={[
+                    'erp-dev-workspace-nav__route',
+                    isExact ? 'erp-dev-workspace-nav__route--active' : '',
+                    isContext ? 'erp-dev-workspace-nav__route--context' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                  aria-current={isExact ? 'page' : undefined}
                 >
-                  {item.label}
+                  <span
+                    className="erp-dev-workspace-nav__route-mark"
+                    aria-hidden="true"
+                  >
+                    {item.label.slice(0, 1)}
+                  </span>
+                  <span>{item.label}</span>
+                  <small>{item.description}</small>
                 </Link>
               )
             })}
           </div>
-        ) : null}
-      </div>
-      <div className="erp-dev-workspace-nav__actions">
-        <ERPThemeToggle
-          className="erp-dev-workspace-nav__theme-toggle"
-          variant="menu"
-          showLabel
-        />
-        <Button
-          block
-          icon={<CopyOutlined />}
-          aria-label="复制当前开发页深链"
-          onClick={handleCopyDeepLink}
-        >
-          复制深链
-        </Button>
-        {sourceHref ? (
+          {secondaryItems.length > 0 ? (
+            <div
+              className="erp-dev-workspace-nav__secondary"
+              role="group"
+              aria-label={`${currentAreaLabel}工作入口`}
+            >
+              <span className="erp-dev-workspace-nav__secondary-title">
+                {currentAreaLabel}入口
+              </span>
+              {secondaryItems.map((item) => {
+                const isActive = currentPathname === item.route
+                return (
+                  <Link
+                    ref={isActive ? currentRouteRef : undefined}
+                    to={item.route}
+                    key={item.route}
+                    className={
+                      isActive
+                        ? 'erp-dev-workspace-nav__secondary-route erp-dev-workspace-nav__secondary-route--active'
+                        : 'erp-dev-workspace-nav__secondary-route'
+                    }
+                    aria-current={isActive ? 'page' : undefined}
+                  >
+                    {item.label}
+                  </Link>
+                )
+              })}
+            </div>
+          ) : null}
+        </div>
+        <div className="erp-dev-workspace-nav__actions">
+          <ERPThemeToggle
+            className="erp-dev-workspace-nav__theme-toggle"
+            variant="menu"
+            showLabel
+          />
           <Button
             block
-            href={sourceHref}
-            icon={<FileTextOutlined />}
-            aria-label={`在开发文档中打开来源 ${sourcePath}`}
+            icon={<CopyOutlined />}
+            aria-label="复制当前开发页深链"
+            onClick={handleCopyDeepLink}
           >
-            来源文档
+            复制深链
           </Button>
-        ) : null}
-        <span className="erp-dev-workspace-nav__boundary">
-          仅开发环境 / DEV ONLY · 不进入正式菜单
-        </span>
-      </div>
-    </nav>
+          {sourceHref ? (
+            <Button
+              block
+              href={sourceHref}
+              icon={<FileTextOutlined />}
+              aria-label={`在开发文档中打开来源 ${sourcePath}`}
+            >
+              来源文档
+            </Button>
+          ) : null}
+          <span className="erp-dev-workspace-nav__boundary">
+            控制端：本地 DEV-only · 不进入正式菜单
+          </span>
+        </div>
+      </nav>
+      <DevEnvironmentEvidencePanel />
+    </>
   )
 }

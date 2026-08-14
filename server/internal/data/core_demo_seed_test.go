@@ -17,13 +17,23 @@ func TestDefaultCoreDemoReferenceSeedDatasetIsExact(t *testing.T) {
 	want := CoreDemoReferenceSeedDataset{
 		Prefix: CoreDemoReferenceSeedPrefix,
 		Units: []CoreDemoUnitSeed{
-			{Code: "YS5-DW-01", Name: "件", Precision: 0},
+			{Code: "YS6-DW-01", Name: "件", Precision: 0},
+			{Code: "YS6-DW-02", Name: "Y", Precision: 6},
+			{Code: "YS6-DW-03", Name: "套", Precision: 0},
+			{Code: "YS6-DW-04", Name: "PCS", Precision: 0},
+			{Code: "YS6-DW-05", Name: "对", Precision: 0},
+			{Code: "YS6-DW-06", Name: "片", Precision: 0},
+			{Code: "YS6-DW-07", Name: "码", Precision: 6},
+			{Code: "YS6-DW-08", Name: "个", Precision: 0},
+			{Code: "YS6-DW-09", Name: "条", Precision: 0},
+			{Code: "YS6-DW-10", Name: "kg", Precision: 3},
+			{Code: "YS6-DW-11", Name: "块", Precision: 0},
 		},
 		Warehouses: []CoreDemoWarehouseSeed{
-			{Code: "YS5-CK-01", Name: "原料仓", Type: "RAW_MATERIAL"},
-			{Code: "YS5-CK-02", Name: "成品仓", Type: "FINISHED_GOODS"},
-			{Code: "YS5-CK-03", Name: "待检仓", Type: "QC_HOLD"},
-			{Code: "YS5-CK-04", Name: "在制仓", Type: "WORK_IN_PROCESS"},
+			{Code: "YS6-CK-01", Name: "原料仓", Type: "RAW_MATERIAL"},
+			{Code: "YS6-CK-02", Name: "成品仓", Type: "FINISHED_GOODS"},
+			{Code: "YS6-CK-03", Name: "待检仓", Type: "QC_HOLD"},
+			{Code: "YS6-CK-04", Name: "在制仓", Type: "WORK_IN_PROCESS"},
 		},
 	}
 	got := DefaultCoreDemoReferenceSeedDataset()
@@ -49,7 +59,7 @@ func TestCoreDemoReferenceSeedRejectsAnythingOutsideExactAllowlist(t *testing.T)
 		{
 			name: "extra unit",
 			mutate: func(dataset *CoreDemoReferenceSeedDataset) {
-				dataset.Units = append(dataset.Units, CoreDemoUnitSeed{Code: "YS5-DW-02", Name: "箱"})
+				dataset.Units = append(dataset.Units, CoreDemoUnitSeed{Code: "YS6-DW-12", Name: "箱"})
 			},
 		},
 		{
@@ -67,7 +77,7 @@ func TestCoreDemoReferenceSeedRejectsAnythingOutsideExactAllowlist(t *testing.T)
 		{
 			name: "extra warehouse",
 			mutate: func(dataset *CoreDemoReferenceSeedDataset) {
-				dataset.Warehouses = append(dataset.Warehouses, CoreDemoWarehouseSeed{Code: "YS5-CK-05", Name: "其他仓", Type: "OTHER"})
+				dataset.Warehouses = append(dataset.Warehouses, CoreDemoWarehouseSeed{Code: "YS6-CK-05", Name: "其他仓", Type: "OTHER"})
 			},
 		},
 		{
@@ -104,9 +114,11 @@ func TestSeedCoreDemoReferencesUpsertsOnlyExactReferencesIdempotently(t *testing
 
 	expectRun := func() {
 		mock.ExpectBegin()
-		mock.ExpectQuery("INSERT INTO units").
-			WithArgs("YS5-DW-01", "件", 0).
-			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(11))
+		for index, unit := range dataset.Units {
+			mock.ExpectQuery("INSERT INTO units").
+				WithArgs(unit.Code, unit.Name, unit.Precision).
+				WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(11 + index))
+		}
 		warehouseIDs := []int{21, 22, 23, 24}
 		for index, warehouse := range dataset.Warehouses {
 			mock.ExpectQuery("INSERT INTO warehouses").
@@ -127,7 +139,7 @@ func TestSeedCoreDemoReferencesUpsertsOnlyExactReferencesIdempotently(t *testing
 		if result.PrimaryUnitID != 11 || result.PrimaryWarehouseID != 22 {
 			t.Fatalf("unexpected primary ids on run %d: %#v", run+1, result)
 		}
-		if len(result.UnitIDs) != 1 || len(result.WarehouseIDs) != 4 {
+		if len(result.UnitIDs) != len(dataset.Units) || len(result.WarehouseIDs) != 4 {
 			t.Fatalf("unexpected reference counts on run %d: %#v", run+1, result)
 		}
 		if len(result.MaterialIDs) != 0 || len(result.ProductIDs) != 0 || len(result.ProcessIDs) != 0 || len(result.BOMHeaderIDs) != 0 {
@@ -157,9 +169,11 @@ func TestSeedCoreDemoReferencesRollsBackAtomically(t *testing.T) {
 	wantErr := errors.New("warehouse write failed")
 
 	mock.ExpectBegin()
-	mock.ExpectQuery("INSERT INTO units").
-		WithArgs("YS5-DW-01", "件", 0).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(11))
+	for index, unit := range dataset.Units {
+		mock.ExpectQuery("INSERT INTO units").
+			WithArgs(unit.Code, unit.Name, unit.Precision).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(11 + index))
+	}
 	mock.ExpectQuery("INSERT INTO warehouses").
 		WithArgs(dataset.Warehouses[0].Code, dataset.Warehouses[0].Name, dataset.Warehouses[0].Type).
 		WillReturnError(wantErr)

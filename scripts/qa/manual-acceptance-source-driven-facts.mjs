@@ -7,6 +7,8 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import {
+  CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+  CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
   MANUAL_ACCEPTANCE_DATASET_KEY,
   assertManualAcceptanceMutationTarget,
   assertManualAcceptanceTargetAttestation,
@@ -18,8 +20,9 @@ import {
   inspectFinanceFieldContract,
 } from "./manual-acceptance-finance-field-contract.mjs";
 
-export const SOURCE_DRIVEN_FACT_DATA_VERSION = "2026.07.16-v5";
-export const SOURCE_DRIVEN_FACT_RUN_ID = "20260716-V5";
+export const SOURCE_DRIVEN_FACT_DATA_VERSION =
+  CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION;
+export const SOURCE_DRIVEN_FACT_RUN_ID = CURRENT_MANUAL_ACCEPTANCE_RUN_ID;
 
 const CUSTOMER_KEY = "yoyoosun";
 const SIMULATED_NOTE = "按订单办理。";

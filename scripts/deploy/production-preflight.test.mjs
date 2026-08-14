@@ -1170,7 +1170,7 @@ test("production preflight rejects V5 runtime app DSN drift without leaking it",
   assert.notEqual(result.status, 0);
   assert.match(
     result.stderr,
-    /POSTGRES_DSN 必须使用 erp_app 精确指向 V5 独立数据库/u,
+    /POSTGRES_DSN 必须使用 erp_app 精确指向登记的试用数据库/u,
   );
   assert.doesNotMatch(result.stdout, new RegExp(runtimeSecret));
   assert.doesNotMatch(result.stderr, new RegExp(runtimeSecret));

@@ -16,17 +16,36 @@ export const DEV_DATA_PREPARATION_PROFILE_KEYS = Object.freeze({
   fullAcceptance: 'full-acceptance',
 })
 
+export const DEV_DATA_PREPARATION_TARGET_KEYS = Object.freeze({
+  localDevelopment: 'local-development',
+  customerTrial133: 'customer-trial-133',
+  isolatedLocal: 'isolated-local',
+})
+
+const PROFILE_TARGET_KEYS = Object.freeze({
+  [DEV_DATA_PREPARATION_PROFILE_KEYS.coreDemo]: Object.freeze([
+    DEV_DATA_PREPARATION_TARGET_KEYS.localDevelopment,
+  ]),
+  [DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo]: Object.freeze([
+    DEV_DATA_PREPARATION_TARGET_KEYS.localDevelopment,
+    DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133,
+  ]),
+  [DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance]: Object.freeze([
+    DEV_DATA_PREPARATION_TARGET_KEYS.isolatedLocal,
+  ]),
+})
+
 export const DEV_DATA_PREPARATION_PROFILE_COPY = Object.freeze({
   [DEV_DATA_PREPARATION_PROFILE_KEYS.coreDemo]: Object.freeze({
-    title: '共享开发基础数据',
+    title: '本地长期基础数据',
     shortTitle: 'Core Demo',
-    purpose: '准备共享开发库的基础账号与主数据',
+    purpose: '准备本地长期开发库的基础账号与主数据',
     retention: '稳定 upsert，可持续保留',
     cleanup:
       '不承诺按批次删除；退出时按账号停用、单据取消或冲正等正常生命周期处理。',
     scope: '基础账号、单位、材料、产品、仓库、工艺与 BOM。',
     targetKey: 'coreDemo',
-    targetTitle: '共享开发目标',
+    targetTitle: '本地开发目标',
     badgeLabel: '长期保留',
     badgeColor: 'default',
     prepareButtonLabel: '准备不可变计划',
@@ -42,9 +61,10 @@ export const DEV_DATA_PREPARATION_PROFILE_COPY = Object.freeze({
     ]),
   }),
   [DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo]: Object.freeze({
-    title: '业务场景演示数据',
+    title: '长期业务场景数据',
     shortTitle: 'Scenario Demo',
-    purpose: '准备长期保留的业务场景演示数据，不是完整验收',
+    purpose:
+      '在本地开发或 133 测试的固定目标上准备同一语义的长期模拟场景，不是完整验收',
     retention:
       '固定批次同批精确复用 / 读回；只补齐缺项，不清空已有数据。岗位到期时间是固定快照，不会随当天滚动。',
     cleanup:
@@ -52,20 +72,20 @@ export const DEV_DATA_PREPARATION_PROFILE_COPY = Object.freeze({
     scope:
       '正式 Source Document、可证明的 ProcessRuntime、模拟岗位任务，以及由领域 API 合法生成的 Fact。',
     targetKey: 'scenarioDemo',
-    targetTitle: '业务场景目标',
+    targetTitle: '长期场景目标',
     badgeLabel: '长期保留',
     badgeColor: 'default',
     prepareButtonLabel: '生成业务场景测试数据',
     prepareDescription:
-      '点击后自动准备固定计划并打开可读确认；确认一次即对齐当前跟踪的本地客户配置并生成数据，无需重启或输入长确认文本。',
+      '在当前目标卡内先权威读回目标身份，再打开二次确认；133 不接受主机、端口、DSN 或命令参数。',
     confirmationDescription:
-      '先通过正式配置 API 对齐当前跟踪的 yoyoosun 本地测试配置，再补齐固定业务场景；不清空已有数据，半批或漂移会阻断。',
+      '本地会通过正式配置 API 对齐跟踪配置；133 必须同时绑定 release、migration、V8 客户配置、数据版本与新回滚点。两端都不清空历史。',
     successDescription:
       '业务场景演示数据已精确读回并长期保留；人工验收仍未完成，本结果不是完整验收。',
     cleanupBoundary: '只向前补齐，不支持批次清理或重置',
     steps: Object.freeze([
-      '确认共享开发库身份、migration 与固定场景目录',
-      '稳定准备本地岗位账号与审计样例，并通过 validate / publish / transition check / activate or rollback / effective-session 对齐当前跟踪客户配置',
+      '权威读回当前目标的 release、数据库、migration、客户配置与数据合同',
+      '本地稳定对齐跟踪配置；133 在目标卡内核对 attestation 与新回滚点',
       '通过正式 Source / ProcessRuntime / Fact 路径执行；固定批次精确复用 / 读回，半批或漂移阻断',
     ]),
   }),
@@ -121,13 +141,14 @@ const PROFILE_BOUNDARIES = Object.freeze({
     automaticCleanup: true,
   }),
 })
-const SUMMARY_TARGET_KEYS = Object.freeze(
-  Object.values(DEV_DATA_PREPARATION_PROFILE_COPY).map(
-    (profileCopy) => profileCopy.targetKey
-  )
-)
+const SUMMARY_TARGET_KEYS = Object.freeze([
+  'coreDemo',
+  'scenarioDemo',
+  'scenarioDemo133',
+  'fullAcceptance',
+])
 const SUMMARY_STATUSES = new Set(['success', 'partial', 'blocked'])
-const TARGET_STATUSES = new Set(['available', 'blocked'])
+const TARGET_STATUSES = new Set(['available', 'blocked', 'not_proven'])
 const OPERATION_STATUSES = new Set([
   'ready',
   'launching',
@@ -149,16 +170,16 @@ const OPERATION_ID_PATTERN =
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u
 const IDEMPOTENCY_KEY_PATTERN =
-  /^data-preparation:prepare:(core-demo|scenario-demo|full-acceptance):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/u
+  /^data-preparation:prepare:(core-demo|scenario-demo|full-acceptance):(local-development|customer-trial-133|isolated-local):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/u
 const HASH_PATTERN = /^[0-9a-f]{64}$/u
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/u
 const RUN_ID_PATTERN = /^[a-z0-9][a-z0-9_]{2,39}$/u
 const DATASET_KEY_PATTERN = /^[a-z][a-z0-9_-]{2,63}$/u
 const SCENARIO_DEMO_DATASET_KEY = 'yoyoosun-manual-acceptance'
-const SCENARIO_DEMO_DATA_VERSION = '2026.07.16-v5'
-const SCENARIO_DEMO_RUN_ID = '20260716-V5'
-const SCENARIO_DEMO_CATALOG_TARGET_COUNT = 50
-const SCENARIO_DEMO_CATALOG_READY_COUNT = 40
+const SCENARIO_DEMO_DATA_VERSION = '2026.08.15-v6'
+const SCENARIO_DEMO_RUN_ID = '20260815-V6'
+const SCENARIO_DEMO_CATALOG_TARGET_COUNT = 51
+const SCENARIO_DEMO_CATALOG_READY_COUNT = 41
 const SCENARIO_DEMO_BROWSER_CHECKS_PENDING = 10
 const ACCEPTANCE_EXECUTION_SCOPE = 'all_registered_chains'
 
@@ -421,7 +442,19 @@ function validateAcceptancePlan(plan) {
 }
 
 function validateTargetIdentity(target, field) {
-  assertExactKeys(target, ['safeTarget', 'status', 'targetFingerprint'], field)
+  assertExactKeys(
+    target,
+    [
+      'customerConfigProductVersion',
+      'customerConfigRevision',
+      'databaseName',
+      'migrationVersion',
+      'safeTarget',
+      'status',
+      'targetFingerprint',
+    ],
+    field
+  )
   if (
     !TARGET_STATUSES.has(target.status) ||
     typeof target.safeTarget !== 'string' ||
@@ -430,7 +463,73 @@ function validateTargetIdentity(target, field) {
     throw new Error(`${field} is invalid`)
   }
   assertSafeText(target.safeTarget, `${field} safe target`, 300)
+  ;[
+    'databaseName',
+    'migrationVersion',
+    'customerConfigRevision',
+    'customerConfigProductVersion',
+  ].forEach((key) => assertSafeText(target[key], `${field} ${key}`, 180))
   return target
+}
+
+function validateDatasetEnvironmentContract(contract) {
+  assertExactKeys(
+    contract,
+    [
+      'customerTrial133',
+      'datasetKey',
+      'dataVersion',
+      'realCustomerImport',
+      'runId',
+      'schemaVersion',
+      'semanticDigest',
+      'simulatedOnly',
+      'unitCount',
+      'warehouseCount',
+    ],
+    'data environment contract'
+  )
+  assertExactKeys(
+    contract.customerTrial133,
+    [
+      'configProductVersion',
+      'configRevision',
+      'databaseLifecycle',
+      'databaseName',
+      'minimumMigration',
+      'target',
+    ],
+    'customer-trial data environment contract'
+  )
+  if (
+    contract.schemaVersion !== 'plush.dev-data-environment-contract/v1' ||
+    contract.datasetKey !== SCENARIO_DEMO_DATASET_KEY ||
+    contract.dataVersion !== SCENARIO_DEMO_DATA_VERSION ||
+    contract.runId !== SCENARIO_DEMO_RUN_ID ||
+    !HASH_PATTERN.test(String(contract.semanticDigest || '')) ||
+    contract.simulatedOnly !== true ||
+    contract.realCustomerImport !== false ||
+    contract.unitCount !== 11 ||
+    contract.warehouseCount !== 4 ||
+    contract.customerTrial133.target !== 'customer-trial-133' ||
+    contract.customerTrial133.databaseName !== 'plush_erp_uat_20260716_v5' ||
+    contract.customerTrial133.databaseLifecycle !==
+      'long-lived-registered-target' ||
+    !/^20[0-9]{12}$/u.test(
+      String(contract.customerTrial133.minimumMigration || '')
+    )
+  ) {
+    throw new Error('data environment contract is invalid')
+  }
+  const requiredConfigFields = ['configRevision', 'configProductVersion']
+  requiredConfigFields.forEach((key) =>
+    assertSafeText(
+      contract.customerTrial133[key],
+      `customer-trial data environment ${key}`,
+      180
+    )
+  )
+  return contract
 }
 
 function validateProfile(profile) {
@@ -476,7 +575,10 @@ function validateProfile(profile) {
   return profile
 }
 
-function validateReadback(readback, { profileKey, status, targetFingerprint }) {
+function validateReadback(
+  readback,
+  { profileKey, status, targetFingerprint, targetKey, targetSummary }
+) {
   if (readback === null) return readback
   assertObject(readback, 'data preparation readback')
   if (
@@ -539,24 +641,35 @@ function validateReadback(readback, { profileKey, status, targetFingerprint }) {
   }
 
   if (profileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo) {
+    const remoteTarget =
+      targetKey === DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133
     assertExactKeys(
       readback,
       [
+        ...(remoteTarget ? ['backupReceipt'] : []),
         'browserChecksPending',
         'catalogReadyCount',
         'catalogTargetCount',
         'cleanupSupported',
+        'customerConfigRevision',
+        'databaseName',
         'dataVersion',
         'datasetKey',
         'factCount',
         'manualAcceptanceCompleted',
+        'migrationVersion',
         'processRuntimeCount',
         'profileKey',
+        'release',
         'replayMode',
         'runId',
         'schemaVersion',
+        'semanticDigest',
         'sourceDocumentCount',
+        'stageCount',
+        'targetEnvironment',
         'targetFingerprint',
+        'targetKey',
       ],
       'scenario demo readback'
     )
@@ -570,6 +683,17 @@ function validateReadback(readback, { profileKey, status, targetFingerprint }) {
       !DATASET_KEY_PATTERN.test(readback.datasetKey) ||
       readback.dataVersion !== SCENARIO_DEMO_DATA_VERSION ||
       readback.runId !== SCENARIO_DEMO_RUN_ID ||
+      !PROFILE_TARGET_KEYS[
+        DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo
+      ].includes(readback.targetKey) ||
+      readback.targetKey !== targetKey ||
+      readback.targetEnvironment !== readback.targetKey ||
+      !COMMIT_PATTERN.test(String(readback.release || '')) ||
+      !/^20[0-9]{12}$/u.test(String(readback.migrationVersion || '')) ||
+      !HASH_PATTERN.test(String(readback.semanticDigest || '')) ||
+      readback.stageCount !== 9 ||
+      !isSafeText(readback.databaseName, 180) ||
+      !isSafeText(readback.customerConfigRevision, 180) ||
       !domainCountFields.every(
         (field) => Number.isSafeInteger(readback[field]) && readback[field] > 0
       ) ||
@@ -587,6 +711,44 @@ function validateReadback(readback, { profileKey, status, targetFingerprint }) {
             SCENARIO_DEMO_BROWSER_CHECKS_PENDING))
     ) {
       throw new Error('scenario demo readback is invalid')
+    }
+    if (remoteTarget) {
+      assertExactKeys(
+        readback.backupReceipt,
+        [
+          'backupAlias',
+          'containsCredentials',
+          'containsPaths',
+          'containsSecrets',
+          'createdAt',
+          'databaseName',
+          'migrationVersion',
+          'releaseSha',
+          'schemaVersion',
+          'sha256',
+          'sizeBytes',
+          'status',
+        ],
+        'scenario demo backup receipt'
+      )
+      if (
+        readback.backupReceipt.schemaVersion !==
+          'plush.customer-trial-133-data-backup/v1' ||
+        readback.backupReceipt.status !== 'passed' ||
+        readback.backupReceipt.backupAlias !== targetSummary.rollbackPoint ||
+        readback.backupReceipt.releaseSha !== readback.release ||
+        readback.backupReceipt.databaseName !== readback.databaseName ||
+        readback.backupReceipt.migrationVersion !== readback.migrationVersion ||
+        !HASH_PATTERN.test(String(readback.backupReceipt.sha256 || '')) ||
+        !Number.isSafeInteger(readback.backupReceipt.sizeBytes) ||
+        readback.backupReceipt.sizeBytes < 1 ||
+        !validTimestamp(readback.backupReceipt.createdAt) ||
+        readback.backupReceipt.containsSecrets !== false ||
+        readback.backupReceipt.containsCredentials !== false ||
+        readback.backupReceipt.containsPaths !== false
+      ) {
+        throw new Error('scenario demo backup receipt is invalid')
+      }
     }
     return readback
   }
@@ -689,6 +851,7 @@ export function validateDevDataPreparationOperation(operation) {
       'planHash',
       'profileKey',
       'readback',
+      'repository',
       'runId',
       'status',
       'targetSummary',
@@ -698,16 +861,39 @@ export function validateDevDataPreparationOperation(operation) {
     ],
     'data preparation operation'
   )
+  const targetSummaryKeys = [
+    'automaticCleanup',
+    'disposable',
+    'preflightFingerprint',
+    'safeTarget',
+    'targetFingerprint',
+    'targetKey',
+  ]
+  const evidenceRichTarget = Object.hasOwn(
+    operation.targetSummary || {},
+    'releaseSha'
+  )
   assertExactKeys(
     operation.targetSummary,
-    [
-      'automaticCleanup',
-      'disposable',
-      'preflightFingerprint',
-      'safeTarget',
-      'targetFingerprint',
-    ],
+    evidenceRichTarget
+      ? [
+          ...targetSummaryKeys,
+          'customerConfigRevision',
+          'databaseName',
+          'datasetRunId',
+          'datasetVersion',
+          'migrationVersion',
+          'releaseSha',
+          'rollbackPoint',
+          'semanticDigest',
+        ]
+      : targetSummaryKeys,
     'data preparation target summary'
+  )
+  assertExactKeys(
+    operation.repository,
+    ['commit', 'dirty', 'fingerprint'],
+    'data preparation operation repository identity'
   )
   if (
     !OPERATION_ID_PATTERN.test(String(operation.id || '')) ||
@@ -721,8 +907,27 @@ export function validateDevDataPreparationOperation(operation) {
     !HASH_PATTERN.test(
       String(operation.targetSummary.preflightFingerprint || '')
     ) ||
+    !PROFILE_TARGET_KEYS[operation.profileKey]?.includes(
+      operation.targetSummary.targetKey
+    ) ||
+    !COMMIT_PATTERN.test(String(operation.repository.commit || '')) ||
+    typeof operation.repository.dirty !== 'boolean' ||
+    !HASH_PATTERN.test(String(operation.repository.fingerprint || '')) ||
     typeof operation.targetSummary.disposable !== 'boolean' ||
     typeof operation.targetSummary.automaticCleanup !== 'boolean' ||
+    (evidenceRichTarget &&
+      (!COMMIT_PATTERN.test(String(operation.targetSummary.releaseSha || '')) ||
+        !/^[a-z][a-z0-9_-]{0,62}$/u.test(
+          String(operation.targetSummary.databaseName || '')
+        ) ||
+        !/^20(?:[0-9]{6}|[0-9]{12})$|^verified-during-lifecycle$/u.test(
+          String(operation.targetSummary.migrationVersion || '')
+        ) ||
+        operation.targetSummary.datasetVersion !== SCENARIO_DEMO_DATA_VERSION ||
+        operation.targetSummary.datasetRunId !== SCENARIO_DEMO_RUN_ID ||
+        !HASH_PATTERN.test(
+          String(operation.targetSummary.semanticDigest || '')
+        ))) ||
     !Array.isArray(operation.events) ||
     !Array.isArray(operation.issues) ||
     typeof operation.confirmationRequired !== 'string' ||
@@ -735,6 +940,18 @@ export function validateDevDataPreparationOperation(operation) {
     'data preparation operation safe target',
     300
   )
+  if (evidenceRichTarget) {
+    assertSafeText(
+      operation.targetSummary.customerConfigRevision,
+      'data preparation customer config revision',
+      240
+    )
+    assertSafeText(
+      operation.targetSummary.rollbackPoint,
+      'data preparation rollback point',
+      240
+    )
+  }
   assertIsoTimestamp(
     operation.createdAt,
     'data preparation operation created timestamp'
@@ -750,9 +967,11 @@ export function validateDevDataPreparationOperation(operation) {
     profileKey: operation.profileKey,
     status: operation.status,
     targetFingerprint: operation.targetSummary.targetFingerprint,
+    targetKey: operation.targetSummary.targetKey,
+    targetSummary: operation.targetSummary,
   })
 
-  const expectedConfirmation = `DATA_PREPARATION:${operation.profileKey}:${operation.runId}:${operation.planHash}:${operation.id}`
+  const expectedConfirmation = `DATA_PREPARATION:${operation.profileKey}:${operation.targetSummary.targetKey}:${operation.runId}:${operation.planHash}:${operation.id}`
   if (
     (operation.status === 'ready' &&
       operation.confirmationRequired !== expectedConfirmation) ||
@@ -778,6 +997,7 @@ export function validateDevDataPreparationSummary(summary) {
     [
       'boundaries',
       'acceptancePlan',
+      'datasetContract',
       'generatedAt',
       'issues',
       'operations',
@@ -795,6 +1015,7 @@ export function validateDevDataPreparationSummary(summary) {
     'data preparation target'
   )
   validateAcceptancePlan(summary.acceptancePlan)
+  validateDatasetEnvironmentContract(summary.datasetContract)
   assertExactKeys(
     summary.boundaries,
     [
@@ -1023,27 +1244,29 @@ export function createDevDataPreparationClient({
       }
       return validateDevDataPreparationOperation(payload.operation)
     },
-    prepare(profileKey, idempotencyKey) {
+    prepare(profileKey, targetKey, idempotencyKey) {
       const idempotencyMatch = IDEMPOTENCY_KEY_PATTERN.exec(
         String(idempotencyKey || '')
       )
       if (
         !PROFILE_KEYS.has(profileKey) ||
-        idempotencyMatch?.[1] !== profileKey
+        !PROFILE_TARGET_KEYS[profileKey]?.includes(targetKey) ||
+        idempotencyMatch?.[1] !== profileKey ||
+        idempotencyMatch?.[2] !== targetKey
       ) {
         throw new Error('数据准备计划参数无效')
       }
-      return postAction('prepare', { profileKey, idempotencyKey })
+      return postAction('prepare', { profileKey, targetKey, idempotencyKey })
     },
     execute(operationId, confirmation) {
       const confirmationMatch =
-        /^DATA_PREPARATION:(core-demo|scenario-demo|full-acceptance):([a-z0-9][a-z0-9_]{2,39}):([0-9a-f]{64}):([0-9a-f-]{36})$/u.exec(
+        /^DATA_PREPARATION:(core-demo|scenario-demo|full-acceptance):(local-development|customer-trial-133|isolated-local):([a-z0-9][a-z0-9_]{2,39}):([0-9a-f]{64}):([0-9a-f-]{36})$/u.exec(
           String(confirmation || '')
         )
       if (
         !OPERATION_ID_PATTERN.test(String(operationId || '')) ||
         !confirmationMatch ||
-        confirmationMatch[4] !== operationId
+        confirmationMatch[5] !== operationId
       ) {
         throw new Error('数据准备执行参数无效')
       }
@@ -1057,34 +1280,44 @@ export function createDevDataPreparationClient({
 
 export function createDataPreparationIdempotencyKey(
   profileKey,
+  targetKey,
   randomUuid = () => globalThis.crypto.randomUUID()
 ) {
-  if (!PROFILE_KEYS.has(profileKey)) {
-    throw new Error('data preparation profile key is invalid')
+  if (!PROFILE_TARGET_KEYS[profileKey]?.includes(targetKey)) {
+    throw new Error('data preparation profile target is invalid')
   }
   const uuid = String(randomUuid())
   if (!UUID_PATTERN.test(uuid)) {
     throw new Error('data preparation idempotency UUID is invalid')
   }
-  return `data-preparation:prepare:${profileKey}:${uuid}`
+  return `data-preparation:prepare:${profileKey}:${targetKey}:${uuid}`
 }
 
 export function resolveDataPreparationPrepareIntent(
   currentIntent,
   profileKey,
+  targetKey,
   randomUuid
 ) {
   if (
     currentIntent?.profileKey === profileKey &&
+    currentIntent?.targetKey === targetKey &&
     typeof currentIntent.idempotencyKey === 'string' &&
     IDEMPOTENCY_KEY_PATTERN.exec(currentIntent.idempotencyKey)?.[1] ===
-      profileKey
+      profileKey &&
+    IDEMPOTENCY_KEY_PATTERN.exec(currentIntent.idempotencyKey)?.[2] ===
+      targetKey
   ) {
     return currentIntent
   }
   return Object.freeze({
     profileKey,
-    idempotencyKey: createDataPreparationIdempotencyKey(profileKey, randomUuid),
+    targetKey,
+    idempotencyKey: createDataPreparationIdempotencyKey(
+      profileKey,
+      targetKey,
+      randomUuid
+    ),
   })
 }
 
@@ -1108,7 +1341,8 @@ export function resolveDataPreparationExecutionConfirmation(
 export function selectRecoverableDataPreparationOperation(
   operations = [],
   currentOperationId = '',
-  preferredProfileKey = ''
+  preferredProfileKey = '',
+  preferredTargetKey = ''
 ) {
   if (!Array.isArray(operations)) return null
   const currentOperation = operations.find(
@@ -1128,7 +1362,10 @@ export function selectRecoverableDataPreparationOperation(
       ['launching', 'running'].includes(operation.status)
     ) ||
     recoverableOperations.find(
-      (operation) => operation.profileKey === preferredProfileKey
+      (operation) =>
+        operation.profileKey === preferredProfileKey &&
+        (!preferredTargetKey ||
+          operation.targetSummary?.targetKey === preferredTargetKey)
     ) ||
     null
   )
@@ -1142,7 +1379,7 @@ export function dataPreparationStatusPresentation(status) {
     passed: ['已完成', 'success'],
     failed: ['执行失败', 'error'],
     blocked: ['已阻断', 'warning'],
-    not_proven: ['结果未证明', 'error'],
+    not_proven: ['结果未证明', 'default'],
     available: ['可准备', 'success'],
   }
   const [label, color] = presentations[status] || ['未知', 'default']

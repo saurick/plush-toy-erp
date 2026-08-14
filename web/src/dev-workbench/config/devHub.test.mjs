@@ -48,6 +48,10 @@ const devPageNavSource = readFileSync(
   new URL('../components/DevPageNav.jsx', import.meta.url),
   'utf8'
 )
+const devEnvironmentEvidencePanelSource = readFileSync(
+  new URL('../components/DevEnvironmentEvidencePanel.jsx', import.meta.url),
+  'utf8'
+)
 const devEntrySourceDetailsSource = readFileSync(
   new URL('../components/DevEntrySourceDetails.jsx', import.meta.url),
   'utf8'
@@ -291,6 +295,27 @@ test('devHub: fifteen dev pages share the backend-style workspace shell', () => 
     assert.match(source, /erp-dev-workspace-page/u)
     assert.match(source, /<DevPageNav/u)
   })
+})
+
+test('devHub: one local DEV-only controller compares local, 133, and isolated evidence without a target switch', () => {
+  assert.match(devPageNavSource, /<DevEnvironmentEvidencePanel \/>/u)
+  assert.match(devPageNavSource, /控制端：本地 DEV-only/u)
+  assert.match(devEnvironmentEvidencePanelSource, /Promise\.allSettled/u)
+  assert.match(devEnvironmentEvidencePanelSource, /new AbortController\(\)/u)
+  assert.match(devEnvironmentEvidencePanelSource, /requestVersionRef/u)
+  assert.match(
+    devEnvironmentEvidencePanelSource,
+    /abortControllerRef\.current\?\.abort/u
+  )
+  assert.match(devEnvironmentEvidencePanelSource, /权威读回/u)
+  assert.doesNotMatch(
+    devEnvironmentEvidencePanelSource,
+    /setInterval|setTimeout/u
+  )
+  assert.doesNotMatch(
+    devEnvironmentEvidencePanelSource,
+    /name=["'](?:host|port|target|path|command|dsn|password|token)["']/iu
+  )
 })
 
 test('devHub: entry cards keep technical paths behind an accessible disclosure', () => {

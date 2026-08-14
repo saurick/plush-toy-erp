@@ -14,18 +14,18 @@ import (
 
 	"server/internal/customertrialconfig"
 	"server/internal/data"
+	"server/internal/manualacceptance"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-const (
-	dsnEnv             = "POSTGRES_DSN"
-	expectedDatabase   = "plush_erp_uat_20260716_v5"
-	expectedDatasetKey = "yoyoosun-manual-acceptance"
-	expectedRunID      = "20260716-V5"
-)
+const dsnEnv = "POSTGRES_DSN"
 
 var (
+	manualAcceptanceContract = manualacceptance.Current()
+	expectedDatabase         = manualAcceptanceContract.CustomerTrial133.DatabaseName
+	expectedDatasetKey       = manualAcceptanceContract.DatasetKey
+	expectedRunID            = manualAcceptanceContract.RunID
 	Version                  = "dev"
 	migrationVersionPattern  = regexp.MustCompile(`^[0-9]{14}$`)
 	releaseVersionPattern    = regexp.MustCompile(`^[0-9a-f]{40}$`)
@@ -251,7 +251,7 @@ LIMIT 1`).Scan(&migrationVersion); err != nil {
 	if err != nil {
 		return nil, fmt.Errorf("pre-write core boundary readback failed: %w", err)
 	}
-	if err := validatePreWriteBoundary(before); err != nil {
+	if err := validatePreWriteBoundary(before, dataset); err != nil {
 		return nil, err
 	}
 	result, err := upsertCoreReferences(ctx, tx, dataset)
@@ -262,7 +262,7 @@ LIMIT 1`).Scan(&migrationVersion); err != nil {
 	if err != nil {
 		return nil, fmt.Errorf("post-write core boundary readback failed: %w", err)
 	}
-	if err := validatePostWriteBoundary(after); err != nil {
+	if err := validatePostWriteBoundary(after, dataset); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -298,16 +298,29 @@ LIMIT 1`, customertrialconfig.ExpectedCustomerKey).Scan(
 }
 
 func validateReferenceDataset(dataset data.CoreDemoReferenceSeedDataset) error {
-	if strings.TrimSpace(dataset.Prefix) == "" || len(dataset.Units) != 1 || len(dataset.Warehouses) != 4 {
-		return fmt.Errorf("%w: default dataset must contain exactly one unit and four warehouses", errCoreBoundaryViolation)
+	contract := manualacceptance.Current()
+	if strings.TrimSpace(dataset.Prefix) != contract.VisiblePrefix || len(dataset.Units) != len(contract.Units) || len(dataset.Warehouses) != len(contract.Warehouses) {
+		return fmt.Errorf("%w: default dataset must contain exactly %d units and %d warehouses", errCoreBoundaryViolation, len(contract.Units), len(contract.Warehouses))
 	}
-	unit := dataset.Units[0]
-	if !strings.HasPrefix(unit.Code, dataset.Prefix+"-") || strings.TrimSpace(unit.Name) == "" || unit.Precision < 0 {
-		return fmt.Errorf("%w: default unit is invalid", errCoreBoundaryViolation)
-	}
-	unitPattern, err := coreCodeNamespacePattern(unit.Code)
-	if err != nil {
-		return err
+	unitCodes := make(map[string]struct{}, len(dataset.Units))
+	unitPattern := ""
+	for _, unit := range dataset.Units {
+		if !strings.HasPrefix(unit.Code, dataset.Prefix+"-") || strings.TrimSpace(unit.Name) == "" || unit.Precision < 0 {
+			return fmt.Errorf("%w: default unit is invalid", errCoreBoundaryViolation)
+		}
+		if _, duplicate := unitCodes[unit.Code]; duplicate {
+			return fmt.Errorf("%w: default unit code is duplicated", errCoreBoundaryViolation)
+		}
+		unitCodes[unit.Code] = struct{}{}
+		pattern, err := coreCodeNamespacePattern(unit.Code)
+		if err != nil {
+			return err
+		}
+		if unitPattern == "" {
+			unitPattern = pattern
+		} else if pattern != unitPattern {
+			return fmt.Errorf("%w: default unit namespace is inconsistent", errCoreBoundaryViolation)
+		}
 	}
 	warehouseCodes := make(map[string]struct{}, len(dataset.Warehouses))
 	warehousePattern := ""
@@ -336,9 +349,9 @@ func validateReferenceDataset(dataset data.CoreDemoReferenceSeedDataset) error {
 }
 
 func inspectCoreBoundary(ctx context.Context, tx *sql.Tx, dataset data.CoreDemoReferenceSeedDataset) (coreBoundary, error) {
-	unit := dataset.Units[0]
+	units := dataset.Units
 	warehouses := dataset.Warehouses
-	unitPattern, err := coreCodeNamespacePattern(unit.Code)
+	unitPattern, err := coreCodeNamespacePattern(units[0].Code)
 	if err != nil {
 		return coreBoundary{}, err
 	}
@@ -346,41 +359,32 @@ func inspectCoreBoundary(ctx context.Context, tx *sql.Tx, dataset data.CoreDemoR
 	if err != nil {
 		return coreBoundary{}, err
 	}
-	var boundary coreBoundary
-	err = tx.QueryRowContext(ctx, `
+	args := []any{unitPattern, warehousePattern}
+	unitClauses := make([]string, 0, len(units))
+	for _, unit := range units {
+		base := len(args) + 1
+		unitClauses = append(unitClauses, fmt.Sprintf("(code = $%d AND name = $%d AND precision = $%d)", base, base+1, base+2))
+		args = append(args, unit.Code, unit.Name, unit.Precision)
+	}
+	warehouseClauses := make([]string, 0, len(warehouses))
+	for _, warehouse := range warehouses {
+		base := len(args) + 1
+		warehouseClauses = append(warehouseClauses, fmt.Sprintf("(code = $%d AND name = $%d AND type = $%d)", base, base+1, base+2))
+		args = append(args, warehouse.Code, warehouse.Name, warehouse.Type)
+	}
+	query := fmt.Sprintf(`
 /* manual-acceptance-core-boundary */
 SELECT
   (SELECT COUNT(*) FROM units WHERE code LIKE $1 OR code LIKE $2),
-  (SELECT COUNT(*) FROM units WHERE code = $3 AND name = $4 AND precision = $5 AND is_active IS TRUE),
+  (SELECT COUNT(*) FROM units WHERE is_active IS TRUE AND (%s)),
   (SELECT COUNT(*) FROM warehouses WHERE code LIKE $1 OR code LIKE $2),
-  (SELECT COUNT(*) FROM warehouses WHERE is_active IS TRUE AND (
-    (code = $6 AND name = $7 AND type = $8) OR
-    (code = $9 AND name = $10 AND type = $11) OR
-    (code = $12 AND name = $13 AND type = $14) OR
-    (code = $15 AND name = $16 AND type = $17)
-  )),
+  (SELECT COUNT(*) FROM warehouses WHERE is_active IS TRUE AND (%s)),
   (SELECT COUNT(*) FROM materials WHERE code LIKE $1 OR code LIKE $2),
   (SELECT COUNT(*) FROM products WHERE code LIKE $1 OR code LIKE $2),
   (SELECT COUNT(*) FROM processes WHERE code LIKE $1 OR code LIKE $2),
-  (SELECT COUNT(*) FROM bom_headers WHERE version LIKE $1 OR version LIKE $2)`,
-		unitPattern,
-		warehousePattern,
-		unit.Code,
-		unit.Name,
-		unit.Precision,
-		warehouses[0].Code,
-		warehouses[0].Name,
-		warehouses[0].Type,
-		warehouses[1].Code,
-		warehouses[1].Name,
-		warehouses[1].Type,
-		warehouses[2].Code,
-		warehouses[2].Name,
-		warehouses[2].Type,
-		warehouses[3].Code,
-		warehouses[3].Name,
-		warehouses[3].Type,
-	).Scan(
+  (SELECT COUNT(*) FROM bom_headers WHERE version LIKE $1 OR version LIKE $2)`, strings.Join(unitClauses, " OR "), strings.Join(warehouseClauses, " OR "))
+	var boundary coreBoundary
+	err = tx.QueryRowContext(ctx, query, args...).Scan(
 		&boundary.unitTotal,
 		&boundary.unitExact,
 		&boundary.warehouseTotal,
@@ -402,24 +406,24 @@ func coreCodeNamespacePattern(code string) (string, error) {
 	return code[:separator+1] + "%", nil
 }
 
-func validatePreWriteBoundary(boundary coreBoundary) error {
+func validatePreWriteBoundary(boundary coreBoundary, dataset data.CoreDemoReferenceSeedDataset) error {
 	if boundary.materialCount != 0 || boundary.productCount != 0 || boundary.processCount != 0 || boundary.bomHeaderCount != 0 {
 		return fmt.Errorf("%w: prefixed material, product, process or BOM records already exist", errCoreBoundaryViolation)
 	}
-	if boundary.unitTotal != boundary.unitExact || boundary.unitTotal > 1 {
+	if boundary.unitTotal != boundary.unitExact || boundary.unitTotal > int64(len(dataset.Units)) {
 		return fmt.Errorf("%w: prefixed unit records are outside the exact allowlist", errCoreBoundaryViolation)
 	}
-	if boundary.warehouseTotal != boundary.warehouseExact || boundary.warehouseTotal > 4 {
+	if boundary.warehouseTotal != boundary.warehouseExact || boundary.warehouseTotal > int64(len(dataset.Warehouses)) {
 		return fmt.Errorf("%w: prefixed warehouse records are outside the exact allowlist", errCoreBoundaryViolation)
 	}
 	return nil
 }
 
-func validatePostWriteBoundary(boundary coreBoundary) error {
-	if err := validatePreWriteBoundary(boundary); err != nil {
+func validatePostWriteBoundary(boundary coreBoundary, dataset data.CoreDemoReferenceSeedDataset) error {
+	if err := validatePreWriteBoundary(boundary, dataset); err != nil {
 		return err
 	}
-	if boundary.unitTotal != 1 || boundary.unitExact != 1 || boundary.warehouseTotal != 4 || boundary.warehouseExact != 4 {
+	if boundary.unitTotal != int64(len(dataset.Units)) || boundary.unitExact != int64(len(dataset.Units)) || boundary.warehouseTotal != int64(len(dataset.Warehouses)) || boundary.warehouseExact != int64(len(dataset.Warehouses)) {
 		return fmt.Errorf("%w: exact unit and warehouse readback counts are incomplete", errCoreBoundaryViolation)
 	}
 	return nil

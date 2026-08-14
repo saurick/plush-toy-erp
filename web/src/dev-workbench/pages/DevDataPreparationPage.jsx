@@ -34,6 +34,7 @@ import {
   DEV_DATA_PREPARATION_PROFILE_COPY,
   DEV_DATA_PREPARATION_PROFILE_KEYS,
   DEV_DATA_PREPARATION_SOURCE_PATH,
+  DEV_DATA_PREPARATION_TARGET_KEYS,
   createDevDataPreparationClient,
   dataPreparationStatusPresentation,
   resolveDataPreparationExecutionConfirmation,
@@ -45,11 +46,45 @@ import useDevCustomerScope from '../hooks/useDevCustomerScope.mjs'
 const { Paragraph, Text, Title } = Typography
 const POLL_INTERVAL_MS = 1500
 const POLL_RECOVERY_INTERVAL_MS = 3000
+const PROFILE_QUERY_KEY = 'dataProfile'
+const TARGET_QUERY_KEY = 'dataTarget'
+
+function profileTargetKey(profileKey, scenarioTargetKey) {
+  if (profileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.coreDemo) {
+    return DEV_DATA_PREPARATION_TARGET_KEYS.localDevelopment
+  }
+  if (profileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo) {
+    return scenarioTargetKey
+  }
+  return DEV_DATA_PREPARATION_TARGET_KEYS.isolatedLocal
+}
+
+function summaryTargetKey(profileKey, scenarioTargetKey) {
+  if (profileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.coreDemo) {
+    return 'coreDemo'
+  }
+  if (profileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance) {
+    return 'fullAcceptance'
+  }
+  return scenarioTargetKey === DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133
+    ? 'scenarioDemo133'
+    : 'scenarioDemo'
+}
 
 function shortHash(value) {
   return typeof value === 'string' && value.length >= 12
     ? value.slice(0, 12)
     : '未证明'
+}
+
+function operationTargetLabel(targetKey) {
+  if (targetKey === DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133) {
+    return '133 测试'
+  }
+  if (targetKey === DEV_DATA_PREPARATION_TARGET_KEYS.isolatedLocal) {
+    return '本地隔离验收'
+  }
+  return '本地开发'
 }
 
 function StatusTag({ status }) {
@@ -274,6 +309,149 @@ function WorkflowStep({ number, title, description, extra, children }) {
   )
 }
 
+function currentPassedOperation(summary, profileKey, predicate) {
+  return summary.operations.find(
+    (operation) =>
+      operation.profileKey === profileKey &&
+      operation.status === 'passed' &&
+      operation.repository?.commit === summary.repository?.commit &&
+      operation.repository?.dirty === false &&
+      predicate(operation)
+  )
+}
+
+function DatasetEnvironmentContract({ summary }) {
+  const contract = summary.datasetContract
+  const coreReadback = currentPassedOperation(
+    summary,
+    DEV_DATA_PREPARATION_PROFILE_KEYS.coreDemo,
+    (operation) =>
+      operation.readback?.core?.units === contract.unitCount &&
+      operation.readback?.core?.warehouses === contract.warehouseCount
+  )
+  const localScenarioReadback = currentPassedOperation(
+    summary,
+    DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo,
+    (operation) =>
+      operation.targetSummary.targetKey ===
+        DEV_DATA_PREPARATION_TARGET_KEYS.localDevelopment &&
+      operation.readback?.dataVersion === contract.dataVersion &&
+      operation.readback?.runId === contract.runId
+  )
+  const trialScenarioReadback = currentPassedOperation(
+    summary,
+    DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo,
+    (operation) =>
+      operation.targetSummary.targetKey ===
+        DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133 &&
+      operation.readback?.dataVersion === contract.dataVersion &&
+      operation.readback?.runId === contract.runId &&
+      operation.readback?.semanticDigest === contract.semanticDigest
+  )
+  const fullReadback = currentPassedOperation(
+    summary,
+    DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance,
+    (operation) =>
+      operation.readback?.dataVersion === contract.dataVersion &&
+      operation.readback?.reportStatus === 'passed' &&
+      operation.readback?.cleanupComplete === true &&
+      operation.readback?.residualDatabaseCount === 0
+  )
+  const localReadBack = Boolean(coreReadback && localScenarioReadback)
+  const targetRows = [
+    {
+      key: 'local',
+      title: '本地长期数据',
+      target: summary.target.scenarioDemo.databaseName,
+      status: localReadBack ? '已读回' : '待补齐 / 待读回',
+      color: localReadBack ? 'success' : 'default',
+      action:
+        'Core 精确读回；缺失才补齐。Scenario 按固定版本向前补齐并长期保留。',
+    },
+    {
+      key: 'trial',
+      title: '133 试用数据',
+      target: contract.customerTrial133.databaseName,
+      status: trialScenarioReadback ? '已独立读回' : '待目标回执',
+      color: trialScenarioReadback ? 'success' : 'default',
+      action:
+        '只走 customer-trial-133 目标策略、attestation 和独立回执；不复制本地数据库。',
+    },
+    {
+      key: 'isolated',
+      title: '隔离完整验收',
+      target: '每次新建的可丢弃数据库',
+      status: fullReadback ? '已通过并清理' : '待新批次',
+      color: fullReadback ? 'success' : 'default',
+      action: '绑定 clean exact commit 运行全部链路；成功或失败都自动清理。',
+    },
+  ]
+
+  return (
+    <section
+      className="erp-dev-data-environment-contract"
+      aria-labelledby="dev-data-environment-contract-title"
+    >
+      <header>
+        <div className="erp-dev-data-environment-contract__heading">
+          <Title level={2} id="dev-data-environment-contract-title">
+            统一数据合同
+          </Title>
+          <Text type="secondary">
+            两端共用一套业务语义，但目标身份、写入锁、回执和回滚点始终独立。
+          </Text>
+        </div>
+        <Space wrap size={[4, 4]}>
+          <Tag>{contract.dataVersion}</Tag>
+          <Tag>{contract.runId}</Tag>
+          <Tag color="blue">仅模拟数据</Tag>
+        </Space>
+      </header>
+      <Descriptions
+        size="small"
+        column={{ xs: 1, md: 2, xl: 4 }}
+        items={[
+          {
+            key: 'dataset',
+            label: 'Dataset key',
+            children: contract.datasetKey,
+          },
+          {
+            key: 'digest',
+            label: 'Semantic digest',
+            children: <Text code>{shortHash(contract.semanticDigest)}</Text>,
+          },
+          {
+            key: 'units',
+            label: '审定模拟单位',
+            children: `${contract.unitCount} 个`,
+          },
+          {
+            key: 'warehouses',
+            label: '模拟仓库',
+            children: `${contract.warehouseCount} 个`,
+          },
+        ]}
+      />
+      <div className="erp-dev-data-environment-contract__targets">
+        {targetRows.map((row) => (
+          <article key={row.key}>
+            <header>
+              <strong>{row.title}</strong>
+              <Tag color={row.color}>{row.status}</Tag>
+            </header>
+            <Text code>{row.target}</Text>
+            <Text type="secondary">{row.action}</Text>
+          </article>
+        ))}
+      </div>
+      <Text type="secondary">
+        本批次不是永绅真实客户导入，不得当作真实出货、库存、财务或客户签收证据。
+      </Text>
+    </section>
+  )
+}
+
 function ProfileOption({ profile, selected, disabled, onSelect }) {
   const copy = DEV_DATA_PREPARATION_PROFILE_COPY[profile.key]
   const className = [
@@ -368,8 +546,33 @@ const READBACK_PRESENTATIONS = Object.freeze({
   [DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo]: (readback) => ({
     column: { xs: 1, sm: 2, lg: 3 },
     notice:
-      '本读回只证明固定批次业务场景已精确创建或读回：40 / 50 项已由数据查询证明，另 10 项只能在浏览器中确认。50 项页面操作与人工验收均未执行，不代表完整验收。',
+      '本读回只证明固定批次业务场景已精确创建或读回：41 / 51 项已由数据查询证明，另 10 项只能在浏览器中确认。51 项页面操作与人工验收均未执行，不代表完整验收。',
     items: [
+      {
+        key: 'targetKey',
+        label: '目标环境',
+        children: operationTargetLabel(readback.targetKey),
+      },
+      {
+        key: 'release',
+        label: 'Release / SHA',
+        children: <Text code>{shortHash(readback.release)}</Text>,
+      },
+      {
+        key: 'databaseName',
+        label: '数据库',
+        children: readback.databaseName,
+      },
+      {
+        key: 'migrationVersion',
+        label: 'Migration',
+        children: readback.migrationVersion,
+      },
+      {
+        key: 'customerConfigRevision',
+        label: '客户配置 revision',
+        children: readback.customerConfigRevision,
+      },
       {
         key: 'datasetKey',
         label: '固定数据集',
@@ -384,6 +587,35 @@ const READBACK_PRESENTATIONS = Object.freeze({
         key: 'runId',
         label: '数据批次',
         children: <Text code>{readback.runId}</Text>,
+      },
+      ...(readback.backupReceipt
+        ? [
+            {
+              key: 'backupAlias',
+              label: '133 新回滚点',
+              children: readback.backupReceipt.backupAlias,
+            },
+            {
+              key: 'backupDigest',
+              label: '备份校验',
+              children: `${shortHash(readback.backupReceipt.sha256)} / ${readback.backupReceipt.sizeBytes} bytes`,
+            },
+            {
+              key: 'backupCreatedAt',
+              label: '备份创建',
+              children: (
+                <DevTimestamp
+                  value={readback.backupReceipt.createdAt}
+                  missing="备份时间未证明"
+                />
+              ),
+            },
+          ]
+        : []),
+      {
+        key: 'semanticDigest',
+        label: 'Semantic digest',
+        children: <Text code>{shortHash(readback.semanticDigest)}</Text>,
       },
       {
         key: 'sourceDocumentCount',
@@ -565,6 +797,7 @@ function OperationDetail({ operation, acceptancePlan, compact = false }) {
       <div className="erp-dev-data-operation-overview">
         <div>
           <Text strong>{profileCopy.title}</Text>
+          <Tag>{operationTargetLabel(operation.targetSummary.targetKey)}</Tag>
           <StatusTag status={operation.status} />
         </div>
         <Text>{operation.targetSummary.safeTarget}</Text>
@@ -687,11 +920,22 @@ export default function DevDataPreparationPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const client = useMemo(() => createDevDataPreparationClient(), [])
   const requestVersionRef = useRef(0)
+  const refreshAbortRef = useRef(null)
   const currentOperationIdRef = useRef('')
   const prepareIntentRef = useRef(null)
   const [summary, setSummary] = useState(null)
-  const [selectedProfileKey, setSelectedProfileKey] = useState(
-    DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance
+  const [selectedProfileKey, setSelectedProfileKey] = useState(() => {
+    const requested = searchParams.get(PROFILE_QUERY_KEY)
+    return Object.values(DEV_DATA_PREPARATION_PROFILE_KEYS).includes(requested)
+      ? requested
+      : DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance
+  })
+  const [selectedScenarioTargetKey, setSelectedScenarioTargetKey] = useState(
+    () =>
+      searchParams.get(TARGET_QUERY_KEY) ===
+      DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133
+        ? DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133
+        : DEV_DATA_PREPARATION_TARGET_KEYS.localDevelopment
   )
   const selectedIsScenarioDemo =
     selectedProfileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo
@@ -726,23 +970,57 @@ export default function DevDataPreparationPage() {
   }, [])
 
   const refresh = useCallback(async () => {
+    refreshAbortRef.current?.abort()
+    const controller = new AbortController()
+    refreshAbortRef.current = controller
     const requestVersion = requestVersionRef.current + 1
     requestVersionRef.current = requestVersion
     setLoading(true)
     setLoadError('')
     try {
-      const nextSummary = await client.summary()
+      const summaryClient = createDevDataPreparationClient({
+        fetchImpl: (input, init) =>
+          globalThis.fetch(input, { ...init, signal: controller.signal }),
+      })
+      const nextSummary = await summaryClient.summary()
       if (requestVersion !== requestVersionRef.current) return
       setSummary(nextSummary)
       const recoveredOperation = selectRecoverableDataPreparationOperation(
         nextSummary.operations,
         currentOperationIdRef.current,
-        DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance
+        selectedProfileKey,
+        profileTargetKey(selectedProfileKey, selectedScenarioTargetKey)
       )
       currentOperationIdRef.current = recoveredOperation?.id || ''
       setCurrentOperation(recoveredOperation)
       if (recoveredOperation) {
         setSelectedProfileKey(recoveredOperation.profileKey)
+        const recoveredTargetKey = recoveredOperation.targetSummary.targetKey
+        if (
+          recoveredOperation.profileKey ===
+          DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo
+        ) {
+          setSelectedScenarioTargetKey(recoveredTargetKey)
+        }
+        setSearchParams(
+          (currentSearchParams) => {
+            const nextSearchParams = new URLSearchParams(currentSearchParams)
+            nextSearchParams.set(
+              PROFILE_QUERY_KEY,
+              recoveredOperation.profileKey
+            )
+            if (
+              recoveredOperation.profileKey ===
+              DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo
+            ) {
+              nextSearchParams.set(TARGET_QUERY_KEY, recoveredTargetKey)
+            } else {
+              nextSearchParams.delete(TARGET_QUERY_KEY)
+            }
+            return nextSearchParams
+          },
+          { replace: true }
+        )
         if (
           prepareIntentRef.current?.profileKey === recoveredOperation.profileKey
         ) {
@@ -750,6 +1028,7 @@ export default function DevDataPreparationPage() {
         }
       }
     } catch (error) {
+      if (error?.name === 'AbortError') return
       if (requestVersion !== requestVersionRef.current) return
       setLoadError(error?.message || '数据准备预检读取失败')
     } finally {
@@ -757,11 +1036,12 @@ export default function DevDataPreparationPage() {
         setLoading(false)
       }
     }
-  }, [client])
+  }, [selectedProfileKey, selectedScenarioTargetKey, setSearchParams])
 
   useEffect(() => {
     refresh()
     return () => {
+      refreshAbortRef.current?.abort()
       requestVersionRef.current += 1
     }
   }, [refresh])
@@ -803,27 +1083,43 @@ export default function DevDataPreparationPage() {
   )
   const selectedProfileCopy =
     DEV_DATA_PREPARATION_PROFILE_COPY[selectedProfileKey]
-  const selectedTarget = summary?.target?.[selectedProfileCopy.targetKey]
+  const selectedOperationTargetKey = profileTargetKey(
+    selectedProfileKey,
+    selectedScenarioTargetKey
+  )
+  const selectedTarget =
+    summary?.target?.[
+      summaryTargetKey(selectedProfileKey, selectedScenarioTargetKey)
+    ]
   const repositoryBlocked =
     selectedProfile?.exactCleanCommitRequired === true &&
     (!summary?.repository || summary.repository.dirty)
   const hasActiveOperation = (summary?.operations || []).some(
     (operation) =>
-      operation.profileKey === selectedProfileKey && !operation.terminal
+      operation.profileKey === selectedProfileKey &&
+      operation.targetSummary.targetKey === selectedOperationTargetKey &&
+      !operation.terminal
   )
   const currentIsScenarioDemo =
     currentOperation?.profileKey ===
     DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo
   const canPrepare =
     Boolean(selectedProfile) &&
-    selectedTarget?.status === 'available' &&
+    (selectedTarget?.status === 'available' ||
+      (selectedIsScenarioDemo &&
+        selectedOperationTargetKey ===
+          DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133 &&
+        selectedTarget?.status === 'not_proven')) &&
     !repositoryBlocked &&
     !hasActiveOperation &&
     (!selectedIsScenarioDemo || customerReady) &&
     !loading
   const canExecuteCurrent =
     currentOperation?.status === 'ready' &&
-    selectedTarget?.status === 'available' &&
+    currentOperation?.targetSummary?.targetKey === selectedOperationTargetKey &&
+    (selectedTarget?.status === 'available' ||
+      selectedOperationTargetKey ===
+        DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133) &&
     !repositoryBlocked &&
     (!currentIsScenarioDemo || customerReady)
   const currentExecutionConfirmation = currentOperation
@@ -835,6 +1131,27 @@ export default function DevDataPreparationPage() {
   const selectProfile = (profileKey) => {
     if (preparing || executing) return
     setSelectedProfileKey(profileKey)
+    const nextSearchParams = new URLSearchParams(searchParams)
+    nextSearchParams.set(PROFILE_QUERY_KEY, profileKey)
+    if (profileKey !== DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo) {
+      nextSearchParams.delete(TARGET_QUERY_KEY)
+    } else {
+      nextSearchParams.set(TARGET_QUERY_KEY, selectedScenarioTargetKey)
+    }
+    setSearchParams(nextSearchParams, { replace: true })
+    currentOperationIdRef.current = ''
+    prepareIntentRef.current = null
+    setCurrentOperation(null)
+    setConfirmation('')
+  }
+
+  const selectScenarioTarget = (targetKey) => {
+    if (preparing || executing) return
+    setSelectedScenarioTargetKey(targetKey)
+    const nextSearchParams = new URLSearchParams(searchParams)
+    nextSearchParams.set(PROFILE_QUERY_KEY, selectedProfileKey)
+    nextSearchParams.set(TARGET_QUERY_KEY, targetKey)
+    setSearchParams(nextSearchParams, { replace: true })
     currentOperationIdRef.current = ''
     prepareIntentRef.current = null
     setCurrentOperation(null)
@@ -860,10 +1177,15 @@ export default function DevDataPreparationPage() {
     try {
       const intent = resolveDataPreparationPrepareIntent(
         prepareIntentRef.current,
-        profileKey
+        profileKey,
+        selectedOperationTargetKey
       )
       prepareIntentRef.current = intent
-      const result = await client.prepare(profileKey, intent.idempotencyKey)
+      const result = await client.prepare(
+        profileKey,
+        selectedOperationTargetKey,
+        intent.idempotencyKey
+      )
       updateOperation(result.operation)
       prepareIntentRef.current = null
       message.success(
@@ -916,6 +1238,7 @@ export default function DevDataPreparationPage() {
         <span>
           {DEV_DATA_PREPARATION_PROFILE_COPY[operation.profileKey].title}
         </span>
+        <Tag>{operationTargetLabel(operation.targetSummary.targetKey)}</Tag>
         <StatusTag status={operation.status} />
         <Text type="secondary" code>
           {shortHash(operation.planHash)}
@@ -1039,6 +1362,7 @@ export default function DevDataPreparationPage() {
 
         {summary ? (
           <div className="erp-dev-data-workflow">
+            <DatasetEnvironmentContract summary={summary} />
             <WorkflowStep
               number="1"
               title="确认完整回归能否开始"
@@ -1046,15 +1370,11 @@ export default function DevDataPreparationPage() {
               extra={
                 <Tag>
                   {
-                    profiles.filter((profile) => {
-                      const copy =
-                        DEV_DATA_PREPARATION_PROFILE_COPY[profile.key]
-                      return (
-                        summary.target[copy.targetKey]?.status === 'available'
-                      )
-                    }).length
+                    Object.values(summary.target).filter(
+                      (target) => target.status === 'available'
+                    ).length
                   }{' '}
-                  / {profiles.length} 个目标可用
+                  / {Object.keys(summary.target).length} 个登记目标可用
                 </Tag>
               }
             >
@@ -1097,13 +1417,41 @@ export default function DevDataPreparationPage() {
                       </div>
                       <StatusTag status={target.status} />
                       <details>
-                        <summary>查看目标与指纹</summary>
+                        <summary>查看目标身份</summary>
                         <Text>{target.safeTarget}</Text>
+                        <Text>数据库：{target.databaseName}</Text>
+                        <Text>Migration：{target.migrationVersion}</Text>
+                        <Text>客户配置：{target.customerConfigRevision}</Text>
                         <Text code>{shortHash(target.targetFingerprint)}</Text>
                       </details>
                     </div>
                   )
                 })}
+                <div className="erp-dev-data-preflight-row">
+                  <div>
+                    <Text strong>133 测试场景目标</Text>
+                    <Text type="secondary">
+                      当前页面只保存登记身份；点击准备后才做权威 target
+                      preflight，不会自动创建写操作。
+                    </Text>
+                  </div>
+                  <StatusTag status={summary.target.scenarioDemo133.status} />
+                  <details>
+                    <summary>查看登记目标</summary>
+                    <Text>{summary.target.scenarioDemo133.safeTarget}</Text>
+                    <Text>
+                      数据库：{summary.target.scenarioDemo133.databaseName}
+                    </Text>
+                    <Text>
+                      最低 Migration：
+                      {summary.target.scenarioDemo133.migrationVersion}
+                    </Text>
+                    <Text>
+                      期望客户配置：
+                      {summary.target.scenarioDemo133.customerConfigRevision}
+                    </Text>
+                  </details>
+                </div>
               </div>
             </WorkflowStep>
 
@@ -1144,14 +1492,46 @@ export default function DevDataPreparationPage() {
                 ))}
               </Radio.Group>
               {selectedIsScenarioDemo ? (
-                <DevCustomerScopeSelector
-                  scope={customerScope}
-                  onChange={customerScope.selectCustomer}
-                  disabled={preparing || executing}
-                  label="业务场景甲方"
-                  note="仅业务场景演示数据按甲方选择；当前永绅对应固定 yoyoosun 场景批次，基础数据与完整回归保持产品通用。"
-                  invalidDescription="当前甲方没有登记固定场景数据；业务场景的准备与执行已停止，其他数据准备方式不受影响。"
-                />
+                <Space
+                  direction="vertical"
+                  size={12}
+                  className="erp-dev-data-target-choice"
+                >
+                  <div className="erp-dev-data-target-choice__heading">
+                    <Text strong>选择本次固定目标</Text>
+                    <Text type="secondary">
+                      这只绑定当前 Scenario
+                      operation，不会静默改变其他页面或操作的写入目标。
+                    </Text>
+                  </div>
+                  <Radio.Group
+                    value={selectedScenarioTargetKey}
+                    disabled={preparing || executing}
+                    onChange={(event) =>
+                      selectScenarioTarget(event.target.value)
+                    }
+                    options={[
+                      {
+                        value:
+                          DEV_DATA_PREPARATION_TARGET_KEYS.localDevelopment,
+                        label: '本地开发',
+                      },
+                      {
+                        value:
+                          DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133,
+                        label: '133 测试',
+                      },
+                    ]}
+                  />
+                  <DevCustomerScopeSelector
+                    scope={customerScope}
+                    onChange={customerScope.selectCustomer}
+                    disabled={preparing || executing}
+                    label="业务场景甲方"
+                    note="仅业务场景模拟数据按甲方选择；当前永绅对应固定 yoyoosun V6 场景批次。"
+                    invalidDescription="当前甲方没有登记固定场景数据；业务场景的准备与执行已停止，其他数据准备方式不受影响。"
+                  />
+                </Space>
               ) : null}
               <div className="erp-dev-data-prepare-actions">
                 <div>
@@ -1324,7 +1704,7 @@ export default function DevDataPreparationPage() {
             showIcon
             message={
               currentIsScenarioDemo
-                ? '确认后生成固定 V5 业务场景数据'
+                ? '确认后生成固定 V6 业务场景数据'
                 : '确认后才会写入固定目标'
             }
             description={
@@ -1342,8 +1722,32 @@ export default function DevDataPreparationPage() {
               <Descriptions.Item label="固定目标">
                 {currentOperation?.targetSummary.safeTarget || '未证明'}
               </Descriptions.Item>
-              <Descriptions.Item label="固定批次">
-                2026.07.16-v5 / 20260716-V5
+              <Descriptions.Item label="已核对 release">
+                <Text code copyable>
+                  {currentOperation?.targetSummary.releaseSha || '未证明'}
+                </Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="数据库身份">
+                {currentOperation?.targetSummary.databaseName || '未证明'}
+              </Descriptions.Item>
+              <Descriptions.Item label="migration">
+                {currentOperation?.targetSummary.migrationVersion || '未证明'}
+              </Descriptions.Item>
+              <Descriptions.Item label="客户配置 revision">
+                {currentOperation?.targetSummary.customerConfigRevision ||
+                  '未证明'}
+              </Descriptions.Item>
+              <Descriptions.Item label="固定数据合同">
+                {currentOperation?.targetSummary.datasetVersion || '未证明'} /{' '}
+                {currentOperation?.targetSummary.datasetRunId || '未证明'}
+              </Descriptions.Item>
+              <Descriptions.Item label="语义摘要">
+                <Text code copyable>
+                  {currentOperation?.targetSummary.semanticDigest || '未证明'}
+                </Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="回滚或清理点">
+                {currentOperation?.targetSummary.rollbackPoint || '未证明'}
               </Descriptions.Item>
               <Descriptions.Item label="数据范围">
                 {

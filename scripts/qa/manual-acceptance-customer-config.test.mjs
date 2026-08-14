@@ -31,7 +31,7 @@ import {
 
 const CONFIG_HASH = "a".repeat(64);
 const CONFIRMATION =
-  "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.07.16-v5:20260716-V5";
+  "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.08.15-v6:20260815-V6";
 const ATTESTATION = Object.freeze({
   target: CUSTOMER_TRIAL_133_TARGET,
   origin: CUSTOMER_TRIAL_133_ORIGIN,
@@ -294,15 +294,15 @@ test("builds a stable, explicit trial manifest without mutating preview input", 
   );
   assert.equal(manifest.compiled_snapshot.target, CUSTOMER_TRIAL_133_TARGET);
   assert.equal(manifest.compiled_snapshot.package.status, "draft");
-  assert.equal(CUSTOMER_CONFIG_DATA_VERSION, "2026.07.16-v5");
-  assert.equal(CUSTOMER_CONFIG_RUN_ID, "20260716-V5");
+  assert.equal(CUSTOMER_CONFIG_DATA_VERSION, "2026.08.15-v6");
+  assert.equal(CUSTOMER_CONFIG_RUN_ID, "20260815-V6");
   assert.equal(
     CUSTOMER_CONFIG_PRODUCT_VERSION,
-    "customer-trial-133-test-2026.07.16-v5",
+    "customer-trial-133-test-2026.08.15-v6",
   );
   assert.equal(
     CUSTOMER_CONFIG_REVISION,
-    "yoyoosun-customer-trial-133-package-v7.runtime-manifest-v1",
+    "yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1",
   );
 });
 
@@ -437,7 +437,7 @@ test("v1 customer-trial identity is rejected instead of retained as an alias", a
         dataVersion: "2026.07.15-v1",
         runId: CUSTOMER_CONFIG_RUN_ID,
       }),
-    /dataVersion must be 2026\.07\.16-v5/u,
+    /dataVersion must be 2026\.08\.15-v6/u,
   );
   assert.throws(
     () =>
@@ -445,7 +445,7 @@ test("v1 customer-trial identity is rejected instead of retained as an alias", a
         dataVersion: CUSTOMER_CONFIG_DATA_VERSION,
         runId: "20260715-V1",
       }),
-    /runId must be 20260716-V5/u,
+    /runId must be 20260815-V6/u,
   );
 
   const currentManifest = buildCustomerTrial133Manifest(previewManifest());
@@ -457,7 +457,7 @@ test("v1 customer-trial identity is rejected instead of retained as an alias", a
         dataVersion: "2026.07.15-v1",
         runId: "20260715-V1",
       }),
-    /requires dataVersion=2026\.07\.16-v5 and runId=20260716-V5/u,
+    /requires dataVersion=2026\.08\.15-v6 and runId=20260815-V6/u,
   );
   let calls = 0;
 
@@ -476,7 +476,7 @@ test("v1 customer-trial identity is rejected instead of retained as an alias", a
         throw new Error("network must not run");
       },
     }),
-    /current registered v5 identity/u,
+    /current registered v6 identity/u,
   );
   assert.equal(calls, 0);
 });

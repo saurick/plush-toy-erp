@@ -53,7 +53,7 @@ test("local acceptance lifecycle keeps the cloned-write report inside the except
   assert.equal(options.databaseName, identity.browserActionsDatabase);
   assert.equal(
     path.relative(datasetOutputRoot, reportPath),
-    "2026.07.16-v5/local/browser-actions/report.json",
+    "2026.08.15-v6/local/browser-actions/report.json",
   );
 });
 
@@ -169,7 +169,7 @@ function fakeRuntime({ failAt = "", residual = "" } = {}) {
         ok: true,
         completedStages: 9,
         report: "output/dataset.json",
-        dataVersion: "2026.07.16-v5",
+        dataVersion: "2026.08.15-v6",
         chainDataDigest: "a".repeat(64),
         chainVerificationDigest: "b".repeat(64),
         startedAt: "2026-07-28T00:01:00.000Z",

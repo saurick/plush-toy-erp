@@ -743,7 +743,7 @@ function usage() {
 
 133 客户试用环境必须通过已登记的 SSH 隧道，并额外提供：
   --target customer-trial-133 --backend-url http://127.0.0.1:18375 \\
-  --data-version 2026.07.16-v5 --run-id 20260716-V5
+  --data-version 2026.08.15-v6 --run-id 20260815-V6
 以及绑定 target / dataVersion / runId 的 MANUAL_ACCEPTANCE_TARGET_CONFIRM，
 和包含精确 origin/customer/release/migration/debug=false 的
 MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON。

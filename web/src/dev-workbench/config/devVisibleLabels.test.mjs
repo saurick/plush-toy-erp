@@ -36,6 +36,7 @@ test('devVisibleLabels: 十五个开发页和共享导航不保留无说明纯�
     'web/src/dev-workbench/pages/DevDatabaseMigrationPage.jsx',
     'web/src/dev-workbench/pages/DevDrillRecoveryPage.jsx',
     'web/src/dev-workbench/components/DevPageNav.jsx',
+    'web/src/dev-workbench/components/DevEnvironmentEvidencePanel.jsx',
     'web/src/dev-workbench/components/DevTaskNav.jsx',
   ]
   const findings = []

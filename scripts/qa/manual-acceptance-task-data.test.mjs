@@ -61,8 +61,8 @@ const RUNTIME_ADMIN_ID = 100;
 
 test("manual acceptance runtime source report binds five exact forward-only sales order candidates to the same simulated dataset", () => {
   const plan = buildLocalTaskMutationPlan({
-    dataVersion: "2026.07.16-v5",
-    runId: "20260716-V5",
+    dataVersion: "2026.08.15-v6",
+    runId: "20260815-V6",
   });
   const candidates = Array.from({ length: 5 }, (_, index) => ({
     id: 100 + index,
@@ -491,8 +491,8 @@ function createSalesOrderRuntimeEvidenceMock(sources) {
 
 test("runtime evidence advances five simulated sales orders through the formal process path", async () => {
   const plan = buildLocalTaskMutationPlan({
-    dataVersion: "2026.07.16-v5",
-    runId: "20260716-V5",
+    dataVersion: "2026.08.15-v6",
+    runId: "20260815-V6",
   });
   const sources = Array.from({ length: 5 }, (_, index) => ({
     id: 201 + index,
@@ -1311,15 +1311,15 @@ test("long-lived workbench keeps twelve stable actionable tasks for every role",
 
 test("warehouse scenarios stay in the trial namespace and never fill the formal shipping release page", () => {
   const plan = buildManualAcceptanceTaskDataPlan({
-    runId: "20260716-V5",
-    dataVersion: "2026.07.16-v5",
+    runId: "20260815-V6",
+    dataVersion: "2026.08.15-v6",
     nowSec: NOW_SEC,
   });
   const warehouseTasks = plan.tasks.filter(
     (task) => task.roleKey === "warehouse",
   );
 
-  assert.equal(TASK_COPY_REVISION, "PLAIN5");
+  assert.equal(TASK_COPY_REVISION, "PLAIN6");
   assert.equal(warehouseTasks.length, 20);
   assert.equal(plan.summary.byTaskGroup.trial_warehouse_work, 20);
   assert.equal(plan.summary.byTaskGroup.shipment_finance_approval, undefined);
@@ -1604,7 +1604,7 @@ test("CLI documents and parses the output report boundary", () => {
     help.stdout,
     /--database-name plush_erp_acceptance_20260728_delivery_dev/u,
   );
-  assert.match(help.stdout, /--run-id 20260716-V5/u);
+  assert.match(help.stdout, /--run-id 20260815-V6/u);
   assert.doesNotMatch(help.stdout, /127\.0\.0\.1:8300/u);
   assert.match(help.stdout, /MANUAL_ACCEPTANCE_ADMIN_PASSWORD/u);
   assert.match(help.stdout, /used only for debug\.capabilities/u);
@@ -1977,7 +1977,7 @@ test("retires an exact legacy batch only after the plain-copy keep batch is comp
 
 test("long-lived workbench supersession is a no-op only when the whole legacy batch is absent", async () => {
   const keepPlan = buildLocalTaskMutationPlan({
-    runId: "20260716-V5",
+    runId: "20260815-V6",
     nowSec: NOW_SEC,
     taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
   });
@@ -2057,7 +2057,7 @@ test("long-lived workbench supersession is a no-op only when the whole legacy ba
 
 test("PLAIN5 legacy references retain the short visible code scheme for future retirement", () => {
   const legacyBatch = buildLegacyManualAcceptanceTaskBatchReference({
-    runId: "20260716-V5",
+    runId: "20260815-V6",
     copyRevision: "PLAIN5",
   });
   assert.equal(legacyBatch.codeScheme, "short-v5");
@@ -2079,8 +2079,8 @@ test("customer-trial-133 task apply binds exact attestation and live debug capab
   const plan = buildManualAcceptanceTaskDataPlan({
     target: CUSTOMER_TRIAL_133_TARGET,
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
-    dataVersion: "2026.07.16-v5",
-    runId: "20260716-V5",
+    dataVersion: "2026.08.15-v6",
+    runId: "20260815-V6",
     nowSec: NOW_SEC,
   });
   const mock = createMockRuntime({ environment: "remote" });
@@ -2095,8 +2095,8 @@ test("customer-trial-133 task apply binds exact attestation and live debug capab
 
   assert.equal(report.target, CUSTOMER_TRIAL_133_TARGET);
   assert.equal(report.datasetKey, MANUAL_ACCEPTANCE_DATASET_KEY);
-  assert.equal(report.dataVersion, "2026.07.16-v5");
-  assert.equal(report.runId, "20260716-V5");
+  assert.equal(report.dataVersion, "2026.08.15-v6");
+  assert.equal(report.runId, "20260815-V6");
   assert.equal(report.summary.persisted, 180);
   assert.deepEqual(report.runtime.targetAttestation, {
     source: "out-of-band",
@@ -2115,8 +2115,8 @@ test("customer-trial-133 accepts a later immutable release when the CAS migratio
   const plan = buildManualAcceptanceTaskDataPlan({
     target: CUSTOMER_TRIAL_133_TARGET,
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
-    dataVersion: "2026.07.16-v5",
-    runId: "20260716-V5",
+    dataVersion: "2026.08.15-v6",
+    runId: "20260815-V6",
     nowSec: NOW_SEC,
   });
   const laterRelease = "56ecf873796ffafc53f12a3cd5f8b7adb0214581";
@@ -2137,8 +2137,8 @@ test("customer-trial-133 rejects an old Workflow migration before login or write
   const plan = buildManualAcceptanceTaskDataPlan({
     target: CUSTOMER_TRIAL_133_TARGET,
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
-    dataVersion: "2026.07.16-v5",
-    runId: "20260716-V5",
+    dataVersion: "2026.08.15-v6",
+    runId: "20260815-V6",
     nowSec: NOW_SEC,
   });
   let fetchCount = 0;

@@ -31,10 +31,23 @@ const SOURCE_TYPE = TASK_SOURCE_TYPE;
 const SIMULATION_PREFIX = TASK_SIMULATION_PREFIX;
 export const TASK_PROFILE_ACCEPTANCE_SNAPSHOT = "acceptance-snapshot";
 export const TASK_PROFILE_LONG_LIVED_WORKBENCH = "long-lived-workbench";
-export const TASK_COPY_REVISION = "PLAIN5";
+export const TASK_COPY_REVISION = "PLAIN6";
+export const PREVIOUS_TASK_COPY_REVISION = "PLAIN5";
+export const PREVIOUS_TASK_RUN_ID = "20260716-V5";
 export const LONG_LIVED_WORKBENCH_TASK_COPY_REVISION = "WORKBENCH1";
 export const LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE = 12;
 export const TASK_VISIBLE_CODE_PREFIX_BY_ROLE = Object.freeze({
+  boss: "YS-V6-LD",
+  sales: "YS-V6-XS",
+  purchase: "YS-V6-CG",
+  production: "YS-V6-SC",
+  warehouse: "YS-V6-CK",
+  finance: "YS-V6-CW",
+  pmc: "YS-V6-JH",
+  quality: "YS-V6-ZJ",
+  engineering: "YS-V6-GC",
+});
+const PREVIOUS_TASK_VISIBLE_CODE_PREFIX_BY_ROLE = Object.freeze({
   boss: "YS-V5-LD",
   sales: "YS-V5-XS",
   purchase: "YS-V5-CG",
@@ -574,18 +587,18 @@ Usage:
 
 Apply to the dedicated local acceptance runtime:
   MANUAL_ACCEPTANCE_TASK_CONFIRM=${CONFIRM_PHRASE} \\
-  MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260728_delivery_dev \\
+  MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.08.15-v6:20260815-V6:plush_erp_acceptance_20260728_delivery_dev \\
   MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \\
   MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \\
     node scripts/qa/manual-acceptance-task-data.mjs --apply \\
       --target local-dev \\
       --backend-url http://127.0.0.1:8310 \\
       --database-name plush_erp_acceptance_20260728_delivery_dev \\
-      --data-version 2026.07.16-v5 \\
-      --run-id 20260716-V5 \\
+      --data-version 2026.08.15-v6 \\
+      --run-id 20260815-V6 \\
       --schedule-anchor-utc 2026-07-17T09:00:00.000Z \\
-      --source-report output/qa/manual-acceptance/datasets/2026.07.16-v5/local/source/apply-report.json \\
-      --out output/qa/manual-acceptance/datasets/2026.07.16-v5/local/task
+      --source-report output/qa/manual-acceptance/datasets/2026.08.15-v6/local/source/apply-report.json \\
+      --out output/qa/manual-acceptance/datasets/2026.08.15-v6/local/task
 
 The registered customer trial target additionally requires
 --target customer-trial-133, the exact registered backend origin, an explicit
@@ -769,7 +782,9 @@ export function buildLegacyManualAcceptanceTaskBatchReference({
     : normalizedRunID;
   const codeScheme =
     normalizedCopyRevision === TASK_COPY_REVISION
-      ? "short-v5"
+      ? "short-v6"
+      : normalizedCopyRevision === PREVIOUS_TASK_COPY_REVISION
+        ? "short-v5"
       : !normalizedCopyRevision || /^PLAIN[1-4]$/u.test(normalizedCopyRevision)
         ? "long-batch"
         : null;
@@ -796,6 +811,9 @@ export function manualAcceptanceLegacyTaskCode(legacyBatch, roleKey, index) {
   }
   const sequence = pad(index);
   if (legacyBatch?.codeScheme === "short-v5") {
+    return `${PREVIOUS_TASK_VISIBLE_CODE_PREFIX_BY_ROLE[roleKey]}-${sequence}`;
+  }
+  if (legacyBatch?.codeScheme === "short-v6") {
     return `${TASK_VISIBLE_CODE_PREFIX_BY_ROLE[roleKey]}-${sequence}`;
   }
   if (legacyBatch?.codeScheme === "long-batch") {

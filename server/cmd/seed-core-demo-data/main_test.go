@@ -36,7 +36,7 @@ func TestReferenceModeReadbackKeepsAcceptanceAndScenarioModesDistinct(t *testing
 
 func TestManualAcceptanceReferenceTargetIsBoundToTheExactFreshDatabase(t *testing.T) {
 	const database = "plush_erp_acceptance_20260728_delivery_dev"
-	const confirmation = "SEED_MANUAL_ACCEPTANCE_CORE_REFERENCES:local-dev:" + database + ":2026.07.16-v5:20260716-V5"
+	const confirmation = "SEED_MANUAL_ACCEPTANCE_CORE_REFERENCES:local-dev:" + database + ":2026.08.15-v6:20260815-V6"
 	validLoopback := "postgres://acceptance:secret@127.0.0.1:55432/" + database + "?sslmode=disable"
 	validRegisteredDevelopment := "postgres://acceptance:secret@192.168.0.106:5432/" + database + "?sslmode=disable"
 	for _, valid := range []string{validLoopback, validRegisteredDevelopment} {
@@ -94,14 +94,14 @@ func TestManualAcceptanceReferenceTargetIsBoundToTheExactFreshDatabase(t *testin
 
 func TestScenarioDemoReferenceTargetIsBoundToRegisteredLongLivedDevelopmentDatabase(t *testing.T) {
 	for _, database := range []string{"plush_erp", "plush_erp_simon_dev"} {
-		confirmation := "SEED_SCENARIO_DEMO_CORE_REFERENCES:scenario-demo:" + database + ":2026.07.16-v5:20260716-V5"
+		confirmation := "SEED_SCENARIO_DEMO_CORE_REFERENCES:scenario-demo:" + database + ":2026.08.15-v6:20260815-V6"
 		dsn := "postgres://acceptance:secret@192.168.0.106:5432/" + database + "?sslmode=disable"
 		if err := validateScenarioDemoReferenceTarget(dsn, database, confirmation); err != nil {
 			t.Fatalf("valid scenario reference target rejected: %v", err)
 		}
 	}
 	const database = "plush_erp"
-	const confirmation = "SEED_SCENARIO_DEMO_CORE_REFERENCES:scenario-demo:plush_erp:2026.07.16-v5:20260716-V5"
+	const confirmation = "SEED_SCENARIO_DEMO_CORE_REFERENCES:scenario-demo:plush_erp:2026.08.15-v6:20260815-V6"
 	for name, input := range map[string]struct {
 		dsn      string
 		database string

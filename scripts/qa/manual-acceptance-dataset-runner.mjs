@@ -16,6 +16,7 @@ import {
 import { runManualAcceptanceReadinessCli } from "./manual-acceptance-readiness.mjs";
 import {
   MANUAL_ACCEPTANCE_CORE_UNIT_CODE,
+  MANUAL_ACCEPTANCE_CORE_UNIT_CODES,
   MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES,
   resolveManualAcceptanceCoreReferences,
   runManualAcceptanceSourceDataCli,
@@ -36,9 +37,14 @@ import {
 } from "./manual-acceptance-target-policy.mjs";
 
 export const MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION =
-  "manual-acceptance-dataset-runner-v5";
+  "manual-acceptance-dataset-runner-v7";
 
 const DATASET_CONFIRM_PHRASE = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA";
+const ISOLATED_LOCAL_TARGET_ALIAS = "local";
+const EMPTY_BASELINE_REPORT_CONTRACT =
+  "manual-acceptance-empty-baseline-report-v1";
+const PERSISTENT_BASELINE_REPORT_CONTRACT =
+  "manual-acceptance-persistent-baseline-report-v1";
 const ACCOUNT_CONFIRM_PHRASE = "APPLY_SIMULATED_ACCOUNT_SCENARIOS";
 const ATTACHMENT_CONFIRM_PHRASE =
   "APPLY_SIMULATED_MANUAL_ACCEPTANCE_ATTACHMENTS";
@@ -710,11 +716,12 @@ export async function verifyManualAcceptanceCoreReferences({
       { stageKey: "core" },
     );
   }
-  await assertManualAcceptanceRuntimeIdentityPrecondition({
-    policy,
-    attestation: attestedTarget,
-    fetchImpl,
-  });
+  const runtimeIdentity =
+    await assertManualAcceptanceRuntimeIdentityPrecondition({
+      policy,
+      attestation: attestedTarget,
+      fetchImpl,
+    });
   const adminLogin = await coreRPC({
     backendURL: policy.backendURL,
     domain: "auth",
@@ -764,7 +771,10 @@ export async function verifyManualAcceptanceCoreReferences({
       backendURL: policy.backendURL,
       domain: "masterdata",
       method: "list_units",
-      params: { ...queryBase, keyword: MANUAL_ACCEPTANCE_CORE_UNIT_CODE },
+      params: {
+        ...queryBase,
+        keyword: MANUAL_ACCEPTANCE_CORE_UNIT_CODE.replace(/\d+$/u, ""),
+      },
       token: adminToken,
       fetchImpl,
     }),
@@ -772,7 +782,7 @@ export async function verifyManualAcceptanceCoreReferences({
       backendURL: policy.backendURL,
       domain: "masterdata",
       method: "list_warehouses",
-      params: { ...queryBase, keyword: "YS5-CK-" },
+      params: { ...queryBase, keyword: "YS6-CK-" },
       token: adminToken,
       fetchImpl,
     }),
@@ -796,9 +806,19 @@ export async function verifyManualAcceptanceCoreReferences({
     configApplyPurpose: runtime.configApplyPurpose,
     configDatasetVersion: runtime.configDatasetVersion ?? null,
     configTarget: runtime.configTarget ?? null,
-    unitCode: MANUAL_ACCEPTANCE_CORE_UNIT_CODE,
+    runtimeIdentity: {
+      scope: policy.external ? "release-v1" : "database-v1",
+      proof: runtimeIdentity.proof,
+      databaseName: runtimeIdentity.databaseName,
+      release: runtimeIdentity.release ?? null,
+      migration: runtimeIdentity.migration ?? null,
+    },
+    unitCodes: Object.values(MANUAL_ACCEPTANCE_CORE_UNIT_CODES),
     warehouseCodes: Object.values(MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES),
-    summary: { units: 1, warehouses: 4 },
+    summary: {
+      units: Object.keys(MANUAL_ACCEPTANCE_CORE_UNIT_CODES).length,
+      warehouses: 4,
+    },
   };
 }
 
@@ -853,7 +873,9 @@ function assertBaselineCoreCodes(units, warehouses) {
   const warehouseCodes = warehouses
     .map((item) => String(item?.code || ""))
     .sort();
-  const expectedUnitCodes = [MANUAL_ACCEPTANCE_CORE_UNIT_CODE];
+  const expectedUnitCodes = Object.values(
+    MANUAL_ACCEPTANCE_CORE_UNIT_CODES,
+  ).sort();
   const expectedWarehouseCodes = Object.values(
     MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES,
   ).sort();
@@ -863,7 +885,7 @@ function assertBaselineCoreCodes(units, warehouses) {
   ) {
     throw new ManualAcceptanceDatasetRunnerError(
       "empty_baseline_core_code_mismatch",
-      "fresh baseline must contain only the exact V5 unit and warehouse codes",
+      "fresh baseline must contain only the exact V6 unit and warehouse codes",
       {
         stageKey: "baseline",
         expectedUnitCodes,
@@ -1007,7 +1029,7 @@ export async function verifyManualAcceptanceEmptyBaseline({
   const units = exactBaselineList(
     await query(unitProbe, { limit: 200, offset: 0 }),
     unitProbe,
-    1,
+    Object.keys(MANUAL_ACCEPTANCE_CORE_UNIT_CODES).length,
   );
   const warehouses = exactBaselineList(
     await query(warehouseProbe, { limit: 200, offset: 0 }),
@@ -1034,9 +1056,9 @@ export async function verifyManualAcceptanceEmptyBaseline({
       BASELINE_CONFIG_FIELDS.map((field) => [field, runtime[field] ?? null]),
     ),
     core: {
-      units: 1,
+      units: Object.keys(MANUAL_ACCEPTANCE_CORE_UNIT_CODES).length,
       warehouses: 4,
-      unitCodes: [MANUAL_ACCEPTANCE_CORE_UNIT_CODE],
+      unitCodes: Object.values(MANUAL_ACCEPTANCE_CORE_UNIT_CODES).sort(),
       warehouseCodes: Object.values(
         MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES,
       ).sort(),
@@ -1063,7 +1085,7 @@ async function defaultCoreComponent(invocation, deps) {
     operation: "verified",
     references: {
       businessCodes: {
-        unit: verified.unitCode,
+        units: verified.unitCodes,
         warehouses: verified.warehouseCodes,
       },
     },
@@ -1082,9 +1104,10 @@ async function defaultCoreComponent(invocation, deps) {
       configApplyPurpose: verified.configApplyPurpose,
       configDatasetVersion: verified.configDatasetVersion,
       configTarget: verified.configTarget,
+      runtimeIdentity: verified.runtimeIdentity,
       prefix,
       businessCodes: {
-        unit: verified.unitCode,
+        units: verified.unitCodes,
         warehouses: verified.warehouseCodes,
       },
       summary: {
@@ -1104,6 +1127,54 @@ async function defaultBaselineComponent(invocation, deps) {
       "empty-baseline verification can only run after the completed core stage",
       { stageKey: "baseline" },
     );
+  }
+  if (targetAdapter.alias !== ISOLATED_LOCAL_TARGET_ALIAS) {
+    const customerConfig = Object.fromEntries(
+      BASELINE_CONFIG_FIELDS.map((field) => [
+        field,
+        core.report[field] ?? null,
+      ]),
+    );
+    const persistentReport = {
+      contract: PERSISTENT_BASELINE_REPORT_CONTRACT,
+      mode: "verify",
+      scope: "manual-acceptance-persistent-target-baseline",
+      simulatedOnly: true,
+      datasetKey: businessInput.datasetKey,
+      dataVersion: businessInput.dataVersion,
+      runId: businessInput.runId,
+      target: targetAdapter.policyTarget,
+      backendURL: targetAdapter.backendURL,
+      databaseName: core.report.databaseName,
+      runtimeIdentity: structuredClone(core.report.runtimeIdentity),
+      customerConfig,
+      core: {
+        units: core.report.summary.units,
+        warehouses: core.report.summary.warehouses,
+        unitCodes: [...core.report.businessCodes.units].sort(),
+        warehouseCodes: [...core.report.businessCodes.warehouses].sort(),
+      },
+      summary: {
+        exactEmptyBusinessBaseline: false,
+        legacyDataPreserved: true,
+        currentBatchGuard: "component-exact-create-or-readback",
+        units: core.report.summary.units,
+        warehouses: core.report.summary.warehouses,
+      },
+    };
+    return {
+      operation: "verified",
+      references: {
+        coreReport: {
+          reportPath: core.reportPath,
+          componentDigest: digestManualAcceptanceDatasetComponentReport(
+            core.report,
+          ),
+        },
+        runtimeIdentity: persistentReport.runtimeIdentity,
+      },
+      report: persistentReport,
+    };
   }
   const verified = await verifyManualAcceptanceEmptyBaseline({
     backendURL: targetAdapter.backendURL,
@@ -1129,7 +1200,7 @@ async function defaultBaselineComponent(invocation, deps) {
       runtimeIdentity: verified.runtimeIdentity,
     },
     report: {
-      contract: "manual-acceptance-empty-baseline-report-v1",
+      contract: EMPTY_BASELINE_REPORT_CONTRACT,
       mode: "verify",
       scope: "manual-acceptance-empty-business-baseline",
       simulatedOnly: true,
@@ -1554,30 +1625,41 @@ function assertReusableBaseline(execution, report) {
   const expectedWarehouses = Object.values(
     MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES,
   ).sort();
-  const validZeroCounts =
-    isPlainRecord(report.zeroCounts) &&
-    Object.keys(report.zeroCounts).length ===
-      MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES.length &&
-    MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES.every(
-      ({ key }) => report.zeroCounts[key] === 0,
-    );
+  const expectedUnits = Object.values(MANUAL_ACCEPTANCE_CORE_UNIT_CODES).sort();
   const validCore =
-    report.core?.units === 1 &&
+    report.core?.units === expectedUnits.length &&
     report.core?.warehouses === 4 &&
-    JSON.stringify(report.core?.unitCodes) ===
-      JSON.stringify([MANUAL_ACCEPTANCE_CORE_UNIT_CODE]) &&
+    JSON.stringify([...(report.core?.unitCodes || [])].sort()) ===
+      JSON.stringify(expectedUnits) &&
     JSON.stringify([...(report.core?.warehouseCodes || [])].sort()) ===
       JSON.stringify(expectedWarehouses);
-  const validSummary =
-    report.contract === "manual-acceptance-empty-baseline-report-v1" &&
-    report.summary?.exactEmptyBusinessBaseline === true &&
-    report.summary?.allTrackedCountsZero === true &&
-    report.summary?.checkedBusinessObjectKinds ===
-      MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES.length;
+  const isolatedLocal =
+    execution.targetAdapter.alias === ISOLATED_LOCAL_TARGET_ALIAS;
+  const validZeroCounts =
+    !isolatedLocal ||
+    (isPlainRecord(report.zeroCounts) &&
+      Object.keys(report.zeroCounts).length ===
+        MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES.length &&
+      MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES.every(
+        ({ key }) => report.zeroCounts[key] === 0,
+      ));
+  const validSummary = isolatedLocal
+    ? report.contract === EMPTY_BASELINE_REPORT_CONTRACT &&
+      report.summary?.exactEmptyBusinessBaseline === true &&
+      report.summary?.allTrackedCountsZero === true &&
+      report.summary?.checkedBusinessObjectKinds ===
+        MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES.length
+    : report.contract === PERSISTENT_BASELINE_REPORT_CONTRACT &&
+      report.summary?.exactEmptyBusinessBaseline === false &&
+      report.summary?.legacyDataPreserved === true &&
+      report.summary?.currentBatchGuard ===
+        "component-exact-create-or-readback";
   if (!currentCore || !validZeroCounts || !validCore || !validSummary) {
     throw new ManualAcceptanceDatasetRunnerError(
       "resume_baseline_invalid",
-      "resume receipt does not contain a complete fresh empty-baseline proof",
+      isolatedLocal
+        ? "resume receipt does not contain a complete fresh empty-baseline proof"
+        : "resume receipt does not contain a complete persistent-target baseline binding",
       { stageKey: "baseline" },
     );
   }

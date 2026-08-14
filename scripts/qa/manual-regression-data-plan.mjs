@@ -13,6 +13,10 @@ import {
   CUSTOMER_TRIAL_133_ORIGIN,
   CUSTOMER_TRIAL_133_TARGET,
 } from "./manual-acceptance-target-policy.mjs";
+import {
+  MANUAL_ACCEPTANCE_CORE_CONTRACT,
+  MANUAL_ACCEPTANCE_CORE_SEMANTIC_DIGEST,
+} from "./manual-acceptance-core-contract.mjs";
 
 const currentFile = fileURLToPath(import.meta.url);
 const DEFAULT_OUT_DIR = "output/qa/manual-regression-data-plan";
@@ -136,12 +140,30 @@ function buildYoyoosunPlan() {
     currentContract: {
       version: identity.dataVersion,
       runId: identity.runId,
+      semanticDigest: MANUAL_ACCEPTANCE_CORE_SEMANTIC_DIGEST,
       targets: ["local", CUSTOMER_TRIAL_133_TARGET],
       sameBusinessMeaning: true,
       sharedDatabaseIds: false,
       factsContract: "source-driven-operational-facts-v1",
       formalBusinessAPIsOnly: true,
       purchaseQualityHandledByFacts: true,
+    },
+    canonicalCore: {
+      units: MANUAL_ACCEPTANCE_CORE_CONTRACT.units.map(
+        ({ key, code, name, sourceLabel, precision }) => ({
+          key,
+          code,
+          name,
+          sourceLabel,
+          precision,
+        }),
+      ),
+      warehouses: MANUAL_ACCEPTANCE_CORE_CONTRACT.warehouses.map(
+        ({ key, code, name, type }) => ({ key, code, name, type }),
+      ),
+      sourceNormalization: structuredClone(
+        MANUAL_ACCEPTANCE_CORE_CONTRACT.sourceNormalization,
+      ),
     },
     targetRules: {
       local: {
@@ -234,8 +256,10 @@ export function formatManualRegressionDataPlan(plan) {
     "",
     "永绅模拟验收数据",
     `- 当前版本: ${plan.yoyoosun.dataVersion} / ${plan.yoyoosun.runId}`,
+    `- 统一数据合同: units=${plan.yoyoosun.canonicalCore.units.length}, warehouses=${plan.yoyoosun.canonicalCore.warehouses.length}, semanticDigest=${plan.yoyoosun.currentContract.semanticDigest}`,
+    `- 单位候选: ${plan.yoyoosun.canonicalCore.units.map((item) => item.name).join(", ")}`,
     `- 参考样例: ${plan.yoyoosun.fixtureKey} (${plan.yoyoosun.fixtureStatus})`,
-    `- 样例数量: ${Object.entries(plan.yoyoosun.fixtureCounts)
+    `- 参考样例数量（不代表当前库）: ${Object.entries(plan.yoyoosun.fixtureCounts)
       .map(([key, value]) => `${key}=${value}`)
       .join(", ")}`,
     `- 销售订单状态: ${plan.yoyoosun.fixtureStateCoverage.salesOrderLifecycleStatuses.join(", ")}`,

@@ -3,6 +3,7 @@ package biz
 import (
 	"context"
 	"errors"
+	"server/internal/manualacceptance"
 	"time"
 )
 
@@ -24,13 +25,14 @@ const (
 	CustomerConfigReleaseRehearsalIDEnv               = "ERP_RELEASE_REHEARSAL_ID"
 	CustomerConfigReleaseRehearsalSystemIdentifierEnv = "ERP_RELEASE_REHEARSAL_PG_SYSTEM_IDENTIFIER"
 
-	CustomerConfigTrialApplyPurpose   = "customer_trial_test_apply"
-	CustomerConfigTrialDatasetVersion = "2026.07.16-v5"
-	CustomerConfigTrialProductVersion = "customer-trial-133-test-2026.07.16-v5"
-	CustomerConfigTrialTarget         = "customer-trial-133"
+	CustomerConfigTrialApplyPurpose = "customer_trial_test_apply"
+	CustomerConfigTrialTarget       = "customer-trial-133"
 )
 
 var (
+	manualAcceptanceContract                = manualacceptance.Current()
+	CustomerConfigTrialDatasetVersion       = manualAcceptanceContract.DataVersion
+	CustomerConfigTrialProductVersion       = manualAcceptanceContract.CustomerTrial133.ConfigProductVersion
 	ErrCustomerConfigNotFound               = errors.New("customer config not found")
 	ErrCustomerConfigRevisionImmutable      = errors.New("customer config revision is immutable")
 	ErrCustomerConfigHashMismatch           = errors.New("customer config hash mismatch")

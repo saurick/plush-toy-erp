@@ -12,6 +12,7 @@ import {
   acquireDataPreparationExecutionLock,
   createOrReuseDataPreparationOperation,
   DATA_PREPARATION_PROFILE_KEYS,
+  DATA_PREPARATION_TARGET_KEYS,
   DATA_PREPARATION_TERMINAL_STATUSES,
   hashDataPreparationPlan,
   listDataPreparationOperations,
@@ -26,10 +27,23 @@ import {
   transitionDataPreparationOperation,
 } from '../../scripts/qa/dev-data-preparation-operation-store.mjs'
 import { readRepositoryIdentity } from '../../scripts/qa/lib/repository-identity.mjs'
+import { createCustomerTrial133DataBackup } from '../../scripts/qa/customer-trial-133-data.mjs'
 import { buildManualAcceptanceBusinessChainReviewPlan } from '../../scripts/qa/manual-acceptance-business-chain-contract.mjs'
-import { MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS } from '../../scripts/qa/manual-acceptance-dataset.mjs'
+import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from '../../scripts/qa/manual-acceptance-core-contract.mjs'
+import {
+  MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS,
+  buildManualAcceptanceSemanticPlan,
+  digestManualAcceptanceSemanticPlan,
+} from '../../scripts/qa/manual-acceptance-dataset.mjs'
 import { buildManualAcceptancePageDataContract } from '../../scripts/qa/manual-acceptance-page-data-contract.mjs'
-import { CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION } from '../../scripts/qa/manual-acceptance-target-policy.mjs'
+import {
+  CUSTOMER_TRIAL_133_DATABASE,
+  CUSTOMER_TRIAL_133_ORIGIN,
+  CUSTOMER_TRIAL_133_TARGET,
+  CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+  CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+} from '../../scripts/qa/manual-acceptance-target-policy.mjs'
+import { runTargetPreflightAsync } from '../../scripts/deploy/target-preflight.mjs'
 import {
   isLoopbackHostHeader,
   isLoopbackRemoteAddress,
@@ -42,7 +56,8 @@ export const DEV_DATA_PREPARATION_ACTION_API_PATH = `${DEV_DATA_PREPARATION_API_
 export const MAX_DEV_DATA_PREPARATION_REQUEST_BYTES = 16 * 1024
 
 const execFileAsync = promisify(execFile)
-const IDEMPOTENCY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$/u
+const IDEMPOTENCY_PATTERN =
+  /^data-preparation:prepare:(core-demo|scenario-demo|full-acceptance):(local-development|customer-trial-133|isolated-local):([0-9a-f-]{36})$/u
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
 const OPERATION_PATH_PATTERN = new RegExp(
@@ -52,9 +67,22 @@ const OPERATION_PATH_PATTERN = new RegExp(
 const REGISTERED_DEVELOPMENT_HOST = '192.168.0.106'
 const REGISTERED_DEVELOPMENT_PORT = 5432
 const CORE_DEMO_PREFIX = 'SIM-PLUSH-CORE'
-const SCENARIO_DEMO_DATA_VERSION = '2026.07.16-v5'
-const SCENARIO_DEMO_RUN_ID = '20260716-V5'
+const SCENARIO_DEMO_DATA_VERSION = CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION
+const SCENARIO_DEMO_RUN_ID = CURRENT_MANUAL_ACCEPTANCE_RUN_ID
+const SCENARIO_DEMO_CATALOG_TARGET_COUNT = 51
+const SCENARIO_DEMO_CATALOG_READY_COUNT = 41
+const SCENARIO_DEMO_BROWSER_CHECKS_PENDING = 10
 const INTERRUPTED_OPERATION_RECOVERY_GRACE_MS = 30_000
+const LOCAL_DEVELOPMENT_TARGET = 'local-development'
+const ISOLATED_LOCAL_TARGET = 'isolated-local'
+const PROFILE_TARGETS = Object.freeze({
+  'core-demo': Object.freeze([LOCAL_DEVELOPMENT_TARGET]),
+  'scenario-demo': Object.freeze([
+    LOCAL_DEVELOPMENT_TARGET,
+    CUSTOMER_TRIAL_133_TARGET,
+  ]),
+  'full-acceptance': Object.freeze([ISOLATED_LOCAL_TARGET]),
+})
 const LOCAL_ACCEPTANCE_DATABASE_BASE_URL_ENV =
   'LOCAL_ACCEPTANCE_DATABASE_BASE_URL'
 const DATABASE_TARGET_MODULE_URL = pathToFileURL(
@@ -72,6 +100,32 @@ const MANUAL_ACCEPTANCE_REVIEW_PLAN =
     catalogTargetCount: buildManualAcceptancePageDataContract().targetCount,
     datasetStageKeys: MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS,
   })
+
+const MANUAL_ACCEPTANCE_ENVIRONMENT_CONTRACT = Object.freeze({
+  schemaVersion: 'plush.dev-data-environment-contract/v1',
+  datasetKey: MANUAL_ACCEPTANCE_CORE_CONTRACT.datasetKey,
+  dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
+  runId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
+  semanticDigest: digestManualAcceptanceSemanticPlan(
+    buildManualAcceptanceSemanticPlan()
+  ),
+  simulatedOnly: MANUAL_ACCEPTANCE_CORE_CONTRACT.simulatedOnly,
+  realCustomerImport: MANUAL_ACCEPTANCE_CORE_CONTRACT.realCustomerImport,
+  unitCount: MANUAL_ACCEPTANCE_CORE_CONTRACT.units.length,
+  warehouseCount: MANUAL_ACCEPTANCE_CORE_CONTRACT.warehouses.length,
+  customerTrial133: Object.freeze({
+    target: MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.target,
+    databaseName: MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.databaseName,
+    databaseLifecycle:
+      MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.databaseLifecycle,
+    minimumMigration:
+      MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
+    configRevision:
+      MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision,
+    configProductVersion:
+      MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configProductVersion,
+  }),
+})
 
 function loadDatabaseTargetModule() {
   databaseTargetModulePromise ||= import(DATABASE_TARGET_MODULE_URL)
@@ -103,14 +157,17 @@ export const DEV_DATA_PREPARATION_PROFILES = Object.freeze([
   }),
   Object.freeze({
     key: 'scenario-demo',
-    title: '长期共享库场景数据',
+    title: '长期业务场景数据',
     purpose:
-      '先对齐当前跟踪的本地客户配置，再按固定 V5 批次精确创建或读回 Source、ProcessRuntime 与 Fact 场景',
+      '本地开发与 133 测试分别按固定目标身份，共用同一 V6 语义精确创建或读回 Source、ProcessRuntime 与 Fact 场景',
     writesDatabase: true,
     dataRetention: 'long-lived',
     cleanupMode: 'forward-only',
     exactCleanCommitRequired: false,
-    requiredEnvironment: Object.freeze(['登记本地开发库', '本机 8300 后端']),
+    requiredEnvironment: Object.freeze([
+      '登记本地开发库与本机 8300 后端',
+      '登记 133 试用库、固定隧道与带外证明',
+    ]),
   }),
 ])
 
@@ -138,12 +195,21 @@ export function validateDevDataPreparationAction(value) {
   if (value.action === 'prepare') {
     assertExactKeys(
       value.payload,
-      ['idempotencyKey', 'profileKey'],
+      ['idempotencyKey', 'profileKey', 'targetKey'],
       'prepare payload'
+    )
+    const idempotency = IDEMPOTENCY_PATTERN.exec(
+      String(value.payload.idempotencyKey || '')
     )
     if (
       !DATA_PREPARATION_PROFILE_KEYS.includes(value.payload.profileKey) ||
-      !IDEMPOTENCY_PATTERN.test(String(value.payload.idempotencyKey || ''))
+      !DATA_PREPARATION_TARGET_KEYS.includes(value.payload.targetKey) ||
+      !PROFILE_TARGETS[value.payload.profileKey]?.includes(
+        value.payload.targetKey
+      ) ||
+      idempotency?.[1] !== value.payload.profileKey ||
+      idempotency?.[2] !== value.payload.targetKey ||
+      !UUID_PATTERN.test(String(idempotency?.[3] || ''))
     ) {
       throw new Error('prepare payload is invalid')
     }
@@ -169,14 +235,66 @@ export function validateDevDataPreparationAction(value) {
 
 function targetSummary(
   parsed,
-  { disposable, automaticCleanup, preflightFingerprint = '0'.repeat(64) }
+  {
+    targetKey,
+    disposable,
+    automaticCleanup,
+    preflightFingerprint = '0'.repeat(64),
+  }
 ) {
+  if (!DATA_PREPARATION_TARGET_KEYS.includes(targetKey)) {
+    throw new Error('data preparation target key is invalid')
+  }
   return Object.freeze({
-    safeTarget: parsed.safeTarget,
+    targetKey,
+    safeTarget: `${targetKey}:${parsed.databaseName}`,
     targetFingerprint: parsed.targetFingerprint,
     preflightFingerprint,
     disposable,
     automaticCleanup,
+  })
+}
+
+export function customerTrialBackupAlias(repository, runId) {
+  const commit = String(repository?.commit || '')
+  if (
+    !/^[0-9a-f]{40}$/u.test(commit) ||
+    !/^d[0-9]{12}_[0-9a-f]{8}$/u.test(runId)
+  ) {
+    throw new Error('customer-trial-133 backup identity is invalid')
+  }
+  return `pre-data-${commit.slice(0, 12)}-${runId}`
+}
+
+function operationTargetSummary(target, { profileKey, repository, runId }) {
+  const customerConfigRevision =
+    target.customerConfigRevision ||
+    (profileKey === 'core-demo'
+      ? 'not-applicable-core-demo'
+      : 'activated-during-lifecycle')
+  const migrationVersion =
+    target.migrationVersion || 'verified-during-lifecycle'
+  const rollbackPoint =
+    target.targetKey === CUSTOMER_TRIAL_133_TARGET
+      ? customerTrialBackupAlias(repository, runId)
+      : profileKey === 'full-acceptance'
+        ? `automatic-cleanup:${runId}`
+        : `forward-only:${target.databaseName}:${SCENARIO_DEMO_RUN_ID}`
+  return Object.freeze({
+    targetKey: target.targetKey,
+    safeTarget: target.safeTarget,
+    targetFingerprint: target.targetFingerprint,
+    preflightFingerprint: target.preflightFingerprint,
+    disposable: target.disposable,
+    automaticCleanup: target.automaticCleanup,
+    releaseSha: repository.commit,
+    databaseName: target.databaseName,
+    migrationVersion,
+    customerConfigRevision,
+    datasetVersion: SCENARIO_DEMO_DATA_VERSION,
+    datasetRunId: SCENARIO_DEMO_RUN_ID,
+    semanticDigest: MANUAL_ACCEPTANCE_ENVIRONMENT_CONTRACT.semanticDigest,
+    rollbackPoint,
   })
 }
 
@@ -261,18 +379,40 @@ export function coreDemoPreflightCommand(projectRoot) {
   })
 }
 
-export function scenarioDemoPlanCommand(projectRoot) {
+function scenarioTargetArgs(targetKey, attestation) {
+  if (targetKey === LOCAL_DEVELOPMENT_TARGET) return []
+  if (targetKey !== CUSTOMER_TRIAL_133_TARGET || !attestation) {
+    throw new Error('scenario demo target context is invalid')
+  }
+  return [
+    '--target',
+    CUSTOMER_TRIAL_133_TARGET,
+    '--target-attestation-json',
+    JSON.stringify(attestation),
+  ]
+}
+
+export function scenarioDemoPlanCommand(
+  projectRoot,
+  targetKey = LOCAL_DEVELOPMENT_TARGET,
+  attestation
+) {
   const root = path.resolve(projectRoot)
   return Object.freeze({
     command: process.execPath,
     args: Object.freeze([
       path.join(root, 'scripts', 'qa', 'scenario-demo-data.mjs'),
+      ...scenarioTargetArgs(targetKey, attestation),
     ]),
     options: Object.freeze({ cwd: root }),
   })
 }
 
-export function scenarioDemoExecutionCommand(projectRoot, operation) {
+export function scenarioDemoExecutionCommand(
+  projectRoot,
+  operation,
+  attestation
+) {
   const root = path.resolve(projectRoot)
   return Object.freeze({
     command: process.execPath,
@@ -281,6 +421,7 @@ export function scenarioDemoExecutionCommand(projectRoot, operation) {
       '--apply',
       '--expected-plan-digest',
       operation.targetSummary.preflightFingerprint,
+      ...scenarioTargetArgs(operation.targetSummary.targetKey, attestation),
     ]),
     options: Object.freeze({ cwd: root }),
   })
@@ -386,7 +527,11 @@ function parseCoreSeedReadback(stdout) {
     throw new Error('core seed readback contract did not match')
   }
   const values = match.slice(2).map(Number)
-  if (values.some((value) => !Number.isSafeInteger(value) || value < 0)) {
+  if (
+    values.some((value) => !Number.isSafeInteger(value) || value < 0) ||
+    values[0] !== MANUAL_ACCEPTANCE_CORE_CONTRACT.units.length ||
+    values[3] !== MANUAL_ACCEPTANCE_CORE_CONTRACT.warehouses.length
+  ) {
     throw new Error('core seed readback counts are invalid')
   }
   return {
@@ -399,7 +544,7 @@ function parseCoreSeedReadback(stdout) {
   }
 }
 
-function corePreflightFingerprint(stdout) {
+function corePreflightEvidence(stdout) {
   const output = String(stdout || '').trim()
   const migration = output.match(
     /migration 已是最新版本（([^，\r\n]+)，(\d+)\/(\d+)）/u
@@ -414,7 +559,7 @@ function corePreflightFingerprint(stdout) {
   ) {
     throw new Error('core demo migration preflight contract did not match')
   }
-  return hashDataPreparationPlan({
+  const evidence = {
     schemaVersion: 'plush.dev-data-preparation-core-preflight/v1',
     migrationVersion: migration[1],
     appliedFiles: Number(migration[2]),
@@ -425,6 +570,10 @@ function corePreflightFingerprint(stdout) {
       procedures: 0,
       nonInternalTriggers: 0,
     },
+  }
+  return Object.freeze({
+    migrationVersion: migration[1],
+    fingerprint: hashDataPreparationPlan(evidence),
   })
 }
 
@@ -485,33 +634,53 @@ function scenarioDemoPlanFingerprint(stdout, repository, target) {
   } catch {
     throw new Error('scenario demo plan is invalid')
   }
+  const expectedAlias =
+    target.targetKey === CUSTOMER_TRIAL_133_TARGET
+      ? CUSTOMER_TRIAL_133_TARGET
+      : 'scenario-demo'
+  const expectedOrigin =
+    target.targetKey === CUSTOMER_TRIAL_133_TARGET
+      ? CUSTOMER_TRIAL_133_ORIGIN
+      : 'http://127.0.0.1:8300'
   if (
-    plan.schemaVersion !== 'plush.scenario-demo-plan/v1' ||
+    plan.schemaVersion !== 'plush.scenario-demo-plan/v2' ||
     plan.profileKey !== 'scenario-demo' ||
+    plan.targetAlias !== expectedAlias ||
     plan.datasetKey !== 'yoyoosun-manual-acceptance' ||
     plan.dataVersion !== SCENARIO_DEMO_DATA_VERSION ||
     plan.runId !== SCENARIO_DEMO_RUN_ID ||
-    plan.backendURL !== 'http://127.0.0.1:8300' ||
+    !/^20[0-9]{12}$/u.test(String(plan.migrationVersion || '')) ||
+    plan.semanticDigest !==
+      MANUAL_ACCEPTANCE_ENVIRONMENT_CONTRACT.semanticDigest ||
+    plan.backendURL !== expectedOrigin ||
     plan.databaseName !== target.databaseName ||
     plan.repository?.commit !== repository.commit ||
     plan.repository?.dirty !== repository.dirty ||
     plan.repository?.fingerprint !== repository.fingerprint ||
     plan.target?.targetFingerprint !== target.targetFingerprint ||
     plan.target?.disposable !== false ||
-    plan.target?.registeredDevelopmentPostgresOnly !== true ||
+    plan.target?.registeredTargetOnly !== true ||
     plan.target?.loopbackBackendOnly !== true ||
+    plan.canonicalRunner?.stageCount !==
+      MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.length ||
+    plan.canonicalRunner?.semanticDigest !== plan.semanticDigest ||
+    plan.canonicalRunner?.persistentBaseline !== true ||
     plan.execution?.replayMode !== 'exact-create-or-readback' ||
     plan.execution?.dataRetention !== 'long-lived' ||
     plan.execution?.cleanupSupported !== false ||
     plan.execution?.cleanupMode !== 'forward-only' ||
     plan.execution?.directBusinessSQL !== false ||
-    plan.execution?.auditMinimum !== 30 ||
     plan.execution?.manualAcceptanceCompleted !== false ||
     !/^[0-9a-f]{64}$/u.test(String(plan.planDigest || ''))
   ) {
     throw new Error('scenario demo plan identity is invalid')
   }
-  return plan.planDigest
+  return Object.freeze({
+    fingerprint: plan.planDigest,
+    migrationVersion: plan.migrationVersion,
+    customerConfigRevision: plan.runtime.configRevision,
+    customerConfigProductVersion: plan.runtime.configProductVersion,
+  })
 }
 
 function parseScenarioDemoReadback(stdout, operation) {
@@ -524,19 +693,30 @@ function parseScenarioDemoReadback(stdout, operation) {
   if (
     readback?.schemaVersion !== 'plush.dev-data-preparation-readback/v1' ||
     readback?.profileKey !== 'scenario-demo' ||
+    readback?.targetKey !== operation.targetSummary.targetKey ||
+    readback?.targetEnvironment !== operation.targetSummary.targetKey ||
     readback?.targetFingerprint !== operation.targetSummary.targetFingerprint ||
+    readback?.databaseName !==
+      operation.targetSummary.safeTarget.split(':').slice(1).join(':') ||
+    readback?.release !== operation.repository.commit ||
+    !/^20[0-9]{12}$/u.test(String(readback?.migrationVersion || '')) ||
+    typeof readback?.customerConfigRevision !== 'string' ||
+    readback.customerConfigRevision.length < 1 ||
     readback?.datasetKey !== 'yoyoosun-manual-acceptance' ||
     readback?.dataVersion !== SCENARIO_DEMO_DATA_VERSION ||
     readback?.runId !== SCENARIO_DEMO_RUN_ID ||
+    readback?.semanticDigest !==
+      MANUAL_ACCEPTANCE_ENVIRONMENT_CONTRACT.semanticDigest ||
+    readback?.stageCount !== MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.length ||
     !Number.isSafeInteger(readback?.sourceDocumentCount) ||
     readback.sourceDocumentCount < 1 ||
     !Number.isSafeInteger(readback?.processRuntimeCount) ||
     readback.processRuntimeCount < 1 ||
     !Number.isSafeInteger(readback?.factCount) ||
     readback.factCount < 1 ||
-    readback?.catalogReadyCount !== 40 ||
-    readback?.catalogTargetCount !== 50 ||
-    readback?.browserChecksPending !== 10 ||
+    readback?.catalogReadyCount !== SCENARIO_DEMO_CATALOG_READY_COUNT ||
+    readback?.catalogTargetCount !== SCENARIO_DEMO_CATALOG_TARGET_COUNT ||
+    readback?.browserChecksPending !== SCENARIO_DEMO_BROWSER_CHECKS_PENDING ||
     readback?.manualAcceptanceCompleted !== false ||
     readback?.cleanupSupported !== false ||
     readback?.replayMode !== 'exact-create-or-readback'
@@ -690,11 +870,17 @@ function operationTiming(operation) {
 }
 
 function publicOperation(operation) {
+  const targetKey =
+    operation.targetSummary.targetKey ||
+    (operation.profileKey === 'full-acceptance'
+      ? ISOLATED_LOCAL_TARGET
+      : LOCAL_DEVELOPMENT_TARGET)
   const confirmation =
     operation.status === 'ready'
       ? [
           'DATA_PREPARATION',
           operation.profileKey,
+          targetKey,
           operation.runId,
           operation.planHash,
           operation.id,
@@ -706,7 +892,8 @@ function publicOperation(operation) {
     status: operation.status,
     planHash: operation.planHash,
     runId: operation.runId,
-    targetSummary: operation.targetSummary,
+    repository: operation.repository,
+    targetSummary: { ...operation.targetSummary, targetKey },
     createdAt: operation.createdAt,
     updatedAt: operation.updatedAt,
     timing: operationTiming(operation),
@@ -731,6 +918,8 @@ function laterScenarioReadbackResolves(operation, operations) {
       candidate.status === 'passed' &&
       candidate.targetSummary.targetFingerprint ===
         operation.targetSummary.targetFingerprint &&
+      (candidate.targetSummary.targetKey || LOCAL_DEVELOPMENT_TARGET) ===
+        (operation.targetSummary.targetKey || LOCAL_DEVELOPMENT_TARGET) &&
       candidate.readback?.dataVersion === SCENARIO_DEMO_DATA_VERSION &&
       candidate.readback?.runId === SCENARIO_DEMO_RUN_ID &&
       Date.parse(candidate.updatedAt) > Date.parse(operation.updatedAt)
@@ -750,6 +939,13 @@ export function unresolvedDataPreparationOutcomeBlocksExecution(
     }
     if (['launching', 'running'].includes(candidate.status)) {
       return true
+    }
+    const operationTargetKey =
+      operation.targetSummary.targetKey || LOCAL_DEVELOPMENT_TARGET
+    const candidateTargetKey =
+      candidate.targetSummary.targetKey || LOCAL_DEVELOPMENT_TARGET
+    if (candidateTargetKey !== operationTargetKey) {
+      return false
     }
     return !(
       operation.profileKey === 'scenario-demo' &&
@@ -778,6 +974,8 @@ export function createDevDataPreparationService({
   environment = process.env,
   now = () => new Date(),
   random = randomBytes,
+  readCustomerTrialPreflight = () => runTargetPreflightAsync('test-133'),
+  createCustomerTrialBackup = createCustomerTrial133DataBackup,
   processId = process.pid,
   isProcessAlive = (pid) => {
     try {
@@ -822,9 +1020,13 @@ export function createDevDataPreparationService({
       }),
       { coreDemo: true }
     )
-    return targetSummary(parsed, {
-      disposable: false,
-      automaticCleanup: false,
+    return Object.freeze({
+      ...targetSummary(parsed, {
+        targetKey: LOCAL_DEVELOPMENT_TARGET,
+        disposable: false,
+        automaticCleanup: false,
+      }),
+      databaseName: parsed.databaseName,
     })
   }
 
@@ -839,9 +1041,13 @@ export function createDevDataPreparationService({
     const parsed = assertRegisteredDevelopmentTarget(
       parseDatabaseURL(value, { allowRegisteredDevelopment: true })
     )
-    return targetSummary(parsed, {
-      disposable: true,
-      automaticCleanup: true,
+    return Object.freeze({
+      ...targetSummary(parsed, {
+        targetKey: ISOLATED_LOCAL_TARGET,
+        disposable: true,
+        automaticCleanup: true,
+      }),
+      databaseName: 'isolated-per-run',
     })
   }
 
@@ -871,6 +1077,7 @@ export function createDevDataPreparationService({
     return Object.freeze({
       databaseName: parsed.databaseName,
       summary: targetSummary(parsed, {
+        targetKey: LOCAL_DEVELOPMENT_TARGET,
         disposable: false,
         automaticCleanup: false,
       }),
@@ -881,13 +1088,114 @@ export function createDevDataPreparationService({
     return (await readScenarioTargetIdentity()).summary
   }
 
-  async function resolveTarget(profileKey) {
+  function assertCustomerTrialPreflight(report, repository) {
+    const runtime = report?.remote?.runtime
+    const config = runtime?.activeCustomerConfig
+    const debug = runtime?.debug
+    const debugDisabled =
+      debug?.environment === 'prod' &&
+      [
+        debug.seedEnabled,
+        debug.seedAllowed,
+        debug.cleanupEnabled,
+        debug.cleanupAllowed,
+        debug.businessDataClearEnabled,
+        debug.businessDataClearAllowed,
+      ].every((value) => value === false)
+    if (
+      report?.status !== 'passed' ||
+      report?.target !== 'test-133' ||
+      report?.trialTarget !== CUSTOMER_TRIAL_133_TARGET ||
+      report?.customer !== 'yoyoosun' ||
+      runtime?.serverSha !== repository.commit ||
+      runtime?.webSha !== repository.commit ||
+      report?.remote?.publicEntry?.gitSha !== repository.commit ||
+      runtime?.databaseName !== CUSTOMER_TRIAL_133_DATABASE ||
+      !/^20[0-9]{12}$/u.test(String(runtime?.migrationVersion || '')) ||
+      runtime.migrationVersion <
+        MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration ||
+      config?.revision !==
+        MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision ||
+      config?.productVersion !==
+        MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configProductVersion ||
+      config?.datasetVersion !== CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION ||
+      runtime?.serverHealth !== 'passed' ||
+      runtime?.serverReady !== 'passed' ||
+      runtime?.webHealth !== 'passed' ||
+      report?.remote?.publicEntry?.status !== 'passed' ||
+      report?.remote?.backup?.tooling !== 'passed' ||
+      !debugDisabled
+    ) {
+      throw new Error(
+        'customer-trial-133 release, migration, configuration, debug, health, or backup preflight is not aligned'
+      )
+    }
+    return report
+  }
+
+  function customerTrialAttestation(report) {
+    const runtime = report.remote.runtime
+    return Object.freeze({
+      target: CUSTOMER_TRIAL_133_TARGET,
+      origin: CUSTOMER_TRIAL_133_ORIGIN,
+      customerKey: 'yoyoosun',
+      environment: 'prod',
+      release: runtime.serverSha,
+      migration: runtime.migrationVersion,
+      debug: Object.freeze({
+        seedEnabled: false,
+        seedAllowed: false,
+        cleanupEnabled: false,
+        cleanupAllowed: false,
+        businessDataClearEnabled: false,
+        businessDataClearAllowed: false,
+      }),
+    })
+  }
+
+  async function readCustomerTrialTargetIdentity(repository) {
+    const report = assertCustomerTrialPreflight(
+      await readCustomerTrialPreflight(),
+      repository
+    )
+    const attestation = customerTrialAttestation(report)
+    const runtime = report.remote.runtime
+    const fingerprint = hashDataPreparationPlan({
+      targetAlias: CUSTOMER_TRIAL_133_TARGET,
+      databaseName: runtime.databaseName,
+      release: runtime.serverSha,
+      migration: runtime.migrationVersion,
+    })
+    return Object.freeze({
+      databaseName: runtime.databaseName,
+      attestation,
+      preflight: report,
+      summary: Object.freeze({
+        targetKey: CUSTOMER_TRIAL_133_TARGET,
+        safeTarget: `${CUSTOMER_TRIAL_133_TARGET}:${runtime.databaseName}`,
+        targetFingerprint: fingerprint,
+        preflightFingerprint: '0'.repeat(64),
+        disposable: false,
+        automaticCleanup: false,
+      }),
+    })
+  }
+
+  async function resolveTarget(profileKey, targetKey) {
     if (profileKey === 'core-demo') return readCoreTarget()
-    if (profileKey === 'scenario-demo') return readScenarioTarget()
+    if (profileKey === 'scenario-demo') {
+      if (targetKey === LOCAL_DEVELOPMENT_TARGET) return readScenarioTarget()
+      throw new Error('customer-trial-133 requires authoritative prepare')
+    }
     return readFullAcceptanceTarget()
   }
 
-  async function resolvePreparedTarget(profileKey, repository, runId) {
+  async function resolvePreparedTarget(
+    profileKey,
+    targetKey,
+    repository,
+    runId
+  ) {
     if (profileKey === 'core-demo') {
       const before = await readCoreTarget()
       const command = coreDemoPreflightCommand(root)
@@ -899,12 +1207,17 @@ export function createDevDataPreparationService({
       if (after.targetFingerprint !== before.targetFingerprint) {
         throw new Error('core demo target changed during migration preflight')
       }
+      const preflight = corePreflightEvidence(result.stdout)
       return Object.freeze({
         ...after,
-        preflightFingerprint: corePreflightFingerprint(result.stdout),
+        preflightFingerprint: preflight.fingerprint,
+        migrationVersion: preflight.migrationVersion,
       })
     }
-    if (profileKey === 'scenario-demo') {
+    if (
+      profileKey === 'scenario-demo' &&
+      targetKey === LOCAL_DEVELOPMENT_TARGET
+    ) {
       const before = await readScenarioTargetIdentity()
       const command = scenarioDemoPlanCommand(root)
       const result = await commandRunner(command.command, command.args, {
@@ -919,16 +1232,45 @@ export function createDevDataPreparationService({
       ) {
         throw new Error('scenario demo target changed during preflight')
       }
+      const plan = scenarioDemoPlanFingerprint(result.stdout, repository, {
+        targetKey: LOCAL_DEVELOPMENT_TARGET,
+        databaseName: after.databaseName,
+        targetFingerprint: after.summary.targetFingerprint,
+      })
       return Object.freeze({
         ...after.summary,
-        preflightFingerprint: scenarioDemoPlanFingerprint(
-          result.stdout,
-          repository,
-          {
-            databaseName: after.databaseName,
-            targetFingerprint: after.summary.targetFingerprint,
-          }
-        ),
+        databaseName: after.databaseName,
+        preflightFingerprint: plan.fingerprint,
+        migrationVersion: plan.migrationVersion,
+        customerConfigRevision: plan.customerConfigRevision,
+        customerConfigProductVersion: plan.customerConfigProductVersion,
+      })
+    }
+    if (profileKey === 'scenario-demo') {
+      const target = await readCustomerTrialTargetIdentity(repository)
+      const command = scenarioDemoPlanCommand(
+        root,
+        CUSTOMER_TRIAL_133_TARGET,
+        target.attestation
+      )
+      const result = await commandRunner(command.command, command.args, {
+        ...command.options,
+        env: environment,
+        maxBuffer: 4 * 1024 * 1024,
+      })
+      const plan = scenarioDemoPlanFingerprint(result.stdout, repository, {
+        targetKey: CUSTOMER_TRIAL_133_TARGET,
+        databaseName: target.databaseName,
+        targetFingerprint: target.summary.targetFingerprint,
+      })
+      return Object.freeze({
+        ...target.summary,
+        databaseName: target.databaseName,
+        preflightFingerprint: plan.fingerprint,
+        migrationVersion: plan.migrationVersion,
+        customerConfigRevision: plan.customerConfigRevision,
+        customerConfigProductVersion: plan.customerConfigProductVersion,
+        attestation: target.attestation,
       })
     }
     const target = await readFullAcceptanceTarget()
@@ -966,25 +1308,57 @@ export function createDevDataPreparationService({
         message: '完整验收要求 exact clean commit；核心演示资料仍可单独准备',
       })
     }
-    const target = {}
-    for (const [key, profileKey] of [
-      ['coreDemo', 'core-demo'],
-      ['scenarioDemo', 'scenario-demo'],
-      ['fullAcceptance', 'full-acceptance'],
+    const target = {
+      scenarioDemo133: {
+        status: 'not_proven',
+        safeTarget: `${CUSTOMER_TRIAL_133_TARGET}:${CUSTOMER_TRIAL_133_DATABASE}`,
+        databaseName: CUSTOMER_TRIAL_133_DATABASE,
+        migrationVersion:
+          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
+        customerConfigRevision:
+          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision,
+        customerConfigProductVersion:
+          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configProductVersion,
+        targetFingerprint: hashDataPreparationPlan({
+          target: CUSTOMER_TRIAL_133_TARGET,
+          databaseName: CUSTOMER_TRIAL_133_DATABASE,
+          status: 'not_proven',
+        }),
+      },
+    }
+    for (const [key, profileKey, targetKey, prepareTarget] of [
+      ['coreDemo', 'core-demo', LOCAL_DEVELOPMENT_TARGET, true],
+      ['scenarioDemo', 'scenario-demo', LOCAL_DEVELOPMENT_TARGET, true],
+      ['fullAcceptance', 'full-acceptance', ISOLATED_LOCAL_TARGET, false],
     ]) {
       try {
-        const resolved = ['core-demo', 'scenario-demo'].includes(profileKey)
-          ? await resolvePreparedTarget(profileKey, repositoryResult, 'summary')
-          : await resolveTarget(profileKey)
+        const resolved = prepareTarget
+          ? await resolvePreparedTarget(
+              profileKey,
+              targetKey,
+              repositoryResult,
+              'summary'
+            )
+          : await resolveTarget(profileKey, targetKey)
         target[key] = {
           status: 'available',
           safeTarget: resolved.safeTarget,
+          databaseName: resolved.databaseName || 'not-proven',
+          migrationVersion: resolved.migrationVersion || 'not-proven',
+          customerConfigRevision:
+            resolved.customerConfigRevision || 'not-proven',
+          customerConfigProductVersion:
+            resolved.customerConfigProductVersion || 'not-proven',
           targetFingerprint: resolved.targetFingerprint,
         }
       } catch {
         target[key] = {
           status: 'blocked',
           safeTarget: 'not-proven',
+          databaseName: 'not-proven',
+          migrationVersion: 'not-proven',
+          customerConfigRevision: 'not-proven',
+          customerConfigProductVersion: 'not-proven',
           targetFingerprint: '0'.repeat(64),
         }
         issues.push({
@@ -1028,6 +1402,7 @@ export function createDevDataPreparationService({
           : 'success',
       generatedAt: now().toISOString(),
       repository: repositoryResult,
+      datasetContract: MANUAL_ACCEPTANCE_ENVIRONMENT_CONTRACT,
       target,
       acceptancePlan: MANUAL_ACCEPTANCE_REVIEW_PLAN,
       profiles: DEV_DATA_PREPARATION_PROFILES,
@@ -1128,11 +1503,17 @@ export function createDevDataPreparationService({
         )
       }
       const runId = createRunId(now(), random)
-      const target = await resolvePreparedTarget(
+      const resolvedTarget = await resolvePreparedTarget(
         payload.profileKey,
+        payload.targetKey,
         repository,
         runId
       )
+      const target = operationTargetSummary(resolvedTarget, {
+        profileKey: payload.profileKey,
+        repository,
+        runId,
+      })
       const planHash = hashDataPreparationPlan({
         profileKey: payload.profileKey,
         repository,
@@ -1183,6 +1564,10 @@ export function createDevDataPreparationService({
     }
     const currentTarget = await resolvePreparedTarget(
       operation.profileKey,
+      operation.targetSummary.targetKey ||
+        (operation.profileKey === 'full-acceptance'
+          ? ISOLATED_LOCAL_TARGET
+          : LOCAL_DEVELOPMENT_TARGET),
       repository,
       operation.runId
     )
@@ -1197,6 +1582,7 @@ export function createDevDataPreparationService({
     if (operation.profileKey === 'full-acceptance' && repository.dirty) {
       throw new Error('full acceptance requires the exact clean current commit')
     }
+    return currentTarget
   }
 
   async function runCoreDemo(operation) {
@@ -1284,31 +1670,68 @@ export function createDevDataPreparationService({
     return readback
   }
 
-  async function runScenarioDemo(operation) {
-    const target = await readScenarioTargetIdentity()
+  async function runScenarioDemo(operation, target) {
+    const local = operation.targetSummary.targetKey === LOCAL_DEVELOPMENT_TARGET
+    const current = local ? await readScenarioTargetIdentity() : target
+    const currentSummary = local ? current.summary : current
     if (
-      target.summary.targetFingerprint !==
+      currentSummary.targetFingerprint !==
       operation.targetSummary.targetFingerprint
     ) {
       throw new Error('scenario demo target readback changed')
     }
-    const command = scenarioDemoExecutionCommand(root, operation)
+    const backupReceipt = local
+      ? null
+      : await createCustomerTrialBackup({
+          backupAlias: operation.targetSummary.rollbackPoint,
+          releaseSha: operation.targetSummary.releaseSha,
+          migrationVersion: operation.targetSummary.migrationVersion,
+        })
+    const command = scenarioDemoExecutionCommand(
+      root,
+      operation,
+      current.attestation
+    )
     const scenarioConfirmation = [
       'APPLY_SCENARIO_DEMO',
-      target.databaseName,
+      local ? 'scenario-demo' : CUSTOMER_TRIAL_133_TARGET,
+      current.databaseName,
       SCENARIO_DEMO_DATA_VERSION,
       SCENARIO_DEMO_RUN_ID,
       operation.targetSummary.preflightFingerprint,
     ].join(':')
-    const result = await commandRunner(command.command, command.args, {
-      ...command.options,
-      env: {
-        ...environment,
-        SCENARIO_DEMO_CONFIRM: scenarioConfirmation,
-      },
-      maxBuffer: 4 * 1024 * 1024,
-    })
-    return parseScenarioDemoReadback(result.stdout, operation)
+    let result
+    try {
+      result = await commandRunner(command.command, command.args, {
+        ...command.options,
+        env: {
+          ...environment,
+          SCENARIO_DEMO_CONFIRM: scenarioConfirmation,
+          ...(current.attestation
+            ? {
+                MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON: JSON.stringify(
+                  current.attestation
+                ),
+                MANUAL_ACCEPTANCE_ADMIN_PASSWORD:
+                  environment.CUSTOMER_TRIAL_133_ADMIN_PASSWORD || '',
+                MANUAL_ACCEPTANCE_PASSWORD:
+                  environment.CUSTOMER_TRIAL_133_ROLE_PASSWORD || '',
+              }
+            : {}),
+        },
+        maxBuffer: 4 * 1024 * 1024,
+      })
+    } catch {
+      const unknownOutcome = new Error(
+        'scenario demo write outcome is not proven; authoritative readback is required'
+      )
+      unknownOutcome.outcomeUnknown = true
+      throw unknownOutcome
+    }
+    const readback = parseScenarioDemoReadback(result.stdout, operation)
+    return backupReceipt
+      ? Object.freeze({ ...readback, backupReceipt })
+      : readback
   }
 
   function execute(payload) {
@@ -1365,7 +1788,7 @@ export function createDevDataPreparationService({
     active.add(operation.id)
     ;(async () => {
       try {
-        await verifyExecutionIdentity(operation)
+        const executionTarget = await verifyExecutionIdentity(operation)
         transitionDataPreparationOperation(store, operation.id, {
           status: 'running',
           message: 'fixed profile execution started',
@@ -1375,7 +1798,7 @@ export function createDevDataPreparationService({
           operation.profileKey === 'core-demo'
             ? await runCoreDemo(operation)
             : operation.profileKey === 'scenario-demo'
-              ? await runScenarioDemo(operation)
+              ? await runScenarioDemo(operation, executionTarget)
               : await runFullAcceptance(operation)
         transitionDataPreparationOperation(store, operation.id, {
           status: 'passed',
@@ -1386,13 +1809,22 @@ export function createDevDataPreparationService({
       } catch (error) {
         const readback = error?.readback
         transitionDataPreparationOperation(store, operation.id, {
-          status: 'failed',
-          message: 'fixed profile execution failed',
+          status: error?.outcomeUnknown === true ? 'not_proven' : 'failed',
+          message:
+            error?.outcomeUnknown === true
+              ? 'fixed profile write outcome requires authoritative readback'
+              : 'fixed profile execution failed',
           issues: [
             {
-              code: 'profile_execution_failed',
+              code:
+                error?.outcomeUnknown === true
+                  ? 'profile_execution_outcome_not_proven'
+                  : 'profile_execution_failed',
               severity: 'blocked',
-              message: `数据准备未完成：${redactError(error)}`,
+              message:
+                error?.outcomeUnknown === true
+                  ? '数据写入结果未证明；请先权威读回，不自动重试或新建操作'
+                  : `数据准备未完成：${redactError(error)}`,
             },
           ],
           ...(readback ? { readback } : {}),

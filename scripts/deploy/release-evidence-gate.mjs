@@ -32,7 +32,7 @@ function loadCredentialContract() {
     contract?.customerCode === "yoyoosun" &&
     contract?.target?.key === "customer-trial-133" &&
     contract?.target?.database === "plush_erp_uat_20260716_v5" &&
-    contract?.target?.datasetVersion === "2026.07.16-v5" &&
+    contract?.target?.datasetVersion === "2026.08.15-v6" &&
     admin?.username === "admin" &&
     envKey.test(admin?.environmentVariable || "") &&
     admin?.credentialSource === "contract-fixed-test" &&

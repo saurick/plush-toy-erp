@@ -4,6 +4,7 @@ import {
   LONG_LIVED_DATABASE_NAMES,
   classifyDatabaseName,
 } from "./database-target.mjs";
+import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from "./manual-acceptance-core-contract.mjs";
 
 const DEFAULT_LOCAL_BACKEND_URL = "http://127.0.0.1:8300";
 const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
@@ -22,10 +23,14 @@ export const CUSTOMER_TRIAL_133_TARGET = "customer-trial-133";
 // the registered endpoint on loopback so callers must reach 133 through an SSH
 // tunnel instead of sending those secrets over plaintext LAN HTTP.
 export const CUSTOMER_TRIAL_133_ORIGIN = "http://127.0.0.1:18375";
-export const CUSTOMER_TRIAL_133_DATABASE = "plush_erp_uat_20260716_v5";
-export const CUSTOMER_TRIAL_133_MIN_MIGRATION = "20260714165115";
-export const CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION = "2026.07.16-v5";
-export const CURRENT_MANUAL_ACCEPTANCE_RUN_ID = "20260716-V5";
+export const CUSTOMER_TRIAL_133_DATABASE =
+  MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.databaseName;
+export const CUSTOMER_TRIAL_133_MIN_MIGRATION =
+  MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration;
+export const CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION =
+  MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion;
+export const CURRENT_MANUAL_ACCEPTANCE_RUN_ID =
+  MANUAL_ACCEPTANCE_CORE_CONTRACT.runId;
 export const LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION =
   "yoyoosun-customer-package-v7.local-d05ec61cc4ea9cee.runtime-v1";
 export const LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION =
@@ -34,12 +39,13 @@ export const LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE = "local_test_apply";
 export const CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION =
   CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION;
 export const CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION =
-  "customer-trial-133-test-2026.07.16-v5";
+  MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configProductVersion;
 export const CUSTOMER_TRIAL_133_CONFIG_REVISION =
-  "yoyoosun-customer-trial-133-package-v7.runtime-manifest-v1";
+  MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision;
 export const CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE =
   "customer_trial_test_apply";
-export const MANUAL_ACCEPTANCE_DATASET_KEY = "yoyoosun-manual-acceptance";
+export const MANUAL_ACCEPTANCE_DATASET_KEY =
+  MANUAL_ACCEPTANCE_CORE_CONTRACT.datasetKey;
 
 export const MANUAL_ACCEPTANCE_TARGET_PROFILES = Object.freeze({
   [CUSTOMER_TRIAL_133_TARGET]: Object.freeze({
@@ -212,9 +218,9 @@ export function resolveManualAcceptanceTarget({
       );
     }
     const identity = registeredScenarioDemoDatasetIdentity(dataVersion, runId);
-    const scenarioDatabaseName = assertScenarioDemoDatabaseName(
-      requestedDatabaseName,
-    );
+    const scenarioDatabaseName = requestedDatabaseName
+      ? assertScenarioDemoDatabaseName(requestedDatabaseName)
+      : undefined;
     return Object.freeze({
       target: SCENARIO_DEMO_TARGET,
       datasetKey: MANUAL_ACCEPTANCE_DATASET_KEY,
@@ -224,7 +230,7 @@ export function resolveManualAcceptanceTarget({
       runId: identity.runId,
       external: false,
       transport: "loopback",
-      databaseName: scenarioDatabaseName,
+      ...(scenarioDatabaseName ? { databaseName: scenarioDatabaseName } : {}),
     });
   }
 
@@ -323,6 +329,11 @@ export function assertManualAcceptanceMutationTarget(
 ) {
   const resolved = resolveManualAcceptanceTarget(policy);
   if (resolved.target === SCENARIO_DEMO_TARGET) {
+    if (!resolved.databaseName) {
+      throw new ManualAcceptanceTargetPolicyError(
+        `${SCENARIO_DEMO_TARGET} apply requires an explicit registered databaseName`,
+      );
+    }
     const expected = manualAcceptanceTargetConfirmation(resolved);
     if (confirmation !== expected) {
       throw new ManualAcceptanceTargetPolicyError(

@@ -1,217 +1,190 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import test from "node:test";
 
+import { PERSISTENT_SCENARIO_DATASET_TARGET } from "./manual-acceptance-dataset.mjs";
 import {
+  CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
+  CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION,
+  CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+  CUSTOMER_TRIAL_133_CONFIG_REVISION,
+  CUSTOMER_TRIAL_133_DATABASE,
+  CUSTOMER_TRIAL_133_ORIGIN,
+  CUSTOMER_TRIAL_133_TARGET,
   LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
   LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
   LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
-  resolveManualAcceptanceTarget,
+  SCENARIO_DEMO_ORIGIN,
 } from "./manual-acceptance-target-policy.mjs";
 import {
-  SCENARIO_DEMO_CATALOG_TARGET_COUNT,
   SCENARIO_DEMO_READBACK_SCHEMA_VERSION,
   SCENARIO_DEMO_REPLAY_MODE,
+  SCENARIO_DEMO_SCHEMA_VERSION,
+  ScenarioDemoError,
   buildScenarioDemoCustomerConfigManifest,
   buildScenarioDemoPlan,
   buildScenarioDemoReadback,
   parseScenarioDemoArgs,
-  preflightScenarioDemoRuntime,
+  resolveCustomerTrialScenarioDemoCredentials,
   resolveLocalScenarioDemoCredentials,
   runScenarioDemoCli,
+  scenarioDemoDigest,
 } from "./scenario-demo-data.mjs";
-import {
-  LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE,
-  LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
-  TASK_COPY_REVISION,
-  TASK_PROFILE_LONG_LIVED_WORKBENCH,
-} from "./manual-acceptance-task-data.mjs";
 
-const HASH = "a".repeat(64);
 const REPOSITORY = Object.freeze({
   commit: "b".repeat(40),
-  dirty: true,
+  dirty: false,
   fingerprint: "c".repeat(64),
 });
-const DATABASE_TARGET = Object.freeze({
+const LOCAL_DATABASE = Object.freeze({
   databaseName: "plush_erp",
   host: "192.168.0.106",
   port: 5432,
-  safeTarget: "host=192.168.0.106 port=5432 database=plush_erp",
-  targetFingerprint: HASH,
+  safeTarget: "registered-development:plush_erp",
+  targetFingerprint: "a".repeat(64),
 });
-const RUNTIME = Object.freeze({
-  target: "scenario-demo",
-  customerKey: "yoyoosun",
-  configRevision: LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
-  configProductVersion: LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
-  configApplyPurpose: LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
-  source: "active_customer_config_revision",
-  requiredModules: [
-    "customers",
-    "suppliers",
-    "products",
-    "materials",
-    "processes",
-    "sales_orders",
-    "workflow_tasks",
-    "purchase_orders",
-    "outsourcing_orders",
-    "material_bom",
-    "production_orders",
-    "production",
-    "inventory",
-    "shipments",
-    "finance",
-    "finance_payments",
-    "purchase_receipts",
-    "quality_inspections",
-  ],
-});
+const MIGRATION_VERSION = "20260729043852";
 
-function scenarioPlan() {
-  return buildScenarioDemoPlan({
-    repository: REPOSITORY,
-    databaseTarget: DATABASE_TARGET,
-    migrationFingerprint: "d".repeat(64),
-    runtime: RUNTIME,
-  });
-}
-
-function jsonRPCResult(data) {
+function trialAttestation() {
   return {
-    ok: true,
-    status: 200,
-    redirected: false,
-    async json() {
-      return { result: { code: 0, data } };
+    target: CUSTOMER_TRIAL_133_TARGET,
+    origin: CUSTOMER_TRIAL_133_ORIGIN,
+    customerKey: "yoyoosun",
+    environment: "prod",
+    release: "d".repeat(40),
+    migration: MIGRATION_VERSION,
+    debug: {
+      seedEnabled: false,
+      seedAllowed: false,
+      cleanupEnabled: false,
+      cleanupAllowed: false,
+      businessDataClearEnabled: false,
+      businessDataClearAllowed: false,
     },
   };
 }
 
-function runtimeFetch(url, init) {
-  if (String(url).endsWith("/readyz/runtime-identity")) {
-    return Promise.resolve({
-      ok: true,
-      status: 200,
-      redirected: false,
-      headers: {
-        get(name) {
-          return name === "X-ERP-Runtime-Identity-Proof" ? "matched-v1" : null;
-        },
-      },
-      async text() {
-        return "runtime identity matched";
-      },
-    });
-  }
-  const request = JSON.parse(init.body);
-  if (request.method === "admin_login") {
-    return Promise.resolve(
-      jsonRPCResult({
-        username: "admin",
-        is_super_admin: true,
-        access_token: "runtime-only-token",
-      }),
-    );
-  }
-  if (request.method === "capabilities") {
-    return Promise.resolve(
-      jsonRPCResult({
-        databaseName: "plush_erp",
-        environment: "dev",
-      }),
-    );
-  }
-  if (request.method === "get_effective_session") {
-    return Promise.resolve(
-      jsonRPCResult({
-        session: {
-          customer: { key: "yoyoosun" },
-          source: "active_customer_config_revision",
-          configRevision: LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
-          configProductVersion: LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
-          configApplyPurpose: LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
-          modules: Object.fromEntries(
-            RUNTIME.requiredModules.map((key) => [key, "enabled"]),
-          ),
-        },
-      }),
-    );
-  }
-  throw new Error(`unexpected RPC method ${request.method}`);
+function localPlan() {
+  return buildScenarioDemoPlan({
+    repository: REPOSITORY,
+    databaseTarget: LOCAL_DATABASE,
+    migrationFingerprint: "e".repeat(64),
+    migrationVersion: MIGRATION_VERSION,
+  });
 }
 
-function planCommandRunner(targetURL) {
-  return async (command, args) => {
-    if (command === "go" && args.includes("./cmd/dburl")) {
-      return { stdout: `${targetURL}\n`, stderr: "" };
-    }
-    if (command === process.execPath && args.includes("--mode")) {
-      return {
-        stdout: [
-          "schema/migration 守卫通过",
-          "migration 已是最新版本（20260729043852，42/42）",
-          "non-system-schema function=0 procedure=0 non-internal-trigger=0",
-        ].join("\n"),
-        stderr: "",
-      };
-    }
-    throw new Error(`unexpected command ${command} ${args.join(" ")}`);
+function remotePlan() {
+  return buildScenarioDemoPlan({
+    repository: REPOSITORY,
+    targetAlias: CUSTOMER_TRIAL_133_TARGET,
+    targetAttestation: trialAttestation(),
+    migrationFingerprint: "f".repeat(64),
+    migrationVersion: MIGRATION_VERSION,
+  });
+}
+
+function completedDatasetReport(plan) {
+  const summaries = {
+    core: { units: 11, warehouses: 4 },
+    baseline: { legacyDataPreserved: true },
+    role: { accounts: 13 },
+    source: {
+      "sales_order.create": 1,
+      "purchase_order.create": 1,
+      "outsourcing_order.create": 1,
+    },
+    task: { byRole: { sales: 2, purchase: 2, production: 2 } },
+    "purchase-quality": { purchaseReceipts: 1 },
+    facts: { productionFacts: 2, inventoryTxns: 3, shipments: 1 },
+    attachments: { attachments: 4 },
+    readiness: {
+      passedTargetData: 41,
+      totalTargets: 51,
+      notProvenTargetData: 10,
+      queryChecksPassed: true,
+      manualAcceptanceCompleted: false,
+    },
+  };
+  return {
+    ok: true,
+    dataVersion: plan.dataVersion,
+    runId: plan.runId,
+    semanticDigest: plan.semanticDigest,
+    target: { alias: plan.targetAlias, databaseName: plan.databaseName },
+    stages: plan.canonicalRunner.stageOrder.map((key) => ({
+      key,
+      status: "completed",
+      summary: summaries[key],
+    })),
   };
 }
 
-test("scenario-demo plan is fixed, long-lived, forward-only, and repository-bound", () => {
-  const plan = scenarioPlan();
-  assert.equal(plan.profileKey, "scenario-demo");
-  assert.equal(plan.datasetKey, "yoyoosun-manual-acceptance");
-  assert.equal(plan.dataVersion, "2026.07.16-v5");
-  assert.equal(plan.runId, "20260716-V5");
-  assert.deepEqual(plan.repository, REPOSITORY);
-  assert.equal(plan.target.disposable, false);
-  assert.equal(plan.target.registeredDevelopmentPostgresOnly, true);
-  assert.equal(plan.target.loopbackBackendOnly, true);
-  assert.equal(plan.execution.cleanupSupported, false);
-  assert.equal(plan.execution.cleanupMode, "forward-only");
-  assert.equal(plan.execution.replayMode, SCENARIO_DEMO_REPLAY_MODE);
-  assert.equal(plan.execution.directBusinessSQL, false);
-  assert.equal(plan.execution.manualAcceptanceCompleted, false);
-  assert.equal(plan.execution.auditMinimum, 30);
-  assert.equal(plan.taskPolicy.profile, TASK_PROFILE_LONG_LIVED_WORKBENCH);
-  assert.equal(
-    plan.taskPolicy.copyRevision,
-    LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
+test("local and 133 plans share one canonical semantic contract with independent identities", () => {
+  const local = localPlan();
+  const remote = remotePlan();
+
+  assert.equal(local.schemaVersion, SCENARIO_DEMO_SCHEMA_VERSION);
+  assert.equal(local.targetAlias, PERSISTENT_SCENARIO_DATASET_TARGET);
+  assert.equal(local.targetEnvironment, "local-development");
+  assert.equal(local.backendURL, SCENARIO_DEMO_ORIGIN);
+  assert.equal(local.databaseName, "plush_erp");
+  assert.equal(local.dataVersion, "2026.08.15-v6");
+  assert.equal(local.runId, "20260815-V6");
+  assert.equal(local.canonicalRunner.stageCount, 9);
+  assert.equal(local.canonicalRunner.persistentBaseline, true);
+  assert.equal(local.execution.replayMode, SCENARIO_DEMO_REPLAY_MODE);
+  assert.equal(local.execution.dataRetention, "long-lived");
+  assert.equal(local.execution.cleanupSupported, false);
+  assert.equal(local.execution.directBusinessSQL, false);
+
+  assert.equal(remote.targetAlias, CUSTOMER_TRIAL_133_TARGET);
+  assert.equal(remote.targetEnvironment, "customer-trial-133");
+  assert.equal(remote.backendURL, CUSTOMER_TRIAL_133_ORIGIN);
+  assert.equal(remote.databaseName, CUSTOMER_TRIAL_133_DATABASE);
+  assert.equal(remote.release, trialAttestation().release);
+  assert.equal(local.semanticDigest, remote.semanticDigest);
+  assert.deepEqual(
+    local.canonicalPlan.semanticPlan,
+    remote.canonicalPlan.semanticPlan,
   );
-  assert.equal(
-    plan.taskPolicy.stableActionablePerRole,
-    LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE,
+  assert.notEqual(
+    local.target.targetFingerprint,
+    remote.target.targetFingerprint,
   );
+  assert.notEqual(local.planDigest, remote.planDigest);
+  assert.match(local.planDigest, /^[0-9a-f]{64}$/u);
+  assert.equal(JSON.stringify(local).includes("password"), false);
+  assert.equal(JSON.stringify(remote).includes("token"), false);
+});
+
+test("target-specific runtime configuration stays outside the shared business definition", () => {
+  const local = localPlan();
+  const remote = remotePlan();
+  assert.deepEqual(local.runtime, {
+    customerKey: "yoyoosun",
+    configRevision: LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
+    configProductVersion: LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
+    configApplyPurpose: LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
+    configDatasetVersion: null,
+    configTarget: null,
+  });
+  assert.deepEqual(remote.runtime, {
+    customerKey: "yoyoosun",
+    configRevision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
+    configProductVersion: CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+    configApplyPurpose: CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
+    configDatasetVersion: CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION,
+    configTarget: CUSTOMER_TRIAL_133_TARGET,
+  });
+  assert.equal(local.canonicalPlan.semanticPlan.customerKey, "yoyoosun");
   assert.equal(
-    plan.taskPolicy.supersededBatch.copyRevision,
-    TASK_COPY_REVISION,
-  );
-  assert.equal(plan.taskPolicy.physicalDelete, false);
-  assert.deepEqual(plan.execution.stageOrder.slice(0, 4), [
-    "core-references",
-    "role-accounts",
-    "customer-config",
-    "accounts",
-  ]);
-  assert.match(plan.componentDigests.customerConfig, /^[0-9a-f]{64}$/u);
-  assert.match(plan.planDigest, /^[0-9a-f]{64}$/u);
-  assert.equal(
-    buildScenarioDemoPlan({
-      repository: REPOSITORY,
-      databaseTarget: DATABASE_TARGET,
-      migrationFingerprint: "d".repeat(64),
-      runtime: RUNTIME,
-    }).planDigest,
-    plan.planDigest,
+    JSON.stringify(local.canonicalPlan.semanticPlan).includes(
+      LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
+    ),
+    false,
   );
 });
 
-test("scenario-demo binds the current tracked local-test customer configuration", () => {
+test("local customer configuration manifest is the tracked runtime package", () => {
   const manifest = buildScenarioDemoCustomerConfigManifest();
   assert.equal(manifest.customer_key, "yoyoosun");
   assert.equal(manifest.revision, LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION);
@@ -225,367 +198,214 @@ test("scenario-demo binds the current tracked local-test customer configuration"
   );
 });
 
-test("scenario-demo resolves local-only defaults and keeps explicit server-side credential overrides", () => {
-  assert.deepEqual(resolveLocalScenarioDemoCredentials(), {
-    rolePassword: "12345678",
-    adminPassword: "adminadmin",
-  });
-  assert.deepEqual(
-    resolveLocalScenarioDemoCredentials({
-      ERP_ROLE_DEMO_PASSWORD: "role-pass-123",
-      REAL_LOGIN_ADMIN_PASSWORD: "admin-pass-123",
-    }),
-    {
-      rolePassword: "role-pass-123",
-      adminPassword: "admin-pass-123",
-    },
-  );
-});
+test("readback requires every canonical stage and reports target-bound evidence", () => {
+  const plan = localPlan();
+  const report = completedDatasetReport(plan);
+  const readback = buildScenarioDemoReadback({ plan, datasetReport: report });
 
-test("scenario-demo plan proves target, migration, and unauthenticated runtime identity without credential input or login", async () => {
-  const environment = {};
-  let authenticatedRPCs = 0;
-  const result = await runScenarioDemoCli([], {
-    projectRoot: "/repo",
-    environment,
-    commandRunner: planCommandRunner(
-      "postgres://dev:db-secret@192.168.0.106:5432/plush_erp?sslmode=disable",
-    ),
-    fetchImpl: async (url, init) => {
-      if (!String(url).endsWith("/readyz/runtime-identity")) {
-        authenticatedRPCs += 1;
-      }
-      return runtimeFetch(url, init);
-    },
-    readRepository: async () => REPOSITORY,
-  });
-  assert.equal(result.exitCode, 0);
-  assert.equal(result.plan.databaseName, "plush_erp");
-  assert.equal(
-    result.plan.runtime.configRevision,
-    LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
-  );
-  assert.doesNotMatch(
-    result.text,
-    /12345678|adminadmin|db-secret|runtime-only-token/u,
-  );
-  assert.equal(
-    authenticatedRPCs,
-    0,
-    "plan/summary preflight must not authenticate or append audit records",
-  );
-
-  await assert.rejects(
-    () =>
-      runScenarioDemoCli([], {
-        projectRoot: "/repo",
-        environment,
-        commandRunner: planCommandRunner(
-          "postgres://dev:db-secret@192.168.0.133:5435/plush_erp?sslmode=disable",
-        ),
-        fetchImpl: runtimeFetch,
-        readRepository: async () => REPOSITORY,
-      }),
-    /registered development PostgreSQL|registered non-disposable/u,
-  );
-});
-
-test("scenario-demo authenticated runtime and customer config checks are reserved for confirmed apply", async () => {
-  const policy = resolveManualAcceptanceTarget({
-    target: "scenario-demo",
-    backendURL: "http://127.0.0.1:8300",
-    dataVersion: "2026.07.16-v5",
-    runId: "20260716-V5",
-    databaseName: "plush_erp",
-  });
-  const runtime = await preflightScenarioDemoRuntime({
-    policy,
-    rolePassword: "role-pass-123",
-    adminPassword: "admin-pass-123",
-    fetchImpl: runtimeFetch,
-  });
-  assert.equal(runtime.configRevision, LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION);
-  await assert.rejects(
-    () =>
-      preflightScenarioDemoRuntime({
-        policy,
-        rolePassword: "role-pass-123",
-        adminPassword: "admin-pass-123",
-        fetchImpl: async (url, init) => {
-          const request = init?.body ? JSON.parse(init.body) : null;
-          if (request?.method === "get_effective_session") {
-            const response = await runtimeFetch(url, init);
-            const payload = await response.json();
-            payload.result.data.session.configRevision = "stale";
-            return jsonRPCResult(payload.result.data);
-          }
-          return runtimeFetch(url, init);
-        },
-      }),
-    /active local-test configuration identity/u,
-  );
-});
-
-test("scenario-demo apply parser requires the prepared plan digest", () => {
-  assert.deepEqual(parseScenarioDemoArgs([]), {
-    apply: false,
-    expectedPlanDigest: "",
-    help: false,
-  });
-  assert.throws(
-    () => parseScenarioDemoArgs(["--apply"]),
-    /expected-plan-digest/u,
-  );
-  assert.deepEqual(
-    parseScenarioDemoArgs([
-      "--apply",
-      "--expected-plan-digest",
-      "e".repeat(64),
-    ]),
-    {
-      apply: true,
-      expectedPlanDigest: "e".repeat(64),
-      help: false,
-    },
-  );
-});
-
-function batchIdentity(plan) {
-  return {
-    mode: "apply",
-    datasetKey: plan.datasetKey,
-    dataVersion: plan.dataVersion,
-    runId: plan.runId,
-    target: plan.profileKey,
-    backendURL: plan.backendURL,
-    databaseName: plan.databaseName,
-  };
-}
-
-test("scenario-demo readback counts only formal source, ProcessRuntime, and Fact evidence", () => {
-  const plan = scenarioPlan();
-  const sourceReport = {
-    ...batchIdentity(plan),
-    semanticDigest: plan.componentDigests.source,
-    prefix: "SIM-YOYOOSUN-UAT-V5",
-    referenceRecords: {
-      salesOrders: [{ id: 1 }, { id: 2 }],
-      purchaseOrders: [{ id: 3 }],
-      outsourcingOrders: [{ id: 4 }],
-    },
-  };
-  const taskReport = {
-    ...batchIdentity(plan),
-    taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
-    copyRevision: LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
-    provesProcessRuntime: true,
-    runtimeEvidence: [{ caseKey: "active" }, { caseKey: "completed" }],
-    displayOnlyTasks: { total: 180, provesProcessRuntime: false },
-    prefix: "SIM-YOYOOSUN-UAT-TASK-V5",
-    sourceType: "simulated-manual-acceptance-task-batch",
-    sourceID: 2026071605,
-    coverage: { catalogScenarioDigest: "1".repeat(64) },
-    summary: {
-      workbenchBuckets: { actionable: 108, risk: 40, history: 32 },
-      workbenchBucketsByRole: Object.fromEntries(
-        [
-          "boss",
-          "sales",
-          "purchase",
-          "production",
-          "warehouse",
-          "finance",
-          "pmc",
-          "quality",
-          "engineering",
-        ].map((roleKey) => [roleKey, { actionable: 12 }]),
-      ),
-    },
-  };
-  const taskRetireReport = {
-    ...batchIdentity(plan),
-    mode: "retire",
-    keepBatch: {
-      copyRevision: LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
-    },
-    retiredBatch: {
-      copyRevision: TASK_COPY_REVISION,
-      sourceID: plan.taskPolicy.supersededBatch.sourceID,
-    },
-    cleanup: { physicalDelete: false },
-    summary: {
-      total: 180,
-      absent: false,
-      activeBefore: 148,
-      activeAfter: 0,
-      actionsApplied: 175,
-    },
-  };
-  const factReport = {
-    ...batchIdentity(plan),
-    reportContract: "source-driven-operational-facts-v1",
-    semanticDigest: plan.componentDigests.source,
-    financeFieldContract: { digest: "2".repeat(64) },
-    referenceRecords: Object.fromEntries(
-      [
-        "productionFacts",
-        "purchaseReceipts",
-        "purchaseReturns",
-        "purchaseReceiptAdjustments",
-        "qualityInspections",
-        "inventoryLots",
-        "inventoryTxns",
-        "outsourcingFacts",
-        "stockReservations",
-        "shipments",
-        "financeFacts",
-        "financePayments",
-        "financeCreditNotes",
-      ].map((key, index) => [key, [{ id: index + 1 }]]),
-    ),
-  };
-  const readinessReport = {
-    ...batchIdentity(plan),
-    mode: "verify",
-    runtimePreflight: {
-      configRevision: plan.runtime.configRevision,
-      source: plan.runtime.source,
-    },
-    reportInputs: {
-      sourceReport: {
-        ...batchIdentity(plan),
-        prefix: sourceReport.prefix,
-      },
-      taskReport: {
-        ...batchIdentity(plan),
-        prefix: taskReport.prefix,
-        sourceType: taskReport.sourceType,
-        sourceID: taskReport.sourceID,
-        taskGroupCoverageDigest: taskReport.coverage.catalogScenarioDigest,
-      },
-      factReport: {
-        ...batchIdentity(plan),
-        reportContract: factReport.reportContract,
-        semanticDigest: factReport.semanticDigest,
-        financeFieldContract: factReport.financeFieldContract,
-      },
-    },
-    summary: {
-      totalTargets: SCENARIO_DEMO_CATALOG_TARGET_COUNT,
-      passedTargetData: 41,
-      failedTargetData: 0,
-      notProvenTargetData: 10,
-      queryChecksPassed: true,
-      queryEvidenceComplete: false,
-      browserChecksCompleted: 0,
-      browserChecksPending: 51,
-      manualAcceptanceCompleted: false,
-    },
-  };
-  const readback = buildScenarioDemoReadback({
-    plan,
-    sourceReport,
-    taskReport,
-    taskRetireReport,
-    factReport,
-    readinessReport,
-  });
   assert.deepEqual(readback, {
     schemaVersion: SCENARIO_DEMO_READBACK_SCHEMA_VERSION,
     profileKey: "scenario-demo",
-    targetFingerprint: HASH,
+    targetKey: "local-development",
+    targetEnvironment: "local-development",
+    targetFingerprint: LOCAL_DATABASE.targetFingerprint,
+    databaseName: "plush_erp",
+    release: REPOSITORY.commit,
+    migrationVersion: MIGRATION_VERSION,
+    customerConfigRevision: LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
     datasetKey: "yoyoosun-manual-acceptance",
-    dataVersion: "2026.07.16-v5",
-    runId: "20260716-V5",
-    sourceDocumentCount: 4,
-    processRuntimeCount: 2,
-    taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
-    stableActionablePerRole: 12,
-    stableActionableTaskCount: 108,
-    supersededTaskBatch: {
-      copyRevision: TASK_COPY_REVISION,
-      total: 180,
-      absent: false,
-      activeBefore: 148,
-      activeAfter: 0,
-      actionsApplied: 175,
-      physicalDelete: false,
-    },
-    factCount: 13,
+    dataVersion: "2026.08.15-v6",
+    runId: "20260815-V6",
+    semanticDigest: plan.semanticDigest,
+    stageCount: 9,
+    sourceDocumentCount: 3,
+    processRuntimeCount: 3,
+    factCount: 6,
     catalogReadyCount: 41,
     catalogTargetCount: 51,
     browserChecksPending: 10,
     manualAcceptanceCompleted: false,
     cleanupSupported: false,
-    replayMode: "exact-create-or-readback",
+    replayMode: SCENARIO_DEMO_REPLAY_MODE,
   });
-  assert.notEqual(readback.processRuntimeCount, 180);
-  assert.throws(
-    () =>
-      buildScenarioDemoReadback({
-        plan,
-        sourceReport,
-        taskReport,
-        taskRetireReport,
-        factReport,
-        readinessReport: {
-          ...readinessReport,
-          summary: {
-            ...readinessReport.summary,
-            notProvenTargetData: 9,
-          },
-        },
-      }),
-    /incomplete or drifted/u,
+
+  const incomplete = completedDatasetReport(plan);
+  incomplete.stages = incomplete.stages.filter(
+    ({ key }) => key !== "attachments",
   );
   assert.throws(
-    () =>
-      buildScenarioDemoReadback({
-        plan,
-        sourceReport,
-        taskReport,
-        taskRetireReport,
-        factReport,
-        readinessReport: {
-          ...readinessReport,
-          reportInputs: {
-            ...readinessReport.reportInputs,
-            factReport: {
-              ...readinessReport.reportInputs.factReport,
-              semanticDigest: "f".repeat(64),
-            },
-          },
-        },
-      }),
-    /upstream semantic identity/u,
+    () => buildScenarioDemoReadback({ plan, datasetReport: incomplete }),
+    /canonical dataset readback is incomplete/u,
+  );
+
+  const drifted = completedDatasetReport(plan);
+  drifted.semanticDigest = "0".repeat(64);
+  assert.throws(
+    () => buildScenarioDemoReadback({ plan, datasetReport: drifted }),
+    /canonical dataset readback is incomplete/u,
   );
 });
 
-test("scenario controller never routes business writes through legacy debug, mobile, dataset, or generic fact helpers", async () => {
-  const source = await readFile(
-    path.join(import.meta.dirname, "scenario-demo-data.mjs"),
-    "utf8",
+test("plan validation fails closed for arbitrary target, database, migration, or attestation", () => {
+  assert.throws(
+    () =>
+      buildScenarioDemoPlan({
+        repository: REPOSITORY,
+        targetAlias: "production",
+        databaseTarget: LOCAL_DATABASE,
+        migrationFingerprint: "e".repeat(64),
+        migrationVersion: MIGRATION_VERSION,
+      }),
+    /target alias is invalid/u,
   );
-  for (const forbidden of [
-    "manual-acceptance-dataset.mjs",
-    "mobile-workflow-simulated-closure.mjs",
-    "operational-fact-simulated-closure.mjs",
-    "trial-simulated-data.mjs",
-  ]) {
-    assert.doesNotMatch(
-      source,
-      new RegExp(forbidden.replaceAll(".", "\\."), "u"),
-    );
-  }
-  assert.match(source, /applyManualAcceptanceSourceData/u);
-  assert.match(source, /applyManualAcceptanceTaskData/u);
-  assert.match(source, /retireLegacyManualAcceptanceTaskBatch/u);
-  assert.match(source, /applyManualAcceptanceFactPlan/u);
-  assert.match(source, /applyManualAcceptanceCustomerConfig/u);
-  assert.match(source, /seed-role-demo-admins\.sh/u);
-  assert.match(
-    source,
-    /assertReportIdentity\(accountReport, plan, "account"\)/u,
+  assert.throws(
+    () =>
+      buildScenarioDemoPlan({
+        repository: REPOSITORY,
+        databaseTarget: { ...LOCAL_DATABASE, host: "127.0.0.1" },
+        migrationFingerprint: "e".repeat(64),
+        migrationVersion: MIGRATION_VERSION,
+      }),
+    /database identity is incomplete/u,
   );
-  assert.match(source, /assertReadinessReportCoupling/u);
+  assert.throws(
+    () =>
+      buildScenarioDemoPlan({
+        repository: REPOSITORY,
+        databaseTarget: LOCAL_DATABASE,
+        migrationFingerprint: "bad",
+        migrationVersion: MIGRATION_VERSION,
+      }),
+    /preflight identity is incomplete/u,
+  );
+  assert.throws(
+    () =>
+      buildScenarioDemoPlan({
+        repository: REPOSITORY,
+        targetAlias: CUSTOMER_TRIAL_133_TARGET,
+        targetAttestation: {
+          ...trialAttestation(),
+          debug: { ...trialAttestation().debug, seedAllowed: true },
+        },
+        migrationFingerprint: "f".repeat(64),
+        migrationVersion: MIGRATION_VERSION,
+      }),
+    /unsafe fields: seedAllowed/u,
+  );
+});
+
+test("CLI accepts only registered persistent targets and binds apply to plan digest", () => {
+  assert.deepEqual(parseScenarioDemoArgs([]), {
+    apply: false,
+    expectedPlanDigest: "",
+    target: PERSISTENT_SCENARIO_DATASET_TARGET,
+    targetAttestation: "",
+    help: false,
+  });
+  assert.equal(
+    parseScenarioDemoArgs(["--target", CUSTOMER_TRIAL_133_TARGET]).target,
+    CUSTOMER_TRIAL_133_TARGET,
+  );
+  assert.throws(
+    () => parseScenarioDemoArgs(["--target", "production"]),
+    /not registered/u,
+  );
+  assert.throws(
+    () => parseScenarioDemoArgs(["--apply"]),
+    /requires --expected-plan-digest/u,
+  );
+  assert.throws(
+    () => parseScenarioDemoArgs(["--host", "192.168.0.106"]),
+    /unknown option/u,
+  );
+});
+
+test("local CLI plan proves database, migration, runtime, and repository", async () => {
+  const calls = [];
+  const commandRunner = async (command, args) => {
+    calls.push({ command, args });
+    if (command === "go") {
+      return {
+        stdout:
+          "postgres://user:redacted@192.168.0.106:5432/plush_erp?sslmode=disable\n",
+        stderr: "",
+      };
+    }
+    return {
+      stdout: [
+        "schema/migration 守卫通过",
+        `migration 已是最新版本（${MIGRATION_VERSION}，42/42）`,
+        "non-system-schema function=0 procedure=0 non-internal-trigger=0",
+      ].join("\n"),
+      stderr: "",
+    };
+  };
+  const fetchImpl = async (url, init) => {
+    assert.equal(url, `${SCENARIO_DEMO_ORIGIN}/readyz/runtime-identity`);
+    assert.equal(init.method, "GET");
+    return {
+      ok: true,
+      status: 200,
+      redirected: false,
+      headers: {
+        get(name) {
+          return name === "X-ERP-Runtime-Identity-Proof" ? "matched-v1" : null;
+        },
+      },
+      async text() {
+        return "runtime identity matched";
+      },
+    };
+  };
+
+  const result = await runScenarioDemoCli([], {
+    projectRoot: "/workspace",
+    environment: {},
+    commandRunner,
+    fetchImpl,
+    readRepository: async () => REPOSITORY,
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.plan.targetAlias, PERSISTENT_SCENARIO_DATASET_TARGET);
+  assert.equal(result.plan.databaseName, "plush_erp");
+  assert.equal(result.plan.migrationVersion, MIGRATION_VERSION);
+  assert.equal(result.readback, null);
+  assert.equal(calls.length, 2);
+  assert.equal(result.text.includes("postgres://"), false);
+});
+
+test("credential lookup is runtime-only and digesting is order-stable", () => {
+  assert.deepEqual(
+    resolveLocalScenarioDemoCredentials({
+      MANUAL_ACCEPTANCE_PASSWORD: "role-secret",
+      MANUAL_ACCEPTANCE_ADMIN_PASSWORD: "admin-secret",
+    }),
+    { rolePassword: "role-secret", adminPassword: "admin-secret" },
+  );
+  assert.deepEqual(
+    resolveCustomerTrialScenarioDemoCredentials({
+      MANUAL_ACCEPTANCE_PASSWORD: "trial-role-secret",
+      MANUAL_ACCEPTANCE_ADMIN_PASSWORD: "trial-admin-secret",
+      ERP_ROLE_DEMO_PASSWORD: "must-not-fallback",
+      REAL_LOGIN_ADMIN_PASSWORD: "must-not-fallback",
+    }),
+    {
+      rolePassword: "trial-role-secret",
+      adminPassword: "trial-admin-secret",
+    },
+  );
+  assert.throws(
+    () =>
+      resolveCustomerTrialScenarioDemoCredentials({
+        ERP_ROLE_DEMO_PASSWORD: "local-only",
+        REAL_LOGIN_ADMIN_PASSWORD: "local-only",
+      }),
+    /controlled runtime credentials/u,
+  );
+  assert.equal(
+    scenarioDemoDigest({ b: 2, a: 1 }),
+    scenarioDemoDigest({ a: 1, b: 2 }),
+  );
+  assert.ok(new ScenarioDemoError("blocked", 2) instanceof Error);
 });

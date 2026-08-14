@@ -145,7 +145,7 @@ if (
   contract?.schemaVersion !== "yoyoosun-credential-contract/v2" ||
   contract?.target?.key !== "customer-trial-133" ||
   contract?.target?.database !== "plush_erp_uat_20260716_v5" ||
-  contract?.target?.datasetVersion !== "2026.07.16-v5" ||
+  contract?.target?.datasetVersion !== "2026.08.15-v6" ||
   admin?.username !== "admin" || admin?.credentialSource !== "contract-fixed-test" || admin?.fixedTestPassword !== "adminadmin" ||
   demo?.credentialSource !== "contract-fixed-test" || demo?.fixedTestPassword !== "12345678" ||
   !text(phone?.service) || !text(phone?.account) ||
@@ -242,11 +242,11 @@ docker compose \
   -e MANUAL_ACCEPTANCE_SMS_PHONE \
   app-server /app/rotate-manual-acceptance-passwords \
     --target customer-trial-133 \
-    --dataset-version 2026.07.16-v5 \
+    --dataset-version 2026.08.15-v6 \
     --expected-migration-version "$expected_migration" \
     --expected-release "$expected_release" \
     --operation-id "$operation_id" \
-    --confirm ROTATE_SIMULATED_ACCEPTANCE_ACCOUNTS:customer-trial-133:2026.07.16-v5
+    --confirm ROTATE_SIMULATED_ACCEPTANCE_ACCOUNTS:customer-trial-133:2026.08.15-v6
 REMOTE_SCRIPT
 } | ssh -o BatchMode=yes -o ConnectTimeout=10 "$ssh_target" \
   bash -s -- "$expected_release" "$expected_migration" "$operation_id" "$backup_file" "$backup_sha256" >"$report_tmp"
@@ -259,7 +259,7 @@ const report = JSON.parse(fs.readFileSync(file, "utf8"));
 const accounts = Array.isArray(report.accounts) ? report.accounts : [];
 const valid =
   report.target === "customer-trial-133" &&
-  report.datasetVersion === "2026.07.16-v5" &&
+  report.datasetVersion === "2026.08.15-v6" &&
   report.release === release &&
   report.migrationVersion === migration &&
   report.operationId === operationId &&

@@ -12,11 +12,11 @@ import (
 func validOptions(target string) options {
 	return options{
 		target:                   target,
-		datasetVersion:           "2026.07.16-v5",
+		datasetVersion:           "2026.08.15-v6",
 		expectedMigrationVersion: "20260710150001",
 		expectedRelease:          strings.Repeat("a", 40),
 		operationID:              "123e4567-e89b-42d3-a456-426614174000",
-		confirm:                  expectedConfirmation(target, "2026.07.16-v5"),
+		confirm:                  expectedConfirmation(target, "2026.08.15-v6"),
 		timeout:                  30 * time.Second,
 	}
 }
@@ -541,7 +541,7 @@ func TestActiveCustomerConfigReadsCompiledSnapshotIdentity(t *testing.T) {
 		sqlmock.NewRows([]string{"revision", "product_version", "compiled_snapshot"}).AddRow(
 			customerTrial133Revision,
 			customerTrial133ProductVersion,
-			[]byte(`{"applyPurpose":"customer_trial_test_apply","datasetVersion":"2026.07.16-v5","target":"customer-trial-133"}`),
+			[]byte(`{"applyPurpose":"customer_trial_test_apply","datasetVersion":"2026.08.15-v6","target":"customer-trial-133"}`),
 		),
 	)
 	identity, err := activeCustomerConfig(t.Context(), db)

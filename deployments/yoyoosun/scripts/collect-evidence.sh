@@ -268,7 +268,7 @@ cat >"$output_dir/credential-rotation-report.json" <<EOF
   "generatedAt": "$generated_at",
   "operationId": "待填写",
   "target": "customer-trial-133",
-  "datasetVersion": "2026.07.16-v5",
+  "datasetVersion": "2026.08.15-v6",
   "migrationVersion": "待填写",
   "customerRevision": "待填写",
   "release": "$git_commit",

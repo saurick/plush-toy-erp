@@ -16,7 +16,8 @@ const REPOSITORY = Object.freeze({
   fingerprint: "c".repeat(64),
 });
 const TARGET = Object.freeze({
-  safeTarget: "host=192.168.0.106 port=5432 database=plush_erp",
+  targetKey: "local-development",
+  safeTarget: "local-development:plush_erp",
   targetFingerprint: HASH,
   preflightFingerprint: "d".repeat(64),
   disposable: false,
@@ -33,15 +34,24 @@ function scenarioReadback(overrides = {}) {
   return {
     schemaVersion: "plush.dev-data-preparation-readback/v1",
     profileKey: "scenario-demo",
+    targetKey: "local-development",
+    targetEnvironment: "local-development",
     targetFingerprint: HASH,
+    databaseName: "plush_erp",
+    release: REPOSITORY.commit,
+    migrationVersion: "20260729043852",
+    customerConfigRevision:
+      "yoyoosun-customer-package-v7.local-d05ec61cc4ea9cee.runtime-v1",
     datasetKey: "yoyoosun-manual-acceptance",
-    dataVersion: "2026.07.16-v5",
-    runId: "20260716-V5",
+    dataVersion: "2026.08.15-v6",
+    runId: "20260815-V6",
+    semanticDigest: "f".repeat(64),
+    stageCount: 9,
     sourceDocumentCount: 135,
     processRuntimeCount: 5,
     factCount: 500,
-    catalogReadyCount: 40,
-    catalogTargetCount: 50,
+    catalogReadyCount: 41,
+    catalogTargetCount: 51,
     browserChecksPending: 10,
     manualAcceptanceCompleted: false,
     cleanupSupported: false,
@@ -73,7 +83,7 @@ function runningScenarioOperation(store) {
   });
 }
 
-test("scenario-demo operation store accepts only the fixed V5 40+10 forward-only readback", (t) => {
+test("scenario-demo operation store accepts only the fixed V6 41+10 forward-only readback", (t) => {
   const store = createFixture(t);
   const running = runningScenarioOperation(store);
   const passed = transitionDataPreparationOperation(store, running.id, {
@@ -82,8 +92,8 @@ test("scenario-demo operation store accepts only the fixed V5 40+10 forward-only
     readback: scenarioReadback(),
     now: "2026-07-29T02:03:07.000Z",
   });
-  assert.equal(passed.readback.runId, "20260716-V5");
-  assert.equal(passed.readback.catalogReadyCount, 40);
+  assert.equal(passed.readback.runId, "20260815-V6");
+  assert.equal(passed.readback.catalogReadyCount, 41);
   assert.equal(passed.readback.browserChecksPending, 10);
   assert.equal(passed.readback.cleanupSupported, false);
   assert.equal(passed.readback.manualAcceptanceCompleted, false);

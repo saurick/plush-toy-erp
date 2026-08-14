@@ -26,6 +26,17 @@ const REPORT_KEYS = Object.freeze([
   "COMPOSE_STATUS",
   "DATABASE_STATUS",
   "DATABASE_NAME",
+  "MIGRATION_VERSION",
+  "ACTIVE_CONFIG_REVISION",
+  "ACTIVE_CONFIG_PRODUCT_VERSION",
+  "ACTIVE_DATASET_VERSION",
+  "DEBUG_ENV",
+  "DEBUG_SEED_ENABLED",
+  "DEBUG_SEED_ALLOWED",
+  "DEBUG_CLEANUP_ENABLED",
+  "DEBUG_CLEANUP_ALLOWED",
+  "DEBUG_BUSINESS_CLEAR_ENABLED",
+  "DEBUG_BUSINESS_CLEAR_ALLOWED",
   "SERVER_SHA",
   "WEB_SHA",
   "SERVER_HEALTH",
@@ -91,6 +102,17 @@ capacity_status=passed
 env_status=passed
 compose_status=passed
 database_status=passed
+migration_version=unknown
+active_config_revision=unknown
+active_config_product_version=unknown
+active_dataset_version=unknown
+debug_env=unknown
+debug_seed_enabled=unknown
+debug_seed_allowed=unknown
+debug_cleanup_enabled=unknown
+debug_cleanup_allowed=unknown
+debug_business_clear_enabled=unknown
+debug_business_clear_allowed=unknown
 server_sha=unknown
 web_sha=unknown
 server_health=failed
@@ -222,6 +244,21 @@ if plain_file "$runtime_env"; then
     database_status=blocked
     block target_database_mismatch
   }
+  debug_env="$(env_value ERP_DEBUG_ENV)"
+  debug_seed_enabled="$(env_value ERP_DEBUG_SEED_ENABLED)"
+  debug_cleanup_enabled="$(env_value ERP_DEBUG_CLEANUP_ENABLED)"
+  debug_business_clear_enabled="$(env_value ERP_DEBUG_BUSINESS_CLEAR_ENABLED)"
+  if [[ "$debug_env" == prod &&
+    "$debug_seed_enabled" == false &&
+    "$debug_cleanup_enabled" == false &&
+    "$debug_business_clear_enabled" == false ]]; then
+    debug_seed_allowed=false
+    debug_cleanup_allowed=false
+    debug_business_clear_allowed=false
+  else
+    env_status=blocked
+    block target_debug_capabilities_unsafe
+  fi
 else
   env_status=blocked
 fi
@@ -443,6 +480,36 @@ if [[ -z "$postgres_cid" || "$(printf '%s\n' "$postgres_cid" | sed '/^$/d' | wc 
 elif ! docker exec "$postgres_cid" sh -c 'command -v pg_dump >/dev/null 2>&1'; then
   backup_tooling_status=blocked
   block target_backup_tooling_missing
+else
+  read_database_scalar() {
+    local query="$1"
+    docker exec "$postgres_cid" sh -c '
+      psql -X --no-psqlrc -A -t -q -v ON_ERROR_STOP=1 \
+        -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "$1"
+    ' sh "$query" 2>/dev/null | tr -d '\r' | sed -n '1p'
+  }
+  if migration_version="$(read_database_scalar "SELECT version FROM atlas_schema_revisions.atlas_schema_revisions WHERE type = 2 ORDER BY executed_at DESC LIMIT 1")" &&
+    [[ "$migration_version" =~ ^20[0-9]{12}$ ]]; then
+    :
+  else
+    migration_version=unknown
+    database_status=blocked
+    block target_migration_readback_failed
+  fi
+  if active_config_revision="$(read_database_scalar "SELECT revision FROM customer_config_revisions WHERE customer_key = 'yoyoosun' AND status = 'active' ORDER BY id DESC LIMIT 1")" &&
+    active_config_product_version="$(read_database_scalar "SELECT product_version FROM customer_config_revisions WHERE customer_key = 'yoyoosun' AND status = 'active' ORDER BY id DESC LIMIT 1")" &&
+    active_dataset_version="$(read_database_scalar "SELECT COALESCE(jsonb_extract_path_text(compiled_snapshot, 'datasetVersion'), '') FROM customer_config_revisions WHERE customer_key = 'yoyoosun' AND status = 'active' ORDER BY id DESC LIMIT 1")" &&
+    [[ "$active_config_revision" =~ ^[A-Za-z0-9._-]+$ ]] &&
+    [[ "$active_config_product_version" =~ ^[A-Za-z0-9._-]+$ ]] &&
+    [[ "$active_dataset_version" =~ ^[A-Za-z0-9._-]+$ ]]; then
+    :
+  else
+    active_config_revision=unknown
+    active_config_product_version=unknown
+    active_dataset_version=unknown
+    database_status=blocked
+    block target_customer_config_readback_failed
+  fi
 fi
 
 latest_backup="$(find "$root/backups" -maxdepth 1 -type f -name '*.dump' -size +0c -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -n1 | cut -d' ' -f2-)"
@@ -469,6 +536,17 @@ printf '%s\n' \
   "COMPOSE_STATUS=$compose_status" \
   "DATABASE_STATUS=$database_status" \
   "DATABASE_NAME=$database" \
+  "MIGRATION_VERSION=$migration_version" \
+  "ACTIVE_CONFIG_REVISION=$active_config_revision" \
+  "ACTIVE_CONFIG_PRODUCT_VERSION=$active_config_product_version" \
+  "ACTIVE_DATASET_VERSION=$active_dataset_version" \
+  "DEBUG_ENV=$debug_env" \
+  "DEBUG_SEED_ENABLED=$debug_seed_enabled" \
+  "DEBUG_SEED_ALLOWED=$debug_seed_allowed" \
+  "DEBUG_CLEANUP_ENABLED=$debug_cleanup_enabled" \
+  "DEBUG_CLEANUP_ALLOWED=$debug_cleanup_allowed" \
+  "DEBUG_BUSINESS_CLEAR_ENABLED=$debug_business_clear_enabled" \
+  "DEBUG_BUSINESS_CLEAR_ALLOWED=$debug_business_clear_allowed" \
   "SERVER_SHA=$server_sha" \
   "WEB_SHA=$web_sha" \
   "SERVER_HEALTH=$server_health" \
@@ -560,6 +638,23 @@ export function parseRemoteTargetPreflight(raw) {
     }
     return value;
   };
+  const safeIdentity = (value, field) => {
+    if (value !== "unknown" && !SAFE_TEXT_PATTERN.test(value)) {
+      throw new Error(`${field} is invalid`);
+    }
+    return value;
+  };
+  const strictFalse = (value, field) => {
+    if (value !== "false") throw new Error(`${field} must be false`);
+    return false;
+  };
+  const migrationVersion = values.MIGRATION_VERSION;
+  if (
+    migrationVersion !== "unknown" &&
+    !/^20[0-9]{12}$/u.test(migrationVersion)
+  ) {
+    throw new Error("migration version is invalid");
+  }
   const blockers =
     values.BLOCKERS === "none"
       ? []
@@ -622,6 +717,48 @@ export function parseRemoteTargetPreflight(raw) {
       compose: checkStatus("COMPOSE_STATUS"),
       database: checkStatus("DATABASE_STATUS"),
       databaseName: values.DATABASE_NAME,
+      migrationVersion,
+      activeCustomerConfig: {
+        revision: safeIdentity(
+          values.ACTIVE_CONFIG_REVISION,
+          "active customer config revision",
+        ),
+        productVersion: safeIdentity(
+          values.ACTIVE_CONFIG_PRODUCT_VERSION,
+          "active customer config product version",
+        ),
+        datasetVersion: safeIdentity(
+          values.ACTIVE_DATASET_VERSION,
+          "active dataset version",
+        ),
+      },
+      debug: {
+        environment: assertEnum(values.DEBUG_ENV, ["prod"], "debug env"),
+        seedEnabled: strictFalse(
+          values.DEBUG_SEED_ENABLED,
+          "debug seed enabled",
+        ),
+        seedAllowed: strictFalse(
+          values.DEBUG_SEED_ALLOWED,
+          "debug seed allowed",
+        ),
+        cleanupEnabled: strictFalse(
+          values.DEBUG_CLEANUP_ENABLED,
+          "debug cleanup enabled",
+        ),
+        cleanupAllowed: strictFalse(
+          values.DEBUG_CLEANUP_ALLOWED,
+          "debug cleanup allowed",
+        ),
+        businessDataClearEnabled: strictFalse(
+          values.DEBUG_BUSINESS_CLEAR_ENABLED,
+          "debug business clear enabled",
+        ),
+        businessDataClearAllowed: strictFalse(
+          values.DEBUG_BUSINESS_CLEAR_ALLOWED,
+          "debug business clear allowed",
+        ),
+      },
       serverSha: sha(values.SERVER_SHA, "server SHA"),
       webSha: sha(values.WEB_SHA, "web SHA"),
       serverHealth: healthStatus("SERVER_HEALTH"),
@@ -732,6 +869,10 @@ export function parseRemoteTargetPreflight(raw) {
     (report.status === "passed" &&
       (!SHA_PATTERN.test(report.runtime.serverSha) ||
         report.runtime.serverSha !== report.runtime.webSha ||
+        report.runtime.migrationVersion === "unknown" ||
+        Object.values(report.runtime.activeCustomerConfig).includes(
+          "unknown",
+        ) ||
         report.publicEntry.status !== "passed" ||
         report.publicEntry.gitSha !== report.runtime.serverSha))
   ) {

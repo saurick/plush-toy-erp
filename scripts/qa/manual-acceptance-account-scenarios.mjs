@@ -5,6 +5,8 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import {
+  CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+  CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
   CUSTOMER_TRIAL_133_TARGET,
   LOCAL_DEV_TARGET,
   SCENARIO_DEMO_TARGET,
@@ -27,8 +29,8 @@ const CONFIRM_PHRASE = "APPLY_SIMULATED_ACCOUNT_SCENARIOS";
 const FORMAL_ACCOUNT_BOOTSTRAP_CONFIRM_PREFIX =
   "BOOTSTRAP_FORMAL_MANUAL_ACCEPTANCE_ACCOUNTS";
 const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
-const ACCOUNT_DATA_VERSION = "2026.07.16-v5";
-const ACCOUNT_RUN_ID = "20260716-V5";
+const ACCOUNT_DATA_VERSION = CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION;
+const ACCOUNT_RUN_ID = CURRENT_MANUAL_ACCEPTANCE_RUN_ID;
 const MANAGED_ROLE_KEYS = new Set(["sales", "purchase"]);
 const MAX_AUDIT_MINIMUM = 200;
 const LOCAL_ONLY_PUBLIC_PASSWORDS = new Set(["12345678"]);
@@ -1634,15 +1636,15 @@ function usage() {
 
 写入本机开发环境：
   MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM=${CONFIRM_PHRASE} \\
-  MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260728_delivery_dev \\
+  MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.08.15-v6:20260815-V6:plush_erp_acceptance_20260728_delivery_dev \\
   MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \\
   MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-super-admin-password>' \\
     node scripts/qa/manual-acceptance-account-scenarios.mjs --apply \\
       --target local-dev \\
       --backend-url http://127.0.0.1:8310 \\
       --database-name plush_erp_acceptance_20260728_delivery_dev \\
-      --data-version 2026.07.16-v5 \\
-      --run-id 20260716-V5 \\
+      --data-version 2026.08.15-v6 \\
+      --run-id 20260815-V6 \\
       --audit-minimum 30 \\
       --json
 
@@ -1653,7 +1655,7 @@ function usage() {
   MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM，只创建或读回固定十个单岗位账号。
 
   133 试用环境必须通过 127.0.0.1:18375 SSH 隧道，并显式提供：
-  --target customer-trial-133 --data-version 2026.07.16-v5 --run-id 20260716-V5 --database-name plush_erp_uat_20260716_v5
+  --target customer-trial-133 --data-version 2026.08.15-v6 --run-id 20260815-V6 --database-name plush_erp_uat_20260716_v5
 同时设置绑定目标的 MANUAL_ACCEPTANCE_TARGET_CONFIRM 与
   MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON。
 远端只核对岗位权限，不修改岗位权限。`;

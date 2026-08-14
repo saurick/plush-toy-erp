@@ -337,8 +337,9 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "scripts/qa/manual-acceptance-target-policy.mjs",
         pattern:
-          /MANUAL_ACCEPTANCE_DATASET_KEY = "yoyoosun-manual-acceptance"/u,
-        message: "manual acceptance data must keep one dataset identity",
+          /MANUAL_ACCEPTANCE_DATASET_KEY\s*=\s*MANUAL_ACCEPTANCE_CORE_CONTRACT\.datasetKey/u,
+        message:
+          "manual acceptance data must derive one dataset identity from the canonical contract",
       },
       {
         path: "scripts/qa/manual-acceptance-target-policy.mjs",
@@ -373,31 +374,31 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
     ]),
   },
   {
-    id: "manual-acceptance-dataset-keeps-one-current-v5-contract",
+    id: "manual-acceptance-dataset-keeps-one-current-v6-contract",
     bucket: "customer-trial-simulated-data",
     description:
-      "the dataset coordinator accepts only the current v5 identity, keeps local and registered 133 semantics equal, and forbids remote core or role seed.",
+      "the dataset coordinator accepts only the current v6 identity, keeps local and registered 133 semantics equal, and forbids remote core or role seed.",
     required: Object.freeze([
       {
         path: "scripts/qa/manual-acceptance-dataset.mjs",
         pattern:
           /DEFAULT_MANUAL_ACCEPTANCE_DATA_VERSION =\s*CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION/u,
         message:
-          "manual acceptance dataset must keep v5 as the only current version",
+          "manual acceptance dataset must keep v6 as the only current version",
       },
       {
         path: "scripts/qa/manual-acceptance-customer-config.mjs",
         pattern:
           /CUSTOMER_CONFIG_DATA_VERSION =\s*CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION[\s\S]{0,320}CUSTOMER_CONFIG_PRODUCT_VERSION =\s*CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION/u,
         message:
-          "customer-trial config helper must use the current v5 version and product identity",
+          "customer-trial config helper must use the current v6 version and product identity",
       },
       {
         path: "server/internal/biz/customer_config.go",
         pattern:
-          /CustomerConfigTrialDatasetVersion = "2026\.07\.16-v5"[\s\S]{0,100}CustomerConfigTrialProductVersion = "customer-trial-133-test-2026\.07\.16-v5"/u,
+          /manualAcceptanceContract\s*=\s*manualacceptance\.Current\(\)[\s\S]{0,180}CustomerConfigTrialDatasetVersion\s*=\s*manualAcceptanceContract\.DataVersion[\s\S]{0,180}CustomerConfigTrialProductVersion\s*=\s*manualAcceptanceContract\.CustomerTrial133\.ConfigProductVersion/u,
         message:
-          "backend trial identity must use the same current v5 dataset and product version",
+          "backend trial identity must derive the current v6 dataset and product version from the canonical contract",
       },
       {
         path: "server/internal/customertrialconfig/guard.go",
@@ -772,8 +773,8 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "scripts/qa/manual-acceptance-source-driven-facts.mjs",
         pattern:
-          /SOURCE_DRIVEN_FACT_DATA_VERSION = "2026\.07\.16-v5"[\s\S]{0,100}SOURCE_DRIVEN_FACT_RUN_ID = "20260716-V5"/u,
-        message: "source-driven Fact helper must keep the current v5 identity",
+          /SOURCE_DRIVEN_FACT_DATA_VERSION\s*=\s*CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION[\s\S]{0,180}SOURCE_DRIVEN_FACT_RUN_ID\s*=\s*CURRENT_MANUAL_ACCEPTANCE_RUN_ID/u,
+        message: "source-driven Fact helper must derive the current v6 identity",
       },
       {
         path: "scripts/qa/manual-acceptance-source-driven-facts.mjs",
@@ -933,9 +934,9 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       },
       {
         path: "scripts/qa/manual-acceptance-source-retire.mjs",
-        pattern: /--data-version 2026\.07\.16-v5 --run-id 20260716-V5/u,
+        pattern: /--data-version 2026\.08\.15-v6 --run-id 20260815-V6/u,
         message:
-          "manual acceptance retirement usage must show the current v5 batch",
+          "manual acceptance retirement usage must show the current v6 batch",
       },
       {
         path: "scripts/qa/manual-acceptance-source-retire.mjs",

@@ -8,10 +8,12 @@ import (
 	"strings"
 
 	"server/internal/biz"
+	"server/internal/manualacceptance"
 )
 
 const CoreDemoSeedPrefix = "SIM-PLUSH-CORE"
-const CoreDemoReferenceSeedPrefix = "YS5"
+
+var CoreDemoReferenceSeedPrefix = manualacceptance.Current().VisiblePrefix
 
 var (
 	ErrCoreDemoSeedMissingDB     = errors.New("SeedCoreDemoData: missing db")
@@ -112,17 +114,27 @@ type CoreDemoSeedResult struct {
 }
 
 func DefaultCoreDemoReferenceSeedDataset() CoreDemoReferenceSeedDataset {
+	contract := manualacceptance.Current()
+	units := make([]CoreDemoUnitSeed, 0, len(contract.Units))
+	for _, unit := range contract.Units {
+		units = append(units, CoreDemoUnitSeed{
+			Code:      unit.Code,
+			Name:      unit.Name,
+			Precision: unit.Precision,
+		})
+	}
+	warehouses := make([]CoreDemoWarehouseSeed, 0, len(contract.Warehouses))
+	for _, warehouse := range contract.Warehouses {
+		warehouses = append(warehouses, CoreDemoWarehouseSeed{
+			Code: warehouse.Code,
+			Name: warehouse.Name,
+			Type: warehouse.Type,
+		})
+	}
 	return CoreDemoReferenceSeedDataset{
-		Prefix: CoreDemoReferenceSeedPrefix,
-		Units: []CoreDemoUnitSeed{
-			{Code: CoreDemoReferenceSeedPrefix + "-DW-01", Name: "件", Precision: 0},
-		},
-		Warehouses: []CoreDemoWarehouseSeed{
-			{Code: CoreDemoReferenceSeedPrefix + "-CK-01", Name: "原料仓", Type: "RAW_MATERIAL"},
-			{Code: CoreDemoReferenceSeedPrefix + "-CK-02", Name: "成品仓", Type: "FINISHED_GOODS"},
-			{Code: CoreDemoReferenceSeedPrefix + "-CK-03", Name: "待检仓", Type: "QC_HOLD"},
-			{Code: CoreDemoReferenceSeedPrefix + "-CK-04", Name: "在制仓", Type: "WORK_IN_PROCESS"},
-		},
+		Prefix:     contract.VisiblePrefix,
+		Units:      units,
+		Warehouses: warehouses,
 	}
 }
 
@@ -598,7 +610,7 @@ func validateCoreDemoReferenceSeedDataset(dataset CoreDemoReferenceSeedDataset) 
 		return fmt.Errorf("%w: references-only prefix must be %q", ErrCoreDemoSeedInvalidRecord, expected.Prefix)
 	}
 	if len(dataset.Units) != len(expected.Units) || len(dataset.Warehouses) != len(expected.Warehouses) {
-		return fmt.Errorf("%w: references-only requires exactly one unit and four warehouses", ErrCoreDemoSeedInvalidRecord)
+		return fmt.Errorf("%w: references-only requires exactly %d units and %d warehouses", ErrCoreDemoSeedInvalidRecord, len(expected.Units), len(expected.Warehouses))
 	}
 
 	expectedUnits := make(map[string]CoreDemoUnitSeed, len(expected.Units))

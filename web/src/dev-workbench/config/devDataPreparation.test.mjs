@@ -14,6 +14,7 @@ import {
   DEV_DATA_PREPARATION_SESSION_API_PATH,
   DEV_DATA_PREPARATION_SOURCE_PATH,
   DEV_DATA_PREPARATION_SUMMARY_API_PATH,
+  DEV_DATA_PREPARATION_TARGET_KEYS,
   createDataPreparationIdempotencyKey,
   createDevDataPreparationClient,
   resolveDataPreparationExecutionConfirmation,
@@ -29,7 +30,7 @@ const TARGET_FINGERPRINT = 'b'.repeat(64)
 const REPOSITORY_FINGERPRINT = 'c'.repeat(64)
 const RUN_ID = 'core_demo_20260729'
 const SCENARIO_OPERATION_RUN_ID = 'scenario_demo_20260729'
-const SCENARIO_DATASET_RUN_ID = '20260716-V5'
+const SCENARIO_DATASET_RUN_ID = '20260815-V6'
 const CREATED_AT = '2026-07-29T02:00:00.000Z'
 const UPDATED_AT = '2026-07-29T02:01:00.000Z'
 const ACCEPTANCE_PLAN = buildManualAcceptanceBusinessChainReviewPlan({
@@ -53,7 +54,13 @@ function operationFixture(overrides = {}) {
     status: 'ready',
     planHash: PLAN_HASH,
     runId: RUN_ID,
+    repository: {
+      commit: 'd'.repeat(40),
+      dirty: false,
+      fingerprint: REPOSITORY_FINGERPRINT,
+    },
     targetSummary: {
+      targetKey: DEV_DATA_PREPARATION_TARGET_KEYS.localDevelopment,
       safeTarget: '共享开发库（固定身份）',
       targetFingerprint: TARGET_FINGERPRINT,
       preflightFingerprint: 'f'.repeat(64),
@@ -76,7 +83,7 @@ function operationFixture(overrides = {}) {
     ],
     issues: [],
     readback: null,
-    confirmationRequired: `DATA_PREPARATION:core-demo:${RUN_ID}:${PLAN_HASH}:${OPERATION_ID}`,
+    confirmationRequired: `DATA_PREPARATION:core-demo:local-development:${RUN_ID}:${PLAN_HASH}:${OPERATION_ID}`,
     terminal: false,
     ...overrides,
   }
@@ -87,15 +94,24 @@ function scenarioReadbackFixture(overrides = {}) {
   return {
     schemaVersion: 'plush.dev-data-preparation-readback/v1',
     profileKey: DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo,
+    targetKey: DEV_DATA_PREPARATION_TARGET_KEYS.localDevelopment,
+    targetEnvironment: DEV_DATA_PREPARATION_TARGET_KEYS.localDevelopment,
     targetFingerprint: '9'.repeat(64),
+    databaseName: 'plush_erp',
+    release: 'd'.repeat(40),
+    migrationVersion: '20260728100514',
+    customerConfigRevision:
+      'yoyoosun-customer-package-v7.local-d05ec61cc4ea9cee.runtime-v1',
     datasetKey: 'yoyoosun-manual-acceptance',
-    dataVersion: '2026.07.16-v5',
+    dataVersion: '2026.08.15-v6',
     runId: SCENARIO_DATASET_RUN_ID,
+    semanticDigest: '6'.repeat(64),
+    stageCount: 9,
     sourceDocumentCount: 16,
     processRuntimeCount: 20,
     factCount: 14,
-    catalogReadyCount: 40,
-    catalogTargetCount: 50,
+    catalogReadyCount: 41,
+    catalogTargetCount: 51,
     browserChecksPending: 10,
     manualAcceptanceCompleted: false,
     cleanupSupported: false,
@@ -110,6 +126,7 @@ function scenarioOperationFixture(overrides = {}) {
     status: 'passed',
     runId: SCENARIO_OPERATION_RUN_ID,
     targetSummary: {
+      targetKey: DEV_DATA_PREPARATION_TARGET_KEYS.localDevelopment,
       safeTarget: '共享开发库业务场景（固定身份）',
       targetFingerprint: '9'.repeat(64),
       preflightFingerprint: '8'.repeat(64),
@@ -135,6 +152,7 @@ function fullOperationFixture(overrides = {}) {
     profileKey: DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance,
     status: 'passed',
     targetSummary: {
+      targetKey: DEV_DATA_PREPARATION_TARGET_KEYS.isolatedLocal,
       safeTarget: '专用隔离验收库',
       targetFingerprint: 'e'.repeat(64),
       preflightFingerprint: 'f'.repeat(64),
@@ -155,7 +173,7 @@ function fullOperationFixture(overrides = {}) {
       reportStatus: 'passed',
       cleanupComplete: true,
       residualDatabaseCount: 0,
-      dataVersion: '2026.07.16-v5',
+      dataVersion: '2026.08.15-v6',
       chainDataDigest: ACCEPTANCE_PLAN.chainDataDigest,
       chainVerificationDigest: ACCEPTANCE_PLAN.chainVerificationDigest,
       chainCount: ACCEPTANCE_PLAN.chainCount,
@@ -183,20 +201,63 @@ function summaryFixture() {
       fingerprint: REPOSITORY_FINGERPRINT,
     },
     acceptancePlan: ACCEPTANCE_PLAN,
+    datasetContract: {
+      schemaVersion: 'plush.dev-data-environment-contract/v1',
+      datasetKey: 'yoyoosun-manual-acceptance',
+      dataVersion: '2026.08.15-v6',
+      runId: '20260815-V6',
+      semanticDigest: '6'.repeat(64),
+      simulatedOnly: true,
+      realCustomerImport: false,
+      unitCount: 11,
+      warehouseCount: 4,
+      customerTrial133: {
+        target: 'customer-trial-133',
+        databaseName: 'plush_erp_uat_20260716_v5',
+        databaseLifecycle: 'long-lived-registered-target',
+        minimumMigration: '20260728100514',
+        configRevision:
+          'yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1',
+        configProductVersion: 'customer-trial-133-test-2026.08.15-v6',
+      },
+    },
     target: {
       coreDemo: {
         status: 'available',
         safeTarget: '共享开发库（固定身份）',
+        databaseName: 'plush_erp',
+        migrationVersion: '20260728100514',
+        customerConfigRevision: 'not-proven',
+        customerConfigProductVersion: 'not-proven',
         targetFingerprint: TARGET_FINGERPRINT,
       },
       scenarioDemo: {
         status: 'available',
         safeTarget: '共享开发库业务场景（固定身份）',
+        databaseName: 'plush_erp',
+        migrationVersion: '20260728100514',
+        customerConfigRevision:
+          'yoyoosun-customer-package-v7.local-d05ec61cc4ea9cee.runtime-v1',
+        customerConfigProductVersion: 'local-customer-package-test-apply',
         targetFingerprint: '9'.repeat(64),
+      },
+      scenarioDemo133: {
+        status: 'not_proven',
+        safeTarget: 'customer-trial-133:plush_erp_uat_20260716_v5',
+        databaseName: 'plush_erp_uat_20260716_v5',
+        migrationVersion: '20260728100514',
+        customerConfigRevision:
+          'yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1',
+        customerConfigProductVersion: 'customer-trial-133-test-2026.08.15-v6',
+        targetFingerprint: '7'.repeat(64),
       },
       fullAcceptance: {
         status: 'available',
         safeTarget: '专用隔离验收库',
+        databaseName: 'isolated-per-run',
+        migrationVersion: 'not-proven',
+        customerConfigRevision: 'not-proven',
+        customerConfigProductVersion: 'not-proven',
         targetFingerprint: 'e'.repeat(64),
       },
     },
@@ -224,7 +285,7 @@ function summaryFixture() {
       {
         key: 'full-acceptance',
         title: '完整验收数据',
-        purpose: '在隔离库执行 50 项验收',
+        purpose: '在隔离库执行 51 项验收',
         writesDatabase: true,
         dataRetention: 'ephemeral',
         cleanupMode: 'automatic',
@@ -279,11 +340,12 @@ test('scenario demo copy keeps one-click review, forward-only and acceptance bou
   assert.equal(copy.targetKey, 'scenarioDemo')
   assert.equal(copy.badgeLabel, '长期保留')
   assert.equal(copy.prepareButtonLabel, '生成业务场景测试数据')
-  assert.match(copy.prepareDescription, /自动准备固定计划/u)
-  assert.match(copy.prepareDescription, /可读确认/u)
-  assert.match(copy.prepareDescription, /对齐当前跟踪的本地客户配置/u)
-  assert.match(copy.prepareDescription, /无需重启/u)
-  assert.match(copy.confirmationDescription, /正式配置 API/u)
+  assert.match(copy.prepareDescription, /权威读回目标身份/u)
+  assert.match(copy.prepareDescription, /二次确认/u)
+  assert.match(copy.prepareDescription, /133/u)
+  assert.match(copy.prepareDescription, /DSN/u)
+  assert.match(copy.confirmationDescription, /release/u)
+  assert.match(copy.confirmationDescription, /不清空历史/u)
   assert.match(copy.retention, /不清空已有数据/u)
   assert.match(copy.cleanup, /forward-only/u)
   assert.match(copy.purpose, /不是完整验收/u)
@@ -292,7 +354,7 @@ test('scenario demo copy keeps one-click review, forward-only and acceptance bou
 test('scenario demo uses the prepared confirmation without exposing a typed secret or long token', () => {
   const scenarioOperation = operationFixture({
     profileKey: DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo,
-    confirmationRequired: `DATA_PREPARATION:scenario-demo:${SCENARIO_OPERATION_RUN_ID}:${PLAN_HASH}:${OPERATION_ID}`,
+    confirmationRequired: `DATA_PREPARATION:scenario-demo:local-development:${SCENARIO_OPERATION_RUN_ID}:${PLAN_HASH}:${OPERATION_ID}`,
   })
   assert.equal(
     resolveDataPreparationExecutionConfirmation(
@@ -494,17 +556,79 @@ test('scenario demo readback binds the fixed batch and rejects half batches or d
     scenarioOperationFixture()
   )
   assert.equal(operation.profileKey, 'scenario-demo')
-  assert.equal(operation.readback.catalogReadyCount, 40)
+  assert.equal(operation.readback.catalogReadyCount, 41)
   assert.equal(operation.readback.browserChecksPending, 10)
   assert.equal(operation.readback.cleanupSupported, false)
   assert.equal(operation.readback.manualAcceptanceCompleted, false)
   assert.equal(operation.readback.replayMode, 'exact-create-or-readback')
 
+  const remoteTargetSummary = {
+    targetKey: DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133,
+    safeTarget: 'customer-trial-133:plush_erp_uat_20260716_v5',
+    targetFingerprint: '7'.repeat(64),
+    preflightFingerprint: '8'.repeat(64),
+    disposable: false,
+    automaticCleanup: false,
+    releaseSha: 'd'.repeat(40),
+    databaseName: 'plush_erp_uat_20260716_v5',
+    migrationVersion: '20260728100514',
+    customerConfigRevision:
+      'yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1',
+    datasetVersion: '2026.08.15-v6',
+    datasetRunId: SCENARIO_DATASET_RUN_ID,
+    semanticDigest: '6'.repeat(64),
+    rollbackPoint: 'pre-data-dddddddddddd-d260729020304_01020304',
+  }
+  const remoteReadback = scenarioReadbackFixture({
+    targetKey: DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133,
+    targetEnvironment: DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133,
+    targetFingerprint: remoteTargetSummary.targetFingerprint,
+    databaseName: remoteTargetSummary.databaseName,
+    customerConfigRevision: remoteTargetSummary.customerConfigRevision,
+    backupReceipt: {
+      schemaVersion: 'plush.customer-trial-133-data-backup/v1',
+      status: 'passed',
+      backupAlias: remoteTargetSummary.rollbackPoint,
+      releaseSha: remoteTargetSummary.releaseSha,
+      databaseName: remoteTargetSummary.databaseName,
+      migrationVersion: remoteTargetSummary.migrationVersion,
+      sha256: '9'.repeat(64),
+      sizeBytes: 4096,
+      createdAt: '2026-07-29T02:03:04.000Z',
+      containsSecrets: false,
+      containsCredentials: false,
+      containsPaths: false,
+    },
+  })
+  const remoteOperation = validateDevDataPreparationOperation(
+    scenarioOperationFixture({
+      targetSummary: remoteTargetSummary,
+      readback: remoteReadback,
+    })
+  )
+  assert.equal(remoteOperation.readback.backupReceipt.status, 'passed')
   assert.throws(
     () =>
       validateDevDataPreparationOperation(
         scenarioOperationFixture({
-          readback: scenarioReadbackFixture({ catalogReadyCount: 50 }),
+          targetSummary: remoteTargetSummary,
+          readback: {
+            ...remoteReadback,
+            backupReceipt: {
+              ...remoteReadback.backupReceipt,
+              backupAlias: 'pre-data-eeeeeeeeeeee-d260729020304_01020304',
+            },
+          },
+        })
+      ),
+    /backup receipt/u
+  )
+
+  assert.throws(
+    () =>
+      validateDevDataPreparationOperation(
+        scenarioOperationFixture({
+          readback: scenarioReadbackFixture({ catalogReadyCount: 51 }),
         })
       ),
     /scenario demo readback/u
@@ -514,7 +638,7 @@ test('scenario demo readback binds the fixed batch and rejects half batches or d
       validateDevDataPreparationOperation(
         scenarioOperationFixture({
           readback: scenarioReadbackFixture({
-            runId: '20260717-V6',
+            runId: '20260816-V7',
           }),
         })
       ),
@@ -567,11 +691,13 @@ test('prepare intent keeps one idempotency key until the intent is proven or res
   const firstIntent = resolveDataPreparationPrepareIntent(
     null,
     'core-demo',
+    'local-development',
     () => '22222222-2222-4222-8222-222222222222'
   )
   const retriedIntent = resolveDataPreparationPrepareIntent(
     firstIntent,
     'core-demo',
+    'local-development',
     () => {
       throw new Error('retry must not allocate a second key')
     }
@@ -581,6 +707,7 @@ test('prepare intent keeps one idempotency key until the intent is proven or res
   const resetIntent = resolveDataPreparationPrepareIntent(
     firstIntent,
     'full-acceptance',
+    'isolated-local',
     () => '33333333-3333-4333-8333-333333333333'
   )
   assert.equal(resetIntent.profileKey, 'full-acceptance')
@@ -589,9 +716,11 @@ test('prepare intent keeps one idempotency key until the intent is proven or res
   const scenarioIntent = resolveDataPreparationPrepareIntent(
     resetIntent,
     'scenario-demo',
+    'customer-trial-133',
     () => '77777777-7777-4777-8777-777777777777'
   )
   assert.equal(scenarioIntent.profileKey, 'scenario-demo')
+  assert.equal(scenarioIntent.targetKey, 'customer-trial-133')
   assert.match(
     scenarioIntent.idempotencyKey,
     /^data-preparation:prepare:scenario-demo:/u
@@ -661,6 +790,28 @@ test('refresh recovery resumes the newest nonterminal operation and preserves an
     )?.id,
     fullAcceptanceReady.id
   )
+  const trialReady = scenarioOperationFixture({
+    id: '99999999-9999-4999-8999-999999999999',
+    targetSummary: {
+      ...scenarioOperationFixture().targetSummary,
+      targetKey: DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133,
+      targetFingerprint: '7'.repeat(64),
+    },
+    readback: null,
+    status: 'ready',
+    confirmationRequired:
+      'DATA_PREPARATION:scenario-demo:customer-trial-133:d260729020304_01020304:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc:99999999-9999-4999-8999-999999999999',
+    terminal: false,
+  })
+  assert.equal(
+    selectRecoverableDataPreparationOperation(
+      [olderReady, trialReady],
+      '',
+      DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo,
+      DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133
+    )?.id,
+    trialReady.id
+  )
   assert.equal(
     selectRecoverableDataPreparationOperation(
       [fullAcceptanceReady, newerRunning],
@@ -714,9 +865,10 @@ test('client reuses one CSRF session and only posts prepare or execute envelopes
   assert.equal((await client.operation(OPERATION_ID)).status, 'running')
   const idempotencyKey = createDataPreparationIdempotencyKey(
     'core-demo',
+    'local-development',
     () => '22222222-2222-4222-8222-222222222222'
   )
-  await client.prepare('core-demo', idempotencyKey)
+  await client.prepare('core-demo', 'local-development', idempotencyKey)
   await client.execute(OPERATION_ID, readyOperation.confirmationRequired)
 
   assert.equal(
@@ -733,6 +885,7 @@ test('client reuses one CSRF session and only posts prepare or execute envelopes
     action: 'prepare',
     payload: {
       profileKey: 'core-demo',
+      targetKey: 'local-development',
       idempotencyKey,
     },
   })
@@ -752,6 +905,7 @@ test('client reuses one CSRF session and only posts prepare or execute envelopes
     () =>
       client.prepare(
         'core-demo',
+        'local-development',
         'data-preparation:prepare:core-demo:arbitrary'
       ),
     /参数无效/u
@@ -801,14 +955,24 @@ test('page defaults to the latest business-chain regression while retaining dail
   assert.match(pageSource, /准备并确认新批次/u)
   assert.match(pageSource, /查看回执与耗时/u)
   assert.match(pageSource, /AcceptancePlanReview/u)
+  assert.match(pageSource, /DatasetEnvironmentContract/u)
+  assert.match(pageSource, /统一数据合同/u)
+  assert.match(pageSource, /本地长期数据/u)
+  assert.match(pageSource, /133 试用数据/u)
+  assert.match(pageSource, /隔离完整验收/u)
+  assert.match(pageSource, /不是永绅真实客户导入/u)
   assert.match(pageSource, /选择只影响计划下钻/u)
   assert.match(pageSource, /代码变化后，旧数据怎么处理/u)
   assert.match(pageSource, /实际执行：/u)
   assert.match(pageSource, /stageTimings/u)
-  assert.match(
-    pageSource,
-    /useState\(\s*DEV_DATA_PREPARATION_PROFILE_KEYS\.fullAcceptance\s*\)/u
-  )
+  assert.match(pageSource, /PROFILE_QUERY_KEY/u)
+  assert.match(pageSource, /TARGET_QUERY_KEY/u)
+  assert.match(pageSource, /searchParams\.get\(PROFILE_QUERY_KEY\)/u)
+  assert.match(pageSource, /searchParams\.get\(TARGET_QUERY_KEY\)/u)
+  assert.match(pageSource, /new AbortController\(\)/u)
+  assert.match(pageSource, /signal: controller\.signal/u)
+  assert.match(pageSource, /customerTrial133/u)
+  assert.match(pageSource, /targetSummary\.targetKey/u)
   assert.match(pageSource, /erp-dev-data-operation-technical/u)
   assert.match(pageSource, /erp-dev-data-history/u)
   assert.match(pageSource, /展开历史回执/u)
@@ -833,10 +997,10 @@ test('page defaults to the latest business-chain regression while retaining dail
     /<DevPageNav sourcePath=\{DEV_DATA_PREPARATION_SOURCE_PATH\}/u
   )
   assert.match(pageSource, /selectRecoverableDataPreparationOperation/u)
-  assert.match(
-    pageSource,
-    /selectRecoverableDataPreparationOperation\([\s\S]*?DEV_DATA_PREPARATION_PROFILE_KEYS\.fullAcceptance\s*\)/u
-  )
+  assert.match(pageSource, /profileTargetKey\(selectedProfileKey/u)
+  assert.match(pageSource, /releaseSha/u)
+  assert.match(pageSource, /customerConfigRevision/u)
+  assert.match(pageSource, /rollbackPoint/u)
   assert.equal(pageSource.match(/<Input\b/gu)?.length, 1)
   assert.match(pageSource, /aria-label="不可变计划确认文本"/u)
   assert.doesNotMatch(pageSource, /<label\b/u)

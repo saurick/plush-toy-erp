@@ -45,16 +45,17 @@
 | `node scripts/qa/test-data-isolation-boundary.mjs --json`                                                                           | 只读检查 Product Core demo seed、yoyoosun 模拟数据和真实导入准备边界，并锁住 dry-run 不具备执行能力                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | 改 seed、fixture、模拟数据或导入准备工具后       |
 | `node scripts/qa/manual-acceptance-catalog.mjs`                                                                                     | 生成 51 项只读基线验收目录，覆盖登录入口、30 个电脑业务页、九岗位任务端、打印预览与打印工作台；默认只输出、不连接后端                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | 准备全页面试用验收范围时                         |
 | `node scripts/qa/local-acceptance-lifecycle.mjs --commit <sha> --run-id <run>`                                                      | 默认输出本地统一生命周期 plan；显式 `--execute` 后在两个按批隔离库串行完成 migration、九岗位数据、51 项只读浏览器与三条真实写异常流，并在成功或失败后停服、删库和读回残留                                                                                                                                                                                                                                                                                                                                                                                                                    | 对 clean exact SHA 做本地完整技术验收时          |
-| `node scripts/qa/scenario-demo-data.mjs`                                                                                            | 默认只读输出固定 V5 长期共享库计划；精确 plan digest 和确认串同时匹配后，才在登记 106 开发库稳定准备岗位账号与至少 30 条真实控制面审计样例，通过正式客户配置 API 对齐当前跟踪 revision，再串行准备 Source、ProcessRuntime、九岗位长期工作台模拟任务、旧 `PLAIN5` 任务正式终态化与 Fact。每岗位仍为 20 条，其中 12 条无到期日、低风险并长期留在“待我处理”；旧批次不物理删除，临期相对时间场景留给隔离完整验收。查询读回只证明数据前置，不替代页面操作和人工验收；长期事实矩阵固定覆盖 4 条收付款和 3 条红冲。固定本机目标证明后可使用本地开发账号约定，显式服务端环境覆盖优先，不清理、不重置 | 需要为日常联调长期保留固定业务场景数据时         |
+| `node scripts/qa/scenario-demo-data.mjs`                                                                                            | 默认只读输出固定 V6 长期数据计划；本地开发与 `customer-trial-133` 复用同一 canonical 业务语义和九阶段 runner，但数据库、release、migration、客户配置、凭据、attestation 与回执独立。精确 plan digest 和确认串匹配后才通过正式 API exact-create-or-readback；不清理、不重置，不把查询读回写成人工验收或真实客户导入                                                                                                                                                | 需要为本地或 133 长期保留固定业务场景数据时      |
+| `node --test scripts/qa/customer-trial-133-data.test.mjs`                                                                           | 锁住 133 数据写入前的新回滚点：固定目标 SSH 脚本使用 `erp_backup` 只读角色，复核 exact release / database / migration，完成 custom dump、`pg_restore --list`、SHA-256、原子落盘和脱敏回执；不接受浏览器主机、路径、DSN 或命令输入                                                                                                                                                                                                                                                                                         | 调整 133 数据准备或备份回执合同后               |
 | `node scripts/qa/manual-acceptance-dataset.mjs`                                                                                     | 默认生成 local 与 133 同语义计划；显式 `--apply --target` 后由唯一串行 runner 调用同一组正式 API 入口并校验严格阶段回执                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | 准备或重放双环境全页面模拟数据时                 |
-| `node scripts/qa/manual-acceptance-source-data.mjs --target local-dev --data-version 2026.07.16-v5 --run-id 20260716-V5 --json`     | 生成带稳定批次前缀的客户、供应商、产品规格、材料、加工环节及销售 / 采购 / 委外 / BOM 源数据计划；默认只读                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | 写入模拟源数据前确认数量、状态和边界时           |
+| `node scripts/qa/manual-acceptance-source-data.mjs --target local-dev --data-version 2026.08.15-v6 --run-id 20260815-V6 --json`     | 生成带稳定批次前缀的客户、供应商、产品规格、材料、加工环节及销售 / 采购 / 委外 / BOM 源数据计划；默认只读                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | 写入模拟源数据前确认数量、状态和边界时           |
 | `node scripts/qa/manual-acceptance-account-scenarios.mjs --json`                                                                    | 生成停用、多岗位和无业务入口三种补充账号计划；在已完成首个管理员 bootstrap 的 fresh 本地 / 133 验收库中，创建或精确核对十个正式岗位账号，再调和三类场景账号                                                                                                                                                                                                                                                                                                                                                                                                                                  | 核对登录与入口异常场景前                         |
-| `node scripts/qa/manual-acceptance-task-data.mjs --source-report <report> --data-version 2026.07.16-v5 --run-id 20260716-V5`        | 生成九岗位各 20 条、共 180 条仅供列表 / 办理交互的模拟任务；apply 时另从同批 source report 选择 5 张模拟销售订单，走正式 ProcessRuntime 路径形成已启动、待办、阻塞、退回和完成证据。整批仍为 `simulatedOnly`，不代表真实客户数据或 UAT                                                                                                                                                                                                                                                                                                                                                       | 准备岗位任务端数据与流程位置证据前               |
-| `node scripts/qa/manual-acceptance-fact-data.mjs --source-report <report> --data-version 2026.07.16-v5 --run-id 20260716-V5 --json` | 复用已核验源数据，按正式来源驱动 API 统一准备采购、质检、库存、生产、出货和财务事实；默认只读                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | 写入模拟业务事实前                               |
+| `node scripts/qa/manual-acceptance-task-data.mjs --source-report <report> --data-version 2026.08.15-v6 --run-id 20260815-V6`        | 生成九岗位各 20 条、共 180 条仅供列表 / 办理交互的模拟任务；apply 时另从同批 source report 选择 5 张模拟销售订单，走正式 ProcessRuntime 路径形成已启动、待办、阻塞、退回和完成证据。整批仍为 `simulatedOnly`，不代表真实客户数据或 UAT                                                                                                                                                                                                                                                                                                                                                       | 准备岗位任务端数据与流程位置证据前               |
+| `node scripts/qa/manual-acceptance-fact-data.mjs --source-report <report> --data-version 2026.08.15-v6 --run-id 20260815-V6 --json` | 复用已核验源数据，按正式来源驱动 API 统一准备采购、质检、库存、生产、出货和财务事实；默认只读                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | 写入模拟业务事实前                               |
 | `node scripts/qa/manual-acceptance-readiness.mjs`                                                                                   | 生成 51 项只读就绪核验计划，并校验每页只引用共享 role / source / task / facts / catalog 阶段；显式 `--verify --backend-url` 才查询运行数据                                                                                                                                                                                                                                                                                                                                                                                                                                                   | 写入后核对页面数据是否达到手工验收门槛时         |
 | `node scripts/qa/manual-acceptance-browser.mjs --plan --base-url <local-url> --backend-url <local-url>`                             | 生成 51 项本机浏览器验收计划；真实模式只登录、逐页读取和切换只读任务页签，列表及两个数据看板都必须取得当前页面数据证据，不点击业务写动作                                                                                                                                                                                                                                                                                                                                                                                                                                                     | 核对真实账号、页面、岗位端和打印入口时           |
 | `node scripts/qa/exception-flow-real-write-browser.mjs ...`                                                                         | 仅在显式确认的全新本地 `browser_actions` 隔离库中，用真实 Chromium 和真实后端办理 Finance Payment、Inventory Adjustment、Production OVER_ISSUE 三条业务写链；它补充 51 项只读页面检查中的真实写动作证据，不是长期场景数据来源或客户 UAT                                                                                                                                                                                                                                                                                                                                                      | 异常流主路径完成 API / 单元验证后的本地写验收    |
-| `node scripts/qa/manual-acceptance-source-retire.mjs --data-version 2026.07.16-v5 --run-id 20260716-V5`                             | 默认 dry-run，预览无活动流程阻断的源单取消 / 归档与主数据停用；不处理 active / blocked ProcessRuntime、已过账事实或物理删除。当前 V5 流程位置证据要完整清理时必须重建专用验收库                                                                                                                                                                                                                                                                                                                                                                                                              | 无流程阻断的旧批次退出前                         |
+| `node scripts/qa/manual-acceptance-source-retire.mjs --data-version 2026.08.15-v6 --run-id 20260815-V6`                             | 默认 dry-run，预览无活动流程阻断的源单取消 / 归档与主数据停用；不处理 active / blocked ProcessRuntime、已过账事实或物理删除。上一固定 V5 批次的流程位置证据要完整清理时必须重建专用验收库                                                                                                                                                                                                                                                                                                                                                                                                        | 无流程阻断的旧批次退出前                         |
 | `node scripts/qa/customer-config-effective-session-probe.mjs --json`                                                                | 无 Authorization 探测本地 `customer_config.get_effective_session`，确认后端可达和 `40302 未登录` 边界                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | yoyoosun 静态入口已命中、但还没有真实登录证据时  |
 | `node --test scripts/qa/customer-package-preview-boundary.test.mjs`                                                                 | 锁住客户配置包 businessFlows / stateMachines / processPolicies 仍为 preview-only，不写 Fact、不覆盖 usecase 生命周期                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | 调整客户包流程、状态机或策略预览后               |
 
@@ -116,7 +117,7 @@ CI action 固定到审核过的 commit，工具链读取 `.n-node-version`、`we
 
 ## 全页面试用验收数据
 
-当前唯一整批合同是 `2026.07.16-v5 / 20260716-V5`。本地开发库和 133 试用库使用同一套业务含义、数量与状态矩阵，但数据库 ID 各自独立，不能复制表行或用“编号相同”代替读回证明。正式部署默认不执行这套数据。
+当前唯一整批合同是 `2026.08.15-v6 / 20260815-V6`。本地开发库和 133 试用库使用同一套业务含义、数量与状态矩阵，但数据库 ID 各自独立，不能复制表行或用“编号相同”代替读回证明。正式部署默认不执行这套数据。
 
 133 的 V5 使用独立 Compose project `plush-toy-erp-v5`：命令必须显式带 `-p plush-toy-erp-v5`，并同时带 `compose.yml` 与只声明 project name 的 `compose.customer-trial-133.yml`。PostgreSQL 为 `127.0.0.1:55435`、后端 HTTP 为 `8315`、前端为 `5185`；Jaeger 端口组为 `45775 / 46831 / 46832 / 45778 / 46687 / 54268 / 54250 / 49411 / 44317 / 44318`。PostgreSQL 只能挂载 `/home/simon/plush-toy-erp-v5/data/postgres`，migration 锁只能使用 `/home/simon/plush-toy-erp-v5/run/atlas-migrate.lock`；旧 `plush-toy-erp-prod` 栈及其 `5435` 端口保留作回滚。任何直连数据库的辅助工具也必须命中 `55435 / plush_erp_uat_20260716_v5`，不能误连旧栈；正常整批造数仍只走后端 API。
 
@@ -161,8 +162,8 @@ node scripts/qa/manual-acceptance-catalog.mjs \
 
 node scripts/qa/manual-acceptance-source-data.mjs \
   --target local-dev \
-  --data-version 2026.07.16-v5 \
-  --run-id 20260716-V5 \
+  --data-version 2026.08.15-v6 \
+  --run-id 20260815-V6 \
   --json
 
 node scripts/qa/manual-acceptance-data-depth.mjs
@@ -199,7 +200,7 @@ node scripts/qa/customer-config-runtime-manifest.mjs \
 本地隔离库通过本地专用 gate 应用配置，不能携带远端 attestation：
 
 ```bash
-MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260728_delivery_dev \
+MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.08.15-v6:20260815-V6:plush_erp_acceptance_20260728_delivery_dev \
 MANUAL_ACCEPTANCE_ADMIN_USERNAME=admin \
 MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<isolated-local-admin-password>' \
 MANUAL_ACCEPTANCE_PASSWORD='<different-demo-password>' \
@@ -209,9 +210,9 @@ MANUAL_ACCEPTANCE_PASSWORD='<different-demo-password>' \
     --target local-dev \
     --backend-url http://127.0.0.1:8310 \
     --database-name plush_erp_acceptance_20260728_delivery_dev \
-    --data-version 2026.07.16-v5 \
-    --run-id 20260716-V5 \
-    --out output/qa/manual-acceptance/datasets/2026.07.16-v5/local/customer-config
+    --data-version 2026.08.15-v6 \
+    --run-id 20260815-V6 \
+    --out output/qa/manual-acceptance/datasets/2026.08.15-v6/local/customer-config
 ```
 
 ```bash
@@ -219,7 +220,7 @@ POSTGRES_DSN='postgres://<user>:<password>@192.168.0.106:5432/plush_erp_acceptan
   bash scripts/seed-core-demo-data.sh \
     --references-only \
     --expected-database plush_erp_acceptance_20260728_delivery_dev \
-    --confirm SEED_MANUAL_ACCEPTANCE_CORE_REFERENCES:local-dev:plush_erp_acceptance_20260728_delivery_dev:2026.07.16-v5:20260716-V5
+    --confirm SEED_MANUAL_ACCEPTANCE_CORE_REFERENCES:local-dev:plush_erp_acceptance_20260728_delivery_dev:2026.08.15-v6:20260815-V6
 ```
 
 本地命令必须指向明确绑定专用验收数据库的后端；当前共享开发端口不能因为地址是本机就当作验收库：
@@ -230,21 +231,21 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<8-to-20-character-admin-password>' \
   node scripts/qa/manual-acceptance-dataset.mjs \
     --apply \
     --target local \
-    --data-version 2026.07.16-v5 \
-    --run-id 20260716-V5 \
+    --data-version 2026.08.15-v6 \
+    --run-id 20260815-V6 \
     --backend-url '<dedicated-local-acceptance-backend-url-not-port-8300>' \
     --database-name plush_erp_acceptance_20260728_delivery_dev \
-    --confirm APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260728_delivery_dev
+    --confirm APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.08.15-v6:20260815-V6:plush_erp_acceptance_20260728_delivery_dev
 ```
 
 本地 `--apply` 同时要求显式后端、`plush_erp_acceptance_*` 数据库名和数据库绑定确认串；端口 `8300` 在参数解析阶段直接拒绝。运行态数据库摘要不匹配时，runner 在认证前停止，不会创建登录会话，也不会进入 `role` 或任何业务写阶段。
 
 133 仍使用同一命令和 runner，但必须额外传入 dry-run 计划给出的精确确认串，以及绑定当前 40 位小写 commit、至少 `20260714165115` 的 14 位 migration 和全部 debug=false 的 attestation。探针会把声明与当前容器 `GIT_SHA`、实际连接库和 Atlas 最新 revision 做只读核对；未冻结并部署同一代码版本时不得写入。
 
-下面是 133 在 migration、一次性管理员和 SSH 隧道已经就绪后的完整可执行链。先在本机通过 `18375` 后端隧道应用 V5 配置；`<release>` 与 `<migration>` 必须替换成当前容器和 Atlas 的精确读回值：
+下面是 133 在 migration、一次性管理员和 SSH 隧道已经就绪后的完整可执行链。先在本机通过 `18375` 后端隧道应用 V6 配置；`<release>` 与 `<migration>` 必须替换成当前容器和 Atlas 的精确读回值：
 
 ```bash
-export MANUAL_ACCEPTANCE_TARGET_CONFIRM='APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.07.16-v5:20260716-V5'
+export MANUAL_ACCEPTANCE_TARGET_CONFIRM='APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.08.15-v6:20260815-V6'
 export MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON='{"target":"customer-trial-133","origin":"http://127.0.0.1:18375","customerKey":"yoyoosun","environment":"prod","release":"<40-character-lowercase-release>","migration":"<14-digit-migration>","debug":{"seedEnabled":false,"seedAllowed":false,"cleanupEnabled":false,"cleanupAllowed":false,"businessDataClearEnabled":false,"businessDataClearAllowed":false}}'
 
 MANUAL_ACCEPTANCE_ADMIN_USERNAME=admin \
@@ -256,9 +257,9 @@ MANUAL_ACCEPTANCE_PASSWORD='<different-demo-password>' \
     --target customer-trial-133 \
     --backend-url http://127.0.0.1:18375 \
     --database-name plush_erp_uat_20260716_v5 \
-    --data-version 2026.07.16-v5 \
-    --run-id 20260716-V5 \
-    --out output/qa/manual-acceptance/datasets/2026.07.16-v5/customer-trial-133/customer-config
+    --data-version 2026.08.15-v6 \
+    --run-id 20260815-V6 \
+    --out output/qa/manual-acceptance/datasets/2026.08.15-v6/customer-trial-133/customer-config
 ```
 
 配置读回为 active 后，在 133 的固定 release 目录运行镜像内 core bootstrap。preflight 与该命令必须在同一个干净 shell 中执行；若宿主已定义 env-file 同名键、`COMPOSE_*` project/file/profile/env-file/path-separator 或 `DOCKER_HOST / DOCKER_CONTEXT / DOCKER_TLS_VERIFY / DOCKER_CERT_PATH`，先 `unset` 后再继续：
@@ -275,7 +276,7 @@ docker compose \
     --expected-database plush_erp_uat_20260716_v5 \
     --expected-migration '<14-digit-migration>' \
     --expected-release '<40-character-lowercase-release>' \
-    --confirm 'BOOTSTRAP_MANUAL_ACCEPTANCE_CORE:customer-trial-133:yoyoosun:plush_erp_uat_20260716_v5:yoyoosun-manual-acceptance:2026.07.16-v5:20260716-V5:<14-digit-migration>:<40-character-lowercase-release>'
+    --confirm 'BOOTSTRAP_MANUAL_ACCEPTANCE_CORE:customer-trial-133:yoyoosun:plush_erp_uat_20260716_v5:yoyoosun-manual-acceptance:2026.08.15-v6:20260815-V6:<14-digit-migration>:<40-character-lowercase-release>'
 ```
 
 回到本机，通过同一隧道执行唯一顶层 runner：
@@ -287,15 +288,15 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<133-independent-admin-password>' \
     --apply \
     --target customer-trial-133 \
     --backend-url http://127.0.0.1:18375 \
-    --data-version 2026.07.16-v5 \
-    --run-id 20260716-V5 \
-    --confirm APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.07.16-v5:20260716-V5 \
+    --data-version 2026.08.15-v6 \
+    --run-id 20260815-V6 \
+    --confirm APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.08.15-v6:20260815-V6 \
     --target-attestation-json "$MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON"
 ```
 
-该命令完成后，规范总回执必须位于 `output/qa/manual-acceptance/datasets/2026.07.16-v5/customer-trial-133/dataset/apply-report.json`。不得跳过总回执，直接拼接分阶段报告去跑浏览器。
+该命令完成后，规范总回执必须位于 `output/qa/manual-acceptance/datasets/2026.08.15-v6/customer-trial-133/dataset/apply-report.json`。不得跳过总回执，直接拼接分阶段报告去跑浏览器。
 
-首次执行前，该目标的规范总回执必须不存在。若某阶段失败，或完整成功后需要证明同批幂等重放，保留原回执，并在完全相同的目标、版本、批次、后端和带外证明参数后追加 `--resume-report output/qa/manual-acceptance/datasets/2026.07.16-v5/<target>/dataset/apply-report.json`。禁止删除回执后重新冒充 fresh apply；resume 会重验 core、客户配置、数据库、release / migration、连续阶段和各组件 digest。
+首次执行前，该目标的规范总回执必须不存在。若某阶段失败，或完整成功后需要证明同批幂等重放，保留原回执，并在完全相同的目标、版本、批次、后端和带外证明参数后追加 `--resume-report output/qa/manual-acceptance/datasets/2026.08.15-v6/<target>/dataset/apply-report.json`。禁止删除回执后重新冒充 fresh apply；resume 会重验 core、客户配置、数据库、release / migration、连续阶段和各组件 digest。
 
 fresh apply 会在开始时捕获一次岗位任务时间锚点并写入总回执；同批 resume 必须校验并复用该锚点，不能按当前时间重排到期日。业务数据版本中的日期只用于来源单业务日期，不再充当任务到期锚点。本地和 133 共享同一时间策略与语义 digest，但分别在自己的 fresh 回执中绑定执行锚点。浏览器必须在回执记录的有效期内同时看到出货放行的“即将到期”和“已超时”；锚点过期后不得继续沿用旧报告宣称通过，应换新数据版本并从 fresh 空库重放。
 
@@ -307,17 +308,17 @@ fresh 和 resume 都会原子占用同目录的 `dataset/.apply.lock`，同一�
 
 ```bash
 MANUAL_ACCEPTANCE_SIM_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA \
-MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260728_delivery_dev \
+MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.08.15-v6:20260815-V6:plush_erp_acceptance_20260728_delivery_dev \
 MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
 MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
   node scripts/qa/manual-acceptance-source-data.mjs \
     --apply \
     --target local-dev \
-    --data-version 2026.07.16-v5 \
-    --run-id 20260716-V5 \
+    --data-version 2026.08.15-v6 \
+    --run-id 20260815-V6 \
     --backend-url '<dedicated-local-acceptance-backend-url>' \
     --database-name plush_erp_acceptance_20260728_delivery_dev \
-    --out output/qa/manual-acceptance/datasets/2026.07.16-v5/local/source
+    --out output/qa/manual-acceptance/datasets/2026.08.15-v6/local/source
 ```
 
 随后按同一 `dataVersion / runId` 准备九岗位任务和统一事实链。采购收货与质检已经归入事实入口，不再单独调用 `purchase-quality-simulated-matrix.mjs`；旧 `operational-fact-simulated-closure.mjs` 只保留历史 report-only 守卫，不能作为当前数据入口。
@@ -325,52 +326,52 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
 ```bash
 node scripts/qa/manual-acceptance-task-data.mjs \
   --target local-dev \
-  --data-version 2026.07.16-v5 \
-  --run-id 20260716-V5
+  --data-version 2026.08.15-v6 \
+  --run-id 20260815-V6
 
 MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM=APPLY_SIMULATED_ACCOUNT_SCENARIOS \
-MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260728_delivery_dev \
+MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.08.15-v6:20260815-V6:plush_erp_acceptance_20260728_delivery_dev \
 MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
 MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
   node scripts/qa/manual-acceptance-account-scenarios.mjs \
     --apply \
     --target local-dev \
-    --data-version 2026.07.16-v5 \
-    --run-id 20260716-V5 \
+    --data-version 2026.08.15-v6 \
+    --run-id 20260815-V6 \
     --backend-url '<dedicated-local-acceptance-backend-url>' \
     --database-name plush_erp_acceptance_20260728_delivery_dev \
     --json
 
 MANUAL_ACCEPTANCE_TASK_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_TASKS \
-MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260728_delivery_dev \
+MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.08.15-v6:20260815-V6:plush_erp_acceptance_20260728_delivery_dev \
 MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
 MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
   node scripts/qa/manual-acceptance-task-data.mjs \
     --apply \
     --target local-dev \
-    --data-version 2026.07.16-v5 \
-    --run-id 20260716-V5 \
+    --data-version 2026.08.15-v6 \
+    --run-id 20260815-V6 \
     --backend-url '<dedicated-local-acceptance-backend-url>' \
     --database-name plush_erp_acceptance_20260728_delivery_dev \
-    --out output/qa/manual-acceptance/datasets/2026.07.16-v5/local/task
+    --out output/qa/manual-acceptance/datasets/2026.08.15-v6/local/task
 ```
 
 `manual-acceptance-fact-data.mjs` 必须输出 `source-driven-operational-facts-v1` 报告，记录本批采购收货、质检、库存、生产、预留、出货与财务对象的精确 ID、业务编号和状态。重复执行只能完整复用或继续同一批次；发现部分冲突或报告身份不一致时必须停止。Readiness、附件和浏览器入口都会拒绝旧通用事实报告。
 
 ```bash
 MANUAL_ACCEPTANCE_SIM_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA \
-MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260728_delivery_dev \
+MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.08.15-v6:20260815-V6:plush_erp_acceptance_20260728_delivery_dev \
 MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
 MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
   node scripts/qa/manual-acceptance-fact-data.mjs \
     --apply \
     --target local-dev \
-    --data-version 2026.07.16-v5 \
-    --run-id 20260716-V5 \
+    --data-version 2026.08.15-v6 \
+    --run-id 20260815-V6 \
     --backend-url '<dedicated-local-acceptance-backend-url>' \
     --database-name plush_erp_acceptance_20260728_delivery_dev \
-    --source-report output/qa/manual-acceptance/datasets/2026.07.16-v5/local/source/apply-report.json \
-    --out output/qa/manual-acceptance/datasets/2026.07.16-v5/local/facts
+    --source-report output/qa/manual-acceptance/datasets/2026.08.15-v6/local/source/apply-report.json \
+    --out output/qa/manual-acceptance/datasets/2026.08.15-v6/local/facts
 ```
 
 需要分段排障时，`--phase purchase-quality` 只准备采购、收货、质检和材料库存；`--phase facts` 会先核对或复用这批采购前置，再继续生产、委外、出货和财务，不是绕过采购前置的独立入口。最终验收仍必须执行完整模式并生成一份同时包含全部精确引用的事实报告。
@@ -384,10 +385,10 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
     --verify \
     --backend-url '<dedicated-local-acceptance-backend-url>' \
     --database-name plush_erp_acceptance_20260728_delivery_dev \
-    --source-report output/qa/manual-acceptance/datasets/2026.07.16-v5/local/source/apply-report.json \
-    --fact-report output/qa/manual-acceptance/datasets/2026.07.16-v5/local/facts/apply-report.json \
-    --task-report output/qa/manual-acceptance/datasets/2026.07.16-v5/local/task/apply-report.json \
-    --out output/qa/manual-acceptance/datasets/2026.07.16-v5/local/readiness
+    --source-report output/qa/manual-acceptance/datasets/2026.08.15-v6/local/source/apply-report.json \
+    --fact-report output/qa/manual-acceptance/datasets/2026.08.15-v6/local/facts/apply-report.json \
+    --task-report output/qa/manual-acceptance/datasets/2026.08.15-v6/local/task/apply-report.json \
+    --out output/qa/manual-acceptance/datasets/2026.08.15-v6/local/readiness
 ```
 
 `readiness` 独立命令保持严格非绿：41 项可查询数据全部通过、5 项模板预览与 5 项打印工作台仍待浏览器时，报告为 `queryChecksPassed=true / queryEvidenceComplete=false` 并退出 1。顶层 dataset runner 只在“0 项查询失败、恰好这 10 项打印目标 `not_proven`、其余 41 项全过”时把数据底座记为已证明，同时明确写入 `browserEvidencePending=true`；任意其他缺口仍立即阻断。浏览器还必须为 5 个预览各证明至少 1 份可见数据，并为每个打印工作台证明本批来源至少 5 条，再打开精确 25 行单据和真实 PDF。最终只有同批浏览器报告的 `acceptancePassed=true` 才能宣称 51 项自动化验收完成。
@@ -407,11 +408,11 @@ MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
   node scripts/qa/manual-acceptance-browser.mjs \
     --base-url http://127.0.0.1:15200 \
     --backend-url '<dedicated-local-acceptance-backend-url>' \
-    --dataset-report output/qa/manual-acceptance/datasets/2026.07.16-v5/local/dataset/apply-report.json \
-    --source-report output/qa/manual-acceptance/datasets/2026.07.16-v5/local/source/apply-report.json \
-    --fact-report output/qa/manual-acceptance/datasets/2026.07.16-v5/local/facts/apply-report.json \
-    --readiness-report output/qa/manual-acceptance/datasets/2026.07.16-v5/local/readiness/verify-report.json \
-    --report output/qa/manual-acceptance/datasets/2026.07.16-v5/local/browser/report.json
+    --dataset-report output/qa/manual-acceptance/datasets/2026.08.15-v6/local/dataset/apply-report.json \
+    --source-report output/qa/manual-acceptance/datasets/2026.08.15-v6/local/source/apply-report.json \
+    --fact-report output/qa/manual-acceptance/datasets/2026.08.15-v6/local/facts/apply-report.json \
+    --readiness-report output/qa/manual-acceptance/datasets/2026.08.15-v6/local/readiness/verify-report.json \
+    --report output/qa/manual-acceptance/datasets/2026.08.15-v6/local/browser/report.json
 ```
 
 `customer-trial-133` 的浏览器报告必须写到当前版本与目标的规范路径 `output/qa/manual-acceptance/datasets/<dataVersion>/customer-trial-133/browser/report.json`，并同时提供同批 `dataset/apply-report.json`、`readiness/verify-report.json` 与 `MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON`。浏览器启动前会重新调用 `/readyz/runtime-identity`，把当前数据库、完整 release commit、Atlas migration、fresh baseline、attachments、source / fact / task / readiness 批次身份原子绑定；readiness 只参与身份闭合，列表数量仍必须由当前页面 DOM 重新证明，打印仍必须由当前 5 份 PDF 证明。
@@ -439,34 +440,34 @@ MANUAL_ACCEPTANCE_PASSWORD='<different-demo-password>' \
   node scripts/qa/manual-acceptance-browser.mjs \
     --base-url http://127.0.0.1:18376 \
     --backend-url http://127.0.0.1:18375 \
-    --dataset-report output/qa/manual-acceptance/datasets/2026.07.16-v5/customer-trial-133/dataset/apply-report.json \
-    --source-report output/qa/manual-acceptance/datasets/2026.07.16-v5/customer-trial-133/source/apply-report.json \
-    --fact-report output/qa/manual-acceptance/datasets/2026.07.16-v5/customer-trial-133/facts/apply-report.json \
-    --readiness-report output/qa/manual-acceptance/datasets/2026.07.16-v5/customer-trial-133/readiness/verify-report.json \
+    --dataset-report output/qa/manual-acceptance/datasets/2026.08.15-v6/customer-trial-133/dataset/apply-report.json \
+    --source-report output/qa/manual-acceptance/datasets/2026.08.15-v6/customer-trial-133/source/apply-report.json \
+    --fact-report output/qa/manual-acceptance/datasets/2026.08.15-v6/customer-trial-133/facts/apply-report.json \
+    --readiness-report output/qa/manual-acceptance/datasets/2026.08.15-v6/customer-trial-133/readiness/verify-report.json \
     --target-attestation-json "$MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON" \
-    --report output/qa/manual-acceptance/datasets/2026.07.16-v5/customer-trial-133/browser/report.json
+    --report output/qa/manual-acceptance/datasets/2026.08.15-v6/customer-trial-133/browser/report.json
 ```
 
 打印工作台必须从同批采购订单、委外订单和 BOM 选择真实模拟记录。PDF 出现 4xx / 5xx、空文件、非 PDF 或缺少 `request_id` 都要失败，不能用页面打开代替带值打印证据。
 
-退出批次前必须先 dry-run。该入口只处理没有 active / blocked ProcessRuntime 阻断的源单；当前 V5 特意保留已启动、待办、阻塞和退回流程证据，不能用业务取消伪造流程撤销。需要连同这些流程证据完整清理时，本地应重建专用验收库，133 必须走受控数据库重建 / 恢复流程；不得让本脚本部分执行后冒充整批已退出。其余可处理源单进入取消 / 归档状态，主数据转为停用；已过账库存、出货和财务历史继续保留，不做物理删除。本地和 133 都走同一 target policy，133 仍要求精确确认和带外证明：
+退出批次前必须先 dry-run。该入口只处理没有 active / blocked ProcessRuntime 阻断的源单；上一固定 V5 批次特意保留已启动、待办、阻塞和退回流程证据，不能用业务取消伪造流程撤销。需要连同这些流程证据完整清理时，本地应重建专用验收库，133 必须走受控数据库重建 / 恢复流程；不得让本脚本部分执行后冒充整批已退出。其余可处理源单进入取消 / 归档状态，主数据转为停用；已过账库存、出货和财务历史继续保留，不做物理删除。本地和 133 都走同一 target policy，133 仍要求精确确认和带外证明：
 
 ```bash
 MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
   node scripts/qa/manual-acceptance-source-retire.mjs \
     --target local-dev \
-    --data-version 2026.07.16-v5 \
-    --run-id 20260716-V5
+    --data-version 2026.08.15-v6 \
+    --run-id 20260815-V6
 
 MANUAL_ACCEPTANCE_RETIRE_CONFIRM=RETIRE_SIMULATED_MANUAL_ACCEPTANCE_SOURCE_DATA \
-MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260728_delivery_dev \
+MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.08.15-v6:20260815-V6:plush_erp_acceptance_20260728_delivery_dev \
 MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
 MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
   node scripts/qa/manual-acceptance-source-retire.mjs \
     --apply \
     --target local-dev \
-    --data-version 2026.07.16-v5 \
-    --run-id 20260716-V5 \
+    --data-version 2026.08.15-v6 \
+    --run-id 20260815-V6 \
     --backend-url '<dedicated-local-acceptance-backend-url>' \
     --database-name plush_erp_acceptance_20260728_delivery_dev
 ```

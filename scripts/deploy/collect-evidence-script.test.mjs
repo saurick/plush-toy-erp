@@ -54,6 +54,7 @@ test("collect evidence draft includes backup restore artifact placeholders compa
     "smoke-test-report.json",
     "rollback-forward-fix-plan.md",
     "rollback-rehearsal-report.json",
+    "credential-rotation-report.json",
     "release-signoff-checklist.md",
   ]) {
     assert.ok(
@@ -71,6 +72,14 @@ test("collect evidence draft includes backup restore artifact placeholders compa
     migrationStatus: "migration-status.txt",
     commandSummary: "command-summary.txt",
   });
+  const credentialRotation = JSON.parse(
+    fs.readFileSync(
+      path.join(output, "credential-rotation-report.json"),
+      "utf8",
+    ),
+  );
+  assert.equal(credentialRotation.target, "customer-trial-133");
+  assert.equal(credentialRotation.datasetVersion, "2026.08.15-v6");
   assert.equal(
     report.backup.migrationVersion,
     "待填写，必须等于 release-evidence.md migrationBefore",

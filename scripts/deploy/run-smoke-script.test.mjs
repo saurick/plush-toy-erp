@@ -117,7 +117,7 @@ case "$url" in
     [[ -z "$write_out" ]] || printf '200'
     ;;
   */rpc/customer_config)
-    response='{"jsonrpc":"2.0","id":"customer-config-smoke","result":{"code":0,"data":{"session":{"configRevision":"yoyoosun-customer-package-v7.runtime-manifest-v1","source":"active_customer_config_revision","pages":["global-dashboard"],"fieldPolicies":{"customers.default":{},"suppliers.default":{},"sales_orders.default":{}}}}}}'
+    response='{"jsonrpc":"2.0","id":"customer-config-smoke","result":{"code":0,"data":{"session":{"configRevision":"yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1","source":"active_customer_config_revision","pages":["global-dashboard"],"fieldPolicies":{"customers.default":{},"suppliers.default":{},"sales_orders.default":{}}}}}}'
     [[ -z "$output_file" ]] && printf '%s\n' "$response" || printf '%s\n' "$response" >"$output_file"
     ;;
   */rpc/auth)
@@ -219,7 +219,7 @@ test("run smoke input template is no-write and does not require endpoint", () =>
   );
   assert.match(
     template.commands.join("\n"),
-    /--customer-config-revision yoyoosun-customer-package-v7\.runtime-manifest-v1/,
+    /--customer-config-revision yoyoosun-customer-trial-133-package-v8\.runtime-manifest-v1/,
   );
   assert.match(
     template.commands.join("\n"),
@@ -254,7 +254,7 @@ test("run smoke writes release-gate compatible report", async () => {
       "--report",
       reportPath,
       "--customer-config-revision",
-      "yoyoosun-customer-package-v7.runtime-manifest-v1",
+      "yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1",
       "--admin-token-env",
       "SMOKE_ADMIN_TOKEN",
       ...credentialArgs,
@@ -345,7 +345,7 @@ test("run smoke writes release-gate compatible report", async () => {
   );
   assert.equal(
     customerConfigCheck.expectedRevision,
-    "yoyoosun-customer-package-v7.runtime-manifest-v1",
+    "yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1",
   );
   assert.equal(customerConfigCheck.tokenSourceEnv, "SMOKE_ADMIN_TOKEN");
   assert.equal(customerConfigCheck.responseBodyStored, false);
@@ -396,7 +396,7 @@ test("run smoke fails authenticated release smoke for a non-PDF response", async
       "--report",
       reportPath,
       "--customer-config-revision",
-      "yoyoosun-customer-package-v7.runtime-manifest-v1",
+      "yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1",
       "--admin-token-env",
       "SMOKE_ADMIN_TOKEN",
       ...credentialArgs,

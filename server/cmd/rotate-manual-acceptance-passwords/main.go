@@ -16,6 +16,7 @@ import (
 
 	"server/internal/biz"
 	"server/internal/data"
+	"server/internal/manualacceptance"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -29,18 +30,22 @@ const (
 	smsPhoneEnv             = "MANUAL_ACCEPTANCE_SMS_PHONE"
 	registeredAdminPassword = "adminadmin"
 	dsnEnv                  = "POSTGRES_DSN"
-	customerTrial133DB      = "plush_erp_uat_20260716_v5"
 	customerTrial133Port    = "55435"
-	currentDatasetVersion   = "2026.07.16-v5"
 
 	localCustomerConfigProductVersion = "local-customer-package-test-apply"
 	localCustomerConfigApplyPurpose   = "local_test_apply"
-	customerTrial133Revision          = "yoyoosun-customer-trial-133-package-v7.runtime-manifest-v1"
-	customerTrial133ProductVersion    = "customer-trial-133-test-2026.07.16-v5"
 	customerTrial133ApplyPurpose      = "customer_trial_test_apply"
 )
 
 var Version = "dev"
+
+var (
+	manualAcceptanceContract         = manualacceptance.Current()
+	customerTrial133DB               = manualAcceptanceContract.CustomerTrial133.DatabaseName
+	currentDatasetVersion            = manualAcceptanceContract.DataVersion
+	customerTrial133Revision         = manualAcceptanceContract.CustomerTrial133.ConfigRevision
+	customerTrial133ProductVersion   = manualAcceptanceContract.CustomerTrial133.ConfigProductVersion
+)
 
 var immutableReleasePattern = regexp.MustCompile(`^[a-f0-9]{40}$`)
 var operationIDPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)

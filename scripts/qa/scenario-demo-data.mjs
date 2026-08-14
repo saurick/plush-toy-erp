@@ -2,7 +2,7 @@
 
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { access } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -10,39 +10,17 @@ import { promisify } from "node:util";
 
 import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
 import { applyManualAcceptanceCustomerConfig } from "./manual-acceptance-customer-config.mjs";
+import { MANUAL_ACCEPTANCE_DATASET_OUTPUT_ROOT } from "./manual-acceptance-dataset-runner.mjs";
 import {
-  MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM_PHRASE,
-  applyManualAcceptanceAccountScenarios,
-  buildManualAcceptanceAccountScenarioPlan,
-  manualAcceptanceFormalAccountBootstrapConfirmation,
-} from "./manual-acceptance-account-scenarios.mjs";
+  PERSISTENT_SCENARIO_DATASET_TARGET,
+  applyManualAcceptanceDataset,
+  buildManualAcceptanceDatasetTargetPlan,
+  manualAcceptanceDatasetApplyReportPath,
+} from "./manual-acceptance-dataset.mjs";
 import {
-  MANUAL_ACCEPTANCE_FACT_CONFIRM_PHRASE,
-  applyManualAcceptanceFactPlan,
-  buildManualAcceptanceFactPlan,
-} from "./manual-acceptance-fact-data.mjs";
-import {
-  buildManualAcceptanceReadinessPlan,
-  verifyManualAcceptanceReadiness,
-} from "./manual-acceptance-readiness.mjs";
-import {
-  MANUAL_ACCEPTANCE_CONFIRM_PHRASE,
-  applyManualAcceptanceSourceData,
-  buildManualAcceptanceSourceDataPlan,
-} from "./manual-acceptance-source-data.mjs";
-import {
-  CONFIRM_PHRASE as MANUAL_ACCEPTANCE_TASK_CONFIRM_PHRASE,
-  LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE,
-  LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
-  TASK_COPY_REVISION,
-  TASK_PROFILE_LONG_LIVED_WORKBENCH,
-  applyManualAcceptanceTaskData,
-  buildLegacyManualAcceptanceTaskBatchReference,
-  buildManualAcceptanceTaskDataPlan,
-  manualAcceptanceTaskRetireConfirmation,
-  retireLegacyManualAcceptanceTaskBatch,
-} from "./manual-acceptance-task-data.mjs";
-import {
+  CUSTOMER_TRIAL_133_DATABASE,
+  CUSTOMER_TRIAL_133_ORIGIN,
+  CUSTOMER_TRIAL_133_TARGET,
   CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
   CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
   LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
@@ -51,10 +29,7 @@ import {
   MANUAL_ACCEPTANCE_DATASET_KEY,
   SCENARIO_DEMO_ORIGIN,
   SCENARIO_DEMO_TARGET,
-  assertManualAcceptanceDatabaseIdentity,
-  assertManualAcceptanceMutationTarget,
   assertManualAcceptanceRuntimeIdentityPrecondition,
-  assertManualAcceptanceRuntimePolicy,
   manualAcceptanceTargetConfirmation,
   resolveManualAcceptanceTarget,
 } from "./manual-acceptance-target-policy.mjs";
@@ -64,89 +39,24 @@ import {
   assertRepositoryIdentityEqual,
   readRepositoryIdentity,
 } from "./lib/repository-identity.mjs";
+import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from "./manual-acceptance-core-contract.mjs";
 
-export const SCENARIO_DEMO_SCHEMA_VERSION = "plush.scenario-demo-plan/v1";
+export const SCENARIO_DEMO_SCHEMA_VERSION = "plush.scenario-demo-plan/v2";
 export const SCENARIO_DEMO_READBACK_SCHEMA_VERSION =
   "plush.dev-data-preparation-readback/v1";
-export const SCENARIO_DEMO_SCHEDULE_ANCHOR_UTC = "2026-07-16T12:00:00.000Z";
-export const SCENARIO_DEMO_CATALOG_TARGET_COUNT = 51;
 export const SCENARIO_DEMO_REPLAY_MODE = "exact-create-or-readback";
 
 const REGISTERED_DEVELOPMENT_HOST = "192.168.0.106";
 const REGISTERED_DEVELOPMENT_PORT = 5432;
 const LOCAL_ROLE_DEMO_PASSWORD = "12345678";
 const LOCAL_STABLE_ADMIN_PASSWORD = "adminadmin";
-const SCENARIO_DEMO_QUERY_READY_COUNT = 41;
-const SCENARIO_DEMO_BROWSER_ONLY_GAP_COUNT = 10;
-const SCENARIO_DEMO_AUDIT_MINIMUM = 30;
 const CUSTOMER_KEY = "yoyoosun";
 const ADMIN_USERNAME = "admin";
-const DEFAULT_OUTPUT_ROOT = path.join(
-  "output",
-  "qa",
-  "scenario-demo",
-  CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
-);
-const REQUIRED_MODULES = Object.freeze([
-  "customers",
-  "suppliers",
-  "products",
-  "materials",
-  "processes",
-  "sales_orders",
-  "workflow_tasks",
-  "purchase_orders",
-  "outsourcing_orders",
-  "material_bom",
-  "production_orders",
-  "production",
-  "inventory",
-  "shipments",
-  "finance",
-  "finance_payments",
-  "purchase_receipts",
-  "quality_inspections",
-]);
-
-export class ScenarioDemoError extends Error {
-  constructor(message, exitCode = 1) {
-    super(message);
-    this.name = "ScenarioDemoError";
-    this.exitCode = exitCode;
-  }
-}
-
-export function buildScenarioDemoCustomerConfigManifest() {
-  const manifest = buildLocalTestApplyRuntimeManifest(yoyoosunCustomerPackage);
-  if (
-    manifest.customer_key !== CUSTOMER_KEY ||
-    manifest.revision !== LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION ||
-    manifest.product_version !==
-      LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION ||
-    manifest.compiled_snapshot?.applyPurpose !==
-      LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE
-  ) {
-    throw new ScenarioDemoError(
-      "scenario-demo tracked customer configuration identity drifted",
-      2,
-    );
-  }
-  return manifest;
-}
-
-const EXPECTED_CUSTOMER_CONFIG_MANIFEST =
-  buildScenarioDemoCustomerConfigManifest();
-const EXPECTED_RUNTIME = Object.freeze({
-  target: SCENARIO_DEMO_TARGET,
-  customerKey: CUSTOMER_KEY,
-  configRevision: EXPECTED_CUSTOMER_CONFIG_MANIFEST.revision,
-  configProductVersion: EXPECTED_CUSTOMER_CONFIG_MANIFEST.product_version,
-  configApplyPurpose:
-    EXPECTED_CUSTOMER_CONFIG_MANIFEST.compiled_snapshot.applyPurpose,
-  source: "active_customer_config_revision",
-  requiredModules: REQUIRED_MODULES,
-});
-const FACT_RECORD_KEYS = Object.freeze([
+const DATASET_CONFIRM_PREFIX = "APPLY_SCENARIO_DEMO";
+const QUERY_READY_COUNT = 41;
+const CATALOG_TARGET_COUNT = 51;
+const BROWSER_ONLY_GAP_COUNT = 10;
+const FACT_COUNT_KEYS = Object.freeze([
   "productionFacts",
   "purchaseReceipts",
   "purchaseReturns",
@@ -161,12 +71,20 @@ const FACT_RECORD_KEYS = Object.freeze([
   "financePayments",
   "financeCreditNotes",
 ]);
-const SOURCE_DOCUMENT_KEYS = Object.freeze([
-  "salesOrders",
-  "purchaseOrders",
-  "outsourcingOrders",
+const SOURCE_DOCUMENT_COUNT_KEYS = Object.freeze([
+  "sales_order.create",
+  "purchase_order.create",
+  "outsourcing_order.create",
 ]);
 const execFileAsync = promisify(execFile);
+
+export class ScenarioDemoError extends Error {
+  constructor(message, exitCode = 1) {
+    super(message);
+    this.name = "ScenarioDemoError";
+    this.exitCode = exitCode;
+  }
+}
 
 function stableValue(value) {
   if (Array.isArray(value)) return value.map(stableValue);
@@ -202,6 +120,22 @@ export function resolveLocalScenarioDemoCredentials(environment = {}) {
   });
 }
 
+export function resolveCustomerTrialScenarioDemoCredentials(environment = {}) {
+  const credentials = Object.freeze({
+    rolePassword: String(environment.MANUAL_ACCEPTANCE_PASSWORD || "").trim(),
+    adminPassword: String(
+      environment.MANUAL_ACCEPTANCE_ADMIN_PASSWORD || "",
+    ).trim(),
+  });
+  if (!credentials.rolePassword || !credentials.adminPassword) {
+    throw new ScenarioDemoError(
+      "customer-trial-133 controlled runtime credentials are required for apply",
+      2,
+    );
+  }
+  return credentials;
+}
+
 function safeErrorMessage(error) {
   return String(error?.message || error || "scenario-demo failed")
     .replace(
@@ -218,6 +152,24 @@ function safeErrorMessage(error) {
     )
     .replace(/\/(?:Users|home|private|var|tmp)\/[^\s:]+/gu, "<local-path>")
     .slice(0, 500);
+}
+
+export function buildScenarioDemoCustomerConfigManifest() {
+  const manifest = buildLocalTestApplyRuntimeManifest(yoyoosunCustomerPackage);
+  if (
+    manifest.customer_key !== CUSTOMER_KEY ||
+    manifest.revision !== LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION ||
+    manifest.product_version !==
+      LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION ||
+    manifest.compiled_snapshot?.applyPurpose !==
+      LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE
+  ) {
+    throw new ScenarioDemoError(
+      "scenario-demo tracked customer configuration identity drifted",
+      2,
+    );
+  }
+  return manifest;
 }
 
 function assertRegisteredScenarioDatabase(databaseURL) {
@@ -239,7 +191,7 @@ function assertRegisteredScenarioDatabase(databaseURL) {
   return parsed;
 }
 
-function migrationPreflightFingerprint(stdout) {
+function migrationPreflightEvidence(stdout) {
   const output = String(stdout || "").trim();
   const migration = output.match(
     /migration 已是最新版本（([^，\r\n]+)，(\d+)\/(\d+)）/u,
@@ -257,8 +209,8 @@ function migrationPreflightFingerprint(stdout) {
       2,
     );
   }
-  return scenarioDemoDigest({
-    contract: "scenario-demo-migration-preflight/v1",
+  const evidence = {
+    contract: "scenario-demo-migration-preflight/v2",
     migrationVersion: migration[1],
     appliedFiles: Number(migration[2]),
     availableFiles: Number(migration[3]),
@@ -268,6 +220,10 @@ function migrationPreflightFingerprint(stdout) {
       procedures: 0,
       nonInternalTriggers: 0,
     },
+  };
+  return Object.freeze({
+    migrationVersion: evidence.migrationVersion,
+    fingerprint: scenarioDemoDigest(evidence),
   });
 }
 
@@ -279,218 +235,127 @@ async function defaultCommandRunner(command, args, options) {
   });
 }
 
-async function rpcCall({
-  backendURL,
-  domain,
-  method,
-  params = {},
-  token,
-  fetchImpl,
-}) {
-  const response = await fetchImpl(
-    new URL(`/rpc/${domain}`, `${backendURL}/`).toString(),
-    {
-      method: "POST",
-      redirect: "error",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: `scenario-demo-preflight-${domain}-${method}`,
-        method,
-        params:
-          domain === "customer_config"
-            ? { customer_key: CUSTOMER_KEY, ...params }
-            : params,
-      }),
-    },
-  );
-  if (response?.redirected || !response?.ok) {
-    throw new ScenarioDemoError(
-      `scenario-demo ${domain}.${method} preflight failed`,
-      2,
-    );
+function runtimeContract(targetAlias) {
+  if (targetAlias === PERSISTENT_SCENARIO_DATASET_TARGET) {
+    return Object.freeze({
+      customerKey: CUSTOMER_KEY,
+      configRevision: LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
+      configProductVersion: LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
+      configApplyPurpose: LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
+      configDatasetVersion: null,
+      configTarget: null,
+    });
   }
-  const payload = await response.json();
-  if (payload?.result?.code !== 0) {
-    throw new ScenarioDemoError(
-      `scenario-demo ${domain}.${method} preflight was rejected`,
-      2,
-    );
-  }
-  return payload.result.data || {};
+  return Object.freeze({
+    customerKey: CUSTOMER_KEY,
+    configRevision:
+      MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision,
+    configProductVersion:
+      MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configProductVersion,
+    configApplyPurpose: "customer_trial_test_apply",
+    configDatasetVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+    configTarget: CUSTOMER_TRIAL_133_TARGET,
+  });
 }
 
-export async function preflightScenarioDemoRuntime({
-  policy,
-  rolePassword,
-  adminPassword,
-  fetchImpl,
-}) {
-  await assertManualAcceptanceRuntimeIdentityPrecondition({
-    policy,
-    fetchImpl,
-  });
-  const login = await rpcCall({
-    backendURL: policy.backendURL,
-    domain: "auth",
-    method: "admin_login",
-    params: { username: ADMIN_USERNAME, password: adminPassword },
-    fetchImpl,
-  });
-  const adminToken = String(login.access_token || login.token || "").trim();
-  if (
-    !adminToken ||
-    login.username !== ADMIN_USERNAME ||
-    (login.is_super_admin !== true && login.isSuperAdmin !== true)
-  ) {
-    throw new ScenarioDemoError(
-      "scenario-demo admin credential did not prove the local super administrator",
-      2,
-    );
-  }
-  if ([...rolePassword].length < 8 || [...rolePassword].length > 20) {
-    throw new ScenarioDemoError(
-      "MANUAL_ACCEPTANCE_PASSWORD must contain 8-20 characters",
-      2,
-    );
-  }
-  const capabilities = await rpcCall({
-    backendURL: policy.backendURL,
-    domain: "debug",
-    method: "capabilities",
-    token: adminToken,
-    fetchImpl,
-  });
-  assertManualAcceptanceDatabaseIdentity({ policy, capabilities });
-  const sessionData = await rpcCall({
-    backendURL: policy.backendURL,
-    domain: "customer_config",
-    method: "get_effective_session",
-    token: adminToken,
-    fetchImpl,
-  });
-  return assertManualAcceptanceRuntimePolicy({
-    policy,
-    capabilities,
-    session: sessionData.session || {},
-    requiredModules: REQUIRED_MODULES,
-    customerKey: CUSTOMER_KEY,
-  });
+function targetEnvironment(targetAlias) {
+  return targetAlias === PERSISTENT_SCENARIO_DATASET_TARGET
+    ? "local-development"
+    : "customer-trial-133";
 }
 
 export function buildScenarioDemoPlan({
   repository,
+  targetAlias = PERSISTENT_SCENARIO_DATASET_TARGET,
   databaseTarget,
   migrationFingerprint,
-  runtime,
+  migrationVersion,
+  targetAttestation,
 } = {}) {
-  const policy = resolveManualAcceptanceTarget({
-    target: SCENARIO_DEMO_TARGET,
-    backendURL: SCENARIO_DEMO_ORIGIN,
-    datasetKey: MANUAL_ACCEPTANCE_DATASET_KEY,
-    dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
-    runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
-    databaseName: databaseTarget?.databaseName,
-  });
+  const local = targetAlias === PERSISTENT_SCENARIO_DATASET_TARGET;
+  if (!local && targetAlias !== CUSTOMER_TRIAL_133_TARGET) {
+    throw new ScenarioDemoError("scenario-demo target alias is invalid", 2);
+  }
   if (
-    databaseTarget?.host !== REGISTERED_DEVELOPMENT_HOST ||
-    databaseTarget?.port !== REGISTERED_DEVELOPMENT_PORT ||
-    !/^[0-9a-f]{64}$/u.test(String(databaseTarget?.targetFingerprint || "")) ||
-    !/^[0-9a-f]{64}$/u.test(String(migrationFingerprint || "")) ||
-    runtime?.target !== SCENARIO_DEMO_TARGET ||
-    runtime?.customerKey !== CUSTOMER_KEY
+    local &&
+    (databaseTarget?.host !== REGISTERED_DEVELOPMENT_HOST ||
+      databaseTarget?.port !== REGISTERED_DEVELOPMENT_PORT)
   ) {
     throw new ScenarioDemoError(
-      "scenario-demo plan preflight identity is incomplete",
+      "scenario-demo local database identity is incomplete",
       2,
     );
   }
-  const accountPlan = buildManualAcceptanceAccountScenarioPlan({
-    ...policy,
-    auditMinimum: SCENARIO_DEMO_AUDIT_MINIMUM,
-  });
-  const sourcePlan = buildManualAcceptanceSourceDataPlan(policy);
-  const taskPlan = buildManualAcceptanceTaskDataPlan({
-    ...policy,
-    scheduleAnchorUtc: SCENARIO_DEMO_SCHEDULE_ANCHOR_UTC,
-    taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
-  });
-  const supersededTaskBatch = buildLegacyManualAcceptanceTaskBatchReference({
+  const backendURL = local ? SCENARIO_DEMO_ORIGIN : CUSTOMER_TRIAL_133_ORIGIN;
+  const databaseName = local
+    ? databaseTarget?.databaseName
+    : CUSTOMER_TRIAL_133_DATABASE;
+  const canonicalPlan = buildManualAcceptanceDatasetTargetPlan({
+    targetAlias,
+    backendURL,
+    databaseName,
+    dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
     runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
-    copyRevision: TASK_COPY_REVISION,
-    backendURL: policy.backendURL,
+    targetAttestation,
   });
+  if (
+    !repository ||
+    !/^[0-9a-f]{40}$/u.test(String(repository.commit || "")) ||
+    typeof repository.dirty !== "boolean" ||
+    !/^[0-9a-f]{64}$/u.test(String(repository.fingerprint || "")) ||
+    !/^[0-9a-f]{64}$/u.test(String(migrationFingerprint || "")) ||
+    !/^20[0-9]{12}$/u.test(String(migrationVersion || "")) ||
+    !databaseName ||
+    canonicalPlan.target.applyReady !== true
+  ) {
+    throw new ScenarioDemoError(
+      "scenario-demo canonical plan preflight identity is incomplete",
+      2,
+    );
+  }
+  const runtime = runtimeContract(targetAlias);
+  const targetFingerprint = local
+    ? databaseTarget.targetFingerprint
+    : scenarioDemoDigest({
+        targetAlias,
+        databaseName,
+        release: canonicalPlan.target.targetAttestation?.release,
+        migration: canonicalPlan.target.targetAttestation?.migration,
+      });
   const plan = {
     schemaVersion: SCENARIO_DEMO_SCHEMA_VERSION,
-    profileKey: SCENARIO_DEMO_TARGET,
+    profileKey: "scenario-demo",
+    targetAlias,
+    targetEnvironment: targetEnvironment(targetAlias),
     datasetKey: MANUAL_ACCEPTANCE_DATASET_KEY,
     dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
     runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
-    backendURL: SCENARIO_DEMO_ORIGIN,
-    databaseName: policy.databaseName,
+    semanticDigest: canonicalPlan.semanticDigest,
+    backendURL,
+    databaseName,
     repository,
     target: {
-      safeTarget: databaseTarget.safeTarget,
-      targetFingerprint: databaseTarget.targetFingerprint,
+      safeTarget: local
+        ? databaseTarget.safeTarget
+        : `${CUSTOMER_TRIAL_133_TARGET}:${databaseName}`,
+      targetFingerprint,
       disposable: false,
-      registeredDevelopmentPostgresOnly: true,
+      registeredTargetOnly: true,
       loopbackBackendOnly: true,
     },
     migrationFingerprint,
-    runtime: {
-      customerKey: runtime.customerKey,
-      configRevision: runtime.configRevision,
-      configProductVersion: runtime.configProductVersion,
-      configApplyPurpose: runtime.configApplyPurpose,
-      source: runtime.source,
-      requiredModules: [...runtime.requiredModules],
-    },
-    taskPolicy: {
-      profile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
-      copyRevision: LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
-      stableActionablePerRole: LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE,
-      supersessionMode: "workflow-lifecycle",
-      physicalDelete: false,
-      supersededBatch: {
-        runId: supersededTaskBatch.runId,
-        copyRevision: supersededTaskBatch.copyRevision,
-        prefix: supersededTaskBatch.prefix,
-        sourceType: supersededTaskBatch.sourceType,
-        sourceID: supersededTaskBatch.sourceID,
-      },
-    },
-    componentDigests: {
-      customerConfig: scenarioDemoDigest(EXPECTED_CUSTOMER_CONFIG_MANIFEST),
-      accounts: scenarioDemoDigest(accountPlan),
-      source: sourcePlan.semanticDigest,
-      tasks: scenarioDemoDigest(taskPlan),
-      facts: scenarioDemoDigest({
-        contract: "source-driven-operational-facts-v1",
-        datasetKey: MANUAL_ACCEPTANCE_DATASET_KEY,
-        dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
-        runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
-      }),
-      readiness: scenarioDemoDigest({
-        contract: "manual-acceptance-page-data-ownership-v2",
-        catalogTargetCount: SCENARIO_DEMO_CATALOG_TARGET_COUNT,
-      }),
+    migrationVersion,
+    release:
+      canonicalPlan.target.targetAttestation?.release || repository.commit,
+    runtime,
+    canonicalRunner: {
+      stageOrder: [...canonicalPlan.semanticPlan.stageOrder],
+      stageCount: canonicalPlan.semanticPlan.stageOrder.length,
+      semanticDigest: canonicalPlan.semanticDigest,
+      targetPolicy: canonicalPlan.target.policyTarget,
+      persistentBaseline: true,
     },
     execution: {
-      stageOrder: [
-        "core-references",
-        "role-accounts",
-        "customer-config",
-        "accounts",
-        "source-documents",
-        "tasks-and-process-runtime",
-        "retire-superseded-task-batch",
-        "facts",
-        "catalog-readiness",
-      ],
       replayMode: SCENARIO_DEMO_REPLAY_MODE,
       dataRetention: "long-lived",
       cleanupSupported: false,
@@ -498,22 +363,47 @@ export function buildScenarioDemoPlan({
       directBusinessSQL: false,
       browserChecksRequired: true,
       manualAcceptanceCompleted: false,
-      auditMinimum: SCENARIO_DEMO_AUDIT_MINIMUM,
     },
   };
   return Object.freeze({
     ...plan,
     planDigest: scenarioDemoDigest(plan),
+    canonicalPlan,
   });
 }
 
 async function resolveScenarioDemoPlan({
+  targetAlias,
+  targetAttestation,
   projectRoot,
   environment,
   commandRunner,
   fetchImpl,
   readRepository,
 }) {
+  const repository = await readRepository(projectRoot);
+  if (targetAlias === CUSTOMER_TRIAL_133_TARGET) {
+    const attestation =
+      targetAttestation ||
+      environment.MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON;
+    const parsed =
+      typeof attestation === "string" ? JSON.parse(attestation) : attestation;
+    const migrationVersion = String(parsed?.migration || "");
+    return {
+      plan: buildScenarioDemoPlan({
+        repository,
+        targetAlias,
+        targetAttestation: parsed,
+        migrationVersion,
+        migrationFingerprint: scenarioDemoDigest({
+          targetAlias,
+          release: parsed?.release,
+          migration: parsed?.migration,
+        }),
+      }),
+      credentials: null,
+    };
+  }
   const targetResult = await commandRunner(
     "go",
     ["run", "./cmd/dburl", "-conf", "./configs/dev/config.yaml"],
@@ -542,188 +432,68 @@ async function resolveScenarioDemoPlan({
     policy,
     fetchImpl,
   });
-  const repository = await readRepository(projectRoot);
-  const credentials = resolveLocalScenarioDemoCredentials(environment);
+  const migration = migrationPreflightEvidence(migrationResult.stdout);
   return {
     plan: buildScenarioDemoPlan({
       repository,
+      targetAlias,
       databaseTarget,
-      migrationFingerprint: migrationPreflightFingerprint(
-        migrationResult.stdout,
-      ),
-      runtime: EXPECTED_RUNTIME,
+      migrationFingerprint: migration.fingerprint,
+      migrationVersion: migration.migrationVersion,
     }),
-    credentials,
-    policy,
+    credentials: resolveLocalScenarioDemoCredentials(environment),
   };
 }
 
-async function assertRepositoryUnchanged(
-  projectRoot,
-  expected,
-  readRepository,
-) {
-  assertRepositoryIdentityEqual(expected, await readRepository(projectRoot));
+function sumNumericFields(summary, keys) {
+  return keys.reduce((total, key) => {
+    const value = Number(summary?.[key] || 0);
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new ScenarioDemoError(`scenario-demo summary ${key} is invalid`);
+    }
+    return total + value;
+  }, 0);
 }
 
-async function writeStageReport(outputRoot, stage, report) {
-  const directory = path.join(outputRoot, stage);
-  await mkdir(directory, { recursive: true });
-  const file = path.join(
-    directory,
-    report.mode === "retire" ? "retire-report.json" : "apply-report.json",
-  );
-  await writeFile(file, `${JSON.stringify(report, null, 2)}\n`, {
-    encoding: "utf8",
-    mode: 0o600,
-  });
-  return file;
-}
-
-function assertReportIdentity(report, plan, label, mode = "apply") {
+export function buildScenarioDemoReadback({ plan, datasetReport } = {}) {
   if (
-    !report ||
-    report.mode !== mode ||
-    report.datasetKey !== plan.datasetKey ||
-    report.dataVersion !== plan.dataVersion ||
-    report.runId !== plan.runId ||
-    report.target !== plan.profileKey ||
-    report.backendURL !== plan.backendURL ||
-    report.databaseName !== plan.databaseName
+    !datasetReport?.ok ||
+    datasetReport.dataVersion !== plan?.dataVersion ||
+    datasetReport.runId !== plan?.runId ||
+    datasetReport.semanticDigest !== plan?.semanticDigest ||
+    datasetReport.target?.alias !== plan?.targetAlias ||
+    datasetReport.target?.databaseName !== plan?.databaseName ||
+    !Array.isArray(datasetReport.stages) ||
+    JSON.stringify(datasetReport.stages.map((stage) => stage.key)) !==
+      JSON.stringify(plan?.canonicalRunner?.stageOrder || []) ||
+    datasetReport.stages.some((stage) => stage.status !== "completed")
   ) {
     throw new ScenarioDemoError(
-      `${label} report identity does not match the fixed scenario-demo batch`,
+      "scenario-demo canonical dataset readback is incomplete",
     );
   }
-  return report;
-}
-
-function assertReadinessReportCoupling(
-  readinessReport,
-  plan,
-  sourceReport,
-  taskReport,
-  factReport,
-) {
-  assertReportIdentity(readinessReport, plan, "readiness", "verify");
-  const sourceInput = readinessReport.reportInputs?.sourceReport;
-  const taskInput = readinessReport.reportInputs?.taskReport;
-  const factInput = readinessReport.reportInputs?.factReport;
-  for (const key of [
-    "datasetKey",
-    "dataVersion",
-    "runId",
-    "target",
-    "backendURL",
-    "databaseName",
-  ]) {
-    if (
-      sourceInput?.[key] !== sourceReport[key] ||
-      taskInput?.[key] !== taskReport[key] ||
-      factInput?.[key] !== factReport[key]
-    ) {
-      throw new ScenarioDemoError(
-        `readiness report input ${key} is not coupled to the same batch`,
-      );
-    }
-  }
-  if (
-    sourceInput.prefix !== sourceReport.prefix ||
-    factInput.reportContract !== factReport.reportContract ||
-    factInput.semanticDigest !== factReport.semanticDigest ||
-    factInput.financeFieldContract?.digest !==
-      factReport.financeFieldContract?.digest ||
-    taskInput.prefix !== taskReport.prefix ||
-    taskInput.sourceType !== taskReport.sourceType ||
-    taskInput.sourceID !== taskReport.sourceID ||
-    taskInput.taskGroupCoverageDigest !==
-      taskReport.coverage?.catalogScenarioDigest ||
-    readinessReport.runtimePreflight?.configRevision !==
-      plan.runtime.configRevision ||
-    readinessReport.runtimePreflight?.source !== plan.runtime.source
-  ) {
-    throw new ScenarioDemoError(
-      "readiness report upstream semantic identity is incomplete or drifted",
-    );
-  }
-}
-
-function countArrays(report, keys, label) {
-  let total = 0;
-  for (const key of keys) {
-    const records = report?.referenceRecords?.[key];
-    if (!Array.isArray(records)) {
-      throw new ScenarioDemoError(`${label} is missing ${key} readback`);
-    }
-    total += records.length;
-  }
-  return total;
-}
-
-export function buildScenarioDemoReadback({
-  plan,
-  sourceReport,
-  taskReport,
-  taskRetireReport,
-  factReport,
-  readinessReport,
-} = {}) {
-  assertReportIdentity(sourceReport, plan, "source");
-  assertReportIdentity(taskReport, plan, "task");
-  assertReportIdentity(
-    taskRetireReport,
-    plan,
-    "superseded task retirement",
-    "retire",
+  const stages = new Map(
+    datasetReport.stages.map((stage) => [stage.key, stage]),
   );
-  assertReportIdentity(factReport, plan, "fact");
-  assertReadinessReportCoupling(
-    readinessReport,
-    plan,
-    sourceReport,
-    taskReport,
-    factReport,
+  const source = stages.get("source")?.summary;
+  const task = stages.get("task")?.summary;
+  const facts = stages.get("facts")?.summary;
+  const readiness = stages.get("readiness")?.summary;
+  const sourceDocumentCount = sumNumericFields(
+    source,
+    SOURCE_DOCUMENT_COUNT_KEYS,
   );
+  const processRuntimeCount = Object.keys(task?.byRole || {}).length;
+  const factCount = sumNumericFields(facts, FACT_COUNT_KEYS);
   if (
-    sourceReport.semanticDigest !== plan.componentDigests.source ||
-    taskReport.taskProfile !== plan.taskPolicy.profile ||
-    taskReport.copyRevision !== plan.taskPolicy.copyRevision ||
-    taskReport.summary?.workbenchBuckets?.actionable !==
-      LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE * 9 ||
-    Object.values(taskReport.summary?.workbenchBucketsByRole || {}).some(
-      (counts) =>
-        counts?.actionable !== LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE,
-    ) ||
-    Object.keys(taskReport.summary?.workbenchBucketsByRole || {}).length !==
-      9 ||
-    taskRetireReport.keepBatch?.copyRevision !== plan.taskPolicy.copyRevision ||
-    taskRetireReport.retiredBatch?.copyRevision !==
-      plan.taskPolicy.supersededBatch.copyRevision ||
-    taskRetireReport.retiredBatch?.sourceID !==
-      plan.taskPolicy.supersededBatch.sourceID ||
-    taskRetireReport.cleanup?.physicalDelete !== false ||
-    taskRetireReport.summary?.activeAfter !== 0 ||
-    ![0, 180].includes(taskRetireReport.summary?.total) ||
-    taskRetireReport.summary?.absent !==
-      (taskRetireReport.summary?.total === 0) ||
-    taskReport.provesProcessRuntime !== true ||
-    !Array.isArray(taskReport.runtimeEvidence) ||
-    readinessReport?.mode !== "verify" ||
-    readinessReport?.summary?.totalTargets !==
-      SCENARIO_DEMO_CATALOG_TARGET_COUNT ||
-    readinessReport.summary.failedTargetData !== 0 ||
-    readinessReport.summary.passedTargetData !==
-      SCENARIO_DEMO_QUERY_READY_COUNT ||
-    readinessReport.summary.notProvenTargetData !==
-      SCENARIO_DEMO_BROWSER_ONLY_GAP_COUNT ||
-    readinessReport.summary.passedTargetData +
-      readinessReport.summary.notProvenTargetData !==
-      SCENARIO_DEMO_CATALOG_TARGET_COUNT ||
-    readinessReport.summary.queryChecksPassed !== true ||
-    readinessReport.summary.browserChecksCompleted !== 0 ||
-    readinessReport.summary.browserChecksPending !==
-      SCENARIO_DEMO_CATALOG_TARGET_COUNT ||
-    readinessReport.summary.manualAcceptanceCompleted !== false
+    sourceDocumentCount < 1 ||
+    processRuntimeCount < 1 ||
+    factCount < 1 ||
+    readiness?.passedTargetData !== QUERY_READY_COUNT ||
+    readiness?.totalTargets !== CATALOG_TARGET_COUNT ||
+    readiness?.notProvenTargetData !== BROWSER_ONLY_GAP_COUNT ||
+    readiness?.queryChecksPassed !== true ||
+    readiness?.manualAcceptanceCompleted !== false
   ) {
     throw new ScenarioDemoError(
       "scenario-demo exact readback is incomplete or drifted",
@@ -731,37 +501,72 @@ export function buildScenarioDemoReadback({
   }
   return Object.freeze({
     schemaVersion: SCENARIO_DEMO_READBACK_SCHEMA_VERSION,
-    profileKey: SCENARIO_DEMO_TARGET,
+    profileKey: "scenario-demo",
+    targetKey: plan.targetEnvironment,
+    targetEnvironment: plan.targetEnvironment,
     targetFingerprint: plan.target.targetFingerprint,
+    databaseName: plan.databaseName,
+    release: plan.release,
+    migrationVersion: plan.migrationVersion,
+    customerConfigRevision: plan.runtime.configRevision,
     datasetKey: plan.datasetKey,
     dataVersion: plan.dataVersion,
     runId: plan.runId,
-    sourceDocumentCount: countArrays(
-      sourceReport,
-      SOURCE_DOCUMENT_KEYS,
-      "source report",
-    ),
-    processRuntimeCount: taskReport.runtimeEvidence.length,
-    taskProfile: taskReport.taskProfile,
-    stableActionablePerRole: LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE,
-    stableActionableTaskCount: taskReport.summary.workbenchBuckets.actionable,
-    supersededTaskBatch: {
-      copyRevision: taskRetireReport.retiredBatch.copyRevision,
-      total: taskRetireReport.summary.total,
-      absent: taskRetireReport.summary.absent,
-      activeBefore: taskRetireReport.summary.activeBefore,
-      activeAfter: taskRetireReport.summary.activeAfter,
-      actionsApplied: taskRetireReport.summary.actionsApplied,
-      physicalDelete: false,
-    },
-    factCount: countArrays(factReport, FACT_RECORD_KEYS, "fact report"),
-    catalogReadyCount: readinessReport.summary.passedTargetData,
-    catalogTargetCount: readinessReport.summary.totalTargets,
-    browserChecksPending: readinessReport.summary.notProvenTargetData,
+    semanticDigest: plan.semanticDigest,
+    stageCount: datasetReport.stages.length,
+    sourceDocumentCount,
+    processRuntimeCount,
+    factCount,
+    catalogReadyCount: readiness.passedTargetData,
+    catalogTargetCount: readiness.totalTargets,
+    browserChecksPending: readiness.notProvenTargetData,
     manualAcceptanceCompleted: false,
     cleanupSupported: false,
     replayMode: SCENARIO_DEMO_REPLAY_MODE,
   });
+}
+
+async function applyLocalCustomerConfig({ plan, credentials, fetchImpl }) {
+  const policy = resolveManualAcceptanceTarget({
+    target: SCENARIO_DEMO_TARGET,
+    backendURL: plan.backendURL,
+    datasetKey: plan.datasetKey,
+    dataVersion: plan.dataVersion,
+    runId: plan.runId,
+    databaseName: plan.databaseName,
+  });
+  const result = await applyManualAcceptanceCustomerConfig({
+    manifest: buildScenarioDemoCustomerConfigManifest(),
+    policy,
+    env: {
+      MANUAL_ACCEPTANCE_TARGET_CONFIRM:
+        manualAcceptanceTargetConfirmation(policy),
+      MANUAL_ACCEPTANCE_ADMIN_USERNAME: ADMIN_USERNAME,
+      MANUAL_ACCEPTANCE_ADMIN_PASSWORD: credentials.adminPassword,
+      MANUAL_ACCEPTANCE_PASSWORD: credentials.rolePassword,
+    },
+    fetchImpl,
+  });
+  if (
+    result.effectiveSession?.configRevision !== plan.runtime.configRevision ||
+    result.effectiveSession?.configProductVersion !==
+      plan.runtime.configProductVersion ||
+    result.effectiveSession?.configApplyPurpose !==
+      plan.runtime.configApplyPurpose
+  ) {
+    throw new ScenarioDemoError(
+      "scenario-demo local customer configuration readback drifted",
+    );
+  }
+}
+
+async function fileExists(file) {
+  try {
+    await access(file);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function applyScenarioDemo({
@@ -769,13 +574,16 @@ async function applyScenarioDemo({
   resolved,
   expectedPlanDigest,
   confirmation,
-  commandRunner,
   fetchImpl,
   readRepository,
   outputRoot,
   environment,
 }) {
-  const { plan, credentials, policy } = resolved;
+  const { plan } = resolved;
+  const credentials =
+    plan.targetAlias === CUSTOMER_TRIAL_133_TARGET
+      ? resolveCustomerTrialScenarioDemoCredentials(environment)
+      : resolved.credentials;
   if (expectedPlanDigest !== plan.planDigest) {
     throw new ScenarioDemoError(
       "scenario-demo expected plan digest does not match current preflight",
@@ -783,7 +591,8 @@ async function applyScenarioDemo({
     );
   }
   const expectedConfirmation = [
-    "APPLY_SCENARIO_DEMO",
+    DATASET_CONFIRM_PREFIX,
+    plan.targetAlias,
     plan.databaseName,
     plan.dataVersion,
     plan.runId,
@@ -795,308 +604,54 @@ async function applyScenarioDemo({
       2,
     );
   }
-  const targetConfirmation = manualAcceptanceTargetConfirmation(policy);
-  assertManualAcceptanceMutationTarget(policy, {
-    confirmation: targetConfirmation,
-  });
-  const repository = plan.repository;
-  const checkRepository = () =>
-    assertRepositoryUnchanged(projectRoot, repository, readRepository);
-  const runStage = async (operation) => {
-    await checkRepository();
-    const result = await operation();
-    await checkRepository();
-    return result;
-  };
+  const checkRepository = async () =>
+    assertRepositoryIdentityEqual(
+      plan.repository,
+      await readRepository(projectRoot),
+    );
   await checkRepository();
-
-  await runStage(async () => {
-    const seedConfirmation = [
-      "SEED_SCENARIO_DEMO_CORE_REFERENCES",
-      SCENARIO_DEMO_TARGET,
-      plan.databaseName,
-      plan.dataVersion,
-      plan.runId,
-    ].join(":");
-    const result = await commandRunner(
-      "go",
-      [
-        "run",
-        "./cmd/seed-core-demo-data",
-        "-conf",
-        "./configs/dev/config.yaml",
-        "--scenario-references",
-        "--expected-database",
-        plan.databaseName,
-        "--confirm",
-        seedConfirmation,
-      ],
-      {
-        cwd: path.join(projectRoot, "server"),
-        env: environment,
-      },
-    );
-    const stdout = String(result.stdout || "");
-    if (
-      !/units=1\b/u.test(stdout) ||
-      !/warehouses=4\b/u.test(stdout) ||
-      !/scenario_references=true\b/u.test(stdout) ||
-      !/exact_allowlist=true\b/u.test(stdout) ||
-      !/no_direct_fact_posting=true\b/u.test(stdout)
-    ) {
-      throw new ScenarioDemoError(
-        "scenario-demo core reference readback did not match",
-      );
-    }
-  });
-
-  await runStage(async () => {
-    const result = await commandRunner(
-      "bash",
-      [path.join(projectRoot, "scripts", "seed-role-demo-admins.sh")],
-      {
-        cwd: projectRoot,
-        env: {
-          ...environment,
-          ERP_ROLE_DEMO_PASSWORD: credentials.rolePassword,
-        },
-      },
-    );
-    const accounts = Number(
-      String(result.stdout || "").match(
-        /role demo admin seed completed accounts=(\d+)\b/u,
-      )?.[1],
-    );
-    if (!Number.isSafeInteger(accounts) || accounts < 10) {
-      throw new ScenarioDemoError(
-        "scenario-demo role account bootstrap readback did not match",
-      );
-    }
-  });
-
-  const customerConfigManifest = buildScenarioDemoCustomerConfigManifest();
-  if (
-    scenarioDemoDigest(customerConfigManifest) !==
-    plan.componentDigests.customerConfig
-  ) {
-    throw new ScenarioDemoError(
-      "scenario-demo customer configuration plan drifted",
-      2,
-    );
+  if (plan.targetAlias === PERSISTENT_SCENARIO_DATASET_TARGET) {
+    await applyLocalCustomerConfig({ plan, credentials, fetchImpl });
+    await checkRepository();
   }
-  const customerConfigApply = await runStage(() =>
-    applyManualAcceptanceCustomerConfig({
-      manifest: customerConfigManifest,
-      policy,
-      env: {
-        MANUAL_ACCEPTANCE_TARGET_CONFIRM: targetConfirmation,
-        MANUAL_ACCEPTANCE_ADMIN_USERNAME: ADMIN_USERNAME,
-        MANUAL_ACCEPTANCE_ADMIN_PASSWORD: credentials.adminPassword,
-        MANUAL_ACCEPTANCE_PASSWORD: credentials.rolePassword,
-      },
-      fetchImpl,
-    }),
-  );
-  const customerConfigReport = {
-    mode: "apply",
-    datasetKey: plan.datasetKey,
+  const canonicalOutputRoot =
+    outputRoot || path.join(projectRoot, MANUAL_ACCEPTANCE_DATASET_OUTPUT_ROOT);
+  const applyReportPath = manualAcceptanceDatasetApplyReportPath({
+    outputRoot: canonicalOutputRoot,
     dataVersion: plan.dataVersion,
-    runId: plan.runId,
-    target: plan.profileKey,
-    backendURL: plan.backendURL,
-    databaseName: plan.databaseName,
-    customerKey: customerConfigApply.effectiveSession.customerKey,
-    configRevision: customerConfigApply.effectiveSession.configRevision,
-    configHash: customerConfigApply.effectiveSession.configHash,
-    configHashVersion: customerConfigApply.effectiveSession.configHashVersion,
-    configProductVersion:
-      customerConfigApply.effectiveSession.configProductVersion,
-    configApplyPurpose: customerConfigApply.effectiveSession.configApplyPurpose,
-    source: customerConfigApply.effectiveSession.source,
-    operations: customerConfigApply.operations,
-  };
-  assertReportIdentity(customerConfigReport, plan, "customer config");
-  if (
-    customerConfigReport.configRevision !== plan.runtime.configRevision ||
-    customerConfigReport.configProductVersion !==
-      plan.runtime.configProductVersion ||
-    customerConfigReport.configApplyPurpose !==
-      plan.runtime.configApplyPurpose ||
-    customerConfigReport.source !== plan.runtime.source
-  ) {
-    throw new ScenarioDemoError(
-      "scenario-demo customer configuration readback drifted",
-      2,
-    );
-  }
-  await writeStageReport(outputRoot, "customer-config", customerConfigReport);
-
-  const runtime = await preflightScenarioDemoRuntime({
-    policy,
-    rolePassword: credentials.rolePassword,
-    adminPassword: credentials.adminPassword,
-    fetchImpl,
+    targetAlias: plan.targetAlias,
   });
-  if (
-    runtime.configRevision !== plan.runtime.configRevision ||
-    runtime.configProductVersion !== plan.runtime.configProductVersion ||
-    runtime.configApplyPurpose !== plan.runtime.configApplyPurpose ||
-    runtime.source !== plan.runtime.source ||
-    JSON.stringify(runtime.requiredModules) !==
-      JSON.stringify(plan.runtime.requiredModules)
-  ) {
-    throw new ScenarioDemoError(
-      "scenario-demo active customer configuration drifted from the prepared plan",
-      2,
-    );
-  }
+  const report = await applyManualAcceptanceDataset(
+    plan.canonicalPlan,
+    {
+      confirmation: plan.canonicalPlan.target.expectedConfirmation,
+      targetAttestation:
+        plan.canonicalPlan.target.targetAttestation || undefined,
+      resumeReportPath: (await fileExists(applyReportPath))
+        ? applyReportPath
+        : undefined,
+    },
+    {
+      outputRoot: canonicalOutputRoot,
+      credentials,
+      fetchImpl,
+    },
+  );
   await checkRepository();
-
-  const accountPlan = buildManualAcceptanceAccountScenarioPlan({
-    ...policy,
-    auditMinimum: SCENARIO_DEMO_AUDIT_MINIMUM,
-  });
-  if (scenarioDemoDigest(accountPlan) !== plan.componentDigests.accounts) {
-    throw new ScenarioDemoError("scenario-demo account plan drifted");
+  if (!report.ok) {
+    throw new ScenarioDemoError(
+      `scenario-demo canonical stage failed: ${report.failedStage || "unknown"}`,
+    );
   }
-  const accountReport = await runStage(() =>
-    applyManualAcceptanceAccountScenarios(accountPlan, {
-      password: credentials.rolePassword,
-      adminPassword: credentials.adminPassword,
-      confirmPhrase: MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM_PHRASE,
-      targetConfirmation,
-      formalAccountConfirmation:
-        manualAcceptanceFormalAccountBootstrapConfirmation(accountPlan),
-      fetchImpl,
-    }),
-  );
-  assertReportIdentity(accountReport, plan, "account");
-  await writeStageReport(outputRoot, "accounts", accountReport);
-
-  const sourcePlan = buildManualAcceptanceSourceDataPlan(policy);
-  if (sourcePlan.semanticDigest !== plan.componentDigests.source) {
-    throw new ScenarioDemoError("scenario-demo source plan drifted");
-  }
-  const sourceReport = await runStage(() =>
-    applyManualAcceptanceSourceData(sourcePlan, {
-      password: credentials.rolePassword,
-      adminPassword: credentials.adminPassword,
-      confirmPhrase: MANUAL_ACCEPTANCE_CONFIRM_PHRASE,
-      targetConfirmation,
-      fetchImpl,
-    }),
-  );
-  assertReportIdentity(sourceReport, plan, "source");
-  if (sourceReport.semanticDigest !== sourcePlan.semanticDigest) {
-    throw new ScenarioDemoError("scenario-demo source semantic digest drifted");
-  }
-  await writeStageReport(outputRoot, "source", sourceReport);
-
-  const taskPlan = buildManualAcceptanceTaskDataPlan({
-    ...policy,
-    scheduleAnchorUtc: SCENARIO_DEMO_SCHEDULE_ANCHOR_UTC,
-    taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
-  });
-  if (scenarioDemoDigest(taskPlan) !== plan.componentDigests.tasks) {
-    throw new ScenarioDemoError("scenario-demo task plan drifted");
-  }
-  const taskReport = await runStage(() =>
-    applyManualAcceptanceTaskData(taskPlan, {
-      password: credentials.rolePassword,
-      adminPassword: credentials.adminPassword,
-      confirmPhrase: MANUAL_ACCEPTANCE_TASK_CONFIRM_PHRASE,
-      targetConfirmation,
-      sourceReport,
-      fetchImpl,
-    }),
-  );
-  assertReportIdentity(taskReport, plan, "task");
-  await writeStageReport(outputRoot, "tasks", taskReport);
-
-  const supersededTaskBatch = buildLegacyManualAcceptanceTaskBatchReference({
-    runId: plan.taskPolicy.supersededBatch.runId,
-    copyRevision: plan.taskPolicy.supersededBatch.copyRevision,
-    backendURL: plan.backendURL,
-  });
-  const taskRetireReport = await runStage(() =>
-    retireLegacyManualAcceptanceTaskBatch(taskPlan, {
-      retireRunId: supersededTaskBatch.runId,
-      retireCopyRevision: supersededTaskBatch.copyRevision,
-      allowAbsent: true,
-      password: credentials.rolePassword,
-      adminPassword: credentials.adminPassword,
-      confirmPhrase: manualAcceptanceTaskRetireConfirmation(
-        taskPlan,
-        supersededTaskBatch,
-      ),
-      targetConfirmation,
-      fetchImpl,
-    }),
-  );
-  assertReportIdentity(
-    taskRetireReport,
-    plan,
-    "superseded task retirement",
-    "retire",
-  );
-  await writeStageReport(
-    outputRoot,
-    "retire-superseded-tasks",
-    taskRetireReport,
-  );
-
-  const factPlan = buildManualAcceptanceFactPlan(sourceReport);
-  const factContractDigest = scenarioDemoDigest({
-    contract: "source-driven-operational-facts-v1",
-    datasetKey: factPlan.datasetKey,
-    dataVersion: factPlan.dataVersion,
-    runId: factPlan.runId,
-  });
-  if (factContractDigest !== plan.componentDigests.facts) {
-    throw new ScenarioDemoError("scenario-demo fact plan drifted");
-  }
-  const factReport = await runStage(() =>
-    applyManualAcceptanceFactPlan(factPlan, sourceReport, {
-      password: credentials.rolePassword,
-      adminPassword: credentials.adminPassword,
-      confirmPhrase: MANUAL_ACCEPTANCE_FACT_CONFIRM_PHRASE,
-      targetConfirmation,
-      fetchImpl,
-    }),
-  );
-  assertReportIdentity(factReport, plan, "fact");
-  await writeStageReport(outputRoot, "facts", factReport);
-
-  const readinessPlan = buildManualAcceptanceReadinessPlan({
-    sourceReport,
-    factReport,
-    taskReport,
-  });
-  const readinessReport = await runStage(() =>
-    verifyManualAcceptanceReadiness(readinessPlan, {
-      backendURL: plan.backendURL,
-      databaseName: plan.databaseName,
-      password: credentials.rolePassword,
-      adminPassword: credentials.adminPassword,
-      targetConfirmation,
-      fetchImpl,
-    }),
-  );
-  await writeStageReport(outputRoot, "readiness", readinessReport);
-  return buildScenarioDemoReadback({
-    plan,
-    sourceReport,
-    taskReport,
-    taskRetireReport,
-    factReport,
-    readinessReport,
-  });
+  return buildScenarioDemoReadback({ plan, datasetReport: report });
 }
 
 export function parseScenarioDemoArgs(argv = []) {
   const options = {
     apply: false,
     expectedPlanDigest: "",
+    target: PERSISTENT_SCENARIO_DATASET_TARGET,
+    targetAttestation: "",
     help: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -1107,9 +662,20 @@ export function parseScenarioDemoArgs(argv = []) {
       options.help = true;
     } else if (token === "--expected-plan-digest") {
       options.expectedPlanDigest = String(argv[++index] || "").trim();
+    } else if (token === "--target") {
+      options.target = String(argv[++index] || "").trim();
+    } else if (token === "--target-attestation-json") {
+      options.targetAttestation = String(argv[++index] || "").trim();
     } else {
       throw new ScenarioDemoError(`unknown option ${token}`, 2);
     }
+  }
+  if (
+    ![PERSISTENT_SCENARIO_DATASET_TARGET, CUSTOMER_TRIAL_133_TARGET].includes(
+      options.target,
+    )
+  ) {
+    throw new ScenarioDemoError("--target is not registered", 2);
   }
   if (options.apply && !/^[0-9a-f]{64}$/u.test(options.expectedPlanDigest)) {
     throw new ScenarioDemoError(
@@ -1121,19 +687,18 @@ export function parseScenarioDemoArgs(argv = []) {
 }
 
 function usage() {
-  return `长期共享库场景数据 / Scenario Demo
+  return `长期业务场景数据 / Scenario Demo
 
 只读计划与前置核对：
   node scripts/qa/scenario-demo-data.mjs
 
-执行固定 V5 批次：
-  SCENARIO_DEMO_CONFIRM='APPLY_SCENARIO_DEMO:<database>:2026.07.16-v5:20260716-V5:<plan-digest>' \\
+执行本地长期 V6 批次：
+  SCENARIO_DEMO_CONFIRM='APPLY_SCENARIO_DEMO:scenario-demo:<database>:2026.08.15-v6:20260815-V6:<plan-digest>' \\
     node scripts/qa/scenario-demo-data.mjs --apply --expected-plan-digest <plan-digest>
 
-仅允许 127.0.0.1:8300 对应的已登记 192.168.0.106:5432 长期开发库。
-固定目标证明后使用项目登记的本机测试账号约定；显式 MANUAL_ACCEPTANCE_* /
-ERP_ROLE_DEMO_PASSWORD / REAL_LOGIN_ADMIN_PASSWORD 覆盖值优先。
-同批次只允许精确创建或读回；不支持自动清理，不代表页面人工验收完成。`;
+133 使用同一 canonical semantic digest，但必须显式 --target customer-trial-133、
+固定 SSH 隧道、带外 attestation、独立确认和目标回执。本入口不接受主机、端口、
+目录、DSN 或任意命令；不执行发布、migration 或客户真实数据导入。`;
 }
 
 export async function runScenarioDemoCli(
@@ -1145,6 +710,7 @@ export async function runScenarioDemoCli(
     fetchImpl = fetch,
     readRepository = readRepositoryIdentity,
     outputRoot,
+    targetAttestation,
   } = {},
 ) {
   const options = parseScenarioDemoArgs(argv);
@@ -1154,6 +720,8 @@ export async function runScenarioDemoCli(
   let resolved;
   try {
     resolved = await resolveScenarioDemoPlan({
+      targetAlias: options.target,
+      targetAttestation: options.targetAttestation || targetAttestation,
       projectRoot,
       environment,
       commandRunner,
@@ -1177,12 +745,9 @@ export async function runScenarioDemoCli(
       resolved,
       expectedPlanDigest: options.expectedPlanDigest,
       confirmation: environment.SCENARIO_DEMO_CONFIRM,
-      commandRunner,
       fetchImpl,
       readRepository,
-      outputRoot:
-        outputRoot ||
-        path.join(projectRoot, DEFAULT_OUTPUT_ROOT, resolved.plan.databaseName),
+      outputRoot,
       environment,
     });
     return {

@@ -556,11 +556,11 @@ export function getManualAcceptanceBrowserHelp() {
   MANUAL_ACCEPTANCE_PASSWORD='<本地试用密码>' node scripts/qa/manual-acceptance-browser.mjs \\
     --base-url http://127.0.0.1:15200 \\
     --backend-url http://127.0.0.1:8310 \\
-    --source-report output/qa/manual-acceptance/datasets/2026.07.16-v5/local/source/apply-report.json \\
-    --fact-report output/qa/manual-acceptance/datasets/2026.07.16-v5/local/facts/apply-report.json \\
-    --readiness-report output/qa/manual-acceptance/datasets/2026.07.16-v5/local/readiness/verify-report.json \\
-    --dataset-report output/qa/manual-acceptance/datasets/2026.07.16-v5/local/dataset/apply-report.json \\
-    --report output/qa/manual-acceptance/datasets/2026.07.16-v5/local/browser/report.json
+    --source-report output/qa/manual-acceptance/datasets/2026.08.15-v6/local/source/apply-report.json \\
+    --fact-report output/qa/manual-acceptance/datasets/2026.08.15-v6/local/facts/apply-report.json \\
+    --readiness-report output/qa/manual-acceptance/datasets/2026.08.15-v6/local/readiness/verify-report.json \\
+    --dataset-report output/qa/manual-acceptance/datasets/2026.08.15-v6/local/dataset/apply-report.json \\
+    --report output/qa/manual-acceptance/datasets/2026.08.15-v6/local/browser/report.json
   node scripts/qa/manual-acceptance-browser.mjs --plan \\
     --base-url http://127.0.0.1:15200 \\
     --backend-url http://127.0.0.1:8310
@@ -1479,7 +1479,7 @@ function requireCurrentBatchTargetEvidence(target, datasetBinding) {
     )
   ) {
     throw new BrowserAcceptanceError(
-      `${target.title} 缺少当前 V5 批次 readiness 证据`,
+      `${target.title} 缺少当前 V6 批次 readiness 证据`,
     );
   }
   return currentBatch;
@@ -2181,10 +2181,10 @@ export function evaluateShipmentReleaseEvidence(rows, schedule, nowMs) {
     return { passed: false, reason: "即将到期样例已超出本批有效时间窗口" };
   }
   const requirements = [
-    ["YS-V5-CK-02", "可执行", "即将到期"],
-    ["YS-V5-CK-13", "阻塞", "已超时"],
-    ["YS-V5-CK-16", "已完成", null],
-    ["YS-V5-CK-19", "退回", null],
+    ["YS-V6-CK-02", "可执行", "即将到期"],
+    ["YS-V6-CK-13", "阻塞", "已超时"],
+    ["YS-V6-CK-16", "已完成", null],
+    ["YS-V6-CK-19", "退回", null],
   ];
   const expectedCodes = requirements.map(([code]) => code);
   const visibleCodes = (rows || []).map((item) => String(item?.code || ""));

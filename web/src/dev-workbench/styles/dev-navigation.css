@@ -65,6 +65,131 @@
   font-size: 11px;
 }
 
+.erp-dev-environment-evidence {
+  min-width: 0;
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--dev-env-border);
+  border-radius: 12px;
+  background: var(--dev-env-surface);
+}
+
+.erp-dev-environment-evidence__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.erp-dev-environment-evidence__header > div {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.erp-dev-environment-evidence__header span {
+  color: var(--dev-env-muted);
+  font-size: 12px;
+}
+
+.erp-dev-environment-evidence__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.erp-dev-environment-card {
+  --dev-env-accent: #2563eb;
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 9px;
+  padding: 11px;
+  border: 1px solid var(--dev-env-border);
+  border-top: 3px solid var(--dev-env-accent);
+  border-radius: 10px;
+  background: var(--dev-env-fill);
+}
+
+.erp-dev-environment-card--trial {
+  --dev-env-accent: #7c3aed;
+}
+
+.erp-dev-environment-card--isolated {
+  --dev-env-accent: #0e7490;
+}
+
+.erp-dev-environment-card > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.erp-dev-environment-card > header > div {
+  display: grid;
+  min-width: 0;
+}
+
+.erp-dev-environment-card__scope,
+.erp-dev-environment-card__next-label {
+  color: var(--dev-env-muted);
+  font-size: 11px;
+}
+
+.erp-dev-environment-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px 10px;
+  margin: 0;
+}
+
+.erp-dev-environment-card dl > div {
+  min-width: 0;
+}
+
+.erp-dev-environment-card dt {
+  color: var(--dev-env-muted);
+  font-size: 11px;
+}
+
+.erp-dev-environment-card dd {
+  margin: 1px 0 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-environment-card__result,
+.erp-dev-environment-card footer {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.erp-dev-environment-card__result .ant-typography,
+.erp-dev-environment-card footer strong {
+  margin: 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-environment-card details {
+  font-size: 12px;
+}
+
+.erp-dev-environment-card details summary {
+  cursor: pointer;
+}
+
+.erp-dev-environment-card footer {
+  padding-top: 8px;
+  border-top: 1px solid var(--dev-env-border);
+}
+
 .erp-dev-workspace-nav__routes {
   display: flex;
   flex: 1 1 auto;
@@ -369,6 +494,14 @@
   .erp-dev-workspace-nav__boundary {
     margin-left: auto;
   }
+
+  .erp-dev-environment-evidence__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-dev-environment-card dl {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 720px) {
@@ -399,6 +532,14 @@
 
   .erp-dev-workspace-nav__boundary {
     display: none;
+  }
+
+  .erp-dev-environment-evidence__header {
+    align-items: flex-start;
+  }
+
+  .erp-dev-environment-card dl {
+    grid-template-columns: 1fr 1fr;
   }
 
   .erp-dev-task-nav,

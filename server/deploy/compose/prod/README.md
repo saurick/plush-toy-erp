@@ -98,7 +98,7 @@ docker compose \
     --expected-database plush_erp_uat_20260716_v5 \
     --expected-migration '<14-digit-atlas-version>' \
     --expected-release '<40-character-lowercase-git-sha>' \
-    --confirm 'BOOTSTRAP_MANUAL_ACCEPTANCE_CORE:customer-trial-133:yoyoosun:plush_erp_uat_20260716_v5:yoyoosun-manual-acceptance:2026.07.16-v5:20260716-V5:<migration>:<release>'
+    --confirm 'BOOTSTRAP_MANUAL_ACCEPTANCE_CORE:customer-trial-133:yoyoosun:plush_erp_uat_20260716_v5:yoyoosun-manual-acceptance:2026.08.15-v6:20260815-V6:<migration>:<release>'
 ```
 
 命令中的 `<migration>`、`<release>` 必须与对应参数逐字一致。成功回执只证明 1 个单位和 4 个仓库及运行身份；完整 V5 仍由手工验收 runner 在空库门禁通过后，通过正式 API 写入并逐页读回。
