@@ -14,10 +14,37 @@ import {
   assertLoggedServiceAlive,
   buildLocalAcceptanceLifecycleIdentity,
   localAcceptanceExceptionReportPath,
+  parseManualAcceptanceCoreReferenceSeedReadback,
   runLocalAcceptanceLifecycle,
 } from "./local-acceptance-lifecycle.mjs";
 
 const COMMIT = "0123456789abcdef0123456789abcdef01234567";
+
+test("local acceptance lifecycle reads the exact V6 core reference contract", () => {
+  const output = [
+    "core demo seed completed prefix=YS6 units=11 materials=0 products=0 warehouses=4 processes=0 bom_headers=0",
+    "simulated_only=true real_customer_import=false no_direct_fact_posting=true",
+    "references_only=true scenario_references=false exact_allowlist=true materials=0 products=0 processes=0 bom_headers=0",
+  ].join("\n");
+  assert.deepEqual(parseManualAcceptanceCoreReferenceSeedReadback(output), {
+    units: 11,
+    warehouses: 4,
+  });
+  assert.throws(
+    () =>
+      parseManualAcceptanceCoreReferenceSeedReadback(
+        output.replace("units=11", "units=1"),
+      ),
+    /core reference seed readback failed/u,
+  );
+  assert.throws(
+    () =>
+      parseManualAcceptanceCoreReferenceSeedReadback(
+        output.replace("references_only=true", "references_only=false"),
+      ),
+    /core reference seed readback failed/u,
+  );
+});
 
 test("local acceptance lifecycle keeps the cloned-write report inside the exception-flow evidence root", () => {
   const identity = buildLocalAcceptanceLifecycleIdentity({

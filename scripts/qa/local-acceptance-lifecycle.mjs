@@ -20,6 +20,7 @@ import { pathToFileURL } from "node:url";
 import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
 import { findAvailableDevAuxPort, loadDevPorts } from "../dev-ports.mjs";
 import { buildRuntimePreviewManifest } from "./customer-config-runtime-manifest.mjs";
+import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from "./manual-acceptance-core-contract.mjs";
 import {
   databaseNameForRun,
   normalizeDatabaseRunID,
@@ -55,6 +56,37 @@ export const LOCAL_ACCEPTANCE_LIFECYCLE_SCHEMA =
   "plush-local-acceptance-lifecycle/v1";
 export const LOCAL_ACCEPTANCE_DATABASE_BASE_URL_ENV =
   "LOCAL_ACCEPTANCE_DATABASE_BASE_URL";
+
+export function parseManualAcceptanceCoreReferenceSeedReadback(output) {
+  const text = String(output || "");
+  const expected = MANUAL_ACCEPTANCE_CORE_CONTRACT;
+  const completed = text.match(
+    /core demo seed completed prefix=(\S+) units=(\d+) materials=(\d+) products=(\d+) warehouses=(\d+) processes=(\d+) bom_headers=(\d+)\b/u,
+  );
+  const counts = completed?.slice(2).map(Number) || [];
+  if (
+    completed?.[1] !== expected.visiblePrefix ||
+    counts.length !== 6 ||
+    counts[0] !== expected.units.length ||
+    counts[1] !== 0 ||
+    counts[2] !== 0 ||
+    counts[3] !== expected.warehouses.length ||
+    counts[4] !== 0 ||
+    counts[5] !== 0 ||
+    !/simulated_only=true real_customer_import=false no_direct_fact_posting=true/u.test(
+      text,
+    ) ||
+    !/references_only=true scenario_references=false exact_allowlist=true materials=0 products=0 processes=0 bom_headers=0/u.test(
+      text,
+    )
+  ) {
+    throw new Error("manual acceptance core reference seed readback failed");
+  }
+  return {
+    units: expected.units.length,
+    warehouses: expected.warehouses.length,
+  };
+}
 
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/u;
 const REGISTERED_DATABASE_HOST = "192.168.0.106";
@@ -985,12 +1017,7 @@ function createDirectRuntime(context) {
           maxBuffer: 64 * 1024 * 1024,
         },
       );
-      if (!/units=1\b/u.test(output) || !/warehouses=4\b/u.test(output)) {
-        throw new Error(
-          "manual acceptance core reference seed readback failed",
-        );
-      }
-      return { units: 1, warehouses: 4 };
+      return parseManualAcceptanceCoreReferenceSeedReadback(output);
     },
     async applyManualDataset(databaseName) {
       const policy = resolveManualAcceptanceTarget({
