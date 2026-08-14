@@ -73,8 +73,11 @@ const FACT_COUNT_KEYS = Object.freeze([
 ]);
 const SOURCE_DOCUMENT_COUNT_KEYS = Object.freeze([
   "sales_order.create",
+  "sales_order.reuse",
   "purchase_order.create",
+  "purchase_order.reuse",
   "outsourcing_order.create",
+  "outsourcing_order.reuse",
 ]);
 const execFileAsync = promisify(execFile);
 

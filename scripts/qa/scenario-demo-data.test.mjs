@@ -229,6 +229,18 @@ test("readback requires every canonical stage and reports target-bound evidence"
     replayMode: SCENARIO_DEMO_REPLAY_MODE,
   });
 
+  const replayed = completedDatasetReport(plan);
+  replayed.stages.find(({ key }) => key === "source").summary = {
+    "sales_order.reuse": 1,
+    "purchase_order.reuse": 1,
+    "outsourcing_order.reuse": 1,
+  };
+  assert.equal(
+    buildScenarioDemoReadback({ plan, datasetReport: replayed })
+      .sourceDocumentCount,
+    3,
+  );
+
   const incomplete = completedDatasetReport(plan);
   incomplete.stages = incomplete.stages.filter(
     ({ key }) => key !== "attachments",
