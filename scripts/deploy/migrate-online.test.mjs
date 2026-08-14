@@ -213,7 +213,9 @@ if [ "\${ATLAS_FAIL_PHASE:-}" = "$phase" ]; then
 fi
 case "$phase" in
   status)
-    if [ -f "$ATLAS_STATE" ]; then
+    if [ "\${ATLAS_FRESH_STATUS:-}" = "1" ]; then
+      printf '%s\n' '{"Status":"PENDING","Current":"No migration applied yet","Next":"20260101000000","Available":[{"Version":"20260101000000"},{"Version":"20260102000000"}],"Applied":null}'
+    elif [ -f "$ATLAS_STATE" ]; then
       printf '%s\n' '{"Status":"OK","Current":"20260102000000","Next":"Already at latest version","Available":[{"Version":"20260101000000"},{"Version":"20260102000000"}],"Applied":[{"Version":"20260101000000"},{"Version":"20260102000000"}]}'
     else
       printf '%s\n' '{"Status":"PENDING","Current":"20260101000000","Next":"20260102000000","Available":[{"Version":"20260101000000"},{"Version":"20260102000000"}],"Applied":[{"Version":"20260101000000"}]}'
@@ -514,6 +516,26 @@ test("migrate_online canonical 模式保持单 compose 文件且不注入 V5 pro
       `compose -f ${fixture.composeFile} ps -q postgres`,
     ]);
     assert.doesNotMatch(result.stdout, /plush-toy-erp-v5/u);
+  } finally {
+    fs.rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("migrate_online 接受 Atlas v0.38.0 的全新数据库 Applied null 状态", () => {
+  const fixture = createFixture();
+  try {
+    const result = runMigration(fixture, ["--status-only"], {
+      ATLAS_FRESH_STATUS: "1",
+    });
+
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    assert.match(result.stdout, /Current Version: No migration applied yet/u);
+    assert.match(result.stdout, /Pending Files:\s+2/u);
+    assert.deepEqual(atlasPhases(fixture.atlasLog), [
+      "validate",
+      "status",
+      "schema-readback",
+    ]);
   } finally {
     fs.rmSync(fixture.root, { recursive: true, force: true });
   }
@@ -1169,6 +1191,7 @@ test("migrate_online 拒绝使用非私有的已有锁目录", () => {
   const fixture = createFixture();
   try {
     fs.mkdirSync(fixture.lockDir, { mode: 0o755 });
+    fs.chmodSync(fixture.lockDir, 0o755);
 
     const result = runMigration(fixture, ["--status-only"]);
 

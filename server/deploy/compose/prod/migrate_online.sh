@@ -821,7 +821,14 @@ read_status_json() {
     (.Current | type == "string") and
     (.Next | type == "string") and
     (.Available | type == "array") and
-    (.Applied | type == "array")
+    (
+      (.Applied | type == "array") or
+      (
+        .Applied == null and
+        .Status == "PENDING" and
+        .Current == "No migration applied yet"
+      )
+    )
   ' "$status_file" >/dev/null || fail "Atlas migration status JSON 无法识别"
 }
 
