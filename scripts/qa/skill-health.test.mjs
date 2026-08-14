@@ -94,7 +94,17 @@ test("skill health: Git closeout keeps read-only probes and lock recovery centra
   );
   assert.match(agents, /浏览器、Vite、数据库和端口使用独立资源租约/u);
   assert.match(agents, /stage、commit 和 push 是独立动作，均先询问用户/u);
-  assert.match(skill, /协议版本为 `3`/u);
+  assert.match(skill, /协议版本为 `4`/u);
+  assert.match(skill, /一次完整申请生命周期绑定稳定 `request_id`/u);
+  assert.match(
+    skill,
+    /重复 `request_id` 复用已有状态[\s\S]*不发送可见 ACK/u,
+  );
+  assert.match(
+    skill,
+    /等待超时只表示本次等待结束[\s\S]*禁止短周期轮询/u,
+  );
+  assert.match(skill, /长测试、构建和部署命令只启动一个可复用后台进程/u);
   assert.match(
     skill,
     /首次写入非 ignored 文件前[\s\S]*HEAD、index、`index\.lock`、status/u,
@@ -138,12 +148,12 @@ test("skill health: Git closeout keeps read-only probes and lock recovery centra
     skill,
     /活动 turn 已进入只读验证时发送一次 `WRITER_RELEASE_REQUIRED`/u,
   );
-  assert.match(skill, /验证失败或新 turn 恢复都要重新申请/u);
+  assert.match(skill, /验证失败或新 turn 恢复要建立新的申请生命周期/u);
   assert.match(skill, /未报告变化登记为 `UNREPORTED_WRITES`/u);
   assert.match(skill, /`EXACT_CLEAN_FREEZE`、`PUSH_FREEZE`、`CLOSEOUT_FREEZE` 不是协议事件/u);
   assert.match(skill, /任何全工作树冻结请求都返回 `UNSUPPORTED_LOCK_DOMAIN`/u);
   assert.match(skill, /`task_complete`、`next_phase` 和紧凑 `continuation_checkpoint`/u);
-  assert.match(skill, /发送后无需等待 ACK 即继续只读验证或最终收口/u);
+  assert.match(skill, /发送后无需等待释放通知即可继续只读验证或最终收口/u);
   assert.match(skill, /把每个 WAIT 登记为 `external` 或 `self_actionable`/u);
   assert.match(skill, /`WAIT_SCOPE`[\s\S]*`WAIT_RECONCILE`[\s\S]*`WAIT_HOT_FILE`/u);
   assert.match(skill, /投递一次 `RESUME_FROM_WAIT`/u);

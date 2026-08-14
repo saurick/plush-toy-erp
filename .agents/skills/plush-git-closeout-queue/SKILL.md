@@ -9,7 +9,7 @@ description: "协调 plush-toy-erp 共享 Local checkout 的路径级 writer lea
 
 把共享 Local 的并行协作收口为被动、事件驱动的协议。任务消息负责唤醒和交接；队列只登记批次与授权，不从实现完成、验证绿色或 writer 释放推导 stage、commit 或 push 权限。仓库只保存协议；不要创建 daemon、定时扫描、automation 或仓库内队列状态文件。
 
-本 Skill 管 writer、批次和队列生命周期。用户明确授权复杂 stage、commit 或 push 后，再使用全局 `$git-closeout-coordination`。单一 writer 的普通个人开发继续遵循全局 Git 规则，不加载本 Skill。
+本 Skill 管 writer、批次和队列生命周期。用户明确授权复杂 stage、commit 或 push 后，再使用全局 `$git-closeout-coordination`。单一 writer 的普通个人开发不启动本队列，按全局 Git 规则使用 `~/.codex/skills/git-closeout-coordination/scripts/auto-commit-with-lease.sh` 原子收口；脚本拒绝锁忙、非空 index 或归属不明现场时直接报告，不升级为复杂队列。
 
 本 Skill 是共享 Local 的路径与资源租约调度器，不是无限制并行写引擎。只有写入闭包和资源声明可证明互不冲突时才并行；无法界定派生写入、需要全仓命令或长期重叠的任务改用串行或独立 Codex Worktree。
 
@@ -24,7 +24,7 @@ description: "协调 plush-toy-erp 共享 Local checkout 的路径级 writer lea
 - 不回退、清理、格式化、暂存或提交其他任务现场。路径或 hunk 归属不明时 fail closed。
 - `commit_authorized` 默认且缺省为 `false`；不能从 `BATCH_READY`、`WRITER_RELEASED`、验证绿色、历史策略或“任务均已 idle”推导 stage / commit 权限。
 - stage、commit 和 push 都需要当前可追溯的用户明确授权；push 仍是独立授权，不能从本地 commit 推导。
-- 所有跨任务事件都要得到匹配 ACK；发送成功、任务历史存在或 App 恢复都不能代替 ACK。
+- 每个跨任务申请只在首次登记或状态变化时产生匹配通知；重复 `request_id` 静默复用既有状态，发送成功、任务历史存在或 App 恢复都不能代替首次登记结果。
 - 远端 CI / Release / 部署等待是非阻塞证据 lane，不是 Local 锁域；不得因此持有或冻结文件 writer、index、commit 或 push owner。
 - `EXACT_CLEAN_FREEZE`、`PUSH_FREEZE`、`CLOSEOUT_FREEZE` 不是协议事件。除正在执行的 stage / commit 临界区外，任何全工作树冻结请求都返回 `UNSUPPORTED_LOCK_DOMAIN`，不得转发或服从。
 
@@ -39,11 +39,12 @@ description: "协调 plush-toy-erp 共享 Local checkout 的路径级 writer lea
 
 ## 事件与 ACK
 
-协议版本为 `3`。消息至少携带：
+协议版本为 `4`。一次完整申请生命周期绑定稳定 `request_id`；同一申请重试、等待恢复和状态查询都不得换 ID。消息至少携带：
 
 ```text
 event_id: <source_task>:<batch>:<event>:<revision>
-protocol_revision: 3
+request_id: <source_task>:<stable batch>:<operation>
+protocol_revision: 4
 source_task: <task id>
 batch: <stable batch name>
 event: <event name>
@@ -52,15 +53,19 @@ revision: <stable revision or content token>
 
 按需追加 `paths`、`derived_paths`、`forbidden_commands`、`start_identity`、`read_hotspots`、`resource_claims`、`owned_hunks`、`last_write_at`、`validation`、`commit_authorized`、`authorization_evidence`、`push_authorized`、目标分支和 exact commit range。`commit_authorized` 未提供时按 `false`；只有本轮可定位的用户原意可以把它设为 `true`。旧 `commit_policy` 只作兼容元数据，`auto_local` 不能授权 Git 动作。`event_id` 在幂等重发时保持不变；内容实质变化才生成新 revision 和新 event_id。
 
-协议 1 / 2 事件和旧 `auto_local` / `COMMIT_READY` 只兼容批次身份、路径与验证信息，统一迁移为 `commit_authorized: false`；历史事件不能代替当前用户授权。证据不足或归属漂移时进入 reconcile，不猜测范围。
+协议 1 / 2 / 3 事件和旧 `auto_local` / `COMMIT_READY` 只兼容批次身份、路径与验证信息，统一迁移为 `commit_authorized: false`；历史事件不能代替当前用户授权。证据不足或归属漂移时进入 reconcile，不猜测范围。
 
 协议升级批次必须先于旧批次精确提交并确认 index 复空；只有新协议进入 HEAD 后才重分类和排空历史队列，不能用尚未提交的工作区规则批量收口旧现场。
 
-队列先回复精确的 `ACK <event_id>`，再附一行状态。只有匹配 ACK 才算登记成功。未收到 ACK 时：
+队列用 [scripts/request-lifecycle.mjs](scripts/request-lifecycle.mjs) 的状态转换语义处理申请；动态状态仍由当前任务历史持有，禁止在仓库创建状态文件。每个 `request_id` 只允许以下可见生命周期：`REQUESTED` 一次；`QUEUED_ACK` 最多一次；`GRANTED` 或 `DENIED` 仅在状态变化时一次；获授权后 `RELEASED` 一次。直接授予可跳过 `QUEUED_ACK`。未收到状态变化通知时：
 
 - 发送方保留原状态和现场，不自行推断 writer 已释放或事件已登记。
-- 下一轮向动态发现的当前队列幂等重发同一 event_id。
-- 队列对重复 event_id 只返回既有结果，不重复读取 Git、授予 owner 或执行副作用。
+- 下一轮向动态发现的当前队列幂等重发同一 `request_id` 和原 event_id；不得制造新申请。
+- 队列对重复 `request_id` 复用已有状态，不创建队列项、不发送可见 ACK、不重复读取 Git、授予 owner 或执行副作用。只有调用方明确查询时才静默返回既有状态。
+
+`wait_threads` 或等价等待超时只表示本次等待结束：不得重新申请、重复 ACK、发送“仍在排队”心跳或改变申请状态。优先让队列只在状态变化时投递一次通知；确需等待时只做一次较长有界等待，下一次由外部状态变化触发，连续失败才按退避延长，禁止短周期轮询。
+
+长测试、构建和部署命令只启动一个可复用后台进程，并把完整输出写入 ignored 的证据目录；任务消息只记录启动、关键状态变化和最终摘要。等待或恢复时先核对原 PID、命令身份和日志位置，不得重启同一作业或把重复日志回灌会话。
 
 ## 只读 Git 快照与锁域
 
@@ -80,7 +85,7 @@ worker 发现锁时只发送一次 `INDEX_LOCK_OBSERVED`，附 compact snapshot�
 
 Local 顶层任务在首次写入非 ignored 文件前，只做一次 optional-lock-free 基线，记录 HEAD、index、`index.lock`、status 及可证明由本任务创建的 dirty hunk。仅当 worktree 干净，或每个 dirty hunk 都可证明由当前任务创建时，才可按单 writer 跳过队列；否则把既有脏路径视为共享/归属不明，按“发现唯一队列”加载本 Skill，并在写入前取得精确 `paths` + `derived_paths` 的 writer lease。该检测不轮询、不建 registry / daemon；不回退、格式化或 stage 外部脏路径，互不重叠的 grant 仍可并行。
 
-需要队列的写任务发送 `WRITER_REQUEST`，并等待匹配 ACK 与 `GRANT_WRITER`。请求必须声明：
+需要队列的写任务发送一次 `WRITER_REQUEST`，并等待同一 `request_id` 的 `QUEUED_ACK` 或 `GRANT_WRITER`。请求必须声明：
 
 - `paths`：本轮允许直接写入的精确路径；同一文件不能拆成并行 hunk lease。
 - `derived_paths`：formatter、generator、lockfile、文档索引、快照或脚本可能连带写入的全部路径；确认没有时显式写 `none`。
@@ -92,7 +97,7 @@ Local 顶层任务在首次写入非 ignored 文件前，只做一次 optional-l
 
 `GRANT_WRITER` 必须回显写入闭包、禁用命令、开始身份和资源声明，只授权接收该 grant 的当前 turn 中一段连续文件写入。发生以下任一情况时租约立即失效：收到 `WRITER_RELEASED` / `WRITER_CANCELLED`；进入确认不会写非 ignored 文件的测试、浏览器检查或 diff 审查；给出最终回复；任务成为 `idle` / `notLoaded`；接收 grant 的 turn 变为 `completed` / `error` / `cancelled`；任务在后续新 turn 恢复。
 
-最后一次文件写入后立即停止写入并发送 `WRITER_RELEASED`，包含最后写入时间、`actual_paths`、实际派生写入、`release_identity`、`task_complete`、`next_phase` 和紧凑 `continuation_checkpoint`。结束身份至少覆盖 HEAD、index / lock 及所有声明和实际写入路径。checkpoint 记录原目标、下一安全动作、待验证项和是否还需 writer；不要为只读验证继续占 writer。发送后无需等待 ACK 即继续只读验证或最终收口，但不得继续写文件，也不得在匹配 ACK 前假定 release / batch 已登记；验证失败或新 turn 恢复都要重新申请。任务取消时发送 `WRITER_CANCELLED`。
+最后一次文件写入后立即停止写入并用原 `request_id` 发送一次 `WRITER_RELEASED`，包含最后写入时间、`actual_paths`、实际派生写入、`release_identity`、`task_complete`、`next_phase` 和紧凑 `continuation_checkpoint`。结束身份至少覆盖 HEAD、index / lock 及所有声明和实际写入路径。checkpoint 记录原目标、下一安全动作、待验证项和是否还需 writer；不要为只读验证继续占 writer。发送后无需等待释放通知即可继续只读验证或最终收口，但不得继续写文件，也不得在状态变化确认前假定 release / batch 已登记；验证失败或新 turn 恢复要建立新的申请生命周期。任务取消时发送 `WRITER_CANCELLED`。
 
 队列每次准备返回 `WAIT_WRITER` 或授予 writer 时，在同一 wake 内核对全部活动 lease：
 
@@ -192,4 +197,4 @@ App 重启、旧任务没有发 ready/release、队列丢失或本地留有无�
 
 ## 精简输出
 
-常规响应只保留两行：`ACK <event_id>` 与一个状态（如 `GRANT_WRITER`、`BATCH_REGISTERED`、`AWAITING_COMMIT_AUTHORIZATION`、`WAIT_HOT_FILE`、`WAIT_GIT_OWNER`）。只有 lock incident 首次诊断、reconcile、实际 closeout、push 失败或 queue rotation 才展开必要证据，避免持续状态播报消耗 token。
+常规响应仅在状态变化时输出一行：`<request_id> <REQUESTED|QUEUED_ACK|GRANTED|DENIED|RELEASED>`。批次登记等非申请事件也只输出一次新状态。重复请求、等待超时和无变化查询不产生可见响应；只有 lock incident 首次诊断、reconcile、实际 closeout、push 失败或 queue rotation 才展开必要证据。

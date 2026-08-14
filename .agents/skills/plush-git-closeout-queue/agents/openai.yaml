@@ -1,4 +1,4 @@
 interface:
   display_name: "Plush Git Closeout Queue"
-  short_description: "共享 Local 路径级 writer 与独立资源租约协调"
-  default_prompt: "Use $plush-git-closeout-queue 协调共享 Local 的路径级 writer、独立资源租约、锁恢复与显式授权 Git 收口。"
+  short_description: "共享 Local 的幂等、事件驱动 Git 收口协调"
+  default_prompt: "Use $plush-git-closeout-queue 以稳定 request_id、仅状态变化通知的方式协调共享 Local writer、资源租约、锁恢复与显式授权 Git 收口；单一 writer 使用 auto-commit-with-lease。"
