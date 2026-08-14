@@ -557,6 +557,13 @@ system_identifier_after="$(docker exec "$postgres_cid" sh -ceu \
   "$system_identifier_after" != "$system_identifier_before" ]] ||
   fail "fresh PostgreSQL physical identity was not established"
 
+stage=database_role_reconciliation
+write_state running
+"${clean_env[@]}" "${compose[@]}" exec -T postgres \
+  /usr/local/bin/plush-database-roles reconcile >>"$log_file" 2>&1
+"${clean_env[@]}" "${compose[@]}" exec -T postgres \
+  /usr/local/bin/plush-database-roles verify >>"$log_file" 2>&1
+
 stage=migration_plan
 write_state running
 "${clean_env[@]}" \

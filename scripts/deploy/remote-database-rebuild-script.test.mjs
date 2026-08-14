@@ -104,6 +104,40 @@ test("remote database rebuild prepares the fresh mount for the image data owner"
   assert.doesNotMatch(source, /chown\s+(?:999|postgres):(?:999|postgres)/u);
 });
 
+test("remote database rebuild reconciles least-privilege roles before migration planning", () => {
+  const physicalIdentity = source.indexOf(
+    'fail "fresh PostgreSQL physical identity was not established"',
+  );
+  const roleStage = source.indexOf(
+    "stage=database_role_reconciliation",
+    physicalIdentity,
+  );
+  const reconcile = source.indexOf(
+    "/usr/local/bin/plush-database-roles reconcile",
+    roleStage,
+  );
+  const verify = source.indexOf(
+    "/usr/local/bin/plush-database-roles verify",
+    reconcile,
+  );
+  const migrationPlan = source.indexOf("stage=migration_plan", verify);
+  assert.ok(
+    physicalIdentity >= 0 &&
+      physicalIdentity < roleStage &&
+      roleStage < reconcile &&
+      reconcile < verify &&
+      verify < migrationPlan,
+  );
+  assert.match(
+    source,
+    /"\$\{clean_env\[@\]\}" "\$\{compose\[@\]\}" exec -T postgres \\\n\s+\/usr\/local\/bin\/plush-database-roles reconcile/u,
+  );
+  assert.match(
+    source,
+    /"\$\{clean_env\[@\]\}" "\$\{compose\[@\]\}" exec -T postgres \\\n\s+\/usr\/local\/bin\/plush-database-roles verify/u,
+  );
+});
+
 test("remote database rebuild uses one-use bootstrap secret and exact readbacks", () => {
   assert.match(source, /bootstrap-admin\.secret/u);
   assert.match(source, /stat -c '%a' "\$secret_file"/u);
