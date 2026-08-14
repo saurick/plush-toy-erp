@@ -43,6 +43,7 @@ import {
   LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
   LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
   LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
+  SCENARIO_DEMO_TARGET,
   manualAcceptanceTargetConfirmation,
 } from "./manual-acceptance-target-policy.mjs";
 
@@ -1526,6 +1527,7 @@ test("business dashboard projection proves the exact runtime module set", () => 
     (item) => item.id === "business-dashboard-stats",
   );
   assert.equal(probe.batchEvidence, "fresh_dataset_projection");
+  assert.equal(probe.expectedModuleTotalComparison, "exact");
   assert.deepEqual(probe.expectedModuleTotals, {
     products: 20,
     inventory: 45,
@@ -1563,6 +1565,42 @@ test("business dashboard projection proves the exact runtime module set", () => 
   assert.equal(
     evaluateBusinessDashboardProjection(probe, {
       modules: modules.slice(1),
+    }).status,
+    "fail",
+  );
+});
+
+test("business dashboard projection preserves legacy totals on persistent targets", () => {
+  const target = {
+    target: SCENARIO_DEMO_TARGET,
+    backendURL: "http://127.0.0.1:8300",
+    databaseName: "plush_erp",
+  };
+  const plan = buildManualAcceptanceReadinessPlan({
+    sourceReport: sourceReport(target),
+    factReport: factReport(target),
+    taskReport: taskReport(target),
+  });
+  const probe = plan.probes.find(
+    (item) => item.id === "business-dashboard-stats",
+  );
+  assert.equal(probe.batchEvidence, "persistent_dataset_projection");
+  assert.equal(probe.expectedModuleTotalComparison, "minimum");
+
+  const modules = probe.expectedModuleKeys.map((moduleKey) => ({
+    module_key: moduleKey,
+    available: true,
+    total: moduleKey === "products" ? 40 : moduleKey === "inventory" ? 90 : 45,
+  }));
+  const passing = evaluateBusinessDashboardProjection(probe, { modules });
+  assert.equal(passing.status, "pass");
+  assert.equal(passing.moduleTotalComparison, "minimum");
+
+  const missingCurrentBatch = structuredClone(modules);
+  missingCurrentBatch.find((item) => item.module_key === "products").total = 19;
+  assert.equal(
+    evaluateBusinessDashboardProjection(probe, {
+      modules: missingCurrentBatch,
     }).status,
     "fail",
   );

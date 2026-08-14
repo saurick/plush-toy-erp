@@ -40,6 +40,7 @@ import {
 import {
   CUSTOMER_TRIAL_133_TARGET,
   MANUAL_ACCEPTANCE_TARGET_PROFILES,
+  SCENARIO_DEMO_TARGET,
   assertManualAcceptanceCapabilitiesPolicy,
   assertManualAcceptanceDatabaseIdentity,
   assertManualAcceptanceMutationTarget,
@@ -1560,6 +1561,10 @@ function resolveBatchEvidence(datasetId, blueprint, sourceReport, factReport) {
 function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
   const canonical = buildCanonicalMinimums(catalog);
   const declared = declaredExpectations(sourceReport, factReport);
+  const persistentProjection = new Set([
+    SCENARIO_DEMO_TARGET,
+    CUSTOMER_TRIAL_133_TARGET,
+  ]).has(factReport?.target);
   const probes = Object.entries(DATASET_BLUEPRINTS).map(([id, blueprint]) => {
     const batch = resolveBatchEvidence(id, blueprint, sourceReport, factReport);
     const params = {
@@ -1596,7 +1601,9 @@ function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
     includeCustomerKey: true,
     batchEvidence:
       sourceReport && factReport && taskReport
-        ? "fresh_dataset_projection"
+        ? persistentProjection
+          ? "persistent_dataset_projection"
+          : "fresh_dataset_projection"
         : "not_proven",
     batchNotProvenReason:
       sourceReport && factReport && taskReport
@@ -1617,6 +1624,7 @@ function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
           }
         : {}),
     },
+    expectedModuleTotalComparison: persistentProjection ? "minimum" : "exact",
     declaredMinimum: null,
     readOnly: true,
   });
@@ -2303,6 +2311,8 @@ export function evaluateManualAcceptanceDataset(probe, data) {
 }
 
 export function evaluateBusinessDashboardProjection(probe, data) {
+  const moduleTotalComparison =
+    probe.expectedModuleTotalComparison === "minimum" ? "minimum" : "exact";
   if (probe.batchEvidence === "not_proven") {
     return {
       id: probe.id,
@@ -2323,6 +2333,7 @@ export function evaluateBusinessDashboardProjection(probe, data) {
       unexpectedModuleKeys: [],
       unavailableModuleKeys: [],
       moduleTotalMismatches: {},
+      moduleTotalComparison,
       notProvenReason: probe.batchNotProvenReason,
       error: null,
     };
@@ -2348,6 +2359,7 @@ export function evaluateBusinessDashboardProjection(probe, data) {
       unexpectedModuleKeys: [],
       unavailableModuleKeys: [],
       moduleTotalMismatches: {},
+      moduleTotalComparison,
       notProvenReason: null,
       error: "查询结果缺少 modules",
     };
@@ -2377,7 +2389,12 @@ export function evaluateBusinessDashboardProjection(probe, data) {
     .map((module) => String(module?.module_key || ""));
   const moduleTotalMismatches = Object.fromEntries(
     Object.entries(probe.expectedModuleTotals || {})
-      .filter(([key, expected]) => moduleTotals[key] !== Number(expected))
+      .filter(([key, expected]) => {
+        const actual = moduleTotals[key];
+        return moduleTotalComparison === "minimum"
+          ? !Number.isFinite(actual) || actual < Number(expected)
+          : actual !== Number(expected);
+      })
       .map(([key, expected]) => [
         key,
         { expected: Number(expected), actual: moduleTotals[key] ?? null },
@@ -2411,6 +2428,7 @@ export function evaluateBusinessDashboardProjection(probe, data) {
     unexpectedModuleKeys,
     unavailableModuleKeys,
     moduleTotalMismatches,
+    moduleTotalComparison,
     notProvenReason: null,
     error: null,
   };
