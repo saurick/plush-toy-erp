@@ -515,12 +515,42 @@ function normalizeComponentResult(raw, execution, defaultOperation) {
     const expectedSchedule = buildManualAcceptanceTaskSchedule(
       Math.floor(Date.parse(input.taskScheduleAnchorUtc) / 1000),
     );
-    if (canonicalJSON(report.schedule) !== canonicalJSON(expectedSchedule)) {
+    let actualSchedule;
+    try {
+      actualSchedule = buildManualAcceptanceTaskSchedule(
+        Number(report.schedule?.anchorUnix),
+      );
+    } catch (error) {
       throw new ManualAcceptanceDatasetRunnerError(
         "task_schedule_anchor_mismatch",
-        "task component report does not reuse the dataset task schedule anchor",
+        `task component report has an invalid schedule: ${error?.message || error}`,
         { stageKey: execution.stageKey },
       );
+    }
+    if (canonicalJSON(report.schedule) !== canonicalJSON(actualSchedule)) {
+      throw new ManualAcceptanceDatasetRunnerError(
+        "task_schedule_anchor_mismatch",
+        "task component report schedule does not match its controlled anchor",
+        { stageKey: execution.stageKey },
+      );
+    }
+    if (canonicalJSON(actualSchedule) !== canonicalJSON(expectedSchedule)) {
+      const binding = report.scheduleBinding;
+      if (
+        !isPlainRecord(binding) ||
+        binding.contract !== "manual-acceptance-task-schedule-binding-v1" ||
+        binding.source !== "persisted_batch_readback" ||
+        binding.requestedAnchorUtc !== expectedSchedule.anchorUtc ||
+        binding.effectiveAnchorUtc !== actualSchedule.anchorUtc ||
+        !Number.isSafeInteger(binding.persistedTaskCount) ||
+        binding.persistedTaskCount <= 0
+      ) {
+        throw new ManualAcceptanceDatasetRunnerError(
+          "task_schedule_anchor_mismatch",
+          "task component may change the requested schedule only from a verified persisted batch readback",
+          { stageKey: execution.stageKey },
+        );
+      }
     }
   }
   if (!isPlainRecord(report.summary)) {
@@ -607,6 +637,12 @@ function receipt(execution, component) {
         backendURL: component.report.backendURL,
         databaseName: component.report.databaseName,
         semanticDigest: component.report.semanticDigest || null,
+        ...(execution.stageKey === "task"
+          ? {
+              taskSchedule: component.report.schedule,
+              taskScheduleBinding: component.report.scheduleBinding || null,
+            }
+          : {}),
       },
     },
   };

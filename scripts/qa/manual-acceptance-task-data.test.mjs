@@ -1902,6 +1902,59 @@ test("applies and safely resumes the 180-task batch through current CAS action c
   assert.equal(replayReport.summary.reusedFinal, 180);
   assert.equal(replayReport.summary.actionsApplied, 0);
   assert.deepEqual(mock.counts(), countsBeforeReplay);
+
+  const shiftedPlan = buildLocalTaskMutationPlan({
+    runId: plan.runId,
+    nowSec: NOW_SEC + 29 * 60,
+  });
+  const recoveredReport = await applyManualAcceptanceTaskData(
+    shiftedPlan,
+    localTaskMutationOptions(shiftedPlan, {
+      confirmPhrase: CONFIRM_PHRASE,
+      password: "local-password",
+      adminPassword: "admin-password",
+      fetchImpl: mock.fetchImpl,
+    }),
+  );
+  assert.deepEqual(recoveredReport.schedule, plan.schedule);
+  assert.deepEqual(recoveredReport.scheduleBinding, {
+    contract: "manual-acceptance-task-schedule-binding-v1",
+    source: "persisted_batch_readback",
+    requestedAnchorUtc: shiftedPlan.schedule.anchorUtc,
+    effectiveAnchorUtc: plan.schedule.anchorUtc,
+    persistedTaskCount: 180,
+  });
+  assert.equal(recoveredReport.summary.reusedFinal, 180);
+  assert.deepEqual(mock.counts(), countsBeforeReplay);
+});
+
+test("rejects an exact task batch whose persisted due dates imply multiple anchors", async () => {
+  const requestedPlan = buildLocalTaskMutationPlan({
+    runId: "SCHEDULE-DRIFT",
+    nowSec: NOW_SEC,
+  });
+  const shiftedPlan = buildLocalTaskMutationPlan({
+    runId: requestedPlan.runId,
+    nowSec: NOW_SEC + 60,
+  });
+  const mock = createMockRuntime();
+  mock.seedPlannedTask(requestedPlan, requestedPlan.tasks[0], { final: true });
+  mock.seedPlannedTask(shiftedPlan, shiftedPlan.tasks[1], { final: true });
+
+  await assert.rejects(
+    () =>
+      applyManualAcceptanceTaskData(
+        requestedPlan,
+        localTaskMutationOptions(requestedPlan, {
+          confirmPhrase: CONFIRM_PHRASE,
+          password: "local-password",
+          adminPassword: "admin-password",
+          fetchImpl: mock.fetchImpl,
+        }),
+      ),
+    /persisted task schedule anchors disagree/u,
+  );
+  assert.deepEqual(mock.counts(), { createCount: 0, actionCount: 0 });
 });
 
 test("retires an exact legacy batch only after the plain-copy keep batch is complete", async () => {

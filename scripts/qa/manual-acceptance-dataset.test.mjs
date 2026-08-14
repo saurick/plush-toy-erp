@@ -1604,6 +1604,76 @@ test("canonical apply report persists and a complete same-batch replay safely re
   }
 });
 
+test("dataset adopts a task schedule recovered from the persisted exact batch", async () => {
+  const outputRoot = await fs.mkdtemp(
+    path.join(os.tmpdir(), "plush-dataset-task-schedule-recovery-"),
+  );
+  try {
+    const plan = localApplyPlan();
+    const requestedSchedule = buildManualAcceptanceTaskSchedule(
+      Math.floor(Date.parse(GENERATED_AT) / 1000),
+    );
+    const persistedSchedule = buildManualAcceptanceTaskSchedule(
+      requestedSchedule.anchorUnix - 29 * 60,
+    );
+    const observedAnchors = new Map();
+    const report = await applyManualAcceptanceDataset(
+      plan,
+      localApplyBinding(plan),
+      durableRunnerDeps({
+        outputRoot,
+        onCall(stageKey, invocation) {
+          observedAnchors.set(
+            stageKey,
+            invocation.businessInput.taskScheduleAnchorUtc,
+          );
+        },
+        override: {
+          async task(invocation) {
+            const component = durableComponentReport({
+              stageKey: "task",
+              ...invocation,
+            });
+            component.schedule = persistedSchedule;
+            component.scheduleBinding = {
+              contract: "manual-acceptance-task-schedule-binding-v1",
+              source: "persisted_batch_readback",
+              requestedAnchorUtc: requestedSchedule.anchorUtc,
+              effectiveAnchorUtc: persistedSchedule.anchorUtc,
+              persistedTaskCount: 180,
+            };
+            return { operation: "applied", report: component };
+          },
+        },
+      }),
+    );
+
+    assert.equal(report.ok, true);
+    assert.deepEqual(report.taskSchedule, persistedSchedule);
+    assert.equal(observedAnchors.get("task"), requestedSchedule.anchorUtc);
+    for (const stageKey of [
+      "facts",
+      "purchase-quality",
+      "attachments",
+      "readiness",
+    ]) {
+      if (observedAnchors.has(stageKey)) {
+        assert.equal(
+          observedAnchors.get(stageKey),
+          persistedSchedule.anchorUtc,
+        );
+      }
+    }
+    assert.deepEqual(
+      report.stages.find((stage) => stage.key === "task").references.component
+        .taskSchedule,
+      persistedSchedule,
+    );
+  } finally {
+    await fs.rm(outputRoot, { recursive: true, force: true });
+  }
+});
+
 test("failed apply report resumes only after its completed contiguous prefix", async () => {
   const outputRoot = await fs.mkdtemp(
     path.join(os.tmpdir(), "plush-dataset-resume-failed-"),

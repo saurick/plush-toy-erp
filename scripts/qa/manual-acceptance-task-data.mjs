@@ -98,6 +98,15 @@ export const TASK_SCHEDULE_POLICY = Object.freeze({
   dueSoonWindowSeconds: DAY_SECONDS,
 });
 
+const TASK_SCHEDULE_BINDING_CONTRACT =
+  "manual-acceptance-task-schedule-binding-v1";
+const TASK_DUE_SCENARIO_OFFSETS = Object.freeze({
+  overdue: TASK_SCHEDULE_POLICY.overdueOffsetSeconds,
+  due_soon: TASK_SCHEDULE_POLICY.dueSoonOffsetSeconds,
+  this_week: TASK_SCHEDULE_POLICY.thisWeekOffsetSeconds,
+  later: TASK_SCHEDULE_POLICY.laterOffsetSeconds,
+});
+
 export const CONFIRM_PHRASE = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_TASKS";
 export const RETIRE_CONFIRM_PREFIX =
   "RETIRE_LEGACY_SIMULATED_MANUAL_ACCEPTANCE_TASKS";
@@ -2119,10 +2128,11 @@ async function listRoleBatch({ plan, roleKey, account, fetchImpl }) {
 }
 
 async function preflightExistingBatch({ plan, accounts, fetchImpl }) {
-  const plannedByCode = new Map(
+  const requestedPlanByCode = new Map(
     plan.tasks.map((task) => [task.createParams.task_code, task]),
   );
-  const existingByCode = new Map();
+  const existing = [];
+  const seenCodes = new Set();
   for (const roleKey of TASK_ROLES) {
     const items = await listRoleBatch({
       plan,
@@ -2135,36 +2145,103 @@ async function preflightExistingBatch({ plan, accounts, fetchImpl }) {
         item?.task_code,
         `${roleKey} existing task code`,
       );
-      const plannedTask = plannedByCode.get(code);
+      const plannedTask = requestedPlanByCode.get(code);
       if (!plannedTask || plannedTask.roleKey !== roleKey) {
         throw new CliError(
           `${roleKey} batch source collision contains unexpected task ${code}`,
         );
       }
-      if (existingByCode.has(code)) {
+      if (seenCodes.has(code)) {
         throw new CliError(`batch contains duplicate persisted task ${code}`);
       }
+      seenCodes.add(code);
       positiveSafeInteger(item.id, `${code} id`);
       positiveSafeInteger(item.version, `${code} version`);
-      assertTaskIdentity(item, plannedTask, accounts);
-      const allowedStatuses = plannedTask.action
-        ? new Set([
-            plannedTask.createParams.task_status_key,
-            plannedTask.targetStatus,
-          ])
-        : new Set([plannedTask.targetStatus]);
-      if (!allowedStatuses.has(item.task_status_key)) {
-        throw new CliError(
-          `${plannedTask.key} cannot safely resume from ${item.task_status_key}`,
-        );
-      }
-      if (item.task_status_key === plannedTask.targetStatus) {
-        assertFinalTask(item, plannedTask, accounts);
-      }
-      existingByCode.set(code, item);
+      existing.push({ code, item, requestedTask: plannedTask });
     }
   }
-  return existingByCode;
+
+  const anchors = new Set();
+  for (const { code, item, requestedTask } of existing) {
+    const offset = TASK_DUE_SCENARIO_OFFSETS[requestedTask.dueScenario];
+    if (!Number.isSafeInteger(offset)) {
+      throw new CliError(
+        `${requestedTask.key} has an unsupported due schedule scenario`,
+      );
+    }
+    const dueAt = positiveSafeInteger(item.due_at, `${code} persisted due_at`);
+    anchors.add(
+      positiveSafeInteger(dueAt - offset, `${code} persisted schedule anchor`),
+    );
+  }
+  if (anchors.size > 1) {
+    throw new CliError(
+      "persisted task schedule anchors disagree inside the exact batch",
+    );
+  }
+
+  const persistedAnchor = anchors.values().next().value;
+  let effectivePlan = plan;
+  let bindingSource = "requested_plan";
+  if (
+    persistedAnchor !== undefined &&
+    persistedAnchor !== plan.schedule.anchorUnix
+  ) {
+    const rebound = structuredClone(plan);
+    rebound.generatedAtUnix = persistedAnchor;
+    rebound.schedule = buildManualAcceptanceTaskSchedule(persistedAnchor);
+    for (const task of rebound.tasks) {
+      const due = manualAcceptanceTaskDueAt(task.index, persistedAnchor);
+      if (due.scenario !== task.dueScenario) {
+        throw new CliError(
+          `${task.key} due schedule scenario changed while reading the persisted batch`,
+        );
+      }
+      task.createParams.due_at = due.value;
+    }
+    effectivePlan = validateManualAcceptanceTaskPlan(rebound);
+    bindingSource = "persisted_batch_readback";
+  }
+
+  const effectivePlanByCode = new Map(
+    effectivePlan.tasks.map((task) => [task.createParams.task_code, task]),
+  );
+  const existingByCode = new Map();
+  for (const { code, item } of existing) {
+    const plannedTask = effectivePlanByCode.get(code);
+    if (!plannedTask) {
+      throw new CliError(
+        `persisted task ${code} is outside the effective plan`,
+      );
+    }
+    assertTaskIdentity(item, plannedTask, accounts);
+    const allowedStatuses = plannedTask.action
+      ? new Set([
+          plannedTask.createParams.task_status_key,
+          plannedTask.targetStatus,
+        ])
+      : new Set([plannedTask.targetStatus]);
+    if (!allowedStatuses.has(item.task_status_key)) {
+      throw new CliError(
+        `${plannedTask.key} cannot safely resume from ${item.task_status_key}`,
+      );
+    }
+    if (item.task_status_key === plannedTask.targetStatus) {
+      assertFinalTask(item, plannedTask, accounts);
+    }
+    existingByCode.set(code, item);
+  }
+  return {
+    plan: effectivePlan,
+    existingByCode,
+    scheduleBinding: {
+      contract: TASK_SCHEDULE_BINDING_CONTRACT,
+      source: bindingSource,
+      requestedAnchorUtc: plan.schedule.anchorUtc,
+      effectiveAnchorUtc: effectivePlan.schedule.anchorUtc,
+      persistedTaskCount: existingByCode.size,
+    },
+  };
 }
 
 async function createPlannedTask({ plan, plannedTask, accounts, fetchImpl }) {
@@ -2888,32 +2965,37 @@ export async function applyManualAcceptanceTaskData(
     includeSalesRuntime: Boolean(sourceReport),
     fetchImpl,
   });
+  const preflight = await preflightExistingBatch({
+    plan,
+    accounts,
+    fetchImpl,
+  });
+  const effectivePlan = preflight.plan;
   const runtimeEvidence = sourceReport
     ? await applySalesOrderAcceptanceRuntimeEvidence({
-        plan,
-        sources: validateSalesOrderAcceptanceSourceReport(sourceReport, plan),
+        plan: effectivePlan,
+        sources: validateSalesOrderAcceptanceSourceReport(
+          sourceReport,
+          effectivePlan,
+        ),
         accounts,
         runtimeAdmin,
         fetchImpl,
       })
     : [];
-  const existingByCode = await preflightExistingBatch({
-    plan,
-    accounts,
-    fetchImpl,
-  });
+  const existingByCode = preflight.existingByCode;
   const steps = [];
   let createdCount = 0;
   let resumedCount = 0;
   let reusedFinalCount = 0;
   let actionCount = 0;
 
-  for (const plannedTask of plan.tasks) {
+  for (const plannedTask of effectivePlan.tasks) {
     const code = plannedTask.createParams.task_code;
     let task = existingByCode.get(code);
     if (!task) {
       task = await createPlannedTask({
-        plan,
+        plan: effectivePlan,
         plannedTask,
         accounts,
         fetchImpl,
@@ -2931,7 +3013,7 @@ export async function applyManualAcceptanceTaskData(
 
     if (plannedTask.action) {
       task = await applyPlannedAction({
-        plan,
+        plan: effectivePlan,
         plannedTask,
         task,
         accounts,
@@ -2947,7 +3029,11 @@ export async function applyManualAcceptanceTaskData(
     }
   }
 
-  const finalTasks = await verifyFinalBatch({ plan, accounts, fetchImpl });
+  const finalTasks = await verifyFinalBatch({
+    plan: effectivePlan,
+    accounts,
+    fetchImpl,
+  });
   return {
     mode: "apply",
     generatedAt: new Date().toISOString(),
@@ -2961,19 +3047,20 @@ export async function applyManualAcceptanceTaskData(
         ? "mixed_formal_runtime_and_simulated_display_only"
         : "simulated_display_only",
     provesProcessRuntime: runtimeEvidence.length > 0,
-    runId: plan.runId,
-    taskProfile: plan.taskProfile,
-    copyRevision: plan.copyRevision,
-    datasetKey: plan.datasetKey,
-    dataVersion: plan.dataVersion,
-    target: plan.target,
-    prefix: plan.prefix,
-    sourceType: plan.sourceType,
-    sourceID: plan.sourceID,
-    backendURL: plan.backendURL,
-    databaseName: plan.databaseName,
-    coverage: plan.coverage,
-    schedule: plan.schedule,
+    runId: effectivePlan.runId,
+    taskProfile: effectivePlan.taskProfile,
+    copyRevision: effectivePlan.copyRevision,
+    datasetKey: effectivePlan.datasetKey,
+    dataVersion: effectivePlan.dataVersion,
+    target: effectivePlan.target,
+    prefix: effectivePlan.prefix,
+    sourceType: effectivePlan.sourceType,
+    sourceID: effectivePlan.sourceID,
+    backendURL: effectivePlan.backendURL,
+    databaseName: effectivePlan.databaseName,
+    coverage: effectivePlan.coverage,
+    schedule: effectivePlan.schedule,
+    scheduleBinding: preflight.scheduleBinding,
     runtime,
     runtimeEvidence,
     displayOnlyTasks: {
@@ -2982,7 +3069,7 @@ export async function applyManualAcceptanceTaskData(
       total: finalTasks.length,
     },
     summary: {
-      ...plan.summary,
+      ...effectivePlan.summary,
       persisted: finalTasks.length,
       created: createdCount,
       resumed: resumedCount,

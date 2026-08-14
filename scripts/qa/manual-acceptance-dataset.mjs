@@ -1922,7 +1922,7 @@ export async function applyManualAcceptanceDataset(
       ...deps,
       resumeComponents: resume.components,
     });
-    const taskSchedule =
+    let taskSchedule =
       resume.taskSchedule ||
       buildManualAcceptanceTaskSchedule(
         Math.floor(Date.parse(generatedAt) / 1000),
@@ -1985,6 +1985,29 @@ export async function applyManualAcceptanceDataset(
           plan,
         );
         Object.assign(stageReport, normalized);
+        if (stage.key === "task") {
+          const returnedSchedule =
+            normalized.references.component?.taskSchedule;
+          let verifiedSchedule;
+          try {
+            verifiedSchedule = buildManualAcceptanceTaskSchedule(
+              returnedSchedule?.anchorUnix,
+            );
+          } catch (error) {
+            throw new ManualAcceptanceDatasetError(
+              `task runner returned an invalid effective schedule: ${error?.message || error}`,
+            );
+          }
+          if (
+            canonicalJSON(returnedSchedule) !== canonicalJSON(verifiedSchedule)
+          ) {
+            throw new ManualAcceptanceDatasetError(
+              "task runner effective schedule does not match its controlled anchor",
+            );
+          }
+          taskSchedule = verifiedSchedule;
+          report.taskSchedule = structuredClone(verifiedSchedule);
+        }
         finishTiming(stageReport, deps, stageStarted);
         if (stage.key === "baseline") {
           const persistentBaseline =
