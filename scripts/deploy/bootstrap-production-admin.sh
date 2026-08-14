@@ -504,7 +504,12 @@ admin_password="${APP_ADMIN_PASSWORD:-}"
 export -n admin_password 2>/dev/null || true
 unset APP_ADMIN_PASSWORD
 
-root_dir="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+if root_dir="$(git -C "$script_dir" rev-parse --show-toplevel 2>/dev/null)"; then
+  :
+else
+  root_dir="$(cd "$script_dir/../.." && pwd -P)"
+fi
 compose_dir="server/deploy/compose/prod"
 compose_override=""
 env_file=""

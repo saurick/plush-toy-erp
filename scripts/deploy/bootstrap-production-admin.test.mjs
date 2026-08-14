@@ -10,6 +10,7 @@ const scriptPath = path.join(
   repoRoot,
   "scripts/deploy/bootstrap-production-admin.sh",
 );
+const scriptSource = fs.readFileSync(scriptPath, "utf8");
 const expectedDatabase = "plush_erp_bootstrap_test";
 const trialDatabase = "plush_erp_uat_20260716_v5";
 const trialProject = "plush-toy-erp-v5";
@@ -25,6 +26,28 @@ const fixtureScratchRoot = path.join(repoRoot, "output", "qa-tmp");
 // Aggregate Node tests run files concurrently; this only gives fixture scheduling headroom.
 const fixtureProcessTimeoutMs = 30_000;
 const fixtureReadyTimeoutMs = 15_000;
+
+test("bootstrap resolves its release root independently of the caller cwd", () => {
+  assert.match(
+    scriptSource,
+    /script_dir="\$\(cd "\$\(dirname "\$\{BASH_SOURCE\[0\]\}"\)" && pwd -P\)"/u,
+  );
+  assert.match(
+    scriptSource,
+    /git -C "\$script_dir" rev-parse --show-toplevel/u,
+  );
+  assert.match(
+    scriptSource,
+    /root_dir="\$\(cd "\$script_dir\/\.\.\/\.\." && pwd -P\)"/u,
+  );
+
+  const help = spawnSync("bash", [scriptPath, "--help"], {
+    cwd: path.parse(repoRoot).root,
+    encoding: "utf8",
+  });
+  assert.equal(help.status, 0, help.stderr);
+  assert.match(help.stdout, /bootstrap-production-admin\.sh/u);
+});
 
 function createFixtureRoot() {
   fs.mkdirSync(fixtureScratchRoot, { recursive: true, mode: 0o700 });
@@ -1625,7 +1648,7 @@ test("bootstrap production admin script keeps the compose one-shot fail-closed",
   assert.match(source, /APP_ADMIN_PASSWORD="\$admin_password"/u);
   assert.ok(
     source.indexOf("unset APP_ADMIN_PASSWORD") <
-      source.indexOf("git rev-parse --show-toplevel"),
+      source.indexOf('git -C "$script_dir" rev-parse --show-toplevel'),
   );
   assert.ok(
     source.indexOf("unset APP_ADMIN_PASSWORD") <

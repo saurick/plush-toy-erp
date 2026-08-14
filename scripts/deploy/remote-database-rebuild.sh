@@ -309,6 +309,11 @@ on_error() {
   local exit_code=$?
   trap - ERR
   set +e
+  if [[ -f "$receipt" && ! -L "$receipt" ]]; then
+    printf '[remote-database-rebuild] failed at stage=%s exit=%s\n' \
+      "$stage" "$exit_code" >&2
+    exit "$exit_code"
+  fi
   restore_database_cleanup
   cleanup_bootstrap_secret
   if [[ "$data_switch_started" -eq 0 ]]; then

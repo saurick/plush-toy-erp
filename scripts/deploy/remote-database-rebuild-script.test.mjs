@@ -43,6 +43,18 @@ test("remote database rebuild serializes the switch and freezes unknown outcomes
   assert.match(source, /recover_predecessor_before_migration/u);
 });
 
+test("remote database rebuild emits an inherited subshell failure receipt once", () => {
+  assert.match(
+    source,
+    /on_error\(\) \{[\s\S]*?trap - ERR[\s\S]*?if \[\[ -f "\$receipt" && ! -L "\$receipt" \]\]; then[\s\S]*?exit "\$exit_code"[\s\S]*?fi[\s\S]*?restore_database_cleanup/u,
+  );
+  const onError = source.slice(
+    source.indexOf("on_error() {"),
+    source.indexOf("trap on_error ERR"),
+  );
+  assert.equal(onError.match(/cat "\$receipt"/gu)?.length, 1);
+});
+
 test("remote database rebuild restores a stopped predecessor before the switch", () => {
   assert.match(source, /predecessor_runtime_stopped=0/u);
   assert.match(source, /restore_predecessor_runtime_before_switch\(\)/u);
