@@ -1839,6 +1839,18 @@ test("sales source replay accepts only the exact downstream ProcessRuntime lifec
   assert.equal(
     await advanceSalesOrderLifecycleThroughProcess({
       plan,
+      record: candidates[3],
+      item: { id: 16, lifecycle_status: "CANCELED" },
+      token: "unused",
+      roleTokens: {},
+      fetchImpl,
+      report,
+    }),
+    "CANCELED",
+  );
+  assert.equal(
+    await advanceSalesOrderLifecycleThroughProcess({
+      plan,
       record: candidates[4],
       item: { id: 21, lifecycle_status: "ACTIVE" },
       token: "unused",

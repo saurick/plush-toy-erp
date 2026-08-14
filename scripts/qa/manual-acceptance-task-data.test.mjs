@@ -35,7 +35,10 @@ import {
   WORKFLOW_TASK_CAS_MIGRATION,
   WORKFLOW_TASK_CAS_RELEASE,
 } from "./manual-acceptance-task-data.mjs";
-import { buildManualAcceptanceSourceDataPlan } from "./manual-acceptance-source-data.mjs";
+import {
+  SALES_ORDER_ACCEPTANCE_REPLAY_STATUSES,
+  buildManualAcceptanceSourceDataPlan,
+} from "./manual-acceptance-source-data.mjs";
 import {
   CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
   CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION,
@@ -67,13 +70,15 @@ test("manual acceptance runtime source report binds five exact forward-only sale
   const candidates = Array.from({ length: 5 }, (_, index) => ({
     id: 100 + index,
     orderNo: `SO-RUNTIME-${index + 1}`,
-    status: index === 4 ? "ACTIVE" : index === 0 ? "DRAFT" : "SUBMITTED",
-    allowedStatuses:
-      index === 0
-        ? ["DRAFT"]
-        : index === 4
-          ? ["DRAFT", "SUBMITTED", "ACTIVE"]
-          : ["DRAFT", "SUBMITTED"],
+    status:
+      index === 4
+        ? "ACTIVE"
+        : index === 3
+          ? "CANCELED"
+          : index === 0
+            ? "DRAFT"
+            : "SUBMITTED",
+    allowedStatuses: [...SALES_ORDER_ACCEPTANCE_REPLAY_STATUSES[index]],
   }));
   const report = {
     mode: "apply",

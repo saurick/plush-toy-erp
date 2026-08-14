@@ -93,7 +93,7 @@ export const SALES_ORDER_ACCEPTANCE_REPLAY_STATUSES = Object.freeze([
   Object.freeze(["DRAFT"]),
   Object.freeze(["DRAFT", "SUBMITTED"]),
   Object.freeze(["DRAFT", "SUBMITTED"]),
-  Object.freeze(["DRAFT", "SUBMITTED"]),
+  Object.freeze(["DRAFT", "SUBMITTED", "CANCELED"]),
   Object.freeze(["DRAFT", "SUBMITTED", "ACTIVE"]),
 ]);
 
