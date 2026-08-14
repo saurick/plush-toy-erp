@@ -461,6 +461,13 @@ available_bytes="$(df -B1 --output=avail / | awk 'NR==2 {print $1}')"
 postgres_cid="$("${compose[@]}" ps -q postgres)"
 [[ "$postgres_cid" =~ ^[0-9a-f]{64}$ ]] ||
   fail "target PostgreSQL container is not unique"
+postgres_image_id="$(docker inspect --format '{{.Image}}' "$postgres_cid")"
+postgres_data_uid="$(docker exec "$postgres_cid" id -u postgres)"
+postgres_data_gid="$(docker exec "$postgres_cid" id -g postgres)"
+[[ "$postgres_image_id" =~ ^sha256:[0-9a-f]{64}$ &&
+  "$postgres_data_uid" =~ ^[1-9][0-9]*$ &&
+  "$postgres_data_gid" =~ ^[1-9][0-9]*$ ]] ||
+  fail "target PostgreSQL image or data-owner identity is invalid"
 postgres_mount="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql"}}{{printf "%s|%s" .Type .Source}}{{end}}{{end}}' "$postgres_cid")"
 [[ "$postgres_mount" == "bind|$data_dir" ]] ||
   fail "target PostgreSQL data mount does not match the fixed directory"
@@ -523,6 +530,11 @@ mv "$data_dir" "$rollback_dir"
 data_switch_started=1
 write_state running
 mkdir -m 700 "$data_dir"
+docker run --rm --pull never --network none --user 0:0 \
+  --volume "$data_dir:/var/lib/postgresql" \
+  --entrypoint sh "$postgres_image_id" -ceu \
+  'chown "$1:$2" /var/lib/postgresql && chmod 700 /var/lib/postgresql' \
+  sh "$postgres_data_uid" "$postgres_data_gid" >>"$log_file" 2>&1
 
 stage=fresh_postgres_start
 write_state running

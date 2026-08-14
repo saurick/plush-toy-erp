@@ -77,6 +77,33 @@ test("remote database rebuild records the switch before fresh directory creation
   assert.match(source, /recovered-predecessor-preflight-report\.txt/u);
 });
 
+test("remote database rebuild prepares the fresh mount for the image data owner", () => {
+  assert.match(
+    source,
+    /postgres_image_id="\$\(docker inspect --format '\{\{\.Image\}\}' "\$postgres_cid"\)"/u,
+  );
+  assert.match(
+    source,
+    /postgres_data_uid="\$\(docker exec "\$postgres_cid" id -u postgres\)"/u,
+  );
+  assert.match(
+    source,
+    /postgres_data_gid="\$\(docker exec "\$postgres_cid" id -g postgres\)"/u,
+  );
+  const create = source.indexOf('mkdir -m 700 "$data_dir"');
+  const prepare = source.indexOf(
+    'docker run --rm --pull never --network none --user 0:0',
+    create,
+  );
+  const start = source.indexOf("stage=fresh_postgres_start", prepare);
+  assert.ok(create >= 0 && create < prepare && prepare < start);
+  assert.match(
+    source,
+    /--volume "\$data_dir:\/var\/lib\/postgresql"[\s\S]*'chown "\$1:\$2" \/var\/lib\/postgresql && chmod 700 \/var\/lib\/postgresql'[\s\S]*sh "\$postgres_data_uid" "\$postgres_data_gid"/u,
+  );
+  assert.doesNotMatch(source, /chown\s+(?:999|postgres):(?:999|postgres)/u);
+});
+
 test("remote database rebuild uses one-use bootstrap secret and exact readbacks", () => {
   assert.match(source, /bootstrap-admin\.secret/u);
   assert.match(source, /stat -c '%a' "\$secret_file"/u);
