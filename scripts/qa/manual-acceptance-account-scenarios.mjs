@@ -19,6 +19,7 @@ import {
   parseManualAcceptanceTargetAttestation,
   resolveManualAcceptanceTarget,
 } from "./manual-acceptance-target-policy.mjs";
+import { MANUAL_ACCEPTANCE_CORE_WAREHOUSES } from "./manual-acceptance-core-contract.mjs";
 import { yoyoosunRoleFlowMatrix } from "../../config/customers/yoyoosun/roleFlowMatrix.mjs";
 
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
@@ -887,12 +888,34 @@ async function readRoleControlPlane({ backendURL, token, fetchImpl }) {
     }
     permissions.set(permission.permissionKey, permission);
   }
-  const warehouseIds = Array.isArray(data.warehouse_scope_options)
+  const expectedWarehouseCodes = MANUAL_ACCEPTANCE_CORE_WAREHOUSES.map(
+    (item) => item.code,
+  );
+  const expectedWarehouseCodeSet = new Set(expectedWarehouseCodes);
+  const warehouseIDsByCode = new Map();
+  for (const item of Array.isArray(data.warehouse_scope_options)
     ? data.warehouse_scope_options
-        .map((item) => Number(item?.id))
-        .filter((id) => Number.isSafeInteger(id) && id > 0)
-        .sort((a, b) => a - b)
-    : [];
+    : []) {
+    const code = optionalText(item?.code);
+    if (!code || !expectedWarehouseCodeSet.has(code)) continue;
+    const id = Number(item?.id);
+    if (!Number.isSafeInteger(id) || id <= 0 || warehouseIDsByCode.has(code)) {
+      throw new CliError(`验收核心仓库 ${code} 的数据范围候选不唯一`, 2);
+    }
+    warehouseIDsByCode.set(code, id);
+  }
+  const missingWarehouseCodes = expectedWarehouseCodes.filter(
+    (code) => !warehouseIDsByCode.has(code),
+  );
+  if (missingWarehouseCodes.length > 0) {
+    throw new CliError(
+      `验收核心仓库数据范围缺少 ${missingWarehouseCodes.join(", ")}`,
+      2,
+    );
+  }
+  const warehouseIds = expectedWarehouseCodes
+    .map((code) => warehouseIDsByCode.get(code))
+    .sort((a, b) => a - b);
   return { roles, permissions, warehouseIds };
 }
 
@@ -914,12 +937,6 @@ async function alignAcceptanceWarehouseScopes({
     token,
     fetchImpl,
   });
-  if (controlPlane.warehouseIds.length !== 4) {
-    throw new CliError(
-      `验收数据范围要求精确 4 个核心仓库，当前为 ${controlPlane.warehouseIds.length}`,
-      2,
-    );
-  }
   const actions = [];
   for (const roleKey of ["warehouse", "quality"]) {
     let role = controlPlane.roles.get(roleKey);

@@ -145,6 +145,14 @@ function ok(data, url, extras = {}) {
   };
 }
 
+function coreWarehouseScopeOptions() {
+  return [1, 2, 3, 4].map((id) => ({
+    id,
+    code: `YS6-CK-0${id}`,
+    name: `仓库 ${id}`,
+  }));
+}
+
 function createBackend({
   environment = "local",
   revision,
@@ -160,6 +168,7 @@ function createBackend({
   initialRolePermissions = {},
   roleOptionsTransform = (roles) => roles,
   permissionOptionsTransform = (permissions) => permissions,
+  warehouseScopeOptions = coreWarehouseScopeOptions(),
 } = {}) {
   const remote = environment === "remote";
   const activeRevision =
@@ -306,11 +315,7 @@ function createBackend({
         {
           roles: roleOptionsTransform(structuredClone(roleState)),
           permissions: permissionOptionsTransform(permissionOptions()),
-          warehouse_scope_options: [1, 2, 3, 4].map((id) => ({
-            id,
-            code: `YS6-CK-0${id}`,
-            name: `仓库 ${id}`,
-          })),
+          warehouse_scope_options: structuredClone(warehouseScopeOptions),
         },
         url,
       );
@@ -1027,7 +1032,13 @@ test("local acceptance adds missing customer capabilities without replacing role
 });
 
 test("local acceptance binds warehouse and quality to the exact four seeded warehouses", async () => {
-  const backend = createBackend();
+  const backend = createBackend({
+    warehouseScopeOptions: [
+      { id: 90, code: "SIM-PLUSH-CORE-WH-01", name: "旧模拟仓" },
+      ...coreWarehouseScopeOptions(),
+      { id: 91, code: "OTHER-WH-01", name: "其他长期仓" },
+    ],
+  });
   for (const roleKey of ["warehouse", "quality"]) {
     const selected = backend.roleState.find(
       (item) => item.role_key === roleKey,
@@ -1072,6 +1083,29 @@ test("local acceptance binds warehouse and quality to the exact four seeded ware
   assert.equal(second.roleDataScopeBaseline.updated, 0);
   assert.equal(second.roleDataScopeBaseline.unchanged, 2);
   assert.equal(roleDataScopeCalls(backend).length, writesAfterFirst);
+});
+
+test("acceptance warehouse scope rejects missing or duplicate canonical warehouse codes before writes", async () => {
+  for (const warehouseScopeOptions of [
+    coreWarehouseScopeOptions().slice(0, 3),
+    [
+      ...coreWarehouseScopeOptions(),
+      { id: 99, code: "YS6-CK-04", name: "重复核心仓" },
+    ],
+  ]) {
+    const backend = createBackend({ warehouseScopeOptions });
+    await assert.rejects(
+      withConfirmation(() =>
+        applyManualAcceptanceAccountScenarios(localPlan(), {
+          password: "demo-pass",
+          fetchImpl: backend.fetchImpl,
+        }),
+      ),
+      /验收核心仓库/u,
+    );
+    assert.equal(roleDataScopeCalls(backend).length, 0);
+    assert.equal(rolePermissionCalls(backend).length, 0);
+  }
 });
 
 test("role and permission metadata are fully preflighted before the first acceptance write", async () => {
