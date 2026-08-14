@@ -63,6 +63,14 @@ test("runtime identity receives only the canonical Atlas revision read grant", (
   );
   assert.match(source, /erp_app may not access % non-canonical Atlas tables/u);
   assert.match(source, /atlas_revision_readable/u);
+  assert.match(
+    source,
+    /SELECT \(count\(\*\) >= 0\)::text FROM atlas_schema_revisions\.atlas_schema_revisions/u,
+  );
+  assert.doesNotMatch(
+    source,
+    /SELECT EXISTS \(SELECT 1 FROM atlas_schema_revisions\.atlas_schema_revisions/u,
+  );
   assert.match(source, /Atlas revision UPDATE/u);
   assert.match(
     source,

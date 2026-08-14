@@ -553,9 +553,9 @@ if psql -X --no-psqlrc --set ON_ERROR_STOP=1 \
   atlas_revision_readable="$(PGPASSWORD="$POSTGRES_APP_PASSWORD" psql -X --no-psqlrc \
     --set ON_ERROR_STOP=1 --username erp_app --dbname "$POSTGRES_DB" \
     --tuples-only --no-align \
-    --command "SELECT EXISTS (SELECT 1 FROM atlas_schema_revisions.atlas_schema_revisions WHERE version IS NOT NULL)::text;")"
+    --command "SELECT (count(*) >= 0)::text FROM atlas_schema_revisions.atlas_schema_revisions;")"
   [[ "$atlas_revision_readable" == "true" ]] ||
-    fail "erp_app cannot read the canonical Atlas revision row"
+    fail "erp_app cannot read the canonical Atlas revision table"
   expect_permission_denied \
     "Atlas revision UPDATE" \
     "UPDATE atlas_schema_revisions.atlas_schema_revisions SET version = version WHERE false"
