@@ -785,9 +785,10 @@ export function buildLegacyManualAcceptanceTaskBatchReference({
       ? "short-v6"
       : normalizedCopyRevision === PREVIOUS_TASK_COPY_REVISION
         ? "short-v5"
-      : !normalizedCopyRevision || /^PLAIN[1-4]$/u.test(normalizedCopyRevision)
-        ? "long-batch"
-        : null;
+        : !normalizedCopyRevision ||
+            /^PLAIN[1-4]$/u.test(normalizedCopyRevision)
+          ? "long-batch"
+          : null;
   if (!codeScheme) {
     throw new CliError(
       `unsupported legacy task copy revision ${normalizedCopyRevision}`,
@@ -2612,26 +2613,29 @@ export async function applySalesOrderAcceptanceRuntimeEvidence({
   for (let index = 0; index < caseKeys.length; index += 1) {
     const caseKey = caseKeys[index];
     const source = sources[index];
-    const startData = await rpcCall({
-      backendURL: plan.backendURL,
-      domain: "customer_config",
-      method: "start_sales_order_acceptance_process",
-      params: {
-        sales_order_id: source.id,
-        business_ref_no: source.orderNo,
-        idempotency_key: [
-          "manual-acceptance-runtime",
-          plan.runId,
-          source.orderNo,
-          "start",
-        ].join(":"),
-      },
-      token: accounts.sales.token,
-      fetchImpl,
-    });
-    const started = requireSalesOrderAcceptanceStart(startData, source);
+    let started = null;
+    if (source.status === "DRAFT") {
+      const startData = await rpcCall({
+        backendURL: plan.backendURL,
+        domain: "customer_config",
+        method: "start_sales_order_acceptance_process",
+        params: {
+          sales_order_id: source.id,
+          business_ref_no: source.orderNo,
+          idempotency_key: [
+            "manual-acceptance-runtime",
+            plan.runId,
+            source.orderNo,
+            "start",
+          ].join(":"),
+        },
+        token: accounts.sales.token,
+        fetchImpl,
+      });
+      started = requireSalesOrderAcceptanceStart(startData, source);
+    }
     if (caseKey === "started_only") {
-      if (started.node.status !== "active") {
+      if (!started || started.node.status !== "active") {
         throw new CliError(
           `${source.orderNo} started-only evidence has already advanced`,
         );
@@ -2653,7 +2657,7 @@ export async function applySalesOrderAcceptanceRuntimeEvidence({
       runtimeAdmin,
       fetchImpl,
     });
-    if (tasks.length === 0 && started.node.status === "active") {
+    if (tasks.length === 0 && started?.node.status === "active") {
       const executionData = await rpcCall({
         backendURL: plan.backendURL,
         domain: "customer_config",
@@ -2684,6 +2688,11 @@ export async function applySalesOrderAcceptanceRuntimeEvidence({
         runtimeAdmin,
         fetchImpl,
       });
+    }
+    if (tasks.length === 0 && source.status !== "DRAFT") {
+      throw new CliError(
+        `${source.orderNo} forward-state replay has no linked process task`,
+      );
     }
     let activeTask = tasks.find((task) => task.task_status_key === "ready");
 

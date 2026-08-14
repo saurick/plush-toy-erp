@@ -593,9 +593,13 @@ test("runtime evidence advances five simulated sales orders through the formal p
     false,
   );
 
+  const replaySources = sources.map((source, index) => ({
+    ...source,
+    status: ["DRAFT", "SUBMITTED", "SUBMITTED", "CANCELED", "ACTIVE"][index],
+  }));
   const replay = await applySalesOrderAcceptanceRuntimeEvidence({
     plan,
-    sources,
+    sources: replaySources,
     accounts: {
       sales: { token: "token-sales" },
       boss: { token: "token-boss" },
@@ -635,7 +639,7 @@ test("runtime evidence advances five simulated sales orders through the formal p
         call.domain === "customer_config" &&
         call.method === "start_sales_order_acceptance_process",
     ).length,
-    10,
+    6,
   );
   assert.equal(
     mock.calls.filter(
