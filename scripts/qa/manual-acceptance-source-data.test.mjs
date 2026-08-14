@@ -2286,3 +2286,19 @@ test("partial draft BOMs resume missing lines while settled BOMs fail closed", (
     /persisted BOM line differs/u,
   );
 });
+
+test("source master references retain the canonical unit map for every downstream document", () => {
+  const source = readFileSync(
+    new URL("./manual-acceptance-source-data.mjs", import.meta.url),
+    "utf8",
+  );
+  const masterDataBlock = source.slice(
+    source.indexOf("async function createMissingMasterRecords"),
+    source.indexOf("async function advanceLifecycle"),
+  );
+  assert.match(masterDataBlock, /const \{ unit, unitsByKey, warehouse \}/u);
+  assert.match(
+    masterDataBlock,
+    /return \{[\s\S]*?unit,[\s\S]*?unitsByKey,[\s\S]*?warehouse,/u,
+  );
+});

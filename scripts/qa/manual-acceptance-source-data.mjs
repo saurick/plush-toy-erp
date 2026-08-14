@@ -2318,6 +2318,7 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
     skus,
     processes,
     unit,
+    unitsByKey,
     warehouse,
     warehouses: [...coreReferences.warehouses],
   };
