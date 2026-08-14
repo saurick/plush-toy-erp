@@ -83,6 +83,7 @@ export function prepareDatabaseRebuild(
     targetKey,
     idempotencyKey,
     operationStore,
+    retryOfOperationId = null,
   },
   {
     runPreflight = runTargetPreflight,
@@ -102,6 +103,7 @@ export function prepareDatabaseRebuild(
     gitSha: release.manifest.gitSha,
     version: release.manifest.version,
     idempotencyKey,
+    retryOfOperationId,
     metadata: {
       source: "version-center",
       releaseManifestSha256,
@@ -184,11 +186,12 @@ export function prepareDatabaseRebuild(
   }
 }
 
-function parseArgs(argv) {
+export function parseDatabaseRebuildControllerArgs(argv) {
   const options = {
     releaseManifest: "",
     target: "",
     idempotencyKey: "",
+    retryOfOperationId: null,
     json: false,
     help: false,
   };
@@ -203,7 +206,12 @@ function parseArgs(argv) {
       continue;
     }
     if (
-      ["--release-manifest", "--target", "--idempotency-key"].includes(token)
+      [
+        "--release-manifest",
+        "--target",
+        "--idempotency-key",
+        "--retry-of-operation-id",
+      ].includes(token)
     ) {
       const value = argv[index + 1];
       if (!value || value.startsWith("--")) {
@@ -242,16 +250,19 @@ function isMainModule() {
 
 if (isMainModule()) {
   try {
-    const options = parseArgs(process.argv.slice(2));
+    const options = parseDatabaseRebuildControllerArgs(process.argv.slice(2));
     if (options.help) {
       console.log(`Usage:
   node scripts/deploy/database-rebuild-controller.mjs \\
     --release-manifest <release-manifest.json> \\
     --target test-133 \\
-    --idempotency-key <stable-random-key> [--json]
+    --idempotency-key <stable-random-key> \\
+    [--retry-of-operation-id <terminal-operation-id>] [--json]
 
 This command only prepares a fixed-target, same-logical-database fresh physical
-generation plan. It never stops services, moves data, migrates or bootstraps.`);
+generation plan. It never stops services, moves data, migrates or bootstraps.
+A terminal operation is retried only through an explicit
+--retry-of-operation-id lineage.`);
       process.exit(0);
     }
     const report = prepareDatabaseRebuild({
@@ -259,6 +270,7 @@ generation plan. It never stops services, moves data, migrates or bootstraps.`);
       releaseManifestPath: options.releaseManifest,
       targetKey: options.target,
       idempotencyKey: options.idempotencyKey,
+      retryOfOperationId: options.retryOfOperationId,
     });
     console.log(
       options.json

@@ -168,7 +168,7 @@ if [[ ! -x /usr/bin/rsync ]] ||
   block target_rsync_unavailable
 fi
 if ! command -v zstd >/dev/null 2>&1 ||
-  ! tar --help 2>/dev/null | grep -Fq -- '--zstd'; then
+  ! tar --help 2>/dev/null | grep -F -- '--zstd' >/dev/null; then
   archive_tooling_status=blocked
   block target_archive_tooling_unavailable
 fi

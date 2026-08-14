@@ -12,6 +12,7 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 import {
+  parseDatabaseRebuildControllerArgs,
   prepareDatabaseRebuild,
   readDatabaseRebuildPlan,
 } from "./database-rebuild-controller.mjs";
@@ -164,6 +165,65 @@ test("database rebuild preparation persists a terminal blocker", (t) => {
   );
 });
 
+test("database rebuild controller CLI exposes explicit terminal retry lineage", () => {
+  const options = parseDatabaseRebuildControllerArgs([
+    "--release-manifest",
+    "output/releases/example/release-manifest.json",
+    "--target",
+    "test-133",
+    "--idempotency-key",
+    "database-rebuild-retry-example",
+    "--retry-of-operation-id",
+    "123e4567-e89b-42d3-a456-426614174000",
+    "--json",
+  ]);
+  assert.equal(
+    options.retryOfOperationId,
+    "123e4567-e89b-42d3-a456-426614174000",
+  );
+  assert.equal(options.json, true);
+});
+
+test("explicit terminal database rebuild retry creates a distinct ready lineage", (t) => {
+  const data = fixture(t);
+  let preflightCalls = 0;
+  const common = {
+    repoRoot: data.root,
+    releaseManifestPath: data.releaseManifestPath,
+    targetKey: "test-133",
+    operationStore: data.store,
+  };
+  const first = prepareDatabaseRebuild(
+    { ...common, idempotencyKey: IDEMPOTENCY_KEY },
+    {
+      runPreflight: () => {
+        preflightCalls += 1;
+        return preflight({ blocked: true });
+      },
+    },
+  );
+  const retry = prepareDatabaseRebuild(
+    {
+      ...common,
+      idempotencyKey: `${IDEMPOTENCY_KEY}:retry-2`,
+      retryOfOperationId: first.operation.id,
+    },
+    {
+      runPreflight: () => {
+        preflightCalls += 1;
+        return preflight();
+      },
+    },
+  );
+  assert.equal(first.operation.status, "blocked");
+  assert.equal(retry.operation.status, "ready");
+  assert.notEqual(retry.operation.id, first.operation.id);
+  assert.equal(retry.operation.attempt, 2);
+  assert.equal(retry.operation.retryOfOperationId, first.operation.id);
+  assert.equal(retry.operation.rootOperationId, first.operation.id);
+  assert.equal(preflightCalls, 2);
+});
+
 test("database rebuild controller help is plan-only", () => {
   const result = spawnSync(
     process.execPath,
@@ -173,4 +233,5 @@ test("database rebuild controller help is plan-only", () => {
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /only prepares/iu);
   assert.match(result.stdout, /never stops services/iu);
+  assert.match(result.stdout, /--retry-of-operation-id/iu);
 });

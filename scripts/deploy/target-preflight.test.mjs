@@ -327,6 +327,14 @@ test("remote target preflight script is read-only and contains no build command"
     REMOTE_TARGET_PREFLIGHT_SCRIPT,
     /target_archive_tooling_unavailable/u,
   );
+  assert.match(
+    REMOTE_TARGET_PREFLIGHT_SCRIPT,
+    /tar --help 2>\/dev\/null \| grep -F -- '--zstd' >\/dev\/null/u,
+  );
+  assert.doesNotMatch(
+    REMOTE_TARGET_PREFLIGHT_SCRIPT,
+    /tar --help 2>\/dev\/null \| grep -Fq -- '--zstd'/u,
+  );
   assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /retention_mode=preview_only/u);
   assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /release-cache/u);
   assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /PUBLIC_ENTRY_STATUS/u);
