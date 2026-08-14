@@ -25,6 +25,7 @@
 - 正式 ERP、移动端、产品配置和 Server runtime 不得依赖本目录。
 - 浏览器不得提交任意命令、路径、DSN、目标、SSH 参数或环境变量；写操作必须使用固定动作、幂等、确认、审计和读回。
 - 数据准备摘要只输出数据集版本、安全数据库名、migration、客户配置 revision 和读回时间；不输出凭据、DSN、主机、端口、命令、路径或内部幂等键。本地与 133 的读取失败分别建模，结果未证明时不自动重试或创建 operation。
+- 本地 Core profile 固定执行 V6 合同的角色账号、11 个审定模拟单位与 4 个仓库引用，只允许登记的长期开发库和服务端生成的精确确认；它不再从工作台调用旧 `SIM-PLUSH-CORE` 全量 seed，材料、产品、工序、BOM、Source、Task 与 Fact 由同一 V6 Scenario 合同补齐并独立读回。
 - 133 Scenario 只能在对应目标卡中准备和二次确认；执行前重新读取固定 target attestation，并创建绑定 exact release / database / migration 的新备份回滚点。备份通过 `erp_backup` 只读角色生成并校验，只向页面返回 alias、hash、大小和时间。
 - 质量门禁没有显式 database base 时只允许本机 Docker 的固定 `postgres:18.1` 托管模式：每次随机凭据、仅绑定 `127.0.0.1` 动态端口、按 operation 与 repository label 精确清理；不得删除外部容器或占用者。
 - production build、production preview 和正式部署不包含本目录模块、`/__dev` 路由或本机私有路径。

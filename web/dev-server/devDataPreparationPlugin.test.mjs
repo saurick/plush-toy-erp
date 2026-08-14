@@ -128,10 +128,12 @@ function successfulRunner(calls) {
         stderr: '',
       }
     }
-    if (args.at(-1)?.endsWith('seed-core-demo-data.sh')) {
+    if (args.some((arg) => arg.endsWith('seed-core-demo-data.sh'))) {
       return {
         stdout:
-          'core demo seed completed prefix=SIM-PLUSH-CORE units=11 materials=8 products=4 warehouses=4 processes=9 bom_headers=2\n',
+          'core demo seed completed prefix=YS6 units=11 materials=0 products=0 warehouses=4 processes=0 bom_headers=0\n' +
+          'simulated_only=true real_customer_import=false no_direct_fact_posting=true\n' +
+          'references_only=false scenario_references=true exact_allowlist=true materials=0 products=0 processes=0 bom_headers=0\n',
         stderr: '',
       }
     }
@@ -231,7 +233,7 @@ test('fixed profile commands cannot receive browser shell, path, DSN, or API ori
     args: ['run', './cmd/dburl', '-conf', './configs/dev/config.yaml'],
     options: { cwd: '/repo/server' },
   })
-  const core = coreDemoExecutionCommands(root)
+  const core = coreDemoExecutionCommands(root, 'plush_erp')
   assert.deepEqual(
     core.map(({ key, command, args }) => ({ key, command, args })),
     [
@@ -243,9 +245,20 @@ test('fixed profile commands cannot receive browser shell, path, DSN, or API ori
       {
         key: 'core-seed',
         command: 'bash',
-        args: ['/repo/scripts/seed-core-demo-data.sh'],
+        args: [
+          '/repo/scripts/seed-core-demo-data.sh',
+          '--scenario-references',
+          '--expected-database',
+          'plush_erp',
+          '--confirm',
+          'SEED_SCENARIO_DEMO_CORE_REFERENCES:scenario-demo:plush_erp:2026.08.15-v6:20260815-V6',
+        ],
       },
     ]
+  )
+  assert.throws(
+    () => coreDemoExecutionCommands(root, 'plush_erp_prod'),
+    /registered development target/u
   )
   assert.deepEqual(coreDemoPreflightCommand(root), {
     command: process.execPath,
@@ -371,11 +384,11 @@ test('core demo prepares an immutable plan, reuses idempotency, executes asynchr
     roleAccounts: 10,
     core: {
       units: 11,
-      materials: 8,
-      products: 4,
+      materials: 0,
+      products: 0,
       warehouses: 4,
-      processes: 9,
-      bomHeaders: 2,
+      processes: 0,
+      bomHeaders: 0,
     },
     stableUpsert: true,
     cleanupSupported: false,
@@ -388,9 +401,7 @@ test('core demo prepares an immutable plan, reuses idempotency, executes asynchr
   assert.deepEqual(
     calls
       .filter(({ command }) => command !== 'go')
-      .map(({ command, args }) =>
-        path.basename(command === process.execPath ? args[0] : args.at(-1))
-      ),
+      .map(({ args }) => path.basename(args[0])),
     [
       'local-runtime-preflight.mjs',
       'local-runtime-preflight.mjs',
@@ -1342,7 +1353,7 @@ test('core demo records partial completion when a later fixed seed step fails', 
     projectRoot: fixture.root,
     operationStore: fixture.store,
     commandRunner: async (command, args, options) => {
-      if (args.at(-1)?.endsWith('seed-core-demo-data.sh')) {
+      if (args.some((arg) => arg.endsWith('seed-core-demo-data.sh'))) {
         throw new Error('core reference write failed')
       }
       return baseRunner(command, args, options)

@@ -66,7 +66,7 @@ const OPERATION_PATH_PATTERN = new RegExp(
 )
 const REGISTERED_DEVELOPMENT_HOST = '192.168.0.106'
 const REGISTERED_DEVELOPMENT_PORT = 5432
-const CORE_DEMO_PREFIX = 'SIM-PLUSH-CORE'
+const CORE_DEMO_DATABASES = new Set(['plush_erp', 'plush_erp_simon_dev'])
 const SCENARIO_DEMO_DATA_VERSION = CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION
 const SCENARIO_DEMO_RUN_ID = CURRENT_MANUAL_ACCEPTANCE_RUN_ID
 const SCENARIO_DEMO_CATALOG_TARGET_COUNT = 51
@@ -344,8 +344,19 @@ export function coreDemoTargetCommand(projectRoot) {
   })
 }
 
-export function coreDemoExecutionCommands(projectRoot) {
+export function coreDemoExecutionCommands(projectRoot, databaseName) {
   const root = path.resolve(projectRoot)
+  const database = String(databaseName || '').trim()
+  if (!CORE_DEMO_DATABASES.has(database)) {
+    throw new Error('core demo database is not a registered development target')
+  }
+  const confirmation = [
+    'SEED_SCENARIO_DEMO_CORE_REFERENCES',
+    'scenario-demo',
+    database,
+    MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
+    MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
+  ].join(':')
   return Object.freeze([
     Object.freeze({
       key: 'role-seed',
@@ -360,6 +371,11 @@ export function coreDemoExecutionCommands(projectRoot) {
       command: 'bash',
       args: Object.freeze([
         path.join(root, 'scripts', 'seed-core-demo-data.sh'),
+        '--scenario-references',
+        '--expected-database',
+        database,
+        '--confirm',
+        confirmation,
       ]),
       options: Object.freeze({ cwd: root }),
     }),
@@ -520,17 +536,28 @@ function parseRoleSeedReadback(stdout) {
 }
 
 function parseCoreSeedReadback(stdout) {
-  const match = String(stdout || '').match(
+  const output = String(stdout || '')
+  const match = output.match(
     /core demo seed completed prefix=(\S+) units=(\d+) materials=(\d+) products=(\d+) warehouses=(\d+) processes=(\d+) bom_headers=(\d+)\b/u
   )
-  if (!match || match[1] !== CORE_DEMO_PREFIX) {
+  if (!match || match[1] !== MANUAL_ACCEPTANCE_CORE_CONTRACT.visiblePrefix) {
     throw new Error('core seed readback contract did not match')
   }
   const values = match.slice(2).map(Number)
   if (
     values.some((value) => !Number.isSafeInteger(value) || value < 0) ||
     values[0] !== MANUAL_ACCEPTANCE_CORE_CONTRACT.units.length ||
-    values[3] !== MANUAL_ACCEPTANCE_CORE_CONTRACT.warehouses.length
+    values[3] !== MANUAL_ACCEPTANCE_CORE_CONTRACT.warehouses.length ||
+    values[1] !== 0 ||
+    values[2] !== 0 ||
+    values[4] !== 0 ||
+    values[5] !== 0 ||
+    !/simulated_only=true real_customer_import=false no_direct_fact_posting=true/u.test(
+      output
+    ) ||
+    !/references_only=false scenario_references=true exact_allowlist=true materials=0 products=0 processes=0 bom_headers=0/u.test(
+      output
+    )
   ) {
     throw new Error('core seed readback counts are invalid')
   }
@@ -1588,7 +1615,10 @@ export function createDevDataPreparationService({
   async function runCoreDemo(operation) {
     const outputs = new Map()
     const completed = []
-    for (const command of coreDemoExecutionCommands(root)) {
+    for (const command of coreDemoExecutionCommands(
+      root,
+      operation.targetSummary.databaseName
+    )) {
       try {
         const result = await commandRunner(command.command, command.args, {
           ...command.options,
