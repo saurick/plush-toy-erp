@@ -7,6 +7,8 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import {
+  CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+  CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
   assertManualAcceptanceCapabilitiesPolicy,
   assertManualAcceptanceMutationTarget,
   assertManualAcceptanceRuntimeIdentityPrecondition,
@@ -73,6 +75,20 @@ export const DEFAULT_SOURCE_DATA_SCALE = Object.freeze({
 });
 const ROUTED_PRODUCTION_SAMPLE_OFFSETS = Object.freeze([3, 4]);
 const ROUTED_PRODUCTION_PLANNED_QUANTITY = 3;
+const REGISTERED_PREVIOUS_ROUTE_PREFIX = "YS5";
+const CURRENT_ROUTE_PREFIX = manualAcceptanceVisibleSourcePrefix(
+  CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+);
+const PROCESS_ROUTE_FIELDS = Object.freeze([
+  "code",
+  "name",
+  "category",
+  "outsourcing_enabled",
+  "inhouse_enabled",
+  "quality_required",
+  "sort_order",
+  "note",
+]);
 export const SALES_ORDER_ACCEPTANCE_REPLAY_STATUSES = Object.freeze([
   Object.freeze(["DRAFT"]),
   Object.freeze(["DRAFT", "SUBMITTED"]),
@@ -878,18 +894,18 @@ function buildUnitUsage(records) {
     add(record.unitKey, "masterData");
     record.skus.forEach(() => add(record.unitKey, "masterData"));
   });
-  records.salesOrders.flatMap((record) => record.items).forEach((item) =>
-    add(item.unitKey, "salesOrderLines"),
-  );
-  records.purchaseOrders.flatMap((record) => record.items).forEach((item) =>
-    add(item.unitKey, "purchaseOrderLines"),
-  );
-  records.outsourcingOrders.flatMap((record) => record.items).forEach((item) =>
-    add(item.unitKey, "outsourcingOrderLines"),
-  );
-  records.bomVersions.flatMap((record) => record.items).forEach((item) =>
-    add(item.unitKey, "bomItems"),
-  );
+  records.salesOrders
+    .flatMap((record) => record.items)
+    .forEach((item) => add(item.unitKey, "salesOrderLines"));
+  records.purchaseOrders
+    .flatMap((record) => record.items)
+    .forEach((item) => add(item.unitKey, "purchaseOrderLines"));
+  records.outsourcingOrders
+    .flatMap((record) => record.items)
+    .forEach((item) => add(item.unitKey, "outsourcingOrderLines"));
+  records.bomVersions
+    .flatMap((record) => record.items)
+    .forEach((item) => add(item.unitKey, "bomItems"));
   const entries = Object.values(usage);
   const missing = entries.filter((item) => item.businessReferences === 0);
   if (missing.length > 0) {
@@ -1418,6 +1434,17 @@ function mapBy(items, key) {
   return new Map((items || []).map((item) => [item?.[key], item]));
 }
 
+function registeredPreviousRouteCode(currentCode) {
+  const code = String(currentCode || "");
+  if (!code.startsWith(`${CURRENT_ROUTE_PREFIX}-`)) {
+    throw new CliError(
+      `current route process ${code || "unknown"} is outside the registered ${CURRENT_ROUTE_PREFIX} contract`,
+      2,
+    );
+  }
+  return `${REGISTERED_PREVIOUS_ROUTE_PREFIX}${code.slice(CURRENT_ROUTE_PREFIX.length)}`;
+}
+
 function comparableDate(value) {
   if (value == null || value === "") return null;
   if (typeof value === "number") return value;
@@ -1480,6 +1507,324 @@ export function assertPersistedSourceRecord({
       );
     }
   }
+}
+
+function assertRegisteredPreviousRouteProcess(record, expected, operationCode) {
+  assertPersistedSourceRecord({
+    label: `registered previous route process ${record?.code || "unknown"}`,
+    expected: {
+      ...expected,
+      code: registeredPreviousRouteCode(expected.code),
+    },
+    actual: record,
+    fields: PROCESS_ROUTE_FIELDS,
+  });
+  const routeCode = record?.production_route_operation_code ?? null;
+  if (routeCode !== null && routeCode !== operationCode) {
+    throw new CliError(
+      `registered previous route process ${record.code} has unexpected route binding ${routeCode}`,
+      2,
+    );
+  }
+}
+
+async function listExactProcessCandidates({ plan, token, keyword, fetchImpl }) {
+  const data = await rpcCall({
+    backendURL: plan.backendURL,
+    domain: "masterdata",
+    method: "list_processes",
+    params: { keyword, active_only: false, limit: 200, offset: 0 },
+    token,
+    fetchImpl,
+  });
+  const items = data.processes;
+  if (
+    !Array.isArray(items) ||
+    !Number.isSafeInteger(data.total) ||
+    data.total !== items.length ||
+    data.total > 200
+  ) {
+    throw new CliError(
+      `process route upgrade query ${keyword} must return one complete bounded page`,
+      2,
+    );
+  }
+  return items;
+}
+
+function processMutationFromReadback(record, routeCode) {
+  return {
+    id: record.id,
+    code: record.code,
+    name: record.name,
+    category: record.category ?? null,
+    production_route_operation_code: routeCode,
+    outsourcing_enabled: record.outsourcing_enabled === true,
+    inhouse_enabled: record.inhouse_enabled === true,
+    quality_required: record.quality_required === true,
+    sort_order: record.sort_order,
+    note: record.note ?? null,
+  };
+}
+
+async function restorePreviousRouteProcess({
+  plan,
+  token,
+  record,
+  operationCode,
+  fetchImpl,
+}) {
+  const restored = await rpcCall({
+    backendURL: plan.backendURL,
+    domain: "masterdata",
+    method: "update_process",
+    params: processMutationFromReadback(record, operationCode),
+    token,
+    fetchImpl,
+  });
+  assertPersistedSourceRecord({
+    label: `restored previous route process ${record.code}`,
+    expected: {
+      ...record,
+      production_route_operation_code: operationCode,
+    },
+    actual: restored.process,
+    fields: [...PROCESS_ROUTE_FIELDS, "production_route_operation_code"],
+  });
+  if (record.is_active === true) {
+    const enabled = await rpcCall({
+      backendURL: plan.backendURL,
+      domain: "masterdata",
+      method: "set_process_active",
+      params: { id: record.id, active: true },
+      token,
+      fetchImpl,
+    });
+    if (enabled.process?.is_active !== true) {
+      throw new CliError(
+        `restored previous route process ${record.code} did not become active`,
+      );
+    }
+  }
+}
+
+export async function reconcileRegisteredPreviousRouteProcesses({
+  plan,
+  token,
+  fetchImpl = fetch,
+  report = { steps: [] },
+}) {
+  if (
+    plan?.dataVersion !== CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION ||
+    plan?.runId !== CURRENT_MANUAL_ACCEPTANCE_RUN_ID ||
+    plan?.prefix !== CURRENT_ROUTE_PREFIX
+  ) {
+    return [];
+  }
+  const expectedRoutes = (plan.records?.processes || []).filter(
+    (record) => record.production_route_operation_code,
+  );
+  if (expectedRoutes.length !== 4) {
+    throw new CliError(
+      "current route upgrade requires exactly four registered route processes",
+      2,
+    );
+  }
+
+  const previousRecords = await listExactProcessCandidates({
+    plan,
+    token,
+    keyword: `${REGISTERED_PREVIOUS_ROUTE_PREFIX}-GX-`,
+    fetchImpl,
+  });
+  const previousByCode = mapBy(
+    previousRecords.filter((record) =>
+      expectedRoutes.some(
+        (expected) =>
+          registeredPreviousRouteCode(expected.code) === record.code,
+      ),
+    ),
+    "code",
+  );
+  const preflight = [];
+  for (const expected of expectedRoutes) {
+    const operationCode = expected.production_route_operation_code;
+    const previousCode = registeredPreviousRouteCode(expected.code);
+    const previous = previousByCode.get(previousCode);
+    if (previous) {
+      assertRegisteredPreviousRouteProcess(previous, expected, operationCode);
+    }
+    const candidates = await listExactProcessCandidates({
+      plan,
+      token,
+      keyword: operationCode,
+      fetchImpl,
+    });
+    const holders = candidates.filter(
+      (record) => record.production_route_operation_code === operationCode,
+    );
+    if (holders.length > 1) {
+      throw new CliError(
+        `route operation ${operationCode} has multiple process holders`,
+        2,
+      );
+    }
+    const holder = holders[0];
+    if (
+      holder &&
+      holder.code !== expected.code &&
+      holder.code !== previousCode
+    ) {
+      throw new CliError(
+        `route operation ${operationCode} is owned by unregistered process ${holder.code}`,
+        2,
+      );
+    }
+    if (holder?.code === previousCode && !previous) {
+      throw new CliError(
+        `registered previous route process ${previousCode} was not returned by its exact batch query`,
+        2,
+      );
+    }
+    if (holder?.code === expected.code) {
+      assertPersistedSourceRecord({
+        label: `current route process ${expected.code}`,
+        expected,
+        actual: holder,
+        fields: [...PROCESS_ROUTE_FIELDS, "production_route_operation_code"],
+      });
+    }
+    preflight.push({ expected, operationCode, previous, holder });
+  }
+
+  const migrated = [];
+  for (const item of preflight) {
+    const { expected, operationCode, previous, holder } = item;
+    if (holder?.code === expected.code) {
+      if (holder.is_active !== true) {
+        const enabled = await rpcCall({
+          backendURL: plan.backendURL,
+          domain: "masterdata",
+          method: "set_process_active",
+          params: { id: holder.id, active: true },
+          token,
+          fetchImpl,
+        });
+        if (enabled.process?.is_active !== true) {
+          throw new CliError(
+            `current route process ${holder.code} did not become active`,
+          );
+        }
+      }
+      if (previous?.is_active === true) {
+        const disabled = await rpcCall({
+          backendURL: plan.backendURL,
+          domain: "masterdata",
+          method: "set_process_active",
+          params: { id: previous.id, active: false },
+          token,
+          fetchImpl,
+        });
+        if (disabled.process?.is_active !== false) {
+          throw new CliError(
+            `registered previous route process ${previous.code} did not become inactive`,
+          );
+        }
+      }
+      continue;
+    }
+    if (!previous) continue;
+
+    const { isActive: _isActive, ...createParams } = expected;
+    const mustRestorePreviousRoute =
+      previous.production_route_operation_code === operationCode;
+    let created;
+    try {
+      if (mustRestorePreviousRoute) {
+        const updated = await rpcCall({
+          backendURL: plan.backendURL,
+          domain: "masterdata",
+          method: "update_process",
+          params: processMutationFromReadback(previous, null),
+          token,
+          fetchImpl,
+        });
+        assertPersistedSourceRecord({
+          label: `released previous route process ${previous.code}`,
+          expected: {
+            ...previous,
+            production_route_operation_code: null,
+          },
+          actual: updated.process,
+          fields: [...PROCESS_ROUTE_FIELDS, "production_route_operation_code"],
+        });
+      }
+      if (previous.is_active === true) {
+        const disabled = await rpcCall({
+          backendURL: plan.backendURL,
+          domain: "masterdata",
+          method: "set_process_active",
+          params: { id: previous.id, active: false },
+          token,
+          fetchImpl,
+        });
+        if (disabled.process?.is_active !== false) {
+          throw new CliError(
+            `registered previous route process ${previous.code} did not become inactive`,
+          );
+        }
+      }
+      created = await rpcCall({
+        backendURL: plan.backendURL,
+        domain: "masterdata",
+        method: "create_process",
+        params: createParams,
+        token,
+        fetchImpl,
+      });
+    } catch (error) {
+      if (mustRestorePreviousRoute) {
+        try {
+          await restorePreviousRouteProcess({
+            plan,
+            token,
+            record: previous,
+            operationCode,
+            fetchImpl,
+          });
+        } catch (restoreError) {
+          throw new CliError(
+            `route upgrade failed for ${expected.code}; previous binding restore also failed: ${restoreError?.message || restoreError}`,
+          );
+        }
+      }
+      throw error;
+    }
+    assertPersistedSourceRecord({
+      label: `process ${expected.code}`,
+      expected,
+      actual: created.process,
+      fields: [...PROCESS_ROUTE_FIELDS, "production_route_operation_code"],
+    });
+    report.steps.push({
+      target: "process_route_upgrade",
+      key: `${previous.code}->${expected.code}`,
+      action: "retire_and_replace",
+      id: previous.id,
+    });
+    report.steps.push({
+      target: "process",
+      key: expected.code,
+      action: "create",
+      id: created.process?.id,
+    });
+    migrated.push({
+      operationCode,
+      previousCode: previous.code,
+      currentCode: expected.code,
+    });
+  }
+  return migrated;
 }
 
 function assertPersistedContacts(label, expected, actual) {
@@ -1895,6 +2240,12 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
     }
   }
 
+  await reconcileRegisteredPreviousRouteProcesses({
+    plan,
+    token: tokens.engineering,
+    fetchImpl,
+    report,
+  });
   const processes = mapBy(
     await listAll({
       plan,
@@ -4507,11 +4858,7 @@ export async function verifyManualAcceptanceSourceData(
       const unitIdsByKey = Object.fromEntries(
         MANUAL_ACCEPTANCE_CORE_UNITS.map((definition) => [
           definition.key,
-          requireUniqueCoreRecord(
-            unitRows,
-            definition.code,
-            "core units",
-          ).id,
+          requireUniqueCoreRecord(unitRows, definition.code, "core units").id,
         ]),
       );
       for (const header of items) {

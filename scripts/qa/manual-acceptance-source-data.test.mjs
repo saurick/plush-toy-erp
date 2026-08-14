@@ -20,6 +20,7 @@ import {
   planBOMItemReconciliation,
   parseManualAcceptanceSourceDataArgs,
   requireLifecycleMutationStatus,
+  reconcileRegisteredPreviousRouteProcesses,
   runManualAcceptanceSourceDataCli,
   resolveManualAcceptanceCoreReferences,
   sanitizeManualAcceptanceRunId,
@@ -307,6 +308,265 @@ test("current V6 plans use short yoyoosun-style visible business numbers", () =>
     "YS6-WW-001",
   );
   assert.match(plan.records.bomVersions[0].version, /^YS6-BOM-/u);
+});
+
+test("V6 source apply retires and replaces only the exact registered V5 route holders", async () => {
+  const plan = buildManualAcceptanceSourceDataPlan({
+    dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+    runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+  });
+  const expectedRoutes = plan.records.processes.filter(
+    (item) => item.production_route_operation_code,
+  );
+  const previous = expectedRoutes.map((item, index) => ({
+    ...item,
+    id: index + 1,
+    code: item.code.replace(/^YS6-/u, "YS5-"),
+    is_active: true,
+  }));
+  const state = new Map(previous.map((item) => [item.code, { ...item }]));
+  const writes = [];
+  const fetchImpl = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    if (body.method === "list_processes") {
+      const keyword = body.params.keyword;
+      const processes =
+        keyword === "YS5-GX-"
+          ? [...state.values()].filter((item) => item.code.startsWith(keyword))
+          : [...state.values()].filter(
+              (item) => item.production_route_operation_code === keyword,
+            );
+      return ok({ processes, total: processes.length });
+    }
+    writes.push({ method: body.method, params: body.params });
+    if (body.method === "update_process") {
+      const current = state.get(body.params.code);
+      const updated = {
+        ...current,
+        ...body.params,
+        production_route_operation_code:
+          body.params.production_route_operation_code ?? null,
+      };
+      state.set(updated.code, updated);
+      return ok({ process: updated });
+    }
+    if (body.method === "set_process_active") {
+      const current = [...state.values()].find(
+        (item) => item.id === body.params.id,
+      );
+      current.is_active = body.params.active;
+      return ok({ process: current });
+    }
+    if (body.method === "create_process") {
+      const created = {
+        ...body.params,
+        id: state.size + 1,
+        is_active: true,
+      };
+      state.set(created.code, created);
+      return ok({ process: created });
+    }
+    throw new Error(`unexpected method ${body.method}`);
+  };
+  const report = { steps: [] };
+
+  const migrated = await reconcileRegisteredPreviousRouteProcesses({
+    plan,
+    token: "token-admin",
+    fetchImpl,
+    report,
+  });
+
+  assert.equal(migrated.length, 4);
+  assert.equal(
+    writes.filter((item) => item.method === "update_process").length,
+    4,
+  );
+  assert.equal(
+    writes.filter((item) => item.method === "set_process_active").length,
+    4,
+  );
+  assert.equal(
+    writes.filter((item) => item.method === "create_process").length,
+    4,
+  );
+  assert.ok(
+    previous.every((item) => {
+      const readback = state.get(item.code);
+      return (
+        readback.is_active === false &&
+        readback.production_route_operation_code === null
+      );
+    }),
+  );
+  assert.deepEqual(
+    expectedRoutes.map((item) => [
+      item.code,
+      state.get(item.code)?.production_route_operation_code,
+    ]),
+    expectedRoutes.map((item) => [
+      item.code,
+      item.production_route_operation_code,
+    ]),
+  );
+  assert.equal(
+    report.steps.filter((item) => item.target === "process_route_upgrade")
+      .length,
+    4,
+  );
+});
+
+test("V6 route upgrade blocks every unregistered holder before mutations", async () => {
+  const plan = buildManualAcceptanceSourceDataPlan({
+    dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+    runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+  });
+  const writes = [];
+  const fetchImpl = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    if (body.method !== "list_processes") {
+      writes.push(body.method);
+      throw new Error("mutation must not run");
+    }
+    if (body.params.keyword === "FABRIC_PROCESSING") {
+      return ok({
+        processes: [
+          {
+            id: 99,
+            code: "FACTORY-PROC-CUT",
+            production_route_operation_code: "FABRIC_PROCESSING",
+          },
+        ],
+        total: 1,
+      });
+    }
+    return ok({ processes: [], total: 0 });
+  };
+
+  await assert.rejects(
+    () =>
+      reconcileRegisteredPreviousRouteProcesses({
+        plan,
+        token: "token-admin",
+        fetchImpl,
+      }),
+    /owned by unregistered process FACTORY-PROC-CUT/u,
+  );
+  assert.deepEqual(writes, []);
+});
+
+test("V6 route upgrade resumes after an already released predecessor without rewriting it", async () => {
+  const plan = buildManualAcceptanceSourceDataPlan({
+    dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+    runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+  });
+  const expected = plan.records.processes.find(
+    (item) => item.production_route_operation_code === "FABRIC_PROCESSING",
+  );
+  const previous = {
+    ...expected,
+    id: 1,
+    code: expected.code.replace(/^YS6-/u, "YS5-"),
+    production_route_operation_code: null,
+    is_active: false,
+  };
+  const writes = [];
+  const fetchImpl = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    if (body.method === "list_processes") {
+      const processes = body.params.keyword === "YS5-GX-" ? [previous] : [];
+      return ok({ processes, total: processes.length });
+    }
+    writes.push(body.method);
+    if (body.method === "create_process") {
+      return ok({ process: { ...body.params, id: 2, is_active: true } });
+    }
+    throw new Error(`unexpected method ${body.method}`);
+  };
+
+  const migrated = await reconcileRegisteredPreviousRouteProcesses({
+    plan,
+    token: "token-admin",
+    fetchImpl,
+  });
+  assert.deepEqual(writes, ["create_process"]);
+  assert.deepEqual(migrated, [
+    {
+      operationCode: "FABRIC_PROCESSING",
+      previousCode: "YS5-GX-001",
+      currentCode: "YS6-GX-001",
+    },
+  ]);
+});
+
+test("V6 route upgrade restores the previous binding when replacement creation fails", async () => {
+  const plan = buildManualAcceptanceSourceDataPlan({
+    dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+    runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+  });
+  const expected = plan.records.processes.find(
+    (item) => item.production_route_operation_code === "FABRIC_PROCESSING",
+  );
+  const previous = {
+    ...expected,
+    id: 1,
+    code: expected.code.replace(/^YS6-/u, "YS5-"),
+    is_active: true,
+  };
+  const state = { ...previous };
+  const writes = [];
+  const fetchImpl = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    if (body.method === "list_processes") {
+      const processes =
+        body.params.keyword === "YS5-GX-" ||
+        body.params.keyword === "FABRIC_PROCESSING"
+          ? [{ ...state }]
+          : [];
+      return ok({ processes, total: processes.length });
+    }
+    writes.push(body.method);
+    if (body.method === "update_process") {
+      Object.assign(state, body.params, {
+        production_route_operation_code:
+          body.params.production_route_operation_code ?? null,
+      });
+      return ok({ process: { ...state } });
+    }
+    if (body.method === "set_process_active") {
+      state.is_active = body.params.active;
+      return ok({ process: { ...state } });
+    }
+    if (body.method === "create_process") {
+      return {
+        ok: true,
+        redirected: false,
+        json: async () => ({
+          result: { code: 50000, message: "simulated create failure" },
+        }),
+      };
+    }
+    throw new Error(`unexpected method ${body.method}`);
+  };
+
+  await assert.rejects(
+    () =>
+      reconcileRegisteredPreviousRouteProcesses({
+        plan,
+        token: "token-admin",
+        fetchImpl,
+      }),
+    /create_process code=50000/u,
+  );
+  assert.deepEqual(writes, [
+    "update_process",
+    "set_process_active",
+    "create_process",
+    "update_process",
+    "set_process_active",
+  ]);
+  assert.equal(state.production_route_operation_code, "FABRIC_PROCESSING");
+  assert.equal(state.is_active, true);
 });
 
 test("outsourcing source plans satisfy the current contract readiness boundary", () => {
