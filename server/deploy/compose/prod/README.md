@@ -331,7 +331,7 @@ sh migrate_online.sh
 MIGRATION_MAINTENANCE_CONFIRMED=1 sh migrate_online.sh --apply
 ```
 
-133 V5 不使用上面的 canonical 默认值。它只接受当前 release 内的受控 override、release 外的精确 `0600` runtime env、仓库 migration 目录、目标根目录固定的 `/home/simon/plush-toy-erp-v5/tools/atlas/v0.38.0/atlas`、`psql` 和仓库 populated-upgrade preflight；该 Atlas 必须由目标用户持有、不是符号链接、可执行且读回精确 `v0.38.0`，并在 controller 前通过目标预检。宿主环境或 env 文件中出现 `MIG_DIR / ATLAS_BIN / PSQL_BIN / POPULATED_UPGRADE_PREFLIGHT` 会在任何 Compose、psql 或 Atlas 调用前阻断。普通部署仍使用 `/usr/local/bin/atlas`；133 不覆盖或降级系统 Atlas，也不使用 Atlas 容器。精确序列如下：
+133 V5 不使用上面的 canonical 默认值。它只接受当前 release 内的受控 override、release 外的精确 `0600` runtime env、仓库 migration 目录、目标根目录固定的 `/home/simon/plush-toy-erp-v5/tools/atlas/v1.2.0/atlas`、`psql` 和仓库 populated-upgrade preflight；该 Atlas 必须由目标用户持有、不是符号链接、可执行且读回精确 `v1.2.0`，并在 controller 前通过目标预检。宿主环境或 env 文件中出现 `MIG_DIR / ATLAS_BIN / PSQL_BIN / POPULATED_UPGRADE_PREFLIGHT` 会在任何 Compose、psql 或 Atlas 调用前阻断。普通部署仍使用固定 `v1.2.0` 的 `/usr/local/bin/atlas`；133 不覆盖或降级系统 Atlas，也不使用 Atlas 容器。精确序列如下：
 
 ```bash
 cd /home/simon/plush-toy-erp-v5/current/server/deploy/compose/prod

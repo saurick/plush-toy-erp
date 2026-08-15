@@ -229,7 +229,7 @@ test("release pins every action and never passes a token to browser or arguments
 test("strict keeps pinned PostgreSQL, Atlas, tools and Chromium sandbox", () => {
   assert.equal(strict["runs-on"], "ubuntu-24.04");
   assert.match(SOURCE, /image: postgres:18\.1/u);
-  assert.match(SOURCE, /version: v0\.38\.0/u);
+  assert.match(SOURCE, /version: v1\.2\.0/u);
   assert.match(strictRuns, /pnpm@10\.13\.1/u);
   assert.match(strictRuns, /gitleaks_8\.30\.1_linux_x64\.tar\.gz/u);
   assert.match(

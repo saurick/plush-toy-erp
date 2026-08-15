@@ -2,7 +2,7 @@ GOHOSTOS:=$(shell go env GOHOSTOS)
 # ⚠️ 注意：数据库迁移必须使用 `make data` 生成，严禁手动修改 SQL 文件！详见 internal/data/AI_DB_WORKFLOW.md
 GOPATH:=$(shell go env GOPATH)
 ATLAS_BIN ?= atlas
-ATLAS_VERSION ?= v0.38.0
+ATLAS_VERSION ?= v1.2.0
 
 # ========================
 # Git 信息（兼容在子目录执行 & 没有提交的情况）

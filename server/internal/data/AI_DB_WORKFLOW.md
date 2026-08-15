@@ -140,7 +140,7 @@ CHECK/UNIQUE/FK 约束。
 ## 🛠 常见问题处理
 
 *   **Checksum Mismatch (校验和不匹配)**: 先用 Git 恢复被改写的已有 migration SQL；禁止重新 hash 掩盖历史漂移。`make migrate_hash` 只允许在新增、尚未跟踪的 custom migration 后更新 `atlas.sum`，并会拒绝任何已跟踪 SQL diff。
-*   **Atlas 版本不一致**: 本地、CI 和发布统一使用 `v0.38.0`。`make data` / `make migrate_hash` 只检查版本，不再联网自动安装或静默替换 Atlas。
+*   **Atlas 版本不一致**: 本地、CI 和发布统一使用 `v1.2.0`。`make data` / `make migrate_hash` 只检查版本，不再联网自动安装或静默替换 Atlas。
 *   **开发库只是落后于仓库已有 migration**: 登记共享开发库执行 `make migrate`，非交互环境执行同一次 operation 的 `migrate_prepare → migrate_execute`；不要因为“缺字段”就重新 `make data`，也不要跳版本。
 *   **Drift Detected / Duplicate Column (字段已存在)**: 这通常表示数据库曾被手动改过，或当前库状态已经偏离迁移历史；不要把它和“开发库单纯还没 apply 最新 migration”混为一谈。先做结构和 revision 对账。通用 `make migrate_set` 已封闭；极少数“SQL 已完整执行但 revision 回执缺失”的异常只能另建一次性专项修复，绑定备份、schema 指纹、checksum、停写确认和修复后读回，不能用于跳过失败的数据门禁。
 

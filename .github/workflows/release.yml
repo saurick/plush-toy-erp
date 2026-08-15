@@ -219,7 +219,7 @@ jobs:
       - name: Set up pinned Atlas
         uses: ariga/setup-atlas@2f3c785c89a15e1c0d07bcae3900fb5feb969eea
         with:
-          version: v0.38.0
+          version: v1.2.0
       - name: Restore pinned strict-gate Go tools
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:

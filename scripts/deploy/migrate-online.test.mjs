@@ -86,7 +86,7 @@ function createFixture({ useSystemFlock = false } = {}) {
   const productionMigrateDirContract =
     "TRIAL_MIG_DIR=$SERVER_ROOT/internal/data/model/migrate";
   const productionAtlasContract =
-    "TRIAL_ATLAS_BIN=/home/simon/plush-toy-erp-v5/tools/atlas/v0.38.0/atlas";
+    "TRIAL_ATLAS_BIN=/home/simon/plush-toy-erp-v5/tools/atlas/v1.2.0/atlas";
   const productionPreflightContract =
     "TRIAL_POPULATED_UPGRADE_PREFLIGHT=$SERVER_ROOT/../scripts/qa/populated-upgrade-preflight.sh";
   let fixtureMigrateSource = fs.readFileSync(migrateScript, "utf8");
@@ -192,7 +192,7 @@ exit 1
     atlasBin,
     `#!/bin/sh
 if [ "$1" = "version" ]; then
-  printf '%s\n' 'atlas version v0.38.0'
+  printf '%s\n' 'atlas version v1.2.0'
   exit 0
 fi
 case "$*" in
@@ -521,7 +521,7 @@ test("migrate_online canonical 模式保持单 compose 文件且不注入 V5 pro
   }
 });
 
-test("migrate_online 接受 Atlas v0.38.0 的全新数据库 Applied null 状态", () => {
+test("migrate_online 接受 Atlas v1.2.0 的全新数据库 Applied null 状态", () => {
   const fixture = createFixture();
   try {
     const result = runMigration(fixture, ["--status-only"], {

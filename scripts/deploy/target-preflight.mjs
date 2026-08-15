@@ -93,8 +93,8 @@ migration_lock=/home/simon/plush-toy-erp-v5/run/atlas-migrate.lock
 minimum_available_bytes=32212254720
 public_endpoint=https://admin.yoyoosun.net
 public_network=plush-toy-erp-v5_default
-trial_atlas_bin=/home/simon/plush-toy-erp-v5/tools/atlas/v0.38.0/atlas
-trial_atlas_required_version=v0.38.0
+trial_atlas_bin=/home/simon/plush-toy-erp-v5/tools/atlas/v1.2.0/atlas
+trial_atlas_required_version=v1.2.0
 
 status=passed
 blockers=()

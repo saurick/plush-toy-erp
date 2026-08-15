@@ -175,7 +175,7 @@ test("CI pins actions, toolchains, database and Chromium sandbox", () => {
   assert.match(qualityRuns, /pnpm@10\.13\.1/u);
   assert.match(qualityRuns, /govulncheck@v1\.6\.0/u);
   assert.match(qualityRuns, /shfmt@v3\.13\.1/u);
-  assert.match(source, /version: v0\.38\.0/u);
+  assert.match(source, /version: v1\.2\.0/u);
   assert.match(qualityRuns, /docker run --detach --rm[\s\S]*postgres:18\.1/u);
   assert.match(qualityRuns, /playwright install --with-deps chromium/u);
   assert.match(qualityRuns, /sudo install -o root -g root -m 4755/u);
