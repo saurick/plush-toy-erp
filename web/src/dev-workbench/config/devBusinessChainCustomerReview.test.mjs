@@ -298,6 +298,12 @@ test('customer review does not hardcode a customer and fails closed for an unkno
   assert.match(pageSource, /disabled=\{!customerReviewReady\}/u)
   assert.match(pageSource, /通用业务链与运行观察仍可使用/u)
   assert.match(pageSource, /customerOverlay/u)
+  assert.match(pageSource, /customerReviewPrintSnapshot/u)
+  assert.match(
+    pageSource,
+    /<DevBusinessChainCustomerReviewPrint review=\{customerReviewPrint\} \/>/u,
+    '打印专用 Mermaid 必须在用户请求导出后才挂载，不能在隐藏 DOM 中抢先渲染'
+  )
   assert.doesNotMatch(moduleSource, /EXCEPTION_PATTERN|EXCEPTION_GROUPS/u)
   assert.match(
     componentSource,

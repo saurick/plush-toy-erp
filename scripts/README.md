@@ -866,7 +866,7 @@ node --test /Users/simon/projects/plush-toy-erp/web/src/erp/utils/adminProfileSy
 node --test /Users/simon/projects/plush-toy-erp/scripts/qa/formal-frontend-customer-config-boundary.test.mjs
 
 cd /Users/simon/projects/plush-toy-erp/web
-STYLE_L1_SCENARIOS=erp-effective-session-super-admin-product-core,erp-effective-session-direct-url-local-dev-diagnostic,erp-effective-session-configured-customer-sync-failure-blocked,erp-effective-session-empty-pages-local-dev-diagnostic,erp-no-permission-menu-falls-back-help-center,erp-effective-session-action-projection-business-pages pnpm style:l1
+STYLE_L1_SCENARIOS=erp-effective-session-super-admin-product-core,erp-effective-session-direct-url-local-dev-diagnostic,erp-effective-session-configured-customer-sync-failure-blocked,erp-effective-session-empty-pages-local-dev-diagnostic,erp-no-permission-menu-falls-back-history-center,erp-effective-session-action-projection-business-pages pnpm style:l1
 ```
 
 `adminProfileSync` 测试负责证明正式普通账号按 RBAC 菜单与 active revision 页面清单交集收窄，隐藏 URL 需要跳转，active revision 空页面清单不回退 RBAC-only，以及模块 disabled 后端投影隐藏业务页时正式账号需要跳转。`style:l1` 运行在前端 DEV 构建态，只证明本地开发诊断、super admin 产品核心看全、sync failure 诊断、无可见菜单空态，以及普通账号页面可见但 `effective_session.actions=[]` 时出货 / 质检 / 采购入库写按钮禁用的真实页面渲染；不要把本地 DEV 诊断场景当成正式客户放开证据，也不要把前端 helper 跳转或按钮禁用当成后端 RBAC / usecase 授权边界。

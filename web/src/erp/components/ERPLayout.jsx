@@ -743,7 +743,12 @@ export default function ERPLayout() {
   ])
 
   useEffect(() => {
-    if (customerRuntimeBootstrapPending || !currentPageShouldRedirect) {
+    if (
+      customerRuntimeBootstrapPending ||
+      (customerRuntimeUnavailable &&
+        currentPageRequiresConfiguredCustomerRuntime) ||
+      !currentPageShouldRedirect
+    ) {
       return
     }
     const fallbackPath = visibleSections[0]?.items[0]?.path || ''
@@ -753,6 +758,8 @@ export default function ERPLayout() {
   }, [
     currentPageShouldRedirect,
     customerRuntimeBootstrapPending,
+    customerRuntimeUnavailable,
+    currentPageRequiresConfiguredCustomerRuntime,
     location.pathname,
     navigate,
     visibleSections,

@@ -79,7 +79,7 @@ function OverviewContent({ overview }) {
         <h2>这份总览解决什么问题</h2>
         <p>{overview.purpose}</p>
       </section>
-      <ReviewDiagram diagram={overview.diagram} label="十二条业务链总览图" />
+      <ReviewDiagram diagram={overview.diagram} label="全部业务链总览图" />
       <section className="erp-dev-flow-customer-review__overview-index">
         <h2>四个业务区</h2>
         <table>

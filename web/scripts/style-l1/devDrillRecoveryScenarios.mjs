@@ -1,4 +1,12 @@
-import { installSummaryRoute } from './devVersionCenterScenarios.mjs'
+import {
+  installDataPreparationContractFailureRoute,
+  installSummaryRoute,
+} from './devVersionCenterScenarios.mjs'
+
+export async function installDrillRecoveryRoutes(page) {
+  await installDataPreparationContractFailureRoute(page)
+  await installSummaryRoute(page)
+}
 
 export function createDevDrillRecoveryScenarios({
   assert,
@@ -13,7 +21,7 @@ export function createDevDrillRecoveryScenarios({
       name: 'dev-drill-recovery-desktop-light',
       path: '/__dev/drill-recovery',
       viewport: { width: 1440, height: 900 },
-      beforeNavigate: async (page) => installSummaryRoute(page),
+      beforeNavigate: installDrillRecoveryRoutes,
       verify: async (page) => {
         await expectHeading(page, '演练与恢复中心')
         assert.equal(
@@ -24,6 +32,9 @@ export function createDevDrillRecoveryScenarios({
           '交付运行菜单必须明确标记当前演练与恢复入口'
         )
         await page.getByText('客户试用环境', { exact: true }).waitFor()
+        await page
+          .locator('.erp-dev-environment-evidence[aria-busy="false"]')
+          .waitFor({ timeout: 20_000 })
         assert.equal(
           await page.locator('.erp-dev-recovery-row').count(),
           6,
@@ -51,11 +62,28 @@ export function createDevDrillRecoveryScenarios({
             '.erp-dev-recovery-shell > .ant-card, .erp-dev-recovery-support > .ant-card'
           ).length,
           documentHeight: document.documentElement.scrollHeight,
+          environmentEvidenceHeight: Math.round(
+            document
+              .querySelector('.erp-dev-environment-evidence')
+              ?.getBoundingClientRect().height || 0
+          ),
+          environmentCardCount: document.querySelectorAll(
+            '.erp-dev-environment-card'
+          ).length,
         }))
         assert(defaultMetrics.cardCount <= 4, '主页面不得退化为演练卡片墙')
+        assert.equal(defaultMetrics.environmentCardCount, 3)
         assert(
-          defaultMetrics.documentHeight < 1900,
-          `桌面首屏信息应保持紧凑，当前高度 ${defaultMetrics.documentHeight}px`
+          defaultMetrics.environmentEvidenceHeight > 0 &&
+            defaultMetrics.environmentEvidenceHeight < 500,
+          `桌面双环境事实应保持紧凑，当前高度 ${defaultMetrics.environmentEvidenceHeight}px`
+        )
+        const coreDocumentHeight =
+          defaultMetrics.documentHeight -
+          defaultMetrics.environmentEvidenceHeight
+        assert(
+          coreDocumentHeight < 1900,
+          `桌面演练核心信息应保持紧凑，当前总高度 ${defaultMetrics.documentHeight}px，核心内容 ${coreDocumentHeight}px，环境事实 ${defaultMetrics.environmentEvidenceHeight}px`
         )
         await assertNoHorizontalOverflow(
           page,
@@ -93,7 +121,7 @@ export function createDevDrillRecoveryScenarios({
       name: 'dev-drill-recovery-mobile-dark',
       path: '/__dev/drill-recovery',
       viewport: { width: 390, height: 844 },
-      beforeNavigate: async (page) => installSummaryRoute(page),
+      beforeNavigate: installDrillRecoveryRoutes,
       verify: async (page) => {
         await expectHeading(page, '演练与恢复中心')
         await clickERPThemeOption(page, '暗色')

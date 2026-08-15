@@ -1098,13 +1098,14 @@ export function createBusinessActionStabilityScenarios(deps) {
 
         await selectBusinessRow(page, 'QI-ACTION-DRAFT')
         assert.equal(
-          await actionBar
-            .locator(
-              '[data-business-action-key="outsourcing-disposition-view"]'
-            )
-            .count(),
-          0,
-          '来料质检不应显示委外处置查看入口'
+          await viewDisposition.count(),
+          1,
+          '只读委外查看权限应保持稳定入口'
+        )
+        assert.equal(
+          await viewDisposition.isDisabled(),
+          true,
+          '来料质检不能启用委外处置查看入口'
         )
 
         await selectBusinessRow(page, 'QI-ACTION-OUTSOURCING-REJECTED')
@@ -1149,14 +1150,18 @@ export function createBusinessActionStabilityScenarios(deps) {
       verify: async (page) => {
         await waitForBusinessPage(page, '采购订单')
         const purchaseEmpty = await captureDesktopActionLayout(page)
+        assert.deepEqual(purchaseEmpty.keys, [
+          'clear-selection',
+          'purchase-edit',
+          'related-records',
+          'generate-inbound',
+          'print-contract',
+        ])
         assert(
-          purchaseEmpty.buttons
-            .filter((button) => button.key !== 'lifecycle-more')
-            .every((button) => button.disabled) &&
-            purchaseEmpty.buttons.find(
-              (button) => button.key === 'lifecycle-more'
-            )?.disabled === false,
-          '采购订单未选择记录时，执行动作应置灰且更多操作仍可打开'
+          purchaseEmpty.buttons.every((button) => button.disabled),
+          `采购订单未选择记录时，客户配置允许的执行动作应全部置灰: ${JSON.stringify(
+            purchaseEmpty
+          )}`
         )
         await screenshot(
           page,
@@ -1182,12 +1187,10 @@ export function createBusinessActionStabilityScenarios(deps) {
             disabled: status !== 'APPROVED',
           })
           await assertDesktopActionState(page, assert, 'lifecycle-primary', {
-            visible: true,
-            disabled: status !== 'DRAFT',
+            visible: false,
           })
           await assertDesktopActionState(page, assert, 'lifecycle-more', {
-            visible: true,
-            disabled: false,
+            visible: false,
           })
           await screenshot(
             page,

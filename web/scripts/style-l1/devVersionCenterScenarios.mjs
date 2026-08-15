@@ -328,6 +328,18 @@ export async function installDeliverySummaryRoute(page, onRequest = () => {}) {
   return summary
 }
 
+export async function installDataPreparationContractFailureRoute(page) {
+  await page.route('**/__dev/api/data-preparation/summary', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        schemaVersion: 'plush.dev-data-preparation-summary/v1',
+      }),
+    })
+  })
+}
+
 export async function installSummaryRoute(page, onRequest = () => {}) {
   const summary = await installDeliverySummaryRoute(page, onRequest)
   const qualityGateSummary = createQualityGateStyleSummary('passed')
@@ -517,7 +529,15 @@ export function createDevVersionCenterScenarios({
           await desktopVersionTimes.first().getAttribute('datetime'),
           '2026-08-08T14:00:00.000Z'
         )
-        assert.equal(desktopSummaryRequests, 1)
+        await page
+          .locator('.erp-dev-environment-evidence[aria-busy="false"]')
+          .waitFor({ timeout: 20_000 })
+        const initialDesktopSummaryRequests = desktopSummaryRequests
+        assert.equal(
+          initialDesktopSummaryRequests,
+          3,
+          '初次加载应包含版本页一次读回与环境面板在 React 开发态的两次可取消读回'
+        )
 
         const desktopTakeoverButton = page.getByRole('button', {
           name: '人工接管说明',
@@ -600,7 +620,7 @@ export function createDevVersionCenterScenarios({
         await page
           .getByRole('heading', { name: 'CI/CD 效能' })
           .waitFor({ state: 'visible' })
-        assert.equal(desktopSummaryRequests, 1)
+        assert.equal(desktopSummaryRequests, initialDesktopSummaryRequests)
         assert.equal(await currentOperation.isVisible(), true)
         const pipeline = page.locator('.erp-dev-version-tab--pipeline')
         const fullTimingDetails = pipeline.locator(
@@ -723,7 +743,7 @@ export function createDevVersionCenterScenarios({
           ['2026-08-08T13:00:00.000Z', '2026-08-08T13:00:02.000Z']
         )
         assert.equal(await currentOperation.isVisible(), true)
-        assert.equal(desktopSummaryRequests, 1)
+        assert.equal(desktopSummaryRequests, initialDesktopSummaryRequests)
 
         await page.screenshot({
           path: path.join(
@@ -778,9 +798,12 @@ export function createDevVersionCenterScenarios({
         await page.reload({ waitUntil: 'domcontentloaded' })
         await waitForView(page, 'history')
         await history.waitFor({ state: 'visible' })
+        await page
+          .locator('.erp-dev-environment-evidence[aria-busy="false"]')
+          .waitFor({ timeout: 20_000 })
         assert.equal(await visibleTableRows(history).count(), 10)
         assert.equal(await currentOperation.isVisible(), true)
-        assert.equal(desktopSummaryRequests, 2)
+        assert.equal(desktopSummaryRequests, initialDesktopSummaryRequests * 2)
 
         await page.getByRole('tab', { name: '版本与部署' }).click()
         await waitForView(page, 'versions')
@@ -799,7 +822,7 @@ export function createDevVersionCenterScenarios({
           6,
           '版本翻页后也应逐行保留发布时间'
         )
-        assert.equal(desktopSummaryRequests, 2)
+        assert.equal(desktopSummaryRequests, initialDesktopSummaryRequests * 2)
 
         const metrics = await page.evaluate(() => {
           const workspace = document.querySelector('.erp-dev-version-workspace')
@@ -878,7 +901,14 @@ export function createDevVersionCenterScenarios({
           20,
           '移动端历史表格应保留每条操作的开始与完成时间'
         )
-        assert.equal(mobileSummaryRequests, 1)
+        await page
+          .locator('.erp-dev-environment-evidence[aria-busy="false"]')
+          .waitFor({ timeout: 20_000 })
+        assert.equal(
+          mobileSummaryRequests,
+          3,
+          '移动端初次加载应包含页面读回与环境面板的可取消读回'
+        )
 
         const mobileTakeoverButton = page.getByRole('button', {
           name: '人工接管说明',

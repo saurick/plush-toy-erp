@@ -3503,10 +3503,25 @@ export function createStyleL1Scenarios(deps) {
           ),
         })
 
+        const controlledSelectDropdown = async (select, label) => {
+          const listboxID = await select
+            .getByRole('combobox')
+            .getAttribute('aria-controls')
+          assert(listboxID, `${label}缺少受控下拉标识`)
+          const listbox = page.locator(`[id="${listboxID}"]`)
+          const dropdown = page
+            .locator('.ant-select-dropdown')
+            .filter({ has: listbox })
+          await dropdown.waitFor({ state: 'visible', timeout: 5000 })
+          return dropdown
+        }
+
         const roleSelect = modal.getByLabel('选择要查看的岗位').first()
         await roleSelect.locator('.ant-select-selector').click()
-        const roleDropdown = page.locator('.ant-select-dropdown:visible')
-        await roleDropdown.waitFor({ state: 'visible', timeout: 5000 })
+        const roleDropdown = await controlledSelectDropdown(
+          roleSelect,
+          '岗位选择'
+        )
         await roleDropdown
           .locator('.ant-select-item-option-content')
           .filter({ hasText: /^业务$/u })
@@ -3527,6 +3542,9 @@ export function createStyleL1Scenarios(deps) {
           .filter({ hasText: /^业务$/u })
           .waitFor({ state: 'visible', timeout: 5000 })
         await roleDropdown.waitFor({ state: 'hidden', timeout: 5000 })
+        await modal
+          .locator('.erp-permission-relationship__graph[aria-busy="false"]')
+          .waitFor({ state: 'visible', timeout: 15_000 })
         await modal
           .locator(
             '.erp-markdown-mermaid[data-mermaid-status="rendered"] .erp-markdown-mermaid__canvas > svg'
@@ -3553,12 +3571,16 @@ export function createStyleL1Scenarios(deps) {
           node.scrollIntoView({ block: 'center', inline: 'nearest' })
         )
         await moduleSelect.locator('.ant-select-selector').click()
-        const moduleDropdown = page.locator('.ant-select-dropdown:visible')
-        await moduleDropdown.waitFor({ state: 'visible', timeout: 5000 })
+        const moduleDropdown = await controlledSelectDropdown(
+          moduleSelect,
+          '功能模块选择'
+        )
         const moduleOptionContent = moduleDropdown
           .locator('.ant-select-item-option-content')
           .filter({ hasText: /^仓储$/u })
+          .first()
         await moduleOptionContent.waitFor({ state: 'visible', timeout: 5000 })
+        await moduleOptionContent.scrollIntoViewIfNeeded()
         const moduleLabels = await moduleDropdown
           .locator('.ant-select-item-option-content')
           .allTextContents()
@@ -3566,10 +3588,7 @@ export function createStyleL1Scenarios(deps) {
           moduleLabels.some((label) => label.trim() === '仓储'),
           `权限关系图功能范围缺少仓储: ${JSON.stringify(moduleLabels)}`
         )
-        const moduleOption = moduleDropdown
-          .locator('.ant-select-item-option')
-          .filter({ hasText: /^仓储$/u })
-        const moduleOptionBox = await moduleOption.boundingBox()
+        const moduleOptionBox = await moduleOptionContent.boundingBox()
         const moduleViewport = page.viewportSize()
         assert(
           moduleOptionBox &&
@@ -4192,15 +4211,12 @@ export function createStyleL1Scenarios(deps) {
     },
     {
       name: 'erp-effective-session-configured-customer-sync-failure-blocked',
-      path: '/erp/system/permissions',
+      path: '/erp/dashboard',
       auth: 'admin',
       adminProfile: {
         is_super_admin: false,
-        permissions: [
-          'system.permission.read',
-          'system.role.permission.manage',
-        ],
-        menus: [{ key: 'permission-center', path: '/erp/system/permissions' }],
+        permissions: ['erp.workbench.read', 'workflow.task.read'],
+        menus: [{ key: 'global-dashboard', path: '/erp/dashboard' }],
       },
       customerKey: 'yoyoosun',
       viewport: { width: 1440, height: 900 },
@@ -4316,7 +4332,7 @@ export function createStyleL1Scenarios(deps) {
       },
     },
     {
-      name: 'erp-no-permission-menu-falls-back-help-center',
+      name: 'erp-no-permission-menu-falls-back-history-center',
       path: '/erp/system/permissions',
       auth: 'admin',
       adminProfile: {
@@ -4334,10 +4350,11 @@ export function createStyleL1Scenarios(deps) {
         workPools: [],
         source: 'active_customer_config_revision',
       },
-      expectPath: '/erp/help-center',
+      expectPath: '/erp/history',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectText(page, '岗位使用帮助')
+        await expectText(page, '历史记录中心')
+        await expectText(page, '当前账号没有可查询的历史记录类型')
         await assertTextAbsent(page, '当前客户有效配置')
         await assertTextAbsent(page, '权限中心')
         await assertTextAbsent(page, '管理员列表')
@@ -4565,7 +4582,15 @@ export function createStyleL1Scenarios(deps) {
       },
       verify: async (page) => {
         await expectHeading(page, '生产异常处置')
-        await expectText(page, '待办任务')
+        const taskTab = page.getByRole('tab', { name: '待审批' })
+        await taskTab.waitFor({ state: 'visible' })
+        assert.equal(await taskTab.getAttribute('aria-selected'), 'true')
+        assert.equal(
+          await page.getByRole('tab', { name: '处置申请' }).count(),
+          0,
+          '仅有任务读取权限时不得挂载不可读的处置申请页签'
+        )
+        await expectText(page, '暂无待审批的生产异常处置申请。')
         assert.equal(
           permissionSafeProductionExceptionRequests,
           0,
@@ -4745,10 +4770,7 @@ export function createStyleL1Scenarios(deps) {
       path: '/erp/dashboard',
       auth: 'admin',
       customerConfig: roleGuidedCustomerConfig,
-      adminProfile: {
-        is_super_admin: false,
-        roles: [{ role_key: 'sales', name: '销售' }],
-      },
+      adminProfile: customerRoleAdminProfile('sales', 'demo_sales'),
       effectiveSession: customerRoleRuntimeSession(
         ['sales'],
         'style-l1-role-guided-sales'
@@ -4923,10 +4945,7 @@ export function createStyleL1Scenarios(deps) {
       auth: 'admin',
       themeMode: 'dark',
       customerConfig: roleGuidedCustomerConfig,
-      adminProfile: {
-        is_super_admin: false,
-        roles: [{ role_key: 'sales', name: '销售' }],
-      },
+      adminProfile: customerRoleAdminProfile('sales', 'demo_sales'),
       effectiveSession: customerRoleRuntimeSession(
         ['sales'],
         'style-l1-role-guided-sales-mobile-dark'
@@ -4960,11 +4979,10 @@ export function createStyleL1Scenarios(deps) {
         )
         assert.deepEqual(await groupTitles.allTextContents(), [
           '基础资料',
-          '销售管理',
           '库存管理',
           '生产管理',
           '运营工具',
-          '系统管理',
+          '历史查询',
           '使用帮助',
         ])
         const groupingMetrics = await moreFunctionsRoot.evaluate((node) => {
@@ -5002,7 +5020,7 @@ export function createStyleL1Scenarios(deps) {
           }
         })
         assert(
-          groupingMetrics.groupTitleCount === 7 &&
+          groupingMetrics.groupTitleCount === 6 &&
             groupingMetrics.leafCount === Number(countMatch[1]) &&
             groupingMetrics.leafTexts.at(-1) === '岗位使用帮助' &&
             groupingMetrics.interactiveGroupTitleCount === 0 &&
@@ -5132,8 +5150,15 @@ export function createStyleL1Scenarios(deps) {
         )
         assert.deepEqual(
           visibleLeafTexts,
-          ['工作台', '任务看板', '业务看板', '销售订单', '采购订单'],
-          `老板电脑端应有三个看板和两个常用业务: ${JSON.stringify(visibleLeafTexts)}`
+          [
+            '工作台',
+            '任务看板',
+            '业务看板',
+            '销售订单',
+            '采购订单',
+            '质量检验',
+          ],
+          `老板电脑端应有三个看板和三个常用业务: ${JSON.stringify(visibleLeafTexts)}`
         )
         const moreFunctionsRoot = menu
           .locator('.ant-menu-submenu-title')
@@ -5148,13 +5173,13 @@ export function createStyleL1Scenarios(deps) {
             .locator('.erp-role-guided-more-group > .ant-menu-item-group-title')
             .allTextContents(),
           [
-            '质检管理',
             '库存管理',
             '委外管理',
             '生产管理',
             '出货管理',
             '财务管理',
             '运营工具',
+            '历史查询',
             '使用帮助',
           ]
         )
@@ -12429,26 +12454,23 @@ export function createStyleL1Scenarios(deps) {
             )
             if (activeIndex === targetIndex) {
               await groupCombobox.press('Enter')
-              await page.waitForFunction(
-                (label) => {
-                  const combobox = document.querySelector(
-                    '.erp-dev-hub-group-filter input[role="combobox"]'
-                  )
-                  const selected = document.querySelector(
-                    '.erp-dev-hub-group-filter .ant-select-selection-item'
-                  )
-                  const expanded =
-                    combobox?.getAttribute('aria-expanded') === 'true'
-                  const normalizedText = String(
-                    selected?.textContent ?? ''
-                  ).replace(/\s+/gu, '')
-                  return (
-                    expanded === false &&
-                    normalizedText === label.replace(/\s+/gu, '')
-                  )
-                },
-                targetLabel
-              )
+              await page.waitForFunction((label) => {
+                const combobox = document.querySelector(
+                  '.erp-dev-hub-group-filter input[role="combobox"]'
+                )
+                const selected = document.querySelector(
+                  '.erp-dev-hub-group-filter .ant-select-selection-item'
+                )
+                const expanded =
+                  combobox?.getAttribute('aria-expanded') === 'true'
+                const normalizedText = String(
+                  selected?.textContent ?? ''
+                ).replace(/\s+/gu, '')
+                return (
+                  expanded === false &&
+                  normalizedText === label.replace(/\s+/gu, '')
+                )
+              }, targetLabel)
               return
             }
             await groupCombobox.press('ArrowDown')

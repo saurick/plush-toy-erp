@@ -282,9 +282,11 @@ async function collectCustomerReviewPrintMetrics(page) {
 
 async function triggerCustomerReviewPrint(page) {
   const beforeURL = page.url()
-  const beforeGeneratedAt = await page
-    .locator('[data-customer-review-print-root]')
-    .getAttribute('data-review-generated-at')
+  const printRoot = page.locator('[data-customer-review-print-root]')
+  const beforePrintRootCount = await printRoot.count()
+  const beforeGeneratedAt = beforePrintRootCount
+    ? await printRoot.getAttribute('data-review-generated-at')
+    : null
   await page.evaluate(() => {
     window.__devBusinessChainPrintCalls = 0
     window.__devBusinessChainPrintDiagramStatus = ''
@@ -302,14 +304,20 @@ async function triggerCustomerReviewPrint(page) {
   })
   await page.getByRole('button', { name: '导出甲方校对版' }).click()
   await page.waitForFunction(() => window.__devBusinessChainPrintCalls === 1)
-  const afterGeneratedAt = await page
-    .locator('[data-customer-review-print-root]')
-    .getAttribute('data-review-generated-at')
+  const afterGeneratedAt = await printRoot.getAttribute(
+    'data-review-generated-at'
+  )
   const printState = await page.evaluate(() => ({
     mermaidStatusAtPrint: window.__devBusinessChainPrintDiagramStatus,
     mermaidThemeAtPrint: window.__devBusinessChainPrintDiagramTheme,
   }))
-  return { beforeURL, beforeGeneratedAt, afterGeneratedAt, ...printState }
+  return {
+    beforeURL,
+    beforePrintRootCount,
+    beforeGeneratedAt,
+    afterGeneratedAt,
+    ...printState,
+  }
 }
 
 function startNoWriteAudit(page, store) {
@@ -416,12 +424,14 @@ async function collectDefinitionSearchMetrics(page) {
     const section = document.querySelector('.erp-dev-flow-global-search')
     const input = section?.querySelector('input')
     const context = document.querySelector('.erp-dev-flow-context')
+    const contextRect = context?.getBoundingClientRect()
     return {
       value: input?.value || '',
       active: document.activeElement === input,
       composing: section?.dataset.searchComposing || '',
       sectionHeight: section?.getBoundingClientRect().height || 0,
-      contextTop: context?.getBoundingClientRect().top || 0,
+      contextTop: contextRect?.top || 0,
+      contextDocumentTop: contextRect ? contextRect.top + window.scrollY : 0,
       resultPanelCount: section?.querySelectorAll(
         '.erp-dev-flow-search-results'
       ).length,
@@ -535,6 +545,9 @@ export function createDevFlowStateObservatoryScenarios({
       },
       verify: async (page) => {
         await waitForCatalog(page)
+        await page
+          .locator('.erp-dev-environment-evidence[aria-busy="false"]')
+          .waitFor({ state: 'visible', timeout: 15_000 })
         await expectText(page, '业务链与运行观察台')
         const root = page.locator('[data-dev-flow-state-observatory]')
         const header = root.locator('.erp-dev-flow-header')
@@ -560,16 +573,36 @@ export function createDevFlowStateObservatoryScenarios({
           '全局定义搜索默认必须折叠，仍允许按需展开'
         )
         const definitionIndexPlacement = await root.evaluate((node) => {
+          const workspaceNavNode = node.querySelector('.erp-dev-workspace-nav')
+          const environmentNode = node.querySelector(
+            '.erp-dev-environment-evidence'
+          )
           const headerNode = node.querySelector('.erp-dev-flow-header')
+          const customerScopeNode = node.querySelector(
+            '.erp-dev-customer-scope'
+          )
           const indexNode = node.querySelector('.erp-dev-flow-definition-tools')
           const navNode = node.querySelector('.erp-dev-flow-nav')
+          const environmentRect = environmentNode?.getBoundingClientRect()
           const headerRect = headerNode?.getBoundingClientRect()
+          const customerScopeRect = customerScopeNode?.getBoundingClientRect()
           const indexRect = indexNode?.getBoundingClientRect()
           const navRect = navNode?.getBoundingClientRect()
           return {
-            previousIsHeader: indexNode?.previousElementSibling === headerNode,
+            workspaceNavNextIsEnvironment:
+              workspaceNavNode?.nextElementSibling === environmentNode,
+            environmentNextIsHeader:
+              environmentNode?.nextElementSibling === headerNode,
+            headerNextIsCustomerScope:
+              headerNode?.nextElementSibling === customerScopeNode,
+            customerScopeNextIsIndex:
+              customerScopeNode?.nextElementSibling === indexNode,
             nextIsPrimaryNav: indexNode?.nextElementSibling === navNode,
+            environmentBottom: environmentRect?.bottom || 0,
+            headerTop: headerRect?.top || 0,
             headerBottom: headerRect?.bottom || 0,
+            customerScopeTop: customerScopeRect?.top || 0,
+            customerScopeBottom: customerScopeRect?.bottom || 0,
             indexTop: indexRect?.top || 0,
             indexBottom: indexRect?.bottom || 0,
             indexHeight: indexRect?.height || 0,
@@ -577,9 +610,24 @@ export function createDevFlowStateObservatoryScenarios({
           }
         })
         assert.equal(
-          definitionIndexPlacement.previousIsHeader,
+          definitionIndexPlacement.workspaceNavNextIsEnvironment,
           true,
-          '定义总索引必须紧跟页头'
+          '双环境事实必须紧跟 DEV 导航'
+        )
+        assert.equal(
+          definitionIndexPlacement.environmentNextIsHeader,
+          true,
+          '业务链页头必须紧跟双环境事实'
+        )
+        assert.equal(
+          definitionIndexPlacement.headerNextIsCustomerScope,
+          true,
+          '甲方校对范围必须紧跟业务链页头'
+        )
+        assert.equal(
+          definitionIndexPlacement.customerScopeNextIsIndex,
+          true,
+          '定义总索引必须紧跟甲方校对范围'
         )
         assert.equal(
           definitionIndexPlacement.nextIsPrimaryNav,
@@ -587,7 +635,15 @@ export function createDevFlowStateObservatoryScenarios({
           '定义总索引必须位于五个主 Tab 之前'
         )
         assert(
+          definitionIndexPlacement.environmentBottom <=
+            definitionIndexPlacement.headerTop + 1
+        )
+        assert(
           definitionIndexPlacement.headerBottom <=
+            definitionIndexPlacement.customerScopeTop + 1
+        )
+        assert(
+          definitionIndexPlacement.customerScopeBottom <=
             definitionIndexPlacement.indexTop + 1
         )
         assert(
@@ -1303,37 +1359,13 @@ export function createDevFlowStateObservatoryScenarios({
         await page.screenshot({
           path: 'output/playwright/style-l1/dev-flow-state-observatory-business-chain-groups.png',
         })
-        await chainSelector.press('Escape')
-        await chainDropdown.waitFor({ state: 'hidden', timeout: 10_000 })
-        await chainSelector
-          .locator(
-            'xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]'
-          )
-          .locator('.ant-select-selector')
-          .click()
         await chainSelector.fill('生产 入库')
-        const filteredChainOptions = page.locator(
-          '.ant-select-dropdown:visible .ant-select-item-option'
+        const filteredChainOptions = chainDropdown.locator(
+          '.ant-select-item-option'
         )
-        await page.waitForFunction(
-          () =>
-            [...document.querySelectorAll('.ant-select-dropdown')].some(
-              (dropdown) => {
-                const rect = dropdown.getBoundingClientRect()
-                const style = window.getComputedStyle(dropdown)
-                return (
-                  rect.width > 0 &&
-                  rect.height > 0 &&
-                  style.display !== 'none' &&
-                  style.visibility !== 'hidden' &&
-                  dropdown.querySelectorAll('.ant-select-item-option')
-                    .length === 1
-                )
-              }
-            ),
-          undefined,
-          { timeout: 10_000 }
-        )
+        await filteredChainOptions
+          .filter({ hasText: '生产执行到成品入库' })
+          .waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(
           await filteredChainOptions.count(),
           1,
@@ -1408,6 +1440,22 @@ export function createDevFlowStateObservatoryScenarios({
         await searchGuide
           .getByText('这个框查目录定义，不查具体任务、运行实例或真实业务记录。')
           .waitFor()
+        await page.waitForFunction(
+          () => {
+            const guide = document.querySelector(
+              '[data-definition-search-guide]'
+            )
+            const buttons = [...(guide?.querySelectorAll('button') || [])]
+            return (
+              buttons.length > 0 &&
+              buttons.every(
+                (button) => button.getBoundingClientRect().height >= 36
+              )
+            )
+          },
+          undefined,
+          { timeout: 10_000 }
+        )
         const searchGuideMetrics = await searchGuide.evaluate((node) => ({
           clientWidth: node.clientWidth,
           scrollWidth: node.scrollWidth,
@@ -1478,8 +1526,8 @@ export function createDevFlowStateObservatoryScenarios({
           '拼音组合期间搜索区高度不得变化'
         )
         assert.equal(
-          imeEvidence.secondComposition.contextTop,
-          imeEvidence.baseline.contextTop,
+          imeEvidence.secondComposition.contextDocumentTop,
+          imeEvidence.baseline.contextDocumentTop,
           '拼音组合期间不得推动下方观察上下文'
         )
         assert.equal(
@@ -1488,8 +1536,8 @@ export function createDevFlowStateObservatoryScenarios({
           '提交中文后结果浮层也不得撑高搜索区'
         )
         assert.equal(
-          imeEvidence.committed.contextTop,
-          imeEvidence.baseline.contextTop,
+          imeEvidence.committed.contextDocumentTop,
+          imeEvidence.baseline.contextDocumentTop,
           '提交中文后结果浮层不得推动下方页面'
         )
 
@@ -2025,6 +2073,11 @@ export function createDevFlowStateObservatoryScenarios({
         )
         const printRequest = await triggerCustomerReviewPrint(page)
         assert.equal(page.url(), printRequest.beforeURL)
+        assert.equal(
+          printRequest.beforePrintRootCount,
+          0,
+          '打印专用 DOM 与 Mermaid 必须在用户点击导出后才创建'
+        )
         assert(printRequest.afterGeneratedAt)
         assert.equal(printRequest.mermaidStatusAtPrint, 'rendered')
         assert.equal(printRequest.mermaidThemeAtPrint, 'light')
@@ -2035,8 +2088,9 @@ export function createDevFlowStateObservatoryScenarios({
         const printText = await printRoot.innerText()
         for (const copy of [
           '业务链甲方校对版｜生产异常决策与执行',
-          '产品通用设计校对稿',
-          '未绑定客户发布版本',
+          '客户配置预览校对稿',
+          '永绅 yoyoosun 客户配置包（仅配置预览）',
+          '未绑定发布版本',
           '第 9 步',
           '先看图：业务怎么走',
           '再看表：每一步谁办、怎么办',
@@ -2044,7 +2098,7 @@ export function createDevFlowStateObservatoryScenarios({
           '超领批准额度',
           '报废或在制让步执行任务',
           '人员与系统怎么配合',
-          '异常时怎么走',
+          '整条业务链的异常与纠正路径',
           '流程或任务完成不等于库存、出货、生产或财务事实已经生效',
           '本文件用于业务需求校对，不单独证明已经实现、发布或经甲方验收',
         ]) {
@@ -2126,6 +2180,11 @@ export function createDevFlowStateObservatoryScenarios({
         )
         const printRequest = await triggerCustomerReviewPrint(page)
         assert.equal(page.url(), printRequest.beforeURL)
+        assert.equal(
+          printRequest.beforePrintRootCount,
+          0,
+          '总览打印专用 DOM 与 Mermaid 必须在用户点击导出后才创建'
+        )
         assert.equal(printRequest.mermaidStatusAtPrint, 'rendered')
         assert.equal(printRequest.mermaidThemeAtPrint, 'light')
 
@@ -2134,7 +2193,7 @@ export function createDevFlowStateObservatoryScenarios({
         await printRoot.waitFor({ state: 'visible', timeout: 10_000 })
         const printText = await printRoot.innerText()
         assert(printText.includes('业务链甲方校对版｜业务链总览'))
-        assert(printText.includes('先看图：十二条业务链怎样衔接'))
+        assert(printText.includes('先看图：全部业务链怎样衔接'))
         assert(printText.includes('不展开每条链的内部步骤'))
         assert.equal(
           await printRoot
@@ -2212,7 +2271,7 @@ export function createDevFlowStateObservatoryScenarios({
         await page.waitForFunction(
           () =>
             `${window.location.pathname}${window.location.search}` ===
-            '/__dev/status-flows?view=chain&chain=all'
+            '/__dev/status-flows?view=chain&chain=all&customer=yoyoosun'
         )
         await page
           .locator('[data-business-chain-overview]')
@@ -2224,7 +2283,7 @@ export function createDevFlowStateObservatoryScenarios({
         await page.waitForFunction(
           () =>
             `${window.location.pathname}${window.location.search}` ===
-            '/__dev/status-flows?view=chain&chain=all'
+            '/__dev/status-flows?view=chain&chain=all&customer=yoyoosun'
         )
         await page
           .locator('[data-business-chain-overview]')
@@ -2436,9 +2495,21 @@ export function createDevFlowStateObservatoryScenarios({
 
         const taskInput = await searchTask(page, 'TRIAL-BOSS-19')
         await expectTaskID(page, 1901)
+        await page.waitForFunction(
+          (expected) =>
+            document.getElementById('dev-flow-task-search')?.value === expected,
+          UNIQUE_TASK_NAME,
+          { timeout: 10_000 }
+        )
         assert.equal(await taskInput.inputValue(), UNIQUE_TASK_NAME)
         await searchTask(page, 'SO-RISK-19')
         await expectTaskID(page, 1901)
+        await page.waitForFunction(
+          (expected) =>
+            document.getElementById('dev-flow-task-search')?.value === expected,
+          UNIQUE_TASK_NAME,
+          { timeout: 10_000 }
+        )
         assert.equal(await taskInput.inputValue(), UNIQUE_TASK_NAME)
         await expectText(page, 'SO-RISK-19')
         await searchTask(page, '不存在的任务名称')

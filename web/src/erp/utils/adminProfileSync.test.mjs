@@ -169,8 +169,8 @@ test('ERPLayout: 客户构建在有效会话完成前不渲染产品核心页面
   )
   assert.match(
     source,
-    /if \(customerRuntimeBootstrapPending \|\| !currentPageShouldRedirect\) \{\s*return\s*\}/u,
-    'configured customer direct URLs must not redirect before effective-session bootstrap completes'
+    /if \(\s*customerRuntimeBootstrapPending \|\|\s*\(customerRuntimeUnavailable &&\s*currentPageRequiresConfiguredCustomerRuntime\) \|\|\s*!currentPageShouldRedirect\s*\) \{\s*return\s*\}/u,
+    'configured customer business pages must not redirect during bootstrap or replace the fail-closed runtime boundary'
   )
   assert.match(
     source,

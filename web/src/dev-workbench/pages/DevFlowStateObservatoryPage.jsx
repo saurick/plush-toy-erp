@@ -1141,7 +1141,6 @@ function TaskFinder({
       serverMatchCount: 0,
       error: '',
     })
-    onClearTask()
     try {
       const data = await listWorkflowTasks(query, { signal: controller.signal })
       if (controller.signal.aborted) return
@@ -1150,6 +1149,7 @@ function TaskFinder({
         selectTask(resolved.autoSelectedTask)
         return
       }
+      onClearTask()
       setLookup({ status: 'ready', error: '', ...resolved })
     } catch (error) {
       if (controller.signal.aborted || isRpcAbortError(error)) return
@@ -2512,6 +2512,7 @@ function RuntimeView({
             aria-label="选择流程定义"
             showSearch
             virtual={false}
+            classNames={DEFINITION_SELECT_CLASS_NAMES}
             {...searchProps}
             filterOption={optionFilter}
             notFoundContent="没有匹配的流程定义"
@@ -3480,9 +3481,8 @@ export default function DevFlowStateObservatoryPage() {
   const [taskDraft, setTaskDraft] = useState(taskId)
   const [selectedTask, setSelectedTask] = useState(null)
   const [taskLookupFocusRequest, setTaskLookupFocusRequest] = useState(0)
-  const [customerReviewGeneratedAt, setCustomerReviewGeneratedAt] = useState(
-    () => new Date().toISOString()
-  )
+  const [customerReviewPrintSnapshot, setCustomerReviewPrintSnapshot] =
+    useState(null)
   const taskSelectionRef = useRef(taskId)
   const chainReturnRef = useRef({
     [QUERY_KEYS.chain]: requestedChainKey || ALL_BUSINESS_CHAINS_KEY,
@@ -3495,6 +3495,17 @@ export default function DevFlowStateObservatoryPage() {
     setSelectedTask(null)
     setTaskDraft(taskId)
   }, [taskId])
+
+  useEffect(() => {
+    if (
+      !Number.isSafeInteger(selectedTask?.id) ||
+      String(selectedTask.id) !== taskId
+    ) {
+      return
+    }
+    const selectedTaskName = cleanText(selectedTask.task_name)
+    if (selectedTaskName) setTaskDraft(selectedTaskName)
+  }, [selectedTask, taskId])
 
   const updateParams = useCallback(
     (patch, options = {}) => {
@@ -3604,19 +3615,29 @@ export default function DevFlowStateObservatoryPage() {
     return buildDevBusinessChainCustomerReview({
       catalog,
       chainKey,
-      generatedAt: customerReviewGeneratedAt,
       customerOverlay,
     })
   }, [
     catalog,
     chain?.key,
     customerOverlay,
-    customerReviewGeneratedAt,
     customerReviewReady,
     overviewSelected,
     valid,
     view,
   ])
+  const customerReviewScopeKey = customerReview
+    ? [
+        customerScope.customerKey,
+        customerReview.version,
+        customerReview.releaseVersion,
+        overviewSelected ? catalog.businessChainOverview.key : chain?.key,
+      ].join(':')
+    : ''
+  const customerReviewPrint =
+    customerReviewPrintSnapshot?.scopeKey === customerReviewScopeKey
+      ? customerReviewPrintSnapshot.review
+      : null
 
   useEffect(() => {
     if (!catalog || !valid) return
@@ -3688,7 +3709,12 @@ export default function DevFlowStateObservatoryPage() {
       nextPatch[QUERY_KEYS.node] = requestedNodeKey || null
     }
     for (const [key, value] of Object.entries(patch)) {
-      if (allowedSelectionKeys.includes(key) || key === QUERY_KEYS.taskId) {
+      if (
+        allowedSelectionKeys.includes(key) ||
+        key === QUERY_KEYS.taskId ||
+        key === QUERY_KEYS.chain ||
+        key === QUERY_KEYS.node
+      ) {
         nextPatch[key] = value
       }
     }
@@ -3706,8 +3732,16 @@ export default function DevFlowStateObservatoryPage() {
       ...patch,
     })
   const printCustomerReview = async () => {
-    if (!customerReviewReady || !customerReview) return
-    setCustomerReviewGeneratedAt(new Date().toISOString())
+    if (!customerReviewReady || !customerReview || !customerReviewScopeKey) {
+      return
+    }
+    setCustomerReviewPrintSnapshot({
+      scopeKey: customerReviewScopeKey,
+      review: {
+        ...customerReview,
+        generatedAt: new Date().toISOString(),
+      },
+    })
     await new Promise((resolve) => {
       window.requestAnimationFrame(() => window.requestAnimationFrame(resolve))
     })
@@ -3759,7 +3793,7 @@ export default function DevFlowStateObservatoryPage() {
                 [QUERY_KEYS.node]: null,
               })
             }
-            onOpenView={openView}
+            onOpenView={openGlobalDefinitionView}
             onPrintCustomerReview={printCustomerReview}
             customerReviewReady={customerReviewReady}
           />
@@ -3777,7 +3811,7 @@ export default function DevFlowStateObservatoryPage() {
             updateParams({ [QUERY_KEYS.chain]: key, [QUERY_KEYS.node]: null })
           }
           onSelectNode={(key) => updateParams({ [QUERY_KEYS.node]: key })}
-          onOpenView={openView}
+          onOpenView={openGlobalDefinitionView}
           onPrintCustomerReview={printCustomerReview}
           customerReviewReady={customerReviewReady}
         />
@@ -4017,7 +4051,7 @@ export default function DevFlowStateObservatoryPage() {
           ? renderView()
           : null}
       </main>
-      <DevBusinessChainCustomerReviewPrint review={customerReview} />
+      <DevBusinessChainCustomerReviewPrint review={customerReviewPrint} />
     </div>
   )
 }
