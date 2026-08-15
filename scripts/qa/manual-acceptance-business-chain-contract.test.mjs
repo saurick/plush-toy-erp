@@ -120,6 +120,14 @@ test("manual acceptance review plan is a readable projection of registered steps
     review.reuseRules.map((rule) => rule.status),
     ["still_usable", "reverify", "must_reseed"],
   );
+  assert.deepEqual(
+    review.reuseRules.map((rule) => rule.nextAction),
+    [
+      "保持当前 dataVersion；用新 operation / batch 绑定 exact commit 后继续回归",
+      "保持当前 dataVersion 和长期数据；用新 operation / batch 重跑受影响验证",
+      "先在新隔离批次修正；仅语义不兼容或冻结下一轮 UAT 时升级 dataVersion",
+    ],
+  );
   for (const chain of review.chains) {
     assert.equal(chain.scenarioCount, 6, chain.key);
     assert.deepEqual(chain.scenarioKinds, DEV_BUSINESS_CHAIN_SCENARIO_KINDS);
@@ -147,7 +155,8 @@ test("business chain digests distinguish reusable, reverify, and reseed data", (
     {
       status: MANUAL_ACCEPTANCE_BUSINESS_CHAIN_REUSE_STATUS.STILL_USABLE,
       reason: "chain_contract_unchanged",
-      nextAction: "沿用同批数据，继续原有 QA 与人工回归。",
+      nextAction:
+        "保持当前 dataVersion；使用新的 operation / batch 绑定 exact commit，继续 QA 与人工回归。",
       currentChainDataDigest: current.chainDataDigest,
       currentChainVerificationDigest: current.chainVerificationDigest,
     },
@@ -165,10 +174,17 @@ test("business chain digests distinguish reusable, reverify, and reseed data", (
     verificationChanged.chainVerificationDigest,
     current.chainVerificationDigest,
   );
+  const reverifyDecision = classifyManualAcceptanceBusinessChainDataReuse(
+    current,
+    verificationChanged,
+  );
   assert.equal(
-    classifyManualAcceptanceBusinessChainDataReuse(current, verificationChanged)
-      .status,
+    reverifyDecision.status,
     MANUAL_ACCEPTANCE_BUSINESS_CHAIN_REUSE_STATUS.REVERIFY,
+  );
+  assert.equal(
+    reverifyDecision.nextAction,
+    "保持当前 dataVersion 和同批数据；使用新的 operation / batch 重跑合同测试、readiness 和受影响的浏览器回归。",
   );
 
   const dataCatalog = cloneCatalog();
@@ -177,9 +193,17 @@ test("business chain digests distinguish reusable, reverify, and reseed data", (
     catalog: dataCatalog,
   });
   assert.notEqual(dataChanged.chainDataDigest, current.chainDataDigest);
+  const reseedDecision = classifyManualAcceptanceBusinessChainDataReuse(
+    current,
+    dataChanged,
+  );
   assert.equal(
-    classifyManualAcceptanceBusinessChainDataReuse(current, dataChanged).status,
+    reseedDecision.status,
     MANUAL_ACCEPTANCE_BUSINESS_CHAIN_REUSE_STATUS.MUST_RESEED,
+  );
+  assert.equal(
+    reseedDecision.nextAction,
+    "先在专用验收库用新的 operation / batch 重新造数；仅在业务语义不兼容或冻结下一轮 UAT 基线时升级 dataVersion。",
   );
 
   assert.equal(

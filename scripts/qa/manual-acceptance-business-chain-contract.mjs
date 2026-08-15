@@ -471,19 +471,22 @@ export function buildManualAcceptanceBusinessChainReviewPlan({
         status: MANUAL_ACCEPTANCE_BUSINESS_CHAIN_REUSE_STATUS.STILL_USABLE,
         label: "仍可用",
         condition: "数据摘要和验证摘要都没有变化",
-        nextAction: "可以继续原 QA 与人工回归",
+        nextAction:
+          "保持当前 dataVersion；用新 operation / batch 绑定 exact commit 后继续回归",
       }),
       Object.freeze({
         status: MANUAL_ACCEPTANCE_BUSINESS_CHAIN_REUSE_STATUS.REVERIFY,
         label: "只需重新核验",
         condition: "数据摘要相同，但验证摘要变化或缺失",
-        nextAction: "保留数据，重跑合同、就绪度和受影响页面",
+        nextAction:
+          "保持当前 dataVersion 和长期数据；用新 operation / batch 重跑受影响验证",
       }),
       Object.freeze({
         status: MANUAL_ACCEPTANCE_BUSINESS_CHAIN_REUSE_STATUS.MUST_RESEED,
         label: "必须重新造数",
         condition: "数据摘要变化或旧数据摘要缺失",
-        nextAction: "使用现有 runner 在新隔离库建立新批次",
+        nextAction:
+          "先在新隔离批次修正；仅语义不兼容或冻结下一轮 UAT 时升级 dataVersion",
       }),
     ]),
     chains: Object.freeze(chains),
@@ -523,10 +526,10 @@ export function selectManualAcceptanceBusinessChainPlan(contract, chainKey) {
 function reuseDecision(status, reason, current) {
   const nextAction =
     status === MANUAL_ACCEPTANCE_BUSINESS_CHAIN_REUSE_STATUS.STILL_USABLE
-      ? "沿用同批数据，继续原有 QA 与人工回归。"
+      ? "保持当前 dataVersion；使用新的 operation / batch 绑定 exact commit，继续 QA 与人工回归。"
       : status === MANUAL_ACCEPTANCE_BUSINESS_CHAIN_REUSE_STATUS.REVERIFY
-        ? "保留同批数据，重跑合同测试、readiness 和受影响的浏览器回归。"
-        : "不要沿用旧批；按现有 runner 在专用验收库重新造数。";
+        ? "保持当前 dataVersion 和同批数据；使用新的 operation / batch 重跑合同测试、readiness 和受影响的浏览器回归。"
+        : "先在专用验收库用新的 operation / batch 重新造数；仅在业务语义不兼容或冻结下一轮 UAT 基线时升级 dataVersion。";
   return Object.freeze({
     status,
     reason,
