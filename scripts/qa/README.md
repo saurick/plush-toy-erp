@@ -95,6 +95,8 @@
 
 直接运行 full / strict 时，任何 `SKIP_*`、`STRICT_SKIP_*` 或调用者提供的旧 coverage 变量都会得到 `incomplete` 并失败；full 始终真实执行 secrets 与 govulncheck，不接受普通调用者自签 JSON 作为前序成功证明。pre-push 先按每个真实 push ref 执行完整历史 secrets，成功后再以聚合范围调用普通 full；新 remote ref 的聚合范围固定为 `empty-tree..HEAD`，确保普通文件、schema 与 repo 变更实际进入 diff / DB guard。任一步失败，外层都不能输出完整结果。
 
+同一次 `prepare-push` 的远端 ref 读回只对明确的超时、断连、拒绝连接、网络不可达和临时 DNS 失败做最多两次短间隔重试；权限、仓库、ref、响应合同及其他错误立即失败。三次尝试仍不可读时形成该次调用的终态失败，不重跑同一 SHA 的 full，也不得绕过 pre-push hook。
+
 开发阶段只跑 affected、同名测试和受影响单链浏览器。产品范围与 clean exact SHA 冻结后，同一候选只执行一轮完整 lifecycle 和一轮 `prepare-push`；只有影响生产正确性、安全、数据完整性、权限或可恢复发布的缺陷才允许改候选并重新进入 affected。fixture、mock、选择器、测试文案、开发工作台或证据展示问题若不使生产结论失效，记录为后续事项，不扩展当前 QA 或重新跑全套。真实 CI / 目标阻塞只报告精确阻塞、清理状态和回滚点，不再新造一层门禁。
 
 CI action 固定到审核过的 commit，工具链读取 `.n-node-version`、`web/package.json#packageManager` 和 `server/go.mod`。普通 `ci.yml` 先在可信 plan job 扫描候选提交历史，再对 PR 运行 affected/full；默认分支 main 的 exact SHA 运行 strict，并上传绑定 repository、40 位 SHA、source archive、policy / workflow / toolchain / migration / lock / 客户配置指纹、分类执行数和 GitHub provenance 的 v3 回执。Go、Web、Atlas、Chromium 和 PostgreSQL 均按计划准备，文档类 PR 不启动数据库。CI / strict 复用锁文件绑定的 pnpm store、Playwright Chromium、固定版本 Go 工具与经固定 SHA-256 复核的 gitleaks archive；缓存损坏会被丢弃并重新下载，缓存命中不能跳过 checksum、依赖安装合同或任何门禁。独立 `release.yml` 只接受等于最新 `origin/main` 的 exact SHA，只有同仓库、受保护默认分支、受信 CI workflow / job、相同 source archive 与全部 fingerprint 一致的 artifact digest 回执可复用；PR、fork、失败、取消、缺字段、skip 或身份漂移均重新 strict。漏洞数据库带 `checkedAt / validUntil`，过期只刷新该项；确定性门禁不重复。随后一次 Buildx Bake 共享图并行调度不可变 Server / Web 制品；相同 SHA 已有完整六项 Release 时复用已验证终态，不为不同 SHA 猜测 digest。`db-guard` 只是提前阻断的静态启发式，不能替代 Ent / Atlas 零漂移、冻结树 fresh / upgrade 验证或目标环境 evidence。

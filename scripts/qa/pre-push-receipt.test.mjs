@@ -27,6 +27,7 @@ import {
   PRE_PUSH_RECEIPT_TTL_MS,
   environmentFingerprint,
   resolveReceiptState,
+  runRemoteRefQueryWithRetry,
 } from "./pre-push-receipt.mjs";
 
 const ROOT = path.resolve(
@@ -281,6 +282,51 @@ function resignReceipt(state, mutate) {
     mode: 0o600,
   });
 }
+
+test("remote ref query retries only bounded transient transport failures", () => {
+  const attempts = [];
+  const delays = [];
+  const result = runRemoteRefQueryWithRetry(
+    "/repo",
+    ["ls-remote", "--refs", "origin", "refs/heads/main"],
+    {
+      runner(_root, args, options) {
+        attempts.push({ args, options });
+        if (attempts.length < 3) {
+          throw Object.assign(new Error("transient"), {
+            detail: "git ls-remote failed: Connection to host port 443 timed out",
+            reason: "remote_ref_query_failed",
+          });
+        }
+        return `${"a".repeat(40)}\trefs/heads/main\n`;
+      },
+      wait: (delayMs) => delays.push(delayMs),
+    },
+  );
+  assert.equal(result, `${"a".repeat(40)}\trefs/heads/main\n`);
+  assert.equal(attempts.length, 3);
+  assert.deepEqual(delays, [250, 750]);
+  assert.deepEqual(attempts[0].options, {
+    reason: "remote_ref_query_failed",
+  });
+
+  let authorizationAttempts = 0;
+  assert.throws(
+    () =>
+      runRemoteRefQueryWithRetry("/repo", ["ls-remote", "origin"], {
+        runner() {
+          authorizationAttempts += 1;
+          throw Object.assign(new Error("denied"), {
+            detail: "git ls-remote failed: Permission denied (publickey)",
+            reason: "remote_ref_query_failed",
+          });
+        },
+        wait: () => assert.fail("authorization failures must not retry"),
+      }),
+    /denied/u,
+  );
+  assert.equal(authorizationAttempts, 1);
+});
 
 test("prepare wrapper exposes help without running full or creating receipt state", () => {
   const fixture = createFixture();

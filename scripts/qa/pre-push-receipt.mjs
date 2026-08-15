@@ -42,6 +42,9 @@ export const PRE_PUSH_SIGNATURE_CONTRACT = "hmac-sha256/v1";
 
 const ZERO_SHA = "0000000000000000000000000000000000000000";
 const CLOCK_SKEW_MS = 30_000;
+const REMOTE_REF_QUERY_RETRY_DELAYS_MS = Object.freeze([250, 750]);
+const RETRYABLE_REMOTE_REF_QUERY_PATTERN =
+  /(?:timed out|connection (?:closed|refused|reset)|network is unreachable|could not resolve host(?:name)?|temporary failure in name resolution)/iu;
 const STATE_DIRECTORY = "plush-qa/pre-push";
 const FORBIDDEN_ENVIRONMENT = Object.freeze([
   "QA_BASE_RANGE",
@@ -360,9 +363,12 @@ function resolveDefaultPreparation(root, requestedRemote = "") {
 
 function readRemoteRefs(root, remoteName, remoteRefs) {
   const unique = [...new Set(remoteRefs)].sort();
-  const output = runGit(root, ["ls-remote", "--refs", remoteName, ...unique], {
-    reason: "remote_ref_query_failed",
-  });
+  const output = runRemoteRefQueryWithRetry(root, [
+    "ls-remote",
+    "--refs",
+    remoteName,
+    ...unique,
+  ]);
   const refs = new Map();
   for (const line of output.split("\n").filter(Boolean)) {
     const [sha, ref, extra] = line.trim().split(/\s+/u);
@@ -376,6 +382,35 @@ function readRemoteRefs(root, remoteName, remoteRefs) {
     refs.set(ref, sha);
   }
   return refs;
+}
+
+function waitForRemoteRefQueryRetry(delayMs) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delayMs);
+}
+
+export function runRemoteRefQueryWithRetry(
+  root,
+  args,
+  { runner = runGit, wait = waitForRemoteRefQueryRetry } = {},
+) {
+  for (
+    let attempt = 0;
+    attempt <= REMOTE_REF_QUERY_RETRY_DELAYS_MS.length;
+    attempt += 1
+  ) {
+    try {
+      return runner(root, args, { reason: "remote_ref_query_failed" });
+    } catch (error) {
+      const retryable =
+        error?.reason === "remote_ref_query_failed" &&
+        RETRYABLE_REMOTE_REF_QUERY_PATTERN.test(String(error?.detail || ""));
+      if (!retryable || attempt === REMOTE_REF_QUERY_RETRY_DELAYS_MS.length) {
+        throw error;
+      }
+      wait(REMOTE_REF_QUERY_RETRY_DELAYS_MS[attempt]);
+    }
+  }
+  throw new ReceiptError("remote_ref_query_failed");
 }
 
 function sortPushRefs(refs) {
