@@ -513,7 +513,11 @@ test("local receipt has one repository-owned issuer while full and CI stay real"
     /pre-push-receipt|PRE_PUSH_RECEIPT/u,
   );
 
+  assert.match(preparePush, /DISPOSABLE_DATABASE_BASE_URL/u);
   assert.match(preparePush, /pre-push-receipt\.mjs" prepare/u);
+  assert.match(preparePush, /run-gate-with-managed-database\.mjs/u);
+  assert.match(preparePush, /--prepare-push/u);
+  assert.match(preparePush, /randomUUID/u);
   assert.match(prePush, /args=\(verify-hook --remote "\$remote_name"\)/u);
   assert.doesNotMatch(prePush, /full\.sh|SKIP_PRE_PUSH/u);
   assert.match(receipt, /PRE_PUSH_RECEIPT_TTL_MS = 30 \* 60 \* 1000/u);

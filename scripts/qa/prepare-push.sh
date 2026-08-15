@@ -7,4 +7,13 @@ cd "$ROOT_DIR"
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   exec node "$ROOT_DIR/scripts/qa/pre-push-receipt.mjs" --help
 fi
-exec node "$ROOT_DIR/scripts/qa/pre-push-receipt.mjs" prepare "$@"
+
+if [[ -n "${DISPOSABLE_DATABASE_BASE_URL:-}" ]]; then
+  exec node "$ROOT_DIR/scripts/qa/pre-push-receipt.mjs" prepare "$@"
+fi
+
+operation_id="$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')"
+exec node "$ROOT_DIR/scripts/qa/run-gate-with-managed-database.mjs" \
+  --prepare-push \
+  --operation-id "$operation_id" \
+  "$@"

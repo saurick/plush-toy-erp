@@ -19,6 +19,7 @@ const OPERATION_ID = "123e4567-e89b-42d3-a456-426614174000";
 const EXACT_SHA = "a9ff5b57af2f7c3a2eb307fb591a1a6acf5e595f";
 const PASSWORD = "a-unique-runtime-password-that-is-long-enough";
 const DATABASE_URL = `postgres://postgres:${PASSWORD}@127.0.0.1:55439/postgres?sslmode=disable`;
+const REFSPEC = "refs/heads/main:refs/heads/main";
 
 function healthyContainer(spec, port = "55439") {
   return {
@@ -102,7 +103,45 @@ test("managed database runner accepts only one exact SHA bound to local HEAD", (
   }
 });
 
-test("managed database command builder keeps fixed gate and exact-SHA commands shell-free", () => {
+test("managed database runner accepts only bounded prepare-push arguments", () => {
+  assert.deepEqual(
+    parseManagedDatabaseArgs([
+      "--prepare-push",
+      "--remote",
+      "origin",
+      "--ref",
+      REFSPEC,
+      "--ref",
+      "refs/tags/v1.2.0:refs/tags/v1.2.0",
+      "--operation-id",
+      OPERATION_ID,
+    ]),
+    {
+      preparePush: true,
+      refs: [REFSPEC, "refs/tags/v1.2.0:refs/tags/v1.2.0"],
+      remote: "origin",
+      operationId: OPERATION_ID,
+    },
+  );
+  for (const invalidArgs of [
+    ["--prepare-push", "--remote", "https://example.invalid/repo"],
+    ["--prepare-push", "--ref", "refs/heads/main:../../unsafe"],
+    ["--prepare-push", "--ref", `${REFSPEC};echo`],
+    ["--prepare-push", "--command", "bash"],
+    ["--prepare-push", "--gate", "full"],
+    ["--prepare-push", "--prepare-push"],
+  ]) {
+    assert.throws(() =>
+      parseManagedDatabaseArgs([
+        ...invalidArgs,
+        "--operation-id",
+        OPERATION_ID,
+      ]),
+    );
+  }
+});
+
+test("managed database command builder keeps every fixed command shell-free", () => {
   const gateCommand = buildManagedQualityGateCommand({
     databaseURL: DATABASE_URL,
     environment: { PATH: "/usr/bin" },
@@ -139,6 +178,29 @@ test("managed database command builder keeps fixed gate and exact-SHA commands s
   assert.equal(exactCommand.shell, false);
   assert.equal(exactCommand.env.DISPOSABLE_DATABASE_BASE_URL, DATABASE_URL);
   assert(!exactCommand.args.join(" ").includes(PASSWORD));
+
+  const preparePushCommand = buildManagedQualityGateCommand({
+    databaseURL: DATABASE_URL,
+    environment: { PATH: "/usr/bin" },
+    preparePush: true,
+    refs: [REFSPEC],
+    remote: "origin",
+    repoRoot: "/repo",
+  });
+  assert.deepEqual(preparePushCommand.args, [
+    "scripts/qa/pre-push-receipt.mjs",
+    "prepare",
+    "--remote",
+    "origin",
+    "--ref",
+    REFSPEC,
+  ]);
+  assert.equal(preparePushCommand.shell, false);
+  assert.equal(
+    preparePushCommand.env.DISPOSABLE_DATABASE_BASE_URL,
+    DATABASE_URL,
+  );
+  assert(!preparePushCommand.args.join(" ").includes(PASSWORD));
 });
 
 test("managed database container is fixed, loopback-only and keeps its secret out of arguments", () => {
@@ -332,6 +394,48 @@ test("managed exact-SHA runner reuses the same owned-container cleanup lifecycle
   assert.deepEqual(events, ["start", "exact-sha", "remove"]);
   assert.deepEqual(result, { code: 0, cleanup: "complete" });
   assert(!output.join(" ").includes(PASSWORD));
+  assert.deepEqual(output, [
+    MANAGED_DATABASE_EVENTS.ready,
+    MANAGED_DATABASE_EVENTS.cleanupComplete,
+  ]);
+});
+
+test("managed prepare-push runner reuses the same owned-container cleanup lifecycle", async () => {
+  const output = [];
+  let container = null;
+  const runtime = {
+    probe: () => ({ ready: true, message: "ready" }),
+    start(spec) {
+      container = healthyContainer(spec);
+    },
+    inspect() {
+      return container;
+    },
+    remove() {
+      container = null;
+    },
+    async runGate(options) {
+      assert.equal(options.preparePush, true);
+      assert.equal(options.remote, "origin");
+      assert.deepEqual(options.refs, [REFSPEC]);
+      assert.equal(options.databaseURL, DATABASE_URL);
+      options.onChild({ kill() {} });
+      return { code: 0, signal: "" };
+    },
+    async sleep() {},
+  };
+  const result = await runManagedQualityGate({
+    preparePush: true,
+    refs: [REFSPEC],
+    remote: "origin",
+    operationId: OPERATION_ID,
+    repoRoot: "/repo",
+    runtime,
+    randomPassword: () => PASSWORD,
+    stdout: { write: (value) => output.push(value.trim()) },
+    processRef: new EventEmitter(),
+  });
+  assert.deepEqual(result, { code: 0, cleanup: "complete" });
   assert.deepEqual(output, [
     MANAGED_DATABASE_EVENTS.ready,
     MANAGED_DATABASE_EVENTS.cleanupComplete,

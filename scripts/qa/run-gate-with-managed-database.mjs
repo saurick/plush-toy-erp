@@ -21,6 +21,7 @@ export const MANAGED_DATABASE_EVENTS = Object.freeze({
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const EXACT_SHA_PATTERN = /^[0-9a-f]{40}$/u;
+const SAFE_REMOTE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u;
 const MANAGED_EXACT_SHA_MAIN_REF = "HEAD";
 const MANAGED_DATABASE_TIMEOUT_MS = 60_000;
 const MANAGED_DATABASE_POLL_MS = 250;
@@ -35,6 +36,9 @@ export function parseManagedDatabaseArgs(argv) {
     gate: "",
     mainRef: "",
     operationId: "",
+    preparePush: false,
+    refs: [],
+    remote: "",
   };
   const seen = new Set();
   const allowlistedArguments = new Set([
@@ -42,21 +46,37 @@ export function parseManagedDatabaseArgs(argv) {
     "--gate",
     "--main-ref",
     "--operation-id",
+    "--prepare-push",
+    "--ref",
+    "--remote",
   ]);
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
+    if (!allowlistedArguments.has(argument)) {
+      throw new Error("managed quality gate argument is not allowlisted");
+    }
+    if (argument === "--prepare-push") {
+      if (seen.has(argument)) {
+        throw new Error("managed quality gate argument is not allowlisted");
+      }
+      seen.add(argument);
+      options.preparePush = true;
+      continue;
+    }
     const value = argv[index + 1];
-    if (!allowlistedArguments.has(argument) || seen.has(argument)) {
+    if (argument !== "--ref" && seen.has(argument)) {
       throw new Error("managed quality gate argument is not allowlisted");
     }
     if (typeof value !== "string" || !value || value.startsWith("--")) {
       throw new Error("managed quality gate argument requires a value");
     }
-    seen.add(argument);
+    if (argument !== "--ref") seen.add(argument);
     if (argument === "--exact-sha") options.exactSha = value;
     else if (argument === "--gate") options.gate = value;
     else if (argument === "--main-ref") options.mainRef = value;
-    else options.operationId = value;
+    else if (argument === "--operation-id") options.operationId = value;
+    else if (argument === "--remote") options.remote = value;
+    else options.refs.push(value);
     index += 1;
   }
   if (!UUID_PATTERN.test(options.operationId)) {
@@ -70,10 +90,17 @@ function normalizeManagedQualityGateRequest({
   exactSha = "",
   gate = "",
   mainRef = "",
+  preparePush = false,
+  refs = [],
+  remote = "",
 } = {}) {
   const hasGate = gate !== "";
   const hasExactSha = exactSha !== "" || mainRef !== "";
-  if (hasGate === hasExactSha) {
+  const hasPreparePush = preparePush === true;
+  if (
+    [hasGate, hasExactSha, hasPreparePush].filter(Boolean).length !== 1 ||
+    (!hasPreparePush && (remote !== "" || refs.length > 0))
+  ) {
     throw new Error("managed quality gate request mode is invalid");
   }
   if (hasGate) {
@@ -82,13 +109,58 @@ function normalizeManagedQualityGateRequest({
     }
     return Object.freeze({ gate });
   }
-  if (!EXACT_SHA_PATTERN.test(exactSha)) {
-    throw new Error("managed exact SHA is invalid");
+  if (hasExactSha) {
+    if (!EXACT_SHA_PATTERN.test(exactSha)) {
+      throw new Error("managed exact SHA is invalid");
+    }
+    if (mainRef !== MANAGED_EXACT_SHA_MAIN_REF) {
+      throw new Error("managed exact SHA main ref is invalid");
+    }
+    return Object.freeze({ exactSha, mainRef });
   }
-  if (mainRef !== MANAGED_EXACT_SHA_MAIN_REF) {
-    throw new Error("managed exact SHA main ref is invalid");
+  if (remote !== "" && !SAFE_REMOTE_PATTERN.test(remote)) {
+    throw new Error("managed prepare-push remote is invalid");
   }
-  return Object.freeze({ exactSha, mainRef });
+  if (
+    !Array.isArray(refs) ||
+    refs.length > 16 ||
+    new Set(refs).size !== refs.length ||
+    refs.some((value) => !isSafeManagedPushRefspec(value))
+  ) {
+    throw new Error("managed prepare-push ref is invalid");
+  }
+  return Object.freeze({
+    preparePush: true,
+    refs: Object.freeze([...refs]),
+    ...(remote ? { remote } : {}),
+  });
+}
+
+function isSafeManagedPushRef(value) {
+  if (
+    typeof value !== "string" ||
+    value.length > 255 ||
+    !/^refs\/(?:heads|tags)\//u.test(value) ||
+    value.includes("..") ||
+    value.includes("//") ||
+    value.includes("@{") ||
+    /[\\~^:?*[\]\x00-\x20\x7f]/u.test(value)
+  ) {
+    return false;
+  }
+  const components = value.split("/").slice(2);
+  return components.every(
+    (component) =>
+      /^[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(component) &&
+      !component.endsWith(".") &&
+      !component.endsWith(".lock"),
+  );
+}
+
+function isSafeManagedPushRefspec(value) {
+  if (typeof value !== "string") return false;
+  const refs = value.split(":");
+  return refs.length === 2 && refs.every(isSafeManagedPushRef);
 }
 
 export function buildManagedQualityGateCommand({
@@ -97,6 +169,9 @@ export function buildManagedQualityGateCommand({
   exactSha = "",
   gate = "",
   mainRef = "",
+  preparePush = false,
+  refs = [],
+  remote = "",
   repoRoot = path.resolve(import.meta.dirname, "../.."),
 } = {}) {
   if (typeof databaseURL !== "string" || databaseURL.length === 0) {
@@ -106,10 +181,15 @@ export function buildManagedQualityGateCommand({
     exactSha,
     gate,
     mainRef,
+    preparePush,
+    refs,
+    remote,
   });
-  const args = request.gate
-    ? ["scripts/qa/run-gate-with-receipt.mjs", "--gate", request.gate]
-    : [
+  let args;
+  if (request.gate) {
+    args = ["scripts/qa/run-gate-with-receipt.mjs", "--gate", request.gate];
+  } else if (request.exactSha) {
+    args = [
         "scripts/qa/exact-sha-gate.mjs",
         "--sha",
         request.exactSha,
@@ -118,6 +198,11 @@ export function buildManagedQualityGateCommand({
         "--run",
         "--json",
       ];
+  } else {
+    args = ["scripts/qa/pre-push-receipt.mjs", "prepare"];
+    if (request.remote) args.push("--remote", request.remote);
+    for (const ref of request.refs) args.push("--ref", ref);
+  }
   return Object.freeze({
     args: Object.freeze(args),
     command: process.execPath,
@@ -305,12 +390,24 @@ function defaultRuntime({ repoRoot }) {
         throw new Error("managed database container cleanup failed");
       }
     },
-    runGate({ databaseURL, exactSha, gate, mainRef, onChild }) {
+    runGate({
+      databaseURL,
+      exactSha,
+      gate,
+      mainRef,
+      preparePush,
+      refs,
+      remote,
+      onChild,
+    }) {
       const commandSpec = buildManagedQualityGateCommand({
         databaseURL,
         exactSha,
         gate,
         mainRef,
+        preparePush,
+        refs,
+        remote,
         repoRoot,
       });
       const child = spawn(commandSpec.command, commandSpec.args, {
@@ -421,6 +518,9 @@ export async function runManagedQualityGate({
   gate,
   mainRef,
   operationId,
+  preparePush,
+  refs,
+  remote,
   repoRoot = path.resolve(import.meta.dirname, "../.."),
   runtime,
   randomPassword = () => randomBytes(32).toString("base64url"),
@@ -431,6 +531,9 @@ export async function runManagedQualityGate({
   if (gate) requestArgs.push("--gate", gate);
   if (exactSha) requestArgs.push("--exact-sha", exactSha);
   if (mainRef) requestArgs.push("--main-ref", mainRef);
+  if (preparePush) requestArgs.push("--prepare-push");
+  if (remote) requestArgs.push("--remote", remote);
+  for (const ref of refs || []) requestArgs.push("--ref", ref);
   requestArgs.push("--operation-id", operationId);
   const request = parseManagedDatabaseArgs(requestArgs);
   const executor = runtime || defaultRuntime({ repoRoot });
@@ -480,6 +583,9 @@ export async function runManagedQualityGate({
       exactSha: request.exactSha,
       gate: request.gate,
       mainRef: request.mainRef,
+      preparePush: request.preparePush,
+      refs: request.refs,
+      remote: request.remote,
       onChild(value) {
         child = value;
         if (forwardedSignal) forward(forwardedSignal);

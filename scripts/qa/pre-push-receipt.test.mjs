@@ -161,6 +161,10 @@ function cleanEnvironment(overrides = {}) {
   ]) {
     if (!(key in overrides)) delete env[key];
   }
+  if (!("DISPOSABLE_DATABASE_BASE_URL" in overrides)) {
+    env.DISPOSABLE_DATABASE_BASE_URL =
+      "postgres://postgres:fixture-password@127.0.0.1:55439/postgres?sslmode=disable";
+  }
   return env;
 }
 
