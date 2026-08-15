@@ -33,8 +33,11 @@ import DevTimestamp from '../components/DevTimestamp.jsx'
 import {
   DEV_DATA_PREPARATION_PROFILE_COPY,
   DEV_DATA_PREPARATION_PROFILE_KEYS,
+  DEV_DATA_PREPARATION_PROFILE_QUERY_KEY,
   DEV_DATA_PREPARATION_SOURCE_PATH,
   DEV_DATA_PREPARATION_TARGET_KEYS,
+  DEV_DATA_PREPARATION_TARGET_QUERY_KEY,
+  buildDevDataPreparationSearch,
   createDevDataPreparationClient,
   dataPreparationStatusPresentation,
   resolveDataPreparationExecutionConfirmation,
@@ -46,8 +49,6 @@ import useDevCustomerScope from '../hooks/useDevCustomerScope.mjs'
 const { Paragraph, Text, Title } = Typography
 const POLL_INTERVAL_MS = 1500
 const POLL_RECOVERY_INTERVAL_MS = 3000
-const PROFILE_QUERY_KEY = 'dataProfile'
-const TARGET_QUERY_KEY = 'dataTarget'
 
 function profileTargetKey(profileKey, scenarioTargetKey) {
   if (profileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.coreDemo) {
@@ -925,14 +926,14 @@ export default function DevDataPreparationPage() {
   const prepareIntentRef = useRef(null)
   const [summary, setSummary] = useState(null)
   const [selectedProfileKey, setSelectedProfileKey] = useState(() => {
-    const requested = searchParams.get(PROFILE_QUERY_KEY)
+    const requested = searchParams.get(DEV_DATA_PREPARATION_PROFILE_QUERY_KEY)
     return Object.values(DEV_DATA_PREPARATION_PROFILE_KEYS).includes(requested)
       ? requested
       : DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance
   })
   const [selectedScenarioTargetKey, setSelectedScenarioTargetKey] = useState(
     () =>
-      searchParams.get(TARGET_QUERY_KEY) ===
+      searchParams.get(DEV_DATA_PREPARATION_TARGET_QUERY_KEY) ===
       DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133
         ? DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133
         : DEV_DATA_PREPARATION_TARGET_KEYS.localDevelopment
@@ -1003,22 +1004,12 @@ export default function DevDataPreparationPage() {
           setSelectedScenarioTargetKey(recoveredTargetKey)
         }
         setSearchParams(
-          (currentSearchParams) => {
-            const nextSearchParams = new URLSearchParams(currentSearchParams)
-            nextSearchParams.set(
-              PROFILE_QUERY_KEY,
-              recoveredOperation.profileKey
-            )
-            if (
-              recoveredOperation.profileKey ===
-              DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo
-            ) {
-              nextSearchParams.set(TARGET_QUERY_KEY, recoveredTargetKey)
-            } else {
-              nextSearchParams.delete(TARGET_QUERY_KEY)
-            }
-            return nextSearchParams
-          },
+          (currentSearchParams) =>
+            buildDevDataPreparationSearch(currentSearchParams, {
+              profileKey: recoveredOperation.profileKey,
+              targetKey: recoveredTargetKey,
+              customerKey: customerScope.customerKey,
+            }),
           { replace: true }
         )
         if (
@@ -1036,7 +1027,12 @@ export default function DevDataPreparationPage() {
         setLoading(false)
       }
     }
-  }, [selectedProfileKey, selectedScenarioTargetKey, setSearchParams])
+  }, [
+    customerScope.customerKey,
+    selectedProfileKey,
+    selectedScenarioTargetKey,
+    setSearchParams,
+  ])
 
   useEffect(() => {
     refresh()
@@ -1131,14 +1127,15 @@ export default function DevDataPreparationPage() {
   const selectProfile = (profileKey) => {
     if (preparing || executing) return
     setSelectedProfileKey(profileKey)
-    const nextSearchParams = new URLSearchParams(searchParams)
-    nextSearchParams.set(PROFILE_QUERY_KEY, profileKey)
-    if (profileKey !== DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo) {
-      nextSearchParams.delete(TARGET_QUERY_KEY)
-    } else {
-      nextSearchParams.set(TARGET_QUERY_KEY, selectedScenarioTargetKey)
-    }
-    setSearchParams(nextSearchParams, { replace: true })
+    setSearchParams(
+      (currentSearchParams) =>
+        buildDevDataPreparationSearch(currentSearchParams, {
+          profileKey,
+          targetKey: selectedScenarioTargetKey,
+          customerKey: customerScope.customerKey,
+        }),
+      { replace: true }
+    )
     currentOperationIdRef.current = ''
     prepareIntentRef.current = null
     setCurrentOperation(null)
@@ -1148,10 +1145,15 @@ export default function DevDataPreparationPage() {
   const selectScenarioTarget = (targetKey) => {
     if (preparing || executing) return
     setSelectedScenarioTargetKey(targetKey)
-    const nextSearchParams = new URLSearchParams(searchParams)
-    nextSearchParams.set(PROFILE_QUERY_KEY, selectedProfileKey)
-    nextSearchParams.set(TARGET_QUERY_KEY, targetKey)
-    setSearchParams(nextSearchParams, { replace: true })
+    setSearchParams(
+      (currentSearchParams) =>
+        buildDevDataPreparationSearch(currentSearchParams, {
+          profileKey: selectedProfileKey,
+          targetKey,
+          customerKey: customerScope.customerKey,
+        }),
+      { replace: true }
+    )
     currentOperationIdRef.current = ''
     prepareIntentRef.current = null
     setCurrentOperation(null)

@@ -1,4 +1,5 @@
 import { DEV_DATA_PREPARATION_ROUTE } from './devRoutes.mjs'
+import { buildDevCustomerScopeSearch } from './devCustomerScope.mjs'
 
 export { DEV_DATA_PREPARATION_ROUTE }
 
@@ -22,6 +23,9 @@ export const DEV_DATA_PREPARATION_TARGET_KEYS = Object.freeze({
   isolatedLocal: 'isolated-local',
 })
 
+export const DEV_DATA_PREPARATION_PROFILE_QUERY_KEY = 'dataProfile'
+export const DEV_DATA_PREPARATION_TARGET_QUERY_KEY = 'dataTarget'
+
 const PROFILE_TARGET_KEYS = Object.freeze({
   [DEV_DATA_PREPARATION_PROFILE_KEYS.coreDemo]: Object.freeze([
     DEV_DATA_PREPARATION_TARGET_KEYS.localDevelopment,
@@ -34,6 +38,33 @@ const PROFILE_TARGET_KEYS = Object.freeze({
     DEV_DATA_PREPARATION_TARGET_KEYS.isolatedLocal,
   ]),
 })
+
+export function buildDevDataPreparationSearch(
+  value,
+  { profileKey, targetKey, customerKey = '' } = {}
+) {
+  const allowedTargets = PROFILE_TARGET_KEYS[profileKey]
+  if (!allowedTargets) {
+    throw new Error('data preparation search requires a registered profile')
+  }
+
+  const searchParams = new URLSearchParams(value)
+  searchParams.set(DEV_DATA_PREPARATION_PROFILE_QUERY_KEY, profileKey)
+  if (profileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo) {
+    if (!allowedTargets.includes(targetKey)) {
+      throw new Error(
+        'scenario data preparation search requires a registered target'
+      )
+    }
+    searchParams.set(DEV_DATA_PREPARATION_TARGET_QUERY_KEY, targetKey)
+    return customerKey
+      ? buildDevCustomerScopeSearch(searchParams, customerKey)
+      : searchParams
+  }
+
+  searchParams.delete(DEV_DATA_PREPARATION_TARGET_QUERY_KEY)
+  return searchParams
+}
 
 export const DEV_DATA_PREPARATION_PROFILE_COPY = Object.freeze({
   [DEV_DATA_PREPARATION_PROFILE_KEYS.coreDemo]: Object.freeze({

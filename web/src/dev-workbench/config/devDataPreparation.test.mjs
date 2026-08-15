@@ -10,11 +10,14 @@ import {
   DEV_DATA_PREPARATION_OPERATION_API_PREFIX,
   DEV_DATA_PREPARATION_PROFILE_COPY,
   DEV_DATA_PREPARATION_PROFILE_KEYS,
+  DEV_DATA_PREPARATION_PROFILE_QUERY_KEY,
   DEV_DATA_PREPARATION_ROUTE,
   DEV_DATA_PREPARATION_SESSION_API_PATH,
   DEV_DATA_PREPARATION_SOURCE_PATH,
   DEV_DATA_PREPARATION_SUMMARY_API_PATH,
   DEV_DATA_PREPARATION_TARGET_KEYS,
+  DEV_DATA_PREPARATION_TARGET_QUERY_KEY,
+  buildDevDataPreparationSearch,
   createDataPreparationIdempotencyKey,
   createDevDataPreparationClient,
   resolveDataPreparationExecutionConfirmation,
@@ -23,6 +26,39 @@ import {
   validateDevDataPreparationOperation,
   validateDevDataPreparationSummary,
 } from './devDataPreparation.mjs'
+
+test('data preparation route search keeps profile, target, and customer atomic', () => {
+  assert.equal(
+    buildDevDataPreparationSearch('', {
+      profileKey: DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo,
+      targetKey: DEV_DATA_PREPARATION_TARGET_KEYS.localDevelopment,
+      customerKey: 'yoyoosun',
+    }).toString(),
+    'dataProfile=scenario-demo&dataTarget=local-development&customer=yoyoosun'
+  )
+  assert.equal(
+    buildDevDataPreparationSearch(
+      'view=history&dataTarget=customer-trial-133&customer=yoyoosun',
+      {
+        profileKey: DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance,
+        targetKey: DEV_DATA_PREPARATION_TARGET_KEYS.isolatedLocal,
+        customerKey: 'yoyoosun',
+      }
+    ).toString(),
+    'view=history&customer=yoyoosun&dataProfile=full-acceptance'
+  )
+  assert.equal(DEV_DATA_PREPARATION_PROFILE_QUERY_KEY, 'dataProfile')
+  assert.equal(DEV_DATA_PREPARATION_TARGET_QUERY_KEY, 'dataTarget')
+  assert.throws(
+    () =>
+      buildDevDataPreparationSearch('', {
+        profileKey: DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo,
+        targetKey: DEV_DATA_PREPARATION_TARGET_KEYS.isolatedLocal,
+        customerKey: 'yoyoosun',
+      }),
+    /registered target/u
+  )
+})
 
 const OPERATION_ID = '11111111-1111-4111-8111-111111111111'
 const PLAN_HASH = 'a'.repeat(64)
@@ -967,8 +1003,15 @@ test('page defaults to the latest business-chain regression while retaining dail
   assert.match(pageSource, /stageTimings/u)
   assert.match(pageSource, /PROFILE_QUERY_KEY/u)
   assert.match(pageSource, /TARGET_QUERY_KEY/u)
-  assert.match(pageSource, /searchParams\.get\(PROFILE_QUERY_KEY\)/u)
-  assert.match(pageSource, /searchParams\.get\(TARGET_QUERY_KEY\)/u)
+  assert.match(
+    pageSource,
+    /searchParams\.get\(DEV_DATA_PREPARATION_PROFILE_QUERY_KEY\)/u
+  )
+  assert.match(
+    pageSource,
+    /searchParams\.get\(DEV_DATA_PREPARATION_TARGET_QUERY_KEY\)/u
+  )
+  assert.match(pageSource, /buildDevDataPreparationSearch/u)
   assert.match(pageSource, /new AbortController\(\)/u)
   assert.match(pageSource, /signal: controller\.signal/u)
   assert.match(pageSource, /customerTrial133/u)
