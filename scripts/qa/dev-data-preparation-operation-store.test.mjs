@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
 import {
   createOrReuseDataPreparationOperation,
+  listDataPreparationOperations,
   transitionDataPreparationOperation,
 } from "./dev-data-preparation-operation-store.mjs";
 
@@ -52,6 +53,27 @@ function scenarioReadback(overrides = {}) {
     factCount: 500,
     catalogReadyCount: 41,
     catalogTargetCount: 51,
+    browserChecksPending: 10,
+    manualAcceptanceCompleted: false,
+    cleanupSupported: false,
+    replayMode: "exact-create-or-readback",
+    ...overrides,
+  };
+}
+
+function historicalScenarioReadback(overrides = {}) {
+  return {
+    schemaVersion: "plush.dev-data-preparation-readback/v1",
+    profileKey: "scenario-demo",
+    targetFingerprint: HASH,
+    datasetKey: "yoyoosun-manual-acceptance",
+    dataVersion: "2026.07.16-v5",
+    runId: "20260716-V5",
+    sourceDocumentCount: 27,
+    processRuntimeCount: 5,
+    factCount: 1634,
+    catalogReadyCount: 40,
+    catalogTargetCount: 50,
     browserChecksPending: 10,
     manualAcceptanceCompleted: false,
     cleanupSupported: false,
@@ -121,4 +143,65 @@ test("scenario-demo operation store rejects run drift, inflated catalog readines
       /scenario demo readback is invalid/u,
     );
   }
+
+  const store = createFixture(t);
+  const running = runningScenarioOperation(store);
+  assert.throws(
+    () =>
+      transitionDataPreparationOperation(store, running.id, {
+        status: "passed",
+        message: "scenario demo V6 readback without target binding",
+        readback: historicalScenarioReadback({
+          dataVersion: "2026.08.15-v6",
+          runId: "20260815-V6",
+          catalogReadyCount: 41,
+          catalogTargetCount: 51,
+        }),
+        now: "2026-07-29T02:03:07.000Z",
+      }),
+    /scenario demo readback is invalid/u,
+  );
+});
+
+test("scenario-demo operation store reads a frozen V5 receipt without accepting V5 for a new write", (t) => {
+  const store = createFixture(t);
+  const running = runningScenarioOperation(store);
+
+  assert.throws(
+    () =>
+      transitionDataPreparationOperation(store, running.id, {
+        status: "passed",
+        message: "scenario demo historical readback cannot be newly written",
+        readback: historicalScenarioReadback(),
+        now: "2026-07-29T02:03:07.000Z",
+      }),
+    /scenario demo readback is invalid/u,
+  );
+
+  const passed = transitionDataPreparationOperation(store, running.id, {
+    status: "passed",
+    message: "scenario demo exact readback passed",
+    readback: scenarioReadback(),
+    now: "2026-07-29T02:03:07.000Z",
+  });
+  const operationFile = path.join(store, "operations", `${passed.id}.json`);
+  const historical = JSON.parse(readFileSync(operationFile, "utf8"));
+  historical.readback = historicalScenarioReadback();
+  writeFileSync(operationFile, `${JSON.stringify(historical, null, 2)}\n`, {
+    mode: 0o600,
+  });
+
+  const listed = listDataPreparationOperations(store);
+  assert.equal(listed.length, 1);
+  assert.equal(listed[0].readback.dataVersion, "2026.07.16-v5");
+  assert.equal(listed[0].readback.catalogReadyCount, 40);
+
+  historical.readback.catalogReadyCount = 39;
+  writeFileSync(operationFile, `${JSON.stringify(historical, null, 2)}\n`, {
+    mode: 0o600,
+  });
+  assert.throws(
+    () => listDataPreparationOperations(store),
+    /scenario demo readback is invalid/u,
+  );
 });

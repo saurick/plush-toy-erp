@@ -187,7 +187,14 @@ export default function DevEnvironmentEvidencePanel() {
       {state.loading && !state.dataSummary && !state.deliverySummary ? (
         <Skeleton active paragraph={{ rows: 3 }} />
       ) : (
-        <div className="erp-dev-environment-evidence__grid">
+        <div
+          className="erp-dev-environment-evidence__grid"
+          role="region"
+          aria-label="本地开发、133 测试与隔离完整验收目标事实"
+          // 横向事实对比区需要键盘焦点，才能在窄屏使用方向键滚动。
+          // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+          tabIndex={0}
+        >
           {evidence.cards.map((card) => (
             <EnvironmentCard key={card.key} card={card} />
           ))}

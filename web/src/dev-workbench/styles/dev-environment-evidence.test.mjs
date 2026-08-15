@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import test from 'node:test'
+
+const css = readFileSync(
+  new URL('./dev-navigation.css', import.meta.url),
+  'utf8'
+)
+const panel = readFileSync(
+  new URL('../components/DevEnvironmentEvidencePanel.jsx', import.meta.url),
+  'utf8'
+)
+
+test('environment evidence keeps all target facts in one mobile comparison strip', () => {
+  assert.match(
+    css,
+    /@media \(max-width: 720px\)[\s\S]*\.erp-dev-environment-evidence__grid \{[\s\S]*display: flex;[\s\S]*overflow-x: auto;[\s\S]*scroll-snap-type: inline mandatory;/u
+  )
+  assert.match(
+    css,
+    /\.erp-dev-environment-card \{[\s\S]*flex: 0 0 min\(300px, calc\(100vw - 68px\)\);[\s\S]*scroll-snap-align: start;/u
+  )
+  assert.match(
+    css,
+    /\.erp-dev-environment-evidence__grid:focus-visible \{[\s\S]*outline:/u
+  )
+  assert.match(
+    panel,
+    /role="region"[\s\S]*aria-label="本地开发、133 测试与隔离完整验收目标事实"[\s\S]*tabIndex=\{0\}/u
+  )
+  assert.match(panel, /Release \/ SHA/u)
+  assert.match(panel, /客户配置 revision/u)
+  assert.match(panel, /数据版本 \/ run/u)
+  assert.match(panel, /权威读回于/u)
+  assert.match(panel, /当前下一步/u)
+})

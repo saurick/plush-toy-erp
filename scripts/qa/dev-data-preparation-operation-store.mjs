@@ -42,6 +42,22 @@ const UUID_PATTERN =
 const IDEMPOTENCY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$/u;
 const HASH_PATTERN = /^[0-9a-f]{64}$/u;
 const RUN_ID_PATTERN = /^[a-z0-9][a-z0-9_]{2,39}$/u;
+const CURRENT_SCENARIO_READBACK_BASELINE = Object.freeze({
+  dataVersion: "2026.08.15-v6",
+  runId: "20260815-V6",
+  catalogReadyCount: 41,
+  catalogTargetCount: 51,
+  browserChecksPending: 10,
+});
+const HISTORICAL_SCENARIO_READBACK_BASELINES = Object.freeze([
+  Object.freeze({
+    dataVersion: "2026.07.16-v5",
+    runId: "20260716-V5",
+    catalogReadyCount: 40,
+    catalogTargetCount: 50,
+    browserChecksPending: 10,
+  }),
+]);
 const STATUS_TRANSITIONS = Object.freeze({
   ready: new Set(["launching", "blocked", "failed"]),
   launching: new Set(["running", "failed", "blocked", "not_proven"]),
@@ -217,7 +233,18 @@ function validateEvent(value) {
   return value;
 }
 
-function validateReadback(value, profileKey, targetSummary) {
+function matchesScenarioReadbackBaseline(value, baseline) {
+  return Object.entries(baseline).every(
+    ([field, expected]) => value[field] === expected,
+  );
+}
+
+function validateReadback(
+  value,
+  profileKey,
+  targetSummary,
+  { allowHistoricalScenarioBaseline = false } = {},
+) {
   if (value === null) return value;
   if (profileKey === "core-demo") {
     assertExactKeys(
@@ -304,12 +331,23 @@ function validateReadback(value, profileKey, targetSummary) {
     if (!legacy && !current && !remoteCurrent) {
       throw new Error("scenario demo readback contains unsupported fields");
     }
+    const matchesCurrentBaseline =
+      (current || remoteCurrent) &&
+      matchesScenarioReadbackBaseline(
+        value,
+        CURRENT_SCENARIO_READBACK_BASELINE,
+      );
+    const matchesHistoricalBaseline =
+      allowHistoricalScenarioBaseline &&
+      legacy &&
+      HISTORICAL_SCENARIO_READBACK_BASELINES.some((baseline) =>
+        matchesScenarioReadbackBaseline(value, baseline),
+      );
     if (
       value.schemaVersion !== "plush.dev-data-preparation-readback/v1" ||
       value.profileKey !== profileKey ||
       value.datasetKey !== "yoyoosun-manual-acceptance" ||
-      value.dataVersion !== "2026.08.15-v6" ||
-      value.runId !== "20260815-V6" ||
+      (!matchesCurrentBaseline && !matchesHistoricalBaseline) ||
       !HASH_PATTERN.test(value.targetFingerprint) ||
       !Number.isSafeInteger(value.sourceDocumentCount) ||
       value.sourceDocumentCount < 1 ||
@@ -317,9 +355,6 @@ function validateReadback(value, profileKey, targetSummary) {
       value.processRuntimeCount < 1 ||
       !Number.isSafeInteger(value.factCount) ||
       value.factCount < 1 ||
-      value.catalogReadyCount !== 41 ||
-      value.catalogTargetCount !== 51 ||
-      value.browserChecksPending !== 10 ||
       value.catalogReadyCount + value.browserChecksPending !==
         value.catalogTargetCount ||
       value.manualAcceptanceCompleted !== false ||
@@ -471,7 +506,10 @@ function validateReadback(value, profileKey, targetSummary) {
   return value;
 }
 
-export function validateDataPreparationOperation(operation) {
+function validateDataPreparationOperationRecord(
+  operation,
+  { allowHistoricalScenarioBaseline = false } = {},
+) {
   assertExactKeys(
     operation,
     [
@@ -519,6 +557,7 @@ export function validateDataPreparationOperation(operation) {
     operation.readback,
     operation.profileKey,
     operation.targetSummary,
+    { allowHistoricalScenarioBaseline },
   );
   const targetKey = operationTargetKey(operation);
   if (
@@ -542,6 +581,10 @@ export function validateDataPreparationOperation(operation) {
     throw new Error("operation event timeline is inconsistent");
   }
   return operation;
+}
+
+export function validateDataPreparationOperation(operation) {
+  return validateDataPreparationOperationRecord(operation);
 }
 
 function ensureDirectory(directory) {
@@ -794,8 +837,9 @@ export function releaseDataPreparationIdempotencyLock(
 }
 
 export function readDataPreparationOperation(store, operationId) {
-  return validateDataPreparationOperation(
+  return validateDataPreparationOperationRecord(
     readPrivateJSON(operationFile(store, operationId)),
+    { allowHistoricalScenarioBaseline: true },
   );
 }
 

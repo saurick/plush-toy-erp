@@ -99,6 +99,9 @@ export function createDevDrillRecoveryScenarios({
         await clickERPThemeOption(page, '暗色')
         await page.evaluate(() => window.scrollTo(0, 0))
         await page.getByText('客户试用环境', { exact: true }).waitFor()
+        await page
+          .locator('.erp-dev-environment-evidence[aria-busy="false"]')
+          .waitFor({ timeout: 20_000 })
         const metrics = await page.evaluate(() => {
           const summary = document.querySelector(
             '.erp-dev-recovery-overview__facts'
@@ -107,6 +110,12 @@ export function createDevDrillRecoveryScenarios({
           const nav = document.querySelector('.erp-dev-workspace-nav')
           const customerScope = document.querySelector(
             '.erp-dev-customer-scope'
+          )
+          const environmentEvidence = document.querySelector(
+            '.erp-dev-environment-evidence'
+          )
+          const environmentScroller = document.querySelector(
+            '.erp-dev-environment-evidence__grid'
           )
           return {
             summaryColumns: summary
@@ -117,6 +126,21 @@ export function createDevDrillRecoveryScenarios({
             customerScopeHeight: customerScope
               ? Math.round(customerScope.getBoundingClientRect().height)
               : null,
+            environmentEvidenceHeight: environmentEvidence
+              ? Math.round(environmentEvidence.getBoundingClientRect().height)
+              : null,
+            environmentCardCount: document.querySelectorAll(
+              '.erp-dev-environment-card'
+            ).length,
+            environmentCardWidths: environmentScroller
+              ? [...environmentScroller.children].map((card) =>
+                  Math.round(card.getBoundingClientRect().width)
+                )
+              : [],
+            environmentScrollerClientWidth:
+              environmentScroller?.clientWidth || 0,
+            environmentScrollerScrollWidth:
+              environmentScroller?.scrollWidth || 0,
             viewportWidth: window.innerWidth,
             documentWidth: document.documentElement.scrollWidth,
             documentHeight: document.documentElement.scrollHeight,
@@ -124,7 +148,15 @@ export function createDevDrillRecoveryScenarios({
               .length,
           }
         })
-        assert.match(metrics.summaryColumns, /^\d+(?:\.\d+)?px$/u)
+        const summaryColumnWidths = metrics.summaryColumns
+          .split(/\s+/u)
+          .map((width) => Number.parseFloat(width))
+        assert.equal(summaryColumnWidths.length, 2)
+        assert(
+          summaryColumnWidths.every(
+            (width) => Number.isFinite(width) && width > 0
+          )
+        )
         assert(metrics.drillWidth > 300 && metrics.drillWidth < 390)
         assert.equal(metrics.navPosition, 'static')
         assert.equal(metrics.openCount, 0)
@@ -133,6 +165,44 @@ export function createDevDrillRecoveryScenarios({
           metrics.customerScopeHeight > 0 && metrics.customerScopeHeight < 200,
           `移动端甲方范围选择器高度异常，当前高度 ${metrics.customerScopeHeight}px`
         )
+        assert(
+          metrics.environmentEvidenceHeight > 0 &&
+            metrics.environmentEvidenceHeight < 450,
+          `移动端双环境事实应使用紧凑对照带，当前高度 ${metrics.environmentEvidenceHeight}px`
+        )
+        assert.equal(metrics.environmentCardCount, 3)
+        assert(
+          metrics.environmentCardWidths.every(
+            (width) => width >= 240 && width <= 310
+          ),
+          `移动端目标卡宽度异常: ${metrics.environmentCardWidths.join(', ')}`
+        )
+        assert(
+          metrics.environmentScrollerScrollWidth >
+            metrics.environmentScrollerClientWidth,
+          '移动端三目标事实应在页面内形成可横向浏览的对照带'
+        )
+        const environmentScroller = page.locator(
+          '.erp-dev-environment-evidence__grid'
+        )
+        await environmentScroller.focus()
+        assert.equal(
+          await environmentScroller.evaluate(
+            (element) => document.activeElement === element
+          ),
+          true
+        )
+        await page.keyboard.press('ArrowRight')
+        await page.waitForTimeout(100)
+        assert(
+          (await environmentScroller.evaluate((element) =>
+            Math.round(element.scrollLeft)
+          )) > 0,
+          '移动端双环境对照带应支持键盘横向浏览'
+        )
+        await environmentScroller.evaluate((element) => {
+          element.scrollLeft = 0
+        })
         const coreDocumentHeight =
           metrics.documentHeight - metrics.customerScopeHeight
         assert(

@@ -128,7 +128,11 @@ function DrillRow({
             {drill.riskPresentation.label}
           </Tag>
         </span>
-        <Text className="erp-dev-recovery-row__cadence" type="secondary">
+        <Text
+          className="erp-dev-recovery-row__cadence"
+          type="secondary"
+          title={drill.cadence}
+        >
           {drill.cadence}
         </Text>
         <span className="erp-dev-recovery-row__chevron" aria-hidden="true" />

@@ -52,14 +52,14 @@ test('drill recovery layout: keeps scan fields visible and evidence on demand', 
   assert.match(css, /overflow-wrap: anywhere/u)
 })
 
-test('drill recovery styles: mobile becomes one readable column with full-width actions', () => {
+test('drill recovery styles: mobile keeps a compact readable scan with full-width actions', () => {
   assert.match(
     css,
     /@media \(max-width: 720px\)[\s\S]*\.erp-dev-recovery-page \.erp-dev-workspace-nav \{[\s\S]*position: static;/u
   )
   assert.match(
     css,
-    /@media \(max-width: 720px\)[\s\S]*\.erp-dev-recovery-overview__facts,[\s\S]*grid-template-columns: minmax\(0, 1fr\);/u
+    /@media \(max-width: 720px\)[\s\S]*\.erp-dev-recovery-row__detail-grid,[\s\S]*grid-template-columns: minmax\(0, 1fr\);/u
   )
   assert.match(
     css,
@@ -73,6 +73,19 @@ test('drill recovery styles: mobile becomes one readable column with full-width 
     css,
     /\.erp-dev-recovery-row__objective,[\s\S]*\.erp-dev-recovery-row__risk \{[\s\S]*display: none;/u
   )
+  assert.match(
+    css,
+    /\.erp-dev-recovery-overview__facts \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/u
+  )
+  assert.match(
+    css,
+    /\.erp-dev-recovery-row > summary \{[\s\S]*grid-template-columns: auto minmax\(0, 1fr\) minmax\(86px, 0\.55fr\) 12px;[\s\S]*min-height: 76px;/u
+  )
+  assert.match(
+    css,
+    /\.erp-dev-recovery-operation-list li \{[\s\S]*grid-template-columns: minmax\(0, 1fr\) auto;/u
+  )
+  assert.match(page, /title=\{drill\.cadence\}/u)
 })
 
 test('drill recovery page exposes business labels and keeps high-risk actions disabled', () => {

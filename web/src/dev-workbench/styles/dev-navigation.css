@@ -505,6 +505,51 @@
 }
 
 @media (max-width: 720px) {
+  .erp-dev-environment-evidence {
+    padding: 10px;
+  }
+
+  .erp-dev-environment-evidence__header {
+    align-items: flex-start;
+    margin-bottom: 8px;
+  }
+
+  .erp-dev-environment-evidence__grid {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scroll-padding-inline: 1px;
+    scroll-snap-type: inline mandatory;
+    scrollbar-gutter: stable;
+  }
+
+  .erp-dev-environment-evidence__grid:focus-visible {
+    outline: 2px solid var(--dev-nav-active-border);
+    outline-offset: 3px;
+  }
+
+  .erp-dev-environment-card {
+    flex: 0 0 min(300px, calc(100vw - 68px));
+    gap: 6px;
+    padding: 9px;
+    scroll-snap-align: start;
+  }
+
+  .erp-dev-environment-card dl {
+    gap: 5px 8px;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .erp-dev-environment-card__result,
+  .erp-dev-environment-card footer {
+    gap: 2px;
+  }
+
+  .erp-dev-environment-card footer {
+    padding-top: 5px;
+  }
+
   .erp-dev-customer-header__copy {
     width: 100%;
     max-width: 100%;
@@ -532,14 +577,6 @@
 
   .erp-dev-workspace-nav__boundary {
     display: none;
-  }
-
-  .erp-dev-environment-evidence__header {
-    align-items: flex-start;
-  }
-
-  .erp-dev-environment-card dl {
-    grid-template-columns: 1fr 1fr;
   }
 
   .erp-dev-task-nav,

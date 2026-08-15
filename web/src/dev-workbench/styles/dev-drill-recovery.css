@@ -380,33 +380,80 @@
     position: static;
   }
 
+  .erp-dev-recovery-shell {
+    gap: 12px;
+  }
+
   .erp-dev-recovery-overview .ant-card-body {
-    gap: 16px;
-    padding: 16px;
+    gap: 12px;
+    padding: 12px;
   }
 
   .erp-dev-recovery-overview__main h2.ant-typography {
-    font-size: 21px;
+    margin-bottom: 10px;
+    font-size: 20px;
   }
 
-  .erp-dev-recovery-overview__facts,
   .erp-dev-recovery-row__detail-grid,
   .erp-dev-recovery-row__detail-grid ul {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .erp-dev-recovery-overview__facts > div,
-  .erp-dev-recovery-overview__facts > div + div {
-    padding: 10px 0;
-    border-inline-start: 0;
+  .erp-dev-recovery-overview__facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-bottom: 10px;
   }
 
+  .erp-dev-recovery-overview__facts > div,
   .erp-dev-recovery-overview__facts > div + div {
+    padding: 7px 0;
+    border-inline-start: 0;
     border-top: 1px solid var(--erp-border, #dce8dd);
   }
 
-  .erp-dev-recovery-row > summary {
+  .erp-dev-recovery-overview__facts > div:first-child {
+    grid-column: 1 / -1;
+    border-top: 0;
+  }
+
+  .erp-dev-recovery-overview__facts > div:nth-child(3) {
+    padding-inline-start: 9px;
+    border-inline-start: 1px solid var(--erp-border, #dce8dd);
+  }
+
+  .erp-dev-recovery-next {
+    padding: 12px;
+  }
+
+  .erp-dev-recovery-next > .ant-typography:last-of-type {
+    margin-bottom: 10px;
+  }
+
+  .erp-dev-recovery-catalog .ant-card-head,
+  .erp-dev-recovery-support .ant-card-head {
+    min-height: 44px;
     padding-inline: 12px;
+  }
+
+  .erp-dev-recovery-row > summary {
+    grid-template-columns: auto minmax(0, 1fr) minmax(86px, 0.55fr) 12px;
+    gap: 6px 8px;
+    min-height: 76px;
+    padding: 8px 10px;
+  }
+
+  .erp-dev-recovery-row__priority {
+    grid-row: 1 / span 2;
+  }
+
+  .erp-dev-recovery-row__title {
+    grid-row: 1;
+    grid-column: 2 / 4;
+  }
+
+  .erp-dev-recovery-row__state {
+    grid-row: 2;
+    grid-column: 2;
   }
 
   .erp-dev-recovery-row__objective,
@@ -415,10 +462,18 @@
   }
 
   .erp-dev-recovery-row__cadence {
+    grid-row: 2;
+    grid-column: 3;
     display: -webkit-box;
     overflow: hidden;
+    font-size: 11px;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+  }
+
+  .erp-dev-recovery-row__chevron {
+    grid-row: 1;
+    grid-column: 4;
   }
 
   .erp-dev-recovery-row__detail {
@@ -435,7 +490,28 @@
     width: 100%;
   }
 
+  .erp-dev-recovery-operations .ant-card-body,
+  .erp-dev-recovery-emergency .ant-card-body {
+    padding: 12px;
+  }
+
+  .erp-dev-recovery-operation-list li {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 8px;
+    padding: 7px 0;
+  }
+
+  .erp-dev-recovery-operation-list li > :first-child {
+    grid-column: 1 / -1;
+  }
+
   .erp-dev-recovery-emergency__content {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .erp-dev-recovery-emergency__content > .anticon {
+    width: 32px;
+    height: 32px;
   }
 }
