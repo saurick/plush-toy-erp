@@ -107,6 +107,7 @@ test("managed database runner accepts only bounded prepare-push arguments", () =
   assert.deepEqual(
     parseManagedDatabaseArgs([
       "--prepare-push",
+      "--full",
       "--remote",
       "origin",
       "--ref",
@@ -118,6 +119,7 @@ test("managed database runner accepts only bounded prepare-push arguments", () =
     ]),
     {
       preparePush: true,
+      forceFull: true,
       refs: [REFSPEC, "refs/tags/v1.2.0:refs/tags/v1.2.0"],
       remote: "origin",
       operationId: OPERATION_ID,
@@ -130,6 +132,8 @@ test("managed database runner accepts only bounded prepare-push arguments", () =
     ["--prepare-push", "--command", "bash"],
     ["--prepare-push", "--gate", "full"],
     ["--prepare-push", "--prepare-push"],
+    ["--prepare-push", "--full", "--full"],
+    ["--full"],
   ]) {
     assert.throws(() =>
       parseManagedDatabaseArgs([
@@ -182,6 +186,7 @@ test("managed database command builder keeps every fixed command shell-free", ()
   const preparePushCommand = buildManagedQualityGateCommand({
     databaseURL: DATABASE_URL,
     environment: { PATH: "/usr/bin" },
+    forceFull: true,
     preparePush: true,
     refs: [REFSPEC],
     remote: "origin",
@@ -190,6 +195,7 @@ test("managed database command builder keeps every fixed command shell-free", ()
   assert.deepEqual(preparePushCommand.args, [
     "scripts/qa/pre-push-receipt.mjs",
     "prepare",
+    "--full",
     "--remote",
     "origin",
     "--ref",
@@ -416,6 +422,7 @@ test("managed prepare-push runner reuses the same owned-container cleanup lifecy
     },
     async runGate(options) {
       assert.equal(options.preparePush, true);
+      assert.equal(options.forceFull, true);
       assert.equal(options.remote, "origin");
       assert.deepEqual(options.refs, [REFSPEC]);
       assert.equal(options.databaseURL, DATABASE_URL);
@@ -426,6 +433,7 @@ test("managed prepare-push runner reuses the same owned-container cleanup lifecy
   };
   const result = await runManagedQualityGate({
     preparePush: true,
+    forceFull: true,
     refs: [REFSPEC],
     remote: "origin",
     operationId: OPERATION_ID,

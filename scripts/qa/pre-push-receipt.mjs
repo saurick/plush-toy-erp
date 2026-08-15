@@ -33,11 +33,16 @@ import {
   PROFILE_REQUIRED_FILES,
   validateWebPackageTestContract,
 } from "./gate-profiles.mjs";
+import {
+  buildAffectedPlan,
+  selectPrePushProfile,
+} from "./affected.mjs";
+import { collectGitChangedFiles } from "./lib/git-range.mjs";
 
-export const PRE_PUSH_RECEIPT_CONTRACT = "plush.pre-push-full-receipt/v1";
+export const PRE_PUSH_RECEIPT_CONTRACT = "plush.pre-push-receipt/v2";
 export const PRE_PUSH_RECEIPT_TTL_MS = 30 * 60 * 1000;
 export const PRE_PUSH_ENVIRONMENT_CONTRACT = "plush.pre-push-environment/v2";
-export const PRE_PUSH_GATE_CONTRACT = "plush.full-gate-tree/v1";
+export const PRE_PUSH_GATE_CONTRACT = "plush.pre-push-gate-tree/v2";
 export const PRE_PUSH_SIGNATURE_CONTRACT = "hmac-sha256/v1";
 
 const ZERO_SHA = "0000000000000000000000000000000000000000";
@@ -265,17 +270,17 @@ function assertCleanSnapshot(snapshot, reason = "dirty_worktree") {
 function assertSnapshotUnchanged(before, after) {
   if (before.head !== after.head) {
     throw new ReceiptError(
-      "head_changed_during_full",
+      "head_changed_during_gate",
       `before=${before.head} after=${after.head}`,
     );
   }
   if (before.tree !== after.tree) {
     throw new ReceiptError(
-      "tree_changed_during_full",
+      "tree_changed_during_gate",
       `before=${before.tree} after=${after.tree}`,
     );
   }
-  assertCleanSnapshot(after, "worktree_changed_during_full");
+  assertCleanSnapshot(after, "worktree_changed_during_gate");
 }
 
 function normalizeRemoteLocation(root, location) {
@@ -499,6 +504,48 @@ function resolvePreparationPlan(root, options) {
   });
 }
 
+function affectedPlanEvidence(plan) {
+  return {
+    changedFiles: plan.changedFiles,
+    affectedScopes: plan.affectedScopes,
+    maxAffectedScope: plan.maxAffectedScope,
+    localGate: plan.localGate,
+    commands: plan.commands.map((command) => ({
+      id: command.id,
+      scope: command.scope,
+      cwd: command.cwd,
+      bin: command.bin,
+      args: command.args,
+      reasons: command.reasons,
+    })),
+    followUps: plan.followUps,
+  };
+}
+
+export function resolvePrePushGateDecision(
+  root,
+  pushPlan,
+  { forceFull = false } = {},
+) {
+  if (!pushPlan?.aggregateRange) {
+    throw new ReceiptError("invalid_push_range", "aggregate range is empty");
+  }
+  const changedFiles = collectGitChangedFiles({
+    root,
+    range: pushPlan.aggregateRange,
+    includeWorktree: false,
+    includeStaged: false,
+    includeUntracked: false,
+  });
+  const affectedPlan = buildAffectedPlan(changedFiles, { root });
+  const selection = selectPrePushProfile(affectedPlan, { forceFull });
+  return Object.freeze({
+    ...selection,
+    changedFileCount: changedFiles.length,
+    planSha256: sha256(stableStringify(affectedPlanEvidence(affectedPlan))),
+  });
+}
+
 function parsePushInput(root, input) {
   const records = [];
   for (const rawLine of input.split("\n")) {
@@ -656,7 +703,10 @@ function readTreeEntries(root, head) {
   return entries;
 }
 
-export function gateContractFingerprint(root, head) {
+export function gateContractFingerprint(root, head, gateDecision) {
+  if (!gateDecision || !["affected", "full"].includes(gateDecision.profile)) {
+    throw new ReceiptError("invalid_gate_decision");
+  }
   runGit(root, ["rev-parse", "--verify", `${head}^{commit}`]);
   const entries = readTreeEntries(root, head);
   const requiredFiles = PROFILE_REQUIRED_FILES.full;
@@ -692,8 +742,13 @@ export function gateContractFingerprint(root, head) {
   }
   const manifest = {
     contract: PRE_PUSH_GATE_CONTRACT,
-    profile: "full",
-    gates: GATE_PROFILES.full,
+    profile: gateDecision.profile,
+    recommendedProfile: gateDecision.recommendedProfile,
+    planSha256: gateDecision.planSha256,
+    gates:
+      gateDecision.profile === "full"
+        ? GATE_PROFILES.full
+        : ["affected-plan", "live-range-secrets"],
     requiredFiles: requiredFiles
       .map((file) => entries.get(file))
       .sort((left, right) => left.file.localeCompare(right.file)),
@@ -948,6 +1003,7 @@ function validateReceipt({
   pushPlan,
   now = Date.now(),
   environment = process.env,
+  gateDecision,
   gateSha256 = "",
   environmentSha256 = "",
 }) {
@@ -955,13 +1011,19 @@ function validateReceipt({
   if (receipt?.contract !== PRE_PUSH_RECEIPT_CONTRACT) {
     throw new ReceiptError("receipt_contract_mismatch");
   }
-  if (receipt?.gate?.profile !== "full") {
+  if (
+    !gateDecision ||
+    receipt?.gate?.profile !== gateDecision.profile ||
+    receipt?.gate?.recommendedProfile !== gateDecision.recommendedProfile ||
+    receipt?.gate?.planSha256 !== gateDecision.planSha256
+  ) {
     throw new ReceiptError("receipt_profile_mismatch");
   }
   if (receipt?.gate?.contract !== PRE_PUSH_GATE_CONTRACT) {
     throw new ReceiptError("receipt_gate_contract_mismatch");
   }
-  const gateSha = gateSha256 || gateContractFingerprint(root, snapshot.head);
+  const gateSha =
+    gateSha256 || gateContractFingerprint(root, snapshot.head, gateDecision);
   if (receipt.gate.sha256 !== gateSha) {
     throw new ReceiptError("receipt_gate_contract_mismatch");
   }
@@ -1002,9 +1064,11 @@ function makeReceipt({
   pushPlan,
   issuedAtMs = Date.now(),
   environment = process.env,
+  gateDecision,
   gateSha256 = "",
   environmentSha256 = "",
 }) {
+  if (!gateDecision) throw new ReceiptError("invalid_gate_decision");
   const unsigned = {
     contract: PRE_PUSH_RECEIPT_CONTRACT,
     issuedAtMs,
@@ -1012,9 +1076,13 @@ function makeReceipt({
     repository: expectedRepositoryIdentity(root, snapshot, state),
     push: pushPlan,
     gate: {
-      profile: "full",
+      profile: gateDecision.profile,
+      recommendedProfile: gateDecision.recommendedProfile,
+      planSha256: gateDecision.planSha256,
       contract: PRE_PUSH_GATE_CONTRACT,
-      sha256: gateSha256 || gateContractFingerprint(root, snapshot.head),
+      sha256:
+        gateSha256 ||
+        gateContractFingerprint(root, snapshot.head, gateDecision),
     },
     environment: {
       contract: PRE_PUSH_ENVIRONMENT_CONTRACT,
@@ -1025,10 +1093,15 @@ function makeReceipt({
 }
 
 function parsePrepareOptions(root, args) {
-  const options = { remoteName: "", refspecs: [] };
+  const options = { forceFull: false, remoteName: "", refspecs: [] };
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     const value = args[index + 1];
+    if (arg === "--full") {
+      if (options.forceFull) throw new ReceiptError("duplicate_option", arg);
+      options.forceFull = true;
+      continue;
+    }
     if (arg === "--remote") {
       if (!value) throw new ReceiptError("missing_option_value", arg);
       options.remoteName = value;
@@ -1071,6 +1144,23 @@ function parseHookOptions(args) {
   return options;
 }
 
+export function resolvePrepareMode(root, options, { env = process.env } = {}) {
+  assertNoForbiddenEnvironment(env);
+  const snapshot = readRepositorySnapshot(root);
+  assertCleanSnapshot(snapshot);
+  const pushPlan = resolvePreparationPlan(root, options);
+  const gateDecision = resolvePrePushGateDecision(root, pushPlan, {
+    forceFull: options.forceFull,
+  });
+  if (gateDecision.requiresFullConfirmation) {
+    throw new ReceiptError(
+      "full_confirmation_required",
+      `reasons=${gateDecision.reasons.join(",")} rerun=bash scripts/qa/prepare-push.sh --full`,
+    );
+  }
+  return gateDecision.requiresManagedDatabase ? "managed" : "direct";
+}
+
 export function preparePush(root, options, { env = process.env } = {}) {
   const state = resolveReceiptState(root);
   const releaseLock = acquireReceiptLock(state, "prepare");
@@ -1081,7 +1171,29 @@ export function preparePush(root, options, { env = process.env } = {}) {
     const before = readRepositorySnapshot(root);
     assertCleanSnapshot(before);
     const initialPlan = resolvePreparationPlan(root, options);
-    const initialGateContract = gateContractFingerprint(root, before.head);
+    const initialGateDecision = resolvePrePushGateDecision(root, initialPlan, {
+      forceFull: options.forceFull,
+    });
+    if (initialGateDecision.requiresFullConfirmation) {
+      throw new ReceiptError(
+        "full_confirmation_required",
+        `reasons=${initialGateDecision.reasons.join(",")} rerun=bash scripts/qa/prepare-push.sh --full`,
+      );
+    }
+    if (
+      initialGateDecision.requiresManagedDatabase &&
+      !env.DISPOSABLE_DATABASE_BASE_URL
+    ) {
+      throw new ReceiptError(
+        "managed_database_required",
+        "rerun=bash scripts/qa/prepare-push.sh",
+      );
+    }
+    const initialGateContract = gateContractFingerprint(
+      root,
+      before.head,
+      initialGateDecision,
+    );
     const initialEnvironment = environmentFingerprint(root, env);
 
     if (existsSync(state.receiptPath)) {
@@ -1094,52 +1206,80 @@ export function preparePush(root, options, { env = process.env } = {}) {
           snapshot: before,
           pushPlan: initialPlan,
           environment: env,
+          gateDecision: initialGateDecision,
           gateSha256: initialGateContract,
           environmentSha256: initialEnvironment,
         });
         console.log(
-          `[qa:prepare-push] status=reused profile=full head=${before.head} aggregate_range=${initialPlan.aggregateRange} expires_at_ms=${existingReceipt.expiresAtMs}`,
+          `[qa:prepare-push] status=reused profile=${initialGateDecision.profile} head=${before.head} aggregate_range=${initialPlan.aggregateRange} expires_at_ms=${existingReceipt.expiresAtMs}`,
         );
         return { receipt: existingReceipt, state, reused: true };
       } catch (error) {
         const reason =
           error instanceof ReceiptError ? error.reason : "unexpected_error";
         console.log(
-          `[qa:prepare-push] existing_receipt=invalid reason=${reason}; running a fresh full gate`,
+          `[qa:prepare-push] existing_receipt=invalid reason=${reason}; running a fresh ${initialGateDecision.profile} gate`,
         );
         removeReceipt(state.receiptPath);
       }
     }
 
     console.log(
-      `[qa:prepare-push] 运行 full（HEAD=${before.head.slice(0, 12)} aggregate_range=${initialPlan.aggregateRange}）`,
+      `[qa:prepare-push] 运行 ${initialGateDecision.profile}（HEAD=${before.head.slice(0, 12)} aggregate_range=${initialPlan.aggregateRange} files=${initialGateDecision.changedFileCount}）`,
     );
-    runCommand(
-      "node",
-      [
-        path.join(root, "scripts/qa/run-gate-with-receipt.mjs"),
-        "--gate",
-        "full",
-        "--out",
-        path.join(state.stateDir, `${state.worktreeKey}.full-receipt.json`),
-      ],
-      {
-        cwd: root,
-        env: { ...env, QA_BASE_RANGE: initialPlan.aggregateRange },
-        inherit: true,
-        reason: "full_gate_failed",
-      },
-    );
+    if (initialGateDecision.profile === "full") {
+      runCommand(
+        "node",
+        [
+          path.join(root, "scripts/qa/run-gate-with-receipt.mjs"),
+          "--gate",
+          "full",
+          "--out",
+          path.join(state.stateDir, `${state.worktreeKey}.full-receipt.json`),
+        ],
+        {
+          cwd: root,
+          env: { ...env, QA_BASE_RANGE: initialPlan.aggregateRange },
+          inherit: true,
+          reason: "full_gate_failed",
+        },
+      );
+    } else {
+      runCommand(
+        "node",
+        [
+          path.join(root, "scripts/qa/affected.mjs"),
+          "--base",
+          initialPlan.aggregateRange,
+          "--run",
+        ],
+        {
+          cwd: root,
+          env,
+          inherit: true,
+          reason: "affected_gate_failed",
+        },
+      );
+    }
 
     const after = readRepositorySnapshot(root);
     assertSnapshotUnchanged(before, after);
     const finalEnvironment = environmentFingerprint(root, env);
     if (finalEnvironment !== initialEnvironment) {
-      throw new ReceiptError("environment_changed_during_full");
+      throw new ReceiptError("environment_changed_during_gate");
     }
     const finalPlan = resolvePreparationPlan(root, options);
     if (stableStringify(initialPlan) !== stableStringify(finalPlan)) {
-      throw new ReceiptError("remote_changed_during_full");
+      throw new ReceiptError("remote_changed_during_gate");
+    }
+    const finalGateDecision = resolvePrePushGateDecision(root, finalPlan, {
+      forceFull: options.forceFull,
+    });
+    if (
+      stableStringify(initialGateDecision) !==
+      stableStringify(finalGateDecision)
+    ) {
+      throw new ReceiptError("gate_decision_changed_during_gate");
     }
     const receipt = makeReceipt({
       root,
@@ -1147,6 +1287,7 @@ export function preparePush(root, options, { env = process.env } = {}) {
       snapshot: after,
       pushPlan: finalPlan,
       environment: env,
+      gateDecision: finalGateDecision,
       gateSha256: initialGateContract,
       environmentSha256: finalEnvironment,
     });
@@ -1163,13 +1304,14 @@ export function preparePush(root, options, { env = process.env } = {}) {
       snapshot: candidateSnapshot,
       pushPlan: finalPlan,
       environment: env,
+      gateDecision: finalGateDecision,
       gateSha256: initialGateContract,
       environmentSha256: finalEnvironment,
     });
     publishPrivateFile(receiptCandidate, state.receiptPath);
     receiptCandidate = "";
     console.log(
-      `[qa:prepare-push] status=complete profile=full head=${after.head} aggregate_range=${finalPlan.aggregateRange} ttl_seconds=${PRE_PUSH_RECEIPT_TTL_MS / 1000}`,
+      `[qa:prepare-push] status=complete profile=${finalGateDecision.profile} head=${after.head} aggregate_range=${finalPlan.aggregateRange} ttl_seconds=${PRE_PUSH_RECEIPT_TTL_MS / 1000}`,
     );
     return { receipt, state, reused: false };
   } catch (error) {
@@ -1242,7 +1384,14 @@ export function verifyPushHook(
       records,
     );
     const receipt = readReceipt(state.receiptPath);
-    const gateSha256 = gateContractFingerprint(root, before.head);
+    const gateDecision = resolvePrePushGateDecision(root, pushPlan, {
+      forceFull: receipt?.gate?.profile === "full",
+    });
+    const gateSha256 = gateContractFingerprint(
+      root,
+      before.head,
+      gateDecision,
+    );
     const environmentSha256 = environmentFingerprint(root, env);
     validateReceipt({
       receipt,
@@ -1257,6 +1406,7 @@ export function verifyPushHook(
       },
       now,
       environment: env,
+      gateDecision,
       gateSha256,
       environmentSha256,
     });
@@ -1278,6 +1428,7 @@ export function verifyPushHook(
       },
       now: Date.now(),
       environment: env,
+      gateDecision,
       gateSha256,
       environmentSha256: environmentFingerprint(root, env),
     });
@@ -1293,10 +1444,13 @@ export function verifyPushHook(
 function printHelp() {
   console.log(`用法:
   bash scripts/qa/prepare-push.sh [--remote <name>] [--ref <local-ref>:<remote-ref>]...
+  bash scripts/qa/prepare-push.sh --full [--remote <name>] [--ref <local-ref>:<remote-ref>]...
 
 说明:
-  prepare 在建立真实 git push 连接前，对 clean HEAD 执行一次 full 并在 Git common dir
-  签发短期本地回执。普通当前分支可不传参数；多 ref 或非默认目标必须逐项传 --ref。
+  prepare 在建立真实 git push 连接前，对 clean HEAD 和真实范围复算 affected 计划。
+  计划可自动闭合时执行 affected；存在 full local gate 或 required follow-up 时停止，
+  须逐次显式使用 --full。发布候选也显式使用 --full。通过后在 Git common dir
+  签发短期本地回执。普通当前分支可不传 remote/ref；多 ref 或非默认目标逐项传 --ref。
   pre-push hook 只读取固定回执位置，不接受调用者提供回执路径、token 或跳过环境变量。`);
 }
 
@@ -1312,6 +1466,10 @@ function main() {
   }
   if (command === "prepare") {
     preparePush(root, parsePrepareOptions(root, args));
+    return;
+  }
+  if (command === "prepare-mode") {
+    console.log(resolvePrepareMode(root, parsePrepareOptions(root, args)));
     return;
   }
   if (command === "verify-hook") {

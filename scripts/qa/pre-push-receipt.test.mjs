@@ -84,10 +84,12 @@ function installRealReceiptFiles(root) {
   for (const file of [
     ".githooks/pre-push",
     "scripts/qa/dev-workbench-receipt.mjs",
+    "scripts/qa/affected.mjs",
     "scripts/qa/gate-profiles.mjs",
     "scripts/qa/pre-push-receipt.mjs",
     "scripts/qa/prepare-push.sh",
     "scripts/qa/run-gate-with-receipt.mjs",
+    "scripts/qa/lib/git-range.mjs",
     "scripts/qa/lib/repository-identity.mjs",
     "scripts/git-hooks/pre-push.sh",
   ]) {
@@ -101,6 +103,56 @@ function installRealReceiptFiles(root) {
 }
 
 function installGateStubs(root) {
+  writeFileSync(
+    path.join(root, "scripts/qa/affected.mjs"),
+    `#!/usr/bin/env node
+import { execFileSync } from "node:child_process";
+import { appendFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+export function buildAffectedPlan(files) {
+  const changedFiles = [...new Set(files)].sort();
+  const focused = changedFiles.length > 0 && changedFiles.every((file) => file.endsWith(".md"));
+  return {
+    changedFiles,
+    affectedScopes: focused ? ["T0", "T1"] : ["T0"],
+    maxAffectedScope: focused ? "T1" : "T0",
+    commands: focused
+      ? [{ id: "docs", scope: "T1", cwd: ".", bin: "node", args: ["--version"], reasons: changedFiles }]
+      : [{ id: "full", scope: "LOCAL_FULL", cwd: ".", bin: "bash", args: ["scripts/qa/full.sh"], reasons: changedFiles }],
+    followUps: [],
+    localGate: focused ? "focused" : "full",
+    prePushGate: "bash scripts/qa/prepare-push.sh",
+  };
+}
+
+export function selectPrePushProfile(plan, { forceFull = false } = {}) {
+  const recommendedProfile = plan.localGate === "full" ? "full" : "affected";
+  const profile = forceFull ? "full" : recommendedProfile;
+  return {
+    profile,
+    recommendedProfile,
+    requiresFullConfirmation: recommendedProfile === "full" && !forceFull,
+    requiresManagedDatabase: profile === "full",
+    reasons: recommendedProfile === "full" ? ["local_gate_full"] : forceFull ? ["explicit_full"] : [],
+  };
+}
+
+function main() {
+  const args = process.argv.slice(2);
+  const range = args[args.indexOf("--base") + 1] || "default";
+  const gitDir = execFileSync("git", ["rev-parse", "--git-dir"], { encoding: "utf8" }).trim();
+  appendFileSync(path.join(gitDir, "affected-ranges.txt"), range + "\\n");
+  if (process.env.FAIL_AFFECTED === "1") process.exit(9);
+  if (process.env.MUTATE_AFFECTED_DIRTY === "1") writeFileSync("affected-dirty.txt", "dirty\\n");
+  console.log("[qa:affected] status=complete");
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+`,
+    "utf8",
+  );
   writeFileSync(
     path.join(root, "scripts/qa/full.sh"),
     `#!/usr/bin/env bash
@@ -154,6 +206,8 @@ function cleanEnvironment(overrides = {}) {
     "STRICT_SKIP_GOVULNCHECK",
     "STYLE_L1_BASE_URL",
     "FAIL_FULL",
+    "FAIL_AFFECTED",
+    "MUTATE_AFFECTED_DIRTY",
     "MUTATE_FULL_DIRTY",
     "MUTATE_FULL_HEAD",
     "MUTATE_REMOTE",
@@ -169,7 +223,7 @@ function cleanEnvironment(overrides = {}) {
   return env;
 }
 
-function createFixture() {
+function createFixture({ changePath = "tracked.txt" } = {}) {
   const root = mkdtempSync(path.join(os.tmpdir(), "plush-receipt-repo-"));
   const remote = mkdtempSync(path.join(os.tmpdir(), "plush-receipt-remote-"));
   git(root, ["init", "-q", "-b", "main"]);
@@ -178,7 +232,8 @@ function createFixture() {
   materializeFullProfile(root);
   installRealReceiptFiles(root);
   installGateStubs(root);
-  writeFileSync(path.join(root, "tracked.txt"), "base\n", "utf8");
+  mkdirSync(path.dirname(path.join(root, changePath)), { recursive: true });
+  writeFileSync(path.join(root, changePath), "base\n", "utf8");
   const remoteSha = commit(root, "base");
   git(root, [
     "-c",
@@ -188,7 +243,7 @@ function createFixture() {
     "origin",
     `${remoteSha}:refs/heads/main`,
   ]);
-  writeFileSync(path.join(root, "tracked.txt"), "head\n", "utf8");
+  writeFileSync(path.join(root, changePath), "head\n", "utf8");
   const localSha = commit(root, "head");
   return {
     root,
@@ -202,7 +257,7 @@ function createFixture() {
   };
 }
 
-function runPrepare(root, args = [], env = cleanEnvironment()) {
+function runPrepare(root, args = ["--full"], env = cleanEnvironment()) {
   return spawnSync("bash", ["scripts/qa/prepare-push.sh", ...args], {
     cwd: root,
     env,
@@ -347,6 +402,94 @@ test("prepare wrapper exposes help without running full or creating receipt stat
   }
 });
 
+test("focused changes run affected once and reuse the exact-range receipt", () => {
+  const fixture = createFixture({ changePath: "docs/guide.md" });
+  try {
+    const env = cleanEnvironment({ DISPOSABLE_DATABASE_BASE_URL: "" });
+    const first = runPrepare(fixture.root, [], env);
+    assert.equal(first.status, 0, first.stderr || first.stdout);
+    assert.match(first.stdout, /status=complete profile=affected/u);
+    const state = resolveReceiptState(fixture.root);
+    const receipt = JSON.parse(readFileSync(state.receiptPath, "utf8"));
+    assert.equal(receipt.gate.profile, "affected");
+    assert.equal(receipt.gate.recommendedProfile, "affected");
+    assert.deepEqual(
+      readLines(gitStateFile(fixture.root, "affected-ranges.txt")),
+      [`${fixture.remoteSha}..${fixture.localSha}`],
+    );
+    assert.equal(
+      existsSync(gitStateFile(fixture.root, "full-ranges.txt")),
+      false,
+    );
+
+    const second = runPrepare(fixture.root, [], env);
+    assert.equal(second.status, 0, second.stderr || second.stdout);
+    assert.match(second.stdout, /status=reused profile=affected/u);
+    assert.equal(
+      readLines(gitStateFile(fixture.root, "affected-ranges.txt")).length,
+      1,
+    );
+
+    const pushed = runHook(fixture, { env });
+    assert.equal(pushed.status, 0, pushed.stderr || pushed.stdout);
+    assert.match(pushed.stdout, /coverage=receipt\+live-range-secrets/u);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("a high-risk plan never starts full without explicit confirmation", () => {
+  const fixture = createFixture();
+  try {
+    const result = runPrepare(
+      fixture.root,
+      [],
+      cleanEnvironment({ DISPOSABLE_DATABASE_BASE_URL: "" }),
+    );
+    assert.equal(result.status, 2, result.stderr || result.stdout);
+    assert.match(result.stderr, /reason=full_confirmation_required/u);
+    assert.match(result.stderr, /prepare-push\.sh --full/u);
+    assert.equal(
+      existsSync(gitStateFile(fixture.root, "full-ranges.txt")),
+      false,
+    );
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("affected failures and repository drift never produce a push receipt", () => {
+  for (const [name, overrides, reason] of [
+    ["failure", { FAIL_AFFECTED: "1" }, "affected_gate_failed"],
+    [
+      "dirty drift",
+      { MUTATE_AFFECTED_DIRTY: "1" },
+      "worktree_changed_during_gate",
+    ],
+  ]) {
+    const fixture = createFixture({ changePath: "docs/guide.md" });
+    try {
+      const result = runPrepare(
+        fixture.root,
+        [],
+        cleanEnvironment({
+          DISPOSABLE_DATABASE_BASE_URL: "",
+          ...overrides,
+        }),
+      );
+      assert.notEqual(result.status, 0, name);
+      assert.match(result.stderr, new RegExp(`reason=${reason}`, "u"), name);
+      assert.equal(
+        existsSync(resolveReceiptState(fixture.root).receiptPath),
+        false,
+        name,
+      );
+    } finally {
+      fixture.cleanup();
+    }
+  }
+});
+
 test("prepare runs full once before push and hook only runs live range gates", () => {
   const fixture = createFixture();
   try {
@@ -427,7 +570,7 @@ test("a real Git push PATH prefix preserves the prepared environment", () => {
       baseline,
     );
 
-    const prepared = runPrepare(fixture.root, [], env);
+    const prepared = runPrepare(fixture.root, ["--full"], env);
     assert.equal(prepared.status, 0, prepared.stderr || prepared.stdout);
     const pushed = runRealGitPush(fixture, { env });
     assert.equal(pushed.status, 0, pushed.stderr || pushed.stdout);
@@ -575,7 +718,7 @@ test("new and existing refs bind one exact aggregate receipt and scan every live
       "--ref",
       "refs/heads/main:refs/heads/new",
     ];
-    const prepared = runPrepare(fixture.root, refspecs);
+    const prepared = runPrepare(fixture.root, ["--full", ...refspecs]);
     assert.equal(prepared.status, 0, prepared.stderr || prepared.stdout);
     const emptyTree = git(fixture.root, [
       "hash-object",
@@ -616,12 +759,16 @@ test("failed or moving full never leaves a green receipt", () => {
     [
       "remote changed after full",
       { MUTATE_REMOTE: "1" },
-      "remote_changed_during_full",
+      "remote_changed_during_gate",
     ],
   ]) {
     const fixture = createFixture();
     try {
-      const result = runPrepare(fixture.root, [], cleanEnvironment(overrides));
+      const result = runPrepare(
+        fixture.root,
+        ["--full"],
+        cleanEnvironment(overrides),
+      );
       assert.notEqual(result.status, 0, name);
       assert.match(result.stderr, new RegExp(`reason=${reason}`, "u"), name);
       const state = resolveReceiptState(fixture.root);
@@ -647,8 +794,14 @@ test("failed or moving full never leaves a green receipt", () => {
   }
 });
 
-test("receipt rejects tampering, expiry, environment drift, and actual range drift", () => {
-  for (const scenario of ["tamper", "expired", "environment", "range"]) {
+test("receipt rejects tampering, profile downgrade, expiry, environment drift, and range drift", () => {
+  for (const scenario of [
+    "tamper",
+    "profile",
+    "expired",
+    "environment",
+    "range",
+  ]) {
     const fixture = createFixture();
     try {
       const prepared = runPrepare(fixture.root);
@@ -666,6 +819,11 @@ test("receipt rejects tampering, expiry, environment drift, and actual range dri
             mode: 0o600,
           },
         );
+      } else if (scenario === "profile") {
+        resignReceipt(state, (receipt) => {
+          receipt.gate.profile = "affected";
+          receipt.gate.recommendedProfile = "affected";
+        });
       } else if (scenario === "expired") {
         resignReceipt(state, (receipt) => {
           receipt.issuedAtMs = Date.now() - PRE_PUSH_RECEIPT_TTL_MS - 1_000;
@@ -684,7 +842,7 @@ test("receipt rejects tampering, expiry, environment drift, and actual range dri
       );
       assert.match(
         pushed.stderr,
-        /reason=receipt_(?:signature_invalid|expired|environment_mismatch|push_range_mismatch)/u,
+        /reason=receipt_(?:signature_invalid|profile_mismatch|expired|environment_mismatch|push_range_mismatch)/u,
         scenario,
       );
       assert.equal(
@@ -842,7 +1000,7 @@ test("caller skip and synthetic receipt environments are rejected, not treated a
       }
       const result = runPrepare(
         fixture.root,
-        [],
+        ["--full"],
         cleanEnvironment({ [variable]: "forged" }),
       );
       assert.equal(result.status, 2, variable);

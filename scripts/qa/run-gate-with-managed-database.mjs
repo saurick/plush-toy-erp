@@ -33,6 +33,7 @@ function repositoryScope(repoRoot) {
 export function parseManagedDatabaseArgs(argv) {
   const options = {
     exactSha: "",
+    forceFull: false,
     gate: "",
     mainRef: "",
     operationId: "",
@@ -43,6 +44,7 @@ export function parseManagedDatabaseArgs(argv) {
   const seen = new Set();
   const allowlistedArguments = new Set([
     "--exact-sha",
+    "--full",
     "--gate",
     "--main-ref",
     "--operation-id",
@@ -55,12 +57,13 @@ export function parseManagedDatabaseArgs(argv) {
     if (!allowlistedArguments.has(argument)) {
       throw new Error("managed quality gate argument is not allowlisted");
     }
-    if (argument === "--prepare-push") {
+    if (argument === "--prepare-push" || argument === "--full") {
       if (seen.has(argument)) {
         throw new Error("managed quality gate argument is not allowlisted");
       }
       seen.add(argument);
-      options.preparePush = true;
+      if (argument === "--prepare-push") options.preparePush = true;
+      else options.forceFull = true;
       continue;
     }
     const value = argv[index + 1];
@@ -88,6 +91,7 @@ export function parseManagedDatabaseArgs(argv) {
 
 function normalizeManagedQualityGateRequest({
   exactSha = "",
+  forceFull = false,
   gate = "",
   mainRef = "",
   preparePush = false,
@@ -99,7 +103,7 @@ function normalizeManagedQualityGateRequest({
   const hasPreparePush = preparePush === true;
   if (
     [hasGate, hasExactSha, hasPreparePush].filter(Boolean).length !== 1 ||
-    (!hasPreparePush && (remote !== "" || refs.length > 0))
+    (!hasPreparePush && (forceFull || remote !== "" || refs.length > 0))
   ) {
     throw new Error("managed quality gate request mode is invalid");
   }
@@ -131,6 +135,7 @@ function normalizeManagedQualityGateRequest({
   }
   return Object.freeze({
     preparePush: true,
+    ...(forceFull ? { forceFull: true } : {}),
     refs: Object.freeze([...refs]),
     ...(remote ? { remote } : {}),
   });
@@ -167,6 +172,7 @@ export function buildManagedQualityGateCommand({
   databaseURL,
   environment = process.env,
   exactSha = "",
+  forceFull = false,
   gate = "",
   mainRef = "",
   preparePush = false,
@@ -179,6 +185,7 @@ export function buildManagedQualityGateCommand({
   }
   const request = normalizeManagedQualityGateRequest({
     exactSha,
+    forceFull,
     gate,
     mainRef,
     preparePush,
@@ -200,6 +207,7 @@ export function buildManagedQualityGateCommand({
       ];
   } else {
     args = ["scripts/qa/pre-push-receipt.mjs", "prepare"];
+    if (request.forceFull) args.push("--full");
     if (request.remote) args.push("--remote", request.remote);
     for (const ref of request.refs) args.push("--ref", ref);
   }
@@ -393,6 +401,7 @@ function defaultRuntime({ repoRoot }) {
     runGate({
       databaseURL,
       exactSha,
+      forceFull,
       gate,
       mainRef,
       preparePush,
@@ -403,6 +412,7 @@ function defaultRuntime({ repoRoot }) {
       const commandSpec = buildManagedQualityGateCommand({
         databaseURL,
         exactSha,
+        forceFull,
         gate,
         mainRef,
         preparePush,
@@ -515,6 +525,7 @@ function boundedReadinessMessage(value, fallback) {
 
 export async function runManagedQualityGate({
   exactSha,
+  forceFull,
   gate,
   mainRef,
   operationId,
@@ -530,6 +541,7 @@ export async function runManagedQualityGate({
   const requestArgs = [];
   if (gate) requestArgs.push("--gate", gate);
   if (exactSha) requestArgs.push("--exact-sha", exactSha);
+  if (forceFull) requestArgs.push("--full");
   if (mainRef) requestArgs.push("--main-ref", mainRef);
   if (preparePush) requestArgs.push("--prepare-push");
   if (remote) requestArgs.push("--remote", remote);
@@ -581,6 +593,7 @@ export async function runManagedQualityGate({
     result = await executor.runGate({
       databaseURL,
       exactSha: request.exactSha,
+      forceFull: request.forceFull,
       gate: request.gate,
       mainRef: request.mainRef,
       preparePush: request.preparePush,

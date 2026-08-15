@@ -22,6 +22,11 @@ const AFFECTED_SCOPE_ORDER = [
   "T8",
 ];
 const LOCAL_FULL_SCOPE = "LOCAL_FULL";
+const MANAGED_DATABASE_COMMAND_IDS = new Set([
+  "critical-pg-create",
+  "critical-pg-migrate",
+  "critical-pg-test",
+]);
 const CUSTOMER_SOURCE_BOUNDARY_TEST =
   "scripts/qa/customer-source-repository-boundary.test.mjs";
 const DEV_PAGE_GOVERNANCE_TEST = "scripts/qa/dev-page-governance.test.mjs";
@@ -789,6 +794,7 @@ export function formatCommand(selected, root = DEFAULT_ROOT) {
 }
 
 export function formatPlan(plan, { root = DEFAULT_ROOT } = {}) {
+  const prePush = selectPrePushProfile(plan);
   const lines = [
     `[qa:affected] files=${plan.changedFiles.length} scopes=${plan.affectedScopes.join(",")} max_scope=${plan.maxAffectedScope} local_gate=${plan.localGate}`,
   ];
@@ -810,9 +816,48 @@ export function formatPlan(plan, { root = DEFAULT_ROOT } = {}) {
     );
   }
   lines.push(
-    `[qa:affected] 最终 clean HEAD 仍需 ${plan.prePushGate} 签发 full 回执；affected 通过不代表发布或目标环境验收完成。`,
+    prePush.recommendedProfile === "affected"
+      ? `[qa:affected] 最终 clean HEAD 可由 ${plan.prePushGate} 复跑本计划并签发 affected 回执；发布候选仍显式使用 --full。`
+      : `[qa:affected] 最终 clean HEAD 需要 full（${prePush.reasons.join(",")}）；${plan.prePushGate} 不会自动启动，须逐次显式使用 --full。`,
+  );
+  lines.push(
+    "[qa:affected] affected/full 回执都不代表 strict、目标环境 migration、smoke 或客户验收完成。",
   );
   return lines.join("\n");
+}
+
+export function selectPrePushProfile(plan, { forceFull = false } = {}) {
+  if (
+    !plan ||
+    !Array.isArray(plan.commands) ||
+    !Array.isArray(plan.followUps) ||
+    !["focused", "full"].includes(plan.localGate)
+  ) {
+    throw new Error("affected plan is invalid");
+  }
+  const reasons = [];
+  if (plan.localGate === "full") reasons.push("local_gate_full");
+  for (const followUp of plan.followUps) {
+    const id = String(followUp?.id || "unknown");
+    reasons.push(`required_follow_up:${id}`);
+  }
+  const recommendedProfile = reasons.length > 0 ? "full" : "affected";
+  const profile = forceFull ? "full" : recommendedProfile;
+  if (forceFull && recommendedProfile === "affected") {
+    reasons.push("explicit_full");
+  }
+  return Object.freeze({
+    profile,
+    recommendedProfile,
+    requiresFullConfirmation:
+      recommendedProfile === "full" && forceFull !== true,
+    requiresManagedDatabase:
+      profile === "full" ||
+      plan.commands.some((command) =>
+        MANAGED_DATABASE_COMMAND_IDS.has(String(command?.id || "")),
+      ),
+    reasons: Object.freeze([...reasons]),
+  });
 }
 
 export function resolveProjectPnpm(root) {
@@ -901,8 +946,9 @@ function printHelp() {
   页面浏览器回归、make data、目标环境 smoke/evidence 会作为 required follow-up 明示。
 
 边界:
-  affected 不替代最终 clean HEAD 的 prepare-push/full 回执，也不替代 strict、
-  目标环境 migration、smoke 或发布证据。`);
+  最终 clean HEAD 仍由 prepare-push 复算同一 affected 计划；有 full local gate
+  或 required follow-up 时须显式 --full。任何本地回执都不替代 strict、目标环境
+  migration、smoke 或发布证据。`);
 }
 
 function parseArgs(argv) {

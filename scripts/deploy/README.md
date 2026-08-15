@@ -88,7 +88,7 @@ RELEASE_BUILDKIT_CACHE_MODE=builder \
 
 正式 promotion 使用下面的串行路径；每一步失败都停在当前层，不能复用旧 SHA、旧镜像或历史回执拼接成功：
 
-1. 在最终 clean HEAD 运行 `full`、`strict` 和 `prepare-push`，完成非强制 push，并等待同一 SHA 的远端 CI 绿色终态。
+1. 在最终 clean HEAD 运行 `strict` 和显式 `prepare-push --full`，完成非强制 push，并等待同一 SHA 的远端 CI 绿色终态；不要再单独重复同一 full。
 2. 从与远端一致的 clean HEAD 构建制品。manifest 记录 committed source archive、两个镜像 content ID / tar checksum、依赖 SBOM、migration 序列和客户配置源指纹；它不宣称目标 active revision。
 3. 先校验并加载制品，再运行本地隔离发布演练。`contentId` 固定表示 OCI config digest；加载后 Docker `.Id` 只允许等于该 config digest 或同一已验 checksum tar 的唯一 OCI manifest digest，以兼容 classic / containerd image store，仍必须同时匹配 tag、`linux/amd64` 和内置 `GIT_SHA`。演练只使用 `server/deploy/compose/prod/compose.yml`，本地测试配置许可同时绑定 exact run ID、`plush_erp_release_<run-id>` 与现场 PostgreSQL system identifier；客户配置所需审批岗位只绑定到该临时库的一次性超级管理员，回执记录岗位与绑定数，不创建可复用账号、不写业务事实。演练不修改长期 `plush_erp`，也不保留一次性数据库、岗位绑定、门禁 identity 或 bootstrap secret。若 manifest 来自仓库外的 Release 下载目录，工作台槽位引用仓库内详细演练回执，禁止写入含 `..` 的外部路径。
 4. 只有本地演练、远端 exact-SHA CI 和目标 rollback point 都通过后，才按目标正式 preflight、备份、migration 锁、Compose 和 smoke 推进 133；133 只 load / pull，不执行构建。

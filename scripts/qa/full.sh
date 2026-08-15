@@ -7,7 +7,7 @@ print_help() {
   bash scripts/qa/full.sh
 
 作用:
-  执行一次完整本地质量检查。最终推送准备由 prepare-push.sh 在建立远端连接前调用。
+  执行一次完整本地质量检查。high-risk 或发布候选由 prepare-push.sh --full 在建立远端连接前调用。
 
 检查内容:
   shared: 复用 fast 的基础守卫，一次运行可安全并行的 scripts Node 显式测试组
@@ -29,7 +29,7 @@ print_help() {
   full/strict 拒绝 SKIP_*、STRICT_SKIP_* 与调用者提供的 coverage 变量。
   full 不复跑会由 Web/Go 全量覆盖的 fast 子集，仍真实执行全部固定 gate；
   只有全部成功才输出 complete；它不读取或签发回执。
-  只有 prepare-push.sh 能在 full 通过且 HEAD/tree/环境/远端范围未变化后签发本地回执。
+  只有 prepare-push.sh --full 能在 full 通过且 HEAD/tree/环境/远端范围未变化后签发 full 回执。
 USAGE
 }
 

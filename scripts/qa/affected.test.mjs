@@ -10,6 +10,7 @@ import {
   buildAffectedPlan,
   collectChangedFiles,
   formatPlan,
+  selectPrePushProfile,
 } from "./affected.mjs";
 
 const ROOT = path.resolve(
@@ -565,15 +566,54 @@ test("affected: full subsumes focused commands but keeps browser follow-up visib
   assert(plan.followUps.some((item) => item.id === "browser-regression"));
 });
 
-test("affected: formatted plan keeps final clean HEAD preparation mandatory", () => {
+test("affected: focused plan selects an affected pre-push receipt", () => {
+  const plan = buildAffectedPlan(["docs/product/自动化测试策略.md"], {
+    root: ROOT,
+  });
+  assert.deepEqual(selectPrePushProfile(plan), {
+    profile: "affected",
+    recommendedProfile: "affected",
+    requiresFullConfirmation: false,
+    requiresManagedDatabase: false,
+    reasons: [],
+  });
+
   const output = formatPlan(
-    buildAffectedPlan(["docs/product/自动化测试策略.md"], { root: ROOT }),
+    plan,
     {
       root: ROOT,
     },
   );
 
-  assert.match(output, /prepare-push\.sh.*full 回执/u);
-  assert.match(output, /affected 通过不代表发布或目标环境验收完成/u);
+  assert.match(output, /prepare-push\.sh.*affected 回执/u);
+  assert.match(output, /发布候选仍显式使用 --full/u);
+  assert.match(output, /不代表 strict、目标环境 migration/u);
   assert.match(output, /scopes=T0,T1 max_scope=T1 local_gate=focused/u);
+});
+
+test("affected: unresolved follow-ups require explicit full pre-push", () => {
+  const plan = buildAffectedPlan(["web/src/erp/pages/V1SalesOrdersPage.jsx"], {
+    root: ROOT,
+  });
+  const selection = selectPrePushProfile(plan);
+
+  assert.equal(selection.profile, "full");
+  assert.equal(selection.recommendedProfile, "full");
+  assert.equal(selection.requiresFullConfirmation, true);
+  assert.equal(selection.requiresManagedDatabase, true);
+  assert(selection.reasons.includes("required_follow_up:browser-regression"));
+  assert.match(formatPlan(plan, { root: ROOT }), /须逐次显式使用 --full/u);
+});
+
+test("affected: explicit full can only escalate a focused plan", () => {
+  const plan = buildAffectedPlan(["docs/product/自动化测试策略.md"], {
+    root: ROOT,
+  });
+  const selection = selectPrePushProfile(plan, { forceFull: true });
+
+  assert.equal(selection.profile, "full");
+  assert.equal(selection.recommendedProfile, "affected");
+  assert.equal(selection.requiresFullConfirmation, false);
+  assert.equal(selection.requiresManagedDatabase, true);
+  assert(selection.reasons.includes("explicit_full"));
 });
