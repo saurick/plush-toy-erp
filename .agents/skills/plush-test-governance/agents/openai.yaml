@@ -1,4 +1,4 @@
 interface:
   display_name: "Plush Test Governance"
   short_description: "按改动影响面选择最小充分测试并准确说明验证与证据边界"
-  default_prompt: "Use $plush-test-governance 按改动影响面选择最小充分验证；内部 T0-T8 只作追踪键，报告实际命令、执行数、skip、未跑项与盲区。"
+  default_prompt: "Use $plush-test-governance 先展示执行合同并按影响面选择最小充分验证；高成本 full/strict/Full Acceptance 等须逐次明确确认，报告实际命令、执行数、skip、未跑项与盲区。"

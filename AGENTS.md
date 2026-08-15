@@ -116,11 +116,10 @@
 
 按 `docs/product/自动化测试策略.md` 和 `$plush-test-governance` 选择 T0-T8 与测试形态。
 
-- Workflow：done/blocked/rejected、reason、旧原因清理、幂等、任务匹配、settled、JSON-RPC/RBAC/owner/assignee/status。
-- Fact：happy path、非法状态、重复提交、取消/冲正、幂等、防负数、事务失败、过账不可改删和查询表一致性。
-- RBAC/API：未登录、disabled、非管理员、无权限、角色/owner/assignee/status、super_admin；前端隐藏不是安全边界。
-- 前端/menu/seed：菜单真源、默认/交互/恢复态、style:l1、移动角色 smoke 和旧开发入口边界。
-- 产品化：不写死客户，不分叉核心 schema/usecase，不把模拟数据说成真实事实。
+- 新任务创建前完整展示提示词，并列明修改范围、精确测试、明确不跑项、数据写入、部署、stage/commit/push 和停止条件；Codex 自拟提示词不能代替用户确认。
+- `full.sh`、`strict.sh`、Full Acceptance、全量 Style L1、全页面或全 PDF 回归等高成本验证必须逐次明确确认；不能从“覆盖所有业务链场景”“一次做完”“提交并推送”等宽泛表述推导。`prepare-push.sh` 会执行一次完整 full，启动前必须单独说明。
+
+- 各领域的正常、边界、异常、权限和证据边界由测试策略、对应代码与测试真源守住，不在本文件重复目录。
 
 自动化通过不代表完整验收；缺失测试必须明确说明。
 

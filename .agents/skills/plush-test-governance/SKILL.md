@@ -18,11 +18,14 @@ description: 项目测试治理（plush-toy-erp）。Use when choosing, running,
 ## 工作流
 
 1. 先看 `git status --short`，确认本轮路径、其他 writer 和当前 repository identity。
-2. 按实际风险选择验证：文档/Skill 做链接与合同检查；schema/migration 做生成、迁移和数据测试；领域/API/RBAC 做正常、边界、异常和权限；页面做 Web 与真实浏览器；发布做目标环境证据。
-3. 开发期先运行 `bash scripts/qa/affected.sh --plan`，确认计划和 required follow-up 后再使用 `--run`。不为一个小改动机械运行 `full/strict`。
-4. 对 `affected` 无法选择的生成命令、真实数据库、浏览器、migration 或发布检查，按计划显式补充；环境不具备时报告 `blocked` 或 `missing`，不要用另一类测试绿色代替。
-5. 记录实际命令、执行数、pass/fail/skip、证据环境和未覆盖项。缺 summary、`0 tests executed` 或意外 skip 一律不能写成通过。
-6. 只有命中项目过程记录条件时才更新 `progress.md`；普通且已闭环的小改动不重复留过程台账。
+2. 新任务或续跑前先展示执行合同：完整提示词、修改范围、精确测试、明确不跑项、数据写入、部署、stage/commit/push 和停止条件；创建任务前让用户看到最终提示词。Codex 自拟提示词不能代替用户确认。
+3. 按实际风险选择验证：文档/Skill 做链接与合同检查；schema/migration 做生成、迁移和数据测试；领域/API/RBAC 做正常、边界、异常和权限；页面做 Web 与真实浏览器；发布做目标环境证据。
+4. 开发期先运行 `bash scripts/qa/affected.sh --plan`，确认计划和 required follow-up 后再使用 `--run`；优先同名测试、受影响模块和单链浏览器，不为普通改动机械运行全站。
+5. `full.sh`、`strict.sh`、Full Acceptance、全量 Style L1、全页面或全 PDF 回归必须逐次得到用户明确确认；“覆盖所有业务链场景”“一次做完”“提交并推送”等宽泛表述不构成授权。`prepare-push.sh` 会运行一次完整 full，启动前单独说明。
+6. 产品范围与 clean exact SHA 冻结后，同一候选只运行一轮完整 lifecycle 和一轮 `prepare-push`。高成本门禁失败即停止，不自动扩圈或重跑；只有影响生产正确性、安全、数据完整性、权限或可恢复发布的修复形成新候选后，才重新确认。fixture、mock、选择器、测试文案、开发工作台或证据展示问题若不使生产结论失效，列为后续事项。
+7. 对 `affected` 无法选择的生成命令、真实数据库、浏览器、migration 或发布检查，按计划显式补充；环境不具备时报告 `blocked` 或 `missing`，不要用另一类测试绿色代替。
+8. 记录实际命令、执行数、pass/fail/skip、证据环境和未覆盖项。缺 summary、`0 tests executed` 或意外 skip 一律不能写成通过。
+9. 只有命中项目过程记录条件时才更新 `progress.md`；普通且已闭环的小改动不重复留过程台账。
 
 ## 风险边界
 

@@ -290,21 +290,27 @@ test("skill health: rejects stale index entries and invalid short descriptions",
 });
 
 test("skill health: testing and capability guidance avoid duplicate mandatory layer catalogs", async () => {
-  const [strategy, testSkill, capabilitySkill, skillIndex] = await Promise.all([
-    readFile(path.join(ROOT, "docs/product/自动化测试策略.md"), "utf8"),
-    readFile(
-      path.join(ROOT, ".agents/skills/plush-test-governance/SKILL.md"),
-      "utf8",
-    ),
-    readFile(
-      path.join(
-        ROOT,
-        ".agents/skills/plush-capability-evidence-audit/SKILL.md",
+  const [projectAgents, strategy, testSkill, capabilitySkill, skillIndex] =
+    await Promise.all([
+      readFile(path.join(ROOT, "AGENTS.md"), "utf8"),
+      readFile(path.join(ROOT, "docs/product/自动化测试策略.md"), "utf8"),
+      readFile(
+        path.join(ROOT, ".agents/skills/plush-test-governance/SKILL.md"),
+        "utf8",
       ),
-      "utf8",
-    ),
-    readFile(path.join(ROOT, ".agents/skills/README.md"), "utf8"),
-  ]);
+      readFile(
+        path.join(
+          ROOT,
+          ".agents/skills/plush-capability-evidence-audit/SKILL.md",
+        ),
+        "utf8",
+      ),
+      readFile(path.join(ROOT, ".agents/skills/README.md"), "utf8"),
+    ]);
+
+  assert.match(projectAgents, /高成本验证必须逐次明确确认/u);
+  assert.match(strategy, /Codex 自拟提示词不能代替用户确认/u);
+  assert.match(testSkill, /高成本门禁失败即停止，不自动扩圈或重跑/u);
 
   assert.equal(
     strategy.match(/^## 验证层级 T0-T8$/gmu)?.length,
