@@ -315,8 +315,21 @@ export function createVersionCenterSummary() {
   })
 }
 
-export async function installSummaryRoute(page, onRequest = () => {}) {
+export async function installDeliverySummaryRoute(page, onRequest = () => {}) {
   const summary = createVersionCenterSummary()
+  await page.route('**/__dev/api/delivery/summary', async (route) => {
+    onRequest()
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(summary),
+    })
+  })
+  return summary
+}
+
+export async function installSummaryRoute(page, onRequest = () => {}) {
+  const summary = await installDeliverySummaryRoute(page, onRequest)
   const qualityGateSummary = createQualityGateStyleSummary('passed')
   const strictReceipt = {
     ...qualityGateSummary.operations[0].receipt,
@@ -346,14 +359,6 @@ export async function installSummaryRoute(page, onRequest = () => {}) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(qualityGateSummary),
-    })
-  })
-  await page.route('**/__dev/api/delivery/summary', async (route) => {
-    onRequest()
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(summary),
     })
   })
   await page.route('**/__dev/api/delivery/operations/*', async (route) => {

@@ -37,6 +37,7 @@ import { createBusinessFormModalAssertions } from './style-l1/businessFormModalA
 import { createPurchaseReceiptAssertions } from './style-l1/purchaseReceiptAssertions.mjs'
 import { createMobileTaskAssertions } from './style-l1/mobileTaskAssertions.mjs'
 import { createStyleL1Scenarios } from './style-l1/scenarios.mjs'
+import { installDeliverySummaryRoute } from './style-l1/devVersionCenterScenarios.mjs'
 import { loadDevPorts } from '../../scripts/dev-ports.mjs'
 
 const webDir = path.resolve(import.meta.dirname, '..')
@@ -770,6 +771,11 @@ async function runScenarioOnce(browser, scenario) {
   })
 
   try {
+    if (String(scenario.path || '').startsWith('/__dev')) {
+      // Style L1 verifies deterministic browser states. Live GitHub and 133
+      // readback remain covered by their dedicated runtime acceptance lanes.
+      await installDeliverySummaryRoute(page)
+    }
     if (typeof scenario.beforeNavigate === 'function') {
       await scenario.beforeNavigate(page)
     }
