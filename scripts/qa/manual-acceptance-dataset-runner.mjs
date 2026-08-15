@@ -23,9 +23,16 @@ import {
 } from "./manual-acceptance-source-data.mjs";
 import {
   CONFIRM_PHRASE as TASK_CONFIRM_PHRASE,
+  PREVIOUS_TASK_COPY_REVISION,
+  PREVIOUS_TASK_RUN_ID,
+  TASK_COPY_REVISION,
+  TASK_PROFILE_LONG_LIVED_WORKBENCH,
   applyManualAcceptanceTaskData,
+  buildLegacyManualAcceptanceTaskBatchReference,
   buildManualAcceptanceTaskDataPlan,
   buildManualAcceptanceTaskSchedule,
+  manualAcceptanceTaskRetireConfirmation,
+  retireLegacyManualAcceptanceTaskBatch,
 } from "./manual-acceptance-task-data.mjs";
 import {
   assertManualAcceptanceCapabilitiesPolicy,
@@ -37,7 +44,7 @@ import {
 } from "./manual-acceptance-target-policy.mjs";
 
 export const MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION =
-  "manual-acceptance-dataset-runner-v7";
+  "manual-acceptance-dataset-runner-v8";
 
 const DATASET_CONFIRM_PHRASE = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA";
 const ISOLATED_LOCAL_TARGET_ALIAS = "local";
@@ -1388,6 +1395,9 @@ export async function runDefaultManualAcceptanceTaskComponent(
       { stageKey: "task" },
     );
   }
+  const useLongLivedTaskProfile =
+    targetAdapter.alias !== ISOLATED_LOCAL_TARGET_ALIAS &&
+    targetAdapter.policyTarget !== "local-dev";
   const plan = buildManualAcceptanceTaskDataPlan({
     target: targetAdapter.policyTarget,
     dataVersion: businessInput.dataVersion,
@@ -1395,25 +1405,79 @@ export async function runDefaultManualAcceptanceTaskComponent(
     backendURL: targetAdapter.backendURL,
     databaseName: targetAdapter.databaseName,
     nowSec: Math.floor(Date.parse(businessInput.taskScheduleAnchorUtc) / 1000),
+    ...(useLongLivedTaskProfile
+      ? { taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH }
+      : {}),
   });
   const applyTaskData = deps.applyTaskData || applyManualAcceptanceTaskData;
-  const report = await applyTaskData(plan, {
-    password: requiredCredential(
-      targetAdapter.credentials.rolePassword,
-      "rolePassword",
-      "task",
-    ),
-    adminPassword: requiredCredential(
-      targetAdapter.credentials.adminPassword,
-      "adminPassword",
-      "task",
-    ),
+  const rolePassword = requiredCredential(
+    targetAdapter.credentials.rolePassword,
+    "rolePassword",
+    "task",
+  );
+  const adminPassword = requiredCredential(
+    targetAdapter.credentials.adminPassword,
+    "adminPassword",
+    "task",
+  );
+  let report = await applyTaskData(plan, {
+    password: rolePassword,
+    adminPassword,
     confirmPhrase: TASK_CONFIRM_PHRASE,
     targetConfirmation: targetAdapter.confirmation || undefined,
     targetAttestation: targetAdapter.attestation || undefined,
     fetchImpl: deps.fetchImpl,
     sourceReport: sourceState.report,
   });
+  if (useLongLivedTaskProfile) {
+    const retireTaskBatch =
+      deps.retireTaskBatch || retireLegacyManualAcceptanceTaskBatch;
+    const legacyBatches = [
+      {
+        runId: PREVIOUS_TASK_RUN_ID,
+        copyRevision: PREVIOUS_TASK_COPY_REVISION,
+      },
+      { runId: businessInput.runId, copyRevision: TASK_COPY_REVISION },
+    ];
+    const legacyRetirements = [];
+    for (const legacy of legacyBatches) {
+      const legacyBatch = buildLegacyManualAcceptanceTaskBatchReference({
+        ...legacy,
+        backendURL: targetAdapter.backendURL,
+      });
+      const retirement = await retireTaskBatch(plan, {
+        retireRunId: legacy.runId,
+        retireCopyRevision: legacy.copyRevision,
+        password: rolePassword,
+        adminPassword,
+        allowAbsent: true,
+        confirmPhrase: manualAcceptanceTaskRetireConfirmation(
+          plan,
+          legacyBatch,
+        ),
+        targetConfirmation: targetAdapter.confirmation || undefined,
+        targetAttestation: targetAdapter.attestation || undefined,
+        fetchImpl: deps.fetchImpl,
+      });
+      legacyRetirements.push({
+        runId: legacy.runId,
+        copyRevision: legacy.copyRevision,
+        summary: retirement.summary,
+      });
+    }
+    report = {
+      ...report,
+      legacyRetirements,
+      summary: {
+        ...report.summary,
+        legacyBatchCount: legacyRetirements.length,
+        legacyTasksTerminalized: legacyRetirements.reduce(
+          (total, item) => total + Number(item.summary?.terminalized || 0),
+          0,
+        ),
+      },
+    };
+  }
   await persistReport(reportPath, report);
   return { operation: "applied", report, reportPath };
 }

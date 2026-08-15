@@ -52,7 +52,14 @@ import {
   CUSTOMER_TRIAL_133_TARGET,
   SCENARIO_DEMO_ORIGIN,
 } from "./manual-acceptance-target-policy.mjs";
-import { buildManualAcceptanceTaskSchedule } from "./manual-acceptance-task-data.mjs";
+import {
+  PREVIOUS_TASK_COPY_REVISION,
+  PREVIOUS_TASK_RUN_ID,
+  TASK_COPY_REVISION,
+  TASK_PROFILE_ACCEPTANCE_SNAPSHOT,
+  TASK_PROFILE_LONG_LIVED_WORKBENCH,
+  buildManualAcceptanceTaskSchedule,
+} from "./manual-acceptance-task-data.mjs";
 
 const GENERATED_AT = "2026-07-15T01:02:03.000Z";
 const LOCAL_APPLY_BACKEND = "http://127.0.0.1:18376";
@@ -115,6 +122,7 @@ test("default task runner binds the exact same-run source report", async () => {
     reportPath,
   };
   let receivedSourceReport = null;
+  let receivedTaskProfile = null;
   try {
     await assert.rejects(
       () =>
@@ -143,13 +151,15 @@ test("default task runner binds the exact same-run source report", async () => {
       fetchImpl: async () => {
         throw new Error("fetch must not run through the injected task apply");
       },
-      applyTaskData: async (_plan, options) => {
+      applyTaskData: async (plan, options) => {
         receivedSourceReport = options.sourceReport;
+        receivedTaskProfile = plan.taskProfile;
         return {
           mode: "apply",
           datasetKey: "yoyoosun-manual-acceptance",
           dataVersion: "2026.08.15-v6",
           runId: "20260815-V6",
+          summary: { persisted: 180 },
         };
       },
     });
@@ -157,6 +167,98 @@ test("default task runner binds the exact same-run source report", async () => {
     await fs.rm(outputRoot, { recursive: true, force: true });
   }
   assert.equal(receivedSourceReport, sourceReport);
+  assert.equal(receivedTaskProfile, TASK_PROFILE_ACCEPTANCE_SNAPSHOT);
+});
+
+test("persistent task runner uses the long-lived profile and retires snapshot batches", async () => {
+  const outputRoot = await fs.mkdtemp(
+    path.join(os.tmpdir(), "plush-persistent-task-profile-"),
+  );
+  const reportPath = path.join(outputRoot, "task-report.json");
+  const sourceReport = {
+    mode: "apply",
+    datasetKey: "yoyoosun-manual-acceptance",
+    dataVersion: "2026.08.15-v6",
+    runId: "20260815-V6",
+  };
+  const sourceReportPath = path.join(outputRoot, "source-report.json");
+  const invocation = {
+    businessInput: {
+      dataVersion: "2026.08.15-v6",
+      runId: "20260815-V6",
+      taskScheduleAnchorUtc: GENERATED_AT,
+    },
+    targetAdapter: {
+      alias: PERSISTENT_SCENARIO_DATASET_TARGET,
+      policyTarget: PERSISTENT_SCENARIO_DATASET_TARGET,
+      backendURL: SCENARIO_DEMO_ORIGIN,
+      databaseName: LOCAL_PERSISTENT_DATABASE,
+      confirmation: "target-confirmation",
+      attestation: null,
+      credentials: {
+        rolePassword: "role-password",
+        adminPassword: "admin-password",
+      },
+    },
+    reportPath,
+  };
+  const retired = [];
+  try {
+    const result = await runDefaultManualAcceptanceTaskComponent(invocation, {
+      state: {
+        componentReports: new Map([
+          ["source", { report: sourceReport, reportPath: sourceReportPath }],
+        ]),
+      },
+      applyTaskData: async (plan, options) => {
+        assert.equal(plan.taskProfile, TASK_PROFILE_LONG_LIVED_WORKBENCH);
+        assert.equal(options.sourceReport, sourceReport);
+        return {
+          mode: "apply",
+          datasetKey: "yoyoosun-manual-acceptance",
+          dataVersion: "2026.08.15-v6",
+          runId: "20260815-V6",
+          taskProfile: plan.taskProfile,
+          summary: { persisted: 180 },
+        };
+      },
+      retireTaskBatch: async (plan, options) => {
+        assert.equal(plan.taskProfile, TASK_PROFILE_LONG_LIVED_WORKBENCH);
+        retired.push({
+          runId: options.retireRunId,
+          copyRevision: options.retireCopyRevision,
+          allowAbsent: options.allowAbsent,
+          confirmation: options.confirmPhrase,
+        });
+        return { summary: { terminalized: retired.length } };
+      },
+    });
+    assert.equal(result.report.taskProfile, TASK_PROFILE_LONG_LIVED_WORKBENCH);
+    assert.equal(result.report.summary.legacyBatchCount, 2);
+    assert.equal(result.report.summary.legacyTasksTerminalized, 3);
+  } finally {
+    await fs.rm(outputRoot, { recursive: true, force: true });
+  }
+  assert.deepEqual(
+    retired.map(({ runId, copyRevision, allowAbsent }) => ({
+      runId,
+      copyRevision,
+      allowAbsent,
+    })),
+    [
+      {
+        runId: PREVIOUS_TASK_RUN_ID,
+        copyRevision: PREVIOUS_TASK_COPY_REVISION,
+        allowAbsent: true,
+      },
+      {
+        runId: "20260815-V6",
+        copyRevision: TASK_COPY_REVISION,
+        allowAbsent: true,
+      },
+    ],
+  );
+  assert.ok(retired.every((item) => item.confirmation.length > 20));
 });
 
 function localApplyPlan(overrides = {}) {
