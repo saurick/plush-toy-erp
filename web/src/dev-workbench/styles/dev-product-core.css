@@ -99,6 +99,7 @@
 
 .erp-dev-product-core-inventory,
 .erp-dev-product-core-empty {
+  min-width: 0;
   border: 1px solid #dce8dd;
   border-radius: 14px;
   background: rgb(255 255 255 / 96%);
