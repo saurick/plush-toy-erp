@@ -29,6 +29,15 @@ function deepFreeze(value) {
   return Object.freeze(value);
 }
 
+function dataSemanticValue(contract) {
+  const value = structuredClone(contract);
+  // The previous activation tuple is a deployment bridge, not part of the
+  // V6 business-data topology. Keep existing V6 Scenario receipts stable.
+  delete value.customerTrial133.previousConfigProductVersion;
+  delete value.customerTrial133.previousDatasetVersion;
+  return value;
+}
+
 export function validateManualAcceptanceCoreContract(contract) {
   if (
     contract?.schemaVersion !== "plush.manual-acceptance-contract/v6" ||
@@ -86,7 +95,13 @@ export function validateManualAcceptanceCoreContract(contract) {
     !String(target?.configProductVersion || "").endsWith(
       contract.dataVersion,
     ) ||
-    !String(target?.previousConfigRevision || "").includes("package-v7")
+    !String(target?.previousConfigRevision || "").includes("package-v7") ||
+    target?.previousConfigProductVersion !==
+      "customer-trial-133-test-2026.07.16-v5" ||
+    target?.previousDatasetVersion !== "2026.07.16-v5" ||
+    !String(target.previousConfigProductVersion).endsWith(
+      target.previousDatasetVersion,
+    )
   ) {
     throw new Error("manual acceptance customer-trial target is invalid");
   }
@@ -100,7 +115,11 @@ export const MANUAL_ACCEPTANCE_CORE_CONTRACT = deepFreeze(
 );
 
 export const MANUAL_ACCEPTANCE_CORE_SEMANTIC_DIGEST = createHash("sha256")
-  .update(JSON.stringify(stableValue(MANUAL_ACCEPTANCE_CORE_CONTRACT)))
+  .update(
+    JSON.stringify(
+      stableValue(dataSemanticValue(MANUAL_ACCEPTANCE_CORE_CONTRACT)),
+    ),
+  )
   .digest("hex");
 
 export const MANUAL_ACCEPTANCE_CORE_UNITS =

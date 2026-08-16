@@ -29,9 +29,11 @@ var (
 	Revision       = contract.CustomerTrial133.ConfigRevision
 	// PreviousActiveRevision is admitted only by startup readback during the
 	// V6-to-V8 activation window. Publish and transition classifiers still
-	// accept Revision only, so the previous identity cannot become a write alias.
-	PreviousActiveRevision = contract.CustomerTrial133.PreviousConfigRevision
-	expectedDatabase       = contract.CustomerTrial133.DatabaseName
+	// accept Revision only, so this exact previous tuple cannot become a write alias.
+	PreviousActiveRevision       = contract.CustomerTrial133.PreviousConfigRevision
+	PreviousActiveProductVersion = contract.CustomerTrial133.PreviousConfigProductVersion
+	PreviousActiveDatasetVersion = contract.CustomerTrial133.PreviousDatasetVersion
+	expectedDatabase             = contract.CustomerTrial133.DatabaseName
 )
 
 // ResolveGate validates the complete runtime boundary and reports whether the
@@ -65,7 +67,15 @@ func ResolveGate(dsn string, getenv func(string) string) (bool, error) {
 // ClassifyManifest reserves the trial marker fields as one atomic identity.
 // A payload carrying any reserved marker must carry every exact marker value.
 func ClassifyManifest(customerKey, revision, productVersion string, compiledSnapshot map[string]any) (bool, error) {
-	return classifyManifestForRevision(customerKey, revision, productVersion, compiledSnapshot, Revision)
+	return classifyManifestForIdentity(
+		customerKey,
+		revision,
+		productVersion,
+		compiledSnapshot,
+		Revision,
+		ProductVersion,
+		DatasetVersion,
+	)
 }
 
 // ClassifyActiveManifest admits the exact previous active revision only long
@@ -76,10 +86,22 @@ func ClassifyActiveManifest(customerKey, revision, productVersion string, compil
 	if err == nil || strings.TrimSpace(revision) != PreviousActiveRevision {
 		return trial, err
 	}
-	return classifyManifestForRevision(customerKey, revision, productVersion, compiledSnapshot, PreviousActiveRevision)
+	return classifyManifestForIdentity(
+		customerKey,
+		revision,
+		productVersion,
+		compiledSnapshot,
+		PreviousActiveRevision,
+		PreviousActiveProductVersion,
+		PreviousActiveDatasetVersion,
+	)
 }
 
-func classifyManifestForRevision(customerKey, revision, productVersion string, compiledSnapshot map[string]any, expectedRevision string) (bool, error) {
+func classifyManifestForIdentity(
+	customerKey, revision, productVersion string,
+	compiledSnapshot map[string]any,
+	expectedRevision, expectedProductVersion, expectedDatasetVersion string,
+) (bool, error) {
 	customerKey = strings.TrimSpace(customerKey)
 	revision = strings.TrimSpace(revision)
 	productVersion = strings.TrimSpace(productVersion)
@@ -94,9 +116,9 @@ func classifyManifestForRevision(customerKey, revision, productVersion string, c
 	}
 	if customerKey != ExpectedCustomerKey ||
 		revision != expectedRevision ||
-		productVersion != ProductVersion ||
+		productVersion != expectedProductVersion ||
 		!exactSnapshotString(compiledSnapshot, "applyPurpose", ApplyPurpose) ||
-		!exactSnapshotString(compiledSnapshot, "datasetVersion", DatasetVersion) ||
+		!exactSnapshotString(compiledSnapshot, "datasetVersion", expectedDatasetVersion) ||
 		!exactSnapshotString(compiledSnapshot, "target", ExpectedTarget) {
 		return false, fmt.Errorf("customer trial config marker is incomplete or invalid")
 	}

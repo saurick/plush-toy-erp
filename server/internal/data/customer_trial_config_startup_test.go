@@ -75,14 +75,18 @@ func TestValidateActiveCustomerTrialConfigAllowsFormalOrMissingRevision(t *testi
 }
 
 func TestValidateActiveCustomerTrialConfigRequiresExactRuntimeOptIn(t *testing.T) {
-	for _, revision := range []string{
-		customertrialconfig.Revision,
-		customertrialconfig.PreviousActiveRevision,
+	for _, identity := range []struct {
+		revision       string
+		productVersion string
+		datasetVersion string
+	}{
+		{customertrialconfig.Revision, customertrialconfig.ProductVersion, customertrialconfig.DatasetVersion},
+		{customertrialconfig.PreviousActiveRevision, customertrialconfig.PreviousActiveProductVersion, customertrialconfig.PreviousActiveDatasetVersion},
 	} {
-		t.Run(revision, func(t *testing.T) {
-			db, mock := expectActiveCustomerConfigVersion(t, revision, customertrialconfig.ProductVersion, map[string]string{
+		t.Run(identity.revision, func(t *testing.T) {
+			db, mock := expectActiveCustomerConfigVersion(t, identity.revision, identity.productVersion, map[string]string{
 				"applyPurpose":   customertrialconfig.ApplyPurpose,
-				"datasetVersion": customertrialconfig.DatasetVersion,
+				"datasetVersion": identity.datasetVersion,
 				"target":         customertrialconfig.ExpectedTarget,
 			}, "plush_erp_uat_20260716_v5", "trial-system", nil)
 			defer func() { _ = db.Close() }()
@@ -111,10 +115,10 @@ func TestValidateActiveCustomerTrialConfigAllowsExactEnabledRuntime(t *testing.T
 	}
 }
 
-func TestValidateActiveCustomerTrialConfigAllowsExactPreviousRevisionDuringV7Activation(t *testing.T) {
-	db, mock := expectActiveCustomerConfigVersion(t, customertrialconfig.PreviousActiveRevision, customertrialconfig.ProductVersion, map[string]string{
+func TestValidateActiveCustomerTrialConfigAllowsExactPreviousIdentityDuringV8Activation(t *testing.T) {
+	db, mock := expectActiveCustomerConfigVersion(t, customertrialconfig.PreviousActiveRevision, customertrialconfig.PreviousActiveProductVersion, map[string]string{
 		"applyPurpose":   customertrialconfig.ApplyPurpose,
-		"datasetVersion": customertrialconfig.DatasetVersion,
+		"datasetVersion": customertrialconfig.PreviousActiveDatasetVersion,
 		"target":         customertrialconfig.ExpectedTarget,
 	}, "plush_erp_uat_20260716_v5", "trial-system", nil)
 	defer func() { _ = db.Close() }()

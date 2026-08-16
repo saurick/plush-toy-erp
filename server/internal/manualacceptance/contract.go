@@ -39,13 +39,15 @@ type Warehouse struct {
 }
 
 type CustomerTrial133 struct {
-	Target                 string `json:"target"`
-	DatabaseName           string `json:"databaseName"`
-	DatabaseLifecycle      string `json:"databaseLifecycle"`
-	MinimumMigration       string `json:"minimumMigration"`
-	ConfigRevision         string `json:"configRevision"`
-	ConfigProductVersion   string `json:"configProductVersion"`
-	PreviousConfigRevision string `json:"previousConfigRevision"`
+	Target                       string `json:"target"`
+	DatabaseName                 string `json:"databaseName"`
+	DatabaseLifecycle            string `json:"databaseLifecycle"`
+	MinimumMigration             string `json:"minimumMigration"`
+	ConfigRevision               string `json:"configRevision"`
+	ConfigProductVersion         string `json:"configProductVersion"`
+	PreviousConfigRevision       string `json:"previousConfigRevision"`
+	PreviousConfigProductVersion string `json:"previousConfigProductVersion"`
+	PreviousDatasetVersion       string `json:"previousDatasetVersion"`
 }
 
 type Contract struct {
@@ -151,7 +153,10 @@ func Validate(contract Contract) error {
 		!regexp.MustCompile(`^[0-9]{14}$`).MatchString(target.MinimumMigration) ||
 		!strings.Contains(target.ConfigRevision, "package-v8") ||
 		!strings.HasSuffix(target.ConfigProductVersion, contract.DataVersion) ||
-		!strings.Contains(target.PreviousConfigRevision, "package-v7") {
+		!strings.Contains(target.PreviousConfigRevision, "package-v7") ||
+		target.PreviousConfigProductVersion != "customer-trial-133-test-2026.07.16-v5" ||
+		target.PreviousDatasetVersion != "2026.07.16-v5" ||
+		!strings.HasSuffix(target.PreviousConfigProductVersion, target.PreviousDatasetVersion) {
 		return fmt.Errorf("customer-trial-133 identity is incomplete")
 	}
 	return nil

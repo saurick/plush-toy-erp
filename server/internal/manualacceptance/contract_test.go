@@ -11,7 +11,9 @@ func TestCurrentContractIsExactAndDefensivelyCopied(t *testing.T) {
 		t.Fatalf("unexpected unit contract: %#v", contract)
 	}
 	if contract.CustomerTrial133.DatabaseLifecycle != "long-lived-registered-target" ||
-		contract.CustomerTrial133.DatabaseName != "plush_erp_uat_20260716_v5" {
+		contract.CustomerTrial133.DatabaseName != "plush_erp_uat_20260716_v5" ||
+		contract.CustomerTrial133.PreviousConfigProductVersion != "customer-trial-133-test-2026.07.16-v5" ||
+		contract.CustomerTrial133.PreviousDatasetVersion != "2026.07.16-v5" {
 		t.Fatalf("unexpected stable customer-trial database identity: %#v", contract.CustomerTrial133)
 	}
 	contract.Units[0].Name = "changed"
@@ -39,5 +41,10 @@ func TestValidateRejectsMergedOrRealCustomerDataset(t *testing.T) {
 	realImport.RealCustomerImport = true
 	if err := Validate(realImport); err == nil {
 		t.Fatal("Validate() accepted a real-customer-import marker")
+	}
+	previousDrift := Current()
+	previousDrift.CustomerTrial133.PreviousDatasetVersion = previousDrift.DataVersion
+	if err := Validate(previousDrift); err == nil {
+		t.Fatal("Validate() accepted a drifted previous activation identity")
 	}
 }

@@ -137,16 +137,21 @@ func TestClassifyManifestRequiresAtomicExactMarker(t *testing.T) {
 }
 
 func TestClassifyActiveManifestAllowsOnlyExactPreviousStartupIdentity(t *testing.T) {
-	marker := map[string]any{
+	currentMarker := map[string]any{
 		"applyPurpose":   ApplyPurpose,
 		"datasetVersion": DatasetVersion,
+		"target":         ExpectedTarget,
+	}
+	previousMarker := map[string]any{
+		"applyPurpose":   ApplyPurpose,
+		"datasetVersion": PreviousActiveDatasetVersion,
 		"target":         ExpectedTarget,
 	}
 	trial, err := ClassifyActiveManifest(
 		ExpectedCustomerKey,
 		PreviousActiveRevision,
-		ProductVersion,
-		marker,
+		PreviousActiveProductVersion,
+		previousMarker,
 	)
 	if err != nil || !trial {
 		t.Fatalf("ClassifyActiveManifest() = (%v, %v), want exact previous active revision", trial, err)
@@ -154,10 +159,27 @@ func TestClassifyActiveManifestAllowsOnlyExactPreviousStartupIdentity(t *testing
 	if trial, err := ClassifyManifest(
 		ExpectedCustomerKey,
 		PreviousActiveRevision,
-		ProductVersion,
-		marker,
+		PreviousActiveProductVersion,
+		previousMarker,
 	); err == nil || trial {
 		t.Fatalf("ClassifyManifest() = (%v, %v), previous revision must remain rejected for writes", trial, err)
+	}
+	for _, identity := range []struct {
+		productVersion string
+		marker         map[string]any
+	}{
+		{productVersion: ProductVersion, marker: currentMarker},
+		{productVersion: PreviousActiveProductVersion, marker: currentMarker},
+		{productVersion: ProductVersion, marker: previousMarker},
+	} {
+		if trial, err := ClassifyActiveManifest(
+			ExpectedCustomerKey,
+			PreviousActiveRevision,
+			identity.productVersion,
+			identity.marker,
+		); err == nil || trial {
+			t.Fatalf("ClassifyActiveManifest() = (%v, %v), want exact previous product and dataset", trial, err)
+		}
 	}
 	for _, revision := range []string{
 		"yoyoosun-customer-trial-133-package-v3.runtime-manifest-v1",
@@ -166,8 +188,8 @@ func TestClassifyActiveManifestAllowsOnlyExactPreviousStartupIdentity(t *testing
 		if trial, err := ClassifyActiveManifest(
 			ExpectedCustomerKey,
 			revision,
-			ProductVersion,
-			marker,
+			PreviousActiveProductVersion,
+			previousMarker,
 		); err == nil || trial {
 			t.Fatalf("ClassifyActiveManifest(%q) = (%v, %v), want rejection", revision, trial, err)
 		}
