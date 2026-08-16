@@ -152,11 +152,11 @@ test("CI affected/full plan controls setup and default main produces one strict 
 test("CI pins actions, toolchains, database and Chromium sandbox", () => {
   const uses = collectUses(workflow).sort();
   assert.deepEqual(uses, [
-    "actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830",
-    "actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830",
-    "actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830",
-    "actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830",
-    "actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830",
+    "actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+    "actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+    "actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+    "actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+    "actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
     "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
     "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
     "actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
