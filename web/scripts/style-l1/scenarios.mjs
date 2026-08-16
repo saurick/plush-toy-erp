@@ -163,7 +163,7 @@ export function createStyleL1Scenarios(deps) {
   const selectVirtualizedAntOption = async (
     page,
     dropdown,
-    { label, optionLabel }
+    { label, optionLabel, activateOption }
   ) => {
     const options = dropdown.locator('.ant-select-item-option')
     const listHolder = dropdown.locator('.rc-virtual-list-holder')
@@ -180,7 +180,9 @@ export function createStyleL1Scenarios(deps) {
         (item) => item === optionLabel
       )
       if (targetIndex >= 0) {
-        await options.nth(targetIndex).click()
+        const targetOption = options.nth(targetIndex)
+        if (activateOption) await activateOption(targetOption)
+        else await targetOption.click()
         return
       }
 
@@ -3628,40 +3630,16 @@ export function createStyleL1Scenarios(deps) {
           ),
         })
 
-        const controlledSelectDropdown = async (select, label) => {
-          const listboxID = await select
-            .getByRole('combobox')
-            .getAttribute('aria-controls')
-          assert(listboxID, `${label}缺少受控下拉标识`)
-          const listbox = page.locator(`[id="${listboxID}"]`)
-          const dropdown = page
-            .locator('.ant-select-dropdown')
-            .filter({ has: listbox })
-          await dropdown.waitFor({ state: 'visible', timeout: 5000 })
-          return dropdown
-        }
-
         const roleSelect = modal.getByLabel('选择要查看的岗位').first()
-        await roleSelect.locator('.ant-select-selector').click()
-        const roleDropdown = await controlledSelectDropdown(
+        const roleDropdown = await openControlledAntSelectDropdown(
+          page,
           roleSelect,
           '岗位选择'
         )
-        await roleDropdown
-          .locator('.ant-select-item-option-content')
-          .filter({ hasText: /^业务$/u })
-          .waitFor({ state: 'visible', timeout: 5000 })
-        const roleLabels = await roleDropdown
-          .locator('.ant-select-item-option-content')
-          .allTextContents()
-        assert(
-          roleLabels.some((label) => label.trim() === '业务'),
-          `权限关系图岗位范围缺少业务: ${JSON.stringify(roleLabels)}`
-        )
-        await roleDropdown
-          .locator('.ant-select-item-option')
-          .filter({ hasText: '业务' })
-          .click()
+        await selectVirtualizedAntOption(page, roleDropdown, {
+          label: '权限关系图岗位范围',
+          optionLabel: '业务',
+        })
         await roleSelect
           .locator('.ant-select-selection-item')
           .filter({ hasText: /^业务$/u })
@@ -3695,46 +3673,51 @@ export function createStyleL1Scenarios(deps) {
         await moduleSelect.evaluate((node) =>
           node.scrollIntoView({ block: 'center', inline: 'nearest' })
         )
-        await moduleSelect.locator('.ant-select-selector').click()
-        const moduleDropdown = await controlledSelectDropdown(
+        const moduleDropdown = await openControlledAntSelectDropdown(
+          page,
           moduleSelect,
           '功能模块选择'
         )
-        const moduleOptionContent = moduleDropdown
-          .locator('.ant-select-item-option-content')
-          .filter({ hasText: /^仓储$/u })
-          .first()
-        await moduleOptionContent.waitFor({ state: 'visible', timeout: 5000 })
-        await moduleOptionContent.scrollIntoViewIfNeeded()
-        const moduleLabels = await moduleDropdown
-          .locator('.ant-select-item-option-content')
-          .allTextContents()
-        assert(
-          moduleLabels.some((label) => label.trim() === '仓储'),
-          `权限关系图功能范围缺少仓储: ${JSON.stringify(moduleLabels)}`
-        )
-        const moduleOptionBox = await moduleOptionContent.boundingBox()
-        const moduleViewport = page.viewportSize()
-        assert(
-          moduleOptionBox &&
-            moduleViewport &&
-            moduleOptionBox.width > 0 &&
-            moduleOptionBox.height > 0 &&
-            moduleOptionBox.x >= 0 &&
-            moduleOptionBox.y >= 0 &&
-            moduleOptionBox.x + moduleOptionBox.width <=
-              moduleViewport.width + 1 &&
-            moduleOptionBox.y + moduleOptionBox.height <=
-              moduleViewport.height + 1,
-          `仓储选项应完整位于当前视口内: ${JSON.stringify({
-            moduleOptionBox,
-            moduleViewport,
-          })}`
-        )
-        await page.mouse.click(
-          moduleOptionBox.x + moduleOptionBox.width / 2,
-          moduleOptionBox.y + moduleOptionBox.height / 2
-        )
+        await selectVirtualizedAntOption(page, moduleDropdown, {
+          label: '权限关系图功能范围',
+          optionLabel: '仓储',
+          activateOption: async (moduleOption) => {
+            const moduleOptionContent = moduleOption.locator(
+              '.ant-select-item-option-content'
+            )
+            await moduleOptionContent.waitFor({
+              state: 'visible',
+              timeout: 5000,
+            })
+            assert.equal(
+              (await moduleOptionContent.innerText()).trim(),
+              '仓储',
+              '权限关系图功能范围应命中仓储'
+            )
+            const moduleOptionBox = await moduleOptionContent.boundingBox()
+            const moduleViewport = page.viewportSize()
+            assert(
+              moduleOptionBox &&
+                moduleViewport &&
+                moduleOptionBox.width > 0 &&
+                moduleOptionBox.height > 0 &&
+                moduleOptionBox.x >= 0 &&
+                moduleOptionBox.y >= 0 &&
+                moduleOptionBox.x + moduleOptionBox.width <=
+                  moduleViewport.width + 1 &&
+                moduleOptionBox.y + moduleOptionBox.height <=
+                  moduleViewport.height + 1,
+              `仓储选项应完整位于当前视口内: ${JSON.stringify({
+                moduleOptionBox,
+                moduleViewport,
+              })}`
+            )
+            await page.mouse.click(
+              moduleOptionBox.x + moduleOptionBox.width / 2,
+              moduleOptionBox.y + moduleOptionBox.height / 2
+            )
+          },
+        })
         await moduleSelect
           .locator('.ant-select-selection-item')
           .filter({ hasText: /^仓储$/u })
