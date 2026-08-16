@@ -137,6 +137,23 @@ export function createStyleL1Scenarios(deps) {
       `effective session 诊断模式应为 ${mode}`
     )
   }
+  const openControlledAntSelectDropdown = async (
+    page,
+    selectRoot,
+    label,
+    { timeout = 10_000 } = {}
+  ) => {
+    const combobox = selectRoot.getByRole('combobox')
+    const listboxID = await combobox.getAttribute('aria-controls')
+    assert(listboxID, `${label}缺少受控下拉标识`)
+    await selectRoot.locator('.ant-select-selector').click()
+    const listbox = page.locator(`[id="${listboxID}"]`)
+    const dropdown = page
+      .locator('.ant-select-dropdown')
+      .filter({ has: listbox })
+    await dropdown.waitFor({ state: 'visible', timeout })
+    return dropdown
+  }
   const assertBusinessDashboardCountStates = async (page, scenarioName) => {
     await page
       .getByRole('button', { name: '查看客户', exact: true })
@@ -16092,11 +16109,16 @@ export function createStyleL1Scenarios(deps) {
         const backupTier = dialog
           .locator('.erp-approval-responsibility-form__tier')
           .nth(1)
-        await backupTier.locator('.ant-select').first().click()
-        await page
-          .locator('.ant-select-dropdown:visible .ant-select-item-option')
+        const backupRoleSelect = backupTier.locator('.ant-select').first()
+        const backupRoleDropdown = await openControlledAntSelectDropdown(
+          page,
+          backupRoleSelect,
+          '审批备用岗位'
+        )
+        await backupRoleDropdown
+          .locator('.ant-select-item-option')
           .filter({ hasText: /^PMC$/u })
-          .dispatchEvent('click')
+          .click()
         await assertAntdModalCentered(
           page,
           dialog,
@@ -16194,11 +16216,16 @@ export function createStyleL1Scenarios(deps) {
         const backupTier = dialog
           .locator('.erp-approval-responsibility-form__tier')
           .nth(1)
-        await backupTier.locator('.ant-select').first().click()
-        await page
-          .locator('.ant-select-dropdown:visible .ant-select-item-option')
+        const backupRoleSelect = backupTier.locator('.ant-select').first()
+        const backupRoleDropdown = await openControlledAntSelectDropdown(
+          page,
+          backupRoleSelect,
+          '审批恢复备用岗位'
+        )
+        await backupRoleDropdown
+          .locator('.ant-select-item-option')
           .filter({ hasText: /^PMC$/u })
-          .dispatchEvent('click')
+          .click()
         await dialog
           .getByRole('button', { name: '保存调整', exact: true })
           .click()
@@ -23091,13 +23118,21 @@ export function createStyleL1Scenarios(deps) {
         const historySelectRoot = historySelect.locator(
           'xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]'
         )
-        await historySelectRoot.locator('.ant-select-selector').click()
-        const historyDropdown = page.locator('.ant-select-dropdown:visible')
-        await historyDropdown.waitFor({ state: 'visible', timeout: 10_000 })
+        const historyDropdown = await openControlledAntSelectDropdown(
+          page,
+          historySelectRoot,
+          '历史记录类型'
+        )
+        await historyDropdown
+          .locator('.ant-select-item-group')
+          .filter({ hasText: '业务单据与版本' })
+          .waitFor({ state: 'visible', timeout: 10_000 })
         assert.deepEqual(
-          await historyDropdown
-            .locator('.ant-select-item-group')
-            .allTextContents(),
+          (
+            await historyDropdown
+              .locator('.ant-select-item-group')
+              .allTextContents()
+          ).map((label) => label.trim()),
           ['基础资料', '业务单据与版本']
         )
         const expectedHistoryOptionLabels = [
