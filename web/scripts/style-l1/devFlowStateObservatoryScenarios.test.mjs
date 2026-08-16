@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 import { createDevFlowStateObservatoryScenarios } from './devFlowStateObservatoryScenarios.mjs'
+
+const scenarioSource = readFileSync(
+  new URL('./devFlowStateObservatoryScenarios.mjs', import.meta.url),
+  'utf8'
+)
 
 test('dev flow state observatory L1 scenarios cover read-only boundaries', () => {
   const scenarios = createDevFlowStateObservatoryScenarios({
@@ -89,4 +95,21 @@ test('dev flow state observatory L1 scenarios cover read-only boundaries', () =>
   )
   assert.doesNotMatch(scenarios[9].path, /[?&](chain|node|flow|state|fact)=/u)
   assert.equal(Object.hasOwn(scenarios[9], 'auth'), false)
+
+  const runtimeSelectorSource = scenarioSource.slice(
+    scenarioSource.indexOf(
+      "name: 'dev-flow-state-observatory-runtime-selector-readonly'"
+    )
+  )
+  assert.equal(
+    runtimeSelectorSource.match(
+      /waitForDefinitionSelectPopupSettled\(page, 6\)/gu
+    )?.length,
+    3,
+    '流程定义下拉每次打开都必须等待完整稳定弹层，不能只等待单个分组节点'
+  )
+  assert.doesNotMatch(
+    runtimeSelectorSource,
+    /\.locator\('\.ant-select-item-group'\)\s*\.nth\(5\)\s*\.waitFor/gu
+  )
 })

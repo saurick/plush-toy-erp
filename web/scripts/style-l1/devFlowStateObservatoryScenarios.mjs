@@ -2915,10 +2915,7 @@ export function createDevFlowStateObservatoryScenarios({
         await runtimeSelectRoot.locator('.ant-select-selector').click()
         const runtimeDropdown = page.locator('.ant-select-dropdown:visible')
         await runtimeDropdown.waitFor({ state: 'visible', timeout: 10_000 })
-        await runtimeDropdown
-          .locator('.ant-select-item-group')
-          .nth(5)
-          .waitFor({ state: 'visible', timeout: 10_000 })
+        await waitForDefinitionSelectPopupSettled(page, 6)
         const expectedGroups = [
           '销售订单受理 · 2',
           '物料供应 · 1',
@@ -2950,10 +2947,7 @@ export function createDevFlowStateObservatoryScenarios({
 
         await runtimeSelectRoot.locator('.ant-select-selector').click()
         await runtimeDropdown.waitFor({ state: 'visible', timeout: 10_000 })
-        await runtimeDropdown
-          .locator('.ant-select-item-group')
-          .nth(5)
-          .waitFor({ state: 'visible', timeout: 10_000 })
+        await waitForDefinitionSelectPopupSettled(page, 6)
         await runtimeDropdown
           .locator('.ant-select-item-option')
           .filter({ hasText: '销售订单受理（审批 + PMC）' })
@@ -2973,10 +2967,7 @@ export function createDevFlowStateObservatoryScenarios({
 
         await runtimeSelectRoot.locator('.ant-select-selector').click()
         await runtimeDropdown.waitFor({ state: 'visible', timeout: 10_000 })
-        await runtimeDropdown
-          .locator('.ant-select-item-group')
-          .nth(5)
-          .waitFor({ state: 'visible', timeout: 10_000 })
+        await waitForDefinitionSelectPopupSettled(page, 6)
         assert.deepEqual(
           await runtimeDropdown
             .locator('.ant-select-item-group')
