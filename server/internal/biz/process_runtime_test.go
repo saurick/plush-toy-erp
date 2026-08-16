@@ -85,6 +85,11 @@ type concurrentActivationProcessRuntimeRepo struct {
 	conflictOnce bool
 }
 
+type concurrentClaimSettlementProcessRuntimeRepo struct {
+	*memProcessRuntimeRepo
+	conflictOnce bool
+}
+
 func (r *concurrentActivationProcessRuntimeRepo) ActivateProcessNodeInstance(
 	ctx context.Context,
 	in *ProcessNodeInstanceActivate,
@@ -98,6 +103,21 @@ func (r *concurrentActivationProcessRuntimeRepo) ActivateProcessNodeInstance(
 		return nil, ErrProcessNodeInstanceConflict
 	}
 	return r.memProcessRuntimeRepo.ActivateProcessNodeInstance(ctx, in, actorID)
+}
+
+func (r *concurrentClaimSettlementProcessRuntimeRepo) ClaimProcessNodeDomainCommand(
+	ctx context.Context,
+	in *ProcessNodeDomainCommandClaim,
+) (*ProcessNodeInstance, error) {
+	claimed, err := r.memProcessRuntimeRepo.ClaimProcessNodeDomainCommand(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	if r.conflictOnce {
+		r.conflictOnce = false
+		return nil, ErrProcessNodeInstanceConflict
+	}
+	return claimed, nil
 }
 
 func (s *processSettlementWorkflowRepo) ListPendingLinkedWorkflowTaskSettlements(_ context.Context, afterWorkflowTaskID int, limit int) ([]*WorkflowTask, error) {
@@ -3847,6 +3867,44 @@ func TestProcessRuntimeUsecaseExecuteDomainCommandNodeReconcilesNodeSettledDurin
 	}
 	if processRepo.claimCalls != 1 || processRepo.completedNode != nil {
 		t.Fatalf("settled claim must reuse the terminal node without a second completion, claims=%d complete=%#v", processRepo.claimCalls, processRepo.completedNode)
+	}
+}
+
+func TestProcessRuntimeUsecaseExecuteDomainCommandNodeReconcilesClaimConflictAfterConcurrentSettlement(t *testing.T) {
+	commandKey := "engineering_package.publish"
+	baseRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{ID: 10, Status: ProcessStatusActive, BusinessRefType: "sales_order", BusinessRefID: 1001},
+		node: &ProcessNodeInstance{
+			ID: 20, ProcessInstanceID: 10, NodeKey: "publish_engineering_package", NodeType: ProcessNodeTypeDomainCommand,
+			Status: ProcessNodeStatusActive, Version: 3, PolicySnapshot: map[string]any{"command_key": commandKey},
+		},
+		settleDuringClaim: true,
+	}
+	processRepo := &concurrentClaimSettlementProcessRuntimeRepo{
+		memProcessRuntimeRepo: baseRepo,
+		conflictOnce:          true,
+	}
+	handler := &stubProcessDomainCommandHandler{result: &ProcessDomainCommandResult{Outcome: "published"}}
+	uc := NewProcessRuntimeUsecase(processRepo, &stubWorkflowRepo{})
+	if err := uc.RegisterDomainCommandHandler(commandKey, handler); err != nil {
+		t.Fatalf("register handler failed: %v", err)
+	}
+
+	settled, err := uc.ExecuteDomainCommandNode(context.Background(), &ProcessDomainCommandExecution{
+		ProcessInstanceID: 10, ProcessNodeInstanceID: 20, ExpectedVersion: 3,
+		CommandKey: commandKey, IdempotencyKey: "process:10:node:20:publish", Payload: map[string]any{"source": "same-intent"},
+	}, 7)
+	if err != nil {
+		t.Fatalf("claim conflict after the same intent settled must reconcile: %v", err)
+	}
+	if settled.Status != ProcessNodeStatusCompleted || settled.Version != 4 || handler.calls != 0 {
+		t.Fatalf("concurrent settlement must not repeat the handler, node=%#v calls=%d", settled, handler.calls)
+	}
+	if processRepo.conflictOnce || baseRepo.claimCalls != 1 || baseRepo.completedNode != nil {
+		t.Fatalf("claim conflict must converge without a second completion, conflict=%v claims=%d complete=%#v", processRepo.conflictOnce, baseRepo.claimCalls, baseRepo.completedNode)
+	}
+	if settled.RoutingCompletedAt == nil {
+		t.Fatal("concurrently settled domain node routing must be durably reconciled")
 	}
 }
 

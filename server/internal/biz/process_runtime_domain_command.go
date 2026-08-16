@@ -92,7 +92,13 @@ func (uc *ProcessRuntimeUsecase) ExecuteDomainCommandNode(ctx context.Context, i
 		DomainCommandFingerprint: domainCommandFingerprint,
 	})
 	if err != nil {
-		return nil, err
+		return uc.reconcileConcurrentDomainCommandClaim(
+			ctx,
+			node,
+			domainCommandFingerprint,
+			err,
+			actorID,
+		)
 	}
 	if claimedNode == nil {
 		return nil, ErrProcessNodeInstanceNotFound
@@ -196,6 +202,41 @@ func (uc *ProcessRuntimeUsecase) ExecuteDomainCommandNode(ctx context.Context, i
 		return nil, err
 	}
 	return completedNode, nil
+}
+
+func (uc *ProcessRuntimeUsecase) reconcileConcurrentDomainCommandClaim(
+	ctx context.Context,
+	activeNode *ProcessNodeInstance,
+	domainCommandFingerprint string,
+	claimErr error,
+	actorID int,
+) (*ProcessNodeInstance, error) {
+	if uc == nil || uc.repo == nil || activeNode == nil || claimErr == nil {
+		return nil, ErrBadParam
+	}
+	if !errors.Is(claimErr, ErrProcessNodeInstanceConflict) &&
+		!errors.Is(claimErr, ErrProcessNodeInstanceSettled) &&
+		!errors.Is(claimErr, ErrProcessNodeInstanceNotActive) &&
+		!errors.Is(claimErr, ErrProcessInstanceSettled) {
+		return nil, claimErr
+	}
+	current, err := uc.repo.GetProcessNodeInstance(ctx, activeNode.ID)
+	if err != nil {
+		return nil, err
+	}
+	if current.ProcessInstanceID != activeNode.ProcessInstanceID {
+		return nil, ErrProcessNodeInstanceConflict
+	}
+	if current.Status == ProcessNodeStatusActive {
+		return nil, claimErr
+	}
+	return uc.reconcileSettledDomainCommandNode(
+		ctx,
+		current,
+		activeNode.Version,
+		domainCommandFingerprint,
+		actorID,
+	)
 }
 
 func validateActiveProcessDomainCommandProtocol(node *ProcessNodeInstance, fingerprint string) error {
