@@ -80,6 +80,26 @@ type processSettlementWorkflowRepo struct {
 	limit      int
 }
 
+type concurrentActivationProcessRuntimeRepo struct {
+	*memProcessRuntimeRepo
+	conflictOnce bool
+}
+
+func (r *concurrentActivationProcessRuntimeRepo) ActivateProcessNodeInstance(
+	ctx context.Context,
+	in *ProcessNodeInstanceActivate,
+	actorID int,
+) (*ProcessNodeInstance, error) {
+	if r.conflictOnce {
+		r.conflictOnce = false
+		if _, err := r.memProcessRuntimeRepo.ActivateProcessNodeInstance(ctx, in, actorID); err != nil {
+			return nil, err
+		}
+		return nil, ErrProcessNodeInstanceConflict
+	}
+	return r.memProcessRuntimeRepo.ActivateProcessNodeInstance(ctx, in, actorID)
+}
+
 func (s *processSettlementWorkflowRepo) ListPendingLinkedWorkflowTaskSettlements(_ context.Context, afterWorkflowTaskID int, limit int) ([]*WorkflowTask, error) {
 	s.afterID = afterWorkflowTaskID
 	s.limit = limit
@@ -3678,6 +3698,88 @@ func TestProcessRuntimeUsecaseExecuteDomainCommandNodeCompletesAndAdvances(t *te
 	}
 	if workflowRepo.createTaskInput.OwnerRoleKey != BossRoleKey {
 		t.Fatalf("expected next linked task owner resolved from active config, got %q", workflowRepo.createTaskInput.OwnerRoleKey)
+	}
+}
+
+func TestProcessRuntimeUsecaseExecuteDomainCommandNodeReconcilesConcurrentDownstreamActivation(t *testing.T) {
+	processID := 10
+	nodeID := 20
+	nextNodeID := 21
+	commandKey := "engineering_package.publish"
+	baseRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{
+			ID:              processID,
+			Status:          ProcessStatusActive,
+			BusinessRefType: "sales_order",
+			BusinessRefID:   1001,
+			ConfigRevision:  "yoyoosun-rev-1",
+		},
+		nodes: []*ProcessNodeInstance{
+			{
+				ID:                nodeID,
+				ProcessInstanceID: processID,
+				NodeKey:           "publish_engineering_package",
+				NodeType:          ProcessNodeTypeDomainCommand,
+				Status:            ProcessNodeStatusActive,
+				Version:           3,
+				PolicySnapshot:    map[string]any{"command_key": commandKey},
+			},
+			{
+				ID:                    nextNodeID,
+				ProcessInstanceID:     processID,
+				NodeKey:               "engineering_release_approval",
+				NodeType:              ProcessNodeTypeApproval,
+				Attempt:               1,
+				Status:                ProcessNodeStatusWaiting,
+				OwnerPoolKey:          ptrString("boss_approval"),
+				RequiredCapabilityKey: ptrString(PermissionWorkflowTaskApprove),
+				Version:               1,
+			},
+		},
+	}
+	processRepo := &concurrentActivationProcessRuntimeRepo{
+		memProcessRuntimeRepo: baseRepo,
+		conflictOnce:          true,
+	}
+	workflowRepo := &retryWorkflowRepo{}
+	uc := NewProcessRuntimeUsecase(processRepo, workflowRepo, &stubProcessOwnerRoleResolver{
+		explanation: &WorkflowTaskCandidateExplanation{
+			ConfigRevision:         "yoyoosun-rev-1",
+			OwnerPoolKey:           "boss_approval",
+			RequiredCapabilities:   []string{PermissionWorkflowTaskApprove},
+			CandidateOwnerRoleKeys: []string{BossRoleKey},
+			Source:                 "active_customer_config",
+		},
+	})
+	handler := &stubProcessDomainCommandHandler{
+		result: &ProcessDomainCommandResult{Outcome: "published"},
+	}
+	if err := uc.RegisterDomainCommandHandler(commandKey, handler); err != nil {
+		t.Fatalf("register domain command handler failed: %v", err)
+	}
+
+	completed, err := uc.ExecuteDomainCommandNode(context.Background(), &ProcessDomainCommandExecution{
+		ProcessInstanceID:     processID,
+		ProcessNodeInstanceID: nodeID,
+		ExpectedVersion:       3,
+		CommandKey:            commandKey,
+		IdempotencyKey:        "process:10:node:20:engineering_package.publish",
+		Payload:               map[string]any{"source": "test"},
+	}, 7)
+	if err != nil {
+		t.Fatalf("concurrent downstream activation must reconcile: %v", err)
+	}
+	if completed.Status != ProcessNodeStatusCompleted || handler.calls != 1 {
+		t.Fatalf("domain command must complete exactly once, node=%#v calls=%d", completed, handler.calls)
+	}
+	if processRepo.conflictOnce || baseRepo.nodes[1].Status != ProcessNodeStatusActive || baseRepo.nodes[1].Version != 2 {
+		t.Fatalf("concurrent activation must converge on one active target, conflict=%v node=%#v", processRepo.conflictOnce, baseRepo.nodes[1])
+	}
+	if len(workflowRepo.createdByCode) != 1 || workflowRepo.createdByCode["PROC-10-NODE-21-A1"] == nil {
+		t.Fatalf("concurrent activation must create exactly one downstream task, tasks=%#v", workflowRepo.createdByCode)
+	}
+	if baseRepo.nodes[0].RoutingCompletedAt == nil {
+		t.Fatalf("completed domain node routing must be durably reconciled")
 	}
 }
 

@@ -367,7 +367,16 @@ func (uc *ProcessRuntimeUsecase) settleActiveProcessDomainCommandResult(
 		)
 	}
 	if err := uc.advanceAfterNodeCompletion(ctx, completedNode, actorID); err != nil {
-		return nil, err
+		if !errors.Is(err, ErrProcessNodeInstanceConflict) {
+			return nil, err
+		}
+		return uc.reconcileSettledDomainCommandNode(
+			ctx,
+			completedNode,
+			node.Version,
+			fingerprint,
+			actorID,
+		)
 	}
 	return completedNode, nil
 }
