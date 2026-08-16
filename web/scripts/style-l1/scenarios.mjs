@@ -154,6 +154,33 @@ export function createStyleL1Scenarios(deps) {
     await dropdown.waitFor({ state: 'visible', timeout })
     return dropdown
   }
+  const waitForApprovalResponsibilityInputs = async (page) => {
+    await expectText(page.locator('.erp-role-center-sidebar'), 'PMC')
+    const adminTab = page.getByRole('tab', { name: /员工账号/u })
+    await adminTab.waitFor({ state: 'visible', timeout: 10_000 })
+    await expectText(adminTab, '7')
+  }
+  const selectApprovalRoleOption = async (
+    page,
+    selectRoot,
+    { label, roleLabel }
+  ) => {
+    const dropdown = await openControlledAntSelectDropdown(
+      page,
+      selectRoot,
+      label
+    )
+    const options = dropdown.locator('.ant-select-item-option')
+    await options.first().waitFor({ state: 'visible', timeout: 10_000 })
+    const optionLabels = (await options.allTextContents()).map((item) =>
+      item.trim()
+    )
+    assert(
+      optionLabels.includes(roleLabel),
+      `${label}缺少可选岗位“${roleLabel}”: ${JSON.stringify(optionLabels)}`
+    )
+    await options.filter({ hasText: new RegExp(`^${roleLabel}$`, 'u') }).click()
+  }
   const assertBusinessDashboardCountStates = async (page, scenarioName) => {
     await page
       .getByRole('button', { name: '查看客户', exact: true })
@@ -16030,6 +16057,7 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '权限管理')
+        await waitForApprovalResponsibilityInputs(page)
         await page.getByRole('tab', { name: /审批责任/ }).click()
         await expectText(page, '待初始化')
         const salesRow = page.getByRole('row', { name: /销售订单审批/ })
@@ -16061,6 +16089,7 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '权限管理')
+        await waitForApprovalResponsibilityInputs(page)
         await page.getByRole('tab', { name: /审批责任/ }).click()
         await expectText(page, '为三项可配置审批指定主办、备用和升级责任')
         await expectText(page, '销售订单审批')
@@ -16110,15 +16139,11 @@ export function createStyleL1Scenarios(deps) {
           .locator('.erp-approval-responsibility-form__tier')
           .nth(1)
         const backupRoleSelect = backupTier.locator('.ant-select').first()
-        const backupRoleDropdown = await openControlledAntSelectDropdown(
+        await selectApprovalRoleOption(
           page,
           backupRoleSelect,
-          '审批备用岗位'
+          { label: '审批备用岗位', roleLabel: 'PMC' }
         )
-        await backupRoleDropdown
-          .locator('.ant-select-item-option')
-          .filter({ hasText: /^PMC$/u })
-          .click()
         await assertAntdModalCentered(
           page,
           dialog,
@@ -16191,6 +16216,7 @@ export function createStyleL1Scenarios(deps) {
             return predicate(responseBody)
           })
         await expectHeading(page, '权限管理')
+        await waitForApprovalResponsibilityInputs(page)
         const initialSettingsRead = waitForApprovalResponse(
           'get_approval_settings',
           (body) => Array.isArray(body?.result?.data?.approval_settings?.items)
@@ -16217,15 +16243,11 @@ export function createStyleL1Scenarios(deps) {
           .locator('.erp-approval-responsibility-form__tier')
           .nth(1)
         const backupRoleSelect = backupTier.locator('.ant-select').first()
-        const backupRoleDropdown = await openControlledAntSelectDropdown(
+        await selectApprovalRoleOption(
           page,
           backupRoleSelect,
-          '审批恢复备用岗位'
+          { label: '审批恢复备用岗位', roleLabel: 'PMC' }
         )
-        await backupRoleDropdown
-          .locator('.ant-select-item-option')
-          .filter({ hasText: /^PMC$/u })
-          .click()
         await dialog
           .getByRole('button', { name: '保存调整', exact: true })
           .click()
@@ -16282,6 +16304,7 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '权限管理')
+        await waitForApprovalResponsibilityInputs(page)
         await page.getByRole('tab', { name: /审批责任/ }).click()
         await page
           .getByRole('row', { name: /销售订单审批/ })
