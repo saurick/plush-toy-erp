@@ -16391,7 +16391,16 @@ export function createStyleL1Scenarios(deps) {
         const permissionHelpTrigger = page.getByRole('button', {
           name: '菜单与操作说明',
         })
-        await permissionHelpTrigger.dispatchEvent('click')
+        // 全量串行运行会继承上一场景的鼠标位置；先清除 hover，再用 focus
+        // 确定性打开同时支持 hover / focus / click 的帮助浮层。
+        await page.mouse.move(20, 20)
+        await permissionHelpTrigger.blur()
+        await page.waitForFunction(() =>
+          [...document.querySelectorAll('.erp-permission-help-popover')].every(
+            (node) => !node.checkVisibility()
+          )
+        )
+        await permissionHelpTrigger.focus()
         await page.waitForFunction(() => {
           const popovers = [
             ...document.querySelectorAll('.erp-permission-help-popover'),
@@ -16433,7 +16442,8 @@ export function createStyleL1Scenarios(deps) {
           path: 'output/playwright/style-l1/permission-center-help-popover.png',
           fullPage: false,
         })
-        await page.mouse.click(20, 20)
+        await permissionHelpTrigger.blur()
+        await page.mouse.move(20, 20)
         await permissionHelpPopover.waitFor({
           state: 'hidden',
           timeout: 5000,
