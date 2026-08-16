@@ -181,9 +181,30 @@ export function createStyleL1Scenarios(deps) {
       )
       if (targetIndex >= 0) {
         const targetOption = options.nth(targetIndex)
-        if (activateOption) await activateOption(targetOption)
-        else await targetOption.click()
-        return
+        const activated = activateOption
+          ? await activateOption(targetOption)
+          : await targetOption
+              .evaluate((node, expectedLabel) => {
+                const box = node.getBoundingClientRect()
+                if (
+                  String(node.textContent || '').trim() !== expectedLabel ||
+                  box.width <= 0 ||
+                  box.height <= 0
+                ) {
+                  return false
+                }
+                node.click()
+                return true
+              }, optionLabel)
+              .catch(() => false)
+        if (activated !== false) return
+        await page.evaluate(
+          () =>
+            new Promise((resolve) =>
+              requestAnimationFrame(() => requestAnimationFrame(resolve))
+            )
+        )
+        continue
       }
 
       const scrollMetrics = await listHolder.evaluate((node) => ({
@@ -3682,40 +3703,55 @@ export function createStyleL1Scenarios(deps) {
           label: '权限关系图功能范围',
           optionLabel: '仓储',
           activateOption: async (moduleOption) => {
-            const moduleOptionContent = moduleOption.locator(
-              '.ant-select-item-option-content'
-            )
-            await moduleOptionContent.waitFor({
-              state: 'visible',
-              timeout: 5000,
+            const activation = await moduleOption.evaluate((node) => {
+              const content = node.querySelector(
+                '.ant-select-item-option-content'
+              )
+              const box = content?.getBoundingClientRect()
+              const text = String(content?.textContent || '').trim()
+              const metrics = {
+                x: box?.x || 0,
+                y: box?.y || 0,
+                width: box?.width || 0,
+                height: box?.height || 0,
+              }
+              const fullyVisible =
+                text === '仓储' &&
+                metrics.width > 0 &&
+                metrics.height > 0 &&
+                metrics.x >= 0 &&
+                metrics.y >= 0 &&
+                metrics.x + metrics.width <= window.innerWidth + 1 &&
+                metrics.y + metrics.height <= window.innerHeight + 1
+              if (!fullyVisible) {
+                return { activated: false, metrics, text }
+              }
+              content.click()
+              return { activated: true, metrics, text }
             })
+            if (!activation.activated) return false
             assert.equal(
-              (await moduleOptionContent.innerText()).trim(),
+              activation.text,
               '仓储',
               '权限关系图功能范围应命中仓储'
             )
-            const moduleOptionBox = await moduleOptionContent.boundingBox()
             const moduleViewport = page.viewportSize()
             assert(
-              moduleOptionBox &&
-                moduleViewport &&
-                moduleOptionBox.width > 0 &&
-                moduleOptionBox.height > 0 &&
-                moduleOptionBox.x >= 0 &&
-                moduleOptionBox.y >= 0 &&
-                moduleOptionBox.x + moduleOptionBox.width <=
+              moduleViewport &&
+                activation.metrics.width > 0 &&
+                activation.metrics.height > 0 &&
+                activation.metrics.x >= 0 &&
+                activation.metrics.y >= 0 &&
+                activation.metrics.x + activation.metrics.width <=
                   moduleViewport.width + 1 &&
-                moduleOptionBox.y + moduleOptionBox.height <=
+                activation.metrics.y + activation.metrics.height <=
                   moduleViewport.height + 1,
               `仓储选项应完整位于当前视口内: ${JSON.stringify({
-                moduleOptionBox,
+                moduleOptionBox: activation.metrics,
                 moduleViewport,
               })}`
             )
-            await page.mouse.click(
-              moduleOptionBox.x + moduleOptionBox.width / 2,
-              moduleOptionBox.y + moduleOptionBox.height / 2
-            )
+            return true
           },
         })
         await moduleSelect
