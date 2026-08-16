@@ -25,6 +25,7 @@ import {
 } from "./gate-profiles.mjs";
 import {
   PRE_PUSH_RECEIPT_TTL_MS,
+  REMOTE_REF_QUERY_TIMEOUT_MS,
   environmentFingerprint,
   resolveReceiptState,
   runRemoteRefQueryWithRetry,
@@ -349,7 +350,10 @@ test("remote ref query retries only bounded transient transport failures", () =>
         attempts.push({ args, options });
         if (attempts.length < 3) {
           throw Object.assign(new Error("transient"), {
-            detail: "git ls-remote failed: Connection to host port 443 timed out",
+            detail:
+              attempts.length === 1
+                ? "git ls-remote failed: Connection to host port 443 timed out"
+                : "git ls-remote failed: spawnSync git ETIMEDOUT",
             reason: "remote_ref_query_failed",
           });
         }
@@ -363,6 +367,7 @@ test("remote ref query retries only bounded transient transport failures", () =>
   assert.deepEqual(delays, [250, 750]);
   assert.deepEqual(attempts[0].options, {
     reason: "remote_ref_query_failed",
+    timeout: REMOTE_REF_QUERY_TIMEOUT_MS,
   });
 
   let authorizationAttempts = 0;

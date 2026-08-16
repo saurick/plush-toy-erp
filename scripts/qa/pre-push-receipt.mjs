@@ -44,12 +44,13 @@ export const PRE_PUSH_RECEIPT_TTL_MS = 30 * 60 * 1000;
 export const PRE_PUSH_ENVIRONMENT_CONTRACT = "plush.pre-push-environment/v2";
 export const PRE_PUSH_GATE_CONTRACT = "plush.pre-push-gate-tree/v2";
 export const PRE_PUSH_SIGNATURE_CONTRACT = "hmac-sha256/v1";
+export const REMOTE_REF_QUERY_TIMEOUT_MS = 20_000;
 
 const ZERO_SHA = "0000000000000000000000000000000000000000";
 const CLOCK_SKEW_MS = 30_000;
 const REMOTE_REF_QUERY_RETRY_DELAYS_MS = Object.freeze([250, 750]);
 const RETRYABLE_REMOTE_REF_QUERY_PATTERN =
-  /(?:timed out|connection (?:closed|refused|reset)|network is unreachable|could not resolve host(?:name)?|temporary failure in name resolution)/iu;
+  /(?:timed out|ETIMEDOUT|connection (?:closed|refused|reset)|network is unreachable|could not resolve host(?:name)?|temporary failure in name resolution)/iu;
 const STATE_DIRECTORY = "plush-qa/pre-push";
 const FORBIDDEN_ENVIRONMENT = Object.freeze([
   "QA_BASE_RANGE",
@@ -163,6 +164,7 @@ function runCommand(
     inherit = false,
     reason = "command_failed",
     acceptedStatuses = [0],
+    timeout,
   } = {},
 ) {
   const result = spawnSync(command, args, {
@@ -171,6 +173,7 @@ function runCommand(
     input,
     encoding: inherit ? undefined : "utf8",
     maxBuffer: 32 * 1024 * 1024,
+    timeout,
     stdio: inherit ? "inherit" : input === undefined ? ["ignore", "pipe", "pipe"] : ["pipe", "pipe", "pipe"],
   });
   if (result.error || !acceptedStatuses.includes(result.status)) {
@@ -191,6 +194,7 @@ function runGit(root, args, options = {}) {
     cwd: root,
     reason: options.reason || "git_command_failed",
     acceptedStatuses: options.acceptedStatuses,
+    timeout: options.timeout,
   });
 }
 
@@ -404,7 +408,10 @@ export function runRemoteRefQueryWithRetry(
     attempt += 1
   ) {
     try {
-      return runner(root, args, { reason: "remote_ref_query_failed" });
+      return runner(root, args, {
+        reason: "remote_ref_query_failed",
+        timeout: REMOTE_REF_QUERY_TIMEOUT_MS,
+      });
     } catch (error) {
       const retryable =
         error?.reason === "remote_ref_query_failed" &&

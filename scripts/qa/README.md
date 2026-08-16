@@ -96,7 +96,7 @@
 
 直接运行 full / strict 时，任何 `SKIP_*`、`STRICT_SKIP_*` 或调用者提供的旧 coverage 变量都会得到 `incomplete` 并失败；full 始终真实执行 secrets 与 govulncheck，不接受普通调用者自签 JSON 作为前序成功证明。`prepare-push` 在远端连接前按聚合范围执行 affected 或经确认的 full；pre-push hook 在连接后逐个真实 push ref 执行完整历史 secrets 并复核回执，不再运行 full。新 remote ref 的聚合范围固定为 `empty-tree..HEAD`，确保普通文件、schema 与 repo 变更实际进入 affected / DB guard。任一步失败，外层都不能输出完整结果。
 
-同一次 `prepare-push` 的远端 ref 读回只对明确的超时、断连、拒绝连接、网络不可达和临时 DNS 失败做最多两次短间隔重试；权限、仓库、ref、响应合同及其他错误立即失败。三次尝试仍不可读时形成该次调用的终态失败，不重跑同一 SHA 的 affected/full，也不得绕过 pre-push hook。
+同一次 `prepare-push` 的远端 ref 读回每次尝试都受 20 秒硬超时约束，只对明确的超时、断连、拒绝连接、网络不可达和临时 DNS 失败做最多两次短间隔重试；权限、仓库、ref、响应合同及其他错误立即失败。三次尝试仍不可读时形成该次调用的终态失败，不重跑同一 SHA 的 affected/full，也不得绕过 pre-push hook。
 
 开发阶段只跑 affected、同名测试和受影响单链浏览器。clean exact SHA 冻结后，同一候选只执行一轮匹配的 `prepare-push`：focused 且无 follow-up 使用 affected；high-risk 或发布候选经明确确认后使用 `--full`。只有影响生产正确性、安全、数据完整性、权限或可恢复发布的缺陷才允许改候选并重新进入 affected。fixture、mock、选择器、测试文案、开发工作台或证据展示问题若不使生产结论失效，记录为后续事项，不扩展当前 QA 或重新跑全套。真实 CI / 目标阻塞只报告精确阻塞、清理状态和回滚点，不再新造一层门禁。
 
