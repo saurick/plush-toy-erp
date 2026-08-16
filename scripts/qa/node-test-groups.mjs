@@ -22,6 +22,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/import/customerSourceExtract.test.mjs",
     "scripts/import/customerSourceManifestCheck.test.mjs",
     "scripts/import/customerSourceSnapshotFreezeCheck.test.mjs",
+    "scripts/lib/bash.test.mjs",
     "scripts/lib/file-digest.test.mjs",
     "scripts/project-scan.test.mjs",
     "scripts/qa/affected.test.mjs",
