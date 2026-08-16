@@ -1962,9 +1962,40 @@ export function createStyleL1Scenarios(deps) {
         await desktopSystemVersionEntry.click()
         const systemVersionModal = page.getByTestId('system-version-modal')
         await systemVersionModal.waitFor({ state: 'visible', timeout: 10_000 })
+        const systemVersionDialog = page
+          .locator('.ant-modal')
+          .filter({ has: systemVersionModal })
+        await systemVersionDialog.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        const systemVersionDialogHandle =
+          await systemVersionDialog.elementHandle()
+        assert(
+          systemVersionDialogHandle,
+          '系统信息弹窗缺少可等待动画结束的外层节点'
+        )
+        try {
+          await page.waitForFunction(
+            (node) => {
+              if (!(node instanceof HTMLElement) || !node.isConnected) {
+                return false
+              }
+              const className = String(node.className || '')
+              return (
+                !className.includes('ant-zoom-enter') &&
+                !className.includes('ant-zoom-appear')
+              )
+            },
+            systemVersionDialogHandle,
+            { timeout: 10_000 }
+          )
+        } finally {
+          await systemVersionDialogHandle.dispose()
+        }
         await expectText(page, 'yoyoosun-20260810-20c96d38-amd64')
         await expectText(page, '前后台版本一致')
-        const versionModalMetrics = await systemVersionModal.evaluate(
+        const versionModalMetrics = await systemVersionDialog.evaluate(
           (node) => {
             const rect = node.getBoundingClientRect()
             return {
