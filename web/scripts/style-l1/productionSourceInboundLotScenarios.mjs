@@ -70,13 +70,13 @@ export function createProductionSourceInboundLotScenarios(deps) {
         await expectText(page, '生产订单已发布，排程任务已进入 PMC 待办')
 
         const completionButton = page.getByRole('button', {
-          name: '登记完工入库',
+          name: '登记生产完工',
         })
         await completionButton.waitFor({ state: 'visible', timeout: 10_000 })
         await completionButton.click()
         const modal = page
           .locator('.ant-modal:visible')
-          .filter({ hasText: '登记完工入库' })
+          .filter({ hasText: '登记生产完工' })
           .last()
         await modal.waitFor({ state: 'visible', timeout: 10_000 })
         const modalText = String((await modal.innerText()) || '').replace(
@@ -138,11 +138,11 @@ export function createProductionSourceInboundLotScenarios(deps) {
           ),
         })
         await modal
-          .getByRole('button', { name: /生\s*成\s*完\s*工\s*记\s*录/u })
+          .getByRole('button', { name: /生\s*成\s*待\s*入\s*库\s*草\s*稿/u })
           .click()
         await expectText(
           page,
-          '已重新读取并确认完工草稿，请到生产记录核对并过账'
+          '已重新读取并确认生产完工报告草稿，请由仓库核对并确认成品入库'
         )
 
         assert.equal(completionCreateParams.length, 1)
@@ -186,7 +186,7 @@ export function createProductionSourceInboundLotScenarios(deps) {
         await completionButton.click()
         const reopened = page
           .locator('.ant-modal:visible')
-          .filter({ hasText: '登记完工入库' })
+          .filter({ hasText: '登记生产完工' })
           .last()
         await reopened.waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(

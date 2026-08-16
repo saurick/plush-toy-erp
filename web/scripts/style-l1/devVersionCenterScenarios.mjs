@@ -535,8 +535,8 @@ export function createDevVersionCenterScenarios({
         const initialDesktopSummaryRequests = desktopSummaryRequests
         assert.equal(
           initialDesktopSummaryRequests,
-          3,
-          '初次加载应包含版本页一次读回与环境面板在 React 开发态的两次可取消读回'
+          2,
+          '初次加载应只包含版本页一次读回与环境面板一次共享读回'
         )
 
         const desktopTakeoverButton = page.getByRole('button', {
@@ -906,8 +906,8 @@ export function createDevVersionCenterScenarios({
           .waitFor({ timeout: 20_000 })
         assert.equal(
           mobileSummaryRequests,
-          3,
-          '移动端初次加载应包含页面读回与环境面板的可取消读回'
+          2,
+          '移动端初次加载应只包含页面一次读回与环境面板一次共享读回'
         )
 
         const mobileTakeoverButton = page.getByRole('button', {

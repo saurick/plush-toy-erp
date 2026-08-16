@@ -1591,7 +1591,7 @@ function PermissionChecklist({
     const normalizedKey = String(groupKey || '').trim()
     const target = sectionNodesRef.current.get(normalizedKey)
     if (!target) return
-    navigationLockUntilRef.current = Date.now() + 700
+    navigationLockUntilRef.current = Date.now() + 1600
     setActiveGroupKey(normalizedKey)
     const reduceMotion =
       typeof window !== 'undefined' &&

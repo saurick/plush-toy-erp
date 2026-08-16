@@ -934,12 +934,25 @@ export function createQualitySourceActionScenarios(deps) {
           ]) {
             assert.equal(derivedField in params, false)
           }
+          const completedDispositionAction = page.locator(
+            '[data-business-action-key="quality-disposition"]'
+          )
           assert.equal(
-            await page
-              .locator('[data-business-action-key="quality-disposition"]')
-              .count(),
-            0,
-            '退货已生成后应隐藏已完成的不合格处置动作'
+            await completedDispositionAction.count(),
+            1,
+            '退货已生成后应保留稳定的不合格处置动作位置'
+          )
+          assert.equal(
+            await completedDispositionAction.isDisabled(),
+            true,
+            '退货已生成后不得再次办理不合格处置'
+          )
+          assert.equal(
+            await completedDispositionAction.evaluate((element) =>
+              element.parentElement?.getAttribute('aria-label')
+            ),
+            '当前质检的不合格处置已完成',
+            '退货已生成后的置灰动作应向键盘和读屏用户解释原因'
           )
           await expectText(
             page,
@@ -981,7 +994,7 @@ export function createQualitySourceActionScenarios(deps) {
               'quality-initial-iqc-disposition-modal-dark-narrow.png'
             ),
           })
-          await page.keyboard.press('Escape')
+          await initialRejectModal.locator('button.ant-modal-close').click()
           await initialRejectModal.waitFor({
             state: 'hidden',
             timeout: 10_000,

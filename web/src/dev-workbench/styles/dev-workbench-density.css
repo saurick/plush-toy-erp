@@ -410,6 +410,16 @@
     column-gap: 10px;
   }
 
+  .erp-dev-customer-eyebrow.ant-typography {
+    display: none;
+  }
+
+  .erp-dev-customer-title.ant-typography {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
   .erp-dev-workspace-nav {
     top: 12px;
     width: 216px;

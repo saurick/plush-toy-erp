@@ -1154,12 +1154,19 @@ export function createBusinessActionStabilityScenarios(deps) {
           'clear-selection',
           'purchase-edit',
           'related-records',
+          'lifecycle-primary',
           'generate-inbound',
           'print-contract',
+          'lifecycle-more',
         ])
         assert(
-          purchaseEmpty.buttons.every((button) => button.disabled),
-          `采购订单未选择记录时，客户配置允许的执行动作应全部置灰: ${JSON.stringify(
+          purchaseEmpty.buttons
+            .filter((button) => button.key !== 'lifecycle-more')
+            .every((button) => button.disabled) &&
+            purchaseEmpty.buttons.find(
+              (button) => button.key === 'lifecycle-more'
+            )?.disabled === false,
+          `采购订单未选择记录时执行动作应置灰，更多操作仍可打开: ${JSON.stringify(
             purchaseEmpty
           )}`
         )
@@ -1187,10 +1194,12 @@ export function createBusinessActionStabilityScenarios(deps) {
             disabled: status !== 'APPROVED',
           })
           await assertDesktopActionState(page, assert, 'lifecycle-primary', {
-            visible: false,
+            visible: true,
+            disabled: status !== 'DRAFT',
           })
           await assertDesktopActionState(page, assert, 'lifecycle-more', {
-            visible: false,
+            visible: true,
+            disabled: false,
           })
           await screenshot(
             page,

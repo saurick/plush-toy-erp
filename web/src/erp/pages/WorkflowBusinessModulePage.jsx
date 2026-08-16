@@ -1574,7 +1574,11 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         tags={
           <Space size={6} wrap>
             <Tag color="blue">
-              {showingProductionExceptionDecisions ? '处置申请' : '待审批'}
+              {showingProductionExceptionDecisions
+                ? '处置申请'
+                : isProductionExceptionPage
+                  ? '待审批'
+                  : '待办任务'}
             </Tag>
             <Tag color="gold">业务处理分开完成</Tag>
           </Space>

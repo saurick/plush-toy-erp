@@ -7,6 +7,10 @@ const scenario = source.slice(
   source.indexOf("name: 'mobile-nine-role-request-recovery-matrix'"),
   source.indexOf("name: 'mobile-yoyo-boss-urge-only'")
 )
+const bossUrgeOnlyScenario = source.slice(
+  source.indexOf("name: 'mobile-yoyo-boss-urge-only'"),
+  source.indexOf("name: 'mobile-yoyo-role-task-readonly-actions'")
+)
 
 test('mobile recovery Style L1 registers every formal role against shared request failures', () => {
   assert.notEqual(scenario.length, 0)
@@ -54,4 +58,18 @@ test('mobile recovery Style L1 fails only role-task reads and proves explicit re
   assert.match(scenario, /status of 503/u)
   assert.match(scenario, /status of 403/u)
   assert.doesNotMatch(scenario, /create_task|complete_task|post_/u)
+})
+
+test('boss urge-only Style L1 uses explicit cross-role supervision without task handling scope', () => {
+  assert.notEqual(bossUrgeOnlyScenario.length, 0)
+  assert.match(bossUrgeOnlyScenario, /'workflow\.task\.supervise'/u)
+  assert.match(
+    bossUrgeOnlyScenario,
+    /'workflow\.task\.read': \['engineering'\]/u
+  )
+  assert.match(
+    bossUrgeOnlyScenario,
+    /'workflow\.task\.update': \['boss'\]/u
+  )
+  assert.match(bossUrgeOnlyScenario, /\['urge'\]/u)
 })

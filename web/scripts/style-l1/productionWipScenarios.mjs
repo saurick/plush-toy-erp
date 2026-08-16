@@ -300,7 +300,7 @@ export function createProductionWipScenarios(deps) {
         await routeModal.locator('button.ant-modal-close').click()
         await routeModal.waitFor({ state: 'hidden', timeout: 10_000 })
 
-        await clickVisibleAction(page, '登记完工入库')
+        await clickVisibleAction(page, '登记生产完工')
         await page.waitForFunction(
           () =>
             Array.from(
@@ -310,7 +310,7 @@ export function createProductionWipScenarios(deps) {
               return (
                 rect?.width > 0 &&
                 rect?.height > 0 &&
-                ['登记完工入库', '暂不能登记完工入库'].includes(
+                ['登记生产完工', '暂不能登记生产完工'].includes(
                   String(node.textContent || '').trim()
                 )
               )
@@ -322,7 +322,7 @@ export function createProductionWipScenarios(deps) {
               return (
                 rect.width > 0 &&
                 rect.height > 0 &&
-                String(node.textContent || '').includes('加载完工入库详情')
+                String(node.textContent || '').includes('加载生产完工详情')
               )
             }),
           undefined,
@@ -345,16 +345,16 @@ export function createProductionWipScenarios(deps) {
           .allInnerTexts()
         assert(
           visibleModalSummaries.some(
-            (item) => item.title === '登记完工入库'
+            (item) => item.title === '登记生产完工'
           ),
-          `完工入库未进入可办理弹窗: ${JSON.stringify({
+          `生产完工未进入可办理弹窗: ${JSON.stringify({
             modals: visibleModalSummaries,
             messages: visibleMessageTexts,
           })}`
         )
         const completionModal = page
           .locator('.ant-modal:visible')
-          .filter({ has: page.getByText('登记完工入库', { exact: true }) })
+          .filter({ has: page.getByText('登记生产完工', { exact: true }) })
           .last()
         await completionModal.waitFor({ state: 'visible', timeout: 10_000 })
         await expectText(page, '部分路线明细暂不可登记')
@@ -367,7 +367,7 @@ export function createProductionWipScenarios(deps) {
         assert.match(
           selectedCompletionItem,
           /PROD-STYLE-L1/u,
-          `完工入库只应默认选择已完成包装且已确认包材的明细: ${selectedCompletionItem}`
+          `生产完工只应默认选择已完成包装且已确认包材的明细: ${selectedCompletionItem}`
         )
         await page.keyboard.press('Escape')
         await completionModal.waitFor({ state: 'hidden', timeout: 10_000 })

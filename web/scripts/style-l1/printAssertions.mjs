@@ -17,32 +17,64 @@ export function createPrintAssertions({
   expectText,
   isIgnorableDevServerError,
 }) {
-  async function resolveCurrentPrintWorkspaceDraftStorageKeys(
-    page,
-    legacyStorageKey
-  ) {
-    return page.evaluate((fallbackKey) => {
-      const keys = []
+  async function resolveCurrentPrintWorkspaceDraftStorageKeys(page) {
+    const evidence = await page.evaluate(() => {
       const pathParts = window.location.pathname.split('/').filter(Boolean)
       const workspaceIndex = pathParts.indexOf('print-workspace')
       const templateKey =
         workspaceIndex >= 0 ? pathParts[workspaceIndex + 1] : ''
       const stateID = new URLSearchParams(window.location.search).get('state')
-
-      if (templateKey) {
-        keys.push(
-          stateID
-            ? `__plush_erp_print_workspace_draft__:${templateKey}:${stateID}`
-            : `__plush_erp_print_workspace_draft__:${templateKey}`
+      const prefix = '__plush_erp_print_workspace_draft__:v2:'
+      const suffix = `:${encodeURIComponent(templateKey)}:${encodeURIComponent(
+        stateID || 'shared'
+      )}`
+      const storageKeys = Array.from(
+        { length: window.localStorage.length },
+        (_, index) => window.localStorage.key(index)
+      )
+        .filter(
+          (key) =>
+            typeof key === 'string' &&
+            key.startsWith(prefix) &&
+            key.endsWith(suffix)
         )
+        .sort()
+      const snapshots = storageKeys.map((key) => {
+        try {
+          const payload = JSON.parse(window.localStorage.getItem(key) || '')
+          return {
+            key,
+            version: Number(payload?.version || 0),
+            updatedAt: Number(payload?.updatedAt || 0),
+            hasDraft: Object.prototype.hasOwnProperty.call(payload, 'draft'),
+          }
+        } catch {
+          return { key, version: 0, updatedAt: 0, hasDraft: false }
+        }
+      })
+      return {
+        templateKey,
+        stateID: stateID || 'shared',
+        storageKeys,
+        snapshots,
       }
-
-      if (fallbackKey && !keys.includes(fallbackKey)) {
-        keys.push(fallbackKey)
-      }
-
-      return keys
-    }, legacyStorageKey)
+    })
+    assert.equal(
+      evidence.storageKeys.length,
+      1,
+      `打印工作区必须解析到唯一当前 v2 草稿 key: ${JSON.stringify(evidence)}`
+    )
+    assert(
+      evidence.snapshots.every(
+        (snapshot) =>
+          snapshot.version === 1 &&
+          Number.isFinite(snapshot.updatedAt) &&
+          snapshot.updatedAt > 0 &&
+          snapshot.hasDraft
+      ),
+      `打印工作区当前草稿必须是有效 v2 快照信封: ${JSON.stringify(evidence)}`
+    )
+    return evidence.storageKeys
   }
 
   async function snapshotLocalStorageValues(page, storageKeys) {
@@ -54,18 +86,6 @@ export function createPrintAssertions({
     }, storageKeys)
   }
 
-  async function restoreLocalStorageValues(page, entries) {
-    await page.evaluate((items) => {
-      items.forEach((item) => {
-        if (typeof item.value === 'string') {
-          window.localStorage.setItem(item.key, item.value)
-          return
-        }
-        window.localStorage.removeItem(item.key)
-      })
-    }, entries)
-  }
-
   async function installDraftInjectionOnNextLoad(page, markerKey) {
     await page.addInitScript((storageMarkerKey) => {
       try {
@@ -74,20 +94,40 @@ export function createPrintAssertions({
           return
         }
         const payload = JSON.parse(rawPayload)
-        const draftJSON = String(payload?.draftJSON || '')
-        if (!draftJSON) {
-          return
-        }
-        const targetKeys = Array.isArray(payload?.keys) ? payload.keys : []
-        targetKeys.forEach((key) => {
-          if (key) {
-            window.localStorage.setItem(key, draftJSON)
+        const entries = Array.isArray(payload?.entries) ? payload.entries : []
+        entries.forEach((entry) => {
+          const key = String(entry?.key || '')
+          if (!key) return
+          if (typeof entry?.value === 'string') {
+            window.localStorage.setItem(key, entry.value)
+          } else {
+            window.localStorage.removeItem(key)
           }
         })
       } catch {
         // L1 injection is best-effort; the assertion after reload reports drift.
+      } finally {
+        window.localStorage.removeItem(storageMarkerKey)
       }
     }, markerKey)
+  }
+
+  async function reloadWithLocalStorageEntries(page, entries, label) {
+    const markerKey = createDraftInjectionMarkerKey(label)
+    await installDraftInjectionOnNextLoad(page, markerKey)
+    await page.evaluate(
+      ({ resolvedMarkerKey, resolvedEntries }) => {
+        window.localStorage.setItem(
+          resolvedMarkerKey,
+          JSON.stringify({ entries: resolvedEntries })
+        )
+      },
+      {
+        resolvedMarkerKey: markerKey,
+        resolvedEntries: entries,
+      }
+    )
+    await page.reload({ waitUntil: 'domcontentloaded' })
   }
 
   function createDraftInjectionMarkerKey(label = 'draft') {
@@ -927,28 +967,23 @@ export function createPrintAssertions({
 
   async function assertWorkspaceContinuedPageMargin(
     page,
-    { storageKey, paperSelector, minimumLineCount = 32, clearMerges = false }
+    { paperSelector, minimumLineCount = 32, clearMerges = false }
   ) {
-    const storageKeys = await resolveCurrentPrintWorkspaceDraftStorageKeys(
-      page,
-      storageKey
-    )
+    const storageKeys = await resolveCurrentPrintWorkspaceDraftStorageKeys(page)
     const originalEntries = await snapshotLocalStorageValues(page, storageKeys)
-    const injectionMarkerKey = createDraftInjectionMarkerKey('continued_page')
-    await installDraftInjectionOnNextLoad(page, injectionMarkerKey)
 
     try {
-      await page.evaluate(
+      const injectedEntries = await page.evaluate(
         ({
           resolvedStorageKeys,
           resolvedMinimumLineCount,
           shouldClearMerges,
-          resolvedInjectionMarkerKey,
         }) => {
-          const rawDraft = resolvedStorageKeys
+          const rawSnapshot = resolvedStorageKeys
             .map((key) => window.localStorage.getItem(key))
             .find((value) => typeof value === 'string')
-          const draft = rawDraft ? JSON.parse(rawDraft) : {}
+          const snapshot = rawSnapshot ? JSON.parse(rawSnapshot) : {}
+          const draft = snapshot?.draft || {}
           const baseLines =
             Array.isArray(draft.lines) && draft.lines.length > 0
               ? draft.lines
@@ -980,26 +1015,26 @@ export function createPrintAssertions({
             draft.merges = []
           }
 
-          resolvedStorageKeys.forEach((key) => {
-            window.localStorage.setItem(key, JSON.stringify(draft))
+          const value = JSON.stringify({
+            ...snapshot,
+            version: 1,
+            updatedAt: Date.now(),
+            draft,
           })
-          window.localStorage.setItem(
-            resolvedInjectionMarkerKey,
-            JSON.stringify({
-              keys: resolvedStorageKeys,
-              draftJSON: JSON.stringify(draft),
-            })
-          )
+          return resolvedStorageKeys.map((key) => ({ key, value }))
         },
         {
           resolvedStorageKeys: storageKeys,
           resolvedMinimumLineCount: minimumLineCount,
           shouldClearMerges: clearMerges,
-          resolvedInjectionMarkerKey: injectionMarkerKey,
         }
       )
 
-      await page.reload({ waitUntil: 'domcontentloaded' })
+      await reloadWithLocalStorageEntries(
+        page,
+        injectedEntries,
+        'continued_page'
+      )
       await page.locator(paperSelector).waitFor({
         state: 'visible',
         timeout: 10_000,
@@ -1054,92 +1089,123 @@ export function createPrintAssertions({
         `工作台跨页后未切到统一续页页边距: ${JSON.stringify(metrics)}`
       )
     } finally {
-      await page.evaluate(
-        (resolvedInjectionMarkerKey) =>
-          window.localStorage.removeItem(resolvedInjectionMarkerKey),
-        injectionMarkerKey
+      await reloadWithLocalStorageEntries(
+        page,
+        originalEntries,
+        'continued_page_restore'
       )
-      await restoreLocalStorageValues(page, originalEntries)
+      await page.locator(paperSelector).waitFor({
+        state: 'visible',
+        timeout: 10_000,
+      })
+      await page.locator('[data-print-appendix-manager]').waitFor({
+        state: 'visible',
+        timeout: 10_000,
+      })
     }
   }
 
   async function assertMaterialContractMetaAlignment(page) {
-    const draftStorageKey =
-      '__plush_erp_material_purchase_contract_print_draft__'
-    await page.evaluate((storageKey) => {
-      const rawDraft = window.localStorage.getItem(storageKey)
-      const draft = rawDraft ? JSON.parse(rawDraft) : {}
-      draft.supplierName =
-        '东莞市永绅玩具有限公司辅料供应中心东城联络处长期备料专线'
-      draft.buyerCompany = '东莞茶山发水电费三大发永绅采购与仓配协同办公室'
-      window.localStorage.setItem(storageKey, JSON.stringify(draft))
-    }, draftStorageKey)
-    await page.reload({ waitUntil: 'domcontentloaded' })
-    await delay(300)
+    const storageKeys = await resolveCurrentPrintWorkspaceDraftStorageKeys(page)
+    const originalEntries = await snapshotLocalStorageValues(page, storageKeys)
 
-    const metrics = await page.evaluate(() => {
-      const pairs = Array.from(
-        document.querySelectorAll(
-          '.erp-material-contract-paper .erp-material-contract-meta__pair'
-        )
-      ).map((pair) => {
-        const pairRect = pair.getBoundingClientRect()
-        const cells = Array.from(
-          pair.querySelectorAll(':scope > .erp-material-contract-meta__cell')
-        ).map((cell) => {
-          const rect = cell.getBoundingClientRect()
+    try {
+      const injectedEntries = await page.evaluate((resolvedStorageKeys) => {
+        const rawSnapshot = resolvedStorageKeys
+          .map((key) => window.localStorage.getItem(key))
+          .find((value) => typeof value === 'string')
+        const snapshot = rawSnapshot ? JSON.parse(rawSnapshot) : {}
+        const draft = snapshot?.draft || {}
+        draft.supplierName =
+          '东莞市永绅玩具有限公司辅料供应中心东城联络处长期备料专线'
+        draft.buyerCompany = '东莞茶山发水电费三大发永绅采购与仓配协同办公室'
+        const value = JSON.stringify({
+          ...snapshot,
+          version: 1,
+          updatedAt: Date.now(),
+          draft,
+        })
+        return resolvedStorageKeys.map((key) => ({ key, value }))
+      }, storageKeys)
+      await reloadWithLocalStorageEntries(
+        page,
+        injectedEntries,
+        'material_meta_alignment'
+      )
+      await expectText(page, '辅料供应中心东城联络处')
+      await expectText(page, '采购与仓配协同办公室')
+      await delay(300)
+
+      const metrics = await page.evaluate(() => {
+        const pairs = Array.from(
+          document.querySelectorAll(
+            '.erp-material-contract-paper .erp-material-contract-meta__pair'
+          )
+        ).map((pair) => {
+          const pairRect = pair.getBoundingClientRect()
+          const cells = Array.from(
+            pair.querySelectorAll(':scope > .erp-material-contract-meta__cell')
+          ).map((cell) => {
+            const rect = cell.getBoundingClientRect()
+            return {
+              top: rect.top,
+              left: rect.left,
+              height: rect.height,
+              width: rect.width,
+            }
+          })
+
           return {
-            top: rect.top,
-            left: rect.left,
-            height: rect.height,
-            width: rect.width,
+            top: pairRect.top,
+            bottom: pairRect.bottom,
+            cellCount: cells.length,
+            cells,
           }
         })
 
         return {
-          top: pairRect.top,
-          bottom: pairRect.bottom,
-          cellCount: cells.length,
-          cells,
+          pairCount: pairs.length,
+          pairs,
         }
       })
-
-      return {
-        pairCount: pairs.length,
-        pairs,
-      }
-    })
-
-    assert.equal(
-      metrics.pairCount,
-      5,
-      `采购合同头部信息行数异常: ${JSON.stringify(metrics)}`
-    )
-
-    metrics.pairs.forEach((pair, index) => {
       assert.equal(
-        pair.cellCount,
-        2,
-        `采购合同第 ${index + 1} 行未保持左右配对: ${JSON.stringify(pair)}`
+        metrics.pairCount,
+        5,
+        `采购合同头部信息行数异常: ${JSON.stringify(metrics)}`
       )
 
-      const [leftCell, rightCell] = pair.cells
-      assert(
-        Math.abs(leftCell.top - rightCell.top) < 1,
-        `采购合同第 ${index + 1} 行左右未对齐: ${JSON.stringify(pair)}`
-      )
-
-      if (index > 0) {
-        const previousPair = metrics.pairs[index - 1]
-        assert(
-          pair.top >= previousPair.bottom - 1,
-          `采购合同第 ${index + 1} 行与上一行发生重叠: ${JSON.stringify({
-            previousPair,
-            pair,
-          })}`
+      metrics.pairs.forEach((pair, index) => {
+        assert.equal(
+          pair.cellCount,
+          2,
+          `采购合同第 ${index + 1} 行未保持左右配对: ${JSON.stringify(pair)}`
         )
-      }
-    })
+
+        const [leftCell, rightCell] = pair.cells
+        assert(
+          Math.abs(leftCell.top - rightCell.top) < 1,
+          `采购合同第 ${index + 1} 行左右未对齐: ${JSON.stringify(pair)}`
+        )
+
+        if (index > 0) {
+          const previousPair = metrics.pairs[index - 1]
+          assert(
+            pair.top >= previousPair.bottom - 1,
+            `采购合同第 ${index + 1} 行与上一行发生重叠: ${JSON.stringify({
+              previousPair,
+              pair,
+            })}`
+          )
+        }
+      })
+    } finally {
+      await reloadWithLocalStorageEntries(
+        page,
+        originalEntries,
+        'material_meta_alignment_restore'
+      )
+      await expectText(page, '打印内容')
+    }
   }
 
   async function assertContractTableEditableAlignment(
@@ -1279,17 +1345,18 @@ export function createPrintAssertions({
 
   async function assertMaterialContractLineCellsWrapLongValues(
     page,
-    { storageKey, scenarioLabel }
+    { scenarioLabel }
   ) {
-    const originalRaw = await page.evaluate(
-      (resolvedStorageKey) => window.localStorage.getItem(resolvedStorageKey),
-      storageKey
-    )
+    const storageKeys = await resolveCurrentPrintWorkspaceDraftStorageKeys(page)
+    const originalEntries = await snapshotLocalStorageValues(page, storageKeys)
 
     try {
-      await page.evaluate((resolvedStorageKey) => {
-        const rawDraft = window.localStorage.getItem(resolvedStorageKey)
-        const draft = rawDraft ? JSON.parse(rawDraft) : {}
+      const injectedEntries = await page.evaluate((resolvedStorageKeys) => {
+        const rawSnapshot = resolvedStorageKeys
+          .map((key) => window.localStorage.getItem(key))
+          .find((value) => typeof value === 'string')
+        const snapshot = rawSnapshot ? JSON.parse(rawSnapshot) : {}
+        const draft = snapshot?.draft || {}
         const sourceLine =
           Array.isArray(draft.lines) && draft.lines.length > 0
             ? draft.lines[0]
@@ -1309,10 +1376,20 @@ export function createPrintAssertions({
           },
         ]
         draft.merges = []
-        window.localStorage.setItem(resolvedStorageKey, JSON.stringify(draft))
-      }, storageKey)
+        const value = JSON.stringify({
+          ...snapshot,
+          version: 1,
+          updatedAt: Date.now(),
+          draft,
+        })
+        return resolvedStorageKeys.map((key) => ({ key, value }))
+      }, storageKeys)
 
-      await page.reload({ waitUntil: 'domcontentloaded' })
+      await reloadWithLocalStorageEntries(
+        page,
+        injectedEntries,
+        'material_long_line'
+      )
       await expectText(page, '打印内容')
       await expectText(page, 'SIM-YOYOOSUN-BULK-PO-03')
 
@@ -1436,20 +1513,11 @@ export function createPrintAssertions({
         `${scenarioLabel} 表格越过纸面边界: ${JSON.stringify(metrics)}`
       )
     } finally {
-      await page.evaluate(
-        ({ resolvedStorageKey, resolvedOriginalRaw }) => {
-          if (typeof resolvedOriginalRaw === 'string') {
-            window.localStorage.setItem(resolvedStorageKey, resolvedOriginalRaw)
-            return
-          }
-          window.localStorage.removeItem(resolvedStorageKey)
-        },
-        {
-          resolvedStorageKey: storageKey,
-          resolvedOriginalRaw: originalRaw,
-        }
+      await reloadWithLocalStorageEntries(
+        page,
+        originalEntries,
+        'material_long_line_restore'
       )
-      await page.reload({ waitUntil: 'domcontentloaded' })
       await expectText(page, '打印内容')
     }
   }
@@ -1883,27 +1951,19 @@ export function createPrintAssertions({
 
   async function assertContractTotalCellsWrapLargeNumbers(
     page,
-    { storageKey, templateKind, totalValueSelector, scenarioLabel }
+    { templateKind, totalValueSelector, scenarioLabel }
   ) {
-    const storageKeys = await resolveCurrentPrintWorkspaceDraftStorageKeys(
-      page,
-      storageKey
-    )
+    const storageKeys = await resolveCurrentPrintWorkspaceDraftStorageKeys(page)
     const originalEntries = await snapshotLocalStorageValues(page, storageKeys)
-    const injectionMarkerKey = createDraftInjectionMarkerKey('large_total')
-    await installDraftInjectionOnNextLoad(page, injectionMarkerKey)
 
     try {
-      await page.evaluate(
-        ({
-          resolvedStorageKeys,
-          resolvedTemplateKind,
-          resolvedInjectionMarkerKey,
-        }) => {
-          const rawDraft = resolvedStorageKeys
+      const injectedEntries = await page.evaluate(
+        ({ resolvedStorageKeys, resolvedTemplateKind }) => {
+          const rawSnapshot = resolvedStorageKeys
             .map((key) => window.localStorage.getItem(key))
             .find((value) => typeof value === 'string')
-          const draft = rawDraft ? JSON.parse(rawDraft) : {}
+          const snapshot = rawSnapshot ? JSON.parse(rawSnapshot) : {}
+          const draft = snapshot?.draft || {}
           const sourceLine =
             Array.isArray(draft.lines) && draft.lines.length > 0
               ? draft.lines[0]
@@ -1922,25 +1982,21 @@ export function createPrintAssertions({
             },
           ]
           draft.merges = []
-          resolvedStorageKeys.forEach((key) => {
-            window.localStorage.setItem(key, JSON.stringify(draft))
+          const value = JSON.stringify({
+            ...snapshot,
+            version: 1,
+            updatedAt: Date.now(),
+            draft,
           })
-          window.localStorage.setItem(
-            resolvedInjectionMarkerKey,
-            JSON.stringify({
-              keys: resolvedStorageKeys,
-              draftJSON: JSON.stringify(draft),
-            })
-          )
+          return resolvedStorageKeys.map((key) => ({ key, value }))
         },
         {
           resolvedStorageKeys: storageKeys,
           resolvedTemplateKind: templateKind,
-          resolvedInjectionMarkerKey: injectionMarkerKey,
         }
       )
 
-      await page.reload({ waitUntil: 'domcontentloaded' })
+      await reloadWithLocalStorageEntries(page, injectedEntries, 'large_total')
       await expectText(page, '打印内容')
       await page.waitForFunction(
         (selector) => document.querySelectorAll(selector).length >= 2,
@@ -1971,6 +2027,12 @@ export function createPrintAssertions({
         metrics.length >= 2,
         `${scenarioLabel} 缺少数量或金额合计单元格: ${JSON.stringify(metrics)}`
       )
+      assert(
+        metrics.some((metric) =>
+          metric.text.replaceAll(',', '').includes('400013111')
+        ),
+        `${scenarioLabel} 未从当前 v2 草稿读回大数值样本: ${JSON.stringify(metrics)}`
+      )
 
       metrics.forEach((metric) => {
         assert(
@@ -1993,13 +2055,11 @@ export function createPrintAssertions({
         )
       })
     } finally {
-      await page.evaluate(
-        (resolvedInjectionMarkerKey) =>
-          window.localStorage.removeItem(resolvedInjectionMarkerKey),
-        injectionMarkerKey
+      await reloadWithLocalStorageEntries(
+        page,
+        originalEntries,
+        'large_total_restore'
       )
-      await restoreLocalStorageValues(page, originalEntries)
-      await page.reload({ waitUntil: 'domcontentloaded' })
       await expectText(page, '打印内容')
     }
   }

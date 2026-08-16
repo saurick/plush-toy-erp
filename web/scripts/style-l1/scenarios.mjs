@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer'
 
+import { customerPackageCatalog } from '../../../config/catalog/customerPackageCatalog.mjs'
 import { yoyoosunRoleFlowMatrix } from '../../../config/customers/yoyoosun/roleFlowMatrix.mjs'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { getNavigationSections } from '../../src/erp/config/seedData.mjs'
@@ -8817,6 +8818,7 @@ export function createStyleL1Scenarios(deps) {
           'mobile.boss.access',
           'workflow.task.create',
           'workflow.task.read',
+          'workflow.task.supervise',
           'workflow.task.update',
         ],
         workflow_visible_owner_role_keys_by_capability: {
@@ -8835,6 +8837,7 @@ export function createStyleL1Scenarios(deps) {
           'mobile.boss.access',
           'workflow.task.create',
           'workflow.task.read',
+          'workflow.task.supervise',
           'workflow.task.update',
         ],
         menus: [],
@@ -10165,10 +10168,13 @@ export function createStyleL1Scenarios(deps) {
         await taskRow.waitFor({ state: 'visible', timeout: 10_000 })
         await taskRow.click()
         await expectText(page, taskName)
-        const processButton = page.getByRole('button', {
-          name: '处理任务',
-          exact: true,
-        })
+        const processFlowStep = page
+          .getByTestId('mobile-task-flow-steps')
+          .getByRole('button', { name: '处理任务', exact: true })
+        await processFlowStep.waitFor({ state: 'visible', timeout: 10_000 })
+        const processButton = page
+          .locator('.mobile-role-action-bar')
+          .getByRole('button', { name: '处理任务', exact: true })
         await processButton.waitFor({ state: 'visible', timeout: 10_000 })
         await processButton.click()
         await page
@@ -11253,6 +11259,29 @@ export function createStyleL1Scenarios(deps) {
           clientWidth: document.documentElement.clientWidth,
           scrollHeight: document.documentElement.scrollHeight,
           clientHeight: document.documentElement.clientHeight,
+          layout: [
+            '.erp-dev-workspace-nav',
+            '.erp-dev-environment-evidence',
+            '.erp-dev-customer-header',
+            '.erp-dev-customer-workspace',
+            '.erp-dev-customer-overview',
+            '.erp-dev-customer-overview > .erp-dev-customer-panel',
+          ].flatMap((selector) =>
+            [...document.querySelectorAll(selector)].map((element) => {
+              const rect = element.getBoundingClientRect()
+              const style = window.getComputedStyle(element)
+              return {
+                selector,
+                top: rect.top,
+                bottom: rect.bottom,
+                height: rect.height,
+                marginTop: style.marginTop,
+                marginBottom: style.marginBottom,
+                paddingTop: style.paddingTop,
+                paddingBottom: style.paddingBottom,
+              }
+            })
+          ),
         }))
         assert.deepEqual(
           {
@@ -11395,16 +11424,16 @@ export function createStyleL1Scenarios(deps) {
             enabledTags: moduleStateMetrics.enabledTags,
           },
           {
-            itemCount: 19,
+            itemCount: customerPackageCatalog.modules.length,
             hasCatalogDefaultCopy: true,
             hasInstallCopy: true,
             hasShipmentModuleLabel: true,
             hasProductionOrderModuleLabel: true,
             hasRawShipmentModuleKey: false,
             hasRawProductionOrderModuleKey: false,
-            enabledTags: 19,
+            enabledTags: customerPackageCatalog.modules.length,
           },
-          `客户配置控制台应展示 19 个模块状态预览项且不直出 raw module key: ${JSON.stringify(moduleStateMetrics)}`
+          `客户配置控制台应展示全部 ${customerPackageCatalog.modules.length} 个目录模块状态且不直出 raw module key: ${JSON.stringify(moduleStateMetrics)}`
         )
         assert(
           moduleStateMetrics.panelWidth <= moduleStateMetrics.viewportWidth,
@@ -12984,12 +13013,13 @@ export function createStyleL1Scenarios(deps) {
           {
             path: '/__dev/product-engineering',
             heading: '产品工程 / Product Engineering',
-            cardCount: 6,
+            cardCount: 7,
             secondaryLabels: [
               '产品内核',
               '权限关系',
               '改动指南',
               '业务链观察',
+              '业务易用性',
               '开发文档',
               '产品原型',
             ],
@@ -13132,6 +13162,7 @@ export function createStyleL1Scenarios(deps) {
                 '账号为什么能使用这些功能？',
                 '这件事该按哪条规则做？',
                 '这一步做完，业务真的完成了吗？',
+                '员工能不能看懂、能不能自己完成？',
                 '这项能力的正式说明写在哪里？',
                 '页面应该怎样组织才更易用？',
               ],
@@ -13144,6 +13175,7 @@ export function createStyleL1Scenarios(deps) {
                 '核对权限关系',
                 '判断规则',
                 '查看业务链',
+                '检查业务易用性',
                 '搜索文档',
                 '评审原型',
               ],
@@ -13526,7 +13558,11 @@ export function createStyleL1Scenarios(deps) {
             },
             { rootSelector, itemSelector }
           )
-        const assertButtonGroup = (name, metrics) => {
+        const assertButtonGroup = (
+          name,
+          metrics,
+          { allowBorderless = false, minimumHeight = 30 } = {}
+        ) => {
           assert(
             metrics.rootExists && metrics.itemCount >= 2,
             `${name} 应渲染为多个可选控件: ${JSON.stringify(metrics)}`
@@ -13537,10 +13573,11 @@ export function createStyleL1Scenarios(deps) {
             `${name} 未选中项不能像普通描述文字: ${JSON.stringify(metrics)}`
           )
           assert(
-            !transparentColors.has(metrics.inactive.backgroundColor) &&
-              metrics.inactive.borderStyle === 'solid' &&
+            (allowBorderless ||
+              (!transparentColors.has(metrics.inactive.backgroundColor) &&
+                metrics.inactive.borderStyle === 'solid')) &&
               metrics.inactive.width > 0 &&
-              metrics.inactive.height >= 30,
+              metrics.inactive.height >= minimumHeight,
             `${name} 未选中项需要稳定按钮盒模型: ${JSON.stringify(metrics)}`
           )
           assert(
@@ -13561,7 +13598,8 @@ export function createStyleL1Scenarios(deps) {
           await readControlGroup(
             '.erp-dev-customer-view-switch',
             '.erp-dev-task-nav__item'
-          )
+          ),
+          { allowBorderless: true, minimumHeight: 44 }
         )
 
         await gotoScenarioPath(page, '/__dev/testing', {
@@ -13622,7 +13660,7 @@ export function createStyleL1Scenarios(deps) {
         await page.waitForFunction(() => {
           const params = new URL(window.location.href).searchParams
           return (
-            params.get('task') === 'data-contract' &&
+            params.get('task') === 'product-core-boundary' &&
             !params.has('axis') &&
             !params.has('scope')
           )
@@ -13706,6 +13744,7 @@ export function createStyleL1Scenarios(deps) {
         assert.deepEqual(
           metrics.taskNames,
           [
+            '判断需求是否进入产品内核',
             '调整数据、接口或权限',
             '调整业务流程、状态或入账结果',
             '调整页面、菜单或原型',
@@ -13715,16 +13754,16 @@ export function createStyleL1Scenarios(deps) {
             '新增或整理正式文档',
             '吸收截图、外部建议或历史材料',
           ],
-          '治理页首屏应只提供八类人能直接选择的常见任务'
+          '治理页首屏应只提供九类人能直接选择的常见任务'
         )
         assert.equal(
           metrics.taskCount,
-          8,
+          9,
           '治理页任务入口数量应与 Markdown 显式映射一致'
         )
         assert.match(
           metrics.activeText,
-          /调整数据、接口或权限/u,
+          /判断需求是否进入产品内核/u,
           '治理页默认应选中第一类常见改动'
         )
         assert.equal(
@@ -13940,7 +13979,7 @@ export function createStyleL1Scenarios(deps) {
           true,
           '用户主动展开后才应显示维护人员参考'
         )
-        assert.equal(metrics.taskCount, 8, '展开高级参考不应改变常见任务入口')
+        assert.equal(metrics.taskCount, 9, '展开高级参考不应改变常见任务入口')
         assert.deepEqual(
           metrics.deliveryStepNames,
           [
@@ -14160,7 +14199,7 @@ export function createStyleL1Scenarios(deps) {
             overflow: metrics.overflow,
           },
           {
-            taskCount: 8,
+            taskCount: 9,
             taskGridColumnCount: 1,
             tasksStacked: true,
             decisionStepCount: 3,
@@ -16024,9 +16063,9 @@ export function createStyleL1Scenarios(deps) {
           .nth(1)
         await backupTier.locator('.ant-select').first().click()
         await page
-          .locator('.ant-select-dropdown:visible')
-          .getByText('PMC', { exact: true })
-          .click({ force: true })
+          .locator('.ant-select-dropdown:visible .ant-select-item-option')
+          .filter({ hasText: /^PMC$/u })
+          .dispatchEvent('click')
         await assertAntdModalCentered(
           page,
           dialog,
@@ -16054,8 +16093,58 @@ export function createStyleL1Scenarios(deps) {
       approvalSettingsMode: 'confirmation_recovery',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
+        const approvalReadRequests = new Set()
+        let lastApprovalReadActivity = Date.now()
+        const approvalReadMethod = (request) => {
+          if (!request.url().includes('/rpc/customer_config')) return ''
+          return request.postDataJSON()?.method || ''
+        }
+        const trackApprovalRead = (request) => {
+          if (approvalReadMethod(request) !== 'get_approval_settings') return
+          approvalReadRequests.add(request)
+          lastApprovalReadActivity = Date.now()
+        }
+        const finishApprovalRead = (request) => {
+          if (!approvalReadRequests.delete(request)) return
+          lastApprovalReadActivity = Date.now()
+        }
+        page.on('request', trackApprovalRead)
+        page.on('requestfinished', finishApprovalRead)
+        page.on('requestfailed', finishApprovalRead)
+        const waitForApprovalReadsIdle = async () => {
+          const deadline = Date.now() + 5_000
+          while (
+            approvalReadRequests.size > 0 ||
+            Date.now() - lastApprovalReadActivity < 250
+          ) {
+            assert(
+              Date.now() < deadline,
+              `审批责任读取未在 5 秒内稳定: in_flight=${approvalReadRequests.size}`
+            )
+            await page.waitForTimeout(25)
+          }
+        }
+        const waitForApprovalResponse = (method, predicate = () => true) =>
+          page.waitForResponse(async (response) => {
+            if (
+              !response.url().includes('/rpc/customer_config') ||
+              response.status() !== 200
+            ) {
+              return false
+            }
+            const requestBody = response.request().postDataJSON() || {}
+            if (requestBody.method !== method) return false
+            const responseBody = await response.json()
+            return predicate(responseBody)
+          })
         await expectHeading(page, '权限管理')
+        const initialSettingsRead = waitForApprovalResponse(
+          'get_approval_settings',
+          (body) => Array.isArray(body?.result?.data?.approval_settings?.items)
+        )
         await page.getByRole('tab', { name: /审批责任/ }).click()
+        await initialSettingsRead
+        await waitForApprovalReadsIdle()
         await page
           .getByRole('row', { name: /销售订单审批/ })
           .getByRole('button', { name: '调整' })
@@ -16063,25 +16152,67 @@ export function createStyleL1Scenarios(deps) {
         const dialog = page
           .getByRole('dialog')
           .filter({ hasText: '调整销售订单审批' })
+        await dialog.waitFor({ state: 'visible', timeout: 10_000 })
+        await dialog.evaluate(async (node) => {
+          await Promise.all(
+            node
+              .getAnimations({ subtree: true })
+              .map((animation) => animation.finished.catch(() => undefined))
+          )
+        })
         const backupTier = dialog
           .locator('.erp-approval-responsibility-form__tier')
           .nth(1)
         await backupTier.locator('.ant-select').first().click()
         await page
-          .locator('.ant-select-dropdown:visible')
-          .getByText('PMC', { exact: true })
-          .click({ force: true })
+          .locator('.ant-select-dropdown:visible .ant-select-item-option')
+          .filter({ hasText: /^PMC$/u })
+          .dispatchEvent('click')
         await dialog
           .getByRole('button', { name: '保存调整', exact: true })
           .click()
         await page
           .getByRole('button', { name: '保存并生效', exact: true })
-          .click()
-        await expectText(page, '等待确认')
-        await expectButton(page, '确认并生效')
+          .click({ trial: true })
+        const applyResponse = waitForApprovalResponse(
+          'apply_approval_settings',
+          (body) => body?.result?.data?.revision?.status === 'active'
+        )
+        const failedReadbackResponse = waitForApprovalResponse(
+          'get_approval_settings',
+          (body) => !Array.isArray(body?.result?.data?.approval_settings?.items)
+        )
         await page
-          .getByRole('button', { name: '确认并生效', exact: true })
+          .getByRole('button', { name: '保存并生效', exact: true })
           .click()
+        await Promise.all([applyResponse, failedReadbackResponse])
+        await expectText(page, '正在等待确认生效结果')
+        const confirmButton = page
+          .locator('.erp-approval-responsibility__actions button:visible')
+          .filter({ hasText: /^确认并生效$/u })
+        await confirmButton.waitFor({ state: 'visible', timeout: 10_000 })
+        await page.waitForFunction(() => {
+          const button = Array.from(
+            document.querySelectorAll(
+              '.erp-approval-responsibility__actions button'
+            )
+          ).find(
+            (candidate) =>
+              String(candidate.textContent || '').trim() === '确认并生效'
+          )
+          return (
+            button instanceof HTMLButtonElement &&
+            !button.disabled &&
+            !button.classList.contains('ant-btn-loading')
+          )
+        })
+        const confirmedReadbackResponse = waitForApprovalResponse(
+          'get_approval_settings',
+          (body) => Array.isArray(body?.result?.data?.approval_settings?.items)
+        )
+        await confirmButton.click()
+        await confirmedReadbackResponse
+        await expectText(page, '审批责任已保存并生效')
         await expectText(page, '已生效')
       },
     },
@@ -16114,16 +16245,37 @@ export function createStyleL1Scenarios(deps) {
         await expectText(primaryRoleSelect, '业务（未开启审批功能）')
         await primaryRoleSelect.click()
         const dropdown = page.locator('.ant-select-dropdown:visible')
-        const salesOption = dropdown
+        await dropdown.waitFor({ state: 'visible' })
+        await dropdown
           .locator('.ant-select-item-option-disabled')
-          .filter({ hasText: '业务（未开启审批功能）' })
-        const bossOption = dropdown
+          .filter({ hasText: /^业务（未开启审批功能）$/u })
+          .waitFor({ state: 'visible' })
+        await dropdown
           .locator('.ant-select-item-option-disabled')
-          .filter({ hasText: '老板（已用于升级责任）' })
-        await salesOption.waitFor({ state: 'visible' })
-        await bossOption.waitFor({ state: 'visible' })
-        assert.equal(await salesOption.count(), 1)
-        assert.equal(await bossOption.count(), 1)
+          .filter({ hasText: /^老板（已用于升级责任）$/u })
+          .waitFor({ state: 'visible' })
+        const disabledRoleLabels = await dropdown
+          .locator(
+            '.ant-select-item-option-disabled .ant-select-item-option-content'
+          )
+          .allTextContents()
+        const normalizedDisabledRoleLabels = disabledRoleLabels.map((label) =>
+          label.trim()
+        )
+        assert.equal(
+          normalizedDisabledRoleLabels.filter(
+            (label) => label === '业务（未开启审批功能）'
+          ).length,
+          1,
+          `业务岗位应唯一标记为缺少审批资格: ${JSON.stringify(disabledRoleLabels)}`
+        )
+        assert.equal(
+          normalizedDisabledRoleLabels.filter(
+            (label) => label === '老板（已用于升级责任）'
+          ).length,
+          1,
+          `老板岗位应唯一标记为升级责任冲突: ${JSON.stringify(disabledRoleLabels)}`
+        )
         const visibleRoleLabels = await dropdown
           .locator('.ant-select-item-option-content')
           .allTextContents()
@@ -16167,10 +16319,31 @@ export function createStyleL1Scenarios(deps) {
         await assertTextAbsent(page, '重点功能')
         await assertTextAbsent(page, '先看菜单结果，再选择页内操作')
         await assertTextAbsent(page, '菜单入口和页内操作分开控制')
+        const financeEffectiveAccessRead = page.waitForResponse((response) => {
+          if (
+            !response.url().includes('/rpc/admin') ||
+            response.status() !== 200
+          ) {
+            return false
+          }
+          const body = response.request().postDataJSON()
+          return (
+            body?.method === 'effective_role_access' &&
+            body?.params?.role_key === 'finance' &&
+            !Array.isArray(body?.params?.permission_keys)
+          )
+        })
         await page
           .locator('.erp-role-template-card')
           .filter({ hasText: '财务' })
           .click()
+        await financeEffectiveAccessRead
+        await page.evaluate(
+          () =>
+            new Promise((resolve) =>
+              requestAnimationFrame(() => requestAnimationFrame(resolve))
+            )
+        )
         await expectText(
           page.locator('.erp-role-center-detail__head'),
           '项功能'
@@ -16187,10 +16360,28 @@ export function createStyleL1Scenarios(deps) {
         const permissionHelpTrigger = page.getByRole('button', {
           name: '菜单与操作说明',
         })
-        await permissionHelpTrigger.hover()
+        await permissionHelpTrigger.dispatchEvent('click')
+        await page.waitForFunction(() => {
+          const popovers = [
+            ...document.querySelectorAll('.erp-permission-help-popover'),
+          ]
+          popovers.forEach((node) =>
+            node.removeAttribute('data-style-l1-active-help')
+          )
+          const activePopover = popovers.find((node) => {
+            const rect = node.getBoundingClientRect()
+            return (
+              node.checkVisibility() && rect.width >= 240 && rect.height >= 90
+            )
+          })
+          if (!activePopover) return false
+          activePopover.setAttribute('data-style-l1-active-help', 'true')
+          return true
+        })
         const permissionHelpPopover = page.locator(
-          '.erp-permission-help-popover:visible'
+          '.erp-permission-help-popover[data-style-l1-active-help="true"]'
         )
+        await permissionHelpPopover.waitFor({ state: 'visible' })
         await expectText(permissionHelpPopover, '菜单与操作')
         await expectText(permissionHelpPopover, '查看类功能决定菜单是否出现')
         await expectText(
@@ -16204,8 +16395,6 @@ export function createStyleL1Scenarios(deps) {
             permissionHelpBox.height >= 90,
           `菜单与操作浮层尺寸异常: ${JSON.stringify(permissionHelpBox)}`
         )
-        await permissionHelpPopover.hover()
-        await permissionHelpPopover.waitFor({ state: 'visible' })
         await permissionHelpPopover.screenshot({
           path: 'output/playwright/style-l1/permission-center-help-popover-card.png',
         })
@@ -16213,9 +16402,9 @@ export function createStyleL1Scenarios(deps) {
           path: 'output/playwright/style-l1/permission-center-help-popover.png',
           fullPage: false,
         })
-        await page.mouse.move(20, 20)
+        await page.mouse.click(20, 20)
         await permissionHelpPopover.waitFor({
-          state: 'detached',
+          state: 'hidden',
           timeout: 5000,
         })
         await page.getByRole('tab', { name: '关联账号（3）' }).click()
@@ -16456,24 +16645,41 @@ export function createStyleL1Scenarios(deps) {
           fullPage: true,
         })
         await page.getByRole('tab', { name: '页面与导航' }).click()
-        await expectText(page, '当前客户已启用版本')
-        await expectText(page, '页面可进入，不等于页面内所有操作都可用')
-        await expectText(page, '当前页面结果')
+        const navigationWorkspaceTabs = page.locator(
+          '.erp-role-navigation-workspace-tabs'
+        )
+        const navigationLayoutTab = navigationWorkspaceTabs.getByRole('tab', {
+          name: '菜单布局',
+        })
+        const pageAccessTab = navigationWorkspaceTabs.getByRole('tab', {
+          name: /^页面可用范围（/u,
+        })
+        assert.equal(
+          await navigationLayoutTab.getAttribute('aria-selected'),
+          'true',
+          '页面与导航应默认进入菜单布局'
+        )
+        await pageAccessTab.waitFor({ state: 'visible' })
         await expectText(page, '设置岗位菜单布局')
         await expectText(page, '系统按岗位推荐高频页面')
         await expectText(page, '导航位置预览')
         await expectText(page, '看板中心')
         await expectText(page, '常用工作')
-        await expectText(page, '更多功能（2）')
+        await expectText(page, '更多功能（3）')
         await expectText(page, '工作台')
         await expectText(page, '任务看板')
         await expectText(page, '客户档案')
         await expectText(page, '销售订单')
         await expectText(page, '库存台账')
+        await expectText(page, '历史记录中心')
         await expectText(page, '岗位使用帮助')
+        await pageAccessTab.click()
+        await expectText(page, '当前客户已启用版本')
+        await expectText(page, '页面内每项操作仍会单独校验')
+        await expectText(page, '当前显示')
         const permissionMapMetrics = await page.evaluate(() => {
           const table = document.querySelector(
-            '.erp-role-policy-tabs .ant-table'
+            '.erp-role-effective-access .ant-table'
           )
           const holder = table?.querySelector('.ant-table-container')
           return {
@@ -16488,6 +16694,7 @@ export function createStyleL1Scenarios(deps) {
               permissionMapMetrics.clientWidth + 1,
           `权限地图表格出现横向溢出: ${JSON.stringify(permissionMapMetrics)}`
         )
+        await navigationLayoutTab.click()
         const navigationPreviewMetrics = await page.evaluate(() => {
           const preview = document.querySelector('.erp-role-navigation-preview')
           const grid = preview?.querySelector(
@@ -16566,6 +16773,7 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '自定义布局')
         await expectText(page, '已保存')
         await page.waitForTimeout(350)
+        await pageAccessTab.click()
         await page.screenshot({
           path: 'output/playwright/style-l1/permission-center-permission-map.png',
           fullPage: true,
@@ -16742,7 +16950,7 @@ export function createStyleL1Scenarios(deps) {
         )
         const adminSearch = page.getByPlaceholder('搜索员工账号、手机号或岗位')
         await adminSearch.fill('assistant')
-        await expectText(page, '命中 1/6 个员工账号')
+        await expectText(page, '命中 1/7 个员工账号')
         const filteredTableText = await page
           .locator('.erp-permission-section--admins .ant-table-tbody')
           .innerText()
@@ -17040,7 +17248,7 @@ export function createStyleL1Scenarios(deps) {
         const draftPreview = await readNavigationPreview()
         assert.deepEqual(
           draftPreview.map((group) => group.title),
-          ['看板中心', '常用工作', '更多功能（4）'],
+          ['看板中心', '常用工作', '更多功能（5）'],
           `权限中心自定义预览分组异常: ${JSON.stringify(draftPreview)}`
         )
         assert.deepEqual(
@@ -17050,7 +17258,7 @@ export function createStyleL1Scenarios(deps) {
         )
         assert.deepEqual(
           draftPreview[2].items,
-          ['客户档案', '销售订单', '出货放行', '岗位使用帮助'],
+          ['客户档案', '销售订单', '出货放行', '历史记录中心', '岗位使用帮助'],
           `权限中心更多功能顺序异常: ${JSON.stringify(draftPreview)}`
         )
         assert.deepEqual(
@@ -17067,6 +17275,10 @@ export function createStyleL1Scenarios(deps) {
             {
               title: '出货管理',
               items: ['出货放行'],
+            },
+            {
+              title: '历史查询',
+              items: ['历史记录中心'],
             },
             {
               title: '使用帮助',
@@ -17196,7 +17408,7 @@ export function createStyleL1Scenarios(deps) {
         )
         assert.deepEqual(
           reopenedPreview[2].items,
-          ['客户档案', '销售订单', '出货放行', '岗位使用帮助'],
+          ['客户档案', '销售订单', '出货放行', '历史记录中心', '岗位使用帮助'],
           `重新打开后更多功能顺序未读回: ${JSON.stringify(reopenedPreview)}`
         )
         await assertNoHorizontalOverflow(
@@ -17238,9 +17450,9 @@ export function createStyleL1Scenarios(deps) {
         await mobileCategoryNav.locator('.ant-select-selector').click()
         await page
           .locator('.ant-select-dropdown:visible .ant-select-item-option')
-          .filter({ hasText: '生产执行' })
-          .click()
-        await page.waitForTimeout(800)
+          .filter({ hasText: /^生产执行/u })
+          .dispatchEvent('click')
+        await page.waitForTimeout(1800)
         const mobileSelectedCategory = String(
           await mobileCategoryNav
             .locator('.ant-select-selection-item')
@@ -17307,8 +17519,8 @@ export function createStyleL1Scenarios(deps) {
         await mobileCategoryNav.locator('.ant-select-selector').click()
         await page
           .locator('.ant-select-dropdown:visible .ant-select-item-option')
-          .filter({ hasText: '财务' })
-          .click()
+          .filter({ hasText: /^财务/u })
+          .dispatchEvent('click')
         await page.waitForTimeout(800)
         const financePermissionSection = page.locator(
           '.erp-permission-checklist__section[data-permission-module="finance"]'
@@ -17406,7 +17618,8 @@ export function createStyleL1Scenarios(deps) {
         await page.getByRole('tab', { name: '菜单布局' }).click()
         await expectText(page, '设置岗位菜单布局')
         await expectText(page, '导航位置预览')
-        await expectText(page, '更多功能（2）')
+        await expectText(page, '更多功能（3）')
+        await expectText(page, '历史记录中心')
         await expectText(page, '岗位使用帮助')
         await page
           .locator(
@@ -18168,11 +18381,9 @@ export function createStyleL1Scenarios(deps) {
           scenarioLabel: '采购合同模板表格',
         })
         await assertMaterialContractLineCellsWrapLongValues(page, {
-          storageKey: '__plush_erp_material_purchase_contract_print_draft__',
           scenarioLabel: '采购合同明细长编号带值',
         })
         await assertContractTotalCellsWrapLargeNumbers(page, {
-          storageKey: '__plush_erp_material_purchase_contract_print_draft__',
           templateKind: 'material',
           totalValueSelector:
             '.erp-material-contract-table__total .erp-contract-table__total-value',
@@ -18180,7 +18391,6 @@ export function createStyleL1Scenarios(deps) {
         })
         await assertMaterialContractMetaAlignment(page)
         await assertWorkspaceContinuedPageMargin(page, {
-          storageKey: '__plush_erp_material_purchase_contract_print_draft__',
           paperSelector: '.erp-material-contract-paper',
           clearMerges: true,
         })
@@ -18336,14 +18546,12 @@ export function createStyleL1Scenarios(deps) {
           scenarioLabel: '加工合同模板表格',
         })
         await assertContractTotalCellsWrapLargeNumbers(page, {
-          storageKey: '__plush_erp_processing_contract_print_draft__',
           templateKind: 'processing',
           totalValueSelector:
             '.erp-processing-contract-table__total .erp-contract-table__total-value',
           scenarioLabel: '加工合同模板合计行',
         })
         await assertWorkspaceContinuedPageMargin(page, {
-          storageKey: '__plush_erp_processing_contract_print_draft__',
           paperSelector: '.erp-processing-contract-paper',
         })
         const emptyAppendixState = await page.evaluate(() => {
@@ -24409,7 +24617,8 @@ export function createStyleL1Scenarios(deps) {
           .getByRole('dialog')
           .getByText('登记库存盘点', { exact: true })
           .waitFor({ state: 'visible', timeout: 10_000 })
-        await expectText(page, '过账时会再次核对账面数量')
+        await expectText(page, '保存和过账时都会重新核对账面数量')
+        await expectText(page, '盘点期间库存变化时')
         await page.screenshot({
           path: path.join(
             outputDir,
@@ -24690,7 +24899,9 @@ export function createStyleL1Scenarios(deps) {
           .inputValue()
         assert.match(allocationLabel, /AR-STYLE-L1/)
         assert.match(allocationLabel, /未核销 1200/)
-        await allocationDialog.getByLabel('本次核销金额').fill('1200')
+        await allocationDialog
+          .getByRole('textbox', { name: /本次核销金额/u })
+          .fill('1200')
         await assertOperationalFactModalViewport(
           page,
           'exception-finance-payment-dark-desktop-allocation'

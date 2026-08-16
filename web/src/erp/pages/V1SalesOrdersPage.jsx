@@ -955,7 +955,15 @@ export default function V1SalesOrdersPage() {
   }
 
   const saveOrder = async () => {
-    const values = await orderForm.validateFields()
+    let values
+    try {
+      values = await orderForm.validateFields()
+    } catch (error) {
+      if (!error?.errorFields) {
+        message.error(getActionErrorMessage(error, '校验销售订单内容'))
+      }
+      return
+    }
     const isCreatingOrder = !editingOrder?.id
     const customer = customers.find((item) => item.id === values.customer_id)
     let params

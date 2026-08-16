@@ -602,22 +602,35 @@ test("yoyoosun approval candidates can approve or reject only through controlled
   }
 });
 
-test("yoyoosun production owns processing contract confirmation", () => {
+test("yoyoosun production owns the complete processing contract lifecycle", () => {
   const roleByKey = new Map(
     yoyoosunRoleFlowMatrix.roles.map((role) => [role.roleKey, role]),
   );
   const productionRole = roleByKey.get("production");
   const purchaseRole = roleByKey.get("purchase");
 
-  assert.ok(
-    productionRole.capabilityKeys.includes("outsourcing.order.confirm"),
-  );
+  for (const permissionKey of [
+    "outsourcing.order.create",
+    "outsourcing.order.update",
+    "outsourcing.order.submit",
+    "outsourcing.order.confirm",
+    "outsourcing.order.close",
+    "outsourcing.order.cancel",
+  ]) {
+    assert.ok(
+      productionRole.capabilityKeys.includes(permissionKey),
+      `永绅生产 / 委外岗位应保留加工合同完整生命周期动作 ${permissionKey}`,
+    );
+  }
   assert.ok(productionRole.printTemplates.includes("processing-contract"));
   assert.ok(purchaseRole.capabilityKeys.includes("outsourcing.order.read"));
   for (const permissionKey of [
     "outsourcing.order.create",
     "outsourcing.order.update",
+    "outsourcing.order.submit",
     "outsourcing.order.confirm",
+    "outsourcing.order.close",
+    "outsourcing.order.cancel",
   ]) {
     assert.equal(
       purchaseRole.capabilityKeys.includes(permissionKey),
@@ -672,8 +685,18 @@ test("yoyoosun finance purchase-contract responsibility uses role composition", 
 
   assert.ok(bossRole.capabilityKeys.includes("purchase.order.read"));
   assert.ok(bossRole.capabilityKeys.includes("workflow.task.approve"));
-  assert.ok(purchaseRole.capabilityKeys.includes("purchase.order.create"));
-  assert.ok(purchaseRole.capabilityKeys.includes("purchase.order.update"));
+  for (const permissionKey of [
+    "purchase.order.create",
+    "purchase.order.update",
+    "purchase.order.submit",
+    "purchase.order.close",
+    "purchase.order.cancel",
+  ]) {
+    assert.ok(
+      purchaseRole.capabilityKeys.includes(permissionKey),
+      `purchase role must keep its source lifecycle action ${permissionKey}`,
+    );
+  }
   assert.equal(
     yoyoosunRoleFlowMatrix.roles.some((role) =>
       role.capabilityKeys.includes("purchase.order.approve"),

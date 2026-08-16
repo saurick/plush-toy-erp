@@ -22,7 +22,7 @@ const ROLE_EXPECTATIONS = Object.freeze({
     denied: "production.fact.post",
   }),
   purchase: Object.freeze({
-    allowed: "purchase.order.update",
+    allowed: "purchase.order.submit",
     denied: "warehouse.inbound.confirm",
   }),
   warehouse: Object.freeze({
@@ -38,7 +38,7 @@ const ROLE_EXPECTATIONS = Object.freeze({
     denied: "purchase.order.update",
   }),
   production: Object.freeze({
-    allowed: "production.fact.post",
+    allowed: "outsourcing.order.submit",
     denied: "quality.inspection.update",
   }),
 });
@@ -52,9 +52,7 @@ function profileFromActions(actions, overrides = {}) {
 }
 
 function roleByKey(roleKey) {
-  return yoyoosunRoleFlowMatrix.roles.find(
-    (role) => role.roleKey === roleKey,
-  );
+  return yoyoosunRoleFlowMatrix.roles.find((role) => role.roleKey === roleKey);
 }
 
 test("永绅九岗位：每个角色至少一个本域动作可用，跨域写动作保持不可用", () => {
@@ -94,13 +92,10 @@ test("控制面管理员默认不获得业务动作，超级管理员仍受有�
   );
   assert.equal(hasActionPermission(adminProfile, "shipment.ship"), false);
 
-  const narrowedSuperAdmin = profileFromActions(
-    ["finance.payment.read"],
-    {
-      is_super_admin: true,
-      permissions: [],
-    },
-  );
+  const narrowedSuperAdmin = profileFromActions(["finance.payment.read"], {
+    is_super_admin: true,
+    permissions: [],
+  });
   assert.equal(
     hasActionPermission(narrowedSuperAdmin, "finance.payment.read"),
     true,
@@ -112,10 +107,9 @@ test("控制面管理员默认不获得业务动作，超级管理员仍受有�
 });
 
 test("财务兼采购合同经办只合并已分配角色，不扩张仓库或质检写权限", () => {
-  const assignment =
-    yoyoosunRoleFlowMatrix.roleAssignmentProfiles.find(
-      (item) => item.profileKey === "finance_purchase_contract_operator",
-    );
+  const assignment = yoyoosunRoleFlowMatrix.roleAssignmentProfiles.find(
+    (item) => item.profileKey === "finance_purchase_contract_operator",
+  );
   assert.ok(assignment, "客户矩阵必须保留财务兼采购合同经办配置");
 
   const actions = new Set(
@@ -125,10 +119,7 @@ test("财务兼采购合同经办只合并已分配角色，不扩张仓库或�
   );
   const profile = profileFromActions(actions);
 
-  assert.equal(
-    hasActionPermission(profile, "finance.payment.create"),
-    true,
-  );
+  assert.equal(hasActionPermission(profile, "finance.payment.create"), true);
   assert.equal(hasActionPermission(profile, "purchase.order.update"), true);
   assert.equal(hasActionPermission(profile, "shipment.ship"), false);
   assert.equal(

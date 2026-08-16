@@ -45,12 +45,8 @@ function historicalUnallocatedLine(
 }
 
 export function createSalesOrderSkuGrainScenarios(deps) {
-  const {
-    assert,
-    customerRuntimeEffectiveSession,
-    expectHeading,
-    expectText,
-  } = deps
+  const { assert, customerRuntimeEffectiveSession, expectHeading, expectText } =
+    deps
   let activeAttempt = null
 
   return [
@@ -150,7 +146,9 @@ export function createSalesOrderSkuGrainScenarios(deps) {
           assert.equal(
             await lineRows
               .nth(lineIndex)
-              .locator('.erp-line-item-field--source .ant-select-selection-item')
+              .locator(
+                '.erp-line-item-field--source .ant-select-selection-item'
+              )
               .count(),
             0,
             `历史 NULL 订单行 ${lineIndex + 1} 在显式选择前不得自动选中 SKU`
@@ -184,6 +182,15 @@ export function createSalesOrderSkuGrainScenarios(deps) {
         )
         await headerNoteField.locator('textarea').fill(HEADER_NOTE)
         await modal.locator('.ant-modal-footer .ant-btn-primary').last().click()
+        await page.waitForTimeout(250)
+        const validationErrors = await modal
+          .locator('.ant-form-item-explain-error')
+          .allTextContents()
+        assert.deepEqual(
+          validationErrors,
+          [],
+          `历史 NULL SKU 订单行保存不应触发表单错误: ${JSON.stringify(validationErrors)}`
+        )
         await expectText(page, '销售订单与订单行已更新')
         await modal.waitFor({ state: 'hidden', timeout: 10_000 })
 

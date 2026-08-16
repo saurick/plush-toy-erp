@@ -348,7 +348,7 @@ export function buildProductionCompletionPayload(
 ) {
   const orderStatus = String(order?.status || '').toUpperCase()
   if (!['RELEASED', 'CLOSED'].includes(orderStatus)) {
-    throw new Error('当前生产订单状态不能登记完工入库')
+    throw new Error('当前生产订单状态不能登记生产完工')
   }
   const orderID = Number(order?.id || 0)
   const itemID = Number(values.production_order_item_id || 0)

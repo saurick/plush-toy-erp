@@ -170,23 +170,11 @@ export function createBusinessFormalScenarios(deps) {
   const confirmVisiblePopconfirm = async (page) => {
     const popconfirm = page.locator('.ant-popconfirm:visible').last()
     await popconfirm.waitFor({ state: 'visible' })
-    const buttons = popconfirm.locator('button')
-    for (let index = 0; index < (await buttons.count()); index += 1) {
-      const candidate = buttons.nth(index)
-      await candidate.waitFor({ state: 'visible' })
-      if (
-        compactVisibleText(await candidate.innerText()) ===
-        compactVisibleText('确认')
-      ) {
-        await candidate.click()
-        return
-      }
-    }
-    throw new Error(
-      `确认弹层缺少“确认”按钮: ${String((await popconfirm.innerText()) || '')
-        .replace(/\s+/gu, ' ')
-        .trim()}`
-    )
+    const confirmButton = popconfirm
+      .getByRole('button', { name: /^确\s*认$/u })
+      .last()
+    await confirmButton.waitFor({ state: 'visible' })
+    await confirmButton.click()
   }
 
   const assertBusinessViewTabNeutralStyle = async (
@@ -367,12 +355,15 @@ export function createBusinessFormalScenarios(deps) {
     page,
     {
       scenarioName,
+      exportVisible = true,
       exportDisabled = false,
       exportTooltip = '',
       columnOrderDisabled = false,
     }
   ) => {
-    const labels = ['导出筛选结果', '列顺序']
+    const labels = exportVisible
+      ? ['导出筛选结果', '列顺序']
+      : ['列顺序']
     for (const label of labels) {
       await expectButton(page, label)
     }
@@ -382,11 +373,15 @@ export function createBusinessFormalScenarios(deps) {
     const columnOrderButton = page
       .getByRole('button', { name: '列顺序' })
       .first()
-    assert.equal(
-      await exportButton.isDisabled(),
-      exportDisabled,
-      `${scenarioName} 导出筛选结果按钮禁用态不符合当前页面能力边界`
-    )
+    if (exportVisible) {
+      assert.equal(
+        await exportButton.isDisabled(),
+        exportDisabled,
+        `${scenarioName} 导出筛选结果按钮禁用态不符合当前页面能力边界`
+      )
+    } else {
+      await expectNoButton(page, '导出筛选结果')
+    }
     assert.equal(
       await columnOrderButton.isDisabled(),
       columnOrderDisabled,
@@ -395,7 +390,7 @@ export function createBusinessFormalScenarios(deps) {
     await expectNoButton(page, '批量删除')
     await expectNoButton(page, '回收站')
     await expectNoButton(page, '刷新协同')
-    if (exportTooltip) {
+    if (exportVisible && exportTooltip) {
       await exportButton.locator('xpath=..').hover()
       await expectText(page, exportTooltip)
     }
@@ -3918,7 +3913,7 @@ export function createBusinessFormalScenarios(deps) {
         await assertOrderLifecycleActionsConsolidated(page, {
           scenarioName: 'business-v1-processing-contracts',
           primaryActionLabel: '提交',
-          menuActionLabels: ['取消'],
+          menuActionLabels: ['确认下单', '正常关闭', '提前关闭', '取消'],
           absentButtonLabels: ['确认下单', '关闭', '取消'],
         })
         await page.keyboard.press('Escape')
@@ -4190,10 +4185,10 @@ export function createBusinessFormalScenarios(deps) {
             await expectText(page, 'SHIP-REL-L1')
             await assertTextAbsent(page, '同来源非放行任务')
             await assertTextAbsent(page, 'SHIP-REL-OTHER')
+            await shippingReleaseTaskRow.click()
             await assertPageAttachmentModalEntrypoint(page, {
               scenarioName:
                 'business-workflow-shipping-release-attachment-modal',
-              rowText: 'SHIP-REL-L1',
               modalTitle: '任务附件',
               panelTitle: '任务附件',
             })
@@ -4550,8 +4545,7 @@ export function createBusinessFormalScenarios(deps) {
         await expectText(page, '暂无待审批的生产异常处置申请。')
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-workflow-production-exceptions-tasks-dark',
-          exportDisabled: true,
-          exportTooltip: '当前页面只用于处理任务，暂不提供业务数据导出。',
+          exportVisible: false,
         })
         await assertERPThemeMode(page, {
           scenarioName: 'business-workflow-production-exceptions-tasks-dark',
@@ -4880,7 +4874,6 @@ export function createBusinessFormalScenarios(deps) {
           .first()
           .getByRole('button', { name: /提\s*交/u })
           .click()
-        await expectText(page, '销售订单已提交，已进入老板审批')
         await waitForCapturedMethods(
           customerConfigMethods,
           [
@@ -4889,6 +4882,7 @@ export function createBusinessFormalScenarios(deps) {
           ],
           { scenarioName: 'sales-order-acceptance-submit-action-desktop' }
         )
+        await expectText(page, '销售订单已提交，已进入审批流程')
         assert.equal(
           salesOrderMethods.includes('submit_sales_order'),
           false,
@@ -4942,6 +4936,32 @@ export function createBusinessFormalScenarios(deps) {
             } catch {
               // 非 JSON-RPC 请求不参与本断言。
             }
+          })
+
+          await page.route('**/rpc/operational_fact', async (route) => {
+            const body = route.request().postDataJSON() || {}
+            const { id = 'mock-id', method, params = {} } = body
+            const recordKey = {
+              list_stock_reservations: 'stock_reservations',
+              list_shipments: 'shipments',
+            }[method]
+            if (!recordKey) {
+              await route.fallback()
+              return
+            }
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id,
+                result: {
+                  code: 0,
+                  message: 'OK',
+                  data: stylePaginatedRpcData([], recordKey, params),
+                },
+              }),
+            })
           })
 
           await page.route('**/rpc/sales_order', async (route) => {
@@ -5271,7 +5291,21 @@ export function createBusinessFormalScenarios(deps) {
             .locator('.ant-modal:visible')
             .filter({ hasText: '生产领料' })
             .last()
-          await issueModal.waitFor({ state: 'visible', timeout: 10_000 })
+          try {
+            await issueModal.waitFor({ state: 'visible', timeout: 10_000 })
+          } catch (error) {
+            const bodyText = String(
+              (await page.locator('body').innerText()) || ''
+            ).replace(/\s+/gu, ' ')
+            throw new Error(
+              `生产领料弹窗未打开: ${JSON.stringify({
+                operationalFactMethods,
+                requirementListParams,
+                inventoryLotParams,
+                bodyText: bodyText.slice(0, 2400),
+              })}; ${error.message}`
+            )
+          }
           const issueText = String(
             (await issueModal.innerText()) || ''
           ).replace(/\s+/gu, ' ')

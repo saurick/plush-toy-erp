@@ -31,7 +31,7 @@ export function createFinishedGoodsDeliveryScenarios({
         await shipmentRow.click()
 
         const submitButton = page.getByRole('button', {
-          name: '提交出货审批',
+          name: '核对出货审批',
           exact: true,
         })
         await submitButton.waitFor({ state: 'visible', timeout: 10_000 })

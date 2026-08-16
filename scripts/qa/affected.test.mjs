@@ -235,6 +235,36 @@ test("affected: DEV 菜单与页面改动强制选择页面治理合同", () => 
   }
 });
 
+test("affected: combined direct-test command keeps a bounded stable id", () => {
+  const plan = buildAffectedPlan(
+    [
+      "web/scripts/style-l1/devFlowStateObservatoryScenarios.mjs",
+      "web/scripts/style-l1/devVersionCenterScenarios.mjs",
+      "web/scripts/style-l1/mobileTaskRecoveryScenarios.test.mjs",
+    ],
+    { root: ROOT },
+  );
+  const command = plan.commands.find((item) =>
+    item.args.includes(
+      "web/scripts/style-l1/mobileTaskRecoveryScenarios.test.mjs",
+    ),
+  );
+
+  assert(command);
+  assert(command.id.length <= 100);
+  assert.match(command.id, /^node-tests:sha256:[a-f0-9]{24}$/u);
+  assert(
+    command.args.includes(
+      "web/scripts/style-l1/devFlowStateObservatoryScenarios.test.mjs",
+    ),
+  );
+  assert(
+    command.args.includes(
+      "web/scripts/style-l1/devVersionCenterScenarios.test.mjs",
+    ),
+  );
+});
+
 test("affected: schema changes select migration guard and data tests without auto-generating files", () => {
   const plan = buildAffectedPlan(
     ["server/internal/data/model/schema/product_sku.go"],

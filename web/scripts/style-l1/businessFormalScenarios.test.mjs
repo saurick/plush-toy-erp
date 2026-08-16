@@ -261,11 +261,9 @@ test('business-core selection actions remain reachable through responsive overfl
 test('business-core destructive draft actions confirm through visible popconfirm content', () => {
   assert.match(source, /actions: \[[\s\S]{0,120}'production\.fact\.cancel'/u)
   assert.match(source, /const confirmVisiblePopconfirm/u)
-  assert.match(source, /const compactVisibleText/u)
-  assert.match(source, /compactVisibleText\(await candidate\.innerText\(\)\)/u)
-  assert.match(source, /const buttons = popconfirm\.locator\('button'\)/u)
-  assert.match(source, /candidate\.waitFor\(\{ state: 'visible' \}\)/u)
-  assert.match(source, /compactVisibleText\('确认'\)/u)
+  assert.match(source, /getByRole\('button', \{ name: \/\^确\\s\*认\$\/u \}\)/u)
+  assert.match(source, /confirmButton\.waitFor\(\{ state: 'visible' \}\)/u)
+  assert.match(source, /confirmButton\.click\(\)/u)
   assert.match(source, /ant-popconfirm:visible/u)
   assert.match(source, /confirmVisiblePopconfirm\(page\)/u)
   assert.doesNotMatch(

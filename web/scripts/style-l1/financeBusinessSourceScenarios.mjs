@@ -398,8 +398,8 @@ export function createFinanceBusinessSourceScenarios(deps) {
           )
           await page.waitForFunction(
             () =>
-              document.querySelector('input[placeholder="搜索单号"]')
-                ?.value === 'INV-STYLE-L1'
+              document.querySelector('input[placeholder="搜索单号"]')?.value ===
+              'INV-STYLE-L1'
           )
           assert.equal(await search.inputValue(), 'INV-STYLE-L1')
           const firstInvoiceExactRequestCount = invoiceListRequests.filter(
@@ -419,8 +419,8 @@ export function createFinanceBusinessSourceScenarios(deps) {
           search = page.getByPlaceholder('搜索出货')
           await page.waitForFunction(
             () =>
-              document.querySelector('input[placeholder="搜索出货"]')
-                ?.value === 'SHIP-STYLE-L1'
+              document.querySelector('input[placeholder="搜索出货"]')?.value ===
+              'SHIP-STYLE-L1'
           )
           assert.equal(await search.inputValue(), 'SHIP-STYLE-L1')
           url = new URL(page.url())
@@ -443,8 +443,8 @@ export function createFinanceBusinessSourceScenarios(deps) {
           search = page.getByPlaceholder('搜索单号')
           await page.waitForFunction(
             () =>
-              document.querySelector('input[placeholder="搜索单号"]')
-                ?.value === 'INV-STYLE-L1'
+              document.querySelector('input[placeholder="搜索单号"]')?.value ===
+              'INV-STYLE-L1'
           )
           assert.equal(await search.inputValue(), 'INV-STYLE-L1')
           url = new URL(page.url())
@@ -484,8 +484,8 @@ export function createFinanceBusinessSourceScenarios(deps) {
           await page.getByRole('button', { name: '清空筛选' }).click()
           await page.waitForFunction(
             () =>
-              document.querySelector('input[placeholder="搜索单号"]')
-                ?.value === ''
+              document.querySelector('input[placeholder="搜索单号"]')?.value ===
+              ''
           )
           assert.equal(await search.inputValue(), '')
           url = new URL(page.url())
@@ -971,6 +971,7 @@ export function createFinanceBusinessSourceScenarios(deps) {
             }
             const financeFact = {
               id: 9501,
+              version: factStatus === 'CANCELLED' ? 2 : 1,
               fact_no: 'AR-DRAFT-CANCEL-L1',
               fact_type: 'RECEIVABLE',
               status: factStatus,
@@ -1035,21 +1036,36 @@ export function createFinanceBusinessSourceScenarios(deps) {
           await modal
             .getByPlaceholder('请填写客户、供应商或账款调整的业务原因')
             .fill('来源出货资料修正')
+          const cancellationResponse = page.waitForResponse((response) => {
+            if (
+              !response.url().includes('/rpc/operational_fact') ||
+              response.status() !== 200
+            ) {
+              return false
+            }
+            return (
+              response.request().postDataJSON()?.method ===
+              'cancel_finance_fact'
+            )
+          })
+          const successNotice = page
+            .locator('.ant-message-notice')
+            .filter({ hasText: '作废财务草稿已完成' })
+            .last()
           await modal
             .getByRole('button', { name: '确认取消', exact: true })
             .click()
-          await page.waitForFunction(() => {
-            const messageText = Array.from(
-              document.querySelectorAll('.ant-message-notice')
-            )
-              .map((node) => String(node.textContent || '').trim())
-              .join(' ')
-            return messageText.includes('作废财务草稿已完成')
-          })
+          const response = await cancellationResponse
+          const responseBody = await response.json()
+          assert.equal(responseBody?.result?.code, 0)
+          await successNotice.waitFor({ state: 'visible', timeout: 10_000 })
           assert.equal(factStatus, 'CANCELLED')
           assert.equal(cancellationParams?.id, 9501)
+          assert.equal(cancellationParams?.expected_version, 1)
+          assert.equal(cancellationParams?.customer_key, 'yoyoosun')
           assert.equal(cancellationParams?.reason, '来源出货资料修正')
           assert.equal(cancellationResult?.status, 'CANCELLED')
+          assert.equal(cancellationResult?.version, 2)
           assert.equal(
             cancellationResult?.cancelled_by_name,
             'style-l1-finance-draft-cancel'

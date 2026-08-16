@@ -54,6 +54,7 @@ const scenarioFilter = new Set(
     .map((item) => item.trim())
     .filter(Boolean)
 )
+const scenarioStartAt = String(process.env.STYLE_L1_START_AT || '').trim()
 const scenarioMaxAttempts = 2
 
 let devServerProcess = null
@@ -196,14 +197,34 @@ async function main() {
       ', '
     )}\n可用场景: ${scenarios.map((scenario) => scenario.name).join(', ')}`
   )
+  assert(
+    !(scenarioFilter.size > 0 && scenarioStartAt),
+    '[style:l1] STYLE_L1_SCENARIOS 与 STYLE_L1_START_AT 不能同时使用'
+  )
+  const scenarioStartIndex = scenarioStartAt
+    ? scenarios.findIndex((scenario) => scenario.name === scenarioStartAt)
+    : -1
+  assert(
+    !scenarioStartAt || scenarioStartIndex >= 0,
+    `[style:l1] STYLE_L1_START_AT 场景不存在: ${scenarioStartAt}`
+  )
   const selectedScenarios =
     scenarioFilter.size > 0
       ? scenarios.filter((scenario) => scenarioFilter.has(scenario.name))
-      : scenarios
+      : scenarioStartAt
+        ? scenarios.slice(scenarioStartIndex)
+        : scenarios
   assert(
     selectedScenarios.length > 0,
-    `[style:l1] 未匹配到场景: ${[...scenarioFilter].join(', ')}`
+    `[style:l1] 未匹配到场景: ${
+      scenarioStartAt || [...scenarioFilter].join(', ')
+    }`
   )
+  if (scenarioStartAt) {
+    console.log(
+      `[style:l1] start_at=${scenarioStartAt} selected=${selectedScenarios.length}/${scenarios.length}`
+    )
+  }
 
   try {
     if (!externalBaseURL) {
@@ -572,7 +593,10 @@ async function runScenario(browser, scenario) {
       }
 
       const reason = String(error?.message || error).split('\n')[0]
-      devServerLogs += `\n[style:l1] retry ${scenario.name} ${attempt + 1}/${scenarioMaxAttempts}: ${reason}\n`
+      const retryMessage = `[style:l1] retry ${scenario.name} ${attempt + 1}/${scenarioMaxAttempts}: ${reason}`
+      const retryEvidence = `${retryMessage}\n${error?.stack || error}`
+      console.warn(retryEvidence)
+      devServerLogs += `\n${retryEvidence}\n`
       await delay(500 * attempt)
     }
   }

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -254,7 +255,14 @@ function addNodeTests(state, files, reason, scope) {
   if (normalized.length === 0) {
     return;
   }
-  const id = `node-tests:${normalized.join(",")}`;
+  const rawId = `node-tests:${normalized.join(",")}`;
+  const id =
+    rawId.length <= 100
+      ? rawId
+      : `node-tests:sha256:${createHash("sha256")
+          .update(normalized.join("\0"), "utf8")
+          .digest("hex")
+          .slice(0, 24)}`;
   const commandScope =
     scope || (normalized.some((file) => file.startsWith("web/")) ? "T5" : "T1");
   state.commands.set(

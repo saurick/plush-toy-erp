@@ -157,6 +157,12 @@ for (const page of pageSources) {
 
   test(`${page.name} separates save failure from accepted post-save work`, () => {
     const mutation = functionSlice(page.source, page.start, page.end)
+    assert.match(mutation, /validateFields\(\)/u)
+    assert.match(
+      mutation,
+      /if \(!error\?\.errorFields\) \{[\s\S]*?getActionErrorMessage/u,
+      `${page.name} must handle form validation rejection without an unhandled page error`
+    )
     assert.match(page.source, new RegExp(page.allItemsCall))
     assert.match(mutation, /expected_version/u)
     assert.match(mutation, new RegExp(`${page.saveCall}\\(`))

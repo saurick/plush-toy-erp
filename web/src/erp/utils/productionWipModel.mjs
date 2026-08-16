@@ -1504,7 +1504,7 @@ export function productionWipCompletionEligibility(
   if (!aggregate?.initialized) {
     return Object.freeze({
       eligible: false,
-      reason: '该生产明细尚未建立完整工序路线，暂不能登记完工入库',
+      reason: '该生产明细尚未建立完整工序路线，暂不能登记生产完工',
       acceptedPackagingBatches: Object.freeze([]),
     })
   }
@@ -1516,7 +1516,7 @@ export function productionWipCompletionEligibility(
   if (!packagingOperation) {
     return Object.freeze({
       eligible: false,
-      reason: '该生产明细的包装工序尚未建立完整，暂不能登记完工入库',
+      reason: '该生产明细的包装工序尚未建立完整，暂不能登记生产完工',
       acceptedPackagingBatches: Object.freeze([]),
     })
   }
@@ -1534,7 +1534,7 @@ export function productionWipCompletionEligibility(
       reason:
         orderStatus === 'CLOSED'
           ? '成品返工补制尚未完成包装验收，暂不能登记补完工'
-          : '需先完成包装工序并通过工序质量关口，才能登记完工入库',
+          : '需先完成包装工序并通过工序质量关口，才能登记生产完工',
       acceptedPackagingBatches: Object.freeze([]),
     })
   }
@@ -1557,7 +1557,7 @@ export function productionWipCompletionEligibility(
   if (!packagingConfirmed) {
     return Object.freeze({
       eligible: false,
-      reason: '需先确认包材版面和包装版本，才能登记完工入库',
+      reason: '需先确认包材版面和包装版本，才能登记生产完工',
       acceptedPackagingBatches: Object.freeze(packagingAcceptedBatches),
     })
   }

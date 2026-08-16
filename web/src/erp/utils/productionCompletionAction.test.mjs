@@ -347,7 +347,7 @@ test('production completion rejects a production order outside an actionable sta
         },
         { id: 1, status: 'DRAFT' }
       ),
-    /当前生产订单状态不能登记完工入库/u
+    /当前生产订单状态不能登记生产完工/u
   )
 })
 

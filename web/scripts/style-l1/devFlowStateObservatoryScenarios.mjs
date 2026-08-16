@@ -1423,6 +1423,10 @@ export function createDevFlowStateObservatoryScenarios({
         await searchGuideTrigger.click()
         const searchGuide = page.locator('[data-definition-search-guide]')
         await searchGuide.waitFor({ state: 'visible', timeout: 10_000 })
+        const searchGuidePopover = page
+          .locator('.ant-popover:visible')
+          .filter({ has: searchGuide })
+        await searchGuidePopover.waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(
           await searchGuideTrigger.getAttribute('aria-expanded'),
           'true',
@@ -1445,8 +1449,14 @@ export function createDevFlowStateObservatoryScenarios({
             const guide = document.querySelector(
               '[data-definition-search-guide]'
             )
+            const popover = guide?.closest('.ant-popover')
+            const popoverStyle = popover
+              ? window.getComputedStyle(popover)
+              : null
             const buttons = [...(guide?.querySelectorAll('button') || [])]
             return (
+              popoverStyle?.transform === 'none' &&
+              popoverStyle.opacity === '1' &&
               buttons.length > 0 &&
               buttons.every(
                 (button) => button.getBoundingClientRect().height >= 36
@@ -1456,13 +1466,16 @@ export function createDevFlowStateObservatoryScenarios({
           undefined,
           { timeout: 10_000 }
         )
-        const searchGuideMetrics = await searchGuide.evaluate((node) => ({
-          clientWidth: node.clientWidth,
-          scrollWidth: node.scrollWidth,
-          buttonHeights: [...node.querySelectorAll('button')].map(
-            (button) => button.getBoundingClientRect().height
-          ),
-        }))
+        const searchGuideMetrics = await searchGuidePopover.evaluate((node) => {
+          const content = node.querySelector('[data-definition-search-guide]')
+          return {
+            clientWidth: content?.clientWidth || 0,
+            scrollWidth: content?.scrollWidth || 0,
+            buttonHeights: [
+              ...(content?.querySelectorAll('button') || []),
+            ].map((button) => button.getBoundingClientRect().height),
+          }
+        })
         assert(
           searchGuideMetrics.scrollWidth <= searchGuideMetrics.clientWidth + 1,
           `搜索范围说明不得横向溢出：${JSON.stringify(searchGuideMetrics)}`
@@ -1471,11 +1484,11 @@ export function createDevFlowStateObservatoryScenarios({
           searchGuideMetrics.buttonHeights.every((height) => height >= 36),
           `搜索示例按钮必须具备稳定触屏高度：${JSON.stringify(searchGuideMetrics)}`
         )
-        await searchGuide.screenshot({
+        await searchGuidePopover.screenshot({
           path: 'output/playwright/style-l1/dev-flow-state-observatory-search-guide.png',
           animations: 'disabled',
         })
-        await searchGuide
+        await searchGuidePopover
           .getByRole('button', { name: '销售 PMC', exact: true })
           .click()
         await page.waitForFunction(

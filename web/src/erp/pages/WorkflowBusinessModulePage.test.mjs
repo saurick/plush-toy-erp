@@ -80,6 +80,13 @@ test('production exception disposition page separates applications and pending a
   )
 })
 
+test('ordinary workflow pages keep task language separate from exception approvals', () => {
+  assert.match(
+    source,
+    /showingProductionExceptionDecisions[\s\S]*isProductionExceptionPage[\s\S]*'待审批'[\s\S]*'待办任务'/u
+  )
+})
+
 test('production exception disposition tabs refresh and summarize only the active workspace', () => {
   assert.match(source, /生产异常处置申请已刷新/u)
   assert.match(source, /productionExceptionRefreshRef\.current/u)
