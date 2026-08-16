@@ -32,7 +32,7 @@ export const CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION =
 export const CURRENT_MANUAL_ACCEPTANCE_RUN_ID =
   MANUAL_ACCEPTANCE_CORE_CONTRACT.runId;
 export const LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION =
-  "yoyoosun-customer-package-v7.local-d05ec61cc4ea9cee.runtime-v1";
+  "yoyoosun-customer-package-v7.local-bfd51004a4c35b47.runtime-v1";
 export const LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION =
   "local-customer-package-test-apply";
 export const LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE = "local_test_apply";

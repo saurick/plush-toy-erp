@@ -137,7 +137,7 @@ function scenarioReadbackFixture(overrides = {}) {
     release: 'd'.repeat(40),
     migrationVersion: '20260728100514',
     customerConfigRevision:
-      'yoyoosun-customer-package-v7.local-d05ec61cc4ea9cee.runtime-v1',
+      'yoyoosun-customer-package-v7.local-bfd51004a4c35b47.runtime-v1',
     datasetKey: 'yoyoosun-manual-acceptance',
     dataVersion: '2026.08.15-v6',
     runId: SCENARIO_DATASET_RUN_ID,
@@ -273,7 +273,7 @@ function summaryFixture() {
         databaseName: 'plush_erp',
         migrationVersion: '20260728100514',
         customerConfigRevision:
-          'yoyoosun-customer-package-v7.local-d05ec61cc4ea9cee.runtime-v1',
+          'yoyoosun-customer-package-v7.local-bfd51004a4c35b47.runtime-v1',
         customerConfigProductVersion: 'local-customer-package-test-apply',
         targetFingerprint: '9'.repeat(64),
       },

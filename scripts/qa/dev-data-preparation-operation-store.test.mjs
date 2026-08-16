@@ -42,7 +42,7 @@ function scenarioReadback(overrides = {}) {
     release: REPOSITORY.commit,
     migrationVersion: "20260729043852",
     customerConfigRevision:
-      "yoyoosun-customer-package-v7.local-d05ec61cc4ea9cee.runtime-v1",
+      "yoyoosun-customer-package-v7.local-bfd51004a4c35b47.runtime-v1",
     datasetKey: "yoyoosun-manual-acceptance",
     dataVersion: "2026.08.15-v6",
     runId: "20260815-V6",
