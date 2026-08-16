@@ -10,7 +10,7 @@ print_help() {
   检查本地开发环境是否满足仓库脚本与门禁运行要求
 
 检查项:
-  - 必需命令: git / node / pnpm / go
+  - 必需命令: git / bash / node / pnpm / go
   - 可选命令: gitleaks / shellcheck / golangci-lint / yamllint / shfmt / govulncheck
   - hooks 路径与关键脚本存在性
   - Node 版本与版本文件（.n-node-version/.node-version/.nvmrc）一致性
@@ -33,7 +33,14 @@ fi
 
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
+# ROOT_DIR pins the repository pnpm helper.
+# shellcheck source=scripts/lib/pnpm.sh
+# shellcheck disable=SC1091
 source "$ROOT_DIR/scripts/lib/pnpm.sh"
+# ROOT_DIR pins the repository Bash toolchain helper.
+# shellcheck source=scripts/lib/bash.sh
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/lib/bash.sh"
 
 missing=0
 warns=0
@@ -42,6 +49,9 @@ print_cmd_version() {
   case "$1" in
   git)
     git --version
+    ;;
+  bash)
+    bash --version | head -n 1
     ;;
   node)
     node -v
@@ -108,7 +118,7 @@ semver_ge() {
 }
 
 echo "[doctor] 检查必需命令"
-for cmd in git node pnpm go; do
+for cmd in git bash node pnpm go; do
   if command -v "$cmd" >/dev/null 2>&1; then
     printf "  - [OK] %s: " "$cmd"
     print_cmd_version "$cmd"
@@ -119,6 +129,9 @@ for cmd in git node pnpm go; do
 done
 
 echo "[doctor] 检查必需版本"
+if ! require_project_bash doctor; then
+  missing=1
+fi
 node_version_files=()
 expected_node=""
 for f in .n-node-version .node-version .nvmrc; do
@@ -227,6 +240,7 @@ required_files=(
   .n-node-version
   .node-version
   .nvmrc
+  scripts/lib/bash.sh
   web/package.json
   server/go.mod
 )

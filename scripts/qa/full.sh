@@ -85,6 +85,11 @@ fi
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
 
+# ROOT_DIR pins the Bash toolchain helper used by this gate and its child scripts.
+# shellcheck source=scripts/lib/bash.sh
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/lib/bash.sh"
+
 DEFAULT_QA_BROWSER_SCENARIOS="root-redirect-desktop,dev-all-pages-mobile,dev-workbench-wide-layout,dev-hub-dark-desktop,dev-drill-recovery-desktop-light,dev-drill-recovery-mobile-dark,dev-business-usability-desktop-light,dev-business-usability-mobile-dark"
 
 # ROOT_DIR pins the shared PostgreSQL contract; ShellCheck scans it separately.
@@ -113,6 +118,7 @@ fi
 source "$ROOT_DIR/scripts/qa/lib/stage-timing.sh"
 
 qa_full_environment_profile() {
+  require_project_bash "qa:full"
   node "$ROOT_DIR/scripts/qa/database-base-preflight.mjs"
   node "$ROOT_DIR/scripts/qa/gate-profiles.mjs" --profile "$full_profile"
 }

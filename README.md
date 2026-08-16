@@ -35,6 +35,7 @@
 
 | 工具 | 当前锁定 | 真源 |
 | --- | --- | --- |
+| Bash | `>= 4` | `scripts/lib/bash.sh`；QA 当前解释器与 `PATH` 子进程均须满足 |
 | Node.js | `24.14.0` | `.n-node-version`、`.node-version`、`.nvmrc` |
 | pnpm | `10.13.1` | `web/package.json` 的 `packageManager` |
 | Go | `>= 1.26.6` | `server/go.mod` 的 `toolchain go1.26.6` |

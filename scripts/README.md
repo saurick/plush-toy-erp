@@ -1123,7 +1123,7 @@ node /Users/simon/projects/plush-toy-erp/scripts/deploy/rollback-rehearsal-repor
 
 ### `doctor.sh`
 
-- 检查 `git`、`node`、`pnpm`、`go`
+- 检查 `git`、`bash`、`node`、`pnpm`、`go`；Bash 当前解释器与 `PATH` 子进程均要求 major >= 4
 - 检查 Node 版本锁文件 `.n-node-version`、`.node-version`、`.nvmrc` 是否一致，并要求当前 Node 等于锁定版本
 - 检查 `web/package.json` 的 `packageManager` 是否固定为 `pnpm@x.y.z`，并要求当前 pnpm 与之一致
 - 在 `server/` 模块内检查 Go toolchain，要求当前 Go 满足 `server/go.mod` 的 `toolchain` / `go` 版本
@@ -1148,6 +1148,7 @@ node /Users/simon/projects/plush-toy-erp/scripts/deploy/rollback-rehearsal-repor
 
 ### `full.sh`
 
+- 环境阶段先校验当前 Bash 与后续子脚本解析到的 `PATH` Bash，避免 macOS Bash 3.2 在部署合同的关联数组处延迟失败
 - 复用 fast 的基础守卫，一次执行 `fast / database / browser / release` 四个 scripts Node 组；不重复稍后由 Web 全集和 server 全集覆盖的 fast Web / Go 子集
 - 补充 secrets、前端 lint / css / test / build、本地 PostgreSQL 关键事务门禁和服务端 `go test ./...` / `make build`；最后运行一次 govulncheck，避免外部网络异常先扰动本地并发测试
 - 若定义了前端 `test`，会一并执行；它仍不替代浏览器里的样式 / box 模型回归
@@ -1198,6 +1199,7 @@ migration apply 和各隔离 PostgreSQL apply 入口都会执行该读回；外�
 
 ## 版本锁定
 
+- QA 与部署合同使用 Bash 关联数组；当前解释器和 `PATH` 中供子脚本调用的 Bash 均要求 major >= 4。
 - 根目录 `.n-node-version`、`.node-version`、`.nvmrc` 都锁定为 `24.14.0`，分别服务 `n`、通用 Node 版本管理器和 `nvm`。
 - `web/package.json` 用 `packageManager: pnpm@10.13.1` 固定 pnpm 版本；建议先执行 `corepack enable`，再进入 `web/` 跑 `pnpm install`。
 - `server/go.mod` 当前使用 `toolchain go1.26.6`；后端命令应在 `server/` 模块内执行，或通过 `scripts/doctor.sh` 先确认实际 toolchain。

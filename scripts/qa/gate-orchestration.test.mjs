@@ -235,6 +235,24 @@ test("full and strict reject ordinary skip environments before running gates", (
   }
 });
 
+test("full and strict validate current and child Bash before expensive gates", () => {
+  const full = read("scripts/qa/full.sh");
+  const strict = read("scripts/qa/strict.sh");
+
+  for (const source of [full, strict]) {
+    assert.match(source, /source "\$ROOT_DIR\/scripts\/lib\/bash\.sh"/u);
+    assert.match(source, /require_project_bash/u);
+  }
+  assert.match(
+    full,
+    /qa_full_environment_profile\(\) \{\s+require_project_bash "qa:full"/u,
+  );
+  assert.match(
+    strict,
+    /qa_strict_profile\(\) \{\s+require_project_bash "qa:strict"/u,
+  );
+});
+
 test("full browser evidence is current-worktree self-hosted on an isolated port", () => {
   const full = read("scripts/qa/full.sh");
   const style = read("web/scripts/styleL1.mjs");

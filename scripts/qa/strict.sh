@@ -59,6 +59,11 @@ done
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
 
+# ROOT_DIR pins the Bash toolchain helper used by this gate and its child scripts.
+# shellcheck source=scripts/lib/bash.sh
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/lib/bash.sh"
+
 if ! command -v node >/dev/null 2>&1; then
   echo "[qa:strict] 未找到 node，请先安装 Node.js"
   exit 1
@@ -75,6 +80,7 @@ fi
 source "$ROOT_DIR/scripts/qa/lib/stage-timing.sh"
 
 qa_strict_profile() {
+  require_project_bash "qa:strict"
   node "$ROOT_DIR/scripts/qa/gate-profiles.mjs" --profile strict
 }
 
