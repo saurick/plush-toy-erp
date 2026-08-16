@@ -68,7 +68,7 @@
 .erp-dev-environment-evidence {
   min-width: 0;
   margin-bottom: 12px;
-  padding: 12px;
+  padding: 10px;
   border: 1px solid var(--dev-env-border);
   border-radius: 12px;
   background: var(--dev-env-surface);
@@ -79,7 +79,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .erp-dev-environment-evidence__header > div {
@@ -106,8 +106,8 @@
   display: grid;
   min-width: 0;
   align-content: start;
-  gap: 9px;
-  padding: 11px;
+  gap: 6px;
+  padding: 9px;
   border: 1px solid var(--dev-env-border);
   border-top: 3px solid var(--dev-env-accent);
   border-radius: 10px;
@@ -130,8 +130,11 @@
 }
 
 .erp-dev-environment-card > header > div {
-  display: grid;
+  display: flex;
   min-width: 0;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 6px;
 }
 
 .erp-dev-environment-card__scope,
@@ -163,10 +166,9 @@
   overflow-wrap: anywhere;
 }
 
-.erp-dev-environment-card__result,
-.erp-dev-environment-card footer {
+.erp-dev-environment-card__result {
   display: grid;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -185,8 +187,24 @@
   cursor: pointer;
 }
 
-.erp-dev-environment-card footer {
+.erp-dev-environment-card__details-body {
+  display: grid;
+  gap: 8px;
   padding-top: 8px;
+}
+
+.erp-dev-environment-card__details-body > .ant-typography {
+  margin: 0;
+  font-size: 12px;
+}
+
+.erp-dev-environment-card footer {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 6px;
+  padding-top: 5px;
   border-top: 1px solid var(--dev-env-border);
 }
 

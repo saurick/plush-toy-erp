@@ -33,4 +33,14 @@ test('environment evidence keeps all target facts in one mobile comparison strip
   assert.match(panel, /数据版本 \/ run/u)
   assert.match(panel, /权威读回于/u)
   assert.match(panel, /当前下一步/u)
+  assert.match(
+    panel,
+    /<details>[\s\S]*<summary>身份与边界<\/summary>[\s\S]*<dl>[\s\S]*Release \/ SHA[\s\S]*Semantic digest[\s\S]*card\.health[\s\S]*card\.rollbackBoundary[\s\S]*<\/details>/u,
+    '技术身份、健康细节与回滚边界必须默认收起，常驻摘要只保留结果、时间和下一步'
+  )
+  assert.match(
+    panel,
+    /<Skeleton active paragraph=\{\{ rows: 2 \}\} title=\{false\} \/>/u,
+    '首次读回的三张目标卡必须使用紧凑骨架，避免把 DEV 页面首屏整体下推'
+  )
 })

@@ -47,6 +47,9 @@ export function createDevBusinessUsabilityScenarios({
             rowCount: document.querySelectorAll(
               '.erp-dev-business-usability-table-card .ant-table-tbody > .ant-table-row'
             ).length,
+            openEnvironmentDetailsCount: document.querySelectorAll(
+              '.erp-dev-environment-card details[open]'
+            ).length,
             documentHeight,
             coreDocumentHeight:
               documentHeight - environmentHeight - environmentMarginBottom,
@@ -62,6 +65,7 @@ export function createDevBusinessUsabilityScenarios({
         })
         assert.equal(defaultMetrics.cardCount, 4)
         assert.equal(defaultMetrics.rowCount, DEV_BUSINESS_USABILITY_PAGE_SIZE)
+        assert.equal(defaultMetrics.openEnvironmentDetailsCount, 0)
         assert.equal(defaultMetrics.tableOverflowX, 'auto')
         assert(defaultMetrics.documentWidth <= defaultMetrics.viewportWidth + 2)
         assert(
@@ -76,6 +80,26 @@ export function createDevBusinessUsabilityScenarios({
         await assertNoHorizontalOverflow(
           page,
           'dev-business-usability-desktop-light'
+        )
+        const firstEnvironmentDetails = page
+          .locator('.erp-dev-environment-card details')
+          .first()
+        await firstEnvironmentDetails.locator('summary').click()
+        assert.equal(
+          await firstEnvironmentDetails.evaluate((details) => details.open),
+          true,
+          '技术身份与边界应可显式展开'
+        )
+        assert.equal(
+          await firstEnvironmentDetails.locator('dt').count(),
+          6,
+          '展开后应保留完整的 Release、数据库、迁移、配置和数据身份'
+        )
+        await firstEnvironmentDetails.locator('summary').click()
+        assert.equal(
+          await firstEnvironmentDetails.evaluate((details) => details.open),
+          false,
+          '技术身份与边界应可恢复为紧凑摘要'
         )
         await page.screenshot({
           path: path.join(

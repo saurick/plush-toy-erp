@@ -66,42 +66,11 @@ function EnvironmentCard({ card, loading }) {
         </Tag>
       </header>
       {loading && card.readbackAt === '' ? (
-        <Skeleton active paragraph={{ rows: 5 }} title={false} />
+        <Skeleton active paragraph={{ rows: 2 }} title={false} />
       ) : (
         <>
-          <dl>
-            <div>
-              <dt>Release / SHA</dt>
-              <dd title={card.releaseSha}>{shortIdentity(card.releaseSha)}</dd>
-            </div>
-            <div>
-              <dt>数据库</dt>
-              <dd>{card.databaseName}</dd>
-            </div>
-            <div>
-              <dt>Migration</dt>
-              <dd>{card.migrationVersion}</dd>
-            </div>
-            <div>
-              <dt>客户配置 revision</dt>
-              <dd>{card.customerConfigRevision}</dd>
-            </div>
-            <div>
-              <dt>数据版本 / run</dt>
-              <dd>
-                {card.datasetVersion} / {card.datasetRunId}
-              </dd>
-            </div>
-            <div>
-              <dt>Semantic digest</dt>
-              <dd title={card.semanticDigest}>
-                {shortIdentity(card.semanticDigest)}
-              </dd>
-            </div>
-          </dl>
           <div className="erp-dev-environment-card__result">
             <Text strong>{card.datasetEvidence}</Text>
-            <Text type="secondary">{card.health}</Text>
             <DevTimestamp
               value={card.readbackAt}
               action="权威读回于"
@@ -109,8 +78,43 @@ function EnvironmentCard({ card, loading }) {
             />
           </div>
           <details>
-            <summary>回滚 / 清理边界</summary>
-            <Text type="secondary">{card.rollbackBoundary}</Text>
+            <summary>身份与边界</summary>
+            <div className="erp-dev-environment-card__details-body">
+              <dl>
+                <div>
+                  <dt>Release / SHA</dt>
+                  <dd title={card.releaseSha}>
+                    {shortIdentity(card.releaseSha)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>数据库</dt>
+                  <dd>{card.databaseName}</dd>
+                </div>
+                <div>
+                  <dt>Migration</dt>
+                  <dd>{card.migrationVersion}</dd>
+                </div>
+                <div>
+                  <dt>客户配置 revision</dt>
+                  <dd>{card.customerConfigRevision}</dd>
+                </div>
+                <div>
+                  <dt>数据版本 / run</dt>
+                  <dd>
+                    {card.datasetVersion} / {card.datasetRunId}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Semantic digest</dt>
+                  <dd title={card.semanticDigest}>
+                    {shortIdentity(card.semanticDigest)}
+                  </dd>
+                </div>
+              </dl>
+              <Text type="secondary">{card.health}</Text>
+              <Text type="secondary">{card.rollbackBoundary}</Text>
+            </div>
           </details>
           <footer>
             <span className="erp-dev-environment-card__next-label">
