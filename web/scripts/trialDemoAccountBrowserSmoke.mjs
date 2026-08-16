@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
@@ -59,6 +60,7 @@ const shouldCheckEffectiveSessionDiagnostic =
 const expectedConfigRevision = String(
   process.env.TRIAL_BROWSER_SMOKE_EXPECT_CONFIG_REVISION || ''
 ).trim()
+const MAX_PAGE_READY_MS = 5_000
 
 const oldEntryLabels = [
   '客户/供应商',
@@ -797,14 +799,23 @@ function buildRealSmokeReport({
   verifiedDesktop,
   verifiedMobile,
   desktopEffectiveSessionDiagnostics,
+  legalNoticeChecks,
+  pagePerformance = [],
 }) {
   const diagnosticBlockers = desktopEffectiveSessionDiagnostics.flatMap(
     (entry) => entry.diagnostic.blockers || []
   )
+  const pagePerformanceSummary = summarizePagePerformance(pagePerformance)
+  const pagePerformanceAcceptance = evaluatePagePerformanceAcceptance(
+    pagePerformanceSummary
+  )
   return {
     scope: 'trial-demo-account-browser-smoke-report',
     generatedAt: new Date().toISOString(),
-    writesDatabase: false,
+    writesDatabase: true,
+    writesBusinessData: false,
+    authenticationSessionWritesExpected: true,
+    legalNoticeAcknowledgementWritesPossible: true,
     callsJSONRPC: true,
     startsBrowser: true,
     startsDevServer: !externalBaseURL,
@@ -842,6 +853,10 @@ function buildRealSmokeReport({
     ),
     mobileDeniedAccount: buildMobileDeniedAccountSummary({ verified: true }),
     desktopEffectiveSessionDiagnostics,
+    legalNoticeChecks,
+    pagePerformance,
+    pagePerformanceSummary,
+    pagePerformanceAcceptance,
     summary: {
       desktopPassedCount: verifiedDesktop.length,
       mobilePassedCount: verifiedMobile.length,
@@ -858,6 +873,10 @@ function buildRealSmokeReport({
           (entry) => entry.diagnostic.projectionMode
         )
       ),
+      legalNoticeCheckCount: legalNoticeChecks.length,
+      legalNoticeAcknowledgedDuringSmokeCount: legalNoticeChecks.filter(
+        (entry) => entry.status === 'acknowledged_during_smoke'
+      ).length,
     },
     boundaries: {
       realCustomerImport: false,
@@ -866,6 +885,215 @@ function buildRealSmokeReport({
       releaseEvidence: false,
       productionDeploy: false,
       provesTargetEnvironment: false,
+    },
+  }
+}
+
+export function evaluatePagePerformanceAcceptance(summary = {}) {
+  const failures = []
+  if (!Number.isSafeInteger(summary.sampleCount) || summary.sampleCount <= 0) {
+    failures.push('missing-page-performance-samples')
+  }
+  if (Number(summary.totalSemanticDuplicateRequestCount) !== 0) {
+    failures.push('semantic-duplicate-rpc-requests')
+  }
+  if (Number(summary.totalFailedRpcRequestCount) !== 0) {
+    failures.push('failed-rpc-requests')
+  }
+  if (Number(summary.totalUnsettledRpcRequestCount) !== 0) {
+    failures.push('unsettled-rpc-requests')
+  }
+  if (Number(summary.maxElapsedMs) > MAX_PAGE_READY_MS) {
+    failures.push('page-ready-time-exceeded')
+  }
+  return {
+    passed: failures.length === 0,
+    maxPageReadyMs: MAX_PAGE_READY_MS,
+    requiresZeroSemanticDuplicateRequests: true,
+    requiresZeroFailedRequests: true,
+    requiresZeroUnsettledRequests: true,
+    failures,
+  }
+}
+
+export function summarizePagePerformance(rows = []) {
+  const normalized = rows
+    .map((row) => ({
+      ...row,
+      elapsedMs: Number(row.elapsedMs) || 0,
+      rpcRequestCount: Number(row.rpcRequestCount) || 0,
+      semanticDuplicateRequestCount:
+        Number(row.semanticDuplicateRequestCount) || 0,
+      abortedRpcRequestCount: Number(row.abortedRpcRequestCount) || 0,
+      failedRpcRequestCount: Number(row.failedRpcRequestCount) || 0,
+      unsettledRpcRequestCount: Number(row.unsettledRpcRequestCount) || 0,
+    }))
+    .sort((left, right) => left.elapsedMs - right.elapsedMs)
+  const percentile = (ratio) => {
+    if (normalized.length === 0) return 0
+    const index = Math.max(0, Math.ceil(normalized.length * ratio) - 1)
+    return normalized[index].elapsedMs
+  }
+  const slowest = [...normalized]
+    .sort((left, right) => right.elapsedMs - left.elapsedMs)
+    .slice(0, 10)
+    .map(({ username, label, path, elapsedMs, rpcRequestCount }) => ({
+      username,
+      label,
+      path,
+      elapsedMs,
+      rpcRequestCount,
+    }))
+  return {
+    sampleCount: normalized.length,
+    p50ElapsedMs: percentile(0.5),
+    p95ElapsedMs: percentile(0.95),
+    maxElapsedMs: normalized.at(-1)?.elapsedMs || 0,
+    totalRpcRequestCount: normalized.reduce(
+      (total, row) => total + row.rpcRequestCount,
+      0
+    ),
+    maxRpcRequestCount: normalized.reduce(
+      (maximum, row) => Math.max(maximum, row.rpcRequestCount),
+      0
+    ),
+    totalSemanticDuplicateRequestCount: normalized.reduce(
+      (total, row) => total + row.semanticDuplicateRequestCount,
+      0
+    ),
+    totalAbortedRpcRequestCount: normalized.reduce(
+      (total, row) => total + row.abortedRpcRequestCount,
+      0
+    ),
+    totalFailedRpcRequestCount: normalized.reduce(
+      (total, row) => total + row.failedRpcRequestCount,
+      0
+    ),
+    totalUnsettledRpcRequestCount: normalized.reduce(
+      (total, row) => total + row.unsettledRpcRequestCount,
+      0
+    ),
+    slowest,
+  }
+}
+
+function createPageRequestTracker() {
+  let active = null
+  const isRPCRequest = (request) => {
+    try {
+      return (
+        request.method() === 'POST' &&
+        new URL(request.url()).pathname.startsWith('/rpc/')
+      )
+    } catch {
+      return false
+    }
+  }
+  const requestMethod = (request) => {
+    try {
+      const domain = new URL(request.url()).pathname
+        .replace(/^\/rpc\//u, '')
+        .split('/')[0]
+      const method = String(request.postDataJSON()?.method || '').trim()
+      return domain && method ? `${domain}.${method}` : domain || 'unknown'
+    } catch {
+      return 'unknown'
+    }
+  }
+  const requestFingerprint = (request) => {
+    let normalizedBody = request.postData() || ''
+    try {
+      const payload = request.postDataJSON()
+      if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+        const normalizedPayload = { ...payload }
+        delete normalizedPayload.id
+        normalizedBody = JSON.stringify(normalizedPayload)
+      }
+    } catch {
+      // Keep the raw body only for the in-memory digest when JSON parsing fails.
+    }
+    return createHash('sha256')
+      .update(`${requestMethod(request)}\n${normalizedBody}`)
+      .digest('hex')
+  }
+  return {
+    begin(meta) {
+      assert.equal(active, null, '页面性能采样不能重叠')
+      active = {
+        ...meta,
+        startedAt: Date.now(),
+        rpcMethods: [],
+        requestFingerprints: [],
+        requests: new Set(),
+        pendingRequests: new Set(),
+        lastRequestAt: Date.now(),
+        completedRpcRequestCount: 0,
+        abortedRpcRequestCount: 0,
+        failedRpcRequestCount: 0,
+      }
+    },
+    record(request) {
+      if (!active || !isRPCRequest(request)) return
+      active.rpcMethods.push(requestMethod(request))
+      active.requestFingerprints.push(requestFingerprint(request))
+      active.requests.add(request)
+      active.pendingRequests.add(request)
+      active.lastRequestAt = Date.now()
+    },
+    recordFailure(request) {
+      if (!active || !active.requests.has(request)) return
+      active.pendingRequests.delete(request)
+      if (request.failure()?.errorText === 'net::ERR_ABORTED') {
+        active.abortedRpcRequestCount += 1
+        return
+      }
+      active.failedRpcRequestCount += 1
+    },
+    recordResponse(response) {
+      if (!active || !active.requests.has(response.request())) return
+      active.pendingRequests.delete(response.request())
+      active.completedRpcRequestCount += 1
+      if (response.status() >= 400) {
+        active.failedRpcRequestCount += 1
+      }
+    },
+    async finish() {
+      assert(active, '页面性能采样尚未开始')
+      const deadline = Date.now() + 5_000
+      while (
+        Date.now() < deadline &&
+        (active.pendingRequests.size > 0 ||
+          Date.now() - active.lastRequestAt < 100)
+      ) {
+        await delay(20)
+      }
+      const fingerprints = active.requestFingerprints
+      const rpcMethodCounts = Object.fromEntries(
+        uniqueStrings(active.rpcMethods)
+          .sort()
+          .map((method) => [
+            method,
+            active.rpcMethods.filter((candidate) => candidate === method)
+              .length,
+          ])
+      )
+      const result = {
+        username: active.username,
+        label: active.label,
+        path: active.path,
+        elapsedMs: Date.now() - active.startedAt,
+        rpcRequestCount: fingerprints.length,
+        completedRpcRequestCount: active.completedRpcRequestCount,
+        semanticDuplicateRequestCount:
+          fingerprints.length - new Set(fingerprints).size,
+        abortedRpcRequestCount: active.abortedRpcRequestCount,
+        failedRpcRequestCount: active.failedRpcRequestCount,
+        unsettledRpcRequestCount: active.pendingRequests.size,
+        rpcMethods: Object.keys(rpcMethodCounts),
+        rpcMethodCounts,
+      }
+      active = null
+      return result
     },
   }
 }
@@ -921,10 +1149,22 @@ async function main() {
   const verifiedDesktop = []
   const verifiedMobile = []
   const desktopEffectiveSessionDiagnostics = []
+  const legalNoticeChecks = []
+  const pagePerformance = []
   try {
     for (const account of desktopAccounts) {
-      const diagnostic = await verifyDesktopAccount(browser, account)
+      const {
+        diagnostic,
+        legalNotice,
+        pagePerformance: accountPerformance,
+      } = await verifyDesktopAccount(browser, account)
+      pagePerformance.push(...accountPerformance)
       verifiedDesktop.push(account.username)
+      legalNoticeChecks.push({
+        username: account.username,
+        surface: 'desktop',
+        status: legalNotice,
+      })
       if (diagnostic) {
         desktopEffectiveSessionDiagnostics.push({
           username: account.username,
@@ -933,21 +1173,35 @@ async function main() {
       }
     }
     for (const [username, roleKey] of mobileAccounts) {
-      await verifyMobileAccount(browser, { username, roleKey })
+      const legalNotice = await verifyMobileAccount(browser, {
+        username,
+        roleKey,
+      })
       verifiedMobile.push(`${username}:${roleKey}`)
+      legalNoticeChecks.push({
+        username,
+        surface: 'mobile',
+        status: legalNotice,
+      })
     }
-    await verifyMobileDeniedAccount(browser)
+    legalNoticeChecks.push({
+      username: 'demo_admin',
+      surface: 'mobile-denied',
+      status: await verifyMobileDeniedAccount(browser),
+    })
   } finally {
     await browser.close()
     await stopDevServer()
   }
 
+  const report = buildRealSmokeReport({
+    verifiedDesktop,
+    verifiedMobile,
+    desktopEffectiveSessionDiagnostics,
+    legalNoticeChecks,
+    pagePerformance,
+  })
   if (args.report) {
-    const report = buildRealSmokeReport({
-      verifiedDesktop,
-      verifiedMobile,
-      desktopEffectiveSessionDiagnostics,
-    })
     await writeJSONReport(args.report, report)
     process.stdout.write(
       `[trial-demo-account-browser-smoke] report written: ${path.relative(
@@ -956,6 +1210,11 @@ async function main() {
       )}\n`
     )
   }
+  assert.equal(
+    report.pagePerformanceAcceptance.passed,
+    true,
+    `页面性能与请求收敛未通过: ${report.pagePerformanceAcceptance.failures.join(', ')}`
+  )
 
   process.stdout.write(
     `[trial-demo-account-browser-smoke] 通过，桌面账号 ${verifiedDesktop.length} 个，岗位任务端 ${verifiedMobile.length} 个，拒绝态 1 个。base=${baseURL}\n`
@@ -1066,6 +1325,13 @@ async function newPage(browser, viewport) {
   )
   const page = await context.newPage()
   const runtimeErrors = []
+  const legalNoticeState = {
+    responseCount: 0,
+    lastAcknowledged: null,
+    lastError: '',
+  }
+  const requestTracker = createPageRequestTracker()
+  page.on('request', (request) => requestTracker.record(request))
   page.on('console', (message) => {
     if (message.type() === 'error') {
       runtimeErrors.push(`console error: ${message.text()}`)
@@ -1075,19 +1341,42 @@ async function newPage(browser, viewport) {
     runtimeErrors.push(`page error: ${error.message}`)
   })
   page.on('requestfailed', (request) => {
+    requestTracker.recordFailure(request)
     const errorText = request.failure()?.errorText || ''
     if (errorText && errorText !== 'net::ERR_ABORTED') {
       runtimeErrors.push(`request failed: ${request.url()} ${errorText}`)
     }
   })
-  return { context, page, runtimeErrors }
+  page.on('response', async (response) => {
+    requestTracker.recordResponse(response)
+    if (!isAdminJSONRPCResponse(response, 'legal_notice_status')) return
+    try {
+      const payload = await response.json()
+      if (Number(payload?.result?.code) !== 0) {
+        legalNoticeState.lastError = 'legal_notice_status 未成功'
+        return
+      }
+      const acknowledged = payload?.result?.data?.acknowledged
+      if (typeof acknowledged !== 'boolean') {
+        legalNoticeState.lastError = 'legal_notice_status 缺少明确状态'
+        return
+      }
+      legalNoticeState.responseCount += 1
+      legalNoticeState.lastAcknowledged = acknowledged
+      legalNoticeState.lastError = ''
+    } catch {
+      legalNoticeState.lastError = 'legal_notice_status 返回无法解析'
+    }
+  })
+  return { context, page, runtimeErrors, legalNoticeState, requestTracker }
 }
 
 async function verifyDesktopAccount(browser, account) {
-  const { context, page, runtimeErrors } = await newPage(browser, {
-    width: 1440,
-    height: 900,
-  })
+  const { context, page, runtimeErrors, legalNoticeState, requestTracker } =
+    await newPage(browser, {
+      width: 1440,
+      height: 900,
+    })
   try {
     await login(page, {
       username: account.username,
@@ -1101,6 +1390,10 @@ async function verifyDesktopAccount(browser, account) {
     await page.getByText(account.username, { exact: true }).waitFor({
       state: 'visible',
       timeout: 15_000,
+    })
+    const legalNotice = await handleLegalNoticeGate(page, {
+      username: account.username,
+      legalNoticeState,
     })
     const expectedVisibleMenus = visibleCustomerMenuLabels(
       account.expectedMenus
@@ -1134,8 +1427,13 @@ async function verifyDesktopAccount(browser, account) {
       await assertNotVisibleInMenu(page, label, account.username)
     }
     const routeAccess = roleRouteAccessByUsername.get(account.username)
+    let pagePerformance = []
     if (routeAccess) {
-      await verifyAllowedRolePages(page, routeAccess)
+      pagePerformance = await verifyAllowedRolePages(
+        page,
+        routeAccess,
+        requestTracker
+      )
       await verifyForbiddenRolePages(page, routeAccess)
     }
     const diagnostic = await verifyEffectiveSessionDiagnostic(page, {
@@ -1148,7 +1446,7 @@ async function verifyDesktopAccount(browser, account) {
       fullPage: true,
     })
     assertNoRuntimeErrors(runtimeErrors, `${account.username} desktop`)
-    return diagnostic
+    return { diagnostic, legalNotice, pagePerformance }
   } catch (error) {
     await screenshotOnFailure(page, `${account.username}-desktop-failed.png`)
     throw error
@@ -1170,14 +1468,19 @@ async function findVisibleMenuItem(page, label) {
       `${label} 不在首层菜单时必须存在唯一的“更多功能”入口`
     )
     const submenu = moreFunctions.locator('..')
-    const submenuClass = String((await submenu.getAttribute('class')) || '')
-    if (!submenuClass.includes('ant-menu-submenu-open')) {
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const submenuClass = String((await submenu.getAttribute('class')) || '')
+      if (submenuClass.includes('ant-menu-submenu-open')) {
+        return submenu
+      }
+      await moreFunctions.waitFor({ state: 'visible', timeout: 15_000 })
       await moreFunctions.click()
+      await page.waitForTimeout(150)
     }
-    await page.waitForFunction(
-      (node) => node.classList.contains('ant-menu-submenu-open'),
-      await submenu.elementHandle(),
-      { timeout: 15_000 }
+    assert.match(
+      String((await submenu.getAttribute('class')) || ''),
+      /ant-menu-submenu-open/u,
+      `${label} 的“更多功能”菜单重试后仍未展开`
     )
     return submenu
   }
@@ -1270,9 +1573,15 @@ async function verifyRoleGuidedMenuStructure(page, username) {
   )
 }
 
-async function verifyAllowedRolePages(page, routeAccess) {
+async function verifyAllowedRolePages(page, routeAccess, requestTracker) {
+  const measurements = []
   for (const target of routeAccess.allowedPages) {
     const menuItem = await findVisibleMenuItem(page, target.label)
+    requestTracker.begin({
+      username: routeAccess.username,
+      label: target.label,
+      path: target.path,
+    })
     await menuItem.click()
     await page.waitForURL((url) => url.pathname === target.path, {
       timeout: 15_000,
@@ -1307,7 +1616,9 @@ async function verifyAllowedRolePages(page, routeAccess) {
       /页面加载失败|页面暂时无法显示|当前页面不可访问/u,
       `${routeAccess.username} 打开 ${target.label} 后页面未正常加载`
     )
+    measurements.push(await requestTracker.finish())
   }
+  return measurements
 }
 
 async function verifyForbiddenRolePages(page, routeAccess) {
@@ -1468,10 +1779,13 @@ function sanitizeEffectiveSessionDiagnostic(diagnostic) {
 }
 
 async function verifyMobileAccount(browser, { username, roleKey }) {
-  const { context, page, runtimeErrors } = await newPage(browser, {
-    width: 390,
-    height: 844,
-  })
+  const { context, page, runtimeErrors, legalNoticeState } = await newPage(
+    browser,
+    {
+      width: 390,
+      height: 844,
+    }
+  )
   try {
     await login(page, {
       username,
@@ -1487,11 +1801,16 @@ async function verifyMobileAccount(browser, { username, roleKey }) {
       state: 'visible',
       timeout: 15_000,
     })
+    const legalNotice = await handleLegalNoticeGate(page, {
+      username,
+      legalNoticeState,
+    })
     await page.screenshot({
       path: path.resolve(outputDir, `${username}-${roleKey}-mobile.png`),
       fullPage: true,
     })
     assertNoRuntimeErrors(runtimeErrors, `${username} mobile`)
+    return legalNotice
   } catch (error) {
     await screenshotOnFailure(page, `${username}-${roleKey}-mobile-failed.png`)
     throw error
@@ -1501,10 +1820,13 @@ async function verifyMobileAccount(browser, { username, roleKey }) {
 }
 
 async function verifyMobileDeniedAccount(browser) {
-  const { context, page, runtimeErrors } = await newPage(browser, {
-    width: 390,
-    height: 844,
-  })
+  const { context, page, runtimeErrors, legalNoticeState } = await newPage(
+    browser,
+    {
+      width: 390,
+      height: 844,
+    }
+  )
   try {
     await login(page, {
       username: 'demo_admin',
@@ -1527,6 +1849,10 @@ async function verifyMobileDeniedAccount(browser) {
         { exact: true }
       )
       .waitFor({ state: 'visible', timeout: 15_000 })
+    const legalNotice = await handleLegalNoticeGate(page, {
+      username: 'demo_admin',
+      legalNoticeState,
+    })
     const desktopEntryButton = page
       .getByText('电脑端', { exact: true })
       .locator('xpath=ancestor::button[1]')
@@ -1559,6 +1885,7 @@ async function verifyMobileDeniedAccount(browser) {
       fullPage: true,
     })
     assertNoRuntimeErrors(runtimeErrors, 'demo_admin mobile denied')
+    return legalNotice
   } catch (error) {
     await screenshotOnFailure(page, 'demo_admin-mobile-denied-failed.png')
     throw error
@@ -1603,6 +1930,79 @@ async function login(
   } else {
     await submit.click()
   }
+}
+
+function isAdminJSONRPCResponse(response, method) {
+  if (!response.url().includes('/rpc/admin')) return false
+  try {
+    return response.request().postDataJSON()?.method === method
+  } catch {
+    return false
+  }
+}
+
+async function readLegalNoticeResult(response, method, username) {
+  assert.equal(response.ok(), true, `${username} ${method} HTTP 请求失败`)
+  const payload = await response.json()
+  assert.equal(Number(payload?.result?.code), 0, `${username} ${method} 未成功`)
+  return payload?.result?.data || {}
+}
+
+async function handleLegalNoticeGate(page, { username, legalNoticeState }) {
+  const gate = page.locator(
+    '[data-testid="legal-notice-gate"] .ant-modal:visible'
+  )
+  const unavailable = page.locator('.legal-notice-status-banner:visible')
+  const deadline = Date.now() + 15_000
+  while (Date.now() < deadline) {
+    assert.equal(
+      await unavailable.count(),
+      0,
+      `${username} 无法核对规则知悉状态`
+    )
+    assert.equal(
+      legalNoticeState.lastError,
+      '',
+      `${username} ${legalNoticeState.lastError}`
+    )
+    if ((await gate.count()) > 0) break
+    if (legalNoticeState.lastAcknowledged === true) {
+      return 'not_required'
+    }
+    await page.waitForTimeout(100)
+  }
+  assert.equal(
+    await gate.count(),
+    1,
+    `${username} 规则知悉状态在最终页面未收敛`
+  )
+  await gate
+    .getByText('请先了解个人信息处理与系统使用规则', { exact: true })
+    .waitFor({ state: 'visible', timeout: 15_000 })
+  await gate
+    .getByRole('link', { name: '打开《个人信息处理规则》' })
+    .waitFor({ state: 'visible', timeout: 15_000 })
+  await gate
+    .getByRole('link', { name: '打开《系统使用规则》' })
+    .waitFor({ state: 'visible', timeout: 15_000 })
+
+  const acknowledgeResponse = page.waitForResponse(
+    (response) => isAdminJSONRPCResponse(response, 'acknowledge_legal_notice'),
+    { timeout: 15_000 }
+  )
+  await gate.getByTestId('legal-notice-acknowledge').click()
+  const acknowledged = await readLegalNoticeResult(
+    await acknowledgeResponse,
+    'acknowledge_legal_notice',
+    username
+  )
+  assert.equal(
+    acknowledged.acknowledged,
+    true,
+    `${username} 规则知悉写入后未得到确认`
+  )
+  await gate.waitFor({ state: 'hidden', timeout: 15_000 })
+  return 'acknowledged_during_smoke'
 }
 
 async function ensureLoginFormReady(
@@ -1702,4 +2102,4 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   })
 }
 
-export { buildInputTemplate, buildPreflightReport }
+export { buildInputTemplate, buildPreflightReport, buildRealSmokeReport }

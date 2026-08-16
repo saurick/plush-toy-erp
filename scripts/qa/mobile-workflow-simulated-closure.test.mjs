@@ -40,12 +40,23 @@ test("mobile workflow simulated mobile closure plan stays simulated and workflow
   assert(
     Object.values(plan.tasks).every((task) => task.task_code.length <= 64),
   );
-  assert.equal(plan.tasks.approval.task_group, "order_approval");
-  assert.equal(plan.tasks.approvalRejected.task_group, "order_approval");
-  assert.equal(plan.tasks.quality.task_group, "finished_goods_qc");
-  assert.equal(plan.tasks.warehouseInbound.task_group, "warehouse_inbound");
-  assert.equal(plan.tasks.shipmentRelease.task_group, "trial_warehouse_exception");
-  assert.equal(plan.tasks.warehouseUrge.task_group, "trial_warehouse_urge");
+  assert.equal(plan.tasks.approval.task_group, "trial_boss_work");
+  assert.equal(plan.tasks.approvalRejected.task_group, "trial_boss_work");
+  assert.equal(plan.tasks.quality.task_group, "trial_quality_work");
+  assert.equal(plan.tasks.warehouseInbound.task_group, "trial_warehouse_work");
+  assert.equal(plan.tasks.shipmentRelease.task_group, "trial_warehouse_work");
+  assert.equal(plan.tasks.warehouseUrge.task_group, "trial_warehouse_work");
+  assert.equal(
+    plan.tasks.approval.required_capability_key,
+    "workflow.task.approve",
+  );
+  for (const task of Object.values(plan.tasks)) {
+    assert.equal(
+      task.idempotency_key,
+      `mobile-workflow-closure:create:${task.task_code}`,
+    );
+    assert(!Object.hasOwn(task, "due_at"));
+  }
   assert.equal(
     plan.tasks.shipmentRelease.business_status_key,
     "shipment_pending",
@@ -59,7 +70,9 @@ test("mobile workflow simulated mobile closure plan stays simulated and workflow
     plan.actions.warehouseUrged.payload.surface_key,
     "mobile_role_tasks",
   );
-  assert(!Object.hasOwn(plan.actions.warehouseUrged.payload, "notification_type"));
+  assert(
+    !Object.hasOwn(plan.actions.warehouseUrged.payload, "notification_type"),
+  );
 });
 
 test("mobile workflow simulated mobile closure refuses real import flags", () => {
@@ -81,7 +94,7 @@ test("mobile workflow simulated mobile closure rejects credentialed backend URL"
   );
 });
 
-test("mobile workflow simulated mobile closure action payload omits evidence refs and keeps feedback and exceptions", () => {
+test("mobile workflow simulated mobile closure action payload keeps only current feedback contract", () => {
   const plan = buildPlan(parseCliArgs(["--run-id", "mobile feedback"]));
 
   assert.equal(plan.newActionEvidenceRefs, "omitted");
@@ -103,35 +116,15 @@ test("mobile workflow simulated mobile closure action payload omits evidence ref
   ]) {
     assert.equal(action.reason, "");
     assert.equal(action.payload.feedback, action.feedback);
-    assert(!Object.hasOwn(action.payload, "mobile_exception_report"));
   }
   for (const action of [
     plan.actions.approvalRejected,
     plan.actions.shipmentReleaseBlocked,
   ]) {
     assert(!Object.hasOwn(action.payload, "feedback"));
-    assert.equal(action.payload.mobile_exception_report.reason, action.reason);
+    assert(!Object.hasOwn(action.payload, "mobile_exception_report"));
+    assert.equal(action.payload.surface_key, "mobile_role_tasks");
   }
-  assert.equal(
-    plan.actions.shipmentReleaseBlocked.payload.mobile_exception_report
-      .simulated_only,
-    true,
-  );
-  assert.equal(
-    plan.actions.approvalRejected.payload.mobile_exception_report
-      .simulated_only,
-    true,
-  );
-  assert.equal(
-    plan.actions.approvalRejected.payload.mobile_exception_report.action_key,
-    "rejected",
-  );
-  assert(
-    !Object.hasOwn(
-      plan.actions.approvalRejected.payload.mobile_exception_report,
-      "evidence_refs",
-    ),
-  );
   assert.match(
     plan.actions.shipmentReleaseBlocked.reason,
     /模拟出货唛头未确认/u,
@@ -208,11 +201,22 @@ test("mobile workflow simulated apply action params do not replay workflow paylo
       );
     }
   }
-  assert.equal(completeParams.payload.feedback, plan.actions.approvalDone.feedback);
+  assert.equal(
+    completeParams.payload.feedback,
+    plan.actions.approvalDone.feedback,
+  );
   assert(!Object.hasOwn(completeParams, "reason"));
-  assert.equal(blockedParams.reason, plan.actions.shipmentReleaseBlocked.reason);
+  assert.equal(
+    blockedParams.reason,
+    plan.actions.shipmentReleaseBlocked.reason,
+  );
   assert(!Object.hasOwn(blockedParams.payload, "feedback"));
-  for (const params of [completeParams, blockedParams, rejectedParams, urgeParams]) {
+  for (const params of [
+    completeParams,
+    blockedParams,
+    rejectedParams,
+    urgeParams,
+  ]) {
     assert(!Object.hasOwn(params.payload, "mobile_action_evidence_refs"));
     assert(!Object.hasOwn(params.payload, "mobile_role_key"));
   }
@@ -288,6 +292,16 @@ test("mobile workflow simulated apply report records omitted evidence refs witho
   assert(!source.includes("business=${step.business_status}"));
   assert(source.includes("evidence_refs_omitted:"));
   assert(source.includes("evidence_refs_omitted=true"));
+  assert(source.includes("workflow_event_recorded:"));
+  assert(source.includes("workflow_event_recorded=true"));
+  assert(source.includes("workflow_event_count:"));
+  assert(source.includes("workflow_action_event_count:"));
+  assert(
+    source.includes(
+      "workflow_action_event_count=${step.workflow_action_event_count}",
+    ),
+  );
+  assert.match(source, /workflowActionEvents !== 1/u);
   assert(!source.includes("evidence_count:"));
   assert(!source.includes(" evidence=${step.evidence_count}"));
   assert(
@@ -329,11 +343,9 @@ test("mobile workflow simulated mobile closure input template is no-write", () =
   assert.equal(template.downstreamReportOnlyWritesReports, true);
   assert.equal(template.downstreamApplyWritesDatabase, true);
   assert.deepEqual(template.simulatedTaskGroups, [
-    "order_approval",
-    "finished_goods_qc",
-    "warehouse_inbound",
-    "trial_warehouse_exception",
-    "trial_warehouse_urge",
+    "trial_boss_work",
+    "trial_quality_work",
+    "trial_warehouse_work",
   ]);
   assert(template.simulatedActions.includes("boss rejected with reason"));
   assert(

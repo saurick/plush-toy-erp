@@ -877,7 +877,10 @@ test('client reuses one CSRF session and only posts prepare or execute envelopes
           apiPrefix: DEV_DATA_PREPARATION_API_PREFIX,
         })
       }
-      if (url === DEV_DATA_PREPARATION_SUMMARY_API_PATH) {
+      if (
+        url === DEV_DATA_PREPARATION_SUMMARY_API_PATH ||
+        url === `${DEV_DATA_PREPARATION_SUMMARY_API_PATH}?refresh=authoritative`
+      ) {
         return response(summaryFixture())
       }
       if (url.startsWith(DEV_DATA_PREPARATION_OPERATION_API_PREFIX)) {
@@ -898,6 +901,7 @@ test('client reuses one CSRF session and only posts prepare or execute envelopes
   })
 
   assert.equal((await client.summary()).profiles.length, 3)
+  assert.equal((await client.summary({ force: true })).profiles.length, 3)
   assert.equal((await client.operation(OPERATION_ID)).status, 'running')
   const idempotencyKey = createDataPreparationIdempotencyKey(
     'core-demo',
@@ -910,6 +914,14 @@ test('client reuses one CSRF session and only posts prepare or execute envelopes
   assert.equal(
     requests.filter(
       (request) => request.url === DEV_DATA_PREPARATION_SESSION_API_PATH
+    ).length,
+    1
+  )
+  assert.equal(
+    requests.filter(
+      (request) =>
+        request.url ===
+        `${DEV_DATA_PREPARATION_SUMMARY_API_PATH}?refresh=authoritative`
     ).length,
     1
   )

@@ -32,7 +32,34 @@ function operation({
   }
 }
 
-function summary({ targetStatus = 'passed', operations = [] } = {}) {
+function backupRestoreReceipt(overrides = {}) {
+  return {
+    schemaVersion: 'plush.backup-restore-evidence/v1',
+    status: 'passed',
+    target: 'test-133',
+    customer: 'yoyoosun',
+    environment: 'customer-trial-133',
+    releaseVersion: CURRENT_SHA,
+    verifiedAt: '2026-08-14T14:56:26.000Z',
+    backupId: 'br-yoyoosun-20260814T225613+0800',
+    reportPath:
+      'output/customers/yoyoosun/backup-restore-rehearsal/target/run/backup-restore-report.json',
+    reportSha256: 'c'.repeat(64),
+    backupSha256: 'd'.repeat(64),
+    backupSizeBytes: 837_713,
+    migrationBefore: '20260812043327',
+    migrationAfter: '20260812043327',
+    pendingFiles: 0,
+    disposableCleanup: 'passed',
+    ...overrides,
+  }
+}
+
+function summary({
+  targetStatus = 'passed',
+  operations = [],
+  recoveryReceipt = null,
+} = {}) {
   return {
     generatedAt: '2026-08-10T01:00:00.000Z',
     boundaries: { target: 'test-133' },
@@ -67,6 +94,10 @@ function summary({ targetStatus = 'passed', operations = [] } = {}) {
       },
     ],
     operations,
+    recovery: {
+      schemaVersion: 'plush.dev-recovery-summary/v1',
+      backupRestore: recoveryReceipt,
+    },
   }
 }
 
@@ -207,6 +238,65 @@ test('devRecovery: 普通部署不冒充幂等演练，故障注入保持禁用'
       .type,
     'refresh'
   )
+})
+
+test('devRecovery: 当前版本的近期隔离恢复回执显示为最近证据', () => {
+  const overview = buildDevRecoveryOverview(
+    summary({ recoveryReceipt: backupRestoreReceipt() }),
+    { nowMs: Date.parse('2026-08-15T00:48:03+08:00') }
+  )
+  const drill = overview.drills.find(
+    (item) => item.key === 'backup-restore-isolated'
+  )
+  assert.equal(drill.status, 'current')
+  assert.equal(drill.evidenceState.at, '2026-08-14T14:56:26.000Z')
+  assert.equal(
+    drill.evidenceState.operationId,
+    'br-yoyoosun-20260814T225613+0800'
+  )
+  assert.match(drill.evidenceState.note, /隔离恢复回执已通过/u)
+  assert.match(
+    drill.evidenceState.note,
+    new RegExp(CURRENT_SHA.slice(0, 12), 'u')
+  )
+})
+
+test('devRecovery: 错误版本、目标、过期、失败和缺失回执均不冒充最近证据', () => {
+  const cases = [
+    {
+      receipt: backupRestoreReceipt({ releaseVersion: PREVIOUS_SHA }),
+      note: /其他运行版本/u,
+    },
+    {
+      receipt: backupRestoreReceipt({ target: 'prod-primary' }),
+      note: /其他目标、甲方或环境/u,
+    },
+    {
+      receipt: backupRestoreReceipt({
+        verifiedAt: '2026-06-30T00:00:00.000Z',
+      }),
+      note: /超过每月复核窗口/u,
+    },
+    {
+      receipt: backupRestoreReceipt({ status: 'failed' }),
+      note: /未通过页面合同校验/u,
+    },
+    {
+      receipt: null,
+      note: /尚无通过校验的隔离恢复回执/u,
+    },
+  ]
+  for (const item of cases) {
+    const overview = buildDevRecoveryOverview(
+      summary({ recoveryReceipt: item.receipt }),
+      { nowMs: Date.parse('2026-08-15T00:48:03+08:00') }
+    )
+    const drill = overview.drills.find(
+      (candidate) => candidate.key === 'backup-restore-isolated'
+    )
+    assert.equal(drill.status, 'guarded')
+    assert.match(drill.evidenceState.note, item.note)
+  }
 })
 
 test('devRecovery: 新增目标后只消费当前目标自己的演练证据', () => {

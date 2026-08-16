@@ -81,6 +81,7 @@ func TestWorkflowUsecase_GetTaskBoardNormalizesReadContract(t *testing.T) {
 		Due:                  "",
 		SourceType:           "all",
 		LaneKey:              "all",
+		Sort:                 "",
 		Limit:                200,
 		Offset:               -1,
 		VisibleOwnerRoleKeys: []string{" sales ", "sales"},
@@ -89,7 +90,7 @@ func TestWorkflowUsecase_GetTaskBoardNormalizesReadContract(t *testing.T) {
 		t.Fatalf("get task board: %v", err)
 	}
 	got := repo.query
-	if got.Keyword != "工程任务" || got.Status != "all" || got.OwnerRoleKey != SalesRoleKey || got.Due != "all" || got.SourceType != "" || got.LaneKey != "" {
+	if got.Keyword != "工程任务" || got.Status != "all" || got.OwnerRoleKey != SalesRoleKey || got.Due != "all" || got.SourceType != "" || got.LaneKey != "" || got.Sort != WorkflowTaskBoardSortSmart {
 		t.Fatalf("unexpected normalized query %#v", got)
 	}
 	if got.Limit != 50 || got.Offset != 0 {
@@ -106,6 +107,8 @@ func TestWorkflowUsecase_GetTaskBoardNormalizesReadContract(t *testing.T) {
 		{Status: "unknown"},
 		{Due: "tomorrow"},
 		{LaneKey: "unknown"},
+		{LaneKey: WorkflowTaskBoardLaneActionable, Sort: "unknown"},
+		{Sort: WorkflowTaskBoardSortNewest},
 	} {
 		if _, err := uc.GetTaskBoard(context.Background(), query); !errors.Is(err, ErrBadParam) {
 			t.Fatalf("invalid board query %#v must fail, got %v", query, err)

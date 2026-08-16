@@ -918,6 +918,65 @@ func TestJsonrpcDispatcher_WorkflowCreateTaskRejectsProcessRuntimeAnchors(t *tes
 	}
 }
 
+func TestJsonrpcDispatcher_WorkflowCreateTaskRejectsOversizedTextWithGuidance(t *testing.T) {
+	repo := &stubWorkflowJSONRPCRepo{}
+	dispatcher := &jsonrpcDispatcher{
+		log:              log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
+		adminReader:      stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionWorkflowTaskCreate)},
+		workflowUC:       biz.NewWorkflowUsecase(repo),
+		customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled"),
+	}
+	base := map[string]any{
+		"idempotency_key": "workflow-public-length-001",
+		"task_code":       "WF-PUBLIC-LENGTH-001",
+		"task_group":      "trial_sales_work",
+		"task_name":       "普通协同任务",
+		"source_type":     "trial-source",
+		"source_id":       float64(1),
+		"task_status_key": "ready",
+		"owner_role_key":  biz.SalesRoleKey,
+		"priority":        float64(1),
+		"payload":         map[string]any{},
+	}
+	tests := []struct {
+		key   string
+		label string
+		limit int
+	}{
+		{key: "task_code", label: "任务编号", limit: biz.WorkflowTaskCodeMaxLength},
+		{key: "task_group", label: "任务分类", limit: biz.WorkflowTaskGroupMaxLength},
+		{key: "task_name", label: "任务名称", limit: biz.WorkflowTaskNameMaxLength},
+		{key: "source_type", label: "来源类型", limit: biz.WorkflowTaskSourceTypeMaxLength},
+		{key: "source_no", label: "来源单号", limit: biz.WorkflowTaskSourceNoMaxLength},
+		{key: "owner_role_key", label: "责任岗位", limit: biz.WorkflowTaskOwnerRoleKeyMaxLength},
+		{key: "owner_pool_key", label: "责任池", limit: biz.WorkflowTaskOwnerPoolKeyMaxLength},
+		{key: "required_capability_key", label: "办理能力", limit: biz.WorkflowTaskRequiredCapabilityMaxLength},
+	}
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			params := make(map[string]any, len(base)+1)
+			for key, value := range base {
+				params[key] = value
+			}
+			params[tt.key] = strings.Repeat("长", tt.limit+1)
+			repo.createInput = nil
+			_, res, err := dispatcher.handleWorkflow(workflowJSONRPCAdminContext(), "create_task", "oversized-"+tt.key, mustJSONRPCStruct(t, params))
+			if err != nil {
+				t.Fatalf("expected nil transport error, got %v", err)
+			}
+			if res == nil || res.Code != errcode.InvalidParam.Code ||
+				!strings.Contains(res.Message, tt.label) ||
+				!strings.Contains(res.Message, fmt.Sprintf("%d", tt.limit)) ||
+				!strings.Contains(res.Message, "重试") {
+				t.Fatalf("expected actionable %s length guidance, got %#v", tt.key, res)
+			}
+			if repo.createInput != nil {
+				t.Fatalf("oversized %s must not reach usecase, got %#v", tt.key, repo.createInput)
+			}
+		})
+	}
+}
+
 func TestJsonrpcDispatcher_WorkflowCreateTaskReplayContract(t *testing.T) {
 	var storedHash string
 	created := &biz.WorkflowTask{

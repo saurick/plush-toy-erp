@@ -550,12 +550,13 @@ test("current documentation rejects stale Shipment, inventory approval and task-
   for (const row of capabilityRows) {
     const status = row.split("|")[2]?.trim();
     assert(
-      ["待办", "实现中", "可试用", "暂不做"].includes(status),
+      ["可试用", "部分可用", "当前不纳入"].includes(status),
       `capability ledger must use a business status, got ${status}`,
     );
   }
   assert.doesNotMatch(capabilityLedger, /已闭环/u);
   assert.doesNotMatch(capabilityLedger, /L[0-8]/u);
+  assert.doesNotMatch(capabilityLedger, /下一步|未完成范围/u);
   assert.match(capabilityLedger, /财务放行不等于已出货/u);
 
   const currentTruth = readFileSync(
@@ -566,7 +567,7 @@ test("current documentation rejects stale Shipment, inventory approval and task-
     currentTruth,
     /确认能力做到 schema、usecase、API、UI、测试还是交付哪一层/u,
   );
-  assert.match(currentTruth, /待办、实现中、可试用或暂不做/u);
+  assert.match(currentTruth, /可试用、部分可用或当前不纳入/u);
 
   const capabilityAuditSkill = readFileSync(
     path.join(

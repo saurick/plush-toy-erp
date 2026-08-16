@@ -53,8 +53,7 @@ test('devProductCore: all 15 capability rows derive from the unique ledger', () 
   assert.deepEqual(summary.counts, {
     entered: 10,
     partial: 3,
-    pending: 1,
-    excluded: 1,
+    excluded: 2,
   })
   assert.equal(summary.total, 15)
   assert.equal(summary.readOnly, true)
@@ -73,11 +72,12 @@ test('devProductCore: all 15 capability rows derive from the unique ledger', () 
     [...new Map(capabilities.map((item) => [item.status, item.membership]))],
     [
       ['可试用', '已进入内核'],
-      ['实现中', '部分进入'],
-      ['待办', '尚未进入'],
-      ['暂不做', '当前不纳入'],
+      ['部分可用', '部分进入'],
+      ['当前不纳入', '当前不纳入'],
     ]
   )
+  assert.doesNotMatch(ledgerSource, /下一步|未完成范围/u)
+  assert.doesNotMatch(pageSource, /主要边界\s*\/\s*下一步/u)
 })
 
 test('devProductCore: filters distinguish membership and readable keywords', () => {
@@ -103,6 +103,7 @@ test('devProductCore: filters distinguish membership and readable keywords', () 
     ['应收、应付、发票、收付款、核销与红冲']
   )
   assert.equal(normalizeProductCoreMembership('unknown'), 'all')
+  assert.equal(normalizeProductCoreMembership('pending'), 'all')
   assert.equal(
     normalizeProductCoreMembership(''),
     DEV_PRODUCT_CORE_MEMBERSHIP_ALL
@@ -116,6 +117,7 @@ test('devProductCore: page is one searchable table with a mobile row layout', ()
   assert.match(pageSource, /<table className="erp-dev-product-core-table">/u)
   assert.match(pageSource, /<caption>当前 Product Core 能力与边界<\/caption>/u)
   assert.match(pageSource, /data-label="当前可用范围"/u)
+  assert.match(pageSource, /data-label="当前边界"/u)
   assert.match(pageSource, /进入 Product Core 不等于已发布或已验收/u)
   assert.doesNotMatch(pageSource, /parseProductCoreEvidenceEntries/u)
   assert.doesNotMatch(pageSource, /erp-dev-product-core-status-help/u)

@@ -4,7 +4,12 @@ import { existsSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 
-import { buildPreflightReport } from './trialDemoAccountBrowserSmoke.mjs'
+import {
+  buildPreflightReport,
+  buildRealSmokeReport,
+  evaluatePagePerformanceAcceptance,
+  summarizePagePerformance,
+} from './trialDemoAccountBrowserSmoke.mjs'
 
 const repoRoot = path.resolve(import.meta.dirname, '..', '..')
 const scriptPath = path.resolve(
@@ -83,6 +88,126 @@ function createMockYoyoosunEntryAuditRuntime() {
     },
   }
 }
+
+test('trial demo account real browser report separates auth and legal acknowledgement writes from business data', () => {
+  const report = buildRealSmokeReport({
+    verifiedDesktop: ['demo_sales'],
+    verifiedMobile: ['demo_sales:sales'],
+    desktopEffectiveSessionDiagnostics: [],
+    legalNoticeChecks: [
+      {
+        username: 'demo_sales',
+        surface: 'desktop',
+        status: 'acknowledged_during_smoke',
+      },
+      {
+        username: 'demo_sales',
+        surface: 'mobile',
+        status: 'not_required',
+      },
+    ],
+    pagePerformance: [
+      {
+        username: 'demo_sales',
+        label: '工作台',
+        path: '/erp/dashboard',
+        elapsedMs: 120,
+        rpcRequestCount: 1,
+        semanticDuplicateRequestCount: 0,
+        abortedRpcRequestCount: 0,
+        failedRpcRequestCount: 0,
+        unsettledRpcRequestCount: 0,
+        rpcMethods: ['workflow.get_workbench'],
+      },
+    ],
+  })
+
+  assert.equal(report.writesDatabase, true)
+  assert.equal(report.writesBusinessData, false)
+  assert.equal(report.authenticationSessionWritesExpected, true)
+  assert.equal(report.legalNoticeAcknowledgementWritesPossible, true)
+  assert.equal(report.summary.legalNoticeCheckCount, 2)
+  assert.equal(report.summary.legalNoticeAcknowledgedDuringSmokeCount, 1)
+  assert.equal(report.pagePerformanceSummary.sampleCount, 1)
+  assert.equal(report.pagePerformanceSummary.maxElapsedMs, 120)
+  assert.equal(report.pagePerformanceAcceptance.passed, true)
+})
+
+test('page performance summary keeps latency, semantic duplicate, abort, and failure evidence', () => {
+  const summary = summarizePagePerformance([
+    {
+      username: 'demo_sales',
+      label: '工作台',
+      path: '/erp/dashboard',
+      elapsedMs: 100,
+      rpcRequestCount: 1,
+      semanticDuplicateRequestCount: 0,
+    },
+    {
+      username: 'demo_sales',
+      label: '销售订单',
+      path: '/erp/sales/project-orders/sales-orders',
+      elapsedMs: 400,
+      rpcRequestCount: 3,
+      semanticDuplicateRequestCount: 1,
+      abortedRpcRequestCount: 1,
+    },
+    {
+      username: 'demo_purchase',
+      label: '采购订单',
+      path: '/erp/purchase/accessories',
+      elapsedMs: 200,
+      rpcRequestCount: 2,
+      semanticDuplicateRequestCount: 0,
+    },
+  ])
+
+  assert.deepEqual(
+    {
+      sampleCount: summary.sampleCount,
+      p50ElapsedMs: summary.p50ElapsedMs,
+      p95ElapsedMs: summary.p95ElapsedMs,
+      maxElapsedMs: summary.maxElapsedMs,
+      totalRpcRequestCount: summary.totalRpcRequestCount,
+      maxRpcRequestCount: summary.maxRpcRequestCount,
+      totalSemanticDuplicateRequestCount:
+        summary.totalSemanticDuplicateRequestCount,
+      totalAbortedRpcRequestCount: summary.totalAbortedRpcRequestCount,
+    },
+    {
+      sampleCount: 3,
+      p50ElapsedMs: 200,
+      p95ElapsedMs: 400,
+      maxElapsedMs: 400,
+      totalRpcRequestCount: 6,
+      maxRpcRequestCount: 3,
+      totalSemanticDuplicateRequestCount: 1,
+      totalAbortedRpcRequestCount: 1,
+    }
+  )
+  assert.equal(
+    summary.slowest[0].path,
+    '/erp/sales/project-orders/sales-orders'
+  )
+})
+
+test('page performance acceptance rejects duplicate, failed, unsettled, or slow evidence', () => {
+  const report = evaluatePagePerformanceAcceptance({
+    sampleCount: 4,
+    totalSemanticDuplicateRequestCount: 1,
+    totalFailedRpcRequestCount: 1,
+    totalUnsettledRpcRequestCount: 1,
+    maxElapsedMs: 5_001,
+  })
+
+  assert.equal(report.passed, false)
+  assert.deepEqual(report.failures, [
+    'semantic-duplicate-rpc-requests',
+    'failed-rpc-requests',
+    'unsettled-rpc-requests',
+    'page-ready-time-exceeded',
+  ])
+})
 
 test('trial demo account browser smoke CLI input template is no-write', () => {
   const result = spawnSync(
@@ -668,12 +793,17 @@ test('trial demo account browser smoke source keeps no-write template before run
   assert.match(source, /verifyEffectiveSessionDiagnostic/u)
   assert.match(source, /verifyRoleGuidedMenuStructure/u)
   assert.match(source, /findVisibleMenuItem/u)
+  assert.match(source, /legal-notice-gate[\s\S]*?\.ant-modal:visible/u)
+  assert.match(source, /legal-notice-acknowledge/u)
+  assert.doesNotMatch(source, /legal-notice-gate"\]:visible/u)
   assert.match(
     source,
     /for \(const label of expectedVisibleLeafMenus\)[\s\S]*?findVisibleMenuItem/u
   )
   assert.match(source, /ancestor::li/u)
   assert.match(source, /ant-menu-submenu-open/u)
+  assert.match(source, /attempt <= 3/u)
+  assert.doesNotMatch(source, /submenu\.elementHandle/u)
   assert.match(source, /item\.count\(\)\) === 0/u)
   assert.match(source, /data-navigation-presentation/u)
   assert.match(source, /不在首层菜单时必须存在唯一的“更多功能”入口/u)

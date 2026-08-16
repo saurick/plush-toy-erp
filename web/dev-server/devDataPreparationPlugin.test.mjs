@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { EventEmitter } from 'node:events'
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import {
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { Readable } from 'node:stream'
@@ -28,6 +34,7 @@ import {
   DEV_DATA_PREPARATION_ACTION_API_PATH,
   DEV_DATA_PREPARATION_PROFILES,
   DEV_DATA_PREPARATION_SESSION_API_PATH,
+  DEV_DATA_PREPARATION_SUMMARY_API_PATH,
   fullAcceptanceExecutionCommand,
   fullAcceptancePlanCommand,
   MAX_DEV_DATA_PREPARATION_REQUEST_BYTES,
@@ -863,6 +870,151 @@ test('summary fails core demo closed when the migration preflight is not ready',
   assert.deepEqual(summary.operations, [])
 })
 
+test('summary coalesces concurrent reads, caches route remounts, and supports an authoritative refresh', async (t) => {
+  const fixture = createFixture(t)
+  const calls = []
+  const service = createDevDataPreparationService({
+    projectRoot: fixture.root,
+    operationStore: fixture.store,
+    commandRunner: successfulRunner(calls),
+    readRepositoryState: async () => REPOSITORY,
+    environment: { LOCAL_ACCEPTANCE_DATABASE_BASE_URL: FULL_DSN },
+    now: () => new Date('2026-07-29T02:03:04.000Z'),
+    summaryTtlMs: 60_000,
+  })
+
+  const [left, right] = await Promise.all([
+    service.summary(),
+    service.summary(),
+  ])
+  assert.strictEqual(left, right)
+  const firstReadCallCount = calls.length
+  await service.summary()
+  assert.equal(calls.length, firstReadCallCount)
+  await service.summary({ force: true })
+  assert.ok(calls.length > firstReadCallCount)
+})
+
+test('summary keeps legacy scenario receipts on disk but omits them from the current public contract', async (t) => {
+  const fixture = createFixture(t)
+  const targetSummary = {
+    safeTarget: 'local-development:plush_erp',
+    targetFingerprint: SCENARIO_TARGET_FINGERPRINT,
+    preflightFingerprint: 'd'.repeat(64),
+    disposable: false,
+    automaticCleanup: false,
+    targetKey: 'local-development',
+  }
+  const runId = 'scenario_demo_legacy'
+  const created = createOrReuseDataPreparationOperation(fixture.store, {
+    idempotencyKey: SCENARIO_IDEMPOTENCY_KEY,
+    profileKey: 'scenario-demo',
+    repository: REPOSITORY,
+    runId,
+    targetSummary,
+    planHash: hashDataPreparationPlan({
+      profileKey: 'scenario-demo',
+      repository: REPOSITORY,
+      runId,
+      targetSummary,
+    }),
+    operationId: '523e4567-e89b-42d3-a456-426614174000',
+    now: '2026-07-29T02:03:04.000Z',
+  })
+  transitionDataPreparationOperation(fixture.store, created.operation.id, {
+    status: 'launching',
+    message: 'legacy execution launched',
+    now: '2026-07-29T02:04:04.000Z',
+  })
+  transitionDataPreparationOperation(fixture.store, created.operation.id, {
+    status: 'running',
+    message: 'legacy execution running',
+    now: '2026-07-29T02:05:04.000Z',
+  })
+  transitionDataPreparationOperation(fixture.store, created.operation.id, {
+    status: 'passed',
+    message: 'legacy execution passed',
+    readback: {
+      schemaVersion: 'plush.dev-data-preparation-readback/v1',
+      profileKey: 'scenario-demo',
+      targetKey: 'local-development',
+      targetEnvironment: 'local-development',
+      targetFingerprint: SCENARIO_TARGET_FINGERPRINT,
+      databaseName: 'plush_erp',
+      release: REPOSITORY.commit,
+      migrationVersion: '20260728100514',
+      customerConfigRevision: 'yoyoosun-local-test.runtime-v1',
+      datasetKey: 'yoyoosun-manual-acceptance',
+      dataVersion: '2026.08.15-v6',
+      runId: '20260815-V6',
+      semanticDigest: SCENARIO_SEMANTIC_DIGEST,
+      stageCount: 9,
+      sourceDocumentCount: 16,
+      processRuntimeCount: 20,
+      factCount: 14,
+      catalogReadyCount: 41,
+      catalogTargetCount: 51,
+      browserChecksPending: 10,
+      manualAcceptanceCompleted: false,
+      cleanupSupported: false,
+      replayMode: 'exact-create-or-readback',
+    },
+    now: '2026-07-29T02:06:04.000Z',
+  })
+  const operationPath = path.join(
+    fixture.store,
+    'operations',
+    `${created.operation.id}.json`
+  )
+  const persisted = JSON.parse(readFileSync(operationPath, 'utf8'))
+  persisted.readback = {
+    schemaVersion: 'plush.dev-data-preparation-readback/v1',
+    profileKey: 'scenario-demo',
+    targetFingerprint: SCENARIO_TARGET_FINGERPRINT,
+    datasetKey: 'yoyoosun-manual-acceptance',
+    dataVersion: '2026.07.16-v5',
+    runId: '20260716-V5',
+    sourceDocumentCount: 16,
+    processRuntimeCount: 20,
+    factCount: 14,
+    catalogReadyCount: 40,
+    catalogTargetCount: 50,
+    browserChecksPending: 10,
+    manualAcceptanceCompleted: false,
+    cleanupSupported: false,
+    replayMode: 'exact-create-or-readback',
+  }
+  writeFileSync(operationPath, `${JSON.stringify(persisted)}\n`, {
+    mode: 0o600,
+  })
+
+  const service = createDevDataPreparationService({
+    projectRoot: fixture.root,
+    operationStore: fixture.store,
+    commandRunner: successfulRunner([]),
+    readRepositoryState: async () => REPOSITORY,
+    environment: { LOCAL_ACCEPTANCE_DATABASE_BASE_URL: FULL_DSN },
+    now: () => new Date('2026-07-29T02:07:04.000Z'),
+  })
+  const summary = await service.summary()
+  assert.equal(
+    summary.operations.some(
+      (operation) => operation.id === created.operation.id
+    ),
+    false
+  )
+  assert.equal(
+    summary.issues.some(
+      (issue) => issue.code === 'historical_operation_contract_omitted'
+    ),
+    true
+  )
+  assert.equal(
+    readDataPreparationOperation(fixture.store, created.operation.id).status,
+    'passed'
+  )
+})
+
 test('core demo rejects malformed registered-family aliases', async (t) => {
   const fixture = createFixture(t)
   const service = createDevDataPreparationService({
@@ -1456,8 +1608,10 @@ async function invokeMiddleware(
 
 test('middleware enforces loopback, same-origin CSRF, strict JSON, and request size', async () => {
   let actions = 0
+  const summaryOptions = []
   const service = {
-    async summary() {
+    async summary(options) {
+      summaryOptions.push(options)
       return { schemaVersion: 'plush.dev-data-preparation-summary/v1' }
     },
     readOperation() {
@@ -1490,6 +1644,18 @@ test('middleware enforces loopback, same-origin CSRF, strict JSON, and request s
   })
   assert.equal(session.statusCode, 200)
   assert.equal(JSON.parse(session.body).csrfToken, csrfToken)
+
+  const summary = await invokeMiddleware(middleware, {
+    url: DEV_DATA_PREPARATION_SUMMARY_API_PATH,
+    headers: { host: '127.0.0.1:5175' },
+  })
+  const refreshedSummary = await invokeMiddleware(middleware, {
+    url: `${DEV_DATA_PREPARATION_SUMMARY_API_PATH}?refresh=authoritative`,
+    headers: { host: '127.0.0.1:5175' },
+  })
+  assert.equal(summary.statusCode, 200)
+  assert.equal(refreshedSummary.statusCode, 200)
+  assert.deepEqual(summaryOptions, [{ force: false }, { force: true }])
 
   const request = JSON.stringify({
     action: 'prepare',

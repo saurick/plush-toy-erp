@@ -20,6 +20,15 @@ const WORKFLOW_TASK_GROUP_LABELS = Object.freeze({
   production_exception: '生产异常',
   production_scheduling: '生产排程',
   shipment_finance_approval: '出货财务审批',
+  trial_boss_work: '老板协同',
+  trial_engineering_work: '工程跟进',
+  trial_finance_work: '财务跟进',
+  trial_pmc_work: '计划跟进',
+  trial_production_work: '生产跟进',
+  trial_purchase_work: '采购跟进',
+  trial_quality_work: '品质跟进',
+  trial_sales_work: '业务跟进',
+  trial_warehouse_work: '仓库跟进',
   warehouse_inbound: '采购入库',
 })
 

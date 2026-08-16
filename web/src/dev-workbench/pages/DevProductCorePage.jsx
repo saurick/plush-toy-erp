@@ -22,7 +22,6 @@ const { Paragraph, Text, Title } = Typography
 const STATUS_COLOR_BY_MEMBERSHIP = Object.freeze({
   entered: 'success',
   partial: 'warning',
-  pending: 'blue',
   excluded: 'default',
   unknown: 'error',
 })
@@ -68,7 +67,7 @@ function CapabilityRow({ item }) {
         </div>
       </td>
       <td data-label="当前可用范围">{item.availableScope}</td>
-      <td data-label="主要边界 / 下一步">{item.boundary}</td>
+      <td data-label="当前边界">{item.boundary}</td>
     </tr>
   )
 }
@@ -160,7 +159,7 @@ export default function DevProductCorePage() {
             </Text>
             <Title level={1}>产品内核 / Product Core</Title>
             <Paragraph>
-              一张表查看哪些能力已进入内核、哪些仍在补齐，以及每项当前最重要的边界。
+              一张表查看哪些能力已进入内核、哪些部分可用、哪些当前不纳入，以及每项当前边界。
             </Paragraph>
           </div>
         </div>
@@ -211,7 +210,7 @@ export default function DevProductCorePage() {
                   allowClear
                   aria-label="搜索产品内核能力"
                   placeholder="搜索能力、范围或边界"
-                  searchHint="可搜索能力名称、当前可用范围、状态和主要边界"
+                  searchHint="可搜索能力名称、当前可用范围、状态和当前边界"
                   value={keyword}
                   onChange={handleKeywordChange}
                 />
@@ -254,7 +253,7 @@ export default function DevProductCorePage() {
                       <th scope="col">业务能力</th>
                       <th scope="col">状态</th>
                       <th scope="col">当前可用范围</th>
-                      <th scope="col">主要边界 / 下一步</th>
+                      <th scope="col">当前边界</th>
                     </tr>
                   </thead>
                   <tbody>

@@ -63,9 +63,9 @@ APP_ADMIN_PASSWORD='<8-to-20-character-ephemeral-secret>' \
 
 停服后但切换前失败时，执行器必须先恢复并预检旧运行态；物理目录已切换但 migration 尚未开始时，必须先恢复并预检旧数据代。只有恢复被证明才返回 `failed`；恢复失败、切换后结果不清楚或 migration 已开始后一律返回 `not_proven`，此时先人工读回目录、容器、migration 和 release，不得重新执行。完整命令和证据边界见 [部署脚本说明](../../../../scripts/deploy/README.md#133-同逻辑库物理重建)。
 
-### 133 V5 基础资料 bootstrap
+### 133 当前试用基础资料 bootstrap
 
-只有已经部署当前固定 release、Atlas migration 和 `customer-trial-133` V5 active 配置的 133 独立验收库，才允许运行镜像内的一次性基础资料入口。该入口只创建或复用 `YS5-DW-01` 与 `YS5-CK-01..04`，写前要求材料、产品、工序和 BOM 为空；不会创建客户、订单、Workflow 或 Fact。
+只有已经部署当前固定 release、Atlas migration 并激活当前 `customer-trial-133` 配置的 133 独立验收库，才允许运行镜像内的一次性基础资料入口。该入口只创建或复用当前 V6 的 11 个 `YS6-DW-*` 单位与 4 个 `YS6-CK-*` 仓库；若发现身份完全匹配的旧 V5 单位/仓库，会在同一事务中停用并保留全部历史引用，身份漂移则整批失败。写前仍要求材料、产品、工序和 BOM 为空；不会创建客户、订单、Workflow 或 Fact。
 
 133 V5 必须始终同时传入 base Compose 和受控 override，并在每条 Compose 命令显式使用 `-p plush-toy-erp-v5`。该 override 只有 `name: plush-toy-erp-v5` 一项；preflight 会拒绝缺失、符号链接、额外服务修改、错误 project name，以及与旧栈冲突的容器标识、数据目录、migration 锁或宿主端口。数据目录只能是 `/home/simon/plush-toy-erp-v5/data/postgres`，migration 锁只能是 `/home/simon/plush-toy-erp-v5/run/atlas-migrate.lock`；相对路径、`.` / `..` 路径段和符号链接均会被拒绝。固定端口是 PostgreSQL `55435`、HTTP `8315`、Web `5185`；Jaeger 独立组是 `45775 / 46831 / 46832 / 45778 / 46687 / 54268 / 54250 / 49411 / 44317 / 44318`。旧 `plush-toy-erp-prod` 栈及其数据不被停止或覆盖。
 

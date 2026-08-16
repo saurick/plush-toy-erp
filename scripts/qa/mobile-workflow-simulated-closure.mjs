@@ -202,18 +202,16 @@ function buildInputTemplate(options = {}) {
     runId,
     roleAccounts: ROLE_USERS,
     simulatedTaskGroups: [
-      "order_approval",
-      "finished_goods_qc",
-      "warehouse_inbound",
-      "trial_warehouse_exception",
-      "trial_warehouse_urge",
+      "trial_boss_work",
+      "trial_quality_work",
+      "trial_warehouse_work",
     ],
     simulatedActions: [
       "boss done with feedback",
       "boss rejected with reason",
       "quality done with feedback",
       "warehouse done with feedback",
-      "shipment release blocked with exception report",
+      "warehouse exception blocked with reason event",
       "pmc urges warehouse task without completing it",
     ],
     requiredApplyInputs: [
@@ -237,34 +235,19 @@ function buildInputTemplate(options = {}) {
   };
 }
 
-function mobileActionPayload({
-  actionKey,
-  roleKey,
-  feedback,
-  reason,
-  nowSec,
-}) {
+function mobileActionPayload({ feedback } = {}) {
   const normalizedFeedback = optionalText(feedback);
-  const normalizedReason = optionalText(reason);
-  const payload = {
+  return {
     ...(normalizedFeedback ? { feedback: normalizedFeedback } : {}),
     surface_key: "mobile_role_tasks",
   };
-  if (["blocked", "rejected"].includes(actionKey)) {
-    payload.mobile_exception_report = {
-      role_key: roleKey,
-      action_key: actionKey,
-      reason: normalizedReason,
-      reported_at: nowSec,
-      simulated_only: true,
-    };
-  }
-  return payload;
 }
 
 function buildTask(prefix, task) {
+  const taskCode = `${prefix}-${task.code}`;
   return {
-    task_code: `${prefix}-${task.code}`,
+    idempotency_key: `mobile-workflow-closure:create:${taskCode}`,
+    task_code: taskCode,
     task_group: task.group,
     task_name: task.name,
     source_type: task.sourceType,
@@ -273,8 +256,10 @@ function buildTask(prefix, task) {
     business_status_key: task.businessStatus,
     task_status_key: "ready",
     owner_role_key: task.ownerRole,
+    ...(task.requiredCapabilityKey
+      ? { required_capability_key: task.requiredCapabilityKey }
+      : {}),
     priority: task.priority ?? 2,
-    due_at: task.dueAt,
     payload: {
       simulated_only: true,
       simulation_prefix: SIMULATION_PREFIX,
@@ -294,8 +279,6 @@ function buildTask(prefix, task) {
 
 function buildPlan(options) {
   const prefix = `${SIMULATION_PREFIX}-${options.runId}`;
-  const nowSec = Math.floor(Date.now() / 1000);
-  const dueAt = nowSec + 86400;
   return {
     customerKey: "yoyoosun",
     scenario: "mobile-workflow-simulated-closure",
@@ -310,14 +293,14 @@ function buildPlan(options) {
     tasks: {
       approval: buildTask(prefix, {
         code: "APPROVAL",
-        group: "order_approval",
+        group: "trial_boss_work",
         name: "Mobile workflow 模拟老板审批",
         sourceType: "project-orders",
         sourceId: 910001,
         sourceNo: "SO-APPROVAL",
         businessStatus: "project_pending",
         ownerRole: "boss",
-        dueAt,
+        requiredCapabilityKey: "workflow.task.approve",
         completeCondition: "老板在岗位任务端确认审批。",
         payload: {
           notification_type: "approval_required",
@@ -326,14 +309,13 @@ function buildPlan(options) {
       }),
       approvalRejected: buildTask(prefix, {
         code: "APPROVAL-REJECT",
-        group: "order_approval",
+        group: "trial_boss_work",
         name: "Mobile workflow 模拟老板退回",
         sourceType: "project-orders",
         sourceId: 910005,
         sourceNo: "SO-REJECT",
         businessStatus: "project_pending",
         ownerRole: "boss",
-        dueAt,
         completeCondition:
           "老板在岗位任务端填写退回原因，退回只写 Workflow 任务状态。",
         payload: {
@@ -343,14 +325,13 @@ function buildPlan(options) {
       }),
       quality: buildTask(prefix, {
         code: "QC",
-        group: "finished_goods_qc",
+        group: "trial_quality_work",
         name: "Mobile workflow 模拟成品抽检",
         sourceType: "production-progress",
         sourceId: 910002,
         sourceNo: "QC",
         businessStatus: "qc_pending",
         ownerRole: "quality",
-        dueAt,
         completeCondition: "品质在岗位任务端确认成品抽检结果。",
         payload: {
           alert_type: "finished_goods_qc_pending",
@@ -359,14 +340,13 @@ function buildPlan(options) {
       }),
       warehouseInbound: buildTask(prefix, {
         code: "WH-IN",
-        group: "warehouse_inbound",
+        group: "trial_warehouse_work",
         name: "Mobile workflow 模拟仓库入库确认",
         sourceType: "accessories-purchase",
         sourceId: 910003,
         sourceNo: "WH-IN",
         businessStatus: "warehouse_inbound_pending",
         ownerRole: "warehouse",
-        dueAt,
         completeCondition: "仓库在岗位任务端确认入库数量、库位和经手人。",
         payload: {
           material_name: "Mobile workflow 模拟辅料",
@@ -374,7 +354,7 @@ function buildPlan(options) {
       }),
       warehouseUrge: buildTask(prefix, {
         code: "WH-URGE",
-        group: "trial_warehouse_urge",
+        group: "trial_warehouse_work",
         name: "Mobile workflow 模拟仓库任务催办",
         sourceType: "shipping-release",
         sourceId: 910006,
@@ -382,7 +362,6 @@ function buildPlan(options) {
         businessStatus: "shipment_pending",
         ownerRole: "warehouse",
         priority: 3,
-        dueAt,
         completeCondition: "PMC 只能催办仓库任务，不能代办完成、阻塞或退回。",
         payload: {
           shipment_release: true,
@@ -392,7 +371,7 @@ function buildPlan(options) {
       }),
       shipmentRelease: buildTask(prefix, {
         code: "SHIP-REL",
-        group: "trial_warehouse_exception",
+        group: "trial_warehouse_work",
         name: "Mobile workflow 模拟仓库异常",
         sourceType: "trial-workflow",
         sourceId: 910004,
@@ -400,7 +379,6 @@ function buildPlan(options) {
         businessStatus: "shipment_pending",
         ownerRole: "warehouse",
         priority: 3,
-        dueAt,
         completeCondition:
           "仓库在岗位任务端确认出货放行；异常时必须上报原因和留痕。",
         payload: {
@@ -416,22 +394,14 @@ function buildPlan(options) {
         reason: "",
         feedback: "Mobile workflow 模拟审批已确认。",
         payload: mobileActionPayload({
-          actionKey: "done",
-          roleKey: "boss",
           feedback: "Mobile workflow 模拟审批已确认。",
-          nowSec,
         }),
       },
       approvalRejected: {
         role: "boss",
         nextStatus: "rejected",
         reason: "Mobile workflow 模拟资料不完整，退回销售补齐。",
-        payload: mobileActionPayload({
-          actionKey: "rejected",
-          roleKey: "boss",
-          reason: "Mobile workflow 模拟资料不完整，退回销售补齐。",
-          nowSec,
-        }),
+        payload: mobileActionPayload(),
       },
       qualityDone: {
         role: "quality",
@@ -439,10 +409,7 @@ function buildPlan(options) {
         reason: "",
         feedback: "Mobile workflow 模拟抽检办理完成。",
         payload: mobileActionPayload({
-          actionKey: "done",
-          roleKey: "quality",
           feedback: "Mobile workflow 模拟抽检办理完成。",
-          nowSec,
         }),
       },
       warehouseInboundDone: {
@@ -451,22 +418,15 @@ function buildPlan(options) {
         reason: "",
         feedback: "Mobile workflow 模拟入库任务办理完成。",
         payload: mobileActionPayload({
-          actionKey: "done",
-          roleKey: "warehouse",
           feedback: "Mobile workflow 模拟入库任务办理完成。",
-          nowSec,
         }),
       },
       shipmentReleaseBlocked: {
         role: "warehouse",
         nextStatus: "blocked",
-        reason: "Mobile workflow 模拟出货唛头未确认，只做本地模拟异常上报。",
-        payload: mobileActionPayload({
-          actionKey: "blocked",
-          roleKey: "warehouse",
-          reason: "Mobile workflow 模拟出货唛头未确认，只做本地模拟异常上报。",
-          nowSec,
-        }),
+        reason:
+          "Mobile workflow 模拟出货唛头未确认，等待业务负责人补齐后恢复。",
+        payload: mobileActionPayload(),
       },
       warehouseUrged: {
         role: "pmc",
@@ -647,6 +607,33 @@ async function urgeTask(plan, tokens, task, action) {
   return data.task;
 }
 
+async function readTaskEvents(plan, token, taskID) {
+  const data = await rpcCall({
+    backendURL: plan.backendURL,
+    domain: "workflow",
+    method: "list_task_events",
+    params: { task_id: taskID, limit: 20 },
+    token,
+  });
+  if (data.truncated === true) {
+    throw new CliError(`workflow task ${taskID} event readback was truncated`);
+  }
+  return Array.isArray(data.items) ? data.items : [];
+}
+
+function workflowActionEventCount(
+  events,
+  { eventType, toStatusKey, actorRoleKey, reason = "" },
+) {
+  return events.filter(
+    (event) =>
+      event?.event_type === eventType &&
+      event?.to_status_key === toStatusKey &&
+      event?.actor_role_key === actorRoleKey &&
+      (!reason || event?.reason === reason),
+  ).length;
+}
+
 async function applyPlan(plan, tokens) {
   const steps = [];
   const run = async (label, taskPlan, action) => {
@@ -668,18 +655,28 @@ async function applyPlan(plan, tokens) {
     } catch (error) {
       throw new CliError(`${label} update failed: ${error.message}`);
     }
+    const events = await readTaskEvents(plan, tokens[action.role], updated.id);
+    const workflowActionEvents = workflowActionEventCount(events, {
+      eventType: "status_changed",
+      toStatusKey: action.nextStatus,
+      actorRoleKey: action.role,
+      reason: action.reason,
+    });
+    if (workflowActionEvents !== 1) {
+      throw new CliError(
+        `${label} workflow event readback expected exactly one action event, got ${workflowActionEvents}`,
+      );
+    }
     steps.push({
       label: `${label} update`,
       id: updated.id,
       status: updated.task_status_key,
       evidence_refs_omitted:
         !Object.hasOwn(updated.payload || {}, "mobile_action_evidence_refs") &&
-        !Object.hasOwn(updated.payload?.mobile_action || {}, "evidence_refs") &&
-        !Object.hasOwn(
-          updated.payload?.mobile_exception_report || {},
-          "evidence_refs",
-        ),
-      exception_reported: Boolean(updated.payload?.mobile_exception_report),
+        !Object.hasOwn(updated.payload?.mobile_action || {}, "evidence_refs"),
+      workflow_event_recorded: true,
+      workflow_event_count: events.length,
+      workflow_action_event_count: workflowActionEvents,
     });
   };
   const runUrge = async (label, taskPlan, action) => {
@@ -704,12 +701,27 @@ async function applyPlan(plan, tokens) {
     const hasUrgeMarker = Boolean(
       updated.payload?.urge_count || updated.payload?.last_urge_at,
     );
+    const events = await readTaskEvents(plan, tokens[action.role], updated.id);
+    const workflowActionEvents = workflowActionEventCount(events, {
+      eventType: action.action,
+      toStatusKey: updated.task_status_key,
+      actorRoleKey: action.role,
+      reason: action.reason,
+    });
+    if (workflowActionEvents !== 1) {
+      throw new CliError(
+        `${label} workflow event readback expected exactly one action event, got ${workflowActionEvents}`,
+      );
+    }
     steps.push({
       label: `${label} urge`,
       id: updated.id,
       status: updated.task_status_key,
       urge_count: hasUrgeMarker ? 1 : 0,
       notification_type: updated.payload?.notification_type || "",
+      workflow_event_recorded: true,
+      workflow_event_count: events.length,
+      workflow_action_event_count: workflowActionEvents,
     });
   };
 
@@ -759,7 +771,7 @@ function buildMarkdownReport(report) {
   } else {
     for (const step of report.steps) {
       lines.push(
-        `- ${step.label}: status=${step.status}${step.evidence_refs_omitted === true ? " evidence_refs_omitted=true" : step.evidence_refs_omitted === false ? " evidence_refs_omitted=false" : ""}${step.exception_reported ? " exception_reported=true" : ""}${step.urge_count ? ` urge=${step.urge_count}` : ""}${step.notification_type ? ` notification=${step.notification_type}` : ""}`,
+        `- ${step.label}: status=${step.status}${step.evidence_refs_omitted === true ? " evidence_refs_omitted=true" : step.evidence_refs_omitted === false ? " evidence_refs_omitted=false" : ""}${step.workflow_event_recorded ? " workflow_event_recorded=true" : ""}${Number.isInteger(step.workflow_event_count) ? ` workflow_event_count=${step.workflow_event_count}` : ""}${Number.isInteger(step.workflow_action_event_count) ? ` workflow_action_event_count=${step.workflow_action_event_count}` : ""}${step.urge_count ? ` urge=${step.urge_count}` : ""}${step.notification_type ? ` notification=${step.notification_type}` : ""}`,
       );
     }
   }

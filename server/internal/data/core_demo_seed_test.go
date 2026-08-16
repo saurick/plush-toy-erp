@@ -13,6 +13,21 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 )
 
+func expectLegacyCoreDemoReferencesAbsent(mock sqlmock.Sqlmock) {
+	for _, legacy := range LegacyCoreDemoReferenceSeedDatasets() {
+		for _, unit := range legacy.Units {
+			mock.ExpectQuery("SELECT id, name, precision, is_active").
+				WithArgs(unit.Code).
+				WillReturnRows(sqlmock.NewRows([]string{"id", "name", "precision", "is_active"}))
+		}
+		for _, warehouse := range legacy.Warehouses {
+			mock.ExpectQuery("SELECT id, name, type, is_active").
+				WithArgs(warehouse.Code).
+				WillReturnRows(sqlmock.NewRows([]string{"id", "name", "type", "is_active"}))
+		}
+	}
+}
+
 func TestDefaultCoreDemoReferenceSeedDatasetIsExact(t *testing.T) {
 	want := CoreDemoReferenceSeedDataset{
 		Prefix: CoreDemoReferenceSeedPrefix,
@@ -125,6 +140,7 @@ func TestSeedCoreDemoReferencesUpsertsOnlyExactReferencesIdempotently(t *testing
 				WithArgs(warehouse.Code, warehouse.Name, warehouse.Type).
 				WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(warehouseIDs[index]))
 		}
+		expectLegacyCoreDemoReferencesAbsent(mock)
 		mock.ExpectCommit()
 	}
 	expectRun()
@@ -145,6 +161,95 @@ func TestSeedCoreDemoReferencesUpsertsOnlyExactReferencesIdempotently(t *testing
 		if len(result.MaterialIDs) != 0 || len(result.ProductIDs) != 0 || len(result.ProcessIDs) != 0 || len(result.BOMHeaderIDs) != 0 {
 			t.Fatalf("references-only seed wrote an unrelated record kind on run %d: %#v", run+1, result)
 		}
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
+func TestSeedCoreDemoReferencesRetiresExactLegacyReferencesWithoutRewritingHistory(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	dataset := DefaultCoreDemoReferenceSeedDataset()
+	legacy := LegacyCoreDemoReferenceSeedDatasets()[0]
+
+	mock.ExpectBegin()
+	for index, unit := range dataset.Units {
+		mock.ExpectQuery("INSERT INTO units").
+			WithArgs(unit.Code, unit.Name, unit.Precision).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(11 + index))
+	}
+	for index, warehouse := range dataset.Warehouses {
+		mock.ExpectQuery("INSERT INTO warehouses").
+			WithArgs(warehouse.Code, warehouse.Name, warehouse.Type).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(21 + index))
+	}
+	mock.ExpectQuery("SELECT id, name, precision, is_active").
+		WithArgs(legacy.Units[0].Code).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "precision", "is_active"}).AddRow(1, legacy.Units[0].Name, legacy.Units[0].Precision, true))
+	mock.ExpectExec("UPDATE units").
+		WithArgs(1).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	for index, warehouse := range legacy.Warehouses {
+		id := 31 + index
+		mock.ExpectQuery("SELECT id, name, type, is_active").
+			WithArgs(warehouse.Code).
+			WillReturnRows(sqlmock.NewRows([]string{"id", "name", "type", "is_active"}).AddRow(id, warehouse.Name, warehouse.Type, true))
+		mock.ExpectExec("UPDATE warehouses").
+			WithArgs(id).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+	}
+	mock.ExpectCommit()
+	mock.ExpectClose()
+
+	result, err := SeedCoreDemoReferences(context.Background(), db, dataset)
+	if err != nil {
+		t.Fatalf("SeedCoreDemoReferences() error = %v", err)
+	}
+	if result.RetiredUnitIDs[legacy.Units[0].Code] != 1 || len(result.RetiredWarehouseIDs) != len(legacy.Warehouses) {
+		t.Fatalf("unexpected retired references: %#v", result)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
+func TestSeedCoreDemoReferencesRejectsLegacyIdentityDriftAtomically(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	dataset := DefaultCoreDemoReferenceSeedDataset()
+	legacy := LegacyCoreDemoReferenceSeedDatasets()[0]
+
+	mock.ExpectBegin()
+	for index, unit := range dataset.Units {
+		mock.ExpectQuery("INSERT INTO units").
+			WithArgs(unit.Code, unit.Name, unit.Precision).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(11 + index))
+	}
+	for index, warehouse := range dataset.Warehouses {
+		mock.ExpectQuery("INSERT INTO warehouses").
+			WithArgs(warehouse.Code, warehouse.Name, warehouse.Type).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(21 + index))
+	}
+	mock.ExpectQuery("SELECT id, name, precision, is_active").
+		WithArgs(legacy.Units[0].Code).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "precision", "is_active"}).AddRow(1, "漂移单位", 0, true))
+	mock.ExpectRollback()
+	mock.ExpectClose()
+
+	_, err = SeedCoreDemoReferences(context.Background(), db, dataset)
+	if !errors.Is(err, ErrCoreDemoSeedInvalidRecord) {
+		t.Fatalf("expected legacy identity drift rejection, got %v", err)
 	}
 	if err := db.Close(); err != nil {
 		t.Fatalf("db.Close() error = %v", err)

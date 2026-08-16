@@ -241,6 +241,18 @@ func expectReferenceUpserts(mock sqlmock.Sqlmock, dataset data.CoreDemoReference
 			WithArgs(warehouse.Code, warehouse.Name, warehouse.Type).
 			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(21 + index))
 	}
+	for _, legacy := range data.LegacyCoreDemoReferenceSeedDatasets() {
+		for _, unit := range legacy.Units {
+			mock.ExpectQuery(`SELECT id, name, precision, is_active`).
+				WithArgs(unit.Code).
+				WillReturnRows(sqlmock.NewRows([]string{"id", "name", "precision", "is_active"}))
+		}
+		for _, warehouse := range legacy.Warehouses {
+			mock.ExpectQuery(`SELECT id, name, type, is_active`).
+				WithArgs(warehouse.Code).
+				WillReturnRows(sqlmock.NewRows([]string{"id", "name", "type", "is_active"}))
+		}
+	}
 }
 
 func TestBootstrapManualAcceptanceCoreRejectsMigrationBeforeWrite(t *testing.T) {

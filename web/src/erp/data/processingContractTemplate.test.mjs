@@ -598,6 +598,25 @@ test('FL_processing_contract_product_order_no__retains_source_order_no_snapshot 
   )
 })
 
+test('FL_processing_contract_product_order_no__rebuilds_from_blank_line_snapshot processingContractTemplate: blank line product order no rebuilds from outsourcing source order', () => {
+  const draft = buildProcessingContractDraftFromOutsourcingOrder(
+    {
+      outsourcing_order_no: ' OUT-ORDER-BLANK-SNAPSHOT ',
+      source_order_no: ' SO-26018-REBUILT ',
+    },
+    [
+      {
+        subject_type: 'PRODUCT',
+        product_order_no_snapshot: '   ',
+        product_no_snapshot: ' P-003 ',
+        product_name_snapshot: ' 毛绒熊半成品 ',
+      },
+    ]
+  )
+
+  assert.equal(draft.lines[0].productOrderNo, 'SO-26018-REBUILT')
+})
+
 test('FL_processing_contract_business_draft__does_not_create_blank_line_without_items processingContractTemplate: 业务带值打印无明细时不补造空白加工行', () => {
   const blankDraft = createBlankProcessingContractDraft()
   assert.equal(blankDraft.lines.length, 1)

@@ -11,6 +11,9 @@ const (
 	WorkflowTaskBoardLaneException  = "exception"
 	WorkflowTaskBoardLaneDue        = "due"
 	WorkflowTaskBoardLaneFinished   = "finished"
+	WorkflowTaskBoardSortSmart      = "smart"
+	WorkflowTaskBoardSortDueSoon    = "due_soon"
+	WorkflowTaskBoardSortNewest     = "newest"
 
 	WorkflowTaskBoardDueWindow    = 24 * time.Hour
 	workflowTaskBoardDefaultLimit = 5
@@ -42,6 +45,12 @@ var workflowTaskBoardDueFilters = map[string]struct{}{
 	"overdue": {},
 	"dueSoon": {},
 	"noDue":   {},
+}
+
+var workflowTaskBoardSortKeys = map[string]struct{}{
+	WorkflowTaskBoardSortSmart:   {},
+	WorkflowTaskBoardSortDueSoon: {},
+	WorkflowTaskBoardSortNewest:  {},
 }
 
 func WorkflowTaskBoardLaneKeys() []string {
@@ -88,6 +97,7 @@ func normalizeWorkflowTaskBoardQuery(query WorkflowTaskBoardQuery) (WorkflowTask
 	query.Due = strings.TrimSpace(query.Due)
 	query.SourceType = strings.TrimSpace(query.SourceType)
 	query.LaneKey = strings.TrimSpace(query.LaneKey)
+	query.Sort = strings.TrimSpace(query.Sort)
 	query.VisibleOwnerRoleKeys = normalizeWorkflowVisibleOwnerRoleKeys(query.VisibleOwnerRoleKeys)
 	query.VisibilityScope = NormalizeWorkflowTaskVisibilityScope(query.VisibilityScope)
 	query.ApprovalVisibilityScopes = NormalizeWorkflowApprovalVisibilityScopes(query.ApprovalVisibilityScopes)
@@ -110,6 +120,9 @@ func normalizeWorkflowTaskBoardQuery(query WorkflowTaskBoardQuery) (WorkflowTask
 	if query.LaneKey == "all" {
 		query.LaneKey = ""
 	}
+	if query.Sort == "" {
+		query.Sort = WorkflowTaskBoardSortSmart
+	}
 	if _, ok := workflowTaskBoardFilterStatuses[query.Status]; !ok {
 		return WorkflowTaskBoardQuery{}, ErrBadParam
 	}
@@ -117,6 +130,12 @@ func normalizeWorkflowTaskBoardQuery(query WorkflowTaskBoardQuery) (WorkflowTask
 		return WorkflowTaskBoardQuery{}, ErrBadParam
 	}
 	if query.LaneKey != "" && !isWorkflowTaskBoardLaneKey(query.LaneKey) {
+		return WorkflowTaskBoardQuery{}, ErrBadParam
+	}
+	if _, ok := workflowTaskBoardSortKeys[query.Sort]; !ok {
+		return WorkflowTaskBoardQuery{}, ErrBadParam
+	}
+	if query.LaneKey == "" && query.Sort != WorkflowTaskBoardSortSmart {
 		return WorkflowTaskBoardQuery{}, ErrBadParam
 	}
 	if query.Limit <= 0 {

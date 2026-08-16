@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   TASK_BOARD_FOCUS_PAGE_SIZE,
   TASK_BOARD_OVERVIEW_LIMIT,
+  TASK_BOARD_SORT_OPTIONS,
   buildWorkflowTaskBoardModel,
   buildWorkflowTaskBoardRequest,
   buildWorkflowTaskBoardRoleOptions,
@@ -328,6 +329,7 @@ test('workflowTaskBoard: 从 URL 读取任务看板筛选并过滤非法值', ()
     due: 'overdue',
     sourceType: 'inbound',
     lane: 'all',
+    sort: 'smart',
     mode: 'all',
     page: 1,
   })
@@ -343,6 +345,7 @@ test('workflowTaskBoard: 从 URL 读取任务看板筛选并过滤非法值', ()
       due: 'all',
       sourceType: 'all',
       lane: 'all',
+      sort: 'smart',
       mode: 'all',
       page: 1,
     }
@@ -365,12 +368,13 @@ test('workflowTaskBoard: 写入 URL 时保留上下文并规范 lane/page', () =
     due: 'all',
     sourceType: 'inbound',
     lane: 'exception',
+    sort: 'newest',
     page: 2,
   })
 
   assert.equal(
     params.toString(),
-    'keep=1&q=%E5%85%A5%E5%BA%93&status=blocked&role=warehouse&source=inbound&lane=exception&page=2'
+    'keep=1&q=%E5%85%A5%E5%BA%93&status=blocked&role=warehouse&source=inbound&lane=exception&sort=newest&page=2'
   )
 
   const cleared = writeWorkflowTaskBoardFiltersToSearch(params, {
@@ -394,6 +398,7 @@ test('workflowTaskBoard: 聚焦请求保留筛选并按每页八条计算 offset
       due: 'dueSoon',
       sourceType: 'inbound',
       lane: 'due',
+      sort: 'due_soon',
       page: 3,
     }),
     {
@@ -403,6 +408,7 @@ test('workflowTaskBoard: 聚焦请求保留筛选并按每页八条计算 offset
       due: 'dueSoon',
       source_type: 'inbound',
       lane_key: 'due',
+      sort: 'due_soon',
       limit: TASK_BOARD_FOCUS_PAGE_SIZE,
       offset: 16,
     }
@@ -411,6 +417,32 @@ test('workflowTaskBoard: 聚焦请求保留筛选并按每页八条计算 offset
     limit: TASK_BOARD_OVERVIEW_LIMIT,
     offset: 0,
   })
+})
+
+test('workflowTaskBoard: 排序只属于聚焦泳道并保持顶部摘要复用', () => {
+  assert.deepEqual(TASK_BOARD_SORT_OPTIONS, [
+    { value: 'smart', label: '智能优先' },
+    { value: 'due_soon', label: '最早到期' },
+    { value: 'newest', label: '最近创建' },
+  ])
+  assert.equal(
+    readWorkflowTaskBoardFiltersFromSearch('?sort=newest').sort,
+    'smart'
+  )
+  const dueRequest = buildWorkflowTaskBoardRequest({
+    lane: 'due',
+    sort: 'due_soon',
+  })
+  const newestRequest = buildWorkflowTaskBoardRequest({
+    lane: 'due',
+    sort: 'newest',
+  })
+  assert.equal(dueRequest.sort, 'due_soon')
+  assert.equal(newestRequest.sort, 'newest')
+  assert.equal(
+    getWorkflowTaskBoardSummaryRequestKey(dueRequest),
+    getWorkflowTaskBoardSummaryRequestKey(newestRequest)
+  )
 })
 
 test('workflowTaskBoard: 待我审批使用服务端审批筛选而非分页后本地过滤', () => {

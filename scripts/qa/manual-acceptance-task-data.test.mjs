@@ -17,8 +17,11 @@ import {
   manualAcceptanceLegacyTaskCode,
   ROLE_USERS,
   LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE,
+  LONG_LIVED_WORKBENCH_BATCH_RUN_ID,
   LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
   LONG_LIVED_WORKBENCH_VISIBLE_CODE_PREFIX_BY_ROLE,
+  PREVIOUS_LONG_LIVED_WORKBENCH_BATCH_RUN_ID,
+  PREVIOUS_LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
   TASK_ROLES,
   TASK_COPY_REVISION,
   TASK_CATALOG_SCENARIO_DIGEST,
@@ -1233,6 +1236,8 @@ test("long-lived workbench keeps twelve stable actionable tasks for every role",
   });
 
   assert.equal(plan.taskProfile, TASK_PROFILE_LONG_LIVED_WORKBENCH);
+  assert.equal(plan.runId, "WORKBENCH-STABLE");
+  assert.equal(plan.batchRunId, LONG_LIVED_WORKBENCH_BATCH_RUN_ID);
   assert.equal(plan.copyRevision, LONG_LIVED_WORKBENCH_TASK_COPY_REVISION);
   assert.deepEqual(plan.summary.dueScenarios, {
     no_due: 108,
@@ -1298,9 +1303,34 @@ test("long-lived workbench keeps twelve stable actionable tasks for every role",
   assert(
     plan.tasks.every((task) =>
       task.createParams.idempotency_key.includes(
-        `:${LONG_LIVED_WORKBENCH_TASK_COPY_REVISION}:`,
+        `:${LONG_LIVED_WORKBENCH_BATCH_RUN_ID}:${LONG_LIVED_WORKBENCH_TASK_COPY_REVISION}:`,
       ),
     ),
+  );
+
+  const nextScenarioRun = buildManualAcceptanceTaskDataPlan({
+    runId: "WORKBENCH-NEXT-RUN",
+    nowSec: NOW_SEC + 86_400,
+    taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
+  });
+  assert.equal(nextScenarioRun.runId, "WORKBENCH-NEXT-RUN");
+  assert.equal(nextScenarioRun.batchRunId, plan.batchRunId);
+  assert.equal(nextScenarioRun.sourceID, plan.sourceID);
+  assert.equal(nextScenarioRun.prefix, plan.prefix);
+  assert.deepEqual(
+    nextScenarioRun.tasks.map((task) => task.createParams.task_code),
+    plan.tasks.map((task) => task.createParams.task_code),
+  );
+  assert.deepEqual(
+    nextScenarioRun.tasks.map((task) => task.createParams.idempotency_key),
+    plan.tasks.map((task) => task.createParams.idempotency_key),
+  );
+
+  const lineageDrift = structuredClone(plan);
+  lineageDrift.batchRunId = "WORKBENCH-DRIFT";
+  assert.throws(
+    () => validateManualAcceptanceTaskPlan(lineageDrift),
+    /run prefix/u,
   );
 
   const dueDrift = structuredClone(plan);
@@ -1839,6 +1869,7 @@ test("applies and safely resumes the 180-task batch through current CAS action c
 
   assert.equal(report.summary.persisted, 180);
   assert.equal(report.runId, plan.runId);
+  assert.equal(report.batchRunId, plan.batchRunId);
   assert.equal(report.prefix, plan.prefix);
   assert.equal(report.copyRevision, TASK_COPY_REVISION);
   assert.equal(report.sourceType, plan.sourceType);
@@ -1926,6 +1957,50 @@ test("applies and safely resumes the 180-task batch through current CAS action c
   });
   assert.equal(recoveredReport.summary.reusedFinal, 180);
   assert.deepEqual(mock.counts(), countsBeforeReplay);
+});
+
+test("long-lived workbench reuses its immutable batch across Scenario run upgrades", async () => {
+  const previousPlan = buildLocalTaskMutationPlan({
+    runId: LONG_LIVED_WORKBENCH_BATCH_RUN_ID,
+    dataVersion: "2026.08.15-v6",
+    nowSec: NOW_SEC,
+    taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
+  });
+  const currentPlan = buildLocalTaskMutationPlan({
+    runId: "20260815-V6",
+    dataVersion: "2026.08.15-v6",
+    nowSec: NOW_SEC + 86_400,
+    taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
+  });
+  const mock = createMockRuntime();
+  previousPlan.tasks.forEach((task) =>
+    mock.seedPlannedTask(previousPlan, task, { final: true }),
+  );
+
+  const report = await applyManualAcceptanceTaskData(
+    currentPlan,
+    localTaskMutationOptions(currentPlan, {
+      confirmPhrase: CONFIRM_PHRASE,
+      password: "local-password",
+      adminPassword: "admin-password",
+      fetchImpl: mock.fetchImpl,
+    }),
+  );
+
+  assert.equal(report.runId, currentPlan.runId);
+  assert.equal(report.batchRunId, LONG_LIVED_WORKBENCH_BATCH_RUN_ID);
+  assert.equal(report.sourceID, previousPlan.sourceID);
+  assert.equal(report.summary.persisted, TOTAL_TASKS);
+  assert.equal(report.summary.created, 0);
+  assert.equal(report.summary.resumed, 0);
+  assert.equal(report.summary.reusedFinal, TOTAL_TASKS);
+  assert.equal(report.summary.actionsApplied, 0);
+  assert.equal(report.scheduleBinding.source, "persisted_batch_readback");
+  assert.equal(
+    report.scheduleBinding.effectiveAnchorUtc,
+    previousPlan.schedule.anchorUtc,
+  );
+  assert.deepEqual(mock.counts(), { createCount: 0, actionCount: 0 });
 });
 
 test("rejects an exact task batch whose persisted due dates imply multiple anchors", async () => {
@@ -2126,6 +2201,15 @@ test("PLAIN5 legacy references retain the short visible code scheme for future r
   assert.equal(
     manualAcceptanceLegacyTaskCode(legacyBatch, "warehouse", 1),
     "YS-V5-CK-01",
+  );
+  const workbench1 = buildLegacyManualAcceptanceTaskBatchReference({
+    runId: PREVIOUS_LONG_LIVED_WORKBENCH_BATCH_RUN_ID,
+    copyRevision: PREVIOUS_LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
+  });
+  assert.equal(workbench1.codeScheme, "short-workbench1");
+  assert.equal(
+    manualAcceptanceLegacyTaskCode(workbench1, "warehouse", 1),
+    "YS-WB1-CK-01",
   );
   assert.throws(
     () =>

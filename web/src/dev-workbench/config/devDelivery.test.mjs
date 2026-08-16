@@ -390,6 +390,40 @@ test('delivery summary requires provider, target and no-shell boundaries', () =>
   )
 })
 
+test('delivery summary accepts dedicated database rebuild records without generic retry', () => {
+  const summary = summaryFixture()
+  summary.operations = [
+    {
+      ...summary.operations[0],
+      action: 'rebuild-database',
+      target: 'test-133',
+      status: 'failed',
+      stages: summary.operations[0].stages.map((stage) => ({
+        ...stage,
+        status: 'failed',
+      })),
+      events: [
+        {
+          status: 'failed',
+          at: summary.operations[0].updatedAt,
+          message: 'database rebuild failed within a recovered boundary',
+        },
+      ],
+      retry: {
+        allowed: false,
+        reason: 'action_not_retryable',
+      },
+    },
+  ]
+
+  const operation = validateDevDeliverySummary(summary).operations[0]
+  assert.equal(operation.action, 'rebuild-database')
+  assert.deepEqual(operation.retry, {
+    allowed: false,
+    reason: 'action_not_retryable',
+  })
+})
+
 test('delivery operations require timezone-bearing ordered event timestamps', () => {
   const assertInvalidTimeline = (change) => {
     const summary = summaryFixture()
@@ -587,6 +621,12 @@ test('delivery presentation helpers are deterministic and bounded', () => {
       'target promotion and basic runtime verification passed'
     ).label,
     '133 部署与基础运行核验已通过'
+  )
+  assert.equal(
+    deliveryOperationMessagePresentation(
+      'fresh database generation and basic runtime verification passed'
+    ).label,
+    '全新数据库代与基础运行核验已通过'
   )
   assert.match(
     deliveryOperationMessagePresentation('Future executor event').title,
@@ -889,6 +929,7 @@ test('version center page does not expose shell, SSH or arbitrary target inputs'
   assert.match(source, /headAlreadyPublished/u)
   assert.match(source, /当前 SHA 已发布并部署，无需重复发布/u)
   assert.match(source, /deliveryOperationMessagePresentation/u)
+  assert.match(source, /重建 133 数据库/u)
   assert.match(source, /查看发布当前 SHA 说明/u)
   assert.match(source, /先发布制品，不会直接部署到 133/u)
   assert.match(source, /“准备部署”和“确认部署”/u)

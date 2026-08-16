@@ -69,6 +69,7 @@ import {
 } from '../utils/workflowTaskMutation.mjs'
 import {
   TASK_BOARD_DUE_OPTIONS,
+  TASK_BOARD_SORT_OPTIONS,
   TASK_BOARD_STATUS_OPTIONS,
   buildWorkflowTaskBoardRoleOptions,
   buildWorkflowTaskBoardModel,
@@ -1182,6 +1183,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     const nextFilters = {
       ...filters,
       lane,
+      sort: 'smart',
       page: 1,
     }
     pendingTaskBoardPageScrollRef.current = null
@@ -2047,6 +2049,14 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                 options={sourceOptions}
                 onChange={(value) => updateFilter('sourceType', value)}
               />
+              {taskBoardModel.focused ? (
+                <SelectFilter
+                  aria-label="任务排序"
+                  value={filters.sort}
+                  options={TASK_BOARD_SORT_OPTIONS}
+                  onChange={(value) => updateFilter('sort', value)}
+                />
+              ) : null}
               <ToolbarButton
                 disabled={!hasActiveFilters}
                 onClick={clearFilters}

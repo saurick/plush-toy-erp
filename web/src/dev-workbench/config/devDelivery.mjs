@@ -38,6 +38,17 @@ const OPERATION_STATUSES = new Set([
   'blocked',
   'not_proven',
 ])
+const DELIVERY_OPERATION_ACTIONS = new Set([
+  'release',
+  'promote',
+  'rollback',
+  'rebuild-database',
+])
+const RETRYABLE_DELIVERY_OPERATION_ACTIONS = new Set([
+  'release',
+  'promote',
+  'rollback',
+])
 const OPERATION_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
 const PIPELINE_STATUSES = new Set([
@@ -171,6 +182,8 @@ const OPERATION_MESSAGE_LABELS = Object.freeze({
   'controlled retry operation accepted': '受控的新尝试已受理',
   'read-only fixed-target preflight started': '已开始固定目标只读预检',
   'read-only rollback qualification started': '已开始只读回滚资格检查',
+  'read-only fixed-target database rebuild qualification started':
+    '已开始固定 133 数据库重建资格检查',
   'promotion plan is eligible and requires explicit confirmation':
     '部署资格已通过，等待明确确认',
   'promotion plan is eligible; explicit confirmation is required':
@@ -179,14 +192,20 @@ const OPERATION_MESSAGE_LABELS = Object.freeze({
     '回滚资格已通过，等待明确确认',
   'code-only rollback is eligible; explicit confirmation is required':
     '仅代码回滚资格已通过，等待明确确认',
+  'database rebuild is eligible; exact destructive-scope confirmation is required':
+    '数据库重建资格已通过，等待精确破坏范围确认',
   'target write started with the fixed promotion contract':
     '已按固定部署合同开始写入目标',
   'code-only target rollback started with the fixed contract':
     '已按固定合同开始仅代码回滚',
+  'target write started with the fixed database rebuild contract':
+    '已按固定合同开始重建 133 数据库',
   'target promotion and basic runtime verification passed':
     '133 部署与基础运行核验已通过',
   'code-only rollback and basic runtime verification passed':
     '代码回滚与基础运行核验已通过',
+  'fresh database generation and basic runtime verification passed':
+    '全新数据库代与基础运行核验已通过',
   'immutable GitHub release and complete assets are published':
     'GitHub 不可变版本及完整制品已发布',
   'GitHub immutable release dispatch started': '已开始触发 GitHub 不可变发布',
@@ -201,10 +220,14 @@ const OPERATION_MESSAGE_LABELS = Object.freeze({
   'promotion is blocked by fixed-target preflight': '部署被固定目标预检阻断',
   'code-only rollback is blocked by fixed qualification':
     '仅代码回滚被固定资格检查阻断',
+  'database rebuild is blocked by fixed-target qualification':
+    '数据库重建被固定目标资格检查阻断',
   'promotion preparation failed without starting a target write':
     '部署准备失败，未开始写入目标',
   'rollback qualification failed without starting a target write':
     '回滚资格检查失败，未开始写入目标',
+  'database rebuild qualification failed without starting a target write':
+    '数据库重建资格检查失败，未开始目标写入',
   'promotion executor child is launching': '部署执行器正在启动',
   'rollback executor child is launching': '回滚执行器正在启动',
   'promotion executor did not start a target write': '部署执行器未开始写入目标',
@@ -222,6 +245,16 @@ const OPERATION_MESSAGE_LABELS = Object.freeze({
     '回滚被目标即时读回阻断',
   'rollback package preparation failed before target write':
     '回滚包准备失败，未开始写入目标',
+  'database rebuild was blocked by the immediate target preflight':
+    '数据库重建被目标即时预检阻断',
+  'database rebuild failed within a recovered boundary':
+    '数据库重建在可恢复边界内失败',
+  'database rebuild outcome requires target readback':
+    '数据库重建结果需要重新读回确认',
+  'remote database rebuild result is unproven; automatic retry is disabled':
+    '远端数据库重建结果未证明，已禁止自动重试',
+  'database rebuild transfer failed before remote execution':
+    '数据库重建包在远端执行前传输失败',
   'target promotion failed before migration apply':
     '目标部署在数据库迁移前失败',
   'target promotion outcome requires readback': '目标部署结果需要重新读回确认',
@@ -451,7 +484,7 @@ function validOperationIdempotency(operation) {
 
 function validOperationRetry(operation) {
   const value = operation.retry
-  const retryableAction = ['release', 'promote', 'rollback'].includes(
+  const retryableAction = RETRYABLE_DELIVERY_OPERATION_ACTIONS.has(
     operation.action
   )
   const allowed =
@@ -474,7 +507,7 @@ function validateOperation(operation) {
   assertObject(operation, 'delivery operation')
   if (
     typeof operation.id !== 'string' ||
-    !['release', 'promote', 'rollback'].includes(operation.action) ||
+    !DELIVERY_OPERATION_ACTIONS.has(operation.action) ||
     !SHA_PATTERN.test(String(operation.gitSha || '')) ||
     !VERSION_PATTERN.test(String(operation.version || '')) ||
     !OPERATION_STATUSES.has(operation.status) ||

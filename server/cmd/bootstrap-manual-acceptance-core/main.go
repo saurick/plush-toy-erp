@@ -59,8 +59,10 @@ type coreBoundary struct {
 }
 
 type bootstrapResult struct {
-	unitIDs      map[string]int
-	warehouseIDs map[string]int
+	unitIDs             map[string]int
+	warehouseIDs        map[string]int
+	retiredUnitIDs      map[string]int
+	retiredWarehouseIDs map[string]int
 }
 
 func main() {
@@ -90,7 +92,7 @@ func main() {
 	}
 
 	fmt.Printf(
-		"manual acceptance core bootstrap completed target=%s customer=%s database=%s dataset_key=%s dataset_version=%s run_id=%s migration=%s release=%s units=%d warehouses=%d idempotent=true\n",
+		"manual acceptance core bootstrap completed target=%s customer=%s database=%s dataset_key=%s dataset_version=%s run_id=%s migration=%s release=%s units=%d warehouses=%d retired_legacy_units=%d retired_legacy_warehouses=%d idempotent=true\n",
 		customertrialconfig.ExpectedTarget,
 		customertrialconfig.ExpectedCustomerKey,
 		expectedDatabase,
@@ -101,6 +103,8 @@ func main() {
 		opts.expectedRelease,
 		len(result.unitIDs),
 		len(result.warehouseIDs),
+		len(result.retiredUnitIDs),
+		len(result.retiredWarehouseIDs),
 	)
 }
 
@@ -430,43 +434,16 @@ func validatePostWriteBoundary(boundary coreBoundary, dataset data.CoreDemoRefer
 }
 
 func upsertCoreReferences(ctx context.Context, tx *sql.Tx, dataset data.CoreDemoReferenceSeedDataset) (*bootstrapResult, error) {
-	result := &bootstrapResult{
-		unitIDs:      make(map[string]int, len(dataset.Units)),
-		warehouseIDs: make(map[string]int, len(dataset.Warehouses)),
+	reconciled, err := data.ReconcileCoreDemoReferencesInTx(ctx, tx, dataset)
+	if err != nil {
+		return nil, fmt.Errorf("reconcile exact core references failed: %w", err)
 	}
-	for _, unit := range dataset.Units {
-		var id int
-		err := tx.QueryRowContext(ctx, `
-INSERT INTO units (code, name, precision, is_active, created_at, updated_at)
-VALUES ($1, $2, $3, TRUE, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET
-  name = EXCLUDED.name,
-  precision = EXCLUDED.precision,
-  is_active = TRUE,
-  updated_at = NOW()
-RETURNING id`, unit.Code, unit.Name, unit.Precision).Scan(&id)
-		if err != nil {
-			return nil, fmt.Errorf("upsert exact core unit failed: %w", err)
-		}
-		result.unitIDs[unit.Code] = id
-	}
-	for _, warehouse := range dataset.Warehouses {
-		var id int
-		err := tx.QueryRowContext(ctx, `
-INSERT INTO warehouses (code, name, type, is_active, created_at, updated_at)
-VALUES ($1, $2, $3, TRUE, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET
-  name = EXCLUDED.name,
-  type = EXCLUDED.type,
-  is_active = TRUE,
-  updated_at = NOW()
-RETURNING id`, warehouse.Code, warehouse.Name, warehouse.Type).Scan(&id)
-		if err != nil {
-			return nil, fmt.Errorf("upsert exact core warehouse failed: %w", err)
-		}
-		result.warehouseIDs[warehouse.Code] = id
-	}
-	return result, nil
+	return &bootstrapResult{
+		unitIDs:             reconciled.UnitIDs,
+		warehouseIDs:        reconciled.WarehouseIDs,
+		retiredUnitIDs:      reconciled.RetiredUnitIDs,
+		retiredWarehouseIDs: reconciled.RetiredWarehouseIDs,
+	}, nil
 }
 
 func fail(format string, args ...any) {

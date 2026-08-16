@@ -275,6 +275,8 @@ pnpm smoke:mobile-auth-login-route
 
 `pnpm test` 使用 Node test runner 的默认自动发现，覆盖 `web/` 下全部 `*.test.mjs`；不要在 `package.json` 中手工枚举测试文件，避免新增测试静默漏跑。
 
+Mock 和 Style L1 运行保留 React StrictMode，用于暴露非幂等 effect 并验证 single-flight；连接真实后端的本地 Vite 使用单次挂载，避免向真实后端发送 StrictMode 演练性双请求。真实后端的重复与请求收敛回归由 `trialDemoAccountBrowserSmoke.mjs` 逐页采样并阻断。
+
 如需按真实管理员登录流程验证采购入库真实写入，或合同编辑联动、在线预览时延、下载 PDF 和浏览器打印入口，再执行：
 
 `node scripts/realLoginSmokeShared.mjs --print-input-template` 只打印真实登录 smoke 所需输入和命令模板，不读取配置、不校验账号、不调用后端、不启动浏览器、不登录、不写库；`node scripts/realLoginSmokeShared.mjs --preflight-report output/real-login-smoke-shared/preflight.json` 只探测后端 health 和管理员凭据来源候选，不读取 config 内容、不读取密码值、不校验账号、不调用 auth JSON-RPC、不启动 Vite / Playwright、不登录、不写数据库。真实 smoke 仍需要本地后端和开发账号。`node scripts/purchaseReceiptRealWriteBrowserE2E.mjs --print-input-template` 只打印采购入库页面真实写入 e2e 的前置输入、持久测试数据确认、`PR-BROWSER-*` 记录边界和真实命令，不启动 Vite、不启动 Playwright、不调用后端、不登录、不写库；`--preflight-report` 只写本地前置报告，探测后端 health、显式管理员凭据 env、持久测试数据确认和页面目标安全性，不读取本地配置、不登录、不调用 JSON-RPC、不启动 Vite / Playwright、不写数据库。
@@ -319,7 +321,7 @@ pnpm smoke:processing-contract-real-login
 
 缺少浏览器运行条件或只想确认移动端认证回跳 smoke 的执行范围时，可先执行 `node scripts/mobileAuthLoginRouteSmoke.mjs --print-input-template`。该命令只打印岗位任务端角色、phone / iPad 视口、可选环境变量和真实回归命令，不启动 Vite、不启动浏览器、不调用真实后端、不登录、不写数据库。需要留下可保存的 no-write 前置记录时，执行 `node scripts/mobileAuthLoginRouteSmoke.mjs --preflight-report output/mobile-auth-login-route-smoke/preflight.json`；该报告只写本地 JSON，记录脚本存在性、岗位任务端路由计划、phone / iPad 视口计划和 mock RPC 覆盖口径，不调用后端 / JSON-RPC、不读取密码、不保存 token、不写数据库。真实 `pnpm smoke:mobile-auth-login-route` 使用 mock auth / admin / customer-config / workflow RPC 验证生产单端口 `/m/<role>/tasks` 路由、会话刷新和登录回跳，不证明真实后端 RBAC、真实账号或 customer config active revision。
 
-`pnpm smoke:mobile-workflow-runtime-browser` 使用真实后端和真实浏览器创建 `simulated_only` 老板审批任务、老板退回任务、老板完成任务、品质成品抽检任务、仓库入库任务与仓库放行任务，登录 `demo_boss` 后在 `/m/boss/tasks` 验证自有任务阻塞、退回、完成反馈、现场留痕、异常上报，以及 `owner_role_key=warehouse` 且 `assignee_id=demo_boss` 的跨角色任务只能催办、不能代办阻塞 / 完成；随后登录 `demo_quality` 和 `demo_warehouse`，分别验证品质岗位完成、仓库入库完成、完成反馈、已办列表和 evidence refs。该回归只覆盖本地 / 试用模拟 workflow 证据，不代表真实客户导入、生产写入或 Fact 落账。
+`pnpm smoke:mobile-workflow-runtime-browser` 使用真实后端和真实浏览器，只在 `trial_boss_work / trial_quality_work / trial_warehouse_work` 普通协同命名空间创建 `simulated_only` 老板、品质和仓库任务。老板完成场景按正式角色合同要求 `workflow.task.approve`，其他岗位完成场景要求 `workflow.task.complete`。登录 `demo_boss` 后在 `/m/boss/tasks` 验证自有任务阻塞、退回、完成反馈、现场留痕和阻塞 / 退回原因事件，以及 `owner_role_key=warehouse` 且未指定跨岗处理人的仓库任务由老板通过监督范围查看，只能催办、不能代办阻塞 / 完成；随后登录 `demo_quality` 和 `demo_warehouse` 验证品质岗位完成、仓库岗位完成、完成反馈、已办列表和 evidence refs。创建幂等键由 `runId + 场景任务码` 稳定生成；脚本不占用正式来源任务组，也不绑定正式领域命令或触发业务来源状态机。该回归只覆盖本地 / 试用模拟 Workflow 证据，不代表真实客户导入、生产写入或 Fact 落账。
 
 缺少本地后端、演示账号密码或前端地址时，可先执行 `node scripts/mobileWorkflowRuntimeBrowserSmoke.mjs --print-input-template`。该命令只打印所需输入、模拟任务计划和真实回归命令，不登录、不调用后端、不启动浏览器、不写数据库，也不证明移动端 workflow 真实可用。具备本地后端候选但还缺演示密码或不确定运行前置时，执行 `node scripts/mobileWorkflowRuntimeBrowserSmoke.mjs --preflight-report output/mobile-workflow-runtime-browser-smoke/preflight.json` 写 no-write 前置报告；报告只探测 backend health、演示密码 env、Vite 托管需求、试用 customer-config 脚本存在性、`audit:yoyoosun-entry` 只读端口审计和模拟任务动作计划 coverage。若显式传入 `MOBILE_WORKFLOW_BROWSER_SMOKE_BASE_URL`，preflight 会要求该端口命中 yoyoosun config 和 yoyoosun asset，否则以 `external-base-url-not-yoyoosun-entry` 阻止真实 smoke。不读取密码值、不调用 JSON-RPC、不启动 Vite / Playwright、不创建任务、不保存 token。需要留下本地真实浏览器读回记录时，可执行 `MOBILE_WORKFLOW_BROWSER_SMOKE_PASSWORD='<local-demo-password>' node scripts/mobileWorkflowRuntimeBrowserSmoke.mjs --report output/mobile-workflow-runtime-browser-smoke/report.json`；报告只保存任务码、状态、模拟任务计划 coverage 摘要、未证明项和脱敏布尔结果，不保存密码、token、Authorization header、raw customer package 或 action 列表，也不代表目标环境发布或 release evidence 完成。
 
@@ -397,7 +399,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 
 #### 产品内核 `/__dev/product-core`
 
-该页只读解析全局唯一的 `docs/product/产品能力进度台账.md`，完整展示全部能力的当前可用范围和主要边界。页面把台账状态翻译为“已进入内核（可试用）、部分进入（实现中）、尚未进入（待办）、当前不纳入（暂不做）”，支持按归属筛选和搜索能力、范围或边界，筛选条件写入 URL。页面不维护第二份能力状态，不根据文件存在、菜单出现或测试数量自行推断完成度；进入 Product Core 也不等于目标环境已发布、恢复可用或客户已验收。字段、状态、Workflow / Fact 和实现细节继续通过台账中的正式证据入口核对。
+该页只读解析全局唯一的 `docs/product/产品能力进度台账.md`，完整展示全部能力的当前可用范围和当前边界。页面把台账状态翻译为“已进入内核（可试用）、部分进入（部分可用）、当前不纳入”，支持按归属筛选和搜索能力、范围或边界，筛选条件写入 URL。台账和页面都不登记实施动作、后续候选或默认优先级；边界不构成待办、实施授权或发布计划。页面不维护第二份能力状态，不根据文件存在、菜单出现或测试数量自行推断完成度；进入 Product Core 也不等于目标环境已发布、恢复可用或客户已验收。字段、状态、Workflow / Fact 和实现细节继续通过台账中的正式证据入口核对。
 
 #### 权限关系 `/__dev/permission-relationships`
 

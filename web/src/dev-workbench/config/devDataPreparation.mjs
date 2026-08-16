@@ -1233,15 +1233,20 @@ export function createDevDataPreparationClient({
   }
 
   return {
-    async summary() {
+    async summary({ force = false } = {}) {
       return validateDevDataPreparationSummary(
         await readJson(
-          await fetchImpl(DEV_DATA_PREPARATION_SUMMARY_API_PATH, {
-            method: 'GET',
-            cache: 'no-store',
-            credentials: 'same-origin',
-            headers: { accept: 'application/json' },
-          }),
+          await fetchImpl(
+            force
+              ? `${DEV_DATA_PREPARATION_SUMMARY_API_PATH}?refresh=authoritative`
+              : DEV_DATA_PREPARATION_SUMMARY_API_PATH,
+            {
+              method: 'GET',
+              cache: 'no-store',
+              credentials: 'same-origin',
+              headers: { accept: 'application/json' },
+            }
+          ),
           '数据准备预检读取失败'
         )
       )

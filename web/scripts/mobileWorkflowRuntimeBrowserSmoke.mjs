@@ -39,6 +39,9 @@ const DEFAULT_PORT = resolveDevAuxPort(
   'mobile workflow browser smoke port'
 )
 const SIM_PREFIX = 'SIM-YOYOOSUN-MOBILE-BROWSER'
+const CREATE_IDEMPOTENCY_PREFIX = 'mobile-workflow-browser:create:'
+const WORKFLOW_TASK_CODE_MAX_LENGTH = 64
+const WORKFLOW_IDEMPOTENCY_KEY_MAX_LENGTH = 128
 const REAL_SMOKE_REQUIREMENTS = Object.freeze([
   'local backend health is reachable',
   'demo password env is present',
@@ -69,8 +72,8 @@ const MOBILE_WORKFLOW_REPORT_ACTION_LABELS = Object.freeze({
   done: '完成任务',
   reject: '退回任务',
   rejected: '退回任务',
-  'quality-complete': '完成成品质检任务',
-  'warehouse-inbound-complete': '完成采购入库任务',
+  'quality-complete': '完成品质模拟任务',
+  'warehouse-inbound-complete': '完成仓库模拟任务',
   urge: '催办协同',
   'urge-only': '催办协同',
 })
@@ -152,6 +155,32 @@ function sanitizeRunId(value) {
     throw new CliError('runId must be 1-20 safe characters')
   }
   return text
+}
+
+function stablePositiveSourceID(value) {
+  let hash = 0
+  for (const symbol of value) {
+    hash = (hash * 131 + symbol.codePointAt(0)) % 90000000
+  }
+  return 900000000 + hash
+}
+
+function buildSimulatedTaskIdentity(options, suffix) {
+  const prefix = `${SIM_PREFIX}-${options.runId}`
+  const taskCode = `${prefix}-${suffix}`
+  const idempotencyKey = `${CREATE_IDEMPOTENCY_PREFIX}${taskCode}`
+  if (taskCode.length > WORKFLOW_TASK_CODE_MAX_LENGTH) {
+    throw new CliError('simulated task code exceeds 64 characters')
+  }
+  if (idempotencyKey.length > WORKFLOW_IDEMPOTENCY_KEY_MAX_LENGTH) {
+    throw new CliError('simulated task idempotency key exceeds 128 characters')
+  }
+  return {
+    prefix,
+    taskCode,
+    sourceID: stablePositiveSourceID(taskCode),
+    idempotencyKey,
+  }
 }
 
 function buildTimestampRunId(date = new Date()) {
@@ -284,11 +313,11 @@ function buildSimulatedTaskPlan() {
   return [
     {
       ownerRoleKey: 'boss',
-      taskGroup: 'order_approval',
+      taskGroup: 'trial_boss_work',
       browserAction: 'block',
       expectedTaskStatusAfterAction: 'blocked',
       requiresReason: true,
-      expectsExceptionReport: true,
+      expectsReasonEvent: true,
       hidesActionEvidenceInput: true,
       omitsNewEvidenceRefs: true,
       notificationType: 'approval_required',
@@ -296,10 +325,10 @@ function buildSimulatedTaskPlan() {
     },
     {
       ownerRoleKey: 'boss',
-      taskGroup: 'order_approval',
+      taskGroup: 'trial_boss_work',
       browserAction: 'complete',
       expectedTaskStatusAfterAction: 'done',
-      expectedBusinessStatusAfterAction: 'project_approved',
+      expectedBusinessStatusAfterAction: 'project_pending',
       requiresReason: false,
       requiresCompletionFeedback: true,
       expectsCompletionPayloadFeedback: true,
@@ -311,12 +340,12 @@ function buildSimulatedTaskPlan() {
     },
     {
       ownerRoleKey: 'boss',
-      taskGroup: 'order_approval',
+      taskGroup: 'trial_boss_work',
       browserAction: 'reject',
       expectedTaskStatusAfterAction: 'rejected',
       expectedBusinessStatusAfterAction: 'project_pending',
       requiresReason: true,
-      expectsExceptionReport: true,
+      expectsReasonEvent: true,
       hidesActionEvidenceInput: true,
       omitsNewEvidenceRefs: true,
       notificationType: 'approval_required',
@@ -324,7 +353,7 @@ function buildSimulatedTaskPlan() {
     },
     {
       ownerRoleKey: 'quality',
-      taskGroup: 'finished_goods_qc',
+      taskGroup: 'trial_quality_work',
       browserAction: 'quality-complete',
       expectedTaskStatusAfterAction: 'done',
       requiresReason: false,
@@ -338,7 +367,7 @@ function buildSimulatedTaskPlan() {
     },
     {
       ownerRoleKey: 'warehouse',
-      taskGroup: 'warehouse_inbound',
+      taskGroup: 'trial_warehouse_work',
       browserAction: 'warehouse-inbound-complete',
       expectedTaskStatusAfterAction: 'done',
       requiresReason: false,
@@ -352,8 +381,8 @@ function buildSimulatedTaskPlan() {
     },
     {
       ownerRoleKey: 'warehouse',
-      assigneeRoleHint: 'boss',
-      taskGroup: 'trial_warehouse_followup',
+      observerRoleHint: 'boss',
+      taskGroup: 'trial_warehouse_work',
       browserAction: 'urge-only',
       expectedTaskStatusAfterAction: 'ready',
       forbiddenBrowserActions: ['block', 'complete'],
@@ -431,10 +460,10 @@ function buildSimulatedTaskPlanCoverage(plan = buildSimulatedTaskPlan()) {
       coversRequiredCompletionFeedback &&
       coversCompletionPayloadFeedback &&
       coversCompletionReceiptFeedback,
-    coversExceptionReport: plan.some(
+    coversReasonEvent: plan.some(
       (item) =>
         ['block', 'reject'].includes(item.browserAction) &&
-        item.expectsExceptionReport === true
+        item.expectsReasonEvent === true
     ),
     coversInternalNotificationHints: coversNotificationTypes.length >= 2,
     notificationHints: coversNotificationTypes.map((notificationType) =>
@@ -476,8 +505,8 @@ function buildSimulatedTaskPlanCoverage(plan = buildSimulatedTaskPlan()) {
   if (!coverage.coversCompletionReceiptFeedback) {
     blockers.push('missing-completion-receipt-feedback-coverage')
   }
-  if (!coverage.coversExceptionReport) {
-    blockers.push('missing-exception-report-coverage')
+  if (!coverage.coversReasonEvent) {
+    blockers.push('missing-reason-event-coverage')
   }
   if (!coverage.coversInternalNotificationHints) {
     blockers.push('missing-internal-notification-hints')
@@ -503,7 +532,7 @@ function buildSimulatedTaskPlanSummary(plan = buildSimulatedTaskPlan()) {
       item.expectsCompletionPayloadFeedback === true,
     completionReceiptFeedbackExpected:
       item.expectsCompletionReceiptFeedback === true,
-    exceptionReportExpected: item.expectsExceptionReport === true,
+    reasonEventExpected: item.expectsReasonEvent === true,
     actionEvidenceInputHidden: item.hidesActionEvidenceInput === true,
     newEvidenceRefsOmitted: item.omitsNewEvidenceRefs === true,
     notificationHint: getWorkflowReportNotificationLabel(item.notificationType),
@@ -800,6 +829,7 @@ function buildSmokeReport({
   updatedQualityTask,
   updatedWarehouseInboundTask,
   updatedWarehouseTask,
+  workflowEventChecks = {},
 }) {
   const detailNoOverflow =
     Number.isFinite(browserResult.metrics?.scrollWidth) &&
@@ -860,11 +890,9 @@ function buildSmokeReport({
         actionLabel: getWorkflowReportActionLabel('blocked'),
         reasonRecorded:
           updatedBossTask.blocked_reason === browserResult.blockReason,
+        workflowEventRecorded: workflowEventChecks.bossBlock === true,
         newEvidenceRefsOmitted:
           omitsNewMobileActionEvidenceRefs(updatedBossTask),
-        exceptionReportRecorded:
-          updatedBossTask.payload?.mobile_exception_report?.reason ===
-          browserResult.blockReason,
       },
       {
         key: 'boss-complete',
@@ -881,6 +909,7 @@ function buildSmokeReport({
         actionLabel: getWorkflowReportActionLabel('done'),
         completionFeedbackRecorded:
           updatedBossDoneTask.payload?.feedback === browserResult.doneFeedback,
+        workflowEventRecorded: workflowEventChecks.bossDone === true,
         newEvidenceRefsOmitted:
           omitsNewMobileActionEvidenceRefs(updatedBossDoneTask),
       },
@@ -898,13 +927,11 @@ function buildSmokeReport({
         ),
         actionLabel: getWorkflowReportActionLabel('rejected'),
         reasonRecorded:
-          updatedBossRejectTask.payload?.mobile_exception_report?.reason ===
-          browserResult.rejectReason,
-        newEvidenceRefsOmitted:
-          omitsNewMobileActionEvidenceRefs(updatedBossRejectTask),
-        exceptionReportRecorded:
-          updatedBossRejectTask.payload?.mobile_exception_report?.reason ===
-          browserResult.rejectReason,
+          updatedBossRejectTask.blocked_reason === browserResult.rejectReason,
+        workflowEventRecorded: workflowEventChecks.bossReject === true,
+        newEvidenceRefsOmitted: omitsNewMobileActionEvidenceRefs(
+          updatedBossRejectTask
+        ),
       },
       {
         key: 'quality-complete',
@@ -922,6 +949,7 @@ function buildSmokeReport({
         completionFeedbackRecorded:
           updatedQualityTask.payload?.feedback ===
           browserResult.qualityFeedback,
+        workflowEventRecorded: workflowEventChecks.qualityDone === true,
         newEvidenceRefsOmitted:
           omitsNewMobileActionEvidenceRefs(updatedQualityTask),
       },
@@ -941,8 +969,11 @@ function buildSmokeReport({
         completionFeedbackRecorded:
           updatedWarehouseInboundTask.payload?.feedback ===
           browserResult.warehouseInboundFeedback,
-        newEvidenceRefsOmitted:
-          omitsNewMobileActionEvidenceRefs(updatedWarehouseInboundTask),
+        workflowEventRecorded:
+          workflowEventChecks.warehouseInboundDone === true,
+        newEvidenceRefsOmitted: omitsNewMobileActionEvidenceRefs(
+          updatedWarehouseInboundTask
+        ),
       },
       {
         key: 'warehouse-urge',
@@ -957,11 +988,12 @@ function buildSmokeReport({
           updatedWarehouseTask.task_status_key
         ),
         actionLabel: getWorkflowReportActionLabel('urge'),
-        assigneeRole: getWorkflowReportRoleLabel('boss'),
+        observerRole: getWorkflowReportRoleLabel('boss'),
         crossRoleActionOnly: true,
         urgeReasonRecorded:
           updatedWarehouseTask.payload?.last_urge_reason ===
           browserResult.urgeReason,
+        workflowEventRecorded: workflowEventChecks.warehouseUrge === true,
         newEvidenceRefsOmitted:
           omitsNewMobileActionEvidenceRefs(updatedWarehouseTask),
       },
@@ -982,6 +1014,9 @@ function buildSmokeReport({
       newEvidenceRefsOmittedChecked: true,
       receiptBackToListChecked: true,
       listStateRestoreChecked: true,
+      workflowEventsChecked:
+        Object.values(workflowEventChecks).length === 6 &&
+        Object.values(workflowEventChecks).every((value) => value === true),
       noHorizontalOverflow:
         detailNoOverflow &&
         urgeNoOverflow &&
@@ -1004,21 +1039,19 @@ function buildSmokeReport({
 }
 
 function buildSimulatedBossTask(options) {
-  const nowSec = Math.floor(Date.now() / 1000)
-  const sourceID = 920000 + Math.floor(nowSec % 100000)
-  const prefix = `${SIM_PREFIX}-${options.runId}`
+  const identity = buildSimulatedTaskIdentity(options, 'BOSS')
   return {
-    task_code: `${prefix}-BOSS`,
-    task_group: 'order_approval',
+    idempotency_key: identity.idempotencyKey,
+    task_code: identity.taskCode,
+    task_group: 'trial_boss_work',
     task_name: `移动端浏览器模拟老板审批 ${options.runId}`,
     source_type: 'project-orders',
-    source_id: sourceID,
-    source_no: `${prefix}-SO`,
+    source_id: identity.sourceID,
+    source_no: `${identity.prefix}-SO`,
     business_status_key: 'project_pending',
     task_status_key: 'ready',
     owner_role_key: 'boss',
     priority: 3,
-    due_at: nowSec + 86400,
     payload: {
       simulated_only: true,
       simulation_prefix: SIM_PREFIX,
@@ -1030,7 +1063,7 @@ function buildSimulatedBossTask(options) {
       unit: 'pcs',
       critical_path: true,
       complete_condition: '老板在岗位任务端填写原因并提交阻塞。',
-      related_documents: [`${prefix}-SO`],
+      related_documents: [`${identity.prefix}-SO`],
       alert_type: 'approval_pending',
       notification_type: 'approval_required',
     },
@@ -1038,21 +1071,20 @@ function buildSimulatedBossTask(options) {
 }
 
 function buildSimulatedBossDoneTask(options) {
-  const nowSec = Math.floor(Date.now() / 1000)
-  const sourceID = 925000 + Math.floor(nowSec % 100000)
-  const prefix = `${SIM_PREFIX}-${options.runId}`
+  const identity = buildSimulatedTaskIdentity(options, 'BOSS-DONE')
   return {
-    task_code: `${prefix}-BOSS-DONE`,
-    task_group: 'order_approval',
+    idempotency_key: identity.idempotencyKey,
+    task_code: identity.taskCode,
+    task_group: 'trial_boss_work',
     task_name: `移动端浏览器模拟老板完成 ${options.runId}`,
     source_type: 'project-orders',
-    source_id: sourceID,
-    source_no: `${prefix}-SO-DONE`,
+    source_id: identity.sourceID,
+    source_no: `${identity.prefix}-SO-DONE`,
     business_status_key: 'project_pending',
     task_status_key: 'ready',
     owner_role_key: 'boss',
+    required_capability_key: 'workflow.task.approve',
     priority: 2,
-    due_at: nowSec + 90000,
     payload: {
       simulated_only: true,
       simulation_prefix: SIM_PREFIX,
@@ -1063,7 +1095,7 @@ function buildSimulatedBossDoneTask(options) {
       quantity: '6',
       unit: 'pcs',
       complete_condition: '老板在岗位任务端点击完成并看到完成反馈。',
-      related_documents: [`${prefix}-SO-DONE`],
+      related_documents: [`${identity.prefix}-SO-DONE`],
       alert_type: 'approval_pending',
       notification_type: 'approval_required',
     },
@@ -1071,21 +1103,19 @@ function buildSimulatedBossDoneTask(options) {
 }
 
 function buildSimulatedBossRejectTask(options) {
-  const nowSec = Math.floor(Date.now() / 1000)
-  const sourceID = 927000 + Math.floor(nowSec % 100000)
-  const prefix = `${SIM_PREFIX}-${options.runId}`
+  const identity = buildSimulatedTaskIdentity(options, 'BOSS-REJECT')
   return {
-    task_code: `${prefix}-BOSS-REJECT`,
-    task_group: 'order_approval',
+    idempotency_key: identity.idempotencyKey,
+    task_code: identity.taskCode,
+    task_group: 'trial_boss_work',
     task_name: `移动端浏览器模拟老板退回 ${options.runId}`,
     source_type: 'project-orders',
-    source_id: sourceID,
-    source_no: `${prefix}-SO-REJECT`,
+    source_id: identity.sourceID,
+    source_no: `${identity.prefix}-SO-REJECT`,
     business_status_key: 'project_pending',
     task_status_key: 'ready',
     owner_role_key: 'boss',
     priority: 2,
-    due_at: nowSec + 91000,
     payload: {
       simulated_only: true,
       simulation_prefix: SIM_PREFIX,
@@ -1096,7 +1126,7 @@ function buildSimulatedBossRejectTask(options) {
       quantity: '9',
       unit: 'pcs',
       complete_condition: '老板在岗位任务端填写退回原因并提交退回。',
-      related_documents: [`${prefix}-SO-REJECT`],
+      related_documents: [`${identity.prefix}-SO-REJECT`],
       alert_type: 'approval_pending',
       notification_type: 'approval_required',
     },
@@ -1104,21 +1134,19 @@ function buildSimulatedBossRejectTask(options) {
 }
 
 function buildSimulatedQualityTask(options) {
-  const nowSec = Math.floor(Date.now() / 1000)
-  const sourceID = 928000 + Math.floor(nowSec % 100000)
-  const prefix = `${SIM_PREFIX}-${options.runId}`
+  const identity = buildSimulatedTaskIdentity(options, 'QUALITY-DONE')
   return {
-    task_code: `${prefix}-QUALITY-DONE`,
-    task_group: 'finished_goods_qc',
+    idempotency_key: identity.idempotencyKey,
+    task_code: identity.taskCode,
+    task_group: 'trial_quality_work',
     task_name: `移动端浏览器模拟品质完成 ${options.runId}`,
     source_type: 'production-progress',
-    source_id: sourceID,
-    source_no: `${prefix}-QC`,
+    source_id: identity.sourceID,
+    source_no: `${identity.prefix}-QC`,
     business_status_key: 'qc_pending',
     task_status_key: 'ready',
     owner_role_key: 'quality',
     priority: 2,
-    due_at: nowSec + 92000,
     payload: {
       simulated_only: true,
       simulation_prefix: SIM_PREFIX,
@@ -1129,7 +1157,7 @@ function buildSimulatedQualityTask(options) {
       quantity: '15',
       unit: 'pcs',
       complete_condition: '品质在岗位任务端确认成品抽检结果并填写反馈。',
-      related_documents: [`${prefix}-QC`],
+      related_documents: [`${identity.prefix}-QC`],
       alert_type: 'finished_goods_qc_pending',
       notification_type: 'finished_goods_qc_pending',
     },
@@ -1137,21 +1165,19 @@ function buildSimulatedQualityTask(options) {
 }
 
 function buildSimulatedWarehouseInboundTask(options) {
-  const nowSec = Math.floor(Date.now() / 1000)
-  const sourceID = 929000 + Math.floor(nowSec % 100000)
-  const prefix = `${SIM_PREFIX}-${options.runId}`
+  const identity = buildSimulatedTaskIdentity(options, 'WH-IN-DONE')
   return {
-    task_code: `${prefix}-WAREHOUSE-INBOUND-DONE`,
-    task_group: 'warehouse_inbound',
+    idempotency_key: identity.idempotencyKey,
+    task_code: identity.taskCode,
+    task_group: 'trial_warehouse_work',
     task_name: `移动端浏览器模拟仓库入库完成 ${options.runId}`,
     source_type: 'accessories-purchase',
-    source_id: sourceID,
-    source_no: `${prefix}-INBOUND`,
+    source_id: identity.sourceID,
+    source_no: `${identity.prefix}-INBOUND`,
     business_status_key: 'warehouse_inbound_pending',
     task_status_key: 'ready',
     owner_role_key: 'warehouse',
     priority: 2,
-    due_at: nowSec + 93000,
     payload: {
       simulated_only: true,
       simulation_prefix: SIM_PREFIX,
@@ -1162,30 +1188,27 @@ function buildSimulatedWarehouseInboundTask(options) {
       quantity: '24',
       unit: 'pcs',
       complete_condition: '仓库在岗位任务端确认入库数量、库位和经手人。',
-      related_documents: [`${prefix}-INBOUND`],
+      related_documents: [`${identity.prefix}-INBOUND`],
       alert_type: 'inbound_pending',
       notification_type: 'inbound_pending',
     },
   }
 }
 
-function buildSimulatedWarehouseTask(options, assigneeID) {
-  const nowSec = Math.floor(Date.now() / 1000)
-  const sourceID = 930000 + Math.floor(nowSec % 100000)
-  const prefix = `${SIM_PREFIX}-${options.runId}`
+function buildSimulatedWarehouseTask(options) {
+  const identity = buildSimulatedTaskIdentity(options, 'WAREHOUSE')
   return {
-    task_code: `${prefix}-WAREHOUSE`,
-    task_group: 'trial_warehouse_followup',
+    idempotency_key: identity.idempotencyKey,
+    task_code: identity.taskCode,
+    task_group: 'trial_warehouse_work',
     task_name: `移动端浏览器模拟仓库跟进 ${options.runId}`,
     source_type: 'trial-workflow',
-    source_id: sourceID,
-    source_no: `${prefix}-SHIP`,
+    source_id: identity.sourceID,
+    source_no: `${identity.prefix}-SHIP`,
     business_status_key: 'shipping_released',
     task_status_key: 'ready',
     owner_role_key: 'warehouse',
-    assignee_id: assigneeID,
     priority: 3,
-    due_at: nowSec + 43200,
     payload: {
       simulated_only: true,
       simulation_prefix: SIM_PREFIX,
@@ -1196,8 +1219,9 @@ function buildSimulatedWarehouseTask(options, assigneeID) {
       quantity: '18',
       unit: 'pcs',
       critical_path: true,
-      complete_condition: '仓库岗位完成出货放行；老板只能催办不能代办。',
-      related_documents: [`${prefix}-SHIP`],
+      complete_condition:
+        '仓库岗位完成出货放行；老板通过跨岗监督只能催办，不能代办。',
+      related_documents: [`${identity.prefix}-SHIP`],
       alert_type: 'shipment_release_pending',
       notification_type: 'shipment_release_pending',
     },
@@ -1277,6 +1301,35 @@ async function readTaskByCode({ backendURL, token, taskCode }) {
   const task = (data.tasks || []).find((item) => item.task_code === taskCode)
   assert(task, `list_tasks should include ${taskCode}`)
   return task
+}
+
+async function readTaskEvents({ backendURL, token, taskID }) {
+  const data = await rpcCall({
+    backendURL,
+    domain: 'workflow',
+    method: 'list_task_events',
+    params: { task_id: taskID, limit: 20 },
+    token,
+  })
+  assert.equal(
+    data.truncated,
+    false,
+    `new simulated task ${taskID} should have a complete bounded event readback`
+  )
+  return Array.isArray(data.items) ? data.items : []
+}
+
+function workflowTaskEventRecorded(
+  events,
+  { eventType, toStatusKey, actorRoleKey, reason = '' }
+) {
+  return events.some(
+    (event) =>
+      event?.event_type === eventType &&
+      event?.to_status_key === toStatusKey &&
+      event?.actor_role_key === actorRoleKey &&
+      (!reason || event?.reason === reason)
+  )
 }
 
 let devServerProcess = null
@@ -1433,12 +1486,113 @@ async function loginMobileBoss(page, { baseURL, password }) {
   })
 }
 
-async function openMobileTaskProcess(page, task, { detailCopy = '' } = {}) {
+async function revealMobileTaskButton(page, task, listKey = 'todo') {
   const taskButton = page
     .locator(`[data-mobile-task-id="${String(task.id)}"]`)
     .filter({ hasText: task.task_name })
     .first()
-  await taskButton.waitFor({ state: 'visible', timeout: 15_000 })
+  const listToggleTestID = `mobile-role-list-toggle-${listKey}`
+  const listToggle = page.getByTestId(listToggleTestID)
+  const maxRevealAttempts = 20
+
+  await page.waitForFunction(
+    ({ listKey, taskID }) => {
+      if (
+        document.querySelector(
+          `[data-mobile-task-id="${CSS.escape(String(taskID))}"]`
+        )
+      ) {
+        return true
+      }
+      if (listKey === 'done') {
+        const doneCount = document.querySelector(
+          '[data-testid="mobile-role-done-count"]'
+        )
+        return Boolean(doneCount && doneCount.textContent?.trim() !== '—')
+      }
+      const taskList = document.querySelector(
+        '[data-testid="mobile-role-task-list"]'
+      )
+      return Boolean(taskList && taskList.getAttribute('aria-busy') !== 'true')
+    },
+    { listKey, taskID: String(task.id) },
+    { timeout: 15_000 }
+  )
+
+  for (let attempt = 0; attempt <= maxRevealAttempts; attempt += 1) {
+    if ((await taskButton.count()) > 0 && (await taskButton.isVisible())) {
+      return taskButton
+    }
+    if (attempt === maxRevealAttempts || (await listToggle.count()) !== 1) {
+      break
+    }
+    const previous = await listToggle.evaluate((button) => ({
+      hasMore: button.dataset.hasMore || '',
+      total: Number(button.dataset.totalItemCount || 0),
+      visible: Number(button.dataset.visibleItemCount || 0),
+    }))
+    await listToggle.scrollIntoViewIfNeeded()
+    await listToggle.click()
+    await page.waitForFunction(
+      ({ listToggleTestID, previous, taskID }) => {
+        if (
+          document.querySelector(
+            `[data-mobile-task-id="${CSS.escape(String(taskID))}"]`
+          )
+        ) {
+          return true
+        }
+        const toggle = document.querySelector(
+          `[data-testid="${CSS.escape(listToggleTestID)}"]`
+        )
+        if (!toggle) return true
+        return (
+          Number(toggle.dataset.totalItemCount || 0) > previous.total ||
+          Number(toggle.dataset.visibleItemCount || 0) > previous.visible ||
+          (previous.hasMore === 'true' && toggle.dataset.hasMore === 'false')
+        )
+      },
+      { listToggleTestID, previous, taskID: String(task.id) },
+      { timeout: 15_000 }
+    )
+  }
+
+  throw new Error(
+    `移动端 ${listKey} 任务列表分页加载后仍未找到 ${task.task_code}，请核对岗位可见性、筛选条件和任务状态`
+  )
+}
+
+async function selectMobileTaskFilter(page, filterKey) {
+  const filter = page.getByTestId(`mobile-role-filter-${filterKey}`)
+  await filter.click()
+  await page.waitForFunction(
+    (key) => {
+      const button = document.querySelector(
+        `[data-testid="mobile-role-filter-${CSS.escape(key)}"]`
+      )
+      const count = button?.querySelector('.mobile-role-task-filter__count')
+      const list = document.querySelector(
+        '[data-testid="mobile-role-task-list"]'
+      )
+      const loading = document.querySelector(
+        '[data-testid="mobile-role-task-list-loading"]'
+      )
+      return Boolean(
+        button?.getAttribute('aria-pressed') === 'true' &&
+          count?.textContent?.trim() &&
+          count.textContent.trim() !== '—' &&
+          list?.getAttribute('aria-busy') !== 'true' &&
+          !loading
+      )
+    },
+    filterKey,
+    { timeout: 15_000 }
+  )
+}
+
+async function openMobileTaskProcess(page, task, { detailCopy = '' } = {}) {
+  const taskButton = await revealMobileTaskButton(page, task)
+  await taskButton.scrollIntoViewIfNeeded()
   const listScrollTop = await page.evaluate(() => {
     const main = document.querySelector('.mobile-role-tasks-page__scroll')
     return main?.scrollTop || 0
@@ -1456,9 +1610,21 @@ async function openMobileTaskProcess(page, task, { detailCopy = '' } = {}) {
       timeout: 15_000,
     })
   }
-  await detailScreen
-    .getByRole('heading', { name: '任务附件', exact: true })
-    .waitFor({ state: 'visible', timeout: 15_000 })
+  const attachmentAction = detailScreen.getByTestId(
+    'mobile-task-attachment-action'
+  )
+  await attachmentAction.waitFor({ state: 'visible', timeout: 15_000 })
+  const attachmentButton = attachmentAction.getByRole('button')
+  assert.equal(
+    await attachmentButton.count(),
+    1,
+    'task detail should expose one attachment action'
+  )
+  assert.match(
+    String(await attachmentButton.textContent()).trim(),
+    /^(?:任务附件|添加附件|查看附件|附件（\d+）)$/u,
+    'task attachment action should show its loading, empty, or counted label'
+  )
   assert.equal(
     await detailScreen.getByText('历史处理线索', { exact: true }).count(),
     0,
@@ -1484,6 +1650,7 @@ async function openMobileTaskProcess(page, task, { detailCopy = '' } = {}) {
   )
 
   await detailScreen
+    .locator('.mobile-role-action-bar')
     .getByRole('button', { name: '处理任务', exact: true })
     .click()
   const actionScreen = page.getByTestId('mobile-task-action-screen')
@@ -1516,7 +1683,9 @@ async function submitMobileTaskAction(
     name: actionLabel,
     exact: true,
   })
-  if ((await actionChoice.count()) === 1) {
+  const actionChoiceCount = await actionChoice.count()
+  assert(actionChoiceCount <= 1, `${actionLabel}处理方式出现重复的可访问选项`)
+  if (actionChoiceCount === 1) {
     await actionChoice.check()
     assert.equal(await actionChoice.isChecked(), true)
   } else {
@@ -1589,17 +1758,32 @@ async function submitMobileTaskAction(
 async function verifyConfirmedReceipt(
   page,
   receiptScreen,
-  { actionLabel, feedback = '', reason = '', roleKey = 'boss', task }
+  {
+    actionLabel,
+    feedback = '',
+    feedbackLabel = '完成反馈',
+    reason = '',
+    receiptTitle = '任务办理已确认',
+    roleKey = 'boss',
+    task,
+  }
 ) {
   await receiptScreen
-    .getByText('任务办理已确认', { exact: true })
+    .getByText(receiptTitle, { exact: true })
     .waitFor({ state: 'visible', timeout: 15_000 })
   await receiptScreen
     .getByText(task.task_name, { exact: true })
     .waitFor({ state: 'visible', timeout: 15_000 })
-  await receiptScreen
-    .getByText(actionLabel, { exact: true })
+  const actionRow = receiptScreen
+    .locator('.mobile-task-receipt-row')
+    .filter({ hasText: '已确认方式' })
+  await actionRow
+    .getByText('已确认方式', { exact: true })
     .waitFor({ state: 'visible', timeout: 15_000 })
+  await actionRow.getByText(actionLabel, { exact: true }).waitFor({
+    state: 'visible',
+    timeout: 15_000,
+  })
   if (reason) {
     const reasonRow = receiptScreen
       .locator('.mobile-task-receipt-row')
@@ -1615,9 +1799,9 @@ async function verifyConfirmedReceipt(
   if (feedback) {
     const feedbackRow = receiptScreen
       .locator('.mobile-task-receipt-row')
-      .filter({ hasText: '完成反馈' })
+      .filter({ hasText: feedbackLabel })
     await feedbackRow
-      .getByText('完成反馈', { exact: true })
+      .getByText(feedbackLabel, { exact: true })
       .waitFor({ state: 'visible', timeout: 15_000 })
     await feedbackRow.getByText(feedback, { exact: true }).waitFor({
       state: 'visible',
@@ -1702,23 +1886,64 @@ async function returnReceiptToList(page, receiptScreen) {
 }
 
 async function verifyRestoredListState(page, task, listScrollTop) {
-  await page.waitForFunction(
-    ({ expectedScrollTop, taskID }) => {
+  const expected = {
+    expectedScrollTop: listScrollTop,
+    taskID: String(task.id),
+  }
+  try {
+    await page.waitForFunction(
+      ({ expectedScrollTop, taskID }) => {
+        const main = document.querySelector('.mobile-role-tasks-page__scroll')
+        const activeTaskButton = document.activeElement?.closest?.(
+          '[data-mobile-task-id]'
+        )
+        const activeListHeading = document.activeElement?.closest?.(
+          '[data-testid="mobile-role-list-heading"]'
+        )
+        const maximumScrollTop = Math.max(
+          0,
+          (main?.scrollHeight || 0) - (main?.clientHeight || 0)
+        )
+        const restoredScrollTop = Math.min(expectedScrollTop, maximumScrollTop)
+        return (
+          Math.abs((main?.scrollTop || 0) - restoredScrollTop) <= 2 &&
+          (activeTaskButton?.getAttribute('data-mobile-task-id') === taskID ||
+            Boolean(activeListHeading))
+        )
+      },
+      expected,
+      { timeout: 15_000 }
+    )
+  } catch (error) {
+    const state = await page.evaluate(({ expectedScrollTop, taskID }) => {
       const main = document.querySelector('.mobile-role-tasks-page__scroll')
       const activeTaskButton = document.activeElement?.closest?.(
         '[data-mobile-task-id]'
       )
-      return (
-        Math.abs((main?.scrollTop || 0) - expectedScrollTop) <= 2 &&
-        activeTaskButton?.getAttribute('data-mobile-task-id') === taskID
+      const activeListHeading = document.activeElement?.closest?.(
+        '[data-testid="mobile-role-list-heading"]'
       )
-    },
-    {
-      expectedScrollTop: listScrollTop,
-      taskID: String(task.id),
-    },
-    { timeout: 15_000 }
-  )
+      return {
+        activeElementTag: document.activeElement?.tagName || '',
+        activeListHeading: Boolean(activeListHeading),
+        activeTaskID:
+          activeTaskButton?.getAttribute('data-mobile-task-id') || '',
+        currentScrollTop: main?.scrollTop ?? null,
+        expectedScrollTop,
+        maximumScrollTop: main
+          ? Math.max(0, main.scrollHeight - main.clientHeight)
+          : null,
+        taskID,
+        taskStillLoaded: Boolean(
+          main?.querySelector(`[data-mobile-task-id="${CSS.escape(taskID)}"]`)
+        ),
+      }
+    }, expected)
+    throw new Error(
+      `${error.message}\nrestored list state: ${JSON.stringify(state)}`,
+      { cause: error }
+    )
+  }
 }
 
 async function runBrowserScenario(
@@ -1792,35 +2017,35 @@ async function runBrowserScenario(
       page,
       doneProcess.actionScreen,
       {
-        actionLabel: '完成',
+        actionLabel: '审批通过',
         feedback: doneFeedback,
-        feedbackLabel: '完成反馈',
-        requiredError: '完成反馈为必填项',
+        feedbackLabel: '审批意见',
+        requiredError: '审批意见为必填项',
       }
     )
     await verifyConfirmedReceipt(page, doneReceipt, {
-      actionLabel: '完成',
+      actionLabel: '审批通过',
       feedback: doneFeedback,
+      feedbackLabel: '审批意见',
+      receiptTitle: '审批办理已确认',
       task: bossDoneTask,
     })
     await returnReceiptToList(page, doneReceipt)
     await page.getByTestId('mobile-role-nav-done').click()
-    await page.getByText('已办任务').waitFor({
+    await page.getByRole('heading', { name: '已办任务', exact: true }).waitFor({
       state: 'visible',
       timeout: 15_000,
     })
-    await page.getByText(bossDoneTask.task_name, { exact: true }).waitFor({
-      state: 'visible',
-      timeout: 15_000,
-    })
+    await revealMobileTaskButton(page, bossDoneTask, 'done')
     await page.screenshot({
       path: path.resolve(outputDir, `${bossDoneTask.task_code}-done.png`),
       fullPage: true,
     })
 
     await page.getByTestId('mobile-role-nav-todo').click()
+    await selectMobileTaskFilter(page, 'risk')
     const urgeProcess = await openMobileTaskProcess(page, warehouseTask, {
-      detailCopy: '这条任务由仓库办理，您可以查看并发起催办。',
+      detailCopy: '负责：仓库',
     })
     const urgeChoices = urgeProcess.actionScreen.getByRole('radio')
     assert.equal(
@@ -1875,11 +2100,10 @@ async function runBrowserScenario(
     }
   } catch (error) {
     const debug = await capturePageDebug(page)
-    if (debug) {
-      error.message = `${error.message}\n${debug}`
-    }
     await screenshotOnFailure(page, `${bossTask.task_code}-failed.png`)
-    throw error
+    throw debug
+      ? new Error(`${error.message}\n${debug}`, { cause: error })
+      : error
   } finally {
     await context.close()
   }
@@ -1918,14 +2142,11 @@ async function runOwnedCompleteScenario(
     })
     await returnReceiptToList(page, receipt)
     await page.getByTestId('mobile-role-nav-done').click()
-    await page.getByText('已办任务').waitFor({
+    await page.getByRole('heading', { name: '已办任务', exact: true }).waitFor({
       state: 'visible',
       timeout: 15_000,
     })
-    await page.getByText(task.task_name, { exact: true }).waitFor({
-      state: 'visible',
-      timeout: 15_000,
-    })
+    await revealMobileTaskButton(page, task, 'done')
 
     const metrics = await page.evaluate(() => {
       const shell = document.querySelector('.mobile-role-tasks-page')
@@ -1978,11 +2199,10 @@ async function runOwnedCompleteScenario(
     return { feedback, metrics }
   } catch (error) {
     const debug = await capturePageDebug(page)
-    if (debug) {
-      error.message = `${error.message}\n${debug}`
-    }
     await screenshotOnFailure(page, `${task.task_code}-failed.png`)
-    throw error
+    throw debug
+      ? new Error(`${error.message}\n${debug}`, { cause: error })
+      : error
   } finally {
     await context.close()
   }
@@ -2079,15 +2299,12 @@ async function main() {
     username: 'demo_warehouse',
     password,
   })
-  const bossAdminID = Number(bossSession.id || bossSession.admin_id || 0)
-  assert(bossAdminID > 0, 'demo_boss login should return admin id')
-
   const bossTaskPlan = buildSimulatedBossTask(options)
   const bossDoneTaskPlan = buildSimulatedBossDoneTask(options)
   const bossRejectTaskPlan = buildSimulatedBossRejectTask(options)
   const qualityTaskPlan = buildSimulatedQualityTask(options)
   const warehouseInboundTaskPlan = buildSimulatedWarehouseInboundTask(options)
-  const warehouseTaskPlan = buildSimulatedWarehouseTask(options, bossAdminID)
+  const warehouseTaskPlan = buildSimulatedWarehouseTask(options)
   const createdBossTask = await createSimulatedTask({
     backendURL: options.backendURL,
     password,
@@ -2153,16 +2370,10 @@ async function main() {
     })
     assert.equal(updatedBossTask.task_status_key, 'blocked')
     assert.equal(updatedBossTask.blocked_reason, browserResult.blockReason)
-    assert.equal(updatedBossTask.payload?.mobile_action?.action_key, 'blocked')
-    assert.equal(updatedBossTask.payload?.mobile_action?.role_key, 'boss')
     assert.equal(
       omitsNewMobileActionEvidenceRefs(updatedBossTask),
       true,
       'blocked task must not create mobile action evidence refs'
-    )
-    assert.equal(
-      updatedBossTask.payload?.mobile_exception_report?.reason,
-      browserResult.blockReason
     )
     const updatedBossDoneTask = await readTaskByCode({
       backendURL: options.backendURL,
@@ -2170,8 +2381,6 @@ async function main() {
       taskCode: createdBossDoneTask.task_code,
     })
     assert.equal(updatedBossDoneTask.task_status_key, 'done')
-    assert.equal(updatedBossDoneTask.payload?.mobile_action?.action_key, 'done')
-    assert.equal(updatedBossDoneTask.payload?.mobile_action?.role_key, 'boss')
     assert.equal(
       updatedBossDoneTask.payload?.feedback,
       browserResult.doneFeedback,
@@ -2189,18 +2398,13 @@ async function main() {
     })
     assert.equal(updatedBossRejectTask.task_status_key, 'rejected')
     assert.equal(
-      updatedBossRejectTask.payload?.mobile_action?.action_key,
-      'rejected'
+      updatedBossRejectTask.blocked_reason,
+      browserResult.rejectReason
     )
-    assert.equal(updatedBossRejectTask.payload?.mobile_action?.role_key, 'boss')
     assert.equal(
       omitsNewMobileActionEvidenceRefs(updatedBossRejectTask),
       true,
       'rejected task must not create mobile action evidence refs'
-    )
-    assert.equal(
-      updatedBossRejectTask.payload?.mobile_exception_report?.reason,
-      browserResult.rejectReason
     )
     const updatedQualityTask = await readTaskByCode({
       backendURL: options.backendURL,
@@ -2209,8 +2413,6 @@ async function main() {
     })
     assert.equal(updatedQualityTask.task_status_key, 'done')
     assert.equal(updatedQualityTask.owner_role_key, 'quality')
-    assert.equal(updatedQualityTask.payload?.mobile_action?.action_key, 'done')
-    assert.equal(updatedQualityTask.payload?.mobile_action?.role_key, 'quality')
     assert.equal(
       updatedQualityTask.payload?.feedback,
       browserResult.qualityFeedback,
@@ -2228,14 +2430,6 @@ async function main() {
     })
     assert.equal(updatedWarehouseInboundTask.task_status_key, 'done')
     assert.equal(updatedWarehouseInboundTask.owner_role_key, 'warehouse')
-    assert.equal(
-      updatedWarehouseInboundTask.payload?.mobile_action?.action_key,
-      'done'
-    )
-    assert.equal(
-      updatedWarehouseInboundTask.payload?.mobile_action?.role_key,
-      'warehouse'
-    )
     assert.equal(
       updatedWarehouseInboundTask.payload?.feedback,
       browserResult.warehouseInboundFeedback,
@@ -2263,15 +2457,95 @@ async function main() {
       'escalate_to_boss'
     )
     assert.equal(
-      updatedWarehouseTask.payload?.mobile_action?.action_key,
-      'urge'
-    )
-    assert.equal(updatedWarehouseTask.payload?.mobile_action?.role_key, 'boss')
-    assert.equal(
       omitsNewMobileActionEvidenceRefs(updatedWarehouseTask),
       true,
       'urged task must not create mobile action evidence refs'
     )
+    const [
+      bossBlockEvents,
+      bossDoneEvents,
+      bossRejectEvents,
+      qualityDoneEvents,
+      warehouseInboundDoneEvents,
+      warehouseUrgeEvents,
+    ] = await Promise.all([
+      readTaskEvents({
+        backendURL: options.backendURL,
+        token: bossSession.token,
+        taskID: updatedBossTask.id,
+      }),
+      readTaskEvents({
+        backendURL: options.backendURL,
+        token: bossSession.token,
+        taskID: updatedBossDoneTask.id,
+      }),
+      readTaskEvents({
+        backendURL: options.backendURL,
+        token: bossSession.token,
+        taskID: updatedBossRejectTask.id,
+      }),
+      readTaskEvents({
+        backendURL: options.backendURL,
+        token: qualitySession.token,
+        taskID: updatedQualityTask.id,
+      }),
+      readTaskEvents({
+        backendURL: options.backendURL,
+        token: warehouseSession.token,
+        taskID: updatedWarehouseInboundTask.id,
+      }),
+      readTaskEvents({
+        backendURL: options.backendURL,
+        token: bossSession.token,
+        taskID: updatedWarehouseTask.id,
+      }),
+    ])
+    const workflowEventChecks = {
+      bossBlock: workflowTaskEventRecorded(bossBlockEvents, {
+        eventType: 'status_changed',
+        toStatusKey: 'blocked',
+        actorRoleKey: 'boss',
+        reason: browserResult.blockReason,
+      }),
+      bossDone: workflowTaskEventRecorded(bossDoneEvents, {
+        eventType: 'status_changed',
+        toStatusKey: 'done',
+        actorRoleKey: 'boss',
+      }),
+      bossReject: workflowTaskEventRecorded(bossRejectEvents, {
+        eventType: 'status_changed',
+        toStatusKey: 'rejected',
+        actorRoleKey: 'boss',
+        reason: browserResult.rejectReason,
+      }),
+      qualityDone: workflowTaskEventRecorded(qualityDoneEvents, {
+        eventType: 'status_changed',
+        toStatusKey: 'done',
+        actorRoleKey: 'quality',
+      }),
+      warehouseInboundDone: workflowTaskEventRecorded(
+        warehouseInboundDoneEvents,
+        {
+          eventType: 'status_changed',
+          toStatusKey: 'done',
+          actorRoleKey: 'warehouse',
+        }
+      ),
+      warehouseUrge: workflowTaskEventRecorded(warehouseUrgeEvents, {
+        eventType: 'escalate_to_boss',
+        toStatusKey: 'ready',
+        actorRoleKey: 'boss',
+        reason: browserResult.urgeReason,
+      }),
+    }
+    assert.deepEqual(workflowEventChecks, {
+      bossBlock: true,
+      bossDone: true,
+      bossReject: true,
+      qualityDone: true,
+      warehouseInboundDone: true,
+      warehouseUrge: true,
+    })
     if (options.report) {
       const report = buildSmokeReport({
         options,
@@ -2288,6 +2562,7 @@ async function main() {
         updatedQualityTask,
         updatedWarehouseInboundTask,
         updatedWarehouseTask,
+        workflowEventChecks,
       })
       await writeJSONReport(options.report, report)
     }

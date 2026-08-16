@@ -167,6 +167,88 @@ func TestWorkflowRepo_GetWorkflowTaskBoardReturnsBoundedExclusiveLanes(t *testin
 	}
 }
 
+func TestWorkflowRepo_GetWorkflowTaskBoardAppliesFocusedLaneSortContract(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:workflow_task_board_sort?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+	repo := NewWorkflowRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard))
+	snapshotAt := time.Date(2026, 7, 13, 12, 0, 0, 0, time.UTC)
+
+	type fixture struct {
+		code        string
+		status      string
+		priority    int16
+		critical    bool
+		dueAt       *time.Time
+		completedAt *time.Time
+		createdAt   time.Time
+	}
+	actionableEarlyDue := snapshotAt.Add(48 * time.Hour)
+	actionableMiddleDue := snapshotAt.Add(72 * time.Hour)
+	actionableLateDue := snapshotAt.Add(96 * time.Hour)
+	finishedOld := snapshotAt.Add(-3 * time.Hour)
+	finishedNew := snapshotAt.Add(-time.Hour)
+	fixtures := []fixture{
+		{code: "SORT-CRITICAL", status: "ready", critical: true, dueAt: &actionableLateDue, createdAt: snapshotAt.Add(-3 * time.Hour)},
+		{code: "SORT-HIGH", status: "ready", priority: 8, dueAt: &actionableMiddleDue, createdAt: snapshotAt.Add(-2 * time.Hour)},
+		{code: "SORT-EARLY", status: "ready", priority: 1, dueAt: &actionableEarlyDue, createdAt: snapshotAt.Add(-time.Hour)},
+		{code: "SORT-FINISHED-OLD", status: "done", completedAt: &finishedOld, createdAt: snapshotAt.Add(-4 * time.Hour)},
+		{code: "SORT-FINISHED-NEW", status: "done", completedAt: &finishedNew, createdAt: snapshotAt.Add(-2 * time.Hour)},
+		{code: "SORT-FINISHED-UNKNOWN", status: "done", createdAt: snapshotAt},
+	}
+	for index, fixture := range fixtures {
+		builder := client.WorkflowTask.Create().
+			SetTaskCode(fixture.code).
+			SetTaskGroup("board-sort-test").
+			SetTaskName(fixture.code).
+			SetSourceType("board-sort-test").
+			SetSourceID(index + 1).
+			SetTaskStatusKey(fixture.status).
+			SetOwnerRoleKey(biz.SalesRoleKey).
+			SetPriority(fixture.priority).
+			SetCriticalPath(fixture.critical).
+			SetNillableDueAt(fixture.dueAt).
+			SetNillableCompletedAt(fixture.completedAt).
+			SetCreatedAt(fixture.createdAt).
+			SetUpdatedAt(fixture.createdAt).
+			SetPayload(map[string]any{})
+		if _, err := builder.Save(ctx); err != nil {
+			t.Fatalf("create sort fixture %s: %v", fixture.code, err)
+		}
+	}
+
+	readCodes := func(laneKey, sortKey string) []string {
+		t.Helper()
+		board, err := repo.GetWorkflowTaskBoard(ctx, biz.WorkflowTaskBoardQuery{
+			LaneKey:    laneKey,
+			Sort:       sortKey,
+			Limit:      10,
+			SnapshotAt: snapshotAt,
+		})
+		if err != nil {
+			t.Fatalf("get sorted board lane=%s sort=%s: %v", laneKey, sortKey, err)
+		}
+		codes := make([]string, 0, len(board.Lanes[0].Tasks))
+		for _, task := range board.Lanes[0].Tasks {
+			codes = append(codes, task.TaskCode)
+		}
+		return codes
+	}
+
+	if got, want := readCodes(biz.WorkflowTaskBoardLaneActionable, biz.WorkflowTaskBoardSortSmart), []string{"SORT-CRITICAL", "SORT-HIGH", "SORT-EARLY"}; fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("smart sort=%v, want %v", got, want)
+	}
+	if got, want := readCodes(biz.WorkflowTaskBoardLaneActionable, biz.WorkflowTaskBoardSortDueSoon), []string{"SORT-EARLY", "SORT-HIGH", "SORT-CRITICAL"}; fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("due sort=%v, want %v", got, want)
+	}
+	if got, want := readCodes(biz.WorkflowTaskBoardLaneActionable, biz.WorkflowTaskBoardSortNewest), []string{"SORT-EARLY", "SORT-HIGH", "SORT-CRITICAL"}; fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("newest sort=%v, want %v", got, want)
+	}
+	if got, want := readCodes(biz.WorkflowTaskBoardLaneFinished, biz.WorkflowTaskBoardSortSmart), []string{"SORT-FINISHED-NEW", "SORT-FINISHED-OLD", "SORT-FINISHED-UNKNOWN"}; fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("finished smart sort=%v, want %v", got, want)
+	}
+}
+
 func TestWorkflowRepo_GetWorkflowTaskBoardApprovalOnlyUsesCapabilityContract(t *testing.T) {
 	ctx := context.Background()
 	client := enttest.Open(t, dialect.SQLite, "file:workflow_task_board_approval?mode=memory&cache=shared&_fk=1")

@@ -327,7 +327,7 @@ Tab 切换属于请求生命周期事件：旧请求必须取消或由 latest-re
 
 ### 演练与恢复目录
 
-`/__dev/drill-recovery` 不是第二套发布平台。它只读复用版本中心摘要、固定目标 preflight、不可变 Release 和 promotion / rollback operation，把“什么时候演练、风险多大、该留下什么证据”按优先级组织成一个目录；目标写入仍回到版本中心按既有 prepare / confirm / readback 合同执行。
+`/__dev/drill-recovery` 不是第二套发布平台。它只读复用版本中心摘要、固定目标 preflight、不可变 Release、promotion / rollback operation，以及固定输出根下通过校验的隔离恢复报告，把“什么时候演练、风险多大、该留下什么证据”按优先级组织成一个目录；目标写入仍回到版本中心按既有 prepare / confirm / readback 合同执行。
 
 页面遵循结论优先的工作台密度：首段只给当前恢复准备度、目标身份和一个下一步；六类演练使用单一紧凑清单，桌面只默认展开当前建议，窄屏默认全部折叠；目的、变化触发、完成证据和安全边界按需查看。最近记录与人工接管降为辅助区，不再用六张大卡重复展示同层信息。
 
@@ -340,7 +340,7 @@ Tab 切换属于请求生命周期事件：旧请求必须取消或由 latest-re
 | P1     | 新服务器或正式环境切换   | 只在目标、域名、证书、网络或正式环境变化时                   | 先登记新目标和独立 preflight，不复制 test-133 凭据或接受临时输入         |
 | P2     | 故障注入与恢复           | 具备隔离环境和固定执行器后每季度                             | 默认关闭，禁止对当前试用或正式环境临时制造故障                           |
 
-页面只把精确证据标为“最近证据可用”：相同 SHA 必须存在 `requested exact SHA is already current and healthy` 的 passed operation；回滚演练必须存在 passed rollback，且之后已 passed promotion 回到当前运行 SHA。其它正常发布、旧 operation 或只有一半的回滚链仍显示“需按门禁准备 / 未证明”。
+页面只把精确证据标为“最近证据可用”：相同 SHA 必须存在 `requested exact SHA is already current and healthy` 的 passed operation；回滚演练必须存在 passed rollback，且之后已 passed promotion 回到当前运行 SHA；备份恢复只扫描 `output/customers/<customer>/backup-restore-rehearsal` 固定根下的 `backup-restore-report.json`，报告必须绑定当前甲方、语义环境和 exact SHA，证明专用备份角色、隔离容器恢复并清理、migration pending 为零、权限与数据审计以及 health / ready / web smoke 全部通过，且核验时间仍在 35 天的月度复核窗口内。页面不接受浏览器传入报告路径，也不返回 DSN、命令或 smoke URL。其它正常发布、旧版本报告、过期报告、错误目标、旧 operation 或只有一半的回滚链仍显示“需按门禁准备 / 未证明”。
 
 新增服务器或正式环境时，deployment target registry 增加一个新的语义环境身份和固定技术 key，并为它补齐 SSH、文件根、Compose、数据库、公网入口、容量、独立 preflight 与 operation 合同。工作台按 `purpose + target key` 展示“客户试用环境 / 正式生产环境”，不按 IP 或机器名复制菜单和页面；未登记目标保持失败关闭。
 

@@ -136,6 +136,10 @@ const STATUS_PRESENTATION = Object.freeze({
 })
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/u
+const TIMESTAMP_WITH_TIME_ZONE_PATTERN =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u
+const BACKUP_RESTORE_CURRENT_WINDOW_MS = 35 * 24 * 60 * 60 * 1000
+const BACKUP_RESTORE_CLOCK_SKEW_MS = 5 * 60 * 1000
 
 function isExactSha(value) {
   return SHA_PATTERN.test(String(value || ''))
@@ -176,6 +180,97 @@ function newestOperation(operations = [], predicate = () => true) {
     )[0]
 }
 
+function backupRestoreEvidenceState(summary, nowMs) {
+  const receipt = summary?.recovery?.backupRestore
+  if (!receipt) {
+    return {
+      status: 'guarded',
+      at: '',
+      operationId: '',
+      note: '尚无通过校验的隔离恢复回执',
+    }
+  }
+  const verifiedAt = String(receipt.verifiedAt || '')
+  const verifiedAtMs = Date.parse(verifiedAt)
+  const validContract =
+    receipt.schemaVersion === 'plush.backup-restore-evidence/v1' &&
+    receipt.status === 'passed' &&
+    isExactSha(receipt.releaseVersion) &&
+    typeof receipt.target === 'string' &&
+    typeof receipt.customer === 'string' &&
+    typeof receipt.environment === 'string' &&
+    typeof receipt.backupId === 'string' &&
+    receipt.backupId !== '' &&
+    TIMESTAMP_WITH_TIME_ZONE_PATTERN.test(verifiedAt) &&
+    Number.isFinite(verifiedAtMs) &&
+    /^[0-9a-f]{64}$/u.test(String(receipt.reportSha256 || '')) &&
+    /^[0-9a-f]{64}$/u.test(String(receipt.backupSha256 || '')) &&
+    Number.isSafeInteger(receipt.backupSizeBytes) &&
+    receipt.backupSizeBytes > 0 &&
+    receipt.pendingFiles === 0 &&
+    receipt.disposableCleanup === 'passed'
+  if (!validContract) {
+    return {
+      status: 'guarded',
+      at: '',
+      operationId: '',
+      note: '隔离恢复回执未通过页面合同校验',
+    }
+  }
+  const target = resolveDevRecoveryTarget(summary)
+  if (
+    receipt.target !== target.key ||
+    receipt.customer !== target.customer ||
+    receipt.environment !== target.trialTarget
+  ) {
+    return {
+      status: 'guarded',
+      at: verifiedAt,
+      operationId: receipt.backupId,
+      note: '隔离恢复回执属于其他目标、甲方或环境',
+    }
+  }
+  const currentSha = targetRuntimeSha(summary)
+  if (!currentSha || receipt.releaseVersion !== currentSha) {
+    return {
+      status: 'guarded',
+      at: verifiedAt,
+      operationId: receipt.backupId,
+      note: '隔离恢复回执属于其他运行版本',
+    }
+  }
+  if (verifiedAtMs > nowMs + BACKUP_RESTORE_CLOCK_SKEW_MS) {
+    return {
+      status: 'guarded',
+      at: verifiedAt,
+      operationId: receipt.backupId,
+      note: '隔离恢复回执时间晚于当前核对时间',
+    }
+  }
+  if (nowMs - verifiedAtMs > BACKUP_RESTORE_CURRENT_WINDOW_MS) {
+    return {
+      status: 'guarded',
+      at: verifiedAt,
+      operationId: receipt.backupId,
+      note: '隔离恢复回执已超过每月复核窗口',
+    }
+  }
+  if (summary?.target?.status !== 'passed') {
+    return {
+      status: 'guarded',
+      at: verifiedAt,
+      operationId: receipt.backupId,
+      note: '演练回执有效，但当前目标预检未通过',
+    }
+  }
+  return {
+    status: 'current',
+    at: verifiedAt,
+    operationId: receipt.backupId,
+    note: `隔离恢复回执已通过 · 版本 ${currentSha.slice(0, 12)}`,
+  }
+}
+
 export function devDrillRiskPresentation(risk) {
   return RISK_PRESENTATION[risk] || RISK_PRESENTATION.interrupting
 }
@@ -203,7 +298,7 @@ export function resolveDevRecoveryTarget(summary = {}) {
   })
 }
 
-function drillStatus(drill, summary) {
+function drillStatus(drill, summary, nowMs) {
   const currentSha = targetRuntimeSha(summary)
   const targetPassed = summary?.target?.status === 'passed'
   const versions = Array.isArray(summary?.versions) ? summary.versions : []
@@ -256,11 +351,13 @@ function drillStatus(drill, summary) {
       ? 'guarded'
       : 'blocked'
   }
-  if (drill.key === 'backup-restore-isolated') return 'guarded'
+  if (drill.key === 'backup-restore-isolated') {
+    return backupRestoreEvidenceState(summary, nowMs).status
+  }
   return 'planned'
 }
 
-function drillEvidence(drill, summary, status) {
+function drillEvidence(drill, summary, status, nowMs) {
   const operations = targetOperations(summary)
   const currentSha = targetRuntimeSha(summary)
   if (drill.key === 'target-readiness') {
@@ -309,18 +406,31 @@ function drillEvidence(drill, summary, status) {
             : '尚无完整回滚与再前滚证据',
     }
   }
+  if (drill.key === 'backup-restore-isolated') {
+    const evidence = backupRestoreEvidenceState(summary, nowMs)
+    return {
+      at: evidence.at,
+      operationId: evidence.operationId,
+      note: evidence.note,
+    }
+  }
   return { at: '', operationId: '', note: '当前没有可冒充演练结果的正式回执' }
 }
 
-export function buildDevRecoveryOverview(summary = {}) {
+export function buildDevRecoveryOverview(
+  summary = {},
+  { nowMs = Date.now() } = {}
+) {
   const drills = DEV_DRILL_RECOVERY_CATALOG.map((drill) => {
-    const status = drillStatus(drill, summary)
+    const status = drillStatus(drill, summary, nowMs)
     return Object.freeze({
       ...drill,
       status,
       statusPresentation: devDrillStatusPresentation(status),
       riskPresentation: devDrillRiskPresentation(drill.risk),
-      evidenceState: Object.freeze(drillEvidence(drill, summary, status)),
+      evidenceState: Object.freeze(
+        drillEvidence(drill, summary, status, nowMs)
+      ),
       action:
         drill.surface === 'refresh'
           ? Object.freeze({ type: 'refresh', label: '刷新只读核验' })

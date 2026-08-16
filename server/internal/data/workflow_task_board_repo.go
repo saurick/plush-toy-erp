@@ -148,9 +148,13 @@ func loadWorkflowTaskBoard(ctx context.Context, client *ent.Client, query biz.Wo
 		if predicateErr != nil {
 			return nil, predicateErr
 		}
+		order, orderErr := workflowTaskBoardOrder(query.Sort, laneKey)
+		if orderErr != nil {
+			return nil, orderErr
+		}
 		rows, rowsErr := baseQuery.Clone().
 			Where(lanePredicate).
-			Order(ent.Desc(workflowtask.FieldID)).
+			Order(order...).
 			Limit(query.Limit).
 			Offset(query.Offset).
 			All(ctx)
@@ -184,6 +188,38 @@ func loadWorkflowTaskBoard(ctx context.Context, client *ent.Client, query biz.Wo
 		SourceTypes:   sourceTypes,
 		OwnerRoleKeys: ownerRoleKeys,
 	}, nil
+}
+
+func workflowTaskBoardOrder(sortKey, laneKey string) ([]workflowtask.OrderOption, error) {
+	switch sortKey {
+	case "", biz.WorkflowTaskBoardSortSmart:
+		if laneKey == biz.WorkflowTaskBoardLaneFinished {
+			return []workflowtask.OrderOption{
+				workflowtask.ByCompletedAt(entsql.OrderDesc(), entsql.OrderNullsLast()),
+				workflowtask.ByUpdatedAt(entsql.OrderDesc()),
+				ent.Desc(workflowtask.FieldID),
+			}, nil
+		}
+		return []workflowtask.OrderOption{
+			workflowtask.ByCriticalPath(entsql.OrderDesc()),
+			workflowtask.ByPriority(entsql.OrderDesc()),
+			workflowtask.ByDueAt(entsql.OrderAsc(), entsql.OrderNullsLast()),
+			ent.Desc(workflowtask.FieldID),
+		}, nil
+	case biz.WorkflowTaskBoardSortDueSoon:
+		return []workflowtask.OrderOption{
+			workflowtask.ByDueAt(entsql.OrderAsc(), entsql.OrderNullsLast()),
+			workflowtask.ByPriority(entsql.OrderDesc()),
+			ent.Desc(workflowtask.FieldID),
+		}, nil
+	case biz.WorkflowTaskBoardSortNewest:
+		return []workflowtask.OrderOption{
+			workflowtask.ByCreatedAt(entsql.OrderDesc()),
+			ent.Desc(workflowtask.FieldID),
+		}, nil
+	default:
+		return nil, biz.ErrBadParam
+	}
 }
 
 func applyWorkflowTaskBoardVisibility(query *ent.WorkflowTaskQuery, filter biz.WorkflowTaskBoardQuery) *ent.WorkflowTaskQuery {

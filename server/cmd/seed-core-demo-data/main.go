@@ -107,6 +107,10 @@ func main() {
 	fmt.Println("simulated_only=true real_customer_import=false no_direct_fact_posting=true")
 	if referenceMode {
 		fmt.Println(referenceModeReadback(*referencesOnly, *scenarioReferences))
+		fmt.Printf("retired_legacy_units=%d retired_legacy_warehouses=%d historical_references_preserved=true\n",
+			len(result.RetiredUnitIDs),
+			len(result.RetiredWarehouseIDs),
+		)
 		fmt.Printf("primary_unit_id=%d primary_warehouse_id=%d\n",
 			result.PrimaryUnitID,
 			result.PrimaryWarehouseID,

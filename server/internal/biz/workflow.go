@@ -10,6 +10,18 @@ import (
 
 const WorkflowTaskEventPageMaxLimit = 100
 
+const (
+	WorkflowTaskCodeMaxLength               = 64
+	WorkflowTaskGroupMaxLength              = 128
+	WorkflowTaskNameMaxLength               = 128
+	WorkflowTaskSourceTypeMaxLength         = 64
+	WorkflowTaskSourceNoMaxLength           = 128
+	WorkflowTaskOwnerRoleKeyMaxLength       = 32
+	WorkflowTaskOwnerPoolKeyMaxLength       = 64
+	WorkflowTaskRequiredCapabilityMaxLength = 128
+	WorkflowTaskConfigRevisionMaxLength     = 128
+)
+
 func (uc *WorkflowUsecase) Metadata() (taskStates, businessStates []WorkflowStateOption) {
 	return WorkflowTaskStates(), WorkflowBusinessStates()
 }
@@ -811,6 +823,7 @@ func normalizeWorkflowTaskCreate(in WorkflowTaskCreate) (WorkflowTaskCreate, err
 	in.TaskGroup = strings.TrimSpace(in.TaskGroup)
 	in.TaskName = strings.TrimSpace(in.TaskName)
 	in.SourceType = strings.TrimSpace(in.SourceType)
+	in.SourceNo = normalizeWorkflowOptionalStringPtr(in.SourceNo)
 	in.TaskStatusKey = strings.TrimSpace(in.TaskStatusKey)
 	in.OwnerRoleKey = NormalizeRoleKey(in.OwnerRoleKey)
 	in.OwnerPoolKey = normalizeWorkflowOptionalStringPtr(in.OwnerPoolKey)
@@ -827,6 +840,10 @@ func normalizeWorkflowTaskCreate(in WorkflowTaskCreate) (WorkflowTaskCreate, err
 	}
 	in.ConfigRevision = normalizeWorkflowOptionalStringPtr(in.ConfigRevision)
 	var err error
+	in.AssigneeID, err = normalizeWorkflowOptionalPositiveIntPtr(in.AssigneeID)
+	if err != nil {
+		return WorkflowTaskCreate{}, err
+	}
 	in.ProcessInstanceID, err = normalizeWorkflowOptionalPositiveIntPtr(in.ProcessInstanceID)
 	if err != nil {
 		return WorkflowTaskCreate{}, err
@@ -848,6 +865,9 @@ func normalizeWorkflowTaskCreate(in WorkflowTaskCreate) (WorkflowTaskCreate, err
 	if workflowCreateHasNumberedPhaseLabel(in) {
 		return WorkflowTaskCreate{}, ErrNumberedImplementationStageLabel
 	}
+	if !workflowTaskCreateTextLengthsValid(in) {
+		return WorkflowTaskCreate{}, ErrBadParam
+	}
 	if in.TaskCode == "" || in.TaskGroup == "" || in.TaskName == "" || in.SourceType == "" || in.SourceID <= 0 || in.OwnerRoleKey == "" {
 		return WorkflowTaskCreate{}, ErrBadParam
 	}
@@ -865,6 +885,30 @@ func normalizeWorkflowTaskCreate(in WorkflowTaskCreate) (WorkflowTaskCreate, err
 		}
 	}
 	return in, nil
+}
+
+func workflowTaskCreateTextLengthsValid(in WorkflowTaskCreate) bool {
+	if utf8.RuneCountInString(in.TaskCode) > WorkflowTaskCodeMaxLength ||
+		utf8.RuneCountInString(in.TaskGroup) > WorkflowTaskGroupMaxLength ||
+		utf8.RuneCountInString(in.TaskName) > WorkflowTaskNameMaxLength ||
+		utf8.RuneCountInString(in.SourceType) > WorkflowTaskSourceTypeMaxLength ||
+		utf8.RuneCountInString(in.OwnerRoleKey) > WorkflowTaskOwnerRoleKeyMaxLength {
+		return false
+	}
+	for _, item := range []struct {
+		value *string
+		limit int
+	}{
+		{value: in.SourceNo, limit: WorkflowTaskSourceNoMaxLength},
+		{value: in.OwnerPoolKey, limit: WorkflowTaskOwnerPoolKeyMaxLength},
+		{value: in.RequiredCapabilityKey, limit: WorkflowTaskRequiredCapabilityMaxLength},
+		{value: in.ConfigRevision, limit: WorkflowTaskConfigRevisionMaxLength},
+	} {
+		if item.value != nil && utf8.RuneCountInString(*item.value) > item.limit {
+			return false
+		}
+	}
+	return true
 }
 
 func normalizeWorkflowOptionalStringPtr(value *string) *string {

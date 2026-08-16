@@ -101,16 +101,39 @@ type CoreDemoReferenceSeedDataset struct {
 }
 
 type CoreDemoSeedResult struct {
-	Prefix             string
-	UnitIDs            map[string]int
-	MaterialIDs        map[string]int
-	ProductIDs         map[string]int
-	WarehouseIDs       map[string]int
-	ProcessIDs         map[string]int
-	BOMHeaderIDs       map[string]int
-	PrimaryUnitID      int
-	PrimaryProductID   int
-	PrimaryWarehouseID int
+	Prefix              string
+	UnitIDs             map[string]int
+	MaterialIDs         map[string]int
+	ProductIDs          map[string]int
+	WarehouseIDs        map[string]int
+	ProcessIDs          map[string]int
+	BOMHeaderIDs        map[string]int
+	RetiredUnitIDs      map[string]int
+	RetiredWarehouseIDs map[string]int
+	PrimaryUnitID       int
+	PrimaryProductID    int
+	PrimaryWarehouseID  int
+}
+
+// LegacyCoreDemoReferenceSeedDatasets returns the exact previously managed
+// reference identities that must no longer remain active after the current
+// acceptance references are reconciled. Historical source and fact rows keep
+// their original foreign keys; only future selection is disabled.
+func LegacyCoreDemoReferenceSeedDatasets() []CoreDemoReferenceSeedDataset {
+	return []CoreDemoReferenceSeedDataset{
+		{
+			Prefix: "YS5",
+			Units: []CoreDemoUnitSeed{
+				{Code: "YS5-DW-01", Name: "件", Precision: 0},
+			},
+			Warehouses: []CoreDemoWarehouseSeed{
+				{Code: "YS5-CK-01", Name: "原料仓", Type: "RAW_MATERIAL"},
+				{Code: "YS5-CK-02", Name: "成品仓", Type: "FINISHED_GOODS"},
+				{Code: "YS5-CK-03", Name: "待检仓", Type: "QC_HOLD"},
+				{Code: "YS5-CK-04", Name: "在制仓", Type: "WORK_IN_PROCESS"},
+			},
+		},
+	}
 }
 
 func DefaultCoreDemoReferenceSeedDataset() CoreDemoReferenceSeedDataset {
@@ -362,28 +385,9 @@ func SeedCoreDemoReferences(ctx context.Context, db *sql.DB, dataset CoreDemoRef
 	}
 	defer rollbackSQLTx(ctx, tx, nil)
 
-	result := &CoreDemoSeedResult{
-		Prefix:       dataset.Prefix,
-		UnitIDs:      map[string]int{},
-		MaterialIDs:  map[string]int{},
-		ProductIDs:   map[string]int{},
-		WarehouseIDs: map[string]int{},
-		ProcessIDs:   map[string]int{},
-		BOMHeaderIDs: map[string]int{},
-	}
-	for _, unit := range dataset.Units {
-		id, err := upsertCoreDemoUnit(ctx, tx, unit)
-		if err != nil {
-			return nil, err
-		}
-		result.UnitIDs[unit.Code] = id
-	}
-	for _, warehouse := range dataset.Warehouses {
-		id, err := upsertCoreDemoWarehouse(ctx, tx, warehouse)
-		if err != nil {
-			return nil, err
-		}
-		result.WarehouseIDs[warehouse.Code] = id
+	result, err := ReconcileCoreDemoReferencesInTx(ctx, tx, dataset)
+	if err != nil {
+		return nil, err
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -399,6 +403,129 @@ func SeedCoreDemoReferences(ctx context.Context, db *sql.DB, dataset CoreDemoRef
 		}
 	}
 	return result, nil
+}
+
+// ReconcileCoreDemoReferencesInTx is shared by the guarded local and 133
+// bootstrap entrypoints. The caller owns the transaction and target identity
+// checks; this function only writes the exact current allowlist and retires
+// exact previously managed references.
+func ReconcileCoreDemoReferencesInTx(ctx context.Context, tx *sql.Tx, dataset CoreDemoReferenceSeedDataset) (*CoreDemoSeedResult, error) {
+	if tx == nil {
+		return nil, ErrCoreDemoSeedMissingDB
+	}
+	if err := validateCoreDemoReferenceSeedDataset(dataset); err != nil {
+		return nil, err
+	}
+	result := &CoreDemoSeedResult{
+		Prefix:              dataset.Prefix,
+		UnitIDs:             map[string]int{},
+		MaterialIDs:         map[string]int{},
+		ProductIDs:          map[string]int{},
+		WarehouseIDs:        map[string]int{},
+		ProcessIDs:          map[string]int{},
+		BOMHeaderIDs:        map[string]int{},
+		RetiredUnitIDs:      map[string]int{},
+		RetiredWarehouseIDs: map[string]int{},
+	}
+	for _, unit := range dataset.Units {
+		id, err := upsertCoreDemoUnit(ctx, tx, unit)
+		if err != nil {
+			return nil, err
+		}
+		result.UnitIDs[unit.Code] = id
+	}
+	for _, warehouse := range dataset.Warehouses {
+		id, err := upsertCoreDemoWarehouse(ctx, tx, warehouse)
+		if err != nil {
+			return nil, err
+		}
+		result.WarehouseIDs[warehouse.Code] = id
+	}
+	if err := retireLegacyCoreDemoReferences(ctx, tx, result); err != nil {
+		return nil, err
+	}
+	result.PrimaryUnitID = result.UnitIDs[dataset.Units[0].Code]
+	for _, warehouse := range dataset.Warehouses {
+		if warehouse.Type == "FINISHED_GOODS" {
+			result.PrimaryWarehouseID = result.WarehouseIDs[warehouse.Code]
+			break
+		}
+	}
+	return result, nil
+}
+
+func retireLegacyCoreDemoReferences(ctx context.Context, tx *sql.Tx, result *CoreDemoSeedResult) error {
+	for _, legacy := range LegacyCoreDemoReferenceSeedDatasets() {
+		for _, unit := range legacy.Units {
+			var id int
+			var name string
+			var precision int
+			var active bool
+			err := tx.QueryRowContext(ctx, `
+SELECT id, name, precision, is_active
+FROM units
+WHERE code = $1
+FOR UPDATE`, unit.Code).Scan(&id, &name, &precision, &active)
+			if errors.Is(err, sql.ErrNoRows) {
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			if name != unit.Name || precision != unit.Precision {
+				return fmt.Errorf("%w: legacy unit %q identity drift", ErrCoreDemoSeedInvalidRecord, unit.Code)
+			}
+			if !active {
+				continue
+			}
+			update, err := tx.ExecContext(ctx, `
+UPDATE units
+SET is_active = FALSE, updated_at = NOW()
+WHERE id = $1 AND is_active IS TRUE`, id)
+			if err != nil {
+				return err
+			}
+			if affected, err := update.RowsAffected(); err != nil || affected != 1 {
+				return fmt.Errorf("%w: legacy unit %q retirement was not atomic", ErrCoreDemoSeedInvalidRecord, unit.Code)
+			}
+			result.RetiredUnitIDs[unit.Code] = id
+		}
+		for _, warehouse := range legacy.Warehouses {
+			var id int
+			var name string
+			var warehouseType string
+			var active bool
+			err := tx.QueryRowContext(ctx, `
+SELECT id, name, type, is_active
+FROM warehouses
+WHERE code = $1
+FOR UPDATE`, warehouse.Code).Scan(&id, &name, &warehouseType, &active)
+			if errors.Is(err, sql.ErrNoRows) {
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			if name != warehouse.Name || warehouseType != warehouse.Type {
+				return fmt.Errorf("%w: legacy warehouse %q identity drift", ErrCoreDemoSeedInvalidRecord, warehouse.Code)
+			}
+			if !active {
+				continue
+			}
+			update, err := tx.ExecContext(ctx, `
+UPDATE warehouses
+SET is_active = FALSE, updated_at = NOW()
+WHERE id = $1 AND is_active IS TRUE`, id)
+			if err != nil {
+				return err
+			}
+			if affected, err := update.RowsAffected(); err != nil || affected != 1 {
+				return fmt.Errorf("%w: legacy warehouse %q retirement was not atomic", ErrCoreDemoSeedInvalidRecord, warehouse.Code)
+			}
+			result.RetiredWarehouseIDs[warehouse.Code] = id
+		}
+	}
+	return nil
 }
 
 func SeedCoreDemoData(ctx context.Context, db *sql.DB, dataset CoreDemoSeedDataset) (*CoreDemoSeedResult, error) {

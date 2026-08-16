@@ -41,6 +41,7 @@ const testFiles = [
   'src/erp/utils/printWorkspace.test.mjs',
   'src/erp/utils/workflowTaskBoard.test.mjs',
   'src/erp/config/printTemplates.test.mjs',
+  '../scripts/qa/sales-order-field-chain-boundary.test.mjs',
 ]
 
 const usage = `用法:

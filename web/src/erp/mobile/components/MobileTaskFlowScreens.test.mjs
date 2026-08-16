@@ -387,6 +387,11 @@ test('mobile task receipt has explicit outcomes without fabricated actor or time
   assert.match(receiptScreenSource, /重新确认结果/u)
   assert.match(receiptScreenSource, /返回列表/u)
   assert.match(receiptScreenSource, /完成反馈/u)
+  assert.match(receiptScreenSource, /approvalTask \? '审批意见' : '完成反馈'/u)
+  assert.match(
+    receiptScreenSource,
+    /isWorkflowApprovalTask\(task\)[\s\S]*candidateActionKey === 'done'[\s\S]*return '审批通过'/u
+  )
   assert.match(receiptScreenSource, /处理说明/u)
   assert.match(receiptScreenSource, /历史处理线索/u)
   assert.match(receiptScreenSource, /本次确认状态/u)

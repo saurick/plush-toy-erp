@@ -114,6 +114,7 @@ function issueDescription(issues = []) {
 function operationActionLabel(action) {
   if (action === 'release') return '发布制品'
   if (action === 'promote') return '部署 133'
+  if (action === 'rebuild-database') return '重建 133 数据库'
   return '回滚'
 }
 

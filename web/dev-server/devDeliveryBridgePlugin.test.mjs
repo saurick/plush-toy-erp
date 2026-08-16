@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { Readable } from 'node:stream'
@@ -20,6 +20,7 @@ import {
   createDevDeliveryService,
   validateDevDeliveryAction,
 } from './devDeliveryBridgePlugin.mjs'
+import { readLatestBackupRestoreEvidence } from './devRecoveryEvidence.mjs'
 
 const SHA = 'a'.repeat(40)
 const OPERATION_ID = '11111111-1111-4111-8111-111111111111'
@@ -33,6 +34,80 @@ function createProject(t) {
     root,
     store: resolveDeliveryOperationStore(root),
   }
+}
+
+function backupRestoreReport(overrides = {}) {
+  const report = {
+    customerCode: 'yoyoosun',
+    environment: 'customer-trial-133',
+    releaseVersion: SHA,
+    backupId: 'br-yoyoosun-20260814T225613+0800',
+    verifiedAt: '2026-08-14T14:56:26Z',
+    restoreTarget: 'temp-postgres-container:postgres:18.1:removed-after-run',
+    backup: {
+      databaseBackupSize: 837_713,
+      databaseBackupHash: 'b'.repeat(64),
+      migrationVersion: '20260812043327',
+      sourcePolicy: 'dedicated-backup',
+      sourceRole: 'erp_backup',
+    },
+    restore: {
+      restoreTestStatus: 'passed-temp-container',
+      migrationBeforeApply: '20260812043327',
+      restoreMigrationVersion: '20260812043327',
+      pendingFiles: '0',
+      schemaReadbackSha256: 'c'.repeat(64),
+      programmability: '0|0|0',
+      permissionReadbackStatus: 'passed',
+      populatedUpgradeAuditStatus: 'passed',
+      customerConfigCutoverAuditStatus: 'passed',
+      databaseConstraintAuditStatus: 'passed',
+    },
+    smoke: {
+      smokeQueryStatus: 'passed',
+      publicTableCount: '74',
+      backendHealthStatus: 'passed',
+      backendReadyStatus: 'passed',
+      webSmokeStatus: 'passed',
+    },
+    redaction: {
+      containsSecrets: false,
+      containsRawCustomerRows: false,
+      containsDumpContent: false,
+      containsFullDsn: false,
+    },
+    summary: {
+      backupCreated: true,
+      restoreCompleted: true,
+      migrationStatus: 'ok',
+      populatedUpgradeAuditStatus: 'passed',
+      customerConfigCutoverAuditStatus: 'passed',
+      databaseConstraintAuditStatus: 'passed',
+      smokeQueryStatus: 'passed',
+    },
+  }
+  return {
+    ...report,
+    ...overrides,
+    backup: { ...report.backup, ...overrides.backup },
+    restore: { ...report.restore, ...overrides.restore },
+    smoke: { ...report.smoke, ...overrides.smoke },
+    redaction: { ...report.redaction, ...overrides.redaction },
+    summary: { ...report.summary, ...overrides.summary },
+  }
+}
+
+function writeBackupRestoreReport(root, report, directory = 'target/run') {
+  const reportDirectory = path.join(
+    root,
+    'output/customers/yoyoosun/backup-restore-rehearsal',
+    directory
+  )
+  mkdirSync(reportDirectory, { recursive: true })
+  writeFileSync(
+    path.join(reportDirectory, 'backup-restore-report.json'),
+    `${JSON.stringify(report)}\n`
+  )
 }
 
 function requestMiddleware(
@@ -169,6 +244,100 @@ test('delivery action contract accepts fixed actions and bounded explicit retry'
       }),
     /unsupported fields/u
   )
+})
+
+test('recovery evidence reader exposes only the newest strict passed receipt', (t) => {
+  const { root } = createProject(t)
+  writeBackupRestoreReport(root, backupRestoreReport(), 'target/valid')
+  writeBackupRestoreReport(
+    root,
+    backupRestoreReport({
+      backupId: 'br-yoyoosun-20260815T010000+0800',
+      verifiedAt: '2026-08-14T17:00:00Z',
+      summary: { restoreCompleted: false },
+    }),
+    'target/invalid-newer'
+  )
+
+  const receipt = readLatestBackupRestoreEvidence({
+    projectRoot: root,
+    target: 'test-133',
+    customer: 'yoyoosun',
+    environment: 'customer-trial-133',
+  })
+  assert.equal(receipt.status, 'passed')
+  assert.equal(receipt.target, 'test-133')
+  assert.equal(receipt.customer, 'yoyoosun')
+  assert.equal(receipt.releaseVersion, SHA)
+  assert.equal(receipt.verifiedAt, '2026-08-14T14:56:26.000Z')
+  assert.equal(receipt.pendingFiles, 0)
+  assert.equal(receipt.disposableCleanup, 'passed')
+  assert.match(receipt.reportPath, /^output\/customers\/yoyoosun\//u)
+  assert.match(receipt.reportSha256, /^[0-9a-f]{64}$/u)
+  assert.equal(Object.hasOwn(receipt, 'restoreTarget'), false)
+  assert.equal(Object.hasOwn(receipt, 'sourceAlias'), false)
+  assert.equal(Object.hasOwn(receipt, 'smoke'), false)
+})
+
+test('recovery evidence reader rejects a report that does not prove cleanup', (t) => {
+  const { root } = createProject(t)
+  writeBackupRestoreReport(
+    root,
+    backupRestoreReport({
+      restoreTarget: 'temp-postgres-container:still-running',
+    })
+  )
+  assert.equal(
+    readLatestBackupRestoreEvidence({
+      projectRoot: root,
+      target: 'test-133',
+      customer: 'yoyoosun',
+      environment: 'customer-trial-133',
+    }),
+    null
+  )
+})
+
+test('delivery summary binds a recovery receipt to registered target identity', async (t) => {
+  const { root, store } = createProject(t)
+  const receipt = Object.freeze({ status: 'passed', backupId: 'br-fixed' })
+  const contexts = []
+  const service = createDevDeliveryService({
+    projectRoot: root,
+    operationStore: store,
+    provider: {
+      listVersions: () => [],
+      getReleaseStatus: () => ({ status: 'missing' }),
+      dispatchRelease: () => {},
+      downloadRelease: () => {},
+    },
+    readRepositoryState: () => ({
+      commit: SHA,
+      dirty: false,
+      fingerprint: 'd'.repeat(64),
+    }),
+    runPreflight: () => ({
+      status: 'passed',
+      target: 'test-133',
+      customer: 'yoyoosun',
+      trialTarget: 'customer-trial-133',
+    }),
+    readRecoveryEvidence(context) {
+      contexts.push(context)
+      return receipt
+    },
+  })
+
+  const result = await service.summary()
+  assert.strictEqual(result.recovery.backupRestore, receipt)
+  assert.deepEqual(contexts, [
+    {
+      projectRoot: root,
+      target: 'test-133',
+      customer: 'yoyoosun',
+      environment: 'customer-trial-133',
+    },
+  ])
 })
 
 test('delivery middleware requires loopback, same-origin and CSRF for writes', async () => {

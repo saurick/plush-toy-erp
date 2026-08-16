@@ -319,7 +319,7 @@ test("sales order line source switching clears stale SKU snapshots", () => {
   );
 });
 
-test("sales order print boundary stays explicit until a mapper is implemented", () => {
+test("FL_sales_order_order_no__print_is_not_applicable_without_template sales order print boundary stays explicit until a mapper is implemented", () => {
   const printBehaviorDoc = read("docs/打印模板字段与编辑行为清单.md");
   const printImplementationDoc = read("docs/打印模板实现原理.md");
   const printTemplates = read("web/src/erp/config/printTemplates.mjs");

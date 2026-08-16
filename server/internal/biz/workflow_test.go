@@ -210,6 +210,61 @@ func TestWorkflowUsecase_CreateTaskDefaultsReady(t *testing.T) {
 	}
 }
 
+func TestWorkflowUsecase_CreateTaskRejectsTextBeyondSchemaLimits(t *testing.T) {
+	base := func() WorkflowTaskCreate {
+		return WorkflowTaskCreate{
+			TaskCode:     "T-LIMIT-001",
+			TaskGroup:    "trial_sales_work",
+			TaskName:     "确认资料",
+			SourceType:   "trial-source",
+			SourceID:     1,
+			OwnerRoleKey: SalesRoleKey,
+		}
+	}
+	tests := []struct {
+		name   string
+		mutate func(*WorkflowTaskCreate)
+	}{
+		{name: "task code", mutate: func(in *WorkflowTaskCreate) { in.TaskCode = strings.Repeat("编", WorkflowTaskCodeMaxLength+1) }},
+		{name: "task group", mutate: func(in *WorkflowTaskCreate) { in.TaskGroup = strings.Repeat("组", WorkflowTaskGroupMaxLength+1) }},
+		{name: "task name", mutate: func(in *WorkflowTaskCreate) { in.TaskName = strings.Repeat("名", WorkflowTaskNameMaxLength+1) }},
+		{name: "source type", mutate: func(in *WorkflowTaskCreate) { in.SourceType = strings.Repeat("源", WorkflowTaskSourceTypeMaxLength+1) }},
+		{name: "source no", mutate: func(in *WorkflowTaskCreate) {
+			value := strings.Repeat("单", WorkflowTaskSourceNoMaxLength+1)
+			in.SourceNo = &value
+		}},
+		{name: "owner role", mutate: func(in *WorkflowTaskCreate) {
+			in.OwnerRoleKey = strings.Repeat("r", WorkflowTaskOwnerRoleKeyMaxLength+1)
+		}},
+		{name: "owner pool", mutate: func(in *WorkflowTaskCreate) {
+			value := strings.Repeat("p", WorkflowTaskOwnerPoolKeyMaxLength+1)
+			in.OwnerPoolKey = &value
+		}},
+		{name: "required capability", mutate: func(in *WorkflowTaskCreate) {
+			value := strings.Repeat("c", WorkflowTaskRequiredCapabilityMaxLength+1)
+			in.RequiredCapabilityKey = &value
+		}},
+		{name: "config revision", mutate: func(in *WorkflowTaskCreate) {
+			value := strings.Repeat("v", WorkflowTaskConfigRevisionMaxLength+1)
+			in.ConfigRevision = &value
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := base()
+			tt.mutate(&input)
+			repo := &stubWorkflowRepo{}
+			_, err := NewWorkflowUsecase(repo).CreateTask(context.Background(), &input, 7)
+			if !errors.Is(err, ErrBadParam) {
+				t.Fatalf("CreateTask error = %v, want ErrBadParam", err)
+			}
+			if repo.createTaskInput != nil {
+				t.Fatalf("oversized %s must not reach repo, got %#v", tt.name, repo.createTaskInput)
+			}
+		})
+	}
+}
+
 func TestWorkflowUsecase_CreateTaskRejectsSourceProducedGroups(t *testing.T) {
 	for _, taskGroup := range []string{
 		WorkflowSourceTaskProductionSchedulingGroup,

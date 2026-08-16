@@ -89,6 +89,16 @@ test('fieldLinkageCatalog: 字段、场景和用例目录保持自洽', () => {
     for (const fieldKey of item.fieldKeys) {
       assert.equal(fieldKeys.has(fieldKey), true, `${item.caseId}:${fieldKey}`)
     }
+    if (item.applicability === 'not_applicable') {
+      assert.equal(
+        String(item.notApplicableReason || '').trim().length > 0,
+        true,
+        item.caseId
+      )
+    } else {
+      assert.equal(item.applicability, undefined, item.caseId)
+      assert.equal(item.notApplicableReason, undefined, item.caseId)
+    }
   }
 
   for (const field of FIELD_LINKAGE_FIELD_CATALOG) {
@@ -120,6 +130,27 @@ test('FL_contract_terms__excluded_from_non_contract_business_scope fieldLinkageC
   assert.deepEqual(settlementTerms.requiredScenarioKeys, [
     'contract_terms_excluded_from_business_scope',
   ])
+})
+
+test('fieldLinkageCatalog: 销售订单打印未接通边界在覆盖报告中显式标记为不适用', () => {
+  const report = buildFieldLinkageCoverageViewModel({
+    cases: [
+      {
+        caseId:
+          'FL_sales_order_order_no__print_is_not_applicable_without_template',
+        status: 'pass',
+      },
+    ],
+  })
+  const orderNo = report.fields.find((item) => item.fieldKey === 'orderNo')
+  const scenario = orderNo.scenarios.find(
+    (item) => item.scenarioKey === 'print_business_draft_blocks_raw_id_fallback'
+  )
+
+  assert.equal(scenario.status, 'not_applicable')
+  assert.match(scenario.notApplicableReason, /未接|不包含销售订单/u)
+  assert.equal(orderNo.notApplicableScenarios, 1)
+  assert.equal(report.summary.notApplicableScenarios, 1)
 })
 
 test('fieldLinkageCatalog: 覆盖报告视图能区分已覆盖、部分覆盖和未覆盖字段', () => {
@@ -163,6 +194,7 @@ test('fieldLinkageCatalog: 覆盖报告视图能区分已覆盖、部分覆盖�
     report.summary.passedScenarios +
       report.summary.failedScenarios +
       report.summary.skippedScenarios +
+      report.summary.notApplicableScenarios +
       report.summary.missingScenarios
   )
   for (const field of report.fields) {
@@ -171,6 +203,7 @@ test('fieldLinkageCatalog: 覆盖报告视图能区分已覆盖、部分覆盖�
       field.passedScenarios +
         field.failedScenarios +
         field.skippedScenarios +
+        field.notApplicableScenarios +
         field.missingScenarios,
       field.fieldKey
     )

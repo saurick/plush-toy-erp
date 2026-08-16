@@ -791,6 +791,17 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
     testFile: 'web/src/erp/utils/masterDataOrderView.test.mjs',
   },
   {
+    caseId: 'FL_sales_order_order_no__print_is_not_applicable_without_template',
+    title: '销售订单未接正式打印模板时订单号打印缺值守卫明确为不适用',
+    fieldKeys: ['orderNo'],
+    scenarioKey: 'print_business_draft_blocks_raw_id_fallback',
+    layer: 'qa',
+    testFile: 'scripts/qa/sales-order-field-chain-boundary.test.mjs',
+    applicability: 'not_applicable',
+    notApplicableReason:
+      '当前正式打印模板不包含销售订单；打印 mapper、模板与入口接通前，该字段没有销售订单打印业务草稿。',
+  },
+  {
     caseId: 'FL_sales_order_source_no__retains_customer_order_no_snapshot',
     title: '销售订单保存参数保留客户来源单号快照',
     fieldKeys: ['sourceNo'],
@@ -973,6 +984,15 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
     title: '加工合同明细保留委外来源销售订单号快照',
     fieldKeys: ['productOrderNo'],
     scenarioKey: 'source_snapshot_retained',
+    layer: 'web',
+    testFile: 'web/src/erp/data/processingContractTemplate.test.mjs',
+  },
+  {
+    caseId:
+      'FL_processing_contract_product_order_no__rebuilds_from_blank_line_snapshot',
+    title: '加工合同明细产品订单号为空时从委外来源订单号重建',
+    fieldKeys: ['productOrderNo'],
+    scenarioKey: 'source_prefill_rebuilds_from_blank',
     layer: 'web',
     testFile: 'web/src/erp/data/processingContractTemplate.test.mjs',
   },
@@ -1188,13 +1208,19 @@ const resolveScenarioStatus = (matchingCases = []) => {
   if (statuses.includes('fail')) return 'fail'
   if (statuses.includes('missing')) return 'missing'
   if (statuses.includes('skip')) return 'skip'
-  return statuses.every((status) => status === 'pass') ? 'pass' : 'missing'
+  if (!statuses.every((status) => status === 'pass')) return 'missing'
+  return matchingCases.every((item) => item.applicability === 'not_applicable')
+    ? 'not_applicable'
+    : 'pass'
 }
 
 const resolveFieldStatus = (scenarios = []) => {
-  const statuses = scenarios.map((item) => normalizeCaseStatus(item.status))
+  const statuses = scenarios.map((item) => item.status)
   if (statuses.includes('fail')) return 'fail'
-  if (statuses.length > 0 && statuses.every((item) => item === 'pass')) {
+  if (
+    statuses.length > 0 &&
+    statuses.every((item) => ['pass', 'not_applicable'].includes(item))
+  ) {
     return 'covered'
   }
   if (statuses.every((item) => item === 'missing')) return 'missing'
@@ -1219,6 +1245,9 @@ const buildFieldScenarioStatusList = (fieldItem, relatedCases) =>
       scenarioLabel: scenarioMetaMap.get(scenarioKey)?.label || scenarioKey,
       status: resolveScenarioStatus(matchingCases),
       caseIds: matchingCases.map((item) => item.caseId),
+      notApplicableReason:
+        matchingCases.find((item) => item.applicability === 'not_applicable')
+          ?.notApplicableReason || '',
     }
   })
 
@@ -1254,6 +1283,9 @@ export const buildFieldLinkageCoverageViewModel = (report = {}) => {
         .length,
       skippedScenarios: scenarios.filter((item) => item.status === 'skip')
         .length,
+      notApplicableScenarios: scenarios.filter(
+        (item) => item.status === 'not_applicable'
+      ).length,
       missingScenarios: scenarios.filter((item) => item.status === 'missing')
         .length,
       totalScenarios: scenarios.length,
@@ -1296,6 +1328,10 @@ export const buildFieldLinkageCoverageViewModel = (report = {}) => {
     ),
     skippedScenarios: fields.reduce(
       (sum, item) => sum + (item.skippedScenarios || 0),
+      0
+    ),
+    notApplicableScenarios: fields.reduce(
+      (sum, item) => sum + (item.notApplicableScenarios || 0),
       0
     ),
     missingScenarios: fields.reduce(

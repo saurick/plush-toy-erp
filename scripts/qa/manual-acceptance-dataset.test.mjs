@@ -42,7 +42,10 @@ import {
   runDefaultManualAcceptanceTaskComponent,
 } from "./manual-acceptance-dataset-runner.mjs";
 import { evaluateManualAcceptanceOutsourcingInventoryCoverage } from "./manual-acceptance-fact-report-contract.mjs";
-import { MANUAL_ACCEPTANCE_CORE_UNITS } from "./manual-acceptance-core-contract.mjs";
+import {
+  MANUAL_ACCEPTANCE_CORE_UNITS,
+  MANUAL_ACCEPTANCE_CORE_WAREHOUSES,
+} from "./manual-acceptance-core-contract.mjs";
 import {
   CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
   CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION,
@@ -53,6 +56,8 @@ import {
   SCENARIO_DEMO_ORIGIN,
 } from "./manual-acceptance-target-policy.mjs";
 import {
+  PREVIOUS_LONG_LIVED_WORKBENCH_BATCH_RUN_ID,
+  PREVIOUS_LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
   PREVIOUS_TASK_COPY_REVISION,
   PREVIOUS_TASK_RUN_ID,
   TASK_COPY_REVISION,
@@ -234,8 +239,8 @@ test("persistent task runner uses the long-lived profile and retires snapshot ba
       },
     });
     assert.equal(result.report.taskProfile, TASK_PROFILE_LONG_LIVED_WORKBENCH);
-    assert.equal(result.report.summary.legacyBatchCount, 2);
-    assert.equal(result.report.summary.legacyTasksTerminalized, 3);
+    assert.equal(result.report.summary.legacyBatchCount, 3);
+    assert.equal(result.report.summary.legacyTasksTerminalized, 6);
   } finally {
     await fs.rm(outputRoot, { recursive: true, force: true });
   }
@@ -246,6 +251,11 @@ test("persistent task runner uses the long-lived profile and retires snapshot ba
       allowAbsent,
     })),
     [
+      {
+        runId: PREVIOUS_LONG_LIVED_WORKBENCH_BATCH_RUN_ID,
+        copyRevision: PREVIOUS_LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
+        allowAbsent: true,
+      },
       {
         runId: PREVIOUS_TASK_RUN_ID,
         copyRevision: PREVIOUS_TASK_COPY_REVISION,
@@ -2359,7 +2369,7 @@ test("apply requires exact target binding and forbids remote core or role seed",
 test("core RPC verifier uses one admin read-only preflight and returns only stable business codes", async () => {
   const requests = [];
   const makeFetch =
-    (omitWarehouse = "") =>
+    (omitWarehouse = "", includeLegacyUnit = false) =>
     async (url, init) => {
       if (!init.body) {
         requests.push({
@@ -2420,21 +2430,40 @@ test("core RPC verifier uses one admin read-only preflight and returns only stab
                   },
                 }
               : request.method === "list_units"
-                ? {
-                    units: CORE_UNIT_CODES.map((code, index) => ({
-                      id: index + 11,
-                      code,
-                    })),
-                  }
+                ? (() => {
+                    const units = MANUAL_ACCEPTANCE_CORE_UNITS.map(
+                      (definition, index) => ({
+                        id: index + 11,
+                        code: definition.code,
+                        name: definition.name,
+                        precision: definition.precision,
+                        is_active: true,
+                      }),
+                    );
+                    if (includeLegacyUnit) {
+                      units.push({
+                        id: 1,
+                        code: "YS5-DW-01",
+                        name: "件",
+                        precision: 0,
+                        is_active: true,
+                      });
+                    }
+                    return { units, total: units.length };
+                  })()
                 : {
-                    warehouses: [
-                      "YS6-CK-01",
-                      "YS6-CK-02",
-                      "YS6-CK-03",
-                      "YS6-CK-04",
-                    ]
-                      .filter((code) => code !== omitWarehouse)
-                      .map((code, index) => ({ id: index + 20, code })),
+                    warehouses: MANUAL_ACCEPTANCE_CORE_WAREHOUSES.filter(
+                      ({ code }) => code !== omitWarehouse,
+                    ).map((definition, index) => ({
+                      id: index + 20,
+                      code: definition.code,
+                      name: definition.name,
+                      type: definition.type,
+                      is_active: true,
+                    })),
+                    total: MANUAL_ACCEPTANCE_CORE_WAREHOUSES.filter(
+                      ({ code }) => code !== omitWarehouse,
+                    ).length,
                   };
       return {
         ok: true,
@@ -2524,6 +2553,16 @@ test("core RPC verifier uses one admin read-only preflight and returns only stab
         fetchImpl: makeFetch("YS6-CK-04"),
       }),
     /YS6-CK-04/u,
+  );
+  await assert.rejects(
+    () =>
+      verifyManualAcceptanceCoreReferences({
+        ...binding,
+        fetchImpl: makeFetch("", true),
+      }),
+    (error) =>
+      error?.code === "core_managed_reference_name_conflict" &&
+      error?.details?.conflictingCodes?.includes("YS5-DW-01"),
   );
 });
 

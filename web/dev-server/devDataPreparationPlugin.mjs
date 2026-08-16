@@ -753,6 +753,92 @@ function parseScenarioDemoReadback(stdout, operation) {
   return readback
 }
 
+function validateScenarioDemoPublicReadback(readback, operation) {
+  const parsed = parseScenarioDemoReadback(JSON.stringify(readback), operation)
+  const remoteTarget =
+    operation.targetSummary.targetKey === CUSTOMER_TRIAL_133_TARGET
+  assertExactKeys(
+    parsed,
+    [
+      ...(remoteTarget ? ['backupReceipt'] : []),
+      'browserChecksPending',
+      'catalogReadyCount',
+      'catalogTargetCount',
+      'cleanupSupported',
+      'customerConfigRevision',
+      'databaseName',
+      'dataVersion',
+      'datasetKey',
+      'factCount',
+      'manualAcceptanceCompleted',
+      'migrationVersion',
+      'processRuntimeCount',
+      'profileKey',
+      'release',
+      'replayMode',
+      'runId',
+      'schemaVersion',
+      'semanticDigest',
+      'sourceDocumentCount',
+      'stageCount',
+      'targetEnvironment',
+      'targetFingerprint',
+      'targetKey',
+    ],
+    'scenario demo public readback'
+  )
+  if (!remoteTarget) return parsed
+
+  assertExactKeys(
+    parsed.backupReceipt,
+    [
+      'backupAlias',
+      'containsCredentials',
+      'containsPaths',
+      'containsSecrets',
+      'createdAt',
+      'databaseName',
+      'migrationVersion',
+      'releaseSha',
+      'schemaVersion',
+      'sha256',
+      'sizeBytes',
+      'status',
+    ],
+    'scenario demo public backup receipt'
+  )
+  const backup = parsed.backupReceipt
+  if (
+    backup.schemaVersion !== 'plush.customer-trial-133-data-backup/v1' ||
+    backup.status !== 'passed' ||
+    backup.backupAlias !== operation.targetSummary.rollbackPoint ||
+    backup.releaseSha !== parsed.release ||
+    backup.databaseName !== parsed.databaseName ||
+    backup.migrationVersion !== parsed.migrationVersion ||
+    !/^[0-9a-f]{64}$/u.test(String(backup.sha256 || '')) ||
+    !Number.isSafeInteger(backup.sizeBytes) ||
+    backup.sizeBytes < 1 ||
+    !validReceiptTimestamp(backup.createdAt) ||
+    backup.containsSecrets !== false ||
+    backup.containsCredentials !== false ||
+    backup.containsPaths !== false
+  ) {
+    throw new Error('scenario demo public backup receipt is invalid')
+  }
+  return parsed
+}
+
+function isCurrentPublicOperation(operation) {
+  if (operation.profileKey !== 'scenario-demo') return true
+  if (operation.readback == null) return operation.status !== 'passed'
+  try {
+    validateScenarioDemoPublicReadback(operation.readback, operation)
+    return true
+  } catch {
+    return false
+  }
+}
+
 async function readPrivateReceipt(file, maxBytes = 256 * 1024) {
   const stats = await lstat(file)
   if (!stats.isFile() || stats.isSymbolicLink() || stats.size > maxBytes) {
@@ -1015,10 +1101,20 @@ export function createDevDataPreparationService({
   sleep = (milliseconds) =>
     new Promise((resolve) => setTimeout(resolve, milliseconds)),
   prepareLockTimeoutMs = 180_000,
+  summaryTtlMs = 15_000,
 } = {}) {
   const root = path.resolve(projectRoot || process.cwd())
   const store = operationStore || resolveDataPreparationOperationStore(root)
   const active = new Set()
+  let summaryCache = null
+  let summaryInFlight = null
+  let summaryGeneration = 0
+
+  function invalidateSummary() {
+    summaryGeneration += 1
+    summaryCache = null
+    summaryInFlight = null
+  }
 
   function recoverOrphanedOperations() {
     const executionLock = readDataPreparationExecutionLock(store)
@@ -1316,7 +1412,7 @@ export function createDevDataPreparationService({
     })
   }
 
-  async function getSummary() {
+  async function buildSummary() {
     recoverOrphanedOperations()
     const issues = []
     const repositoryResult = await Promise.resolve(readRepositoryState(root))
@@ -1401,6 +1497,15 @@ export function createDevDataPreparationService({
       }
     }
     const operations = listDataPreparationOperations(store, { limit: 100 })
+    const currentOperations = operations.filter(isCurrentPublicOperation)
+    const omittedOperationCount = operations.length - currentOperations.length
+    if (omittedOperationCount > 0) {
+      issues.push({
+        code: 'historical_operation_contract_omitted',
+        severity: 'warning',
+        message: `已保留 ${omittedOperationCount} 条旧合同历史回执，但不会混入当前数据摘要`,
+      })
+    }
     const unresolvedOperations = operations.filter(
       (operation) =>
         operation.status === 'not_proven' &&
@@ -1433,9 +1538,7 @@ export function createDevDataPreparationService({
       target,
       acceptancePlan: MANUAL_ACCEPTANCE_REVIEW_PLAN,
       profiles: DEV_DATA_PREPARATION_PROFILES,
-      operations: listDataPreparationOperations(store, { limit: 50 }).map(
-        publicOperation
-      ),
+      operations: currentOperations.slice(0, 50).map(publicOperation),
       issues,
       boundaries: {
         developmentOnly: true,
@@ -1446,6 +1549,32 @@ export function createDevDataPreparationService({
         customerUAT: false,
       },
     }
+  }
+
+  function getSummary({ force = false } = {}) {
+    const currentTime = Date.now()
+    if (summaryInFlight) return summaryInFlight
+    if (
+      !force &&
+      summaryCache &&
+      currentTime - summaryCache.readAt < summaryTtlMs
+    ) {
+      return Promise.resolve(summaryCache.value)
+    }
+
+    const generation = summaryGeneration
+    const pending = buildSummary()
+      .then((value) => {
+        if (generation === summaryGeneration) {
+          summaryCache = { readAt: Date.now(), value }
+        }
+        return value
+      })
+      .finally(() => {
+        if (summaryInFlight === pending) summaryInFlight = null
+      })
+    summaryInFlight = pending
+    return pending
   }
 
   async function prepare(payload) {
@@ -1556,6 +1685,7 @@ export function createDevDataPreparationService({
         planHash,
         now: now().toISOString(),
       })
+      invalidateSummary()
       return {
         schemaVersion: 'plush.dev-data-preparation-action-result/v1',
         action: 'prepare',
@@ -1759,9 +1889,10 @@ export function createDevDataPreparationService({
       throw unknownOutcome
     }
     const readback = parseScenarioDemoReadback(result.stdout, operation)
-    return backupReceipt
+    const completedReadback = backupReceipt
       ? Object.freeze({ ...readback, backupReceipt })
       : readback
+    return validateScenarioDemoPublicReadback(completedReadback, operation)
   }
 
   function execute(payload) {
@@ -1811,6 +1942,7 @@ export function createDevDataPreparationService({
         message: 'fixed profile executor is launching',
         now: now().toISOString(),
       })
+      invalidateSummary()
     } catch (error) {
       releaseDataPreparationExecutionLock(store, operation.id)
       throw error
@@ -1836,6 +1968,7 @@ export function createDevDataPreparationService({
           readback,
           now: now().toISOString(),
         })
+        invalidateSummary()
       } catch (error) {
         const readback = error?.readback
         transitionDataPreparationOperation(store, operation.id, {
@@ -1860,6 +1993,7 @@ export function createDevDataPreparationService({
           ...(readback ? { readback } : {}),
           now: now().toISOString(),
         })
+        invalidateSummary()
       } finally {
         active.delete(operation.id)
         releaseDataPreparationExecutionLock(store, operation.id)
@@ -1958,13 +2092,14 @@ export function createDevDataPreparationMiddleware({
   const dataService =
     service || createDevDataPreparationService({ projectRoot })
   return async (request, response, next) => {
-    let requestPath
+    let requestURL
     try {
-      requestPath = new URL(request.url || '/', 'http://localhost').pathname
+      requestURL = new URL(request.url || '/', 'http://localhost')
     } catch {
       next()
       return
     }
+    const requestPath = requestURL.pathname
     if (!requestPath.startsWith(`${DEV_DATA_PREPARATION_API_PREFIX}/`)) {
       next()
       return
@@ -1995,7 +2130,20 @@ export function createDevDataPreparationMiddleware({
         request.method === 'GET' &&
         requestPath === DEV_DATA_PREPARATION_SUMMARY_API_PATH
       ) {
-        sendJson(response, 200, await dataService.summary())
+        const summaryQuery = [...requestURL.searchParams.entries()]
+        if (
+          summaryQuery.length > 1 ||
+          (summaryQuery.length === 1 &&
+            (summaryQuery[0][0] !== 'refresh' ||
+              summaryQuery[0][1] !== 'authoritative'))
+        ) {
+          throw new Error('summary refresh query is unsupported')
+        }
+        sendJson(
+          response,
+          200,
+          await dataService.summary({ force: summaryQuery.length === 1 })
+        )
         return
       }
       const operationMatch = OPERATION_PATH_PATTERN.exec(requestPath)

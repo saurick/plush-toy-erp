@@ -30,6 +30,11 @@ test('workflow business page consumes the dashboard source keyword without mutat
   assert.match(source, /useSearchParams/u)
   assert.match(source, /searchParams\.get\('link_keyword'\)/u)
   assert.match(source, /useState\(linkedKeyword\)/u)
+  assert.match(source, /linkedKeywordRef\s*=\s*useRef\(linkedKeyword\)/u)
+  assert.match(
+    source,
+    /if \(linkedKeywordRef\.current === linkedKeyword\) return/u
+  )
   assert.match(source, /setKeyword\(linkedKeyword\)/u)
   assert.match(source, /formatWorkflowTaskSource/u)
   assert.doesNotMatch(
@@ -158,7 +163,10 @@ test('workflow business module keeps stable task actions while submitting exact 
   ]) {
     assert.match(
       source,
-      new RegExp(`['"]data-business-action-key['"]?:?\\s*['"]${actionKey}['"]|data-business-action-key="${actionKey}"`, 'u'),
+      new RegExp(
+        `['"]data-business-action-key['"]?:?\\s*['"]${actionKey}['"]|data-business-action-key="${actionKey}"`,
+        'u'
+      ),
       `${actionKey} must keep a stable task action slot`
     )
   }
@@ -211,10 +219,7 @@ test('production exception applications use server-backed filters and a selected
   assert.match(productionExceptionPanel, /aria-label="异常类型"/u)
   assert.match(productionExceptionPanel, /aria-label="审批状态"/u)
   assert.match(productionExceptionPanel, /aria-label="业务状态"/u)
-  assert.match(
-    productionExceptionPanel,
-    /decision_type:\s*decisionTypeFilter/u
-  )
+  assert.match(productionExceptionPanel, /decision_type:\s*decisionTypeFilter/u)
   assert.match(productionExceptionPanel, /status:\s*statusFilter/u)
   assert.match(
     productionExceptionPanel,

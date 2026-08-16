@@ -34,7 +34,10 @@ export const TASK_PROFILE_LONG_LIVED_WORKBENCH = "long-lived-workbench";
 export const TASK_COPY_REVISION = "PLAIN6";
 export const PREVIOUS_TASK_COPY_REVISION = "PLAIN5";
 export const PREVIOUS_TASK_RUN_ID = "20260716-V5";
-export const LONG_LIVED_WORKBENCH_TASK_COPY_REVISION = "WORKBENCH1";
+export const PREVIOUS_LONG_LIVED_WORKBENCH_TASK_COPY_REVISION = "WORKBENCH1";
+export const PREVIOUS_LONG_LIVED_WORKBENCH_BATCH_RUN_ID = PREVIOUS_TASK_RUN_ID;
+export const LONG_LIVED_WORKBENCH_TASK_COPY_REVISION = "WORKBENCH2";
+export const LONG_LIVED_WORKBENCH_BATCH_RUN_ID = "20260815-V6";
 export const LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE = 12;
 export const TASK_VISIBLE_CODE_PREFIX_BY_ROLE = Object.freeze({
   boss: "YS-V6-LD",
@@ -59,26 +62,43 @@ const PREVIOUS_TASK_VISIBLE_CODE_PREFIX_BY_ROLE = Object.freeze({
   engineering: "YS-V5-GC",
 });
 export const LONG_LIVED_WORKBENCH_VISIBLE_CODE_PREFIX_BY_ROLE = Object.freeze({
-  boss: "YS-WB1-LD",
-  sales: "YS-WB1-XS",
-  purchase: "YS-WB1-CG",
-  production: "YS-WB1-SC",
-  warehouse: "YS-WB1-CK",
-  finance: "YS-WB1-CW",
-  pmc: "YS-WB1-JH",
-  quality: "YS-WB1-ZJ",
-  engineering: "YS-WB1-GC",
+  boss: "YS-WB2-LD",
+  sales: "YS-WB2-XS",
+  purchase: "YS-WB2-CG",
+  production: "YS-WB2-SC",
+  warehouse: "YS-WB2-CK",
+  finance: "YS-WB2-CW",
+  pmc: "YS-WB2-JH",
+  quality: "YS-WB2-ZJ",
+  engineering: "YS-WB2-GC",
 });
+const PREVIOUS_LONG_LIVED_WORKBENCH_VISIBLE_CODE_PREFIX_BY_ROLE =
+  Object.freeze({
+    boss: "YS-WB1-LD",
+    sales: "YS-WB1-XS",
+    purchase: "YS-WB1-CG",
+    production: "YS-WB1-SC",
+    warehouse: "YS-WB1-CK",
+    finance: "YS-WB1-CW",
+    pmc: "YS-WB1-JH",
+    quality: "YS-WB1-ZJ",
+    engineering: "YS-WB1-GC",
+  });
 const TASK_PROFILE_CONTRACTS = Object.freeze({
   [TASK_PROFILE_ACCEPTANCE_SNAPSHOT]: Object.freeze({
     key: TASK_PROFILE_ACCEPTANCE_SNAPSHOT,
     copyRevision: TASK_COPY_REVISION,
+    batchRunId: null,
     visibleCodePrefixByRole: TASK_VISIBLE_CODE_PREFIX_BY_ROLE,
     stableActionablePerRole: 0,
   }),
   [TASK_PROFILE_LONG_LIVED_WORKBENCH]: Object.freeze({
     key: TASK_PROFILE_LONG_LIVED_WORKBENCH,
     copyRevision: LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
+    // WORKBENCH2 was first created under this immutable lineage. Current
+    // dataVersion/runId still describe each Scenario run; changing the batch
+    // lineage would orphan the stable YS-WB2-* codes and create duplicates.
+    batchRunId: LONG_LIVED_WORKBENCH_BATCH_RUN_ID,
     visibleCodePrefixByRole: LONG_LIVED_WORKBENCH_VISIBLE_CODE_PREFIX_BY_ROLE,
     stableActionablePerRole: LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE,
   }),
@@ -766,14 +786,14 @@ export function manualAcceptanceTaskBatchIdentity(
 ) {
   const normalizedRunID = sanitizeRunId(runId);
   const profile = getManualAcceptanceTaskProfileContract(taskProfile);
+  const batchRunId = profile.batchRunId || normalizedRunID;
   return Object.freeze({
     runId: normalizedRunID,
+    batchRunId,
     copyRevision: profile.copyRevision,
     sourceType: TASK_SOURCE_TYPE,
-    sourceID: stablePositiveSourceID(
-      `${normalizedRunID}:${profile.copyRevision}`,
-    ),
-    prefix: `${TASK_SIMULATION_PREFIX}-${normalizedRunID}-${profile.copyRevision}`,
+    sourceID: stablePositiveSourceID(`${batchRunId}:${profile.copyRevision}`),
+    prefix: `${TASK_SIMULATION_PREFIX}-${batchRunId}-${profile.copyRevision}`,
   });
 }
 
@@ -794,6 +814,9 @@ export function buildLegacyManualAcceptanceTaskBatchReference({
       ? "short-v6"
       : normalizedCopyRevision === PREVIOUS_TASK_COPY_REVISION
         ? "short-v5"
+        : normalizedCopyRevision ===
+            PREVIOUS_LONG_LIVED_WORKBENCH_TASK_COPY_REVISION
+          ? "short-workbench1"
         : !normalizedCopyRevision ||
             /^PLAIN[1-4]$/u.test(normalizedCopyRevision)
           ? "long-batch"
@@ -822,6 +845,9 @@ export function manualAcceptanceLegacyTaskCode(legacyBatch, roleKey, index) {
   const sequence = pad(index);
   if (legacyBatch?.codeScheme === "short-v5") {
     return `${PREVIOUS_TASK_VISIBLE_CODE_PREFIX_BY_ROLE[roleKey]}-${sequence}`;
+  }
+  if (legacyBatch?.codeScheme === "short-workbench1") {
+    return `${PREVIOUS_LONG_LIVED_WORKBENCH_VISIBLE_CODE_PREFIX_BY_ROLE[roleKey]}-${sequence}`;
   }
   if (legacyBatch?.codeScheme === "short-v6") {
     return `${TASK_VISIBLE_CODE_PREFIX_BY_ROLE[roleKey]}-${sequence}`;
@@ -983,9 +1009,10 @@ function workbenchBucketForTask(index, targetStatus, taskProfile) {
 
 function taskIdempotencyNamespace(runId, taskProfile) {
   const profile = getManualAcceptanceTaskProfileContract(taskProfile);
+  const batchRunId = profile.batchRunId || runId;
   return profile.copyRevision === TASK_COPY_REVISION
-    ? runId
-    : `${runId}:${profile.copyRevision}`;
+    ? batchRunId
+    : `${batchRunId}:${profile.copyRevision}`;
 }
 
 function actionFor(
@@ -1338,6 +1365,7 @@ export function validateManualAcceptanceTaskPlan(plan) {
   });
   if (
     sanitizeRunId(plan.runId) !== plan.runId ||
+    plan.batchRunId !== expectedBatchIdentity.batchRunId ||
     plan.copyRevision !== expectedBatchIdentity.copyRevision ||
     plan.prefix !== expectedBatchIdentity.prefix ||
     plan.sourceID !== expectedBatchIdentity.sourceID
@@ -1616,7 +1644,7 @@ export function buildManualAcceptanceTaskDataPlan(options = {}) {
   const batchIdentity = manualAcceptanceTaskBatchIdentity(runId, {
     taskProfile: taskProfile.key,
   });
-  const { prefix, sourceID } = batchIdentity;
+  const { batchRunId, prefix, sourceID } = batchIdentity;
   const tasks = TASK_ROLES.flatMap((roleKey) =>
     Array.from({ length: TASKS_PER_ROLE }, (_, offset) =>
       buildRoleTask({
@@ -1642,6 +1670,7 @@ export function buildManualAcceptanceTaskDataPlan(options = {}) {
     backendURL,
     databaseName: targetPolicy.databaseName,
     runId,
+    batchRunId,
     taskProfile: taskProfile.key,
     copyRevision: taskProfile.copyRevision,
     prefix,
@@ -2163,6 +2192,14 @@ async function preflightExistingBatch({ plan, accounts, fetchImpl }) {
 
   const anchors = new Set();
   for (const { code, item, requestedTask } of existing) {
+    if (requestedTask.dueScenario === "no_due") {
+      if ((item.due_at ?? null) !== null) {
+        throw new CliError(
+          `${requestedTask.key} persisted no-due task unexpectedly has due_at`,
+        );
+      }
+      continue;
+    }
     const offset = TASK_DUE_SCENARIO_OFFSETS[requestedTask.dueScenario];
     if (!Number.isSafeInteger(offset)) {
       throw new CliError(
@@ -2191,7 +2228,11 @@ async function preflightExistingBatch({ plan, accounts, fetchImpl }) {
     rebound.generatedAtUnix = persistedAnchor;
     rebound.schedule = buildManualAcceptanceTaskSchedule(persistedAnchor);
     for (const task of rebound.tasks) {
-      const due = manualAcceptanceTaskDueAt(task.index, persistedAnchor);
+      const due = taskDueForProfile(
+        task.index,
+        persistedAnchor,
+        rebound.taskProfile,
+      );
       if (due.scenario !== task.dueScenario) {
         throw new CliError(
           `${task.key} due schedule scenario changed while reading the persisted batch`,
@@ -3048,6 +3089,7 @@ export async function applyManualAcceptanceTaskData(
         : "simulated_display_only",
     provesProcessRuntime: runtimeEvidence.length > 0,
     runId: effectivePlan.runId,
+    batchRunId: effectivePlan.batchRunId,
     taskProfile: effectivePlan.taskProfile,
     copyRevision: effectivePlan.copyRevision,
     datasetKey: effectivePlan.datasetKey,
@@ -3397,6 +3439,7 @@ export async function retireLegacyManualAcceptanceTaskBatch(
     runtime,
     keepBatch: {
       runId: keepPlan.runId,
+      batchRunId: keepPlan.batchRunId,
       taskProfile: keepPlan.taskProfile,
       copyRevision: keepPlan.copyRevision,
       prefix: keepPlan.prefix,

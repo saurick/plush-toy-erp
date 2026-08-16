@@ -193,6 +193,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     useState('idle')
   const linkedKeyword = String(searchParams.get('link_keyword') || '').trim()
   const [keyword, setKeyword] = useState(linkedKeyword)
+  const linkedKeywordRef = useRef(linkedKeyword)
   const [status, setStatus] = useState('')
   const [ownerRoleKey, setOwnerRoleKey] = useState('')
   const [dueFrom, setDueFrom] = useState('')
@@ -399,6 +400,8 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   }, [loadWorkflowTasks])
 
   useEffect(() => {
+    if (linkedKeywordRef.current === linkedKeyword) return
+    linkedKeywordRef.current = linkedKeyword
     setKeyword(linkedKeyword)
     resetBusinessPaginationCurrent(setPagination)
   }, [linkedKeyword])
@@ -1498,15 +1501,17 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
             description="核对完成前不会提交审批决策。"
             style={{ marginBottom: 16 }}
           />
-        ) : taskReasonProcessDecisionRequired &&
-          !taskReasonProcessApprovalForm ? (
-            <Alert
-              type="error"
-              showIcon
-              message="审批表单与当前流程节点不一致"
-              description="请关闭后刷新任务再试；系统不会按任务名称或页面入口猜测审批字段。"
-              style={{ marginBottom: 16 }}
-            />
+        ) : null}
+        {taskReasonProcessDecisionRequired &&
+        taskReasonProcessContextState !== 'loading' &&
+        !taskReasonProcessApprovalForm ? (
+          <Alert
+            type="error"
+            showIcon
+            message="审批表单与当前流程节点不一致"
+            description="请关闭后刷新任务再试；系统不会按任务名称或页面入口猜测审批字段。"
+            style={{ marginBottom: 16 }}
+          />
         ) : null}
         <Input.TextArea
           rows={4}

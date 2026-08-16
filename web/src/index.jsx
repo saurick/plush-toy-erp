@@ -16,11 +16,15 @@ const routerFutureFlags = {
 }
 
 // 只在开发环境 & 打开开关时启用 mock
-if (import.meta.env.DEV && import.meta.env.VITE_ENABLE_RPC_MOCK === 'true') {
-  (async () => {
+const rpcMockEnabled =
+  import.meta.env.DEV && import.meta.env.VITE_ENABLE_RPC_MOCK === 'true'
+
+if (rpcMockEnabled) {
+  const startMockServer = async () => {
     const { setupJsonRpcMockServer } = await import('./mocks/jsonRpcMockServer')
     setupJsonRpcMockServer()
-  })()
+  }
+  startMockServer()
 }
 
 const redirectedLocalDevHost =
@@ -34,15 +38,18 @@ if (!redirectedLocalDevHost) {
 
   const root = ReactDOM.createRoot(rootElement)
 
+  const application = (
+    <HelmetProvider>
+      <Router basename={import.meta.env.BASE_URL} future={routerFutureFlags}>
+        <AppAlertProvider>
+          <App />
+        </AppAlertProvider>
+      </Router>
+    </HelmetProvider>
+  )
+
+  // Mock/Style L1 保留 StrictMode 双挂载探针；真实后端不应承受演练性 RPC 双发。
   root.render(
-    <StrictMode>
-      <HelmetProvider>
-        <Router basename={import.meta.env.BASE_URL} future={routerFutureFlags}>
-          <AppAlertProvider>
-            <App />
-          </AppAlertProvider>
-        </Router>
-      </HelmetProvider>
-    </StrictMode>
+    rpcMockEnabled ? <StrictMode>{application}</StrictMode> : application
   )
 }

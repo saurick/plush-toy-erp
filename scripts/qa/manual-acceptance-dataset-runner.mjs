@@ -5,6 +5,10 @@ import process from "node:process";
 
 import { applyAttachmentData } from "./manual-acceptance-attachment-data.mjs";
 import {
+  MANUAL_ACCEPTANCE_CORE_UNITS,
+  MANUAL_ACCEPTANCE_CORE_WAREHOUSES,
+} from "./manual-acceptance-core-contract.mjs";
+import {
   manualAcceptanceFormalAccountBootstrapConfirmation,
   runManualAcceptanceAccountScenarioCli,
 } from "./manual-acceptance-account-scenarios.mjs";
@@ -15,7 +19,6 @@ import {
 } from "./manual-acceptance-page-data-contract.mjs";
 import { runManualAcceptanceReadinessCli } from "./manual-acceptance-readiness.mjs";
 import {
-  MANUAL_ACCEPTANCE_CORE_UNIT_CODE,
   MANUAL_ACCEPTANCE_CORE_UNIT_CODES,
   MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES,
   resolveManualAcceptanceCoreReferences,
@@ -23,6 +26,8 @@ import {
 } from "./manual-acceptance-source-data.mjs";
 import {
   CONFIRM_PHRASE as TASK_CONFIRM_PHRASE,
+  PREVIOUS_LONG_LIVED_WORKBENCH_BATCH_RUN_ID,
+  PREVIOUS_LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
   PREVIOUS_TASK_COPY_REVISION,
   PREVIOUS_TASK_RUN_ID,
   TASK_COPY_REVISION,
@@ -44,7 +49,7 @@ import {
 } from "./manual-acceptance-target-policy.mjs";
 
 export const MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION =
-  "manual-acceptance-dataset-runner-v8";
+  "manual-acceptance-dataset-runner-v9";
 
 const DATASET_CONFIRM_PHRASE = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA";
 const ISOLATED_LOCAL_TARGET_ALIAS = "local";
@@ -808,16 +813,14 @@ export async function verifyManualAcceptanceCoreReferences({
   const queryBase = {
     active_only: true,
     limit: 200,
+    offset: 0,
   };
   const [unitData, warehouseData] = await Promise.all([
     coreRPC({
       backendURL: policy.backendURL,
       domain: "masterdata",
       method: "list_units",
-      params: {
-        ...queryBase,
-        keyword: MANUAL_ACCEPTANCE_CORE_UNIT_CODE.replace(/\d+$/u, ""),
-      },
+      params: queryBase,
       token: adminToken,
       fetchImpl,
     }),
@@ -825,17 +828,26 @@ export async function verifyManualAcceptanceCoreReferences({
       backendURL: policy.backendURL,
       domain: "masterdata",
       method: "list_warehouses",
-      params: { ...queryBase, keyword: "YS6-CK-" },
+      params: queryBase,
       token: adminToken,
       fetchImpl,
     }),
   ]);
   try {
+    assertManualAcceptanceActiveCoreReferenceIntegrity({
+      units: unitData.units,
+      unitTotal: unitData.total,
+      warehouses: warehouseData.warehouses,
+      warehouseTotal: warehouseData.total,
+    });
     resolveManualAcceptanceCoreReferences({
       units: unitData.units,
       warehouses: warehouseData.warehouses,
     });
   } catch (error) {
+    if (error instanceof ManualAcceptanceDatasetRunnerError) {
+      throw error;
+    }
     throw new ManualAcceptanceDatasetRunnerError(
       "core_business_codes_incomplete",
       String(error?.message || error),
@@ -863,6 +875,106 @@ export async function verifyManualAcceptanceCoreReferences({
       warehouses: 4,
     },
   };
+}
+
+function normalizedManagedReferenceName(value) {
+  return String(value ?? "").trim();
+}
+
+function assertCompleteActiveReferencePage(items, total, label) {
+  if (
+    !Array.isArray(items) ||
+    !Number.isSafeInteger(total) ||
+    total < 0 ||
+    total !== items.length
+  ) {
+    throw new ManualAcceptanceDatasetRunnerError(
+      "core_active_reference_page_incomplete",
+      `${label} active reference query must return one complete bounded page`,
+      { stageKey: "core", label, total, returned: items?.length ?? null },
+    );
+  }
+}
+
+function assertExactManagedReference(items, definition, label) {
+  const matches = items.filter(
+    (item) => String(item?.code || "").trim() === definition.code,
+  );
+  const item = matches[0];
+  const exactUnit =
+    Object.hasOwn(definition, "precision") &&
+    normalizedManagedReferenceName(item?.name) === definition.name &&
+    Number(item?.precision) === definition.precision;
+  const exactWarehouse =
+    Object.hasOwn(definition, "type") &&
+    normalizedManagedReferenceName(item?.name) === definition.name &&
+    String(item?.type || "").trim() === definition.type;
+  if (
+    matches.length !== 1 ||
+    !Number.isSafeInteger(Number(item?.id)) ||
+    item?.is_active !== true ||
+    (!exactUnit && !exactWarehouse)
+  ) {
+    throw new ManualAcceptanceDatasetRunnerError(
+      "core_managed_reference_identity_mismatch",
+      `${label} must contain one exact active ${definition.code}`,
+      { stageKey: "core", label, code: definition.code },
+    );
+  }
+}
+
+function assertNoManagedNameConflict(items, definitions, label) {
+  const currentCodes = new Set(definitions.map((item) => item.code));
+  const managedNames = new Set(
+    definitions.map((item) => normalizedManagedReferenceName(item.name)),
+  );
+  const conflictingCodes = items
+    .filter(
+      (item) =>
+        !currentCodes.has(String(item?.code || "").trim()) &&
+        managedNames.has(normalizedManagedReferenceName(item?.name)),
+    )
+    .map((item) => String(item?.code || "").trim())
+    .filter(Boolean)
+    .sort();
+  if (conflictingCodes.length > 0) {
+    throw new ManualAcceptanceDatasetRunnerError(
+      "core_managed_reference_name_conflict",
+      `${label} contains active legacy or duplicate names; reconcile the exact core references first`,
+      { stageKey: "core", label, conflictingCodes },
+    );
+  }
+}
+
+export function assertManualAcceptanceActiveCoreReferenceIntegrity({
+  units,
+  unitTotal,
+  warehouses,
+  warehouseTotal,
+}) {
+  assertCompleteActiveReferencePage(units, unitTotal, "core units");
+  assertCompleteActiveReferencePage(
+    warehouses,
+    warehouseTotal,
+    "core warehouses",
+  );
+  MANUAL_ACCEPTANCE_CORE_UNITS.forEach((definition) =>
+    assertExactManagedReference(units, definition, "core units"),
+  );
+  MANUAL_ACCEPTANCE_CORE_WAREHOUSES.forEach((definition) =>
+    assertExactManagedReference(warehouses, definition, "core warehouses"),
+  );
+  assertNoManagedNameConflict(
+    units,
+    MANUAL_ACCEPTANCE_CORE_UNITS,
+    "core units",
+  );
+  assertNoManagedNameConflict(
+    warehouses,
+    MANUAL_ACCEPTANCE_CORE_WAREHOUSES,
+    "core warehouses",
+  );
+  return true;
 }
 
 const BASELINE_CONFIG_FIELDS = Object.freeze([
@@ -1433,6 +1545,10 @@ export async function runDefaultManualAcceptanceTaskComponent(
     const retireTaskBatch =
       deps.retireTaskBatch || retireLegacyManualAcceptanceTaskBatch;
     const legacyBatches = [
+      {
+        runId: PREVIOUS_LONG_LIVED_WORKBENCH_BATCH_RUN_ID,
+        copyRevision: PREVIOUS_LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
+      },
       {
         runId: PREVIOUS_TASK_RUN_ID,
         copyRevision: PREVIOUS_TASK_COPY_REVISION,

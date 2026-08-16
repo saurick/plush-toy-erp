@@ -4,6 +4,13 @@
 
 ## 当前活跃事项
 
+### V6 测试数据、研发工作台与双环境交付（2026-08-16 候选提交前检查点）
+
+- 本地数据治理：Core Demo 已升级为 V6 稳定业务编码，并在同一事务中仅停用精确识别的 V5 单位 / 仓库；历史外键保持不变。“件”重复和四组仓库同名重复已收敛为单一 active 记录。Core 与 Scenario 均连续执行两次，第二次没有新增或受管数量漂移；Scenario 固定 `dataVersion=2026.08.15-v6`、`runId=20260815-V6`、`semanticDigest=feb935f4cb49915e6691d4695c71339bd4b4a7c56e04a35bbeace2c6c4825b02`，当前 `WORKBENCH2` 为九岗位各 20 条，旧 `WORKBENCH1 / PLAIN5 / PLAIN6` 活跃任务已通过正式 Workflow 动作归零。
+- 合同与运行态：任务看板聚焦泳道采用服务端全量排序 / 分页，审批只依据 capability；移动办理和催办使用稳定幂等、后端 canonical task 与事件读回，写入成功和后续刷新失败分层反馈。研发工作台补齐数据准备、交付、恢复和 Product Core 证据投影；真实后端九岗位浏览器巡检覆盖桌面 / 移动 114 个页面样本，RPC 语义重复、失败和未收敛请求均为 0，普通 ERP 页面不展示双环境控制面事实。
+- 当前验证：Core / Scenario、字段联动、真实 PostgreSQL 定向、Go 领域 / 数据 / 服务、角色 / RBAC、浏览器与定向 Style L1 已通过。完整门禁发现并修正移动端成功反馈与刷新失败的局部测试合同冲突；修正后共享脚本 `1807 / 1807`、Server `3571 / 3571`、Web `2429 / 2429` 分层通过且无 skip。由于最新 `full-latest` 仍绑定修正前失败批次，本节不把它写成完整门禁绿色；最终证据必须来自 clean exact SHA 上的新回执。
+- 后续与边界：候选提交前仍须完成整体 diff / secret / 文档审查、简体中文提交和 clean exact-SHA `prepare-push --full`、独立 Full Acceptance、全量 Style L1 / 页面 / PDF / 真实 PostgreSQL / strict，再普通 push。随后按正式目标流程对 133 做 fresh backup 与 restore rehearsal、Atlas / 配置 V5 → V7 → V8 桥接、exact-SHA 制品部署、Scenario V6 双跑、九岗位与页面 / PDF 读回和临时库零残留核对。生产、真实客户数据导入和客户人工 UAT 均不在自动化完成声明内；本节只冻结提交前过程检查点，发布与目标运行事实继续以绑定 exact SHA 的最新回执为准。
+
 ### ProcessRuntime 状态机与来源单据强动作收口（2026-08-11）
 
 - 完成：ProcessRuntime 已收口实例 / 节点结论、阻塞 / 恢复、路由回执与有界 reconciliation；销售、采购和委外来源单据的关闭 / 取消统一使用版本与幂等门禁，存在履约或过账事实时继续失败关闭。

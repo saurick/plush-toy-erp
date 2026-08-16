@@ -21,6 +21,7 @@ import {
   isLoopbackHostHeader,
   isLoopbackRemoteAddress,
 } from './devServerSecurity.mjs'
+import { readLatestBackupRestoreEvidence } from './devRecoveryEvidence.mjs'
 
 export const DEV_DELIVERY_API_PREFIX = '/__dev/api/delivery'
 export const DEV_DELIVERY_SESSION_API_PATH = `${DEV_DELIVERY_API_PREFIX}/session`
@@ -394,6 +395,7 @@ export function createDevDeliveryService({
   runPreflight = runTargetPreflightAsync,
   preparePromotionAction = preparePromotion,
   prepareRollbackAction = prepareRollback,
+  readRecoveryEvidence = readLatestBackupRestoreEvidence,
   spawnProcess = spawn,
   now = () => new Date().toISOString(),
   preflightTtlMs = 30_000,
@@ -516,6 +518,30 @@ export function createDevDeliveryService({
         message: 'GitHub 流水线耗时暂不可用；发布与部署状态仍可独立核对',
       })
     }
+    let backupRestoreEvidence = null
+    if (
+      targetResult.status === 'fulfilled' &&
+      targetResult.value?.target &&
+      targetResult.value?.customer &&
+      targetResult.value?.trialTarget
+    ) {
+      try {
+        backupRestoreEvidence = await Promise.resolve(
+          readRecoveryEvidence({
+            projectRoot: root,
+            target: targetResult.value.target,
+            customer: targetResult.value.customer,
+            environment: targetResult.value.trialTarget,
+          })
+        )
+      } catch {
+        issues.push({
+          code: 'recovery_evidence_unavailable',
+          level: 'warning',
+          message: '隔离恢复回执暂不可用；不会把未校验文件显示为最近证据',
+        })
+      }
+    }
     return {
       schemaVersion: 'plush.dev-delivery-summary/v1',
       status: issues.length === 0 ? 'success' : 'partial',
@@ -535,6 +561,10 @@ export function createDevDeliveryService({
           })
         )
       })(),
+      recovery: {
+        schemaVersion: 'plush.dev-recovery-summary/v1',
+        backupRestore: backupRestoreEvidence,
+      },
       issues,
       boundaries: {
         provider: 'github',

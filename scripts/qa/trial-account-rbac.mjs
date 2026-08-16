@@ -161,13 +161,16 @@ const usage = `用法:
   TRIAL_ACCOUNT_BACKEND_URL   后端地址，默认 ${defaultBackendURL}
 
 作用:
-  只读验证 10 个 demo_* 账号能通过真实 /rpc/auth admin_login + me，并核对:
+  验证 10 个 demo_* 账号能通过真实 /rpc/auth admin_login + me，并核对:
   - 单一预期角色
   - 对应 mobile.<role>.access
   - 至少一个真实电脑端菜单；老板额外包含工作台和业务看板
   - 无 debug.* 权限
   - 非 super admin
   - 未禁用
+
+写入边界:
+  真实 admin_login 会创建正常认证会话；脚本不调用业务写入 RPC，不写 Source Document、Workflow 或 Fact。
 
 只读前置:
   --print-input-template 只打印本地运行所需输入和命令模板，不读密码、不登录、不调用后端、不写报告、不写数据库。
@@ -355,7 +358,10 @@ export const buildVerificationReport = ({ backendURL, rows }) => ({
   scope: "trial-account-rbac-verification-report",
   generatedAt: new Date().toISOString(),
   backendEndpointAlias: backendURL,
-  writesDatabase: false,
+  writesDatabase: true,
+  writesBusinessData: false,
+  authenticationSessionWritesExpected: true,
+  businessWriteAttempted: false,
   checkedAccounts: rows.map((row) => ({
     ...buildVerificationAccountSummary(row),
   })),
@@ -363,6 +369,13 @@ export const buildVerificationReport = ({ backendURL, rows }) => ({
     totalAccounts: rows.length,
     passedAccounts: rows.length,
     failedAccounts: 0,
+  },
+  boundaries: {
+    realCustomerImport: false,
+    sourceDocumentWrite: false,
+    workflowWrite: false,
+    factWrite: false,
+    provesTargetEnvironment: false,
   },
   redaction: {
     storesPassword: false,
@@ -443,10 +456,7 @@ export const buildStaticProjectionReport = ({
         browserMobileDenied:
           includes("trialBrowserSmoke", "demo_admin-mobile-denied.png") &&
           includes("trialBrowserSmoke", "mobile-role-unassigned") &&
-          includes(
-            "trialBrowserSmoke",
-            "当前账号未分配业务岗位",
-          ),
+          includes("trialBrowserSmoke", "当前账号未分配业务岗位"),
       });
     }
 

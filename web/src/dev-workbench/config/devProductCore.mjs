@@ -10,7 +10,6 @@ export const DEV_PRODUCT_CORE_MEMBERSHIP_ALL = 'all'
 export const DEV_PRODUCT_CORE_MEMBERSHIP_ORDER = Object.freeze([
   'entered',
   'partial',
-  'pending',
   'excluded',
 ])
 
@@ -20,17 +19,12 @@ export const DEV_PRODUCT_CORE_STATUS_PRESENTATION = Object.freeze({
     membership: '已进入内核',
     shortDescription: '当前承诺范围的主路径已经收口',
   }),
-  实现中: Object.freeze({
+  部分可用: Object.freeze({
     key: 'partial',
     membership: '部分进入',
-    shortDescription: '已有实现，但完整主路径尚未收口',
+    shortDescription: '已有可核对的局部能力，但完整主路径尚未收口',
   }),
-  待办: Object.freeze({
-    key: 'pending',
-    membership: '尚未进入',
-    shortDescription: '目前只有需求线索或评审结论',
-  }),
-  暂不做: Object.freeze({
+  当前不纳入: Object.freeze({
     key: 'excluded',
     membership: '当前不纳入',
     shortDescription: '不属于当前版本的 Product Core 范围',
@@ -181,7 +175,7 @@ export function parseProductCoreCapabilities(source = '') {
       membership: presentation.membership,
       membershipDescription: presentation.shortDescription,
       availableScope: row['当前可用范围'] || '',
-      boundary: row['主要边界 / 下一步'] || '',
+      boundary: row['当前边界'] || '',
     }
   })
 }

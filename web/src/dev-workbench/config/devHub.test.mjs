@@ -300,13 +300,16 @@ test('devHub: fifteen dev pages share the backend-style workspace shell', () => 
 test('devHub: one local DEV-only controller compares local, 133, and isolated evidence without a target switch', () => {
   assert.match(devPageNavSource, /<DevEnvironmentEvidencePanel \/>/u)
   assert.match(devPageNavSource, /控制端：本地 DEV-only/u)
-  assert.match(devEnvironmentEvidencePanelSource, /Promise\.allSettled/u)
-  assert.match(devEnvironmentEvidencePanelSource, /new AbortController\(\)/u)
+  assert.match(devEnvironmentEvidencePanelSource, /sharedSummaryResources/u)
+  assert.match(devEnvironmentEvidencePanelSource, /readSharedSummary/u)
+  assert.match(devEnvironmentEvidencePanelSource, /SUMMARY_TTL_MS = 120_000/u)
   assert.match(devEnvironmentEvidencePanelSource, /requestVersionRef/u)
-  assert.match(
+  assert.doesNotMatch(
     devEnvironmentEvidencePanelSource,
-    /abortControllerRef\.current\?\.abort/u
+    /Promise\.allSettled|new AbortController\(\)/u
   )
+  assert.match(devEnvironmentEvidencePanelSource, /dataLoading/u)
+  assert.match(devEnvironmentEvidencePanelSource, /deliveryLoading/u)
   assert.match(devEnvironmentEvidencePanelSource, /权威读回/u)
   assert.doesNotMatch(
     devEnvironmentEvidencePanelSource,

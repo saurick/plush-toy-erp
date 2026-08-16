@@ -63,6 +63,12 @@ export const TASK_BOARD_DUE_OPTIONS = Object.freeze([
   { value: 'noDue', label: '未设置到期' },
 ])
 
+export const TASK_BOARD_SORT_OPTIONS = Object.freeze([
+  { value: 'smart', label: '智能优先' },
+  { value: 'due_soon', label: '最早到期' },
+  { value: 'newest', label: '最近创建' },
+])
+
 export const DEFAULT_TASK_BOARD_FILTERS = Object.freeze({
   keyword: '',
   status: 'all',
@@ -70,6 +76,7 @@ export const DEFAULT_TASK_BOARD_FILTERS = Object.freeze({
   due: 'all',
   sourceType: 'all',
   lane: 'all',
+  sort: 'smart',
   mode: 'all',
   page: 1,
 })
@@ -114,6 +121,7 @@ const FILTER_QUERY_KEYS = Object.freeze({
   due: 'due',
   sourceType: 'source',
   lane: 'lane',
+  sort: 'sort',
   page: 'page',
   mode: 'mode',
 })
@@ -129,6 +137,7 @@ const DUE_FILTER_VALUES = new Set(
   TASK_BOARD_DUE_OPTIONS.map((item) => item.value)
 )
 const LANE_FILTER_VALUES = new Set(['all', ...WORKFLOW_TASK_BOARD_LANE_KEYS])
+const SORT_VALUES = new Set(TASK_BOARD_SORT_OPTIONS.map((item) => item.value))
 
 const TASK_STATUS_META = Object.freeze({
   ready: { label: '可执行', color: 'blue' },
@@ -333,13 +342,18 @@ function normalizePositiveInteger(value, fallback = 1) {
 }
 
 export function normalizeWorkflowTaskBoardFilters(filters = {}) {
+  const lane = normalizeKnownFilterValue(filters.lane, LANE_FILTER_VALUES)
   return {
     keyword: String(filters.keyword || '').trim(),
     status: normalizeKnownFilterValue(filters.status, STATUS_FILTER_VALUES),
     role: normalizeKnownFilterValue(filters.role, ROLE_FILTER_VALUES),
     due: normalizeKnownFilterValue(filters.due, DUE_FILTER_VALUES),
     sourceType: normalizeFilterValue(filters.sourceType),
-    lane: normalizeKnownFilterValue(filters.lane, LANE_FILTER_VALUES),
+    lane,
+    sort:
+      lane === DEFAULT_TASK_BOARD_FILTERS.lane
+        ? DEFAULT_TASK_BOARD_FILTERS.sort
+        : normalizeKnownFilterValue(filters.sort, SORT_VALUES, 'smart'),
     mode: filters.mode === 'approval' ? 'approval' : 'all',
     page: normalizePositiveInteger(filters.page),
   }
@@ -369,6 +383,7 @@ export function readWorkflowTaskBoardFiltersFromSearch(searchParams = '') {
     due: params.get(FILTER_QUERY_KEYS.due),
     sourceType: params.get(FILTER_QUERY_KEYS.sourceType),
     lane: params.get(FILTER_QUERY_KEYS.lane),
+    sort: params.get(FILTER_QUERY_KEYS.sort),
     mode: params.get(FILTER_QUERY_KEYS.mode),
     page: params.get(FILTER_QUERY_KEYS.page),
   })
@@ -403,6 +418,9 @@ export function writeWorkflowTaskBoardFiltersToSearch(
   }
   if (normalized.lane !== DEFAULT_TASK_BOARD_FILTERS.lane) {
     params.set(FILTER_QUERY_KEYS.lane, normalized.lane)
+    if (normalized.sort !== DEFAULT_TASK_BOARD_FILTERS.sort) {
+      params.set(FILTER_QUERY_KEYS.sort, normalized.sort)
+    }
     params.set(FILTER_QUERY_KEYS.page, String(normalized.page))
   }
   if (normalized.mode !== DEFAULT_TASK_BOARD_FILTERS.mode) {
@@ -433,7 +451,10 @@ export function buildWorkflowTaskBoardRequest(filters = {}) {
   if (normalized.sourceType !== DEFAULT_TASK_BOARD_FILTERS.sourceType) {
     params.source_type = normalized.sourceType
   }
-  if (focused) params.lane_key = normalized.lane
+  if (focused) {
+    params.lane_key = normalized.lane
+    params.sort = normalized.sort
+  }
   if (normalized.mode === 'approval') params.approval_only = true
   return params
 }
@@ -453,6 +474,7 @@ export function getWorkflowTaskBoardSummaryRequestKey(request = {}) {
     lane_key: _laneKey,
     limit: _limit,
     offset: _offset,
+    sort: _sort,
     ...summaryRequest
   } = request
   return getWorkflowTaskBoardRequestKey(summaryRequest)

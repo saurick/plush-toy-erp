@@ -7,6 +7,7 @@ import {
   ReloadOutlined,
 } from '@ant-design/icons'
 import {
+  normalizeMobileTaskActionKey,
   resolveMobileActionDisplayLabel,
   resolveMobileTaskStatusLabel,
   resolveTaskSourceLabel,
@@ -54,6 +55,12 @@ function resolveReceiptActionLabel({ action, outcome, task }) {
     outcome === MOBILE_TASK_RECEIPT_OUTCOMES.CONFIRMED
       ? task?.mobile_action || action
       : action
+  const candidateActionKey = normalizeMobileTaskActionKey(
+    typeof candidate === 'string' ? candidate : candidate?.action_key
+  )
+  if (isWorkflowApprovalTask(task) && candidateActionKey === 'done') {
+    return '审批通过'
+  }
   return candidate
     ? resolveMobileActionDisplayLabel(candidate)
     : '办理信息暂不可用'
@@ -230,7 +237,9 @@ export default function MobileTaskReceiptScreen({
             </div>
             {String(feedback || '').trim() ? (
               <div className="mobile-task-receipt-row mobile-task-receipt-row--long grid grid-cols-[104px_minmax(0,1fr)] gap-3 px-4 py-3">
-                <dt className="text-sm font-medium text-slate-500">完成反馈</dt>
+                <dt className="text-sm font-medium text-slate-500">
+                  {approvalTask ? '审批意见' : '完成反馈'}
+                </dt>
                 <dd className="min-w-0 break-words text-right text-base font-semibold text-slate-950 [overflow-wrap:anywhere]">
                   {String(feedback).trim()}
                 </dd>

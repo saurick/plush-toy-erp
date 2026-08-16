@@ -509,12 +509,22 @@ test("trial account RBAC verification report is sanitized", () => {
   });
 
   assert.equal(report.scope, "trial-account-rbac-verification-report");
-  assert.equal(report.writesDatabase, false);
+  assert.equal(report.writesDatabase, true);
+  assert.equal(report.writesBusinessData, false);
+  assert.equal(report.authenticationSessionWritesExpected, true);
+  assert.equal(report.businessWriteAttempted, false);
   assert.equal(report.backendEndpointAlias, "http://127.0.0.1:8300");
   assert.deepEqual(report.summary, {
     totalAccounts: 1,
     passedAccounts: 1,
     failedAccounts: 0,
+  });
+  assert.deepEqual(report.boundaries, {
+    realCustomerImport: false,
+    sourceDocumentWrite: false,
+    workflowWrite: false,
+    factWrite: false,
+    provesTargetEnvironment: false,
   });
   assert.deepEqual(report.redaction, {
     storesPassword: false,

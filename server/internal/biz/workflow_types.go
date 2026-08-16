@@ -76,6 +76,7 @@ type WorkflowTaskBoardQuery struct {
 	Due                      string
 	SourceType               string
 	LaneKey                  string
+	Sort                     string
 	ApprovalOnly             bool
 	Limit                    int
 	Offset                   int

@@ -139,6 +139,7 @@ func TestJsonrpcDispatcher_WorkflowGetTaskBoardReturnsFocusedPageAndCapsLimit(t 
 		"board-focused",
 		mustJSONRPCStruct(t, map[string]any{
 			"lane_key": biz.WorkflowTaskBoardLaneException,
+			"sort":     biz.WorkflowTaskBoardSortNewest,
 			"limit":    float64(200),
 			"offset":   float64(20),
 		}),
@@ -146,7 +147,7 @@ func TestJsonrpcDispatcher_WorkflowGetTaskBoardReturnsFocusedPageAndCapsLimit(t 
 	if err != nil || res == nil || res.Code != errcode.OK.Code {
 		t.Fatalf("focused board response=%#v err=%v", res, err)
 	}
-	if repo.query.LaneKey != biz.WorkflowTaskBoardLaneException || repo.query.Limit != 50 || repo.query.Offset != 20 {
+	if repo.query.LaneKey != biz.WorkflowTaskBoardLaneException || repo.query.Sort != biz.WorkflowTaskBoardSortNewest || repo.query.Limit != 50 || repo.query.Offset != 20 {
 		t.Fatalf("unexpected focused board query %#v", repo.query)
 	}
 	if repo.query.VisibilityScope == nil || !repo.query.VisibilityScope.StandaloneAllowAllOwnerRoles || repo.query.VisibilityScope.VisibleAssigneeID != nil {
@@ -174,6 +175,8 @@ func TestJsonrpcDispatcher_WorkflowGetTaskBoardRejectsInvalidContract(t *testing
 		{name: "invalid owner role", params: map[string]any{"owner_role_key": "unknown"}},
 		{name: "invalid due", params: map[string]any{"due": "tomorrow"}},
 		{name: "invalid lane", params: map[string]any{"lane_key": "unknown"}},
+		{name: "invalid sort", params: map[string]any{"lane_key": biz.WorkflowTaskBoardLaneActionable, "sort": "unknown"}},
+		{name: "overview custom sort", params: map[string]any{"sort": biz.WorkflowTaskBoardSortNewest}},
 		{name: "zero limit", params: map[string]any{"limit": float64(0)}},
 		{name: "fractional limit", params: map[string]any{"limit": float64(1.5)}},
 		{name: "negative offset", params: map[string]any{"offset": float64(-1)}},

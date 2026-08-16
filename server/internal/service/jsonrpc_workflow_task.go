@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"math"
 	"sort"
 	"strings"
@@ -282,6 +283,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 			"due",
 			"source_type",
 			"lane_key",
+			"sort",
 			"approval_only",
 			"limit",
 			"offset",
@@ -405,6 +407,9 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 			return id, res, nil
 		}
 		if res := validateWorkflowTaskWritePublicParams(method, pm); res != nil {
+			return id, res, nil
+		}
+		if res := validateWorkflowTaskCreatePublicTextLengths(pm); res != nil {
 			return id, res, nil
 		}
 		idempotencyKey, ok := pm["idempotency_key"].(string)
@@ -610,6 +615,10 @@ func getWorkflowTaskBoardQuery(pm map[string]any) (biz.WorkflowTaskBoardQuery, *
 	if res != nil {
 		return biz.WorkflowTaskBoardQuery{}, res
 	}
+	sortKey, res := getOptionalWorkflowTaskBoardString(pm, "sort", 32)
+	if res != nil {
+		return biz.WorkflowTaskBoardQuery{}, res
+	}
 	approvalOnly := false
 	if raw, exists := pm["approval_only"]; exists {
 		value, ok := raw.(bool)
@@ -636,6 +645,7 @@ func getWorkflowTaskBoardQuery(pm map[string]any) (biz.WorkflowTaskBoardQuery, *
 		Due:          due,
 		SourceType:   sourceType,
 		LaneKey:      laneKey,
+		Sort:         sortKey,
 		ApprovalOnly: approvalOnly,
 		Limit:        limit,
 		Offset:       offset,
@@ -772,6 +782,34 @@ func validateWorkflowTaskCreatePublicParams(pm map[string]any) *v1.JsonrpcResult
 				Code:    errcode.InvalidParam.Code,
 				Message: "create_task 不接收参数 " + key,
 			}
+		}
+	}
+	return nil
+}
+
+func validateWorkflowTaskCreatePublicTextLengths(pm map[string]any) *v1.JsonrpcResult {
+	for _, field := range []struct {
+		key   string
+		label string
+		limit int
+	}{
+		{key: "task_code", label: "任务编号", limit: biz.WorkflowTaskCodeMaxLength},
+		{key: "task_group", label: "任务分类", limit: biz.WorkflowTaskGroupMaxLength},
+		{key: "task_name", label: "任务名称", limit: biz.WorkflowTaskNameMaxLength},
+		{key: "source_type", label: "来源类型", limit: biz.WorkflowTaskSourceTypeMaxLength},
+		{key: "source_no", label: "来源单号", limit: biz.WorkflowTaskSourceNoMaxLength},
+		{key: "owner_role_key", label: "责任岗位", limit: biz.WorkflowTaskOwnerRoleKeyMaxLength},
+		{key: "owner_pool_key", label: "责任池", limit: biz.WorkflowTaskOwnerPoolKeyMaxLength},
+		{key: "required_capability_key", label: "办理能力", limit: biz.WorkflowTaskRequiredCapabilityMaxLength},
+	} {
+		raw, exists := pm[field.key]
+		value, ok := raw.(string)
+		if !exists || !ok || utf8.RuneCountInString(strings.TrimSpace(value)) <= field.limit {
+			continue
+		}
+		return &v1.JsonrpcResult{
+			Code:    errcode.InvalidParam.Code,
+			Message: fmt.Sprintf("%s过长，请缩短到 %d 个字符以内后重试", field.label, field.limit),
 		}
 	}
 	return nil

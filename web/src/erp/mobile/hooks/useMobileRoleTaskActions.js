@@ -554,8 +554,7 @@ export default function useMobileRoleTaskActions({
           publishActionReceipt({
             action: 'urge',
             evidence_refs: [],
-            message:
-              '网络中断，催办结果尚未确认。本次原因已保留，可继续确认。',
+            message: '网络中断，催办结果尚未确认。本次原因已保留，可继续确认。',
             reason,
             status: 'unknown',
             task,

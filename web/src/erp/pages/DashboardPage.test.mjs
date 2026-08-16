@@ -154,6 +154,18 @@ test('task board metrics keep category tones separate from the active filter sta
   }
 })
 
+test('task board exposes server sorting only after focusing one lane', () => {
+  assert.match(source, /TASK_BOARD_SORT_OPTIONS/u)
+  assert.match(
+    source,
+    /taskBoardModel\.focused\s*\?\s*\([\s\S]{0,260}aria-label="任务排序"[\s\S]{0,260}updateFilter\('sort', value\)/u
+  )
+  assert.match(
+    source,
+    /const selectTaskBoardLane = \(lane\) => \{[\s\S]{0,180}sort: 'smart'/u
+  )
+})
+
 test('related document entry is gated by backend source access and menu projection on every path', () => {
   assert.match(
     source,
