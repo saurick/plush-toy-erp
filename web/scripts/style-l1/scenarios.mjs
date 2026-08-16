@@ -160,6 +160,61 @@ export function createStyleL1Scenarios(deps) {
     await adminTab.waitFor({ state: 'visible', timeout: 10_000 })
     await expectText(adminTab, '7')
   }
+  const selectVirtualizedAntOption = async (
+    page,
+    dropdown,
+    { label, optionLabel }
+  ) => {
+    const options = dropdown.locator('.ant-select-item-option')
+    const listHolder = dropdown.locator('.rc-virtual-list-holder')
+    await options.first().waitFor({ state: 'visible', timeout: 10_000 })
+    await listHolder.waitFor({ state: 'visible', timeout: 10_000 })
+    const observedLabels = new Set()
+
+    for (let step = 0; step < 100; step += 1) {
+      const renderedLabels = (await options.allTextContents()).map((item) =>
+        item.trim()
+      )
+      renderedLabels.forEach((item) => observedLabels.add(item))
+      const targetIndex = renderedLabels.findIndex(
+        (item) => item === optionLabel
+      )
+      if (targetIndex >= 0) {
+        await options.nth(targetIndex).click()
+        return
+      }
+
+      const scrollMetrics = await listHolder.evaluate((node) => ({
+        clientHeight: node.clientHeight,
+        scrollHeight: node.scrollHeight,
+        scrollTop: node.scrollTop,
+      }))
+      const maxScrollTop = Math.max(
+        0,
+        scrollMetrics.scrollHeight - scrollMetrics.clientHeight
+      )
+      if (scrollMetrics.scrollTop >= maxScrollTop) break
+      const nextScrollTop = Math.min(
+        maxScrollTop,
+        scrollMetrics.scrollTop +
+          Math.max(1, Math.floor(scrollMetrics.clientHeight / 2))
+      )
+      await listHolder.evaluate((node, value) => {
+        node.scrollTop = value
+        node.dispatchEvent(new Event('scroll', { bubbles: true }))
+      }, nextScrollTop)
+      await page.evaluate(
+        () =>
+          new Promise((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(resolve))
+          )
+      )
+    }
+
+    assert.fail(
+      `${label}缺少可选项“${optionLabel}”: ${JSON.stringify([...observedLabels])}`
+    )
+  }
   const selectApprovalRoleOption = async (
     page,
     selectRoot,
@@ -170,16 +225,10 @@ export function createStyleL1Scenarios(deps) {
       selectRoot,
       label
     )
-    const options = dropdown.locator('.ant-select-item-option')
-    await options.first().waitFor({ state: 'visible', timeout: 10_000 })
-    const optionLabels = (await options.allTextContents()).map((item) =>
-      item.trim()
-    )
-    assert(
-      optionLabels.includes(roleLabel),
-      `${label}缺少可选岗位“${roleLabel}”: ${JSON.stringify(optionLabels)}`
-    )
-    await options.filter({ hasText: new RegExp(`^${roleLabel}$`, 'u') }).click()
+    await selectVirtualizedAntOption(page, dropdown, {
+      label,
+      optionLabel: roleLabel,
+    })
   }
   const assertBusinessDashboardCountStates = async (page, scenarioName) => {
     await page
@@ -23232,10 +23281,10 @@ export function createStyleL1Scenarios(deps) {
         await historyDropdown.waitFor({ state: 'hidden', timeout: 10_000 })
         await historySelectRoot.locator('.ant-select-selector').click()
         await historyDropdown.waitFor({ state: 'visible', timeout: 10_000 })
-        await historyDropdown
-          .locator('.ant-select-item-option')
-          .filter({ hasText: '销售订单' })
-          .click()
+        await selectVirtualizedAntOption(page, historyDropdown, {
+          label: '历史记录类型',
+          optionLabel: '销售订单',
+        })
         await page.waitForFunction(
           () =>
             new URLSearchParams(window.location.search).get('source') ===
