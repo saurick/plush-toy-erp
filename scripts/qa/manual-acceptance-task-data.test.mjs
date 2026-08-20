@@ -2162,6 +2162,55 @@ test("retires an exact legacy batch only after the plain-copy keep batch is comp
   assert.deepEqual(mock.counts(), countsAfterFirst);
 });
 
+test("legacy retirement rebinds the immutable keep batch schedule before validation", async () => {
+  const persistedPlan = buildLocalTaskMutationPlan({
+    runId: "RETIRE-SCHEDULE-KEEP",
+    nowSec: NOW_SEC,
+    taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
+  });
+  const shiftedPlan = buildLocalTaskMutationPlan({
+    runId: persistedPlan.runId,
+    nowSec: NOW_SEC + 5 * 86_400,
+    taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
+  });
+  const legacyBatch = buildLegacyManualAcceptanceTaskBatchReference({
+    runId: "RETIRE-SCHEDULE-OLD",
+    copyRevision: "PLAIN2",
+    backendURL: shiftedPlan.backendURL,
+  });
+  const mock = createMockRuntime();
+  for (const task of persistedPlan.tasks) {
+    mock.seedPlannedTask(persistedPlan, task, { final: true });
+  }
+
+  const report = await retireLegacyManualAcceptanceTaskBatch(
+    shiftedPlan,
+    localTaskMutationOptions(shiftedPlan, {
+      retireRunId: legacyBatch.runId,
+      retireCopyRevision: legacyBatch.copyRevision,
+      allowAbsent: true,
+      confirmPhrase: manualAcceptanceTaskRetireConfirmation(
+        shiftedPlan,
+        legacyBatch,
+      ),
+      password: "local-password",
+      adminPassword: "admin-password",
+      fetchImpl: mock.fetchImpl,
+    }),
+  );
+
+  assert.deepEqual(report.scheduleBinding, {
+    contract: "manual-acceptance-task-schedule-binding-v1",
+    source: "persisted_batch_readback",
+    requestedAnchorUtc: shiftedPlan.schedule.anchorUtc,
+    effectiveAnchorUtc: persistedPlan.schedule.anchorUtc,
+    persistedTaskCount: TOTAL_TASKS,
+  });
+  assert.equal(report.keepBatch.total, TOTAL_TASKS);
+  assert.equal(report.summary.absent, true);
+  assert.deepEqual(mock.counts(), { createCount: 0, actionCount: 0 });
+});
+
 test("long-lived workbench supersession is a no-op only when the whole legacy batch is absent", async () => {
   const keepPlan = buildLocalTaskMutationPlan({
     runId: "20260815-V6",

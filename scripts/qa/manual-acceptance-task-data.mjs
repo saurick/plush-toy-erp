@@ -3396,8 +3396,13 @@ export async function retireLegacyManualAcceptanceTaskBatch(
     targetAttestation: parsedTargetAttestation,
     fetchImpl,
   });
-  const keepTasks = await verifyFinalBatch({
+  const keepPreflight = await preflightExistingBatch({
     plan: keepPlan,
+    accounts,
+    fetchImpl,
+  });
+  const keepTasks = await verifyFinalBatch({
+    plan: keepPreflight.plan,
     accounts,
     fetchImpl,
   });
@@ -3490,6 +3495,7 @@ export async function retireLegacyManualAcceptanceTaskBatch(
     backendURL: keepPlan.backendURL,
     databaseName: keepPlan.databaseName,
     runtime,
+    scheduleBinding: keepPreflight.scheduleBinding,
     keepBatch: {
       runId: keepPlan.runId,
       batchRunId: keepPlan.batchRunId,
