@@ -224,6 +224,47 @@ function cleanEnvironment(overrides = {}) {
   return env;
 }
 
+function createStableGitPushEnvironment(baseEnvironment) {
+  const root = mkdtempSync(path.join(os.tmpdir(), "plush-receipt-tools-"));
+  const bin = path.join(root, "bin");
+  mkdirSync(bin, { recursive: true });
+  const gitExecutable = execFileSync(
+    "/bin/sh",
+    ["-c", "command -v git"],
+    {
+      encoding: "utf8",
+      env: baseEnvironment,
+    },
+  ).trim();
+  assert.equal(path.isAbsolute(gitExecutable), true);
+  symlinkSync(gitExecutable, path.join(bin, "git"));
+  for (const command of [
+    "atlas",
+    "gitleaks",
+    "go",
+    "govulncheck",
+    "pnpm",
+    "psql",
+  ]) {
+    const executable = path.join(bin, command);
+    writeFileSync(
+      executable,
+      `#!/bin/sh\nprintf '%s\\n' '${command} stable-test-version'\n`,
+      "utf8",
+    );
+    chmodSync(executable, 0o755);
+  }
+  return {
+    env: {
+      ...baseEnvironment,
+      PATH: `${bin}${path.delimiter}${baseEnvironment.PATH}`,
+    },
+    cleanup() {
+      rmSync(root, { recursive: true, force: true });
+    },
+  };
+}
+
 function createFixture({ changePath = "tracked.txt" } = {}) {
   const root = mkdtempSync(path.join(os.tmpdir(), "plush-receipt-repo-"));
   const remote = mkdtempSync(path.join(os.tmpdir(), "plush-receipt-remote-"));
@@ -556,8 +597,9 @@ test("a second prepare with the same fingerprint reuses the valid full receipt",
 
 test("a real Git push PATH prefix preserves the prepared environment", () => {
   const fixture = createFixture();
+  const stableTools = createStableGitPushEnvironment(cleanEnvironment());
   try {
-    const env = cleanEnvironment();
+    const env = stableTools.env;
     const gitExecPath = git(fixture.root, ["--exec-path"]);
     const baseline = environmentFingerprint(fixture.root, env);
     assert.equal(
@@ -592,6 +634,7 @@ test("a real Git push PATH prefix preserves the prepared environment", () => {
     );
   } finally {
     fixture.cleanup();
+    stableTools.cleanup();
   }
 });
 
