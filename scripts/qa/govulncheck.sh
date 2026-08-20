@@ -7,12 +7,12 @@ print_help() {
   bash scripts/qa/govulncheck.sh [包参数...]
 
 作用:
-  对 server 执行 govulncheck（默认 ./...）。
+  使用固定 govulncheck v1.6.0 对 server 执行扫描（默认 ./...）。
 
 环境变量:
   SKIP_GOVULNCHECK=1              跳过检查
   GOVULNCHECK_STRICT=1            非 0 退出码时阻断（默认仅提示）
-  GOVULNCHECK_TIMEOUT_SECONDS=900 单次扫描上限（1-3600 秒）
+  GOVULNCHECK_TIMEOUT_SECONDS=300 单次扫描上限（1-3600 秒）
 USAGE
 }
 
@@ -30,7 +30,8 @@ if [[ "${SKIP_GOVULNCHECK:-0}" == "1" ]]; then
 fi
 
 strict="${GOVULNCHECK_STRICT:-0}"
-timeout_seconds="${GOVULNCHECK_TIMEOUT_SECONDS:-900}"
+required_version="v1.6.0"
+timeout_seconds="${GOVULNCHECK_TIMEOUT_SECONDS:-300}"
 if [[ ! "$timeout_seconds" =~ ^[0-9]+$ ]] ||
   ((timeout_seconds < 1 || timeout_seconds > 3600)); then
   echo "[qa:govulncheck] GOVULNCHECK_TIMEOUT_SECONDS 必须是 1-3600 的整数" >&2
@@ -39,6 +40,25 @@ fi
 
 if ! command -v govulncheck >/dev/null 2>&1; then
   echo "[qa:govulncheck] 未安装 govulncheck"
+  if [[ "$strict" == "1" ]]; then
+    echo "[qa:govulncheck] GOVULNCHECK_STRICT=1，阻断"
+    exit 1
+  fi
+  echo "[qa:govulncheck] 跳过"
+  exit 0
+fi
+
+if ! version_output="$(env GO_TELEMETRY_CHILD=2 govulncheck -version 2>&1)"; then
+  echo "[qa:govulncheck] 无法读取 govulncheck 版本"
+  if [[ "$strict" == "1" ]]; then
+    echo "[qa:govulncheck] GOVULNCHECK_STRICT=1，阻断"
+    exit 1
+  fi
+  echo "[qa:govulncheck] 跳过"
+  exit 0
+fi
+if ! grep -Fqx "Scanner: govulncheck@$required_version" <<<"$version_output"; then
+  echo "[qa:govulncheck] 版本不匹配，要求 $required_version"
   if [[ "$strict" == "1" ]]; then
     echo "[qa:govulncheck] GOVULNCHECK_STRICT=1，阻断"
     exit 1

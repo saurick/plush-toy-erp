@@ -10,7 +10,7 @@ const SCRIPT = path.join(ROOT_DIR, "scripts/qa/govulncheck.sh");
 
 async function runFakeGovulncheck(
   statuses,
-  { strict = true, timeoutSeconds = 2 } = {},
+  { strict = true, timeoutSeconds = 2, version = "v1.6.0" } = {},
 ) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "plush-govulncheck-"));
   const bin = path.join(directory, "bin");
@@ -27,6 +27,10 @@ set -euo pipefail
 counter="\${FAKE_GOVULNCHECK_COUNTER:?}"
 telemetry_child="\${FAKE_GOVULNCHECK_TELEMETRY_CHILD:?}"
 printf '%s\\n' "\${GO_TELEMETRY_CHILD:-unset}" > "$telemetry_child"
+if [[ "\${1:-}" == "-version" ]]; then
+  printf 'Scanner: govulncheck@%s\\n' "\${FAKE_GOVULNCHECK_VERSION:?}"
+  exit 0
+fi
 attempt=0
 if [[ -f "$counter" ]]; then
   read -r attempt < "$counter"
@@ -59,12 +63,18 @@ exit "$status"
         FAKE_GOVULNCHECK_COUNTER: counter,
         FAKE_GOVULNCHECK_STATUSES: statuses.join(","),
         FAKE_GOVULNCHECK_TELEMETRY_CHILD: telemetryChild,
+        FAKE_GOVULNCHECK_VERSION: version,
         GOVULNCHECK_STRICT: strict ? "1" : "0",
         GOVULNCHECK_TIMEOUT_SECONDS: String(timeoutSeconds),
         PATH: `${bin}:${process.env.PATH}`,
       },
     });
-    const attempts = Number((await readFile(counter, "utf8")).trim());
+    const attempts = await readFile(counter, "utf8")
+      .then((value) => Number(value.toString().trim()))
+      .catch((error) => {
+        if (error?.code === "ENOENT") return 0;
+        throw error;
+      });
     return {
       attempts,
       output: `${result.stdout || ""}\n${result.stderr || ""}`,
@@ -94,6 +104,16 @@ test("govulncheck retries one scanner or database failure and can recover", asyn
     result.output,
     /status=retry reason=scanner_or_database_failure attempt=1 next=2 max=2/u,
   );
+});
+
+test("govulncheck rejects a scanner version that differs from the release pin", async () => {
+  const result = await runFakeGovulncheck([0], { version: "v1.1.4" });
+
+  assert.equal(result.status, 1);
+  assert.equal(result.attempts, 0);
+  assert.equal(result.telemetryChild, "2");
+  assert.match(result.output, /版本不匹配，要求 v1\.6\.0/u);
+  assert.match(result.output, /GOVULNCHECK_STRICT=1，阻断/u);
 });
 
 test("govulncheck remains fail-closed after the bounded retry is exhausted", async () => {
@@ -135,4 +155,19 @@ test("govulncheck times out a stalled scan, retries once, and remains fail-close
     result.output,
     /status=failed reason=timeout attempts=2 timeout_seconds=1/u,
   );
+});
+
+test("govulncheck keeps the release scanner pin and default timeout documented", async () => {
+  const [script, readme] = await Promise.all([
+    readFile(SCRIPT, "utf8"),
+    readFile(path.join(ROOT_DIR, "scripts/README.md"), "utf8"),
+  ]);
+
+  assert.match(script, /required_version="v1\.6\.0"/u);
+  assert.match(
+    script,
+    /timeout_seconds="\$\{GOVULNCHECK_TIMEOUT_SECONDS:-300\}"/u,
+  );
+  assert.match(readme, /govulncheck v1\.6\.0/u);
+  assert.match(readme, /单次默认限时 300 秒/u);
 });
