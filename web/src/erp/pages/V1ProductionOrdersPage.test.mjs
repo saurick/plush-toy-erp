@@ -319,7 +319,22 @@ test('released production order detail renders frozen requirements and fails clo
 
 test('production material issue uses exact permission and source-bound RPC contracts', () => {
   assert.match(page, /'production\.material_issue\.create'/u)
-  assert.match(page, /listProductionOrderMaterialRequirements/u)
+  const openMaterialIssue = page.slice(
+    page.indexOf('const openProductionMaterialIssue'),
+    page.indexOf('const loadProductionMaterialIssueLots')
+  )
+  assert.match(
+    openMaterialIssue,
+    /const requirements = Array\.isArray\(nextAggregate\.materialRequirements\)/u
+  )
+  assert.doesNotMatch(
+    openMaterialIssue,
+    /listProductionOrderMaterialRequirements|listAllProductionFacts|Promise\.all/u
+  )
+  assert.match(
+    openMaterialIssue,
+    /getProductionOrder[\s\S]*listAllWarehouses[\s\S]*listAllInventoryLots/u
+  )
   assert.match(page, /createProductionMaterialIssueFromOrder\(params\)/u)
   assert.match(
     materialIssueAction,

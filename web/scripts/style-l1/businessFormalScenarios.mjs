@@ -5357,13 +5357,9 @@ export function createBusinessFormalScenarios(deps) {
 
           assert.equal(
             requirementListParams.length,
-            1,
-            `物料需求应只按当前生产订单读取: ${JSON.stringify(requirementListParams)}`
+            0,
+            `领料应复用生产订单聚合中的冻结需求，不应重复读取: ${JSON.stringify(requirementListParams)}`
           )
-          assert.deepEqual(requirementListParams[0], {
-            customer_key: 'yoyoosun',
-            production_order_id: 71,
-          })
           assert.deepEqual(inventoryLotParams, [
             {
               subject_type: 'MATERIAL',
@@ -5420,9 +5416,9 @@ export function createBusinessFormalScenarios(deps) {
           assert.equal(
             operationalFactMethods.filter(
               (method) => method === 'list_production_facts'
-            ).length >= 2,
-            true,
-            `创建后应重新读取关联生产记录: ${JSON.stringify(operationalFactMethods)}`
+            ).length,
+            1,
+            `创建后应只重新读取一次关联生产记录: ${JSON.stringify(operationalFactMethods)}`
           )
           await assertNoHorizontalOverflow(
             page,

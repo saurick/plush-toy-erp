@@ -203,6 +203,34 @@ test('errorMessage: 常见服务异常统一为可执行提示', () => {
   }
 })
 
+test('errorMessage: HTTP 429 说明失败动作、恢复方式和处理责任', () => {
+  const generic =
+    '请求未完成：系统当前处理请求较多。请稍候重试；如持续出现，请联系系统管理员。'
+  assert.equal(
+    getUserFacingErrorMessage(
+      {
+        message: 'service unavailable due to rate limit exceeded',
+        code: 429,
+        httpStatus: 429,
+      },
+      '请求失败，请稍后重试'
+    ),
+    generic
+  )
+  assert.equal(getUserFacingErrorMessage('HTTP error 429'), generic)
+  assert.equal(
+    getActionErrorMessage(
+      {
+        message: 'service unavailable due to rate limit exceeded',
+        code: 429,
+        httpStatus: 429,
+      },
+      '加载生产领料详情'
+    ),
+    '加载生产领料详情未完成：系统当前处理请求较多。请稍候重试；如持续出现，请联系系统管理员。'
+  )
+})
+
 test('errorMessage: 直接传入英文拒绝原因也收口到 fallback', () => {
   assert.equal(
     getUserFacingErrorMessage(

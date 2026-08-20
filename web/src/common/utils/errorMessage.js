@@ -32,6 +32,10 @@ const RAW_ERROR_PATTERNS = Object.freeze([
     /^http error 403$/iu,
     DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.PERMISSION_DENIED],
   ],
+  [
+    /^http error 429$/iu,
+    '请求未完成：系统当前处理请求较多。请稍候重试；如持续出现，请联系系统管理员。',
+  ],
   [/^http error \d+$/iu, '系统暂时不可用，请稍后重试'],
 ])
 
@@ -63,6 +67,22 @@ function normalizeErrorText(message) {
   const text = String(message || '').trim()
   if (!text) return ''
   return text.replace(/^(rpcerror|error):\s*/iu, '')
+}
+
+function isRateLimitError(err) {
+  if (Number(err?.httpStatus) === 429) return true
+  const message = normalizeErrorText(
+    typeof err === 'string' ? err : (err?.message ?? err)
+  )
+  return /^(?:http error 429|ratelimit)$/iu.test(message)
+}
+
+function rateLimitActionMessage(action) {
+  const subject = String(action || '')
+    .trim()
+    .split(/[，,]/u, 1)[0]
+    .replace(/失败$/u, '')
+  return `${subject || '请求'}未完成：系统当前处理请求较多。请稍候重试；如持续出现，请联系系统管理员。`
 }
 
 function translateKnownErrorMessage(message) {
@@ -109,6 +129,9 @@ export function getUserFacingErrorMessage(
   err,
   fallback = '请求失败，请稍后重试'
 ) {
+  if (isRateLimitError(err)) {
+    return '请求未完成：系统当前处理请求较多。请稍候重试；如持续出现，请联系系统管理员。'
+  }
   const code = Number(err?.code)
   const mappedCodeMessage = DEFAULT_RPC_ERROR_MESSAGES[code]
   if (mappedCodeMessage && !containsTechnicalErrorText(mappedCodeMessage)) {
@@ -127,6 +150,7 @@ export function getUserFacingErrorMessage(
 }
 
 export function getActionErrorMessage(err, action, options = {}) {
+  if (isRateLimitError(err)) return rateLimitActionMessage(action)
   return getUserFacingErrorMessage(
     err,
     resolveActionErrorFallback(action, options)

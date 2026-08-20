@@ -4,6 +4,7 @@ import test from "node:test";
 
 import {
   assertExceptionFlowEvidenceContract,
+  assertNoUnexpectedHTTPFailures,
   exceptionFlowConfirmation,
   normalizeLoopbackOrigin,
   parseExceptionFlowArgs,
@@ -150,6 +151,24 @@ test("exception-flow browser runner keeps reports inside the acceptance evidence
       /JSON file under output\/qa\/manual-acceptance/u,
     );
   }
+});
+
+test("exception-flow browser runner fails on any collected HTTP 4xx or 5xx", () => {
+  assert.equal(assertNoUnexpectedHTTPFailures([], "production flow"), true);
+  assert.throws(
+    () =>
+      assertNoUnexpectedHTTPFailures(
+        [
+          {
+            status: 429,
+            pathname: "/rpc/operational_fact",
+            rpcMethod: "list_production_order_material_requirements",
+          },
+        ],
+        "production flow",
+      ),
+    /production flow observed unexpected HTTP failures.*429/u,
+  );
 });
 
 test("exception-flow browser runner fails closed on incomplete or unsupported arguments", () => {

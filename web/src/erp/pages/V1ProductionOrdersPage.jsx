@@ -39,7 +39,6 @@ import {
   createProductionCompletionFromOrder,
   createProductionMaterialIssueFromOrder,
   listAllProductionFacts,
-  listProductionOrderMaterialRequirements,
 } from '../api/operationalFactApi.mjs'
 import {
   cancelProductionOrder,
@@ -833,25 +832,9 @@ export default function V1ProductionOrdersPage() {
     const request = beginLatestRequest('production-material-issue-context')
     setMaterialIssueLoading(true)
     try {
-      const [nextAggregate, requirements, factData, warehouseData] =
-        await Promise.all([
-          getProductionOrder(orderID, { signal: request.signal }),
-          listProductionOrderMaterialRequirements(
-            {
-              customer_key: activeCustomerKey || undefined,
-              production_order_id: orderID,
-            },
-            { signal: request.signal }
-          ),
-          listAllProductionFacts(
-            {
-              source_type: 'PRODUCTION_ORDER',
-              source_id: orderID,
-            },
-            { signal: request.signal }
-          ),
-          listAllWarehouses({ active_only: true }, { signal: request.signal }),
-        ])
+      const nextAggregate = await getProductionOrder(orderID, {
+        signal: request.signal,
+      })
       if (
         !request.isCurrent() ||
         materialIssueContextRequestRef.current !== requestID ||
@@ -868,6 +851,9 @@ export default function V1ProductionOrdersPage() {
         message.warning('物料需求需要计划人员复核，暂不能领料')
         return
       }
+      const requirements = Array.isArray(nextAggregate.materialRequirements)
+        ? nextAggregate.materialRequirements
+        : []
       const freshRequirement = requirements.find(
         (item) => Number(item.id) === Number(requirement?.id)
       )
@@ -889,6 +875,17 @@ export default function V1ProductionOrdersPage() {
       )
       if (!orderItem) {
         message.warning('生产明细已变化，请刷新后重试')
+        return
+      }
+      const warehouseData = await listAllWarehouses(
+        { active_only: true },
+        { signal: request.signal }
+      )
+      if (
+        !request.isCurrent() ||
+        materialIssueContextRequestRef.current !== requestID ||
+        selectedIDRef.current !== orderID
+      ) {
         return
       }
       const warehouseOptions = uniqueReferenceOptions(
@@ -920,9 +917,6 @@ export default function V1ProductionOrdersPage() {
         requirement: freshRequirement,
         materialRequirementsState: nextAggregate.materialRequirementsState,
         requirements,
-        facts: Array.isArray(factData?.production_facts)
-          ? factData.production_facts
-          : [],
         warehouseOptions,
         lots: filterProductionMaterialIssueLots(
           freshRequirement,

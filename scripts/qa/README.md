@@ -439,9 +439,9 @@ MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
 
 `customer-trial-133` 的浏览器报告必须写到当前版本与目标的规范路径 `output/qa/manual-acceptance/datasets/<dataVersion>/customer-trial-133/browser/report.json`，并同时提供同批 `dataset/apply-report.json`、`readiness/verify-report.json` 与 `MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON`。浏览器启动前会重新调用 `/readyz/runtime-identity`，把当前数据库、完整 release commit、Atlas migration、fresh baseline、attachments、source / fact / task / readiness 批次身份原子绑定；readiness 只参与身份闭合，列表数量仍必须由当前页面 DOM 重新证明，打印仍必须由当前 5 份 PDF 证明。
 
-本地 Kratos BBR 若在逐页读取期间返回纯 HTTP 429，浏览器验收会按递增等待最多重试两次，并在报告保留每次失败事件与截图。只要混入其他运行时错误、最终页面数据不足，或第三次仍被限流，整轮验收仍失败；该重试不能把持续过载或业务错误改写成绿色。
+本地 Kratos BBR 若在逐页读取期间返回纯 HTTP 429，浏览器验收会按 10 / 20 / 30 秒递增等待，最多执行四次，并在报告保留每次失败事件与截图。只要混入其他运行时错误、最终页面数据不足，或第四次仍被限流，整轮验收仍失败；该重试不能把持续过载或业务错误改写成绿色。
 
-四条异常流真实写浏览器验收必须单独使用名称和归属明确、可回收的全新本地隔离库。数据库名必须由 `database-target.mjs` 的 `browser-actions` 生命周期生成并匹配 `plush_erp_acceptance_<run-id>_browser_actions_dev`，后端必须是 loopback 且不能使用共享端口 `8300`，显式确认串必须同时绑定数据库名与后端 origin；runner 启动后还会用 `/readyz/runtime-identity` 复核同一数据库身份。禁止指向共享开发库、133、客户试用或生产数据库。
+三条异常流真实写浏览器验收必须单独使用名称和归属明确、可回收的全新本地隔离库。数据库名必须由 `database-target.mjs` 的 `browser-actions` 生命周期生成并匹配 `plush_erp_acceptance_<run-id>_browser_actions_dev`，后端必须是 loopback 且不能使用共享端口 `8300`，显式确认串必须同时绑定数据库名与后端 origin；runner 启动后还会用 `/readyz/runtime-identity` 复核同一数据库身份。禁止指向共享开发库、133、客户试用或生产数据库。
 
 ```bash
 MANUAL_ACCEPTANCE_DEMO_PASSWORD='<local-demo-password>' \
@@ -453,7 +453,7 @@ EXCEPTION_FLOW_BROWSER_CONFIRM='RUN_ISOLATED_EXCEPTION_FLOW_BROWSER_ACTIONS:plus
     --report output/qa/manual-acceptance/local-business-actions/report.json
 ```
 
-该 companion 的主业务 mutation 由真实产品 UI 点击触发；直接浏览器上下文 RPC 只用于结构合法的无权角色负例、权威读回和重复 / 旧 version 重试。未知结果场景是在后端已经返回成功后丢弃浏览器响应，再由页面权威读回确认，不 mock 业务成功。报告会明确记录 `admin_users.last_login_at` 的 `auth-write`、三条业务写、三个服务端 `40304`、三个 simulated transport fault、终态 Fact / 库存 / 核销读回及 `40920` CAS 拒绝。Finance Payment 使用隔离数据集中已经批准的来源，Inventory Adjustment 由浏览器新建并办理老板审批与仓库执行任务，Production OVER_ISSUE 使用已批准额度并由真实领料 Fact 消费后取消恢复。它不证明其他岗位、IQC / 委外写动作、打印工作台、部署、客户账号或客户 UAT；这些证据继续按各自验收层级单列。
+该 companion 登录后先停在轻量工作入口，等待账号、客户配置和知悉状态稳定，再开始业务读回；任一页面响应出现 HTTP 4xx / 5xx 都会保留脱敏路径和方法并使验收失败。主业务 mutation 由真实产品 UI 点击触发；直接浏览器上下文 RPC 只用于结构合法的无权角色负例、权威读回和重复 / 旧 version 重试。未知结果场景是在后端已经返回成功后丢弃浏览器响应，再由页面权威读回确认，不 mock 业务成功。报告会明确记录 `admin_users.last_login_at` 的 `auth-write`、三条业务写、三个服务端 `40304`、三个 simulated transport fault、终态 Fact / 库存 / 核销读回及 `40920` CAS 拒绝。Finance Payment 使用隔离数据集中已经批准的来源，Inventory Adjustment 由浏览器新建并办理老板审批与仓库执行任务，Production OVER_ISSUE 使用已批准额度并由真实领料 Fact 消费后取消恢复。它不证明其他岗位、IQC / 委外写动作、打印工作台、部署、客户账号或客户 UAT；这些证据继续按各自验收层级单列。
 
 133 前端隧道为 `18376` 时，最终浏览器命令为：
 

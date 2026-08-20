@@ -22,6 +22,7 @@ const PERMISSION_DENIED = 40304;
 const STALE_WRITE_CONFLICT = 40920;
 const PAGE_TIMEOUT_MS = 30_000;
 const RPC_TIMEOUT_MS = 20_000;
+const LOGIN_SETTLE_TIMEOUT_MS = 20_000;
 
 class AcceptanceError extends Error {
   constructor(message, exitCode = 1) {
@@ -238,6 +239,63 @@ async function browserRpc(page, service, method, params = {}) {
   return response.json.result?.data || {};
 }
 
+function attachUnexpectedHTTPFailureCollector(page) {
+  const failures = [];
+  page.on("response", (response) => {
+    const status = response.status();
+    if (status < 400) return;
+    let rpcMethod = "";
+    try {
+      rpcMethod = String(response.request().postDataJSON()?.method || "");
+    } catch {
+      rpcMethod = "";
+    }
+    let pathname = "";
+    try {
+      pathname = new URL(response.url()).pathname;
+    } catch {
+      pathname = "invalid-response-url";
+    }
+    failures.push({ status, pathname, rpcMethod });
+  });
+  return failures;
+}
+
+export function assertNoUnexpectedHTTPFailures(
+  failures,
+  label = "browser session",
+) {
+  const items = Array.isArray(failures) ? failures : [];
+  if (items.length === 0) return true;
+  throw new AcceptanceError(
+    `${label} observed unexpected HTTP failures: ${JSON.stringify(items)}`,
+  );
+}
+
+async function closeSession(session, label) {
+  const failures = Array.isArray(session?.httpFailures)
+    ? [...session.httpFailures]
+    : [];
+  await session?.context?.close();
+  assertNoUnexpectedHTTPFailures(failures, label);
+}
+
+function waitForLegalNoticeStatus(page) {
+  return page.waitForResponse(
+    (response) => {
+      if (!response.url().includes("/rpc/admin")) return false;
+      try {
+        return (
+          response.request().postDataJSON()?.method === "legal_notice_status"
+        );
+      } catch {
+        return false;
+      }
+    },
+    { timeout: LOGIN_SETTLE_TIMEOUT_MS },
+  );
+}
+
 async function expectPermissionDenied(page, service, method, params) {
   const response = await browserRpcRaw(page, service, method, params);
   assert.equal(
@@ -385,17 +443,55 @@ async function login(browser, { baseURL, password, roleKey }) {
     viewport: { width: 1440, height: 900 },
   });
   const page = await context.newPage();
+  const httpFailures = attachUnexpectedHTTPFailureCollector(page);
   page.setDefaultTimeout(PAGE_TIMEOUT_MS);
-  await page.goto(new URL("/admin-login", `${baseURL}/`).toString(), {
-    waitUntil: "domcontentloaded",
-  });
-  await page.getByLabel("账号").fill(account.username);
-  await page.locator('input[type="password"]').fill(password);
-  await Promise.all([
-    page.waitForURL((url) => url.pathname !== "/admin-login"),
-    page.locator('button[type="submit"]').click(),
-  ]);
-  return { account, context, page };
+  try {
+    await page.goto(new URL("/admin-login", `${baseURL}/`).toString(), {
+      waitUntil: "domcontentloaded",
+    });
+    await page.getByLabel("账号").fill(account.username);
+    await page.locator('input[type="password"]').fill(password);
+    const legalNoticeStatus = waitForLegalNoticeStatus(page);
+    await Promise.all([
+      page.waitForURL((url) => url.pathname !== "/admin-login"),
+      page.locator('button[type="submit"]').click(),
+    ]);
+    await page.goto(new URL("/entry", `${baseURL}/`).toString(), {
+      waitUntil: "domcontentloaded",
+    });
+    const legalResponse = await legalNoticeStatus;
+    if (legalResponse.status() >= 400) {
+      throw new AcceptanceError(
+        `${account.username} legal notice status returned HTTP ${legalResponse.status()}`,
+      );
+    }
+    await page.locator(".erp-entry-page").waitFor({
+      state: "visible",
+      timeout: LOGIN_SETTLE_TIMEOUT_MS,
+    });
+    await page
+      .waitForLoadState("networkidle", { timeout: 750 })
+      .catch(() => {});
+    await page.waitForTimeout(250);
+    if (
+      await page
+        .getByTestId("legal-notice-gate")
+        .isVisible()
+        .catch(() => false)
+    ) {
+      throw new AcceptanceError(
+        `${account.username} legal notice acknowledgement precondition is missing`,
+      );
+    }
+    assertNoUnexpectedHTTPFailures(
+      httpFailures,
+      `${account.username} login initialization`,
+    );
+    return { account, context, page, httpFailures };
+  } catch (error) {
+    await context.close().catch(() => {});
+    throw error;
+  }
 }
 
 async function goto(page, baseURL, pathname, expectedText) {
@@ -445,7 +541,17 @@ async function visibleModal(page, title) {
     .locator(".ant-modal:visible")
     .filter({ hasText: title })
     .last();
-  await modal.waitFor({ state: "visible" });
+  try {
+    await modal.waitFor({ state: "visible" });
+  } catch (error) {
+    const visibleMessages = await page
+      .locator(".ant-message-notice-content")
+      .allInnerTexts()
+      .catch(() => []);
+    throw new AcceptanceError(
+      `${title} was not shown; visibleMessages=${JSON.stringify(visibleMessages)}; cause=${String(error?.message || error)}`,
+    );
+  }
   return modal;
 }
 
@@ -521,7 +627,7 @@ async function actOnTaskInBrowser(
       result: "browser_task_action_completed",
     };
   } finally {
-    await session.context.close();
+    await closeSession(session, `${roleKey} task action`);
   }
 }
 
@@ -602,7 +708,7 @@ async function runFinancePaymentFlow(browser, options, report) {
       "posted finance payment",
     );
   } finally {
-    await authorizedLookup.context.close();
+    await closeSession(authorizedLookup, "finance authorized lookup");
   }
   const negative = await login(browser, { ...options, roleKey: "sales" });
   try {
@@ -619,7 +725,7 @@ async function runFinancePaymentFlow(browser, options, report) {
       ),
     );
   } finally {
-    await negative.context.close();
+    await closeSession(negative, "finance permission boundary");
   }
 
   const session = await login(browser, { ...options, roleKey: "finance" });
@@ -758,7 +864,7 @@ async function runFinancePaymentFlow(browser, options, report) {
     flow.passed = true;
     return flow;
   } finally {
-    await session.context.close();
+    await closeSession(session, "finance payment flow");
   }
 }
 
@@ -819,7 +925,7 @@ async function runInventoryAdjustmentFlow(browser, options, report) {
       ),
     );
   } finally {
-    await negative.context.close();
+    await closeSession(negative, "inventory permission boundary");
   }
 
   const operationNo = `BROWSER-INV-ADJ-${Date.now()}`;
@@ -883,7 +989,7 @@ async function runInventoryAdjustmentFlow(browser, options, report) {
       { customer_key: CUSTOMER_KEY, inventory_operation_id: operation.id },
     );
     flow.processBeforeApproval = summarizeProcess(processBefore);
-    await session.context.close();
+    await closeSession(session, "inventory adjustment source flow");
 
     const approvalTaskAction = await approveInventoryTaskInBrowser(
       browser,
@@ -1076,11 +1182,11 @@ async function runInventoryAdjustmentFlow(browser, options, report) {
       flow.passed = true;
       return flow;
     } finally {
-      await execution.context.close();
+      await closeSession(execution, "inventory adjustment execution flow");
     }
   } finally {
     if (!session.context.pages().every((page) => page.isClosed())) {
-      await session.context.close().catch(() => {});
+      await closeSession(session, "inventory adjustment source flow");
     }
   }
 }
@@ -1397,7 +1503,7 @@ async function runProductionExceptionFlow(browser, options, report) {
         ),
       );
     } finally {
-      await unauthorized.context.close();
+      await closeSession(unauthorized, "production permission boundary");
     }
 
     await selectRow(session.page, draft.fact_no);
@@ -1478,7 +1584,7 @@ async function runProductionExceptionFlow(browser, options, report) {
     flow.passed = true;
     return flow;
   } finally {
-    await session.context.close();
+    await closeSession(session, "production exception flow");
   }
 }
 
