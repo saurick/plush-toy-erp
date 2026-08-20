@@ -296,7 +296,7 @@ func (r *workflowRepo) CreateWorkflowTask(ctx context.Context, in *biz.WorkflowT
 	if err != nil {
 		return nil, err
 	}
-	defer rollbackEntTx(ctx, tx, r.log)
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	if publicCreate {
 		if replayed, found, err := resolveWorkflowTaskCreateInTx(ctx, tx, actorID, in.IdempotencyKey, in.IntentHash); err != nil || found {
 			return replayed, err
@@ -344,6 +344,7 @@ func (r *workflowRepo) CreateWorkflowTask(ctx context.Context, in *biz.WorkflowT
 		if ent.IsConstraintError(err) {
 			if publicCreate {
 				_ = tx.Rollback()
+				tx = nil
 				if replayed, found, replayErr := r.resolveWorkflowTaskCreate(ctx, actorID, in.IdempotencyKey, in.IntentHash); replayErr != nil || found {
 					return replayed, replayErr
 				}
@@ -452,7 +453,7 @@ func (r *workflowRepo) UpdateWorkflowTaskStatus(ctx context.Context, in *biz.Wor
 	if err != nil {
 		return nil, err
 	}
-	defer rollbackEntTx(ctx, tx, r.log)
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	if replayed, found, err := resolveWorkflowTaskMutationInTx(ctx, tx, in.ID, in.IdempotencyKey, in.IntentHash, in.CommandKey, actorID); err != nil || found {
 		return replayed, err
 	}
@@ -611,7 +612,7 @@ func (r *workflowRepo) UrgeWorkflowTask(ctx context.Context, in *biz.WorkflowTas
 	if err != nil {
 		return nil, err
 	}
-	defer rollbackEntTx(ctx, tx, r.log)
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	if replayed, found, err := resolveWorkflowTaskMutationInTx(ctx, tx, in.ID, in.IdempotencyKey, in.IntentHash, in.CommandKey, actorID); err != nil || found {
 		return replayed, err
 	}
@@ -758,7 +759,7 @@ func (r *workflowRepo) ReassignWorkflowTask(
 	if err != nil {
 		return nil, err
 	}
-	defer rollbackEntTx(ctx, tx, r.log)
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	if replayed, found, err := resolveWorkflowTaskMutationInTx(
 		ctx,
 		tx,

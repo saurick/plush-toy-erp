@@ -1667,7 +1667,7 @@ func (r *inventoryRepo) CopyBOMVersion(ctx context.Context, sourceHeaderID int, 
 	if err != nil {
 		return nil, err
 	}
-	defer rollbackEntTx(ctx, tx, r.log)
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 
 	source, err := tx.BOMHeader.Get(ctx, sourceHeaderID)
 	if err != nil {
@@ -1776,7 +1776,7 @@ func (r *inventoryRepo) ActivateBOMVersion(ctx context.Context, id int) (*biz.BO
 	if err != nil {
 		return nil, err
 	}
-	defer rollbackEntTx(ctx, tx, r.log)
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 
 	target, err := tx.BOMHeader.Get(ctx, id)
 	if err != nil {

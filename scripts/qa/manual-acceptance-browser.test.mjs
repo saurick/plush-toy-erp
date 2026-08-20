@@ -2576,6 +2576,24 @@ test("fresh business print sessions run before the long page traversal", async (
   assert.ok(formalAccountIndex > printIndex);
 });
 
+test("data-bound pages prove current DOM data before reading the generic page summary", async () => {
+  const source = await fs.readFile(scriptPath, "utf8");
+  const verifyStart = source.indexOf("async function verifyTarget(");
+  const verifyEnd = source.indexOf(
+    "async function attemptRejectedLogin(",
+    verifyStart,
+  );
+  assert.ok(verifyStart > 0);
+  assert.ok(verifyEnd > verifyStart);
+  const verifySource = source.slice(verifyStart, verifyEnd);
+  const dataEvidenceIndex = verifySource.indexOf("const dataEvidence =");
+  const visibleSummaryIndex = verifySource.indexOf(
+    "const visible = await readVisibleTextSummary(page)",
+  );
+  assert.ok(dataEvidenceIndex > 0);
+  assert.ok(visibleSummaryIndex > dataEvidenceIndex);
+});
+
 test("historical readiness evidence cannot override a current DOM minimum failure", () => {
   const summary = summarizeManualAcceptance({
     formalAccounts: [{ passed: true }],

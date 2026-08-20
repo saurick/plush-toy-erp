@@ -297,7 +297,7 @@ func (r *salesOrderRepo) ApplySalesOrderLifecycleAction(
 	if err != nil {
 		return nil, err
 	}
-	defer rollbackEntTx(ctx, tx, r.log)
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	replayed, err := resolveSourceOrderLifecycleActionReplay(ctx, tx.Client(), "sales_order", in)
 	if err != nil {
 		return nil, err
@@ -542,7 +542,7 @@ func (r *salesOrderRepo) SubmitSalesOrderForProcessCommand(
 	if err != nil {
 		return nil, err
 	}
-	defer rollbackEntTx(ctx, tx, r.log)
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	affected, err := tx.SalesOrder.Update().
 		Where(salesorder.ID(salesOrderID), salesorder.LifecycleStatus(biz.SalesOrderStatusDraft)).
 		SetLifecycleStatus(biz.SalesOrderStatusSubmitted).
@@ -598,7 +598,7 @@ func (r *salesOrderRepo) ActivateSalesOrderForProcessCommand(
 	if err != nil {
 		return nil, err
 	}
-	defer rollbackEntTx(ctx, tx, r.log)
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	query := tx.SalesOrder.Query().Where(salesorder.ID(salesOrderID))
 	if r.data.sqlDialect == dialect.Postgres {
 		query = query.Where(func(selector *sql.Selector) { selector.ForUpdate() })
@@ -654,7 +654,7 @@ func (r *salesOrderRepo) RejectSalesOrderForProcessCommand(
 	if err != nil {
 		return nil, err
 	}
-	defer rollbackEntTx(ctx, tx, r.log)
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	query := tx.SalesOrder.Query().Where(salesorder.ID(salesOrderID))
 	if r.data.sqlDialect == dialect.Postgres {
 		query = query.Where(func(selector *sql.Selector) { selector.ForUpdate() })
@@ -724,7 +724,7 @@ func (r *salesOrderRepo) cancelSalesOrderLifecycle(ctx context.Context, id int, 
 	if err != nil {
 		return nil, err
 	}
-	defer rollbackEntTx(ctx, tx, r.log)
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	query := tx.SalesOrder.Query().Where(salesorder.ID(id))
 	if r.data.sqlDialect == dialect.Postgres {
 		query = query.Where(func(selector *sql.Selector) { selector.ForUpdate() })

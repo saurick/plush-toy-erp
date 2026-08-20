@@ -70,7 +70,7 @@ func (r *processRuntimeRepo) CreateProcessInstance(ctx context.Context, in *biz.
 	if err != nil {
 		return nil, nil, err
 	}
-	defer rollbackEntTx(ctx, tx, r.log)
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 
 	row, nodes, err := createProcessInstanceRowsInTx(ctx, tx, in, actorID)
 	if err != nil {
@@ -164,7 +164,7 @@ func (r *processRuntimeRepo) CreateProcessInstanceFromSource(
 	if err != nil {
 		return nil, nil, err
 	}
-	defer rollbackEntTx(ctx, tx, r.log)
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 
 	refNo, sourceStatus, err := r.lockProcessSourceInTx(ctx, tx, in)
 	if err != nil {
@@ -883,7 +883,7 @@ func (r *processRuntimeRepo) RecoverProcessDomainCommandCompensation(
 	if err != nil {
 		return nil, err
 	}
-	defer rollbackEntTx(ctx, tx, r.log)
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	origin, err := tx.ProcessNodeInstance.Query().Where(
 		processnodeinstance.ID(in.ProcessNodeInstanceID),
 		processnodeinstance.ProcessInstanceID(in.ProcessInstanceID),
@@ -1255,7 +1255,7 @@ func (r *processRuntimeRepo) CompleteProcessInstance(ctx context.Context, in *bi
 	if err != nil {
 		return nil, err
 	}
-	defer rollbackEntTx(ctx, tx, r.log)
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	terminal, err := tx.ProcessNodeInstance.Query().Where(
 		processnodeinstance.ID(in.TerminalNodeID),
 		processnodeinstance.ProcessInstanceID(in.ID),
@@ -1458,7 +1458,7 @@ func (r *processRuntimeRepo) BlockProcessNodeAndInstance(ctx context.Context, in
 	if err != nil {
 		return nil, err
 	}
-	defer rollbackEntTx(ctx, tx, r.log)
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 
 	blockedNode, err := blockProcessNodeInstanceWithClient(ctx, tx.Client(), in, actorID)
 	if err != nil {
@@ -1555,7 +1555,7 @@ func (r *processRuntimeRepo) ResumeProcessNodeAndInstance(
 	if err != nil {
 		return nil, err
 	}
-	defer rollbackEntTx(ctx, tx, r.log)
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	instance, err := tx.ProcessInstance.Query().Where(
 		processinstance.ID(in.ProcessInstanceID),
 		processinstance.Status(biz.ProcessStatusBlocked),

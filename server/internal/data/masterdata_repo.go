@@ -93,7 +93,7 @@ func (r *masterDataRepo) SaveCustomerWithContacts(ctx context.Context, id int, i
 	if err != nil {
 		return nil, err
 	}
-	defer rollbackMasterDataEntTx(ctx, tx, r.log)
+	defer func() { rollbackMasterDataEntTx(ctx, tx, r.log) }()
 
 	var customerRow *ent.Customer
 	if id > 0 {
@@ -249,7 +249,7 @@ func (r *masterDataRepo) SaveSupplierWithContacts(ctx context.Context, id int, i
 	if err != nil {
 		return nil, err
 	}
-	defer rollbackMasterDataEntTx(ctx, tx, r.log)
+	defer func() { rollbackMasterDataEntTx(ctx, tx, r.log) }()
 
 	var supplierRow *ent.Supplier
 	if id > 0 {
@@ -893,7 +893,7 @@ func (r *masterDataRepo) CreateContact(ctx context.Context, in *biz.ContactMutat
 	if err != nil {
 		return nil, err
 	}
-	defer rollbackMasterDataEntTx(ctx, tx, r.log)
+	defer func() { rollbackMasterDataEntTx(ctx, tx, r.log) }()
 
 	if in.IsPrimary {
 		if _, err := tx.Contact.Update().
@@ -930,7 +930,7 @@ func (r *masterDataRepo) UpdateContact(ctx context.Context, id int, in *biz.Cont
 	if err != nil {
 		return nil, err
 	}
-	defer rollbackMasterDataEntTx(ctx, tx, r.log)
+	defer func() { rollbackMasterDataEntTx(ctx, tx, r.log) }()
 
 	if exists, err := tx.Contact.Query().Where(contact.ID(id)).Exist(ctx); err != nil {
 		return nil, err
@@ -1026,7 +1026,7 @@ func (r *masterDataRepo) SetPrimaryContact(ctx context.Context, id int) (*biz.Co
 	if err != nil {
 		return nil, err
 	}
-	defer rollbackMasterDataEntTx(ctx, tx, r.log)
+	defer func() { rollbackMasterDataEntTx(ctx, tx, r.log) }()
 
 	row, err := tx.Contact.Get(ctx, id)
 	if err != nil {

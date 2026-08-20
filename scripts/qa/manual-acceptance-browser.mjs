@@ -4011,17 +4011,6 @@ async function verifyTarget(
     if (target.key !== "admin-login" && actualURL.pathname === "/admin-login") {
       throw new BrowserAcceptanceError(`${target.title} 被退回登录页`);
     }
-    const visible = await readVisibleTextSummary(page);
-    if (!visible.heading && visible.textLength < 40) {
-      throw new BrowserAcceptanceError(`${target.title} 缺少可识别的页面内容`);
-    }
-    if (["admin-login", "entry"].includes(target.key)) {
-      if (!visible.companyVisible || !visible.systemNameVisible) {
-        throw new BrowserAcceptanceError(
-          `${target.title} 未显示甲方公司和系统名称`,
-        );
-      }
-    }
     const dataEvidence = target.requiresDataEvidence
       ? target.isList
         ? await readListEvidence(page, target, datasetBinding)
@@ -4034,6 +4023,20 @@ async function verifyTarget(
           minimumRecords: target.minimumRecords,
           minimumSatisfied: null,
         };
+    // 数据页先等待当前批次的真实可见 DOM 证明，再读取通用页面摘要。
+    // 页面 shell 会早于业务请求完成；若先按 shell 文本判定，会把仍在加载的
+    // 正常页面误报为“缺少内容”，也无法证明列表中的当前批次数据已经可见。
+    const visible = await readVisibleTextSummary(page);
+    if (!visible.heading && visible.textLength < 40) {
+      throw new BrowserAcceptanceError(`${target.title} 缺少可识别的页面内容`);
+    }
+    if (["admin-login", "entry"].includes(target.key)) {
+      if (!visible.companyVisible || !visible.systemNameVisible) {
+        throw new BrowserAcceptanceError(
+          `${target.title} 未显示甲方公司和系统名称`,
+        );
+      }
+    }
     await page.waitForTimeout(150);
     const runtimeEvents = partitionTargetRuntimeEvents(target, events);
     if (runtimeEvents.blocking.length > 0) {

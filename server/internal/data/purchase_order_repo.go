@@ -304,7 +304,7 @@ func (r *purchaseOrderRepo) RejectPurchaseOrderForProcessCommand(
 	if err != nil {
 		return nil, err
 	}
-	defer rollbackEntTx(ctx, tx, r.log)
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	query := tx.PurchaseOrder.Query().Where(purchaseorder.ID(purchaseOrderID))
 	if r.data.sqlDialect == dialect.Postgres {
 		query = query.Where(func(selector *sql.Selector) { selector.ForUpdate() })
@@ -385,7 +385,7 @@ func (r *purchaseOrderRepo) updatePurchaseOrderForProcessCommand(
 	if err != nil {
 		return nil, err
 	}
-	defer rollbackEntTx(ctx, tx, r.log)
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	query := tx.PurchaseOrder.Query().Where(purchaseorder.ID(purchaseOrderID))
 	if r.data.sqlDialect == dialect.Postgres {
 		query = query.Where(func(selector *sql.Selector) { selector.ForUpdate() })
@@ -429,7 +429,7 @@ func (r *purchaseOrderRepo) settlePurchaseOrderLifecycle(ctx context.Context, id
 	if err != nil {
 		return nil, err
 	}
-	defer rollbackEntTx(ctx, tx, r.log)
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	query := tx.PurchaseOrder.Query().Where(purchaseorder.ID(id))
 	if r.data.sqlDialect == dialect.Postgres {
 		query = query.Where(func(selector *sql.Selector) { selector.ForUpdate() })
@@ -473,7 +473,7 @@ func (r *purchaseOrderRepo) ApplyPurchaseOrderLifecycleAction(
 	if err != nil {
 		return nil, err
 	}
-	defer rollbackEntTx(ctx, tx, r.log)
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	replayed, err := resolveSourceOrderLifecycleActionReplay(ctx, tx.Client(), "purchase_order", in)
 	if err != nil {
 		return nil, err
