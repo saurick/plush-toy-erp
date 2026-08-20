@@ -1864,6 +1864,8 @@ export function buildManualAcceptanceReadinessPlan(options = {}) {
             target: taskReport.target,
             backendURL: taskReport.backendURL,
             databaseName: taskReport.databaseName,
+            taskProfile: taskReport.taskProfile,
+            copyRevision: taskReport.copyRevision,
             prefix: taskReport.prefix,
             sourceType: taskReport.sourceType,
             sourceID: taskReport.sourceID,

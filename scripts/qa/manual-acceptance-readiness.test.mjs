@@ -1504,6 +1504,15 @@ test("readiness binds the explicit long-lived workbench batch identity and prefi
   const byID = new Map(plan.probes.map((probe) => [probe.id, probe]));
 
   assert.equal(
+    plan.reportInputs.taskReport.taskProfile,
+    TASK_PROFILE_LONG_LIVED_WORKBENCH,
+  );
+  assert.equal(
+    plan.reportInputs.taskReport.copyRevision,
+    LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
+  );
+
+  assert.equal(
     byID.get("boss-dashboard-tasks").exactTaskCodePrefix,
     LONG_LIVED_WORKBENCH_VISIBLE_CODE_PREFIX_BY_ROLE.boss,
   );

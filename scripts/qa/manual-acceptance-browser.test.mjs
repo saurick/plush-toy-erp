@@ -10,6 +10,7 @@ import {
   EXCEPTION_BROWSER_ACCOUNTS,
   FORMAL_BROWSER_ACCOUNTS,
   MANUAL_ACCEPTANCE_BROWSER_BOUNDARY,
+  awaitLoginSubmission,
   assertPDFRenderResponse,
   assertManualAcceptanceBrowserReadinessBinding,
   assertManualAcceptanceTaskGroupCoverage,
@@ -61,7 +62,9 @@ import {
   manualAcceptanceDatasetStageReportPath,
 } from "./manual-acceptance-dataset-runner.mjs";
 import {
+  LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
   TASK_SOURCE_TYPE,
+  TASK_PROFILE_LONG_LIVED_WORKBENCH,
   TASK_VISIBLE_CODE_PREFIX_BY_ROLE,
   buildManualAcceptanceTaskSchedule,
   manualAcceptanceTaskBatchIdentity,
@@ -78,6 +81,19 @@ const scriptPath = path.resolve(
   repoRoot,
   "scripts/qa/manual-acceptance-browser.mjs",
 );
+
+test("login owns the legal-notice response wait while navigation is pending", async () => {
+  const timeout = new Error("legal notice timeout");
+  await assert.rejects(
+    awaitLoginSubmission({
+      navigation: new Promise(() => {}),
+      submit: Promise.resolve(),
+      legalNoticeStatus: Promise.reject(timeout),
+    }),
+    timeout,
+  );
+});
+
 const CORE_UNIT_CODES = MANUAL_ACCEPTANCE_CORE_UNITS.map((item) => item.code);
 
 const TASK_COVERAGE_ROLES = Object.freeze([
@@ -860,7 +876,9 @@ test("bound print inputs stay in the acceptance report root and match the curren
 });
 
 test("remote browser evidence binds the exact readiness batch and canonical report path", () => {
-  const taskBatch = manualAcceptanceTaskBatchIdentity("20260815-V6");
+  const taskBatch = manualAcceptanceTaskBatchIdentity("20260815-V6", {
+    taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
+  });
   const taskCoverage = taskGroupCoverageFixture();
   const runtimeAttestation = {
     source: "out-of-band",
@@ -951,6 +969,8 @@ test("remote browser evidence binds the exact readiness batch and canonical repo
         target: printInput.target,
         backendURL: printInput.backendURL,
         databaseName: printInput.databaseName,
+        taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
+        copyRevision: LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
         prefix: taskBatch.prefix,
         sourceType: taskBatch.sourceType,
         sourceID: taskBatch.sourceID,
@@ -979,6 +999,12 @@ test("remote browser evidence binds the exact readiness batch and canonical repo
   assert.equal(binding.datasetSubstrateVerified, true);
   assert.equal(binding.browserOnlyNotProvenTargets, 10);
   assert.equal(binding.taskSourceID, taskBatch.sourceID);
+  assert.equal(binding.taskProfile, TASK_PROFILE_LONG_LIVED_WORKBENCH);
+  assert.equal(
+    binding.taskCopyRevision,
+    LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
+  );
+  assert.equal(binding.taskVisibleCodePrefixes.boss, "YS-WB2-LD");
   assert.equal(binding.taskGroupCoverage.complete, true);
 
   const canonical = resolveManualAcceptanceBrowserReportPath(
@@ -1020,6 +1046,26 @@ test("remote browser evidence binds the exact readiness batch and canonical repo
     () =>
       assertManualAcceptanceBrowserReadinessBinding(
         mixedTaskSource,
+        printInput,
+      ),
+    /批次或运行态身份不一致/u,
+  );
+  const mixedTaskProfile = structuredClone(readiness);
+  mixedTaskProfile.reportInputs.taskReport.taskProfile = "acceptance-snapshot";
+  assert.throws(
+    () =>
+      assertManualAcceptanceBrowserReadinessBinding(
+        mixedTaskProfile,
+        printInput,
+      ),
+    /批次或运行态身份不一致/u,
+  );
+  const mixedCopyRevision = structuredClone(readiness);
+  mixedCopyRevision.reportInputs.taskReport.copyRevision = "WORKBENCH1";
+  assert.throws(
+    () =>
+      assertManualAcceptanceBrowserReadinessBinding(
+        mixedCopyRevision,
         printInput,
       ),
     /批次或运行态身份不一致/u,
@@ -1911,6 +1957,27 @@ test("mobile current-batch proof requires an exact role source and a visible cur
     currentBatch,
   });
   assert.equal(passing.minimumSatisfied, true);
+  const longLivedPrefix = "YS-WB2-XS";
+  assert.equal(
+    evaluateMobileCurrentBatchEvidence({
+      roleKey,
+      todoCount: 14,
+      doneCount: 6,
+      visibleCurrentBatchTaskCount: 1,
+      minimumRecords: 20,
+      currentBatch: {
+        ...currentBatch,
+        probes: [
+          {
+            ...currentBatch.probes[0],
+            exactTaskCodePrefix: longLivedPrefix,
+          },
+        ],
+      },
+      taskCodePrefix: longLivedPrefix,
+    }).minimumSatisfied,
+    true,
+  );
   assert.equal(
     evaluateMobileCurrentBatchEvidence({
       roleKey,
@@ -2018,6 +2085,30 @@ test("dashboard task evidence binds the visible page to the exact current batch"
       roleKey: "boss",
       visibleTaskCodes: ["YS-V6-LD-01"],
       currentBatchTaskCodes: currentPageTaskCodes,
+    }).minimumSatisfied,
+    true,
+  );
+  const longLivedPrefix = "YS-WB2-LD";
+  assert.equal(
+    evaluateDashboardTaskCurrentBatchEvidence({
+      evidence: base,
+      currentBatch: {
+        ...currentBatch,
+        probes: [
+          {
+            ...currentBatch.probes[0],
+            exactTaskCodePrefix: longLivedPrefix,
+          },
+        ],
+      },
+      roleKey: "boss",
+      taskCodePrefix: longLivedPrefix,
+      visibleTaskCodes: [`${longLivedPrefix}-01`],
+      currentBatchTaskCodes: Array.from(
+        { length: 18 },
+        (_, index) =>
+          `${longLivedPrefix}-${String(index + 1).padStart(2, "0")}`,
+      ),
     }).minimumSatisfied,
     true,
   );
@@ -2199,6 +2290,129 @@ test("business dashboard binds every card to the fresh projection and same-batch
       evidence,
       currentBatch,
       baselineProven: false,
+    }).minimumSatisfied,
+    false,
+  );
+  assert.equal(
+    evaluateBusinessDashboardCurrentBatchEvidence({
+      evidence,
+      currentBatch: {
+        ...currentBatch,
+        probes: [
+          ...currentBatch.probes.slice(0, 3),
+          {
+            ...currentBatch.probes[3],
+            batchEvidence: "unregistered_projection",
+          },
+        ],
+      },
+      baselineProven: true,
+    }).minimumSatisfied,
+    false,
+  );
+});
+
+test("business dashboard binds persistent totals without confusing them with the current batch", () => {
+  const requirements = [
+    {
+      key: "customers",
+      label: "客户",
+      minimumRecords: 60,
+      probeId: "customers",
+      exactCurrentBatchCount: true,
+    },
+    {
+      key: "products",
+      label: "产品",
+      minimumRecords: 20,
+      probeId: "products",
+      exactCurrentBatchCount: true,
+    },
+    {
+      key: "inventory",
+      label: "库存台账",
+      minimumRecords: 45,
+      probeId: "inventory-balances",
+      exactCurrentBatchCount: true,
+    },
+  ];
+  const evidence = evaluateBusinessDashboardEvidence(
+    ["客户数量75", "产品数量40", "库存台账数量220"],
+    requirements,
+  );
+  const currentBatch = {
+    dataStatus: "pass",
+    actual: 20,
+    probes: [
+      {
+        id: "customers",
+        status: "pass",
+        actual: 60,
+        batchEvidence: "prefix_filtered",
+      },
+      {
+        id: "products",
+        status: "pass",
+        actual: 20,
+        batchEvidence: "prefix_filtered",
+      },
+      {
+        id: "inventory-balances",
+        status: "pass",
+        actual: 193,
+        batchEvidence: "exact_references",
+      },
+      {
+        id: "business-dashboard-stats",
+        status: "pass",
+        actual: 20,
+        batchEvidence: "persistent_dataset_projection",
+        moduleTotals: { customers: 75, products: 40, inventory: 220 },
+      },
+    ],
+  };
+  const passing = evaluateBusinessDashboardCurrentBatchEvidence({
+    evidence,
+    currentBatch,
+    baselineProven: true,
+  });
+  assert.equal(passing.minimumSatisfied, true);
+  assert.equal(
+    passing.projectionBatchEvidence,
+    "persistent_dataset_projection",
+  );
+  assert.equal(
+    passing.sources[0].currentBatchCountComparison,
+    "projection_total_with_batch_minimum",
+  );
+  assert.equal(
+    evaluateBusinessDashboardCurrentBatchEvidence({
+      evidence,
+      currentBatch: {
+        ...currentBatch,
+        probes: [
+          { ...currentBatch.probes[0], status: "fail" },
+          ...currentBatch.probes.slice(1),
+        ],
+      },
+      baselineProven: true,
+    }).minimumSatisfied,
+    false,
+  );
+  assert.equal(
+    evaluateBusinessDashboardCurrentBatchEvidence({
+      evidence,
+      currentBatch: {
+        ...currentBatch,
+        probes: [
+          ...currentBatch.probes.slice(0, 3),
+          {
+            ...currentBatch.probes[3],
+            moduleTotals: { customers: 74, products: 40, inventory: 220 },
+          },
+        ],
+      },
+      baselineProven: true,
     }).minimumSatisfied,
     false,
   );

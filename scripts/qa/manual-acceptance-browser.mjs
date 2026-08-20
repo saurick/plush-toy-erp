@@ -44,6 +44,7 @@ import {
   TASK_SOURCE_TYPE,
   TASK_VISIBLE_CODE_PREFIX_BY_ROLE,
   buildManualAcceptanceTaskSchedule,
+  getManualAcceptanceTaskProfileContract,
   manualAcceptanceTaskBatchIdentity,
 } from "./manual-acceptance-task-data.mjs";
 
@@ -246,6 +247,10 @@ const BUSINESS_DASHBOARD_PAGE_KEY_BY_SOURCE = Object.freeze({
   outbound: "shipments",
 });
 const BUSINESS_DASHBOARD_PROJECTION_PROBE_ID = "business-dashboard-stats";
+const BUSINESS_DASHBOARD_PROJECTION_BATCH_EVIDENCE = new Set([
+  "fresh_dataset_projection",
+  "persistent_dataset_projection",
+]);
 
 const BUSINESS_DASHBOARD_PROBE_ID_BY_SOURCE = Object.freeze({
   customers: "customers",
@@ -761,6 +766,19 @@ async function acknowledgeLegalNoticeIfRequired(page, statusResponse) {
   return true;
 }
 
+export async function awaitLoginSubmission({
+  navigation,
+  submit,
+  legalNoticeStatus,
+}) {
+  const [, , legalNoticeStatusResponse] = await Promise.all([
+    navigation,
+    submit,
+    legalNoticeStatus,
+  ]);
+  return legalNoticeStatusResponse;
+}
+
 async function loginFormalAccountAttempt(
   browser,
   {
@@ -794,12 +812,13 @@ async function loginFormalAccountAttempt(
       entryTarget,
     });
     const legalNoticeStatus = waitForLegalNoticeStatus(page);
-    await Promise.all([
-      page.waitForURL((url) => url.pathname !== "/admin-login", {
+    const legalNoticeStatusResponse = await awaitLoginSubmission({
+      navigation: page.waitForURL((url) => url.pathname !== "/admin-login", {
         timeout: LOGIN_TIMEOUT_MS,
       }),
-      page.locator('button[type="submit"]').first().click(),
-    ]);
+      submit: page.locator('button[type="submit"]').first().click(),
+      legalNoticeStatus,
+    });
     const landingPath = new URL(page.url()).pathname;
     if (entryTarget === "desktop") {
       // 登录后的默认工作台会并发读取多块业务数据；验收账号建态只需入口页，
@@ -810,7 +829,7 @@ async function loginFormalAccountAttempt(
     }
     const legalNoticeAcknowledged = await acknowledgeLegalNoticeIfRequired(
       page,
-      legalNoticeStatus,
+      legalNoticeStatusResponse,
     );
     await waitForReadablePage(page);
     const visibleText = await page.locator("body").innerText();
@@ -1163,10 +1182,15 @@ export function evaluateBusinessDashboardCurrentBatchEvidence({
     (currentBatch?.probes || []).map((probe) => [probe.id, probe]),
   );
   const projectionProbe = probeById.get(BUSINESS_DASHBOARD_PROJECTION_PROBE_ID);
+  const projectionBatchEvidence = String(
+    projectionProbe?.batchEvidence || "not_proven",
+  );
+  const persistentProjection =
+    projectionBatchEvidence === "persistent_dataset_projection";
   const projectionProven =
     baselineProven === true &&
     projectionProbe?.status === "pass" &&
-    projectionProbe?.batchEvidence === "fresh_dataset_projection" &&
+    BUSINESS_DASHBOARD_PROJECTION_BATCH_EVIDENCE.has(projectionBatchEvidence) &&
     projectionProbe?.moduleTotals &&
     typeof projectionProbe.moduleTotals === "object";
   const sources = (evidence?.sources || []).map((source) => {
@@ -1184,7 +1208,7 @@ export function evaluateBusinessDashboardCurrentBatchEvidence({
       source.actual === projectionActual;
     const exactCurrentBatchCountSatisfied =
       source.exactCurrentBatchCount === false ||
-      (batchProven && source.actual === probe.actual);
+      (batchProven && (persistentProjection || source.actual === probe.actual));
     return {
       ...source,
       currentBatchActual: probe?.actual ?? null,
@@ -1195,6 +1219,9 @@ export function evaluateBusinessDashboardCurrentBatchEvidence({
         : null,
       projectionCountSatisfied,
       exactCurrentBatchCountSatisfied,
+      currentBatchCountComparison: persistentProjection
+        ? "projection_total_with_batch_minimum"
+        : "exact_current_batch",
     };
   });
   const currentBatchBound =
@@ -1219,6 +1246,7 @@ export function evaluateBusinessDashboardCurrentBatchEvidence({
     evidenceSource:
       "business dashboard source aria labels bound to current-batch readiness probes",
     sources,
+    projectionBatchEvidence,
     projectionProven,
     currentBatchBound,
     minimumSatisfied,
@@ -1230,10 +1258,11 @@ export function evaluateDashboardTaskCurrentBatchEvidence({
   currentBatch,
   roleKey,
   taskGroup = null,
+  taskCodePrefix = TASK_VISIBLE_CODE_PREFIX_BY_ROLE[roleKey],
   visibleTaskCodes = [],
   currentBatchTaskCodes = [],
 }) {
-  const expectedPrefix = TASK_VISIBLE_CODE_PREFIX_BY_ROLE[roleKey];
+  const expectedPrefix = String(taskCodePrefix || "").trim();
   const taskProbe = currentBatch?.probes?.find(
     (probe) => probe.exactTaskCodePrefix === expectedPrefix,
   );
@@ -1291,6 +1320,14 @@ async function readDashboardEvidence(page, target, datasetBinding) {
     datasetBinding,
   );
   if (target.key === "global-dashboard") {
+    const taskCodePrefix = String(
+      datasetBinding?.readiness?.taskVisibleCodePrefixes?.boss || "",
+    ).trim();
+    if (!taskCodePrefix) {
+      throw new BrowserAcceptanceError(
+        "全局看板缺少当前任务批次的岗位编码前缀",
+      );
+    }
     await page.waitForFunction(
       () => {
         const labels = [
@@ -1347,7 +1384,7 @@ async function readDashboardEvidence(page, target, datasetBinding) {
         );
       },
       {
-        taskCodePrefix: TASK_VISIBLE_CODE_PREFIX_BY_ROLE.boss,
+        taskCodePrefix,
         expectedCount: currentBatch.actual,
       },
       { timeout: PAGE_TIMEOUT_MS },
@@ -1389,7 +1426,7 @@ async function readDashboardEvidence(page, target, datasetBinding) {
           )
           .map((node) => node.getAttribute("data-task-code") || ""),
       }),
-      TASK_VISIBLE_CODE_PREFIX_BY_ROLE.boss,
+      taskCodePrefix,
     );
     return evaluateDashboardTaskCurrentBatchEvidence({
       evidence: evaluateGlobalDashboardEvidence(
@@ -1399,6 +1436,7 @@ async function readDashboardEvidence(page, target, datasetBinding) {
       ),
       currentBatch,
       roleKey: "boss",
+      taskCodePrefix,
       visibleTaskCodes: metrics.visibleTaskCodes,
       currentBatchTaskCodes: metrics.currentBatchTaskCodes,
     });
@@ -1493,6 +1531,7 @@ export function evaluateMobileCurrentBatchEvidence({
   visibleCurrentBatchTaskCount = 0,
   minimumRecords,
   currentBatch,
+  taskCodePrefix = TASK_VISIBLE_CODE_PREFIX_BY_ROLE[roleKey],
 }) {
   const observedTotal = Number(todoCount) + Number(doneCount);
   const taskProbe = currentBatch?.probes?.find(
@@ -1506,8 +1545,7 @@ export function evaluateMobileCurrentBatchEvidence({
     taskProbe?.exactSourceType === TASK_SOURCE_TYPE &&
     Number.isSafeInteger(taskProbe?.exactSourceID) &&
     taskProbe.exactSourceID > 0 &&
-    taskProbe?.exactTaskCodePrefix ===
-      TASK_VISIBLE_CODE_PREFIX_BY_ROLE[roleKey] &&
+    taskProbe?.exactTaskCodePrefix === taskCodePrefix &&
     taskProbe?.exactOwnerRoleKey === roleKey;
   const minimumSatisfied =
     currentBatchBound &&
@@ -1538,6 +1576,14 @@ async function readMobileTaskEvidence(page, target, datasetBinding) {
     datasetBinding,
   );
   const minimumRecords = target.minimumRecords;
+  const taskCodePrefix = String(
+    datasetBinding?.readiness?.taskVisibleCodePrefixes?.[target.roleKey] || "",
+  ).trim();
+  if (!taskCodePrefix) {
+    throw new BrowserAcceptanceError(
+      `${target.title} 缺少当前任务批次的岗位编码前缀`,
+    );
+  }
   await page.getByTestId("mobile-role-bottom-nav").waitFor({
     state: "visible",
     timeout: PAGE_TIMEOUT_MS,
@@ -1552,7 +1598,6 @@ async function readMobileTaskEvidence(page, target, datasetBinding) {
       { timeout: PAGE_TIMEOUT_MS },
     );
   await waitForActiveViewLoaded();
-  const taskCodePrefix = TASK_VISIBLE_CODE_PREFIX_BY_ROLE[target.roleKey];
   const visibleCurrentBatchTaskCount = async () =>
     page
       .locator(`.erp-mobile-list-item[data-task-code^="${taskCodePrefix}-"]`)
@@ -1615,6 +1660,7 @@ async function readMobileTaskEvidence(page, target, datasetBinding) {
       visibleTodoCurrentBatchTaskCount + visibleDoneCurrentBatchTaskCount,
     minimumRecords,
     currentBatch,
+    taskCodePrefix,
   });
 }
 
@@ -2589,15 +2635,31 @@ export function assertManualAcceptanceBrowserReadinessBinding(
     ) &&
     String(sourceInput?.runId || "") === printInput.sourceRunId &&
     String(sourceInput?.prefix || "") === printInput.sourcePrefix;
-  const expectedTaskIdentity = manualAcceptanceTaskBatchIdentity(
-    printInput.sourceRunId,
-  );
+  const taskProfile = String(taskInput?.taskProfile || "").trim();
+  let taskProfileContract = null;
+  let expectedTaskIdentity = null;
+  try {
+    taskProfileContract = taskProfile
+      ? getManualAcceptanceTaskProfileContract(taskProfile)
+      : null;
+    expectedTaskIdentity = taskProfileContract
+      ? manualAcceptanceTaskBatchIdentity(printInput.sourceRunId, {
+          taskProfile,
+        })
+      : null;
+  } catch {
+    taskProfileContract = null;
+    expectedTaskIdentity = null;
+  }
   const taskMatches =
+    expectedTaskIdentity !== null &&
     ["datasetKey", "dataVersion", "target", "backendURL", "databaseName"].every(
       (field) =>
         String(taskInput?.[field] || "") === String(printInput[field] || ""),
     ) &&
     String(taskInput?.runId || "") === printInput.sourceRunId &&
+    String(taskInput?.copyRevision || "") ===
+      expectedTaskIdentity.copyRevision &&
     String(taskInput?.prefix || "") === expectedTaskIdentity.prefix &&
     String(taskInput?.sourceType || "") === TASK_SOURCE_TYPE &&
     Number(taskInput?.sourceID) === expectedTaskIdentity.sourceID;
@@ -2648,9 +2710,13 @@ export function assertManualAcceptanceBrowserReadinessBinding(
     sourcePrefix: printInput.sourcePrefix,
     taskRunId: taskInput.runId,
     taskPrefix: taskInput.prefix,
+    taskProfile,
+    taskCopyRevision: expectedTaskIdentity.copyRevision,
     taskSourceType: taskInput.sourceType,
     taskSourceID: Number(taskInput.sourceID),
-    taskVisibleCodePrefixes: { ...TASK_VISIBLE_CODE_PREFIX_BY_ROLE },
+    taskVisibleCodePrefixes: {
+      ...taskProfileContract.visibleCodePrefixByRole,
+    },
     taskGroupCoverage,
     financeFieldDigest: printInput.financeFieldDigest,
     financeRepresentatives: printInput.financeRepresentatives,
