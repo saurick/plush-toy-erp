@@ -16510,7 +16510,7 @@ export function createStyleL1Scenarios(deps) {
           name: '菜单与操作说明',
         })
         // 全量串行运行会继承上一场景的鼠标位置；先清除 hover，再用 focus
-        // 确定性打开同时支持 hover / focus / click 的帮助浮层。
+        // 确定性打开浮层。AntD 可能替换 portal 节点，后续始终解析当前可见节点。
         await page.mouse.move(20, 20)
         await permissionHelpTrigger.blur()
         await page.waitForFunction(() =>
@@ -16523,22 +16523,17 @@ export function createStyleL1Scenarios(deps) {
           const popovers = [
             ...document.querySelectorAll('.erp-permission-help-popover'),
           ]
-          popovers.forEach((node) =>
-            node.removeAttribute('data-style-l1-active-help')
-          )
-          const activePopover = popovers.find((node) => {
+          return popovers.some((node) => {
             const rect = node.getBoundingClientRect()
             return (
               node.checkVisibility() && rect.width >= 240 && rect.height >= 90
             )
           })
-          if (!activePopover) return false
-          activePopover.setAttribute('data-style-l1-active-help', 'true')
-          return true
         })
-        const permissionHelpPopover = page.locator(
-          '.erp-permission-help-popover[data-style-l1-active-help="true"]'
-        )
+        const permissionHelpPopover = page
+          .locator('.erp-permission-help-popover:visible')
+          .filter({ hasText: '当前调整仅预览，保存岗位设置后生效' })
+          .last()
         await permissionHelpPopover.waitFor({ state: 'visible' })
         await expectText(permissionHelpPopover, '菜单与操作')
         await expectText(permissionHelpPopover, '查看类功能决定菜单是否出现')
