@@ -1467,7 +1467,7 @@ test("browser target retries only bounded pure HTTP 429 failures and retains evi
   const recoveredAfterDefaultWindow = await runTargetWithRateLimitRetry(
     async () => {
       attempts += 1;
-      return attempts < 3
+      return attempts < 4
         ? rateLimited
         : { passed: true, runtimeErrors: [], dataEvidence: { proven: true } };
     },
@@ -1475,10 +1475,10 @@ test("browser target retries only bounded pure HTTP 429 failures and retains evi
       waitImpl: async (milliseconds) => defaultWaits.push(milliseconds),
     },
   );
-  assert.equal(attempts, 3);
-  assert.deepEqual(defaultWaits, [10_000, 20_000]);
+  assert.equal(attempts, 4);
+  assert.deepEqual(defaultWaits, [10_000, 20_000, 30_000]);
   assert.equal(recoveredAfterDefaultWindow.passed, true);
-  assert.equal(recoveredAfterDefaultWindow.rateLimitRetryEvidence.length, 2);
+  assert.equal(recoveredAfterDefaultWindow.rateLimitRetryEvidence.length, 3);
 
   attempts = 0;
   const persistent = await runTargetWithRateLimitRetry(
