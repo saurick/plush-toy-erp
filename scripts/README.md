@@ -1150,7 +1150,7 @@ node /Users/simon/projects/plush-toy-erp/scripts/deploy/rollback-rehearsal-repor
 
 - 环境阶段先校验当前 Bash 与后续子脚本解析到的 `PATH` Bash，避免 macOS Bash 3.2 在部署合同的关联数组处延迟失败
 - 复用 fast 的基础守卫，一次执行 `fast / database / browser / release` 四个 scripts Node 组；不重复稍后由 Web 全集和 server 全集覆盖的 fast Web / Go 子集
-- 补充 secrets、前端 lint / css / test / build、本地 PostgreSQL 关键事务门禁和服务端 `go test ./...` / `make build`；最后运行一次 govulncheck，避免外部网络异常先扰动本地并发测试
+- 补充 secrets、前端 lint / css / test / build、本地 PostgreSQL 关键事务门禁和服务端 `go test ./...` / `make build`；最后运行一次 govulncheck，避免外部网络异常先扰动本地并发测试。govulncheck 仅在扫描器或官方漏洞库访问返回 exit 1 时固定重试一次；真实漏洞 exit 3、参数错误、未知状态和第二次失败仍立即阻断 strict
 - 若定义了前端 `test`，会一并执行；它仍不替代浏览器里的样式 / box 模型回归
 - 始终真实执行固定门禁，不读取或签发本地推送回执；CI strict 也永不读取该回执
 

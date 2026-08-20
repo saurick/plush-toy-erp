@@ -55,6 +55,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/qa/frontend-error-message-boundary.test.mjs",
     "scripts/qa/gate-orchestration.test.mjs",
     "scripts/qa/gate-profiles.test.mjs",
+    "scripts/qa/govulncheck.test.mjs",
     "scripts/qa/industry-template-closure.test.mjs",
     "scripts/qa/lib/git-range.test.mjs",
     "scripts/qa/lib/repository-identity.test.mjs",
