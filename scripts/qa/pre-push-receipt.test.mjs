@@ -16,7 +16,7 @@ import {
 } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import test from "node:test";
+import test, { after } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -189,7 +189,7 @@ if [[ "\${FAIL_RANGE:-}" == "\${QA_BASE_RANGE:-default}" ]]; then exit 8; fi
 }
 
 function cleanEnvironment(overrides = {}) {
-  const env = { ...process.env, ...overrides };
+  const env = { ...STABLE_RECEIPT_TOOLS.env, ...overrides };
   for (const key of [
     "QA_BASE_RANGE",
     "QA_GATE_COVERAGE_RECEIPT",
@@ -224,7 +224,7 @@ function cleanEnvironment(overrides = {}) {
   return env;
 }
 
-function createStableGitPushEnvironment(baseEnvironment) {
+function createStableReceiptEnvironment(baseEnvironment) {
   const root = mkdtempSync(path.join(os.tmpdir(), "plush-receipt-tools-"));
   const bin = path.join(root, "bin");
   mkdirSync(bin, { recursive: true });
@@ -264,6 +264,9 @@ function createStableGitPushEnvironment(baseEnvironment) {
     },
   };
 }
+
+const STABLE_RECEIPT_TOOLS = createStableReceiptEnvironment(process.env);
+after(() => STABLE_RECEIPT_TOOLS.cleanup());
 
 function createFixture({ changePath = "tracked.txt" } = {}) {
   const root = mkdtempSync(path.join(os.tmpdir(), "plush-receipt-repo-"));
@@ -597,9 +600,8 @@ test("a second prepare with the same fingerprint reuses the valid full receipt",
 
 test("a real Git push PATH prefix preserves the prepared environment", () => {
   const fixture = createFixture();
-  const stableTools = createStableGitPushEnvironment(cleanEnvironment());
   try {
-    const env = stableTools.env;
+    const env = cleanEnvironment();
     const gitExecPath = git(fixture.root, ["--exec-path"]);
     const baseline = environmentFingerprint(fixture.root, env);
     assert.equal(
@@ -634,7 +636,6 @@ test("a real Git push PATH prefix preserves the prepared environment", () => {
     );
   } finally {
     fixture.cleanup();
-    stableTools.cleanup();
   }
 });
 
@@ -660,7 +661,7 @@ test("a wrapped Git exec-path prefix is normalized through the base PATH", (t) =
 
   const baseEnvironment = cleanEnvironment({
     FAKE_GIT_EXEC_PATH: execPath,
-    PATH: `${wrapperBin}${path.delimiter}${process.env.PATH}`,
+    PATH: `${wrapperBin}${path.delimiter}${STABLE_RECEIPT_TOOLS.env.PATH}`,
   });
   const baseline = environmentFingerprint(root, baseEnvironment);
   assert.equal(
@@ -679,26 +680,24 @@ test(
     const root = mkdtempSync(path.join(os.tmpdir(), "plush-receipt-env-"));
     const bin = path.join(root, "bin");
     const executable = path.join(bin, "govulncheck");
-    const originalPath = process.env.PATH;
     mkdirSync(bin, { recursive: true });
-    t.after(() => {
-      process.env.PATH = originalPath;
-      rmSync(root, { recursive: true, force: true });
-    });
+    t.after(() => rmSync(root, { recursive: true, force: true }));
     writeFileSync(
       executable,
       "#!/bin/sh\nsleep 6\nprintf '%s\\n' 'Go: stable-test-version'\n",
       "utf8",
     );
     chmodSync(executable, 0o755);
-    process.env.PATH = `${bin}${path.delimiter}${originalPath}`;
-    const slow = environmentFingerprint(root, process.env);
+    const environment = cleanEnvironment({
+      PATH: `${bin}${path.delimiter}${STABLE_RECEIPT_TOOLS.env.PATH}`,
+    });
+    const slow = environmentFingerprint(root, environment);
     writeFileSync(
       executable,
       "#!/bin/sh\nprintf '%s\\n' 'Go: stable-test-version'\n",
       "utf8",
     );
-    const fast = environmentFingerprint(root, process.env);
+    const fast = environmentFingerprint(root, environment);
     assert.equal(slow, fast);
   },
 );
