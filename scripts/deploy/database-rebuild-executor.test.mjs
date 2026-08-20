@@ -27,6 +27,7 @@ import {
 } from "./delivery-operation-store.mjs";
 import { sha256File } from "./release-catalog.mjs";
 import { releaseManifestStrictEvidenceFixture } from "./release-catalog-test-fixtures.mjs";
+import { readManualAcceptanceDatabaseRebuildReceipt } from "../qa/manual-acceptance-dataset.mjs";
 
 const SHA = "a".repeat(40);
 const OPERATION_ID = "123e4567-e89b-42d3-a456-426614174000";
@@ -178,7 +179,9 @@ function preflight() {
 }
 
 function executableFixture(t, suffix) {
-  const root = mkdtempSync(path.join(os.tmpdir(), `database-rebuild-${suffix}-`));
+  const root = mkdtempSync(
+    path.join(os.tmpdir(), `database-rebuild-${suffix}-`),
+  );
   t.after(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(path.join(root, "output"), { recursive: true });
   const releasePath = path.join(root, "release-manifest.json");
@@ -275,7 +278,9 @@ test("failed database rebuild receipts cannot masquerade as passed", () => {
 });
 
 test("database rebuild transfer keeps the secret private and outside checksums", (t) => {
-  const root = mkdtempSync(path.join(os.tmpdir(), "database-rebuild-transfer-"));
+  const root = mkdtempSync(
+    path.join(os.tmpdir(), "database-rebuild-transfer-"),
+  );
   t.after(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(path.join(root, "output"), { recursive: true });
   const releasePath = path.join(root, "release-manifest.json");
@@ -311,10 +316,110 @@ test("database rebuild transfer keeps the secret private and outside checksums",
   );
   assert.doesNotMatch(checksums, /bootstrap-admin\.secret/u);
   assert.doesNotMatch(
-    readFileSync(path.join(destination, "database-rebuild-manifest.json"), "utf8"),
+    readFileSync(
+      path.join(destination, "database-rebuild-manifest.json"),
+      "utf8",
+    ),
     /FreshAdmin9/u,
   );
   chmodSync(transfer.secretFile, 0o600);
+});
+
+test("database rebuild executor persists the validated redacted receipt for downstream baseline binding", async (t) => {
+  const { root, releasePath, store, prepared } = executableFixture(
+    t,
+    "executor-receipt-persistence",
+  );
+  const remoteReceipt = receipt({
+    operationId: prepared.operation.id,
+    releaseManifestSha256: sha256File(releasePath),
+    databaseRebuildFingerprint: prepared.plan.fingerprint,
+    database: {
+      ...receipt().database,
+      previousDataAlias: `rollback-${SHA.slice(0, 12)}-${prepared.operation.id.slice(0, 8)}`,
+    },
+  });
+  const runCommand = (command, args, options = {}) => {
+    if (command === "git" && args[0] === "show") {
+      return {
+        status: 0,
+        stdout: "#!/usr/bin/env bash\nexit 0\n",
+        stderr: "",
+      };
+    }
+    if (command === "git") {
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    if (command === "rsync" && args[0] === "--version") {
+      return {
+        status: 0,
+        stdout: "rsync  version 3.4.4  protocol version 32\n",
+        stderr: "",
+      };
+    }
+    if (command === "rsync") {
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    if (command === "ssh" && options.input) {
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    if (command === "ssh") {
+      return {
+        status: 0,
+        stdout: `${JSON.stringify(remoteReceipt)}\n`,
+        stderr: "",
+      };
+    }
+    throw new Error(`unexpected command: ${command}`);
+  };
+  const report = executeDatabaseRebuild(
+    {
+      repoRoot: root,
+      operationId: prepared.operation.id,
+      releaseManifestPath: releasePath,
+      confirmation: `REBUILD_DATABASE:test-133:${SHA}:${prepared.operation.id}`,
+      operationStore: store,
+    },
+    {
+      runPreflight: () => preflight(),
+      runCommand,
+      createSecret: () => "FreshAdmin9!abcd",
+    },
+  );
+  const receiptFile = path.join(root, report.databaseRebuildReceiptFile);
+  assert.equal(report.operation.status, "passed");
+  assert.equal(report.targetWriteStarted, true);
+  assert.equal(statSync(receiptFile).mode & 0o777, 0o600);
+  assert.deepEqual(
+    JSON.parse(readFileSync(receiptFile, "utf8")),
+    remoteReceipt,
+  );
+  assert.equal(report.databaseRebuildReceiptSha256, sha256File(receiptFile));
+  assert.equal(
+    report.operation.metadata.databaseRebuildReceiptFile,
+    `receipts/${prepared.operation.id}.database-rebuild.json`,
+  );
+  assert.equal(
+    report.operation.metadata.databaseRebuildReceiptSha256,
+    report.databaseRebuildReceiptSha256,
+  );
+  assert.equal(
+    await readManualAcceptanceDatabaseRebuildReceipt(receiptFile, {
+      operationStore: store,
+    }),
+    readFileSync(receiptFile, "utf8"),
+  );
+  const copiedReceipt = path.join(root, "copied-database-rebuild.json");
+  writeFileSync(copiedReceipt, readFileSync(receiptFile, "utf8"), {
+    mode: 0o600,
+  });
+  await assert.rejects(
+    () =>
+      readManualAcceptanceDatabaseRebuildReceipt(copiedReceipt, {
+        operationStore: store,
+      }),
+    /canonical delivery operation path/u,
+  );
 });
 
 test("database rebuild executor blocks an unexplained immediate preflight failure before writes", (t) => {
@@ -328,8 +433,7 @@ test("database rebuild executor blocks an unexplained immediate preflight failur
       repoRoot: root,
       operationId: prepared.operation.id,
       releaseManifestPath: releasePath,
-      confirmation:
-        `REBUILD_DATABASE:test-133:${SHA}:${prepared.operation.id}`,
+      confirmation: `REBUILD_DATABASE:test-133:${SHA}:${prepared.operation.id}`,
       operationStore: store,
     },
     {
@@ -348,9 +452,10 @@ test("database rebuild executor blocks an unexplained immediate preflight failur
   assert.equal(report.targetWriteStarted, false);
   assert.equal(report.receipt, null);
   assert.equal(commands, 0);
-  assert.deepEqual(report.operation.issues.map((issue) => issue.code), [
-    "database_rebuild_target_preflight_blocked",
-  ]);
+  assert.deepEqual(
+    report.operation.issues.map((issue) => issue.code),
+    ["database_rebuild_target_preflight_blocked"],
+  );
 });
 
 test("database rebuild executor removes the remote secret after a partial transfer", (t) => {
@@ -387,8 +492,7 @@ test("database rebuild executor removes the remote secret after a partial transf
           repoRoot: root,
           operationId: prepared.operation.id,
           releaseManifestPath: releasePath,
-          confirmation:
-            `REBUILD_DATABASE:test-133:${SHA}:${prepared.operation.id}`,
+          confirmation: `REBUILD_DATABASE:test-133:${SHA}:${prepared.operation.id}`,
           operationStore: store,
         },
         {
@@ -447,8 +551,7 @@ test("database rebuild executor freezes a partial transfer when secret cleanup i
           repoRoot: root,
           operationId: prepared.operation.id,
           releaseManifestPath: releasePath,
-          confirmation:
-            `REBUILD_DATABASE:test-133:${SHA}:${prepared.operation.id}`,
+          confirmation: `REBUILD_DATABASE:test-133:${SHA}:${prepared.operation.id}`,
           operationStore: store,
         },
         {

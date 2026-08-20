@@ -54,6 +54,7 @@ import {
   MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS,
 } from "./manual-acceptance-dataset.mjs";
 import {
+  MANUAL_ACCEPTANCE_DATABASE_REBUILD_PROOF_CONTRACT,
   MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
   MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES,
   digestManualAcceptanceDatasetComponentReport,
@@ -164,7 +165,7 @@ function taskGroupCoverageFixture(catalogScenarioDigest = "c".repeat(64)) {
   };
 }
 
-async function datasetApplyEvidenceFixture() {
+async function datasetApplyEvidenceFixture({ remote = false } = {}) {
   const outputRoot = path.join(
     repoRoot,
     "output/qa/manual-acceptance/datasets/lifecycle",
@@ -172,26 +173,46 @@ async function datasetApplyEvidenceFixture() {
   );
   await fs.mkdir(outputRoot, { recursive: true });
   const dataVersion = "2026.08.15-v6";
-  const targetAlias = "local";
+  const targetAlias = remote ? "customer-trial-133" : "local";
   const datasetSemanticDigest = "e".repeat(64);
   const taskCoverage = taskGroupCoverageFixture();
   const taskSchedule = buildManualAcceptanceTaskSchedule(2_000_000_000);
   const financeFacts = financeFieldFixture();
   const financeFieldContract = inspectFinanceFieldContract(financeFacts);
+  const runtimeAttestation = remote
+    ? {
+        target: "customer-trial-133",
+        origin: "http://127.0.0.1:18375",
+        customerKey: "yoyoosun",
+        environment: "prod",
+        release: "f".repeat(40),
+        migration: "20260812043327",
+        debug: {
+          seedEnabled: false,
+          seedAllowed: false,
+          cleanupEnabled: false,
+          cleanupAllowed: false,
+          businessDataClearEnabled: false,
+          businessDataClearAllowed: false,
+        },
+      }
+    : null;
   const printInput = {
     datasetKey: "yoyoosun-manual-acceptance",
     dataVersion,
     runId: "20260815-V6",
     sourceRunId: "20260815-V6",
-    target: "local-dev",
-    backendURL: "http://127.0.0.1:8310",
-    databaseName: "plush_erp_acceptance_local_fixture_dev",
+    target: remote ? "customer-trial-133" : "local-dev",
+    backendURL: remote ? "http://127.0.0.1:18375" : "http://127.0.0.1:8310",
+    databaseName: remote
+      ? "plush_erp_uat_20260716_v5"
+      : "plush_erp_acceptance_local_fixture_dev",
     semanticDigest: "d".repeat(64),
     sourcePrefix: "YS6",
-    configRevision: "local-config-v5",
+    configRevision: remote ? "customer-trial-config-v8" : "local-config-v5",
     financeFieldDigest: financeFieldContract.digest,
     financeRepresentatives: financeFieldContract.representatives,
-    runtimeAttestation: null,
+    runtimeAttestation,
   };
   const baseReport = (stageKey) => ({
     mode: ["core", "baseline", "purchase-quality", "readiness"].includes(
@@ -217,23 +238,37 @@ async function datasetApplyEvidenceFixture() {
   );
   Object.assign(reports.core, {
     configRevision: printInput.configRevision,
-    configProductVersion: "local-customer-v5",
-    configApplyPurpose: "local_test_apply",
+    configProductVersion: remote
+      ? "customer-trial-133-test-2026.08.15-v6"
+      : "local-customer-v5",
+    configApplyPurpose: remote ? "customer_trial_apply" : "local_test_apply",
     configDatasetVersion: printInput.dataVersion,
     configTarget: printInput.target,
   });
   const zeroCounts = Object.fromEntries(
     MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES.map(({ key }) => [key, 0]),
   );
+  const databaseRebuildProof = remote
+    ? {
+        contract: MANUAL_ACCEPTANCE_DATABASE_REBUILD_PROOF_CONTRACT,
+        status: "passed",
+        databaseName: printInput.databaseName,
+        release: runtimeAttestation.release,
+        migration: runtimeAttestation.migration,
+        systemIdentifierBefore: "7673878211904323625",
+        systemIdentifierAfter: "7675963039852556329",
+      }
+    : null;
   Object.assign(reports.baseline, {
     contract: "manual-acceptance-empty-baseline-report-v1",
     runtimeIdentity: {
-      scope: "database-v1",
+      scope: remote ? "release-v1" : "database-v1",
       proof: "matched-v1",
       databaseName: printInput.databaseName,
-      release: null,
-      migration: null,
+      release: runtimeAttestation?.release || null,
+      migration: runtimeAttestation?.migration || null,
     },
+    databaseRebuildProof,
     customerConfig: {
       configRevision: reports.core.configRevision,
       configProductVersion: reports.core.configProductVersion,
@@ -388,6 +423,7 @@ async function datasetApplyEvidenceFixture() {
       backendURL: printInput.backendURL,
       databaseName: printInput.databaseName,
     },
+    databaseRebuildProof,
     freshEmptyBaseline: {
       origin: "fresh_empty_baseline",
       status: "completed",
@@ -1079,6 +1115,41 @@ test("browser dataset binding requires the complete stage chain including baseli
           printInput: fixture.printInput,
         }),
       /attachments stage component digest/u,
+    );
+  } finally {
+    await fs.rm(fixture.outputRoot, { recursive: true, force: true });
+  }
+});
+
+test("remote browser binding requires the same database rebuild proof in dataset and baseline", async () => {
+  const fixture = await datasetApplyEvidenceFixture({ remote: true });
+  try {
+    const binding = await verifyManualAcceptanceDatasetApplyReportBinding({
+      datasetReportPath: fixture.datasetReportPath,
+      sourceReportPath: fixture.sourceReportPath,
+      factReportPath: fixture.factReportPath,
+      readinessReportPath: fixture.readinessReportPath,
+      printInput: fixture.printInput,
+    });
+    assert.equal(binding.baseline.exactEmptyBusinessBaseline, true);
+
+    const withoutRebuildProof = structuredClone(fixture.datasetReport);
+    delete withoutRebuildProof.databaseRebuildProof;
+    await fs.writeFile(
+      fixture.datasetReportPath,
+      `${JSON.stringify(withoutRebuildProof, null, 2)}\n`,
+      "utf8",
+    );
+    await assert.rejects(
+      () =>
+        verifyManualAcceptanceDatasetApplyReportBinding({
+          datasetReportPath: fixture.datasetReportPath,
+          sourceReportPath: fixture.sourceReportPath,
+          factReportPath: fixture.factReportPath,
+          readinessReportPath: fixture.readinessReportPath,
+          printInput: fixture.printInput,
+        }),
+      /fresh empty baseline/u,
     );
   } finally {
     await fs.rm(fixture.outputRoot, { recursive: true, force: true });

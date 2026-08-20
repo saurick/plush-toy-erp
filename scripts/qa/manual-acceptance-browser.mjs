@@ -26,6 +26,7 @@ import {
   MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS,
 } from "./manual-acceptance-dataset.mjs";
 import {
+  MANUAL_ACCEPTANCE_DATABASE_REBUILD_PROOF_CONTRACT,
   MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
   MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES,
   assertManualAcceptanceDatasetReadinessBoundary,
@@ -3103,9 +3104,24 @@ export async function verifyManualAcceptanceDatasetApplyReportBinding({
       ? baseline?.runtimeIdentity?.release ===
           printInput.runtimeAttestation?.release &&
         baseline?.runtimeIdentity?.migration ===
-          printInput.runtimeAttestation?.migration
+          printInput.runtimeAttestation?.migration &&
+        baseline?.databaseRebuildProof?.contract ===
+          MANUAL_ACCEPTANCE_DATABASE_REBUILD_PROOF_CONTRACT &&
+        baseline.databaseRebuildProof.status === "passed" &&
+        baseline.databaseRebuildProof.databaseName ===
+          printInput.databaseName &&
+        baseline.databaseRebuildProof.release ===
+          printInput.runtimeAttestation?.release &&
+        baseline.databaseRebuildProof.migration ===
+          printInput.runtimeAttestation?.migration &&
+        baseline.databaseRebuildProof.systemIdentifierBefore !==
+          baseline.databaseRebuildProof.systemIdentifierAfter &&
+        JSON.stringify(baseline.databaseRebuildProof) ===
+          JSON.stringify(dataset.databaseRebuildProof)
       : baseline?.runtimeIdentity?.release == null &&
-        baseline?.runtimeIdentity?.migration == null;
+        baseline?.runtimeIdentity?.migration == null &&
+        baseline?.databaseRebuildProof == null &&
+        dataset?.databaseRebuildProof == null;
   if (!emptyBaselineProven || !runtimeBaselineMatches) {
     throw new BrowserAcceptanceError(
       "dataset apply 报告没有绑定当前运行态的 fresh empty baseline",

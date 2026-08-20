@@ -2,9 +2,11 @@
 
 import { createHash, randomUUID } from "node:crypto";
 import {
+  lstat,
   mkdir,
   open,
   readFile,
+  realpath,
   rename,
   unlink,
   writeFile,
@@ -13,6 +15,14 @@ import path from "node:path";
 import { performance } from "node:perf_hooks";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+
+import {
+  DATABASE_REBUILD_RECEIPT_FILE_SUFFIX,
+  REMOTE_DATABASE_REBUILD_RECEIPT_CONTRACT,
+  validateRemoteDatabaseRebuildReceipt,
+} from "../deploy/database-rebuild-executor.mjs";
+import { readDatabaseRebuildPlan } from "../deploy/database-rebuild-controller.mjs";
+import { readDeliveryOperation } from "../deploy/delivery-operation-store.mjs";
 
 import {
   FORMAL_DEMO_ACCOUNTS,
@@ -39,6 +49,7 @@ import {
 import {
   MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
   MANUAL_ACCEPTANCE_DATASET_OUTPUT_ROOT,
+  MANUAL_ACCEPTANCE_DATABASE_REBUILD_PROOF_CONTRACT,
   MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES,
   createManualAcceptanceDatasetStageRunner,
   digestManualAcceptanceDatasetComponentReport,
@@ -89,6 +100,16 @@ export const MANUAL_ACCEPTANCE_DATASET_APPLY_REPORT_CONTRACT =
   "manual-acceptance-dataset-apply-report-v4";
 export const MANUAL_ACCEPTANCE_DATASET_APPLY_LOCK_CONTRACT =
   "manual-acceptance-dataset-apply-lock-v1";
+export { MANUAL_ACCEPTANCE_DATABASE_REBUILD_PROOF_CONTRACT };
+const MAX_DATABASE_REBUILD_RECEIPT_BYTES = 256 * 1024;
+const REPO_ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../..",
+);
+const DEFAULT_DELIVERY_OPERATION_STORE = path.join(
+  REPO_ROOT,
+  "output/dev-workbench/delivery-operations",
+);
 
 function stageCapability(mode, supportedTargets, reason) {
   return Object.freeze({
@@ -107,7 +128,7 @@ export const MANUAL_ACCEPTANCE_DATASET_STAGE_CAPABILITIES = Object.freeze({
   baseline: stageCapability(
     "registered-targets-read-only",
     REGISTERED_DATASET_TARGETS,
-    "after core and before mutation, disposable local runs prove an exact empty baseline while long-lived targets bind current runtime/config and preserve unrelated history before exact-create-or-readback",
+    "after core and before mutation, disposable local and receipt-bound fresh customer-trial runs prove an exact live empty baseline while other long-lived targets preserve unrelated history before exact-create-or-readback",
   ),
   role: stageCapability(
     "registered-targets",
@@ -176,6 +197,184 @@ export class ManualAcceptanceDatasetError extends Error {
     this.name = "ManualAcceptanceDatasetError";
     this.exitCode = exitCode;
   }
+}
+
+export async function readManualAcceptanceDatabaseRebuildReceipt(
+  filePath,
+  { operationStore = DEFAULT_DELIVERY_OPERATION_STORE } = {},
+) {
+  const requestedPath = path.resolve(
+    requiredText(filePath, "databaseRebuildReceiptPath"),
+  );
+  let stat;
+  let resolved;
+  let store;
+  try {
+    stat = await lstat(requestedPath);
+    [resolved, store] = await Promise.all([
+      realpath(requestedPath),
+      realpath(path.resolve(operationStore)),
+    ]);
+  } catch (error) {
+    throw new ManualAcceptanceDatasetError(
+      `cannot inspect database rebuild receipt: ${error?.message || error}`,
+    );
+  }
+  if (
+    !stat.isFile() ||
+    stat.isSymbolicLink() ||
+    stat.size <= 0 ||
+    stat.size > MAX_DATABASE_REBUILD_RECEIPT_BYTES
+  ) {
+    throw new ManualAcceptanceDatasetError(
+      "database rebuild receipt must be a bounded regular non-symlink file",
+    );
+  }
+  const fileName = path.basename(resolved);
+  const suffixIndex = fileName.indexOf(DATABASE_REBUILD_RECEIPT_FILE_SUFFIX);
+  const operationId = fileName.slice(0, suffixIndex);
+  const expectedPath = path.join(
+    store,
+    "receipts",
+    `${operationId}${DATABASE_REBUILD_RECEIPT_FILE_SUFFIX}`,
+  );
+  if (
+    suffixIndex <= 0 ||
+    suffixIndex + DATABASE_REBUILD_RECEIPT_FILE_SUFFIX.length !==
+      fileName.length ||
+    resolved !== expectedPath
+  ) {
+    throw new ManualAcceptanceDatasetError(
+      "database rebuild receipt must use its canonical delivery operation path",
+    );
+  }
+  let raw;
+  try {
+    raw = await readFile(resolved, "utf8");
+  } catch (error) {
+    throw new ManualAcceptanceDatasetError(
+      `cannot read database rebuild receipt: ${error?.message || error}`,
+    );
+  }
+  try {
+    const receipt = JSON.parse(raw);
+    const operation = readDeliveryOperation(store, operationId);
+    const plan = readDatabaseRebuildPlan(store, operationId);
+    validateRemoteDatabaseRebuildReceipt(receipt, {
+      operationId,
+      gitSha: operation.gitSha,
+      version: operation.version,
+      migration: plan.release.migration.latest,
+      releaseManifestSha256: plan.release.manifestSha256,
+      databaseRebuildFingerprint: plan.fingerprint,
+    });
+    const receiptSha256 = createHash("sha256").update(raw).digest("hex");
+    if (
+      operation.action !== "rebuild-database" ||
+      operation.target !== "test-133" ||
+      operation.status !== "passed" ||
+      plan.status !== "eligible" ||
+      plan.operationId !== operationId ||
+      receipt.status !== "passed" ||
+      receipt.database.logicalName !== plan.target.database ||
+      operation.metadata?.databaseRebuildReceiptFile !==
+        `receipts/${fileName}` ||
+      operation.metadata?.databaseRebuildReceiptSha256 !== receiptSha256
+    ) {
+      throw new Error("delivery operation binding is inconsistent");
+    }
+  } catch (error) {
+    throw new ManualAcceptanceDatasetError(
+      `database rebuild receipt provenance is invalid: ${error?.message || error}`,
+    );
+  }
+  return raw;
+}
+
+export function buildManualAcceptanceDatabaseRebuildProof({
+  receiptRaw,
+  target,
+  targetAttestation,
+}) {
+  if (
+    target?.alias !== CUSTOMER_TRIAL_133_TARGET ||
+    target?.policyTarget !== CUSTOMER_TRIAL_133_TARGET ||
+    target?.external !== true
+  ) {
+    throw new ManualAcceptanceDatasetError(
+      "database rebuild receipt is only valid for customer-trial-133",
+    );
+  }
+  if (!targetAttestation) {
+    throw new ManualAcceptanceDatasetError(
+      "database rebuild receipt requires the exact target attestation",
+    );
+  }
+  const raw = String(receiptRaw || "");
+  if (
+    Buffer.byteLength(raw, "utf8") <= 0 ||
+    Buffer.byteLength(raw, "utf8") > MAX_DATABASE_REBUILD_RECEIPT_BYTES
+  ) {
+    throw new ManualAcceptanceDatasetError(
+      "database rebuild receipt content is missing or too large",
+    );
+  }
+  let receipt;
+  try {
+    receipt = JSON.parse(raw);
+  } catch (error) {
+    throw new ManualAcceptanceDatasetError(
+      `database rebuild receipt is not valid JSON: ${error?.message || error}`,
+    );
+  }
+  try {
+    receipt = validateRemoteDatabaseRebuildReceipt(receipt, {
+      operationId: receipt?.operationId,
+      gitSha: targetAttestation.release,
+      version: receipt?.version,
+      migration: targetAttestation.migration,
+      releaseManifestSha256: receipt?.releaseManifestSha256,
+      databaseRebuildFingerprint: receipt?.databaseRebuildFingerprint,
+    });
+  } catch (error) {
+    throw new ManualAcceptanceDatasetError(
+      `database rebuild receipt is invalid: ${error?.message || error}`,
+    );
+  }
+  if (
+    receipt.status !== "passed" ||
+    receipt.schemaVersion !== REMOTE_DATABASE_REBUILD_RECEIPT_CONTRACT ||
+    receipt.database.logicalName !== target.databaseName
+  ) {
+    throw new ManualAcceptanceDatasetError(
+      "database rebuild receipt does not prove this target database",
+    );
+  }
+  return {
+    contract: MANUAL_ACCEPTANCE_DATABASE_REBUILD_PROOF_CONTRACT,
+    status: "passed",
+    receiptContract: receipt.schemaVersion,
+    receiptSha256: createHash("sha256").update(raw).digest("hex"),
+    operationId: receipt.operationId,
+    deploymentTarget: receipt.target,
+    databaseName: receipt.database.logicalName,
+    release: receipt.gitSha,
+    releaseVersion: receipt.version,
+    migration: receipt.migration.readback,
+    releaseManifestSha256: receipt.releaseManifestSha256,
+    databaseRebuildFingerprint: receipt.databaseRebuildFingerprint,
+    systemIdentifierBefore: receipt.database.systemIdentifierBefore,
+    systemIdentifierAfter: receipt.database.systemIdentifierAfter,
+    finishedAt: receipt.finishedAt,
+    checks: {
+      freshDatabase: receipt.checks.freshDatabase,
+      emptyBusinessBaseline: receipt.checks.emptyBusinessBaseline,
+      releaseIdentity: receipt.checks.releaseIdentity,
+      health: receipt.checks.health,
+      ready: receipt.checks.ready,
+      webHealth: receipt.checks.webHealth,
+    },
+  };
 }
 
 function requiredText(value, name) {
@@ -635,7 +834,7 @@ function buildStages(identity, businessChainContract) {
       key: "baseline",
       applyCapability: capabilityForStage("baseline"),
       purpose:
-        "在任何岗位、源单、任务或事实写入前，只读绑定当前数据库、运行态和客户配置；隔离库还须证明业务对象精确为零，长期库保留历史并由后续组件逐项 exact-create-or-readback。",
+        "在任何岗位、源单、任务或事实写入前，只读绑定当前数据库、运行态和客户配置；隔离库与绑定权威重建回执的 133 还须实时证明业务对象精确为零，其余长期库保留历史并逐项 exact-create-or-readback。",
       writesBusinessData: false,
       targetExecution: verificationOnlyExecution(),
       commands: [
@@ -648,6 +847,7 @@ function buildStages(identity, businessChainContract) {
           runtimeIdentityRequired: true,
           activeCustomerConfigurationRequired: true,
           remoteAttestationRequired: "when-external",
+          databaseRebuildReceiptRequired: "for-fresh-customer-trial-133",
           adminQueriesReadOnly: true,
         },
       ],
@@ -660,6 +860,11 @@ function buildStages(identity, businessChainContract) {
           exactEmptyBusinessBaseline: false,
           legacyDataPreserved: true,
           currentBatchGuard: "component-exact-create-or-readback",
+        },
+        freshRebuiltCustomerTrial133: {
+          exactEmptyBusinessBaseline: true,
+          databaseRebuildReceiptRequired: true,
+          liveZeroCountReadbackRequired: true,
         },
         units: MANUAL_ACCEPTANCE_CORE_UNITS.length,
         warehouses: 4,
@@ -1352,7 +1557,12 @@ export function buildManualAcceptanceDatasetBundle(options = {}) {
   };
 }
 
-function validateApplyPlan(plan, confirmation, targetAttestation) {
+function validateApplyPlan(
+  plan,
+  confirmation,
+  targetAttestation,
+  databaseRebuildReceiptRaw,
+) {
   if (!plan || plan.mode !== "plan" || plan.dryRun !== true) {
     throw new ManualAcceptanceDatasetError(
       "apply requires a validated target plan",
@@ -1438,6 +1648,18 @@ function validateApplyPlan(plan, confirmation, targetAttestation) {
         attestation: providedAttestation,
       })
     : null;
+  if (!resolved.external && databaseRebuildReceiptRaw) {
+    throw new ManualAcceptanceDatasetError(
+      "database rebuild receipt is only valid for customer-trial-133",
+    );
+  }
+  const databaseRebuildProof = databaseRebuildReceiptRaw
+    ? buildManualAcceptanceDatabaseRebuildProof({
+        receiptRaw: databaseRebuildReceiptRaw,
+        target,
+        targetAttestation: attestation,
+      })
+    : null;
   const stageCapabilities = evaluateManualAcceptanceTargetCapabilities(
     plan.semanticPlan,
     target.alias,
@@ -1454,6 +1676,7 @@ function validateApplyPlan(plan, confirmation, targetAttestation) {
       ? confirmation
       : null,
     targetAttestation: attestation,
+    databaseRebuildProof,
     stageCapabilities,
   };
 }
@@ -1514,6 +1737,14 @@ function assertResumeIdentity(prior, plan, executionBinding) {
       "resume report target attestation does not match the current target binding",
     );
   }
+  if (
+    canonicalJSON(prior.databaseRebuildProof ?? null) !==
+    canonicalJSON(executionBinding.databaseRebuildProof ?? null)
+  ) {
+    throw new ManualAcceptanceDatasetError(
+      "resume report database rebuild proof does not match the current target binding",
+    );
+  }
   let expectedTaskSchedule;
   try {
     expectedTaskSchedule = buildManualAcceptanceTaskSchedule(
@@ -1547,7 +1778,11 @@ async function prepareManualAcceptanceResume({
       taskSchedule: null,
       metadata: {
         requested: false,
-        mode: "fresh_empty_baseline",
+        mode:
+          plan.target.alias === LOCAL_DATASET_TARGET ||
+          executionBinding.databaseRebuildProof
+            ? "fresh_empty_baseline"
+            : "persistent_target_baseline",
         sourceReportPath: null,
         sourceReportSHA256: null,
         reusedStages: [],
@@ -1881,13 +2116,25 @@ function baseApplyReport(
 
 export async function applyManualAcceptanceDataset(
   plan,
-  { confirmation, targetAttestation, resumeReportPath = "" } = {},
+  {
+    confirmation,
+    targetAttestation,
+    databaseRebuildReceiptPath,
+    resumeReportPath = "",
+  } = {},
   deps = {},
 ) {
+  const databaseRebuildReceiptRaw = databaseRebuildReceiptPath
+    ? await (
+        deps.readDatabaseRebuildReceipt ||
+        readManualAcceptanceDatabaseRebuildReceipt
+      )(databaseRebuildReceiptPath)
+    : undefined;
   const executionBinding = validateApplyPlan(
     plan,
     confirmation,
     targetAttestation,
+    databaseRebuildReceiptRaw,
   );
   const outputRoot = deps.outputRoot || MANUAL_ACCEPTANCE_DATASET_OUTPUT_ROOT;
   const applyReportPath = manualAcceptanceDatasetApplyReportPath({
@@ -1936,6 +2183,9 @@ export async function applyManualAcceptanceDataset(
     );
     report.targetConfirmation = executionBinding.confirmation;
     report.targetAttestation = executionBinding.targetAttestation;
+    report.databaseRebuildProof = executionBinding.databaseRebuildProof
+      ? structuredClone(executionBinding.databaseRebuildProof)
+      : null;
     report.target.stageCapabilities = executionBinding.stageCapabilities;
     report.target.applyReady = true;
     report.target.targetAttestation = executionBinding.targetAttestation;
@@ -1958,6 +2208,9 @@ export async function applyManualAcceptanceDataset(
           targetConfirmation: executionBinding.confirmation,
           targetAttestation: executionBinding.targetAttestation
             ? structuredClone(executionBinding.targetAttestation)
+            : null,
+          databaseRebuildProof: executionBinding.databaseRebuildProof
+            ? structuredClone(executionBinding.databaseRebuildProof)
             : null,
           completedStages: report.stages
             .slice(0, index)
@@ -2019,7 +2272,11 @@ export async function applyManualAcceptanceDataset(
                 : persistentBaseline
                   ? "persistent_target_baseline"
                   : "fresh_empty_baseline",
-            lifecycle: persistentBaseline ? "long-lived" : "disposable",
+            lifecycle: persistentBaseline
+              ? "long-lived"
+              : plan.target.alias === LOCAL_DATASET_TARGET
+                ? "disposable"
+                : "fresh-physical-generation",
             status: normalized.status,
             operation: normalized.operation,
             summary: structuredClone(normalized.summary),
@@ -2069,6 +2326,7 @@ export function parseManualAcceptanceDatasetArgs(argv = []) {
     databaseName: "",
     confirmation: "",
     targetAttestation: "",
+    databaseRebuildReceiptPath: "",
     resumeReportPath: "",
     chainKey: "",
   };
@@ -2112,6 +2370,9 @@ export function parseManualAcceptanceDatasetArgs(argv = []) {
         break;
       case "target-attestation-json":
         options.targetAttestation = value;
+        break;
+      case "database-rebuild-receipt":
+        options.databaseRebuildReceiptPath = value;
         break;
       case "resume-report":
         options.resumeReportPath = value;
@@ -2174,12 +2435,21 @@ export function parseManualAcceptanceDatasetArgs(argv = []) {
         "customer-trial-133 uses its registered database identity; omit --database-name",
       );
     }
+    if (
+      options.databaseRebuildReceiptPath &&
+      options.target !== CUSTOMER_TRIAL_133_TARGET
+    ) {
+      throw new ManualAcceptanceDatasetError(
+        "--database-rebuild-receipt is only valid for customer-trial-133",
+      );
+    }
   } else if (
     options.target ||
     options.backendURL ||
     options.databaseName ||
     options.confirmation ||
     options.targetAttestation ||
+    options.databaseRebuildReceiptPath ||
     options.resumeReportPath
   ) {
     throw new ManualAcceptanceDatasetError(
@@ -2206,7 +2476,7 @@ function helpText() {
     "--run-id 可用于 plan 与 apply，但必须精确等于当前 dataVersion 唯一派生的 20260815-V6。",
     "完整 apply 会 fail-closed：每个阶段只允许走唯一注册 handler 与严格组件回执。",
     "core 两端都只走正式 RPC 稳定码核对；默认 runner 不执行任何数据库 seed 脚本。",
-    "baseline 紧跟 core：隔离 local 精确证明业务对象为 0；长期 scenario-demo / 133 绑定运行态与客户配置并保留历史，后续组件逐项 exact-create-or-readback。",
+    "baseline 紧跟 core：隔离 local 精确证明业务对象为 0；scenario-demo 与未绑定重建回执的 133 保留历史并逐项 exact-create-or-readback。",
     "role 两端都只走注册账号场景组件；正式岗位账号缺失会返回机器可读阻断原因。",
     "采购收货与质检归入统一 source-driven facts，不再调用旧通用写入器。",
     "fresh 与 resume 会先用 dataset/.apply.lock 原子排他；同目标同版本第二实例会在任何 runner/RPC 前阻断。",
@@ -2221,6 +2491,9 @@ function helpText() {
     "  --target customer-trial-133",
     "  --confirm <exact-confirmation>",
     "  --target-attestation-json <exact-json>",
+    "fresh 重建后的 133 如需进入完整浏览器验收，还必须绑定执行器保存的脱敏回执：",
+    "  --database-rebuild-receipt output/dev-workbench/delivery-operations/receipts/<operation-id>.database-rebuild.json",
+    "runner 会先校验回执的 target/release/migration/database/physical generation，再实时证明当前业务对象仍为 0；任一不符都在写入前停止。",
     "",
     "正式生产目标不在允许列表中。",
   ].join("\n");
@@ -2261,6 +2534,8 @@ export async function runManualAcceptanceDatasetCli(argv = [], deps = {}) {
     {
       confirmation: options.confirmation || undefined,
       targetAttestation: options.targetAttestation || undefined,
+      databaseRebuildReceiptPath:
+        options.databaseRebuildReceiptPath || undefined,
       resumeReportPath: options.resumeReportPath || undefined,
     },
     deps,

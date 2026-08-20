@@ -4,12 +4,12 @@
 
 ## 当前活跃事项
 
-### V6 测试数据、研发工作台与双环境交付（2026-08-16 候选提交前检查点）
+### V6 测试数据、研发工作台与双环境交付（2026-08-20 候选提交前检查点）
 
-- 本地数据治理：Core Demo 已升级为 V6 稳定业务编码，并在同一事务中仅停用精确识别的 V5 单位 / 仓库；历史外键保持不变。“件”重复和四组仓库同名重复已收敛为单一 active 记录。Core 与 Scenario 均连续执行两次，第二次没有新增或受管数量漂移；Scenario 固定 `dataVersion=2026.08.15-v6`、`runId=20260815-V6`、`semanticDigest=feb935f4cb49915e6691d4695c71339bd4b4a7c56e04a35bbeace2c6c4825b02`，当前 `WORKBENCH2` 为九岗位各 20 条，旧 `WORKBENCH1 / PLAIN5 / PLAIN6` 活跃任务已通过正式 Workflow 动作归零。
-- 合同与运行态：任务看板聚焦泳道采用服务端全量排序 / 分页，审批只依据 capability；移动办理和催办使用稳定幂等、后端 canonical task 与事件读回，写入成功和后续刷新失败分层反馈。研发工作台补齐数据准备、交付、恢复和 Product Core 证据投影；真实后端九岗位浏览器巡检覆盖桌面 / 移动 114 个页面样本，RPC 语义重复、失败和未收敛请求均为 0，普通 ERP 页面不展示双环境控制面事实。
-- 当前验证：Core / Scenario、字段联动、真实 PostgreSQL 定向、Go 领域 / 数据 / 服务、角色 / RBAC、浏览器与定向 Style L1 已通过。完整门禁发现并修正移动端成功反馈与刷新失败的局部测试合同冲突；修正后共享脚本 `1807 / 1807`、Server `3571 / 3571`、Web `2429 / 2429` 分层通过且无 skip。由于最新 `full-latest` 仍绑定修正前失败批次，本节不把它写成完整门禁绿色；最终证据必须来自 clean exact SHA 上的新回执。
-- 后续与边界：候选提交前仍须完成整体 diff / secret / 文档审查、简体中文提交和 clean exact-SHA `prepare-push --full`、独立 Full Acceptance、全量 Style L1 / 页面 / PDF / 真实 PostgreSQL / strict，再普通 push。随后按正式目标流程对 133 做 fresh backup 与 restore rehearsal、Atlas / 配置 V5 → V7 → V8 桥接、exact-SHA 制品部署、Scenario V6 双跑、九岗位与页面 / PDF 读回和临时库零残留核对。生产、真实客户数据导入和客户人工 UAT 均不在自动化完成声明内；本节只冻结提交前过程检查点，发布与目标运行事实继续以绑定 exact SHA 的最新回执为准。
+- 数据与目标检查点：Core Demo 与 Scenario V6 继续使用稳定业务编码，`dataVersion=2026.08.15-v6`、`runId=20260815-V6`、`semanticDigest=feb935f4cb49915e6691d4695c71339bd4b4a7c56e04a35bbeace2c6c4825b02`。候选 `d7445ca2f0096a3f6b2fb69534d367677f7a84f0` 曾按正式 promotion、备份恢复、数据库重建、Atlas、V8 客户配置和 Core / Scenario 首次与 resume 流程部署到登记的 `customer-trial-133`，两次 Scenario 的语义与业务链 digest 一致；该批随后在完整浏览器前置检查失败，因此只作问题复现与回滚点证据，不作本轮最终交付结论。
+- 根因与修复：重建后的 133 仍被 dataset runner 按普通长期目标生成 persistent baseline，浏览器无法证明“当前物理数据库代确由权威重建且业务对象在写入前为零”。现在固定数据库重建执行器会把已校验、脱敏回执原子保存到 canonical ignored operation store，并在 operation metadata 记录相对路径和 SHA-256；dataset CLI 只接受该路径的同一 passed operation / eligible plan，精确绑定 target、release、migration、逻辑数据库、重建 fingerprint 和前后 PostgreSQL system identifier，再通过正式 API 实时核对受管业务对象全部为零。没有回执的 133 与 scenario-demo 继续保留长期库语义；resume 必须复用同一重建证明，浏览器必须看到 dataset 与 baseline 中完全相同的证明。
+- 当前验证：重建回执持久化、来源校验、fresh / persistent baseline、实时非空阻断、跨物理 generation resume 阻断和浏览器绑定的定向合同已通过。当前未提交候选通过 managed PostgreSQL 包装器执行 affected/full：Web `2431 / 2431`、共享 Node `1815 / 1815`、资源敏感发布合同 `38 / 38`，均为 0 fail / 0 skip；服务端、构建、真实 PostgreSQL disposable、实际 Chromium、Style L1 八场景和 govulncheck 同轮通过，临时数据库与 managed 容器清理完成。该回执绑定未提交工作树，不能替代 clean exact SHA 的最终门禁。
+- 后续与边界：仍须把当前预期源代码收口为 clean exact SHA，在该 SHA 上只运行一轮 `prepare-push.sh --full`、独立 Full Acceptance、全部登记 Style L1 / 页面 / PDF / 真实 PostgreSQL / 角色回归和 release-grade strict，再普通 push、核对远端 SHA、生成不可变制品并重新执行 133 的备份恢复、promotion、数据库重建、V8 配置、Scenario V6 首次 / resume、浏览器 / PDF 和运行读回。生产、真实客户数据导入和客户人工 UAT 均不在自动化完成声明内；最终发布事实只以绑定 exact SHA、数据库、配置和当前运行态的最新回执为准。
 
 ### ProcessRuntime 状态机与来源单据强动作收口（2026-08-11）
 

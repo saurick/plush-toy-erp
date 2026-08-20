@@ -29,14 +29,12 @@ import {
   assertLocalRsync,
   buildFixedTargetRsyncTransfer,
 } from "./fixed-target-rsync.mjs";
-import {
-  sha256File,
-  validateReleaseManifest,
-} from "./release-catalog.mjs";
+import { sha256File, validateReleaseManifest } from "./release-catalog.mjs";
 import { runTargetPreflight } from "./target-preflight.mjs";
 
 export const REMOTE_DATABASE_REBUILD_RECEIPT_CONTRACT =
   "plush.remote-database-rebuild-receipt/v1";
+export const DATABASE_REBUILD_RECEIPT_FILE_SUFFIX = ".database-rebuild.json";
 
 const UUID_V4_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
@@ -95,18 +93,15 @@ function generateBootstrapSecret() {
 }
 
 export function prepareDatabaseRebuildTransfer(
-  {
-    repoRoot,
-    releaseManifestPath,
-    databaseRebuildPlan,
-    destination,
-  },
+  { repoRoot, releaseManifestPath, databaseRebuildPlan, destination },
   { runCommand = spawnSync, createSecret = generateBootstrapSecret } = {},
 ) {
   const root = realpathSync(repoRoot);
   const plan = validateDatabaseRebuildManifest(databaseRebuildPlan);
   if (plan.status !== "eligible") {
-    throw new Error("only an eligible database rebuild plan can be transferred");
+    throw new Error(
+      "only an eligible database rebuild plan can be transferred",
+    );
   }
   const release = readReleaseManifest(releaseManifestPath);
   if (
@@ -114,7 +109,9 @@ export function prepareDatabaseRebuildTransfer(
     release.manifest.version !== plan.release.version ||
     sha256File(release.absolute) !== plan.release.manifestSha256
   ) {
-    throw new Error("release manifest does not match the database rebuild plan");
+    throw new Error(
+      "release manifest does not match the database rebuild plan",
+    );
   }
   runChecked(
     runCommand,
@@ -175,7 +172,9 @@ export function prepareDatabaseRebuildTransfer(
       !/[a-z]/u.test(secret) ||
       !/[0-9]/u.test(secret)
     ) {
-      throw new Error("generated bootstrap secret does not satisfy the contract");
+      throw new Error(
+        "generated bootstrap secret does not satisfy the contract",
+      );
     }
     const secretFile = path.join(destination, "bootstrap-admin.secret");
     writeFileSync(secretFile, secret, { mode: 0o600 });
@@ -290,7 +289,8 @@ export function validateRemoteDatabaseRebuildReceipt(receipt, expected) {
     receipt?.gitSha !== expected.gitSha ||
     receipt?.version !== expected.version ||
     receipt?.releaseManifestSha256 !== expected.releaseManifestSha256 ||
-    receipt?.databaseRebuildFingerprint !== expected.databaseRebuildFingerprint ||
+    receipt?.databaseRebuildFingerprint !==
+      expected.databaseRebuildFingerprint ||
     receipt?.database?.logicalName !== "plush_erp_uat_20260716_v5" ||
     receipt?.database?.previousDataAlias !==
       `rollback-${expected.gitSha.slice(0, 12)}-${expected.operationId.slice(0, 8)}` ||
@@ -346,6 +346,25 @@ export function validateRemoteDatabaseRebuildReceipt(receipt, expected) {
     throw new Error("remote database rebuild receipt status is inconsistent");
   }
   return receipt;
+}
+
+function persistDatabaseRebuildReceipt(store, receipt) {
+  const operationId = String(receipt?.operationId || "");
+  if (!UUID_V4_PATTERN.test(operationId)) {
+    throw new Error("database rebuild receipt operation id is invalid");
+  }
+  const directory = path.join(store, "receipts");
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  const file = path.join(
+    directory,
+    `${operationId}${DATABASE_REBUILD_RECEIPT_FILE_SUFFIX}`,
+  );
+  writeFileSync(file, `${JSON.stringify(receipt, null, 2)}\n`, {
+    encoding: "utf8",
+    flag: "wx",
+    mode: 0o600,
+  });
+  return file;
 }
 
 function fixedSshArgs(target) {
@@ -416,13 +435,7 @@ function terminalIssue(status) {
 }
 
 export function executeDatabaseRebuild(
-  {
-    repoRoot,
-    operationId,
-    releaseManifestPath,
-    confirmation,
-    operationStore,
-  },
+  { repoRoot, operationId, releaseManifestPath, confirmation, operationStore },
   {
     runCommand = spawnSync,
     runPreflight = runTargetPreflight,
@@ -447,10 +460,11 @@ export function executeDatabaseRebuild(
   ) {
     throw new Error("database rebuild operation is not eligible and ready");
   }
-  const expectedConfirmation =
-    `REBUILD_DATABASE:test-133:${operation.gitSha}:${operation.id}`;
+  const expectedConfirmation = `REBUILD_DATABASE:test-133:${operation.gitSha}:${operation.id}`;
   if (confirmation !== expectedConfirmation) {
-    throw new Error(`explicit confirmation is required: ${expectedConfirmation}`);
+    throw new Error(
+      `explicit confirmation is required: ${expectedConfirmation}`,
+    );
   }
   const immediatePreflight = runPreflight("test-133");
   const immediateRuntime = immediatePreflight.remote?.runtime;
@@ -539,8 +553,7 @@ export function executeDatabaseRebuild(
       { timeout: 10 * 60_000 },
       "transfer fixed database rebuild package",
     );
-    const remoteScript =
-      `${target.filesystem.root}/incoming/${operation.id}/remote-database-rebuild.sh`;
+    const remoteScript = `${target.filesystem.root}/incoming/${operation.id}/remote-database-rebuild.sh`;
     remoteExecutionInvoked = true;
     const result = runCommand(
       "ssh",
@@ -574,17 +587,25 @@ export function executeDatabaseRebuild(
         databaseRebuildFingerprint: plan.fingerprint,
       });
     } catch (error) {
-      throw new Error(`remote receipt is unavailable or invalid: ${error.message}`);
+      throw new Error(
+        `remote receipt is unavailable or invalid: ${error.message}`,
+      );
     }
     if (result.error) {
-      throw new Error(`remote database rebuild SSH failed: ${result.error.message}`);
+      throw new Error(
+        `remote database rebuild SSH failed: ${result.error.message}`,
+      );
     }
     if (
       (result.status === 0) !== (receipt.status === "passed") &&
       !(result.status !== 0 && receipt.status !== "passed")
     ) {
-      throw new Error("remote database rebuild exit status contradicts its receipt");
+      throw new Error(
+        "remote database rebuild exit status contradicts its receipt",
+      );
     }
+    const receiptFile = persistDatabaseRebuildReceipt(store, receipt);
+    const receiptSha256 = sha256File(receiptFile);
     if (receipt.status !== "passed" && existsSync(transfer.secretFile)) {
       rmSync(transfer.secretFile);
     }
@@ -604,6 +625,8 @@ export function executeDatabaseRebuild(
         backupSizeBytes: receipt.rollbackPoint.backupSizeBytes,
         migrationReadback: receipt.migration.readback,
         predecessorPreserved: receipt.database.predecessorPreserved,
+        databaseRebuildReceiptFile: path.relative(store, receiptFile),
+        databaseRebuildReceiptSha256: receiptSha256,
       },
       now: now(),
     });
@@ -612,6 +635,8 @@ export function executeDatabaseRebuild(
       operation,
       targetWriteStarted: true,
       receipt,
+      databaseRebuildReceiptFile: path.relative(root, receiptFile),
+      databaseRebuildReceiptSha256: receiptSha256,
       bootstrapSecretFile:
         receipt.status === "passed"
           ? path.relative(root, transfer.secretFile)
@@ -657,9 +682,7 @@ export function executeDatabaseRebuild(
       });
     }
     if (!localSecretCleanupProven || !remoteSecretCleanupProven) {
-      throw new Error(
-        `${error.message}; bootstrap secret cleanup is unproven`,
-      );
+      throw new Error(`${error.message}; bootstrap secret cleanup is unproven`);
     }
     throw error;
   }
@@ -684,9 +707,7 @@ function parseArgs(argv) {
       continue;
     }
     if (
-      ["--operation-id", "--release-manifest", "--confirmation"].includes(
-        token,
-      )
+      ["--operation-id", "--release-manifest", "--confirmation"].includes(token)
     ) {
       const value = argv[index + 1];
       if (!value || value.startsWith("--")) {

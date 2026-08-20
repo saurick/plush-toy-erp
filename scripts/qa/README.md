@@ -296,10 +296,13 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<133-independent-admin-password>' \
     --data-version 2026.08.15-v6 \
     --run-id 20260815-V6 \
     --confirm APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.08.15-v6:20260815-V6 \
-    --target-attestation-json "$MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON"
+    --target-attestation-json "$MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON" \
+    --database-rebuild-receipt output/dev-workbench/delivery-operations/receipts/<database-rebuild-operation-id>.database-rebuild.json
 ```
 
 该命令完成后，规范总回执必须位于 `output/qa/manual-acceptance/datasets/2026.08.15-v6/customer-trial-133/dataset/apply-report.json`。不得跳过总回执，直接拼接分阶段报告去跑浏览器。
+
+`--database-rebuild-receipt` 只接受固定 `test-133` 重建执行器原子保存的脱敏 passed 回执，并同时核对当前 release、migration、逻辑数据库和已切换的物理 PostgreSQL generation。runner 随后仍会在写入前通过正式 API 实时证明全部受管业务对象为零；历史回执、错误 SHA、相同 system identifier 或当前非空都会停止。未提供该回执的 133 与 scenario-demo 继续按长期库语义保留历史，不能进入要求 fresh baseline 的完整浏览器验收。
 
 首次执行前，该目标的规范总回执必须不存在。若某阶段失败，或完整成功后需要证明同批幂等重放，保留原回执，并在完全相同的目标、版本、批次、后端和带外证明参数后追加 `--resume-report output/qa/manual-acceptance/datasets/2026.08.15-v6/<target>/dataset/apply-report.json`。禁止删除回执后重新冒充 fresh apply；resume 会重验 core、客户配置、数据库、release / migration、连续阶段和各组件 digest。
 

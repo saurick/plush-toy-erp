@@ -49,7 +49,9 @@ import {
 } from "./manual-acceptance-target-policy.mjs";
 
 export const MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION =
-  "manual-acceptance-dataset-runner-v9";
+  "manual-acceptance-dataset-runner-v10";
+export const MANUAL_ACCEPTANCE_DATABASE_REBUILD_PROOF_CONTRACT =
+  "manual-acceptance-database-rebuild-proof-v1";
 
 const DATASET_CONFIRM_PHRASE = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA";
 const ISOLATED_LOCAL_TARGET_ALIAS = "local";
@@ -278,6 +280,7 @@ export const MANUAL_ACCEPTANCE_TARGET_ADAPTER_KEYS = Object.freeze([
   "databaseName",
   "confirmation",
   "attestation",
+  "databaseRebuildProof",
   "credentials",
   "reportRoot",
   "executionPolicy",
@@ -460,6 +463,9 @@ export function buildManualAcceptanceTargetAdapter(context, deps = {}) {
     confirmation: context.targetConfirmation || null,
     attestation: context.targetAttestation
       ? structuredClone(context.targetAttestation)
+      : null,
+    databaseRebuildProof: context.databaseRebuildProof
+      ? structuredClone(context.databaseRebuildProof)
       : null,
     credentials: resolveCredentials(deps),
     reportRoot: path.join(outputRoot, context.dataVersion, alias),
@@ -1273,6 +1279,43 @@ async function defaultCoreComponent(invocation, deps) {
   };
 }
 
+function assertFreshDatabaseRebuildProof(targetAdapter, verified) {
+  const proof = targetAdapter.databaseRebuildProof;
+  const allChecksPassed =
+    isPlainRecord(proof?.checks) &&
+    [
+      "freshDatabase",
+      "emptyBusinessBaseline",
+      "releaseIdentity",
+      "health",
+      "ready",
+      "webHealth",
+    ].every((field) => proof.checks[field] === true);
+  if (
+    targetAdapter.alias === ISOLATED_LOCAL_TARGET_ALIAS ||
+    !targetAdapter.attestation ||
+    !isPlainRecord(proof) ||
+    proof.contract !== MANUAL_ACCEPTANCE_DATABASE_REBUILD_PROOF_CONTRACT ||
+    proof.status !== "passed" ||
+    proof.deploymentTarget !== "test-133" ||
+    proof.databaseName !== verified.databaseName ||
+    proof.release !== verified.runtimeIdentity.release ||
+    proof.migration !== verified.runtimeIdentity.migration ||
+    proof.systemIdentifierBefore === proof.systemIdentifierAfter ||
+    !/^[0-9]{10,24}$/u.test(String(proof.systemIdentifierBefore || "")) ||
+    !/^[0-9]{10,24}$/u.test(String(proof.systemIdentifierAfter || "")) ||
+    !/^[0-9a-f]{64}$/u.test(String(proof.receiptSha256 || "")) ||
+    !allChecksPassed
+  ) {
+    throw new ManualAcceptanceDatasetRunnerError(
+      "database_rebuild_proof_mismatch",
+      "fresh customer-trial baseline requires an exact database rebuild proof bound to the current runtime",
+      { stageKey: "baseline" },
+    );
+  }
+  return structuredClone(proof);
+}
+
 async function defaultBaselineComponent(invocation, deps) {
   const { businessInput, targetAdapter } = invocation;
   const core = deps.state.componentReports.get("core");
@@ -1283,7 +1326,10 @@ async function defaultBaselineComponent(invocation, deps) {
       { stageKey: "baseline" },
     );
   }
-  if (targetAdapter.alias !== ISOLATED_LOCAL_TARGET_ALIAS) {
+  if (
+    targetAdapter.alias !== ISOLATED_LOCAL_TARGET_ALIAS &&
+    !targetAdapter.databaseRebuildProof
+  ) {
     const customerConfig = Object.fromEntries(
       BASELINE_CONFIG_FIELDS.map((field) => [
         field,
@@ -1343,6 +1389,9 @@ async function defaultBaselineComponent(invocation, deps) {
     coreReport: core.report,
     fetchImpl: deps.fetchImpl,
   });
+  const databaseRebuildProof = targetAdapter.databaseRebuildProof
+    ? assertFreshDatabaseRebuildProof(targetAdapter, verified)
+    : null;
   return {
     operation: "verified",
     references: {
@@ -1353,6 +1402,7 @@ async function defaultBaselineComponent(invocation, deps) {
         ),
       },
       runtimeIdentity: verified.runtimeIdentity,
+      ...(databaseRebuildProof ? { databaseRebuildProof } : {}),
     },
     report: {
       contract: EMPTY_BASELINE_REPORT_CONTRACT,
@@ -1366,6 +1416,7 @@ async function defaultBaselineComponent(invocation, deps) {
       backendURL: targetAdapter.backendURL,
       databaseName: verified.databaseName,
       runtimeIdentity: verified.runtimeIdentity,
+      databaseRebuildProof,
       customerConfig: verified.customerConfig,
       core: verified.core,
       zeroCounts: verified.zeroCounts,
@@ -1851,15 +1902,19 @@ function assertReusableBaseline(execution, report) {
       JSON.stringify(expectedWarehouses);
   const isolatedLocal =
     execution.targetAdapter.alias === ISOLATED_LOCAL_TARGET_ALIAS;
+  const receiptBoundFresh = Boolean(
+    execution.targetAdapter.databaseRebuildProof,
+  );
+  const exactEmptyBaseline = isolatedLocal || receiptBoundFresh;
   const validZeroCounts =
-    !isolatedLocal ||
+    !exactEmptyBaseline ||
     (isPlainRecord(report.zeroCounts) &&
       Object.keys(report.zeroCounts).length ===
         MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES.length &&
       MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES.every(
         ({ key }) => report.zeroCounts[key] === 0,
       ));
-  const validSummary = isolatedLocal
+  const validSummary = exactEmptyBaseline
     ? report.contract === EMPTY_BASELINE_REPORT_CONTRACT &&
       report.summary?.exactEmptyBusinessBaseline === true &&
       report.summary?.allTrackedCountsZero === true &&
@@ -1870,10 +1925,21 @@ function assertReusableBaseline(execution, report) {
       report.summary?.legacyDataPreserved === true &&
       report.summary?.currentBatchGuard ===
         "component-exact-create-or-readback";
-  if (!currentCore || !validZeroCounts || !validCore || !validSummary) {
+  const validDatabaseRebuildProof = receiptBoundFresh
+    ? isPlainRecord(report.databaseRebuildProof) &&
+      canonicalJSON(report.databaseRebuildProof) ===
+        canonicalJSON(execution.targetAdapter.databaseRebuildProof)
+    : report.databaseRebuildProof == null;
+  if (
+    !currentCore ||
+    !validZeroCounts ||
+    !validCore ||
+    !validSummary ||
+    !validDatabaseRebuildProof
+  ) {
     throw new ManualAcceptanceDatasetRunnerError(
       "resume_baseline_invalid",
-      isolatedLocal
+      exactEmptyBaseline
         ? "resume receipt does not contain a complete fresh empty-baseline proof"
         : "resume receipt does not contain a complete persistent-target baseline binding",
       { stageKey: "baseline" },

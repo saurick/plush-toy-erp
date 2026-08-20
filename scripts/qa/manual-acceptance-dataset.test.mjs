@@ -15,6 +15,7 @@ import {
   MANUAL_ACCEPTANCE_DATASET_APPLY_REPORT_CONTRACT,
   ManualAcceptanceDatasetError,
   applyManualAcceptanceDataset,
+  buildManualAcceptanceDatabaseRebuildProof,
   buildManualAcceptanceDatasetBundle,
   buildManualAcceptanceDatasetTargetPlan,
   buildManualAcceptanceSemanticPlan,
@@ -31,10 +32,12 @@ import {
 } from "./manual-acceptance-dataset.mjs";
 import {
   MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+  MANUAL_ACCEPTANCE_DATABASE_REBUILD_PROOF_CONTRACT,
   MANUAL_ACCEPTANCE_DATASET_STAGE_REGISTRY,
   MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES,
   MANUAL_ACCEPTANCE_TARGET_ADAPTER_KEYS,
   assertManualAcceptanceDatasetReadinessBoundary,
+  createManualAcceptanceDatasetStageRunner,
   digestManualAcceptanceDatasetComponentReport,
   verifyManualAcceptanceEmptyBaseline,
   verifyManualAcceptanceCoreReferences,
@@ -324,6 +327,189 @@ function trialAttestation(
   };
 }
 
+function trialDatabaseRebuildReceipt(
+  attestation = trialAttestation(),
+  overrides = {},
+) {
+  const operationId = "123e4567-e89b-42d3-a456-426614174000";
+  const base = {
+    schemaVersion: "plush.remote-database-rebuild-receipt/v1",
+    status: "passed",
+    operationId,
+    target: "test-133",
+    gitSha: attestation.release,
+    version: "2026.08.20-1",
+    releaseManifestSha256: "a".repeat(64),
+    databaseRebuildFingerprint: "b".repeat(64),
+    stage: "passed",
+    issueCode: "none",
+    database: {
+      logicalName: "plush_erp_uat_20260716_v5",
+      previousDataAlias: `rollback-${attestation.release.slice(0, 12)}-${operationId.slice(0, 8)}`,
+      dataSwitchStarted: true,
+      predecessorRecovered: false,
+      predecessorPreserved: true,
+      freshDirectoryActive: true,
+      automaticDeletion: false,
+      systemIdentifierBefore: "7673878211904323625",
+      systemIdentifierAfter: "7675963039852556329",
+    },
+    rollbackPoint: {
+      backupAlias: `pre-rebuild-${attestation.release.slice(0, 12)}-${operationId}`,
+      backupSha256: "c".repeat(64),
+      backupSizeBytes: 838981,
+      restoreChecked: true,
+    },
+    migration: {
+      automaticDownMigration: false,
+      applyStarted: true,
+      readback: attestation.migration,
+    },
+    bootstrap: {
+      started: true,
+      completed: true,
+      secretPersistedOnTarget: false,
+    },
+    checks: {
+      releaseIdentity: true,
+      freshDatabase: true,
+      emptyBusinessBaseline: true,
+      health: true,
+      ready: true,
+      webHealth: true,
+    },
+    redaction: {
+      containsSecrets: false,
+      containsCredentials: false,
+      containsAbsolutePaths: false,
+      containsRawEnvironmentValues: false,
+      containsRawLogs: false,
+    },
+    notProven: [
+      "customer configuration activation and effective-session readback",
+      "nine-stage acceptance dataset and 52-page browser/PDF regression",
+      "credential rotation and 11-account role smoke",
+      "customer UAT and sign-off",
+    ],
+    finishedAt: "2026-08-20T04:18:01Z",
+  };
+  return { ...base, ...overrides };
+}
+
+function trialCoreComponentReport({ businessInput, targetAdapter }) {
+  return {
+    mode: "verify",
+    scope: "manual-acceptance-core-data",
+    simulatedOnly: true,
+    datasetKey: businessInput.datasetKey,
+    dataVersion: businessInput.dataVersion,
+    runId: businessInput.runId,
+    target: targetAdapter.policyTarget,
+    backendURL: targetAdapter.backendURL,
+    databaseName: targetAdapter.databaseName,
+    configRevision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
+    configProductVersion: CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+    configApplyPurpose: CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
+    configDatasetVersion: CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION,
+    configTarget: CUSTOMER_TRIAL_133_TARGET,
+    runtimeIdentity: {
+      scope: "release-v1",
+      proof: "matched-v1",
+      databaseName: targetAdapter.databaseName,
+      release: targetAdapter.attestation.release,
+      migration: targetAdapter.attestation.migration,
+    },
+    prefix: "YS6",
+    businessCodes: {
+      units: CORE_UNIT_CODES,
+      warehouses: ["YS6-CK-01", "YS6-CK-02", "YS6-CK-03", "YS6-CK-04"],
+    },
+    summary: { units: 11, warehouses: 4, seedExecuted: false },
+  };
+}
+
+function trialBaselineFetch(nonEmptyKey = "") {
+  const requests = [];
+  const fetchImpl = async (_url, init) => {
+    if (!init.body) {
+      requests.push("runtime_identity");
+      return {
+        ok: true,
+        status: 200,
+        redirected: false,
+        headers: {
+          get: (name) =>
+            name === "X-ERP-Runtime-Identity-Proof" ? "matched-v1" : null,
+        },
+        async text() {
+          return "runtime identity matched";
+        },
+      };
+    }
+    const request = JSON.parse(init.body);
+    requests.push(request.method);
+    let data;
+    if (request.method === "admin_login") {
+      data = { access_token: "temporary-test-token" };
+    } else if (request.method === "capabilities") {
+      data = {
+        environment: "remote",
+        databaseName: "plush_erp_uat_20260716_v5",
+        seedEnabled: false,
+        seedAllowed: false,
+        cleanupEnabled: false,
+        cleanupAllowed: false,
+        businessDataClearEnabled: false,
+        businessDataClearAllowed: false,
+      };
+    } else if (request.method === "get_effective_session") {
+      data = {
+        session: {
+          customer: { key: "yoyoosun" },
+          source: "active_customer_config_revision",
+          configRevision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
+          configProductVersion: CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+          configApplyPurpose: CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
+          configDatasetVersion: CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION,
+          configTarget: CUSTOMER_TRIAL_133_TARGET,
+          modules: {},
+        },
+      };
+    } else if (request.method === "list_units") {
+      data = {
+        units: CORE_UNIT_CODES.map((code) => ({ code })),
+        total: CORE_UNIT_CODES.length,
+      };
+    } else if (request.method === "list_warehouses") {
+      data = {
+        warehouses: ["YS6-CK-01", "YS6-CK-02", "YS6-CK-03", "YS6-CK-04"].map(
+          (code) => ({ code }),
+        ),
+        total: 4,
+      };
+    } else {
+      const probe = MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES.find(
+        (item) => item.method === request.method,
+      );
+      assert.ok(probe, `unexpected baseline method ${request.method}`);
+      const nonEmpty = probe.key === nonEmptyKey;
+      data = {
+        [probe.listKey]: nonEmpty ? [{ id: 1 }] : [],
+        total: nonEmpty ? 1 : 0,
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      redirected: false,
+      async json() {
+        return { result: { code: 0, data } };
+      },
+    };
+  };
+  return { fetchImpl, requests };
+}
+
 function completedStageResult(
   context,
   { operation = "completed", summary = {}, references = {} } = {},
@@ -456,6 +642,11 @@ function runnerDeps(options = {}) {
       rolePassword: "role-password",
       adminPassword: "admin-password",
     },
+    ...(options.readDatabaseRebuildReceipt
+      ? {
+          readDatabaseRebuildReceipt: options.readDatabaseRebuildReceipt,
+        }
+      : {}),
     components: fakeComponents(options),
   };
 }
@@ -888,6 +1079,11 @@ test("semantic plan locks the nine narrow stage contracts", () => {
     legacyDataPreserved: true,
     currentBatchGuard: "component-exact-create-or-readback",
   });
+  assert.deepEqual(baseline.expected.freshRebuiltCustomerTrial133, {
+    exactEmptyBusinessBaseline: true,
+    databaseRebuildReceiptRequired: true,
+    liveZeroCountReadbackRequired: true,
+  });
   assert.equal(baseline.expected.units, 11);
   assert.equal(baseline.expected.warehouses, 4);
   assert.deepEqual(
@@ -1147,6 +1343,240 @@ test("target capability evaluation accepts both exact targets without broadening
   assert.deepEqual(trial.blockedStages, []);
 });
 
+test("customer-trial database rebuild proof is exact, redacted, and runtime-bound", () => {
+  const attestation = trialAttestation();
+  const plan = buildManualAcceptanceDatasetTargetPlan({
+    targetAlias: CUSTOMER_TRIAL_133_TARGET,
+    targetAttestation: attestation,
+    generatedAt: GENERATED_AT,
+  });
+  const receipt = trialDatabaseRebuildReceipt(attestation);
+  const proof = buildManualAcceptanceDatabaseRebuildProof({
+    receiptRaw: `${JSON.stringify(receipt, null, 2)}\n`,
+    target: plan.target,
+    targetAttestation: attestation,
+  });
+  assert.equal(
+    proof.contract,
+    MANUAL_ACCEPTANCE_DATABASE_REBUILD_PROOF_CONTRACT,
+  );
+  assert.equal(proof.databaseName, plan.target.databaseName);
+  assert.equal(proof.release, attestation.release);
+  assert.equal(proof.migration, attestation.migration);
+  assert.notEqual(proof.systemIdentifierBefore, proof.systemIdentifierAfter);
+  assert.match(proof.receiptSha256, /^[0-9a-f]{64}$/u);
+  assert.equal(JSON.stringify(proof).includes("backupAlias"), false);
+
+  assert.throws(
+    () =>
+      buildManualAcceptanceDatabaseRebuildProof({
+        receiptRaw: JSON.stringify(
+          trialDatabaseRebuildReceipt(attestation, {
+            gitSha: "f".repeat(40),
+          }),
+        ),
+        target: plan.target,
+        targetAttestation: attestation,
+      }),
+    /database rebuild receipt is invalid/u,
+  );
+  assert.throws(
+    () =>
+      buildManualAcceptanceDatabaseRebuildProof({
+        receiptRaw: JSON.stringify(
+          trialDatabaseRebuildReceipt(attestation, {
+            database: {
+              ...receipt.database,
+              systemIdentifierAfter: receipt.database.systemIdentifierBefore,
+            },
+          }),
+        ),
+        target: plan.target,
+        targetAttestation: attestation,
+      }),
+    /database rebuild receipt is invalid/u,
+  );
+});
+
+test("customer-trial fresh baseline requires both rebuild proof and live zero readback", async () => {
+  const attestation = trialAttestation();
+  const plan = buildManualAcceptanceDatasetTargetPlan({
+    targetAlias: CUSTOMER_TRIAL_133_TARGET,
+    targetAttestation: attestation,
+    generatedAt: GENERATED_AT,
+  });
+  const proof = buildManualAcceptanceDatabaseRebuildProof({
+    receiptRaw: JSON.stringify(trialDatabaseRebuildReceipt(attestation)),
+    target: plan.target,
+    targetAttestation: attestation,
+  });
+  const context = (stage, databaseRebuildProof) => ({
+    mode: "apply",
+    target: structuredClone(plan.target),
+    dataVersion: plan.dataVersion,
+    dateAnchorUtc: plan.semanticPlan.dateAnchorUtc,
+    taskScheduleAnchorUtc: GENERATED_AT,
+    semanticDigest: plan.semanticDigest,
+    semanticPlan: structuredClone(plan.semanticPlan),
+    stage: structuredClone(stage),
+    targetConfirmation: plan.target.expectedConfirmation,
+    targetAttestation: structuredClone(attestation),
+    databaseRebuildProof: databaseRebuildProof
+      ? structuredClone(databaseRebuildProof)
+      : null,
+    completedStages: [],
+  });
+  const runBaseline = async ({
+    databaseRebuildProof,
+    fetchImpl,
+    outputRoot,
+  }) => {
+    const runner = createManualAcceptanceDatasetStageRunner({
+      outputRoot,
+      fetchImpl,
+      credentials: { adminPassword: "admin-password", rolePassword: "role" },
+      components: {
+        core: async (invocation) => ({
+          operation: "verified",
+          report: trialCoreComponentReport(invocation),
+        }),
+      },
+    });
+    await runner(context(plan.semanticPlan.stages[0], databaseRebuildProof));
+    return runner(context(plan.semanticPlan.stages[1], databaseRebuildProof));
+  };
+
+  const outputRoot = await fs.mkdtemp(
+    path.join(os.tmpdir(), "plush-trial-fresh-baseline-"),
+  );
+  const persistentRoot = await fs.mkdtemp(
+    path.join(os.tmpdir(), "plush-trial-persistent-baseline-"),
+  );
+  const dirtyRoot = await fs.mkdtemp(
+    path.join(os.tmpdir(), "plush-trial-dirty-baseline-"),
+  );
+  try {
+    const live = trialBaselineFetch();
+    const result = await runBaseline({
+      databaseRebuildProof: proof,
+      fetchImpl: live.fetchImpl,
+      outputRoot,
+    });
+    const freshReport = JSON.parse(
+      await fs.readFile(result.references.runner.reportPath, "utf8"),
+    );
+    assert.equal(
+      freshReport.contract,
+      "manual-acceptance-empty-baseline-report-v1",
+    );
+    assert.deepEqual(freshReport.databaseRebuildProof, proof);
+    assert.equal(freshReport.summary.exactEmptyBusinessBaseline, true);
+    assert.equal(
+      live.requests.filter((method) => method === "list_shipments").length,
+      1,
+    );
+
+    const persistent = await runBaseline({
+      databaseRebuildProof: null,
+      fetchImpl: async () => {
+        throw new Error("persistent target baseline must not probe for zero");
+      },
+      outputRoot: persistentRoot,
+    });
+    const persistentReport = JSON.parse(
+      await fs.readFile(persistent.references.runner.reportPath, "utf8"),
+    );
+    assert.equal(
+      persistentReport.contract,
+      "manual-acceptance-persistent-baseline-report-v1",
+    );
+    assert.equal(persistentReport.summary.exactEmptyBusinessBaseline, false);
+
+    const dirty = trialBaselineFetch("shipments");
+    await assert.rejects(
+      () =>
+        runBaseline({
+          databaseRebuildProof: proof,
+          fetchImpl: dirty.fetchImpl,
+          outputRoot: dirtyRoot,
+        }),
+      (error) =>
+        error?.code === "empty_baseline_not_empty" &&
+        error?.details?.objectKey === "shipments",
+    );
+  } finally {
+    await Promise.all(
+      [outputRoot, persistentRoot, dirtyRoot].map((directory) =>
+        fs.rm(directory, { recursive: true, force: true }),
+      ),
+    );
+  }
+});
+
+test("customer-trial resume rejects a different database generation before any stage", async () => {
+  const outputRoot = await fs.mkdtemp(
+    path.join(os.tmpdir(), "plush-trial-rebuild-proof-resume-"),
+  );
+  const attestation = trialAttestation();
+  const plan = buildManualAcceptanceDatasetTargetPlan({
+    targetAlias: CUSTOMER_TRIAL_133_TARGET,
+    targetAttestation: attestation,
+    generatedAt: GENERATED_AT,
+  });
+  const binding = {
+    confirmation: plan.target.expectedConfirmation,
+    targetAttestation: attestation,
+    databaseRebuildReceiptPath: "/test/database-rebuild-receipt.json",
+  };
+  const firstReceiptRaw = JSON.stringify(
+    trialDatabaseRebuildReceipt(attestation),
+  );
+  try {
+    const first = await applyManualAcceptanceDataset(
+      plan,
+      binding,
+      runnerDeps({
+        outputRoot,
+        readDatabaseRebuildReceipt: async () => firstReceiptRaw,
+      }),
+    );
+    assert.equal(first.ok, true);
+    const secondOperationId = "223e4567-e89b-42d3-a456-426614174000";
+    const secondReceipt = trialDatabaseRebuildReceipt(attestation, {
+      operationId: secondOperationId,
+      database: {
+        ...trialDatabaseRebuildReceipt(attestation).database,
+        previousDataAlias: `rollback-${attestation.release.slice(0, 12)}-${secondOperationId.slice(0, 8)}`,
+        systemIdentifierBefore: "7675963039852556329",
+        systemIdentifierAfter: "7675963039852556330",
+      },
+    });
+    let stageCalls = 0;
+    await assert.rejects(
+      () =>
+        applyManualAcceptanceDataset(
+          plan,
+          {
+            ...binding,
+            resumeReportPath: first.applyReportPath,
+          },
+          runnerDeps({
+            outputRoot,
+            readDatabaseRebuildReceipt: async () =>
+              JSON.stringify(secondReceipt),
+            onCall() {
+              stageCalls += 1;
+            },
+          }),
+        ),
+      /database rebuild proof does not match/u,
+    );
+    assert.equal(stageCalls, 0);
+  } finally {
+    await fs.rm(outputRoot, { recursive: true, force: true });
+  }
+});
+
 test("CLI defaults to a two-target dry-run and rejects implicit or production apply", async () => {
   assert.deepEqual(parseManualAcceptanceDatasetArgs([]), {
     apply: false,
@@ -1158,6 +1588,7 @@ test("CLI defaults to a two-target dry-run and rejects implicit or production ap
     databaseName: "",
     confirmation: "",
     targetAttestation: "",
+    databaseRebuildReceiptPath: "",
     resumeReportPath: "",
     chainKey: "",
   });
@@ -1187,6 +1618,25 @@ test("CLI defaults to a two-target dry-run and rejects implicit or production ap
   assert.throws(
     () => parseManualAcceptanceDatasetArgs(["--target", "local"]),
     /only valid with --apply/u,
+  );
+  assert.throws(
+    () =>
+      parseManualAcceptanceDatasetArgs([
+        ...localApplyArgs(),
+        "--database-rebuild-receipt",
+        "/tmp/rebuild.json",
+      ]),
+    /only valid for customer-trial-133/u,
+  );
+  assert.equal(
+    parseManualAcceptanceDatasetArgs([
+      "--apply",
+      "--target",
+      CUSTOMER_TRIAL_133_TARGET,
+      "--database-rebuild-receipt",
+      "/tmp/rebuild.json",
+    ]).databaseRebuildReceiptPath,
+    "/tmp/rebuild.json",
   );
   assert.equal(
     parseManualAcceptanceDatasetArgs([
