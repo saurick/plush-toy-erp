@@ -1121,9 +1121,25 @@ test("browser dataset binding requires the complete stage chain including baseli
   }
 });
 
-test("remote browser binding requires the same database rebuild proof in dataset and baseline", async () => {
+test("remote browser binding compares the database rebuild proof by canonical value", async () => {
   const fixture = await datasetApplyEvidenceFixture({ remote: true });
   try {
+    const reorderedProof = Object.fromEntries(
+      Object.entries(fixture.datasetReport.databaseRebuildProof).reverse(),
+    );
+    assert.notEqual(
+      JSON.stringify(reorderedProof),
+      JSON.stringify(fixture.reports.baseline.databaseRebuildProof),
+    );
+    const reorderedDatasetReport = {
+      ...fixture.datasetReport,
+      databaseRebuildProof: reorderedProof,
+    };
+    await fs.writeFile(
+      fixture.datasetReportPath,
+      `${JSON.stringify(reorderedDatasetReport, null, 2)}\n`,
+      "utf8",
+    );
     const binding = await verifyManualAcceptanceDatasetApplyReportBinding({
       datasetReportPath: fixture.datasetReportPath,
       sourceReportPath: fixture.sourceReportPath,
@@ -1133,11 +1149,11 @@ test("remote browser binding requires the same database rebuild proof in dataset
     });
     assert.equal(binding.baseline.exactEmptyBusinessBaseline, true);
 
-    const withoutRebuildProof = structuredClone(fixture.datasetReport);
-    delete withoutRebuildProof.databaseRebuildProof;
+    const tamperedRebuildProof = structuredClone(reorderedDatasetReport);
+    tamperedRebuildProof.databaseRebuildProof.release = "e".repeat(40);
     await fs.writeFile(
       fixture.datasetReportPath,
-      `${JSON.stringify(withoutRebuildProof, null, 2)}\n`,
+      `${JSON.stringify(tamperedRebuildProof, null, 2)}\n`,
       "utf8",
     );
     await assert.rejects(

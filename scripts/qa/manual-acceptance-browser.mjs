@@ -3116,8 +3116,12 @@ export async function verifyManualAcceptanceDatasetApplyReportBinding({
           printInput.runtimeAttestation?.migration &&
         baseline.databaseRebuildProof.systemIdentifierBefore !==
           baseline.databaseRebuildProof.systemIdentifierAfter &&
-        JSON.stringify(baseline.databaseRebuildProof) ===
-          JSON.stringify(dataset.databaseRebuildProof)
+        digestManualAcceptanceDatasetComponentReport(
+          baseline.databaseRebuildProof,
+        ) ===
+          digestManualAcceptanceDatasetComponentReport(
+            dataset.databaseRebuildProof,
+          )
       : baseline?.runtimeIdentity?.release == null &&
         baseline?.runtimeIdentity?.migration == null &&
         baseline?.databaseRebuildProof == null &&
