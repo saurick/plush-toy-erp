@@ -548,6 +548,48 @@ test("fresh database bootstraps exact formal accounts before customer configurat
   );
 });
 
+test("formal-accounts-only CLI exposes the pre-configuration bootstrap without reading effective session", async () => {
+  const backend = createBackend({ initialAccounts: [] });
+  const plan = localPlan();
+  const result = await runManualAcceptanceAccountScenarioCli(
+    [
+      "--apply",
+      "--formal-accounts-only",
+      "--json",
+      "--target",
+      plan.target,
+      "--backend-url",
+      plan.backendURL,
+      "--database-name",
+      plan.databaseName,
+      "--data-version",
+      plan.dataVersion,
+      "--run-id",
+      plan.runId,
+    ],
+    {
+      password: "demo-pass",
+      adminPassword: "guard-pass",
+      targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+      formalAccountConfirmation:
+        manualAcceptanceFormalAccountBootstrapConfirmation(plan),
+      fetchImpl: backend.fetchImpl,
+    },
+  );
+  assert.equal(result.report.created, 10);
+  assert.equal(result.report.verified, 0);
+  assert.equal(result.report.accounts.length, 10);
+  assert.equal(
+    backend.calls.some(
+      (call) =>
+        call.domain === "customer_config" &&
+        call.method === "get_effective_session",
+    ),
+    false,
+  );
+  assert.deepEqual(result.report, JSON.parse(result.text));
+});
+
 test("loopback URL normalization rejects credentials and every external host", () => {
   assert.equal(
     normalizeAccountScenarioBackendURL("http://localhost:8300/"),
@@ -1314,7 +1356,24 @@ test("CLI help points only to the dedicated current local acceptance database", 
   );
   assert.match(help.text, /--data-version 2026\.08\.15-v6/u);
   assert.match(help.text, /--run-id 20260815-V6/u);
+  assert.match(help.text, /--formal-accounts-only/u);
   assert.doesNotMatch(help.text, /127\.0\.0\.1:8300/u);
+});
+
+test("formal-accounts-only CLI requires apply and rejects scenario audit options", async () => {
+  await assert.rejects(
+    runManualAcceptanceAccountScenarioCli(["--formal-accounts-only"]),
+    /requires --apply/u,
+  );
+  await assert.rejects(
+    runManualAcceptanceAccountScenarioCli([
+      "--apply",
+      "--formal-accounts-only",
+      "--audit-minimum",
+      "1",
+    ]),
+    /does not accept --audit-minimum/u,
+  );
 });
 
 test("apply output reports password readiness without printing the password", async () => {

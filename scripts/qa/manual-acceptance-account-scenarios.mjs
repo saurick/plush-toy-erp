@@ -1597,6 +1597,7 @@ export function parseManualAcceptanceAccountScenarioArgs(argv) {
   const options = {
     backendURL: DEFAULT_BACKEND_URL,
     apply: false,
+    formalAccountsOnly: false,
     auditMinimum: 0,
     target: "",
     dataVersion: ACCOUNT_DATA_VERSION,
@@ -1608,6 +1609,8 @@ export function parseManualAcceptanceAccountScenarioArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === "--apply") options.apply = true;
+    else if (token === "--formal-accounts-only")
+      options.formalAccountsOnly = true;
     else if (token === "--json") options.json = true;
     else if (token === "--help" || token === "-h") options.help = true;
     else if (token === "--backend-url") {
@@ -1629,6 +1632,15 @@ export function parseManualAcceptanceAccountScenarioArgs(argv) {
     }
   }
   options.backendURL = normalizeAccountScenarioBackendURL(options.backendURL);
+  if (options.formalAccountsOnly && !options.apply) {
+    throw new CliError("--formal-accounts-only requires --apply", 2);
+  }
+  if (options.formalAccountsOnly && options.auditMinimum !== 0) {
+    throw new CliError(
+      "--formal-accounts-only does not accept --audit-minimum",
+      2,
+    );
+  }
   if (
     options.target &&
     !new Set([
@@ -1650,6 +1662,19 @@ function usage() {
 
 只读查看：
   node scripts/qa/manual-acceptance-account-scenarios.mjs --json
+
+fresh 库配置激活前只创建或读回固定十个单岗位账号：
+  MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM=BOOTSTRAP_FORMAL_MANUAL_ACCEPTANCE_ACCOUNTS:<target>:2026.08.15-v6:20260815-V6 \
+  MANUAL_ACCEPTANCE_TARGET_CONFIRM='<exact-target-confirmation>' \
+  MANUAL_ACCEPTANCE_PASSWORD='<demo-password>' \
+  MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<fresh-bootstrap-admin-password>' \
+    node scripts/qa/manual-acceptance-account-scenarios.mjs --apply --formal-accounts-only \
+      --target <target> \
+      --backend-url <registered-loopback-backend-url> \
+      --database-name <registered-database-name> \
+      --data-version 2026.08.15-v6 \
+      --run-id 20260815-V6 \
+      --json
 
 写入本机开发环境：
   MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM=${CONFIRM_PHRASE} \\
@@ -1683,7 +1708,9 @@ export async function runManualAcceptanceAccountScenarioCli(argv, deps = {}) {
   if (options.help) return { text: `${usage()}\n`, exitCode: 0 };
   const plan = buildManualAcceptanceAccountScenarioPlan(options);
   const report = options.apply
-    ? await applyManualAcceptanceAccountScenarios(plan, deps)
+    ? options.formalAccountsOnly
+      ? await bootstrapManualAcceptanceFormalAccounts(plan, deps)
+      : await applyManualAcceptanceAccountScenarios(plan, deps)
     : plan;
   // The CLI contract is JSON, so return the same JSON-safe object that is
   // emitted on stdout. Local runtime projections intentionally omit remote-only
