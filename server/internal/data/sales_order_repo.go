@@ -577,6 +577,7 @@ func (r *salesOrderRepo) SubmitSalesOrderForProcessCommand(
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	tx = nil
 	return entSalesOrderToBiz(row), nil
 }
 
@@ -630,6 +631,7 @@ func (r *salesOrderRepo) ActivateSalesOrderForProcessCommand(
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	tx = nil
 	return entSalesOrderToBiz(row), nil
 }
 
@@ -712,6 +714,7 @@ func (r *salesOrderRepo) RejectSalesOrderForProcessCommand(
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	tx = nil
 	return entSalesOrderToBiz(row), nil
 }
 
@@ -765,6 +768,7 @@ func (r *salesOrderRepo) cancelSalesOrderLifecycle(ctx context.Context, id int, 
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	tx = nil
 	return entSalesOrderToBiz(row), nil
 }
 

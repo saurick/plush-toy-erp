@@ -13,6 +13,7 @@ import {
   allocateLocalAcceptancePorts,
   assertLoggedServiceAlive,
   buildLocalAcceptanceLifecycleIdentity,
+  inspectLocalAcceptanceBackendLog,
   localAcceptanceExceptionReportPath,
   parseManualAcceptanceCoreReferenceSeedReadback,
   runLocalAcceptanceLifecycle,
@@ -43,6 +44,28 @@ test("local acceptance lifecycle reads the exact V6 core reference contract", ()
         output.replace("references_only=true", "references_only=false"),
       ),
     /core reference seed readback failed/u,
+  );
+});
+
+test("local acceptance lifecycle rejects rate limits and committed transaction rollbacks in backend logs", () => {
+  assert.deepEqual(inspectLocalAcceptanceBackendLog("clean backend log\n"), {
+    passed: true,
+    rateLimitCount: 0,
+    committedTransactionRollbackCount: 0,
+  });
+  assert.deepEqual(
+    inspectLocalAcceptanceBackendLog(
+      [
+        '{"code":429,"message":"too many requests"}',
+        "rollback ent tx failed err=sql: transaction has already been committed or rolled back",
+        "rollback ent tx failed err=sql: transaction has already been committed or rolled back",
+      ].join("\n"),
+    ),
+    {
+      passed: false,
+      rateLimitCount: 1,
+      committedTransactionRollbackCount: 2,
+    },
   );
 });
 
@@ -233,6 +256,18 @@ function fakeRuntime({ failAt = "", residual = "" } = {}) {
       await invoke("backend:stop");
       backend = false;
     },
+    async verifyBackendLogHygiene(name) {
+      assert.equal(
+        backend,
+        false,
+        "backend log must be closed before hygiene verification",
+      );
+      return invoke(`backend:logs:${name}`, {
+        passed: true,
+        rateLimitCount: 0,
+        committedTransactionRollbackCount: 0,
+      });
+    },
     async cloneDatabase(source, target) {
       await invoke(`clone:${source}:${target}`);
       assert.equal(backend, false, "backend must stop before database clone");
@@ -287,9 +322,20 @@ test("local acceptance lifecycle runs read-only evidence before cloned real writ
   const exceptionIndex = runtime.events.findIndex((item) =>
     item.startsWith("browser:exception:"),
   );
+  const acceptanceLogIndex = runtime.events.findIndex((item) =>
+    item.startsWith("backend:logs:plush_erp_acceptance_"),
+  );
+  const browserActionsLogIndex = runtime.events.findIndex(
+    (item) =>
+      item.startsWith("backend:logs:plush_erp_acceptance_") &&
+      item.includes("browser_actions"),
+  );
   assert(manualIndex < stopIndex);
+  assert(stopIndex < acceptanceLogIndex);
+  assert(acceptanceLogIndex < cloneIndex);
   assert(stopIndex < cloneIndex);
   assert(cloneIndex < exceptionIndex);
+  assert(exceptionIndex < browserActionsLogIndex);
   assert.deepEqual(runtime.state(), {
     backend: false,
     web: false,
@@ -298,7 +344,50 @@ test("local acceptance lifecycle runs read-only evidence before cloned real writ
   assert.equal(report.boundary.customerUAT, false);
   assert.equal(report.evidence.dataset.durationMs, 60_000);
   assert.equal(report.evidence.dataset.stageTimings[0].key, "core");
+  assert.deepEqual(report.evidence.backendLogs, {
+    acceptance: {
+      passed: true,
+      rateLimitCount: 0,
+      committedTransactionRollbackCount: 0,
+    },
+    browserActions: {
+      passed: true,
+      rateLimitCount: 0,
+      committedTransactionRollbackCount: 0,
+    },
+  });
   assert.doesNotMatch(JSON.stringify(report), /password|postgres:\/\//iu);
+});
+
+test("local acceptance lifecycle fails closed on backend log hygiene and still cleans the database", async () => {
+  const identity = buildLocalAcceptanceLifecycleIdentity({
+    commit: COMMIT,
+    runID: "20260728-log-hygiene",
+  });
+  const runtime = fakeRuntime({
+    failAt: `backend:logs:${identity.acceptanceDatabase}`,
+  });
+  const report = await runLocalAcceptanceLifecycle({
+    commit: COMMIT,
+    runID: "20260728-log-hygiene",
+    runtime,
+  });
+  assert.equal(report.status, "failed");
+  assert.deepEqual(report.cleanup.residualDatabases, []);
+  assert.equal(runtime.state().backend, false);
+  assert.equal(runtime.state().web, false);
+  assert.equal(
+    report.stages.some(
+      (item) =>
+        item.stage === "backend-log-hygiene-acceptance" &&
+        item.status === "failed",
+    ),
+    true,
+  );
+  assert.equal(
+    runtime.events.some((item) => item.startsWith("clone:")),
+    false,
+  );
 });
 
 test("local acceptance lifecycle cleans the acceptance database after a workflow failure", async () => {

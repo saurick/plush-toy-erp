@@ -362,6 +362,7 @@ func (r *purchaseOrderRepo) RejectPurchaseOrderForProcessCommand(
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	tx = nil
 	return entPurchaseOrderToBiz(row), nil
 }
 
@@ -417,6 +418,7 @@ func (r *purchaseOrderRepo) updatePurchaseOrderForProcessCommand(
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	tx = nil
 	return entPurchaseOrderToBiz(row), nil
 }
 
@@ -457,6 +459,7 @@ func (r *purchaseOrderRepo) settlePurchaseOrderLifecycle(ctx context.Context, id
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	tx = nil
 	return entPurchaseOrderToBiz(row), nil
 }
 

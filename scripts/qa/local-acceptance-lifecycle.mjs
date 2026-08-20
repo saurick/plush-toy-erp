@@ -5,6 +5,7 @@ import { createHash, randomBytes } from "node:crypto";
 import {
   chmodSync,
   closeSync,
+  createReadStream,
   existsSync,
   mkdirSync,
   openSync,
@@ -15,6 +16,7 @@ import {
 import net from "node:net";
 import path from "node:path";
 import process from "node:process";
+import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
 
 import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
@@ -86,6 +88,42 @@ export function parseManualAcceptanceCoreReferenceSeedReadback(output) {
     units: expected.units.length,
     warehouses: expected.warehouses.length,
   };
+}
+
+export function inspectLocalAcceptanceBackendLog(output) {
+  const text = String(output || "");
+  const rateLimitCount = (text.match(/"code"\s*:\s*429\b/gu) || []).length;
+  const committedTransactionRollbackCount = (
+    text.match(/rollback ent tx failed/gu) || []
+  ).length;
+  return Object.freeze({
+    passed: rateLimitCount === 0 && committedTransactionRollbackCount === 0,
+    rateLimitCount,
+    committedTransactionRollbackCount,
+  });
+}
+
+async function inspectLocalAcceptanceBackendLogFile(logPath) {
+  if (!existsSync(logPath)) {
+    throw new Error("acceptance backend log is missing");
+  }
+  let rateLimitCount = 0;
+  let committedTransactionRollbackCount = 0;
+  const lines = createInterface({
+    input: createReadStream(logPath, { encoding: "utf8" }),
+    crlfDelay: Infinity,
+  });
+  for await (const line of lines) {
+    const result = inspectLocalAcceptanceBackendLog(line);
+    rateLimitCount += result.rateLimitCount;
+    committedTransactionRollbackCount +=
+      result.committedTransactionRollbackCount;
+  }
+  return Object.freeze({
+    passed: rateLimitCount === 0 && committedTransactionRollbackCount === 0,
+    rateLimitCount,
+    committedTransactionRollbackCount,
+  });
 }
 
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/u;
@@ -227,11 +265,18 @@ export async function runLocalAcceptanceLifecycle({
   let dataset = null;
   let manualBrowser = null;
   let exceptionBrowser = null;
+  let acceptanceBackendLog = null;
+  let browserActionsBackendLog = null;
 
   const stage = async (name, action, summarize = () => ({})) => {
-    const result = await action();
-    recordStage(stages, name, "passed", summarize(result));
-    return result;
+    try {
+      const result = await action();
+      recordStage(stages, name, "passed", summarize(result));
+      return result;
+    } catch (error) {
+      if (error instanceof LocalAcceptanceLifecycleError) throw error;
+      throw new LocalAcceptanceLifecycleError(name, safeError(error));
+    }
   };
 
   try {
@@ -343,6 +388,17 @@ export async function runLocalAcceptanceLifecycle({
       await runtime.stopBackend();
       backendStarted = false;
     });
+    acceptanceBackendLog = await stage(
+      "backend-log-hygiene-acceptance",
+      () => runtime.verifyBackendLogHygiene(identity.acceptanceDatabase),
+      (result) => ({
+        passed: result?.passed === true,
+        rateLimitCount: Number(result?.rateLimitCount || 0),
+        committedTransactionRollbackCount: Number(
+          result?.committedTransactionRollbackCount || 0,
+        ),
+      }),
+    );
     await stage("browser-actions-clone", async () => {
       await runtime.cloneDatabase(
         identity.acceptanceDatabase,
@@ -368,6 +424,21 @@ export async function runLocalAcceptanceLifecycle({
         passed: result?.passed === true,
         flows: Number(result?.flows || 0),
         report: result?.report || "",
+      }),
+    );
+    await stage("backend-stop-after-browser-actions", async () => {
+      await runtime.stopBackend();
+      backendStarted = false;
+    });
+    browserActionsBackendLog = await stage(
+      "backend-log-hygiene-browser-actions",
+      () => runtime.verifyBackendLogHygiene(identity.browserActionsDatabase),
+      (result) => ({
+        passed: result?.passed === true,
+        rateLimitCount: Number(result?.rateLimitCount || 0),
+        committedTransactionRollbackCount: Number(
+          result?.committedTransactionRollbackCount || 0,
+        ),
       }),
     );
   } catch (error) {
@@ -469,6 +540,10 @@ export async function runLocalAcceptanceLifecycle({
       dataset,
       manualBrowser,
       exceptionBrowser,
+      backendLogs: Object.freeze({
+        acceptance: acceptanceBackendLog,
+        browserActions: browserActionsBackendLog,
+      }),
     }),
     cleanup: Object.freeze({
       complete: residualDatabases.length === 0,
@@ -739,6 +814,8 @@ function createDirectRuntime(context) {
     replaceDatabaseName(context.baseDatabaseURL, databaseName, {
       allowRegisteredDevelopment: true,
     });
+  const backendLogPath = (databaseName) =>
+    path.join(context.outputDir, `backend-${databaseName}.log`);
   const psql = (databaseName, sql, label) =>
     runCommand(
       "psql",
@@ -869,7 +946,7 @@ function createDirectRuntime(context) {
           ERP_DEBUG_BUSINESS_CLEAR_ENABLED: "false",
           DEV_HTTP_PORT: String(context.httpPort),
         },
-        logPath: path.join(context.outputDir, `backend-${databaseName}.log`),
+        logPath: backendLogPath(databaseName),
         label: "acceptance backend",
       });
       try {
@@ -1169,6 +1246,17 @@ function createDirectRuntime(context) {
       await stopLoggedService(backend);
       backend = null;
       activeDatabase = "";
+    },
+    async verifyBackendLogHygiene(databaseName) {
+      const result = await inspectLocalAcceptanceBackendLogFile(
+        backendLogPath(databaseName),
+      );
+      if (!result.passed) {
+        throw new Error(
+          `acceptance backend log hygiene failed: rate_limit=${result.rateLimitCount} committed_transaction_rollback=${result.committedTransactionRollbackCount}`,
+        );
+      }
+      return result;
     },
     async cloneDatabase(sourceDatabase, targetDatabase) {
       psql(
