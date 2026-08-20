@@ -3843,6 +3843,39 @@ func TestCustomerConfigJSONRPCStartSalesOrderAcceptanceProcess(t *testing.T) {
 		t.Fatalf("retry should return existing process/node, first=%#v/%#v retry=%#v/%#v", instance, startedNode, retryInstance, retryStartedNode)
 	}
 
+	getParams, _ := structpb.NewStruct(map[string]any{
+		"customer_key":   biz.DefaultCustomerKey,
+		"sales_order_id": float64(42),
+	})
+	_, getRes, err := dispatcher.handleCustomerConfig(ctx, "get_sales_order_acceptance_process", "get", getParams)
+	if err != nil {
+		t.Fatalf("get process err = %v", err)
+	}
+	if getRes.Code != errcode.OK.Code {
+		t.Fatalf("get process code = %d msg=%s", getRes.Code, getRes.Message)
+	}
+	getData := getRes.Data.AsMap()
+	processContext, ok := getData["process_context"].(map[string]any)
+	if !ok {
+		t.Fatalf("get process_context missing: %#v", getData)
+	}
+	readInstance, ok := processContext["process_instance"].(map[string]any)
+	if !ok || readInstance["id"] != instance["id"] || readInstance["config_revision"] != instance["config_revision"] {
+		t.Fatalf("get process instance = %#v, want historical instance %#v", readInstance, instance)
+	}
+	readNodes, ok := processContext["nodes"].([]any)
+	if !ok || len(readNodes) != len(nodes) {
+		t.Fatalf("get process nodes = %#v", processContext["nodes"])
+	}
+	sourceReadback, ok := getData["source_readback"].(map[string]any)
+	if !ok || sourceReadback["type"] != "sales_order" || sourceReadback["id"] != float64(42) || sourceReadback["no"] != "SO-42" {
+		t.Fatalf("get source readback = %#v", sourceReadback)
+	}
+	readBoundary, ok := getData["runtime_boundary"].(map[string]any)
+	if !ok || readBoundary["read_only"] != true || readBoundary["config_revision"] != instance["config_revision"] {
+		t.Fatalf("get runtime boundary = %#v", readBoundary)
+	}
+
 	duplicateParams, _ := structpb.NewStruct(map[string]any{
 		"customer_key":    biz.DefaultCustomerKey,
 		"sales_order_id":  float64(42),
@@ -3855,6 +3888,37 @@ func TestCustomerConfigJSONRPCStartSalesOrderAcceptanceProcess(t *testing.T) {
 	}
 	if duplicateRes.Code != errcode.InvalidParam.Code || duplicateRes.Message != "流程实例已存在" {
 		t.Fatalf("duplicate start should be rejected, code=%d msg=%s", duplicateRes.Code, duplicateRes.Message)
+	}
+}
+
+func TestCustomerConfigJSONRPCGetSalesOrderAcceptanceProcessReturnsExactEmptyReadback(t *testing.T) {
+	dispatcher := newCustomerConfigTestDispatcherWithSalesOrderRepo(
+		&biz.AdminUser{ID: 1, Username: "admin", IsSuperAdmin: true, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		[]string{},
+		newServiceSalesOrderRepo(map[int]*biz.SalesOrder{
+			43: {ID: 43, OrderNo: "SO-43", LifecycleStatus: biz.SalesOrderStatusDraft},
+		}),
+	)
+	params, _ := structpb.NewStruct(map[string]any{
+		"customer_key":   biz.DefaultCustomerKey,
+		"sales_order_id": float64(43),
+	})
+	_, result, err := dispatcher.handleCustomerConfig(
+		customerConfigAdminCtx(1, "admin"),
+		"get_sales_order_acceptance_process",
+		"get-missing",
+		params,
+	)
+	if err != nil || result.Code != errcode.OK.Code {
+		t.Fatalf("get missing process result=%#v err=%v", result, err)
+	}
+	data := result.Data.AsMap()
+	if data["process_context"] != nil {
+		t.Fatalf("missing source-bound process must return null context: %#v", data)
+	}
+	sourceReadback, ok := data["source_readback"].(map[string]any)
+	if !ok || sourceReadback["id"] != float64(43) || sourceReadback["no"] != "SO-43" {
+		t.Fatalf("missing process source readback = %#v", sourceReadback)
 	}
 }
 

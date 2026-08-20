@@ -72,8 +72,8 @@ export const LONG_LIVED_WORKBENCH_VISIBLE_CODE_PREFIX_BY_ROLE = Object.freeze({
   quality: "YS-WB2-ZJ",
   engineering: "YS-WB2-GC",
 });
-const PREVIOUS_LONG_LIVED_WORKBENCH_VISIBLE_CODE_PREFIX_BY_ROLE =
-  Object.freeze({
+const PREVIOUS_LONG_LIVED_WORKBENCH_VISIBLE_CODE_PREFIX_BY_ROLE = Object.freeze(
+  {
     boss: "YS-WB1-LD",
     sales: "YS-WB1-XS",
     purchase: "YS-WB1-CG",
@@ -83,7 +83,8 @@ const PREVIOUS_LONG_LIVED_WORKBENCH_VISIBLE_CODE_PREFIX_BY_ROLE =
     pmc: "YS-WB1-JH",
     quality: "YS-WB1-ZJ",
     engineering: "YS-WB1-GC",
-  });
+  },
+);
 const TASK_PROFILE_CONTRACTS = Object.freeze({
   [TASK_PROFILE_ACCEPTANCE_SNAPSHOT]: Object.freeze({
     key: TASK_PROFILE_ACCEPTANCE_SNAPSHOT,
@@ -817,10 +818,10 @@ export function buildLegacyManualAcceptanceTaskBatchReference({
         : normalizedCopyRevision ===
             PREVIOUS_LONG_LIVED_WORKBENCH_TASK_COPY_REVISION
           ? "short-workbench1"
-        : !normalizedCopyRevision ||
-            /^PLAIN[1-4]$/u.test(normalizedCopyRevision)
-          ? "long-batch"
-          : null;
+          : !normalizedCopyRevision ||
+              /^PLAIN[1-4]$/u.test(normalizedCopyRevision)
+            ? "long-batch"
+            : null;
   if (!codeScheme) {
     throw new CliError(
       `unsupported legacy task copy revision ${normalizedCopyRevision}`,
@@ -2579,6 +2580,50 @@ function requireSalesOrderAcceptanceStart(data, source) {
   return { instance, node, nodes: data.nodes };
 }
 
+async function readSalesOrderAcceptanceStart({
+  plan,
+  source,
+  token,
+  fetchImpl,
+}) {
+  const data = await rpcCall({
+    backendURL: plan.backendURL,
+    domain: "customer_config",
+    method: "get_sales_order_acceptance_process",
+    params: {
+      sales_order_id: source.id,
+    },
+    token,
+    fetchImpl,
+  });
+  const context = data?.process_context;
+  if (context == null) return null;
+  const nodes = Array.isArray(context?.nodes) ? context.nodes : [];
+  const candidates = nodes.filter(
+    (node) =>
+      node?.node_key === "submit_sales_order" &&
+      node.node_type === "domain_command" &&
+      Number(node.process_instance_id) ===
+        Number(context?.process_instance?.id),
+  );
+  if (
+    candidates.length !== 1 ||
+    Number(context?.process_instance?.business_ref_id) !== source.id
+  ) {
+    throw new CliError(
+      `${source.orderNo} existing process readback is incomplete`,
+    );
+  }
+  return requireSalesOrderAcceptanceStart(
+    {
+      process_instance: context.process_instance,
+      started_node: candidates[0],
+      nodes,
+    },
+    source,
+  );
+}
+
 function requireSalesOrderAcceptanceExecution(data, source, expected) {
   const node = data?.completed_node;
   const matchingNode = Array.isArray(data?.nodes)
@@ -2733,24 +2778,32 @@ export async function applySalesOrderAcceptanceRuntimeEvidence({
     const source = sources[index];
     let started = null;
     if (source.status === "DRAFT") {
-      const startData = await rpcCall({
-        backendURL: plan.backendURL,
-        domain: "customer_config",
-        method: "start_sales_order_acceptance_process",
-        params: {
-          sales_order_id: source.id,
-          business_ref_no: source.orderNo,
-          idempotency_key: [
-            "manual-acceptance-runtime",
-            plan.runId,
-            source.orderNo,
-            "start",
-          ].join(":"),
-        },
+      started = await readSalesOrderAcceptanceStart({
+        plan,
+        source,
         token: accounts.sales.token,
         fetchImpl,
       });
-      started = requireSalesOrderAcceptanceStart(startData, source);
+      if (!started) {
+        const startData = await rpcCall({
+          backendURL: plan.backendURL,
+          domain: "customer_config",
+          method: "start_sales_order_acceptance_process",
+          params: {
+            sales_order_id: source.id,
+            business_ref_no: source.orderNo,
+            idempotency_key: [
+              "manual-acceptance-runtime",
+              plan.runId,
+              source.orderNo,
+              "start",
+            ].join(":"),
+          },
+          token: accounts.sales.token,
+          fetchImpl,
+        });
+        started = requireSalesOrderAcceptanceStart(startData, source);
+      }
     }
     if (caseKey === "started_only") {
       if (!started || started.node.status !== "active") {

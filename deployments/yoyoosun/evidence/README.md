@@ -67,6 +67,7 @@ bash scripts/deploy/production-preflight.sh \
 SOURCE_POSTGRES_DSN="$(cd server && make print_db_url)" \
   bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh \
     --release-version <release-version> \
+    --environment <environment> \
     --out output/customers/yoyoosun/backup-restore-rehearsal
 ```
 

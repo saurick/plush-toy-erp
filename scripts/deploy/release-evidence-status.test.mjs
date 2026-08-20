@@ -510,7 +510,15 @@ test("release evidence status reports missing evidence directory without throwin
   assert.equal(status.closeoutChecklist.length, 7);
   assert.deepEqual(
     status.closeoutChecklist.map((item) => item.status),
-    ["missing", "missing", "missing", "missing", "missing", "missing", "missing"],
+    [
+      "missing",
+      "missing",
+      "missing",
+      "missing",
+      "missing",
+      "missing",
+      "missing",
+    ],
   );
   assert.deepEqual(status.closeoutSummary, {
     total: 7,
@@ -750,6 +758,10 @@ test("release evidence status reports draft evidence gate errors", () => {
     backupRestore.commands.join("\n"),
     /--backup-purpose pre-migration/,
   );
+  assert.match(
+    backupRestore.commands.join("\n"),
+    /--environment <environment>/,
+  );
   const targetSmoke = status.closeoutNextActions.find(
     (item) => item.id === "target-smoke",
   );
@@ -835,10 +847,7 @@ test("release evidence status suggests customer config smoke when manifest evide
     nextCommands,
     /--admin-password-env MANUAL_ACCEPTANCE_ADMIN_PASSWORD/,
   );
-  assert.match(
-    nextCommands,
-    /--demo-password-env MANUAL_ACCEPTANCE_PASSWORD/,
-  );
+  assert.match(nextCommands, /--demo-password-env MANUAL_ACCEPTANCE_PASSWORD/);
   assert.match(nextCommands, /--admin-username admin/);
   assert.match(nextCommands, /--sms-phone-env MANUAL_ACCEPTANCE_SMS_PHONE/);
   assert.match(
@@ -1103,6 +1112,7 @@ test("release evidence status suggests restore rehearsal for missing supporting 
   const nextCommands = status.nextCommands.join("\n");
   assert.match(nextCommands, /run-backup-restore-rehearsal\.sh/);
   assert.match(nextCommands, /--backup-purpose pre-migration/);
+  assert.match(nextCommands, /--environment <environment>/);
   assert.match(
     nextCommands,
     /--evidence-dir deployments\/yoyoosun\/evidence\/releases\/2026-06-29/,

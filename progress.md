@@ -4,12 +4,12 @@
 
 ## 当前活跃事项
 
-### V6 测试数据、研发工作台与双环境交付（2026-08-20 候选提交前检查点）
+### V6 测试数据、研发工作台与双环境交付（2026-08-21 新候选检查点）
 
-- 数据与目标检查点：Core Demo 与 Scenario V6 继续使用稳定业务编码，`dataVersion=2026.08.15-v6`、`runId=20260815-V6`、`semanticDigest=feb935f4cb49915e6691d4695c71339bd4b4a7c56e04a35bbeace2c6c4825b02`。候选 `d7445ca2f0096a3f6b2fb69534d367677f7a84f0` 曾按正式 promotion、备份恢复、数据库重建、Atlas、V8 客户配置和 Core / Scenario 首次与 resume 流程部署到登记的 `customer-trial-133`，两次 Scenario 的语义与业务链 digest 一致；该批随后在完整浏览器前置检查失败，因此只作问题复现与回滚点证据，不作本轮最终交付结论。
-- 根因与修复：重建后的 133 仍被 dataset runner 按普通长期目标生成 persistent baseline，浏览器无法证明“当前物理数据库代确由权威重建且业务对象在写入前为零”。现在固定数据库重建执行器会把已校验、脱敏回执原子保存到 canonical ignored operation store，并在 operation metadata 记录相对路径和 SHA-256；dataset CLI 只接受该路径的同一 passed operation / eligible plan，精确绑定 target、release、migration、逻辑数据库、重建 fingerprint 和前后 PostgreSQL system identifier，再通过正式 API 实时核对受管业务对象全部为零。没有回执的 133 与 scenario-demo 继续保留长期库语义；resume 必须复用同一重建证明，浏览器必须看到 dataset 与 baseline 中完全相同的证明。
-- 当前验证：重建回执持久化、来源校验、fresh / persistent baseline、实时非空阻断、跨物理 generation resume 阻断和浏览器绑定的定向合同已通过。当前未提交候选通过 managed PostgreSQL 包装器执行 affected/full：Web `2431 / 2431`、共享 Node `1815 / 1815`、资源敏感发布合同 `38 / 38`，均为 0 fail / 0 skip；服务端、构建、真实 PostgreSQL disposable、实际 Chromium、Style L1 八场景和 govulncheck 同轮通过，临时数据库与 managed 容器清理完成。该回执绑定未提交工作树，不能替代 clean exact SHA 的最终门禁。
-- 后续与边界：仍须把当前预期源代码收口为 clean exact SHA，在该 SHA 上只运行一轮 `prepare-push.sh --full`、独立 Full Acceptance、全部登记 Style L1 / 页面 / PDF / 真实 PostgreSQL / 角色回归和 release-grade strict，再普通 push、核对远端 SHA、生成不可变制品并重新执行 133 的备份恢复、promotion、数据库重建、V8 配置、Scenario V6 首次 / resume、浏览器 / PDF 和运行读回。生产、真实客户数据导入和客户人工 UAT 均不在自动化完成声明内；最终发布事实只以绑定 exact SHA、数据库、配置和当前运行态的最新回执为准。
+- 数据与目标检查点：Core Demo 与 Scenario V6 继续使用稳定业务编码，当前 canonical `dataVersion=2026.08.15-v6`、`runId=20260815-V6`、`semanticDigest=97c7dfca780fc60205de97d4a92c2cde18f6a183c6d150389844884733ab84f3`。`d5d16d3e2732e1da321da37ff39d22783cb108da` 曾完成本地门禁并部署到登记的 `customer-trial-133`，但本地长期 Scenario 续跑暴露新的历史 ProcessRuntime 幂等问题，后续源码修改已使该 SHA 的测试、制品和目标报告失去最终候选资格，只保留为可回滚历史证据。
+- 根因与修复：长期销售单 `YS6-XD-001` 已存在由旧客户配置 revision 创建的 `sales_order_acceptance` 实例；runner 在当前 revision 下用同一 request id 再次启动时，被服务端正确判定为“同一幂等键内容变化”。现在新增受 `sales_order.read`、客户键、来源单据和业务引用共同约束的只读查询，页面与 Scenario runner 先读取并严格校验既有 ProcessRuntime，只在不存在时启动；旧 revision 的流程按自身快照继续办理，不放宽幂等冲突、不直接改库，也不把 Workflow 完成冒充 Fact 写入。备份恢复脚本、正式帮助和发布证据建议命令同时显式携带 `--environment`，避免目标恢复回执被默认标成 `local-dev`。
+- 当前验证：新候选的 Go 业务 / 服务、Scenario runner、Web API / lineage、备份恢复与 release evidence 定向合同均通过；随后由受管 PostgreSQL wrapper 完整执行 dirty-tree `full`，共 `6012 / 6012`、0 fail / 0 skip，覆盖 Web `2432`、Server `3578`、真实 PostgreSQL `2`、浏览器 `2`、安全 `2`，实际 Chromium Style L1 八场景和 `govulncheck` 同轮通过，临时数据库、容器与卷清理为零。该回执绑定未提交工作树，不能替代 clean exact SHA 的最终发布门禁。
+- 后续与边界：仍须提交当前预期源代码，重启本地后端并完成 Core / Scenario 两次幂等读回；在 clean exact SHA 上只运行一轮 `prepare-push.sh --full`、独立 Full Acceptance、全部登记 Style L1 / 页面 / PDF / 真实 PostgreSQL / 角色回归和 release-grade strict，再普通 push、核对远端 SHA、生成不可变制品并重新执行 133 的备份恢复、promotion、V8 配置、Scenario V6 首次 / resume、浏览器 / PDF 和运行读回。生产、真实客户数据导入和客户人工 UAT 均不在自动化完成声明内；最终发布事实只以绑定 exact SHA、数据库、配置和当前运行态的最新回执为准。
 
 ### ProcessRuntime 状态机与来源单据强动作收口（2026-08-11）
 

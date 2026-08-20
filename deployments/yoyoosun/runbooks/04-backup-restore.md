@@ -33,6 +33,7 @@
 SOURCE_POSTGRES_DSN='<postgres://erp_backup:...@host:port/database?sslmode=...>' \
   bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh \
     --release-version <release-version> \
+    --environment <environment> \
     --backup-purpose pre-migration \
     --out output/customers/yoyoosun/backup-restore-rehearsal \
     --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \
@@ -40,7 +41,7 @@ SOURCE_POSTGRES_DSN='<postgres://erp_backup:...@host:port/database?sslmode=...>'
     --web-url http://127.0.0.1:5175/erp
 ```
 
-该脚本会把 dump 放在 `output/` 下并恢复到临时隔离 PostgreSQL 容器；`output/` 不纳入 git。`--backup-purpose` 必须明确是 `pre-migration`、`pre-deploy`、发布前或 migration 前语义，方便 release evidence gate 证明这是 migration 前备份。脚本恢复 dump 后会先记录 `migration-status-before-apply.txt`，再对隔离库依次运行 populated upgrade 与 customer config cutover read-only audit；两项都通过后才执行 `atlas migrate apply`，最后生成 release gate 使用的 `migration-status.txt`。因此 `backup-evidence.md` 与 `backup-restore-report.json backup.migrationVersion / restore.migrationBeforeApply` 记录的是 migrationBefore，`backup-restore-report.json restore.restoreMigrationVersion` 记录的是恢复后 migrationAfter。跨越 `20260714055504` 时，四处 `populatedUpgradeAuditStatus` 必须为 `passed`；跨越 `20260714055825` 时，四处 `customerConfigCutoverAuditStatus` 必须为 `passed`；command summary 的步骤还必须包含对应 read-only audit。提供 `--evidence-dir` 时，脚本只把脱敏后的 `backup-evidence.md`、`migration-status-before-apply.txt`、`migration-status.txt`、`command-summary.txt` 和 `backup-restore-report.json` 复制到 release evidence 目录，不复制 dump。`backup-restore-report.json` 中的 artifact 路径必须保持为当前 release evidence 目录内的相对路径，不能指向 `output/`、绝对路径、完整 DSN 或不存在的文件；`command-summary.txt` 必须绑定同一 `backupId / releaseVersion / sourceAlias / restoreTarget`，并记录 pg_dump、restore、atlas、smoke 的脱敏步骤。
+该脚本会把 dump 放在 `output/` 下并恢复到临时隔离 PostgreSQL 容器；`output/` 不纳入 git。`--environment` 必须绑定本次真实环境，目标演练不能沿用默认 `local-dev`；`--backup-purpose` 必须明确是 `pre-migration`、`pre-deploy`、发布前或 migration 前语义，方便 release evidence gate 证明这是 migration 前备份。脚本恢复 dump 后会先记录 `migration-status-before-apply.txt`，再对隔离库依次运行 populated upgrade 与 customer config cutover read-only audit；两项都通过后才执行 `atlas migrate apply`，最后生成 release gate 使用的 `migration-status.txt`。因此 `backup-evidence.md` 与 `backup-restore-report.json backup.migrationVersion / restore.migrationBeforeApply` 记录的是 migrationBefore，`backup-restore-report.json restore.restoreMigrationVersion` 记录的是恢复后 migrationAfter。跨越 `20260714055504` 时，四处 `populatedUpgradeAuditStatus` 必须为 `passed`；跨越 `20260714055825` 时，四处 `customerConfigCutoverAuditStatus` 必须为 `passed`；command summary 的步骤还必须包含对应 read-only audit。提供 `--evidence-dir` 时，脚本只把脱敏后的 `backup-evidence.md`、`migration-status-before-apply.txt`、`migration-status.txt`、`command-summary.txt` 和 `backup-restore-report.json` 复制到 release evidence 目录，不复制 dump。`backup-restore-report.json` 中的 artifact 路径必须保持为当前 release evidence 目录内的相对路径，不能指向 `output/`、绝对路径、完整 DSN 或不存在的文件；`command-summary.txt` 必须绑定同一 `backupId / releaseVersion / sourceAlias / restoreTarget`，并记录 pg_dump、restore、atlas、smoke 的脱敏步骤。
 
 ## 恢复步骤
 

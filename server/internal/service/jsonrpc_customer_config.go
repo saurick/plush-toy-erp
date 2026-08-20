@@ -81,6 +81,71 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		result := d.handleCustomerConfigExceptionProcess(ctx, method, pm)
 		return id, result, nil
 
+	case "get_sales_order_acceptance_process":
+		if res := d.requireSourceActionReadPermissions(ctx, "customer_config", method); res != nil {
+			return id, res, nil
+		}
+		if !customerConfigAllowsOnly(pm, "customer_key", "sales_order_id") {
+			return id, invalidParamResult(), nil
+		}
+		salesOrderID := getInt(pm, "sales_order_id", 0)
+		if salesOrderID <= 0 {
+			return id, invalidParamResult(), nil
+		}
+		businessRefNo, err := d.salesOrderProcessSourceRefNo(ctx, salesOrderID)
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		resolvedCustomerKey, err := runtimeCustomerKey(getString(pm, "customer_key"))
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		instance, nodes, err := d.processRuntimeUC.GetProcessInstanceByBusinessRef(
+			ctx,
+			biz.ProcessKeySalesOrderAcceptance,
+			"sales_order",
+			salesOrderID,
+		)
+		if errors.Is(err, biz.ErrProcessInstanceNotFound) {
+			return id, &v1.JsonrpcResult{
+				Code:    errcode.OK.Code,
+				Message: errcode.OK.Message,
+				Data: newDataStruct(map[string]any{
+					"process_context": nil,
+					"source_readback": map[string]any{
+						"type": "sales_order",
+						"id":   salesOrderID,
+						"no":   *businessRefNo,
+					},
+				}),
+			}, nil
+		}
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		if !processInstanceCustomerKeyMatches(instance, resolvedCustomerKey) ||
+			instance.BusinessRefNo == nil || strings.TrimSpace(*instance.BusinessRefNo) != *businessRefNo {
+			return id, d.mapCustomerConfigError(ctx, biz.ErrForbidden), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{
+				"process_context": exceptionProcessContextToMap(instance, nodes),
+				"source_readback": map[string]any{
+					"type": "sales_order",
+					"id":   salesOrderID,
+					"no":   *businessRefNo,
+				},
+				"runtime_boundary": customerConfigProcessRuntimeBoundary(instance.ConfigRevision, map[string]any{
+					"process_key":                   biz.ProcessKeySalesOrderAcceptance,
+					"read_only":                     true,
+					"executes_domain_command":       false,
+					"workflow_task_done_posts_fact": false,
+				}),
+			}),
+		}, nil
+
 	case "start_sales_order_acceptance_process":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSalesOrderSubmit); res != nil {
 			return id, res, nil

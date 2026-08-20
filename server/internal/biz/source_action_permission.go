@@ -134,6 +134,7 @@ var publicSourceActionReadPermissionContracts = []SourceActionReadPermissionCont
 			{PermissionKey: PermissionOutsourcingOrderRead, Condition: SourceReadConditionOutsourcedExecution},
 		},
 	},
+	{Domain: "customer_config", Method: "get_sales_order_acceptance_process", Rules: sourceReadRules(PermissionSalesOrderRead)},
 	{Domain: "customer_config", Method: "start_sales_order_acceptance_process", Rules: sourceReadRules(PermissionSalesOrderRead)},
 	{Domain: "customer_config", Method: "execute_sales_order_acceptance_submit", Rules: sourceReadRules(PermissionSalesOrderRead)},
 	{Domain: "customer_config", Method: "start_material_supply_purchase_order_process", Rules: sourceReadRules(PermissionPurchaseOrderRead)},

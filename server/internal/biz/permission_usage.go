@@ -299,7 +299,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	)
 
 	// Sales orders.
-	salesOrderReadMethods := append(permissionMethods("sales_order", "get_sales_order", "list_sales_orders"), permissionMethods("customer_config", "start_sales_order_acceptance_process")...)
+	salesOrderReadMethods := append(permissionMethods("sales_order", "get_sales_order", "list_sales_orders"), permissionMethods("customer_config", "get_sales_order_acceptance_process", "start_sales_order_acceptance_process")...)
 	add(PermissionSalesOrderRead,
 		menuPermissionSurface("sales-orders", "sales-orders", "销售订单", "sales-order-list", "销售订单列表和详情", permissionControlPage, "允许进入并查看", salesOrderReadMethods, businessUsageConditions),
 		menuPermissionSurface("shipping-release", "sales-order-release-context", "销售订单", "sales-order-release-reference", "出货放行的订单依据", permissionControlSection, "允许查看", permissionMethods("sales_order", "get_sales_order", "list_sales_orders"), businessUsageConditions),

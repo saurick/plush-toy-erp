@@ -147,6 +147,7 @@ const NON_LINEAGE_CUSTOMER_CONFIG_ACTIONS = Object.freeze([
 ])
 
 const FORMAL_UI_PROCESS_RUNTIME_ACTIONS = Object.freeze([
+  'get_sales_order_acceptance_process',
   'start_sales_order_acceptance_process',
   'execute_sales_order_acceptance_submit',
   'start_material_supply_purchase_order_process',

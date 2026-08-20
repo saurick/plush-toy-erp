@@ -28,6 +28,8 @@ test("backup restore rehearsal script help is runnable", () => {
   assert.match(result.stdout, /SOURCE_POSTGRES_DSN/);
   assert.match(result.stdout, /backup-restore-report\.json/);
   assert.match(result.stdout, /--evidence-dir/);
+  assert.match(result.stdout, /--environment local-dev/);
+  assert.match(result.stdout, /目标演练必须显式填写实际环境/);
   assert.match(result.stdout, /--source-policy dedicated-backup/);
   assert.match(
     result.stdout,
@@ -242,14 +244,8 @@ test("backup restore rehearsal scopes the shared development source exception", 
     sharedPolicyBlock,
     /source_(?:super|createdb|createrole|bypassrls)|CREATE ROLE|ALTER ROLE|source_pg_user=/,
   );
-  assert.match(
-    source,
-    /PGOPTIONS="\$source_pg_options"[\s\S]*"\$psql_bin"/,
-  );
-  assert.match(
-    source,
-    /PGOPTIONS="\$source_pg_options"[\s\S]*"\$pg_dump_bin"/,
-  );
+  assert.match(source, /PGOPTIONS="\$source_pg_options"[\s\S]*"\$psql_bin"/);
+  assert.match(source, /PGOPTIONS="\$source_pg_options"[\s\S]*"\$pg_dump_bin"/);
   assert.match(
     dedicatedPolicyBlock,
     /source_policy" == "dedicated-backup"[\s\S]*source_user" == "erp_backup"[\s\S]*source_super" == "f"[\s\S]*source_createdb" == "f"[\s\S]*source_createrole" == "f"[\s\S]*source_bypassrls" == "f"[\s\S]*source_database_create" == "f"[\s\S]*source_schema_create" == "f"[\s\S]*source_invalid_table_count" == "0"/,
@@ -262,8 +258,7 @@ test("backup restore rehearsal resolves output ownership without concatenating f
   const source = fs.readFileSync(scriptPath, "utf8");
   const bsdAttempt =
     'if ! out_root_owner_uid="$(stat -f \'%u\' "$out_root" 2>/dev/null)"; then';
-  const gnuFallback =
-    'out_root_owner_uid="$(stat -c \'%u\' "$out_root")"';
+  const gnuFallback = 'out_root_owner_uid="$(stat -c \'%u\' "$out_root")"';
   const ownerGate =
     '[[ -d "$out_root" && ! -L "$out_root" && "$out_root_owner_uid" == "$(id -u)" ]]';
   const bsdAttemptIndex = source.indexOf(bsdAttempt);
@@ -297,10 +292,7 @@ test("backup restore rehearsal waits for the final postgres process before resto
     source,
     /docker inspect --format '\{\{\.State\.Running\}\}' "\$container_name"/,
   );
-  assert.match(
-    source,
-    /docker exec "\$container_name" cat \/proc\/1\/comm/,
-  );
+  assert.match(source, /docker exec "\$container_name" cat \/proc\/1\/comm/);
   const finalPostgresGate = source.indexOf(
     '[[ "$container_running" == "true" && "$pid1_comm" == "postgres" ]]',
   );
@@ -313,8 +305,14 @@ test("backup restore rehearsal waits for the final postgres process before resto
     readyGate,
   );
   assert(finalPostgresGate >= 0, "final postgres PID 1 gate must be explicit");
-  assert(readyGate > finalPostgresGate, "pg_isready must follow the PID 1 gate");
-  assert(restore > readyGate, "restore must follow the complete readiness gate");
+  assert(
+    readyGate > finalPostgresGate,
+    "pg_isready must follow the PID 1 gate",
+  );
+  assert(
+    restore > readyGate,
+    "restore must follow the complete readiness gate",
+  );
   assert.match(source, /docker logs --tail 80 "\$container_name"/);
   assert.match(source, /gsub\(secret, "\[REDACTED\]"\)/);
 });

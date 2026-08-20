@@ -66,6 +66,14 @@ export async function startSalesOrderAcceptanceProcess(params = {}) {
   return dataOf(result)
 }
 
+export async function getSalesOrderAcceptanceProcess(params = {}) {
+  const result = await customerConfigRpc.call(
+    'get_sales_order_acceptance_process',
+    params
+  )
+  return dataOf(result)
+}
+
 export async function executeSalesOrderAcceptanceSubmit(params = {}) {
   const result = await customerConfigRpc.call(
     'execute_sales_order_acceptance_submit',
@@ -123,13 +131,34 @@ function requireSalesOrderAcceptanceStart(data, salesOrderID) {
   ) {
     throw new Error(PROCESS_RESULT_INVALID_MESSAGE)
   }
-  if (
-    node.status === 'completed' &&
-    node.outcome !== 'sales_order.submitted'
-  ) {
+  if (node.status === 'completed' && node.outcome !== 'sales_order.submitted') {
     throw new Error(PROCESS_RESULT_INVALID_MESSAGE)
   }
   return { instance, node }
+}
+
+function salesOrderAcceptanceStartFromContext(data, salesOrderID) {
+  const context = data?.process_context
+  if (context == null) return null
+  const nodes = Array.isArray(context?.nodes) ? context.nodes : []
+  const candidates = nodes.filter(
+    (node) =>
+      node?.node_key === 'submit_sales_order' &&
+      node.node_type === 'domain_command' &&
+      node.process_instance_id === context?.process_instance?.id
+  )
+  if (
+    candidates.length !== 1 ||
+    context?.process_instance?.business_ref_id !== salesOrderID
+  ) {
+    throw new Error(PROCESS_RESULT_INVALID_MESSAGE)
+  }
+  return {
+    process_instance: context.process_instance,
+    started_node: candidates[0],
+    nodes,
+    runtime_boundary: data.runtime_boundary,
+  }
 }
 
 function requireSalesOrderAcceptanceExecution(data, expected) {
@@ -178,7 +207,16 @@ export async function submitSalesOrderAcceptanceProcess(params = {}) {
   if (params.customer_key) {
     startPayload.customer_key = params.customer_key
   }
-  const startData = await startSalesOrderAcceptanceProcess(startPayload)
+  const readPayload = { sales_order_id: salesOrderID }
+  if (params.customer_key) {
+    readPayload.customer_key = params.customer_key
+  }
+  const existing = salesOrderAcceptanceStartFromContext(
+    await getSalesOrderAcceptanceProcess(readPayload),
+    salesOrderID
+  )
+  const startData =
+    existing || (await startSalesOrderAcceptanceProcess(startPayload))
   const { instance: processInstance, node: startedNode } =
     requireSalesOrderAcceptanceStart(startData, salesOrderID)
   if (startedNode.status === 'completed') {

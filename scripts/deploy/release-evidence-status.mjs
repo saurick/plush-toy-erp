@@ -86,7 +86,8 @@ const CLOSEOUT_EVIDENCE_GROUPS = [
     id: "credential-rotation",
     label: "凭据轮换与登录矩阵",
     files: [REQUIRED_FILES.credentialRotation, REQUIRED_FILES.smoke],
-    reason: "证明 admin 与十个 demo 已轮换、旧会话已撤销且目标环境 11/11 真实登录通过",
+    reason:
+      "证明 admin 与十个 demo 已轮换、旧会话已撤销且目标环境 11/11 真实登录通过",
   },
   {
     id: "target-smoke",
@@ -320,7 +321,7 @@ function buildNextCommands({
     missing.has(REQUIRED_FILES.migration)
   ) {
     commands.push(
-      `SOURCE_POSTGRES_DSN="<source-dsn>" bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh --release-version <release-version> --backup-purpose pre-migration --out output/customers/yoyoosun/backup-restore-rehearsal --evidence-dir ${evidenceDir}`,
+      `SOURCE_POSTGRES_DSN="<source-dsn>" bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh --release-version <release-version> --environment <environment> --backup-purpose pre-migration --out output/customers/yoyoosun/backup-restore-rehearsal --evidence-dir ${evidenceDir}`,
     );
   }
   if (missing.has(REQUIRED_FILES.smoke)) {
@@ -398,7 +399,7 @@ function buildCloseoutNextActions({
           break;
         case "backup-restore-rehearsal":
           action.commands.push(
-            `SOURCE_POSTGRES_DSN="<source-dsn>" bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh --release-version <release-version> --backup-purpose pre-migration --out output/customers/yoyoosun/backup-restore-rehearsal --evidence-dir ${evidenceDir}`,
+            `SOURCE_POSTGRES_DSN="<source-dsn>" bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh --release-version <release-version> --environment <environment> --backup-purpose pre-migration --out output/customers/yoyoosun/backup-restore-rehearsal --evidence-dir ${evidenceDir}`,
           );
           action.manualChecks.push(
             "Bind backupId, migrationBefore, migrationAfter, backup hash, restore target, command summary, and smoke query evidence to the same release batch.",

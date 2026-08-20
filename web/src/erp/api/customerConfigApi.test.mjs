@@ -112,6 +112,22 @@ function processExecutionData() {
   }
 }
 
+function processReadData(startData = processStartData()) {
+  return {
+    process_context: {
+      process_instance: startData.process_instance,
+      nodes: startData.nodes,
+      active_nodes: startData.nodes.filter((node) => node.status === 'active'),
+      settled_nodes: startData.nodes.filter((node) => node.status !== 'active'),
+    },
+    source_readback: {
+      type: 'sales_order',
+      id: startData.process_instance.business_ref_id,
+      no: 'SIM-SO-036',
+    },
+  }
+}
+
 function purchaseProcessStartData({
   purchaseOrderID = 5001,
   status = 'active',
@@ -288,6 +304,10 @@ test('customerConfigApi: sales order acceptance submit uses explicit start and d
   assert.match(customerConfigApiSource, /rollbackCustomerConfig/)
   assert.match(
     customerConfigApiSource,
+    /call\(\s*'get_sales_order_acceptance_process'/
+  )
+  assert.match(
+    customerConfigApiSource,
     /call\(\s*'start_sales_order_acceptance_process'/
   )
   assert.match(
@@ -316,6 +336,9 @@ test('customerConfigApi: fresh sales order acceptance submit calls start then ex
   const calls = []
   const api = await loadCustomerConfigApiForTest(async (method, params) => {
     calls.push({ method, params })
+    if (method === 'get_sales_order_acceptance_process') {
+      return { data: { process_context: null } }
+    }
     if (method === 'start_sales_order_acceptance_process') {
       return { data: processStartData() }
     }
@@ -335,17 +358,22 @@ test('customerConfigApi: fresh sales order acceptance submit calls start then ex
   assert.deepEqual(
     calls.map((item) => item.method),
     [
+      'get_sales_order_acceptance_process',
       'start_sales_order_acceptance_process',
       'execute_sales_order_acceptance_submit',
     ]
   )
   assert.deepEqual(calls[0].params, {
     sales_order_id: 81,
+    customer_key: 'yoyoosun',
+  })
+  assert.deepEqual(calls[1].params, {
+    sales_order_id: 81,
     business_ref_no: 'SIM-SO-036',
     idempotency_key: 'submit-81',
     customer_key: 'yoyoosun',
   })
-  assert.deepEqual(calls[1].params, {
+  assert.deepEqual(calls[2].params, {
     customer_key: 'yoyoosun',
     process_instance_id: 2,
     process_node_instance_id: 6,
@@ -365,7 +393,8 @@ test('customerConfigApi: completed start replay succeeds without repeating domai
   })
   const api = await loadCustomerConfigApiForTest(async (method, params) => {
     calls.push({ method, params })
-    return { data: replay }
+    assert.equal(method, 'get_sales_order_acceptance_process')
+    return { data: processReadData(replay) }
   })
 
   const result = await api.submitSalesOrderAcceptanceProcess({
@@ -375,7 +404,7 @@ test('customerConfigApi: completed start replay succeeds without repeating domai
 
   assert.deepEqual(
     calls.map((item) => item.method),
-    ['start_sales_order_acceptance_process']
+    ['get_sales_order_acceptance_process']
   )
   assert.equal(result.started_node.status, 'completed')
   assert.equal(result.nodes[1].node_key, 'order_approval')
@@ -408,6 +437,9 @@ test('customerConfigApi: malformed, blocked, and compensated start results fail 
       const calls = []
       const api = await loadCustomerConfigApiForTest(async (method, params) => {
         calls.push({ method, params })
+        if (method === 'get_sales_order_acceptance_process') {
+          return { data: { process_context: null } }
+        }
         return { data: item.data }
       })
       await assert.rejects(
@@ -416,7 +448,10 @@ test('customerConfigApi: malformed, blocked, and compensated start results fail 
       )
       assert.deepEqual(
         calls.map((call) => call.method),
-        ['start_sales_order_acceptance_process']
+        [
+          'get_sales_order_acceptance_process',
+          'start_sales_order_acceptance_process',
+        ]
       )
     })
   }
@@ -426,6 +461,9 @@ test('customerConfigApi: malformed execution result fails closed', async () => {
   const calls = []
   const api = await loadCustomerConfigApiForTest(async (method, params) => {
     calls.push({ method, params })
+    if (method === 'get_sales_order_acceptance_process') {
+      return { data: { process_context: null } }
+    }
     if (method === 'start_sales_order_acceptance_process') {
       return { data: processStartData() }
     }
@@ -444,7 +482,7 @@ test('customerConfigApi: malformed execution result fails closed', async () => {
     api.submitSalesOrderAcceptanceProcess({ sales_order_id: 81 }),
     /销售订单提交结果无法确认，请刷新后重试/
   )
-  assert.equal(calls.length, 2)
+  assert.equal(calls.length, 3)
 })
 
 test('customerConfigApi: purchase submit uses process start then durable domain command', async () => {
@@ -697,7 +735,10 @@ test('customerConfigApi: compensated process recovery uses exact evidence and re
     return { data: { recovered_node: recoveredNode } }
   })
 
-  assert.equal(api.findExceptionProcessRecoveryCandidate(processData), candidate)
+  assert.equal(
+    api.findExceptionProcessRecoveryCandidate(processData),
+    candidate
+  )
   const recovered = await api.recoverCompensatedProcessDomainCommand({
     process_instance_id: 791,
     process_node_instance_id: 991,

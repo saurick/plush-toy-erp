@@ -344,6 +344,40 @@ function createSalesOrderRuntimeEvidenceMock(sources) {
 
     if (
       domain === "customer_config" &&
+      body.method === "get_sales_order_acceptance_process"
+    ) {
+      assert.equal(actorRole, "sales");
+      const source = sources.find(
+        (candidate) => candidate.id === params.sales_order_id,
+      );
+      assert.ok(source);
+      const record = records.get(source.id);
+      return jsonResponse({
+        process_context: record
+          ? {
+              process_instance: {
+                ...clone(record.instance),
+                status: record.processStatus,
+              },
+              nodes: clone(record.nodes),
+              active_nodes: clone(
+                record.nodes.filter((node) => node.status === "active"),
+              ),
+              settled_nodes: clone(
+                record.nodes.filter((node) => node.status !== "active"),
+              ),
+            }
+          : null,
+        source_readback: {
+          type: "sales_order",
+          id: source.id,
+          no: source.orderNo,
+        },
+      });
+    }
+
+    if (
+      domain === "customer_config" &&
       body.method === "start_sales_order_acceptance_process"
     ) {
       assert.equal(actorRole, "sales");
@@ -559,6 +593,14 @@ test("runtime evidence advances five simulated sales orders through the formal p
     mock.calls.filter(
       (call) =>
         call.domain === "customer_config" &&
+        call.method === "get_sales_order_acceptance_process",
+    ).length,
+    5,
+  );
+  assert.equal(
+    mock.calls.filter(
+      (call) =>
+        call.domain === "customer_config" &&
         call.method === "start_sales_order_acceptance_process",
     ).length,
     5,
@@ -640,9 +682,17 @@ test("runtime evidence advances five simulated sales orders through the formal p
     mock.calls.filter(
       (call) =>
         call.domain === "customer_config" &&
-        call.method === "start_sales_order_acceptance_process",
+        call.method === "get_sales_order_acceptance_process",
     ).length,
     6,
+  );
+  assert.equal(
+    mock.calls.filter(
+      (call) =>
+        call.domain === "customer_config" &&
+        call.method === "start_sales_order_acceptance_process",
+    ).length,
+    5,
   );
   assert.equal(
     mock.calls.filter(

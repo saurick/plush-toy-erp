@@ -743,6 +743,7 @@ export const businessPageFlowDefinitions = Object.freeze(
         // records. Start/gate/release actions listed here only advance the
         // process; domain-writing wrappers stay classified by their actual
         // generate/post/lifecycle effect above.
+        ['sales-orders', 'sales-orders', 'get_sales_order_acceptance_process'],
         [
           'sales-orders',
           'sales-orders',

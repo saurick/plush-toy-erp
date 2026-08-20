@@ -84,6 +84,7 @@ node scripts/deploy/image-digests-evidence.mjs \
 SOURCE_POSTGRES_DSN="$(cd server && make print_db_url)" \
   bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh \
     --release-version <release-version> \
+    --environment <environment> \
     --backup-purpose pre-migration \
     --out output/customers/yoyoosun/backup-restore-rehearsal \
     --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \
