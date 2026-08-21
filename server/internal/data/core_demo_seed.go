@@ -544,6 +544,9 @@ func SeedCoreDemoData(ctx context.Context, db *sql.DB, dataset CoreDemoSeedDatas
 		return nil, err
 	}
 	defer rollbackSQLTx(ctx, tx, nil)
+	if err := validateCoreDemoRouteOwnership(ctx, tx, dataset.Processes); err != nil {
+		return nil, err
+	}
 
 	result := &CoreDemoSeedResult{
 		Prefix:       dataset.Prefix,
@@ -630,6 +633,36 @@ func SeedCoreDemoData(ctx context.Context, db *sql.DB, dataset CoreDemoSeedDatas
 	}
 
 	return result, nil
+}
+
+func validateCoreDemoRouteOwnership(ctx context.Context, tx *sql.Tx, processes []CoreDemoProcessSeed) error {
+	for _, candidate := range processes {
+		operationCode := strings.TrimSpace(candidate.ProductionRouteOperationCode)
+		if operationCode == "" {
+			continue
+		}
+		var ownerCode string
+		err := tx.QueryRowContext(ctx, `
+SELECT code
+FROM processes
+WHERE production_route_operation_code = $1
+FOR UPDATE`, operationCode).Scan(&ownerCode)
+		if errors.Is(err, sql.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if ownerCode != candidate.Code {
+			return fmt.Errorf(
+				"%w: production route operation %q is already owned by process %q; full core demo data cannot be added to a versioned Scenario database, use the guarded --scenario-references profile instead",
+				ErrCoreDemoSeedInvalidRecord,
+				operationCode,
+				ownerCode,
+			)
+		}
+	}
+	return nil
 }
 
 func validateCoreDemoSeedDataset(dataset CoreDemoSeedDataset) error {

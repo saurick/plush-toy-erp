@@ -147,8 +147,8 @@ export const DEV_DATA_PREPARATION_PROFILES = Object.freeze([
   }),
   Object.freeze({
     key: 'core-demo',
-    title: 'Product Core 基础测试数据',
-    purpose: '稳定 upsert 现有角色账号与 Product Core 基础资料',
+    title: '本地长期基础数据',
+    purpose: '稳定准备十个演示账号与当前 V6 的单位、仓库引用',
     writesDatabase: true,
     dataRetention: 'long-lived',
     cleanupMode: 'not-supported',
@@ -1757,8 +1757,7 @@ export function createDevDataPreparationService({
         outputs.set(command.key, String(result.stdout || ''))
         completed.push(command.key)
       } catch (error) {
-        const stage =
-          command.key === 'role-seed' ? '角色账号' : 'Product Core 基础资料'
+        const stage = command.key === 'role-seed' ? '角色账号' : 'V6 单位与仓库'
         const partial =
           completed.length > 0
             ? `；已完成 ${completed.join('、')}，目标可能已部分更新，禁止按全量成功使用`

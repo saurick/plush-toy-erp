@@ -407,6 +407,50 @@ func TestSeedCoreDemoDataRejectsUnsafePrefixAndMissingDB(t *testing.T) {
 	}
 }
 
+func TestSeedCoreDemoDataRejectsForeignRouteOwnerBeforeWrites(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	dataset := CoreDemoSeedDataset{
+		Prefix: "SIM-TEST",
+		Units: []CoreDemoUnitSeed{
+			{Code: "SIM-TEST-PCS", Name: "件", Precision: 0},
+		},
+		Products: []CoreDemoProductSeed{
+			{Code: "SIM-TEST-PROD", Name: "演示产品", DefaultUnitCode: "SIM-TEST-PCS"},
+		},
+		Warehouses: []CoreDemoWarehouseSeed{
+			{Code: "SIM-TEST-FG", Name: "成品仓", Type: "FINISHED_GOODS"},
+		},
+		Processes: []CoreDemoProcessSeed{
+			{
+				Code:                         "SIM-TEST-PROC-SEWING",
+				Name:                         "车缝",
+				ProductionRouteOperationCode: biz.ProductionWIPOperationSewing,
+			},
+		},
+	}
+
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT code\\s+FROM processes\\s+WHERE production_route_operation_code = \\$1\\s+FOR UPDATE").
+		WithArgs(biz.ProductionWIPOperationSewing).
+		WillReturnRows(sqlmock.NewRows([]string{"code"}).AddRow("YS6-GX-005"))
+	mock.ExpectRollback()
+	mock.ExpectClose()
+
+	_, err = SeedCoreDemoData(context.Background(), db, dataset)
+	if !errors.Is(err, ErrCoreDemoSeedInvalidRecord) || !strings.Contains(err.Error(), "--scenario-references") {
+		t.Fatalf("expected guarded Scenario ownership error, got %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
 func TestCoreDemoSeedRejectsNumberedImplementationStageLabels(t *testing.T) {
 	dataset := DefaultCoreDemoSeedDataset("")
 	dataset.Units[0].Name = "Phase" + " 8 模拟单位"

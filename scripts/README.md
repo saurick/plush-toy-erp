@@ -251,7 +251,7 @@ node --test scripts/qa/test-data-isolation-boundary.test.mjs
 
 本地开发也可在 `http://127.0.0.1:5175/__dev/data-preparation` 使用受控测试数据中心。它不是浏览器 shell，而是 development serve 的 loopback Bridge：只允许固定 `core-demo`、`scenario-demo` 与 `full-acceptance`，先生成绑定仓库指纹、目标、migration、`runId` 和 `planHash` 的计划，再确认后异步执行。浏览器不能传入命令、路径、DSN、后端地址、密码或环境变量。
 
-- `core-demo` 复用 `seed-role-demo-admins` 与 `seed-core-demo-data`，只允许登记的 106 开发库族。两个入口顺序执行，稳定 upsert 可重放但不是跨入口单事务；不提供按 operation 删除，也不生成客户、订单、Workflow 或 Fact。
+- `core-demo` 复用 `seed-role-demo-admins` 与 `seed-core-demo-data --scenario-references`，只允许登记的 106 开发库族。它顺序准备十个演示账号、当前 V6 的 11 个单位与 4 个仓库；稳定 upsert 可重放但不是跨入口单事务，不提供按 operation 删除，也不生成材料、产品、工艺、BOM、客户、订单、Workflow 或 Fact。材料及其后的业务数据由 `scenario-demo` 的版本化阶段负责，避免两套基础资料和生产工序语义并存。
 - `scenario-demo` 固定为 `yoyoosun-manual-acceptance / 2026.08.15-v6 / 20260815-V6`，只允许 `127.0.0.1:8300` 对应的登记 106 长期开发库。它先稳定准备本地岗位账号和至少 30 条由真实控制面操作产生的审计样例，并通过正式客户配置 API 对齐当前跟踪的 yoyoosun 本地测试 revision，再准备 Source Document、已登记的 ProcessRuntime、模拟岗位任务和来源驱动 Fact；半批、字段漂移或目标变化会阻断，代码变化则使旧计划失效并要求用新 operation / batch 绑定新的 exact commit。长期工作台任务使用独立 `long-lived-workbench / WORKBENCH2` 批次：九个岗位各 20 条，其中前 12 条保持 `ready + due_at=null + priority<3`，因此不会随固定日期滚入风险队列；剩余任务稳定覆盖风险和历史状态。新批次完整读回后，旧 `WORKBENCH1` 及 `PLAIN5 / PLAIN6` 快照任务只通过正式 Workflow 动作进入 done / rejected，整批不存在时才幂等跳过，部分缺失则失败；不会物理删除，也不会写 Fact。WORKBENCH2 的不可变 lineage 与当前 V6 run 分开记录，后续同语义重放复用稳定业务编码；只有任务结构或状态合同实质变化时才升级 copy revision。隔离 Full Acceptance 继续使用 `acceptance-snapshot`，临期 / 本周等相对时间场景也只由该隔离批次负责。收付款覆盖已批准、两笔已过账和已冲销，红冲覆盖一条有效红冲与一组原红冲 / 反向红冲。查询读回只证明数据前置；全部页面操作和人工验收仍需按当期清单执行。
 - `full-acceptance` 复用 `local-acceptance-lifecycle.mjs`，要求 clean exact commit 和 Bridge 进程环境已有 `LOCAL_ACCEPTANCE_DATABASE_BASE_URL`。它在同批专用数据库执行完整数据与浏览器验收，并在成功或失败后自动删库、读回残留。
 - 首页读取 `core-demo` 就会执行只读 schema / migration / 数据库对象预检；未到 migration head 或 db-guard 失败时按钮保持禁用，不允许以“只是造数”为由跳过结构前置。
@@ -288,6 +288,13 @@ node scripts/qa/trial-simulated-data.mjs \
 ```bash
 bash scripts/seed-core-demo-data.sh
 ```
+
+这个无参数入口是独立的 `SIM-PLUSH-CORE` 全量主数据 seed，不是工作台
+`core-demo` 的执行命令。它只适用于尚未存在版本化 Scenario 生产工序的开发库；
+若四个生产路线工序语义已由其他正式工序持有，脚本会在任何写入前拒绝，并提示
+改用受控的 `--scenario-references`。日常长期库应从工作台的“本地长期基础数据”
+入口准备账号、当前 V6 单位与仓库，再由 `scenario-demo` 补齐材料、产品、工艺、
+BOM、Source、ProcessRuntime 与 Fact。
 
 如果只需要最小产品 / 单位前置数据，也可使用试用模拟 seed。该 seed 只写 `units` 和 `products` 两个 MasterData 表，编码固定带 `SIM-YOYOOSUN-TRIAL` 前缀，不写客户、供应商、联系人、销售订单、库存、出货或财务事实：
 

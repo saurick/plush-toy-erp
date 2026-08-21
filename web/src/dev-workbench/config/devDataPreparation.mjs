@@ -70,11 +70,11 @@ export const DEV_DATA_PREPARATION_PROFILE_COPY = Object.freeze({
   [DEV_DATA_PREPARATION_PROFILE_KEYS.coreDemo]: Object.freeze({
     title: '本地长期基础数据',
     shortTitle: 'Core Demo',
-    purpose: '准备本地长期开发库的基础账号与主数据',
+    purpose: '准备本地长期开发库的演示账号与当前 V6 单位、仓库',
     retention: '稳定 upsert，可持续保留',
     cleanup:
       '不承诺按批次删除；退出时按账号停用、单据取消或冲正等正常生命周期处理。',
-    scope: '基础账号、单位、材料、产品、仓库、工艺与 BOM。',
+    scope: '十个演示账号、11 个当前 V6 单位与 4 个当前 V6 仓库。',
     targetKey: 'coreDemo',
     targetTitle: '本地开发目标',
     badgeLabel: '长期保留',
@@ -87,7 +87,7 @@ export const DEV_DATA_PREPARATION_PROFILE_COPY = Object.freeze({
     cleanupBoundary: '不支持批次删除，按正常生命周期退出',
     steps: Object.freeze([
       '确认共享开发库身份与基础前置',
-      '稳定 upsert 基础账号、主数据、工艺与 BOM',
+      '稳定 upsert 演示账号、当前 V6 单位与仓库',
       '读回固定数据计数并保留长期使用',
     ]),
   }),
