@@ -427,7 +427,16 @@ func (uc *ProcessRuntimeUsecase) CompleteLinkedWorkflowTask(ctx context.Context,
 		Outcome:           outcome,
 	}, actorID)
 	if err != nil {
-		return nil, err
+		return uc.reconcileConcurrentLinkedWorkflowTaskCompletion(
+			ctx,
+			node,
+			taskStatusKey,
+			outcome,
+			reason,
+			actorID,
+			commandPayload,
+			err,
+		)
 	}
 	if taskStatusKey == "rejected" {
 		if err := uc.settleRejectedProcessAfterNodeCompletion(ctx, completedNode, reason, actorID, commandPayload); err != nil {
@@ -439,6 +448,54 @@ func (uc *ProcessRuntimeUsecase) CompleteLinkedWorkflowTask(ctx context.Context,
 		}
 	}
 	return completedNode, nil
+}
+
+func (uc *ProcessRuntimeUsecase) reconcileConcurrentLinkedWorkflowTaskCompletion(
+	ctx context.Context,
+	activeNode *ProcessNodeInstance,
+	taskStatusKey string,
+	outcome string,
+	reason string,
+	actorID int,
+	commandPayload map[string]any,
+	completionErr error,
+) (*ProcessNodeInstance, error) {
+	if uc == nil || uc.repo == nil || activeNode == nil || completionErr == nil {
+		return nil, ErrBadParam
+	}
+	if !errors.Is(completionErr, ErrProcessNodeInstanceConflict) &&
+		!errors.Is(completionErr, ErrProcessNodeInstanceSettled) &&
+		!errors.Is(completionErr, ErrProcessNodeInstanceNotActive) {
+		return nil, completionErr
+	}
+	current, err := uc.repo.GetProcessNodeInstance(ctx, activeNode.ID)
+	if err != nil {
+		return nil, err
+	}
+	// A terminal Workflow task can be observed concurrently by the request
+	// path and the background reconciler. Treat the losing CAS as an exact
+	// replay only when the authoritative node proves the single expected
+	// active -> completed transition with the same outcome. Any other version,
+	// status, process identity, or outcome remains a real conflict.
+	if current.ID != activeNode.ID ||
+		current.ProcessInstanceID != activeNode.ProcessInstanceID ||
+		current.NodeType != activeNode.NodeType ||
+		current.Version != activeNode.Version+1 ||
+		current.Status != ProcessNodeStatusCompleted ||
+		!processNodeOutcomeMatches(current, outcome) {
+		return nil, completionErr
+	}
+	if err := uc.reconcileLinkedWorkflowTaskCompletion(
+		ctx,
+		current,
+		taskStatusKey,
+		reason,
+		actorID,
+		commandPayload,
+	); err != nil {
+		return nil, err
+	}
+	return current, nil
 }
 
 // ValidateLinkedWorkflowTaskCompletionIntent performs the linked ProcessRuntime

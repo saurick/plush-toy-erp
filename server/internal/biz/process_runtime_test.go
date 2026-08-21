@@ -91,6 +91,12 @@ type concurrentClaimSettlementProcessRuntimeRepo struct {
 	conflictOnce bool
 }
 
+type concurrentWorkflowNodeCompletionProcessRuntimeRepo struct {
+	*memProcessRuntimeRepo
+	targetNodeID int
+	conflictOnce bool
+}
+
 func (r *concurrentActivationProcessRuntimeRepo) ActivateProcessNodeInstance(
 	ctx context.Context,
 	in *ProcessNodeInstanceActivate,
@@ -119,6 +125,21 @@ func (r *concurrentClaimSettlementProcessRuntimeRepo) ClaimProcessNodeDomainComm
 		return nil, ErrProcessNodeInstanceConflict
 	}
 	return claimed, nil
+}
+
+func (r *concurrentWorkflowNodeCompletionProcessRuntimeRepo) CompleteProcessNodeInstance(
+	ctx context.Context,
+	in *ProcessNodeInstanceComplete,
+	actorID int,
+) (*ProcessNodeInstance, error) {
+	if r.conflictOnce && in != nil && in.ID == r.targetNodeID {
+		r.conflictOnce = false
+		if _, err := r.memProcessRuntimeRepo.CompleteProcessNodeInstance(ctx, in, actorID); err != nil {
+			return nil, err
+		}
+		return nil, ErrProcessNodeInstanceConflict
+	}
+	return r.memProcessRuntimeRepo.CompleteProcessNodeInstance(ctx, in, actorID)
 }
 
 func (s *processSettlementWorkflowRepo) ListPendingLinkedWorkflowTaskSettlements(_ context.Context, afterWorkflowTaskID int, limit int) ([]*WorkflowTask, error) {
@@ -2069,6 +2090,120 @@ func TestProcessRuntimeUsecaseCompleteLinkedWorkflowTaskCompletesNode(t *testing
 	}
 	if processRepo.completedNode == nil || processRepo.completedNode.ExpectedVersion != 3 {
 		t.Fatalf("expected optimistic version passed to repo, got %#v", processRepo.completedNode)
+	}
+}
+
+func TestProcessRuntimeUsecaseCompleteLinkedWorkflowTaskReconcilesConcurrentNodeCompletion(t *testing.T) {
+	const (
+		processID = 10
+		nodeID    = 20
+		nextID    = 21
+	)
+	ownerPoolKey := "order_review"
+	requiredCapabilityKey := PermissionWorkflowTaskComplete
+	baseRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{
+			ID: processID, Status: ProcessStatusActive, ConfigRevision: "yoyoosun-rev-1",
+			BusinessRefType: "sales_order", BusinessRefID: 1001,
+		},
+		nodes: []*ProcessNodeInstance{
+			{
+				ID: nodeID, ProcessInstanceID: processID, NodeKey: "order_approval",
+				NodeType: ProcessNodeTypeApproval, Attempt: 1, Status: ProcessNodeStatusActive, Version: 3,
+			},
+			{
+				ID: nextID, ProcessInstanceID: processID, NodeKey: "order_review",
+				NodeType: ProcessNodeTypeHumanTask, Attempt: 1, Status: ProcessNodeStatusWaiting, Version: 1,
+				OwnerPoolKey: &ownerPoolKey, RequiredCapabilityKey: &requiredCapabilityKey,
+			},
+		},
+	}
+	processRepo := &concurrentWorkflowNodeCompletionProcessRuntimeRepo{
+		memProcessRuntimeRepo: baseRepo,
+		targetNodeID:          nodeID,
+		conflictOnce:          true,
+	}
+	workflowRepo := &retryWorkflowRepo{stubWorkflowRepo: stubWorkflowRepo{
+		currentTask: &WorkflowTask{
+			ID: 99, TaskStatusKey: "done", ProcessInstanceID: processTestIntPtr(processID),
+			ProcessNodeInstanceID: processTestIntPtr(nodeID), Payload: map[string]any{"outcome": "approved"},
+		},
+	}}
+	uc := NewProcessRuntimeUsecase(processRepo, workflowRepo, &stubProcessOwnerRoleResolver{
+		explanation: &WorkflowTaskCandidateExplanation{
+			ConfigRevision: "yoyoosun-rev-1", OwnerPoolKey: ownerPoolKey,
+			RequiredCapabilities: []string{requiredCapabilityKey}, CandidateOwnerRoleKeys: []string{PMCRoleKey},
+			Source: "customer_config_revision",
+		},
+	})
+
+	completed, err := uc.CompleteLinkedWorkflowTask(context.Background(), &ProcessLinkedWorkflowTaskCompletion{
+		WorkflowTaskID: 99,
+	}, 7)
+	if err != nil {
+		t.Fatalf("matching concurrent node completion must reconcile: %v", err)
+	}
+	if processRepo.conflictOnce || completed == nil || completed.Status != ProcessNodeStatusCompleted ||
+		completed.Version != 4 || completed.Outcome == nil || *completed.Outcome != "approved" {
+		t.Fatalf("unexpected reconciled completion conflict=%v node=%#v", processRepo.conflictOnce, completed)
+	}
+	if baseRepo.nodes[0].RoutingCompletedAt == nil {
+		t.Fatal("concurrently completed workflow node must retain durable routing evidence")
+	}
+	if baseRepo.nodes[1].Status != ProcessNodeStatusActive || baseRepo.nodes[1].Version != 2 {
+		t.Fatalf("concurrent completion must activate the exact next node, got %#v", baseRepo.nodes[1])
+	}
+	if len(workflowRepo.createdByCode) != 1 || workflowRepo.createdByCode["PROC-10-NODE-21-A1"] == nil {
+		t.Fatalf("concurrent completion must create one downstream task, got %#v", workflowRepo.createdByCode)
+	}
+}
+
+func TestProcessRuntimeUsecaseCompleteLinkedWorkflowTaskRejectsNonMatchingConcurrentCompletion(t *testing.T) {
+	const (
+		processID = 10
+		nodeID    = 20
+	)
+	active := &ProcessNodeInstance{
+		ID: nodeID, ProcessInstanceID: processID, NodeKey: "order_approval",
+		NodeType: ProcessNodeTypeApproval, Status: ProcessNodeStatusActive, Version: 3,
+	}
+	tests := []struct {
+		name   string
+		mutate func(*ProcessNodeInstance)
+	}{
+		{name: "different process", mutate: func(node *ProcessNodeInstance) { node.ProcessInstanceID++ }},
+		{name: "different node type", mutate: func(node *ProcessNodeInstance) { node.NodeType = ProcessNodeTypeDomainCommand }},
+		{name: "version advanced twice", mutate: func(node *ProcessNodeInstance) { node.Version++ }},
+		{name: "still active", mutate: func(node *ProcessNodeInstance) { node.Status = ProcessNodeStatusActive }},
+		{name: "different outcome", mutate: func(node *ProcessNodeInstance) { node.Outcome = processTestStringPtr("rejected") }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			current := *active
+			current.Status = ProcessNodeStatusCompleted
+			current.Version = active.Version + 1
+			current.Outcome = processTestStringPtr("approved")
+			test.mutate(&current)
+			processRepo := &memProcessRuntimeRepo{node: &current}
+			uc := NewProcessRuntimeUsecase(processRepo, &stubWorkflowRepo{})
+
+			_, err := uc.reconcileConcurrentLinkedWorkflowTaskCompletion(
+				context.Background(),
+				active,
+				"done",
+				"approved",
+				"",
+				7,
+				nil,
+				ErrProcessNodeInstanceConflict,
+			)
+			if !errors.Is(err, ErrProcessNodeInstanceConflict) {
+				t.Fatalf("mismatched concurrent completion must preserve the original conflict, got %v", err)
+			}
+			if processRepo.activatedNode != nil || processRepo.completedProcess != nil {
+				t.Fatalf("mismatched completion must not route, repo=%#v", processRepo)
+			}
+		})
 	}
 }
 

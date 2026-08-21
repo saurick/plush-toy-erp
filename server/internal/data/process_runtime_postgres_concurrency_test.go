@@ -29,6 +29,13 @@ type postgresProcessClaimBarrierRepo struct {
 	release      chan struct{}
 }
 
+type postgresProcessNodeCompletionBarrierRepo struct {
+	*processRuntimeRepo
+	targetNodeID int
+	entered      chan struct{}
+	release      chan struct{}
+}
+
 func (r *postgresProcessClaimBarrierRepo) ClaimProcessNodeDomainCommand(
 	ctx context.Context,
 	in *biz.ProcessNodeDomainCommandClaim,
@@ -46,6 +53,26 @@ func (r *postgresProcessClaimBarrierRepo) ClaimProcessNodeDomainCommand(
 		}
 	}
 	return r.processRuntimeRepo.ClaimProcessNodeDomainCommand(ctx, in)
+}
+
+func (r *postgresProcessNodeCompletionBarrierRepo) CompleteProcessNodeInstance(
+	ctx context.Context,
+	in *biz.ProcessNodeInstanceComplete,
+	actorID int,
+) (*biz.ProcessNodeInstance, error) {
+	if in != nil && in.ID == r.targetNodeID {
+		select {
+		case r.entered <- struct{}{}:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		select {
+		case <-r.release:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	return r.processRuntimeRepo.CompleteProcessNodeInstance(ctx, in, actorID)
 }
 
 type postgresFixedProcessOwnerResolver struct {
@@ -402,6 +429,117 @@ func TestProcessRuntimePostgresConcurrentSalesActivationReusesWinnerAndRoutesRev
 	tasks := client.WorkflowTask.Query().Where(workflowtask.ProcessNodeInstanceID(nodes[1].ID)).AllX(ctx)
 	if len(tasks) != 1 || tasks[0].TaskStatusKey != "ready" || tasks[0].OwnerRoleKey != biz.PMCRoleKey {
 		t.Fatalf("order review must have one ready PMC task, got %#v", tasks)
+	}
+}
+
+func TestProcessRuntimePostgresConcurrentTerminalWorkflowTaskReconcilesOneCompletionAndRoute(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	data, client := openPurchaseReceiptPostgresTestData(t)
+	logger := log.NewStdLogger(io.Discard)
+	baseRepo := NewProcessRuntimeRepo(data, logger)
+	workflowRepo := NewWorkflowRepo(data, logger)
+	suffix := postgresTestSuffix()
+	ownerPool := "order_review"
+	requiredCapability := biz.PermissionWorkflowTaskComplete
+	revision := "workflow-completion-concurrency-" + suffix
+	instance, nodes, err := baseRepo.CreateProcessInstance(ctx, &biz.ProcessInstanceCreate{
+		ProcessKey:      "workflow_completion_concurrency_" + suffix,
+		ProcessVersion:  "v1",
+		ConfigRevision:  revision,
+		DefinitionHash:  "sha256:workflow-completion-concurrency-" + suffix,
+		BusinessRefType: "sales_order",
+		BusinessRefID:   workflowPostgresSourceID(),
+		IdempotencyKey:  "workflow-completion-concurrency/" + suffix,
+		Status:          biz.ProcessStatusActive,
+		Nodes: []biz.ProcessNodeInstanceCreate{
+			{
+				NodeKey: "order_approval", NodeType: biz.ProcessNodeTypeApproval,
+				Attempt: 1, Status: biz.ProcessNodeStatusWaiting,
+			},
+			{
+				NodeKey: "order_review", NodeType: biz.ProcessNodeTypeHumanTask,
+				Attempt: 1, Status: biz.ProcessNodeStatusWaiting,
+				OwnerPoolKey: &ownerPool, RequiredCapabilityKey: &requiredCapability,
+			},
+		},
+	}, 7)
+	if err != nil {
+		t.Fatalf("create concurrent workflow completion process: %v", err)
+	}
+	approvalNode := activateProcessNodeForTest(t, ctx, baseRepo, instance, nodes[0])
+	now := time.Now().UTC()
+	task := client.WorkflowTask.Create().
+		SetTaskCode("WF-CONCURRENT-COMPLETE-" + suffix).
+		SetTaskGroup("process_runtime").
+		SetTaskName("并发流程完成测试").
+		SetSourceType("sales_order").
+		SetSourceID(instance.BusinessRefID).
+		SetTaskStatusKey("done").
+		SetOwnerRoleKey(biz.BossRoleKey).
+		SetProcessInstanceID(instance.ID).
+		SetProcessNodeInstanceID(approvalNode.ID).
+		SetCompletedAt(now).
+		SetCreatedBy(7).
+		SetUpdatedBy(7).
+		SaveX(ctx)
+	barrierRepo := &postgresProcessNodeCompletionBarrierRepo{
+		processRuntimeRepo: baseRepo,
+		targetNodeID:       approvalNode.ID,
+		entered:            make(chan struct{}, 2),
+		release:            make(chan struct{}),
+	}
+	runtimeUC := biz.NewProcessRuntimeUsecase(barrierRepo, workflowRepo, &postgresFixedProcessOwnerResolver{
+		revision: revision, poolKey: ownerPool, roleKey: biz.PMCRoleKey,
+	})
+
+	results := make(chan *biz.ProcessNodeInstance, 2)
+	errs := make(chan error, 2)
+	var wg sync.WaitGroup
+	for range 2 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			result, completeErr := runtimeUC.CompleteLinkedWorkflowTask(ctx, &biz.ProcessLinkedWorkflowTaskCompletion{
+				WorkflowTaskID: task.ID,
+			}, 7)
+			results <- result
+			errs <- completeErr
+		}()
+	}
+	for range 2 {
+		select {
+		case <-barrierRepo.entered:
+		case <-ctx.Done():
+			t.Fatalf("both terminal task settlements did not reach node completion: %v", ctx.Err())
+		}
+	}
+	close(barrierRepo.release)
+	wg.Wait()
+	close(results)
+	close(errs)
+	for completeErr := range errs {
+		if completeErr != nil {
+			t.Fatalf("concurrent terminal task settlement must reconcile: %v", completeErr)
+		}
+	}
+	for result := range results {
+		if result == nil || result.Status != biz.ProcessNodeStatusCompleted || result.Version != approvalNode.Version+1 {
+			t.Fatalf("unexpected reconciled workflow node %#v", result)
+		}
+	}
+	storedApproval := client.ProcessNodeInstance.GetX(ctx, approvalNode.ID)
+	if storedApproval.Status != biz.ProcessNodeStatusCompleted || storedApproval.RoutingCompletedAt == nil ||
+		storedApproval.Version != approvalNode.Version+1 {
+		t.Fatalf("terminal workflow task must complete and route once, got %#v", storedApproval)
+	}
+	storedReview := client.ProcessNodeInstance.GetX(ctx, nodes[1].ID)
+	if storedReview.Status != biz.ProcessNodeStatusActive || storedReview.Version != nodes[1].Version+1 {
+		t.Fatalf("concurrent completion must activate the review node once, got %#v", storedReview)
+	}
+	tasks := client.WorkflowTask.Query().Where(workflowtask.ProcessNodeInstanceID(nodes[1].ID)).AllX(ctx)
+	if len(tasks) != 1 || tasks[0].TaskStatusKey != "ready" || tasks[0].OwnerRoleKey != biz.PMCRoleKey {
+		t.Fatalf("concurrent completion must create one downstream PMC task, got %#v", tasks)
 	}
 }
 
