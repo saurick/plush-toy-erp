@@ -1433,6 +1433,71 @@ test('scenario-demo allows only a newer explicit same-target replay after an unk
   )
 })
 
+test('a later authoritative scenario readback releases the resolved unknown outcome for core demo', () => {
+  const targetSummary = {
+    targetKey: 'local-development',
+    safeTarget: 'host=192.168.0.106 port=5432 database=plush_erp',
+    targetFingerprint: 'c'.repeat(64),
+    preflightFingerprint: 'd'.repeat(64),
+    disposable: false,
+    automaticCleanup: false,
+  }
+  const coreCandidate = {
+    id: '323e4567-e89b-42d3-a456-426614174000',
+    profileKey: 'core-demo',
+    status: 'ready',
+    createdAt: '2026-07-29T02:07:04.000Z',
+    targetSummary,
+  }
+  const unknown = {
+    id: '123e4567-e89b-42d3-a456-426614174000',
+    profileKey: 'scenario-demo',
+    status: 'not_proven',
+    createdAt: '2026-07-29T02:03:04.000Z',
+    updatedAt: '2026-07-29T02:05:04.000Z',
+    targetSummary,
+  }
+  const authoritativeReadback = {
+    id: '223e4567-e89b-42d3-a456-426614174000',
+    profileKey: 'scenario-demo',
+    status: 'passed',
+    createdAt: '2026-07-29T02:05:30.000Z',
+    updatedAt: '2026-07-29T02:06:04.000Z',
+    targetSummary,
+    readback: {
+      dataVersion: '2026.08.15-v6',
+      runId: '20260815-V6',
+    },
+  }
+
+  assert.equal(
+    unresolvedDataPreparationOutcomeBlocksExecution(coreCandidate, [
+      unknown,
+      authoritativeReadback,
+    ]),
+    false
+  )
+  for (const drift of [
+    { readback: { ...authoritativeReadback.readback, dataVersion: 'older' } },
+    { readback: { ...authoritativeReadback.readback, runId: 'older' } },
+    {
+      targetSummary: {
+        ...targetSummary,
+        targetFingerprint: 'e'.repeat(64),
+      },
+    },
+    { updatedAt: '2026-07-29T02:04:04.000Z' },
+  ]) {
+    assert.equal(
+      unresolvedDataPreparationOutcomeBlocksExecution(coreCandidate, [
+        unknown,
+        { ...authoritativeReadback, ...drift },
+      ]),
+      true
+    )
+  }
+})
+
 test('failed command receipts redact credentials and full DSNs', async (t) => {
   const fixture = createFixture(t)
   let preflightCount = 0

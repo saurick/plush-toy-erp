@@ -1053,6 +1053,9 @@ export function unresolvedDataPreparationOutcomeBlocksExecution(
     if (['launching', 'running'].includes(candidate.status)) {
       return true
     }
+    if (laterScenarioReadbackResolves(candidate, operations)) {
+      return false
+    }
     const operationTargetKey =
       operation.targetSummary.targetKey || LOCAL_DEVELOPMENT_TARGET
     const candidateTargetKey =
