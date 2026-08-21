@@ -129,6 +129,22 @@ func (uc *ProcessRuntimeUsecase) ExecuteDomainCommandNode(ctx context.Context, i
 	}
 	result, err := handler.ExecuteProcessDomainCommand(ctx, commandInput, actorID)
 	if err != nil {
+		// The durable command protocol permits the same immutable intent to be
+		// executed concurrently. A competing executor can commit the source
+		// mutation and the matching result while this executor is blocked inside
+		// its handler. In that case the handler may observe the already-mutated
+		// source and return a stale-state error even though the authoritative
+		// result is now durable. Re-read the result before surfacing the handler
+		// error so both callers converge on the same receipt. A missing result
+		// still fails closed with the original error; source state alone never
+		// proves that this command caused the mutation.
+		storedNode, found, resultErr := uc.getStoredProcessDomainCommandResult(ctx, node, domainCommandFingerprint)
+		if resultErr != nil {
+			return nil, resultErr
+		}
+		if found {
+			return uc.settleActiveProcessDomainCommandResult(ctx, storedNode, domainCommandFingerprint, actorID)
+		}
 		return nil, err
 	}
 	if resultRepo, ok := uc.repo.(ProcessRuntimeDomainCommandResultRepo); ok {

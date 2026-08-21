@@ -10,14 +10,70 @@ import (
 	"time"
 
 	"server/internal/biz"
+	"server/internal/data/model/ent/workflowtask"
 
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/shopspring/decimal"
 )
 
 type postgresBarrierDomainCommandHandler struct {
 	entered chan struct{}
 	release chan struct{}
 	calls   atomic.Int32
+}
+
+type postgresProcessClaimBarrierRepo struct {
+	*processRuntimeRepo
+	targetNodeID int
+	entered      chan struct{}
+	release      chan struct{}
+}
+
+func (r *postgresProcessClaimBarrierRepo) ClaimProcessNodeDomainCommand(
+	ctx context.Context,
+	in *biz.ProcessNodeDomainCommandClaim,
+) (*biz.ProcessNodeInstance, error) {
+	if in != nil && in.ProcessNodeInstanceID == r.targetNodeID {
+		select {
+		case r.entered <- struct{}{}:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		select {
+		case <-r.release:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	return r.processRuntimeRepo.ClaimProcessNodeDomainCommand(ctx, in)
+}
+
+type postgresFixedProcessOwnerResolver struct {
+	revision string
+	poolKey  string
+	roleKey  string
+}
+
+func (r *postgresFixedProcessOwnerResolver) WorkflowCandidateOwnerRoleKeysAtRevision(
+	_ context.Context,
+	_, revision, ownerPoolKey string,
+	requiredCapabilities ...string,
+) (*biz.WorkflowTaskCandidateExplanation, error) {
+	if revision != r.revision || ownerPoolKey != r.poolKey {
+		return &biz.WorkflowTaskCandidateExplanation{
+			ConfigRevision:       revision,
+			OwnerPoolKey:         ownerPoolKey,
+			RequiredCapabilities: requiredCapabilities,
+			Source:               "postgres_test_owner_resolver",
+		}, nil
+	}
+	return &biz.WorkflowTaskCandidateExplanation{
+		ConfigRevision:         revision,
+		OwnerPoolKey:           ownerPoolKey,
+		RequiredCapabilities:   requiredCapabilities,
+		CandidateOwnerRoleKeys: []string{r.roleKey},
+		Source:                 "postgres_test_owner_resolver",
+	}, nil
 }
 
 func (h *postgresBarrierDomainCommandHandler) ValidateProcessDomainCommand(context.Context, *biz.ProcessDomainCommandInput, int) error {
@@ -221,6 +277,131 @@ func TestProcessRuntimePostgresConcurrentSameIntentExecutionReconcilesOneTermina
 		persisted.DomainCommandResultState == nil || *persisted.DomainCommandResultState != biz.ProcessDomainCommandResultStateSucceeded ||
 		persisted.DomainCommandResultHash == nil || persisted.DomainCommandResultRecordedAt == nil {
 		t.Fatalf("same-intent concurrency must converge on one durable result, got %#v", persisted)
+	}
+}
+
+func TestProcessRuntimePostgresConcurrentSalesActivationReusesWinnerAndRoutesReview(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	data, client := openPurchaseReceiptPostgresTestData(t)
+	logger := log.NewStdLogger(io.Discard)
+	baseRepo := NewProcessRuntimeRepo(data, logger)
+	workflowRepo := NewWorkflowRepo(data, logger)
+	salesRepo := NewSalesOrderRepo(data, logger)
+	suffix := postgresTestSuffix()
+	unit := createTestUnit(t, ctx, client, "SALES-CONCURRENT-U-"+suffix)
+	product := createTestProduct(t, ctx, client, unit.ID, "SALES-CONCURRENT-P-"+suffix)
+	customer := createSalesOrderTestCustomer(t, ctx, client, "SALES-CONCURRENT-C-"+suffix, true)
+	order := client.SalesOrder.Create().
+		SetOrderNo("SO-CONCURRENT-ACTIVATE-" + suffix).
+		SetCustomerID(customer.ID).
+		SetOrderDate(time.Now().UTC()).
+		SetLifecycleStatus(biz.SalesOrderStatusSubmitted).
+		SaveX(ctx)
+	client.SalesOrderItem.Create().
+		SetSalesOrderID(order.ID).
+		SetLineNo(1).
+		SetProductID(product.ID).
+		SetUnitID(unit.ID).
+		SetOrderedQuantity(decimal.RequireFromString("1.25")).
+		SaveX(ctx)
+	revision := "sales-concurrent-activation-" + suffix
+	ownerPool := "order_review"
+	requiredCapability := biz.PermissionWorkflowTaskComplete
+	instance, nodes, err := baseRepo.CreateProcessInstance(ctx, &biz.ProcessInstanceCreate{
+		ProcessKey:      biz.ProcessKeySalesOrderAcceptance,
+		ProcessVersion:  "v1",
+		ConfigRevision:  revision,
+		DefinitionHash:  "sha256:sales-concurrent-activation-" + suffix,
+		BusinessRefType: "sales_order",
+		BusinessRefID:   order.ID,
+		IdempotencyKey:  "sales-concurrent-activation/" + suffix,
+		Status:          biz.ProcessStatusActive,
+		Nodes: []biz.ProcessNodeInstanceCreate{
+			{
+				NodeKey: "activate_sales_order", NodeType: biz.ProcessNodeTypeDomainCommand,
+				Attempt: 1, Status: biz.ProcessNodeStatusWaiting,
+				PolicySnapshot: map[string]any{"command_key": biz.ProcessDomainCommandSalesOrderActivate},
+			},
+			{
+				NodeKey: "order_review", NodeType: biz.ProcessNodeTypeHumanTask,
+				Attempt: 1, Status: biz.ProcessNodeStatusWaiting,
+				OwnerPoolKey: &ownerPool, RequiredCapabilityKey: &requiredCapability,
+			},
+		},
+	}, 7)
+	if err != nil {
+		t.Fatalf("create sales activation process: %v", err)
+	}
+	activationNode := activateProcessNodeForTest(t, ctx, baseRepo, instance, nodes[0])
+	barrierRepo := &postgresProcessClaimBarrierRepo{
+		processRuntimeRepo: baseRepo,
+		targetNodeID:       activationNode.ID,
+		entered:            make(chan struct{}, 2),
+		release:            make(chan struct{}),
+	}
+	runtimeUC := biz.NewProcessRuntimeUsecase(barrierRepo, workflowRepo, &postgresFixedProcessOwnerResolver{
+		revision: revision, poolKey: ownerPool, roleKey: biz.PMCRoleKey,
+	})
+	if err := biz.RegisterSalesOrderProcessDomainCommandHandlers(runtimeUC, biz.NewSalesOrderUsecase(salesRepo)); err != nil {
+		t.Fatalf("register sales process commands: %v", err)
+	}
+
+	results := make(chan *biz.ProcessNodeInstance, 2)
+	errs := make(chan error, 2)
+	var wg sync.WaitGroup
+	for range 2 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			result, executeErr := runtimeUC.ExecuteDomainCommandNode(ctx, &biz.ProcessDomainCommandExecution{
+				ProcessInstanceID: instance.ID, ProcessNodeInstanceID: activationNode.ID,
+				ExpectedVersion: activationNode.Version, CommandKey: biz.ProcessDomainCommandSalesOrderActivate,
+				IdempotencyKey: "sales-concurrent-activation/execute/" + suffix,
+				Payload:        map[string]any{"sales_order_id": order.ID},
+			}, 7)
+			results <- result
+			errs <- executeErr
+		}()
+	}
+	for range 2 {
+		select {
+		case <-barrierRepo.entered:
+		case <-ctx.Done():
+			t.Fatalf("both sales activation attempts did not reach claim: %v", ctx.Err())
+		}
+	}
+	close(barrierRepo.release)
+	wg.Wait()
+	close(results)
+	close(errs)
+	for executeErr := range errs {
+		if executeErr != nil {
+			t.Fatalf("same-intent sales activation must reuse the durable winner: %v", executeErr)
+		}
+	}
+	for result := range results {
+		if result == nil || result.Status != biz.ProcessNodeStatusCompleted || result.Outcome == nil ||
+			*result.Outcome != biz.SalesOrderProcessCommandOutcomeActivated {
+			t.Fatalf("unexpected reconciled sales activation %#v", result)
+		}
+	}
+	storedOrder := client.SalesOrder.GetX(ctx, order.ID)
+	if storedOrder.LifecycleStatus != biz.SalesOrderStatusActive || storedOrder.Version != order.Version+1 {
+		t.Fatalf("sales activation must mutate the source exactly once, got status=%s version=%d", storedOrder.LifecycleStatus, storedOrder.Version)
+	}
+	storedActivation := client.ProcessNodeInstance.GetX(ctx, activationNode.ID)
+	if storedActivation.Status != biz.ProcessNodeStatusCompleted || storedActivation.RoutingCompletedAt == nil ||
+		storedActivation.DomainCommandResultHash == nil {
+		t.Fatalf("activation receipt must be terminal and routed, got %#v", storedActivation)
+	}
+	storedReview := client.ProcessNodeInstance.GetX(ctx, nodes[1].ID)
+	if storedReview.Status != biz.ProcessNodeStatusActive {
+		t.Fatalf("order review node must be active, got %#v", storedReview)
+	}
+	tasks := client.WorkflowTask.Query().Where(workflowtask.ProcessNodeInstanceID(nodes[1].ID)).AllX(ctx)
+	if len(tasks) != 1 || tasks[0].TaskStatusKey != "ready" || tasks[0].OwnerRoleKey != biz.PMCRoleKey {
+		t.Fatalf("order review must have one ready PMC task, got %#v", tasks)
 	}
 }
 

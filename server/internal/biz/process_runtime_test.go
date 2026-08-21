@@ -48,6 +48,7 @@ type stubProcessDomainCommandHandler struct {
 	result        *ProcessDomainCommandResult
 	err           error
 	validateErr   error
+	executeHook   func(*ProcessDomainCommandInput, int) error
 	validateCalls int
 	calls         int
 }
@@ -193,6 +194,11 @@ func (h *stubProcessDomainCommandHandler) ValidateProcessDomainCommand(ctx conte
 func (h *stubProcessDomainCommandHandler) ExecuteProcessDomainCommand(ctx context.Context, in *ProcessDomainCommandInput, actorID int) (*ProcessDomainCommandResult, error) {
 	h.calls++
 	h.input = in
+	if h.executeHook != nil {
+		if err := h.executeHook(in, actorID); err != nil {
+			return nil, err
+		}
+	}
 	if h.err != nil {
 		return nil, h.err
 	}
@@ -3905,6 +3911,75 @@ func TestProcessRuntimeUsecaseExecuteDomainCommandNodeReconcilesClaimConflictAft
 	}
 	if settled.RoutingCompletedAt == nil {
 		t.Fatal("concurrently settled domain node routing must be durably reconciled")
+	}
+}
+
+func TestProcessRuntimeUsecaseExecuteDomainCommandNodeReconcilesResultCommittedWhileHandlerFails(t *testing.T) {
+	const (
+		processID = 10
+		nodeID    = 20
+		nextID    = 21
+		command   = "engineering_package.publish"
+	)
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{
+			ID: processID, Status: ProcessStatusActive, BusinessRefType: "sales_order",
+			BusinessRefID: 1001, ConfigRevision: "yoyoosun-rev-1",
+		},
+		nodes: []*ProcessNodeInstance{
+			{
+				ID: nodeID, ProcessInstanceID: processID, NodeKey: "publish_engineering_package",
+				NodeType: ProcessNodeTypeDomainCommand, Status: ProcessNodeStatusActive, Version: 3,
+				PolicySnapshot: map[string]any{"command_key": command},
+			},
+			{
+				ID: nextID, ProcessInstanceID: processID, NodeKey: "engineering_release_approval",
+				NodeType: ProcessNodeTypeApproval, Attempt: 1, Status: ProcessNodeStatusWaiting, Version: 1,
+				OwnerPoolKey: ptrString("boss_approval"), RequiredCapabilityKey: ptrString(PermissionWorkflowTaskApprove),
+			},
+		},
+	}
+	workflowRepo := &retryWorkflowRepo{}
+	uc := NewProcessRuntimeUsecase(processRepo, workflowRepo, &stubProcessOwnerRoleResolver{
+		explanation: &WorkflowTaskCandidateExplanation{
+			ConfigRevision: "yoyoosun-rev-1", OwnerPoolKey: "boss_approval",
+			RequiredCapabilities: []string{PermissionWorkflowTaskApprove}, CandidateOwnerRoleKeys: []string{BossRoleKey},
+			Source: "customer_config_revision",
+		},
+	})
+	result := &ProcessDomainCommandResult{Outcome: "published"}
+	staleSourceErr := errors.New("source state changed while the handler waited")
+	handler := &stubProcessDomainCommandHandler{
+		result: result,
+		err:    staleSourceErr,
+		executeHook: func(in *ProcessDomainCommandInput, actorID int) error {
+			record, err := BuildProcessNodeDomainCommandResultRecord(in, result)
+			if err != nil {
+				return err
+			}
+			_, err = processRepo.RecordProcessNodeDomainCommandResult(context.Background(), record, actorID)
+			return err
+		},
+	}
+	if err := uc.RegisterDomainCommandHandler(command, handler); err != nil {
+		t.Fatalf("register domain command handler: %v", err)
+	}
+
+	settled, err := uc.ExecuteDomainCommandNode(context.Background(), &ProcessDomainCommandExecution{
+		ProcessInstanceID: processID, ProcessNodeInstanceID: nodeID, ExpectedVersion: 3,
+		CommandKey: command, IdempotencyKey: "process:10:node:20:publish", Payload: map[string]any{"source": "same-intent"},
+	}, 7)
+	if err != nil {
+		t.Fatalf("matching result committed by the concurrent winner must reconcile: %v", err)
+	}
+	if settled == nil || settled.Status != ProcessNodeStatusCompleted || settled.Outcome == nil || *settled.Outcome != result.Outcome {
+		t.Fatalf("unexpected reconciled node %#v", settled)
+	}
+	if handler.calls != 1 || processRepo.resultRecordCalls != 1 {
+		t.Fatalf("losing handler must reuse one durable result, calls=%d result_records=%d", handler.calls, processRepo.resultRecordCalls)
+	}
+	if processRepo.nodes[1].Status != ProcessNodeStatusActive || workflowRepo.createdByCode["PROC-10-NODE-21-A1"] == nil {
+		t.Fatalf("reconciliation must continue routing exactly once, node=%#v tasks=%#v", processRepo.nodes[1], workflowRepo.createdByCode)
 	}
 }
 
