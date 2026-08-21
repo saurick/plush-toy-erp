@@ -300,6 +300,21 @@ async function installActionStabilityRpcRows(
   if (delaySalesSubmit) {
     await page.route('**/rpc/customer_config', async (route) => {
       const body = route.request().postDataJSON() || {}
+      if (body.method === 'get_sales_order_acceptance_process') {
+        const salesOrderID = Number(body.params?.sales_order_id)
+        const salesOrder = salesOrders.find(
+          (order) => Number(order.id) === salesOrderID
+        )
+        await fulfillRpc(route, body.id || 'action-stability-sales-get', {
+          process_context: null,
+          source_readback: {
+            type: 'sales_order',
+            id: salesOrderID,
+            no: salesOrder?.order_no,
+          },
+        })
+        return
+      }
       if (body.method === 'start_sales_order_acceptance_process') {
         await new Promise((resolve) => {
           setTimeout(resolve, 1_200)
