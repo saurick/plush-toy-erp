@@ -8,6 +8,7 @@ import {
   normalizePermissionUsage,
 } from '../../erp/utils/permissionCenterAccess.mjs'
 import { getPermissionModuleTitle } from '../../erp/utils/permissionModuleLabels.mjs'
+import { formatAdminIdentity } from '../../erp/utils/adminIdentity.mjs'
 
 export const PERMISSION_RELATIONSHIP_VIEW_MODE = Object.freeze({
   ROLE: 'role',
@@ -57,7 +58,7 @@ function accountKey(account = {}) {
 }
 
 function accountName(account = {}) {
-  return normalizeText(account?.username) || '未命名账号'
+  return formatAdminIdentity(account) || '未命名账号'
 }
 
 function accountStatus(account = {}) {
@@ -99,11 +100,11 @@ export function buildPermissionRelationshipTargetOptions({
       .filter((account) => accountKey(account))
       .map((account) => ({
         value: accountKey(account),
-        label: `${accountName(account)}（${
+        label: `${accountName(account)} · ${
           account?.is_super_admin === true
             ? '超级管理员'
             : accountStatus(account)
-        }）`,
+        }`,
         disabled: false,
       }))
       .sort((left, right) => left.label.localeCompare(right.label, 'zh-CN'))

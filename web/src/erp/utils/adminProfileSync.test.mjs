@@ -75,7 +75,7 @@ test('ERPLayout: 管理员 profile 后台同步调度合同', () => {
   )
   assert.match(
     source,
-    /const isCurrentSync = \(\) => profileSyncActiveRef\.current/u
+    /const isCurrentSync = \(\) =>\s*profileSyncActiveRef\.current &&\s*profileSyncGenerationRef\.current === syncGeneration/u
   )
   assert.match(
     source,
@@ -86,6 +86,23 @@ test('ERPLayout: 管理员 profile 后台同步调度合同', () => {
     source,
     /if \(!isCurrentSync\(\)\) \{\s*return\s*\}[\s\S]*?persistAuthMeta/u,
     'stale profile reads must stop before persisting auth metadata'
+  )
+})
+
+test('ERPLayout: 跨窗口登录态变化会先关闭旧投影并使在途同步失效', () => {
+  const source = readERPLayoutSource()
+
+  assert.match(
+    source,
+    /const ADMIN_AUTH_STORAGE_KEYS = new Set\(\[\s*'admin_access_token',\s*'admin_user_id'\s*,?\s*\]\)/u
+  )
+  assert.match(
+    source,
+    /setProfileSyncCompleted\(false\)[\s\S]*?profileSyncGenerationRef\.current \+= 1[\s\S]*?profileSyncInFlightRef\.current = null[\s\S]*?loadProfile\(\{ showLoading: true \}\)/u
+  )
+  assert.match(
+    source,
+    /window\.addEventListener\('storage', handleAdminAuthStorageChange\)[\s\S]*?window\.removeEventListener\('storage', handleAdminAuthStorageChange\)/u
   )
 })
 
@@ -165,16 +182,20 @@ test('ERPLayout: 客户构建在有效会话完成前不渲染产品核心页面
   )
   assert.match(
     source,
-    /if \(customerRuntimeBootstrapPending\) \{[\s\S]*?data-customer-runtime-bootstrap="true"/u
+    /const customerRuntimeGate = resolveCustomerRuntimeGate\([\s\S]*?bootstrapPending: customerRuntimeBootstrapPending[\s\S]*?pageRequiresCustomerRuntime:[\s\S]*?currentPageRequiresConfiguredCustomerRuntime/u
   )
   assert.match(
     source,
-    /if \(\s*customerRuntimeBootstrapPending \|\|\s*\(customerRuntimeUnavailable &&\s*currentPageRequiresConfiguredCustomerRuntime\) \|\|\s*!currentPageShouldRedirect\s*\) \{\s*return\s*\}/u,
+    /if \(\s*customerRuntimeGate !== CUSTOMER_RUNTIME_GATE\.READY \|\|\s*!currentPageShouldRedirect\s*\) \{\s*return\s*\}/u,
     'configured customer business pages must not redirect during bootstrap or replace the fail-closed runtime boundary'
   )
   assert.match(
     source,
-    /if \(\s*customerRuntimeUnavailable &&\s*currentPageRequiresConfiguredCustomerRuntime\s*\) \{[\s\S]*?<CustomerRuntimeUnavailable/u
+    /if \(customerRuntimeGate === CUSTOMER_RUNTIME_GATE\.BOOTSTRAP\) \{[\s\S]*?data-customer-runtime-bootstrap="true"/u
+  )
+  assert.match(
+    source,
+    /if \(customerRuntimeGate === CUSTOMER_RUNTIME_GATE\.UNAVAILABLE\) \{[\s\S]*?<CustomerRuntimeUnavailable/u
   )
   assert.match(
     source,
@@ -219,7 +240,7 @@ test('ERPLayout: 系统页只按本次 admin.me 的 RBAC 判断，不借客户�
   )
   assert.match(
     source,
-    /customerRuntimeUnavailable &&\s*currentPageRequiresConfiguredCustomerRuntime/u
+    /pageRequiresCustomerRuntime:\s*currentPageRequiresConfiguredCustomerRuntime/u
   )
 })
 

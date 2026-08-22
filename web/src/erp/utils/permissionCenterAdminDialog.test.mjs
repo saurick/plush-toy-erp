@@ -10,7 +10,12 @@ import {
 
 test('permission-center admin dialogs keep exactly one active account action', () => {
   const firstAdmin = { id: 1, username: 'first' }
-  const secondAdmin = { id: 2, username: 'second', phone: '13800138000' }
+  const secondAdmin = {
+    id: 2,
+    username: 'second',
+    display_name: '张三',
+    phone: '13800138000',
+  }
 
   const editRoles = permissionCenterAdminDialogReducer(
     createPermissionCenterAdminDialogState(),
@@ -20,17 +25,19 @@ test('permission-center admin dialogs keep exactly one active account action', (
       admin: firstAdmin,
     }
   )
-  const editPhone = permissionCenterAdminDialogReducer(editRoles, {
+  const editProfile = permissionCenterAdminDialogReducer(editRoles, {
     type: 'open',
-    kind: PERMISSION_CENTER_ADMIN_DIALOG.EDIT_PHONE,
+    kind: PERMISSION_CENTER_ADMIN_DIALOG.EDIT_PROFILE,
     admin: secondAdmin,
+    displayName: secondAdmin.display_name,
     phone: secondAdmin.phone,
   })
 
-  assert.equal(editPhone.kind, PERMISSION_CENTER_ADMIN_DIALOG.EDIT_PHONE)
-  assert.equal(editPhone.admin, secondAdmin)
-  assert.equal(editPhone.phone, '13800138000')
-  assert.equal(editPhone.statusDisabled, false)
+  assert.equal(editProfile.kind, PERMISSION_CENTER_ADMIN_DIALOG.EDIT_PROFILE)
+  assert.equal(editProfile.admin, secondAdmin)
+  assert.equal(editProfile.displayName, '张三')
+  assert.equal(editProfile.phone, '13800138000')
+  assert.equal(editProfile.statusDisabled, false)
 })
 
 test('permission-center admin dialog close clears the previous account context', () => {
@@ -51,7 +58,7 @@ test('permission-center admin dialog close clears the previous account context',
   assert.deepEqual(closed, createPermissionCenterAdminDialogState())
 })
 
-test('permission-center phone edits only update the phone dialog', () => {
+test('permission-center profile edits only update the profile dialog', () => {
   const initial = createPermissionCenterAdminDialogState()
   assert.equal(
     permissionCenterAdminDialogReducer(initial, {
@@ -61,15 +68,20 @@ test('permission-center phone edits only update the phone dialog', () => {
     initial
   )
 
-  const phoneDialog = permissionCenterAdminDialogReducer(initial, {
+  const profileDialog = permissionCenterAdminDialogReducer(initial, {
     type: 'open',
-    kind: PERMISSION_CENTER_ADMIN_DIALOG.EDIT_PHONE,
+    kind: PERMISSION_CENTER_ADMIN_DIALOG.EDIT_PROFILE,
     admin: { id: 4 },
   })
-  const edited = permissionCenterAdminDialogReducer(phoneDialog, {
+  const withName = permissionCenterAdminDialogReducer(profileDialog, {
+    type: 'set_display_name',
+    displayName: '李四',
+  })
+  const edited = permissionCenterAdminDialogReducer(withName, {
     type: 'set_phone',
     phone: '13900139000',
   })
+  assert.equal(edited.displayName, '李四')
   assert.equal(edited.phone, '13900139000')
 })
 

@@ -15,6 +15,10 @@ import {
   parseManualAcceptanceTargetAttestation,
   resolveManualAcceptanceTarget,
 } from "./manual-acceptance-target-policy.mjs";
+import {
+  manualAcceptanceAccountSetForTarget,
+  resolveManualAcceptanceRoleCredential,
+} from "./manual-acceptance-account-identities.mjs";
 
 export const CONFIRM_PHRASE = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_ATTACHMENTS";
 export const ATTACHMENT_NOTE = "样例附件，只用于查看和下载。";
@@ -85,7 +89,9 @@ export function assertAttachmentFixtureIntegrity({
       String(value?.sha256 || "").toLowerCase() !== expectedHash ||
       String(value?.note || "") !== ATTACHMENT_NOTE
     ) {
-      throw new Error(`${item.file_name} ${label} conflicts with the current fixture`);
+      throw new Error(
+        `${item.file_name} ${label} conflicts with the current fixture`,
+      );
     }
   }
   const encoded = String(downloadedAttachment?.content_base64 || "");
@@ -97,7 +103,9 @@ export function assertAttachmentFixtureIntegrity({
     downloaded.length !== expectedSize ||
     createHash("sha256").update(downloaded).digest("hex") !== expectedHash
   ) {
-    throw new Error(`${item.file_name} downloaded content conflicts with the current fixture`);
+    throw new Error(
+      `${item.file_name} downloaded content conflicts with the current fixture`,
+    );
   }
   return Object.freeze({ sha256: expectedHash, fileSize: expectedSize });
 }
@@ -188,15 +196,21 @@ function requiredReportText(value, name) {
 }
 
 export function resolveAttachmentCredentials({
-  attestation,
+  target,
   adminPassword,
   rolePassword,
   password,
   env = process.env,
 } = {}) {
-  const effectiveRolePassword = rolePassword || env.MANUAL_ACCEPTANCE_PASSWORD;
+  const accountSet = manualAcceptanceAccountSetForTarget(target);
+  const roleCredential = resolveManualAcceptanceRoleCredential({
+    target,
+    password: rolePassword,
+    env,
+  });
+  const effectiveRolePassword = roleCredential.value;
   if (typeof effectiveRolePassword !== "string" || !effectiveRolePassword) {
-    throw new Error("MANUAL_ACCEPTANCE_PASSWORD is required");
+    throw new Error(`${accountSet.passwordEnvironmentVariable} is required`);
   }
   const effectiveAdminPassword =
     adminPassword || password || env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD;
@@ -211,6 +225,7 @@ export function resolveAttachmentCredentials({
   return {
     adminPassword: effectiveAdminPassword,
     rolePassword: effectiveRolePassword,
+    rolePasswordSource: roleCredential.source,
   };
 }
 
@@ -500,11 +515,13 @@ export async function applyAttachmentData({
     targetAttestation,
   });
   const credentials = resolveAttachmentCredentials({
-    attestation,
+    target: policy.target,
     adminPassword,
     rolePassword,
     password,
   });
+  const accountSet = manualAcceptanceAccountSetForTarget(policy.target);
+  const pmcUsername = accountSet.roleUsernames.pmc;
   backendURL = policy.backendURL;
   await assertManualAcceptanceRuntimeIdentityPrecondition({
     policy,
@@ -547,11 +564,11 @@ export async function applyAttachmentData({
     backendURL,
     domain: "auth",
     method: "admin_login",
-    params: { username: "demo_pmc", password: credentials.rolePassword },
+    params: { username: pmcUsername, password: credentials.rolePassword },
   });
   const pmcToken = pmcLogin.access_token || pmcLogin.token;
   if (!pmcToken)
-    throw new Error("demo_pmc login response is missing access token");
+    throw new Error(`${pmcUsername} login response is missing access token`);
   const actorTokens = {
     sales_order: runtimeAdminToken,
     purchase_order: runtimeAdminToken,
@@ -623,7 +640,13 @@ export async function applyAttachmentData({
   const steps = [];
   for (const target of targets) {
     const actorToken = actorTokens[target.owner_type];
-    const listed = await rpc({ backendURL, domain: "attachment", method: "list_attachments", params: { owner_type: target.owner_type, owner_id: target.owner_id }, token: actorToken });
+    const listed = await rpc({
+      backendURL,
+      domain: "attachment",
+      method: "list_attachments",
+      params: { owner_type: target.owner_type, owner_id: target.owner_id },
+      token: actorToken,
+    });
     const existing = new Map();
     for (const listedItem of listed.attachments || []) {
       if (existing.has(listedItem.file_name)) {
@@ -666,7 +689,13 @@ export async function applyAttachmentData({
         attachment = uploaded.attachment;
         operation = "upload";
       }
-      const downloaded = await rpc({ backendURL, domain: "attachment", method: "download_attachment", params: { id: attachment.id }, token: actorToken });
+      const downloaded = await rpc({
+        backendURL,
+        domain: "attachment",
+        method: "download_attachment",
+        params: { id: attachment.id },
+        token: actorToken,
+      });
       const integrity = assertAttachmentFixtureIntegrity({
         fixture: item,
         attachment,
@@ -682,7 +711,7 @@ export async function applyAttachmentData({
         fileSize: integrity.fileSize,
         sha256: integrity.sha256,
         operation,
-        actor: target.owner_type === "workflow_task" ? "demo_pmc" : "admin",
+        actor: target.owner_type === "workflow_task" ? pmcUsername : "admin",
       });
     }
     const verified = await rpc({
@@ -704,7 +733,32 @@ export async function applyAttachmentData({
       );
     }
   }
-  return { scope: "manual-acceptance-attachment-data", customerKey: CUSTOMER_KEY, simulatedOnly: true, datasetKey: factReport.datasetKey, dataVersion: factReport.dataVersion, runId: factReport.runId, target: factReport.target, backendURL: policy.backendURL, databaseName: policy.databaseName, semanticDigest: factReport.semanticDigest, runtime, actorPolicy: { crossDomainSeed: "admin", workflowTask: "demo_pmc", rolePageAccessVerifiedElsewhere: true }, summary: { targets: targets.length, attachments: steps.length, uploaded: steps.filter((item) => item.operation === "upload").length, reused: steps.filter((item) => item.operation === "reuse").length }, steps };
+  return {
+    scope: "manual-acceptance-attachment-data",
+    customerKey: CUSTOMER_KEY,
+    simulatedOnly: true,
+    datasetKey: factReport.datasetKey,
+    dataVersion: factReport.dataVersion,
+    runId: factReport.runId,
+    target: factReport.target,
+    backendURL: policy.backendURL,
+    databaseName: policy.databaseName,
+    semanticDigest: factReport.semanticDigest,
+    rolePasswordSource: credentials.rolePasswordSource,
+    runtime,
+    actorPolicy: {
+      crossDomainSeed: "admin",
+      workflowTask: pmcUsername,
+      rolePageAccessVerifiedElsewhere: true,
+    },
+    summary: {
+      targets: targets.length,
+      attachments: steps.length,
+      uploaded: steps.filter((item) => item.operation === "upload").length,
+      reused: steps.filter((item) => item.operation === "reuse").length,
+    },
+    steps,
+  };
 }
 
 async function main() {
@@ -717,7 +771,6 @@ async function main() {
       args.get("--database-name") ||
       process.env.MANUAL_ACCEPTANCE_DATABASE_NAME,
     adminPassword: process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
-    rolePassword: process.env.MANUAL_ACCEPTANCE_PASSWORD,
     confirm: process.env.MANUAL_ACCEPTANCE_ATTACHMENT_CONFIRM,
     sourceReportPath:
       args.get("--source-report") ||

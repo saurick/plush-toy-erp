@@ -100,6 +100,7 @@ export function matchesAdminKeyword(admin = {}, keyword = '') {
 
   return includesKeyword(
     [
+      admin.display_name,
       admin.username,
       admin.phone,
       getAdminStatusText(admin),

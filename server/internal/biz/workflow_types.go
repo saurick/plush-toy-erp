@@ -152,17 +152,19 @@ type WorkflowTaskStatusUpdate struct {
 }
 
 type WorkflowTaskEvent struct {
-	ID            int
-	TaskID        int
-	TaskVersion   *int
-	EventType     string
-	FromStatusKey *string
-	ToStatusKey   *string
-	ActorRoleKey  *string
-	ActorID       *int
-	Reason        *string
-	Payload       map[string]any
-	CreatedAt     time.Time
+	ID               int
+	TaskID           int
+	TaskVersion      *int
+	EventType        string
+	FromStatusKey    *string
+	ToStatusKey      *string
+	ActorRoleKey     *string
+	ActorID          *int
+	ActorUsername    string
+	ActorDisplayName string
+	Reason           *string
+	Payload          map[string]any
+	CreatedAt        time.Time
 }
 
 type WorkflowTaskBreakGlassIntent struct {

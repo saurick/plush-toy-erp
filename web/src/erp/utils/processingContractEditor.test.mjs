@@ -228,6 +228,23 @@ test('FL_processing_contract_editor__recomputes_default_amount_on_quantity_chang
   assert.equal(nextLines[0].amount, '24')
 })
 
+test('processingContractEditor: 调整明细时按十进制定点数重算分币边界金额', () => {
+  const nextLines = updateProcessingContractLineCell(
+    [
+      {
+        quantity: '1',
+        unitPrice: '2.675',
+        amount: '',
+      },
+    ],
+    0,
+    'quantity',
+    '1'
+  )
+
+  assert.equal(nextLines[0].amount, '2.68')
+})
+
 test('FL_processing_contract_editor__keeps_manual_amount_on_quantity_change processingContractEditor: 已手工改写的委托加工金额不会被数量变更覆盖', () => {
   const nextLines = updateProcessingContractLineCell(
     [

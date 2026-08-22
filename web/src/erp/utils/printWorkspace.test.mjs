@@ -146,31 +146,89 @@ test('printWorkspace: 壳页 URL、窗口状态 key 与草稿 key 统一收口',
     buildPrintWorkspaceDraftStorageKey(
       MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
       'window-3',
-      { customerKey: 'yoyoosun', accountKey: '42' }
+      {
+        customerKey: 'yoyoosun',
+        accountKey: '42',
+        configRevision: 'revision-7',
+      }
     ),
-    '__plush_erp_print_workspace_draft__:v2:yoyoosun:42:material-purchase-contract:window-3'
+    '__plush_erp_print_workspace_draft__:v3:yoyoosun:42:revision-7:material-purchase-contract:window-3'
   )
 })
 
-test('printWorkspace: 草稿 key 按客户、账号、模板和窗口隔离', () => {
+test('printWorkspace: 草稿 key 按客户、账号、配置版本、模板和窗口隔离', () => {
   const firstAccountKey = buildPrintWorkspaceDraftStorageKey(
     MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
     'window-scope',
-    { customerKey: 'yoyoosun', accountKey: '10' }
+    {
+      customerKey: 'yoyoosun',
+      accountKey: '10',
+      configRevision: 'revision-1',
+    }
   )
   const secondAccountKey = buildPrintWorkspaceDraftStorageKey(
     MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
     'window-scope',
-    { customerKey: 'yoyoosun', accountKey: '11' }
+    {
+      customerKey: 'yoyoosun',
+      accountKey: '11',
+      configRevision: 'revision-1',
+    }
   )
   const secondCustomerKey = buildPrintWorkspaceDraftStorageKey(
     MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
     'window-scope',
-    { customerKey: 'reference-customer', accountKey: '10' }
+    {
+      customerKey: 'reference-customer',
+      accountKey: '10',
+      configRevision: 'revision-1',
+    }
+  )
+  const secondConfigRevisionKey = buildPrintWorkspaceDraftStorageKey(
+    MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+    'window-scope',
+    {
+      customerKey: 'yoyoosun',
+      accountKey: '10',
+      configRevision: 'revision-2',
+    }
   )
 
   assert.notEqual(firstAccountKey, secondAccountKey)
   assert.notEqual(firstAccountKey, secondCustomerKey)
+  assert.notEqual(firstAccountKey, secondConfigRevisionKey)
+})
+
+test('printWorkspace: 缺少已验证账号 ID 时不生成草稿 key 或写入持久化存储', () => {
+  const writes = []
+  const storage = {
+    getItem(key) {
+      return key === 'admin_user_id' ? '42' : null
+    },
+    setItem(key, value) {
+      writes.push([key, value])
+    },
+  }
+  const storageKey = buildPrintWorkspaceDraftStorageKey(
+    MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+    'missing-account-window',
+    {
+      customerKey: 'yoyoosun',
+      configRevision: 'revision-1',
+      windowLike: { localStorage: storage },
+    }
+  )
+
+  assert.equal(storageKey, '')
+  assert.equal(
+    persistPrintWorkspaceDraftSnapshot(
+      storageKey,
+      { contractNo: 'CG-MISSING-ACCOUNT' },
+      storage
+    ),
+    false
+  )
+  assert.deepEqual(writes, [])
 })
 
 test('printWorkspace: 窗口状态持久化后可按 TTL 读取，过期时自动失效', () => {
@@ -542,6 +600,8 @@ test('printWorkspace: 业务页打开时会先写入当前窗口专属打印草�
       entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
       initialDraft,
       customerKey: 'yoyoosun',
+      accountKey: '42',
+      configRevision: 'revision-7',
     })
 
     assert.equal(
@@ -551,7 +611,12 @@ test('printWorkspace: 业务页打开时会先写入当前窗口专属打印草�
     const draftStorageKey = buildPrintWorkspaceDraftStorageKey(
       MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
       'business-window-1',
-      { customerKey: 'yoyoosun', windowLike: globalThis.window }
+      {
+        customerKey: 'yoyoosun',
+        accountKey: '42',
+        configRevision: 'revision-7',
+        windowLike: globalThis.window,
+      }
     )
     assert.deepEqual(
       readPrintWorkspaceDraftSnapshot(
@@ -617,6 +682,7 @@ test('printWorkspace: localStorage 无法写草稿时使用当前弹窗一次性
       {
         entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
         initialDraft,
+        accountKey: '42',
       }
     )
 
@@ -649,7 +715,8 @@ test('printWorkspace: localStorage 无法写草稿时使用当前弹窗一次性
       persistPrintWorkspaceDraftSnapshot(
         buildPrintWorkspaceDraftStorageKey(
           MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
-          'business-window-fallback'
+          'business-window-fallback',
+          { accountKey: '42' }
         ),
         initialDraft,
         {
@@ -680,7 +747,8 @@ test('printWorkspace: localStorage 无法写草稿时使用当前弹窗一次性
       persistPrintWorkspaceDraftSnapshot(
         buildPrintWorkspaceDraftStorageKey(
           MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
-          'business-window-fallback'
+          'business-window-fallback',
+          { accountKey: '42' }
         ),
         persistedDraft,
         {
@@ -759,6 +827,7 @@ test('printWorkspace: 业务页弹窗被拦截时会清理本次临时打印草�
         openPrintWorkspaceWindow(MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY, {
           entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
           initialDraft: { contractNo: 'CG202604240003' },
+          accountKey: '42',
         }),
       /浏览器拦截了弹窗/
     )
@@ -766,7 +835,8 @@ test('printWorkspace: 业务页弹窗被拦截时会清理本次临时打印草�
       storage.has(
         buildPrintWorkspaceDraftStorageKey(
           MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
-          'blocked-window-1'
+          'blocked-window-1',
+          { accountKey: '42' }
         )
       ),
       false

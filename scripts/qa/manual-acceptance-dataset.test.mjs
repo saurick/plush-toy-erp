@@ -850,6 +850,17 @@ test("bundle emits persistent local and 133 plans with identical target-free sem
     LOCAL_PERSISTENT_DATABASE,
   );
   assert.equal(bundle.targets[1].target.backendURL, CUSTOMER_TRIAL_133_ORIGIN);
+  assert.equal(bundle.targets[0].target.accountIdentity.usernamePrefix, "demo");
+  assert.equal(bundle.targets[1].target.accountIdentity.usernamePrefix, "uat");
+  assert.equal(
+    bundle.targets[1].target.accountIdentity.passwordEnvironmentVariable,
+    "MANUAL_ACCEPTANCE_UAT_PASSWORD",
+  );
+  assert.ok(
+    bundle.targets[1].target.accountIdentity.formalAccounts.every((username) =>
+      /^uat_/u.test(username),
+    ),
+  );
   assert.equal(bundle.targets[0].semanticDigest, bundle.semanticDigest);
   assert.equal(bundle.targets[1].semanticDigest, bundle.semanticDigest);
   assert.match(bundle.chainDataDigest, /^[0-9a-f]{64}$/u);

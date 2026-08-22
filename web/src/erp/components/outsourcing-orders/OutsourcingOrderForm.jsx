@@ -1,5 +1,9 @@
-import React, { useCallback } from 'react'
-import { CopyOutlined, DeleteOutlined } from '@ant-design/icons'
+import React, { useCallback, useState } from 'react'
+import {
+  CopyOutlined,
+  DeleteOutlined,
+  OrderedListOutlined,
+} from '@ant-design/icons'
 import {
   AutoComplete,
   Button,
@@ -12,6 +16,7 @@ import {
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
 import BusinessLineItemsSection from '../business-list/BusinessLineItemsSection.jsx'
+import BusinessLineItemOrderModal from '../business-list/BusinessLineItemOrderModal.jsx'
 import BusinessLineItemsSummaryValue from '../business-list/BusinessLineItemsSummaryValue.jsx'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import FieldWithUnitSuffix, {
@@ -103,6 +108,26 @@ export function unitLabel(unit = {}) {
   return [unit.code, unit.name].filter(Boolean).join(' / ') || '单位已关联'
 }
 
+export function outsourcingOrderLineOrderLabel(item = {}, index = 0) {
+  const subjectLabel =
+    item.subject_type === OUTSOURCING_ORDER_SUBJECT_TYPES.MATERIAL
+      ? [item.material_code_snapshot, item.material_name_snapshot]
+          .filter(Boolean)
+          .join(' / ')
+      : [
+          item.product_no_snapshot,
+          item.sku_code_snapshot,
+          item.product_name_snapshot,
+        ]
+          .filter(Boolean)
+          .join(' / ')
+  return (
+    [subjectLabel, item.processing_item, item.process_name_snapshot]
+      .filter(Boolean)
+      .join(' / ') || `第 ${index + 1} 行（未选择加工对象）`
+  )
+}
+
 export default function OutsourcingOrderForm({
   form,
   supplierOptions,
@@ -124,6 +149,8 @@ export default function OutsourcingOrderForm({
   onProcessChange,
   onUnitChange,
 }) {
+  const [lineOrderOpen, setLineOrderOpen] = useState(false)
+  const [lineOrderItems, setLineOrderItems] = useState([])
   const orderDate = Form.useWatch('order_date', form)
   const expectedReturnDate = Form.useWatch('expected_return_date', form)
   const { registerLineItemRow, requestLineItemScroll } =
@@ -362,6 +389,39 @@ export default function OutsourcingOrderForm({
         title="加工明细"
         description="同一份加工合同内维护产品、工序、数量、单价和预计回货。加工布料等材料时，请在“加工品类”中选择“材料”。"
         emptyDescription="暂无加工明细"
+        renderBeforeHeader={({ fields }) => (
+          <>
+            <div className="erp-line-items-form__import-row">
+              <div className="erp-line-items-form__import-copy">
+                <strong>调整加工明细顺序</strong>
+                <span>按合同展示和后续选单需要调整，不改变原明细身份。</span>
+              </div>
+              <Button
+                className="erp-line-items-form__import-button"
+                disabled={fields.length < 2}
+                icon={<OrderedListOutlined />}
+                onClick={() => {
+                  const currentLines = form.getFieldValue('items') || []
+                  setLineOrderItems([...currentLines])
+                  setLineOrderOpen(true)
+                }}
+              >
+                明细顺序
+              </Button>
+            </div>
+            <BusinessLineItemOrderModal
+              getItemLabel={outsourcingOrderLineOrderLabel}
+              itemNoun="加工明细"
+              items={lineOrderItems}
+              onApply={(orderedItems) =>
+                form.setFieldsValue({ items: orderedItems })
+              }
+              onClose={() => setLineOrderOpen(false)}
+              open={lineOrderOpen}
+              title="调整加工明细顺序"
+            />
+          </>
+        )}
         renderRow={({ add, field, fields, index, remove }) => (
           <div
             className="erp-sales-order-lines-form__row"

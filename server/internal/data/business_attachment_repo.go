@@ -561,19 +561,23 @@ func (r *businessAttachmentRepo) resolveBusinessAttachmentAuditUsernames(
 		ids = append(ids, id)
 	}
 	admins, err := r.data.postgres.AdminUser.Query().
-		Select(adminuser.FieldID, adminuser.FieldUsername).
+		Select(adminuser.FieldID, adminuser.FieldUsername, adminuser.FieldDisplayName).
 		Where(adminuser.IDIn(ids...)).
 		All(ctx)
 	if err != nil {
 		return err
 	}
 	usernameByID := make(map[int]string, len(admins))
+	displayNameByID := make(map[int]string, len(admins))
 	for _, admin := range admins {
 		if admin == nil {
 			continue
 		}
 		if username := strings.TrimSpace(admin.Username); username != "" {
 			usernameByID[admin.ID] = username
+		}
+		if displayName := strings.TrimSpace(stringValue(admin.DisplayName)); displayName != "" {
+			displayNameByID[admin.ID] = displayName
 		}
 	}
 	for _, item := range items {
@@ -584,10 +588,16 @@ func (r *businessAttachmentRepo) resolveBusinessAttachmentAuditUsernames(
 			if username := usernameByID[*item.UploadedBy]; username != "" {
 				item.UploadedByUsername = &username
 			}
+			if displayName := displayNameByID[*item.UploadedBy]; displayName != "" {
+				item.UploadedByDisplayName = &displayName
+			}
 		}
 		if item.WithdrawnBy != nil {
 			if username := usernameByID[*item.WithdrawnBy]; username != "" {
 				item.WithdrawnByUsername = &username
+			}
+			if displayName := displayNameByID[*item.WithdrawnBy]; displayName != "" {
+				item.WithdrawnByDisplayName = &displayName
 			}
 		}
 	}

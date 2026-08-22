@@ -1,5 +1,11 @@
 import { normalizePrintAppendixImages } from '../utils/printAppendixImages.mjs'
 import { unixSecondsToBusinessDate } from '../utils/businessDate.mjs'
+import {
+  multiplyNumeric20Scale6Values,
+  normalizeNumeric20Scale6,
+  numeric20Scale6Units,
+  sumNumeric20Scale6Values,
+} from '../utils/numeric20Scale6.mjs'
 
 export const PROCESSING_CONTRACT_TEMPLATE_KEY = 'processing-contract'
 export const PROCESSING_CONTRACT_DRAFT_VERSION = 4
@@ -211,24 +217,10 @@ function isCanceledBusinessLineStatus(value) {
   return ['canceled', 'cancelled'].includes(normalizeText(value).toLowerCase())
 }
 
-function parseNumber(value) {
-  const text = normalizeText(value).replaceAll(',', '')
-  if (!text) {
-    return null
-  }
-  const numericValue = Number(text)
-  return Number.isFinite(numericValue) ? numericValue : null
-}
-
-export function formatTrimmedNumber(value, maximumFractionDigits = 2) {
-  if (!Number.isFinite(value)) {
-    return ''
-  }
-  return new Intl.NumberFormat('en-US', {
-    useGrouping: false,
-    minimumFractionDigits: 0,
-    maximumFractionDigits,
-  }).format(value)
+function trimProcessingDecimalText(value) {
+  const [integer = '', fraction = ''] = String(value ?? '').split('.')
+  const trimmedFraction = fraction.replace(/0+$/u, '')
+  return trimmedFraction ? `${integer}.${trimmedFraction}` : integer
 }
 
 function sanitizePositiveDecimalText(
@@ -285,17 +277,13 @@ export function normalizeProcessingAmountText(value) {
   const sanitized = sanitizePositiveDecimalText(value, {
     maximumFractionDigits: 2,
   })
-  const numericValue = parseNumber(sanitized)
-  return numericValue === null ? '' : formatTrimmedNumber(numericValue, 2)
+  return trimProcessingDecimalText(normalizeNumeric20Scale6(sanitized))
 }
 
 export function resolveComputedProcessingLineAmount(line = {}) {
-  const quantity = parseNumber(line.quantity)
-  const unitPrice = parseNumber(line.unitPrice)
-  if (quantity === null || unitPrice === null) {
-    return ''
-  }
-  return formatTrimmedNumber(quantity * unitPrice, 2)
+  return trimProcessingDecimalText(
+    multiplyNumeric20Scale6Values(line.quantity, line.unitPrice, 2)
+  )
 }
 
 export function resolveProcessingLineAmount(line = {}) {
@@ -381,10 +369,8 @@ export function calculateProcessingContractTotals(
   lines = [],
   { merges = [] } = {}
 ) {
-  let totalQuantity = 0
-  let totalAmount = 0
-  let hasQuantity = false
-  let hasAmount = false
+  const quantityValues = []
+  const amountValues = []
 
   lines.forEach((line, rowIndex) => {
     const normalizedLine = normalizeProcessingLine(line)
@@ -393,30 +379,40 @@ export function calculateProcessingContractTotals(
       rowIndex,
       'quantity'
     )
-      ? null
-      : parseNumber(normalizedLine.quantity)
+      ? ''
+      : normalizedLine.quantity
     const amount = isProcessingContractCellHiddenByMerge(
       merges,
       rowIndex,
       'amount'
     )
-      ? null
-      : parseNumber(resolveProcessingLineAmount(normalizedLine))
+      ? ''
+      : resolveProcessingLineAmount(normalizedLine)
 
-    if (quantity !== null) {
-      totalQuantity += quantity
-      hasQuantity = true
+    if (numeric20Scale6Units(quantity) !== null) {
+      quantityValues.push(quantity)
     }
 
-    if (amount !== null) {
-      totalAmount += amount
-      hasAmount = true
+    if (numeric20Scale6Units(amount) !== null) {
+      amountValues.push(amount)
     }
   })
 
+  const totalQuantity = sumNumeric20Scale6Values(quantityValues)
+  const totalAmount = sumNumeric20Scale6Values(amountValues)
   return {
-    totalQuantityText: hasQuantity ? formatTrimmedNumber(totalQuantity, 3) : '',
-    totalAmountText: hasAmount ? formatTrimmedNumber(totalAmount, 2) : '',
+    totalQuantityText:
+      quantityValues.length > 0
+        ? trimProcessingDecimalText(
+            multiplyNumeric20Scale6Values(totalQuantity, '1', 3)
+          )
+        : '',
+    totalAmountText:
+      amountValues.length > 0
+        ? trimProcessingDecimalText(
+            multiplyNumeric20Scale6Values(totalAmount, '1', 2)
+          )
+        : '',
   }
 }
 

@@ -13,6 +13,7 @@ const META_KEYS = [
   'token_type',
   'user_id',
   'username',
+  'display_name',
   'phone',
   'is_super_admin',
   'roles',
@@ -161,6 +162,8 @@ export function getCurrentUser(scope = AUTH_SCOPE.ADMIN) {
     return {
       id: Number(claims.uid),
       username: String(getAuthMeta(normalizedScope, 'username') || ''),
+      display_name: String(getAuthMeta(normalizedScope, 'display_name') || ''),
+      phone: String(getAuthMeta(normalizedScope, 'phone') || ''),
       // 当前 token 只存在于 admin scope；真正授权仍由后端 session、账号状态与 RBAC 校验。
       role: 'admin',
       exp: claims.exp, // 秒级时间戳
@@ -182,9 +185,15 @@ export function getStoredAdminProfile() {
   const permissions = getAuthMeta(AUTH_SCOPE.ADMIN, 'permissions')
   const menus = getAuthMeta(AUTH_SCOPE.ADMIN, 'menus')
   const erpPreferences = getAuthMeta(AUTH_SCOPE.ADMIN, 'erp_preferences')
+  const displayName = String(
+    getAuthMeta(AUTH_SCOPE.ADMIN, 'display_name') || ''
+  )
+  const phone = String(getAuthMeta(AUTH_SCOPE.ADMIN, 'phone') || '')
 
   return {
     ...admin,
+    display_name: displayName,
+    phone,
     is_super_admin:
       isSuperAdminMeta === true || String(isSuperAdminMeta) === 'true',
     roles: Array.isArray(roles) ? roles : [],

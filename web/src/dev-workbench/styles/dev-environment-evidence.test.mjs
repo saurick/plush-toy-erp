@@ -12,6 +12,7 @@ const panel = readFileSync(
 )
 
 test('environment evidence keeps all target facts in one mobile comparison strip', () => {
+  assert.match(panel, /环境与验收事实/u)
   assert.match(
     css,
     /@media \(max-width: 720px\)[\s\S]*\.erp-dev-environment-evidence__grid \{[\s\S]*display: flex;[\s\S]*overflow-x: auto;[\s\S]*scroll-snap-type: inline mandatory;/u

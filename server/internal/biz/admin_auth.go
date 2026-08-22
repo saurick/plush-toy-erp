@@ -41,6 +41,7 @@ type AdminDirectoryReader interface {
 type AdminUser struct {
 	ID              int
 	Username        string
+	DisplayName     string
 	Phone           string
 	PasswordHash    string
 	IsSuperAdmin    bool
@@ -56,6 +57,16 @@ type AdminUser struct {
 	LastLoginAt     *time.Time
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+}
+
+func AdminDisplayName(admin *AdminUser) string {
+	if admin == nil {
+		return ""
+	}
+	if displayName := strings.TrimSpace(admin.DisplayName); displayName != "" {
+		return displayName
+	}
+	return strings.TrimSpace(admin.Username)
 }
 
 type AdminSession struct {

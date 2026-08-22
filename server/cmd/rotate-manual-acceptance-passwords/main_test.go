@@ -42,10 +42,10 @@ func TestValidateOptionsBindsConfirmationToTargetAndVersion(t *testing.T) {
 	}
 }
 
-func TestAcceptanceAccountUsernamesSelectsStableAdminOnlyFor133(t *testing.T) {
+func TestAcceptanceAccountUsernamesSeparatesLocalDemoAndCustomerUAT(t *testing.T) {
 	for _, target := range []string{targetLocalDev, targetCustomerTrial133} {
 		opts := validOptions(target)
-		adminUsernames, demoUsernames, err := acceptanceAccountUsernames(opts)
+		adminUsernames, roleUsernames, accountKind, err := acceptanceAccountUsernames(opts)
 		if err != nil {
 			t.Fatalf("acceptanceAccountUsernames(%s): %v", target, err)
 		}
@@ -55,12 +55,24 @@ func TestAcceptanceAccountUsernamesSelectsStableAdminOnlyFor133(t *testing.T) {
 		if target == targetCustomerTrial133 && (len(adminUsernames) != 1 || adminUsernames[0] != "admin") {
 			t.Fatalf("133 admin usernames = %v, want stable admin", adminUsernames)
 		}
-		if len(demoUsernames) == 0 {
-			t.Fatalf("%s demo usernames must not be empty", target)
+		wantKind := "local-demo"
+		wantPrefix := "demo_"
+		if target == targetCustomerTrial133 {
+			wantKind = "customer-uat"
+			wantPrefix = "uat_"
 		}
-		for _, username := range demoUsernames {
+		if accountKind != wantKind {
+			t.Fatalf("%s account kind = %q, want %q", target, accountKind, wantKind)
+		}
+		if len(roleUsernames) == 0 {
+			t.Fatalf("%s role usernames must not be empty", target)
+		}
+		for _, username := range roleUsernames {
 			if strings.EqualFold(strings.TrimSpace(username), "admin") {
 				t.Fatalf("%s selected protected username %q", target, username)
+			}
+			if !strings.HasPrefix(username, wantPrefix) {
+				t.Fatalf("%s selected cross-target username %q", target, username)
 			}
 		}
 	}
@@ -103,23 +115,27 @@ func TestValidateTargetDSNSeparatesLocalAnd133(t *testing.T) {
 	}
 }
 
-func TestValidateRotationPasswordsRequiresRegisteredSimpleTestCredentials(t *testing.T) {
-	if err := validateRotationPasswords(targetCustomerTrial133, "adminadmin", "12345678"); err != nil {
+func TestValidateRotationPasswordsSeparatesLocalPublicAndCustomerUATSecrets(t *testing.T) {
+	if err := validateRotationPasswords(targetCustomerTrial133, "remote-admin-secret", "remote-uat-secret"); err != nil {
 		t.Fatalf("validateRotationPasswords() error = %v", err)
 	}
-	for _, test := range []struct{ admin, demo, want string }{
-		{admin: "", demo: "12345678", want: adminPasswordEnv},
-		{admin: "same-password", demo: "same-password", want: "registered"},
-		{admin: "admin-password", demo: "12345678", want: "registered"},
-		{admin: "adminadmin", demo: "demo-password", want: "registered"},
+	for _, test := range []struct{ admin, role, want string }{
+		{admin: "remote-admin-secret", role: "", want: uatPasswordEnv},
+		{admin: "", role: "remote-uat-secret", want: adminPasswordEnv},
+		{admin: "same-password", role: "same-password", want: "must differ"},
+		{admin: "remote-admin-secret", role: "12345678", want: "local-only public"},
+		{admin: "adminadmin", role: "remote-uat-secret", want: "local-only public"},
 	} {
-		err := validateRotationPasswords(targetCustomerTrial133, test.admin, test.demo)
+		err := validateRotationPasswords(targetCustomerTrial133, test.admin, test.role)
 		if err == nil || !strings.Contains(err.Error(), test.want) {
-			t.Fatalf("validateRotationPasswords(%q,%q) error=%v, want %q", test.admin, test.demo, err, test.want)
+			t.Fatalf("validateRotationPasswords(%q,%q) error=%v, want %q", test.admin, test.role, err, test.want)
 		}
 	}
 	if err := validateRotationPasswords(targetLocalDev, "", "12345678"); err != nil {
 		t.Fatalf("registered isolated local target may use the public credential: %v", err)
+	}
+	if err := validateRotationPasswords(targetLocalDev, "", "remote-uat-secret"); err == nil {
+		t.Fatal("local target accepted a non-registered role password")
 	}
 }
 
@@ -176,12 +192,40 @@ func TestAssertAcceptanceAccountsDoesNotReadStableAdminForLocalDev(t *testing.T)
 	}
 	defer func() { _ = db.Close() }()
 	rows := sqlmock.NewRows([]string{"username"})
-	for _, username := range demoAcceptanceUsernames {
+	for _, username := range localDemoAcceptanceUsernames {
 		rows.AddRow(username)
 	}
-	mock.ExpectQuery(`SELECT username FROM admin_users WHERE username LIKE 'demo_%'`).WillReturnRows(rows)
-	if err := assertAcceptanceAccounts(t.Context(), db, nil, demoAcceptanceUsernames); err != nil {
+	mock.ExpectQuery(`SELECT username FROM admin_users WHERE username LIKE \$1`).WithArgs("demo_%").WillReturnRows(rows)
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM admin_users WHERE username LIKE \$1`).WithArgs("uat_%").WillReturnRows(
+		sqlmock.NewRows([]string{"count"}).AddRow(0),
+	)
+	if err := assertAcceptanceAccounts(t.Context(), db, targetLocalDev, nil, localDemoAcceptanceUsernames); err != nil {
 		t.Fatalf("assertAcceptanceAccounts(local-dev): %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet(): %v", err)
+	}
+}
+
+func TestAssertAcceptanceAccountsRequiresUATAndRejectsDemoOn133(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New(): %v", err)
+	}
+	defer func() { _ = db.Close() }()
+	rows := sqlmock.NewRows([]string{"username"})
+	for _, username := range customerUATAcceptanceUsernames {
+		rows.AddRow(username)
+	}
+	mock.ExpectQuery(`SELECT username FROM admin_users WHERE username LIKE \$1`).WithArgs("uat_%").WillReturnRows(rows)
+	mock.ExpectQuery(`SELECT username FROM admin_users WHERE username = \$1`).WithArgs("admin").WillReturnRows(
+		sqlmock.NewRows([]string{"username"}).AddRow("admin"),
+	)
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM admin_users WHERE username LIKE \$1`).WithArgs("demo_%").WillReturnRows(
+		sqlmock.NewRows([]string{"count"}).AddRow(0),
+	)
+	if err := assertAcceptanceAccounts(t.Context(), db, targetCustomerTrial133, []string{"admin"}, customerUATAcceptanceUsernames); err != nil {
+		t.Fatalf("assertAcceptanceAccounts(customer-trial-133): %v", err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("ExpectationsWereMet(): %v", err)

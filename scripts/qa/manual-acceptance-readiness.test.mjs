@@ -1427,6 +1427,12 @@ test("default plan covers all 51 targets and never connects to a backend", async
   assert.equal(result.plan.callsBackend, false);
   assert.equal(result.plan.writesBackend, false);
   assert.equal(result.plan.directSQL, false);
+  assert.equal(result.plan.accountTarget, "local-dev");
+  assert.ok(
+    result.plan.accountProjections.every((item) =>
+      /^demo_/u.test(item.username),
+    ),
+  );
   assert.equal(result.plan.targets.length, 51);
   assert.equal(
     result.plan.targets.filter(
@@ -1444,6 +1450,19 @@ test("default plan covers all 51 targets and never connects to a backend", async
       (item) => item.id === "desktopPages:production-scheduling",
     ).probeIds,
     ["workflow-tasks:production_scheduling"],
+  );
+
+  const uatPlan = buildManualAcceptanceReadinessPlan({
+    target: CUSTOMER_TRIAL_133_TARGET,
+  });
+  assert.equal(uatPlan.accountTarget, CUSTOMER_TRIAL_133_TARGET);
+  assert.ok(
+    uatPlan.accountProjections.every((item) => /^uat_/u.test(item.username)),
+  );
+  assert.ok(
+    uatPlan.probes
+      .filter((probe) => probe.username)
+      .every((probe) => /^uat_/u.test(probe.username)),
   );
   assert.deepEqual(
     result.plan.targets.find(
@@ -1909,7 +1928,7 @@ test("permission account evidence requires the exact thirteen acceptance account
 
   const revokedExpected = structuredClone(admins);
   revokedExpected.find(
-    (item) => item.username === "demo_uat_disabled",
+    (item) => item.username === "demo_disabled",
   ).account_status = "revoked";
   const revokedResult = evaluateManualAcceptanceDataset(probe, {
     admins: revokedExpected,
@@ -2425,7 +2444,7 @@ test("CLI requires an explicit backend for verification and stays read-only", as
   const help = await runManualAcceptanceReadinessCli(["--help"]);
   assert.match(help.text, /MANUAL_ACCEPTANCE_ADMIN_PASSWORD/u);
   assert.match(help.text, /超级管理员 admin/u);
-  assert.match(help.text, /demo_admin 仍按试用账号权限核对/u);
+  assert.match(help.text, /本地使用 demo_admin，133 使用 uat_admin/u);
 });
 
 test("CLI verification uses strict non-green exit codes for not-proven and wrong-batch evidence", async () => {

@@ -66,6 +66,11 @@ func LineNo(v int) predicate.OutsourcingOrderItem {
 	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldLineNo, v))
 }
 
+// DisplayOrder applies equality check predicate on the "display_order" field. It's identical to DisplayOrderEQ.
+func DisplayOrder(v int) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldDisplayOrder, v))
+}
+
 // SubjectType applies equality check predicate on the "subject_type" field. It's identical to SubjectTypeEQ.
 func SubjectType(v string) predicate.OutsourcingOrderItem {
 	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldSubjectType, v))
@@ -244,6 +249,56 @@ func LineNoLT(v int) predicate.OutsourcingOrderItem {
 // LineNoLTE applies the LTE predicate on the "line_no" field.
 func LineNoLTE(v int) predicate.OutsourcingOrderItem {
 	return predicate.OutsourcingOrderItem(sql.FieldLTE(FieldLineNo, v))
+}
+
+// DisplayOrderEQ applies the EQ predicate on the "display_order" field.
+func DisplayOrderEQ(v int) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldDisplayOrder, v))
+}
+
+// DisplayOrderNEQ applies the NEQ predicate on the "display_order" field.
+func DisplayOrderNEQ(v int) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldNEQ(FieldDisplayOrder, v))
+}
+
+// DisplayOrderIn applies the In predicate on the "display_order" field.
+func DisplayOrderIn(vs ...int) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldIn(FieldDisplayOrder, vs...))
+}
+
+// DisplayOrderNotIn applies the NotIn predicate on the "display_order" field.
+func DisplayOrderNotIn(vs ...int) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldNotIn(FieldDisplayOrder, vs...))
+}
+
+// DisplayOrderGT applies the GT predicate on the "display_order" field.
+func DisplayOrderGT(v int) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldGT(FieldDisplayOrder, v))
+}
+
+// DisplayOrderGTE applies the GTE predicate on the "display_order" field.
+func DisplayOrderGTE(v int) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldGTE(FieldDisplayOrder, v))
+}
+
+// DisplayOrderLT applies the LT predicate on the "display_order" field.
+func DisplayOrderLT(v int) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldLT(FieldDisplayOrder, v))
+}
+
+// DisplayOrderLTE applies the LTE predicate on the "display_order" field.
+func DisplayOrderLTE(v int) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldLTE(FieldDisplayOrder, v))
+}
+
+// DisplayOrderIsNil applies the IsNil predicate on the "display_order" field.
+func DisplayOrderIsNil() predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldIsNull(FieldDisplayOrder))
+}
+
+// DisplayOrderNotNil applies the NotNil predicate on the "display_order" field.
+func DisplayOrderNotNil() predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldNotNull(FieldDisplayOrder))
 }
 
 // SubjectTypeEQ applies the EQ predicate on the "subject_type" field.

@@ -28,6 +28,11 @@ import {
   MANUAL_ACCEPTANCE_CORE_WAREHOUSES,
   MANUAL_ACCEPTANCE_PRIMARY_UNIT,
 } from "./manual-acceptance-core-contract.mjs";
+import {
+  LOCAL_DEMO_ACCOUNT_SET,
+  manualAcceptanceAccountSetForTarget,
+  resolveManualAcceptanceRoleCredential,
+} from "./manual-acceptance-account-identities.mjs";
 
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
 const DEFAULT_OUT_DIR = "output/qa/manual-acceptance/source-data";
@@ -99,13 +104,39 @@ export const SALES_ORDER_ACCEPTANCE_REPLAY_STATUSES = Object.freeze([
 
 export const ROLE_USERS = Object.freeze({
   seedAdmin: "admin",
-  sales: "demo_sales",
-  purchase: "demo_purchase",
-  engineering: "demo_engineering",
-  production: "demo_production",
-  boss: "demo_boss",
-  pmc: "demo_pmc",
+  sales: LOCAL_DEMO_ACCOUNT_SET.roleUsernames.sales,
+  purchase: LOCAL_DEMO_ACCOUNT_SET.roleUsernames.purchase,
+  engineering: LOCAL_DEMO_ACCOUNT_SET.roleUsernames.engineering,
+  production: LOCAL_DEMO_ACCOUNT_SET.roleUsernames.production,
+  boss: LOCAL_DEMO_ACCOUNT_SET.roleUsernames.boss,
+  pmc: LOCAL_DEMO_ACCOUNT_SET.roleUsernames.pmc,
 });
+
+function sourceRoleUsersForTarget(target) {
+  const roleUsernames =
+    manualAcceptanceAccountSetForTarget(target).roleUsernames;
+  return Object.freeze({
+    seedAdmin: "admin",
+    sales: roleUsernames.sales,
+    purchase: roleUsernames.purchase,
+    engineering: roleUsernames.engineering,
+    production: roleUsernames.production,
+    boss: roleUsernames.boss,
+    pmc: roleUsernames.pmc,
+  });
+}
+
+function assertSourceRoleUsers(plan) {
+  if (
+    JSON.stringify(plan?.roleUsers) !==
+    JSON.stringify(sourceRoleUsersForTarget(plan?.target))
+  ) {
+    throw new CliError(
+      `${plan?.target || "unknown"} source role users do not match the target account contract`,
+      2,
+    );
+  }
+}
 
 class CliError extends Error {
   constructor(message, exitCode = 1) {
@@ -1160,6 +1191,7 @@ export function buildManualAcceptanceSourceDataPlan(options = {}) {
     anchorDate,
     backendURL,
     databaseName: targetPolicy.databaseName,
+    roleUsers: sourceRoleUsersForTarget(targetPolicy.target),
     scale,
     records,
     coreSemanticDigest: MANUAL_ACCEPTANCE_CORE_SEMANTIC_DIGEST,
@@ -1350,7 +1382,7 @@ async function loginRole({ backendURL, username, password, fetchImpl }) {
   });
   const token = data.access_token || data.token;
   if (!token) throw new CliError(`${username}: login response missing token`);
-  if (username === ROLE_USERS.seedAdmin && data.is_super_admin !== true) {
+  if (username === "admin" && data.is_super_admin !== true) {
     throw new CliError(
       `${username}: manual acceptance seed writer must be a local super admin`,
     );
@@ -1360,12 +1392,13 @@ async function loginRole({ backendURL, username, password, fetchImpl }) {
 
 async function loginRoles({
   backendURL,
+  roleUsers,
   password,
   seedAdminPassword,
   includeSeedAdmin = false,
   fetchImpl,
 }) {
-  const roleEntries = Object.entries(ROLE_USERS).filter(
+  const roleEntries = Object.entries(roleUsers).filter(
     ([role]) => includeSeedAdmin || role !== "seedAdmin",
   );
   const entries = [];
@@ -4336,6 +4369,7 @@ export async function applyManualAcceptanceSourceData(
     fetchImpl = fetch,
   } = {},
 ) {
+  assertSourceRoleUsers(plan);
   assertManualAcceptanceMutationTarget(plan, {
     confirmation: targetConfirmation,
   });
@@ -4353,12 +4387,14 @@ export async function applyManualAcceptanceSourceData(
       2,
     );
   }
+  const roleCredential = resolveManualAcceptanceRoleCredential({
+    target: plan.target,
+    password,
+  });
   const effectivePassword = requiredText(
-    password ||
-      process.env.MANUAL_ACCEPTANCE_PASSWORD ||
-      process.env.TRIAL_ACCOUNT_PASSWORD ||
-      process.env.ERP_ROLE_DEMO_PASSWORD,
-    "MANUAL_ACCEPTANCE_PASSWORD/TRIAL_ACCOUNT_PASSWORD/ERP_ROLE_DEMO_PASSWORD",
+    roleCredential.value,
+    manualAcceptanceAccountSetForTarget(plan.target)
+      .passwordEnvironmentVariable,
   );
   const effectiveAdminPassword = requiredText(
     adminPassword || process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
@@ -4371,6 +4407,7 @@ export async function applyManualAcceptanceSourceData(
   });
   const tokens = await loginRoles({
     backendURL: plan.backendURL,
+    roleUsers: plan.roleUsers,
     password: effectivePassword,
     seedAdminPassword: effectiveAdminPassword,
     includeSeedAdmin: true,
@@ -4383,6 +4420,7 @@ export async function applyManualAcceptanceSourceData(
     datasetKey: plan.datasetKey,
     dataVersion: plan.dataVersion,
     target: plan.target,
+    rolePasswordSource: roleCredential.source,
     prefix: plan.prefix,
     anchorDate: plan.anchorDate,
     semanticDigest: plan.semanticDigest,
@@ -4656,6 +4694,7 @@ export async function verifyManualAcceptanceSourceData(
     fetchImpl = fetch,
   } = {},
 ) {
+  assertSourceRoleUsers(plan);
   resolveManualAcceptanceTarget(plan);
   const parsedTargetAttestation =
     parseManualAcceptanceTargetAttestation(targetAttestation);
@@ -4665,12 +4704,14 @@ export async function verifyManualAcceptanceSourceData(
       attestation: parsedTargetAttestation,
     });
   }
+  const roleCredential = resolveManualAcceptanceRoleCredential({
+    target: plan.target,
+    password,
+  });
   const effectivePassword = requiredText(
-    password ||
-      process.env.MANUAL_ACCEPTANCE_PASSWORD ||
-      process.env.TRIAL_ACCOUNT_PASSWORD ||
-      process.env.ERP_ROLE_DEMO_PASSWORD,
-    "MANUAL_ACCEPTANCE_PASSWORD/TRIAL_ACCOUNT_PASSWORD/ERP_ROLE_DEMO_PASSWORD",
+    roleCredential.value,
+    manualAcceptanceAccountSetForTarget(plan.target)
+      .passwordEnvironmentVariable,
   );
   const effectiveAdminPassword = parsedTargetAttestation
     ? undefined
@@ -4680,6 +4721,7 @@ export async function verifyManualAcceptanceSourceData(
       );
   const tokens = await loginRoles({
     backendURL: plan.backendURL,
+    roleUsers: plan.roleUsers,
     password: effectivePassword,
     seedAdminPassword: effectiveAdminPassword,
     includeSeedAdmin: !parsedTargetAttestation,

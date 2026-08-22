@@ -565,6 +565,7 @@ export async function installAdminRpcMocks(
   const defaultAdminProfile = {
     id: 1,
     username: 'style-l1-admin',
+    display_name: '系统管理员',
     phone: '13800138000',
     is_super_admin: true,
     disabled: false,

@@ -5,9 +5,13 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-import { expectedAccounts } from "./trial-account-rbac.mjs";
 import { dashboardHealthModules } from "../../web/src/erp/config/dashboardModules.mjs";
-import { MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS } from "./manual-acceptance-account-scenarios.mjs";
+import {
+  LOCAL_DEMO_ACCOUNT_SET,
+  MANUAL_ACCEPTANCE_BUSINESS_ROLE_KEYS,
+  manualAcceptanceAccountSetForTarget,
+  resolveManualAcceptanceRoleCredential,
+} from "./manual-acceptance-account-identities.mjs";
 import {
   MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT,
   MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_COUNT,
@@ -39,6 +43,7 @@ import {
 } from "./manual-acceptance-task-data.mjs";
 import {
   CUSTOMER_TRIAL_133_TARGET,
+  LOCAL_DEV_TARGET,
   MANUAL_ACCEPTANCE_TARGET_PROFILES,
   SCENARIO_DEMO_TARGET,
   assertManualAcceptanceCapabilitiesPolicy,
@@ -68,28 +73,49 @@ const SOURCE_DRIVEN_FACT_REPORT_CONTRACT = "source-driven-operational-facts-v1";
 const TASK_REQUIRED_STATUSES = Object.freeze(
   TASK_STATUS_KEYS.map((status) => status.toUpperCase()),
 );
-const TASK_ROLE_KEYS = Object.freeze(
-  expectedAccounts
-    .filter(([, , mobilePermission]) => Boolean(mobilePermission))
-    .map(([, roleKey]) => roleKey),
+const TASK_ROLE_KEYS = Object.freeze([...MANUAL_ACCEPTANCE_BUSINESS_ROLE_KEYS]);
+
+const MOBILE_PERMISSION_BY_ROLE = Object.freeze(
+  Object.fromEntries(
+    MANUAL_ACCEPTANCE_BUSINESS_ROLE_KEYS.map((roleKey) => [
+      roleKey,
+      `mobile.${roleKey}.access`,
+    ]),
+  ),
 );
 
-export const MANUAL_ACCEPTANCE_ACCOUNT_STATE_EXPECTATIONS = Object.freeze([
-  ...expectedAccounts.map(([username, roleKey]) =>
-    Object.freeze({
+function accountProjectionsForTarget(target) {
+  return manualAcceptanceAccountSetForTarget(target).formalProfiles.map(
+    ({ username, roleKey }) => ({
       username,
-      accountStatus: "active",
-      roleKeys: Object.freeze([roleKey]),
+      roleKey,
+      mobilePermission: MOBILE_PERMISSION_BY_ROLE[roleKey] || null,
     }),
-  ),
-  ...MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS.map((scenario) =>
-    Object.freeze({
-      username: scenario.username,
-      accountStatus: scenario.disabled ? "suspended" : "active",
-      roleKeys: Object.freeze([...scenario.roleKeys].sort()),
-    }),
-  ),
-]);
+  );
+}
+
+function accountStateExpectationsForTarget(target) {
+  const accountSet = manualAcceptanceAccountSetForTarget(target);
+  return Object.freeze([
+    ...accountSet.formalProfiles.map(({ username, roleKey }) =>
+      Object.freeze({
+        username,
+        accountStatus: "active",
+        roleKeys: Object.freeze([roleKey]),
+      }),
+    ),
+    ...accountSet.scenarios.map((scenario) =>
+      Object.freeze({
+        username: scenario.username,
+        accountStatus: scenario.disabled ? "suspended" : "active",
+        roleKeys: Object.freeze([...scenario.roleKeys].sort()),
+      }),
+    ),
+  ]);
+}
+
+export const MANUAL_ACCEPTANCE_ACCOUNT_STATE_EXPECTATIONS =
+  accountStateExpectationsForTarget(LOCAL_DEMO_ACCOUNT_SET.target);
 
 function taskStatusCountsForRole(roleKey) {
   return Object.fromEntries(
@@ -484,7 +510,6 @@ const DATASET_BLUEPRINTS = Object.freeze({
     listKey: "admins",
     statusField: "account_status",
     requiredStatuses: ["ACTIVE", "DISABLED"],
-    expectedAccountStates: MANUAL_ACCEPTANCE_ACCOUNT_STATE_EXPECTATIONS,
     params: {},
   },
   "permission-roles": {
@@ -1558,7 +1583,14 @@ function resolveBatchEvidence(datasetId, blueprint, sourceReport, factReport) {
   return factReferenceEvidence(datasetId, blueprint, factReport);
 }
 
-function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
+function buildDatasetProbes(
+  catalog,
+  sourceReport,
+  factReport,
+  taskReport,
+  accountProjections,
+  accountStateExpectations,
+) {
   const canonical = buildCanonicalMinimums(catalog);
   const declared = declaredExpectations(sourceReport, factReport);
   const persistentProjection = new Set([
@@ -1582,6 +1614,9 @@ function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
       id,
       ...blueprint,
       ...batch,
+      ...(id === "permission-accounts"
+        ? { expectedAccountStates: accountStateExpectations }
+        : {}),
       params,
       expectedMinimum: Math.max(canonical[id] ?? 0, declared[id] ?? 0),
       ...(id === "shipments"
@@ -1631,7 +1666,8 @@ function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
   probes.push({
     id: "boss-dashboard-tasks",
     roleKey: "boss",
-    username: "demo_boss",
+    username: accountProjections.find((item) => item.roleKey === "boss")
+      .username,
     domain: "workflow",
     method: "list_tasks",
     includeCustomerKey: false,
@@ -1671,8 +1707,10 @@ function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
       : "未提供本次岗位任务写入报告，不能用历史任务数量代替本批任务。",
     readOnly: true,
   });
-  for (const account of expectedAccounts.filter((item) => item[2])) {
-    const [username, roleKey] = account;
+  for (const account of accountProjections.filter(
+    (item) => item.mobilePermission,
+  )) {
+    const { username, roleKey } = account;
     probes.push({
       id: `mobile-tasks:${roleKey}`,
       roleKey,
@@ -1744,7 +1782,8 @@ function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
     probes.push({
       id: `workflow-tasks:${taskGroup}`,
       roleKey,
-      username: `demo_${roleKey}`,
+      username: accountProjections.find((item) => item.roleKey === roleKey)
+        .username,
       domain: "workflow",
       method: "list_tasks",
       includeCustomerKey: false,
@@ -1789,6 +1828,22 @@ export function buildManualAcceptanceReadinessPlan(options = {}) {
   const factReport = validateFactReport(options.factReport || null);
   const taskReport = validateTaskReport(options.taskReport || null);
   validateReportBatch(sourceReport, factReport, taskReport);
+  const reportTargets = [sourceReport, factReport, taskReport]
+    .filter(Boolean)
+    .map((report) => report.target);
+  const accountTarget = reportTargets[0] || options.target || LOCAL_DEV_TARGET;
+  if (
+    reportTargets.some((target) => target !== accountTarget) ||
+    (options.target && options.target !== accountTarget)
+  ) {
+    throw new CliError(
+      "readiness reports and requested target must use one account identity contract",
+      2,
+    );
+  }
+  const accountProjections = accountProjectionsForTarget(accountTarget);
+  const accountStateExpectations =
+    accountStateExpectationsForTarget(accountTarget);
   const allTargets = pageDataContract.targets.map((item) => ({
     ...item,
     roleKeys: [...item.roleKeys],
@@ -1800,6 +1855,8 @@ export function buildManualAcceptanceReadinessPlan(options = {}) {
     sourceReport,
     factReport,
     taskReport,
+    accountProjections,
+    accountStateExpectations,
   );
   assertManualAcceptancePageDataContract(pageDataContract, {
     catalog,
@@ -1818,6 +1875,7 @@ export function buildManualAcceptanceReadinessPlan(options = {}) {
     authenticationMayAppendAudit: false,
     directSQL: false,
     callsBackend: false,
+    accountTarget,
     expected: {
       targets: MANUAL_ACCEPTANCE_PAGE_TARGET_COUNT,
       mobileRolePages: 9,
@@ -1874,13 +1932,7 @@ export function buildManualAcceptanceReadinessPlan(options = {}) {
         : null,
     },
     inputWarnings,
-    accountProjections: expectedAccounts.map(
-      ([username, roleKey, mobilePermission]) => ({
-        username,
-        roleKey,
-        mobilePermission: mobilePermission || null,
-      }),
-    ),
+    accountProjections,
     probes,
     targets: allTargets,
     boundary:
@@ -2645,10 +2697,15 @@ async function assertSafeReadRuntime({
   };
 }
 
-async function loginAccounts({ backendURL, password, fetchImpl }) {
+async function loginAccounts({
+  backendURL,
+  accountProjections,
+  password,
+  fetchImpl,
+}) {
   const tokens = {};
   const results = [];
-  for (const [username, roleKey] of expectedAccounts) {
+  for (const { username, roleKey } of accountProjections) {
     try {
       const token = await loginAccount({
         backendURL,
@@ -2670,12 +2727,12 @@ async function loginAccounts({ backendURL, password, fetchImpl }) {
   return { tokens, results };
 }
 
-function loginProbeResult(accountResults) {
+function loginProbeResult(accountResults, expectedCount) {
   const actual = accountResults.filter((item) => item.status === "pass").length;
   return {
     id: MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS.validAccountLogins,
-    status: actual === expectedAccounts.length ? "pass" : "fail",
-    expectedMinimum: expectedAccounts.length,
+    status: actual === expectedCount ? "pass" : "fail",
+    expectedMinimum: expectedCount,
     actual,
     returned: actual,
     statusField: null,
@@ -2683,7 +2740,7 @@ function loginProbeResult(accountResults) {
     statusKinds: 0,
     requiredStatuses: [],
     missingStatuses: [],
-    enoughRecords: actual === expectedAccounts.length,
+    enoughRecords: actual === expectedCount,
     enoughStatuses: true,
     enoughSecondaryKinds: true,
     batchEvidence: "not_applicable",
@@ -2989,7 +3046,7 @@ function resolveReadinessTarget({
   const factInput = plan.reportInputs?.factReport;
   const identity = factInput || {
     datasetKey: "yoyoosun-manual-acceptance",
-    target: "local-dev",
+    target: plan.accountTarget || LOCAL_DEV_TARGET,
   };
   let policy;
   try {
@@ -3070,23 +3127,29 @@ export async function verifyManualAcceptanceReadiness(
         adminPassword || process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
         "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
       );
+  const roleCredential = resolveManualAcceptanceRoleCredential({
+    target: policy.target,
+    password,
+  });
   const effectivePassword = requiredText(
-    password ||
-      process.env.MANUAL_ACCEPTANCE_PASSWORD ||
-      process.env.TRIAL_ACCOUNT_PASSWORD ||
-      process.env.ERP_ROLE_DEMO_PASSWORD,
-    "试用账号密码环境变量",
+    roleCredential.value,
+    manualAcceptanceAccountSetForTarget(policy.target)
+      .passwordEnvironmentVariable,
   );
   let accounts;
   let runtimePreflight;
   if (attestation) {
     accounts = await loginAccounts({
       backendURL: normalizedBackendURL,
+      accountProjections: plan.accountProjections,
       password: effectivePassword,
       fetchImpl,
     });
     if (!accounts.tokens.admin) {
-      throw new CliError("demo_admin 未能登录，不能核对客户试用运行时", 2);
+      throw new CliError(
+        `${manualAcceptanceAccountSetForTarget(policy.target).businessAdminUsername} 未能登录，不能核对客户试用运行时`,
+        2,
+      );
     }
     runtimePreflight = await assertSafeReadRuntime({
       policy,
@@ -3104,6 +3167,7 @@ export async function verifyManualAcceptanceReadiness(
     });
     accounts = await loginAccounts({
       backendURL: normalizedBackendURL,
+      accountProjections: plan.accountProjections,
       password: effectivePassword,
       fetchImpl,
     });
@@ -3228,7 +3292,10 @@ export async function verifyManualAcceptanceReadiness(
   const resultById = new Map(
     rawResults.map(({ probe, result }) => [probe.id, result]),
   );
-  const loginResult = loginProbeResult(accounts.results);
+  const loginResult = loginProbeResult(
+    accounts.results,
+    plan.accountProjections.length,
+  );
   resultById.set(loginResult.id, loginResult);
   const mobileResults = plan.probes
     .filter((probe) => probe.id.startsWith("mobile-tasks:"))
@@ -3286,6 +3353,7 @@ export async function verifyManualAcceptanceReadiness(
     dataVersion: policy.dataVersion,
     runId: policy.runId,
     target: policy.target,
+    rolePasswordSource: roleCredential.source,
     backendURL: normalizedBackendURL,
     databaseName: policy.databaseName,
     readOnly: true,
@@ -3476,7 +3544,7 @@ function helpText() {
       --task-report output/qa/manual-acceptance/task-data/apply-report.json \\
       --out ${DEFAULT_OUT_DIR}
 
-  说明：默认模式不会连接系统；只有同时提供 --verify、--backend-url 和 --database-name 才执行只读核对。本地超级管理员 admin 只用于运行时安全前置，demo_admin 仍按试用账号权限核对。`;
+  说明：默认模式不会连接系统；只有同时提供 --verify、--backend-url 和 --database-name 才执行只读核对。本地超级管理员 admin 只用于运行时安全前置；本地使用 demo_admin，133 使用 uat_admin，并分别按目标环境的验收账号权限核对。`;
 }
 
 export async function runManualAcceptanceReadinessCli(argv = [], deps = {}) {

@@ -2,12 +2,12 @@
 
 ## 备份范围
 
-| 范围 | 说明 | 是否提交到 Git |
-| --- | --- | --- |
-| PostgreSQL | 业务数据库；当前业务附件正文也存于 `business_attachments.content`，随整库备份 | 否 |
-| 受控 `.env` 指纹 | 只记录 hash，不记录明文 | 可记录 hash |
-| release evidence | 发布审计资料 | 可入库，必须脱敏 |
-| import / dry-run report | 导入报告摘要 | 可入库，不能含 raw rows |
+| 范围                    | 说明                                                                          | 是否提交到 Git          |
+| ----------------------- | ----------------------------------------------------------------------------- | ----------------------- |
+| PostgreSQL              | 业务数据库；当前业务附件正文也存于 `business_attachments.content`，随整库备份 | 否                      |
+| 受控 `.env` 指纹        | 只记录 hash，不记录明文                                                       | 可记录 hash             |
+| release evidence        | 发布审计资料                                                                  | 可入库，必须脱敏        |
+| import / dry-run report | 导入报告摘要                                                                  | 可入库，不能含 raw rows |
 
 ## 备份频率
 
@@ -54,7 +54,7 @@ SOURCE_POSTGRES_DSN='<postgres://erp_backup:...@host:port/database?sslmode=...>'
 7. 执行 customer config cutover read-only audit；发现遗留流程实例或任务配置 revision 锚点时停止，由人工治理，不执行自动 DML。
 8. 两项审计通过后执行 migration apply，再执行 migration status，确认 migrationAfter 和 pending files。
 9. 完成 customer config active revision 读回，保持客户入口关闭。
-10. 使用发布工作站 Keychain 当前值强制轮换稳定 `admin` 与固定十个 demo，并撤销备份中恢复出的所有旧会话。
+10. 按凭据合同的 Keychain alias 读取彼此独立的管理员 / UAT 岗位外部 secret，强制轮换稳定 `admin` 与十个 `uat_*`，并撤销备份中恢复出的所有旧会话；不得使用本地 Demo 的 `adminadmin` / `12345678`。
 11. 启动 steady 后端并运行真实登录矩阵；只有 11 个账号全部取得新 token，且人工录入 SMS 手机号时指定身份绑定读回通过，才允许恢复 Web 入口。未录入手机号不阻断密码登录验收。
 12. 执行 smoke query、健康检查和关键页面 smoke。
 13. 写入恢复演练报告。
@@ -70,10 +70,10 @@ SOURCE_POSTGRES_DSN='<postgres://erp_backup:...@host:port/database?sslmode=...>'
 
 ## RPO / RTO
 
-| 指标 | 当前建议 |
-| --- | --- |
-| RPO | 发布 / migration 前为 0；日常名义周期为 24 小时，恢复检查按 36 小时 freshness 上限阻断，实际值以目标 timer 和最新成功备份时间为准 |
-| RTO | 先以单机恢复演练结果为准，未演练前不得承诺固定时长 |
+| 指标 | 当前建议                                                                                                                          |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------- |
+| RPO  | 发布 / migration 前为 0；日常名义周期为 24 小时，恢复检查按 36 小时 freshness 上限阻断，实际值以目标 timer 和最新成功备份时间为准 |
+| RTO  | 先以单机恢复演练结果为准，未演练前不得承诺固定时长                                                                                |
 
 ## 禁止
 

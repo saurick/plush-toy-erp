@@ -16,10 +16,15 @@ import {
 export default function MaterialPurchaseContractPrintWorkspacePage() {
   const [searchParams] = useSearchParams()
   const outletContext = useOutletContext()
-  const profileCustomerKey =
+  const accountKey = String(outletContext?.adminProfile?.id || '').trim()
+  const profileCustomerKey = String(
     outletContext?.adminProfile?.effective_session?.customer?.key || ''
+  ).trim()
+  const configRevision = String(
+    outletContext?.adminProfile?.effective_session?.config_revision || ''
+  ).trim()
   const customerKey = useMemo(
-    () => resolvePrintWorkspaceCustomerKey(searchParams, profileCustomerKey),
+    () => profileCustomerKey || resolvePrintWorkspaceCustomerKey(searchParams),
     [profileCustomerKey, searchParams]
   )
   const template = getPrintTemplateByKey('material-purchase-contract')
@@ -32,10 +37,12 @@ export default function MaterialPurchaseContractPrintWorkspacePage() {
     ? buildPrintWorkspaceDraftStorageKey(
         'material-purchase-contract',
         workspaceStateID,
-        { customerKey }
+        { customerKey, accountKey, configRevision }
       )
     : buildPrintWorkspaceDraftStorageKey('material-purchase-contract', '', {
         customerKey,
+        accountKey,
+        configRevision,
       })
   const workspaceURL = useMemo(() => {
     if (!workspaceStateID || typeof window === 'undefined') {

@@ -32,9 +32,10 @@ func BuildWorkflowTaskAssignmentAuditEvent(
 	var nextAssignee map[string]any
 	if targetAssignee != nil {
 		nextAssignee = map[string]any{
-			"id":        targetAssignee.ID,
-			"username":  targetAssignee.Username,
-			"role_keys": AdminRoleKeys(targetAssignee),
+			"id":           targetAssignee.ID,
+			"username":     targetAssignee.Username,
+			"display_name": targetAssignee.DisplayName,
+			"role_keys":    AdminRoleKeys(targetAssignee),
 		}
 	}
 	payload := map[string]any{
@@ -42,6 +43,7 @@ func BuildWorkflowTaskAssignmentAuditEvent(
 		"actor": map[string]any{
 			"id":             operator.ID,
 			"username":       operator.Username,
+			"display_name":   operator.DisplayName,
 			"role_keys":      AdminRoleKeys(operator),
 			"is_super_admin": operator.IsSuperAdmin,
 		},

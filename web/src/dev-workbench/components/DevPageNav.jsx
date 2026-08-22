@@ -1,40 +1,105 @@
-import React, { useEffect, useMemo, useRef } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { CopyOutlined, FileTextOutlined } from '@ant-design/icons'
 import { Button, theme } from 'antd'
 import { Link, useLocation } from 'react-router-dom'
+import { Loading } from '@/common/components/loading'
 import ERPThemeToggle from '@/common/components/theme/ERPThemeToggle'
 import { message } from '@/common/utils/antdApp'
-import DevEnvironmentEvidencePanel from './DevEnvironmentEvidencePanel.jsx'
 import {
   DEV_DOCS_ROUTE,
+  DEV_PAGE_TITLE_BY_ROUTE,
   DEV_WORKSPACE_NAV_ITEMS,
   getDevSecondaryNavItems,
   resolveDevWorkbenchAreaKey,
 } from '../config/devRoutes.mjs'
+import { preloadDevRoute } from '../config/devRouteModules.mjs'
 
 const COPY_MESSAGE_KEY = 'dev-page-nav-copy-deep-link'
+const EMPTY_NAVIGATION_INTENT = Object.freeze({
+  sourcePathname: '',
+  targetPathname: '',
+})
+
+function normalizePathname(pathname) {
+  return pathname === '/' ? pathname : pathname.replace(/\/+$/, '')
+}
+
+function isPlainRouteClick(event) {
+  return (
+    !event.defaultPrevented &&
+    event.button === 0 &&
+    !event.metaKey &&
+    !event.altKey &&
+    !event.ctrlKey &&
+    !event.shiftKey
+  )
+}
 
 export default function DevPageNav({ sourcePath = '', navRef = null }) {
   const location = useLocation()
   const { token } = theme.useToken()
-  const currentPathname =
-    location.pathname === '/'
-      ? location.pathname
-      : location.pathname.replace(/\/+$/, '')
+  const routedPathname = normalizePathname(location.pathname)
+  const [navigationIntent, setNavigationIntent] = useState(
+    EMPTY_NAVIGATION_INTENT
+  )
+  const routePending =
+    navigationIntent.sourcePathname === routedPathname &&
+    navigationIntent.targetPathname !== '' &&
+    navigationIntent.targetPathname !== routedPathname
+  const currentPathname = routePending
+    ? navigationIntent.targetPathname
+    : routedPathname
   const currentAreaKey = resolveDevWorkbenchAreaKey(currentPathname)
   const secondaryItems = getDevSecondaryNavItems(currentAreaKey)
   const currentAreaLabel =
     DEV_WORKSPACE_NAV_ITEMS.find((item) => item.key === currentAreaKey)
       ?.label || ''
+  const pendingRouteLabel =
+    DEV_PAGE_TITLE_BY_ROUTE[currentPathname] || '目标页面'
   const currentRouteRef = useRef(null)
   const currentDeepLink = useMemo(() => {
-    const relativeLink = `${location.pathname}${location.search}${location.hash}`
+    const relativeLink = routePending
+      ? currentPathname
+      : `${location.pathname}${location.search}${location.hash}`
     if (typeof window === 'undefined') return relativeLink
     return `${window.location.origin}${relativeLink}`
-  }, [location.hash, location.pathname, location.search])
+  }, [
+    currentPathname,
+    location.hash,
+    location.pathname,
+    location.search,
+    routePending,
+  ])
   const sourceHref = sourcePath
     ? `${DEV_DOCS_ROUTE}?path=${encodeURIComponent(sourcePath)}`
     : ''
+
+  useEffect(() => {
+    setNavigationIntent((currentIntent) => {
+      if (!currentIntent.targetPathname) return currentIntent
+      const stillPending =
+        currentIntent.sourcePathname === routedPathname &&
+        currentIntent.targetPathname !== routedPathname
+      return stillPending ? currentIntent : EMPTY_NAVIGATION_INTENT
+    })
+  }, [routedPathname])
+
+  useEffect(() => {
+    const handleHistoryNavigation = () => {
+      const targetPathname = normalizePathname(window.location.pathname)
+      setNavigationIntent(
+        targetPathname === routedPathname
+          ? EMPTY_NAVIGATION_INTENT
+          : {
+              sourcePathname: routedPathname,
+              targetPathname,
+            }
+      )
+    }
+
+    window.addEventListener('popstate', handleHistoryNavigation)
+    return () => window.removeEventListener('popstate', handleHistoryNavigation)
+  }, [routedPathname])
 
   useEffect(() => {
     currentRouteRef.current?.scrollIntoView({
@@ -42,6 +107,28 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
       inline: 'nearest',
     })
   }, [currentPathname])
+
+  useEffect(() => {
+    const routePathnames = [
+      ...getDevSecondaryNavItems(currentAreaKey).map((item) => item.route),
+      ...DEV_WORKSPACE_NAV_ITEMS.map((item) => item.route),
+    ].filter((routePathname) => routePathname !== routedPathname)
+    const preloadVisibleRoutes = () => {
+      routePathnames.forEach((routePathname) => {
+        preloadDevRoute(routePathname)
+      })
+    }
+
+    if (typeof window.requestIdleCallback === 'function') {
+      const idleCallbackId = window.requestIdleCallback(preloadVisibleRoutes, {
+        timeout: 350,
+      })
+      return () => window.cancelIdleCallback(idleCallbackId)
+    }
+
+    const timeoutId = window.setTimeout(preloadVisibleRoutes, 0)
+    return () => window.clearTimeout(timeoutId)
+  }, [currentAreaKey, routedPathname])
 
   const handleCopyDeepLink = () => {
     if (typeof navigator === 'undefined' || !navigator.clipboard) {
@@ -67,11 +154,28 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
       )
   }
 
+  const handleRouteIntent = (event, targetPathname) => {
+    if (!isPlainRouteClick(event)) return
+    if (targetPathname === currentPathname) {
+      event.preventDefault()
+      return
+    }
+    setNavigationIntent({
+      sourcePathname: routedPathname,
+      targetPathname,
+    })
+  }
+
+  const handleRoutePreload = (targetPathname) => {
+    preloadDevRoute(targetPathname)
+  }
+
   return (
     <>
       <nav
         ref={navRef}
         aria-label="开发页面导航"
+        aria-busy={routePending || undefined}
         className="erp-dev-workspace-nav"
         style={{
           '--dev-nav-border': token.colorBorder,
@@ -106,6 +210,9 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
                   ref={isExact ? currentRouteRef : undefined}
                   to={item.route}
                   key={item.route}
+                  onPointerEnter={() => handleRoutePreload(item.route)}
+                  onFocus={() => handleRoutePreload(item.route)}
+                  onClick={(event) => handleRouteIntent(event, item.route)}
                   className={[
                     'erp-dev-workspace-nav__route',
                     isExact ? 'erp-dev-workspace-nav__route--active' : '',
@@ -143,6 +250,9 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
                     ref={isActive ? currentRouteRef : undefined}
                     to={item.route}
                     key={item.route}
+                    onPointerEnter={() => handleRoutePreload(item.route)}
+                    onFocus={() => handleRoutePreload(item.route)}
+                    onClick={(event) => handleRouteIntent(event, item.route)}
                     className={
                       isActive
                         ? 'erp-dev-workspace-nav__secondary-route erp-dev-workspace-nav__secondary-route--active'
@@ -186,7 +296,20 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
           </span>
         </div>
       </nav>
-      <DevEnvironmentEvidencePanel />
+      {routePending ? (
+        <div
+          className="erp-dev-route-transition"
+          style={{
+            '--dev-route-transition-bg': token.colorBgLayout,
+          }}
+        >
+          <Loading
+            title={`正在打开${pendingRouteLabel}`}
+            description="菜单仍可继续切换"
+            className="erp-dev-route-transition__loading"
+          />
+        </div>
+      ) : null}
     </>
   )
 }

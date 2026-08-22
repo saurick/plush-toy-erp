@@ -652,8 +652,7 @@ test('style-l1 operational fact mock enforces production requirement and issue a
   assert.equal(requirements.result.code, 0)
   assert.equal(requirements.result.data.material_requirements.length, 1)
   assert.equal(
-    requirements.result.data.material_requirements[0]
-      .production_operation_code,
+    requirements.result.data.material_requirements[0].production_operation_code,
     'FABRIC_PROCESSING'
   )
   assert.equal(
@@ -662,8 +661,7 @@ test('style-l1 operational fact mock enforces production requirement and issue a
     '0'
   )
   assert.equal(
-    requirements.result.data.material_requirements[0]
-      .effective_limit_quantity,
+    requirements.result.data.material_requirements[0].effective_limit_quantity,
     '10.200000'
   )
   assert.equal(
@@ -2279,6 +2277,8 @@ test('style-l1 workflow process context mock returns only visible task runtime t
   assert.equal(events.result.code, 0)
   assert.equal(events.result.data.items.length, 1)
   assert.equal(events.result.data.truncated, false)
+  assert.equal(events.result.data.items[0].actor_username, '')
+  assert.equal(events.result.data.items[0].actor_display_name, '')
 
   const missing = await call('get_task_process_context', { task_id: 84 })
   assert.equal(missing.result.code, 40010)

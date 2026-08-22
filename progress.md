@@ -4,6 +4,20 @@
 
 ## 当前活跃事项
 
+### 员工姓名与账号身份贯通（2026-08-22）
+
+- 真源 / 边界：管理员账号新增可空 `display_name` 姓名字段；账号 `username` 继续负责登录、唯一性与不可变审计身份。新建员工和资料维护要求姓名非空且最多 64 个字符，存量缺失姓名只在展示时回退账号，不做伪造回填。
+- 当前实现：员工账号新建、资料维护、账号列表、岗位与审批责任选择、当前登录人、审计日志、任务处理记录及附件 / 业务动作留痕已统一贯通姓名；面向人员的选择显示“姓名（账号）”，任务处理记录显示“姓名（岗位）”，系统事件继续显示“系统”。超级管理员仅可维护自己的姓名和手机号，其他保护边界不变。
+- 生成 / 验证：隔离 `make data` 首次生成并再次读回零漂移，只新增 `admin_users.display_name` 的 Atlas migration；`db-guard`、Go 的 biz / service / data 与两个账号命令包定向测试、Node 身份链 `92 / 92`、人工验收账号 `39 / 39`、RPC mock `33 / 33`、布局 / profile 同步 `41 / 41`、触达 ESLint / Prettier 和 `git diff --check` 均通过。Playwright 在 1440px 与 720px 实际渲染确认顶部、员工列表、新建和本人资料弹窗的姓名 / 账号口径，页面级横向溢出为 0，控制台 `0 error / 0 warning`；浏览器 RPC 全部由本地 mock 截获，未触碰后端或数据库。
+- 未做 / 边界：未连接或 apply 共享 / 目标数据库，未部署、未做客户 UAT，也未 stage、commit 或 push。
+
+### 销售、采购与委外来源单据明细顺序（2026-08-22）
+
+- 目标 / 范围：草稿销售订单、采购订单和委外订单增加显式明细顺序面板；用户在当前表单应用顺序并保存后，列表、详情、打印、导出和后续来源选择按该顺序读取。产品主数据、BOM、生产订单、Workflow 和已经形成的库存 / 出货 / 财务事实不在本次范围。
+- 真源 / 身份：三个来源单据行新增可空正整数 `display_order`，历史空值按 `line_no` 读取；既有行重排只更新 `display_order`，不改 `id / line_no`。新行号从该单据全部历史行的最大 `line_no + 1` 分配，已取消行号不复用。
+- 当前状态：schema、repository、共享前端顺序面板、三类表单接线、下游来源读取、正式字段文档、Ent 生成物、Atlas migration 与 `atlas.sum` 已在同一切片完成；隔离再生成明确报告 migration 已与目标状态同步，生成前后 diff hash 不变。`db-guard`、完整 `internal/data` Go 测试、顺序 helper / 三表单接线 Node 测试、触达 ESLint / Prettier / stylelint、Vite production build 和精确 `git diff --check` 均通过。
+- 浏览器 / 边界：独立 Playwright 会话验证默认态、上移、置顶、取消恢复、应用和键盘 Enter；720px 下页面、弹窗、列表与每行横向溢出均为 0，应用读回 ID 顺序为 `103,101,102`，干净会话控制台 `0 error / 0 warning`。未连接或 apply 共享 / 目标数据库，未运行需要独立数据库目标的 T7、全仓 full / strict、部署或客户 UAT，也未 stage、commit 或 push。
+
 ### V6 测试数据、研发工作台与双环境交付（2026-08-21 新候选检查点）
 
 - 数据与目标检查点：Core Demo 与 Scenario V6 继续使用稳定业务编码，当前 canonical `dataVersion=2026.08.15-v6`、`runId=20260815-V6`、`semanticDigest=97c7dfca12092f91a2e6b254b05f938acaa51e27ec9a4fcf14d7adfa5b24c632`。`d5d16d3e2732e1da321da37ff39d22783cb108da` 曾完成本地门禁并部署到登记的 `customer-trial-133`，但本地长期 Scenario 续跑暴露新的历史 ProcessRuntime 幂等问题，后续源码修改已使该 SHA 的测试、制品和目标报告失去最终候选资格，只保留为可回滚历史证据。

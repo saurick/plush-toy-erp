@@ -31,6 +31,7 @@ import {
   freezeApprovalSettingsPayload,
   nextApprovalSettingsRevision,
 } from '../utils/approvalSettingsDraft.mjs'
+import { formatAdminIdentity } from '../utils/adminIdentity.mjs'
 import { getRoleDisplayName, ROLE_DISPLAY_NAMES } from '../utils/roleKeys.mjs'
 
 const { Text, Title } = Typography
@@ -215,7 +216,9 @@ function memberLabel(member, adminByID) {
   const role = getRoleDisplayName(member.role_key)
   const admin = adminByID.get(Number(member.user_id || 0))
   return `${strategy} · ${role}${
-    admin ? ` · ${admin.username || `员工 ${admin.id}`}` : ''
+    admin
+      ? ` · ${formatAdminIdentity(admin, { fallback: `员工 ${admin.id}` })}`
+      : ''
   }`
 }
 
@@ -471,7 +474,9 @@ export default function ApprovalResponsibilityPanel({
         } else if (occupiedBy) {
           reason = `已用于${strategyShortLabel(occupiedBy)}责任`
         }
-        const displayLabel = admin.username || admin.phone || `员工 ${adminID}`
+        const displayLabel = formatAdminIdentity(admin, {
+          fallback: admin.phone || `员工 ${adminID}`,
+        })
         return {
           value: adminID,
           label: reason ? `${displayLabel}（${reason}）` : displayLabel,

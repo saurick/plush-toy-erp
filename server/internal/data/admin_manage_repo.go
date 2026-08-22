@@ -71,6 +71,7 @@ func mapEntAdminUser(a *ent.AdminUser) *biz.AdminUser {
 	return &biz.AdminUser{
 		ID:              a.ID,
 		Username:        a.Username,
+		DisplayName:     stringValue(a.DisplayName),
 		Phone:           stringValue(a.Phone),
 		PasswordHash:    a.PasswordHash,
 		IsSuperAdmin:    a.IsSuperAdmin,
@@ -153,8 +154,9 @@ func (r *adminManageRepo) CreateAdminWithAudit(ctx context.Context, command *biz
 	}
 	in := command.Admin
 	username := strings.TrimSpace(in.Username)
+	displayName := strings.TrimSpace(in.DisplayName)
 	phone := strings.TrimSpace(in.Phone)
-	if username == "" || strings.TrimSpace(in.PasswordHash) == "" {
+	if username == "" || displayName == "" || strings.TrimSpace(in.PasswordHash) == "" {
 		return nil, biz.ErrBadParam
 	}
 	roleKeys := biz.NormalizeAdminRoleKeys(in.RoleKeys)
@@ -179,6 +181,7 @@ func (r *adminManageRepo) CreateAdminWithAudit(ctx context.Context, command *biz
 
 	row, err := tx.AdminUser.Create().
 		SetUsername(username).
+		SetDisplayName(displayName).
 		SetNillablePhone(stringPtrOrNil(phone)).
 		SetPasswordHash(in.PasswordHash).
 		SetIsSuperAdmin(false).
@@ -662,11 +665,15 @@ func validateWarehouseDataScopeResourcesInTx(ctx context.Context, tx *ent.Tx, sc
 	return nil
 }
 
-func (r *adminManageRepo) SetAdminPhoneWithAudit(ctx context.Context, change *biz.AdminPhoneChange) (*biz.AdminUser, error) {
+func (r *adminManageRepo) SetAdminProfileWithAudit(ctx context.Context, change *biz.AdminProfileChange) (*biz.AdminUser, error) {
 	if change == nil || change.AdminID <= 0 || change.OperatorID <= 0 {
 		return nil, biz.ErrBadParam
 	}
+	displayName := strings.TrimSpace(change.DisplayName)
 	phone := strings.TrimSpace(change.Phone)
+	if displayName == "" {
+		return nil, biz.ErrBadParam
+	}
 
 	tx, err := r.data.postgres.Tx(ctx)
 	if err != nil {
@@ -678,13 +685,13 @@ func (r *adminManageRepo) SetAdminPhoneWithAudit(ctx context.Context, change *bi
 	if err != nil {
 		return nil, err
 	}
-	if err := biz.ValidateAdminControlTarget(operator, before); err != nil {
+	if err := biz.ValidateAdminProfileTarget(operator, before); err != nil {
 		return nil, err
 	}
 	if before.AccountStatus() == biz.AdminAccountStatusRevoked {
 		return nil, biz.ErrAdminRevoked
 	}
-	update := tx.AdminUser.Update().Where(adminuser.ID(before.ID), adminuser.RevokedAtIsNil())
+	update := tx.AdminUser.Update().Where(adminuser.ID(before.ID), adminuser.RevokedAtIsNil()).SetDisplayName(displayName)
 	if phone == "" {
 		update = update.ClearPhone()
 	} else {
@@ -706,7 +713,7 @@ func (r *adminManageRepo) SetAdminPhoneWithAudit(ctx context.Context, change *bi
 	}
 	auditEvent, err := biz.BuildAdminControlAuditEvent(
 		operator,
-		"admin_user.phone.set",
+		"admin_user.profile.set",
 		"admin_user",
 		after.ID,
 		after.Username,

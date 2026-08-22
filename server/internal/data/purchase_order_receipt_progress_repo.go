@@ -34,10 +34,11 @@ func (r *purchaseOrderRepo) GetPurchaseOrderReceiptProgress(
 			query.
 				WithMaterial().
 				WithUnit().
-				Order(
-					purchaseorderitem.ByLineNo(),
-					purchaseorderitem.ByID(),
-				)
+				Order(sourceDocumentItemOrder(
+					purchaseorderitem.FieldDisplayOrder,
+					purchaseorderitem.FieldLineNo,
+					purchaseorderitem.FieldID,
+				))
 		}).
 		Only(ctx)
 	if err != nil {

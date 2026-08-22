@@ -15,7 +15,7 @@
 | `$plush-print-template-source-governance` | 客户 Excel/PDF/图片源、纸张版式、字段映射、模板编辑与 PDF/打印保真 |
 | `$plush-seed-import-governance` | seed、fixture、模拟数据、import dry-run、批次与数据 cleanup 边界 |
 | `$plush-manual-acceptance-governance` | 人工验收目录/批次、岗位账号/任务、浏览器/PDF 与人工证据、签收和退出清理 |
-| `$plush-test-governance` | 按影响面选择文档、领域/API、页面、真实数据库或发布验证；内部 T0-T8 只作工作台追踪键 |
+| `$plush-test-governance` | 按影响面选择文档、领域/API、页面、真实数据库或发布验证，并治理网页 GPT 的 review-only 快照；T0-T8 只作工作台追踪键 |
 | `$plush-operations-governance` | runtime 诊断、可观测/错误、安全/隐私、发布、迁移和回滚 |
 
 ## 选择规则

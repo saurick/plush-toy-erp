@@ -40,7 +40,7 @@ const VALID_ENV = {
   SMOKE_ENDPOINT: "https://erp.example.invalid",
   SMOKE_BACKEND_URL: "https://backend.example.invalid",
   MANUAL_ACCEPTANCE_ADMIN_PASSWORD: "admin-secret-distinct",
-  MANUAL_ACCEPTANCE_PASSWORD: "demo-secret-distinct",
+  MANUAL_ACCEPTANCE_UAT_PASSWORD: "uat-secret-distinct",
   MANUAL_ACCEPTANCE_SMS_PHONE: "13800138000",
   ROLLBACK_TARGET_RELEASE: "20260628T1200-previous",
   ROLLBACK_TRIGGER_SCENARIO: "smoke failed after activation",
@@ -319,9 +319,13 @@ test("closeout runner report-only keeps target smoke report sanitized", () => {
   assert.equal(payload.results.length, 0);
   assert.equal(payload.plan.executeReady, true);
   assert.deepEqual(payload.plan.actions[0].commands[0].envKeys, [
+    "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
     "MANUAL_ACCEPTANCE_SMS_PHONE",
+    "MANUAL_ACCEPTANCE_UAT_PASSWORD",
   ]);
+  assert.match(content, /MANUAL_ACCEPTANCE_ADMIN_PASSWORD=<redacted>/);
   assert.match(content, /MANUAL_ACCEPTANCE_SMS_PHONE=<redacted>/);
+  assert.match(content, /MANUAL_ACCEPTANCE_UAT_PASSWORD=<redacted>/);
   assert.match(
     payload.plan.actions[0].commands[0].displayCommand,
     /run-smoke\.sh .*--endpoint https:\/\/erp\.example\.invalid/,
@@ -366,7 +370,9 @@ test("closeout runner report-only keeps customer config smoke token sanitized", 
   assert(smokeCommand);
   assert.deepEqual(smokeCommand.envKeys, [
     "CUSTOMER_CONFIG_ADMIN_TOKEN",
+    "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
     "MANUAL_ACCEPTANCE_SMS_PHONE",
+    "MANUAL_ACCEPTANCE_UAT_PASSWORD",
   ]);
   assert.match(
     smokeCommand.displayCommand,
@@ -374,7 +380,15 @@ test("closeout runner report-only keeps customer config smoke token sanitized", 
   );
   assert.match(
     smokeCommand.displayCommand,
+    /MANUAL_ACCEPTANCE_ADMIN_PASSWORD=<redacted>/,
+  );
+  assert.match(
+    smokeCommand.displayCommand,
     /MANUAL_ACCEPTANCE_SMS_PHONE=<redacted>/,
+  );
+  assert.match(
+    smokeCommand.displayCommand,
+    /MANUAL_ACCEPTANCE_UAT_PASSWORD=<redacted>/,
   );
   assert.match(
     smokeCommand.displayCommand,

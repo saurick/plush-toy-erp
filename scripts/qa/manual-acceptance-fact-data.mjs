@@ -32,6 +32,11 @@ import {
 import { evaluateManualAcceptanceOutsourcingInventoryCoverage } from "./manual-acceptance-fact-report-contract.mjs";
 import { inspectFinanceFieldContract } from "./manual-acceptance-finance-field-contract.mjs";
 import { approvePurchaseOrderThroughProcess } from "./purchase-order-approval-process.mjs";
+import {
+  LOCAL_DEMO_ACCOUNT_SET,
+  manualAcceptanceAccountSetForTarget,
+  resolveManualAcceptanceRoleCredential,
+} from "./manual-acceptance-account-identities.mjs";
 
 const CUSTOMER_KEY = "yoyoosun";
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
@@ -61,15 +66,24 @@ const RAW_RPC_ENDPOINTS = new Set([
   "operational_fact.cancel_finance_fact",
 ]);
 const ROLE_USERS = Object.freeze({
-  boss: "demo_boss",
-  purchase: "demo_purchase",
-  quality: "demo_quality",
-  warehouse: "demo_warehouse",
-  production: "demo_production",
-  pmc: "demo_pmc",
-  sales: "demo_sales",
-  finance: "demo_finance",
+  boss: LOCAL_DEMO_ACCOUNT_SET.roleUsernames.boss,
+  purchase: LOCAL_DEMO_ACCOUNT_SET.roleUsernames.purchase,
+  quality: LOCAL_DEMO_ACCOUNT_SET.roleUsernames.quality,
+  warehouse: LOCAL_DEMO_ACCOUNT_SET.roleUsernames.warehouse,
+  production: LOCAL_DEMO_ACCOUNT_SET.roleUsernames.production,
+  pmc: LOCAL_DEMO_ACCOUNT_SET.roleUsernames.pmc,
+  sales: LOCAL_DEMO_ACCOUNT_SET.roleUsernames.sales,
+  finance: LOCAL_DEMO_ACCOUNT_SET.roleUsernames.finance,
 });
+
+function factRoleUsersForTarget(target) {
+  const usernames = manualAcceptanceAccountSetForTarget(target).roleUsernames;
+  return Object.freeze(
+    Object.fromEntries(
+      Object.keys(ROLE_USERS).map((roleKey) => [roleKey, usernames[roleKey]]),
+    ),
+  );
+}
 const REFERENCE_KEYS = Object.freeze([
   "productionOrders",
   "productionFacts",
@@ -617,6 +631,7 @@ export function buildManualAcceptanceFactPlan(sourceReport) {
     dataVersion: report.dataVersion,
     runId: report.runId,
     target: policy.target,
+    roleUsers: factRoleUsersForTarget(policy.target),
     backendURL: policy.backendURL,
     databaseName: policy.databaseName,
     semanticDigest: report.semanticDigest,
@@ -807,6 +822,15 @@ export function assertManualAcceptanceAdminProfile(profile) {
 }
 
 async function createExecutionContext(plan, options = {}) {
+  if (
+    JSON.stringify(plan.roleUsers) !==
+    JSON.stringify(factRoleUsersForTarget(plan.target))
+  ) {
+    throw new CliError(
+      `${plan.target} fact role users do not match the target account contract`,
+      2,
+    );
+  }
   if (options.rpc && options.runtime)
     return { rpc: options.rpc, runtime: options.runtime };
   const fetchImpl = options.fetchImpl || fetch;
@@ -826,18 +850,21 @@ async function createExecutionContext(plan, options = {}) {
       2,
     );
   }
+  const roleCredential = resolveManualAcceptanceRoleCredential({
+    target: plan.target,
+    password: options.password,
+  });
   const rolePassword = requiredText(
-    options.password ||
-      process.env.MANUAL_ACCEPTANCE_PASSWORD ||
-      process.env.TRIAL_ACCOUNT_PASSWORD,
-    "MANUAL_ACCEPTANCE_PASSWORD/TRIAL_ACCOUNT_PASSWORD",
+    roleCredential.value,
+    manualAcceptanceAccountSetForTarget(plan.target)
+      .passwordEnvironmentVariable,
   );
   const adminPassword = requiredText(
     options.adminPassword || process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
     "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
   );
   const tokens = {};
-  for (const [role, username] of Object.entries(ROLE_USERS)) {
+  for (const [role, username] of Object.entries(plan.roleUsers)) {
     tokens[role] = await login({
       backendURL: plan.backendURL,
       username,
@@ -895,6 +922,7 @@ async function createExecutionContext(plan, options = {}) {
     });
   return {
     rpc,
+    rolePasswordSource: roleCredential.source,
     targetConfirmation:
       options.targetConfirmation ||
       process.env.MANUAL_ACCEPTANCE_TARGET_CONFIRM,

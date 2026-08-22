@@ -1040,11 +1040,16 @@ test('workflowApi: assignment options expose only the strict task-scoped project
         can_return_to_pool: true,
         reason_code: 'allowed',
         reason: '可以转交',
-        current_assignee: { admin_id: 7, username: 'quality_primary' },
+        current_assignee: {
+          admin_id: 7,
+          username: 'quality_primary',
+          display_name: '主检员',
+        },
         candidates: [
           {
             admin_id: 8,
             username: 'quality_backup',
+            display_name: '备用质检员',
             role_keys: ['quality'],
             role_label: '品质',
           },
@@ -1060,6 +1065,7 @@ test('workflowApi: assignment options expose only the strict task-scoped project
     task_id: 42,
   })
   assert.equal(assignment.candidates[0].username, 'quality_backup')
+  assert.equal(assignment.candidates[0].display_name, '备用质检员')
   assert.deepEqual(calls, [
     { method: 'get_task_assignment_options', params: { task_id: 42 } },
   ])

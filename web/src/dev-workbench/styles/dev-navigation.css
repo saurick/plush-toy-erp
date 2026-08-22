@@ -12,6 +12,7 @@
 
 .erp-dev-workspace-nav {
   position: sticky;
+  z-index: 30;
   top: 16px;
   grid-row: 1 / span 40;
   display: flex;
@@ -26,6 +27,25 @@
   box-shadow:
     0 1px 2px rgb(15 23 42 / 0.04),
     0 12px 28px rgb(15 23 42 / 0.06);
+}
+
+.erp-dev-workspace-nav[aria-busy='true'] ~ :not(.erp-dev-route-transition) {
+  visibility: hidden;
+}
+
+.erp-dev-route-transition {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px 24px 24px 252px;
+  background: var(--dev-route-transition-bg);
+}
+
+.erp-dev-route-transition__loading.loading-page--inline {
+  min-height: 100%;
+  padding: 24px;
 }
 
 .erp-dev-workspace-nav__brand {
@@ -439,6 +459,10 @@
     height: auto;
     min-height: 0;
     margin: 0 auto 12px;
+  }
+
+  .erp-dev-route-transition {
+    padding: 8px;
   }
 
   .erp-dev-workspace-nav__brand {

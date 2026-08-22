@@ -1153,15 +1153,15 @@ func entFinanceFactToBiz(row *ent.FinanceFact) *biz.FinanceFact {
 	var posterName *string
 	var settlerName *string
 	if poster, err := row.Edges.PosterOrErr(); err == nil && poster != nil {
-		name := poster.Username
+		name := biz.AdminDisplayName(mapEntAdminUser(poster))
 		posterName = &name
 	}
 	if settler, err := row.Edges.SettlerOrErr(); err == nil && settler != nil {
-		name := settler.Username
+		name := biz.AdminDisplayName(mapEntAdminUser(settler))
 		settlerName = &name
 	}
 	if canceller, err := row.Edges.CancellerOrErr(); err == nil && canceller != nil {
-		name := canceller.Username
+		name := biz.AdminDisplayName(mapEntAdminUser(canceller))
 		cancellerName = &name
 	}
 	return &biz.FinanceFact{ID: row.ID, FactNo: row.FactNo, FactType: row.FactType, Status: row.Status, Version: row.Version, CounterpartyType: row.CounterpartyType, CounterpartyID: row.CounterpartyID, Amount: row.Amount, OutstandingAmount: row.Amount, FeeAmount: row.FeeAmount, Currency: row.Currency, CollectionType: row.CollectionType, PaymentTerm: row.PaymentTerm, PaymentTermDays: row.PaymentTermDays, DueAt: row.DueAt, InvoiceCategory: row.InvoiceCategory, SourceType: row.SourceType, SourceID: row.SourceID, SourceLineID: row.SourceLineID, IdempotencyKey: row.IdempotencyKey, OccurredAt: row.OccurredAt, PostedAt: row.PostedAt, PostedBy: row.PostedBy, PostedByName: posterName, SettledAt: row.SettledAt, SettledBy: row.SettledBy, SettledByName: settlerName, CancelledAt: row.CancelledAt, CancelledBy: row.CancelledBy, CancelledByName: cancellerName, CancelReason: row.CancelReason, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}

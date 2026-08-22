@@ -6,7 +6,12 @@ import React, {
   useRef,
   useState,
 } from 'react'
-import { Navigate, useParams, useSearchParams } from 'react-router-dom'
+import {
+  Navigate,
+  useOutletContext,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import PrintAppendixImageManager, {
@@ -45,6 +50,7 @@ import {
   readPrintWorkspaceDraftSnapshot,
   resolvePrintWorkspaceDraftMode,
   resolvePrintWorkspaceEntrySource,
+  resolvePrintWorkspaceCustomerKey,
   resolvePrintWorkspaceStateID,
 } from '../utils/printWorkspace.js'
 import {
@@ -2543,6 +2549,14 @@ function WorkInstructionContinuationPage({
 export default function EngineeringPrintWorkspacePage() {
   const { templateKey = '' } = useParams()
   const [searchParams] = useSearchParams()
+  const outletContext = useOutletContext()
+  const accountKey = String(outletContext?.adminProfile?.id || '').trim()
+  const profileCustomerKey = String(
+    outletContext?.adminProfile?.effective_session?.customer?.key || ''
+  ).trim()
+  const configRevision = String(
+    outletContext?.adminProfile?.effective_session?.config_revision || ''
+  ).trim()
   const template = getPrintTemplateByKey(templateKey)
   const workspaceStateID = resolvePrintWorkspaceStateID(searchParams)
   const entrySource = resolvePrintWorkspaceEntrySource(searchParams)
@@ -2550,15 +2564,21 @@ export default function EngineeringPrintWorkspacePage() {
     resolvePrintWorkspaceDraftMode(searchParams) ===
     PRINT_WORKSPACE_DRAFT_MODE.FRESH
   const customerKey = useMemo(
-    () => String(searchParams.get('customer_key') || '').trim(),
-    [searchParams]
+    () => profileCustomerKey || resolvePrintWorkspaceCustomerKey(searchParams),
+    [profileCustomerKey, searchParams]
   )
   const businessInput = entrySource === PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS
   const draftStorageKey = workspaceStateID
     ? buildPrintWorkspaceDraftStorageKey(templateKey, workspaceStateID, {
         customerKey,
+        accountKey,
+        configRevision,
       })
-    : buildPrintWorkspaceDraftStorageKey(templateKey, '', { customerKey })
+    : buildPrintWorkspaceDraftStorageKey(templateKey, '', {
+        customerKey,
+        accountKey,
+        configRevision,
+      })
   const workspaceURL = useMemo(() => {
     if (!workspaceStateID || typeof window === 'undefined') {
       return ''

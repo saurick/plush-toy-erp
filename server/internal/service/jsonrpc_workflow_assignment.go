@@ -77,19 +77,25 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskAssignmentOptions(
 			}
 		}
 		sort.Slice(eligible, func(i, j int) bool {
-			left := strings.ToLower(strings.TrimSpace(eligible[i].Username))
-			right := strings.ToLower(strings.TrimSpace(eligible[j].Username))
+			left := strings.ToLower(biz.AdminDisplayName(eligible[i]))
+			right := strings.ToLower(biz.AdminDisplayName(eligible[j]))
 			if left == right {
-				return eligible[i].ID < eligible[j].ID
+				leftUsername := strings.ToLower(strings.TrimSpace(eligible[i].Username))
+				rightUsername := strings.ToLower(strings.TrimSpace(eligible[j].Username))
+				if leftUsername == rightUsername {
+					return eligible[i].ID < eligible[j].ID
+				}
+				return leftUsername < rightUsername
 			}
 			return left < right
 		})
 		for _, candidate := range eligible {
 			candidates = append(candidates, map[string]any{
-				"admin_id":   candidate.ID,
-				"username":   candidate.Username,
-				"role_keys":  toAnySliceString([]string{biz.NormalizeRoleKey(task.OwnerRoleKey)}),
-				"role_label": workflowTaskOwnerRoleDisplayName(task.OwnerRoleKey),
+				"admin_id":     candidate.ID,
+				"username":     candidate.Username,
+				"display_name": candidate.DisplayName,
+				"role_keys":    toAnySliceString([]string{biz.NormalizeRoleKey(task.OwnerRoleKey)}),
+				"role_label":   workflowTaskOwnerRoleDisplayName(task.OwnerRoleKey),
 			})
 		}
 	}
@@ -111,8 +117,9 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskAssignmentOptions(
 		currentAssignee, currentErr := d.adminReader.GetAdminByID(ctx, *task.AssigneeID)
 		if currentErr == nil && currentAssignee != nil {
 			options["current_assignee"] = map[string]any{
-				"admin_id": currentAssignee.ID,
-				"username": currentAssignee.Username,
+				"admin_id":     currentAssignee.ID,
+				"username":     currentAssignee.Username,
+				"display_name": currentAssignee.DisplayName,
 			}
 		} else if currentErr != nil && !errors.Is(currentErr, biz.ErrAdminNotFound) {
 			return id, d.mapAdminManageError(ctx, currentErr), nil

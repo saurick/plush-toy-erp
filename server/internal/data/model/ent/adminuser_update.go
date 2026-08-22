@@ -42,6 +42,26 @@ func (_u *AdminUserUpdate) SetNillableUsername(v *string) *AdminUserUpdate {
 	return _u
 }
 
+// SetDisplayName sets the "display_name" field.
+func (_u *AdminUserUpdate) SetDisplayName(v string) *AdminUserUpdate {
+	_u.mutation.SetDisplayName(v)
+	return _u
+}
+
+// SetNillableDisplayName sets the "display_name" field if the given value is not nil.
+func (_u *AdminUserUpdate) SetNillableDisplayName(v *string) *AdminUserUpdate {
+	if v != nil {
+		_u.SetDisplayName(*v)
+	}
+	return _u
+}
+
+// ClearDisplayName clears the value of the "display_name" field.
+func (_u *AdminUserUpdate) ClearDisplayName() *AdminUserUpdate {
+	_u.mutation.ClearDisplayName()
+	return _u
+}
+
 // SetPhone sets the "phone" field.
 func (_u *AdminUserUpdate) SetPhone(v string) *AdminUserUpdate {
 	_u.mutation.SetPhone(v)
@@ -300,6 +320,11 @@ func (_u *AdminUserUpdate) check() error {
 			return &ValidationError{Name: "username", err: fmt.Errorf(`ent: validator failed for field "AdminUser.username": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.DisplayName(); ok {
+		if err := adminuser.DisplayNameValidator(v); err != nil {
+			return &ValidationError{Name: "display_name", err: fmt.Errorf(`ent: validator failed for field "AdminUser.display_name": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Phone(); ok {
 		if err := adminuser.PhoneValidator(v); err != nil {
 			return &ValidationError{Name: "phone", err: fmt.Errorf(`ent: validator failed for field "AdminUser.phone": %w`, err)}
@@ -347,6 +372,12 @@ func (_u *AdminUserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.Username(); ok {
 		_spec.SetField(adminuser.FieldUsername, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.DisplayName(); ok {
+		_spec.SetField(adminuser.FieldDisplayName, field.TypeString, value)
+	}
+	if _u.mutation.DisplayNameCleared() {
+		_spec.ClearField(adminuser.FieldDisplayName, field.TypeString)
 	}
 	if value, ok := _u.mutation.Phone(); ok {
 		_spec.SetField(adminuser.FieldPhone, field.TypeString, value)
@@ -439,6 +470,26 @@ func (_u *AdminUserUpdateOne) SetNillableUsername(v *string) *AdminUserUpdateOne
 	if v != nil {
 		_u.SetUsername(*v)
 	}
+	return _u
+}
+
+// SetDisplayName sets the "display_name" field.
+func (_u *AdminUserUpdateOne) SetDisplayName(v string) *AdminUserUpdateOne {
+	_u.mutation.SetDisplayName(v)
+	return _u
+}
+
+// SetNillableDisplayName sets the "display_name" field if the given value is not nil.
+func (_u *AdminUserUpdateOne) SetNillableDisplayName(v *string) *AdminUserUpdateOne {
+	if v != nil {
+		_u.SetDisplayName(*v)
+	}
+	return _u
+}
+
+// ClearDisplayName clears the value of the "display_name" field.
+func (_u *AdminUserUpdateOne) ClearDisplayName() *AdminUserUpdateOne {
+	_u.mutation.ClearDisplayName()
 	return _u
 }
 
@@ -713,6 +764,11 @@ func (_u *AdminUserUpdateOne) check() error {
 			return &ValidationError{Name: "username", err: fmt.Errorf(`ent: validator failed for field "AdminUser.username": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.DisplayName(); ok {
+		if err := adminuser.DisplayNameValidator(v); err != nil {
+			return &ValidationError{Name: "display_name", err: fmt.Errorf(`ent: validator failed for field "AdminUser.display_name": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Phone(); ok {
 		if err := adminuser.PhoneValidator(v); err != nil {
 			return &ValidationError{Name: "phone", err: fmt.Errorf(`ent: validator failed for field "AdminUser.phone": %w`, err)}
@@ -777,6 +833,12 @@ func (_u *AdminUserUpdateOne) sqlSave(ctx context.Context) (_node *AdminUser, er
 	}
 	if value, ok := _u.mutation.Username(); ok {
 		_spec.SetField(adminuser.FieldUsername, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.DisplayName(); ok {
+		_spec.SetField(adminuser.FieldDisplayName, field.TypeString, value)
+	}
+	if _u.mutation.DisplayNameCleared() {
+		_spec.ClearField(adminuser.FieldDisplayName, field.TypeString)
 	}
 	if value, ok := _u.mutation.Phone(); ok {
 		_spec.SetField(adminuser.FieldPhone, field.TypeString, value)

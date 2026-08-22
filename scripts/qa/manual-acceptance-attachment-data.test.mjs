@@ -50,24 +50,34 @@ test("attachment copy stays short, ordinary, and clearly sample-only", () => {
 test("attachment actors use an independent role password", () => {
   assert.deepEqual(
     resolveAttachmentCredentials({
+      target: "local-dev",
       adminPassword: "admin-secret",
       rolePassword: "role-secret",
       env: {},
     }),
-    { adminPassword: "admin-secret", rolePassword: "role-secret" },
+    {
+      adminPassword: "admin-secret",
+      rolePassword: "role-secret",
+      rolePasswordSource: "explicit",
+    },
   );
   assert.deepEqual(
     resolveAttachmentCredentials({
-      attestation: { source: "out-of-band" },
+      target: "customer-trial-133",
       adminPassword: "admin-secret",
       rolePassword: "role-secret",
       env: {},
     }),
-    { adminPassword: "admin-secret", rolePassword: "role-secret" },
+    {
+      adminPassword: "admin-secret",
+      rolePassword: "role-secret",
+      rolePasswordSource: "explicit",
+    },
   );
   assert.throws(
     () =>
       resolveAttachmentCredentials({
+        target: "local-dev",
         adminPassword: "same-secret",
         rolePassword: "same-secret",
         env: {},
@@ -75,7 +85,12 @@ test("attachment actors use an independent role password", () => {
     /must be independent/u,
   );
   assert.throws(
-    () => resolveAttachmentCredentials({ adminPassword: "admin", env: {} }),
+    () =>
+      resolveAttachmentCredentials({
+        target: "local-dev",
+        adminPassword: "admin",
+        env: {},
+      }),
     /MANUAL_ACCEPTANCE_PASSWORD/u,
   );
 });
@@ -88,13 +103,12 @@ function reports(overrides = {}) {
     (target === CUSTOMER_TRIAL_133_TARGET
       ? CUSTOMER_TRIAL_133_DATABASE
       : LOCAL_DATABASE_NAME);
-  const runtime =
-    overrides.runtime || {
-      environment: "local",
-      customerKey: "yoyoosun",
-      configRevision: "cfg-local-1",
-      source: "active_customer_config_revision",
-    };
+  const runtime = overrides.runtime || {
+    environment: "local",
+    customerKey: "yoyoosun",
+    configRevision: "cfg-local-1",
+    source: "active_customer_config_revision",
+  };
   const identity = {
     datasetKey: "yoyoosun-manual-acceptance",
     dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
@@ -374,9 +388,7 @@ test("attachment report batch binds exact dataset identity and registered target
   const local = reports();
   const resolvedLocal = validateAttachmentReportBatch({
     ...local,
-    targetConfirmation: manualAcceptanceTargetConfirmation(
-      local.factReport,
-    ),
+    targetConfirmation: manualAcceptanceTargetConfirmation(local.factReport),
     targetAttestation: undefined,
   });
   assert.equal(resolvedLocal.policy.target, "local-dev");
@@ -403,8 +415,7 @@ test("attachment report batch binds exact dataset identity and registered target
     () => validateAttachmentReportBatch(remote),
     /MANUAL_ACCEPTANCE_TARGET_CONFIRM/u,
   );
-  const targetConfirmation =
-    `APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:${CUSTOMER_TRIAL_133_TARGET}:${CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION}:${CURRENT_MANUAL_ACCEPTANCE_RUN_ID}`;
+  const targetConfirmation = `APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:${CUSTOMER_TRIAL_133_TARGET}:${CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION}:${CURRENT_MANUAL_ACCEPTANCE_RUN_ID}`;
   assert.throws(
     () => validateAttachmentReportBatch({ ...remote, targetConfirmation }),
     /attestation is required/u,

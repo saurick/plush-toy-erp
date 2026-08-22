@@ -926,6 +926,8 @@ export default function BOMVersionsPage() {
         entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
         initialDraft,
         customerKey: activeCustomerKey,
+        accountKey: adminProfile?.id,
+        configRevision: adminProfile?.effective_session?.config_revision || '',
       })
       message.success(
         templateKey === COLOR_CARD_TEMPLATE_KEY

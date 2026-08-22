@@ -190,6 +190,96 @@ func TestOutsourcingOrderRepoProductAndMaterialSubjects(t *testing.T) {
 	}
 }
 
+func TestOutsourcingOrderRepoSaveWithItemsKeepsLineIdentityWhileReordering(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:outsourcing_order_display_order?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+	uc := biz.NewOutsourcingOrderUsecase(NewOutsourcingOrderRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard)))
+
+	unit := client.Unit.Create().SetCode("PCS-OUT-ORDER").SetName("件").SaveX(ctx)
+	product := client.Product.Create().SetCode("PROD-OUT-ORDER").SetName("委外成品").SetDefaultUnitID(unit.ID).SaveX(ctx)
+	process := client.Process.Create().SetCode("PROC-OUT-ORDER").SetName("委外工序").SetOutsourcingEnabled(true).SaveX(ctx)
+	supplier := client.Supplier.Create().SetCode("SUP-OUT-ORDER").SetName("委外供应商").SetSupplierType("outsourcing").SaveX(ctx)
+	orderDate := time.Date(2026, 8, 22, 0, 0, 0, 0, time.UTC)
+	qty := decimal.NewFromInt(10)
+	productID := product.ID
+	line := func(id, lineNo int) *biz.OutsourcingOrderItemSaveMutation {
+		return &biz.OutsourcingOrderItemSaveMutation{
+			ID: id,
+			OutsourcingOrderItemMutation: biz.OutsourcingOrderItemMutation{
+				LineNo:              lineNo,
+				SubjectType:         biz.OutsourcingOrderSubjectProduct,
+				ProductID:           &productID,
+				ProcessID:           process.ID,
+				UnitID:              unit.ID,
+				OutsourcingQuantity: qty,
+			},
+		}
+	}
+	created, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &biz.OutsourcingOrderMutation{
+		OutsourcingOrderNo: "OUT-DISPLAY-ORDER",
+		SupplierID:         supplier.ID,
+		OrderDate:          orderDate,
+	}, []*biz.OutsourcingOrderItemSaveMutation{line(0, 1), line(0, 2), line(0, 3)})
+	if err != nil {
+		t.Fatalf("create outsourcing order with items: %v", err)
+	}
+	first, second, third := created.Items[0], created.Items[1], created.Items[2]
+	orderMutation := func(expectedVersion int) *biz.OutsourcingOrderMutation {
+		return &biz.OutsourcingOrderMutation{
+			OutsourcingOrderNo:    created.Order.OutsourcingOrderNo,
+			SupplierID:            supplier.ID,
+			Currency:              created.Order.Currency,
+			PaymentTermDays:       created.Order.PaymentTermDays,
+			SupplierSnapshot:      created.Order.SupplierSnapshot,
+			ContractPartySnapshot: created.Order.ContractPartySnapshot,
+			OrderDate:             orderDate,
+			ExpectedVersion:       expectedVersion,
+		}
+	}
+
+	reordered, err := uc.SaveOutsourcingOrderWithItems(ctx, created.Order.ID, orderMutation(created.Order.Version), []*biz.OutsourcingOrderItemSaveMutation{
+		line(third.ID, 1),
+		line(first.ID, 2),
+		line(second.ID, 3),
+	})
+	if err != nil {
+		t.Fatalf("reorder outsourcing order items: %v", err)
+	}
+	if len(reordered.Items) != 3 || reordered.Items[0].ID != third.ID || reordered.Items[1].ID != first.ID || reordered.Items[2].ID != second.ID {
+		t.Fatalf("unexpected reordered items: %#v", reordered.Items)
+	}
+	if reordered.Items[0].LineNo != third.LineNo || reordered.Items[1].LineNo != first.LineNo || reordered.Items[2].LineNo != second.LineNo {
+		t.Fatalf("line identity changed during reorder: %#v", reordered.Items)
+	}
+	for itemID, expectedOrder := range map[int]int{third.ID: 1, first.ID: 2, second.ID: 3} {
+		row := client.OutsourcingOrderItem.GetX(ctx, itemID)
+		if row.DisplayOrder == nil || *row.DisplayOrder != expectedOrder {
+			t.Fatalf("item %d display_order = %v, want %d", itemID, row.DisplayOrder, expectedOrder)
+		}
+	}
+
+	_, err = uc.SaveOutsourcingOrderWithItems(ctx, created.Order.ID, orderMutation(reordered.Order.Version), []*biz.OutsourcingOrderItemSaveMutation{
+		line(third.ID, 1),
+		line(0, 2),
+		line(first.ID, 3),
+	})
+	if err != nil {
+		t.Fatalf("replace outsourcing order item: %v", err)
+	}
+	openItems, _, err := uc.ListOutsourcingOrderItems(ctx, biz.OutsourcingOrderItemFilter{
+		OutsourcingOrderID: created.Order.ID,
+		LineStatus:         biz.OutsourcingOrderItemStatusOpen,
+		Limit:              20,
+	})
+	if err != nil {
+		t.Fatalf("list reordered outsourcing order items: %v", err)
+	}
+	if len(openItems) != 3 || openItems[0].ID != third.ID || openItems[2].ID != first.ID || openItems[1].LineNo != 4 {
+		t.Fatalf("new line must use the next stable identity: %#v", openItems)
+	}
+}
+
 func TestOutsourcingProductNoSnapshotPrefersStyleNo(t *testing.T) {
 	styleNo := " 27001# "
 	withStyle := outsourcingProductNoSnapshot(&ent.Product{

@@ -66,6 +66,11 @@ func LineNo(v int) predicate.SalesOrderItem {
 	return predicate.SalesOrderItem(sql.FieldEQ(FieldLineNo, v))
 }
 
+// DisplayOrder applies equality check predicate on the "display_order" field. It's identical to DisplayOrderEQ.
+func DisplayOrder(v int) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldEQ(FieldDisplayOrder, v))
+}
+
 // ProductID applies equality check predicate on the "product_id" field. It's identical to ProductIDEQ.
 func ProductID(v int) predicate.SalesOrderItem {
 	return predicate.SalesOrderItem(sql.FieldEQ(FieldProductID, v))
@@ -194,6 +199,56 @@ func LineNoLT(v int) predicate.SalesOrderItem {
 // LineNoLTE applies the LTE predicate on the "line_no" field.
 func LineNoLTE(v int) predicate.SalesOrderItem {
 	return predicate.SalesOrderItem(sql.FieldLTE(FieldLineNo, v))
+}
+
+// DisplayOrderEQ applies the EQ predicate on the "display_order" field.
+func DisplayOrderEQ(v int) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldEQ(FieldDisplayOrder, v))
+}
+
+// DisplayOrderNEQ applies the NEQ predicate on the "display_order" field.
+func DisplayOrderNEQ(v int) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldNEQ(FieldDisplayOrder, v))
+}
+
+// DisplayOrderIn applies the In predicate on the "display_order" field.
+func DisplayOrderIn(vs ...int) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldIn(FieldDisplayOrder, vs...))
+}
+
+// DisplayOrderNotIn applies the NotIn predicate on the "display_order" field.
+func DisplayOrderNotIn(vs ...int) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldNotIn(FieldDisplayOrder, vs...))
+}
+
+// DisplayOrderGT applies the GT predicate on the "display_order" field.
+func DisplayOrderGT(v int) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldGT(FieldDisplayOrder, v))
+}
+
+// DisplayOrderGTE applies the GTE predicate on the "display_order" field.
+func DisplayOrderGTE(v int) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldGTE(FieldDisplayOrder, v))
+}
+
+// DisplayOrderLT applies the LT predicate on the "display_order" field.
+func DisplayOrderLT(v int) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldLT(FieldDisplayOrder, v))
+}
+
+// DisplayOrderLTE applies the LTE predicate on the "display_order" field.
+func DisplayOrderLTE(v int) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldLTE(FieldDisplayOrder, v))
+}
+
+// DisplayOrderIsNil applies the IsNil predicate on the "display_order" field.
+func DisplayOrderIsNil() predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldIsNull(FieldDisplayOrder))
+}
+
+// DisplayOrderNotNil applies the NotNil predicate on the "display_order" field.
+func DisplayOrderNotNil() predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldNotNull(FieldDisplayOrder))
 }
 
 // ProductIDEQ applies the EQ predicate on the "product_id" field.

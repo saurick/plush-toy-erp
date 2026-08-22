@@ -168,7 +168,7 @@ func TestRoleDemoAccountsForPasswordIncludesDemoAdminAndExcludesDebugByDefault(t
 			t.Fatalf("default role demo accounts must not include debug role %q", account.RoleKey)
 		}
 		switch account.Username {
-		case "admin", "demo_debug", "demo_uat_disabled", "demo_uat_sales_purchase", "demo_uat_no_entry":
+		case "admin", "demo_debug", "demo_disabled", "demo_sales_purchase", "demo_no_entry":
 			t.Fatalf("default role demo accounts must not include protected account %q", account.Username)
 		}
 	}

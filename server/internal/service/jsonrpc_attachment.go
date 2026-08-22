@@ -67,9 +67,11 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 		}
 		uploadedBy := 0
 		uploadedByUsername := ""
+		uploadedByDisplayName := ""
 		if workflowGuard != nil {
 			uploadedBy = workflowGuard.ActorID
 			uploadedByUsername = workflowGuard.ActorUsername
+			uploadedByDisplayName = workflowGuard.ActorDisplayName
 		} else {
 			admin, res := d.CurrentAdmin(ctx)
 			if res != nil {
@@ -77,6 +79,7 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 			}
 			uploadedBy = admin.ID
 			uploadedByUsername = admin.Username
+			uploadedByDisplayName = admin.DisplayName
 		}
 		item, err := d.attachmentUC.UploadBusinessAttachment(ctx, &biz.BusinessAttachmentUploadInput{
 			OwnerType:      ownerType,
@@ -95,6 +98,9 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 		}
 		if username := strings.TrimSpace(uploadedByUsername); item != nil && username != "" {
 			item.UploadedByUsername = &username
+		}
+		if displayName := strings.TrimSpace(uploadedByDisplayName); item != nil && displayName != "" {
+			item.UploadedByDisplayName = &displayName
 		}
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
 			"attachment": businessAttachmentToAny(item, false),
@@ -147,6 +153,9 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 			if username := strings.TrimSpace(admin.Username); username != "" {
 				item.WithdrawnByUsername = &username
 			}
+			if displayName := strings.TrimSpace(admin.DisplayName); displayName != "" {
+				item.WithdrawnByDisplayName = &displayName
+			}
 			return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
 				"attachment": businessAttachmentToAny(item, false),
 			})}, nil
@@ -173,9 +182,11 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 		}
 		withdrawnBy := 0
 		withdrawnByUsername := ""
+		withdrawnByDisplayName := ""
 		if workflowGuard != nil {
 			withdrawnBy = workflowGuard.ActorID
 			withdrawnByUsername = workflowGuard.ActorUsername
+			withdrawnByDisplayName = workflowGuard.ActorDisplayName
 		} else {
 			admin, res := d.CurrentAdmin(ctx)
 			if res != nil {
@@ -183,6 +194,7 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 			}
 			withdrawnBy = admin.ID
 			withdrawnByUsername = admin.Username
+			withdrawnByDisplayName = admin.DisplayName
 		}
 		item, err = d.attachmentUC.WithdrawBusinessAttachment(ctx, &biz.BusinessAttachmentWithdrawInput{
 			Attachment:    item,
@@ -195,6 +207,9 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 		}
 		if username := strings.TrimSpace(withdrawnByUsername); username != "" {
 			item.WithdrawnByUsername = &username
+		}
+		if displayName := strings.TrimSpace(withdrawnByDisplayName); displayName != "" {
+			item.WithdrawnByDisplayName = &displayName
 		}
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
 			"attachment": businessAttachmentToAny(item, false),
@@ -287,6 +302,7 @@ func (d *jsonrpcDispatcher) authorizeWorkflowAttachmentTaskAccess(
 		ExpectedVersion:      expectedVersion,
 		ActorID:              admin.ID,
 		ActorUsername:        admin.Username,
+		ActorDisplayName:     admin.DisplayName,
 		VisibleOwnerRoleKeys: append([]string(nil), visibility.RoleKeys...),
 	}, nil
 }
@@ -444,23 +460,25 @@ func businessAttachmentToAny(item *biz.BusinessAttachment, includeContent bool) 
 		return map[string]any{}
 	}
 	out := map[string]any{
-		"id":                    item.ID,
-		"owner_type":            item.OwnerType,
-		"owner_id":              item.OwnerID,
-		"attachment_type":       item.AttachmentType,
-		"slot_key":              optionalStringValue(item.SlotKey),
-		"file_name":             item.FileName,
-		"mime_type":             item.MimeType,
-		"file_size":             item.FileSize,
-		"sha256":                item.SHA256,
-		"uploaded_by":           optionalIntValue(item.UploadedBy),
-		"uploaded_by_username":  optionalStringValue(item.UploadedByUsername),
-		"note":                  optionalStringValue(item.Note),
-		"withdrawn_at":          optionalTimeUnix(item.WithdrawnAt),
-		"withdrawn_by":          optionalIntValue(item.WithdrawnBy),
-		"withdrawn_by_username": optionalStringValue(item.WithdrawnByUsername),
-		"withdrawal_reason":     optionalStringValue(item.WithdrawalReason),
-		"created_at":            item.CreatedAt.Unix(),
+		"id":                        item.ID,
+		"owner_type":                item.OwnerType,
+		"owner_id":                  item.OwnerID,
+		"attachment_type":           item.AttachmentType,
+		"slot_key":                  optionalStringValue(item.SlotKey),
+		"file_name":                 item.FileName,
+		"mime_type":                 item.MimeType,
+		"file_size":                 item.FileSize,
+		"sha256":                    item.SHA256,
+		"uploaded_by":               optionalIntValue(item.UploadedBy),
+		"uploaded_by_username":      optionalStringValue(item.UploadedByUsername),
+		"uploaded_by_display_name":  optionalStringValue(item.UploadedByDisplayName),
+		"note":                      optionalStringValue(item.Note),
+		"withdrawn_at":              optionalTimeUnix(item.WithdrawnAt),
+		"withdrawn_by":              optionalIntValue(item.WithdrawnBy),
+		"withdrawn_by_username":     optionalStringValue(item.WithdrawnByUsername),
+		"withdrawn_by_display_name": optionalStringValue(item.WithdrawnByDisplayName),
+		"withdrawal_reason":         optionalStringValue(item.WithdrawalReason),
+		"created_at":                item.CreatedAt.Unix(),
 	}
 	if includeContent {
 		out["content_base64"] = base64.StdEncoding.EncodeToString(item.Content)

@@ -685,6 +685,7 @@ func (r *purchaseOrderRepo) AddPurchaseOrderItem(ctx context.Context, in *biz.Pu
 	row, err := r.data.postgres.PurchaseOrderItem.Create().
 		SetPurchaseOrderID(in.PurchaseOrderID).
 		SetLineNo(in.LineNo).
+		SetDisplayOrder(in.LineNo).
 		SetMaterialID(in.MaterialID).
 		SetUnitID(in.UnitID).
 		SetNillableMaterialCodeSnapshot(in.MaterialCodeSnapshot).
@@ -807,7 +808,11 @@ func (r *purchaseOrderRepo) ListPurchaseOrderItems(ctx context.Context, filter b
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := query.Order(ent.Asc(purchaseorderitem.FieldLineNo)).
+	rows, err := query.Order(sourceDocumentItemOrder(
+		purchaseorderitem.FieldDisplayOrder,
+		purchaseorderitem.FieldLineNo,
+		purchaseorderitem.FieldID,
+	)).
 		Limit(filter.Limit).
 		Offset(filter.Offset).
 		All(ctx)
@@ -902,41 +907,50 @@ func (r *purchaseOrderRepo) SavePurchaseOrderWithItems(ctx context.Context, id i
 		}
 	}
 
-	existingOpenItems, err := tx.PurchaseOrderItem.Query().
-		Where(
-			purchaseorderitem.PurchaseOrderID(orderRow.ID),
-			purchaseorderitem.LineStatus(biz.PurchaseOrderItemStatusOpen),
-		).
+	existingItems, err := tx.PurchaseOrderItem.Query().
+		Where(purchaseorderitem.PurchaseOrderID(orderRow.ID)).
 		All(ctx)
 	if err != nil {
 		return nil, err
 	}
+	existingByID := make(map[int]*ent.PurchaseOrderItem, len(existingItems))
+	existingOpenItems := make([]*ent.PurchaseOrderItem, 0, len(existingItems))
+	maxLineNo := 0
+	for _, existing := range existingItems {
+		existingByID[existing.ID] = existing
+		if existing.LineNo > maxLineNo {
+			maxLineNo = existing.LineNo
+		}
+		if existing.LineStatus == biz.PurchaseOrderItemStatusOpen {
+			existingOpenItems = append(existingOpenItems, existing)
+		}
+	}
 	submittedIDs := map[int]struct{}{}
-	for _, item := range items {
+	for index, item := range items {
 		mutation := item.PurchaseOrderItemMutation
 		mutation.PurchaseOrderID = orderRow.ID
+		displayOrder := index + 1
 		if item.ID > 0 {
-			current, err := tx.PurchaseOrderItem.Query().
-				Where(purchaseorderitem.ID(item.ID), purchaseorderitem.PurchaseOrderID(orderRow.ID)).
-				Only(ctx)
-			if err != nil {
-				if ent.IsNotFound(err) {
-					return nil, biz.ErrPurchaseOrderItemNotFound
-				}
-				return nil, err
+			current, ok := existingByID[item.ID]
+			if !ok {
+				return nil, biz.ErrPurchaseOrderItemNotFound
 			}
 			if current.LineStatus == biz.PurchaseOrderItemStatusCanceled || current.LineStatus == biz.PurchaseOrderItemStatusClosed {
 				return nil, biz.ErrBadParam
 			}
-			if _, err := savePurchaseOrderItemUpdate(ctx, tx, item.ID, &mutation); err != nil {
+			mutation.LineNo = current.LineNo
+			if _, err := savePurchaseOrderItemUpdate(ctx, tx, item.ID, displayOrder, &mutation); err != nil {
 				return nil, err
 			}
 			submittedIDs[item.ID] = struct{}{}
 			continue
 		}
+		maxLineNo++
+		mutation.LineNo = maxLineNo
 		if _, err := tx.PurchaseOrderItem.Create().
 			SetPurchaseOrderID(mutation.PurchaseOrderID).
 			SetLineNo(mutation.LineNo).
+			SetDisplayOrder(displayOrder).
 			SetMaterialID(mutation.MaterialID).
 			SetUnitID(mutation.UnitID).
 			SetNillableMaterialCodeSnapshot(mutation.MaterialCodeSnapshot).
@@ -969,7 +983,11 @@ func (r *purchaseOrderRepo) SavePurchaseOrderWithItems(ctx context.Context, id i
 
 	itemRows, err := tx.PurchaseOrderItem.Query().
 		Where(purchaseorderitem.PurchaseOrderID(orderRow.ID)).
-		Order(ent.Asc(purchaseorderitem.FieldLineNo), ent.Asc(purchaseorderitem.FieldID)).
+		Order(sourceDocumentItemOrder(
+			purchaseorderitem.FieldDisplayOrder,
+			purchaseorderitem.FieldLineNo,
+			purchaseorderitem.FieldID,
+		)).
 		All(ctx)
 	if err != nil {
 		return nil, err
@@ -1051,10 +1069,11 @@ func (r *purchaseOrderRepo) UnitIsActive(ctx context.Context, id int) (bool, err
 	return row.IsActive, nil
 }
 
-func savePurchaseOrderItemUpdate(ctx context.Context, tx *ent.Tx, id int, in *biz.PurchaseOrderItemMutation) (*ent.PurchaseOrderItem, error) {
+func savePurchaseOrderItemUpdate(ctx context.Context, tx *ent.Tx, id int, displayOrder int, in *biz.PurchaseOrderItemMutation) (*ent.PurchaseOrderItem, error) {
 	update := tx.PurchaseOrderItem.UpdateOneID(id).
 		SetPurchaseOrderID(in.PurchaseOrderID).
 		SetLineNo(in.LineNo).
+		SetDisplayOrder(displayOrder).
 		SetMaterialID(in.MaterialID).
 		SetUnitID(in.UnitID).
 		SetPurchasedQuantity(in.PurchasedQuantity)

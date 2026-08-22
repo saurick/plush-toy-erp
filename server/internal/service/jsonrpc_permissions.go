@@ -259,6 +259,7 @@ func adminProfileToMap(admin *biz.AdminUser, includeTokenMeta map[string]any) ma
 		"id":                admin.ID,
 		"user_id":           admin.ID,
 		"username":          admin.Username,
+		"display_name":      admin.DisplayName,
 		"phone":             admin.Phone,
 		"role":              int(biz.RoleAdmin),
 		"disabled":          admin.Disabled,
@@ -295,6 +296,7 @@ func adminListItemToMap(admin *biz.AdminUser) map[string]any {
 	return map[string]any{
 		"id":               admin.ID,
 		"username":         admin.Username,
+		"display_name":     admin.DisplayName,
 		"phone":            admin.Phone,
 		"is_super_admin":   admin.IsSuperAdmin,
 		"account_status":   string(admin.AccountStatus()),

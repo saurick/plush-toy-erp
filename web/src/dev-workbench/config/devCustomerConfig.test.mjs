@@ -212,7 +212,7 @@ test('devCustomerConfig: 未登记客户返回 missing 且不 fallback 到 yoyoo
   assert.equal(overview.blockedPieces[0].key, 'missing-customer-package')
   assert.equal(overview.blockedPieces[0].title, '未登记客户配置包')
   assert.equal(overview.blockedPieces[0].status, '未登记')
-  assert.match(overview.blockedPieces[0].boundary, /不会 fallback/)
+  assert.match(overview.blockedPieces[0].boundary, /不会自动改用其他客户包/)
 })
 
 test('devCustomerConfig: registry 暴露已登记客户列表', () => {
@@ -1399,11 +1399,11 @@ test('devCustomerConfig: 总览区分 runtime、draft 和 blocked 能力', () =>
   )
   assert.deepEqual(
     overview.blockedPieces.map((item) => item.key),
-    ['real-import', 'saas-tenant']
+    ['real-import']
   )
   assert.deepEqual(
     overview.blockedPieces.map((item) => item.sourceLabel),
-    ['导入工具入口', '客户配置包说明']
+    ['导入工具入口']
   )
   assert.equal(overview.packageConsoleSummary.primaryStatus, 'PREVIEW_READY')
 })

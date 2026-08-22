@@ -137,8 +137,9 @@ func mapAdminPhoneUniqueViolation(err error) error {
 }
 
 type RoleDemoAdminAccountSpec struct {
-	Username string
-	RoleKey  string
+	DisplayName string
+	Username    string
+	RoleKey     string
 }
 
 type RoleDemoAdminSeedOptions struct {
@@ -149,6 +150,7 @@ type RoleDemoAdminSeedOptions struct {
 }
 
 type RoleDemoAdminSeededAccount struct {
+	DisplayName   string
 	Username      string
 	RoleKey       string
 	Created       bool
@@ -401,7 +403,7 @@ WHERE admin_user_id = $1
 			}
 			if phoneBound && !phoneAlreadyBound {
 				phonePayload, err := json.Marshal(map[string]any{
-					"action": "admin_user.phone.set",
+					"action": "admin_user.profile.set",
 					"actor":  map[string]any{"id": 0, "username": "system:manual-acceptance-password-rotation"},
 					"target": map[string]any{"type": "admin_user", "id": adminID, "key": username},
 					"before": map[string]any{"phone_bound": false},
@@ -412,7 +414,7 @@ WHERE admin_user_id = $1
 				}
 				if _, err := tx.ExecContext(ctx,
 					"INSERT INTO runtime_audit_events (event_type, event_key, source, payload, created_at) VALUES ($1, $2, $3, $4, $5)",
-					"admin_control_plane", "admin_user.phone.set", "manual_acceptance_password_rotation", string(phonePayload), now,
+					"admin_control_plane", "admin_user.profile.set", "manual_acceptance_password_rotation", string(phonePayload), now,
 				); err != nil {
 					return nil, err
 				}
@@ -445,21 +447,22 @@ WHERE admin_user_id = $1
 
 func DefaultRoleDemoAdminAccounts(includeDebug bool) []RoleDemoAdminAccountSpec {
 	accounts := []RoleDemoAdminAccountSpec{
-		{Username: "demo_boss", RoleKey: biz.BossRoleKey},
-		{Username: "demo_sales", RoleKey: biz.SalesRoleKey},
-		{Username: "demo_purchase", RoleKey: biz.PurchaseRoleKey},
-		{Username: "demo_production", RoleKey: biz.ProductionRoleKey},
-		{Username: "demo_warehouse", RoleKey: biz.WarehouseRoleKey},
-		{Username: "demo_quality", RoleKey: biz.QualityRoleKey},
-		{Username: "demo_finance", RoleKey: biz.FinanceRoleKey},
-		{Username: "demo_pmc", RoleKey: biz.PMCRoleKey},
-		{Username: "demo_engineering", RoleKey: biz.EngineeringRoleKey},
-		{Username: "demo_admin", RoleKey: biz.AdminRoleKey},
+		{DisplayName: "演示老板", Username: "demo_boss", RoleKey: biz.BossRoleKey},
+		{DisplayName: "演示业务员", Username: "demo_sales", RoleKey: biz.SalesRoleKey},
+		{DisplayName: "演示采购员", Username: "demo_purchase", RoleKey: biz.PurchaseRoleKey},
+		{DisplayName: "演示生产员", Username: "demo_production", RoleKey: biz.ProductionRoleKey},
+		{DisplayName: "演示仓管员", Username: "demo_warehouse", RoleKey: biz.WarehouseRoleKey},
+		{DisplayName: "演示质检员", Username: "demo_quality", RoleKey: biz.QualityRoleKey},
+		{DisplayName: "演示财务员", Username: "demo_finance", RoleKey: biz.FinanceRoleKey},
+		{DisplayName: "演示 PMC", Username: "demo_pmc", RoleKey: biz.PMCRoleKey},
+		{DisplayName: "演示工程员", Username: "demo_engineering", RoleKey: biz.EngineeringRoleKey},
+		{DisplayName: "演示系统管理员", Username: "demo_admin", RoleKey: biz.AdminRoleKey},
 	}
 	if includeDebug {
 		accounts = append(accounts, RoleDemoAdminAccountSpec{
-			Username: "demo_debug",
-			RoleKey:  biz.DebugOperatorRoleKey,
+			DisplayName: "演示调试员",
+			Username:    "demo_debug",
+			RoleKey:     biz.DebugOperatorRoleKey,
 		})
 	}
 	return accounts
@@ -501,6 +504,10 @@ func seedOneRoleDemoAdmin(ctx context.Context, db *sql.DB, account RoleDemoAdmin
 	if strings.EqualFold(username, "admin") {
 		return RoleDemoAdminSeededAccount{}, ErrStableAdminProtected
 	}
+	displayName, err := biz.NormalizeAdminDisplayName(account.DisplayName)
+	if err != nil {
+		return RoleDemoAdminSeededAccount{}, biz.ErrBadParam
+	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
@@ -530,20 +537,21 @@ func seedOneRoleDemoAdmin(ctx context.Context, db *sql.DB, account RoleDemoAdmin
 		}
 		created = true
 		if err := tx.QueryRowContext(ctx, `
-INSERT INTO admin_users (username, password_hash, is_super_admin, disabled, created_at, updated_at)
-VALUES ($1, $2, FALSE, FALSE, $3, $4)
-RETURNING id`, username, string(hash), now, now).Scan(&adminID); err != nil {
+INSERT INTO admin_users (display_name, username, password_hash, is_super_admin, disabled, created_at, updated_at)
+VALUES ($1, $2, $3, FALSE, FALSE, $4, $5)
+RETURNING id`, displayName, username, string(hash), now, now).Scan(&adminID); err != nil {
 			return RoleDemoAdminSeededAccount{}, err
 		}
 	} else if resetPassword {
 		if _, err := tx.ExecContext(ctx, `
 UPDATE admin_users
 SET password_hash = $2,
+    display_name = $3,
     auth_version = auth_version + 1,
     is_super_admin = FALSE,
     disabled = FALSE,
-    updated_at = $3
-WHERE id = $1`, adminID, string(hash), now); err != nil {
+    updated_at = $4
+WHERE id = $1`, adminID, string(hash), displayName, now); err != nil {
 			return RoleDemoAdminSeededAccount{}, err
 		}
 		if _, err := tx.ExecContext(ctx, `
@@ -557,8 +565,8 @@ WHERE admin_user_id = $1
 	} else {
 		if _, err := tx.ExecContext(ctx, `
 UPDATE admin_users
-SET is_super_admin = FALSE, disabled = FALSE, updated_at = $2
-WHERE id = $1`, adminID, now); err != nil {
+SET display_name = $2, is_super_admin = FALSE, disabled = FALSE, updated_at = $3
+WHERE id = $1`, adminID, displayName, now); err != nil {
 			return RoleDemoAdminSeededAccount{}, err
 		}
 	}
@@ -578,6 +586,7 @@ ON CONFLICT (admin_user_id, role_id) DO NOTHING`, adminID, roleID, now); err != 
 	tx = nil
 
 	return RoleDemoAdminSeededAccount{
+		DisplayName:   displayName,
 		Username:      username,
 		RoleKey:       roleKey,
 		Created:       created,

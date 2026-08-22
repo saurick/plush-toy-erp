@@ -142,6 +142,91 @@ func TestPurchaseOrderRepoSaveLifecycleAndReceiptLink(t *testing.T) {
 	}
 }
 
+func TestPurchaseOrderRepoSaveWithItemsKeepsLineIdentityWhileReordering(t *testing.T) {
+	ctx := context.Background()
+	uc, client := openPurchaseOrderRepoTest(t, "purchase_order_repo_display_order")
+	defer mustCloseEntClient(t, client)
+
+	unit := createTestUnit(t, ctx, client, "PCS-PO-ORDER")
+	material := createTestMaterial(t, ctx, client, unit.ID, "MAT-PO-ORDER")
+	supplier := createPurchaseOrderTestSupplier(t, ctx, client, "SUP-PO-ORDER", true)
+	purchaseDate := time.Date(2026, 8, 22, 0, 0, 0, 0, time.UTC)
+	qty := decimal.NewFromInt(10)
+	line := func(id, lineNo int) *biz.PurchaseOrderItemSaveMutation {
+		return &biz.PurchaseOrderItemSaveMutation{
+			ID: id,
+			PurchaseOrderItemMutation: biz.PurchaseOrderItemMutation{
+				LineNo:            lineNo,
+				MaterialID:        material.ID,
+				UnitID:            unit.ID,
+				PurchasedQuantity: qty,
+			},
+		}
+	}
+	created, err := uc.SavePurchaseOrderWithItems(ctx, 0, &biz.PurchaseOrderMutation{
+		PurchaseOrderNo: "PO-DISPLAY-ORDER",
+		SupplierID:      supplier.ID,
+		PurchaseDate:    purchaseDate,
+	}, []*biz.PurchaseOrderItemSaveMutation{line(0, 1), line(0, 2), line(0, 3)})
+	if err != nil {
+		t.Fatalf("create purchase order with items: %v", err)
+	}
+	first, second, third := created.Items[0], created.Items[1], created.Items[2]
+	orderMutation := func(expectedVersion int) *biz.PurchaseOrderMutation {
+		return &biz.PurchaseOrderMutation{
+			PurchaseOrderNo:       created.Order.PurchaseOrderNo,
+			SupplierID:            supplier.ID,
+			Currency:              created.Order.Currency,
+			PaymentTermDays:       created.Order.PaymentTermDays,
+			SupplierSnapshot:      created.Order.SupplierSnapshot,
+			ContractPartySnapshot: created.Order.ContractPartySnapshot,
+			PurchaseDate:          purchaseDate,
+			ExpectedVersion:       expectedVersion,
+		}
+	}
+
+	reordered, err := uc.SavePurchaseOrderWithItems(ctx, created.Order.ID, orderMutation(created.Order.Version), []*biz.PurchaseOrderItemSaveMutation{
+		line(third.ID, 1),
+		line(first.ID, 2),
+		line(second.ID, 3),
+	})
+	if err != nil {
+		t.Fatalf("reorder purchase order items: %v", err)
+	}
+	if len(reordered.Items) != 3 || reordered.Items[0].ID != third.ID || reordered.Items[1].ID != first.ID || reordered.Items[2].ID != second.ID {
+		t.Fatalf("unexpected reordered items: %#v", reordered.Items)
+	}
+	if reordered.Items[0].LineNo != third.LineNo || reordered.Items[1].LineNo != first.LineNo || reordered.Items[2].LineNo != second.LineNo {
+		t.Fatalf("line identity changed during reorder: %#v", reordered.Items)
+	}
+	for itemID, expectedOrder := range map[int]int{third.ID: 1, first.ID: 2, second.ID: 3} {
+		row := client.PurchaseOrderItem.GetX(ctx, itemID)
+		if row.DisplayOrder == nil || *row.DisplayOrder != expectedOrder {
+			t.Fatalf("item %d display_order = %v, want %d", itemID, row.DisplayOrder, expectedOrder)
+		}
+	}
+
+	_, err = uc.SavePurchaseOrderWithItems(ctx, created.Order.ID, orderMutation(reordered.Order.Version), []*biz.PurchaseOrderItemSaveMutation{
+		line(third.ID, 1),
+		line(0, 2),
+		line(first.ID, 3),
+	})
+	if err != nil {
+		t.Fatalf("replace purchase order item: %v", err)
+	}
+	openItems, _, err := uc.ListPurchaseOrderItems(ctx, biz.PurchaseOrderItemFilter{
+		PurchaseOrderID: created.Order.ID,
+		LineStatus:      biz.PurchaseOrderItemStatusOpen,
+		Limit:           20,
+	})
+	if err != nil {
+		t.Fatalf("list reordered purchase order items: %v", err)
+	}
+	if len(openItems) != 3 || openItems[0].ID != third.ID || openItems[2].ID != first.ID || openItems[1].LineNo != 4 {
+		t.Fatalf("new line must use the next stable identity: %#v", openItems)
+	}
+}
+
 func createPurchaseOrderTestSupplier(t *testing.T, ctx context.Context, client *ent.Client, code string, active bool) *ent.Supplier {
 	t.Helper()
 	row, err := client.Supplier.Create().

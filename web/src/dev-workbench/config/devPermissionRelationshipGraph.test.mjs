@@ -12,21 +12,24 @@ import {
 const accounts = [
   {
     id: 11,
-    username: '小林',
+    username: 'sales01',
+    display_name: '小林',
     phone: '13800000000',
     account_status: 'active',
     roles: [{ role_key: 'sales', name: '业务员' }],
   },
   {
     id: 12,
-    username: '小周',
+    username: 'sales02',
+    display_name: '小周',
     phone: '13900000000',
     account_status: 'suspended',
     roles: [{ role_key: 'sales', name: '业务员' }],
   },
   {
     id: 20,
-    username: '小吴',
+    username: 'warehouse01',
+    display_name: '小吴',
     phone: '13700000000',
     account_status: 'suspended',
     roles: [
@@ -36,7 +39,8 @@ const accounts = [
   },
   {
     id: 1,
-    username: '系统管理员',
+    username: 'root-admin',
+    display_name: '系统管理员',
     phone: '13600000000',
     is_super_admin: true,
     account_status: 'active',
@@ -213,7 +217,10 @@ test('role view connects accounts, role, final permissions, pages, scope and app
     pages: 1,
     approvals: 1,
   })
-  assert.match(model.chart, /关联账号（3）：小林、小周、小吴｜可用 1/u)
+  assert.match(
+    model.chart,
+    /关联账号（3）：小林（sales01）、小周（sales02）、小吴（warehouse01）｜可用 1/u
+  )
   assert.match(model.chart, /岗位：业务员/u)
   assert.match(model.chart, /功能：查看销售订单｜最终可用/u)
   assert.match(model.chart, /功能：确认报价 ”A” ＜内部＞｜｜当前受限/u)
@@ -229,7 +236,8 @@ test('role view connects accounts, role, final permissions, pages, scope and app
   )
   assert.ok(
     model.rows.some(
-      (row) => row.source === '小周' && row.result === '账号状态阻断使用'
+      (row) =>
+        row.source === '小周（sales02）' && row.result === '账号状态阻断使用'
     )
   )
   const visibleOutput = JSON.stringify(model)
@@ -254,7 +262,7 @@ test('account view preserves multiple role paths and marks an inactive account a
   assert.equal(model.summary.roles, 2)
   assert.equal(model.summary.effectivePermissions, 2)
   assert.equal(model.summary.blockedPermissions, 1)
-  assert.match(model.chart, /账号：小吴｜临时停用/u)
+  assert.match(model.chart, /账号：小吴（warehouse01）｜临时停用/u)
   assert.match(model.chart, /岗位：业务员/u)
   assert.match(model.chart, /岗位：仓管员/u)
   assert.match(model.chart, /功能汇总：1 个模块｜可用 1 \/ 已选 2/u)
@@ -325,7 +333,7 @@ test('super administrator is rendered as a protected system path, not a fabricat
 
   assert.equal(model.summary.accounts, 1)
   assert.equal(model.summary.roles, 0)
-  assert.match(model.chart, /账号：系统管理员｜始终启用/u)
+  assert.match(model.chart, /账号：系统管理员（root-admin）｜始终启用/u)
   assert.match(model.chart, /系统保留：全部权限｜不由岗位汇总/u)
   assert.doesNotMatch(model.chart, /岗位：超级管理员/u)
   assert.ok(model.warnings.some((warning) => warning.includes('系统保留账号')))
@@ -357,6 +365,8 @@ test('target and module helpers keep stable human-readable choices', () => {
     buildPermissionRelationshipTargetOptions({
       viewMode: PERMISSION_RELATIONSHIP_VIEW_MODE.ACCOUNT,
       accounts,
-    }).some((option) => option.label === '系统管理员（超级管理员）')
+    }).some(
+      (option) => option.label === '系统管理员（root-admin） · 超级管理员'
+    )
   )
 })

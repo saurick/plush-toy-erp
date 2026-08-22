@@ -45,6 +45,7 @@ import {
   buildWorkflowAssignmentSelectOptions,
   flattenWorkflowAssignmentSelectOptions,
 } from '../../utils/workflowAssignmentSelectOptions.mjs'
+import { formatAdminIdentity } from '../../utils/adminIdentity.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import BusinessAttachmentModalButton from '../business-list/BusinessAttachmentModalButton.jsx'
@@ -200,8 +201,9 @@ export default function WorkflowTaskActionDrawer({
   const actionTone = getTaskActionTone(actionMode)
   const ownerRoleLabel = task ? getWorkflowTaskOwnerRoleLabel(task) : ''
   const currentAssigneeLabel =
-    assignmentAccess.current_assignee?.username ||
-    (task?.assignee_id ? '已指定处理人' : '共同待办')
+    (assignmentAccess.current_assignee
+      ? formatAdminIdentity(assignmentAccess.current_assignee)
+      : '') || (task?.assignee_id ? '已指定处理人' : '共同待办')
   const responsibilityLabel = [ownerRoleLabel, currentAssigneeLabel]
     .filter(Boolean)
     .join(' · ')
@@ -1046,7 +1048,11 @@ export default function WorkflowTaskActionDrawer({
                       <div>
                         <dt>当前处理人</dt>
                         <dd>
-                          {assignmentAccess.current_assignee?.username ||
+                          {(assignmentAccess.current_assignee
+                            ? formatAdminIdentity(
+                                assignmentAccess.current_assignee
+                              )
+                            : '') ||
                             (task.assignee_id
                               ? '已指定处理人'
                               : '负责岗位共同待办')}

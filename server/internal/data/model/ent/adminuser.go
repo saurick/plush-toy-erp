@@ -19,6 +19,8 @@ type AdminUser struct {
 	ID int `json:"id,omitempty"`
 	// Username holds the value of the "username" field.
 	Username string `json:"username,omitempty"`
+	// 员工姓名；业务页面优先展示，存量缺失时回退账号名
+	DisplayName *string `json:"display_name,omitempty"`
 	// 管理员手机号，用于短信验证码登录
 	Phone *string `json:"phone,omitempty"`
 	// PasswordHash holds the value of the "password_hash" field.
@@ -57,7 +59,7 @@ func (*AdminUser) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case adminuser.FieldID, adminuser.FieldAuthVersion, adminuser.FieldStatusChangedBy:
 			values[i] = new(sql.NullInt64)
-		case adminuser.FieldUsername, adminuser.FieldPhone, adminuser.FieldPasswordHash, adminuser.FieldErpPreferences, adminuser.FieldStatusReason:
+		case adminuser.FieldUsername, adminuser.FieldDisplayName, adminuser.FieldPhone, adminuser.FieldPasswordHash, adminuser.FieldErpPreferences, adminuser.FieldStatusReason:
 			values[i] = new(sql.NullString)
 		case adminuser.FieldRevokedAt, adminuser.FieldStatusChangedAt, adminuser.FieldLastLoginAt, adminuser.FieldCreatedAt, adminuser.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -87,6 +89,13 @@ func (_m *AdminUser) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field username", values[i])
 			} else if value.Valid {
 				_m.Username = value.String
+			}
+		case adminuser.FieldDisplayName:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field display_name", values[i])
+			} else if value.Valid {
+				_m.DisplayName = new(string)
+				*_m.DisplayName = value.String
 			}
 		case adminuser.FieldPhone:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -210,6 +219,11 @@ func (_m *AdminUser) String() string {
 	builder.WriteString(fmt.Sprintf("id=%v, ", _m.ID))
 	builder.WriteString("username=")
 	builder.WriteString(_m.Username)
+	builder.WriteString(", ")
+	if v := _m.DisplayName; v != nil {
+		builder.WriteString("display_name=")
+		builder.WriteString(*v)
+	}
 	builder.WriteString(", ")
 	if v := _m.Phone; v != nil {
 		builder.WriteString("phone=")

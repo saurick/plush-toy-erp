@@ -1,5 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { CopyOutlined, DeleteOutlined } from '@ant-design/icons'
+import {
+  CopyOutlined,
+  DeleteOutlined,
+  OrderedListOutlined,
+} from '@ant-design/icons'
 import { Button, Form, Input, InputNumber, Select, Space } from 'antd'
 
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
@@ -11,6 +15,7 @@ import FieldWithUnitSuffix, {
   unitSuffixTextFromOptions,
 } from '../business-list/FieldWithUnitSuffix.jsx'
 import SourceImportPickerModal from '../business-list/SourceImportPickerModal.jsx'
+import BusinessLineItemOrderModal from '../business-list/BusinessLineItemOrderModal.jsx'
 import BusinessLineItemsSummaryValue from '../business-list/BusinessLineItemsSummaryValue.jsx'
 import BusinessLineItemsSection from '../business-list/BusinessLineItemsSection.jsx'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
@@ -129,6 +134,18 @@ export function normalizePurchaseLineFormValue(item = {}) {
   }
 }
 
+export function purchaseOrderLineOrderLabel(item = {}, index = 0) {
+  return (
+    [
+      item.material_code_snapshot,
+      item.material_name_snapshot,
+      item.color_snapshot,
+    ]
+      .filter(Boolean)
+      .join(' / ') || `第 ${index + 1} 行（未选择材料）`
+  )
+}
+
 export function PurchaseOrderFormFields({
   form,
   suppliers,
@@ -140,6 +157,8 @@ export function PurchaseOrderFormFields({
   onMaterialChange,
 }) {
   const [materialImportOpen, setMaterialImportOpen] = useState(false)
+  const [lineOrderOpen, setLineOrderOpen] = useState(false)
+  const [lineOrderItems, setLineOrderItems] = useState([])
   useEffect(() => {
     if (!referenceDataReady) setMaterialImportOpen(false)
   }, [referenceDataReady])
@@ -358,7 +377,7 @@ export function PurchaseOrderFormFields({
         title="采购明细"
         description="同一个采购订单内维护多条供应商承诺明细。"
         emptyDescription="暂无采购明细"
-        renderBeforeHeader={({ add }) => (
+        renderBeforeHeader={({ add, fields }) => (
           <>
             <div className="erp-line-items-form__import-row">
               <div className="erp-line-items-form__import-copy">
@@ -367,19 +386,43 @@ export function PurchaseOrderFormFields({
                   从材料库添加；数量、单价和预计到货日期回到采购明细维护。
                 </span>
               </div>
-              <Button
-                className="erp-line-items-form__import-button"
-                disabled={!referenceDataReady}
-                title={
-                  !referenceDataReady
-                    ? '采购基础资料加载完成后可选择材料'
-                    : undefined
-                }
-                onClick={() => setMaterialImportOpen(true)}
-              >
-                从材料库添加
-              </Button>
+              <Space className="erp-line-item-order-actions" wrap>
+                <Button
+                  className="erp-line-items-form__import-button"
+                  disabled={!referenceDataReady}
+                  title={
+                    !referenceDataReady
+                      ? '采购基础资料加载完成后可选择材料'
+                      : undefined
+                  }
+                  onClick={() => setMaterialImportOpen(true)}
+                >
+                  从材料库添加
+                </Button>
+                <Button
+                  icon={<OrderedListOutlined />}
+                  disabled={!referenceDataReady || fields.length < 2}
+                  onClick={() => {
+                    const currentLines = form.getFieldValue('items') || []
+                    setLineOrderItems([...currentLines])
+                    setLineOrderOpen(true)
+                  }}
+                >
+                  材料顺序
+                </Button>
+              </Space>
             </div>
+            <BusinessLineItemOrderModal
+              getItemLabel={purchaseOrderLineOrderLabel}
+              itemNoun="采购明细"
+              items={lineOrderItems}
+              onApply={(orderedItems) =>
+                form.setFieldsValue({ items: orderedItems })
+              }
+              onClose={() => setLineOrderOpen(false)}
+              open={lineOrderOpen}
+              title="调整材料顺序"
+            />
             <SourceImportPickerModal
               open={materialImportOpen}
               title="选择材料添加采购明细"

@@ -89,8 +89,11 @@ func (r *operationalFactRepo) ListShipmentSourceCandidates(
 		WithUnit().
 		Order(
 			ent.Desc(salesorderitem.FieldSalesOrderID),
-			ent.Asc(salesorderitem.FieldLineNo),
-			ent.Asc(salesorderitem.FieldID),
+			sourceDocumentItemOrder(
+				salesorderitem.FieldDisplayOrder,
+				salesorderitem.FieldLineNo,
+				salesorderitem.FieldID,
+			),
 		).
 		Limit(filter.Limit).
 		Offset(filter.Offset).

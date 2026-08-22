@@ -723,6 +723,26 @@ test('FL_processing_contract_amount__derives_default_line_amount_snapshot proces
   assert.equal(draft.lines[2].amount, '15')
 })
 
+test('processingContractTemplate: 金额按十进制定点数四舍五入并精确合计', () => {
+  const roundedLine = normalizeProcessingLine({
+    quantity: '1',
+    unitPrice: '2.675',
+  })
+
+  assert.equal(roundedLine.amount, '2.68')
+  assert.deepEqual(
+    calculateProcessingContractTotals([
+      roundedLine,
+      { quantity: '0.1', amount: '0.1' },
+      { quantity: '0.2', amount: '0.2' },
+    ]),
+    {
+      totalQuantityText: '1.3',
+      totalAmountText: '2.98',
+    }
+  )
+})
+
 test('FL_processing_contract_amount__keeps_manual_line_amount_snapshot processingContractTemplate: 已有委托加工金额快照时优先保留手工值', () => {
   const line = normalizeProcessingLine({
     quantity: '10',

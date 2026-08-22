@@ -19,7 +19,7 @@ func TestFinanceFactCancelAuditPostgresPreservesPostingAndReplaysExactly(t *test
 	data, client := openPurchaseReceiptPostgresTestData(t)
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 	suffix := postgresTestSuffix()
-	actor := client.AdminUser.Create().SetUsername("finance-audit-" + suffix).SetPasswordHash("test-password-hash").SaveX(ctx)
+	actor := client.AdminUser.Create().SetUsername("finance-audit-" + suffix).SetDisplayName("财务测试员").SetPasswordHash("test-password-hash").SaveX(ctx)
 	fact := createPostedFinanceFactForCancelAudit(t, ctx, data, client, repo, suffix, actor.ID)
 	postedAt := *fact.PostedAt
 
@@ -32,7 +32,7 @@ func TestFinanceFactCancelAuditPostgresPreservesPostingAndReplaysExactly(t *test
 	}
 	if cancelled.CancelledAt == nil || cancelled.CancelledBy == nil || *cancelled.CancelledBy != actor.ID ||
 		cancelled.CancelReason == nil || *cancelled.CancelReason != "客户确认账款作废" ||
-		cancelled.CancelledByName == nil || *cancelled.CancelledByName != actor.Username {
+		cancelled.CancelledByName == nil || *cancelled.CancelledByName != "财务测试员" {
 		t.Fatalf("unexpected cancellation audit: %#v", cancelled)
 	}
 	replayed, err := repo.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(fact.ID, fact.Version, actor.ID, "客户确认账款作废"))

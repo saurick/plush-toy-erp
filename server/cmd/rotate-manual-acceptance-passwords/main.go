@@ -23,14 +23,14 @@ import (
 )
 
 const (
-	targetLocalDev          = "local-dev"
-	targetCustomerTrial133  = "customer-trial-133"
-	adminPasswordEnv        = "MANUAL_ACCEPTANCE_ADMIN_PASSWORD"
-	demoPasswordEnv         = "MANUAL_ACCEPTANCE_PASSWORD"
-	smsPhoneEnv             = "MANUAL_ACCEPTANCE_SMS_PHONE"
-	registeredAdminPassword = "adminadmin"
-	dsnEnv                  = "POSTGRES_DSN"
-	customerTrial133Port    = "55435"
+	targetLocalDev         = "local-dev"
+	targetCustomerTrial133 = "customer-trial-133"
+	adminPasswordEnv       = "MANUAL_ACCEPTANCE_ADMIN_PASSWORD"
+	demoPasswordEnv        = "MANUAL_ACCEPTANCE_PASSWORD"
+	uatPasswordEnv         = "MANUAL_ACCEPTANCE_UAT_PASSWORD"
+	smsPhoneEnv            = "MANUAL_ACCEPTANCE_SMS_PHONE"
+	dsnEnv                 = "POSTGRES_DSN"
+	customerTrial133Port   = "55435"
 
 	localCustomerConfigProductVersion = "local-customer-package-test-apply"
 	localCustomerConfigApplyPurpose   = "local_test_apply"
@@ -40,11 +40,11 @@ const (
 var Version = "dev"
 
 var (
-	manualAcceptanceContract         = manualacceptance.Current()
-	customerTrial133DB               = manualAcceptanceContract.CustomerTrial133.DatabaseName
-	currentDatasetVersion            = manualAcceptanceContract.DataVersion
-	customerTrial133Revision         = manualAcceptanceContract.CustomerTrial133.ConfigRevision
-	customerTrial133ProductVersion   = manualAcceptanceContract.CustomerTrial133.ConfigProductVersion
+	manualAcceptanceContract       = manualacceptance.Current()
+	customerTrial133DB             = manualAcceptanceContract.CustomerTrial133.DatabaseName
+	currentDatasetVersion          = manualAcceptanceContract.DataVersion
+	customerTrial133Revision       = manualAcceptanceContract.CustomerTrial133.ConfigRevision
+	customerTrial133ProductVersion = manualAcceptanceContract.CustomerTrial133.ConfigProductVersion
 )
 
 var immutableReleasePattern = regexp.MustCompile(`^[a-f0-9]{40}$`)
@@ -55,7 +55,7 @@ var localCustomerConfigRevisionPattern = regexp.MustCompile(
 	`^yoyoosun-customer-package-v[1-9][0-9]*\.local-[a-f0-9]{16}\.runtime-v1$`,
 )
 
-var demoAcceptanceUsernames = []string{
+var localDemoAcceptanceUsernames = []string{
 	"demo_admin",
 	"demo_boss",
 	"demo_engineering",
@@ -66,6 +66,19 @@ var demoAcceptanceUsernames = []string{
 	"demo_quality",
 	"demo_sales",
 	"demo_warehouse",
+}
+
+var customerUATAcceptanceUsernames = []string{
+	"uat_admin",
+	"uat_boss",
+	"uat_engineering",
+	"uat_finance",
+	"uat_pmc",
+	"uat_production",
+	"uat_purchase",
+	"uat_quality",
+	"uat_sales",
+	"uat_warehouse",
 }
 
 type options struct {
@@ -93,7 +106,8 @@ type rotationReceipt struct {
 	CustomerRevision       string                                         `json:"customerRevision"`
 	Release                string                                         `json:"release"`
 	AdminAccounts          int                                            `json:"adminAccounts"`
-	DemoAccounts           int                                            `json:"demoAccounts"`
+	AccountKind            string                                         `json:"accountKind"`
+	RoleAccounts           int                                            `json:"roleAccounts"`
 	RevokedSessions        int64                                          `json:"revokedSessions"`
 	AuthVersionIncremented bool                                           `json:"authVersionIncremented"`
 	AuditSource            string                                         `json:"auditSource"`
@@ -300,20 +314,25 @@ func validateActiveCustomerConfigIdentity(target string, identity activeCustomer
 	return nil
 }
 
-func acceptanceAccountUsernames(opts options) (adminUsernames, demoUsernames []string, err error) {
-	demoUsernames = append([]string(nil), demoAcceptanceUsernames...)
+func acceptanceAccountUsernames(opts options) (adminUsernames, roleUsernames []string, accountKind string, err error) {
 	switch opts.target {
 	case targetLocalDev:
-		return nil, demoUsernames, nil
+		return nil, append([]string(nil), localDemoAcceptanceUsernames...), "local-demo", nil
 	case targetCustomerTrial133:
-		return []string{"admin"}, demoUsernames, nil
+		return []string{"admin"}, append([]string(nil), customerUATAcceptanceUsernames...), "customer-uat", nil
 	default:
-		return nil, nil, errors.New("unsupported target")
+		return nil, nil, "", errors.New("unsupported target")
 	}
 }
 
-func assertAcceptanceAccounts(ctx context.Context, db *sql.DB, adminUsernames, demoUsernames []string) error {
-	rows, err := db.QueryContext(ctx, `SELECT username FROM admin_users WHERE username LIKE 'demo_%'`)
+func assertAcceptanceAccounts(ctx context.Context, db *sql.DB, target string, adminUsernames, roleUsernames []string) error {
+	requiredPrefix := "demo_"
+	forbiddenPrefix := "uat_"
+	if target == targetCustomerTrial133 {
+		requiredPrefix = "uat_"
+		forbiddenPrefix = "demo_"
+	}
+	rows, err := db.QueryContext(ctx, `SELECT username FROM admin_users WHERE username LIKE $1`, requiredPrefix+"%")
 	if err != nil {
 		return err
 	}
@@ -344,7 +363,7 @@ func assertAcceptanceAccounts(ctx context.Context, db *sql.DB, adminUsernames, d
 		present[found] = true
 	}
 	missing := make([]string, 0)
-	usernames := append(append([]string(nil), adminUsernames...), demoUsernames...)
+	usernames := append(append([]string(nil), adminUsernames...), roleUsernames...)
 	for _, username := range usernames {
 		if !present[username] {
 			missing = append(missing, username)
@@ -354,19 +373,30 @@ func assertAcceptanceAccounts(ctx context.Context, db *sql.DB, adminUsernames, d
 		sort.Strings(missing)
 		return fmt.Errorf("required acceptance accounts are missing: %s", strings.Join(missing, ","))
 	}
+	var forbiddenCount int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM admin_users WHERE username LIKE $1`, forbiddenPrefix+"%").Scan(&forbiddenCount); err != nil {
+		return err
+	}
+	if forbiddenCount != 0 {
+		return fmt.Errorf("%s target contains %d forbidden %s accounts", target, forbiddenCount, forbiddenPrefix)
+	}
 	return nil
 }
 
-func validateRotationPasswords(target, adminPassword, demoPassword string) error {
-	demoPassword = strings.TrimSpace(demoPassword)
-	if demoPassword == "" {
-		return fmt.Errorf("%s is required", demoPasswordEnv)
+func validateRotationPasswords(target, adminPassword, rolePassword string) error {
+	rolePassword = strings.TrimSpace(rolePassword)
+	rolePasswordEnv := demoPasswordEnv
+	if target == targetCustomerTrial133 {
+		rolePasswordEnv = uatPasswordEnv
 	}
-	if biz.ValidateAdminPassword(demoPassword) != nil {
-		return fmt.Errorf("%s must contain 8-20 characters", demoPasswordEnv)
+	if rolePassword == "" {
+		return fmt.Errorf("%s is required", rolePasswordEnv)
+	}
+	if biz.ValidateAdminPassword(rolePassword) != nil {
+		return fmt.Errorf("%s must contain 8-20 characters", rolePasswordEnv)
 	}
 	if target == targetLocalDev {
-		if demoPassword != data.PublicRoleDemoPassword {
+		if rolePassword != data.PublicRoleDemoPassword {
 			return fmt.Errorf("%s must match the registered local test credential", demoPasswordEnv)
 		}
 		return nil
@@ -374,8 +404,8 @@ func validateRotationPasswords(target, adminPassword, demoPassword string) error
 	if target != targetCustomerTrial133 {
 		return errors.New("unsupported target")
 	}
-	if demoPassword != data.PublicRoleDemoPassword {
-		return fmt.Errorf("%s must match the registered customer-trial-133 test credential", demoPasswordEnv)
+	if rolePassword == data.PublicRoleDemoPassword || rolePassword == "adminadmin" {
+		return fmt.Errorf("%s must not use a registered local-only public password", uatPasswordEnv)
 	}
 	adminPassword = strings.TrimSpace(adminPassword)
 	if adminPassword == "" {
@@ -384,11 +414,11 @@ func validateRotationPasswords(target, adminPassword, demoPassword string) error
 	if biz.ValidateAdminPassword(adminPassword) != nil {
 		return fmt.Errorf("%s must contain 8-20 characters", adminPasswordEnv)
 	}
-	if adminPassword != registeredAdminPassword {
-		return fmt.Errorf("%s must match the registered customer-trial-133 test credential", adminPasswordEnv)
+	if adminPassword == data.PublicRoleDemoPassword || adminPassword == "adminadmin" {
+		return fmt.Errorf("%s must not use a registered local-only public password", adminPasswordEnv)
 	}
-	if adminPassword == demoPassword {
-		return errors.New("manual acceptance admin and demo passwords must differ")
+	if adminPassword == rolePassword {
+		return errors.New("manual acceptance admin and UAT role passwords must differ")
 	}
 	return nil
 }
@@ -410,7 +440,7 @@ func normalizeRotationSMSPhone(target, rawPhone string) (string, error) {
 	return phone, nil
 }
 
-func run(ctx context.Context, opts options, dsn, adminPassword, demoPassword, smsPhone string) error {
+func run(ctx context.Context, opts options, dsn, adminPassword, rolePassword, smsPhone string) error {
 	if err := validateOptions(opts); err != nil {
 		return err
 	}
@@ -420,11 +450,11 @@ func run(ctx context.Context, opts options, dsn, adminPassword, demoPassword, sm
 	if err := validateTargetDSN(opts.target, opts.datasetVersion, dsn); err != nil {
 		return err
 	}
-	adminUsernames, demoUsernames, err := acceptanceAccountUsernames(opts)
+	adminUsernames, roleUsernames, accountKind, err := acceptanceAccountUsernames(opts)
 	if err != nil {
 		return err
 	}
-	if err := validateRotationPasswords(opts.target, adminPassword, demoPassword); err != nil {
+	if err := validateRotationPasswords(opts.target, adminPassword, rolePassword); err != nil {
 		return err
 	}
 	normalizedSMSPhone, err := normalizeRotationSMSPhone(opts.target, smsPhone)
@@ -453,7 +483,7 @@ func run(ctx context.Context, opts options, dsn, adminPassword, demoPassword, sm
 	if err := validateActiveCustomerConfigIdentity(opts.target, activeConfig); err != nil {
 		return err
 	}
-	if err := assertAcceptanceAccounts(ctx, db, adminUsernames, demoUsernames); err != nil {
+	if err := assertAcceptanceAccounts(ctx, db, opts.target, adminUsernames, roleUsernames); err != nil {
 		return err
 	}
 	phoneUsername := ""
@@ -465,8 +495,8 @@ func run(ctx context.Context, opts options, dsn, adminPassword, demoPassword, sm
 		db,
 		adminUsernames,
 		adminPassword,
-		demoUsernames,
-		demoPassword,
+		roleUsernames,
+		rolePassword,
 		phoneUsername,
 		normalizedSMSPhone,
 		data.ManualAcceptancePasswordRotationOperation{
@@ -487,7 +517,7 @@ func run(ctx context.Context, opts options, dsn, adminPassword, demoPassword, sm
 		Target: opts.target, DatasetVersion: opts.datasetVersion,
 		MigrationVersion: version, CustomerRevision: activeConfig.revision,
 		Release:       opts.expectedRelease,
-		AdminAccounts: len(adminUsernames), DemoAccounts: len(demoUsernames),
+		AdminAccounts: len(adminUsernames), AccountKind: accountKind, RoleAccounts: len(roleUsernames),
 		RevokedSessions: revokedSessions, AuthVersionIncremented: true,
 		AuditSource: "manual_acceptance_password_rotation", PhoneBound: normalizedSMSPhone != "", Accounts: passwordReceipt.Accounts,
 		Replayed: passwordReceipt.Replayed,
@@ -508,12 +538,16 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), opts.timeout)
 	defer cancel()
+	rolePasswordEnv := demoPasswordEnv
+	if opts.target == targetCustomerTrial133 {
+		rolePasswordEnv = uatPasswordEnv
+	}
 	if err := run(
 		ctx,
 		opts,
 		os.Getenv(dsnEnv),
 		os.Getenv(adminPasswordEnv),
-		os.Getenv(demoPasswordEnv),
+		os.Getenv(rolePasswordEnv),
 		os.Getenv(smsPhoneEnv),
 	); err != nil {
 		fmt.Fprintf(os.Stderr, "rotate manual acceptance passwords: %v\n", err)

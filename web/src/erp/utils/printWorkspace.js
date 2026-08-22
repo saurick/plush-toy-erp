@@ -21,7 +21,7 @@ const PRINT_WORKSPACE_WINDOW_STATE_TTL_MS = 24 * 60 * 60 * 1000
 const PRINT_WORKSPACE_DRAFT_SNAPSHOT_VERSION = 1
 const PRINT_WORKSPACE_DRAFT_SNAPSHOT_TTL_MS = 24 * 60 * 60 * 1000
 const PRINT_WORKSPACE_DRAFT_STORAGE_KEY_PREFIX =
-  '__plush_erp_print_workspace_draft__:v2'
+  '__plush_erp_print_workspace_draft__:v3'
 const PRINT_WORKSPACE_SHELL_PATH = '/print-window-shell.html'
 const PRINT_WORKSPACE_INITIAL_DRAFT_WINDOW_NAME_PREFIX =
   '__plush_erp_print_initial_draft__:'
@@ -63,20 +63,10 @@ function normalizeDraftScopePart(value, fallback) {
 }
 
 function resolvePrintWorkspaceDraftAccountKey(options = {}) {
-  const explicitAccountKey = String(options.accountKey ?? '').trim()
-  if (explicitAccountKey) {
-    return explicitAccountKey
-  }
-
-  const runtimeWindow =
-    options.windowLike || (typeof window !== 'undefined' ? window : null)
-  try {
-    return String(
-      runtimeWindow?.localStorage?.getItem('admin_user_id') || ''
-    ).trim()
-  } catch {
-    return ''
-  }
+  const accountID = Number(String(options.accountKey ?? '').trim())
+  return Number.isSafeInteger(accountID) && accountID > 0
+    ? String(accountID)
+    : ''
 }
 
 function resolvePrintWorkspaceDraftCustomerKey(options = {}) {
@@ -92,6 +82,10 @@ function resolvePrintWorkspaceDraftCustomerKey(options = {}) {
       runtimeWindow?.__PLUSH_ERP_CUSTOMER_CONFIG__?.brand?.customerKey ||
       ''
   ).trim()
+}
+
+function resolvePrintWorkspaceDraftConfigRevision(options = {}) {
+  return String(options.configRevision ?? '').trim()
 }
 
 export function resolveRuntimeCustomerPrintCompanyName(windowLike) {
@@ -149,20 +143,25 @@ export function buildPrintWorkspaceDraftStorageKey(
 ) {
   const normalizedTemplateKey = normalizeTemplateKey(templateKey)
   const normalizedStateID = normalizeStateID(stateID)
+  const accountKey = resolvePrintWorkspaceDraftAccountKey(options)
+  if (!accountKey) {
+    return ''
+  }
   const customerScope = normalizeDraftScopePart(
     resolvePrintWorkspaceDraftCustomerKey(options),
     'product-core'
   )
-  const accountScope = normalizeDraftScopePart(
-    resolvePrintWorkspaceDraftAccountKey(options),
-    'anonymous'
+  const accountScope = normalizeDraftScopePart(accountKey, '')
+  const configRevisionScope = normalizeDraftScopePart(
+    resolvePrintWorkspaceDraftConfigRevision(options),
+    'unversioned'
   )
   const templateScope = normalizeDraftScopePart(
     normalizedTemplateKey,
     'unknown-template'
   )
   const stateScope = normalizeDraftScopePart(normalizedStateID, 'shared')
-  return `${PRINT_WORKSPACE_DRAFT_STORAGE_KEY_PREFIX}:${customerScope}:${accountScope}:${templateScope}:${stateScope}`
+  return `${PRINT_WORKSPACE_DRAFT_STORAGE_KEY_PREFIX}:${customerScope}:${accountScope}:${configRevisionScope}:${templateScope}:${stateScope}`
 }
 
 function buildInitialDraftWindowNamePayload(templateKey, stateID, draft) {
@@ -653,6 +652,8 @@ export function openPrintWorkspaceWindow(
         stateID,
         {
           customerKey: workspaceOptions.customerKey,
+          accountKey: workspaceOptions.accountKey,
+          configRevision: workspaceOptions.configRevision,
           windowLike: typeof window !== 'undefined' ? window : null,
         }
       )

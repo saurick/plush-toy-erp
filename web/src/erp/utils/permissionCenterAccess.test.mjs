@@ -5,6 +5,7 @@ import {
   buildAssignableRoleOptions,
   filterAssignableBusinessPermissions,
   getAdminControlTargetBlockReason,
+  getAdminProfileTargetBlockReason,
   getPermissionCenterRoleVersion,
   getRoleAssignmentBlockReason,
   getRolePermissionReadOnlyReason,
@@ -202,10 +203,7 @@ test('permissionCenterAccess: 角色分配与权限编辑分别服从后端 meta
     version: 2,
   }
   assert.deepEqual(buildAssignableRoleOptions([editableButNotAssignable]), [])
-  assert.equal(
-    getRolePermissionReadOnlyReason(editableButNotAssignable),
-    ''
-  )
+  assert.equal(getRolePermissionReadOnlyReason(editableButNotAssignable), '')
 
   const assignableButReadOnly = {
     ...editableButNotAssignable,
@@ -337,6 +335,26 @@ test('permissionCenterAccess: 系统角色可按 metadata 分配但系统账号�
       roles,
     }),
     /资料尚未完整加载/u
+  )
+})
+
+test('permissionCenterAccess: 超级管理员只能维护自己的姓名和手机号', () => {
+  const currentAdmin = { id: 1, is_super_admin: true }
+  assert.equal(
+    getAdminProfileTargetBlockReason({
+      currentAdmin,
+      targetAdmin: { id: 1, is_super_admin: true },
+      roles,
+    }),
+    ''
+  )
+  assert.match(
+    getAdminProfileTargetBlockReason({
+      currentAdmin,
+      targetAdmin: { id: 2, is_super_admin: true },
+      roles,
+    }),
+    /超级管理员由系统保护/u
   )
 })
 

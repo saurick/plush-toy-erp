@@ -50,11 +50,12 @@ test('businessAttachmentWithdrawal: 撤销审计显示业务可读账号时间�
     withdrawn_at: 1_750_000_000,
     withdrawn_by: 7,
     withdrawn_by_username: ' demo_admin ',
+    withdrawn_by_display_name: ' 系统管理员 ',
     withdrawal_reason: ' 上传了错误版本 ',
   })
 
   assert.equal(meta.withdrawn, true)
-  assert.equal(meta.withdrawerLabel, '撤销账号：demo_admin')
+  assert.equal(meta.withdrawerLabel, '撤销人：系统管理员（demo_admin）')
   assert.match(meta.withdrawnAtLabel, /^撤销时间：/u)
   assert.equal(meta.withdrawalReasonLabel, '撤销原因：上传了错误版本')
   assert(!meta.withdrawerLabel.includes('7'))
@@ -68,6 +69,6 @@ test('businessAttachmentWithdrawal: 历史缺失撤销身份不回退内部数�
     withdrawal_reason: '',
   })
 
-  assert.equal(meta.withdrawerLabel, '撤销账号：未记录')
+  assert.equal(meta.withdrawerLabel, '撤销人：未记录')
   assert.equal(meta.withdrawalReasonLabel, '撤销原因：未记录')
 })

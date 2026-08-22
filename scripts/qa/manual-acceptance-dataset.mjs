@@ -25,9 +25,10 @@ import { readDatabaseRebuildPlan } from "../deploy/database-rebuild-controller.m
 import { readDeliveryOperation } from "../deploy/delivery-operation-store.mjs";
 
 import {
-  FORMAL_DEMO_ACCOUNTS,
-  MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS,
-} from "./manual-acceptance-account-scenarios.mjs";
+  MANUAL_ACCEPTANCE_FORMAL_ROLE_KEYS,
+  LOCAL_DEMO_ACCOUNT_SET,
+  manualAcceptanceAccountSetForTarget,
+} from "./manual-acceptance-account-identities.mjs";
 import { buildAttachmentFixtures } from "./manual-acceptance-attachment-data.mjs";
 import {
   MANUAL_ACCEPTANCE_BUSINESS_CHAIN_REUSE_STATUS,
@@ -914,11 +915,12 @@ function buildStages(identity, businessChainContract) {
         ),
       ],
       expected: {
-        formalAccounts: [...FORMAL_DEMO_ACCOUNTS],
-        scenarioAccounts: MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS.map(
-          ({ key, username, roleKeys, disabled }) => ({
+        formalAccounts: MANUAL_ACCEPTANCE_FORMAL_ROLE_KEYS.map((roleKey) => ({
+          roleKey,
+        })),
+        scenarioAccounts: LOCAL_DEMO_ACCOUNT_SET.scenarios.map(
+          ({ key, roleKeys, disabled }) => ({
             key,
-            username,
             roleKeys: [...roleKeys],
             disabled,
           }),
@@ -1463,6 +1465,9 @@ export function buildManualAcceptanceDatasetTargetPlan(options = {}) {
     runId: semanticPlan.runId,
     targetAttestation: options.targetAttestation,
   });
+  const accountSet = manualAcceptanceAccountSetForTarget(
+    targetBinding.policyTarget,
+  );
   const stageCapabilities = evaluateManualAcceptanceTargetCapabilities(
     semanticPlan,
     targetBinding.alias,
@@ -1481,6 +1486,16 @@ export function buildManualAcceptanceDatasetTargetPlan(options = {}) {
     generatedAt: normalizeGeneratedAt(options.generatedAt),
     target: {
       ...targetBinding,
+      accountIdentity: {
+        accountKind: accountSet.accountKind,
+        usernamePrefix: accountSet.usernamePrefix,
+        passwordEnvironmentVariable: accountSet.passwordEnvironmentVariable,
+        formalAccounts: [...accountSet.formalUsernames],
+        scenarioAccounts: accountSet.scenarios.map((scenario) => ({
+          key: scenario.key,
+          username: scenario.username,
+        })),
+      },
       stageCapabilities,
       applyReady: targetBinding.bindingReady && stageCapabilities.ready,
     },

@@ -508,6 +508,24 @@ test("manual acceptance browser plan covers all 51 catalog targets and ten forma
   );
   assert.equal(productionOrders?.roleKey, "sales");
   assert.equal(productionOrders?.username, "demo_sales");
+
+  const uatPlan = buildManualAcceptanceBrowserPlan({
+    baseURL: "http://127.0.0.1:15200",
+    backendURL: "http://127.0.0.1:18375",
+    target: "customer-trial-133",
+  });
+  assert.equal(
+    uatPlan.passwordEnvironmentVariable,
+    "MANUAL_ACCEPTANCE_UAT_PASSWORD",
+  );
+  assert.ok(
+    uatPlan.formalAccounts.every((account) => /^uat_/u.test(account.username)),
+  );
+  assert.ok(
+    uatPlan.exceptionAccounts.every((account) =>
+      /^uat_/u.test(account.username),
+    ),
+  );
   assert.equal(
     plan.targets.filter((item) => item.username === "demo_admin").length,
     2,
@@ -2800,7 +2818,7 @@ test("fresh business print sessions run before the long page traversal", async (
     "printEvidence = await verifyBusinessPrintEvidence",
   );
   const formalAccountIndex = source.lastIndexOf(
-    "for (const account of FORMAL_BROWSER_ACCOUNTS)",
+    "for (const account of plan.formalAccounts)",
   );
   assert.ok(printIndex > 0);
   assert.ok(formalAccountIndex > printIndex);
@@ -2890,7 +2908,7 @@ test("missing password starts zero browsers and performs zero probes", async () 
         },
       },
     ),
-    /缺少本地试用账号密码/,
+    /缺少目标验收账号密码/,
   );
   assert.equal(chromiumLoads, 0);
   assert.equal(fetchCalls, 0);

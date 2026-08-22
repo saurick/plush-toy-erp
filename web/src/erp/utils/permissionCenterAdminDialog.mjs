@@ -1,7 +1,7 @@
 export const PERMISSION_CENTER_ADMIN_DIALOG = Object.freeze({
   CREATE: 'create',
   EDIT_ROLES: 'edit_roles',
-  EDIT_PHONE: 'edit_phone',
+  EDIT_PROFILE: 'edit_profile',
   RESET_PASSWORD: 'reset_password',
   CHANGE_STATUS: 'change_status',
   REVOKE: 'revoke',
@@ -15,6 +15,7 @@ export function createPermissionCenterAdminDialogState() {
   return {
     admin: null,
     kind: '',
+    displayName: '',
     phone: '',
     statusDisabled: false,
   }
@@ -28,8 +29,12 @@ export function permissionCenterAdminDialogReducer(state, action) {
       return {
         admin: action.admin || null,
         kind: action.kind,
+        displayName:
+          action.kind === PERMISSION_CENTER_ADMIN_DIALOG.EDIT_PROFILE
+            ? String(action.displayName || '')
+            : '',
         phone:
-          action.kind === PERMISSION_CENTER_ADMIN_DIALOG.EDIT_PHONE
+          action.kind === PERMISSION_CENTER_ADMIN_DIALOG.EDIT_PROFILE
             ? String(action.phone || '')
             : '',
         statusDisabled:
@@ -39,10 +44,15 @@ export function permissionCenterAdminDialogReducer(state, action) {
       }
     }
     case 'set_phone':
-      if (currentState.kind !== PERMISSION_CENTER_ADMIN_DIALOG.EDIT_PHONE) {
+      if (currentState.kind !== PERMISSION_CENTER_ADMIN_DIALOG.EDIT_PROFILE) {
         return currentState
       }
       return { ...currentState, phone: String(action.phone || '') }
+    case 'set_display_name':
+      if (currentState.kind !== PERMISSION_CENTER_ADMIN_DIALOG.EDIT_PROFILE) {
+        return currentState
+      }
+      return { ...currentState, displayName: String(action.displayName || '') }
     case 'close':
       return createPermissionCenterAdminDialogState()
     default:

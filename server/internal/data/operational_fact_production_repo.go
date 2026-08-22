@@ -2256,11 +2256,11 @@ func entProductionFactToBiz(row *ent.ProductionFact) *biz.ProductionFact {
 	var cancellerName *string
 	var posterName *string
 	if poster, err := row.Edges.PosterOrErr(); err == nil && poster != nil {
-		name := poster.Username
+		name := biz.AdminDisplayName(mapEntAdminUser(poster))
 		posterName = &name
 	}
 	if canceller, err := row.Edges.CancellerOrErr(); err == nil && canceller != nil {
-		name := canceller.Username
+		name := biz.AdminDisplayName(mapEntAdminUser(canceller))
 		cancellerName = &name
 	}
 	return &biz.ProductionFact{ID: row.ID, FactNo: row.FactNo, FactType: row.FactType, Status: row.Status, Version: row.Version, SubjectType: row.SubjectType, SubjectID: row.SubjectID, ProductSkuID: row.ProductSkuID, WarehouseID: row.WarehouseID, UnitID: row.UnitID, LotID: row.LotID, Quantity: row.Quantity, SourceType: row.SourceType, SourceID: row.SourceID, SourceLineID: row.SourceLineID, ProductionWIPBatchID: row.ProductionWipBatchID, IdempotencyKey: row.IdempotencyKey, OccurredAt: row.OccurredAt, PostedAt: row.PostedAt, PostedBy: row.PostedBy, PostedByName: posterName, CancelledAt: row.CancelledAt, CancelledBy: row.CancelledBy, CancelledByName: cancellerName, CancelReason: row.CancelReason, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}

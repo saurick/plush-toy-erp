@@ -25,6 +25,8 @@ type PurchaseOrderItem struct {
 	PurchaseOrderID int `json:"purchase_order_id,omitempty"`
 	// LineNo holds the value of the "line_no" field.
 	LineNo int `json:"line_no,omitempty"`
+	// DisplayOrder holds the value of the "display_order" field.
+	DisplayOrder *int `json:"display_order,omitempty"`
 	// MaterialID holds the value of the "material_id" field.
 	MaterialID int `json:"material_id,omitempty"`
 	// UnitID holds the value of the "unit_id" field.
@@ -129,7 +131,7 @@ func (*PurchaseOrderItem) scanValues(columns []string) ([]any, error) {
 			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
 		case purchaseorderitem.FieldPurchasedQuantity:
 			values[i] = new(decimal.Decimal)
-		case purchaseorderitem.FieldID, purchaseorderitem.FieldPurchaseOrderID, purchaseorderitem.FieldLineNo, purchaseorderitem.FieldMaterialID, purchaseorderitem.FieldUnitID:
+		case purchaseorderitem.FieldID, purchaseorderitem.FieldPurchaseOrderID, purchaseorderitem.FieldLineNo, purchaseorderitem.FieldDisplayOrder, purchaseorderitem.FieldMaterialID, purchaseorderitem.FieldUnitID:
 			values[i] = new(sql.NullInt64)
 		case purchaseorderitem.FieldMaterialCodeSnapshot, purchaseorderitem.FieldMaterialNameSnapshot, purchaseorderitem.FieldColorSnapshot, purchaseorderitem.FieldProductOrderNoSnapshot, purchaseorderitem.FieldProductNoSnapshot, purchaseorderitem.FieldProductNameSnapshot, purchaseorderitem.FieldLineStatus, purchaseorderitem.FieldNote:
 			values[i] = new(sql.NullString)
@@ -167,6 +169,13 @@ func (_m *PurchaseOrderItem) assignValues(columns []string, values []any) error 
 				return fmt.Errorf("unexpected type %T for field line_no", values[i])
 			} else if value.Valid {
 				_m.LineNo = int(value.Int64)
+			}
+		case purchaseorderitem.FieldDisplayOrder:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field display_order", values[i])
+			} else if value.Valid {
+				_m.DisplayOrder = new(int)
+				*_m.DisplayOrder = int(value.Int64)
 			}
 		case purchaseorderitem.FieldMaterialID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -335,6 +344,11 @@ func (_m *PurchaseOrderItem) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("line_no=")
 	builder.WriteString(fmt.Sprintf("%v", _m.LineNo))
+	builder.WriteString(", ")
+	if v := _m.DisplayOrder; v != nil {
+		builder.WriteString("display_order=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("material_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.MaterialID))

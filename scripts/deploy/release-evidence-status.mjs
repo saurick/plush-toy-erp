@@ -87,7 +87,7 @@ const CLOSEOUT_EVIDENCE_GROUPS = [
     label: "凭据轮换与登录矩阵",
     files: [REQUIRED_FILES.credentialRotation, REQUIRED_FILES.smoke],
     reason:
-      "证明 admin 与十个 demo 已轮换、旧会话已撤销且目标环境 11/11 真实登录通过",
+      "证明 admin 与十个 UAT 岗位账号已轮换、旧会话已撤销且目标环境 11/11 真实登录通过",
   },
   {
     id: "target-smoke",
@@ -262,7 +262,7 @@ function buildSmokeCommand({ evidenceDir, customerConfigRevision = "" }) {
   const customerConfigSmokeArgs = customerConfigRevision
     ? ` --customer-config-revision ${customerConfigRevision} --admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN`
     : "";
-  return `bash deployments/yoyoosun/scripts/run-smoke.sh --release-version <release-version> --environment <environment> --endpoint <public-endpoint> --backend-url <backend-endpoint> --admin-username admin --admin-password-env MANUAL_ACCEPTANCE_ADMIN_PASSWORD --demo-password-env MANUAL_ACCEPTANCE_PASSWORD --sms-phone-env MANUAL_ACCEPTANCE_SMS_PHONE${customerConfigSmokeArgs} --report ${evidenceDir}/smoke-test-report.json`;
+  return `bash deployments/yoyoosun/scripts/run-smoke.sh --release-version <release-version> --environment <environment> --endpoint <public-endpoint> --backend-url <backend-endpoint> --admin-username admin --admin-password-env MANUAL_ACCEPTANCE_ADMIN_PASSWORD --uat-password-env MANUAL_ACCEPTANCE_UAT_PASSWORD --sms-phone-env MANUAL_ACCEPTANCE_SMS_PHONE${customerConfigSmokeArgs} --report ${evidenceDir}/smoke-test-report.json`;
 }
 
 function buildRollbackRehearsalCommand({

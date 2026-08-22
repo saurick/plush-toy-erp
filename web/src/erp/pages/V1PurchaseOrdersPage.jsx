@@ -1184,6 +1184,8 @@ export default function V1PurchaseOrdersPage() {
       suppliers,
       unitOptions,
       customerKey: activeCustomerKey,
+      accountKey: adminProfile?.id,
+      configRevision: adminProfile?.effective_session?.config_revision || '',
     })
   const {
     closeInboundDraftModal,

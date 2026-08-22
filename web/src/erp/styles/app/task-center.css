@@ -200,6 +200,27 @@
   grid-row: 2;
 }
 
+.erp-task-board-scope-filter {
+  display: flex;
+  flex: 1 0 100%;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.erp-task-board-scope-filter > .ant-typography {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.erp-task-board-scope-filter .ant-segmented {
+  min-width: 220px;
+}
+
+.erp-task-board-scope-filter .ant-segmented-item {
+  min-width: 104px;
+}
+
 .erp-task-board-filters
   > .erp-business-filter-control--search.ant-input-affix-wrapper {
   flex: 1 1 320px;

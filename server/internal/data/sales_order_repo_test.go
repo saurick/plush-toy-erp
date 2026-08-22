@@ -283,8 +283,9 @@ func TestSalesOrderRepoItemGuardsAndCancel(t *testing.T) {
 
 func TestSalesOrderRepoSaveWithItemsRollsBackOnItemFailure(t *testing.T) {
 	ctx := context.Background()
-	uc, client := openSalesOrderRepoTest(t, "sales_order_repo_save_rollback")
+	_, client := openSalesOrderRepoTest(t, "sales_order_repo_save_rollback")
 	defer mustCloseEntClient(t, client)
+	repo := NewSalesOrderRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard))
 
 	customer := createSalesOrderTestCustomer(t, ctx, client, "C-SO-TX-ROLLBACK", true)
 	unit := createSalesOrderTestUnit(t, ctx, client, "PCS-SO-TX-ROLLBACK", true)
@@ -292,16 +293,17 @@ func TestSalesOrderRepoSaveWithItemsRollsBackOnItemFailure(t *testing.T) {
 	orderDate := time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC)
 	qty := decimal.NewFromInt(10)
 
-	_, err := uc.SaveSalesOrderWithItems(ctx, 0, &biz.SalesOrderMutation{
+	_, err := repo.SaveSalesOrderWithItems(ctx, 0, &biz.SalesOrderMutation{
 		OrderNo:    "SO-TX-ROLLBACK",
 		CustomerID: customer.ID,
+		Currency:   biz.FinanceCurrencyCNY,
 		OrderDate:  orderDate,
 	}, []*biz.SalesOrderItemSaveMutation{
 		{SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 1, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: qty}},
-		{SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 1, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: qty}},
+		{SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 2, ProductID: product.ID + 1000000, UnitID: unit.ID, OrderedQuantity: qty}},
 	})
 	if err == nil {
-		t.Fatalf("expected duplicate line failure")
+		t.Fatalf("expected foreign-key failure")
 	}
 	count, countErr := client.SalesOrder.Query().
 		Where(salesorder.OrderNo("SO-TX-ROLLBACK")).
@@ -311,6 +313,111 @@ func TestSalesOrderRepoSaveWithItemsRollsBackOnItemFailure(t *testing.T) {
 	}
 	if count != 0 {
 		t.Fatalf("expected transaction rollback to remove order header, got count=%d", count)
+	}
+}
+
+func TestSalesOrderRepoSaveWithItemsKeepsLineIdentityWhileReordering(t *testing.T) {
+	ctx := context.Background()
+	uc, client := openSalesOrderRepoTest(t, "sales_order_repo_display_order")
+	defer mustCloseEntClient(t, client)
+
+	customer := createSalesOrderTestCustomer(t, ctx, client, "C-SO-ORDER", true)
+	unit := createSalesOrderTestUnit(t, ctx, client, "PCS-SO-ORDER", true)
+	product := createSalesOrderTestProduct(t, ctx, client, unit.ID, "PRD-SO-ORDER", true)
+	orderDate := time.Date(2026, 8, 22, 0, 0, 0, 0, time.UTC)
+	qty := decimal.NewFromInt(10)
+	created, err := uc.SaveSalesOrderWithItems(ctx, 0, &biz.SalesOrderMutation{
+		OrderNo:    "SO-DISPLAY-ORDER",
+		CustomerID: customer.ID,
+		OrderDate:  orderDate,
+	}, []*biz.SalesOrderItemSaveMutation{
+		{SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 1, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: qty}},
+		{SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 2, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: qty}},
+		{SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 3, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: qty}},
+	})
+	if err != nil {
+		t.Fatalf("create sales order with items: %v", err)
+	}
+	first, second, third := created.Items[0], created.Items[1], created.Items[2]
+
+	reordered, err := uc.SaveSalesOrderWithItems(ctx, created.Order.ID, &biz.SalesOrderMutation{
+		OrderNo:         created.Order.OrderNo,
+		CustomerID:      customer.ID,
+		Currency:        created.Order.Currency,
+		OrderDate:       orderDate,
+		ExpectedVersion: created.Order.Version,
+	}, []*biz.SalesOrderItemSaveMutation{
+		{ID: third.ID, SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 1, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: qty}},
+		{ID: first.ID, SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 2, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: qty}},
+		{ID: second.ID, SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 3, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: qty}},
+	})
+	if err != nil {
+		t.Fatalf("reorder sales order items: %v", err)
+	}
+	if len(reordered.Items) != 3 || reordered.Items[0].ID != third.ID || reordered.Items[1].ID != first.ID || reordered.Items[2].ID != second.ID {
+		t.Fatalf("unexpected reordered items: %#v", reordered.Items)
+	}
+	if reordered.Items[0].LineNo != third.LineNo || reordered.Items[1].LineNo != first.LineNo || reordered.Items[2].LineNo != second.LineNo {
+		t.Fatalf("line identity changed during reorder: %#v", reordered.Items)
+	}
+	for itemID, expectedOrder := range map[int]int{third.ID: 1, first.ID: 2, second.ID: 3} {
+		row := client.SalesOrderItem.GetX(ctx, itemID)
+		if row.DisplayOrder == nil || *row.DisplayOrder != expectedOrder {
+			t.Fatalf("item %d display_order = %v, want %d", itemID, row.DisplayOrder, expectedOrder)
+		}
+	}
+
+	withReplacement, err := uc.SaveSalesOrderWithItems(ctx, created.Order.ID, &biz.SalesOrderMutation{
+		OrderNo:         created.Order.OrderNo,
+		CustomerID:      customer.ID,
+		Currency:        created.Order.Currency,
+		OrderDate:       orderDate,
+		ExpectedVersion: reordered.Order.Version,
+	}, []*biz.SalesOrderItemSaveMutation{
+		{ID: third.ID, SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 1, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: qty}},
+		{SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 2, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: qty}},
+		{ID: first.ID, SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 3, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: qty}},
+	})
+	if err != nil {
+		t.Fatalf("replace sales order item: %v", err)
+	}
+	openItems, _, err := uc.ListSalesOrderItems(ctx, biz.SalesOrderItemFilter{
+		SalesOrderID: created.Order.ID,
+		LineStatus:   biz.SalesOrderItemStatusOpen,
+		Limit:        20,
+	})
+	if err != nil {
+		t.Fatalf("list reordered sales order items: %v", err)
+	}
+	if len(openItems) != 3 || openItems[0].ID != third.ID || openItems[2].ID != first.ID || openItems[1].LineNo != 4 {
+		t.Fatalf("new line must use the next stable identity: %#v", openItems)
+	}
+
+	replacedID := openItems[1].ID
+	_, err = uc.SaveSalesOrderWithItems(ctx, created.Order.ID, &biz.SalesOrderMutation{
+		OrderNo:         created.Order.OrderNo,
+		CustomerID:      customer.ID,
+		Currency:        created.Order.Currency,
+		OrderDate:       orderDate,
+		ExpectedVersion: withReplacement.Order.Version,
+	}, []*biz.SalesOrderItemSaveMutation{
+		{ID: third.ID, SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 1, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: qty}},
+		{SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 2, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: qty}},
+		{ID: first.ID, SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 3, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: qty}},
+	})
+	if err != nil {
+		t.Fatalf("replace sales order item again: %v", err)
+	}
+	openItems, _, err = uc.ListSalesOrderItems(ctx, biz.SalesOrderItemFilter{
+		SalesOrderID: created.Order.ID,
+		LineStatus:   biz.SalesOrderItemStatusOpen,
+		Limit:        20,
+	})
+	if err != nil {
+		t.Fatalf("list second replacement: %v", err)
+	}
+	if len(openItems) != 3 || openItems[1].ID == replacedID || openItems[1].LineNo != 5 {
+		t.Fatalf("canceled line number must not be reused: %#v", openItems)
 	}
 }
 

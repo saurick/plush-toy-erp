@@ -618,38 +618,47 @@ func (r *outsourcingOrderRepo) SaveOutsourcingOrderWithItems(ctx context.Context
 		}
 	}
 
-	existingOpenItems, err := tx.OutsourcingOrderItem.Query().
-		Where(
-			outsourcingorderitem.OutsourcingOrderID(orderRow.ID),
-			outsourcingorderitem.LineStatus(biz.OutsourcingOrderItemStatusOpen),
-		).
+	existingItems, err := tx.OutsourcingOrderItem.Query().
+		Where(outsourcingorderitem.OutsourcingOrderID(orderRow.ID)).
 		All(ctx)
 	if err != nil {
 		return nil, err
 	}
+	existingByID := make(map[int]*ent.OutsourcingOrderItem, len(existingItems))
+	existingOpenItems := make([]*ent.OutsourcingOrderItem, 0, len(existingItems))
+	maxLineNo := 0
+	for _, existing := range existingItems {
+		existingByID[existing.ID] = existing
+		if existing.LineNo > maxLineNo {
+			maxLineNo = existing.LineNo
+		}
+		if existing.LineStatus == biz.OutsourcingOrderItemStatusOpen {
+			existingOpenItems = append(existingOpenItems, existing)
+		}
+	}
 	submittedIDs := map[int]struct{}{}
-	for _, item := range items {
+	for index, item := range items {
 		mutation := item.OutsourcingOrderItemMutation
 		mutation.OutsourcingOrderID = orderRow.ID
+		displayOrder := index + 1
 		if item.ID > 0 {
-			current, err := tx.OutsourcingOrderItem.Query().
-				Where(outsourcingorderitem.ID(item.ID), outsourcingorderitem.OutsourcingOrderID(orderRow.ID)).
-				Only(ctx)
-			if err != nil {
-				if ent.IsNotFound(err) {
-					return nil, biz.ErrOutsourcingOrderItemNotFound
-				}
-				return nil, err
+			current, ok := existingByID[item.ID]
+			if !ok {
+				return nil, biz.ErrOutsourcingOrderItemNotFound
 			}
 			if current.LineStatus != biz.OutsourcingOrderItemStatusOpen {
 				return nil, biz.ErrBadParam
 			}
+			mutation.LineNo = current.LineNo
+		} else {
+			maxLineNo++
+			mutation.LineNo = maxLineNo
 		}
 		if err := setCanonicalOutsourcingOrderItemSnapshots(ctx, tx, &mutation); err != nil {
 			return nil, err
 		}
 		if item.ID > 0 {
-			if _, err := saveOutsourcingOrderItemUpdate(ctx, tx, item.ID, &mutation); err != nil {
+			if _, err := saveOutsourcingOrderItemUpdate(ctx, tx, item.ID, displayOrder, &mutation); err != nil {
 				return nil, err
 			}
 			submittedIDs[item.ID] = struct{}{}
@@ -658,6 +667,7 @@ func (r *outsourcingOrderRepo) SaveOutsourcingOrderWithItems(ctx context.Context
 		if _, err := tx.OutsourcingOrderItem.Create().
 			SetOutsourcingOrderID(mutation.OutsourcingOrderID).
 			SetLineNo(mutation.LineNo).
+			SetDisplayOrder(displayOrder).
 			SetSubjectType(mutation.SubjectType).
 			SetNillableProductID(mutation.ProductID).
 			SetNillableProductSkuID(mutation.ProductSKUID).
@@ -698,7 +708,11 @@ func (r *outsourcingOrderRepo) SaveOutsourcingOrderWithItems(ctx context.Context
 
 	itemRows, err := tx.OutsourcingOrderItem.Query().
 		Where(outsourcingorderitem.OutsourcingOrderID(orderRow.ID)).
-		Order(ent.Asc(outsourcingorderitem.FieldLineNo), ent.Asc(outsourcingorderitem.FieldID)).
+		Order(sourceDocumentItemOrder(
+			outsourcingorderitem.FieldDisplayOrder,
+			outsourcingorderitem.FieldLineNo,
+			outsourcingorderitem.FieldID,
+		)).
 		All(ctx)
 	if err != nil {
 		return nil, err
@@ -891,7 +905,11 @@ func (r *outsourcingOrderRepo) ListOutsourcingOrderItems(ctx context.Context, fi
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := query.Order(ent.Asc(outsourcingorderitem.FieldLineNo)).
+	rows, err := query.Order(sourceDocumentItemOrder(
+		outsourcingorderitem.FieldDisplayOrder,
+		outsourcingorderitem.FieldLineNo,
+		outsourcingorderitem.FieldID,
+	)).
 		Limit(filter.Limit).
 		Offset(filter.Offset).
 		All(ctx)
@@ -1002,10 +1020,11 @@ func (r *outsourcingOrderRepo) ProcessIsUsableForOutsourcing(ctx context.Context
 	return row.IsActive, row.OutsourcingEnabled, nil
 }
 
-func saveOutsourcingOrderItemUpdate(ctx context.Context, tx *ent.Tx, id int, in *biz.OutsourcingOrderItemMutation) (*ent.OutsourcingOrderItem, error) {
+func saveOutsourcingOrderItemUpdate(ctx context.Context, tx *ent.Tx, id int, displayOrder int, in *biz.OutsourcingOrderItemMutation) (*ent.OutsourcingOrderItem, error) {
 	update := tx.OutsourcingOrderItem.UpdateOneID(id).
 		SetOutsourcingOrderID(in.OutsourcingOrderID).
 		SetLineNo(in.LineNo).
+		SetDisplayOrder(displayOrder).
 		SetSubjectType(in.SubjectType).
 		SetProcessID(in.ProcessID).
 		SetUnitID(in.UnitID).

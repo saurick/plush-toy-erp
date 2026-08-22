@@ -18,7 +18,9 @@ const contractSha256 = crypto
 const fixtureRelease = "abc1234000000000000000000000000000000000";
 
 function markdownField(content, name) {
-  return content.match(new RegExp(`^\\|\\s*${name}\\s*\\|\\s*([^|]+?)\\s*\\|$`, "mu"))?.[1]?.trim();
+  return content
+    .match(new RegExp(`^\\|\\s*${name}\\s*\\|\\s*([^|]+?)\\s*\\|$`, "mu"))?.[1]
+    ?.trim();
 }
 
 export function writeCredentialEvidenceTestFixture(
@@ -56,17 +58,17 @@ export function writeCredentialEvidenceTestFixture(
     phoneConfigured: false,
     phoneBound: false,
     adminAuthVersion: 2,
-    demoExpected: 10,
-    demoAuthenticated: 10,
+    uatExpected: 10,
+    uatAuthenticated: 10,
     totalExpected: 11,
     totalAuthenticated: 11,
     uniqueTokensObserved: true,
     usernames: [
       contract.credentials.admin.username,
-      ...contract.credentials.demo.usernames,
+      ...contract.credentials.uat.usernames,
     ],
-    adminPasswordSource: "credential-contract",
-    demoPasswordSource: "credential-contract",
+    adminPasswordSource: contract.credentials.admin.credentialSource,
+    uatPasswordSource: contract.credentials.uat.credentialSource,
     smsPhoneSourceEnv: contract.smsLoginIdentity.environmentVariable,
     responseBodyStored: false,
   });
@@ -81,7 +83,7 @@ export function writeCredentialEvidenceTestFixture(
 
   const accounts = [
     contract.credentials.admin.username,
-    ...contract.credentials.demo.usernames,
+    ...contract.credentials.uat.usernames,
   ].map((username, index) => ({
     username,
     authVersion: index + 2,
@@ -100,7 +102,8 @@ export function writeCredentialEvidenceTestFixture(
         customerRevision,
         release: fixtureRelease,
         adminAccounts: 1,
-        demoAccounts: 10,
+        accountKind: "customer-uat",
+        roleAccounts: 10,
         revokedSessions: 1,
         authVersionIncremented: true,
         auditSource: "manual_acceptance_password_rotation",

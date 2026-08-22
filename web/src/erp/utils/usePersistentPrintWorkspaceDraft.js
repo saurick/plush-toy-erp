@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 import { persistPrintWorkspaceDraftSnapshot } from './printWorkspace.js'
 
 let silentDraftUpdateDepth = 0
@@ -43,6 +49,18 @@ export function usePersistentPrintWorkspaceDraft(
     draftStorageKey ? 'saving' : 'unavailable'
   )
   const draftRef = useRef(draft)
+  const activeDraftStorageKeyRef = useRef(draftStorageKey)
+
+  useLayoutEffect(() => {
+    if (activeDraftStorageKeyRef.current === draftStorageKey) {
+      return
+    }
+    const nextInitialDraft = resolveNextDraft(initialDraft, draftRef.current)
+    activeDraftStorageKeyRef.current = draftStorageKey
+    draftRef.current = nextInitialDraft
+    setDraftState(nextInitialDraft)
+    setPersistenceStatus(draftStorageKey ? 'saving' : 'unavailable')
+  }, [draftStorageKey, initialDraft])
 
   const persistDraft = useCallback(
     (nextDraft = draftRef.current) => {

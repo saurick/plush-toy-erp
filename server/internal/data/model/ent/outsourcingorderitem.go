@@ -28,6 +28,8 @@ type OutsourcingOrderItem struct {
 	OutsourcingOrderID int `json:"outsourcing_order_id,omitempty"`
 	// LineNo holds the value of the "line_no" field.
 	LineNo int `json:"line_no,omitempty"`
+	// DisplayOrder holds the value of the "display_order" field.
+	DisplayOrder *int `json:"display_order,omitempty"`
 	// SubjectType holds the value of the "subject_type" field.
 	SubjectType string `json:"subject_type,omitempty"`
 	// ProductID holds the value of the "product_id" field.
@@ -187,7 +189,7 @@ func (*OutsourcingOrderItem) scanValues(columns []string) ([]any, error) {
 			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
 		case outsourcingorderitem.FieldOutsourcingQuantity:
 			values[i] = new(decimal.Decimal)
-		case outsourcingorderitem.FieldID, outsourcingorderitem.FieldOutsourcingOrderID, outsourcingorderitem.FieldLineNo, outsourcingorderitem.FieldProductID, outsourcingorderitem.FieldProductSkuID, outsourcingorderitem.FieldMaterialID, outsourcingorderitem.FieldProcessID, outsourcingorderitem.FieldUnitID:
+		case outsourcingorderitem.FieldID, outsourcingorderitem.FieldOutsourcingOrderID, outsourcingorderitem.FieldLineNo, outsourcingorderitem.FieldDisplayOrder, outsourcingorderitem.FieldProductID, outsourcingorderitem.FieldProductSkuID, outsourcingorderitem.FieldMaterialID, outsourcingorderitem.FieldProcessID, outsourcingorderitem.FieldUnitID:
 			values[i] = new(sql.NullInt64)
 		case outsourcingorderitem.FieldSubjectType, outsourcingorderitem.FieldProductNoSnapshot, outsourcingorderitem.FieldSkuCodeSnapshot, outsourcingorderitem.FieldProductOrderNoSnapshot, outsourcingorderitem.FieldProductNameSnapshot, outsourcingorderitem.FieldMaterialCodeSnapshot, outsourcingorderitem.FieldMaterialNameSnapshot, outsourcingorderitem.FieldProcessingItem, outsourcingorderitem.FieldProcessNameSnapshot, outsourcingorderitem.FieldProcessCategorySnapshot, outsourcingorderitem.FieldUnitNameSnapshot, outsourcingorderitem.FieldLineStatus, outsourcingorderitem.FieldNote:
 			values[i] = new(sql.NullString)
@@ -225,6 +227,13 @@ func (_m *OutsourcingOrderItem) assignValues(columns []string, values []any) err
 				return fmt.Errorf("unexpected type %T for field line_no", values[i])
 			} else if value.Valid {
 				_m.LineNo = int(value.Int64)
+			}
+		case outsourcingorderitem.FieldDisplayOrder:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field display_order", values[i])
+			} else if value.Valid {
+				_m.DisplayOrder = new(int)
+				*_m.DisplayOrder = int(value.Int64)
 			}
 		case outsourcingorderitem.FieldSubjectType:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -463,6 +472,11 @@ func (_m *OutsourcingOrderItem) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("line_no=")
 	builder.WriteString(fmt.Sprintf("%v", _m.LineNo))
+	builder.WriteString(", ")
+	if v := _m.DisplayOrder; v != nil {
+		builder.WriteString("display_order=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("subject_type=")
 	builder.WriteString(_m.SubjectType)

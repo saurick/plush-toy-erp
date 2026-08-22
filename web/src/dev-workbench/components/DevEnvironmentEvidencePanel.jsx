@@ -228,7 +228,7 @@ export default function DevEnvironmentEvidencePanel() {
     >
       <header className="erp-dev-environment-evidence__header">
         <div>
-          <strong id="dev-environment-evidence-title">双环境事实</strong>
+          <strong id="dev-environment-evidence-title">环境与验收事实</strong>
           <span>控制端：{evidence.controller}</span>
         </div>
         <Button

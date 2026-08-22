@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"go.opentelemetry.io/otel"
@@ -19,6 +20,7 @@ import (
 var (
 	ErrAdminNotFound                     = errors.New("admin not found")
 	ErrAdminExists                       = errors.New("admin already exists")
+	ErrAdminUsernameInvalid              = errors.New("admin username is invalid")
 	ErrAdminPhoneExists                  = errors.New("admin phone already exists")
 	ErrAdminRevoked                      = errors.New("admin account revoked")
 	ErrRoleNotFound                      = errors.New("role not found")
@@ -48,6 +50,7 @@ type AdminRoleAccess struct {
 
 type AdminCreate struct {
 	Username     string
+	DisplayName  string
 	Phone        string
 	PasswordHash string
 	RoleKeys     []string
@@ -116,7 +119,7 @@ type AdminManageRepo interface {
 	ListPermissions(ctx context.Context) ([]AdminPermission, error)
 	GetRoleByKey(ctx context.Context, roleKey string) (*AdminRole, error)
 	UpdateAdminERPColumnOrder(ctx context.Context, id int, moduleKey string, order []string) error
-	SetAdminPhoneWithAudit(ctx context.Context, change *AdminPhoneChange) (*AdminUser, error)
+	SetAdminProfileWithAudit(ctx context.Context, change *AdminProfileChange) (*AdminUser, error)
 	ChangeAdminLifecycle(ctx context.Context, change *AdminLifecycleChange) (updated *AdminUser, releasedTaskCount int, err error)
 	ResetAdminPasswordWithAudit(ctx context.Context, reset *AdminPasswordReset) (*AdminUser, error)
 	RecordRuntimeAuditEvent(ctx context.Context, event *RuntimeAuditEventCreate) error
@@ -262,17 +265,27 @@ func BuildAdminControlAuditEvent(
 	if action == "" || targetType == "" {
 		return nil, ErrBadParam
 	}
+	target := map[string]any{
+		"type": targetType,
+		"id":   targetID,
+		"key":  targetKey,
+	}
+	if targetType == "admin_user" {
+		identity := after
+		if identity == nil {
+			identity = before
+		}
+		target["username"] = strings.TrimSpace(anyToString(identity["username"]))
+		target["display_name"] = strings.TrimSpace(anyToString(identity["display_name"]))
+	}
 	payload := map[string]any{
 		"action": action,
 		"actor": map[string]any{
-			"id":       operator.ID,
-			"username": operator.Username,
+			"id":           operator.ID,
+			"username":     operator.Username,
+			"display_name": operator.DisplayName,
 		},
-		"target": map[string]any{
-			"type": targetType,
-			"id":   targetID,
-			"key":  targetKey,
-		},
+		"target": target,
 		"before": before,
 		"after":  after,
 	}
@@ -291,6 +304,7 @@ func AdminAuditUserSnapshot(admin *AdminUser) map[string]any {
 	return map[string]any{
 		"id":             admin.ID,
 		"username":       admin.Username,
+		"display_name":   admin.DisplayName,
 		"phone":          maskAdminAuditPhone(admin.Phone),
 		"role_keys":      AdminRoleKeys(admin),
 		"disabled":       admin.Disabled,
@@ -313,6 +327,51 @@ func maskAdminAuditPhone(phone string) string {
 		return string(runes[:1]) + "***" + string(runes[len(runes)-1:])
 	}
 	return "****"
+}
+
+const (
+	AdminUsernameMinLength   = 3
+	AdminUsernameMaxLength   = 64
+	adminDisplayNameMaxRunes = 64
+)
+
+func NormalizeAdminUsername(value string) (string, error) {
+	username := strings.TrimSpace(value)
+	if len(username) < AdminUsernameMinLength || len(username) > AdminUsernameMaxLength {
+		return "", ErrAdminUsernameInvalid
+	}
+	for index := 0; index < len(username); index++ {
+		char := username[index]
+		if (char >= 'a' && char <= 'z') ||
+			(char >= 'A' && char <= 'Z') ||
+			(char >= '0' && char <= '9') ||
+			char == '_' {
+			continue
+		}
+		return "", ErrAdminUsernameInvalid
+	}
+	return username, nil
+}
+
+func NormalizeAdminDisplayName(value string) (string, error) {
+	displayName := strings.TrimSpace(value)
+	if displayName == "" || utf8.RuneCountInString(displayName) > adminDisplayNameMaxRunes {
+		return "", ErrBadParam
+	}
+	return displayName, nil
+}
+
+func ValidateAdminProfileTarget(operator, target *AdminUser) error {
+	if operator == nil || target == nil {
+		return ErrBadParam
+	}
+	if target.IsSuperAdmin {
+		if operator.IsSuperAdmin && operator.ID == target.ID {
+			return nil
+		}
+		return ErrNoPermission
+	}
+	return ValidateAdminControlTarget(operator, target)
 }
 
 func AdminAuditRoleSnapshot(role *AdminRole) map[string]any {
@@ -397,6 +456,7 @@ func BuildWorkflowBreakGlassAuditEvent(
 		"actor": map[string]any{
 			"id":             operator.ID,
 			"username":       operator.Username,
+			"display_name":   operator.DisplayName,
 			"role_keys":      AdminRoleKeys(operator),
 			"is_super_admin": operator.IsSuperAdmin,
 		},
@@ -458,8 +518,8 @@ func runtimeAuditActionLabelAndRisk(eventKey string) (string, string) {
 		return "新建管理员", "warning"
 	case "admin_user.roles.set":
 		return "账号角色变更", "warning"
-	case "admin_user.phone.set":
-		return "账号手机号变更", "normal"
+	case "admin_user.profile.set":
+		return "员工资料变更", "normal"
 	case "admin_user.disabled.set":
 		return "账号启停变更", "high"
 	case "admin_user.revoked":
@@ -616,6 +676,7 @@ func (uc *AdminManageUsecase) List(ctx context.Context) (list []*AdminUser, err 
 
 func (uc *AdminManageUsecase) Create(
 	ctx context.Context,
+	displayName string,
 	username string,
 	phone string,
 	password string,
@@ -635,9 +696,18 @@ func (uc *AdminManageUsecase) Create(
 		return nil, err
 	}
 
-	username = strings.TrimSpace(username)
+	displayName, err = NormalizeAdminDisplayName(displayName)
+	if err != nil {
+		span.SetStatus(codes.Error, ErrBadParam.Error())
+		return nil, ErrBadParam
+	}
+	username, err = NormalizeAdminUsername(username)
+	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
 	phone = strings.TrimSpace(phone)
-	if username == "" || password == "" {
+	if password == "" {
 		span.SetStatus(codes.Error, ErrBadParam.Error())
 		return nil, ErrBadParam
 	}
@@ -690,6 +760,7 @@ func (uc *AdminManageUsecase) Create(
 		OperatorID: operator.ID,
 		Admin: &AdminCreate{
 			Username:     username,
+			DisplayName:  displayName,
 			Phone:        normalizedPhone,
 			PasswordHash: string(hash),
 			RoleKeys:     normalizedRoleKeys,
@@ -925,12 +996,13 @@ func (uc *AdminManageUsecase) ListPermissions(ctx context.Context) ([]AdminPermi
 	return uc.repo.ListPermissions(ctx)
 }
 
-func (uc *AdminManageUsecase) SetPhone(
+func (uc *AdminManageUsecase) SetProfile(
 	ctx context.Context,
 	adminID int,
+	displayName string,
 	phone string,
 ) (updated *AdminUser, err error) {
-	ctx, span := uc.Tracer().Start(ctx, "admin_manage.set_phone",
+	ctx, span := uc.Tracer().Start(ctx, "admin_manage.set_profile",
 		trace.WithAttributes(attribute.Int("admin.id", adminID)),
 	)
 	defer span.End()
@@ -952,12 +1024,17 @@ func (uc *AdminManageUsecase) SetPhone(
 		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
-	if err := ValidateAdminControlTarget(operator, target); err != nil {
+	if err := ValidateAdminProfileTarget(operator, target); err != nil {
 		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	if target.AccountStatus() == AdminAccountStatusRevoked {
 		return nil, ErrAdminRevoked
+	}
+	displayName, err = NormalizeAdminDisplayName(displayName)
+	if err != nil {
+		span.SetStatus(codes.Error, ErrBadParam.Error())
+		return nil, ErrBadParam
 	}
 	normalizedPhone := ""
 	if strings.TrimSpace(phone) != "" {
@@ -976,8 +1053,8 @@ func (uc *AdminManageUsecase) SetPhone(
 		}
 	}
 
-	updated, err = uc.repo.SetAdminPhoneWithAudit(ctx, &AdminPhoneChange{
-		AdminID: adminID, OperatorID: operator.ID, Phone: normalizedPhone,
+	updated, err = uc.repo.SetAdminProfileWithAudit(ctx, &AdminProfileChange{
+		AdminID: adminID, OperatorID: operator.ID, DisplayName: displayName, Phone: normalizedPhone,
 	})
 	if err != nil {
 		span.RecordError(err)

@@ -106,9 +106,9 @@ func main() {
 	}
 	if *includeManualAcceptanceScenarios {
 		if err := data.ResetRoleDemoAdminPasswords(ctx, db, []string{
-			"demo_uat_disabled",
-			"demo_uat_sales_purchase",
-			"demo_uat_no_entry",
+			"demo_disabled",
+			"demo_sales_purchase",
+			"demo_no_entry",
 		}, effectivePassword); err != nil {
 			fail("reset manual acceptance scenario passwords failed: %v", err)
 		}

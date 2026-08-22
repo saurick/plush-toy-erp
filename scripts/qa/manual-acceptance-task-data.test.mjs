@@ -734,9 +734,9 @@ function createMockRuntime(options = {}) {
   let actionCount = 0;
 
   const usernameToRole = new Map(
-    Object.entries(ROLE_USERS).map(([roleKey, username]) => [
-      username,
-      roleKey,
+    Object.entries(ROLE_USERS).flatMap(([roleKey, username]) => [
+      [username, roleKey],
+      [`uat_${roleKey}`, roleKey],
     ]),
   );
   usernameToRole.set("admin", "runtime_admin");

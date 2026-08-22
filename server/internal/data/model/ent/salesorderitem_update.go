@@ -70,6 +70,33 @@ func (_u *SalesOrderItemUpdate) AddLineNo(v int) *SalesOrderItemUpdate {
 	return _u
 }
 
+// SetDisplayOrder sets the "display_order" field.
+func (_u *SalesOrderItemUpdate) SetDisplayOrder(v int) *SalesOrderItemUpdate {
+	_u.mutation.ResetDisplayOrder()
+	_u.mutation.SetDisplayOrder(v)
+	return _u
+}
+
+// SetNillableDisplayOrder sets the "display_order" field if the given value is not nil.
+func (_u *SalesOrderItemUpdate) SetNillableDisplayOrder(v *int) *SalesOrderItemUpdate {
+	if v != nil {
+		_u.SetDisplayOrder(*v)
+	}
+	return _u
+}
+
+// AddDisplayOrder adds value to the "display_order" field.
+func (_u *SalesOrderItemUpdate) AddDisplayOrder(v int) *SalesOrderItemUpdate {
+	_u.mutation.AddDisplayOrder(v)
+	return _u
+}
+
+// ClearDisplayOrder clears the value of the "display_order" field.
+func (_u *SalesOrderItemUpdate) ClearDisplayOrder() *SalesOrderItemUpdate {
+	_u.mutation.ClearDisplayOrder()
+	return _u
+}
+
 // SetProductID sets the "product_id" field.
 func (_u *SalesOrderItemUpdate) SetProductID(v int) *SalesOrderItemUpdate {
 	_u.mutation.SetProductID(v)
@@ -461,6 +488,11 @@ func (_u *SalesOrderItemUpdate) check() error {
 			return &ValidationError{Name: "line_no", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.line_no": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.DisplayOrder(); ok {
+		if err := salesorderitem.DisplayOrderValidator(v); err != nil {
+			return &ValidationError{Name: "display_order", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.display_order": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.ProductID(); ok {
 		if err := salesorderitem.ProductIDValidator(v); err != nil {
 			return &ValidationError{Name: "product_id", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.product_id": %w`, err)}
@@ -530,6 +562,15 @@ func (_u *SalesOrderItemUpdate) sqlSave(ctx context.Context) (_node int, err err
 	}
 	if value, ok := _u.mutation.AddedLineNo(); ok {
 		_spec.AddField(salesorderitem.FieldLineNo, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.DisplayOrder(); ok {
+		_spec.SetField(salesorderitem.FieldDisplayOrder, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedDisplayOrder(); ok {
+		_spec.AddField(salesorderitem.FieldDisplayOrder, field.TypeInt, value)
+	}
+	if _u.mutation.DisplayOrderCleared() {
+		_spec.ClearField(salesorderitem.FieldDisplayOrder, field.TypeInt)
 	}
 	if value, ok := _u.mutation.ProductCodeSnapshot(); ok {
 		_spec.SetField(salesorderitem.FieldProductCodeSnapshot, field.TypeString, value)
@@ -840,6 +881,33 @@ func (_u *SalesOrderItemUpdateOne) SetNillableLineNo(v *int) *SalesOrderItemUpda
 // AddLineNo adds value to the "line_no" field.
 func (_u *SalesOrderItemUpdateOne) AddLineNo(v int) *SalesOrderItemUpdateOne {
 	_u.mutation.AddLineNo(v)
+	return _u
+}
+
+// SetDisplayOrder sets the "display_order" field.
+func (_u *SalesOrderItemUpdateOne) SetDisplayOrder(v int) *SalesOrderItemUpdateOne {
+	_u.mutation.ResetDisplayOrder()
+	_u.mutation.SetDisplayOrder(v)
+	return _u
+}
+
+// SetNillableDisplayOrder sets the "display_order" field if the given value is not nil.
+func (_u *SalesOrderItemUpdateOne) SetNillableDisplayOrder(v *int) *SalesOrderItemUpdateOne {
+	if v != nil {
+		_u.SetDisplayOrder(*v)
+	}
+	return _u
+}
+
+// AddDisplayOrder adds value to the "display_order" field.
+func (_u *SalesOrderItemUpdateOne) AddDisplayOrder(v int) *SalesOrderItemUpdateOne {
+	_u.mutation.AddDisplayOrder(v)
+	return _u
+}
+
+// ClearDisplayOrder clears the value of the "display_order" field.
+func (_u *SalesOrderItemUpdateOne) ClearDisplayOrder() *SalesOrderItemUpdateOne {
+	_u.mutation.ClearDisplayOrder()
 	return _u
 }
 
@@ -1247,6 +1315,11 @@ func (_u *SalesOrderItemUpdateOne) check() error {
 			return &ValidationError{Name: "line_no", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.line_no": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.DisplayOrder(); ok {
+		if err := salesorderitem.DisplayOrderValidator(v); err != nil {
+			return &ValidationError{Name: "display_order", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.display_order": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.ProductID(); ok {
 		if err := salesorderitem.ProductIDValidator(v); err != nil {
 			return &ValidationError{Name: "product_id", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.product_id": %w`, err)}
@@ -1333,6 +1406,15 @@ func (_u *SalesOrderItemUpdateOne) sqlSave(ctx context.Context) (_node *SalesOrd
 	}
 	if value, ok := _u.mutation.AddedLineNo(); ok {
 		_spec.AddField(salesorderitem.FieldLineNo, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.DisplayOrder(); ok {
+		_spec.SetField(salesorderitem.FieldDisplayOrder, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedDisplayOrder(); ok {
+		_spec.AddField(salesorderitem.FieldDisplayOrder, field.TypeInt, value)
+	}
+	if _u.mutation.DisplayOrderCleared() {
+		_spec.ClearField(salesorderitem.FieldDisplayOrder, field.TypeInt)
 	}
 	if value, ok := _u.mutation.ProductCodeSnapshot(); ok {
 		_spec.SetField(salesorderitem.FieldProductCodeSnapshot, field.TypeString, value)

@@ -20,11 +20,15 @@ import {
   resolveManualAcceptanceTarget,
 } from "./manual-acceptance-target-policy.mjs";
 import { MANUAL_ACCEPTANCE_CORE_WAREHOUSES } from "./manual-acceptance-core-contract.mjs";
+import {
+  LOCAL_DEMO_ACCOUNT_SET,
+  manualAcceptanceAccountSetForTarget,
+  resolveManualAcceptanceRoleCredential,
+} from "./manual-acceptance-account-identities.mjs";
 import { yoyoosunRoleFlowMatrix } from "../../config/customers/yoyoosun/roleFlowMatrix.mjs";
 
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
 const CUSTOMER_KEY = "yoyoosun";
-const BUSINESS_ADMIN_USERNAME = "demo_admin";
 const GUARD_ADMIN_USERNAME = "admin";
 const CONFIRM_PHRASE = "APPLY_SIMULATED_ACCOUNT_SCENARIOS";
 const FORMAL_ACCOUNT_BOOTSTRAP_CONFIRM_PREFIX =
@@ -34,7 +38,7 @@ const ACCOUNT_DATA_VERSION = CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION;
 const ACCOUNT_RUN_ID = CURRENT_MANUAL_ACCEPTANCE_RUN_ID;
 const MANAGED_ROLE_KEYS = new Set(["sales", "purchase"]);
 const MAX_AUDIT_MINIMUM = 200;
-const LOCAL_ONLY_PUBLIC_PASSWORDS = new Set(["12345678"]);
+const LOCAL_ONLY_PUBLIC_PASSWORDS = new Set(["12345678", "adminadmin"]);
 
 export const MANUAL_ACCEPTANCE_ROLE_CAPABILITY_BASELINE = Object.freeze(
   yoyoosunRoleFlowMatrix.roles.map((profile) =>
@@ -47,62 +51,10 @@ export const MANUAL_ACCEPTANCE_ROLE_CAPABILITY_BASELINE = Object.freeze(
   ),
 );
 
-export const FORMAL_DEMO_ACCOUNTS = Object.freeze([
-  "demo_boss",
-  "demo_sales",
-  "demo_purchase",
-  "demo_production",
-  "demo_warehouse",
-  "demo_quality",
-  "demo_finance",
-  "demo_pmc",
-  "demo_engineering",
-  "demo_admin",
-]);
-
-export const FORMAL_DEMO_ACCOUNT_PROFILES = Object.freeze([
-  Object.freeze({ username: "demo_boss", roleKey: "boss" }),
-  Object.freeze({ username: "demo_sales", roleKey: "sales" }),
-  Object.freeze({ username: "demo_purchase", roleKey: "purchase" }),
-  Object.freeze({ username: "demo_production", roleKey: "production" }),
-  Object.freeze({ username: "demo_warehouse", roleKey: "warehouse" }),
-  Object.freeze({ username: "demo_quality", roleKey: "quality" }),
-  Object.freeze({ username: "demo_finance", roleKey: "finance" }),
-  Object.freeze({ username: "demo_pmc", roleKey: "pmc" }),
-  Object.freeze({ username: "demo_engineering", roleKey: "engineering" }),
-  Object.freeze({ username: "demo_admin", roleKey: "admin" }),
-]);
-
-export const MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS = Object.freeze([
-  Object.freeze({
-    key: "disabled-account",
-    username: "demo_uat_disabled",
-    title: "已停用账号",
-    instruction: "核对停用后的账号不能进入系统，已有业务资料仍然保留。",
-    disabledReason: "验收时暂时停用",
-    roleKeys: Object.freeze(["sales"]),
-    positions: Object.freeze(["业务"]),
-    disabled: true,
-  }),
-  Object.freeze({
-    key: "multi-position-account",
-    username: "demo_uat_sales_purchase",
-    title: "业务与采购兼任账号",
-    instruction: "核对兼任人员登录后可以看到业务和采购两类入口。",
-    roleKeys: Object.freeze(["sales", "purchase"]),
-    positions: Object.freeze(["业务", "采购"]),
-    disabled: false,
-  }),
-  Object.freeze({
-    key: "no-business-entry-account",
-    username: "demo_uat_no_entry",
-    title: "未分配岗位账号",
-    instruction: "核对尚未分配岗位的人员登录后不显示业务入口。",
-    roleKeys: Object.freeze([]),
-    positions: Object.freeze([]),
-    disabled: false,
-  }),
-]);
+export const FORMAL_DEMO_ACCOUNTS = LOCAL_DEMO_ACCOUNT_SET.formalUsernames;
+export const FORMAL_DEMO_ACCOUNT_PROFILES =
+  LOCAL_DEMO_ACCOUNT_SET.formalProfiles;
+export const LOCAL_DEMO_ACCOUNT_SCENARIOS = LOCAL_DEMO_ACCOUNT_SET.scenarios;
 
 class CliError extends Error {
   constructor(message, exitCode = 1) {
@@ -314,6 +266,7 @@ export function requireAdminAccountRecord(value, context = "admin") {
     throw new CliError(`${context} response missing admin id`);
   }
   const username = requiredText(value.username, `${context}.username`);
+  const displayName = optionalText(value.display_name) || username;
   const rawAccountStatus = optionalText(value.account_status);
   const accountStatusFromDisabled =
     typeof value.disabled === "boolean"
@@ -337,6 +290,7 @@ export function requireAdminAccountRecord(value, context = "admin") {
   return {
     id,
     username,
+    displayName,
     phone: String(value.phone ?? "").trim(),
     accountStatus,
     disabled,
@@ -384,6 +338,11 @@ function assertOwnedScenarioAccount(account, scenario) {
 
 function assertScenarioState(account, scenario) {
   assertOwnedScenarioAccount(account, scenario);
+  if (account.displayName !== scenario.displayName) {
+    throw new CliError(
+      `${scenario.title}: returned employee name was not updated`,
+    );
+  }
   const expectedRoleKeys = scenarioRoleKeys(scenario);
   if (!sameStringList(account.roleKeys, expectedRoleKeys)) {
     throw new CliError(
@@ -410,6 +369,7 @@ function accountSnapshot(account) {
   return {
     id: account.id,
     username: account.username,
+    displayName: account.displayName,
     accountStatus: account.accountStatus,
     disabled: account.disabled,
     isSuperAdmin: account.isSuperAdmin,
@@ -417,15 +377,15 @@ function accountSnapshot(account) {
   };
 }
 
-function buildFormalAccountSnapshots(accounts) {
+function buildFormalAccountSnapshots(accounts, protectedAccounts) {
   const byUsername = new Map(
     accounts.map((account) => [account.username, account]),
   );
-  return FORMAL_DEMO_ACCOUNTS.map((username) => {
+  return protectedAccounts.map((username) => {
     const account = byUsername.get(username);
     if (!account) {
       throw new CliError(
-        `required formal demo account is missing: ${username}`,
+        `required formal acceptance account is missing: ${username}`,
       );
     }
     return accountSnapshot(account);
@@ -443,7 +403,7 @@ function assertFormalAccountsUnchanged(before, afterAccounts) {
     const after = afterByUsername.get(snapshot.username);
     if (!after || JSON.stringify(after) !== JSON.stringify(snapshot)) {
       throw new CliError(
-        `formal demo account changed while preparing acceptance scenarios: ${snapshot.username}`,
+        `formal acceptance account changed while preparing acceptance scenarios: ${snapshot.username}`,
       );
     }
   }
@@ -462,7 +422,7 @@ export function manualAcceptanceFormalAccountBootstrapConfirmation({
   ].join(":");
 }
 
-function assertFormalAccountState(account, profile) {
+function assertOwnedFormalAccount(account, profile) {
   if (
     account.username !== profile.username ||
     account.phone ||
@@ -472,7 +432,17 @@ function assertFormalAccountState(account, profile) {
     !sameStringList(account.roleKeys, [profile.roleKey])
   ) {
     throw new CliError(
-      `formal demo account is not the exact safe single-role account: ${profile.username}`,
+      `formal acceptance account is not the exact safe single-role account: ${profile.username}`,
+      2,
+    );
+  }
+}
+
+function assertFormalAccountState(account, profile) {
+  assertOwnedFormalAccount(account, profile);
+  if (account.displayName !== profile.displayName) {
+    throw new CliError(
+      `formal acceptance account employee name was not updated: ${profile.username}`,
       2,
     );
   }
@@ -501,24 +471,51 @@ async function bootstrapMissingFormalAccounts({
   const beforeByUsername = new Map(
     beforeAccounts.map((account) => [account.username, account]),
   );
-  for (const profile of FORMAL_DEMO_ACCOUNT_PROFILES) {
+  for (const profile of plan.formalAccountProfiles) {
     const existing = beforeByUsername.get(profile.username);
-    if (existing) assertFormalAccountState(existing, profile);
+    if (existing) assertOwnedFormalAccount(existing, profile);
   }
 
   const actions = [];
-  for (const profile of FORMAL_DEMO_ACCOUNT_PROFILES) {
-    if (beforeByUsername.has(profile.username)) {
+  for (const profile of plan.formalAccountProfiles) {
+    let account = beforeByUsername.get(profile.username);
+    if (account && account.displayName !== profile.displayName) {
+      const accountID = account.id;
+      account = await mutateAdmin({
+        backendURL: plan.backendURL,
+        token,
+        fetchImpl,
+        method: "set_profile",
+        params: {
+          id: account.id,
+          display_name: profile.displayName,
+          phone: "",
+        },
+        context: `admin.set_profile ${profile.username}`,
+      });
+      if (account.id !== accountID) {
+        throw new CliError(
+          `formal acceptance account profile update returned another account: ${profile.username}`,
+          2,
+        );
+      }
+      assertFormalAccountState(account, profile);
+      actions.push({ username: profile.username, action: "profile-updated" });
+      continue;
+    }
+    if (account) {
+      assertFormalAccountState(account, profile);
       actions.push({ username: profile.username, action: "verified" });
       continue;
     }
-    const account = await mutateAdmin({
+    account = await mutateAdmin({
       backendURL: plan.backendURL,
       token,
       fetchImpl,
       method: "create",
       params: {
         username: profile.username,
+        display_name: profile.displayName,
         password,
         phone: "",
         role_keys: [profile.roleKey],
@@ -537,11 +534,11 @@ async function bootstrapMissingFormalAccounts({
   const afterByUsername = new Map(
     afterAccounts.map((account) => [account.username, account]),
   );
-  const accounts = FORMAL_DEMO_ACCOUNT_PROFILES.map((profile) => {
+  const accounts = plan.formalAccountProfiles.map((profile) => {
     const account = afterByUsername.get(profile.username);
     if (!account) {
       throw new CliError(
-        `formal demo account is missing after bootstrap: ${profile.username}`,
+        `formal acceptance account is missing after bootstrap: ${profile.username}`,
       );
     }
     assertFormalAccountState(account, profile);
@@ -550,6 +547,8 @@ async function bootstrapMissingFormalAccounts({
   return {
     mode: `${plan.target}-exact-create-or-verify`,
     created: actions.filter((item) => item.action === "created").length,
+    profilesUpdated: actions.filter((item) => item.action === "profile-updated")
+      .length,
     verified: actions.filter((item) => item.action === "verified").length,
     accounts,
     actions,
@@ -592,12 +591,13 @@ export async function bootstrapManualAcceptanceFormalAccounts(
     );
   }
 
+  const roleCredential = resolveManualAcceptanceRoleCredential({
+    target: safePlan.target,
+    password,
+  });
   const effectivePassword = requiredText(
-    password ||
-      process.env.MANUAL_ACCEPTANCE_PASSWORD ||
-      process.env.TRIAL_ACCOUNT_PASSWORD ||
-      process.env.ERP_ROLE_DEMO_PASSWORD,
-    "MANUAL_ACCEPTANCE_PASSWORD/TRIAL_ACCOUNT_PASSWORD/ERP_ROLE_DEMO_PASSWORD",
+    roleCredential.value,
+    safePlan.passwordEnvironmentVariable,
   );
   if ([...effectivePassword].length < 8 || [...effectivePassword].length > 20) {
     throw new CliError("account password must contain 8-20 characters", 2);
@@ -618,7 +618,7 @@ export async function bootstrapManualAcceptanceFormalAccounts(
   }
   if (resolvedTarget.external && effectivePassword === effectiveAdminPassword) {
     throw new CliError(
-      "customer-trial-133 admin and demo passwords must be different",
+      "customer-trial-133 admin and UAT role passwords must be different",
       2,
     );
   }
@@ -660,6 +660,9 @@ export async function bootstrapManualAcceptanceFormalAccounts(
   });
   return {
     target: resolvedTarget.target,
+    accountKind: safePlan.accountKind,
+    accountPrefix: safePlan.accountPrefix,
+    rolePasswordSource: roleCredential.source,
     databaseName: databaseIdentity.databaseName,
     environment: runtimePolicy.environment,
     runtimeIdentityProof: runtimeIdentity.proof,
@@ -682,6 +685,7 @@ export function buildManualAcceptanceAccountScenarioPlan({
     runId,
     databaseName,
   });
+  const accountSet = manualAcceptanceAccountSetForTarget(targetPolicy.target);
   return {
     mode: "report-only",
     backendURL: targetPolicy.backendURL,
@@ -691,7 +695,10 @@ export function buildManualAcceptanceAccountScenarioPlan({
     runId: targetPolicy.runId,
     databaseName: targetPolicy.databaseName,
     external: targetPolicy.external,
-    loginAccount: BUSINESS_ADMIN_USERNAME,
+    accountKind: accountSet.accountKind,
+    accountPrefix: accountSet.usernamePrefix,
+    passwordEnvironmentVariable: accountSet.passwordEnvironmentVariable,
+    loginAccount: accountSet.businessAdminUsername,
     simulatedOnly: true,
     realCustomerImport: false,
     directSQL: false,
@@ -702,10 +709,16 @@ export function buildManualAcceptanceAccountScenarioPlan({
         capabilityKeys: [...item.capabilityKeys],
       }),
     ),
-    protectedAccounts: [...FORMAL_DEMO_ACCOUNTS],
-    scenarios: MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS.map((scenario) => ({
+    formalAccountProfiles: accountSet.formalProfiles.map((profile) => ({
+      username: profile.username,
+      displayName: profile.displayName,
+      roleKey: profile.roleKey,
+    })),
+    protectedAccounts: [...accountSet.formalUsernames],
+    scenarios: accountSet.scenarios.map((scenario) => ({
       key: scenario.key,
       username: scenario.username,
+      displayName: scenario.displayName,
       title: scenario.title,
       instruction: scenario.instruction,
       disabledReason: scenario.disabledReason || "",
@@ -1160,6 +1173,7 @@ async function fillAuditEvidence({
   account,
   minimum,
   total,
+  disabledScenario,
 }) {
   const expectedRoleKeys = ["sales"];
   let current = account;
@@ -1211,9 +1225,6 @@ async function fillAuditEvidence({
       `审计记录只有 ${currentTotal} 条，未达到 ${minimum} 条验收要求`,
     );
   }
-  const disabledScenario = MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS.find(
-    (scenario) => scenario.key === "disabled-account",
-  );
   assertScenarioState(current, disabledScenario);
   return { account: current, total: currentTotal, mutations };
 }
@@ -1261,12 +1272,13 @@ export async function applyManualAcceptanceAccountScenarios(
       2,
     );
   }
+  const roleCredential = resolveManualAcceptanceRoleCredential({
+    target: safePlan.target,
+    password,
+  });
   const effectivePassword = requiredText(
-    password ||
-      process.env.MANUAL_ACCEPTANCE_PASSWORD ||
-      process.env.TRIAL_ACCOUNT_PASSWORD ||
-      process.env.ERP_ROLE_DEMO_PASSWORD,
-    "MANUAL_ACCEPTANCE_PASSWORD/TRIAL_ACCOUNT_PASSWORD/ERP_ROLE_DEMO_PASSWORD",
+    roleCredential.value,
+    safePlan.passwordEnvironmentVariable,
   );
   if ([...effectivePassword].length < 8 || [...effectivePassword].length > 20) {
     throw new CliError("account password must contain 8-20 characters", 2);
@@ -1287,7 +1299,7 @@ export async function applyManualAcceptanceAccountScenarios(
   }
   if (resolvedTarget.external && effectivePassword === effectiveAdminPassword) {
     throw new CliError(
-      "customer-trial-133 admin and demo passwords must be different",
+      "customer-trial-133 admin and UAT role passwords must be different",
       2,
     );
   }
@@ -1337,7 +1349,7 @@ export async function applyManualAcceptanceAccountScenarios(
   });
   const { token, profile } = await loginAdmin({
     backendURL: safePlan.backendURL,
-    username: BUSINESS_ADMIN_USERNAME,
+    username: safePlan.loginAccount,
     password: effectivePassword,
     fetchImpl,
   });
@@ -1361,7 +1373,10 @@ export async function applyManualAcceptanceAccountScenarios(
     token,
     fetchImpl,
   });
-  const formalBefore = buildFormalAccountSnapshots(beforeAccounts);
+  const formalBefore = buildFormalAccountSnapshots(
+    beforeAccounts,
+    safePlan.protectedAccounts,
+  );
   const beforeByUsername = new Map(
     beforeAccounts.map((account) => [account.username, account]),
   );
@@ -1374,13 +1389,13 @@ export async function applyManualAcceptanceAccountScenarios(
         })
       : null;
 
-  for (const scenario of MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS) {
+  for (const scenario of safePlan.scenarios) {
     const existing = beforeByUsername.get(scenario.username);
     if (existing) assertOwnedScenarioAccount(existing, scenario);
   }
 
   const actions = [];
-  for (const scenario of MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS) {
+  for (const scenario of safePlan.scenarios) {
     const expectedRoleKeys = scenarioRoleKeys(scenario);
     let account = beforeByUsername.get(scenario.username);
     let created = false;
@@ -1392,6 +1407,7 @@ export async function applyManualAcceptanceAccountScenarios(
         method: "create",
         params: {
           username: scenario.username,
+          display_name: scenario.displayName,
           password: effectivePassword,
           phone: "",
           role_keys: expectedRoleKeys,
@@ -1409,6 +1425,32 @@ export async function applyManualAcceptanceAccountScenarios(
       }
       created = true;
       actions.push({ username: scenario.username, action: "created" });
+    }
+
+    if (account.displayName !== scenario.displayName) {
+      const accountID = account.id;
+      account = await mutateAdmin({
+        backendURL: safePlan.backendURL,
+        token,
+        fetchImpl,
+        method: "set_profile",
+        params: {
+          id: account.id,
+          display_name: scenario.displayName,
+          phone: "",
+        },
+        context: `admin.set_profile ${scenario.username}`,
+      });
+      if (account.id !== accountID) {
+        throw new CliError(
+          `${scenario.title}: profile update returned another account`,
+        );
+      }
+      assertOwnedScenarioAccount(account, scenario);
+      if (account.displayName !== scenario.displayName) {
+        throw new CliError(`${scenario.title}: employee name was not updated`);
+      }
+      actions.push({ username: scenario.username, action: "profile-updated" });
     }
 
     if (!sameStringList(account.roleKeys, expectedRoleKeys)) {
@@ -1481,7 +1523,7 @@ export async function applyManualAcceptanceAccountScenarios(
       fetchImpl,
     });
     if (auditAfter < safePlan.auditMinimum) {
-      const disabledScenario = MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS.find(
+      const disabledScenario = safePlan.scenarios.find(
         (scenario) => scenario.key === "disabled-account",
       );
       const currentAccounts = await listAdmins({
@@ -1503,6 +1545,7 @@ export async function applyManualAcceptanceAccountScenarios(
         account: disabledAccount,
         minimum: safePlan.auditMinimum,
         total: auditAfter,
+        disabledScenario,
       });
       auditAfter = filled.total;
       auditFillMutations = filled.mutations;
@@ -1518,7 +1561,7 @@ export async function applyManualAcceptanceAccountScenarios(
   const afterByUsername = new Map(
     afterAccounts.map((account) => [account.username, account]),
   );
-  const scenarios = MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS.map((scenario) => {
+  const scenarios = safePlan.scenarios.map((scenario) => {
     const account = afterByUsername.get(scenario.username);
     if (!account)
       throw new CliError(`${scenario.title}: account is missing after apply`);
@@ -1526,6 +1569,7 @@ export async function applyManualAcceptanceAccountScenarios(
     return {
       key: scenario.key,
       username: scenario.username,
+      displayName: scenario.displayName,
       title: scenario.title,
       instruction: scenario.instruction,
       positions: [...scenario.positions],
@@ -1541,6 +1585,8 @@ export async function applyManualAcceptanceAccountScenarios(
   });
   const summary = {
     created: actions.filter((item) => item.action === "created").length,
+    profilesUpdated: actions.filter((item) => item.action === "profile-updated")
+      .length,
     positionsUpdated: actions.filter(
       (item) => item.action === "positions-updated",
     ).length,
@@ -1556,6 +1602,9 @@ export async function applyManualAcceptanceAccountScenarios(
     generatedAt: new Date().toISOString(),
     backendURL: safePlan.backendURL,
     target: safePlan.target,
+    accountKind: safePlan.accountKind,
+    accountPrefix: safePlan.accountPrefix,
+    rolePasswordSource: roleCredential.source,
     datasetKey: safePlan.datasetKey,
     dataVersion: safePlan.dataVersion,
     runId: safePlan.runId,
@@ -1666,7 +1715,7 @@ function usage() {
 fresh 库配置激活前只创建或读回固定十个单岗位账号：
   MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM=BOOTSTRAP_FORMAL_MANUAL_ACCEPTANCE_ACCOUNTS:<target>:2026.08.15-v6:20260815-V6 \
   MANUAL_ACCEPTANCE_TARGET_CONFIRM='<exact-target-confirmation>' \
-  MANUAL_ACCEPTANCE_PASSWORD='<demo-password>' \
+  <target-role-password-env>='<target-role-password>' \
   MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<fresh-bootstrap-admin-password>' \
     node scripts/qa/manual-acceptance-account-scenarios.mjs --apply --formal-accounts-only \
       --target <target> \
@@ -1690,10 +1739,11 @@ fresh 库配置激活前只创建或读回固定十个单岗位账号：
       --audit-minimum 30 \\
       --json
 
-本入口保留现有十个正式试用账号，只准备“已停用”“业务与采购兼任”
+本入口保留目标环境的十个正式验收账号，只准备“已停用”“业务与采购兼任”
 和“未分配岗位”三个补充验收账号。密码必须为 8 到 20 位。
 
-  fresh 本地专用库和 133 都必须设置精确的
+  本地只允许 demo_* 和 MANUAL_ACCEPTANCE_PASSWORD；133 只允许 uat_* 和
+  MANUAL_ACCEPTANCE_UAT_PASSWORD。fresh 本地专用库和 133 都必须设置精确的
   MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM，只创建或读回固定十个单岗位账号。
 
   133 试用环境必须通过 127.0.0.1:18375 SSH 隧道，并显式提供：

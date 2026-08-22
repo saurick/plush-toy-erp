@@ -37,6 +37,20 @@ func (_c *PurchaseOrderItemCreate) SetLineNo(v int) *PurchaseOrderItemCreate {
 	return _c
 }
 
+// SetDisplayOrder sets the "display_order" field.
+func (_c *PurchaseOrderItemCreate) SetDisplayOrder(v int) *PurchaseOrderItemCreate {
+	_c.mutation.SetDisplayOrder(v)
+	return _c
+}
+
+// SetNillableDisplayOrder sets the "display_order" field if the given value is not nil.
+func (_c *PurchaseOrderItemCreate) SetNillableDisplayOrder(v *int) *PurchaseOrderItemCreate {
+	if v != nil {
+		_c.SetDisplayOrder(*v)
+	}
+	return _c
+}
+
 // SetMaterialID sets the "material_id" field.
 func (_c *PurchaseOrderItemCreate) SetMaterialID(v int) *PurchaseOrderItemCreate {
 	_c.mutation.SetMaterialID(v)
@@ -334,6 +348,11 @@ func (_c *PurchaseOrderItemCreate) check() error {
 			return &ValidationError{Name: "line_no", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrderItem.line_no": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.DisplayOrder(); ok {
+		if err := purchaseorderitem.DisplayOrderValidator(v); err != nil {
+			return &ValidationError{Name: "display_order", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrderItem.display_order": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.MaterialID(); !ok {
 		return &ValidationError{Name: "material_id", err: errors.New(`ent: missing required field "PurchaseOrderItem.material_id"`)}
 	}
@@ -440,6 +459,10 @@ func (_c *PurchaseOrderItemCreate) createSpec() (*PurchaseOrderItem, *sqlgraph.C
 	if value, ok := _c.mutation.LineNo(); ok {
 		_spec.SetField(purchaseorderitem.FieldLineNo, field.TypeInt, value)
 		_node.LineNo = value
+	}
+	if value, ok := _c.mutation.DisplayOrder(); ok {
+		_spec.SetField(purchaseorderitem.FieldDisplayOrder, field.TypeInt, value)
+		_node.DisplayOrder = &value
 	}
 	if value, ok := _c.mutation.MaterialCodeSnapshot(); ok {
 		_spec.SetField(purchaseorderitem.FieldMaterialCodeSnapshot, field.TypeString, value)

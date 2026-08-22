@@ -8,6 +8,7 @@ import {
 import { Link } from 'react-router-dom'
 import { Tag, Typography } from 'antd'
 import DevEntrySourceDetails from '../components/DevEntrySourceDetails.jsx'
+import DevEnvironmentEvidencePanel from '../components/DevEnvironmentEvidencePanel.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import { DEV_HUB_ITEMS } from '../config/devHub.mjs'
 import { DEV_WORKBENCH_AREA_KEYS } from '../config/devRoutes.mjs'
@@ -256,6 +257,7 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
   const isQualityArea = areaKey === DEV_WORKBENCH_AREA_KEYS.quality
   const isProductEngineeringArea =
     areaKey === DEV_WORKBENCH_AREA_KEYS.productEngineering
+  const isDeliveryArea = areaKey === DEV_WORKBENCH_AREA_KEYS.delivery
 
   if (!presentation) {
     throw new Error(`unknown dev workbench area: ${String(areaKey || '')}`)
@@ -281,6 +283,7 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
       </header>
 
       <main className="erp-dev-hub-shell">
+        {isDeliveryArea ? <DevEnvironmentEvidencePanel /> : null}
         {isProductEngineeringArea ? (
           <section
             className="erp-dev-product-start"
@@ -332,7 +335,7 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
             </div>
           </section>
         ) : null}
-        {!isQualityArea && !isProductEngineeringArea ? (
+        {isDeliveryArea ? (
           <section
             className="erp-dev-hub-grid"
             aria-label={`${presentation.title}入口`}

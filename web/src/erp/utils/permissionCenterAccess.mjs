@@ -197,6 +197,21 @@ export function getAdminControlTargetBlockReason({
   return ''
 }
 
+export function getAdminProfileTargetBlockReason({
+  currentAdmin = {},
+  targetAdmin = {},
+  roles = [],
+} = {}) {
+  if (
+    targetAdmin?.is_super_admin === true &&
+    currentAdmin?.is_super_admin === true &&
+    isSameAdminAccount(currentAdmin, targetAdmin)
+  ) {
+    return ''
+  }
+  return getAdminControlTargetBlockReason({ currentAdmin, targetAdmin, roles })
+}
+
 export function getRoleAssignmentBlockReason({
   currentAdmin = {},
   targetAdmin = {},

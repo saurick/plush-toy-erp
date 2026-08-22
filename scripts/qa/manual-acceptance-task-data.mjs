@@ -20,6 +20,11 @@ import {
   parseManualAcceptanceTargetAttestation,
   resolveManualAcceptanceTarget,
 } from "./manual-acceptance-target-policy.mjs";
+import {
+  LOCAL_DEMO_ACCOUNT_SET,
+  manualAcceptanceAccountSetForTarget,
+  resolveManualAcceptanceRoleCredential,
+} from "./manual-acceptance-account-identities.mjs";
 
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
 const DEFAULT_OUT_DIR = "output/qa/manual-acceptance/task-data";
@@ -151,15 +156,7 @@ export const TASK_ROLES = Object.freeze([
 ]);
 export const TOTAL_TASKS = TASK_ROLES.length * TASKS_PER_ROLE;
 export const ROLE_USERS = Object.freeze({
-  boss: "demo_boss",
-  sales: "demo_sales",
-  purchase: "demo_purchase",
-  production: "demo_production",
-  warehouse: "demo_warehouse",
-  finance: "demo_finance",
-  pmc: "demo_pmc",
-  quality: "demo_quality",
-  engineering: "demo_engineering",
+  ...LOCAL_DEMO_ACCOUNT_SET.businessRoleUsernames,
 });
 const SINGLE_TASK_GROUP_BY_ROLE = Object.freeze({
   boss: "trial_boss_work",
@@ -1345,6 +1342,18 @@ export function validateManualAcceptanceTaskPlan(plan) {
     throw new CliError("task plan customerKey must be yoyoosun");
   }
   resolveManualAcceptanceTarget(plan);
+  const expectedRoleUsers = Object.fromEntries(
+    TASK_ROLES.map((roleKey) => [
+      roleKey,
+      manualAcceptanceAccountSetForTarget(plan.target).roleUsernames[roleKey],
+    ]),
+  );
+  if (JSON.stringify(plan.roleUsers) !== JSON.stringify(expectedRoleUsers)) {
+    throw new CliError(
+      `${plan.target} task role users do not match the target account contract`,
+      2,
+    );
+  }
   if (
     plan.simulatedOnly !== true ||
     plan.realCustomerImport !== false ||
@@ -1640,6 +1649,7 @@ export function buildManualAcceptanceTaskDataPlan(options = {}) {
     databaseName: options.databaseName,
   });
   const backendURL = targetPolicy.backendURL;
+  const accountSet = manualAcceptanceAccountSetForTarget(targetPolicy.target);
   const nowSec = runAnchorSeconds(runId, options.nowSec);
   const schedule = buildManualAcceptanceTaskSchedule(nowSec);
   const batchIdentity = manualAcceptanceTaskBatchIdentity(runId, {
@@ -1680,7 +1690,7 @@ export function buildManualAcceptanceTaskDataPlan(options = {}) {
     generatedAtUnix: nowSec,
     schedule,
     roleUsers: Object.fromEntries(
-      TASK_ROLES.map((roleKey) => [roleKey, ROLE_USERS[roleKey]]),
+      TASK_ROLES.map((roleKey) => [roleKey, accountSet.roleUsernames[roleKey]]),
     ),
     summary: summarizePlanTasks(tasks),
     coverage: summarizeTaskCoverage(tasks),
@@ -1915,9 +1925,9 @@ async function loginAccount({ backendURL, username, password, fetchImpl }) {
   return { ...data, id, token };
 }
 
-async function loginAccounts({ backendURL, password, fetchImpl }) {
+async function loginAccounts({ backendURL, roleUsers, password, fetchImpl }) {
   const entries = [];
-  for (const [roleKey, username] of Object.entries(ROLE_USERS)) {
+  for (const [roleKey, username] of Object.entries(roleUsers)) {
     entries.push([
       roleKey,
       await loginAccount({ backendURL, username, password, fetchImpl }),
@@ -1927,15 +1937,13 @@ async function loginAccounts({ backendURL, password, fetchImpl }) {
   for (const roleKey of TASK_ROLES) {
     const profile = accounts[roleKey];
     if (!roleSet(profile).has(roleKey)) {
-      throw new CliError(
-        `${ROLE_USERS[roleKey]} is not assigned to ${roleKey}`,
-      );
+      throw new CliError(`${roleUsers[roleKey]} is not assigned to ${roleKey}`);
     }
     const permissions = permissionSet(profile);
     for (const requiredPermission of requiredRolePermissions(roleKey)) {
       if (!permissions.has(requiredPermission)) {
         throw new CliError(
-          `${ROLE_USERS[roleKey]} is missing ${requiredPermission}`,
+          `${roleUsers[roleKey]} is missing ${requiredPermission}`,
         );
       }
     }
@@ -3025,12 +3033,14 @@ export async function applyManualAcceptanceTaskData(
       2,
     );
   }
+  const roleCredential = resolveManualAcceptanceRoleCredential({
+    target: plan.target,
+    password,
+  });
   const effectivePassword = requiredText(
-    password ||
-      process.env.MANUAL_ACCEPTANCE_PASSWORD ||
-      process.env.TRIAL_ACCOUNT_PASSWORD ||
-      process.env.ERP_ROLE_DEMO_PASSWORD,
-    "MANUAL_ACCEPTANCE_PASSWORD/TRIAL_ACCOUNT_PASSWORD/ERP_ROLE_DEMO_PASSWORD",
+    roleCredential.value,
+    manualAcceptanceAccountSetForTarget(plan.target)
+      .passwordEnvironmentVariable,
   );
   const effectiveAdminPassword = requiredText(
     adminPassword ?? process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
@@ -3048,6 +3058,7 @@ export async function applyManualAcceptanceTaskData(
   });
   const accounts = await loginAccounts({
     backendURL: plan.backendURL,
+    roleUsers: plan.roleUsers,
     password: effectivePassword,
     fetchImpl,
   });
@@ -3148,6 +3159,7 @@ export async function applyManualAcceptanceTaskData(
     datasetKey: effectivePlan.datasetKey,
     dataVersion: effectivePlan.dataVersion,
     target: effectivePlan.target,
+    rolePasswordSource: roleCredential.source,
     prefix: effectivePlan.prefix,
     sourceType: effectivePlan.sourceType,
     sourceID: effectivePlan.sourceID,
@@ -3363,12 +3375,14 @@ export async function retireLegacyManualAcceptanceTaskBatch(
       2,
     );
   }
+  const roleCredential = resolveManualAcceptanceRoleCredential({
+    target: keepPlan.target,
+    password,
+  });
   const effectivePassword = requiredText(
-    password ||
-      process.env.MANUAL_ACCEPTANCE_PASSWORD ||
-      process.env.TRIAL_ACCOUNT_PASSWORD ||
-      process.env.ERP_ROLE_DEMO_PASSWORD,
-    "MANUAL_ACCEPTANCE_PASSWORD/TRIAL_ACCOUNT_PASSWORD/ERP_ROLE_DEMO_PASSWORD",
+    roleCredential.value,
+    manualAcceptanceAccountSetForTarget(keepPlan.target)
+      .passwordEnvironmentVariable,
   );
   const effectiveAdminPassword = requiredText(
     adminPassword ?? process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
@@ -3386,6 +3400,7 @@ export async function retireLegacyManualAcceptanceTaskBatch(
   });
   const accounts = await loginAccounts({
     backendURL: keepPlan.backendURL,
+    roleUsers: keepPlan.roleUsers,
     password: effectivePassword,
     fetchImpl,
   });
@@ -3488,6 +3503,7 @@ export async function retireLegacyManualAcceptanceTaskBatch(
     writesFacts: false,
     directSQL: false,
     target: keepPlan.target,
+    rolePasswordSource: roleCredential.source,
     datasetKey: keepPlan.datasetKey,
     dataVersion: keepPlan.dataVersion,
     runId: keepPlan.runId,

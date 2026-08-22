@@ -23,28 +23,47 @@ function loadCredentialContract() {
   const raw = fs.readFileSync(credentialContractPath);
   const contract = JSON.parse(raw.toString("utf8"));
   const admin = contract?.credentials?.admin;
-  const demo = contract?.credentials?.demo;
+  const uat = contract?.credentials?.uat;
   const sms = contract?.smsLoginIdentity;
   const envKey = /^[A-Za-z_][A-Za-z0-9_]*$/;
   const username = /^[A-Za-z0-9_]+$/;
+  const text = (value) =>
+    typeof value === "string" && value.length > 0 && !/[\t\r\n]/u.test(value);
+  const expectedUATUsernames = [
+    "uat_boss",
+    "uat_sales",
+    "uat_purchase",
+    "uat_production",
+    "uat_warehouse",
+    "uat_quality",
+    "uat_finance",
+    "uat_pmc",
+    "uat_engineering",
+    "uat_admin",
+  ];
   const valid =
-    contract?.schemaVersion === "yoyoosun-credential-contract/v2" &&
+    contract?.schemaVersion === "yoyoosun-credential-contract/v3" &&
     contract?.customerCode === "yoyoosun" &&
     contract?.target?.key === "customer-trial-133" &&
     contract?.target?.database === "plush_erp_uat_20260716_v5" &&
     contract?.target?.datasetVersion === "2026.08.15-v6" &&
     admin?.username === "admin" &&
-    envKey.test(admin?.environmentVariable || "") &&
-    admin?.credentialSource === "contract-fixed-test" &&
-    admin?.fixedTestPassword === "adminadmin" &&
-    Array.isArray(demo?.usernames) &&
-    demo.usernames.length === 10 &&
-    new Set(demo.usernames).size === 10 &&
-    demo.usernames.every((value) => username.test(value)) &&
-    !demo.usernames.includes(admin.username) &&
-    envKey.test(demo?.environmentVariable || "") &&
-    demo?.credentialSource === "contract-fixed-test" &&
-    demo?.fixedTestPassword === "12345678" &&
+    admin?.environmentVariable === "MANUAL_ACCEPTANCE_ADMIN_PASSWORD" &&
+    admin?.credentialSource === "external-secret" &&
+    text(admin?.keychain?.service) &&
+    text(admin?.keychain?.account) &&
+    !("fixedTestPassword" in admin) &&
+    Array.isArray(uat?.usernames) &&
+    JSON.stringify(uat.usernames) === JSON.stringify(expectedUATUsernames) &&
+    uat.usernames.every(
+      (value) => username.test(value) && value.startsWith("uat_"),
+    ) &&
+    !uat.usernames.includes(admin.username) &&
+    uat?.environmentVariable === "MANUAL_ACCEPTANCE_UAT_PASSWORD" &&
+    uat?.credentialSource === "external-secret" &&
+    text(uat?.keychain?.service) &&
+    text(uat?.keychain?.account) &&
+    !("fixedTestPassword" in uat) &&
     sms?.username === admin.username &&
     sms?.phoneRequiredWhenProviderEnabled === false &&
     sms?.verifyPhoneIdentityWhenConfigured === true &&
@@ -52,12 +71,14 @@ function loadCredentialContract() {
     sms?.keychain?.service === "plush-toy-erp-yoyoosun-sms-phone" &&
     sms?.keychain?.account === "customer-trial-133:admin" &&
     contract?.policy?.passwordsMustDiffer === true &&
-    JSON.stringify(contract?.policy?.registeredSimplePasswordTargets) ===
-      JSON.stringify(["local-dev", "customer-trial-133"]) &&
+    JSON.stringify(contract?.policy?.localPublicPasswordTargets) ===
+      JSON.stringify(["local-dev"]) &&
+    contract.policy.customerTrialRequiresExternalSecrets === true &&
     contract.policy.rotateAfterCreateRestoreOrRollback === true &&
     contract.policy.revokeExistingSessionsOnRotation === true &&
     contract.policy.requireCredentialLoginMatrixBeforeCutover === true &&
     contract?.redaction?.containsSecrets === false &&
+    contract.redaction.contractContainsPublicTestPasswords === false &&
     contract.redaction.storePasswords === false &&
     contract.redaction.storeTokens === false &&
     contract.redaction.storePhoneNumber === false &&
@@ -1427,7 +1448,7 @@ function validateSmokeReport(content, errors, absoluteDir) {
     const contract = credentialContractEvidence.contract;
     const requiredUsernames = [
       contract.credentials.admin.username,
-      ...contract.credentials.demo.usernames,
+      ...contract.credentials.uat.usernames,
     ];
     assert(
       credentialCheck.target === "jsonrpc:auth.admin_login",
@@ -1444,11 +1465,11 @@ function validateSmokeReport(content, errors, absoluteDir) {
       errors,
     );
     assert(
-      Number(credentialCheck.demoExpected) === 10 &&
-        Number(credentialCheck.demoAuthenticated) === 10 &&
+      Number(credentialCheck.uatExpected) === 10 &&
+        Number(credentialCheck.uatAuthenticated) === 10 &&
         Number(credentialCheck.totalExpected) === 11 &&
         Number(credentialCheck.totalAuthenticated) === 11,
-      `${REQUIRED_FILES.smoke} credential-login-matrix must prove 10/10 demo and 11/11 total logins`,
+      `${REQUIRED_FILES.smoke} credential-login-matrix must prove 10/10 UAT and 11/11 total logins`,
       errors,
     );
     assert(
@@ -1462,15 +1483,15 @@ function validateSmokeReport(content, errors, absoluteDir) {
     assert(
       usernames.length === requiredUsernames.length &&
         new Set(usernames).size === requiredUsernames.length &&
-        requiredUsernames.every((username) =>
-          usernames.includes(username),
-        ),
-      `${REQUIRED_FILES.smoke} credential-login-matrix usernames must match admin plus the 10 contracted demo identities`,
+        requiredUsernames.every((username) => usernames.includes(username)),
+      `${REQUIRED_FILES.smoke} credential-login-matrix usernames must match admin plus the 10 contracted UAT identities`,
       errors,
     );
     assert(
-      credentialCheck.adminPasswordSource === "credential-contract" &&
-        credentialCheck.demoPasswordSource === "credential-contract" &&
+      credentialCheck.adminPasswordSource ===
+        contract.credentials.admin.credentialSource &&
+        credentialCheck.uatPasswordSource ===
+          contract.credentials.uat.credentialSource &&
         credentialCheck.smsPhoneSourceEnv ===
           contract.smsLoginIdentity.environmentVariable,
       `${REQUIRED_FILES.smoke} credential-login-matrix credential sources must match the credential contract`,
@@ -1600,8 +1621,10 @@ function validateCredentialRotationReport(content, errors) {
     errors,
   );
   assert(
-    Number(report.adminAccounts) === 1 && Number(report.demoAccounts) === 10,
-    `${REQUIRED_FILES.credentialRotation} must prove adminAccounts=1 and demoAccounts=10`,
+    Number(report.adminAccounts) === 1 &&
+      report.accountKind === "customer-uat" &&
+      Number(report.roleAccounts) === 10,
+    `${REQUIRED_FILES.credentialRotation} must prove adminAccounts=1, accountKind=customer-uat, and roleAccounts=10`,
     errors,
   );
   assert(
@@ -1614,7 +1637,7 @@ function validateCredentialRotationReport(content, errors) {
   const accounts = Array.isArray(report.accounts) ? report.accounts : [];
   const requiredUsernames = [
     credentialContractEvidence.contract.credentials.admin.username,
-    ...credentialContractEvidence.contract.credentials.demo.usernames,
+    ...credentialContractEvidence.contract.credentials.uat.usernames,
   ];
   assert(
     accounts.length === 11 &&
@@ -1642,8 +1665,9 @@ function validateCredentialRotationReport(content, errors) {
     accounts.every(
       (account) =>
         account?.phoneBound ===
-        (report.phoneBound && account?.username ===
-          credentialContractEvidence.contract.credentials.admin.username),
+        (report.phoneBound &&
+          account?.username ===
+            credentialContractEvidence.contract.credentials.admin.username),
     ),
     `${REQUIRED_FILES.credentialRotation} account phoneBound values must follow the optional contracted admin binding`,
     errors,

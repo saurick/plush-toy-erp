@@ -1,5 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { CopyOutlined, DeleteOutlined } from '@ant-design/icons'
+import {
+  CopyOutlined,
+  DeleteOutlined,
+  OrderedListOutlined,
+} from '@ant-design/icons'
 import {
   AutoComplete,
   Button,
@@ -22,6 +26,7 @@ import FieldWithUnitSuffix, {
   unitSuffixTextFromOptions,
 } from '../business-list/FieldWithUnitSuffix.jsx'
 import SourceImportPickerModal from '../business-list/SourceImportPickerModal.jsx'
+import BusinessLineItemOrderModal from '../business-list/BusinessLineItemOrderModal.jsx'
 import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.jsx'
 import BusinessLineItemsSummaryValue from '../business-list/BusinessLineItemsSummaryValue.jsx'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
@@ -128,6 +133,18 @@ export function normalizeSalesOrderItemFormValue(item = {}) {
     planned_delivery_date: unixToDateInputValue(item.planned_delivery_date),
     note: item.note || '',
   }
+}
+
+export function salesOrderLineOrderLabel(item = {}, index = 0) {
+  return (
+    [
+      item.product_code_snapshot,
+      item.product_name_snapshot,
+      item.color_snapshot,
+    ]
+      .filter(Boolean)
+      .join(' / ') || `第 ${index + 1} 行（未选择产品）`
+  )
 }
 
 function getNextLineNo(lines = []) {
@@ -465,6 +482,8 @@ export function SalesOrderItemsFormSection({
   unitOptions = [],
 }) {
   const [skuImportOpen, setSkuImportOpen] = useState(false)
+  const [lineOrderOpen, setLineOrderOpen] = useState(false)
+  const [lineOrderItems, setLineOrderItems] = useState([])
   const orderDate = Form.useWatch('order_date', form)
   const { registerLineItemRow, requestLineItemScroll } =
     useLineItemAppendScroll()
@@ -541,14 +560,40 @@ export function SalesOrderItemsFormSection({
                 <strong>从 SKU 添加明细</strong>
                 <span>从 SKU 库添加；数量、单价和交期回到订单行维护。</span>
               </div>
-              <Button
-                className="erp-line-items-form__import-button"
-                disabled={!canCreateItem}
-                onClick={() => setSkuImportOpen(true)}
-              >
-                从 SKU 库添加
-              </Button>
+              <Space className="erp-line-item-order-actions" wrap>
+                <Button
+                  className="erp-line-items-form__import-button"
+                  disabled={!canCreateItem}
+                  onClick={() => setSkuImportOpen(true)}
+                >
+                  从 SKU 库添加
+                </Button>
+                <Button
+                  icon={<OrderedListOutlined />}
+                  disabled={
+                    fields.length < 2 || (!canCreateItem && !canUpdateItem)
+                  }
+                  onClick={() => {
+                    const currentLines = form.getFieldValue('items') || []
+                    setLineOrderItems([...currentLines])
+                    setLineOrderOpen(true)
+                  }}
+                >
+                  产品顺序
+                </Button>
+              </Space>
             </div>
+            <BusinessLineItemOrderModal
+              getItemLabel={salesOrderLineOrderLabel}
+              itemNoun="产品明细"
+              items={lineOrderItems}
+              onApply={(orderedItems) =>
+                form.setFieldsValue({ items: orderedItems })
+              }
+              onClose={() => setLineOrderOpen(false)}
+              open={lineOrderOpen}
+              title="调整产品顺序"
+            />
             <SourceImportPickerModal
               open={skuImportOpen}
               title="选择 SKU 添加订单行"

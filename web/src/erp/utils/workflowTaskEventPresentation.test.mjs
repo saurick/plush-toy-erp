@@ -14,6 +14,8 @@ test('workflow task event presentation uses approval language only for approval 
     from_status_key: 'ready',
     to_status_key: 'done',
     actor_role_key: 'boss',
+    actor_username: 'boss01',
+    actor_display_name: '王总',
     task_version: 4,
     created_at: 1_720_000_000,
   }
@@ -32,7 +34,7 @@ test('workflow task event presentation uses approval language only for approval 
       label: '任务已完成',
       approvalLabel: '审批已通过',
       transitionLabel: '待处理 → 已完成',
-      actorLabel: '老板',
+      actorLabel: '王总（老板）',
       versionLabel: '版本 4',
     }
   )
@@ -53,6 +55,7 @@ test('workflow task event presentation distinguishes exception recovery and resp
   const escalated = presentWorkflowTaskEvent({
     event_type: 'escalate_to_pmc',
     actor_role_key: 'warehouse',
+    actor_username: 'warehouse01',
   })
   const returnedToPool = presentWorkflowTaskEvent({
     event_type: 'unassigned',
@@ -65,7 +68,7 @@ test('workflow task event presentation distinguishes exception recovery and resp
   assert.equal(recovered.label, '任务已恢复待处理')
   assert.equal(escalated.categoryLabel, '责任流转')
   assert.equal(escalated.label, '已升级至 PMC')
-  assert.equal(escalated.actorLabel, '仓库')
+  assert.equal(escalated.actorLabel, 'warehouse01（仓库）')
   assert.equal(returnedToPool.label, '已退回负责岗位共同待办')
 })
 

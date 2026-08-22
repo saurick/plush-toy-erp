@@ -86,19 +86,21 @@ func (r *stubAttachmentJSONRPCRepo) ListBusinessAttachments(_ context.Context, o
 	r.listCalls++
 	uploaderID := 7
 	uploaderUsername := "demo_boss"
+	uploaderDisplayName := "王总"
 	return []*biz.BusinessAttachment{
 		{
-			ID:                 102,
-			OwnerType:          ownerType,
-			OwnerID:            ownerID,
-			AttachmentType:     "evidence",
-			FileName:           "proof.pdf",
-			MimeType:           "application/pdf",
-			FileSize:           5,
-			SHA256:             testAttachmentProofSHA256,
-			UploadedBy:         &uploaderID,
-			UploadedByUsername: &uploaderUsername,
-			CreatedAt:          time.Unix(2, 0),
+			ID:                    102,
+			OwnerType:             ownerType,
+			OwnerID:               ownerID,
+			AttachmentType:        "evidence",
+			FileName:              "proof.pdf",
+			MimeType:              "application/pdf",
+			FileSize:              5,
+			SHA256:                testAttachmentProofSHA256,
+			UploadedBy:            &uploaderID,
+			UploadedByUsername:    &uploaderUsername,
+			UploadedByDisplayName: &uploaderDisplayName,
+			CreatedAt:             time.Unix(2, 0),
 		},
 	}, nil
 }
@@ -207,32 +209,38 @@ func TestBusinessAttachmentShipmentWritePermissionsIncludeDraftUpdate(t *testing
 func TestBusinessAttachmentToAnyIncludesReadableUploaderAuditMetadata(t *testing.T) {
 	uploaderID := 7
 	uploaderUsername := "demo_boss"
+	uploaderDisplayName := "王总"
 	withdrawnAt := time.Unix(4, 0)
 	withdrawnBy := 8
 	withdrawnByUsername := "demo_admin"
+	withdrawnByDisplayName := "系统管理员"
 	withdrawalReason := "上传了错误版本"
 	out := businessAttachmentToAny(&biz.BusinessAttachment{
-		ID:                  101,
-		OwnerType:           biz.BusinessAttachmentOwnerWorkflowTask,
-		OwnerID:             42,
-		AttachmentType:      "evidence",
-		FileName:            "proof.pdf",
-		MimeType:            "application/pdf",
-		FileSize:            5,
-		SHA256:              "sha",
-		UploadedBy:          &uploaderID,
-		UploadedByUsername:  &uploaderUsername,
-		WithdrawnAt:         &withdrawnAt,
-		WithdrawnBy:         &withdrawnBy,
-		WithdrawnByUsername: &withdrawnByUsername,
-		WithdrawalReason:    &withdrawalReason,
-		CreatedAt:           time.Unix(2, 0),
+		ID:                     101,
+		OwnerType:              biz.BusinessAttachmentOwnerWorkflowTask,
+		OwnerID:                42,
+		AttachmentType:         "evidence",
+		FileName:               "proof.pdf",
+		MimeType:               "application/pdf",
+		FileSize:               5,
+		SHA256:                 "sha",
+		UploadedBy:             &uploaderID,
+		UploadedByUsername:     &uploaderUsername,
+		UploadedByDisplayName:  &uploaderDisplayName,
+		WithdrawnAt:            &withdrawnAt,
+		WithdrawnBy:            &withdrawnBy,
+		WithdrawnByUsername:    &withdrawnByUsername,
+		WithdrawnByDisplayName: &withdrawnByDisplayName,
+		WithdrawalReason:       &withdrawalReason,
+		CreatedAt:              time.Unix(2, 0),
 	}, false)
 	if out["uploaded_by"] != uploaderID ||
 		out["uploaded_by_username"] != uploaderUsername ||
+		out["uploaded_by_display_name"] != uploaderDisplayName ||
 		out["withdrawn_at"] != int64(4) ||
 		out["withdrawn_by"] != withdrawnBy ||
 		out["withdrawn_by_username"] != withdrawnByUsername ||
+		out["withdrawn_by_display_name"] != withdrawnByDisplayName ||
 		out["withdrawal_reason"] != withdrawalReason ||
 		out["created_at"] != int64(2) {
 		t.Fatalf("attachment audit metadata = %#v", out)
@@ -249,9 +257,9 @@ func TestBusinessAttachmentToAnyIncludesReadableUploaderAuditMetadata(t *testing
 		SHA256:         "sha",
 		CreatedAt:      time.Unix(3, 0),
 	}, false)
-	if legacy["uploaded_by"] != nil || legacy["uploaded_by_username"] != nil ||
+	if legacy["uploaded_by"] != nil || legacy["uploaded_by_username"] != nil || legacy["uploaded_by_display_name"] != nil ||
 		legacy["withdrawn_at"] != nil || legacy["withdrawn_by"] != nil ||
-		legacy["withdrawn_by_username"] != nil || legacy["withdrawal_reason"] != nil {
+		legacy["withdrawn_by_username"] != nil || legacy["withdrawn_by_display_name"] != nil || legacy["withdrawal_reason"] != nil {
 		t.Fatalf("legacy attachment uploader metadata must remain missing: %#v", legacy)
 	}
 }
@@ -553,11 +561,13 @@ func TestJsonrpcDispatcher_WithdrawAttachmentUsesSessionActorAndReturnsAuditRece
 		SHA256:         testAttachmentProofSHA256,
 		CreatedAt:      time.Unix(3, 0),
 	}}
-	dispatcher := newAttachmentJSONRPCTestDispatcher(t, repo, workflowJSONRPCAdmin(
+	admin := workflowJSONRPCAdmin(
 		[]string{biz.SalesRoleKey},
 		biz.PermissionSalesOrderRead,
 		biz.PermissionSalesOrderUpdate,
-	))
+	)
+	admin.DisplayName = "系统管理员"
+	dispatcher := newAttachmentJSONRPCTestDispatcher(t, repo, admin)
 
 	_, res, err := dispatcher.handleBusinessAttachment(ctx, "withdraw_attachment", "withdraw", mustJSONRPCStruct(t, map[string]any{
 		"id":           101,
@@ -575,6 +585,7 @@ func TestJsonrpcDispatcher_WithdrawAttachmentUsesSessionActorAndReturnsAuditRece
 	}
 	out := res.Data.AsMap()["attachment"].(map[string]any)
 	if out["withdrawn_by"] != float64(7) || out["withdrawn_by_username"] != "admin" ||
+		out["withdrawn_by_display_name"] != "系统管理员" ||
 		out["withdrawal_reason"] != "上传了错误版本" || out["withdrawn_at"] != float64(4) {
 		t.Fatalf("withdrawal receipt = %#v", out)
 	}

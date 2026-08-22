@@ -38,7 +38,11 @@ function writeRuntimeManifest(root) {
   fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
   fs.writeFileSync(
     manifestPath,
-    JSON.stringify(buildRuntimeManifest(releaseReadyYoyoosunCustomerPackage), null, 2),
+    JSON.stringify(
+      buildRuntimeManifest(releaseReadyYoyoosunCustomerPackage),
+      null,
+      2,
+    ),
   );
   return "output/customers/yoyoosun/customer-config-runtime-manifest.json";
 }
@@ -274,17 +278,19 @@ Pending Files: 0
             phoneConfigured: false,
             phoneBound: false,
             adminAuthVersion: 2,
-            demoExpected: 10,
-            demoAuthenticated: 10,
+            uatExpected: 10,
+            uatAuthenticated: 10,
             totalExpected: 11,
             totalAuthenticated: 11,
             uniqueTokensObserved: true,
             usernames: [
               credentialContract.credentials.admin.username,
-              ...credentialContract.credentials.demo.usernames,
+              ...credentialContract.credentials.uat.usernames,
             ],
-            adminPasswordSource: "credential-contract",
-            demoPasswordSource: "credential-contract",
+            adminPasswordSource:
+              credentialContract.credentials.admin.credentialSource,
+            uatPasswordSource:
+              credentialContract.credentials.uat.credentialSource,
             smsPhoneSourceEnv:
               credentialContract.smsLoginIdentity.environmentVariable,
             responseBodyStored: false,
@@ -319,7 +325,8 @@ Pending Files: 0
         customerRevision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
         release: releaseGitCommit,
         adminAccounts: 1,
-        demoAccounts: 10,
+        accountKind: "customer-uat",
+        roleAccounts: 10,
         revokedSessions: 1,
         authVersionIncremented: true,
         auditSource: "manual_acceptance_password_rotation",
@@ -331,7 +338,7 @@ Pending Files: 0
             revokedSessions: 1,
             phoneBound: false,
           },
-          ...credentialContract.credentials.demo.usernames.map(
+          ...credentialContract.credentials.uat.usernames.map(
             (username, index) => ({
               username,
               authVersion: index + 2,

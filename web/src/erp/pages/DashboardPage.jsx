@@ -14,6 +14,7 @@ import {
   Descriptions,
   Empty,
   Pagination,
+  Segmented,
   Space,
   Table,
   Tag,
@@ -109,6 +110,11 @@ const WORKBENCH_QUEUE_OPTIONS = Object.freeze([
     requiresApproval: true,
   },
   { key: 'risk', label: '阻塞/逾期', hint: '先补原因' },
+])
+
+const TASK_BOARD_SCOPE_OPTIONS = Object.freeze([
+  { label: '全部任务', value: 'all' },
+  { label: '待我审批', value: 'approval' },
 ])
 
 const WORKBENCH_QUEUE_PAGE_SIZE = 8
@@ -1836,24 +1842,9 @@ export default function DashboardPage({ initialView = 'workbench' }) {
             <div className="erp-task-center-overview">
               <section className="erp-task-center-summary">
                 <div>
-                  <Space wrap align="center">
-                    <Title level={3} className="erp-command-center-hero-title">
-                      {approvalInboxActive ? '待我审批' : '任务看板'}
-                    </Title>
-                    {canViewApprovalInbox ? (
-                      <Button
-                        type={approvalInboxActive ? 'primary' : 'default'}
-                        onClick={() =>
-                          updateFilter(
-                            'mode',
-                            approvalInboxActive ? 'all' : 'approval'
-                          )
-                        }
-                      >
-                        {approvalInboxActive ? '返回全部任务' : '待我审批'}
-                      </Button>
-                    ) : null}
-                  </Space>
+                  <Title level={3} className="erp-command-center-hero-title">
+                    任务看板
+                  </Title>
                   <Paragraph className="erp-dashboard-summary">
                     {approvalInboxActive
                       ? '只显示服务端登记为审批节点且当前账号可见的事项；审批仍受岗位、指定处理人、配置版本和单据状态约束。'
@@ -2011,6 +2002,22 @@ export default function DashboardPage({ initialView = 'workbench' }) {
             </div>
 
             <div className="erp-task-board-filters">
+              {canViewApprovalInbox ? (
+                <div
+                  className="erp-task-board-scope-filter"
+                  role="group"
+                  aria-label="任务范围筛选"
+                >
+                  <Text strong>任务范围</Text>
+                  <Segmented
+                    aria-label="任务范围"
+                    size="large"
+                    value={filters.mode}
+                    options={TASK_BOARD_SCOPE_OPTIONS}
+                    onChange={(value) => updateFilter('mode', value)}
+                  />
+                </div>
+              ) : null}
               <SearchInput
                 placeholder="搜索任务"
                 searchHint="可搜索：任务、单号、来源、处理原因"

@@ -26,6 +26,20 @@ func (_c *AdminUserCreate) SetUsername(v string) *AdminUserCreate {
 	return _c
 }
 
+// SetDisplayName sets the "display_name" field.
+func (_c *AdminUserCreate) SetDisplayName(v string) *AdminUserCreate {
+	_c.mutation.SetDisplayName(v)
+	return _c
+}
+
+// SetNillableDisplayName sets the "display_name" field if the given value is not nil.
+func (_c *AdminUserCreate) SetNillableDisplayName(v *string) *AdminUserCreate {
+	if v != nil {
+		_c.SetDisplayName(*v)
+	}
+	return _c
+}
+
 // SetPhone sets the "phone" field.
 func (_c *AdminUserCreate) SetPhone(v string) *AdminUserCreate {
 	_c.mutation.SetPhone(v)
@@ -271,6 +285,11 @@ func (_c *AdminUserCreate) check() error {
 			return &ValidationError{Name: "username", err: fmt.Errorf(`ent: validator failed for field "AdminUser.username": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.DisplayName(); ok {
+		if err := adminuser.DisplayNameValidator(v); err != nil {
+			return &ValidationError{Name: "display_name", err: fmt.Errorf(`ent: validator failed for field "AdminUser.display_name": %w`, err)}
+		}
+	}
 	if v, ok := _c.mutation.Phone(); ok {
 		if err := adminuser.PhoneValidator(v); err != nil {
 			return &ValidationError{Name: "phone", err: fmt.Errorf(`ent: validator failed for field "AdminUser.phone": %w`, err)}
@@ -351,6 +370,10 @@ func (_c *AdminUserCreate) createSpec() (*AdminUser, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Username(); ok {
 		_spec.SetField(adminuser.FieldUsername, field.TypeString, value)
 		_node.Username = value
+	}
+	if value, ok := _c.mutation.DisplayName(); ok {
+		_spec.SetField(adminuser.FieldDisplayName, field.TypeString, value)
+		_node.DisplayName = &value
 	}
 	if value, ok := _c.mutation.Phone(); ok {
 		_spec.SetField(adminuser.FieldPhone, field.TypeString, value)

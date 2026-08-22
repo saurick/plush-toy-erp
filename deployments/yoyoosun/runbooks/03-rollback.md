@@ -2,12 +2,12 @@
 
 ## 回滚类型
 
-| 类型 | 适用场景 | 优先策略 |
-| --- | --- | --- |
-| 应用版本回滚 | 新镜像启动失败、页面严重异常 | 恢复上一版 `APP_IMAGE` / `WEB_IMAGE` |
-| 配置回滚 | `.env` 或网关配置错误 | 恢复上一版受控配置 |
-| migration 回滚 | migration 导致结构或数据不可用 | 优先恢复升级前备份；必要时走 forward-fix |
-| 导入回滚 | 导入批次错误 | 当前 yoyoosun 真实导入未开放；未来必须按 import batch 和反向事实处理 |
+| 类型           | 适用场景                       | 优先策略                                                             |
+| -------------- | ------------------------------ | -------------------------------------------------------------------- |
+| 应用版本回滚   | 新镜像启动失败、页面严重异常   | 恢复上一版 `APP_IMAGE` / `WEB_IMAGE`                                 |
+| 配置回滚       | `.env` 或网关配置错误          | 恢复上一版受控配置                                                   |
+| migration 回滚 | migration 导致结构或数据不可用 | 优先恢复升级前备份；必要时走 forward-fix                             |
+| 导入回滚       | 导入批次错误                   | 当前 yoyoosun 真实导入未开放；未来必须按 import batch 和反向事实处理 |
 
 ## 决策前检查
 
@@ -39,7 +39,7 @@ docker compose -f compose.yml --env-file /secure/path/yoyoosun/.env ps
 - 恢复后 migration version。
 - 恢复后 smoke 结果。
 
-恢复期间保持 `app-server` 和 Web 停止。恢复完成后先核对 migration version 与旧镜像合同，再使用 `credential.contract.json` 登记的固定测试凭据轮换稳定 `admin` 与固定十个 demo、递增认证版本并撤销恢复出的旧会话。随后启动 steady 后端，运行真实登录矩阵；SMS 手机号仅在人工录入后执行绑定读回。全部适用检查通过后才启动 / 开放 Web。不得把新 schema 与旧镜像混用，也不得使用备份中恢复出的旧 token 或旧密码签收。
+恢复期间保持 `app-server` 和 Web 停止。恢复完成后先核对 migration version 与旧镜像合同，再按 `credential.contract.json` 登记的 Keychain alias 读取彼此独立的管理员 / UAT 岗位外部 secret，轮换稳定 `admin` 与十个 `uat_*`、递增认证版本并撤销恢复出的旧会话；不得使用本地 Demo 的 `adminadmin` / `12345678`。随后启动 steady 后端，运行真实登录矩阵；SMS 手机号仅在人工录入后执行绑定读回。全部适用检查通过后才启动 / 开放 Web。不得把新 schema 与旧镜像混用，也不得使用备份中恢复出的旧 token 或旧密码签收。
 
 ## 禁止
 

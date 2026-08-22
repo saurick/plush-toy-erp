@@ -20,6 +20,8 @@ export function usePurchaseOrderContractPrint({
   printTemplateDefaults = {},
   unitOptions = [],
   customerKey = '',
+  accountKey = '',
+  configRevision = '',
   suppliers = [],
   resolveSupplierSnapshot,
 }) {
@@ -76,6 +78,8 @@ export function usePurchaseOrderContractPrint({
           entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
           initialDraft,
           customerKey,
+          accountKey,
+          configRevision,
         })
         message.success('已打开采购合同打印模板')
       } catch (error) {
@@ -85,7 +89,9 @@ export function usePurchaseOrderContractPrint({
       }
     },
     [
+      accountKey,
       customerKey,
+      configRevision,
       loadOrderItems,
       loadPrintReferenceData,
       materials,

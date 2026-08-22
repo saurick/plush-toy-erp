@@ -421,17 +421,19 @@ func TestJsonrpcDispatcher_WorkflowListTaskEventsSupportsNonApprovalTasksWithout
 		},
 		events: []*biz.WorkflowTaskEvent{
 			{
-				ID:            7,
-				TaskID:        42,
-				TaskVersion:   &taskVersion,
-				EventType:     "status_changed",
-				FromStatusKey: &fromStatus,
-				ToStatusKey:   &toStatus,
-				ActorRoleKey:  &actorRole,
-				ActorID:       &actorID,
-				Reason:        &reason,
-				Payload:       map[string]any{},
-				CreatedAt:     time.Unix(1_720_000_000, 0),
+				ID:               7,
+				TaskID:           42,
+				TaskVersion:      &taskVersion,
+				EventType:        "status_changed",
+				FromStatusKey:    &fromStatus,
+				ToStatusKey:      &toStatus,
+				ActorRoleKey:     &actorRole,
+				ActorID:          &actorID,
+				ActorUsername:    "warehouse01",
+				ActorDisplayName: "张仓管",
+				Reason:           &reason,
+				Payload:          map[string]any{},
+				CreatedAt:        time.Unix(1_720_000_000, 0),
 			},
 		},
 	}
@@ -465,6 +467,9 @@ func TestJsonrpcDispatcher_WorkflowListTaskEventsSupportsNonApprovalTasksWithout
 	}
 	if _, exposed := event["actor_id"]; exposed {
 		t.Fatalf("task event read model must not expose actor_id: %#v", event)
+	}
+	if event["actor_username"] != "warehouse01" || event["actor_display_name"] != "张仓管" {
+		t.Fatalf("task event must expose business-readable actor identity: %#v", event)
 	}
 
 	j.adminReader = stubAdminAccountReader{admin: workflowJSONRPCAdmin(

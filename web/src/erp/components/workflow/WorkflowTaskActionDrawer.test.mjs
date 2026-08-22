@@ -182,6 +182,10 @@ test('task transfer is an explicit scoped action with person and pool destinatio
   assert.match(source, /assignmentTargetValid/u)
   assert.match(source, /如果暂时不确定由谁接手，可退回该岗位共同待办/u)
   assert.match(source, /assignmentAccess\.stale/u)
+  assert.match(
+    source,
+    /formatAdminIdentity\(assignmentAccess\.current_assignee\)/u
+  )
   assert.match(source, /任务信息已更新，请刷新任务列表/u)
   assert.match(source, /不会使用旧版本的转交候选人/u)
   assert.match(source, /确认后只改变任务归属/u)

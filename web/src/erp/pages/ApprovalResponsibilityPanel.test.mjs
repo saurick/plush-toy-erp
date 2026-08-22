@@ -16,6 +16,7 @@ test('approval responsibility panel reuses permission-center accounts and roles'
   assert.match(source, /adminRoleKeys\(admin\)/)
   assert.match(source, /adminHasRole\(admin, roleKey\)/)
   assert.match(source, /adminIsActive\(admin\)/)
+  assert.match(source, /formatAdminIdentity\(admin,/)
   assert.match(source, /activeEmployeeCount/)
   assert.match(source, /暂无启用员工/)
   assert.match(source, /岗位已停用/)

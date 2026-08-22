@@ -180,7 +180,14 @@ func (r *productionOrderRepo) listProductionOrderSalesItemOptions(ctx context.Co
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := query.Order(ent.Asc(salesorderitem.FieldSalesOrderID), ent.Asc(salesorderitem.FieldLineNo), ent.Asc(salesorderitem.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	rows, err := query.Order(
+		ent.Asc(salesorderitem.FieldSalesOrderID),
+		sourceDocumentItemOrder(
+			salesorderitem.FieldDisplayOrder,
+			salesorderitem.FieldLineNo,
+			salesorderitem.FieldID,
+		),
+	).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
 	if err != nil {
 		return nil, 0, err
 	}

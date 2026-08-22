@@ -47,6 +47,12 @@ import {
   getManualAcceptanceTaskProfileContract,
   manualAcceptanceTaskBatchIdentity,
 } from "./manual-acceptance-task-data.mjs";
+import {
+  LOCAL_DEMO_ACCOUNT_SET,
+  MANUAL_ACCEPTANCE_BUSINESS_ROLE_KEYS,
+  manualAcceptanceAccountSetForTarget,
+  resolveManualAcceptanceRoleCredential,
+} from "./manual-acceptance-account-identities.mjs";
 
 const REPO_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -88,36 +94,21 @@ const TARGET_PACE_MS = 3_000;
 const TARGET_RATE_LIMIT_MAX_ATTEMPTS = 4;
 const TARGET_RATE_LIMIT_RETRY_DELAY_MS = 10_000;
 
-export const FORMAL_BROWSER_ACCOUNTS = Object.freeze([
-  Object.freeze({ username: "demo_boss", roleKey: "boss" }),
-  Object.freeze({ username: "demo_sales", roleKey: "sales" }),
-  Object.freeze({ username: "demo_purchase", roleKey: "purchase" }),
-  Object.freeze({ username: "demo_production", roleKey: "production" }),
-  Object.freeze({ username: "demo_warehouse", roleKey: "warehouse" }),
-  Object.freeze({ username: "demo_quality", roleKey: "quality" }),
-  Object.freeze({ username: "demo_finance", roleKey: "finance" }),
-  Object.freeze({ username: "demo_pmc", roleKey: "pmc" }),
-  Object.freeze({ username: "demo_engineering", roleKey: "engineering" }),
-  Object.freeze({ username: "demo_admin", roleKey: "system_admin" }),
-]);
+function exceptionBrowserAccounts(accountSet) {
+  const expectedByKey = {
+    "disabled-account": "disabled_login_rejected",
+    "multi-position-account": "sales_and_purchase_entries_visible",
+    "no-business-entry-account": "no_business_entry_warning",
+  };
+  return accountSet.scenarios.map(({ key, username }) =>
+    Object.freeze({ key, username, expected: expectedByKey[key] }),
+  );
+}
 
-export const EXCEPTION_BROWSER_ACCOUNTS = Object.freeze([
-  Object.freeze({
-    key: "disabled-account",
-    username: "demo_uat_disabled",
-    expected: "disabled_login_rejected",
-  }),
-  Object.freeze({
-    key: "multi-position-account",
-    username: "demo_uat_sales_purchase",
-    expected: "sales_and_purchase_entries_visible",
-  }),
-  Object.freeze({
-    key: "no-business-entry-account",
-    username: "demo_uat_no_entry",
-    expected: "no_business_entry_warning",
-  }),
-]);
+export const FORMAL_BROWSER_ACCOUNTS = LOCAL_DEMO_ACCOUNT_SET.browserProfiles;
+export const EXCEPTION_BROWSER_ACCOUNTS = Object.freeze(
+  exceptionBrowserAccounts(LOCAL_DEMO_ACCOUNT_SET),
+);
 
 export const MANUAL_ACCEPTANCE_BROWSER_BOUNDARY = Object.freeze({
   readOnly: false,
@@ -227,14 +218,12 @@ function flattenCatalogTargets(catalog) {
   ].flatMap(([group, items]) => items.map((item) => ({ group, ...item })));
 }
 
-function accountForTarget(target) {
+function accountForTarget(target, formalAccounts) {
   if (target.key === "admin-login") return null;
   const roleKey = new Set(["global-dashboard", "task-board"]).has(target.key)
     ? "boss"
     : target.roleKeys[0];
-  const account = FORMAL_BROWSER_ACCOUNTS.find(
-    (item) => item.roleKey === roleKey,
-  );
+  const account = formalAccounts.find((item) => item.roleKey === roleKey);
   if (!account) {
     throw new BrowserAcceptanceError(
       `页面 ${target.route} 没有可用的正式岗位试用账号`,
@@ -318,15 +307,22 @@ function businessDashboardRequirements(catalog) {
   );
 }
 
-export function buildManualAcceptanceBrowserPlan({ baseURL, backendURL } = {}) {
+export function buildManualAcceptanceBrowserPlan({
+  baseURL,
+  backendURL,
+  target = LOCAL_DEMO_ACCOUNT_SET.target,
+} = {}) {
   const catalog = buildManualAcceptanceCatalog();
+  const accountSet = manualAcceptanceAccountSetForTarget(target);
+  const formalAccounts = accountSet.browserProfiles;
+  const exceptionAccounts = exceptionBrowserAccounts(accountSet);
   const pageDataContract = buildManualAcceptancePageDataContract({ catalog });
   const pageDataTargetByRoute = new Map(
     pageDataContract.targets.map((target) => [target.route, target]),
   );
   const dashboardRequirements = businessDashboardRequirements(catalog);
   const targets = flattenCatalogTargets(catalog).map((target) => {
-    const account = accountForTarget(target);
+    const account = accountForTarget(target, formalAccounts);
     const pageDataTarget = pageDataTargetByRoute.get(target.route);
     if (!pageDataTarget || pageDataTarget.key !== target.key) {
       throw new BrowserAcceptanceError(
@@ -368,12 +364,16 @@ export function buildManualAcceptanceBrowserPlan({ baseURL, backendURL } = {}) {
     backendURL: backendURL
       ? normalizeLocalBrowserURL(backendURL, "--backend-url")
       : "",
+    target: accountSet.target,
+    accountKind: accountSet.accountKind,
+    accountPrefix: accountSet.usernamePrefix,
+    passwordEnvironmentVariable: accountSet.passwordEnvironmentVariable,
     ...MANUAL_ACCEPTANCE_BROWSER_BOUNDARY,
-    formalAccounts: FORMAL_BROWSER_ACCOUNTS.map(({ username, roleKey }) => ({
+    formalAccounts: formalAccounts.map(({ username, roleKey }) => ({
       username,
       roleKey,
     })),
-    exceptionAccounts: EXCEPTION_BROWSER_ACCOUNTS.map((item) => ({ ...item })),
+    exceptionAccounts: exceptionAccounts.map((item) => ({ ...item })),
     summary: {
       entryPages: catalog.summary.entryPages,
       desktopPages: catalog.summary.desktopPages,
@@ -575,7 +575,7 @@ export function getManualAcceptanceBrowserHelp() {
   只允许 localhost / 127.0.0.1 / ::1，不接受带凭据、路径、查询参数或跳转的 URL。
   真实验收只登录、读页面和切换只读页签，不点击新增、编辑、提交、完成、取消或过账动作。
   非 plan 模式必须提供同一 runner 生成的 dataset、source、facts 和 readiness 规范报告；缺少附件或岗位场景也会失败。
-  customer-trial-133 使用 127.0.0.1:18375 SSH 隧道、对应 customer-trial-133 报告和 --target-attestation-json，并先通过只读 runtime identity 探针。
+  本地报告只登录 demo_* 并读取 MANUAL_ACCEPTANCE_PASSWORD；customer-trial-133 只登录 uat_*、读取 MANUAL_ACCEPTANCE_UAT_PASSWORD，并使用 127.0.0.1:18375 SSH 隧道、对应报告和 --target-attestation-json。
   报告默认写入 output/qa/manual-acceptance/browser/report.json，不保存密码或登录令牌。
 `;
 }
@@ -1664,16 +1664,6 @@ async function readMobileTaskEvidence(page, target, datasetBinding) {
   });
 }
 
-function sharedTextPrefix(values) {
-  const normalized = values.map((value) => String(value || "")).filter(Boolean);
-  if (normalized.length === 0) return "";
-  let prefix = normalized[0];
-  for (const value of normalized.slice(1)) {
-    while (prefix && !value.startsWith(prefix)) prefix = prefix.slice(0, -1);
-  }
-  return prefix;
-}
-
 export function resolveCurrentBatchListFilter(
   target,
   currentBatch,
@@ -1692,12 +1682,10 @@ export function resolveCurrentBatchListFilter(
     };
   }
   if (["permission-center", "system-audit-logs"].includes(target.key)) {
-    const identifier = sharedTextPrefix(
-      [...FORMAL_BROWSER_ACCOUNTS, ...EXCEPTION_BROWSER_ACCOUNTS].map(
-        (account) => account.username,
-      ),
-    );
-    if (identifier.length < 5) {
+    const identifier = String(target.username || "").match(
+      /^(?:demo|uat)_/u,
+    )?.[0];
+    if (!identifier) {
       throw new BrowserAcceptanceError("验收账号缺少稳定的当前批次搜索前缀");
     }
     return { mode: "account_prefix", identifier };
@@ -2479,9 +2467,7 @@ export function assertManualAcceptanceTaskGroupCoverage(
   const taskInput = readiness?.reportInputs?.taskReport;
   const coverage = readiness?.summary?.taskGroupCoverage;
   const digest = String(taskInput?.taskGroupCoverageDigest || "");
-  const expectedRoles = FORMAL_BROWSER_ACCOUNTS.map((item) => item.roleKey)
-    .filter((roleKey) => roleKey !== "system_admin")
-    .sort();
+  const expectedRoles = [...MANUAL_ACCEPTANCE_BUSINESS_ROLE_KEYS].sort();
   const actualRoles = Object.keys(coverage?.byRole || {}).sort();
   const relevantProbes = (
     Array.isArray(readiness?.probes) ? readiness.probes : []
@@ -3840,7 +3826,7 @@ async function verifyBusinessPrintTemplate(browser, options) {
 
 async function verifyBusinessPrintEvidence(
   browser,
-  { baseURL, password, printInput },
+  { baseURL, password, printInput, formalAccounts },
 ) {
   const workspaceMinimumByTemplate = new Map(
     buildManualAcceptanceCatalog().technicalManifest.printWorkspacePages.map(
@@ -3849,7 +3835,7 @@ async function verifyBusinessPrintEvidence(
   );
   const cases = [
     [
-      "demo_purchase",
+      "purchase",
       "/erp/purchase/accessories",
       "打印合同",
       "material-purchase-contract",
@@ -3858,7 +3844,7 @@ async function verifyBusinessPrintEvidence(
       printInput.printRecords.purchaseOrder.lineCount,
     ],
     [
-      "demo_production",
+      "production",
       "/erp/purchase/processing-contracts",
       "加工合同打印",
       "processing-contract",
@@ -3867,7 +3853,7 @@ async function verifyBusinessPrintEvidence(
       printInput.printRecords.outsourcingOrder.lineCount,
     ],
     [
-      "demo_engineering",
+      "engineering",
       "/erp/purchase/material-bom",
       "打印物料明细",
       "engineering-material-detail",
@@ -3876,7 +3862,7 @@ async function verifyBusinessPrintEvidence(
       printInput.printRecords.bomVersion.lineCount,
     ],
     [
-      "demo_engineering",
+      "engineering",
       "/erp/purchase/material-bom",
       "打印色卡",
       "engineering-color-card",
@@ -3885,7 +3871,7 @@ async function verifyBusinessPrintEvidence(
       printInput.printRecords.bomVersion.lineCount,
     ],
     [
-      "demo_engineering",
+      "engineering",
       "/erp/purchase/material-bom",
       "打印作业指导书",
       "engineering-work-instruction",
@@ -3896,7 +3882,7 @@ async function verifyBusinessPrintEvidence(
   ];
   const templates = [];
   for (const [
-    username,
+    roleKey,
     sourceRoute,
     actionLabel,
     templateKey,
@@ -3910,10 +3896,10 @@ async function verifyBusinessPrintEvidence(
         Number.isSafeInteger(minimumSourceRecords) && minimumSourceRecords > 0,
         `${templateKey} 缺少打印工作台最少来源记录合同`,
       );
-      const account = FORMAL_BROWSER_ACCOUNTS.find(
-        (candidate) => candidate.username === username,
+      const account = formalAccounts.find(
+        (candidate) => candidate.roleKey === roleKey,
       );
-      assert.ok(account, `${username} 必须是正式岗位试用账号`);
+      assert.ok(account, `${roleKey} 必须有正式岗位验收账号`);
       const login = await loginFormalAccount(browser, {
         baseURL,
         account,
@@ -4258,11 +4244,18 @@ async function verifyScenarioRoute(
   }
 }
 
-async function verifyExceptionAccounts(browser, { baseURL, password }) {
+async function verifyExceptionAccounts(
+  browser,
+  { baseURL, password, exceptionAccounts },
+) {
+  const byKey = new Map(exceptionAccounts.map((item) => [item.key, item]));
+  const disabledAccount = byKey.get("disabled-account");
+  const multiPositionAccount = byKey.get("multi-position-account");
+  const noEntryAccount = byKey.get("no-business-entry-account");
   await wait(AUTH_PACE_MS);
   const disabled = await attemptRejectedLogin(browser, {
     baseURL,
-    username: "demo_uat_disabled",
+    username: disabledAccount.username,
     password,
     expectedText: "账号已停用",
   });
@@ -4272,7 +4265,7 @@ async function verifyExceptionAccounts(browser, { baseURL, password }) {
   try {
     const multiLogin = await loginForScenario(browser, {
       baseURL,
-      username: "demo_uat_sales_purchase",
+      username: multiPositionAccount.username,
       password,
       entryTarget: "mobile",
       fromPath: "/m/sales/tasks",
@@ -4295,7 +4288,7 @@ async function verifyExceptionAccounts(browser, { baseURL, password }) {
     }
     multiPosition = {
       key: "multi-position-account",
-      username: "demo_uat_sales_purchase",
+      username: multiPositionAccount.username,
       passed: verifiedEntries.every((item) => item.passed),
       verifiedEntries,
       storesPasswordValue: false,
@@ -4304,7 +4297,7 @@ async function verifyExceptionAccounts(browser, { baseURL, password }) {
   } catch (error) {
     multiPosition = {
       key: "multi-position-account",
-      username: "demo_uat_sales_purchase",
+      username: multiPositionAccount.username,
       passed: false,
       error: sanitizeDiagnostic(error?.message || error),
       verifiedEntries: [],
@@ -4318,7 +4311,7 @@ async function verifyExceptionAccounts(browser, { baseURL, password }) {
   try {
     const login = await loginForScenario(browser, {
       baseURL,
-      username: "demo_uat_no_entry",
+      username: noEntryAccount.username,
       password,
       entryTarget: "desktop",
       fromPath: "/entry",
@@ -4332,7 +4325,7 @@ async function verifyExceptionAccounts(browser, { baseURL, password }) {
     });
     noEntry = {
       key: "no-business-entry-account",
-      username: "demo_uat_no_entry",
+      username: noEntryAccount.username,
       passed: verifiedEntry.passed,
       verifiedEntry,
       expectedResult: "登录后只显示无可用入口提示",
@@ -4340,7 +4333,7 @@ async function verifyExceptionAccounts(browser, { baseURL, password }) {
   } catch (error) {
     noEntry = {
       key: "no-business-entry-account",
-      username: "demo_uat_no_entry",
+      username: noEntryAccount.username,
       passed: false,
       expectedResult: "登录后只显示无可用入口提示",
       error: sanitizeDiagnostic(error?.message || error),
@@ -4411,23 +4404,38 @@ export async function runManualAcceptanceBrowser(
         "--dataset-report",
       )
     : "";
-  const secret = String(password || "").trim();
-  if (!secret) {
+  if (
+    !String(password || "").trim() &&
+    !String(process.env.MANUAL_ACCEPTANCE_PASSWORD || "").trim() &&
+    !String(process.env.MANUAL_ACCEPTANCE_UAT_PASSWORD || "").trim()
+  ) {
     throw new BrowserAcceptanceError(
-      "缺少本地试用账号密码：请设置 MANUAL_ACCEPTANCE_PASSWORD",
+      "缺少目标验收账号密码：请设置 MANUAL_ACCEPTANCE_PASSWORD 或 MANUAL_ACCEPTANCE_UAT_PASSWORD",
       2,
     );
   }
-
-  const plan = buildManualAcceptanceBrowserPlan({
-    baseURL: normalizedBaseURL,
-    backendURL: normalizedBackendURL,
-  });
   const fetchImpl = runtime.fetchImpl || globalThis.fetch;
   const printInput = await loadBoundSimulatedPrintInput({
     sourceReportPath: normalizedSourceReportPath,
     factReportPath: normalizedFactReportPath,
     backendURL: normalizedBackendURL,
+  });
+  const roleCredential = resolveManualAcceptanceRoleCredential({
+    target: printInput.target,
+    password,
+  });
+  const secret = String(roleCredential.value || "").trim();
+  const accountSet = manualAcceptanceAccountSetForTarget(printInput.target);
+  if (!secret) {
+    throw new BrowserAcceptanceError(
+      `缺少目标验收账号密码：请设置 ${accountSet.passwordEnvironmentVariable}`,
+      2,
+    );
+  }
+  const plan = buildManualAcceptanceBrowserPlan({
+    baseURL: normalizedBaseURL,
+    backendURL: normalizedBackendURL,
+    target: printInput.target,
   });
   assertManualAcceptanceBrowserReportPathBinding(
     normalizedReportPath,
@@ -4463,8 +4471,9 @@ export async function runManualAcceptanceBrowser(
       baseURL: normalizedBaseURL,
       password: secret,
       printInput,
+      formalAccounts: plan.formalAccounts,
     });
-    for (const account of FORMAL_BROWSER_ACCOUNTS) {
+    for (const account of plan.formalAccounts) {
       const login = await loginFormalAccount(browser, {
         baseURL: normalizedBaseURL,
         account,
@@ -4474,7 +4483,7 @@ export async function runManualAcceptanceBrowser(
       formalAccounts.push(login.result);
       await wait(AUTH_PACE_MS);
     }
-    for (const account of FORMAL_BROWSER_ACCOUNTS.filter(
+    for (const account of plan.formalAccounts.filter(
       (item) => item.roleKey !== "system_admin",
     )) {
       const login = await loginFormalAccount(browser, {
@@ -4537,6 +4546,7 @@ export async function runManualAcceptanceBrowser(
     exceptionAccounts = await verifyExceptionAccounts(browser, {
       baseURL: normalizedBaseURL,
       password: secret,
+      exceptionAccounts: plan.exceptionAccounts,
     });
   } finally {
     desktopStorageStates.clear();
@@ -4562,6 +4572,10 @@ export async function runManualAcceptanceBrowser(
     scope: "manual-acceptance-browser-report",
     generatedAt: new Date().toISOString(),
     customerKey: CUSTOMER_KEY,
+    target: plan.target,
+    accountKind: plan.accountKind,
+    accountPrefix: plan.accountPrefix,
+    rolePasswordSource: roleCredential.source,
     baseURL: normalizedBaseURL,
     backendURL: normalizedBackendURL,
     ...MANUAL_ACCEPTANCE_BROWSER_BOUNDARY,
@@ -4581,14 +4595,14 @@ export async function runManualAcceptanceBrowser(
       acceptancePassed: acceptance.acceptancePassed,
       printEvidencePassed: acceptance.printEvidencePassed,
       formalAccountPassedCount: formalAccounts.length - failedAccounts.length,
-      formalAccountCount: FORMAL_BROWSER_ACCOUNTS.length,
+      formalAccountCount: plan.formalAccounts.length,
       formalMobileAccountPassedCount: formalMobileAccounts.filter(
         (item) => item.passed,
       ).length,
-      formalMobileAccountCount: FORMAL_BROWSER_ACCOUNTS.length - 1,
+      formalMobileAccountCount: plan.formalAccounts.length - 1,
       exceptionAccountPassedCount:
         exceptionAccounts.length - failedExceptions.length,
-      exceptionAccountCount: EXCEPTION_BROWSER_ACCOUNTS.length,
+      exceptionAccountCount: plan.exceptionAccounts.length,
       targetPassedCount: targets.length - failedTargets.length,
       targetFailedCount: failedTargets.length,
       targetCount: targets.length,
@@ -4637,7 +4651,6 @@ async function main() {
   }
   const report = await runManualAcceptanceBrowser({
     ...options,
-    password: process.env.MANUAL_ACCEPTANCE_PASSWORD,
     targetAttestation:
       options.targetAttestation ||
       process.env.MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON,

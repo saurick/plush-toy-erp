@@ -64,6 +64,10 @@ const devWorkbenchAreaPageSource = readFileSync(
   new URL('../pages/DevWorkbenchAreaPage.jsx', import.meta.url),
   'utf8'
 )
+const devWorkbenchDensityStyles = readFileSync(
+  new URL('../styles/dev-workbench-density.css', import.meta.url),
+  'utf8'
+)
 
 test('devHub: route and dev gate stay dev-only', () => {
   assert.equal(DEV_HUB_ROUTE, '/__dev')
@@ -297,9 +301,22 @@ test('devHub: fifteen dev pages share the backend-style workspace shell', () => 
   })
 })
 
-test('devHub: one local DEV-only controller compares local, 133, and isolated evidence without a target switch', () => {
-  assert.match(devPageNavSource, /<DevEnvironmentEvidencePanel \/>/u)
+test('devHub: delivery overview owns the local, 133, and isolated evidence comparison', () => {
+  assert.doesNotMatch(devPageNavSource, /DevEnvironmentEvidencePanel/u)
   assert.match(devPageNavSource, /控制端：本地 DEV-only/u)
+  assert.match(
+    devWorkbenchAreaPageSource,
+    /import DevEnvironmentEvidencePanel from '..\/components\/DevEnvironmentEvidencePanel\.jsx'/u
+  )
+  assert.match(
+    devWorkbenchAreaPageSource,
+    /const isDeliveryArea = areaKey === DEV_WORKBENCH_AREA_KEYS\.delivery/u
+  )
+  assert.match(
+    devWorkbenchAreaPageSource,
+    /\{isDeliveryArea \? <DevEnvironmentEvidencePanel \/> : null\}/u
+  )
+  assert.match(devEnvironmentEvidencePanelSource, /环境与验收事实/u)
   assert.match(devEnvironmentEvidencePanelSource, /sharedSummaryResources/u)
   assert.match(devEnvironmentEvidencePanelSource, /readSharedSummary/u)
   assert.match(devEnvironmentEvidencePanelSource, /SUMMARY_TTL_MS = 120_000/u)
@@ -318,6 +335,21 @@ test('devHub: one local DEV-only controller compares local, 133, and isolated ev
   assert.doesNotMatch(
     devEnvironmentEvidencePanelSource,
     /name=["'](?:host|port|target|path|command|dsn|password|token)["']/iu
+  )
+})
+
+test('devHub: iconless delivery cards keep the full content width on narrow screens', () => {
+  assert.match(
+    devWorkbenchDensityStyles,
+    /@media \(max-width: 720px\)[\s\S]*\.erp-dev-hub-card--without-icon \{[\s\S]*grid-template-columns: minmax\(0, 1fr\);[\s\S]*\}/u
+  )
+  assert.match(
+    devWorkbenchDensityStyles,
+    /\.erp-dev-hub-card--without-icon \.erp-dev-hub-card__head \{[\s\S]*flex-direction: column;[\s\S]*\}/u
+  )
+  assert.match(
+    devWorkbenchDensityStyles,
+    /\.erp-dev-hub-card--without-icon \.erp-dev-hub-card__head \.ant-tag \{[\s\S]*max-width: 100%;[\s\S]*overflow-wrap: anywhere;[\s\S]*white-space: normal;[\s\S]*\}/u
   )
 })
 

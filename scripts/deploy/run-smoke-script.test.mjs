@@ -12,10 +12,7 @@ const scriptPath = path.join(
 );
 const credentialContract = JSON.parse(
   fs.readFileSync(
-    path.join(
-      repoRoot,
-      "deployments/yoyoosun/env/credential.contract.json",
-    ),
+    path.join(repoRoot, "deployments/yoyoosun/env/credential.contract.json"),
     "utf8",
   ),
 );
@@ -24,16 +21,15 @@ const credentialArgs = [
   credentialContract.credentials.admin.username,
   "--admin-password-env",
   credentialContract.credentials.admin.environmentVariable,
-  "--demo-password-env",
-  credentialContract.credentials.demo.environmentVariable,
+  "--uat-password-env",
+  credentialContract.credentials.uat.environmentVariable,
   "--sms-phone-env",
   credentialContract.smsLoginIdentity.environmentVariable,
 ];
 const credentialEnv = {
   [credentialContract.credentials.admin.environmentVariable]:
-    "test-admin-password-unique",
-  [credentialContract.credentials.demo.environmentVariable]:
-    "test-demo-password-unique",
+    "test-admin-secret",
+  [credentialContract.credentials.uat.environmentVariable]: "test-uat-secret",
   [credentialContract.smsLoginIdentity.environmentVariable]: "13800138000",
 };
 const releaseSha = "a".repeat(40);
@@ -83,7 +79,7 @@ request_data=""
 if [[ -n "\${FAKE_CURL_ARGV_OUT:-}" ]]; then
   printf '%s\n' "$*" >>"$FAKE_CURL_ARGV_OUT"
 fi
-if [[ -n "\${MANUAL_ACCEPTANCE_ADMIN_PASSWORD+x}" || -n "\${MANUAL_ACCEPTANCE_PASSWORD+x}" || -n "\${MANUAL_ACCEPTANCE_SMS_PHONE+x}" || -n "\${CUSTOMER_CONFIG_ADMIN_TOKEN+x}" ]]; then
+if [[ -n "\${MANUAL_ACCEPTANCE_ADMIN_PASSWORD+x}" || -n "\${MANUAL_ACCEPTANCE_UAT_PASSWORD+x}" || -n "\${MANUAL_ACCEPTANCE_SMS_PHONE+x}" || -n "\${CUSTOMER_CONFIG_ADMIN_TOKEN+x}" ]]; then
   printf 'secret-env-leak\n' >>"\${FAKE_CURL_ARGV_OUT:-/dev/null}"
 fi
 while [[ $# -gt 0 ]]; do
@@ -171,7 +167,7 @@ test("run smoke help is runnable", () => {
   assert.match(result.stdout, /--release-version/);
   assert.match(result.stdout, /--environment/);
   assert.match(result.stdout, /--admin-password-env/);
-  assert.match(result.stdout, /--demo-password-env/);
+  assert.match(result.stdout, /--uat-password-env/);
   assert.match(result.stdout, /--print-input-template/);
 });
 
@@ -305,22 +301,22 @@ test("run smoke writes release-gate compatible report", async () => {
   assert.equal(credentialCheck.adminSuperAdmin, true);
   assert.equal(credentialCheck.phoneConfigured, true);
   assert.equal(credentialCheck.phoneBound, true);
-  assert.equal(credentialCheck.demoExpected, 10);
-  assert.equal(credentialCheck.demoAuthenticated, 10);
+  assert.equal(credentialCheck.uatExpected, 10);
+  assert.equal(credentialCheck.uatAuthenticated, 10);
   assert.equal(credentialCheck.totalExpected, 11);
   assert.equal(credentialCheck.totalAuthenticated, 11);
   assert.equal(credentialCheck.uniqueTokensObserved, true);
   assert.deepEqual(credentialCheck.usernames, [
     credentialContract.credentials.admin.username,
-    ...credentialContract.credentials.demo.usernames,
+    ...credentialContract.credentials.uat.usernames,
   ]);
   assert.equal(
     credentialCheck.adminPasswordSource,
-    "credential-contract",
+    credentialContract.credentials.admin.credentialSource,
   );
   assert.equal(
-    credentialCheck.demoPasswordSource,
-    "credential-contract",
+    credentialCheck.uatPasswordSource,
+    credentialContract.credentials.uat.credentialSource,
   );
   assert.equal(credentialCheck.responseBodyStored, false);
   assert.match(credentialCheck.credentialContractSha256, /^[a-f0-9]{64}$/);
@@ -365,11 +361,11 @@ test("run smoke writes release-gate compatible report", async () => {
   assert.equal(Object.hasOwn(pdfPayload, "base_url"), false);
   assert.doesNotMatch(
     JSON.stringify(report),
-    /test-token|test-admin-password|test-demo-password|13800138000|unique-token|access_token|%PDF|release-smoke/,
+    /test-token|test-admin-secret|test-uat-secret|13800138000|unique-token|access_token|%PDF|release-smoke/,
   );
   assert.doesNotMatch(
     fs.readFileSync(path.join(root, "curl-argv.txt"), "utf8"),
-    /test-token|test-admin-password|test-demo-password|13800138000|unique-token|secret-env-leak/,
+    /test-token|test-admin-secret|test-uat-secret|13800138000|unique-token|secret-env-leak/,
   );
   assert.deepEqual(fs.readdirSync(tempDir), []);
   assert.equal(report.redaction.containsSecrets, false);
@@ -428,7 +424,7 @@ test("run smoke fails authenticated release smoke for a non-PDF response", async
   assert.deepEqual(fs.readdirSync(tempDir), []);
 });
 
-test("run smoke fails when one contracted demo credential cannot log in", async () => {
+test("run smoke fails when one contracted UAT credential cannot log in", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "run-smoke-login-fail-"));
   const reportPath = path.join(root, "smoke-test-report.json");
   const fakeCurlBin = createFakeCurlBin(root);
@@ -451,7 +447,7 @@ test("run smoke fails when one contracted demo credential cannot log in", async 
       env: {
         PATH: `${fakeCurlBin}:${process.env.PATH ?? ""}`,
         ...credentialEnv,
-        FAKE_LOGIN_FAIL_USERNAME: "demo_quality",
+        FAKE_LOGIN_FAIL_USERNAME: "uat_quality",
       },
     },
   );
@@ -464,14 +460,14 @@ test("run smoke fails when one contracted demo credential cannot log in", async 
   assert.equal(credentialCheck.status, "fail");
   assert.equal(credentialCheck.adminAuthenticated, true);
   assert.equal(credentialCheck.phoneBound, true);
-  assert.equal(credentialCheck.demoAuthenticated, 9);
+  assert.equal(credentialCheck.uatAuthenticated, 9);
   assert.equal(credentialCheck.totalAuthenticated, 10);
   assert.equal(credentialCheck.uniqueTokensObserved, false);
   assert.equal(credentialCheck.responseBodyStored, false);
   assert.equal(report.summary.failed, 1);
   assert.doesNotMatch(
     JSON.stringify(report),
-    /test-admin-password|test-demo-password|fresh-token|access_token|login rejected/,
+    /test-admin-secret|test-uat-secret|fresh-token|access_token|login rejected/,
   );
 });
 
@@ -481,7 +477,9 @@ for (const [name, fakeEnv, authenticated] of [
   ["legacy token alias", { FAKE_LOGIN_TOKEN_KEY: "token" }, 0],
 ]) {
   test(`run smoke rejects ${name} without storing raw login response`, async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "run-smoke-login-contract-"));
+    const root = fs.mkdtempSync(
+      path.join(os.tmpdir(), "run-smoke-login-contract-"),
+    );
     const reportPath = path.join(root, "smoke-test-report.json");
     const fakeCurlBin = createFakeCurlBin(root);
     const result = await runScriptAsync(
@@ -523,11 +521,13 @@ for (const [name, fakeEnv, authenticated] of [
   });
 }
 
-test("run smoke ignores conflicting password env and uses the registered contract credentials", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "run-smoke-same-password-"));
+test("run smoke rejects matching external admin and UAT passwords", async () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "run-smoke-same-password-"),
+  );
   const reportPath = path.join(root, "smoke-test-report.json");
   const fakeCurlBin = createFakeCurlBin(root);
-  const sharedPassword = "same-password-is-not-allowed";
+  const sharedPassword = "same-secret-value";
 
   const result = await runScriptAsync(
     [
@@ -548,20 +548,15 @@ test("run smoke ignores conflicting password env and uses the registered contrac
         PATH: `${fakeCurlBin}:${process.env.PATH ?? ""}`,
         [credentialContract.credentials.admin.environmentVariable]:
           sharedPassword,
-        [credentialContract.credentials.demo.environmentVariable]:
+        [credentialContract.credentials.uat.environmentVariable]:
           sharedPassword,
       },
     },
   );
 
-  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
-  const check = report.checks.find((item) => item.name === "credential-login-matrix");
-  assert.equal(check.status, "pass");
-  assert.equal(check.phoneConfigured, false);
-  assert.equal(check.phoneBound, false);
-  assert.equal(check.adminPasswordSource, "credential-contract");
-  assert.equal(check.demoPasswordSource, "credential-contract");
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout, /admin and UAT passwords must differ/u);
+  assert.equal(fs.existsSync(reportPath), false);
 });
 
 test("run smoke keeps backend checks optional", async () => {

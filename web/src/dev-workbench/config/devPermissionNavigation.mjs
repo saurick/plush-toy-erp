@@ -20,6 +20,7 @@ import {
   PERMISSION_RELATIONSHIP_VIEW_MODE,
   getPermissionRelationshipRoleKeys,
 } from './devPermissionRelationshipGraph.mjs'
+import { formatAdminIdentity } from '../../erp/utils/adminIdentity.mjs'
 
 export const PERMISSION_NAVIGATION_STATE = Object.freeze({
   READY: 'ready',
@@ -46,7 +47,7 @@ function accountKey(account = {}) {
 }
 
 function accountName(account = {}) {
-  return normalizeText(account?.username) || '未命名账号'
+  return formatAdminIdentity(account) || '未命名账号'
 }
 
 function accessForRole(accessByRoleKey = {}, roleKey = '') {

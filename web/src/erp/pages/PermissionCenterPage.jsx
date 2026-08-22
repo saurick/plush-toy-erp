@@ -51,6 +51,16 @@ import {
 } from '../utils/contactValidation.mjs'
 import { adminPasswordPolicyRule } from '../utils/adminPasswordPolicy.mjs'
 import {
+  ADMIN_USERNAME_MAX_LENGTH,
+  ADMIN_USERNAME_RULE_TEXT,
+  getAdminUsernameValidationMessage,
+} from '../utils/adminUsername.mjs'
+import {
+  findAdminsWithDisplayName,
+  formatAdminIdentity,
+  getAdminDisplayName,
+} from '../utils/adminIdentity.mjs'
+import {
   getPermissionModuleTitle,
   UNCLASSIFIED_PERMISSION_MODULE_TITLE,
 } from '../utils/permissionModuleLabels.mjs'
@@ -58,6 +68,7 @@ import {
   buildAssignableRoleOptions,
   filterAssignableBusinessPermissions,
   getAdminControlTargetBlockReason,
+  getAdminProfileTargetBlockReason,
   getPermissionCenterRoleVersion,
   getRoleAssignmentBlockReason,
   getRolePermissionReadOnlyReason,
@@ -1174,9 +1185,16 @@ function compareAssociatedAdmins(left = {}, right = {}) {
   if (leftOrder !== rightOrder) {
     return leftOrder - rightOrder
   }
-  return String(left.username || '').localeCompare(
-    String(right.username || ''),
+  const nameOrder = getAdminDisplayName(left).localeCompare(
+    getAdminDisplayName(right),
     'zh-CN'
+  )
+  return (
+    nameOrder ||
+    String(left.username || '').localeCompare(
+      String(right.username || ''),
+      'zh-CN'
+    )
   )
 }
 
@@ -1194,6 +1212,72 @@ function renderAssociatedAdminStatus(admin = {}) {
     default:
       return <Tag color="gold">状态待刷新</Tag>
   }
+}
+
+function getAdminPhoneSuffix(phone = '') {
+  const digits = String(phone || '').replace(/\D/gu, '')
+  return digits.length >= 4 ? digits.slice(-4) : ''
+}
+
+function DuplicateAdminNameWarning({ matches = [], style }) {
+  if (!Array.isArray(matches) || matches.length === 0) {
+    return null
+  }
+
+  const sortedMatches = [...matches].sort(compareAssociatedAdmins)
+  const visibleMatches = sortedMatches.slice(0, 3)
+  const hiddenCount = sortedMatches.length - visibleMatches.length
+  const hasRevokedAccount = sortedMatches.some(
+    (admin) => getAdminAccountStatus(admin) === ADMIN_ACCOUNT_STATUS.REVOKED
+  )
+
+  return (
+    <Alert
+      type="warning"
+      showIcon
+      style={style}
+      message={`发现 ${sortedMatches.length} 个同名账号，请先核对`}
+      description={
+        <Space direction="vertical" size={6} style={{ width: '100%' }}>
+          <Text>
+            同一个人兼任多个岗位，请维护原账号；确为同名不同人可以继续本次操作。
+          </Text>
+          {visibleMatches.map((admin) => {
+            const roleLabels = [
+              ...new Set(
+                (Array.isArray(admin.roles) ? admin.roles : [])
+                  .map(getRoleVisibleName)
+                  .filter(Boolean)
+              ),
+            ]
+            const phoneSuffix = getAdminPhoneSuffix(admin.phone)
+            return (
+              <Space key={admin.id || admin.username} wrap size={[4, 4]}>
+                <Text strong>{formatAdminIdentity(admin)}</Text>
+                {renderAssociatedAdminStatus(admin)}
+                {roleLabels.map((roleLabel) => (
+                  <Tag key={`${admin.id || admin.username}-${roleLabel}`}>
+                    {roleLabel}
+                  </Tag>
+                ))}
+                {phoneSuffix ? (
+                  <Text type="secondary">手机号尾号 {phoneSuffix}</Text>
+                ) : null}
+              </Space>
+            )
+          })}
+          {hiddenCount > 0 ? (
+            <Text type="secondary">另有 {hiddenCount} 个同名账号</Text>
+          ) : null}
+          {hasRevokedAccount ? (
+            <Text type="secondary">
+              已注销账号不可恢复；如果是员工返聘，请按新账号办理。
+            </Text>
+          ) : null}
+        </Space>
+      }
+    />
+  )
 }
 
 function RoleAssociatedAccounts({
@@ -1216,9 +1300,10 @@ function RoleAssociatedAccounts({
   const sortedAdmins = [...admins].sort(compareAssociatedAdmins)
   const columns = [
     {
-      title: '关联账号',
-      dataIndex: 'username',
+      title: '关联员工',
+      dataIndex: 'display_name',
       width: 220,
+      render: (_, record) => formatAdminIdentity(record),
     },
     {
       title: '状态',
@@ -1822,8 +1907,8 @@ export default function PermissionCenterPage() {
     adminDialog.kind === PERMISSION_CENTER_ADMIN_DIALOG.CREATE
   const editModalOpen =
     adminDialog.kind === PERMISSION_CENTER_ADMIN_DIALOG.EDIT_ROLES
-  const phoneModalOpen =
-    adminDialog.kind === PERMISSION_CENTER_ADMIN_DIALOG.EDIT_PHONE
+  const profileModalOpen =
+    adminDialog.kind === PERMISSION_CENTER_ADMIN_DIALOG.EDIT_PROFILE
   const resetModalOpen =
     adminDialog.kind === PERMISSION_CENTER_ADMIN_DIALOG.RESET_PASSWORD
   const statusModalOpen =
@@ -1831,14 +1916,18 @@ export default function PermissionCenterPage() {
   const revokeModalOpen =
     adminDialog.kind === PERMISSION_CENTER_ADMIN_DIALOG.REVOKE
   const editingAdmin = editModalOpen ? adminDialog.admin : null
-  const phoneAdmin = phoneModalOpen ? adminDialog.admin : null
+  const profileAdmin = profileModalOpen ? adminDialog.admin : null
   const resettingAdmin = resetModalOpen ? adminDialog.admin : null
   const statusActionAdmin = statusModalOpen ? adminDialog.admin : null
   const statusActionDisabled = statusModalOpen
     ? adminDialog.statusDisabled
     : false
   const revokingAdmin = revokeModalOpen ? adminDialog.admin : null
-  const editingPhone = phoneModalOpen ? adminDialog.phone : ''
+  const editingDisplayName = profileModalOpen ? adminDialog.displayName : ''
+  const setEditingDisplayName = useCallback((displayName) => {
+    dispatchAdminDialog({ type: 'set_display_name', displayName })
+  }, [])
+  const editingPhone = profileModalOpen ? adminDialog.phone : ''
   const setEditingPhone = useCallback((phone) => {
     dispatchAdminDialog({ type: 'set_phone', phone })
   }, [])
@@ -1873,6 +1962,18 @@ export default function PermissionCenterPage() {
   const [resetForm] = Form.useForm()
   const [statusForm] = Form.useForm()
   const [revokeForm] = Form.useForm()
+  const createDisplayName = Form.useWatch('display_name', createForm)
+  const createDuplicateNameAdmins = useMemo(
+    () => findAdminsWithDisplayName(admins, createDisplayName),
+    [admins, createDisplayName]
+  )
+  const profileDuplicateNameAdmins = useMemo(
+    () =>
+      findAdminsWithDisplayName(admins, editingDisplayName, {
+        excludeAdminID: profileAdmin?.id,
+      }),
+    [admins, editingDisplayName, profileAdmin?.id]
+  )
 
   const roleOptions = useMemo(
     () =>
@@ -2849,17 +2950,16 @@ export default function PermissionCenterPage() {
     setSelectedRoleKeys([])
   }
 
-  const openPhoneModal = (admin) => {
+  const openProfileModal = (admin) => {
     const accountStatus = getAdminAccountStatus(admin)
     if (
       !admin ||
-      admin.is_super_admin ||
       !accountStatus ||
       accountStatus === ADMIN_ACCOUNT_STATUS.REVOKED
     ) {
       return
     }
-    const blockReason = getAdminControlTargetBlockReason({
+    const blockReason = getAdminProfileTargetBlockReason({
       currentAdmin,
       targetAdmin: admin,
       roles,
@@ -2870,13 +2970,14 @@ export default function PermissionCenterPage() {
     }
     dispatchAdminDialog({
       type: 'open',
-      kind: PERMISSION_CENTER_ADMIN_DIALOG.EDIT_PHONE,
+      kind: PERMISSION_CENTER_ADMIN_DIALOG.EDIT_PROFILE,
       admin,
+      displayName: admin.display_name || '',
       phone: admin.phone || '',
     })
   }
 
-  const closePhoneModal = () => {
+  const closeProfileModal = () => {
     dispatchAdminDialog({ type: 'close' })
   }
 
@@ -2928,6 +3029,7 @@ export default function PermissionCenterPage() {
     setCreating(true)
     try {
       const payload = {
+        display_name: String(values.display_name || '').trim(),
         username: String(values.username || '').trim(),
         password: values.password,
         phone: String(values.phone || '').trim(),
@@ -2939,7 +3041,7 @@ export default function PermissionCenterPage() {
       const createdAdmin = result?.data?.admin
       message.success(
         createdAdmin?.username
-          ? `员工账号 ${createdAdmin.username} 已创建`
+          ? `${formatAdminIdentity(createdAdmin)} 已创建`
           : '员工账号已创建'
       )
       closeCreateModal()
@@ -2986,13 +3088,22 @@ export default function PermissionCenterPage() {
     }
   }
 
-  const saveAdminPhone = async () => {
-    const accountStatus = getAdminAccountStatus(phoneAdmin)
+  const saveAdminProfile = async () => {
+    const accountStatus = getAdminAccountStatus(profileAdmin)
     if (
-      !phoneAdmin?.id ||
+      !profileAdmin?.id ||
       !accountStatus ||
       accountStatus === ADMIN_ACCOUNT_STATUS.REVOKED
     ) {
+      return
+    }
+    const nextDisplayName = String(editingDisplayName || '').trim()
+    if (!nextDisplayName) {
+      message.warning('请输入员工姓名')
+      return
+    }
+    if (Array.from(nextDisplayName).length > 64) {
+      message.warning('员工姓名不能超过 64 个字符')
       return
     }
     const nextPhone = String(editingPhone || '').trim()
@@ -3000,21 +3111,28 @@ export default function PermissionCenterPage() {
       message.warning('请输入有效手机号')
       return
     }
-    if (nextPhone === String(phoneAdmin.phone || '').trim()) {
-      closePhoneModal()
+    if (
+      nextDisplayName === String(profileAdmin.display_name || '').trim() &&
+      nextPhone === String(profileAdmin.phone || '').trim()
+    ) {
+      closeProfileModal()
       return
     }
     setSaving(true)
     try {
-      await adminRpc.call('set_phone', {
-        id: phoneAdmin.id,
+      await adminRpc.call('set_profile', {
+        id: profileAdmin.id,
+        display_name: nextDisplayName,
         phone: nextPhone,
       })
-      message.success('登录手机号已更新')
-      closePhoneModal()
+      if (Number(outletContext.adminProfile?.id) === Number(profileAdmin.id)) {
+        await outletContext.refreshAdminProfile?.()
+      }
+      message.success('员工资料已更新')
+      closeProfileModal()
       await loadData()
     } catch (err) {
-      message.error(getActionErrorMessage(err, '更新登录手机号'))
+      message.error(getActionErrorMessage(err, '更新员工资料'))
     } finally {
       setSaving(false)
     }
@@ -3120,8 +3238,8 @@ export default function PermissionCenterPage() {
       })
       message.success(
         disabled
-          ? `已临时停用员工账号 ${admin.username}`
-          : `已启用员工账号 ${admin.username}`
+          ? `已临时停用 ${formatAdminIdentity(admin)}`
+          : `已启用 ${formatAdminIdentity(admin)}`
       )
       await loadData()
       dispatchAdminDialog({ type: 'close' })
@@ -3148,7 +3266,7 @@ export default function PermissionCenterPage() {
         id: resettingAdmin.id,
         password: values.password,
       })
-      message.success(`已重置员工账号 ${resettingAdmin.username} 的密码`)
+      message.success(`已重置 ${formatAdminIdentity(resettingAdmin)} 的密码`)
       closeResetModal()
       await loadData()
     } catch (err) {
@@ -3231,9 +3349,19 @@ export default function PermissionCenterPage() {
 
   const columns = [
     {
-      title: '员工账号',
-      dataIndex: 'username',
-      width: 180,
+      title: '姓名 / 账号',
+      dataIndex: 'display_name',
+      width: 210,
+      render: (_, record) => (
+        <Space direction="vertical" size={0}>
+          <Text strong>{getAdminDisplayName(record, '未填写姓名')}</Text>
+          {record.display_name ? (
+            <Text type="secondary">账号：{record.username}</Text>
+          ) : (
+            <Text type="warning">姓名待补录 · 账号：{record.username}</Text>
+          )}
+        </Space>
+      ),
     },
     {
       title: '手机号',
@@ -3371,9 +3499,6 @@ export default function PermissionCenterPage() {
       title: '操作',
       width: 240,
       render: (_, record) => {
-        if (record.is_super_admin) {
-          return <Text type="secondary">系统保留</Text>
-        }
         const accountStatus = getAdminAccountStatus(record)
         const revoked = accountStatus === ADMIN_ACCOUNT_STATUS.REVOKED
         const statusUnavailable = !accountStatus
@@ -3391,12 +3516,23 @@ export default function PermissionCenterPage() {
               roles,
               isProduction: IS_PRODUCTION_BUILD,
             })
-        const phoneAndPasswordBlockReason = revoked
-          ? '已注销账号不可修改手机号或重置密码；如需重新使用，请创建新账号'
+        const profileBlockReason = revoked
+          ? '已注销账号不可修改资料；如需重新使用，请创建新账号'
           : statusUnavailable
             ? '账号状态尚未完整加载，请刷新后再操作'
             : !canManageUsers
-              ? '当前账号不能修改手机号或重置密码'
+              ? '当前账号不能修改员工资料'
+              : getAdminProfileTargetBlockReason({
+                  currentAdmin,
+                  targetAdmin: record,
+                  roles,
+                })
+        const passwordBlockReason = revoked
+          ? '已注销账号不可重置密码；如需重新使用，请创建新账号'
+          : statusUnavailable
+            ? '账号状态尚未完整加载，请刷新后再操作'
+            : !canManageUsers
+              ? '当前账号不能重置密码'
               : controlTargetBlockReason
         const revokeBlockReason = revoked
           ? '账号已注销且不可恢复；如需重新使用，请创建新账号'
@@ -3408,7 +3544,8 @@ export default function PermissionCenterPage() {
                 (!canRevokeUsers ? '当前账号不能办理离职注销' : '')
         const operationBlockReasons = [
           roleBlockReason,
-          phoneAndPasswordBlockReason,
+          profileBlockReason,
+          passwordBlockReason,
           revokeBlockReason,
         ].filter(
           (reason, index, reasons) =>
@@ -3426,14 +3563,14 @@ export default function PermissionCenterPage() {
               </Button>
               <Button
                 size="small"
-                disabled={Boolean(phoneAndPasswordBlockReason)}
-                onClick={() => openPhoneModal(record)}
+                disabled={Boolean(profileBlockReason)}
+                onClick={() => openProfileModal(record)}
               >
-                修改手机号
+                修改资料
               </Button>
               <Button
                 size="small"
-                disabled={Boolean(phoneAndPasswordBlockReason)}
+                disabled={Boolean(passwordBlockReason)}
                 onClick={() => openResetModal(record)}
               >
                 重置密码
@@ -3455,6 +3592,9 @@ export default function PermissionCenterPage() {
                 {revoked ? '已注销' : '离职注销'}
               </Button>
             </Space>
+            {record.is_super_admin ? (
+              <Text type="secondary">仅允许本人修改姓名和手机号</Text>
+            ) : null}
             {operationBlockReasons.length > 0 ? (
               <Text type="secondary" role="note" tabIndex={0}>
                 操作受限：{operationBlockReasons.join('；')}
@@ -3987,7 +4127,7 @@ export default function PermissionCenterPage() {
             allowClear
             className="erp-permission-list-toolbar__search"
             value={adminSearchKeyword}
-            placeholder="搜索员工账号、手机号或岗位"
+            placeholder="搜索姓名、员工账号、手机号或岗位"
             onChange={(event) => {
               setAdminSearchKeyword(event.target.value)
               setTablePagination((prev) => ({ ...prev, current: 1 }))
@@ -4023,7 +4163,7 @@ export default function PermissionCenterPage() {
           showTotal: (total) => `共 ${total} 条`,
         }}
         locale={{ emptyText }}
-        scroll={{ x: 1040 }}
+        scroll={{ x: 1100 }}
         onChange={handleTableChange}
       />
     </Card>
@@ -4118,19 +4258,55 @@ export default function PermissionCenterPage() {
       >
         <Form form={createForm} layout="vertical" onFinish={createAdmin}>
           <Form.Item
-            label="账号"
-            name="username"
+            label="姓名"
+            name="display_name"
+            validateFirst
             rules={[
-              { required: true, message: '请输入员工账号' },
+              { required: true, message: '请输入员工姓名' },
               {
-                validator: (_, value) =>
-                  String(value || '').trim()
+                validator: (_, value) => {
+                  const displayName = String(value || '').trim()
+                  if (!displayName) {
+                    return Promise.reject(new Error('请输入员工姓名'))
+                  }
+                  return Array.from(displayName).length <= 64
                     ? Promise.resolve()
-                    : Promise.reject(new Error('请输入员工账号')),
+                    : Promise.reject(new Error('员工姓名不能超过 64 个字符'))
+                },
               },
             ]}
           >
-            <Input placeholder="例如 sales01" autoComplete="username" />
+            <Input placeholder="例如 张三" autoComplete="name" />
+          </Form.Item>
+          <DuplicateAdminNameWarning
+            matches={createDuplicateNameAdmins}
+            style={{ marginBottom: 24 }}
+          />
+          <Form.Item
+            label="账号"
+            name="username"
+            extra={ADMIN_USERNAME_RULE_TEXT}
+            validateFirst
+            rules={[
+              { required: true, message: '请输入员工账号' },
+              {
+                validator: (_, value) => {
+                  const validationMessage =
+                    getAdminUsernameValidationMessage(value)
+                  return validationMessage
+                    ? Promise.reject(new Error(validationMessage))
+                    : Promise.resolve()
+                },
+              },
+            ]}
+          >
+            <Input
+              placeholder="例如 sales01 或 sales_01"
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
+              maxLength={ADMIN_USERNAME_MAX_LENGTH}
+            />
           </Form.Item>
           <Form.Item
             label="手机号"
@@ -4177,7 +4353,7 @@ export default function PermissionCenterPage() {
         className="erp-permission-modal"
         title={
           editingAdmin?.username
-            ? `分配岗位：${editingAdmin.username}`
+            ? `分配岗位：${formatAdminIdentity(editingAdmin)}`
             : '分配岗位'
         }
         open={editModalOpen}
@@ -4195,7 +4371,7 @@ export default function PermissionCenterPage() {
             type="info"
             showIcon
             message="多个岗位会合并最终有效权限"
-            description="例如财务兼采购账号可以同时获得两类岗位已放行的页面和操作；页面可见不代表拥有页面内全部按钮。修改登录手机号请使用账号列表中的“修改手机号”。"
+            description="例如财务兼采购账号可以同时获得两类岗位已放行的页面和操作；页面可见不代表拥有页面内全部按钮。姓名和登录手机号请使用账号列表中的“修改资料”。"
           />
           <label>
             <Text strong>岗位</Text>
@@ -4215,15 +4391,15 @@ export default function PermissionCenterPage() {
       <Modal
         className="erp-permission-modal"
         title={
-          phoneAdmin?.username
-            ? `修改登录手机号：${phoneAdmin.username}`
-            : '修改登录手机号'
+          profileAdmin?.username
+            ? `修改资料：${formatAdminIdentity(profileAdmin)}`
+            : '修改员工资料'
         }
-        open={phoneModalOpen}
-        onCancel={closePhoneModal}
-        onOk={saveAdminPhone}
+        open={profileModalOpen}
+        onCancel={closeProfileModal}
+        onOk={saveAdminProfile}
         confirmLoading={saving}
-        okText="保存手机号"
+        okText="保存资料"
         cancelText="取消"
         centered
         width={520}
@@ -4233,9 +4409,20 @@ export default function PermissionCenterPage() {
           <Alert
             type="info"
             showIcon
-            message="修改后用于该账号的短信登录"
-            description="岗位不会随本次操作改变。留空表示解除当前登录手机号。"
+            message="姓名用于任务记录、审批责任和业务操作人展示"
+            description="账号和岗位不会随本次操作改变；手机号留空表示解除短信登录手机号。"
           />
+          <label>
+            <Text strong>姓名</Text>
+            <Input
+              value={editingDisplayName}
+              placeholder="例如 张三"
+              autoComplete="name"
+              style={{ marginTop: 8 }}
+              onChange={(event) => setEditingDisplayName(event.target.value)}
+            />
+          </label>
+          <DuplicateAdminNameWarning matches={profileDuplicateNameAdmins} />
           <label>
             <Text strong>登录手机号</Text>
             <Input
@@ -4253,7 +4440,7 @@ export default function PermissionCenterPage() {
         className="erp-permission-modal"
         title={
           resettingAdmin?.username
-            ? `重置密码：${resettingAdmin.username}`
+            ? `重置密码：${formatAdminIdentity(resettingAdmin)}`
             : '重置密码'
         }
         open={resetModalOpen}
@@ -4299,8 +4486,8 @@ export default function PermissionCenterPage() {
           showIcon
           message={
             statusActionDisabled
-              ? `${statusActionAdmin?.username || '该账号'} 将立即无法继续访问后台`
-              : `${statusActionAdmin?.username || '该账号'} 将恢复登录和原有岗位功能`
+              ? `${formatAdminIdentity(statusActionAdmin)} 将立即无法继续访问后台`
+              : `${formatAdminIdentity(statusActionAdmin)} 将恢复登录和原有岗位功能`
           }
           style={{ marginBottom: 16 }}
         />
@@ -4343,7 +4530,7 @@ export default function PermissionCenterPage() {
         <Alert
           type="warning"
           showIcon
-          message={`将正式注销 ${revokingAdmin?.username || '该账号'}`}
+          message={`将正式注销 ${formatAdminIdentity(revokingAdmin)}`}
           description="账号和历史操作记录会保留，未完成的个人待办将退回原负责岗位，供该岗位其他人员继续处理。注销不可恢复；如需该人员重新使用系统，必须创建新账号。"
           style={{ marginBottom: 16 }}
         />

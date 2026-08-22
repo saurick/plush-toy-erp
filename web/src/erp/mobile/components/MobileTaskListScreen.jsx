@@ -715,8 +715,15 @@ export default function MobileTaskListScreen({
             </span>
             <div className="min-w-0">
               <div className="truncate text-xl font-semibold text-slate-950">
-                {adminProfile?.username || '当前账号'}
+                {adminProfile?.display_name ||
+                  adminProfile?.username ||
+                  '当前账号'}
               </div>
+              {adminProfile?.display_name && adminProfile?.username ? (
+                <div className="mt-1 truncate text-sm text-slate-500">
+                  账号：{adminProfile.username}
+                </div>
+              ) : null}
             </div>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-3 text-sm">

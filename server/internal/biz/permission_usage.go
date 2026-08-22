@@ -223,7 +223,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 		menuPermissionSurface("permission-center", "approval-responsibility", "审批责任", "approval-member-users", "可选具名员工", permissionControlSection, "允许读取可配置的员工候选", permissionMethods("admin", "list"), systemUsageConditions),
 	)
 	addMenu(PermissionSystemUserCreate, "permission-center", "admin-accounts", "管理员账号", "create-admin", "创建管理员", permissionControlButton, "显示并允许创建", permissionMethods("admin", "create"), systemUsageConditions)
-	addMenu(PermissionSystemUserUpdate, "permission-center", "admin-accounts", "管理员账号", "edit-admin-profile", "修改账号资料和重置密码", permissionControlForm, "显示并允许修改", permissionMethods("admin", "set_phone", "reset_password"), systemUsageConditions)
+	addMenu(PermissionSystemUserUpdate, "permission-center", "admin-accounts", "管理员账号", "edit-admin-profile", "修改员工姓名、登录手机号和重置密码", permissionControlForm, "显示并允许修改", permissionMethods("admin", "set_profile", "reset_password"), systemUsageConditions)
 	addMenu(PermissionSystemUserRoleAssign, "permission-center", "admin-accounts", "管理员账号", "assign-admin-roles", "分配业务角色", permissionControlForm, "显示并允许分配可委派角色", permissionMethods("admin", "set_roles"), systemUsageConditions)
 	addMenu(PermissionSystemUserDisable, "permission-center", "admin-accounts", "管理员账号", "set-admin-disabled", "临时停用或恢复账号", permissionControlSwitch, "显示并允许切换账号状态", permissionMethods("admin", "set_disabled"), systemUsageConditions)
 	addMenu(PermissionSystemUserRevoke, "permission-center", "admin-accounts", "管理员账号", "revoke-admin", "离职注销账号", permissionControlButton, "显示并允许正式注销", permissionMethods("admin", "revoke"), systemUsageConditions)

@@ -256,8 +256,8 @@ steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status 
             phoneConfigured: false,
             phoneBound: false,
             adminAuthVersion: 2,
-            demoExpected: 10,
-            demoAuthenticated: 10,
+            uatExpected: 10,
+            uatAuthenticated: 10,
             totalExpected: 11,
             totalAuthenticated: 11,
             uniqueTokensObserved: true,
@@ -266,21 +266,14 @@ steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status 
             credentialTarget: credentialContract.target.key,
             credentialDatabase: credentialContract.target.database,
             credentialDatasetVersion: credentialContract.target.datasetVersion,
-            adminPasswordSource: "credential-contract",
-            demoPasswordSource: "credential-contract",
+            adminPasswordSource:
+              credentialContract.credentials.admin.credentialSource,
+            uatPasswordSource:
+              credentialContract.credentials.uat.credentialSource,
             smsPhoneSourceEnv: "MANUAL_ACCEPTANCE_SMS_PHONE",
             usernames: [
               "admin",
-              "demo_boss",
-              "demo_sales",
-              "demo_purchase",
-              "demo_production",
-              "demo_warehouse",
-              "demo_quality",
-              "demo_finance",
-              "demo_pmc",
-              "demo_engineering",
-              "demo_admin",
+              ...credentialContract.credentials.uat.usernames,
             ],
             responseBodyStored: false,
           },
@@ -323,7 +316,8 @@ steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status 
         customerRevision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
         release: releaseGitCommit,
         adminAccounts: 1,
-        demoAccounts: 10,
+        accountKind: "customer-uat",
+        roleAccounts: 10,
         revokedSessions: 1,
         authVersionIncremented: true,
         auditSource: "manual_acceptance_password_rotation",
@@ -335,7 +329,7 @@ steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status 
             revokedSessions: 1,
             phoneBound: false,
           },
-          ...credentialContract.credentials.demo.usernames.map(
+          ...credentialContract.credentials.uat.usernames.map(
             (username, index) => ({
               username,
               authVersion: index + 2,
@@ -847,7 +841,10 @@ test("release evidence status suggests customer config smoke when manifest evide
     nextCommands,
     /--admin-password-env MANUAL_ACCEPTANCE_ADMIN_PASSWORD/,
   );
-  assert.match(nextCommands, /--demo-password-env MANUAL_ACCEPTANCE_PASSWORD/);
+  assert.match(
+    nextCommands,
+    /--uat-password-env MANUAL_ACCEPTANCE_UAT_PASSWORD/,
+  );
   assert.match(nextCommands, /--admin-username admin/);
   assert.match(nextCommands, /--sms-phone-env MANUAL_ACCEPTANCE_SMS_PHONE/);
   assert.match(

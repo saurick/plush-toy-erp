@@ -435,7 +435,8 @@ function requireWorkflowTaskAssignmentOptionsResponse(result, taskID) {
         !Number.isSafeInteger(currentAssignee.admin_id) ||
         currentAssignee.admin_id <= 0 ||
         typeof currentAssignee.username !== 'string' ||
-        !currentAssignee.username.trim())) ||
+        !currentAssignee.username.trim() ||
+        typeof currentAssignee.display_name !== 'string')) ||
     candidates.some((candidate) => {
       const invalid =
         !candidate ||
@@ -446,6 +447,7 @@ function requireWorkflowTaskAssignmentOptionsResponse(result, taskID) {
         candidateIDs.has(candidate.admin_id) ||
         typeof candidate.username !== 'string' ||
         !candidate.username.trim() ||
+        typeof candidate.display_name !== 'string' ||
         !Array.isArray(candidate.role_keys) ||
         candidate.role_keys.some(
           (roleKey) => typeof roleKey !== 'string' || !roleKey.trim()
@@ -462,6 +464,7 @@ function requireWorkflowTaskAssignmentOptionsResponse(result, taskID) {
     candidates: candidates.map((candidate) => ({
       admin_id: candidate.admin_id,
       username: candidate.username.trim(),
+      display_name: candidate.display_name.trim(),
       role_keys: candidate.role_keys.map((roleKey) => roleKey.trim()),
       role_label: candidate.role_label.trim(),
     })),
@@ -470,6 +473,7 @@ function requireWorkflowTaskAssignmentOptionsResponse(result, taskID) {
         ? {
             admin_id: currentAssignee.admin_id,
             username: currentAssignee.username.trim(),
+            display_name: currentAssignee.display_name.trim(),
           }
         : null,
   }

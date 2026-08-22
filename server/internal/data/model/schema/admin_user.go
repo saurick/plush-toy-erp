@@ -30,6 +30,11 @@ func (AdminUser) Fields() []ent.Field {
 		field.String("username").
 			NotEmpty().
 			MaxLen(64),
+		field.String("display_name").
+			Optional().
+			Nillable().
+			MaxRuneLen(64).
+			Comment("员工姓名；业务页面优先展示，存量缺失时回退账号名"),
 		field.String("phone").
 			Optional().
 			Nillable().

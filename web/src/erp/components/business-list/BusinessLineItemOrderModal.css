@@ -1,0 +1,18 @@
+.erp-line-item-order-actions.ant-space {
+  justify-self: end;
+}
+
+@media screen and (max-width: 980px) {
+  .erp-line-item-order-actions.ant-space {
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .erp-line-item-order-actions.ant-space .ant-space-item {
+    flex: 1 1 160px;
+  }
+
+  .erp-line-item-order-actions.ant-space .ant-btn {
+    width: 100%;
+  }
+}

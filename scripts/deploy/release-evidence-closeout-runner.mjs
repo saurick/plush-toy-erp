@@ -272,8 +272,8 @@ function materializeCommandFromText({
       "admin",
       "--admin-password-env",
       "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
-      "--demo-password-env",
-      "MANUAL_ACCEPTANCE_PASSWORD",
+      "--uat-password-env",
+      "MANUAL_ACCEPTANCE_UAT_PASSWORD",
       "--sms-phone-env",
       "MANUAL_ACCEPTANCE_SMS_PHONE",
     );
@@ -284,7 +284,16 @@ function materializeCommandFromText({
       args.push("--admin-token-env", "CUSTOMER_CONFIG_ADMIN_TOKEN");
     }
     args.push("--report", path.join(evidenceDir, "smoke-test-report.json"));
-    const secretEnv = {};
+    const secretEnv = {
+      MANUAL_ACCEPTANCE_ADMIN_PASSWORD: requireEnv(
+        env,
+        "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
+      ),
+      MANUAL_ACCEPTANCE_UAT_PASSWORD: requireEnv(
+        env,
+        "MANUAL_ACCEPTANCE_UAT_PASSWORD",
+      ),
+    };
     if (String(env.MANUAL_ACCEPTANCE_SMS_PHONE ?? "").trim()) {
       secretEnv.MANUAL_ACCEPTANCE_SMS_PHONE = String(
         env.MANUAL_ACCEPTANCE_SMS_PHONE,

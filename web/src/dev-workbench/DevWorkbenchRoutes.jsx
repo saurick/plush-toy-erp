@@ -2,15 +2,31 @@ import React, { Suspense, useEffect } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Loading } from '@/common/components/loading'
-import { lazyWithDynamicImportRetry } from '@/common/utils/lazyImportRetry.mjs'
 import {
+  DEV_BUSINESS_USABILITY_ROUTE,
+  DEV_CUSTOMER_CONFIG_ROUTE,
+  DEV_DATABASE_MIGRATION_ROUTE,
+  DEV_DATA_PREPARATION_ROUTE,
+  DEV_DELIVERY_ROUTE,
+  DEV_DOCS_ROUTE,
+  DEV_DRILL_RECOVERY_ROUTE,
+  DEV_GOVERNANCE_ROUTE,
+  DEV_HUB_ROUTE,
+  DEV_PERMISSION_RELATIONSHIPS_ROUTE,
+  DEV_PRODUCT_CORE_ROUTE,
+  DEV_PRODUCT_ENGINEERING_ROUTE,
+  DEV_PROTOTYPES_ROUTE,
+  DEV_QUALITY_GATES_ROUTE,
+  DEV_QUALITY_ROUTE,
+  DEV_STATUS_FLOWS_ROUTE,
+  DEV_TESTING_ROUTE,
+  DEV_VERSION_CENTER_ROUTE,
   DEV_WORKBENCH_AREA_KEYS,
   resolveDevPageFavicon,
   resolveDevPageTitle,
 } from './config/devRoutes.mjs'
+import { createDevLazyRoute } from './config/devRouteModules.mjs'
 import './styles/index.css'
-
-const lazyRoute = lazyWithDynamicImportRetry
 
 function applyDevWorkbenchFavicon(documentRef, href) {
   const iconLinks = Array.from(
@@ -24,46 +40,79 @@ function applyDevWorkbenchFavicon(documentRef, href) {
   if (!link.parentNode) documentRef.head.appendChild(link)
 }
 
-const DevHubPage = lazyRoute(() => import('./pages/DevHubPage.jsx'))
-const DevWorkbenchAreaPage = lazyRoute(
-  () => import('./pages/DevWorkbenchAreaPage.jsx')
+const importDevWorkbenchAreaPage = () =>
+  import('./pages/DevWorkbenchAreaPage.jsx')
+
+const DevHubPage = createDevLazyRoute(
+  DEV_HUB_ROUTE,
+  () => import('./pages/DevHubPage.jsx')
 )
-const DevProductCorePage = lazyRoute(
+const DevProductEngineeringPage = createDevLazyRoute(
+  DEV_PRODUCT_ENGINEERING_ROUTE,
+  importDevWorkbenchAreaPage
+)
+const DevQualityPage = createDevLazyRoute(
+  DEV_QUALITY_ROUTE,
+  importDevWorkbenchAreaPage
+)
+const DevDeliveryPage = createDevLazyRoute(
+  DEV_DELIVERY_ROUTE,
+  importDevWorkbenchAreaPage
+)
+const DevProductCorePage = createDevLazyRoute(
+  DEV_PRODUCT_CORE_ROUTE,
   () => import('./pages/DevProductCorePage.jsx')
 )
-const DevPermissionRelationshipsPage = lazyRoute(
+const DevPermissionRelationshipsPage = createDevLazyRoute(
+  DEV_PERMISSION_RELATIONSHIPS_ROUTE,
   () => import('./pages/DevPermissionRelationshipsPage.jsx')
 )
-const DevDocsPage = lazyRoute(() => import('./pages/DevDocsPage.jsx'))
-const DevGovernancePage = lazyRoute(
+const DevDocsPage = createDevLazyRoute(
+  DEV_DOCS_ROUTE,
+  () => import('./pages/DevDocsPage.jsx')
+)
+const DevGovernancePage = createDevLazyRoute(
+  DEV_GOVERNANCE_ROUTE,
   () => import('./pages/DevGovernancePage.jsx')
 )
-const DevFlowStateObservatoryPage = lazyRoute(
+const DevFlowStateObservatoryPage = createDevLazyRoute(
+  DEV_STATUS_FLOWS_ROUTE,
   () => import('./pages/DevFlowStateObservatoryPage.jsx')
 )
-const DevBusinessUsabilityPage = lazyRoute(
+const DevBusinessUsabilityPage = createDevLazyRoute(
+  DEV_BUSINESS_USABILITY_ROUTE,
   () => import('./pages/DevBusinessUsabilityPage.jsx')
 )
-const DevPrototypesPage = lazyRoute(
+const DevPrototypesPage = createDevLazyRoute(
+  DEV_PROTOTYPES_ROUTE,
   () => import('./pages/DevPrototypesPage.jsx')
 )
-const DevCustomerConfigPage = lazyRoute(
+const DevCustomerConfigPage = createDevLazyRoute(
+  DEV_CUSTOMER_CONFIG_ROUTE,
   () => import('./pages/DevCustomerConfigPage.jsx')
 )
-const DevTestingPage = lazyRoute(() => import('./pages/DevTestingPage.jsx'))
-const DevQualityGatesPage = lazyRoute(
+const DevTestingPage = createDevLazyRoute(
+  DEV_TESTING_ROUTE,
+  () => import('./pages/DevTestingPage.jsx')
+)
+const DevQualityGatesPage = createDevLazyRoute(
+  DEV_QUALITY_GATES_ROUTE,
   () => import('./pages/DevQualityGatesPage.jsx')
 )
-const DevDataPreparationPage = lazyRoute(
+const DevDataPreparationPage = createDevLazyRoute(
+  DEV_DATA_PREPARATION_ROUTE,
   () => import('./pages/DevDataPreparationPage.jsx')
 )
-const DevDatabaseMigrationPage = lazyRoute(
+const DevDatabaseMigrationPage = createDevLazyRoute(
+  DEV_DATABASE_MIGRATION_ROUTE,
   () => import('./pages/DevDatabaseMigrationPage.jsx')
 )
-const DevVersionCenterPage = lazyRoute(
+const DevVersionCenterPage = createDevLazyRoute(
+  DEV_VERSION_CENTER_ROUTE,
   () => import('./pages/DevVersionCenterPage.jsx')
 )
-const DevDrillRecoveryPage = lazyRoute(
+const DevDrillRecoveryPage = createDevLazyRoute(
+  DEV_DRILL_RECOVERY_ROUTE,
   () => import('./pages/DevDrillRecoveryPage.jsx')
 )
 
@@ -99,7 +148,7 @@ export default function DevWorkbenchRoutes() {
           <Route
             path="product-engineering"
             element={
-              <DevWorkbenchAreaPage
+              <DevProductEngineeringPage
                 areaKey={DEV_WORKBENCH_AREA_KEYS.productEngineering}
               />
             }
@@ -107,15 +156,13 @@ export default function DevWorkbenchRoutes() {
           <Route
             path="quality"
             element={
-              <DevWorkbenchAreaPage areaKey={DEV_WORKBENCH_AREA_KEYS.quality} />
+              <DevQualityPage areaKey={DEV_WORKBENCH_AREA_KEYS.quality} />
             }
           />
           <Route
             path="delivery"
             element={
-              <DevWorkbenchAreaPage
-                areaKey={DEV_WORKBENCH_AREA_KEYS.delivery}
-              />
+              <DevDeliveryPage areaKey={DEV_WORKBENCH_AREA_KEYS.delivery} />
             }
           />
           <Route path="product-core" element={<DevProductCorePage />} />

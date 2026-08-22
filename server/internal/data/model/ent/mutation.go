@@ -1881,6 +1881,7 @@ type AdminUserMutation struct {
 	typ                  string
 	id                   *int
 	username             *string
+	display_name         *string
 	phone                *string
 	password_hash        *string
 	is_super_admin       *bool
@@ -2034,6 +2035,55 @@ func (m *AdminUserMutation) OldUsername(ctx context.Context) (v string, err erro
 // ResetUsername resets all changes to the "username" field.
 func (m *AdminUserMutation) ResetUsername() {
 	m.username = nil
+}
+
+// SetDisplayName sets the "display_name" field.
+func (m *AdminUserMutation) SetDisplayName(s string) {
+	m.display_name = &s
+}
+
+// DisplayName returns the value of the "display_name" field in the mutation.
+func (m *AdminUserMutation) DisplayName() (r string, exists bool) {
+	v := m.display_name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDisplayName returns the old "display_name" field's value of the AdminUser entity.
+// If the AdminUser object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AdminUserMutation) OldDisplayName(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDisplayName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDisplayName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDisplayName: %w", err)
+	}
+	return oldValue.DisplayName, nil
+}
+
+// ClearDisplayName clears the value of the "display_name" field.
+func (m *AdminUserMutation) ClearDisplayName() {
+	m.display_name = nil
+	m.clearedFields[adminuser.FieldDisplayName] = struct{}{}
+}
+
+// DisplayNameCleared returns if the "display_name" field was cleared in this mutation.
+func (m *AdminUserMutation) DisplayNameCleared() bool {
+	_, ok := m.clearedFields[adminuser.FieldDisplayName]
+	return ok
+}
+
+// ResetDisplayName resets all changes to the "display_name" field.
+func (m *AdminUserMutation) ResetDisplayName() {
+	m.display_name = nil
+	delete(m.clearedFields, adminuser.FieldDisplayName)
 }
 
 // SetPhone sets the "phone" field.
@@ -2657,9 +2707,12 @@ func (m *AdminUserMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *AdminUserMutation) Fields() []string {
-	fields := make([]string, 0, 14)
+	fields := make([]string, 0, 15)
 	if m.username != nil {
 		fields = append(fields, adminuser.FieldUsername)
+	}
+	if m.display_name != nil {
+		fields = append(fields, adminuser.FieldDisplayName)
 	}
 	if m.phone != nil {
 		fields = append(fields, adminuser.FieldPhone)
@@ -2710,6 +2763,8 @@ func (m *AdminUserMutation) Field(name string) (ent.Value, bool) {
 	switch name {
 	case adminuser.FieldUsername:
 		return m.Username()
+	case adminuser.FieldDisplayName:
+		return m.DisplayName()
 	case adminuser.FieldPhone:
 		return m.Phone()
 	case adminuser.FieldPasswordHash:
@@ -2747,6 +2802,8 @@ func (m *AdminUserMutation) OldField(ctx context.Context, name string) (ent.Valu
 	switch name {
 	case adminuser.FieldUsername:
 		return m.OldUsername(ctx)
+	case adminuser.FieldDisplayName:
+		return m.OldDisplayName(ctx)
 	case adminuser.FieldPhone:
 		return m.OldPhone(ctx)
 	case adminuser.FieldPasswordHash:
@@ -2788,6 +2845,13 @@ func (m *AdminUserMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetUsername(v)
+		return nil
+	case adminuser.FieldDisplayName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDisplayName(v)
 		return nil
 	case adminuser.FieldPhone:
 		v, ok := value.(string)
@@ -2937,6 +3001,9 @@ func (m *AdminUserMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *AdminUserMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(adminuser.FieldDisplayName) {
+		fields = append(fields, adminuser.FieldDisplayName)
+	}
 	if m.FieldCleared(adminuser.FieldPhone) {
 		fields = append(fields, adminuser.FieldPhone)
 	}
@@ -2969,6 +3036,9 @@ func (m *AdminUserMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *AdminUserMutation) ClearField(name string) error {
 	switch name {
+	case adminuser.FieldDisplayName:
+		m.ClearDisplayName()
+		return nil
 	case adminuser.FieldPhone:
 		m.ClearPhone()
 		return nil
@@ -2997,6 +3067,9 @@ func (m *AdminUserMutation) ResetField(name string) error {
 	switch name {
 	case adminuser.FieldUsername:
 		m.ResetUsername()
+		return nil
+	case adminuser.FieldDisplayName:
+		m.ResetDisplayName()
 		return nil
 	case adminuser.FieldPhone:
 		m.ResetPhone()
@@ -34780,6 +34853,8 @@ type OutsourcingOrderItemMutation struct {
 	id                                            *int
 	line_no                                       *int
 	addline_no                                    *int
+	display_order                                 *int
+	adddisplay_order                              *int
 	subject_type                                  *string
 	product_no_snapshot                           *string
 	sku_code_snapshot                             *string
@@ -35008,6 +35083,76 @@ func (m *OutsourcingOrderItemMutation) AddedLineNo() (r int, exists bool) {
 func (m *OutsourcingOrderItemMutation) ResetLineNo() {
 	m.line_no = nil
 	m.addline_no = nil
+}
+
+// SetDisplayOrder sets the "display_order" field.
+func (m *OutsourcingOrderItemMutation) SetDisplayOrder(i int) {
+	m.display_order = &i
+	m.adddisplay_order = nil
+}
+
+// DisplayOrder returns the value of the "display_order" field in the mutation.
+func (m *OutsourcingOrderItemMutation) DisplayOrder() (r int, exists bool) {
+	v := m.display_order
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDisplayOrder returns the old "display_order" field's value of the OutsourcingOrderItem entity.
+// If the OutsourcingOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderItemMutation) OldDisplayOrder(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDisplayOrder is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDisplayOrder requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDisplayOrder: %w", err)
+	}
+	return oldValue.DisplayOrder, nil
+}
+
+// AddDisplayOrder adds i to the "display_order" field.
+func (m *OutsourcingOrderItemMutation) AddDisplayOrder(i int) {
+	if m.adddisplay_order != nil {
+		*m.adddisplay_order += i
+	} else {
+		m.adddisplay_order = &i
+	}
+}
+
+// AddedDisplayOrder returns the value that was added to the "display_order" field in this mutation.
+func (m *OutsourcingOrderItemMutation) AddedDisplayOrder() (r int, exists bool) {
+	v := m.adddisplay_order
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearDisplayOrder clears the value of the "display_order" field.
+func (m *OutsourcingOrderItemMutation) ClearDisplayOrder() {
+	m.display_order = nil
+	m.adddisplay_order = nil
+	m.clearedFields[outsourcingorderitem.FieldDisplayOrder] = struct{}{}
+}
+
+// DisplayOrderCleared returns if the "display_order" field was cleared in this mutation.
+func (m *OutsourcingOrderItemMutation) DisplayOrderCleared() bool {
+	_, ok := m.clearedFields[outsourcingorderitem.FieldDisplayOrder]
+	return ok
+}
+
+// ResetDisplayOrder resets all changes to the "display_order" field.
+func (m *OutsourcingOrderItemMutation) ResetDisplayOrder() {
+	m.display_order = nil
+	m.adddisplay_order = nil
+	delete(m.clearedFields, outsourcingorderitem.FieldDisplayOrder)
 }
 
 // SetSubjectType sets the "subject_type" field.
@@ -36345,12 +36490,15 @@ func (m *OutsourcingOrderItemMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *OutsourcingOrderItemMutation) Fields() []string {
-	fields := make([]string, 0, 26)
+	fields := make([]string, 0, 27)
 	if m.outsourcing_order != nil {
 		fields = append(fields, outsourcingorderitem.FieldOutsourcingOrderID)
 	}
 	if m.line_no != nil {
 		fields = append(fields, outsourcingorderitem.FieldLineNo)
+	}
+	if m.display_order != nil {
+		fields = append(fields, outsourcingorderitem.FieldDisplayOrder)
 	}
 	if m.subject_type != nil {
 		fields = append(fields, outsourcingorderitem.FieldSubjectType)
@@ -36436,6 +36584,8 @@ func (m *OutsourcingOrderItemMutation) Field(name string) (ent.Value, bool) {
 		return m.OutsourcingOrderID()
 	case outsourcingorderitem.FieldLineNo:
 		return m.LineNo()
+	case outsourcingorderitem.FieldDisplayOrder:
+		return m.DisplayOrder()
 	case outsourcingorderitem.FieldSubjectType:
 		return m.SubjectType()
 	case outsourcingorderitem.FieldProductID:
@@ -36497,6 +36647,8 @@ func (m *OutsourcingOrderItemMutation) OldField(ctx context.Context, name string
 		return m.OldOutsourcingOrderID(ctx)
 	case outsourcingorderitem.FieldLineNo:
 		return m.OldLineNo(ctx)
+	case outsourcingorderitem.FieldDisplayOrder:
+		return m.OldDisplayOrder(ctx)
 	case outsourcingorderitem.FieldSubjectType:
 		return m.OldSubjectType(ctx)
 	case outsourcingorderitem.FieldProductID:
@@ -36567,6 +36719,13 @@ func (m *OutsourcingOrderItemMutation) SetField(name string, value ent.Value) er
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetLineNo(v)
+		return nil
+	case outsourcingorderitem.FieldDisplayOrder:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDisplayOrder(v)
 		return nil
 	case outsourcingorderitem.FieldSubjectType:
 		v, ok := value.(string)
@@ -36747,6 +36906,9 @@ func (m *OutsourcingOrderItemMutation) AddedFields() []string {
 	if m.addline_no != nil {
 		fields = append(fields, outsourcingorderitem.FieldLineNo)
 	}
+	if m.adddisplay_order != nil {
+		fields = append(fields, outsourcingorderitem.FieldDisplayOrder)
+	}
 	return fields
 }
 
@@ -36757,6 +36919,8 @@ func (m *OutsourcingOrderItemMutation) AddedField(name string) (ent.Value, bool)
 	switch name {
 	case outsourcingorderitem.FieldLineNo:
 		return m.AddedLineNo()
+	case outsourcingorderitem.FieldDisplayOrder:
+		return m.AddedDisplayOrder()
 	}
 	return nil, false
 }
@@ -36773,6 +36937,13 @@ func (m *OutsourcingOrderItemMutation) AddField(name string, value ent.Value) er
 		}
 		m.AddLineNo(v)
 		return nil
+	case outsourcingorderitem.FieldDisplayOrder:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddDisplayOrder(v)
+		return nil
 	}
 	return fmt.Errorf("unknown OutsourcingOrderItem numeric field %s", name)
 }
@@ -36781,6 +36952,9 @@ func (m *OutsourcingOrderItemMutation) AddField(name string, value ent.Value) er
 // mutation.
 func (m *OutsourcingOrderItemMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(outsourcingorderitem.FieldDisplayOrder) {
+		fields = append(fields, outsourcingorderitem.FieldDisplayOrder)
+	}
 	if m.FieldCleared(outsourcingorderitem.FieldProductID) {
 		fields = append(fields, outsourcingorderitem.FieldProductID)
 	}
@@ -36846,6 +37020,9 @@ func (m *OutsourcingOrderItemMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *OutsourcingOrderItemMutation) ClearField(name string) error {
 	switch name {
+	case outsourcingorderitem.FieldDisplayOrder:
+		m.ClearDisplayOrder()
+		return nil
 	case outsourcingorderitem.FieldProductID:
 		m.ClearProductID()
 		return nil
@@ -36910,6 +37087,9 @@ func (m *OutsourcingOrderItemMutation) ResetField(name string) error {
 		return nil
 	case outsourcingorderitem.FieldLineNo:
 		m.ResetLineNo()
+		return nil
+	case outsourcingorderitem.FieldDisplayOrder:
+		m.ResetDisplayOrder()
 		return nil
 	case outsourcingorderitem.FieldSubjectType:
 		m.ResetSubjectType()
@@ -70985,6 +71165,8 @@ type PurchaseOrderItemMutation struct {
 	id                            *int
 	line_no                       *int
 	addline_no                    *int
+	display_order                 *int
+	adddisplay_order              *int
 	material_code_snapshot        *string
 	material_name_snapshot        *string
 	color_snapshot                *string
@@ -71202,6 +71384,76 @@ func (m *PurchaseOrderItemMutation) AddedLineNo() (r int, exists bool) {
 func (m *PurchaseOrderItemMutation) ResetLineNo() {
 	m.line_no = nil
 	m.addline_no = nil
+}
+
+// SetDisplayOrder sets the "display_order" field.
+func (m *PurchaseOrderItemMutation) SetDisplayOrder(i int) {
+	m.display_order = &i
+	m.adddisplay_order = nil
+}
+
+// DisplayOrder returns the value of the "display_order" field in the mutation.
+func (m *PurchaseOrderItemMutation) DisplayOrder() (r int, exists bool) {
+	v := m.display_order
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDisplayOrder returns the old "display_order" field's value of the PurchaseOrderItem entity.
+// If the PurchaseOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseOrderItemMutation) OldDisplayOrder(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDisplayOrder is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDisplayOrder requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDisplayOrder: %w", err)
+	}
+	return oldValue.DisplayOrder, nil
+}
+
+// AddDisplayOrder adds i to the "display_order" field.
+func (m *PurchaseOrderItemMutation) AddDisplayOrder(i int) {
+	if m.adddisplay_order != nil {
+		*m.adddisplay_order += i
+	} else {
+		m.adddisplay_order = &i
+	}
+}
+
+// AddedDisplayOrder returns the value that was added to the "display_order" field in this mutation.
+func (m *PurchaseOrderItemMutation) AddedDisplayOrder() (r int, exists bool) {
+	v := m.adddisplay_order
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearDisplayOrder clears the value of the "display_order" field.
+func (m *PurchaseOrderItemMutation) ClearDisplayOrder() {
+	m.display_order = nil
+	m.adddisplay_order = nil
+	m.clearedFields[purchaseorderitem.FieldDisplayOrder] = struct{}{}
+}
+
+// DisplayOrderCleared returns if the "display_order" field was cleared in this mutation.
+func (m *PurchaseOrderItemMutation) DisplayOrderCleared() bool {
+	_, ok := m.clearedFields[purchaseorderitem.FieldDisplayOrder]
+	return ok
+}
+
+// ResetDisplayOrder resets all changes to the "display_order" field.
+func (m *PurchaseOrderItemMutation) ResetDisplayOrder() {
+	m.display_order = nil
+	m.adddisplay_order = nil
+	delete(m.clearedFields, purchaseorderitem.FieldDisplayOrder)
 }
 
 // SetMaterialID sets the "material_id" field.
@@ -72079,12 +72331,15 @@ func (m *PurchaseOrderItemMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PurchaseOrderItemMutation) Fields() []string {
-	fields := make([]string, 0, 18)
+	fields := make([]string, 0, 19)
 	if m.purchase_order != nil {
 		fields = append(fields, purchaseorderitem.FieldPurchaseOrderID)
 	}
 	if m.line_no != nil {
 		fields = append(fields, purchaseorderitem.FieldLineNo)
+	}
+	if m.display_order != nil {
+		fields = append(fields, purchaseorderitem.FieldDisplayOrder)
 	}
 	if m.material != nil {
 		fields = append(fields, purchaseorderitem.FieldMaterialID)
@@ -72146,6 +72401,8 @@ func (m *PurchaseOrderItemMutation) Field(name string) (ent.Value, bool) {
 		return m.PurchaseOrderID()
 	case purchaseorderitem.FieldLineNo:
 		return m.LineNo()
+	case purchaseorderitem.FieldDisplayOrder:
+		return m.DisplayOrder()
 	case purchaseorderitem.FieldMaterialID:
 		return m.MaterialID()
 	case purchaseorderitem.FieldUnitID:
@@ -72191,6 +72448,8 @@ func (m *PurchaseOrderItemMutation) OldField(ctx context.Context, name string) (
 		return m.OldPurchaseOrderID(ctx)
 	case purchaseorderitem.FieldLineNo:
 		return m.OldLineNo(ctx)
+	case purchaseorderitem.FieldDisplayOrder:
+		return m.OldDisplayOrder(ctx)
 	case purchaseorderitem.FieldMaterialID:
 		return m.OldMaterialID(ctx)
 	case purchaseorderitem.FieldUnitID:
@@ -72245,6 +72504,13 @@ func (m *PurchaseOrderItemMutation) SetField(name string, value ent.Value) error
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetLineNo(v)
+		return nil
+	case purchaseorderitem.FieldDisplayOrder:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDisplayOrder(v)
 		return nil
 	case purchaseorderitem.FieldMaterialID:
 		v, ok := value.(int)
@@ -72369,6 +72635,9 @@ func (m *PurchaseOrderItemMutation) AddedFields() []string {
 	if m.addline_no != nil {
 		fields = append(fields, purchaseorderitem.FieldLineNo)
 	}
+	if m.adddisplay_order != nil {
+		fields = append(fields, purchaseorderitem.FieldDisplayOrder)
+	}
 	return fields
 }
 
@@ -72379,6 +72648,8 @@ func (m *PurchaseOrderItemMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case purchaseorderitem.FieldLineNo:
 		return m.AddedLineNo()
+	case purchaseorderitem.FieldDisplayOrder:
+		return m.AddedDisplayOrder()
 	}
 	return nil, false
 }
@@ -72395,6 +72666,13 @@ func (m *PurchaseOrderItemMutation) AddField(name string, value ent.Value) error
 		}
 		m.AddLineNo(v)
 		return nil
+	case purchaseorderitem.FieldDisplayOrder:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddDisplayOrder(v)
+		return nil
 	}
 	return fmt.Errorf("unknown PurchaseOrderItem numeric field %s", name)
 }
@@ -72403,6 +72681,9 @@ func (m *PurchaseOrderItemMutation) AddField(name string, value ent.Value) error
 // mutation.
 func (m *PurchaseOrderItemMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(purchaseorderitem.FieldDisplayOrder) {
+		fields = append(fields, purchaseorderitem.FieldDisplayOrder)
+	}
 	if m.FieldCleared(purchaseorderitem.FieldMaterialCodeSnapshot) {
 		fields = append(fields, purchaseorderitem.FieldMaterialCodeSnapshot)
 	}
@@ -72447,6 +72728,9 @@ func (m *PurchaseOrderItemMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *PurchaseOrderItemMutation) ClearField(name string) error {
 	switch name {
+	case purchaseorderitem.FieldDisplayOrder:
+		m.ClearDisplayOrder()
+		return nil
 	case purchaseorderitem.FieldMaterialCodeSnapshot:
 		m.ClearMaterialCodeSnapshot()
 		return nil
@@ -72490,6 +72774,9 @@ func (m *PurchaseOrderItemMutation) ResetField(name string) error {
 		return nil
 	case purchaseorderitem.FieldLineNo:
 		m.ResetLineNo()
+		return nil
+	case purchaseorderitem.FieldDisplayOrder:
+		m.ResetDisplayOrder()
 		return nil
 	case purchaseorderitem.FieldMaterialID:
 		m.ResetMaterialID()
@@ -92466,6 +92753,8 @@ type SalesOrderItemMutation struct {
 	id                        *int
 	line_no                   *int
 	addline_no                *int
+	display_order             *int
+	adddisplay_order          *int
 	product_code_snapshot     *string
 	product_name_snapshot     *string
 	color_snapshot            *string
@@ -92685,6 +92974,76 @@ func (m *SalesOrderItemMutation) AddedLineNo() (r int, exists bool) {
 func (m *SalesOrderItemMutation) ResetLineNo() {
 	m.line_no = nil
 	m.addline_no = nil
+}
+
+// SetDisplayOrder sets the "display_order" field.
+func (m *SalesOrderItemMutation) SetDisplayOrder(i int) {
+	m.display_order = &i
+	m.adddisplay_order = nil
+}
+
+// DisplayOrder returns the value of the "display_order" field in the mutation.
+func (m *SalesOrderItemMutation) DisplayOrder() (r int, exists bool) {
+	v := m.display_order
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDisplayOrder returns the old "display_order" field's value of the SalesOrderItem entity.
+// If the SalesOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SalesOrderItemMutation) OldDisplayOrder(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDisplayOrder is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDisplayOrder requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDisplayOrder: %w", err)
+	}
+	return oldValue.DisplayOrder, nil
+}
+
+// AddDisplayOrder adds i to the "display_order" field.
+func (m *SalesOrderItemMutation) AddDisplayOrder(i int) {
+	if m.adddisplay_order != nil {
+		*m.adddisplay_order += i
+	} else {
+		m.adddisplay_order = &i
+	}
+}
+
+// AddedDisplayOrder returns the value that was added to the "display_order" field in this mutation.
+func (m *SalesOrderItemMutation) AddedDisplayOrder() (r int, exists bool) {
+	v := m.adddisplay_order
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearDisplayOrder clears the value of the "display_order" field.
+func (m *SalesOrderItemMutation) ClearDisplayOrder() {
+	m.display_order = nil
+	m.adddisplay_order = nil
+	m.clearedFields[salesorderitem.FieldDisplayOrder] = struct{}{}
+}
+
+// DisplayOrderCleared returns if the "display_order" field was cleared in this mutation.
+func (m *SalesOrderItemMutation) DisplayOrderCleared() bool {
+	_, ok := m.clearedFields[salesorderitem.FieldDisplayOrder]
+	return ok
+}
+
+// ResetDisplayOrder resets all changes to the "display_order" field.
+func (m *SalesOrderItemMutation) ResetDisplayOrder() {
+	m.display_order = nil
+	m.adddisplay_order = nil
+	delete(m.clearedFields, salesorderitem.FieldDisplayOrder)
 }
 
 // SetProductID sets the "product_id" field.
@@ -93545,12 +93904,15 @@ func (m *SalesOrderItemMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SalesOrderItemMutation) Fields() []string {
-	fields := make([]string, 0, 16)
+	fields := make([]string, 0, 17)
 	if m.sales_order != nil {
 		fields = append(fields, salesorderitem.FieldSalesOrderID)
 	}
 	if m.line_no != nil {
 		fields = append(fields, salesorderitem.FieldLineNo)
+	}
+	if m.display_order != nil {
+		fields = append(fields, salesorderitem.FieldDisplayOrder)
 	}
 	if m.product != nil {
 		fields = append(fields, salesorderitem.FieldProductID)
@@ -93606,6 +93968,8 @@ func (m *SalesOrderItemMutation) Field(name string) (ent.Value, bool) {
 		return m.SalesOrderID()
 	case salesorderitem.FieldLineNo:
 		return m.LineNo()
+	case salesorderitem.FieldDisplayOrder:
+		return m.DisplayOrder()
 	case salesorderitem.FieldProductID:
 		return m.ProductID()
 	case salesorderitem.FieldProductSkuID:
@@ -93647,6 +94011,8 @@ func (m *SalesOrderItemMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldSalesOrderID(ctx)
 	case salesorderitem.FieldLineNo:
 		return m.OldLineNo(ctx)
+	case salesorderitem.FieldDisplayOrder:
+		return m.OldDisplayOrder(ctx)
 	case salesorderitem.FieldProductID:
 		return m.OldProductID(ctx)
 	case salesorderitem.FieldProductSkuID:
@@ -93697,6 +94063,13 @@ func (m *SalesOrderItemMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetLineNo(v)
+		return nil
+	case salesorderitem.FieldDisplayOrder:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDisplayOrder(v)
 		return nil
 	case salesorderitem.FieldProductID:
 		v, ok := value.(int)
@@ -93807,6 +94180,9 @@ func (m *SalesOrderItemMutation) AddedFields() []string {
 	if m.addline_no != nil {
 		fields = append(fields, salesorderitem.FieldLineNo)
 	}
+	if m.adddisplay_order != nil {
+		fields = append(fields, salesorderitem.FieldDisplayOrder)
+	}
 	return fields
 }
 
@@ -93817,6 +94193,8 @@ func (m *SalesOrderItemMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case salesorderitem.FieldLineNo:
 		return m.AddedLineNo()
+	case salesorderitem.FieldDisplayOrder:
+		return m.AddedDisplayOrder()
 	}
 	return nil, false
 }
@@ -93833,6 +94211,13 @@ func (m *SalesOrderItemMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddLineNo(v)
 		return nil
+	case salesorderitem.FieldDisplayOrder:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddDisplayOrder(v)
+		return nil
 	}
 	return fmt.Errorf("unknown SalesOrderItem numeric field %s", name)
 }
@@ -93841,6 +94226,9 @@ func (m *SalesOrderItemMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *SalesOrderItemMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(salesorderitem.FieldDisplayOrder) {
+		fields = append(fields, salesorderitem.FieldDisplayOrder)
+	}
 	if m.FieldCleared(salesorderitem.FieldProductSkuID) {
 		fields = append(fields, salesorderitem.FieldProductSkuID)
 	}
@@ -93879,6 +94267,9 @@ func (m *SalesOrderItemMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *SalesOrderItemMutation) ClearField(name string) error {
 	switch name {
+	case salesorderitem.FieldDisplayOrder:
+		m.ClearDisplayOrder()
+		return nil
 	case salesorderitem.FieldProductSkuID:
 		m.ClearProductSkuID()
 		return nil
@@ -93916,6 +94307,9 @@ func (m *SalesOrderItemMutation) ResetField(name string) error {
 		return nil
 	case salesorderitem.FieldLineNo:
 		m.ResetLineNo()
+		return nil
+	case salesorderitem.FieldDisplayOrder:
+		m.ResetDisplayOrder()
 		return nil
 	case salesorderitem.FieldProductID:
 		m.ResetProductID()

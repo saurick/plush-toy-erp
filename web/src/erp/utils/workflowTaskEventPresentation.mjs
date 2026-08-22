@@ -1,4 +1,4 @@
-import { getRoleDisplayName } from './roleKeys.mjs'
+import { getRoleDisplayName, ROLE_DISPLAY_NAMES } from './roleKeys.mjs'
 
 const TASK_STATUS_LABELS = Object.freeze({
   ready: '待处理',
@@ -191,13 +191,23 @@ export function presentWorkflowTaskEvent(
 ) {
   const presentation = eventPresentation(event, approvalTask)
   const taskVersion = positiveInteger(event.task_version)
+  const actorRoleKey = normalizedText(event.actor_role_key)
+  const actorRoleLabel = ROLE_DISPLAY_NAMES[actorRoleKey] || ''
+  const actorName =
+    normalizedText(event.actor_display_name) ||
+    normalizedText(event.actor_username)
+  const actorLabel = actorName
+    ? actorRoleLabel
+      ? `${actorName}（${actorRoleLabel}）`
+      : actorName
+    : actorRoleLabel || '系统'
   return {
     key:
       positiveInteger(event.id) ||
       `${normalizedText(event.event_type) || 'event'}-${index}`,
     ...presentation,
-    actorLabel: getRoleDisplayName(event.actor_role_key, '系统'),
-    actorRoleKey: normalizedText(event.actor_role_key),
+    actorLabel,
+    actorRoleKey,
     reason: normalizedText(event.reason),
     timeLabel: formatWorkflowTaskEventTime(event.created_at),
     transitionLabel: eventTransitionLabel(event),

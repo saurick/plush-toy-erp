@@ -160,12 +160,46 @@ func (r *workflowRepo) ListWorkflowTaskEvents(ctx context.Context, taskID int, l
 	if err != nil {
 		return nil, err
 	}
+	actorIDs := make(map[int]struct{})
+	for _, row := range rows {
+		if row.ActorID != nil && *row.ActorID > 0 {
+			actorIDs[*row.ActorID] = struct{}{}
+		}
+	}
+	adminByID := make(map[int]*ent.AdminUser, len(actorIDs))
+	if len(actorIDs) > 0 {
+		ids := make([]int, 0, len(actorIDs))
+		for actorID := range actorIDs {
+			ids = append(ids, actorID)
+		}
+		admins, adminErr := r.data.postgres.AdminUser.Query().
+			Select(adminuser.FieldID, adminuser.FieldUsername, adminuser.FieldDisplayName).
+			Where(adminuser.IDIn(ids...)).
+			All(ctx)
+		if adminErr != nil {
+			return nil, adminErr
+		}
+		for _, admin := range admins {
+			if admin != nil {
+				adminByID[admin.ID] = admin
+			}
+		}
+	}
 	events := make([]*biz.WorkflowTaskEvent, 0, len(rows))
 	for _, row := range rows {
+		actorUsername := ""
+		actorDisplayName := ""
+		if row.ActorID != nil {
+			if actor := adminByID[*row.ActorID]; actor != nil {
+				actorUsername = strings.TrimSpace(actor.Username)
+				actorDisplayName = strings.TrimSpace(stringValue(actor.DisplayName))
+			}
+		}
 		events = append(events, &biz.WorkflowTaskEvent{
 			ID: row.ID, TaskID: row.TaskID, TaskVersion: row.TaskVersion,
 			EventType: row.EventType, FromStatusKey: row.FromStatusKey, ToStatusKey: row.ToStatusKey,
-			ActorRoleKey: row.ActorRoleKey, ActorID: row.ActorID, Reason: row.Reason,
+			ActorRoleKey: row.ActorRoleKey, ActorID: row.ActorID,
+			ActorUsername: actorUsername, ActorDisplayName: actorDisplayName, Reason: row.Reason,
 			Payload: copyWorkflowPayload(row.Payload), CreatedAt: row.CreatedAt,
 		})
 	}

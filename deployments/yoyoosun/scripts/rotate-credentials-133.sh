@@ -17,8 +17,9 @@ print_help() {
     --confirm 'ROTATE_YOYOOSUN_CREDENTIALS_133:<release>:<migration>:<operation-id>'
 
 说明:
-  只在发布工作站运行。admin 与 demo 使用 credential.contract.json 明确登记的
-  测试服固定简单密码；短信手机号仅在对应 Keychain alias 已人工录入时读取。
+  只在发布工作站运行。admin 与 uat_* 岗位账号只使用
+  credential.contract.json 登记的 Keychain alias；合同不保存密码。
+  短信手机号仅在对应 Keychain alias 已人工录入时读取。
   三项值只经 SSH stdin 临时注入一次性 Compose 容器，不进入服务器 steady env
   或脱敏 receipt。执行前必须提供已存在且 hash 匹配的远端备份。
 USAGE
@@ -133,23 +134,28 @@ contract_file="$script_dir/../env/credential.contract.json"
   exit 1
 }
 
-IFS=$'\t' read -r admin_password demo_password phone_service phone_account < <(
+IFS=$'\t' read -r admin_service admin_account uat_service uat_account phone_service phone_account < <(
   node - "$contract_file" <<'NODE'
 const fs = require("node:fs");
 const contract = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
 const admin = contract?.credentials?.admin;
-const demo = contract?.credentials?.demo;
+const uat = contract?.credentials?.uat;
 const phone = contract?.smsLoginIdentity?.keychain;
 const text = (value) => typeof value === "string" && value.length > 0 && !/[\t\r\n]/u.test(value);
 if (
-  contract?.schemaVersion !== "yoyoosun-credential-contract/v2" ||
+  contract?.schemaVersion !== "yoyoosun-credential-contract/v3" ||
   contract?.target?.key !== "customer-trial-133" ||
   contract?.target?.database !== "plush_erp_uat_20260716_v5" ||
   contract?.target?.datasetVersion !== "2026.08.15-v6" ||
-  admin?.username !== "admin" || admin?.credentialSource !== "contract-fixed-test" || admin?.fixedTestPassword !== "adminadmin" ||
-  demo?.credentialSource !== "contract-fixed-test" || demo?.fixedTestPassword !== "12345678" ||
+  admin?.username !== "admin" || admin?.environmentVariable !== "MANUAL_ACCEPTANCE_ADMIN_PASSWORD" ||
+  admin?.credentialSource !== "external-secret" || !text(admin?.keychain?.service) || !text(admin?.keychain?.account) ||
+  uat?.environmentVariable !== "MANUAL_ACCEPTANCE_UAT_PASSWORD" ||
+  uat?.credentialSource !== "external-secret" || !text(uat?.keychain?.service) || !text(uat?.keychain?.account) ||
+  !Array.isArray(uat?.usernames) || uat.usernames.length !== 10 ||
+  new Set(uat.usernames).size !== 10 || !uat.usernames.every((value) => /^uat_[a-z_]+$/u.test(value)) ||
   !text(phone?.service) || !text(phone?.account) ||
-  JSON.stringify(contract?.policy?.registeredSimplePasswordTargets) !== JSON.stringify(["local-dev", "customer-trial-133"]) ||
+  JSON.stringify(contract?.policy?.localPublicPasswordTargets) !== JSON.stringify(["local-dev"]) ||
+  contract?.policy?.customerTrialRequiresExternalSecrets !== true ||
   contract?.policy?.passwordsMustDiffer !== true ||
   contract.policy.rotateAfterCreateRestoreOrRollback !== true ||
   contract.policy.revokeExistingSessionsOnRotation !== true ||
@@ -157,36 +163,48 @@ if (
   contract?.smsLoginIdentity?.phoneRequiredWhenProviderEnabled !== false ||
   contract.smsLoginIdentity.verifyPhoneIdentityWhenConfigured !== true ||
   contract?.redaction?.containsSecrets !== false ||
+  contract.redaction.contractContainsPublicTestPasswords !== false ||
   contract.redaction.storePasswords !== false ||
   contract.redaction.storeTokens !== false ||
   contract.redaction.storePhoneNumber !== false ||
   contract.redaction.storeRawProfiles !== false
 ) throw new Error("invalid yoyoosun credential contract");
 process.stdout.write([
-  admin.fixedTestPassword,
-  demo.fixedTestPassword,
+  admin.keychain.service,
+  admin.keychain.account,
+  uat.keychain.service,
+  uat.keychain.account,
   phone.service,
   phone.account,
 ].join("\t") + "\n");
 NODE
 )
 
+admin_password="$(security find-generic-password -w -s "$admin_service" -a "$admin_account" 2>/dev/null)" || {
+  echo "[rotate-credentials-133] admin Keychain secret 不存在" >&2
+  exit 1
+}
+uat_password="$(security find-generic-password -w -s "$uat_service" -a "$uat_account" 2>/dev/null)" || {
+  echo "[rotate-credentials-133] UAT 岗位 Keychain secret 不存在" >&2
+  exit 1
+}
 sms_phone="$(security find-generic-password -w -s "$phone_service" -a "$phone_account" 2>/dev/null || true)"
 
 [[ ${#admin_password} -ge 8 && ${#admin_password} -le 20 ]] || {
-  echo "[rotate-credentials-133] admin 合同密码长度非法" >&2
+  echo "[rotate-credentials-133] admin Keychain 密码长度非法" >&2
   exit 1
 }
-[[ ${#demo_password} -ge 8 && ${#demo_password} -le 20 ]] || {
-  echo "[rotate-credentials-133] demo 合同密码长度非法" >&2
+[[ ${#uat_password} -ge 8 && ${#uat_password} -le 20 ]] || {
+  echo "[rotate-credentials-133] UAT 岗位 Keychain 密码长度非法" >&2
   exit 1
 }
-[[ "$admin_password" != "$demo_password" ]] || {
-  echo "[rotate-credentials-133] admin 与 demo 密码必须不同" >&2
+[[ "$admin_password" != "$uat_password" ]] || {
+  echo "[rotate-credentials-133] admin 与 UAT 岗位密码必须不同" >&2
   exit 1
 }
-[[ "$admin_password" == "adminadmin" && "$demo_password" == "12345678" ]] || {
-  echo "[rotate-credentials-133] 测试凭据合同漂移" >&2
+[[ "$admin_password" != "adminadmin" && "$admin_password" != "12345678" &&
+  "$uat_password" != "adminadmin" && "$uat_password" != "12345678" ]] || {
+  echo "[rotate-credentials-133] 133 禁止使用本地公开测试密码" >&2
   exit 1
 }
 [[ -z "$sms_phone" || "$sms_phone" =~ ^1[3-9][0-9]{9}$ ]] || {
@@ -201,7 +219,7 @@ mkdir -p "$report_dir"
 report_tmp="$(mktemp "$report_dir/.credential-rotation.XXXXXX")"
 cleanup() {
   admin_password=""
-  demo_password=""
+  uat_password=""
   sms_phone=""
   rm -f "$report_tmp"
 }
@@ -209,9 +227,9 @@ trap cleanup EXIT HUP INT TERM
 
 {
   printf 'MANUAL_ACCEPTANCE_ADMIN_PASSWORD=%q\n' "$admin_password"
-  printf 'MANUAL_ACCEPTANCE_PASSWORD=%q\n' "$demo_password"
+  printf 'MANUAL_ACCEPTANCE_UAT_PASSWORD=%q\n' "$uat_password"
   printf 'MANUAL_ACCEPTANCE_SMS_PHONE=%q\n' "$sms_phone"
-  printf '%s\n' 'export MANUAL_ACCEPTANCE_ADMIN_PASSWORD MANUAL_ACCEPTANCE_PASSWORD MANUAL_ACCEPTANCE_SMS_PHONE'
+  printf '%s\n' 'export MANUAL_ACCEPTANCE_ADMIN_PASSWORD MANUAL_ACCEPTANCE_UAT_PASSWORD MANUAL_ACCEPTANCE_SMS_PHONE'
   cat <<'REMOTE_SCRIPT'
 set -euo pipefail
 expected_release="$1"
@@ -238,7 +256,7 @@ docker compose \
   -f "$trial_compose" \
   run --rm -T --no-deps --pull never \
   -e MANUAL_ACCEPTANCE_ADMIN_PASSWORD \
-  -e MANUAL_ACCEPTANCE_PASSWORD \
+  -e MANUAL_ACCEPTANCE_UAT_PASSWORD \
   -e MANUAL_ACCEPTANCE_SMS_PHONE \
   app-server /app/rotate-manual-acceptance-passwords \
     --target customer-trial-133 \
@@ -264,14 +282,16 @@ const valid =
   report.migrationVersion === migration &&
   report.operationId === operationId &&
   report.adminAccounts === 1 &&
-  report.demoAccounts === 10 &&
+  report.accountKind === "customer-uat" &&
+  report.roleAccounts === 10 &&
   report.authVersionIncremented === true &&
   report.phoneBound === phoneExpected &&
   report.auditSource === "manual_acceptance_password_rotation" &&
   accounts.length === 11 &&
   new Set(accounts.map((item) => item?.username)).size === 11 &&
   accounts.every((item) => Number.isSafeInteger(item?.authVersion) && item.authVersion > 1) &&
-  accounts.every((item) => item?.phoneBound === (phoneExpected && item?.username === "admin"));
+  accounts.every((item) => item?.phoneBound === (phoneExpected && item?.username === "admin")) &&
+  accounts.filter((item) => item?.username !== "admin").every((item) => /^uat_/u.test(item?.username || ""));
 if (!valid) throw new Error("credential rotation receipt is incomplete");
 const visit = (value) => {
   if (Array.isArray(value)) return value.forEach(visit);

@@ -69,9 +69,10 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserCreate); res != nil {
 			return id, res, nil
 		}
-		if res := rejectUnknownAdminParams(pm, "username", "phone", "password", "role_keys"); res != nil {
+		if res := rejectUnknownAdminParams(pm, "display_name", "username", "phone", "password", "role_keys"); res != nil {
 			return id, res, nil
 		}
+		displayName := getString(pm, "display_name")
 		username := getString(pm, "username")
 		phone := getString(pm, "phone")
 		password := getString(pm, "password")
@@ -88,7 +89,7 @@ func (d *jsonrpcDispatcher) handleAdmin(
 			}
 		}
 
-		admin, err := d.adminManageUC.Create(ctx, username, phone, password, roleKeys)
+		admin, err := d.adminManageUC.Create(ctx, displayName, username, phone, password, roleKeys)
 		if err != nil {
 			return id, d.mapAdminManageError(ctx, err), nil
 		}
@@ -311,15 +312,15 @@ func (d *jsonrpcDispatcher) handleAdmin(
 			}),
 		}, nil
 
-	case "set_phone":
+	case "set_profile":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserUpdate); res != nil {
 			return id, res, nil
 		}
-		if res := rejectUnknownAdminParams(pm, "id", "phone"); res != nil {
+		if res := rejectUnknownAdminParams(pm, "id", "display_name", "phone"); res != nil {
 			return id, res, nil
 		}
 		adminID := getInt(pm, "id", 0)
-		admin, err := d.adminManageUC.SetPhone(ctx, adminID, getString(pm, "phone"))
+		admin, err := d.adminManageUC.SetProfile(ctx, adminID, getString(pm, "display_name"), getString(pm, "phone"))
 		if err != nil {
 			return id, d.mapAdminManageError(ctx, err), nil
 		}
@@ -539,6 +540,17 @@ func invalidAdminPasswordResult() *v1.JsonrpcResult {
 	}
 }
 
+func invalidAdminUsernameResult() *v1.JsonrpcResult {
+	return &v1.JsonrpcResult{
+		Code: errcode.InvalidParam.Code,
+		Message: fmt.Sprintf(
+			"员工账号只能包含英文字母、数字和下划线，长度须为 %d 到 %d 个字符",
+			biz.AdminUsernameMinLength,
+			biz.AdminUsernameMaxLength,
+		),
+	}
+}
+
 func invalidAdminParamResult() *v1.JsonrpcResult {
 	return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
 }
@@ -563,6 +575,9 @@ func (d *jsonrpcDispatcher) mapAdminManageError(ctx context.Context, err error) 
 	case errors.Is(err, biz.ErrForbidden), errors.Is(err, biz.ErrNoPermission):
 		l.Warnf("[admin] permission denied err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
+	case errors.Is(err, biz.ErrAdminUsernameInvalid):
+		l.Warnf("[admin] invalid username err=%v", err)
+		return invalidAdminUsernameResult()
 	case errors.Is(err, biz.ErrBadParam), errors.Is(err, biz.ErrRoleDataScopeResourceNotFound):
 		l.Warnf("[admin] invalid param err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}

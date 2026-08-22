@@ -40,6 +40,20 @@ func (_c *OutsourcingOrderItemCreate) SetLineNo(v int) *OutsourcingOrderItemCrea
 	return _c
 }
 
+// SetDisplayOrder sets the "display_order" field.
+func (_c *OutsourcingOrderItemCreate) SetDisplayOrder(v int) *OutsourcingOrderItemCreate {
+	_c.mutation.SetDisplayOrder(v)
+	return _c
+}
+
+// SetNillableDisplayOrder sets the "display_order" field if the given value is not nil.
+func (_c *OutsourcingOrderItemCreate) SetNillableDisplayOrder(v *int) *OutsourcingOrderItemCreate {
+	if v != nil {
+		_c.SetDisplayOrder(*v)
+	}
+	return _c
+}
+
 // SetSubjectType sets the "subject_type" field.
 func (_c *OutsourcingOrderItemCreate) SetSubjectType(v string) *OutsourcingOrderItemCreate {
 	_c.mutation.SetSubjectType(v)
@@ -456,6 +470,11 @@ func (_c *OutsourcingOrderItemCreate) check() error {
 			return &ValidationError{Name: "line_no", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.line_no": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.DisplayOrder(); ok {
+		if err := outsourcingorderitem.DisplayOrderValidator(v); err != nil {
+			return &ValidationError{Name: "display_order", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.display_order": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.SubjectType(); !ok {
 		return &ValidationError{Name: "subject_type", err: errors.New(`ent: missing required field "OutsourcingOrderItem.subject_type"`)}
 	}
@@ -605,6 +624,10 @@ func (_c *OutsourcingOrderItemCreate) createSpec() (*OutsourcingOrderItem, *sqlg
 	if value, ok := _c.mutation.LineNo(); ok {
 		_spec.SetField(outsourcingorderitem.FieldLineNo, field.TypeInt, value)
 		_node.LineNo = value
+	}
+	if value, ok := _c.mutation.DisplayOrder(); ok {
+		_spec.SetField(outsourcingorderitem.FieldDisplayOrder, field.TypeInt, value)
+		_node.DisplayOrder = &value
 	}
 	if value, ok := _c.mutation.SubjectType(); ok {
 		_spec.SetField(outsourcingorderitem.FieldSubjectType, field.TypeString, value)

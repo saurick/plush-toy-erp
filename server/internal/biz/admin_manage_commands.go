@@ -25,10 +25,11 @@ type RoleSettingsChangeCommand struct {
 	SecondaryMenuPaths []string
 }
 
-type AdminPhoneChange struct {
-	AdminID    int
-	OperatorID int
-	Phone      string
+type AdminProfileChange struct {
+	AdminID     int
+	OperatorID  int
+	DisplayName string
+	Phone       string
 }
 
 type AdminPasswordReset struct {

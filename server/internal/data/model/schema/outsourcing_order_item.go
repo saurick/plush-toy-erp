@@ -20,6 +20,7 @@ func (OutsourcingOrderItem) Annotations() []schema.Annotation {
 		entsql.Annotation{
 			Checks: map[string]string{
 				"outsourcing_order_items_line_no_positive":         "line_no > 0",
+				"outsourcing_order_items_display_order_positive":   "display_order IS NULL OR display_order > 0",
 				"outsourcing_order_items_quantity_positive":        "outsourcing_quantity > 0",
 				"outsourcing_order_items_unit_price_non_negative":  "unit_price IS NULL OR unit_price >= 0",
 				"outsourcing_order_items_amount_non_negative":      "amount IS NULL OR amount >= 0",
@@ -40,6 +41,10 @@ func (OutsourcingOrderItem) Fields() []ent.Field {
 		field.Int("outsourcing_order_id").
 			Positive(),
 		field.Int("line_no").
+			Positive(),
+		field.Int("display_order").
+			Optional().
+			Nillable().
 			Positive(),
 		field.String("subject_type").
 			NotEmpty().

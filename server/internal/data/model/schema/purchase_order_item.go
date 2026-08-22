@@ -20,6 +20,7 @@ func (PurchaseOrderItem) Annotations() []schema.Annotation {
 		entsql.Annotation{
 			Checks: map[string]string{
 				"purchase_order_items_line_no_positive":        "line_no > 0",
+				"purchase_order_items_display_order_positive":  "display_order IS NULL OR display_order > 0",
 				"purchase_order_items_purchased_qty_positive":  "purchased_quantity > 0",
 				"purchase_order_items_unit_price_non_negative": "unit_price IS NULL OR unit_price >= 0",
 				"purchase_order_items_amount_non_negative":     "amount IS NULL OR amount >= 0",
@@ -34,6 +35,10 @@ func (PurchaseOrderItem) Fields() []ent.Field {
 		field.Int("purchase_order_id").
 			Positive(),
 		field.Int("line_no").
+			Positive(),
+		field.Int("display_order").
+			Optional().
+			Nillable().
 			Positive(),
 		field.Int("material_id").
 			Positive(),

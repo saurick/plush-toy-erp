@@ -140,24 +140,26 @@ var allowedBusinessAttachmentPrintAppendixFileTypes = map[string]map[string]stru
 }
 
 type BusinessAttachment struct {
-	ID                  int
-	OwnerType           string
-	OwnerID             int
-	AttachmentType      string
-	SlotKey             *string
-	FileName            string
-	MimeType            string
-	FileSize            int
-	SHA256              string
-	Content             []byte
-	UploadedBy          *int
-	UploadedByUsername  *string
-	Note                *string
-	WithdrawnAt         *time.Time
-	WithdrawnBy         *int
-	WithdrawnByUsername *string
-	WithdrawalReason    *string
-	CreatedAt           time.Time
+	ID                     int
+	OwnerType              string
+	OwnerID                int
+	AttachmentType         string
+	SlotKey                *string
+	FileName               string
+	MimeType               string
+	FileSize               int
+	SHA256                 string
+	Content                []byte
+	UploadedBy             *int
+	UploadedByUsername     *string
+	UploadedByDisplayName  *string
+	Note                   *string
+	WithdrawnAt            *time.Time
+	WithdrawnBy            *int
+	WithdrawnByUsername    *string
+	WithdrawnByDisplayName *string
+	WithdrawalReason       *string
+	CreatedAt              time.Time
 }
 
 type BusinessAttachmentUploadInput struct {
@@ -177,6 +179,7 @@ type WorkflowAttachmentWriteGuard struct {
 	ExpectedVersion      int
 	ActorID              int
 	ActorUsername        string
+	ActorDisplayName     string
 	VisibleOwnerRoleKeys []string
 }
 

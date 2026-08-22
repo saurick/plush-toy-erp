@@ -636,6 +636,13 @@ test("versioned source plans use a stable date anchor and semantic digest across
   assert.equal(localPlan.anchorDate, "2026-08-15");
   assert.equal(remotePlan.anchorDate, localPlan.anchorDate);
   assert.equal(remotePlan.semanticDigest, localPlan.semanticDigest);
+  assert.equal(localPlan.roleUsers.sales, "demo_sales");
+  assert.equal(remotePlan.roleUsers.sales, "uat_sales");
+  assert.ok(
+    Object.values(remotePlan.roleUsers)
+      .filter((username) => username !== "admin")
+      .every((username) => /^uat_/u.test(username)),
+  );
   assert.equal(localPlan.semanticDigest.length, 64);
   assert.deepEqual(remotePlan.records, localPlan.records);
   assert.equal(

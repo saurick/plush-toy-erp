@@ -71,8 +71,9 @@ func BuildLegalNoticeAcknowledgementAuditEvent(
 		Payload: map[string]any{
 			"action": legalNoticeAuditAction,
 			"actor": map[string]any{
-				"id":       admin.ID,
-				"username": admin.Username,
+				"id":           admin.ID,
+				"username":     admin.Username,
+				"display_name": admin.DisplayName,
 			},
 			"target": map[string]any{
 				"type": legalNoticeTargetType,

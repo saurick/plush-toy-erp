@@ -5877,12 +5877,19 @@ export function createStyleL1Scenarios(deps) {
         await assertNoDashboardCenterLocalRefreshButton(page, {
           scenarioName: 'erp-task-board-desktop',
         })
-        const approvalInboxButton = page.getByRole('button', {
-          name: '待我审批',
-          exact: true,
-        })
-        await approvalInboxButton.click()
-        await expectHeading(page, '待我审批')
+        const taskScopeFilter = page.locator('.erp-task-board-scope-filter')
+        await expectText(taskScopeFilter, '任务范围')
+        await expectText(taskScopeFilter, '全部任务')
+        await expectText(taskScopeFilter, '待我审批')
+        await taskScopeFilter.getByText('待我审批', { exact: true }).click()
+        await page.waitForFunction(
+          () => new URL(window.location.href).searchParams.get('mode') === 'approval'
+        )
+        await taskScopeFilter
+          .locator('.ant-segmented-item-selected')
+          .filter({ hasText: '待我审批' })
+          .waitFor({ state: 'visible', timeout: 2_000 })
+        await expectHeading(page, '任务看板')
         await expectText(
           page,
           '只显示服务端登记为审批节点且当前账号可见的事项；审批仍受岗位、指定处理人、配置版本和单据状态约束。'
@@ -5891,15 +5898,20 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, 'SHIP-L1-501')
         const approvalInboxLayout = await page.evaluate(() => {
           const card = document.querySelector('.erp-dashboard-task-board-card')
-          const heading = [...document.querySelectorAll('h1, h2, h3')].find(
-            (element) => element.textContent?.trim() === '待我审批'
+          const filters = document.querySelector('.erp-task-board-filters')
+          const scopeFilter = document.querySelector(
+            '.erp-task-board-scope-filter'
           )
-          const backButton = [...document.querySelectorAll('button')].find(
-            (element) => element.textContent?.trim() === '返回全部任务'
+          const heading = [...document.querySelectorAll('h1, h2, h3')].find(
+            (element) => element.textContent?.trim() === '任务看板'
+          )
+          const selectedScope = scopeFilter?.querySelector(
+            '.ant-segmented-item-selected'
           )
           const cardRect = card?.getBoundingClientRect()
+          const filtersRect = filters?.getBoundingClientRect()
+          const scopeFilterRect = scopeFilter?.getBoundingClientRect()
           const headingRect = heading?.getBoundingClientRect()
-          const backButtonRect = backButton?.getBoundingClientRect()
           return {
             cardFits:
               Boolean(card) &&
@@ -5908,16 +5920,22 @@ export function createStyleL1Scenarios(deps) {
               Boolean(cardRect && headingRect) &&
               headingRect.left >= cardRect.left &&
               headingRect.right <= cardRect.right,
-            backButtonVisible:
-              Boolean(cardRect && backButtonRect) &&
-              backButtonRect.left >= cardRect.left &&
-              backButtonRect.right <= cardRect.right,
+            scopeInsideFilters: Boolean(
+              filters && scopeFilter && scopeFilter.parentElement === filters
+            ),
+            scopeFilterVisible:
+              Boolean(filtersRect && scopeFilterRect) &&
+              scopeFilterRect.left >= filtersRect.left &&
+              scopeFilterRect.right <= filtersRect.right,
+            selectedScope: selectedScope?.textContent?.trim() || '',
           }
         })
         assert(
           approvalInboxLayout.cardFits &&
             approvalInboxLayout.headingVisible &&
-            approvalInboxLayout.backButtonVisible,
+            approvalInboxLayout.scopeInsideFilters &&
+            approvalInboxLayout.scopeFilterVisible &&
+            approvalInboxLayout.selectedScope === '待我审批',
           `待我审批入口存在溢出或不可见控件: ${JSON.stringify(
             approvalInboxLayout
           )}`
@@ -6192,10 +6210,15 @@ export function createStyleL1Scenarios(deps) {
         })
         await approvalDrawer.locator('.ant-drawer-close').click()
         await approvalDrawer.waitFor({ state: 'hidden', timeout: 10_000 })
-        await page
-          .getByRole('button', { name: '返回全部任务', exact: true })
-          .click()
+        await taskScopeFilter.getByText('全部任务', { exact: true }).click()
+        await page.waitForFunction(
+          () => new URL(window.location.href).searchParams.get('mode') !== 'approval'
+        )
         await expectHeading(page, '任务看板')
+        await expectText(
+          page,
+          '看清谁该处理、哪里卡住、哪些已经超时；电脑端可双击任务卡快速查看详情。'
+        )
         const navigationTask = await page.evaluate(async () => {
           const response = await fetch('/rpc/workflow', {
             method: 'POST',

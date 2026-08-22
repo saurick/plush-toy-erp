@@ -166,6 +166,7 @@ func (r *memAdminManageRepoForData) CreateAdmin(_ context.Context, admin *biz.Ad
 	created := &biz.AdminUser{
 		ID:           len(r.admins) + 1,
 		Username:     admin.Username,
+		DisplayName:  admin.DisplayName,
 		Phone:        admin.Phone,
 		PasswordHash: admin.PasswordHash,
 		CreatedAt:    now,
@@ -297,20 +298,21 @@ func (r *memAdminManageRepoForData) UpdateRolePermissions(_ context.Context, rol
 	return nil
 }
 
-func (r *memAdminManageRepoForData) UpdateAdminPhone(_ context.Context, id int, phone string) error {
+func (r *memAdminManageRepoForData) UpdateAdminProfile(_ context.Context, id int, displayName, phone string) error {
 	admin, ok := r.admins[id]
 	if !ok {
 		return biz.ErrAdminNotFound
 	}
 	admin.Phone = phone
+	admin.DisplayName = displayName
 	return nil
 }
 
-func (r *memAdminManageRepoForData) SetAdminPhoneWithAudit(ctx context.Context, change *biz.AdminPhoneChange) (*biz.AdminUser, error) {
+func (r *memAdminManageRepoForData) SetAdminProfileWithAudit(ctx context.Context, change *biz.AdminProfileChange) (*biz.AdminUser, error) {
 	if change == nil {
 		return nil, biz.ErrBadParam
 	}
-	if err := r.UpdateAdminPhone(ctx, change.AdminID, change.Phone); err != nil {
+	if err := r.UpdateAdminProfile(ctx, change.AdminID, change.DisplayName, change.Phone); err != nil {
 		return nil, err
 	}
 	return r.GetAdminByID(ctx, change.AdminID)
@@ -516,6 +518,7 @@ func TestJsonrpcDispatcher_AdminListUsesMinimalAccountProjection(t *testing.T) {
 	repo.admins[2] = &biz.AdminUser{
 		ID:           2,
 		Username:     "worker",
+		DisplayName:  "张员工",
 		Phone:        "13800138000",
 		PasswordHash: "sentinel-password-hash",
 		AuthVersion:  88,
@@ -558,7 +561,7 @@ func TestJsonrpcDispatcher_AdminListUsesMinimalAccountProjection(t *testing.T) {
 		t.Fatal("worker projection not found")
 	}
 	wantKeys := map[string]struct{}{
-		"id": {}, "username": {}, "phone": {}, "is_super_admin": {},
+		"id": {}, "username": {}, "display_name": {}, "phone": {}, "is_super_admin": {},
 		"account_status": {}, "status_reason": {}, "roles": {}, "permission_count": {},
 	}
 	if len(worker) != len(wantKeys) {
@@ -708,9 +711,10 @@ func TestJsonrpcDispatcher_AdminCreateWithRolesRequiresRoleAssignPermission(t *t
 		Role:     biz.RoleAdmin,
 	})
 	withRoleParams, _ := structpb.NewStruct(map[string]any{
-		"username":  "operator-with-role",
-		"password":  "new-secret",
-		"role_keys": []any{biz.WarehouseRoleKey},
+		"display_name": "仓库员工",
+		"username":     "operator_with_role",
+		"password":     "new-secret",
+		"role_keys":    []any{biz.WarehouseRoleKey},
 	})
 
 	_, res, err := j.handleAdmin(ctx, "create", "1", withRoleParams)
@@ -722,8 +726,9 @@ func TestJsonrpcDispatcher_AdminCreateWithRolesRequiresRoleAssignPermission(t *t
 	}
 
 	withoutRoleParams, _ := structpb.NewStruct(map[string]any{
-		"username": "operator-no-role",
-		"password": "new-secret",
+		"display_name": "普通员工",
+		"username":     "operator_no_role",
+		"password":     "new-secret",
 	})
 	_, res, err = j.handleAdmin(ctx, "create", "2", withoutRoleParams)
 	if err != nil {
@@ -1253,6 +1258,12 @@ func TestJsonrpcDispatcher_AdminManageErrorsMapToExplicitContracts(t *testing.T)
 			}
 		})
 	}
+
+	invalidUsername := dispatcher.mapAdminManageError(context.Background(), biz.ErrAdminUsernameInvalid)
+	if invalidUsername.Code != errcode.InvalidParam.Code ||
+		invalidUsername.Message != "员工账号只能包含英文字母、数字和下划线，长度须为 3 到 64 个字符" {
+		t.Fatalf("invalid username result = %#v", invalidUsername)
+	}
 }
 
 func TestJsonrpcDispatcher_AdminSetERPColumnOrder(t *testing.T) {
@@ -1430,7 +1441,7 @@ func TestJsonrpcDispatcher_AdminMutationsRejectUnknownParams(t *testing.T) {
 		method string
 		params map[string]any
 	}{
-		{method: "create", params: map[string]any{"username": "worker", "password": "123456", "actor_id": 9}},
+		{method: "create", params: map[string]any{"display_name": "张员工", "username": "worker", "password": "123456", "actor_id": 9}},
 		{method: "set_roles", params: map[string]any{"id": 2, "role_keys": []any{"sales"}, "permissions": []any{"system.audit.read"}}},
 		{method: "set_role_settings", params: map[string]any{
 			"role_key":             "sales",

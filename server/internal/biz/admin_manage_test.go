@@ -211,6 +211,7 @@ func (r *stubAdminManageRepo) CreateAdminWithAudit(ctx context.Context, command 
 	created := &AdminUser{
 		ID:           r.nextID,
 		Username:     admin.Username,
+		DisplayName:  admin.DisplayName,
 		Phone:        admin.Phone,
 		PasswordHash: admin.PasswordHash,
 		Disabled:     false,
@@ -362,7 +363,7 @@ func (r *stubAdminManageRepo) SetRoleSettingsWithAudit(ctx context.Context, chan
 	return &updated, nil
 }
 
-func (r *stubAdminManageRepo) SetAdminPhoneWithAudit(ctx context.Context, change *AdminPhoneChange) (*AdminUser, error) {
+func (r *stubAdminManageRepo) SetAdminProfileWithAudit(ctx context.Context, change *AdminProfileChange) (*AdminUser, error) {
 	if change == nil {
 		return nil, ErrBadParam
 	}
@@ -379,11 +380,12 @@ func (r *stubAdminManageRepo) SetAdminPhoneWithAudit(ctx context.Context, change
 		delete(r.adminsByPhone, admin.Phone)
 	}
 	admin.Phone = change.Phone
+	admin.DisplayName = change.DisplayName
 	if change.Phone != "" {
 		r.adminsByPhone[change.Phone] = admin
 	}
 	event, err := BuildAdminControlAuditEvent(
-		operator, "admin_user.phone.set", "admin_user", admin.ID, admin.Username,
+		operator, "admin_user.profile.set", "admin_user", admin.ID, admin.Username,
 		before, AdminAuditUserSnapshot(admin),
 	)
 	if err != nil {
@@ -628,12 +630,15 @@ func TestAdminManageUsecase_CreateAssignsRolesForStandardAdmin(t *testing.T) {
 		Role:     RoleAdmin,
 	})
 
-	created, err := uc.Create(ctx, "manager", "13800138000", "secret123", []string{"purchase"})
+	created, err := uc.Create(ctx, "王采购", "manager", "13800138000", "secret123", []string{"purchase"})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
 	if created.Phone != "13800138000" {
 		t.Fatalf("expected normalized phone, got %q", created.Phone)
+	}
+	if created.DisplayName != "王采购" {
+		t.Fatalf("expected display name, got %q", created.DisplayName)
 	}
 	if len(created.Roles) != 1 || created.Roles[0].Key != PurchaseRoleKey {
 		t.Fatalf("expected purchase role, got %#v", created.Roles)
@@ -745,8 +750,8 @@ func TestAdminManageUsecase_SetDisabledRequiresReasonAndCannotRestoreRevoked(t *
 	if _, err := uc.SetRoles(ctx, 2, nil); !errors.Is(err, ErrAdminRevoked) {
 		t.Fatalf("set roles on revoked error = %v, want ErrAdminRevoked", err)
 	}
-	if _, err := uc.SetPhone(ctx, 2, "13800138000"); !errors.Is(err, ErrAdminRevoked) {
-		t.Fatalf("set phone on revoked error = %v, want ErrAdminRevoked", err)
+	if _, err := uc.SetProfile(ctx, 2, "王员工", "13800138000"); !errors.Is(err, ErrAdminRevoked) {
+		t.Fatalf("set profile on revoked error = %v, want ErrAdminRevoked", err)
 	}
 	if _, err := uc.ResetPassword(ctx, 2, "new-secret"); !errors.Is(err, ErrAdminRevoked) {
 		t.Fatalf("reset revoked password error = %v, want ErrAdminRevoked", err)
@@ -1076,8 +1081,8 @@ func TestAdminManageUsecase_SetRolesRejectsSelfEscalationAndSystemRoles(t *testi
 	if _, err := uc.SetRoles(ctx, 3, []string{WarehouseRoleKey}); !errors.Is(err, ErrPrivilegedAdminTargetForbidden) {
 		t.Fatalf("system role target change error = %v, want ErrPrivilegedAdminTargetForbidden", err)
 	}
-	if _, err := uc.SetPhone(ctx, 3, "13800138000"); !errors.Is(err, ErrPrivilegedAdminTargetForbidden) {
-		t.Fatalf("system role target phone error = %v, want ErrPrivilegedAdminTargetForbidden", err)
+	if _, err := uc.SetProfile(ctx, 3, "系统员工", "13800138000"); !errors.Is(err, ErrPrivilegedAdminTargetForbidden) {
+		t.Fatalf("system role target profile error = %v, want ErrPrivilegedAdminTargetForbidden", err)
 	}
 	if _, err := uc.SetDisabled(ctx, 3, true, "临时停用"); !errors.Is(err, ErrPrivilegedAdminTargetForbidden) {
 		t.Fatalf("system role target disable error = %v, want ErrPrivilegedAdminTargetForbidden", err)
@@ -1103,8 +1108,8 @@ func TestAdminManageUsecase_SuperAdminCanMaintainSystemRoleTarget(t *testing.T) 
 	uc := NewAdminManageUsecase(repo, log.NewStdLogger(io.Discard), tracesdk.NewTracerProvider())
 	ctx := NewContextWithClaims(context.Background(), &AuthClaims{UserID: 1, Role: RoleAdmin})
 
-	if _, err := uc.SetPhone(ctx, 2, "13800138000"); err != nil {
-		t.Fatalf("super SetPhone(system target) error = %v", err)
+	if _, err := uc.SetProfile(ctx, 2, "系统员工", "13800138000"); err != nil {
+		t.Fatalf("super SetProfile(system target) error = %v", err)
 	}
 	if _, err := uc.ResetPassword(ctx, 2, "new-secret"); err != nil {
 		t.Fatalf("super ResetPassword(system target) error = %v", err)
@@ -1360,7 +1365,7 @@ func TestAdminManageUsecase_ListRolesWithAccessUsesCurrentAdminAndEnvironment(t 
 	}
 }
 
-func TestAdminManageUsecase_SetPhoneRejectsDuplicatePhone(t *testing.T) {
+func TestAdminManageUsecase_SetProfileRejectsDuplicatePhone(t *testing.T) {
 	repo := newStubAdminManageRepo()
 	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
 	repo.adminsByName["root"] = repo.adminsByID[1]
@@ -1377,19 +1382,111 @@ func TestAdminManageUsecase_SetPhoneRejectsDuplicatePhone(t *testing.T) {
 		Role:     RoleAdmin,
 	})
 
-	_, err := uc.SetPhone(ctx, 2, "13800138000")
+	_, err := uc.SetProfile(ctx, 2, "王经理", "13800138000")
 	if !errors.Is(err, ErrAdminPhoneExists) {
 		t.Fatalf("expected ErrAdminPhoneExists, got %v", err)
 	}
 }
 
 func TestAdminAuditUserSnapshotMasksPhone(t *testing.T) {
-	snapshot := AdminAuditUserSnapshot(&AdminUser{ID: 2, Username: "worker", Phone: "13800138000"})
+	snapshot := AdminAuditUserSnapshot(&AdminUser{ID: 2, Username: "worker", DisplayName: "张员工", Phone: "13800138000"})
+	if snapshot["display_name"] != "张员工" {
+		t.Fatalf("display name = %#v", snapshot["display_name"])
+	}
 	if snapshot["phone"] != "138****8000" {
 		t.Fatalf("masked phone = %#v, want 138****8000", snapshot["phone"])
 	}
 	if strings.Contains(fmt.Sprint(snapshot), "13800138000") {
 		t.Fatalf("audit snapshot exposed raw phone: %#v", snapshot)
+	}
+}
+
+func TestAdminDisplayNamePrefersEmployeeNameAndFallsBackToUsername(t *testing.T) {
+	if got := AdminDisplayName(&AdminUser{DisplayName: " 张员工 ", Username: "worker"}); got != "张员工" {
+		t.Fatalf("display name = %q", got)
+	}
+	if got := AdminDisplayName(&AdminUser{Username: "legacy-worker"}); got != "legacy-worker" {
+		t.Fatalf("legacy fallback = %q", got)
+	}
+}
+
+func TestNormalizeAdminDisplayNameRequiresAtMost64UnicodeCharacters(t *testing.T) {
+	if got, err := NormalizeAdminDisplayName("  张员工  "); err != nil || got != "张员工" {
+		t.Fatalf("normalized display name = %q, err=%v", got, err)
+	}
+	raw := strings.Repeat("人", 64)
+	if got, err := NormalizeAdminDisplayName(raw); err != nil || got != raw {
+		t.Fatalf("64-character display name = %q, err=%v", got, err)
+	}
+	for _, raw := range []string{"   ", strings.Repeat("人", 65), strings.Repeat("😀", 65)} {
+		if _, err := NormalizeAdminDisplayName(raw); !errors.Is(err, ErrBadParam) {
+			t.Fatalf("display name %q error = %v, want ErrBadParam", raw, err)
+		}
+	}
+}
+
+func TestNormalizeAdminUsernameAllowsOnlyLettersNumbersAndUnderscores(t *testing.T) {
+	for _, raw := range []string{"abc", "001", "___", "sales01", " demo_admin ", "UAT_Sales_01"} {
+		got, err := NormalizeAdminUsername(raw)
+		if err != nil {
+			t.Fatalf("NormalizeAdminUsername(%q) error = %v", raw, err)
+		}
+		if got != strings.TrimSpace(raw) {
+			t.Fatalf("NormalizeAdminUsername(%q) = %q", raw, got)
+		}
+	}
+
+	for _, raw := range []string{
+		"",
+		"   ",
+		"a",
+		"ab",
+		" ab ",
+		"销售01",
+		"sales-01",
+		"sales.01",
+		"sales 01",
+		"sales@01",
+		strings.Repeat("a", AdminUsernameMaxLength+1),
+	} {
+		if _, err := NormalizeAdminUsername(raw); !errors.Is(err, ErrAdminUsernameInvalid) {
+			t.Fatalf("NormalizeAdminUsername(%q) error = %v, want ErrAdminUsernameInvalid", raw, err)
+		}
+	}
+}
+
+func TestAdminManageUsecaseCreateRejectsInvalidUsernameBeforeRepositoryWrite(t *testing.T) {
+	repo := newStubAdminManageRepo()
+	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
+	repo.adminsByName["root"] = repo.adminsByID[1]
+	uc := NewAdminManageUsecase(repo, log.NewStdLogger(io.Discard), tracesdk.NewTracerProvider())
+	ctx := NewContextWithClaims(context.Background(), &AuthClaims{UserID: 1, Username: "root", Role: RoleAdmin})
+
+	beforeCount := len(repo.adminsByID)
+	_, err := uc.Create(ctx, "王采购", "sales-01", "", "secret123", nil)
+	if !errors.Is(err, ErrAdminUsernameInvalid) {
+		t.Fatalf("Create() error = %v, want ErrAdminUsernameInvalid", err)
+	}
+	if len(repo.adminsByID) != beforeCount || len(repo.auditEvents) != 0 {
+		t.Fatalf("invalid username wrote repository state: admins=%d audit=%d", len(repo.adminsByID), len(repo.auditEvents))
+	}
+}
+
+func TestAdminManageUsecase_SuperAdminCanEditOwnProfileOnly(t *testing.T) {
+	repo := newStubAdminManageRepo()
+	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
+	repo.adminsByName["root"] = repo.adminsByID[1]
+	repo.adminsByID[2] = &AdminUser{ID: 2, Username: "other-super", IsSuperAdmin: true}
+	repo.adminsByName["other-super"] = repo.adminsByID[2]
+	uc := NewAdminManageUsecase(repo, log.NewStdLogger(io.Discard), tracesdk.NewTracerProvider())
+	ctx := NewContextWithClaims(context.Background(), &AuthClaims{UserID: 1, Username: "root", Role: RoleAdmin})
+
+	updated, err := uc.SetProfile(ctx, 1, "系统管理员", "13800138000")
+	if err != nil || updated.DisplayName != "系统管理员" {
+		t.Fatalf("self profile update = %#v, err=%v", updated, err)
+	}
+	if _, err := uc.SetProfile(ctx, 2, "另一管理员", ""); !errors.Is(err, ErrNoPermission) {
+		t.Fatalf("other super-admin profile error = %v", err)
 	}
 }
 

@@ -104,6 +104,7 @@ function persistMobileAdminProfile(profile) {
     {
       user_id: profile.id,
       username: profile.username,
+      display_name: profile.display_name,
       is_super_admin: profile.is_super_admin === true,
       roles: profile.roles || [],
       permissions: profile.permissions || [],
@@ -164,8 +165,7 @@ export default function MobileAppLayout() {
   const canUseCurrentMobileRole =
     mobileRolePermissionAllowed && customerRuntimeAvailable
   const canEnterDesktop = hasDesktopEntryAccess(adminProfile, entryConfig)
-  const canReturnToEntries =
-    canEnterDesktop || allowedMobileRoleKeys.length > 1
+  const canReturnToEntries = canEnterDesktop || allowedMobileRoleKeys.length > 1
   const authRpc = useMemo(
     () =>
       new JsonRpc({

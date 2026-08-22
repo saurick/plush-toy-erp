@@ -79,6 +79,8 @@ test('auth: 新版 session token 不依赖已移除的 uname 与 role claim', ()
     {
       access_token: createMockAdminToken('root'),
       username: 'root',
+      display_name: '系统管理员',
+      phone: '13800138000',
       is_super_admin: true,
     },
     AUTH_SCOPE.ADMIN
@@ -87,6 +89,8 @@ test('auth: 新版 session token 不依赖已移除的 uname 与 role claim', ()
   const currentUser = getCurrentUser(AUTH_SCOPE.ADMIN)
   assert.equal(currentUser?.id, 1)
   assert.equal(currentUser?.username, 'root')
+  assert.equal(currentUser?.display_name, '系统管理员')
+  assert.equal(currentUser?.phone, '13800138000')
   assert.equal(currentUser?.role, 'admin')
   assert(currentUser?.exp > Math.floor(Date.now() / 1000))
   assert.equal(getStoredAdminProfile().role, 'admin')
@@ -143,6 +147,8 @@ test('auth: 显式 is_super_admin=true 仍保留超级管理员身份和 RBAC �
     {
       access_token: createMockAdminToken('root'),
       username: 'root',
+      display_name: '系统管理员',
+      phone: '13800138000',
       is_super_admin: true,
       roles: [{ role_key: 'admin', name: '系统管理员' }],
       permissions: ['system.user.read'],
@@ -153,6 +159,8 @@ test('auth: 显式 is_super_admin=true 仍保留超级管理员身份和 RBAC �
 
   const profile = getStoredAdminProfile()
   assert.equal(profile.is_super_admin, true)
+  assert.equal(profile.display_name, '系统管理员')
+  assert.equal(profile.phone, '13800138000')
   assert.deepEqual(profile.roles, [{ role_key: 'admin', name: '系统管理员' }])
   assert.deepEqual(profile.permissions, ['system.user.read'])
   assert.deepEqual(profile.menus, [

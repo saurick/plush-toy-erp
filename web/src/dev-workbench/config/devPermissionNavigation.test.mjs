@@ -199,7 +199,8 @@ test('employee menu projection merges multiple roles once and marks an inactive 
     accounts: [
       {
         id: 20,
-        username: '小吴',
+        username: 'warehouse01',
+        display_name: '小吴',
         account_status: 'suspended',
         roles: [
           { role_key: 'sales', name: '业务' },
@@ -213,6 +214,7 @@ test('employee menu projection merges multiple roles once and marks an inactive 
   })
 
   assert.equal(model.state, PERMISSION_NAVIGATION_STATE.BLOCKED)
+  assert.equal(model.contextLabel, '小吴（warehouse01）')
   assert.equal(model.modeLabel, '多岗位合并（2）')
   assert.match(model.notice, /临时停用/u)
   assert.equal(model.effectivePageCount, 7)
@@ -237,7 +239,8 @@ test('menu projection fails closed for partial access instead of showing a parti
     accounts: [
       {
         id: 21,
-        username: '小陈',
+        username: 'sales01',
+        display_name: '小陈',
         account_status: 'active',
         roles: [
           { role_key: 'sales', name: '业务' },
@@ -265,7 +268,8 @@ test('super administrator menu is not fabricated from ordinary role settings', (
     accounts: [
       {
         id: 1,
-        username: '系统管理员',
+        username: 'root-admin',
+        display_name: '系统管理员',
         account_status: 'active',
         is_super_admin: true,
         roles: [],
@@ -277,6 +281,7 @@ test('super administrator menu is not fabricated from ordinary role settings', (
   })
 
   assert.equal(model.state, PERMISSION_NAVIGATION_STATE.UNAVAILABLE)
+  assert.equal(model.contextLabel, '系统管理员（root-admin）')
   assert.equal(model.modeLabel, '系统保留账号')
   assert.match(model.message, /不推导可能失真的完整菜单/u)
 })

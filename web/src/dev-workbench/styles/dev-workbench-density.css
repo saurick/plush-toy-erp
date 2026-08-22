@@ -538,6 +538,22 @@
     gap: 8px;
   }
 
+  .erp-dev-hub-card--without-icon {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .erp-dev-hub-card--without-icon .erp-dev-hub-card__head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .erp-dev-hub-card--without-icon .erp-dev-hub-card__head .ant-tag {
+    max-width: 100%;
+    margin-inline-end: 0;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
   .erp-dev-hub-card__icon,
   .erp-dev-hub-card--compact .erp-dev-hub-card__icon {
     width: 32px;

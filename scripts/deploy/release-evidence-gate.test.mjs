@@ -224,8 +224,8 @@ Pending Files: 0
             adminSuperAdmin: true,
             phoneConfigured: false,
             phoneBound: false,
-            demoExpected: 10,
-            demoAuthenticated: 10,
+            uatExpected: 10,
+            uatAuthenticated: 10,
             totalExpected: 11,
             totalAuthenticated: 11,
             uniqueTokensObserved: true,
@@ -237,19 +237,12 @@ Pending Files: 0
             credentialDatasetVersion: credentialContract.target.datasetVersion,
             usernames: [
               "admin",
-              "demo_boss",
-              "demo_sales",
-              "demo_purchase",
-              "demo_production",
-              "demo_warehouse",
-              "demo_quality",
-              "demo_finance",
-              "demo_pmc",
-              "demo_engineering",
-              "demo_admin",
+              ...credentialContract.credentials.uat.usernames,
             ],
-            adminPasswordSource: "credential-contract",
-            demoPasswordSource: "credential-contract",
+            adminPasswordSource:
+              credentialContract.credentials.admin.credentialSource,
+            uatPasswordSource:
+              credentialContract.credentials.uat.credentialSource,
             smsPhoneSourceEnv: "MANUAL_ACCEPTANCE_SMS_PHONE",
             responseBodyStored: false,
           },
@@ -272,7 +265,8 @@ Pending Files: 0
         customerRevision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
         operationId: "123e4567-e89b-42d3-a456-426614174000",
         adminAccounts: 1,
-        demoAccounts: 10,
+        accountKind: "customer-uat",
+        roleAccounts: 10,
         revokedSessions: 1,
         authVersionIncremented: true,
         auditSource: "manual_acceptance_password_rotation",
@@ -285,7 +279,7 @@ Pending Files: 0
             revokedSessions: 1,
             phoneBound: false,
           },
-          ...credentialContract.credentials.demo.usernames.map(
+          ...credentialContract.credentials.uat.usernames.map(
             (username, index) => ({
               username,
               authVersion: index + 2,
@@ -1031,14 +1025,14 @@ test("release evidence gate rejects duplicate credential login matrices", () => 
 
 for (const [field, value, expectedError] of [
   [
-    "demoAuthenticated",
+    "uatAuthenticated",
     9,
-    /credential-login-matrix must prove 10\/10 demo and 11\/11 total logins/,
+    /credential-login-matrix must prove 10\/10 UAT and 11\/11 total logins/,
   ],
   [
     "totalAuthenticated",
     10,
-    /credential-login-matrix must prove 10\/10 demo and 11\/11 total logins/,
+    /credential-login-matrix must prove 10\/10 UAT and 11\/11 total logins/,
   ],
   [
     "uniqueTokensObserved",
@@ -1141,7 +1135,7 @@ for (const [name, mutate, expectedError] of [
     /every account authVersion must be greater than 1/,
   ],
   [
-    "demo phone binding",
+    "UAT phone binding",
     (report) => (report.accounts[1].phoneBound = true),
     /account phoneBound values must follow the optional contracted admin binding/,
   ],

@@ -17,6 +17,11 @@ const DATA_RUNTIME_SCOPE_CUSTOMER = 'customer_runtime'
 const DATA_RUNTIME_SCOPE_PRODUCT_CORE_REVIEW = 'product_core_review'
 const DATA_RUNTIME_SCOPE_SYNC_FAILED = 'sync_failed_diagnostic'
 const DATA_RUNTIME_SCOPE_CUSTOMER_MISSING = 'customer_runtime_missing'
+export const CUSTOMER_RUNTIME_GATE = Object.freeze({
+  BOOTSTRAP: 'bootstrap',
+  UNAVAILABLE: 'unavailable',
+  READY: 'ready',
+})
 const CUSTOMER_CONFIG_INDEPENDENT_PAGE_KEYS = new Set([
   'permission-center',
   'system-audit-logs',
@@ -213,6 +218,20 @@ export function shouldGuardCustomerBusinessPageRuntime({
   )
 }
 
+export function resolveCustomerRuntimeGate({
+  bootstrapPending = false,
+  runtimeUnavailable = false,
+  pageRequiresCustomerRuntime = false,
+} = {}) {
+  if (bootstrapPending) {
+    return CUSTOMER_RUNTIME_GATE.BOOTSTRAP
+  }
+  if (runtimeUnavailable && pageRequiresCustomerRuntime) {
+    return CUSTOMER_RUNTIME_GATE.UNAVAILABLE
+  }
+  return CUSTOMER_RUNTIME_GATE.READY
+}
+
 export function canMountCustomerRuntime(adminProfile) {
   const customerKey = adminProfile?.effective_session?.customer?.key
   return Boolean(
@@ -352,10 +371,7 @@ export function resolveEffectiveSessionCustomerKey(activeBrand = {}) {
   return customerKey || ''
 }
 
-export function resolveEffectiveSessionPageAccess(
-  adminProfile,
-  pageKey
-) {
+export function resolveEffectiveSessionPageAccess(adminProfile, pageKey) {
   const normalizedPageKey = typeof pageKey === 'string' ? pageKey.trim() : ''
   if (!normalizedPageKey) {
     return { allowed: true, reason: 'empty_page_key' }

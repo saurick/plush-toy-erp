@@ -26,6 +26,8 @@ type SalesOrderItem struct {
 	SalesOrderID int `json:"sales_order_id,omitempty"`
 	// LineNo holds the value of the "line_no" field.
 	LineNo int `json:"line_no,omitempty"`
+	// DisplayOrder holds the value of the "display_order" field.
+	DisplayOrder *int `json:"display_order,omitempty"`
 	// ProductID holds the value of the "product_id" field.
 	ProductID int `json:"product_id,omitempty"`
 	// ProductSkuID holds the value of the "product_sku_id" field.
@@ -150,7 +152,7 @@ func (*SalesOrderItem) scanValues(columns []string) ([]any, error) {
 			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
 		case salesorderitem.FieldOrderedQuantity:
 			values[i] = new(decimal.Decimal)
-		case salesorderitem.FieldID, salesorderitem.FieldSalesOrderID, salesorderitem.FieldLineNo, salesorderitem.FieldProductID, salesorderitem.FieldProductSkuID, salesorderitem.FieldUnitID:
+		case salesorderitem.FieldID, salesorderitem.FieldSalesOrderID, salesorderitem.FieldLineNo, salesorderitem.FieldDisplayOrder, salesorderitem.FieldProductID, salesorderitem.FieldProductSkuID, salesorderitem.FieldUnitID:
 			values[i] = new(sql.NullInt64)
 		case salesorderitem.FieldProductCodeSnapshot, salesorderitem.FieldProductNameSnapshot, salesorderitem.FieldColorSnapshot, salesorderitem.FieldLineStatus, salesorderitem.FieldNote:
 			values[i] = new(sql.NullString)
@@ -188,6 +190,13 @@ func (_m *SalesOrderItem) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field line_no", values[i])
 			} else if value.Valid {
 				_m.LineNo = int(value.Int64)
+			}
+		case salesorderitem.FieldDisplayOrder:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field display_order", values[i])
+			} else if value.Valid {
+				_m.DisplayOrder = new(int)
+				*_m.DisplayOrder = int(value.Int64)
 			}
 		case salesorderitem.FieldProductID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -352,6 +361,11 @@ func (_m *SalesOrderItem) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("line_no=")
 	builder.WriteString(fmt.Sprintf("%v", _m.LineNo))
+	builder.WriteString(", ")
+	if v := _m.DisplayOrder; v != nil {
+		builder.WriteString("display_order=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("product_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ProductID))

@@ -78,6 +78,7 @@ export async function installSystemRpcMocks(page, context) {
   const assistantAdmin = {
     id: 2,
     username: 'assistant-admin',
+    display_name: '业务助理',
     phone: '13900139000',
     is_super_admin: false,
     disabled: false,
@@ -91,6 +92,7 @@ export async function installSystemRpcMocks(page, context) {
   const purchaseAdmin = {
     id: 3,
     username: 'purchase-employee',
+    display_name: '采购专员',
     phone: '13900139001',
     is_super_admin: false,
     disabled: false,
@@ -104,6 +106,7 @@ export async function installSystemRpcMocks(page, context) {
   const pmcAdmin = {
     id: 7,
     username: 'pmc-employee',
+    display_name: 'PMC 专员',
     phone: '13900139005',
     is_super_admin: false,
     disabled: false,
@@ -117,6 +120,7 @@ export async function installSystemRpcMocks(page, context) {
   const multiRoleAdmin = {
     id: 4,
     username: 'multi-role-employee',
+    display_name: '综合跟单',
     phone: '13900139002',
     is_super_admin: false,
     disabled: false,
@@ -132,6 +136,7 @@ export async function installSystemRpcMocks(page, context) {
   const suspendedAdmin = {
     id: 5,
     username: 'suspended-finance',
+    display_name: '离岗财务',
     phone: '13900139003',
     is_super_admin: false,
     disabled: true,
@@ -145,6 +150,7 @@ export async function installSystemRpcMocks(page, context) {
   const revokedAdmin = {
     id: 6,
     username: 'revoked-sales',
+    display_name: '离职业务员',
     phone: '13900139004',
     is_super_admin: false,
     disabled: true,
@@ -180,6 +186,7 @@ export async function installSystemRpcMocks(page, context) {
         break
       case 'create':
       case 'set_roles':
+      case 'set_profile':
       case 'set_disabled':
       case 'reset_password':
         if (method === 'set_roles') {
@@ -189,6 +196,15 @@ export async function installSystemRpcMocks(page, context) {
                 name: roleKey,
               }))
             : assistantAdmin.roles
+        }
+        if (method === 'create') {
+          assistantAdmin.display_name = String(params.display_name || '').trim()
+          assistantAdmin.username = String(params.username || '').trim()
+          assistantAdmin.phone = String(params.phone || '').trim()
+        }
+        if (method === 'set_profile') {
+          assistantAdmin.display_name = String(params.display_name || '').trim()
+          assistantAdmin.phone = String(params.phone || '').trim()
         }
         if (method === 'set_disabled') {
           assistantAdmin.disabled = Boolean(params.disabled)

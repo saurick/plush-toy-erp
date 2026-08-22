@@ -1154,7 +1154,10 @@ test("dev entry boundary: customer config console stays preview or gated apply o
   assert.equal(missingOverview.status, "missing");
   assert.equal(missingOverview.customerKey, "unknown-customer");
   assert.equal(missingOverview.menuSummary, undefined);
-  assert.match(missingOverview.blockedPieces[0].boundary, /不会 fallback/);
+  assert.match(
+    missingOverview.blockedPieces[0].boundary,
+    /不会自动改用其他客户包/,
+  );
 
   const overview =
     buildCustomerConfigDevOverviewFromSearch("?customer=yoyoosun");

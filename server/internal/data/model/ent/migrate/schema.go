@@ -86,6 +86,7 @@ var (
 	AdminUsersColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "username", Type: field.TypeString, Size: 64},
+		{Name: "display_name", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "phone", Type: field.TypeString, Nullable: true, Size: 32},
 		{Name: "password_hash", Type: field.TypeString},
 		{Name: "is_super_admin", Type: field.TypeBool, Default: false},
@@ -114,12 +115,12 @@ var (
 			{
 				Name:    "adminuser_phone",
 				Unique:  true,
-				Columns: []*schema.Column{AdminUsersColumns[2]},
+				Columns: []*schema.Column{AdminUsersColumns[3]},
 			},
 			{
 				Name:    "adminuser_is_super_admin",
 				Unique:  false,
-				Columns: []*schema.Column{AdminUsersColumns[4]},
+				Columns: []*schema.Column{AdminUsersColumns[5]},
 			},
 		},
 	}
@@ -1348,6 +1349,7 @@ var (
 	OutsourcingOrderItemsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "line_no", Type: field.TypeInt},
+		{Name: "display_order", Type: field.TypeInt, Nullable: true},
 		{Name: "subject_type", Type: field.TypeString, Size: 16},
 		{Name: "product_no_snapshot", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "sku_code_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
@@ -1382,37 +1384,37 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "outsourcing_order_items_materials_outsourcing_order_items",
-				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[21]},
+				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[22]},
 				RefColumns: []*schema.Column{MaterialsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "outsourcing_order_items_outsourcing_orders_items",
-				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[22]},
+				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[23]},
 				RefColumns: []*schema.Column{OutsourcingOrdersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "outsourcing_order_items_product_skus_product_sku",
-				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[23]},
+				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[24]},
 				RefColumns: []*schema.Column{ProductSkusColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "outsourcing_order_items_processes_outsourcing_order_items",
-				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[24]},
+				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[25]},
 				RefColumns: []*schema.Column{ProcessesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "outsourcing_order_items_products_outsourcing_order_items",
-				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[25]},
+				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[26]},
 				RefColumns: []*schema.Column{ProductsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "outsourcing_order_items_units_outsourcing_order_items",
-				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[26]},
+				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[27]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1421,47 +1423,47 @@ var (
 			{
 				Name:    "outsourcingorderitem_outsourcing_order_id_line_no",
 				Unique:  true,
-				Columns: []*schema.Column{OutsourcingOrderItemsColumns[22], OutsourcingOrderItemsColumns[1]},
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[23], OutsourcingOrderItemsColumns[1]},
 			},
 			{
 				Name:    "outsourcingorderitem_subject_type",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrderItemsColumns[2]},
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[3]},
 			},
 			{
 				Name:    "outsourcingorderitem_product_id",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrderItemsColumns[25]},
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[26]},
 			},
 			{
 				Name:    "outsourcingorderitem_product_sku_id",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrderItemsColumns[23]},
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[24]},
 			},
 			{
 				Name:    "outsourcingorderitem_material_id",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrderItemsColumns[21]},
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[22]},
 			},
 			{
 				Name:    "outsourcingorderitem_process_id",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrderItemsColumns[24]},
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[25]},
 			},
 			{
 				Name:    "outsourcingorderitem_unit_id",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrderItemsColumns[26]},
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[27]},
 			},
 			{
 				Name:    "outsourcingorderitem_line_status",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrderItemsColumns[17]},
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[18]},
 			},
 			{
 				Name:    "outsourcingorderitem_expected_return_date",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrderItemsColumns[16]},
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[17]},
 			},
 		},
 	}
@@ -2859,6 +2861,7 @@ var (
 	PurchaseOrderItemsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "line_no", Type: field.TypeInt},
+		{Name: "display_order", Type: field.TypeInt, Nullable: true},
 		{Name: "material_code_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "material_name_snapshot", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "color_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
@@ -2885,19 +2888,19 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "purchase_order_items_materials_purchase_order_items",
-				Columns:    []*schema.Column{PurchaseOrderItemsColumns[16]},
+				Columns:    []*schema.Column{PurchaseOrderItemsColumns[17]},
 				RefColumns: []*schema.Column{MaterialsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "purchase_order_items_purchase_orders_items",
-				Columns:    []*schema.Column{PurchaseOrderItemsColumns[17]},
+				Columns:    []*schema.Column{PurchaseOrderItemsColumns[18]},
 				RefColumns: []*schema.Column{PurchaseOrdersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "purchase_order_items_units_purchase_order_items",
-				Columns:    []*schema.Column{PurchaseOrderItemsColumns[18]},
+				Columns:    []*schema.Column{PurchaseOrderItemsColumns[19]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -2906,27 +2909,27 @@ var (
 			{
 				Name:    "purchaseorderitem_purchase_order_id_line_no",
 				Unique:  true,
-				Columns: []*schema.Column{PurchaseOrderItemsColumns[17], PurchaseOrderItemsColumns[1]},
+				Columns: []*schema.Column{PurchaseOrderItemsColumns[18], PurchaseOrderItemsColumns[1]},
 			},
 			{
 				Name:    "purchaseorderitem_material_id",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrderItemsColumns[16]},
+				Columns: []*schema.Column{PurchaseOrderItemsColumns[17]},
 			},
 			{
 				Name:    "purchaseorderitem_unit_id",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrderItemsColumns[18]},
+				Columns: []*schema.Column{PurchaseOrderItemsColumns[19]},
 			},
 			{
 				Name:    "purchaseorderitem_line_status",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrderItemsColumns[12]},
+				Columns: []*schema.Column{PurchaseOrderItemsColumns[13]},
 			},
 			{
 				Name:    "purchaseorderitem_expected_arrival_date",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrderItemsColumns[11]},
+				Columns: []*schema.Column{PurchaseOrderItemsColumns[12]},
 			},
 		},
 	}
@@ -3922,6 +3925,7 @@ var (
 	SalesOrderItemsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "line_no", Type: field.TypeInt},
+		{Name: "display_order", Type: field.TypeInt, Nullable: true},
 		{Name: "product_code_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "product_name_snapshot", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "color_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
@@ -3946,25 +3950,25 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "sales_order_items_product_skus_sales_order_items",
-				Columns:    []*schema.Column{SalesOrderItemsColumns[13]},
+				Columns:    []*schema.Column{SalesOrderItemsColumns[14]},
 				RefColumns: []*schema.Column{ProductSkusColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "sales_order_items_sales_orders_items",
-				Columns:    []*schema.Column{SalesOrderItemsColumns[14]},
+				Columns:    []*schema.Column{SalesOrderItemsColumns[15]},
 				RefColumns: []*schema.Column{SalesOrdersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "sales_order_items_products_product",
-				Columns:    []*schema.Column{SalesOrderItemsColumns[15]},
+				Columns:    []*schema.Column{SalesOrderItemsColumns[16]},
 				RefColumns: []*schema.Column{ProductsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "sales_order_items_units_unit",
-				Columns:    []*schema.Column{SalesOrderItemsColumns[16]},
+				Columns:    []*schema.Column{SalesOrderItemsColumns[17]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -3973,32 +3977,32 @@ var (
 			{
 				Name:    "salesorderitem_sales_order_id_line_no",
 				Unique:  true,
-				Columns: []*schema.Column{SalesOrderItemsColumns[14], SalesOrderItemsColumns[1]},
+				Columns: []*schema.Column{SalesOrderItemsColumns[15], SalesOrderItemsColumns[1]},
 			},
 			{
 				Name:    "salesorderitem_product_id",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrderItemsColumns[15]},
+				Columns: []*schema.Column{SalesOrderItemsColumns[16]},
 			},
 			{
 				Name:    "salesorderitem_product_sku_id",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrderItemsColumns[13]},
+				Columns: []*schema.Column{SalesOrderItemsColumns[14]},
 			},
 			{
 				Name:    "salesorderitem_unit_id",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrderItemsColumns[16]},
+				Columns: []*schema.Column{SalesOrderItemsColumns[17]},
 			},
 			{
 				Name:    "salesorderitem_line_status",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrderItemsColumns[9]},
+				Columns: []*schema.Column{SalesOrderItemsColumns[10]},
 			},
 			{
 				Name:    "salesorderitem_planned_delivery_date",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrderItemsColumns[8]},
+				Columns: []*schema.Column{SalesOrderItemsColumns[9]},
 			},
 		},
 	}
@@ -4980,6 +4984,7 @@ func init() {
 	OutsourcingOrderItemsTable.Annotation = &entsql.Annotation{}
 	OutsourcingOrderItemsTable.Annotation.Checks = map[string]string{
 		"outsourcing_order_items_amount_non_negative":      "amount IS NULL OR amount >= 0",
+		"outsourcing_order_items_display_order_positive":   "display_order IS NULL OR display_order > 0",
 		"outsourcing_order_items_line_no_positive":         "line_no > 0",
 		"outsourcing_order_items_line_status_allowed":      "line_status IN ('open', 'closed', 'canceled')",
 		"outsourcing_order_items_material_id_positive":     "material_id IS NULL OR material_id > 0",
@@ -5205,6 +5210,7 @@ func init() {
 	PurchaseOrderItemsTable.Annotation = &entsql.Annotation{}
 	PurchaseOrderItemsTable.Annotation.Checks = map[string]string{
 		"purchase_order_items_amount_non_negative":     "amount IS NULL OR amount >= 0",
+		"purchase_order_items_display_order_positive":  "display_order IS NULL OR display_order > 0",
 		"purchase_order_items_line_no_positive":        "line_no > 0",
 		"purchase_order_items_line_status_allowed":     "line_status IN ('open', 'closed', 'canceled')",
 		"purchase_order_items_purchased_qty_positive":  "purchased_quantity > 0",
@@ -5321,6 +5327,7 @@ func init() {
 	SalesOrderItemsTable.Annotation = &entsql.Annotation{}
 	SalesOrderItemsTable.Annotation.Checks = map[string]string{
 		"sales_order_items_amount_non_negative":     "amount IS NULL OR amount >= 0",
+		"sales_order_items_display_order_positive":  "display_order IS NULL OR display_order > 0",
 		"sales_order_items_line_no_positive":        "line_no > 0",
 		"sales_order_items_line_status_allowed":     "line_status IN ('open', 'closed', 'canceled')",
 		"sales_order_items_ordered_qty_positive":    "ordered_quantity > 0",

@@ -39,6 +39,20 @@ func (_c *SalesOrderItemCreate) SetLineNo(v int) *SalesOrderItemCreate {
 	return _c
 }
 
+// SetDisplayOrder sets the "display_order" field.
+func (_c *SalesOrderItemCreate) SetDisplayOrder(v int) *SalesOrderItemCreate {
+	_c.mutation.SetDisplayOrder(v)
+	return _c
+}
+
+// SetNillableDisplayOrder sets the "display_order" field if the given value is not nil.
+func (_c *SalesOrderItemCreate) SetNillableDisplayOrder(v *int) *SalesOrderItemCreate {
+	if v != nil {
+		_c.SetDisplayOrder(*v)
+	}
+	return _c
+}
+
 // SetProductID sets the "product_id" field.
 func (_c *SalesOrderItemCreate) SetProductID(v int) *SalesOrderItemCreate {
 	_c.mutation.SetProductID(v)
@@ -328,6 +342,11 @@ func (_c *SalesOrderItemCreate) check() error {
 			return &ValidationError{Name: "line_no", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.line_no": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.DisplayOrder(); ok {
+		if err := salesorderitem.DisplayOrderValidator(v); err != nil {
+			return &ValidationError{Name: "display_order", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.display_order": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.ProductID(); !ok {
 		return &ValidationError{Name: "product_id", err: errors.New(`ent: missing required field "SalesOrderItem.product_id"`)}
 	}
@@ -424,6 +443,10 @@ func (_c *SalesOrderItemCreate) createSpec() (*SalesOrderItem, *sqlgraph.CreateS
 	if value, ok := _c.mutation.LineNo(); ok {
 		_spec.SetField(salesorderitem.FieldLineNo, field.TypeInt, value)
 		_node.LineNo = value
+	}
+	if value, ok := _c.mutation.DisplayOrder(); ok {
+		_spec.SetField(salesorderitem.FieldDisplayOrder, field.TypeInt, value)
+		_node.DisplayOrder = &value
 	}
 	if value, ok := _c.mutation.ProductCodeSnapshot(); ok {
 		_spec.SetField(salesorderitem.FieldProductCodeSnapshot, field.TypeString, value)

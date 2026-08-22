@@ -308,8 +308,12 @@ test("skill health: testing and capability guidance avoid duplicate mandatory la
       readFile(path.join(ROOT, ".agents/skills/README.md"), "utf8"),
     ]);
 
-  assert.match(projectAgents, /高成本验证必须逐次明确确认/u);
-  assert.match(strategy, /Codex 自拟提示词不能代替用户确认/u);
+  assert.match(
+    projectAgents,
+    /高成本验证按 `\$plush-test-governance` 在执行前点名授权/u,
+  );
+  assert.match(strategy, /同一候选可一次合并确认/u);
+  assert.doesNotMatch(strategy, /新任务提示词在创建任务前完整展示/u);
   assert.match(testSkill, /高成本门禁失败即停止，不自动扩圈或重跑/u);
 
   assert.equal(

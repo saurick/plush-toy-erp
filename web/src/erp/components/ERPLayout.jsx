@@ -81,7 +81,9 @@ import {
   DEFAULT_DESKTOP_ENTRY,
   resolveCurrentNavigationEntry,
 } from '../utils/currentNavigationEntry.mjs'
+import { formatAdminIdentity } from '../utils/adminIdentity.mjs'
 import {
+  CUSTOMER_RUNTIME_GATE,
   attachEffectiveSessionToAdminProfile,
   attachUnavailableEffectiveSessionToAdminProfile,
   buildEffectiveSessionDiagnosticSummary,
@@ -90,6 +92,7 @@ import {
   hasExpectedDesktopCustomerSession,
   isLocalCustomerDesktopPreviewSession,
   loadProfileSyncReadWithRetry,
+  resolveCustomerRuntimeGate,
   resolveEffectiveSessionCustomerKey,
   resolveEffectiveSessionPageAccess,
   shouldRedirectFromCurrentNavigation,
@@ -102,6 +105,7 @@ const { Paragraph, Text } = Typography
 const PROFILE_SYNC_INTERVAL_MS = 60 * 1000
 const PROFILE_BOOTSTRAP_RETRY_DELAYS_MS = [200, 600]
 const ROLE_GUIDED_MORE_MENU_KEY = 'role-more-functions'
+const ADMIN_AUTH_STORAGE_KEYS = new Set(['admin_access_token', 'admin_user_id'])
 
 const navIconRegistry = {
   'workspace-home': <AppstoreOutlined />,
@@ -277,6 +281,7 @@ function buildUnavailableCachedAdminProfile(profile) {
   return attachUnavailableEffectiveSessionToAdminProfile({
     id: profile.id,
     username: profile.username,
+    display_name: profile.display_name,
     phone: profile.phone,
     is_super_admin: false,
     roles: [],
@@ -305,6 +310,7 @@ export default function ERPLayout() {
   const [profileSyncCompleted, setProfileSyncCompleted] = useState(false)
   const adminProfileRef = useRef(adminProfile)
   const profileSyncInFlightRef = useRef(null)
+  const profileSyncGenerationRef = useRef(0)
   const profileSyncActiveRef = useRef(false)
   const profileInitialSyncStartedRef = useRef(false)
   const profileSyncErrorNotifiedRef = useRef(false)
@@ -403,6 +409,11 @@ export default function ERPLayout() {
       adminProfile,
       currentNavigationEntry.pageKey
     ).reason !== 'system_page_rbac_scope'
+  const customerRuntimeGate = resolveCustomerRuntimeGate({
+    bootstrapPending: customerRuntimeBootstrapPending,
+    runtimeUnavailable: customerRuntimeUnavailable,
+    pageRequiresCustomerRuntime: currentPageRequiresConfiguredCustomerRuntime,
+  })
 
   const loadProfile = useCallback(
     ({ showLoading = false } = {}) => {
@@ -410,7 +421,10 @@ export default function ERPLayout() {
         return profileSyncInFlightRef.current
       }
 
-      const isCurrentSync = () => profileSyncActiveRef.current
+      const syncGeneration = profileSyncGenerationRef.current
+      const isCurrentSync = () =>
+        profileSyncActiveRef.current &&
+        profileSyncGenerationRef.current === syncGeneration
       const loadCurrentSyncRead = (load, retryDelaysMs) =>
         loadProfileSyncReadWithRetry(
           () => {
@@ -495,6 +509,8 @@ export default function ERPLayout() {
               {
                 user_id: nextProfile.id,
                 username: nextProfile.username,
+                display_name: nextProfile.display_name,
+                phone: nextProfile.phone,
                 is_super_admin: nextProfile.is_super_admin === true,
                 roles: nextProfile.roles || [],
                 permissions: nextProfile.permissions || [],
@@ -551,6 +567,8 @@ export default function ERPLayout() {
               {
                 user_id: unavailableProfile.id,
                 username: unavailableProfile.username,
+                display_name: unavailableProfile.display_name,
+                phone: unavailableProfile.phone,
                 is_super_admin: false,
                 roles: [],
                 permissions: [],
@@ -604,6 +622,28 @@ export default function ERPLayout() {
       profileSyncActiveRef.current = false
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.clearInterval(profileSyncTimer)
+    }
+  }, [loadProfile])
+
+  useEffect(() => {
+    const handleAdminAuthStorageChange = (event) => {
+      if (event.storageArea && event.storageArea !== window.localStorage) {
+        return
+      }
+      if (event.key !== null && !ADMIN_AUTH_STORAGE_KEYS.has(event.key)) {
+        return
+      }
+
+      setProfileSyncCompleted(false)
+      setProfileLoading(true)
+      profileSyncGenerationRef.current += 1
+      profileSyncInFlightRef.current = null
+      loadProfile({ showLoading: true })
+    }
+
+    window.addEventListener('storage', handleAdminAuthStorageChange)
+    return () => {
+      window.removeEventListener('storage', handleAdminAuthStorageChange)
     }
   }, [loadProfile])
 
@@ -744,9 +784,7 @@ export default function ERPLayout() {
 
   useEffect(() => {
     if (
-      customerRuntimeBootstrapPending ||
-      (customerRuntimeUnavailable &&
-        currentPageRequiresConfiguredCustomerRuntime) ||
+      customerRuntimeGate !== CUSTOMER_RUNTIME_GATE.READY ||
       !currentPageShouldRedirect
     ) {
       return
@@ -757,9 +795,7 @@ export default function ERPLayout() {
     }
   }, [
     currentPageShouldRedirect,
-    customerRuntimeBootstrapPending,
-    customerRuntimeUnavailable,
-    currentPageRequiresConfiguredCustomerRuntime,
+    customerRuntimeGate,
     location.pathname,
     navigate,
     visibleSections,
@@ -904,6 +940,8 @@ export default function ERPLayout() {
         {
           user_id: nextProfile.id,
           username: nextProfile.username,
+          display_name: nextProfile.display_name,
+          phone: nextProfile.phone,
           is_super_admin: nextProfile.is_super_admin === true,
           roles: nextProfile.roles || [],
           permissions: nextProfile.permissions || [],
@@ -922,6 +960,7 @@ export default function ERPLayout() {
       allowedMenuPaths,
       visibleMenuPaths,
       profileSyncCompleted,
+      refreshAdminProfile: loadProfile,
       registerPageLeaveGuard,
       registerPageRefresh,
       updateAdminERPPreferences,
@@ -931,6 +970,7 @@ export default function ERPLayout() {
       allowedMenuPaths,
       visibleMenuPaths,
       profileSyncCompleted,
+      loadProfile,
       registerPageLeaveGuard,
       registerPageRefresh,
       updateAdminERPPreferences,
@@ -1082,8 +1122,10 @@ export default function ERPLayout() {
         .filter(Boolean)
         .slice(0, 2)
         .join(' / ') || '普通管理员'
-  const displayUsername =
-    adminProfile?.username || tokenAdmin?.username || 'admin'
+  const displayAdminIdentity = formatAdminIdentity(
+    adminProfile || tokenAdmin || {},
+    { fallback: 'admin' }
+  )
   const accountMenuItems = [
     {
       key: 'privacy-and-rules',
@@ -1138,7 +1180,7 @@ export default function ERPLayout() {
     )
   }
 
-  if (customerRuntimeBootstrapPending) {
+  if (customerRuntimeGate === CUSTOMER_RUNTIME_GATE.BOOTSTRAP) {
     return (
       <div data-customer-runtime-bootstrap="true">
         <Loading
@@ -1151,10 +1193,7 @@ export default function ERPLayout() {
     )
   }
 
-  if (
-    customerRuntimeUnavailable &&
-    currentPageRequiresConfiguredCustomerRuntime
-  ) {
+  if (customerRuntimeGate === CUSTOMER_RUNTIME_GATE.UNAVAILABLE) {
     return (
       <CustomerRuntimeUnavailable
         loggingOut={loggingOut}
@@ -1230,9 +1269,9 @@ export default function ERPLayout() {
                       icon={<UserOutlined />}
                       loading={loggingOut}
                       data-testid="desktop-account-menu-trigger"
-                      aria-label={`账号菜单：${displayUsername}`}
+                      aria-label={`账号菜单：${displayAdminIdentity}`}
                     >
-                      <span>{displayUsername}</span>
+                      <span>{displayAdminIdentity}</span>
                       <DownOutlined />
                     </Button>
                   </Dropdown>

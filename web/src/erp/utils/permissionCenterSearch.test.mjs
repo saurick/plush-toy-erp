@@ -31,6 +31,7 @@ const admins = [
   {
     id: 2,
     username: 'warehouse-user',
+    display_name: '王仓管',
     phone: '13800000002',
     is_super_admin: false,
     disabled: false,
@@ -55,6 +56,10 @@ const admins = [
 ]
 
 test('permissionCenterSearch: 管理员搜索只匹配用户可见账号、手机号、岗位和菜单名称', () => {
+  assert.deepEqual(
+    filterAdminRecords(admins, { keyword: '王仓管' }).map((item) => item.id),
+    [2]
+  )
   assert.deepEqual(
     filterAdminRecords(admins, { keyword: 'warehouse-user' }).map(
       (item) => item.id

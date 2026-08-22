@@ -123,10 +123,15 @@ export default function ProcessingContractPrintWorkspacePage() {
   const { templateKey } = useParams()
   const [searchParams] = useSearchParams()
   const outletContext = useOutletContext()
-  const profileCustomerKey =
+  const accountKey = String(outletContext?.adminProfile?.id || '').trim()
+  const profileCustomerKey = String(
     outletContext?.adminProfile?.effective_session?.customer?.key || ''
+  ).trim()
+  const configRevision = String(
+    outletContext?.adminProfile?.effective_session?.config_revision || ''
+  ).trim()
   const customerKey = useMemo(
-    () => resolvePrintWorkspaceCustomerKey(searchParams, profileCustomerKey),
+    () => profileCustomerKey || resolvePrintWorkspaceCustomerKey(searchParams),
     [profileCustomerKey, searchParams]
   )
   const paperRef = useRef(null)
@@ -144,10 +149,12 @@ export default function ProcessingContractPrintWorkspacePage() {
     ? buildPrintWorkspaceDraftStorageKey(
         PROCESSING_CONTRACT_TEMPLATE_KEY,
         workspaceStateID,
-        { customerKey }
+        { customerKey, accountKey, configRevision }
       )
     : buildPrintWorkspaceDraftStorageKey(PROCESSING_CONTRACT_TEMPLATE_KEY, '', {
         customerKey,
+        accountKey,
+        configRevision,
       })
   const workspaceURL = useMemo(() => {
     if (!workspaceStateID || typeof window === 'undefined') {

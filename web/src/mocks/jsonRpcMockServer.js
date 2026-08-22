@@ -348,6 +348,7 @@ const mockSuperAdminProfile = {
   id: 1,
   user_id: 1,
   username: 'mock-admin',
+  display_name: '系统管理员',
   phone: '13800138000',
   is_super_admin: true,
   disabled: false,
@@ -1208,6 +1209,7 @@ export function setupJsonRpcMockServer() {
               {
                 id: 1,
                 username: 'mock-admin',
+                display_name: '系统管理员',
                 phone: '13800138000',
                 is_super_admin: true,
                 disabled: false,
@@ -1251,7 +1253,7 @@ export function setupJsonRpcMockServer() {
       } else if (
         method === 'create' ||
         method === 'set_roles' ||
-        method === 'set_phone' ||
+        method === 'set_profile' ||
         method === 'set_disabled' ||
         method === 'revoke' ||
         method === 'reset_password'
@@ -1264,6 +1266,7 @@ export function setupJsonRpcMockServer() {
             admin: {
               id: Number(params.id || 2),
               username: params.username || 'mock-created-admin',
+              display_name: params.display_name || '测试员工',
               phone: params.phone || '',
               is_super_admin: false,
               disabled: revoked || Boolean(params.disabled),

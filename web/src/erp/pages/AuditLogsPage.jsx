@@ -29,6 +29,7 @@ import { DateInput } from '../components/business-list/BusinessListLayout.jsx'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import { buildAuditActionSelectOptions } from '../utils/auditActionSelectOptions.mjs'
 import { buildAuditLogParams } from '../utils/auditLogParams.mjs'
+import { formatAdminIdentity } from '../utils/adminIdentity.mjs'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -68,11 +69,11 @@ const actionMetaMap = {
     intent: '确认员工账号增加或移除了哪些岗位',
     next: '重点核对员工账号的岗位变化，以及是否新增系统管理等重要功能。',
   },
-  'admin_user.phone.set': {
-    label: '登录手机号变更',
+  'admin_user.profile.set': {
+    label: '员工资料变更',
     risk: 'normal',
-    intent: '确认登录或通知手机号是否被调整',
-    next: '核对手机号修改前后的内容，确认是否由账号负责人发起。',
+    intent: '确认员工姓名或登录手机号是否被调整',
+    next: '核对修改前后的姓名和手机号，确认与实际员工身份一致。',
   },
   'admin_user.disabled.set': {
     label: '账号启用或停用',
@@ -237,9 +238,8 @@ function formatTime(event = {}) {
 
 function getActorText(payload = {}) {
   const actor = payload.actor || {}
-  const name =
-    actor.username || actor.name || actor.display_name || actor.displayName
-  if (name) return name
+  const identity = formatAdminIdentity(actor, { fallback: '' })
+  if (identity) return identity
   if (actor.id) {
     return '管理员'
   }
@@ -249,20 +249,24 @@ function getActorText(payload = {}) {
 function getEventActorText(event = {}) {
   return (
     event.actor_label ||
+    getActorText(event.payload) ||
     event.actor_name ||
-    event.payload?.actor?.username ||
-    getActorText(event.payload)
+    event.payload?.actor?.username
   )
 }
 
 function getTargetText(payload = {}) {
   const target = payload.target || {}
   const targetType = String(target.type || '').trim()
+  if (targetType === 'admin_user') {
+    const identity = formatAdminIdentity(target, { fallback: '' })
+    if (identity) return identity
+  }
   const key =
-    target.username ||
     target.name ||
     target.display_name ||
     target.displayName ||
+    target.username ||
     target.no ||
     target.code ||
     target.order_no ||

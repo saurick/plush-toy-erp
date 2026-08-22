@@ -18,6 +18,8 @@ const (
 	FieldSalesOrderID = "sales_order_id"
 	// FieldLineNo holds the string denoting the line_no field in the database.
 	FieldLineNo = "line_no"
+	// FieldDisplayOrder holds the string denoting the display_order field in the database.
+	FieldDisplayOrder = "display_order"
 	// FieldProductID holds the string denoting the product_id field in the database.
 	FieldProductID = "product_id"
 	// FieldProductSkuID holds the string denoting the product_sku_id field in the database.
@@ -109,6 +111,7 @@ var Columns = []string{
 	FieldID,
 	FieldSalesOrderID,
 	FieldLineNo,
+	FieldDisplayOrder,
 	FieldProductID,
 	FieldProductSkuID,
 	FieldUnitID,
@@ -140,6 +143,8 @@ var (
 	SalesOrderIDValidator func(int) error
 	// LineNoValidator is a validator for the "line_no" field. It is called by the builders before save.
 	LineNoValidator func(int) error
+	// DisplayOrderValidator is a validator for the "display_order" field. It is called by the builders before save.
+	DisplayOrderValidator func(int) error
 	// ProductIDValidator is a validator for the "product_id" field. It is called by the builders before save.
 	ProductIDValidator func(int) error
 	// ProductSkuIDValidator is a validator for the "product_sku_id" field. It is called by the builders before save.
@@ -182,6 +187,11 @@ func BySalesOrderID(opts ...sql.OrderTermOption) OrderOption {
 // ByLineNo orders the results by the line_no field.
 func ByLineNo(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldLineNo, opts...).ToFunc()
+}
+
+// ByDisplayOrder orders the results by the display_order field.
+func ByDisplayOrder(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDisplayOrder, opts...).ToFunc()
 }
 
 // ByProductID orders the results by the product_id field.

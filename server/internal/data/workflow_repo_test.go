@@ -320,6 +320,11 @@ func TestWorkflowRepo_TaskStatusReasonEventAndCompletionCleanup(t *testing.T) {
 		&Data{postgres: client},
 		log.NewStdLogger(io.Discard),
 	)
+	actor := client.AdminUser.Create().
+		SetUsername("boss01").
+		SetDisplayName("王总").
+		SetPasswordHash("test-password-hash").
+		SaveX(ctx)
 
 	task, err := repo.CreateWorkflowTask(ctx, &biz.WorkflowTaskCreate{
 		TaskCode:      "TASK-REASON-CLEANUP-001",
@@ -355,7 +360,7 @@ func TestWorkflowRepo_TaskStatusReasonEventAndCompletionCleanup(t *testing.T) {
 				Payload:           map[string]any{"blocked_reason": blockedReason},
 			},
 		},
-	}), 8, biz.BossRoleKey)
+	}), actor.ID, biz.BossRoleKey)
 	if err != nil {
 		t.Fatalf("block task failed: %v", err)
 	}
@@ -371,7 +376,7 @@ func TestWorkflowRepo_TaskStatusReasonEventAndCompletionCleanup(t *testing.T) {
 		BusinessStatusKey: "project_approved",
 		Reason:            resumeReason,
 		Payload:           map[string]any{"mobile_action": "resume"},
-	}), 8, biz.BossRoleKey)
+	}), actor.ID, biz.BossRoleKey)
 	if !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("resume must reject a client or usecase supplied business phase, got %v", err)
 	}
@@ -388,7 +393,7 @@ func TestWorkflowRepo_TaskStatusReasonEventAndCompletionCleanup(t *testing.T) {
 				BusinessStatusKey: "project_approved",
 			},
 		},
-	}), 8, biz.BossRoleKey)
+	}), actor.ID, biz.BossRoleKey)
 	if !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("resume must reject business projection side effects, got %v", err)
 	}
@@ -402,7 +407,7 @@ func TestWorkflowRepo_TaskStatusReasonEventAndCompletionCleanup(t *testing.T) {
 			"mobile_action": "resume",
 			"evidence_refs": []any{"note://packaging-confirmed"},
 		},
-	}), 8, biz.BossRoleKey)
+	}), actor.ID, biz.BossRoleKey)
 	if err != nil {
 		t.Fatalf("resume task failed: %v", err)
 	}
@@ -434,7 +439,7 @@ func TestWorkflowRepo_TaskStatusReasonEventAndCompletionCleanup(t *testing.T) {
 			"mobile_action": "resume",
 			"evidence_refs": []any{"note://packaging-confirmed"},
 		},
-	}), 8, biz.BossRoleKey)
+	}), actor.ID, biz.BossRoleKey)
 	if err != nil {
 		t.Fatalf("same receipt resume replay failed: %v", err)
 	}
@@ -449,7 +454,7 @@ func TestWorkflowRepo_TaskStatusReasonEventAndCompletionCleanup(t *testing.T) {
 		Reason:          "另一个解除阻塞原因",
 		IntentHash:      strings.Repeat("b", 64),
 		Payload:         map[string]any{"mobile_action": "resume"},
-	}), 8, biz.BossRoleKey)
+	}), actor.ID, biz.BossRoleKey)
 	if !errors.Is(err, biz.ErrIdempotencyConflict) {
 		t.Fatalf("same receipt with a different intent must conflict, got %v", err)
 	}
@@ -460,7 +465,7 @@ func TestWorkflowRepo_TaskStatusReasonEventAndCompletionCleanup(t *testing.T) {
 		TaskStatusKey:   "ready",
 		Reason:          resumeReason,
 		Payload:         map[string]any{"mobile_action": "resume"},
-	}), 8, biz.BossRoleKey)
+	}), actor.ID, biz.BossRoleKey)
 	if !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("a new receipt must not resume an already ready task, got %v", err)
 	}
@@ -476,7 +481,7 @@ func TestWorkflowRepo_TaskStatusReasonEventAndCompletionCleanup(t *testing.T) {
 			"mobile_action": "rejected",
 			"evidence_refs": []any{"note://price"},
 		},
-	}), 8, biz.BossRoleKey)
+	}), actor.ID, biz.BossRoleKey)
 	if err != nil {
 		t.Fatalf("reject resumed task failed: %v", err)
 	}
@@ -495,7 +500,7 @@ func TestWorkflowRepo_TaskStatusReasonEventAndCompletionCleanup(t *testing.T) {
 			"mobile_action": "done",
 			"evidence_refs": []any{"note://approved"},
 		},
-	}), 8, biz.BossRoleKey)
+	}), actor.ID, biz.BossRoleKey)
 	if !errors.Is(err, biz.ErrWorkflowTaskSettled) {
 		t.Fatalf("terminal rejected task must reject later completion, got %v", err)
 	}
@@ -510,6 +515,16 @@ func TestWorkflowRepo_TaskStatusReasonEventAndCompletionCleanup(t *testing.T) {
 	if len(events) != 4 {
 		t.Fatalf("expected created + blocked + resumed + rejected events only, got %d", len(events))
 	}
+	readEvents, err := repo.ListWorkflowTaskEvents(ctx, task.ID, 10)
+	if err != nil || len(readEvents) != 4 {
+		t.Fatalf("list task events with actor identity: events=%d err=%v", len(readEvents), err)
+	}
+	for _, event := range readEvents {
+		if event.ActorID != nil && *event.ActorID == actor.ID &&
+			(event.ActorUsername != "boss01" || event.ActorDisplayName != "王总") {
+			t.Fatalf("task event actor identity = %#v", event)
+		}
+	}
 
 	assertEvent := func(index int, from string, to string, reason *string, mobileAction string) {
 		t.Helper()
@@ -521,8 +536,8 @@ func TestWorkflowRepo_TaskStatusReasonEventAndCompletionCleanup(t *testing.T) {
 			event.ToStatusKey == nil || *event.ToStatusKey != to {
 			t.Fatalf("event %d expected %s -> %s, got %#v -> %#v", index, from, to, event.FromStatusKey, event.ToStatusKey)
 		}
-		if event.ActorID == nil || *event.ActorID != 8 {
-			t.Fatalf("event %d expected actor id 8, got %#v", index, event.ActorID)
+		if event.ActorID == nil || *event.ActorID != actor.ID {
+			t.Fatalf("event %d expected actor id %d, got %#v", index, actor.ID, event.ActorID)
 		}
 		if event.ActorRoleKey == nil || *event.ActorRoleKey != biz.BossRoleKey {
 			t.Fatalf("event %d expected actor role boss, got %#v", index, event.ActorRoleKey)

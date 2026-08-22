@@ -4,8 +4,8 @@ import test from "node:test";
 import {
   FORMAL_DEMO_ACCOUNTS,
   FORMAL_DEMO_ACCOUNT_PROFILES,
+  LOCAL_DEMO_ACCOUNT_SCENARIOS,
   MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM_PHRASE,
-  MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS,
   MANUAL_ACCEPTANCE_ROLE_CAPABILITY_BASELINE,
   applyManualAcceptanceAccountScenarios,
   bootstrapManualAcceptanceFormalAccounts,
@@ -28,6 +28,10 @@ import {
   LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
   manualAcceptanceTargetConfirmation,
 } from "./manual-acceptance-target-policy.mjs";
+import {
+  CUSTOMER_UAT_ACCOUNT_SET,
+  LOCAL_DEMO_ACCOUNT_SET,
+} from "./manual-acceptance-account-identities.mjs";
 
 const LOCAL_BACKEND_URL = "http://127.0.0.1:8310";
 const LOCAL_DATABASE_NAME = "plush_erp_acceptance_local_fixture_dev";
@@ -74,15 +78,23 @@ function role(roleKey) {
 function admin({
   id,
   username,
+  displayName,
   roleKeys = [],
   disabled = false,
   phone = "",
   isSuperAdmin = false,
   accountStatus,
 }) {
+  const knownProfile = [
+    ...LOCAL_DEMO_ACCOUNT_SET.formalProfiles,
+    ...LOCAL_DEMO_ACCOUNT_SET.scenarios,
+    ...CUSTOMER_UAT_ACCOUNT_SET.formalProfiles,
+    ...CUSTOMER_UAT_ACCOUNT_SET.scenarios,
+  ].find((item) => item.username === username);
   return {
     id,
     username,
+    display_name: displayName ?? knownProfile?.displayName ?? username,
     phone,
     is_super_admin: isSuperAdmin,
     disabled,
@@ -93,12 +105,13 @@ function admin({
   };
 }
 
-function formalAccounts() {
-  return FORMAL_DEMO_ACCOUNTS.map((username, index) =>
+function formalAccounts(profiles = FORMAL_DEMO_ACCOUNT_PROFILES) {
+  return profiles.map(({ username, displayName, roleKey }, index) =>
     admin({
       id: index + 1,
       username,
-      roleKeys: [username.replace(/^demo_/u, "")],
+      displayName,
+      roleKeys: [roleKey],
     }),
   );
 }
@@ -348,6 +361,7 @@ function createBackend({
       const created = admin({
         id: nextID++,
         username: body.params.username,
+        displayName: body.params.display_name,
         roleKeys: body.params.role_keys,
       });
       state.push(created);
@@ -358,6 +372,13 @@ function createBackend({
         return ok({ admin: malformed }, url);
       }
       return ok({ admin: structuredClone(created) }, url);
+    }
+    if (domain === "admin" && body.method === "set_profile") {
+      const account = state.find((item) => item.id === body.params.id);
+      account.display_name = body.params.display_name;
+      account.phone = body.params.phone;
+      auditTotal += 1;
+      return ok({ admin: structuredClone(account) }, url);
     }
     if (domain === "admin" && body.method === "set_roles") {
       const account = state.find((item) => item.id === body.params.id);
@@ -388,9 +409,19 @@ function mutationCalls(backend) {
   return backend.calls.filter(
     (call) =>
       call.domain === "admin" &&
-      new Set(["create", "set_roles", "set_disabled", "reset_password"]).has(
-        call.method,
-      ),
+      new Set([
+        "create",
+        "set_profile",
+        "set_roles",
+        "set_disabled",
+        "reset_password",
+      ]).has(call.method),
+  );
+}
+
+function profileUpdateCalls(backend) {
+  return backend.calls.filter(
+    (call) => call.domain === "admin" && call.method === "set_profile",
   );
 }
 
@@ -485,7 +516,11 @@ test("report-only plan keeps ten formal accounts and describes three clear scena
   assert.equal(plan.scenarios[0].disabledReason, "验收时暂时停用");
   assert.deepEqual(
     plan.scenarios.map((item) => item.username),
-    ["demo_uat_disabled", "demo_uat_sales_purchase", "demo_uat_no_entry"],
+    ["demo_disabled", "demo_sales_purchase", "demo_no_entry"],
+  );
+  assert.deepEqual(
+    plan.scenarios.map((item) => item.displayName),
+    ["演示停用员工", "演示业务采购兼任", "演示未分配岗位员工"],
   );
   assert.deepEqual(plan.scenarios[0].roleKeys, ["sales"]);
   assert.equal(plan.scenarios[0].disabled, true);
@@ -511,6 +546,33 @@ test("report-only plan keeps ten formal accounts and describes three clear scena
   assert.equal(result.report.mode, "report-only");
 });
 
+test("registered 133 plan uses only UAT account identities", () => {
+  const plan = buildManualAcceptanceAccountScenarioPlan({
+    backendURL: CUSTOMER_TRIAL_133_ORIGIN,
+    target: CUSTOMER_TRIAL_133_TARGET,
+    dataVersion: "2026.08.15-v6",
+    runId: "20260815-V6",
+  });
+  assert.equal(plan.accountKind, "customer-uat");
+  assert.equal(plan.accountPrefix, "uat");
+  assert.equal(
+    plan.passwordEnvironmentVariable,
+    "MANUAL_ACCEPTANCE_UAT_PASSWORD",
+  );
+  assert.equal(plan.loginAccount, "uat_admin");
+  assert.ok(
+    plan.protectedAccounts.every((username) => /^uat_/u.test(username)),
+  );
+  assert.deepEqual(
+    plan.scenarios.map((item) => item.username),
+    ["uat_disabled", "uat_sales_purchase", "uat_no_entry"],
+  );
+  assert.deepEqual(
+    plan.formalAccountProfiles.map((item) => item.displayName),
+    CUSTOMER_UAT_ACCOUNT_SET.formalProfiles.map((item) => item.displayName),
+  );
+});
+
 test("fresh database bootstraps exact formal accounts before customer configuration exists", async () => {
   const plan = localPlan();
   const backend = createBackend({ initialAccounts: [] });
@@ -527,6 +589,7 @@ test("fresh database bootstraps exact formal accounts before customer configurat
   assert.equal(result.environment, "local");
   assert.equal(result.runtimeIdentityProof, "matched-v1");
   assert.equal(result.created, 10);
+  assert.equal(result.profilesUpdated, 0);
   assert.equal(result.verified, 0);
   assert.deepEqual(
     result.accounts.map((item) => item.username),
@@ -546,6 +609,57 @@ test("fresh database bootstraps exact formal accounts before customer configurat
     ).length,
     10,
   );
+  assert.deepEqual(
+    backend.calls
+      .filter((call) => call.domain === "admin" && call.method === "create")
+      .map((call) => call.params.display_name),
+    FORMAL_DEMO_ACCOUNT_PROFILES.map((item) => item.displayName),
+  );
+});
+
+test("formal account bootstrap repairs missing employee names and replay is idempotent", async () => {
+  const existing = formalAccounts();
+  delete existing[0].display_name;
+  existing[1].display_name = "旧演示姓名";
+  const backend = createBackend({ initialAccounts: existing });
+  const plan = localPlan();
+  const options = {
+    password: "demo-pass",
+    adminPassword: "guard-pass",
+    targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+    formalAccountConfirmation:
+      manualAcceptanceFormalAccountBootstrapConfirmation(plan),
+    fetchImpl: backend.fetchImpl,
+  };
+
+  const first = await bootstrapManualAcceptanceFormalAccounts(plan, options);
+  assert.equal(first.created, 0);
+  assert.equal(first.profilesUpdated, 2);
+  assert.equal(first.verified, 8);
+  assert.deepEqual(
+    profileUpdateCalls(backend).map((call) => ({
+      username: backend.state.find((item) => item.id === call.params.id)
+        .username,
+      displayName: call.params.display_name,
+      phone: call.params.phone,
+    })),
+    FORMAL_DEMO_ACCOUNT_PROFILES.slice(0, 2).map((profile) => ({
+      username: profile.username,
+      displayName: profile.displayName,
+      phone: "",
+    })),
+  );
+  assert.deepEqual(
+    first.accounts.map((account) => account.displayName),
+    FORMAL_DEMO_ACCOUNT_PROFILES.map((profile) => profile.displayName),
+  );
+
+  const writesAfterFirst = profileUpdateCalls(backend).length;
+  const second = await bootstrapManualAcceptanceFormalAccounts(plan, options);
+  assert.equal(second.created, 0);
+  assert.equal(second.profilesUpdated, 0);
+  assert.equal(second.verified, 10);
+  assert.equal(profileUpdateCalls(backend).length, writesAfterFirst);
 });
 
 test("formal-accounts-only CLI exposes the pre-configuration bootstrap without reading effective session", async () => {
@@ -746,6 +860,7 @@ test("registered 133 target reconciles the same three scenario accounts without 
   const backend = createBackend({
     environment: "remote",
     revision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
+    initialAccounts: formalAccounts(CUSTOMER_UAT_ACCOUNT_SET.formalProfiles),
   });
   for (const roleKey of ["warehouse", "quality"]) {
     const selected = backend.roleState.find(
@@ -824,7 +939,7 @@ test("fresh registered 133 target creates the exact ten formal accounts before s
       username: item.username,
       roleKey: item.roleKeys[0],
     })),
-    FORMAL_DEMO_ACCOUNT_PROFILES.map((item) => ({
+    CUSTOMER_UAT_ACCOUNT_SET.formalProfiles.map((item) => ({
       username: item.username,
       roleKey: item.roleKey,
     })),
@@ -841,7 +956,7 @@ test("fresh registered 133 target creates the exact ten formal accounts before s
       (call) =>
         call.domain === "admin" &&
         call.method === "create" &&
-        FORMAL_DEMO_ACCOUNTS.includes(call.params.username),
+        CUSTOMER_UAT_ACCOUNT_SET.formalUsernames.includes(call.params.username),
     ).length,
     10,
   );
@@ -984,7 +1099,7 @@ test("scenario password policy rejects values outside 8 to 20 characters before 
   }
 });
 
-test("registered 133 target rejects local-only public and shared admin/demo passwords before login", async () => {
+test("registered 133 target rejects local-only public and shared admin/UAT passwords before login", async () => {
   const plan = buildManualAcceptanceAccountScenarioPlan({
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
     target: CUSTOMER_TRIAL_133_TARGET,
@@ -993,7 +1108,9 @@ test("registered 133 target rejects local-only public and shared admin/demo pass
   });
   for (const [password, adminPassword, expected] of [
     ["12345678", "guard-pass", /local-only public password/u],
+    ["adminadmin", "guard-pass", /local-only public password/u],
     ["demo-pass", "12345678", /local-only public password/u],
+    ["uat-pass", "adminadmin", /local-only public password/u],
     ["same-secret", "same-secret", /must be different/u],
   ]) {
     let fetchCount = 0;
@@ -1246,6 +1363,7 @@ test("first apply creates three accounts and every repeated apply resets all pas
   );
   assert.deepEqual(first.summary, {
     created: 3,
+    profilesUpdated: 0,
     positionsUpdated: 0,
     statusUpdated: 1,
     passwordReset: 3,
@@ -1256,8 +1374,7 @@ test("first apply creates three accounts and every repeated apply resets all pas
   assert.equal(first.scenarios.length, 3);
   assert.ok(first.scenarios.every((scenario) => scenario.passwordReset));
   assert.equal(
-    backend.state.find((item) => item.username === "demo_uat_disabled")
-      .disabled,
+    backend.state.find((item) => item.username === "demo_disabled").disabled,
     true,
   );
 
@@ -1272,6 +1389,7 @@ test("first apply creates three accounts and every repeated apply resets all pas
   );
   assert.deepEqual(second.summary, {
     created: 0,
+    profilesUpdated: 0,
     positionsUpdated: 0,
     statusUpdated: 0,
     passwordReset: 3,
@@ -1305,7 +1423,7 @@ test("audit minimum is filled with the disabled scenario account and replay skip
     fillMutations: 20,
   });
   const disabled = backend.state.find(
-    (item) => item.username === "demo_uat_disabled",
+    (item) => item.username === "demo_disabled",
   );
   assert.equal(disabled.disabled, true);
   assert.deepEqual(
@@ -1400,25 +1518,26 @@ test("apply output reports password readiness without printing the password", as
 });
 
 test("safely owned same-name accounts converge only the necessary fields", async () => {
-  const existing = [
-    ...formalAccounts(),
+  const scenarios = [
     admin({
       id: 20,
-      username: "demo_uat_disabled",
+      username: "demo_disabled",
       roleKeys: ["sales"],
       disabled: false,
     }),
     admin({
       id: 21,
-      username: "demo_uat_sales_purchase",
+      username: "demo_sales_purchase",
       roleKeys: ["sales"],
     }),
     admin({
       id: 22,
-      username: "demo_uat_no_entry",
+      username: "demo_no_entry",
       roleKeys: ["purchase"],
     }),
   ];
+  for (const account of scenarios) delete account.display_name;
+  const existing = [...formalAccounts(), ...scenarios];
   const backend = createBackend({ initialAccounts: existing });
   const report = await withConfirmation(() =>
     applyManualAcceptanceAccountScenarios(localPlan(), {
@@ -1428,6 +1547,7 @@ test("safely owned same-name accounts converge only the necessary fields", async
   );
   assert.deepEqual(report.summary, {
     created: 0,
+    profilesUpdated: 3,
     positionsUpdated: 2,
     statusUpdated: 1,
     passwordReset: 3,
@@ -1436,18 +1556,35 @@ test("safely owned same-name accounts converge only the necessary fields", async
   assert.deepEqual(
     mutationCalls(backend).map((call) => call.method),
     [
+      "set_profile",
       "set_disabled",
       "reset_password",
+      "set_profile",
       "set_roles",
       "reset_password",
+      "set_profile",
       "set_roles",
       "reset_password",
     ],
+  );
+  assert.deepEqual(
+    profileUpdateCalls(backend).map((call) => call.params.display_name),
+    LOCAL_DEMO_ACCOUNT_SCENARIOS.map((scenario) => scenario.displayName),
   );
   const disableCall = mutationCalls(backend).find(
     (call) => call.method === "set_disabled",
   );
   assert.equal(disableCall.params.reason, "验收时暂时停用");
+
+  const profileWritesAfterFirst = profileUpdateCalls(backend).length;
+  const replay = await withConfirmation(() =>
+    applyManualAcceptanceAccountScenarios(localPlan(), {
+      password: "demo-pass",
+      fetchImpl: backend.fetchImpl,
+    }),
+  );
+  assert.equal(replay.summary.profilesUpdated, 0);
+  assert.equal(profileUpdateCalls(backend).length, profileWritesAfterFirst);
 });
 
 test("unsafe same-name ownership fails before the first account write", async () => {
@@ -1455,7 +1592,7 @@ test("unsafe same-name ownership fails before the first account write", async ()
     ...formalAccounts(),
     admin({
       id: 20,
-      username: "demo_uat_no_entry",
+      username: "demo_no_entry",
       roleKeys: ["admin"],
     }),
   ];
@@ -1547,8 +1684,16 @@ test("password reset response must contain the exact account identity and state"
 });
 
 test("admin record validation accepts login disabled or list account_status projections", () => {
-  const valid = admin({ id: 1, username: "demo_uat_no_entry" });
-  assert.equal(requireAdminAccountRecord(valid).username, "demo_uat_no_entry");
+  const valid = admin({ id: 1, username: "demo_no_entry" });
+  assert.equal(requireAdminAccountRecord(valid).username, "demo_no_entry");
+  assert.equal(
+    requireAdminAccountRecord(valid).displayName,
+    "演示未分配岗位员工",
+  );
+
+  const legacy = structuredClone(valid);
+  delete legacy.display_name;
+  assert.equal(requireAdminAccountRecord(legacy).displayName, "demo_no_entry");
 
   for (const field of ["id", "username", "roles"]) {
     const malformed = structuredClone(valid);
@@ -1558,7 +1703,7 @@ test("admin record validation accepts login disabled or list account_status proj
 
   const listProjection = admin({
     id: 2,
-    username: "demo_uat_disabled",
+    username: "demo_disabled",
     accountStatus: "suspended",
   });
   delete listProjection.disabled;
@@ -1577,7 +1722,7 @@ test("admin record validation accepts login disabled or list account_status proj
       requireAdminAccountRecord(
         admin({
           id: 3,
-          username: "demo_uat_conflict",
+          username: "demo_conflict",
           disabled: false,
           accountStatus: "suspended",
         }),
@@ -1595,15 +1740,12 @@ test("admin record validation accepts login disabled or list account_status proj
 });
 
 test("scenario definitions remain the sole managed account set", () => {
-  assert.equal(MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS.length, 3);
+  assert.equal(LOCAL_DEMO_ACCOUNT_SCENARIOS.length, 3);
   assert.ok(
-    MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS.every((item) =>
-      item.username.includes("demo_uat"),
-    ),
+    LOCAL_DEMO_ACCOUNT_SCENARIOS.every((item) => /^demo_/u.test(item.username)),
   );
   assert.equal(
-    new Set(MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS.map((item) => item.username))
-      .size,
+    new Set(LOCAL_DEMO_ACCOUNT_SCENARIOS.map((item) => item.username)).size,
     3,
   );
 });

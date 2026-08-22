@@ -7,10 +7,11 @@ test('businessAttachmentPresentation: 已保存附件显示业务可读的上传
   const meta = resolveBusinessAttachmentAuditMeta({
     uploaded_by: 7,
     uploaded_by_username: ' demo_boss ',
+    uploaded_by_display_name: ' 王总 ',
     created_at: 1_750_000_000,
   })
 
-  assert.equal(meta.uploaderLabel, '上传人：demo_boss')
+  assert.equal(meta.uploaderLabel, '上传人：王总（demo_boss）')
   assert.match(meta.uploadedAtLabel, /^上传时间：/u)
   assert.notEqual(meta.uploadedAtLabel, '上传时间：未记录')
   assert(!meta.uploaderLabel.includes('7'))

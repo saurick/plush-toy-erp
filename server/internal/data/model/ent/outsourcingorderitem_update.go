@@ -71,6 +71,33 @@ func (_u *OutsourcingOrderItemUpdate) AddLineNo(v int) *OutsourcingOrderItemUpda
 	return _u
 }
 
+// SetDisplayOrder sets the "display_order" field.
+func (_u *OutsourcingOrderItemUpdate) SetDisplayOrder(v int) *OutsourcingOrderItemUpdate {
+	_u.mutation.ResetDisplayOrder()
+	_u.mutation.SetDisplayOrder(v)
+	return _u
+}
+
+// SetNillableDisplayOrder sets the "display_order" field if the given value is not nil.
+func (_u *OutsourcingOrderItemUpdate) SetNillableDisplayOrder(v *int) *OutsourcingOrderItemUpdate {
+	if v != nil {
+		_u.SetDisplayOrder(*v)
+	}
+	return _u
+}
+
+// AddDisplayOrder adds value to the "display_order" field.
+func (_u *OutsourcingOrderItemUpdate) AddDisplayOrder(v int) *OutsourcingOrderItemUpdate {
+	_u.mutation.AddDisplayOrder(v)
+	return _u
+}
+
+// ClearDisplayOrder clears the value of the "display_order" field.
+func (_u *OutsourcingOrderItemUpdate) ClearDisplayOrder() *OutsourcingOrderItemUpdate {
+	_u.mutation.ClearDisplayOrder()
+	return _u
+}
+
 // SetSubjectType sets the "subject_type" field.
 func (_u *OutsourcingOrderItemUpdate) SetSubjectType(v string) *OutsourcingOrderItemUpdate {
 	_u.mutation.SetSubjectType(v)
@@ -642,6 +669,11 @@ func (_u *OutsourcingOrderItemUpdate) check() error {
 			return &ValidationError{Name: "line_no", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.line_no": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.DisplayOrder(); ok {
+		if err := outsourcingorderitem.DisplayOrderValidator(v); err != nil {
+			return &ValidationError{Name: "display_order", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.display_order": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.SubjectType(); ok {
 		if err := outsourcingorderitem.SubjectTypeValidator(v); err != nil {
 			return &ValidationError{Name: "subject_type", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.subject_type": %w`, err)}
@@ -761,6 +793,15 @@ func (_u *OutsourcingOrderItemUpdate) sqlSave(ctx context.Context) (_node int, e
 	}
 	if value, ok := _u.mutation.AddedLineNo(); ok {
 		_spec.AddField(outsourcingorderitem.FieldLineNo, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.DisplayOrder(); ok {
+		_spec.SetField(outsourcingorderitem.FieldDisplayOrder, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedDisplayOrder(); ok {
+		_spec.AddField(outsourcingorderitem.FieldDisplayOrder, field.TypeInt, value)
+	}
+	if _u.mutation.DisplayOrderCleared() {
+		_spec.ClearField(outsourcingorderitem.FieldDisplayOrder, field.TypeInt)
 	}
 	if value, ok := _u.mutation.SubjectType(); ok {
 		_spec.SetField(outsourcingorderitem.FieldSubjectType, field.TypeString, value)
@@ -1129,6 +1170,33 @@ func (_u *OutsourcingOrderItemUpdateOne) SetNillableLineNo(v *int) *OutsourcingO
 // AddLineNo adds value to the "line_no" field.
 func (_u *OutsourcingOrderItemUpdateOne) AddLineNo(v int) *OutsourcingOrderItemUpdateOne {
 	_u.mutation.AddLineNo(v)
+	return _u
+}
+
+// SetDisplayOrder sets the "display_order" field.
+func (_u *OutsourcingOrderItemUpdateOne) SetDisplayOrder(v int) *OutsourcingOrderItemUpdateOne {
+	_u.mutation.ResetDisplayOrder()
+	_u.mutation.SetDisplayOrder(v)
+	return _u
+}
+
+// SetNillableDisplayOrder sets the "display_order" field if the given value is not nil.
+func (_u *OutsourcingOrderItemUpdateOne) SetNillableDisplayOrder(v *int) *OutsourcingOrderItemUpdateOne {
+	if v != nil {
+		_u.SetDisplayOrder(*v)
+	}
+	return _u
+}
+
+// AddDisplayOrder adds value to the "display_order" field.
+func (_u *OutsourcingOrderItemUpdateOne) AddDisplayOrder(v int) *OutsourcingOrderItemUpdateOne {
+	_u.mutation.AddDisplayOrder(v)
+	return _u
+}
+
+// ClearDisplayOrder clears the value of the "display_order" field.
+func (_u *OutsourcingOrderItemUpdateOne) ClearDisplayOrder() *OutsourcingOrderItemUpdateOne {
+	_u.mutation.ClearDisplayOrder()
 	return _u
 }
 
@@ -1716,6 +1784,11 @@ func (_u *OutsourcingOrderItemUpdateOne) check() error {
 			return &ValidationError{Name: "line_no", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.line_no": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.DisplayOrder(); ok {
+		if err := outsourcingorderitem.DisplayOrderValidator(v); err != nil {
+			return &ValidationError{Name: "display_order", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.display_order": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.SubjectType(); ok {
 		if err := outsourcingorderitem.SubjectTypeValidator(v); err != nil {
 			return &ValidationError{Name: "subject_type", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.subject_type": %w`, err)}
@@ -1852,6 +1925,15 @@ func (_u *OutsourcingOrderItemUpdateOne) sqlSave(ctx context.Context) (_node *Ou
 	}
 	if value, ok := _u.mutation.AddedLineNo(); ok {
 		_spec.AddField(outsourcingorderitem.FieldLineNo, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.DisplayOrder(); ok {
+		_spec.SetField(outsourcingorderitem.FieldDisplayOrder, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedDisplayOrder(); ok {
+		_spec.AddField(outsourcingorderitem.FieldDisplayOrder, field.TypeInt, value)
+	}
+	if _u.mutation.DisplayOrderCleared() {
+		_spec.ClearField(outsourcingorderitem.FieldDisplayOrder, field.TypeInt)
 	}
 	if value, ok := _u.mutation.SubjectType(); ok {
 		_spec.SetField(outsourcingorderitem.FieldSubjectType, field.TypeString, value)

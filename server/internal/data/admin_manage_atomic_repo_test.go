@@ -99,6 +99,38 @@ func newAdminManageAtomicFixture(t *testing.T) adminManageAtomicFixture {
 	}
 }
 
+func TestAdminManageRepoDisplayNameUsesUnicodeCharacterLimit(t *testing.T) {
+	fx := newAdminManageAtomicFixture(t)
+	displayName := strings.Repeat("人", 64)
+	created, err := fx.repo.CreateAdminWithAudit(fx.ctx, &biz.AdminCreateCommand{
+		OperatorID: fx.operator.ID,
+		Admin: &biz.AdminCreate{
+			DisplayName:  displayName,
+			Username:     "atomic_unicode_64",
+			PasswordHash: "unicode-hash",
+			RoleKeys:     []string{biz.SalesRoleKey},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateAdminWithAudit() with 64 Chinese characters error = %v", err)
+	}
+	if created.DisplayName != displayName {
+		t.Fatalf("display name = %q, want %q", created.DisplayName, displayName)
+	}
+
+	if _, err := fx.repo.CreateAdminWithAudit(fx.ctx, &biz.AdminCreateCommand{
+		OperatorID: fx.operator.ID,
+		Admin: &biz.AdminCreate{
+			DisplayName:  strings.Repeat("人", 65),
+			Username:     "atomic_unicode_65",
+			PasswordHash: "unicode-hash",
+			RoleKeys:     []string{biz.SalesRoleKey},
+		},
+	}); err == nil {
+		t.Fatal("CreateAdminWithAudit() with 65 Chinese characters unexpectedly succeeded")
+	}
+}
+
 func TestAdminManageRepoControlPlaneMutationsCommitWithAudit(t *testing.T) {
 	fx := newAdminManageAtomicFixture(t)
 	if _, err := fx.repo.SetAdminRolesWithAudit(fx.ctx, &biz.AdminRolesChange{
@@ -131,7 +163,7 @@ func TestAdminManageRepoControlPlaneMutationsCommitWithAudit(t *testing.T) {
 	created, err := fx.repo.CreateAdminWithAudit(fx.ctx, &biz.AdminCreateCommand{
 		OperatorID: fx.operator.ID,
 		Admin: &biz.AdminCreate{
-			Username: "atomic_created", PasswordHash: "created-hash", RoleKeys: []string{biz.SalesRoleKey},
+			DisplayName: "原子测试员工", Username: "atomic_created", PasswordHash: "created-hash", RoleKeys: []string{biz.SalesRoleKey},
 		},
 	})
 	if err != nil {
@@ -189,17 +221,17 @@ func TestAdminManageRepoControlPlaneMutationsCommitWithAudit(t *testing.T) {
 		t.Fatalf("stale role version error = %v, want ErrRoleVersionConflict", err)
 	}
 
-	created, err = fx.repo.SetAdminPhoneWithAudit(fx.ctx, &biz.AdminPhoneChange{
-		AdminID: created.ID, OperatorID: fx.operator.ID, Phone: "13800138000",
+	created, err = fx.repo.SetAdminProfileWithAudit(fx.ctx, &biz.AdminProfileChange{
+		AdminID: created.ID, OperatorID: fx.operator.ID, DisplayName: "原子测试主管", Phone: "13800138000",
 	})
 	if err != nil {
-		t.Fatalf("SetAdminPhoneWithAudit() error = %v", err)
+		t.Fatalf("SetAdminProfileWithAudit() error = %v", err)
 	}
-	if created.Phone != "13800138000" {
-		t.Fatalf("phone = %q, want 13800138000", created.Phone)
+	if created.Phone != "13800138000" || created.DisplayName != "原子测试主管" {
+		t.Fatalf("profile = %#v", created)
 	}
 	phoneAudit := fx.client.RuntimeAuditEvent.Query().
-		Where(runtimeauditevent.EventKey("admin_user.phone.set")).
+		Where(runtimeauditevent.EventKey("admin_user.profile.set")).
 		OnlyX(fx.ctx)
 	if strings.Contains(phoneAudit.Payload, "13800138000") || !strings.Contains(phoneAudit.Payload, "138****8000") {
 		t.Fatalf("phone audit must contain only masked phone: %s", phoneAudit.Payload)
@@ -301,7 +333,7 @@ func TestAdminManageRepoControlPlaneMutationsCommitWithAudit(t *testing.T) {
 		"admin_user.create",
 		"admin_user.roles.set",
 		"role.settings.set",
-		"admin_user.phone.set",
+		"admin_user.profile.set",
 		"admin_user.password.reset",
 		"admin_user.disabled.set",
 	} {
@@ -450,7 +482,7 @@ func TestAdminManageRepoControlPlaneMutationsRollBackWhenAuditWriteFails(t *test
 	if _, err := fx.repo.CreateAdminWithAudit(fx.ctx, &biz.AdminCreateCommand{
 		OperatorID: fx.operator.ID,
 		Admin: &biz.AdminCreate{
-			Username: "atomic_rolled_back", PasswordHash: "hash", RoleKeys: []string{biz.SalesRoleKey},
+			DisplayName: "回滚员工", Username: "atomic_rolled_back", PasswordHash: "hash", RoleKeys: []string{biz.SalesRoleKey},
 		},
 	}); err == nil {
 		t.Fatal("CreateAdminWithAudit() must fail when audit insert fails")
@@ -497,13 +529,17 @@ func TestAdminManageRepoControlPlaneMutationsRollBackWhenAuditWriteFails(t *test
 		t.Fatalf("role settings mutation survived audit rollback: role=%#v links=%#v", roleAfterFailure, links)
 	}
 
-	if _, err := fx.repo.SetAdminPhoneWithAudit(fx.ctx, &biz.AdminPhoneChange{
-		AdminID: fx.target.ID, OperatorID: fx.operator.ID, Phone: "13900139000",
+	if _, err := fx.repo.SetAdminProfileWithAudit(fx.ctx, &biz.AdminProfileChange{
+		AdminID: fx.target.ID, OperatorID: fx.operator.ID, DisplayName: "回滚后姓名", Phone: "13900139000",
 	}); err == nil {
-		t.Fatal("SetAdminPhoneWithAudit() must fail when audit insert fails")
+		t.Fatal("SetAdminProfileWithAudit() must fail when audit insert fails")
 	}
-	if phone := fx.client.AdminUser.GetX(fx.ctx, fx.target.ID).Phone; phone != nil {
+	profileAfterFailure := fx.client.AdminUser.GetX(fx.ctx, fx.target.ID)
+	if phone := profileAfterFailure.Phone; phone != nil {
 		t.Fatalf("phone survived audit rollback: %q", *phone)
+	}
+	if profileAfterFailure.DisplayName != nil {
+		t.Fatalf("display name survived audit rollback: %q", *profileAfterFailure.DisplayName)
 	}
 
 	if _, err := fx.repo.ResetAdminPasswordWithAudit(fx.ctx, &biz.AdminPasswordReset{
@@ -577,10 +613,10 @@ func TestAdminManageRepoRejectsNonSuperMutationOfSystemRoleTargetAfterLock(t *te
 			},
 		},
 		{
-			name: "phone",
+			name: "profile",
 			run: func() error {
-				_, err := fx.repo.SetAdminPhoneWithAudit(fx.ctx, &biz.AdminPhoneChange{
-					AdminID: fx.target.ID, OperatorID: operator.ID, Phone: "13800138000",
+				_, err := fx.repo.SetAdminProfileWithAudit(fx.ctx, &biz.AdminProfileChange{
+					AdminID: fx.target.ID, OperatorID: operator.ID, DisplayName: "系统员工", Phone: "13800138000",
 				})
 				return err
 			},

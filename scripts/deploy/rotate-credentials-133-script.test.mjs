@@ -20,7 +20,9 @@ function writeExecutable(file, source) {
 }
 
 function fixture(t) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rotate-credentials-133-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "rotate-credentials-133-"),
+  );
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const bin = path.join(root, "bin");
   fs.mkdirSync(bin);
@@ -31,6 +33,8 @@ function fixture(t) {
 set -euo pipefail
 args="$*"
 case "$args" in
+  *plush-toy-erp-yoyoosun-uat-password*customer-trial-133:admin*) printf '%s\\n' "\${FAKE_ADMIN_PASSWORD:-remote-admin-secret}" ;;
+  *plush-toy-erp-yoyoosun-uat-password*customer-trial-133:uat-roles*) printf '%s\\n' "\${FAKE_UAT_PASSWORD:-remote-uat-secret}" ;;
   *plush-toy-erp-yoyoosun-sms-phone*) [[ "\${FAKE_SMS_MISSING:-0}" != 1 ]] && printf '%s\\n' "\${FAKE_SMS_PHONE:-13800138000}" ;;
   *) exit 1 ;;
 esac
@@ -42,13 +46,13 @@ esac
 set -euo pipefail
 printf '%s\\n' "$*" >"$FAKE_SSH_LOG"
 IFS= read -r admin_assignment
-IFS= read -r demo_assignment
+IFS= read -r uat_assignment
 IFS= read -r phone_assignment
 IFS= read -r export_line
 cat >/dev/null
-[[ "$admin_assignment" == "MANUAL_ACCEPTANCE_ADMIN_PASSWORD=adminadmin" ]]
-[[ "$demo_assignment" == "MANUAL_ACCEPTANCE_PASSWORD=12345678" ]]
-[[ "$export_line" == "export MANUAL_ACCEPTANCE_ADMIN_PASSWORD MANUAL_ACCEPTANCE_PASSWORD MANUAL_ACCEPTANCE_SMS_PHONE" ]]
+[[ "$admin_assignment" == "MANUAL_ACCEPTANCE_ADMIN_PASSWORD=remote-admin-secret" ]]
+[[ "$uat_assignment" == "MANUAL_ACCEPTANCE_UAT_PASSWORD=remote-uat-secret" ]]
+[[ "$export_line" == "export MANUAL_ACCEPTANCE_ADMIN_PASSWORD MANUAL_ACCEPTANCE_UAT_PASSWORD MANUAL_ACCEPTANCE_SMS_PHONE" ]]
 [[ "$phone_assignment" == MANUAL_ACCEPTANCE_SMS_PHONE=* ]]
 eval "$phone_assignment"
 phone_secret="$MANUAL_ACCEPTANCE_SMS_PHONE"
@@ -58,7 +62,7 @@ if [[ -n "$phone_secret" ]]; then
   phone_bound=true
 fi
 cat <<JSON
-{"generatedAt":"2026-07-22T08:00:00Z","target":"customer-trial-133","datasetVersion":"2026.08.15-v6","migrationVersion":"${migration}","customerRevision":"yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1","release":"${release}","operationId":"${operationId}","adminAccounts":1,"demoAccounts":10,"revokedSessions":3,"authVersionIncremented":true,"auditSource":"manual_acceptance_password_rotation","phoneBound":$phone_bound,"replayed":false,"accounts":[{"username":"admin","authVersion":2,"revokedSessions":1,"phoneBound":$phone_bound},{"username":"demo_admin","authVersion":2,"revokedSessions":1,"phoneBound":false},{"username":"demo_boss","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"demo_engineering","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"demo_finance","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"demo_pmc","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"demo_production","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"demo_purchase","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"demo_quality","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"demo_sales","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"demo_warehouse","authVersion":2,"revokedSessions":1,"phoneBound":false}]}
+{"generatedAt":"2026-07-22T08:00:00Z","target":"customer-trial-133","datasetVersion":"2026.08.15-v6","migrationVersion":"${migration}","customerRevision":"yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1","release":"${release}","operationId":"${operationId}","adminAccounts":1,"accountKind":"customer-uat","roleAccounts":10,"revokedSessions":3,"authVersionIncremented":true,"auditSource":"manual_acceptance_password_rotation","phoneBound":$phone_bound,"replayed":false,"accounts":[{"username":"admin","authVersion":2,"revokedSessions":1,"phoneBound":$phone_bound},{"username":"uat_admin","authVersion":2,"revokedSessions":1,"phoneBound":false},{"username":"uat_boss","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_engineering","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_finance","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_pmc","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_production","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_purchase","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_quality","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_sales","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_warehouse","authVersion":2,"revokedSessions":1,"phoneBound":false}]}
 JSON
 `,
   );
@@ -104,13 +108,14 @@ function run(f, env = {}) {
   );
 }
 
-test("133 credential rotation wrapper streams registered test credentials and writes only a redacted receipt", (t) => {
+test("133 credential rotation wrapper streams external UAT secrets and writes only a redacted receipt", (t) => {
   const f = fixture(t);
   const result = run(f);
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   const receipt = JSON.parse(fs.readFileSync(f.report, "utf8"));
   assert.equal(receipt.adminAccounts, 1);
-  assert.equal(receipt.demoAccounts, 10);
+  assert.equal(receipt.accountKind, "customer-uat");
+  assert.equal(receipt.roleAccounts, 10);
   assert.equal(receipt.phoneBound, true);
   const observable = [
     result.stdout,
@@ -118,10 +123,16 @@ test("133 credential rotation wrapper streams registered test credentials and wr
     fs.readFileSync(f.report, "utf8"),
     fs.readFileSync(f.sshLog, "utf8"),
   ].join("\n");
-  assert.doesNotMatch(observable, /adminadmin|12345678|13800138000/u);
+  assert.doesNotMatch(
+    observable,
+    /remote-admin-secret|remote-uat-secret|13800138000/u,
+  );
   const sshArgs = fs.readFileSync(f.sshLog, "utf8");
   assert.match(sshArgs, /bash -s --/u);
-  assert.match(sshArgs, new RegExp(`${operationId} .*pre-rotation\\.dump ${backupSha}`, "u"));
+  assert.match(
+    sshArgs,
+    new RegExp(`${operationId} .*pre-rotation\\.dump ${backupSha}`, "u"),
+  );
 });
 
 test("133 credential rotation wrapper accepts a missing optional SMS phone", (t) => {

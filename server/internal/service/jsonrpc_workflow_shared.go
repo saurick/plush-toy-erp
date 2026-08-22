@@ -143,6 +143,7 @@ func workflowTaskEventsToAny(items []*biz.WorkflowTaskEvent) []any {
 			"id": event.ID, "task_id": event.TaskID, "task_version": workflowIntValue(event.TaskVersion),
 			"event_type": event.EventType, "from_status_key": workflowStringValue(event.FromStatusKey),
 			"to_status_key": workflowStringValue(event.ToStatusKey), "actor_role_key": workflowStringValue(event.ActorRoleKey),
+			"actor_username": event.ActorUsername, "actor_display_name": event.ActorDisplayName,
 			"reason": workflowStringValue(event.Reason), "payload": workflowMapValue(event.Payload), "created_at": event.CreatedAt.Unix(),
 		})
 	}

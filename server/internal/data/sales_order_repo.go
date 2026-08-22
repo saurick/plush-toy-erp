@@ -833,6 +833,7 @@ func (r *salesOrderRepo) AddSalesOrderItem(ctx context.Context, in *biz.SalesOrd
 	row, err := r.data.postgres.SalesOrderItem.Create().
 		SetSalesOrderID(in.SalesOrderID).
 		SetLineNo(in.LineNo).
+		SetDisplayOrder(in.LineNo).
 		SetProductID(in.ProductID).
 		SetNillableProductSkuID(in.ProductSkuID).
 		SetUnitID(in.UnitID).
@@ -943,7 +944,11 @@ func (r *salesOrderRepo) ListSalesOrderItems(ctx context.Context, filter biz.Sal
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := query.Order(ent.Asc(salesorderitem.FieldLineNo)).
+	rows, err := query.Order(sourceDocumentItemOrder(
+		salesorderitem.FieldDisplayOrder,
+		salesorderitem.FieldLineNo,
+		salesorderitem.FieldID,
+	)).
 		Limit(filter.Limit).
 		Offset(filter.Offset).
 		All(ctx)
@@ -1060,41 +1065,50 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 		}
 	}
 
-	existingOpenItems, err := tx.SalesOrderItem.Query().
-		Where(
-			salesorderitem.SalesOrderID(orderRow.ID),
-			salesorderitem.LineStatus(biz.SalesOrderItemStatusOpen),
-		).
+	existingItems, err := tx.SalesOrderItem.Query().
+		Where(salesorderitem.SalesOrderID(orderRow.ID)).
 		All(ctx)
 	if err != nil {
 		return nil, err
 	}
+	existingByID := make(map[int]*ent.SalesOrderItem, len(existingItems))
+	existingOpenItems := make([]*ent.SalesOrderItem, 0, len(existingItems))
+	maxLineNo := 0
+	for _, existing := range existingItems {
+		existingByID[existing.ID] = existing
+		if existing.LineNo > maxLineNo {
+			maxLineNo = existing.LineNo
+		}
+		if existing.LineStatus == biz.SalesOrderItemStatusOpen {
+			existingOpenItems = append(existingOpenItems, existing)
+		}
+	}
 	submittedIDs := map[int]struct{}{}
-	for _, item := range items {
+	for index, item := range items {
 		mutation := item.SalesOrderItemMutation
 		mutation.SalesOrderID = orderRow.ID
+		displayOrder := index + 1
 		if item.ID > 0 {
-			current, err := tx.SalesOrderItem.Query().
-				Where(salesorderitem.ID(item.ID), salesorderitem.SalesOrderID(orderRow.ID)).
-				Only(ctx)
-			if err != nil {
-				if ent.IsNotFound(err) {
-					return nil, biz.ErrSalesOrderItemNotFound
-				}
-				return nil, err
+			current, ok := existingByID[item.ID]
+			if !ok {
+				return nil, biz.ErrSalesOrderItemNotFound
 			}
 			if current.LineStatus == biz.SalesOrderItemStatusCanceled || current.LineStatus == biz.SalesOrderItemStatusClosed {
 				return nil, biz.ErrBadParam
 			}
-			if _, err := saveSalesOrderItemUpdate(ctx, tx, item.ID, &mutation); err != nil {
+			mutation.LineNo = current.LineNo
+			if _, err := saveSalesOrderItemUpdate(ctx, tx, item.ID, displayOrder, &mutation); err != nil {
 				return nil, err
 			}
 			submittedIDs[item.ID] = struct{}{}
 			continue
 		}
+		maxLineNo++
+		mutation.LineNo = maxLineNo
 		if _, err := tx.SalesOrderItem.Create().
 			SetSalesOrderID(mutation.SalesOrderID).
 			SetLineNo(mutation.LineNo).
+			SetDisplayOrder(displayOrder).
 			SetProductID(mutation.ProductID).
 			SetNillableProductSkuID(mutation.ProductSkuID).
 			SetUnitID(mutation.UnitID).
@@ -1125,7 +1139,11 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 
 	itemRows, err := tx.SalesOrderItem.Query().
 		Where(salesorderitem.SalesOrderID(orderRow.ID)).
-		Order(ent.Asc(salesorderitem.FieldLineNo), ent.Asc(salesorderitem.FieldID)).
+		Order(sourceDocumentItemOrder(
+			salesorderitem.FieldDisplayOrder,
+			salesorderitem.FieldLineNo,
+			salesorderitem.FieldID,
+		)).
 		All(ctx)
 	if err != nil {
 		return nil, err
@@ -1207,10 +1225,11 @@ func (r *salesOrderRepo) UnitIsActive(ctx context.Context, id int) (bool, error)
 	return row.IsActive, nil
 }
 
-func saveSalesOrderItemUpdate(ctx context.Context, tx *ent.Tx, id int, in *biz.SalesOrderItemMutation) (*ent.SalesOrderItem, error) {
+func saveSalesOrderItemUpdate(ctx context.Context, tx *ent.Tx, id int, displayOrder int, in *biz.SalesOrderItemMutation) (*ent.SalesOrderItem, error) {
 	update := tx.SalesOrderItem.UpdateOneID(id).
 		SetSalesOrderID(in.SalesOrderID).
 		SetLineNo(in.LineNo).
+		SetDisplayOrder(displayOrder).
 		SetProductID(in.ProductID).
 		SetUnitID(in.UnitID).
 		SetOrderedQuantity(in.OrderedQuantity)

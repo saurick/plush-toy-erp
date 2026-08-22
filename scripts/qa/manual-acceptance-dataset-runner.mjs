@@ -47,6 +47,7 @@ import {
   assertManualAcceptanceTargetAttestation,
   resolveManualAcceptanceTarget,
 } from "./manual-acceptance-target-policy.mjs";
+import { resolveManualAcceptanceRoleCredential } from "./manual-acceptance-account-identities.mjs";
 
 export const MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION =
   "manual-acceptance-dataset-runner-v10";
@@ -400,16 +401,14 @@ async function persistReport(reportPath, report) {
   return reportPath;
 }
 
-function resolveCredentials(deps = {}) {
+function resolveCredentials(target, deps = {}) {
   const credentials = deps.credentials || {};
+  const roleCredential = resolveManualAcceptanceRoleCredential({
+    target,
+    password: credentials.rolePassword ?? deps.password,
+  });
   return {
-    rolePassword:
-      credentials.rolePassword ??
-      deps.password ??
-      process.env.MANUAL_ACCEPTANCE_PASSWORD ??
-      process.env.TRIAL_ACCOUNT_PASSWORD ??
-      process.env.ERP_ROLE_DEMO_PASSWORD ??
-      "",
+    rolePassword: roleCredential.value,
     adminPassword:
       credentials.adminPassword ??
       deps.adminPassword ??
@@ -467,7 +466,10 @@ export function buildManualAcceptanceTargetAdapter(context, deps = {}) {
     databaseRebuildProof: context.databaseRebuildProof
       ? structuredClone(context.databaseRebuildProof)
       : null,
-    credentials: resolveCredentials(deps),
+    credentials: resolveCredentials(
+      requiredText(target.policyTarget, "target.policyTarget"),
+      deps,
+    ),
     reportRoot: path.join(outputRoot, context.dataVersion, alias),
     executionPolicy: structuredClone(
       context.stage?.targetExecution?.[alias] || {

@@ -112,6 +112,37 @@ test('task board keeps selection on click and opens the same detail surface on d
   )
 })
 
+test('task board presents approval as a range filter instead of a title action', () => {
+  const filtersStart = source.indexOf(
+    '<div className="erp-task-board-filters">'
+  )
+  const scopeFilterStart = source.indexOf(
+    'className="erp-task-board-scope-filter"',
+    filtersStart
+  )
+  const searchStart = source.indexOf('<SearchInput', filtersStart)
+
+  assert.ok(filtersStart >= 0)
+  assert.ok(scopeFilterStart > filtersStart)
+  assert.ok(searchStart > scopeFilterStart)
+  assert.match(
+    source,
+    /<Title level=\{3\} className="erp-command-center-hero-title">\s*任务看板\s*<\/Title>/u
+  )
+  assert.match(source, /aria-label="任务范围筛选"/u)
+  assert.match(
+    source,
+    /<Segmented[\s\S]{0,220}aria-label="任务范围"[\s\S]{0,220}value=\{filters\.mode\}[\s\S]{0,220}options=\{TASK_BOARD_SCOPE_OPTIONS\}/u
+  )
+  assert.match(source, /\{ label: '全部任务', value: 'all' \}/u)
+  assert.match(source, /\{ label: '待我审批', value: 'approval' \}/u)
+  assert.doesNotMatch(source, /返回全部任务/u)
+  assert.match(
+    taskCenterStyleSource,
+    /\.erp-task-board-scope-filter\s*\{[\s\S]{0,180}flex:\s*1 0 100%/u
+  )
+})
+
 test('task board metrics keep category tones separate from the active filter state', () => {
   assert.match(
     source,

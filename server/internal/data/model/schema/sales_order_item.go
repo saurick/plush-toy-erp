@@ -20,6 +20,7 @@ func (SalesOrderItem) Annotations() []schema.Annotation {
 		entsql.Annotation{
 			Checks: map[string]string{
 				"sales_order_items_line_no_positive":        "line_no > 0",
+				"sales_order_items_display_order_positive":  "display_order IS NULL OR display_order > 0",
 				"sales_order_items_ordered_qty_positive":    "ordered_quantity > 0",
 				"sales_order_items_unit_price_non_negative": "unit_price IS NULL OR unit_price >= 0",
 				"sales_order_items_amount_non_negative":     "amount IS NULL OR amount >= 0",
@@ -34,6 +35,10 @@ func (SalesOrderItem) Fields() []ent.Field {
 		field.Int("sales_order_id").
 			Positive(),
 		field.Int("line_no").
+			Positive(),
+		field.Int("display_order").
+			Optional().
+			Nillable().
 			Positive(),
 		// product_id is still the runtime primary path; product_sku_id is optional traceability.
 		field.Int("product_id").

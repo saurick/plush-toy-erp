@@ -12,7 +12,7 @@ print_help() {
     --report output/yoyoosun-smoke.json \
     --admin-username admin \
     --admin-password-env MANUAL_ACCEPTANCE_ADMIN_PASSWORD \
-    --demo-password-env MANUAL_ACCEPTANCE_PASSWORD \
+    --uat-password-env MANUAL_ACCEPTANCE_UAT_PASSWORD \
     --sms-phone-env MANUAL_ACCEPTANCE_SMS_PHONE \
     --customer-config-revision yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1 \
     --admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN
@@ -22,7 +22,8 @@ Input template only:
 
 说明:
   做轻量 health / route / auth capabilities / credential login matrix / customer_config effective session smoke；
-  带管理员 token 时还会真实生成最小 PDF，不创建业务事实。测试密码读取凭据合同；
+  带管理员 token 时还会真实生成最小 PDF，不创建业务事实。133 的 admin 与 UAT 密码
+  只从凭据合同登记的外部环境变量读取，合同不保存密码且不回退到本地 Demo 密码；
   短信手机号只有人工录入对应环境变量时才校验。报告不保存密码、token、手机号或原始 profile。
 USAGE
 }
@@ -40,7 +41,8 @@ print_input_template() {
   "readsAdminToken": false,
   "secretInputs": [
     "CUSTOMER_CONFIG_ADMIN_TOKEN or the environment variable named by --admin-token-env",
-    "fixed admin and demo test passwords from credential.contract.json",
+    "external admin secret from the environment variable named by --admin-password-env",
+    "external UAT role secret from the environment variable named by --uat-password-env",
     "optional SMS phone from the environment variable named by --sms-phone-env"
   ],
   "requiredInputs": [
@@ -60,14 +62,14 @@ print_input_template() {
     "server-readyz when --backend-url is provided",
     "login-page",
     "mobile-role-route",
-    "credential-login-matrix (admin + 10 demo identities and 11 unique tokens; exact admin phone binding only when configured)",
+    "credential-login-matrix (admin + 10 uat identities and 11 unique tokens; exact admin phone binding only when configured)",
     "auth-sms-capabilities (provider/enabled/not-mock)",
     "customer-config-effective-session when --customer-config-revision is provided",
     "template-pdf-render when --customer-config-revision and an admin token are provided"
   ],
   "commands": [
-    "bash deployments/yoyoosun/scripts/run-smoke.sh --endpoint https://erp.example.invalid --backend-url https://api.example.invalid --release-version <release-version> --environment customer-trial --report deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/smoke-test-report.json --admin-username admin --admin-password-env MANUAL_ACCEPTANCE_ADMIN_PASSWORD --demo-password-env MANUAL_ACCEPTANCE_PASSWORD --sms-phone-env MANUAL_ACCEPTANCE_SMS_PHONE",
-    "CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' bash deployments/yoyoosun/scripts/run-smoke.sh --endpoint https://erp.example.invalid --backend-url https://api.example.invalid --release-version <release-version> --environment customer-trial --report deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/smoke-test-report.json --admin-username admin --admin-password-env MANUAL_ACCEPTANCE_ADMIN_PASSWORD --demo-password-env MANUAL_ACCEPTANCE_PASSWORD --sms-phone-env MANUAL_ACCEPTANCE_SMS_PHONE --customer-config-revision yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1 --admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN"
+    "MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<admin-secret>' MANUAL_ACCEPTANCE_UAT_PASSWORD='<uat-role-secret>' bash deployments/yoyoosun/scripts/run-smoke.sh --endpoint https://erp.example.invalid --backend-url https://api.example.invalid --release-version <release-version> --environment customer-trial --report deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/smoke-test-report.json --admin-username admin --admin-password-env MANUAL_ACCEPTANCE_ADMIN_PASSWORD --uat-password-env MANUAL_ACCEPTANCE_UAT_PASSWORD --sms-phone-env MANUAL_ACCEPTANCE_SMS_PHONE",
+    "MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<admin-secret>' MANUAL_ACCEPTANCE_UAT_PASSWORD='<uat-role-secret>' CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' bash deployments/yoyoosun/scripts/run-smoke.sh --endpoint https://erp.example.invalid --backend-url https://api.example.invalid --release-version <release-version> --environment customer-trial --report deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/smoke-test-report.json --admin-username admin --admin-password-env MANUAL_ACCEPTANCE_ADMIN_PASSWORD --uat-password-env MANUAL_ACCEPTANCE_UAT_PASSWORD --sms-phone-env MANUAL_ACCEPTANCE_SMS_PHONE --customer-config-revision yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1 --admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN"
   ],
   "requiredReadbackEvidence": [
     "check name=auth-sms-capabilities, target=jsonrpc:auth.capabilities, expectedMode=provider, enabled=true, mockDelivery=false, responseBodyStored=false",
@@ -80,7 +82,7 @@ print_input_template() {
     "template-pdf-render returns HTTP 200 with application/pdf, starts with %PDF, and records only contentType/sha256/sizeBytes with responseBodyStored=false",
     "report backendEndpointAlias matches the release executor report backendEndpointAlias"
   ],
-  "boundary": "This template does not call endpoints, read credentials, call customer_config, write smoke-test-report.json, write database rows, import business data, or prove active revision readback. Real proof requires running the smoke command against the target backend with credential env names and an admin token env; the report stores only aggregate login evidence, usernames, source env keys, and redacted customer-config evidence."
+  "boundary": "This template does not call endpoints, read credentials, call customer_config, write smoke-test-report.json, write database rows, import business data, or prove active revision readback. Real proof requires running the smoke command against the target backend with external admin and UAT secrets plus an admin token env; the report stores only aggregate login evidence, usernames, source labels, env keys, and redacted customer-config evidence."
 }
 JSON
 }
@@ -94,7 +96,7 @@ customer_config_revision=""
 admin_token_env=""
 admin_username=""
 admin_password_env=""
-demo_password_env=""
+uat_password_env=""
 sms_phone_env=""
 
 while [[ $# -gt 0 ]]; do
@@ -135,8 +137,8 @@ while [[ $# -gt 0 ]]; do
     admin_password_env="${2:-}"
     shift 2
     ;;
-  --demo-password-env)
-    demo_password_env="${2:-}"
+  --uat-password-env)
+    uat_password_env="${2:-}"
     shift 2
     ;;
   --sms-phone-env)
@@ -214,34 +216,41 @@ if [[ -n "$backend_url" ]]; then
     echo "[run-smoke] credential contract is missing: $credential_contract"
     exit 1
   }
-  IFS=$'\t' read -r contract_admin_username contract_admin_password contract_admin_password_env contract_demo_password contract_demo_password_env contract_demo_usernames_csv credential_contract_schema contract_sms_phone_env contract_target contract_database contract_dataset contract_sha256 < <(
+  IFS=$'\t' read -r contract_admin_username contract_admin_password_env contract_admin_password_source contract_uat_password_env contract_uat_password_source contract_uat_usernames_csv credential_contract_schema contract_sms_phone_env contract_target contract_database contract_dataset contract_sha256 < <(
     node - "$credential_contract" <<'NODE'
 const fs = require("node:fs");
 const file = process.argv[2];
 const contract = JSON.parse(fs.readFileSync(file, "utf8"));
 const admin = contract?.credentials?.admin;
-const demo = contract?.credentials?.demo;
+const uat = contract?.credentials?.uat;
 const sms = contract?.smsLoginIdentity;
 const envKey = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const username = /^[A-Za-z0-9_]+$/;
+const text = (value) => typeof value === "string" && value.length > 0 && !/[\t\r\n]/u.test(value);
+const expectedUATUsernames = [
+  "uat_boss", "uat_sales", "uat_purchase", "uat_production", "uat_warehouse",
+  "uat_quality", "uat_finance", "uat_pmc", "uat_engineering", "uat_admin",
+];
 const valid =
-  contract?.schemaVersion === "yoyoosun-credential-contract/v2" &&
+  contract?.schemaVersion === "yoyoosun-credential-contract/v3" &&
   contract?.customerCode === "yoyoosun" &&
   contract?.target?.key === "customer-trial-133" &&
   contract?.target?.database === "plush_erp_uat_20260716_v5" &&
   contract?.target?.datasetVersion === "2026.08.15-v6" &&
   username.test(admin?.username || "") &&
-  envKey.test(admin?.environmentVariable || "") &&
-  envKey.test(demo?.environmentVariable || "") &&
-  Array.isArray(demo?.usernames) &&
-  demo.usernames.length === 10 &&
-  new Set(demo.usernames).size === 10 &&
-  demo.usernames.every((value) => username.test(value)) &&
-  !demo.usernames.includes(admin.username) &&
-  admin?.credentialSource === "contract-fixed-test" &&
-  admin?.fixedTestPassword === "adminadmin" &&
-  demo?.credentialSource === "contract-fixed-test" &&
-  demo?.fixedTestPassword === "12345678" &&
+  admin?.environmentVariable === "MANUAL_ACCEPTANCE_ADMIN_PASSWORD" &&
+  admin?.credentialSource === "external-secret" &&
+  text(admin?.keychain?.service) &&
+  text(admin?.keychain?.account) &&
+  !("fixedTestPassword" in admin) &&
+  uat?.environmentVariable === "MANUAL_ACCEPTANCE_UAT_PASSWORD" &&
+  uat?.credentialSource === "external-secret" &&
+  text(uat?.keychain?.service) &&
+  text(uat?.keychain?.account) &&
+  !("fixedTestPassword" in uat) &&
+  JSON.stringify(uat?.usernames) === JSON.stringify(expectedUATUsernames) &&
+  uat.usernames.every((value) => username.test(value) && value.startsWith("uat_")) &&
+  !uat.usernames.includes(admin.username) &&
   sms?.username === admin.username &&
   envKey.test(sms?.environmentVariable || "") &&
   sms?.phoneRequiredWhenProviderEnabled === false &&
@@ -249,11 +258,13 @@ const valid =
   sms?.keychain?.service === "plush-toy-erp-yoyoosun-sms-phone" &&
   sms?.keychain?.account === "customer-trial-133:admin" &&
   contract?.policy?.passwordsMustDiffer === true &&
-  JSON.stringify(contract?.policy?.registeredSimplePasswordTargets) === JSON.stringify(["local-dev", "customer-trial-133"]) &&
+  JSON.stringify(contract?.policy?.localPublicPasswordTargets) === JSON.stringify(["local-dev"]) &&
+  contract.policy.customerTrialRequiresExternalSecrets === true &&
   contract.policy.rotateAfterCreateRestoreOrRollback === true &&
   contract.policy.revokeExistingSessionsOnRotation === true &&
   contract.policy.requireCredentialLoginMatrixBeforeCutover === true &&
   contract?.redaction?.containsSecrets === false &&
+  contract.redaction.contractContainsPublicTestPasswords === false &&
   contract.redaction.storePasswords === false &&
   contract.redaction.storeTokens === false &&
   contract.redaction.storePhoneNumber === false &&
@@ -262,11 +273,11 @@ if (!valid) throw new Error("invalid yoyoosun credential contract");
 const crypto = require("node:crypto");
 process.stdout.write([
   admin.username,
-  admin.fixedTestPassword,
   admin.environmentVariable,
-  demo.fixedTestPassword,
-  demo.environmentVariable,
-  demo.usernames.join(","),
+  admin.credentialSource,
+  uat.environmentVariable,
+  uat.credentialSource,
+  uat.usernames.join(","),
   contract.schemaVersion,
   sms.environmentVariable,
   contract.target.key,
@@ -284,25 +295,38 @@ NODE
     echo "[run-smoke] --admin-password-env must match credential contract"
     exit 1
   }
-  [[ "$demo_password_env" == "$contract_demo_password_env" ]] || {
-    echo "[run-smoke] --demo-password-env must match credential contract"
+  [[ "$uat_password_env" == "$contract_uat_password_env" ]] || {
+    echo "[run-smoke] --uat-password-env must match credential contract"
     exit 1
   }
   [[ "$sms_phone_env" == "$contract_sms_phone_env" ]] || {
     echo "[run-smoke] --sms-phone-env must match credential contract"
     exit 1
   }
-  IFS=',' read -r -a demo_usernames <<<"$contract_demo_usernames_csv"
+  IFS=',' read -r -a uat_usernames <<<"$contract_uat_usernames_csv"
   sms_phone="${!sms_phone_env:-}"
-  admin_password="$contract_admin_password"
-  demo_password="$contract_demo_password"
-  unset "$admin_password_env" "$demo_password_env" "$sms_phone_env"
+  admin_password="${!admin_password_env:-}"
+  uat_password="${!uat_password_env:-}"
+  unset "$admin_password_env" "$uat_password_env" "$sms_phone_env"
   [[ -z "$sms_phone" || "$sms_phone" =~ ^[0-9]{11}$ ]] || {
     echo "[run-smoke] SMS phone env must be empty or contain one normalized 11-digit phone"
     exit 1
   }
-  [[ "$admin_password" != "$demo_password" ]] || {
-    echo "[run-smoke] admin and demo passwords must differ"
+  [[ ${#admin_password} -ge 8 && ${#admin_password} -le 20 ]] || {
+    echo "[run-smoke] admin password env must contain an 8-20 character external secret"
+    exit 1
+  }
+  [[ ${#uat_password} -ge 8 && ${#uat_password} -le 20 ]] || {
+    echo "[run-smoke] UAT password env must contain an 8-20 character external secret"
+    exit 1
+  }
+  [[ "$admin_password" != "$uat_password" ]] || {
+    echo "[run-smoke] admin and UAT passwords must differ"
+    exit 1
+  }
+  [[ "$admin_password" != "adminadmin" && "$admin_password" != "12345678" &&
+    "$uat_password" != "adminadmin" && "$uat_password" != "12345678" ]] || {
+    echo "[run-smoke] customer-trial-133 must not use local public test passwords"
     exit 1
   }
 fi
@@ -384,13 +408,13 @@ for check in "${checks[@]}"; do
 done
 
 if [[ -n "$backend_url" ]]; then
-  credential_expected=$((${#demo_usernames[@]} + 1))
+  credential_expected=$((${#uat_usernames[@]} + 1))
   credential_authenticated=0
   credential_admin_authenticated=false
   credential_admin_phone_bound=false
   credential_phone_configured=false
   [[ -n "$sms_phone" ]] && credential_phone_configured=true
-  credential_demo_authenticated=0
+  credential_uat_authenticated=0
   credential_unique_tokens=false
   declare -A credential_token_digests=()
 
@@ -462,12 +486,12 @@ try {
     credential_admin_phone_bound="$credential_last_phone_bound"
     credential_admin_auth_version="$credential_last_auth_version"
   fi
-  for demo_username in "${demo_usernames[@]}"; do
-    if credential_login "$demo_username" "$demo_password" false; then
-      credential_demo_authenticated=$((credential_demo_authenticated + 1))
+  for uat_username in "${uat_usernames[@]}"; do
+    if credential_login "$uat_username" "$uat_password" false; then
+      credential_uat_authenticated=$((credential_uat_authenticated + 1))
     fi
   done
-  unset admin_password demo_password sms_phone
+  unset admin_password uat_password sms_phone
   if [[ "$credential_authenticated" -eq "$credential_expected" && "${#credential_token_digests[@]}" -eq "$credential_expected" ]]; then
     credential_unique_tokens=true
   fi
@@ -476,17 +500,17 @@ try {
   if [[ "$credential_phone_configured" == true && "$credential_admin_phone_bound" != true ]]; then
     credential_phone_requirement_satisfied=false
   fi
-  if [[ "$credential_admin_authenticated" == true && "$credential_phone_requirement_satisfied" == true && "$credential_demo_authenticated" -eq "${#demo_usernames[@]}" && "$credential_unique_tokens" == true ]]; then
+  if [[ "$credential_admin_authenticated" == true && "$credential_phone_requirement_satisfied" == true && "$credential_uat_authenticated" -eq "${#uat_usernames[@]}" && "$credential_unique_tokens" == true ]]; then
     credential_status=pass
     passed=$((passed + 1))
   else
     failed=$((failed + 1))
   fi
-  credential_usernames_json="$(node -e 'process.stdout.write(JSON.stringify(process.argv.slice(1)))' "$admin_username" "${demo_usernames[@]}")"
+  credential_usernames_json="$(node -e 'process.stdout.write(JSON.stringify(process.argv.slice(1)))' "$admin_username" "${uat_usernames[@]}")"
   checks+=("credential-login-matrix")
   admin_auth_version_json=null
   [[ "${credential_admin_auth_version:-}" =~ ^[1-9][0-9]*$ ]] && admin_auth_version_json="$credential_admin_auth_version"
-  items+=("{\"name\":\"credential-login-matrix\",\"status\":\"$credential_status\",\"target\":\"jsonrpc:auth.admin_login\",\"credentialContractSchema\":\"$credential_contract_schema\",\"credentialContractSha256\":\"$contract_sha256\",\"credentialTarget\":\"$contract_target\",\"credentialDatabase\":\"$contract_database\",\"credentialDatasetVersion\":\"$contract_dataset\",\"adminUsername\":\"$admin_username\",\"adminAuthenticated\":$credential_admin_authenticated,\"adminSuperAdmin\":$credential_admin_authenticated,\"phoneConfigured\":$credential_phone_configured,\"phoneBound\":$credential_admin_phone_bound,\"adminAuthVersion\":$admin_auth_version_json,\"demoExpected\":${#demo_usernames[@]},\"demoAuthenticated\":$credential_demo_authenticated,\"totalExpected\":$credential_expected,\"totalAuthenticated\":$credential_authenticated,\"uniqueTokensObserved\":$credential_unique_tokens,\"usernames\":$credential_usernames_json,\"adminPasswordSource\":\"credential-contract\",\"demoPasswordSource\":\"credential-contract\",\"smsPhoneSourceEnv\":\"$sms_phone_env\",\"responseBodyStored\":false}")
+  items+=("{\"name\":\"credential-login-matrix\",\"status\":\"$credential_status\",\"target\":\"jsonrpc:auth.admin_login\",\"credentialContractSchema\":\"$credential_contract_schema\",\"credentialContractSha256\":\"$contract_sha256\",\"credentialTarget\":\"$contract_target\",\"credentialDatabase\":\"$contract_database\",\"credentialDatasetVersion\":\"$contract_dataset\",\"adminUsername\":\"$admin_username\",\"adminAuthenticated\":$credential_admin_authenticated,\"adminSuperAdmin\":$credential_admin_authenticated,\"phoneConfigured\":$credential_phone_configured,\"phoneBound\":$credential_admin_phone_bound,\"adminAuthVersion\":$admin_auth_version_json,\"uatExpected\":${#uat_usernames[@]},\"uatAuthenticated\":$credential_uat_authenticated,\"totalExpected\":$credential_expected,\"totalAuthenticated\":$credential_authenticated,\"uniqueTokensObserved\":$credential_unique_tokens,\"usernames\":$credential_usernames_json,\"adminPasswordSource\":\"$contract_admin_password_source\",\"uatPasswordSource\":\"$contract_uat_password_source\",\"smsPhoneSourceEnv\":\"$sms_phone_env\",\"responseBodyStored\":false}")
 fi
 
 auth_rpc_base_url="$endpoint"

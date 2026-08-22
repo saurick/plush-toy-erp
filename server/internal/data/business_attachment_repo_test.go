@@ -139,6 +139,7 @@ func TestBusinessAttachmentRepoResolvesUploaderUsernameAndKeepsLegacyMissing(t *
 	taskID := createAttachmentWorkflowTask(t, repo, "ready", 1, nil)
 	uploader, err := repo.data.postgres.AdminUser.Create().
 		SetUsername("demo_boss").
+		SetDisplayName("王总").
 		SetPasswordHash("test-password-hash").
 		SetDisabled(true).
 		Save(ctx)
@@ -183,16 +184,18 @@ func TestBusinessAttachmentRepoResolvesUploaderUsernameAndKeepsLegacyMissing(t *
 	}
 	named := itemsByName["with-uploader.pdf"]
 	if named == nil || named.UploadedBy == nil || *named.UploadedBy != uploader.ID ||
-		named.UploadedByUsername == nil || *named.UploadedByUsername != "demo_boss" {
+		named.UploadedByUsername == nil || *named.UploadedByUsername != "demo_boss" ||
+		named.UploadedByDisplayName == nil || *named.UploadedByDisplayName != "王总" {
 		t.Fatalf("attachment uploader username must resolve by immutable account id: %#v", named)
 	}
 	legacy := itemsByName["legacy.pdf"]
-	if legacy == nil || legacy.UploadedBy != nil || legacy.UploadedByUsername != nil {
+	if legacy == nil || legacy.UploadedBy != nil || legacy.UploadedByUsername != nil || legacy.UploadedByDisplayName != nil {
 		t.Fatalf("legacy attachment without uploader must remain explicitly missing: %#v", legacy)
 	}
 
 	metadata, err := repo.GetBusinessAttachmentMetadata(ctx, withUploader.ID)
-	if err != nil || metadata.UploadedByUsername == nil || *metadata.UploadedByUsername != "demo_boss" {
+	if err != nil || metadata.UploadedByUsername == nil || *metadata.UploadedByUsername != "demo_boss" ||
+		metadata.UploadedByDisplayName == nil || *metadata.UploadedByDisplayName != "王总" {
 		t.Fatalf("attachment metadata uploader username: item=%#v err=%v", metadata, err)
 	}
 }
@@ -203,6 +206,7 @@ func TestBusinessAttachmentRepoWithdrawsOnceAndKeepsReadableAuditMetadata(t *tes
 	ctx := context.Background()
 	actor, err := repo.data.postgres.AdminUser.Create().
 		SetUsername("demo_admin").
+		SetDisplayName("系统管理员").
 		SetPasswordHash("test-password-hash").
 		Save(ctx)
 	if err != nil {
@@ -243,7 +247,8 @@ func TestBusinessAttachmentRepoWithdrawsOnceAndKeepsReadableAuditMetadata(t *tes
 	}
 	items, err := repo.ListBusinessAttachments(ctx, biz.BusinessAttachmentOwnerWorkflowTask, taskID)
 	if err != nil || len(items) != 1 || items[0].WithdrawnByUsername == nil ||
-		*items[0].WithdrawnByUsername != "demo_admin" || items[0].WithdrawalReason == nil {
+		*items[0].WithdrawnByUsername != "demo_admin" || items[0].WithdrawnByDisplayName == nil ||
+		*items[0].WithdrawnByDisplayName != "系统管理员" || items[0].WithdrawalReason == nil {
 		t.Fatalf("listed withdrawal audit = %#v, err=%v", items, err)
 	}
 	if _, err := repo.GetBusinessAttachmentContent(ctx, attachment.ID, biz.BusinessAttachmentOwnerWorkflowTask, taskID); !errors.Is(err, biz.ErrBusinessAttachmentNotFound) {

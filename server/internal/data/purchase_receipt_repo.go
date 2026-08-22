@@ -240,7 +240,11 @@ func (r *inventoryRepo) createPurchaseReceiptFromPurchaseOrder(
 			purchaseorderitem.PurchaseOrderID(order.ID),
 			purchaseorderitem.LineStatus(biz.PurchaseOrderItemStatusOpen),
 		).
-		Order(ent.Asc(purchaseorderitem.FieldLineNo), ent.Asc(purchaseorderitem.FieldID)).
+		Order(sourceDocumentItemOrder(
+			purchaseorderitem.FieldDisplayOrder,
+			purchaseorderitem.FieldLineNo,
+			purchaseorderitem.FieldID,
+		)).
 		All(ctx)
 	if err != nil {
 		return nil, err
@@ -261,7 +265,11 @@ func (r *inventoryRepo) createPurchaseReceiptFromPurchaseOrder(
 			purchaseorderitem.PurchaseOrderID(order.ID),
 			purchaseorderitem.LineStatus(biz.PurchaseOrderItemStatusOpen),
 		).
-		Order(ent.Asc(purchaseorderitem.FieldLineNo), ent.Asc(purchaseorderitem.FieldID)).
+		Order(sourceDocumentItemOrder(
+			purchaseorderitem.FieldDisplayOrder,
+			purchaseorderitem.FieldLineNo,
+			purchaseorderitem.FieldID,
+		)).
 		All(ctx)
 	if err != nil {
 		return nil, err

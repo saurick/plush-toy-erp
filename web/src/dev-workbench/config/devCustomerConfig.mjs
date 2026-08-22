@@ -2085,8 +2085,8 @@ export function buildCustomerConfigDevOverview({
       : '未选择客户配置包'
     const missingPackageStatus = hasRequestedCustomerKey ? '未登记' : '未选择'
     const missingPackageBoundary = hasRequestedCustomerKey
-      ? '当前 URL customer 参数没有对应客户配置包；开发态总控不会 fallback 到 yoyoosun 冒充，也不会创建 SaaS tenant。'
-      : '当前 URL 缺少 customer 参数；开发态总控必须显式选择客户配置包，不会 fallback 到 yoyoosun 冒充，也不会创建 SaaS tenant。'
+      ? '当前 URL 的 customer 参数没有对应客户配置包；系统不会自动改用其他客户包，请从已登记列表中选择。'
+      : '当前 URL 缺少 customer 参数；请从已登记列表中选择客户配置包。'
     return {
       status: resolved.status,
       customerKey: resolved.customerKey,
@@ -2196,15 +2196,6 @@ export function buildCustomerConfigDevOverview({
         status: '未批准',
         boundary:
           '客户配置测试 / 发布只写控制面表；客户、供应商、订单、库存、出货、财务等历史业务数据导入必须另走专项。',
-      },
-      {
-        key: 'saas-tenant',
-        title: 'SaaS tenant / tenant_id',
-        sourcePath: DEV_CUSTOMER_CONFIG_SOURCE_PATH,
-        sourceLabel: mapSourcePathLabel(DEV_CUSTOMER_CONFIG_SOURCE_PATH),
-        status: '禁止误接',
-        boundary:
-          'customer key 只表示客户包选择，不代表 SaaS runtime tenant，也不新增 tenant_id。',
       },
     ],
   }

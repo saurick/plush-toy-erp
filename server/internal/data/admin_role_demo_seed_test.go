@@ -71,7 +71,7 @@ func (expected phoneAuditPayloadMatcher) Match(value driver.Value) bool {
 		return false
 	}
 	var decoded map[string]any
-	if json.Unmarshal([]byte(payload), &decoded) != nil || decoded["action"] != "admin_user.phone.set" {
+	if json.Unmarshal([]byte(payload), &decoded) != nil || decoded["action"] != "admin_user.profile.set" {
 		return false
 	}
 	target, _ := decoded["target"].(map[string]any)
@@ -116,7 +116,7 @@ func expectPhoneAudit(mock sqlmock.Sqlmock, username, phone string) {
 	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO runtime_audit_events (event_type, event_key, source, payload, created_at) VALUES ($1, $2, $3, $4, $5)")).
 		WithArgs(
 			"admin_control_plane",
-			"admin_user.phone.set",
+			"admin_user.profile.set",
 			"manual_acceptance_password_rotation",
 			phoneAuditPayloadMatcher{username: username, phone: phone},
 			sqlmock.AnyArg(),
@@ -131,6 +131,9 @@ func TestDefaultRoleDemoAdminAccountsExcludeDebugByDefault(t *testing.T) {
 	}
 	foundEngineering := false
 	for _, account := range accounts {
+		if strings.TrimSpace(account.DisplayName) == "" {
+			t.Fatalf("default role demo account is missing display name: %#v", account)
+		}
 		if account.RoleKey == biz.DebugOperatorRoleKey || account.Username == "demo_debug" {
 			t.Fatalf("debug demo account must be opt-in, got %#v", account)
 		}
@@ -155,7 +158,7 @@ func TestRejectPublicRoleDemoPassword(t *testing.T) {
 func TestDefaultRoleDemoAdminAccountsCanIncludeDebug(t *testing.T) {
 	accounts := DefaultRoleDemoAdminAccounts(true)
 	last := accounts[len(accounts)-1]
-	if last.Username != "demo_debug" || last.RoleKey != biz.DebugOperatorRoleKey {
+	if last.DisplayName != "演示调试员" || last.Username != "demo_debug" || last.RoleKey != biz.DebugOperatorRoleKey {
 		t.Fatalf("expected opt-in debug account at the end, got %#v", last)
 	}
 }
@@ -175,9 +178,9 @@ func TestSeedRoleDemoAdminAccountsUpdatesExistingAccountRole(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(100))
 	mock.ExpectExec(regexp.QuoteMeta(`
 UPDATE admin_users
-SET is_super_admin = FALSE, disabled = FALSE, updated_at = $2
+SET display_name = $2, is_super_admin = FALSE, disabled = FALSE, updated_at = $3
 WHERE id = $1`)).
-		WithArgs(100, sqlmock.AnyArg()).
+		WithArgs(100, "演示业务员", sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM admin_user_roles WHERE admin_user_id = $1")).
 		WithArgs(100).
@@ -194,7 +197,7 @@ ON CONFLICT (admin_user_id, role_id) DO NOTHING`)).
 	result, err := SeedRoleDemoAdminAccounts(context.Background(), db, RoleDemoAdminSeedOptions{
 		Password: "role-demo-password",
 		Accounts: []RoleDemoAdminAccountSpec{
-			{Username: "demo_sales", RoleKey: biz.SalesRoleKey},
+			{DisplayName: "演示业务员", Username: "demo_sales", RoleKey: biz.SalesRoleKey},
 		},
 	})
 	if err != nil {
@@ -208,6 +211,9 @@ ON CONFLICT (admin_user_id, role_id) DO NOTHING`)).
 	}
 	if result.Accounts[0].PasswordReset {
 		t.Fatalf("password must not reset unless requested")
+	}
+	if result.Accounts[0].DisplayName != "演示业务员" {
+		t.Fatalf("seeded display name = %q", result.Accounts[0].DisplayName)
 	}
 	if err := db.Close(); err != nil {
 		t.Fatalf("db.Close() error = %v", err)
@@ -233,12 +239,13 @@ func TestSeedRoleDemoAdminAccountsResetBumpsAuthVersionAndRevokesSessions(t *tes
 	mock.ExpectExec(regexp.QuoteMeta(`
 UPDATE admin_users
 SET password_hash = $2,
+    display_name = $3,
     auth_version = auth_version + 1,
     is_super_admin = FALSE,
     disabled = FALSE,
-    updated_at = $3
+    updated_at = $4
 WHERE id = $1`)).
-		WithArgs(100, bcryptHashMatcher("role-demo-password"), sqlmock.AnyArg()).
+		WithArgs(100, bcryptHashMatcher("role-demo-password"), "演示业务员", sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(regexp.QuoteMeta(`
 UPDATE admin_sessions
@@ -264,7 +271,7 @@ ON CONFLICT (admin_user_id, role_id) DO NOTHING`)).
 		Password:      "role-demo-password",
 		ResetPassword: true,
 		Accounts: []RoleDemoAdminAccountSpec{
-			{Username: "demo_sales", RoleKey: biz.SalesRoleKey},
+			{DisplayName: "演示业务员", Username: "demo_sales", RoleKey: biz.SalesRoleKey},
 		},
 	})
 	if err != nil {
@@ -297,12 +304,13 @@ func TestSeedRoleDemoAdminAccountsResetRollsBackWhenSessionRevocationFails(t *te
 	mock.ExpectExec(regexp.QuoteMeta(`
 UPDATE admin_users
 SET password_hash = $2,
+    display_name = $3,
     auth_version = auth_version + 1,
     is_super_admin = FALSE,
     disabled = FALSE,
-    updated_at = $3
+    updated_at = $4
 WHERE id = $1`)).
-		WithArgs(100, bcryptHashMatcher("role-demo-password"), sqlmock.AnyArg()).
+		WithArgs(100, bcryptHashMatcher("role-demo-password"), "演示业务员", sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(regexp.QuoteMeta(`
 UPDATE admin_sessions
@@ -319,7 +327,7 @@ WHERE admin_user_id = $1
 		Password:      "role-demo-password",
 		ResetPassword: true,
 		Accounts: []RoleDemoAdminAccountSpec{
-			{Username: "demo_sales", RoleKey: biz.SalesRoleKey},
+			{DisplayName: "演示业务员", Username: "demo_sales", RoleKey: biz.SalesRoleKey},
 		},
 	})
 	if err == nil || !strings.Contains(err.Error(), "session storage unavailable") {
@@ -351,6 +359,29 @@ func TestSeedRoleDemoAdminAccountsRejectsMissingPassword(t *testing.T) {
 	}
 }
 
+func TestSeedRoleDemoAdminAccountsRejectsMissingDisplayNameBeforeTransaction(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	mock.ExpectClose()
+	_, err = SeedRoleDemoAdminAccounts(context.Background(), db, RoleDemoAdminSeedOptions{
+		Password: "role-demo-password",
+		Accounts: []RoleDemoAdminAccountSpec{
+			{Username: "demo_sales", RoleKey: biz.SalesRoleKey},
+		},
+	})
+	if !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("missing display name error = %v, want ErrBadParam", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
 func TestResetRoleDemoAdminPasswordsBumpsAuthVersionAndRevokesSessions(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
@@ -362,7 +393,7 @@ UPDATE admin_users
 SET password_hash = $2, auth_version = auth_version + 1, updated_at = $3
 WHERE username = $1
 RETURNING id, auth_version`)).
-		WithArgs("demo_uat_disabled", bcryptHashMatcher("manual-test-pass"), sqlmock.AnyArg()).
+		WithArgs("demo_disabled", bcryptHashMatcher("manual-test-pass"), sqlmock.AnyArg()).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "auth_version"}).AddRow(101, 2))
 	mock.ExpectExec(regexp.QuoteMeta(`
 UPDATE admin_sessions
@@ -372,14 +403,14 @@ WHERE admin_user_id = $1
   AND expires_at > $2`)).
 		WithArgs(101, sqlmock.AnyArg(), adminSessionRevokeReasonPasswordReset).
 		WillReturnResult(sqlmock.NewResult(0, 2))
-	expectRotationAudit(mock, "demo_uat_disabled", "manual-test-pass")
+	expectRotationAudit(mock, "demo_disabled", "manual-test-pass")
 	mock.ExpectCommit()
 	mock.ExpectClose()
 
 	err = ResetRoleDemoAdminPasswords(
 		context.Background(),
 		db,
-		[]string{"demo_uat_disabled"},
+		[]string{"demo_disabled"},
 		"manual-test-pass",
 	)
 	if err != nil {

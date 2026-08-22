@@ -66,7 +66,7 @@ func TestAdminManageUsecase_LegalNoticeAcknowledgementIsVersionedAndIdempotent(t
 }
 
 func TestBuildLegalNoticeAcknowledgementAuditEventStoresNoCredentialOrPhone(t *testing.T) {
-	admin := &AdminUser{ID: 7, Username: "worker", Phone: "13800138000"}
+	admin := &AdminUser{ID: 7, Username: "worker", DisplayName: "张员工", Phone: "13800138000"}
 	event, err := BuildLegalNoticeAcknowledgementAuditEvent(
 		admin,
 		"2026-08-11.1",
@@ -85,6 +85,10 @@ func TestBuildLegalNoticeAcknowledgementAuditEventStoresNoCredentialOrPhone(t *t
 		if strings.Contains(payload, forbidden) {
 			t.Fatalf("audit payload contains forbidden value %q: %s", forbidden, payload)
 		}
+	}
+	actor, ok := event.Payload["actor"].(map[string]any)
+	if !ok || actor["display_name"] != "张员工" || actor["username"] != "worker" {
+		t.Fatalf("audit actor identity = %#v", event.Payload["actor"])
 	}
 	enriched := EnrichRuntimeAuditEvent(RuntimeAuditEvent{
 		EventType: event.EventType,

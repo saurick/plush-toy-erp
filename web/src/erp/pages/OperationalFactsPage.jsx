@@ -1218,6 +1218,8 @@ export function OperationalFactWorkspace({
         entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
         initialDraft,
         customerKey: activeCustomerKey,
+        accountKey: adminProfile?.id,
+        configRevision: adminProfile?.effective_session?.config_revision || '',
       })
       message.success('已打开加工合同打印模板，可在窗口补齐工序和明细')
     } catch (error) {

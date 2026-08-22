@@ -2375,6 +2375,8 @@ export async function installFactRpcMocks(page, context) {
               from_status_key: '',
               to_status_key: task.task_status_key,
               actor_role_key: task.owner_role_key,
+              actor_username: adminProfile?.username || '',
+              actor_display_name: adminProfile?.display_name || '',
               reason: '等待审批人核对来源单据与放行条件',
               task_version: task.version,
               created_at: Number(task.created_at || nowUnix()),
