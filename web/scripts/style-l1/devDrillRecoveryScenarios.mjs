@@ -32,9 +32,11 @@ export function createDevDrillRecoveryScenarios({
           '交付运行菜单必须明确标记当前演练与恢复入口'
         )
         await page.getByText('客户试用环境', { exact: true }).waitFor()
-        await page
-          .locator('.erp-dev-environment-evidence[aria-busy="false"]')
-          .waitFor({ timeout: 20_000 })
+        assert.equal(
+          await page.locator('.erp-dev-environment-evidence').count(),
+          0,
+          '双环境事实只在交付运行总览展示，演练子页不应重复常驻'
+        )
         assert.equal(
           await page.locator('.erp-dev-recovery-row').count(),
           6,
@@ -62,28 +64,11 @@ export function createDevDrillRecoveryScenarios({
             '.erp-dev-recovery-shell > .ant-card, .erp-dev-recovery-support > .ant-card'
           ).length,
           documentHeight: document.documentElement.scrollHeight,
-          environmentEvidenceHeight: Math.round(
-            document
-              .querySelector('.erp-dev-environment-evidence')
-              ?.getBoundingClientRect().height || 0
-          ),
-          environmentCardCount: document.querySelectorAll(
-            '.erp-dev-environment-card'
-          ).length,
         }))
         assert(defaultMetrics.cardCount <= 4, '主页面不得退化为演练卡片墙')
-        assert.equal(defaultMetrics.environmentCardCount, 3)
         assert(
-          defaultMetrics.environmentEvidenceHeight > 0 &&
-            defaultMetrics.environmentEvidenceHeight < 500,
-          `桌面双环境事实应保持紧凑，当前高度 ${defaultMetrics.environmentEvidenceHeight}px`
-        )
-        const coreDocumentHeight =
-          defaultMetrics.documentHeight -
-          defaultMetrics.environmentEvidenceHeight
-        assert(
-          coreDocumentHeight < 1900,
-          `桌面演练核心信息应保持紧凑，当前总高度 ${defaultMetrics.documentHeight}px，核心内容 ${coreDocumentHeight}px，环境事实 ${defaultMetrics.environmentEvidenceHeight}px`
+          defaultMetrics.documentHeight < 1900,
+          `桌面演练核心信息应保持紧凑，当前总高度 ${defaultMetrics.documentHeight}px`
         )
         await assertNoHorizontalOverflow(
           page,
@@ -127,9 +112,11 @@ export function createDevDrillRecoveryScenarios({
         await clickERPThemeOption(page, '暗色')
         await page.evaluate(() => window.scrollTo(0, 0))
         await page.getByText('客户试用环境', { exact: true }).waitFor()
-        await page
-          .locator('.erp-dev-environment-evidence[aria-busy="false"]')
-          .waitFor({ timeout: 20_000 })
+        assert.equal(
+          await page.locator('.erp-dev-environment-evidence').count(),
+          0,
+          '移动端演练子页不应重复常驻双环境事实'
+        )
         const metrics = await page.evaluate(() => {
           const summary = document.querySelector(
             '.erp-dev-recovery-overview__facts'
@@ -138,12 +125,6 @@ export function createDevDrillRecoveryScenarios({
           const nav = document.querySelector('.erp-dev-workspace-nav')
           const customerScope = document.querySelector(
             '.erp-dev-customer-scope'
-          )
-          const environmentEvidence = document.querySelector(
-            '.erp-dev-environment-evidence'
-          )
-          const environmentScroller = document.querySelector(
-            '.erp-dev-environment-evidence__grid'
           )
           return {
             summaryColumns: summary
@@ -154,21 +135,6 @@ export function createDevDrillRecoveryScenarios({
             customerScopeHeight: customerScope
               ? Math.round(customerScope.getBoundingClientRect().height)
               : null,
-            environmentEvidenceHeight: environmentEvidence
-              ? Math.round(environmentEvidence.getBoundingClientRect().height)
-              : null,
-            environmentCardCount: document.querySelectorAll(
-              '.erp-dev-environment-card'
-            ).length,
-            environmentCardWidths: environmentScroller
-              ? [...environmentScroller.children].map((card) =>
-                  Math.round(card.getBoundingClientRect().width)
-                )
-              : [],
-            environmentScrollerClientWidth:
-              environmentScroller?.clientWidth || 0,
-            environmentScrollerScrollWidth:
-              environmentScroller?.scrollWidth || 0,
             viewportWidth: window.innerWidth,
             documentWidth: document.documentElement.scrollWidth,
             documentHeight: document.documentElement.scrollHeight,
@@ -193,44 +159,6 @@ export function createDevDrillRecoveryScenarios({
           metrics.customerScopeHeight > 0 && metrics.customerScopeHeight < 200,
           `移动端甲方范围选择器高度异常，当前高度 ${metrics.customerScopeHeight}px`
         )
-        assert(
-          metrics.environmentEvidenceHeight > 0 &&
-            metrics.environmentEvidenceHeight < 450,
-          `移动端双环境事实应使用紧凑对照带，当前高度 ${metrics.environmentEvidenceHeight}px`
-        )
-        assert.equal(metrics.environmentCardCount, 3)
-        assert(
-          metrics.environmentCardWidths.every(
-            (width) => width >= 240 && width <= 310
-          ),
-          `移动端目标卡宽度异常: ${metrics.environmentCardWidths.join(', ')}`
-        )
-        assert(
-          metrics.environmentScrollerScrollWidth >
-            metrics.environmentScrollerClientWidth,
-          '移动端三目标事实应在页面内形成可横向浏览的对照带'
-        )
-        const environmentScroller = page.locator(
-          '.erp-dev-environment-evidence__grid'
-        )
-        await environmentScroller.focus()
-        assert.equal(
-          await environmentScroller.evaluate(
-            (element) => document.activeElement === element
-          ),
-          true
-        )
-        await page.keyboard.press('ArrowRight')
-        await page.waitForTimeout(100)
-        assert(
-          (await environmentScroller.evaluate((element) =>
-            Math.round(element.scrollLeft)
-          )) > 0,
-          '移动端双环境对照带应支持键盘横向浏览'
-        )
-        await environmentScroller.evaluate((element) => {
-          element.scrollLeft = 0
-        })
         const coreDocumentHeight =
           metrics.documentHeight - metrics.customerScopeHeight
         assert(
