@@ -8,7 +8,6 @@ import {
   Input,
   InputNumber,
   Select,
-  Space,
   Table,
   Tag,
   Typography,
@@ -204,11 +203,13 @@ function ShipmentSelectedSourceAlert({
             className="erp-business-source-summary erp-business-inline-note"
             role="note"
           >
-            <Text strong>{`来源销售订单：${
-              selectedSalesOrder.order_no ||
-              selectedSalesOrder.customer_order_no ||
-              '已选择'
-            }`}</Text>
+            <Text strong>
+              {`来源销售订单：${
+                selectedSalesOrder.order_no ||
+                selectedSalesOrder.customer_order_no ||
+                '已选择'
+              }`}
+            </Text>
             <Text type="secondary">
               客户：{salesOrderCustomerText(selectedSalesOrder) || '-'}；已导入{' '}
               {selectedSourceRows.length} 行
