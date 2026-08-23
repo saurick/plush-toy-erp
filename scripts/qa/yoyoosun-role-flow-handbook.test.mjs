@@ -331,12 +331,13 @@ test("trial runbook keeps config, RBAC and release evidence boundaries", () => {
   }
 });
 
-test("trial account checklist protects credentials and current navigation", () => {
+test("trial account checklist fixes public 133 test credentials and current navigation", () => {
   assert.match(
     trialAccountChecklist,
-    /账号名和凭据只在受控环境配置与授权交付渠道维护/u,
+    /`customer-trial-133` 明确登记的公开测试凭据/u,
   );
-  assert.doesNotMatch(trialAccountChecklist, /12345678|adminadmin/u);
+  assert.match(trialAccountChecklist, /`uat_\*`\s*\| `12345678`/u);
+  assert.match(trialAccountChecklist, /`admin`\s*\| `adminadmin`/u);
   assert.match(
     trialAccountChecklist,
     /常用：`应收管理`、`应付管理`、`发票管理`；更多：`对账管理`、`收付款核销`和来源核对页/u,

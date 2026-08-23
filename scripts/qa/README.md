@@ -47,7 +47,7 @@
 | `node scripts/qa/test-data-isolation-boundary.mjs --json`                                                                           | 只读检查 Product Core demo seed、yoyoosun 模拟数据和真实导入准备边界，并锁住 dry-run 不具备执行能力                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | 改 seed、fixture、模拟数据或导入准备工具后       |
 | `node scripts/qa/manual-acceptance-catalog.mjs`                                                                                     | 生成 51 项只读基线验收目录，覆盖登录入口、30 个电脑业务页、九岗位任务端、打印预览与打印工作台；默认只输出、不连接后端                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | 准备全页面试用验收范围时                         |
 | `node scripts/qa/local-acceptance-lifecycle.mjs --commit <sha> --run-id <run>`                                                      | 默认输出本地统一生命周期 plan；显式 `--execute` 后在两个按批隔离库串行完成 migration、九岗位数据、51 项只读浏览器与三条真实写异常流，并在成功或失败后停服、删库和读回残留                                                                                                                                                                                                                                                                                                                                                                                                                    | 对 clean exact SHA 做本地完整技术验收时          |
-| `node scripts/qa/scenario-demo-data.mjs`                                                                                            | 默认只读输出固定 V6 长期数据计划；本地开发与 `customer-trial-133` 复用同一 canonical 业务语义和九阶段 runner，但数据库、release、migration、客户配置、凭据、attestation 与回执独立。精确 plan digest 和确认串匹配后才通过正式 API exact-create-or-readback；不清理、不重置，不把查询读回写成人工验收或真实客户导入                                                                                                                                                | 需要为本地或 133 长期保留固定业务场景数据时      |
+| `node scripts/qa/scenario-demo-data.mjs`                                                                                            | 默认只读输出固定 V6 长期数据计划；本地开发与 `customer-trial-133` 复用同一 canonical 业务语义和九阶段 runner，但数据库、release、migration、客户配置、账号命名、attestation 与回执独立。133 的密码值由固定公开测试凭据合同约束，不构成数据共库。精确 plan digest 和确认串匹配后才通过正式 API exact-create-or-readback；不清理、不重置，不把查询读回写成人工验收或真实客户导入                                                                                              | 需要为本地或 133 长期保留固定业务场景数据时      |
 | `node --test scripts/qa/customer-trial-133-data.test.mjs`                                                                           | 锁住 133 数据写入前的新回滚点：固定目标 SSH 脚本使用 `erp_backup` 只读角色，复核 exact release / database / migration，完成 custom dump、`pg_restore --list`、SHA-256、原子落盘和脱敏回执；不接受浏览器主机、路径、DSN 或命令输入                                                                                                                                                                                                                                                                                         | 调整 133 数据准备或备份回执合同后               |
 | `node scripts/qa/manual-acceptance-dataset.mjs`                                                                                     | 默认生成 local 与 133 同语义计划；显式 `--apply --target` 后由唯一串行 runner 调用同一组正式 API 入口并校验严格阶段回执                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | 准备或重放双环境全页面模拟数据时                 |
 | `node scripts/qa/manual-acceptance-source-data.mjs --target local-dev --data-version 2026.08.15-v6 --run-id 20260815-V6 --json`     | 生成带稳定批次前缀的客户、供应商、产品规格、材料、加工环节及销售 / 采购 / 委外 / BOM 源数据计划；默认只读                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | 写入模拟源数据前确认数量、状态和边界时           |
@@ -177,7 +177,7 @@ node scripts/qa/manual-acceptance-source-data.mjs \
 node scripts/qa/manual-acceptance-data-depth.mjs
 ```
 
-正常整批写入只使用顶层 runner。它按 `core → baseline → role → source → task → facts → purchase-quality → attachments → readiness` 串行执行；两端 handler 身份和 target-free 业务输入相同，目标适配层只提供 endpoint、数据库身份、凭据、确认、带外证明和报告目录。`core` 在登录前先调用只读 `/readyz/runtime-identity`，用摘要同时绑定实际数据库、完整 40 位 release commit 和 14 位 Atlas revision；探针只返回匹配 marker，不返回数据库名或连接信息。随后登录 admin 读取真实 `debug.capabilities`，再次核对数据库、运行环境和六个 debug=false，只读证明后续阶段依赖的 1 个稳定单位和 4 个仓库。`baseline` 再逐类读回客户、供应商、材料、产品、SKU、工序、BOM、来源单、Workflow 和全部 Fact 都为 0；任何已有业务记录都会阻断，不能用历史数据凑页面数量。`role` 在已注册的 local 与 133 验收目标中读取岗位当前完整设置，再统一通过带版本校验和审计的 `admin.set_role_settings` 整包回写原权限、原菜单布局和新的仓库范围，把 `warehouse / quality` 精确绑定到这 4 个核心仓库；不得分拆写入、丢失导航顺序或用脚本直写 RBAC 表。材料、产品、工序、BOM 与业务源单数量随后由 `source` 阶段独立写入并读回。密码创建与重置统一要求 8～20 位且 UTF-8 编码后不超过 72 字节，凭据只从环境变量注入，不写报告。
+正常整批写入只使用顶层 runner。它按 `core → baseline → role → source → task → facts → purchase-quality → attachments → readiness` 串行执行；两端 handler 身份和 target-free 业务输入相同，目标适配层只提供 endpoint、数据库身份、凭据、确认、带外证明和报告目录。`core` 在登录前先调用只读 `/readyz/runtime-identity`，用摘要同时绑定实际数据库、完整 40 位 release commit 和 14 位 Atlas revision；探针只返回匹配 marker，不返回数据库名或连接信息。随后登录 admin 读取真实 `debug.capabilities`，再次核对数据库、运行环境和六个 debug=false，只读证明后续阶段依赖的 1 个稳定单位和 4 个仓库。`baseline` 再逐类读回客户、供应商、材料、产品、SKU、工序、BOM、来源单、Workflow 和全部 Fact 都为 0；任何已有业务记录都会阻断，不能用历史数据凑页面数量。`role` 在已注册的 local 与 133 验收目标中读取岗位当前完整设置，再统一通过带版本校验和审计的 `admin.set_role_settings` 整包回写原权限、原菜单布局和新的仓库范围，把 `warehouse / quality` 精确绑定到这 4 个核心仓库；不得分拆写入、丢失导航顺序或用脚本直写 RBAC 表。材料、产品、工序、BOM 与业务源单数量随后由 `source` 阶段独立写入并读回。密码创建与重置统一要求 8～20 位且 UTF-8 编码后不超过 72 字节；本地从环境变量读取，133 从固定测试凭据合同读取，报告均不保存密码。
 
 `local-acceptance-lifecycle.mjs` 是本地完整验收的统一入口：它只接受登记的 `192.168.0.106:5432` 开发 PostgreSQL、clean exact commit、按批生成的 `plush_erp_acceptance_<run-id>_dev` 与 `plush_erp_acceptance_<run-id>_browser_actions_dev`，并使用隔离端口完成建库、migration、后端、十个正式模拟岗位账号的受控预配置 bootstrap、客户配置、core、九岗位数据、51 项只读浏览器和三条真实写异常流。预配置 bootstrap 只在 runtime identity、精确数据库、环境、super admin、目标确认和账号确认均通过后走 `admin.create`，不直写账号表；它先满足客户配置审批责任岗位的“有可办理员工”发布门禁，dataset role 阶段仍会重新核对账号并补齐正式岗位权限和仓库范围。浏览器启动前会重新扫描规范辅助端口，并在健康检查后复核本轮 Vite 子进程仍存活，不能把并发任务占用端口上的外部页面误认成本轮服务。只读验收完成并停后端后才克隆 `browser_actions` 库；无论成功失败都会停服务、逐库强制删除和读回残留，清理失败返回非零并报告精确库名。默认只打印 plan；真实执行必须传入 exact commit、run id、由 plan 生成的确认串和 `LOCAL_ACCEPTANCE_DATABASE_BASE_URL`，回执不保存 DSN、密码或 token：
 
@@ -259,7 +259,7 @@ export MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON='{"target":"customer-trial-133"
 MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM='BOOTSTRAP_FORMAL_MANUAL_ACCEPTANCE_ACCOUNTS:customer-trial-133:2026.08.15-v6:20260815-V6' \
 MANUAL_ACCEPTANCE_ADMIN_USERNAME=admin \
 MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<fresh-bootstrap-admin-password>' \
-MANUAL_ACCEPTANCE_PASSWORD='<different-demo-password>' \
+MANUAL_ACCEPTANCE_UAT_PASSWORD='12345678' \
   node scripts/qa/manual-acceptance-account-scenarios.mjs \
     --apply \
     --formal-accounts-only \
@@ -271,8 +271,8 @@ MANUAL_ACCEPTANCE_PASSWORD='<different-demo-password>' \
     --json
 
 MANUAL_ACCEPTANCE_ADMIN_USERNAME=admin \
-MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<133-independent-admin-password>' \
-MANUAL_ACCEPTANCE_PASSWORD='<different-demo-password>' \
+MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<fresh-bootstrap-admin-password>' \
+MANUAL_ACCEPTANCE_UAT_PASSWORD='12345678' \
   node scripts/qa/manual-acceptance-customer-config.mjs \
     --apply \
     --preview-manifest output/qa/manual-acceptance-dataset/yoyoosun-runtime-manifest-preview.json \
@@ -304,8 +304,8 @@ docker compose \
 回到本机，通过同一隧道执行唯一顶层 runner：
 
 ```bash
-MANUAL_ACCEPTANCE_PASSWORD='<different-demo-password>' \
-MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<133-independent-admin-password>' \
+MANUAL_ACCEPTANCE_UAT_PASSWORD='12345678' \
+MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<fresh-bootstrap-admin-password>' \
   node scripts/qa/manual-acceptance-dataset.mjs \
     --apply \
     --target customer-trial-133 \

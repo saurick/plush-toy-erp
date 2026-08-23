@@ -6,7 +6,7 @@
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `verify-env.sh`                   | 校验 env 样例或受控 `.env` 的必需变量和危险配置                                                                                                                                                                                                                                             |
 | `run-smoke.sh`                    | 对指定 endpoint 执行 health / route / SMS provider capabilities / customer_config effective session 与真实最小 PDF smoke，并输出脱敏 JSON；支持 `--print-input-template` 只读输出目标 smoke 输入模板                                                                                        |
-| `rotate-credentials-133.sh`       | 从 `credential.contract.json` 读取账号、变量名和 Keychain alias，再从发布工作站 Keychain 读取彼此独立的管理员 / UAT 岗位外部 secret；SMS 手机号仅在已人工录入时读取，经 SSH stdin 临时注入 133 镜像内轮换工具；要求发布 / migration / operation id / 备份 hash 精确绑定，只输出脱敏持久回执 |
+| `rotate-credentials-133.sh`       | 从 `credential.contract.json` 读取固定 `admin/adminadmin` 与全部 `uat_*/12345678`；SMS 手机号仅在发布工作站 Keychain 已人工录入时读取，经 SSH stdin 临时注入 133 镜像内轮换工具；要求发布 / migration / operation id / 备份 hash 精确绑定，只输出脱敏持久回执 |
 | `cutover-public-web.sh`           | yoyoosun 133 公网前端适配层的 plan-first 切流；先验证候选镜像 release、健康和 provider capabilities，失败自动恢复旧容器且保留回滚点                                                                                                                                                         |
 | `collect-evidence.sh`             | 生成 release evidence 草稿目录和 backup restore artifact 占位，不采集 secret                                                                                                                                                                                                                |
 | `verify-backup-restore.sh`        | 检查备份恢复 evidence 是否具备必要字段，不处理备份文件本体                                                                                                                                                                                                                                  |
@@ -20,9 +20,7 @@
 bash deployments/yoyoosun/scripts/verify-env.sh --example
 bash deployments/yoyoosun/scripts/run-smoke.sh --print-input-template
 bash deployments/yoyoosun/scripts/rotate-credentials-133.sh --help
-MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<admin-secret>' \
-MANUAL_ACCEPTANCE_UAT_PASSWORD='<uat-role-secret>' \
-  bash deployments/yoyoosun/scripts/run-smoke.sh \
+bash deployments/yoyoosun/scripts/run-smoke.sh \
   --endpoint https://erp.example.invalid \
   --backend-url http://127.0.0.1:8300 \
   --release-version <release-version> \
@@ -56,7 +54,7 @@ SOURCE_POSTGRES_DSN="$(cd server && make print_db_url)" \
 node scripts/deploy/release-evidence-gate.mjs --customer yoyoosun --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
 
-133 凭据合同是 `deployments/yoyoosun/env/credential.contract.json`：它只登记稳定 `admin`、十个 `uat_*` 岗位账号、环境变量名和发布工作站 Keychain alias，不保存密码值。管理员与 UAT 岗位必须使用彼此不同的外部 secret，且都不得复用本地 Demo 的 `adminadmin` / `12345678`；其他 staging / UAT / 生产目标同样不得复用。SMS 手机号只在人工录入 Keychain 后参与轮换和读回，没有录入时不阻断密码登录矩阵。每次 fresh / restore / rollback 后先完成受控备份，再使用唯一的小写 UUID v4 `operation-id` 运行 `rotate-credentials-133.sh`；命令中断后必须复用同一 operation id，镜像内 durable marker 会返回同一回执而不重复轮换。随后使用相同两个外部 secret 执行正式 `run-smoke.sh`，少于 11/11 真实登录、已配置手机号不一致、合同 hash 漂移或 release gate 缺少 credential matrix 都会失败。
+133 凭据合同是 `deployments/yoyoosun/env/credential.contract.json`：稳定管理员固定为 `admin/adminadmin`，十个岗位账号固定为 `uat_*/12345678`。两组公开测试凭据只允许 `customer-trial-133` 隔离测试目标使用，不进入服务器 steady `.env`，轮换和 smoke 也不读取外部密码覆盖值；其他 staging / UAT / 生产目标不得复用。SMS 手机号只在人工录入 Keychain 后参与轮换和读回，没有录入时不阻断密码登录矩阵。每次 fresh / restore / rollback 后先完成受控备份，再使用唯一的小写 UUID v4 `operation-id` 运行 `rotate-credentials-133.sh`；命令中断后必须复用同一 operation id，镜像内 durable marker 会返回同一回执而不重复轮换。随后执行正式 `run-smoke.sh`，少于 11/11 真实登录、已配置手机号不一致、合同 hash 漂移或 release gate 缺少 credential matrix 都会失败。
 
 `--print-input-template` 只输出目标 smoke 所需 endpoint、backend URL、releaseVersion、environment、report、客户配置 revision 和 token env 名，不触网、不读取 token、不写 smoke report、不证明 active revision 已读回。
 

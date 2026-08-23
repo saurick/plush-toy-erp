@@ -27,8 +27,6 @@ function loadCredentialContract() {
   const sms = contract?.smsLoginIdentity;
   const envKey = /^[A-Za-z_][A-Za-z0-9_]*$/;
   const username = /^[A-Za-z0-9_]+$/;
-  const text = (value) =>
-    typeof value === "string" && value.length > 0 && !/[\t\r\n]/u.test(value);
   const expectedUATUsernames = [
     "uat_boss",
     "uat_sales",
@@ -42,17 +40,15 @@ function loadCredentialContract() {
     "uat_admin",
   ];
   const valid =
-    contract?.schemaVersion === "yoyoosun-credential-contract/v3" &&
+    contract?.schemaVersion === "yoyoosun-credential-contract/v4" &&
     contract?.customerCode === "yoyoosun" &&
     contract?.target?.key === "customer-trial-133" &&
     contract?.target?.database === "plush_erp_uat_20260716_v5" &&
     contract?.target?.datasetVersion === "2026.08.15-v6" &&
     admin?.username === "admin" &&
     admin?.environmentVariable === "MANUAL_ACCEPTANCE_ADMIN_PASSWORD" &&
-    admin?.credentialSource === "external-secret" &&
-    text(admin?.keychain?.service) &&
-    text(admin?.keychain?.account) &&
-    !("fixedTestPassword" in admin) &&
+    admin?.credentialSource === "contract-fixed-test" &&
+    admin?.fixedTestPassword === "adminadmin" &&
     Array.isArray(uat?.usernames) &&
     JSON.stringify(uat.usernames) === JSON.stringify(expectedUATUsernames) &&
     uat.usernames.every(
@@ -60,10 +56,8 @@ function loadCredentialContract() {
     ) &&
     !uat.usernames.includes(admin.username) &&
     uat?.environmentVariable === "MANUAL_ACCEPTANCE_UAT_PASSWORD" &&
-    uat?.credentialSource === "external-secret" &&
-    text(uat?.keychain?.service) &&
-    text(uat?.keychain?.account) &&
-    !("fixedTestPassword" in uat) &&
+    uat?.credentialSource === "contract-fixed-test" &&
+    uat?.fixedTestPassword === "12345678" &&
     sms?.username === admin.username &&
     sms?.phoneRequiredWhenProviderEnabled === false &&
     sms?.verifyPhoneIdentityWhenConfigured === true &&
@@ -71,14 +65,14 @@ function loadCredentialContract() {
     sms?.keychain?.service === "plush-toy-erp-yoyoosun-sms-phone" &&
     sms?.keychain?.account === "customer-trial-133:admin" &&
     contract?.policy?.passwordsMustDiffer === true &&
-    JSON.stringify(contract?.policy?.localPublicPasswordTargets) ===
-      JSON.stringify(["local-dev"]) &&
-    contract.policy.customerTrialRequiresExternalSecrets === true &&
+    JSON.stringify(contract?.policy?.registeredSimplePasswordTargets) ===
+      JSON.stringify(["local-dev", "customer-trial-133"]) &&
+    contract.policy.customerTrialUsesFixedPublicTestCredentials === true &&
     contract.policy.rotateAfterCreateRestoreOrRollback === true &&
     contract.policy.revokeExistingSessionsOnRotation === true &&
     contract.policy.requireCredentialLoginMatrixBeforeCutover === true &&
     contract?.redaction?.containsSecrets === false &&
-    contract.redaction.contractContainsPublicTestPasswords === false &&
+    contract.redaction.contractContainsPublicTestPasswords === true &&
     contract.redaction.storePasswords === false &&
     contract.redaction.storeTokens === false &&
     contract.redaction.storePhoneNumber === false &&

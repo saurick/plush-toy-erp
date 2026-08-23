@@ -115,16 +115,15 @@ func TestValidateTargetDSNSeparatesLocalAnd133(t *testing.T) {
 	}
 }
 
-func TestValidateRotationPasswordsSeparatesLocalPublicAndCustomerUATSecrets(t *testing.T) {
-	if err := validateRotationPasswords(targetCustomerTrial133, "remote-admin-secret", "remote-uat-secret"); err != nil {
+func TestValidateRotationPasswordsRequiresRegistered133TestCredentials(t *testing.T) {
+	if err := validateRotationPasswords(targetCustomerTrial133, "adminadmin", "12345678"); err != nil {
 		t.Fatalf("validateRotationPasswords() error = %v", err)
 	}
 	for _, test := range []struct{ admin, role, want string }{
-		{admin: "remote-admin-secret", role: "", want: uatPasswordEnv},
-		{admin: "", role: "remote-uat-secret", want: adminPasswordEnv},
-		{admin: "same-password", role: "same-password", want: "must differ"},
-		{admin: "remote-admin-secret", role: "12345678", want: "local-only public"},
-		{admin: "adminadmin", role: "remote-uat-secret", want: "local-only public"},
+		{admin: "adminadmin", role: "", want: uatPasswordEnv},
+		{admin: "", role: "12345678", want: adminPasswordEnv},
+		{admin: "remote-admin-secret", role: "12345678", want: "registered"},
+		{admin: "adminadmin", role: "remote-uat-secret", want: "registered"},
 	} {
 		err := validateRotationPasswords(targetCustomerTrial133, test.admin, test.role)
 		if err == nil || !strings.Contains(err.Error(), test.want) {

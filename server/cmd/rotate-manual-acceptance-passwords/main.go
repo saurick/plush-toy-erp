@@ -23,14 +23,15 @@ import (
 )
 
 const (
-	targetLocalDev         = "local-dev"
-	targetCustomerTrial133 = "customer-trial-133"
-	adminPasswordEnv       = "MANUAL_ACCEPTANCE_ADMIN_PASSWORD"
-	demoPasswordEnv        = "MANUAL_ACCEPTANCE_PASSWORD"
-	uatPasswordEnv         = "MANUAL_ACCEPTANCE_UAT_PASSWORD"
-	smsPhoneEnv            = "MANUAL_ACCEPTANCE_SMS_PHONE"
-	dsnEnv                 = "POSTGRES_DSN"
-	customerTrial133Port   = "55435"
+	targetLocalDev          = "local-dev"
+	targetCustomerTrial133  = "customer-trial-133"
+	adminPasswordEnv        = "MANUAL_ACCEPTANCE_ADMIN_PASSWORD"
+	demoPasswordEnv         = "MANUAL_ACCEPTANCE_PASSWORD"
+	uatPasswordEnv          = "MANUAL_ACCEPTANCE_UAT_PASSWORD"
+	smsPhoneEnv             = "MANUAL_ACCEPTANCE_SMS_PHONE"
+	registeredAdminPassword = "adminadmin"
+	dsnEnv                  = "POSTGRES_DSN"
+	customerTrial133Port    = "55435"
 
 	localCustomerConfigProductVersion = "local-customer-package-test-apply"
 	localCustomerConfigApplyPurpose   = "local_test_apply"
@@ -404,8 +405,8 @@ func validateRotationPasswords(target, adminPassword, rolePassword string) error
 	if target != targetCustomerTrial133 {
 		return errors.New("unsupported target")
 	}
-	if rolePassword == data.PublicRoleDemoPassword || rolePassword == "adminadmin" {
-		return fmt.Errorf("%s must not use a registered local-only public password", uatPasswordEnv)
+	if rolePassword != data.PublicRoleDemoPassword {
+		return fmt.Errorf("%s must match the registered customer-trial-133 test credential", uatPasswordEnv)
 	}
 	adminPassword = strings.TrimSpace(adminPassword)
 	if adminPassword == "" {
@@ -414,8 +415,8 @@ func validateRotationPasswords(target, adminPassword, rolePassword string) error
 	if biz.ValidateAdminPassword(adminPassword) != nil {
 		return fmt.Errorf("%s must contain 8-20 characters", adminPasswordEnv)
 	}
-	if adminPassword == data.PublicRoleDemoPassword || adminPassword == "adminadmin" {
-		return fmt.Errorf("%s must not use a registered local-only public password", adminPasswordEnv)
+	if adminPassword != registeredAdminPassword {
+		return fmt.Errorf("%s must match the registered customer-trial-133 test credential", adminPasswordEnv)
 	}
 	if adminPassword == rolePassword {
 		return errors.New("manual acceptance admin and UAT role passwords must differ")

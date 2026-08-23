@@ -397,23 +397,27 @@ test("credential lookup is runtime-only and digesting is order-stable", () => {
   );
   assert.deepEqual(
     resolveCustomerTrialScenarioDemoCredentials({
-      MANUAL_ACCEPTANCE_PASSWORD: "trial-role-secret",
-      MANUAL_ACCEPTANCE_ADMIN_PASSWORD: "trial-admin-secret",
+      MANUAL_ACCEPTANCE_UAT_PASSWORD: "12345678",
+      MANUAL_ACCEPTANCE_ADMIN_PASSWORD: "adminadmin",
       ERP_ROLE_DEMO_PASSWORD: "must-not-fallback",
       REAL_LOGIN_ADMIN_PASSWORD: "must-not-fallback",
     }),
     {
-      rolePassword: "trial-role-secret",
-      adminPassword: "trial-admin-secret",
+      rolePassword: "12345678",
+      adminPassword: "adminadmin",
     },
   );
+  assert.deepEqual(resolveCustomerTrialScenarioDemoCredentials({}), {
+    rolePassword: "12345678",
+    adminPassword: "adminadmin",
+  });
   assert.throws(
     () =>
       resolveCustomerTrialScenarioDemoCredentials({
-        ERP_ROLE_DEMO_PASSWORD: "local-only",
-        REAL_LOGIN_ADMIN_PASSWORD: "local-only",
+        MANUAL_ACCEPTANCE_UAT_PASSWORD: "random-role-secret",
+        MANUAL_ACCEPTANCE_ADMIN_PASSWORD: "random-admin-secret",
       }),
-    /controlled runtime credentials/u,
+    /fixed test contract/u,
   );
   assert.equal(
     scenarioDemoDigest({ b: 2, a: 1 }),

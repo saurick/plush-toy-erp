@@ -23,7 +23,7 @@ Input template only:
 说明:
   做轻量 health / route / auth capabilities / credential login matrix / customer_config effective session smoke；
   带管理员 token 时还会真实生成最小 PDF，不创建业务事实。133 的 admin 与 UAT 密码
-  只从凭据合同登记的外部环境变量读取，合同不保存密码且不回退到本地 Demo 密码；
+  固定从凭据合同读取，环境变量只保留调用参数兼容且不能覆盖合同值；
   短信手机号只有人工录入对应环境变量时才校验。报告不保存密码、token、手机号或原始 profile。
 USAGE
 }
@@ -41,8 +41,6 @@ print_input_template() {
   "readsAdminToken": false,
   "secretInputs": [
     "CUSTOMER_CONFIG_ADMIN_TOKEN or the environment variable named by --admin-token-env",
-    "external admin secret from the environment variable named by --admin-password-env",
-    "external UAT role secret from the environment variable named by --uat-password-env",
     "optional SMS phone from the environment variable named by --sms-phone-env"
   ],
   "requiredInputs": [
@@ -68,8 +66,8 @@ print_input_template() {
     "template-pdf-render when --customer-config-revision and an admin token are provided"
   ],
   "commands": [
-    "MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<admin-secret>' MANUAL_ACCEPTANCE_UAT_PASSWORD='<uat-role-secret>' bash deployments/yoyoosun/scripts/run-smoke.sh --endpoint https://erp.example.invalid --backend-url https://api.example.invalid --release-version <release-version> --environment customer-trial --report deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/smoke-test-report.json --admin-username admin --admin-password-env MANUAL_ACCEPTANCE_ADMIN_PASSWORD --uat-password-env MANUAL_ACCEPTANCE_UAT_PASSWORD --sms-phone-env MANUAL_ACCEPTANCE_SMS_PHONE",
-    "MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<admin-secret>' MANUAL_ACCEPTANCE_UAT_PASSWORD='<uat-role-secret>' CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' bash deployments/yoyoosun/scripts/run-smoke.sh --endpoint https://erp.example.invalid --backend-url https://api.example.invalid --release-version <release-version> --environment customer-trial --report deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/smoke-test-report.json --admin-username admin --admin-password-env MANUAL_ACCEPTANCE_ADMIN_PASSWORD --uat-password-env MANUAL_ACCEPTANCE_UAT_PASSWORD --sms-phone-env MANUAL_ACCEPTANCE_SMS_PHONE --customer-config-revision yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1 --admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN"
+    "bash deployments/yoyoosun/scripts/run-smoke.sh --endpoint https://erp.example.invalid --backend-url https://api.example.invalid --release-version <release-version> --environment customer-trial --report deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/smoke-test-report.json --admin-username admin --admin-password-env MANUAL_ACCEPTANCE_ADMIN_PASSWORD --uat-password-env MANUAL_ACCEPTANCE_UAT_PASSWORD --sms-phone-env MANUAL_ACCEPTANCE_SMS_PHONE",
+    "CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' bash deployments/yoyoosun/scripts/run-smoke.sh --endpoint https://erp.example.invalid --backend-url https://api.example.invalid --release-version <release-version> --environment customer-trial --report deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/smoke-test-report.json --admin-username admin --admin-password-env MANUAL_ACCEPTANCE_ADMIN_PASSWORD --uat-password-env MANUAL_ACCEPTANCE_UAT_PASSWORD --sms-phone-env MANUAL_ACCEPTANCE_SMS_PHONE --customer-config-revision yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1 --admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN"
   ],
   "requiredReadbackEvidence": [
     "check name=auth-sms-capabilities, target=jsonrpc:auth.capabilities, expectedMode=provider, enabled=true, mockDelivery=false, responseBodyStored=false",
@@ -82,7 +80,7 @@ print_input_template() {
     "template-pdf-render returns HTTP 200 with application/pdf, starts with %PDF, and records only contentType/sha256/sizeBytes with responseBodyStored=false",
     "report backendEndpointAlias matches the release executor report backendEndpointAlias"
   ],
-  "boundary": "This template does not call endpoints, read credentials, call customer_config, write smoke-test-report.json, write database rows, import business data, or prove active revision readback. Real proof requires running the smoke command against the target backend with external admin and UAT secrets plus an admin token env; the report stores only aggregate login evidence, usernames, source labels, env keys, and redacted customer-config evidence."
+  "boundary": "This template does not call endpoints, read secrets, call customer_config, write smoke-test-report.json, write database rows, import business data, or prove active revision readback. Real proof requires running the smoke command against the target backend with the fixed credential contract plus an admin token env when customer configuration readback is requested; the report stores only aggregate login evidence, usernames, source labels, env keys, and redacted customer-config evidence."
 }
 JSON
 }
@@ -216,7 +214,7 @@ if [[ -n "$backend_url" ]]; then
     echo "[run-smoke] credential contract is missing: $credential_contract"
     exit 1
   }
-  IFS=$'\t' read -r contract_admin_username contract_admin_password_env contract_admin_password_source contract_uat_password_env contract_uat_password_source contract_uat_usernames_csv credential_contract_schema contract_sms_phone_env contract_target contract_database contract_dataset contract_sha256 < <(
+  IFS=$'\t' read -r contract_admin_username contract_admin_password contract_admin_password_env contract_admin_password_source contract_uat_password contract_uat_password_env contract_uat_password_source contract_uat_usernames_csv credential_contract_schema contract_sms_phone_env contract_target contract_database contract_dataset contract_sha256 < <(
     node - "$credential_contract" <<'NODE'
 const fs = require("node:fs");
 const file = process.argv[2];
@@ -226,28 +224,23 @@ const uat = contract?.credentials?.uat;
 const sms = contract?.smsLoginIdentity;
 const envKey = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const username = /^[A-Za-z0-9_]+$/;
-const text = (value) => typeof value === "string" && value.length > 0 && !/[\t\r\n]/u.test(value);
 const expectedUATUsernames = [
   "uat_boss", "uat_sales", "uat_purchase", "uat_production", "uat_warehouse",
   "uat_quality", "uat_finance", "uat_pmc", "uat_engineering", "uat_admin",
 ];
 const valid =
-  contract?.schemaVersion === "yoyoosun-credential-contract/v3" &&
+  contract?.schemaVersion === "yoyoosun-credential-contract/v4" &&
   contract?.customerCode === "yoyoosun" &&
   contract?.target?.key === "customer-trial-133" &&
   contract?.target?.database === "plush_erp_uat_20260716_v5" &&
   contract?.target?.datasetVersion === "2026.08.15-v6" &&
   username.test(admin?.username || "") &&
   admin?.environmentVariable === "MANUAL_ACCEPTANCE_ADMIN_PASSWORD" &&
-  admin?.credentialSource === "external-secret" &&
-  text(admin?.keychain?.service) &&
-  text(admin?.keychain?.account) &&
-  !("fixedTestPassword" in admin) &&
+  admin?.credentialSource === "contract-fixed-test" &&
+  admin?.fixedTestPassword === "adminadmin" &&
   uat?.environmentVariable === "MANUAL_ACCEPTANCE_UAT_PASSWORD" &&
-  uat?.credentialSource === "external-secret" &&
-  text(uat?.keychain?.service) &&
-  text(uat?.keychain?.account) &&
-  !("fixedTestPassword" in uat) &&
+  uat?.credentialSource === "contract-fixed-test" &&
+  uat?.fixedTestPassword === "12345678" &&
   JSON.stringify(uat?.usernames) === JSON.stringify(expectedUATUsernames) &&
   uat.usernames.every((value) => username.test(value) && value.startsWith("uat_")) &&
   !uat.usernames.includes(admin.username) &&
@@ -258,13 +251,13 @@ const valid =
   sms?.keychain?.service === "plush-toy-erp-yoyoosun-sms-phone" &&
   sms?.keychain?.account === "customer-trial-133:admin" &&
   contract?.policy?.passwordsMustDiffer === true &&
-  JSON.stringify(contract?.policy?.localPublicPasswordTargets) === JSON.stringify(["local-dev"]) &&
-  contract.policy.customerTrialRequiresExternalSecrets === true &&
+  JSON.stringify(contract?.policy?.registeredSimplePasswordTargets) === JSON.stringify(["local-dev", "customer-trial-133"]) &&
+  contract.policy.customerTrialUsesFixedPublicTestCredentials === true &&
   contract.policy.rotateAfterCreateRestoreOrRollback === true &&
   contract.policy.revokeExistingSessionsOnRotation === true &&
   contract.policy.requireCredentialLoginMatrixBeforeCutover === true &&
   contract?.redaction?.containsSecrets === false &&
-  contract.redaction.contractContainsPublicTestPasswords === false &&
+  contract.redaction.contractContainsPublicTestPasswords === true &&
   contract.redaction.storePasswords === false &&
   contract.redaction.storeTokens === false &&
   contract.redaction.storePhoneNumber === false &&
@@ -273,8 +266,10 @@ if (!valid) throw new Error("invalid yoyoosun credential contract");
 const crypto = require("node:crypto");
 process.stdout.write([
   admin.username,
+  admin.fixedTestPassword,
   admin.environmentVariable,
   admin.credentialSource,
+  uat.fixedTestPassword,
   uat.environmentVariable,
   uat.credentialSource,
   uat.usernames.join(","),
@@ -305,28 +300,27 @@ NODE
   }
   IFS=',' read -r -a uat_usernames <<<"$contract_uat_usernames_csv"
   sms_phone="${!sms_phone_env:-}"
-  admin_password="${!admin_password_env:-}"
-  uat_password="${!uat_password_env:-}"
+  admin_password="$contract_admin_password"
+  uat_password="$contract_uat_password"
   unset "$admin_password_env" "$uat_password_env" "$sms_phone_env"
   [[ -z "$sms_phone" || "$sms_phone" =~ ^[0-9]{11}$ ]] || {
     echo "[run-smoke] SMS phone env must be empty or contain one normalized 11-digit phone"
     exit 1
   }
   [[ ${#admin_password} -ge 8 && ${#admin_password} -le 20 ]] || {
-    echo "[run-smoke] admin password env must contain an 8-20 character external secret"
+    echo "[run-smoke] admin contract password must contain 8-20 characters"
     exit 1
   }
   [[ ${#uat_password} -ge 8 && ${#uat_password} -le 20 ]] || {
-    echo "[run-smoke] UAT password env must contain an 8-20 character external secret"
+    echo "[run-smoke] UAT contract password must contain 8-20 characters"
     exit 1
   }
   [[ "$admin_password" != "$uat_password" ]] || {
     echo "[run-smoke] admin and UAT passwords must differ"
     exit 1
   }
-  [[ "$admin_password" != "adminadmin" && "$admin_password" != "12345678" &&
-    "$uat_password" != "adminadmin" && "$uat_password" != "12345678" ]] || {
-    echo "[run-smoke] customer-trial-133 must not use local public test passwords"
+  [[ "$admin_password" == "adminadmin" && "$uat_password" == "12345678" ]] || {
+    echo "[run-smoke] customer-trial-133 fixed test credentials drifted"
     exit 1
   }
 fi

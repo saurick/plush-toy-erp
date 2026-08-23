@@ -34,9 +34,9 @@ const TARGET_CONTRACTS = Object.freeze({
     accountKind: "customer-uat",
     usernamePrefix: "uat",
     passwordEnvironmentVariable: "MANUAL_ACCEPTANCE_UAT_PASSWORD",
+    fixedTestPassword: "12345678",
   }),
 });
-const LOCAL_DEMO_PUBLIC_PASSWORDS = new Set(["adminadmin", "12345678"]);
 const MANUAL_ACCEPTANCE_ROLE_DISPLAY_NAMES = Object.freeze({
   boss: "老板",
   sales: "业务",
@@ -127,6 +127,7 @@ function buildAccountSet(target) {
     accountKind: contract.accountKind,
     usernamePrefix: contract.usernamePrefix,
     passwordEnvironmentVariable: contract.passwordEnvironmentVariable,
+    fixedTestPassword: contract.fixedTestPassword,
     formalProfiles: Object.freeze(profiles),
     formalUsernames: Object.freeze(profiles.map(({ username }) => username)),
     browserProfiles: Object.freeze(
@@ -197,25 +198,19 @@ export function resolveManualAcceptanceRoleCredential({
   env = process.env,
 } = {}) {
   const accountSet = manualAcceptanceAccountSetForTarget(target);
-  const result = (value, source) => {
-    if (
-      accountSet.accountKind === "customer-uat" &&
-      LOCAL_DEMO_PUBLIC_PASSWORDS.has(value)
-    ) {
+  const result = (value, source) => Object.freeze({ value, source });
+  const explicit = String(password || "").trim();
+  if (accountSet.accountKind === "customer-uat") {
+    const override =
+      explicit || String(env?.MANUAL_ACCEPTANCE_UAT_PASSWORD || "").trim();
+    if (override && override !== accountSet.fixedTestPassword) {
       throw new Error(
-        `${accountSet.target} refuses local-only public password`,
+        `${accountSet.target} must use its fixed UAT test credential`,
       );
     }
-    return Object.freeze({ value, source });
-  };
-  const explicit = String(password || "").trim();
-  if (explicit) return result(explicit, "explicit");
-  if (accountSet.accountKind === "customer-uat") {
-    return result(
-      String(env?.MANUAL_ACCEPTANCE_UAT_PASSWORD || "").trim(),
-      "MANUAL_ACCEPTANCE_UAT_PASSWORD",
-    );
+    return result(accountSet.fixedTestPassword, "credential.contract.json");
   }
+  if (explicit) return result(explicit, "explicit");
   for (const source of [
     "MANUAL_ACCEPTANCE_PASSWORD",
     "TRIAL_ACCOUNT_PASSWORD",

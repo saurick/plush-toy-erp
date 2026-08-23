@@ -49,14 +49,14 @@ MIGRATION_MAINTENANCE_CONFIRMED=1 sh migrate_online.sh --apply
 ```
 
 10. 全新库先使用一次性 bootstrap 创建稳定 `admin`；随后以 steady env 启动后端，保持 Web / 客户入口关闭，完成客户配置与模拟验收数据。
-11. 按 `credential.contract.json` 登记的账号与 Keychain alias，从发布工作站读取彼此独立的管理员 / UAT 岗位外部 secret，精确轮换稳定 `admin` 与十个 `uat_*`。轮换必须覆盖全部 11 个账号、递增 `auth_version`、撤销旧会话并生成脱敏回执；外部 secret 不得进入服务器 steady `.env`、日志或 evidence，也不得使用本地 Demo 的 `adminadmin` / `12345678`。
+11. 按 `credential.contract.json` 精确恢复固定 `admin/adminadmin` 与全部 `uat_*/12345678`。轮换必须覆盖全部 11 个账号、递增 `auth_version`、撤销旧会话并生成脱敏回执；这两组公开测试凭据不得由 Keychain、环境变量或临时发布输入覆盖，也不得进入服务器 steady `.env`。
 12. 确认轮换完成后启动全部业务服务：
 
 ```bash
 docker compose -f compose.yml --env-file /secure/path/yoyoosun/.env up -d --remove-orphans
 ```
 
-13. 执行 health / ready 后，使用与轮换相同的两个外部 secret 运行正式 smoke。`credential-login-matrix` 必须真实登录稳定 `admin` 与十个 `uat_*`，逐一核对返回身份和新 token；SMS 手机号仅在人工录入后校验指定账号绑定。任何密码账号失败，或已配置手机号不一致，都保持入口关闭。
+13. 执行 health / ready 后，使用合同固定测试凭据运行正式 smoke。`credential-login-matrix` 必须真实登录稳定 `admin` 与十个 `uat_*`，逐一核对返回身份和新 token；SMS 手机号仅在人工录入后校验指定账号绑定。任何密码账号失败，或已配置手机号不一致，都保持入口关闭。
 14. 收集 image digest、migration status、config fingerprint、smoke report、known limitations 和 release sign-off checklist。
 15. 客户试用或交付前执行 release evidence gate：
 

@@ -38,7 +38,6 @@ const ACCOUNT_DATA_VERSION = CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION;
 const ACCOUNT_RUN_ID = CURRENT_MANUAL_ACCEPTANCE_RUN_ID;
 const MANAGED_ROLE_KEYS = new Set(["sales", "purchase"]);
 const MAX_AUDIT_MINIMUM = 200;
-const LOCAL_ONLY_PUBLIC_PASSWORDS = new Set(["12345678", "adminadmin"]);
 
 export const MANUAL_ACCEPTANCE_ROLE_CAPABILITY_BASELINE = Object.freeze(
   yoyoosunRoleFlowMatrix.roles.map((profile) =>
@@ -606,16 +605,6 @@ export async function bootstrapManualAcceptanceFormalAccounts(
     adminPassword || process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
     "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
   );
-  if (
-    resolvedTarget.external &&
-    (LOCAL_ONLY_PUBLIC_PASSWORDS.has(effectivePassword) ||
-      LOCAL_ONLY_PUBLIC_PASSWORDS.has(effectiveAdminPassword))
-  ) {
-    throw new CliError(
-      "customer-trial-133 passwords must not use a local-only public password",
-      2,
-    );
-  }
   if (resolvedTarget.external && effectivePassword === effectiveAdminPassword) {
     throw new CliError(
       "customer-trial-133 admin and UAT role passwords must be different",
@@ -1287,16 +1276,6 @@ export async function applyManualAcceptanceAccountScenarios(
     adminPassword || process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
     "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
   );
-  if (
-    resolvedTarget.external &&
-    (LOCAL_ONLY_PUBLIC_PASSWORDS.has(effectivePassword) ||
-      LOCAL_ONLY_PUBLIC_PASSWORDS.has(effectiveAdminPassword))
-  ) {
-    throw new CliError(
-      "customer-trial-133 passwords must not use a local-only public password",
-      2,
-    );
-  }
   if (resolvedTarget.external && effectivePassword === effectiveAdminPassword) {
     throw new CliError(
       "customer-trial-133 admin and UAT role passwords must be different",
@@ -1742,9 +1721,10 @@ fresh 库配置激活前只创建或读回固定十个单岗位账号：
 本入口保留目标环境的十个正式验收账号，只准备“已停用”“业务与采购兼任”
 和“未分配岗位”三个补充验收账号。密码必须为 8 到 20 位。
 
-  本地只允许 demo_* 和 MANUAL_ACCEPTANCE_PASSWORD；133 只允许 uat_* 和
-  MANUAL_ACCEPTANCE_UAT_PASSWORD。fresh 本地专用库和 133 都必须设置精确的
-  MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM，只创建或读回固定十个单岗位账号。
+  本地只允许 demo_* 和 MANUAL_ACCEPTANCE_PASSWORD；133 只允许 uat_*，并固定
+  使用 12345678。MANUAL_ACCEPTANCE_UAT_PASSWORD 如提供只能等于该固定值。
+  fresh 本地专用库和 133 都必须设置精确的 MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM，
+  只创建或读回固定十个单岗位账号。
 
   133 试用环境必须通过 127.0.0.1:18375 SSH 隧道，并显式提供：
   --target customer-trial-133 --data-version 2026.08.15-v6 --run-id 20260815-V6 --database-name plush_erp_uat_20260716_v5

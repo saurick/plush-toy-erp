@@ -18,8 +18,8 @@ print_help() {
 
 说明:
   只在发布工作站运行。admin 与 uat_* 岗位账号只使用
-  credential.contract.json 登记的 Keychain alias；合同不保存密码。
-  短信手机号仅在对应 Keychain alias 已人工录入时读取。
+  credential.contract.json 登记的固定测试密码；短信手机号仅在对应
+  Keychain alias 已人工录入时读取。
   三项值只经 SSH stdin 临时注入一次性 Compose 容器，不进入服务器 steady env
   或脱敏 receipt。执行前必须提供已存在且 hash 匹配的远端备份。
 USAGE
@@ -134,7 +134,7 @@ contract_file="$script_dir/../env/credential.contract.json"
   exit 1
 }
 
-IFS=$'\t' read -r admin_service admin_account uat_service uat_account phone_service phone_account < <(
+IFS=$'\t' read -r admin_password uat_password phone_service phone_account < <(
   node - "$contract_file" <<'NODE'
 const fs = require("node:fs");
 const contract = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
@@ -142,20 +142,23 @@ const admin = contract?.credentials?.admin;
 const uat = contract?.credentials?.uat;
 const phone = contract?.smsLoginIdentity?.keychain;
 const text = (value) => typeof value === "string" && value.length > 0 && !/[\t\r\n]/u.test(value);
+const expectedUATUsernames = [
+  "uat_boss", "uat_sales", "uat_purchase", "uat_production", "uat_warehouse",
+  "uat_quality", "uat_finance", "uat_pmc", "uat_engineering", "uat_admin",
+];
 if (
-  contract?.schemaVersion !== "yoyoosun-credential-contract/v3" ||
+  contract?.schemaVersion !== "yoyoosun-credential-contract/v4" ||
   contract?.target?.key !== "customer-trial-133" ||
   contract?.target?.database !== "plush_erp_uat_20260716_v5" ||
   contract?.target?.datasetVersion !== "2026.08.15-v6" ||
   admin?.username !== "admin" || admin?.environmentVariable !== "MANUAL_ACCEPTANCE_ADMIN_PASSWORD" ||
-  admin?.credentialSource !== "external-secret" || !text(admin?.keychain?.service) || !text(admin?.keychain?.account) ||
+  admin?.credentialSource !== "contract-fixed-test" || admin?.fixedTestPassword !== "adminadmin" ||
   uat?.environmentVariable !== "MANUAL_ACCEPTANCE_UAT_PASSWORD" ||
-  uat?.credentialSource !== "external-secret" || !text(uat?.keychain?.service) || !text(uat?.keychain?.account) ||
-  !Array.isArray(uat?.usernames) || uat.usernames.length !== 10 ||
-  new Set(uat.usernames).size !== 10 || !uat.usernames.every((value) => /^uat_[a-z_]+$/u.test(value)) ||
+  uat?.credentialSource !== "contract-fixed-test" || uat?.fixedTestPassword !== "12345678" ||
+  JSON.stringify(uat?.usernames) !== JSON.stringify(expectedUATUsernames) ||
   !text(phone?.service) || !text(phone?.account) ||
-  JSON.stringify(contract?.policy?.localPublicPasswordTargets) !== JSON.stringify(["local-dev"]) ||
-  contract?.policy?.customerTrialRequiresExternalSecrets !== true ||
+  JSON.stringify(contract?.policy?.registeredSimplePasswordTargets) !== JSON.stringify(["local-dev", "customer-trial-133"]) ||
+  contract?.policy?.customerTrialUsesFixedPublicTestCredentials !== true ||
   contract?.policy?.passwordsMustDiffer !== true ||
   contract.policy.rotateAfterCreateRestoreOrRollback !== true ||
   contract.policy.revokeExistingSessionsOnRotation !== true ||
@@ -163,48 +166,37 @@ if (
   contract?.smsLoginIdentity?.phoneRequiredWhenProviderEnabled !== false ||
   contract.smsLoginIdentity.verifyPhoneIdentityWhenConfigured !== true ||
   contract?.redaction?.containsSecrets !== false ||
-  contract.redaction.contractContainsPublicTestPasswords !== false ||
+  contract.redaction.contractContainsPublicTestPasswords !== true ||
   contract.redaction.storePasswords !== false ||
   contract.redaction.storeTokens !== false ||
   contract.redaction.storePhoneNumber !== false ||
   contract.redaction.storeRawProfiles !== false
 ) throw new Error("invalid yoyoosun credential contract");
 process.stdout.write([
-  admin.keychain.service,
-  admin.keychain.account,
-  uat.keychain.service,
-  uat.keychain.account,
+  admin.fixedTestPassword,
+  uat.fixedTestPassword,
   phone.service,
   phone.account,
 ].join("\t") + "\n");
 NODE
 )
 
-admin_password="$(security find-generic-password -w -s "$admin_service" -a "$admin_account" 2>/dev/null)" || {
-  echo "[rotate-credentials-133] admin Keychain secret 不存在" >&2
-  exit 1
-}
-uat_password="$(security find-generic-password -w -s "$uat_service" -a "$uat_account" 2>/dev/null)" || {
-  echo "[rotate-credentials-133] UAT 岗位 Keychain secret 不存在" >&2
-  exit 1
-}
 sms_phone="$(security find-generic-password -w -s "$phone_service" -a "$phone_account" 2>/dev/null || true)"
 
 [[ ${#admin_password} -ge 8 && ${#admin_password} -le 20 ]] || {
-  echo "[rotate-credentials-133] admin Keychain 密码长度非法" >&2
+  echo "[rotate-credentials-133] admin 合同密码长度非法" >&2
   exit 1
 }
 [[ ${#uat_password} -ge 8 && ${#uat_password} -le 20 ]] || {
-  echo "[rotate-credentials-133] UAT 岗位 Keychain 密码长度非法" >&2
+  echo "[rotate-credentials-133] UAT 岗位合同密码长度非法" >&2
   exit 1
 }
 [[ "$admin_password" != "$uat_password" ]] || {
   echo "[rotate-credentials-133] admin 与 UAT 岗位密码必须不同" >&2
   exit 1
 }
-[[ "$admin_password" != "adminadmin" && "$admin_password" != "12345678" &&
-  "$uat_password" != "adminadmin" && "$uat_password" != "12345678" ]] || {
-  echo "[rotate-credentials-133] 133 禁止使用本地公开测试密码" >&2
+[[ "$admin_password" == "adminadmin" && "$uat_password" == "12345678" ]] || {
+  echo "[rotate-credentials-133] 133 固定测试凭据合同漂移" >&2
   exit 1
 }
 [[ -z "$sms_phone" || "$sms_phone" =~ ^1[3-9][0-9]{9}$ ]] || {

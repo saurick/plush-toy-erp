@@ -639,7 +639,7 @@ function runnerDeps(options = {}) {
         `${process.pid}-${(runnerOutputSequence += 1)}`,
       ),
     credentials: {
-      rolePassword: "role-password",
+      rolePassword: "12345678",
       adminPassword: "admin-password",
     },
     ...(options.readDatabaseRebuildReceipt
@@ -1445,7 +1445,10 @@ test("customer-trial fresh baseline requires both rebuild proof and live zero re
     const runner = createManualAcceptanceDatasetStageRunner({
       outputRoot,
       fetchImpl,
-      credentials: { adminPassword: "admin-password", rolePassword: "role" },
+      credentials: {
+        adminPassword: "admin-password",
+        rolePassword: "12345678",
+      },
       components: {
         core: async (invocation) => ({
           operation: "verified",

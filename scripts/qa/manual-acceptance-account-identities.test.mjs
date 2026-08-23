@@ -63,7 +63,7 @@ test("account identity lookup rejects unknown or cross-target usernames", () => 
   );
 });
 
-test("customer UAT credential never falls back to local demo variables", () => {
+test("customer UAT credential always resolves to the fixed 133 test password", () => {
   const env = {
     MANUAL_ACCEPTANCE_PASSWORD: "local-demo-secret",
     TRIAL_ACCOUNT_PASSWORD: "legacy-local-secret",
@@ -74,16 +74,16 @@ test("customer UAT credential never falls back to local demo variables", () => {
       target: "customer-trial-133",
       env,
     }),
-    { value: "", source: "MANUAL_ACCEPTANCE_UAT_PASSWORD" },
+    { value: "12345678", source: "credential.contract.json" },
   );
   assert.deepEqual(
     resolveManualAcceptanceRoleCredential({
       target: "customer-trial-133",
-      env: { ...env, MANUAL_ACCEPTANCE_UAT_PASSWORD: "target-uat-secret" },
+      env: { ...env, MANUAL_ACCEPTANCE_UAT_PASSWORD: "12345678" },
     }),
     {
-      value: "target-uat-secret",
-      source: "MANUAL_ACCEPTANCE_UAT_PASSWORD",
+      value: "12345678",
+      source: "credential.contract.json",
     },
   );
   assert.equal(
@@ -95,15 +95,15 @@ test("customer UAT credential never falls back to local demo variables", () => {
   );
 });
 
-test("customer UAT credential rejects local-only public values from env and explicit callers", () => {
-  for (const password of ["adminadmin", "12345678"]) {
+test("customer UAT credential rejects every override except the fixed 133 value", () => {
+  for (const password of ["adminadmin", "target-uat-secret"]) {
     assert.throws(
       () =>
         resolveManualAcceptanceRoleCredential({
           target: "customer-trial-133",
           password,
         }),
-      /refuses local-only public password/u,
+      /must use its fixed UAT test credential/u,
     );
     assert.throws(
       () =>
@@ -111,14 +111,14 @@ test("customer UAT credential rejects local-only public values from env and expl
           target: "customer-trial-133",
           env: { MANUAL_ACCEPTANCE_UAT_PASSWORD: password },
         }),
-      /refuses local-only public password/u,
-    );
-    assert.equal(
-      resolveManualAcceptanceRoleCredential({
-        target: "local-dev",
-        password,
-      }).value,
-      password,
+      /must use its fixed UAT test credential/u,
     );
   }
+  assert.equal(
+    resolveManualAcceptanceRoleCredential({
+      target: "customer-trial-133",
+      password: "12345678",
+    }).value,
+    "12345678",
+  );
 });

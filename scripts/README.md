@@ -472,7 +472,7 @@ bash /Users/simon/projects/plush-toy-erp/scripts/project-scan.sh --strict
 
 `demo_admin` 是普通演示角色账号，不是稳定超级管理员 `admin`。角色演示账号的 seed / reset 只处理 `demo_*`，不得顺带重置稳定管理员。
 
-无显式密码时，脚本只允许连接登记的 `192.168.0.106:5432/plush_erp` 或 `plush_erp_*_dev` 本地开发库，并使用公开测试密码 `12345678` 生成十个角色演示账号（包括普通演示管理员 `demo_admin`）；不会生成 `demo_debug`，也不会重置稳定超级管理员或人工验收场景账号。公开测试值一旦 seed 就是可登录凭据，不得用于 133、其他共享 / 试用、staging 或生产目标。独立命令行调试账号和人工验收账号操作仍必须通过 `--password` 或 `ERP_ROLE_DEMO_PASSWORD` 显式提供非默认密码；唯一例外是 DEV-only 测试数据中心的固定 `scenario-demo` 编排，它在精确证明本机 8300 与登记 106 开发库后，可复用本机公开测试账号约定实现页面生成，且没有 133、staging 或生产逃逸开关。管理员和演示账号的创建、重置密码仍统一要求 8～20 个 Unicode 字符，且 UTF-8 编码后不超过 bcrypt 的 72 字节边界。
+无显式密码时，脚本只允许连接登记的 `192.168.0.106:5432/plush_erp` 或 `plush_erp_*_dev` 本地开发库，并使用公开测试密码 `12345678` 生成十个角色演示账号（包括普通演示管理员 `demo_admin`）；不会生成 `demo_debug`，也不会重置稳定超级管理员或人工验收场景账号。本入口及其 `demo_*` 账号不得用于 133、其他共享 / 试用、staging 或生产目标；`customer-trial-133` 复用相同公开密码值时只能走其独立 `uat_*` 凭据合同与受控轮换器。独立命令行调试账号和其他人工验收账号操作仍必须通过 `--password` 或 `ERP_ROLE_DEMO_PASSWORD` 显式提供非默认密码；唯一例外是 DEV-only 测试数据中心的固定 `scenario-demo` 编排，它在精确证明本机 8300 与登记 106 开发库后，可复用本机公开测试账号约定实现页面生成，且没有 133、staging 或生产逃逸开关。管理员和演示账号的创建、重置密码仍统一要求 8～20 个 Unicode 字符，且 UTF-8 编码后不超过 bcrypt 的 72 字节边界。
 
 ```bash
 bash /Users/simon/projects/plush-toy-erp/scripts/seed-role-demo-admins.sh

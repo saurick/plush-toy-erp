@@ -878,7 +878,7 @@ test("registered 133 target reconciles the same three scenario accounts without 
     auditMinimum: 30,
   });
   const report = await applyManualAcceptanceAccountScenarios(plan, {
-    password: "demo-pass",
+    password: "12345678",
     adminPassword: "guard-pass",
     confirmPhrase: MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM_PHRASE,
     targetConfirmation: manualAcceptanceTargetConfirmation(plan),
@@ -921,7 +921,7 @@ test("fresh registered 133 target creates the exact ten formal accounts before s
     runId: "20260815-V6",
   });
   const options = {
-    password: "demo-pass",
+    password: "12345678",
     adminPassword: "guard-pass",
     confirmPhrase: MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM_PHRASE,
     targetConfirmation: manualAcceptanceTargetConfirmation(plan),
@@ -1037,7 +1037,7 @@ test("fresh registered 133 target requires the exact formal-account confirmation
 
   await assert.rejects(
     applyManualAcceptanceAccountScenarios(plan, {
-      password: "demo-pass",
+      password: "12345678",
       adminPassword: "guard-pass",
       confirmPhrase: MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM_PHRASE,
       targetConfirmation: manualAcceptanceTargetConfirmation(plan),
@@ -1066,7 +1066,7 @@ test("registered 133 target rejects the old active configuration before account 
 
   await assert.rejects(
     applyManualAcceptanceAccountScenarios(plan, {
-      password: "demo-pass",
+      password: "12345678",
       adminPassword: "guard-pass",
       confirmPhrase: MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM_PHRASE,
       targetConfirmation: manualAcceptanceTargetConfirmation(plan),
@@ -1099,7 +1099,7 @@ test("scenario password policy rejects values outside 8 to 20 characters before 
   }
 });
 
-test("registered 133 target rejects local-only public and shared admin/UAT passwords before login", async () => {
+test("registered 133 target requires the fixed UAT password and a different admin password before login", async () => {
   const plan = buildManualAcceptanceAccountScenarioPlan({
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
     target: CUSTOMER_TRIAL_133_TARGET,
@@ -1107,11 +1107,9 @@ test("registered 133 target rejects local-only public and shared admin/UAT passw
     runId: "20260815-V6",
   });
   for (const [password, adminPassword, expected] of [
-    ["12345678", "guard-pass", /local-only public password/u],
-    ["adminadmin", "guard-pass", /local-only public password/u],
-    ["demo-pass", "12345678", /local-only public password/u],
-    ["uat-pass", "adminadmin", /local-only public password/u],
-    ["same-secret", "same-secret", /must be different/u],
+    ["remote-uat-secret", "guard-pass", /fixed UAT test credential/u],
+    ["adminadmin", "guard-pass", /fixed UAT test credential/u],
+    ["12345678", "12345678", /must be different/u],
   ]) {
     let fetchCount = 0;
     await assert.rejects(

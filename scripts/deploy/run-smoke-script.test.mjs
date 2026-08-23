@@ -521,12 +521,13 @@ for (const [name, fakeEnv, authenticated] of [
   });
 }
 
-test("run smoke rejects matching external admin and UAT passwords", async () => {
+test("run smoke ignores external password overrides and uses the fixed contract", async () => {
   const root = fs.mkdtempSync(
     path.join(os.tmpdir(), "run-smoke-same-password-"),
   );
   const reportPath = path.join(root, "smoke-test-report.json");
   const fakeCurlBin = createFakeCurlBin(root);
+  const curlArgvPath = path.join(root, "curl-argv.txt");
   const sharedPassword = "same-secret-value";
 
   const result = await runScriptAsync(
@@ -546,6 +547,7 @@ test("run smoke rejects matching external admin and UAT passwords", async () => 
     {
       env: {
         PATH: `${fakeCurlBin}:${process.env.PATH ?? ""}`,
+        FAKE_CURL_ARGV_OUT: curlArgvPath,
         [credentialContract.credentials.admin.environmentVariable]:
           sharedPassword,
         [credentialContract.credentials.uat.environmentVariable]:
@@ -554,9 +556,15 @@ test("run smoke rejects matching external admin and UAT passwords", async () => 
     },
   );
 
-  assert.notEqual(result.status, 0);
-  assert.match(result.stdout, /admin and UAT passwords must differ/u);
-  assert.equal(fs.existsSync(reportPath), false);
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  const check = report.checks.find(
+    (candidate) => candidate.name === "credential-login-matrix",
+  );
+  assert.equal(check.status, "pass");
+  assert.equal(check.adminPasswordSource, "contract-fixed-test");
+  assert.equal(check.uatPasswordSource, "contract-fixed-test");
+  assert.doesNotMatch(fs.readFileSync(curlArgvPath, "utf8"), /same-secret-value/u);
 });
 
 test("run smoke keeps backend checks optional", async () => {

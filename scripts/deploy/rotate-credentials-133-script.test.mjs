@@ -33,8 +33,6 @@ function fixture(t) {
 set -euo pipefail
 args="$*"
 case "$args" in
-  *plush-toy-erp-yoyoosun-uat-password*customer-trial-133:admin*) printf '%s\\n' "\${FAKE_ADMIN_PASSWORD:-remote-admin-secret}" ;;
-  *plush-toy-erp-yoyoosun-uat-password*customer-trial-133:uat-roles*) printf '%s\\n' "\${FAKE_UAT_PASSWORD:-remote-uat-secret}" ;;
   *plush-toy-erp-yoyoosun-sms-phone*) [[ "\${FAKE_SMS_MISSING:-0}" != 1 ]] && printf '%s\\n' "\${FAKE_SMS_PHONE:-13800138000}" ;;
   *) exit 1 ;;
 esac
@@ -50,8 +48,8 @@ IFS= read -r uat_assignment
 IFS= read -r phone_assignment
 IFS= read -r export_line
 cat >/dev/null
-[[ "$admin_assignment" == "MANUAL_ACCEPTANCE_ADMIN_PASSWORD=remote-admin-secret" ]]
-[[ "$uat_assignment" == "MANUAL_ACCEPTANCE_UAT_PASSWORD=remote-uat-secret" ]]
+[[ "$admin_assignment" == "MANUAL_ACCEPTANCE_ADMIN_PASSWORD=adminadmin" ]]
+[[ "$uat_assignment" == "MANUAL_ACCEPTANCE_UAT_PASSWORD=12345678" ]]
 [[ "$export_line" == "export MANUAL_ACCEPTANCE_ADMIN_PASSWORD MANUAL_ACCEPTANCE_UAT_PASSWORD MANUAL_ACCEPTANCE_SMS_PHONE" ]]
 [[ "$phone_assignment" == MANUAL_ACCEPTANCE_SMS_PHONE=* ]]
 eval "$phone_assignment"
@@ -108,7 +106,7 @@ function run(f, env = {}) {
   );
 }
 
-test("133 credential rotation wrapper streams external UAT secrets and writes only a redacted receipt", (t) => {
+test("133 credential rotation wrapper enforces fixed test credentials and writes only a redacted receipt", (t) => {
   const f = fixture(t);
   const result = run(f);
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
@@ -125,7 +123,7 @@ test("133 credential rotation wrapper streams external UAT secrets and writes on
   ].join("\n");
   assert.doesNotMatch(
     observable,
-    /remote-admin-secret|remote-uat-secret|13800138000/u,
+    /13800138000/u,
   );
   const sshArgs = fs.readFileSync(f.sshLog, "utf8");
   assert.match(sshArgs, /bash -s --/u);

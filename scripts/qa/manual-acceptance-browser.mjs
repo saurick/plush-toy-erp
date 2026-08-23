@@ -35,6 +35,7 @@ import {
 } from "./manual-acceptance-dataset-runner.mjs";
 import { normalizeDatabaseRunID } from "./database-target.mjs";
 import {
+  CUSTOMER_TRIAL_133_ORIGIN,
   CUSTOMER_TRIAL_133_TARGET,
   assertManualAcceptanceRuntimeIdentityPrecondition,
   parseManualAcceptanceTargetAttestation,
@@ -575,7 +576,7 @@ export function getManualAcceptanceBrowserHelp() {
   只允许 localhost / 127.0.0.1 / ::1，不接受带凭据、路径、查询参数或跳转的 URL。
   真实验收只登录、读页面和切换只读页签，不点击新增、编辑、提交、完成、取消或过账动作。
   非 plan 模式必须提供同一 runner 生成的 dataset、source、facts 和 readiness 规范报告；缺少附件或岗位场景也会失败。
-  本地报告只登录 demo_* 并读取 MANUAL_ACCEPTANCE_PASSWORD；customer-trial-133 只登录 uat_*、读取 MANUAL_ACCEPTANCE_UAT_PASSWORD，并使用 127.0.0.1:18375 SSH 隧道、对应报告和 --target-attestation-json。
+  本地报告只登录 demo_* 并读取 MANUAL_ACCEPTANCE_PASSWORD；customer-trial-133 只登录 uat_* 并固定使用 12345678，MANUAL_ACCEPTANCE_UAT_PASSWORD 如提供不得漂移，并使用 127.0.0.1:18375 SSH 隧道、对应报告和 --target-attestation-json。
   报告默认写入 output/qa/manual-acceptance/browser/report.json，不保存密码或登录令牌。
 `;
 }
@@ -4405,12 +4406,12 @@ export async function runManualAcceptanceBrowser(
       )
     : "";
   if (
+    normalizedBackendURL !== CUSTOMER_TRIAL_133_ORIGIN &&
     !String(password || "").trim() &&
-    !String(process.env.MANUAL_ACCEPTANCE_PASSWORD || "").trim() &&
-    !String(process.env.MANUAL_ACCEPTANCE_UAT_PASSWORD || "").trim()
+    !String(process.env.MANUAL_ACCEPTANCE_PASSWORD || "").trim()
   ) {
     throw new BrowserAcceptanceError(
-      "缺少目标验收账号密码：请设置 MANUAL_ACCEPTANCE_PASSWORD 或 MANUAL_ACCEPTANCE_UAT_PASSWORD",
+      "缺少目标验收账号密码：请设置 MANUAL_ACCEPTANCE_PASSWORD",
       2,
     );
   }
