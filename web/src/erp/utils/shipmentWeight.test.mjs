@@ -379,7 +379,10 @@ test('shipmentWeight: SKU, shipment modal, list column, export and stale-clear U
     /exportTitle: 'SKU 单重（克）'/u
   )
 
-  assert.match(shipmentModalSource, /message=\{`预计总净重：/u)
+  assert.match(
+    shipmentModalSource,
+    /<Text strong>预计总净重：\{preview\.totalNetWeightG\} 克<\/Text>/u
+  )
   assert.match(shipmentModalSource, /label="实际总净重（克）"/u)
   assert.match(shipmentModalSource, /normalizeShipmentQuantity\(value\)/u)
   assert.match(shipmentModalSource, /数量必须大于 0，且最多保留 6 位小数/u)
