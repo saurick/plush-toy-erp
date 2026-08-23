@@ -140,8 +140,13 @@ test("trial role docs cover all current role demo accounts and mobile task paths
   );
   assertIncludes(
     scriptReadme,
-    "公开测试值一旦 seed 就是可登录凭据",
-    "scripts README public demo credential boundary",
+    "本入口及其 `demo_*` 账号不得用于 133",
+    "scripts README local demo credential boundary",
+  );
+  assertIncludes(
+    scriptReadme,
+    "`customer-trial-133` 复用相同公开密码值时只能走其独立 `uat_*` 凭据合同与受控轮换器",
+    "scripts README customer-trial credential boundary",
   );
   assertIncludes(
     serverConfigDoc,

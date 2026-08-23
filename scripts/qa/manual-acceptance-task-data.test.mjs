@@ -2328,13 +2328,17 @@ test("customer-trial-133 task apply binds exact attestation and live debug capab
     runId: "20260815-V6",
     nowSec: NOW_SEC,
   });
-  const mock = createMockRuntime({ environment: "remote" });
+  const mock = createMockRuntime({
+    environment: "remote",
+    rolePassword: "12345678",
+    adminPassword: "adminadmin",
+  });
   const report = await applyManualAcceptanceTaskData(plan, {
     confirmPhrase: CONFIRM_PHRASE,
     targetConfirmation: manualAcceptanceTargetConfirmation(plan),
     targetAttestation: customerTrial133Attestation(),
-    password: "local-password",
-    adminPassword: "admin-password",
+    password: "12345678",
+    adminPassword: "adminadmin",
     fetchImpl: mock.fetchImpl,
   });
 
@@ -2365,13 +2369,17 @@ test("customer-trial-133 accepts a later immutable release when the CAS migratio
     nowSec: NOW_SEC,
   });
   const laterRelease = "56ecf873796ffafc53f12a3cd5f8b7adb0214581";
-  const mock = createMockRuntime({ environment: "remote" });
+  const mock = createMockRuntime({
+    environment: "remote",
+    rolePassword: "12345678",
+    adminPassword: "adminadmin",
+  });
   const report = await applyManualAcceptanceTaskData(plan, {
     confirmPhrase: CONFIRM_PHRASE,
     targetConfirmation: manualAcceptanceTargetConfirmation(plan),
     targetAttestation: customerTrial133Attestation({ release: laterRelease }),
-    password: "local-password",
-    adminPassword: "admin-password",
+    password: "12345678",
+    adminPassword: "adminadmin",
     fetchImpl: mock.fetchImpl,
   });
   assert.equal(report.summary.persisted, TOTAL_TASKS);

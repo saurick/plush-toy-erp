@@ -64,14 +64,14 @@ test("attachment actors use an independent role password", () => {
   assert.deepEqual(
     resolveAttachmentCredentials({
       target: "customer-trial-133",
-      adminPassword: "admin-secret",
-      rolePassword: "role-secret",
+      adminPassword: "adminadmin",
+      rolePassword: "12345678",
       env: {},
     }),
     {
-      adminPassword: "admin-secret",
-      rolePassword: "role-secret",
-      rolePasswordSource: "explicit",
+      adminPassword: "adminadmin",
+      rolePassword: "12345678",
+      rolePasswordSource: "credential.contract.json",
     },
   );
   assert.throws(

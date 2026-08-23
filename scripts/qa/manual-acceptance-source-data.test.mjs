@@ -1094,8 +1094,8 @@ test("customer-trial-133 source apply accepts only the registered attested runti
   await assert.rejects(
     () =>
       applyManualAcceptanceSourceData(plan, {
-        password: "role-password",
-        adminPassword: "admin-password",
+        password: "12345678",
+        adminPassword: "adminadmin",
         confirmPhrase: "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA",
         targetConfirmation: manualAcceptanceTargetConfirmation(plan),
         targetAttestation: customerTrial133Attestation(),

@@ -2607,7 +2607,7 @@ test("registered customer-trial-133 verification requires explicit confirmation 
       verifyManualAcceptanceReadiness(plan, {
         backendURL,
         databaseName: CUSTOMER_TRIAL_133_DATABASE,
-        password: "trial-demo-password",
+        password: "12345678",
         fetchImpl: async () => {
           fetchCalls += 1;
           throw new Error("missing target confirmation must fail before fetch");
@@ -2622,7 +2622,7 @@ test("registered customer-trial-133 verification requires explicit confirmation 
       verifyManualAcceptanceReadiness(plan, {
         backendURL,
         databaseName: CUSTOMER_TRIAL_133_DATABASE,
-        password: "trial-demo-password",
+        password: "12345678",
         targetConfirmation,
         fetchImpl: async () => {
           fetchCalls += 1;
@@ -2644,7 +2644,7 @@ test("registered customer-trial-133 verification requires explicit confirmation 
   const report = await verifyManualAcceptanceReadiness(plan, {
     backendURL,
     databaseName: CUSTOMER_TRIAL_133_DATABASE,
-    password: "trial-demo-password",
+    password: "12345678",
     targetConfirmation,
     targetAttestation,
     fetchImpl: remote.fetchImpl,
