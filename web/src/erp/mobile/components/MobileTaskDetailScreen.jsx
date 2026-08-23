@@ -18,7 +18,6 @@ import {
   formatProcessStartedAt,
   getProcessLabel,
   getProcessStatusLabel,
-  isDisplayOnlyWorkflowTask,
 } from '../../utils/processRuntimePresentation.mjs'
 import {
   buildTaskFactRows,
@@ -30,6 +29,7 @@ import {
   resolveTaskReasonLabel,
   resolveTaskSourceLabel,
 } from '../utils/mobileRoleTaskModel.mjs'
+import { getWorkflowTaskExceptionContactPresentation } from '../../utils/workflowTaskProcessingHint.mjs'
 import BusinessAttachmentModalButton from '../../components/business-list/BusinessAttachmentModalButton.jsx'
 import ProductionRouteExecutionModal from '../../components/production-orders/ProductionRouteExecutionModal.jsx'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
@@ -171,6 +171,9 @@ export default function MobileTaskDetailScreen({
   const ownerRoleLabel = getMobileRoleLabel(selectedTask.owner_role_key)
   const taskReason = resolveTaskReason(selectedTask)
   const taskReasonLabel = resolveTaskReasonLabel(selectedTask)
+  const exceptionContact =
+    getWorkflowTaskExceptionContactPresentation(selectedTask)
+  const exceptionContactHint = exceptionContact.text
   const taskStatusLabel = resolveMobileTaskStatusLabel(selectedTask)
   const resolvedDueLabel = resolveMobileTaskDueLabel(selectedTask)
   const taskDueLabel =
@@ -285,13 +288,6 @@ export default function MobileTaskDetailScreen({
           </div>
         </section>
 
-        {isDisplayOnlyWorkflowTask(selectedTask) ? (
-          <section className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-800">
-            <strong>模拟任务：</strong>
-            仅用于界面检查，不计入业务流程。
-          </section>
-        ) : null}
-
         {actionGuidance ? (
           <section
             className="mobile-role-action-guidance"
@@ -328,10 +324,38 @@ export default function MobileTaskDetailScreen({
           </section>
         ) : null}
 
-        {isTaskRisk(selectedTask) && taskReason ? (
-          <section className="mobile-role-detail-risk rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-base font-semibold leading-6 text-red-700">
-            <ExclamationCircleFilled className="mr-2" aria-hidden="true" />
-            {taskReasonLabel}：{taskReason}
+        {(isTaskRisk(selectedTask) && taskReason) || exceptionContactHint ? (
+          <section
+            className="mobile-role-detail-risk rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-sm leading-6 text-red-700"
+            data-testid="mobile-task-exception-contact"
+            role="note"
+          >
+            {isTaskRisk(selectedTask) ? (
+              <ExclamationCircleFilled className="mr-2" aria-hidden="true" />
+            ) : null}
+            {taskReason ? (
+              <strong>
+                {taskReasonLabel}：{taskReason}
+              </strong>
+            ) : null}
+            {exceptionContactHint ? (
+              <span className={`${taskReason ? 'mt-2 ' : ''}block font-normal`}>
+                {exceptionContact.parts.map((part, index) =>
+                  part.kind === 'role' ? (
+                    <strong
+                      className="mobile-task-exception-contact__role font-extrabold"
+                      key={`${part.kind}-${part.text}-${index}`}
+                    >
+                      {part.text}
+                    </strong>
+                  ) : (
+                    <React.Fragment key={`${part.kind}-${part.text}-${index}`}>
+                      {part.text}
+                    </React.Fragment>
+                  )
+                )}
+              </span>
+            ) : null}
           </section>
         ) : null}
 

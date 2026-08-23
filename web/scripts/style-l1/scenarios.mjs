@@ -1586,9 +1586,8 @@ export function createStyleL1Scenarios(deps) {
       mockAdminRpc: true,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '业务管理')
+        await expectHeading(page, '毛绒玩具管理系统')
         await expectButton(page, /^登\s*录$/)
-        await expectText(page, '毛绒玩具管理系统')
         await assertAdminLoginLayout(page, { minCardWidth: 520 })
       },
     },
@@ -1598,9 +1597,8 @@ export function createStyleL1Scenarios(deps) {
       mockAdminRpc: true,
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
-        await expectHeading(page, '业务管理')
+        await expectHeading(page, '毛绒玩具管理系统')
         await expectButton(page, /^登\s*录$/)
-        await expectText(page, '毛绒玩具管理系统')
         await assertAdminLoginLayout(page, { minCardWidth: 320 })
       },
     },
@@ -1610,9 +1608,8 @@ export function createStyleL1Scenarios(deps) {
       mockAdminRpc: true,
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
-        await expectText(page, '业务管理')
+        await expectHeading(page, '毛绒玩具管理系统')
         await expectButton(page, /^登\s*录$/)
-        await expectText(page, '毛绒玩具管理系统')
         await assertAdminLoginLayout(page, { minCardWidth: 320 })
       },
     },
@@ -1669,7 +1666,7 @@ export function createStyleL1Scenarios(deps) {
         })
       },
       verify: async (page) => {
-        await expectText(page, '业务管理')
+        await expectHeading(page, '毛绒玩具管理系统')
         const username = page.getByLabel('账号')
         const password = page.getByLabel('密码')
         const submit = page.locator('.erp-login-card button[type="submit"]')
@@ -1699,7 +1696,7 @@ export function createStyleL1Scenarios(deps) {
       mockAdminRpc: true,
       viewport: { width: 1280, height: 800 },
       verify: async (page) => {
-        await expectText(page, '业务管理')
+        await expectHeading(page, '毛绒玩具管理系统')
         await assertERPThemeMode(page, {
           scenarioName: 'admin-login-theme-modes-desktop',
           expectedMode: 'system',
@@ -1816,7 +1813,7 @@ export function createStyleL1Scenarios(deps) {
         })
         await clickERPThemeOption(page, '暗色')
         await page.reload({ waitUntil: 'domcontentloaded' })
-        await expectText(page, '业务管理')
+        await expectHeading(page, '毛绒玩具管理系统')
         await assertERPThemeMode(page, {
           scenarioName: 'admin-login-theme-modes-desktop',
           expectedMode: 'dark',
@@ -1839,7 +1836,7 @@ export function createStyleL1Scenarios(deps) {
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1280, height: 800 },
       verify: async (page) => {
-        await expectText(page, '业务管理')
+        await expectHeading(page, '毛绒玩具管理系统')
         await page.getByText('电脑端业务管理', { exact: true }).click()
         await page.getByLabel('账号').fill('style-l1-admin')
         await page.locator('#password').fill('style-l1-password')
@@ -2379,7 +2376,7 @@ export function createStyleL1Scenarios(deps) {
       mockAdminRpc: true,
       viewport: { width: 1280, height: 800 },
       verify: async (page) => {
-        await expectText(page, '业务管理')
+        await expectHeading(page, '毛绒玩具管理系统')
         const focusOrigin = page
           .getByRole('button', { name: /^登\s*录$/ })
           .first()
@@ -2478,7 +2475,7 @@ export function createStyleL1Scenarios(deps) {
         })
         await page.getByRole('button', { name: '重新登录' }).click()
         await waitForPath(page, '/admin-login')
-        await expectText(page, '业务管理')
+        await expectHeading(page, '毛绒玩具管理系统')
       },
     },
     {
@@ -2498,7 +2495,7 @@ export function createStyleL1Scenarios(deps) {
         await assertTextAbsent(page, '待我处理')
         await page.getByRole('button', { name: '重新登录' }).click()
         await waitForPath(page, '/admin-login')
-        await expectText(page, '业务管理')
+        await expectHeading(page, '毛绒玩具管理系统')
       },
     },
     {
@@ -2526,7 +2523,7 @@ export function createStyleL1Scenarios(deps) {
         await assertTextAbsent(page, '待我处理')
         await page.getByRole('button', { name: '重新登录' }).click()
         await waitForPath(page, '/admin-login')
-        await expectText(page, '业务管理')
+        await expectHeading(page, '毛绒玩具管理系统')
       },
     },
     {
@@ -2534,7 +2531,7 @@ export function createStyleL1Scenarios(deps) {
       path: '/erp/dashboard',
       viewport: { width: 1280, height: 800 },
       verify: async (page) => {
-        await expectText(page, '业务管理')
+        await expectHeading(page, '毛绒玩具管理系统')
         await expectButton(page, /^登\s*录$/)
         await assertAdminLoginLayout(page, { minCardWidth: 520 })
       },
@@ -5548,14 +5545,16 @@ export function createStyleL1Scenarios(deps) {
       ),
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
-        await expectText(page, '当前账号有多个岗位')
-        await expectText(
-          page,
-          '这里仅切换说明内容，不会改变当前登录账号的岗位或权限'
+        await expectText(page, '切换这里只查看说明，不改变岗位或权限')
+        assert.equal(
+          await page.locator('.erp-help-center-page .ant-alert').count(),
+          0,
+          '岗位帮助默认页面不应堆叠 Alert 卡片'
         )
         await expectText(page, '采购')
-        await expectText(page, '正常办理案例')
+        await expectText(page, '正常怎么做')
         await expectText(page, '异常完成标准')
+        await assertTextAbsent(page, '常见问题')
 
         await page
           .locator('.erp-help-center-role-picker .ant-select-selector')
@@ -6688,12 +6687,7 @@ export function createStyleL1Scenarios(deps) {
           .filter({ hasText: '看板跳转测试任务' })
           .first()
         await navigationCurrentTask
-          .getByText('处理提示', { exact: true })
-          .waitFor({ state: 'visible', timeout: 10_000 })
-        await navigationCurrentTask
-          .getByText('系统按任务状态、可用操作和关联入口生成', {
-            exact: true,
-          })
+          .getByText('办理提示：', { exact: true })
           .waitFor({ state: 'visible', timeout: 10_000 })
         const processingHintMetrics = await navigationCurrentTask
           .locator('.erp-task-processing-hint')
@@ -6702,6 +6696,8 @@ export function createStyleL1Scenarios(deps) {
             scrollWidth: node.scrollWidth,
             clientHeight: node.clientHeight,
             scrollHeight: node.scrollHeight,
+            iconCount: node.querySelectorAll('.ant-alert-icon').length,
+            isAlert: node.classList.contains('ant-alert'),
           }))
         assert(
           processingHintMetrics.clientWidth > 0 &&
@@ -6709,8 +6705,10 @@ export function createStyleL1Scenarios(deps) {
             processingHintMetrics.scrollWidth <=
               processingHintMetrics.clientWidth + 1 &&
             processingHintMetrics.scrollHeight <=
-              processingHintMetrics.clientHeight + 1,
-          `任务看板处理提示不应裁切或横向溢出: ${JSON.stringify(
+              processingHintMetrics.clientHeight + 1 &&
+            processingHintMetrics.iconCount === 0 &&
+            processingHintMetrics.isAlert === false,
+          `任务看板办理提示应为紧凑文字，不应显示警告卡、裁切或横向溢出: ${JSON.stringify(
             processingHintMetrics
           )}`
         )
@@ -6751,6 +6749,11 @@ export function createStyleL1Scenarios(deps) {
           expectedActionText: '即将提交',
           expectReasonInput: false,
         })
+        await expectText(taskDrawer, '提交后会发生什么')
+        await expectText(
+          taskDrawer,
+          '确认后只完成当前任务；相关业务是否办结以对应业务页面为准。'
+        )
         const conflictMutation = await page.evaluate(
           async ({ taskID, expectedVersion }) => {
             const response = await fetch('/rpc/workflow', {
@@ -6845,7 +6848,11 @@ export function createStyleL1Scenarios(deps) {
           ),
         })
         await taskDrawer.getByRole('tab', { name: /确认与提交/ }).click()
-        await expectText(taskDrawer, '确认后只改变任务归属')
+        await expectText(taskDrawer, '提交后会发生什么')
+        await expectText(
+          taskDrawer,
+          '确认后只改变处理人，负责岗位和流程保持不变。'
+        )
         await expectText(taskDrawer, 'warehouse-backup · 仓库')
         await taskDrawer.getByRole('button', { name: '确认转交' }).click()
         await page
@@ -7844,6 +7851,29 @@ export function createStyleL1Scenarios(deps) {
           .filter({ hasText: '宽屏重叠回归任务' })
           .first()
         await wideCurrentTask
+          .getByText('办理提示：', { exact: true })
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          await wideCurrentTask
+            .locator('.erp-task-processing-hint .ant-alert-icon')
+            .count(),
+          0,
+          '普通处理提示不应重复显示圆形提示图标'
+        )
+        assert.equal(
+          await wideCurrentTask
+            .locator('.erp-task-processing-hint.ant-alert')
+            .count(),
+          0,
+          '普通办理提示不应使用 Alert 卡片'
+        )
+        await wideCurrentTask.screenshot({
+          path: path.resolve(
+            outputDir,
+            'erp-task-board-dark-wide-processing-hint.png'
+          ),
+        })
+        await wideCurrentTask
           .getByRole('button', { name: '处理任务', exact: true })
           .click()
         await assertTaskActionDrawerLayout(page, {
@@ -7863,6 +7893,64 @@ export function createStyleL1Scenarios(deps) {
           scenarioName: 'erp-task-board-dark-wide-complete-action',
           expectedTaskText: '宽屏重叠回归任务',
           expectedActionText: '提交后任务会进入已完成',
+          expectReasonInput: false,
+        })
+        const wideTaskDrawer = page.locator('.erp-task-action-drawer')
+        const responsibilityEmphasis = await wideTaskDrawer
+          .locator('.erp-task-action-drawer__responsibility')
+          .evaluate((node) => {
+            const role = node.querySelector(
+              '.erp-task-action-drawer__responsibility-role'
+            )
+            const person = node.querySelector(
+              '.erp-task-action-drawer__responsibility-person'
+            )
+            const roleStyle = role ? getComputedStyle(role) : null
+            const personStyle = person ? getComputedStyle(person) : null
+            return {
+              roleWeight: Number(roleStyle?.fontWeight || 0),
+              personWeight: Number(personStyle?.fontWeight || 0),
+              roleSize: Number.parseFloat(roleStyle?.fontSize || '0'),
+              personSize: Number.parseFloat(personStyle?.fontSize || '0'),
+              roleColor: roleStyle?.color || '',
+              personColor: personStyle?.color || '',
+            }
+          })
+        assert(
+          responsibilityEmphasis.roleWeight >= 700 &&
+            responsibilityEmphasis.personWeight <= 400 &&
+            responsibilityEmphasis.roleSize >
+              responsibilityEmphasis.personSize &&
+            responsibilityEmphasis.roleColor !==
+              responsibilityEmphasis.personColor,
+          `负责人岗位必须以可感知的字号、字重和中性色区别于处理人: ${JSON.stringify(
+            responsibilityEmphasis
+          )}`
+        )
+        await wideTaskDrawer.getByRole('tab', { name: /确认与提交/ }).click()
+        await expectText(wideTaskDrawer, '提交后会发生什么')
+        await expectText(
+          wideTaskDrawer,
+          '确认后只完成当前任务；相关业务是否办结以对应业务页面为准。'
+        )
+        assert.equal(
+          await wideTaskDrawer
+            .locator('.erp-task-action-drawer__outcome-note .ant-alert-icon')
+            .count(),
+          0,
+          '普通提交结果说明不应重复显示圆形提示图标'
+        )
+        assert.equal(
+          await wideTaskDrawer
+            .locator('.erp-task-action-drawer__outcome-note.ant-alert')
+            .count(),
+          0,
+          '普通提交结果说明不应使用 Alert 卡片'
+        )
+        await assertTaskActionDrawerLayout(page, {
+          scenarioName: 'erp-task-board-dark-wide-complete-confirmation',
+          expectedTaskText: '宽屏重叠回归任务',
+          expectedActionText: '即将提交',
           expectReasonInput: false,
         })
         await page.screenshot({
@@ -10228,6 +10316,120 @@ export function createStyleL1Scenarios(deps) {
         )
         page.off('request', captureRoleTaskViewRequest)
         await expectText(page, '阻塞原因')
+        const blockedTaskItem = page
+          .locator('.erp-mobile-list-item')
+          .filter({ hasText: '阻塞原因' })
+          .first()
+        await blockedTaskItem.click()
+        await page
+          .getByTestId('mobile-task-detail-screen')
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        await expectText(page, '请联系 业务岗位，确认卡点和恢复条件。')
+        const mobileContactRoleMetrics = await page
+          .locator('.mobile-task-exception-contact__role')
+          .first()
+          .evaluate((node) => {
+            const contactStyle = node.parentElement
+              ? getComputedStyle(node.parentElement)
+              : null
+            const roleStyle = getComputedStyle(node)
+            return {
+              contactColor: contactStyle?.color || '',
+              contactWeight: Number(contactStyle?.fontWeight || 0),
+              roleColor: roleStyle.color,
+              roleWeight: Number(roleStyle.fontWeight || 0),
+              text: node.textContent?.trim() || '',
+            }
+          })
+        assert(
+          mobileContactRoleMetrics.roleWeight >= 800 &&
+            mobileContactRoleMetrics.roleWeight >
+              mobileContactRoleMetrics.contactWeight &&
+            mobileContactRoleMetrics.roleColor !==
+              mobileContactRoleMetrics.contactColor &&
+            mobileContactRoleMetrics.text === '业务岗位',
+          `移动端应以字重和同色系对比突出联系岗位: ${JSON.stringify(
+            mobileContactRoleMetrics
+          )}`
+        )
+        const mobileEventMeta = page
+          .getByTestId('workflow-task-event-trail')
+          .locator('.workflow-task-event-trail__meta')
+          .first()
+        await mobileEventMeta.waitFor({ state: 'visible', timeout: 10_000 })
+        const mobileEventMetaMetrics = await mobileEventMeta.evaluate(
+          (node) => {
+            const actorName = node.querySelector(
+              '.workflow-task-event-trail__actor-name'
+            )
+            const actorRole = node.querySelector(
+              '.workflow-task-event-trail__actor-role'
+            )
+            const eventTime = node.querySelector(
+              '.workflow-task-event-trail__meta-time'
+            )
+            const eventVersion = node.querySelector(
+              '.workflow-task-event-trail__meta-version'
+            )
+            return {
+              actorNameText: actorName?.textContent?.trim() || '',
+              actorRoleText: actorRole?.textContent?.trim() || '',
+              actorNameWeight: Number(
+                actorName ? getComputedStyle(actorName).fontWeight : 0
+              ),
+              actorRoleWeight: Number(
+                actorRole ? getComputedStyle(actorRole).fontWeight : 0
+              ),
+              timeWeight: Number(
+                eventTime ? getComputedStyle(eventTime).fontWeight : 0
+              ),
+              versionWeight: Number(
+                eventVersion ? getComputedStyle(eventVersion).fontWeight : 0
+              ),
+            }
+          }
+        )
+        assert(
+          mobileEventMetaMetrics.actorNameText &&
+            mobileEventMetaMetrics.actorRoleText &&
+            mobileEventMetaMetrics.actorNameWeight >= 500 &&
+            mobileEventMetaMetrics.actorRoleWeight <= 400 &&
+            mobileEventMetaMetrics.timeWeight <= 400 &&
+            mobileEventMetaMetrics.versionWeight <= 400,
+          `历史记录只应轻微突出经办人，岗位、时间和版本保持次要: ${JSON.stringify(
+            mobileEventMetaMetrics
+          )}`
+        )
+        assert.equal(
+          await page
+            .getByTestId('mobile-task-exception-contact')
+            .getByText('异常处理：', { exact: true })
+            .count(),
+          0,
+          '移动端紧凑异常区不应重复“异常处理”前缀'
+        )
+        assert.equal(
+          await page.locator('.mobile-role-detail-risk').count(),
+          1,
+          '阻塞原因和异常处理应合并为一个紧凑区域'
+        )
+        await page.getByTestId('mobile-task-detail-screen').screenshot({
+          path: path.resolve(
+            outputDir,
+            'mobile-tasks-dark-blocked-contact.png'
+          ),
+        })
+        await page.getByTestId('workflow-task-event-trail').screenshot({
+          path: path.resolve(
+            outputDir,
+            'mobile-tasks-dark-task-event-history.png'
+          ),
+        })
+        await page.getByLabel('返回任务列表').click()
+        await page.waitForFunction(() => {
+          const heading = document.querySelector('.mobile-role-tasks-page h1')
+          return heading?.textContent?.trim() === '待办'
+        })
         await assertERPThemeMode(page, {
           scenarioName: 'mobile-tasks-dark',
           expectedMode: 'dark',
@@ -17170,12 +17372,12 @@ export function createStyleL1Scenarios(deps) {
           .click()
         const resetModal = page
           .locator('.ant-modal-content')
-          .filter({ hasText: '重置密码：assistant-admin' })
+          .filter({ hasText: '重置密码：业务助理（assistant-admin）' })
           .last()
         await resetModal.getByText('新密码').waitFor()
         await assertVisibleModalInputFocusStyle(page, {
           scenarioName: 'permission-center-reset-modal-focus',
-          modalText: '重置密码：assistant-admin',
+          modalText: '重置密码：业务助理（assistant-admin）',
         })
         await resetModal
           .locator('.ant-input-affix-wrapper input')
@@ -17184,7 +17386,7 @@ export function createStyleL1Scenarios(deps) {
           .getByRole('button', { name: /重\s*置/ })
           .last()
           .click()
-        await expectText(page, '已重置员工账号 assistant-admin 的密码')
+        await expectText(page, '已重置 业务助理（assistant-admin） 的密码')
         await page
           .getByRole('row', { name: /assistant-admin/ })
           .getByRole('button', { name: '离职注销' })
@@ -17242,34 +17444,42 @@ export function createStyleL1Scenarios(deps) {
         await assistantRow.getByRole('button', { name: '分配岗位' }).click()
         const roleModal = page
           .locator('.ant-modal-content')
-          .filter({ hasText: '分配岗位：assistant-admin' })
+          .filter({ hasText: '分配岗位：业务助理（assistant-admin）' })
           .last()
-        await expectText(roleModal, '多个岗位会合并最终有效权限')
+        await expectText(
+          roleModal,
+          '选择多个岗位时，账号会合并这些岗位已开放的页面和操作。'
+        )
+        assert.equal(
+          await roleModal.locator('.ant-alert').count(),
+          0,
+          '普通岗位说明不应使用 Alert 卡片'
+        )
         await roleModal.locator('.ant-modal-footer button').first().click()
 
-        await assistantRow.getByRole('button', { name: '修改手机号' }).click()
+        await assistantRow.getByRole('button', { name: '修改资料' }).click()
         const phoneModal = page
           .locator('.ant-modal-content')
-          .filter({ hasText: '修改登录手机号：assistant-admin' })
+          .filter({ hasText: '修改资料：业务助理（assistant-admin）' })
           .last()
-        await phoneModal.locator('input').fill('13700137000')
+        await phoneModal.locator('input[inputmode="tel"]').fill('13700137000')
         await phoneModal.locator('.ant-modal-footer button').first().click()
 
         await assistantRow.getByRole('button', { name: '重置密码' }).click()
         const resetModal = page
           .locator('.ant-modal-content')
-          .filter({ hasText: '重置密码：assistant-admin' })
+          .filter({ hasText: '重置密码：业务助理（assistant-admin）' })
           .last()
         await resetModal.getByText('新密码').waitFor()
         await assertVisibleModalInputFocusStyle(page, {
           scenarioName: 'permission-center-admin-dialogs-reset',
-          modalText: '重置密码：assistant-admin',
+          modalText: '重置密码：业务助理（assistant-admin）',
         })
         await resetModal
           .locator('.ant-input-affix-wrapper input')
           .fill('new-secret')
         await resetModal.getByRole('button', { name: /重\s*置/u }).click()
-        await expectText(page, '已重置员工账号 assistant-admin 的密码')
+        await expectText(page, '已重置 业务助理（assistant-admin） 的密码')
 
         await assistantRow.getByRole('switch').click()
         const statusModal = page

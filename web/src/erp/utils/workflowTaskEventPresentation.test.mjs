@@ -28,6 +28,8 @@ test('workflow task event presentation uses approval language only for approval 
       }).label,
       transitionLabel: presentWorkflowTaskEvent(event).transitionLabel,
       actorLabel: presentWorkflowTaskEvent(event).actorLabel,
+      actorName: presentWorkflowTaskEvent(event).actorName,
+      actorRoleLabel: presentWorkflowTaskEvent(event).actorRoleLabel,
       versionLabel: presentWorkflowTaskEvent(event).versionLabel,
     },
     {
@@ -35,6 +37,8 @@ test('workflow task event presentation uses approval language only for approval 
       approvalLabel: '审批已通过',
       transitionLabel: '待处理 → 已完成',
       actorLabel: '王总（老板）',
+      actorName: '王总',
+      actorRoleLabel: '老板',
       versionLabel: '版本 4',
     }
   )
@@ -69,6 +73,8 @@ test('workflow task event presentation distinguishes exception recovery and resp
   assert.equal(escalated.categoryLabel, '责任流转')
   assert.equal(escalated.label, '已升级至 PMC')
   assert.equal(escalated.actorLabel, 'warehouse01（仓库）')
+  assert.equal(escalated.actorName, 'warehouse01')
+  assert.equal(escalated.actorRoleLabel, '仓库')
   assert.equal(returnedToPool.label, '已退回负责岗位共同待办')
 })
 

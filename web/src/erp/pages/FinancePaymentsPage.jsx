@@ -1809,11 +1809,9 @@ export default function FinancePaymentsPage() {
         onCancel={() => !loading && setAllocationOpen(false)}
         onOk={postPayment}
       >
-        <Alert
-          type="info"
-          showIcon
-          message="仅显示与当前收付款方向、往来方和币种一致的已过账应收或应付；实际可核销余额由系统再次校验。"
-        />
+        <div className="erp-business-inline-note" role="note">
+          仅显示与当前收付款方向、往来方和币种一致的已过账记录；提交时会再次核对可核销余额。
+        </div>
         {allocationCandidates.length === 0 ? (
           <Alert
             type="warning"

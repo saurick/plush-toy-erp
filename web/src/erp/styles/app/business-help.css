@@ -114,6 +114,29 @@
   gap: 12px;
 }
 
+.erp-business-page-help__boundary {
+  border-top: 1px solid var(--erp-border, #dfe9e1);
+  padding-top: 12px;
+  color: var(--erp-text-muted, #64748b);
+}
+
+.erp-business-page-help__boundary > summary {
+  width: fit-content;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.erp-business-page-help__boundary > summary:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--erp-primary-soft, #dcefe0);
+  outline-offset: 3px;
+}
+
+.erp-business-page-help__boundary > p {
+  margin: 10px 0 0;
+  line-height: 1.65;
+}
+
 .erp-business-help-explanation {
   min-width: 0;
   border: 1px solid var(--erp-border, #dfe9e1);

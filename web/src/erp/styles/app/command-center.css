@@ -524,41 +524,23 @@
   overflow-wrap: anywhere;
 }
 
-.erp-task-processing-hint.ant-alert-with-description {
+.erp-task-processing-hint {
+  display: flex;
   width: 100%;
-  padding: 8px 10px;
-}
-
-.erp-task-processing-hint.ant-alert-with-description .ant-alert-icon {
-  margin-top: 2px;
-  margin-inline-end: 8px;
-  font-size: 14px;
-}
-
-.erp-task-processing-hint .ant-alert-message {
-  margin-bottom: 2px;
+  min-width: 0;
+  align-items: baseline;
+  gap: 4px;
+  padding: 4px 0;
+  color: var(--erp-text-muted, #475569);
   font-size: 13px;
-  line-height: 1.35;
-}
-
-.erp-task-processing-hint .ant-alert-description {
-  font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 
-.erp-task-processing-hint__head {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 8px;
-  align-items: baseline;
-  justify-content: space-between;
-}
-
-.erp-task-processing-hint__head .ant-typography {
+.erp-task-processing-hint .ant-typography {
+  flex: 0 0 auto;
   margin: 0;
-  font-size: 11px;
-  line-height: 1.35;
+  font-size: inherit;
 }
 
 .erp-workbench-detail-actions {

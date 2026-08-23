@@ -25,6 +25,7 @@ import {
   isPositiveNumeric20Scale6Units,
   numeric20Scale6Units,
 } from '../../utils/numeric20Scale6.mjs'
+import { getWorkflowTaskActionOutcomeHint } from '../../utils/workflowTaskProcessingHint.mjs'
 import MobileTaskFlowHeader from './MobileTaskFlowHeader.jsx'
 
 const ACTION_OPTIONS = Object.freeze([
@@ -229,6 +230,10 @@ export default function MobileTaskActionScreen({
   const busySubmitLabel = effectiveActionLabel
     ? `正在${effectiveActionLabel}`
     : '正在提交'
+  const actionOutcomeHint = getWorkflowTaskActionOutcomeHint({
+    task,
+    actionMode: effectiveAction,
+  })
 
   useEffect(() => {
     if (!processDecisionRequired) {
@@ -669,7 +674,7 @@ export default function MobileTaskActionScreen({
             ) : null}
 
             <p className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm leading-6 text-blue-700 [overflow-wrap:anywhere]">
-              提交只更新当前任务；任务附件在详情页管理，库存、质检、出货及财务结果仍在对应单据办理。
+              {actionOutcomeHint}
             </p>
           </>
         ) : null}

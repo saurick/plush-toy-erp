@@ -54,6 +54,7 @@ Use this skill to turn "简洁易用、美观、低心智负担" into concrete i
 
 5. Reduce density by meaning, not by hiding truth.
    - Delete, merge, rename, or downgrade elements that are decorative, duplicated, vanity-only, or do not change a user's judgment or next action.
+   - Reserve prominent `Alert` cards and warning icons for states that require the user to stop, correct, retry, confirm risk, or resolve missing permission. Routine guidance, successful calculations, loading copy, DEV / QA / simulation labels, and evidence-boundary explanations must not become persistent employee-facing alerts; use one short inline note, field help, or an on-demand disclosure instead, and keep at most one passive note visible by default in a page or modal section.
    - Prefer fewer stronger sections over many small cards.
    - Avoid duplicate shortcuts to the same action unless the duplicate is role-specific and measurably shortens the main task.
    - Keep ERP pages work-focused: compact filters, readable tables, clear primary actions, restrained status summaries, and obvious selected-row actions.

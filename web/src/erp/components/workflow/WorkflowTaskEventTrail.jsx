@@ -97,8 +97,35 @@ export default function WorkflowTaskEventTrail({
                     <span>{item.categoryLabel}</span>
                   </div>
                   <p className="workflow-task-event-trail__meta">
-                    {item.actorLabel} · {item.timeLabel}
-                    {item.versionLabel ? ` · ${item.versionLabel}` : ''}
+                    {item.actorName ? (
+                      <>
+                        <span className="workflow-task-event-trail__actor-name">
+                          {item.actorName}
+                        </span>
+                        {item.actorRoleLabel ? (
+                          <span className="workflow-task-event-trail__actor-role">
+                            （{item.actorRoleLabel}）
+                          </span>
+                        ) : null}
+                      </>
+                    ) : (
+                      <span className="workflow-task-event-trail__actor-name">
+                        {item.actorLabel}
+                      </span>
+                    )}{' '}
+                    ·{' '}
+                    <span className="workflow-task-event-trail__meta-time">
+                      {item.timeLabel}
+                    </span>
+                    {item.versionLabel ? (
+                      <>
+                        {' '}
+                        ·{' '}
+                        <span className="workflow-task-event-trail__meta-version">
+                          {item.versionLabel}
+                        </span>
+                      </>
+                    ) : null}
                   </p>
                   {item.transitionLabel ? (
                     <p className="workflow-task-event-trail__transition">

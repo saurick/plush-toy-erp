@@ -523,18 +523,10 @@ function TaskProcessingHint({ task, access = {}, canOpenEntry = false }) {
   })
 
   return (
-    <Alert
-      type="info"
-      showIcon
-      className="erp-task-processing-hint"
-      message={
-        <div className="erp-task-processing-hint__head">
-          <span>处理提示</span>
-          <Text type="secondary">系统按任务状态、可用操作和关联入口生成</Text>
-        </div>
-      }
-      description={hint}
-    />
+    <div className="erp-task-processing-hint" role="note">
+      <Text type="secondary">办理提示：</Text>
+      <span>{hint}</span>
+    </div>
   )
 }
 

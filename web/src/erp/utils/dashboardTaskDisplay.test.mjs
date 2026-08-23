@@ -9,14 +9,14 @@ import {
 } from './dashboardTaskDisplay.mjs'
 import { canOpenWorkflowTaskEntry } from './workflowTaskEntryAccess.mjs'
 
-test('formatWorkflowTaskSource marks simulated task catalog as display-only', () => {
+test('formatWorkflowTaskSource keeps simulated markers out of employee copy', () => {
   assert.equal(
     formatWorkflowTaskSource({
       source_type: 'simulated-manual-acceptance-task-batch',
       source_no: 'SIM-001',
       payload: { simulated_only: true },
     }),
-    '模拟任务批次'
+    '任务记录'
   )
 })
 

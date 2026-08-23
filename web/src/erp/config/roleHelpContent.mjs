@@ -6,36 +6,11 @@ const DESKTOP_HELP_ROLE_ORDER = Object.freeze([
   'admin',
 ])
 
-const commonQuestions = Object.freeze([
-  {
-    question: '页面里没有需要的按钮怎么办？',
-    answer:
-      '能进页面不代表拥有页面内所有操作，新建、修改、审核、过账和取消会分别控制。先确认是否选中可办理的记录，并检查当前状态；仍看不到入口时，请联系系统管理员核对账号岗位和权限。',
-  },
-  {
-    question: '常用工作里没找到页面怎么办？',
-    answer:
-      '看板统一放在最前，“更多功能”会把其他已授权的低频页面按照管理员菜单的相同模块分组，“岗位使用帮助”固定在最后。管理员也可以在权限管理中调整岗位常用入口和顺序，以及同一菜单分组内的顺序；放置位置只为了好找，不会增加或减少权限。',
-  },
-  {
-    question: '任务显示完成，为什么业务记录还没变化？',
-    answer:
-      '任务完成只表示协同事项已经处理。入库、出货、应收、应付等结果仍要回到对应业务页面确认，最终以业务记录状态为准。',
-  },
-  {
-    question: '页面里的专业词、金额或自动带入内容看不懂怎么办？',
-    answer:
-      '先点页面右上角“这页怎么用”，查看当前任务、完成标准、办理顺序和交接对象；金额、比例、字段来源等局部内容可点名称旁的问号查看。不能操作的原因、高风险提醒和必须交给谁处理的事项会直接显示，不需要藏在问号里找。',
-  },
-])
-
 export const ROLE_HELP_GUIDES = Object.freeze([
   {
     key: 'boss',
     label: '老板 / 管理层',
     headline: '先办审批和退回，再处理今天最重要的风险。',
-    summary:
-      '管理层负责审批、退回、定优先级和跨岗协调，不代替各岗位办理具体业务。',
     priorities: [
       {
         title: '办理审批和退回',
@@ -77,18 +52,12 @@ export const ROLE_HELP_GUIDES = Object.freeze([
       returnTo: '退回实际来源岗位，例如销售、采购或财务。',
       doneWhen: '退回原因、补充要求和责任岗位均可查，原审批没有继续向下流转。',
     },
-    cautions: [
-      '不要把任务完成当成入库、出货或收付款已经完成。',
-      '先看异常原因和来源记录，再决定是否催办或调整优先级。',
-      '经营数字用于发现问题，最终结果以对应业务页面记录为准。',
-    ],
-    questions: commonQuestions,
+    caution: '任务完成不等于入库、出货或收付款已经完成。',
   },
   {
     key: 'sales',
     label: '销售',
     headline: '从客户和销售订单开始，持续跟进交期、出货和回款。',
-    summary: '销售岗位帮助覆盖客户资料、销售订单、交期和出货结果跟进。',
     priorities: [
       {
         title: '维护客户资料',
@@ -130,19 +99,12 @@ export const ROLE_HELP_GUIDES = Object.freeze([
       returnTo: '修正完成后重新交给老板审批，并通知受影响的工程和 PMC。',
       doneWhen: '旧订单不再继续流转，新订单内容与客户要求一致并重新进入审批。',
     },
-    cautions: [
-      '销售订单不会自动生成库存、出货、应收或发票记录。',
-      '客户或产品来源变化时，要重新核对订单明细，不保留错误旧值。',
-      '任务链完成但订单仍为已提交时，保留订单号并联系实施人员核对，不手工绕过审批。',
-    ],
-    questions: commonQuestions,
+    caution: '任务链完成不等于订单已经生效，必须回销售订单核对状态。',
   },
   {
     key: 'purchase',
     label: '采购',
     headline: '把采购承诺、到料、检验和入库衔接清楚。',
-    summary:
-      '采购岗位帮助聚焦供应商、材料、采购订单、到料质检、入库和委外协作。',
     priorities: [
       {
         title: '核对供应商和材料',
@@ -184,19 +146,12 @@ export const ROLE_HELP_GUIDES = Object.freeze([
       returnTo: '需要供应商处理的由采购承接，检验交品质，实物状态交仓库。',
       doneWhen: '差异原因、处置方向和责任人可查，本次不合格来料没有被误入库。',
     },
-    cautions: [
-      '采购订单只表示采购承诺，不等于已经到货或入库。',
-      '首次到货检验不合格会阻止本次入库，可按来源行和部分数量登记退厂或补换，不能绕过检验继续确认。',
-      '退货和调整必须从已经入库的来源记录办理。',
-    ],
-    questions: commonQuestions,
+    caution: '采购订单只表示采购承诺，不等于已经到货或入库。',
   },
   {
     key: 'production',
     label: '生产 / 委外',
     headline: '围绕生产和委外来源推进工序、检验、领料和完工。',
-    summary:
-      '生产岗位帮助覆盖生产订单、工序推进、异常处理、领料和完工报告；成品入库由仓库核对实收后确认。',
     priorities: [
       {
         title: '查看生产订单',
@@ -247,19 +202,12 @@ export const ROLE_HELP_GUIDES = Object.freeze([
       doneWhen:
         '异常来源、责任人和下一步可查，受影响数量没有进入错误的完工或库存状态。',
     },
-    cautions: [
-      '生产订单发布、工序完成或任务完成都不等于库存已经变化。',
-      '领料和完工报告必须从明确的生产订单来源生成；生产提交完工不等于成品已经入库。',
-      '返工记录与异常待办要分别核对，不能只处理其中一处。',
-    ],
-    questions: commonQuestions,
+    caution: '生产订单发布、工序完成或任务完成都不等于库存已经变化。',
   },
   {
     key: 'warehouse',
     label: '仓库',
     headline: '按来源办理收货、入库、库存和实际出货。',
-    summary:
-      '仓库岗位帮助聚焦采购与成品入库确认、批次状态、库存可用量、出货放行和实际出库。',
     priorities: [
       {
         title: '办理入库',
@@ -308,20 +256,12 @@ export const ROLE_HELP_GUIDES = Object.freeze([
       returnTo: '到料问题交采购 / 品质，出货来源问题交销售，库存安排交 PMC。',
       doneWhen: '差异和责任人可查，未满足条件的记录没有过账或发货。',
     },
-    cautions: [
-      '出货放行只表示可以继续发货，不等于已经出库。',
-      '生产提交完工报告不等于成品已经入库，只有仓库确认后才增加库存。',
-      '释放预留不会增加库存总量，确认发货才会扣减库存。',
-      '来源、批次或数量不一致时先停下核对，不要用其他记录补平差异。',
-    ],
-    questions: commonQuestions,
+    caution: '生产提交完工报告不等于成品已经入库；出货放行也不等于已经出库。',
   },
   {
     key: 'finance',
     label: '财务',
     headline: '从已发生的业务结果办理应收、应付、发票和对账。',
-    summary:
-      '财务岗位帮助聚焦来源核对、过账、取消、收付款核销和单笔对账，不替代银行或税控系统。',
     recommendedPrimaryLimit: 4,
     priorities: [
       {
@@ -372,18 +312,12 @@ export const ROLE_HELP_GUIDES = Object.freeze([
       doneWhen:
         '差异原因和责任人可查，错误记录没有过账，正确来源可以重新核对。',
     },
-    cautions: [
-      '应收只从已出货记录生成，应付只从符合条件的入库或委外回货生成。',
-      '系统发票记录不等于税控开票已经完成。',
-      '当前页面未提供的收付款、核销或冲销动作，不在其他页面代办。',
-    ],
-    questions: commonQuestions,
+    caution: '系统发票记录不等于税控开票，结清必须以正式核销结果为准。',
   },
   {
     key: 'pmc',
     label: 'PMC',
     headline: '把订单、物料、排产、生产和出货节奏连起来。',
-    summary: 'PMC 帮助聚焦齐套、排程、生产进度、委外进度、延期和出货协调。',
     priorities: [
       {
         title: '查看任务和风险',
@@ -425,18 +359,12 @@ export const ROLE_HELP_GUIDES = Object.freeze([
       returnTo: '缺料交采购，资料交工程，产能交生产，客户交期变更交销售。',
       doneWhen: '风险、责任人、处理日期和下一步可查，相关岗位已经收到事项。',
     },
-    cautions: [
-      '排程任务完成不等于领料、完工或库存已经更新。',
-      '查看库存时同时核对已预留和可用量。',
-      '交期变化要回到来源订单和相关任务同步确认。',
-    ],
-    questions: commonQuestions,
+    caution: '排程任务完成不等于领料、完工或库存已经更新。',
   },
   {
     key: 'quality',
     label: '品质',
     headline: '从真实来源发起检验，给出清晰判定并交回下一岗位。',
-    summary: '品质岗位帮助覆盖采购来料、委外回货、生产过程和出货前成品检验。',
     priorities: [
       {
         title: '办理质量检验',
@@ -478,19 +406,12 @@ export const ROLE_HELP_GUIDES = Object.freeze([
       returnTo: '来料退采购 / 仓库，生产过程退生产，出货前问题退仓库 / 销售。',
       doneWhen: '不合格结果和后续责任可查，相关批次没有被误放行。',
     },
-    cautions: [
-      '任务完成不等于检验记录已经完成，最终以质检单状态为准。',
-      '质检状态不会直接增减库存总量。',
-      '首次到货不合格与已入库后的退货处理是两种不同场景。',
-    ],
-    questions: commonQuestions,
+    caution: '任务完成不等于检验记录已经完成，最终以质检单状态为准。',
   },
   {
     key: 'engineering',
     label: '工程',
     headline: '先把产品、规格、材料、物料清单和加工环节维护准确。',
-    summary:
-      '工程岗位帮助聚焦产品工程资料，为销售、采购、生产、委外和打印提供可靠基础。',
     priorities: [
       {
         title: '维护产品规格',
@@ -533,19 +454,12 @@ export const ROLE_HELP_GUIDES = Object.freeze([
       returnTo: '客户规格问题交销售确认，计划影响交 PMC 确认。',
       doneWhen: '新旧适用范围和受影响订单可查，未完成单据没有误用新资料。',
     },
-    cautions: [
-      '物料清单生效不会自动生成采购需求、生产任务或库存。',
-      '同一产品只保留一个当前生效的物料清单版本。',
-      '修改工程资料前先确认是否会影响正在办理的订单。',
-    ],
-    questions: commonQuestions,
+    caution: '物料清单生效不会自动生成采购需求、生产任务或库存。',
   },
   {
     key: 'admin',
     label: '系统管理员',
     headline: '维护账号、岗位和可用页面，并通过操作记录核对变更。',
-    summary:
-      '系统管理员帮助只覆盖系统设置，不授予采购、生产、库存、出货或财务办理能力。',
     priorities: [
       {
         title: '维护员工账号',
@@ -581,24 +495,7 @@ export const ROLE_HELP_GUIDES = Object.freeze([
       returnTo: '职责定义不清时退回部门负责人确认，不由系统管理员代替决定。',
       doneWhen: '员工本人验证通过，设置和操作记录可查，无关入口已收回。',
     },
-    cautions: [
-      '系统管理员不会自动获得业务办理权限。',
-      '停用账号会阻止登录，但不会删除历史业务记录。',
-      '只分配完成工作所需的岗位和页面，避免无关入口增加误操作。',
-    ],
-    questions: [
-      ...commonQuestions,
-      {
-        question: '员工登录后看不到页面怎么办？',
-        answer:
-          '先核对账号是否启用、岗位是否正确、页面是否已分配；保存后让员工重新登录或等待页面自动同步。',
-      },
-      {
-        question: '能否直接替员工办理业务？',
-        answer:
-          '系统管理员只负责系统设置。需要办理业务时，应另行分配真实业务岗位和所需页面，并由实际负责人操作。',
-      },
-    ],
+    caution: '系统管理员不会自动获得采购、生产、库存、出货或财务办理权限。',
   },
 ])
 
@@ -610,8 +507,6 @@ export const GENERIC_HELP_GUIDE = Object.freeze({
   key: 'generic',
   label: '通用使用帮助',
   headline: '从当前可见页面开始，按来源和状态完成手头工作。',
-  summary:
-    '当前账号使用自定义岗位或尚未配置标准岗位，帮助中心只展示通用操作原则和已经开放的页面。',
   priorities: [],
   workflow: [
     '先从工作台或当前可见页面查看待处理事项。',
@@ -632,12 +527,7 @@ export const GENERIC_HELP_GUIDE = Object.freeze({
     returnTo: '退回系统管理员和实际业务负责人共同核对。',
     doneWhen: '责任岗位、可用页面和下一步均已明确，没有发生试探性修改。',
   },
-  cautions: [
-    '不要通过猜测修改不熟悉的业务记录。',
-    '页面未开放的操作需要由对应岗位办理。',
-    '遇到异常先保留来源单号和页面提示，再联系负责人。',
-  ],
-  questions: commonQuestions,
+  caution: '不要猜着修改不熟悉的业务记录；先保留单号和页面提示。',
 })
 
 export function getRoleHelpGuide(roleKey = '') {

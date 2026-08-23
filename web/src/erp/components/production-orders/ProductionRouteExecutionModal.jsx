@@ -842,11 +842,9 @@ export default function ProductionRouteExecutionModal({
             {executionMode === PRODUCTION_WIP_EXECUTION_MODE.OUTSOURCED ? (
               <>
                 {outsourcingLoadState === 'loading' ? (
-                  <Alert
-                    showIcon
-                    type="info"
-                    message="正在读取已确认加工合同的未关闭明细……"
-                  />
+                  <div className="erp-business-inline-note" role="status">
+                    正在读取已确认加工合同的未关闭明细…
+                  </div>
                 ) : null}
                 {outsourcingLoadState === 'error' ? (
                   <Alert
@@ -878,11 +876,11 @@ export default function ProductionRouteExecutionModal({
                           message={`暂无一份已确认加工合同能同时覆盖 ${fabricMaterialRequirements.length} 项布料需求。每项都必须在同一合同中有材料、工序、单位和数量完全一致的未关闭明细。`}
                         />
                       ) : (
-                        <Alert
-                          showIcon
-                          type="success"
-                          message={`已找到 ${fabricContractOptions.length} 份可完整覆盖 ${fabricMaterialRequirements.length} 项布料需求的合同；提交时后端仍会逐项复核。`}
-                        />
+                        <div className="erp-business-inline-note" role="note">
+                          已找到 {fabricContractOptions.length} 份可完整覆盖{' '}
+                          {fabricMaterialRequirements.length}{' '}
+                          项布料需求的合同，提交时会再次核对。
+                        </div>
                       )}
                       <Form.Item
                         name="fabric_contract_order_id"
@@ -1006,11 +1004,9 @@ export default function ProductionRouteExecutionModal({
                             )
                           })
                         : null}
-                      <Alert
-                        showIcon
-                        type="info"
-                        message="布料加工按生产明细整单外发，不在首道拆批。保存安排后，外发开工前还必须把合同对应材料发料过账；系统会复核每项数量和库存批次。"
-                      />
+                      <div className="erp-business-inline-note" role="note">
+                        布料加工按生产明细整单外发，不在首道拆批。保存安排后，外发开工前还必须把合同对应材料发料过账。
+                      </div>
                     </>
                   ) : (
                     <>
@@ -1021,11 +1017,10 @@ export default function ProductionRouteExecutionModal({
                           message="暂无完全匹配的加工合同明细。候选必须来自已确认合同的未关闭产品行，且产品、规格、工序、单位和数量与当前批次一致。"
                         />
                       ) : (
-                        <Alert
-                          showIcon
-                          type="success"
-                          message={`已按产品、规格、工序、单位和当前批次数量筛出 ${normalizedOutsourcingItemOptions.length} 条候选；提交时后端仍会最终复核。`}
-                        />
+                        <div className="erp-business-inline-note" role="note">
+                          已筛出 {normalizedOutsourcingItemOptions.length}{' '}
+                          条匹配当前批次的合同明细，提交时会再次核对。
+                        </div>
                       )}
                       <Form.Item
                         name="outsourcing_order_item_id"
@@ -1077,11 +1072,9 @@ export default function ProductionRouteExecutionModal({
                 ) : null}
               </>
             ) : (
-              <Alert
-                showIcon
-                type="info"
-                message="本厂生产使用车间移交 / WIP 转移；只有外发加工完成返回才登记回仓。需要分开安排时，请先拆分批次。"
-              />
+              <div className="erp-business-inline-note" role="note">
+                本厂生产使用车间移交；外发加工完成返回才登记回仓。需要分开安排时，请先拆分批次。
+              </div>
             )}
           </>
         ) : null}
@@ -1102,11 +1095,9 @@ export default function ProductionRouteExecutionModal({
         ) : null}
 
         {activeAction === PRODUCTION_WIP_ACTION.START_OPERATION ? (
-          <Alert
-            showIcon
-            type="info"
-            message="开始后该批次进入当前工序；后续工序仍需按顺序办理。"
-          />
+          <div className="erp-business-inline-note" role="note">
+            开始后该批次进入当前工序，后续工序仍需按顺序办理。
+          </div>
         ) : null}
 
         {activeAction === PRODUCTION_WIP_ACTION.CANCEL_BATCH ? (
@@ -1129,11 +1120,11 @@ export default function ProductionRouteExecutionModal({
         ) : null}
 
         {activeAction === PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION ? (
-          <Alert
-            showIcon
-            type="info"
-            message={`当前批次已检验合格，将通过车间移交 / WIP 转移进入${productionWipOperationLabel(nextOperation)}。完工或回仓不会自动跳到下道工序。`}
-          />
+          <div className="erp-business-inline-note" role="note">
+            当前批次已检验合格，将移交进入
+            {productionWipOperationLabel(nextOperation)}
+            ；完工或回仓不会自动跳到下道工序。
+          </div>
         ) : null}
 
         {activeAction === PRODUCTION_WIP_ACTION.CONFIRM_PACKAGING_MATERIAL ? (
@@ -1266,33 +1257,19 @@ export default function ProductionRouteExecutionModal({
       destroyOnHidden
     >
       {assignmentOnly ? (
-        <Alert
-          showIcon
-          type="info"
-          message="保存后只更新生产批次的加工安排，不会自动完成当前任务，也不会登记完工、回仓、质检或库存。"
-        />
+        <div className="erp-business-inline-note" role="note">
+          保存后只更新加工安排，不会自动完成当前任务，也不会登记完工、回仓、质检或库存。
+        </div>
       ) : (
-        <>
-          <Alert
-            showIcon
-            type="info"
-            message="固定顺序：布料加工 → 车缝 → 手工 → 包装。正常首道布料加工固定按生产明细整单外发，裁片返工按返工批次处理；车缝、手工两道分别独立决定本厂或外发，包装在本厂完成；特别是先车缝、后手工。"
-          />
-          <Alert
-            showIcon
-            type="warning"
-            message="本页只显示质量关口状态；检验判定仍由品质人员到“质量检验”办理。内部流转叫车间移交 / WIP 转移，外发完成返回才叫回仓。"
-            style={{ marginTop: 12 }}
-          />
-        </>
+        <div className="erp-business-inline-note" role="note">
+          按布料加工 → 车缝 → 手工 →
+          包装顺序办理；车缝、手工两道分别独立决定本厂或外发，包装在本厂完成；质量判定由品质人员在“质量检验”办理。
+        </div>
       )}
       {orderStatus === 'CLOSED' ? (
-        <Alert
-          showIcon
-          type="info"
-          message="当前订单已关闭，仅“成品返工补制”批次可以继续办理；原生产批次保持只读。成品返工如需撤销，请回到返工记录办理。"
-          style={{ marginTop: 12 }}
-        />
+        <div className="erp-business-inline-note" role="note">
+          当前订单已关闭；原生产批次只读，仅“成品返工补制”批次可以继续办理。成品返工如需撤销，请回到返工记录办理。
+        </div>
       ) : null}
       <Descriptions
         size="small"
@@ -1638,17 +1615,13 @@ export default function ProductionRouteExecutionModal({
                 </Space>
               </Space>
               {isNormalFabricBatch ? (
-                <Alert
-                  showIcon
-                  type="info"
-                  message="布料加工按整单外发，首道不拆批；裁片检验合格并转入车缝后，才可按产品数量拆分为本厂或外发。"
-                />
+                <div className="erp-business-inline-note" role="note">
+                  布料加工按整单外发，首道不拆批；裁片检验合格并转入车缝后，才可按产品数量拆分。
+                </div>
               ) : currentOperation?.operation_code === 'FABRIC_PROCESSING' ? (
-                <Alert
-                  showIcon
-                  type="info"
-                  message="裁片返工按当前返工批次关联一条产品加工合同明细，不重复生成布料发料要求。"
-                />
+                <div className="erp-business-inline-note" role="note">
+                  裁片返工按当前返工批次关联一条产品加工合同明细，不重复生成布料发料要求。
+                </div>
               ) : null}
               {!assignmentOnly ? (
                 <Steps

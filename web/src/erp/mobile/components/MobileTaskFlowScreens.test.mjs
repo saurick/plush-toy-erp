@@ -119,7 +119,6 @@ test('mobile task action screen validates and focuses the first missing field', 
   assert.match(actionScreenSource, /actionChoiceRef\.current\?\.focus\(\)/u)
   assert.match(actionScreenSource, /reasonRef\.current\?\.focus\(\)/u)
   assert.doesNotMatch(actionScreenSource, /现场证据|onEvidenceChange/u)
-  assert.match(actionScreenSource, /任务附件在详情页管理/u)
   assert.match(actionScreenSource, /aria-invalid=/u)
   assert.match(actionScreenSource, /noValidate/u)
   assert.match(actionScreenSource, /min-h-\[48px\]/u)
@@ -282,10 +281,8 @@ test('mobile task list keeps approval in the primary filter row and gates it by 
 })
 
 test('mobile task processing explains business boundaries before submit without repeating developer copy in the receipt', () => {
-  assert.match(
-    actionScreenSource,
-    /提交只更新当前任务；任务附件在详情页管理，库存、质检、出货及财务结果仍在对应单据办理/u
-  )
+  assert.match(actionScreenSource, /getWorkflowTaskActionOutcomeHint/u)
+  assert.match(actionScreenSource, /actionMode: effectiveAction/u)
   assert.doesNotMatch(
     receiptScreenSource,
     /结果边界|流程锚点|未来分支|领域单据|业务事实|审计记录/u
@@ -305,9 +302,25 @@ test('mobile task detail keeps one compact task summary and leaves completion fe
   )
   assert.doesNotMatch(detailScreenSource, />\s*完成反馈\s*</u)
   assert.doesNotMatch(detailScreenSource, />\s*返回列表\s*</u)
+  assert.match(
+    detailScreenSource,
+    /getWorkflowTaskExceptionContactPresentation/u
+  )
+  assert.match(detailScreenSource, /mobile-task-exception-contact/u)
+  assert.match(detailScreenSource, /mobile-task-exception-contact__role/u)
+  assert.match(
+    detailScreenSource,
+    /mobile-task-exception-contact__role font-extrabold/u
+  )
+  assert.match(detailScreenSource, /part\.kind === 'role'/u)
+  assert.doesNotMatch(detailScreenSource, /<strong>异常处理：<\/strong>/u)
+  assert.match(
+    detailScreenSource,
+    /\(isTaskRisk\(selectedTask\) && taskReason\) \|\| exceptionContactHint/u
+  )
 })
 
-test('mobile task detail loads formal process position and marks display-only tasks', () => {
+test('mobile task detail loads formal process position without QA-only banners', () => {
   assert.match(detailScreenSource, /getWorkflowTaskProcessContext/u)
   assert.match(detailScreenSource, /mobile-task-process-context/u)
   assert.match(detailScreenSource, />\s*业务轨迹\s*</u)
@@ -318,8 +331,7 @@ test('mobile task detail loads formal process position and marks display-only ta
   assert.match(processStageSource, /data-testid="workflow-process-stage"/u)
   assert.match(processStageSource, /aria-current=\{item\.current \? 'step'/u)
   assert.match(processStageSource, /data-linked-task=/u)
-  assert.match(detailScreenSource, /模拟任务/u)
-  assert.match(detailScreenSource, /不计入业务流程/u)
+  assert.doesNotMatch(detailScreenSource, /模拟任务|不计入业务流程/u)
   assert.doesNotMatch(detailScreenSource, /<dt[^>]*>来源单据<\/dt>/u)
 })
 
@@ -328,6 +340,10 @@ test('mobile task detail loads current-task records for every task and keeps the
   assert.match(detailScreenSource, /WorkflowTaskEventTrail/u)
   assert.match(detailScreenSource, /showResponsibility=\{false\}/u)
   assert.match(taskEventTrailSource, /本任务处理记录/u)
+  assert.match(taskEventTrailSource, /workflow-task-event-trail__actor-name/u)
+  assert.match(taskEventTrailSource, /workflow-task-event-trail__actor-role/u)
+  assert.match(taskEventTrailSource, /workflow-task-event-trail__meta-time/u)
+  assert.match(taskEventTrailSource, /workflow-task-event-trail__meta-version/u)
   assert.doesNotMatch(taskEventTrailSource, /完整审批链/u)
   assert.match(detailScreenSource, /taskEventsTruncated/u)
   assert.match(detailScreenSource, /truncated=\{taskEventsTruncated\}/u)
@@ -371,7 +387,7 @@ test('mobile task detail separates real attachments from historical text referen
   assert.doesNotMatch(detailScreenSource, /当前任务尚无可显示的处理证据/u)
   assert.ok(
     detailScreenSource.indexOf('mobile-task-attachment-action') <
-      detailScreenSource.indexOf('isDisplayOnlyWorkflowTask(selectedTask)')
+      detailScreenSource.indexOf('>业务轨迹</h2>')
   )
   assert.match(
     roleTaskPageSource,

@@ -172,6 +172,16 @@
   line-height: 1.5;
 }
 
+.workflow-task-event-trail__actor-name {
+  font-weight: 600;
+}
+
+.workflow-task-event-trail__actor-role,
+.workflow-task-event-trail__meta-time,
+.workflow-task-event-trail__meta-version {
+  font-weight: 400;
+}
+
 .workflow-task-event-trail__reason {
   margin-top: 6px;
   padding: 8px 10px;

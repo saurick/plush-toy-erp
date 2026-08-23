@@ -162,7 +162,7 @@ export function formatWorkflowTaskSource(task = {}) {
     task?.payload?.simulated_only === true ||
     String(task.source_type || '') === 'simulated-manual-acceptance-task-batch'
   ) {
-    return '模拟任务批次'
+    return '任务记录'
   }
   const sourceType = String(task.source_type || '').trim()
   const sourceTitle = getWorkflowTaskSourceTypeLabel(sourceType, '')

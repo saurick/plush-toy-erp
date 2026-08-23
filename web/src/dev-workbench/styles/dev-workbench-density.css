@@ -5,6 +5,28 @@
   padding: 12px;
 }
 
+/* Passive DEV facts are supporting context, not warnings. Keep real warning
+   and error alerts unchanged so blocked or destructive states remain obvious. */
+.erp-dev-workspace-page :is(.ant-alert-info, .ant-alert-success) {
+  border: 0;
+  background: transparent;
+  padding: 5px 0;
+}
+
+.erp-dev-workspace-page
+  :is(.ant-alert-info, .ant-alert-success)
+  .ant-alert-icon {
+  display: none;
+}
+
+.erp-dev-workspace-page
+  :is(.ant-alert-info, .ant-alert-success)
+  .ant-alert-message {
+  color: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 :is(
   .erp-dev-hub-header,
   .erp-dev-docs-header,

@@ -79,6 +79,21 @@ test('desktop workbench renders its page shell before the bounded task read fini
   assert.match(source, />\s*重新加载\s*</u)
 })
 
+test('routine task guidance stays readable without repeating an alert icon on every task', () => {
+  const hintStart = source.indexOf('function TaskProcessingHint')
+  const hintEnd = source.indexOf(
+    '\nexport default function DashboardPage',
+    hintStart
+  )
+  const hintSource = source.slice(hintStart, hintEnd)
+
+  assert.ok(hintStart >= 0)
+  assert.ok(hintEnd > hintStart)
+  assert.match(hintSource, /className="erp-task-processing-hint"/u)
+  assert.match(hintSource, /<Text type="secondary">办理提示：<\/Text>/u)
+  assert.doesNotMatch(hintSource, /<Alert|showIcon|系统按任务状态/u)
+})
+
 test('workbench pagination keeps settled rows mounted while the next page loads', () => {
   assert.match(
     source,

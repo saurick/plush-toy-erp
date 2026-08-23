@@ -91,7 +91,7 @@ const navItemRegistry = {
     label: '岗位使用帮助',
     path: '/erp/help-center',
     shortLabel: '帮助',
-    description: '根据当前账号的岗位查看工作重点、办理顺序、交接和常见问题。',
+    description: '根据当前账号的岗位查看常用入口、办理顺序和异常处理。',
     access: 'authenticated',
   },
 }

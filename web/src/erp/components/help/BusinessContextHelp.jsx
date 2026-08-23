@@ -4,7 +4,7 @@ import {
   CheckCircleOutlined,
   QuestionCircleOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Modal, Popover, Tag, Typography } from 'antd'
+import { Button, Modal, Popover, Tag, Typography } from 'antd'
 import {
   BUSINESS_HELP_TYPE_PRESENTATION,
   getBusinessHelpItem,
@@ -98,12 +98,10 @@ function PageGuideContent({ entry }) {
         </section>
       ) : null}
 
-      <Alert
-        showIcon
-        type="warning"
-        message="这页不会自动完成什么"
-        description={entry.boundary}
-      />
+      <details className="erp-business-page-help__boundary">
+        <summary>使用限制</summary>
+        <p>{entry.boundary}</p>
+      </details>
     </div>
   )
 }

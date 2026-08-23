@@ -1,6 +1,105 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { getWorkflowTaskProcessingHint } from './workflowTaskProcessingHint.mjs'
+import {
+  getWorkflowTaskActionOutcomeHint,
+  getWorkflowTaskExceptionContactHint,
+  getWorkflowTaskExceptionContactPresentation,
+  getWorkflowTaskProcessingHint,
+} from './workflowTaskProcessingHint.mjs'
+
+test('exception contact is shown only for a blocked or escalated task', () => {
+  const blockedContact = getWorkflowTaskExceptionContactPresentation({
+    task_status_key: 'blocked',
+    owner_role_key: 'warehouse',
+    escalate_target_role_key: 'pmc',
+  })
+  assert.equal(
+    blockedContact.text,
+    '先联系 仓库岗位；仍无法解决时联系 PMC岗位。'
+  )
+  assert.deepEqual(blockedContact.parts, [
+    { kind: 'text', text: '先联系 ' },
+    { kind: 'role', text: '仓库岗位' },
+    { kind: 'text', text: '；仍无法解决时联系 ' },
+    { kind: 'role', text: 'PMC岗位' },
+    { kind: 'text', text: '。' },
+  ])
+  assert.doesNotMatch(blockedContact.text, /\u00a0|&nbsp;/u)
+  assert.deepEqual(
+    blockedContact.parts
+      .filter((part) => part.kind === 'role')
+      .map((part) => part.text),
+    ['仓库岗位', 'PMC岗位']
+  )
+  assert.equal(
+    getWorkflowTaskExceptionContactHint({
+      task_status_key: 'blocked',
+      owner_role_key: 'warehouse',
+      escalate_target_role_key: 'pmc',
+    }),
+    blockedContact.text
+  )
+  assert.equal(
+    getWorkflowTaskExceptionContactHint({
+      task_status_key: 'ready',
+      owner_role_key: 'sales',
+      escalate_target_role_key: 'finance',
+      is_escalated: true,
+    }),
+    '请联系 财务岗位，确认处理。'
+  )
+  assert.equal(
+    getWorkflowTaskExceptionContactHint({
+      task_status_key: 'blocked',
+      owner_role_key: 'pmc',
+    }),
+    '请联系 PMC岗位，确认卡点和恢复条件。'
+  )
+  assert.equal(
+    getWorkflowTaskExceptionContactHint({
+      task_status_key: 'ready',
+      owner_role_key: 'sales',
+    }),
+    ''
+  )
+})
+
+test('action outcome explains automatic flow without guessing a future person', () => {
+  const processTask = {
+    process_instance_id: 12,
+    owner_role_key: 'purchase',
+    escalate_target_role_key: 'boss',
+  }
+
+  assert.equal(
+    getWorkflowTaskActionOutcomeHint({
+      task: processTask,
+      actionMode: 'done',
+    }),
+    '确认后系统会按本次结果自动流转；提交成功后以业务进度和对应业务单据为准。'
+  )
+  assert.equal(
+    getWorkflowTaskActionOutcomeHint({
+      task: processTask,
+      actionMode: 'blocked',
+    }),
+    '确认后任务会标记为受阻；先联系 采购岗位，仍无法解决时联系 老板岗位，不会改变业务单据。'
+  )
+  assert.equal(
+    getWorkflowTaskActionOutcomeHint({
+      task: processTask,
+      actionMode: 'assign',
+    }),
+    '确认后只改变处理人，负责岗位和流程保持不变。'
+  )
+  assert.equal(
+    getWorkflowTaskActionOutcomeHint({
+      task: { owner_role_key: 'quality' },
+      actionMode: 'complete',
+    }),
+    '确认后只完成当前任务；相关业务是否办结以对应业务页面为准。'
+  )
+})
 
 test('processing hint reports access loading and failure without guessing an action', () => {
   const task = { task_status_key: 'ready' }

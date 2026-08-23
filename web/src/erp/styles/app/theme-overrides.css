@@ -369,6 +369,12 @@
   color: var(--erp-text-muted);
 }
 
+[data-erp-theme='dark']
+  .erp-task-action-drawer__responsibility
+  .erp-task-action-drawer__responsibility-role {
+  color: var(--erp-text);
+}
+
 [data-erp-theme='dark'] .erp-task-action-drawer__title,
 [data-erp-theme='dark'] .erp-task-action-drawer__section-title,
 [data-erp-theme='dark'] .erp-task-action-drawer__task-title.ant-typography,
@@ -603,8 +609,7 @@
   box-shadow: 0 28px 70px rgb(0 0 0 / 0.38);
 }
 
-[data-erp-theme='dark'] .erp-login-logo__title,
-[data-erp-theme='dark'] .erp-login-card__title.ant-typography {
+[data-erp-theme='dark'] .erp-login-logo__title {
   color: var(--erp-text);
 }
 

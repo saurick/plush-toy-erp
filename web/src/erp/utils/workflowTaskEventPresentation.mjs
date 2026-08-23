@@ -207,6 +207,8 @@ export function presentWorkflowTaskEvent(
       `${normalizedText(event.event_type) || 'event'}-${index}`,
     ...presentation,
     actorLabel,
+    actorName,
+    actorRoleLabel,
     actorRoleKey,
     reason: normalizedText(event.reason),
     timeLabel: formatWorkflowTaskEventTime(event.created_at),

@@ -277,11 +277,23 @@ export function buildWorkflowProcessStageModel(value) {
   const currentLabels = items
     .filter((item) => item.current)
     .map((item) => item.label)
+  const linkedNodeCompleted = completedNodeIDs.has(linkedNodeID)
+  const currentNodesAreSystemOnly =
+    context.current_nodes.length > 0 &&
+    context.current_nodes.every((node) => node.node_type === 'domain_command')
   let handoffLabel = ''
   if (counts.blocked > 0) {
-    handoffLabel = `当前受阻阶段：${currentLabels.join('、')}`
+    handoffLabel = linkedNodeCompleted
+      ? `系统已流转到${currentLabels.join('、')}，当前受阻。`
+      : `当前受阻阶段：${currentLabels.join('、')}`
   } else if (currentLabels.length > 0) {
-    handoffLabel = `当前办理阶段：${currentLabels.join('、')}`
+    if (linkedNodeCompleted) {
+      handoffLabel = `系统已自动流转到：${currentLabels.join('、')}。`
+    } else if (currentNodesAreSystemOnly) {
+      handoffLabel = `系统正在自动处理：${currentLabels.join('、')}。`
+    } else {
+      handoffLabel = `当前办理阶段：${currentLabels.join('、')}`
+    }
   } else if (context.process_instance.status === 'completed') {
     handoffLabel = counts.rejected > 0 ? '流程已退回结束。' : '流程已结束。'
   } else {

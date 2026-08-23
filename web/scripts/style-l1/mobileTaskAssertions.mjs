@@ -1543,6 +1543,10 @@ export function createMobileTaskAssertions(deps) {
       true,
       `${scenarioName} 进入处理页后应选中推荐的完成动作`
     )
+    await expectText(
+      actionScreen,
+      '确认后只完成当前任务；相关业务是否办结以对应业务页面为准。'
+    )
     assert.equal(
       await actionScreen
         .getByTestId('mobile-task-action-options')

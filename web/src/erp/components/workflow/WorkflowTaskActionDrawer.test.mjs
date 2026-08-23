@@ -15,6 +15,12 @@ const taskEventTrailSource = readFileSync(
   fileURLToPath(new URL('./WorkflowTaskEventTrail.jsx', import.meta.url)),
   'utf8'
 )
+const processingHintSource = readFileSync(
+  fileURLToPath(
+    new URL('../../utils/workflowTaskProcessingHint.mjs', import.meta.url)
+  ),
+  'utf8'
+)
 
 test('task action drawer exposes real clickable steps without using actions as navigation', () => {
   assert.match(source, /role="tablist"/u)
@@ -51,7 +57,19 @@ test('task actions are selectable options and confirmation is separately gated',
   assert.match(source, /催办只是处理方式之一/u)
   assert.match(source, /disabled=\{actionSaving \|\| !canConfirm\}/u)
   assert.match(source, /activeStepKey === 'confirm'/u)
-  assert.match(source, /确认后只更新当前任务/u)
+  assert.match(source, /<strong>提交后会发生什么<\/strong>/u)
+  assert.match(source, /<span>\{actionOutcomeHint\}<\/span>/u)
+  assert.match(source, /className="erp-task-action-drawer__outcome-note"/u)
+  const outcomeNoteStart = source.indexOf(
+    'className="erp-task-action-drawer__outcome-note"'
+  )
+  const outcomeNoteEnd = source.indexOf('</div>', outcomeNoteStart)
+  assert.ok(outcomeNoteStart >= 0)
+  assert.ok(outcomeNoteEnd > outcomeNoteStart)
+  assert.doesNotMatch(
+    source.slice(outcomeNoteStart, outcomeNoteEnd),
+    /showIcon/u
+  )
   assert.doesNotMatch(
     source,
     /onClick=\{\(\) => selectAction\('urge',[\s\S]{0,80}下一步/u
@@ -114,7 +132,7 @@ test('task action drawer separates business trajectory from current-task process
   assert.match(source, /showResponsibility=\{false\}/u)
 })
 
-test('task action drawer shows task-scoped process position and marks display-only tasks', () => {
+test('task action drawer shows task-scoped process position without exposing QA-only copy', () => {
   assert.match(source, /getWorkflowTaskProcessContext\(task\.id/u)
   assert.match(source, /业务流程/u)
   assert.match(source, /业务进度/u)
@@ -130,11 +148,11 @@ test('task action drawer shows task-scoped process position and marks display-on
   assert.match(processStageSource, /item\.attemptLabel/u)
   assert.match(source, /task\?\.process_node_instance_id/u)
   assert.match(source, /task\?\.version/u)
-  assert.match(source, /模拟展示数据/u)
-  assert.match(source, /不计入流程闭环证据/u)
+  assert.doesNotMatch(source, /模拟展示数据|不计入流程闭环证据/u)
 })
 
 test('task action drawer keeps one compact business-facing task summary', () => {
+  assert.match(source, /const \{ Paragraph, Text, Title \} = Typography/u)
   assert.match(source, /getWorkflowTaskDisplayName\(task\)/u)
   assert.match(
     source,
@@ -153,6 +171,29 @@ test('task action drawer keeps one compact business-facing task summary', () => 
   assert.doesNotMatch(source, /erp-task-action-drawer__guide-note/u)
   assert.doesNotMatch(source, /核对任务信息|核对审批事项|处理范围：/u)
   assert.doesNotMatch(source, />\s*关闭\s*<\/Button>/u)
+  assert.match(source, /getWorkflowTaskExceptionContactPresentation\(task\)/u)
+  assert.match(
+    source,
+    /<span>\{taskReason \? '当前原因' : '处理建议'\}<\/span>/u
+  )
+  assert.match(source, /erp-task-action-drawer__responsibility-role/u)
+  assert.match(source, /erp-task-action-drawer__responsibility-person/u)
+  assert.match(source, /erp-task-action-drawer__reason-contact-role/u)
+  assert.match(source, /part\.kind === 'role'/u)
+  assert.doesNotMatch(source, /font-style:\s*italic/u)
+  const taskSummaryStart = source.indexOf(
+    '<section className="erp-task-action-drawer__summary erp-task-action-drawer__summary--task">'
+  )
+  const taskSummaryEnd = source.indexOf(
+    '{task.process_instance_id ? (',
+    taskSummaryStart
+  )
+  const taskSummarySource = source.slice(taskSummaryStart, taskSummaryEnd)
+  assert.ok(taskSummaryStart >= 0)
+  assert.ok(taskSummaryEnd > taskSummaryStart)
+  assert.doesNotMatch(taskSummarySource, /showIcon/u)
+  assert.doesNotMatch(taskSummarySource, /<Alert/u)
+  assert.doesNotMatch(taskSummarySource, /模拟展示数据|仅用于检查/u)
 })
 
 test('task action drawer submits formal approvals only from the authoritative runtime form', () => {
@@ -188,5 +229,9 @@ test('task transfer is an explicit scoped action with person and pool destinatio
   )
   assert.match(source, /任务信息已更新，请刷新任务列表/u)
   assert.match(source, /不会使用旧版本的转交候选人/u)
-  assert.match(source, /确认后只改变任务归属/u)
+  assert.match(
+    source,
+    /getWorkflowTaskActionOutcomeHint\(\{ task, actionMode \}\)/u
+  )
+  assert.match(processingHintSource, /确认后只改变处理人/u)
 })

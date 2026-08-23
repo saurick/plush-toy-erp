@@ -18,6 +18,10 @@ import {
   getWorkflowTaskStatusMeta,
 } from '../../utils/workflowTaskBoard.mjs'
 import {
+  getWorkflowTaskActionOutcomeHint,
+  getWorkflowTaskExceptionContactPresentation,
+} from '../../utils/workflowTaskProcessingHint.mjs'
+import {
   getWorkflowTaskActionStepAvailability,
   isWorkflowTaskActionReady,
   moveWorkflowTaskActionStep,
@@ -39,7 +43,6 @@ import {
   getProcessLabel,
   getProcessStatusLabel,
   getWorkflowTaskDisplayName,
-  isDisplayOnlyWorkflowTask,
 } from '../../utils/processRuntimePresentation.mjs'
 import {
   buildWorkflowAssignmentSelectOptions,
@@ -52,7 +55,7 @@ import BusinessAttachmentModalButton from '../business-list/BusinessAttachmentMo
 import WorkflowProcessStageTrack from './WorkflowProcessStageTrack.jsx'
 import WorkflowTaskEventTrail from './WorkflowTaskEventTrail.jsx'
 
-const { Paragraph, Title } = Typography
+const { Paragraph, Text, Title } = Typography
 const { TextArea } = Input
 
 export const TASK_ACTION_META = Object.freeze({
@@ -96,13 +99,33 @@ export const TASK_ACTION_META = Object.freeze({
 
 export function getWorkflowTaskActionMeta(task = {}, actionMode = '') {
   const base = TASK_ACTION_META[actionMode]
-  if (!base || !isWorkflowApprovalTask(task)) return base || null
+  if (!base) return null
+
+  const processLinked = Number(task?.process_instance_id || 0) > 0
+  if (!isWorkflowApprovalTask(task)) {
+    if (!processLinked) return base
+    if (actionMode === 'complete') {
+      return {
+        ...base,
+        successMessage: '任务已处理完成，系统已按结果自动流转',
+      }
+    }
+    if (actionMode === 'reject') {
+      return {
+        ...base,
+        successMessage: '任务已退回，系统已按结果自动流转',
+      }
+    }
+    return base
+  }
   if (actionMode === 'complete') {
     return {
       ...base,
       title: '审批通过',
       buttonLabel: '确认通过',
-      successMessage: '审批已通过',
+      successMessage: processLinked
+        ? '审批已通过，系统已按结果自动流转'
+        : '审批已通过',
       requireReason: true,
     }
   }
@@ -111,7 +134,9 @@ export function getWorkflowTaskActionMeta(task = {}, actionMode = '') {
       ...base,
       title: '审批退回',
       buttonLabel: '确认退回',
-      successMessage: '审批已退回',
+      successMessage: processLinked
+        ? '审批已退回，系统已按结果自动流转'
+        : '审批已退回',
     }
   }
   return base
@@ -204,10 +229,14 @@ export default function WorkflowTaskActionDrawer({
     (assignmentAccess.current_assignee
       ? formatAdminIdentity(assignmentAccess.current_assignee)
       : '') || (task?.assignee_id ? '已指定处理人' : '共同待办')
-  const responsibilityLabel = [ownerRoleLabel, currentAssigneeLabel]
-    .filter(Boolean)
-    .join(' · ')
   const taskDisplayName = task ? getWorkflowTaskDisplayName(task) : ''
+  const exceptionContact = task
+    ? getWorkflowTaskExceptionContactPresentation(task)
+    : { parts: [], text: '' }
+  const exceptionContactHint = exceptionContact.text
+  const actionOutcomeHint = task
+    ? getWorkflowTaskActionOutcomeHint({ task, actionMode })
+    : ''
   const canOpenRelatedEntry = Boolean(task && canOpenEntry && onOpenEntry)
   const allowedActionModeSet = new Set(allowedActionModes)
   const canSubmitAction = Boolean(
@@ -620,26 +649,58 @@ export default function WorkflowTaskActionDrawer({
               </div>
               <div>
                 <span>负责人</span>
-                <strong>{responsibilityLabel || '-'}</strong>
+                <strong className="erp-task-action-drawer__responsibility">
+                  {ownerRoleLabel ? (
+                    <span className="erp-task-action-drawer__responsibility-role">
+                      {ownerRoleLabel}
+                    </span>
+                  ) : null}
+                  {ownerRoleLabel && currentAssigneeLabel ? (
+                    <span
+                      className="erp-task-action-drawer__responsibility-separator"
+                      aria-hidden="true"
+                    >
+                      ·
+                    </span>
+                  ) : null}
+                  {currentAssigneeLabel ? (
+                    <span className="erp-task-action-drawer__responsibility-person">
+                      {currentAssigneeLabel}
+                    </span>
+                  ) : null}
+                  {!ownerRoleLabel && !currentAssigneeLabel ? '-' : null}
+                </strong>
               </div>
               <div>
                 <span>截止时间</span>
                 <strong>{getWorkflowTaskDueLabel(task)}</strong>
               </div>
             </div>
-            {taskReason ? (
+            {taskReason || exceptionContactHint ? (
               <div className="erp-task-action-drawer__reason">
-                <span>当前原因</span>
-                <strong>{taskReason}</strong>
+                <span>{taskReason ? '当前原因' : '处理建议'}</span>
+                {taskReason ? <strong>{taskReason}</strong> : null}
+                {exceptionContactHint ? (
+                  <span className="erp-task-action-drawer__reason-contact">
+                    {exceptionContact.parts.map((part, index) =>
+                      part.kind === 'role' ? (
+                        <strong
+                          className="erp-task-action-drawer__reason-contact-role"
+                          key={`${part.kind}-${part.text}-${index}`}
+                        >
+                          {part.text}
+                        </strong>
+                      ) : (
+                        <React.Fragment
+                          key={`${part.kind}-${part.text}-${index}`}
+                        >
+                          {part.text}
+                        </React.Fragment>
+                      )
+                    )}
+                  </span>
+                ) : null}
               </div>
-            ) : null}
-            {isDisplayOnlyWorkflowTask(task) ? (
-              <Alert
-                type="warning"
-                showIcon
-                message="模拟展示数据"
-                description="这条任务只用于检查列表和办理界面，未接入真实流程，不计入流程闭环证据。"
-              />
             ) : null}
           </section>
 
@@ -655,7 +716,9 @@ export default function WorkflowTaskActionDrawer({
                 业务进度
               </h3>
               {processContextState === 'loading' ? (
-                <Alert type="info" showIcon message="正在读取业务进度" />
+                <Text type="secondary" role="status">
+                  正在读取业务进度
+                </Text>
               ) : processContextState === 'error' ? (
                 <Alert
                   type="error"
@@ -767,7 +830,9 @@ export default function WorkflowTaskActionDrawer({
             className="erp-task-action-drawer__step-panel"
           >
             {actionAvailabilityLoading ? (
-              <Alert type="info" showIcon message="正在确认可用的处理方式" />
+              <Text type="secondary" role="status">
+                正在确认可用的处理方式
+              </Text>
             ) : !canChooseActions ? (
               <Alert
                 type="warning"
@@ -939,12 +1004,9 @@ export default function WorkflowTaskActionDrawer({
                   ) : null}
                   {processDecisionRequired &&
                   processContextState === 'loading' ? (
-                    <Alert
-                      type="info"
-                      showIcon
-                      message="正在核对当前流程的审批表单"
-                      description="核对完成前不会提交审批决策。"
-                    />
+                    <Text type="secondary" role="status">
+                      正在核对当前流程的审批表单，核对完成前不能提交。
+                    </Text>
                   ) : processDecisionRequired && !processApprovalForm ? (
                     <Alert
                       type="error"
@@ -1065,20 +1127,14 @@ export default function WorkflowTaskActionDrawer({
                     </>
                   ) : null}
                 </dl>
-                <Alert
-                  type={actionTone === 'danger' ? 'warning' : 'info'}
-                  showIcon
-                  message={
-                    actionMode === 'assign'
-                      ? '确认后只改变任务归属'
-                      : '确认后只更新当前任务'
-                  }
-                  description={
-                    actionMode === 'assign'
-                      ? '任务状态保持不变，也不会代替接收人完成库存、出货、财务等业务办理。'
-                      : '库存、出货、应收、开票和付款仍需进入对应业务页面办理。'
-                  }
-                />
+                <div
+                  className="erp-task-action-drawer__outcome-note"
+                  data-tone={actionTone === 'danger' ? 'warning' : 'info'}
+                  role="note"
+                >
+                  <strong>提交后会发生什么</strong>
+                  <span>{actionOutcomeHint}</span>
+                </div>
               </div>
             ) : null}
           </section>

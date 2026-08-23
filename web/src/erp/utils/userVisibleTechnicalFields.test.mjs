@@ -599,8 +599,8 @@ test('权限中心角色展示不把 role_key 当用户可见 fallback', () => {
     content,
     /canReadUsers\s*\?\s*` · \$\{selectedRoleAdmins\.length\} 个账号`/u
   )
-  assert.match(content, /多个岗位会合并最终有效权限/u)
-  assert.match(content, /页面可见不代表拥有页面内全部按钮/u)
+  assert.match(content, /员工有多个岗位时[\s\S]*再合并结果/u)
+  assert.match(content, /可进入只表示具备页面入口，页面内每项操作仍会单独校验/u)
   assert.doesNotMatch(content, /岗位任务端/u)
 })
 

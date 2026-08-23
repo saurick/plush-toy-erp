@@ -4,19 +4,9 @@ import {
   CheckCircleOutlined,
   ExclamationCircleOutlined,
   MobileOutlined,
-  QuestionCircleOutlined,
   SwapOutlined,
 } from '@ant-design/icons'
-import {
-  Alert,
-  Button,
-  Card,
-  Collapse,
-  Select,
-  Space,
-  Tag,
-  Typography,
-} from 'antd'
+import { Button, Card, Empty, Select, Space, Tag, Typography } from 'antd'
 import {
   useNavigate,
   useOutletContext,
@@ -105,9 +95,6 @@ export default function HelpCenterPage() {
             <Title level={2} className="erp-help-center-hero__title">
               {selectedGuide.headline}
             </Title>
-            <Paragraph className="erp-help-center-hero__summary">
-              {selectedGuide.summary}
-            </Paragraph>
           </div>
 
           {guides.length > 1 ? (
@@ -149,20 +136,11 @@ export default function HelpCenterPage() {
       </Card>
 
       {guides.length > 1 ? (
-        <Alert
-          type="info"
-          showIcon
-          message="当前账号有多个岗位"
-          description={`现在显示“${selectedGuide.label}”的办理说明。这里仅切换说明内容，不会改变当前登录账号的岗位或权限；实际可办理动作仍以当前账号权限为准。`}
-        />
+        <Text type="secondary" className="erp-help-center-role-note">
+          当前查看“{selectedGuide.label}
+          ”说明；切换这里只查看说明，不改变岗位或权限。
+        </Text>
       ) : null}
-
-      <Alert
-        type="info"
-        showIcon
-        message="业务页面里也能随手查看说明"
-        description="页面右上角的“这页怎么用”会说明当前任务、完成标准、办理顺序和交接对象；金额、比例、字段来源等局部内容可点名称旁的问号。不能操作的原因、高风险提醒和必须交给谁处理的事项仍会直接显示。"
-      />
 
       <section aria-labelledby="help-priorities-title">
         <div className="erp-help-center-section-head">
@@ -198,11 +176,9 @@ export default function HelpCenterPage() {
             ))}
           </div>
         ) : (
-          <Alert
-            type="info"
-            showIcon
-            message="当前没有可直接打开的常用入口"
-            description="请从左侧当前可见页面开始工作；如页面与实际职责不符，请联系系统管理员核对岗位设置。"
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description="当前岗位没有常用入口，请从左侧可见页面开始"
           />
         )}
       </section>
@@ -214,7 +190,7 @@ export default function HelpCenterPage() {
         >
           <div className="erp-help-center-card-heading">
             <CheckCircleOutlined aria-hidden="true" />
-            <Title level={4}>正常办理案例</Title>
+            <Title level={4}>正常怎么做</Title>
           </div>
           <ol className="erp-help-center-workflow">
             {selectedGuide.workflow.map((step, index) => (
@@ -265,32 +241,12 @@ export default function HelpCenterPage() {
             <Text type="secondary">异常完成标准</Text>
             <strong>{selectedGuide.exception.doneWhen}</strong>
           </div>
-          <div className="erp-help-center-card-heading erp-help-center-card-heading--secondary">
-            <ExclamationCircleOutlined aria-hidden="true" />
-            <Title level={4}>操作时要注意</Title>
+          <div className="erp-help-center-result">
+            <Text type="secondary">特别注意</Text>
+            <strong>{selectedGuide.caution}</strong>
           </div>
-          <ul className="erp-help-center-cautions">
-            {selectedGuide.cautions.map((caution) => (
-              <li key={caution}>{caution}</li>
-            ))}
-          </ul>
         </Card>
       </div>
-
-      <Card className="erp-page-card erp-help-center-faq" variant="borderless">
-        <div className="erp-help-center-card-heading">
-          <QuestionCircleOutlined aria-hidden="true" />
-          <Title level={4}>常见问题</Title>
-        </div>
-        <Collapse
-          ghost
-          items={selectedGuide.questions.map((item, index) => ({
-            key: `${selectedGuide.key}-${index}`,
-            label: item.question,
-            children: <Paragraph>{item.answer}</Paragraph>,
-          }))}
-        />
-      </Card>
     </div>
   )
 }

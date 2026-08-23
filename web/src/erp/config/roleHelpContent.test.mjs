@@ -28,7 +28,6 @@ test('roleHelpContent: 覆盖九个业务岗位和系统管理员且正文各不
   ROLE_HELP_GUIDES.forEach((guide) => {
     assert(guide.label)
     assert(guide.headline)
-    assert(guide.summary)
     assert(guide.priorities.length >= 2)
     assert(guide.workflow.length >= 4)
     assert(guide.completion)
@@ -38,8 +37,10 @@ test('roleHelpContent: 覆盖九个业务岗位和系统管理员且正文各不
     assert(guide.exception?.steps?.length >= 2)
     assert(guide.exception?.returnTo)
     assert(guide.exception?.doneWhen)
-    assert(guide.cautions.length >= 3)
-    assert(guide.questions.length >= 2)
+    assert(guide.caution)
+    assert.equal('summary' in guide, false)
+    assert.equal('cautions' in guide, false)
+    assert.equal('questions' in guide, false)
     contentSignatures.add(
       JSON.stringify([
         guide.headline,
@@ -48,39 +49,15 @@ test('roleHelpContent: 覆盖九个业务岗位和系统管理员且正文各不
         guide.completion,
         guide.handoff,
         guide.exception,
-        guide.cautions,
+        guide.caution,
       ])
     )
   })
   assert.equal(contentSignatures.size, ROLE_HELP_GUIDES.length)
-  assert(
-    ROLE_HELP_GUIDES[0].questions.some(
-      (item) =>
-        item.question === '页面里没有需要的按钮怎么办？' &&
-        item.answer.includes('不代表拥有页面内所有操作')
-    )
-  )
-  assert(
-    ROLE_HELP_GUIDES[0].questions.some(
-      (item) =>
-        item.question === '常用工作里没找到页面怎么办？' &&
-        item.answer.includes('更多功能') &&
-        item.answer.includes('管理员菜单的相同模块分组') &&
-        item.answer.includes('同一菜单分组内的顺序')
-    )
-  )
-  assert(
-    ROLE_HELP_GUIDES.every((guide) =>
-      guide.questions.some(
-        (item) =>
-          item.question ===
-            '页面里的专业词、金额或自动带入内容看不懂怎么办？' &&
-          item.answer.includes('这页怎么用') &&
-          item.answer.includes('名称旁的问号') &&
-          item.answer.includes('直接显示')
-      )
-    )
-  )
+  assert(GENERIC_HELP_GUIDE.caution)
+  assert.equal('summary' in GENERIC_HELP_GUIDE, false)
+  assert.equal('cautions' in GENERIC_HELP_GUIDE, false)
+  assert.equal('questions' in GENERIC_HELP_GUIDE, false)
 })
 
 test('roleHelpContent: 快捷入口全部来自当前正式导航', () => {

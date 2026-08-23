@@ -59,12 +59,8 @@ test('assignment-only mode is scoped to the trusted rework batch and one mutatio
 })
 
 test('confirmed plush flow and internal versus external wording stay explicit', () => {
-  assert.match(source, /布料加工 → 车缝 → 手工 → 包装/u)
-  assert.match(source, /先车缝、后手工/u)
-  assert.match(source, /车间移交 \/ WIP 转移/u)
-  assert.match(source, /外发完成返回才叫回仓/u)
-  assert.match(source, /正常首道布料加工固定按生产明细整单外发/u)
-  assert.match(source, /裁片返工按返工批次处理/u)
+  assert.match(source, /布料加工 → 车缝 → 手工 →\s*包装/u)
+  assert.match(source, /本厂生产使用车间移交；外发加工完成返回才登记回仓/u)
   assert.match(source, /车缝、手工两道分别独立决定本厂或外发/u)
   assert.match(source, /包装在本厂完成/u)
   assert.doesNotMatch(source, /每道生产工序分别决定本厂或外发/u)
@@ -123,7 +119,7 @@ test('assignment, split and rework preserve quantity and external-contract bound
   assert.match(source, /listAllOutsourcingOrderItems/u)
   assert.match(source, /line_status:\s*'open'/u)
   assert.match(source, /canReadOutsourcingContracts/u)
-  assert.match(source, /提交时后端仍会最终复核/u)
+  assert.match(source, /提交时会再次核对/u)
   assert.match(source, /operation\.operation_code !== 'FABRIC_PROCESSING'/u)
   assert.match(source, /布料加工按整单外发，首道不拆批/u)
   assert.match(source, /转入车缝后，才可按产品数量拆分/u)
@@ -185,7 +181,7 @@ test('closed orders keep normal batches read-only and continue only finished-goo
   assert.match(source, /orderStatus === 'CLOSED'/u)
   assert.match(source, /origin_rework_fact_id/u)
   assert.match(source, /成品返工补制/u)
-  assert.match(source, /原生产批次保持只读/u)
+  assert.match(source, /原生产批次只读/u)
   assert.match(source, /成品返工如需撤销，请回到返工记录办理/u)
   assert.match(
     source,

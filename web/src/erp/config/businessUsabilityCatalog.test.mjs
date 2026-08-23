@@ -117,6 +117,12 @@ test('businessUsabilityCatalog: 关键字段问号可悬停、聚焦和点击且
   assert.match(componentSource, /maxHeight: 'min\(70vh, 680px\)'/u)
   assert.match(componentSource, /overflowY: 'auto'/u)
   assert.match(componentSource, /overscrollBehavior: 'contain'/u)
+  assert.match(
+    componentSource,
+    /<details className="erp-business-page-help__boundary">/u
+  )
+  assert.match(componentSource, /<summary>使用限制<\/summary>/u)
+  assert.doesNotMatch(componentSource, /<Alert|showIcon/u)
 
   const inlineSources = [
     ['web/src/erp/components/sales-orders/SalesOrderForm.jsx', 'line-amount'],

@@ -508,6 +508,31 @@
   padding: 9px 0;
 }
 
+.erp-task-action-drawer__responsibility {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: baseline;
+  font-weight: 400;
+}
+
+.erp-task-action-drawer__responsibility
+  .erp-task-action-drawer__responsibility-role {
+  color: var(--erp-text, #172033);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.erp-task-action-drawer__responsibility-separator {
+  color: var(--erp-text-muted, #98a2b3);
+  font-weight: 400;
+}
+
+.erp-task-action-drawer__responsibility-person {
+  color: var(--erp-text-muted, #64748b);
+  font-weight: 400;
+}
+
 .erp-task-action-drawer__process-meta {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -519,6 +544,39 @@
 
 .erp-task-action-drawer__reason strong {
   color: #b42318;
+}
+
+.erp-task-action-drawer__reason-contact {
+  color: #7f1d1d;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.erp-task-action-drawer__reason .erp-task-action-drawer__reason-contact-role {
+  color: inherit;
+  font-size: inherit;
+  font-weight: 800;
+  line-height: inherit;
+}
+
+.erp-task-action-drawer__outcome-note {
+  display: grid;
+  gap: 4px;
+  border-left: 3px solid var(--erp-primary, #2b8a3e);
+  border-radius: 6px;
+  background: var(--erp-surface-bg-soft, #f7faf7);
+  padding: 9px 11px;
+  color: var(--erp-text-muted, #475569);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.erp-task-action-drawer__outcome-note strong {
+  color: var(--erp-text, #1f2937);
+}
+
+.erp-task-action-drawer__outcome-note[data-tone='warning'] {
+  border-left-color: #d97706;
 }
 
 .erp-task-action-drawer__guide {

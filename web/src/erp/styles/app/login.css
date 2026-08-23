@@ -57,15 +57,12 @@
 }
 
 .erp-login-logo__title {
+  margin: 0;
   color: #204160;
   font-size: clamp(1.45rem, 4vw, 2.1rem);
   font-weight: 800;
   letter-spacing: 0.02em;
   line-height: 1.08;
-}
-
-.erp-login-card__title.ant-typography {
-  margin: 0 !important;
 }
 
 .erp-login-card__theme-toggle.ant-btn {
@@ -228,22 +225,12 @@
   overflow-wrap: anywhere;
 }
 
-.erp-login-sms-privacy-note {
-  margin: -14px 2px 20px;
-  color: #66756c;
-  font-size: 13px;
-  line-height: 1.65;
-}
-
-.erp-login-sms-privacy-note a,
 .erp-login-legal-links a {
   margin: 0 3px;
   color: #237a38;
   font-weight: 700;
 }
 
-.erp-login-sms-privacy-note a:hover,
-.erp-login-sms-privacy-note a:focus-visible,
 .erp-login-legal-links a:hover,
 .erp-login-legal-links a:focus-visible {
   color: #175d29;
@@ -262,12 +249,10 @@
   text-align: center;
 }
 
-[data-erp-theme='dark'] .erp-login-sms-privacy-note,
 [data-erp-theme='dark'] .erp-login-legal-links {
   color: #94a3b8;
 }
 
-[data-erp-theme='dark'] .erp-login-sms-privacy-note a,
 [data-erp-theme='dark'] .erp-login-legal-links a {
   color: #86efac;
 }

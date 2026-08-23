@@ -350,6 +350,23 @@
   margin-bottom: 4px;
 }
 
+.erp-business-inline-note {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 4px 0;
+  color: var(--erp-text-muted, #64748b);
+  font-size: 13px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.erp-business-inline-note .ant-typography {
+  margin: 0;
+}
+
 .erp-business-action-form__field--full.ant-form-item {
   grid-column: 1 / -1;
 }

@@ -7,7 +7,6 @@ import {
   Input,
   Segmented,
   Space,
-  Typography,
 } from 'antd'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import {
@@ -43,8 +42,6 @@ import {
   rememberLoginModePreference,
   rememberSMSLoginSession,
 } from './adminLoginState.mjs'
-
-const { Title } = Typography
 
 function buildLocationPath(locationLike, fallback = '') {
   if (!locationLike) {
@@ -338,20 +335,19 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
           variant="menu"
         />
         <Space direction="vertical" size={16} style={{ width: '100%' }}>
-          <div className="erp-login-logo" aria-label={activeBrand.companyName}>
-            <span className="erp-admin-brand__logo-mark erp-login-logo__mark">
+          <div className="erp-login-logo">
+            <span
+              className="erp-admin-brand__logo-mark erp-login-logo__mark"
+              aria-hidden="true"
+            >
               {activeBrand.brandMark}
             </span>
             <div className="erp-login-logo__copy">
-              <div className="erp-login-logo__title">
+              <h1 className="erp-login-logo__title">
                 {activeBrand.companyName}
-              </div>
+              </h1>
             </div>
           </div>
-
-          <Title level={3} className="erp-login-card__title">
-            {activeBrand.systemName}
-          </Title>
 
           {error ? <Alert type="error" showIcon message={error} /> : null}
           {entryOptions.length === 0 ? (
@@ -465,11 +461,6 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
                     }}
                   />
                 </Form.Item>
-                <div className="erp-login-sms-privacy-note">
-                  手机号仅用于登录验证。获取验证码前，可查看
-                  <Link to="/legal/privacy">个人信息处理规则</Link>
-                  中的短信处理方和保存说明。
-                </div>
                 <Form.Item label="验证码" required>
                   <Space.Compact
                     className="erp-login-sms-code-compact"

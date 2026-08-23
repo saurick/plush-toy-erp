@@ -243,6 +243,36 @@ test('process runtime presentation builds execution trail without inventing futu
   assert.equal('percent' in model, false)
 })
 
+test('process runtime presentation reports the confirmed stage reached after automatic flow', () => {
+  const value = context()
+  const approvalNode = {
+    ...value.nodes[1],
+    status: 'completed',
+    outcome: 'approved',
+  }
+  const systemNode = {
+    id: 13,
+    process_instance_id: 10,
+    node_key: 'activate_sales_order',
+    node_type: 'domain_command',
+    attempt: 1,
+    version: 1,
+    status: 'active',
+  }
+  value.nodes = [value.nodes[0], approvalNode, systemNode]
+  value.current_nodes = [systemNode]
+  value.completed_nodes = [value.nodes[0], approvalNode]
+  value.linked_node = approvalNode
+
+  const model = buildWorkflowProcessStageModel(value)
+  assert.equal(model.handoffLabel, '系统已自动流转到：销售订单生效。')
+  assert.equal(model.hasUndecidedRoute, false)
+  assert.deepEqual(
+    model.items.map((item) => item.label),
+    ['提交销售订单', '订单审批', '销售订单生效']
+  )
+})
+
 test('process runtime presentation keeps blocked and retried stages explicit', () => {
   const value = context()
   const [, currentNode] = value.nodes

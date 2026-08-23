@@ -27,6 +27,15 @@ test('admin login visible copy uses ordinary work entry language', () => {
   }
 })
 
+test('admin login uses the product name as its only visible heading', () => {
+  assert.match(
+    loginPageSource,
+    /<h1 className="erp-login-logo__title">[\s\S]*?\{activeBrand\.companyName\}[\s\S]*?<\/h1>/u
+  )
+  assert.doesNotMatch(loginPageSource, /\{activeBrand\.systemName\}/u)
+  assert.doesNotMatch(loginPageSource, /erp-login-card__title/u)
+})
+
 test('application title fallback uses ordinary Chinese copy', () => {
   assert.match(appSource, /'毛绒玩具管理系统'/u)
   assert.doesNotMatch(appSource, /'Plush Toy ERP'/u)

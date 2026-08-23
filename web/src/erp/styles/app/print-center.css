@@ -2,16 +2,90 @@
   min-height: auto;
 }
 
+.erp-login-card .erp-login-sms-code-compact.ant-space-compact {
+  --erp-login-sms-border: #d1d5db;
+  --erp-login-sms-focus: #8fb39a;
+  --erp-login-sms-focus-ring: rgb(47 143 75 / 0.16);
+  --erp-login-sms-button-bg: #f7f9fa;
+  --erp-login-sms-button-hover-bg: #eef5f0;
+  --erp-login-sms-button-disabled-bg: #f4f6f8;
+  --erp-login-sms-button-color: #204160;
+  --erp-login-sms-button-disabled-color: #8793a1;
+
+  position: relative;
+  align-items: stretch;
+  overflow: hidden;
+  border-radius: var(--erp-control-radius, 12px);
+  background: #ffffff;
+  box-shadow: none;
+  transition: box-shadow 160ms ease;
+}
+
+.erp-login-card .erp-login-sms-code-compact.ant-space-compact::after {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  box-sizing: border-box;
+  border: 1px solid var(--erp-login-sms-border);
+  border-radius: inherit;
+  content: '';
+  pointer-events: none;
+  transition: border-color 160ms ease;
+}
+
+.erp-login-card .erp-login-sms-code-compact.ant-space-compact:hover {
+  --erp-login-sms-border: #b6c5d3;
+}
+
+.erp-login-card .erp-login-sms-code-compact.ant-space-compact:focus-within {
+  --erp-login-sms-border: var(--erp-login-sms-focus);
+
+  box-shadow: 0 0 0 3px var(--erp-login-sms-focus-ring);
+}
+
+#root
+  .erp-login-card
+  .erp-login-sms-code-compact.ant-space-compact
+  > .ant-input.ant-input-lg {
+  flex: 1 1 auto;
+  z-index: 0;
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  box-shadow: none;
+  transition: none;
+}
+
+#root
+  .erp-login-card
+  .erp-login-sms-code-compact.ant-space-compact
+  > .ant-input.ant-input-lg:focus {
+  z-index: 0;
+  border-color: transparent;
+  outline: none;
+  box-shadow: none;
+}
+
 .erp-login-card
   .erp-login-sms-code-compact.ant-space-compact
   .ant-btn.ant-btn-lg {
-  flex: 0 0 112px;
+  flex: 0 0 124px;
+  z-index: 0;
+  min-width: 124px;
   min-height: 56px;
-  border-color: #d1d5db;
-  border-radius: 0 22px 22px 0;
-  color: #1f2937;
+  margin-inline-start: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--erp-login-sms-button-bg);
+  box-shadow: none;
+  color: var(--erp-login-sms-button-color);
   font-size: 15px;
   font-weight: 700;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
 }
 
 .erp-login-card
@@ -20,15 +94,33 @@
 .erp-login-card
   .erp-login-sms-code-compact.ant-space-compact
   .ant-btn.ant-btn-lg:focus-visible {
-  border-color: #b6c5d3;
-  color: #204160;
+  border-color: transparent;
+  background: var(--erp-login-sms-button-hover-bg);
+  color: var(--erp-login-sms-button-color);
 }
 
 .erp-login-card
   .erp-login-sms-code-compact.ant-space-compact
   .ant-btn.ant-btn-lg:disabled {
-  border-color: #d1d5db;
-  color: #9ca3af;
+  border-color: transparent;
+  background: var(--erp-login-sms-button-disabled-bg);
+  color: var(--erp-login-sms-button-disabled-color);
+  opacity: 1;
+}
+
+[data-erp-theme='dark']
+  .erp-login-card
+  .erp-login-sms-code-compact.ant-space-compact {
+  --erp-login-sms-border: var(--erp-border);
+  --erp-login-sms-focus: var(--erp-interactive-border-focus);
+  --erp-login-sms-focus-ring: var(--erp-focus-ring);
+  --erp-login-sms-button-bg: #182235;
+  --erp-login-sms-button-hover-bg: var(--erp-interactive-bg-hover);
+  --erp-login-sms-button-disabled-bg: rgb(17 24 39 / 0.58);
+  --erp-login-sms-button-color: var(--erp-text);
+  --erp-login-sms-button-disabled-color: var(--erp-text-subtle);
+
+  background: #0f172a;
 }
 
 .erp-login-card .ant-input:hover,

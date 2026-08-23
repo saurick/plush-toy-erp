@@ -735,7 +735,7 @@ async function runMobileAuthScenario(
     }
   )
   await waitForPath(page, '/admin-login')
-  await expectText(page, '业务管理')
+  await expectText(page, '毛绒玩具管理系统')
   assert.equal(
     workflowCalls,
     0,
@@ -780,7 +780,7 @@ async function runMobileAuthScenario(
   )
 
   await waitForPath(page, '/admin-login')
-  await expectText(page, '业务管理')
+  await expectText(page, '毛绒玩具管理系统')
   assert.equal(
     workflowCalls,
     0,

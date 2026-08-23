@@ -200,29 +200,20 @@ function ShipmentSelectedSourceAlert({
           shipmentSourceRows
         )
         return (
-          <Alert
-            className="erp-business-source-summary"
-            showIcon
-            type="info"
-            message={`来源销售订单：${
+          <div
+            className="erp-business-source-summary erp-business-inline-note"
+            role="note"
+          >
+            <Text strong>{`来源销售订单：${
               selectedSalesOrder.order_no ||
               selectedSalesOrder.customer_order_no ||
               '已选择'
-            }`}
-            description={
-              <Space direction="vertical" size={2}>
-                <Text>
-                  {`客户：${
-                    salesOrderCustomerText(selectedSalesOrder) || '-'
-                  }；已导入来源行：${selectedSourceRows.length} 行`}
-                </Text>
-                <Text type="secondary">
-                  出货草稿不占用剩余量；确认出货时系统会校验来源、产品 / SKU、
-                  单位、累计出货和库存可用量。
-                </Text>
-              </Space>
-            }
-          />
+            }`}</Text>
+            <Text type="secondary">
+              客户：{salesOrderCustomerText(selectedSalesOrder) || '-'}；已导入{' '}
+              {selectedSourceRows.length} 行
+            </Text>
+          </div>
         )
       }}
     </Form.Item>
@@ -280,12 +271,10 @@ function ShipmentWeightCreateSummary({ form, products, productSKUs }) {
         <Input />
       </Form.Item>
       {preview.complete ? (
-        <Alert
-          showIcon
-          type="info"
-          message={`预计总净重：${preview.totalNetWeightG} 克`}
-          description="按当前明细和产品 / SKU 单重计算；保存草稿时不提交人工总重，确认出货后的最终总净重以系统确认结果为准。"
-        />
+        <div className="erp-business-inline-note" role="note">
+          <Text strong>预计总净重：{preview.totalNetWeightG} 克</Text>
+          <Text type="secondary">按当前明细和产品 / SKU 单重自动计算</Text>
+        </div>
       ) : (
         <>
           <Alert
@@ -338,17 +327,21 @@ function ShipmentWeightDetailSummary({ shipment, products, productSKUs }) {
   const status = String(shipment?.status || '').toUpperCase()
   if (hasFinalShipmentWeight(status)) {
     const finalWeight = String(shipment?.total_net_weight_g ?? '').trim()
+    if (!finalWeight) {
+      return (
+        <Alert
+          showIcon
+          type="warning"
+          message="最终总净重未记录"
+          description="确认出货时单重信息不完整且未填实际总净重，因此未生成部分合计。"
+        />
+      )
+    }
     return (
-      <Alert
-        showIcon
-        type={finalWeight ? 'success' : 'warning'}
-        message={`最终总净重：${finalWeight ? `${finalWeight} 克` : '未记录'}`}
-        description={
-          finalWeight
-            ? '这是确认出货时形成的整单净重；下方明细同时显示确认出货单重和行净重。'
-            : '确认出货时单重信息不完整且未填实际总净重，因此未生成部分合计。'
-        }
-      />
+      <div className="erp-business-inline-note" role="note">
+        <Text strong>最终总净重：{finalWeight} 克</Text>
+        <Text type="secondary">确认出货时形成的整单净重</Text>
+      </div>
     )
   }
   if (status === 'DRAFT') {
@@ -359,35 +352,29 @@ function ShipmentWeightDetailSummary({ shipment, products, productSKUs }) {
     })
     if (preview.complete) {
       return (
-        <Alert
-          showIcon
-          type="info"
-          message={`预计总净重：${preview.totalNetWeightG} 克`}
-          description="当前仍是草稿，数值按现有明细和基础资料计算，尚不是最终出货结果。"
-        />
+        <div className="erp-business-inline-note" role="note">
+          <Text strong>预计总净重：{preview.totalNetWeightG} 克</Text>
+          <Text type="secondary">草稿预估值，确认出货后形成最终结果</Text>
+        </div>
       )
     }
     return (
-      <Alert
-        showIcon
-        type={shipment?.total_net_weight_g ? 'warning' : 'info'}
-        message={
-          shipment?.total_net_weight_g
+      <div className="erp-business-inline-note" role="note">
+        <Text strong>
+          {shipment?.total_net_weight_g
             ? `实际总净重：${shipmentWeightText(shipment.total_net_weight_g)}`
-            : '预计总净重：待补齐'
-        }
-        description="当前仍是草稿；单重信息不完整时仅显示人工填写的整单实际净重，不显示部分合计。"
-      />
+            : '预计总净重：待补齐'}
+        </Text>
+        <Text type="secondary">当前仍是草稿</Text>
+      </div>
     )
   }
   return (
-    <Alert
-      showIcon
-      type="info"
-      message={`出货记录总净重：${shipmentWeightText(
-        shipment?.total_net_weight_g
-      )}`}
-    />
+    <div className="erp-business-inline-note" role="note">
+      <Text strong>
+        出货记录总净重：{shipmentWeightText(shipment?.total_net_weight_g)}
+      </Text>
+    </div>
   )
 }
 

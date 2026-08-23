@@ -505,12 +505,12 @@ function RoleNavigationEditor({
         />
       </div>
       {mode === ROLE_NAVIGATION_MODES.RECOMMENDED ? (
-        <Alert
-          type="info"
-          showIcon
-          message="系统按岗位推荐高频页面"
-          description="财务默认显示应收、应付、发票和对账；其他岗位默认显示约 3 个高频页面，其余页面按系统顺序进入更多功能。看板始终在最前，岗位帮助始终在最后。"
-        />
+        <div className="erp-business-inline-note" role="note">
+          <Text strong>系统按岗位推荐高频页面：</Text>
+          <Text type="secondary">
+            高频页面放在“常用工作”，其余放进“更多功能”；看板在最前，岗位帮助在最后。
+          </Text>
+        </div>
       ) : (
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
           <Text type="secondary">
@@ -669,12 +669,9 @@ function PermissionImpactMap({ permissions = [], permissionKeys = [] }) {
 
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
-      <Alert
-        type="info"
-        showIcon
-        message="页面可进入，不等于页面内所有操作都可用"
-        description="查看、创建、修改、审核、过账和取消分别控制；最终还要结合公司当前启用范围、数据范围、单据状态和任务负责人。"
-      />
+      <Paragraph type="secondary" className="erp-business-inline-note">
+        页面可进入，不等于页面内所有操作都可用；查看、创建、修改、审核、过账和取消分别控制。
+      </Paragraph>
       <Table
         rowKey="rowID"
         size="small"
@@ -1048,12 +1045,9 @@ function DataScopeOverview({
 }) {
   return (
     <div className="erp-role-policy-boundary">
-      <Alert
-        type="info"
-        showIcon
-        message="仓库与库存查看范围已生效"
-        description="可选择全部仓库、指定仓库或不允许查看；选择指定仓库但未勾选具体仓库时，将按不允许查看处理。"
-      />
+      <Paragraph type="secondary" className="erp-business-inline-note">
+        库存范围可设为全部仓库、指定仓库或不允许查看；选择指定仓库时必须勾选具体仓库。
+      </Paragraph>
       <div className="erp-role-policy-boundary__grid">
         <div>
           <Text strong>仓库范围模式</Text>
@@ -1114,12 +1108,9 @@ function SensitiveFieldOverview({ permissionKeys = [] }) {
   ]
   return (
     <div className="erp-role-policy-boundary">
-      <Alert
-        type="info"
-        showIcon
-        message="敏感字段由独立权限控制"
-        description="电话、地址、单价、金额和结算资料会按岗位统一控制，列表、相关单据和打印保持一致。请在“可用功能”中勾选对应字段组。"
-      />
+      <Paragraph type="secondary" className="erp-business-inline-note">
+        电话、地址、单价、金额和结算资料由独立权限控制，请在“可用功能”中勾选对应字段组。
+      </Paragraph>
       <div className="erp-role-policy-boundary__grid">
         {groups.map(([key, label, description]) => (
           <div key={key}>
@@ -4339,12 +4330,9 @@ export default function PermissionCenterPage() {
             />
           </Form.Item>
           {!canAssignUserRoles ? (
-            <Alert
-              type="info"
-              showIcon
-              message="创建后暂不分配岗位"
-              description="当前账号不能分配岗位，只能创建未分配岗位的账号；后续请联系账号负责人完成设置。"
-            />
+            <Paragraph type="secondary" className="erp-business-inline-note">
+              当前账号不能分配岗位；新账号创建后，请联系账号负责人完成岗位设置。
+            </Paragraph>
           ) : null}
         </Form>
       </Modal>
@@ -4367,12 +4355,9 @@ export default function PermissionCenterPage() {
         forceRender
       >
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
-          <Alert
-            type="info"
-            showIcon
-            message="多个岗位会合并最终有效权限"
-            description="例如财务兼采购账号可以同时获得两类岗位已放行的页面和操作；页面可见不代表拥有页面内全部按钮。姓名和登录手机号请使用账号列表中的“修改资料”。"
-          />
+          <Paragraph type="secondary" className="erp-business-inline-note">
+            选择多个岗位时，账号会合并这些岗位已开放的页面和操作。
+          </Paragraph>
           <label>
             <Text strong>岗位</Text>
             <Select
@@ -4406,12 +4391,9 @@ export default function PermissionCenterPage() {
         forceRender
       >
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
-          <Alert
-            type="info"
-            showIcon
-            message="姓名用于任务记录、审批责任和业务操作人展示"
-            description="账号和岗位不会随本次操作改变；手机号留空表示解除短信登录手机号。"
-          />
+          <Paragraph type="secondary" className="erp-business-inline-note">
+            姓名用于任务、审批和业务操作记录；手机号留空表示解除短信登录手机号。
+          </Paragraph>
           <label>
             <Text strong>姓名</Text>
             <Input
