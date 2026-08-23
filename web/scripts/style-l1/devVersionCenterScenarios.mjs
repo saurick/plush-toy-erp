@@ -529,14 +529,16 @@ export function createDevVersionCenterScenarios({
           await desktopVersionTimes.first().getAttribute('datetime'),
           '2026-08-08T14:00:00.000Z'
         )
-        await page
-          .locator('.erp-dev-environment-evidence[aria-busy="false"]')
-          .waitFor({ timeout: 20_000 })
+        assert.equal(
+          await page.locator('.erp-dev-environment-evidence').count(),
+          0,
+          '版本中心子页不应重复常驻双环境事实'
+        )
         const initialDesktopSummaryRequests = desktopSummaryRequests
         assert.equal(
           initialDesktopSummaryRequests,
-          2,
-          '初次加载应只包含版本页一次读回与环境面板一次共享读回'
+          1,
+          '初次加载只应执行版本页自身的一次读回'
         )
 
         const desktopTakeoverButton = page.getByRole('button', {
@@ -798,9 +800,10 @@ export function createDevVersionCenterScenarios({
         await page.reload({ waitUntil: 'domcontentloaded' })
         await waitForView(page, 'history')
         await history.waitFor({ state: 'visible' })
-        await page
-          .locator('.erp-dev-environment-evidence[aria-busy="false"]')
-          .waitFor({ timeout: 20_000 })
+        assert.equal(
+          await page.locator('.erp-dev-environment-evidence').count(),
+          0
+        )
         assert.equal(await visibleTableRows(history).count(), 10)
         assert.equal(await currentOperation.isVisible(), true)
         assert.equal(desktopSummaryRequests, initialDesktopSummaryRequests * 2)
@@ -901,13 +904,15 @@ export function createDevVersionCenterScenarios({
           20,
           '移动端历史表格应保留每条操作的开始与完成时间'
         )
-        await page
-          .locator('.erp-dev-environment-evidence[aria-busy="false"]')
-          .waitFor({ timeout: 20_000 })
+        assert.equal(
+          await page.locator('.erp-dev-environment-evidence').count(),
+          0,
+          '移动端版本中心子页不应重复常驻双环境事实'
+        )
         assert.equal(
           mobileSummaryRequests,
-          2,
-          '移动端初次加载应只包含页面一次读回与环境面板一次共享读回'
+          1,
+          '移动端初次加载只应执行版本页自身的一次读回'
         )
 
         const mobileTakeoverButton = page.getByRole('button', {

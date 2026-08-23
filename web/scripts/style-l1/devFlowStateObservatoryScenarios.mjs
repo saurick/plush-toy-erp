@@ -545,9 +545,11 @@ export function createDevFlowStateObservatoryScenarios({
       },
       verify: async (page) => {
         await waitForCatalog(page)
-        await page
-          .locator('.erp-dev-environment-evidence[aria-busy="false"]')
-          .waitFor({ state: 'visible', timeout: 15_000 })
+        assert.equal(
+          await page.locator('.erp-dev-environment-evidence').count(),
+          0,
+          '业务链观察子页不应重复常驻双环境事实'
+        )
         await expectText(page, '业务链与运行观察台')
         const root = page.locator('[data-dev-flow-state-observatory]')
         const header = root.locator('.erp-dev-flow-header')
@@ -574,31 +576,24 @@ export function createDevFlowStateObservatoryScenarios({
         )
         const definitionIndexPlacement = await root.evaluate((node) => {
           const workspaceNavNode = node.querySelector('.erp-dev-workspace-nav')
-          const environmentNode = node.querySelector(
-            '.erp-dev-environment-evidence'
-          )
           const headerNode = node.querySelector('.erp-dev-flow-header')
           const customerScopeNode = node.querySelector(
             '.erp-dev-customer-scope'
           )
           const indexNode = node.querySelector('.erp-dev-flow-definition-tools')
           const navNode = node.querySelector('.erp-dev-flow-nav')
-          const environmentRect = environmentNode?.getBoundingClientRect()
           const headerRect = headerNode?.getBoundingClientRect()
           const customerScopeRect = customerScopeNode?.getBoundingClientRect()
           const indexRect = indexNode?.getBoundingClientRect()
           const navRect = navNode?.getBoundingClientRect()
           return {
-            workspaceNavNextIsEnvironment:
-              workspaceNavNode?.nextElementSibling === environmentNode,
-            environmentNextIsHeader:
-              environmentNode?.nextElementSibling === headerNode,
+            workspaceNavNextIsHeader:
+              workspaceNavNode?.nextElementSibling === headerNode,
             headerNextIsCustomerScope:
               headerNode?.nextElementSibling === customerScopeNode,
             customerScopeNextIsIndex:
               customerScopeNode?.nextElementSibling === indexNode,
             nextIsPrimaryNav: indexNode?.nextElementSibling === navNode,
-            environmentBottom: environmentRect?.bottom || 0,
             headerTop: headerRect?.top || 0,
             headerBottom: headerRect?.bottom || 0,
             customerScopeTop: customerScopeRect?.top || 0,
@@ -610,14 +605,9 @@ export function createDevFlowStateObservatoryScenarios({
           }
         })
         assert.equal(
-          definitionIndexPlacement.workspaceNavNextIsEnvironment,
+          definitionIndexPlacement.workspaceNavNextIsHeader,
           true,
-          '双环境事实必须紧跟 DEV 导航'
-        )
-        assert.equal(
-          definitionIndexPlacement.environmentNextIsHeader,
-          true,
-          '业务链页头必须紧跟双环境事实'
+          '业务链页头必须直接紧跟 DEV 导航'
         )
         assert.equal(
           definitionIndexPlacement.headerNextIsCustomerScope,
@@ -633,10 +623,6 @@ export function createDevFlowStateObservatoryScenarios({
           definitionIndexPlacement.nextIsPrimaryNav,
           true,
           '定义总索引必须位于五个主 Tab 之前'
-        )
-        assert(
-          definitionIndexPlacement.environmentBottom <=
-            definitionIndexPlacement.headerTop + 1
         )
         assert(
           definitionIndexPlacement.headerBottom <=

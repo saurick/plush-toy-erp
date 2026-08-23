@@ -14,6 +14,7 @@ import { createDevDrillRecoveryScenarios } from './devDrillRecoveryScenarios.mjs
 import { createDevQualityGateScenarios } from './devQualityGateScenarios.mjs'
 import {
   createDevVersionCenterScenarios,
+  installDataPreparationContractFailureRoute,
   installSummaryRoute,
 } from './devVersionCenterScenarios.mjs'
 import { createFinanceBusinessSourceScenarios } from './financeBusinessSourceScenarios.mjs'
@@ -11629,7 +11630,6 @@ export function createStyleL1Scenarios(deps) {
           clientHeight: document.documentElement.clientHeight,
           layout: [
             '.erp-dev-workspace-nav',
-            '.erp-dev-environment-evidence',
             '.erp-dev-customer-header',
             '.erp-dev-customer-workspace',
             '.erp-dev-customer-overview',
@@ -12993,6 +12993,7 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 390, height: 844 },
       mockAdminRpc: true,
       beforeNavigate: async (page) => {
+        await installDataPreparationContractFailureRoute(page)
         await installSummaryRoute(page)
       },
       verify: async (page) => {
@@ -13116,6 +13117,11 @@ export function createStyleL1Scenarios(deps) {
             waitUntil: 'domcontentloaded',
           })
           await expectHeading(page, devPage.heading)
+          if (devPage.path === '/__dev/delivery') {
+            await page
+              .locator('.erp-dev-environment-evidence[aria-busy="false"]')
+              .waitFor({ timeout: 20_000 })
+          }
           await assertNoHorizontalOverflow(
             page,
             `dev-all-pages-mobile:${devPage.path}`
@@ -13255,6 +13261,12 @@ export function createStyleL1Scenarios(deps) {
               openStaticGuidanceCount: document.querySelectorAll(
                 '.erp-dev-static-guidance[open]'
               ).length,
+              environmentEvidenceCount: document.querySelectorAll(
+                '.erp-dev-environment-evidence'
+              ).length,
+              environmentCardCount: document.querySelectorAll(
+                '.erp-dev-environment-card'
+              ).length,
             }
           }, devPage.rootSelector)
 
@@ -13294,6 +13306,16 @@ export function createStyleL1Scenarios(deps) {
               `交付工具固定边界应保留但默认折叠: ${devPage.path} ${JSON.stringify(metrics)}`
             )
           }
+          assert.equal(
+            metrics.environmentEvidenceCount,
+            devPage.path === '/__dev/delivery' ? 1 : 0,
+            `双环境事实只应在交付运行总览常驻: ${devPage.path} ${JSON.stringify(metrics)}`
+          )
+          assert.equal(
+            metrics.environmentCardCount,
+            devPage.path === '/__dev/delivery' ? 3 : 0,
+            `交付运行总览应展示三个环境目标卡，其他开发页不重复展示: ${devPage.path} ${JSON.stringify(metrics)}`
+          )
           if (devPage.path === '/__dev/') {
             assert(
               metrics.overviewStageCount === 3 &&
@@ -13369,6 +13391,10 @@ export function createStyleL1Scenarios(deps) {
       path: '/__dev/product-engineering',
       themeMode: 'dark',
       viewport: { width: 1536, height: 900 },
+      beforeNavigate: async (page) => {
+        await installDataPreparationContractFailureRoute(page)
+        await installSummaryRoute(page)
+      },
       verify: async (page) => {
         const legacyReceiptRequests = []
         const recordLegacyReceiptRequest = (request) => {
@@ -13416,6 +13442,11 @@ export function createStyleL1Scenarios(deps) {
             waitUntil: 'domcontentloaded',
           })
           await expectHeading(page, areaPage.heading)
+          if (areaPage.path === '/__dev/delivery') {
+            await page
+              .locator('.erp-dev-environment-evidence[aria-busy="false"]')
+              .waitFor({ timeout: 20_000 })
+          }
           const navigationNames = await page.evaluate(() => ({
             primary: Array.from(
               document.querySelectorAll('.erp-dev-workspace-nav__route')
@@ -13576,6 +13607,15 @@ export function createStyleL1Scenarios(deps) {
               openTechnicalDetailsCount: document.querySelectorAll(
                 '.erp-dev-hub-grid .erp-dev-entry-source-details[open]'
               ).length,
+              environmentEvidenceCount: document.querySelectorAll(
+                '.erp-dev-environment-evidence'
+              ).length,
+              environmentCardCount: document.querySelectorAll(
+                '.erp-dev-environment-card'
+              ).length,
+              openEnvironmentDetailsCount: document.querySelectorAll(
+                '.erp-dev-environment-card details[open]'
+              ).length,
               cards: cards.map((card) => {
                 const body = card.querySelector('.erp-dev-hub-card__body')
                 const title = card.querySelector('.erp-dev-hub-card__title')
@@ -13609,6 +13649,15 @@ export function createStyleL1Scenarios(deps) {
             metrics.cards.length,
             areaPage.cardCount,
             `工作台区域页入口数量异常: ${areaPage.path} ${JSON.stringify(metrics)}`
+          )
+          assert.deepEqual(
+            {
+              evidence: metrics.environmentEvidenceCount,
+              cards: metrics.environmentCardCount,
+              openDetails: metrics.openEnvironmentDetailsCount,
+            },
+            { evidence: 1, cards: 3, openDetails: 0 },
+            `交付运行总览应独占双环境事实并默认保持紧凑: ${JSON.stringify(metrics)}`
           )
           assert.equal(
             metrics.legacyReceiptPanelCount,
