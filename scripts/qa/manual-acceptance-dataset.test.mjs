@@ -853,7 +853,7 @@ test("bundle emits persistent local and 133 plans with identical target-free sem
   assert.equal(bundle.targets[0].target.accountIdentity.usernamePrefix, "demo");
   assert.equal(bundle.targets[1].target.accountIdentity.usernamePrefix, "uat");
   assert.equal(
-    bundle.targets[1].target.accountIdentity.passwordEnvironmentVariable,
+    bundle.targets[1].target.accountIdentity.credentialEnvironmentVariable,
     "MANUAL_ACCEPTANCE_UAT_PASSWORD",
   );
   assert.ok(

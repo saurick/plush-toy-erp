@@ -1489,7 +1489,7 @@ export function buildManualAcceptanceDatasetTargetPlan(options = {}) {
       accountIdentity: {
         accountKind: accountSet.accountKind,
         usernamePrefix: accountSet.usernamePrefix,
-        passwordEnvironmentVariable: accountSet.passwordEnvironmentVariable,
+        credentialEnvironmentVariable: accountSet.passwordEnvironmentVariable,
         formalAccounts: [...accountSet.formalUsernames],
         scenarioAccounts: accountSet.scenarios.map((scenario) => ({
           key: scenario.key,
