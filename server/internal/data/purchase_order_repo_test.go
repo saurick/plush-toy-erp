@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"errors"
 	"io"
 	"testing"
 	"time"
@@ -185,10 +186,9 @@ func TestPurchaseOrderRepoSaveWithItemsKeepsLineIdentityWhileReordering(t *testi
 		}
 	}
 
-	reordered, err := uc.SavePurchaseOrderWithItems(ctx, created.Order.ID, orderMutation(created.Order.Version), []*biz.PurchaseOrderItemSaveMutation{
-		line(third.ID, 1),
-		line(first.ID, 2),
-		line(second.ID, 3),
+	reordered, err := uc.ReorderPurchaseOrderItems(ctx, created.Order.ID, &biz.SourceDocumentItemOrderMutation{
+		ExpectedVersion: created.Order.Version,
+		ItemIDs:         []int{third.ID, first.ID, second.ID},
 	})
 	if err != nil {
 		t.Fatalf("reorder purchase order items: %v", err)
@@ -204,6 +204,15 @@ func TestPurchaseOrderRepoSaveWithItemsKeepsLineIdentityWhileReordering(t *testi
 		if row.DisplayOrder == nil || *row.DisplayOrder != expectedOrder {
 			t.Fatalf("item %d display_order = %v, want %d", itemID, row.DisplayOrder, expectedOrder)
 		}
+	}
+	if _, err := uc.ReorderPurchaseOrderItems(ctx, created.Order.ID, &biz.SourceDocumentItemOrderMutation{
+		ExpectedVersion: reordered.Order.Version,
+		ItemIDs:         []int{third.ID, first.ID},
+	}); err == nil {
+		t.Fatal("incomplete purchase order item permutation must fail")
+	}
+	if current := client.PurchaseOrder.GetX(ctx, created.Order.ID); current.Version != reordered.Order.Version {
+		t.Fatalf("failed purchase reorder must roll back parent version: got %d want %d", current.Version, reordered.Order.Version)
 	}
 
 	_, err = uc.SavePurchaseOrderWithItems(ctx, created.Order.ID, orderMutation(reordered.Order.Version), []*biz.PurchaseOrderItemSaveMutation{
@@ -224,6 +233,32 @@ func TestPurchaseOrderRepoSaveWithItemsKeepsLineIdentityWhileReordering(t *testi
 	}
 	if len(openItems) != 3 || openItems[0].ID != third.ID || openItems[2].ID != first.ID || openItems[1].LineNo != 4 {
 		t.Fatalf("new line must use the next stable identity: %#v", openItems)
+	}
+
+	current := client.PurchaseOrder.GetX(ctx, created.Order.ID)
+	client.PurchaseOrder.UpdateOneID(created.Order.ID).
+		SetLifecycleStatus(biz.PurchaseOrderStatusApproved).
+		SaveX(ctx)
+	approvedOrder, err := uc.ReorderPurchaseOrderItems(ctx, created.Order.ID, &biz.SourceDocumentItemOrderMutation{
+		ExpectedVersion: current.Version,
+		ItemIDs:         []int{openItems[2].ID, openItems[0].ID, openItems[1].ID},
+	})
+	if err != nil {
+		t.Fatalf("reorder approved purchase order items: %v", err)
+	}
+	if approvedOrder.Order.LifecycleStatus != biz.PurchaseOrderStatusApproved || approvedOrder.Order.Version != current.Version+1 {
+		t.Fatalf("approved purchase reorder changed lifecycle or version unexpectedly: %#v", approvedOrder.Order)
+	}
+
+	repo := NewPurchaseOrderRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard))
+	client.PurchaseOrder.UpdateOneID(created.Order.ID).
+		SetLifecycleStatus(biz.PurchaseOrderStatusClosed).
+		SaveX(ctx)
+	if _, err := repo.ReorderPurchaseOrderItems(ctx, created.Order.ID, approvedOrder.Order.Version, []int{openItems[0].ID, openItems[1].ID, openItems[2].ID}); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("closed purchase order reorder must fail: %v", err)
+	}
+	if current := client.PurchaseOrder.GetX(ctx, created.Order.ID); current.Version != approvedOrder.Order.Version {
+		t.Fatalf("blocked purchase reorder changed parent version: got %d want %d", current.Version, approvedOrder.Order.Version)
 	}
 }
 

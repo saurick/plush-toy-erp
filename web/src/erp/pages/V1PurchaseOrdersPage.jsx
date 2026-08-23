@@ -22,10 +22,12 @@ import {
 } from '../components/business-list/ColumnOrderModal.jsx'
 import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
+import BusinessLineItemOrderModal from '../components/business-list/BusinessLineItemOrderModal.jsx'
 import SourceOrderLifecycleConfirmContent from '../components/business-list/SourceOrderLifecycleConfirmContent.jsx'
 import {
   createBlankPurchaseLine,
   normalizePurchaseLineFormValue,
+  purchaseOrderLineOrderLabel,
 } from '../components/purchase-orders/PurchaseOrderForm.jsx'
 import PurchaseOrderBusinessModal from '../components/purchase-orders/PurchaseOrderBusinessModal.jsx'
 import PurchaseOrderInboundDraftModal from '../components/purchase-orders/PurchaseOrderInboundDraftModal.jsx'
@@ -42,6 +44,7 @@ import {
   listAllSuppliers,
   listAllUnits,
   listAllWarehouses,
+  reorderPurchaseOrderItems,
   savePurchaseOrderWithItems,
 } from '../api/masterDataOrderApi.mjs'
 import {
@@ -82,6 +85,7 @@ import {
   loadBusinessCollaborationTasksForSource,
 } from '../utils/businessCollaborationTasks.mjs'
 import {
+  canReorderSourceDocumentItems,
   commitSourceDocumentSaveResult,
   createSourceDocumentOpenEditController,
   isMutationResultUnknown,
@@ -181,6 +185,13 @@ export default function V1PurchaseOrdersPage() {
   const [columnOrder, setColumnOrder] = useState(null)
   const [columnOrderOpen, setColumnOrderOpen] = useState(false)
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
+  const [lineOrderLoading, setLineOrderLoading] = useState(false)
+  const [lineOrderOpen, setLineOrderOpen] = useState(false)
+  const [lineOrderContext, setLineOrderContext] = useState({
+    order: null,
+    items: [],
+  })
+  const lineOrderRequestRef = useRef(0)
   const [suppliers, setSuppliers] = useState([])
   const [materials, setMaterials] = useState([])
   const [units, setUnits] = useState([])
@@ -1205,7 +1216,11 @@ export default function V1PurchaseOrdersPage() {
     unitOptions,
   })
   const recordActionBusy =
-    saving || generatingInboundDraft || printingContract || itemsLoading
+    saving ||
+    generatingInboundDraft ||
+    printingContract ||
+    itemsLoading ||
+    lineOrderLoading
   const inboundReferenceDataReady = inboundReferenceDataState === 'ready'
   const hasInboundWarehouse = warehouseOptions.length > 0
   const openInboundDraftModal = useCallback(
@@ -1274,6 +1289,92 @@ export default function V1PurchaseOrdersPage() {
     canUpdate,
     order: singleSelectedOrder,
   })
+  const selectedOrderCanReorder = Boolean(
+    canUpdate &&
+      canReorderSourceDocumentItems('purchase_order', singleSelectedOrder)
+  )
+  const openPurchaseOrderLineOrder = async () => {
+    const order = singleSelectedOrder
+    if (!selectedOrderCanReorder) {
+      message.warning(
+        order ? '当前状态不能调整材料顺序' : '请先选择一条采购订单'
+      )
+      return
+    }
+    const requestID = lineOrderRequestRef.current + 1
+    lineOrderRequestRef.current = requestID
+    setLineOrderLoading(true)
+    try {
+      const items = await loadOrderItems(order)
+      if (
+        lineOrderRequestRef.current !== requestID ||
+        selectedRowKeysRef.current.length !== 1 ||
+        Number(selectedRowKeysRef.current[0]) !== Number(order.id)
+      ) {
+        return
+      }
+      setLineOrderContext({
+        order,
+        items: selectOpenSourceDocumentItems(items),
+      })
+      setLineOrderOpen(true)
+    } catch (error) {
+      if (isResourceVersionConflict(error)) {
+        message.warning('采购订单已被其他操作更新，请刷新后重试')
+      } else {
+        message.error(getActionErrorMessage(error, '加载采购订单材料顺序'))
+      }
+    } finally {
+      if (lineOrderRequestRef.current === requestID) {
+        setLineOrderLoading(false)
+      }
+    }
+  }
+  const applyPurchaseOrderLineOrder = async (orderedItems) => {
+    const { order } = lineOrderContext
+    if (!order?.id || !Array.isArray(orderedItems)) return false
+    setSaving(true)
+    try {
+      const result = await reorderPurchaseOrderItems({
+        customer_key: activeCustomerKey,
+        id: order.id,
+        expected_version: order.version,
+        item_ids: orderedItems.map((item) => item.id),
+      })
+      const { purchase_order: savedOrder } = result
+      const openItems = selectOpenSourceDocumentItems(
+        result.purchase_order_items
+      )
+      purchaseOrderItemsPreview.invalidate(order)
+      setOrders((current) =>
+        current.map((item) =>
+          item.id === savedOrder.id ? savedOrder : item
+        )
+      )
+      setSelectedOrder(savedOrder)
+      applySelectedRowKeys([savedOrder.id])
+      setLineOrderContext({ order: savedOrder, items: openItems })
+      message.success('采购订单材料顺序已保存')
+      return true
+    } catch (error) {
+      if (isResourceVersionConflict(error)) {
+        message.warning('采购订单已被其他操作更新，请刷新后重试')
+        setLineOrderOpen(false)
+        await loadOrders()
+      } else if (isMutationResultUnknown(error)) {
+        message.warning(
+          '材料顺序保存结果尚未确认，请先刷新核对，不要连续重复提交'
+        )
+        setLineOrderOpen(false)
+        await loadOrders()
+      } else {
+        message.error(getActionErrorMessage(error, '保存采购订单材料顺序'))
+      }
+      return false
+    } finally {
+      setSaving(false)
+    }
+  }
   const canGenerateInboundDraft = canCreateInboundDraftFromPurchaseOrder({
     canCreatePurchaseReceipt,
     order: singleSelectedOrder,
@@ -1383,6 +1484,7 @@ export default function V1PurchaseOrdersPage() {
         generatingInboundDraft={generatingInboundDraft}
         hasActiveFilters={hasActiveFilters}
         itemsLoading={itemsLoading}
+        lineOrderLoading={lineOrderLoading}
         keyword={resolvedRouteKeyword || linkedKeyword || keyword}
         lifecycleScope={lifecycleScope}
         onLifecycleScopeChange={(nextScope) => {
@@ -1409,6 +1511,7 @@ export default function V1PurchaseOrdersPage() {
         openCreateModal={openCreateModal}
         openEditModal={openEditModal}
         openInboundDraftModal={openInboundDraftModal}
+        openLineOrder={openPurchaseOrderLineOrder}
         openRelatedTable={openRelatedTable}
         relatedMenuItems={relatedMenuItems}
         orders={orders}
@@ -1421,6 +1524,7 @@ export default function V1PurchaseOrdersPage() {
         secondaryLifecycleActions={secondaryLifecycleActions}
         selectedItems={selectedItems}
         selectedOrderCanEdit={selectedOrderCanEdit}
+        selectedOrderCanReorder={selectedOrderCanReorder}
         selectedOrderDisplayText={selectedOrderDisplayText}
         selectedRowKeys={selectedRowKeys}
         setColumnOrderOpen={setColumnOrderOpen}
@@ -1550,6 +1654,20 @@ export default function V1PurchaseOrdersPage() {
         moduleTitle="采购订单列表"
         onChange={(nextOrder) => persistColumnOrder(nextOrder, dataColumns)}
         onClose={() => setColumnOrderOpen(false)}
+      />
+
+      <BusinessLineItemOrderModal
+        description="保存后只调整当前采购订单的材料展示顺序，不修改材料、数量、价格或稳定行号。"
+        getItemLabel={purchaseOrderLineOrderLabel}
+        itemNoun="材料"
+        items={lineOrderContext.items}
+        open={lineOrderOpen}
+        title="调整材料顺序"
+        onApply={applyPurchaseOrderLineOrder}
+        onClose={() => {
+          lineOrderRequestRef.current += 1
+          setLineOrderOpen(false)
+        }}
       />
 
       <PurchaseOrderBusinessModal

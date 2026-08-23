@@ -55,6 +55,34 @@ func TestGetOptionalJSONRPCNonNegativeInt(t *testing.T) {
 	}
 }
 
+func TestGetRequiredJSONRPCPositiveIntSlice(t *testing.T) {
+	got, ok := getRequiredJSONRPCPositiveIntSlice(map[string]any{
+		"item_ids": []any{float64(7), float64(2), int(9)},
+	}, "item_ids")
+	if !ok || len(got) != 3 || got[0] != 7 || got[1] != 2 || got[2] != 9 {
+		t.Fatalf("positive integer slice = %#v ok=%t", got, ok)
+	}
+	for name, value := range map[string]any{
+		"missing":   nil,
+		"not-array": "1,2",
+		"empty":     []any{},
+		"zero":      []any{float64(0)},
+		"fraction":  []any{float64(1.5)},
+		"duplicate": []any{float64(1), float64(1)},
+		"unsafe":    []any{float64(9007199254740992)},
+	} {
+		t.Run(name, func(t *testing.T) {
+			params := map[string]any{}
+			if value != nil {
+				params["item_ids"] = value
+			}
+			if got, ok := getRequiredJSONRPCPositiveIntSlice(params, "item_ids"); ok || got != nil {
+				t.Fatalf("invalid positive integer slice = %#v ok=%t", got, ok)
+			}
+		})
+	}
+}
+
 func jsonRPCIntPointer(value int) *int {
 	return &value
 }

@@ -33,10 +33,12 @@ export default function BusinessLineItemOrderModal({
   title = '调整明细顺序',
 }) {
   const [draftEntries, setDraftEntries] = useState([])
+  const [applying, setApplying] = useState(false)
 
   useEffect(() => {
     if (open) {
       setDraftEntries(buildBusinessLineItemOrderEntries(items))
+      setApplying(false)
     }
   }, [items, open])
 
@@ -45,25 +47,42 @@ export default function BusinessLineItemOrderModal({
     [draftEntries]
   )
 
-  const applyOrder = () => {
-    if (!hasChanges) return
-    onApply?.(orderedBusinessLineItems(draftEntries))
-    onClose?.()
+  const applyOrder = async () => {
+    if (!hasChanges || applying) return
+    setApplying(true)
+    try {
+      const applied = await onApply?.(orderedBusinessLineItems(draftEntries))
+      if (applied !== false) {
+        onClose?.()
+      }
+    } finally {
+      setApplying(false)
+    }
   }
 
   return (
     <Modal
       className="erp-business-action-modal erp-business-action-modal--columns"
       destroyOnHidden={false}
+      closable={!applying}
       footer={
         <Space wrap className="erp-business-column-order-modal__footer">
-          <Button onClick={onClose}>取消</Button>
-          <Button type="primary" disabled={!hasChanges} onClick={applyOrder}>
+          <Button disabled={applying} onClick={onClose}>
+            取消
+          </Button>
+          <Button
+            type="primary"
+            disabled={!hasChanges || applying}
+            loading={applying}
+            onClick={applyOrder}
+          >
             应用顺序
           </Button>
         </Space>
       }
-      onCancel={onClose}
+      keyboard={!applying}
+      maskClosable={!applying}
+      onCancel={applying ? undefined : onClose}
       open={open}
       title={
         <div className="erp-business-action-modal__title">
@@ -107,7 +126,7 @@ export default function BusinessLineItemOrderModal({
                   <Button
                     aria-label={`${label} 移到最前`}
                     className="erp-business-column-order-modal__action"
-                    disabled={isFirst}
+                    disabled={isFirst || applying}
                     icon={<VerticalAlignTopOutlined />}
                     onClick={() =>
                       setDraftEntries((current) =>
@@ -120,7 +139,7 @@ export default function BusinessLineItemOrderModal({
                   <Button
                     aria-label={`${label} 上移`}
                     className="erp-business-column-order-modal__action"
-                    disabled={isFirst}
+                    disabled={isFirst || applying}
                     icon={<ArrowUpOutlined />}
                     onClick={() =>
                       setDraftEntries((current) =>
@@ -133,7 +152,7 @@ export default function BusinessLineItemOrderModal({
                   <Button
                     aria-label={`${label} 下移`}
                     className="erp-business-column-order-modal__action"
-                    disabled={isLast}
+                    disabled={isLast || applying}
                     icon={<ArrowDownOutlined />}
                     onClick={() =>
                       setDraftEntries((current) =>
@@ -146,7 +165,7 @@ export default function BusinessLineItemOrderModal({
                   <Button
                     aria-label={`${label} 移到最后`}
                     className="erp-business-column-order-modal__action"
-                    disabled={isLast}
+                    disabled={isLast || applying}
                     icon={<VerticalAlignBottomOutlined />}
                     onClick={() =>
                       setDraftEntries((current) =>

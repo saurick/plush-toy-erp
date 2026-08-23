@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"errors"
 	"io"
 	"testing"
 	"time"
@@ -238,10 +239,9 @@ func TestOutsourcingOrderRepoSaveWithItemsKeepsLineIdentityWhileReordering(t *te
 		}
 	}
 
-	reordered, err := uc.SaveOutsourcingOrderWithItems(ctx, created.Order.ID, orderMutation(created.Order.Version), []*biz.OutsourcingOrderItemSaveMutation{
-		line(third.ID, 1),
-		line(first.ID, 2),
-		line(second.ID, 3),
+	reordered, err := uc.ReorderOutsourcingOrderItems(ctx, created.Order.ID, &biz.SourceDocumentItemOrderMutation{
+		ExpectedVersion: created.Order.Version,
+		ItemIDs:         []int{third.ID, first.ID, second.ID},
 	})
 	if err != nil {
 		t.Fatalf("reorder outsourcing order items: %v", err)
@@ -257,6 +257,15 @@ func TestOutsourcingOrderRepoSaveWithItemsKeepsLineIdentityWhileReordering(t *te
 		if row.DisplayOrder == nil || *row.DisplayOrder != expectedOrder {
 			t.Fatalf("item %d display_order = %v, want %d", itemID, row.DisplayOrder, expectedOrder)
 		}
+	}
+	if _, err := uc.ReorderOutsourcingOrderItems(ctx, created.Order.ID, &biz.SourceDocumentItemOrderMutation{
+		ExpectedVersion: reordered.Order.Version,
+		ItemIDs:         []int{third.ID, first.ID},
+	}); err == nil {
+		t.Fatal("incomplete outsourcing order item permutation must fail")
+	}
+	if current := client.OutsourcingOrder.GetX(ctx, created.Order.ID); current.Version != reordered.Order.Version {
+		t.Fatalf("failed outsourcing reorder must roll back parent version: got %d want %d", current.Version, reordered.Order.Version)
 	}
 
 	_, err = uc.SaveOutsourcingOrderWithItems(ctx, created.Order.ID, orderMutation(reordered.Order.Version), []*biz.OutsourcingOrderItemSaveMutation{
@@ -277,6 +286,32 @@ func TestOutsourcingOrderRepoSaveWithItemsKeepsLineIdentityWhileReordering(t *te
 	}
 	if len(openItems) != 3 || openItems[0].ID != third.ID || openItems[2].ID != first.ID || openItems[1].LineNo != 4 {
 		t.Fatalf("new line must use the next stable identity: %#v", openItems)
+	}
+
+	current := client.OutsourcingOrder.GetX(ctx, created.Order.ID)
+	client.OutsourcingOrder.UpdateOneID(created.Order.ID).
+		SetLifecycleStatus(biz.OutsourcingOrderStatusConfirmed).
+		SaveX(ctx)
+	confirmedOrder, err := uc.ReorderOutsourcingOrderItems(ctx, created.Order.ID, &biz.SourceDocumentItemOrderMutation{
+		ExpectedVersion: current.Version,
+		ItemIDs:         []int{openItems[2].ID, openItems[0].ID, openItems[1].ID},
+	})
+	if err != nil {
+		t.Fatalf("reorder confirmed outsourcing order items: %v", err)
+	}
+	if confirmedOrder.Order.LifecycleStatus != biz.OutsourcingOrderStatusConfirmed || confirmedOrder.Order.Version != current.Version+1 {
+		t.Fatalf("confirmed outsourcing reorder changed lifecycle or version unexpectedly: %#v", confirmedOrder.Order)
+	}
+
+	repo := NewOutsourcingOrderRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard))
+	client.OutsourcingOrder.UpdateOneID(created.Order.ID).
+		SetLifecycleStatus(biz.OutsourcingOrderStatusClosed).
+		SaveX(ctx)
+	if _, err := repo.ReorderOutsourcingOrderItems(ctx, created.Order.ID, confirmedOrder.Order.Version, []int{openItems[0].ID, openItems[1].ID, openItems[2].ID}); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("closed outsourcing order reorder must fail: %v", err)
+	}
+	if current := client.OutsourcingOrder.GetX(ctx, created.Order.ID); current.Version != confirmedOrder.Order.Version {
+		t.Fatalf("blocked outsourcing reorder changed parent version: got %d want %d", current.Version, confirmedOrder.Order.Version)
 	}
 }
 

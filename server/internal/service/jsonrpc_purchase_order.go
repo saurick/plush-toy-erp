@@ -28,6 +28,7 @@ func (d *jsonrpcDispatcher) handlePurchaseOrder(
 
 	switch method {
 	case "save_purchase_order_with_items",
+		"reorder_purchase_order_items",
 		"get_purchase_order",
 		"get_purchase_order_receipt_progress",
 		"list_purchase_orders":

@@ -1002,6 +1002,96 @@ func (r *purchaseOrderRepo) SavePurchaseOrderWithItems(ctx context.Context, id i
 	}, nil
 }
 
+func (r *purchaseOrderRepo) ReorderPurchaseOrderItems(ctx context.Context, id, expectedVersion int, itemIDs []int) (*biz.PurchaseOrderWithItems, error) {
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if tx != nil {
+			rollbackEntTx(ctx, tx, r.log)
+		}
+	}()
+
+	affected, err := tx.PurchaseOrder.Update().
+		Where(
+			purchaseorder.ID(id),
+			purchaseorder.LifecycleStatusIn(
+				biz.PurchaseOrderStatusDraft,
+				biz.PurchaseOrderStatusSubmitted,
+				biz.PurchaseOrderStatusApproved,
+			),
+			purchaseorder.Version(expectedVersion),
+		).
+		SetVersion(expectedVersion + 1).
+		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if affected == 0 {
+		current, err := tx.PurchaseOrder.Get(ctx, id)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return nil, biz.ErrPurchaseOrderNotFound
+			}
+			return nil, err
+		}
+		if !biz.CanReorderPurchaseOrderItems(current.LifecycleStatus) {
+			return nil, biz.ErrBadParam
+		}
+		return nil, biz.ErrPurchaseOrderConflict
+	}
+
+	openItems, err := tx.PurchaseOrderItem.Query().Where(
+		purchaseorderitem.PurchaseOrderID(id),
+		purchaseorderitem.LineStatus(biz.PurchaseOrderItemStatusOpen),
+	).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(openItems) != len(itemIDs) {
+		return nil, biz.ErrBadParam
+	}
+	openByID := make(map[int]struct{}, len(openItems))
+	for _, item := range openItems {
+		openByID[item.ID] = struct{}{}
+	}
+	for index, itemID := range itemIDs {
+		if _, ok := openByID[itemID]; !ok {
+			return nil, biz.ErrBadParam
+		}
+		if _, err := tx.PurchaseOrderItem.UpdateOneID(itemID).
+			SetDisplayOrder(index + 1).
+			Save(ctx); err != nil {
+			return nil, err
+		}
+	}
+
+	orderRow, err := tx.PurchaseOrder.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	itemRows, err := tx.PurchaseOrderItem.Query().
+		Where(purchaseorderitem.PurchaseOrderID(id)).
+		Order(sourceDocumentItemOrder(
+			purchaseorderitem.FieldDisplayOrder,
+			purchaseorderitem.FieldLineNo,
+			purchaseorderitem.FieldID,
+		)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return &biz.PurchaseOrderWithItems{
+		Order: entPurchaseOrderToBiz(orderRow),
+		Items: entPurchaseOrderItemsToBiz(itemRows),
+	}, nil
+}
+
 func purchaseOrderLifecyclePredecessors(next string) []string {
 	statuses := []string{
 		biz.PurchaseOrderStatusDraft,

@@ -79,6 +79,43 @@ func getRequiredJSONRPCPositiveInt(pm map[string]any, key string) (int, bool) {
 	}
 }
 
+func getRequiredJSONRPCPositiveIntSlice(pm map[string]any, key string) ([]int, bool) {
+	raw, ok := pm[key]
+	if !ok || raw == nil {
+		return nil, false
+	}
+	items, ok := raw.([]any)
+	if !ok || len(items) == 0 {
+		return nil, false
+	}
+	const maxJSONSafeInteger = float64(9007199254740991)
+	values := make([]int, 0, len(items))
+	seen := make(map[int]struct{}, len(items))
+	for _, item := range items {
+		var value int
+		switch typed := item.(type) {
+		case float64:
+			if typed <= 0 || typed > maxJSONSafeInteger || typed != float64(int64(typed)) {
+				return nil, false
+			}
+			value = int(typed)
+		case int:
+			if typed <= 0 {
+				return nil, false
+			}
+			value = typed
+		default:
+			return nil, false
+		}
+		if _, exists := seen[value]; exists {
+			return nil, false
+		}
+		seen[value] = struct{}{}
+		values = append(values, value)
+	}
+	return values, true
+}
+
 func getRequiredJSONRPCTime(pm map[string]any, key string) (time.Time, bool) {
 	if _, ok := pm[key]; !ok {
 		return time.Time{}, false

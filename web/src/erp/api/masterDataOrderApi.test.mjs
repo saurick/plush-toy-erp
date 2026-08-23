@@ -178,10 +178,11 @@ test('V1MasterDataPage: owner and contacts save through backend aggregate API', 
   }
 })
 
-test('masterDataOrderApi: sales orders expose only aggregate writes and lifecycle actions', () => {
+test('masterDataOrderApi: sales orders expose aggregate save, dedicated reorder, and lifecycle actions', () => {
   for (const methodName of [
     'list_sales_orders',
     'save_sales_order_with_items',
+    'reorder_sales_order_items',
     'get_sales_order',
     'close_sales_order',
     'cancel_sales_order',
@@ -258,6 +259,25 @@ test('masterDataOrderApi: aggregate saves validate versioned responses and full-
         `export async function ${functionName}\\([\\s\\S]*?listSourceDocumentItemsAtVersion\\([\\s\\S]*?listAllSourceDocumentItems\\(\\s*${pageFunctionName}`
       )
     )
+  }
+})
+
+test('masterDataOrderApi: dedicated source-document reorder validates version and exact open-item order', () => {
+  assert.match(source, /function validateSourceDocumentReorderResult\(/u)
+  assert.match(source, /order\.version !== expectedVersion \+ 1/u)
+  assert.match(source, /openItemIDs\.length !== expectedItemIDs\.length/u)
+  assert.match(
+    source,
+    /openItemIDs\.some\(\(itemID, index\) => itemID !== expectedItemIDs\[index\]\)/u
+  )
+  for (const [functionName, methodName] of [
+    ['reorderSalesOrderItems', 'reorder_sales_order_items'],
+    ['reorderPurchaseOrderItems', 'reorder_purchase_order_items'],
+    ['reorderOutsourcingOrderItems', 'reorder_outsourcing_order_items'],
+  ]) {
+    const functionSource = exportedFunctionSource(functionName)
+    assert.match(functionSource, new RegExp(`call\\(\\s*'${methodName}'`, 'u'))
+    assert.match(functionSource, /validateSourceDocumentReorderResult/u)
   }
 })
 

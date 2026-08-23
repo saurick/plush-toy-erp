@@ -340,16 +340,9 @@ func TestSalesOrderRepoSaveWithItemsKeepsLineIdentityWhileReordering(t *testing.
 	}
 	first, second, third := created.Items[0], created.Items[1], created.Items[2]
 
-	reordered, err := uc.SaveSalesOrderWithItems(ctx, created.Order.ID, &biz.SalesOrderMutation{
-		OrderNo:         created.Order.OrderNo,
-		CustomerID:      customer.ID,
-		Currency:        created.Order.Currency,
-		OrderDate:       orderDate,
+	reordered, err := uc.ReorderSalesOrderItems(ctx, created.Order.ID, &biz.SourceDocumentItemOrderMutation{
 		ExpectedVersion: created.Order.Version,
-	}, []*biz.SalesOrderItemSaveMutation{
-		{ID: third.ID, SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 1, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: qty}},
-		{ID: first.ID, SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 2, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: qty}},
-		{ID: second.ID, SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 3, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: qty}},
+		ItemIDs:         []int{third.ID, first.ID, second.ID},
 	})
 	if err != nil {
 		t.Fatalf("reorder sales order items: %v", err)
@@ -365,6 +358,15 @@ func TestSalesOrderRepoSaveWithItemsKeepsLineIdentityWhileReordering(t *testing.
 		if row.DisplayOrder == nil || *row.DisplayOrder != expectedOrder {
 			t.Fatalf("item %d display_order = %v, want %d", itemID, row.DisplayOrder, expectedOrder)
 		}
+	}
+	if _, err := uc.ReorderSalesOrderItems(ctx, created.Order.ID, &biz.SourceDocumentItemOrderMutation{
+		ExpectedVersion: reordered.Order.Version,
+		ItemIDs:         []int{third.ID, first.ID},
+	}); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("incomplete sales order item permutation must fail: %v", err)
+	}
+	if current := client.SalesOrder.GetX(ctx, created.Order.ID); current.Version != reordered.Order.Version {
+		t.Fatalf("failed sales reorder must roll back parent version: got %d want %d", current.Version, reordered.Order.Version)
 	}
 
 	withReplacement, err := uc.SaveSalesOrderWithItems(ctx, created.Order.ID, &biz.SalesOrderMutation{
@@ -418,6 +420,32 @@ func TestSalesOrderRepoSaveWithItemsKeepsLineIdentityWhileReordering(t *testing.
 	}
 	if len(openItems) != 3 || openItems[1].ID == replacedID || openItems[1].LineNo != 5 {
 		t.Fatalf("canceled line number must not be reused: %#v", openItems)
+	}
+
+	current := client.SalesOrder.GetX(ctx, created.Order.ID)
+	client.SalesOrder.UpdateOneID(created.Order.ID).
+		SetLifecycleStatus(biz.SalesOrderStatusActive).
+		SaveX(ctx)
+	activeOrder, err := uc.ReorderSalesOrderItems(ctx, created.Order.ID, &biz.SourceDocumentItemOrderMutation{
+		ExpectedVersion: current.Version,
+		ItemIDs:         []int{openItems[2].ID, openItems[0].ID, openItems[1].ID},
+	})
+	if err != nil {
+		t.Fatalf("reorder active sales order items: %v", err)
+	}
+	if activeOrder.Order.LifecycleStatus != biz.SalesOrderStatusActive || activeOrder.Order.Version != current.Version+1 {
+		t.Fatalf("active sales reorder changed lifecycle or version unexpectedly: %#v", activeOrder.Order)
+	}
+
+	repo := NewSalesOrderRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard))
+	client.SalesOrder.UpdateOneID(created.Order.ID).
+		SetLifecycleStatus(biz.SalesOrderStatusClosed).
+		SaveX(ctx)
+	if _, err := repo.ReorderSalesOrderItems(ctx, created.Order.ID, activeOrder.Order.Version, []int{openItems[0].ID, openItems[1].ID, openItems[2].ID}); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("closed sales order reorder must fail: %v", err)
+	}
+	if current := client.SalesOrder.GetX(ctx, created.Order.ID); current.Version != activeOrder.Order.Version {
+		t.Fatalf("blocked sales reorder changed parent version: got %d want %d", current.Version, activeOrder.Order.Version)
 	}
 }
 

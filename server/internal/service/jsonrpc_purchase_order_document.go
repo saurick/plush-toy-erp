@@ -45,6 +45,30 @@ func (d *jsonrpcDispatcher) handlePurchaseOrderDocument(
 		}
 		result, err := d.purchaseOrderUC.SavePurchaseOrderWithItems(ctx, orderID, in, items)
 		return id, purchaseOrderWithItemsMutationResult(ctx, d, result, err), nil
+	case "reorder_purchase_order_items":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseOrderUpdate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_orders"); res != nil {
+			return id, res, nil
+		}
+		orderID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		expectedVersion, ok := getRequiredJSONRPCPositiveInt(pm, "expected_version")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		itemIDs, ok := getRequiredJSONRPCPositiveIntSlice(pm, "item_ids")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		result, err := d.purchaseOrderUC.ReorderPurchaseOrderItems(ctx, orderID, &biz.SourceDocumentItemOrderMutation{
+			ExpectedVersion: expectedVersion,
+			ItemIDs:         itemIDs,
+		})
+		return id, purchaseOrderWithItemsMutationResult(ctx, d, result, err), nil
 	case "get_purchase_order":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseOrderRead); res != nil {
 			return id, res, nil

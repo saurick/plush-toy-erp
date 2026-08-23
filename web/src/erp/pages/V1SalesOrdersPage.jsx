@@ -5,6 +5,7 @@ import {
   EditOutlined,
   EyeOutlined,
   LinkOutlined,
+  OrderedListOutlined,
   PlusOutlined,
   SettingOutlined,
 } from '@ant-design/icons'
@@ -40,6 +41,7 @@ import {
 } from '../components/business-list/ColumnOrderModal.jsx'
 import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
+import BusinessLineItemOrderModal from '../components/business-list/BusinessLineItemOrderModal.jsx'
 import SourceOrderLifecycleConfirmContent from '../components/business-list/SourceOrderLifecycleConfirmContent.jsx'
 import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
 import SalesOrderReservationModal from '../components/sales-orders/SalesOrderReservationModal.jsx'
@@ -54,6 +56,7 @@ import {
   listSalesOrders,
   listAllUnits,
   listAllWarehouses,
+  reorderSalesOrderItems,
   saveSalesOrderWithItems,
 } from '../api/masterDataOrderApi.mjs'
 import {
@@ -68,6 +71,7 @@ import {
 import {
   createBlankOrderLine,
   normalizeSalesOrderItemFormValue,
+  salesOrderLineOrderLabel,
 } from '../components/sales-orders/SalesOrderForm.jsx'
 import SalesOrderBusinessModal from '../components/sales-orders/SalesOrderBusinessModal.jsx'
 import { buildSalesOrderColumns } from '../components/sales-orders/salesOrderColumns.jsx'
@@ -106,6 +110,7 @@ import {
 } from '../utils/businessTableActions.mjs'
 import { isDraftSourceDocument } from '../utils/sourceDocumentEditing.mjs'
 import {
+  canReorderSourceDocumentItems,
   commitSourceDocumentSaveResult,
   createSourceDocumentOpenEditController,
   isMutationResultUnknown,
@@ -260,6 +265,12 @@ export default function V1SalesOrdersPage() {
   const [orderColumnOrder, setOrderColumnOrder] = useState(null)
   const [columnOrderTarget, setColumnOrderTarget] = useState(null)
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
+  const [lineOrderLoading, setLineOrderLoading] = useState(false)
+  const [lineOrderOpen, setLineOrderOpen] = useState(false)
+  const [lineOrderContext, setLineOrderContext] = useState({
+    order: null,
+    items: [],
+  })
   const [orderForm] = Form.useForm()
   const [productSKUs, setProductSKUs] = useState([])
   const [customerContacts, setCustomerContacts] = useState([])
@@ -298,6 +309,7 @@ export default function V1SalesOrdersPage() {
   )
   const orderAttachmentRef = useRef(null)
   const contactLoadSeqRef = useRef(0)
+  const lineOrderRequestRef = useRef(0)
   const reservationContextRequestRef = useRef(0)
   const reservationBalanceRequestRef = useRef(0)
   const reservationInFlightRef = useRef(false)
@@ -334,6 +346,10 @@ export default function V1SalesOrdersPage() {
   }, [selectedOrder?.id])
   const selectedOrderCanEdit = Boolean(
     canUpdateOrder && isDraftSourceDocument(selectedOrder)
+  )
+  const selectedOrderCanReorder = Boolean(
+    canUpdateOrder &&
+      canReorderSourceDocumentItems('sales_order', selectedOrder)
   )
   const selectedOrderLifecycleStatus = String(
     selectedOrder?.lifecycle_status || ''
@@ -954,6 +970,89 @@ export default function V1SalesOrdersPage() {
     openSalesOrderDetails(order)
   }
 
+  const openSalesOrderLineOrder = async () => {
+    const order = selectedOrder
+    if (!selectedOrderCanReorder) {
+      message.warning(
+        order ? '当前状态不能调整产品顺序' : '请先选择一条销售订单'
+      )
+      return
+    }
+    const requestID = lineOrderRequestRef.current + 1
+    lineOrderRequestRef.current = requestID
+    setLineOrderLoading(true)
+    try {
+      const data = await listAllSalesOrderItems({
+        sales_order_id: order.id,
+        expected_version: order.version,
+      })
+      if (
+        lineOrderRequestRef.current !== requestID ||
+        selectedOrderIDRef.current !== Number(order.id)
+      ) {
+        return
+      }
+      setLineOrderContext({
+        order,
+        items: selectOpenSourceDocumentItems(data?.sales_order_items),
+      })
+      setLineOrderOpen(true)
+    } catch (error) {
+      if (isResourceVersionConflict(error)) {
+        message.warning('销售订单已被其他操作更新，请刷新后重试')
+      } else {
+        message.error(getActionErrorMessage(error, '加载销售订单产品顺序'))
+      }
+    } finally {
+      if (lineOrderRequestRef.current === requestID) {
+        setLineOrderLoading(false)
+      }
+    }
+  }
+
+  const applySalesOrderLineOrder = async (orderedItems) => {
+    const { order } = lineOrderContext
+    if (!order?.id || !Array.isArray(orderedItems)) return false
+    setSaving(true)
+    try {
+      const result = await reorderSalesOrderItems({
+        customer_key: activeCustomerKey,
+        id: order.id,
+        expected_version: order.version,
+        item_ids: orderedItems.map((item) => item.id),
+      })
+      const { sales_order: savedOrder } = result
+      const openItems = selectOpenSourceDocumentItems(result.sales_order_items)
+      salesOrderItemsPreview.invalidate(order)
+      setOrders((current) =>
+        current.map((item) =>
+          item.id === savedOrder.id ? savedOrder : item
+        )
+      )
+      setSelectedOrder(savedOrder)
+      setLineOrderContext({ order: savedOrder, items: openItems })
+      message.success('销售订单产品顺序已保存')
+      return true
+    } catch (error) {
+      if (isResourceVersionConflict(error)) {
+        message.warning('销售订单已被其他操作更新，请刷新后重试')
+        setLineOrderOpen(false)
+        await loadOrders()
+      } else if (isMutationResultUnknown(error)) {
+        message.warning(
+          '产品顺序保存结果尚未确认，请先刷新核对，不要连续重复提交'
+        )
+        setLineOrderOpen(false)
+        await loadOrders()
+      } else {
+        message.error(getActionErrorMessage(error, '保存销售订单产品顺序'))
+      }
+      return false
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const saveOrder = async () => {
     let values
     try {
@@ -1497,6 +1596,31 @@ export default function V1SalesOrdersPage() {
             >
               列顺序
             </ToolbarButton>
+            {canUpdateOrder ? (
+              <BusinessActionTooltip
+                disabled={!selectedOrderCanReorder || lineOrderLoading || saving}
+                disabledReason={
+                  !selectedOrder
+                    ? '请先选择一条销售订单'
+                    : !selectedOrderCanReorder
+                      ? '当前状态不能调整产品顺序'
+                      : lineOrderLoading || saving
+                        ? '当前订单操作完成后可调整产品顺序'
+                        : ''
+                }
+              >
+                <ToolbarButton
+                  icon={<OrderedListOutlined />}
+                  loading={lineOrderLoading}
+                  disabled={
+                    !selectedOrderCanReorder || lineOrderLoading || saving
+                  }
+                  onClick={openSalesOrderLineOrder}
+                >
+                  产品顺序
+                </ToolbarButton>
+              </BusinessActionTooltip>
+            ) : null}
           </Space>
         }
         primaryAction={
@@ -1730,6 +1854,20 @@ export default function V1SalesOrdersPage() {
           })
         }
         onClose={() => setColumnOrderTarget(null)}
+      />
+
+      <BusinessLineItemOrderModal
+        description="保存后只调整当前销售订单的产品展示顺序，不修改产品、数量、价格或稳定行号。"
+        getItemLabel={salesOrderLineOrderLabel}
+        itemNoun="产品"
+        items={lineOrderContext.items}
+        open={lineOrderOpen}
+        title="调整产品顺序"
+        onApply={applySalesOrderLineOrder}
+        onClose={() => {
+          lineOrderRequestRef.current += 1
+          setLineOrderOpen(false)
+        }}
       />
 
       <SalesOrderBusinessModal

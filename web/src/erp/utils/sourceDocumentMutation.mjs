@@ -21,6 +21,11 @@ function invalidSourceDocumentItemsResponse() {
 }
 
 const SOURCE_DOCUMENT_OPEN_EDIT_REQUEST_KEY = 'source-document-open-edit'
+const SOURCE_DOCUMENT_ITEM_ORDER_STATUSES = Object.freeze({
+  sales_order: new Set(['draft', 'submitted', 'active']),
+  purchase_order: new Set(['draft', 'submitted', 'approved']),
+  outsourcing_order: new Set(['draft', 'submitted', 'confirmed']),
+})
 
 function requestIsCurrent(isCurrent) {
   return typeof isCurrent !== 'function' || isCurrent()
@@ -124,6 +129,14 @@ export function isOpenSourceDocumentItem(item) {
       .trim()
       .toLowerCase() === 'open'
   )
+}
+
+export function canReorderSourceDocumentItems(documentType, document) {
+  const statuses = SOURCE_DOCUMENT_ITEM_ORDER_STATUSES[documentType]
+  const status = String(document?.lifecycle_status || '')
+    .trim()
+    .toLowerCase()
+  return Boolean(statuses?.has(status))
 }
 
 export function selectOpenSourceDocumentItems(items) {

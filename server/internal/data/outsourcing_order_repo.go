@@ -727,6 +727,96 @@ func (r *outsourcingOrderRepo) SaveOutsourcingOrderWithItems(ctx context.Context
 	}, nil
 }
 
+func (r *outsourcingOrderRepo) ReorderOutsourcingOrderItems(ctx context.Context, id, expectedVersion int, itemIDs []int) (*biz.OutsourcingOrderWithItems, error) {
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if tx != nil {
+			rollbackEntTx(ctx, tx, r.log)
+		}
+	}()
+
+	affected, err := tx.OutsourcingOrder.Update().
+		Where(
+			outsourcingorder.ID(id),
+			outsourcingorder.LifecycleStatusIn(
+				biz.OutsourcingOrderStatusDraft,
+				biz.OutsourcingOrderStatusSubmitted,
+				biz.OutsourcingOrderStatusConfirmed,
+			),
+			outsourcingorder.Version(expectedVersion),
+		).
+		SetVersion(expectedVersion + 1).
+		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if affected == 0 {
+		current, err := tx.OutsourcingOrder.Get(ctx, id)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return nil, biz.ErrOutsourcingOrderNotFound
+			}
+			return nil, err
+		}
+		if !biz.CanReorderOutsourcingOrderItems(current.LifecycleStatus) {
+			return nil, biz.ErrBadParam
+		}
+		return nil, biz.ErrOutsourcingOrderConflict
+	}
+
+	openItems, err := tx.OutsourcingOrderItem.Query().Where(
+		outsourcingorderitem.OutsourcingOrderID(id),
+		outsourcingorderitem.LineStatus(biz.OutsourcingOrderItemStatusOpen),
+	).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(openItems) != len(itemIDs) {
+		return nil, biz.ErrBadParam
+	}
+	openByID := make(map[int]struct{}, len(openItems))
+	for _, item := range openItems {
+		openByID[item.ID] = struct{}{}
+	}
+	for index, itemID := range itemIDs {
+		if _, ok := openByID[itemID]; !ok {
+			return nil, biz.ErrBadParam
+		}
+		if _, err := tx.OutsourcingOrderItem.UpdateOneID(itemID).
+			SetDisplayOrder(index + 1).
+			Save(ctx); err != nil {
+			return nil, err
+		}
+	}
+
+	orderRow, err := tx.OutsourcingOrder.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	itemRows, err := tx.OutsourcingOrderItem.Query().
+		Where(outsourcingorderitem.OutsourcingOrderID(id)).
+		Order(sourceDocumentItemOrder(
+			outsourcingorderitem.FieldDisplayOrder,
+			outsourcingorderitem.FieldLineNo,
+			outsourcingorderitem.FieldID,
+		)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return &biz.OutsourcingOrderWithItems{
+		Order: entOutsourcingOrderToBiz(orderRow),
+		Items: entOutsourcingOrderItemsToBiz(itemRows),
+	}, nil
+}
+
 func outsourcingOrderWIPDependencyBatchIDs(ctx context.Context, client *ent.Client, orderID int) ([]int, error) {
 	if client == nil || orderID <= 0 {
 		return nil, biz.ErrBadParam

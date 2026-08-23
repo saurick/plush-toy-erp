@@ -45,6 +45,30 @@ func (d *jsonrpcDispatcher) handleSalesOrderDocument(
 		}
 		result, err := d.salesOrderUC.SaveSalesOrderWithItems(ctx, orderID, in, items)
 		return id, salesOrderWithItemsMutationResult(ctx, d, result, err), nil
+	case "reorder_sales_order_items":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionSalesOrderUpdate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "sales_orders"); res != nil {
+			return id, res, nil
+		}
+		orderID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		expectedVersion, ok := getRequiredJSONRPCPositiveInt(pm, "expected_version")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		itemIDs, ok := getRequiredJSONRPCPositiveIntSlice(pm, "item_ids")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		result, err := d.salesOrderUC.ReorderSalesOrderItems(ctx, orderID, &biz.SourceDocumentItemOrderMutation{
+			ExpectedVersion: expectedVersion,
+			ItemIDs:         itemIDs,
+		})
+		return id, salesOrderWithItemsMutationResult(ctx, d, result, err), nil
 	case "get_sales_order":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSalesOrderRead); res != nil {
 			return id, res, nil

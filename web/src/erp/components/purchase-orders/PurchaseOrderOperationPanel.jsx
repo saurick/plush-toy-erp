@@ -6,6 +6,7 @@ import {
   FileTextOutlined,
   ImportOutlined,
   LinkOutlined,
+  OrderedListOutlined,
   PlusOutlined,
   SettingOutlined,
 } from '@ant-design/icons'
@@ -51,6 +52,7 @@ export default function PurchaseOrderOperationPanel({
   generatingInboundDraft = false,
   hasActiveFilters = false,
   itemsLoading = false,
+  lineOrderLoading = false,
   keyword = '',
   lifecycleScope = 'current',
   lifecycleActionStates = {},
@@ -61,6 +63,7 @@ export default function PurchaseOrderOperationPanel({
   openCreateModal,
   openEditModal,
   openInboundDraftModal,
+  openLineOrder,
   openRelatedTable,
   relatedMenuItems = PURCHASE_ORDER_RELATED_MENU_ITEMS,
   orders = [],
@@ -72,6 +75,7 @@ export default function PurchaseOrderOperationPanel({
   secondaryLifecycleActions = [],
   selectedItems = [],
   selectedOrderCanEdit = false,
+  selectedOrderCanReorder = false,
   selectedOrderDisplayText = '请先选择采购订单',
   selectedRowKeys = [],
   setColumnOrderOpen,
@@ -98,7 +102,11 @@ export default function PurchaseOrderOperationPanel({
     singleSelectedOrder?.lifecycle_status || ''
   ).toLowerCase()
   const recordActionBusy =
-    saving || generatingInboundDraft || printingContract || itemsLoading
+    saving ||
+    generatingInboundDraft ||
+    printingContract ||
+    itemsLoading ||
+    lineOrderLoading
   const primaryLifecycleState = lifecycleActionStates[
     primaryLifecycleAction?.key
   ] || {
@@ -197,6 +205,29 @@ export default function PurchaseOrderOperationPanel({
           >
             列顺序
           </ToolbarButton>
+          {canUpdate ? (
+            <BusinessActionTooltip
+              disabled={!selectedOrderCanReorder || recordActionBusy}
+              disabledReason={
+                !singleSelectedOrder
+                  ? '请先选择一条采购订单'
+                  : !selectedOrderCanReorder
+                    ? '当前状态不能调整材料顺序'
+                    : recordActionBusy
+                      ? '当前订单操作完成后可调整材料顺序'
+                      : ''
+              }
+            >
+              <ToolbarButton
+                icon={<OrderedListOutlined />}
+                loading={lineOrderLoading}
+                disabled={!selectedOrderCanReorder || recordActionBusy}
+                onClick={openLineOrder}
+              >
+                材料顺序
+              </ToolbarButton>
+            </BusinessActionTooltip>
+          ) : null}
         </Space>
       }
       primaryAction={

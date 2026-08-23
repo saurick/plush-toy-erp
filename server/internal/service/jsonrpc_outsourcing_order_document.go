@@ -51,6 +51,30 @@ func (d *jsonrpcDispatcher) handleOutsourcingOrderDocument(
 		}
 		result, err := d.outsourcingOrderUC.SaveOutsourcingOrderWithItems(ctx, orderID, in, items)
 		return id, outsourcingOrderWithItemsMutationResult(ctx, d, result, err), nil
+	case "reorder_outsourcing_order_items":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionOutsourcingOrderUpdate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "outsourcing_orders"); res != nil {
+			return id, res, nil
+		}
+		orderID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		expectedVersion, ok := getRequiredJSONRPCPositiveInt(pm, "expected_version")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		itemIDs, ok := getRequiredJSONRPCPositiveIntSlice(pm, "item_ids")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		result, err := d.outsourcingOrderUC.ReorderOutsourcingOrderItems(ctx, orderID, &biz.SourceDocumentItemOrderMutation{
+			ExpectedVersion: expectedVersion,
+			ItemIDs:         itemIDs,
+		})
+		return id, outsourcingOrderWithItemsMutationResult(ctx, d, result, err), nil
 	case "get_outsourcing_order":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionOutsourcingOrderRead); res != nil {
 			return id, res, nil

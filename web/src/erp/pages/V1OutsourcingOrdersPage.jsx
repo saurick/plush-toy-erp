@@ -3,6 +3,7 @@ import {
   DownloadOutlined,
   EditOutlined,
   FileTextOutlined,
+  OrderedListOutlined,
   PlusOutlined,
   PrinterOutlined,
   SettingOutlined,
@@ -45,6 +46,7 @@ import {
 } from '../components/business-list/businessListPreferences.mjs'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
+import BusinessLineItemOrderModal from '../components/business-list/BusinessLineItemOrderModal.jsx'
 import SourceOrderLifecycleConfirmContent from '../components/business-list/SourceOrderLifecycleConfirmContent.jsx'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
@@ -54,6 +56,7 @@ import OutsourcingOrderForm, {
   processLabel,
   supplierLabel,
   unitLabel,
+  outsourcingOrderLineOrderLabel,
 } from '../components/outsourcing-orders/OutsourcingOrderForm.jsx'
 import OutsourcingOrderSourceFactModal from '../components/outsourcing-orders/OutsourcingOrderSourceFactModal.jsx'
 import OutsourcingReturnRecordsModal from '../components/outsourcing-orders/OutsourcingReturnRecordsModal.jsx'
@@ -75,6 +78,7 @@ import {
   listAllSuppliers,
   listAllUnits,
   listAllWarehouses,
+  reorderOutsourcingOrderItems,
   saveOutsourcingOrderWithItems,
 } from '../api/masterDataOrderApi.mjs'
 import {
@@ -132,6 +136,7 @@ import {
 } from '../utils/businessCollaborationTasks.mjs'
 import {
   buildSourceDocumentItemSaveParams,
+  canReorderSourceDocumentItems,
   commitSourceDocumentSaveResult,
   createSourceDocumentOpenEditController,
   isMutationResultUnknown,
@@ -269,6 +274,12 @@ export default function V1OutsourcingOrdersPage() {
   const [columnOrder, setColumnOrder] = useState(null)
   const [columnOrderOpen, setColumnOrderOpen] = useState(false)
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
+  const [lineOrderLoading, setLineOrderLoading] = useState(false)
+  const [lineOrderOpen, setLineOrderOpen] = useState(false)
+  const [lineOrderContext, setLineOrderContext] = useState({
+    order: null,
+    items: [],
+  })
   const [keyword, setKeyword] = useState('')
   const [lifecycleScope, setLifecycleScope] = useState(() =>
     lifecycleScopeFromSearchParams(searchParams)
@@ -286,6 +297,8 @@ export default function V1OutsourcingOrdersPage() {
   const [editingRow, setEditingRow] = useState(null)
   const [detailOrder, setDetailOrder] = useState(null)
   const orderAttachmentRef = useRef(null)
+  const lineOrderRequestRef = useRef(0)
+  const selectedRowIDRef = useRef(0)
   const [suppliers, setSuppliers] = useState([])
   const [supplierContacts, setSupplierContacts] = useState([])
   const [supplierContactsLoading, setSupplierContactsLoading] = useState(false)
@@ -384,6 +397,10 @@ export default function V1OutsourcingOrdersPage() {
       }),
     [beginLatestRequest]
   )
+
+  useEffect(() => {
+    selectedRowIDRef.current = Number(selectedRow?.id || 0)
+  }, [selectedRow?.id])
 
   const supplierOptions = useMemo(
     () =>
@@ -639,6 +656,10 @@ export default function V1OutsourcingOrdersPage() {
   const canUpdate = hasActionPermission(
     adminProfile,
     'outsourcing.order.update'
+  )
+  const selectedOrderCanReorder = Boolean(
+    canUpdate &&
+      canReorderSourceDocumentItems('outsourcing_order', selectedRow)
   )
   const canCreateMaterialIssue = hasActionPermission(
     adminProfile,
@@ -1837,6 +1858,88 @@ export default function V1OutsourcingOrdersPage() {
     openOutsourcingOrderDetails(record)
   }
 
+  const openOutsourcingOrderLineOrder = async () => {
+    const order = selectedRow
+    if (!selectedOrderCanReorder) {
+      message.warning(
+        order ? '当前状态不能调整加工明细顺序' : '请先选择一条加工合同'
+      )
+      return
+    }
+    const requestID = lineOrderRequestRef.current + 1
+    lineOrderRequestRef.current = requestID
+    setLineOrderLoading(true)
+    try {
+      const items = await loadOrderItems(order)
+      if (
+        lineOrderRequestRef.current !== requestID ||
+        selectedRowIDRef.current !== Number(order.id)
+      ) {
+        return
+      }
+      setLineOrderContext({
+        order,
+        items: selectOpenSourceDocumentItems(items),
+      })
+      setLineOrderOpen(true)
+    } catch (error) {
+      if (isResourceVersionConflict(error)) {
+        message.warning('加工合同已被其他操作更新，请刷新后重试')
+      } else {
+        message.error(getActionErrorMessage(error, '加载加工明细顺序'))
+      }
+    } finally {
+      if (lineOrderRequestRef.current === requestID) {
+        setLineOrderLoading(false)
+      }
+    }
+  }
+
+  const applyOutsourcingOrderLineOrder = async (orderedItems) => {
+    const { order } = lineOrderContext
+    if (!order?.id || !Array.isArray(orderedItems)) return false
+    setSaving(true)
+    try {
+      const result = await reorderOutsourcingOrderItems({
+        customer_key: activeCustomerKey,
+        id: order.id,
+        expected_version: order.version,
+        item_ids: orderedItems.map((item) => item.id),
+      })
+      const { outsourcing_order: savedOrder } = result
+      const openItems = selectOpenSourceDocumentItems(
+        result.outsourcing_order_items
+      )
+      outsourcingOrderItemsPreview.invalidate(order)
+      setRows((current) =>
+        current.map((item) =>
+          item.id === savedOrder.id ? savedOrder : item
+        )
+      )
+      setSelectedRow(savedOrder)
+      setLineOrderContext({ order: savedOrder, items: openItems })
+      message.success('加工明细顺序已保存')
+      return true
+    } catch (error) {
+      if (isResourceVersionConflict(error)) {
+        message.warning('加工合同已被其他操作更新，请刷新后重试')
+        setLineOrderOpen(false)
+        await loadOrders()
+      } else if (isMutationResultUnknown(error)) {
+        message.warning(
+          '加工明细顺序保存结果尚未确认，请先刷新核对，不要连续重复提交'
+        )
+        setLineOrderOpen(false)
+        await loadOrders()
+      } else {
+        message.error(getActionErrorMessage(error, '保存加工明细顺序'))
+      }
+      return false
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const closeModal = () => {
     sourceDocumentOpenEditController.invalidate()
     orderAttachmentRef.current?.clearPendingAttachments()
@@ -2859,6 +2962,37 @@ export default function V1OutsourcingOrdersPage() {
             >
               列顺序
             </ToolbarButton>
+            {canUpdate ? (
+              <BusinessActionTooltip
+                disabled={
+                  !selectedOrderCanReorder ||
+                  lineOrderLoading ||
+                  saving
+                }
+                disabledReason={
+                  !selectedRow
+                    ? '请先选择一条加工合同'
+                    : !selectedOrderCanReorder
+                      ? '当前状态不能调整加工明细顺序'
+                      : lineOrderLoading || saving
+                        ? '当前合同操作完成后可调整加工明细顺序'
+                        : ''
+                }
+              >
+                <ToolbarButton
+                  icon={<OrderedListOutlined />}
+                  loading={lineOrderLoading}
+                  disabled={
+                    !selectedOrderCanReorder ||
+                    lineOrderLoading ||
+                    saving
+                  }
+                  onClick={openOutsourcingOrderLineOrder}
+                >
+                  加工明细顺序
+                </ToolbarButton>
+              </BusinessActionTooltip>
+            ) : null}
           </Space>
         }
         primaryAction={
@@ -3196,6 +3330,20 @@ export default function V1OutsourcingOrdersPage() {
         moduleTitle="委外订单列表"
         onChange={(nextOrder) => persistColumnOrder(nextOrder, dataColumns)}
         onClose={() => setColumnOrderOpen(false)}
+      />
+
+      <BusinessLineItemOrderModal
+        description="保存后只调整当前加工合同的明细展示顺序，不修改产品或材料、数量、价格或稳定行号。"
+        getItemLabel={outsourcingOrderLineOrderLabel}
+        itemNoun="加工明细"
+        items={lineOrderContext.items}
+        open={lineOrderOpen}
+        title="调整加工明细顺序"
+        onApply={applyOutsourcingOrderLineOrder}
+        onClose={() => {
+          lineOrderRequestRef.current += 1
+          setLineOrderOpen(false)
+        }}
       />
 
       <BusinessFormModal

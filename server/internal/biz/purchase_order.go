@@ -203,6 +203,10 @@ type PurchaseOrderLifecycleActionRepo interface {
 	ApplyPurchaseOrderLifecycleAction(ctx context.Context, in *SourceOrderLifecycleAction, lifecycleStatus string) (*PurchaseOrder, error)
 }
 
+type PurchaseOrderItemOrderRepo interface {
+	ReorderPurchaseOrderItems(ctx context.Context, id, expectedVersion int, itemIDs []int) (*PurchaseOrderWithItems, error)
+}
+
 type SupplierDefaultPaymentTermDaysReader interface {
 	SupplierDefaultPaymentTermDays(ctx context.Context, supplierID int) (int, error)
 }
@@ -498,6 +502,31 @@ func (uc *PurchaseOrderUsecase) SavePurchaseOrderWithItems(ctx context.Context, 
 	return uc.repo.SavePurchaseOrderWithItems(ctx, id, &normalizedOrder, normalizedItems)
 }
 
+func (uc *PurchaseOrderUsecase) ReorderPurchaseOrderItems(ctx context.Context, id int, in *SourceDocumentItemOrderMutation) (*PurchaseOrderWithItems, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeSourceDocumentItemOrderMutation(id, in)
+	if err != nil {
+		return nil, err
+	}
+	current, err := uc.repo.GetPurchaseOrder(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if !CanReorderPurchaseOrderItems(current.LifecycleStatus) {
+		return nil, ErrBadParam
+	}
+	if current.Version != normalized.ExpectedVersion {
+		return nil, ErrPurchaseOrderConflict
+	}
+	repo, ok := uc.repo.(PurchaseOrderItemOrderRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return repo.ReorderPurchaseOrderItems(ctx, id, normalized.ExpectedVersion, normalized.ItemIDs)
+}
+
 func (uc *PurchaseOrderUsecase) ListPurchaseOrderItems(ctx context.Context, filter PurchaseOrderItemFilter) ([]*PurchaseOrderItem, int, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
@@ -749,6 +778,15 @@ func IsValidPurchaseOrderStatus(value string) bool {
 
 func IsValidPurchaseOrderItemStatus(value string) bool {
 	return corestatus.IsPurchaseOrderItemStatus(value)
+}
+
+func CanReorderPurchaseOrderItems(status string) bool {
+	switch corestatus.NormalizePurchaseOrderStatus(status) {
+	case PurchaseOrderStatusDraft, PurchaseOrderStatusSubmitted, PurchaseOrderStatusApproved:
+		return true
+	default:
+		return false
+	}
 }
 
 func IsPurchaseOrderLifecycleTransitionAllowed(current string, next string) bool {

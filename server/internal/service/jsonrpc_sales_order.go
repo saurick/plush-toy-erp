@@ -28,6 +28,7 @@ func (d *jsonrpcDispatcher) handleSalesOrder(
 
 	switch method {
 	case "save_sales_order_with_items",
+		"reorder_sales_order_items",
 		"get_sales_order",
 		"list_sales_orders":
 		return d.handleSalesOrderDocument(ctx, method, id, pm)

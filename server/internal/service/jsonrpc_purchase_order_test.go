@@ -15,21 +15,22 @@ import (
 )
 
 type stubPurchaseOrderJSONRPCRepo struct {
-	orders         map[int]*biz.PurchaseOrder
-	items          map[int]*biz.PurchaseOrderItem
-	nextOrderID    int
-	nextItemID     int
-	supplierActive bool
-	materialActive bool
-	unitActive     bool
-	lastFilter     biz.PurchaseOrderFilter
-	lifecycleCalls int
-	saveErr        error
-	saveCalls      int
-	progress       *biz.PurchaseOrderReceiptProgress
-	progressErr    error
-	progressCalls  int
-	supplierTerm   int
+	orders           map[int]*biz.PurchaseOrder
+	items            map[int]*biz.PurchaseOrderItem
+	nextOrderID      int
+	nextItemID       int
+	supplierActive   bool
+	materialActive   bool
+	unitActive       bool
+	lastFilter       biz.PurchaseOrderFilter
+	lifecycleCalls   int
+	saveErr          error
+	saveCalls        int
+	progress         *biz.PurchaseOrderReceiptProgress
+	progressErr      error
+	progressCalls    int
+	supplierTerm     int
+	reorderedItemIDs []int
 }
 
 func newStubPurchaseOrderJSONRPCRepo() *stubPurchaseOrderJSONRPCRepo {
@@ -200,6 +201,26 @@ func (s *stubPurchaseOrderJSONRPCRepo) SavePurchaseOrderWithItems(_ context.Cont
 	return out, nil
 }
 
+func (s *stubPurchaseOrderJSONRPCRepo) ReorderPurchaseOrderItems(_ context.Context, id, expectedVersion int, itemIDs []int) (*biz.PurchaseOrderWithItems, error) {
+	s.reorderedItemIDs = append([]int(nil), itemIDs...)
+	order, ok := s.orders[id]
+	if !ok {
+		return nil, biz.ErrPurchaseOrderNotFound
+	}
+	updated := *order
+	updated.Version = expectedVersion + 1
+	s.orders[id] = &updated
+	items := make([]*biz.PurchaseOrderItem, 0, len(itemIDs))
+	for _, itemID := range itemIDs {
+		item, exists := s.items[itemID]
+		if !exists || item.PurchaseOrderID != id || item.LineStatus != biz.PurchaseOrderItemStatusOpen {
+			return nil, biz.ErrBadParam
+		}
+		items = append(items, item)
+	}
+	return &biz.PurchaseOrderWithItems{Order: &updated, Items: items}, nil
+}
+
 func (s *stubPurchaseOrderJSONRPCRepo) SupplierIsActive(context.Context, int) (bool, error) {
 	return s.supplierActive, nil
 }
@@ -350,6 +371,32 @@ func TestJsonrpcDispatcher_PurchaseOrderAPISavesListsAndTransitions(t *testing.T
 	_, removedApproveRes, err := j.handlePurchaseOrder(ctx, "approve_purchase_order", "approve-removed", mustJSONRPCStruct(t, map[string]any{"id": float64(orderID)}))
 	if err != nil || removedApproveRes == nil || removedApproveRes.Code != errcode.UnknownMethod.Code {
 		t.Fatalf("direct purchase approval must stay removed, res=%#v err=%v", removedApproveRes, err)
+	}
+}
+
+func TestJsonrpcDispatcher_ReorderPurchaseOrderItemsUsesUpdatePermissionAndStableIDs(t *testing.T) {
+	repo := newStubPurchaseOrderJSONRPCRepo()
+	repo.orders[1] = &biz.PurchaseOrder{ID: 1, PurchaseOrderNo: "PO-ORDER", SupplierID: 1, PurchaseDate: time.Unix(1, 0), LifecycleStatus: biz.PurchaseOrderStatusDraft, Version: 1}
+	for _, itemID := range []int{1, 2, 3} {
+		repo.items[itemID] = &biz.PurchaseOrderItem{ID: itemID, PurchaseOrderID: 1, LineNo: itemID, MaterialID: 1, UnitID: 1, PurchasedQuantity: decimal.NewFromInt(1), LineStatus: biz.PurchaseOrderItemStatusOpen}
+	}
+	j := newPurchaseOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin(
+		[]string{biz.PurchaseRoleKey},
+		biz.PermissionPurchaseOrderUpdate,
+	))
+	_, res, err := j.handlePurchaseOrder(workflowJSONRPCAdminContext(), "reorder_purchase_order_items", "reorder", mustJSONRPCStruct(t, map[string]any{
+		"id":               float64(1),
+		"expected_version": float64(1),
+		"item_ids":         []any{float64(3), float64(1), float64(2)},
+	}))
+	if err != nil || res == nil || res.Code != errcode.OK.Code {
+		t.Fatalf("reorder purchase order items: res=%#v err=%v", res, err)
+	}
+	if len(repo.reorderedItemIDs) != 3 || repo.reorderedItemIDs[0] != 3 || repo.reorderedItemIDs[2] != 2 {
+		t.Fatalf("stable item order not forwarded: %#v", repo.reorderedItemIDs)
+	}
+	if version := jsonRPCInt(t, jsonRPCNestedMap(t, res, "purchase_order"), "version"); version != 2 {
+		t.Fatalf("reordered purchase order version = %d, want 2", version)
 	}
 }
 

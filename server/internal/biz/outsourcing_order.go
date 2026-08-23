@@ -182,6 +182,10 @@ type OutsourcingOrderLifecycleActionRepo interface {
 	ApplyOutsourcingOrderLifecycleAction(ctx context.Context, in *SourceOrderLifecycleAction, lifecycleStatus string) (*OutsourcingOrder, error)
 }
 
+type OutsourcingOrderItemOrderRepo interface {
+	ReorderOutsourcingOrderItems(ctx context.Context, id, expectedVersion int, itemIDs []int) (*OutsourcingOrderWithItems, error)
+}
+
 type OutsourcingOrderUsecase struct {
 	repo OutsourcingOrderRepo
 }
@@ -289,6 +293,31 @@ func (uc *OutsourcingOrderUsecase) SaveOutsourcingOrderWithItems(ctx context.Con
 	}
 
 	return uc.repo.SaveOutsourcingOrderWithItems(ctx, id, &normalizedOrder, normalizedItems)
+}
+
+func (uc *OutsourcingOrderUsecase) ReorderOutsourcingOrderItems(ctx context.Context, id int, in *SourceDocumentItemOrderMutation) (*OutsourcingOrderWithItems, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeSourceDocumentItemOrderMutation(id, in)
+	if err != nil {
+		return nil, err
+	}
+	current, err := uc.repo.GetOutsourcingOrder(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if !CanReorderOutsourcingOrderItems(current.LifecycleStatus) {
+		return nil, ErrBadParam
+	}
+	if current.Version != normalized.ExpectedVersion {
+		return nil, ErrOutsourcingOrderConflict
+	}
+	repo, ok := uc.repo.(OutsourcingOrderItemOrderRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return repo.ReorderOutsourcingOrderItems(ctx, id, normalized.ExpectedVersion, normalized.ItemIDs)
 }
 
 func (uc *OutsourcingOrderUsecase) SubmitOutsourcingOrder(ctx context.Context, id int) (*OutsourcingOrder, error) {
@@ -708,6 +737,15 @@ func IsOutsourcingOrderLifecycleTransitionAllowed(current string, next string) b
 		return next == OutsourcingOrderStatusConfirmed || next == OutsourcingOrderStatusCanceled
 	case OutsourcingOrderStatusConfirmed:
 		return next == OutsourcingOrderStatusClosed || next == OutsourcingOrderStatusCanceled
+	default:
+		return false
+	}
+}
+
+func CanReorderOutsourcingOrderItems(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case OutsourcingOrderStatusDraft, OutsourcingOrderStatusSubmitted, OutsourcingOrderStatusConfirmed:
+		return true
 	default:
 		return false
 	}

@@ -28,6 +28,7 @@ func (d *jsonrpcDispatcher) handleOutsourcingOrder(
 
 	switch method {
 	case "save_outsourcing_order_with_items",
+		"reorder_outsourcing_order_items",
 		"get_outsourcing_order",
 		"list_outsourcing_orders":
 		return d.handleOutsourcingOrderDocument(ctx, method, id, pm)

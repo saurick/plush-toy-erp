@@ -1158,6 +1158,96 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 	}, nil
 }
 
+func (r *salesOrderRepo) ReorderSalesOrderItems(ctx context.Context, id, expectedVersion int, itemIDs []int) (*biz.SalesOrderWithItems, error) {
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if tx != nil {
+			rollbackEntTx(ctx, tx, r.log)
+		}
+	}()
+
+	affected, err := tx.SalesOrder.Update().
+		Where(
+			salesorder.ID(id),
+			salesorder.LifecycleStatusIn(
+				biz.SalesOrderStatusDraft,
+				biz.SalesOrderStatusSubmitted,
+				biz.SalesOrderStatusActive,
+			),
+			salesorder.Version(expectedVersion),
+		).
+		SetVersion(expectedVersion + 1).
+		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if affected == 0 {
+		current, err := tx.SalesOrder.Get(ctx, id)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return nil, biz.ErrSalesOrderNotFound
+			}
+			return nil, err
+		}
+		if !biz.CanReorderSalesOrderItems(current.LifecycleStatus) {
+			return nil, biz.ErrBadParam
+		}
+		return nil, biz.ErrSalesOrderConflict
+	}
+
+	openItems, err := tx.SalesOrderItem.Query().Where(
+		salesorderitem.SalesOrderID(id),
+		salesorderitem.LineStatus(biz.SalesOrderItemStatusOpen),
+	).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(openItems) != len(itemIDs) {
+		return nil, biz.ErrBadParam
+	}
+	openByID := make(map[int]struct{}, len(openItems))
+	for _, item := range openItems {
+		openByID[item.ID] = struct{}{}
+	}
+	for index, itemID := range itemIDs {
+		if _, ok := openByID[itemID]; !ok {
+			return nil, biz.ErrBadParam
+		}
+		if _, err := tx.SalesOrderItem.UpdateOneID(itemID).
+			SetDisplayOrder(index + 1).
+			Save(ctx); err != nil {
+			return nil, err
+		}
+	}
+
+	orderRow, err := tx.SalesOrder.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	itemRows, err := tx.SalesOrderItem.Query().
+		Where(salesorderitem.SalesOrderID(id)).
+		Order(sourceDocumentItemOrder(
+			salesorderitem.FieldDisplayOrder,
+			salesorderitem.FieldLineNo,
+			salesorderitem.FieldID,
+		)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return &biz.SalesOrderWithItems{
+		Order: entSalesOrderToBiz(orderRow),
+		Items: entSalesOrderItemsToBiz(itemRows),
+	}, nil
+}
+
 func salesOrderLifecyclePredecessors(next string) []string {
 	statuses := []string{
 		biz.SalesOrderStatusDraft,
