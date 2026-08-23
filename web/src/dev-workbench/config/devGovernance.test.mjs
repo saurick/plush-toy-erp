@@ -79,8 +79,9 @@ test('devGovernance: shared dev page nav exposes workspace routes and unique dee
   )
   assert.match(
     devPageNavSource,
-    /location\.pathname\.replace\(\/\\\/\+\$\/, ''\)/
+    /function normalizePathname\(pathname\)[\s\S]*pathname\.replace\(\/\\\/\+\$\/, ''\)/
   )
+  assert.match(devPageNavSource, /normalizePathname\(location\.pathname\)/)
   assert.match(devPageNavSource, /aria-current=\{isExact \? 'page'/)
   assert.match(devPageNavSource, /aria-current=\{isActive \? 'page'/)
   assert.match(devPageNavSource, /erp-dev-workspace-nav__route--context/)
