@@ -105,6 +105,10 @@ import {
 import { resolveExactRecordPage } from '../utils/businessPagination.mjs'
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
 import {
+  resolveBusinessActionAvailability,
+  resolveContextualBusinessActionAvailability,
+} from '../utils/businessActionAvailability.mjs'
+import {
   LIFECYCLE_SCOPE,
   filterLifecycleStatusOptions,
   lifecycleScopeFromSearchParams,
@@ -387,6 +391,43 @@ export default function V1ProductionOrdersPage() {
     adminProfile,
     'outsourcing.order.read'
   )
+  const canManageProductionWip =
+    canAssignProductionWip ||
+    canExecuteProductionWip ||
+    canReworkProductionWip ||
+    canConfirmPackagingMaterial
+  const productionRouteReadOnly =
+    canReadProductionWip && !canManageProductionWip
+  const selectedProductionRouteRelevant = [
+    PRODUCTION_ORDER_STATUS.RELEASED,
+    PRODUCTION_ORDER_STATUS.CLOSED,
+  ].includes(selected?.status)
+  const productionRouteActionAvailability = productionRouteReadOnly
+    ? resolveContextualBusinessActionAvailability({
+        authorized: canReadProductionWip,
+        selected: Boolean(selected),
+        relevant: selectedProductionRouteRelevant,
+        busy: detailLoading || mutationLoading,
+        busyReason: '当前资料处理完成后可查看工序',
+      })
+    : resolveBusinessActionAvailability({
+        authorized: canReadProductionWip,
+        selected: Boolean(selected),
+        relevant: selectedProductionRouteRelevant,
+        applicable: selectedProductionRouteRelevant,
+        busy: detailLoading || mutationLoading,
+        selectionReason: '请先选择一张生产订单',
+        unavailableReason: '生产订单发布后可办理工序',
+        busyReason: '当前资料处理完成后可办理工序',
+      })
+  const productionReworkProgressAvailability =
+    resolveContextualBusinessActionAvailability({
+      authorized: canReadProductionWip && canReadProductionFacts,
+      selected: Boolean(selected),
+      relevant: selectedProductionRouteRelevant,
+      busy: detailLoading || reworkProgressLoading,
+      busyReason: '当前资料加载完成后可查看返工进度',
+    })
 
   useEffect(() => {
     selectedIDRef.current = Number(selected?.id || 0)
@@ -1748,84 +1789,34 @@ export default function V1ProductionOrdersPage() {
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {canReadProductionWip ? (
+          {productionRouteActionAvailability.visible ? (
             <BusinessActionTooltip
-              disabled={
-                !selected ||
-                ![
-                  PRODUCTION_ORDER_STATUS.RELEASED,
-                  PRODUCTION_ORDER_STATUS.CLOSED,
-                ].includes(selected.status) ||
-                detailLoading ||
-                mutationLoading
-              }
-              disabledReason={
-                !selected
-                  ? '请先选择一张生产订单'
-                  : ![
-                        PRODUCTION_ORDER_STATUS.RELEASED,
-                        PRODUCTION_ORDER_STATUS.CLOSED,
-                      ].includes(selected.status)
-                    ? '生产订单发布后可办理工序'
-                    : detailLoading || mutationLoading
-                      ? '当前资料处理完成后可办理工序'
-                      : ''
-              }
+              disabled={productionRouteActionAvailability.disabled}
+              disabledReason={productionRouteActionAvailability.disabledReason}
             >
               <Button
                 data-business-action-key="route-execution"
-                disabled={
-                  !selected ||
-                  ![
-                    PRODUCTION_ORDER_STATUS.RELEASED,
-                    PRODUCTION_ORDER_STATUS.CLOSED,
-                  ].includes(selected.status) ||
-                  detailLoading ||
-                  mutationLoading
-                }
+                disabled={productionRouteActionAvailability.disabled}
                 onClick={() => setProductionRouteOpen(true)}
               >
-                {selected?.status === PRODUCTION_ORDER_STATUS.CLOSED
-                  ? '返工工序办理'
-                  : '工序办理'}
+                {productionRouteReadOnly
+                  ? '查看工序'
+                  : selected?.status === PRODUCTION_ORDER_STATUS.CLOSED
+                    ? '返工工序办理'
+                    : '工序办理'}
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {canReadProductionWip && canReadProductionFacts ? (
+          {productionReworkProgressAvailability.visible ? (
             <BusinessActionTooltip
-              disabled={
-                !selected ||
-                ![
-                  PRODUCTION_ORDER_STATUS.RELEASED,
-                  PRODUCTION_ORDER_STATUS.CLOSED,
-                ].includes(selected.status) ||
-                detailLoading ||
-                reworkProgressLoading
-              }
+              disabled={productionReworkProgressAvailability.disabled}
               disabledReason={
-                !selected
-                  ? '请先选择一张生产订单'
-                  : ![
-                        PRODUCTION_ORDER_STATUS.RELEASED,
-                        PRODUCTION_ORDER_STATUS.CLOSED,
-                      ].includes(selected.status)
-                    ? '生产订单发布后可查看返工进度'
-                    : detailLoading || reworkProgressLoading
-                      ? '当前资料加载完成后可查看返工进度'
-                      : ''
+                productionReworkProgressAvailability.disabledReason
               }
             >
               <Button
                 data-business-action-key="rework-progress"
-                disabled={
-                  !selected ||
-                  ![
-                    PRODUCTION_ORDER_STATUS.RELEASED,
-                    PRODUCTION_ORDER_STATUS.CLOSED,
-                  ].includes(selected.status) ||
-                  detailLoading ||
-                  reworkProgressLoading
-                }
+                disabled={productionReworkProgressAvailability.disabled}
                 loading={reworkProgressLoading}
                 onClick={() => openProductionReworkProgress(selected)}
               >

@@ -90,6 +90,7 @@ import {
   resolveExactRecordPage,
 } from '../utils/businessPagination.mjs'
 import { applyBusinessColumnSorters } from '../utils/moduleTableColumns.mjs'
+import { resolveContextualBusinessActionAvailability } from '../utils/businessActionAvailability.mjs'
 import { resolveRelatedRecordActionAvailability } from '../utils/operationalActionAvailability.mjs'
 import {
   inventoryLotOption,
@@ -307,6 +308,13 @@ export default function V1PurchaseReceiptsPage() {
     authorized: hasRelatedCapability,
     record: selectedRow,
     itemCount: relatedMenuItems.length,
+  })
+  const payableViewAvailability = resolveContextualBusinessActionAvailability({
+    authorized: canViewPayable,
+    selected: Boolean(selectedRow),
+    relevant: selectedRow?.status === 'POSTED',
+    busy: saving || financeSourceLoading,
+    busyReason: '当前操作完成后可查看应付',
   })
   const materialOptions = useMemo(
     () => uniqueReferenceOptions(materials, materialOption),
@@ -1303,31 +1311,15 @@ export default function V1PurchaseReceiptsPage() {
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {canViewPayable ? (
+          {payableViewAvailability.visible ? (
             <BusinessActionTooltip
-              disabled={
-                !selectedRow ||
-                selectedRow.status !== 'POSTED' ||
-                saving ||
-                financeSourceLoading
-              }
-              disabledReason={
-                !selectedRow
-                  ? '请先选择一条入库记录'
-                  : selectedRow.status !== 'POSTED'
-                    ? '入库记录过账后可查看应付'
-                    : '当前操作完成后可查看应付'
-              }
+              disabled={payableViewAvailability.disabled}
+              disabledReason={payableViewAvailability.disabledReason}
             >
               <Button
                 data-business-action-key="view-payable"
                 size="small"
-                disabled={
-                  !selectedRow ||
-                  selectedRow.status !== 'POSTED' ||
-                  saving ||
-                  financeSourceLoading
-                }
+                disabled={payableViewAvailability.disabled}
                 onClick={() => viewPurchaseReceiptPayable(selectedRow)}
               >
                 查看应付

@@ -104,6 +104,7 @@ import {
   QUALITY_STATUS_OPTIONS,
 } from '../components/quality-inspections/qualityInspectionColumns.jsx'
 import { formatQuantity } from '../utils/businessLineItems.mjs'
+import { resolveContextualBusinessActionAvailability } from '../utils/businessActionAvailability.mjs'
 import { resolveRelatedRecordActionAvailability } from '../utils/operationalActionAvailability.mjs'
 import {
   compactParams,
@@ -667,6 +668,15 @@ export default function V1QualityInspectionsPage() {
                         : ''
   const showReadOnlyOutsourcingDisposition =
     canReadOutsourcingDisposition && !canManageOutsourcingDisposition
+  const outsourcingDispositionViewAvailability =
+    resolveContextualBusinessActionAvailability({
+      authorized: showReadOnlyOutsourcingDisposition,
+      selected: Boolean(selectedRow),
+      relevant:
+        selectedIsOutsourcingInspection && selectedQualityStatus === 'REJECTED',
+      busy: saving,
+      busyReason: '当前操作完成后可查看委外处置',
+    })
   const selectedPurchaseReceiptItem = useMemo(
     () =>
       findByPositiveID(selectedPurchaseReceiptItemID, purchaseReceiptItems) ||
@@ -2054,35 +2064,17 @@ export default function V1QualityInspectionsPage() {
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {showReadOnlyOutsourcingDisposition ? (
+          {outsourcingDispositionViewAvailability.visible ? (
             <BusinessActionTooltip
-              disabled={
-                !selectedRow ||
-                !selectedIsOutsourcingInspection ||
-                selectedQualityStatus !== 'REJECTED' ||
-                saving
-              }
+              disabled={outsourcingDispositionViewAvailability.disabled}
               disabledReason={
-                !selectedRow
-                  ? '请先选择一条委外回货质检记录'
-                  : !selectedIsOutsourcingInspection
-                    ? '只有委外回货质检可以查看委外处置'
-                    : selectedQualityStatus !== 'REJECTED'
-                      ? '质检判定不合格后可查看委外处置'
-                      : saving
-                        ? '当前操作完成后可查看委外处置'
-                        : ''
+                outsourcingDispositionViewAvailability.disabledReason
               }
             >
               <Button
                 data-business-action-key="outsourcing-disposition-view"
                 size="small"
-                disabled={
-                  !selectedRow ||
-                  !selectedIsOutsourcingInspection ||
-                  selectedQualityStatus !== 'REJECTED' ||
-                  saving
-                }
+                disabled={outsourcingDispositionViewAvailability.disabled}
                 onClick={() => setOutsourcingDispositionOpen(true)}
               >
                 查看委外处置

@@ -25,7 +25,11 @@ test('production route modal is a self-contained production-order surface', () =
   assert.match(source, /originReworkFactID\s*=\s*null/u)
   assert.match(
     source,
-    /assignmentOnly[\s\S]*?'安排本厂或外发加工'[\s\S]*?'返工工序办理'[\s\S]*?'生产工序办理'/u
+    /assignmentOnly[\s\S]*?'安排本厂或外发加工'[\s\S]*?readOnly[\s\S]*?'查看返工工序'[\s\S]*?'查看生产工序'[\s\S]*?'返工工序办理'[\s\S]*?'生产工序办理'/u
+  )
+  assert.match(
+    source,
+    /const readOnly =[\s\S]*?!canAssign[\s\S]*?!canExecute[\s\S]*?!canRework[\s\S]*?!canConfirmPackaging/u
   )
 })
 

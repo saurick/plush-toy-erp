@@ -49,6 +49,19 @@ const FORMAL_SELECTION_STABLE_ACTION_EVIDENCE = Object.freeze({
     /data-business-action-key="workflow-task-complete"/u,
 })
 
+const CONTEXTUAL_ACTION_EVIDENCE = Object.freeze({
+  'OperationalFactsPage.jsx': /relatedActionAvailability\.visible/u,
+  'V1OutsourcingOrdersPage.jsx':
+    /relatedOutsourcingFactsAvailability\.visible/u,
+  'V1ProductionOrdersPage.jsx':
+    /productionReworkProgressAvailability\.visible/u,
+  'V1PurchaseOrdersPage.jsx': /relatedActionAvailability\.visible/u,
+  'V1PurchaseReceiptsPage.jsx': /payableViewAvailability\.visible/u,
+  'V1QualityInspectionsPage.jsx':
+    /outsourcingDispositionViewAvailability\.visible/u,
+  'V1SalesOrdersPage.jsx': /relatedActionAvailability\.visible/u,
+})
+
 function pageSource(fileName) {
   return readFileSync(resolve(pagesDirectory, fileName), 'utf8')
 }
@@ -101,7 +114,7 @@ test('全部正式业务选择页复用稳定动作条、清空入口和禁用�
   }
 })
 
-test('全部正式业务选择页保留稳定动作键，不允许选择或记录状态决定动作节点是否渲染', () => {
+test('全部正式业务选择页保留核心动作键，不直接用选择或状态拼装动作节点', () => {
   assert.deepEqual(
     Object.keys(FORMAL_SELECTION_STABLE_ACTION_EVIDENCE).sort(),
     Object.keys(FORMAL_SELECTION_PAGE_CONSUMERS).sort(),
@@ -135,6 +148,18 @@ test('全部正式业务选择页保留稳定动作键，不允许选择或记�
       actionBarSource,
       /\{\s*(?:\w+\s*&&\s*)?\(?[^{}]{0,160}(?:\.status|lifecycleStatus)[^{}]{0,120}\?\s*\(\s*<(?:BusinessActionTooltip|BusinessLifecyclePrimaryAction|BusinessLifecycleMoreAction|Button|Dropdown|Popconfirm)/u,
       `${pageFile} 不得按记录状态增删当前操作节点`
+    )
+  }
+})
+
+test('低频上下文动作通过语义可见性收口，不以无效置灰入口占据操作位', () => {
+  for (const [pageFile, evidence] of Object.entries(
+    CONTEXTUAL_ACTION_EVIDENCE
+  )) {
+    assert.match(
+      consumerSource(FORMAL_SELECTION_PAGE_CONSUMERS[pageFile]),
+      evidence,
+      `${pageFile} 必须显式消费上下文动作可见性`
     )
   }
 })

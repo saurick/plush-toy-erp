@@ -600,11 +600,24 @@ async function assertDesktopActionState(
   }
 }
 
-function assertStableDesktopLayout(assert, baseline, current, scenarioName) {
+function assertStableDesktopLayout(
+  assert,
+  baseline,
+  current,
+  scenarioName,
+  { contextualKeys = [] } = {}
+) {
+  const contextualKeySet = new Set(contextualKeys)
+  const baselineCoreButtons = baseline.buttons.filter(
+    (button) => !contextualKeySet.has(button.key)
+  )
+  const currentCoreButtons = current.buttons.filter(
+    (button) => !contextualKeySet.has(button.key)
+  )
   assert.deepEqual(
-    current.keys,
-    baseline.keys,
-    `${scenarioName} 状态切换不得改变动作槽顺序`
+    currentCoreButtons.map((button) => button.key),
+    baselineCoreButtons.map((button) => button.key),
+    `${scenarioName} 状态切换不得改变核心动作槽顺序`
   )
   assert.equal(
     current.actionOverflow,
@@ -616,9 +629,10 @@ function assertStableDesktopLayout(assert, baseline, current, scenarioName) {
     0,
     `${scenarioName} 页面不应横向溢出: ${JSON.stringify(current)}`
   )
-  for (let index = 0; index < baseline.buttons.length; index += 1) {
-    const before = baseline.buttons[index]
-    const after = current.buttons[index]
+  if (contextualKeys.length > 0) return
+  for (let index = 0; index < baselineCoreButtons.length; index += 1) {
+    const before = baselineCoreButtons[index]
+    const after = currentCoreButtons[index]
     assert(
       Math.abs(before.left - after.left) <= 2 &&
         Math.abs(before.top - after.top) <= 2 &&
@@ -777,7 +791,6 @@ export function createBusinessActionStabilityScenarios(deps) {
         const emptyLayout = await captureDesktopActionLayout(page)
         assert.deepEqual(emptyLayout.keys, [
           'clear-selection',
-          'related-records',
           'view-details',
           'edit',
           'reserve-stock',
@@ -831,7 +844,8 @@ export function createBusinessActionStabilityScenarios(deps) {
             assert,
             emptyLayout,
             layout,
-            `销售订单 ${status}`
+            `销售订单 ${status}`,
+            { contextualKeys: ['related-records'] }
           )
           if (status === 'draft') draftLayout = layout
           assert.equal(
@@ -1101,8 +1115,7 @@ export function createBusinessActionStabilityScenarios(deps) {
         const viewDisposition = actionBar.locator(
           '[data-business-action-key="outsourcing-disposition-view"]'
         )
-        assert.equal(await viewDisposition.count(), 1)
-        assert.equal(await viewDisposition.isDisabled(), true)
+        assert.equal(await viewDisposition.count(), 0)
         assert.equal(
           await actionBar
             .locator('[data-business-action-key="quality-disposition"]')
@@ -1114,13 +1127,8 @@ export function createBusinessActionStabilityScenarios(deps) {
         await selectBusinessRow(page, 'QI-ACTION-DRAFT')
         assert.equal(
           await viewDisposition.count(),
-          1,
-          '只读委外查看权限应保持稳定入口'
-        )
-        assert.equal(
-          await viewDisposition.isDisabled(),
-          true,
-          '来料质检不能启用委外处置查看入口'
+          0,
+          '来料质检不应占用委外处置查看入口'
         )
 
         await selectBusinessRow(page, 'QI-ACTION-OUTSOURCING-REJECTED')
@@ -1168,7 +1176,6 @@ export function createBusinessActionStabilityScenarios(deps) {
         assert.deepEqual(purchaseEmpty.keys, [
           'clear-selection',
           'purchase-edit',
-          'related-records',
           'lifecycle-primary',
           'generate-inbound',
           'print-contract',
@@ -1198,7 +1205,8 @@ export function createBusinessActionStabilityScenarios(deps) {
             assert,
             purchaseEmpty,
             layout,
-            `采购订单 ${status}`
+            `采购订单 ${status}`,
+            { contextualKeys: ['related-records'] }
           )
           await assertDesktopActionState(page, assert, 'purchase-edit', {
             visible: true,
@@ -1243,7 +1251,8 @@ export function createBusinessActionStabilityScenarios(deps) {
           assert,
           receiptEmpty,
           await captureDesktopActionLayout(page),
-          '采购入库 DRAFT'
+          '采购入库 DRAFT',
+          { contextualKeys: ['related-records', 'view-payable'] }
         )
         await screenshot(
           page,
@@ -1257,7 +1266,8 @@ export function createBusinessActionStabilityScenarios(deps) {
           assert,
           receiptEmpty,
           receiptCancelled,
-          '采购入库 CANCELLED'
+          '采购入库 CANCELLED',
+          { contextualKeys: ['related-records', 'view-payable'] }
         )
         for (const key of [
           'create-return',
@@ -1298,7 +1308,13 @@ export function createBusinessActionStabilityScenarios(deps) {
             assert,
             qualityEmpty,
             layout,
-            `质量检验 ${status}`
+            `质量检验 ${status}`,
+            {
+              contextualKeys: [
+                'related-records',
+                'outsourcing-disposition-view',
+              ],
+            }
           )
           if (status === 'DRAFT') {
             await assertDesktopActionState(page, assert, 'submit', {
@@ -1337,8 +1353,7 @@ export function createBusinessActionStabilityScenarios(deps) {
         }
         await selectBusinessRow(page, 'QI-ACTION-PRODUCTION-WIP')
         await assertDesktopActionState(page, assert, 'related-records', {
-          visible: true,
-          disabled: true,
+          visible: false,
         })
         await screenshot(
           page,
@@ -1363,12 +1378,12 @@ export function createBusinessActionStabilityScenarios(deps) {
         for (const status of ['DRAFT', 'SHIPPED', 'CANCELLED']) {
           await selectBusinessRow(page, `SHIP-ACTION-${status}`)
           const layout = await captureDesktopActionLayout(page)
-          assert.equal(layout.actionOverflow, 0)
-          assert.equal(layout.pageOverflow, 0)
-          assert.deepEqual(
-            layout.keys,
-            shipmentEmpty.keys,
-            `出货单 ${status} 不得增删动作槽`
+          assertStableDesktopLayout(
+            assert,
+            shipmentEmpty,
+            layout,
+            `出货单 ${status}`,
+            { contextualKeys: ['related-records'] }
           )
           if (status === 'CANCELLED') {
             for (const key of [

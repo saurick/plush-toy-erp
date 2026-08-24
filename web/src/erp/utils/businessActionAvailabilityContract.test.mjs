@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   resolveBusinessActionAvailability,
+  resolveContextualBusinessActionAvailability,
   resolveBusinessLifecycleActions,
   selectStableBusinessActionIndexes,
 } from './businessActionAvailability.mjs'
@@ -86,6 +87,35 @@ test('业务动作可用性：只有无权限隐藏，选择、结构、终态�
       applicable: true,
     }),
     { visible: true, disabled: false, disabledReason: '' }
+  )
+})
+
+test('上下文动作：没有选中或记录不相关时不占操作位，相关记录的临时忙碌仍保留说明', () => {
+  for (const input of [
+    { authorized: false, selected: true, relevant: true },
+    { authorized: true, selected: false, relevant: true },
+    { authorized: true, selected: true, relevant: false },
+  ]) {
+    assert.deepEqual(resolveContextualBusinessActionAvailability(input), {
+      visible: false,
+      disabled: true,
+      disabledReason: '',
+    })
+  }
+
+  assert.deepEqual(
+    resolveContextualBusinessActionAvailability({
+      authorized: true,
+      selected: true,
+      relevant: true,
+      busy: true,
+      busyReason: '资料加载完成后可查看',
+    }),
+    {
+      visible: true,
+      disabled: true,
+      disabledReason: '资料加载完成后可查看',
+    }
   )
 })
 

@@ -256,6 +256,12 @@ export default function ProductionRouteExecutionModal({
     .trim()
     .toUpperCase()
   const batchScopeEnabled = originReworkFactID !== null
+  const readOnly =
+    !assignmentOnly &&
+    !canAssign &&
+    !canExecute &&
+    !canRework &&
+    !canConfirmPackaging
   const scopedReworkFactID = Number(originReworkFactID || 0)
   const canRunAction = useCallback(
     (action) => {
@@ -1236,9 +1242,13 @@ export default function ProductionRouteExecutionModal({
       title={
         assignmentOnly
           ? '安排本厂或外发加工'
-          : orderStatus === 'CLOSED'
-            ? '返工工序办理'
-            : '生产工序办理'
+          : readOnly
+            ? orderStatus === 'CLOSED'
+              ? '查看返工工序'
+              : '查看生产工序'
+            : orderStatus === 'CLOSED'
+              ? '返工工序办理'
+              : '生产工序办理'
       }
       description={
         assignmentOnly

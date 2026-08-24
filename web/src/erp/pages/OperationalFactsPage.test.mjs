@@ -216,7 +216,7 @@ test('posted rework records open authoritative progress and link back to the pro
   assert.match(source, /该返工记录尚未关联可核对的成品返工补制批次/u)
 })
 
-test('operational fact actions keep a stable authorized catalog across selection and status changes', () => {
+test('operational fact core actions stay stable and contextual views remain explicitly registered', () => {
   for (const actionKey of [
     'related-records',
     'operational-fact-details',
@@ -267,6 +267,7 @@ test('related-record menu keeps permission-scoped slots and disables unavailable
     source,
     /const hasRelatedCapability = relatedMenuItems\.length > 0/u
   )
-  assert.match(source, /\{hasRelatedCapability \? \(/u)
-  assert.doesNotMatch(source, /\{relatedActionAvailability\.visible \? \(/u)
+  assert.match(source, /\{relatedActionAvailability\.visible \? \(/u)
+  assert.match(source, /productionReworkProgressAvailability\.visible/u)
+  assert.match(source, /outsourcingPayableViewAvailability\.visible/u)
 })

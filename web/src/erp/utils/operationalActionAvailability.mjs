@@ -1,4 +1,7 @@
-import { resolveBusinessActionAvailability } from './businessActionAvailability.mjs'
+import {
+  resolveBusinessActionAvailability,
+  resolveContextualBusinessActionAvailability,
+} from './businessActionAvailability.mjs'
 
 function resolveAction({
   authorized,
@@ -256,14 +259,17 @@ export function resolveRelatedRecordActionAvailability({
   authorized = false,
   record = null,
   itemCount = 0,
+  busy = false,
+  busyReason = '当前操作完成后可查看相关单据',
 } = {}) {
   const hasItems = Number(itemCount) > 0
-  return resolveAction({
+  return resolveContextualBusinessActionAvailability({
     authorized,
-    record,
-    relevant: !record || hasItems,
+    selected: Boolean(record),
+    relevant: hasItems,
     applicable: hasItems,
-    selectionReason: '请先选择一条业务记录',
+    busy,
+    busyReason,
     unavailableReason: '当前业务记录没有可打开的关联单据',
   })
 }

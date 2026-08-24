@@ -350,7 +350,7 @@ test('生产异常动作：按异常类型、审批状态、执行状态和申�
   )
 })
 
-test('相关单据动作：有能力但未选中或无关联时都保留入口并说明原因', () => {
+test('相关单据动作：无选择或无关联时不占操作位，记录相关时才显示', () => {
   assert.deepEqual(
     state(
       resolveRelatedRecordActionAvailability({
@@ -365,7 +365,7 @@ test('相关单据动作：有能力但未选中或无关联时都保留入口�
         authorized: true,
       })
     ),
-    [true, true, '请先选择一条业务记录']
+    [false, true, '']
   )
   assert.deepEqual(
     state(
@@ -375,7 +375,7 @@ test('相关单据动作：有能力但未选中或无关联时都保留入口�
         itemCount: 0,
       })
     ),
-    [true, true, '当前业务记录没有可打开的关联单据']
+    [false, true, '']
   )
   assert.deepEqual(
     state(
@@ -386,5 +386,16 @@ test('相关单据动作：有能力但未选中或无关联时都保留入口�
       })
     ),
     [true, false, '']
+  )
+  assert.deepEqual(
+    state(
+      resolveRelatedRecordActionAvailability({
+        authorized: true,
+        record: { id: 1 },
+        itemCount: 2,
+        busy: true,
+      })
+    ),
+    [true, true, '当前操作完成后可查看相关单据']
   )
 })

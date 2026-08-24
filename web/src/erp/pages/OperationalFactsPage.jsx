@@ -99,6 +99,7 @@ import {
 } from '../utils/sourceBusinessAction.mjs'
 import { matchesOperationalFactLifecycleResult } from '../utils/operationalFactLifecycle.mjs'
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
+import { resolveContextualBusinessActionAvailability } from '../utils/businessActionAvailability.mjs'
 import { resolveRelatedRecordActionAvailability } from '../utils/operationalActionAvailability.mjs'
 import {
   buildProductionReworkPayload,
@@ -1507,6 +1508,24 @@ export function OperationalFactWorkspace({
     record: activeSelectedRow,
     itemCount: availableRelatedMenuItems.length,
   })
+  const productionReworkProgressAvailability =
+    resolveContextualBusinessActionAvailability({
+      authorized:
+        currentActiveKey === 'production' && canViewProductionReworkProgress,
+      selected: Boolean(activeSelectedRow),
+      relevant: selectedCanViewProductionReworkProgress,
+      busy: productionReworkProgressLoading,
+      busyReason: '返工进度加载完成后可查看',
+    })
+  const outsourcingPayableViewAvailability =
+    resolveContextualBusinessActionAvailability({
+      authorized:
+        currentActiveKey === 'outsourcing' && canViewOutsourcingPayable,
+      selected: Boolean(activeSelectedRow),
+      relevant: selectedIsPostedOutsourcingReturn,
+      busy: saving || financeSourceLoading,
+      busyReason: '当前操作完成后可查看应付',
+    })
 
   const openRelatedTable = ({ key }) => {
     if (!activeSelectedRow) return
@@ -1763,7 +1782,7 @@ export function OperationalFactWorkspace({
             selectionLabel="业务记录"
             onClear={clearActiveSelection}
           />
-          {hasRelatedCapability ? (
+          {relatedActionAvailability.visible ? (
             <BusinessActionTooltip
               disabled={relatedActionAvailability.disabled}
               disabledReason={
@@ -1939,32 +1958,17 @@ export function OperationalFactWorkspace({
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {currentActiveKey === 'production' &&
-          canViewProductionReworkProgress ? (
+          {productionReworkProgressAvailability.visible ? (
             <BusinessActionTooltip
-              disabled={
-                !activeSelectedRow ||
-                !selectedCanViewProductionReworkProgress ||
-                productionReworkProgressLoading
-              }
+              disabled={productionReworkProgressAvailability.disabled}
               disabledReason={
-                !activeSelectedRow
-                  ? '请先选择一条返工记录'
-                  : !selectedCanViewProductionReworkProgress
-                    ? '返工记录过账后可查看补制进度'
-                    : productionReworkProgressLoading
-                      ? '返工进度加载完成后可查看'
-                      : ''
+                productionReworkProgressAvailability.disabledReason
               }
             >
               <Button
                 size="small"
                 data-business-action-key="production-rework-progress"
-                disabled={
-                  !activeSelectedRow ||
-                  !selectedCanViewProductionReworkProgress ||
-                  productionReworkProgressLoading
-                }
+                disabled={productionReworkProgressAvailability.disabled}
                 loading={productionReworkProgressLoading}
                 onClick={() => openProductionReworkProgress(activeSelectedRow)}
               >
@@ -2111,31 +2115,15 @@ export function OperationalFactWorkspace({
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {currentActiveKey === 'outsourcing' && canViewOutsourcingPayable ? (
+          {outsourcingPayableViewAvailability.visible ? (
             <BusinessActionTooltip
-              disabled={
-                !activeSelectedRow ||
-                !selectedIsPostedOutsourcingReturn ||
-                saving ||
-                financeSourceLoading
-              }
-              disabledReason={
-                !activeSelectedRow
-                  ? '请先选择一条委外记录'
-                  : !selectedIsPostedOutsourcingReturn
-                    ? '请选择已过账的委外回货记录'
-                    : '当前操作完成后可查看应付'
-              }
+              disabled={outsourcingPayableViewAvailability.disabled}
+              disabledReason={outsourcingPayableViewAvailability.disabledReason}
             >
               <Button
                 size="small"
                 data-business-action-key="outsourcing-payable"
-                disabled={
-                  !activeSelectedRow ||
-                  !selectedIsPostedOutsourcingReturn ||
-                  saving ||
-                  financeSourceLoading
-                }
+                disabled={outsourcingPayableViewAvailability.disabled}
                 onClick={() => viewOutsourcingPayable(activeSelectedRow)}
               >
                 查看应付

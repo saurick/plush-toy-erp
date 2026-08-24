@@ -95,7 +95,7 @@ test('production order page reuses the ERP shell refresh entrypoint', () => {
   assert.doesNotMatch(page, /ReloadOutlined/u)
 })
 
-test('production order actions keep a permission-stable DOM across record states', () => {
+test('production order core actions stay stable while record-specific readers use contextual visibility', () => {
   for (const actionKey of [
     'view',
     'edit',
@@ -121,6 +121,8 @@ test('production order actions keep a permission-stable DOM across record states
     /selected\.status !== PRODUCTION_ORDER_STATUS\.DRAFT/u
   )
   assert.match(page, /当前生产订单状态不能取消/u)
+  assert.match(page, /productionRouteActionAvailability\.visible/u)
+  assert.match(page, /productionReworkProgressAvailability\.visible/u)
 })
 
 test('production order release explains the atomic scheduling handoff', () => {
@@ -184,7 +186,7 @@ test('released and closed production orders expose route execution through separ
   )
   assert.match(
     page,
-    /\? '返工工序办理'\s*:\s*'工序办理'/u
+    /productionRouteReadOnly[\s\S]*?'查看工序'[\s\S]*?'返工工序办理'[\s\S]*?'工序办理'/u
   )
 })
 

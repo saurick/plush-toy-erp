@@ -67,6 +67,28 @@ export function resolveBusinessActionAvailability({
   }
 }
 
+export function resolveContextualBusinessActionAvailability({
+  authorized = false,
+  selected = false,
+  relevant = true,
+  ...options
+} = {}) {
+  if (!authorized || !selected || !relevant) {
+    return {
+      visible: false,
+      disabled: true,
+      disabledReason: '',
+    }
+  }
+
+  return resolveBusinessActionAvailability({
+    ...options,
+    authorized,
+    selected,
+    relevant,
+  })
+}
+
 export function resolveBusinessLifecycleActions({
   actions = [],
   selected = false,

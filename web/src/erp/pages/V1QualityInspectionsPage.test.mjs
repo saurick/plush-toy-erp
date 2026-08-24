@@ -149,7 +149,7 @@ test('quality disposition separates mutation permissions from read-only access a
   }
 })
 
-test('quality actions keep a permission-stable DOM across record states and sources', () => {
+test('quality core actions stay stable while read-only disposition appears only for a matching record', () => {
   for (const actionKey of [
     'related-records',
     'view-details',
@@ -171,7 +171,11 @@ test('quality actions keep a permission-stable DOM across record states and sour
   )
   assert.match(source, /!selectedDispositionSourceSupported \|\|/u)
   assert.match(source, /!selectedDispositionAuthorized \|\|/u)
-  assert.match(source, /!selectedIsOutsourcingInspection \|\|/u)
+  assert.match(source, /outsourcingDispositionViewAvailability\.visible/u)
+  assert.match(
+    source,
+    /selectedIsOutsourcingInspection\s*&&\s*selectedQualityStatus === 'REJECTED'/u
+  )
 })
 
 test('quality page preserves the source receipt numeric(20,6) quantity string', () => {
