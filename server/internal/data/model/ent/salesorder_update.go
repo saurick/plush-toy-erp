@@ -17,6 +17,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/shopspring/decimal"
 )
 
 // SalesOrderUpdate is the builder for updating SalesOrder entities.
@@ -138,6 +139,18 @@ func (_u *SalesOrderUpdate) ClearContactSnapshot() *SalesOrderUpdate {
 	return _u
 }
 
+// SetDeliverySnapshot sets the "delivery_snapshot" field.
+func (_u *SalesOrderUpdate) SetDeliverySnapshot(v map[string]interface{}) *SalesOrderUpdate {
+	_u.mutation.SetDeliverySnapshot(v)
+	return _u
+}
+
+// ClearDeliverySnapshot clears the value of the "delivery_snapshot" field.
+func (_u *SalesOrderUpdate) ClearDeliverySnapshot() *SalesOrderUpdate {
+	_u.mutation.ClearDeliverySnapshot()
+	return _u
+}
+
 // SetPaymentMethod sets the "payment_method" field.
 func (_u *SalesOrderUpdate) SetPaymentMethod(v string) *SalesOrderUpdate {
 	_u.mutation.SetPaymentMethod(v)
@@ -202,6 +215,126 @@ func (_u *SalesOrderUpdate) SetNillablePriceConditionNote(v *string) *SalesOrder
 // ClearPriceConditionNote clears the value of the "price_condition_note" field.
 func (_u *SalesOrderUpdate) ClearPriceConditionNote() *SalesOrderUpdate {
 	_u.mutation.ClearPriceConditionNote()
+	return _u
+}
+
+// SetTaxMode sets the "tax_mode" field.
+func (_u *SalesOrderUpdate) SetTaxMode(v string) *SalesOrderUpdate {
+	_u.mutation.SetTaxMode(v)
+	return _u
+}
+
+// SetNillableTaxMode sets the "tax_mode" field if the given value is not nil.
+func (_u *SalesOrderUpdate) SetNillableTaxMode(v *string) *SalesOrderUpdate {
+	if v != nil {
+		_u.SetTaxMode(*v)
+	}
+	return _u
+}
+
+// ClearTaxMode clears the value of the "tax_mode" field.
+func (_u *SalesOrderUpdate) ClearTaxMode() *SalesOrderUpdate {
+	_u.mutation.ClearTaxMode()
+	return _u
+}
+
+// SetTaxRate sets the "tax_rate" field.
+func (_u *SalesOrderUpdate) SetTaxRate(v decimal.Decimal) *SalesOrderUpdate {
+	_u.mutation.SetTaxRate(v)
+	return _u
+}
+
+// SetNillableTaxRate sets the "tax_rate" field if the given value is not nil.
+func (_u *SalesOrderUpdate) SetNillableTaxRate(v *decimal.Decimal) *SalesOrderUpdate {
+	if v != nil {
+		_u.SetTaxRate(*v)
+	}
+	return _u
+}
+
+// ClearTaxRate clears the value of the "tax_rate" field.
+func (_u *SalesOrderUpdate) ClearTaxRate() *SalesOrderUpdate {
+	_u.mutation.ClearTaxRate()
+	return _u
+}
+
+// SetFreightTerms sets the "freight_terms" field.
+func (_u *SalesOrderUpdate) SetFreightTerms(v string) *SalesOrderUpdate {
+	_u.mutation.SetFreightTerms(v)
+	return _u
+}
+
+// SetNillableFreightTerms sets the "freight_terms" field if the given value is not nil.
+func (_u *SalesOrderUpdate) SetNillableFreightTerms(v *string) *SalesOrderUpdate {
+	if v != nil {
+		_u.SetFreightTerms(*v)
+	}
+	return _u
+}
+
+// ClearFreightTerms clears the value of the "freight_terms" field.
+func (_u *SalesOrderUpdate) ClearFreightTerms() *SalesOrderUpdate {
+	_u.mutation.ClearFreightTerms()
+	return _u
+}
+
+// SetGoodsAmount sets the "goods_amount" field.
+func (_u *SalesOrderUpdate) SetGoodsAmount(v decimal.Decimal) *SalesOrderUpdate {
+	_u.mutation.SetGoodsAmount(v)
+	return _u
+}
+
+// SetNillableGoodsAmount sets the "goods_amount" field if the given value is not nil.
+func (_u *SalesOrderUpdate) SetNillableGoodsAmount(v *decimal.Decimal) *SalesOrderUpdate {
+	if v != nil {
+		_u.SetGoodsAmount(*v)
+	}
+	return _u
+}
+
+// ClearGoodsAmount clears the value of the "goods_amount" field.
+func (_u *SalesOrderUpdate) ClearGoodsAmount() *SalesOrderUpdate {
+	_u.mutation.ClearGoodsAmount()
+	return _u
+}
+
+// SetTaxAmount sets the "tax_amount" field.
+func (_u *SalesOrderUpdate) SetTaxAmount(v decimal.Decimal) *SalesOrderUpdate {
+	_u.mutation.SetTaxAmount(v)
+	return _u
+}
+
+// SetNillableTaxAmount sets the "tax_amount" field if the given value is not nil.
+func (_u *SalesOrderUpdate) SetNillableTaxAmount(v *decimal.Decimal) *SalesOrderUpdate {
+	if v != nil {
+		_u.SetTaxAmount(*v)
+	}
+	return _u
+}
+
+// ClearTaxAmount clears the value of the "tax_amount" field.
+func (_u *SalesOrderUpdate) ClearTaxAmount() *SalesOrderUpdate {
+	_u.mutation.ClearTaxAmount()
+	return _u
+}
+
+// SetOrderTotal sets the "order_total" field.
+func (_u *SalesOrderUpdate) SetOrderTotal(v decimal.Decimal) *SalesOrderUpdate {
+	_u.mutation.SetOrderTotal(v)
+	return _u
+}
+
+// SetNillableOrderTotal sets the "order_total" field if the given value is not nil.
+func (_u *SalesOrderUpdate) SetNillableOrderTotal(v *decimal.Decimal) *SalesOrderUpdate {
+	if v != nil {
+		_u.SetOrderTotal(*v)
+	}
+	return _u
+}
+
+// ClearOrderTotal clears the value of the "order_total" field.
+func (_u *SalesOrderUpdate) ClearOrderTotal() *SalesOrderUpdate {
+	_u.mutation.ClearOrderTotal()
 	return _u
 }
 
@@ -609,6 +742,16 @@ func (_u *SalesOrderUpdate) check() error {
 			return &ValidationError{Name: "price_condition_note", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.price_condition_note": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.TaxMode(); ok {
+		if err := salesorder.TaxModeValidator(v); err != nil {
+			return &ValidationError{Name: "tax_mode", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.tax_mode": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.FreightTerms(); ok {
+		if err := salesorder.FreightTermsValidator(v); err != nil {
+			return &ValidationError{Name: "freight_terms", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.freight_terms": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.LifecycleStatus(); ok {
 		if err := salesorder.LifecycleStatusValidator(v); err != nil {
 			return &ValidationError{Name: "lifecycle_status", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.lifecycle_status": %w`, err)}
@@ -692,6 +835,12 @@ func (_u *SalesOrderUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	if _u.mutation.ContactSnapshotCleared() {
 		_spec.ClearField(salesorder.FieldContactSnapshot, field.TypeJSON)
 	}
+	if value, ok := _u.mutation.DeliverySnapshot(); ok {
+		_spec.SetField(salesorder.FieldDeliverySnapshot, field.TypeJSON, value)
+	}
+	if _u.mutation.DeliverySnapshotCleared() {
+		_spec.ClearField(salesorder.FieldDeliverySnapshot, field.TypeJSON)
+	}
 	if value, ok := _u.mutation.PaymentMethod(); ok {
 		_spec.SetField(salesorder.FieldPaymentMethod, field.TypeString, value)
 	}
@@ -712,6 +861,42 @@ func (_u *SalesOrderUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	}
 	if _u.mutation.PriceConditionNoteCleared() {
 		_spec.ClearField(salesorder.FieldPriceConditionNote, field.TypeString)
+	}
+	if value, ok := _u.mutation.TaxMode(); ok {
+		_spec.SetField(salesorder.FieldTaxMode, field.TypeString, value)
+	}
+	if _u.mutation.TaxModeCleared() {
+		_spec.ClearField(salesorder.FieldTaxMode, field.TypeString)
+	}
+	if value, ok := _u.mutation.TaxRate(); ok {
+		_spec.SetField(salesorder.FieldTaxRate, field.TypeOther, value)
+	}
+	if _u.mutation.TaxRateCleared() {
+		_spec.ClearField(salesorder.FieldTaxRate, field.TypeOther)
+	}
+	if value, ok := _u.mutation.FreightTerms(); ok {
+		_spec.SetField(salesorder.FieldFreightTerms, field.TypeString, value)
+	}
+	if _u.mutation.FreightTermsCleared() {
+		_spec.ClearField(salesorder.FieldFreightTerms, field.TypeString)
+	}
+	if value, ok := _u.mutation.GoodsAmount(); ok {
+		_spec.SetField(salesorder.FieldGoodsAmount, field.TypeOther, value)
+	}
+	if _u.mutation.GoodsAmountCleared() {
+		_spec.ClearField(salesorder.FieldGoodsAmount, field.TypeOther)
+	}
+	if value, ok := _u.mutation.TaxAmount(); ok {
+		_spec.SetField(salesorder.FieldTaxAmount, field.TypeOther, value)
+	}
+	if _u.mutation.TaxAmountCleared() {
+		_spec.ClearField(salesorder.FieldTaxAmount, field.TypeOther)
+	}
+	if value, ok := _u.mutation.OrderTotal(); ok {
+		_spec.SetField(salesorder.FieldOrderTotal, field.TypeOther, value)
+	}
+	if _u.mutation.OrderTotalCleared() {
+		_spec.ClearField(salesorder.FieldOrderTotal, field.TypeOther)
 	}
 	if value, ok := _u.mutation.OrderDate(); ok {
 		_spec.SetField(salesorder.FieldOrderDate, field.TypeTime, value)
@@ -1063,6 +1248,18 @@ func (_u *SalesOrderUpdateOne) ClearContactSnapshot() *SalesOrderUpdateOne {
 	return _u
 }
 
+// SetDeliverySnapshot sets the "delivery_snapshot" field.
+func (_u *SalesOrderUpdateOne) SetDeliverySnapshot(v map[string]interface{}) *SalesOrderUpdateOne {
+	_u.mutation.SetDeliverySnapshot(v)
+	return _u
+}
+
+// ClearDeliverySnapshot clears the value of the "delivery_snapshot" field.
+func (_u *SalesOrderUpdateOne) ClearDeliverySnapshot() *SalesOrderUpdateOne {
+	_u.mutation.ClearDeliverySnapshot()
+	return _u
+}
+
 // SetPaymentMethod sets the "payment_method" field.
 func (_u *SalesOrderUpdateOne) SetPaymentMethod(v string) *SalesOrderUpdateOne {
 	_u.mutation.SetPaymentMethod(v)
@@ -1127,6 +1324,126 @@ func (_u *SalesOrderUpdateOne) SetNillablePriceConditionNote(v *string) *SalesOr
 // ClearPriceConditionNote clears the value of the "price_condition_note" field.
 func (_u *SalesOrderUpdateOne) ClearPriceConditionNote() *SalesOrderUpdateOne {
 	_u.mutation.ClearPriceConditionNote()
+	return _u
+}
+
+// SetTaxMode sets the "tax_mode" field.
+func (_u *SalesOrderUpdateOne) SetTaxMode(v string) *SalesOrderUpdateOne {
+	_u.mutation.SetTaxMode(v)
+	return _u
+}
+
+// SetNillableTaxMode sets the "tax_mode" field if the given value is not nil.
+func (_u *SalesOrderUpdateOne) SetNillableTaxMode(v *string) *SalesOrderUpdateOne {
+	if v != nil {
+		_u.SetTaxMode(*v)
+	}
+	return _u
+}
+
+// ClearTaxMode clears the value of the "tax_mode" field.
+func (_u *SalesOrderUpdateOne) ClearTaxMode() *SalesOrderUpdateOne {
+	_u.mutation.ClearTaxMode()
+	return _u
+}
+
+// SetTaxRate sets the "tax_rate" field.
+func (_u *SalesOrderUpdateOne) SetTaxRate(v decimal.Decimal) *SalesOrderUpdateOne {
+	_u.mutation.SetTaxRate(v)
+	return _u
+}
+
+// SetNillableTaxRate sets the "tax_rate" field if the given value is not nil.
+func (_u *SalesOrderUpdateOne) SetNillableTaxRate(v *decimal.Decimal) *SalesOrderUpdateOne {
+	if v != nil {
+		_u.SetTaxRate(*v)
+	}
+	return _u
+}
+
+// ClearTaxRate clears the value of the "tax_rate" field.
+func (_u *SalesOrderUpdateOne) ClearTaxRate() *SalesOrderUpdateOne {
+	_u.mutation.ClearTaxRate()
+	return _u
+}
+
+// SetFreightTerms sets the "freight_terms" field.
+func (_u *SalesOrderUpdateOne) SetFreightTerms(v string) *SalesOrderUpdateOne {
+	_u.mutation.SetFreightTerms(v)
+	return _u
+}
+
+// SetNillableFreightTerms sets the "freight_terms" field if the given value is not nil.
+func (_u *SalesOrderUpdateOne) SetNillableFreightTerms(v *string) *SalesOrderUpdateOne {
+	if v != nil {
+		_u.SetFreightTerms(*v)
+	}
+	return _u
+}
+
+// ClearFreightTerms clears the value of the "freight_terms" field.
+func (_u *SalesOrderUpdateOne) ClearFreightTerms() *SalesOrderUpdateOne {
+	_u.mutation.ClearFreightTerms()
+	return _u
+}
+
+// SetGoodsAmount sets the "goods_amount" field.
+func (_u *SalesOrderUpdateOne) SetGoodsAmount(v decimal.Decimal) *SalesOrderUpdateOne {
+	_u.mutation.SetGoodsAmount(v)
+	return _u
+}
+
+// SetNillableGoodsAmount sets the "goods_amount" field if the given value is not nil.
+func (_u *SalesOrderUpdateOne) SetNillableGoodsAmount(v *decimal.Decimal) *SalesOrderUpdateOne {
+	if v != nil {
+		_u.SetGoodsAmount(*v)
+	}
+	return _u
+}
+
+// ClearGoodsAmount clears the value of the "goods_amount" field.
+func (_u *SalesOrderUpdateOne) ClearGoodsAmount() *SalesOrderUpdateOne {
+	_u.mutation.ClearGoodsAmount()
+	return _u
+}
+
+// SetTaxAmount sets the "tax_amount" field.
+func (_u *SalesOrderUpdateOne) SetTaxAmount(v decimal.Decimal) *SalesOrderUpdateOne {
+	_u.mutation.SetTaxAmount(v)
+	return _u
+}
+
+// SetNillableTaxAmount sets the "tax_amount" field if the given value is not nil.
+func (_u *SalesOrderUpdateOne) SetNillableTaxAmount(v *decimal.Decimal) *SalesOrderUpdateOne {
+	if v != nil {
+		_u.SetTaxAmount(*v)
+	}
+	return _u
+}
+
+// ClearTaxAmount clears the value of the "tax_amount" field.
+func (_u *SalesOrderUpdateOne) ClearTaxAmount() *SalesOrderUpdateOne {
+	_u.mutation.ClearTaxAmount()
+	return _u
+}
+
+// SetOrderTotal sets the "order_total" field.
+func (_u *SalesOrderUpdateOne) SetOrderTotal(v decimal.Decimal) *SalesOrderUpdateOne {
+	_u.mutation.SetOrderTotal(v)
+	return _u
+}
+
+// SetNillableOrderTotal sets the "order_total" field if the given value is not nil.
+func (_u *SalesOrderUpdateOne) SetNillableOrderTotal(v *decimal.Decimal) *SalesOrderUpdateOne {
+	if v != nil {
+		_u.SetOrderTotal(*v)
+	}
+	return _u
+}
+
+// ClearOrderTotal clears the value of the "order_total" field.
+func (_u *SalesOrderUpdateOne) ClearOrderTotal() *SalesOrderUpdateOne {
+	_u.mutation.ClearOrderTotal()
 	return _u
 }
 
@@ -1547,6 +1864,16 @@ func (_u *SalesOrderUpdateOne) check() error {
 			return &ValidationError{Name: "price_condition_note", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.price_condition_note": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.TaxMode(); ok {
+		if err := salesorder.TaxModeValidator(v); err != nil {
+			return &ValidationError{Name: "tax_mode", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.tax_mode": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.FreightTerms(); ok {
+		if err := salesorder.FreightTermsValidator(v); err != nil {
+			return &ValidationError{Name: "freight_terms", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.freight_terms": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.LifecycleStatus(); ok {
 		if err := salesorder.LifecycleStatusValidator(v); err != nil {
 			return &ValidationError{Name: "lifecycle_status", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.lifecycle_status": %w`, err)}
@@ -1647,6 +1974,12 @@ func (_u *SalesOrderUpdateOne) sqlSave(ctx context.Context) (_node *SalesOrder, 
 	if _u.mutation.ContactSnapshotCleared() {
 		_spec.ClearField(salesorder.FieldContactSnapshot, field.TypeJSON)
 	}
+	if value, ok := _u.mutation.DeliverySnapshot(); ok {
+		_spec.SetField(salesorder.FieldDeliverySnapshot, field.TypeJSON, value)
+	}
+	if _u.mutation.DeliverySnapshotCleared() {
+		_spec.ClearField(salesorder.FieldDeliverySnapshot, field.TypeJSON)
+	}
 	if value, ok := _u.mutation.PaymentMethod(); ok {
 		_spec.SetField(salesorder.FieldPaymentMethod, field.TypeString, value)
 	}
@@ -1667,6 +2000,42 @@ func (_u *SalesOrderUpdateOne) sqlSave(ctx context.Context) (_node *SalesOrder, 
 	}
 	if _u.mutation.PriceConditionNoteCleared() {
 		_spec.ClearField(salesorder.FieldPriceConditionNote, field.TypeString)
+	}
+	if value, ok := _u.mutation.TaxMode(); ok {
+		_spec.SetField(salesorder.FieldTaxMode, field.TypeString, value)
+	}
+	if _u.mutation.TaxModeCleared() {
+		_spec.ClearField(salesorder.FieldTaxMode, field.TypeString)
+	}
+	if value, ok := _u.mutation.TaxRate(); ok {
+		_spec.SetField(salesorder.FieldTaxRate, field.TypeOther, value)
+	}
+	if _u.mutation.TaxRateCleared() {
+		_spec.ClearField(salesorder.FieldTaxRate, field.TypeOther)
+	}
+	if value, ok := _u.mutation.FreightTerms(); ok {
+		_spec.SetField(salesorder.FieldFreightTerms, field.TypeString, value)
+	}
+	if _u.mutation.FreightTermsCleared() {
+		_spec.ClearField(salesorder.FieldFreightTerms, field.TypeString)
+	}
+	if value, ok := _u.mutation.GoodsAmount(); ok {
+		_spec.SetField(salesorder.FieldGoodsAmount, field.TypeOther, value)
+	}
+	if _u.mutation.GoodsAmountCleared() {
+		_spec.ClearField(salesorder.FieldGoodsAmount, field.TypeOther)
+	}
+	if value, ok := _u.mutation.TaxAmount(); ok {
+		_spec.SetField(salesorder.FieldTaxAmount, field.TypeOther, value)
+	}
+	if _u.mutation.TaxAmountCleared() {
+		_spec.ClearField(salesorder.FieldTaxAmount, field.TypeOther)
+	}
+	if value, ok := _u.mutation.OrderTotal(); ok {
+		_spec.SetField(salesorder.FieldOrderTotal, field.TypeOther, value)
+	}
+	if _u.mutation.OrderTotalCleared() {
+		_spec.ClearField(salesorder.FieldOrderTotal, field.TypeOther)
 	}
 	if value, ok := _u.mutation.OrderDate(); ok {
 		_spec.SetField(salesorder.FieldOrderDate, field.TypeTime, value)

@@ -21,7 +21,8 @@ func salesOrderMutationFromParams(pm map[string]any) (*biz.SalesOrderMutation, b
 	if !sourceOrderAllowsOnly(pm,
 		"customer_key", "id", "expected_version", "order_no", "customer_id", "currency",
 		"customer_order_no", "customer_snapshot", "sales_owner", "contact_snapshot",
-		"payment_method", "payment_term_days", "price_condition_note", "order_date",
+		"delivery_snapshot", "payment_method", "payment_term_days", "price_condition_note",
+		"tax_mode", "tax_rate", "freight_terms", "order_date",
 		"planned_delivery_date", "note", "items",
 	) {
 		return nil, false
@@ -38,6 +39,10 @@ func salesOrderMutationFromParams(pm map[string]any) (*biz.SalesOrderMutation, b
 	if !ok {
 		return nil, false
 	}
+	taxRate, ok := getOptionalJSONRPCDecimalString(pm, "tax_rate")
+	if !ok {
+		return nil, false
+	}
 	return &biz.SalesOrderMutation{
 		OrderNo:             getString(pm, "order_no"),
 		CustomerID:          getInt(pm, "customer_id", 0),
@@ -46,9 +51,13 @@ func salesOrderMutationFromParams(pm map[string]any) (*biz.SalesOrderMutation, b
 		CustomerSnapshot:    getMap(pm, "customer_snapshot"),
 		SalesOwner:          getWorkflowStringPtr(pm, "sales_owner"),
 		ContactSnapshot:     getMap(pm, "contact_snapshot"),
+		DeliverySnapshot:    getMap(pm, "delivery_snapshot"),
 		PaymentMethod:       getWorkflowStringPtr(pm, "payment_method"),
 		PaymentTermDays:     paymentTermDays,
 		PriceConditionNote:  getWorkflowStringPtr(pm, "price_condition_note"),
+		TaxMode:             getWorkflowStringPtr(pm, "tax_mode"),
+		TaxRate:             taxRate,
+		FreightTerms:        getWorkflowStringPtr(pm, "freight_terms"),
 		OrderDate:           orderDate,
 		PlannedDeliveryDate: plannedDeliveryDate,
 		Note:                getWorkflowStringPtr(pm, "note"),
@@ -121,6 +130,10 @@ func (d *jsonrpcDispatcher) mapSalesOrderError(ctx context.Context, err error) *
 	switch {
 	case errors.Is(err, biz.ErrSalesOrderConflict):
 		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: errcode.ResourceVersionConflict.Message}
+	case errors.Is(err, biz.ErrSalesOrderCommercialTermsIncomplete):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "请先补齐税价方式、税率和运费条件，再提交订单"}
+	case errors.Is(err, biz.ErrSalesOrderItemPriceMissing):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "订单仍有未填写单价的产品明细，请补齐后再提交"}
 	case errors.Is(err, biz.ErrIdempotencyConflict):
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
 	case errors.Is(err, biz.ErrSourceOrderNormalCloseIncomplete):
@@ -189,9 +202,16 @@ func salesOrderToMap(item *biz.SalesOrder) map[string]any {
 		"customer_snapshot":     item.CustomerSnapshot,
 		"sales_owner":           optionalStringValue(item.SalesOwner),
 		"contact_snapshot":      item.ContactSnapshot,
+		"delivery_snapshot":     item.DeliverySnapshot,
 		"payment_method":        optionalStringValue(item.PaymentMethod),
 		"payment_term_days":     optionalIntValue(item.PaymentTermDays),
 		"price_condition_note":  optionalStringValue(item.PriceConditionNote),
+		"tax_mode":              optionalStringValue(item.TaxMode),
+		"tax_rate":              optionalDecimalString(item.TaxRate),
+		"freight_terms":         optionalStringValue(item.FreightTerms),
+		"goods_amount":          optionalDecimalString(item.GoodsAmount),
+		"tax_amount":            optionalDecimalString(item.TaxAmount),
+		"order_total":           optionalDecimalString(item.OrderTotal),
 		"order_date":            item.OrderDate.Unix(),
 		"planned_delivery_date": optionalTimeUnix(item.PlannedDeliveryDate),
 		"lifecycle_status":      item.LifecycleStatus,

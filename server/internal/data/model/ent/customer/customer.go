@@ -26,6 +26,14 @@ const (
 	FieldDefaultPaymentTermDays = "default_payment_term_days"
 	// FieldTaxNo holds the string denoting the tax_no field in the database.
 	FieldTaxNo = "tax_no"
+	// FieldCountryRegion holds the string denoting the country_region field in the database.
+	FieldCountryRegion = "country_region"
+	// FieldDefaultDeliveryRecipient holds the string denoting the default_delivery_recipient field in the database.
+	FieldDefaultDeliveryRecipient = "default_delivery_recipient"
+	// FieldDefaultDeliveryPhone holds the string denoting the default_delivery_phone field in the database.
+	FieldDefaultDeliveryPhone = "default_delivery_phone"
+	// FieldDefaultDeliveryAddress holds the string denoting the default_delivery_address field in the database.
+	FieldDefaultDeliveryAddress = "default_delivery_address"
 	// FieldIsActive holds the string denoting the is_active field in the database.
 	FieldIsActive = "is_active"
 	// FieldNote holds the string denoting the note field in the database.
@@ -65,6 +73,10 @@ var Columns = []string{
 	FieldDefaultPaymentMethod,
 	FieldDefaultPaymentTermDays,
 	FieldTaxNo,
+	FieldCountryRegion,
+	FieldDefaultDeliveryRecipient,
+	FieldDefaultDeliveryPhone,
+	FieldDefaultDeliveryAddress,
 	FieldIsActive,
 	FieldNote,
 	FieldCreatedAt,
@@ -94,6 +106,14 @@ var (
 	DefaultPaymentTermDaysValidator func(int) error
 	// TaxNoValidator is a validator for the "tax_no" field. It is called by the builders before save.
 	TaxNoValidator func(string) error
+	// CountryRegionValidator is a validator for the "country_region" field. It is called by the builders before save.
+	CountryRegionValidator func(string) error
+	// DefaultDeliveryRecipientValidator is a validator for the "default_delivery_recipient" field. It is called by the builders before save.
+	DefaultDeliveryRecipientValidator func(string) error
+	// DefaultDeliveryPhoneValidator is a validator for the "default_delivery_phone" field. It is called by the builders before save.
+	DefaultDeliveryPhoneValidator func(string) error
+	// DefaultDeliveryAddressValidator is a validator for the "default_delivery_address" field. It is called by the builders before save.
+	DefaultDeliveryAddressValidator func(string) error
 	// DefaultIsActive holds the default value on creation for the "is_active" field.
 	DefaultIsActive bool
 	// NoteValidator is a validator for the "note" field. It is called by the builders before save.
@@ -142,6 +162,26 @@ func ByDefaultPaymentTermDays(opts ...sql.OrderTermOption) OrderOption {
 // ByTaxNo orders the results by the tax_no field.
 func ByTaxNo(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldTaxNo, opts...).ToFunc()
+}
+
+// ByCountryRegion orders the results by the country_region field.
+func ByCountryRegion(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCountryRegion, opts...).ToFunc()
+}
+
+// ByDefaultDeliveryRecipient orders the results by the default_delivery_recipient field.
+func ByDefaultDeliveryRecipient(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDefaultDeliveryRecipient, opts...).ToFunc()
+}
+
+// ByDefaultDeliveryPhone orders the results by the default_delivery_phone field.
+func ByDefaultDeliveryPhone(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDefaultDeliveryPhone, opts...).ToFunc()
+}
+
+// ByDefaultDeliveryAddress orders the results by the default_delivery_address field.
+func ByDefaultDeliveryAddress(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDefaultDeliveryAddress, opts...).ToFunc()
 }
 
 // ByIsActive orders the results by the is_active field.

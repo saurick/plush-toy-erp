@@ -60,6 +60,18 @@ func getOptionalJSONRPCNonNegativeInt(pm map[string]any, key string) (*int, bool
 	return &value, true
 }
 
+func getOptionalJSONRPCBool(pm map[string]any, key string) (*bool, bool) {
+	raw, exists := pm[key]
+	if !exists || raw == nil {
+		return nil, true
+	}
+	value, ok := raw.(bool)
+	if !ok {
+		return nil, false
+	}
+	return &value, true
+}
+
 func getRequiredJSONRPCPositiveInt(pm map[string]any, key string) (int, bool) {
 	const maxJSONSafeInteger = float64(9007199254740991)
 	raw, ok := pm[key]
@@ -249,6 +261,13 @@ func optionalStringValue(value *string) any {
 }
 
 func optionalIntValue(value *int) any {
+	if value == nil {
+		return nil
+	}
+	return *value
+}
+
+func optionalBoolValue(value *bool) any {
 	if value == nil {
 		return nil
 	}

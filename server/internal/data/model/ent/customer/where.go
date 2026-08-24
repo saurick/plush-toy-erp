@@ -85,6 +85,26 @@ func TaxNo(v string) predicate.Customer {
 	return predicate.Customer(sql.FieldEQ(FieldTaxNo, v))
 }
 
+// CountryRegion applies equality check predicate on the "country_region" field. It's identical to CountryRegionEQ.
+func CountryRegion(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldEQ(FieldCountryRegion, v))
+}
+
+// DefaultDeliveryRecipient applies equality check predicate on the "default_delivery_recipient" field. It's identical to DefaultDeliveryRecipientEQ.
+func DefaultDeliveryRecipient(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldEQ(FieldDefaultDeliveryRecipient, v))
+}
+
+// DefaultDeliveryPhone applies equality check predicate on the "default_delivery_phone" field. It's identical to DefaultDeliveryPhoneEQ.
+func DefaultDeliveryPhone(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldEQ(FieldDefaultDeliveryPhone, v))
+}
+
+// DefaultDeliveryAddress applies equality check predicate on the "default_delivery_address" field. It's identical to DefaultDeliveryAddressEQ.
+func DefaultDeliveryAddress(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldEQ(FieldDefaultDeliveryAddress, v))
+}
+
 // IsActive applies equality check predicate on the "is_active" field. It's identical to IsActiveEQ.
 func IsActive(v bool) predicate.Customer {
 	return predicate.Customer(sql.FieldEQ(FieldIsActive, v))
@@ -508,6 +528,306 @@ func TaxNoEqualFold(v string) predicate.Customer {
 // TaxNoContainsFold applies the ContainsFold predicate on the "tax_no" field.
 func TaxNoContainsFold(v string) predicate.Customer {
 	return predicate.Customer(sql.FieldContainsFold(FieldTaxNo, v))
+}
+
+// CountryRegionEQ applies the EQ predicate on the "country_region" field.
+func CountryRegionEQ(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldEQ(FieldCountryRegion, v))
+}
+
+// CountryRegionNEQ applies the NEQ predicate on the "country_region" field.
+func CountryRegionNEQ(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldNEQ(FieldCountryRegion, v))
+}
+
+// CountryRegionIn applies the In predicate on the "country_region" field.
+func CountryRegionIn(vs ...string) predicate.Customer {
+	return predicate.Customer(sql.FieldIn(FieldCountryRegion, vs...))
+}
+
+// CountryRegionNotIn applies the NotIn predicate on the "country_region" field.
+func CountryRegionNotIn(vs ...string) predicate.Customer {
+	return predicate.Customer(sql.FieldNotIn(FieldCountryRegion, vs...))
+}
+
+// CountryRegionGT applies the GT predicate on the "country_region" field.
+func CountryRegionGT(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldGT(FieldCountryRegion, v))
+}
+
+// CountryRegionGTE applies the GTE predicate on the "country_region" field.
+func CountryRegionGTE(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldGTE(FieldCountryRegion, v))
+}
+
+// CountryRegionLT applies the LT predicate on the "country_region" field.
+func CountryRegionLT(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldLT(FieldCountryRegion, v))
+}
+
+// CountryRegionLTE applies the LTE predicate on the "country_region" field.
+func CountryRegionLTE(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldLTE(FieldCountryRegion, v))
+}
+
+// CountryRegionContains applies the Contains predicate on the "country_region" field.
+func CountryRegionContains(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldContains(FieldCountryRegion, v))
+}
+
+// CountryRegionHasPrefix applies the HasPrefix predicate on the "country_region" field.
+func CountryRegionHasPrefix(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldHasPrefix(FieldCountryRegion, v))
+}
+
+// CountryRegionHasSuffix applies the HasSuffix predicate on the "country_region" field.
+func CountryRegionHasSuffix(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldHasSuffix(FieldCountryRegion, v))
+}
+
+// CountryRegionIsNil applies the IsNil predicate on the "country_region" field.
+func CountryRegionIsNil() predicate.Customer {
+	return predicate.Customer(sql.FieldIsNull(FieldCountryRegion))
+}
+
+// CountryRegionNotNil applies the NotNil predicate on the "country_region" field.
+func CountryRegionNotNil() predicate.Customer {
+	return predicate.Customer(sql.FieldNotNull(FieldCountryRegion))
+}
+
+// CountryRegionEqualFold applies the EqualFold predicate on the "country_region" field.
+func CountryRegionEqualFold(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldEqualFold(FieldCountryRegion, v))
+}
+
+// CountryRegionContainsFold applies the ContainsFold predicate on the "country_region" field.
+func CountryRegionContainsFold(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldContainsFold(FieldCountryRegion, v))
+}
+
+// DefaultDeliveryRecipientEQ applies the EQ predicate on the "default_delivery_recipient" field.
+func DefaultDeliveryRecipientEQ(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldEQ(FieldDefaultDeliveryRecipient, v))
+}
+
+// DefaultDeliveryRecipientNEQ applies the NEQ predicate on the "default_delivery_recipient" field.
+func DefaultDeliveryRecipientNEQ(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldNEQ(FieldDefaultDeliveryRecipient, v))
+}
+
+// DefaultDeliveryRecipientIn applies the In predicate on the "default_delivery_recipient" field.
+func DefaultDeliveryRecipientIn(vs ...string) predicate.Customer {
+	return predicate.Customer(sql.FieldIn(FieldDefaultDeliveryRecipient, vs...))
+}
+
+// DefaultDeliveryRecipientNotIn applies the NotIn predicate on the "default_delivery_recipient" field.
+func DefaultDeliveryRecipientNotIn(vs ...string) predicate.Customer {
+	return predicate.Customer(sql.FieldNotIn(FieldDefaultDeliveryRecipient, vs...))
+}
+
+// DefaultDeliveryRecipientGT applies the GT predicate on the "default_delivery_recipient" field.
+func DefaultDeliveryRecipientGT(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldGT(FieldDefaultDeliveryRecipient, v))
+}
+
+// DefaultDeliveryRecipientGTE applies the GTE predicate on the "default_delivery_recipient" field.
+func DefaultDeliveryRecipientGTE(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldGTE(FieldDefaultDeliveryRecipient, v))
+}
+
+// DefaultDeliveryRecipientLT applies the LT predicate on the "default_delivery_recipient" field.
+func DefaultDeliveryRecipientLT(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldLT(FieldDefaultDeliveryRecipient, v))
+}
+
+// DefaultDeliveryRecipientLTE applies the LTE predicate on the "default_delivery_recipient" field.
+func DefaultDeliveryRecipientLTE(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldLTE(FieldDefaultDeliveryRecipient, v))
+}
+
+// DefaultDeliveryRecipientContains applies the Contains predicate on the "default_delivery_recipient" field.
+func DefaultDeliveryRecipientContains(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldContains(FieldDefaultDeliveryRecipient, v))
+}
+
+// DefaultDeliveryRecipientHasPrefix applies the HasPrefix predicate on the "default_delivery_recipient" field.
+func DefaultDeliveryRecipientHasPrefix(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldHasPrefix(FieldDefaultDeliveryRecipient, v))
+}
+
+// DefaultDeliveryRecipientHasSuffix applies the HasSuffix predicate on the "default_delivery_recipient" field.
+func DefaultDeliveryRecipientHasSuffix(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldHasSuffix(FieldDefaultDeliveryRecipient, v))
+}
+
+// DefaultDeliveryRecipientIsNil applies the IsNil predicate on the "default_delivery_recipient" field.
+func DefaultDeliveryRecipientIsNil() predicate.Customer {
+	return predicate.Customer(sql.FieldIsNull(FieldDefaultDeliveryRecipient))
+}
+
+// DefaultDeliveryRecipientNotNil applies the NotNil predicate on the "default_delivery_recipient" field.
+func DefaultDeliveryRecipientNotNil() predicate.Customer {
+	return predicate.Customer(sql.FieldNotNull(FieldDefaultDeliveryRecipient))
+}
+
+// DefaultDeliveryRecipientEqualFold applies the EqualFold predicate on the "default_delivery_recipient" field.
+func DefaultDeliveryRecipientEqualFold(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldEqualFold(FieldDefaultDeliveryRecipient, v))
+}
+
+// DefaultDeliveryRecipientContainsFold applies the ContainsFold predicate on the "default_delivery_recipient" field.
+func DefaultDeliveryRecipientContainsFold(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldContainsFold(FieldDefaultDeliveryRecipient, v))
+}
+
+// DefaultDeliveryPhoneEQ applies the EQ predicate on the "default_delivery_phone" field.
+func DefaultDeliveryPhoneEQ(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldEQ(FieldDefaultDeliveryPhone, v))
+}
+
+// DefaultDeliveryPhoneNEQ applies the NEQ predicate on the "default_delivery_phone" field.
+func DefaultDeliveryPhoneNEQ(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldNEQ(FieldDefaultDeliveryPhone, v))
+}
+
+// DefaultDeliveryPhoneIn applies the In predicate on the "default_delivery_phone" field.
+func DefaultDeliveryPhoneIn(vs ...string) predicate.Customer {
+	return predicate.Customer(sql.FieldIn(FieldDefaultDeliveryPhone, vs...))
+}
+
+// DefaultDeliveryPhoneNotIn applies the NotIn predicate on the "default_delivery_phone" field.
+func DefaultDeliveryPhoneNotIn(vs ...string) predicate.Customer {
+	return predicate.Customer(sql.FieldNotIn(FieldDefaultDeliveryPhone, vs...))
+}
+
+// DefaultDeliveryPhoneGT applies the GT predicate on the "default_delivery_phone" field.
+func DefaultDeliveryPhoneGT(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldGT(FieldDefaultDeliveryPhone, v))
+}
+
+// DefaultDeliveryPhoneGTE applies the GTE predicate on the "default_delivery_phone" field.
+func DefaultDeliveryPhoneGTE(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldGTE(FieldDefaultDeliveryPhone, v))
+}
+
+// DefaultDeliveryPhoneLT applies the LT predicate on the "default_delivery_phone" field.
+func DefaultDeliveryPhoneLT(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldLT(FieldDefaultDeliveryPhone, v))
+}
+
+// DefaultDeliveryPhoneLTE applies the LTE predicate on the "default_delivery_phone" field.
+func DefaultDeliveryPhoneLTE(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldLTE(FieldDefaultDeliveryPhone, v))
+}
+
+// DefaultDeliveryPhoneContains applies the Contains predicate on the "default_delivery_phone" field.
+func DefaultDeliveryPhoneContains(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldContains(FieldDefaultDeliveryPhone, v))
+}
+
+// DefaultDeliveryPhoneHasPrefix applies the HasPrefix predicate on the "default_delivery_phone" field.
+func DefaultDeliveryPhoneHasPrefix(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldHasPrefix(FieldDefaultDeliveryPhone, v))
+}
+
+// DefaultDeliveryPhoneHasSuffix applies the HasSuffix predicate on the "default_delivery_phone" field.
+func DefaultDeliveryPhoneHasSuffix(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldHasSuffix(FieldDefaultDeliveryPhone, v))
+}
+
+// DefaultDeliveryPhoneIsNil applies the IsNil predicate on the "default_delivery_phone" field.
+func DefaultDeliveryPhoneIsNil() predicate.Customer {
+	return predicate.Customer(sql.FieldIsNull(FieldDefaultDeliveryPhone))
+}
+
+// DefaultDeliveryPhoneNotNil applies the NotNil predicate on the "default_delivery_phone" field.
+func DefaultDeliveryPhoneNotNil() predicate.Customer {
+	return predicate.Customer(sql.FieldNotNull(FieldDefaultDeliveryPhone))
+}
+
+// DefaultDeliveryPhoneEqualFold applies the EqualFold predicate on the "default_delivery_phone" field.
+func DefaultDeliveryPhoneEqualFold(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldEqualFold(FieldDefaultDeliveryPhone, v))
+}
+
+// DefaultDeliveryPhoneContainsFold applies the ContainsFold predicate on the "default_delivery_phone" field.
+func DefaultDeliveryPhoneContainsFold(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldContainsFold(FieldDefaultDeliveryPhone, v))
+}
+
+// DefaultDeliveryAddressEQ applies the EQ predicate on the "default_delivery_address" field.
+func DefaultDeliveryAddressEQ(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldEQ(FieldDefaultDeliveryAddress, v))
+}
+
+// DefaultDeliveryAddressNEQ applies the NEQ predicate on the "default_delivery_address" field.
+func DefaultDeliveryAddressNEQ(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldNEQ(FieldDefaultDeliveryAddress, v))
+}
+
+// DefaultDeliveryAddressIn applies the In predicate on the "default_delivery_address" field.
+func DefaultDeliveryAddressIn(vs ...string) predicate.Customer {
+	return predicate.Customer(sql.FieldIn(FieldDefaultDeliveryAddress, vs...))
+}
+
+// DefaultDeliveryAddressNotIn applies the NotIn predicate on the "default_delivery_address" field.
+func DefaultDeliveryAddressNotIn(vs ...string) predicate.Customer {
+	return predicate.Customer(sql.FieldNotIn(FieldDefaultDeliveryAddress, vs...))
+}
+
+// DefaultDeliveryAddressGT applies the GT predicate on the "default_delivery_address" field.
+func DefaultDeliveryAddressGT(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldGT(FieldDefaultDeliveryAddress, v))
+}
+
+// DefaultDeliveryAddressGTE applies the GTE predicate on the "default_delivery_address" field.
+func DefaultDeliveryAddressGTE(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldGTE(FieldDefaultDeliveryAddress, v))
+}
+
+// DefaultDeliveryAddressLT applies the LT predicate on the "default_delivery_address" field.
+func DefaultDeliveryAddressLT(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldLT(FieldDefaultDeliveryAddress, v))
+}
+
+// DefaultDeliveryAddressLTE applies the LTE predicate on the "default_delivery_address" field.
+func DefaultDeliveryAddressLTE(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldLTE(FieldDefaultDeliveryAddress, v))
+}
+
+// DefaultDeliveryAddressContains applies the Contains predicate on the "default_delivery_address" field.
+func DefaultDeliveryAddressContains(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldContains(FieldDefaultDeliveryAddress, v))
+}
+
+// DefaultDeliveryAddressHasPrefix applies the HasPrefix predicate on the "default_delivery_address" field.
+func DefaultDeliveryAddressHasPrefix(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldHasPrefix(FieldDefaultDeliveryAddress, v))
+}
+
+// DefaultDeliveryAddressHasSuffix applies the HasSuffix predicate on the "default_delivery_address" field.
+func DefaultDeliveryAddressHasSuffix(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldHasSuffix(FieldDefaultDeliveryAddress, v))
+}
+
+// DefaultDeliveryAddressIsNil applies the IsNil predicate on the "default_delivery_address" field.
+func DefaultDeliveryAddressIsNil() predicate.Customer {
+	return predicate.Customer(sql.FieldIsNull(FieldDefaultDeliveryAddress))
+}
+
+// DefaultDeliveryAddressNotNil applies the NotNil predicate on the "default_delivery_address" field.
+func DefaultDeliveryAddressNotNil() predicate.Customer {
+	return predicate.Customer(sql.FieldNotNull(FieldDefaultDeliveryAddress))
+}
+
+// DefaultDeliveryAddressEqualFold applies the EqualFold predicate on the "default_delivery_address" field.
+func DefaultDeliveryAddressEqualFold(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldEqualFold(FieldDefaultDeliveryAddress, v))
+}
+
+// DefaultDeliveryAddressContainsFold applies the ContainsFold predicate on the "default_delivery_address" field.
+func DefaultDeliveryAddressContainsFold(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldContainsFold(FieldDefaultDeliveryAddress, v))
 }
 
 // IsActiveEQ applies the EQ predicate on the "is_active" field.

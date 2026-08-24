@@ -2,8 +2,10 @@ package data
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -54,9 +56,19 @@ func (r *operationalFactRepo) CreateShipmentDraftWithItems(ctx context.Context, 
 		SetNillableSalesOrderID(shipmentIn.SalesOrderID).
 		SetNillableCustomerID(shipmentIn.CustomerID).
 		SetNillableCustomerSnapshot(shipmentIn.CustomerSnapshot).
+		SetDeliverySnapshot(shipmentIn.DeliverySnapshot).
 		SetStatus(biz.ShipmentStatusDraft).
 		SetIdempotencyKey(shipmentIn.IdempotencyKey).
 		SetNillablePlannedShipAt(shipmentIn.PlannedShipAt).
+		SetNillableTransportMethod(shipmentIn.TransportMethod).
+		SetNillableCarrierName(shipmentIn.CarrierName).
+		SetNillableTrackingNo(shipmentIn.TrackingNo).
+		SetNillablePackageCount(shipmentIn.PackageCount).
+		SetNillableGrossWeightKg(shipmentIn.GrossWeightKg).
+		SetNillableVolumeM3(shipmentIn.VolumeM3).
+		SetNillableShippingMark(shipmentIn.ShippingMark).
+		SetNillableFreightAmount(shipmentIn.FreightAmount).
+		SetNillableFreightCurrency(shipmentIn.FreightCurrency).
 		SetNillableTotalNetWeightG(shipmentIn.TotalNetWeightG).
 		SetNillableRequestedTotalNetWeightG(shipmentIn.TotalNetWeightG).
 		SetNillableNote(shipmentIn.Note).
@@ -115,8 +127,18 @@ func (r *operationalFactRepo) SaveShipmentDraftWithItems(ctx context.Context, in
 		SalesOrderID:     in.SalesOrderID,
 		CustomerID:       in.CustomerID,
 		CustomerSnapshot: in.CustomerSnapshot,
+		DeliverySnapshot: in.DeliverySnapshot,
 		IdempotencyKey:   current.IdempotencyKey,
 		PlannedShipAt:    in.PlannedShipAt,
+		TransportMethod:  in.TransportMethod,
+		CarrierName:      in.CarrierName,
+		TrackingNo:       in.TrackingNo,
+		PackageCount:     in.PackageCount,
+		GrossWeightKg:    in.GrossWeightKg,
+		VolumeM3:         in.VolumeM3,
+		ShippingMark:     in.ShippingMark,
+		FreightAmount:    in.FreightAmount,
+		FreightCurrency:  in.FreightCurrency,
 		TotalNetWeightG:  in.TotalNetWeightG,
 		Note:             in.Note,
 	}, in.Items)
@@ -194,8 +216,16 @@ func replaceShipmentDraftHeader(
 	if tx == nil || tx.sqlTx == nil || current == nil || in == nil {
 		return biz.ErrBadParam
 	}
-	p := inventorySQLPlaceholders(tx.dialect, 11)
-	query := fmt.Sprintf(`UPDATE shipments SET shipment_no = %s, sales_order_id = %s, customer_id = %s, customer_snapshot = %s, planned_ship_at = %s, total_net_weight_g = %s, requested_total_net_weight_g = %s, note = %s, version = version + 1, updated_at = %s WHERE id = %s AND status = 'DRAFT' AND version = %s`, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10])
+	deliverySnapshot, err := json.Marshal(in.DeliverySnapshot)
+	if err != nil {
+		return biz.ErrBadParam
+	}
+	p := inventorySQLPlaceholders(tx.dialect, 21)
+	deliverySnapshotPlaceholder := p[4]
+	if tx.dialect == dialect.Postgres {
+		deliverySnapshotPlaceholder = fmt.Sprintf("CAST(%s AS JSONB)", p[4])
+	}
+	query := fmt.Sprintf(`UPDATE shipments SET shipment_no = %s, sales_order_id = %s, customer_id = %s, customer_snapshot = %s, delivery_snapshot = %s, planned_ship_at = %s, transport_method = %s, carrier_name = %s, tracking_no = %s, package_count = %s, gross_weight_kg = %s, volume_m3 = %s, shipping_mark = %s, freight_amount = %s, freight_currency = %s, total_net_weight_g = %s, requested_total_net_weight_g = %s, note = %s, version = version + 1, updated_at = %s WHERE id = %s AND status = 'DRAFT' AND version = %s`, p[0], p[1], p[2], p[3], deliverySnapshotPlaceholder, p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15], p[16], p[17], p[18], p[19], p[20])
 	result, err := tx.sqlTx.ExecContext(
 		ctx,
 		query,
@@ -203,7 +233,17 @@ func replaceShipmentDraftHeader(
 		optionalIntSQLValue(in.SalesOrderID),
 		optionalIntSQLValue(in.CustomerID),
 		optionalStringSQLValue(in.CustomerSnapshot),
+		string(deliverySnapshot),
 		optionalTimeSQLValue(in.PlannedShipAt),
+		optionalStringSQLValue(in.TransportMethod),
+		optionalStringSQLValue(in.CarrierName),
+		optionalStringSQLValue(in.TrackingNo),
+		optionalIntSQLValue(in.PackageCount),
+		optionalDecimalSQLValue(in.GrossWeightKg),
+		optionalDecimalSQLValue(in.VolumeM3),
+		optionalStringSQLValue(in.ShippingMark),
+		optionalDecimalSQLValue(in.FreightAmount),
+		optionalStringSQLValue(in.FreightCurrency),
 		optionalDecimalSQLValue(in.TotalNetWeightG),
 		optionalDecimalSQLValue(in.TotalNetWeightG),
 		optionalStringSQLValue(in.Note),
@@ -343,7 +383,34 @@ func lockAndResolveShipmentSalesOrderSource(
 
 	resolved := *in
 	resolved.CustomerSnapshot = shipmentCustomerNameFromSalesOrderSnapshot(order.CustomerSnapshot)
+	if len(resolved.DeliverySnapshot) == 0 {
+		resolved.DeliverySnapshot = cloneStringAnyMap(order.DeliverySnapshot)
+	}
 	return &resolved, nil
+}
+
+func cloneStringAnyMap(source map[string]any) map[string]any {
+	if len(source) == 0 {
+		return map[string]any{}
+	}
+	result := make(map[string]any, len(source))
+	for key, value := range source {
+		result[key] = value
+	}
+	return result
+}
+
+func sameStringAnyMap(left, right map[string]any) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for key, leftValue := range left {
+		rightValue, ok := right[key]
+		if !ok || !reflect.DeepEqual(leftValue, rightValue) {
+			return false
+		}
+	}
+	return true
 }
 
 func shipmentCustomerNameFromSalesOrderSnapshot(snapshot map[string]any) *string {
@@ -485,6 +552,8 @@ func createShipmentItem(ctx context.Context, client *ent.Client, shipmentID int,
 		SetNillableUnitPriceSnapshot(unitPriceSnapshot).
 		SetNillableAmountSnapshot(amountSnapshot).
 		SetNillableCurrencySnapshot(currencySnapshot).
+		SetNillablePackageDescription(in.PackageDescription).
+		SetNillableCaseNo(in.CaseNo).
 		SetNillableNote(in.Note).
 		Save(ctx)
 }
@@ -594,6 +663,9 @@ func resolveShipmentReplayCustomerSnapshot(
 	}
 	resolved := *in
 	resolved.CustomerSnapshot = shipmentCustomerNameFromSalesOrderSnapshot(order.CustomerSnapshot)
+	if len(resolved.DeliverySnapshot) == 0 {
+		resolved.DeliverySnapshot = cloneStringAnyMap(order.DeliverySnapshot)
+	}
 	return &resolved, nil
 }
 
@@ -605,8 +677,18 @@ func shipmentMatchesCreate(row *ent.Shipment, in *biz.ShipmentCreate) bool {
 		sameOptionalInt(row.SalesOrderID, in.SalesOrderID) &&
 		sameOptionalInt(row.CustomerID, in.CustomerID) &&
 		sameOptionalString(row.CustomerSnapshot, in.CustomerSnapshot) &&
+		sameStringAnyMap(row.DeliverySnapshot, in.DeliverySnapshot) &&
 		row.IdempotencyKey == in.IdempotencyKey &&
 		sameOptionalTime(row.PlannedShipAt, in.PlannedShipAt) &&
+		sameOptionalString(row.TransportMethod, in.TransportMethod) &&
+		sameOptionalString(row.CarrierName, in.CarrierName) &&
+		sameOptionalString(row.TrackingNo, in.TrackingNo) &&
+		sameOptionalInt(row.PackageCount, in.PackageCount) &&
+		sameOptionalDecimal(row.GrossWeightKg, in.GrossWeightKg) &&
+		sameOptionalDecimal(row.VolumeM3, in.VolumeM3) &&
+		sameOptionalString(row.ShippingMark, in.ShippingMark) &&
+		sameOptionalDecimal(row.FreightAmount, in.FreightAmount) &&
+		sameOptionalString(row.FreightCurrency, in.FreightCurrency) &&
 		sameOptionalDecimal(row.RequestedTotalNetWeightG, in.TotalNetWeightG) &&
 		sameOptionalString(row.Note, in.Note)
 }
@@ -625,6 +707,8 @@ func shipmentItemsMatchCreate(rows []*biz.ShipmentItem, inputs []*biz.ShipmentIt
 			row.UnitID != in.UnitID ||
 			!sameOptionalInt(row.LotID, in.LotID) ||
 			row.Quantity.Cmp(in.Quantity) != 0 ||
+			!sameOptionalString(row.PackageDescription, in.PackageDescription) ||
+			!sameOptionalString(row.CaseNo, in.CaseNo) ||
 			!sameOptionalString(row.Note, in.Note) {
 			return false
 		}
@@ -886,6 +970,10 @@ func (r *operationalFactRepo) ListShipments(ctx context.Context, filter biz.Oper
 		q = q.Where(shipment.Or(
 			shipment.ShipmentNoContainsFold(filter.Keyword),
 			shipment.CustomerSnapshotContainsFold(filter.Keyword),
+			shipment.TransportMethodContainsFold(filter.Keyword),
+			shipment.CarrierNameContainsFold(filter.Keyword),
+			shipment.TrackingNoContainsFold(filter.Keyword),
+			shipment.ShippingMarkContainsFold(filter.Keyword),
 			shipment.StatusContainsFold(filter.Keyword),
 			shipment.IdempotencyKeyContainsFold(filter.Keyword),
 			shipment.NoteContainsFold(filter.Keyword),
@@ -1962,7 +2050,40 @@ func entShipmentToBiz(row *ent.Shipment, itemRows []*ent.ShipmentItem) *biz.Ship
 	for _, item := range itemRows {
 		items = append(items, entShipmentItemToBiz(item))
 	}
-	return &biz.Shipment{ID: row.ID, ShipmentNo: row.ShipmentNo, SalesOrderID: row.SalesOrderID, CustomerID: row.CustomerID, CustomerSnapshot: row.CustomerSnapshot, Status: row.Status, Version: row.Version, FinanceReleaseStatus: row.FinanceReleaseStatus, FinanceReleaseVersion: row.FinanceReleaseVersion, FinanceReleasedAt: row.FinanceReleasedAt, FinanceReleasedBy: row.FinanceReleasedBy, FinanceReleaseProcessInstanceID: row.FinanceReleaseProcessInstanceID, FinanceReleaseProcessNodeID: row.FinanceReleaseProcessNodeID, FinanceReleaseNote: row.FinanceReleaseNote, IdempotencyKey: row.IdempotencyKey, PlannedShipAt: row.PlannedShipAt, ShippedAt: row.ShippedAt, TotalNetWeightG: row.TotalNetWeightG, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, Items: items}
+	return &biz.Shipment{
+		ID:                              row.ID,
+		ShipmentNo:                      row.ShipmentNo,
+		SalesOrderID:                    row.SalesOrderID,
+		CustomerID:                      row.CustomerID,
+		CustomerSnapshot:                row.CustomerSnapshot,
+		DeliverySnapshot:                row.DeliverySnapshot,
+		Status:                          row.Status,
+		Version:                         row.Version,
+		FinanceReleaseStatus:            row.FinanceReleaseStatus,
+		FinanceReleaseVersion:           row.FinanceReleaseVersion,
+		FinanceReleasedAt:               row.FinanceReleasedAt,
+		FinanceReleasedBy:               row.FinanceReleasedBy,
+		FinanceReleaseProcessInstanceID: row.FinanceReleaseProcessInstanceID,
+		FinanceReleaseProcessNodeID:     row.FinanceReleaseProcessNodeID,
+		FinanceReleaseNote:              row.FinanceReleaseNote,
+		IdempotencyKey:                  row.IdempotencyKey,
+		PlannedShipAt:                   row.PlannedShipAt,
+		ShippedAt:                       row.ShippedAt,
+		TransportMethod:                 row.TransportMethod,
+		CarrierName:                     row.CarrierName,
+		TrackingNo:                      row.TrackingNo,
+		PackageCount:                    row.PackageCount,
+		GrossWeightKg:                   row.GrossWeightKg,
+		VolumeM3:                        row.VolumeM3,
+		ShippingMark:                    row.ShippingMark,
+		FreightAmount:                   row.FreightAmount,
+		FreightCurrency:                 row.FreightCurrency,
+		TotalNetWeightG:                 row.TotalNetWeightG,
+		Note:                            row.Note,
+		CreatedAt:                       row.CreatedAt,
+		UpdatedAt:                       row.UpdatedAt,
+		Items:                           items,
+	}
 }
 
 func entShipmentItemToBiz(row *ent.ShipmentItem) *biz.ShipmentItem {
@@ -1974,5 +2095,24 @@ func entShipmentItemToBiz(row *ent.ShipmentItem) *biz.ShipmentItem {
 		currency := row.CurrencySnapshot
 		currencySnapshot = &currency
 	}
-	return &biz.ShipmentItem{ID: row.ID, ShipmentID: row.ShipmentID, SalesOrderItemID: row.SalesOrderItemID, ProductID: row.ProductID, ProductSkuID: row.ProductSkuID, WarehouseID: row.WarehouseID, UnitID: row.UnitID, LotID: row.LotID, Quantity: row.Quantity, UnitNetWeightGSnapshot: row.UnitNetWeightGSnapshot, UnitPriceSnapshot: row.UnitPriceSnapshot, AmountSnapshot: row.AmountSnapshot, CurrencySnapshot: currencySnapshot, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	return &biz.ShipmentItem{
+		ID:                     row.ID,
+		ShipmentID:             row.ShipmentID,
+		SalesOrderItemID:       row.SalesOrderItemID,
+		ProductID:              row.ProductID,
+		ProductSkuID:           row.ProductSkuID,
+		WarehouseID:            row.WarehouseID,
+		UnitID:                 row.UnitID,
+		LotID:                  row.LotID,
+		Quantity:               row.Quantity,
+		UnitNetWeightGSnapshot: row.UnitNetWeightGSnapshot,
+		UnitPriceSnapshot:      row.UnitPriceSnapshot,
+		AmountSnapshot:         row.AmountSnapshot,
+		CurrencySnapshot:       currencySnapshot,
+		PackageDescription:     row.PackageDescription,
+		CaseNo:                 row.CaseNo,
+		Note:                   row.Note,
+		CreatedAt:              row.CreatedAt,
+		UpdatedAt:              row.UpdatedAt,
+	}
 }

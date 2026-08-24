@@ -22,6 +22,13 @@ func (SalesOrder) Annotations() []schema.Annotation {
 				"sales_orders_lifecycle_status_allowed": "lifecycle_status IN ('draft', 'submitted', 'active', 'closed', 'canceled')",
 				"sales_orders_version_positive":         "version > 0",
 				"sales_orders_currency_allowed":         "currency IN ('USD', 'CNY', 'HKD')",
+				"sales_orders_tax_mode_allowed":         "tax_mode IS NULL OR tax_mode IN ('INCLUSIVE', 'EXCLUSIVE', 'NONE')",
+				"sales_orders_tax_rate_valid":           "tax_rate IS NULL OR (tax_rate > 0 AND tax_rate <= 100)",
+				"sales_orders_tax_pair_valid":           "((tax_mode IS NULL AND tax_rate IS NULL) OR (tax_mode = 'NONE' AND tax_rate IS NULL) OR (tax_mode IN ('INCLUSIVE', 'EXCLUSIVE') AND tax_rate IS NOT NULL))",
+				"sales_orders_freight_terms_allowed":    "freight_terms IS NULL OR freight_terms IN ('INCLUDED', 'EXCLUDED')",
+				"sales_orders_goods_amount_nonnegative": "goods_amount IS NULL OR goods_amount >= 0",
+				"sales_orders_tax_amount_nonnegative":   "tax_amount IS NULL OR tax_amount >= 0",
+				"sales_orders_order_total_nonnegative":  "order_total IS NULL OR order_total >= 0",
 			},
 		},
 	}
@@ -51,6 +58,8 @@ func (SalesOrder) Fields() []ent.Field {
 			MaxLen(128),
 		field.JSON("contact_snapshot", map[string]any{}).
 			Optional(),
+		field.JSON("delivery_snapshot", map[string]any{}).
+			Optional(),
 		field.String("payment_method").
 			Optional().
 			Nillable().
@@ -63,6 +72,12 @@ func (SalesOrder) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			MaxLen(255),
+		field.String("tax_mode").Optional().Nillable().MaxLen(32),
+		optionalDecimalField("tax_rate"),
+		field.String("freight_terms").Optional().Nillable().MaxLen(32),
+		optionalDecimalField("goods_amount"),
+		optionalDecimalField("tax_amount"),
+		optionalDecimalField("order_total"),
 		field.Time("order_date"),
 		field.Time("planned_delivery_date").
 			Optional().

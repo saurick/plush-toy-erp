@@ -196,6 +196,46 @@ func shipmentCreateFromParams(pm map[string]any) (*biz.ShipmentCreate, bool) {
 	if !ok {
 		return nil, false
 	}
+	deliverySnapshot, ok := getOptionalShipmentMap(pm, "delivery_snapshot")
+	if !ok {
+		return nil, false
+	}
+	transportMethod, ok := getOptionalShipmentString(pm, "transport_method")
+	if !ok {
+		return nil, false
+	}
+	carrierName, ok := getOptionalShipmentString(pm, "carrier_name")
+	if !ok {
+		return nil, false
+	}
+	trackingNo, ok := getOptionalShipmentString(pm, "tracking_no")
+	if !ok {
+		return nil, false
+	}
+	packageCount, ok := getOptionalShipmentPositiveInt(pm, "package_count")
+	if !ok {
+		return nil, false
+	}
+	grossWeightKg, ok := getOptionalJSONRPCDecimalString(pm, "gross_weight_kg")
+	if !ok {
+		return nil, false
+	}
+	volumeM3, ok := getOptionalJSONRPCDecimalString(pm, "volume_m3")
+	if !ok {
+		return nil, false
+	}
+	shippingMark, ok := getOptionalShipmentString(pm, "shipping_mark")
+	if !ok {
+		return nil, false
+	}
+	freightAmount, ok := getOptionalJSONRPCDecimalString(pm, "freight_amount")
+	if !ok {
+		return nil, false
+	}
+	freightCurrency, ok := getOptionalShipmentString(pm, "freight_currency")
+	if !ok {
+		return nil, false
+	}
 	note, ok := getOptionalShipmentString(pm, "note")
 	if !ok {
 		return nil, false
@@ -205,8 +245,18 @@ func shipmentCreateFromParams(pm map[string]any) (*biz.ShipmentCreate, bool) {
 		SalesOrderID:     salesOrderID,
 		CustomerID:       customerID,
 		CustomerSnapshot: customerSnapshot,
+		DeliverySnapshot: deliverySnapshot,
 		IdempotencyKey:   getString(pm, "idempotency_key"),
 		PlannedShipAt:    plannedShipAt,
+		TransportMethod:  transportMethod,
+		CarrierName:      carrierName,
+		TrackingNo:       trackingNo,
+		PackageCount:     packageCount,
+		GrossWeightKg:    grossWeightKg,
+		VolumeM3:         volumeM3,
+		ShippingMark:     shippingMark,
+		FreightAmount:    freightAmount,
+		FreightCurrency:  freightCurrency,
 		TotalNetWeightG:  totalNetWeightG,
 		Note:             note,
 	}, true
@@ -221,6 +271,8 @@ func shipmentItemCreateFromParams(pm map[string]any) (*biz.ShipmentItemCreate, b
 		"unit_id",
 		"lot_id",
 		"quantity",
+		"package_description",
+		"case_no",
 		"note",
 	) {
 		return nil, false
@@ -253,19 +305,29 @@ func shipmentItemCreateFromParams(pm map[string]any) (*biz.ShipmentItemCreate, b
 	if !ok {
 		return nil, false
 	}
+	packageDescription, ok := getOptionalShipmentString(pm, "package_description")
+	if !ok {
+		return nil, false
+	}
+	caseNo, ok := getOptionalShipmentString(pm, "case_no")
+	if !ok {
+		return nil, false
+	}
 	note, ok := getOptionalShipmentString(pm, "note")
 	if !ok {
 		return nil, false
 	}
 	return &biz.ShipmentItemCreate{
-		SalesOrderItemID: salesOrderItemID,
-		ProductID:        productID,
-		ProductSkuID:     productSkuID,
-		WarehouseID:      warehouseID,
-		UnitID:           unitID,
-		LotID:            lotID,
-		Quantity:         quantity,
-		Note:             note,
+		SalesOrderItemID:   salesOrderItemID,
+		ProductID:          productID,
+		ProductSkuID:       productSkuID,
+		WarehouseID:        warehouseID,
+		UnitID:             unitID,
+		LotID:              lotID,
+		Quantity:           quantity,
+		PackageDescription: packageDescription,
+		CaseNo:             caseNo,
+		Note:               note,
 	}, true
 }
 
@@ -289,8 +351,18 @@ func shipmentCreateWithItemsFromParams(pm map[string]any) (*biz.ShipmentCreateWi
 		"sales_order_id",
 		"customer_id",
 		"customer_snapshot",
+		"delivery_snapshot",
 		"idempotency_key",
 		"planned_ship_at",
+		"transport_method",
+		"carrier_name",
+		"tracking_no",
+		"package_count",
+		"gross_weight_kg",
+		"volume_m3",
+		"shipping_mark",
+		"freight_amount",
+		"freight_currency",
 		"total_net_weight_g",
 		"note",
 		"items",
@@ -337,7 +409,17 @@ func shipmentDraftSaveFromParams(pm map[string]any) (*biz.ShipmentDraftSave, boo
 		"sales_order_id",
 		"customer_id",
 		"customer_snapshot",
+		"delivery_snapshot",
 		"planned_ship_at",
+		"transport_method",
+		"carrier_name",
+		"tracking_no",
+		"package_count",
+		"gross_weight_kg",
+		"volume_m3",
+		"shipping_mark",
+		"freight_amount",
+		"freight_currency",
 		"total_net_weight_g",
 		"note",
 		"items",
@@ -373,40 +455,30 @@ func shipmentDraftSaveFromParams(pm map[string]any) (*biz.ShipmentDraftSave, boo
 		}
 		items = append(items, item)
 	}
-	plannedShipAt, ok := getOptionalShipmentTime(pm, "planned_ship_at")
-	if !ok {
-		return nil, false
-	}
-	totalNetWeightG, ok := getOptionalJSONRPCDecimalString(pm, "total_net_weight_g")
-	if !ok {
-		return nil, false
-	}
-	salesOrderID, ok := getOptionalShipmentPositiveInt(pm, "sales_order_id")
-	if !ok {
-		return nil, false
-	}
-	customerID, ok := getOptionalShipmentPositiveInt(pm, "customer_id")
-	if !ok {
-		return nil, false
-	}
-	customerSnapshot, ok := getOptionalShipmentString(pm, "customer_snapshot")
-	if !ok {
-		return nil, false
-	}
-	note, ok := getOptionalShipmentString(pm, "note")
+	header, ok := shipmentCreateFromParams(pm)
 	if !ok {
 		return nil, false
 	}
 	return &biz.ShipmentDraftSave{
 		ID:               id,
 		ExpectedVersion:  expectedVersion,
-		ShipmentNo:       getString(pm, "shipment_no"),
-		SalesOrderID:     salesOrderID,
-		CustomerID:       customerID,
-		CustomerSnapshot: customerSnapshot,
-		PlannedShipAt:    plannedShipAt,
-		TotalNetWeightG:  totalNetWeightG,
-		Note:             note,
+		ShipmentNo:       header.ShipmentNo,
+		SalesOrderID:     header.SalesOrderID,
+		CustomerID:       header.CustomerID,
+		CustomerSnapshot: header.CustomerSnapshot,
+		DeliverySnapshot: header.DeliverySnapshot,
+		PlannedShipAt:    header.PlannedShipAt,
+		TransportMethod:  header.TransportMethod,
+		CarrierName:      header.CarrierName,
+		TrackingNo:       header.TrackingNo,
+		PackageCount:     header.PackageCount,
+		GrossWeightKg:    header.GrossWeightKg,
+		VolumeM3:         header.VolumeM3,
+		ShippingMark:     header.ShippingMark,
+		FreightAmount:    header.FreightAmount,
+		FreightCurrency:  header.FreightCurrency,
+		TotalNetWeightG:  header.TotalNetWeightG,
+		Note:             header.Note,
 		Items:            items,
 	}, true
 }
@@ -502,6 +574,18 @@ func getOptionalShipmentString(pm map[string]any, key string) (*string, bool) {
 	return &value, true
 }
 
+func getOptionalShipmentMap(pm map[string]any, key string) (map[string]any, bool) {
+	raw, exists := pm[key]
+	if !exists || raw == nil {
+		return map[string]any{}, true
+	}
+	value, ok := raw.(map[string]any)
+	if !ok {
+		return nil, false
+	}
+	return value, true
+}
+
 func getOptionalShipmentTime(pm map[string]any, key string) (*time.Time, bool) {
 	raw, exists := pm[key]
 	if !exists || raw == nil {
@@ -547,6 +631,7 @@ func shipmentSourceCandidateToAny(item *biz.ShipmentSourceCandidate) map[string]
 		"order_version":         item.OrderVersion,
 		"customer_id":           item.CustomerID,
 		"customer_snapshot":     item.CustomerSnapshot,
+		"delivery_snapshot":     item.DeliverySnapshot,
 		"customer_name":         item.CustomerName,
 		"sales_order_item_id":   item.SalesOrderItemID,
 		"line_no":               item.LineNo,
@@ -579,12 +664,64 @@ func shipmentToAny(item *biz.Shipment) map[string]any {
 	for _, line := range item.Items {
 		lines = append(lines, shipmentItemToAny(line))
 	}
-	return map[string]any{"id": item.ID, "shipment_no": item.ShipmentNo, "sales_order_id": optionalIntToAny(item.SalesOrderID), "customer_id": optionalIntToAny(item.CustomerID), "customer_snapshot": optionalStringToAny(item.CustomerSnapshot), "status": item.Status, "version": item.Version, "finance_release_status": item.FinanceReleaseStatus, "finance_release_version": item.FinanceReleaseVersion, "finance_released_at": optionalUnix(item.FinanceReleasedAt), "finance_released_by": optionalIntToAny(item.FinanceReleasedBy), "finance_release_process_instance_id": optionalIntToAny(item.FinanceReleaseProcessInstanceID), "finance_release_process_node_id": optionalIntToAny(item.FinanceReleaseProcessNodeID), "finance_release_note": optionalStringToAny(item.FinanceReleaseNote), "idempotency_key": item.IdempotencyKey, "planned_ship_at": optionalUnix(item.PlannedShipAt), "shipped_at": optionalUnix(item.ShippedAt), "total_net_weight_g": optionalDecimalString(item.TotalNetWeightG), "note": optionalStringToAny(item.Note), "items": lines, "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
+	return map[string]any{
+		"id":                                  item.ID,
+		"shipment_no":                         item.ShipmentNo,
+		"sales_order_id":                      optionalIntToAny(item.SalesOrderID),
+		"customer_id":                         optionalIntToAny(item.CustomerID),
+		"customer_snapshot":                   optionalStringToAny(item.CustomerSnapshot),
+		"delivery_snapshot":                   item.DeliverySnapshot,
+		"status":                              item.Status,
+		"version":                             item.Version,
+		"finance_release_status":              item.FinanceReleaseStatus,
+		"finance_release_version":             item.FinanceReleaseVersion,
+		"finance_released_at":                 optionalUnix(item.FinanceReleasedAt),
+		"finance_released_by":                 optionalIntToAny(item.FinanceReleasedBy),
+		"finance_release_process_instance_id": optionalIntToAny(item.FinanceReleaseProcessInstanceID),
+		"finance_release_process_node_id":     optionalIntToAny(item.FinanceReleaseProcessNodeID),
+		"finance_release_note":                optionalStringToAny(item.FinanceReleaseNote),
+		"idempotency_key":                     item.IdempotencyKey,
+		"planned_ship_at":                     optionalUnix(item.PlannedShipAt),
+		"shipped_at":                          optionalUnix(item.ShippedAt),
+		"transport_method":                    optionalStringToAny(item.TransportMethod),
+		"carrier_name":                        optionalStringToAny(item.CarrierName),
+		"tracking_no":                         optionalStringToAny(item.TrackingNo),
+		"package_count":                       optionalIntToAny(item.PackageCount),
+		"gross_weight_kg":                     optionalDecimalString(item.GrossWeightKg),
+		"volume_m3":                           optionalDecimalString(item.VolumeM3),
+		"shipping_mark":                       optionalStringToAny(item.ShippingMark),
+		"freight_amount":                      optionalDecimalString(item.FreightAmount),
+		"freight_currency":                    optionalStringToAny(item.FreightCurrency),
+		"total_net_weight_g":                  optionalDecimalString(item.TotalNetWeightG),
+		"note":                                optionalStringToAny(item.Note),
+		"items":                               lines,
+		"created_at":                          item.CreatedAt.Unix(),
+		"updated_at":                          item.UpdatedAt.Unix(),
+	}
 }
 
 func shipmentItemToAny(item *biz.ShipmentItem) map[string]any {
 	if item == nil {
 		return map[string]any{}
 	}
-	return map[string]any{"id": item.ID, "shipment_id": item.ShipmentID, "sales_order_item_id": optionalIntToAny(item.SalesOrderItemID), "product_id": item.ProductID, "product_sku_id": optionalIntToAny(item.ProductSkuID), "warehouse_id": item.WarehouseID, "unit_id": item.UnitID, "lot_id": optionalIntToAny(item.LotID), "quantity": item.Quantity.String(), "unit_net_weight_g_snapshot": optionalDecimalString(item.UnitNetWeightGSnapshot), "unit_price_snapshot": optionalDecimalString(item.UnitPriceSnapshot), "amount_snapshot": optionalDecimalString(item.AmountSnapshot), "currency_snapshot": optionalStringToAny(item.CurrencySnapshot), "note": optionalStringToAny(item.Note), "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
+	return map[string]any{
+		"id":                         item.ID,
+		"shipment_id":                item.ShipmentID,
+		"sales_order_item_id":        optionalIntToAny(item.SalesOrderItemID),
+		"product_id":                 item.ProductID,
+		"product_sku_id":             optionalIntToAny(item.ProductSkuID),
+		"warehouse_id":               item.WarehouseID,
+		"unit_id":                    item.UnitID,
+		"lot_id":                     optionalIntToAny(item.LotID),
+		"quantity":                   item.Quantity.String(),
+		"unit_net_weight_g_snapshot": optionalDecimalString(item.UnitNetWeightGSnapshot),
+		"unit_price_snapshot":        optionalDecimalString(item.UnitPriceSnapshot),
+		"amount_snapshot":            optionalDecimalString(item.AmountSnapshot),
+		"currency_snapshot":          optionalStringToAny(item.CurrencySnapshot),
+		"package_description":        optionalStringToAny(item.PackageDescription),
+		"case_no":                    optionalStringToAny(item.CaseNo),
+		"note":                       optionalStringToAny(item.Note),
+		"created_at":                 item.CreatedAt.Unix(),
+		"updated_at":                 item.UpdatedAt.Unix(),
+	}
 }

@@ -15,6 +15,7 @@ import (
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/shopspring/decimal"
 )
 
 // SalesOrderCreate is the builder for creating a SalesOrder entity.
@@ -90,6 +91,12 @@ func (_c *SalesOrderCreate) SetContactSnapshot(v map[string]interface{}) *SalesO
 	return _c
 }
 
+// SetDeliverySnapshot sets the "delivery_snapshot" field.
+func (_c *SalesOrderCreate) SetDeliverySnapshot(v map[string]interface{}) *SalesOrderCreate {
+	_c.mutation.SetDeliverySnapshot(v)
+	return _c
+}
+
 // SetPaymentMethod sets the "payment_method" field.
 func (_c *SalesOrderCreate) SetPaymentMethod(v string) *SalesOrderCreate {
 	_c.mutation.SetPaymentMethod(v)
@@ -128,6 +135,90 @@ func (_c *SalesOrderCreate) SetPriceConditionNote(v string) *SalesOrderCreate {
 func (_c *SalesOrderCreate) SetNillablePriceConditionNote(v *string) *SalesOrderCreate {
 	if v != nil {
 		_c.SetPriceConditionNote(*v)
+	}
+	return _c
+}
+
+// SetTaxMode sets the "tax_mode" field.
+func (_c *SalesOrderCreate) SetTaxMode(v string) *SalesOrderCreate {
+	_c.mutation.SetTaxMode(v)
+	return _c
+}
+
+// SetNillableTaxMode sets the "tax_mode" field if the given value is not nil.
+func (_c *SalesOrderCreate) SetNillableTaxMode(v *string) *SalesOrderCreate {
+	if v != nil {
+		_c.SetTaxMode(*v)
+	}
+	return _c
+}
+
+// SetTaxRate sets the "tax_rate" field.
+func (_c *SalesOrderCreate) SetTaxRate(v decimal.Decimal) *SalesOrderCreate {
+	_c.mutation.SetTaxRate(v)
+	return _c
+}
+
+// SetNillableTaxRate sets the "tax_rate" field if the given value is not nil.
+func (_c *SalesOrderCreate) SetNillableTaxRate(v *decimal.Decimal) *SalesOrderCreate {
+	if v != nil {
+		_c.SetTaxRate(*v)
+	}
+	return _c
+}
+
+// SetFreightTerms sets the "freight_terms" field.
+func (_c *SalesOrderCreate) SetFreightTerms(v string) *SalesOrderCreate {
+	_c.mutation.SetFreightTerms(v)
+	return _c
+}
+
+// SetNillableFreightTerms sets the "freight_terms" field if the given value is not nil.
+func (_c *SalesOrderCreate) SetNillableFreightTerms(v *string) *SalesOrderCreate {
+	if v != nil {
+		_c.SetFreightTerms(*v)
+	}
+	return _c
+}
+
+// SetGoodsAmount sets the "goods_amount" field.
+func (_c *SalesOrderCreate) SetGoodsAmount(v decimal.Decimal) *SalesOrderCreate {
+	_c.mutation.SetGoodsAmount(v)
+	return _c
+}
+
+// SetNillableGoodsAmount sets the "goods_amount" field if the given value is not nil.
+func (_c *SalesOrderCreate) SetNillableGoodsAmount(v *decimal.Decimal) *SalesOrderCreate {
+	if v != nil {
+		_c.SetGoodsAmount(*v)
+	}
+	return _c
+}
+
+// SetTaxAmount sets the "tax_amount" field.
+func (_c *SalesOrderCreate) SetTaxAmount(v decimal.Decimal) *SalesOrderCreate {
+	_c.mutation.SetTaxAmount(v)
+	return _c
+}
+
+// SetNillableTaxAmount sets the "tax_amount" field if the given value is not nil.
+func (_c *SalesOrderCreate) SetNillableTaxAmount(v *decimal.Decimal) *SalesOrderCreate {
+	if v != nil {
+		_c.SetTaxAmount(*v)
+	}
+	return _c
+}
+
+// SetOrderTotal sets the "order_total" field.
+func (_c *SalesOrderCreate) SetOrderTotal(v decimal.Decimal) *SalesOrderCreate {
+	_c.mutation.SetOrderTotal(v)
+	return _c
+}
+
+// SetNillableOrderTotal sets the "order_total" field if the given value is not nil.
+func (_c *SalesOrderCreate) SetNillableOrderTotal(v *decimal.Decimal) *SalesOrderCreate {
+	if v != nil {
+		_c.SetOrderTotal(*v)
 	}
 	return _c
 }
@@ -450,6 +541,16 @@ func (_c *SalesOrderCreate) check() error {
 			return &ValidationError{Name: "price_condition_note", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.price_condition_note": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.TaxMode(); ok {
+		if err := salesorder.TaxModeValidator(v); err != nil {
+			return &ValidationError{Name: "tax_mode", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.tax_mode": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.FreightTerms(); ok {
+		if err := salesorder.FreightTermsValidator(v); err != nil {
+			return &ValidationError{Name: "freight_terms", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.freight_terms": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.OrderDate(); !ok {
 		return &ValidationError{Name: "order_date", err: errors.New(`ent: missing required field "SalesOrder.order_date"`)}
 	}
@@ -553,6 +654,10 @@ func (_c *SalesOrderCreate) createSpec() (*SalesOrder, *sqlgraph.CreateSpec) {
 		_spec.SetField(salesorder.FieldContactSnapshot, field.TypeJSON, value)
 		_node.ContactSnapshot = value
 	}
+	if value, ok := _c.mutation.DeliverySnapshot(); ok {
+		_spec.SetField(salesorder.FieldDeliverySnapshot, field.TypeJSON, value)
+		_node.DeliverySnapshot = value
+	}
 	if value, ok := _c.mutation.PaymentMethod(); ok {
 		_spec.SetField(salesorder.FieldPaymentMethod, field.TypeString, value)
 		_node.PaymentMethod = &value
@@ -564,6 +669,30 @@ func (_c *SalesOrderCreate) createSpec() (*SalesOrder, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.PriceConditionNote(); ok {
 		_spec.SetField(salesorder.FieldPriceConditionNote, field.TypeString, value)
 		_node.PriceConditionNote = &value
+	}
+	if value, ok := _c.mutation.TaxMode(); ok {
+		_spec.SetField(salesorder.FieldTaxMode, field.TypeString, value)
+		_node.TaxMode = &value
+	}
+	if value, ok := _c.mutation.TaxRate(); ok {
+		_spec.SetField(salesorder.FieldTaxRate, field.TypeOther, value)
+		_node.TaxRate = &value
+	}
+	if value, ok := _c.mutation.FreightTerms(); ok {
+		_spec.SetField(salesorder.FieldFreightTerms, field.TypeString, value)
+		_node.FreightTerms = &value
+	}
+	if value, ok := _c.mutation.GoodsAmount(); ok {
+		_spec.SetField(salesorder.FieldGoodsAmount, field.TypeOther, value)
+		_node.GoodsAmount = &value
+	}
+	if value, ok := _c.mutation.TaxAmount(); ok {
+		_spec.SetField(salesorder.FieldTaxAmount, field.TypeOther, value)
+		_node.TaxAmount = &value
+	}
+	if value, ok := _c.mutation.OrderTotal(); ok {
+		_spec.SetField(salesorder.FieldOrderTotal, field.TypeOther, value)
+		_node.OrderTotal = &value
 	}
 	if value, ok := _c.mutation.OrderDate(); ok {
 		_spec.SetField(salesorder.FieldOrderDate, field.TypeTime, value)

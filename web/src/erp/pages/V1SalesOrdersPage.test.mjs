@@ -14,12 +14,50 @@ const modal = readFileSync(
   'utf8'
 )
 const columns = readFileSync(
+  new URL('../components/sales-orders/salesOrderColumns.jsx', import.meta.url),
+  'utf8'
+)
+const form = readFileSync(
+  new URL('../components/sales-orders/SalesOrderForm.jsx', import.meta.url),
+  'utf8'
+)
+const businessModal = readFileSync(
   new URL(
-    '../components/sales-orders/salesOrderColumns.jsx',
+    '../components/sales-orders/SalesOrderBusinessModal.jsx',
     import.meta.url
   ),
   'utf8'
 )
+
+test('sales order commercial and delivery fields stay grouped without changing the established modal order', () => {
+  for (const copy of [
+    '税费与运费条件',
+    '计税方式',
+    '税率',
+    '报价是否含运费',
+    '交付与收货',
+    '国家 / 地区',
+    '收货人',
+    '收货电话',
+    '收货地址',
+    '订单数量',
+    '单价',
+    '金额',
+    '货款金额',
+    '税额',
+    '订单总额',
+  ]) {
+    assert.match(form, new RegExp(copy.replace('/', '\\/'), 'u'))
+  }
+  assert.match(form, /unitText="%"/u)
+  assert.doesNotMatch(form, /addonAfter=/u)
+  const headerIndex = businessModal.indexOf('<SalesOrderFormFields')
+  const attachmentsIndex = businessModal.indexOf('<BusinessAttachmentPanel')
+  const itemsIndex = businessModal.indexOf('<SalesOrderItemsFormSection')
+  assert(headerIndex >= 0)
+  assert(attachmentsIndex > headerIndex)
+  assert(itemsIndex > attachmentsIndex)
+})
 
 test('planned delivery date header keeps enough width for one line', () => {
   assert.match(
@@ -110,8 +148,14 @@ test('sales lifecycle mutation locks selection and duplicate intent synchronousl
   assert.match(page, /lifecycleInFlightRef\.current = false/u)
   assert.match(page, /disabled=\{saving\}[\s\S]*当前订单操作完成后可更换选择/u)
   assert.match(page, /getCheckboxProps: \(\) => \(\{ disabled: saving \}\)/u)
-  assert.match(page, /onChange: \(_keys, selectedRows\) => \{[\s\S]*if \(saving\) return/u)
-  assert.match(page, /onOpenRecord=\{saving \? undefined : openSalesOrderRecord\}/u)
+  assert.match(
+    page,
+    /onChange: \(_keys, selectedRows\) => \{[\s\S]*if \(saving\) return/u
+  )
+  assert.match(
+    page,
+    /onOpenRecord=\{saving \? undefined : openSalesOrderRecord\}/u
+  )
 })
 
 test('sales selection actions keep one authorized catalog across record states', () => {
@@ -121,15 +165,15 @@ test('sales selection actions keep one authorized catalog across record states',
     'edit',
     'reserve-stock',
   ]) {
-    assert.match(page, new RegExp(`data-business-action-key="${actionKey}"`, 'u'))
+    assert.match(
+      page,
+      new RegExp(`data-business-action-key="${actionKey}"`, 'u')
+    )
   }
   assert.match(page, /actionStates: lifecycleActionStates/u)
   assert.match(page, /actionStates=\{lifecycleActionStates\}/u)
   assert.match(page, /disabled=\{primaryLifecycleState\.disabled\}/u)
-  assert.doesNotMatch(
-    page,
-    /canUpdateOrder\s*&&[\s\S]{0,100}!selectedOrder/u
-  )
+  assert.doesNotMatch(page, /canUpdateOrder\s*&&[\s\S]{0,100}!selectedOrder/u)
   assert.doesNotMatch(
     page,
     /canCreateReservation\s*&&[\s\S]{0,120}selectedOrderLifecycleStatus/u

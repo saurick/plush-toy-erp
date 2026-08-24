@@ -8,6 +8,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/shopspring/decimal"
 )
 
 // ID filters vertices based on their ID field.
@@ -93,6 +94,36 @@ func PaymentTermDays(v int) predicate.SalesOrder {
 // PriceConditionNote applies equality check predicate on the "price_condition_note" field. It's identical to PriceConditionNoteEQ.
 func PriceConditionNote(v string) predicate.SalesOrder {
 	return predicate.SalesOrder(sql.FieldEQ(FieldPriceConditionNote, v))
+}
+
+// TaxMode applies equality check predicate on the "tax_mode" field. It's identical to TaxModeEQ.
+func TaxMode(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldTaxMode, v))
+}
+
+// TaxRate applies equality check predicate on the "tax_rate" field. It's identical to TaxRateEQ.
+func TaxRate(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldTaxRate, v))
+}
+
+// FreightTerms applies equality check predicate on the "freight_terms" field. It's identical to FreightTermsEQ.
+func FreightTerms(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldFreightTerms, v))
+}
+
+// GoodsAmount applies equality check predicate on the "goods_amount" field. It's identical to GoodsAmountEQ.
+func GoodsAmount(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldGoodsAmount, v))
+}
+
+// TaxAmount applies equality check predicate on the "tax_amount" field. It's identical to TaxAmountEQ.
+func TaxAmount(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldTaxAmount, v))
+}
+
+// OrderTotal applies equality check predicate on the "order_total" field. It's identical to OrderTotalEQ.
+func OrderTotal(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldOrderTotal, v))
 }
 
 // OrderDate applies equality check predicate on the "order_date" field. It's identical to OrderDateEQ.
@@ -475,6 +506,16 @@ func ContactSnapshotNotNil() predicate.SalesOrder {
 	return predicate.SalesOrder(sql.FieldNotNull(FieldContactSnapshot))
 }
 
+// DeliverySnapshotIsNil applies the IsNil predicate on the "delivery_snapshot" field.
+func DeliverySnapshotIsNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIsNull(FieldDeliverySnapshot))
+}
+
+// DeliverySnapshotNotNil applies the NotNil predicate on the "delivery_snapshot" field.
+func DeliverySnapshotNotNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotNull(FieldDeliverySnapshot))
+}
+
 // PaymentMethodEQ applies the EQ predicate on the "payment_method" field.
 func PaymentMethodEQ(v string) predicate.SalesOrder {
 	return predicate.SalesOrder(sql.FieldEQ(FieldPaymentMethod, v))
@@ -673,6 +714,356 @@ func PriceConditionNoteEqualFold(v string) predicate.SalesOrder {
 // PriceConditionNoteContainsFold applies the ContainsFold predicate on the "price_condition_note" field.
 func PriceConditionNoteContainsFold(v string) predicate.SalesOrder {
 	return predicate.SalesOrder(sql.FieldContainsFold(FieldPriceConditionNote, v))
+}
+
+// TaxModeEQ applies the EQ predicate on the "tax_mode" field.
+func TaxModeEQ(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldTaxMode, v))
+}
+
+// TaxModeNEQ applies the NEQ predicate on the "tax_mode" field.
+func TaxModeNEQ(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNEQ(FieldTaxMode, v))
+}
+
+// TaxModeIn applies the In predicate on the "tax_mode" field.
+func TaxModeIn(vs ...string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIn(FieldTaxMode, vs...))
+}
+
+// TaxModeNotIn applies the NotIn predicate on the "tax_mode" field.
+func TaxModeNotIn(vs ...string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotIn(FieldTaxMode, vs...))
+}
+
+// TaxModeGT applies the GT predicate on the "tax_mode" field.
+func TaxModeGT(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGT(FieldTaxMode, v))
+}
+
+// TaxModeGTE applies the GTE predicate on the "tax_mode" field.
+func TaxModeGTE(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGTE(FieldTaxMode, v))
+}
+
+// TaxModeLT applies the LT predicate on the "tax_mode" field.
+func TaxModeLT(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLT(FieldTaxMode, v))
+}
+
+// TaxModeLTE applies the LTE predicate on the "tax_mode" field.
+func TaxModeLTE(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLTE(FieldTaxMode, v))
+}
+
+// TaxModeContains applies the Contains predicate on the "tax_mode" field.
+func TaxModeContains(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldContains(FieldTaxMode, v))
+}
+
+// TaxModeHasPrefix applies the HasPrefix predicate on the "tax_mode" field.
+func TaxModeHasPrefix(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldHasPrefix(FieldTaxMode, v))
+}
+
+// TaxModeHasSuffix applies the HasSuffix predicate on the "tax_mode" field.
+func TaxModeHasSuffix(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldHasSuffix(FieldTaxMode, v))
+}
+
+// TaxModeIsNil applies the IsNil predicate on the "tax_mode" field.
+func TaxModeIsNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIsNull(FieldTaxMode))
+}
+
+// TaxModeNotNil applies the NotNil predicate on the "tax_mode" field.
+func TaxModeNotNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotNull(FieldTaxMode))
+}
+
+// TaxModeEqualFold applies the EqualFold predicate on the "tax_mode" field.
+func TaxModeEqualFold(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEqualFold(FieldTaxMode, v))
+}
+
+// TaxModeContainsFold applies the ContainsFold predicate on the "tax_mode" field.
+func TaxModeContainsFold(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldContainsFold(FieldTaxMode, v))
+}
+
+// TaxRateEQ applies the EQ predicate on the "tax_rate" field.
+func TaxRateEQ(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldTaxRate, v))
+}
+
+// TaxRateNEQ applies the NEQ predicate on the "tax_rate" field.
+func TaxRateNEQ(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNEQ(FieldTaxRate, v))
+}
+
+// TaxRateIn applies the In predicate on the "tax_rate" field.
+func TaxRateIn(vs ...decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIn(FieldTaxRate, vs...))
+}
+
+// TaxRateNotIn applies the NotIn predicate on the "tax_rate" field.
+func TaxRateNotIn(vs ...decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotIn(FieldTaxRate, vs...))
+}
+
+// TaxRateGT applies the GT predicate on the "tax_rate" field.
+func TaxRateGT(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGT(FieldTaxRate, v))
+}
+
+// TaxRateGTE applies the GTE predicate on the "tax_rate" field.
+func TaxRateGTE(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGTE(FieldTaxRate, v))
+}
+
+// TaxRateLT applies the LT predicate on the "tax_rate" field.
+func TaxRateLT(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLT(FieldTaxRate, v))
+}
+
+// TaxRateLTE applies the LTE predicate on the "tax_rate" field.
+func TaxRateLTE(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLTE(FieldTaxRate, v))
+}
+
+// TaxRateIsNil applies the IsNil predicate on the "tax_rate" field.
+func TaxRateIsNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIsNull(FieldTaxRate))
+}
+
+// TaxRateNotNil applies the NotNil predicate on the "tax_rate" field.
+func TaxRateNotNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotNull(FieldTaxRate))
+}
+
+// FreightTermsEQ applies the EQ predicate on the "freight_terms" field.
+func FreightTermsEQ(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldFreightTerms, v))
+}
+
+// FreightTermsNEQ applies the NEQ predicate on the "freight_terms" field.
+func FreightTermsNEQ(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNEQ(FieldFreightTerms, v))
+}
+
+// FreightTermsIn applies the In predicate on the "freight_terms" field.
+func FreightTermsIn(vs ...string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIn(FieldFreightTerms, vs...))
+}
+
+// FreightTermsNotIn applies the NotIn predicate on the "freight_terms" field.
+func FreightTermsNotIn(vs ...string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotIn(FieldFreightTerms, vs...))
+}
+
+// FreightTermsGT applies the GT predicate on the "freight_terms" field.
+func FreightTermsGT(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGT(FieldFreightTerms, v))
+}
+
+// FreightTermsGTE applies the GTE predicate on the "freight_terms" field.
+func FreightTermsGTE(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGTE(FieldFreightTerms, v))
+}
+
+// FreightTermsLT applies the LT predicate on the "freight_terms" field.
+func FreightTermsLT(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLT(FieldFreightTerms, v))
+}
+
+// FreightTermsLTE applies the LTE predicate on the "freight_terms" field.
+func FreightTermsLTE(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLTE(FieldFreightTerms, v))
+}
+
+// FreightTermsContains applies the Contains predicate on the "freight_terms" field.
+func FreightTermsContains(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldContains(FieldFreightTerms, v))
+}
+
+// FreightTermsHasPrefix applies the HasPrefix predicate on the "freight_terms" field.
+func FreightTermsHasPrefix(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldHasPrefix(FieldFreightTerms, v))
+}
+
+// FreightTermsHasSuffix applies the HasSuffix predicate on the "freight_terms" field.
+func FreightTermsHasSuffix(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldHasSuffix(FieldFreightTerms, v))
+}
+
+// FreightTermsIsNil applies the IsNil predicate on the "freight_terms" field.
+func FreightTermsIsNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIsNull(FieldFreightTerms))
+}
+
+// FreightTermsNotNil applies the NotNil predicate on the "freight_terms" field.
+func FreightTermsNotNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotNull(FieldFreightTerms))
+}
+
+// FreightTermsEqualFold applies the EqualFold predicate on the "freight_terms" field.
+func FreightTermsEqualFold(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEqualFold(FieldFreightTerms, v))
+}
+
+// FreightTermsContainsFold applies the ContainsFold predicate on the "freight_terms" field.
+func FreightTermsContainsFold(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldContainsFold(FieldFreightTerms, v))
+}
+
+// GoodsAmountEQ applies the EQ predicate on the "goods_amount" field.
+func GoodsAmountEQ(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldGoodsAmount, v))
+}
+
+// GoodsAmountNEQ applies the NEQ predicate on the "goods_amount" field.
+func GoodsAmountNEQ(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNEQ(FieldGoodsAmount, v))
+}
+
+// GoodsAmountIn applies the In predicate on the "goods_amount" field.
+func GoodsAmountIn(vs ...decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIn(FieldGoodsAmount, vs...))
+}
+
+// GoodsAmountNotIn applies the NotIn predicate on the "goods_amount" field.
+func GoodsAmountNotIn(vs ...decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotIn(FieldGoodsAmount, vs...))
+}
+
+// GoodsAmountGT applies the GT predicate on the "goods_amount" field.
+func GoodsAmountGT(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGT(FieldGoodsAmount, v))
+}
+
+// GoodsAmountGTE applies the GTE predicate on the "goods_amount" field.
+func GoodsAmountGTE(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGTE(FieldGoodsAmount, v))
+}
+
+// GoodsAmountLT applies the LT predicate on the "goods_amount" field.
+func GoodsAmountLT(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLT(FieldGoodsAmount, v))
+}
+
+// GoodsAmountLTE applies the LTE predicate on the "goods_amount" field.
+func GoodsAmountLTE(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLTE(FieldGoodsAmount, v))
+}
+
+// GoodsAmountIsNil applies the IsNil predicate on the "goods_amount" field.
+func GoodsAmountIsNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIsNull(FieldGoodsAmount))
+}
+
+// GoodsAmountNotNil applies the NotNil predicate on the "goods_amount" field.
+func GoodsAmountNotNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotNull(FieldGoodsAmount))
+}
+
+// TaxAmountEQ applies the EQ predicate on the "tax_amount" field.
+func TaxAmountEQ(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldTaxAmount, v))
+}
+
+// TaxAmountNEQ applies the NEQ predicate on the "tax_amount" field.
+func TaxAmountNEQ(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNEQ(FieldTaxAmount, v))
+}
+
+// TaxAmountIn applies the In predicate on the "tax_amount" field.
+func TaxAmountIn(vs ...decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIn(FieldTaxAmount, vs...))
+}
+
+// TaxAmountNotIn applies the NotIn predicate on the "tax_amount" field.
+func TaxAmountNotIn(vs ...decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotIn(FieldTaxAmount, vs...))
+}
+
+// TaxAmountGT applies the GT predicate on the "tax_amount" field.
+func TaxAmountGT(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGT(FieldTaxAmount, v))
+}
+
+// TaxAmountGTE applies the GTE predicate on the "tax_amount" field.
+func TaxAmountGTE(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGTE(FieldTaxAmount, v))
+}
+
+// TaxAmountLT applies the LT predicate on the "tax_amount" field.
+func TaxAmountLT(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLT(FieldTaxAmount, v))
+}
+
+// TaxAmountLTE applies the LTE predicate on the "tax_amount" field.
+func TaxAmountLTE(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLTE(FieldTaxAmount, v))
+}
+
+// TaxAmountIsNil applies the IsNil predicate on the "tax_amount" field.
+func TaxAmountIsNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIsNull(FieldTaxAmount))
+}
+
+// TaxAmountNotNil applies the NotNil predicate on the "tax_amount" field.
+func TaxAmountNotNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotNull(FieldTaxAmount))
+}
+
+// OrderTotalEQ applies the EQ predicate on the "order_total" field.
+func OrderTotalEQ(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldOrderTotal, v))
+}
+
+// OrderTotalNEQ applies the NEQ predicate on the "order_total" field.
+func OrderTotalNEQ(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNEQ(FieldOrderTotal, v))
+}
+
+// OrderTotalIn applies the In predicate on the "order_total" field.
+func OrderTotalIn(vs ...decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIn(FieldOrderTotal, vs...))
+}
+
+// OrderTotalNotIn applies the NotIn predicate on the "order_total" field.
+func OrderTotalNotIn(vs ...decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotIn(FieldOrderTotal, vs...))
+}
+
+// OrderTotalGT applies the GT predicate on the "order_total" field.
+func OrderTotalGT(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGT(FieldOrderTotal, v))
+}
+
+// OrderTotalGTE applies the GTE predicate on the "order_total" field.
+func OrderTotalGTE(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGTE(FieldOrderTotal, v))
+}
+
+// OrderTotalLT applies the LT predicate on the "order_total" field.
+func OrderTotalLT(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLT(FieldOrderTotal, v))
+}
+
+// OrderTotalLTE applies the LTE predicate on the "order_total" field.
+func OrderTotalLTE(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLTE(FieldOrderTotal, v))
+}
+
+// OrderTotalIsNil applies the IsNil predicate on the "order_total" field.
+func OrderTotalIsNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIsNull(FieldOrderTotal))
+}
+
+// OrderTotalNotNil applies the NotNil predicate on the "order_total" field.
+func OrderTotalNotNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotNull(FieldOrderTotal))
 }
 
 // OrderDateEQ applies the EQ predicate on the "order_date" field.

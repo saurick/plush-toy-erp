@@ -5,6 +5,7 @@ import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
 import {
   formatPaymentCondition,
   formatProductUnitNetWeight,
+  purchaseInvoicePreferenceText,
 } from '../../utils/masterDataOrderView.mjs'
 import { compareNumeric20Scale6Values } from '../../utils/numeric20Scale6.mjs'
 import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
@@ -88,6 +89,22 @@ function productColumns({ unitDisplay }) {
       dataIndex: 'name',
       width: 220,
       sorter: (a, b) => compareText(a?.name, b?.name),
+    },
+    {
+      title: '英文品名',
+      exportTitle: '英文品名',
+      dataIndex: 'english_name',
+      width: 220,
+      sorter: (a, b) => compareText(a?.english_name, b?.english_name),
+      render: (value) => value || '-',
+    },
+    {
+      title: '海关编码（HS Code）',
+      exportTitle: '海关编码（HS Code）',
+      dataIndex: 'hs_code',
+      width: 180,
+      sorter: (a, b) => compareText(a?.hs_code, b?.hs_code),
+      render: (value) => value || '-',
     },
     {
       title: '内部款号',
@@ -362,6 +379,53 @@ function baseColumns({ type, unitDisplay, processOptions }) {
               return method || (termDays != null ? `${termDays}天` : '')
             },
           },
+          {
+            title: '国家 / 地区',
+            exportTitle: '国家 / 地区',
+            dataIndex: 'country_region',
+            width: 150,
+            sorter: (a, b) => compareText(a?.country_region, b?.country_region),
+            render: (value) => value || '-',
+          },
+          {
+            title: '默认收货信息',
+            exportTitle: '默认收货信息',
+            key: 'default_delivery',
+            width: 320,
+            sorter: (a, b) =>
+              compareText(
+                [
+                  a?.default_delivery_recipient,
+                  a?.default_delivery_phone,
+                  a?.default_delivery_address,
+                ]
+                  .filter(Boolean)
+                  .join(' / '),
+                [
+                  b?.default_delivery_recipient,
+                  b?.default_delivery_phone,
+                  b?.default_delivery_address,
+                ]
+                  .filter(Boolean)
+                  .join(' / ')
+              ),
+            render: (_, record) =>
+              [
+                record?.default_delivery_recipient,
+                record?.default_delivery_phone,
+                record?.default_delivery_address,
+              ]
+                .filter(Boolean)
+                .join(' / ') || '-',
+            exportValue: (record) =>
+              [
+                record?.default_delivery_recipient,
+                record?.default_delivery_phone,
+                record?.default_delivery_address,
+              ]
+                .filter(Boolean)
+                .join(' / '),
+          },
         ]
       : []),
     ...(type === 'materials'
@@ -446,6 +510,15 @@ function baseColumns({ type, unitDisplay, processOptions }) {
             render: (value) => value || '-',
           },
           {
+            title: '默认付款方式',
+            exportTitle: '默认付款方式',
+            dataIndex: 'default_payment_method',
+            width: 160,
+            sorter: (a, b) =>
+              compareText(a?.default_payment_method, b?.default_payment_method),
+            render: (value) => value || '-',
+          },
+          {
             title: '默认付款周期',
             exportTitle: '默认付款周期',
             dataIndex: 'default_payment_term_days',
@@ -459,6 +532,33 @@ function baseColumns({ type, unitDisplay, processOptions }) {
               formatPaymentCondition({
                 payment_term_days: record?.default_payment_term_days,
               }),
+          },
+          {
+            title: '默认发票要求',
+            exportTitle: '默认发票要求',
+            key: 'default_invoice_preference',
+            width: 220,
+            sorter: (a, b) =>
+              compareText(
+                purchaseInvoicePreferenceText(
+                  a?.default_invoice_required,
+                  a?.default_invoice_category
+                ),
+                purchaseInvoicePreferenceText(
+                  b?.default_invoice_required,
+                  b?.default_invoice_category
+                )
+              ),
+            render: (_, record) =>
+              purchaseInvoicePreferenceText(
+                record?.default_invoice_required,
+                record?.default_invoice_category
+              ),
+            exportValue: (record) =>
+              purchaseInvoicePreferenceText(
+                record?.default_invoice_required,
+                record?.default_invoice_category
+              ),
           },
           {
             title: '可加工工序',

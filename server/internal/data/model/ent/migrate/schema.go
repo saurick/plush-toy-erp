@@ -375,6 +375,10 @@ var (
 		{Name: "default_payment_method", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "default_payment_term_days", Type: field.TypeInt, Nullable: true},
 		{Name: "tax_no", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "country_region", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "default_delivery_recipient", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "default_delivery_phone", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "default_delivery_address", Type: field.TypeString, Nullable: true, Size: 512},
 		{Name: "is_active", Type: field.TypeBool, Default: true},
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
@@ -409,7 +413,7 @@ var (
 			{
 				Name:    "customer_is_active",
 				Unique:  false,
-				Columns: []*schema.Column{CustomersColumns[7]},
+				Columns: []*schema.Column{CustomersColumns[11]},
 			},
 		},
 	}
@@ -1808,6 +1812,8 @@ var (
 		{Name: "name", Type: field.TypeString, Size: 255},
 		{Name: "style_no", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "customer_style_no", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "english_name", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "hs_code", Type: field.TypeString, Nullable: true, Size: 32},
 		{Name: "unit_net_weight_g", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "is_active", Type: field.TypeBool, Default: true},
 		{Name: "created_at", Type: field.TypeTime},
@@ -1822,7 +1828,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "products_units_products",
-				Columns:    []*schema.Column{ProductsColumns[9]},
+				Columns:    []*schema.Column{ProductsColumns[11]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -2794,11 +2800,16 @@ var (
 		{Name: "purchase_order_no", Type: field.TypeString, Size: 64},
 		{Name: "currency", Type: field.TypeString, Size: 16, Default: "CNY"},
 		{Name: "payment_term_days", Type: field.TypeInt, Nullable: true},
+		{Name: "payment_method", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "invoice_required", Type: field.TypeBool, Nullable: true},
+		{Name: "invoice_category", Type: field.TypeString, Nullable: true, Size: 32},
 		{Name: "supplier_purchase_order_no", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "supplier_snapshot", Type: field.TypeJSON, Nullable: true},
 		{Name: "contract_party_snapshot", Type: field.TypeJSON, Nullable: true},
 		{Name: "purchase_date", Type: field.TypeTime},
 		{Name: "expected_arrival_date", Type: field.TypeTime, Nullable: true},
+		{Name: "supplier_confirmed_arrival_date", Type: field.TypeTime, Nullable: true},
+		{Name: "delivery_address", Type: field.TypeString, Nullable: true, Size: 512},
 		{Name: "lifecycle_status", Type: field.TypeString, Size: 32, Default: "draft"},
 		{Name: "version", Type: field.TypeInt, Default: 1},
 		{Name: "settlement_action", Type: field.TypeString, Nullable: true, Size: 32},
@@ -2819,7 +2830,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "purchase_orders_suppliers_purchase_orders",
-				Columns:    []*schema.Column{PurchaseOrdersColumns[19]},
+				Columns:    []*schema.Column{PurchaseOrdersColumns[24]},
 				RefColumns: []*schema.Column{SuppliersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -2833,27 +2844,27 @@ var (
 			{
 				Name:    "purchaseorder_supplier_id",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrdersColumns[19]},
+				Columns: []*schema.Column{PurchaseOrdersColumns[24]},
 			},
 			{
 				Name:    "purchaseorder_supplier_purchase_order_no",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrdersColumns[4]},
+				Columns: []*schema.Column{PurchaseOrdersColumns[7]},
 			},
 			{
 				Name:    "purchaseorder_lifecycle_status",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrdersColumns[9]},
+				Columns: []*schema.Column{PurchaseOrdersColumns[14]},
 			},
 			{
 				Name:    "purchaseorder_purchase_date",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrdersColumns[7]},
+				Columns: []*schema.Column{PurchaseOrdersColumns[10]},
 			},
 			{
 				Name:    "purchaseorder_expected_arrival_date",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrdersColumns[8]},
+				Columns: []*schema.Column{PurchaseOrdersColumns[11]},
 			},
 		},
 	}
@@ -3848,9 +3859,16 @@ var (
 		{Name: "customer_snapshot", Type: field.TypeJSON, Nullable: true},
 		{Name: "sales_owner", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "contact_snapshot", Type: field.TypeJSON, Nullable: true},
+		{Name: "delivery_snapshot", Type: field.TypeJSON, Nullable: true},
 		{Name: "payment_method", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "payment_term_days", Type: field.TypeInt, Nullable: true},
 		{Name: "price_condition_note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "tax_mode", Type: field.TypeString, Nullable: true, Size: 32},
+		{Name: "tax_rate", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "freight_terms", Type: field.TypeString, Nullable: true, Size: 32},
+		{Name: "goods_amount", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "tax_amount", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "order_total", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "order_date", Type: field.TypeTime},
 		{Name: "planned_delivery_date", Type: field.TypeTime, Nullable: true},
 		{Name: "lifecycle_status", Type: field.TypeString, Size: 32, Default: "draft"},
@@ -3873,7 +3891,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "sales_orders_customers_sales_orders",
-				Columns:    []*schema.Column{SalesOrdersColumns[22]},
+				Columns:    []*schema.Column{SalesOrdersColumns[29]},
 				RefColumns: []*schema.Column{CustomersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -3887,7 +3905,7 @@ var (
 			{
 				Name:    "salesorder_customer_id",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[22]},
+				Columns: []*schema.Column{SalesOrdersColumns[29]},
 			},
 			{
 				Name:    "salesorder_customer_order_no",
@@ -3902,22 +3920,22 @@ var (
 			{
 				Name:    "salesorder_payment_method",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[7]},
+				Columns: []*schema.Column{SalesOrdersColumns[8]},
 			},
 			{
 				Name:    "salesorder_lifecycle_status",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[12]},
+				Columns: []*schema.Column{SalesOrdersColumns[19]},
 			},
 			{
 				Name:    "salesorder_order_date",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[10]},
+				Columns: []*schema.Column{SalesOrdersColumns[17]},
 			},
 			{
 				Name:    "salesorder_planned_delivery_date",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[11]},
+				Columns: []*schema.Column{SalesOrdersColumns[18]},
 			},
 		},
 	}
@@ -4011,6 +4029,7 @@ var (
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "shipment_no", Type: field.TypeString, Size: 64},
 		{Name: "customer_snapshot", Type: field.TypeString, Nullable: true, Size: 512},
+		{Name: "delivery_snapshot", Type: field.TypeJSON, Nullable: true},
 		{Name: "status", Type: field.TypeString, Size: 32, Default: "DRAFT"},
 		{Name: "version", Type: field.TypeInt, Default: 1},
 		{Name: "finance_release_status", Type: field.TypeString, Size: 32, Default: "PENDING"},
@@ -4023,6 +4042,15 @@ var (
 		{Name: "idempotency_key", Type: field.TypeString, Size: 128},
 		{Name: "planned_ship_at", Type: field.TypeTime, Nullable: true},
 		{Name: "shipped_at", Type: field.TypeTime, Nullable: true},
+		{Name: "transport_method", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "carrier_name", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "tracking_no", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "package_count", Type: field.TypeInt, Nullable: true},
+		{Name: "gross_weight_kg", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "volume_m3", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "shipping_mark", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "freight_amount", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "freight_currency", Type: field.TypeString, Nullable: true, Size: 16},
 		{Name: "total_net_weight_g", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "requested_total_net_weight_g", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
@@ -4039,13 +4067,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "shipments_customers_shipments",
-				Columns:    []*schema.Column{ShipmentsColumns[20]},
+				Columns:    []*schema.Column{ShipmentsColumns[30]},
 				RefColumns: []*schema.Column{CustomersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "shipments_sales_orders_shipments",
-				Columns:    []*schema.Column{ShipmentsColumns[21]},
+				Columns:    []*schema.Column{ShipmentsColumns[31]},
 				RefColumns: []*schema.Column{SalesOrdersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -4059,22 +4087,22 @@ var (
 			{
 				Name:    "shipment_idempotency_key",
 				Unique:  true,
-				Columns: []*schema.Column{ShipmentsColumns[12]},
+				Columns: []*schema.Column{ShipmentsColumns[13]},
 			},
 			{
 				Name:    "shipment_sales_order_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentsColumns[21]},
+				Columns: []*schema.Column{ShipmentsColumns[31]},
 			},
 			{
 				Name:    "shipment_customer_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentsColumns[20]},
+				Columns: []*schema.Column{ShipmentsColumns[30]},
 			},
 			{
 				Name:    "shipment_status",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentsColumns[3]},
+				Columns: []*schema.Column{ShipmentsColumns[4]},
 			},
 		},
 	}
@@ -4086,6 +4114,8 @@ var (
 		{Name: "unit_price_snapshot", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "amount_snapshot", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "currency_snapshot", Type: field.TypeString, Size: 16, Default: "CNY"},
+		{Name: "package_description", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "case_no", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -4105,43 +4135,43 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "shipment_items_inventory_lots_shipment_items",
-				Columns:    []*schema.Column{ShipmentItemsColumns[9]},
+				Columns:    []*schema.Column{ShipmentItemsColumns[11]},
 				RefColumns: []*schema.Column{InventoryLotsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "shipment_items_products_shipment_items",
-				Columns:    []*schema.Column{ShipmentItemsColumns[10]},
+				Columns:    []*schema.Column{ShipmentItemsColumns[12]},
 				RefColumns: []*schema.Column{ProductsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "shipment_items_product_skus_shipment_items",
-				Columns:    []*schema.Column{ShipmentItemsColumns[11]},
+				Columns:    []*schema.Column{ShipmentItemsColumns[13]},
 				RefColumns: []*schema.Column{ProductSkusColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "shipment_items_sales_order_items_shipment_items",
-				Columns:    []*schema.Column{ShipmentItemsColumns[12]},
+				Columns:    []*schema.Column{ShipmentItemsColumns[14]},
 				RefColumns: []*schema.Column{SalesOrderItemsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "shipment_items_shipments_items",
-				Columns:    []*schema.Column{ShipmentItemsColumns[13]},
+				Columns:    []*schema.Column{ShipmentItemsColumns[15]},
 				RefColumns: []*schema.Column{ShipmentsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "shipment_items_units_shipment_items",
-				Columns:    []*schema.Column{ShipmentItemsColumns[14]},
+				Columns:    []*schema.Column{ShipmentItemsColumns[16]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "shipment_items_warehouses_shipment_items",
-				Columns:    []*schema.Column{ShipmentItemsColumns[15]},
+				Columns:    []*schema.Column{ShipmentItemsColumns[17]},
 				RefColumns: []*schema.Column{WarehousesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -4150,22 +4180,22 @@ var (
 			{
 				Name:    "shipmentitem_shipment_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentItemsColumns[13]},
+				Columns: []*schema.Column{ShipmentItemsColumns[15]},
 			},
 			{
 				Name:    "shipmentitem_sales_order_item_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentItemsColumns[12]},
+				Columns: []*schema.Column{ShipmentItemsColumns[14]},
 			},
 			{
 				Name:    "shipmentitem_product_sku_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentItemsColumns[11]},
+				Columns: []*schema.Column{ShipmentItemsColumns[13]},
 			},
 			{
 				Name:    "shipmentitem_product_id_warehouse_id_lot_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentItemsColumns[10], ShipmentItemsColumns[15], ShipmentItemsColumns[9]},
+				Columns: []*schema.Column{ShipmentItemsColumns[12], ShipmentItemsColumns[17], ShipmentItemsColumns[11]},
 			},
 		},
 	}
@@ -4329,6 +4359,9 @@ var (
 		{Name: "address", Type: field.TypeString, Nullable: true, Size: 512},
 		{Name: "tax_no", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "default_payment_term_days", Type: field.TypeInt, Default: 0},
+		{Name: "default_payment_method", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "default_invoice_required", Type: field.TypeBool, Nullable: true},
+		{Name: "default_invoice_category", Type: field.TypeString, Nullable: true, Size: 32},
 		{Name: "is_active", Type: field.TypeBool, Default: true},
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
@@ -4363,7 +4396,7 @@ var (
 			{
 				Name:    "supplier_is_active",
 				Unique:  false,
-				Columns: []*schema.Column{SuppliersColumns[8]},
+				Columns: []*schema.Column{SuppliersColumns[11]},
 			},
 		},
 	}
@@ -5200,6 +5233,8 @@ func init() {
 	PurchaseOrdersTable.Annotation = &entsql.Annotation{}
 	PurchaseOrdersTable.Annotation.Checks = map[string]string{
 		"purchase_orders_currency_allowed":              "currency IN ('USD', 'CNY', 'HKD')",
+		"purchase_orders_invoice_category_allowed":      "invoice_category IS NULL OR invoice_category IN ('EXPORT_GENERAL', 'VAT_GENERAL_1', 'VAT_SPECIAL_3', 'VAT_SPECIAL_13')",
+		"purchase_orders_invoice_pair_valid":            "((invoice_required IS NULL AND invoice_category IS NULL) OR (invoice_required = false AND invoice_category IS NULL) OR (invoice_required = true AND invoice_category IS NOT NULL))",
 		"purchase_orders_lifecycle_status_allowed":      "lifecycle_status IN ('draft', 'submitted', 'approved', 'closed', 'canceled')",
 		"purchase_orders_payment_term_days_nonnegative": "payment_term_days IS NULL OR payment_term_days >= 0",
 		"purchase_orders_version_positive":              "version > 0",
@@ -5317,7 +5352,14 @@ func init() {
 	SalesOrdersTable.Annotation = &entsql.Annotation{}
 	SalesOrdersTable.Annotation.Checks = map[string]string{
 		"sales_orders_currency_allowed":         "currency IN ('USD', 'CNY', 'HKD')",
+		"sales_orders_freight_terms_allowed":    "freight_terms IS NULL OR freight_terms IN ('INCLUDED', 'EXCLUDED')",
+		"sales_orders_goods_amount_nonnegative": "goods_amount IS NULL OR goods_amount >= 0",
 		"sales_orders_lifecycle_status_allowed": "lifecycle_status IN ('draft', 'submitted', 'active', 'closed', 'canceled')",
+		"sales_orders_order_total_nonnegative":  "order_total IS NULL OR order_total >= 0",
+		"sales_orders_tax_amount_nonnegative":   "tax_amount IS NULL OR tax_amount >= 0",
+		"sales_orders_tax_mode_allowed":         "tax_mode IS NULL OR tax_mode IN ('INCLUSIVE', 'EXCLUSIVE', 'NONE')",
+		"sales_orders_tax_pair_valid":           "((tax_mode IS NULL AND tax_rate IS NULL) OR (tax_mode = 'NONE' AND tax_rate IS NULL) OR (tax_mode IN ('INCLUSIVE', 'EXCLUSIVE') AND tax_rate IS NOT NULL))",
+		"sales_orders_tax_rate_valid":           "tax_rate IS NULL OR (tax_rate > 0 AND tax_rate <= 100)",
 		"sales_orders_version_positive":         "version > 0",
 	}
 	SalesOrderItemsTable.ForeignKeys[0].RefTable = ProductSkusTable
@@ -5339,10 +5381,16 @@ func init() {
 	ShipmentsTable.Annotation.Checks = map[string]string{
 		"shipments_finance_release_status_allowed":        "finance_release_status IN ('PENDING', 'APPROVED', 'REJECTED')",
 		"shipments_finance_release_version_positive":      "finance_release_version > 0",
+		"shipments_freight_amount_nonnegative":            "freight_amount IS NULL OR freight_amount >= 0",
+		"shipments_freight_currency_allowed":              "freight_currency IS NULL OR freight_currency IN ('USD', 'CNY', 'HKD')",
+		"shipments_freight_pair_valid":                    "((freight_amount IS NULL AND freight_currency IS NULL) OR (freight_amount IS NOT NULL AND freight_currency IS NOT NULL))",
+		"shipments_gross_weight_kg_positive":              "gross_weight_kg IS NULL OR gross_weight_kg > 0",
+		"shipments_package_count_positive":                "package_count IS NULL OR package_count > 0",
 		"shipments_requested_total_net_weight_g_positive": "requested_total_net_weight_g IS NULL OR requested_total_net_weight_g > 0",
 		"shipments_status_allowed":                        "status IN ('DRAFT', 'SHIPPED', 'CANCELLED')",
 		"shipments_total_net_weight_g_positive":           "total_net_weight_g IS NULL OR total_net_weight_g > 0",
 		"shipments_version_positive":                      "version > 0",
+		"shipments_volume_m3_positive":                    "volume_m3 IS NULL OR volume_m3 > 0",
 	}
 	ShipmentItemsTable.ForeignKeys[0].RefTable = InventoryLotsTable
 	ShipmentItemsTable.ForeignKeys[1].RefTable = ProductsTable
@@ -5380,7 +5428,9 @@ func init() {
 	}
 	SuppliersTable.Annotation = &entsql.Annotation{}
 	SuppliersTable.Annotation.Checks = map[string]string{
-		"suppliers_supplier_type_allowed": "supplier_type IS NULL OR supplier_type IN ('material', 'outsourcing', 'service', 'mixed')",
+		"suppliers_default_invoice_category_allowed": "default_invoice_category IS NULL OR default_invoice_category IN ('EXPORT_GENERAL', 'VAT_GENERAL_1', 'VAT_SPECIAL_3', 'VAT_SPECIAL_13')",
+		"suppliers_default_invoice_pair_valid":       "((default_invoice_required IS NULL AND default_invoice_category IS NULL) OR (default_invoice_required = false AND default_invoice_category IS NULL) OR (default_invoice_required = true AND default_invoice_category IS NOT NULL))",
+		"suppliers_supplier_type_allowed":            "supplier_type IS NULL OR supplier_type IN ('material', 'outsourcing', 'service', 'mixed')",
 	}
 	WorkflowBusinessStatesTable.Annotation = &entsql.Annotation{}
 	WorkflowBusinessStatesTable.Annotation.Checks = map[string]string{

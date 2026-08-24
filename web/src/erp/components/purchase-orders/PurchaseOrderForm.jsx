@@ -28,6 +28,8 @@ import {
 } from '../../utils/dateRange.mjs'
 import {
   BUSINESS_CURRENCY_OPTIONS,
+  PURCHASE_INVOICE_CATEGORY_OPTIONS,
+  PURCHASE_INVOICE_REQUIRED_OPTIONS,
   buildPurchaseOrderItemSourceValuesFromMaterial,
   summarizePurchaseOrderLines,
   unixToDateInputValue,
@@ -164,11 +166,18 @@ export function PurchaseOrderFormFields({
   }, [referenceDataReady])
   const purchaseDate = Form.useWatch('purchase_date', form)
   const expectedArrivalDate = Form.useWatch('expected_arrival_date', form)
+  const supplierConfirmedArrivalDate = Form.useWatch(
+    'supplier_confirmed_arrival_date',
+    form
+  )
+  const invoiceRequired = Form.useWatch('invoice_required', form)
   const { registerLineItemRow, requestLineItemScroll } =
     useLineItemAppendScroll()
-  const disablePurchaseDateAfterExpectedArrival = useCallback(
-    (current) => isDateInputAfter(current, expectedArrivalDate),
-    [expectedArrivalDate]
+  const disablePurchaseDateAfterArrival = useCallback(
+    (current) =>
+      isDateInputAfter(current, expectedArrivalDate) ||
+      isDateInputAfter(current, supplierConfirmedArrivalDate),
+    [expectedArrivalDate, supplierConfirmedArrivalDate]
   )
   const disableExpectedArrivalBeforePurchaseDate = useCallback(
     (current) => isDateInputBefore(current, purchaseDate),
@@ -268,6 +277,15 @@ export function PurchaseOrderFormFields({
       >
         <Select options={BUSINESS_CURRENCY_OPTIONS} />
       </Form.Item>
+      <BusinessFormSectionTitle>结算与发票</BusinessFormSectionTitle>
+      <Form.Item
+        className="erp-business-action-form__field"
+        extra="从供应商档案带出后可按本单调整。"
+        name="payment_method"
+        label="付款方式"
+      >
+        <Input allowClear maxLength={128} placeholder="如银行转账、月结" />
+      </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
         extra="保存后冻结为本单付款条件，不随供应商档案后续调整。"
@@ -286,6 +304,42 @@ export function PurchaseOrderFormFields({
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
+        name="invoice_required"
+        label="是否需要发票"
+      >
+        <Select
+          allowClear
+          options={PURCHASE_INVOICE_REQUIRED_OPTIONS}
+          placeholder="请选择"
+          onChange={(value) => {
+            if (value !== true) {
+              form.setFieldValue('invoice_category', undefined)
+            }
+          }}
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        dependencies={['invoice_required']}
+        name="invoice_category"
+        label="发票类别"
+        rules={[
+          {
+            required: invoiceRequired === true,
+            message: '请选择发票类别',
+          },
+        ]}
+      >
+        <Select
+          allowClear
+          disabled={invoiceRequired !== true}
+          options={PURCHASE_INVOICE_CATEGORY_OPTIONS}
+          placeholder="请先选择需要发票"
+        />
+      </Form.Item>
+      <BusinessFormSectionTitle>到货与收货</BusinessFormSectionTitle>
+      <Form.Item
+        className="erp-business-action-form__field"
         name="purchase_date"
         label="下单日期"
         rules={[
@@ -294,12 +348,17 @@ export function PurchaseOrderFormFields({
             getEndValue: () => form.getFieldValue('expected_arrival_date'),
             message: '下单日期不能晚于预计到货日期',
           }),
+          dateInputNotAfterRule({
+            getEndValue: () =>
+              form.getFieldValue('supplier_confirmed_arrival_date'),
+            message: '下单日期不能晚于供应商确认到货日期',
+          }),
         ]}
       >
         <DateInput
           disabledDate={
-            expectedArrivalDate
-              ? disablePurchaseDateAfterExpectedArrival
+            expectedArrivalDate || supplierConfirmedArrivalDate
+              ? disablePurchaseDateAfterArrival
               : undefined
           }
         />
@@ -320,6 +379,36 @@ export function PurchaseOrderFormFields({
           disabledDate={
             purchaseDate ? disableExpectedArrivalBeforePurchaseDate : undefined
           }
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        dependencies={['purchase_date']}
+        name="supplier_confirmed_arrival_date"
+        label="供应商确认到货日期"
+        rules={[
+          dateInputNotBeforeRule({
+            getStartValue: () => form.getFieldValue('purchase_date'),
+            message: '供应商确认到货日期不能早于下单日期',
+          }),
+        ]}
+      >
+        <DateInput
+          disabledDate={
+            purchaseDate ? disableExpectedArrivalBeforePurchaseDate : undefined
+          }
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field erp-business-action-form__field--full"
+        label="收货地址"
+        name="delivery_address"
+      >
+        <Input.TextArea
+          allowClear
+          autoSize={{ minRows: 1, maxRows: 3 }}
+          maxLength={512}
+          showCount
         />
       </Form.Item>
       <BusinessFormSectionTitle>合同订购方信息</BusinessFormSectionTitle>

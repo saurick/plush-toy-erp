@@ -26,11 +26,21 @@ func TestCancellationCompensationKeepsAuthenticatedActor(t *testing.T) {
 		data := &Data{postgres: client}
 		uc := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, log.NewStdLogger(io.Discard)))
 		customer := createSalesOrderTestCustomer(t, ctx, client, "C-COMP-ACTOR", true)
+		unit := createSalesOrderTestUnit(t, ctx, client, "U-COMP-ACTOR", true)
+		product := createSalesOrderTestProduct(t, ctx, client, unit.ID, "P-COMP-ACTOR", true)
 		order, err := uc.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
 			OrderNo: "SO-COMP-ACTOR", CustomerID: customer.ID, OrderDate: time.Now(),
+			TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
 		})
 		if err != nil {
 			t.Fatalf("create sales order: %v", err)
+		}
+		unitPrice := decimal.NewFromInt(1)
+		if _, err := uc.AddSalesOrderItem(ctx, &biz.SalesOrderItemMutation{
+			SalesOrderID: order.ID, LineNo: 1, ProductID: product.ID, UnitID: unit.ID,
+			OrderedQuantity: decimal.NewFromInt(1), UnitPrice: &unitPrice,
+		}); err != nil {
+			t.Fatalf("create sales order item: %v", err)
 		}
 		if _, err := uc.SubmitSalesOrder(ctx, order.ID); err != nil {
 			t.Fatalf("submit sales order: %v", err)

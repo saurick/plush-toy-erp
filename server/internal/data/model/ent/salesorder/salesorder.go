@@ -28,12 +28,26 @@ const (
 	FieldSalesOwner = "sales_owner"
 	// FieldContactSnapshot holds the string denoting the contact_snapshot field in the database.
 	FieldContactSnapshot = "contact_snapshot"
+	// FieldDeliverySnapshot holds the string denoting the delivery_snapshot field in the database.
+	FieldDeliverySnapshot = "delivery_snapshot"
 	// FieldPaymentMethod holds the string denoting the payment_method field in the database.
 	FieldPaymentMethod = "payment_method"
 	// FieldPaymentTermDays holds the string denoting the payment_term_days field in the database.
 	FieldPaymentTermDays = "payment_term_days"
 	// FieldPriceConditionNote holds the string denoting the price_condition_note field in the database.
 	FieldPriceConditionNote = "price_condition_note"
+	// FieldTaxMode holds the string denoting the tax_mode field in the database.
+	FieldTaxMode = "tax_mode"
+	// FieldTaxRate holds the string denoting the tax_rate field in the database.
+	FieldTaxRate = "tax_rate"
+	// FieldFreightTerms holds the string denoting the freight_terms field in the database.
+	FieldFreightTerms = "freight_terms"
+	// FieldGoodsAmount holds the string denoting the goods_amount field in the database.
+	FieldGoodsAmount = "goods_amount"
+	// FieldTaxAmount holds the string denoting the tax_amount field in the database.
+	FieldTaxAmount = "tax_amount"
+	// FieldOrderTotal holds the string denoting the order_total field in the database.
+	FieldOrderTotal = "order_total"
 	// FieldOrderDate holds the string denoting the order_date field in the database.
 	FieldOrderDate = "order_date"
 	// FieldPlannedDeliveryDate holds the string denoting the planned_delivery_date field in the database.
@@ -108,9 +122,16 @@ var Columns = []string{
 	FieldCustomerSnapshot,
 	FieldSalesOwner,
 	FieldContactSnapshot,
+	FieldDeliverySnapshot,
 	FieldPaymentMethod,
 	FieldPaymentTermDays,
 	FieldPriceConditionNote,
+	FieldTaxMode,
+	FieldTaxRate,
+	FieldFreightTerms,
+	FieldGoodsAmount,
+	FieldTaxAmount,
+	FieldOrderTotal,
 	FieldOrderDate,
 	FieldPlannedDeliveryDate,
 	FieldLifecycleStatus,
@@ -154,6 +175,10 @@ var (
 	PaymentTermDaysValidator func(int) error
 	// PriceConditionNoteValidator is a validator for the "price_condition_note" field. It is called by the builders before save.
 	PriceConditionNoteValidator func(string) error
+	// TaxModeValidator is a validator for the "tax_mode" field. It is called by the builders before save.
+	TaxModeValidator func(string) error
+	// FreightTermsValidator is a validator for the "freight_terms" field. It is called by the builders before save.
+	FreightTermsValidator func(string) error
 	// DefaultLifecycleStatus holds the default value on creation for the "lifecycle_status" field.
 	DefaultLifecycleStatus string
 	// LifecycleStatusValidator is a validator for the "lifecycle_status" field. It is called by the builders before save.
@@ -226,6 +251,36 @@ func ByPaymentTermDays(opts ...sql.OrderTermOption) OrderOption {
 // ByPriceConditionNote orders the results by the price_condition_note field.
 func ByPriceConditionNote(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPriceConditionNote, opts...).ToFunc()
+}
+
+// ByTaxMode orders the results by the tax_mode field.
+func ByTaxMode(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTaxMode, opts...).ToFunc()
+}
+
+// ByTaxRate orders the results by the tax_rate field.
+func ByTaxRate(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTaxRate, opts...).ToFunc()
+}
+
+// ByFreightTerms orders the results by the freight_terms field.
+func ByFreightTerms(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFreightTerms, opts...).ToFunc()
+}
+
+// ByGoodsAmount orders the results by the goods_amount field.
+func ByGoodsAmount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldGoodsAmount, opts...).ToFunc()
+}
+
+// ByTaxAmount orders the results by the tax_amount field.
+func ByTaxAmount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTaxAmount, opts...).ToFunc()
+}
+
+// ByOrderTotal orders the results by the order_total field.
+func ByOrderTotal(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldOrderTotal, opts...).ToFunc()
 }
 
 // ByOrderDate orders the results by the order_date field.

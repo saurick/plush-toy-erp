@@ -145,6 +145,86 @@ func (_u *CustomerUpdate) ClearTaxNo() *CustomerUpdate {
 	return _u
 }
 
+// SetCountryRegion sets the "country_region" field.
+func (_u *CustomerUpdate) SetCountryRegion(v string) *CustomerUpdate {
+	_u.mutation.SetCountryRegion(v)
+	return _u
+}
+
+// SetNillableCountryRegion sets the "country_region" field if the given value is not nil.
+func (_u *CustomerUpdate) SetNillableCountryRegion(v *string) *CustomerUpdate {
+	if v != nil {
+		_u.SetCountryRegion(*v)
+	}
+	return _u
+}
+
+// ClearCountryRegion clears the value of the "country_region" field.
+func (_u *CustomerUpdate) ClearCountryRegion() *CustomerUpdate {
+	_u.mutation.ClearCountryRegion()
+	return _u
+}
+
+// SetDefaultDeliveryRecipient sets the "default_delivery_recipient" field.
+func (_u *CustomerUpdate) SetDefaultDeliveryRecipient(v string) *CustomerUpdate {
+	_u.mutation.SetDefaultDeliveryRecipient(v)
+	return _u
+}
+
+// SetNillableDefaultDeliveryRecipient sets the "default_delivery_recipient" field if the given value is not nil.
+func (_u *CustomerUpdate) SetNillableDefaultDeliveryRecipient(v *string) *CustomerUpdate {
+	if v != nil {
+		_u.SetDefaultDeliveryRecipient(*v)
+	}
+	return _u
+}
+
+// ClearDefaultDeliveryRecipient clears the value of the "default_delivery_recipient" field.
+func (_u *CustomerUpdate) ClearDefaultDeliveryRecipient() *CustomerUpdate {
+	_u.mutation.ClearDefaultDeliveryRecipient()
+	return _u
+}
+
+// SetDefaultDeliveryPhone sets the "default_delivery_phone" field.
+func (_u *CustomerUpdate) SetDefaultDeliveryPhone(v string) *CustomerUpdate {
+	_u.mutation.SetDefaultDeliveryPhone(v)
+	return _u
+}
+
+// SetNillableDefaultDeliveryPhone sets the "default_delivery_phone" field if the given value is not nil.
+func (_u *CustomerUpdate) SetNillableDefaultDeliveryPhone(v *string) *CustomerUpdate {
+	if v != nil {
+		_u.SetDefaultDeliveryPhone(*v)
+	}
+	return _u
+}
+
+// ClearDefaultDeliveryPhone clears the value of the "default_delivery_phone" field.
+func (_u *CustomerUpdate) ClearDefaultDeliveryPhone() *CustomerUpdate {
+	_u.mutation.ClearDefaultDeliveryPhone()
+	return _u
+}
+
+// SetDefaultDeliveryAddress sets the "default_delivery_address" field.
+func (_u *CustomerUpdate) SetDefaultDeliveryAddress(v string) *CustomerUpdate {
+	_u.mutation.SetDefaultDeliveryAddress(v)
+	return _u
+}
+
+// SetNillableDefaultDeliveryAddress sets the "default_delivery_address" field if the given value is not nil.
+func (_u *CustomerUpdate) SetNillableDefaultDeliveryAddress(v *string) *CustomerUpdate {
+	if v != nil {
+		_u.SetDefaultDeliveryAddress(*v)
+	}
+	return _u
+}
+
+// ClearDefaultDeliveryAddress clears the value of the "default_delivery_address" field.
+func (_u *CustomerUpdate) ClearDefaultDeliveryAddress() *CustomerUpdate {
+	_u.mutation.ClearDefaultDeliveryAddress()
+	return _u
+}
+
 // SetIsActive sets the "is_active" field.
 func (_u *CustomerUpdate) SetIsActive(v bool) *CustomerUpdate {
 	_u.mutation.SetIsActive(v)
@@ -330,6 +410,26 @@ func (_u *CustomerUpdate) check() error {
 			return &ValidationError{Name: "tax_no", err: fmt.Errorf(`ent: validator failed for field "Customer.tax_no": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.CountryRegion(); ok {
+		if err := customer.CountryRegionValidator(v); err != nil {
+			return &ValidationError{Name: "country_region", err: fmt.Errorf(`ent: validator failed for field "Customer.country_region": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.DefaultDeliveryRecipient(); ok {
+		if err := customer.DefaultDeliveryRecipientValidator(v); err != nil {
+			return &ValidationError{Name: "default_delivery_recipient", err: fmt.Errorf(`ent: validator failed for field "Customer.default_delivery_recipient": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.DefaultDeliveryPhone(); ok {
+		if err := customer.DefaultDeliveryPhoneValidator(v); err != nil {
+			return &ValidationError{Name: "default_delivery_phone", err: fmt.Errorf(`ent: validator failed for field "Customer.default_delivery_phone": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.DefaultDeliveryAddress(); ok {
+		if err := customer.DefaultDeliveryAddressValidator(v); err != nil {
+			return &ValidationError{Name: "default_delivery_address", err: fmt.Errorf(`ent: validator failed for field "Customer.default_delivery_address": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := customer.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "Customer.note": %w`, err)}
@@ -382,6 +482,30 @@ func (_u *CustomerUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.TaxNoCleared() {
 		_spec.ClearField(customer.FieldTaxNo, field.TypeString)
+	}
+	if value, ok := _u.mutation.CountryRegion(); ok {
+		_spec.SetField(customer.FieldCountryRegion, field.TypeString, value)
+	}
+	if _u.mutation.CountryRegionCleared() {
+		_spec.ClearField(customer.FieldCountryRegion, field.TypeString)
+	}
+	if value, ok := _u.mutation.DefaultDeliveryRecipient(); ok {
+		_spec.SetField(customer.FieldDefaultDeliveryRecipient, field.TypeString, value)
+	}
+	if _u.mutation.DefaultDeliveryRecipientCleared() {
+		_spec.ClearField(customer.FieldDefaultDeliveryRecipient, field.TypeString)
+	}
+	if value, ok := _u.mutation.DefaultDeliveryPhone(); ok {
+		_spec.SetField(customer.FieldDefaultDeliveryPhone, field.TypeString, value)
+	}
+	if _u.mutation.DefaultDeliveryPhoneCleared() {
+		_spec.ClearField(customer.FieldDefaultDeliveryPhone, field.TypeString)
+	}
+	if value, ok := _u.mutation.DefaultDeliveryAddress(); ok {
+		_spec.SetField(customer.FieldDefaultDeliveryAddress, field.TypeString, value)
+	}
+	if _u.mutation.DefaultDeliveryAddressCleared() {
+		_spec.ClearField(customer.FieldDefaultDeliveryAddress, field.TypeString)
 	}
 	if value, ok := _u.mutation.IsActive(); ok {
 		_spec.SetField(customer.FieldIsActive, field.TypeBool, value)
@@ -620,6 +744,86 @@ func (_u *CustomerUpdateOne) ClearTaxNo() *CustomerUpdateOne {
 	return _u
 }
 
+// SetCountryRegion sets the "country_region" field.
+func (_u *CustomerUpdateOne) SetCountryRegion(v string) *CustomerUpdateOne {
+	_u.mutation.SetCountryRegion(v)
+	return _u
+}
+
+// SetNillableCountryRegion sets the "country_region" field if the given value is not nil.
+func (_u *CustomerUpdateOne) SetNillableCountryRegion(v *string) *CustomerUpdateOne {
+	if v != nil {
+		_u.SetCountryRegion(*v)
+	}
+	return _u
+}
+
+// ClearCountryRegion clears the value of the "country_region" field.
+func (_u *CustomerUpdateOne) ClearCountryRegion() *CustomerUpdateOne {
+	_u.mutation.ClearCountryRegion()
+	return _u
+}
+
+// SetDefaultDeliveryRecipient sets the "default_delivery_recipient" field.
+func (_u *CustomerUpdateOne) SetDefaultDeliveryRecipient(v string) *CustomerUpdateOne {
+	_u.mutation.SetDefaultDeliveryRecipient(v)
+	return _u
+}
+
+// SetNillableDefaultDeliveryRecipient sets the "default_delivery_recipient" field if the given value is not nil.
+func (_u *CustomerUpdateOne) SetNillableDefaultDeliveryRecipient(v *string) *CustomerUpdateOne {
+	if v != nil {
+		_u.SetDefaultDeliveryRecipient(*v)
+	}
+	return _u
+}
+
+// ClearDefaultDeliveryRecipient clears the value of the "default_delivery_recipient" field.
+func (_u *CustomerUpdateOne) ClearDefaultDeliveryRecipient() *CustomerUpdateOne {
+	_u.mutation.ClearDefaultDeliveryRecipient()
+	return _u
+}
+
+// SetDefaultDeliveryPhone sets the "default_delivery_phone" field.
+func (_u *CustomerUpdateOne) SetDefaultDeliveryPhone(v string) *CustomerUpdateOne {
+	_u.mutation.SetDefaultDeliveryPhone(v)
+	return _u
+}
+
+// SetNillableDefaultDeliveryPhone sets the "default_delivery_phone" field if the given value is not nil.
+func (_u *CustomerUpdateOne) SetNillableDefaultDeliveryPhone(v *string) *CustomerUpdateOne {
+	if v != nil {
+		_u.SetDefaultDeliveryPhone(*v)
+	}
+	return _u
+}
+
+// ClearDefaultDeliveryPhone clears the value of the "default_delivery_phone" field.
+func (_u *CustomerUpdateOne) ClearDefaultDeliveryPhone() *CustomerUpdateOne {
+	_u.mutation.ClearDefaultDeliveryPhone()
+	return _u
+}
+
+// SetDefaultDeliveryAddress sets the "default_delivery_address" field.
+func (_u *CustomerUpdateOne) SetDefaultDeliveryAddress(v string) *CustomerUpdateOne {
+	_u.mutation.SetDefaultDeliveryAddress(v)
+	return _u
+}
+
+// SetNillableDefaultDeliveryAddress sets the "default_delivery_address" field if the given value is not nil.
+func (_u *CustomerUpdateOne) SetNillableDefaultDeliveryAddress(v *string) *CustomerUpdateOne {
+	if v != nil {
+		_u.SetDefaultDeliveryAddress(*v)
+	}
+	return _u
+}
+
+// ClearDefaultDeliveryAddress clears the value of the "default_delivery_address" field.
+func (_u *CustomerUpdateOne) ClearDefaultDeliveryAddress() *CustomerUpdateOne {
+	_u.mutation.ClearDefaultDeliveryAddress()
+	return _u
+}
+
 // SetIsActive sets the "is_active" field.
 func (_u *CustomerUpdateOne) SetIsActive(v bool) *CustomerUpdateOne {
 	_u.mutation.SetIsActive(v)
@@ -818,6 +1022,26 @@ func (_u *CustomerUpdateOne) check() error {
 			return &ValidationError{Name: "tax_no", err: fmt.Errorf(`ent: validator failed for field "Customer.tax_no": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.CountryRegion(); ok {
+		if err := customer.CountryRegionValidator(v); err != nil {
+			return &ValidationError{Name: "country_region", err: fmt.Errorf(`ent: validator failed for field "Customer.country_region": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.DefaultDeliveryRecipient(); ok {
+		if err := customer.DefaultDeliveryRecipientValidator(v); err != nil {
+			return &ValidationError{Name: "default_delivery_recipient", err: fmt.Errorf(`ent: validator failed for field "Customer.default_delivery_recipient": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.DefaultDeliveryPhone(); ok {
+		if err := customer.DefaultDeliveryPhoneValidator(v); err != nil {
+			return &ValidationError{Name: "default_delivery_phone", err: fmt.Errorf(`ent: validator failed for field "Customer.default_delivery_phone": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.DefaultDeliveryAddress(); ok {
+		if err := customer.DefaultDeliveryAddressValidator(v); err != nil {
+			return &ValidationError{Name: "default_delivery_address", err: fmt.Errorf(`ent: validator failed for field "Customer.default_delivery_address": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := customer.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "Customer.note": %w`, err)}
@@ -887,6 +1111,30 @@ func (_u *CustomerUpdateOne) sqlSave(ctx context.Context) (_node *Customer, err 
 	}
 	if _u.mutation.TaxNoCleared() {
 		_spec.ClearField(customer.FieldTaxNo, field.TypeString)
+	}
+	if value, ok := _u.mutation.CountryRegion(); ok {
+		_spec.SetField(customer.FieldCountryRegion, field.TypeString, value)
+	}
+	if _u.mutation.CountryRegionCleared() {
+		_spec.ClearField(customer.FieldCountryRegion, field.TypeString)
+	}
+	if value, ok := _u.mutation.DefaultDeliveryRecipient(); ok {
+		_spec.SetField(customer.FieldDefaultDeliveryRecipient, field.TypeString, value)
+	}
+	if _u.mutation.DefaultDeliveryRecipientCleared() {
+		_spec.ClearField(customer.FieldDefaultDeliveryRecipient, field.TypeString)
+	}
+	if value, ok := _u.mutation.DefaultDeliveryPhone(); ok {
+		_spec.SetField(customer.FieldDefaultDeliveryPhone, field.TypeString, value)
+	}
+	if _u.mutation.DefaultDeliveryPhoneCleared() {
+		_spec.ClearField(customer.FieldDefaultDeliveryPhone, field.TypeString)
+	}
+	if value, ok := _u.mutation.DefaultDeliveryAddress(); ok {
+		_spec.SetField(customer.FieldDefaultDeliveryAddress, field.TypeString, value)
+	}
+	if _u.mutation.DefaultDeliveryAddressCleared() {
+		_spec.ClearField(customer.FieldDefaultDeliveryAddress, field.TypeString)
 	}
 	if value, ok := _u.mutation.IsActive(); ok {
 		_spec.SetField(customer.FieldIsActive, field.TypeBool, value)

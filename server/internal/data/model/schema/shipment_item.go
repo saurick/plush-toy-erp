@@ -30,6 +30,8 @@ var shipmentItemLockedFields = map[string]struct{}{
 	"unit_price_snapshot":        {},
 	"amount_snapshot":            {},
 	"currency_snapshot":          {},
+	"package_description":        {},
+	"case_no":                    {},
 }
 
 func (ShipmentItem) Hooks() []ent.Hook {
@@ -78,6 +80,8 @@ func (ShipmentItem) Fields() []ent.Field {
 		optionalDecimalField("unit_price_snapshot"),
 		optionalDecimalField("amount_snapshot"),
 		field.String("currency_snapshot").NotEmpty().Default("CNY").MaxLen(16),
+		field.String("package_description").Optional().Nillable().MaxLen(255),
+		field.String("case_no").Optional().Nillable().MaxLen(128),
 		field.String("note").Optional().Nillable().MaxLen(255),
 		field.Time("created_at").Default(time.Now).Immutable(),
 		field.Time("updated_at").Default(time.Now).UpdateDefault(time.Now),

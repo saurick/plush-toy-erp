@@ -156,6 +156,34 @@ func (_c *ShipmentItemCreate) SetNillableCurrencySnapshot(v *string) *ShipmentIt
 	return _c
 }
 
+// SetPackageDescription sets the "package_description" field.
+func (_c *ShipmentItemCreate) SetPackageDescription(v string) *ShipmentItemCreate {
+	_c.mutation.SetPackageDescription(v)
+	return _c
+}
+
+// SetNillablePackageDescription sets the "package_description" field if the given value is not nil.
+func (_c *ShipmentItemCreate) SetNillablePackageDescription(v *string) *ShipmentItemCreate {
+	if v != nil {
+		_c.SetPackageDescription(*v)
+	}
+	return _c
+}
+
+// SetCaseNo sets the "case_no" field.
+func (_c *ShipmentItemCreate) SetCaseNo(v string) *ShipmentItemCreate {
+	_c.mutation.SetCaseNo(v)
+	return _c
+}
+
+// SetNillableCaseNo sets the "case_no" field if the given value is not nil.
+func (_c *ShipmentItemCreate) SetNillableCaseNo(v *string) *ShipmentItemCreate {
+	if v != nil {
+		_c.SetCaseNo(*v)
+	}
+	return _c
+}
+
 // SetNote sets the "note" field.
 func (_c *ShipmentItemCreate) SetNote(v string) *ShipmentItemCreate {
 	_c.mutation.SetNote(v)
@@ -365,6 +393,16 @@ func (_c *ShipmentItemCreate) check() error {
 			return &ValidationError{Name: "currency_snapshot", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.currency_snapshot": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.PackageDescription(); ok {
+		if err := shipmentitem.PackageDescriptionValidator(v); err != nil {
+			return &ValidationError{Name: "package_description", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.package_description": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.CaseNo(); ok {
+		if err := shipmentitem.CaseNoValidator(v); err != nil {
+			return &ValidationError{Name: "case_no", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.case_no": %w`, err)}
+		}
+	}
 	if v, ok := _c.mutation.Note(); ok {
 		if err := shipmentitem.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.note": %w`, err)}
@@ -433,6 +471,14 @@ func (_c *ShipmentItemCreate) createSpec() (*ShipmentItem, *sqlgraph.CreateSpec)
 	if value, ok := _c.mutation.CurrencySnapshot(); ok {
 		_spec.SetField(shipmentitem.FieldCurrencySnapshot, field.TypeString, value)
 		_node.CurrencySnapshot = value
+	}
+	if value, ok := _c.mutation.PackageDescription(); ok {
+		_spec.SetField(shipmentitem.FieldPackageDescription, field.TypeString, value)
+		_node.PackageDescription = &value
+	}
+	if value, ok := _c.mutation.CaseNo(); ok {
+		_spec.SetField(shipmentitem.FieldCaseNo, field.TypeString, value)
+		_node.CaseNo = &value
 	}
 	if value, ok := _c.mutation.Note(); ok {
 		_spec.SetField(shipmentitem.FieldNote, field.TypeString, value)

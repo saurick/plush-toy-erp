@@ -68,6 +68,7 @@ import {
   buildPurchaseOrderItemSourceValuesFromMaterial,
   buildPurchaseOrderItemParams,
   buildPurchaseOrderParams,
+  buildPurchaseOrderSupplierDefaults,
   buildSequentialDraftCode,
   contractPartySnapshotFromPrintTemplateDefaults,
   buildSupplierSnapshot,
@@ -612,6 +613,7 @@ export default function V1PurchaseOrdersPage() {
     sourceDocumentOpenEditController.invalidate()
     orderAttachmentRef.current?.clearPendingAttachments()
     setEditingOrder(null)
+    form.resetFields()
     form.setFieldsValue({
       purchase_order_no: buildSequentialDraftCode(orders, {
         prefix: 'PO',
@@ -619,10 +621,15 @@ export default function V1PurchaseOrdersPage() {
       }),
       supplier_id: undefined,
       currency: 'CNY',
+      payment_method: '',
       payment_term_days: undefined,
+      invoice_required: undefined,
+      invoice_category: undefined,
       supplier_purchase_order_no: '',
       purchase_date: todayInputValue(),
       expected_arrival_date: '',
+      supplier_confirmed_arrival_date: '',
+      delivery_address: '',
       contract_party_snapshot: contractPartySnapshotFromPrintTemplateDefaults(
         purchasePrintTemplateDefaults,
         MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY
@@ -657,11 +664,21 @@ export default function V1PurchaseOrdersPage() {
             )
             orderAttachmentRef.current?.clearPendingAttachments()
             setEditingOrder(record)
+            form.resetFields()
             form.setFieldsValue({
               purchase_order_no: record.purchase_order_no || '',
               supplier_id: record.supplier_id,
               currency: record.currency,
+              payment_method: record.payment_method || '',
               payment_term_days: record.payment_term_days,
+              invoice_required:
+                typeof record.invoice_required === 'boolean'
+                  ? record.invoice_required
+                  : undefined,
+              invoice_category:
+                record.invoice_required === true
+                  ? record.invoice_category || undefined
+                  : undefined,
               supplier_purchase_order_no:
                 record.supplier_purchase_order_no || '',
               supplier_snapshot:
@@ -673,6 +690,10 @@ export default function V1PurchaseOrdersPage() {
               expected_arrival_date: unixToDateInputValue(
                 record.expected_arrival_date
               ),
+              supplier_confirmed_arrival_date: unixToDateInputValue(
+                record.supplier_confirmed_arrival_date
+              ),
+              delivery_address: record.delivery_address || '',
               contract_party_snapshot:
                 record.contract_party_snapshot &&
                 typeof record.contract_party_snapshot === 'object'
@@ -756,19 +777,7 @@ export default function V1PurchaseOrdersPage() {
     const supplier = suppliers.find((item) => item.id === supplierID)
     form.setFieldValue('supplier_snapshot', buildSupplierSnapshot(supplier))
     if (!editingOrder?.id) {
-      const termDays = supplier?.default_payment_term_days
-      const normalizedTermDays = Number(termDays)
-      form.setFieldValue(
-        'payment_term_days',
-        termDays !== undefined &&
-          termDays !== null &&
-          termDays !== '' &&
-          Number.isFinite(normalizedTermDays) &&
-          Number.isInteger(normalizedTermDays) &&
-          normalizedTermDays >= 0
-          ? normalizedTermDays
-          : undefined
-      )
+      form.setFieldsValue(buildPurchaseOrderSupplierDefaults(supplier))
     }
     resolveSupplierSnapshot(supplier).then((snapshot) => {
       if (
@@ -1347,9 +1356,7 @@ export default function V1PurchaseOrdersPage() {
       )
       purchaseOrderItemsPreview.invalidate(order)
       setOrders((current) =>
-        current.map((item) =>
-          item.id === savedOrder.id ? savedOrder : item
-        )
+        current.map((item) => (item.id === savedOrder.id ? savedOrder : item))
       )
       setSelectedOrder(savedOrder)
       applySelectedRowKeys([savedOrder.id])
@@ -1555,7 +1562,7 @@ export default function V1PurchaseOrdersPage() {
         columns={columns}
         dataSource={orders}
         expandable={purchaseOrderItemsPreview.expandable}
-        scroll={{ x: 1200 }}
+        scroll={{ x: 1900 }}
         rowSelection={{
           type: 'radio',
           selectedRowKeys,

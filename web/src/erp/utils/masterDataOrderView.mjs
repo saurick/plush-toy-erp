@@ -3,6 +3,8 @@ import { unixSecondsToBusinessDate } from './businessDate.mjs'
 import { normalizeMaterialPurchaseUnitText } from './materialPurchaseContractEditor.mjs'
 import {
   normalizeNumeric20Scale6,
+  numeric20Scale6TextFromUnits,
+  numeric20Scale6Units,
   sumNumeric20Scale6Values,
 } from './numeric20Scale6.mjs'
 
@@ -55,6 +57,76 @@ export const BUSINESS_CURRENCY_OPTIONS = Object.freeze([
   Object.freeze({ value: 'USD', label: '美元（USD）' }),
   Object.freeze({ value: 'HKD', label: '港币（HKD）' }),
 ])
+
+export const SALES_ORDER_TAX_MODE_OPTIONS = Object.freeze([
+  Object.freeze({ value: 'INCLUSIVE', label: '含税价' }),
+  Object.freeze({ value: 'EXCLUSIVE', label: '未税价（税额另加）' }),
+  Object.freeze({ value: 'NONE', label: '不计税' }),
+])
+
+export const SALES_ORDER_FREIGHT_TERMS_OPTIONS = Object.freeze([
+  Object.freeze({ value: 'INCLUDED', label: '报价含运费' }),
+  Object.freeze({ value: 'EXCLUDED', label: '报价不含运费' }),
+])
+
+export const PURCHASE_INVOICE_REQUIRED_OPTIONS = Object.freeze([
+  Object.freeze({ value: true, label: '需要发票' }),
+  Object.freeze({ value: false, label: '不需要发票' }),
+])
+
+export const PURCHASE_INVOICE_CATEGORY_OPTIONS = Object.freeze([
+  Object.freeze({ value: 'EXPORT_GENERAL', label: '出口普通发票' }),
+  Object.freeze({ value: 'VAT_GENERAL_1', label: '增值税普通发票 1%' }),
+  Object.freeze({ value: 'VAT_SPECIAL_3', label: '增值税专用发票 3%' }),
+  Object.freeze({ value: 'VAT_SPECIAL_13', label: '增值税专用发票 13%' }),
+])
+
+const SALES_ORDER_TAX_MODE_LABELS = Object.freeze(
+  Object.fromEntries(
+    SALES_ORDER_TAX_MODE_OPTIONS.map((option) => [option.value, option.label])
+  )
+)
+const SALES_ORDER_FREIGHT_TERMS_LABELS = Object.freeze(
+  Object.fromEntries(
+    SALES_ORDER_FREIGHT_TERMS_OPTIONS.map((option) => [
+      option.value,
+      option.label,
+    ])
+  )
+)
+const PURCHASE_INVOICE_CATEGORY_LABELS = Object.freeze(
+  Object.fromEntries(
+    PURCHASE_INVOICE_CATEGORY_OPTIONS.map((option) => [
+      option.value,
+      option.label,
+    ])
+  )
+)
+
+export function salesOrderTaxModeText(value) {
+  const key = String(value || '')
+    .trim()
+    .toUpperCase()
+  return SALES_ORDER_TAX_MODE_LABELS[key] || (key ? '税费方式待核对' : '未填写')
+}
+
+export function salesOrderFreightTermsText(value) {
+  const key = String(value || '')
+    .trim()
+    .toUpperCase()
+  return (
+    SALES_ORDER_FREIGHT_TERMS_LABELS[key] || (key ? '运费条件待核对' : '未填写')
+  )
+}
+
+export function purchaseInvoicePreferenceText(required, category) {
+  if (required === null || required === undefined) return '未填写'
+  if (required === false) return '不需要发票'
+  const key = String(category || '')
+    .trim()
+    .toUpperCase()
+  return PURCHASE_INVOICE_CATEGORY_LABELS[key] || '需要发票（类别未填写）'
+}
 
 export const DEFAULT_PAYMENT_CONDITIONS = Object.freeze([
   Object.freeze({ method: '发生即到期', termDays: 0 }),
@@ -325,6 +397,75 @@ function deriveOrderItemAmount(values, quantityField) {
 
 export function deriveSalesOrderItemAmount(values = {}) {
   return deriveOrderItemAmount(values, 'ordered_quantity')
+}
+
+function divideAndRoundNonNegative(numerator, denominator) {
+  if (denominator <= BigInt(0)) return null
+  return (numerator + denominator / BigInt(2)) / denominator
+}
+
+export function calculateSalesOrderAmounts({
+  items = [],
+  taxMode,
+  taxRate,
+} = {}) {
+  const normalizedItems = Array.isArray(items) ? items : []
+  if (normalizedItems.length === 0) {
+    return { complete: false, goodsAmount: '', taxAmount: '', orderTotal: '' }
+  }
+  const amountUnits = normalizedItems.map((item) =>
+    numeric20Scale6Units(deriveSalesOrderItemAmount(item))
+  )
+  if (amountUnits.some((value) => value === null)) {
+    return { complete: false, goodsAmount: '', taxAmount: '', orderTotal: '' }
+  }
+  const goodsUnits = amountUnits.reduce(
+    (total, value) => total + BigInt(value),
+    BigInt(0)
+  )
+  const goodsAmount = numeric20Scale6TextFromUnits(goodsUnits.toString())
+  const mode = String(taxMode || '')
+    .trim()
+    .toUpperCase()
+  if (mode === 'NONE') {
+    return {
+      complete: true,
+      goodsAmount,
+      taxAmount: '0',
+      orderTotal: goodsAmount,
+    }
+  }
+  if (mode !== 'INCLUSIVE' && mode !== 'EXCLUSIVE') {
+    return { complete: false, goodsAmount, taxAmount: '', orderTotal: '' }
+  }
+  const rateUnits = numeric20Scale6Units(taxRate)
+  const percentageBaseUnits = BigInt(100) * BigInt(1_000_000)
+  if (
+    rateUnits === null ||
+    BigInt(rateUnits) <= BigInt(0) ||
+    BigInt(rateUnits) > percentageBaseUnits
+  ) {
+    return { complete: false, goodsAmount, taxAmount: '', orderTotal: '' }
+  }
+  const denominator =
+    mode === 'INCLUSIVE'
+      ? percentageBaseUnits + BigInt(rateUnits)
+      : percentageBaseUnits
+  const taxUnits = divideAndRoundNonNegative(
+    goodsUnits * BigInt(rateUnits),
+    denominator
+  )
+  if (taxUnits === null) {
+    return { complete: false, goodsAmount, taxAmount: '', orderTotal: '' }
+  }
+  const orderTotalUnits =
+    mode === 'EXCLUSIVE' ? goodsUnits + taxUnits : goodsUnits
+  return {
+    complete: true,
+    goodsAmount,
+    taxAmount: numeric20Scale6TextFromUnits(taxUnits.toString()),
+    orderTotal: numeric20Scale6TextFromUnits(orderTotalUnits.toString()),
+  }
 }
 
 export function derivePurchaseOrderItemAmount(values = {}) {
@@ -818,16 +959,43 @@ export function buildCustomerSnapshot(customer = {}) {
   })
 }
 
+export function buildDeliverySnapshot(values = {}) {
+  return compactParams({
+    country_region: trimOptional(values.delivery_country_region),
+    recipient: trimOptional(values.delivery_recipient),
+    phone: trimOptional(values.delivery_phone),
+    address: trimOptional(values.delivery_address),
+  })
+}
+
+export function deliverySnapshotFormValues(snapshot = {}) {
+  const source = snapshot && typeof snapshot === 'object' ? snapshot : {}
+  return {
+    delivery_country_region: trimOptional(source.country_region) || '',
+    delivery_recipient: trimOptional(source.recipient) || '',
+    delivery_phone: trimOptional(source.phone) || '',
+    delivery_address: trimOptional(source.address) || '',
+  }
+}
+
 export function buildSalesOrderCustomerSourceValues(customer = {}) {
   if (!customer?.id) {
     return {
       customer_id: undefined,
       customer_snapshot: {},
+      ...deliverySnapshotFormValues(),
     }
+  }
+  const deliveryValues = {
+    delivery_country_region: customer.country_region,
+    delivery_recipient: customer.default_delivery_recipient,
+    delivery_phone: customer.default_delivery_phone,
+    delivery_address: customer.default_delivery_address,
   }
   return {
     customer_id: Number(customer.id || 0) || undefined,
     customer_snapshot: buildCustomerSnapshot(customer),
+    ...deliverySnapshotFormValues(buildDeliverySnapshot(deliveryValues)),
   }
 }
 
@@ -884,6 +1052,23 @@ export function buildSupplierSnapshot(supplier = {}) {
       trimOptional(primaryContact.mobile),
     address: trimOptional(supplier.address),
   })
+}
+
+export function buildPurchaseOrderSupplierDefaults(supplier = {}) {
+  return {
+    payment_term_days: normalizeOptionalNonNegativeInteger(
+      supplier.default_payment_term_days
+    ),
+    payment_method: trimOptional(supplier.default_payment_method) || '',
+    invoice_required:
+      typeof supplier.default_invoice_required === 'boolean'
+        ? supplier.default_invoice_required
+        : undefined,
+    invoice_category:
+      supplier.default_invoice_required === true
+        ? trimOptional(supplier.default_invoice_category) || undefined
+        : undefined,
+  }
 }
 
 export function buildSupplierSnapshotWithContacts(
@@ -997,9 +1182,21 @@ export function buildMasterDataParams(values = {}, extra = {}) {
     default_payment_term_days: normalizeOptionalNonNegativeInteger(
       values.default_payment_term_days
     ),
+    country_region: trimOptional(values.country_region),
+    default_delivery_recipient: trimOptional(values.default_delivery_recipient),
+    default_delivery_phone: trimOptional(values.default_delivery_phone),
+    default_delivery_address: trimOptional(values.default_delivery_address),
     supplier_type: trimOptional(values.supplier_type),
     address: trimOptional(values.address),
     tax_no: trimOptional(values.tax_no),
+    default_invoice_required:
+      typeof values.default_invoice_required === 'boolean'
+        ? values.default_invoice_required
+        : undefined,
+    default_invoice_category:
+      values.default_invoice_required === true
+        ? trimOptional(values.default_invoice_category)
+        : undefined,
     process_ids: Array.isArray(values.process_ids)
       ? values.process_ids.map((value) => Number(value || 0))
       : undefined,
@@ -1019,6 +1216,8 @@ export function buildProductParams(values = {}, extra = {}) {
     ...extra,
     code: trimOptional(values.code),
     name: trimOptional(values.name),
+    english_name: trimOptional(values.english_name),
+    hs_code: trimOptional(values.hs_code),
     style_no: trimOptional(values.style_no),
     customer_style_no: trimOptional(values.customer_style_no),
     default_unit_id:
@@ -1083,6 +1282,10 @@ export function buildContactParams(values = {}, extra = {}) {
 }
 
 export function buildSalesOrderParams(values = {}, extra = {}) {
+  const deliverySnapshot = buildDeliverySnapshot(values)
+  const taxMode = String(values.tax_mode || '')
+    .trim()
+    .toUpperCase()
   return compactParams({
     ...extra,
     order_no: trimOptional(values.order_no),
@@ -1103,11 +1306,19 @@ export function buildSalesOrderParams(values = {}, extra = {}) {
       values.contact_snapshot && typeof values.contact_snapshot === 'object'
         ? values.contact_snapshot
         : buildOrderContactSnapshot(values),
+    delivery_snapshot:
+      Object.keys(deliverySnapshot).length > 0 ? deliverySnapshot : undefined,
     payment_method: trimOptional(values.payment_method),
     payment_term_days: normalizeOptionalNonNegativeInteger(
       values.payment_term_days
     ),
     price_condition_note: trimOptional(values.price_condition_note),
+    tax_mode: trimOptional(values.tax_mode),
+    tax_rate:
+      !taxMode || taxMode === 'NONE'
+        ? undefined
+        : normalizeOptionalDecimalString(values.tax_rate),
+    freight_terms: trimOptional(values.freight_terms),
     order_date: trimOptional(values.order_date),
     planned_delivery_date: trimOptional(values.planned_delivery_date),
     note: trimOptional(values.note),
@@ -1284,9 +1495,22 @@ export function buildPurchaseOrderParams(values = {}, extra = {}) {
     contract_party_snapshot: buildOptionalContractPartySnapshotParam(values),
     purchase_date: trimOptional(values.purchase_date),
     expected_arrival_date: trimOptional(values.expected_arrival_date),
+    supplier_confirmed_arrival_date: trimOptional(
+      values.supplier_confirmed_arrival_date
+    ),
     payment_term_days: normalizeOptionalNonNegativeInteger(
       values.payment_term_days
     ),
+    payment_method: trimOptional(values.payment_method),
+    invoice_required:
+      typeof values.invoice_required === 'boolean'
+        ? values.invoice_required
+        : undefined,
+    invoice_category:
+      values.invoice_required === true
+        ? trimOptional(values.invoice_category)
+        : undefined,
+    delivery_address: trimOptional(values.delivery_address),
     note: trimOptional(values.note),
   })
 }

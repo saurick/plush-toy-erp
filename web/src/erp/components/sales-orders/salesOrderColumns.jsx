@@ -8,10 +8,15 @@ import {
   deriveSalesOrderItemAmount,
   formatPaymentCondition,
   formatUnixDate,
+  salesOrderFreightTermsText,
+  salesOrderTaxModeText,
   statusText,
 } from '../../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
-import { compareNumeric20Scale6Values } from '../../utils/numeric20Scale6.mjs'
+import {
+  compareNumeric20Scale6Values,
+  formatNumeric20Scale6Summary,
+} from '../../utils/numeric20Scale6.mjs'
 
 function compareText(a, b) {
   return String(a || '').localeCompare(String(b || ''))
@@ -34,6 +39,30 @@ function contactText(snapshot = {}) {
   const name = snapshot?.name || ''
   const phone = snapshot?.mobile || snapshot?.phone || ''
   return [name, phone].filter(Boolean).join(' / ') || '-'
+}
+
+function moneyText(value, currency, fallback = '-') {
+  const text = String(value ?? '').trim()
+  if (!text) return fallback
+  return `${String(currency || '').trim()} ${formatNumeric20Scale6Summary(
+    text,
+    2
+  )}`.trim()
+}
+
+function taxTermsText(record = {}) {
+  const mode = salesOrderTaxModeText(record.tax_mode)
+  const rate = String(record.tax_rate ?? '').trim()
+  return rate ? `${mode} / ${rate}%` : mode
+}
+
+function deliveryText(snapshot = {}) {
+  const source = snapshot && typeof snapshot === 'object' ? snapshot : {}
+  return (
+    [source.country_region, source.recipient, source.phone, source.address]
+      .filter(Boolean)
+      .join(' / ') || '-'
+  )
 }
 
 function salesOrderStatusTag(status) {
@@ -103,6 +132,66 @@ export function buildSalesOrderColumns() {
       exportValue: (record) => contactText(record?.contact_snapshot),
     },
     {
+      title: '币种',
+      exportTitle: '币种',
+      dataIndex: 'currency',
+      width: 90,
+      sorter: (a, b) => compareText(a?.currency, b?.currency),
+      render: (value) => value || '-',
+    },
+    {
+      title: '货款金额',
+      exportTitle: '货款金额',
+      dataIndex: 'goods_amount',
+      width: 140,
+      sorter: (a, b) =>
+        compareNumeric20Scale6Values(a?.goods_amount, b?.goods_amount),
+      render: (value, record) => moneyText(value, record?.currency),
+      exportValue: (record) =>
+        moneyText(record?.goods_amount, record?.currency, ''),
+    },
+    {
+      title: '计税方式 / 税率',
+      exportTitle: '计税方式 / 税率',
+      key: 'tax_terms',
+      width: 200,
+      sorter: (a, b) => compareText(taxTermsText(a), taxTermsText(b)),
+      render: (_, record) => taxTermsText(record),
+      exportValue: taxTermsText,
+    },
+    {
+      title: '税额',
+      exportTitle: '税额',
+      dataIndex: 'tax_amount',
+      width: 130,
+      sorter: (a, b) =>
+        compareNumeric20Scale6Values(a?.tax_amount, b?.tax_amount),
+      render: (value, record) => moneyText(value, record?.currency),
+      exportValue: (record) =>
+        moneyText(record?.tax_amount, record?.currency, ''),
+    },
+    {
+      title: '订单总额',
+      exportTitle: '订单总额',
+      dataIndex: 'order_total',
+      width: 150,
+      sorter: (a, b) =>
+        compareNumeric20Scale6Values(a?.order_total, b?.order_total),
+      render: (value, record) => moneyText(value, record?.currency),
+      exportValue: (record) =>
+        moneyText(record?.order_total, record?.currency, ''),
+    },
+    {
+      title: '运费条件',
+      exportTitle: '运费条件',
+      dataIndex: 'freight_terms',
+      width: 150,
+      sorter: (a, b) => compareText(a?.freight_terms, b?.freight_terms),
+      render: salesOrderFreightTermsText,
+      exportValue: (record) =>
+        salesOrderFreightTermsText(record?.freight_terms),
+    },
+    {
       title: '付款条件',
       exportTitle: '付款条件',
       dataIndex: 'payment_method',
@@ -131,6 +220,19 @@ export function buildSalesOrderColumns() {
         compareNumber(a?.planned_delivery_date, b?.planned_delivery_date),
       render: formatUnixDate,
       exportValue: (record) => formatUnixDate(record?.planned_delivery_date),
+    },
+    {
+      title: '收货信息',
+      exportTitle: '收货信息',
+      dataIndex: 'delivery_snapshot',
+      width: 360,
+      sorter: (a, b) =>
+        compareText(
+          deliveryText(a?.delivery_snapshot),
+          deliveryText(b?.delivery_snapshot)
+        ),
+      render: deliveryText,
+      exportValue: (record) => deliveryText(record?.delivery_snapshot),
     },
     {
       title: '状态',
@@ -186,10 +288,7 @@ export function buildSalesOrderItemColumns() {
       dataIndex: 'ordered_quantity',
       width: 120,
       sorter: (a, b) =>
-        compareNumeric20Scale6Values(
-          a?.ordered_quantity,
-          b?.ordered_quantity
-        ),
+        compareNumeric20Scale6Values(a?.ordered_quantity, b?.ordered_quantity),
     },
     {
       title: '单价',

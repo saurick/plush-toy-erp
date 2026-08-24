@@ -37,6 +37,22 @@ func (Customer) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			MaxLen(64),
+		field.String("country_region").
+			Optional().
+			Nillable().
+			MaxLen(128),
+		field.String("default_delivery_recipient").
+			Optional().
+			Nillable().
+			MaxLen(128),
+		field.String("default_delivery_phone").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.String("default_delivery_address").
+			Optional().
+			Nillable().
+			MaxLen(512),
 		field.Bool("is_active").
 			Default(true),
 		field.String("note").

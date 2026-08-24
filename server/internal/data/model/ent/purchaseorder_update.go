@@ -99,6 +99,66 @@ func (_u *PurchaseOrderUpdate) ClearPaymentTermDays() *PurchaseOrderUpdate {
 	return _u
 }
 
+// SetPaymentMethod sets the "payment_method" field.
+func (_u *PurchaseOrderUpdate) SetPaymentMethod(v string) *PurchaseOrderUpdate {
+	_u.mutation.SetPaymentMethod(v)
+	return _u
+}
+
+// SetNillablePaymentMethod sets the "payment_method" field if the given value is not nil.
+func (_u *PurchaseOrderUpdate) SetNillablePaymentMethod(v *string) *PurchaseOrderUpdate {
+	if v != nil {
+		_u.SetPaymentMethod(*v)
+	}
+	return _u
+}
+
+// ClearPaymentMethod clears the value of the "payment_method" field.
+func (_u *PurchaseOrderUpdate) ClearPaymentMethod() *PurchaseOrderUpdate {
+	_u.mutation.ClearPaymentMethod()
+	return _u
+}
+
+// SetInvoiceRequired sets the "invoice_required" field.
+func (_u *PurchaseOrderUpdate) SetInvoiceRequired(v bool) *PurchaseOrderUpdate {
+	_u.mutation.SetInvoiceRequired(v)
+	return _u
+}
+
+// SetNillableInvoiceRequired sets the "invoice_required" field if the given value is not nil.
+func (_u *PurchaseOrderUpdate) SetNillableInvoiceRequired(v *bool) *PurchaseOrderUpdate {
+	if v != nil {
+		_u.SetInvoiceRequired(*v)
+	}
+	return _u
+}
+
+// ClearInvoiceRequired clears the value of the "invoice_required" field.
+func (_u *PurchaseOrderUpdate) ClearInvoiceRequired() *PurchaseOrderUpdate {
+	_u.mutation.ClearInvoiceRequired()
+	return _u
+}
+
+// SetInvoiceCategory sets the "invoice_category" field.
+func (_u *PurchaseOrderUpdate) SetInvoiceCategory(v string) *PurchaseOrderUpdate {
+	_u.mutation.SetInvoiceCategory(v)
+	return _u
+}
+
+// SetNillableInvoiceCategory sets the "invoice_category" field if the given value is not nil.
+func (_u *PurchaseOrderUpdate) SetNillableInvoiceCategory(v *string) *PurchaseOrderUpdate {
+	if v != nil {
+		_u.SetInvoiceCategory(*v)
+	}
+	return _u
+}
+
+// ClearInvoiceCategory clears the value of the "invoice_category" field.
+func (_u *PurchaseOrderUpdate) ClearInvoiceCategory() *PurchaseOrderUpdate {
+	_u.mutation.ClearInvoiceCategory()
+	return _u
+}
+
 // SetSupplierPurchaseOrderNo sets the "supplier_purchase_order_no" field.
 func (_u *PurchaseOrderUpdate) SetSupplierPurchaseOrderNo(v string) *PurchaseOrderUpdate {
 	_u.mutation.SetSupplierPurchaseOrderNo(v)
@@ -174,6 +234,46 @@ func (_u *PurchaseOrderUpdate) SetNillableExpectedArrivalDate(v *time.Time) *Pur
 // ClearExpectedArrivalDate clears the value of the "expected_arrival_date" field.
 func (_u *PurchaseOrderUpdate) ClearExpectedArrivalDate() *PurchaseOrderUpdate {
 	_u.mutation.ClearExpectedArrivalDate()
+	return _u
+}
+
+// SetSupplierConfirmedArrivalDate sets the "supplier_confirmed_arrival_date" field.
+func (_u *PurchaseOrderUpdate) SetSupplierConfirmedArrivalDate(v time.Time) *PurchaseOrderUpdate {
+	_u.mutation.SetSupplierConfirmedArrivalDate(v)
+	return _u
+}
+
+// SetNillableSupplierConfirmedArrivalDate sets the "supplier_confirmed_arrival_date" field if the given value is not nil.
+func (_u *PurchaseOrderUpdate) SetNillableSupplierConfirmedArrivalDate(v *time.Time) *PurchaseOrderUpdate {
+	if v != nil {
+		_u.SetSupplierConfirmedArrivalDate(*v)
+	}
+	return _u
+}
+
+// ClearSupplierConfirmedArrivalDate clears the value of the "supplier_confirmed_arrival_date" field.
+func (_u *PurchaseOrderUpdate) ClearSupplierConfirmedArrivalDate() *PurchaseOrderUpdate {
+	_u.mutation.ClearSupplierConfirmedArrivalDate()
+	return _u
+}
+
+// SetDeliveryAddress sets the "delivery_address" field.
+func (_u *PurchaseOrderUpdate) SetDeliveryAddress(v string) *PurchaseOrderUpdate {
+	_u.mutation.SetDeliveryAddress(v)
+	return _u
+}
+
+// SetNillableDeliveryAddress sets the "delivery_address" field if the given value is not nil.
+func (_u *PurchaseOrderUpdate) SetNillableDeliveryAddress(v *string) *PurchaseOrderUpdate {
+	if v != nil {
+		_u.SetDeliveryAddress(*v)
+	}
+	return _u
+}
+
+// ClearDeliveryAddress clears the value of the "delivery_address" field.
+func (_u *PurchaseOrderUpdate) ClearDeliveryAddress() *PurchaseOrderUpdate {
+	_u.mutation.ClearDeliveryAddress()
 	return _u
 }
 
@@ -455,9 +555,24 @@ func (_u *PurchaseOrderUpdate) check() error {
 			return &ValidationError{Name: "payment_term_days", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.payment_term_days": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.PaymentMethod(); ok {
+		if err := purchaseorder.PaymentMethodValidator(v); err != nil {
+			return &ValidationError{Name: "payment_method", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.payment_method": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.InvoiceCategory(); ok {
+		if err := purchaseorder.InvoiceCategoryValidator(v); err != nil {
+			return &ValidationError{Name: "invoice_category", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.invoice_category": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.SupplierPurchaseOrderNo(); ok {
 		if err := purchaseorder.SupplierPurchaseOrderNoValidator(v); err != nil {
 			return &ValidationError{Name: "supplier_purchase_order_no", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.supplier_purchase_order_no": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.DeliveryAddress(); ok {
+		if err := purchaseorder.DeliveryAddressValidator(v); err != nil {
+			return &ValidationError{Name: "delivery_address", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.delivery_address": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.LifecycleStatus(); ok {
@@ -528,6 +643,24 @@ func (_u *PurchaseOrderUpdate) sqlSave(ctx context.Context) (_node int, err erro
 	if _u.mutation.PaymentTermDaysCleared() {
 		_spec.ClearField(purchaseorder.FieldPaymentTermDays, field.TypeInt)
 	}
+	if value, ok := _u.mutation.PaymentMethod(); ok {
+		_spec.SetField(purchaseorder.FieldPaymentMethod, field.TypeString, value)
+	}
+	if _u.mutation.PaymentMethodCleared() {
+		_spec.ClearField(purchaseorder.FieldPaymentMethod, field.TypeString)
+	}
+	if value, ok := _u.mutation.InvoiceRequired(); ok {
+		_spec.SetField(purchaseorder.FieldInvoiceRequired, field.TypeBool, value)
+	}
+	if _u.mutation.InvoiceRequiredCleared() {
+		_spec.ClearField(purchaseorder.FieldInvoiceRequired, field.TypeBool)
+	}
+	if value, ok := _u.mutation.InvoiceCategory(); ok {
+		_spec.SetField(purchaseorder.FieldInvoiceCategory, field.TypeString, value)
+	}
+	if _u.mutation.InvoiceCategoryCleared() {
+		_spec.ClearField(purchaseorder.FieldInvoiceCategory, field.TypeString)
+	}
 	if value, ok := _u.mutation.SupplierPurchaseOrderNo(); ok {
 		_spec.SetField(purchaseorder.FieldSupplierPurchaseOrderNo, field.TypeString, value)
 	}
@@ -554,6 +687,18 @@ func (_u *PurchaseOrderUpdate) sqlSave(ctx context.Context) (_node int, err erro
 	}
 	if _u.mutation.ExpectedArrivalDateCleared() {
 		_spec.ClearField(purchaseorder.FieldExpectedArrivalDate, field.TypeTime)
+	}
+	if value, ok := _u.mutation.SupplierConfirmedArrivalDate(); ok {
+		_spec.SetField(purchaseorder.FieldSupplierConfirmedArrivalDate, field.TypeTime, value)
+	}
+	if _u.mutation.SupplierConfirmedArrivalDateCleared() {
+		_spec.ClearField(purchaseorder.FieldSupplierConfirmedArrivalDate, field.TypeTime)
+	}
+	if value, ok := _u.mutation.DeliveryAddress(); ok {
+		_spec.SetField(purchaseorder.FieldDeliveryAddress, field.TypeString, value)
+	}
+	if _u.mutation.DeliveryAddressCleared() {
+		_spec.ClearField(purchaseorder.FieldDeliveryAddress, field.TypeString)
 	}
 	if value, ok := _u.mutation.LifecycleStatus(); ok {
 		_spec.SetField(purchaseorder.FieldLifecycleStatus, field.TypeString, value)
@@ -769,6 +914,66 @@ func (_u *PurchaseOrderUpdateOne) ClearPaymentTermDays() *PurchaseOrderUpdateOne
 	return _u
 }
 
+// SetPaymentMethod sets the "payment_method" field.
+func (_u *PurchaseOrderUpdateOne) SetPaymentMethod(v string) *PurchaseOrderUpdateOne {
+	_u.mutation.SetPaymentMethod(v)
+	return _u
+}
+
+// SetNillablePaymentMethod sets the "payment_method" field if the given value is not nil.
+func (_u *PurchaseOrderUpdateOne) SetNillablePaymentMethod(v *string) *PurchaseOrderUpdateOne {
+	if v != nil {
+		_u.SetPaymentMethod(*v)
+	}
+	return _u
+}
+
+// ClearPaymentMethod clears the value of the "payment_method" field.
+func (_u *PurchaseOrderUpdateOne) ClearPaymentMethod() *PurchaseOrderUpdateOne {
+	_u.mutation.ClearPaymentMethod()
+	return _u
+}
+
+// SetInvoiceRequired sets the "invoice_required" field.
+func (_u *PurchaseOrderUpdateOne) SetInvoiceRequired(v bool) *PurchaseOrderUpdateOne {
+	_u.mutation.SetInvoiceRequired(v)
+	return _u
+}
+
+// SetNillableInvoiceRequired sets the "invoice_required" field if the given value is not nil.
+func (_u *PurchaseOrderUpdateOne) SetNillableInvoiceRequired(v *bool) *PurchaseOrderUpdateOne {
+	if v != nil {
+		_u.SetInvoiceRequired(*v)
+	}
+	return _u
+}
+
+// ClearInvoiceRequired clears the value of the "invoice_required" field.
+func (_u *PurchaseOrderUpdateOne) ClearInvoiceRequired() *PurchaseOrderUpdateOne {
+	_u.mutation.ClearInvoiceRequired()
+	return _u
+}
+
+// SetInvoiceCategory sets the "invoice_category" field.
+func (_u *PurchaseOrderUpdateOne) SetInvoiceCategory(v string) *PurchaseOrderUpdateOne {
+	_u.mutation.SetInvoiceCategory(v)
+	return _u
+}
+
+// SetNillableInvoiceCategory sets the "invoice_category" field if the given value is not nil.
+func (_u *PurchaseOrderUpdateOne) SetNillableInvoiceCategory(v *string) *PurchaseOrderUpdateOne {
+	if v != nil {
+		_u.SetInvoiceCategory(*v)
+	}
+	return _u
+}
+
+// ClearInvoiceCategory clears the value of the "invoice_category" field.
+func (_u *PurchaseOrderUpdateOne) ClearInvoiceCategory() *PurchaseOrderUpdateOne {
+	_u.mutation.ClearInvoiceCategory()
+	return _u
+}
+
 // SetSupplierPurchaseOrderNo sets the "supplier_purchase_order_no" field.
 func (_u *PurchaseOrderUpdateOne) SetSupplierPurchaseOrderNo(v string) *PurchaseOrderUpdateOne {
 	_u.mutation.SetSupplierPurchaseOrderNo(v)
@@ -844,6 +1049,46 @@ func (_u *PurchaseOrderUpdateOne) SetNillableExpectedArrivalDate(v *time.Time) *
 // ClearExpectedArrivalDate clears the value of the "expected_arrival_date" field.
 func (_u *PurchaseOrderUpdateOne) ClearExpectedArrivalDate() *PurchaseOrderUpdateOne {
 	_u.mutation.ClearExpectedArrivalDate()
+	return _u
+}
+
+// SetSupplierConfirmedArrivalDate sets the "supplier_confirmed_arrival_date" field.
+func (_u *PurchaseOrderUpdateOne) SetSupplierConfirmedArrivalDate(v time.Time) *PurchaseOrderUpdateOne {
+	_u.mutation.SetSupplierConfirmedArrivalDate(v)
+	return _u
+}
+
+// SetNillableSupplierConfirmedArrivalDate sets the "supplier_confirmed_arrival_date" field if the given value is not nil.
+func (_u *PurchaseOrderUpdateOne) SetNillableSupplierConfirmedArrivalDate(v *time.Time) *PurchaseOrderUpdateOne {
+	if v != nil {
+		_u.SetSupplierConfirmedArrivalDate(*v)
+	}
+	return _u
+}
+
+// ClearSupplierConfirmedArrivalDate clears the value of the "supplier_confirmed_arrival_date" field.
+func (_u *PurchaseOrderUpdateOne) ClearSupplierConfirmedArrivalDate() *PurchaseOrderUpdateOne {
+	_u.mutation.ClearSupplierConfirmedArrivalDate()
+	return _u
+}
+
+// SetDeliveryAddress sets the "delivery_address" field.
+func (_u *PurchaseOrderUpdateOne) SetDeliveryAddress(v string) *PurchaseOrderUpdateOne {
+	_u.mutation.SetDeliveryAddress(v)
+	return _u
+}
+
+// SetNillableDeliveryAddress sets the "delivery_address" field if the given value is not nil.
+func (_u *PurchaseOrderUpdateOne) SetNillableDeliveryAddress(v *string) *PurchaseOrderUpdateOne {
+	if v != nil {
+		_u.SetDeliveryAddress(*v)
+	}
+	return _u
+}
+
+// ClearDeliveryAddress clears the value of the "delivery_address" field.
+func (_u *PurchaseOrderUpdateOne) ClearDeliveryAddress() *PurchaseOrderUpdateOne {
+	_u.mutation.ClearDeliveryAddress()
 	return _u
 }
 
@@ -1138,9 +1383,24 @@ func (_u *PurchaseOrderUpdateOne) check() error {
 			return &ValidationError{Name: "payment_term_days", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.payment_term_days": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.PaymentMethod(); ok {
+		if err := purchaseorder.PaymentMethodValidator(v); err != nil {
+			return &ValidationError{Name: "payment_method", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.payment_method": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.InvoiceCategory(); ok {
+		if err := purchaseorder.InvoiceCategoryValidator(v); err != nil {
+			return &ValidationError{Name: "invoice_category", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.invoice_category": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.SupplierPurchaseOrderNo(); ok {
 		if err := purchaseorder.SupplierPurchaseOrderNoValidator(v); err != nil {
 			return &ValidationError{Name: "supplier_purchase_order_no", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.supplier_purchase_order_no": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.DeliveryAddress(); ok {
+		if err := purchaseorder.DeliveryAddressValidator(v); err != nil {
+			return &ValidationError{Name: "delivery_address", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.delivery_address": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.LifecycleStatus(); ok {
@@ -1228,6 +1488,24 @@ func (_u *PurchaseOrderUpdateOne) sqlSave(ctx context.Context) (_node *PurchaseO
 	if _u.mutation.PaymentTermDaysCleared() {
 		_spec.ClearField(purchaseorder.FieldPaymentTermDays, field.TypeInt)
 	}
+	if value, ok := _u.mutation.PaymentMethod(); ok {
+		_spec.SetField(purchaseorder.FieldPaymentMethod, field.TypeString, value)
+	}
+	if _u.mutation.PaymentMethodCleared() {
+		_spec.ClearField(purchaseorder.FieldPaymentMethod, field.TypeString)
+	}
+	if value, ok := _u.mutation.InvoiceRequired(); ok {
+		_spec.SetField(purchaseorder.FieldInvoiceRequired, field.TypeBool, value)
+	}
+	if _u.mutation.InvoiceRequiredCleared() {
+		_spec.ClearField(purchaseorder.FieldInvoiceRequired, field.TypeBool)
+	}
+	if value, ok := _u.mutation.InvoiceCategory(); ok {
+		_spec.SetField(purchaseorder.FieldInvoiceCategory, field.TypeString, value)
+	}
+	if _u.mutation.InvoiceCategoryCleared() {
+		_spec.ClearField(purchaseorder.FieldInvoiceCategory, field.TypeString)
+	}
 	if value, ok := _u.mutation.SupplierPurchaseOrderNo(); ok {
 		_spec.SetField(purchaseorder.FieldSupplierPurchaseOrderNo, field.TypeString, value)
 	}
@@ -1254,6 +1532,18 @@ func (_u *PurchaseOrderUpdateOne) sqlSave(ctx context.Context) (_node *PurchaseO
 	}
 	if _u.mutation.ExpectedArrivalDateCleared() {
 		_spec.ClearField(purchaseorder.FieldExpectedArrivalDate, field.TypeTime)
+	}
+	if value, ok := _u.mutation.SupplierConfirmedArrivalDate(); ok {
+		_spec.SetField(purchaseorder.FieldSupplierConfirmedArrivalDate, field.TypeTime, value)
+	}
+	if _u.mutation.SupplierConfirmedArrivalDateCleared() {
+		_spec.ClearField(purchaseorder.FieldSupplierConfirmedArrivalDate, field.TypeTime)
+	}
+	if value, ok := _u.mutation.DeliveryAddress(); ok {
+		_spec.SetField(purchaseorder.FieldDeliveryAddress, field.TypeString, value)
+	}
+	if _u.mutation.DeliveryAddressCleared() {
+		_spec.ClearField(purchaseorder.FieldDeliveryAddress, field.TypeString)
 	}
 	if value, ok := _u.mutation.LifecycleStatus(); ok {
 		_spec.SetField(purchaseorder.FieldLifecycleStatus, field.TypeString, value)

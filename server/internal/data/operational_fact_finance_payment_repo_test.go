@@ -42,6 +42,8 @@ func createShippedShipmentForFinanceFactFixture(
 		CustomerID:      customer.ID,
 		OrderDate:       time.Now().UTC(),
 		PaymentTermDays: &paymentTermDays,
+		TaxMode:         stringPtr(biz.SalesOrderTaxModeNone),
+		FreightTerms:    stringPtr(biz.SalesOrderFreightTermsExcluded),
 	})
 	if err != nil {
 		t.Fatalf("create finance fixture sales order: %v", err)

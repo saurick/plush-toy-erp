@@ -89,13 +89,17 @@ func (d *jsonrpcDispatcher) handleMasterDataCustomer(
 
 func customerMutationFromParams(pm map[string]any) *biz.CustomerMutation {
 	return &biz.CustomerMutation{
-		Code:                   getString(pm, "code"),
-		Name:                   getString(pm, "name"),
-		ShortName:              getWorkflowStringPtr(pm, "short_name"),
-		DefaultPaymentMethod:   getWorkflowStringPtr(pm, "default_payment_method"),
-		DefaultPaymentTermDays: getOptionalNonNegativeInt(pm, "default_payment_term_days"),
-		TaxNo:                  getWorkflowStringPtr(pm, "tax_no"),
-		Note:                   getWorkflowStringPtr(pm, "note"),
+		Code:                     getString(pm, "code"),
+		Name:                     getString(pm, "name"),
+		ShortName:                getWorkflowStringPtr(pm, "short_name"),
+		DefaultPaymentMethod:     getWorkflowStringPtr(pm, "default_payment_method"),
+		DefaultPaymentTermDays:   getOptionalNonNegativeInt(pm, "default_payment_term_days"),
+		TaxNo:                    getWorkflowStringPtr(pm, "tax_no"),
+		CountryRegion:            getWorkflowStringPtr(pm, "country_region"),
+		DefaultDeliveryRecipient: getWorkflowStringPtr(pm, "default_delivery_recipient"),
+		DefaultDeliveryPhone:     getWorkflowStringPtr(pm, "default_delivery_phone"),
+		DefaultDeliveryAddress:   getWorkflowStringPtr(pm, "default_delivery_address"),
+		Note:                     getWorkflowStringPtr(pm, "note"),
 	}
 }
 
@@ -121,17 +125,21 @@ func customerToMap(item *biz.Customer) map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"id":                        item.ID,
-		"code":                      item.Code,
-		"name":                      item.Name,
-		"short_name":                optionalStringValue(item.ShortName),
-		"default_payment_method":    optionalStringValue(item.DefaultPaymentMethod),
-		"default_payment_term_days": optionalIntValue(item.DefaultPaymentTermDays),
-		"tax_no":                    optionalStringValue(item.TaxNo),
-		"is_active":                 item.IsActive,
-		"note":                      optionalStringValue(item.Note),
-		"created_at":                item.CreatedAt.Unix(),
-		"updated_at":                item.UpdatedAt.Unix(),
+		"id":                         item.ID,
+		"code":                       item.Code,
+		"name":                       item.Name,
+		"short_name":                 optionalStringValue(item.ShortName),
+		"default_payment_method":     optionalStringValue(item.DefaultPaymentMethod),
+		"default_payment_term_days":  optionalIntValue(item.DefaultPaymentTermDays),
+		"tax_no":                     optionalStringValue(item.TaxNo),
+		"country_region":             optionalStringValue(item.CountryRegion),
+		"default_delivery_recipient": optionalStringValue(item.DefaultDeliveryRecipient),
+		"default_delivery_phone":     optionalStringValue(item.DefaultDeliveryPhone),
+		"default_delivery_address":   optionalStringValue(item.DefaultDeliveryAddress),
+		"is_active":                  item.IsActive,
+		"note":                       optionalStringValue(item.Note),
+		"created_at":                 item.CreatedAt.Unix(),
+		"updated_at":                 item.UpdatedAt.Unix(),
 	}
 }
 

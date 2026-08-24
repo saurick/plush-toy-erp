@@ -29,6 +29,14 @@ type Customer struct {
 	DefaultPaymentTermDays *int `json:"default_payment_term_days,omitempty"`
 	// TaxNo holds the value of the "tax_no" field.
 	TaxNo *string `json:"tax_no,omitempty"`
+	// CountryRegion holds the value of the "country_region" field.
+	CountryRegion *string `json:"country_region,omitempty"`
+	// DefaultDeliveryRecipient holds the value of the "default_delivery_recipient" field.
+	DefaultDeliveryRecipient *string `json:"default_delivery_recipient,omitempty"`
+	// DefaultDeliveryPhone holds the value of the "default_delivery_phone" field.
+	DefaultDeliveryPhone *string `json:"default_delivery_phone,omitempty"`
+	// DefaultDeliveryAddress holds the value of the "default_delivery_address" field.
+	DefaultDeliveryAddress *string `json:"default_delivery_address,omitempty"`
 	// IsActive holds the value of the "is_active" field.
 	IsActive bool `json:"is_active,omitempty"`
 	// Note holds the value of the "note" field.
@@ -81,7 +89,7 @@ func (*Customer) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case customer.FieldID, customer.FieldDefaultPaymentTermDays:
 			values[i] = new(sql.NullInt64)
-		case customer.FieldCode, customer.FieldName, customer.FieldShortName, customer.FieldDefaultPaymentMethod, customer.FieldTaxNo, customer.FieldNote:
+		case customer.FieldCode, customer.FieldName, customer.FieldShortName, customer.FieldDefaultPaymentMethod, customer.FieldTaxNo, customer.FieldCountryRegion, customer.FieldDefaultDeliveryRecipient, customer.FieldDefaultDeliveryPhone, customer.FieldDefaultDeliveryAddress, customer.FieldNote:
 			values[i] = new(sql.NullString)
 		case customer.FieldCreatedAt, customer.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -145,6 +153,34 @@ func (_m *Customer) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.TaxNo = new(string)
 				*_m.TaxNo = value.String
+			}
+		case customer.FieldCountryRegion:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field country_region", values[i])
+			} else if value.Valid {
+				_m.CountryRegion = new(string)
+				*_m.CountryRegion = value.String
+			}
+		case customer.FieldDefaultDeliveryRecipient:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field default_delivery_recipient", values[i])
+			} else if value.Valid {
+				_m.DefaultDeliveryRecipient = new(string)
+				*_m.DefaultDeliveryRecipient = value.String
+			}
+		case customer.FieldDefaultDeliveryPhone:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field default_delivery_phone", values[i])
+			} else if value.Valid {
+				_m.DefaultDeliveryPhone = new(string)
+				*_m.DefaultDeliveryPhone = value.String
+			}
+		case customer.FieldDefaultDeliveryAddress:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field default_delivery_address", values[i])
+			} else if value.Valid {
+				_m.DefaultDeliveryAddress = new(string)
+				*_m.DefaultDeliveryAddress = value.String
 			}
 		case customer.FieldIsActive:
 			if value, ok := values[i].(*sql.NullBool); !ok {
@@ -240,6 +276,26 @@ func (_m *Customer) String() string {
 	builder.WriteString(", ")
 	if v := _m.TaxNo; v != nil {
 		builder.WriteString("tax_no=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.CountryRegion; v != nil {
+		builder.WriteString("country_region=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.DefaultDeliveryRecipient; v != nil {
+		builder.WriteString("default_delivery_recipient=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.DefaultDeliveryPhone; v != nil {
+		builder.WriteString("default_delivery_phone=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.DefaultDeliveryAddress; v != nil {
+		builder.WriteString("default_delivery_address=")
 		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")

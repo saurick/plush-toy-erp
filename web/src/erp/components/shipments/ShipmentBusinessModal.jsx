@@ -2,6 +2,7 @@ import React, { useEffect } from 'react'
 import { DeleteOutlined } from '@ant-design/icons'
 import {
   Alert,
+  AutoComplete,
   Button,
   Empty,
   Form,
@@ -29,6 +30,9 @@ import {
   filterShipmentProductSKUOptions,
   formatQuantity,
 } from '../../utils/businessLineItems.mjs'
+import { optionalContactPhoneRule } from '../../utils/contactValidation.mjs'
+import { BUSINESS_CURRENCY_OPTIONS } from '../../utils/masterDataOrderView.mjs'
+import { numeric20Scale6Units } from '../../utils/numeric20Scale6.mjs'
 import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
 import {
   calculateShipmentLineNetWeightG,
@@ -42,6 +46,16 @@ import { message } from '@/common/utils/antdApp'
 
 const { Text } = Typography
 const EMPTY_SHIPMENT_ITEMS = Object.freeze([])
+const SHIPMENT_TRANSPORT_METHOD_OPTIONS = Object.freeze(
+  ['快递', '物流专线', '海运', '空运', '铁路', '自提'].map((value) => ({
+    value,
+  }))
+)
+
+function isPositiveNumeric20Scale6(value) {
+  const units = numeric20Scale6Units(value)
+  return units !== null && BigInt(units) > BigInt(0)
+}
 
 export function salesOrderCustomerText(order = {}) {
   const snapshot = order.customer_snapshot
@@ -85,12 +99,15 @@ export function sourceLineProductText(
 }
 
 function ShipmentFormFields({
+  form,
   disabled = false,
   customerOptions = [],
   salesOrderOptions = [],
   sourceSelectionOnly = false,
   sourceLocked = false,
 }) {
+  const freightAmount = Form.useWatch('freight_amount', form)
+  const freightCurrency = Form.useWatch('freight_currency', form)
   return (
     <>
       <BusinessFormSectionTitle>单据与客户</BusinessFormSectionTitle>
@@ -149,7 +166,7 @@ function ShipmentFormFields({
       <Form.Item name="idempotency_key" hidden rules={[{ required: true }]}>
         <Input disabled={disabled} />
       </Form.Item>
-      <BusinessFormSectionTitle>计划与附件</BusinessFormSectionTitle>
+      <BusinessFormSectionTitle>计划与收货</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field"
         label="计划出货日期"
@@ -157,6 +174,233 @@ function ShipmentFormFields({
       >
         <DateInput disabled={disabled} />
       </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="国家 / 地区"
+        name="delivery_country_region"
+      >
+        <Input
+          allowClear
+          autoComplete="off"
+          disabled={disabled}
+          maxLength={128}
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="收货人"
+        name="delivery_recipient"
+      >
+        <Input
+          allowClear
+          autoComplete="off"
+          disabled={disabled}
+          maxLength={128}
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="收货电话"
+        name="delivery_phone"
+        rules={[optionalContactPhoneRule()]}
+      >
+        <Input
+          allowClear
+          autoComplete="off"
+          disabled={disabled}
+          maxLength={64}
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field erp-business-action-form__field--full"
+        extra="从销售订单带出后可按本次出货调整；保存后固定为本单收货信息。"
+        label="收货地址"
+        name="delivery_address"
+      >
+        <Input.TextArea
+          allowClear
+          autoSize={{ minRows: 1, maxRows: 3 }}
+          disabled={disabled}
+          maxLength={512}
+          showCount
+        />
+      </Form.Item>
+      <BusinessFormSectionTitle>运输与包装</BusinessFormSectionTitle>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="运输方式"
+        name="transport_method"
+      >
+        <AutoComplete
+          allowClear
+          disabled={disabled}
+          maxLength={64}
+          options={SHIPMENT_TRANSPORT_METHOD_OPTIONS}
+          placeholder="可选择或直接输入"
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="承运商"
+        name="carrier_name"
+      >
+        <Input
+          allowClear
+          autoComplete="off"
+          disabled={disabled}
+          maxLength={128}
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="物流 / 提单号"
+        name="tracking_no"
+      >
+        <Input
+          allowClear
+          autoComplete="off"
+          disabled={disabled}
+          maxLength={128}
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="件数 / 箱数"
+        name="package_count"
+        rules={[
+          {
+            type: 'integer',
+            min: 1,
+            message: '件数 / 箱数必须为大于 0 的整数',
+          },
+        ]}
+      >
+        <InputNumber
+          disabled={disabled}
+          min={1}
+          precision={0}
+          style={{ width: '100%' }}
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="毛重（千克）"
+        name="gross_weight_kg"
+        rules={[
+          {
+            validator: async (_, value) => {
+              if (value === undefined || value === null || value === '') return
+              if (!isPositiveNumeric20Scale6(value)) {
+                throw new Error('毛重必须大于 0，且最多保留 6 位小数')
+              }
+            },
+          },
+        ]}
+      >
+        <InputNumber
+          disabled={disabled}
+          max="99999999999999.999999"
+          min="0.000001"
+          precision={6}
+          stringMode
+          style={{ width: '100%' }}
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="体积（立方米）"
+        name="volume_m3"
+        rules={[
+          {
+            validator: async (_, value) => {
+              if (value === undefined || value === null || value === '') return
+              if (!isPositiveNumeric20Scale6(value)) {
+                throw new Error('体积必须大于 0，且最多保留 6 位小数')
+              }
+            },
+          },
+        ]}
+      >
+        <InputNumber
+          disabled={disabled}
+          max="99999999999999.999999"
+          min="0.000001"
+          precision={6}
+          stringMode
+          style={{ width: '100%' }}
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field erp-business-action-form__field--full"
+        label="唛头"
+        name="shipping_mark"
+      >
+        <Input.TextArea
+          allowClear
+          autoSize={{ minRows: 1, maxRows: 3 }}
+          disabled={disabled}
+          maxLength={255}
+          showCount
+        />
+      </Form.Item>
+      <BusinessFormSectionTitle>实际运费</BusinessFormSectionTitle>
+      <Form.Item
+        className="erp-business-action-form__field"
+        dependencies={['freight_currency']}
+        extra="只记录本次出货的实际物流金额，不自动生成应付或付款记录。"
+        label="实际运费金额"
+        name="freight_amount"
+        rules={[
+          {
+            validator: async (_, value) => {
+              if (value === undefined || value === null || value === '') {
+                if (freightCurrency) throw new Error('请填写实际运费金额')
+                return
+              }
+              if (numeric20Scale6Units(value) === null) {
+                throw new Error('实际运费必须为非负数，且最多保留 6 位小数')
+              }
+            },
+          },
+        ]}
+      >
+        <InputNumber
+          disabled={disabled}
+          max="99999999999999.999999"
+          min="0"
+          precision={6}
+          stringMode
+          style={{ width: '100%' }}
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        dependencies={['freight_amount']}
+        label="实际运费币种"
+        name="freight_currency"
+        rules={[
+          {
+            validator: async (_, value) => {
+              if (
+                freightAmount !== undefined &&
+                freightAmount !== null &&
+                freightAmount !== '' &&
+                !value
+              ) {
+                throw new Error('请选择实际运费币种')
+              }
+            },
+          },
+        ]}
+      >
+        <Select
+          allowClear
+          disabled={disabled}
+          options={BUSINESS_CURRENCY_OPTIONS}
+          placeholder="请选择币种"
+        />
+      </Form.Item>
+      <BusinessFormSectionTitle>其他说明</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field erp-business-action-form__field--full"
         label="备注"
@@ -543,6 +787,20 @@ function ShipmentItemFormFields({
         <Input allowClear autoComplete="off" placeholder="例如：120.5" />
       </Form.Item>
       <Form.Item
+        className="erp-business-action-form__field"
+        label="包装说明"
+        name={fieldName('package_description')}
+      >
+        <Input allowClear autoComplete="off" maxLength={255} />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="箱号"
+        name={fieldName('case_no')}
+      >
+        <Input allowClear autoComplete="off" maxLength={128} />
+      </Form.Item>
+      <Form.Item
         className="erp-business-action-form__field erp-business-action-form__field--full"
         label="备注"
         name={fieldName('note')}
@@ -575,7 +833,7 @@ function ShipmentItemsTable({
       dataSource={items}
       pagination={false}
       locale={{ emptyText: <Empty description="暂无出货明细" /> }}
-      scroll={{ x: hasFinalShipmentWeight(status) ? 1060 : 760 }}
+      scroll={{ x: hasFinalShipmentWeight(status) ? 1340 : 1040 }}
       columns={[
         {
           title: '销售订单行',
@@ -607,6 +865,18 @@ function ShipmentItemsTable({
             ].join(' / '),
         },
         { title: '数量', dataIndex: 'quantity', width: 120 },
+        {
+          title: '包装说明',
+          dataIndex: 'package_description',
+          width: 180,
+          render: (value) => value || '-',
+        },
+        {
+          title: '箱号',
+          dataIndex: 'case_no',
+          width: 130,
+          render: (value) => value || '-',
+        },
         ...(hasFinalShipmentWeight(status)
           ? [
               {
@@ -723,6 +993,7 @@ export default function ShipmentBusinessModal({
     >
       <Form layout="vertical" form={form} className="erp-business-action-form">
         <ShipmentFormFields
+          form={form}
           customerOptions={customerOptions}
           disabled={!isWritableModal}
           salesOrderOptions={salesOrderOptions}

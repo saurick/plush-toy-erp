@@ -41,6 +41,10 @@ func (r *masterDataRepo) CreateCustomer(ctx context.Context, in *biz.CustomerMut
 		SetNillableDefaultPaymentMethod(in.DefaultPaymentMethod).
 		SetNillableDefaultPaymentTermDays(in.DefaultPaymentTermDays).
 		SetNillableTaxNo(in.TaxNo).
+		SetNillableCountryRegion(in.CountryRegion).
+		SetNillableDefaultDeliveryRecipient(in.DefaultDeliveryRecipient).
+		SetNillableDefaultDeliveryPhone(in.DefaultDeliveryPhone).
+		SetNillableDefaultDeliveryAddress(in.DefaultDeliveryAddress).
 		SetNillableNote(in.Note).
 		Save(ctx)
 	if err != nil {
@@ -72,6 +76,26 @@ func (r *masterDataRepo) UpdateCustomer(ctx context.Context, id int, in *biz.Cus
 		update.ClearTaxNo()
 	} else {
 		update.SetTaxNo(*in.TaxNo)
+	}
+	if in.CountryRegion == nil {
+		update.ClearCountryRegion()
+	} else {
+		update.SetCountryRegion(*in.CountryRegion)
+	}
+	if in.DefaultDeliveryRecipient == nil {
+		update.ClearDefaultDeliveryRecipient()
+	} else {
+		update.SetDefaultDeliveryRecipient(*in.DefaultDeliveryRecipient)
+	}
+	if in.DefaultDeliveryPhone == nil {
+		update.ClearDefaultDeliveryPhone()
+	} else {
+		update.SetDefaultDeliveryPhone(*in.DefaultDeliveryPhone)
+	}
+	if in.DefaultDeliveryAddress == nil {
+		update.ClearDefaultDeliveryAddress()
+	} else {
+		update.SetDefaultDeliveryAddress(*in.DefaultDeliveryAddress)
 	}
 	if in.Note == nil {
 		update.ClearNote()
@@ -137,6 +161,8 @@ func (r *masterDataRepo) ListCustomers(ctx context.Context, filter biz.MasterDat
 			customer.CodeContains(filter.Keyword),
 			customer.NameContains(filter.Keyword),
 			customer.ShortNameContains(filter.Keyword),
+			customer.DefaultPaymentMethodContains(filter.Keyword),
+			customer.CountryRegionContains(filter.Keyword),
 		))
 	}
 	if active, scoped := biz.LifecycleActiveState(filter.LifecycleScope); scoped {
@@ -179,6 +205,9 @@ func (r *masterDataRepo) CreateSupplier(ctx context.Context, in *biz.SupplierMut
 		SetNillableAddress(in.Address).
 		SetNillableTaxNo(in.TaxNo).
 		SetDefaultPaymentTermDays(in.DefaultPaymentTermDays).
+		SetNillableDefaultPaymentMethod(in.DefaultPaymentMethod).
+		SetNillableDefaultInvoiceRequired(in.DefaultInvoiceRequired).
+		SetNillableDefaultInvoiceCategory(in.DefaultInvoiceCategory).
 		SetNillableNote(in.Note)
 	if len(in.ProcessIDs) > 0 {
 		create.AddProcessCapabilityIDs(in.ProcessIDs...)
@@ -218,6 +247,21 @@ func (r *masterDataRepo) UpdateSupplier(ctx context.Context, id int, in *biz.Sup
 		update.ClearTaxNo()
 	} else {
 		update.SetTaxNo(*in.TaxNo)
+	}
+	if in.DefaultPaymentMethod == nil {
+		update.ClearDefaultPaymentMethod()
+	} else {
+		update.SetDefaultPaymentMethod(*in.DefaultPaymentMethod)
+	}
+	if in.DefaultInvoiceRequired == nil {
+		update.ClearDefaultInvoiceRequired()
+	} else {
+		update.SetDefaultInvoiceRequired(*in.DefaultInvoiceRequired)
+	}
+	if in.DefaultInvoiceCategory == nil {
+		update.ClearDefaultInvoiceCategory()
+	} else {
+		update.SetDefaultInvoiceCategory(*in.DefaultInvoiceCategory)
 	}
 	if in.Note == nil {
 		update.ClearNote()
@@ -298,6 +342,7 @@ func (r *masterDataRepo) ListSuppliers(ctx context.Context, filter biz.MasterDat
 			supplier.NameContains(filter.Keyword),
 			supplier.ShortNameContains(filter.Keyword),
 			supplier.AddressContains(filter.Keyword),
+			supplier.DefaultPaymentMethodContains(filter.Keyword),
 		))
 	}
 	if active, scoped := biz.LifecycleActiveState(filter.LifecycleScope); scoped {
@@ -654,6 +699,8 @@ func (r *masterDataRepo) CreateProduct(ctx context.Context, in *biz.ProductMutat
 		SetName(in.Name).
 		SetNillableStyleNo(in.StyleNo).
 		SetNillableCustomerStyleNo(in.CustomerStyleNo).
+		SetNillableEnglishName(in.EnglishName).
+		SetNillableHsCode(in.HSCode).
 		SetNillableUnitNetWeightG(in.UnitNetWeightG).
 		SetDefaultUnitID(in.DefaultUnitID).
 		Save(ctx)
@@ -677,6 +724,16 @@ func (r *masterDataRepo) UpdateProduct(ctx context.Context, id int, in *biz.Prod
 		update.ClearCustomerStyleNo()
 	} else {
 		update.SetCustomerStyleNo(*in.CustomerStyleNo)
+	}
+	if in.EnglishName == nil {
+		update.ClearEnglishName()
+	} else {
+		update.SetEnglishName(*in.EnglishName)
+	}
+	if in.HSCode == nil {
+		update.ClearHsCode()
+	} else {
+		update.SetHsCode(*in.HSCode)
 	}
 	if in.UnitNetWeightG == nil {
 		update.ClearUnitNetWeightG()
@@ -712,6 +769,8 @@ func (r *masterDataRepo) ListProducts(ctx context.Context, filter biz.MasterData
 			product.NameContains(filter.Keyword),
 			product.StyleNoContains(filter.Keyword),
 			product.CustomerStyleNoContains(filter.Keyword),
+			product.EnglishNameContains(filter.Keyword),
+			product.HsCodeContains(filter.Keyword),
 		))
 	}
 	if active, scoped := biz.LifecycleActiveState(filter.LifecycleScope); scoped {
@@ -1078,6 +1137,10 @@ func createCustomerWithClient(ctx context.Context, client *ent.Client, in *biz.C
 		SetNillableDefaultPaymentMethod(in.DefaultPaymentMethod).
 		SetNillableDefaultPaymentTermDays(in.DefaultPaymentTermDays).
 		SetNillableTaxNo(in.TaxNo).
+		SetNillableCountryRegion(in.CountryRegion).
+		SetNillableDefaultDeliveryRecipient(in.DefaultDeliveryRecipient).
+		SetNillableDefaultDeliveryPhone(in.DefaultDeliveryPhone).
+		SetNillableDefaultDeliveryAddress(in.DefaultDeliveryAddress).
 		SetNillableNote(in.Note).
 		Save(ctx)
 }
@@ -1106,6 +1169,26 @@ func updateCustomerWithClient(ctx context.Context, client *ent.Client, id int, i
 	} else {
 		update.SetTaxNo(*in.TaxNo)
 	}
+	if in.CountryRegion == nil {
+		update.ClearCountryRegion()
+	} else {
+		update.SetCountryRegion(*in.CountryRegion)
+	}
+	if in.DefaultDeliveryRecipient == nil {
+		update.ClearDefaultDeliveryRecipient()
+	} else {
+		update.SetDefaultDeliveryRecipient(*in.DefaultDeliveryRecipient)
+	}
+	if in.DefaultDeliveryPhone == nil {
+		update.ClearDefaultDeliveryPhone()
+	} else {
+		update.SetDefaultDeliveryPhone(*in.DefaultDeliveryPhone)
+	}
+	if in.DefaultDeliveryAddress == nil {
+		update.ClearDefaultDeliveryAddress()
+	} else {
+		update.SetDefaultDeliveryAddress(*in.DefaultDeliveryAddress)
+	}
 	if in.Note == nil {
 		update.ClearNote()
 	} else {
@@ -1130,6 +1213,9 @@ func createSupplierWithClient(ctx context.Context, client *ent.Client, in *biz.S
 		SetNillableAddress(in.Address).
 		SetNillableTaxNo(in.TaxNo).
 		SetDefaultPaymentTermDays(in.DefaultPaymentTermDays).
+		SetNillableDefaultPaymentMethod(in.DefaultPaymentMethod).
+		SetNillableDefaultInvoiceRequired(in.DefaultInvoiceRequired).
+		SetNillableDefaultInvoiceCategory(in.DefaultInvoiceCategory).
 		SetNillableNote(in.Note)
 	if len(in.ProcessIDs) > 0 {
 		create.AddProcessCapabilityIDs(in.ProcessIDs...)
@@ -1161,6 +1247,21 @@ func updateSupplierWithClient(ctx context.Context, client *ent.Client, id int, i
 		update.ClearTaxNo()
 	} else {
 		update.SetTaxNo(*in.TaxNo)
+	}
+	if in.DefaultPaymentMethod == nil {
+		update.ClearDefaultPaymentMethod()
+	} else {
+		update.SetDefaultPaymentMethod(*in.DefaultPaymentMethod)
+	}
+	if in.DefaultInvoiceRequired == nil {
+		update.ClearDefaultInvoiceRequired()
+	} else {
+		update.SetDefaultInvoiceRequired(*in.DefaultInvoiceRequired)
+	}
+	if in.DefaultInvoiceCategory == nil {
+		update.ClearDefaultInvoiceCategory()
+	} else {
+		update.SetDefaultInvoiceCategory(*in.DefaultInvoiceCategory)
 	}
 	if in.Note == nil {
 		update.ClearNote()
@@ -1331,17 +1432,21 @@ func entCustomerToBiz(row *ent.Customer) *biz.Customer {
 		return nil
 	}
 	return &biz.Customer{
-		ID:                     row.ID,
-		Code:                   row.Code,
-		Name:                   row.Name,
-		ShortName:              row.ShortName,
-		DefaultPaymentMethod:   row.DefaultPaymentMethod,
-		DefaultPaymentTermDays: row.DefaultPaymentTermDays,
-		TaxNo:                  row.TaxNo,
-		IsActive:               row.IsActive,
-		Note:                   row.Note,
-		CreatedAt:              row.CreatedAt,
-		UpdatedAt:              row.UpdatedAt,
+		ID:                       row.ID,
+		Code:                     row.Code,
+		Name:                     row.Name,
+		ShortName:                row.ShortName,
+		DefaultPaymentMethod:     row.DefaultPaymentMethod,
+		DefaultPaymentTermDays:   row.DefaultPaymentTermDays,
+		TaxNo:                    row.TaxNo,
+		CountryRegion:            row.CountryRegion,
+		DefaultDeliveryRecipient: row.DefaultDeliveryRecipient,
+		DefaultDeliveryPhone:     row.DefaultDeliveryPhone,
+		DefaultDeliveryAddress:   row.DefaultDeliveryAddress,
+		IsActive:                 row.IsActive,
+		Note:                     row.Note,
+		CreatedAt:                row.CreatedAt,
+		UpdatedAt:                row.UpdatedAt,
 	}
 }
 
@@ -1372,6 +1477,9 @@ func entSupplierToBiz(row *ent.Supplier) *biz.Supplier {
 		Address:                row.Address,
 		TaxNo:                  row.TaxNo,
 		DefaultPaymentTermDays: row.DefaultPaymentTermDays,
+		DefaultPaymentMethod:   row.DefaultPaymentMethod,
+		DefaultInvoiceRequired: row.DefaultInvoiceRequired,
+		DefaultInvoiceCategory: row.DefaultInvoiceCategory,
 		ProcessIDs:             processIDs,
 		IsActive:               row.IsActive,
 		Note:                   row.Note,
@@ -1499,6 +1607,8 @@ func entProductToBiz(row *ent.Product) *biz.Product {
 		Name:            row.Name,
 		StyleNo:         row.StyleNo,
 		CustomerStyleNo: row.CustomerStyleNo,
+		EnglishName:     row.EnglishName,
+		HSCode:          row.HsCode,
 		DefaultUnitID:   row.DefaultUnitID,
 		UnitNetWeightG:  row.UnitNetWeightG,
 		IsActive:        row.IsActive,

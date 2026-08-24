@@ -39,6 +39,10 @@ const (
 	FieldAmountSnapshot = "amount_snapshot"
 	// FieldCurrencySnapshot holds the string denoting the currency_snapshot field in the database.
 	FieldCurrencySnapshot = "currency_snapshot"
+	// FieldPackageDescription holds the string denoting the package_description field in the database.
+	FieldPackageDescription = "package_description"
+	// FieldCaseNo holds the string denoting the case_no field in the database.
+	FieldCaseNo = "case_no"
 	// FieldNote holds the string denoting the note field in the database.
 	FieldNote = "note"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -127,6 +131,8 @@ var Columns = []string{
 	FieldUnitPriceSnapshot,
 	FieldAmountSnapshot,
 	FieldCurrencySnapshot,
+	FieldPackageDescription,
+	FieldCaseNo,
 	FieldNote,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -167,6 +173,10 @@ var (
 	DefaultCurrencySnapshot string
 	// CurrencySnapshotValidator is a validator for the "currency_snapshot" field. It is called by the builders before save.
 	CurrencySnapshotValidator func(string) error
+	// PackageDescriptionValidator is a validator for the "package_description" field. It is called by the builders before save.
+	PackageDescriptionValidator func(string) error
+	// CaseNoValidator is a validator for the "case_no" field. It is called by the builders before save.
+	CaseNoValidator func(string) error
 	// NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	NoteValidator func(string) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -243,6 +253,16 @@ func ByAmountSnapshot(opts ...sql.OrderTermOption) OrderOption {
 // ByCurrencySnapshot orders the results by the currency_snapshot field.
 func ByCurrencySnapshot(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCurrencySnapshot, opts...).ToFunc()
+}
+
+// ByPackageDescription orders the results by the package_description field.
+func ByPackageDescription(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPackageDescription, opts...).ToFunc()
+}
+
+// ByCaseNo orders the results by the case_no field.
+func ByCaseNo(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCaseNo, opts...).ToFunc()
 }
 
 // ByNote orders the results by the note field.

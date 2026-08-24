@@ -22,6 +22,10 @@ const (
 	FieldStyleNo = "style_no"
 	// FieldCustomerStyleNo holds the string denoting the customer_style_no field in the database.
 	FieldCustomerStyleNo = "customer_style_no"
+	// FieldEnglishName holds the string denoting the english_name field in the database.
+	FieldEnglishName = "english_name"
+	// FieldHsCode holds the string denoting the hs_code field in the database.
+	FieldHsCode = "hs_code"
 	// FieldDefaultUnitID holds the string denoting the default_unit_id field in the database.
 	FieldDefaultUnitID = "default_unit_id"
 	// FieldUnitNetWeightG holds the string denoting the unit_net_weight_g field in the database.
@@ -97,6 +101,8 @@ var Columns = []string{
 	FieldName,
 	FieldStyleNo,
 	FieldCustomerStyleNo,
+	FieldEnglishName,
+	FieldHsCode,
 	FieldDefaultUnitID,
 	FieldUnitNetWeightG,
 	FieldIsActive,
@@ -123,6 +129,10 @@ var (
 	StyleNoValidator func(string) error
 	// CustomerStyleNoValidator is a validator for the "customer_style_no" field. It is called by the builders before save.
 	CustomerStyleNoValidator func(string) error
+	// EnglishNameValidator is a validator for the "english_name" field. It is called by the builders before save.
+	EnglishNameValidator func(string) error
+	// HsCodeValidator is a validator for the "hs_code" field. It is called by the builders before save.
+	HsCodeValidator func(string) error
 	// DefaultUnitIDValidator is a validator for the "default_unit_id" field. It is called by the builders before save.
 	DefaultUnitIDValidator func(int) error
 	// DefaultIsActive holds the default value on creation for the "is_active" field.
@@ -161,6 +171,16 @@ func ByStyleNo(opts ...sql.OrderTermOption) OrderOption {
 // ByCustomerStyleNo orders the results by the customer_style_no field.
 func ByCustomerStyleNo(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCustomerStyleNo, opts...).ToFunc()
+}
+
+// ByEnglishName orders the results by the english_name field.
+func ByEnglishName(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldEnglishName, opts...).ToFunc()
+}
+
+// ByHsCode orders the results by the hs_code field.
+func ByHsCode(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldHsCode, opts...).ToFunc()
 }
 
 // ByDefaultUnitID orders the results by the default_unit_id field.

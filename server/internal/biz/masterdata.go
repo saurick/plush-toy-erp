@@ -29,17 +29,21 @@ var contactOwnerTypes = map[string]struct{}{
 }
 
 type Customer struct {
-	ID                     int
-	Code                   string
-	Name                   string
-	ShortName              *string
-	DefaultPaymentMethod   *string
-	DefaultPaymentTermDays *int
-	TaxNo                  *string
-	IsActive               bool
-	Note                   *string
-	CreatedAt              time.Time
-	UpdatedAt              time.Time
+	ID                       int
+	Code                     string
+	Name                     string
+	ShortName                *string
+	DefaultPaymentMethod     *string
+	DefaultPaymentTermDays   *int
+	TaxNo                    *string
+	CountryRegion            *string
+	DefaultDeliveryRecipient *string
+	DefaultDeliveryPhone     *string
+	DefaultDeliveryAddress   *string
+	IsActive                 bool
+	Note                     *string
+	CreatedAt                time.Time
+	UpdatedAt                time.Time
 }
 
 type Supplier struct {
@@ -51,6 +55,9 @@ type Supplier struct {
 	Address                *string
 	TaxNo                  *string
 	DefaultPaymentTermDays int
+	DefaultPaymentMethod   *string
+	DefaultInvoiceRequired *bool
+	DefaultInvoiceCategory *string
 	ProcessIDs             []int
 	PrimaryContact         *Contact
 	IsActive               bool
@@ -114,6 +121,8 @@ type Product struct {
 	Name            string
 	StyleNo         *string
 	CustomerStyleNo *string
+	EnglishName     *string
+	HSCode          *string
 	DefaultUnitID   int
 	UnitNetWeightG  *decimal.Decimal
 	IsActive        bool
@@ -156,13 +165,17 @@ type Contact struct {
 }
 
 type CustomerMutation struct {
-	Code                   string
-	Name                   string
-	ShortName              *string
-	DefaultPaymentMethod   *string
-	DefaultPaymentTermDays *int
-	TaxNo                  *string
-	Note                   *string
+	Code                     string
+	Name                     string
+	ShortName                *string
+	DefaultPaymentMethod     *string
+	DefaultPaymentTermDays   *int
+	TaxNo                    *string
+	CountryRegion            *string
+	DefaultDeliveryRecipient *string
+	DefaultDeliveryPhone     *string
+	DefaultDeliveryAddress   *string
+	Note                     *string
 }
 
 type SupplierMutation struct {
@@ -173,6 +186,9 @@ type SupplierMutation struct {
 	Address                *string
 	TaxNo                  *string
 	DefaultPaymentTermDays int
+	DefaultPaymentMethod   *string
+	DefaultInvoiceRequired *bool
+	DefaultInvoiceCategory *string
 	// Nil preserves existing capabilities on partial update; a non-nil empty
 	// slice explicitly clears the declared supplier-process relationships.
 	ProcessIDs []int
@@ -205,6 +221,8 @@ type ProductMutation struct {
 	Name            string
 	StyleNo         *string
 	CustomerStyleNo *string
+	EnglishName     *string
+	HSCode          *string
 	DefaultUnitID   int
 	UnitNetWeightG  *decimal.Decimal
 }
@@ -852,6 +870,14 @@ func normalizeCustomerMutation(in CustomerMutation) (CustomerMutation, error) {
 	in.ShortName = normalizeOptionalString(in.ShortName)
 	in.DefaultPaymentMethod = normalizeOptionalString(in.DefaultPaymentMethod)
 	in.TaxNo = normalizeOptionalString(in.TaxNo)
+	in.CountryRegion = normalizeOptionalString(in.CountryRegion)
+	in.DefaultDeliveryRecipient = normalizeOptionalString(in.DefaultDeliveryRecipient)
+	var err error
+	in.DefaultDeliveryPhone, err = normalizeContactPhone(in.DefaultDeliveryPhone)
+	if err != nil {
+		return CustomerMutation{}, err
+	}
+	in.DefaultDeliveryAddress = normalizeOptionalString(in.DefaultDeliveryAddress)
 	in.Note = normalizeOptionalString(in.Note)
 	if in.Code == "" || in.Name == "" || (in.DefaultPaymentTermDays != nil && *in.DefaultPaymentTermDays < 0) {
 		return CustomerMutation{}, ErrBadParam
@@ -866,6 +892,12 @@ func normalizeSupplierMutation(in SupplierMutation) (SupplierMutation, error) {
 	in.SupplierType = normalizeOptionalString(in.SupplierType)
 	in.Address = normalizeOptionalString(in.Address)
 	in.TaxNo = normalizeOptionalString(in.TaxNo)
+	in.DefaultPaymentMethod = normalizeOptionalString(in.DefaultPaymentMethod)
+	var err error
+	in.DefaultInvoiceRequired, in.DefaultInvoiceCategory, err = normalizeInvoicePreference(in.DefaultInvoiceRequired, in.DefaultInvoiceCategory)
+	if err != nil {
+		return SupplierMutation{}, err
+	}
 	in.Note = normalizeOptionalString(in.Note)
 	if in.ProcessIDs != nil {
 		normalizedIDs := make([]int, 0, len(in.ProcessIDs))
@@ -957,6 +989,8 @@ func normalizeProductMutation(in ProductMutation) (ProductMutation, error) {
 	in.Name = strings.TrimSpace(in.Name)
 	in.StyleNo = normalizeOptionalString(in.StyleNo)
 	in.CustomerStyleNo = normalizeOptionalString(in.CustomerStyleNo)
+	in.EnglishName = normalizeOptionalString(in.EnglishName)
+	in.HSCode = normalizeOptionalString(in.HSCode)
 	if in.Code == "" || in.Name == "" || in.DefaultUnitID <= 0 ||
 		!validNetWeightG(in.UnitNetWeightG) {
 		return ProductMutation{}, ErrBadParam

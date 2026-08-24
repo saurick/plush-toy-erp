@@ -161,6 +161,66 @@ func (_u *SupplierUpdate) AddDefaultPaymentTermDays(v int) *SupplierUpdate {
 	return _u
 }
 
+// SetDefaultPaymentMethod sets the "default_payment_method" field.
+func (_u *SupplierUpdate) SetDefaultPaymentMethod(v string) *SupplierUpdate {
+	_u.mutation.SetDefaultPaymentMethod(v)
+	return _u
+}
+
+// SetNillableDefaultPaymentMethod sets the "default_payment_method" field if the given value is not nil.
+func (_u *SupplierUpdate) SetNillableDefaultPaymentMethod(v *string) *SupplierUpdate {
+	if v != nil {
+		_u.SetDefaultPaymentMethod(*v)
+	}
+	return _u
+}
+
+// ClearDefaultPaymentMethod clears the value of the "default_payment_method" field.
+func (_u *SupplierUpdate) ClearDefaultPaymentMethod() *SupplierUpdate {
+	_u.mutation.ClearDefaultPaymentMethod()
+	return _u
+}
+
+// SetDefaultInvoiceRequired sets the "default_invoice_required" field.
+func (_u *SupplierUpdate) SetDefaultInvoiceRequired(v bool) *SupplierUpdate {
+	_u.mutation.SetDefaultInvoiceRequired(v)
+	return _u
+}
+
+// SetNillableDefaultInvoiceRequired sets the "default_invoice_required" field if the given value is not nil.
+func (_u *SupplierUpdate) SetNillableDefaultInvoiceRequired(v *bool) *SupplierUpdate {
+	if v != nil {
+		_u.SetDefaultInvoiceRequired(*v)
+	}
+	return _u
+}
+
+// ClearDefaultInvoiceRequired clears the value of the "default_invoice_required" field.
+func (_u *SupplierUpdate) ClearDefaultInvoiceRequired() *SupplierUpdate {
+	_u.mutation.ClearDefaultInvoiceRequired()
+	return _u
+}
+
+// SetDefaultInvoiceCategory sets the "default_invoice_category" field.
+func (_u *SupplierUpdate) SetDefaultInvoiceCategory(v string) *SupplierUpdate {
+	_u.mutation.SetDefaultInvoiceCategory(v)
+	return _u
+}
+
+// SetNillableDefaultInvoiceCategory sets the "default_invoice_category" field if the given value is not nil.
+func (_u *SupplierUpdate) SetNillableDefaultInvoiceCategory(v *string) *SupplierUpdate {
+	if v != nil {
+		_u.SetDefaultInvoiceCategory(*v)
+	}
+	return _u
+}
+
+// ClearDefaultInvoiceCategory clears the value of the "default_invoice_category" field.
+func (_u *SupplierUpdate) ClearDefaultInvoiceCategory() *SupplierUpdate {
+	_u.mutation.ClearDefaultInvoiceCategory()
+	return _u
+}
+
 // SetIsActive sets the "is_active" field.
 func (_u *SupplierUpdate) SetIsActive(v bool) *SupplierUpdate {
 	_u.mutation.SetIsActive(v)
@@ -423,6 +483,16 @@ func (_u *SupplierUpdate) check() error {
 			return &ValidationError{Name: "default_payment_term_days", err: fmt.Errorf(`ent: validator failed for field "Supplier.default_payment_term_days": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.DefaultPaymentMethod(); ok {
+		if err := supplier.DefaultPaymentMethodValidator(v); err != nil {
+			return &ValidationError{Name: "default_payment_method", err: fmt.Errorf(`ent: validator failed for field "Supplier.default_payment_method": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.DefaultInvoiceCategory(); ok {
+		if err := supplier.DefaultInvoiceCategoryValidator(v); err != nil {
+			return &ValidationError{Name: "default_invoice_category", err: fmt.Errorf(`ent: validator failed for field "Supplier.default_invoice_category": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := supplier.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "Supplier.note": %w`, err)}
@@ -478,6 +548,24 @@ func (_u *SupplierUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.AddedDefaultPaymentTermDays(); ok {
 		_spec.AddField(supplier.FieldDefaultPaymentTermDays, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.DefaultPaymentMethod(); ok {
+		_spec.SetField(supplier.FieldDefaultPaymentMethod, field.TypeString, value)
+	}
+	if _u.mutation.DefaultPaymentMethodCleared() {
+		_spec.ClearField(supplier.FieldDefaultPaymentMethod, field.TypeString)
+	}
+	if value, ok := _u.mutation.DefaultInvoiceRequired(); ok {
+		_spec.SetField(supplier.FieldDefaultInvoiceRequired, field.TypeBool, value)
+	}
+	if _u.mutation.DefaultInvoiceRequiredCleared() {
+		_spec.ClearField(supplier.FieldDefaultInvoiceRequired, field.TypeBool)
+	}
+	if value, ok := _u.mutation.DefaultInvoiceCategory(); ok {
+		_spec.SetField(supplier.FieldDefaultInvoiceCategory, field.TypeString, value)
+	}
+	if _u.mutation.DefaultInvoiceCategoryCleared() {
+		_spec.ClearField(supplier.FieldDefaultInvoiceCategory, field.TypeString)
 	}
 	if value, ok := _u.mutation.IsActive(); ok {
 		_spec.SetField(supplier.FieldIsActive, field.TypeBool, value)
@@ -820,6 +908,66 @@ func (_u *SupplierUpdateOne) AddDefaultPaymentTermDays(v int) *SupplierUpdateOne
 	return _u
 }
 
+// SetDefaultPaymentMethod sets the "default_payment_method" field.
+func (_u *SupplierUpdateOne) SetDefaultPaymentMethod(v string) *SupplierUpdateOne {
+	_u.mutation.SetDefaultPaymentMethod(v)
+	return _u
+}
+
+// SetNillableDefaultPaymentMethod sets the "default_payment_method" field if the given value is not nil.
+func (_u *SupplierUpdateOne) SetNillableDefaultPaymentMethod(v *string) *SupplierUpdateOne {
+	if v != nil {
+		_u.SetDefaultPaymentMethod(*v)
+	}
+	return _u
+}
+
+// ClearDefaultPaymentMethod clears the value of the "default_payment_method" field.
+func (_u *SupplierUpdateOne) ClearDefaultPaymentMethod() *SupplierUpdateOne {
+	_u.mutation.ClearDefaultPaymentMethod()
+	return _u
+}
+
+// SetDefaultInvoiceRequired sets the "default_invoice_required" field.
+func (_u *SupplierUpdateOne) SetDefaultInvoiceRequired(v bool) *SupplierUpdateOne {
+	_u.mutation.SetDefaultInvoiceRequired(v)
+	return _u
+}
+
+// SetNillableDefaultInvoiceRequired sets the "default_invoice_required" field if the given value is not nil.
+func (_u *SupplierUpdateOne) SetNillableDefaultInvoiceRequired(v *bool) *SupplierUpdateOne {
+	if v != nil {
+		_u.SetDefaultInvoiceRequired(*v)
+	}
+	return _u
+}
+
+// ClearDefaultInvoiceRequired clears the value of the "default_invoice_required" field.
+func (_u *SupplierUpdateOne) ClearDefaultInvoiceRequired() *SupplierUpdateOne {
+	_u.mutation.ClearDefaultInvoiceRequired()
+	return _u
+}
+
+// SetDefaultInvoiceCategory sets the "default_invoice_category" field.
+func (_u *SupplierUpdateOne) SetDefaultInvoiceCategory(v string) *SupplierUpdateOne {
+	_u.mutation.SetDefaultInvoiceCategory(v)
+	return _u
+}
+
+// SetNillableDefaultInvoiceCategory sets the "default_invoice_category" field if the given value is not nil.
+func (_u *SupplierUpdateOne) SetNillableDefaultInvoiceCategory(v *string) *SupplierUpdateOne {
+	if v != nil {
+		_u.SetDefaultInvoiceCategory(*v)
+	}
+	return _u
+}
+
+// ClearDefaultInvoiceCategory clears the value of the "default_invoice_category" field.
+func (_u *SupplierUpdateOne) ClearDefaultInvoiceCategory() *SupplierUpdateOne {
+	_u.mutation.ClearDefaultInvoiceCategory()
+	return _u
+}
+
 // SetIsActive sets the "is_active" field.
 func (_u *SupplierUpdateOne) SetIsActive(v bool) *SupplierUpdateOne {
 	_u.mutation.SetIsActive(v)
@@ -1095,6 +1243,16 @@ func (_u *SupplierUpdateOne) check() error {
 			return &ValidationError{Name: "default_payment_term_days", err: fmt.Errorf(`ent: validator failed for field "Supplier.default_payment_term_days": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.DefaultPaymentMethod(); ok {
+		if err := supplier.DefaultPaymentMethodValidator(v); err != nil {
+			return &ValidationError{Name: "default_payment_method", err: fmt.Errorf(`ent: validator failed for field "Supplier.default_payment_method": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.DefaultInvoiceCategory(); ok {
+		if err := supplier.DefaultInvoiceCategoryValidator(v); err != nil {
+			return &ValidationError{Name: "default_invoice_category", err: fmt.Errorf(`ent: validator failed for field "Supplier.default_invoice_category": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := supplier.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "Supplier.note": %w`, err)}
@@ -1167,6 +1325,24 @@ func (_u *SupplierUpdateOne) sqlSave(ctx context.Context) (_node *Supplier, err 
 	}
 	if value, ok := _u.mutation.AddedDefaultPaymentTermDays(); ok {
 		_spec.AddField(supplier.FieldDefaultPaymentTermDays, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.DefaultPaymentMethod(); ok {
+		_spec.SetField(supplier.FieldDefaultPaymentMethod, field.TypeString, value)
+	}
+	if _u.mutation.DefaultPaymentMethodCleared() {
+		_spec.ClearField(supplier.FieldDefaultPaymentMethod, field.TypeString)
+	}
+	if value, ok := _u.mutation.DefaultInvoiceRequired(); ok {
+		_spec.SetField(supplier.FieldDefaultInvoiceRequired, field.TypeBool, value)
+	}
+	if _u.mutation.DefaultInvoiceRequiredCleared() {
+		_spec.ClearField(supplier.FieldDefaultInvoiceRequired, field.TypeBool)
+	}
+	if value, ok := _u.mutation.DefaultInvoiceCategory(); ok {
+		_spec.SetField(supplier.FieldDefaultInvoiceCategory, field.TypeString, value)
+	}
+	if _u.mutation.DefaultInvoiceCategoryCleared() {
+		_spec.ClearField(supplier.FieldDefaultInvoiceCategory, field.TypeString)
 	}
 	if value, ok := _u.mutation.IsActive(); ok {
 		_spec.SetField(supplier.FieldIsActive, field.TypeBool, value)

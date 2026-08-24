@@ -106,6 +106,48 @@ func (_c *SupplierCreate) SetNillableDefaultPaymentTermDays(v *int) *SupplierCre
 	return _c
 }
 
+// SetDefaultPaymentMethod sets the "default_payment_method" field.
+func (_c *SupplierCreate) SetDefaultPaymentMethod(v string) *SupplierCreate {
+	_c.mutation.SetDefaultPaymentMethod(v)
+	return _c
+}
+
+// SetNillableDefaultPaymentMethod sets the "default_payment_method" field if the given value is not nil.
+func (_c *SupplierCreate) SetNillableDefaultPaymentMethod(v *string) *SupplierCreate {
+	if v != nil {
+		_c.SetDefaultPaymentMethod(*v)
+	}
+	return _c
+}
+
+// SetDefaultInvoiceRequired sets the "default_invoice_required" field.
+func (_c *SupplierCreate) SetDefaultInvoiceRequired(v bool) *SupplierCreate {
+	_c.mutation.SetDefaultInvoiceRequired(v)
+	return _c
+}
+
+// SetNillableDefaultInvoiceRequired sets the "default_invoice_required" field if the given value is not nil.
+func (_c *SupplierCreate) SetNillableDefaultInvoiceRequired(v *bool) *SupplierCreate {
+	if v != nil {
+		_c.SetDefaultInvoiceRequired(*v)
+	}
+	return _c
+}
+
+// SetDefaultInvoiceCategory sets the "default_invoice_category" field.
+func (_c *SupplierCreate) SetDefaultInvoiceCategory(v string) *SupplierCreate {
+	_c.mutation.SetDefaultInvoiceCategory(v)
+	return _c
+}
+
+// SetNillableDefaultInvoiceCategory sets the "default_invoice_category" field if the given value is not nil.
+func (_c *SupplierCreate) SetNillableDefaultInvoiceCategory(v *string) *SupplierCreate {
+	if v != nil {
+		_c.SetDefaultInvoiceCategory(*v)
+	}
+	return _c
+}
+
 // SetIsActive sets the "is_active" field.
 func (_c *SupplierCreate) SetIsActive(v bool) *SupplierCreate {
 	_c.mutation.SetIsActive(v)
@@ -321,6 +363,16 @@ func (_c *SupplierCreate) check() error {
 			return &ValidationError{Name: "default_payment_term_days", err: fmt.Errorf(`ent: validator failed for field "Supplier.default_payment_term_days": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.DefaultPaymentMethod(); ok {
+		if err := supplier.DefaultPaymentMethodValidator(v); err != nil {
+			return &ValidationError{Name: "default_payment_method", err: fmt.Errorf(`ent: validator failed for field "Supplier.default_payment_method": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.DefaultInvoiceCategory(); ok {
+		if err := supplier.DefaultInvoiceCategoryValidator(v); err != nil {
+			return &ValidationError{Name: "default_invoice_category", err: fmt.Errorf(`ent: validator failed for field "Supplier.default_invoice_category": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.IsActive(); !ok {
 		return &ValidationError{Name: "is_active", err: errors.New(`ent: missing required field "Supplier.is_active"`)}
 	}
@@ -388,6 +440,18 @@ func (_c *SupplierCreate) createSpec() (*Supplier, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.DefaultPaymentTermDays(); ok {
 		_spec.SetField(supplier.FieldDefaultPaymentTermDays, field.TypeInt, value)
 		_node.DefaultPaymentTermDays = value
+	}
+	if value, ok := _c.mutation.DefaultPaymentMethod(); ok {
+		_spec.SetField(supplier.FieldDefaultPaymentMethod, field.TypeString, value)
+		_node.DefaultPaymentMethod = &value
+	}
+	if value, ok := _c.mutation.DefaultInvoiceRequired(); ok {
+		_spec.SetField(supplier.FieldDefaultInvoiceRequired, field.TypeBool, value)
+		_node.DefaultInvoiceRequired = &value
+	}
+	if value, ok := _c.mutation.DefaultInvoiceCategory(); ok {
+		_spec.SetField(supplier.FieldDefaultInvoiceCategory, field.TypeString, value)
+		_node.DefaultInvoiceCategory = &value
 	}
 	if value, ok := _c.mutation.IsActive(); ok {
 		_spec.SetField(supplier.FieldIsActive, field.TypeBool, value)

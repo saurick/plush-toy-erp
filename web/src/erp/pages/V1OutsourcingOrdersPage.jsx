@@ -129,7 +129,10 @@ import {
   unixToDateInputValue,
 } from '../utils/masterDataOrderView.mjs'
 import { referenceLabel } from '../utils/referenceSelectOptions.mjs'
-import { resolveBusinessLifecycleActions } from '../utils/businessActionAvailability.mjs'
+import {
+  resolveBusinessLifecycleActions,
+  resolveContextualBusinessActionAvailability,
+} from '../utils/businessActionAvailability.mjs'
 import {
   filterBusinessCollaborationTasksBySource,
   loadBusinessCollaborationTasksForSource,
@@ -2376,26 +2379,43 @@ export default function V1OutsourcingOrdersPage() {
       modal.confirm({
         title: action.key === 'submit' ? '确认提交加工合同' : '确认下单',
         content: (
-          <Descriptions bordered column={1} size="small">
-            <Descriptions.Item label="甲方">
-              {summary.buyerName}
-            </Descriptions.Item>
-            <Descriptions.Item label="乙方">
-              {summary.supplierName}
-            </Descriptions.Item>
-            <Descriptions.Item label="预计回货">
-              {formatUnixDate(summary.expectedReturnDate)}
-            </Descriptions.Item>
-            <Descriptions.Item label="加工明细">
-              {summary.lineCount} 条
-            </Descriptions.Item>
-            <Descriptions.Item label="合同金额">
-              {summary.totalAmountText}
-            </Descriptions.Item>
-            <Descriptions.Item label="附件">
-              {summary.attachmentCount} 个
-            </Descriptions.Item>
-          </Descriptions>
+          <Descriptions
+            bordered
+            column={1}
+            size="small"
+            items={[
+              {
+                key: 'buyer',
+                label: '甲方',
+                children: summary.buyerName,
+              },
+              {
+                key: 'supplier',
+                label: '乙方',
+                children: summary.supplierName,
+              },
+              {
+                key: 'expected-return',
+                label: '预计回货',
+                children: formatUnixDate(summary.expectedReturnDate),
+              },
+              {
+                key: 'lines',
+                label: '加工明细',
+                children: `${summary.lineCount} 条`,
+              },
+              {
+                key: 'amount',
+                label: '合同金额',
+                children: summary.totalAmountText,
+              },
+              {
+                key: 'attachments',
+                label: '附件',
+                children: `${summary.attachmentCount} 个`,
+              },
+            ]}
+          />
         ),
         okText: action.key === 'submit' ? '确认提交' : '确认下单',
         cancelText: '返回核对',
@@ -2822,6 +2842,13 @@ export default function V1OutsourcingOrdersPage() {
     disabled: true,
     disabledReason: '请先选择一条加工合同',
   }
+  const relatedOutsourcingFactsAvailability =
+    resolveContextualBusinessActionAvailability({
+      authorized: canReadOutsourcingFacts,
+      selected: Boolean(selectedRow),
+      busy: returnRecordsLoading,
+      busyReason: '委外记录加载完成后可继续',
+    })
 
   return (
     <BusinessPageLayout className="erp-v1-outsourcing-orders-page">
@@ -3069,19 +3096,17 @@ export default function V1OutsourcingOrdersPage() {
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {canReadOutsourcingFacts ? (
+          {relatedOutsourcingFactsAvailability.visible ? (
             <BusinessActionTooltip
-              disabled={!selectedRow || returnRecordsLoading}
+              disabled={relatedOutsourcingFactsAvailability.disabled}
               disabledReason={
-                !selectedRow
-                  ? '请先选择一条加工合同'
-                  : '委外记录加载完成后可继续'
+                relatedOutsourcingFactsAvailability.disabledReason
               }
             >
               <Button
                 data-business-action-key="related-outsourcing-facts"
                 size="small"
-                disabled={!selectedRow || returnRecordsLoading}
+                disabled={relatedOutsourcingFactsAvailability.disabled}
                 loading={returnRecordsLoading}
                 onClick={() => openRelatedReturnRecords(selectedRow)}
               >

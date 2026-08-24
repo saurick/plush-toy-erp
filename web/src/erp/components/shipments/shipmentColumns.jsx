@@ -3,6 +3,7 @@ import { Tag } from 'antd'
 
 import { formatUnixDate } from '../../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
+import { formatNumeric20Scale6Summary } from '../../utils/numeric20Scale6.mjs'
 import { hasFinalShipmentWeight } from '../../utils/shipmentWeight.mjs'
 
 export const SHIPMENTS_MODULE_KEY = 'shipments'
@@ -43,6 +44,42 @@ export function shipmentStatusTag(status) {
       {shipmentStatusText(key)}
     </Tag>
   )
+}
+
+function deliveryText(snapshot = {}) {
+  const source = snapshot && typeof snapshot === 'object' ? snapshot : {}
+  return (
+    [source.country_region, source.recipient, source.phone, source.address]
+      .filter(Boolean)
+      .join(' / ') || '-'
+  )
+}
+
+function transportText(record = {}) {
+  return (
+    [record.transport_method, record.carrier_name, record.tracking_no]
+      .filter(Boolean)
+      .join(' / ') || '-'
+  )
+}
+
+function packageText(record = {}) {
+  const packageCount = Number(record.package_count || 0)
+  const parts = [
+    packageCount > 0 ? `${packageCount} 件 / 箱` : '',
+    record.gross_weight_kg ? `毛重 ${record.gross_weight_kg} 千克` : '',
+    record.volume_m3 ? `体积 ${record.volume_m3} 立方米` : '',
+  ]
+  return parts.filter(Boolean).join(' / ') || '-'
+}
+
+function freightText(record = {}, fallback = '-') {
+  const amount = String(record.freight_amount ?? '').trim()
+  if (!amount) return fallback
+  return `${record.freight_currency || ''} ${formatNumeric20Scale6Summary(
+    amount,
+    2
+  )}`.trim()
 }
 
 export function buildShipmentColumns({ salesOrdersByID }) {
@@ -124,6 +161,50 @@ export function buildShipmentColumns({ salesOrdersByID }) {
         return `${weight} 克`
       },
       exportValue: (record) => String(record?.total_net_weight_g ?? '').trim(),
+    },
+    {
+      title: '收货信息',
+      exportTitle: '收货信息',
+      dataIndex: 'delivery_snapshot',
+      width: 360,
+      sortValue: (record) => deliveryText(record?.delivery_snapshot),
+      render: deliveryText,
+      exportValue: (record) => deliveryText(record?.delivery_snapshot),
+    },
+    {
+      title: '运输 / 承运 / 单号',
+      exportTitle: '运输 / 承运 / 单号',
+      key: 'transport',
+      width: 300,
+      sortValue: transportText,
+      render: (_, record) => transportText(record),
+      exportValue: transportText,
+    },
+    {
+      title: '包装 / 毛重 / 体积',
+      exportTitle: '包装 / 毛重 / 体积',
+      key: 'package_summary',
+      width: 280,
+      sortable: false,
+      render: (_, record) => packageText(record),
+      exportValue: packageText,
+    },
+    {
+      title: '实际运费',
+      exportTitle: '实际运费',
+      key: 'freight',
+      width: 150,
+      sortable: false,
+      render: (_, record) => freightText(record),
+      exportValue: (record) => freightText(record, ''),
+    },
+    {
+      title: '唛头',
+      exportTitle: '唛头',
+      dataIndex: 'shipping_mark',
+      width: 220,
+      sortable: false,
+      render: (value) => value || '-',
     },
     {
       title: '计划出货日期 / 实际出货日期',

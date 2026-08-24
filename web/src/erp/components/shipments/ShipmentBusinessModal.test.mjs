@@ -61,3 +61,44 @@ test('shipment source labels prefer immutable snapshots and use current display 
   assert.doesNotMatch(source, /sku_(?:code|name)_snapshot/u)
   assert.doesNotMatch(source, /selectedSourceRows\.reduce|剩余可出货合计/u)
 })
+
+test('shipment logistics fields are grouped, paired, and remain before attachments and details', () => {
+  for (const copy of [
+    '计划与收货',
+    '国家 / 地区',
+    '收货人',
+    '收货电话',
+    '收货地址',
+    '运输与包装',
+    '运输方式',
+    '承运商',
+    '物流 / 提单号',
+    '件数 / 箱数',
+    '毛重（千克）',
+    '体积（立方米）',
+    '唛头',
+    '实际运费',
+    '实际运费金额',
+    '实际运费币种',
+    '包装说明',
+    '箱号',
+  ]) {
+    assert.match(source, new RegExp(copy.replaceAll('/', '\\/'), 'u'))
+  }
+  assert.match(
+    source,
+    /只记录本次出货的实际物流金额，不自动生成应付或付款记录/u
+  )
+  assert.match(
+    source,
+    /if \(freightCurrency\) throw new Error\('请填写实际运费金额'\)/u
+  )
+  assert.match(source, /throw new Error\('请选择实际运费币种'\)/u)
+
+  const fieldsIndex = source.indexOf('<ShipmentFormFields')
+  const attachmentsIndex = source.indexOf('<BusinessAttachmentPanel')
+  const itemsIndex = source.indexOf('<Form.List name="items">')
+  assert(fieldsIndex >= 0)
+  assert(attachmentsIndex > fieldsIndex)
+  assert(itemsIndex > attachmentsIndex)
+})

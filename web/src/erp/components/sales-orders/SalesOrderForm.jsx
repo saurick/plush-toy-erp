@@ -39,7 +39,10 @@ import {
 } from '../../utils/dateRange.mjs'
 import {
   BUSINESS_CURRENCY_OPTIONS,
+  SALES_ORDER_FREIGHT_TERMS_OPTIONS,
+  SALES_ORDER_TAX_MODE_OPTIONS,
   buildSalesOrderItemSourceValuesFromSKU,
+  calculateSalesOrderAmounts,
   deriveSalesOrderItemAmount,
   paymentConditionCompleteness,
   summarizeSalesOrderLines,
@@ -55,7 +58,10 @@ import {
   CATALOG_FILL_MODES,
   buildCatalogFillRowsPlan,
 } from '../../utils/catalogFillRows.mjs'
-import { formatNumeric20Scale6Summary } from '../../utils/numeric20Scale6.mjs'
+import {
+  formatNumeric20Scale6Summary,
+  numeric20Scale6Units,
+} from '../../utils/numeric20Scale6.mjs'
 
 function skuLabel(sku = {}) {
   return (
@@ -205,6 +211,17 @@ function isOrderLineQuantityValidForUnit(line, quantityField, unitOptions) {
   )
 }
 
+function optionalMoneyRule(label) {
+  return {
+    validator: async (_, value) => {
+      if (value === undefined || value === null || value === '') return
+      if (numeric20Scale6Units(value) === null) {
+        throw new Error(`${label}必须为非负数，且最多保留 6 位小数`)
+      }
+    },
+  }
+}
+
 export function SalesOrderFormFields({
   form,
   customers,
@@ -218,6 +235,7 @@ export function SalesOrderFormFields({
 }) {
   const orderDate = Form.useWatch('order_date', form)
   const plannedDeliveryDate = Form.useWatch('planned_delivery_date', form)
+  const taxMode = Form.useWatch('tax_mode', form)
   const disableOrderDateAfterPlannedDelivery = useCallback(
     (current) => isDateInputAfter(current, plannedDeliveryDate),
     [plannedDeliveryDate]
@@ -356,7 +374,7 @@ export function SalesOrderFormFields({
       <Form.Item name="contact_title" hidden>
         <Input />
       </Form.Item>
-      <BusinessFormSectionTitle>结算与交付</BusinessFormSectionTitle>
+      <BusinessFormSectionTitle>结算条件</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field"
         dependencies={['payment_term_days']}
@@ -406,6 +424,77 @@ export function SalesOrderFormFields({
           onBlur={onPaymentConditionBlur}
         />
       </Form.Item>
+      <BusinessFormSectionTitle>税费与运费条件</BusinessFormSectionTitle>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="计税方式"
+        name="tax_mode"
+        rules={[{ required: true, message: '请选择计税方式' }]}
+      >
+        <Select
+          allowClear
+          options={SALES_ORDER_TAX_MODE_OPTIONS}
+          placeholder="请选择计税方式"
+          onChange={(value) => {
+            if (value === 'NONE') {
+              form.setFieldValue('tax_rate', undefined)
+            }
+          }}
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        dependencies={['tax_mode']}
+        label="税率"
+        name="tax_rate"
+        rules={[
+          {
+            required: taxMode === 'INCLUSIVE' || taxMode === 'EXCLUSIVE',
+            message: '请填写税率',
+          },
+          {
+            validator: async (_, value) => {
+              if (taxMode === 'NONE') return
+              if (value === undefined || value === null || value === '') return
+              const units = numeric20Scale6Units(value)
+              if (
+                units === null ||
+                BigInt(units) <= BigInt(0) ||
+                BigInt(units) > BigInt(100_000_000)
+              ) {
+                throw new Error(
+                  '税率必须大于 0 且不超过 100%，最多保留 6 位小数'
+                )
+              }
+            },
+          },
+        ]}
+      >
+        <FieldWithUnitSuffix
+          control={
+            <InputNumber
+              disabled={taxMode === 'NONE'}
+              max="100"
+              min="0.000001"
+              precision={6}
+              stringMode
+            />
+          }
+          unitText="%"
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="报价是否含运费"
+        name="freight_terms"
+        rules={[{ required: true, message: '请选择报价是否含运费' }]}
+      >
+        <Select
+          allowClear
+          options={SALES_ORDER_FREIGHT_TERMS_OPTIONS}
+          placeholder="请选择运费条件"
+        />
+      </Form.Item>
       <Form.Item
         className="erp-business-action-form__field erp-business-action-form__field--full"
         label="报价备注"
@@ -419,6 +508,7 @@ export function SalesOrderFormFields({
           placeholder="账期影响报价时记录核对结论"
         />
       </Form.Item>
+      <BusinessFormSectionTitle>交付与收货</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field"
         label="签约日期"
@@ -441,6 +531,41 @@ export function SalesOrderFormFields({
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
+        label="国家 / 地区"
+        name="delivery_country_region"
+      >
+        <Input allowClear autoComplete="off" maxLength={128} />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="收货人"
+        name="delivery_recipient"
+      >
+        <Input allowClear autoComplete="off" maxLength={128} />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="收货电话"
+        name="delivery_phone"
+        rules={[optionalContactPhoneRule()]}
+      >
+        <Input allowClear autoComplete="off" maxLength={64} />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field erp-business-action-form__field--full"
+        extra="从客户档案带出后可按本单调整；保存后固定为本单收货信息。"
+        label="收货地址"
+        name="delivery_address"
+      >
+        <Input.TextArea
+          allowClear
+          autoSize={{ minRows: 1, maxRows: 3 }}
+          maxLength={512}
+          showCount
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
         dependencies={['order_date']}
         label="计划交付日期"
         name="planned_delivery_date"
@@ -457,6 +582,7 @@ export function SalesOrderFormFields({
           }
         />
       </Form.Item>
+      <BusinessFormSectionTitle>其他说明</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field erp-business-action-form__field--full"
         label="备注"
@@ -485,6 +611,19 @@ export function SalesOrderItemsFormSection({
   const [lineOrderOpen, setLineOrderOpen] = useState(false)
   const [lineOrderItems, setLineOrderItems] = useState([])
   const orderDate = Form.useWatch('order_date', form)
+  const watchedItems = Form.useWatch('items', form)
+  const taxMode = Form.useWatch('tax_mode', form)
+  const taxRate = Form.useWatch('tax_rate', form)
+  const currency = Form.useWatch('currency', form)
+  const commercialAmounts = useMemo(
+    () =>
+      calculateSalesOrderAmounts({
+        items: watchedItems || [],
+        taxMode,
+        taxRate,
+      }),
+    [watchedItems, taxMode, taxRate]
+  )
   const { registerLineItemRow, requestLineItemScroll } =
     useLineItemAppendScroll()
   const skuByID = useMemo(
@@ -900,11 +1039,13 @@ export function SalesOrderItemsFormSection({
                           className="erp-line-item-field erp-line-item-field--money"
                           label="单价"
                           name={[field.name, 'unit_price']}
+                          rules={[optionalMoneyRule('单价')]}
                         >
                           <Input
                             allowClear
                             autoComplete="off"
                             disabled={!canEditLine}
+                            placeholder="草稿可暂缺，提交前补齐"
                           />
                         </Form.Item>
                         <Form.Item
@@ -1035,16 +1176,32 @@ export function SalesOrderItemsFormSection({
                   ),
                 },
                 {
-                  key: 'amount',
-                  label: '金额合计',
-                  value: (
-                    <BusinessLineItemsSummaryValue
-                      summarize={summarizeSalesOrderLines}
-                      select={(summary) =>
-                        formatNumeric20Scale6Summary(summary.amount, 2)
-                      }
-                    />
-                  ),
+                  key: 'goods-amount',
+                  label: '货款金额',
+                  value: `${currency || ''} ${formatNumeric20Scale6Summary(
+                    commercialAmounts.goodsAmount,
+                    2
+                  )}`.trim(),
+                },
+                {
+                  key: 'tax-amount',
+                  label: '税额',
+                  value: commercialAmounts.complete
+                    ? `${currency || ''} ${formatNumeric20Scale6Summary(
+                        commercialAmounts.taxAmount,
+                        2
+                      )}`.trim()
+                    : '待补齐',
+                },
+                {
+                  key: 'order-total',
+                  label: '订单总额',
+                  value: commercialAmounts.complete
+                    ? `${currency || ''} ${formatNumeric20Scale6Summary(
+                        commercialAmounts.orderTotal,
+                        2
+                      )}`.trim()
+                    : '待补齐',
                 },
               ]}
             />

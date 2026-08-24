@@ -40,16 +40,20 @@ func createEditableShipmentSourceFixture(
 		CustomerID:       customer.ID,
 		CustomerSnapshot: map[string]any{"code": "C-SHIP-EDIT", "name": "出货编辑测试客户"},
 		OrderDate:        time.Date(2026, 8, 9, 0, 0, 0, 0, time.UTC),
+		TaxMode:          stringPtr(biz.SalesOrderTaxModeNone),
+		FreightTerms:     stringPtr(biz.SalesOrderFreightTermsExcluded),
 	})
 	if err != nil {
 		t.Fatalf("create source sales order: %v", err)
 	}
+	unitPrice := decimal.NewFromInt(1)
 	item, err := salesUC.AddSalesOrderItem(ctx, &biz.SalesOrderItemMutation{
 		SalesOrderID:    order.ID,
 		LineNo:          1,
 		ProductID:       fixtures.productID,
 		UnitID:          fixtures.unitID,
 		OrderedQuantity: decimal.NewFromInt(50),
+		UnitPrice:       &unitPrice,
 	})
 	if err != nil {
 		t.Fatalf("create source sales order item: %v", err)
@@ -109,8 +113,19 @@ func shipmentDraftSaveInput(
 	forgedSnapshot := "不能写入的前端客户旧值"
 	note := "修改后的出货备注"
 	itemNote := "修改后的行备注"
+	transportMethod := " 海运 "
+	carrierName := " 测试船运 "
+	trackingNo := " TRACK-EDIT-001 "
+	shippingMark := " YS / SHANGHAI "
+	freightCurrency := " usd "
+	packageDescription := " 2 个 / 箱 "
+	caseNo := " A01-A10 "
+	packageCount := 10
 	plannedAt := time.Date(2026, 8, 12, 0, 0, 0, 0, time.UTC)
 	weight := decimal.RequireFromString("9.500000")
+	grossWeight := decimal.RequireFromString("12.750000")
+	volume := decimal.RequireFromString("1.250000")
+	freightAmount := decimal.RequireFromString("88.500000")
 	return &biz.ShipmentDraftSave{
 		ID:               shipment.ID,
 		ExpectedVersion:  shipment.Version,
@@ -118,16 +133,33 @@ func shipmentDraftSaveInput(
 		SalesOrderID:     &source.salesOrderID,
 		CustomerID:       &source.customerID,
 		CustomerSnapshot: &forgedSnapshot,
-		PlannedShipAt:    &plannedAt,
-		TotalNetWeightG:  &weight,
-		Note:             &note,
+		DeliverySnapshot: map[string]any{
+			"country_region": " 中国 ",
+			"recipient":      " 王女士 ",
+			"phone":          " 13800000000 ",
+			"address":        " 上海测试仓 1 号 ",
+		},
+		PlannedShipAt:   &plannedAt,
+		TransportMethod: &transportMethod,
+		CarrierName:     &carrierName,
+		TrackingNo:      &trackingNo,
+		PackageCount:    &packageCount,
+		GrossWeightKg:   &grossWeight,
+		VolumeM3:        &volume,
+		ShippingMark:    &shippingMark,
+		FreightAmount:   &freightAmount,
+		FreightCurrency: &freightCurrency,
+		TotalNetWeightG: &weight,
+		Note:            &note,
 		Items: []*biz.ShipmentItemCreate{{
-			SalesOrderItemID: &source.salesOrderItemID,
-			ProductID:        source.productID,
-			WarehouseID:      warehouseID,
-			UnitID:           source.unitID,
-			Quantity:         decimal.RequireFromString("2.500000"),
-			Note:             &itemNote,
+			SalesOrderItemID:   &source.salesOrderItemID,
+			ProductID:          source.productID,
+			WarehouseID:        warehouseID,
+			UnitID:             source.unitID,
+			Quantity:           decimal.RequireFromString("2.500000"),
+			PackageDescription: &packageDescription,
+			CaseNo:             &caseNo,
+			Note:               &itemNote,
 		}},
 	}
 }
@@ -157,15 +189,36 @@ func TestOperationalFactRepoSaveShipmentDraftReplacesAggregateWithCASAndServerSn
 	if updated.CustomerSnapshot == nil || *updated.CustomerSnapshot != *created.CustomerSnapshot || *updated.CustomerSnapshot == *in.CustomerSnapshot {
 		t.Fatalf("customer snapshot was not resolved from sales order: created=%#v input=%#v updated=%#v", created.CustomerSnapshot, in.CustomerSnapshot, updated.CustomerSnapshot)
 	}
-	if len(updated.Items) != 1 || updated.Items[0].WarehouseID != otherWarehouse.ID || !updated.Items[0].Quantity.Equal(decimal.RequireFromString("2.5")) {
+	if updated.DeliverySnapshot["country_region"] != "中国" || updated.DeliverySnapshot["recipient"] != "王女士" || updated.DeliverySnapshot["phone"] != "13800000000" || updated.DeliverySnapshot["address"] != "上海测试仓 1 号" {
+		t.Fatalf("delivery snapshot = %#v", updated.DeliverySnapshot)
+	}
+	if updated.TransportMethod == nil || *updated.TransportMethod != "海运" ||
+		updated.CarrierName == nil || *updated.CarrierName != "测试船运" ||
+		updated.TrackingNo == nil || *updated.TrackingNo != "TRACK-EDIT-001" ||
+		updated.PackageCount == nil || *updated.PackageCount != 10 ||
+		updated.GrossWeightKg == nil || !updated.GrossWeightKg.Equal(decimal.RequireFromString("12.75")) ||
+		updated.VolumeM3 == nil || !updated.VolumeM3.Equal(decimal.RequireFromString("1.25")) ||
+		updated.ShippingMark == nil || *updated.ShippingMark != "YS / SHANGHAI" ||
+		updated.FreightAmount == nil || !updated.FreightAmount.Equal(decimal.RequireFromString("88.5")) ||
+		updated.FreightCurrency == nil || *updated.FreightCurrency != "USD" {
+		t.Fatalf("shipment logistics = %#v", updated)
+	}
+	if len(updated.Items) != 1 || updated.Items[0].WarehouseID != otherWarehouse.ID || !updated.Items[0].Quantity.Equal(decimal.RequireFromString("2.5")) ||
+		updated.Items[0].PackageDescription == nil || *updated.Items[0].PackageDescription != "2 个 / 箱" ||
+		updated.Items[0].CaseNo == nil || *updated.Items[0].CaseNo != "A01-A10" {
 		t.Fatalf("replacement lines = %#v", updated.Items)
 	}
 	if count := client.ShipmentItem.Query().Where(shipmentitem.ShipmentID(created.ID)).CountX(ctx); count != 1 {
 		t.Fatalf("replacement left %d shipment items, want 1", count)
 	}
 	persisted := client.Shipment.GetX(ctx, created.ID)
-	if persisted.Version != updated.Version || persisted.RequestedTotalNetWeightG == nil || !persisted.RequestedTotalNetWeightG.Equal(decimal.RequireFromString("9.5")) {
+	if persisted.Version != updated.Version || persisted.RequestedTotalNetWeightG == nil || !persisted.RequestedTotalNetWeightG.Equal(decimal.RequireFromString("9.5")) ||
+		persisted.FreightAmount == nil || !persisted.FreightAmount.Equal(decimal.RequireFromString("88.5")) || persisted.FreightCurrency == nil || *persisted.FreightCurrency != "USD" {
 		t.Fatalf("persisted header = %#v", persisted)
+	}
+	rows, total, err := repo.ListShipments(ctx, biz.OperationalFactFilter{Keyword: "TRACK-EDIT-001", Limit: 20})
+	if err != nil || total != 1 || len(rows) != 1 || rows[0].ID != updated.ID {
+		t.Fatalf("tracking keyword search total=%d rows=%#v err=%v", total, rows, err)
 	}
 
 	stale := *in

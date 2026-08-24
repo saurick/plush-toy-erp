@@ -38,6 +38,8 @@ func TestSalesOrderRepoOrderLifecycleAndList(t *testing.T) {
 	paymentMethod := "60天月结"
 	paymentTermDays := 60
 	priceConditionNote := "原始报价"
+	taxMode := biz.SalesOrderTaxModeNone
+	freightTerms := biz.SalesOrderFreightTermsExcluded
 	note := "首单"
 	order, err := uc.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
 		OrderNo:             "SO-001",
@@ -48,6 +50,8 @@ func TestSalesOrderRepoOrderLifecycleAndList(t *testing.T) {
 		PaymentMethod:       &paymentMethod,
 		PaymentTermDays:     &paymentTermDays,
 		PriceConditionNote:  &priceConditionNote,
+		TaxMode:             &taxMode,
+		FreightTerms:        &freightTerms,
 		OrderDate:           orderDate,
 		PlannedDeliveryDate: &plannedDate,
 		Note:                &note,
@@ -71,6 +75,8 @@ func TestSalesOrderRepoOrderLifecycleAndList(t *testing.T) {
 		CustomerID:       customer.ID,
 		Currency:         biz.FinanceCurrencyHKD,
 		CustomerSnapshot: map[string]any{"name": "updated"},
+		TaxMode:          &taxMode,
+		FreightTerms:     &freightTerms,
 		OrderDate:        orderDate,
 		Note:             &updatedNote,
 	})
@@ -98,6 +104,8 @@ func TestSalesOrderRepoOrderLifecycleAndList(t *testing.T) {
 		OrderNo:             "SO-002",
 		CustomerID:          customer.ID,
 		CustomerSnapshot:    map[string]any{"name": customer.Name},
+		TaxMode:             &taxMode,
+		FreightTerms:        &freightTerms,
 		OrderDate:           nextOrderDate,
 		PlannedDeliveryDate: &nextPlannedDate,
 	})
@@ -139,6 +147,15 @@ func TestSalesOrderRepoOrderLifecycleAndList(t *testing.T) {
 		t.Fatalf("expected reversed date range rejected, got %v", err)
 	}
 
+	unit := createSalesOrderTestUnit(t, ctx, client, "PCS-SO-LIFECYCLE", true)
+	product := createSalesOrderTestProduct(t, ctx, client, unit.ID, "PRD-SO-LIFECYCLE", true)
+	unitPrice := decimal.NewFromInt(1)
+	if _, err := uc.AddSalesOrderItem(ctx, &biz.SalesOrderItemMutation{
+		SalesOrderID: order.ID, LineNo: 1, ProductID: product.ID, UnitID: unit.ID,
+		OrderedQuantity: decimal.NewFromInt(1), UnitPrice: &unitPrice,
+	}); err != nil {
+		t.Fatalf("add submittable sales order item failed: %v", err)
+	}
 	submitted, err := uc.SubmitSalesOrder(ctx, order.ID)
 	if err != nil {
 		t.Fatalf("submit sales order failed: %v", err)
@@ -498,6 +515,87 @@ func TestSalesOrderRepoSaveWithItemsUpdatesAndCancelsMissingOpenLines(t *testing
 	}
 	if result.Items[1].LineStatus != biz.SalesOrderItemStatusCanceled {
 		t.Fatalf("expected omitted open line canceled, got %#v", result.Items[1])
+	}
+}
+
+func TestSalesOrderRepoSubmitRequiresCommercialClosure(t *testing.T) {
+	ctx := context.Background()
+	uc, client := openSalesOrderRepoTest(t, "sales_order_repo_commercial_closure")
+	defer mustCloseEntClient(t, client)
+
+	customer := createSalesOrderTestCustomer(t, ctx, client, "C-SO-COMMERCIAL", true)
+	unit := createSalesOrderTestUnit(t, ctx, client, "PCS-SO-COMMERCIAL", true)
+	product := createSalesOrderTestProduct(t, ctx, client, unit.ID, "PRD-SO-COMMERCIAL", true)
+	orderDate := time.Date(2026, 8, 24, 0, 0, 0, 0, time.UTC)
+	unitPrice := decimal.NewFromInt(50)
+
+	missingTerms, err := uc.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
+		OrderNo: "SO-COMMERCIAL-MISSING-TERMS", CustomerID: customer.ID, OrderDate: orderDate,
+	})
+	if err != nil {
+		t.Fatalf("create missing-terms order: %v", err)
+	}
+	if _, err := uc.AddSalesOrderItem(ctx, &biz.SalesOrderItemMutation{
+		SalesOrderID: missingTerms.ID, LineNo: 1, ProductID: product.ID, UnitID: unit.ID,
+		OrderedQuantity: decimal.NewFromInt(1), UnitPrice: &unitPrice,
+	}); err != nil {
+		t.Fatalf("add priced missing-terms line: %v", err)
+	}
+	if _, err := uc.SubmitSalesOrder(ctx, missingTerms.ID); !errors.Is(err, biz.ErrSalesOrderCommercialTermsIncomplete) {
+		t.Fatalf("missing commercial terms error=%v, want ErrSalesOrderCommercialTermsIncomplete", err)
+	}
+
+	missingPrice, err := uc.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
+		OrderNo: "SO-COMMERCIAL-MISSING-PRICE", CustomerID: customer.ID, OrderDate: orderDate,
+		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
+	})
+	if err != nil {
+		t.Fatalf("create missing-price order: %v", err)
+	}
+	if _, err := uc.AddSalesOrderItem(ctx, &biz.SalesOrderItemMutation{
+		SalesOrderID: missingPrice.ID, LineNo: 1, ProductID: product.ID, UnitID: unit.ID,
+		OrderedQuantity: decimal.NewFromInt(1),
+	}); err != nil {
+		t.Fatalf("add missing-price line: %v", err)
+	}
+	if _, err := uc.SubmitSalesOrder(ctx, missingPrice.ID); !errors.Is(err, biz.ErrSalesOrderItemPriceMissing) {
+		t.Fatalf("missing item price error=%v, want ErrSalesOrderItemPriceMissing", err)
+	}
+
+	missingLines, err := uc.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
+		OrderNo: "SO-COMMERCIAL-MISSING-LINES", CustomerID: customer.ID, OrderDate: orderDate,
+		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsIncluded),
+	})
+	if err != nil {
+		t.Fatalf("create missing-lines order: %v", err)
+	}
+	if _, err := uc.SubmitSalesOrder(ctx, missingLines.ID); !errors.Is(err, biz.ErrSalesOrderCommercialTermsIncomplete) {
+		t.Fatalf("missing lines error=%v, want ErrSalesOrderCommercialTermsIncomplete", err)
+	}
+
+	taxMode := biz.SalesOrderTaxModeExclusive
+	taxRate := decimal.NewFromInt(13)
+	complete, err := uc.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
+		OrderNo: "SO-COMMERCIAL-COMPLETE", CustomerID: customer.ID, OrderDate: orderDate,
+		TaxMode: &taxMode, TaxRate: &taxRate, FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
+	})
+	if err != nil {
+		t.Fatalf("create complete order: %v", err)
+	}
+	if _, err := uc.AddSalesOrderItem(ctx, &biz.SalesOrderItemMutation{
+		SalesOrderID: complete.ID, LineNo: 1, ProductID: product.ID, UnitID: unit.ID,
+		OrderedQuantity: decimal.NewFromInt(2), UnitPrice: &unitPrice,
+	}); err != nil {
+		t.Fatalf("add complete order line: %v", err)
+	}
+	complete, err = uc.SubmitSalesOrder(ctx, complete.ID)
+	if err != nil {
+		t.Fatalf("submit complete order: %v", err)
+	}
+	if complete.GoodsAmount == nil || !complete.GoodsAmount.Equal(decimal.NewFromInt(100)) ||
+		complete.TaxAmount == nil || !complete.TaxAmount.Equal(decimal.NewFromInt(13)) ||
+		complete.OrderTotal == nil || !complete.OrderTotal.Equal(decimal.NewFromInt(113)) {
+		t.Fatalf("submitted commercial totals=%#v", complete)
 	}
 }
 

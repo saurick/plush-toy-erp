@@ -27,6 +27,10 @@ type Product struct {
 	StyleNo *string `json:"style_no,omitempty"`
 	// CustomerStyleNo holds the value of the "customer_style_no" field.
 	CustomerStyleNo *string `json:"customer_style_no,omitempty"`
+	// EnglishName holds the value of the "english_name" field.
+	EnglishName *string `json:"english_name,omitempty"`
+	// HsCode holds the value of the "hs_code" field.
+	HsCode *string `json:"hs_code,omitempty"`
 	// DefaultUnitID holds the value of the "default_unit_id" field.
 	DefaultUnitID int `json:"default_unit_id,omitempty"`
 	// UnitNetWeightG holds the value of the "unit_net_weight_g" field.
@@ -129,7 +133,7 @@ func (*Product) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case product.FieldID, product.FieldDefaultUnitID:
 			values[i] = new(sql.NullInt64)
-		case product.FieldCode, product.FieldName, product.FieldStyleNo, product.FieldCustomerStyleNo:
+		case product.FieldCode, product.FieldName, product.FieldStyleNo, product.FieldCustomerStyleNo, product.FieldEnglishName, product.FieldHsCode:
 			values[i] = new(sql.NullString)
 		case product.FieldCreatedAt, product.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -179,6 +183,20 @@ func (_m *Product) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.CustomerStyleNo = new(string)
 				*_m.CustomerStyleNo = value.String
+			}
+		case product.FieldEnglishName:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field english_name", values[i])
+			} else if value.Valid {
+				_m.EnglishName = new(string)
+				*_m.EnglishName = value.String
+			}
+		case product.FieldHsCode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field hs_code", values[i])
+			} else if value.Valid {
+				_m.HsCode = new(string)
+				*_m.HsCode = value.String
 			}
 		case product.FieldDefaultUnitID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -290,6 +308,16 @@ func (_m *Product) String() string {
 	builder.WriteString(", ")
 	if v := _m.CustomerStyleNo; v != nil {
 		builder.WriteString("customer_style_no=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.EnglishName; v != nil {
+		builder.WriteString("english_name=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.HsCode; v != nil {
+		builder.WriteString("hs_code=")
 		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")

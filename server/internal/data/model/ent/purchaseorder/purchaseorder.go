@@ -22,6 +22,12 @@ const (
 	FieldCurrency = "currency"
 	// FieldPaymentTermDays holds the string denoting the payment_term_days field in the database.
 	FieldPaymentTermDays = "payment_term_days"
+	// FieldPaymentMethod holds the string denoting the payment_method field in the database.
+	FieldPaymentMethod = "payment_method"
+	// FieldInvoiceRequired holds the string denoting the invoice_required field in the database.
+	FieldInvoiceRequired = "invoice_required"
+	// FieldInvoiceCategory holds the string denoting the invoice_category field in the database.
+	FieldInvoiceCategory = "invoice_category"
 	// FieldSupplierPurchaseOrderNo holds the string denoting the supplier_purchase_order_no field in the database.
 	FieldSupplierPurchaseOrderNo = "supplier_purchase_order_no"
 	// FieldSupplierSnapshot holds the string denoting the supplier_snapshot field in the database.
@@ -32,6 +38,10 @@ const (
 	FieldPurchaseDate = "purchase_date"
 	// FieldExpectedArrivalDate holds the string denoting the expected_arrival_date field in the database.
 	FieldExpectedArrivalDate = "expected_arrival_date"
+	// FieldSupplierConfirmedArrivalDate holds the string denoting the supplier_confirmed_arrival_date field in the database.
+	FieldSupplierConfirmedArrivalDate = "supplier_confirmed_arrival_date"
+	// FieldDeliveryAddress holds the string denoting the delivery_address field in the database.
+	FieldDeliveryAddress = "delivery_address"
 	// FieldLifecycleStatus holds the string denoting the lifecycle_status field in the database.
 	FieldLifecycleStatus = "lifecycle_status"
 	// FieldVersion holds the string denoting the version field in the database.
@@ -81,11 +91,16 @@ var Columns = []string{
 	FieldSupplierID,
 	FieldCurrency,
 	FieldPaymentTermDays,
+	FieldPaymentMethod,
+	FieldInvoiceRequired,
+	FieldInvoiceCategory,
 	FieldSupplierPurchaseOrderNo,
 	FieldSupplierSnapshot,
 	FieldContractPartySnapshot,
 	FieldPurchaseDate,
 	FieldExpectedArrivalDate,
+	FieldSupplierConfirmedArrivalDate,
+	FieldDeliveryAddress,
 	FieldLifecycleStatus,
 	FieldVersion,
 	FieldSettlementAction,
@@ -119,8 +134,14 @@ var (
 	CurrencyValidator func(string) error
 	// PaymentTermDaysValidator is a validator for the "payment_term_days" field. It is called by the builders before save.
 	PaymentTermDaysValidator func(int) error
+	// PaymentMethodValidator is a validator for the "payment_method" field. It is called by the builders before save.
+	PaymentMethodValidator func(string) error
+	// InvoiceCategoryValidator is a validator for the "invoice_category" field. It is called by the builders before save.
+	InvoiceCategoryValidator func(string) error
 	// SupplierPurchaseOrderNoValidator is a validator for the "supplier_purchase_order_no" field. It is called by the builders before save.
 	SupplierPurchaseOrderNoValidator func(string) error
+	// DeliveryAddressValidator is a validator for the "delivery_address" field. It is called by the builders before save.
+	DeliveryAddressValidator func(string) error
 	// DefaultLifecycleStatus holds the default value on creation for the "lifecycle_status" field.
 	DefaultLifecycleStatus string
 	// LifecycleStatusValidator is a validator for the "lifecycle_status" field. It is called by the builders before save.
@@ -175,6 +196,21 @@ func ByPaymentTermDays(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPaymentTermDays, opts...).ToFunc()
 }
 
+// ByPaymentMethod orders the results by the payment_method field.
+func ByPaymentMethod(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPaymentMethod, opts...).ToFunc()
+}
+
+// ByInvoiceRequired orders the results by the invoice_required field.
+func ByInvoiceRequired(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldInvoiceRequired, opts...).ToFunc()
+}
+
+// ByInvoiceCategory orders the results by the invoice_category field.
+func ByInvoiceCategory(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldInvoiceCategory, opts...).ToFunc()
+}
+
 // BySupplierPurchaseOrderNo orders the results by the supplier_purchase_order_no field.
 func BySupplierPurchaseOrderNo(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSupplierPurchaseOrderNo, opts...).ToFunc()
@@ -188,6 +224,16 @@ func ByPurchaseDate(opts ...sql.OrderTermOption) OrderOption {
 // ByExpectedArrivalDate orders the results by the expected_arrival_date field.
 func ByExpectedArrivalDate(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldExpectedArrivalDate, opts...).ToFunc()
+}
+
+// BySupplierConfirmedArrivalDate orders the results by the supplier_confirmed_arrival_date field.
+func BySupplierConfirmedArrivalDate(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSupplierConfirmedArrivalDate, opts...).ToFunc()
+}
+
+// ByDeliveryAddress orders the results by the delivery_address field.
+func ByDeliveryAddress(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDeliveryAddress, opts...).ToFunc()
 }
 
 // ByLifecycleStatus orders the results by the lifecycle_status field.

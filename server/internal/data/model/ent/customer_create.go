@@ -90,6 +90,62 @@ func (_c *CustomerCreate) SetNillableTaxNo(v *string) *CustomerCreate {
 	return _c
 }
 
+// SetCountryRegion sets the "country_region" field.
+func (_c *CustomerCreate) SetCountryRegion(v string) *CustomerCreate {
+	_c.mutation.SetCountryRegion(v)
+	return _c
+}
+
+// SetNillableCountryRegion sets the "country_region" field if the given value is not nil.
+func (_c *CustomerCreate) SetNillableCountryRegion(v *string) *CustomerCreate {
+	if v != nil {
+		_c.SetCountryRegion(*v)
+	}
+	return _c
+}
+
+// SetDefaultDeliveryRecipient sets the "default_delivery_recipient" field.
+func (_c *CustomerCreate) SetDefaultDeliveryRecipient(v string) *CustomerCreate {
+	_c.mutation.SetDefaultDeliveryRecipient(v)
+	return _c
+}
+
+// SetNillableDefaultDeliveryRecipient sets the "default_delivery_recipient" field if the given value is not nil.
+func (_c *CustomerCreate) SetNillableDefaultDeliveryRecipient(v *string) *CustomerCreate {
+	if v != nil {
+		_c.SetDefaultDeliveryRecipient(*v)
+	}
+	return _c
+}
+
+// SetDefaultDeliveryPhone sets the "default_delivery_phone" field.
+func (_c *CustomerCreate) SetDefaultDeliveryPhone(v string) *CustomerCreate {
+	_c.mutation.SetDefaultDeliveryPhone(v)
+	return _c
+}
+
+// SetNillableDefaultDeliveryPhone sets the "default_delivery_phone" field if the given value is not nil.
+func (_c *CustomerCreate) SetNillableDefaultDeliveryPhone(v *string) *CustomerCreate {
+	if v != nil {
+		_c.SetDefaultDeliveryPhone(*v)
+	}
+	return _c
+}
+
+// SetDefaultDeliveryAddress sets the "default_delivery_address" field.
+func (_c *CustomerCreate) SetDefaultDeliveryAddress(v string) *CustomerCreate {
+	_c.mutation.SetDefaultDeliveryAddress(v)
+	return _c
+}
+
+// SetNillableDefaultDeliveryAddress sets the "default_delivery_address" field if the given value is not nil.
+func (_c *CustomerCreate) SetNillableDefaultDeliveryAddress(v *string) *CustomerCreate {
+	if v != nil {
+		_c.SetDefaultDeliveryAddress(*v)
+	}
+	return _c
+}
+
 // SetIsActive sets the "is_active" field.
 func (_c *CustomerCreate) SetIsActive(v bool) *CustomerCreate {
 	_c.mutation.SetIsActive(v)
@@ -263,6 +319,26 @@ func (_c *CustomerCreate) check() error {
 			return &ValidationError{Name: "tax_no", err: fmt.Errorf(`ent: validator failed for field "Customer.tax_no": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.CountryRegion(); ok {
+		if err := customer.CountryRegionValidator(v); err != nil {
+			return &ValidationError{Name: "country_region", err: fmt.Errorf(`ent: validator failed for field "Customer.country_region": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.DefaultDeliveryRecipient(); ok {
+		if err := customer.DefaultDeliveryRecipientValidator(v); err != nil {
+			return &ValidationError{Name: "default_delivery_recipient", err: fmt.Errorf(`ent: validator failed for field "Customer.default_delivery_recipient": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.DefaultDeliveryPhone(); ok {
+		if err := customer.DefaultDeliveryPhoneValidator(v); err != nil {
+			return &ValidationError{Name: "default_delivery_phone", err: fmt.Errorf(`ent: validator failed for field "Customer.default_delivery_phone": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.DefaultDeliveryAddress(); ok {
+		if err := customer.DefaultDeliveryAddressValidator(v); err != nil {
+			return &ValidationError{Name: "default_delivery_address", err: fmt.Errorf(`ent: validator failed for field "Customer.default_delivery_address": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.IsActive(); !ok {
 		return &ValidationError{Name: "is_active", err: errors.New(`ent: missing required field "Customer.is_active"`)}
 	}
@@ -326,6 +402,22 @@ func (_c *CustomerCreate) createSpec() (*Customer, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.TaxNo(); ok {
 		_spec.SetField(customer.FieldTaxNo, field.TypeString, value)
 		_node.TaxNo = &value
+	}
+	if value, ok := _c.mutation.CountryRegion(); ok {
+		_spec.SetField(customer.FieldCountryRegion, field.TypeString, value)
+		_node.CountryRegion = &value
+	}
+	if value, ok := _c.mutation.DefaultDeliveryRecipient(); ok {
+		_spec.SetField(customer.FieldDefaultDeliveryRecipient, field.TypeString, value)
+		_node.DefaultDeliveryRecipient = &value
+	}
+	if value, ok := _c.mutation.DefaultDeliveryPhone(); ok {
+		_spec.SetField(customer.FieldDefaultDeliveryPhone, field.TypeString, value)
+		_node.DefaultDeliveryPhone = &value
+	}
+	if value, ok := _c.mutation.DefaultDeliveryAddress(); ok {
+		_spec.SetField(customer.FieldDefaultDeliveryAddress, field.TypeString, value)
+		_node.DefaultDeliveryAddress = &value
 	}
 	if value, ok := _c.mutation.IsActive(); ok {
 		_spec.SetField(customer.FieldIsActive, field.TypeBool, value)

@@ -3,6 +3,7 @@
 package ent
 
 import (
+	"encoding/json"
 	"fmt"
 	"server/internal/data/model/ent/customer"
 	"server/internal/data/model/ent/salesorder"
@@ -28,6 +29,8 @@ type Shipment struct {
 	CustomerID *int `json:"customer_id,omitempty"`
 	// CustomerSnapshot holds the value of the "customer_snapshot" field.
 	CustomerSnapshot *string `json:"customer_snapshot,omitempty"`
+	// DeliverySnapshot holds the value of the "delivery_snapshot" field.
+	DeliverySnapshot map[string]interface{} `json:"delivery_snapshot,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
 	// Version holds the value of the "version" field.
@@ -52,6 +55,24 @@ type Shipment struct {
 	PlannedShipAt *time.Time `json:"planned_ship_at,omitempty"`
 	// ShippedAt holds the value of the "shipped_at" field.
 	ShippedAt *time.Time `json:"shipped_at,omitempty"`
+	// TransportMethod holds the value of the "transport_method" field.
+	TransportMethod *string `json:"transport_method,omitempty"`
+	// CarrierName holds the value of the "carrier_name" field.
+	CarrierName *string `json:"carrier_name,omitempty"`
+	// TrackingNo holds the value of the "tracking_no" field.
+	TrackingNo *string `json:"tracking_no,omitempty"`
+	// PackageCount holds the value of the "package_count" field.
+	PackageCount *int `json:"package_count,omitempty"`
+	// GrossWeightKg holds the value of the "gross_weight_kg" field.
+	GrossWeightKg *decimal.Decimal `json:"gross_weight_kg,omitempty"`
+	// VolumeM3 holds the value of the "volume_m3" field.
+	VolumeM3 *decimal.Decimal `json:"volume_m3,omitempty"`
+	// ShippingMark holds the value of the "shipping_mark" field.
+	ShippingMark *string `json:"shipping_mark,omitempty"`
+	// FreightAmount holds the value of the "freight_amount" field.
+	FreightAmount *decimal.Decimal `json:"freight_amount,omitempty"`
+	// FreightCurrency holds the value of the "freight_currency" field.
+	FreightCurrency *string `json:"freight_currency,omitempty"`
 	// TotalNetWeightG holds the value of the "total_net_weight_g" field.
 	TotalNetWeightG *decimal.Decimal `json:"total_net_weight_g,omitempty"`
 	// RequestedTotalNetWeightG holds the value of the "requested_total_net_weight_g" field.
@@ -117,11 +138,13 @@ func (*Shipment) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case shipment.FieldTotalNetWeightG, shipment.FieldRequestedTotalNetWeightG:
+		case shipment.FieldGrossWeightKg, shipment.FieldVolumeM3, shipment.FieldFreightAmount, shipment.FieldTotalNetWeightG, shipment.FieldRequestedTotalNetWeightG:
 			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
-		case shipment.FieldID, shipment.FieldSalesOrderID, shipment.FieldCustomerID, shipment.FieldVersion, shipment.FieldFinanceReleaseVersion, shipment.FieldFinanceReleasedBy, shipment.FieldFinanceReleaseProcessInstanceID, shipment.FieldFinanceReleaseProcessNodeID:
+		case shipment.FieldDeliverySnapshot:
+			values[i] = new([]byte)
+		case shipment.FieldID, shipment.FieldSalesOrderID, shipment.FieldCustomerID, shipment.FieldVersion, shipment.FieldFinanceReleaseVersion, shipment.FieldFinanceReleasedBy, shipment.FieldFinanceReleaseProcessInstanceID, shipment.FieldFinanceReleaseProcessNodeID, shipment.FieldPackageCount:
 			values[i] = new(sql.NullInt64)
-		case shipment.FieldShipmentNo, shipment.FieldCustomerSnapshot, shipment.FieldStatus, shipment.FieldFinanceReleaseStatus, shipment.FieldFinanceReleaseNote, shipment.FieldIdempotencyKey, shipment.FieldNote:
+		case shipment.FieldShipmentNo, shipment.FieldCustomerSnapshot, shipment.FieldStatus, shipment.FieldFinanceReleaseStatus, shipment.FieldFinanceReleaseNote, shipment.FieldIdempotencyKey, shipment.FieldTransportMethod, shipment.FieldCarrierName, shipment.FieldTrackingNo, shipment.FieldShippingMark, shipment.FieldFreightCurrency, shipment.FieldNote:
 			values[i] = new(sql.NullString)
 		case shipment.FieldFinanceReleasedAt, shipment.FieldPlannedShipAt, shipment.FieldShippedAt, shipment.FieldCreatedAt, shipment.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -172,6 +195,14 @@ func (_m *Shipment) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.CustomerSnapshot = new(string)
 				*_m.CustomerSnapshot = value.String
+			}
+		case shipment.FieldDeliverySnapshot:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field delivery_snapshot", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.DeliverySnapshot); err != nil {
+					return fmt.Errorf("unmarshal field delivery_snapshot: %w", err)
+				}
 			}
 		case shipment.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -251,6 +282,69 @@ func (_m *Shipment) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.ShippedAt = new(time.Time)
 				*_m.ShippedAt = value.Time
+			}
+		case shipment.FieldTransportMethod:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field transport_method", values[i])
+			} else if value.Valid {
+				_m.TransportMethod = new(string)
+				*_m.TransportMethod = value.String
+			}
+		case shipment.FieldCarrierName:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field carrier_name", values[i])
+			} else if value.Valid {
+				_m.CarrierName = new(string)
+				*_m.CarrierName = value.String
+			}
+		case shipment.FieldTrackingNo:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field tracking_no", values[i])
+			} else if value.Valid {
+				_m.TrackingNo = new(string)
+				*_m.TrackingNo = value.String
+			}
+		case shipment.FieldPackageCount:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field package_count", values[i])
+			} else if value.Valid {
+				_m.PackageCount = new(int)
+				*_m.PackageCount = int(value.Int64)
+			}
+		case shipment.FieldGrossWeightKg:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field gross_weight_kg", values[i])
+			} else if value.Valid {
+				_m.GrossWeightKg = new(decimal.Decimal)
+				*_m.GrossWeightKg = *value.S.(*decimal.Decimal)
+			}
+		case shipment.FieldVolumeM3:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field volume_m3", values[i])
+			} else if value.Valid {
+				_m.VolumeM3 = new(decimal.Decimal)
+				*_m.VolumeM3 = *value.S.(*decimal.Decimal)
+			}
+		case shipment.FieldShippingMark:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field shipping_mark", values[i])
+			} else if value.Valid {
+				_m.ShippingMark = new(string)
+				*_m.ShippingMark = value.String
+			}
+		case shipment.FieldFreightAmount:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field freight_amount", values[i])
+			} else if value.Valid {
+				_m.FreightAmount = new(decimal.Decimal)
+				*_m.FreightAmount = *value.S.(*decimal.Decimal)
+			}
+		case shipment.FieldFreightCurrency:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field freight_currency", values[i])
+			} else if value.Valid {
+				_m.FreightCurrency = new(string)
+				*_m.FreightCurrency = value.String
 			}
 		case shipment.FieldTotalNetWeightG:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -354,6 +448,9 @@ func (_m *Shipment) String() string {
 		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")
+	builder.WriteString("delivery_snapshot=")
+	builder.WriteString(fmt.Sprintf("%v", _m.DeliverySnapshot))
+	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)
 	builder.WriteString(", ")
@@ -402,6 +499,51 @@ func (_m *Shipment) String() string {
 	if v := _m.ShippedAt; v != nil {
 		builder.WriteString("shipped_at=")
 		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.TransportMethod; v != nil {
+		builder.WriteString("transport_method=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.CarrierName; v != nil {
+		builder.WriteString("carrier_name=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.TrackingNo; v != nil {
+		builder.WriteString("tracking_no=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.PackageCount; v != nil {
+		builder.WriteString("package_count=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.GrossWeightKg; v != nil {
+		builder.WriteString("gross_weight_kg=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.VolumeM3; v != nil {
+		builder.WriteString("volume_m3=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.ShippingMark; v != nil {
+		builder.WriteString("shipping_mark=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.FreightAmount; v != nil {
+		builder.WriteString("freight_amount=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.FreightCurrency; v != nil {
+		builder.WriteString("freight_currency=")
+		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")
 	if v := _m.TotalNetWeightG; v != nil {

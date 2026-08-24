@@ -9039,6 +9039,10 @@ type CustomerMutation struct {
 	default_payment_term_days    *int
 	adddefault_payment_term_days *int
 	tax_no                       *string
+	country_region               *string
+	default_delivery_recipient   *string
+	default_delivery_phone       *string
+	default_delivery_address     *string
 	is_active                    *bool
 	note                         *string
 	created_at                   *time.Time
@@ -9442,6 +9446,202 @@ func (m *CustomerMutation) ResetTaxNo() {
 	delete(m.clearedFields, customer.FieldTaxNo)
 }
 
+// SetCountryRegion sets the "country_region" field.
+func (m *CustomerMutation) SetCountryRegion(s string) {
+	m.country_region = &s
+}
+
+// CountryRegion returns the value of the "country_region" field in the mutation.
+func (m *CustomerMutation) CountryRegion() (r string, exists bool) {
+	v := m.country_region
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCountryRegion returns the old "country_region" field's value of the Customer entity.
+// If the Customer object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CustomerMutation) OldCountryRegion(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCountryRegion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCountryRegion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCountryRegion: %w", err)
+	}
+	return oldValue.CountryRegion, nil
+}
+
+// ClearCountryRegion clears the value of the "country_region" field.
+func (m *CustomerMutation) ClearCountryRegion() {
+	m.country_region = nil
+	m.clearedFields[customer.FieldCountryRegion] = struct{}{}
+}
+
+// CountryRegionCleared returns if the "country_region" field was cleared in this mutation.
+func (m *CustomerMutation) CountryRegionCleared() bool {
+	_, ok := m.clearedFields[customer.FieldCountryRegion]
+	return ok
+}
+
+// ResetCountryRegion resets all changes to the "country_region" field.
+func (m *CustomerMutation) ResetCountryRegion() {
+	m.country_region = nil
+	delete(m.clearedFields, customer.FieldCountryRegion)
+}
+
+// SetDefaultDeliveryRecipient sets the "default_delivery_recipient" field.
+func (m *CustomerMutation) SetDefaultDeliveryRecipient(s string) {
+	m.default_delivery_recipient = &s
+}
+
+// DefaultDeliveryRecipient returns the value of the "default_delivery_recipient" field in the mutation.
+func (m *CustomerMutation) DefaultDeliveryRecipient() (r string, exists bool) {
+	v := m.default_delivery_recipient
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDefaultDeliveryRecipient returns the old "default_delivery_recipient" field's value of the Customer entity.
+// If the Customer object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CustomerMutation) OldDefaultDeliveryRecipient(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDefaultDeliveryRecipient is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDefaultDeliveryRecipient requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDefaultDeliveryRecipient: %w", err)
+	}
+	return oldValue.DefaultDeliveryRecipient, nil
+}
+
+// ClearDefaultDeliveryRecipient clears the value of the "default_delivery_recipient" field.
+func (m *CustomerMutation) ClearDefaultDeliveryRecipient() {
+	m.default_delivery_recipient = nil
+	m.clearedFields[customer.FieldDefaultDeliveryRecipient] = struct{}{}
+}
+
+// DefaultDeliveryRecipientCleared returns if the "default_delivery_recipient" field was cleared in this mutation.
+func (m *CustomerMutation) DefaultDeliveryRecipientCleared() bool {
+	_, ok := m.clearedFields[customer.FieldDefaultDeliveryRecipient]
+	return ok
+}
+
+// ResetDefaultDeliveryRecipient resets all changes to the "default_delivery_recipient" field.
+func (m *CustomerMutation) ResetDefaultDeliveryRecipient() {
+	m.default_delivery_recipient = nil
+	delete(m.clearedFields, customer.FieldDefaultDeliveryRecipient)
+}
+
+// SetDefaultDeliveryPhone sets the "default_delivery_phone" field.
+func (m *CustomerMutation) SetDefaultDeliveryPhone(s string) {
+	m.default_delivery_phone = &s
+}
+
+// DefaultDeliveryPhone returns the value of the "default_delivery_phone" field in the mutation.
+func (m *CustomerMutation) DefaultDeliveryPhone() (r string, exists bool) {
+	v := m.default_delivery_phone
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDefaultDeliveryPhone returns the old "default_delivery_phone" field's value of the Customer entity.
+// If the Customer object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CustomerMutation) OldDefaultDeliveryPhone(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDefaultDeliveryPhone is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDefaultDeliveryPhone requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDefaultDeliveryPhone: %w", err)
+	}
+	return oldValue.DefaultDeliveryPhone, nil
+}
+
+// ClearDefaultDeliveryPhone clears the value of the "default_delivery_phone" field.
+func (m *CustomerMutation) ClearDefaultDeliveryPhone() {
+	m.default_delivery_phone = nil
+	m.clearedFields[customer.FieldDefaultDeliveryPhone] = struct{}{}
+}
+
+// DefaultDeliveryPhoneCleared returns if the "default_delivery_phone" field was cleared in this mutation.
+func (m *CustomerMutation) DefaultDeliveryPhoneCleared() bool {
+	_, ok := m.clearedFields[customer.FieldDefaultDeliveryPhone]
+	return ok
+}
+
+// ResetDefaultDeliveryPhone resets all changes to the "default_delivery_phone" field.
+func (m *CustomerMutation) ResetDefaultDeliveryPhone() {
+	m.default_delivery_phone = nil
+	delete(m.clearedFields, customer.FieldDefaultDeliveryPhone)
+}
+
+// SetDefaultDeliveryAddress sets the "default_delivery_address" field.
+func (m *CustomerMutation) SetDefaultDeliveryAddress(s string) {
+	m.default_delivery_address = &s
+}
+
+// DefaultDeliveryAddress returns the value of the "default_delivery_address" field in the mutation.
+func (m *CustomerMutation) DefaultDeliveryAddress() (r string, exists bool) {
+	v := m.default_delivery_address
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDefaultDeliveryAddress returns the old "default_delivery_address" field's value of the Customer entity.
+// If the Customer object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CustomerMutation) OldDefaultDeliveryAddress(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDefaultDeliveryAddress is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDefaultDeliveryAddress requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDefaultDeliveryAddress: %w", err)
+	}
+	return oldValue.DefaultDeliveryAddress, nil
+}
+
+// ClearDefaultDeliveryAddress clears the value of the "default_delivery_address" field.
+func (m *CustomerMutation) ClearDefaultDeliveryAddress() {
+	m.default_delivery_address = nil
+	m.clearedFields[customer.FieldDefaultDeliveryAddress] = struct{}{}
+}
+
+// DefaultDeliveryAddressCleared returns if the "default_delivery_address" field was cleared in this mutation.
+func (m *CustomerMutation) DefaultDeliveryAddressCleared() bool {
+	_, ok := m.clearedFields[customer.FieldDefaultDeliveryAddress]
+	return ok
+}
+
+// ResetDefaultDeliveryAddress resets all changes to the "default_delivery_address" field.
+func (m *CustomerMutation) ResetDefaultDeliveryAddress() {
+	m.default_delivery_address = nil
+	delete(m.clearedFields, customer.FieldDefaultDeliveryAddress)
+}
+
 // SetIsActive sets the "is_active" field.
 func (m *CustomerMutation) SetIsActive(b bool) {
 	m.is_active = &b
@@ -9741,7 +9941,7 @@ func (m *CustomerMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *CustomerMutation) Fields() []string {
-	fields := make([]string, 0, 10)
+	fields := make([]string, 0, 14)
 	if m.code != nil {
 		fields = append(fields, customer.FieldCode)
 	}
@@ -9759,6 +9959,18 @@ func (m *CustomerMutation) Fields() []string {
 	}
 	if m.tax_no != nil {
 		fields = append(fields, customer.FieldTaxNo)
+	}
+	if m.country_region != nil {
+		fields = append(fields, customer.FieldCountryRegion)
+	}
+	if m.default_delivery_recipient != nil {
+		fields = append(fields, customer.FieldDefaultDeliveryRecipient)
+	}
+	if m.default_delivery_phone != nil {
+		fields = append(fields, customer.FieldDefaultDeliveryPhone)
+	}
+	if m.default_delivery_address != nil {
+		fields = append(fields, customer.FieldDefaultDeliveryAddress)
 	}
 	if m.is_active != nil {
 		fields = append(fields, customer.FieldIsActive)
@@ -9792,6 +10004,14 @@ func (m *CustomerMutation) Field(name string) (ent.Value, bool) {
 		return m.DefaultPaymentTermDays()
 	case customer.FieldTaxNo:
 		return m.TaxNo()
+	case customer.FieldCountryRegion:
+		return m.CountryRegion()
+	case customer.FieldDefaultDeliveryRecipient:
+		return m.DefaultDeliveryRecipient()
+	case customer.FieldDefaultDeliveryPhone:
+		return m.DefaultDeliveryPhone()
+	case customer.FieldDefaultDeliveryAddress:
+		return m.DefaultDeliveryAddress()
 	case customer.FieldIsActive:
 		return m.IsActive()
 	case customer.FieldNote:
@@ -9821,6 +10041,14 @@ func (m *CustomerMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldDefaultPaymentTermDays(ctx)
 	case customer.FieldTaxNo:
 		return m.OldTaxNo(ctx)
+	case customer.FieldCountryRegion:
+		return m.OldCountryRegion(ctx)
+	case customer.FieldDefaultDeliveryRecipient:
+		return m.OldDefaultDeliveryRecipient(ctx)
+	case customer.FieldDefaultDeliveryPhone:
+		return m.OldDefaultDeliveryPhone(ctx)
+	case customer.FieldDefaultDeliveryAddress:
+		return m.OldDefaultDeliveryAddress(ctx)
 	case customer.FieldIsActive:
 		return m.OldIsActive(ctx)
 	case customer.FieldNote:
@@ -9879,6 +10107,34 @@ func (m *CustomerMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetTaxNo(v)
+		return nil
+	case customer.FieldCountryRegion:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCountryRegion(v)
+		return nil
+	case customer.FieldDefaultDeliveryRecipient:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDefaultDeliveryRecipient(v)
+		return nil
+	case customer.FieldDefaultDeliveryPhone:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDefaultDeliveryPhone(v)
+		return nil
+	case customer.FieldDefaultDeliveryAddress:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDefaultDeliveryAddress(v)
 		return nil
 	case customer.FieldIsActive:
 		v, ok := value.(bool)
@@ -9965,6 +10221,18 @@ func (m *CustomerMutation) ClearedFields() []string {
 	if m.FieldCleared(customer.FieldTaxNo) {
 		fields = append(fields, customer.FieldTaxNo)
 	}
+	if m.FieldCleared(customer.FieldCountryRegion) {
+		fields = append(fields, customer.FieldCountryRegion)
+	}
+	if m.FieldCleared(customer.FieldDefaultDeliveryRecipient) {
+		fields = append(fields, customer.FieldDefaultDeliveryRecipient)
+	}
+	if m.FieldCleared(customer.FieldDefaultDeliveryPhone) {
+		fields = append(fields, customer.FieldDefaultDeliveryPhone)
+	}
+	if m.FieldCleared(customer.FieldDefaultDeliveryAddress) {
+		fields = append(fields, customer.FieldDefaultDeliveryAddress)
+	}
 	if m.FieldCleared(customer.FieldNote) {
 		fields = append(fields, customer.FieldNote)
 	}
@@ -9994,6 +10262,18 @@ func (m *CustomerMutation) ClearField(name string) error {
 	case customer.FieldTaxNo:
 		m.ClearTaxNo()
 		return nil
+	case customer.FieldCountryRegion:
+		m.ClearCountryRegion()
+		return nil
+	case customer.FieldDefaultDeliveryRecipient:
+		m.ClearDefaultDeliveryRecipient()
+		return nil
+	case customer.FieldDefaultDeliveryPhone:
+		m.ClearDefaultDeliveryPhone()
+		return nil
+	case customer.FieldDefaultDeliveryAddress:
+		m.ClearDefaultDeliveryAddress()
+		return nil
 	case customer.FieldNote:
 		m.ClearNote()
 		return nil
@@ -10022,6 +10302,18 @@ func (m *CustomerMutation) ResetField(name string) error {
 		return nil
 	case customer.FieldTaxNo:
 		m.ResetTaxNo()
+		return nil
+	case customer.FieldCountryRegion:
+		m.ResetCountryRegion()
+		return nil
+	case customer.FieldDefaultDeliveryRecipient:
+		m.ResetDefaultDeliveryRecipient()
+		return nil
+	case customer.FieldDefaultDeliveryPhone:
+		m.ResetDefaultDeliveryPhone()
+		return nil
+	case customer.FieldDefaultDeliveryAddress:
+		m.ResetDefaultDeliveryAddress()
 		return nil
 	case customer.FieldIsActive:
 		m.ResetIsActive()
@@ -47618,6 +47910,8 @@ type ProductMutation struct {
 	name                           *string
 	style_no                       *string
 	customer_style_no              *string
+	english_name                   *string
+	hs_code                        *string
 	unit_net_weight_g              *decimal.Decimal
 	is_active                      *bool
 	created_at                     *time.Time
@@ -47911,6 +48205,104 @@ func (m *ProductMutation) CustomerStyleNoCleared() bool {
 func (m *ProductMutation) ResetCustomerStyleNo() {
 	m.customer_style_no = nil
 	delete(m.clearedFields, product.FieldCustomerStyleNo)
+}
+
+// SetEnglishName sets the "english_name" field.
+func (m *ProductMutation) SetEnglishName(s string) {
+	m.english_name = &s
+}
+
+// EnglishName returns the value of the "english_name" field in the mutation.
+func (m *ProductMutation) EnglishName() (r string, exists bool) {
+	v := m.english_name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEnglishName returns the old "english_name" field's value of the Product entity.
+// If the Product object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProductMutation) OldEnglishName(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEnglishName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEnglishName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEnglishName: %w", err)
+	}
+	return oldValue.EnglishName, nil
+}
+
+// ClearEnglishName clears the value of the "english_name" field.
+func (m *ProductMutation) ClearEnglishName() {
+	m.english_name = nil
+	m.clearedFields[product.FieldEnglishName] = struct{}{}
+}
+
+// EnglishNameCleared returns if the "english_name" field was cleared in this mutation.
+func (m *ProductMutation) EnglishNameCleared() bool {
+	_, ok := m.clearedFields[product.FieldEnglishName]
+	return ok
+}
+
+// ResetEnglishName resets all changes to the "english_name" field.
+func (m *ProductMutation) ResetEnglishName() {
+	m.english_name = nil
+	delete(m.clearedFields, product.FieldEnglishName)
+}
+
+// SetHsCode sets the "hs_code" field.
+func (m *ProductMutation) SetHsCode(s string) {
+	m.hs_code = &s
+}
+
+// HsCode returns the value of the "hs_code" field in the mutation.
+func (m *ProductMutation) HsCode() (r string, exists bool) {
+	v := m.hs_code
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldHsCode returns the old "hs_code" field's value of the Product entity.
+// If the Product object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProductMutation) OldHsCode(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldHsCode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldHsCode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldHsCode: %w", err)
+	}
+	return oldValue.HsCode, nil
+}
+
+// ClearHsCode clears the value of the "hs_code" field.
+func (m *ProductMutation) ClearHsCode() {
+	m.hs_code = nil
+	m.clearedFields[product.FieldHsCode] = struct{}{}
+}
+
+// HsCodeCleared returns if the "hs_code" field was cleared in this mutation.
+func (m *ProductMutation) HsCodeCleared() bool {
+	_, ok := m.clearedFields[product.FieldHsCode]
+	return ok
+}
+
+// ResetHsCode resets all changes to the "hs_code" field.
+func (m *ProductMutation) ResetHsCode() {
+	m.hs_code = nil
+	delete(m.clearedFields, product.FieldHsCode)
 }
 
 // SetDefaultUnitID sets the "default_unit_id" field.
@@ -48437,7 +48829,7 @@ func (m *ProductMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ProductMutation) Fields() []string {
-	fields := make([]string, 0, 9)
+	fields := make([]string, 0, 11)
 	if m.code != nil {
 		fields = append(fields, product.FieldCode)
 	}
@@ -48449,6 +48841,12 @@ func (m *ProductMutation) Fields() []string {
 	}
 	if m.customer_style_no != nil {
 		fields = append(fields, product.FieldCustomerStyleNo)
+	}
+	if m.english_name != nil {
+		fields = append(fields, product.FieldEnglishName)
+	}
+	if m.hs_code != nil {
+		fields = append(fields, product.FieldHsCode)
 	}
 	if m.default_unit != nil {
 		fields = append(fields, product.FieldDefaultUnitID)
@@ -48481,6 +48879,10 @@ func (m *ProductMutation) Field(name string) (ent.Value, bool) {
 		return m.StyleNo()
 	case product.FieldCustomerStyleNo:
 		return m.CustomerStyleNo()
+	case product.FieldEnglishName:
+		return m.EnglishName()
+	case product.FieldHsCode:
+		return m.HsCode()
 	case product.FieldDefaultUnitID:
 		return m.DefaultUnitID()
 	case product.FieldUnitNetWeightG:
@@ -48508,6 +48910,10 @@ func (m *ProductMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldStyleNo(ctx)
 	case product.FieldCustomerStyleNo:
 		return m.OldCustomerStyleNo(ctx)
+	case product.FieldEnglishName:
+		return m.OldEnglishName(ctx)
+	case product.FieldHsCode:
+		return m.OldHsCode(ctx)
 	case product.FieldDefaultUnitID:
 		return m.OldDefaultUnitID(ctx)
 	case product.FieldUnitNetWeightG:
@@ -48554,6 +48960,20 @@ func (m *ProductMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCustomerStyleNo(v)
+		return nil
+	case product.FieldEnglishName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnglishName(v)
+		return nil
+	case product.FieldHsCode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetHsCode(v)
 		return nil
 	case product.FieldDefaultUnitID:
 		v, ok := value.(int)
@@ -48629,6 +49049,12 @@ func (m *ProductMutation) ClearedFields() []string {
 	if m.FieldCleared(product.FieldCustomerStyleNo) {
 		fields = append(fields, product.FieldCustomerStyleNo)
 	}
+	if m.FieldCleared(product.FieldEnglishName) {
+		fields = append(fields, product.FieldEnglishName)
+	}
+	if m.FieldCleared(product.FieldHsCode) {
+		fields = append(fields, product.FieldHsCode)
+	}
 	if m.FieldCleared(product.FieldUnitNetWeightG) {
 		fields = append(fields, product.FieldUnitNetWeightG)
 	}
@@ -48652,6 +49078,12 @@ func (m *ProductMutation) ClearField(name string) error {
 	case product.FieldCustomerStyleNo:
 		m.ClearCustomerStyleNo()
 		return nil
+	case product.FieldEnglishName:
+		m.ClearEnglishName()
+		return nil
+	case product.FieldHsCode:
+		m.ClearHsCode()
+		return nil
 	case product.FieldUnitNetWeightG:
 		m.ClearUnitNetWeightG()
 		return nil
@@ -48674,6 +49106,12 @@ func (m *ProductMutation) ResetField(name string) error {
 		return nil
 	case product.FieldCustomerStyleNo:
 		m.ResetCustomerStyleNo()
+		return nil
+	case product.FieldEnglishName:
+		m.ResetEnglishName()
+		return nil
+	case product.FieldHsCode:
+		m.ResetHsCode()
 		return nil
 	case product.FieldDefaultUnitID:
 		m.ResetDefaultUnitID()
@@ -69407,39 +69845,44 @@ func (m *ProductionWIPOutsourcingAllocationMutation) ResetEdge(name string) erro
 // PurchaseOrderMutation represents an operation that mutates the PurchaseOrder nodes in the graph.
 type PurchaseOrderMutation struct {
 	config
-	op                         Op
-	typ                        string
-	id                         *int
-	purchase_order_no          *string
-	currency                   *string
-	payment_term_days          *int
-	addpayment_term_days       *int
-	supplier_purchase_order_no *string
-	supplier_snapshot          *map[string]interface{}
-	contract_party_snapshot    *map[string]interface{}
-	purchase_date              *time.Time
-	expected_arrival_date      *time.Time
-	lifecycle_status           *string
-	version                    *int
-	addversion                 *int
-	settlement_action          *string
-	settlement_mode            *string
-	settlement_reason          *string
-	settled_at                 *time.Time
-	settled_by                 *int
-	addsettled_by              *int
-	note                       *string
-	created_at                 *time.Time
-	updated_at                 *time.Time
-	clearedFields              map[string]struct{}
-	supplier                   *int
-	clearedsupplier            bool
-	items                      map[int]struct{}
-	removeditems               map[int]struct{}
-	cleareditems               bool
-	done                       bool
-	oldValue                   func(context.Context) (*PurchaseOrder, error)
-	predicates                 []predicate.PurchaseOrder
+	op                              Op
+	typ                             string
+	id                              *int
+	purchase_order_no               *string
+	currency                        *string
+	payment_term_days               *int
+	addpayment_term_days            *int
+	payment_method                  *string
+	invoice_required                *bool
+	invoice_category                *string
+	supplier_purchase_order_no      *string
+	supplier_snapshot               *map[string]interface{}
+	contract_party_snapshot         *map[string]interface{}
+	purchase_date                   *time.Time
+	expected_arrival_date           *time.Time
+	supplier_confirmed_arrival_date *time.Time
+	delivery_address                *string
+	lifecycle_status                *string
+	version                         *int
+	addversion                      *int
+	settlement_action               *string
+	settlement_mode                 *string
+	settlement_reason               *string
+	settled_at                      *time.Time
+	settled_by                      *int
+	addsettled_by                   *int
+	note                            *string
+	created_at                      *time.Time
+	updated_at                      *time.Time
+	clearedFields                   map[string]struct{}
+	supplier                        *int
+	clearedsupplier                 bool
+	items                           map[int]struct{}
+	removeditems                    map[int]struct{}
+	cleareditems                    bool
+	done                            bool
+	oldValue                        func(context.Context) (*PurchaseOrder, error)
+	predicates                      []predicate.PurchaseOrder
 }
 
 var _ ent.Mutation = (*PurchaseOrderMutation)(nil)
@@ -69718,6 +70161,153 @@ func (m *PurchaseOrderMutation) ResetPaymentTermDays() {
 	delete(m.clearedFields, purchaseorder.FieldPaymentTermDays)
 }
 
+// SetPaymentMethod sets the "payment_method" field.
+func (m *PurchaseOrderMutation) SetPaymentMethod(s string) {
+	m.payment_method = &s
+}
+
+// PaymentMethod returns the value of the "payment_method" field in the mutation.
+func (m *PurchaseOrderMutation) PaymentMethod() (r string, exists bool) {
+	v := m.payment_method
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPaymentMethod returns the old "payment_method" field's value of the PurchaseOrder entity.
+// If the PurchaseOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseOrderMutation) OldPaymentMethod(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPaymentMethod is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPaymentMethod requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPaymentMethod: %w", err)
+	}
+	return oldValue.PaymentMethod, nil
+}
+
+// ClearPaymentMethod clears the value of the "payment_method" field.
+func (m *PurchaseOrderMutation) ClearPaymentMethod() {
+	m.payment_method = nil
+	m.clearedFields[purchaseorder.FieldPaymentMethod] = struct{}{}
+}
+
+// PaymentMethodCleared returns if the "payment_method" field was cleared in this mutation.
+func (m *PurchaseOrderMutation) PaymentMethodCleared() bool {
+	_, ok := m.clearedFields[purchaseorder.FieldPaymentMethod]
+	return ok
+}
+
+// ResetPaymentMethod resets all changes to the "payment_method" field.
+func (m *PurchaseOrderMutation) ResetPaymentMethod() {
+	m.payment_method = nil
+	delete(m.clearedFields, purchaseorder.FieldPaymentMethod)
+}
+
+// SetInvoiceRequired sets the "invoice_required" field.
+func (m *PurchaseOrderMutation) SetInvoiceRequired(b bool) {
+	m.invoice_required = &b
+}
+
+// InvoiceRequired returns the value of the "invoice_required" field in the mutation.
+func (m *PurchaseOrderMutation) InvoiceRequired() (r bool, exists bool) {
+	v := m.invoice_required
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInvoiceRequired returns the old "invoice_required" field's value of the PurchaseOrder entity.
+// If the PurchaseOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseOrderMutation) OldInvoiceRequired(ctx context.Context) (v *bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInvoiceRequired is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInvoiceRequired requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInvoiceRequired: %w", err)
+	}
+	return oldValue.InvoiceRequired, nil
+}
+
+// ClearInvoiceRequired clears the value of the "invoice_required" field.
+func (m *PurchaseOrderMutation) ClearInvoiceRequired() {
+	m.invoice_required = nil
+	m.clearedFields[purchaseorder.FieldInvoiceRequired] = struct{}{}
+}
+
+// InvoiceRequiredCleared returns if the "invoice_required" field was cleared in this mutation.
+func (m *PurchaseOrderMutation) InvoiceRequiredCleared() bool {
+	_, ok := m.clearedFields[purchaseorder.FieldInvoiceRequired]
+	return ok
+}
+
+// ResetInvoiceRequired resets all changes to the "invoice_required" field.
+func (m *PurchaseOrderMutation) ResetInvoiceRequired() {
+	m.invoice_required = nil
+	delete(m.clearedFields, purchaseorder.FieldInvoiceRequired)
+}
+
+// SetInvoiceCategory sets the "invoice_category" field.
+func (m *PurchaseOrderMutation) SetInvoiceCategory(s string) {
+	m.invoice_category = &s
+}
+
+// InvoiceCategory returns the value of the "invoice_category" field in the mutation.
+func (m *PurchaseOrderMutation) InvoiceCategory() (r string, exists bool) {
+	v := m.invoice_category
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInvoiceCategory returns the old "invoice_category" field's value of the PurchaseOrder entity.
+// If the PurchaseOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseOrderMutation) OldInvoiceCategory(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInvoiceCategory is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInvoiceCategory requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInvoiceCategory: %w", err)
+	}
+	return oldValue.InvoiceCategory, nil
+}
+
+// ClearInvoiceCategory clears the value of the "invoice_category" field.
+func (m *PurchaseOrderMutation) ClearInvoiceCategory() {
+	m.invoice_category = nil
+	m.clearedFields[purchaseorder.FieldInvoiceCategory] = struct{}{}
+}
+
+// InvoiceCategoryCleared returns if the "invoice_category" field was cleared in this mutation.
+func (m *PurchaseOrderMutation) InvoiceCategoryCleared() bool {
+	_, ok := m.clearedFields[purchaseorder.FieldInvoiceCategory]
+	return ok
+}
+
+// ResetInvoiceCategory resets all changes to the "invoice_category" field.
+func (m *PurchaseOrderMutation) ResetInvoiceCategory() {
+	m.invoice_category = nil
+	delete(m.clearedFields, purchaseorder.FieldInvoiceCategory)
+}
+
 // SetSupplierPurchaseOrderNo sets the "supplier_purchase_order_no" field.
 func (m *PurchaseOrderMutation) SetSupplierPurchaseOrderNo(s string) {
 	m.supplier_purchase_order_no = &s
@@ -69948,6 +70538,104 @@ func (m *PurchaseOrderMutation) ExpectedArrivalDateCleared() bool {
 func (m *PurchaseOrderMutation) ResetExpectedArrivalDate() {
 	m.expected_arrival_date = nil
 	delete(m.clearedFields, purchaseorder.FieldExpectedArrivalDate)
+}
+
+// SetSupplierConfirmedArrivalDate sets the "supplier_confirmed_arrival_date" field.
+func (m *PurchaseOrderMutation) SetSupplierConfirmedArrivalDate(t time.Time) {
+	m.supplier_confirmed_arrival_date = &t
+}
+
+// SupplierConfirmedArrivalDate returns the value of the "supplier_confirmed_arrival_date" field in the mutation.
+func (m *PurchaseOrderMutation) SupplierConfirmedArrivalDate() (r time.Time, exists bool) {
+	v := m.supplier_confirmed_arrival_date
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSupplierConfirmedArrivalDate returns the old "supplier_confirmed_arrival_date" field's value of the PurchaseOrder entity.
+// If the PurchaseOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseOrderMutation) OldSupplierConfirmedArrivalDate(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSupplierConfirmedArrivalDate is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSupplierConfirmedArrivalDate requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSupplierConfirmedArrivalDate: %w", err)
+	}
+	return oldValue.SupplierConfirmedArrivalDate, nil
+}
+
+// ClearSupplierConfirmedArrivalDate clears the value of the "supplier_confirmed_arrival_date" field.
+func (m *PurchaseOrderMutation) ClearSupplierConfirmedArrivalDate() {
+	m.supplier_confirmed_arrival_date = nil
+	m.clearedFields[purchaseorder.FieldSupplierConfirmedArrivalDate] = struct{}{}
+}
+
+// SupplierConfirmedArrivalDateCleared returns if the "supplier_confirmed_arrival_date" field was cleared in this mutation.
+func (m *PurchaseOrderMutation) SupplierConfirmedArrivalDateCleared() bool {
+	_, ok := m.clearedFields[purchaseorder.FieldSupplierConfirmedArrivalDate]
+	return ok
+}
+
+// ResetSupplierConfirmedArrivalDate resets all changes to the "supplier_confirmed_arrival_date" field.
+func (m *PurchaseOrderMutation) ResetSupplierConfirmedArrivalDate() {
+	m.supplier_confirmed_arrival_date = nil
+	delete(m.clearedFields, purchaseorder.FieldSupplierConfirmedArrivalDate)
+}
+
+// SetDeliveryAddress sets the "delivery_address" field.
+func (m *PurchaseOrderMutation) SetDeliveryAddress(s string) {
+	m.delivery_address = &s
+}
+
+// DeliveryAddress returns the value of the "delivery_address" field in the mutation.
+func (m *PurchaseOrderMutation) DeliveryAddress() (r string, exists bool) {
+	v := m.delivery_address
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDeliveryAddress returns the old "delivery_address" field's value of the PurchaseOrder entity.
+// If the PurchaseOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseOrderMutation) OldDeliveryAddress(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDeliveryAddress is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDeliveryAddress requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDeliveryAddress: %w", err)
+	}
+	return oldValue.DeliveryAddress, nil
+}
+
+// ClearDeliveryAddress clears the value of the "delivery_address" field.
+func (m *PurchaseOrderMutation) ClearDeliveryAddress() {
+	m.delivery_address = nil
+	m.clearedFields[purchaseorder.FieldDeliveryAddress] = struct{}{}
+}
+
+// DeliveryAddressCleared returns if the "delivery_address" field was cleared in this mutation.
+func (m *PurchaseOrderMutation) DeliveryAddressCleared() bool {
+	_, ok := m.clearedFields[purchaseorder.FieldDeliveryAddress]
+	return ok
+}
+
+// ResetDeliveryAddress resets all changes to the "delivery_address" field.
+func (m *PurchaseOrderMutation) ResetDeliveryAddress() {
+	m.delivery_address = nil
+	delete(m.clearedFields, purchaseorder.FieldDeliveryAddress)
 }
 
 // SetLifecycleStatus sets the "lifecycle_status" field.
@@ -70544,7 +71232,7 @@ func (m *PurchaseOrderMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PurchaseOrderMutation) Fields() []string {
-	fields := make([]string, 0, 19)
+	fields := make([]string, 0, 24)
 	if m.purchase_order_no != nil {
 		fields = append(fields, purchaseorder.FieldPurchaseOrderNo)
 	}
@@ -70556,6 +71244,15 @@ func (m *PurchaseOrderMutation) Fields() []string {
 	}
 	if m.payment_term_days != nil {
 		fields = append(fields, purchaseorder.FieldPaymentTermDays)
+	}
+	if m.payment_method != nil {
+		fields = append(fields, purchaseorder.FieldPaymentMethod)
+	}
+	if m.invoice_required != nil {
+		fields = append(fields, purchaseorder.FieldInvoiceRequired)
+	}
+	if m.invoice_category != nil {
+		fields = append(fields, purchaseorder.FieldInvoiceCategory)
 	}
 	if m.supplier_purchase_order_no != nil {
 		fields = append(fields, purchaseorder.FieldSupplierPurchaseOrderNo)
@@ -70571,6 +71268,12 @@ func (m *PurchaseOrderMutation) Fields() []string {
 	}
 	if m.expected_arrival_date != nil {
 		fields = append(fields, purchaseorder.FieldExpectedArrivalDate)
+	}
+	if m.supplier_confirmed_arrival_date != nil {
+		fields = append(fields, purchaseorder.FieldSupplierConfirmedArrivalDate)
+	}
+	if m.delivery_address != nil {
+		fields = append(fields, purchaseorder.FieldDeliveryAddress)
 	}
 	if m.lifecycle_status != nil {
 		fields = append(fields, purchaseorder.FieldLifecycleStatus)
@@ -70618,6 +71321,12 @@ func (m *PurchaseOrderMutation) Field(name string) (ent.Value, bool) {
 		return m.Currency()
 	case purchaseorder.FieldPaymentTermDays:
 		return m.PaymentTermDays()
+	case purchaseorder.FieldPaymentMethod:
+		return m.PaymentMethod()
+	case purchaseorder.FieldInvoiceRequired:
+		return m.InvoiceRequired()
+	case purchaseorder.FieldInvoiceCategory:
+		return m.InvoiceCategory()
 	case purchaseorder.FieldSupplierPurchaseOrderNo:
 		return m.SupplierPurchaseOrderNo()
 	case purchaseorder.FieldSupplierSnapshot:
@@ -70628,6 +71337,10 @@ func (m *PurchaseOrderMutation) Field(name string) (ent.Value, bool) {
 		return m.PurchaseDate()
 	case purchaseorder.FieldExpectedArrivalDate:
 		return m.ExpectedArrivalDate()
+	case purchaseorder.FieldSupplierConfirmedArrivalDate:
+		return m.SupplierConfirmedArrivalDate()
+	case purchaseorder.FieldDeliveryAddress:
+		return m.DeliveryAddress()
 	case purchaseorder.FieldLifecycleStatus:
 		return m.LifecycleStatus()
 	case purchaseorder.FieldVersion:
@@ -70665,6 +71378,12 @@ func (m *PurchaseOrderMutation) OldField(ctx context.Context, name string) (ent.
 		return m.OldCurrency(ctx)
 	case purchaseorder.FieldPaymentTermDays:
 		return m.OldPaymentTermDays(ctx)
+	case purchaseorder.FieldPaymentMethod:
+		return m.OldPaymentMethod(ctx)
+	case purchaseorder.FieldInvoiceRequired:
+		return m.OldInvoiceRequired(ctx)
+	case purchaseorder.FieldInvoiceCategory:
+		return m.OldInvoiceCategory(ctx)
 	case purchaseorder.FieldSupplierPurchaseOrderNo:
 		return m.OldSupplierPurchaseOrderNo(ctx)
 	case purchaseorder.FieldSupplierSnapshot:
@@ -70675,6 +71394,10 @@ func (m *PurchaseOrderMutation) OldField(ctx context.Context, name string) (ent.
 		return m.OldPurchaseDate(ctx)
 	case purchaseorder.FieldExpectedArrivalDate:
 		return m.OldExpectedArrivalDate(ctx)
+	case purchaseorder.FieldSupplierConfirmedArrivalDate:
+		return m.OldSupplierConfirmedArrivalDate(ctx)
+	case purchaseorder.FieldDeliveryAddress:
+		return m.OldDeliveryAddress(ctx)
 	case purchaseorder.FieldLifecycleStatus:
 		return m.OldLifecycleStatus(ctx)
 	case purchaseorder.FieldVersion:
@@ -70732,6 +71455,27 @@ func (m *PurchaseOrderMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetPaymentTermDays(v)
 		return nil
+	case purchaseorder.FieldPaymentMethod:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPaymentMethod(v)
+		return nil
+	case purchaseorder.FieldInvoiceRequired:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInvoiceRequired(v)
+		return nil
+	case purchaseorder.FieldInvoiceCategory:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInvoiceCategory(v)
+		return nil
 	case purchaseorder.FieldSupplierPurchaseOrderNo:
 		v, ok := value.(string)
 		if !ok {
@@ -70766,6 +71510,20 @@ func (m *PurchaseOrderMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetExpectedArrivalDate(v)
+		return nil
+	case purchaseorder.FieldSupplierConfirmedArrivalDate:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSupplierConfirmedArrivalDate(v)
+		return nil
+	case purchaseorder.FieldDeliveryAddress:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDeliveryAddress(v)
 		return nil
 	case purchaseorder.FieldLifecycleStatus:
 		v, ok := value.(string)
@@ -70909,6 +71667,15 @@ func (m *PurchaseOrderMutation) ClearedFields() []string {
 	if m.FieldCleared(purchaseorder.FieldPaymentTermDays) {
 		fields = append(fields, purchaseorder.FieldPaymentTermDays)
 	}
+	if m.FieldCleared(purchaseorder.FieldPaymentMethod) {
+		fields = append(fields, purchaseorder.FieldPaymentMethod)
+	}
+	if m.FieldCleared(purchaseorder.FieldInvoiceRequired) {
+		fields = append(fields, purchaseorder.FieldInvoiceRequired)
+	}
+	if m.FieldCleared(purchaseorder.FieldInvoiceCategory) {
+		fields = append(fields, purchaseorder.FieldInvoiceCategory)
+	}
 	if m.FieldCleared(purchaseorder.FieldSupplierPurchaseOrderNo) {
 		fields = append(fields, purchaseorder.FieldSupplierPurchaseOrderNo)
 	}
@@ -70920,6 +71687,12 @@ func (m *PurchaseOrderMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(purchaseorder.FieldExpectedArrivalDate) {
 		fields = append(fields, purchaseorder.FieldExpectedArrivalDate)
+	}
+	if m.FieldCleared(purchaseorder.FieldSupplierConfirmedArrivalDate) {
+		fields = append(fields, purchaseorder.FieldSupplierConfirmedArrivalDate)
+	}
+	if m.FieldCleared(purchaseorder.FieldDeliveryAddress) {
+		fields = append(fields, purchaseorder.FieldDeliveryAddress)
 	}
 	if m.FieldCleared(purchaseorder.FieldSettlementAction) {
 		fields = append(fields, purchaseorder.FieldSettlementAction)
@@ -70956,6 +71729,15 @@ func (m *PurchaseOrderMutation) ClearField(name string) error {
 	case purchaseorder.FieldPaymentTermDays:
 		m.ClearPaymentTermDays()
 		return nil
+	case purchaseorder.FieldPaymentMethod:
+		m.ClearPaymentMethod()
+		return nil
+	case purchaseorder.FieldInvoiceRequired:
+		m.ClearInvoiceRequired()
+		return nil
+	case purchaseorder.FieldInvoiceCategory:
+		m.ClearInvoiceCategory()
+		return nil
 	case purchaseorder.FieldSupplierPurchaseOrderNo:
 		m.ClearSupplierPurchaseOrderNo()
 		return nil
@@ -70967,6 +71749,12 @@ func (m *PurchaseOrderMutation) ClearField(name string) error {
 		return nil
 	case purchaseorder.FieldExpectedArrivalDate:
 		m.ClearExpectedArrivalDate()
+		return nil
+	case purchaseorder.FieldSupplierConfirmedArrivalDate:
+		m.ClearSupplierConfirmedArrivalDate()
+		return nil
+	case purchaseorder.FieldDeliveryAddress:
+		m.ClearDeliveryAddress()
 		return nil
 	case purchaseorder.FieldSettlementAction:
 		m.ClearSettlementAction()
@@ -71006,6 +71794,15 @@ func (m *PurchaseOrderMutation) ResetField(name string) error {
 	case purchaseorder.FieldPaymentTermDays:
 		m.ResetPaymentTermDays()
 		return nil
+	case purchaseorder.FieldPaymentMethod:
+		m.ResetPaymentMethod()
+		return nil
+	case purchaseorder.FieldInvoiceRequired:
+		m.ResetInvoiceRequired()
+		return nil
+	case purchaseorder.FieldInvoiceCategory:
+		m.ResetInvoiceCategory()
+		return nil
 	case purchaseorder.FieldSupplierPurchaseOrderNo:
 		m.ResetSupplierPurchaseOrderNo()
 		return nil
@@ -71020,6 +71817,12 @@ func (m *PurchaseOrderMutation) ResetField(name string) error {
 		return nil
 	case purchaseorder.FieldExpectedArrivalDate:
 		m.ResetExpectedArrivalDate()
+		return nil
+	case purchaseorder.FieldSupplierConfirmedArrivalDate:
+		m.ResetSupplierConfirmedArrivalDate()
+		return nil
+	case purchaseorder.FieldDeliveryAddress:
+		m.ResetDeliveryAddress()
 		return nil
 	case purchaseorder.FieldLifecycleStatus:
 		m.ResetLifecycleStatus()
@@ -90619,10 +91422,17 @@ type SalesOrderMutation struct {
 	customer_snapshot         *map[string]interface{}
 	sales_owner               *string
 	contact_snapshot          *map[string]interface{}
+	delivery_snapshot         *map[string]interface{}
 	payment_method            *string
 	payment_term_days         *int
 	addpayment_term_days      *int
 	price_condition_note      *string
+	tax_mode                  *string
+	tax_rate                  *decimal.Decimal
+	freight_terms             *string
+	goods_amount              *decimal.Decimal
+	tax_amount                *decimal.Decimal
+	order_total               *decimal.Decimal
 	order_date                *time.Time
 	planned_delivery_date     *time.Time
 	lifecycle_status          *string
@@ -91056,6 +91866,55 @@ func (m *SalesOrderMutation) ResetContactSnapshot() {
 	delete(m.clearedFields, salesorder.FieldContactSnapshot)
 }
 
+// SetDeliverySnapshot sets the "delivery_snapshot" field.
+func (m *SalesOrderMutation) SetDeliverySnapshot(value map[string]interface{}) {
+	m.delivery_snapshot = &value
+}
+
+// DeliverySnapshot returns the value of the "delivery_snapshot" field in the mutation.
+func (m *SalesOrderMutation) DeliverySnapshot() (r map[string]interface{}, exists bool) {
+	v := m.delivery_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDeliverySnapshot returns the old "delivery_snapshot" field's value of the SalesOrder entity.
+// If the SalesOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SalesOrderMutation) OldDeliverySnapshot(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDeliverySnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDeliverySnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDeliverySnapshot: %w", err)
+	}
+	return oldValue.DeliverySnapshot, nil
+}
+
+// ClearDeliverySnapshot clears the value of the "delivery_snapshot" field.
+func (m *SalesOrderMutation) ClearDeliverySnapshot() {
+	m.delivery_snapshot = nil
+	m.clearedFields[salesorder.FieldDeliverySnapshot] = struct{}{}
+}
+
+// DeliverySnapshotCleared returns if the "delivery_snapshot" field was cleared in this mutation.
+func (m *SalesOrderMutation) DeliverySnapshotCleared() bool {
+	_, ok := m.clearedFields[salesorder.FieldDeliverySnapshot]
+	return ok
+}
+
+// ResetDeliverySnapshot resets all changes to the "delivery_snapshot" field.
+func (m *SalesOrderMutation) ResetDeliverySnapshot() {
+	m.delivery_snapshot = nil
+	delete(m.clearedFields, salesorder.FieldDeliverySnapshot)
+}
+
 // SetPaymentMethod sets the "payment_method" field.
 func (m *SalesOrderMutation) SetPaymentMethod(s string) {
 	m.payment_method = &s
@@ -91222,6 +92081,300 @@ func (m *SalesOrderMutation) PriceConditionNoteCleared() bool {
 func (m *SalesOrderMutation) ResetPriceConditionNote() {
 	m.price_condition_note = nil
 	delete(m.clearedFields, salesorder.FieldPriceConditionNote)
+}
+
+// SetTaxMode sets the "tax_mode" field.
+func (m *SalesOrderMutation) SetTaxMode(s string) {
+	m.tax_mode = &s
+}
+
+// TaxMode returns the value of the "tax_mode" field in the mutation.
+func (m *SalesOrderMutation) TaxMode() (r string, exists bool) {
+	v := m.tax_mode
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTaxMode returns the old "tax_mode" field's value of the SalesOrder entity.
+// If the SalesOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SalesOrderMutation) OldTaxMode(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTaxMode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTaxMode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTaxMode: %w", err)
+	}
+	return oldValue.TaxMode, nil
+}
+
+// ClearTaxMode clears the value of the "tax_mode" field.
+func (m *SalesOrderMutation) ClearTaxMode() {
+	m.tax_mode = nil
+	m.clearedFields[salesorder.FieldTaxMode] = struct{}{}
+}
+
+// TaxModeCleared returns if the "tax_mode" field was cleared in this mutation.
+func (m *SalesOrderMutation) TaxModeCleared() bool {
+	_, ok := m.clearedFields[salesorder.FieldTaxMode]
+	return ok
+}
+
+// ResetTaxMode resets all changes to the "tax_mode" field.
+func (m *SalesOrderMutation) ResetTaxMode() {
+	m.tax_mode = nil
+	delete(m.clearedFields, salesorder.FieldTaxMode)
+}
+
+// SetTaxRate sets the "tax_rate" field.
+func (m *SalesOrderMutation) SetTaxRate(d decimal.Decimal) {
+	m.tax_rate = &d
+}
+
+// TaxRate returns the value of the "tax_rate" field in the mutation.
+func (m *SalesOrderMutation) TaxRate() (r decimal.Decimal, exists bool) {
+	v := m.tax_rate
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTaxRate returns the old "tax_rate" field's value of the SalesOrder entity.
+// If the SalesOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SalesOrderMutation) OldTaxRate(ctx context.Context) (v *decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTaxRate is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTaxRate requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTaxRate: %w", err)
+	}
+	return oldValue.TaxRate, nil
+}
+
+// ClearTaxRate clears the value of the "tax_rate" field.
+func (m *SalesOrderMutation) ClearTaxRate() {
+	m.tax_rate = nil
+	m.clearedFields[salesorder.FieldTaxRate] = struct{}{}
+}
+
+// TaxRateCleared returns if the "tax_rate" field was cleared in this mutation.
+func (m *SalesOrderMutation) TaxRateCleared() bool {
+	_, ok := m.clearedFields[salesorder.FieldTaxRate]
+	return ok
+}
+
+// ResetTaxRate resets all changes to the "tax_rate" field.
+func (m *SalesOrderMutation) ResetTaxRate() {
+	m.tax_rate = nil
+	delete(m.clearedFields, salesorder.FieldTaxRate)
+}
+
+// SetFreightTerms sets the "freight_terms" field.
+func (m *SalesOrderMutation) SetFreightTerms(s string) {
+	m.freight_terms = &s
+}
+
+// FreightTerms returns the value of the "freight_terms" field in the mutation.
+func (m *SalesOrderMutation) FreightTerms() (r string, exists bool) {
+	v := m.freight_terms
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFreightTerms returns the old "freight_terms" field's value of the SalesOrder entity.
+// If the SalesOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SalesOrderMutation) OldFreightTerms(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFreightTerms is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFreightTerms requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFreightTerms: %w", err)
+	}
+	return oldValue.FreightTerms, nil
+}
+
+// ClearFreightTerms clears the value of the "freight_terms" field.
+func (m *SalesOrderMutation) ClearFreightTerms() {
+	m.freight_terms = nil
+	m.clearedFields[salesorder.FieldFreightTerms] = struct{}{}
+}
+
+// FreightTermsCleared returns if the "freight_terms" field was cleared in this mutation.
+func (m *SalesOrderMutation) FreightTermsCleared() bool {
+	_, ok := m.clearedFields[salesorder.FieldFreightTerms]
+	return ok
+}
+
+// ResetFreightTerms resets all changes to the "freight_terms" field.
+func (m *SalesOrderMutation) ResetFreightTerms() {
+	m.freight_terms = nil
+	delete(m.clearedFields, salesorder.FieldFreightTerms)
+}
+
+// SetGoodsAmount sets the "goods_amount" field.
+func (m *SalesOrderMutation) SetGoodsAmount(d decimal.Decimal) {
+	m.goods_amount = &d
+}
+
+// GoodsAmount returns the value of the "goods_amount" field in the mutation.
+func (m *SalesOrderMutation) GoodsAmount() (r decimal.Decimal, exists bool) {
+	v := m.goods_amount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldGoodsAmount returns the old "goods_amount" field's value of the SalesOrder entity.
+// If the SalesOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SalesOrderMutation) OldGoodsAmount(ctx context.Context) (v *decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldGoodsAmount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldGoodsAmount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldGoodsAmount: %w", err)
+	}
+	return oldValue.GoodsAmount, nil
+}
+
+// ClearGoodsAmount clears the value of the "goods_amount" field.
+func (m *SalesOrderMutation) ClearGoodsAmount() {
+	m.goods_amount = nil
+	m.clearedFields[salesorder.FieldGoodsAmount] = struct{}{}
+}
+
+// GoodsAmountCleared returns if the "goods_amount" field was cleared in this mutation.
+func (m *SalesOrderMutation) GoodsAmountCleared() bool {
+	_, ok := m.clearedFields[salesorder.FieldGoodsAmount]
+	return ok
+}
+
+// ResetGoodsAmount resets all changes to the "goods_amount" field.
+func (m *SalesOrderMutation) ResetGoodsAmount() {
+	m.goods_amount = nil
+	delete(m.clearedFields, salesorder.FieldGoodsAmount)
+}
+
+// SetTaxAmount sets the "tax_amount" field.
+func (m *SalesOrderMutation) SetTaxAmount(d decimal.Decimal) {
+	m.tax_amount = &d
+}
+
+// TaxAmount returns the value of the "tax_amount" field in the mutation.
+func (m *SalesOrderMutation) TaxAmount() (r decimal.Decimal, exists bool) {
+	v := m.tax_amount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTaxAmount returns the old "tax_amount" field's value of the SalesOrder entity.
+// If the SalesOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SalesOrderMutation) OldTaxAmount(ctx context.Context) (v *decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTaxAmount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTaxAmount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTaxAmount: %w", err)
+	}
+	return oldValue.TaxAmount, nil
+}
+
+// ClearTaxAmount clears the value of the "tax_amount" field.
+func (m *SalesOrderMutation) ClearTaxAmount() {
+	m.tax_amount = nil
+	m.clearedFields[salesorder.FieldTaxAmount] = struct{}{}
+}
+
+// TaxAmountCleared returns if the "tax_amount" field was cleared in this mutation.
+func (m *SalesOrderMutation) TaxAmountCleared() bool {
+	_, ok := m.clearedFields[salesorder.FieldTaxAmount]
+	return ok
+}
+
+// ResetTaxAmount resets all changes to the "tax_amount" field.
+func (m *SalesOrderMutation) ResetTaxAmount() {
+	m.tax_amount = nil
+	delete(m.clearedFields, salesorder.FieldTaxAmount)
+}
+
+// SetOrderTotal sets the "order_total" field.
+func (m *SalesOrderMutation) SetOrderTotal(d decimal.Decimal) {
+	m.order_total = &d
+}
+
+// OrderTotal returns the value of the "order_total" field in the mutation.
+func (m *SalesOrderMutation) OrderTotal() (r decimal.Decimal, exists bool) {
+	v := m.order_total
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOrderTotal returns the old "order_total" field's value of the SalesOrder entity.
+// If the SalesOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SalesOrderMutation) OldOrderTotal(ctx context.Context) (v *decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOrderTotal is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOrderTotal requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOrderTotal: %w", err)
+	}
+	return oldValue.OrderTotal, nil
+}
+
+// ClearOrderTotal clears the value of the "order_total" field.
+func (m *SalesOrderMutation) ClearOrderTotal() {
+	m.order_total = nil
+	m.clearedFields[salesorder.FieldOrderTotal] = struct{}{}
+}
+
+// OrderTotalCleared returns if the "order_total" field was cleared in this mutation.
+func (m *SalesOrderMutation) OrderTotalCleared() bool {
+	_, ok := m.clearedFields[salesorder.FieldOrderTotal]
+	return ok
+}
+
+// ResetOrderTotal resets all changes to the "order_total" field.
+func (m *SalesOrderMutation) ResetOrderTotal() {
+	m.order_total = nil
+	delete(m.clearedFields, salesorder.FieldOrderTotal)
 }
 
 // SetOrderDate sets the "order_date" field.
@@ -92011,7 +93164,7 @@ func (m *SalesOrderMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SalesOrderMutation) Fields() []string {
-	fields := make([]string, 0, 22)
+	fields := make([]string, 0, 29)
 	if m.order_no != nil {
 		fields = append(fields, salesorder.FieldOrderNo)
 	}
@@ -92033,6 +93186,9 @@ func (m *SalesOrderMutation) Fields() []string {
 	if m.contact_snapshot != nil {
 		fields = append(fields, salesorder.FieldContactSnapshot)
 	}
+	if m.delivery_snapshot != nil {
+		fields = append(fields, salesorder.FieldDeliverySnapshot)
+	}
 	if m.payment_method != nil {
 		fields = append(fields, salesorder.FieldPaymentMethod)
 	}
@@ -92041,6 +93197,24 @@ func (m *SalesOrderMutation) Fields() []string {
 	}
 	if m.price_condition_note != nil {
 		fields = append(fields, salesorder.FieldPriceConditionNote)
+	}
+	if m.tax_mode != nil {
+		fields = append(fields, salesorder.FieldTaxMode)
+	}
+	if m.tax_rate != nil {
+		fields = append(fields, salesorder.FieldTaxRate)
+	}
+	if m.freight_terms != nil {
+		fields = append(fields, salesorder.FieldFreightTerms)
+	}
+	if m.goods_amount != nil {
+		fields = append(fields, salesorder.FieldGoodsAmount)
+	}
+	if m.tax_amount != nil {
+		fields = append(fields, salesorder.FieldTaxAmount)
+	}
+	if m.order_total != nil {
+		fields = append(fields, salesorder.FieldOrderTotal)
 	}
 	if m.order_date != nil {
 		fields = append(fields, salesorder.FieldOrderDate)
@@ -92100,12 +93274,26 @@ func (m *SalesOrderMutation) Field(name string) (ent.Value, bool) {
 		return m.SalesOwner()
 	case salesorder.FieldContactSnapshot:
 		return m.ContactSnapshot()
+	case salesorder.FieldDeliverySnapshot:
+		return m.DeliverySnapshot()
 	case salesorder.FieldPaymentMethod:
 		return m.PaymentMethod()
 	case salesorder.FieldPaymentTermDays:
 		return m.PaymentTermDays()
 	case salesorder.FieldPriceConditionNote:
 		return m.PriceConditionNote()
+	case salesorder.FieldTaxMode:
+		return m.TaxMode()
+	case salesorder.FieldTaxRate:
+		return m.TaxRate()
+	case salesorder.FieldFreightTerms:
+		return m.FreightTerms()
+	case salesorder.FieldGoodsAmount:
+		return m.GoodsAmount()
+	case salesorder.FieldTaxAmount:
+		return m.TaxAmount()
+	case salesorder.FieldOrderTotal:
+		return m.OrderTotal()
 	case salesorder.FieldOrderDate:
 		return m.OrderDate()
 	case salesorder.FieldPlannedDeliveryDate:
@@ -92153,12 +93341,26 @@ func (m *SalesOrderMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldSalesOwner(ctx)
 	case salesorder.FieldContactSnapshot:
 		return m.OldContactSnapshot(ctx)
+	case salesorder.FieldDeliverySnapshot:
+		return m.OldDeliverySnapshot(ctx)
 	case salesorder.FieldPaymentMethod:
 		return m.OldPaymentMethod(ctx)
 	case salesorder.FieldPaymentTermDays:
 		return m.OldPaymentTermDays(ctx)
 	case salesorder.FieldPriceConditionNote:
 		return m.OldPriceConditionNote(ctx)
+	case salesorder.FieldTaxMode:
+		return m.OldTaxMode(ctx)
+	case salesorder.FieldTaxRate:
+		return m.OldTaxRate(ctx)
+	case salesorder.FieldFreightTerms:
+		return m.OldFreightTerms(ctx)
+	case salesorder.FieldGoodsAmount:
+		return m.OldGoodsAmount(ctx)
+	case salesorder.FieldTaxAmount:
+		return m.OldTaxAmount(ctx)
+	case salesorder.FieldOrderTotal:
+		return m.OldOrderTotal(ctx)
 	case salesorder.FieldOrderDate:
 		return m.OldOrderDate(ctx)
 	case salesorder.FieldPlannedDeliveryDate:
@@ -92241,6 +93443,13 @@ func (m *SalesOrderMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetContactSnapshot(v)
 		return nil
+	case salesorder.FieldDeliverySnapshot:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDeliverySnapshot(v)
+		return nil
 	case salesorder.FieldPaymentMethod:
 		v, ok := value.(string)
 		if !ok {
@@ -92261,6 +93470,48 @@ func (m *SalesOrderMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetPriceConditionNote(v)
+		return nil
+	case salesorder.FieldTaxMode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTaxMode(v)
+		return nil
+	case salesorder.FieldTaxRate:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTaxRate(v)
+		return nil
+	case salesorder.FieldFreightTerms:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFreightTerms(v)
+		return nil
+	case salesorder.FieldGoodsAmount:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetGoodsAmount(v)
+		return nil
+	case salesorder.FieldTaxAmount:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTaxAmount(v)
+		return nil
+	case salesorder.FieldOrderTotal:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOrderTotal(v)
 		return nil
 	case salesorder.FieldOrderDate:
 		v, ok := value.(time.Time)
@@ -92427,6 +93678,9 @@ func (m *SalesOrderMutation) ClearedFields() []string {
 	if m.FieldCleared(salesorder.FieldContactSnapshot) {
 		fields = append(fields, salesorder.FieldContactSnapshot)
 	}
+	if m.FieldCleared(salesorder.FieldDeliverySnapshot) {
+		fields = append(fields, salesorder.FieldDeliverySnapshot)
+	}
 	if m.FieldCleared(salesorder.FieldPaymentMethod) {
 		fields = append(fields, salesorder.FieldPaymentMethod)
 	}
@@ -92435,6 +93689,24 @@ func (m *SalesOrderMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(salesorder.FieldPriceConditionNote) {
 		fields = append(fields, salesorder.FieldPriceConditionNote)
+	}
+	if m.FieldCleared(salesorder.FieldTaxMode) {
+		fields = append(fields, salesorder.FieldTaxMode)
+	}
+	if m.FieldCleared(salesorder.FieldTaxRate) {
+		fields = append(fields, salesorder.FieldTaxRate)
+	}
+	if m.FieldCleared(salesorder.FieldFreightTerms) {
+		fields = append(fields, salesorder.FieldFreightTerms)
+	}
+	if m.FieldCleared(salesorder.FieldGoodsAmount) {
+		fields = append(fields, salesorder.FieldGoodsAmount)
+	}
+	if m.FieldCleared(salesorder.FieldTaxAmount) {
+		fields = append(fields, salesorder.FieldTaxAmount)
+	}
+	if m.FieldCleared(salesorder.FieldOrderTotal) {
+		fields = append(fields, salesorder.FieldOrderTotal)
 	}
 	if m.FieldCleared(salesorder.FieldPlannedDeliveryDate) {
 		fields = append(fields, salesorder.FieldPlannedDeliveryDate)
@@ -92483,6 +93755,9 @@ func (m *SalesOrderMutation) ClearField(name string) error {
 	case salesorder.FieldContactSnapshot:
 		m.ClearContactSnapshot()
 		return nil
+	case salesorder.FieldDeliverySnapshot:
+		m.ClearDeliverySnapshot()
+		return nil
 	case salesorder.FieldPaymentMethod:
 		m.ClearPaymentMethod()
 		return nil
@@ -92491,6 +93766,24 @@ func (m *SalesOrderMutation) ClearField(name string) error {
 		return nil
 	case salesorder.FieldPriceConditionNote:
 		m.ClearPriceConditionNote()
+		return nil
+	case salesorder.FieldTaxMode:
+		m.ClearTaxMode()
+		return nil
+	case salesorder.FieldTaxRate:
+		m.ClearTaxRate()
+		return nil
+	case salesorder.FieldFreightTerms:
+		m.ClearFreightTerms()
+		return nil
+	case salesorder.FieldGoodsAmount:
+		m.ClearGoodsAmount()
+		return nil
+	case salesorder.FieldTaxAmount:
+		m.ClearTaxAmount()
+		return nil
+	case salesorder.FieldOrderTotal:
+		m.ClearOrderTotal()
 		return nil
 	case salesorder.FieldPlannedDeliveryDate:
 		m.ClearPlannedDeliveryDate()
@@ -92542,6 +93835,9 @@ func (m *SalesOrderMutation) ResetField(name string) error {
 	case salesorder.FieldContactSnapshot:
 		m.ResetContactSnapshot()
 		return nil
+	case salesorder.FieldDeliverySnapshot:
+		m.ResetDeliverySnapshot()
+		return nil
 	case salesorder.FieldPaymentMethod:
 		m.ResetPaymentMethod()
 		return nil
@@ -92550,6 +93846,24 @@ func (m *SalesOrderMutation) ResetField(name string) error {
 		return nil
 	case salesorder.FieldPriceConditionNote:
 		m.ResetPriceConditionNote()
+		return nil
+	case salesorder.FieldTaxMode:
+		m.ResetTaxMode()
+		return nil
+	case salesorder.FieldTaxRate:
+		m.ResetTaxRate()
+		return nil
+	case salesorder.FieldFreightTerms:
+		m.ResetFreightTerms()
+		return nil
+	case salesorder.FieldGoodsAmount:
+		m.ResetGoodsAmount()
+		return nil
+	case salesorder.FieldTaxAmount:
+		m.ResetTaxAmount()
+		return nil
+	case salesorder.FieldOrderTotal:
+		m.ResetOrderTotal()
 		return nil
 	case salesorder.FieldOrderDate:
 		m.ResetOrderDate()
@@ -94547,6 +95861,7 @@ type ShipmentMutation struct {
 	id                                     *int
 	shipment_no                            *string
 	customer_snapshot                      *string
+	delivery_snapshot                      *map[string]interface{}
 	status                                 *string
 	version                                *int
 	addversion                             *int
@@ -94564,6 +95879,16 @@ type ShipmentMutation struct {
 	idempotency_key                        *string
 	planned_ship_at                        *time.Time
 	shipped_at                             *time.Time
+	transport_method                       *string
+	carrier_name                           *string
+	tracking_no                            *string
+	package_count                          *int
+	addpackage_count                       *int
+	gross_weight_kg                        *decimal.Decimal
+	volume_m3                              *decimal.Decimal
+	shipping_mark                          *string
+	freight_amount                         *decimal.Decimal
+	freight_currency                       *string
 	total_net_weight_g                     *decimal.Decimal
 	requested_total_net_weight_g           *decimal.Decimal
 	note                                   *string
@@ -94861,6 +96186,55 @@ func (m *ShipmentMutation) CustomerSnapshotCleared() bool {
 func (m *ShipmentMutation) ResetCustomerSnapshot() {
 	m.customer_snapshot = nil
 	delete(m.clearedFields, shipment.FieldCustomerSnapshot)
+}
+
+// SetDeliverySnapshot sets the "delivery_snapshot" field.
+func (m *ShipmentMutation) SetDeliverySnapshot(value map[string]interface{}) {
+	m.delivery_snapshot = &value
+}
+
+// DeliverySnapshot returns the value of the "delivery_snapshot" field in the mutation.
+func (m *ShipmentMutation) DeliverySnapshot() (r map[string]interface{}, exists bool) {
+	v := m.delivery_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDeliverySnapshot returns the old "delivery_snapshot" field's value of the Shipment entity.
+// If the Shipment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShipmentMutation) OldDeliverySnapshot(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDeliverySnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDeliverySnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDeliverySnapshot: %w", err)
+	}
+	return oldValue.DeliverySnapshot, nil
+}
+
+// ClearDeliverySnapshot clears the value of the "delivery_snapshot" field.
+func (m *ShipmentMutation) ClearDeliverySnapshot() {
+	m.delivery_snapshot = nil
+	m.clearedFields[shipment.FieldDeliverySnapshot] = struct{}{}
+}
+
+// DeliverySnapshotCleared returns if the "delivery_snapshot" field was cleared in this mutation.
+func (m *ShipmentMutation) DeliverySnapshotCleared() bool {
+	_, ok := m.clearedFields[shipment.FieldDeliverySnapshot]
+	return ok
+}
+
+// ResetDeliverySnapshot resets all changes to the "delivery_snapshot" field.
+func (m *ShipmentMutation) ResetDeliverySnapshot() {
+	m.delivery_snapshot = nil
+	delete(m.clearedFields, shipment.FieldDeliverySnapshot)
 }
 
 // SetStatus sets the "status" field.
@@ -95489,6 +96863,468 @@ func (m *ShipmentMutation) ResetShippedAt() {
 	delete(m.clearedFields, shipment.FieldShippedAt)
 }
 
+// SetTransportMethod sets the "transport_method" field.
+func (m *ShipmentMutation) SetTransportMethod(s string) {
+	m.transport_method = &s
+}
+
+// TransportMethod returns the value of the "transport_method" field in the mutation.
+func (m *ShipmentMutation) TransportMethod() (r string, exists bool) {
+	v := m.transport_method
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTransportMethod returns the old "transport_method" field's value of the Shipment entity.
+// If the Shipment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShipmentMutation) OldTransportMethod(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTransportMethod is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTransportMethod requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTransportMethod: %w", err)
+	}
+	return oldValue.TransportMethod, nil
+}
+
+// ClearTransportMethod clears the value of the "transport_method" field.
+func (m *ShipmentMutation) ClearTransportMethod() {
+	m.transport_method = nil
+	m.clearedFields[shipment.FieldTransportMethod] = struct{}{}
+}
+
+// TransportMethodCleared returns if the "transport_method" field was cleared in this mutation.
+func (m *ShipmentMutation) TransportMethodCleared() bool {
+	_, ok := m.clearedFields[shipment.FieldTransportMethod]
+	return ok
+}
+
+// ResetTransportMethod resets all changes to the "transport_method" field.
+func (m *ShipmentMutation) ResetTransportMethod() {
+	m.transport_method = nil
+	delete(m.clearedFields, shipment.FieldTransportMethod)
+}
+
+// SetCarrierName sets the "carrier_name" field.
+func (m *ShipmentMutation) SetCarrierName(s string) {
+	m.carrier_name = &s
+}
+
+// CarrierName returns the value of the "carrier_name" field in the mutation.
+func (m *ShipmentMutation) CarrierName() (r string, exists bool) {
+	v := m.carrier_name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCarrierName returns the old "carrier_name" field's value of the Shipment entity.
+// If the Shipment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShipmentMutation) OldCarrierName(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCarrierName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCarrierName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCarrierName: %w", err)
+	}
+	return oldValue.CarrierName, nil
+}
+
+// ClearCarrierName clears the value of the "carrier_name" field.
+func (m *ShipmentMutation) ClearCarrierName() {
+	m.carrier_name = nil
+	m.clearedFields[shipment.FieldCarrierName] = struct{}{}
+}
+
+// CarrierNameCleared returns if the "carrier_name" field was cleared in this mutation.
+func (m *ShipmentMutation) CarrierNameCleared() bool {
+	_, ok := m.clearedFields[shipment.FieldCarrierName]
+	return ok
+}
+
+// ResetCarrierName resets all changes to the "carrier_name" field.
+func (m *ShipmentMutation) ResetCarrierName() {
+	m.carrier_name = nil
+	delete(m.clearedFields, shipment.FieldCarrierName)
+}
+
+// SetTrackingNo sets the "tracking_no" field.
+func (m *ShipmentMutation) SetTrackingNo(s string) {
+	m.tracking_no = &s
+}
+
+// TrackingNo returns the value of the "tracking_no" field in the mutation.
+func (m *ShipmentMutation) TrackingNo() (r string, exists bool) {
+	v := m.tracking_no
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTrackingNo returns the old "tracking_no" field's value of the Shipment entity.
+// If the Shipment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShipmentMutation) OldTrackingNo(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTrackingNo is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTrackingNo requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTrackingNo: %w", err)
+	}
+	return oldValue.TrackingNo, nil
+}
+
+// ClearTrackingNo clears the value of the "tracking_no" field.
+func (m *ShipmentMutation) ClearTrackingNo() {
+	m.tracking_no = nil
+	m.clearedFields[shipment.FieldTrackingNo] = struct{}{}
+}
+
+// TrackingNoCleared returns if the "tracking_no" field was cleared in this mutation.
+func (m *ShipmentMutation) TrackingNoCleared() bool {
+	_, ok := m.clearedFields[shipment.FieldTrackingNo]
+	return ok
+}
+
+// ResetTrackingNo resets all changes to the "tracking_no" field.
+func (m *ShipmentMutation) ResetTrackingNo() {
+	m.tracking_no = nil
+	delete(m.clearedFields, shipment.FieldTrackingNo)
+}
+
+// SetPackageCount sets the "package_count" field.
+func (m *ShipmentMutation) SetPackageCount(i int) {
+	m.package_count = &i
+	m.addpackage_count = nil
+}
+
+// PackageCount returns the value of the "package_count" field in the mutation.
+func (m *ShipmentMutation) PackageCount() (r int, exists bool) {
+	v := m.package_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPackageCount returns the old "package_count" field's value of the Shipment entity.
+// If the Shipment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShipmentMutation) OldPackageCount(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPackageCount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPackageCount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPackageCount: %w", err)
+	}
+	return oldValue.PackageCount, nil
+}
+
+// AddPackageCount adds i to the "package_count" field.
+func (m *ShipmentMutation) AddPackageCount(i int) {
+	if m.addpackage_count != nil {
+		*m.addpackage_count += i
+	} else {
+		m.addpackage_count = &i
+	}
+}
+
+// AddedPackageCount returns the value that was added to the "package_count" field in this mutation.
+func (m *ShipmentMutation) AddedPackageCount() (r int, exists bool) {
+	v := m.addpackage_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearPackageCount clears the value of the "package_count" field.
+func (m *ShipmentMutation) ClearPackageCount() {
+	m.package_count = nil
+	m.addpackage_count = nil
+	m.clearedFields[shipment.FieldPackageCount] = struct{}{}
+}
+
+// PackageCountCleared returns if the "package_count" field was cleared in this mutation.
+func (m *ShipmentMutation) PackageCountCleared() bool {
+	_, ok := m.clearedFields[shipment.FieldPackageCount]
+	return ok
+}
+
+// ResetPackageCount resets all changes to the "package_count" field.
+func (m *ShipmentMutation) ResetPackageCount() {
+	m.package_count = nil
+	m.addpackage_count = nil
+	delete(m.clearedFields, shipment.FieldPackageCount)
+}
+
+// SetGrossWeightKg sets the "gross_weight_kg" field.
+func (m *ShipmentMutation) SetGrossWeightKg(d decimal.Decimal) {
+	m.gross_weight_kg = &d
+}
+
+// GrossWeightKg returns the value of the "gross_weight_kg" field in the mutation.
+func (m *ShipmentMutation) GrossWeightKg() (r decimal.Decimal, exists bool) {
+	v := m.gross_weight_kg
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldGrossWeightKg returns the old "gross_weight_kg" field's value of the Shipment entity.
+// If the Shipment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShipmentMutation) OldGrossWeightKg(ctx context.Context) (v *decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldGrossWeightKg is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldGrossWeightKg requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldGrossWeightKg: %w", err)
+	}
+	return oldValue.GrossWeightKg, nil
+}
+
+// ClearGrossWeightKg clears the value of the "gross_weight_kg" field.
+func (m *ShipmentMutation) ClearGrossWeightKg() {
+	m.gross_weight_kg = nil
+	m.clearedFields[shipment.FieldGrossWeightKg] = struct{}{}
+}
+
+// GrossWeightKgCleared returns if the "gross_weight_kg" field was cleared in this mutation.
+func (m *ShipmentMutation) GrossWeightKgCleared() bool {
+	_, ok := m.clearedFields[shipment.FieldGrossWeightKg]
+	return ok
+}
+
+// ResetGrossWeightKg resets all changes to the "gross_weight_kg" field.
+func (m *ShipmentMutation) ResetGrossWeightKg() {
+	m.gross_weight_kg = nil
+	delete(m.clearedFields, shipment.FieldGrossWeightKg)
+}
+
+// SetVolumeM3 sets the "volume_m3" field.
+func (m *ShipmentMutation) SetVolumeM3(d decimal.Decimal) {
+	m.volume_m3 = &d
+}
+
+// VolumeM3 returns the value of the "volume_m3" field in the mutation.
+func (m *ShipmentMutation) VolumeM3() (r decimal.Decimal, exists bool) {
+	v := m.volume_m3
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVolumeM3 returns the old "volume_m3" field's value of the Shipment entity.
+// If the Shipment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShipmentMutation) OldVolumeM3(ctx context.Context) (v *decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVolumeM3 is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVolumeM3 requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVolumeM3: %w", err)
+	}
+	return oldValue.VolumeM3, nil
+}
+
+// ClearVolumeM3 clears the value of the "volume_m3" field.
+func (m *ShipmentMutation) ClearVolumeM3() {
+	m.volume_m3 = nil
+	m.clearedFields[shipment.FieldVolumeM3] = struct{}{}
+}
+
+// VolumeM3Cleared returns if the "volume_m3" field was cleared in this mutation.
+func (m *ShipmentMutation) VolumeM3Cleared() bool {
+	_, ok := m.clearedFields[shipment.FieldVolumeM3]
+	return ok
+}
+
+// ResetVolumeM3 resets all changes to the "volume_m3" field.
+func (m *ShipmentMutation) ResetVolumeM3() {
+	m.volume_m3 = nil
+	delete(m.clearedFields, shipment.FieldVolumeM3)
+}
+
+// SetShippingMark sets the "shipping_mark" field.
+func (m *ShipmentMutation) SetShippingMark(s string) {
+	m.shipping_mark = &s
+}
+
+// ShippingMark returns the value of the "shipping_mark" field in the mutation.
+func (m *ShipmentMutation) ShippingMark() (r string, exists bool) {
+	v := m.shipping_mark
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldShippingMark returns the old "shipping_mark" field's value of the Shipment entity.
+// If the Shipment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShipmentMutation) OldShippingMark(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldShippingMark is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldShippingMark requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldShippingMark: %w", err)
+	}
+	return oldValue.ShippingMark, nil
+}
+
+// ClearShippingMark clears the value of the "shipping_mark" field.
+func (m *ShipmentMutation) ClearShippingMark() {
+	m.shipping_mark = nil
+	m.clearedFields[shipment.FieldShippingMark] = struct{}{}
+}
+
+// ShippingMarkCleared returns if the "shipping_mark" field was cleared in this mutation.
+func (m *ShipmentMutation) ShippingMarkCleared() bool {
+	_, ok := m.clearedFields[shipment.FieldShippingMark]
+	return ok
+}
+
+// ResetShippingMark resets all changes to the "shipping_mark" field.
+func (m *ShipmentMutation) ResetShippingMark() {
+	m.shipping_mark = nil
+	delete(m.clearedFields, shipment.FieldShippingMark)
+}
+
+// SetFreightAmount sets the "freight_amount" field.
+func (m *ShipmentMutation) SetFreightAmount(d decimal.Decimal) {
+	m.freight_amount = &d
+}
+
+// FreightAmount returns the value of the "freight_amount" field in the mutation.
+func (m *ShipmentMutation) FreightAmount() (r decimal.Decimal, exists bool) {
+	v := m.freight_amount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFreightAmount returns the old "freight_amount" field's value of the Shipment entity.
+// If the Shipment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShipmentMutation) OldFreightAmount(ctx context.Context) (v *decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFreightAmount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFreightAmount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFreightAmount: %w", err)
+	}
+	return oldValue.FreightAmount, nil
+}
+
+// ClearFreightAmount clears the value of the "freight_amount" field.
+func (m *ShipmentMutation) ClearFreightAmount() {
+	m.freight_amount = nil
+	m.clearedFields[shipment.FieldFreightAmount] = struct{}{}
+}
+
+// FreightAmountCleared returns if the "freight_amount" field was cleared in this mutation.
+func (m *ShipmentMutation) FreightAmountCleared() bool {
+	_, ok := m.clearedFields[shipment.FieldFreightAmount]
+	return ok
+}
+
+// ResetFreightAmount resets all changes to the "freight_amount" field.
+func (m *ShipmentMutation) ResetFreightAmount() {
+	m.freight_amount = nil
+	delete(m.clearedFields, shipment.FieldFreightAmount)
+}
+
+// SetFreightCurrency sets the "freight_currency" field.
+func (m *ShipmentMutation) SetFreightCurrency(s string) {
+	m.freight_currency = &s
+}
+
+// FreightCurrency returns the value of the "freight_currency" field in the mutation.
+func (m *ShipmentMutation) FreightCurrency() (r string, exists bool) {
+	v := m.freight_currency
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFreightCurrency returns the old "freight_currency" field's value of the Shipment entity.
+// If the Shipment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShipmentMutation) OldFreightCurrency(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFreightCurrency is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFreightCurrency requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFreightCurrency: %w", err)
+	}
+	return oldValue.FreightCurrency, nil
+}
+
+// ClearFreightCurrency clears the value of the "freight_currency" field.
+func (m *ShipmentMutation) ClearFreightCurrency() {
+	m.freight_currency = nil
+	m.clearedFields[shipment.FieldFreightCurrency] = struct{}{}
+}
+
+// FreightCurrencyCleared returns if the "freight_currency" field was cleared in this mutation.
+func (m *ShipmentMutation) FreightCurrencyCleared() bool {
+	_, ok := m.clearedFields[shipment.FieldFreightCurrency]
+	return ok
+}
+
+// ResetFreightCurrency resets all changes to the "freight_currency" field.
+func (m *ShipmentMutation) ResetFreightCurrency() {
+	m.freight_currency = nil
+	delete(m.clearedFields, shipment.FieldFreightCurrency)
+}
+
 // SetTotalNetWeightG sets the "total_net_weight_g" field.
 func (m *ShipmentMutation) SetTotalNetWeightG(d decimal.Decimal) {
 	m.total_net_weight_g = &d
@@ -95850,7 +97686,7 @@ func (m *ShipmentMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ShipmentMutation) Fields() []string {
-	fields := make([]string, 0, 21)
+	fields := make([]string, 0, 31)
 	if m.shipment_no != nil {
 		fields = append(fields, shipment.FieldShipmentNo)
 	}
@@ -95862,6 +97698,9 @@ func (m *ShipmentMutation) Fields() []string {
 	}
 	if m.customer_snapshot != nil {
 		fields = append(fields, shipment.FieldCustomerSnapshot)
+	}
+	if m.delivery_snapshot != nil {
+		fields = append(fields, shipment.FieldDeliverySnapshot)
 	}
 	if m.status != nil {
 		fields = append(fields, shipment.FieldStatus)
@@ -95899,6 +97738,33 @@ func (m *ShipmentMutation) Fields() []string {
 	if m.shipped_at != nil {
 		fields = append(fields, shipment.FieldShippedAt)
 	}
+	if m.transport_method != nil {
+		fields = append(fields, shipment.FieldTransportMethod)
+	}
+	if m.carrier_name != nil {
+		fields = append(fields, shipment.FieldCarrierName)
+	}
+	if m.tracking_no != nil {
+		fields = append(fields, shipment.FieldTrackingNo)
+	}
+	if m.package_count != nil {
+		fields = append(fields, shipment.FieldPackageCount)
+	}
+	if m.gross_weight_kg != nil {
+		fields = append(fields, shipment.FieldGrossWeightKg)
+	}
+	if m.volume_m3 != nil {
+		fields = append(fields, shipment.FieldVolumeM3)
+	}
+	if m.shipping_mark != nil {
+		fields = append(fields, shipment.FieldShippingMark)
+	}
+	if m.freight_amount != nil {
+		fields = append(fields, shipment.FieldFreightAmount)
+	}
+	if m.freight_currency != nil {
+		fields = append(fields, shipment.FieldFreightCurrency)
+	}
 	if m.total_net_weight_g != nil {
 		fields = append(fields, shipment.FieldTotalNetWeightG)
 	}
@@ -95930,6 +97796,8 @@ func (m *ShipmentMutation) Field(name string) (ent.Value, bool) {
 		return m.CustomerID()
 	case shipment.FieldCustomerSnapshot:
 		return m.CustomerSnapshot()
+	case shipment.FieldDeliverySnapshot:
+		return m.DeliverySnapshot()
 	case shipment.FieldStatus:
 		return m.Status()
 	case shipment.FieldVersion:
@@ -95954,6 +97822,24 @@ func (m *ShipmentMutation) Field(name string) (ent.Value, bool) {
 		return m.PlannedShipAt()
 	case shipment.FieldShippedAt:
 		return m.ShippedAt()
+	case shipment.FieldTransportMethod:
+		return m.TransportMethod()
+	case shipment.FieldCarrierName:
+		return m.CarrierName()
+	case shipment.FieldTrackingNo:
+		return m.TrackingNo()
+	case shipment.FieldPackageCount:
+		return m.PackageCount()
+	case shipment.FieldGrossWeightKg:
+		return m.GrossWeightKg()
+	case shipment.FieldVolumeM3:
+		return m.VolumeM3()
+	case shipment.FieldShippingMark:
+		return m.ShippingMark()
+	case shipment.FieldFreightAmount:
+		return m.FreightAmount()
+	case shipment.FieldFreightCurrency:
+		return m.FreightCurrency()
 	case shipment.FieldTotalNetWeightG:
 		return m.TotalNetWeightG()
 	case shipment.FieldRequestedTotalNetWeightG:
@@ -95981,6 +97867,8 @@ func (m *ShipmentMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldCustomerID(ctx)
 	case shipment.FieldCustomerSnapshot:
 		return m.OldCustomerSnapshot(ctx)
+	case shipment.FieldDeliverySnapshot:
+		return m.OldDeliverySnapshot(ctx)
 	case shipment.FieldStatus:
 		return m.OldStatus(ctx)
 	case shipment.FieldVersion:
@@ -96005,6 +97893,24 @@ func (m *ShipmentMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldPlannedShipAt(ctx)
 	case shipment.FieldShippedAt:
 		return m.OldShippedAt(ctx)
+	case shipment.FieldTransportMethod:
+		return m.OldTransportMethod(ctx)
+	case shipment.FieldCarrierName:
+		return m.OldCarrierName(ctx)
+	case shipment.FieldTrackingNo:
+		return m.OldTrackingNo(ctx)
+	case shipment.FieldPackageCount:
+		return m.OldPackageCount(ctx)
+	case shipment.FieldGrossWeightKg:
+		return m.OldGrossWeightKg(ctx)
+	case shipment.FieldVolumeM3:
+		return m.OldVolumeM3(ctx)
+	case shipment.FieldShippingMark:
+		return m.OldShippingMark(ctx)
+	case shipment.FieldFreightAmount:
+		return m.OldFreightAmount(ctx)
+	case shipment.FieldFreightCurrency:
+		return m.OldFreightCurrency(ctx)
 	case shipment.FieldTotalNetWeightG:
 		return m.OldTotalNetWeightG(ctx)
 	case shipment.FieldRequestedTotalNetWeightG:
@@ -96051,6 +97957,13 @@ func (m *ShipmentMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCustomerSnapshot(v)
+		return nil
+	case shipment.FieldDeliverySnapshot:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDeliverySnapshot(v)
 		return nil
 	case shipment.FieldStatus:
 		v, ok := value.(string)
@@ -96136,6 +98049,69 @@ func (m *ShipmentMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetShippedAt(v)
 		return nil
+	case shipment.FieldTransportMethod:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTransportMethod(v)
+		return nil
+	case shipment.FieldCarrierName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCarrierName(v)
+		return nil
+	case shipment.FieldTrackingNo:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTrackingNo(v)
+		return nil
+	case shipment.FieldPackageCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPackageCount(v)
+		return nil
+	case shipment.FieldGrossWeightKg:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetGrossWeightKg(v)
+		return nil
+	case shipment.FieldVolumeM3:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVolumeM3(v)
+		return nil
+	case shipment.FieldShippingMark:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetShippingMark(v)
+		return nil
+	case shipment.FieldFreightAmount:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFreightAmount(v)
+		return nil
+	case shipment.FieldFreightCurrency:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFreightCurrency(v)
+		return nil
 	case shipment.FieldTotalNetWeightG:
 		v, ok := value.(decimal.Decimal)
 		if !ok {
@@ -96194,6 +98170,9 @@ func (m *ShipmentMutation) AddedFields() []string {
 	if m.addfinance_release_process_node_id != nil {
 		fields = append(fields, shipment.FieldFinanceReleaseProcessNodeID)
 	}
+	if m.addpackage_count != nil {
+		fields = append(fields, shipment.FieldPackageCount)
+	}
 	return fields
 }
 
@@ -96212,6 +98191,8 @@ func (m *ShipmentMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedFinanceReleaseProcessInstanceID()
 	case shipment.FieldFinanceReleaseProcessNodeID:
 		return m.AddedFinanceReleaseProcessNodeID()
+	case shipment.FieldPackageCount:
+		return m.AddedPackageCount()
 	}
 	return nil, false
 }
@@ -96256,6 +98237,13 @@ func (m *ShipmentMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddFinanceReleaseProcessNodeID(v)
 		return nil
+	case shipment.FieldPackageCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPackageCount(v)
+		return nil
 	}
 	return fmt.Errorf("unknown Shipment numeric field %s", name)
 }
@@ -96272,6 +98260,9 @@ func (m *ShipmentMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(shipment.FieldCustomerSnapshot) {
 		fields = append(fields, shipment.FieldCustomerSnapshot)
+	}
+	if m.FieldCleared(shipment.FieldDeliverySnapshot) {
+		fields = append(fields, shipment.FieldDeliverySnapshot)
 	}
 	if m.FieldCleared(shipment.FieldFinanceReleasedAt) {
 		fields = append(fields, shipment.FieldFinanceReleasedAt)
@@ -96293,6 +98284,33 @@ func (m *ShipmentMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(shipment.FieldShippedAt) {
 		fields = append(fields, shipment.FieldShippedAt)
+	}
+	if m.FieldCleared(shipment.FieldTransportMethod) {
+		fields = append(fields, shipment.FieldTransportMethod)
+	}
+	if m.FieldCleared(shipment.FieldCarrierName) {
+		fields = append(fields, shipment.FieldCarrierName)
+	}
+	if m.FieldCleared(shipment.FieldTrackingNo) {
+		fields = append(fields, shipment.FieldTrackingNo)
+	}
+	if m.FieldCleared(shipment.FieldPackageCount) {
+		fields = append(fields, shipment.FieldPackageCount)
+	}
+	if m.FieldCleared(shipment.FieldGrossWeightKg) {
+		fields = append(fields, shipment.FieldGrossWeightKg)
+	}
+	if m.FieldCleared(shipment.FieldVolumeM3) {
+		fields = append(fields, shipment.FieldVolumeM3)
+	}
+	if m.FieldCleared(shipment.FieldShippingMark) {
+		fields = append(fields, shipment.FieldShippingMark)
+	}
+	if m.FieldCleared(shipment.FieldFreightAmount) {
+		fields = append(fields, shipment.FieldFreightAmount)
+	}
+	if m.FieldCleared(shipment.FieldFreightCurrency) {
+		fields = append(fields, shipment.FieldFreightCurrency)
 	}
 	if m.FieldCleared(shipment.FieldTotalNetWeightG) {
 		fields = append(fields, shipment.FieldTotalNetWeightG)
@@ -96326,6 +98344,9 @@ func (m *ShipmentMutation) ClearField(name string) error {
 	case shipment.FieldCustomerSnapshot:
 		m.ClearCustomerSnapshot()
 		return nil
+	case shipment.FieldDeliverySnapshot:
+		m.ClearDeliverySnapshot()
+		return nil
 	case shipment.FieldFinanceReleasedAt:
 		m.ClearFinanceReleasedAt()
 		return nil
@@ -96346,6 +98367,33 @@ func (m *ShipmentMutation) ClearField(name string) error {
 		return nil
 	case shipment.FieldShippedAt:
 		m.ClearShippedAt()
+		return nil
+	case shipment.FieldTransportMethod:
+		m.ClearTransportMethod()
+		return nil
+	case shipment.FieldCarrierName:
+		m.ClearCarrierName()
+		return nil
+	case shipment.FieldTrackingNo:
+		m.ClearTrackingNo()
+		return nil
+	case shipment.FieldPackageCount:
+		m.ClearPackageCount()
+		return nil
+	case shipment.FieldGrossWeightKg:
+		m.ClearGrossWeightKg()
+		return nil
+	case shipment.FieldVolumeM3:
+		m.ClearVolumeM3()
+		return nil
+	case shipment.FieldShippingMark:
+		m.ClearShippingMark()
+		return nil
+	case shipment.FieldFreightAmount:
+		m.ClearFreightAmount()
+		return nil
+	case shipment.FieldFreightCurrency:
+		m.ClearFreightCurrency()
 		return nil
 	case shipment.FieldTotalNetWeightG:
 		m.ClearTotalNetWeightG()
@@ -96375,6 +98423,9 @@ func (m *ShipmentMutation) ResetField(name string) error {
 		return nil
 	case shipment.FieldCustomerSnapshot:
 		m.ResetCustomerSnapshot()
+		return nil
+	case shipment.FieldDeliverySnapshot:
+		m.ResetDeliverySnapshot()
 		return nil
 	case shipment.FieldStatus:
 		m.ResetStatus()
@@ -96411,6 +98462,33 @@ func (m *ShipmentMutation) ResetField(name string) error {
 		return nil
 	case shipment.FieldShippedAt:
 		m.ResetShippedAt()
+		return nil
+	case shipment.FieldTransportMethod:
+		m.ResetTransportMethod()
+		return nil
+	case shipment.FieldCarrierName:
+		m.ResetCarrierName()
+		return nil
+	case shipment.FieldTrackingNo:
+		m.ResetTrackingNo()
+		return nil
+	case shipment.FieldPackageCount:
+		m.ResetPackageCount()
+		return nil
+	case shipment.FieldGrossWeightKg:
+		m.ResetGrossWeightKg()
+		return nil
+	case shipment.FieldVolumeM3:
+		m.ResetVolumeM3()
+		return nil
+	case shipment.FieldShippingMark:
+		m.ResetShippingMark()
+		return nil
+	case shipment.FieldFreightAmount:
+		m.ResetFreightAmount()
+		return nil
+	case shipment.FieldFreightCurrency:
+		m.ResetFreightCurrency()
 		return nil
 	case shipment.FieldTotalNetWeightG:
 		m.ResetTotalNetWeightG()
@@ -96562,6 +98640,8 @@ type ShipmentItemMutation struct {
 	unit_price_snapshot        *decimal.Decimal
 	amount_snapshot            *decimal.Decimal
 	currency_snapshot          *string
+	package_description        *string
+	case_no                    *string
 	note                       *string
 	created_at                 *time.Time
 	updated_at                 *time.Time
@@ -97193,6 +99273,104 @@ func (m *ShipmentItemMutation) ResetCurrencySnapshot() {
 	m.currency_snapshot = nil
 }
 
+// SetPackageDescription sets the "package_description" field.
+func (m *ShipmentItemMutation) SetPackageDescription(s string) {
+	m.package_description = &s
+}
+
+// PackageDescription returns the value of the "package_description" field in the mutation.
+func (m *ShipmentItemMutation) PackageDescription() (r string, exists bool) {
+	v := m.package_description
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPackageDescription returns the old "package_description" field's value of the ShipmentItem entity.
+// If the ShipmentItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShipmentItemMutation) OldPackageDescription(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPackageDescription is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPackageDescription requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPackageDescription: %w", err)
+	}
+	return oldValue.PackageDescription, nil
+}
+
+// ClearPackageDescription clears the value of the "package_description" field.
+func (m *ShipmentItemMutation) ClearPackageDescription() {
+	m.package_description = nil
+	m.clearedFields[shipmentitem.FieldPackageDescription] = struct{}{}
+}
+
+// PackageDescriptionCleared returns if the "package_description" field was cleared in this mutation.
+func (m *ShipmentItemMutation) PackageDescriptionCleared() bool {
+	_, ok := m.clearedFields[shipmentitem.FieldPackageDescription]
+	return ok
+}
+
+// ResetPackageDescription resets all changes to the "package_description" field.
+func (m *ShipmentItemMutation) ResetPackageDescription() {
+	m.package_description = nil
+	delete(m.clearedFields, shipmentitem.FieldPackageDescription)
+}
+
+// SetCaseNo sets the "case_no" field.
+func (m *ShipmentItemMutation) SetCaseNo(s string) {
+	m.case_no = &s
+}
+
+// CaseNo returns the value of the "case_no" field in the mutation.
+func (m *ShipmentItemMutation) CaseNo() (r string, exists bool) {
+	v := m.case_no
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCaseNo returns the old "case_no" field's value of the ShipmentItem entity.
+// If the ShipmentItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShipmentItemMutation) OldCaseNo(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCaseNo is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCaseNo requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCaseNo: %w", err)
+	}
+	return oldValue.CaseNo, nil
+}
+
+// ClearCaseNo clears the value of the "case_no" field.
+func (m *ShipmentItemMutation) ClearCaseNo() {
+	m.case_no = nil
+	m.clearedFields[shipmentitem.FieldCaseNo] = struct{}{}
+}
+
+// CaseNoCleared returns if the "case_no" field was cleared in this mutation.
+func (m *ShipmentItemMutation) CaseNoCleared() bool {
+	_, ok := m.clearedFields[shipmentitem.FieldCaseNo]
+	return ok
+}
+
+// ResetCaseNo resets all changes to the "case_no" field.
+func (m *ShipmentItemMutation) ResetCaseNo() {
+	m.case_no = nil
+	delete(m.clearedFields, shipmentitem.FieldCaseNo)
+}
+
 // SetNote sets the "note" field.
 func (m *ShipmentItemMutation) SetNote(s string) {
 	m.note = &s
@@ -97550,7 +99728,7 @@ func (m *ShipmentItemMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ShipmentItemMutation) Fields() []string {
-	fields := make([]string, 0, 15)
+	fields := make([]string, 0, 17)
 	if m.shipment != nil {
 		fields = append(fields, shipmentitem.FieldShipmentID)
 	}
@@ -97586,6 +99764,12 @@ func (m *ShipmentItemMutation) Fields() []string {
 	}
 	if m.currency_snapshot != nil {
 		fields = append(fields, shipmentitem.FieldCurrencySnapshot)
+	}
+	if m.package_description != nil {
+		fields = append(fields, shipmentitem.FieldPackageDescription)
+	}
+	if m.case_no != nil {
+		fields = append(fields, shipmentitem.FieldCaseNo)
 	}
 	if m.note != nil {
 		fields = append(fields, shipmentitem.FieldNote)
@@ -97628,6 +99812,10 @@ func (m *ShipmentItemMutation) Field(name string) (ent.Value, bool) {
 		return m.AmountSnapshot()
 	case shipmentitem.FieldCurrencySnapshot:
 		return m.CurrencySnapshot()
+	case shipmentitem.FieldPackageDescription:
+		return m.PackageDescription()
+	case shipmentitem.FieldCaseNo:
+		return m.CaseNo()
 	case shipmentitem.FieldNote:
 		return m.Note()
 	case shipmentitem.FieldCreatedAt:
@@ -97667,6 +99855,10 @@ func (m *ShipmentItemMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldAmountSnapshot(ctx)
 	case shipmentitem.FieldCurrencySnapshot:
 		return m.OldCurrencySnapshot(ctx)
+	case shipmentitem.FieldPackageDescription:
+		return m.OldPackageDescription(ctx)
+	case shipmentitem.FieldCaseNo:
+		return m.OldCaseNo(ctx)
 	case shipmentitem.FieldNote:
 		return m.OldNote(ctx)
 	case shipmentitem.FieldCreatedAt:
@@ -97766,6 +99958,20 @@ func (m *ShipmentItemMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetCurrencySnapshot(v)
 		return nil
+	case shipmentitem.FieldPackageDescription:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPackageDescription(v)
+		return nil
+	case shipmentitem.FieldCaseNo:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCaseNo(v)
+		return nil
 	case shipmentitem.FieldNote:
 		v, ok := value.(string)
 		if !ok {
@@ -97838,6 +100044,12 @@ func (m *ShipmentItemMutation) ClearedFields() []string {
 	if m.FieldCleared(shipmentitem.FieldAmountSnapshot) {
 		fields = append(fields, shipmentitem.FieldAmountSnapshot)
 	}
+	if m.FieldCleared(shipmentitem.FieldPackageDescription) {
+		fields = append(fields, shipmentitem.FieldPackageDescription)
+	}
+	if m.FieldCleared(shipmentitem.FieldCaseNo) {
+		fields = append(fields, shipmentitem.FieldCaseNo)
+	}
 	if m.FieldCleared(shipmentitem.FieldNote) {
 		fields = append(fields, shipmentitem.FieldNote)
 	}
@@ -97872,6 +100084,12 @@ func (m *ShipmentItemMutation) ClearField(name string) error {
 		return nil
 	case shipmentitem.FieldAmountSnapshot:
 		m.ClearAmountSnapshot()
+		return nil
+	case shipmentitem.FieldPackageDescription:
+		m.ClearPackageDescription()
+		return nil
+	case shipmentitem.FieldCaseNo:
+		m.ClearCaseNo()
 		return nil
 	case shipmentitem.FieldNote:
 		m.ClearNote()
@@ -97919,6 +100137,12 @@ func (m *ShipmentItemMutation) ResetField(name string) error {
 		return nil
 	case shipmentitem.FieldCurrencySnapshot:
 		m.ResetCurrencySnapshot()
+		return nil
+	case shipmentitem.FieldPackageDescription:
+		m.ResetPackageDescription()
+		return nil
+	case shipmentitem.FieldCaseNo:
+		m.ResetCaseNo()
 		return nil
 	case shipmentitem.FieldNote:
 		m.ResetNote()
@@ -101026,6 +103250,9 @@ type SupplierMutation struct {
 	tax_no                       *string
 	default_payment_term_days    *int
 	adddefault_payment_term_days *int
+	default_payment_method       *string
+	default_invoice_required     *bool
+	default_invoice_category     *string
 	is_active                    *bool
 	note                         *string
 	created_at                   *time.Time
@@ -101470,6 +103697,153 @@ func (m *SupplierMutation) ResetDefaultPaymentTermDays() {
 	m.adddefault_payment_term_days = nil
 }
 
+// SetDefaultPaymentMethod sets the "default_payment_method" field.
+func (m *SupplierMutation) SetDefaultPaymentMethod(s string) {
+	m.default_payment_method = &s
+}
+
+// DefaultPaymentMethod returns the value of the "default_payment_method" field in the mutation.
+func (m *SupplierMutation) DefaultPaymentMethod() (r string, exists bool) {
+	v := m.default_payment_method
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDefaultPaymentMethod returns the old "default_payment_method" field's value of the Supplier entity.
+// If the Supplier object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SupplierMutation) OldDefaultPaymentMethod(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDefaultPaymentMethod is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDefaultPaymentMethod requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDefaultPaymentMethod: %w", err)
+	}
+	return oldValue.DefaultPaymentMethod, nil
+}
+
+// ClearDefaultPaymentMethod clears the value of the "default_payment_method" field.
+func (m *SupplierMutation) ClearDefaultPaymentMethod() {
+	m.default_payment_method = nil
+	m.clearedFields[supplier.FieldDefaultPaymentMethod] = struct{}{}
+}
+
+// DefaultPaymentMethodCleared returns if the "default_payment_method" field was cleared in this mutation.
+func (m *SupplierMutation) DefaultPaymentMethodCleared() bool {
+	_, ok := m.clearedFields[supplier.FieldDefaultPaymentMethod]
+	return ok
+}
+
+// ResetDefaultPaymentMethod resets all changes to the "default_payment_method" field.
+func (m *SupplierMutation) ResetDefaultPaymentMethod() {
+	m.default_payment_method = nil
+	delete(m.clearedFields, supplier.FieldDefaultPaymentMethod)
+}
+
+// SetDefaultInvoiceRequired sets the "default_invoice_required" field.
+func (m *SupplierMutation) SetDefaultInvoiceRequired(b bool) {
+	m.default_invoice_required = &b
+}
+
+// DefaultInvoiceRequired returns the value of the "default_invoice_required" field in the mutation.
+func (m *SupplierMutation) DefaultInvoiceRequired() (r bool, exists bool) {
+	v := m.default_invoice_required
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDefaultInvoiceRequired returns the old "default_invoice_required" field's value of the Supplier entity.
+// If the Supplier object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SupplierMutation) OldDefaultInvoiceRequired(ctx context.Context) (v *bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDefaultInvoiceRequired is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDefaultInvoiceRequired requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDefaultInvoiceRequired: %w", err)
+	}
+	return oldValue.DefaultInvoiceRequired, nil
+}
+
+// ClearDefaultInvoiceRequired clears the value of the "default_invoice_required" field.
+func (m *SupplierMutation) ClearDefaultInvoiceRequired() {
+	m.default_invoice_required = nil
+	m.clearedFields[supplier.FieldDefaultInvoiceRequired] = struct{}{}
+}
+
+// DefaultInvoiceRequiredCleared returns if the "default_invoice_required" field was cleared in this mutation.
+func (m *SupplierMutation) DefaultInvoiceRequiredCleared() bool {
+	_, ok := m.clearedFields[supplier.FieldDefaultInvoiceRequired]
+	return ok
+}
+
+// ResetDefaultInvoiceRequired resets all changes to the "default_invoice_required" field.
+func (m *SupplierMutation) ResetDefaultInvoiceRequired() {
+	m.default_invoice_required = nil
+	delete(m.clearedFields, supplier.FieldDefaultInvoiceRequired)
+}
+
+// SetDefaultInvoiceCategory sets the "default_invoice_category" field.
+func (m *SupplierMutation) SetDefaultInvoiceCategory(s string) {
+	m.default_invoice_category = &s
+}
+
+// DefaultInvoiceCategory returns the value of the "default_invoice_category" field in the mutation.
+func (m *SupplierMutation) DefaultInvoiceCategory() (r string, exists bool) {
+	v := m.default_invoice_category
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDefaultInvoiceCategory returns the old "default_invoice_category" field's value of the Supplier entity.
+// If the Supplier object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SupplierMutation) OldDefaultInvoiceCategory(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDefaultInvoiceCategory is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDefaultInvoiceCategory requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDefaultInvoiceCategory: %w", err)
+	}
+	return oldValue.DefaultInvoiceCategory, nil
+}
+
+// ClearDefaultInvoiceCategory clears the value of the "default_invoice_category" field.
+func (m *SupplierMutation) ClearDefaultInvoiceCategory() {
+	m.default_invoice_category = nil
+	m.clearedFields[supplier.FieldDefaultInvoiceCategory] = struct{}{}
+}
+
+// DefaultInvoiceCategoryCleared returns if the "default_invoice_category" field was cleared in this mutation.
+func (m *SupplierMutation) DefaultInvoiceCategoryCleared() bool {
+	_, ok := m.clearedFields[supplier.FieldDefaultInvoiceCategory]
+	return ok
+}
+
+// ResetDefaultInvoiceCategory resets all changes to the "default_invoice_category" field.
+func (m *SupplierMutation) ResetDefaultInvoiceCategory() {
+	m.default_invoice_category = nil
+	delete(m.clearedFields, supplier.FieldDefaultInvoiceCategory)
+}
+
 // SetIsActive sets the "is_active" field.
 func (m *SupplierMutation) SetIsActive(b bool) {
 	m.is_active = &b
@@ -101877,7 +104251,7 @@ func (m *SupplierMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SupplierMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 14)
 	if m.code != nil {
 		fields = append(fields, supplier.FieldCode)
 	}
@@ -101898,6 +104272,15 @@ func (m *SupplierMutation) Fields() []string {
 	}
 	if m.default_payment_term_days != nil {
 		fields = append(fields, supplier.FieldDefaultPaymentTermDays)
+	}
+	if m.default_payment_method != nil {
+		fields = append(fields, supplier.FieldDefaultPaymentMethod)
+	}
+	if m.default_invoice_required != nil {
+		fields = append(fields, supplier.FieldDefaultInvoiceRequired)
+	}
+	if m.default_invoice_category != nil {
+		fields = append(fields, supplier.FieldDefaultInvoiceCategory)
 	}
 	if m.is_active != nil {
 		fields = append(fields, supplier.FieldIsActive)
@@ -101933,6 +104316,12 @@ func (m *SupplierMutation) Field(name string) (ent.Value, bool) {
 		return m.TaxNo()
 	case supplier.FieldDefaultPaymentTermDays:
 		return m.DefaultPaymentTermDays()
+	case supplier.FieldDefaultPaymentMethod:
+		return m.DefaultPaymentMethod()
+	case supplier.FieldDefaultInvoiceRequired:
+		return m.DefaultInvoiceRequired()
+	case supplier.FieldDefaultInvoiceCategory:
+		return m.DefaultInvoiceCategory()
 	case supplier.FieldIsActive:
 		return m.IsActive()
 	case supplier.FieldNote:
@@ -101964,6 +104353,12 @@ func (m *SupplierMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldTaxNo(ctx)
 	case supplier.FieldDefaultPaymentTermDays:
 		return m.OldDefaultPaymentTermDays(ctx)
+	case supplier.FieldDefaultPaymentMethod:
+		return m.OldDefaultPaymentMethod(ctx)
+	case supplier.FieldDefaultInvoiceRequired:
+		return m.OldDefaultInvoiceRequired(ctx)
+	case supplier.FieldDefaultInvoiceCategory:
+		return m.OldDefaultInvoiceCategory(ctx)
 	case supplier.FieldIsActive:
 		return m.OldIsActive(ctx)
 	case supplier.FieldNote:
@@ -102029,6 +104424,27 @@ func (m *SupplierMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetDefaultPaymentTermDays(v)
+		return nil
+	case supplier.FieldDefaultPaymentMethod:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDefaultPaymentMethod(v)
+		return nil
+	case supplier.FieldDefaultInvoiceRequired:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDefaultInvoiceRequired(v)
+		return nil
+	case supplier.FieldDefaultInvoiceCategory:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDefaultInvoiceCategory(v)
 		return nil
 	case supplier.FieldIsActive:
 		v, ok := value.(bool)
@@ -102115,6 +104531,15 @@ func (m *SupplierMutation) ClearedFields() []string {
 	if m.FieldCleared(supplier.FieldTaxNo) {
 		fields = append(fields, supplier.FieldTaxNo)
 	}
+	if m.FieldCleared(supplier.FieldDefaultPaymentMethod) {
+		fields = append(fields, supplier.FieldDefaultPaymentMethod)
+	}
+	if m.FieldCleared(supplier.FieldDefaultInvoiceRequired) {
+		fields = append(fields, supplier.FieldDefaultInvoiceRequired)
+	}
+	if m.FieldCleared(supplier.FieldDefaultInvoiceCategory) {
+		fields = append(fields, supplier.FieldDefaultInvoiceCategory)
+	}
 	if m.FieldCleared(supplier.FieldNote) {
 		fields = append(fields, supplier.FieldNote)
 	}
@@ -102143,6 +104568,15 @@ func (m *SupplierMutation) ClearField(name string) error {
 		return nil
 	case supplier.FieldTaxNo:
 		m.ClearTaxNo()
+		return nil
+	case supplier.FieldDefaultPaymentMethod:
+		m.ClearDefaultPaymentMethod()
+		return nil
+	case supplier.FieldDefaultInvoiceRequired:
+		m.ClearDefaultInvoiceRequired()
+		return nil
+	case supplier.FieldDefaultInvoiceCategory:
+		m.ClearDefaultInvoiceCategory()
 		return nil
 	case supplier.FieldNote:
 		m.ClearNote()
@@ -102175,6 +104609,15 @@ func (m *SupplierMutation) ResetField(name string) error {
 		return nil
 	case supplier.FieldDefaultPaymentTermDays:
 		m.ResetDefaultPaymentTermDays()
+		return nil
+	case supplier.FieldDefaultPaymentMethod:
+		m.ResetDefaultPaymentMethod()
+		return nil
+	case supplier.FieldDefaultInvoiceRequired:
+		m.ResetDefaultInvoiceRequired()
+		return nil
+	case supplier.FieldDefaultInvoiceCategory:
+		m.ResetDefaultInvoiceCategory()
 		return nil
 	case supplier.FieldIsActive:
 		m.ResetIsActive()

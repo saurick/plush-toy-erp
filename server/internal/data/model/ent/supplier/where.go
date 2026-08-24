@@ -90,6 +90,21 @@ func DefaultPaymentTermDays(v int) predicate.Supplier {
 	return predicate.Supplier(sql.FieldEQ(FieldDefaultPaymentTermDays, v))
 }
 
+// DefaultPaymentMethod applies equality check predicate on the "default_payment_method" field. It's identical to DefaultPaymentMethodEQ.
+func DefaultPaymentMethod(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldEQ(FieldDefaultPaymentMethod, v))
+}
+
+// DefaultInvoiceRequired applies equality check predicate on the "default_invoice_required" field. It's identical to DefaultInvoiceRequiredEQ.
+func DefaultInvoiceRequired(v bool) predicate.Supplier {
+	return predicate.Supplier(sql.FieldEQ(FieldDefaultInvoiceRequired, v))
+}
+
+// DefaultInvoiceCategory applies equality check predicate on the "default_invoice_category" field. It's identical to DefaultInvoiceCategoryEQ.
+func DefaultInvoiceCategory(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldEQ(FieldDefaultInvoiceCategory, v))
+}
+
 // IsActive applies equality check predicate on the "is_active" field. It's identical to IsActiveEQ.
 func IsActive(v bool) predicate.Supplier {
 	return predicate.Supplier(sql.FieldEQ(FieldIsActive, v))
@@ -578,6 +593,176 @@ func DefaultPaymentTermDaysLT(v int) predicate.Supplier {
 // DefaultPaymentTermDaysLTE applies the LTE predicate on the "default_payment_term_days" field.
 func DefaultPaymentTermDaysLTE(v int) predicate.Supplier {
 	return predicate.Supplier(sql.FieldLTE(FieldDefaultPaymentTermDays, v))
+}
+
+// DefaultPaymentMethodEQ applies the EQ predicate on the "default_payment_method" field.
+func DefaultPaymentMethodEQ(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldEQ(FieldDefaultPaymentMethod, v))
+}
+
+// DefaultPaymentMethodNEQ applies the NEQ predicate on the "default_payment_method" field.
+func DefaultPaymentMethodNEQ(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldNEQ(FieldDefaultPaymentMethod, v))
+}
+
+// DefaultPaymentMethodIn applies the In predicate on the "default_payment_method" field.
+func DefaultPaymentMethodIn(vs ...string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldIn(FieldDefaultPaymentMethod, vs...))
+}
+
+// DefaultPaymentMethodNotIn applies the NotIn predicate on the "default_payment_method" field.
+func DefaultPaymentMethodNotIn(vs ...string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldNotIn(FieldDefaultPaymentMethod, vs...))
+}
+
+// DefaultPaymentMethodGT applies the GT predicate on the "default_payment_method" field.
+func DefaultPaymentMethodGT(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldGT(FieldDefaultPaymentMethod, v))
+}
+
+// DefaultPaymentMethodGTE applies the GTE predicate on the "default_payment_method" field.
+func DefaultPaymentMethodGTE(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldGTE(FieldDefaultPaymentMethod, v))
+}
+
+// DefaultPaymentMethodLT applies the LT predicate on the "default_payment_method" field.
+func DefaultPaymentMethodLT(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldLT(FieldDefaultPaymentMethod, v))
+}
+
+// DefaultPaymentMethodLTE applies the LTE predicate on the "default_payment_method" field.
+func DefaultPaymentMethodLTE(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldLTE(FieldDefaultPaymentMethod, v))
+}
+
+// DefaultPaymentMethodContains applies the Contains predicate on the "default_payment_method" field.
+func DefaultPaymentMethodContains(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldContains(FieldDefaultPaymentMethod, v))
+}
+
+// DefaultPaymentMethodHasPrefix applies the HasPrefix predicate on the "default_payment_method" field.
+func DefaultPaymentMethodHasPrefix(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldHasPrefix(FieldDefaultPaymentMethod, v))
+}
+
+// DefaultPaymentMethodHasSuffix applies the HasSuffix predicate on the "default_payment_method" field.
+func DefaultPaymentMethodHasSuffix(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldHasSuffix(FieldDefaultPaymentMethod, v))
+}
+
+// DefaultPaymentMethodIsNil applies the IsNil predicate on the "default_payment_method" field.
+func DefaultPaymentMethodIsNil() predicate.Supplier {
+	return predicate.Supplier(sql.FieldIsNull(FieldDefaultPaymentMethod))
+}
+
+// DefaultPaymentMethodNotNil applies the NotNil predicate on the "default_payment_method" field.
+func DefaultPaymentMethodNotNil() predicate.Supplier {
+	return predicate.Supplier(sql.FieldNotNull(FieldDefaultPaymentMethod))
+}
+
+// DefaultPaymentMethodEqualFold applies the EqualFold predicate on the "default_payment_method" field.
+func DefaultPaymentMethodEqualFold(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldEqualFold(FieldDefaultPaymentMethod, v))
+}
+
+// DefaultPaymentMethodContainsFold applies the ContainsFold predicate on the "default_payment_method" field.
+func DefaultPaymentMethodContainsFold(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldContainsFold(FieldDefaultPaymentMethod, v))
+}
+
+// DefaultInvoiceRequiredEQ applies the EQ predicate on the "default_invoice_required" field.
+func DefaultInvoiceRequiredEQ(v bool) predicate.Supplier {
+	return predicate.Supplier(sql.FieldEQ(FieldDefaultInvoiceRequired, v))
+}
+
+// DefaultInvoiceRequiredNEQ applies the NEQ predicate on the "default_invoice_required" field.
+func DefaultInvoiceRequiredNEQ(v bool) predicate.Supplier {
+	return predicate.Supplier(sql.FieldNEQ(FieldDefaultInvoiceRequired, v))
+}
+
+// DefaultInvoiceRequiredIsNil applies the IsNil predicate on the "default_invoice_required" field.
+func DefaultInvoiceRequiredIsNil() predicate.Supplier {
+	return predicate.Supplier(sql.FieldIsNull(FieldDefaultInvoiceRequired))
+}
+
+// DefaultInvoiceRequiredNotNil applies the NotNil predicate on the "default_invoice_required" field.
+func DefaultInvoiceRequiredNotNil() predicate.Supplier {
+	return predicate.Supplier(sql.FieldNotNull(FieldDefaultInvoiceRequired))
+}
+
+// DefaultInvoiceCategoryEQ applies the EQ predicate on the "default_invoice_category" field.
+func DefaultInvoiceCategoryEQ(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldEQ(FieldDefaultInvoiceCategory, v))
+}
+
+// DefaultInvoiceCategoryNEQ applies the NEQ predicate on the "default_invoice_category" field.
+func DefaultInvoiceCategoryNEQ(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldNEQ(FieldDefaultInvoiceCategory, v))
+}
+
+// DefaultInvoiceCategoryIn applies the In predicate on the "default_invoice_category" field.
+func DefaultInvoiceCategoryIn(vs ...string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldIn(FieldDefaultInvoiceCategory, vs...))
+}
+
+// DefaultInvoiceCategoryNotIn applies the NotIn predicate on the "default_invoice_category" field.
+func DefaultInvoiceCategoryNotIn(vs ...string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldNotIn(FieldDefaultInvoiceCategory, vs...))
+}
+
+// DefaultInvoiceCategoryGT applies the GT predicate on the "default_invoice_category" field.
+func DefaultInvoiceCategoryGT(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldGT(FieldDefaultInvoiceCategory, v))
+}
+
+// DefaultInvoiceCategoryGTE applies the GTE predicate on the "default_invoice_category" field.
+func DefaultInvoiceCategoryGTE(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldGTE(FieldDefaultInvoiceCategory, v))
+}
+
+// DefaultInvoiceCategoryLT applies the LT predicate on the "default_invoice_category" field.
+func DefaultInvoiceCategoryLT(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldLT(FieldDefaultInvoiceCategory, v))
+}
+
+// DefaultInvoiceCategoryLTE applies the LTE predicate on the "default_invoice_category" field.
+func DefaultInvoiceCategoryLTE(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldLTE(FieldDefaultInvoiceCategory, v))
+}
+
+// DefaultInvoiceCategoryContains applies the Contains predicate on the "default_invoice_category" field.
+func DefaultInvoiceCategoryContains(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldContains(FieldDefaultInvoiceCategory, v))
+}
+
+// DefaultInvoiceCategoryHasPrefix applies the HasPrefix predicate on the "default_invoice_category" field.
+func DefaultInvoiceCategoryHasPrefix(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldHasPrefix(FieldDefaultInvoiceCategory, v))
+}
+
+// DefaultInvoiceCategoryHasSuffix applies the HasSuffix predicate on the "default_invoice_category" field.
+func DefaultInvoiceCategoryHasSuffix(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldHasSuffix(FieldDefaultInvoiceCategory, v))
+}
+
+// DefaultInvoiceCategoryIsNil applies the IsNil predicate on the "default_invoice_category" field.
+func DefaultInvoiceCategoryIsNil() predicate.Supplier {
+	return predicate.Supplier(sql.FieldIsNull(FieldDefaultInvoiceCategory))
+}
+
+// DefaultInvoiceCategoryNotNil applies the NotNil predicate on the "default_invoice_category" field.
+func DefaultInvoiceCategoryNotNil() predicate.Supplier {
+	return predicate.Supplier(sql.FieldNotNull(FieldDefaultInvoiceCategory))
+}
+
+// DefaultInvoiceCategoryEqualFold applies the EqualFold predicate on the "default_invoice_category" field.
+func DefaultInvoiceCategoryEqualFold(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldEqualFold(FieldDefaultInvoiceCategory, v))
+}
+
+// DefaultInvoiceCategoryContainsFold applies the ContainsFold predicate on the "default_invoice_category" field.
+func DefaultInvoiceCategoryContainsFold(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldContainsFold(FieldDefaultInvoiceCategory, v))
 }
 
 // IsActiveEQ applies the EQ predicate on the "is_active" field.

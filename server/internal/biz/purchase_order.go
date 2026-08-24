@@ -38,26 +38,31 @@ var (
 )
 
 type PurchaseOrder struct {
-	ID                      int
-	PurchaseOrderNo         string
-	SupplierID              int
-	Currency                string
-	PaymentTermDays         *int
-	SupplierPurchaseOrderNo *string
-	SupplierSnapshot        map[string]any
-	ContractPartySnapshot   map[string]any
-	PurchaseDate            time.Time
-	ExpectedArrivalDate     *time.Time
-	LifecycleStatus         string
-	Version                 int
-	SettlementAction        *string
-	SettlementMode          *string
-	SettlementReason        *string
-	SettledAt               *time.Time
-	SettledBy               *int
-	Note                    *string
-	CreatedAt               time.Time
-	UpdatedAt               time.Time
+	ID                           int
+	PurchaseOrderNo              string
+	SupplierID                   int
+	Currency                     string
+	PaymentTermDays              *int
+	PaymentMethod                *string
+	InvoiceRequired              *bool
+	InvoiceCategory              *string
+	SupplierPurchaseOrderNo      *string
+	SupplierSnapshot             map[string]any
+	ContractPartySnapshot        map[string]any
+	PurchaseDate                 time.Time
+	ExpectedArrivalDate          *time.Time
+	SupplierConfirmedArrivalDate *time.Time
+	DeliveryAddress              *string
+	LifecycleStatus              string
+	Version                      int
+	SettlementAction             *string
+	SettlementMode               *string
+	SettlementReason             *string
+	SettledAt                    *time.Time
+	SettledBy                    *int
+	Note                         *string
+	CreatedAt                    time.Time
+	UpdatedAt                    time.Time
 	// ItemCount is populated only by the list read model. Nil means the
 	// repository did not load the detail count for this response.
 	ItemCount *int
@@ -86,17 +91,22 @@ type PurchaseOrderItem struct {
 }
 
 type PurchaseOrderMutation struct {
-	ExpectedVersion         int
-	PurchaseOrderNo         string
-	SupplierID              int
-	Currency                string
-	PaymentTermDays         *int
-	SupplierPurchaseOrderNo *string
-	SupplierSnapshot        map[string]any
-	ContractPartySnapshot   map[string]any
-	PurchaseDate            time.Time
-	ExpectedArrivalDate     *time.Time
-	Note                    *string
+	ExpectedVersion              int
+	PurchaseOrderNo              string
+	SupplierID                   int
+	Currency                     string
+	PaymentTermDays              *int
+	PaymentMethod                *string
+	InvoiceRequired              *bool
+	InvoiceCategory              *string
+	SupplierPurchaseOrderNo      *string
+	SupplierSnapshot             map[string]any
+	ContractPartySnapshot        map[string]any
+	PurchaseDate                 time.Time
+	ExpectedArrivalDate          *time.Time
+	SupplierConfirmedArrivalDate *time.Time
+	DeliveryAddress              *string
+	Note                         *string
 }
 
 type PurchaseOrderItemMutation struct {
@@ -211,6 +221,16 @@ type SupplierDefaultPaymentTermDaysReader interface {
 	SupplierDefaultPaymentTermDays(ctx context.Context, supplierID int) (int, error)
 }
 
+type SupplierPurchaseDefaults struct {
+	PaymentMethod   *string
+	InvoiceRequired *bool
+	InvoiceCategory *string
+}
+
+type SupplierPurchaseDefaultsReader interface {
+	SupplierPurchaseDefaults(ctx context.Context, supplierID int) (*SupplierPurchaseDefaults, error)
+}
+
 type PurchaseOrderUsecase struct {
 	repo PurchaseOrderRepo
 }
@@ -232,6 +252,9 @@ func (uc *PurchaseOrderUsecase) CreatePurchaseOrder(ctx context.Context, in *Pur
 	}
 	normalized.PaymentTermDays, err = resolveSourceOrderPaymentTermDays(ctx, uc.repo, normalized.SupplierID, normalized.PaymentTermDays)
 	if err != nil {
+		return nil, err
+	}
+	if err := resolvePurchaseOrderSupplierDefaults(ctx, uc.repo, normalized.SupplierID, &normalized); err != nil {
 		return nil, err
 	}
 	return uc.repo.CreatePurchaseOrder(ctx, &normalized)
@@ -450,6 +473,9 @@ func (uc *PurchaseOrderUsecase) SavePurchaseOrderWithItems(ctx context.Context, 
 		if err != nil {
 			return nil, err
 		}
+		if err := resolvePurchaseOrderSupplierDefaults(ctx, uc.repo, normalizedOrder.SupplierID, &normalizedOrder); err != nil {
+			return nil, err
+		}
 	}
 
 	normalizedItems := make([]*PurchaseOrderItemSaveMutation, 0, len(items))
@@ -619,6 +645,13 @@ func normalizePurchaseOrderMutation(in PurchaseOrderMutation, create bool) (Purc
 		in.PaymentTermDays = &termDays
 	}
 	in.SupplierPurchaseOrderNo = normalizeOptionalString(in.SupplierPurchaseOrderNo)
+	in.PaymentMethod = normalizeOptionalString(in.PaymentMethod)
+	var err error
+	in.InvoiceRequired, in.InvoiceCategory, err = normalizeInvoicePreference(in.InvoiceRequired, in.InvoiceCategory)
+	if err != nil {
+		return PurchaseOrderMutation{}, err
+	}
+	in.DeliveryAddress = normalizeOptionalString(in.DeliveryAddress)
 	in.Note = normalizeOptionalString(in.Note)
 	if in.SupplierSnapshot == nil {
 		in.SupplierSnapshot = map[string]any{}
@@ -630,6 +663,9 @@ func normalizePurchaseOrderMutation(in PurchaseOrderMutation, create bool) (Purc
 		return PurchaseOrderMutation{}, ErrBadParam
 	}
 	if err := validateOptionalDateNotBefore(in.PurchaseDate, in.ExpectedArrivalDate); err != nil {
+		return PurchaseOrderMutation{}, err
+	}
+	if err := validateOptionalDateNotBefore(in.PurchaseDate, in.SupplierConfirmedArrivalDate); err != nil {
 		return PurchaseOrderMutation{}, err
 	}
 	return in, nil
@@ -655,6 +691,33 @@ func resolveSourceOrderPaymentTermDays(ctx context.Context, repo any, supplierID
 		return nil, ErrBadParam
 	}
 	return &termDays, nil
+}
+
+func resolvePurchaseOrderSupplierDefaults(ctx context.Context, repo any, supplierID int, order *PurchaseOrderMutation) error {
+	if order == nil || supplierID <= 0 {
+		return ErrBadParam
+	}
+	if order.PaymentMethod != nil && order.InvoiceRequired != nil {
+		return nil
+	}
+	reader, ok := repo.(SupplierPurchaseDefaultsReader)
+	if !ok {
+		return nil
+	}
+	defaults, err := reader.SupplierPurchaseDefaults(ctx, supplierID)
+	if err != nil {
+		return err
+	}
+	if defaults == nil {
+		return nil
+	}
+	if order.PaymentMethod == nil {
+		order.PaymentMethod = defaults.PaymentMethod
+	}
+	if order.InvoiceRequired == nil && order.InvoiceCategory == nil {
+		order.InvoiceRequired, order.InvoiceCategory, err = normalizeInvoicePreference(defaults.InvoiceRequired, defaults.InvoiceCategory)
+	}
+	return err
 }
 
 func normalizePurchaseOrderItemMutation(in PurchaseOrderItemMutation) (PurchaseOrderItemMutation, error) {

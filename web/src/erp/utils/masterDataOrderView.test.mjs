@@ -31,6 +31,7 @@ import {
   buildSalesOrderItemSourceValuesFromSKU,
   buildPurchaseOrderItemParams,
   buildPurchaseOrderParams,
+  buildPurchaseOrderSupplierDefaults,
   buildSalesOrderItemParams,
   buildSalesOrderParams,
   buildSequentialDraftCode,
@@ -42,6 +43,7 @@ import {
   canRunPurchaseOrderLifecycleAction,
   canRunSalesOrderLifecycleAction,
   canRunOutsourcingOrderLifecycleAction,
+  calculateSalesOrderAmounts,
   createBlankOutsourcingLine,
   deriveOutsourcingOrderItemAmount,
   deriveSalesOrderItemAmount,
@@ -1837,6 +1839,94 @@ test('FL_sales_order_item_amount__keeps_manual_snapshot_without_inputs masterDat
   )
 })
 
+test('masterDataOrderView: sales order totals preserve tax-mode semantics and incomplete drafts', () => {
+  const items = [{ ordered_quantity: '2', unit_price: '50' }]
+  assert.deepEqual(calculateSalesOrderAmounts({ items: [], taxMode: 'NONE' }), {
+    complete: false,
+    goodsAmount: '',
+    taxAmount: '',
+    orderTotal: '',
+  })
+  assert.deepEqual(calculateSalesOrderAmounts({ items, taxMode: 'NONE' }), {
+    complete: true,
+    goodsAmount: '100',
+    taxAmount: '0',
+    orderTotal: '100',
+  })
+  assert.deepEqual(
+    calculateSalesOrderAmounts({
+      items,
+      taxMode: 'EXCLUSIVE',
+      taxRate: '13',
+    }),
+    {
+      complete: true,
+      goodsAmount: '100',
+      taxAmount: '13',
+      orderTotal: '113',
+    }
+  )
+  assert.deepEqual(
+    calculateSalesOrderAmounts({
+      items: [{ ordered_quantity: '1', unit_price: '113' }],
+      taxMode: 'INCLUSIVE',
+      taxRate: '13',
+    }),
+    {
+      complete: true,
+      goodsAmount: '113',
+      taxAmount: '13',
+      orderTotal: '113',
+    }
+  )
+  assert.deepEqual(
+    calculateSalesOrderAmounts({
+      items: [{ ordered_quantity: '2', unit_price: '' }],
+      taxMode: 'EXCLUSIVE',
+      taxRate: '13',
+    }),
+    {
+      complete: false,
+      goodsAmount: '',
+      taxAmount: '',
+      orderTotal: '',
+    }
+  )
+})
+
+test('masterDataOrderView: purchase supplier defaults freeze only explicit payment and invoice preferences', () => {
+  assert.deepEqual(
+    buildPurchaseOrderSupplierDefaults({
+      default_payment_term_days: '30',
+      default_payment_method: ' Wire ',
+      default_invoice_required: true,
+      default_invoice_category: ' VAT_SPECIAL_13 ',
+      address: '不应自动充当收货地址',
+    }),
+    {
+      payment_term_days: 30,
+      payment_method: 'Wire',
+      invoice_required: true,
+      invoice_category: 'VAT_SPECIAL_13',
+    }
+  )
+  assert.deepEqual(
+    buildPurchaseOrderParams({
+      purchase_order_no: 'PO-INVOICE-CLEAR',
+      supplier_id: 7,
+      invoice_required: false,
+      invoice_category: 'VAT_SPECIAL_13',
+    }),
+    {
+      purchase_order_no: 'PO-INVOICE-CLEAR',
+      currency: 'CNY',
+      supplier_id: 7,
+      supplier_snapshot: {},
+      invoice_required: false,
+    }
+  )
+})
+
 test('FL_sales_order_customer_snapshot__retains_customer_snapshot masterDataOrderView: sales order params retain customer source snapshot', () => {
   assert.deepEqual(
     buildSalesOrderParams({
@@ -1871,6 +1961,10 @@ test('FL_sales_order_customer_snapshot__prefills_customer_from_blank masterDataO
       code: ' C003 ',
       name: ' 客户三 ',
       short_name: ' 三号客户 ',
+      country_region: ' 中国 ',
+      default_delivery_recipient: ' 王女士 ',
+      default_delivery_phone: ' 13800000000 ',
+      default_delivery_address: ' 上海仓 ',
       tax_no: 'not-copied',
     }),
     {
@@ -1881,6 +1975,10 @@ test('FL_sales_order_customer_snapshot__prefills_customer_from_blank masterDataO
         name: '客户三',
         short_name: '三号客户',
       },
+      delivery_country_region: '中国',
+      delivery_recipient: '王女士',
+      delivery_phone: '13800000000',
+      delivery_address: '上海仓',
     }
   )
 })
@@ -1929,6 +2027,10 @@ test('FL_sales_order_customer_snapshot__clears_customer_on_source_clear masterDa
       customer_id: undefined,
       customer_snapshot: {},
       customer_order_no: 'CUS-PO-001',
+      delivery_country_region: '',
+      delivery_recipient: '',
+      delivery_phone: '',
+      delivery_address: '',
     }
   )
 
@@ -1939,6 +2041,10 @@ test('FL_sales_order_customer_snapshot__clears_customer_on_source_clear masterDa
         id: 5,
         code: 'C005',
         name: '客户五',
+        country_region: '美国',
+        default_delivery_recipient: 'Jane',
+        default_delivery_phone: '+1 555 0100',
+        default_delivery_address: 'New York Warehouse',
       }),
     },
     {
@@ -1949,6 +2055,10 @@ test('FL_sales_order_customer_snapshot__clears_customer_on_source_clear masterDa
         name: '客户五',
       },
       customer_order_no: 'CUS-PO-001',
+      delivery_country_region: '美国',
+      delivery_recipient: 'Jane',
+      delivery_phone: '+1 555 0100',
+      delivery_address: 'New York Warehouse',
     }
   )
 })

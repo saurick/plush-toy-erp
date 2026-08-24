@@ -75,7 +75,9 @@ import {
 } from '../components/shipments/shipmentColumns.jsx'
 import {
   compactParams,
+  buildDeliverySnapshot,
   buildSequentialDraftCode,
+  deliverySnapshotFormValues,
   hasActionPermission,
   trimOptional,
   V1_ROUTE_PATHS,
@@ -183,8 +185,18 @@ function buildShipmentParams(
     sales_order_id: positiveInt(values.sales_order_id),
     customer_id: positiveInt(values.customer_id),
     customer_snapshot: trimOptional(values.customer_snapshot),
+    delivery_snapshot: buildDeliverySnapshot(values),
     idempotency_key: trimOptional(values.idempotency_key),
     planned_ship_at: trimOptional(values.planned_ship_at),
+    transport_method: trimOptional(values.transport_method),
+    carrier_name: trimOptional(values.carrier_name),
+    tracking_no: trimOptional(values.tracking_no),
+    package_count: positiveInt(values.package_count),
+    gross_weight_kg: trimOptional(values.gross_weight_kg),
+    volume_m3: trimOptional(values.volume_m3),
+    shipping_mark: trimOptional(values.shipping_mark),
+    freight_amount: trimOptional(values.freight_amount),
+    freight_currency: trimOptional(values.freight_currency),
     total_net_weight_g: resolveShipmentSubmittedTotalNetWeight({
       preview: weightPreview,
       manualValue: values.total_net_weight_g,
@@ -212,10 +224,20 @@ function shipmentFormValues(shipment = {}) {
     sales_order_id: shipment.sales_order_id,
     customer_id: shipment.customer_id,
     customer_snapshot: shipment.customer_snapshot || '',
+    ...deliverySnapshotFormValues(shipment.delivery_snapshot),
     idempotency_key: shipment.idempotency_key || '',
     planned_ship_at:
       plannedShipAt > 0 ? unixSecondsToBusinessDate(plannedShipAt) : '',
     total_net_weight_g: shipment.total_net_weight_g,
+    transport_method: shipment.transport_method || '',
+    carrier_name: shipment.carrier_name || '',
+    tracking_no: shipment.tracking_no || '',
+    package_count: shipment.package_count,
+    gross_weight_kg: shipment.gross_weight_kg,
+    volume_m3: shipment.volume_m3,
+    shipping_mark: shipment.shipping_mark || '',
+    freight_amount: shipment.freight_amount,
+    freight_currency: shipment.freight_currency,
     note: shipment.note || '',
   }
 }
@@ -989,6 +1011,9 @@ export default function ShipmentsPage() {
         sales_order_id: sourceOrder.id,
         customer_id: sourceOrder.customer_id,
         customer_snapshot: salesOrderCustomerText(sourceOrder),
+        ...(currentSourceOrderID
+          ? {}
+          : deliverySnapshotFormValues(sourceOrder.delivery_snapshot)),
       })
       const currentItems = (shipmentForm.getFieldValue('items') || []).filter(
         (item) => !isBlankShipmentItem(item)
@@ -1048,8 +1073,18 @@ export default function ShipmentsPage() {
       sales_order_id: undefined,
       customer_id: undefined,
       customer_snapshot: '',
+      ...deliverySnapshotFormValues(),
       idempotency_key: idempotencyKey('shipment'),
       planned_ship_at: currentBusinessDate(),
+      transport_method: '',
+      carrier_name: '',
+      tracking_no: '',
+      package_count: undefined,
+      gross_weight_kg: undefined,
+      volume_m3: undefined,
+      shipping_mark: '',
+      freight_amount: undefined,
+      freight_currency: undefined,
       items: [createBlankShipmentItem()],
     })
     setShipmentModal({ mode: 'create', shipment: null })
@@ -1572,7 +1607,7 @@ export default function ShipmentsPage() {
             <SearchInput
               value={resolvedRouteKeyword || linkedKeyword || keyword}
               placeholder="搜索出货"
-              searchHint="可搜索：出货单号、客户、销售订单"
+              searchHint="可搜索：出货单号、客户、运输方式、承运商、物流单号、唛头"
               onChange={(event) => {
                 if (linkedKeyword || routeSalesOrderID || routeShipmentID) {
                   clearRouteContext()
@@ -1923,7 +1958,7 @@ export default function ShipmentsPage() {
           onChange: (current, pageSize) => setPagination({ current, pageSize }),
         })}
         emptyDescription="暂无出货单"
-        scroll={{ x: 1510 }}
+        scroll={{ x: 2700 }}
         rowSelection={{
           type: 'radio',
           selectedRowKeys: selectedRow ? [selectedRow.id] : [],

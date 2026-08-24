@@ -165,6 +165,10 @@ func shipmentSourceCandidateFromEnt(
 	if customerSnapshot == nil {
 		customerSnapshot = map[string]any{}
 	}
+	deliverySnapshot := order.DeliverySnapshot
+	if deliverySnapshot == nil {
+		deliverySnapshot = map[string]any{}
+	}
 
 	candidate := &biz.ShipmentSourceCandidate{
 		SalesOrderID:        order.ID,
@@ -173,6 +177,7 @@ func shipmentSourceCandidateFromEnt(
 		OrderVersion:        order.Version,
 		CustomerID:          order.CustomerID,
 		CustomerSnapshot:    customerSnapshot,
+		DeliverySnapshot:    deliverySnapshot,
 		CustomerName:        customerRow.Name,
 		SalesOrderItemID:    row.ID,
 		LineNo:              row.LineNo,

@@ -33,18 +33,36 @@ func TestMasterDataRepoCustomerSupplierCRUD(t *testing.T) {
 	shortName := "成品客户"
 	defaultPaymentMethod := "30天月结"
 	defaultPaymentTermDays := 30
+	countryRegion := "中国"
+	deliveryRecipient := "王小明"
+	deliveryPhone := "+86 138-0000-0000"
+	deliveryAddress := "深圳市测试路 1 号"
 	customer, err := uc.CreateCustomer(ctx, &biz.CustomerMutation{
-		Code:                   "C-001",
-		Name:                   "测试客户",
-		ShortName:              &shortName,
-		DefaultPaymentMethod:   &defaultPaymentMethod,
-		DefaultPaymentTermDays: &defaultPaymentTermDays,
+		Code:                     "C-001",
+		Name:                     "测试客户",
+		ShortName:                &shortName,
+		DefaultPaymentMethod:     &defaultPaymentMethod,
+		DefaultPaymentTermDays:   &defaultPaymentTermDays,
+		CountryRegion:            &countryRegion,
+		DefaultDeliveryRecipient: &deliveryRecipient,
+		DefaultDeliveryPhone:     &deliveryPhone,
+		DefaultDeliveryAddress:   &deliveryAddress,
 	})
 	if err != nil {
 		t.Fatalf("create customer failed: %v", err)
 	}
 	if customer.DefaultPaymentMethod == nil || *customer.DefaultPaymentMethod != defaultPaymentMethod || customer.DefaultPaymentTermDays == nil || *customer.DefaultPaymentTermDays != defaultPaymentTermDays {
 		t.Fatalf("expected customer payment defaults retained, got %#v", customer)
+	}
+	if customer.CountryRegion == nil || *customer.CountryRegion != countryRegion ||
+		customer.DefaultDeliveryRecipient == nil || *customer.DefaultDeliveryRecipient != deliveryRecipient ||
+		customer.DefaultDeliveryPhone == nil || *customer.DefaultDeliveryPhone != deliveryPhone ||
+		customer.DefaultDeliveryAddress == nil || *customer.DefaultDeliveryAddress != deliveryAddress {
+		t.Fatalf("expected customer delivery defaults retained, got %#v", customer)
+	}
+	customersByRegion, regionTotal, err := uc.ListCustomers(ctx, biz.MasterDataFilter{Keyword: countryRegion, Limit: 20})
+	if err != nil || regionTotal != 1 || len(customersByRegion) != 1 || customersByRegion[0].ID != customer.ID {
+		t.Fatalf("search customer by country/region rows=%#v total=%d err=%v", customersByRegion, regionTotal, err)
 	}
 	if _, err := uc.CreateCustomer(ctx, &biz.CustomerMutation{Code: "C-001", Name: "重复客户"}); !ent.IsConstraintError(err) {
 		t.Fatalf("expected duplicate customer code rejected, got %v", err)
@@ -56,8 +74,10 @@ func TestMasterDataRepoCustomerSupplierCRUD(t *testing.T) {
 	if updatedCustomer.ShortName != nil {
 		t.Fatalf("expected customer short_name cleared, got %q", *updatedCustomer.ShortName)
 	}
-	if updatedCustomer.DefaultPaymentMethod != nil || updatedCustomer.DefaultPaymentTermDays != nil {
-		t.Fatalf("expected customer payment defaults cleared, got %#v", updatedCustomer)
+	if updatedCustomer.DefaultPaymentMethod != nil || updatedCustomer.DefaultPaymentTermDays != nil ||
+		updatedCustomer.CountryRegion != nil || updatedCustomer.DefaultDeliveryRecipient != nil ||
+		updatedCustomer.DefaultDeliveryPhone != nil || updatedCustomer.DefaultDeliveryAddress != nil {
+		t.Fatalf("expected customer defaults cleared, got %#v", updatedCustomer)
 	}
 	disabledCustomer, err := uc.SetCustomerActive(ctx, customer.ID, false)
 	if err != nil {
@@ -84,6 +104,9 @@ func TestMasterDataRepoCustomerSupplierCRUD(t *testing.T) {
 	supplierType := "material"
 	address := "测试工业园 1 号"
 	supplierPaymentTermDays := 30
+	supplierPaymentMethod := "银行转账"
+	defaultInvoiceRequired := true
+	defaultInvoiceCategory := biz.FinanceInvoiceCategoryVATSpecial13
 	processRow, err := client.Process.Create().
 		SetCode("PROC-SUP-001").
 		SetName("电绣").
@@ -98,6 +121,9 @@ func TestMasterDataRepoCustomerSupplierCRUD(t *testing.T) {
 		SupplierType:           &supplierType,
 		Address:                &address,
 		DefaultPaymentTermDays: supplierPaymentTermDays,
+		DefaultPaymentMethod:   &supplierPaymentMethod,
+		DefaultInvoiceRequired: &defaultInvoiceRequired,
+		DefaultInvoiceCategory: &defaultInvoiceCategory,
 		ProcessIDs:             []int{processRow.ID, processRow.ID},
 	})
 	if err != nil {
@@ -115,6 +141,15 @@ func TestMasterDataRepoCustomerSupplierCRUD(t *testing.T) {
 	}
 	if loadedSupplier.DefaultPaymentTermDays != supplierPaymentTermDays {
 		t.Fatalf("expected supplier payment term %d, got %d", supplierPaymentTermDays, loadedSupplier.DefaultPaymentTermDays)
+	}
+	if loadedSupplier.DefaultPaymentMethod == nil || *loadedSupplier.DefaultPaymentMethod != supplierPaymentMethod ||
+		loadedSupplier.DefaultInvoiceRequired == nil || !*loadedSupplier.DefaultInvoiceRequired ||
+		loadedSupplier.DefaultInvoiceCategory == nil || *loadedSupplier.DefaultInvoiceCategory != defaultInvoiceCategory {
+		t.Fatalf("expected supplier payment and invoice defaults retained, got %#v", loadedSupplier)
+	}
+	suppliersByPayment, paymentTotal, err := uc.ListSuppliers(ctx, biz.MasterDataFilter{Keyword: supplierPaymentMethod, Limit: 20})
+	if err != nil || paymentTotal != 1 || len(suppliersByPayment) != 1 || suppliersByPayment[0].ID != supplier.ID {
+		t.Fatalf("search supplier by payment method rows=%#v total=%d err=%v", suppliersByPayment, paymentTotal, err)
 	}
 	if loadedSupplier.Address == nil || *loadedSupplier.Address != address || len(loadedSupplier.ProcessIDs) != 1 || loadedSupplier.ProcessIDs[0] != processRow.ID {
 		t.Fatalf("expected supplier address and deduplicated process capability retained, got %#v", loadedSupplier)
@@ -158,7 +193,8 @@ func TestMasterDataRepoCustomerSupplierCRUD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("clear supplier address and process capabilities failed: %v", err)
 	}
-	if clearedSupplier.Address != nil || len(clearedSupplier.ProcessIDs) != 0 || clearedSupplier.DefaultPaymentTermDays != 0 {
+	if clearedSupplier.Address != nil || len(clearedSupplier.ProcessIDs) != 0 || clearedSupplier.DefaultPaymentTermDays != 0 ||
+		clearedSupplier.DefaultPaymentMethod != nil || clearedSupplier.DefaultInvoiceRequired != nil || clearedSupplier.DefaultInvoiceCategory != nil {
 		t.Fatalf("expected supplier address and process capabilities cleared and payment term reset, got %#v", clearedSupplier)
 	}
 	if _, err := uc.SetSupplierActive(ctx, supplier.ID, false); err != nil {
@@ -334,20 +370,30 @@ func TestMasterDataRepoProductCRUDAndUnitGuard(t *testing.T) {
 	}
 	styleNo := "BEAR-BASE"
 	customerStyleNo := "CUS-BEAR"
+	englishName := "Plush Bear"
+	hsCode := "9503002100"
 	unitNetWeightG := decimal.RequireFromString("0.425")
 	product, err := uc.CreateProduct(ctx, &biz.ProductMutation{
 		Code:            "P-001",
 		Name:            "毛绒熊",
 		StyleNo:         &styleNo,
 		CustomerStyleNo: &customerStyleNo,
+		EnglishName:     &englishName,
+		HSCode:          &hsCode,
 		DefaultUnitID:   unitRow.ID,
 		UnitNetWeightG:  &unitNetWeightG,
 	})
 	if err != nil {
 		t.Fatalf("create product failed: %v", err)
 	}
-	if product.DefaultUnitID != unitRow.ID || product.StyleNo == nil || *product.StyleNo != styleNo || product.UnitNetWeightG == nil || !product.UnitNetWeightG.Equal(unitNetWeightG) {
+	if product.DefaultUnitID != unitRow.ID || product.StyleNo == nil || *product.StyleNo != styleNo ||
+		product.EnglishName == nil || *product.EnglishName != englishName || product.HSCode == nil || *product.HSCode != hsCode ||
+		product.UnitNetWeightG == nil || !product.UnitNetWeightG.Equal(unitNetWeightG) {
 		t.Fatalf("expected product fields retained, got %#v", product)
+	}
+	searched, searchedTotal, err := uc.ListProducts(ctx, biz.MasterDataFilter{Keyword: hsCode, Limit: 20})
+	if err != nil || searchedTotal != 1 || len(searched) != 1 || searched[0].ID != product.ID {
+		t.Fatalf("search product by HS code rows=%#v total=%d err=%v", searched, searchedTotal, err)
 	}
 	if _, err := uc.CreateProduct(ctx, &biz.ProductMutation{Code: "P-001", Name: "重复产品", DefaultUnitID: unitRow.ID}); !ent.IsConstraintError(err) {
 		t.Fatalf("expected duplicate product code rejected, got %v", err)
@@ -366,7 +412,8 @@ func TestMasterDataRepoProductCRUDAndUnitGuard(t *testing.T) {
 	if err != nil {
 		t.Fatalf("update product failed: %v", err)
 	}
-	if updated.StyleNo != nil || updated.CustomerStyleNo != nil || updated.UnitNetWeightG == nil || !updated.UnitNetWeightG.Equal(updatedUnitNetWeightG) {
+	if updated.StyleNo != nil || updated.CustomerStyleNo != nil || updated.EnglishName != nil || updated.HSCode != nil ||
+		updated.UnitNetWeightG == nil || !updated.UnitNetWeightG.Equal(updatedUnitNetWeightG) {
 		t.Fatalf("expected optional product fields cleared, got %#v", updated)
 	}
 	cleared, err := uc.UpdateProduct(ctx, product.ID, &biz.ProductMutation{

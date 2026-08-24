@@ -106,6 +106,18 @@ func (_u *ShipmentUpdate) ClearCustomerSnapshot() *ShipmentUpdate {
 	return _u
 }
 
+// SetDeliverySnapshot sets the "delivery_snapshot" field.
+func (_u *ShipmentUpdate) SetDeliverySnapshot(v map[string]interface{}) *ShipmentUpdate {
+	_u.mutation.SetDeliverySnapshot(v)
+	return _u
+}
+
+// ClearDeliverySnapshot clears the value of the "delivery_snapshot" field.
+func (_u *ShipmentUpdate) ClearDeliverySnapshot() *ShipmentUpdate {
+	_u.mutation.ClearDeliverySnapshot()
+	return _u
+}
+
 // SetStatus sets the "status" field.
 func (_u *ShipmentUpdate) SetStatus(v string) *ShipmentUpdate {
 	_u.mutation.SetStatus(v)
@@ -351,6 +363,193 @@ func (_u *ShipmentUpdate) ClearShippedAt() *ShipmentUpdate {
 	return _u
 }
 
+// SetTransportMethod sets the "transport_method" field.
+func (_u *ShipmentUpdate) SetTransportMethod(v string) *ShipmentUpdate {
+	_u.mutation.SetTransportMethod(v)
+	return _u
+}
+
+// SetNillableTransportMethod sets the "transport_method" field if the given value is not nil.
+func (_u *ShipmentUpdate) SetNillableTransportMethod(v *string) *ShipmentUpdate {
+	if v != nil {
+		_u.SetTransportMethod(*v)
+	}
+	return _u
+}
+
+// ClearTransportMethod clears the value of the "transport_method" field.
+func (_u *ShipmentUpdate) ClearTransportMethod() *ShipmentUpdate {
+	_u.mutation.ClearTransportMethod()
+	return _u
+}
+
+// SetCarrierName sets the "carrier_name" field.
+func (_u *ShipmentUpdate) SetCarrierName(v string) *ShipmentUpdate {
+	_u.mutation.SetCarrierName(v)
+	return _u
+}
+
+// SetNillableCarrierName sets the "carrier_name" field if the given value is not nil.
+func (_u *ShipmentUpdate) SetNillableCarrierName(v *string) *ShipmentUpdate {
+	if v != nil {
+		_u.SetCarrierName(*v)
+	}
+	return _u
+}
+
+// ClearCarrierName clears the value of the "carrier_name" field.
+func (_u *ShipmentUpdate) ClearCarrierName() *ShipmentUpdate {
+	_u.mutation.ClearCarrierName()
+	return _u
+}
+
+// SetTrackingNo sets the "tracking_no" field.
+func (_u *ShipmentUpdate) SetTrackingNo(v string) *ShipmentUpdate {
+	_u.mutation.SetTrackingNo(v)
+	return _u
+}
+
+// SetNillableTrackingNo sets the "tracking_no" field if the given value is not nil.
+func (_u *ShipmentUpdate) SetNillableTrackingNo(v *string) *ShipmentUpdate {
+	if v != nil {
+		_u.SetTrackingNo(*v)
+	}
+	return _u
+}
+
+// ClearTrackingNo clears the value of the "tracking_no" field.
+func (_u *ShipmentUpdate) ClearTrackingNo() *ShipmentUpdate {
+	_u.mutation.ClearTrackingNo()
+	return _u
+}
+
+// SetPackageCount sets the "package_count" field.
+func (_u *ShipmentUpdate) SetPackageCount(v int) *ShipmentUpdate {
+	_u.mutation.ResetPackageCount()
+	_u.mutation.SetPackageCount(v)
+	return _u
+}
+
+// SetNillablePackageCount sets the "package_count" field if the given value is not nil.
+func (_u *ShipmentUpdate) SetNillablePackageCount(v *int) *ShipmentUpdate {
+	if v != nil {
+		_u.SetPackageCount(*v)
+	}
+	return _u
+}
+
+// AddPackageCount adds value to the "package_count" field.
+func (_u *ShipmentUpdate) AddPackageCount(v int) *ShipmentUpdate {
+	_u.mutation.AddPackageCount(v)
+	return _u
+}
+
+// ClearPackageCount clears the value of the "package_count" field.
+func (_u *ShipmentUpdate) ClearPackageCount() *ShipmentUpdate {
+	_u.mutation.ClearPackageCount()
+	return _u
+}
+
+// SetGrossWeightKg sets the "gross_weight_kg" field.
+func (_u *ShipmentUpdate) SetGrossWeightKg(v decimal.Decimal) *ShipmentUpdate {
+	_u.mutation.SetGrossWeightKg(v)
+	return _u
+}
+
+// SetNillableGrossWeightKg sets the "gross_weight_kg" field if the given value is not nil.
+func (_u *ShipmentUpdate) SetNillableGrossWeightKg(v *decimal.Decimal) *ShipmentUpdate {
+	if v != nil {
+		_u.SetGrossWeightKg(*v)
+	}
+	return _u
+}
+
+// ClearGrossWeightKg clears the value of the "gross_weight_kg" field.
+func (_u *ShipmentUpdate) ClearGrossWeightKg() *ShipmentUpdate {
+	_u.mutation.ClearGrossWeightKg()
+	return _u
+}
+
+// SetVolumeM3 sets the "volume_m3" field.
+func (_u *ShipmentUpdate) SetVolumeM3(v decimal.Decimal) *ShipmentUpdate {
+	_u.mutation.SetVolumeM3(v)
+	return _u
+}
+
+// SetNillableVolumeM3 sets the "volume_m3" field if the given value is not nil.
+func (_u *ShipmentUpdate) SetNillableVolumeM3(v *decimal.Decimal) *ShipmentUpdate {
+	if v != nil {
+		_u.SetVolumeM3(*v)
+	}
+	return _u
+}
+
+// ClearVolumeM3 clears the value of the "volume_m3" field.
+func (_u *ShipmentUpdate) ClearVolumeM3() *ShipmentUpdate {
+	_u.mutation.ClearVolumeM3()
+	return _u
+}
+
+// SetShippingMark sets the "shipping_mark" field.
+func (_u *ShipmentUpdate) SetShippingMark(v string) *ShipmentUpdate {
+	_u.mutation.SetShippingMark(v)
+	return _u
+}
+
+// SetNillableShippingMark sets the "shipping_mark" field if the given value is not nil.
+func (_u *ShipmentUpdate) SetNillableShippingMark(v *string) *ShipmentUpdate {
+	if v != nil {
+		_u.SetShippingMark(*v)
+	}
+	return _u
+}
+
+// ClearShippingMark clears the value of the "shipping_mark" field.
+func (_u *ShipmentUpdate) ClearShippingMark() *ShipmentUpdate {
+	_u.mutation.ClearShippingMark()
+	return _u
+}
+
+// SetFreightAmount sets the "freight_amount" field.
+func (_u *ShipmentUpdate) SetFreightAmount(v decimal.Decimal) *ShipmentUpdate {
+	_u.mutation.SetFreightAmount(v)
+	return _u
+}
+
+// SetNillableFreightAmount sets the "freight_amount" field if the given value is not nil.
+func (_u *ShipmentUpdate) SetNillableFreightAmount(v *decimal.Decimal) *ShipmentUpdate {
+	if v != nil {
+		_u.SetFreightAmount(*v)
+	}
+	return _u
+}
+
+// ClearFreightAmount clears the value of the "freight_amount" field.
+func (_u *ShipmentUpdate) ClearFreightAmount() *ShipmentUpdate {
+	_u.mutation.ClearFreightAmount()
+	return _u
+}
+
+// SetFreightCurrency sets the "freight_currency" field.
+func (_u *ShipmentUpdate) SetFreightCurrency(v string) *ShipmentUpdate {
+	_u.mutation.SetFreightCurrency(v)
+	return _u
+}
+
+// SetNillableFreightCurrency sets the "freight_currency" field if the given value is not nil.
+func (_u *ShipmentUpdate) SetNillableFreightCurrency(v *string) *ShipmentUpdate {
+	if v != nil {
+		_u.SetFreightCurrency(*v)
+	}
+	return _u
+}
+
+// ClearFreightCurrency clears the value of the "freight_currency" field.
+func (_u *ShipmentUpdate) ClearFreightCurrency() *ShipmentUpdate {
+	_u.mutation.ClearFreightCurrency()
+	return _u
+}
+
 // SetTotalNetWeightG sets the "total_net_weight_g" field.
 func (_u *ShipmentUpdate) SetTotalNetWeightG(v decimal.Decimal) *ShipmentUpdate {
 	_u.mutation.SetTotalNetWeightG(v)
@@ -589,6 +788,36 @@ func (_u *ShipmentUpdate) check() error {
 			return &ValidationError{Name: "idempotency_key", err: fmt.Errorf(`ent: validator failed for field "Shipment.idempotency_key": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.TransportMethod(); ok {
+		if err := shipment.TransportMethodValidator(v); err != nil {
+			return &ValidationError{Name: "transport_method", err: fmt.Errorf(`ent: validator failed for field "Shipment.transport_method": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CarrierName(); ok {
+		if err := shipment.CarrierNameValidator(v); err != nil {
+			return &ValidationError{Name: "carrier_name", err: fmt.Errorf(`ent: validator failed for field "Shipment.carrier_name": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.TrackingNo(); ok {
+		if err := shipment.TrackingNoValidator(v); err != nil {
+			return &ValidationError{Name: "tracking_no", err: fmt.Errorf(`ent: validator failed for field "Shipment.tracking_no": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.PackageCount(); ok {
+		if err := shipment.PackageCountValidator(v); err != nil {
+			return &ValidationError{Name: "package_count", err: fmt.Errorf(`ent: validator failed for field "Shipment.package_count": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ShippingMark(); ok {
+		if err := shipment.ShippingMarkValidator(v); err != nil {
+			return &ValidationError{Name: "shipping_mark", err: fmt.Errorf(`ent: validator failed for field "Shipment.shipping_mark": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.FreightCurrency(); ok {
+		if err := shipment.FreightCurrencyValidator(v); err != nil {
+			return &ValidationError{Name: "freight_currency", err: fmt.Errorf(`ent: validator failed for field "Shipment.freight_currency": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := shipment.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "Shipment.note": %w`, err)}
@@ -617,6 +846,12 @@ func (_u *ShipmentUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.CustomerSnapshotCleared() {
 		_spec.ClearField(shipment.FieldCustomerSnapshot, field.TypeString)
+	}
+	if value, ok := _u.mutation.DeliverySnapshot(); ok {
+		_spec.SetField(shipment.FieldDeliverySnapshot, field.TypeJSON, value)
+	}
+	if _u.mutation.DeliverySnapshotCleared() {
+		_spec.ClearField(shipment.FieldDeliverySnapshot, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(shipment.FieldStatus, field.TypeString, value)
@@ -689,6 +924,63 @@ func (_u *ShipmentUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.ShippedAtCleared() {
 		_spec.ClearField(shipment.FieldShippedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.TransportMethod(); ok {
+		_spec.SetField(shipment.FieldTransportMethod, field.TypeString, value)
+	}
+	if _u.mutation.TransportMethodCleared() {
+		_spec.ClearField(shipment.FieldTransportMethod, field.TypeString)
+	}
+	if value, ok := _u.mutation.CarrierName(); ok {
+		_spec.SetField(shipment.FieldCarrierName, field.TypeString, value)
+	}
+	if _u.mutation.CarrierNameCleared() {
+		_spec.ClearField(shipment.FieldCarrierName, field.TypeString)
+	}
+	if value, ok := _u.mutation.TrackingNo(); ok {
+		_spec.SetField(shipment.FieldTrackingNo, field.TypeString, value)
+	}
+	if _u.mutation.TrackingNoCleared() {
+		_spec.ClearField(shipment.FieldTrackingNo, field.TypeString)
+	}
+	if value, ok := _u.mutation.PackageCount(); ok {
+		_spec.SetField(shipment.FieldPackageCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedPackageCount(); ok {
+		_spec.AddField(shipment.FieldPackageCount, field.TypeInt, value)
+	}
+	if _u.mutation.PackageCountCleared() {
+		_spec.ClearField(shipment.FieldPackageCount, field.TypeInt)
+	}
+	if value, ok := _u.mutation.GrossWeightKg(); ok {
+		_spec.SetField(shipment.FieldGrossWeightKg, field.TypeOther, value)
+	}
+	if _u.mutation.GrossWeightKgCleared() {
+		_spec.ClearField(shipment.FieldGrossWeightKg, field.TypeOther)
+	}
+	if value, ok := _u.mutation.VolumeM3(); ok {
+		_spec.SetField(shipment.FieldVolumeM3, field.TypeOther, value)
+	}
+	if _u.mutation.VolumeM3Cleared() {
+		_spec.ClearField(shipment.FieldVolumeM3, field.TypeOther)
+	}
+	if value, ok := _u.mutation.ShippingMark(); ok {
+		_spec.SetField(shipment.FieldShippingMark, field.TypeString, value)
+	}
+	if _u.mutation.ShippingMarkCleared() {
+		_spec.ClearField(shipment.FieldShippingMark, field.TypeString)
+	}
+	if value, ok := _u.mutation.FreightAmount(); ok {
+		_spec.SetField(shipment.FieldFreightAmount, field.TypeOther, value)
+	}
+	if _u.mutation.FreightAmountCleared() {
+		_spec.ClearField(shipment.FieldFreightAmount, field.TypeOther)
+	}
+	if value, ok := _u.mutation.FreightCurrency(); ok {
+		_spec.SetField(shipment.FieldFreightCurrency, field.TypeString, value)
+	}
+	if _u.mutation.FreightCurrencyCleared() {
+		_spec.ClearField(shipment.FieldFreightCurrency, field.TypeString)
 	}
 	if value, ok := _u.mutation.TotalNetWeightG(); ok {
 		_spec.SetField(shipment.FieldTotalNetWeightG, field.TypeOther, value)
@@ -905,6 +1197,18 @@ func (_u *ShipmentUpdateOne) SetNillableCustomerSnapshot(v *string) *ShipmentUpd
 // ClearCustomerSnapshot clears the value of the "customer_snapshot" field.
 func (_u *ShipmentUpdateOne) ClearCustomerSnapshot() *ShipmentUpdateOne {
 	_u.mutation.ClearCustomerSnapshot()
+	return _u
+}
+
+// SetDeliverySnapshot sets the "delivery_snapshot" field.
+func (_u *ShipmentUpdateOne) SetDeliverySnapshot(v map[string]interface{}) *ShipmentUpdateOne {
+	_u.mutation.SetDeliverySnapshot(v)
+	return _u
+}
+
+// ClearDeliverySnapshot clears the value of the "delivery_snapshot" field.
+func (_u *ShipmentUpdateOne) ClearDeliverySnapshot() *ShipmentUpdateOne {
+	_u.mutation.ClearDeliverySnapshot()
 	return _u
 }
 
@@ -1150,6 +1454,193 @@ func (_u *ShipmentUpdateOne) SetNillableShippedAt(v *time.Time) *ShipmentUpdateO
 // ClearShippedAt clears the value of the "shipped_at" field.
 func (_u *ShipmentUpdateOne) ClearShippedAt() *ShipmentUpdateOne {
 	_u.mutation.ClearShippedAt()
+	return _u
+}
+
+// SetTransportMethod sets the "transport_method" field.
+func (_u *ShipmentUpdateOne) SetTransportMethod(v string) *ShipmentUpdateOne {
+	_u.mutation.SetTransportMethod(v)
+	return _u
+}
+
+// SetNillableTransportMethod sets the "transport_method" field if the given value is not nil.
+func (_u *ShipmentUpdateOne) SetNillableTransportMethod(v *string) *ShipmentUpdateOne {
+	if v != nil {
+		_u.SetTransportMethod(*v)
+	}
+	return _u
+}
+
+// ClearTransportMethod clears the value of the "transport_method" field.
+func (_u *ShipmentUpdateOne) ClearTransportMethod() *ShipmentUpdateOne {
+	_u.mutation.ClearTransportMethod()
+	return _u
+}
+
+// SetCarrierName sets the "carrier_name" field.
+func (_u *ShipmentUpdateOne) SetCarrierName(v string) *ShipmentUpdateOne {
+	_u.mutation.SetCarrierName(v)
+	return _u
+}
+
+// SetNillableCarrierName sets the "carrier_name" field if the given value is not nil.
+func (_u *ShipmentUpdateOne) SetNillableCarrierName(v *string) *ShipmentUpdateOne {
+	if v != nil {
+		_u.SetCarrierName(*v)
+	}
+	return _u
+}
+
+// ClearCarrierName clears the value of the "carrier_name" field.
+func (_u *ShipmentUpdateOne) ClearCarrierName() *ShipmentUpdateOne {
+	_u.mutation.ClearCarrierName()
+	return _u
+}
+
+// SetTrackingNo sets the "tracking_no" field.
+func (_u *ShipmentUpdateOne) SetTrackingNo(v string) *ShipmentUpdateOne {
+	_u.mutation.SetTrackingNo(v)
+	return _u
+}
+
+// SetNillableTrackingNo sets the "tracking_no" field if the given value is not nil.
+func (_u *ShipmentUpdateOne) SetNillableTrackingNo(v *string) *ShipmentUpdateOne {
+	if v != nil {
+		_u.SetTrackingNo(*v)
+	}
+	return _u
+}
+
+// ClearTrackingNo clears the value of the "tracking_no" field.
+func (_u *ShipmentUpdateOne) ClearTrackingNo() *ShipmentUpdateOne {
+	_u.mutation.ClearTrackingNo()
+	return _u
+}
+
+// SetPackageCount sets the "package_count" field.
+func (_u *ShipmentUpdateOne) SetPackageCount(v int) *ShipmentUpdateOne {
+	_u.mutation.ResetPackageCount()
+	_u.mutation.SetPackageCount(v)
+	return _u
+}
+
+// SetNillablePackageCount sets the "package_count" field if the given value is not nil.
+func (_u *ShipmentUpdateOne) SetNillablePackageCount(v *int) *ShipmentUpdateOne {
+	if v != nil {
+		_u.SetPackageCount(*v)
+	}
+	return _u
+}
+
+// AddPackageCount adds value to the "package_count" field.
+func (_u *ShipmentUpdateOne) AddPackageCount(v int) *ShipmentUpdateOne {
+	_u.mutation.AddPackageCount(v)
+	return _u
+}
+
+// ClearPackageCount clears the value of the "package_count" field.
+func (_u *ShipmentUpdateOne) ClearPackageCount() *ShipmentUpdateOne {
+	_u.mutation.ClearPackageCount()
+	return _u
+}
+
+// SetGrossWeightKg sets the "gross_weight_kg" field.
+func (_u *ShipmentUpdateOne) SetGrossWeightKg(v decimal.Decimal) *ShipmentUpdateOne {
+	_u.mutation.SetGrossWeightKg(v)
+	return _u
+}
+
+// SetNillableGrossWeightKg sets the "gross_weight_kg" field if the given value is not nil.
+func (_u *ShipmentUpdateOne) SetNillableGrossWeightKg(v *decimal.Decimal) *ShipmentUpdateOne {
+	if v != nil {
+		_u.SetGrossWeightKg(*v)
+	}
+	return _u
+}
+
+// ClearGrossWeightKg clears the value of the "gross_weight_kg" field.
+func (_u *ShipmentUpdateOne) ClearGrossWeightKg() *ShipmentUpdateOne {
+	_u.mutation.ClearGrossWeightKg()
+	return _u
+}
+
+// SetVolumeM3 sets the "volume_m3" field.
+func (_u *ShipmentUpdateOne) SetVolumeM3(v decimal.Decimal) *ShipmentUpdateOne {
+	_u.mutation.SetVolumeM3(v)
+	return _u
+}
+
+// SetNillableVolumeM3 sets the "volume_m3" field if the given value is not nil.
+func (_u *ShipmentUpdateOne) SetNillableVolumeM3(v *decimal.Decimal) *ShipmentUpdateOne {
+	if v != nil {
+		_u.SetVolumeM3(*v)
+	}
+	return _u
+}
+
+// ClearVolumeM3 clears the value of the "volume_m3" field.
+func (_u *ShipmentUpdateOne) ClearVolumeM3() *ShipmentUpdateOne {
+	_u.mutation.ClearVolumeM3()
+	return _u
+}
+
+// SetShippingMark sets the "shipping_mark" field.
+func (_u *ShipmentUpdateOne) SetShippingMark(v string) *ShipmentUpdateOne {
+	_u.mutation.SetShippingMark(v)
+	return _u
+}
+
+// SetNillableShippingMark sets the "shipping_mark" field if the given value is not nil.
+func (_u *ShipmentUpdateOne) SetNillableShippingMark(v *string) *ShipmentUpdateOne {
+	if v != nil {
+		_u.SetShippingMark(*v)
+	}
+	return _u
+}
+
+// ClearShippingMark clears the value of the "shipping_mark" field.
+func (_u *ShipmentUpdateOne) ClearShippingMark() *ShipmentUpdateOne {
+	_u.mutation.ClearShippingMark()
+	return _u
+}
+
+// SetFreightAmount sets the "freight_amount" field.
+func (_u *ShipmentUpdateOne) SetFreightAmount(v decimal.Decimal) *ShipmentUpdateOne {
+	_u.mutation.SetFreightAmount(v)
+	return _u
+}
+
+// SetNillableFreightAmount sets the "freight_amount" field if the given value is not nil.
+func (_u *ShipmentUpdateOne) SetNillableFreightAmount(v *decimal.Decimal) *ShipmentUpdateOne {
+	if v != nil {
+		_u.SetFreightAmount(*v)
+	}
+	return _u
+}
+
+// ClearFreightAmount clears the value of the "freight_amount" field.
+func (_u *ShipmentUpdateOne) ClearFreightAmount() *ShipmentUpdateOne {
+	_u.mutation.ClearFreightAmount()
+	return _u
+}
+
+// SetFreightCurrency sets the "freight_currency" field.
+func (_u *ShipmentUpdateOne) SetFreightCurrency(v string) *ShipmentUpdateOne {
+	_u.mutation.SetFreightCurrency(v)
+	return _u
+}
+
+// SetNillableFreightCurrency sets the "freight_currency" field if the given value is not nil.
+func (_u *ShipmentUpdateOne) SetNillableFreightCurrency(v *string) *ShipmentUpdateOne {
+	if v != nil {
+		_u.SetFreightCurrency(*v)
+	}
+	return _u
+}
+
+// ClearFreightCurrency clears the value of the "freight_currency" field.
+func (_u *ShipmentUpdateOne) ClearFreightCurrency() *ShipmentUpdateOne {
+	_u.mutation.ClearFreightCurrency()
 	return _u
 }
 
@@ -1404,6 +1895,36 @@ func (_u *ShipmentUpdateOne) check() error {
 			return &ValidationError{Name: "idempotency_key", err: fmt.Errorf(`ent: validator failed for field "Shipment.idempotency_key": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.TransportMethod(); ok {
+		if err := shipment.TransportMethodValidator(v); err != nil {
+			return &ValidationError{Name: "transport_method", err: fmt.Errorf(`ent: validator failed for field "Shipment.transport_method": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CarrierName(); ok {
+		if err := shipment.CarrierNameValidator(v); err != nil {
+			return &ValidationError{Name: "carrier_name", err: fmt.Errorf(`ent: validator failed for field "Shipment.carrier_name": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.TrackingNo(); ok {
+		if err := shipment.TrackingNoValidator(v); err != nil {
+			return &ValidationError{Name: "tracking_no", err: fmt.Errorf(`ent: validator failed for field "Shipment.tracking_no": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.PackageCount(); ok {
+		if err := shipment.PackageCountValidator(v); err != nil {
+			return &ValidationError{Name: "package_count", err: fmt.Errorf(`ent: validator failed for field "Shipment.package_count": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ShippingMark(); ok {
+		if err := shipment.ShippingMarkValidator(v); err != nil {
+			return &ValidationError{Name: "shipping_mark", err: fmt.Errorf(`ent: validator failed for field "Shipment.shipping_mark": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.FreightCurrency(); ok {
+		if err := shipment.FreightCurrencyValidator(v); err != nil {
+			return &ValidationError{Name: "freight_currency", err: fmt.Errorf(`ent: validator failed for field "Shipment.freight_currency": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := shipment.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "Shipment.note": %w`, err)}
@@ -1449,6 +1970,12 @@ func (_u *ShipmentUpdateOne) sqlSave(ctx context.Context) (_node *Shipment, err 
 	}
 	if _u.mutation.CustomerSnapshotCleared() {
 		_spec.ClearField(shipment.FieldCustomerSnapshot, field.TypeString)
+	}
+	if value, ok := _u.mutation.DeliverySnapshot(); ok {
+		_spec.SetField(shipment.FieldDeliverySnapshot, field.TypeJSON, value)
+	}
+	if _u.mutation.DeliverySnapshotCleared() {
+		_spec.ClearField(shipment.FieldDeliverySnapshot, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(shipment.FieldStatus, field.TypeString, value)
@@ -1521,6 +2048,63 @@ func (_u *ShipmentUpdateOne) sqlSave(ctx context.Context) (_node *Shipment, err 
 	}
 	if _u.mutation.ShippedAtCleared() {
 		_spec.ClearField(shipment.FieldShippedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.TransportMethod(); ok {
+		_spec.SetField(shipment.FieldTransportMethod, field.TypeString, value)
+	}
+	if _u.mutation.TransportMethodCleared() {
+		_spec.ClearField(shipment.FieldTransportMethod, field.TypeString)
+	}
+	if value, ok := _u.mutation.CarrierName(); ok {
+		_spec.SetField(shipment.FieldCarrierName, field.TypeString, value)
+	}
+	if _u.mutation.CarrierNameCleared() {
+		_spec.ClearField(shipment.FieldCarrierName, field.TypeString)
+	}
+	if value, ok := _u.mutation.TrackingNo(); ok {
+		_spec.SetField(shipment.FieldTrackingNo, field.TypeString, value)
+	}
+	if _u.mutation.TrackingNoCleared() {
+		_spec.ClearField(shipment.FieldTrackingNo, field.TypeString)
+	}
+	if value, ok := _u.mutation.PackageCount(); ok {
+		_spec.SetField(shipment.FieldPackageCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedPackageCount(); ok {
+		_spec.AddField(shipment.FieldPackageCount, field.TypeInt, value)
+	}
+	if _u.mutation.PackageCountCleared() {
+		_spec.ClearField(shipment.FieldPackageCount, field.TypeInt)
+	}
+	if value, ok := _u.mutation.GrossWeightKg(); ok {
+		_spec.SetField(shipment.FieldGrossWeightKg, field.TypeOther, value)
+	}
+	if _u.mutation.GrossWeightKgCleared() {
+		_spec.ClearField(shipment.FieldGrossWeightKg, field.TypeOther)
+	}
+	if value, ok := _u.mutation.VolumeM3(); ok {
+		_spec.SetField(shipment.FieldVolumeM3, field.TypeOther, value)
+	}
+	if _u.mutation.VolumeM3Cleared() {
+		_spec.ClearField(shipment.FieldVolumeM3, field.TypeOther)
+	}
+	if value, ok := _u.mutation.ShippingMark(); ok {
+		_spec.SetField(shipment.FieldShippingMark, field.TypeString, value)
+	}
+	if _u.mutation.ShippingMarkCleared() {
+		_spec.ClearField(shipment.FieldShippingMark, field.TypeString)
+	}
+	if value, ok := _u.mutation.FreightAmount(); ok {
+		_spec.SetField(shipment.FieldFreightAmount, field.TypeOther, value)
+	}
+	if _u.mutation.FreightAmountCleared() {
+		_spec.ClearField(shipment.FieldFreightAmount, field.TypeOther)
+	}
+	if value, ok := _u.mutation.FreightCurrency(); ok {
+		_spec.SetField(shipment.FieldFreightCurrency, field.TypeString, value)
+	}
+	if _u.mutation.FreightCurrencyCleared() {
+		_spec.ClearField(shipment.FieldFreightCurrency, field.TypeString)
 	}
 	if value, ok := _u.mutation.TotalNetWeightG(); ok {
 		_spec.SetField(shipment.FieldTotalNetWeightG, field.TypeOther, value)

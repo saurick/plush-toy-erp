@@ -62,6 +62,48 @@ func (_c *PurchaseOrderCreate) SetNillablePaymentTermDays(v *int) *PurchaseOrder
 	return _c
 }
 
+// SetPaymentMethod sets the "payment_method" field.
+func (_c *PurchaseOrderCreate) SetPaymentMethod(v string) *PurchaseOrderCreate {
+	_c.mutation.SetPaymentMethod(v)
+	return _c
+}
+
+// SetNillablePaymentMethod sets the "payment_method" field if the given value is not nil.
+func (_c *PurchaseOrderCreate) SetNillablePaymentMethod(v *string) *PurchaseOrderCreate {
+	if v != nil {
+		_c.SetPaymentMethod(*v)
+	}
+	return _c
+}
+
+// SetInvoiceRequired sets the "invoice_required" field.
+func (_c *PurchaseOrderCreate) SetInvoiceRequired(v bool) *PurchaseOrderCreate {
+	_c.mutation.SetInvoiceRequired(v)
+	return _c
+}
+
+// SetNillableInvoiceRequired sets the "invoice_required" field if the given value is not nil.
+func (_c *PurchaseOrderCreate) SetNillableInvoiceRequired(v *bool) *PurchaseOrderCreate {
+	if v != nil {
+		_c.SetInvoiceRequired(*v)
+	}
+	return _c
+}
+
+// SetInvoiceCategory sets the "invoice_category" field.
+func (_c *PurchaseOrderCreate) SetInvoiceCategory(v string) *PurchaseOrderCreate {
+	_c.mutation.SetInvoiceCategory(v)
+	return _c
+}
+
+// SetNillableInvoiceCategory sets the "invoice_category" field if the given value is not nil.
+func (_c *PurchaseOrderCreate) SetNillableInvoiceCategory(v *string) *PurchaseOrderCreate {
+	if v != nil {
+		_c.SetInvoiceCategory(*v)
+	}
+	return _c
+}
+
 // SetSupplierPurchaseOrderNo sets the "supplier_purchase_order_no" field.
 func (_c *PurchaseOrderCreate) SetSupplierPurchaseOrderNo(v string) *PurchaseOrderCreate {
 	_c.mutation.SetSupplierPurchaseOrderNo(v)
@@ -104,6 +146,34 @@ func (_c *PurchaseOrderCreate) SetExpectedArrivalDate(v time.Time) *PurchaseOrde
 func (_c *PurchaseOrderCreate) SetNillableExpectedArrivalDate(v *time.Time) *PurchaseOrderCreate {
 	if v != nil {
 		_c.SetExpectedArrivalDate(*v)
+	}
+	return _c
+}
+
+// SetSupplierConfirmedArrivalDate sets the "supplier_confirmed_arrival_date" field.
+func (_c *PurchaseOrderCreate) SetSupplierConfirmedArrivalDate(v time.Time) *PurchaseOrderCreate {
+	_c.mutation.SetSupplierConfirmedArrivalDate(v)
+	return _c
+}
+
+// SetNillableSupplierConfirmedArrivalDate sets the "supplier_confirmed_arrival_date" field if the given value is not nil.
+func (_c *PurchaseOrderCreate) SetNillableSupplierConfirmedArrivalDate(v *time.Time) *PurchaseOrderCreate {
+	if v != nil {
+		_c.SetSupplierConfirmedArrivalDate(*v)
+	}
+	return _c
+}
+
+// SetDeliveryAddress sets the "delivery_address" field.
+func (_c *PurchaseOrderCreate) SetDeliveryAddress(v string) *PurchaseOrderCreate {
+	_c.mutation.SetDeliveryAddress(v)
+	return _c
+}
+
+// SetNillableDeliveryAddress sets the "delivery_address" field if the given value is not nil.
+func (_c *PurchaseOrderCreate) SetNillableDeliveryAddress(v *string) *PurchaseOrderCreate {
+	if v != nil {
+		_c.SetDeliveryAddress(*v)
 	}
 	return _c
 }
@@ -356,6 +426,16 @@ func (_c *PurchaseOrderCreate) check() error {
 			return &ValidationError{Name: "payment_term_days", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.payment_term_days": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.PaymentMethod(); ok {
+		if err := purchaseorder.PaymentMethodValidator(v); err != nil {
+			return &ValidationError{Name: "payment_method", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.payment_method": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.InvoiceCategory(); ok {
+		if err := purchaseorder.InvoiceCategoryValidator(v); err != nil {
+			return &ValidationError{Name: "invoice_category", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.invoice_category": %w`, err)}
+		}
+	}
 	if v, ok := _c.mutation.SupplierPurchaseOrderNo(); ok {
 		if err := purchaseorder.SupplierPurchaseOrderNoValidator(v); err != nil {
 			return &ValidationError{Name: "supplier_purchase_order_no", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.supplier_purchase_order_no": %w`, err)}
@@ -363,6 +443,11 @@ func (_c *PurchaseOrderCreate) check() error {
 	}
 	if _, ok := _c.mutation.PurchaseDate(); !ok {
 		return &ValidationError{Name: "purchase_date", err: errors.New(`ent: missing required field "PurchaseOrder.purchase_date"`)}
+	}
+	if v, ok := _c.mutation.DeliveryAddress(); ok {
+		if err := purchaseorder.DeliveryAddressValidator(v); err != nil {
+			return &ValidationError{Name: "delivery_address", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.delivery_address": %w`, err)}
+		}
 	}
 	if _, ok := _c.mutation.LifecycleStatus(); !ok {
 		return &ValidationError{Name: "lifecycle_status", err: errors.New(`ent: missing required field "PurchaseOrder.lifecycle_status"`)}
@@ -452,6 +537,18 @@ func (_c *PurchaseOrderCreate) createSpec() (*PurchaseOrder, *sqlgraph.CreateSpe
 		_spec.SetField(purchaseorder.FieldPaymentTermDays, field.TypeInt, value)
 		_node.PaymentTermDays = &value
 	}
+	if value, ok := _c.mutation.PaymentMethod(); ok {
+		_spec.SetField(purchaseorder.FieldPaymentMethod, field.TypeString, value)
+		_node.PaymentMethod = &value
+	}
+	if value, ok := _c.mutation.InvoiceRequired(); ok {
+		_spec.SetField(purchaseorder.FieldInvoiceRequired, field.TypeBool, value)
+		_node.InvoiceRequired = &value
+	}
+	if value, ok := _c.mutation.InvoiceCategory(); ok {
+		_spec.SetField(purchaseorder.FieldInvoiceCategory, field.TypeString, value)
+		_node.InvoiceCategory = &value
+	}
 	if value, ok := _c.mutation.SupplierPurchaseOrderNo(); ok {
 		_spec.SetField(purchaseorder.FieldSupplierPurchaseOrderNo, field.TypeString, value)
 		_node.SupplierPurchaseOrderNo = &value
@@ -471,6 +568,14 @@ func (_c *PurchaseOrderCreate) createSpec() (*PurchaseOrder, *sqlgraph.CreateSpe
 	if value, ok := _c.mutation.ExpectedArrivalDate(); ok {
 		_spec.SetField(purchaseorder.FieldExpectedArrivalDate, field.TypeTime, value)
 		_node.ExpectedArrivalDate = &value
+	}
+	if value, ok := _c.mutation.SupplierConfirmedArrivalDate(); ok {
+		_spec.SetField(purchaseorder.FieldSupplierConfirmedArrivalDate, field.TypeTime, value)
+		_node.SupplierConfirmedArrivalDate = &value
+	}
+	if value, ok := _c.mutation.DeliveryAddress(); ok {
+		_spec.SetField(purchaseorder.FieldDeliveryAddress, field.TypeString, value)
+		_node.DeliveryAddress = &value
 	}
 	if value, ok := _c.mutation.LifecycleStatus(); ok {
 		_spec.SetField(purchaseorder.FieldLifecycleStatus, field.TypeString, value)

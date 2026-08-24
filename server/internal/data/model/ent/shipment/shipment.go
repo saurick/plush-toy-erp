@@ -23,6 +23,8 @@ const (
 	FieldCustomerID = "customer_id"
 	// FieldCustomerSnapshot holds the string denoting the customer_snapshot field in the database.
 	FieldCustomerSnapshot = "customer_snapshot"
+	// FieldDeliverySnapshot holds the string denoting the delivery_snapshot field in the database.
+	FieldDeliverySnapshot = "delivery_snapshot"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
 	// FieldVersion holds the string denoting the version field in the database.
@@ -47,6 +49,24 @@ const (
 	FieldPlannedShipAt = "planned_ship_at"
 	// FieldShippedAt holds the string denoting the shipped_at field in the database.
 	FieldShippedAt = "shipped_at"
+	// FieldTransportMethod holds the string denoting the transport_method field in the database.
+	FieldTransportMethod = "transport_method"
+	// FieldCarrierName holds the string denoting the carrier_name field in the database.
+	FieldCarrierName = "carrier_name"
+	// FieldTrackingNo holds the string denoting the tracking_no field in the database.
+	FieldTrackingNo = "tracking_no"
+	// FieldPackageCount holds the string denoting the package_count field in the database.
+	FieldPackageCount = "package_count"
+	// FieldGrossWeightKg holds the string denoting the gross_weight_kg field in the database.
+	FieldGrossWeightKg = "gross_weight_kg"
+	// FieldVolumeM3 holds the string denoting the volume_m3 field in the database.
+	FieldVolumeM3 = "volume_m3"
+	// FieldShippingMark holds the string denoting the shipping_mark field in the database.
+	FieldShippingMark = "shipping_mark"
+	// FieldFreightAmount holds the string denoting the freight_amount field in the database.
+	FieldFreightAmount = "freight_amount"
+	// FieldFreightCurrency holds the string denoting the freight_currency field in the database.
+	FieldFreightCurrency = "freight_currency"
 	// FieldTotalNetWeightG holds the string denoting the total_net_weight_g field in the database.
 	FieldTotalNetWeightG = "total_net_weight_g"
 	// FieldRequestedTotalNetWeightG holds the string denoting the requested_total_net_weight_g field in the database.
@@ -95,6 +115,7 @@ var Columns = []string{
 	FieldSalesOrderID,
 	FieldCustomerID,
 	FieldCustomerSnapshot,
+	FieldDeliverySnapshot,
 	FieldStatus,
 	FieldVersion,
 	FieldFinanceReleaseStatus,
@@ -107,6 +128,15 @@ var Columns = []string{
 	FieldIdempotencyKey,
 	FieldPlannedShipAt,
 	FieldShippedAt,
+	FieldTransportMethod,
+	FieldCarrierName,
+	FieldTrackingNo,
+	FieldPackageCount,
+	FieldGrossWeightKg,
+	FieldVolumeM3,
+	FieldShippingMark,
+	FieldFreightAmount,
+	FieldFreightCurrency,
 	FieldTotalNetWeightG,
 	FieldRequestedTotalNetWeightG,
 	FieldNote,
@@ -165,6 +195,18 @@ var (
 	FinanceReleaseNoteValidator func(string) error
 	// IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
 	IdempotencyKeyValidator func(string) error
+	// TransportMethodValidator is a validator for the "transport_method" field. It is called by the builders before save.
+	TransportMethodValidator func(string) error
+	// CarrierNameValidator is a validator for the "carrier_name" field. It is called by the builders before save.
+	CarrierNameValidator func(string) error
+	// TrackingNoValidator is a validator for the "tracking_no" field. It is called by the builders before save.
+	TrackingNoValidator func(string) error
+	// PackageCountValidator is a validator for the "package_count" field. It is called by the builders before save.
+	PackageCountValidator func(int) error
+	// ShippingMarkValidator is a validator for the "shipping_mark" field. It is called by the builders before save.
+	ShippingMarkValidator func(string) error
+	// FreightCurrencyValidator is a validator for the "freight_currency" field. It is called by the builders before save.
+	FreightCurrencyValidator func(string) error
 	// NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	NoteValidator func(string) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -261,6 +303,51 @@ func ByPlannedShipAt(opts ...sql.OrderTermOption) OrderOption {
 // ByShippedAt orders the results by the shipped_at field.
 func ByShippedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldShippedAt, opts...).ToFunc()
+}
+
+// ByTransportMethod orders the results by the transport_method field.
+func ByTransportMethod(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTransportMethod, opts...).ToFunc()
+}
+
+// ByCarrierName orders the results by the carrier_name field.
+func ByCarrierName(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCarrierName, opts...).ToFunc()
+}
+
+// ByTrackingNo orders the results by the tracking_no field.
+func ByTrackingNo(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTrackingNo, opts...).ToFunc()
+}
+
+// ByPackageCount orders the results by the package_count field.
+func ByPackageCount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPackageCount, opts...).ToFunc()
+}
+
+// ByGrossWeightKg orders the results by the gross_weight_kg field.
+func ByGrossWeightKg(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldGrossWeightKg, opts...).ToFunc()
+}
+
+// ByVolumeM3 orders the results by the volume_m3 field.
+func ByVolumeM3(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldVolumeM3, opts...).ToFunc()
+}
+
+// ByShippingMark orders the results by the shipping_mark field.
+func ByShippingMark(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldShippingMark, opts...).ToFunc()
+}
+
+// ByFreightAmount orders the results by the freight_amount field.
+func ByFreightAmount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFreightAmount, opts...).ToFunc()
+}
+
+// ByFreightCurrency orders the results by the freight_currency field.
+func ByFreightCurrency(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFreightCurrency, opts...).ToFunc()
 }
 
 // ByTotalNetWeightG orders the results by the total_net_weight_g field.

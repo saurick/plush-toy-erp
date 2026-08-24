@@ -181,6 +181,7 @@ type Shipment struct {
 	SalesOrderID                    *int
 	CustomerID                      *int
 	CustomerSnapshot                *string
+	DeliverySnapshot                map[string]any
 	Status                          string
 	Version                         int
 	FinanceReleaseStatus            string
@@ -193,6 +194,15 @@ type Shipment struct {
 	IdempotencyKey                  string
 	PlannedShipAt                   *time.Time
 	ShippedAt                       *time.Time
+	TransportMethod                 *string
+	CarrierName                     *string
+	TrackingNo                      *string
+	PackageCount                    *int
+	GrossWeightKg                   *decimal.Decimal
+	VolumeM3                        *decimal.Decimal
+	ShippingMark                    *string
+	FreightAmount                   *decimal.Decimal
+	FreightCurrency                 *string
 	TotalNetWeightG                 *decimal.Decimal
 	Note                            *string
 	CreatedAt                       time.Time
@@ -214,6 +224,8 @@ type ShipmentItem struct {
 	UnitPriceSnapshot      *decimal.Decimal
 	AmountSnapshot         *decimal.Decimal
 	CurrencySnapshot       *string
+	PackageDescription     *string
+	CaseNo                 *string
 	Note                   *string
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
@@ -416,21 +428,33 @@ type ShipmentCreate struct {
 	SalesOrderID     *int
 	CustomerID       *int
 	CustomerSnapshot *string
+	DeliverySnapshot map[string]any
 	IdempotencyKey   string
 	PlannedShipAt    *time.Time
+	TransportMethod  *string
+	CarrierName      *string
+	TrackingNo       *string
+	PackageCount     *int
+	GrossWeightKg    *decimal.Decimal
+	VolumeM3         *decimal.Decimal
+	ShippingMark     *string
+	FreightAmount    *decimal.Decimal
+	FreightCurrency  *string
 	TotalNetWeightG  *decimal.Decimal
 	Note             *string
 }
 
 type ShipmentItemCreate struct {
-	SalesOrderItemID *int
-	ProductID        int
-	ProductSkuID     *int
-	WarehouseID      int
-	UnitID           int
-	LotID            *int
-	Quantity         decimal.Decimal
-	Note             *string
+	SalesOrderItemID   *int
+	ProductID          int
+	ProductSkuID       *int
+	WarehouseID        int
+	UnitID             int
+	LotID              *int
+	Quantity           decimal.Decimal
+	PackageDescription *string
+	CaseNo             *string
+	Note               *string
 }
 
 type ShipmentCreateWithItems struct {
@@ -447,7 +471,17 @@ type ShipmentDraftSave struct {
 	SalesOrderID     *int
 	CustomerID       *int
 	CustomerSnapshot *string
+	DeliverySnapshot map[string]any
 	PlannedShipAt    *time.Time
+	TransportMethod  *string
+	CarrierName      *string
+	TrackingNo       *string
+	PackageCount     *int
+	GrossWeightKg    *decimal.Decimal
+	VolumeM3         *decimal.Decimal
+	ShippingMark     *string
+	FreightAmount    *decimal.Decimal
+	FreightCurrency  *string
 	TotalNetWeightG  *decimal.Decimal
 	Note             *string
 	Items            []*ShipmentItemCreate
@@ -1076,7 +1110,17 @@ func (uc *OperationalFactUsecase) SaveShipmentDraftWithItems(ctx context.Context
 		SalesOrderID:     normalized.SalesOrderID,
 		CustomerID:       normalized.CustomerID,
 		CustomerSnapshot: normalized.CustomerSnapshot,
+		DeliverySnapshot: normalized.DeliverySnapshot,
 		PlannedShipAt:    normalized.PlannedShipAt,
+		TransportMethod:  normalized.TransportMethod,
+		CarrierName:      normalized.CarrierName,
+		TrackingNo:       normalized.TrackingNo,
+		PackageCount:     normalized.PackageCount,
+		GrossWeightKg:    normalized.GrossWeightKg,
+		VolumeM3:         normalized.VolumeM3,
+		ShippingMark:     normalized.ShippingMark,
+		FreightAmount:    normalized.FreightAmount,
+		FreightCurrency:  normalized.FreightCurrency,
 		TotalNetWeightG:  normalized.TotalNetWeightG,
 		Note:             normalized.Note,
 	}
@@ -1737,9 +1781,39 @@ func normalizeShipmentCreate(in *ShipmentCreate) (*ShipmentCreate, error) {
 	out := *in
 	out.ShipmentNo = strings.TrimSpace(out.ShipmentNo)
 	out.CustomerSnapshot = normalizeOptionalString(out.CustomerSnapshot)
+	var err error
+	out.DeliverySnapshot, err = normalizeDeliverySnapshot(out.DeliverySnapshot)
+	if err != nil {
+		return nil, err
+	}
+	out.TransportMethod = normalizeOptionalString(out.TransportMethod)
+	out.CarrierName = normalizeOptionalString(out.CarrierName)
+	out.TrackingNo = normalizeOptionalString(out.TrackingNo)
+	out.ShippingMark = normalizeOptionalString(out.ShippingMark)
+	out.FreightCurrency = normalizeOptionalUpperString(out.FreightCurrency)
 	out.Note = normalizeOptionalString(out.Note)
 	if !validNetWeightG(out.TotalNetWeightG) {
 		return nil, ErrBadParam
+	}
+	if out.PackageCount != nil && *out.PackageCount <= 0 {
+		return nil, ErrBadParam
+	}
+	if !validOptionalPositiveNumeric20Scale6(out.GrossWeightKg) ||
+		!validOptionalPositiveNumeric20Scale6(out.VolumeM3) {
+		return nil, ErrBadParam
+	}
+	if err := value.ValidateOptionalNonNegativeMoney(out.FreightAmount); err != nil {
+		return nil, ErrBadParam
+	}
+	if (out.FreightAmount == nil) != (out.FreightCurrency == nil) {
+		return nil, ErrBadParam
+	}
+	if out.FreightCurrency != nil {
+		if normalized, ok := normalizeSourceOrderCurrency(*out.FreightCurrency, false); !ok {
+			return nil, ErrBadParam
+		} else {
+			out.FreightCurrency = &normalized
+		}
 	}
 	idempotencyKey, err := value.NewIdempotencyKey(out.IdempotencyKey)
 	if err != nil {
@@ -1768,6 +1842,8 @@ func normalizeShipmentItemCreate(in *ShipmentItemCreate) (*ShipmentItemCreate, e
 	}
 	out := *in
 	out.Note = normalizeOptionalString(out.Note)
+	out.PackageDescription = normalizeOptionalString(out.PackageDescription)
+	out.CaseNo = normalizeOptionalString(out.CaseNo)
 	if out.SalesOrderItemID != nil && *out.SalesOrderItemID <= 0 {
 		out.SalesOrderItemID = nil
 	}
@@ -1815,6 +1891,16 @@ func normalizeShipmentDraftSave(in *ShipmentDraftSave) (*ShipmentDraftSave, erro
 	out := *in
 	out.ShipmentNo = strings.TrimSpace(out.ShipmentNo)
 	out.CustomerSnapshot = normalizeOptionalString(out.CustomerSnapshot)
+	var err error
+	out.DeliverySnapshot, err = normalizeDeliverySnapshot(out.DeliverySnapshot)
+	if err != nil {
+		return nil, err
+	}
+	out.TransportMethod = normalizeOptionalString(out.TransportMethod)
+	out.CarrierName = normalizeOptionalString(out.CarrierName)
+	out.TrackingNo = normalizeOptionalString(out.TrackingNo)
+	out.ShippingMark = normalizeOptionalString(out.ShippingMark)
+	out.FreightCurrency = normalizeOptionalUpperString(out.FreightCurrency)
 	out.Note = normalizeOptionalString(out.Note)
 	if out.SalesOrderID != nil && *out.SalesOrderID <= 0 {
 		out.SalesOrderID = nil
@@ -1826,8 +1912,24 @@ func normalizeShipmentDraftSave(in *ShipmentDraftSave) (*ShipmentDraftSave, erro
 		plannedShipAt := out.PlannedShipAt.UTC().Truncate(time.Microsecond)
 		out.PlannedShipAt = &plannedShipAt
 	}
-	if out.ShipmentNo == "" || !validNetWeightG(out.TotalNetWeightG) {
+	if out.ShipmentNo == "" || !validNetWeightG(out.TotalNetWeightG) ||
+		(out.PackageCount != nil && *out.PackageCount <= 0) ||
+		!validOptionalPositiveNumeric20Scale6(out.GrossWeightKg) ||
+		!validOptionalPositiveNumeric20Scale6(out.VolumeM3) {
 		return nil, ErrBadParam
+	}
+	if err := value.ValidateOptionalNonNegativeMoney(out.FreightAmount); err != nil {
+		return nil, ErrBadParam
+	}
+	if (out.FreightAmount == nil) != (out.FreightCurrency == nil) {
+		return nil, ErrBadParam
+	}
+	if out.FreightCurrency != nil {
+		if normalized, ok := normalizeSourceOrderCurrency(*out.FreightCurrency, false); !ok {
+			return nil, ErrBadParam
+		} else {
+			out.FreightCurrency = &normalized
+		}
 	}
 	out.Items = make([]*ShipmentItemCreate, 0, len(in.Items))
 	for _, item := range in.Items {

@@ -303,6 +303,9 @@ test('businessLineItems: shipment item preserves SKU traceability from sales ord
     product_name_snapshot: '小熊',
   })
 
+  item.package_description = ' 2 个 / 箱 '
+  item.case_no = ' A01-A10 '
+
   assert.equal(item.product_sku_id, 11)
   assert.equal(isBlankShipmentItem(item), false)
   assert.deepEqual(buildShipmentItemParams(item), {
@@ -312,6 +315,8 @@ test('businessLineItems: shipment item preserves SKU traceability from sales ord
     warehouse_id: 0,
     unit_id: 2,
     quantity: '20',
+    package_description: '2 个 / 箱',
+    case_no: 'A01-A10',
     note: '来源销售订单行：小熊',
   })
 })
@@ -332,10 +337,7 @@ test('businessLineItems: shipment import defaults to remaining source quantity',
 
 test('businessLineItems: quantity display preserves numeric(20,6) boundaries', () => {
   assert.equal(formatQuantity('0.000001'), '0.000001')
-  assert.equal(
-    formatQuantity('99999999999999.999999'),
-    '99999999999999.999999'
-  )
+  assert.equal(formatQuantity('99999999999999.999999'), '99999999999999.999999')
 })
 
 test('businessLineItems: shipment source switching replaces dependent SKU fields and clears stale values', () => {
@@ -361,6 +363,8 @@ test('businessLineItems: shipment source switching replaces dependent SKU fields
     lot_id: undefined,
     unit_id: 2,
     quantity: '11.5',
+    package_description: '',
+    case_no: '',
     note: '来源销售订单行：小熊',
   })
   assert.deepEqual(buildShipmentSourceItemChangePatch('', sourceItems), {

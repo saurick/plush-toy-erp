@@ -139,6 +139,8 @@ func productMutationFromParams(pm map[string]any) (*biz.ProductMutation, bool) {
 		Name:            getString(pm, "name"),
 		StyleNo:         getWorkflowStringPtr(pm, "style_no"),
 		CustomerStyleNo: getWorkflowStringPtr(pm, "customer_style_no"),
+		EnglishName:     getWorkflowStringPtr(pm, "english_name"),
+		HSCode:          getWorkflowStringPtr(pm, "hs_code"),
 		DefaultUnitID:   getInt(pm, "default_unit_id", 0),
 		UnitNetWeightG:  unitNetWeightG,
 	}, true
@@ -199,6 +201,8 @@ func productToMap(item *biz.Product) map[string]any {
 		"name":              item.Name,
 		"style_no":          optionalStringValue(item.StyleNo),
 		"customer_style_no": optionalStringValue(item.CustomerStyleNo),
+		"english_name":      optionalStringValue(item.EnglishName),
+		"hs_code":           optionalStringValue(item.HSCode),
 		"default_unit_id":   item.DefaultUnitID,
 		"unit_net_weight_g": optionalDecimalString(item.UnitNetWeightG),
 		"is_active":         item.IsActive,

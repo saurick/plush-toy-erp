@@ -23,6 +23,8 @@ func (PurchaseOrder) Annotations() []schema.Annotation {
 				"purchase_orders_version_positive":              "version > 0",
 				"purchase_orders_currency_allowed":              "currency IN ('USD', 'CNY', 'HKD')",
 				"purchase_orders_payment_term_days_nonnegative": "payment_term_days IS NULL OR payment_term_days >= 0",
+				"purchase_orders_invoice_category_allowed":      "invoice_category IS NULL OR invoice_category IN ('EXPORT_GENERAL', 'VAT_GENERAL_1', 'VAT_SPECIAL_3', 'VAT_SPECIAL_13')",
+				"purchase_orders_invoice_pair_valid":            "((invoice_required IS NULL AND invoice_category IS NULL) OR (invoice_required = false AND invoice_category IS NULL) OR (invoice_required = true AND invoice_category IS NOT NULL))",
 			},
 		},
 	}
@@ -43,6 +45,9 @@ func (PurchaseOrder) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			NonNegative(),
+		field.String("payment_method").Optional().Nillable().MaxLen(128),
+		field.Bool("invoice_required").Optional().Nillable(),
+		field.String("invoice_category").Optional().Nillable().MaxLen(32),
 		field.String("supplier_purchase_order_no").
 			Optional().
 			Nillable().
@@ -56,6 +61,10 @@ func (PurchaseOrder) Fields() []ent.Field {
 		field.Time("expected_arrival_date").
 			Optional().
 			Nillable(),
+		field.Time("supplier_confirmed_arrival_date").
+			Optional().
+			Nillable(),
+		field.String("delivery_address").Optional().Nillable().MaxLen(512),
 		field.String("lifecycle_status").
 			NotEmpty().
 			Default("draft").

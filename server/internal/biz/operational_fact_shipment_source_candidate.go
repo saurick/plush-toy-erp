@@ -28,6 +28,7 @@ type ShipmentSourceCandidate struct {
 	OrderVersion     int
 	CustomerID       int
 	CustomerSnapshot map[string]any
+	DeliverySnapshot map[string]any
 	// CustomerName is a current-master search/display projection. The immutable
 	// order-time value remains CustomerSnapshot.
 	CustomerName     string

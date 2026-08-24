@@ -19,7 +19,9 @@ func (Supplier) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{
 			Checks: map[string]string{
-				"suppliers_supplier_type_allowed": "supplier_type IS NULL OR supplier_type IN ('material', 'outsourcing', 'service', 'mixed')",
+				"suppliers_supplier_type_allowed":            "supplier_type IS NULL OR supplier_type IN ('material', 'outsourcing', 'service', 'mixed')",
+				"suppliers_default_invoice_category_allowed": "default_invoice_category IS NULL OR default_invoice_category IN ('EXPORT_GENERAL', 'VAT_GENERAL_1', 'VAT_SPECIAL_3', 'VAT_SPECIAL_13')",
+				"suppliers_default_invoice_pair_valid":       "((default_invoice_required IS NULL AND default_invoice_category IS NULL) OR (default_invoice_required = false AND default_invoice_category IS NULL) OR (default_invoice_required = true AND default_invoice_category IS NOT NULL))",
 			},
 		},
 	}
@@ -52,6 +54,17 @@ func (Supplier) Fields() []ent.Field {
 		field.Int("default_payment_term_days").
 			Default(0).
 			NonNegative(),
+		field.String("default_payment_method").
+			Optional().
+			Nillable().
+			MaxLen(128),
+		field.Bool("default_invoice_required").
+			Optional().
+			Nillable(),
+		field.String("default_invoice_category").
+			Optional().
+			Nillable().
+			MaxLen(32),
 		field.Bool("is_active").
 			Default(true),
 		field.String("note").

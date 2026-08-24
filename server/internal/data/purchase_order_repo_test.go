@@ -33,11 +33,20 @@ func TestPurchaseOrderRepoSaveLifecycleAndReceiptLink(t *testing.T) {
 	material := createTestMaterial(t, ctx, client, unit.ID, "MAT-PO-001")
 	warehouse := createTestWarehouse(t, ctx, client, "WH-PO-001")
 	supplier := createPurchaseOrderTestSupplier(t, ctx, client, "SUP-PO-001", true)
-	if _, err := client.Supplier.UpdateOneID(supplier.ID).SetDefaultPaymentTermDays(30).Save(ctx); err != nil {
+	supplierPaymentMethod := "银行转账"
+	defaultInvoiceCategory := biz.FinanceInvoiceCategoryVATSpecial13
+	if _, err := client.Supplier.UpdateOneID(supplier.ID).
+		SetDefaultPaymentTermDays(30).
+		SetDefaultPaymentMethod(supplierPaymentMethod).
+		SetDefaultInvoiceRequired(true).
+		SetDefaultInvoiceCategory(defaultInvoiceCategory).
+		Save(ctx); err != nil {
 		t.Fatalf("set supplier payment term: %v", err)
 	}
 	purchaseDate := time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC)
 	expectedArrival := purchaseDate.AddDate(0, 0, 7)
+	confirmedArrival := purchaseDate.AddDate(0, 0, 9)
+	deliveryAddress := "深圳市采购收货仓"
 	qty := decimal.NewFromInt(10)
 	price := decimal.NewFromInt(5)
 	productOrderNo := "SO-PO-001"
@@ -45,11 +54,13 @@ func TestPurchaseOrderRepoSaveLifecycleAndReceiptLink(t *testing.T) {
 	productName := "采购关联产品"
 
 	result, err := uc.SavePurchaseOrderWithItems(ctx, 0, &biz.PurchaseOrderMutation{
-		PurchaseOrderNo:     "PO-001",
-		SupplierID:          supplier.ID,
-		SupplierSnapshot:    map[string]any{"name": supplier.Name},
-		PurchaseDate:        purchaseDate,
-		ExpectedArrivalDate: &expectedArrival,
+		PurchaseOrderNo:              "PO-001",
+		SupplierID:                   supplier.ID,
+		SupplierSnapshot:             map[string]any{"name": supplier.Name},
+		PurchaseDate:                 purchaseDate,
+		ExpectedArrivalDate:          &expectedArrival,
+		SupplierConfirmedArrivalDate: &confirmedArrival,
+		DeliveryAddress:              &deliveryAddress,
 	}, []*biz.PurchaseOrderItemSaveMutation{
 		{
 			PurchaseOrderItemMutation: biz.PurchaseOrderItemMutation{
@@ -76,6 +87,13 @@ func TestPurchaseOrderRepoSaveLifecycleAndReceiptLink(t *testing.T) {
 	if result.Order.Currency != biz.FinanceCurrencyCNY || result.Order.PaymentTermDays == nil || *result.Order.PaymentTermDays != 30 {
 		t.Fatalf("expected create to freeze CNY and supplier term 30, got %#v", result.Order)
 	}
+	if result.Order.PaymentMethod == nil || *result.Order.PaymentMethod != supplierPaymentMethod ||
+		result.Order.InvoiceRequired == nil || !*result.Order.InvoiceRequired ||
+		result.Order.InvoiceCategory == nil || *result.Order.InvoiceCategory != defaultInvoiceCategory ||
+		result.Order.SupplierConfirmedArrivalDate == nil || !result.Order.SupplierConfirmedArrivalDate.Equal(confirmedArrival) ||
+		result.Order.DeliveryAddress == nil || *result.Order.DeliveryAddress != deliveryAddress {
+		t.Fatalf("expected supplier defaults and delivery terms retained, got %#v", result.Order)
+	}
 	line := result.Items[0]
 	if line.ProductOrderNoSnapshot == nil || *line.ProductOrderNoSnapshot != productOrderNo ||
 		line.ProductNoSnapshot == nil || *line.ProductNoSnapshot != productNo ||
@@ -83,20 +101,34 @@ func TestPurchaseOrderRepoSaveLifecycleAndReceiptLink(t *testing.T) {
 		t.Fatalf("expected product snapshots persisted, got %#v", line)
 	}
 	updatedTermDays := 60
+	updatedPaymentMethod := "信用证"
+	updatedInvoiceRequired := false
+	updatedConfirmedArrival := purchaseDate.AddDate(0, 0, 10)
+	updatedDeliveryAddress := "香港中转仓"
 	updated, err := uc.UpdatePurchaseOrder(ctx, result.Order.ID, &biz.PurchaseOrderMutation{
-		PurchaseOrderNo:     result.Order.PurchaseOrderNo,
-		SupplierID:          supplier.ID,
-		Currency:            biz.FinanceCurrencyHKD,
-		PaymentTermDays:     &updatedTermDays,
-		SupplierSnapshot:    result.Order.SupplierSnapshot,
-		PurchaseDate:        purchaseDate,
-		ExpectedArrivalDate: &expectedArrival,
+		PurchaseOrderNo:              result.Order.PurchaseOrderNo,
+		SupplierID:                   supplier.ID,
+		Currency:                     biz.FinanceCurrencyHKD,
+		PaymentTermDays:              &updatedTermDays,
+		PaymentMethod:                &updatedPaymentMethod,
+		InvoiceRequired:              &updatedInvoiceRequired,
+		SupplierSnapshot:             result.Order.SupplierSnapshot,
+		PurchaseDate:                 purchaseDate,
+		ExpectedArrivalDate:          &expectedArrival,
+		SupplierConfirmedArrivalDate: &updatedConfirmedArrival,
+		DeliveryAddress:              &updatedDeliveryAddress,
 	})
 	if err != nil {
 		t.Fatalf("update purchase currency/term failed: %v", err)
 	}
 	if updated.Currency != biz.FinanceCurrencyHKD || updated.PaymentTermDays == nil || *updated.PaymentTermDays != 60 {
 		t.Fatalf("expected explicit HKD/60 update persisted, got %#v", updated)
+	}
+	if updated.PaymentMethod == nil || *updated.PaymentMethod != updatedPaymentMethod ||
+		updated.InvoiceRequired == nil || *updated.InvoiceRequired || updated.InvoiceCategory != nil ||
+		updated.SupplierConfirmedArrivalDate == nil || !updated.SupplierConfirmedArrivalDate.Equal(updatedConfirmedArrival) ||
+		updated.DeliveryAddress == nil || *updated.DeliveryAddress != updatedDeliveryAddress {
+		t.Fatalf("expected updated purchase terms retained, got %#v", updated)
 	}
 
 	if _, err := uc.SubmitPurchaseOrder(ctx, result.Order.ID); err != nil {

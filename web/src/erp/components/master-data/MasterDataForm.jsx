@@ -11,7 +11,11 @@ import {
   Switch,
 } from 'antd'
 
-import { paymentConditionCompleteness } from '../../utils/masterDataOrderView.mjs'
+import {
+  PURCHASE_INVOICE_CATEGORY_OPTIONS,
+  PURCHASE_INVOICE_REQUIRED_OPTIONS,
+  paymentConditionCompleteness,
+} from '../../utils/masterDataOrderView.mjs'
 import { normalizeNetWeightG } from '../../utils/shipmentWeight.mjs'
 import {
   optionalContactEmailRule,
@@ -262,10 +266,12 @@ export function MasterDataFormFields({
   onCustomerPaymentMethodChange,
 }) {
   const productSKUParentField = productSKUParentFieldContract(isEditing)
+  const defaultInvoiceRequired = Form.useWatch('default_invoice_required', form)
 
   if (type === 'products') {
     return (
       <>
+        <BusinessFormSectionTitle>基本资料</BusinessFormSectionTitle>
         <Form.Item
           className="erp-business-action-form__field"
           label="产品编号（自动）"
@@ -300,6 +306,32 @@ export function MasterDataFormFields({
         >
           <Input allowClear autoComplete="off" />
         </Form.Item>
+        <BusinessFormSectionTitle>外贸信息</BusinessFormSectionTitle>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="英文品名"
+          name="english_name"
+        >
+          <Input
+            allowClear
+            autoComplete="off"
+            maxLength={255}
+            placeholder="用于外贸单据，未知时可留空"
+          />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="海关编码（HS Code）"
+          name="hs_code"
+        >
+          <Input
+            allowClear
+            autoComplete="off"
+            maxLength={32}
+            placeholder="按实际报关编码填写"
+          />
+        </Form.Item>
+        <BusinessFormSectionTitle>计量信息</BusinessFormSectionTitle>
         <DefaultUnitSelect
           form={form}
           required
@@ -578,7 +610,20 @@ export function MasterDataFormFields({
           >
             <Input allowClear autoComplete="off" />
           </Form.Item>
-          <BusinessFormSectionTitle>结算条件</BusinessFormSectionTitle>
+          <BusinessFormSectionTitle>结算与发票</BusinessFormSectionTitle>
+          <Form.Item
+            className="erp-business-action-form__field"
+            extra="仅作为新建采购订单的默认值，订单保存后不再随档案变化。"
+            label="默认付款方式"
+            name="default_payment_method"
+          >
+            <Input
+              allowClear
+              autoComplete="off"
+              maxLength={128}
+              placeholder="如银行转账、月结"
+            />
+          </Form.Item>
           <Form.Item
             className="erp-business-action-form__field"
             extra="仅作为新建采购或委外订单的默认值；订单保存后不会随供应商档案变化。"
@@ -594,6 +639,42 @@ export function MasterDataFormFields({
             ]}
           >
             <InputNumber min={0} precision={0} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            extra="历史资料可不设置；新建采购订单时会带出本项。"
+            label="默认是否需要发票"
+            name="default_invoice_required"
+          >
+            <Select
+              allowClear
+              options={PURCHASE_INVOICE_REQUIRED_OPTIONS}
+              placeholder="请选择"
+              onChange={(value) => {
+                if (value !== true) {
+                  form?.setFieldValue('default_invoice_category', undefined)
+                }
+              }}
+            />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            dependencies={['default_invoice_required']}
+            label="默认发票类别"
+            name="default_invoice_category"
+            rules={[
+              {
+                required: defaultInvoiceRequired === true,
+                message: '请选择默认发票类别',
+              },
+            ]}
+          >
+            <Select
+              allowClear
+              disabled={defaultInvoiceRequired !== true}
+              options={PURCHASE_INVOICE_CATEGORY_OPTIONS}
+              placeholder="请先选择需要发票"
+            />
           </Form.Item>
           <BusinessFormSectionTitle>加工能力</BusinessFormSectionTitle>
           <Form.Item
@@ -622,6 +703,42 @@ export function MasterDataFormFields({
             name="tax_no"
           >
             <Input allowClear autoComplete="off" />
+          </Form.Item>
+          <BusinessFormSectionTitle>默认收货信息</BusinessFormSectionTitle>
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="国家 / 地区"
+            name="country_region"
+          >
+            <Input allowClear autoComplete="off" maxLength={128} />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="默认收货人"
+            name="default_delivery_recipient"
+          >
+            <Input allowClear autoComplete="off" maxLength={128} />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="默认收货电话"
+            name="default_delivery_phone"
+            rules={[optionalContactPhoneRule()]}
+          >
+            <Input allowClear autoComplete="off" maxLength={64} />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field erp-business-action-form__field--full"
+            extra="新建销售订单时带出，订单保存后形成当时快照。"
+            label="默认收货地址"
+            name="default_delivery_address"
+          >
+            <Input.TextArea
+              allowClear
+              autoSize={{ minRows: 1, maxRows: 3 }}
+              maxLength={512}
+              showCount
+            />
           </Form.Item>
           <BusinessFormSectionTitle>结算方式</BusinessFormSectionTitle>
           <Form.Item

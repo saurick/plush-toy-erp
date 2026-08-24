@@ -241,16 +241,16 @@ export function getRecordSearchHint(type = '') {
     return '可搜索：环节编号、名称、类别、备注'
   }
   if (type === 'products') {
-    return '可搜索：产品编号、名称、内部款号、客户款号'
+    return '可搜索：产品编号、中英文名称、内部款号、客户款号、HS 编码'
   }
   if (type === 'product_skus') {
     return '可搜索：规格编号、条码、客户规格编号、颜色、色号、尺码、包装版本'
   }
   if (type === 'customers') {
-    return '可搜索：编号、名称、简称、付款方式'
+    return '可搜索：编号、名称、简称、付款方式、国家或地区'
   }
   if (type === 'suppliers') {
-    return '可搜索：编号、名称、简称'
+    return '可搜索：编号、名称、简称、地址、付款方式'
   }
   return getRecordSearchPlaceholder(type)
 }

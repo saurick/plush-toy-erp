@@ -2,23 +2,25 @@ package biz
 
 import "github.com/shopspring/decimal"
 
-const netWeightScale int32 = 6
+const numeric20Scale6 int32 = 6
 
-var maxNetWeightG = decimal.RequireFromString("99999999999999.999999")
+var maxPositiveNumeric20Scale6 = decimal.RequireFromString("99999999999999.999999")
 
-func validNetWeightG(value *decimal.Decimal) bool {
+func validOptionalPositiveNumeric20Scale6(value *decimal.Decimal) bool {
 	if value == nil {
 		return true
 	}
 	return value.IsPositive() &&
-		value.Equal(value.Truncate(netWeightScale)) &&
-		value.LessThanOrEqual(maxNetWeightG)
+		value.Equal(value.Truncate(numeric20Scale6)) &&
+		value.LessThanOrEqual(maxPositiveNumeric20Scale6)
+}
+
+func validNetWeightG(value *decimal.Decimal) bool {
+	return validOptionalPositiveNumeric20Scale6(value)
 }
 
 func validShipmentNetWeightQuantity(value decimal.Decimal) bool {
-	return value.IsPositive() &&
-		value.Equal(value.Truncate(netWeightScale)) &&
-		value.LessThanOrEqual(maxNetWeightG)
+	return validOptionalPositiveNumeric20Scale6(&value)
 }
 
 type ShipmentNetWeightLine struct {
@@ -82,7 +84,7 @@ func CalculateShipmentTotalNetWeightG(lines []ShipmentNetWeightLine) (*decimal.D
 	if !complete {
 		return nil, false, nil
 	}
-	total = total.Round(netWeightScale)
+	total = total.Round(numeric20Scale6)
 	if !validNetWeightG(&total) {
 		return nil, false, ErrBadParam
 	}

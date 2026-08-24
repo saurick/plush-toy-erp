@@ -109,6 +109,10 @@ func supplierMutationFromParams(pm map[string]any) (*biz.SupplierMutation, bool)
 	if !ok {
 		return nil, false
 	}
+	defaultInvoiceRequired, ok := getOptionalJSONRPCBool(pm, "default_invoice_required")
+	if !ok {
+		return nil, false
+	}
 	return &biz.SupplierMutation{
 		Code:                   getString(pm, "code"),
 		Name:                   getString(pm, "name"),
@@ -117,6 +121,9 @@ func supplierMutationFromParams(pm map[string]any) (*biz.SupplierMutation, bool)
 		Address:                getWorkflowStringPtr(pm, "address"),
 		TaxNo:                  getWorkflowStringPtr(pm, "tax_no"),
 		DefaultPaymentTermDays: defaultPaymentTermDays,
+		DefaultPaymentMethod:   getWorkflowStringPtr(pm, "default_payment_method"),
+		DefaultInvoiceRequired: defaultInvoiceRequired,
+		DefaultInvoiceCategory: getWorkflowStringPtr(pm, "default_invoice_category"),
 		ProcessIDs:             processIDs,
 		Note:                   getWorkflowStringPtr(pm, "note"),
 	}, true
@@ -204,6 +211,9 @@ func supplierToMap(item *biz.Supplier) map[string]any {
 		"address":                   optionalStringValue(item.Address),
 		"tax_no":                    optionalStringValue(item.TaxNo),
 		"default_payment_term_days": item.DefaultPaymentTermDays,
+		"default_payment_method":    optionalStringValue(item.DefaultPaymentMethod),
+		"default_invoice_required":  optionalBoolValue(item.DefaultInvoiceRequired),
+		"default_invoice_category":  optionalStringValue(item.DefaultInvoiceCategory),
 		"process_ids":               supplierProcessIDsToAny(item.ProcessIDs),
 		"primary_contact":           contactToMap(item.PrimaryContact),
 		"is_active":                 item.IsActive,

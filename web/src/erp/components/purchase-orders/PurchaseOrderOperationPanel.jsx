@@ -32,6 +32,7 @@ import {
   PURCHASE_ORDER_STATUS_OPTIONS,
 } from './purchaseOrderPageConfig.mjs'
 import { filterLifecycleStatusOptions } from '../../utils/lifecycleScope.mjs'
+import { resolveRelatedRecordActionAvailability } from '../../utils/operationalActionAvailability.mjs'
 
 export default function PurchaseOrderOperationPanel({
   applySelectedRowKeys,
@@ -107,6 +108,13 @@ export default function PurchaseOrderOperationPanel({
     printingContract ||
     itemsLoading ||
     lineOrderLoading
+  const relatedActionAvailability = resolveRelatedRecordActionAvailability({
+    authorized: relatedMenuItems.length > 0,
+    record: singleSelectedOrder,
+    itemCount: relatedMenuItems.length,
+    busy: recordActionBusy,
+    busyReason: '当前订单操作完成后可查看相关单据',
+  })
   const primaryLifecycleState = lifecycleActionStates[
     primaryLifecycleAction?.key
   ] || {
@@ -302,27 +310,15 @@ export default function PurchaseOrderOperationPanel({
             </Button>
           </BusinessActionTooltip>
         ) : null}
-        {relatedMenuItems.length > 0 ? (
+        {relatedActionAvailability.visible ? (
           <BusinessActionTooltip
-            disabled={
-              selectedRowKeys.length !== 1 ||
-              !singleSelectedOrder ||
-              recordActionBusy
-            }
-            disabledReason={
-              recordActionBusy
-                ? '当前订单操作完成后可查看相关单据'
-                : '请先选择一条采购订单'
-            }
+            disabled={relatedActionAvailability.disabled}
+            disabledReason={relatedActionAvailability.disabledReason}
           >
             <Dropdown
               trigger={['click']}
               destroyOnHidden
-              disabled={
-                selectedRowKeys.length !== 1 ||
-                !singleSelectedOrder ||
-                recordActionBusy
-              }
+              disabled={relatedActionAvailability.disabled}
               menu={{
                 items: relatedMenuItems,
                 onClick: openRelatedTable,
@@ -332,11 +328,7 @@ export default function PurchaseOrderOperationPanel({
                 data-business-action-key="related-records"
                 size="small"
                 icon={<LinkOutlined />}
-                disabled={
-                  selectedRowKeys.length !== 1 ||
-                  !singleSelectedOrder ||
-                  recordActionBusy
-                }
+                disabled={relatedActionAvailability.disabled}
               >
                 相关单据 <DownOutlined />
               </Button>

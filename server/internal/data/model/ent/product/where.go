@@ -76,6 +76,16 @@ func CustomerStyleNo(v string) predicate.Product {
 	return predicate.Product(sql.FieldEQ(FieldCustomerStyleNo, v))
 }
 
+// EnglishName applies equality check predicate on the "english_name" field. It's identical to EnglishNameEQ.
+func EnglishName(v string) predicate.Product {
+	return predicate.Product(sql.FieldEQ(FieldEnglishName, v))
+}
+
+// HsCode applies equality check predicate on the "hs_code" field. It's identical to HsCodeEQ.
+func HsCode(v string) predicate.Product {
+	return predicate.Product(sql.FieldEQ(FieldHsCode, v))
+}
+
 // DefaultUnitID applies equality check predicate on the "default_unit_id" field. It's identical to DefaultUnitIDEQ.
 func DefaultUnitID(v int) predicate.Product {
 	return predicate.Product(sql.FieldEQ(FieldDefaultUnitID, v))
@@ -379,6 +389,156 @@ func CustomerStyleNoEqualFold(v string) predicate.Product {
 // CustomerStyleNoContainsFold applies the ContainsFold predicate on the "customer_style_no" field.
 func CustomerStyleNoContainsFold(v string) predicate.Product {
 	return predicate.Product(sql.FieldContainsFold(FieldCustomerStyleNo, v))
+}
+
+// EnglishNameEQ applies the EQ predicate on the "english_name" field.
+func EnglishNameEQ(v string) predicate.Product {
+	return predicate.Product(sql.FieldEQ(FieldEnglishName, v))
+}
+
+// EnglishNameNEQ applies the NEQ predicate on the "english_name" field.
+func EnglishNameNEQ(v string) predicate.Product {
+	return predicate.Product(sql.FieldNEQ(FieldEnglishName, v))
+}
+
+// EnglishNameIn applies the In predicate on the "english_name" field.
+func EnglishNameIn(vs ...string) predicate.Product {
+	return predicate.Product(sql.FieldIn(FieldEnglishName, vs...))
+}
+
+// EnglishNameNotIn applies the NotIn predicate on the "english_name" field.
+func EnglishNameNotIn(vs ...string) predicate.Product {
+	return predicate.Product(sql.FieldNotIn(FieldEnglishName, vs...))
+}
+
+// EnglishNameGT applies the GT predicate on the "english_name" field.
+func EnglishNameGT(v string) predicate.Product {
+	return predicate.Product(sql.FieldGT(FieldEnglishName, v))
+}
+
+// EnglishNameGTE applies the GTE predicate on the "english_name" field.
+func EnglishNameGTE(v string) predicate.Product {
+	return predicate.Product(sql.FieldGTE(FieldEnglishName, v))
+}
+
+// EnglishNameLT applies the LT predicate on the "english_name" field.
+func EnglishNameLT(v string) predicate.Product {
+	return predicate.Product(sql.FieldLT(FieldEnglishName, v))
+}
+
+// EnglishNameLTE applies the LTE predicate on the "english_name" field.
+func EnglishNameLTE(v string) predicate.Product {
+	return predicate.Product(sql.FieldLTE(FieldEnglishName, v))
+}
+
+// EnglishNameContains applies the Contains predicate on the "english_name" field.
+func EnglishNameContains(v string) predicate.Product {
+	return predicate.Product(sql.FieldContains(FieldEnglishName, v))
+}
+
+// EnglishNameHasPrefix applies the HasPrefix predicate on the "english_name" field.
+func EnglishNameHasPrefix(v string) predicate.Product {
+	return predicate.Product(sql.FieldHasPrefix(FieldEnglishName, v))
+}
+
+// EnglishNameHasSuffix applies the HasSuffix predicate on the "english_name" field.
+func EnglishNameHasSuffix(v string) predicate.Product {
+	return predicate.Product(sql.FieldHasSuffix(FieldEnglishName, v))
+}
+
+// EnglishNameIsNil applies the IsNil predicate on the "english_name" field.
+func EnglishNameIsNil() predicate.Product {
+	return predicate.Product(sql.FieldIsNull(FieldEnglishName))
+}
+
+// EnglishNameNotNil applies the NotNil predicate on the "english_name" field.
+func EnglishNameNotNil() predicate.Product {
+	return predicate.Product(sql.FieldNotNull(FieldEnglishName))
+}
+
+// EnglishNameEqualFold applies the EqualFold predicate on the "english_name" field.
+func EnglishNameEqualFold(v string) predicate.Product {
+	return predicate.Product(sql.FieldEqualFold(FieldEnglishName, v))
+}
+
+// EnglishNameContainsFold applies the ContainsFold predicate on the "english_name" field.
+func EnglishNameContainsFold(v string) predicate.Product {
+	return predicate.Product(sql.FieldContainsFold(FieldEnglishName, v))
+}
+
+// HsCodeEQ applies the EQ predicate on the "hs_code" field.
+func HsCodeEQ(v string) predicate.Product {
+	return predicate.Product(sql.FieldEQ(FieldHsCode, v))
+}
+
+// HsCodeNEQ applies the NEQ predicate on the "hs_code" field.
+func HsCodeNEQ(v string) predicate.Product {
+	return predicate.Product(sql.FieldNEQ(FieldHsCode, v))
+}
+
+// HsCodeIn applies the In predicate on the "hs_code" field.
+func HsCodeIn(vs ...string) predicate.Product {
+	return predicate.Product(sql.FieldIn(FieldHsCode, vs...))
+}
+
+// HsCodeNotIn applies the NotIn predicate on the "hs_code" field.
+func HsCodeNotIn(vs ...string) predicate.Product {
+	return predicate.Product(sql.FieldNotIn(FieldHsCode, vs...))
+}
+
+// HsCodeGT applies the GT predicate on the "hs_code" field.
+func HsCodeGT(v string) predicate.Product {
+	return predicate.Product(sql.FieldGT(FieldHsCode, v))
+}
+
+// HsCodeGTE applies the GTE predicate on the "hs_code" field.
+func HsCodeGTE(v string) predicate.Product {
+	return predicate.Product(sql.FieldGTE(FieldHsCode, v))
+}
+
+// HsCodeLT applies the LT predicate on the "hs_code" field.
+func HsCodeLT(v string) predicate.Product {
+	return predicate.Product(sql.FieldLT(FieldHsCode, v))
+}
+
+// HsCodeLTE applies the LTE predicate on the "hs_code" field.
+func HsCodeLTE(v string) predicate.Product {
+	return predicate.Product(sql.FieldLTE(FieldHsCode, v))
+}
+
+// HsCodeContains applies the Contains predicate on the "hs_code" field.
+func HsCodeContains(v string) predicate.Product {
+	return predicate.Product(sql.FieldContains(FieldHsCode, v))
+}
+
+// HsCodeHasPrefix applies the HasPrefix predicate on the "hs_code" field.
+func HsCodeHasPrefix(v string) predicate.Product {
+	return predicate.Product(sql.FieldHasPrefix(FieldHsCode, v))
+}
+
+// HsCodeHasSuffix applies the HasSuffix predicate on the "hs_code" field.
+func HsCodeHasSuffix(v string) predicate.Product {
+	return predicate.Product(sql.FieldHasSuffix(FieldHsCode, v))
+}
+
+// HsCodeIsNil applies the IsNil predicate on the "hs_code" field.
+func HsCodeIsNil() predicate.Product {
+	return predicate.Product(sql.FieldIsNull(FieldHsCode))
+}
+
+// HsCodeNotNil applies the NotNil predicate on the "hs_code" field.
+func HsCodeNotNil() predicate.Product {
+	return predicate.Product(sql.FieldNotNull(FieldHsCode))
+}
+
+// HsCodeEqualFold applies the EqualFold predicate on the "hs_code" field.
+func HsCodeEqualFold(v string) predicate.Product {
+	return predicate.Product(sql.FieldEqualFold(FieldHsCode, v))
+}
+
+// HsCodeContainsFold applies the ContainsFold predicate on the "hs_code" field.
+func HsCodeContainsFold(v string) predicate.Product {
+	return predicate.Product(sql.FieldContainsFold(FieldHsCode, v))
 }
 
 // DefaultUnitIDEQ applies the EQ predicate on the "default_unit_id" field.

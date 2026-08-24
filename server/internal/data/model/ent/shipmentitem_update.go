@@ -240,6 +240,46 @@ func (_u *ShipmentItemUpdate) SetNillableCurrencySnapshot(v *string) *ShipmentIt
 	return _u
 }
 
+// SetPackageDescription sets the "package_description" field.
+func (_u *ShipmentItemUpdate) SetPackageDescription(v string) *ShipmentItemUpdate {
+	_u.mutation.SetPackageDescription(v)
+	return _u
+}
+
+// SetNillablePackageDescription sets the "package_description" field if the given value is not nil.
+func (_u *ShipmentItemUpdate) SetNillablePackageDescription(v *string) *ShipmentItemUpdate {
+	if v != nil {
+		_u.SetPackageDescription(*v)
+	}
+	return _u
+}
+
+// ClearPackageDescription clears the value of the "package_description" field.
+func (_u *ShipmentItemUpdate) ClearPackageDescription() *ShipmentItemUpdate {
+	_u.mutation.ClearPackageDescription()
+	return _u
+}
+
+// SetCaseNo sets the "case_no" field.
+func (_u *ShipmentItemUpdate) SetCaseNo(v string) *ShipmentItemUpdate {
+	_u.mutation.SetCaseNo(v)
+	return _u
+}
+
+// SetNillableCaseNo sets the "case_no" field if the given value is not nil.
+func (_u *ShipmentItemUpdate) SetNillableCaseNo(v *string) *ShipmentItemUpdate {
+	if v != nil {
+		_u.SetCaseNo(*v)
+	}
+	return _u
+}
+
+// ClearCaseNo clears the value of the "case_no" field.
+func (_u *ShipmentItemUpdate) ClearCaseNo() *ShipmentItemUpdate {
+	_u.mutation.ClearCaseNo()
+	return _u
+}
+
 // SetNote sets the "note" field.
 func (_u *ShipmentItemUpdate) SetNote(v string) *ShipmentItemUpdate {
 	_u.mutation.SetNote(v)
@@ -446,6 +486,16 @@ func (_u *ShipmentItemUpdate) check() error {
 			return &ValidationError{Name: "currency_snapshot", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.currency_snapshot": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.PackageDescription(); ok {
+		if err := shipmentitem.PackageDescriptionValidator(v); err != nil {
+			return &ValidationError{Name: "package_description", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.package_description": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CaseNo(); ok {
+		if err := shipmentitem.CaseNoValidator(v); err != nil {
+			return &ValidationError{Name: "case_no", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.case_no": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := shipmentitem.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.note": %w`, err)}
@@ -501,6 +551,18 @@ func (_u *ShipmentItemUpdate) sqlSave(ctx context.Context) (_node int, err error
 	}
 	if value, ok := _u.mutation.CurrencySnapshot(); ok {
 		_spec.SetField(shipmentitem.FieldCurrencySnapshot, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.PackageDescription(); ok {
+		_spec.SetField(shipmentitem.FieldPackageDescription, field.TypeString, value)
+	}
+	if _u.mutation.PackageDescriptionCleared() {
+		_spec.ClearField(shipmentitem.FieldPackageDescription, field.TypeString)
+	}
+	if value, ok := _u.mutation.CaseNo(); ok {
+		_spec.SetField(shipmentitem.FieldCaseNo, field.TypeString, value)
+	}
+	if _u.mutation.CaseNoCleared() {
+		_spec.ClearField(shipmentitem.FieldCaseNo, field.TypeString)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(shipmentitem.FieldNote, field.TypeString, value)
@@ -938,6 +1000,46 @@ func (_u *ShipmentItemUpdateOne) SetNillableCurrencySnapshot(v *string) *Shipmen
 	return _u
 }
 
+// SetPackageDescription sets the "package_description" field.
+func (_u *ShipmentItemUpdateOne) SetPackageDescription(v string) *ShipmentItemUpdateOne {
+	_u.mutation.SetPackageDescription(v)
+	return _u
+}
+
+// SetNillablePackageDescription sets the "package_description" field if the given value is not nil.
+func (_u *ShipmentItemUpdateOne) SetNillablePackageDescription(v *string) *ShipmentItemUpdateOne {
+	if v != nil {
+		_u.SetPackageDescription(*v)
+	}
+	return _u
+}
+
+// ClearPackageDescription clears the value of the "package_description" field.
+func (_u *ShipmentItemUpdateOne) ClearPackageDescription() *ShipmentItemUpdateOne {
+	_u.mutation.ClearPackageDescription()
+	return _u
+}
+
+// SetCaseNo sets the "case_no" field.
+func (_u *ShipmentItemUpdateOne) SetCaseNo(v string) *ShipmentItemUpdateOne {
+	_u.mutation.SetCaseNo(v)
+	return _u
+}
+
+// SetNillableCaseNo sets the "case_no" field if the given value is not nil.
+func (_u *ShipmentItemUpdateOne) SetNillableCaseNo(v *string) *ShipmentItemUpdateOne {
+	if v != nil {
+		_u.SetCaseNo(*v)
+	}
+	return _u
+}
+
+// ClearCaseNo clears the value of the "case_no" field.
+func (_u *ShipmentItemUpdateOne) ClearCaseNo() *ShipmentItemUpdateOne {
+	_u.mutation.ClearCaseNo()
+	return _u
+}
+
 // SetNote sets the "note" field.
 func (_u *ShipmentItemUpdateOne) SetNote(v string) *ShipmentItemUpdateOne {
 	_u.mutation.SetNote(v)
@@ -1157,6 +1259,16 @@ func (_u *ShipmentItemUpdateOne) check() error {
 			return &ValidationError{Name: "currency_snapshot", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.currency_snapshot": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.PackageDescription(); ok {
+		if err := shipmentitem.PackageDescriptionValidator(v); err != nil {
+			return &ValidationError{Name: "package_description", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.package_description": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CaseNo(); ok {
+		if err := shipmentitem.CaseNoValidator(v); err != nil {
+			return &ValidationError{Name: "case_no", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.case_no": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := shipmentitem.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.note": %w`, err)}
@@ -1229,6 +1341,18 @@ func (_u *ShipmentItemUpdateOne) sqlSave(ctx context.Context) (_node *ShipmentIt
 	}
 	if value, ok := _u.mutation.CurrencySnapshot(); ok {
 		_spec.SetField(shipmentitem.FieldCurrencySnapshot, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.PackageDescription(); ok {
+		_spec.SetField(shipmentitem.FieldPackageDescription, field.TypeString, value)
+	}
+	if _u.mutation.PackageDescriptionCleared() {
+		_spec.ClearField(shipmentitem.FieldPackageDescription, field.TypeString)
+	}
+	if value, ok := _u.mutation.CaseNo(); ok {
+		_spec.SetField(shipmentitem.FieldCaseNo, field.TypeString, value)
+	}
+	if _u.mutation.CaseNoCleared() {
+		_spec.ClearField(shipmentitem.FieldCaseNo, field.TypeString)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(shipmentitem.FieldNote, field.TypeString, value)

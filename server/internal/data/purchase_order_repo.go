@@ -45,11 +45,16 @@ func (r *purchaseOrderRepo) CreatePurchaseOrder(ctx context.Context, in *biz.Pur
 		SetSupplierID(in.SupplierID).
 		SetCurrency(in.Currency).
 		SetNillablePaymentTermDays(in.PaymentTermDays).
+		SetNillablePaymentMethod(in.PaymentMethod).
+		SetNillableInvoiceRequired(in.InvoiceRequired).
+		SetNillableInvoiceCategory(in.InvoiceCategory).
 		SetNillableSupplierPurchaseOrderNo(in.SupplierPurchaseOrderNo).
 		SetSupplierSnapshot(in.SupplierSnapshot).
 		SetContractPartySnapshot(in.ContractPartySnapshot).
 		SetPurchaseDate(in.PurchaseDate).
 		SetNillableExpectedArrivalDate(in.ExpectedArrivalDate).
+		SetNillableSupplierConfirmedArrivalDate(in.SupplierConfirmedArrivalDate).
+		SetNillableDeliveryAddress(in.DeliveryAddress).
 		SetLifecycleStatus(biz.PurchaseOrderStatusDraft).
 		SetNillableNote(in.Note).
 		Save(ctx)
@@ -68,6 +73,21 @@ func (r *purchaseOrderRepo) UpdatePurchaseOrder(ctx context.Context, id int, in 
 		SetSupplierSnapshot(in.SupplierSnapshot).
 		SetContractPartySnapshot(in.ContractPartySnapshot).
 		SetPurchaseDate(in.PurchaseDate)
+	if in.PaymentMethod == nil {
+		update.ClearPaymentMethod()
+	} else {
+		update.SetPaymentMethod(*in.PaymentMethod)
+	}
+	if in.InvoiceRequired == nil {
+		update.ClearInvoiceRequired()
+	} else {
+		update.SetInvoiceRequired(*in.InvoiceRequired)
+	}
+	if in.InvoiceCategory == nil {
+		update.ClearInvoiceCategory()
+	} else {
+		update.SetInvoiceCategory(*in.InvoiceCategory)
+	}
 	if in.SupplierPurchaseOrderNo == nil {
 		update.ClearSupplierPurchaseOrderNo()
 	} else {
@@ -77,6 +97,16 @@ func (r *purchaseOrderRepo) UpdatePurchaseOrder(ctx context.Context, id int, in 
 		update.ClearExpectedArrivalDate()
 	} else {
 		update.SetExpectedArrivalDate(*in.ExpectedArrivalDate)
+	}
+	if in.SupplierConfirmedArrivalDate == nil {
+		update.ClearSupplierConfirmedArrivalDate()
+	} else {
+		update.SetSupplierConfirmedArrivalDate(*in.SupplierConfirmedArrivalDate)
+	}
+	if in.DeliveryAddress == nil {
+		update.ClearDeliveryAddress()
+	} else {
+		update.SetDeliveryAddress(*in.DeliveryAddress)
 	}
 	if in.Note == nil {
 		update.ClearNote()
@@ -849,6 +879,21 @@ func (r *purchaseOrderRepo) SavePurchaseOrderWithItems(ctx context.Context, id i
 			SetContractPartySnapshot(in.ContractPartySnapshot).
 			SetPurchaseDate(in.PurchaseDate).
 			SetVersion(in.ExpectedVersion + 1)
+		if in.PaymentMethod == nil {
+			update.ClearPaymentMethod()
+		} else {
+			update.SetPaymentMethod(*in.PaymentMethod)
+		}
+		if in.InvoiceRequired == nil {
+			update.ClearInvoiceRequired()
+		} else {
+			update.SetInvoiceRequired(*in.InvoiceRequired)
+		}
+		if in.InvoiceCategory == nil {
+			update.ClearInvoiceCategory()
+		} else {
+			update.SetInvoiceCategory(*in.InvoiceCategory)
+		}
 		if in.SupplierPurchaseOrderNo == nil {
 			update.ClearSupplierPurchaseOrderNo()
 		} else {
@@ -858,6 +903,16 @@ func (r *purchaseOrderRepo) SavePurchaseOrderWithItems(ctx context.Context, id i
 			update.ClearExpectedArrivalDate()
 		} else {
 			update.SetExpectedArrivalDate(*in.ExpectedArrivalDate)
+		}
+		if in.SupplierConfirmedArrivalDate == nil {
+			update.ClearSupplierConfirmedArrivalDate()
+		} else {
+			update.SetSupplierConfirmedArrivalDate(*in.SupplierConfirmedArrivalDate)
+		}
+		if in.DeliveryAddress == nil {
+			update.ClearDeliveryAddress()
+		} else {
+			update.SetDeliveryAddress(*in.DeliveryAddress)
 		}
 		if in.Note == nil {
 			update.ClearNote()
@@ -894,11 +949,16 @@ func (r *purchaseOrderRepo) SavePurchaseOrderWithItems(ctx context.Context, id i
 			SetSupplierID(in.SupplierID).
 			SetCurrency(in.Currency).
 			SetNillablePaymentTermDays(in.PaymentTermDays).
+			SetNillablePaymentMethod(in.PaymentMethod).
+			SetNillableInvoiceRequired(in.InvoiceRequired).
+			SetNillableInvoiceCategory(in.InvoiceCategory).
 			SetNillableSupplierPurchaseOrderNo(in.SupplierPurchaseOrderNo).
 			SetSupplierSnapshot(in.SupplierSnapshot).
 			SetContractPartySnapshot(in.ContractPartySnapshot).
 			SetPurchaseDate(in.PurchaseDate).
 			SetNillableExpectedArrivalDate(in.ExpectedArrivalDate).
+			SetNillableSupplierConfirmedArrivalDate(in.SupplierConfirmedArrivalDate).
+			SetNillableDeliveryAddress(in.DeliveryAddress).
 			SetLifecycleStatus(biz.PurchaseOrderStatusDraft).
 			SetNillableNote(in.Note).
 			Save(ctx)
@@ -1133,6 +1193,21 @@ func (r *purchaseOrderRepo) SupplierDefaultPaymentTermDays(ctx context.Context, 
 	return row.DefaultPaymentTermDays, nil
 }
 
+func (r *purchaseOrderRepo) SupplierPurchaseDefaults(ctx context.Context, id int) (*biz.SupplierPurchaseDefaults, error) {
+	row, err := r.data.postgres.Supplier.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrSupplierNotFound
+		}
+		return nil, err
+	}
+	return &biz.SupplierPurchaseDefaults{
+		PaymentMethod:   row.DefaultPaymentMethod,
+		InvoiceRequired: row.DefaultInvoiceRequired,
+		InvoiceCategory: row.DefaultInvoiceCategory,
+	}, nil
+}
+
 func (r *purchaseOrderRepo) MaterialIsActive(ctx context.Context, id int) (bool, error) {
 	row, err := r.data.postgres.Material.Query().
 		Where(material.ID(id)).
@@ -1232,26 +1307,31 @@ func entPurchaseOrderToBiz(row *ent.PurchaseOrder) *biz.PurchaseOrder {
 		return nil
 	}
 	return &biz.PurchaseOrder{
-		ID:                      row.ID,
-		PurchaseOrderNo:         row.PurchaseOrderNo,
-		SupplierID:              row.SupplierID,
-		Currency:                row.Currency,
-		PaymentTermDays:         row.PaymentTermDays,
-		SupplierPurchaseOrderNo: row.SupplierPurchaseOrderNo,
-		SupplierSnapshot:        row.SupplierSnapshot,
-		ContractPartySnapshot:   row.ContractPartySnapshot,
-		PurchaseDate:            row.PurchaseDate,
-		ExpectedArrivalDate:     row.ExpectedArrivalDate,
-		LifecycleStatus:         row.LifecycleStatus,
-		Version:                 row.Version,
-		SettlementAction:        row.SettlementAction,
-		SettlementMode:          row.SettlementMode,
-		SettlementReason:        row.SettlementReason,
-		SettledAt:               row.SettledAt,
-		SettledBy:               row.SettledBy,
-		Note:                    row.Note,
-		CreatedAt:               row.CreatedAt,
-		UpdatedAt:               row.UpdatedAt,
+		ID:                           row.ID,
+		PurchaseOrderNo:              row.PurchaseOrderNo,
+		SupplierID:                   row.SupplierID,
+		Currency:                     row.Currency,
+		PaymentTermDays:              row.PaymentTermDays,
+		PaymentMethod:                row.PaymentMethod,
+		InvoiceRequired:              row.InvoiceRequired,
+		InvoiceCategory:              row.InvoiceCategory,
+		SupplierPurchaseOrderNo:      row.SupplierPurchaseOrderNo,
+		SupplierSnapshot:             row.SupplierSnapshot,
+		ContractPartySnapshot:        row.ContractPartySnapshot,
+		PurchaseDate:                 row.PurchaseDate,
+		ExpectedArrivalDate:          row.ExpectedArrivalDate,
+		SupplierConfirmedArrivalDate: row.SupplierConfirmedArrivalDate,
+		DeliveryAddress:              row.DeliveryAddress,
+		LifecycleStatus:              row.LifecycleStatus,
+		Version:                      row.Version,
+		SettlementAction:             row.SettlementAction,
+		SettlementMode:               row.SettlementMode,
+		SettlementReason:             row.SettlementReason,
+		SettledAt:                    row.SettledAt,
+		SettledBy:                    row.SettledBy,
+		Note:                         row.Note,
+		CreatedAt:                    row.CreatedAt,
+		UpdatedAt:                    row.UpdatedAt,
 	}
 }
 

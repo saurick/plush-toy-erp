@@ -31,6 +31,12 @@ type Supplier struct {
 	TaxNo *string `json:"tax_no,omitempty"`
 	// DefaultPaymentTermDays holds the value of the "default_payment_term_days" field.
 	DefaultPaymentTermDays int `json:"default_payment_term_days,omitempty"`
+	// DefaultPaymentMethod holds the value of the "default_payment_method" field.
+	DefaultPaymentMethod *string `json:"default_payment_method,omitempty"`
+	// DefaultInvoiceRequired holds the value of the "default_invoice_required" field.
+	DefaultInvoiceRequired *bool `json:"default_invoice_required,omitempty"`
+	// DefaultInvoiceCategory holds the value of the "default_invoice_category" field.
+	DefaultInvoiceCategory *string `json:"default_invoice_category,omitempty"`
 	// IsActive holds the value of the "is_active" field.
 	IsActive bool `json:"is_active,omitempty"`
 	// Note holds the value of the "note" field.
@@ -101,11 +107,11 @@ func (*Supplier) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case supplier.FieldIsActive:
+		case supplier.FieldDefaultInvoiceRequired, supplier.FieldIsActive:
 			values[i] = new(sql.NullBool)
 		case supplier.FieldID, supplier.FieldDefaultPaymentTermDays:
 			values[i] = new(sql.NullInt64)
-		case supplier.FieldCode, supplier.FieldName, supplier.FieldShortName, supplier.FieldSupplierType, supplier.FieldAddress, supplier.FieldTaxNo, supplier.FieldNote:
+		case supplier.FieldCode, supplier.FieldName, supplier.FieldShortName, supplier.FieldSupplierType, supplier.FieldAddress, supplier.FieldTaxNo, supplier.FieldDefaultPaymentMethod, supplier.FieldDefaultInvoiceCategory, supplier.FieldNote:
 			values[i] = new(sql.NullString)
 		case supplier.FieldCreatedAt, supplier.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -175,6 +181,27 @@ func (_m *Supplier) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field default_payment_term_days", values[i])
 			} else if value.Valid {
 				_m.DefaultPaymentTermDays = int(value.Int64)
+			}
+		case supplier.FieldDefaultPaymentMethod:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field default_payment_method", values[i])
+			} else if value.Valid {
+				_m.DefaultPaymentMethod = new(string)
+				*_m.DefaultPaymentMethod = value.String
+			}
+		case supplier.FieldDefaultInvoiceRequired:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field default_invoice_required", values[i])
+			} else if value.Valid {
+				_m.DefaultInvoiceRequired = new(bool)
+				*_m.DefaultInvoiceRequired = value.Bool
+			}
+		case supplier.FieldDefaultInvoiceCategory:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field default_invoice_category", values[i])
+			} else if value.Valid {
+				_m.DefaultInvoiceCategory = new(string)
+				*_m.DefaultInvoiceCategory = value.String
 			}
 		case supplier.FieldIsActive:
 			if value, ok := values[i].(*sql.NullBool); !ok {
@@ -285,6 +312,21 @@ func (_m *Supplier) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("default_payment_term_days=")
 	builder.WriteString(fmt.Sprintf("%v", _m.DefaultPaymentTermDays))
+	builder.WriteString(", ")
+	if v := _m.DefaultPaymentMethod; v != nil {
+		builder.WriteString("default_payment_method=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.DefaultInvoiceRequired; v != nil {
+		builder.WriteString("default_invoice_required=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.DefaultInvoiceCategory; v != nil {
+		builder.WriteString("default_invoice_category=")
+		builder.WriteString(*v)
+	}
 	builder.WriteString(", ")
 	builder.WriteString("is_active=")
 	builder.WriteString(fmt.Sprintf("%v", _m.IsActive))

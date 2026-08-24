@@ -74,6 +74,8 @@ export function buildShipmentItemParams(values = {}) {
     unit_id: requiredInt(values.unit_id),
     lot_id: positiveInt(values.lot_id),
     quantity: trimOptional(values.quantity),
+    package_description: trimOptional(values.package_description),
+    case_no: trimOptional(values.case_no),
     note: trimOptional(values.note),
   })
 }
@@ -92,6 +94,8 @@ export function createShipmentItemFromSalesOrderItem(item, { quantity } = {}) {
     lot_id: undefined,
     unit_id: sourceItem.unit_id,
     quantity: nextQuantity,
+    package_description: '',
+    case_no: '',
     note: sourceItem.product_name_snapshot
       ? `来源销售订单行：${sourceItem.product_name_snapshot}`
       : '',
@@ -113,9 +117,7 @@ export function buildShipmentSourceItemChangePatch(
   salesOrderItems = []
 ) {
   const sourceItem = recordByID(salesOrderItems, salesOrderItemID)
-  const remainingQuantity = numeric20Scale6Units(
-    sourceItem?.remainingQuantity
-  )
+  const remainingQuantity = numeric20Scale6Units(sourceItem?.remainingQuantity)
   if (
     !sourceItem ||
     sourceItem.selectable !== true ||
@@ -218,6 +220,8 @@ export function isBlankShipmentItem(item = {}) {
     item.lot_id,
     item.unit_id,
     item.quantity,
+    item.package_description,
+    item.case_no,
     item.note,
   ].every((value) => value === undefined || value === null || value === '')
 }
@@ -231,6 +235,8 @@ export function createBlankShipmentItem() {
     lot_id: undefined,
     unit_id: undefined,
     quantity: '',
+    package_description: '',
+    case_no: '',
     note: '',
   }
 }

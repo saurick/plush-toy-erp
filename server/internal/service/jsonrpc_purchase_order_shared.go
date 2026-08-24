@@ -21,7 +21,8 @@ func purchaseOrderMutationFromParams(pm map[string]any) (*biz.PurchaseOrderMutat
 	if !sourceOrderAllowsOnly(pm,
 		"customer_key", "id", "expected_version", "purchase_order_no", "supplier_id", "currency",
 		"payment_term_days", "supplier_purchase_order_no", "supplier_snapshot", "contract_party_snapshot",
-		"purchase_date", "expected_arrival_date", "note", "items",
+		"payment_method", "invoice_required", "invoice_category", "purchase_date", "expected_arrival_date",
+		"supplier_confirmed_arrival_date", "delivery_address", "note", "items",
 	) {
 		return nil, false
 	}
@@ -37,17 +38,30 @@ func purchaseOrderMutationFromParams(pm map[string]any) (*biz.PurchaseOrderMutat
 	if !ok {
 		return nil, false
 	}
+	supplierConfirmedArrivalDate, ok := getOptionalJSONRPCTime(pm, "supplier_confirmed_arrival_date")
+	if !ok {
+		return nil, false
+	}
+	invoiceRequired, ok := getOptionalJSONRPCBool(pm, "invoice_required")
+	if !ok {
+		return nil, false
+	}
 	return &biz.PurchaseOrderMutation{
-		PurchaseOrderNo:         getString(pm, "purchase_order_no"),
-		SupplierID:              getInt(pm, "supplier_id", 0),
-		Currency:                getString(pm, "currency"),
-		PaymentTermDays:         paymentTermDays,
-		SupplierPurchaseOrderNo: getWorkflowStringPtr(pm, "supplier_purchase_order_no"),
-		SupplierSnapshot:        getMap(pm, "supplier_snapshot"),
-		ContractPartySnapshot:   getMap(pm, "contract_party_snapshot"),
-		PurchaseDate:            purchaseDate,
-		ExpectedArrivalDate:     expectedArrivalDate,
-		Note:                    getWorkflowStringPtr(pm, "note"),
+		PurchaseOrderNo:              getString(pm, "purchase_order_no"),
+		SupplierID:                   getInt(pm, "supplier_id", 0),
+		Currency:                     getString(pm, "currency"),
+		PaymentTermDays:              paymentTermDays,
+		PaymentMethod:                getWorkflowStringPtr(pm, "payment_method"),
+		InvoiceRequired:              invoiceRequired,
+		InvoiceCategory:              getWorkflowStringPtr(pm, "invoice_category"),
+		SupplierPurchaseOrderNo:      getWorkflowStringPtr(pm, "supplier_purchase_order_no"),
+		SupplierSnapshot:             getMap(pm, "supplier_snapshot"),
+		ContractPartySnapshot:        getMap(pm, "contract_party_snapshot"),
+		PurchaseDate:                 purchaseDate,
+		ExpectedArrivalDate:          expectedArrivalDate,
+		SupplierConfirmedArrivalDate: supplierConfirmedArrivalDate,
+		DeliveryAddress:              getWorkflowStringPtr(pm, "delivery_address"),
+		Note:                         getWorkflowStringPtr(pm, "note"),
 	}, true
 }
 
@@ -227,26 +241,31 @@ func purchaseOrderToMap(item *biz.PurchaseOrder) map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"id":                         item.ID,
-		"purchase_order_no":          item.PurchaseOrderNo,
-		"supplier_id":                item.SupplierID,
-		"currency":                   item.Currency,
-		"payment_term_days":          optionalIntValue(item.PaymentTermDays),
-		"supplier_purchase_order_no": optionalStringValue(item.SupplierPurchaseOrderNo),
-		"supplier_snapshot":          item.SupplierSnapshot,
-		"contract_party_snapshot":    item.ContractPartySnapshot,
-		"purchase_date":              item.PurchaseDate.Unix(),
-		"expected_arrival_date":      optionalUnix(item.ExpectedArrivalDate),
-		"lifecycle_status":           item.LifecycleStatus,
-		"version":                    item.Version,
-		"settlement_action":          optionalStringValue(item.SettlementAction),
-		"settlement_mode":            optionalStringValue(item.SettlementMode),
-		"settlement_reason":          optionalStringValue(item.SettlementReason),
-		"settled_at":                 optionalUnix(item.SettledAt),
-		"settled_by":                 optionalIntValue(item.SettledBy),
-		"note":                       optionalStringValue(item.Note),
-		"created_at":                 item.CreatedAt.Unix(),
-		"updated_at":                 item.UpdatedAt.Unix(),
+		"id":                              item.ID,
+		"purchase_order_no":               item.PurchaseOrderNo,
+		"supplier_id":                     item.SupplierID,
+		"currency":                        item.Currency,
+		"payment_term_days":               optionalIntValue(item.PaymentTermDays),
+		"payment_method":                  optionalStringValue(item.PaymentMethod),
+		"invoice_required":                optionalBoolValue(item.InvoiceRequired),
+		"invoice_category":                optionalStringValue(item.InvoiceCategory),
+		"supplier_purchase_order_no":      optionalStringValue(item.SupplierPurchaseOrderNo),
+		"supplier_snapshot":               item.SupplierSnapshot,
+		"contract_party_snapshot":         item.ContractPartySnapshot,
+		"purchase_date":                   item.PurchaseDate.Unix(),
+		"expected_arrival_date":           optionalUnix(item.ExpectedArrivalDate),
+		"supplier_confirmed_arrival_date": optionalUnix(item.SupplierConfirmedArrivalDate),
+		"delivery_address":                optionalStringValue(item.DeliveryAddress),
+		"lifecycle_status":                item.LifecycleStatus,
+		"version":                         item.Version,
+		"settlement_action":               optionalStringValue(item.SettlementAction),
+		"settlement_mode":                 optionalStringValue(item.SettlementMode),
+		"settlement_reason":               optionalStringValue(item.SettlementReason),
+		"settled_at":                      optionalUnix(item.SettledAt),
+		"settled_by":                      optionalIntValue(item.SettledBy),
+		"note":                            optionalStringValue(item.Note),
+		"created_at":                      item.CreatedAt.Unix(),
+		"updated_at":                      item.UpdatedAt.Unix(),
 	}
 }
 

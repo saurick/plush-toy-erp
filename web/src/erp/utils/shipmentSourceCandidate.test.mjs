@@ -16,6 +16,12 @@ function candidate(overrides = {}) {
     order_version: 3,
     customer_id: 8,
     customer_snapshot: { code: 'C-008', name: '示例客户' },
+    delivery_snapshot: {
+      country_region: '中国',
+      recipient: '王女士',
+      phone: '13800000000',
+      address: '上海测试仓 1 号',
+    },
     customer_name: '当前客户名称',
     sales_order_item_id: 31,
     line_no: 1,
@@ -228,6 +234,7 @@ test('shipment source candidate accepts missing historical snapshots with curren
   for (const customerSnapshot of [{}, null]) {
     const withoutSnapshots = candidate({
       customer_snapshot: customerSnapshot,
+      delivery_snapshot: null,
       product_code_snapshot: null,
       product_name_snapshot: null,
     })
@@ -355,6 +362,12 @@ test('shipment source candidate normalization keeps backend quantity truth and s
     customer_id: 8,
     customer_snapshot: { code: 'C-008', name: '示例客户' },
     customer_name: '当前客户名称',
+    delivery_snapshot: {
+      country_region: '中国',
+      recipient: '王女士',
+      phone: '13800000000',
+      address: '上海测试仓 1 号',
+    },
   })
   assert.equal(
     normalizeShipmentSourceCandidate(

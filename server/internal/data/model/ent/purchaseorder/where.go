@@ -75,6 +75,21 @@ func PaymentTermDays(v int) predicate.PurchaseOrder {
 	return predicate.PurchaseOrder(sql.FieldEQ(FieldPaymentTermDays, v))
 }
 
+// PaymentMethod applies equality check predicate on the "payment_method" field. It's identical to PaymentMethodEQ.
+func PaymentMethod(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldPaymentMethod, v))
+}
+
+// InvoiceRequired applies equality check predicate on the "invoice_required" field. It's identical to InvoiceRequiredEQ.
+func InvoiceRequired(v bool) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldInvoiceRequired, v))
+}
+
+// InvoiceCategory applies equality check predicate on the "invoice_category" field. It's identical to InvoiceCategoryEQ.
+func InvoiceCategory(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldInvoiceCategory, v))
+}
+
 // SupplierPurchaseOrderNo applies equality check predicate on the "supplier_purchase_order_no" field. It's identical to SupplierPurchaseOrderNoEQ.
 func SupplierPurchaseOrderNo(v string) predicate.PurchaseOrder {
 	return predicate.PurchaseOrder(sql.FieldEQ(FieldSupplierPurchaseOrderNo, v))
@@ -88,6 +103,16 @@ func PurchaseDate(v time.Time) predicate.PurchaseOrder {
 // ExpectedArrivalDate applies equality check predicate on the "expected_arrival_date" field. It's identical to ExpectedArrivalDateEQ.
 func ExpectedArrivalDate(v time.Time) predicate.PurchaseOrder {
 	return predicate.PurchaseOrder(sql.FieldEQ(FieldExpectedArrivalDate, v))
+}
+
+// SupplierConfirmedArrivalDate applies equality check predicate on the "supplier_confirmed_arrival_date" field. It's identical to SupplierConfirmedArrivalDateEQ.
+func SupplierConfirmedArrivalDate(v time.Time) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldSupplierConfirmedArrivalDate, v))
+}
+
+// DeliveryAddress applies equality check predicate on the "delivery_address" field. It's identical to DeliveryAddressEQ.
+func DeliveryAddress(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldDeliveryAddress, v))
 }
 
 // LifecycleStatus applies equality check predicate on the "lifecycle_status" field. It's identical to LifecycleStatusEQ.
@@ -340,6 +365,176 @@ func PaymentTermDaysNotNil() predicate.PurchaseOrder {
 	return predicate.PurchaseOrder(sql.FieldNotNull(FieldPaymentTermDays))
 }
 
+// PaymentMethodEQ applies the EQ predicate on the "payment_method" field.
+func PaymentMethodEQ(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldPaymentMethod, v))
+}
+
+// PaymentMethodNEQ applies the NEQ predicate on the "payment_method" field.
+func PaymentMethodNEQ(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNEQ(FieldPaymentMethod, v))
+}
+
+// PaymentMethodIn applies the In predicate on the "payment_method" field.
+func PaymentMethodIn(vs ...string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIn(FieldPaymentMethod, vs...))
+}
+
+// PaymentMethodNotIn applies the NotIn predicate on the "payment_method" field.
+func PaymentMethodNotIn(vs ...string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotIn(FieldPaymentMethod, vs...))
+}
+
+// PaymentMethodGT applies the GT predicate on the "payment_method" field.
+func PaymentMethodGT(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldGT(FieldPaymentMethod, v))
+}
+
+// PaymentMethodGTE applies the GTE predicate on the "payment_method" field.
+func PaymentMethodGTE(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldGTE(FieldPaymentMethod, v))
+}
+
+// PaymentMethodLT applies the LT predicate on the "payment_method" field.
+func PaymentMethodLT(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldLT(FieldPaymentMethod, v))
+}
+
+// PaymentMethodLTE applies the LTE predicate on the "payment_method" field.
+func PaymentMethodLTE(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldLTE(FieldPaymentMethod, v))
+}
+
+// PaymentMethodContains applies the Contains predicate on the "payment_method" field.
+func PaymentMethodContains(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldContains(FieldPaymentMethod, v))
+}
+
+// PaymentMethodHasPrefix applies the HasPrefix predicate on the "payment_method" field.
+func PaymentMethodHasPrefix(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldHasPrefix(FieldPaymentMethod, v))
+}
+
+// PaymentMethodHasSuffix applies the HasSuffix predicate on the "payment_method" field.
+func PaymentMethodHasSuffix(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldHasSuffix(FieldPaymentMethod, v))
+}
+
+// PaymentMethodIsNil applies the IsNil predicate on the "payment_method" field.
+func PaymentMethodIsNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIsNull(FieldPaymentMethod))
+}
+
+// PaymentMethodNotNil applies the NotNil predicate on the "payment_method" field.
+func PaymentMethodNotNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotNull(FieldPaymentMethod))
+}
+
+// PaymentMethodEqualFold applies the EqualFold predicate on the "payment_method" field.
+func PaymentMethodEqualFold(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEqualFold(FieldPaymentMethod, v))
+}
+
+// PaymentMethodContainsFold applies the ContainsFold predicate on the "payment_method" field.
+func PaymentMethodContainsFold(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldContainsFold(FieldPaymentMethod, v))
+}
+
+// InvoiceRequiredEQ applies the EQ predicate on the "invoice_required" field.
+func InvoiceRequiredEQ(v bool) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldInvoiceRequired, v))
+}
+
+// InvoiceRequiredNEQ applies the NEQ predicate on the "invoice_required" field.
+func InvoiceRequiredNEQ(v bool) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNEQ(FieldInvoiceRequired, v))
+}
+
+// InvoiceRequiredIsNil applies the IsNil predicate on the "invoice_required" field.
+func InvoiceRequiredIsNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIsNull(FieldInvoiceRequired))
+}
+
+// InvoiceRequiredNotNil applies the NotNil predicate on the "invoice_required" field.
+func InvoiceRequiredNotNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotNull(FieldInvoiceRequired))
+}
+
+// InvoiceCategoryEQ applies the EQ predicate on the "invoice_category" field.
+func InvoiceCategoryEQ(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldInvoiceCategory, v))
+}
+
+// InvoiceCategoryNEQ applies the NEQ predicate on the "invoice_category" field.
+func InvoiceCategoryNEQ(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNEQ(FieldInvoiceCategory, v))
+}
+
+// InvoiceCategoryIn applies the In predicate on the "invoice_category" field.
+func InvoiceCategoryIn(vs ...string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIn(FieldInvoiceCategory, vs...))
+}
+
+// InvoiceCategoryNotIn applies the NotIn predicate on the "invoice_category" field.
+func InvoiceCategoryNotIn(vs ...string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotIn(FieldInvoiceCategory, vs...))
+}
+
+// InvoiceCategoryGT applies the GT predicate on the "invoice_category" field.
+func InvoiceCategoryGT(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldGT(FieldInvoiceCategory, v))
+}
+
+// InvoiceCategoryGTE applies the GTE predicate on the "invoice_category" field.
+func InvoiceCategoryGTE(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldGTE(FieldInvoiceCategory, v))
+}
+
+// InvoiceCategoryLT applies the LT predicate on the "invoice_category" field.
+func InvoiceCategoryLT(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldLT(FieldInvoiceCategory, v))
+}
+
+// InvoiceCategoryLTE applies the LTE predicate on the "invoice_category" field.
+func InvoiceCategoryLTE(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldLTE(FieldInvoiceCategory, v))
+}
+
+// InvoiceCategoryContains applies the Contains predicate on the "invoice_category" field.
+func InvoiceCategoryContains(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldContains(FieldInvoiceCategory, v))
+}
+
+// InvoiceCategoryHasPrefix applies the HasPrefix predicate on the "invoice_category" field.
+func InvoiceCategoryHasPrefix(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldHasPrefix(FieldInvoiceCategory, v))
+}
+
+// InvoiceCategoryHasSuffix applies the HasSuffix predicate on the "invoice_category" field.
+func InvoiceCategoryHasSuffix(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldHasSuffix(FieldInvoiceCategory, v))
+}
+
+// InvoiceCategoryIsNil applies the IsNil predicate on the "invoice_category" field.
+func InvoiceCategoryIsNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIsNull(FieldInvoiceCategory))
+}
+
+// InvoiceCategoryNotNil applies the NotNil predicate on the "invoice_category" field.
+func InvoiceCategoryNotNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotNull(FieldInvoiceCategory))
+}
+
+// InvoiceCategoryEqualFold applies the EqualFold predicate on the "invoice_category" field.
+func InvoiceCategoryEqualFold(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEqualFold(FieldInvoiceCategory, v))
+}
+
+// InvoiceCategoryContainsFold applies the ContainsFold predicate on the "invoice_category" field.
+func InvoiceCategoryContainsFold(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldContainsFold(FieldInvoiceCategory, v))
+}
+
 // SupplierPurchaseOrderNoEQ applies the EQ predicate on the "supplier_purchase_order_no" field.
 func SupplierPurchaseOrderNoEQ(v string) predicate.PurchaseOrder {
 	return predicate.PurchaseOrder(sql.FieldEQ(FieldSupplierPurchaseOrderNo, v))
@@ -523,6 +718,131 @@ func ExpectedArrivalDateIsNil() predicate.PurchaseOrder {
 // ExpectedArrivalDateNotNil applies the NotNil predicate on the "expected_arrival_date" field.
 func ExpectedArrivalDateNotNil() predicate.PurchaseOrder {
 	return predicate.PurchaseOrder(sql.FieldNotNull(FieldExpectedArrivalDate))
+}
+
+// SupplierConfirmedArrivalDateEQ applies the EQ predicate on the "supplier_confirmed_arrival_date" field.
+func SupplierConfirmedArrivalDateEQ(v time.Time) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldSupplierConfirmedArrivalDate, v))
+}
+
+// SupplierConfirmedArrivalDateNEQ applies the NEQ predicate on the "supplier_confirmed_arrival_date" field.
+func SupplierConfirmedArrivalDateNEQ(v time.Time) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNEQ(FieldSupplierConfirmedArrivalDate, v))
+}
+
+// SupplierConfirmedArrivalDateIn applies the In predicate on the "supplier_confirmed_arrival_date" field.
+func SupplierConfirmedArrivalDateIn(vs ...time.Time) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIn(FieldSupplierConfirmedArrivalDate, vs...))
+}
+
+// SupplierConfirmedArrivalDateNotIn applies the NotIn predicate on the "supplier_confirmed_arrival_date" field.
+func SupplierConfirmedArrivalDateNotIn(vs ...time.Time) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotIn(FieldSupplierConfirmedArrivalDate, vs...))
+}
+
+// SupplierConfirmedArrivalDateGT applies the GT predicate on the "supplier_confirmed_arrival_date" field.
+func SupplierConfirmedArrivalDateGT(v time.Time) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldGT(FieldSupplierConfirmedArrivalDate, v))
+}
+
+// SupplierConfirmedArrivalDateGTE applies the GTE predicate on the "supplier_confirmed_arrival_date" field.
+func SupplierConfirmedArrivalDateGTE(v time.Time) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldGTE(FieldSupplierConfirmedArrivalDate, v))
+}
+
+// SupplierConfirmedArrivalDateLT applies the LT predicate on the "supplier_confirmed_arrival_date" field.
+func SupplierConfirmedArrivalDateLT(v time.Time) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldLT(FieldSupplierConfirmedArrivalDate, v))
+}
+
+// SupplierConfirmedArrivalDateLTE applies the LTE predicate on the "supplier_confirmed_arrival_date" field.
+func SupplierConfirmedArrivalDateLTE(v time.Time) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldLTE(FieldSupplierConfirmedArrivalDate, v))
+}
+
+// SupplierConfirmedArrivalDateIsNil applies the IsNil predicate on the "supplier_confirmed_arrival_date" field.
+func SupplierConfirmedArrivalDateIsNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIsNull(FieldSupplierConfirmedArrivalDate))
+}
+
+// SupplierConfirmedArrivalDateNotNil applies the NotNil predicate on the "supplier_confirmed_arrival_date" field.
+func SupplierConfirmedArrivalDateNotNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotNull(FieldSupplierConfirmedArrivalDate))
+}
+
+// DeliveryAddressEQ applies the EQ predicate on the "delivery_address" field.
+func DeliveryAddressEQ(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldDeliveryAddress, v))
+}
+
+// DeliveryAddressNEQ applies the NEQ predicate on the "delivery_address" field.
+func DeliveryAddressNEQ(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNEQ(FieldDeliveryAddress, v))
+}
+
+// DeliveryAddressIn applies the In predicate on the "delivery_address" field.
+func DeliveryAddressIn(vs ...string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIn(FieldDeliveryAddress, vs...))
+}
+
+// DeliveryAddressNotIn applies the NotIn predicate on the "delivery_address" field.
+func DeliveryAddressNotIn(vs ...string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotIn(FieldDeliveryAddress, vs...))
+}
+
+// DeliveryAddressGT applies the GT predicate on the "delivery_address" field.
+func DeliveryAddressGT(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldGT(FieldDeliveryAddress, v))
+}
+
+// DeliveryAddressGTE applies the GTE predicate on the "delivery_address" field.
+func DeliveryAddressGTE(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldGTE(FieldDeliveryAddress, v))
+}
+
+// DeliveryAddressLT applies the LT predicate on the "delivery_address" field.
+func DeliveryAddressLT(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldLT(FieldDeliveryAddress, v))
+}
+
+// DeliveryAddressLTE applies the LTE predicate on the "delivery_address" field.
+func DeliveryAddressLTE(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldLTE(FieldDeliveryAddress, v))
+}
+
+// DeliveryAddressContains applies the Contains predicate on the "delivery_address" field.
+func DeliveryAddressContains(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldContains(FieldDeliveryAddress, v))
+}
+
+// DeliveryAddressHasPrefix applies the HasPrefix predicate on the "delivery_address" field.
+func DeliveryAddressHasPrefix(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldHasPrefix(FieldDeliveryAddress, v))
+}
+
+// DeliveryAddressHasSuffix applies the HasSuffix predicate on the "delivery_address" field.
+func DeliveryAddressHasSuffix(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldHasSuffix(FieldDeliveryAddress, v))
+}
+
+// DeliveryAddressIsNil applies the IsNil predicate on the "delivery_address" field.
+func DeliveryAddressIsNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIsNull(FieldDeliveryAddress))
+}
+
+// DeliveryAddressNotNil applies the NotNil predicate on the "delivery_address" field.
+func DeliveryAddressNotNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotNull(FieldDeliveryAddress))
+}
+
+// DeliveryAddressEqualFold applies the EqualFold predicate on the "delivery_address" field.
+func DeliveryAddressEqualFold(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEqualFold(FieldDeliveryAddress, v))
+}
+
+// DeliveryAddressContainsFold applies the ContainsFold predicate on the "delivery_address" field.
+func DeliveryAddressContainsFold(v string) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldContainsFold(FieldDeliveryAddress, v))
 }
 
 // LifecycleStatusEQ applies the EQ predicate on the "lifecycle_status" field.

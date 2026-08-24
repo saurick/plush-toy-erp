@@ -262,6 +262,10 @@ owner_type IN ('CUSTOMER', 'SUPPLIER')
 | <code>default_payment_method</code> | <code>varchar(128)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>default_payment_term_days</code> | <code>bigint</code> | <code>int</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>tax_no</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | 敏感 | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
+| <code>country_region</code> | <code>varchar(128)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>default_delivery_recipient</code> | <code>varchar(128)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>default_delivery_phone</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>default_delivery_address</code> | <code>varchar(512)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>is_active</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>true</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>note</code> | <code>varchar(255)</code> | <code>string</code> | 可空 | — | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
 | <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
@@ -530,6 +534,8 @@ unit_net_weight_g IS NULL OR default_unit_id IS NOT NULL
 | <code>name</code> | <code>varchar(255)</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>style_no</code> | <code>varchar(128)</code> | <code>string</code> | 可空 | — | — | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
 | <code>customer_style_no</code> | <code>varchar(128)</code> | <code>string</code> | 可空 | — | — | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
+| <code>english_name</code> | <code>varchar(255)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>hs_code</code> | <code>varchar(32)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>unit_net_weight_g</code> | <code>numeric(20,6)</code> | <code>other</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>is_active</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>true</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
@@ -646,6 +652,9 @@ unit_net_weight_g IS NULL OR unit_net_weight_g > 0
 | <code>address</code> | <code>varchar(512)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>tax_no</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | 敏感 | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
 | <code>default_payment_term_days</code> | <code>bigint</code> | <code>int</code> | 非空 | <code>0</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>default_payment_method</code> | <code>varchar(128)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>default_invoice_required</code> | <code>boolean</code> | <code>bool</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>default_invoice_category</code> | <code>varchar(32)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>is_active</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>true</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>note</code> | <code>varchar(255)</code> | <code>string</code> | 可空 | — | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
 | <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
@@ -670,6 +679,18 @@ unit_net_weight_g IS NULL OR unit_net_weight_g > 0
 | <code>supplier_supplier_type</code> | 否 | <code>supplier_type</code> | — |
 
 ### CHECK 约束
+
+- <code>suppliers_default_invoice_category_allowed</code>
+
+```sql
+default_invoice_category IS NULL OR default_invoice_category IN ('EXPORT_GENERAL', 'VAT_GENERAL_1', 'VAT_SPECIAL_3', 'VAT_SPECIAL_13')
+```
+
+- <code>suppliers_default_invoice_pair_valid</code>
+
+```sql
+((default_invoice_required IS NULL AND default_invoice_category IS NULL) OR (default_invoice_required = false AND default_invoice_category IS NULL) OR (default_invoice_required = true AND default_invoice_category IS NOT NULL))
+```
 
 - <code>suppliers_supplier_type_allowed</code>
 

@@ -43,6 +43,26 @@ function sourceSlice(source, start, end) {
   return source.slice(startIndex, endIndex)
 }
 
+test('purchase commercial and arrival fields stay in readable groups before attachments and line items', () => {
+  for (const copy of [
+    '结算与发票',
+    '付款方式',
+    '是否需要发票',
+    '发票类别',
+    '到货与收货',
+    '供应商确认到货日期',
+    '收货地址',
+  ]) {
+    assert.match(form, new RegExp(copy, 'u'))
+  }
+  const fieldsIndex = form.indexOf('<BusinessFormSectionTitle>订单与供应商')
+  const attachmentsIndex = form.indexOf('{attachmentPanel}')
+  const itemsIndex = form.indexOf('<BusinessLineItemsSection')
+  assert(fieldsIndex >= 0)
+  assert(attachmentsIndex > fieldsIndex)
+  assert(itemsIndex > attachmentsIndex)
+})
+
 test('purchase form references fail closed, support latest-wins, and distinguish a legal empty result', () => {
   const referenceLoader = sourceSlice(
     page,
@@ -179,14 +199,8 @@ test('purchase selection actions keep one authorized catalog across record state
     )
   }
   assert.match(page, /actionStates: lifecycleActionStates/u)
-  assert.match(
-    operationPanel,
-    /actionStates=\{lifecycleActionStates\}/u
-  )
-  assert.match(
-    operationPanel,
-    /disabled=\{primaryLifecycleState\.disabled\}/u
-  )
+  assert.match(operationPanel, /actionStates=\{lifecycleActionStates\}/u)
+  assert.match(operationPanel, /disabled=\{primaryLifecycleState\.disabled\}/u)
   assert.doesNotMatch(
     operationPanel,
     /canUpdate\s*&&[\s\S]{0,100}selectedLifecycleStatus/u

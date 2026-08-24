@@ -103,6 +103,46 @@ func (_u *ProductUpdate) ClearCustomerStyleNo() *ProductUpdate {
 	return _u
 }
 
+// SetEnglishName sets the "english_name" field.
+func (_u *ProductUpdate) SetEnglishName(v string) *ProductUpdate {
+	_u.mutation.SetEnglishName(v)
+	return _u
+}
+
+// SetNillableEnglishName sets the "english_name" field if the given value is not nil.
+func (_u *ProductUpdate) SetNillableEnglishName(v *string) *ProductUpdate {
+	if v != nil {
+		_u.SetEnglishName(*v)
+	}
+	return _u
+}
+
+// ClearEnglishName clears the value of the "english_name" field.
+func (_u *ProductUpdate) ClearEnglishName() *ProductUpdate {
+	_u.mutation.ClearEnglishName()
+	return _u
+}
+
+// SetHsCode sets the "hs_code" field.
+func (_u *ProductUpdate) SetHsCode(v string) *ProductUpdate {
+	_u.mutation.SetHsCode(v)
+	return _u
+}
+
+// SetNillableHsCode sets the "hs_code" field if the given value is not nil.
+func (_u *ProductUpdate) SetNillableHsCode(v *string) *ProductUpdate {
+	if v != nil {
+		_u.SetHsCode(*v)
+	}
+	return _u
+}
+
+// ClearHsCode clears the value of the "hs_code" field.
+func (_u *ProductUpdate) ClearHsCode() *ProductUpdate {
+	_u.mutation.ClearHsCode()
+	return _u
+}
+
 // SetDefaultUnitID sets the "default_unit_id" field.
 func (_u *ProductUpdate) SetDefaultUnitID(v int) *ProductUpdate {
 	_u.mutation.SetDefaultUnitID(v)
@@ -411,6 +451,16 @@ func (_u *ProductUpdate) check() error {
 			return &ValidationError{Name: "customer_style_no", err: fmt.Errorf(`ent: validator failed for field "Product.customer_style_no": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.EnglishName(); ok {
+		if err := product.EnglishNameValidator(v); err != nil {
+			return &ValidationError{Name: "english_name", err: fmt.Errorf(`ent: validator failed for field "Product.english_name": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.HsCode(); ok {
+		if err := product.HsCodeValidator(v); err != nil {
+			return &ValidationError{Name: "hs_code", err: fmt.Errorf(`ent: validator failed for field "Product.hs_code": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.DefaultUnitID(); ok {
 		if err := product.DefaultUnitIDValidator(v); err != nil {
 			return &ValidationError{Name: "default_unit_id", err: fmt.Errorf(`ent: validator failed for field "Product.default_unit_id": %w`, err)}
@@ -451,6 +501,18 @@ func (_u *ProductUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.CustomerStyleNoCleared() {
 		_spec.ClearField(product.FieldCustomerStyleNo, field.TypeString)
+	}
+	if value, ok := _u.mutation.EnglishName(); ok {
+		_spec.SetField(product.FieldEnglishName, field.TypeString, value)
+	}
+	if _u.mutation.EnglishNameCleared() {
+		_spec.ClearField(product.FieldEnglishName, field.TypeString)
+	}
+	if value, ok := _u.mutation.HsCode(); ok {
+		_spec.SetField(product.FieldHsCode, field.TypeString, value)
+	}
+	if _u.mutation.HsCodeCleared() {
+		_spec.ClearField(product.FieldHsCode, field.TypeString)
 	}
 	if value, ok := _u.mutation.UnitNetWeightG(); ok {
 		_spec.SetField(product.FieldUnitNetWeightG, field.TypeOther, value)
@@ -806,6 +868,46 @@ func (_u *ProductUpdateOne) ClearCustomerStyleNo() *ProductUpdateOne {
 	return _u
 }
 
+// SetEnglishName sets the "english_name" field.
+func (_u *ProductUpdateOne) SetEnglishName(v string) *ProductUpdateOne {
+	_u.mutation.SetEnglishName(v)
+	return _u
+}
+
+// SetNillableEnglishName sets the "english_name" field if the given value is not nil.
+func (_u *ProductUpdateOne) SetNillableEnglishName(v *string) *ProductUpdateOne {
+	if v != nil {
+		_u.SetEnglishName(*v)
+	}
+	return _u
+}
+
+// ClearEnglishName clears the value of the "english_name" field.
+func (_u *ProductUpdateOne) ClearEnglishName() *ProductUpdateOne {
+	_u.mutation.ClearEnglishName()
+	return _u
+}
+
+// SetHsCode sets the "hs_code" field.
+func (_u *ProductUpdateOne) SetHsCode(v string) *ProductUpdateOne {
+	_u.mutation.SetHsCode(v)
+	return _u
+}
+
+// SetNillableHsCode sets the "hs_code" field if the given value is not nil.
+func (_u *ProductUpdateOne) SetNillableHsCode(v *string) *ProductUpdateOne {
+	if v != nil {
+		_u.SetHsCode(*v)
+	}
+	return _u
+}
+
+// ClearHsCode clears the value of the "hs_code" field.
+func (_u *ProductUpdateOne) ClearHsCode() *ProductUpdateOne {
+	_u.mutation.ClearHsCode()
+	return _u
+}
+
 // SetDefaultUnitID sets the "default_unit_id" field.
 func (_u *ProductUpdateOne) SetDefaultUnitID(v int) *ProductUpdateOne {
 	_u.mutation.SetDefaultUnitID(v)
@@ -1127,6 +1229,16 @@ func (_u *ProductUpdateOne) check() error {
 			return &ValidationError{Name: "customer_style_no", err: fmt.Errorf(`ent: validator failed for field "Product.customer_style_no": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.EnglishName(); ok {
+		if err := product.EnglishNameValidator(v); err != nil {
+			return &ValidationError{Name: "english_name", err: fmt.Errorf(`ent: validator failed for field "Product.english_name": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.HsCode(); ok {
+		if err := product.HsCodeValidator(v); err != nil {
+			return &ValidationError{Name: "hs_code", err: fmt.Errorf(`ent: validator failed for field "Product.hs_code": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.DefaultUnitID(); ok {
 		if err := product.DefaultUnitIDValidator(v); err != nil {
 			return &ValidationError{Name: "default_unit_id", err: fmt.Errorf(`ent: validator failed for field "Product.default_unit_id": %w`, err)}
@@ -1184,6 +1296,18 @@ func (_u *ProductUpdateOne) sqlSave(ctx context.Context) (_node *Product, err er
 	}
 	if _u.mutation.CustomerStyleNoCleared() {
 		_spec.ClearField(product.FieldCustomerStyleNo, field.TypeString)
+	}
+	if value, ok := _u.mutation.EnglishName(); ok {
+		_spec.SetField(product.FieldEnglishName, field.TypeString, value)
+	}
+	if _u.mutation.EnglishNameCleared() {
+		_spec.ClearField(product.FieldEnglishName, field.TypeString)
+	}
+	if value, ok := _u.mutation.HsCode(); ok {
+		_spec.SetField(product.FieldHsCode, field.TypeString, value)
+	}
+	if _u.mutation.HsCodeCleared() {
+		_spec.ClearField(product.FieldHsCode, field.TypeString)
 	}
 	if value, ok := _u.mutation.UnitNetWeightG(); ok {
 		_spec.SetField(product.FieldUnitNetWeightG, field.TypeOther, value)

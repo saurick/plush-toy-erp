@@ -116,6 +116,16 @@ func CurrencySnapshot(v string) predicate.ShipmentItem {
 	return predicate.ShipmentItem(sql.FieldEQ(FieldCurrencySnapshot, v))
 }
 
+// PackageDescription applies equality check predicate on the "package_description" field. It's identical to PackageDescriptionEQ.
+func PackageDescription(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldEQ(FieldPackageDescription, v))
+}
+
+// CaseNo applies equality check predicate on the "case_no" field. It's identical to CaseNoEQ.
+func CaseNo(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldEQ(FieldCaseNo, v))
+}
+
 // Note applies equality check predicate on the "note" field. It's identical to NoteEQ.
 func Note(v string) predicate.ShipmentItem {
 	return predicate.ShipmentItem(sql.FieldEQ(FieldNote, v))
@@ -554,6 +564,156 @@ func CurrencySnapshotEqualFold(v string) predicate.ShipmentItem {
 // CurrencySnapshotContainsFold applies the ContainsFold predicate on the "currency_snapshot" field.
 func CurrencySnapshotContainsFold(v string) predicate.ShipmentItem {
 	return predicate.ShipmentItem(sql.FieldContainsFold(FieldCurrencySnapshot, v))
+}
+
+// PackageDescriptionEQ applies the EQ predicate on the "package_description" field.
+func PackageDescriptionEQ(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldEQ(FieldPackageDescription, v))
+}
+
+// PackageDescriptionNEQ applies the NEQ predicate on the "package_description" field.
+func PackageDescriptionNEQ(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldNEQ(FieldPackageDescription, v))
+}
+
+// PackageDescriptionIn applies the In predicate on the "package_description" field.
+func PackageDescriptionIn(vs ...string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldIn(FieldPackageDescription, vs...))
+}
+
+// PackageDescriptionNotIn applies the NotIn predicate on the "package_description" field.
+func PackageDescriptionNotIn(vs ...string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldNotIn(FieldPackageDescription, vs...))
+}
+
+// PackageDescriptionGT applies the GT predicate on the "package_description" field.
+func PackageDescriptionGT(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldGT(FieldPackageDescription, v))
+}
+
+// PackageDescriptionGTE applies the GTE predicate on the "package_description" field.
+func PackageDescriptionGTE(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldGTE(FieldPackageDescription, v))
+}
+
+// PackageDescriptionLT applies the LT predicate on the "package_description" field.
+func PackageDescriptionLT(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldLT(FieldPackageDescription, v))
+}
+
+// PackageDescriptionLTE applies the LTE predicate on the "package_description" field.
+func PackageDescriptionLTE(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldLTE(FieldPackageDescription, v))
+}
+
+// PackageDescriptionContains applies the Contains predicate on the "package_description" field.
+func PackageDescriptionContains(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldContains(FieldPackageDescription, v))
+}
+
+// PackageDescriptionHasPrefix applies the HasPrefix predicate on the "package_description" field.
+func PackageDescriptionHasPrefix(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldHasPrefix(FieldPackageDescription, v))
+}
+
+// PackageDescriptionHasSuffix applies the HasSuffix predicate on the "package_description" field.
+func PackageDescriptionHasSuffix(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldHasSuffix(FieldPackageDescription, v))
+}
+
+// PackageDescriptionIsNil applies the IsNil predicate on the "package_description" field.
+func PackageDescriptionIsNil() predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldIsNull(FieldPackageDescription))
+}
+
+// PackageDescriptionNotNil applies the NotNil predicate on the "package_description" field.
+func PackageDescriptionNotNil() predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldNotNull(FieldPackageDescription))
+}
+
+// PackageDescriptionEqualFold applies the EqualFold predicate on the "package_description" field.
+func PackageDescriptionEqualFold(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldEqualFold(FieldPackageDescription, v))
+}
+
+// PackageDescriptionContainsFold applies the ContainsFold predicate on the "package_description" field.
+func PackageDescriptionContainsFold(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldContainsFold(FieldPackageDescription, v))
+}
+
+// CaseNoEQ applies the EQ predicate on the "case_no" field.
+func CaseNoEQ(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldEQ(FieldCaseNo, v))
+}
+
+// CaseNoNEQ applies the NEQ predicate on the "case_no" field.
+func CaseNoNEQ(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldNEQ(FieldCaseNo, v))
+}
+
+// CaseNoIn applies the In predicate on the "case_no" field.
+func CaseNoIn(vs ...string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldIn(FieldCaseNo, vs...))
+}
+
+// CaseNoNotIn applies the NotIn predicate on the "case_no" field.
+func CaseNoNotIn(vs ...string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldNotIn(FieldCaseNo, vs...))
+}
+
+// CaseNoGT applies the GT predicate on the "case_no" field.
+func CaseNoGT(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldGT(FieldCaseNo, v))
+}
+
+// CaseNoGTE applies the GTE predicate on the "case_no" field.
+func CaseNoGTE(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldGTE(FieldCaseNo, v))
+}
+
+// CaseNoLT applies the LT predicate on the "case_no" field.
+func CaseNoLT(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldLT(FieldCaseNo, v))
+}
+
+// CaseNoLTE applies the LTE predicate on the "case_no" field.
+func CaseNoLTE(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldLTE(FieldCaseNo, v))
+}
+
+// CaseNoContains applies the Contains predicate on the "case_no" field.
+func CaseNoContains(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldContains(FieldCaseNo, v))
+}
+
+// CaseNoHasPrefix applies the HasPrefix predicate on the "case_no" field.
+func CaseNoHasPrefix(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldHasPrefix(FieldCaseNo, v))
+}
+
+// CaseNoHasSuffix applies the HasSuffix predicate on the "case_no" field.
+func CaseNoHasSuffix(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldHasSuffix(FieldCaseNo, v))
+}
+
+// CaseNoIsNil applies the IsNil predicate on the "case_no" field.
+func CaseNoIsNil() predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldIsNull(FieldCaseNo))
+}
+
+// CaseNoNotNil applies the NotNil predicate on the "case_no" field.
+func CaseNoNotNil() predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldNotNull(FieldCaseNo))
+}
+
+// CaseNoEqualFold applies the EqualFold predicate on the "case_no" field.
+func CaseNoEqualFold(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldEqualFold(FieldCaseNo, v))
+}
+
+// CaseNoContainsFold applies the ContainsFold predicate on the "case_no" field.
+func CaseNoContainsFold(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldContainsFold(FieldCaseNo, v))
 }
 
 // NoteEQ applies the EQ predicate on the "note" field.

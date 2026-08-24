@@ -22,6 +22,13 @@ const (
 	SalesOrderItemStatusOpen     = corestatus.SalesOrderItemOpen
 	SalesOrderItemStatusClosed   = corestatus.SalesOrderItemClosed
 	SalesOrderItemStatusCanceled = corestatus.SalesOrderItemCanceled
+
+	SalesOrderTaxModeInclusive = "INCLUSIVE"
+	SalesOrderTaxModeExclusive = "EXCLUSIVE"
+	SalesOrderTaxModeNone      = "NONE"
+
+	SalesOrderFreightTermsIncluded = "INCLUDED"
+	SalesOrderFreightTermsExcluded = "EXCLUDED"
 )
 
 var (
@@ -37,6 +44,8 @@ var (
 	ErrUnitNotFound                                = errors.New("unit not found")
 	ErrUnitInactive                                = errors.New("unit inactive")
 	ErrCustomerInactive                            = errors.New("customer inactive")
+	ErrSalesOrderCommercialTermsIncomplete         = errors.New("sales order commercial terms incomplete")
+	ErrSalesOrderItemPriceMissing                  = errors.New("sales order item price missing")
 )
 
 type SalesOrder struct {
@@ -48,9 +57,16 @@ type SalesOrder struct {
 	CustomerSnapshot    map[string]any
 	SalesOwner          *string
 	ContactSnapshot     map[string]any
+	DeliverySnapshot    map[string]any
 	PaymentMethod       *string
 	PaymentTermDays     *int
 	PriceConditionNote  *string
+	TaxMode             *string
+	TaxRate             *decimal.Decimal
+	FreightTerms        *string
+	GoodsAmount         *decimal.Decimal
+	TaxAmount           *decimal.Decimal
+	OrderTotal          *decimal.Decimal
 	OrderDate           time.Time
 	PlannedDeliveryDate *time.Time
 	LifecycleStatus     string
@@ -97,9 +113,16 @@ type SalesOrderMutation struct {
 	CustomerSnapshot    map[string]any
 	SalesOwner          *string
 	ContactSnapshot     map[string]any
+	DeliverySnapshot    map[string]any
 	PaymentMethod       *string
 	PaymentTermDays     *int
 	PriceConditionNote  *string
+	TaxMode             *string
+	TaxRate             *decimal.Decimal
+	FreightTerms        *string
+	GoodsAmount         *decimal.Decimal
+	TaxAmount           *decimal.Decimal
+	OrderTotal          *decimal.Decimal
 	OrderDate           time.Time
 	PlannedDeliveryDate *time.Time
 	Note                *string
@@ -170,6 +193,10 @@ type SalesOrderRepo interface {
 	ProductIsActive(ctx context.Context, id int) (bool, error)
 	ProductSKUIsActiveForProduct(ctx context.Context, skuID int, productID int) (bool, error)
 	UnitIsActive(ctx context.Context, id int) (bool, error)
+}
+
+type SalesOrderCommercialReadinessRepo interface {
+	ValidateSalesOrderCommercialReadiness(ctx context.Context, id int) error
 }
 
 // SalesOrderCancellationActorRepo is the authenticated cancellation path used
@@ -446,6 +473,18 @@ func (uc *SalesOrderUsecase) SaveSalesOrderWithItems(ctx context.Context, id int
 			SalesOrderItemMutation: normalizedItem,
 		})
 	}
+	amounts := make([]*decimal.Decimal, 0, len(normalizedItems))
+	for _, item := range normalizedItems {
+		amounts = append(amounts, item.Amount)
+	}
+	normalizedOrder.GoodsAmount, normalizedOrder.TaxAmount, normalizedOrder.OrderTotal, err = CalculateSalesOrderAmounts(
+		normalizedOrder.TaxMode,
+		normalizedOrder.TaxRate,
+		amounts,
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	return uc.repo.SaveSalesOrderWithItems(ctx, id, &normalizedOrder, normalizedItems)
 }
@@ -499,6 +538,13 @@ func (uc *SalesOrderUsecase) changeSalesOrderLifecycle(ctx context.Context, id i
 	}
 	if current.LifecycleStatus == next {
 		return current, nil
+	}
+	if next == SalesOrderStatusSubmitted || next == SalesOrderStatusActive {
+		if repo, ok := uc.repo.(SalesOrderCommercialReadinessRepo); ok {
+			if err := repo.ValidateSalesOrderCommercialReadiness(ctx, id); err != nil {
+				return nil, err
+			}
+		}
 	}
 	return uc.repo.UpdateSalesOrderLifecycle(ctx, id, next)
 }
@@ -569,11 +615,19 @@ func normalizeSalesOrderMutation(in SalesOrderMutation, create bool) (SalesOrder
 	in.SalesOwner = normalizeOptionalString(in.SalesOwner)
 	in.PaymentMethod = normalizeOptionalString(in.PaymentMethod)
 	in.PriceConditionNote = normalizeOptionalString(in.PriceConditionNote)
+	in.TaxMode, in.TaxRate, in.FreightTerms, err = normalizeSalesOrderCommercialTerms(in.TaxMode, in.TaxRate, in.FreightTerms)
+	if err != nil {
+		return SalesOrderMutation{}, err
+	}
 	in.Note = normalizeOptionalString(in.Note)
 	if in.CustomerSnapshot == nil {
 		in.CustomerSnapshot = map[string]any{}
 	}
 	in.ContactSnapshot, err = normalizeContactSnapshot(in.ContactSnapshot)
+	if err != nil {
+		return SalesOrderMutation{}, err
+	}
+	in.DeliverySnapshot, err = normalizeDeliverySnapshot(in.DeliverySnapshot)
 	if err != nil {
 		return SalesOrderMutation{}, err
 	}

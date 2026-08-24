@@ -27,6 +27,12 @@ type PurchaseOrder struct {
 	Currency string `json:"currency,omitempty"`
 	// PaymentTermDays holds the value of the "payment_term_days" field.
 	PaymentTermDays *int `json:"payment_term_days,omitempty"`
+	// PaymentMethod holds the value of the "payment_method" field.
+	PaymentMethod *string `json:"payment_method,omitempty"`
+	// InvoiceRequired holds the value of the "invoice_required" field.
+	InvoiceRequired *bool `json:"invoice_required,omitempty"`
+	// InvoiceCategory holds the value of the "invoice_category" field.
+	InvoiceCategory *string `json:"invoice_category,omitempty"`
 	// SupplierPurchaseOrderNo holds the value of the "supplier_purchase_order_no" field.
 	SupplierPurchaseOrderNo *string `json:"supplier_purchase_order_no,omitempty"`
 	// SupplierSnapshot holds the value of the "supplier_snapshot" field.
@@ -37,6 +43,10 @@ type PurchaseOrder struct {
 	PurchaseDate time.Time `json:"purchase_date,omitempty"`
 	// ExpectedArrivalDate holds the value of the "expected_arrival_date" field.
 	ExpectedArrivalDate *time.Time `json:"expected_arrival_date,omitempty"`
+	// SupplierConfirmedArrivalDate holds the value of the "supplier_confirmed_arrival_date" field.
+	SupplierConfirmedArrivalDate *time.Time `json:"supplier_confirmed_arrival_date,omitempty"`
+	// DeliveryAddress holds the value of the "delivery_address" field.
+	DeliveryAddress *string `json:"delivery_address,omitempty"`
 	// LifecycleStatus holds the value of the "lifecycle_status" field.
 	LifecycleStatus string `json:"lifecycle_status,omitempty"`
 	// Version holds the value of the "version" field.
@@ -101,11 +111,13 @@ func (*PurchaseOrder) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case purchaseorder.FieldSupplierSnapshot, purchaseorder.FieldContractPartySnapshot:
 			values[i] = new([]byte)
+		case purchaseorder.FieldInvoiceRequired:
+			values[i] = new(sql.NullBool)
 		case purchaseorder.FieldID, purchaseorder.FieldSupplierID, purchaseorder.FieldPaymentTermDays, purchaseorder.FieldVersion, purchaseorder.FieldSettledBy:
 			values[i] = new(sql.NullInt64)
-		case purchaseorder.FieldPurchaseOrderNo, purchaseorder.FieldCurrency, purchaseorder.FieldSupplierPurchaseOrderNo, purchaseorder.FieldLifecycleStatus, purchaseorder.FieldSettlementAction, purchaseorder.FieldSettlementMode, purchaseorder.FieldSettlementReason, purchaseorder.FieldNote:
+		case purchaseorder.FieldPurchaseOrderNo, purchaseorder.FieldCurrency, purchaseorder.FieldPaymentMethod, purchaseorder.FieldInvoiceCategory, purchaseorder.FieldSupplierPurchaseOrderNo, purchaseorder.FieldDeliveryAddress, purchaseorder.FieldLifecycleStatus, purchaseorder.FieldSettlementAction, purchaseorder.FieldSettlementMode, purchaseorder.FieldSettlementReason, purchaseorder.FieldNote:
 			values[i] = new(sql.NullString)
-		case purchaseorder.FieldPurchaseDate, purchaseorder.FieldExpectedArrivalDate, purchaseorder.FieldSettledAt, purchaseorder.FieldCreatedAt, purchaseorder.FieldUpdatedAt:
+		case purchaseorder.FieldPurchaseDate, purchaseorder.FieldExpectedArrivalDate, purchaseorder.FieldSupplierConfirmedArrivalDate, purchaseorder.FieldSettledAt, purchaseorder.FieldCreatedAt, purchaseorder.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -153,6 +165,27 @@ func (_m *PurchaseOrder) assignValues(columns []string, values []any) error {
 				_m.PaymentTermDays = new(int)
 				*_m.PaymentTermDays = int(value.Int64)
 			}
+		case purchaseorder.FieldPaymentMethod:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field payment_method", values[i])
+			} else if value.Valid {
+				_m.PaymentMethod = new(string)
+				*_m.PaymentMethod = value.String
+			}
+		case purchaseorder.FieldInvoiceRequired:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field invoice_required", values[i])
+			} else if value.Valid {
+				_m.InvoiceRequired = new(bool)
+				*_m.InvoiceRequired = value.Bool
+			}
+		case purchaseorder.FieldInvoiceCategory:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field invoice_category", values[i])
+			} else if value.Valid {
+				_m.InvoiceCategory = new(string)
+				*_m.InvoiceCategory = value.String
+			}
 		case purchaseorder.FieldSupplierPurchaseOrderNo:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field supplier_purchase_order_no", values[i])
@@ -188,6 +221,20 @@ func (_m *PurchaseOrder) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.ExpectedArrivalDate = new(time.Time)
 				*_m.ExpectedArrivalDate = value.Time
+			}
+		case purchaseorder.FieldSupplierConfirmedArrivalDate:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field supplier_confirmed_arrival_date", values[i])
+			} else if value.Valid {
+				_m.SupplierConfirmedArrivalDate = new(time.Time)
+				*_m.SupplierConfirmedArrivalDate = value.Time
+			}
+		case purchaseorder.FieldDeliveryAddress:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field delivery_address", values[i])
+			} else if value.Valid {
+				_m.DeliveryAddress = new(string)
+				*_m.DeliveryAddress = value.String
 			}
 		case purchaseorder.FieldLifecycleStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -315,6 +362,21 @@ func (_m *PurchaseOrder) String() string {
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")
+	if v := _m.PaymentMethod; v != nil {
+		builder.WriteString("payment_method=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.InvoiceRequired; v != nil {
+		builder.WriteString("invoice_required=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.InvoiceCategory; v != nil {
+		builder.WriteString("invoice_category=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
 	if v := _m.SupplierPurchaseOrderNo; v != nil {
 		builder.WriteString("supplier_purchase_order_no=")
 		builder.WriteString(*v)
@@ -332,6 +394,16 @@ func (_m *PurchaseOrder) String() string {
 	if v := _m.ExpectedArrivalDate; v != nil {
 		builder.WriteString("expected_arrival_date=")
 		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.SupplierConfirmedArrivalDate; v != nil {
+		builder.WriteString("supplier_confirmed_arrival_date=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.DeliveryAddress; v != nil {
+		builder.WriteString("delivery_address=")
+		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")
 	builder.WriteString("lifecycle_status=")

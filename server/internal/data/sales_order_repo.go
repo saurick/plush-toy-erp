@@ -44,8 +44,13 @@ var _ biz.SalesOrderActivateProcessCommandRepo = (*salesOrderRepo)(nil)
 var _ biz.SalesOrderRejectProcessCommandRepo = (*salesOrderRepo)(nil)
 var _ biz.SalesOrderCancellationActorRepo = (*salesOrderRepo)(nil)
 var _ biz.SalesOrderLifecycleActionRepo = (*salesOrderRepo)(nil)
+var _ biz.SalesOrderCommercialReadinessRepo = (*salesOrderRepo)(nil)
 
 func (r *salesOrderRepo) CreateSalesOrder(ctx context.Context, in *biz.SalesOrderMutation) (*biz.SalesOrder, error) {
+	goodsAmount, taxAmount, orderTotal, err := biz.CalculateSalesOrderAmounts(in.TaxMode, in.TaxRate, nil)
+	if err != nil {
+		return nil, err
+	}
 	row, err := r.data.postgres.SalesOrder.Create().
 		SetOrderNo(in.OrderNo).
 		SetCustomerID(in.CustomerID).
@@ -54,9 +59,16 @@ func (r *salesOrderRepo) CreateSalesOrder(ctx context.Context, in *biz.SalesOrde
 		SetCustomerSnapshot(in.CustomerSnapshot).
 		SetNillableSalesOwner(in.SalesOwner).
 		SetContactSnapshot(in.ContactSnapshot).
+		SetDeliverySnapshot(in.DeliverySnapshot).
 		SetNillablePaymentMethod(in.PaymentMethod).
 		SetNillablePaymentTermDays(in.PaymentTermDays).
 		SetNillablePriceConditionNote(in.PriceConditionNote).
+		SetNillableTaxMode(in.TaxMode).
+		SetNillableTaxRate(in.TaxRate).
+		SetNillableFreightTerms(in.FreightTerms).
+		SetNillableGoodsAmount(goodsAmount).
+		SetNillableTaxAmount(taxAmount).
+		SetNillableOrderTotal(orderTotal).
 		SetOrderDate(in.OrderDate).
 		SetNillablePlannedDeliveryDate(in.PlannedDeliveryDate).
 		SetLifecycleStatus(biz.SalesOrderStatusDraft).
@@ -69,12 +81,21 @@ func (r *salesOrderRepo) CreateSalesOrder(ctx context.Context, in *biz.SalesOrde
 }
 
 func (r *salesOrderRepo) UpdateSalesOrder(ctx context.Context, id int, in *biz.SalesOrderMutation) (*biz.SalesOrder, error) {
+	amounts, err := salesOrderOpenItemAmounts(ctx, r.data.postgres, id)
+	if err != nil {
+		return nil, err
+	}
+	in.GoodsAmount, in.TaxAmount, in.OrderTotal, err = biz.CalculateSalesOrderAmounts(in.TaxMode, in.TaxRate, amounts)
+	if err != nil {
+		return nil, err
+	}
 	update := r.data.postgres.SalesOrder.UpdateOneID(id).
 		SetOrderNo(in.OrderNo).
 		SetCustomerID(in.CustomerID).
 		SetCurrency(in.Currency).
 		SetCustomerSnapshot(in.CustomerSnapshot).
 		SetContactSnapshot(in.ContactSnapshot).
+		SetDeliverySnapshot(in.DeliverySnapshot).
 		SetOrderDate(in.OrderDate)
 	if in.CustomerOrderNo == nil {
 		update.ClearCustomerOrderNo()
@@ -101,6 +122,7 @@ func (r *salesOrderRepo) UpdateSalesOrder(ctx context.Context, id int, in *biz.S
 	} else {
 		update.SetPriceConditionNote(*in.PriceConditionNote)
 	}
+	setSalesOrderCommercialFieldsOnUpdateOne(update, in)
 	if in.PlannedDeliveryDate == nil {
 		update.ClearPlannedDeliveryDate()
 	} else {
@@ -253,6 +275,11 @@ func (r *salesOrderRepo) UpdateSalesOrderLifecycle(ctx context.Context, id int, 
 	allowedCurrent := salesOrderLifecyclePredecessors(lifecycleStatus)
 	if len(allowedCurrent) == 0 {
 		return nil, biz.ErrBadParam
+	}
+	if lifecycleStatus == biz.SalesOrderStatusSubmitted || lifecycleStatus == biz.SalesOrderStatusActive {
+		if err := validateSalesOrderCommercialReadinessWithClient(ctx, r.data.postgres, id); err != nil {
+			return nil, err
+		}
 	}
 	affected, err := r.data.postgres.SalesOrder.Update().
 		Where(
@@ -543,6 +570,9 @@ func (r *salesOrderRepo) SubmitSalesOrderForProcessCommand(
 		return nil, err
 	}
 	defer func() { rollbackEntTx(ctx, tx, r.log) }()
+	if err := validateSalesOrderCommercialReadinessWithClient(ctx, tx.Client(), salesOrderID); err != nil {
+		return nil, err
+	}
 	affected, err := tx.SalesOrder.Update().
 		Where(salesorder.ID(salesOrderID), salesorder.LifecycleStatus(biz.SalesOrderStatusDraft)).
 		SetLifecycleStatus(biz.SalesOrderStatusSubmitted).
@@ -613,6 +643,9 @@ func (r *salesOrderRepo) ActivateSalesOrderForProcessCommand(
 	}
 	if current.LifecycleStatus != biz.SalesOrderStatusSubmitted {
 		return nil, biz.ErrBadParam
+	}
+	if err := validateSalesOrderCommercialReadinessWithClient(ctx, tx.Client(), salesOrderID); err != nil {
+		return nil, err
 	}
 	row, err := tx.SalesOrder.UpdateOneID(salesOrderID).
 		Where(salesorder.Version(current.Version), salesorder.LifecycleStatus(biz.SalesOrderStatusSubmitted)).
@@ -830,7 +863,12 @@ func containsString(values []string, target string) bool {
 }
 
 func (r *salesOrderRepo) AddSalesOrderItem(ctx context.Context, in *biz.SalesOrderItemMutation) (*biz.SalesOrderItem, error) {
-	row, err := r.data.postgres.SalesOrderItem.Create().
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
+	row, err := tx.SalesOrderItem.Create().
 		SetSalesOrderID(in.SalesOrderID).
 		SetLineNo(in.LineNo).
 		SetDisplayOrder(in.LineNo).
@@ -850,11 +888,23 @@ func (r *salesOrderRepo) AddSalesOrderItem(ctx context.Context, in *biz.SalesOrd
 	if err != nil {
 		return nil, err
 	}
+	if err := recalculateSalesOrderAmountsWithClient(ctx, tx.Client(), in.SalesOrderID); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
 	return entSalesOrderItemToBiz(row), nil
 }
 
 func (r *salesOrderRepo) UpdateSalesOrderItem(ctx context.Context, id int, in *biz.SalesOrderItemMutation) (*biz.SalesOrderItem, error) {
-	update := r.data.postgres.SalesOrderItem.UpdateOneID(id).
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
+	update := tx.SalesOrderItem.UpdateOneID(id).
 		SetSalesOrderID(in.SalesOrderID).
 		SetLineNo(in.LineNo).
 		SetProductID(in.ProductID).
@@ -907,6 +957,13 @@ func (r *salesOrderRepo) UpdateSalesOrderItem(ctx context.Context, id int, in *b
 		}
 		return nil, err
 	}
+	if err := recalculateSalesOrderAmountsWithClient(ctx, tx.Client(), in.SalesOrderID); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
 	return entSalesOrderItemToBiz(row), nil
 }
 
@@ -922,7 +979,19 @@ func (r *salesOrderRepo) GetSalesOrderItem(ctx context.Context, id int) (*biz.Sa
 }
 
 func (r *salesOrderRepo) UpdateSalesOrderItemStatus(ctx context.Context, id int, lineStatus string) (*biz.SalesOrderItem, error) {
-	row, err := r.data.postgres.SalesOrderItem.UpdateOneID(id).
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
+	current, err := tx.SalesOrderItem.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrSalesOrderItemNotFound
+		}
+		return nil, err
+	}
+	row, err := tx.SalesOrderItem.UpdateOneID(id).
 		SetLineStatus(lineStatus).
 		Save(ctx)
 	if err != nil {
@@ -931,6 +1000,13 @@ func (r *salesOrderRepo) UpdateSalesOrderItemStatus(ctx context.Context, id int,
 		}
 		return nil, err
 	}
+	if err := recalculateSalesOrderAmountsWithClient(ctx, tx.Client(), current.SalesOrderID); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
 	return entSalesOrderItemToBiz(row), nil
 }
 
@@ -982,6 +1058,7 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 			SetCurrency(in.Currency).
 			SetCustomerSnapshot(in.CustomerSnapshot).
 			SetContactSnapshot(in.ContactSnapshot).
+			SetDeliverySnapshot(in.DeliverySnapshot).
 			SetOrderDate(in.OrderDate).
 			SetVersion(in.ExpectedVersion + 1)
 		if in.CustomerOrderNo == nil {
@@ -1009,6 +1086,7 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 		} else {
 			update.SetPriceConditionNote(*in.PriceConditionNote)
 		}
+		setSalesOrderCommercialFieldsOnUpdate(update, in)
 		if in.PlannedDeliveryDate == nil {
 			update.ClearPlannedDeliveryDate()
 		} else {
@@ -1052,9 +1130,16 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 			SetCustomerSnapshot(in.CustomerSnapshot).
 			SetNillableSalesOwner(in.SalesOwner).
 			SetContactSnapshot(in.ContactSnapshot).
+			SetDeliverySnapshot(in.DeliverySnapshot).
 			SetNillablePaymentMethod(in.PaymentMethod).
 			SetNillablePaymentTermDays(in.PaymentTermDays).
 			SetNillablePriceConditionNote(in.PriceConditionNote).
+			SetNillableTaxMode(in.TaxMode).
+			SetNillableTaxRate(in.TaxRate).
+			SetNillableFreightTerms(in.FreightTerms).
+			SetNillableGoodsAmount(in.GoodsAmount).
+			SetNillableTaxAmount(in.TaxAmount).
+			SetNillableOrderTotal(in.OrderTotal).
 			SetOrderDate(in.OrderDate).
 			SetNillablePlannedDeliveryDate(in.PlannedDeliveryDate).
 			SetLifecycleStatus(biz.SalesOrderStatusDraft).
@@ -1386,9 +1471,16 @@ func entSalesOrderToBiz(row *ent.SalesOrder) *biz.SalesOrder {
 		CustomerSnapshot:    row.CustomerSnapshot,
 		SalesOwner:          row.SalesOwner,
 		ContactSnapshot:     row.ContactSnapshot,
+		DeliverySnapshot:    row.DeliverySnapshot,
 		PaymentMethod:       row.PaymentMethod,
 		PaymentTermDays:     row.PaymentTermDays,
 		PriceConditionNote:  row.PriceConditionNote,
+		TaxMode:             row.TaxMode,
+		TaxRate:             row.TaxRate,
+		FreightTerms:        row.FreightTerms,
+		GoodsAmount:         row.GoodsAmount,
+		TaxAmount:           row.TaxAmount,
+		OrderTotal:          row.OrderTotal,
 		OrderDate:           row.OrderDate,
 		PlannedDeliveryDate: row.PlannedDeliveryDate,
 		LifecycleStatus:     row.LifecycleStatus,
@@ -1443,4 +1535,163 @@ func entSalesOrderItemsToBiz(rows []*ent.SalesOrderItem) []*biz.SalesOrderItem {
 		out = append(out, entSalesOrderItemToBiz(row))
 	}
 	return out
+}
+
+func (r *salesOrderRepo) ValidateSalesOrderCommercialReadiness(ctx context.Context, id int) error {
+	if r == nil || r.data == nil || r.data.postgres == nil || id <= 0 {
+		return biz.ErrBadParam
+	}
+	return validateSalesOrderCommercialReadinessWithClient(ctx, r.data.postgres, id)
+}
+
+func validateSalesOrderCommercialReadinessWithClient(ctx context.Context, client *ent.Client, id int) error {
+	order, err := client.SalesOrder.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return biz.ErrSalesOrderNotFound
+		}
+		return err
+	}
+	if order.TaxMode == nil || order.FreightTerms == nil {
+		return biz.ErrSalesOrderCommercialTermsIncomplete
+	}
+	if *order.TaxMode != biz.SalesOrderTaxModeNone && order.TaxRate == nil {
+		return biz.ErrSalesOrderCommercialTermsIncomplete
+	}
+	items, err := client.SalesOrderItem.Query().Where(
+		salesorderitem.SalesOrderID(id),
+		salesorderitem.LineStatus(biz.SalesOrderItemStatusOpen),
+	).All(ctx)
+	if err != nil {
+		return err
+	}
+	if len(items) == 0 {
+		return biz.ErrSalesOrderCommercialTermsIncomplete
+	}
+	for _, item := range items {
+		if item.UnitPrice == nil || item.Amount == nil {
+			return biz.ErrSalesOrderItemPriceMissing
+		}
+	}
+	if order.GoodsAmount == nil || order.TaxAmount == nil || order.OrderTotal == nil {
+		return biz.ErrSalesOrderCommercialTermsIncomplete
+	}
+	return nil
+}
+
+func salesOrderOpenItemAmounts(ctx context.Context, client *ent.Client, id int) ([]*decimal.Decimal, error) {
+	rows, err := client.SalesOrderItem.Query().Where(
+		salesorderitem.SalesOrderID(id),
+		salesorderitem.LineStatus(biz.SalesOrderItemStatusOpen),
+	).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	amounts := make([]*decimal.Decimal, 0, len(rows))
+	for _, row := range rows {
+		amounts = append(amounts, row.Amount)
+	}
+	return amounts, nil
+}
+
+func recalculateSalesOrderAmountsWithClient(ctx context.Context, client *ent.Client, id int) error {
+	order, err := client.SalesOrder.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return biz.ErrSalesOrderNotFound
+		}
+		return err
+	}
+	amounts, err := salesOrderOpenItemAmounts(ctx, client, id)
+	if err != nil {
+		return err
+	}
+	goodsAmount, taxAmount, orderTotal, err := biz.CalculateSalesOrderAmounts(order.TaxMode, order.TaxRate, amounts)
+	if err != nil {
+		return err
+	}
+	update := client.SalesOrder.UpdateOneID(id)
+	if goodsAmount == nil {
+		update.ClearGoodsAmount()
+	} else {
+		update.SetGoodsAmount(*goodsAmount)
+	}
+	if taxAmount == nil {
+		update.ClearTaxAmount()
+	} else {
+		update.SetTaxAmount(*taxAmount)
+	}
+	if orderTotal == nil {
+		update.ClearOrderTotal()
+	} else {
+		update.SetOrderTotal(*orderTotal)
+	}
+	_, err = update.Save(ctx)
+	return err
+}
+
+func setSalesOrderCommercialFieldsOnUpdateOne(update *ent.SalesOrderUpdateOne, in *biz.SalesOrderMutation) {
+	if in.TaxMode == nil {
+		update.ClearTaxMode()
+	} else {
+		update.SetTaxMode(*in.TaxMode)
+	}
+	if in.TaxRate == nil {
+		update.ClearTaxRate()
+	} else {
+		update.SetTaxRate(*in.TaxRate)
+	}
+	if in.FreightTerms == nil {
+		update.ClearFreightTerms()
+	} else {
+		update.SetFreightTerms(*in.FreightTerms)
+	}
+	if in.GoodsAmount == nil {
+		update.ClearGoodsAmount()
+	} else {
+		update.SetGoodsAmount(*in.GoodsAmount)
+	}
+	if in.TaxAmount == nil {
+		update.ClearTaxAmount()
+	} else {
+		update.SetTaxAmount(*in.TaxAmount)
+	}
+	if in.OrderTotal == nil {
+		update.ClearOrderTotal()
+	} else {
+		update.SetOrderTotal(*in.OrderTotal)
+	}
+}
+
+func setSalesOrderCommercialFieldsOnUpdate(update *ent.SalesOrderUpdate, in *biz.SalesOrderMutation) {
+	if in.TaxMode == nil {
+		update.ClearTaxMode()
+	} else {
+		update.SetTaxMode(*in.TaxMode)
+	}
+	if in.TaxRate == nil {
+		update.ClearTaxRate()
+	} else {
+		update.SetTaxRate(*in.TaxRate)
+	}
+	if in.FreightTerms == nil {
+		update.ClearFreightTerms()
+	} else {
+		update.SetFreightTerms(*in.FreightTerms)
+	}
+	if in.GoodsAmount == nil {
+		update.ClearGoodsAmount()
+	} else {
+		update.SetGoodsAmount(*in.GoodsAmount)
+	}
+	if in.TaxAmount == nil {
+		update.ClearTaxAmount()
+	} else {
+		update.SetTaxAmount(*in.TaxAmount)
+	}
+	if in.OrderTotal == nil {
+		update.ClearOrderTotal()
+	} else {
+		update.SetOrderTotal(*in.OrderTotal)
+	}
 }

@@ -116,6 +116,7 @@ export function validateShipmentSourceCandidatePage(
         : '0'
     const productSkuID = row?.product_sku_id
     const customerSnapshot = row?.customer_snapshot
+    const deliverySnapshot = row?.delivery_snapshot
     if (
       !isPositiveSafeInteger(salesOrderID) ||
       !isPositiveSafeInteger(salesOrderItemID) ||
@@ -129,7 +130,9 @@ export function validateShipmentSourceCandidatePage(
       row.order_version <= 0 ||
       !Number.isSafeInteger(row?.line_no) ||
       row.line_no <= 0 ||
-      String(row?.order_status || '').trim().toLowerCase() !== 'active' ||
+      String(row?.order_status || '')
+        .trim()
+        .toLowerCase() !== 'active' ||
       String(row?.line_status || '').trim() === '' ||
       String(row?.order_no || '').trim() === '' ||
       String(row?.customer_name || '').trim() === '' ||
@@ -149,6 +152,10 @@ export function validateShipmentSourceCandidatePage(
         customerSnapshot !== undefined &&
         (typeof customerSnapshot !== 'object' ||
           Array.isArray(customerSnapshot))) ||
+      (deliverySnapshot !== null &&
+        deliverySnapshot !== undefined &&
+        (typeof deliverySnapshot !== 'object' ||
+          Array.isArray(deliverySnapshot))) ||
       sourceItemIDs.has(salesOrderItemID) ||
       typeof selectable !== 'boolean' ||
       orderedQuantity === null ||
@@ -200,5 +207,8 @@ export function shipmentSourceOrderFromCandidate(row = {}) {
     customer_id: positiveInt(row.customer_id),
     customer_snapshot: row.customer_snapshot,
     customer_name: row.customer_name || '',
+    ...(row.delivery_snapshot && typeof row.delivery_snapshot === 'object'
+      ? { delivery_snapshot: row.delivery_snapshot }
+      : {}),
   }
 }

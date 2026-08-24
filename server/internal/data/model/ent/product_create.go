@@ -67,6 +67,34 @@ func (_c *ProductCreate) SetNillableCustomerStyleNo(v *string) *ProductCreate {
 	return _c
 }
 
+// SetEnglishName sets the "english_name" field.
+func (_c *ProductCreate) SetEnglishName(v string) *ProductCreate {
+	_c.mutation.SetEnglishName(v)
+	return _c
+}
+
+// SetNillableEnglishName sets the "english_name" field if the given value is not nil.
+func (_c *ProductCreate) SetNillableEnglishName(v *string) *ProductCreate {
+	if v != nil {
+		_c.SetEnglishName(*v)
+	}
+	return _c
+}
+
+// SetHsCode sets the "hs_code" field.
+func (_c *ProductCreate) SetHsCode(v string) *ProductCreate {
+	_c.mutation.SetHsCode(v)
+	return _c
+}
+
+// SetNillableHsCode sets the "hs_code" field if the given value is not nil.
+func (_c *ProductCreate) SetNillableHsCode(v *string) *ProductCreate {
+	if v != nil {
+		_c.SetHsCode(*v)
+	}
+	return _c
+}
+
 // SetDefaultUnitID sets the "default_unit_id" field.
 func (_c *ProductCreate) SetDefaultUnitID(v int) *ProductCreate {
 	_c.mutation.SetDefaultUnitID(v)
@@ -286,6 +314,16 @@ func (_c *ProductCreate) check() error {
 			return &ValidationError{Name: "customer_style_no", err: fmt.Errorf(`ent: validator failed for field "Product.customer_style_no": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.EnglishName(); ok {
+		if err := product.EnglishNameValidator(v); err != nil {
+			return &ValidationError{Name: "english_name", err: fmt.Errorf(`ent: validator failed for field "Product.english_name": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.HsCode(); ok {
+		if err := product.HsCodeValidator(v); err != nil {
+			return &ValidationError{Name: "hs_code", err: fmt.Errorf(`ent: validator failed for field "Product.hs_code": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.DefaultUnitID(); !ok {
 		return &ValidationError{Name: "default_unit_id", err: errors.New(`ent: missing required field "Product.default_unit_id"`)}
 	}
@@ -347,6 +385,14 @@ func (_c *ProductCreate) createSpec() (*Product, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.CustomerStyleNo(); ok {
 		_spec.SetField(product.FieldCustomerStyleNo, field.TypeString, value)
 		_node.CustomerStyleNo = &value
+	}
+	if value, ok := _c.mutation.EnglishName(); ok {
+		_spec.SetField(product.FieldEnglishName, field.TypeString, value)
+		_node.EnglishName = &value
+	}
+	if value, ok := _c.mutation.HsCode(); ok {
+		_spec.SetField(product.FieldHsCode, field.TypeString, value)
+		_node.HsCode = &value
 	}
 	if value, ok := _c.mutation.UnitNetWeightG(); ok {
 		_spec.SetField(product.FieldUnitNetWeightG, field.TypeOther, value)

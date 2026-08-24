@@ -41,6 +41,14 @@ func (Product) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			MaxLen(128),
+		field.String("english_name").
+			Optional().
+			Nillable().
+			MaxLen(255),
+		field.String("hs_code").
+			Optional().
+			Nillable().
+			MaxLen(32),
 		field.Int("default_unit_id").
 			Positive(),
 		optionalDecimalField("unit_net_weight_g"),

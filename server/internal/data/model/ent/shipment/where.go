@@ -136,6 +136,51 @@ func ShippedAt(v time.Time) predicate.Shipment {
 	return predicate.Shipment(sql.FieldEQ(FieldShippedAt, v))
 }
 
+// TransportMethod applies equality check predicate on the "transport_method" field. It's identical to TransportMethodEQ.
+func TransportMethod(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldTransportMethod, v))
+}
+
+// CarrierName applies equality check predicate on the "carrier_name" field. It's identical to CarrierNameEQ.
+func CarrierName(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldCarrierName, v))
+}
+
+// TrackingNo applies equality check predicate on the "tracking_no" field. It's identical to TrackingNoEQ.
+func TrackingNo(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldTrackingNo, v))
+}
+
+// PackageCount applies equality check predicate on the "package_count" field. It's identical to PackageCountEQ.
+func PackageCount(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldPackageCount, v))
+}
+
+// GrossWeightKg applies equality check predicate on the "gross_weight_kg" field. It's identical to GrossWeightKgEQ.
+func GrossWeightKg(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldGrossWeightKg, v))
+}
+
+// VolumeM3 applies equality check predicate on the "volume_m3" field. It's identical to VolumeM3EQ.
+func VolumeM3(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldVolumeM3, v))
+}
+
+// ShippingMark applies equality check predicate on the "shipping_mark" field. It's identical to ShippingMarkEQ.
+func ShippingMark(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldShippingMark, v))
+}
+
+// FreightAmount applies equality check predicate on the "freight_amount" field. It's identical to FreightAmountEQ.
+func FreightAmount(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldFreightAmount, v))
+}
+
+// FreightCurrency applies equality check predicate on the "freight_currency" field. It's identical to FreightCurrencyEQ.
+func FreightCurrency(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldFreightCurrency, v))
+}
+
 // TotalNetWeightG applies equality check predicate on the "total_net_weight_g" field. It's identical to TotalNetWeightGEQ.
 func TotalNetWeightG(v decimal.Decimal) predicate.Shipment {
 	return predicate.Shipment(sql.FieldEQ(FieldTotalNetWeightG, v))
@@ -359,6 +404,16 @@ func CustomerSnapshotEqualFold(v string) predicate.Shipment {
 // CustomerSnapshotContainsFold applies the ContainsFold predicate on the "customer_snapshot" field.
 func CustomerSnapshotContainsFold(v string) predicate.Shipment {
 	return predicate.Shipment(sql.FieldContainsFold(FieldCustomerSnapshot, v))
+}
+
+// DeliverySnapshotIsNil applies the IsNil predicate on the "delivery_snapshot" field.
+func DeliverySnapshotIsNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldIsNull(FieldDeliverySnapshot))
+}
+
+// DeliverySnapshotNotNil applies the NotNil predicate on the "delivery_snapshot" field.
+func DeliverySnapshotNotNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotNull(FieldDeliverySnapshot))
 }
 
 // StatusEQ applies the EQ predicate on the "status" field.
@@ -1009,6 +1064,581 @@ func ShippedAtIsNil() predicate.Shipment {
 // ShippedAtNotNil applies the NotNil predicate on the "shipped_at" field.
 func ShippedAtNotNil() predicate.Shipment {
 	return predicate.Shipment(sql.FieldNotNull(FieldShippedAt))
+}
+
+// TransportMethodEQ applies the EQ predicate on the "transport_method" field.
+func TransportMethodEQ(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldTransportMethod, v))
+}
+
+// TransportMethodNEQ applies the NEQ predicate on the "transport_method" field.
+func TransportMethodNEQ(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNEQ(FieldTransportMethod, v))
+}
+
+// TransportMethodIn applies the In predicate on the "transport_method" field.
+func TransportMethodIn(vs ...string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldIn(FieldTransportMethod, vs...))
+}
+
+// TransportMethodNotIn applies the NotIn predicate on the "transport_method" field.
+func TransportMethodNotIn(vs ...string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotIn(FieldTransportMethod, vs...))
+}
+
+// TransportMethodGT applies the GT predicate on the "transport_method" field.
+func TransportMethodGT(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGT(FieldTransportMethod, v))
+}
+
+// TransportMethodGTE applies the GTE predicate on the "transport_method" field.
+func TransportMethodGTE(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGTE(FieldTransportMethod, v))
+}
+
+// TransportMethodLT applies the LT predicate on the "transport_method" field.
+func TransportMethodLT(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLT(FieldTransportMethod, v))
+}
+
+// TransportMethodLTE applies the LTE predicate on the "transport_method" field.
+func TransportMethodLTE(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLTE(FieldTransportMethod, v))
+}
+
+// TransportMethodContains applies the Contains predicate on the "transport_method" field.
+func TransportMethodContains(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldContains(FieldTransportMethod, v))
+}
+
+// TransportMethodHasPrefix applies the HasPrefix predicate on the "transport_method" field.
+func TransportMethodHasPrefix(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldHasPrefix(FieldTransportMethod, v))
+}
+
+// TransportMethodHasSuffix applies the HasSuffix predicate on the "transport_method" field.
+func TransportMethodHasSuffix(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldHasSuffix(FieldTransportMethod, v))
+}
+
+// TransportMethodIsNil applies the IsNil predicate on the "transport_method" field.
+func TransportMethodIsNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldIsNull(FieldTransportMethod))
+}
+
+// TransportMethodNotNil applies the NotNil predicate on the "transport_method" field.
+func TransportMethodNotNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotNull(FieldTransportMethod))
+}
+
+// TransportMethodEqualFold applies the EqualFold predicate on the "transport_method" field.
+func TransportMethodEqualFold(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEqualFold(FieldTransportMethod, v))
+}
+
+// TransportMethodContainsFold applies the ContainsFold predicate on the "transport_method" field.
+func TransportMethodContainsFold(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldContainsFold(FieldTransportMethod, v))
+}
+
+// CarrierNameEQ applies the EQ predicate on the "carrier_name" field.
+func CarrierNameEQ(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldCarrierName, v))
+}
+
+// CarrierNameNEQ applies the NEQ predicate on the "carrier_name" field.
+func CarrierNameNEQ(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNEQ(FieldCarrierName, v))
+}
+
+// CarrierNameIn applies the In predicate on the "carrier_name" field.
+func CarrierNameIn(vs ...string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldIn(FieldCarrierName, vs...))
+}
+
+// CarrierNameNotIn applies the NotIn predicate on the "carrier_name" field.
+func CarrierNameNotIn(vs ...string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotIn(FieldCarrierName, vs...))
+}
+
+// CarrierNameGT applies the GT predicate on the "carrier_name" field.
+func CarrierNameGT(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGT(FieldCarrierName, v))
+}
+
+// CarrierNameGTE applies the GTE predicate on the "carrier_name" field.
+func CarrierNameGTE(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGTE(FieldCarrierName, v))
+}
+
+// CarrierNameLT applies the LT predicate on the "carrier_name" field.
+func CarrierNameLT(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLT(FieldCarrierName, v))
+}
+
+// CarrierNameLTE applies the LTE predicate on the "carrier_name" field.
+func CarrierNameLTE(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLTE(FieldCarrierName, v))
+}
+
+// CarrierNameContains applies the Contains predicate on the "carrier_name" field.
+func CarrierNameContains(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldContains(FieldCarrierName, v))
+}
+
+// CarrierNameHasPrefix applies the HasPrefix predicate on the "carrier_name" field.
+func CarrierNameHasPrefix(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldHasPrefix(FieldCarrierName, v))
+}
+
+// CarrierNameHasSuffix applies the HasSuffix predicate on the "carrier_name" field.
+func CarrierNameHasSuffix(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldHasSuffix(FieldCarrierName, v))
+}
+
+// CarrierNameIsNil applies the IsNil predicate on the "carrier_name" field.
+func CarrierNameIsNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldIsNull(FieldCarrierName))
+}
+
+// CarrierNameNotNil applies the NotNil predicate on the "carrier_name" field.
+func CarrierNameNotNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotNull(FieldCarrierName))
+}
+
+// CarrierNameEqualFold applies the EqualFold predicate on the "carrier_name" field.
+func CarrierNameEqualFold(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEqualFold(FieldCarrierName, v))
+}
+
+// CarrierNameContainsFold applies the ContainsFold predicate on the "carrier_name" field.
+func CarrierNameContainsFold(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldContainsFold(FieldCarrierName, v))
+}
+
+// TrackingNoEQ applies the EQ predicate on the "tracking_no" field.
+func TrackingNoEQ(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldTrackingNo, v))
+}
+
+// TrackingNoNEQ applies the NEQ predicate on the "tracking_no" field.
+func TrackingNoNEQ(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNEQ(FieldTrackingNo, v))
+}
+
+// TrackingNoIn applies the In predicate on the "tracking_no" field.
+func TrackingNoIn(vs ...string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldIn(FieldTrackingNo, vs...))
+}
+
+// TrackingNoNotIn applies the NotIn predicate on the "tracking_no" field.
+func TrackingNoNotIn(vs ...string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotIn(FieldTrackingNo, vs...))
+}
+
+// TrackingNoGT applies the GT predicate on the "tracking_no" field.
+func TrackingNoGT(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGT(FieldTrackingNo, v))
+}
+
+// TrackingNoGTE applies the GTE predicate on the "tracking_no" field.
+func TrackingNoGTE(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGTE(FieldTrackingNo, v))
+}
+
+// TrackingNoLT applies the LT predicate on the "tracking_no" field.
+func TrackingNoLT(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLT(FieldTrackingNo, v))
+}
+
+// TrackingNoLTE applies the LTE predicate on the "tracking_no" field.
+func TrackingNoLTE(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLTE(FieldTrackingNo, v))
+}
+
+// TrackingNoContains applies the Contains predicate on the "tracking_no" field.
+func TrackingNoContains(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldContains(FieldTrackingNo, v))
+}
+
+// TrackingNoHasPrefix applies the HasPrefix predicate on the "tracking_no" field.
+func TrackingNoHasPrefix(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldHasPrefix(FieldTrackingNo, v))
+}
+
+// TrackingNoHasSuffix applies the HasSuffix predicate on the "tracking_no" field.
+func TrackingNoHasSuffix(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldHasSuffix(FieldTrackingNo, v))
+}
+
+// TrackingNoIsNil applies the IsNil predicate on the "tracking_no" field.
+func TrackingNoIsNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldIsNull(FieldTrackingNo))
+}
+
+// TrackingNoNotNil applies the NotNil predicate on the "tracking_no" field.
+func TrackingNoNotNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotNull(FieldTrackingNo))
+}
+
+// TrackingNoEqualFold applies the EqualFold predicate on the "tracking_no" field.
+func TrackingNoEqualFold(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEqualFold(FieldTrackingNo, v))
+}
+
+// TrackingNoContainsFold applies the ContainsFold predicate on the "tracking_no" field.
+func TrackingNoContainsFold(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldContainsFold(FieldTrackingNo, v))
+}
+
+// PackageCountEQ applies the EQ predicate on the "package_count" field.
+func PackageCountEQ(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldPackageCount, v))
+}
+
+// PackageCountNEQ applies the NEQ predicate on the "package_count" field.
+func PackageCountNEQ(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNEQ(FieldPackageCount, v))
+}
+
+// PackageCountIn applies the In predicate on the "package_count" field.
+func PackageCountIn(vs ...int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldIn(FieldPackageCount, vs...))
+}
+
+// PackageCountNotIn applies the NotIn predicate on the "package_count" field.
+func PackageCountNotIn(vs ...int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotIn(FieldPackageCount, vs...))
+}
+
+// PackageCountGT applies the GT predicate on the "package_count" field.
+func PackageCountGT(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGT(FieldPackageCount, v))
+}
+
+// PackageCountGTE applies the GTE predicate on the "package_count" field.
+func PackageCountGTE(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGTE(FieldPackageCount, v))
+}
+
+// PackageCountLT applies the LT predicate on the "package_count" field.
+func PackageCountLT(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLT(FieldPackageCount, v))
+}
+
+// PackageCountLTE applies the LTE predicate on the "package_count" field.
+func PackageCountLTE(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLTE(FieldPackageCount, v))
+}
+
+// PackageCountIsNil applies the IsNil predicate on the "package_count" field.
+func PackageCountIsNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldIsNull(FieldPackageCount))
+}
+
+// PackageCountNotNil applies the NotNil predicate on the "package_count" field.
+func PackageCountNotNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotNull(FieldPackageCount))
+}
+
+// GrossWeightKgEQ applies the EQ predicate on the "gross_weight_kg" field.
+func GrossWeightKgEQ(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldGrossWeightKg, v))
+}
+
+// GrossWeightKgNEQ applies the NEQ predicate on the "gross_weight_kg" field.
+func GrossWeightKgNEQ(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNEQ(FieldGrossWeightKg, v))
+}
+
+// GrossWeightKgIn applies the In predicate on the "gross_weight_kg" field.
+func GrossWeightKgIn(vs ...decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldIn(FieldGrossWeightKg, vs...))
+}
+
+// GrossWeightKgNotIn applies the NotIn predicate on the "gross_weight_kg" field.
+func GrossWeightKgNotIn(vs ...decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotIn(FieldGrossWeightKg, vs...))
+}
+
+// GrossWeightKgGT applies the GT predicate on the "gross_weight_kg" field.
+func GrossWeightKgGT(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGT(FieldGrossWeightKg, v))
+}
+
+// GrossWeightKgGTE applies the GTE predicate on the "gross_weight_kg" field.
+func GrossWeightKgGTE(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGTE(FieldGrossWeightKg, v))
+}
+
+// GrossWeightKgLT applies the LT predicate on the "gross_weight_kg" field.
+func GrossWeightKgLT(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLT(FieldGrossWeightKg, v))
+}
+
+// GrossWeightKgLTE applies the LTE predicate on the "gross_weight_kg" field.
+func GrossWeightKgLTE(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLTE(FieldGrossWeightKg, v))
+}
+
+// GrossWeightKgIsNil applies the IsNil predicate on the "gross_weight_kg" field.
+func GrossWeightKgIsNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldIsNull(FieldGrossWeightKg))
+}
+
+// GrossWeightKgNotNil applies the NotNil predicate on the "gross_weight_kg" field.
+func GrossWeightKgNotNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotNull(FieldGrossWeightKg))
+}
+
+// VolumeM3EQ applies the EQ predicate on the "volume_m3" field.
+func VolumeM3EQ(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldVolumeM3, v))
+}
+
+// VolumeM3NEQ applies the NEQ predicate on the "volume_m3" field.
+func VolumeM3NEQ(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNEQ(FieldVolumeM3, v))
+}
+
+// VolumeM3In applies the In predicate on the "volume_m3" field.
+func VolumeM3In(vs ...decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldIn(FieldVolumeM3, vs...))
+}
+
+// VolumeM3NotIn applies the NotIn predicate on the "volume_m3" field.
+func VolumeM3NotIn(vs ...decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotIn(FieldVolumeM3, vs...))
+}
+
+// VolumeM3GT applies the GT predicate on the "volume_m3" field.
+func VolumeM3GT(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGT(FieldVolumeM3, v))
+}
+
+// VolumeM3GTE applies the GTE predicate on the "volume_m3" field.
+func VolumeM3GTE(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGTE(FieldVolumeM3, v))
+}
+
+// VolumeM3LT applies the LT predicate on the "volume_m3" field.
+func VolumeM3LT(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLT(FieldVolumeM3, v))
+}
+
+// VolumeM3LTE applies the LTE predicate on the "volume_m3" field.
+func VolumeM3LTE(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLTE(FieldVolumeM3, v))
+}
+
+// VolumeM3IsNil applies the IsNil predicate on the "volume_m3" field.
+func VolumeM3IsNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldIsNull(FieldVolumeM3))
+}
+
+// VolumeM3NotNil applies the NotNil predicate on the "volume_m3" field.
+func VolumeM3NotNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotNull(FieldVolumeM3))
+}
+
+// ShippingMarkEQ applies the EQ predicate on the "shipping_mark" field.
+func ShippingMarkEQ(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldShippingMark, v))
+}
+
+// ShippingMarkNEQ applies the NEQ predicate on the "shipping_mark" field.
+func ShippingMarkNEQ(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNEQ(FieldShippingMark, v))
+}
+
+// ShippingMarkIn applies the In predicate on the "shipping_mark" field.
+func ShippingMarkIn(vs ...string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldIn(FieldShippingMark, vs...))
+}
+
+// ShippingMarkNotIn applies the NotIn predicate on the "shipping_mark" field.
+func ShippingMarkNotIn(vs ...string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotIn(FieldShippingMark, vs...))
+}
+
+// ShippingMarkGT applies the GT predicate on the "shipping_mark" field.
+func ShippingMarkGT(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGT(FieldShippingMark, v))
+}
+
+// ShippingMarkGTE applies the GTE predicate on the "shipping_mark" field.
+func ShippingMarkGTE(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGTE(FieldShippingMark, v))
+}
+
+// ShippingMarkLT applies the LT predicate on the "shipping_mark" field.
+func ShippingMarkLT(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLT(FieldShippingMark, v))
+}
+
+// ShippingMarkLTE applies the LTE predicate on the "shipping_mark" field.
+func ShippingMarkLTE(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLTE(FieldShippingMark, v))
+}
+
+// ShippingMarkContains applies the Contains predicate on the "shipping_mark" field.
+func ShippingMarkContains(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldContains(FieldShippingMark, v))
+}
+
+// ShippingMarkHasPrefix applies the HasPrefix predicate on the "shipping_mark" field.
+func ShippingMarkHasPrefix(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldHasPrefix(FieldShippingMark, v))
+}
+
+// ShippingMarkHasSuffix applies the HasSuffix predicate on the "shipping_mark" field.
+func ShippingMarkHasSuffix(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldHasSuffix(FieldShippingMark, v))
+}
+
+// ShippingMarkIsNil applies the IsNil predicate on the "shipping_mark" field.
+func ShippingMarkIsNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldIsNull(FieldShippingMark))
+}
+
+// ShippingMarkNotNil applies the NotNil predicate on the "shipping_mark" field.
+func ShippingMarkNotNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotNull(FieldShippingMark))
+}
+
+// ShippingMarkEqualFold applies the EqualFold predicate on the "shipping_mark" field.
+func ShippingMarkEqualFold(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEqualFold(FieldShippingMark, v))
+}
+
+// ShippingMarkContainsFold applies the ContainsFold predicate on the "shipping_mark" field.
+func ShippingMarkContainsFold(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldContainsFold(FieldShippingMark, v))
+}
+
+// FreightAmountEQ applies the EQ predicate on the "freight_amount" field.
+func FreightAmountEQ(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldFreightAmount, v))
+}
+
+// FreightAmountNEQ applies the NEQ predicate on the "freight_amount" field.
+func FreightAmountNEQ(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNEQ(FieldFreightAmount, v))
+}
+
+// FreightAmountIn applies the In predicate on the "freight_amount" field.
+func FreightAmountIn(vs ...decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldIn(FieldFreightAmount, vs...))
+}
+
+// FreightAmountNotIn applies the NotIn predicate on the "freight_amount" field.
+func FreightAmountNotIn(vs ...decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotIn(FieldFreightAmount, vs...))
+}
+
+// FreightAmountGT applies the GT predicate on the "freight_amount" field.
+func FreightAmountGT(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGT(FieldFreightAmount, v))
+}
+
+// FreightAmountGTE applies the GTE predicate on the "freight_amount" field.
+func FreightAmountGTE(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGTE(FieldFreightAmount, v))
+}
+
+// FreightAmountLT applies the LT predicate on the "freight_amount" field.
+func FreightAmountLT(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLT(FieldFreightAmount, v))
+}
+
+// FreightAmountLTE applies the LTE predicate on the "freight_amount" field.
+func FreightAmountLTE(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLTE(FieldFreightAmount, v))
+}
+
+// FreightAmountIsNil applies the IsNil predicate on the "freight_amount" field.
+func FreightAmountIsNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldIsNull(FieldFreightAmount))
+}
+
+// FreightAmountNotNil applies the NotNil predicate on the "freight_amount" field.
+func FreightAmountNotNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotNull(FieldFreightAmount))
+}
+
+// FreightCurrencyEQ applies the EQ predicate on the "freight_currency" field.
+func FreightCurrencyEQ(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldFreightCurrency, v))
+}
+
+// FreightCurrencyNEQ applies the NEQ predicate on the "freight_currency" field.
+func FreightCurrencyNEQ(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNEQ(FieldFreightCurrency, v))
+}
+
+// FreightCurrencyIn applies the In predicate on the "freight_currency" field.
+func FreightCurrencyIn(vs ...string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldIn(FieldFreightCurrency, vs...))
+}
+
+// FreightCurrencyNotIn applies the NotIn predicate on the "freight_currency" field.
+func FreightCurrencyNotIn(vs ...string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotIn(FieldFreightCurrency, vs...))
+}
+
+// FreightCurrencyGT applies the GT predicate on the "freight_currency" field.
+func FreightCurrencyGT(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGT(FieldFreightCurrency, v))
+}
+
+// FreightCurrencyGTE applies the GTE predicate on the "freight_currency" field.
+func FreightCurrencyGTE(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGTE(FieldFreightCurrency, v))
+}
+
+// FreightCurrencyLT applies the LT predicate on the "freight_currency" field.
+func FreightCurrencyLT(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLT(FieldFreightCurrency, v))
+}
+
+// FreightCurrencyLTE applies the LTE predicate on the "freight_currency" field.
+func FreightCurrencyLTE(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLTE(FieldFreightCurrency, v))
+}
+
+// FreightCurrencyContains applies the Contains predicate on the "freight_currency" field.
+func FreightCurrencyContains(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldContains(FieldFreightCurrency, v))
+}
+
+// FreightCurrencyHasPrefix applies the HasPrefix predicate on the "freight_currency" field.
+func FreightCurrencyHasPrefix(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldHasPrefix(FieldFreightCurrency, v))
+}
+
+// FreightCurrencyHasSuffix applies the HasSuffix predicate on the "freight_currency" field.
+func FreightCurrencyHasSuffix(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldHasSuffix(FieldFreightCurrency, v))
+}
+
+// FreightCurrencyIsNil applies the IsNil predicate on the "freight_currency" field.
+func FreightCurrencyIsNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldIsNull(FieldFreightCurrency))
+}
+
+// FreightCurrencyNotNil applies the NotNil predicate on the "freight_currency" field.
+func FreightCurrencyNotNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotNull(FieldFreightCurrency))
+}
+
+// FreightCurrencyEqualFold applies the EqualFold predicate on the "freight_currency" field.
+func FreightCurrencyEqualFold(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEqualFold(FieldFreightCurrency, v))
+}
+
+// FreightCurrencyContainsFold applies the ContainsFold predicate on the "freight_currency" field.
+func FreightCurrencyContainsFold(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldContainsFold(FieldFreightCurrency, v))
 }
 
 // TotalNetWeightGEQ applies the EQ predicate on the "total_net_weight_g" field.

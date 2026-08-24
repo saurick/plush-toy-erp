@@ -12,6 +12,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/shopspring/decimal"
 )
 
 // SalesOrder is the model entity for the SalesOrder schema.
@@ -33,12 +34,26 @@ type SalesOrder struct {
 	SalesOwner *string `json:"sales_owner,omitempty"`
 	// ContactSnapshot holds the value of the "contact_snapshot" field.
 	ContactSnapshot map[string]interface{} `json:"contact_snapshot,omitempty"`
+	// DeliverySnapshot holds the value of the "delivery_snapshot" field.
+	DeliverySnapshot map[string]interface{} `json:"delivery_snapshot,omitempty"`
 	// PaymentMethod holds the value of the "payment_method" field.
 	PaymentMethod *string `json:"payment_method,omitempty"`
 	// PaymentTermDays holds the value of the "payment_term_days" field.
 	PaymentTermDays *int `json:"payment_term_days,omitempty"`
 	// PriceConditionNote holds the value of the "price_condition_note" field.
 	PriceConditionNote *string `json:"price_condition_note,omitempty"`
+	// TaxMode holds the value of the "tax_mode" field.
+	TaxMode *string `json:"tax_mode,omitempty"`
+	// TaxRate holds the value of the "tax_rate" field.
+	TaxRate *decimal.Decimal `json:"tax_rate,omitempty"`
+	// FreightTerms holds the value of the "freight_terms" field.
+	FreightTerms *string `json:"freight_terms,omitempty"`
+	// GoodsAmount holds the value of the "goods_amount" field.
+	GoodsAmount *decimal.Decimal `json:"goods_amount,omitempty"`
+	// TaxAmount holds the value of the "tax_amount" field.
+	TaxAmount *decimal.Decimal `json:"tax_amount,omitempty"`
+	// OrderTotal holds the value of the "order_total" field.
+	OrderTotal *decimal.Decimal `json:"order_total,omitempty"`
 	// OrderDate holds the value of the "order_date" field.
 	OrderDate time.Time `json:"order_date,omitempty"`
 	// PlannedDeliveryDate holds the value of the "planned_delivery_date" field.
@@ -127,11 +142,13 @@ func (*SalesOrder) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case salesorder.FieldCustomerSnapshot, salesorder.FieldContactSnapshot:
+		case salesorder.FieldTaxRate, salesorder.FieldGoodsAmount, salesorder.FieldTaxAmount, salesorder.FieldOrderTotal:
+			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
+		case salesorder.FieldCustomerSnapshot, salesorder.FieldContactSnapshot, salesorder.FieldDeliverySnapshot:
 			values[i] = new([]byte)
 		case salesorder.FieldID, salesorder.FieldCustomerID, salesorder.FieldPaymentTermDays, salesorder.FieldVersion, salesorder.FieldSettledBy:
 			values[i] = new(sql.NullInt64)
-		case salesorder.FieldOrderNo, salesorder.FieldCurrency, salesorder.FieldCustomerOrderNo, salesorder.FieldSalesOwner, salesorder.FieldPaymentMethod, salesorder.FieldPriceConditionNote, salesorder.FieldLifecycleStatus, salesorder.FieldSettlementAction, salesorder.FieldSettlementMode, salesorder.FieldSettlementReason, salesorder.FieldNote:
+		case salesorder.FieldOrderNo, salesorder.FieldCurrency, salesorder.FieldCustomerOrderNo, salesorder.FieldSalesOwner, salesorder.FieldPaymentMethod, salesorder.FieldPriceConditionNote, salesorder.FieldTaxMode, salesorder.FieldFreightTerms, salesorder.FieldLifecycleStatus, salesorder.FieldSettlementAction, salesorder.FieldSettlementMode, salesorder.FieldSettlementReason, salesorder.FieldNote:
 			values[i] = new(sql.NullString)
 		case salesorder.FieldOrderDate, salesorder.FieldPlannedDeliveryDate, salesorder.FieldSettledAt, salesorder.FieldCreatedAt, salesorder.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -204,6 +221,14 @@ func (_m *SalesOrder) assignValues(columns []string, values []any) error {
 					return fmt.Errorf("unmarshal field contact_snapshot: %w", err)
 				}
 			}
+		case salesorder.FieldDeliverySnapshot:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field delivery_snapshot", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.DeliverySnapshot); err != nil {
+					return fmt.Errorf("unmarshal field delivery_snapshot: %w", err)
+				}
+			}
 		case salesorder.FieldPaymentMethod:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field payment_method", values[i])
@@ -224,6 +249,48 @@ func (_m *SalesOrder) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.PriceConditionNote = new(string)
 				*_m.PriceConditionNote = value.String
+			}
+		case salesorder.FieldTaxMode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field tax_mode", values[i])
+			} else if value.Valid {
+				_m.TaxMode = new(string)
+				*_m.TaxMode = value.String
+			}
+		case salesorder.FieldTaxRate:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field tax_rate", values[i])
+			} else if value.Valid {
+				_m.TaxRate = new(decimal.Decimal)
+				*_m.TaxRate = *value.S.(*decimal.Decimal)
+			}
+		case salesorder.FieldFreightTerms:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field freight_terms", values[i])
+			} else if value.Valid {
+				_m.FreightTerms = new(string)
+				*_m.FreightTerms = value.String
+			}
+		case salesorder.FieldGoodsAmount:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field goods_amount", values[i])
+			} else if value.Valid {
+				_m.GoodsAmount = new(decimal.Decimal)
+				*_m.GoodsAmount = *value.S.(*decimal.Decimal)
+			}
+		case salesorder.FieldTaxAmount:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field tax_amount", values[i])
+			} else if value.Valid {
+				_m.TaxAmount = new(decimal.Decimal)
+				*_m.TaxAmount = *value.S.(*decimal.Decimal)
+			}
+		case salesorder.FieldOrderTotal:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field order_total", values[i])
+			} else if value.Valid {
+				_m.OrderTotal = new(decimal.Decimal)
+				*_m.OrderTotal = *value.S.(*decimal.Decimal)
 			}
 		case salesorder.FieldOrderDate:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -385,6 +452,9 @@ func (_m *SalesOrder) String() string {
 	builder.WriteString("contact_snapshot=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ContactSnapshot))
 	builder.WriteString(", ")
+	builder.WriteString("delivery_snapshot=")
+	builder.WriteString(fmt.Sprintf("%v", _m.DeliverySnapshot))
+	builder.WriteString(", ")
 	if v := _m.PaymentMethod; v != nil {
 		builder.WriteString("payment_method=")
 		builder.WriteString(*v)
@@ -398,6 +468,36 @@ func (_m *SalesOrder) String() string {
 	if v := _m.PriceConditionNote; v != nil {
 		builder.WriteString("price_condition_note=")
 		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.TaxMode; v != nil {
+		builder.WriteString("tax_mode=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.TaxRate; v != nil {
+		builder.WriteString("tax_rate=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.FreightTerms; v != nil {
+		builder.WriteString("freight_terms=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.GoodsAmount; v != nil {
+		builder.WriteString("goods_amount=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.TaxAmount; v != nil {
+		builder.WriteString("tax_amount=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.OrderTotal; v != nil {
+		builder.WriteString("order_total=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")
 	builder.WriteString("order_date=")

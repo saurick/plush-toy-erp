@@ -92,6 +92,7 @@ import {
   canRunSalesOrderLifecycleAction,
   buildSalesOrderItemParams,
   buildSalesOrderParams,
+  deliverySnapshotFormValues,
   formatUnixDate,
   hasActionPermission,
   SALES_ORDER_ITEM_STATUS_LABELS,
@@ -151,6 +152,7 @@ import {
   buildSalesOrderReservationPayload,
 } from '../utils/salesOrderReservationAction.mjs'
 import { resolveBusinessLifecycleActions } from '../utils/businessActionAvailability.mjs'
+import { resolveRelatedRecordActionAvailability } from '../utils/operationalActionAvailability.mjs'
 import {
   createSourceBusinessActionAttemptStore,
   sourceBusinessActionNo,
@@ -542,11 +544,21 @@ export default function V1SalesOrdersPage() {
 
   const applyCustomerOrderDefaults = useCallback(
     (customerID) => {
+      const customer = customers.find(
+        (item) => String(item?.id || '') === String(customerID || '')
+      )
+      orderForm.setFieldsValue(buildSalesOrderCustomerSourceValues(customer))
       applyCustomerPaymentDefaults(customerID)
       clearContactFields()
       loadCustomerContacts(customerID, { applyDefault: true })
     },
-    [applyCustomerPaymentDefaults, clearContactFields, loadCustomerContacts]
+    [
+      applyCustomerPaymentDefaults,
+      clearContactFields,
+      customers,
+      loadCustomerContacts,
+      orderForm,
+    ]
   )
 
   const loadCustomers = useCallback(async () => {
@@ -889,6 +901,9 @@ export default function V1SalesOrdersPage() {
         field: 'order_no',
       }),
       currency: 'CNY',
+      tax_mode: undefined,
+      tax_rate: undefined,
+      freight_terms: undefined,
       order_date: currentBusinessDate(),
       items: [createBlankOrderLine(1, { unitID: defaultUnitID })],
     })
@@ -925,6 +940,7 @@ export default function V1SalesOrdersPage() {
               planned_delivery_date: unixToDateInputValue(
                 order.planned_delivery_date
               ),
+              ...deliverySnapshotFormValues(order.delivery_snapshot),
               ...buildSalesOrderContactFormValues(order),
               items: openItems.map(normalizeSalesOrderItemFormValue),
             })
@@ -1025,9 +1041,7 @@ export default function V1SalesOrdersPage() {
       const openItems = selectOpenSourceDocumentItems(result.sales_order_items)
       salesOrderItemsPreview.invalidate(order)
       setOrders((current) =>
-        current.map((item) =>
-          item.id === savedOrder.id ? savedOrder : item
-        )
+        current.map((item) => (item.id === savedOrder.id ? savedOrder : item))
       )
       setSelectedOrder(savedOrder)
       setLineOrderContext({ order: savedOrder, items: openItems })
@@ -1065,12 +1079,13 @@ export default function V1SalesOrdersPage() {
     }
     const isCreatingOrder = !editingOrder?.id
     const customer = customers.find((item) => item.id === values.customer_id)
+    const customerSourceValues = buildSalesOrderCustomerSourceValues(customer)
     let params
     try {
       params = buildSalesOrderParams(
         {
           ...values,
-          ...buildSalesOrderCustomerSourceValues(customer),
+          customer_snapshot: customerSourceValues.customer_snapshot,
           contact_snapshot: buildOrderContactSnapshot(values),
         },
         editingOrder?.id
@@ -1448,6 +1463,13 @@ export default function V1SalesOrdersPage() {
       ].filter(Boolean),
     [canOpenRelatedPath]
   )
+  const relatedActionAvailability = resolveRelatedRecordActionAvailability({
+    authorized: relatedMenuItems.length > 0,
+    record: selectedOrder,
+    itemCount: relatedMenuItems.length,
+    busy: saving,
+    busyReason: '当前订单操作完成后可查看相关单据',
+  })
   const openRelatedTable = ({ key }) => {
     if (!selectedOrder) return
     const salesOrderID = selectedOrder.id
@@ -1598,7 +1620,9 @@ export default function V1SalesOrdersPage() {
             </ToolbarButton>
             {canUpdateOrder ? (
               <BusinessActionTooltip
-                disabled={!selectedOrderCanReorder || lineOrderLoading || saving}
+                disabled={
+                  !selectedOrderCanReorder || lineOrderLoading || saving
+                }
                 disabledReason={
                   !selectedOrder
                     ? '请先选择一条销售订单'
@@ -1651,19 +1675,15 @@ export default function V1SalesOrdersPage() {
               setSelectedOrder(null)
             }}
           />
-          {relatedMenuItems.length > 0 ? (
+          {relatedActionAvailability.visible ? (
             <BusinessActionTooltip
-              disabled={!selectedOrder || saving}
-              disabledReason={
-                saving
-                  ? '当前订单操作完成后可查看相关单据'
-                  : '请先选择一条销售订单'
-              }
+              disabled={relatedActionAvailability.disabled}
+              disabledReason={relatedActionAvailability.disabledReason}
             >
               <Dropdown
                 trigger={['click']}
                 destroyOnHidden
-                disabled={!selectedOrder || saving}
+                disabled={relatedActionAvailability.disabled}
                 menu={{
                   items: relatedMenuItems,
                   onClick: openRelatedTable,
@@ -1673,7 +1693,7 @@ export default function V1SalesOrdersPage() {
                   data-business-action-key="related-records"
                   size="small"
                   icon={<LinkOutlined />}
-                  disabled={!selectedOrder || saving}
+                  disabled={relatedActionAvailability.disabled}
                 >
                   相关单据 <DownOutlined />
                 </Button>
@@ -1784,7 +1804,7 @@ export default function V1SalesOrdersPage() {
         columns={orderColumns}
         dataSource={orders}
         expandable={salesOrderItemsPreview.expandable}
-        scroll={{ x: 1560 }}
+        scroll={{ x: 2600 }}
         pagination={createBusinessTablePagination({
           pagination,
           total,

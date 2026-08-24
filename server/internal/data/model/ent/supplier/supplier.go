@@ -28,6 +28,12 @@ const (
 	FieldTaxNo = "tax_no"
 	// FieldDefaultPaymentTermDays holds the string denoting the default_payment_term_days field in the database.
 	FieldDefaultPaymentTermDays = "default_payment_term_days"
+	// FieldDefaultPaymentMethod holds the string denoting the default_payment_method field in the database.
+	FieldDefaultPaymentMethod = "default_payment_method"
+	// FieldDefaultInvoiceRequired holds the string denoting the default_invoice_required field in the database.
+	FieldDefaultInvoiceRequired = "default_invoice_required"
+	// FieldDefaultInvoiceCategory holds the string denoting the default_invoice_category field in the database.
+	FieldDefaultInvoiceCategory = "default_invoice_category"
 	// FieldIsActive holds the string denoting the is_active field in the database.
 	FieldIsActive = "is_active"
 	// FieldNote holds the string denoting the note field in the database.
@@ -84,6 +90,9 @@ var Columns = []string{
 	FieldAddress,
 	FieldTaxNo,
 	FieldDefaultPaymentTermDays,
+	FieldDefaultPaymentMethod,
+	FieldDefaultInvoiceRequired,
+	FieldDefaultInvoiceCategory,
 	FieldIsActive,
 	FieldNote,
 	FieldCreatedAt,
@@ -123,6 +132,10 @@ var (
 	DefaultDefaultPaymentTermDays int
 	// DefaultPaymentTermDaysValidator is a validator for the "default_payment_term_days" field. It is called by the builders before save.
 	DefaultPaymentTermDaysValidator func(int) error
+	// DefaultPaymentMethodValidator is a validator for the "default_payment_method" field. It is called by the builders before save.
+	DefaultPaymentMethodValidator func(string) error
+	// DefaultInvoiceCategoryValidator is a validator for the "default_invoice_category" field. It is called by the builders before save.
+	DefaultInvoiceCategoryValidator func(string) error
 	// DefaultIsActive holds the default value on creation for the "is_active" field.
 	DefaultIsActive bool
 	// NoteValidator is a validator for the "note" field. It is called by the builders before save.
@@ -176,6 +189,21 @@ func ByTaxNo(opts ...sql.OrderTermOption) OrderOption {
 // ByDefaultPaymentTermDays orders the results by the default_payment_term_days field.
 func ByDefaultPaymentTermDays(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldDefaultPaymentTermDays, opts...).ToFunc()
+}
+
+// ByDefaultPaymentMethod orders the results by the default_payment_method field.
+func ByDefaultPaymentMethod(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDefaultPaymentMethod, opts...).ToFunc()
+}
+
+// ByDefaultInvoiceRequired orders the results by the default_invoice_required field.
+func ByDefaultInvoiceRequired(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDefaultInvoiceRequired, opts...).ToFunc()
+}
+
+// ByDefaultInvoiceCategory orders the results by the default_invoice_category field.
+func ByDefaultInvoiceCategory(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDefaultInvoiceCategory, opts...).ToFunc()
 }
 
 // ByIsActive orders the results by the is_active field.
