@@ -75,6 +75,7 @@ import {
   buildProcessDefinitionSelectOptions,
   buildStateDefinitionSelectOptions,
 } from './devFlowDefinitionSelectOptions.mjs'
+import { buildDevFlowRuntimeResponsibility } from './devFlowRuntimeResponsibility.mjs'
 import {
   DEV_FLOW_STATE_TRANSITION_FILTERS,
   buildDevFlowStateNodeSummary,
@@ -2391,6 +2392,85 @@ function ProcessDefinitionCard({ definition }) {
   )
 }
 
+function RuntimeResponsibilityEvidence({ model }) {
+  const definitionCopy = model.matchedDefinitions.length
+    ? `${model.processKey} · ${model.processVersion} · ${model.matchedDefinitions.length} 个匹配 variant`
+    : '未找到与运行实例节点相符的版本化定义'
+  const staticPoolCopy = model.currentItems.length
+    ? model.currentItems
+        .map((item) => {
+          const roles = item.staticOwnerPoolKeys.map(getProcessOwnerPoolLabel)
+          return `${item.nodeLabel}：${roles.length ? roles.join('、') : '静态定义未声明人工责任池'}`
+        })
+        .join('；')
+    : '当前没有运行中节点'
+  const runtimeResponsibilityCopy = model.currentItems.length
+    ? model.currentItems
+        .map(
+          (item) =>
+            `${item.nodeLabel}：${
+              item.runtimeRoleKey
+                ? getProcessOwnerPoolLabel(item.runtimeRoleKey)
+                : '运行实例未返回责任岗位'
+            }`
+        )
+        .join('；')
+    : '当前没有运行中节点'
+  const alignmentWarning =
+    model.definitionAlignment === 'different' ||
+    model.taskAlignment === 'different'
+  const alignmentCopy = alignmentWarning
+    ? '静态责任池、运行实例责任或当前任务岗位存在差异，请回到正式流程配置与任务记录核对。'
+    : model.definitionAlignment === 'aligned' &&
+        model.taskAlignment === 'aligned'
+      ? '静态责任池、运行实例当前责任与当前任务岗位一致。'
+      : '只展示已读到的责任来源；缺失部分保持未确认，不从任务名称或流程名称猜测。'
+
+  return (
+    <section
+      className="erp-dev-flow-responsibility"
+      aria-label="流程责任来源核对"
+    >
+      <div className="erp-dev-flow-section-heading">
+        <div>
+          <Text strong>责任来源核对</Text>
+          <Text type="secondary">
+            版本化静态定义、运行实例当前责任和当前任务岗位分开显示。
+          </Text>
+        </div>
+      </div>
+      <dl>
+        <div>
+          <dt>版本化静态定义</dt>
+          <dd>{definitionCopy}</dd>
+        </div>
+        <div>
+          <dt>当前节点定义责任池</dt>
+          <dd>{staticPoolCopy}</dd>
+        </div>
+        <div>
+          <dt>运行实例当前责任</dt>
+          <dd>{runtimeResponsibilityCopy}</dd>
+        </div>
+        <div>
+          <dt>当前任务岗位</dt>
+          <dd>
+            {model.taskRoleKey
+              ? getProcessOwnerPoolLabel(model.taskRoleKey)
+              : '任务未返回负责岗位'}
+          </dd>
+        </div>
+      </dl>
+      <Alert
+        showIcon
+        type={alignmentWarning ? 'warning' : 'info'}
+        message={alignmentCopy}
+        description="责任核对只说明流程与任务由谁承接，不推断具体处理人，也不证明 Source Document 或 Fact / Ledger 已生效。"
+      />
+    </section>
+  )
+}
+
 function RuntimeUnlinkedTaskBoundary({ task, taskId }) {
   const displayOnly = isDisplayOnlyWorkflowTask(task)
   const status = task ? getWorkflowTaskStatusMeta(task) : null
@@ -2491,6 +2571,15 @@ function RuntimeView({
   const association = getDevFlowStateTaskRuntimeAssociation(selectedTask)
   const runtime = useRuntimeContext(taskId, association)
   const nodes = asArray(runtime.context?.nodes)
+  const runtimeResponsibility = useMemo(
+    () =>
+      buildDevFlowRuntimeResponsibility({
+        definitions: catalog.processDefinitions,
+        context: runtime.context,
+        task: selectedTask,
+      }),
+    [catalog.processDefinitions, runtime.context, selectedTask]
+  )
   return (
     <div className="erp-dev-flow-view-stack">
       <GuidanceDisclosure
@@ -2643,6 +2732,7 @@ function RuntimeView({
             message="尚未证明业务事实已落账"
             description="下面的 completed 只属于 ProcessRuntime 节点；不会把 Workflow 或 Fact / Ledger 节点一并标成完成。"
           />
+          <RuntimeResponsibilityEvidence model={runtimeResponsibility} />
           <ol className="erp-dev-flow-runtime-nodes">
             {nodes.map((node) => (
               <li

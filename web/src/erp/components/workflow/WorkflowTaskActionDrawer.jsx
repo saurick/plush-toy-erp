@@ -153,7 +153,7 @@ const TASK_DRAWER_STEPS = Object.freeze([
   },
   {
     key: 'confirm',
-    title: '确认与提交',
+    title: '确认与结果',
   },
 ])
 
@@ -200,6 +200,7 @@ function getTaskActionTone(actionMode = '') {
 
 export default function WorkflowTaskActionDrawer({
   task,
+  actionReceipt = null,
   actionMode = '',
   actionReason = '',
   actionSaving = false,
@@ -218,6 +219,7 @@ export default function WorkflowTaskActionDrawer({
   onOpenEntry,
   onSubmit,
 }) {
+  const hasActionReceipt = Boolean(actionReceipt && task)
   const actionMeta = getWorkflowTaskActionMeta(task, actionMode)
   const approvalTask = isWorkflowApprovalTask(task)
   const statusMeta = task ? getWorkflowTaskStatusMeta(task) : null
@@ -316,13 +318,20 @@ export default function WorkflowTaskActionDrawer({
       allowedActionModes,
       requireReason: Boolean(actionMeta?.requireReason),
     })
-  const stepAvailability = React.useMemo(
+  const actionStepAvailability = React.useMemo(
     () =>
       getWorkflowTaskActionStepAvailability({
         canChooseActions,
         canConfirm,
       }),
     [canChooseActions, canConfirm]
+  )
+  const stepAvailability = React.useMemo(
+    () =>
+      hasActionReceipt
+        ? { context: false, action: false, confirm: true }
+        : actionStepAvailability,
+    [actionStepAvailability, hasActionReceipt]
   )
   React.useEffect(() => {
     if (taskIdentity === previousTaskIdentityRef.current) return
@@ -338,6 +347,10 @@ export default function WorkflowTaskActionDrawer({
       setActiveStepKey('context')
     }
   }, [task])
+
+  React.useEffect(() => {
+    if (hasActionReceipt) setActiveStepKey('confirm')
+  }, [hasActionReceipt, taskIdentity, task?.version])
 
   React.useEffect(() => {
     if (!task?.id) {
@@ -514,7 +527,8 @@ export default function WorkflowTaskActionDrawer({
 
   const showFooter = Boolean(
     task &&
-      (activeStepKey !== 'context' ||
+      (hasActionReceipt ||
+        activeStepKey !== 'context' ||
         canOpenRelatedEntry ||
         canViewAttachments ||
         canChooseActions)
@@ -524,7 +538,11 @@ export default function WorkflowTaskActionDrawer({
     <Drawer
       title={
         <strong className="erp-task-action-drawer__title">
-          {approvalTask ? '审批详情' : '任务详情'}
+          {hasActionReceipt
+            ? '办理结果'
+            : approvalTask
+              ? '审批详情'
+              : '任务详情'}
         </strong>
       }
       width="min(640px, calc(100vw - 24px))"
@@ -544,7 +562,7 @@ export default function WorkflowTaskActionDrawer({
         showFooter ? (
           <div className="erp-task-action-drawer__footer">
             <div className="erp-task-action-drawer__footer-nav">
-              {activeStepKey !== 'context' ? (
+              {!hasActionReceipt && activeStepKey !== 'context' ? (
                 <Button
                   disabled={actionSaving}
                   onClick={() =>
@@ -591,7 +609,11 @@ export default function WorkflowTaskActionDrawer({
               ) : null}
             </div>
             <div className="erp-task-action-drawer__footer-primary">
-              {activeStepKey === 'context' && canChooseActions ? (
+              {hasActionReceipt ? (
+                <Button type="primary" onClick={() => onClose?.()}>
+                  完成并关闭
+                </Button>
+              ) : activeStepKey === 'context' && canChooseActions ? (
                 <Button
                   type="primary"
                   disabled={actionSaving}
@@ -600,7 +622,7 @@ export default function WorkflowTaskActionDrawer({
                   选择处理方式
                 </Button>
               ) : null}
-              {activeStepKey === 'action' ? (
+              {!hasActionReceipt && activeStepKey === 'action' ? (
                 <Button
                   type="primary"
                   disabled={actionSaving || !canConfirm}
@@ -619,7 +641,7 @@ export default function WorkflowTaskActionDrawer({
                   核对并确认
                 </Button>
               ) : null}
-              {activeStepKey === 'confirm' ? (
+              {!hasActionReceipt && activeStepKey === 'confirm' ? (
                 <Button
                   type="primary"
                   danger={actionMode === 'block' || actionMode === 'reject'}
@@ -648,14 +670,16 @@ export default function WorkflowTaskActionDrawer({
                 <strong>{taskSourceLabel}</strong>
               </div>
               <div>
-                <span>负责人</span>
+                <span>{hasActionReceipt ? '本次责任岗位' : '负责人'}</span>
                 <strong className="erp-task-action-drawer__responsibility">
                   {ownerRoleLabel ? (
                     <span className="erp-task-action-drawer__responsibility-role">
                       {ownerRoleLabel}
                     </span>
                   ) : null}
-                  {ownerRoleLabel && currentAssigneeLabel ? (
+                  {!hasActionReceipt &&
+                  ownerRoleLabel &&
+                  currentAssigneeLabel ? (
                     <span
                       className="erp-task-action-drawer__responsibility-separator"
                       aria-hidden="true"
@@ -663,12 +687,15 @@ export default function WorkflowTaskActionDrawer({
                       ·
                     </span>
                   ) : null}
-                  {currentAssigneeLabel ? (
+                  {!hasActionReceipt && currentAssigneeLabel ? (
                     <span className="erp-task-action-drawer__responsibility-person">
                       {currentAssigneeLabel}
                     </span>
                   ) : null}
-                  {!ownerRoleLabel && !currentAssigneeLabel ? '-' : null}
+                  {!ownerRoleLabel &&
+                  (!currentAssigneeLabel || hasActionReceipt)
+                    ? '-'
+                    : null}
                 </strong>
               </div>
               <div>
@@ -704,7 +731,7 @@ export default function WorkflowTaskActionDrawer({
             ) : null}
           </section>
 
-          {task.process_instance_id ? (
+          {!hasActionReceipt && task.process_instance_id ? (
             <section
               className="erp-task-action-drawer__summary"
               aria-labelledby="erp-task-action-process-title"
@@ -777,7 +804,8 @@ export default function WorkflowTaskActionDrawer({
               {TASK_DRAWER_STEPS.map((step, index) => {
                 const active = step.key === activeStepKey
                 const available = stepAvailability[step.key]
-                const interactive = available && !actionSaving
+                const interactive =
+                  available && !actionSaving && !hasActionReceipt
                 return (
                   <button
                     type="button"
@@ -1078,7 +1106,86 @@ export default function WorkflowTaskActionDrawer({
             hidden={activeStepKey !== 'confirm'}
             className="erp-task-action-drawer__step-panel"
           >
-            {actionMeta ? (
+            {hasActionReceipt ? (
+              <div
+                className="erp-task-action-drawer__confirm-panel"
+                data-testid="workflow-task-action-receipt"
+              >
+                <div
+                  className="erp-task-action-drawer__confirm-copy"
+                  role="status"
+                >
+                  <CheckCircleOutlined aria-hidden="true" />
+                  <span>
+                    <strong>办理结果已确认</strong>
+                    <br />
+                    {actionReceipt.successMessage ||
+                      '本次办理结果已由系统确认。'}
+                  </span>
+                </div>
+                <dl className="erp-task-action-drawer__confirm-list">
+                  <div>
+                    <dt>当前任务</dt>
+                    <dd>{taskDisplayName}</dd>
+                  </div>
+                  <div>
+                    <dt>已确认方式</dt>
+                    <dd>
+                      {actionReceipt.actionTitle ||
+                        actionMeta?.title ||
+                        '任务办理'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>确认状态</dt>
+                    <dd>{statusMeta?.label || '已确认'}</dd>
+                  </div>
+                  {String(actionReceipt.reason || '').trim() ? (
+                    <div>
+                      <dt>处理说明</dt>
+                      <dd>{String(actionReceipt.reason).trim()}</dd>
+                    </div>
+                  ) : null}
+                </dl>
+                <div
+                  className="erp-task-action-drawer__outcome-note"
+                  data-tone="info"
+                >
+                  <strong>流程交接结果</strong>
+                  {task.process_instance_id ? (
+                    processContextState === 'loading' ? (
+                      <Text type="secondary" role="status">
+                        正在读取流程交接结果
+                      </Text>
+                    ) : processContextState === 'error' ? (
+                      <>
+                        <Text type="danger" role="alert">
+                          暂时无法读取流程交接结果
+                        </Text>
+                        <Button
+                          size="small"
+                          onClick={() =>
+                            setProcessContextReloadKey(
+                              (current) => current + 1
+                            )
+                          }
+                        >
+                          重新读取
+                        </Button>
+                      </>
+                    ) : processContext ? (
+                      <WorkflowProcessStageTrack context={processContext} />
+                    ) : null
+                  ) : (
+                    <span>
+                      {isTerminal
+                        ? '本任务已结束，没有关联的后续业务流程。'
+                        : '本次操作不触发流程流转，任务仍由当前负责岗位继续办理。'}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ) : actionMeta ? (
               <div className="erp-task-action-drawer__confirm-panel">
                 <div className="erp-task-action-drawer__confirm-head">
                   <span>即将提交</span>

@@ -60,10 +60,15 @@ test('task actions are selectable options and confirmation is separately gated',
   assert.match(source, /<strong>提交后会发生什么<\/strong>/u)
   assert.match(source, /<span>\{actionOutcomeHint\}<\/span>/u)
   assert.match(source, /className="erp-task-action-drawer__outcome-note"/u)
-  const outcomeNoteStart = source.indexOf(
-    'className="erp-task-action-drawer__outcome-note"'
+  const outcomeCopyIndex = source.indexOf(
+    '<strong>提交后会发生什么</strong>'
   )
-  const outcomeNoteEnd = source.indexOf('</div>', outcomeNoteStart)
+  const outcomeNoteStart = source.lastIndexOf(
+    'className="erp-task-action-drawer__outcome-note"',
+    outcomeCopyIndex
+  )
+  const outcomeNoteEnd = source.indexOf('</div>', outcomeCopyIndex)
+  assert.ok(outcomeCopyIndex >= 0)
   assert.ok(outcomeNoteStart >= 0)
   assert.ok(outcomeNoteEnd > outcomeNoteStart)
   assert.doesNotMatch(
@@ -73,6 +78,30 @@ test('task actions are selectable options and confirmation is separately gated',
   assert.doesNotMatch(
     source,
     /onClick=\{\(\) => selectAction\('urge',[\s\S]{0,80}下一步/u
+  )
+})
+
+test('task action drawer keeps confirmed mutations on step three and renders an authoritative handoff receipt', () => {
+  assert.match(source, /title: '确认与结果'/u)
+  assert.match(source, /actionReceipt = null/u)
+  assert.match(source, /hasActionReceipt/u)
+  assert.match(source, /setActiveStepKey\('confirm'\)/u)
+  assert.match(source, /workflow-task-action-receipt/u)
+  assert.match(source, /办理结果已确认/u)
+  assert.match(source, /hasActionReceipt \? '本次责任岗位' : '负责人'/u)
+  assert.match(source, /!hasActionReceipt && currentAssigneeLabel \? \(/u)
+  assert.match(source, /<strong>流程交接结果<\/strong>/u)
+  assert.match(source, /正在读取流程交接结果/u)
+  assert.match(source, /WorkflowProcessStageTrack context=\{processContext\}/u)
+  assert.match(source, /本任务已结束，没有关联的后续业务流程/u)
+  assert.match(source, /本次操作不触发流程流转/u)
+  assert.match(source, />\s*完成并关闭\s*<\/Button>/u)
+  assert.doesNotMatch(
+    source.slice(
+      source.indexOf('data-testid="workflow-task-action-receipt"'),
+      source.indexOf(') : actionMeta ? (')
+    ),
+    /assignee|处理人/u
   )
 })
 
@@ -128,7 +157,10 @@ test('task action drawer separates business trajectory from current-task process
   assert.match(source, /approvalTask=\{approvalTask\}/u)
   assert.match(source, /activeStepKey === 'context'/u)
   assert.match(source, /getWorkflowTaskActionMeta\(task, actionMode\)/u)
-  assert.match(source, /approvalTask \? '审批详情' : '任务详情'/u)
+  assert.match(source, /hasActionReceipt/u)
+  assert.match(source, /\? '办理结果'/u)
+  assert.match(source, /\? '审批详情'/u)
+  assert.match(source, /: '任务详情'/u)
   assert.match(source, /showResponsibility=\{false\}/u)
 })
 
@@ -160,7 +192,7 @@ test('task action drawer keeps one compact business-facing task summary', () => 
   )
   assert.match(source, /erp-task-action-drawer__task-meta/u)
   assert.match(source, /<span>来源单据<\/span>/u)
-  assert.match(source, /<span>负责人<\/span>/u)
+  assert.match(source, /hasActionReceipt \? '本次责任岗位' : '负责人'/u)
   assert.match(source, /<span>截止时间<\/span>/u)
   assert.doesNotMatch(source, /getWorkflowTaskCodeLabel/u)
   assert.doesNotMatch(source, /erp-task-action-drawer__eyebrow">当前任务/u)
@@ -185,7 +217,7 @@ test('task action drawer keeps one compact business-facing task summary', () => 
     '<section className="erp-task-action-drawer__summary erp-task-action-drawer__summary--task">'
   )
   const taskSummaryEnd = source.indexOf(
-    '{task.process_instance_id ? (',
+    '{!hasActionReceipt && task.process_instance_id ? (',
     taskSummaryStart
   )
   const taskSummarySource = source.slice(taskSummaryStart, taskSummaryEnd)

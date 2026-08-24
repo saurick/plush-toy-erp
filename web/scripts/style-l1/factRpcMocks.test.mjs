@@ -1595,6 +1595,7 @@ test('style-l1 workflow assignment mock keeps operator authority separate from e
     [903],
     '超级管理员本身没有仓库岗位时不能自动成为接收人'
   )
+  assert.equal(options.result.data.assignment.candidates[0].display_name, '')
 
   const params = {
     task_id: 875,
@@ -1619,6 +1620,10 @@ test('style-l1 workflow assignment mock keeps operator authority separate from e
   })
   assert.equal(assignedOptions.result.data.assignment.can_return_to_pool, true)
   assert.deepEqual(assignedOptions.result.data.assignment.candidates, [])
+  assert.equal(
+    assignedOptions.result.data.assignment.current_assignee.display_name,
+    ''
+  )
 
   const released = await call('reassign_task', {
     task_id: 875,
@@ -2260,6 +2265,12 @@ test('style-l1 workflow process context mock returns only visible task runtime t
         attempt: 1,
         status: 'active',
         outcome: '',
+      },
+    ],
+    current_responsibilities: [
+      {
+        node_instance_id: 831,
+        owner_role_key: 'sales',
       },
     ],
     completed_nodes: [],

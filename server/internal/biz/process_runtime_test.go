@@ -337,9 +337,9 @@ func TestProcessRuntimeUsecaseGetProcessTaskContextUsesRuntimeTruth(t *testing.T
 	processRepo := &memProcessRuntimeRepo{
 		process: &ProcessInstance{ID: processID, BusinessRefType: "sales_order", BusinessRefID: 1001, BusinessRefNo: &sourceNo, Status: ProcessStatusActive},
 		nodes: []*ProcessNodeInstance{
-			{ID: 40, ProcessInstanceID: processID, NodeKey: "submit_sales_order", Status: ProcessNodeStatusCompleted},
-			{ID: nodeID, ProcessInstanceID: processID, NodeKey: "order_approval", Status: ProcessNodeStatusActive},
-			{ID: 43, ProcessInstanceID: processID, NodeKey: "end", Status: ProcessNodeStatusWaiting},
+			{ID: 40, ProcessInstanceID: processID, NodeKey: "submit_sales_order", NodeType: ProcessNodeTypeDomainCommand, Attempt: 1, Status: ProcessNodeStatusCompleted},
+			{ID: nodeID, ProcessInstanceID: processID, NodeKey: "order_approval", NodeType: ProcessNodeTypeApproval, Attempt: 1, Status: ProcessNodeStatusActive},
+			{ID: 43, ProcessInstanceID: processID, NodeKey: "end", NodeType: ProcessNodeTypeEnd, Attempt: 1, Status: ProcessNodeStatusWaiting},
 		},
 	}
 	uc := NewProcessRuntimeUsecase(processRepo, nil)
@@ -350,6 +350,93 @@ func TestProcessRuntimeUsecaseGetProcessTaskContextUsesRuntimeTruth(t *testing.T
 	}
 	if processContext.Task != task || processContext.Instance.ID != processID || len(processContext.CurrentNodes) != 1 || processContext.CurrentNodes[0].ID != nodeID || len(processContext.CompletedNodes) != 1 {
 		t.Fatalf("unexpected process task context: %#v", processContext)
+	}
+	if len(processContext.CurrentResponsibilities) != 1 ||
+		processContext.CurrentResponsibilities[0].NodeInstanceID != nodeID ||
+		processContext.CurrentResponsibilities[0].OwnerRoleKey != BossRoleKey {
+		t.Fatalf("unexpected current responsibilities: %#v", processContext.CurrentResponsibilities)
+	}
+}
+
+func TestProcessRuntimeUsecaseGetProcessTaskContextReadsNextRoleFromActualWorkflowTask(t *testing.T) {
+	processID := 51
+	linkedNodeID := 52
+	nextNodeID := 53
+	sourceNo := "SO-TRIAL-002"
+	task := &WorkflowTask{
+		ID:                    8,
+		SourceType:            "sales_order",
+		SourceID:              1002,
+		SourceNo:              &sourceNo,
+		ProcessInstanceID:     &processID,
+		ProcessNodeInstanceID: &linkedNodeID,
+		TaskStatusKey:         "done",
+		OwnerRoleKey:          BossRoleKey,
+	}
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{ID: processID, BusinessRefType: "sales_order", BusinessRefID: 1002, BusinessRefNo: &sourceNo, Status: ProcessStatusActive},
+		nodes: []*ProcessNodeInstance{
+			{ID: linkedNodeID, ProcessInstanceID: processID, NodeKey: "order_approval", NodeType: ProcessNodeTypeApproval, Attempt: 1, Status: ProcessNodeStatusCompleted},
+			{ID: nextNodeID, ProcessInstanceID: processID, NodeKey: "engineering_data", NodeType: ProcessNodeTypeHumanTask, Attempt: 1, Status: ProcessNodeStatusActive},
+		},
+	}
+	nextTaskCode := defaultProcessLinkedWorkflowTaskCode(processID, nextNodeID, 1)
+	workflowRepo := &retryWorkflowRepo{createdByCode: map[string]*WorkflowTask{nextTaskCode: {
+		ID:                    9,
+		TaskCode:              nextTaskCode,
+		SourceType:            "sales_order",
+		SourceID:              1002,
+		TaskStatusKey:         "ready",
+		OwnerRoleKey:          EngineeringRoleKey,
+		ProcessInstanceID:     &processID,
+		ProcessNodeInstanceID: &nextNodeID,
+	}}}
+	uc := NewProcessRuntimeUsecase(processRepo, workflowRepo)
+
+	processContext, err := uc.GetProcessTaskContext(context.Background(), task)
+	if err != nil {
+		t.Fatalf("GetProcessTaskContext err = %v", err)
+	}
+	if len(processContext.CurrentResponsibilities) != 1 ||
+		processContext.CurrentResponsibilities[0].NodeInstanceID != nextNodeID ||
+		processContext.CurrentResponsibilities[0].OwnerRoleKey != EngineeringRoleKey {
+		t.Fatalf("unexpected next responsibility: %#v", processContext.CurrentResponsibilities)
+	}
+	if processContext.CurrentResponsibilities[0].OwnerRoleKey == BossRoleKey {
+		t.Fatal("next responsibility must not be copied from the completed task")
+	}
+}
+
+func TestProcessRuntimeUsecaseGetProcessTaskContextDoesNotGuessMissingNextRole(t *testing.T) {
+	processID := 61
+	linkedNodeID := 62
+	nextNodeID := 63
+	ownerPoolKey := "engineering_data"
+	requiredCapabilityKey := "engineering.data.prepare"
+	task := &WorkflowTask{
+		ID:                    10,
+		SourceType:            "sales_order",
+		SourceID:              1003,
+		ProcessInstanceID:     &processID,
+		ProcessNodeInstanceID: &linkedNodeID,
+		TaskStatusKey:         "done",
+		OwnerRoleKey:          BossRoleKey,
+	}
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{ID: processID, BusinessRefType: "sales_order", BusinessRefID: 1003, Status: ProcessStatusActive},
+		nodes: []*ProcessNodeInstance{
+			{ID: linkedNodeID, ProcessInstanceID: processID, NodeKey: "order_approval", NodeType: ProcessNodeTypeApproval, Attempt: 1, Status: ProcessNodeStatusCompleted},
+			{ID: nextNodeID, ProcessInstanceID: processID, NodeKey: "engineering_data", NodeType: ProcessNodeTypeHumanTask, Attempt: 1, Status: ProcessNodeStatusActive, OwnerPoolKey: &ownerPoolKey, RequiredCapabilityKey: &requiredCapabilityKey},
+		},
+	}
+	uc := NewProcessRuntimeUsecase(processRepo, &stubWorkflowRepo{})
+
+	processContext, err := uc.GetProcessTaskContext(context.Background(), task)
+	if err != nil {
+		t.Fatalf("GetProcessTaskContext err = %v", err)
+	}
+	if len(processContext.CurrentResponsibilities) != 0 {
+		t.Fatalf("missing linked task must not fall back to owner pool: %#v", processContext.CurrentResponsibilities)
 	}
 }
 

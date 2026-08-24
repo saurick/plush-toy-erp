@@ -169,6 +169,7 @@ export function CollaborationTaskPanel({
   const [actionDrawerTask, setActionDrawerTask] = React.useState(null)
   const [actionDrawerMode, setActionDrawerMode] = React.useState('')
   const [actionDrawerReason, setActionDrawerReason] = React.useState('')
+  const [actionDrawerReceipt, setActionDrawerReceipt] = React.useState(null)
   const [actionDrawerSaving, setActionDrawerSaving] = React.useState(false)
   const tabIDPrefix = React.useId().replace(/:/g, '')
   const statusLabels = taskStatusLabels || DEFAULT_TASK_STATUS_LABELS
@@ -314,14 +315,16 @@ export function CollaborationTaskPanel({
     setActionDrawerReason(
       mode === 'block' ? getBusinessCollaborationTaskReason(task) : ''
     )
+    setActionDrawerReceipt(null)
   }, [])
   const closeActionDrawer = React.useCallback(() => {
     setActionDrawerTask(null)
     setActionDrawerMode('')
     setActionDrawerReason('')
+    setActionDrawerReceipt(null)
   }, [])
   React.useEffect(() => {
-    if (!actionDrawerTask) return
+    if (!actionDrawerTask || actionDrawerSaving || actionDrawerReceipt) return
 
     const latestActionTask = resolveBusinessCollaborationActionTask({
       actionTask: actionDrawerTask,
@@ -334,7 +337,13 @@ export function CollaborationTaskPanel({
     if (latestActionTask !== actionDrawerTask) {
       setActionDrawerTask(latestActionTask)
     }
-  }, [actionDrawerTask, closeActionDrawer, tasks])
+  }, [
+    actionDrawerReceipt,
+    actionDrawerSaving,
+    actionDrawerTask,
+    closeActionDrawer,
+    tasks,
+  ])
   const submitActionDrawer = React.useCallback(async () => {
     if (!actionDrawerTask || !actionDrawerMode) return
     const actionMeta = getWorkflowTaskActionMeta(
@@ -375,11 +384,26 @@ export function CollaborationTaskPanel({
 
     setActionDrawerSaving(true)
     try {
-      const succeeded = await actionHandler(actionDrawerTask, {
+      const confirmedTask = await actionHandler(actionDrawerTask, {
         actionMode: actionDrawerMode,
         reason,
       })
-      if (succeeded !== false) closeActionDrawer()
+      if (confirmedTask === false) return
+      if (
+        confirmedTask &&
+        typeof confirmedTask === 'object' &&
+        Number(confirmedTask.id) === Number(actionDrawerTask.id)
+      ) {
+        setActionDrawerTask(confirmedTask)
+        setActionDrawerReceipt({
+          actionMode: actionDrawerMode,
+          actionTitle: actionMeta.title,
+          reason,
+          successMessage: actionMeta.successMessage,
+        })
+      } else {
+        closeActionDrawer()
+      }
     } catch (error) {
       if (isWorkflowTaskMutationResultUnknown(error)) {
         message.warning('提交结果暂未确认，已保留本次操作，可直接重试')
@@ -614,6 +638,7 @@ export function CollaborationTaskPanel({
       </Card>
       <WorkflowTaskActionDrawer
         task={actionDrawerTask}
+        actionReceipt={actionDrawerReceipt}
         actionMode={actionDrawerMode}
         actionReason={actionDrawerReason}
         actionSaving={actionDrawerSaving}

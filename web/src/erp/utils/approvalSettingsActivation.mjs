@@ -1,3 +1,9 @@
+const APPROVAL_SETTINGS_BLOCKER_LABELS = Object.freeze({
+  approval_settings_not_published: '尚未发布审批责任',
+  approval_disabled: '该审批事项已停用',
+  no_eligible_approver: '没有符合岗位、账号和责任设置的办理人',
+})
+
 function normalizedItems(items = []) {
   return (Array.isArray(items) ? items : [])
     .filter((item) => item?.configurable !== false)
@@ -21,6 +27,13 @@ function normalizedItems(items = []) {
       }
     })
     .sort((left, right) => left.approval_key.localeCompare(right.approval_key))
+}
+
+export function getApprovalSettingsBlockerLabel(code) {
+  return (
+    APPROVAL_SETTINGS_BLOCKER_LABELS[String(code || '').trim()] ||
+    '当前设置不能启用'
+  )
 }
 
 function invalidReadback(message) {

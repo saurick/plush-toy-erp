@@ -270,3 +270,52 @@ test('desktop task board preserves the drawer decision and refuses to invent app
   assert.match(source, /审批表单与当前流程节点不一致/u)
   assert.doesNotMatch(source, /process_decision:/u)
 })
+
+test('desktop task board preserves the canonical mutation result as the shared drawer receipt', () => {
+  assert.match(
+    source,
+    /const \[actionReceipt, setActionReceipt\] = useState\(null\)/u
+  )
+  assert.match(
+    source,
+    /const confirmedTask = await mutationAttemptsRef\.current\.run/u
+  )
+  assert.match(source, /setSelectedTask\(confirmedTask\)/u)
+  assert.match(source, /setActionReceipt\(\{/u)
+  assert.match(source, /successMessage: actionMetaSnapshot\.successMessage/u)
+  assert.match(source, /actionReceipt=\{actionReceipt\}/u)
+  const confirmedMutationStart = source.indexOf(
+    'const confirmedTask = await mutationAttemptsRef.current.run'
+  )
+  const successMessageIndex = source.indexOf(
+    'message.success(actionMetaSnapshot.successMessage)',
+    confirmedMutationStart
+  )
+  assert.ok(confirmedMutationStart >= 0)
+  assert.ok(successMessageIndex > confirmedMutationStart)
+  assert.doesNotMatch(
+    source,
+    /closeSubmittedTaskDrawer\(\)\s*message\.success\(actionMetaSnapshot\.successMessage\)/u
+  )
+})
+
+test('embedded collaboration drawers preserve the canonical task while the result receipt is open', () => {
+  assert.match(collaborationPanelSource, /actionDrawerReceipt/u)
+  assert.match(
+    collaborationPanelSource,
+    /if \(!actionDrawerTask \|\| actionDrawerSaving \|\| actionDrawerReceipt\) return/u
+  )
+  assert.match(
+    collaborationPanelSource,
+    /const confirmedTask = await actionHandler/u
+  )
+  assert.match(
+    collaborationPanelSource,
+    /setActionDrawerTask\(confirmedTask\)/u
+  )
+  assert.match(collaborationPanelSource, /setActionDrawerReceipt\(\{/u)
+  assert.match(
+    collaborationPanelSource,
+    /actionReceipt=\{actionDrawerReceipt\}/u
+  )
+})

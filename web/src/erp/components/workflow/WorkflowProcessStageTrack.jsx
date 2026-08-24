@@ -26,6 +26,7 @@ export default function WorkflowProcessStageTrack({
         .filter(Boolean)
         .join(' ')}
       data-testid="workflow-process-stage"
+      data-handoff-kind={model.handoffKind}
     >
       <div className="workflow-process-stage__head">
         <div className="workflow-process-stage__title">

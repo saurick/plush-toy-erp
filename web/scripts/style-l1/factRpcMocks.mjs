@@ -2127,6 +2127,7 @@ export async function installFactRpcMocks(page, context) {
       .map((candidate) => ({
         admin_id: candidate.admin_id,
         username: String(candidate.username || '').trim(),
+        display_name: String(candidate.display_name || '').trim(),
         role_keys: [...candidate.role_keys],
         role_label:
           String(candidate.role_label || '').trim() ||
@@ -2839,6 +2840,7 @@ export async function installFactRpcMocks(page, context) {
                 ? {
                     admin_id: Number(task.assignee_id),
                     username: '当前处理人',
+                    display_name: '',
                   }
                 : null,
             assignment_boundary: 'only_assignee_changes',

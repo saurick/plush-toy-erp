@@ -139,6 +139,9 @@ function validProcessContext(overrides = {}) {
     nodes: [completedNode, currentNode],
     current_nodes: [currentNode],
     completed_nodes: [completedNode],
+    current_responsibilities: [
+      { node_instance_id: currentNode.id, owner_role_key: 'boss' },
+    ],
     ...overrides,
   }
 }

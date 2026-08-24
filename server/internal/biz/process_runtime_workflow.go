@@ -9,6 +9,10 @@ import (
 
 const ProcessLinkedWorkflowTaskReconcileMaxLimit = 100
 
+func defaultProcessLinkedWorkflowTaskCode(processInstanceID, processNodeInstanceID, attempt int) string {
+	return fmt.Sprintf("PROC-%d-NODE-%d-A%d", processInstanceID, processNodeInstanceID, attempt)
+}
+
 type ProcessLinkedWorkflowTaskSettlementCandidateRepo interface {
 	ListPendingLinkedWorkflowTaskSettlements(ctx context.Context, afterWorkflowTaskID int, limit int) ([]*WorkflowTask, error)
 }
@@ -247,7 +251,7 @@ func (uc *ProcessRuntimeUsecase) CreateLinkedWorkflowTask(ctx context.Context, i
 	}
 	taskCode := normalized.TaskCode
 	if taskCode == "" {
-		taskCode = fmt.Sprintf("PROC-%d-NODE-%d-A%d", instance.ID, node.ID, node.Attempt)
+		taskCode = defaultProcessLinkedWorkflowTaskCode(instance.ID, node.ID, node.Attempt)
 	}
 	taskGroup := normalized.TaskGroup
 	if taskGroup == "" {

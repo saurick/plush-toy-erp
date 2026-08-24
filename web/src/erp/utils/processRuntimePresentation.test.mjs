@@ -45,6 +45,9 @@ function context(overrides = {}) {
     nodes: [completed, current],
     current_nodes: [current],
     completed_nodes: [completed],
+    current_responsibilities: [
+      { node_instance_id: current.id, owner_role_key: 'boss' },
+    ],
     ...overrides,
   }
 }
@@ -235,7 +238,8 @@ test('process runtime presentation builds execution trail without inventing futu
   })
   assert.equal(model.items[1].linked, true)
   assert.equal(model.hasUndecidedRoute, true)
-  assert.equal(model.handoffLabel, '当前办理阶段：订单审批')
+  assert.equal(model.handoffLabel, '当前责任岗位：老板；当前办理：订单审批。')
+  assert.equal(model.handoffKind, 'role')
   assert.equal(
     model.summaryLabel,
     '已结束步骤 1 · 当前步骤 1 · 后续路径待流程决定'
@@ -262,10 +266,12 @@ test('process runtime presentation reports the confirmed stage reached after aut
   value.nodes = [value.nodes[0], approvalNode, systemNode]
   value.current_nodes = [systemNode]
   value.completed_nodes = [value.nodes[0], approvalNode]
+  value.current_responsibilities = []
   value.linked_node = approvalNode
 
   const model = buildWorkflowProcessStageModel(value)
-  assert.equal(model.handoffLabel, '系统已自动流转到：销售订单生效。')
+  assert.equal(model.handoffLabel, '系统正在自动处理：销售订单生效。')
+  assert.equal(model.handoffKind, 'system')
   assert.equal(model.hasUndecidedRoute, false)
   assert.deepEqual(
     model.items.map((item) => item.label),
@@ -284,7 +290,7 @@ test('process runtime presentation keeps blocked and retried stages explicit', (
   const model = buildWorkflowProcessStageModel(value)
   assert.equal(model.items[1].tone, 'blocked')
   assert.equal(model.items[1].attemptLabel, '第 2 次')
-  assert.equal(model.handoffLabel, '当前受阻阶段：订单审批')
+  assert.equal(model.handoffLabel, '当前责任岗位：老板；受阻阶段：订单审批。')
 })
 
 test('process runtime presentation preserves canonical attempt order and unique keys', () => {
@@ -303,6 +309,9 @@ test('process runtime presentation preserves canonical attempt order and unique 
   value.nodes = [secondAttempt, firstAttempt, value.nodes[0]]
   value.current_nodes = [secondAttempt]
   value.completed_nodes = [value.nodes[2], firstAttempt]
+  value.current_responsibilities = [
+    { node_instance_id: secondAttempt.id, owner_role_key: 'boss' },
+  ]
   value.linked_node = secondAttempt
 
   const model = buildWorkflowProcessStageModel(value)
@@ -337,6 +346,7 @@ test('completed rejected process does not present dormant branches as undecided 
   value.nodes = [value.nodes[0], rejectedNode, dormantBranch]
   value.current_nodes = []
   value.completed_nodes = [value.nodes[0], rejectedNode]
+  value.current_responsibilities = []
   value.linked_node = rejectedNode
 
   const model = buildWorkflowProcessStageModel(value)
@@ -344,7 +354,68 @@ test('completed rejected process does not present dormant branches as undecided 
   assert.equal(model.items[1].tone, 'rejected')
   assert.equal(model.items[1].statusLabel, '已退回')
   assert.equal(model.handoffLabel, '流程已退回结束。')
+  assert.equal(model.handoffKind, 'end')
   assert.equal(model.summaryLabel, '已结束步骤 2 · 当前步骤 0')
+})
+
+test('process runtime presentation reports the next role without exposing a person', () => {
+  const value = context()
+  const approvalNode = {
+    ...value.nodes[1],
+    status: 'completed',
+    outcome: 'approved',
+  }
+  const nextNode = {
+    id: 13,
+    process_instance_id: 10,
+    node_key: 'engineering_data',
+    node_type: 'human_task',
+    attempt: 1,
+    version: 1,
+    status: 'active',
+  }
+  value.nodes = [value.nodes[0], approvalNode, nextNode]
+  value.current_nodes = [nextNode]
+  value.completed_nodes = [value.nodes[0], approvalNode]
+  value.current_responsibilities = [
+    { node_instance_id: nextNode.id, owner_role_key: 'engineering' },
+  ]
+  value.linked_node = approvalNode
+
+  const model = buildWorkflowProcessStageModel(value)
+  assert.equal(model.handoffLabel, '下一责任岗位：工程；下一办理：工程资料。')
+  assert.equal(model.handoffKind, 'role')
+  assert.doesNotMatch(model.handoffLabel, /处理人|负责人姓名/u)
+})
+
+test('process runtime presentation keeps an unreconciled role explicit instead of guessing from the node', () => {
+  const value = context({ current_responsibilities: [] })
+  value.linked_node = {
+    ...value.nodes[0],
+    id: value.nodes[0].id,
+  }
+
+  const model = buildWorkflowProcessStageModel(value)
+  assert.equal(model.handoffLabel, '已流转至：订单审批；责任岗位正在确认。')
+  assert.equal(model.handoffKind, 'pending')
+})
+
+test('process runtime presentation rejects responsibility fields that identify a person', () => {
+  assert.throws(
+    () =>
+      requireWorkflowProcessContext(
+        context({
+          current_responsibilities: [
+            {
+              node_instance_id: 12,
+              owner_role_key: 'boss',
+              assignee_id: 7,
+            },
+          ],
+        })
+      ),
+    /业务轨迹暂时无法确认/u
+  )
 })
 
 test('process runtime presentation fails closed on foreign or invalid nodes', () => {

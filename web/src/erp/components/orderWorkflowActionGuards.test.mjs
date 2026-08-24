@@ -94,6 +94,7 @@ test('purchase and outsourcing hooks synchronously block another action for the 
       let completeCalls = 0
       let blockCalls = 0
       let completeParams
+      const updatedTask = { id: 42, task_status_key: 'done', version: 8 }
       const hook = loadOrderWorkflowHook({
         ...config,
         verifyWorkflowTaskActionAccessBeforeSubmit: async () => {
@@ -103,6 +104,7 @@ test('purchase and outsourcing hooks synchronously block another action for the 
         completeWorkflowTaskAction: async (params) => {
           completeCalls += 1
           completeParams = params
+          return updatedTask
         },
         blockWorkflowTaskAction: async () => {
           blockCalls += 1
@@ -122,7 +124,7 @@ test('purchase and outsourcing hooks synchronously block another action for the 
       assert.equal(blockCalls, 0)
 
       preflight.resolve(true)
-      assert.equal(await completeSubmit, true)
+      assert.equal(await completeSubmit, updatedTask)
       assert.equal(completeCalls, 1)
       assert.equal(blockCalls, 0)
       assert.equal(completeParams.expected_version, 7)
@@ -148,11 +150,15 @@ test('purchase and outsourcing hooks submit blocked-to-ready resume through the 
     await t.test(config.exportName, async () => {
       const submitted = []
       const verified = []
+      const updatedTask = { id: 42, task_status_key: 'ready', version: 8 }
       const hook = loadOrderWorkflowHook({
         ...config,
         blockWorkflowTaskAction: async () => {},
         completeWorkflowTaskAction: async () => {},
-        resumeWorkflowTaskAction: async (params) => submitted.push(params),
+        resumeWorkflowTaskAction: async (params) => {
+          submitted.push(params)
+          return updatedTask
+        },
         verifyWorkflowTaskActionAccessBeforeSubmit: async (input) => {
           verified.push(input)
           return true
@@ -165,7 +171,7 @@ test('purchase and outsourcing hooks submit blocked-to-ready resume through the 
         await actions.resumeWorkflowTask(task, {
           reason: '资料已补齐，可以继续处理',
         }),
-        true
+        updatedTask
       )
       assert.equal(verified.length, 1)
       assert.equal(verified[0].actionKey, 'resume')

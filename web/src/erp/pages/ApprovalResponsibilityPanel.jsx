@@ -24,6 +24,7 @@ import {
 } from '../api/approvalSettingsApi.mjs'
 import {
   approvalSettingsMutationMayHaveSucceeded,
+  getApprovalSettingsBlockerLabel,
   getApprovalSettingsBlockingItems,
   verifyAppliedApprovalSettings,
 } from '../utils/approvalSettingsActivation.mjs'
@@ -61,11 +62,6 @@ const EDITOR_MEMBER_FIELDS = STRATEGIES.flatMap(({ key }) => [
   `${key}_user`,
 ])
 
-const BLOCKER_LABELS = {
-  approval_settings_not_published: '尚未发布审批责任',
-  approval_disabled: '该审批事项已停用',
-  no_eligible_approver: '没有符合岗位、账号和责任设置的办理人',
-}
 const APPROVAL_SETTINGS_RESULT_MESSAGE_KEY = 'approval-settings-result'
 
 function notifyApprovalSettingsApplied() {
@@ -203,10 +199,6 @@ function draftSignature(items = []) {
       ),
     }))
   )
-}
-
-function blockerLabel(code) {
-  return BLOCKER_LABELS[code] || '当前设置不能启用'
 }
 
 function memberLabel(member, adminByID) {
@@ -688,7 +680,7 @@ export default function ApprovalResponsibilityPanel({
               .map(
                 (item) =>
                   `${item.label}：${item.blocked_reasons
-                    .map(blockerLabel)
+                    .map(getApprovalSettingsBlockerLabel)
                     .join('、')}`
               )
               .join('；')
@@ -808,7 +800,9 @@ export default function ApprovalResponsibilityPanel({
         if (item.blocked_reasons?.length) {
           return (
             <Text type="danger">
-              {item.blocked_reasons.map(blockerLabel).join('、')}
+              {item.blocked_reasons
+                .map(getApprovalSettingsBlockerLabel)
+                .join('、')}
             </Text>
           )
         }

@@ -542,6 +542,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const [actionMode, setActionMode] = useState('')
   const [actionReason, setActionReason] = useState('')
   const [assignmentTarget, setAssignmentTarget] = useState()
+  const [actionReceipt, setActionReceipt] = useState(null)
   const [actionSaving, setActionSaving] = useState(false)
   const selectedTaskRef = useRef(selectedTask)
   selectedTaskRef.current = selectedTask
@@ -1273,6 +1274,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     setActionMode(nextMode)
     setActionReason(nextMode === 'block' ? getWorkflowTaskReason(task) : '')
     setAssignmentTarget(undefined)
+    setActionReceipt(null)
   }
 
   const closeTaskDrawer = () => {
@@ -1281,6 +1283,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     setActionMode('')
     setActionReason('')
     setAssignmentTarget(undefined)
+    setActionReceipt(null)
   }
 
   const changeTaskActionMode = (nextMode) => {
@@ -1412,12 +1415,23 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       if (!accessVerified) return
 
       try {
-        await mutationAttemptsRef.current.run({
+        const confirmedTask = await mutationAttemptsRef.current.run({
           scope,
           operation,
           mutate,
           params,
         })
+        if (
+          getWorkflowTaskStableKey(selectedTaskRef.current) === taskIdentity
+        ) {
+          setSelectedTask(confirmedTask)
+          setActionReceipt({
+            actionMode: actionModeSnapshot,
+            actionTitle: actionMetaSnapshot.title,
+            reason,
+            successMessage: actionMetaSnapshot.successMessage,
+          })
+        }
       } catch (error) {
         if (isWorkflowTaskMutationResultUnknown(error)) {
           message.warning('提交结果暂未确认，已保留本次操作，可直接重试')
@@ -1430,7 +1444,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         }
         return
       }
-      closeSubmittedTaskDrawer()
       message.success(actionMetaSnapshot.successMessage)
       try {
         await loadDashboardStats()
@@ -1735,24 +1748,42 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                       <Title level={4} className="erp-workbench-detail-title">
                         {selectedWorkbenchTask.task_name || '未命名任务'}
                       </Title>
-                      <Descriptions size="small" column={1}>
-                        <Descriptions.Item label="来源">
-                          {formatWorkflowTaskSource(selectedWorkbenchTask)}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="负责岗位">
-                          {getWorkflowTaskOwnerRoleLabel(selectedWorkbenchTask)}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="到期">
-                          {getWorkflowTaskDueLabel(selectedWorkbenchTask)}
-                        </Descriptions.Item>
-                        <Descriptions.Item
-                          label={getWorkflowTaskReasonLabel(
-                            selectedWorkbenchTask
-                          )}
-                        >
-                          {getWorkflowTaskReason(selectedWorkbenchTask) || '-'}
-                        </Descriptions.Item>
-                      </Descriptions>
+                      <Descriptions
+                        size="small"
+                        column={1}
+                        items={[
+                          {
+                            key: 'source',
+                            label: '来源',
+                            children:
+                              formatWorkflowTaskSource(selectedWorkbenchTask),
+                          },
+                          {
+                            key: 'owner-role',
+                            label: '负责岗位',
+                            children:
+                              getWorkflowTaskOwnerRoleLabel(
+                                selectedWorkbenchTask
+                              ),
+                          },
+                          {
+                            key: 'due',
+                            label: '到期',
+                            children:
+                              getWorkflowTaskDueLabel(selectedWorkbenchTask),
+                          },
+                          {
+                            key: 'reason',
+                            label:
+                              getWorkflowTaskReasonLabel(
+                                selectedWorkbenchTask
+                              ),
+                            children:
+                              getWorkflowTaskReason(selectedWorkbenchTask) ||
+                              '-',
+                          },
+                        ]}
+                      />
                       <TaskProcessingHint
                         task={selectedWorkbenchTask}
                         access={selectedWorkbenchTaskAccess}
@@ -2118,6 +2149,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
 
       <WorkflowTaskActionDrawer
         task={selectedTask}
+        actionReceipt={actionReceipt}
         actionMode={actionMode}
         actionReason={actionReason}
         actionSaving={actionSaving}

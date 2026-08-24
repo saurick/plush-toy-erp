@@ -1,3 +1,5 @@
+import { getRoleDisplayName } from './roleKeys.mjs'
+
 const PROCESS_STATUS_LABELS = Object.freeze({
   active: '办理中',
   blocked: '流程受阻',
@@ -93,6 +95,7 @@ export function requireWorkflowProcessContext(value) {
   const nodes = value?.nodes
   const currentNodes = value?.current_nodes
   const completedNodes = value?.completed_nodes
+  const currentResponsibilities = value?.current_responsibilities
   const linkedNode = value?.linked_node
   const approvalForm = value?.approval_form
   if (
@@ -116,7 +119,8 @@ export function requireWorkflowProcessContext(value) {
     instance.started_at <= 0 ||
     !Array.isArray(nodes) ||
     !Array.isArray(currentNodes) ||
-    !Array.isArray(completedNodes)
+    !Array.isArray(completedNodes) ||
+    !Array.isArray(currentResponsibilities)
   ) {
     invalidProcessContext()
   }
@@ -167,6 +171,34 @@ export function requireWorkflowProcessContext(value) {
         matchesCanonicalNode(node) &&
         node.status === 'completed'
     )
+  ) {
+    invalidProcessContext()
+  }
+  const currentNodeByID = new Map(currentNodes.map((node) => [node.id, node]))
+  const responsibilityNodeIDs = new Set()
+  if (
+    !currentResponsibilities.every((item) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        return false
+      }
+      const keys = Object.keys(item).sort()
+      const node = currentNodeByID.get(item.node_instance_id)
+      if (
+        keys.length !== 2 ||
+        keys[0] !== 'node_instance_id' ||
+        keys[1] !== 'owner_role_key' ||
+        !node ||
+        !['human_task', 'approval'].includes(node.node_type) ||
+        responsibilityNodeIDs.has(item.node_instance_id) ||
+        typeof item.owner_role_key !== 'string' ||
+        !item.owner_role_key.trim() ||
+        item.owner_role_key !== item.owner_role_key.trim()
+      ) {
+        return false
+      }
+      responsibilityNodeIDs.add(item.node_instance_id)
+      return true
+    })
   ) {
     invalidProcessContext()
   }
@@ -277,24 +309,57 @@ export function buildWorkflowProcessStageModel(value) {
   const currentLabels = items
     .filter((item) => item.current)
     .map((item) => item.label)
+  const currentHumanNodes = context.current_nodes.filter((node) =>
+    ['human_task', 'approval'].includes(node.node_type)
+  )
+  const currentHumanLabels = currentHumanNodes.map(getProcessNodeLabel)
+  const currentSystemLabels = context.current_nodes
+    .filter((node) => node.node_type === 'domain_command')
+    .map(getProcessNodeLabel)
+  const responsibilityByNodeID = new Map(
+    context.current_responsibilities.map((item) => [
+      item.node_instance_id,
+      getRoleDisplayName(item.owner_role_key),
+    ])
+  )
+  const responsibilityLabels = [
+    ...new Set(
+      currentHumanNodes
+        .map((node) => responsibilityByNodeID.get(node.id))
+        .filter(Boolean)
+    ),
+  ]
+  const hasUnresolvedResponsibility = currentHumanNodes.some(
+    (node) => !responsibilityByNodeID.has(node.id)
+  )
   const linkedNodeCompleted = completedNodeIDs.has(linkedNodeID)
-  const currentNodesAreSystemOnly =
-    context.current_nodes.length > 0 &&
-    context.current_nodes.every((node) => node.node_type === 'domain_command')
   let handoffLabel = ''
+  let handoffKind = 'pending'
   if (counts.blocked > 0) {
-    handoffLabel = linkedNodeCompleted
-      ? `系统已流转到${currentLabels.join('、')}，当前受阻。`
-      : `当前受阻阶段：${currentLabels.join('、')}`
-  } else if (currentLabels.length > 0) {
-    if (linkedNodeCompleted) {
-      handoffLabel = `系统已自动流转到：${currentLabels.join('、')}。`
-    } else if (currentNodesAreSystemOnly) {
-      handoffLabel = `系统正在自动处理：${currentLabels.join('、')}。`
+    handoffKind = 'blocked'
+    if (responsibilityLabels.length > 0) {
+      handoffLabel = `${linkedNodeCompleted ? '下一责任岗位' : '当前责任岗位'}：${responsibilityLabels.join('、')}；受阻阶段：${currentLabels.join('、')}。`
     } else {
-      handoffLabel = `当前办理阶段：${currentLabels.join('、')}`
+      handoffLabel = `${linkedNodeCompleted ? '已流转至' : '当前受阻阶段'}：${currentLabels.join('、')}；责任岗位正在确认。`
     }
+  } else if (currentHumanLabels.length > 0) {
+    if (responsibilityLabels.length > 0) {
+      handoffKind = 'role'
+      handoffLabel = `${linkedNodeCompleted ? '下一责任岗位' : '当前责任岗位'}：${responsibilityLabels.join('、')}；${linkedNodeCompleted ? '下一办理' : '当前办理'}：${currentHumanLabels.join('、')}。`
+      if (hasUnresolvedResponsibility) {
+        handoffLabel += ' 其余责任岗位正在确认。'
+      }
+    } else {
+      handoffLabel = `${linkedNodeCompleted ? '已流转至' : '当前办理'}：${currentHumanLabels.join('、')}；责任岗位正在确认。`
+    }
+    if (currentSystemLabels.length > 0) {
+      handoffLabel += ` 系统同时处理：${currentSystemLabels.join('、')}。`
+    }
+  } else if (currentSystemLabels.length > 0) {
+    handoffKind = 'system'
+    handoffLabel = `系统正在自动处理：${currentSystemLabels.join('、')}。`
   } else if (context.process_instance.status === 'completed') {
+    handoffKind = 'end'
     handoffLabel = counts.rejected > 0 ? '流程已退回结束。' : '流程已结束。'
   } else {
     handoffLabel = '当前等待后续条件或流程分支确认。'
@@ -306,6 +371,7 @@ export function buildWorkflowProcessStageModel(value) {
     statusLabel: getProcessStatusLabel(context.process_instance),
     summaryLabel: `已结束步骤 ${counts.completed} · 当前步骤 ${counts.current}${routeNote}`,
     handoffLabel,
+    handoffKind,
     hasUndecidedRoute,
     counts,
     items,

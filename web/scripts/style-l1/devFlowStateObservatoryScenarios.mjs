@@ -120,6 +120,12 @@ function taskLookupProcessContext(task) {
       approval_form: null,
       nodes: [node],
       current_nodes: [node],
+      current_responsibilities: [
+        {
+          node_instance_id: node.id,
+          owner_role_key: task.owner_role_key,
+        },
+      ],
       completed_nodes: [],
     },
   }
@@ -2401,6 +2407,31 @@ export function createDevFlowStateObservatoryScenarios({
         await expectText(page, '具体运行实例')
         await expectText(page, '7019')
         await expectText(page, '尚未证明业务事实已落账')
+        const runtimeResponsibility = runtimeView.getByLabel(
+          '流程责任来源核对'
+        )
+        await runtimeResponsibility.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        await expectText(runtimeResponsibility, '版本化静态定义')
+        await expectText(runtimeResponsibility, 'v1')
+        await expectText(runtimeResponsibility, '当前节点定义责任池')
+        await expectText(runtimeResponsibility, '订单审批：老板')
+        await expectText(runtimeResponsibility, '运行实例当前责任')
+        await expectText(runtimeResponsibility, '当前任务岗位')
+        await expectText(
+          runtimeResponsibility,
+          '静态责任池、运行实例当前责任与当前任务岗位一致。'
+        )
+        assert.equal(
+          await runtimeResponsibility
+            .locator('dt')
+            .filter({ hasText: /处理人/u })
+            .count(),
+          0,
+          '责任来源核对不应补造具体处理人字段'
+        )
         taskContextEvidence.runtime =
           await expectTaskScopedOutsideGlobalContext(
             assert,

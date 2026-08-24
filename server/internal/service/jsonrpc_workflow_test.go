@@ -37,6 +37,7 @@ type stubWorkflowJSONRPCRepo struct {
 	upsertStateInput   *biz.WorkflowBusinessStateUpsert
 	upsertStateActorID int
 	currentTask        *biz.WorkflowTask
+	tasksByCode        map[string]*biz.WorkflowTask
 	events             []*biz.WorkflowTaskEvent
 	taskEventLimit     int
 	listTaskFilter     biz.WorkflowTaskFilter
@@ -118,6 +119,9 @@ func (s *stubWorkflowJSONRPCRepo) GetWorkflowTask(_ context.Context, id int) (*b
 }
 
 func (s *stubWorkflowJSONRPCRepo) GetWorkflowTaskByTaskCode(_ context.Context, taskCode string) (*biz.WorkflowTask, error) {
+	if task, ok := s.tasksByCode[strings.TrimSpace(taskCode)]; ok {
+		return task, nil
+	}
 	if s.currentTask != nil && strings.TrimSpace(s.currentTask.TaskCode) == strings.TrimSpace(taskCode) {
 		return s.currentTask, nil
 	}
@@ -269,8 +273,8 @@ func TestJsonrpcDispatcher_WorkflowGetTaskProcessContextUsesTaskVisibility(t *te
 	processRepo := &stubProcessRuntimeJSONRPCRepo{
 		process: &biz.ProcessInstance{ID: processID, ProcessKey: biz.ProcessKeySalesOrderAcceptance, ProcessVersion: "v1", BusinessRefType: "sales_order", BusinessRefID: 1001, BusinessRefNo: &sourceNo, Status: biz.ProcessStatusActive, StartedAt: startedAt},
 		nodes: []*biz.ProcessNodeInstance{
-			{ID: 19, ProcessInstanceID: processID, NodeKey: "submit_sales_order", NodeType: biz.ProcessNodeTypeDomainCommand, Status: biz.ProcessNodeStatusCompleted},
-			{ID: nodeID, ProcessInstanceID: processID, NodeKey: "order_approval", NodeType: biz.ProcessNodeTypeApproval, Status: biz.ProcessNodeStatusActive},
+			{ID: 19, ProcessInstanceID: processID, NodeKey: "submit_sales_order", NodeType: biz.ProcessNodeTypeDomainCommand, Attempt: 1, Version: 1, Status: biz.ProcessNodeStatusCompleted},
+			{ID: nodeID, ProcessInstanceID: processID, NodeKey: "order_approval", NodeType: biz.ProcessNodeTypeApproval, Attempt: 1, Version: 1, Status: biz.ProcessNodeStatusActive},
 		},
 	}
 	j := &jsonrpcDispatcher{
@@ -294,6 +298,17 @@ func TestJsonrpcDispatcher_WorkflowGetTaskProcessContextUsesTaskVisibility(t *te
 	}
 	if approvalForm, exists := contextMap["approval_form"]; !exists || approvalForm != nil {
 		t.Fatalf("ordinary approval task must serialize approval_form as null, got %#v", approvalForm)
+	}
+	responsibilities, ok := contextMap["current_responsibilities"].([]any)
+	if !ok || len(responsibilities) != 1 {
+		t.Fatalf("unexpected current responsibilities %#v", contextMap["current_responsibilities"])
+	}
+	responsibility := responsibilities[0].(map[string]any)
+	if responsibility["node_instance_id"] != float64(nodeID) || responsibility["owner_role_key"] != biz.BossRoleKey {
+		t.Fatalf("unexpected responsibility %#v", responsibility)
+	}
+	if _, exposed := responsibility["assignee_id"]; exposed {
+		t.Fatal("process responsibility must not expose a concrete assignee")
 	}
 
 	j.adminReader = stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionWorkflowTaskRead)}

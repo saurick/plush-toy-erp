@@ -58,7 +58,7 @@ export function useOutsourcingOrderWorkflowActions({ loadWorkflowTasks }) {
             }),
         })
         if (!accessVerified) return false
-        await runWorkflowTaskMutationWithFailureRefresh(
+        const updatedTask = await runWorkflowTaskMutationWithFailureRefresh(
           () =>
             mutationAttemptsRef.current.run({
               scope,
@@ -74,7 +74,7 @@ export function useOutsourcingOrderWorkflowActions({ loadWorkflowTasks }) {
         } catch {
           message.warning('操作已成功但列表刷新失败，请手动刷新')
         }
-        return true
+        return updatedTask
       })
     },
     [loadWorkflowTasks, runMutationInFlight]
@@ -109,7 +109,7 @@ export function useOutsourcingOrderWorkflowActions({ loadWorkflowTasks }) {
             }),
         })
         if (!accessVerified) return false
-        await runWorkflowTaskMutationWithFailureRefresh(
+        const updatedTask = await runWorkflowTaskMutationWithFailureRefresh(
           () =>
             mutationAttemptsRef.current.run({
               scope,
@@ -125,7 +125,7 @@ export function useOutsourcingOrderWorkflowActions({ loadWorkflowTasks }) {
         } catch {
           message.warning('操作已成功但列表刷新失败，请手动刷新')
         }
-        return true
+        return updatedTask
       })
     },
     [loadWorkflowTasks, runMutationInFlight]
@@ -160,7 +160,7 @@ export function useOutsourcingOrderWorkflowActions({ loadWorkflowTasks }) {
             }),
         })
         if (!accessVerified) return false
-        await runWorkflowTaskMutationWithFailureRefresh(
+        const updatedTask = await runWorkflowTaskMutationWithFailureRefresh(
           () =>
             mutationAttemptsRef.current.run({
               scope,
@@ -176,7 +176,7 @@ export function useOutsourcingOrderWorkflowActions({ loadWorkflowTasks }) {
         } catch {
           message.warning('操作已成功但列表刷新失败，请手动刷新')
         }
-        return true
+        return updatedTask
       })
     },
     [loadWorkflowTasks, runMutationInFlight]
@@ -211,7 +211,7 @@ export function useOutsourcingOrderWorkflowActions({ loadWorkflowTasks }) {
             }),
         })
         if (!accessVerified) return false
-        await runWorkflowTaskMutationWithFailureRefresh(
+        const updatedTask = await runWorkflowTaskMutationWithFailureRefresh(
           () =>
             mutationAttemptsRef.current.run({
               scope,
@@ -227,7 +227,7 @@ export function useOutsourcingOrderWorkflowActions({ loadWorkflowTasks }) {
         } catch {
           message.warning('操作已成功但列表刷新失败，请手动刷新')
         }
-        return true
+        return updatedTask
       })
     },
     [loadWorkflowTasks, runMutationInFlight]
@@ -262,7 +262,7 @@ export function useOutsourcingOrderWorkflowActions({ loadWorkflowTasks }) {
             }),
         })
         if (!accessVerified) return false
-        await runWorkflowTaskMutationWithFailureRefresh(
+        const updatedTask = await runWorkflowTaskMutationWithFailureRefresh(
           () =>
             mutationAttemptsRef.current.run({
               scope,
@@ -278,7 +278,7 @@ export function useOutsourcingOrderWorkflowActions({ loadWorkflowTasks }) {
         } catch {
           message.warning('操作已成功但列表刷新失败，请手动刷新')
         }
-        return true
+        return updatedTask
       })
     },
     [loadWorkflowTasks, runMutationInFlight]

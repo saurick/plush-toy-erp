@@ -420,8 +420,8 @@ test('mobile task receipt has explicit outcomes without fabricated actor or time
     receiptScreenSource,
     /outcome === MOBILE_TASK_RECEIPT_OUTCOMES\.CONFIRMED &&[\s\S]*?hasProcessAnchor \? \(/u
   )
-  assert.match(receiptScreenSource, />当前流程<\/h2>/u)
-  assert.match(receiptScreenSource, /正在读取当前流程/u)
+  assert.match(receiptScreenSource, /流程交接结果\s*<\/h2>/u)
+  assert.match(receiptScreenSource, /正在读取流程交接结果/u)
   assert.match(receiptScreenSource, /WorkflowProcessStageTrack/u)
   assert.match(receiptScreenSource, /task\?\.process_node_instance_id/u)
   assert.match(receiptScreenSource, /task\?\.version/u)

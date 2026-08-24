@@ -165,6 +165,9 @@ func workflowProcessTaskContextToMap(processContext *biz.ProcessTaskContext) map
 		"nodes":            workflowProcessNodesToAny(processContext.Nodes),
 		"current_nodes":    workflowProcessNodesToAny(processContext.CurrentNodes),
 		"completed_nodes":  workflowProcessNodesToAny(processContext.CompletedNodes),
+		"current_responsibilities": workflowProcessResponsibilitiesToAny(
+			processContext.CurrentResponsibilities,
+		),
 	}
 	if approvalForm := workflowProcessApprovalFormToMap(processContext.LinkedNode); approvalForm != nil {
 		result["approval_form"] = approvalForm
@@ -174,6 +177,17 @@ func workflowProcessTaskContextToMap(processContext *biz.ProcessTaskContext) map
 		result["approval_form"] = nil
 	}
 	return result
+}
+
+func workflowProcessResponsibilitiesToAny(items []biz.ProcessTaskResponsibility) []any {
+	out := make([]any, 0, len(items))
+	for _, item := range items {
+		out = append(out, map[string]any{
+			"node_instance_id": item.NodeInstanceID,
+			"owner_role_key":   item.OwnerRoleKey,
+		})
+	}
+	return out
 }
 
 func workflowProcessInstanceSummaryToMap(instance *biz.ProcessInstance) map[string]any {

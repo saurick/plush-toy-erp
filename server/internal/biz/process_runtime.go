@@ -226,12 +226,22 @@ type ProcessInstanceStart struct {
 // ProcessRuntime instance and nodes remain the only source of process position;
 // callers must not infer it from task payload snapshots.
 type ProcessTaskContext struct {
-	Task           *WorkflowTask
-	Instance       *ProcessInstance
-	LinkedNode     *ProcessNodeInstance
-	Nodes          []*ProcessNodeInstance
-	CurrentNodes   []*ProcessNodeInstance
-	CompletedNodes []*ProcessNodeInstance
+	Task                    *WorkflowTask
+	Instance                *ProcessInstance
+	LinkedNode              *ProcessNodeInstance
+	Nodes                   []*ProcessNodeInstance
+	CurrentNodes            []*ProcessNodeInstance
+	CompletedNodes          []*ProcessNodeInstance
+	CurrentResponsibilities []ProcessTaskResponsibility
+}
+
+// ProcessTaskResponsibility projects the responsible role of an active human
+// node from its actual linked Workflow task. It intentionally excludes any
+// assignee so result receipts describe durable role responsibility, not a
+// person who may be reassigned later.
+type ProcessTaskResponsibility struct {
+	NodeInstanceID int
+	OwnerRoleKey   string
 }
 
 type ProcessLinkedWorkflowTaskCreate struct {
@@ -737,5 +747,72 @@ func (uc *ProcessRuntimeUsecase) GetProcessTaskContext(ctx context.Context, task
 	if processContext.LinkedNode == nil {
 		return nil, ErrBadParam
 	}
+	for _, node := range processContext.CurrentNodes {
+		responsibility, err := uc.getCurrentProcessTaskResponsibility(ctx, task, instance, node)
+		if err != nil {
+			return nil, err
+		}
+		if responsibility != nil {
+			processContext.CurrentResponsibilities = append(processContext.CurrentResponsibilities, *responsibility)
+		}
+	}
 	return processContext, nil
+}
+
+func (uc *ProcessRuntimeUsecase) getCurrentProcessTaskResponsibility(
+	ctx context.Context,
+	linkedTask *WorkflowTask,
+	instance *ProcessInstance,
+	node *ProcessNodeInstance,
+) (*ProcessTaskResponsibility, error) {
+	if uc == nil || instance == nil || node == nil {
+		return nil, ErrBadParam
+	}
+	if node.NodeType != ProcessNodeTypeHumanTask && node.NodeType != ProcessNodeTypeApproval {
+		return nil, nil
+	}
+
+	currentTask := linkedTask
+	usesLinkedTask := linkedTask.ProcessNodeInstanceID != nil && *linkedTask.ProcessNodeInstanceID == node.ID
+	if !usesLinkedTask {
+		if uc.workflowRepo == nil {
+			return nil, nil
+		}
+		var err error
+		currentTask, err = uc.workflowRepo.GetWorkflowTaskByTaskCode(
+			ctx,
+			defaultProcessLinkedWorkflowTaskCode(instance.ID, node.ID, node.Attempt),
+		)
+		if errors.Is(err, ErrWorkflowTaskNotFound) {
+			// An active node can temporarily precede its linked task during
+			// reconciliation. Do not guess a role from the owner pool.
+			return nil, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if currentTask == nil {
+		return nil, ErrBadParam
+	}
+	if usesLinkedTask && IsTerminalWorkflowTaskStatus(currentTask.TaskStatusKey) {
+		// During idempotent settlement replay the Workflow task can already be
+		// terminal while its linked node is still active. The caller must be
+		// allowed to reconcile that gap, but the read model must not present the
+		// completed task's role as a current responsibility.
+		return nil, nil
+	}
+	ownerRoleKey := NormalizeRoleKey(currentTask.OwnerRoleKey)
+	if currentTask.ProcessInstanceID == nil || *currentTask.ProcessInstanceID != instance.ID ||
+		currentTask.ProcessNodeInstanceID == nil || *currentTask.ProcessNodeInstanceID != node.ID ||
+		currentTask.SourceType != instance.BusinessRefType || currentTask.SourceID != instance.BusinessRefID ||
+		(currentTask.TaskStatusKey != "ready" && currentTask.TaskStatusKey != "blocked") ||
+		ownerRoleKey == "" {
+		return nil, ErrBadParam
+	}
+	return &ProcessTaskResponsibility{
+		NodeInstanceID: node.ID,
+		OwnerRoleKey:   ownerRoleKey,
+	}, nil
 }

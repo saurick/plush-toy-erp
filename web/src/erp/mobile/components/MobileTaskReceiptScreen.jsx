@@ -279,7 +279,9 @@ export default function MobileTaskReceiptScreen({
             className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
             data-testid="mobile-task-receipt-handoff"
           >
-            <h2 className="text-lg font-semibold text-slate-950">当前流程</h2>
+            <h2 className="text-lg font-semibold text-slate-950">
+              流程交接结果
+            </h2>
             {processContextState === 'error' ? (
               <p className="mt-3 text-sm text-red-600">
                 当前流程暂时无法显示。
@@ -291,7 +293,9 @@ export default function MobileTaskReceiptScreen({
                 variant="mobile"
               />
             ) : (
-              <p className="mt-3 text-sm text-slate-500">正在读取当前流程</p>
+              <p className="mt-3 text-sm text-slate-500">
+                正在读取流程交接结果
+              </p>
             )}
           </section>
         ) : null}

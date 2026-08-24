@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   approvalSettingsMutationMayHaveSucceeded,
+  getApprovalSettingsBlockerLabel,
   getApprovalSettingsBlockingItems,
   verifyAppliedApprovalSettings,
 } from './approvalSettingsActivation.mjs'
@@ -123,6 +124,14 @@ test('approval readback rejects revision, hash, source and projection drift', ()
 })
 
 test('approval preview blockers and uncertain transport are classified narrowly', () => {
+  assert.equal(
+    getApprovalSettingsBlockerLabel('no_eligible_approver'),
+    '没有符合岗位、账号和责任设置的办理人'
+  )
+  assert.equal(
+    getApprovalSettingsBlockerLabel('future_blocker'),
+    '当前设置不能启用'
+  )
   assert.deepEqual(
     getApprovalSettingsBlockingItems({
       items: [
