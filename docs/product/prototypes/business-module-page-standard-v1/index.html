@@ -571,77 +571,6 @@
         line-height: 1;
       }
 
-      .lifecycle-modal {
-        width: min(980px, calc(100vw - 48px));
-        max-height: calc(100vh - 64px);
-        overflow: hidden;
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        background: var(--panel);
-        color: var(--text);
-        padding: 0;
-        box-shadow: 0 18px 48px rgb(15 23 42 / 18%);
-      }
-
-      .lifecycle-modal[open] {
-        display: grid;
-        grid-template-rows: auto auto minmax(0, 1fr);
-      }
-
-      .lifecycle-modal::backdrop {
-        background: var(--overlay);
-      }
-
-      .modal-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        padding: 18px 22px 10px;
-      }
-
-      .modal-title {
-        font-size: 20px;
-        font-weight: 850;
-      }
-
-      .modal-close {
-        width: 34px;
-        height: 34px;
-        border: 0;
-        background: transparent;
-        color: var(--muted);
-        font-size: 34px;
-        line-height: 1;
-      }
-
-      .modal-toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 10px;
-        padding: 0 22px 12px;
-      }
-
-      .modal-body {
-        overflow: auto;
-        padding: 0 22px 22px;
-      }
-
-      .lifecycle-modal table {
-        min-width: 860px;
-      }
-
-      .empty-lifecycle {
-        display: grid;
-        min-height: 220px;
-        place-items: center;
-        border-bottom: 1px solid var(--line);
-        color: var(--muted);
-        font-size: 16px;
-        font-weight: 750;
-      }
-
       @media (prefers-color-scheme: dark) {
         .panel,
         .search,
@@ -742,10 +671,6 @@
           grid-template-columns: 1fr;
         }
 
-        .lifecycle-modal {
-          width: calc(100vw - 24px);
-          max-height: calc(100vh - 24px);
-        }
       }
 
       @media (max-width: 640px) {
@@ -838,7 +763,6 @@
             <div class="toolbar-actions">
               <button class="btn">导出当前筛选</button>
               <button class="btn">⚙ 列顺序</button>
-              <button class="btn" id="openLifecycle" type="button">状态规则</button>
             </div>
             <div class="create-actions">
               <button class="btn primary">+ 新建记录</button>
@@ -971,53 +895,6 @@
       </div>
     </main>
 
-    <dialog
-      class="lifecycle-modal"
-      id="lifecycleDialog"
-      aria-modal="true"
-      aria-labelledby="lifecycleTitle"
-      aria-describedby="lifecycleDescription"
-    >
-        <header class="modal-head">
-          <h2 class="modal-title" id="lifecycleTitle">状态动作说明</h2>
-          <button class="modal-close" id="closeLifecycle" type="button" aria-label="关闭" data-initial-focus>×</button>
-        </header>
-        <div class="modal-toolbar">
-          <span class="muted" id="lifecycleDescription">本页面不提供通用删除或回收站；不同对象只展示适用的状态动作。</span>
-        </div>
-        <div class="modal-body">
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th style="width: 160px">对象类型</th>
-                  <th>页面动作</th>
-                  <th style="width: 220px">不展示的动作</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>主数据</td>
-                  <td>启用 / 停用，保留历史引用可读。</td>
-                  <td>通用删除、回收站</td>
-                </tr>
-                <tr>
-                  <td>源单据</td>
-                  <td>提交、取消、关闭、归档。</td>
-                  <td>提交后删除</td>
-                </tr>
-                <tr>
-                  <td>事实 / 台账</td>
-                  <td>取消、冲正、调整或只读。</td>
-                  <td>删除事实流水</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div class="empty-lifecycle">只有具备完整业务规则和历史记录保护的对象，才会单独提供删除或恢复入口。</div>
-        </div>
-    </dialog>
-
     <script>
       const records = [
         {
@@ -1056,19 +933,7 @@
       );
       const moreActionsButton = document.querySelector("#moreActionsButton");
       const statusActionMenu = document.querySelector("#statusActionMenu");
-      const openLifecycle = document.querySelector("#openLifecycle");
-      const closeLifecycle = document.querySelector("#closeLifecycle");
-      const lifecycleDialog = document.querySelector("#lifecycleDialog");
-      const lifecycleFocusableSelector = [
-        "button:not([disabled])",
-        "a[href]",
-        "input:not([disabled])",
-        "select:not([disabled])",
-        "textarea:not([disabled])",
-        '[tabindex]:not([tabindex="-1"])',
-      ].join(",");
       let selectedIndex = -1;
-      let lifecycleTrigger = openLifecycle;
 
       function closeMoreActions({ restoreFocus = false } = {}) {
         if (statusActionMenu.hidden) return;
@@ -1086,16 +951,6 @@
         statusActionMenu.querySelector('[role="menuitem"]')?.focus({
           preventScroll: true,
         });
-      }
-
-      function getLifecycleFocusableElements() {
-        return Array.from(
-          lifecycleDialog.querySelectorAll(lifecycleFocusableSelector),
-        ).filter((element) => element.getClientRects().length > 0);
-      }
-
-      function closeLifecycleDialog() {
-        if (lifecycleDialog.open) lifecycleDialog.close();
       }
 
       function renderRows() {
@@ -1179,53 +1034,6 @@
         if (event.key === "Escape" && !statusActionMenu.hidden) {
           event.preventDefault();
           closeMoreActions({ restoreFocus: true });
-        }
-      });
-
-      openLifecycle.addEventListener("click", (event) => {
-        if (lifecycleDialog.open) return;
-        lifecycleTrigger = event.currentTarget;
-        lifecycleDialog.showModal();
-        requestAnimationFrame(() => {
-          lifecycleDialog.querySelector("[data-initial-focus]")?.focus({
-            preventScroll: true,
-          });
-        });
-      });
-
-      closeLifecycle.addEventListener("click", closeLifecycleDialog);
-      lifecycleDialog.addEventListener("cancel", (event) => {
-        event.preventDefault();
-        closeLifecycleDialog();
-      });
-      lifecycleDialog.addEventListener("close", () => {
-        requestAnimationFrame(() =>
-          lifecycleTrigger?.focus({ preventScroll: true }),
-        );
-      });
-      lifecycleDialog.addEventListener("keydown", (event) => {
-        if (event.key !== "Tab") return;
-        const focusableElements = getLifecycleFocusableElements();
-        if (!focusableElements.length) {
-          event.preventDefault();
-          lifecycleDialog.focus();
-          return;
-        }
-        const firstFocusable = focusableElements[0];
-        const lastFocusable = focusableElements[focusableElements.length - 1];
-        if (
-          event.shiftKey &&
-          (document.activeElement === firstFocusable ||
-            !lifecycleDialog.contains(document.activeElement))
-        ) {
-          event.preventDefault();
-          lastFocusable.focus();
-        } else if (
-          !event.shiftKey &&
-          document.activeElement === lastFocusable
-        ) {
-          event.preventDefault();
-          firstFocusable.focus();
         }
       });
 

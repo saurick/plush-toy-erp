@@ -154,7 +154,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     assetPath: 'task-command-center-v1/index.html',
     readmePath: 'task-command-center-v1/README.md',
     description:
-      '把任务菜单收敛为职责处理台：待我处理、我发起的、阻塞交接、当前任务详情、任务处理抽屉和关联业务对象。',
+      '用四类互斥队列、组合筛选和当前任务只读详情收敛桌面职责处理台；处理入口只传递任务上下文，三步状态机由共享任务处理流程唯一定义。',
     appliesTo:
       '我的任务、任务看板、工作台风险队列、岗位任务端和业务页协同入口可参照；不复制业务菜单树，不把任务完成写成事实过账。',
   },
@@ -306,14 +306,14 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
   },
   {
     key: 'business-detail-standard-page',
-    title: '业务详情页标准样板',
+    title: '业务详情弹窗标准样板',
     type: 'HTML',
     statuses: [DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT],
     directory: 'business-detail-page-standard-v1/',
     assetPath: 'business-detail-page-standard-v1/index.html',
     readmePath: 'business-detail-page-standard-v1/README.md',
     description:
-      '覆盖基础信息、业务状态、关联单据、操作记录、附件区，并区分 Workflow 协同动作和 Fact 事实动作。',
+      '对齐共享只读详情 Modal：覆盖字段描述表、完整明细卡片、10 条分页，以及加载、空结果和失败重试；底部只保留关闭。',
     appliesTo:
       '销售订单、客户 / 供应商、产品、采购入库、库存批次、质检、出货和财务等需要详情承载的页面可参照；字段和动作仍由各自 API / usecase / RBAC 决定。',
   },
@@ -326,7 +326,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     assetPath: 'business-form-page-standard-v1/index.html',
     readmePath: 'business-form-page-standard-v1/README.md',
     description:
-      '覆盖页面级新建 / 编辑骨架、字段分组、item 区来源选择器入口、横向滚动、明细统计、必填提示、校验错误、保存 / 取消 / 重置、来源带值、清值、新增 / 编辑 / 只读状态和缺值 / 残值防护。',
+      '对齐销售订单运行态宽业务 Modal：覆盖订单与客户、联系人与负责人、结算、交付、附件，以及 SKU 来源、带出摘要、单位、复制行、产品顺序、保存 / 取消和只读评审状态；不提供通用整表重置。',
     appliesTo:
       '客户、供应商、联系人、销售订单、采购订单、BOM 和出货单等主数据或源单页面的新建 / 编辑表单可参照；生产、委外、库存、质检和财务事实不得套用无来源页面级新建，来源动作回到局部动作弹窗样板。',
   },
@@ -339,7 +339,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     assetPath: 'action-modal-drawer-standard-v1/index.html',
     readmePath: 'action-modal-drawer-standard-v1/README.md',
     description:
-      '覆盖单据补录、来源选择器、明细行、列顺序、状态动作说明和危险确认；来源选择器最多作为第二层，保留分页、已选摘要和清空已选，只选择来源不编辑本单字段，不承诺通用回收站。',
+      '只覆盖来源选择器、列顺序、状态规则说明和危险确认；来源选择器最多作为第二层并保留分页与已选摘要，不再复制完整业务表单或只读详情。',
     appliesTo:
       '生产订单领料 / 完工、加工合同发料 / 回货、委外回货质检、出货生成应收 / 发票、采购或委外来源应付、单笔核对、真实收付款和多来源核销等正式动作可参照；银行直连、付款审批、总账和税控不在当前范围，字段真源、权限、幂等和事实约束仍由后端 usecase / RBAC 决定。',
   },
@@ -402,7 +402,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     assetPath: 'mobile-role-tasks-v1/implemented-reference.html',
     readmePath: 'mobile-role-tasks-v1/README.md',
     description:
-      '覆盖当前仍在使用的待办 / 已办 / 提醒 / 我的、主筛选、分批展开和任务卡片；HTML 内旧详情内处理只作历史对照。',
+      '只覆盖当前待办 / 已办 / 消息 / 我的、主筛选、分批展开、刷新和任务选择；详情、处理与结果回执由 v2 唯一定义。',
     appliesTo:
       '岗位任务端 `/m/<role>/tasks` 当前列表基线；与 v2 当前选中任务流程共同组成完整移动任务主路径。',
   },

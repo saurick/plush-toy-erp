@@ -1,27 +1,26 @@
 <!doctype html>
 <html lang="zh-CN">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>岗位任务端当前列表基线</title>
     <style>
       :root {
-        --bg: #eef4ef;
-        --surface: #fff;
-        --surface-soft: #f8fafc;
-        --line: #dbe5df;
-        --line-strong: #c8d5ce;
-        --text: #0f172a;
-        --muted: #64748b;
-        --green: #047857;
-        --green-soft: #e8f5ea;
+        color-scheme: light dark;
+        --bg: #edf1f4;
+        --panel: #ffffff;
+        --panel-soft: #f7f9fa;
+        --text: #17212b;
+        --muted: #637080;
+        --line: #dde3e8;
+        --green: #147d69;
+        --green-soft: #eaf7f3;
+        --orange: #d97706;
+        --orange-soft: #fff7e8;
+        --red: #c9362b;
+        --red-soft: #fff1f0;
         --blue: #2563eb;
-        --blue-soft: #eff6ff;
-        --red: #dc2626;
-        --red-soft: #fef2f2;
-        --orange: #ea580c;
-        --orange-soft: #fff7ed;
-        --shadow: 0 12px 32px rgb(15 23 42 / 10%);
+        font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
       }
 
       * {
@@ -29,900 +28,412 @@
       }
 
       body {
-        margin: 0;
+        min-width: 320px;
         min-height: 100vh;
-        background: #dfe9e2;
+        margin: 0;
+        background: var(--bg);
         color: var(--text);
-        font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI",
-          "PingFang SC", "Microsoft YaHei", sans-serif;
       }
 
-      button,
-      textarea {
+      button {
+        color: inherit;
         font: inherit;
       }
 
-      .page {
+      button:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--blue) 28%, transparent);
+        outline-offset: 2px;
+      }
+
+      .stage {
         display: grid;
         min-height: 100vh;
         place-items: center;
-        padding: 20px;
+        padding: 22px;
       }
 
       .phone {
         position: relative;
-        display: flex;
+        display: grid;
         width: min(430px, 100%);
-        height: min(860px, calc(100vh - 40px));
-        min-height: 720px;
+        height: min(900px, calc(100vh - 44px));
+        min-height: 650px;
+        grid-template-rows: minmax(0, 1fr) auto;
         overflow: hidden;
-        border: 1px solid var(--line-strong);
-        border-radius: 28px;
-        background: var(--surface);
-        box-shadow: var(--shadow);
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background: var(--panel-soft);
+        box-shadow: 0 24px 70px rgb(15 23 42 / 18%);
       }
 
-      .screen {
-        display: none;
-        flex: 1;
-        min-height: 0;
-        flex-direction: column;
-      }
-
-      .screen.active {
-        display: flex;
-      }
-
-      .main-scroll,
-      .detail-main {
-        min-height: 0;
-        flex: 1 1 auto;
+      .scroll-area {
         overflow-y: auto;
         overscroll-behavior: contain;
       }
 
       .header {
+        position: sticky;
+        z-index: 4;
+        top: 0;
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 12px;
-        padding: 24px 20px 10px;
+        border-bottom: 1px solid var(--line);
+        background: color-mix(in srgb, var(--panel) 94%, transparent);
+        padding: 16px 18px 12px;
+        backdrop-filter: blur(10px);
       }
 
-      .header-left {
-        display: flex;
-        align-items: center;
-        min-width: 0;
-        gap: 10px;
-      }
-
-      h1,
-      h2,
-      p {
+      .header h1,
+      .header p,
+      .section-title h2 {
         margin: 0;
       }
 
-      h1 {
-        font-size: 34px;
-        line-height: 1.1;
+      .header h1 {
+        font-size: 22px;
       }
 
-      h2 {
-        font-size: 20px;
+      .header-meta {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 12px;
       }
 
       .role-pill,
-      .badge,
-      .chip {
+      .count-tag,
+      .status-chip {
         display: inline-flex;
+        min-height: 23px;
         align-items: center;
         justify-content: center;
-        white-space: nowrap;
+        border-radius: 999px;
+        padding: 0 8px;
+        font-size: 12px;
+        font-weight: 750;
       }
 
-      .role-pill {
-        min-height: 38px;
-        border: 1px solid #bde6cc;
-        border-radius: 12px;
+      .role-pill,
+      .count-tag {
         background: var(--green-soft);
         color: var(--green);
-        padding: 0 12px;
-        font-weight: 700;
       }
 
       .refresh {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        border: 0;
-        background: transparent;
-        color: var(--green);
+        min-height: 34px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 0 11px;
+        cursor: pointer;
         font-weight: 700;
       }
 
-      .detail-meta {
-        color: var(--muted);
-        font-size: 13px;
-        font-weight: 700;
+      .content {
+        padding: 12px 12px 28px;
       }
 
-      .sync {
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--panel);
+        margin-bottom: 12px;
+        padding: 14px;
+      }
+
+      .section-title {
         display: flex;
-        flex-wrap: wrap;
         align-items: center;
-        gap: 8px;
-        padding: 0 20px;
-        color: var(--muted);
-        font-size: 14px;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
       }
 
-      .dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 999px;
-        background: #34d399;
+      .section-title h2 {
+        font-size: 16px;
       }
 
       .metrics {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        margin: 20px;
-        overflow: hidden;
-        border: 1px solid var(--line);
-        border-radius: 18px;
-        background: var(--surface);
-        box-shadow: 0 5px 18px rgb(15 23 42 / 5%);
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        margin-bottom: 12px;
       }
 
       .metric {
-        min-width: 0;
-        min-height: 82px;
-        border-right: 1px solid var(--line);
-        padding: 12px 6px;
+        display: grid;
+        gap: 3px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--panel);
+        padding: 10px 8px;
         text-align: center;
       }
 
-      .metric:last-child {
-        border-right: 0;
-      }
-
       .metric strong {
-        display: block;
-        font-size: 28px;
-        line-height: 1.15;
+        font-size: 19px;
       }
 
       .metric span {
-        display: block;
-        margin-top: 4px;
         color: var(--muted);
-        font-size: 13px;
-        overflow-wrap: anywhere;
-      }
-
-      .skeleton-wrap {
-        margin: 20px;
-      }
-
-      .skeleton-metrics {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        overflow: hidden;
-        border: 1px solid var(--line);
-        border-radius: 18px;
-        background: var(--surface);
-        box-shadow: 0 5px 18px rgb(15 23 42 / 5%);
-      }
-
-      .skeleton-metric {
-        display: grid;
-        min-height: 82px;
-        align-content: center;
-        justify-items: center;
-        gap: 10px;
-        border-right: 1px solid var(--line);
-        padding: 14px 6px;
-      }
-
-      .skeleton-metric:last-child {
-        border-right: 0;
-      }
-
-      .skeleton-block {
-        display: block;
-        max-width: 100%;
-        border-radius: 999px;
-        background: #d8e2dd;
-        animation: skeleton-pulse 1.4s ease-in-out infinite;
-      }
-
-      .skeleton-value {
-        width: 42px;
-        height: 30px;
-        background: #c8d5ce;
-      }
-
-      .skeleton-label {
-        width: 54px;
-        height: 16px;
-      }
-
-      .skeleton-filters {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        margin-top: 16px;
-        border-radius: 18px;
-        background: #eef3ef;
-        padding: 4px;
-      }
-
-      .skeleton-filter {
-        height: 44px;
-        padding: 11px 9px;
-      }
-
-      .skeleton-list {
-        margin-top: 18px;
-        overflow: hidden;
-        border: 1px solid var(--line);
-        border-radius: 18px;
-        background: var(--surface);
-      }
-
-      .skeleton-row {
-        display: grid;
-        min-height: 112px;
-        grid-template-columns: 64px minmax(0, 1fr) 94px;
-        gap: 12px;
-        padding: 16px 20px;
-      }
-
-      .skeleton-row + .skeleton-row {
-        border-top: 1px solid var(--line);
-      }
-
-      .skeleton-badge {
-        width: 52px;
-        height: 30px;
-        border-radius: 8px;
-      }
-
-      .skeleton-title {
-        width: min(190px, 88%);
-        height: 22px;
-        background: #c8d5ce;
-      }
-
-      .skeleton-source {
-        width: min(230px, 96%);
-        height: 16px;
-        margin-top: 10px;
-      }
-
-      .skeleton-meta {
-        width: min(180px, 78%);
-        height: 16px;
-        margin-top: 12px;
-      }
-
-      .skeleton-chip {
-        width: min(76px, 100%);
-        height: 28px;
-        margin-left: auto;
-        border-radius: 8px;
-        background: #c8d5ce;
-      }
-
-      .skeleton-time {
-        width: min(82px, 100%);
-        height: 16px;
-        margin-top: 12px;
-        margin-left: auto;
-      }
-
-      @keyframes skeleton-pulse {
-        0%,
-        100% {
-          opacity: 0.56;
-        }
-
-        50% {
-          opacity: 0.92;
-        }
-      }
-
-      @media (prefers-reduced-motion: reduce) {
-        .skeleton-block {
-          animation-duration: 0.01ms;
-        }
-      }
-
-      .filters,
-      .message-tabs {
-        position: sticky;
-        top: 0;
-        z-index: 2;
-        display: grid;
-        gap: 6px;
-        margin: 0 20px;
-        border-radius: 16px;
-        background: #f1f5f9;
-        padding: 5px;
-        box-shadow: inset 0 0 0 1px rgb(15 23 42 / 4%);
+        font-size: 12px;
       }
 
       .filters {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-      }
-
-      .filters.filters--with-approval {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-      }
-
-      .message-tabs {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        background: rgb(255 255 255 / 94%);
-        border: 1px solid var(--line);
-        box-shadow: 0 8px 18px rgb(15 23 42 / 8%);
-      }
-
-      .filter,
-      .message-tab {
-        display: flex;
-        min-width: 0;
-        min-height: 42px;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        border: 0;
-        border-radius: 12px;
-        background: transparent;
-        color: var(--muted);
-        font-weight: 700;
-        white-space: nowrap;
-      }
-
-      .filter.active,
-      .message-tab.active {
-        background: #fff;
-        color: var(--green);
-        box-shadow: 0 1px 5px rgb(15 23 42 / 8%);
-      }
-
-      .count-tag {
-        display: inline-flex;
-        min-width: 24px;
-        height: 24px;
-        align-items: center;
-        justify-content: center;
-        border-radius: 999px;
-        background: rgb(15 23 42 / 8%);
-        padding: 0 7px;
-        font-size: 13px;
-        font-variant-numeric: tabular-nums;
-        font-weight: 800;
-        line-height: 1;
-      }
-
-      .filter.active .count-tag,
-      .message-tab.active .count-tag,
-      .panel-title .count-tag {
-        background: rgb(4 120 87 / 14%);
-      }
-
-      .panel-title {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .list-head {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) 112px;
-        padding: 20px 20px 8px;
-        color: var(--muted);
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 7px;
+        margin-bottom: 12px;
       }
 
-      .list-head > :last-child {
-        justify-self: end;
-        white-space: nowrap;
+      .filter {
+        min-width: 0;
+        min-height: 36px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--panel);
+        cursor: pointer;
+        padding: 0 6px;
+        font-weight: 700;
+      }
+
+      .filter.active {
+        border-color: var(--green);
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .filter .count-tag {
+        min-width: 20px;
+        min-height: 20px;
+        margin-left: 3px;
+        padding: 0 5px;
       }
 
       .task-list {
-        margin: 0 20px 18px;
-        overflow: hidden;
+        display: grid;
+        gap: 8px;
+      }
+
+      .task-row,
+      .message-card,
+      .account-card {
+        width: 100%;
         border: 1px solid var(--line);
-        border-radius: 18px;
-        background: #fff;
+        border-radius: 11px;
+        background: var(--panel);
+        text-align: left;
       }
 
       .task-row {
         display: grid;
-        grid-template-columns: 58px minmax(0, 1fr) 92px;
-        gap: 12px;
-        width: 100%;
-        border: 0;
-        border-bottom: 1px solid var(--line);
-        background: #fff;
-        padding: 14px;
-        text-align: left;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 10px;
+        cursor: pointer;
+        padding: 12px;
       }
 
-      .task-row:last-child {
-        border-bottom: 0;
+      .task-row:hover,
+      .task-row[aria-current="true"] {
+        border-color: var(--green);
+        box-shadow: inset 3px 0 0 var(--green);
       }
 
-      .task-row.alert {
-        background: #f8fffb;
+      .task-title {
+        font-weight: 800;
       }
 
-      .task-row.overdue {
-        background: #fff7f7;
-      }
-
-      .badge {
-        min-width: 48px;
-        min-height: 30px;
-        border: 1px solid #d8e1e8;
-        border-radius: 8px;
-        background: #f8fafc;
+      .task-source,
+      .task-meta,
+      .task-owner,
+      .due {
+        margin-top: 5px;
         color: var(--muted);
-        font-size: 13px;
-        font-weight: 700;
+        font-size: 12px;
+        line-height: 1.45;
       }
 
-      .badge.overdue,
-      .badge.critical {
-        border-color: #fecaca;
-        background: var(--red-soft);
-        color: var(--red);
+      .task-owner {
+        color: var(--text);
       }
 
-      .badge.alert {
+      .task-side {
+        display: grid;
+        align-content: space-between;
+        justify-items: end;
+        gap: 12px;
+      }
+
+      .status-chip {
+        border: 1px solid var(--line);
+        background: var(--panel-soft);
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      .status-chip.risk {
         border-color: #fed7aa;
         background: var(--orange-soft);
         color: var(--orange);
       }
 
-      .task-title {
-        font-size: 16px;
-        font-weight: 750;
-        line-height: 1.25;
-      }
-
-      .task-source,
-      .task-meta,
-      .task-blocked {
-        margin-top: 4px;
-        color: var(--muted);
-        font-size: 13px;
-        overflow-wrap: anywhere;
-      }
-
-      .task-blocked {
+      .status-chip.overdue {
+        border-color: #fecaca;
+        background: var(--red-soft);
         color: var(--red);
-      }
-
-      .right {
-        min-width: 0;
-        text-align: right;
-      }
-
-      .chip {
-        max-width: 100%;
-        min-height: 28px;
-        border: 1px solid #bfdbfe;
-        border-radius: 8px;
-        background: var(--blue-soft);
-        color: var(--blue);
-        padding: 0 8px;
-        font-size: 13px;
-        font-weight: 700;
-      }
-
-      .due {
-        margin-top: 8px;
-        color: var(--muted);
-        font-size: 13px;
       }
 
       .due.overdue {
         color: var(--red);
+        font-weight: 750;
       }
 
-      .due.alert {
-        color: var(--orange);
-      }
-
-      .list-more {
-        width: calc(100% - 40px);
-        min-height: 44px;
-        margin: 0 20px 20px;
-        border: 1px dashed #cbd5e1;
-        border-radius: 12px;
-        background: rgb(248 250 252 / 86%);
+      .load-more {
+        width: 100%;
+        min-height: 40px;
+        border: 1px dashed var(--line);
+        border-radius: 10px;
+        background: transparent;
         color: var(--green);
+        cursor: pointer;
+        margin-top: 10px;
+        font-weight: 750;
+      }
+
+      .selection-notice {
+        position: sticky;
+        z-index: 3;
+        bottom: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        border: 1px solid color-mix(in srgb, var(--green) 55%, var(--line));
+        border-radius: 10px;
+        background: var(--green-soft);
+        color: var(--green);
+        margin-top: 12px;
+        padding: 10px 12px;
+        box-shadow: 0 12px 32px rgb(15 23 42 / 14%);
+        font-size: 13px;
         font-weight: 700;
       }
 
-      .panel {
-        margin: 20px;
-        border: 1px solid var(--line);
-        border-radius: 18px;
-        background: #fff;
-        padding: 16px;
-        box-shadow: 0 5px 18px rgb(15 23 42 / 5%);
+      .selection-notice[hidden] {
+        display: none;
       }
 
-      .progress-bar {
-        height: 8px;
-        overflow: hidden;
-        border-radius: 999px;
-        background: #e2e8f0;
-        margin-top: 12px;
-      }
-
-      .progress-bar span {
-        display: block;
-        width: 42%;
-        height: 100%;
-        border-radius: inherit;
-        background: #10b981;
-      }
-
-      .done-card,
-      .message-card,
-      .mine-card {
-        border-radius: 14px;
-        background: var(--surface-soft);
-        padding: 12px;
-        margin-top: 10px;
-      }
-
-      button.done-card {
-        display: block;
-        width: 100%;
-        border: 1px solid var(--line);
-        color: var(--text);
-        text-align: left;
-      }
-
-      .message-card.warning {
-        border: 1px solid #fed7aa;
-        background: #fff7ed;
-      }
-
-      .mine-account-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 10px;
-        margin-top: 16px;
-      }
-
-      .mine-account-grid .mine-card {
-        min-width: 0;
-        margin-top: 0;
-      }
-
-      .mine-account-grid .mine-card strong {
-        display: block;
-        margin-top: 6px;
-        overflow-wrap: anywhere;
-      }
-
-      .mine-account-grid .mine-card span {
-        color: var(--muted);
-        font-size: 13px;
+      .selection-notice button {
+        min-height: 30px;
+        border: 1px solid color-mix(in srgb, var(--green) 55%, var(--line));
+        border-radius: 7px;
+        background: var(--panel);
+        cursor: pointer;
+        white-space: nowrap;
       }
 
       .bottom-nav {
+        z-index: 5;
         display: grid;
-        flex: 0 0 auto;
         grid-template-columns: repeat(4, minmax(0, 1fr));
         border-top: 1px solid var(--line);
-        background: rgb(255 255 255 / 96%);
-        box-shadow: 0 -8px 24px rgb(15 23 42 / 8%);
-        padding: 8px 8px 10px;
+        background: color-mix(in srgb, var(--panel) 95%, transparent);
+        padding: 7px 6px calc(7px + env(safe-area-inset-bottom));
+        backdrop-filter: blur(10px);
       }
 
-      .nav-btn {
-        min-height: 58px;
+      .nav-button {
+        min-height: 48px;
         border: 0;
-        border-radius: 12px;
+        border-radius: 9px;
         background: transparent;
         color: var(--muted);
-        font-weight: 700;
-      }
-
-      .nav-btn.active {
-        color: var(--green);
-      }
-
-      .nav-btn .icon {
-        display: block;
-        font-size: 22px;
-      }
-
-      .scroll-top {
-        position: absolute;
-        right: 18px;
-        bottom: 92px;
-        z-index: 8;
-        display: none;
-        width: 44px;
-        height: 44px;
-        border: 1px solid rgb(16 185 129 / 32%);
-        border-radius: 999px;
-        background: rgb(255 255 255 / 94%);
-        box-shadow: 0 12px 28px rgb(15 23 42 / 18%);
-        color: var(--green);
-      }
-
-      .scroll-top.visible {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .detail-header {
-        flex: 0 0 auto;
-        border-bottom: 1px solid var(--line);
-        background: rgb(255 255 255 / 95%);
-        padding: 14px 16px;
-      }
-
-      .detail-top {
-        display: grid;
-        grid-template-columns: 98px minmax(0, 1fr) 82px;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .back {
-        border: 0;
-        background: transparent;
-        text-align: left;
-        font-size: 16px;
-      }
-
-      .detail-title {
-        overflow: hidden;
-        text-align: center;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        font-size: 20px;
+        cursor: pointer;
         font-weight: 750;
       }
 
-      .detail-source {
-        display: flex;
-        gap: 6px;
-        margin-top: 10px;
-        color: var(--muted);
-        overflow-wrap: anywhere;
-      }
-
-      .detail-main {
-        background: #f8fafc;
-        padding: 14px;
-      }
-
-      .fact-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        overflow: hidden;
-        border: 1px solid var(--line);
-        border-radius: 14px;
-        margin-top: 12px;
-      }
-
-      .fact {
-        min-height: 76px;
-        border-right: 1px solid var(--line);
-        border-bottom: 1px solid var(--line);
-        padding: 12px;
-      }
-
-      .fact:nth-child(2n) {
-        border-right: 0;
-      }
-
-      .fact label {
-        display: block;
-        color: var(--muted);
-        font-size: 13px;
-      }
-
-      .fact strong {
-        display: block;
-        margin-top: 6px;
-      }
-
-      .risk-box,
-      .exception-box {
-        margin-top: 14px;
-        border-radius: 16px;
-        padding: 14px;
-        font-weight: 750;
-      }
-
-      .risk-box {
-        border: 1px solid #fecaca;
-        background: var(--red-soft);
-        color: #b91c1c;
-      }
-
-      .exception-box {
-        border: 1px solid #fed7aa;
-        background: var(--orange-soft);
-        color: #9a3412;
-      }
-
-      .textarea {
-        width: 100%;
-        min-height: 96px;
-        margin-top: 12px;
-        border: 1px solid var(--line);
-        border-radius: 14px;
-        padding: 12px;
-        resize: vertical;
-      }
-
-      .textarea:disabled {
-        background: #f1f5f9;
-        color: var(--muted);
-        cursor: not-allowed;
-      }
-
-      .event {
-        display: flex;
-        gap: 10px;
-        margin-top: 12px;
-        border-radius: 14px;
-        background: var(--surface-soft);
-        padding: 12px;
-      }
-
-      .event-dot {
-        width: 11px;
-        height: 11px;
-        margin-top: 6px;
-        border-radius: 999px;
-        background: var(--blue);
-      }
-
-      .reason-sheet {
-        display: none;
-        border: 1px solid var(--line);
-        border-radius: 22px 22px 0 0;
-        background: #fff;
-        padding: 14px;
-        box-shadow: 0 -8px 28px rgb(15 23 42 / 10%);
-      }
-
-      .reason-sheet.visible {
-        display: block;
-      }
-
-      .quick-reasons {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-top: 10px;
-      }
-
-      .quick-reasons button {
-        min-height: 34px;
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        background: #fff;
-        padding: 0 10px;
-        color: var(--muted);
-      }
-
-      .reason-actions {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 10px;
-        margin-top: 14px;
-      }
-
-      .reason-actions button {
-        min-height: 44px;
-      }
-
-      .action-feedback {
-        display: none;
-        margin-top: 12px;
-        border-radius: 12px;
-        padding: 10px 12px;
-        font-weight: 700;
-      }
-
-      .action-feedback.visible {
-        display: block;
-      }
-
-      .action-feedback.error {
-        background: #fef2f2;
-        color: var(--red);
-      }
-
-      .action-feedback.success {
+      .nav-button.active {
         background: var(--green-soft);
         color: var(--green);
       }
 
-      .action-bar {
-        display: grid;
-        flex: 0 0 auto;
-        grid-template-columns: minmax(0, 1fr);
-        gap: 10px;
-        border-top: 1px solid var(--line);
-        background: rgb(255 255 255 / 95%);
-        padding: 10px;
-        box-shadow: 0 -8px 24px rgb(15 23 42 / 8%);
-      }
-
-      .action-bar.action-bar--empty {
-        grid-template-columns: minmax(0, 1fr);
-      }
-
-      .action-guidance {
-        grid-column: 1 / -1;
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        background: var(--surface-soft);
-        color: var(--muted);
-        padding: 10px 12px;
-        font-size: 14px;
-      }
-
-      .action {
-        min-height: 56px;
-        border: 0;
-        border-radius: 14px;
-        color: #fff;
-        font-weight: 800;
-      }
-
-      .action.block {
-        background: var(--orange);
-      }
-
-      .action.done {
-        background: #059669;
-      }
-
-      .action.urge {
-        border: 1px solid var(--line);
-        background: #fff;
-        color: var(--text);
-      }
-
-      .action.resume {
-        background: var(--blue);
-      }
-
-      .action.rejected {
-        grid-column: 1 / -1;
-        border: 1px solid #fecaca;
-        background: var(--red-soft);
-        color: var(--red);
-      }
-
-      .note {
-        margin: 12px 20px 18px;
-        border: 1px solid #fde68a;
-        border-radius: 14px;
-        background: #fffbeb;
-        color: #92400e;
+      .message-card,
+      .account-card {
+        margin-bottom: 8px;
         padding: 12px;
-        font-size: 14px;
+      }
+
+      .account-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .account-card span,
+      .account-card strong {
+        display: block;
+      }
+
+      .account-card span {
+        color: var(--muted);
+        font-size: 12px;
+        margin-bottom: 4px;
+      }
+
+      .skeleton {
+        position: relative;
+        overflow: hidden;
+        border-radius: 7px;
+        background: var(--line);
+      }
+
+      .skeleton::after {
+        position: absolute;
+        inset: 0;
+        content: "";
+        background: linear-gradient(90deg, transparent, rgb(255 255 255 / 55%), transparent);
+        animation: shimmer 1.1s infinite;
+        transform: translateX(-100%);
+      }
+
+      @keyframes shimmer {
+        to { transform: translateX(100%); }
+      }
+
+      .skeleton-row {
+        height: 104px;
+        margin-bottom: 8px;
+      }
+
+      .empty {
+        display: grid;
+        min-height: 220px;
+        place-items: center;
+        color: var(--muted);
+        text-align: center;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #101820;
+          --panel: #19232d;
+          --panel-soft: #202d39;
+          --text: #f1f5f9;
+          --muted: #a8b3c0;
+          --line: #344453;
+          --green: #45c5aa;
+          --green-soft: #173d37;
+          --orange-soft: #452f16;
+          --red-soft: #452327;
+        }
       }
 
       @media (max-width: 460px) {
-        .page {
+        .stage {
           padding: 0;
         }
 
@@ -937,854 +448,183 @@
     </style>
   </head>
   <body>
-    <main class="page">
+    <main class="stage">
       <section class="phone" aria-label="岗位任务端当前列表基线">
-        <section class="screen active" id="listScreen">
-          <div class="main-scroll" id="mainScroll">
-            <header class="header">
-              <div class="header-left">
-                <h1 id="pageTitle">待办</h1>
-                <span class="role-pill">仓库</span>
-              </div>
-              <button class="refresh" id="refreshButton">↻ 刷新</button>
-            </header>
-
-            <div class="sync">
-              <span class="dot"></span>
-              <span>最后同步：04/26 12:14</span>
-              <span id="refreshStatus" role="status" hidden></span>
+        <div class="scroll-area" id="scrollArea">
+          <header class="header">
+            <div>
+              <h1 id="pageTitle">待办</h1>
+              <div class="header-meta"><span class="role-pill">仓库</span><span id="syncText">最后同步：12:14</span></div>
             </div>
-
-            <section id="tabContent"></section>
-          </div>
-          <button class="scroll-top" id="scrollTopButton">↑</button>
-          <nav class="bottom-nav" aria-label="岗位任务端主导航">
-            <button class="nav-btn active" data-tab="todo">
-              <span class="icon">▣</span>待办
-            </button>
-            <button class="nav-btn" data-tab="done">
-              <span class="icon">☑</span>已办
-            </button>
-            <button class="nav-btn" data-tab="messages">
-              <span class="icon">◔</span>消息
-            </button>
-            <button class="nav-btn" data-tab="mine">
-              <span class="icon">♙</span>我的
-            </button>
-          </nav>
-        </section>
-
-        <section class="screen" id="detailScreen">
-          <header class="detail-header">
-            <div class="detail-top">
-              <button class="back" id="backButton">‹ 任务列表</button>
-              <div class="detail-title" id="detailTitle">成品返工处理</div>
-              <div style="text-align: right">
-                <span class="badge overdue" id="detailBadge">超时</span>
-              </div>
-            </div>
-            <div class="detail-source">
-              <span>▤</span>
-              <span id="detailSourceText">来源：SO-202607-018</span>
-            </div>
+            <button class="refresh" id="refreshButton" type="button">↻ 刷新</button>
           </header>
-
-          <main class="detail-main">
-            <p style="margin: 0 0 14px; color: #52616f; line-height: 1.6">
-              历史对照：本 HTML 中的旧详情内处理仅用于追溯 v1。当前运行态从列表选中任务后，进入 v2 的“查看任务 → 处理任务 → 结果回执”，结束后恢复原列表状态。
-            </p>
-            <section class="panel" style="margin: 0">
-              <div style="display: flex; justify-content: space-between; gap: 12px">
-                <h2>▤ 任务关键信息</h2>
-                <span class="detail-meta">摘要</span>
-              </div>
-              <div class="fact-grid" id="detailFacts">
-                <div class="fact"><label>状态</label><strong>待处理</strong></div>
-                <div class="fact"><label>业务</label><strong>质检不合格</strong></div>
-                <div class="fact"><label>客户</label><strong>星河礼品</strong></div>
-                <div class="fact"><label>款式</label><strong>云朵小熊</strong></div>
-                <div class="fact"><label>数量</label><strong>600 只</strong></div>
-                <div class="fact"><label>截止</label><strong>04/25 18:00</strong></div>
-              </div>
-            </section>
-
-            <section class="risk-box" id="detailRisk">! 质检不合格 · 需要确认后继续流转</section>
-            <section class="exception-box" id="detailExceptionSection">
-              <strong>异常上报</strong>
-              <div id="detailException" style="margin-top: 6px; font-weight: 500">生产确认返工完成后重新提交成品抽检。</div>
-            </section>
-
-            <section class="panel" style="margin: 14px 0 0">
-              <div style="display: flex; justify-content: space-between">
-                <h2>◇ 关联来源（1）</h2>
-                <span class="detail-meta">来源</span>
-              </div>
-              <div class="done-card" id="detailLinkedSource">来源：SO-202607-018</div>
-            </section>
-
-            <section class="panel" style="margin: 14px 0 0">
-              <div style="display: flex; justify-content: space-between">
-                <h2>▧ 现场留痕</h2>
-                <span id="detailEvidenceState" style="color: var(--muted); font-size: 13px">可选</span>
-              </div>
-              <textarea class="textarea" id="detailEvidenceInput" placeholder="填写照片、附件编号或链接；多条可换行"></textarea>
-              <div style="text-align: right; color: var(--muted); font-size: 13px">0/500</div>
-            </section>
-
-            <section class="panel" style="margin: 14px 0 0">
-              <div style="display: flex; justify-content: space-between">
-                <h2>◷ 最近动态</h2>
-                <span class="detail-meta">最近一条</span>
-              </div>
-              <div class="event">
-                <span class="event-dot"></span>
-                <div>
-                  <strong>系统 <span class="chip" id="detailEventStatus">待处理</span></strong>
-                  <div id="detailEventText" style="margin-top: 6px; color: var(--muted)">
-                    任务已流转至仓库
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <p class="note">完成、阻塞、退回、解除阻塞或催办只更新 Workflow 协同任务；库存、质检、出货和财务事实仍须在对应业务页面办理。</p>
-
-            <section class="reason-sheet" id="reasonSheet">
-              <div style="display: flex; justify-content: space-between">
-                <h2 id="reasonTitle">阻塞原因（必填） ·</h2>
-                <button class="refresh" id="closeReasonButton">收起 ^</button>
-              </div>
-              <textarea class="textarea" id="reasonInput" maxlength="500" placeholder="请填写原因，说明卡点、退回依据或催办诉求"></textarea>
-              <div id="reasonCount" style="text-align: right; color: var(--muted); font-size: 13px">0/500</div>
-              <div style="margin-top: 12px; color: var(--muted)">快捷选择（可选）</div>
-              <div class="quick-reasons">
-                <button type="button" data-quick-reason="材料不足">材料不足</button>
-                <button type="button" data-quick-reason="产能不足">产能不足</button>
-                <button type="button" data-quick-reason="工艺/模具问题">工艺/模具问题</button>
-                <button type="button" data-quick-reason="信息不清">信息不清</button>
-              </div>
-              <div class="action-feedback" id="actionFeedback" role="status" aria-live="polite"></div>
-              <div class="reason-actions">
-                <button class="refresh" id="cancelReasonButton" type="button">取消</button>
-                <button class="action done" id="submitReasonButton" type="button">提交</button>
-              </div>
-            </section>
-          </main>
-
-          <div class="action-bar" id="actionBar" aria-label="当前任务可用操作"></div>
-        </section>
+          <div class="content" id="content" aria-live="polite"></div>
+        </div>
+        <nav class="bottom-nav" aria-label="岗位任务端主导航">
+          <button class="nav-button active" type="button" data-tab="todo">待办</button>
+          <button class="nav-button" type="button" data-tab="done">已办</button>
+          <button class="nav-button" type="button" data-tab="messages">消息</button>
+          <button class="nav-button" type="button" data-tab="mine">我的</button>
+        </nav>
       </section>
     </main>
 
     <script>
-      const ACTIONS = {
-        blocked: {
-          label: "Ⅱ 阻塞",
-          sheetLabel: "阻塞原因（必填）",
-          className: "block",
-        },
-        done: {
-          label: "✓ 完成",
-          sheetLabel: "完成反馈（必填）",
-          className: "done",
-        },
-        rejected: {
-          label: "退回当前任务",
-          sheetLabel: "退回原因（必填）",
-          className: "rejected",
-        },
-        resume: {
-          label: "↻ 解除阻塞",
-          sheetLabel: "阻塞解除说明（必填）",
-          className: "resume",
-        },
-        urge: {
-          label: "◔ 催办",
-          sheetLabel: "催办原因（必填）",
-          className: "urge",
-        },
-      };
-
       const tasks = [
-        {
-          id: "task-rework-018",
-          title: "成品返工处理",
-          source: "SO-202607-018",
-          meta: "客户：星河礼品 ｜ 款式：云朵小熊 ｜ 数量：600只",
-          badge: "超时",
-          tone: "overdue",
-          chip: "质检不合格",
-          status: "已阻塞",
-          due: "04/25 18:00",
-          mine: true,
-          listView: "todo",
-          accessMode: "actionable",
-          actions: ["resume", "urge"],
-          guidance: "任务已阻塞，本岗位可填写解除说明后恢复处理，也可催办相关协作岗位。",
-          risk: "质检不合格 · 已超时",
-          blockedReason: "生产确认返工完成，重新提交成品抽检",
-          exception: "生产确认返工完成后重新提交成品抽检。",
-        },
-        {
-          id: "task-rework-021",
-          title: "成品返工处理",
-          source: "SO-202607-021",
-          meta: "客户：星河礼品 ｜ 款式：云朵小熊 ｜ 数量：600只",
-          badge: "预警",
-          tone: "alert",
-          chip: "生产确认返工完成",
-          status: "待处理",
-          due: "04/27 15:00",
-          mine: true,
-          listView: "todo",
-          accessMode: "actionable",
-          actions: ["blocked", "done", "urge"],
-          guidance: "本岗位可以阻塞、完成或催办；提交前仍需由服务端复核当前状态和权限。",
-          risk: "生产确认返工完成 · 需尽快确认",
-        },
-        {
-          id: "task-receivable-006",
-          title: "财务已超时-应收登记",
-          source: "AR-202607-006",
-          meta: "客户：晨光百货 ｜ 款式：毛绒狗 ｜ 数量：600只",
-          badge: "预警",
-          tone: "alert",
-          chip: "应收登记",
-          status: "待处理",
-          due: "04/24 17:30",
-          mine: false,
-          listView: "todo",
-          accessMode: "urge-only",
-          actions: ["urge"],
-          guidance: "当前任务由财务岗位负责，仓库只能查看并催办，不能代替财务完成或退回。",
-          risk: "应收登记已超时",
-        },
-        {
-          id: "task-quality-011",
-          title: "成品抽检待处理",
-          source: "QI-202607-011",
-          meta: "客户：晨光百货 ｜ 款式：毛绒狗 ｜ 数量：600只",
-          badge: "预警",
-          tone: "alert",
-          chip: "生产抽检",
-          status: "待处理",
-          due: "04/28 10:00",
-          mine: false,
-          listView: "todo",
-          accessMode: "readonly",
-          actions: [],
-          guidance: "当前任务由品质岗位负责，本岗位只能查看，不能处理或催办。",
-          risk: "",
-        },
-        {
-          id: "task-inbound-028",
-          title: "物料入库确认",
-          source: "PO-202607-028",
-          meta: "物料：PP棉 ｜ 规格：1kg/包 ｜ 数量：120包",
-          badge: "普通",
-          tone: "",
-          chip: "待入库确认",
-          status: "待处理",
-          due: "04/29 09:30",
-          mine: true,
-          listView: "todo",
-          accessMode: "actionable",
-          actions: ["blocked", "done", "urge", "rejected"],
-          guidance: "本岗位可核对入库任务并选择阻塞、完成、退回或催办。",
-          risk: "",
-        },
-        {
-          id: "task-picking-014",
-          title: "生产领料审核",
-          source: "MO-202607-014",
-          meta: "产品：泰迪熊 ｜ 规格：35cm ｜ 数量：1,000只",
-          badge: "普通",
-          tone: "",
-          chip: "待领料审核",
-          status: "待处理",
-          due: "04/29 11:00",
-          mine: true,
-          approval: true,
-          listView: "todo",
-          accessMode: "actionable",
-          actions: ["blocked", "done", "urge"],
-          guidance: "本岗位可处理当前审核任务，动作只更新协同任务状态。",
-          risk: "",
-        },
-        {
-          id: "task-inbound-done-026",
-          title: "仓库入库确认",
-          source: "PR-202607-026",
-          meta: "物料：水洗棉 ｜ 数量：80包 ｜ 仓位：原料A区",
-          badge: "已完成",
-          tone: "",
-          chip: "入库确认",
-          status: "已完成",
-          due: "04/26 16:20",
-          mine: true,
-          listView: "history",
-          accessMode: "readonly",
-          actions: [],
-          guidance: "任务已完成，当前只保留详情和处理留痕，不能再次修改任务状态。",
-          risk: "",
-        },
-        {
-          id: "task-inbound-rejected-024",
-          title: "包装破损来料确认",
-          source: "PR-202607-024",
-          meta: "物料：短毛绒 ｜ 数量：12卷 ｜ 结果：已退回",
-          badge: "已退回",
-          tone: "alert",
-          chip: "来料核对",
-          status: "已退回",
-          due: "04/26 15:10",
-          mine: true,
-          listView: "history",
-          accessMode: "readonly",
-          actions: [],
-          guidance: "任务已退回并结束当前处理，当前只读；后续业务结果仍以来源单据为准。",
-          risk: "",
-        },
+        { id: "task-inbound-031", title: "成品入库确认", source: "PR-202608-031", meta: "产品：云朵小熊 ｜ 数量：600 只", ownerRole: "仓库", status: "已阻塞", tone: "overdue", due: "今天 14:30", approval: false, listView: "todo" },
+        { id: "task-rework-021", title: "成品返工处理", source: "SO-202608-021", meta: "客户：星河礼品 ｜ 数量：600 只", ownerRole: "仓库", status: "待处理", tone: "risk", due: "今天 15:00", approval: false, listView: "todo" },
+        { id: "task-receivable-006", title: "应收登记", source: "AR-202608-006", meta: "客户：晨光百货 ｜ 金额：¥ 28,600", ownerRole: "财务", status: "已超时", tone: "overdue", due: "昨天 17:30", approval: false, listView: "todo" },
+        { id: "task-picking-014", title: "生产领料审核", source: "MO-202608-014", meta: "产品：泰迪熊 ｜ 数量：1,000 只", ownerRole: "仓库", status: "待审批", tone: "", due: "明天 11:00", approval: true, listView: "todo" },
+        { id: "task-quality-011", title: "成品抽检待处理", source: "QI-202608-011", meta: "客户：晨光百货 ｜ 数量：600 只", ownerRole: "品质", status: "待处理", tone: "risk", due: "明天 10:00", approval: false, listView: "todo" },
+        { id: "task-inbound-028", title: "物料入库确认", source: "PO-202608-028", meta: "物料：PP 棉 ｜ 数量：120 包", ownerRole: "仓库", status: "待处理", tone: "", due: "周五 09:30", approval: false, listView: "todo" },
+        { id: "task-inbound-done-026", title: "仓库入库确认", source: "PR-202608-026", meta: "物料：水洗棉 ｜ 数量：80 包", ownerRole: "仓库", status: "已完成", tone: "", due: "04/26 16:20", approval: false, listView: "done" },
+        { id: "task-returned-024", title: "包装破损来料确认", source: "PR-202608-024", meta: "物料：短毛绒 ｜ 数量：12 卷", ownerRole: "仓库", status: "已退回", tone: "risk", due: "04/26 15:10", approval: false, listView: "done" },
       ];
 
-      // 这些状态会在 tabData 初始化时被 renderTodo / renderTaskRows 读取，
-      // 必须先于 tabData 赋值，避免浏览器触发 let 的暂时性死区。
-      let activeTaskTrigger = null;
+      const content = document.querySelector("#content");
+      const pageTitle = document.querySelector("#pageTitle");
+      const syncText = document.querySelector("#syncText");
+      const refreshButton = document.querySelector("#refreshButton");
+      const scrollArea = document.querySelector("#scrollArea");
+      const navButtons = Array.from(document.querySelectorAll("[data-tab]"));
+      let activeTab = "todo";
       let activeFilter = "all";
-      const canViewApprovalInbox = true;
-      let visibleTaskLimit = 4;
-      let activeActionButton = null;
-      let activeTask = null;
-      let actionSubmitting = false;
+      let visibleLimit = 4;
+      let selectedTaskId = "";
+      let refreshing = false;
 
       function todoTasks() {
         return tasks.filter((task) => task.listView === "todo");
       }
 
-      function historyTasks() {
-        return tasks.filter((task) => task.listView === "history");
-      }
-
-      const tabData = {
-        todo: {
-          title: "待办",
-          content: renderTodo(),
-        },
-        done: {
-          title: "已办",
-          content: renderDone(),
-        },
-        messages: {
-          title: "消息",
-          content: renderMessages(),
-        },
-        mine: {
-          title: "我的",
-          content: renderMine(),
-        },
-      };
-
-      const tabContent = document.querySelector("#tabContent");
-      const pageTitle = document.querySelector("#pageTitle");
-      const refreshStatus = document.querySelector("#refreshStatus");
-      const listScreen = document.querySelector("#listScreen");
-      const detailScreen = document.querySelector("#detailScreen");
-      const mainScroll = document.querySelector("#mainScroll");
-      const scrollTopButton = document.querySelector("#scrollTopButton");
-      const reasonSheet = document.querySelector("#reasonSheet");
-      const reasonTitle = document.querySelector("#reasonTitle");
-      const reasonInput = document.querySelector("#reasonInput");
-      const reasonCount = document.querySelector("#reasonCount");
-      const actionFeedback = document.querySelector("#actionFeedback");
-      const submitReasonButton = document.querySelector("#submitReasonButton");
-      const detailTitle = document.querySelector("#detailTitle");
-      const detailBadge = document.querySelector("#detailBadge");
-      const detailSourceText = document.querySelector("#detailSourceText");
-      const detailFacts = document.querySelector("#detailFacts");
-      const detailRisk = document.querySelector("#detailRisk");
-      const detailExceptionSection = document.querySelector("#detailExceptionSection");
-      const detailException = document.querySelector("#detailException");
-      const detailLinkedSource = document.querySelector("#detailLinkedSource");
-      const detailEvidenceInput = document.querySelector("#detailEvidenceInput");
-      const detailEvidenceState = document.querySelector("#detailEvidenceState");
-      const detailEventStatus = document.querySelector("#detailEventStatus");
-      const detailEventText = document.querySelector("#detailEventText");
-      const backButton = document.querySelector("#backButton");
-      const actionBar = document.querySelector("#actionBar");
-
-      function renderActionBar(task) {
-        const actions = Array.isArray(task.actions) ? task.actions : [];
-        const primaryActionCount = actions.filter(
-          (actionKey) => actionKey !== "rejected",
-        ).length;
-        const columnCount = Math.max(1, Math.min(3, primaryActionCount));
-        const guidance = task.guidance
-          ? `<div class="action-guidance" role="note">${task.guidance}</div>`
-          : "";
-        actionBar.classList.toggle("action-bar--empty", actions.length === 0);
-        actionBar.style.gridTemplateColumns = `repeat(${columnCount}, minmax(0, 1fr))`;
-        actionBar.innerHTML = [
-          guidance,
-          ...actions.map((actionKey) => {
-            const action = ACTIONS[actionKey];
-            if (!action) return "";
-            return `<button class="action ${action.className}" data-action="${actionKey}" data-action-label="${action.sheetLabel}" aria-expanded="false">${action.label}</button>`;
-          }),
-        ].join("");
-      }
-
-      function renderTaskDetail(task) {
-        activeTask = task;
-        activeActionButton = null;
-        closeReasonSheet();
-        const metadataFacts = task.meta.split(" ｜ ").map((item) => {
-          const [label, ...valueParts] = item.split("：");
-          return [label, valueParts.join("：")];
-        });
-        const factRows = [
-          ["状态", task.status],
-          ["业务", task.chip],
-          ...metadataFacts,
-          ["截止", task.due],
-        ];
-
-        detailTitle.textContent = task.title;
-        detailBadge.textContent = task.badge;
-        detailBadge.className = `badge ${task.tone}`.trim();
-        detailSourceText.textContent = `来源：${task.source}`;
-        detailLinkedSource.textContent = `来源：${task.source}`;
-        detailRisk.hidden = !task.risk;
-        detailRisk.textContent = task.risk ? `! ${task.risk}` : "";
-        detailExceptionSection.hidden = !task.exception;
-        detailException.textContent =
-          task.exception || "请按当前任务要求处理，并在提交前核对业务信息。";
-        const isReadonly = task.accessMode === "readonly";
-        detailEvidenceInput.disabled = isReadonly;
-        detailEvidenceInput.value = "";
-        detailEvidenceInput.placeholder = isReadonly
-          ? "当前任务只读，现场留痕不可编辑"
-          : "填写照片、附件编号或链接；多条可换行";
-        detailEvidenceState.textContent = isReadonly ? "只读" : "可选";
-        detailEventStatus.textContent = task.status;
-        detailEventText.textContent =
-          task.status === "已完成"
-            ? "任务已完成，当前只保留协同处理留痕。"
-            : task.status === "已退回"
-              ? "任务已退回并结束当前处理。"
-              : `任务已流转至${task.mine ? "仓库" : "责任岗位"}`;
-        renderActionBar(task);
-        detailFacts.replaceChildren(
-          ...factRows.map(([label, value]) => {
-            const item = document.createElement("div");
-            const itemLabel = document.createElement("label");
-            const itemValue = document.createElement("strong");
-            item.className = "fact";
-            itemLabel.textContent = label;
-            itemValue.textContent = value;
-            item.append(itemLabel, itemValue);
-            return item;
-          }),
-        );
-      }
-
       function filteredTasks() {
-        const currentTodoTasks = todoTasks();
-        if (activeFilter === "risk") {
-          return currentTodoTasks.filter((task) => task.tone);
-        }
-        if (activeFilter === "overdue") {
-          return currentTodoTasks.filter((task) => task.tone === "overdue");
-        }
-        if (activeFilter === "approval") {
-          return currentTodoTasks.filter((task) => task.approval);
-        }
-        return currentTodoTasks;
+        const currentTasks = todoTasks();
+        if (activeFilter === "approval") return currentTasks.filter((task) => task.approval);
+        if (activeFilter === "risk") return currentTasks.filter((task) => task.tone);
+        if (activeFilter === "overdue") return currentTasks.filter((task) => task.tone === "overdue");
+        return currentTasks;
       }
 
-      function renderTaskRows() {
-        const matchingTasks = filteredTasks();
-        const visibleTasks = matchingTasks.slice(0, visibleTaskLimit);
-        const remainingCount = Math.max(
-          0,
-          matchingTasks.length - visibleTasks.length,
-        );
-        return `
-          <div class="list-head">
-            <span>任务信息</span>
-            <span>状态 / 截止</span>
+      function taskCard(task) {
+        const selected = task.id === selectedTaskId;
+        return `<button class="task-row" type="button" data-task-id="${task.id}" aria-current="${selected ? "true" : "false"}">
+          <div>
+            <div class="task-title">${task.title}</div>
+            <div class="task-source">${task.source}</div>
+            <div class="task-meta">${task.meta}</div>
+            <div class="task-owner">责任岗位：${task.ownerRole}</div>
           </div>
-          <div class="task-list">
-            ${visibleTasks
-              .map(
-                (task) => {
-                  const taskIndex = tasks.indexOf(task);
-                  return `
-                <button class="task-row ${task.tone}" data-open-detail="${taskIndex}">
-                  <div><span class="badge ${task.tone}">${task.badge}</span></div>
-                  <div>
-                    <div class="task-title">${task.title}</div>
-                    <div class="task-source">${task.source}</div>
-                    <div class="task-meta">♙ ${task.meta}</div>
-                    ${task.blockedReason ? `<div class="task-blocked">阻塞：${task.blockedReason}</div>` : ""}
-                  </div>
-                  <div class="right">
-                    <span class="chip">${task.chip}</span>
-                    <div class="due ${task.tone}">${task.due}</div>
-                  </div>
-                </button>`;
-                },
-              )
-              .join("")}
+          <div class="task-side">
+            <span class="status-chip ${task.tone}">${task.status}</span>
+            <span class="due ${task.tone}">${task.due}</span>
           </div>
-          ${matchingTasks.length > 4 ? `<button class="list-more" data-list-more>${remainingCount > 0 ? `展开更多任务 <span style="color:var(--muted);font-size:12px">剩余 ${remainingCount} 条</span>` : "收起任务"}</button>` : ""}
-        `;
+        </button>`;
       }
 
       function renderTodo() {
-        const currentTodoTasks = todoTasks();
-        const riskCount = currentTodoTasks.filter((task) => task.risk).length;
-        const overdueCount = currentTodoTasks.filter((task) => task.tone === "overdue").length;
-        const blockedCount = currentTodoTasks.filter((task) => task.status === "已阻塞").length;
-        return `
-          ${renderLoadedTaskOverview()}
-          <section class="metrics">
-            <div class="metric"><strong style="color:var(--orange)">${riskCount}</strong><span>风险</span></div>
-            <div class="metric"><strong style="color:var(--red)">${overdueCount}</strong><span>已超时</span></div>
-            <div class="metric"><strong>0</strong><span>即将超时</span></div>
-            <div class="metric"><strong style="color:var(--red)">${blockedCount}</strong><span>阻塞/高优先</span></div>
+        const currentTasks = todoTasks();
+        const matching = filteredTasks();
+        const visible = matching.slice(0, visibleLimit);
+        const selectedTask = tasks.find((task) => task.id === selectedTaskId);
+        return `<section class="metrics" aria-label="待办摘要">
+            <div class="metric"><strong>${currentTasks.length}</strong><span>待处理</span></div>
+            <div class="metric"><strong style="color:var(--orange)">${currentTasks.filter((task) => task.tone).length}</strong><span>风险</span></div>
+            <div class="metric"><strong style="color:var(--red)">${currentTasks.filter((task) => task.tone === "overdue").length}</strong><span>超时</span></div>
           </section>
-          <div class="filters ${canViewApprovalInbox ? "filters--with-approval" : ""}">
-            <button class="filter ${activeFilter === "all" ? "active" : ""}" data-filter="all"><span>全部</span><span class="count-tag">${currentTodoTasks.length}</span></button>
-            ${canViewApprovalInbox ? `<button class="filter ${activeFilter === "approval" ? "active" : ""}" data-filter="approval" aria-label="待我审批"><span>审批</span><span class="count-tag">${currentTodoTasks.filter((task) => task.approval).length}</span></button>` : ""}
-            <button class="filter ${activeFilter === "risk" ? "active" : ""}" data-filter="risk"><span>风险</span><span class="count-tag">${currentTodoTasks.filter((task) => task.tone).length}</span></button>
-            <button class="filter ${activeFilter === "overdue" ? "active" : ""}" data-filter="overdue"><span>超时</span><span class="count-tag">${currentTodoTasks.filter((task) => task.tone === "overdue").length}</span></button>
+          <div class="filters" aria-label="待办筛选">
+            <button class="filter ${activeFilter === "all" ? "active" : ""}" type="button" data-filter="all">全部 <span class="count-tag">${currentTasks.length}</span></button>
+            <button class="filter ${activeFilter === "approval" ? "active" : ""}" type="button" data-filter="approval">审批 <span class="count-tag">${currentTasks.filter((task) => task.approval).length}</span></button>
+            <button class="filter ${activeFilter === "risk" ? "active" : ""}" type="button" data-filter="risk">风险 <span class="count-tag">${currentTasks.filter((task) => task.tone).length}</span></button>
+            <button class="filter ${activeFilter === "overdue" ? "active" : ""}" type="button" data-filter="overdue">超时 <span class="count-tag">${currentTasks.filter((task) => task.tone === "overdue").length}</span></button>
           </div>
-          ${renderTaskRows()}
-        `;
-      }
-
-      function renderLoadedTaskOverview() {
-        const loadedTodoTasks = todoTasks();
-        const loadedHistoryTasks = historyTasks();
-        return `
-          <section class="panel">
-            <h2>已加载任务分布</h2>
-            <section class="metrics" style="margin:12px 0 0">
-              <div class="metric"><strong>${loadedTodoTasks.filter((task) => task.status === "待处理").length}</strong><span>待处理</span></div>
-              <div class="metric"><strong style="color:var(--orange)">${loadedTodoTasks.filter((task) => task.status === "已阻塞").length}</strong><span>卡住</span></div>
-              <div class="metric"><strong style="color:var(--red)">${loadedHistoryTasks.filter((task) => task.status === "已退回").length}</strong><span>已退回</span></div>
-              <div class="metric"><strong style="color:var(--green)">${loadedHistoryTasks.filter((task) => task.status === "已完成").length}</strong><span>完成</span></div>
-            </section>
-          </section>
-        `;
-      }
-
-      function renderLoading() {
-        const metricPlaceholders = [0, 1, 2, 3]
-          .map(
-            () => `
-              <div class="skeleton-metric">
-                <span class="skeleton-block skeleton-value"></span>
-                <span class="skeleton-block skeleton-label"></span>
-              </div>`
-          )
-          .join("");
-        const filterPlaceholders = [0, 1, 2, 3]
-          .map(
-            () => `
-              <div class="skeleton-filter">
-                <span class="skeleton-block" style="height:22px"></span>
-              </div>`
-          )
-          .join("");
-        const rowPlaceholders = [0, 1, 2, 3]
-          .map(
-            () => `
-              <div class="skeleton-row">
-                <span class="skeleton-block skeleton-badge"></span>
-                <div>
-                  <span class="skeleton-block skeleton-title"></span>
-                  <span class="skeleton-block skeleton-source"></span>
-                  <span class="skeleton-block skeleton-meta"></span>
-                </div>
-                <div>
-                  <span class="skeleton-block skeleton-chip"></span>
-                  <span class="skeleton-block skeleton-time"></span>
-                </div>
-              </div>`
-          )
-          .join("");
-        return `
-          <section class="skeleton-wrap" aria-hidden="true">
-            <div class="skeleton-metrics">${metricPlaceholders}</div>
-            <div class="skeleton-filters">${filterPlaceholders}</div>
-            <div class="list-head" style="padding-top:18px">
-              <span class="skeleton-block" style="width:96px;height:20px"></span>
-              <span class="skeleton-block" style="justify-self:end;width:86px;height:20px"></span>
-            </div>
-            <div class="skeleton-list">${rowPlaceholders}</div>
-          </section>
-        `;
+          <div class="task-list">${visible.length ? visible.map(taskCard).join("") : '<div class="empty">当前筛选没有待办</div>'}</div>
+          ${matching.length > 4 ? `<button class="load-more" type="button" data-load-more>${visibleLimit < matching.length ? `展开更多（剩余 ${matching.length - visible.length} 条）` : "收起任务"}</button>` : ""}
+          <aside class="selection-notice" ${selectedTask ? "" : "hidden"} role="status">
+            <span>${selectedTask ? `已选择：${selectedTask.title}` : ""}</span>
+            <button type="button" data-continue>进入任务</button>
+          </aside>`;
       }
 
       function renderDone() {
-        const completedTasks = historyTasks();
-        return `
-          <section class="panel">
-            <div class="panel-title"><h2>已办任务</h2><span class="count-tag">${completedTasks.length}</span></div>
-            ${completedTasks
-              .map((task) => {
-                const taskIndex = tasks.indexOf(task);
-                return `<button class="done-card" data-open-detail="${taskIndex}"><strong>${task.title}</strong><br><span style="color:var(--muted)">${task.status} · ${task.due}</span></button>`;
-              })
-              .join("")}
-          </section>
-        `;
+        const completedTasks = tasks.filter((task) => task.listView === "done");
+        return `<section class="panel"><div class="section-title"><h2>已办任务</h2><span class="count-tag">${completedTasks.length}</span></div><div class="task-list">${completedTasks.map(taskCard).join("")}</div></section>`;
       }
 
       function renderMessages() {
-        return `
-          <section class="message-tabs">
-            <button class="message-tab active">预警 <span class="count-tag">9</span></button>
-            <button class="message-tab">通知 <span class="count-tag">3</span></button>
-          </section>
-          <section class="panel">
-            <h2>预警</h2>
-            <div class="message-card warning"><strong>已超时</strong><br>成品返工处理<br><span style="color:var(--muted)">SO-202607-018</span></div>
-            <div class="message-card warning"><strong>阻塞任务</strong><br>成品入库登记<br><span style="color:var(--red)">生产确认返工完成，重新提交成品抽检</span></div>
-          </section>
-        `;
+        return `<section class="panel"><div class="section-title"><h2>提醒</h2><span class="count-tag">2</span></div>
+          <div class="message-card"><strong>入库任务已阻塞</strong><p class="muted">请关注 PR-202608-031 的后续处理。</p></div>
+          <div class="message-card"><strong>应收登记已超时</strong><p class="muted">责任岗位：财务</p></div></section>`;
       }
 
       function renderMine() {
-        return `
-          <section class="panel">
-            <div style="display:flex;gap:12px;align-items:center">
-              <span style="display:grid;place-items:center;width:56px;height:56px;border-radius:16px;background:var(--green-soft);color:var(--green);font-size:28px">♙</span>
-              <div><h2>仓库值班员</h2></div>
-            </div>
-            <div class="mine-account-grid">
-              <div class="mine-card"><span>账号岗位</span><strong>仓库</strong></div>
-              <div class="mine-card"><span>可用入口</span><strong>电脑端 / 手机待办</strong></div>
-            </div>
-          </section>
-          <section class="panel">
-            <h2>入口与安全</h2>
-            <button class="action block" style="width:100%;margin-top:14px">⇄ 切换工作入口</button>
-            <button class="action block" style="width:100%;margin-top:10px">退出登录</button>
-          </section>
-        `;
+        return `<section class="panel"><div class="section-title"><h2>仓库值班员</h2><span class="role-pill">仓库</span></div>
+          <div class="account-grid"><div class="account-card"><span>账号岗位</span><strong>仓库</strong></div><div class="account-card"><span>可用入口</span><strong>电脑端 / 手机待办</strong></div></div></section>`;
       }
 
-      function setTab(tab, options = {}) {
-        const data = tabData[tab] || tabData.todo;
-        pageTitle.textContent = data.title;
-        refreshStatus.hidden = true;
-        tabContent.innerHTML = options.loading && tab === "todo"
-          ? renderLoading()
-          : tab === "todo"
-            ? renderTodo()
-            : tab === "done"
-              ? renderDone()
-              : data.content;
-        mainScroll.setAttribute("aria-busy", options.loading ? "true" : "false");
-        document.querySelectorAll("[data-tab]").forEach((button) => {
-          button.classList.toggle("active", button.dataset.tab === tab);
-        });
-        mainScroll.scrollTop = 0;
+      function renderLoading() {
+        return `<section aria-label="正在刷新"><div class="metrics"><div class="metric skeleton"></div><div class="metric skeleton"></div><div class="metric skeleton"></div></div><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></section>`;
       }
 
-      document.querySelectorAll("[data-tab]").forEach((button) => {
-        button.addEventListener("click", () => setTab(button.dataset.tab));
-      });
+      function render() {
+        pageTitle.textContent = { todo: "待办", done: "已办", messages: "消息", mine: "我的" }[activeTab];
+        navButtons.forEach((button) => button.classList.toggle("active", button.dataset.tab === activeTab));
+        if (refreshing) {
+          content.innerHTML = renderLoading();
+          return;
+        }
+        content.innerHTML = { todo: renderTodo, done: renderDone, messages: renderMessages, mine: renderMine }[activeTab]();
+      }
 
-      tabContent.addEventListener("click", (event) => {
+      content.addEventListener("click", (event) => {
         const filterButton = event.target.closest("[data-filter]");
         if (filterButton) {
           activeFilter = filterButton.dataset.filter;
-          visibleTaskLimit = 4;
-          setTab("todo");
+          visibleLimit = 4;
+          selectedTaskId = "";
+          render();
           return;
         }
-        if (event.target.closest("[data-list-more]")) {
-          visibleTaskLimit = visibleTaskLimit > 4 ? 4 : filteredTasks().length;
-          setTab("todo");
+        const loadMore = event.target.closest("[data-load-more]");
+        if (loadMore) {
+          visibleLimit = visibleLimit < filteredTasks().length ? filteredTasks().length : 4;
+          render();
           return;
         }
-        const taskButton = event.target.closest("[data-open-detail]");
-        if (!taskButton) return;
-        const task = tasks[Number(taskButton.dataset.openDetail)];
-        if (!task) return;
-        activeTaskTrigger = taskButton;
-        renderTaskDetail(task);
-        listScreen.classList.remove("active");
-        detailScreen.classList.add("active");
-        requestAnimationFrame(() => backButton.focus({ preventScroll: true }));
-      });
-
-      backButton.addEventListener("click", () => {
-        if (actionSubmitting) return;
-        detailScreen.classList.remove("active");
-        listScreen.classList.add("active");
-        closeReasonSheet();
-        requestAnimationFrame(() =>
-          activeTaskTrigger?.focus({ preventScroll: true }),
-        );
-      });
-
-      actionBar.addEventListener("click", (event) => {
-        const button = event.target.closest("[data-action]");
-        if (!button || actionSubmitting || button.disabled) return;
-        activeActionButton = button;
-        reasonTitle.textContent = `${button.dataset.actionLabel} ·`;
-        reasonInput.value = "";
-        reasonCount.textContent = "0/500";
-        actionFeedback.className = "action-feedback";
-        actionFeedback.textContent = "";
-        reasonSheet.classList.add("visible");
-        button.setAttribute("aria-expanded", "true");
-        requestAnimationFrame(() =>
-          reasonInput.focus({ preventScroll: true }),
-        );
-      });
-
-      function closeReasonSheet({ restoreFocus = false } = {}) {
-        reasonSheet.classList.remove("visible");
-        activeActionButton?.setAttribute("aria-expanded", "false");
-        if (restoreFocus) {
-          requestAnimationFrame(() =>
-            activeActionButton?.focus({ preventScroll: true }),
-          );
-        }
-      }
-
-      document.querySelector("#closeReasonButton").addEventListener(
-        "click",
-        () => closeReasonSheet({ restoreFocus: true }),
-      );
-      document.querySelector("#cancelReasonButton").addEventListener(
-        "click",
-        () => closeReasonSheet({ restoreFocus: true }),
-      );
-      reasonInput.addEventListener("input", () => {
-        reasonCount.textContent = `${reasonInput.value.length}/500`;
-      });
-      reasonSheet.addEventListener("click", (event) => {
-        const quickReason = event.target.closest("[data-quick-reason]");
-        if (!quickReason) return;
-        reasonInput.value = [
-          reasonInput.value.trim(),
-          quickReason.dataset.quickReason,
-        ]
-          .filter(Boolean)
-          .join("；")
-          .slice(0, 500);
-        reasonCount.textContent = `${reasonInput.value.length}/500`;
-        reasonInput.focus();
-      });
-
-      function setActionSubmitting(submitting) {
-        actionSubmitting = submitting;
-        reasonInput.disabled = submitting;
-        submitReasonButton.disabled = submitting;
-        document
-          .querySelectorAll("[data-action]")
-          .forEach((button) => {
-            button.disabled = submitting;
-          });
-        document
-          .querySelectorAll("[data-quick-reason], #cancelReasonButton, #closeReasonButton")
-          .forEach((button) => {
-            button.disabled = submitting;
-          });
-        submitReasonButton.textContent = submitting ? "提交中" : "提交";
-      }
-
-      submitReasonButton.addEventListener("click", () => {
-        if (!activeActionButton || !activeTask || actionSubmitting) return;
-        const submittedActionButton = activeActionButton;
-        const submittedTask = activeTask;
-        const action = activeActionButton.dataset.action;
-        const reason = reasonInput.value.trim();
-        if (!reason) {
-          actionFeedback.className = "action-feedback visible error";
-          actionFeedback.textContent = "请先填写本次处理说明再提交。";
-          reasonInput.focus();
+        const taskButton = event.target.closest("[data-task-id]");
+        if (taskButton) {
+          selectedTaskId = taskButton.dataset.taskId;
+          render();
+          requestAnimationFrame(() => content.querySelector(`[data-task-id="${selectedTaskId}"]`)?.focus({ preventScroll: true }));
           return;
         }
-        const submittedActionLabel = submittedActionButton.textContent.trim();
-        setActionSubmitting(true);
+        if (event.target.closest("[data-continue]")) {
+          const task = tasks.find((item) => item.id === selectedTaskId);
+          event.target.closest("[data-continue]").textContent = task ? "进入任务详情" : "进入任务";
+        }
+      });
+
+      navButtons.forEach((button) => button.addEventListener("click", () => {
+        activeTab = button.dataset.tab;
+        selectedTaskId = "";
+        scrollArea.scrollTop = 0;
+        render();
+      }));
+
+      refreshButton.addEventListener("click", () => {
+        if (refreshing) return;
+        refreshing = true;
+        refreshButton.disabled = true;
+        render();
         window.setTimeout(() => {
-          if (action === "blocked") {
-            submittedTask.status = "已阻塞";
-            submittedTask.blockedReason = reason;
-            submittedTask.risk = `${submittedTask.chip} · 已阻塞`;
-            submittedTask.badge = "阻塞";
-            submittedTask.tone = "alert";
-            submittedTask.actions = ["resume", "urge"];
-            submittedTask.guidance =
-              "任务已阻塞，本岗位可填写解除说明后恢复处理，也可催办相关协作岗位。";
-          } else if (action === "done") {
-            submittedTask.status = "已完成";
-            submittedTask.badge = "已完成";
-            submittedTask.tone = "";
-            submittedTask.listView = "history";
-            submittedTask.accessMode = "readonly";
-            submittedTask.actions = [];
-            submittedTask.guidance =
-              "任务已完成，当前只保留详情和处理留痕，不能再次修改任务状态。";
-          } else if (action === "rejected") {
-            submittedTask.status = "已退回";
-            submittedTask.badge = "已退回";
-            submittedTask.tone = "alert";
-            submittedTask.listView = "history";
-            submittedTask.accessMode = "readonly";
-            submittedTask.actions = [];
-            submittedTask.guidance =
-              "任务已退回并结束当前处理，当前只读；后续业务结果仍以来源单据为准。";
-          } else if (action === "resume") {
-            submittedTask.status = "待处理";
-            submittedTask.blockedReason = "";
-            submittedTask.badge = "预警";
-            submittedTask.tone = "alert";
-            submittedTask.actions = ["blocked", "done", "urge"];
-            submittedTask.guidance =
-              "阻塞已解除，本岗位可以继续阻塞、完成或催办；提交前仍需服务端复核。";
-          }
-          setActionSubmitting(false);
-          closeReasonSheet();
-          detailScreen.classList.remove("active");
-          listScreen.classList.add("active");
-          setTab("todo");
-          refreshStatus.textContent = `${submittedActionLabel}已提交，任务列表已刷新`;
-          refreshStatus.hidden = false;
-          activeTask = null;
-          activeActionButton = null;
-          requestAnimationFrame(() =>
-            document.querySelector("[data-open-detail]")?.focus({ preventScroll: true }),
-          );
-        }, 500);
-      });
-
-      mainScroll.addEventListener("scroll", () => {
-        scrollTopButton.classList.toggle("visible", mainScroll.scrollTop > 280);
-      });
-
-      scrollTopButton.addEventListener("click", () => {
-        mainScroll.scrollTo({ top: 0, behavior: "smooth" });
-      });
-
-      document.querySelector("#refreshButton").addEventListener("click", (event) => {
-        const button = event.currentTarget;
-        button.textContent = "↻ 刷新中";
-        window.setTimeout(() => {
-          button.textContent = "↻ 刷新";
+          refreshing = false;
+          refreshButton.disabled = false;
+          syncText.textContent = "刚刚同步";
+          render();
+          refreshButton.focus({ preventScroll: true });
         }, 700);
       });
 
-      renderTaskDetail(tasks[0]);
-      setTab("todo", { loading: true });
-      window.setTimeout(() => setTab("todo"), 700);
+      render();
     </script>
   </body>
 </html>

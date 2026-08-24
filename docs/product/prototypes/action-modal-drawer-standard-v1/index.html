@@ -178,7 +178,6 @@
         padding: 0 9px;
       }
 
-      body[data-modal="form"] .switcher [data-target="form"],
       body[data-modal="import"] .switcher [data-target="import"],
       body[data-modal="lifecycle"] .switcher [data-target="lifecycle"],
       body[data-modal="columns"] .switcher [data-target="columns"],
@@ -216,11 +215,6 @@
         border-radius: 8px;
         background: var(--panel);
         box-shadow: var(--shadow);
-      }
-
-      .modal.form {
-        width: min(1720px, calc(100vw - 96px));
-        max-height: calc(100vh - 72px);
       }
 
       .modal.import,
@@ -278,41 +272,7 @@
         padding: 12px 22px 14px;
       }
 
-      .form-grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        column-gap: 14px;
-        row-gap: 14px;
-      }
-
-      .field {
-        display: grid;
-        min-width: 0;
-        gap: 7px;
-      }
-
-      .field.full {
-        grid-column: 1 / -1;
-      }
-
-      .field.span-2 {
-        grid-column: span 2;
-      }
-
-      label {
-        color: #273344;
-        font-weight: 700;
-      }
-
-      .required,
-      .danger-text {
-        color: var(--red);
-      }
-
-      input,
-      textarea,
-      .select-like,
-      .unit-input {
+      input {
         width: 100%;
         min-width: 0;
         min-height: 36px;
@@ -323,35 +283,11 @@
         padding: 0 12px;
       }
 
-      input[disabled] {
-        background: var(--panel-soft);
-        color: var(--muted);
-      }
-
-      textarea {
-        min-height: 78px;
-        padding: 9px 12px;
-        resize: vertical;
-      }
-
-      .select-like {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        color: var(--muted);
-      }
-
-      .source-row,
       .compact-toolbar {
         display: flex;
         flex-wrap: wrap;
         gap: 10px;
         align-items: center;
-      }
-
-      .source-warning {
-        color: var(--red);
-        font-weight: 700;
       }
 
       .source-note {
@@ -420,7 +356,6 @@
         font-weight: 740;
       }
 
-      .badge,
       .status-pill {
         display: inline-flex;
         min-height: 26px;
@@ -428,12 +363,6 @@
         border-radius: 7px;
         padding: 0 10px;
         font-weight: 700;
-      }
-
-      .badge {
-        border: 1px solid #ffb6bd;
-        background: var(--red-soft);
-        color: var(--red);
       }
 
       .status-pill {
@@ -445,72 +374,6 @@
       .status-pill.purple {
         border-color: color-mix(in srgb, var(--purple) 45%, var(--line));
         color: var(--purple);
-      }
-
-      .unit-input {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        overflow: hidden;
-        padding: 0;
-      }
-
-      .unit-input input {
-        min-height: 34px;
-        border: 0;
-        border-radius: 0;
-      }
-
-      .unit {
-        display: inline-flex;
-        min-width: 46px;
-        align-items: center;
-        justify-content: center;
-        border-left: 1px solid var(--line);
-        background: var(--panel-soft);
-        color: var(--muted);
-        font-weight: 700;
-      }
-
-      .count {
-        justify-self: end;
-        margin-top: -2px;
-        color: var(--muted);
-        font-size: 12px;
-      }
-
-      .section-head {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-        margin: 18px 0 10px;
-      }
-
-      .section-title {
-        margin: 0;
-        font-size: 15px;
-      }
-
-      .totals {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
-
-      .line-card {
-        display: grid;
-        gap: 10px;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: var(--panel-wash);
-        padding: 12px;
-      }
-
-      .line-grid {
-        display: grid;
-        grid-template-columns: 1.1fr 1.4fr 1.2fr 76px 92px 92px 96px 1fr;
-        gap: 10px;
       }
 
       .table-wrap {
@@ -652,24 +515,16 @@
       }
 
       @media (max-width: 980px) {
-        .modal.form,
         .modal.import,
         .modal.lifecycle,
         .modal.columns {
-          width: 100%;
-          max-height: none;
+          width: calc(100% - 24px);
+          max-height: calc(100vh - 24px);
         }
 
-        .form-grid,
-        .line-grid,
         .search-row,
         .order-row {
           grid-template-columns: 1fr;
-        }
-
-        .field.full,
-        .field.span-2 {
-          grid-column: auto;
         }
 
         .switcher {
@@ -691,7 +546,6 @@
   </head>
   <body>
     <nav class="switcher" aria-label="弹窗状态">
-      <button type="button" data-target="form" aria-haspopup="dialog" aria-controls="formDialog">单据补录</button>
       <button type="button" data-target="import" aria-haspopup="dialog" aria-controls="importDialog">选择来源明细</button>
       <button type="button" data-target="lifecycle" aria-haspopup="dialog" aria-controls="lifecycleDialog">状态动作</button>
       <button type="button" data-target="columns" aria-haspopup="dialog" aria-controls="columnsDialog">列顺序</button>
@@ -725,119 +579,6 @@
     </main>
 
     <div class="overlay">
-      <dialog id="formDialog" class="modal form" aria-modal="true" aria-labelledby="formTitle" aria-describedby="formDescription">
-        <header class="modal-head">
-          <div>
-            <h2 class="modal-title" id="formTitle">补录出货信息</h2>
-            <p class="modal-subtitle" id="formDescription">从销售订单带入客户、产品和剩余可出货数量，再补齐计划日期、仓库、批次和本次出货数量。</p>
-          </div>
-          <button class="close" type="button" aria-label="关闭" data-dialog-close>×</button>
-        </header>
-
-        <div class="modal-body">
-          <div class="form-grid">
-            <div class="field">
-              <label>从销售订单导入</label>
-              <div class="source-row">
-                <button class="btn" type="button" data-initial-focus>选择销售订单行</button>
-                <span class="status-pill">已关联来源</span>
-              </div>
-              <span class="source-note">SO-202606-018</span>
-            </div>
-            <div class="field">
-              <label>出货单号（自动）</label>
-              <input value="保存时自动生成" disabled />
-            </div>
-            <div class="field">
-              <label>客户</label>
-              <input value="样例客户 A" disabled />
-            </div>
-            <div class="field">
-              <label>单据客户名称</label>
-              <input value="样例客户 A" disabled />
-            </div>
-            <div class="field">
-              <label>计划出货日期</label>
-              <div class="select-like">2026/06/20 <span>▣</span></div>
-            </div>
-            <div class="field full">
-              <label>备注</label>
-              <textarea placeholder="填写本次出货需要说明的事项"></textarea>
-              <span class="count">0 / 300</span>
-            </div>
-            <div class="field full">
-              <label>出货附件</label>
-              <div class="source-row">
-                <button class="btn" type="button">上传附件</button>
-                <span class="source-note">可上传装箱照片、物流单或签收回单</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="section-head">
-            <div>
-              <h3 class="section-title"><span class="required">*</span> 明细行（产品 / 物料）</h3>
-              <p class="hint">来源产品、SKU 和单位随销售订单行带入；本次补齐仓库、批次和出货数量。</p>
-            </div>
-            <button class="btn" type="button">添加明细行</button>
-          </div>
-
-          <div class="line-card">
-            <strong>明细行 1</strong>
-            <div class="line-grid">
-              <div class="field">
-                <label>来源行</label>
-                <input value="SO-202606-018 / 第 1 行" disabled />
-              </div>
-              <div class="field">
-                <label>产品 / 物料</label>
-                <input value="毛绒挂件 A" disabled />
-              </div>
-              <div class="field">
-                <label>规格 / SKU</label>
-                <input value="12cm / 白色" disabled />
-              </div>
-              <div class="field">
-                <label>单位</label>
-                <input value="个" disabled />
-              </div>
-              <div class="field">
-                <label><span class="required">*</span> 仓库</label>
-                <div class="select-like">成品仓 <span>⌄</span></div>
-              </div>
-              <div class="field">
-                <label>批次</label>
-                <div class="select-like">待分配 <span>⌄</span></div>
-              </div>
-              <div class="field">
-                <label><span class="required">*</span> 本次出货数量</label>
-                <input value="120" />
-              </div>
-              <div class="field">
-                <label>明细备注</label>
-                <input placeholder="可选" />
-              </div>
-            </div>
-          </div>
-
-          <div class="section-head">
-            <div class="totals">
-              <span class="status-pill">明细 1 行</span>
-              <span class="status-pill">数量合计 120</span>
-            </div>
-            <div class="field" style="min-width: 220px">
-              <label>保存状态</label>
-              <input value="草稿" disabled />
-            </div>
-          </div>
-        </div>
-
-        <footer class="modal-foot">
-          <button class="btn" type="button" data-dialog-close>取消</button>
-          <button class="btn primary" type="button">保存补录</button>
-        </footer>
-      </dialog>
-
       <dialog id="importDialog" class="modal import" aria-modal="true" aria-labelledby="importTitle" aria-describedby="importDescription">
         <header class="modal-head">
           <div>
@@ -1129,7 +870,7 @@
         });
       });
 
-      openDialog("form", buttons[0]);
+      openDialog("import", buttons[0]);
     </script>
   </body>
 </html>

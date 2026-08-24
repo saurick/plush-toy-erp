@@ -1,49 +1,26 @@
 <!doctype html>
 <html lang="zh-CN">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>业务详情页标准样板</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>业务详情弹窗样板</title>
     <style>
       :root {
         color-scheme: light dark;
-        --bg: #f5f7fb;
+        --bg: #f4f6f8;
         --panel: #ffffff;
-        --panel-soft: #f9fbfd;
-        --line: #dbe4ef;
-        --line-strong: #bfccdc;
-        --text: #152033;
-        --muted: #65758b;
-        --blue: #1f6fe5;
-        --blue-soft: #edf5ff;
-        --green: #1f7a55;
-        --green-soft: #edf8f2;
-        --amber: #a86107;
-        --amber-soft: #fff7e8;
-        --red: #c43d45;
-        --red-soft: #fff1f2;
-        --shadow: 0 14px 34px rgb(15 23 42 / 8%);
-      }
-
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --bg: #111827;
-          --panel: #182235;
-          --panel-soft: #202c42;
-          --line: #334157;
-          --line-strong: #46566f;
-          --text: #edf3fb;
-          --muted: #aab7ca;
-          --blue: #75a7ff;
-          --blue-soft: #1f3556;
-          --green: #7dd8ad;
-          --green-soft: #183b2d;
-          --amber: #f0bd67;
-          --amber-soft: #463214;
-          --red: #ff9aa2;
-          --red-soft: #4a2228;
-          --shadow: 0 18px 44px rgb(0 0 0 / 28%);
-        }
+        --panel-soft: #fafafa;
+        --text: #1f2937;
+        --muted: #667085;
+        --line: #e5e7eb;
+        --line-strong: #d0d5dd;
+        --green: #16836f;
+        --green-soft: #edf8f5;
+        --blue: #1677ff;
+        --red: #d92d20;
+        --red-soft: #fef3f2;
+        --shadow: 0 24px 64px rgb(15 23 42 / 22%);
+        font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
       }
 
       * {
@@ -51,607 +28,601 @@
       }
 
       body {
+        min-width: 320px;
+        min-height: 100vh;
         margin: 0;
         background: var(--bg);
         color: var(--text);
-        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI",
-          "PingFang SC", "Microsoft YaHei", sans-serif;
-      }
-
-      button,
-      input {
-        font: inherit;
       }
 
       button {
-        cursor: pointer;
-      }
-
-      .app {
-        display: grid;
-        grid-template-columns: 240px minmax(0, 1fr);
-        min-height: 100vh;
-      }
-
-      .side {
-        border-right: 1px solid var(--line);
-        background: var(--panel);
-        padding: 18px 12px;
-      }
-
-      .brand {
-        display: grid;
-        grid-template-columns: 40px minmax(0, 1fr);
-        gap: 10px;
-        align-items: center;
-        margin-bottom: 18px;
-      }
-
-      .mark {
-        display: grid;
-        place-items: center;
-        width: 40px;
-        height: 40px;
-        border-radius: 8px;
-        background: #225f99;
-        color: #fff;
-        font-size: 20px;
-        font-weight: 760;
-      }
-
-      .brand strong,
-      .brand span,
-      .nav-item {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .brand span,
-      .nav-title,
-      .muted,
-      .crumb {
-        color: var(--muted);
-        font-size: 12px;
-      }
-
-      .nav-note {
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: var(--panel-soft);
-        color: var(--muted);
-        font-size: 12px;
-        margin-bottom: 12px;
-        padding: 10px;
-      }
-
-      .nav-title {
-        padding: 12px 10px 6px;
-      }
-
-      .nav-item {
-        min-height: 36px;
-        border-radius: 8px;
-        padding: 8px 10px;
-      }
-
-      .nav-item.active {
-        background: var(--blue-soft);
-        color: var(--blue);
-        font-weight: 700;
-      }
-
-      .main {
-        min-width: 0;
-      }
-
-      .topbar {
-        position: sticky;
-        top: 0;
-        z-index: 4;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        border-bottom: 1px solid var(--line);
-        background: color-mix(in srgb, var(--panel) 94%, transparent);
-        padding: 14px 22px;
-      }
-
-      .topbar h1 {
-        margin: 2px 0 0;
-        font-size: 18px;
-      }
-
-      .actions,
-      .tags,
-      .tabs {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        align-items: center;
-      }
-
-      .btn {
         min-height: 34px;
         border: 1px solid var(--line-strong);
         border-radius: 7px;
         background: var(--panel);
         color: var(--text);
-        padding: 0 12px;
+        cursor: pointer;
+        padding: 0 13px;
+        font: inherit;
+        font-weight: 650;
       }
 
-      .btn.primary {
-        border-color: var(--blue);
-        background: var(--blue);
+      button:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--blue) 28%, transparent);
+        outline-offset: 2px;
+      }
+
+      button.primary {
+        border-color: var(--green);
+        background: var(--green);
         color: #fff;
       }
 
-      .btn.danger {
-        border-color: var(--red);
-        color: var(--red);
-      }
-
-      .btn.text {
-        border-color: transparent;
-        background: transparent;
-        color: var(--blue);
-      }
-
-      .content {
-        padding: 20px 22px 28px;
-      }
-
       .page {
-        display: grid;
-        gap: 14px;
-        max-width: 1280px;
+        width: min(1280px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 24px 0;
       }
 
-      .panel {
-        min-width: 0;
+      .page-head,
+      .list-shell {
         border: 1px solid var(--line);
-        border-radius: 8px;
+        border-radius: 10px;
         background: var(--panel);
-        box-shadow: var(--shadow);
+        box-shadow: 0 2px 10px rgb(15 23 42 / 5%);
       }
 
-      .hero {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 16px;
-        padding: 18px;
+      .page-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 14px;
+        padding: 18px 20px;
       }
 
-      h2,
-      h3,
-      p {
-        margin-top: 0;
+      .page-head h1,
+      .page-head p {
+        margin: 0;
       }
 
-      h2 {
-        margin-bottom: 8px;
-        font-size: 24px;
-        line-height: 1.22;
+      .page-head h1 {
+        margin-bottom: 4px;
+        font-size: 22px;
       }
 
-      h3 {
-        margin-bottom: 10px;
-        font-size: 16px;
-      }
-
-      .summary {
-        max-width: 780px;
-        margin-bottom: 0;
+      .page-head p,
+      .muted {
         color: var(--muted);
       }
 
-      .tag {
-        display: inline-flex;
-        align-items: center;
-        min-height: 24px;
-        border-radius: 999px;
-        padding: 0 9px;
-        font-size: 12px;
+      .list-shell {
+        overflow: hidden;
+      }
+
+      .list-toolbar {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid var(--line);
+        padding: 14px 18px;
+      }
+
+      .list-table {
+        display: grid;
+        grid-template-columns: 1.1fr 1.4fr 1fr 0.8fr;
+      }
+
+      .list-table > span {
+        min-width: 0;
+        border-bottom: 1px solid var(--line);
+        padding: 13px 18px;
+      }
+
+      .list-table > span:nth-child(-n + 4) {
+        background: var(--panel-soft);
+        color: var(--muted);
         font-weight: 700;
       }
 
-      .tag.blue {
-        background: var(--blue-soft);
-        color: var(--blue);
+      dialog {
+        width: min(1120px, calc(100vw - 48px));
+        max-height: calc(100vh - 48px);
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--panel);
+        color: var(--text);
+        padding: 0;
+        box-shadow: var(--shadow);
       }
 
-      .tag.green {
+      dialog[open] {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+      }
+
+      dialog::backdrop {
+        background: rgb(17 24 39 / 48%);
+        backdrop-filter: blur(2px);
+      }
+
+      .modal-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 18px;
+        border-bottom: 1px solid var(--line);
+        padding: 18px 22px 14px;
+      }
+
+      .modal-title,
+      .modal-description {
+        margin: 0;
+      }
+
+      .modal-title {
+        font-size: 20px;
+        line-height: 1.4;
+      }
+
+      .modal-description {
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .close {
+        width: 34px;
+        min-height: 34px;
+        border: 0;
+        background: transparent;
+        color: var(--muted);
+        padding: 0;
+        font-size: 28px;
+        line-height: 1;
+      }
+
+      .modal-body {
+        overflow: auto;
+        padding: 18px 22px 24px;
+      }
+
+      .review-states {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 7px;
+        border: 1px dashed var(--line-strong);
+        border-radius: 8px;
+        background: var(--panel-soft);
+        margin-bottom: 18px;
+        padding: 8px 10px;
+      }
+
+      .review-states strong {
+        margin-right: 4px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .review-states button {
+        min-height: 28px;
+        padding: 0 9px;
+        font-size: 12px;
+      }
+
+      .review-states button[aria-pressed="true"] {
+        border-color: var(--green);
         background: var(--green-soft);
         color: var(--green);
       }
 
-      .tag.amber {
-        background: var(--amber-soft);
-        color: var(--amber);
-      }
-
-      .tag.red {
-        background: var(--red-soft);
-        color: var(--red);
-      }
-
-      .grid {
+      .descriptions {
         display: grid;
-        grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
-        gap: 14px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        border-top: 1px solid var(--line);
+        border-left: 1px solid var(--line);
       }
 
-      .section {
-        padding: 16px;
-      }
-
-      .kv {
+      .description-item {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: minmax(88px, 38%) minmax(0, 1fr);
+        min-width: 0;
+        border-right: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .description-item dt,
+      .description-item dd {
+        min-width: 0;
+        margin: 0;
+        padding: 10px 11px;
+        overflow-wrap: anywhere;
+      }
+
+      .description-item dt {
+        background: var(--panel-soft);
+        color: var(--muted);
+        font-weight: 650;
+      }
+
+      .description-item dd {
+        font-weight: 620;
+      }
+
+      .divider {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 22px 0 14px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .divider::before,
+      .divider::after {
+        height: 1px;
+        flex: 1;
+        content: "";
+        background: var(--line);
+      }
+
+      .divider::before {
+        max-width: 16px;
+      }
+
+      .items {
+        display: grid;
         gap: 10px;
       }
 
-      .kv div,
-      .timeline li,
-      .file,
-      .link-row {
+      .item-card {
         border: 1px solid var(--line);
         border-radius: 8px;
-        background: var(--panel-soft);
-        padding: 11px;
+        background: var(--panel);
+        overflow: hidden;
       }
 
-      .kv span {
-        display: block;
+      .item-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        background: var(--panel-soft);
+        padding: 10px 12px;
+      }
+
+      .item-head span {
         color: var(--muted);
         font-size: 12px;
       }
 
-      .kv strong,
-      .file strong,
-      .link-row strong {
-        display: block;
-        margin-top: 3px;
-        overflow-wrap: anywhere;
-      }
-
-      .state-rail {
+      .item-grid {
         display: grid;
-        gap: 8px;
-      }
-
-      .state {
-        display: grid;
-        grid-template-columns: 10px minmax(0, 1fr);
-        gap: 10px;
-        align-items: start;
-      }
-
-      .dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 999px;
-        background: var(--line-strong);
-        margin-top: 5px;
-      }
-
-      .state.done .dot {
-        background: var(--green);
-      }
-
-      .state.current .dot {
-        background: var(--blue);
-      }
-
-      .state.blocked .dot {
-        background: var(--red);
-      }
-
-      .link-list,
-      .files {
-        display: grid;
-        gap: 8px;
-      }
-
-      .link-row {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 12px;
-        align-items: center;
-      }
-
-      .timeline {
-        display: grid;
-        gap: 8px;
-        list-style: none;
         margin: 0;
-        padding: 0;
-      }
-
-      .timeline small {
-        display: block;
-        color: var(--muted);
-      }
-
-      .action-panel {
-        border-top: 1px solid var(--line);
-        background: var(--panel-soft);
-        padding: 14px 16px 16px;
-      }
-
-      .tabs {
-        margin-bottom: 12px;
-      }
-
-      .tab {
-        min-height: 32px;
-        border: 1px solid var(--line);
-        border-radius: 7px;
-        background: var(--panel);
-        color: var(--text);
-        padding: 0 10px;
-      }
-
-      .tab.active,
-      .tab[aria-selected="true"] {
-        border-color: var(--blue);
-        background: var(--blue-soft);
-        color: var(--blue);
-        font-weight: 700;
-      }
-
-      .action-copy {
-        min-height: 86px;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: var(--panel);
         padding: 12px;
       }
 
-      @media (max-width: 920px) {
-        .app {
-          grid-template-columns: 1fr;
+      .item-grid div {
+        min-width: 0;
+      }
+
+      .item-grid dt,
+      .item-grid dd {
+        margin: 0;
+        overflow-wrap: anywhere;
+      }
+
+      .item-grid dt {
+        margin-bottom: 4px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .item-grid dd {
+        font-weight: 650;
+      }
+
+      .state-box {
+        display: grid;
+        min-height: 150px;
+        place-items: center;
+        border: 1px dashed var(--line-strong);
+        border-radius: 8px;
+        color: var(--muted);
+        text-align: center;
+        padding: 24px;
+      }
+
+      .state-box.error {
+        border-color: #fda29b;
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .spinner {
+        width: 24px;
+        height: 24px;
+        border: 3px solid var(--line);
+        border-top-color: var(--green);
+        border-radius: 50%;
+        margin: 0 auto 10px;
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
+      .pagination {
+        display: flex;
+        justify-content: flex-end;
+        gap: 6px;
+        margin-top: 12px;
+      }
+
+      .pagination button {
+        min-width: 34px;
+        padding: 0 8px;
+      }
+
+      .pagination button[aria-current="page"] {
+        border-color: var(--green);
+        color: var(--green);
+      }
+
+      .modal-foot {
+        display: flex;
+        justify-content: flex-end;
+        border-top: 1px solid var(--line);
+        background: var(--panel-soft);
+        padding: 12px 22px;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #111827;
+          --panel: #18212f;
+          --panel-soft: #202b3a;
+          --text: #f3f4f6;
+          --muted: #aab4c3;
+          --line: #344054;
+          --line-strong: #475467;
+          --green: #42c3a7;
+          --green-soft: #173d37;
+          --red-soft: #3d2427;
+        }
+      }
+
+      @media (max-width: 820px) {
+        dialog {
+          width: calc(100vw - 24px);
+          max-height: calc(100vh - 24px);
         }
 
-        .side {
-          display: none;
+        .descriptions {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
-        .topbar,
-        .hero,
-        .grid,
-        .link-row {
-          grid-template-columns: 1fr;
-        }
-
-        .topbar {
-          position: static;
-          align-items: flex-start;
-          flex-direction: column;
-          padding: 14px 16px;
-        }
-
-        .content {
-          padding: 14px;
+        .item-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
         }
       }
 
       @media (max-width: 560px) {
-        .kv {
+        .page {
+          width: calc(100vw - 16px);
+          padding: 8px 0;
+        }
+
+        .page-head,
+        .list-toolbar,
+        .modal-head {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .list-table {
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .list-table > span:nth-child(n + 3):nth-child(-n + 4),
+        .list-table > span:nth-child(n + 7) {
+          display: none;
+        }
+
+        dialog {
+          width: 100vw;
+          max-height: 100vh;
+          border: 0;
+          border-radius: 0;
+        }
+
+        .modal-head,
+        .modal-body,
+        .modal-foot {
+          padding-right: 14px;
+          padding-left: 14px;
+        }
+
+        .modal-head {
+          position: relative;
+          padding-right: 50px;
+        }
+
+        .close {
+          position: absolute;
+          top: 14px;
+          right: 12px;
+        }
+
+        .descriptions,
+        .item-grid {
           grid-template-columns: 1fr;
+        }
+
+        .description-item {
+          grid-template-columns: 112px minmax(0, 1fr);
         }
       }
     </style>
   </head>
   <body>
-    <div class="app">
-      <aside class="side" aria-label="后台导航">
-        <div class="brand">
-          <div class="mark">样</div>
-          <div>
-            <strong>毛绒 ERP</strong>
-            <span>详情页标准样板</span>
-          </div>
+    <main class="page">
+      <header class="page-head">
+        <div>
+          <h1>销售订单</h1>
+          <p>选择一条记录后查看完整只读信息。</p>
         </div>
-        <div class="nav-note">以下为常用入口 / 快捷入口示意，不替代 seedData 或 yoyoosun 客户菜单。</div>
-        <div class="nav-title">看板中心</div>
-        <div class="nav-item">工作台</div>
-        <div class="nav-item">业务看板</div>
-        <div class="nav-title">销售链路</div>
-        <div class="nav-item active">销售订单</div>
-        <div class="nav-title">采购/仓储</div>
-        <div class="nav-item">入库通知/检验/入库</div>
-        <div class="nav-item">库存</div>
-        <div class="nav-item">待出货/出货放行</div>
-        <div class="nav-title">系统管理</div>
-        <div class="nav-item">权限管理</div>
-      </aside>
+        <button class="primary" id="openDetails" type="button">查看详情</button>
+      </header>
+      <section class="list-shell" aria-label="销售订单列表背景">
+        <div class="list-toolbar"><strong>当前记录：SO-202608-018</strong><span class="muted">已提交</span></div>
+        <div class="list-table">
+          <span>订单号</span><span>客户</span><span>负责人</span><span>状态</span>
+          <span>SO-202608-018</span><span>星河礼品</span><span>销售一组</span><span>已提交</span>
+        </div>
+      </section>
+    </main>
 
-      <main class="main">
-        <header class="topbar">
-          <div>
-            <div class="crumb">销售链路 / 销售订单 / SO-202606-018</div>
-            <h1>业务详情页样板</h1>
-          </div>
-          <div class="actions">
-            <button class="btn">导出</button>
-            <button class="btn">打印</button>
-            <button class="btn primary">编辑草稿</button>
-          </div>
-        </header>
+    <dialog id="detailsDialog" aria-labelledby="detailsTitle" aria-describedby="detailsDescription">
+      <header class="modal-head">
+        <div>
+          <h2 class="modal-title" id="detailsTitle">销售订单详情 · SO-202608-018</h2>
+          <p class="modal-description" id="detailsDescription">以下信息只读；需要修改时请关闭后使用列表中的“编辑”。</p>
+        </div>
+        <button class="close" id="closeIcon" type="button" aria-label="关闭详情">×</button>
+      </header>
 
-        <section class="content">
-          <div class="page">
-            <section class="panel hero">
-              <div>
-                <div class="crumb">ERP / 标准详情页 / To Implement</div>
-                <h2>销售订单 SO-202606-018</h2>
-                <p class="summary">
-                  详情页先让用户看清业务对象、状态、关联链路和下一步动作。
-                  Workflow 协同动作与库存、出货、财务等 Fact 动作分区展示，不混成一种按钮语义。
-                </p>
-              </div>
-              <div class="tags" aria-label="状态">
-                <span class="tag green">订单 active</span>
-                <span class="tag amber">协同待处理</span>
-                <span class="tag blue">非事实过账</span>
-              </div>
-            </section>
+      <div class="modal-body">
+        <div class="review-states" role="group" aria-label="原型评审状态（非运行态字段）">
+          <strong>原型评审状态（非运行态字段）</strong>
+          <button type="button" data-state="items" aria-pressed="true">有明细</button>
+          <button type="button" data-state="empty" aria-pressed="false">空明细</button>
+          <button type="button" data-state="loading" aria-pressed="false">加载中</button>
+          <button type="button" data-state="error" aria-pressed="false">加载失败</button>
+        </div>
 
-            <div class="grid">
-              <section class="panel section" aria-label="基础信息">
-                <h3>基础信息</h3>
-                <div class="kv">
-                  <div><span>客户</span><strong>样例客户 A</strong></div>
-                  <div><span>产品</span><strong>毛绒挂件 A / 蓝色款</strong></div>
-                  <div><span>数量</span><strong>3,000 pcs</strong></div>
-                  <div><span>交期</span><strong>2026-06-18</strong></div>
-                  <div><span>负责人</span><strong>业务 / PMC</strong></div>
-                  <div><span>字段来源</span><strong>销售订单主表 + 明细行</strong></div>
-                </div>
-              </section>
+        <dl class="descriptions" aria-label="订单基本信息">
+          <div class="description-item"><dt>订单号</dt><dd>SO-202608-018</dd></div>
+          <div class="description-item"><dt>客户</dt><dd>星河礼品</dd></div>
+          <div class="description-item"><dt>状态</dt><dd>已提交</dd></div>
+          <div class="description-item"><dt>联系人</dt><dd>陈经理</dd></div>
+          <div class="description-item"><dt>负责人</dt><dd>销售一组</dd></div>
+          <div class="description-item"><dt>交付日期</dt><dd>2026-09-10</dd></div>
+          <div class="description-item"><dt>结算方式</dt><dd>月结 30 天</dd></div>
+          <div class="description-item"><dt>币种</dt><dd>CNY</dd></div>
+          <div class="description-item"><dt>客户订单号</dt><dd>-</dd></div>
+        </dl>
 
-              <section class="panel section" aria-label="业务状态">
-                <h3>业务状态</h3>
-                <div class="state-rail">
-                  <div class="state done">
-                    <span class="dot"></span>
-                    <div><strong>订单已提交</strong><div class="muted">来源单据成立，不写出货或库存事实。</div></div>
-                  </div>
-                  <div class="state current">
-                    <span class="dot"></span>
-                    <div><strong>执行中</strong><div class="muted">可进入协同任务、排产、采购或出货前检查。</div></div>
-                  </div>
-                  <div class="state blocked">
-                    <span class="dot"></span>
-                    <div><strong>协同阻塞待处理</strong><div class="muted">只代表任务卡点，不代表订单事实失败。</div></div>
-                  </div>
-                </div>
-              </section>
+        <div class="divider" id="itemsTitle">完整明细（共 12 条）</div>
+        <section id="itemsRegion" aria-labelledby="itemsTitle" aria-live="polite"></section>
+      </div>
 
-              <section class="panel section" aria-label="关联单据">
-                <h3>关联单据</h3>
-                <div class="link-list">
-                  <div class="link-row"><strong>材料 BOM / BOM-26029</strong><span class="tag blue">资料层</span></div>
-                  <div class="link-row"><strong>入库通知 / INB-202606-009</strong><span class="tag amber">协同中</span></div>
-                  <div class="link-row"><strong>库存批次 / LOT-PLUSH-008</strong><span class="tag green">事实查询</span></div>
-                  <div class="link-row"><strong>出货放行 / 待创建</strong><span class="tag red">不能伪造</span></div>
-                </div>
-              </section>
-
-              <section class="panel section" aria-label="附件区">
-                <h3>附件区</h3>
-                <div class="files">
-                  <div class="file"><span class="muted">图纸</span><strong>blue-hanger-spec-v3.pdf</strong></div>
-                  <div class="file"><span class="muted">合同</span><strong>purchase-contract-preview.pdf</strong></div>
-                  <div class="file"><span class="muted">质检照片</span><strong>待上传，不在原型中实现附件服务</strong></div>
-                </div>
-              </section>
-            </div>
-
-            <section class="panel" aria-label="操作记录和动作区">
-              <div class="section">
-                <h3>操作记录</h3>
-                <ol class="timeline">
-                  <li><strong>业务提交销售订单</strong><small>2026-06-11 09:24 / 只写销售订单状态。</small></li>
-                  <li><strong>PMC 标记齐套风险</strong><small>2026-06-11 10:18 / 生成 Workflow 协同任务。</small></li>
-                  <li><strong>仓库反馈入库异常</strong><small>2026-06-11 14:05 / 任务阻塞，不等于库存事实失败。</small></li>
-                </ol>
-              </div>
-              <div class="action-panel">
-                <div class="tabs" role="tablist" aria-label="动作区类型">
-                  <button
-                    class="tab active"
-                    id="tab-workflow"
-                    role="tab"
-                    type="button"
-                    data-panel="workflow"
-                    aria-controls="actionCopy"
-                    aria-selected="true"
-                  >
-                    Workflow 协同动作
-                  </button>
-                  <button
-                    class="tab"
-                    id="tab-fact"
-                    role="tab"
-                    type="button"
-                    data-panel="fact"
-                    aria-controls="actionCopy"
-                    aria-selected="false"
-                  >
-                    Fact 事实动作
-                  </button>
-                </div>
-                <div class="action-copy" id="actionCopy" role="tabpanel" aria-labelledby="tab-workflow">
-                  <strong>处理协同任务</strong>
-                  <p class="summary">可完成、阻塞、驳回或催办当前任务；这些动作只写 Workflow 任务和协同状态，不写库存、出货、财务、开票或收付款事实。</p>
-                  <div class="actions">
-                    <button class="btn primary">完成任务</button>
-                    <button class="btn">记录阻塞</button>
-                    <button class="btn">催办</button>
-                  </div>
-                </div>
-              </div>
-            </section>
-          </div>
-        </section>
-      </main>
-    </div>
+      <footer class="modal-foot">
+        <button id="closeDetails" type="button">关闭</button>
+      </footer>
+    </dialog>
 
     <script>
-      const tabs = Array.from(document.querySelectorAll(".tab"));
-      const actionCopy = document.querySelector("#actionCopy");
+      const dialog = document.querySelector("#detailsDialog");
+      const openButton = document.querySelector("#openDetails");
+      const closeButtons = [document.querySelector("#closeIcon"), document.querySelector("#closeDetails")];
+      const stateButtons = Array.from(document.querySelectorAll("[data-state]"));
+      const itemsRegion = document.querySelector("#itemsRegion");
+      const itemsTitle = document.querySelector("#itemsTitle");
+      let currentState = "items";
+      let currentPage = 1;
 
-      const panels = {
-        workflow: {
-          title: "处理协同任务",
-          copy:
-            "可完成、阻塞、驳回或催办当前任务；这些动作只写 Workflow 任务和协同状态，不写库存、出货、财务、开票或收付款事实。",
-          buttons: ["完成任务", "记录阻塞", "催办"],
-          kind: "primary",
-        },
-        fact: {
-          title: "进入事实动作",
-          copy:
-            "库存入账、出货发货、财务登记必须回到对应 Fact usecase；详情页只给出入口和状态提示，不能由任务完成自动触发。",
-          buttons: ["打开入库单", "打开出货事实", "查看财务登记"],
-          kind: "danger",
-        },
-      };
+      const items = Array.from({ length: 12 }, (_, index) => ({
+        name: index % 2 ? "云朵小熊" : "星星挂件",
+        sku: index % 2 ? "35cm / 奶茶色" : "12cm / 米白色",
+        quantity: index % 2 ? "300 只" : "500 只",
+        price: index % 2 ? "¥ 38.00" : "¥ 12.50",
+      }));
 
-      function renderPanel(name) {
-        const panel = panels[name] || panels.workflow;
-        actionCopy.innerHTML = `
-          <strong>${panel.title}</strong>
-          <p class="summary">${panel.copy}</p>
-          <div class="actions">
-            ${panel.buttons
-              .map((label, index) => {
-                const className =
-                  index === 0
-                    ? panel.kind === "danger"
-                      ? "btn danger"
-                      : "btn primary"
-                    : "btn";
-                return `<button class="${className}">${label}</button>`;
-              })
-              .join("")}
-          </div>
-        `;
+      function itemCard(item, index) {
+        return `
+          <article class="item-card">
+            <header class="item-head"><strong>明细 ${index + 1}</strong><span>${item.name}</span></header>
+            <dl class="item-grid">
+              <div><dt>产品</dt><dd>${item.name}</dd></div>
+              <div><dt>规格 / SKU</dt><dd>${item.sku}</dd></div>
+              <div><dt>数量</dt><dd>${item.quantity}</dd></div>
+              <div><dt>含税单价</dt><dd>${item.price}</dd></div>
+            </dl>
+          </article>`;
       }
 
-      tabs.forEach((tab) => {
-        tab.addEventListener("click", () => {
-          tabs.forEach((item) => item.classList.remove("active"));
-          tabs.forEach((item) => item.setAttribute("aria-selected", "false"));
-          tab.classList.add("active");
-          tab.setAttribute("aria-selected", "true");
-          actionCopy.setAttribute("aria-labelledby", tab.id);
-          renderPanel(tab.dataset.panel);
+      function renderItems() {
+        itemsTitle.textContent = `完整明细（共 ${currentState === "empty" ? 0 : items.length} 条）`;
+        if (currentState === "loading") {
+          itemsRegion.innerHTML = '<div class="state-box"><div><div class="spinner" aria-hidden="true"></div><strong>正在加载明细…</strong></div></div>';
+          return;
+        }
+        if (currentState === "error") {
+          itemsRegion.innerHTML = '<div class="state-box error"><div><strong>加载明细失败</strong><p>请检查网络后重试。</p><button type="button" data-retry>重试</button></div></div>';
+          itemsRegion.querySelector("[data-retry]").addEventListener("click", () => {
+            currentState = "loading";
+            syncStateButtons();
+            renderItems();
+            window.setTimeout(() => {
+              currentState = "items";
+              syncStateButtons();
+              renderItems();
+            }, 650);
+          });
+          return;
+        }
+        if (currentState === "empty") {
+          itemsRegion.innerHTML = '<div class="state-box"><div><strong>当前记录暂无明细</strong><p>详情仍保持只读，不在这里新增明细。</p></div></div>';
+          return;
+        }
+        const start = (currentPage - 1) * 10;
+        const pageItems = items.slice(start, start + 10);
+        itemsRegion.innerHTML = `<div class="items">${pageItems.map((item, index) => itemCard(item, start + index)).join("")}</div>
+          <nav class="pagination" aria-label="明细分页">
+            <button type="button" data-page="1" aria-current="${currentPage === 1 ? "page" : "false"}">1</button>
+            <button type="button" data-page="2" aria-current="${currentPage === 2 ? "page" : "false"}">2</button>
+          </nav>`;
+        itemsRegion.querySelectorAll("[data-page]").forEach((button) => {
+          button.addEventListener("click", () => {
+            currentPage = Number(button.dataset.page);
+            renderItems();
+            itemsTitle.scrollIntoView({ block: "nearest" });
+          });
         });
-      });
+      }
+
+      function syncStateButtons() {
+        stateButtons.forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.state === currentState)));
+      }
+
+      function openDialog() {
+        if (dialog.open) return;
+        dialog.showModal();
+        requestAnimationFrame(() => document.querySelector("#closeIcon").focus({ preventScroll: true }));
+      }
+
+      function closeDialog() {
+        if (dialog.open) dialog.close();
+      }
+
+      openButton.addEventListener("click", openDialog);
+      closeButtons.forEach((button) => button.addEventListener("click", closeDialog));
+      dialog.addEventListener("close", () => requestAnimationFrame(() => openButton.focus({ preventScroll: true })));
+      stateButtons.forEach((button) => button.addEventListener("click", () => {
+        currentState = button.dataset.state;
+        currentPage = 1;
+        syncStateButtons();
+        renderItems();
+      }));
+
+      renderItems();
+      openDialog();
     </script>
   </body>
 </html>

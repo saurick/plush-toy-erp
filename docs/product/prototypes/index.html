@@ -588,15 +588,15 @@
       <section class="section" aria-labelledby="task-center-heading">
         <div class="section-head">
           <div>
-            <h2 id="task-center-heading">任务中心样板 / Task Command Center Pattern</h2>
-            <p class="section-note">用于评审任务入口作为职责处理台：谁要处理、谁发起、哪里阻塞、如何在任务处理抽屉里提交动作、跳回哪个业务对象。</p>
+            <h2 id="task-center-heading">任务看板中心样板 / Task Command Center Pattern</h2>
+            <p class="section-note">用于评审四类互斥任务队列、组合筛选与当前只读详情；本页只提供进入专用处理流程和相关单据的入口，不复制动作表单。</p>
           </div>
           <a class="open-readme" href="task-command-center-v1/README.md">打开说明</a>
         </div>
         <div class="asset-list">
-          <article class="asset" data-category="to-implement" data-status="待实现" data-text="任务中心 样板 HTML task-command-center-v1 我的任务 任务看板 待我处理 我发起的 阻塞交接 当前任务 任务处理抽屉 Side panel 关联业务对象 Workflow 职责处理台 待实现">
+          <article class="asset" data-category="to-implement" data-status="待实现" data-text="任务看板中心 样板 HTML task-command-center-v1 常规 风险 阻塞 到期 组合筛选 当前只读详情 共享处理流程入口 相关业务对象 职责处理台 待实现">
             <div class="name">
-              <p class="asset-title">任务中心样板</p>
+              <p class="asset-title">任务看板中心样板</p>
               <div class="dir">task-command-center-v1/</div>
             </div>
             <span class="type type-html">HTML</span>
@@ -844,7 +844,7 @@
         <div class="section-head">
           <div>
             <h2 id="business-heading">业务模块标准页 / Business Module Page Standard</h2>
-            <p class="section-note">用于评审业务列表页骨架、选中操作条、分页和条件式协同入口；协同入口只显示当前选中记录的待办，跨记录任务回任务中心，不承接 Fact 动作。</p>
+            <p class="section-note">用于评审业务列表页骨架、选中操作条、分页和条件式协同入口；协同入口只显示当前选中记录的待办，跨记录任务回任务中心，列表页不替代实际业务办理。</p>
           </div>
           <a class="open-readme" href="business-module-page-standard-v1/README.md">打开说明</a>
         </div>
@@ -931,14 +931,14 @@
         <div class="section-head">
           <div>
             <h2 id="standards-heading">后台标准样板 / Backoffice Standard Patterns</h2>
-            <p class="section-note">补齐详情页、业务表单弹窗和局部动作弹窗三类标准样板；同类菜单参照复用，逐菜单内容通过核心菜单覆盖样板核对。</p>
+            <p class="section-note">补齐只读详情弹窗、业务表单弹窗和局部动作弹窗三类标准样板；同类菜单参照复用，逐菜单内容通过核心菜单覆盖样板核对。</p>
           </div>
           <a class="open-readme" href="README.md">查看总说明</a>
         </div>
         <div class="asset-list">
-          <article class="asset" data-category="to-implement" data-status="待实现" data-text="业务详情页 标准样板 HTML business-detail-page-standard-v1 基础信息 状态 关联单据 操作记录 附件 Workflow Fact 待实现 销售订单 客户 供应商 产品 采购入库 库存批次 质检 出货 财务">
+          <article class="asset" data-category="to-implement" data-status="待实现" data-text="业务详情弹窗 标准样板 HTML business-detail-page-standard-v1 只读 Modal 基础信息 明细卡片 十条分页 空明细 加载中 加载失败 重试 关闭 待实现 销售订单 客户 供应商 产品 采购入库 库存批次 质检 出货 财务">
             <div class="name">
-              <p class="asset-title">业务详情页标准样板</p>
+              <p class="asset-title">业务详情弹窗标准样板</p>
               <div class="dir">business-detail-page-standard-v1/</div>
             </div>
             <span class="type type-html">HTML</span>
@@ -949,7 +949,7 @@
             </div>
           </article>
 
-          <article class="asset" data-category="to-implement" data-status="待实现" data-text="新建 编辑 业务弹窗 表单 标准样板 HTML business-form-page-standard-v1 主表字段 明细 items 联系人 订单行 产品 BOM 出货 来源选择器 Source Picker 入口 字段分组 必填 校验 来源带值 清值 新增 编辑 只读 残值防护 待实现 客户 供应商 联系人 销售订单 采购 库存 质检 财务">
+          <article class="asset" data-category="to-implement" data-status="待实现" data-text="新建 编辑 业务弹窗 表单 标准样板 HTML business-form-page-standard-v1 订单与客户 联系人与负责人 结算条件 交付与收货 附件 订单行 SKU 来源摘要 单位 数量 单价 金额 交期 复制行 产品顺序 新增 编辑 只读 残值防护 待实现">
             <div class="name">
               <p class="asset-title">新建 / 编辑业务弹窗标准样板</p>
               <div class="dir">business-form-page-standard-v1/</div>
@@ -962,7 +962,7 @@
             </div>
           </article>
 
-          <article class="asset" data-category="to-implement" data-status="待实现" data-text="局部动作 弹窗 标准样板 HTML action-modal-drawer-standard-v1 来源选择器 Source Picker 第二层 分页 已选摘要 清空已选 来源导入 列顺序 状态动作 危险确认 不编辑本单字段 无第三层 待实现 出货 采购 质检 库存 财务 权限 幂等">
+          <article class="asset" data-category="to-implement" data-status="待实现" data-text="局部动作 弹窗 标准样板 HTML action-modal-drawer-standard-v1 来源选择器 Source Picker 第二层 分页 已选摘要 清空已选 来源导入 列顺序 状态规则 危险确认 不复制完整业务表单 不复制只读详情 无第三层 待实现">
             <div class="name">
               <p class="asset-title">局部动作弹窗标准样板</p>
               <div class="dir">action-modal-drawer-standard-v1/</div>
@@ -999,7 +999,7 @@
             </div>
           </article>
 
-          <article class="asset" data-category="current" data-status="当前实现" data-text="岗位任务端 当前列表基线 HTML implemented-reference 待办 已办 提醒 我的 筛选 分页 任务卡片 旧详情历史对照 mobile role tasks">
+          <article class="asset" data-category="current" data-status="当前实现" data-text="岗位任务端 当前列表基线 HTML implemented-reference 待办 已办 消息 我的 筛选 展开更多 刷新 任务卡片 进入 v2 详情处理流程 列表唯一职责 mobile role tasks">
             <div class="name">
               <p class="asset-title">岗位任务端当前列表基线</p>
               <div class="dir">mobile-role-tasks-v1/</div>

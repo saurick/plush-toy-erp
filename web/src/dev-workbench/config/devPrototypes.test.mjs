@@ -227,7 +227,7 @@ test('devPrototypes: 登记当前原型与样板资产并区分类型和状态',
     DEV_PROTOTYPE_ASSETS.find(
       (item) => item.key === 'business-form-standard-page'
     )?.description || '',
-    /只读状态/
+    /只读评审状态/
   )
   assert.match(
     DEV_PROTOTYPE_ASSETS.find(
@@ -243,8 +243,8 @@ test('devPrototypes: 登记当前原型与样板资产并区分类型和状态',
     /覆盖[^。；]*回收站|删除确认/,
     '局部动作弹窗样板不应把回收站或删除确认登记成通用覆盖项'
   )
-  assert.match(actionModal?.description || '', /状态动作说明/)
-  assert.match(actionModal?.description || '', /不承诺通用回收站/)
+  assert.match(actionModal?.description || '', /状态规则说明/)
+  assert.match(actionModal?.description || '', /不再复制完整业务表单或只读详情/)
   assert.match(actionModal?.appliesTo || '', /后端 usecase \/ RBAC 决定/)
   assert.equal(
     DEV_PROTOTYPE_ASSETS.find(
@@ -297,11 +297,24 @@ test('devPrototypes: 中央 README 与静态查看器同步登记本轮重设计
       readFileSync(path.join(repoRoot, 'docs/product/prototypes', assetPath))
     )
   }
-  assert.match(prototypeRegistryReadmeSource, /截至 2026-08-11/u)
+  assert.doesNotMatch(prototypeRegistryReadmeSource, /截至 2026-08-11/u)
   assert.match(prototypeRegistryReadmeSource, /十五个产品内核相关 HTML/u)
   assert.match(
     prototypeRegistryReadmeSource,
     /移动任务端由 v1 当前列表基线和 v2 当前选中任务流程共同组成/u
+  )
+  assert.match(
+    prototypeStaticIndexSource,
+    /任务看板中心样板[\s\S]*?共享处理流程入口/u
+  )
+  assert.match(prototypeStaticIndexSource, /业务详情弹窗标准样板/u)
+  assert.match(
+    prototypeStaticIndexSource,
+    /岗位任务端 当前列表基线[^\n]*列表唯一职责/u
+  )
+  assert.doesNotMatch(
+    prototypeStaticIndexSource,
+    /如何在任务处理抽屉里提交动作|业务详情页 标准样板|旧详情历史对照/u
   )
 })
 
@@ -313,7 +326,6 @@ test('devPrototypes: 业务页协同入口只呈现当前记录待办并在空�
     ),
     'utf8'
   )
-
   assert.match(html, /协同入口只处理当前选中记录的待办/u)
   assert.match(html, /跨记录任务回到任务中心/u)
   assert.match(html, /const tasksByRecord = \{/u)
@@ -327,7 +339,7 @@ test('devPrototypes: 业务页协同入口只呈现当前记录待办并在空�
   assert.doesNotMatch(html, /处理本页相关任务|本页待办|只显示当前页面相关任务/u)
 })
 
-test('devPrototypes: 岗位任务端当前参考不透出移动端旧动作和技术 key', () => {
+test('devPrototypes: 岗位任务端 v1 Current 只保留列表职责', () => {
   const html = readFileSync(
     path.join(
       repoRoot,
@@ -336,62 +348,29 @@ test('devPrototypes: 岗位任务端当前参考不透出移动端旧动作和�
     'utf8'
   )
 
-  assert(
-    html.includes('task.mine ? "仓库" : "责任岗位"'),
-    'mobile role tasks Current reference should use readable owner role label'
-  )
-  assert(
-    html.includes('请填写原因，说明卡点、退回依据或催办诉求'),
-    'mobile role tasks Current reference should keep the runtime reason placeholder'
-  )
-  assert(
-    html.includes('<strong>仓库</strong>'),
-    'mobile role tasks Current reference should show readable role names in Mine tab'
-  )
+  assert.match(html, /data-tab="todo"/u)
+  assert.match(html, /data-tab="done"/u)
+  assert.match(html, /data-tab="messages"/u)
+  assert.match(html, /data-tab="mine"/u)
+  assert.match(html, /data-filter="all"/u)
+  assert.match(html, /data-filter="approval"/u)
+  assert.match(html, /data-filter="risk"/u)
+  assert.match(html, /data-filter="overdue"/u)
+  assert.match(html, /data-load-more/u)
+  assert.match(html, /let selectedTaskId = ""/u)
+  assert.match(html, /data-task-id="\$\{task\.id\}"/u)
+  assert.match(html, /责任岗位：\$\{task\.ownerRole\}/u)
+  assert.match(html, /function renderLoading\(\)/u)
+  assert.match(html, /refreshButton\.addEventListener\("click"/u)
+  assert.match(html, /<strong>仓库<\/strong>/u)
   assert.doesNotMatch(
     html,
-    /仓库任务端/u,
-    'mobile role tasks Current reference should not repeat the active role below the account name'
+    /detailScreen|reasonSheet|renderActionBar|data-action=|actionSubmitting|完成反馈（必填）|请填写原因/u
   )
-  assert.doesNotMatch(
-    html,
-    /id="tabSummary"|已加载 \d+ 条(?:待处理|已办|消息)/u,
-    'mobile role tasks Current reference should not repeat loaded-count sentences above each tab'
-  )
-  assert.match(
-    html,
-    /class="count-tag">\$\{currentTodoTasks\.length\}<\/span>/u,
-    'mobile role tasks Current reference should keep todo counts in compact numeric tags'
-  )
-  assert.match(
-    html,
-    /class="panel-title"><h2>已办任务<\/h2><span class="count-tag">\$\{completedTasks\.length\}<\/span>/u,
-    'mobile role tasks Current reference should keep the done count beside its section heading'
-  )
-  assert.match(
-    html,
-    /actionBar\.style\.gridTemplateColumns = `repeat\(\$\{columnCount\}, minmax\(0, 1fr\)\)`/u,
-    'mobile role tasks Current reference action bar should size from the available runtime actions'
-  )
-  assert.match(html, /accessMode: "actionable"/u)
-  assert.match(html, /accessMode: "urge-only"/u)
-  assert.match(html, /accessMode: "readonly"/u)
-  assert.match(html, /actions: \["resume", "urge"\]/u)
-  assert.match(html, /label: "↻ 解除阻塞"/u)
-  assert.match(html, /status: "已完成"[\s\S]*?actions: \[\]/u)
-  assert.match(html, /status: "已退回"[\s\S]*?actions: \[\]/u)
-  assert.match(html, /function renderActionBar\(task\)/u)
-  assert.match(html, /data-action="\$\{actionKey\}"/u)
-  assert.match(html, /detailEvidenceInput\.disabled = isReadonly/u)
-  assert.match(html, /detailEventStatus\.textContent = task\.status/u)
-  assert.match(html, /detailExceptionSection\.hidden = !task\.exception/u)
-  assert.doesNotMatch(html, /任务已流转至[^<]*\/\s*warehouse/u)
-  assert.doesNotMatch(html, /<strong>仓库\s*\/\s*demo<\/strong>/u)
-  assert.doesNotMatch(html, /class="action process"|▶ 处理/u)
-  assert.doesNotMatch(html, /请填写原因，至少 5 个字/u)
+  assert.doesNotMatch(html, /PROSHIP-01|DBG|demo_|调试/u)
 })
 
-test('devPrototypes: 岗位任务端当前参考由同一任务对象渲染列表与详情', () => {
+test('devPrototypes: 岗位任务端 v1 将详情与处理唯一交给 v2', () => {
   const html = readFileSync(
     path.join(
       repoRoot,
@@ -399,50 +378,17 @@ test('devPrototypes: 岗位任务端当前参考由同一任务对象渲染列�
     ),
     'utf8'
   )
+  const readme = readFileSync(
+    path.join(repoRoot, 'docs/product/prototypes/mobile-role-tasks-v1/README.md'),
+    'utf8'
+  )
 
-  assert.match(html, /function renderTaskDetail\(task\)/u)
-  assert.match(
-    html,
-    /const task = tasks\[Number\(taskButton\.dataset\.openDetail\)\]/u
-  )
-  assert.match(html, /renderTaskDetail\(task\)/u)
-  assert.match(
-    html,
-    /detailSourceText\.textContent = `来源：\$\{task\.source\}`/u
-  )
-  assert.match(
-    html,
-    /detailLinkedSource\.textContent = `来源：\$\{task\.source\}`/u
-  )
-  assert.match(html, /\["截止", task\.due\]/u)
-  assert.match(html, /activeTaskTrigger\?\.focus/u)
-  assert.doesNotMatch(html, /PROSHIP-01|DBG|demo_|调试/u)
-  assert.match(html, /data-filter="all"/u)
-  assert.match(html, /data-filter="risk"/u)
-  assert.match(html, /data-list-more/u)
-  assert.match(html, /id="cancelReasonButton"/u)
-  assert.match(html, /id="submitReasonButton"/u)
-  assert.match(
-    html,
-    /if \(!activeActionButton \|\| !activeTask \|\| actionSubmitting\) return/u
-  )
-  assert.match(html, /完成反馈（必填）/u)
-  assert.match(html, /if \(!reason\)/u)
-  assert.match(html, /请先填写本次处理说明再提交。/u)
-  assert.match(html, /const submittedActionButton = activeActionButton/u)
-  assert.match(html, /const submittedTask = activeTask/u)
-  assert.match(html, /setActionSubmitting\(true\)/u)
-  assert.match(html, /submittedTask\.actions = \["resume", "urge"\]/u)
-  assert.match(html, /submittedTask\.listView = "history"/u)
-  assert.match(html, /submittedTask\.actions = \[\]/u)
-  assert.doesNotMatch(html, /submittedTask\.actionLocked = true/u)
-  assert.doesNotMatch(html, /tasks\.splice\(submittedTaskIndex, 1\)/u)
-  assert.match(html, /任务列表已刷新/u)
-  assert.match(html, /\["状态", task\.status\]/u)
-  assert.match(html, /detailRisk\.hidden = !task\.risk/u)
-  assert.match(html, /task\.blockedReason \?/u)
-  assert.doesNotMatch(html, /taskIndex === 0/u)
-  assert.match(html, /activeActionButton\?\.focus/u)
+  assert.match(html, /data-continue/u)
+  assert.match(html, />进入任务<\/button>/u)
+  assert.equal([...html.matchAll(/<dialog\b/gu)].length, 0)
+  assert.doesNotMatch(html, /renderTaskDetail|detailScreen|reasonSheet|data-action=/u)
+  assert.match(readme, /详情、处理与结果回执的当前交互由 `mobile-role-tasks-v2\/index\.html` 唯一定义/u)
+  assert.match(readme, /不再保留旧详情页、原因面板、动作栏或提交脚本/u)
 })
 
 test('devPrototypes: 岗位任务端 v2 保持三类查询视图、统一任务附件且无空回执入口', () => {
@@ -530,6 +476,13 @@ test('devPrototypes: 业务列表更多操作默认关闭并在窄屏收敛动�
     ),
     'utf8'
   )
+  const readme = readFileSync(
+    path.join(
+      repoRoot,
+      'docs/product/prototypes/business-module-page-standard-v1/README.md'
+    ),
+    'utf8'
+  )
 
   assert.match(
     html,
@@ -559,11 +512,11 @@ test('devPrototypes: 业务列表更多操作默认关闭并在窄屏收敛动�
   )
   assert.match(html, /已关闭，仅可查看、复制或打印/u)
   assert.match(html, /type="radio" name="purchaseOrderSelection"/u)
-  assert.match(html, /id="lifecycleDialog"[\s\S]*?aria-modal="true"/u)
-  assert.match(html, /lifecycleDialog\.showModal\(\)/u)
-  assert.match(html, /lifecycleDialog\.addEventListener\("cancel"/u)
-  assert.match(html, /event\.key !== "Tab"/u)
-  assert.match(html, /lifecycleTrigger\?\.focus/u)
+  assert.doesNotMatch(html, /lifecycleDialog|openLifecycle|状态动作说明/u)
+  assert.match(
+    readme,
+    /状态规则说明、危险确认和列顺序的弹窗细节统一由 `action-modal-drawer-standard-v1\/index\.html` 表达/u
+  )
 })
 
 test('devPrototypes: 业务表单样板使用真实单弹窗与完整键盘边界', () => {
@@ -593,20 +546,32 @@ test('devPrototypes: 业务表单样板使用真实单弹窗与完整键盘边�
   assert.match(html, /event\.key !== "Tab"/u)
   assert.match(html, /modalTrigger\?\.focus/u)
   assert.doesNotMatch(html, /<dialog[^>]*\sopen(?:\s|>)/u)
-  const editableFields =
-    html.match(/const editableFieldIds = \[([\s\S]*?)\];/u)?.[1] || ''
-  assert.doesNotMatch(editableFields, /"lineAmount"/u)
   assert.match(html, /<input id="lineAmount"[^>]*disabled/u)
   assert.doesNotMatch(html, /id="source"|sourceData|上游业务单据/u)
+  assert.match(html, /<h3>订单与客户<\/h3>/u)
+  assert.match(html, /<h3>联系人与负责人<\/h3>/u)
+  assert.match(html, /<h3>结算条件<\/h3>/u)
+  assert.match(html, /<h3>交付与收货<\/h3>/u)
+  assert.match(html, /<h3>附件与其他说明<\/h3>/u)
   assert.match(html, /<label class="required" for="customer">客户<\/label>/u)
   assert.match(html, /<select id="customer"/u)
+  assert.doesNotMatch(html, /id="status"/u)
+  assert.doesNotMatch(html, /toy-a|toy-b/u)
+  assert.match(html, /id="productSku"/u)
+  assert.match(html, /id="productSku" data-line-field="sku"/u)
+  assert.match(html, /id="sourceSummary"[^>]*disabled/u)
+  assert.match(html, /id="productOrder"[^>]*disabled/u)
+  assert.doesNotMatch(html, /id="copyItem"/u)
+  assert.match(html, /function addItem\(sourceCard = null\)/u)
+  assert.match(html, /copyItemValues\(template, article\)/u)
   assert.match(
     html,
-    /<input id="status"[^>]*readonly[^>]*aria-readonly="true"/u
+    /event\.target\.closest\("\.copy-item"\)[\s\S]*?addItem\(card\)/u
   )
-  assert.doesNotMatch(html, /toy-a|toy-b/u)
-  assert.match(html, /<select id="itemImportSelection">/u)
-  assert.match(html, /applySkuSelection\(itemImportSelection\.value\)/u)
+  assert.match(
+    html,
+    /applySkuSelection\([\s\S]*?setLineField\(card, key, nextValue\)/u
+  )
   assert.match(
     html,
     /SKU 只带入产品主数据，不覆盖当前订单的数量、价格、金额和交期/u
@@ -614,10 +579,24 @@ test('devPrototypes: 业务表单样板使用真实单弹窗与完整键盘边�
   assert.match(html, /const mutationControlSelector = \[/u)
   assert.match(html, /"#itemImportApply"/u)
   assert.match(html, /"#attachment"/u)
-  assert.match(html, /"\.remove-item"/u)
+  assert.match(html, /function syncItemControls\(/u)
+  assert.doesNotMatch(
+    html.match(/const mutationControlSelector = \[([\s\S]*?)\]\.join/u)?.[1] || '',
+    /\.remove-item/u
+  )
   assert.match(html, /"#addItem"/u)
-  assert.match(html, /"#footerReset"/u)
   assert.match(html, /"#footerSave"/u)
+  assert.doesNotMatch(html, /footerReset|resetBusinessForm/u)
+  assert.match(html, /原型评审状态（非运行态字段）/u)
+  assert.match(html, /width: min\(1720px, calc\(100vw - 96px\)\);/u)
+  const modalSizes = readFileSync(
+    path.join(repoRoot, 'web/src/erp/utils/modalSizes.mjs'),
+    'utf8'
+  )
+  assert.match(
+    modalSizes,
+    /businessForm: 'min\(1720px, calc\(100vw - 96px\)\)'/u
+  )
   assert.match(html, /function syncMutationControls\(readonly\)/u)
   assert.match(html, /if \(formMode\.value === "readonly"\) return/u)
   const skuCatalog = html.match(
@@ -628,6 +607,68 @@ test('devPrototypes: 业务表单样板使用真实单弹窗与完整键盘边�
     skuCatalog,
     /quantity|unitPrice|lineAmount|dueDate/u,
     'SKU master selection must not overwrite document quantity, price, amount, or due date'
+  )
+})
+
+test('devPrototypes: 业务详情样板只承接共享只读 Modal', () => {
+  const html = readFileSync(
+    path.join(
+      repoRoot,
+      'docs/product/prototypes/business-detail-page-standard-v1/index.html'
+    ),
+    'utf8'
+  )
+
+  assert.equal([...html.matchAll(/<dialog\b/gu)].length, 1)
+  assert.match(html, /销售订单详情 · SO-202608-018/u)
+  assert.match(html, /class="descriptions"/u)
+  assert.equal([...html.matchAll(/class="description-item"/gu)].length, 9)
+  assert.match(html, /data-state="items"/u)
+  assert.match(html, /data-state="empty"/u)
+  assert.match(html, /data-state="loading"/u)
+  assert.match(html, /data-state="error"/u)
+  assert.match(html, /items\.slice\(start, start \+ 10\)/u)
+  assert.match(html, /data-retry/u)
+  assert.match(html, /<footer class="modal-foot">\s*<button id="closeDetails"/u)
+  assert.doesNotMatch(html, /Workflow|Fact|协同动作|事实动作/u)
+})
+
+test('devPrototypes: 任务中心只保留队列和共享处理流程入口', () => {
+  const html = readFileSync(
+    path.join(
+      repoRoot,
+      'docs/product/prototypes/task-command-center-v1/index.html'
+    ),
+    'utf8'
+  )
+  const readme = readFileSync(
+    path.join(
+      repoRoot,
+      'docs/product/prototypes/task-command-center-v1/README.md'
+    ),
+    'utf8'
+  )
+
+  assert.equal([...html.matchAll(/<dialog\b/gu)].length, 0)
+  assert.match(html, /\{ key: "normal", label: "常规 \/ 只读" \}/u)
+  assert.match(html, /\{ key: "risk", label: "风险" \}/u)
+  assert.match(html, /\{ key: "blocked", label: "阻塞" \}/u)
+  assert.match(html, /\{ key: "due", label: "到期 \/ 超时" \}/u)
+  assert.match(html, /data-open-flow/u)
+  assert.match(html, /任务处理动作流程”专用原型统一定义/u)
+  assert.match(html, /event\.key === "ArrowDown"/u)
+  assert.match(html, /event\.key === "Enter"/u)
+  assert.doesNotMatch(
+    html,
+    /drawer|data-step-panel|reasonInput|submitFailed|data-drawer-command/u
+  )
+  assert.match(
+    readme,
+    /\| `index\.html` \|[^\n]*共享处理流程交接/u
+  )
+  assert.doesNotMatch(
+    readme,
+    /\| `index\.html` \|[^\n]*三步任务处理抽屉/u
   )
 })
 
@@ -660,9 +701,9 @@ test('devPrototypes: 局部动作弹层使用原生 dialog 和 alertdialog 行�
     'utf8'
   )
 
-  assert.equal([...html.matchAll(/<dialog\b/gu)].length, 5)
-  assert.equal([...html.matchAll(/<\/dialog>/gu)].length, 5)
-  assert.equal([...html.matchAll(/aria-haspopup="dialog"/gu)].length, 5)
+  assert.equal([...html.matchAll(/<dialog\b/gu)].length, 4)
+  assert.equal([...html.matchAll(/<\/dialog>/gu)].length, 4)
+  assert.equal([...html.matchAll(/aria-haspopup="dialog"/gu)].length, 4)
   assert.match(
     html,
     /<dialog[^>]*id="confirmDialog"[^>]*role="alertdialog"[^>]*aria-modal="true"/u
@@ -674,7 +715,16 @@ test('devPrototypes: 局部动作弹层使用原生 dialog 和 alertdialog 行�
   assert.match(html, /element\.inert = blocked/u)
   assert.match(html, /dialog\.querySelector\([\s\S]*?\[data-initial-focus\]/u)
   assert.match(html, /trigger\?\.focus\(\{ preventScroll: true \}\)/u)
-  assert.match(html, /openDialog\("form", buttons\[0\]\)/u)
+  assert.match(html, /openDialog\("import", buttons\[0\]\)/u)
+  assert.doesNotMatch(html, /formDialog|data-target="form"|补录出货信息|保存补录/u)
+  assert.match(
+    html,
+    /@media \(max-width: 980px\)[\s\S]*?\.modal\.columns \{[\s\S]*?max-height: calc\(100vh - 24px\)/u
+  )
+  assert.doesNotMatch(
+    html,
+    /@media \(max-width: 980px\)[\s\S]*?\.modal\.columns \{[\s\S]*?max-height: none/u
+  )
 })
 
 test('devPrototypes: 模板打印中心样板覆盖当前五个正式模板', () => {
@@ -906,7 +956,7 @@ test('devPrototypes: 支持按状态和关键词筛选', () => {
   assert(
     filterDevPrototypeItems(items, {
       status: DEV_PROTOTYPE_FILTERS.TO_IMPLEMENT,
-      keyword: '只读状态',
+      keyword: '只读评审状态',
     }).some((item) => item.key === 'business-form-standard-page')
   )
   assert(

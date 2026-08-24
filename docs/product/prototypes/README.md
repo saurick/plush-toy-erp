@@ -178,7 +178,7 @@
 | `index.html` | Current | Evidence | 产品原型与样板查看器，可直接用浏览器 `file://` 打开，用于筛选和访问本目录下的 HTML 样板、PNG 方案图和截图证据。 |
 | `admin-command-center-v1/index.html` | To Implement | Core | 后台工作台标准样板，把工作台收敛为登录后的今日处理台：今日焦点、可点击队列筛选、当前任务上下文、当前任务关联记录入口和交接边界。 |
 | `admin-command-center-v1/images/workbench-redesign-reference.png` | Draft | Exploration | 后台工作台重设计方向图，只用于对照首屏层级、主从布局和操作密度，不是运行时截图或实现真源。 |
-| `task-command-center-v1/index.html` | To Implement | Core | 任务中心标准样板，把任务菜单收敛为职责处理台：待我处理、我发起的、阻塞交接、当前选中任务详情、任务处理抽屉和关联业务对象。 |
+| `task-command-center-v1/index.html` | To Implement | Core | 任务中心标准样板，负责四类任务队列、组合筛选、当前任务只读详情和进入共享处理流程的上下文入口；不复制三步处理状态机。 |
 | `task-command-center-v1/images/task-board-redesign-reference.png` | Draft | Exploration | 任务看板重设计方向图，只用于对照队列、泳道、当前任务详情和主操作层级，不定义任务权限或状态机。 |
 | `workflow-task-action-flow-v1/index.html` | To Implement | Core | Workflow 任务处理流程样板，把核对任务、选择处理、确认与结果收口为可直接导航的三步流程；催办只是处理动作，确认页受动作与原因校验约束。 |
 | `workflow-task-action-flow-v1/images/task-action-flow-redesign-reference.png` | Draft | Exploration | 任务处理流程重设计方向图，只用于对照三步导航、动作选择、原因输入和确认回执，不替代运行时组件或 Workflow 权限真源。 |
@@ -192,12 +192,12 @@
 | `business-module-page-standard-v1/index.html` | To Implement | Core | 业务模块标准页样板，使用项目统一的紧凑工作台结构，把筛选、页面动作和当前操作压缩到同一卡片；表头保留列顺序入口和排序箭头，不内置通用删除 / 回收站；页面只展示必要业务信息，协同入口不作为所有标准页的默认固定栏。像生产异常处置这样同时存在两套同级、全量工作区的正式复合页使用页签隔离，不纵向堆表。 |
 | `business-module-page-standard-v1/task-collab-entry-v2.html` | To Implement | Core | 业务页协同入口组件样板，仅用于有真实 Workflow 关联的业务页，展示当前选中业务记录的待办；未选中记录或当前记录无待办时不显示固定栏，跨记录任务回到任务中心。 |
 | `print-template-center-v1/index.html` | To Implement | Core | 模板打印中心样板，覆盖模板导航、纸面预览和打印窗口入口；字段编辑和明细确认回到独立打印窗口。 |
-| `business-detail-page-standard-v1/index.html` | To Implement | Core | 业务详情页标准样板，覆盖基础信息、业务状态、关联单据、操作记录、附件区，并区分 Workflow 协同动作和 Fact 事实动作。 |
-| `business-form-page-standard-v1/index.html` | To Implement | Core | 新建 / 编辑业务弹窗标准样板，覆盖同一弹窗内上方主表字段、附件证据行、下方明细 items、来源选择器入口、首个落地对象、字段分组、必填校验、保存 / 取消 / 重置、来源带值、清值、新增 / 编辑 / 只读状态和缺值 / 残值防护。 |
-| `action-modal-drawer-standard-v1/index.html` | To Implement | Core | 局部动作弹窗标准样板，承接来源选择器、来源导入、列顺序、状态动作说明和危险确认；来源选择器最多作为第二层弹窗，并保留分页、已选摘要和清空已选，不替代业务对象新建 / 编辑弹窗主路径。目录名保留历史 `drawer` 字样仅为引用兼容，不代表业务编辑继续使用抽屉。 |
+| `business-detail-page-standard-v1/index.html` | To Implement | Core | 业务只读详情 Modal 样板，对齐共享详情组件的标题、字段描述表、完整明细分页和加载 / 空 / 失败状态；不再保留独立详情页外壳或业务动作区。 |
+| `business-form-page-standard-v1/index.html` | To Implement | Core | 销售订单宽业务 Modal 样板，对齐订单与客户、联系人与负责人、结算条件、交付与收货、附件，以及 SKU 来源、带出摘要、单位、复制行和产品顺序；保留保存 / 取消、来源清值和只读评审状态，不提供通用整表重置。 |
+| `action-modal-drawer-standard-v1/index.html` | To Implement | Core | 局部动作弹窗标准样板，只承接来源选择器、列顺序、状态规则说明和危险确认；不再复制完整业务表单或只读详情。目录名保留历史 `drawer` 字样仅为引用兼容。 |
 | `business-module-page-standard-v1/images/` | Reference | Exploration / Evidence | 早期三张协同入口方向图，用于追溯方案比较。 |
 | `mobile-role-tasks-v2/index.html` | Current | Core | 当前选中任务查看、处理、任务附件和可信回执流程；与 v1 当前列表基线共同组成移动任务主路径。 |
-| `mobile-role-tasks-v1/implemented-reference.html` | Current | Core | 岗位任务端当前唯一列表基线；保留标签、筛选、分页和任务卡片，文件内旧详情内处理仅作历史对照。 |
+| `mobile-role-tasks-v1/implemented-reference.html` | Current | Core | 岗位任务端当前列表基线，只保留标签、筛选、分批展开、刷新和任务选择；详情、处理与结果回执由 v2 唯一定义。 |
 | `mobile-role-tasks-v1/images/` | Reference | Exploration / Evidence | 岗位任务端改版三张 PNG 原型图，作为早期视觉方向和历史参考。 |
 
 当前中央登记共 27 项资产：17 个 HTML、10 个 PNG；15 个 HTML 保持 `To Implement`。`mobile-role-tasks-v1/implemented-reference.html` 和 `mobile-role-tasks-v2/index.html` 都是 `Current`，分别登记列表基线和选中任务流程。方向 PNG 统一作为 `Draft / Exploration` 参考，不因同轮运行态重构而晋级为实现真源。
@@ -213,7 +213,7 @@
 | 页面类型 | 标准样板 | 参照范围 | 正式吸收边界 |
 | --- | --- | --- | --- |
 | 工作台 / 总控页 | `admin-command-center-v1/index.html` | 后台首页 / 工作台、任务看板、业务看板和模板打印中心等总控入口可参照；运行态工作台承接待我处理、权限门控的待我审批与阻塞 / 逾期风险队列，只保留当前任务关联记录入口，不再铺通用快捷入口列表。 | 正式菜单仍按菜单评审和客户配置决定；关联记录跳转只作为当前任务上下文入口。 |
-| 任务中心 / 职责处理台 | `task-command-center-v1/index.html` | 我的任务、任务看板、工作台风险队列、岗位任务端和业务页协同入口可参照；入口按职责和任务状态组织，当前选中任务详情和任务处理抽屉按上下文、处理步骤、原因输入和底部动作收口。 | 跨记录、跨模块待办由任务中心承接；业务对象入口回到正式菜单，任务完成仍只代表 Workflow 协同状态。 |
+| 任务中心 / 职责处理台 | `task-command-center-v1/index.html` | 我的任务、任务看板和工作台风险队列可参照；入口按职责和任务状态组织，当前选中任务只做上下文核对并进入共享处理流程。 | 跨记录、跨模块待办由任务中心承接；三步处理、原因、提交与回执只由 `workflow-task-action-flow-v1` 定义，业务对象入口回到正式菜单。 |
 | Workflow 任务处理流程 | `workflow-task-action-flow-v1/index.html` | 任务中心、岗位任务端和有真实 Workflow 关联的业务页协同入口可参照；核对任务、选择处理可以直接切换，确认与结果按动作和原因校验受控进入。 | 催办只是一种处理动作；可用动作、原因规则、owner / assignee、状态和 RBAC 继续由运行时真源决定，任务动作不写业务事实。 |
 | 业务管理中心 / 对象总控 | `business-management-center-v1/index.html` | 业务管理类总入口、业务看板下钻、正式入口壳和同类业务对象选择可参照；入口按业务链路和对象组织。 | 正式菜单和领域成熟度回到菜单评审、API / schema / RBAC 和能力台账。 |
 | 指标卡交互语义 | `metric-card-interaction-standard-v1/index.html` | 后台首页、任务看板、业务看板、业务页标题摘要和同类 KPI / 数字入口可参照；先区分只读、动作和筛选三类语义。 | 只读、动作和筛选三类语义要在真实控件、焦点态和测试中体现；业务能力由对应 usecase 决定。 |
@@ -222,8 +222,8 @@
 | 正式菜单候选导航 | `formal-menu-candidate-v1/index.html` | 工作台、我的任务 / 任务看板、客户 / 供应商 / 产品 / BOM、销售订单、采购 / 入库 / 质检、库存、生产 / 外协、出货、财务对账、报表、数据导入、系统管理等主入口可用它评审；进入运行时前先对照 `../菜单与正式入口合同.md`。 | 左侧导航、51 个内部覆盖项、权限和路由进入运行时前，先走菜单配置和路由评审。 |
 | 系统审计日志 | `audit-log-page-v1/index.html` | 系统管理下的审计日志页可参照，重点是审计摘要、系统控制面筛选、风险事件、日志表格、事件详情、空态和只读边界。 | 真实事件来源、payload 字段、保留周期、导出策略、API、RBAC 和菜单仍回到当前代码与正式文档；审计日志不替代业务事实表。 |
 | 业务模块列表页 / 标准业务页 | `business-module-page-standard-v1/index.html` | 客户档案、供应商与加工厂、产品、销售订单、采购订单、加工合同 / 委外下单、入库通知 / 检验 / 入库、库存、待出货 / 出货放行、出库、生产排单、生产进度、延期 / 返工 / 异常、品质检验、对账 / 结算、待付款 / 应付提醒、应收 / 开票登记和发票登记等同类列表页可参照；当前操作行按钮是出货 / 出库类动作示例，真实页面应按模块调整。 | 同类菜单可复用列表骨架，但不默认挂载协同固定栏；未实现菜单、模块动作和 Workflow 关联进入运行时前按模块评审。 |
-| 业务详情页 | `business-detail-page-standard-v1/index.html` | 销售订单、客户 / 供应商、产品、采购入库、库存批次、质检、出货和财务等需要详情承载的页面可参照。 | 字段真源、状态机、关联单据和允许动作回到对应领域文档、API 和 usecase。 |
-| 新建 / 编辑业务弹窗 | `business-form-page-standard-v1/index.html` | 客户、供应商、联系人、销售订单、采购、BOM、出货、库存、质检和财务等业务对象新建 / 编辑可参照；上方放主表字段，单据级附件作为备注 / 交付 / 合同资料 / 凭证附近的紧凑证据行放在明细前，并保留选择、PNG / JPG / WEBP / GIF / PDF 轻量预览和其他格式下载动作；下方放联系人、订单行、产品、BOM 或出货等必要 items，item 区只保留来源选择器入口和导入回填结果。业务对象创建、编辑和查看统一走 Modal，并保留打开焦点、Tab、Escape / 关闭和焦点返回路径。 | schema、API、RBAC、保存 usecase、字段默认值和残值 / 缺值防护规则回到对应领域主路径；附件只挂已保存业务对象，不改变 Source Document、Fact、Workflow 或状态；来源选择器、列顺序、状态动作说明和危险确认按局部动作弹窗收口。 |
+| 业务只读详情 | `business-detail-page-standard-v1/index.html` | 销售订单、客户 / 供应商、产品、采购入库、库存批次、质检、出货和财务等只读查看可参照共享详情 Modal。 | 字段来自页面列配置，完整明细来自正式加载函数；底部只关闭，编辑、状态动作和附件维护回各自入口。 |
+| 新建 / 编辑业务弹窗 | `business-form-page-standard-v1/index.html` | 当前以销售订单运行态结构为代表：主字段按业务语义分组，订单行展示 SKU 来源、带出产品 / 单位、数量、价格、交期、复制行与产品顺序；其他对象只复用共享 Modal 和适用模式，不机械复制销售字段。 | schema、API、RBAC、保存 usecase、默认值及残值 / 缺值防护回到对应主路径；原型评审状态不是运行态字段，来源选择器细节与危险确认回到局部动作弹窗。 |
 | 协同任务入口 / 处理组件 | `business-module-page-standard-v1/task-collab-entry-v2.html` | 仅有真实 Workflow 关联、能定位当前选中业务记录待办的业务页可参照。 | 只显示当前记录的关联待办；未选中或无待办时不显示固定栏，跨记录任务回到任务中心。独立菜单、路由和权限仍回到任务看板或正式菜单评审。 |
 | 局部动作弹窗 / 确认动作 | `action-modal-drawer-standard-v1/index.html` | 出货、采购、质检、库存、财务等需要在列表页内打开辅助浮层的场景可参照，重点是来源选择器、列顺序、状态动作说明和危险确认的宽度、密度、底部动作和信息边界；来源选择器必须包含分页、已选摘要和清空入口。 | 字段真源、后端权限、幂等、状态边界、来源导入门禁、保存 usecase、明细行校验、状态规则和事实约束回到对应领域主路径；来源选择器只作为第二层选择来源，不编辑本单字段，不再弹第三层；完整新建 / 编辑统一回到业务表单弹窗样板。 |
 | 岗位任务端 | `mobile-role-tasks-v1/implemented-reference.html` + `mobile-role-tasks-v2/index.html` | 采用有意组合的当前主路径：v1 保留 `/m/<role>/tasks` 列表标签、筛选和分页；选中任务后由 v2 承接查看、处理、任务附件、可信回执并恢复列表。 | 岗位入口继续按 Workflow 任务、服务端 RBAC 和客户 effective session 投影；两份 Current 资产分别描述列表和选中任务流程，v2 不替换 v1 列表。 |
@@ -266,7 +266,7 @@ Core 样板中的订单号、客户、产品、数量、日期、任务和附件
 
 当前推荐的简化理解是：顶部只判断“当前 / 待实现 / 参考资料”；`HTML / PNG` 只表示格式，`截图证据 / Evidence`、`方案对比 / Comparison`、`历史参考 / History` 等细标签只解释来源和用途。不要反过来用 HTML / PNG 文件格式或辅助标签判断资产阶段。
 
-截至 2026-08-11，待实现队列包含 `admin-command-center-v1/index.html`、`task-command-center-v1/index.html`、`workflow-task-action-flow-v1/index.html`、`business-management-center-v1/index.html`、`metric-card-interaction-standard-v1/index.html`、`core-menu-coverage-v1/index.html`、`current-page-atlas-v3/index.html`、`formal-menu-candidate-v1/index.html`、`audit-log-page-v1/index.html`、`business-module-page-standard-v1/index.html`、`business-module-page-standard-v1/task-collab-entry-v2.html`、`print-template-center-v1/index.html`、`business-detail-page-standard-v1/index.html`、`business-form-page-standard-v1/index.html` 和 `action-modal-drawer-standard-v1/index.html`。这十五个产品内核相关 HTML 继续保留 To Implement；移动任务端由 v1 当前列表基线和 v2 当前选中任务流程共同组成。
+待实现队列包含 `admin-command-center-v1/index.html`、`task-command-center-v1/index.html`、`workflow-task-action-flow-v1/index.html`、`business-management-center-v1/index.html`、`metric-card-interaction-standard-v1/index.html`、`core-menu-coverage-v1/index.html`、`current-page-atlas-v3/index.html`、`formal-menu-candidate-v1/index.html`、`audit-log-page-v1/index.html`、`business-module-page-standard-v1/index.html`、`business-module-page-standard-v1/task-collab-entry-v2.html`、`print-template-center-v1/index.html`、`business-detail-page-standard-v1/index.html`、`business-form-page-standard-v1/index.html` 和 `action-modal-drawer-standard-v1/index.html`。这十五个产品内核相关 HTML 继续保留 To Implement；移动任务端由 v1 当前列表基线和 v2 当前选中任务流程共同组成。
 
 本地工作树运行态已承接本轮看板中心低密度重构：工作台和任务看板减少重复动作，改为“处理任务 / 查看详情 + 查看相关单据”的单一主路径，并增加由当前任务状态、账号可用操作和已授权关联入口派生的只读“处理提示”；“查看相关单据”只有在服务端确认真实来源关联、当前账号可读取来源、入口路由可解析且菜单入口可见时才显示。任务可见性仍独立表达责任、阻塞和到期，不因来源菜单不可见而吞掉任务；来源权限失配时仍可查看任务上下文并保留原有催办能力，但不能完成、阻塞、退回或解除阻塞。有独立转交权限的管理人仍可把任务转给具备来源读取能力的同岗位人员。工作台保留立即处理队列和当前任务详情，并为具备任一有效审批能力的账号显示“待我审批”；完整计数、筛选、互斥 Workflow 泳道和当前任务主从布局由任务看板承接。业务看板改为业务记录表与关注事项并列，明确 0 与不可用的差异；跨模块风险任务统一由工作台的阻塞 / 逾期队列和任务看板承接，不再提供重复的通用异常总控页。共享任务处理抽屉已把核对任务、选择处理、确认结果改为可点击步骤，催办只保留为一种处理动作，确认页继续受动作和原因校验约束。移动岗位任务端采用 v1 列表 + v2 选中任务流程：保留 v1 待办 / 已办 / 风险 / 我的四项主导航、筛选和分页；具备任一有效审批能力时在待办内显示“待我审批”，不增加第五个底部导航。岗位状态数量来自服务端首屏同一读快照，满足 `todo=ready+blocked`、`history=done+rejected+withdrawn`、`total=todo+history`；审批、风险、超时是可重叠关注面，监督权限下明确显示“跨岗风险”。浏览器已加载数组只负责当前页渲染，不再冒充岗位总量；独立详情、处理和可信回执结束后使数量快照失效并恢复原列表状态。桌面抽屉、移动详情和已确认回执复用 ProcessRuntime 执行轨迹，只显示已执行 / 当前 / 受阻节点、本任务锚点和重试次数，不把可能属于未选分支的 `waiting` 节点画成确定未来步骤。服务端 `todo / approval / risk / history` 四视图、客户 guard、action explain、真实附件和 Workflow / Fact 边界继续保留。处理提示不是人工填写字段，也不承诺唯一业务结论；人工只填写当前动作合同要求的反馈或原因，任务附件统一在详情页按权限查看或管理，旧证据引用仅作为历史处理线索只读显示。
 
