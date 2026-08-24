@@ -110,6 +110,10 @@
   margin: 0;
 }
 
+.erp-permission-relationship__evidence .ant-typography {
+  overflow-wrap: anywhere;
+}
+
 .erp-permission-relationship__intro .ant-typography + .ant-typography,
 .erp-permission-relationship__section-head .ant-typography + .ant-typography {
   display: block;
@@ -121,9 +125,15 @@
   font-size: 20px;
 }
 
+.erp-permission-relationship__boundary-note {
+  border-left: 3px solid var(--erp-primary, #2b8a3e);
+  background: var(--erp-primary-soft, #eef7ef);
+  padding: 8px 10px;
+}
+
 .erp-permission-relationship__toolbar {
   display: grid;
-  grid-template-columns: auto minmax(220px, 1fr) minmax(220px, 1fr);
+  grid-template-columns: auto minmax(240px, 1fr);
   gap: 12px;
   min-width: 0;
   border: 1px solid var(--erp-border, #d8e1ed);
@@ -170,6 +180,14 @@ body
   min-width: 0;
 }
 
+.erp-permission-relationship__summary-head {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .erp-permission-relationship__summary .ant-statistic {
   min-width: 0;
   border: 1px solid var(--erp-border, #d8e1ed);
@@ -182,6 +200,62 @@ body
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.erp-permission-relationship__evidence {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid var(--erp-border, #d8e1ed);
+  border-radius: 12px;
+  background: var(--erp-surface-bg-soft, #f8fafc);
+  padding: 10px;
+}
+
+.erp-permission-relationship__evidence > div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.erp-permission-relationship__tabs {
+  min-width: 0;
+}
+
+.erp-permission-relationship__tabs > .ant-tabs-nav {
+  margin-bottom: 12px;
+}
+
+.erp-permission-relationship__tabs > .ant-tabs-content-holder,
+.erp-permission-relationship__tabs .ant-tabs-tabpane {
+  min-width: 0;
+}
+
+.erp-permission-relationship__tab-panel {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.erp-permission-relationship__tab-toolbar,
+.erp-permission-relationship__detail-toolbar {
+  display: grid;
+  min-width: 0;
+  align-items: end;
+  gap: 12px;
+  border: 1px solid var(--erp-border, #d8e1ed);
+  border-radius: 12px;
+  background: var(--erp-surface-bg-soft, #f8fafc);
+  padding: 10px 12px;
+}
+
+.erp-permission-relationship__tab-toolbar {
+  grid-template-columns: minmax(220px, 360px) minmax(0, 1fr);
+}
+
+.erp-permission-relationship__detail-toolbar {
+  grid-template-columns: minmax(220px, 1fr) auto;
 }
 
 .erp-permission-navigation {
@@ -599,7 +673,8 @@ body
 }
 
 @media (max-width: 1100px) {
-  .erp-permission-relationship__summary {
+  .erp-permission-relationship__summary,
+  .erp-permission-relationship__evidence {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
@@ -652,7 +727,8 @@ body
   }
 
   .erp-permission-relationship__intro,
-  .erp-permission-relationship__section-head {
+  .erp-permission-relationship__section-head,
+  .erp-permission-relationship__summary-head {
     align-items: stretch;
     flex-direction: column;
   }
@@ -661,7 +737,13 @@ body
     grid-template-columns: 1fr;
   }
 
-  .erp-permission-relationship__summary {
+  .erp-permission-relationship__tab-toolbar,
+  .erp-permission-relationship__detail-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-permission-relationship__summary,
+  .erp-permission-relationship__evidence {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

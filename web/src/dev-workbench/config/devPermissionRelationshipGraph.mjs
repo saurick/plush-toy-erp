@@ -9,10 +9,16 @@ import {
 } from '../../erp/utils/permissionCenterAccess.mjs'
 import { getPermissionModuleTitle } from '../../erp/utils/permissionModuleLabels.mjs'
 import { formatAdminIdentity } from '../../erp/utils/adminIdentity.mjs'
+import { getApprovalSettingsBlockerLabel } from '../../erp/utils/approvalSettingsActivation.mjs'
 
 export const PERMISSION_RELATIONSHIP_VIEW_MODE = Object.freeze({
   ROLE: 'role',
   ACCOUNT: 'account',
+})
+
+export const PERMISSION_RELATIONSHIP_DETAIL_SCOPE = Object.freeze({
+  RELATED: 'related',
+  ALL: 'all',
 })
 
 export const PERMISSION_RELATIONSHIP_ALL_MODULES = 'all'
@@ -209,6 +215,43 @@ function accessSourceLabel(access = {}) {
   )
 }
 
+export function buildPermissionRelationshipEvidence({
+  roleKeys = [],
+  accessByRoleKey = {},
+  approvalSettings = null,
+} = {}) {
+  const normalizedRoleKeys = unique(
+    normalizeList(roleKeys).map(normalizeText).filter(Boolean)
+  )
+  const accesses = normalizedRoleKeys
+    .map((roleKey) => accessForRole(accessByRoleKey, roleKey))
+    .filter(Boolean)
+  const valuesOf = (key) =>
+    unique(
+      accesses.map((access) => normalizeText(access?.[key])).filter(Boolean)
+    )
+  const roleVersions = unique(
+    accesses
+      .map((access) => Number(access?.role_version || 0))
+      .filter((value) => Number.isSafeInteger(value) && value > 0)
+      .map(String)
+  )
+
+  return {
+    sources: unique(accesses.map(accessSourceLabel)),
+    configRevisions: valuesOf('config_revision'),
+    productVersions: valuesOf('product_version'),
+    roleVersions,
+    approvalRevision: normalizeText(approvalSettings?.config_revision),
+    approvalProductVersion: normalizeText(approvalSettings?.product_version),
+    approvalPartial: approvalSettings?.partial === true,
+    allFinal:
+      normalizedRoleKeys.length > 0 &&
+      accesses.length === normalizedRoleKeys.length &&
+      accesses.every((access) => access?.is_final === true),
+  }
+}
+
 function getRoleWarehouseScope(role = {}, warehouseOptions = []) {
   const scope = normalizeList(role?.data_scopes).find(
     (item) => normalizeText(item?.resource_type) === 'warehouse'
@@ -281,6 +324,145 @@ function decisionReason(decision = {}, fallback = '') {
   return reason || fallback
 }
 
+function permissionPageDetailMap(permissions = []) {
+  const pages = new Map()
+  permissionDetailMap(permissions).forEach((permission) => {
+    normalizeList(permission.rawPages).forEach((page) => {
+      const key = normalizeText(page?.key)
+      if (!key) return
+      const current = pages.get(key) || {
+        key,
+        name: normalizeText(page?.name) || '相关页面',
+        moduleKeys: new Set(),
+      }
+      current.moduleKeys.add(permission.moduleKey)
+      if (current.name === '相关页面' && normalizeText(page?.name)) {
+        current.name = normalizeText(page.name)
+      }
+      pages.set(key, current)
+    })
+  })
+  return pages
+}
+
+export function buildPermissionRelationshipDetailRows({
+  viewMode = PERMISSION_RELATIONSHIP_VIEW_MODE.ROLE,
+  targetKey = '',
+  moduleKey = PERMISSION_RELATIONSHIP_ALL_MODULES,
+  detailScope = PERMISSION_RELATIONSHIP_DETAIL_SCOPE.RELATED,
+  accounts = [],
+  roles = [],
+  permissions = [],
+  accessByRoleKey = {},
+} = {}) {
+  const roleByKey = new Map(
+    normalizeList(roles)
+      .filter((role) => getPermissionCenterRoleKey(role))
+      .map((role) => [getPermissionCenterRoleKey(role), role])
+  )
+  const selectedRoleKeys = getPermissionRelationshipRoleKeys({
+    viewMode,
+    targetKey,
+    accounts,
+  }).filter((roleKey) => roleByKey.has(roleKey))
+  const detailByKey = permissionDetailMap(permissions)
+  const pageDetailByKey = permissionPageDetailMap(permissions)
+  const selectedModule = normalizeText(moduleKey)
+  const exactModule =
+    selectedModule && selectedModule !== PERMISSION_RELATIONSHIP_ALL_MODULES
+  const includeUngranted =
+    detailScope === PERMISSION_RELATIONSHIP_DETAIL_SCOPE.ALL
+  const rows = []
+  let sequence = 0
+  const addRow = (row) => {
+    sequence += 1
+    rows.push({ ...row, rowKey: `detail-${sequence}` })
+  }
+
+  selectedRoleKeys.forEach((roleKey) => {
+    const role = roleByKey.get(roleKey)
+    const roleName = getPermissionCenterRoleName(role)
+    const access = accessForRole(accessByRoleKey, roleKey)
+    const permissionDecisions = accessPermissionMap(access)
+    const pageDecisions = accessPageMap(access)
+    const permissionKeys = includeUngranted
+      ? [...detailByKey.keys()]
+      : [...permissionDecisions.keys()]
+
+    permissionKeys
+      .map((key) => ({ key, detail: detailByKey.get(key) }))
+      .filter(({ detail }) => detail)
+      .filter(
+        ({ detail }) => !exactModule || detail.moduleKey === selectedModule
+      )
+      .sort((left, right) =>
+        `${left.detail.moduleName}:${left.detail.name}`.localeCompare(
+          `${right.detail.moduleName}:${right.detail.name}`,
+          'zh-CN'
+        )
+      )
+      .forEach(({ key, detail }) => {
+        const decision = permissionDecisions.get(key)
+        const effective = decision?.effective === true
+        const ungranted = !decision
+        addRow({
+          kind: 'permission',
+          source: roleName,
+          relation: '获得功能',
+          target: detail.name,
+          result: ungranted
+            ? '岗位未授予该功能'
+            : effective
+              ? '最终可用'
+              : decisionReason(decision, '当前设置未放行'),
+          status: ungranted ? '未授予' : effective ? '已生效' : '受限',
+        })
+      })
+
+    const pageKeys = includeUngranted
+      ? unique([...pageDetailByKey.keys(), ...pageDecisions.keys()])
+      : [...pageDecisions.keys()]
+    pageKeys
+      .map((key) => ({
+        key,
+        detail: pageDetailByKey.get(key),
+        decision: pageDecisions.get(key),
+      }))
+      .filter(
+        ({ detail }) =>
+          !exactModule || detail?.moduleKeys?.has(selectedModule) === true
+      )
+      .sort((left, right) =>
+        (
+          normalizeText(left.decision?.label) ||
+          left.detail?.name ||
+          ''
+        ).localeCompare(
+          normalizeText(right.decision?.label) || right.detail?.name || '',
+          'zh-CN'
+        )
+      )
+      .forEach(({ detail, decision }) => {
+        const effective = decision?.effective === true
+        const ungranted = !decision
+        addRow({
+          kind: 'page',
+          source: roleName,
+          relation: '进入页面',
+          target: normalizeText(decision?.label) || detail?.name || '相关页面',
+          result: ungranted
+            ? '岗位未授予该页面所需功能'
+            : effective
+              ? '可进入'
+              : decisionReason(decision, '页面当前不可进入'),
+          status: ungranted ? '未授予' : effective ? '已生效' : '受限',
+        })
+      })
+  })
+
+  return rows
+}
+
 function approvalRoleKeys(item = {}) {
   const effective = normalizeList(item?.effective_role_keys)
     .map(normalizeText)
@@ -316,6 +498,7 @@ function emptyModel(message = '请选择要查看的岗位或账号') {
   return {
     chart: graph.finish(),
     rows: [],
+    contextRows: [],
     warnings: [],
     summary: {
       accounts: 0,
@@ -428,6 +611,7 @@ export function buildPermissionRelationshipModel({
       )
       graph.addEdge(accountNode, systemNode, '系统保护')
       addRow({
+        kind: 'account',
         source: accountName(selectedAccount),
         relation: '系统保护',
         target: '全部系统权限',
@@ -447,6 +631,7 @@ export function buildPermissionRelationshipModel({
       const emptyRoleNode = graph.addNode('未分配岗位', 'blocked')
       graph.addEdge(accountNode, emptyRoleNode, '当前分配')
       addRow({
+        kind: 'account',
         source: accountName(selectedAccount),
         relation: '分配岗位',
         target: '未分配岗位',
@@ -470,6 +655,7 @@ export function buildPermissionRelationshipModel({
     if (accountNode) {
       graph.addEdge(accountNode, roleNode, '分配')
       addRow({
+        kind: 'account',
         source: accountName(selectedAccount),
         relation: '分配岗位',
         target: roleName,
@@ -504,6 +690,7 @@ export function buildPermissionRelationshipModel({
           getAdminAccountStatus(account) === ADMIN_ACCOUNT_STATUS.ACTIVE
         relatedAccountKeys.add(accountKey(account))
         addRow({
+          kind: 'account',
           source: accountName(account),
           relation: '分配岗位',
           target: roleName,
@@ -530,6 +717,7 @@ export function buildPermissionRelationshipModel({
     }
 
     addRow({
+      kind: 'source',
       source: accessSourceLabel(access),
       relation: '约束岗位',
       target: roleName,
@@ -541,6 +729,7 @@ export function buildPermissionRelationshipModel({
     const scopeNode = graph.addNode(`数据范围：${scopeLabel}`, 'scope')
     graph.addEdge(roleNode, scopeNode, '限制')
     addRow({
+      kind: 'scope',
       source: roleName,
       relation: '限制数据范围',
       target: '仓库数据',
@@ -573,6 +762,7 @@ export function buildPermissionRelationshipModel({
           blockedPermissionKeys.add(key)
         }
         addRow({
+          kind: 'permission',
           source: roleName,
           relation: '获得功能',
           target: detail.name,
@@ -591,6 +781,7 @@ export function buildPermissionRelationshipModel({
           const backendNode = graph.addNode('无独立页面的受控操作', 'source')
           graph.addEdge(permissionNode, backendNode, '控制')
           addRow({
+            kind: 'action',
             source: detail.name,
             relation: '控制',
             target: '无独立页面的受控操作',
@@ -620,6 +811,7 @@ export function buildPermissionRelationshipModel({
             effectivePageKeys.add(pageKey)
           }
           addRow({
+            kind: 'page',
             source: detail.name,
             relation: '影响页面',
             target: pageName,
@@ -671,6 +863,7 @@ export function buildPermissionRelationshipModel({
       }
       moduleSummaries.forEach((module) => {
         addRow({
+          kind: 'module',
           source: roleName,
           relation: '汇总功能模块',
           target: module.name,
@@ -696,6 +889,9 @@ export function buildPermissionRelationshipModel({
       .forEach((item) => {
         const approvalName = normalizeText(item?.label) || '审批事项'
         const blocked = normalizeList(item?.blocked_reasons).length > 0
+        const blockedReason = normalizeList(item?.blocked_reasons)
+          .map(getApprovalSettingsBlockerLabel)
+          .join('、')
         const approvalNode = graph.addNode(
           `审批责任：${approvalName}｜${blocked ? '当前受限' : '已配置'}`,
           blocked ? 'blocked' : 'approval'
@@ -703,10 +899,11 @@ export function buildPermissionRelationshipModel({
         graph.addEdge(roleNode, approvalNode, '承担')
         approvalKeys.add(normalizeText(item?.approval_key) || approvalName)
         addRow({
+          kind: 'approval',
           source: roleName,
           relation: '承担审批责任',
           target: approvalName,
-          result: blocked ? '当前设置存在阻塞' : '已配置',
+          result: blocked ? blockedReason : '已配置',
           status: blocked ? '受限' : '已配置',
         })
       })
@@ -719,6 +916,9 @@ export function buildPermissionRelationshipModel({
   return {
     chart: graph.finish(),
     rows,
+    contextRows: rows.filter((row) =>
+      ['account', 'source', 'scope', 'approval'].includes(row.kind)
+    ),
     warnings: unique(warnings),
     summary: {
       accounts: relatedAccountKeys.size,

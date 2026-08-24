@@ -2,7 +2,10 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   PERMISSION_RELATIONSHIP_ALL_MODULES,
+  PERMISSION_RELATIONSHIP_DETAIL_SCOPE,
   PERMISSION_RELATIONSHIP_VIEW_MODE,
+  buildPermissionRelationshipDetailRows,
+  buildPermissionRelationshipEvidence,
   buildPermissionRelationshipModel,
   buildPermissionRelationshipModuleOptions,
   buildPermissionRelationshipTargetOptions,
@@ -234,6 +237,8 @@ test('role view connects accounts, role, final permissions, pages, scope and app
         row.result === '当前客户未启用确认能力'
     )
   )
+  assert.ok(model.contextRows.every((row) => row.kind !== 'permission'))
+  assert.ok(model.contextRows.some((row) => row.kind === 'approval'))
   assert.ok(
     model.rows.some(
       (row) =>
@@ -243,6 +248,115 @@ test('role view connects accounts, role, final permissions, pages, scope and app
   const visibleOutput = JSON.stringify(model)
   assert.doesNotMatch(visibleOutput, /sales\.order\.(read|confirm)/u)
   assert.doesNotMatch(visibleOutput, /13[6789]00000000/u)
+})
+
+test('permission evidence keeps role, customer, product and approval versions together', () => {
+  const evidence = buildPermissionRelationshipEvidence({
+    roleKeys: ['sales'],
+    accessByRoleKey: {
+      sales: {
+        ...accessByRoleKey.sales,
+        role_version: 7,
+        config_revision: 'customer-v7',
+        product_version: 'product-v3',
+      },
+    },
+    approvalSettings: {
+      config_revision: 'approval-v5',
+      product_version: 'product-v3',
+      items: [],
+    },
+  })
+
+  assert.deepEqual(evidence, {
+    sources: ['当前客户已启用设置'],
+    configRevisions: ['customer-v7'],
+    productVersions: ['product-v3'],
+    roleVersions: ['7'],
+    approvalRevision: 'approval-v5',
+    approvalProductVersion: 'product-v3',
+    approvalPartial: false,
+    allFinal: true,
+  })
+})
+
+test('detail rows can include the product permissions and pages not granted to the role', () => {
+  const relatedRows = buildPermissionRelationshipDetailRows({
+    viewMode: PERMISSION_RELATIONSHIP_VIEW_MODE.ROLE,
+    targetKey: 'sales',
+    accounts,
+    roles,
+    permissions,
+    accessByRoleKey,
+  })
+  const completeRows = buildPermissionRelationshipDetailRows({
+    viewMode: PERMISSION_RELATIONSHIP_VIEW_MODE.ROLE,
+    targetKey: 'sales',
+    detailScope: PERMISSION_RELATIONSHIP_DETAIL_SCOPE.ALL,
+    accounts,
+    roles,
+    permissions,
+    accessByRoleKey,
+  })
+
+  assert.equal(
+    relatedRows.some((row) => row.target === '查看库存'),
+    false
+  )
+  assert.ok(
+    completeRows.some(
+      (row) =>
+        row.kind === 'permission' &&
+        row.target === '查看库存' &&
+        row.result === '岗位未授予该功能' &&
+        row.status === '未授予'
+    )
+  )
+  assert.ok(
+    completeRows.some(
+      (row) =>
+        row.kind === 'page' &&
+        row.target === '库存查询' &&
+        row.result === '岗位未授予该页面所需功能' &&
+        row.status === '未授予'
+    )
+  )
+  assert.doesNotMatch(
+    JSON.stringify(completeRows),
+    /warehouse\.inventory\.read/u
+  )
+})
+
+test('blocked approval responsibility explains the business blocker', () => {
+  const model = buildPermissionRelationshipModel({
+    viewMode: PERMISSION_RELATIONSHIP_VIEW_MODE.ROLE,
+    targetKey: 'sales',
+    moduleKey: 'sales',
+    accounts,
+    roles,
+    permissions,
+    accessByRoleKey,
+    approvalSettings: {
+      items: [
+        {
+          approval_key: 'sales_order_review',
+          label: '销售订单审批',
+          enabled: true,
+          effective_role_keys: ['sales'],
+          members: [],
+          blocked_reasons: ['no_eligible_approver'],
+        },
+      ],
+    },
+  })
+
+  assert.ok(
+    model.rows.some(
+      (row) =>
+        row.target === '销售订单审批' &&
+        row.result === '没有符合岗位、账号和责任设置的办理人'
+    )
+  )
 })
 
 test('account view preserves multiple role paths and marks an inactive account as blocked', () => {

@@ -300,10 +300,15 @@ export async function installSystemRpcMocks(page, context) {
         data = {
           effective_access: {
             role_key: role.role_key,
+            role_name: role.name,
+            role_version: Number(role.version || 1),
             source: 'active_customer_config_revision',
             is_final: true,
             is_preview: Array.isArray(params.permission_keys),
             config_revision: 'style-l1-active-revision',
+            config_hash: 'style-l1-active-config-hash',
+            config_hash_version: 1,
+            product_version: 'style-l1-product',
             permissions: permissionKeys.map((permissionKey) => {
               const permission = mockPermissions.find(
                 (item) => item.permission_key === permissionKey

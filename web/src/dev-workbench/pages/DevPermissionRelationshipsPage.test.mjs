@@ -48,11 +48,13 @@ test('dev permission relationship page remains valid JSX', async () => {
 })
 
 test('dev permission relationship page reads existing truth sources without writing RBAC', () => {
+  assert.match(source, /useSearchParams/u)
   assert.match(source, /adminRpc\.call\('list', \{\}\)/u)
   assert.match(source, /adminRpc\.call\('rbac_options', \{\}\)/u)
   assert.match(source, /adminRpc\.call\('effective_role_access'/u)
   assert.match(source, /getApprovalSettings\(\{\}\)/u)
   assert.match(source, /buildPermissionRelationshipNavigationModel/u)
+  assert.match(source, /buildPermissionRelationshipEvidence/u)
   assert.match(navigationSource, /getNavigationSections/u)
   assert.match(navigationSource, /buildRoleGuidedNavigationPreview/u)
   assert.match(navigationSource, /buildRoleGuidedNavigation/u)
@@ -60,7 +62,9 @@ test('dev permission relationship page reads existing truth sources without writ
     source + navigationSource + navigationComponentSource,
     /set_roles|set_role_settings|publishApprovalSettings|applyApprovalSettings/u
   )
-  assert.match(source, /关系图是只读结果，不是新的权限配置入口/u)
+  assert.match(source, /不代表某张单据在当前状态一定可操作/u)
+  assert.equal(source.match(/role="note"/gu)?.length, 1)
+  assert.doesNotMatch(source, /type="info"/u)
 })
 
 test('permission graph loads on the dev page and hides technical source on render failure', () => {
@@ -72,6 +76,24 @@ test('permission graph loads on the dev page and hides technical source on rende
   assert.match(source, /showSourceOnError=\{false\}/u)
   assert.match(source, /label="权限生效关系图"/u)
   assert.match(source, /<DevPermissionNavigationOverview/u)
+  assert.match(source, /当前权限证据版本/u)
+  assert.match(source, /客户配置版本/u)
+  assert.match(source, /产品版本/u)
+  assert.match(source, /审批设置版本/u)
+  assert.match(source, /最近读取时间/u)
+  assert.match(source, /<Tabs/u)
+  assert.match(source, /aria-label="权限核对视图"/u)
+  assert.match(source, /destroyOnHidden/u)
+  assert.match(source, /仅岗位相关/u)
+  assert.match(source, /包含未授予/u)
+  assert.match(source, /产品权限全集/u)
+  assert.match(source, /buildPermissionRelationshipDetailRows/u)
+  assert.match(source, /searchParams\.get\('mode'\)/u)
+  assert.match(source, /searchParams\.get\('tab'\)/u)
+  assert.match(source, /searchParams\.get\('module'\)/u)
+  assert.match(source, /searchParams\.get\('scope'\)/u)
+  assert.match(source, /\{ replace = false \}/u)
+  assert.doesNotMatch(source, /scrollIntoView|PERMISSION_RELATIONSHIP_FOCUS/u)
   assert.match(navigationComponentSource, /实际侧栏 \/ 可用菜单/u)
   assert.match(navigationComponentSource, /不会随“功能范围”筛选缩小/u)
   assert.match(navigationComponentSource, /菜单位置只影响查找顺序/u)
@@ -93,7 +115,7 @@ test('permission graph exposes only permission-adjacent relationships', () => {
   ]) {
     assert.match(source + modelSource, new RegExp(label, 'u'))
   }
-  assert.match(source, /不包含任务、单据、流程运行或业务事实/u)
+  assert.match(source, /不代表某张单据在当前状态一定可操作/u)
   assert.match(navigationSource, /is_final !== true/u)
   assert.match(navigationSource, /不推导可能失真的完整菜单/u)
   assert.doesNotMatch(modelSource, /\.phone\b/u)

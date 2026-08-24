@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   ApartmentOutlined,
   LoginOutlined,
@@ -15,6 +16,7 @@ import {
   Space,
   Statistic,
   Table,
+  Tabs,
   Tag,
   Typography,
 } from 'antd'
@@ -30,7 +32,10 @@ import DevPermissionNavigationOverview from '../components/DevPermissionNavigati
 import { buildPermissionRelationshipNavigationModel } from '../config/devPermissionNavigation.mjs'
 import {
   PERMISSION_RELATIONSHIP_ALL_MODULES,
+  PERMISSION_RELATIONSHIP_DETAIL_SCOPE,
   PERMISSION_RELATIONSHIP_VIEW_MODE,
+  buildPermissionRelationshipDetailRows,
+  buildPermissionRelationshipEvidence,
   buildPermissionRelationshipModel,
   buildPermissionRelationshipModuleOptions,
   buildPermissionRelationshipTargetOptions,
@@ -54,6 +59,21 @@ const EMPTY_BASE_STATE = Object.freeze({
   approvalSettings: null,
 })
 
+const PERMISSION_RELATIONSHIP_TAB = Object.freeze({
+  MENU: 'menu',
+  GRAPH: 'graph',
+  DETAILS: 'details',
+})
+
+const RELATIONSHIP_KIND_LABELS = Object.freeze({
+  account: '账号',
+  source: '结果来源',
+  scope: '数据范围',
+  approval: '审批责任',
+  permission: '功能',
+  page: '页面',
+})
+
 function hasOwn(object, key) {
   return Object.prototype.hasOwnProperty.call(object, key)
 }
@@ -63,12 +83,38 @@ function preferredTargetKey(options) {
   return options[0].value
 }
 
+function normalizedQueryValue(value) {
+  return String(value || '').trim()
+}
+
+function evidenceValue(values = [], fallback = '未绑定') {
+  return values.length > 0 ? values.join('、') : fallback
+}
+
+function formatReadTime(value = '') {
+  if (!value) return '尚未读取'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '尚未读取'
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(date)
+}
+
 function resultTag(status = '') {
   if (['已生效', '有可用功能', '已配置'].includes(status)) {
     return <Tag color="green">{status}</Tag>
   }
   if (['受限', '全部受限'].includes(status)) {
     return <Tag color="orange">{status}</Tag>
+  }
+  if (status === '未授予') {
+    return <Tag>{status}</Tag>
   }
   if (status === '特殊账号') {
     return <Tag color="purple">{status}</Tag>
@@ -77,17 +123,34 @@ function resultTag(status = '') {
 }
 
 export default function DevPermissionRelationshipsPage() {
-  const [viewMode, setViewMode] = useState(
-    PERMISSION_RELATIONSHIP_VIEW_MODE.ROLE
-  )
-  const [targetKey, setTargetKey] = useState('')
-  const [moduleKey, setModuleKey] = useState(
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedViewMode = normalizedQueryValue(searchParams.get('mode'))
+  const viewMode =
+    requestedViewMode === PERMISSION_RELATIONSHIP_VIEW_MODE.ACCOUNT
+      ? PERMISSION_RELATIONSHIP_VIEW_MODE.ACCOUNT
+      : PERMISSION_RELATIONSHIP_VIEW_MODE.ROLE
+  const requestedTargetKey = normalizedQueryValue(searchParams.get('target'))
+  const requestedModuleKey =
+    normalizedQueryValue(searchParams.get('module')) ||
     PERMISSION_RELATIONSHIP_ALL_MODULES
+  const requestedTabKey = normalizedQueryValue(searchParams.get('tab'))
+  const tabKey = Object.values(PERMISSION_RELATIONSHIP_TAB).includes(
+    requestedTabKey
   )
+    ? requestedTabKey
+    : PERMISSION_RELATIONSHIP_TAB.MENU
+  const requestedDetailScope = normalizedQueryValue(searchParams.get('scope'))
+  const detailScope = Object.values(
+    PERMISSION_RELATIONSHIP_DETAIL_SCOPE
+  ).includes(requestedDetailScope)
+    ? requestedDetailScope
+    : PERMISSION_RELATIONSHIP_DETAIL_SCOPE.RELATED
   const [baseState, setBaseState] = useState(EMPTY_BASE_STATE)
   const [baseLoading, setBaseLoading] = useState(false)
   const [baseError, setBaseError] = useState('')
+  const [baseReadAt, setBaseReadAt] = useState('')
   const [accessByRoleKey, setAccessByRoleKey] = useState({})
+  const [accessReadAtByRoleKey, setAccessReadAtByRoleKey] = useState({})
   const [accessLoading, setAccessLoading] = useState(false)
   const [accessError, setAccessError] = useState('')
   const baseRequestRef = useRef(0)
@@ -106,6 +169,28 @@ export default function DevPermissionRelationshipsPage() {
     () => buildPermissionRelationshipModuleOptions(baseState.permissions),
     [baseState.permissions]
   )
+  const targetKey = targetOptions.some(
+    (option) => option.value === requestedTargetKey
+  )
+    ? requestedTargetKey
+    : preferredTargetKey(targetOptions)
+  const moduleKey = moduleOptions.some(
+    (option) => option.value === requestedModuleKey
+  )
+    ? requestedModuleKey
+    : PERMISSION_RELATIONSHIP_ALL_MODULES
+  const updateSearch = useCallback(
+    (patch, { replace = false } = {}) => {
+      const next = new URLSearchParams(searchParams)
+      Object.entries(patch).forEach(([key, value]) => {
+        const normalized = normalizedQueryValue(value)
+        if (normalized) next.set(key, normalized)
+        else next.delete(key)
+      })
+      setSearchParams(next, { replace })
+    },
+    [searchParams, setSearchParams]
+  )
 
   const loadBaseData = useCallback(async () => {
     const requestID = baseRequestRef.current + 1
@@ -113,8 +198,10 @@ export default function DevPermissionRelationshipsPage() {
     accessRequestRef.current += 1
     setBaseLoading(true)
     setBaseError('')
+    setBaseReadAt('')
     setAccessError('')
     setAccessByRoleKey({})
+    setAccessReadAtByRoleKey({})
     try {
       const approvalPromise = getApprovalSettings({})
         .then((value) => ({ value, error: '' }))
@@ -148,6 +235,7 @@ export default function DevPermissionRelationshipsPage() {
         approvalSettings: approvalResult.value,
       }
       setBaseState(nextState)
+      setBaseReadAt(new Date().toISOString())
       if (approvalResult.error) {
         setAccessError('审批责任暂未汇入；账号、岗位、功能和数据范围仍可查看。')
       }
@@ -172,15 +260,60 @@ export default function DevPermissionRelationshipsPage() {
   }, [loadBaseData])
 
   useEffect(() => {
-    if (baseLoading) return
     if (
-      targetKey &&
-      targetOptions.some((option) => option.value === targetKey)
+      baseLoading ||
+      baseError ||
+      (baseState.roles.length === 0 && baseState.accounts.length === 0)
     ) {
       return
     }
-    setTargetKey(preferredTargetKey(targetOptions))
-  }, [baseLoading, targetKey, targetOptions, viewMode])
+    const next = new URLSearchParams(searchParams)
+    next.delete('view')
+    next.delete('focus')
+    if (viewMode === PERMISSION_RELATIONSHIP_VIEW_MODE.ROLE) {
+      next.delete('mode')
+    } else {
+      next.set('mode', viewMode)
+    }
+    if (targetKey) next.set('target', targetKey)
+    else next.delete('target')
+    if (
+      tabKey === PERMISSION_RELATIONSHIP_TAB.MENU ||
+      moduleKey === PERMISSION_RELATIONSHIP_ALL_MODULES
+    ) {
+      next.delete('module')
+    } else {
+      next.set('module', moduleKey)
+    }
+    if (tabKey === PERMISSION_RELATIONSHIP_TAB.MENU) {
+      next.delete('tab')
+    } else {
+      next.set('tab', tabKey)
+    }
+    if (
+      tabKey === PERMISSION_RELATIONSHIP_TAB.DETAILS &&
+      detailScope === PERMISSION_RELATIONSHIP_DETAIL_SCOPE.ALL
+    ) {
+      next.set('scope', detailScope)
+    } else {
+      next.delete('scope')
+    }
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true })
+    }
+  }, [
+    baseError,
+    baseLoading,
+    baseState.accounts.length,
+    baseState.roles.length,
+    detailScope,
+    moduleKey,
+    searchParams,
+    setSearchParams,
+    tabKey,
+    targetKey,
+    viewMode,
+  ])
 
   const requiredRoleKeys = useMemo(
     () =>
@@ -221,9 +354,16 @@ export default function DevPermissionRelationshipsPage() {
         .filter((result) => result.status === 'fulfilled')
         .map((result) => result.value)
       if (fulfilled.length > 0) {
+        const readAt = new Date().toISOString()
         setAccessByRoleKey((current) => ({
           ...current,
           ...Object.fromEntries(fulfilled),
+        }))
+        setAccessReadAtByRoleKey((current) => ({
+          ...current,
+          ...Object.fromEntries(
+            fulfilled.map(([roleKey]) => [roleKey, readAt])
+          ),
         }))
       }
       const failed = results.find((result) => result.status === 'rejected')
@@ -240,7 +380,22 @@ export default function DevPermissionRelationshipsPage() {
     }
   }, [accessByRoleKey, baseError, baseLoading, requiredRoleKeys])
 
-  const model = useMemo(
+  const globalModel = useMemo(
+    () =>
+      buildPermissionRelationshipModel({
+        viewMode,
+        targetKey,
+        moduleKey: PERMISSION_RELATIONSHIP_ALL_MODULES,
+        accounts: baseState.accounts,
+        roles: baseState.roles,
+        permissions: baseState.permissions,
+        warehouseOptions: baseState.warehouseOptions,
+        accessByRoleKey,
+        approvalSettings: baseState.approvalSettings,
+      }),
+    [accessByRoleKey, baseState, targetKey, viewMode]
+  )
+  const graphModel = useMemo(
     () =>
       buildPermissionRelationshipModel({
         viewMode,
@@ -255,6 +410,29 @@ export default function DevPermissionRelationshipsPage() {
       }),
     [accessByRoleKey, baseState, moduleKey, targetKey, viewMode]
   )
+  const permissionDetailRows = useMemo(
+    () =>
+      buildPermissionRelationshipDetailRows({
+        viewMode,
+        targetKey,
+        moduleKey,
+        detailScope,
+        accounts: baseState.accounts,
+        roles: baseState.roles,
+        permissions: baseState.permissions,
+        accessByRoleKey,
+      }),
+    [
+      accessByRoleKey,
+      baseState.accounts,
+      baseState.permissions,
+      baseState.roles,
+      detailScope,
+      moduleKey,
+      targetKey,
+      viewMode,
+    ]
+  )
   const navigationModel = useMemo(
     () =>
       buildPermissionRelationshipNavigationModel({
@@ -266,6 +444,29 @@ export default function DevPermissionRelationshipsPage() {
       }),
     [accessByRoleKey, baseState.accounts, baseState.roles, targetKey, viewMode]
   )
+  const relationshipEvidence = useMemo(
+    () =>
+      buildPermissionRelationshipEvidence({
+        roleKeys: requiredRoleKeys,
+        accessByRoleKey,
+        approvalSettings: baseState.approvalSettings,
+      }),
+    [accessByRoleKey, baseState.approvalSettings, requiredRoleKeys]
+  )
+  const currentReadAt = useMemo(() => {
+    const roleReadTimes = requiredRoleKeys
+      .map((roleKey) => accessReadAtByRoleKey[roleKey])
+      .filter(Boolean)
+      .sort()
+    return roleReadTimes.at(-1) || baseReadAt
+  }, [accessReadAtByRoleKey, baseReadAt, requiredRoleKeys])
+  const detailRows = useMemo(
+    () => [...globalModel.contextRows, ...permissionDetailRows],
+    [globalModel.contextRows, permissionDetailRows]
+  )
+  const ungrantedDetailCount = detailRows.filter(
+    (row) => row.status === '未授予'
+  ).length
 
   const changeViewMode = (nextMode) => {
     const nextOptions = buildPermissionRelationshipTargetOptions({
@@ -273,32 +474,61 @@ export default function DevPermissionRelationshipsPage() {
       roles: baseState.roles,
       accounts: baseState.accounts,
     })
-    setViewMode(nextMode)
-    setTargetKey(preferredTargetKey(nextOptions))
-    setModuleKey(PERMISSION_RELATIONSHIP_ALL_MODULES)
+    updateSearch({
+      mode: nextMode === PERMISSION_RELATIONSHIP_VIEW_MODE.ROLE ? '' : nextMode,
+      target: preferredTargetKey(nextOptions),
+      module: '',
+      scope: '',
+    })
     setAccessError('')
   }
 
+  const changeTab = (nextTab) => {
+    updateSearch({
+      tab: nextTab === PERMISSION_RELATIONSHIP_TAB.MENU ? '' : nextTab,
+      module: nextTab === PERMISSION_RELATIONSHIP_TAB.MENU ? '' : moduleKey,
+      scope:
+        nextTab === PERMISSION_RELATIONSHIP_TAB.DETAILS &&
+        detailScope === PERMISSION_RELATIONSHIP_DETAIL_SCOPE.ALL
+          ? detailScope
+          : '',
+    })
+  }
+
   const summaryItems = [
-    { key: 'accounts', label: '关联账号', value: model.summary.accounts },
-    { key: 'roles', label: '关联岗位', value: model.summary.roles },
+    {
+      key: 'accounts',
+      label: '关联账号',
+      value: globalModel.summary.accounts,
+    },
+    { key: 'roles', label: '关联岗位', value: globalModel.summary.roles },
     {
       key: 'effective',
       label: '最终可用功能',
-      value: model.summary.effectivePermissions,
+      value: globalModel.summary.effectivePermissions,
     },
     {
       key: 'blocked',
-      label: '当前受限功能',
-      value: model.summary.blockedPermissions,
+      label: '岗位已选但受限',
+      value: globalModel.summary.blockedPermissions,
     },
-    { key: 'pages', label: '可进入页面', value: model.summary.pages },
-    { key: 'approvals', label: '审批责任', value: model.summary.approvals },
+    { key: 'pages', label: '可进入页面', value: globalModel.summary.pages },
+    {
+      key: 'approvals',
+      label: '审批责任',
+      value: globalModel.summary.approvals,
+    },
   ]
 
   const columns = [
     { title: '来源', dataIndex: 'source', width: 180 },
-    { title: '关系', dataIndex: 'relation', width: 150 },
+    {
+      title: '类型',
+      dataIndex: 'kind',
+      width: 100,
+      render: (value) => RELATIONSHIP_KIND_LABELS[value] || '其他',
+    },
+    { title: '关系', dataIndex: 'relation', width: 140 },
     { title: '结果对象', dataIndex: 'target', width: 220 },
     {
       title: '生效说明',
@@ -358,13 +588,6 @@ export default function DevPermissionRelationshipsPage() {
       </header>
 
       <main className="erp-dev-permission-relationships-shell">
-        <Alert
-          type="info"
-          showIcon
-          message="这里只汇聚权限结果，不创建第二套权限真源"
-          description="数据来自当前后端已有的员工账号、岗位、最终功能解释、仓库范围和已启用审批设置，菜单位置复用正式前端投影；不包含任务、单据、流程运行或业务事实，也不在本页保存配置。"
-        />
-
         <section className="erp-permission-relationship">
           <div className="erp-permission-relationship__intro">
             <div>
@@ -374,6 +597,16 @@ export default function DevPermissionRelationshipsPage() {
               </Paragraph>
             </div>
             <Tag color="blue">只读结果</Tag>
+          </div>
+
+          <div
+            className="erp-permission-relationship__boundary-note"
+            role="note"
+          >
+            <Text type="secondary">
+              本页核对“岗位权限 ×
+              当前启用配置”的只读结果；不代表某张单据在当前状态一定可操作，也不在这里保存权限配置。
+            </Text>
           </div>
 
           {baseError ? (
@@ -452,19 +685,9 @@ export default function DevPermissionRelationshipsPage() {
                         : '请选择员工'
                     }
                     onChange={(value) => {
-                      setTargetKey(value)
-                      setModuleKey(PERMISSION_RELATIONSHIP_ALL_MODULES)
+                      updateSearch({ target: value, module: '', scope: '' })
                       setAccessError('')
                     }}
-                  />
-                </div>
-                <div className="erp-permission-relationship__control">
-                  <Text strong>功能范围</Text>
-                  <Select
-                    aria-label="选择功能模块"
-                    value={moduleKey}
-                    options={moduleOptions}
-                    onChange={setModuleKey}
                   />
                 </div>
               </div>
@@ -482,7 +705,7 @@ export default function DevPermissionRelationshipsPage() {
                 />
               ) : null}
 
-              {model.warnings.map((warning) => (
+              {globalModel.warnings.map((warning) => (
                 <Alert
                   key={warning}
                   type="warning"
@@ -491,6 +714,12 @@ export default function DevPermissionRelationshipsPage() {
                 />
               ))}
 
+              <div className="erp-permission-relationship__summary-head">
+                <Text strong>当前对象全局结果</Text>
+                <Text type="secondary">
+                  始终按全部功能统计，不随关系图或明细中的模块筛选变化。
+                </Text>
+              </div>
               <div
                 className="erp-permission-relationship__summary"
                 aria-label="权限关系汇总"
@@ -504,95 +733,255 @@ export default function DevPermissionRelationshipsPage() {
                 ))}
               </div>
 
-              <DevPermissionNavigationOverview
-                model={navigationModel}
-                loading={accessLoading}
-              />
-
-              <div className="erp-permission-relationship__legend">
-                <Text type="secondary">图例</Text>
-                <Space wrap size={[6, 6]}>
-                  <Tag color="blue">账号</Tag>
-                  <Tag color="purple">岗位</Tag>
-                  <Tag color="green">最终可用</Tag>
-                  <Tag color="orange">当前受限</Tag>
-                  <Tag color="cyan">数据范围</Tag>
-                  <Tag color="gold">审批责任</Tag>
-                </Space>
-              </div>
-
               <section
-                className="erp-permission-relationship__graph"
-                aria-labelledby="permission-relationship-graph-title"
-                aria-busy={accessLoading}
+                className="erp-permission-relationship__evidence"
+                aria-label="当前权限证据版本"
               >
-                <div className="erp-permission-relationship__section-head">
-                  <div>
-                    <Title id="permission-relationship-graph-title" level={5}>
-                      有向关系图
-                    </Title>
-                    <Text type="secondary">
-                      箭头表示“分配、约束、获得、影响或承担”；可用右上角工具放大和全屏查看。
-                    </Text>
-                  </div>
-                  {accessLoading ? (
-                    <Tag color="processing">正在核对</Tag>
-                  ) : null}
+                <div>
+                  <Text type="secondary">结果性质</Text>
+                  <Text strong>
+                    {relationshipEvidence.allFinal
+                      ? '最终生效结果'
+                      : '预览或读取不完整'}
+                  </Text>
                 </div>
-                {targetOptions.length === 0 ? (
-                  <Empty
-                    image={<ApartmentOutlined />}
-                    description="当前没有可查看的岗位或账号"
-                  />
-                ) : (
-                  <MermaidDiagram
-                    chart={model.chart}
-                    label="权限生效关系图"
-                    showSourceOnError={false}
-                  />
-                )}
+                <div>
+                  <Text type="secondary">权限结果来源</Text>
+                  <Text strong>
+                    {evidenceValue(
+                      relationshipEvidence.sources,
+                      '最终结果尚未读取'
+                    )}
+                  </Text>
+                </div>
+                <div>
+                  <Text type="secondary">客户配置版本</Text>
+                  <Text strong>
+                    {evidenceValue(relationshipEvidence.configRevisions)}
+                  </Text>
+                </div>
+                <div>
+                  <Text type="secondary">产品版本</Text>
+                  <Text strong>
+                    {evidenceValue([
+                      ...new Set(
+                        [
+                          ...relationshipEvidence.productVersions,
+                          relationshipEvidence.approvalProductVersion,
+                        ].filter(Boolean)
+                      ),
+                    ])}
+                  </Text>
+                </div>
+                <div>
+                  <Text type="secondary">岗位版本</Text>
+                  <Text strong>
+                    {evidenceValue(relationshipEvidence.roleVersions)}
+                  </Text>
+                </div>
+                <div>
+                  <Text type="secondary">审批设置版本</Text>
+                  <Text strong>
+                    {relationshipEvidence.approvalRevision ||
+                      (relationshipEvidence.approvalPartial
+                        ? '读取不完整'
+                        : '未绑定')}
+                  </Text>
+                </div>
+                <div>
+                  <Text type="secondary">最近读取时间</Text>
+                  <Text strong>{formatReadTime(currentReadAt)}</Text>
+                </div>
               </section>
 
-              <section
-                className="erp-permission-relationship__details"
-                aria-labelledby="permission-relationship-detail-title"
-              >
-                <div className="erp-permission-relationship__section-head">
-                  <div>
-                    <Title id="permission-relationship-detail-title" level={5}>
-                      关系明细
-                    </Title>
-                    <Text type="secondary">
-                      用表格逐条核对图中关系；这里只显示业务名称和使用状态。
-                    </Text>
-                  </div>
-                  <Text type="secondary">共 {model.rows.length} 条</Text>
-                </div>
-                <Table
-                  rowKey="rowKey"
-                  size="small"
-                  columns={columns}
-                  dataSource={model.rows}
-                  loading={accessLoading}
-                  scroll={{ x: 920 }}
-                  pagination={{
-                    pageSize: 12,
-                    hideOnSinglePage: true,
-                    showSizeChanger: false,
-                  }}
-                  locale={{
-                    emptyText: (
-                      <Empty description="当前选择没有可展示的权限关系" />
+              <Tabs
+                className="erp-permission-relationship__tabs"
+                aria-label="权限核对视图"
+                activeKey={tabKey}
+                onChange={changeTab}
+                destroyOnHidden
+                items={[
+                  {
+                    key: PERMISSION_RELATIONSHIP_TAB.MENU,
+                    label: '实际菜单',
+                    children: (
+                      <DevPermissionNavigationOverview
+                        model={navigationModel}
+                        loading={accessLoading}
+                      />
                     ),
-                  }}
-                />
-              </section>
-
-              <Alert
-                type="info"
-                showIcon
-                message="关系图是只读结果，不是新的权限配置入口"
-                description="岗位功能、员工岗位、菜单布局、数据范围和审批责任仍在“系统管理 → 权限配置”维护；保存后返回本页刷新即可核对。"
+                  },
+                  {
+                    key: PERMISSION_RELATIONSHIP_TAB.GRAPH,
+                    label: '关系图',
+                    children: (
+                      <div className="erp-permission-relationship__tab-panel">
+                        <div className="erp-permission-relationship__tab-toolbar">
+                          <div className="erp-permission-relationship__control">
+                            <Text strong>图中功能范围</Text>
+                            <Select
+                              aria-label="选择关系图功能模块"
+                              value={moduleKey}
+                              options={moduleOptions}
+                              onChange={(value) =>
+                                updateSearch({
+                                  module:
+                                    value ===
+                                    PERMISSION_RELATIONSHIP_ALL_MODULES
+                                      ? ''
+                                      : value,
+                                })
+                              }
+                            />
+                          </div>
+                          <Text type="secondary">
+                            只缩小关系图，顶部统计和实际菜单保持全局口径。
+                          </Text>
+                        </div>
+                        <div className="erp-permission-relationship__legend">
+                          <Text type="secondary">图例</Text>
+                          <Space wrap size={[6, 6]}>
+                            <Tag color="blue">账号</Tag>
+                            <Tag color="purple">岗位</Tag>
+                            <Tag color="green">最终可用</Tag>
+                            <Tag color="orange">岗位已选但受限</Tag>
+                            <Tag color="cyan">数据范围</Tag>
+                            <Tag color="gold">审批责任</Tag>
+                          </Space>
+                        </div>
+                        <section
+                          className="erp-permission-relationship__graph"
+                          aria-labelledby="permission-relationship-graph-title"
+                          aria-busy={accessLoading}
+                        >
+                          <div className="erp-permission-relationship__section-head">
+                            <div>
+                              <Title
+                                id="permission-relationship-graph-title"
+                                level={5}
+                              >
+                                有向关系图
+                              </Title>
+                              <Text type="secondary">
+                                箭头表示“分配、约束、获得、影响或承担”；可用右上角工具放大和全屏查看。
+                              </Text>
+                            </div>
+                            {accessLoading ? (
+                              <Tag color="processing">正在核对</Tag>
+                            ) : null}
+                          </div>
+                          {targetOptions.length === 0 ? (
+                            <Empty
+                              image={<ApartmentOutlined />}
+                              description="当前没有可查看的岗位或账号"
+                            />
+                          ) : (
+                            <MermaidDiagram
+                              chart={graphModel.chart}
+                              label="权限生效关系图"
+                              showSourceOnError={false}
+                            />
+                          )}
+                        </section>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: PERMISSION_RELATIONSHIP_TAB.DETAILS,
+                    label: '明细核对',
+                    children: (
+                      <section
+                        className="erp-permission-relationship__details"
+                        aria-labelledby="permission-relationship-detail-title"
+                      >
+                        <div className="erp-permission-relationship__detail-toolbar">
+                          <div className="erp-permission-relationship__control">
+                            <Text strong>明细功能范围</Text>
+                            <Select
+                              aria-label="选择明细功能模块"
+                              value={moduleKey}
+                              options={moduleOptions}
+                              onChange={(value) =>
+                                updateSearch({
+                                  module:
+                                    value ===
+                                    PERMISSION_RELATIONSHIP_ALL_MODULES
+                                      ? ''
+                                      : value,
+                                })
+                              }
+                            />
+                          </div>
+                          <div className="erp-permission-relationship__control">
+                            <Text strong>核对范围</Text>
+                            <Segmented
+                              aria-label="选择权限明细范围"
+                              value={detailScope}
+                              onChange={(value) =>
+                                updateSearch({
+                                  scope:
+                                    value ===
+                                    PERMISSION_RELATIONSHIP_DETAIL_SCOPE.ALL
+                                      ? value
+                                      : '',
+                                })
+                              }
+                              options={[
+                                {
+                                  label: '仅岗位相关',
+                                  value:
+                                    PERMISSION_RELATIONSHIP_DETAIL_SCOPE.RELATED,
+                                },
+                                {
+                                  label: '包含未授予',
+                                  value:
+                                    PERMISSION_RELATIONSHIP_DETAIL_SCOPE.ALL,
+                                },
+                              ]}
+                            />
+                          </div>
+                        </div>
+                        <div className="erp-permission-relationship__section-head">
+                          <div>
+                            <Title
+                              id="permission-relationship-detail-title"
+                              level={5}
+                            >
+                              关系明细
+                            </Title>
+                            <Text type="secondary">
+                              “包含未授予”会把产品权限全集中该岗位没有选择的功能一并列出。
+                            </Text>
+                          </div>
+                          <Text type="secondary">
+                            共 {detailRows.length} 条
+                            {ungrantedDetailCount > 0
+                              ? `，未授予 ${ungrantedDetailCount} 条`
+                              : ''}
+                          </Text>
+                        </div>
+                        <Table
+                          rowKey="rowKey"
+                          size="small"
+                          columns={columns}
+                          dataSource={detailRows}
+                          loading={accessLoading}
+                          scroll={{ x: 1020 }}
+                          pagination={{
+                            pageSize: 12,
+                            hideOnSinglePage: true,
+                            showSizeChanger: false,
+                          }}
+                          locale={{
+                            emptyText: (
+                              <Empty description="当前选择没有可展示的权限关系" />
+                            ),
+                          }}
+                        />
+                      </section>
+                    ),
+                  },
+                ]}
               />
             </>
           ) : null}
