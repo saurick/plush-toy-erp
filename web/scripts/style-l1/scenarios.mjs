@@ -3555,26 +3555,110 @@ export function createStyleL1Scenarios(deps) {
         const modal = page.locator('.erp-dev-permission-relationships-shell')
         await modal.waitFor({ state: 'visible', timeout: 10_000 })
         await expectText(modal, '从账号到最终可用范围，一页看清')
-        await expectText(modal, '关系图是只读结果')
+        await expectText(modal, '不代表某张单据在当前状态一定可操作')
+        const permissionTabs = modal.getByRole('tablist')
+        const menuTab = permissionTabs.getByRole('tab', {
+          name: '实际菜单',
+          exact: true,
+        })
+        const graphTab = permissionTabs.getByRole('tab', {
+          name: '关系图',
+          exact: true,
+        })
+        const detailsTab = permissionTabs.getByRole('tab', {
+          name: '明细核对',
+          exact: true,
+        })
+        const activeDetailsTab = permissionTabs
+          .locator('[role="tab"][aria-selected="true"]')
+          .filter({ hasText: /^明细核对$/u })
+        await menuTab.waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          await menuTab.getAttribute('aria-selected'),
+          'true',
+          '权限关系页默认应打开实际菜单 Tab'
+        )
+        const navigation = modal.locator('.erp-permission-navigation')
+        await navigation.waitFor({ state: 'visible', timeout: 10_000 })
+        await expectText(navigation, '实际侧栏 / 可用菜单')
+        await expectText(navigation, '系统推荐')
+        await expectText(navigation, '任务看板')
+        await expectText(navigation, '对账管理')
+        await expectText(navigation, '岗位使用帮助')
+        assert.equal(
+          await modal.locator('.erp-markdown-mermaid').count(),
+          0,
+          '默认实际菜单 Tab 不应提前挂载关系图'
+        )
         await page.screenshot({
           path: path.resolve(
             outputDir,
-            'dev-permission-relationships-role-desktop.png'
+            'dev-permission-relationships-menu-role-desktop.png'
           ),
           fullPage: true,
         })
+        await expectText(modal, '关联账号')
+        await expectText(modal, '关联岗位')
+        await expectText(modal, '最终可用功能')
+        await expectText(modal, '岗位已选但受限')
+        await expectText(modal, '审批责任')
+        await modal
+          .getByLabel('当前权限证据版本')
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        await expectText(modal, '客户配置版本')
+        await expectText(modal, 'style-l1-active-revision')
+        await expectText(modal, '产品版本')
+        await expectText(modal, 'style-l1-product')
+        await expectText(modal, '最近读取时间')
+        await assertTextAbsent(modal, '13800138000')
+        await assertTextAbsent(modal, 'sales_order.read')
+        const navigationTextBeforeTabs = await navigation.innerText()
+        await graphTab.click()
+        await page.waitForURL(
+          (url) => url.searchParams.get('tab') === 'graph',
+          { timeout: 10_000 }
+        )
+        assert.equal(
+          new URL(page.url()).searchParams.get('tab'),
+          'graph',
+          '关系图 Tab 应写入 URL'
+        )
+        await navigation.waitFor({ state: 'detached', timeout: 10_000 })
         await modal
           .locator(
             '.erp-markdown-mermaid[data-mermaid-status="rendered"] .erp-markdown-mermaid__canvas > svg'
           )
           .waitFor({ state: 'visible', timeout: 15_000 })
-        await expectText(modal, '关联账号')
-        await expectText(modal, '关联岗位')
-        await expectText(modal, '最终可用功能')
-        await expectText(modal, '审批责任')
-        await assertTextAbsent(modal, '13800138000')
-        await assertTextAbsent(modal, 'sales_order.read')
-        await assertTextAbsent(modal, 'style-l1-active-revision')
+        await page.goBack()
+        await page.waitForURL((url) => !url.searchParams.has('tab'), {
+          timeout: 10_000,
+        })
+        await navigation.waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          await navigation.innerText(),
+          navigationTextBeforeTabs,
+          '浏览器返回应恢复同一实际菜单结果'
+        )
+        assert.equal(
+          await modal.locator('.erp-markdown-mermaid').count(),
+          0,
+          '浏览器返回实际菜单后应卸载关系图'
+        )
+        await page.goForward()
+        await page.waitForURL(
+          (url) => url.searchParams.get('tab') === 'graph',
+          { timeout: 10_000 }
+        )
+        await modal
+          .locator(
+            '.erp-markdown-mermaid[data-mermaid-status="rendered"] .erp-markdown-mermaid__canvas > svg'
+          )
+          .waitFor({ state: 'visible', timeout: 15_000 })
+        assert.equal(
+          await graphTab.getAttribute('aria-selected'),
+          'true',
+          '浏览器前进应恢复关系图 Tab'
+        )
 
         const roleGraphMetrics = await page.evaluate(() => {
           const root = document.querySelector(
@@ -3590,10 +3674,10 @@ export function createStyleL1Scenarios(deps) {
           const summary = shell?.querySelector(
             '.erp-permission-relationship__summary'
           )
-          const navigation = shell?.querySelector('.erp-permission-navigation')
-          const navigationGrid = shell?.querySelector(
-            '.erp-permission-navigation__grid'
+          const evidence = shell?.querySelector(
+            '.erp-permission-relationship__evidence'
           )
+          const tabs = shell?.querySelectorAll('[role="tab"]') || []
           const navRect = nav?.getBoundingClientRect()
           const shellRect = shell?.getBoundingClientRect()
           const viewportRect = graphViewport?.getBoundingClientRect()
@@ -3608,18 +3692,14 @@ export function createStyleL1Scenarios(deps) {
               ? window.getComputedStyle(summary).gridTemplateColumns.split(' ')
                   .length
               : 0,
-            navigationColumns: navigationGrid
-              ? window
-                  .getComputedStyle(navigationGrid)
-                  .gridTemplateColumns.split(' ').length
+            evidenceColumns: evidence
+              ? window.getComputedStyle(evidence).gridTemplateColumns.split(' ')
+                  .length
               : 0,
-            navigationItems:
-              navigation?.querySelectorAll(
-                '.erp-permission-navigation__items li'
-              ).length || 0,
-            navigationOverflow: navigation
-              ? navigation.scrollWidth - navigation.clientWidth
-              : 0,
+            tabCount: tabs.length,
+            activeTab: [...tabs]
+              .find((tab) => tab.getAttribute('aria-selected') === 'true')
+              ?.textContent?.trim(),
             viewportWidth: window.innerWidth,
             viewportHeight: window.innerHeight,
             documentOverflow:
@@ -3634,11 +3714,11 @@ export function createStyleL1Scenarios(deps) {
             roleGraphMetrics.graphWidth > 600 &&
             roleGraphMetrics.graphHeight >= 360 &&
             roleGraphMetrics.summaryColumns === 6 &&
-            roleGraphMetrics.navigationColumns === 3 &&
-            roleGraphMetrics.navigationItems > 0 &&
-            roleGraphMetrics.navigationOverflow <= 1 &&
+            roleGraphMetrics.evidenceColumns === 7 &&
+            roleGraphMetrics.tabCount === 3 &&
+            roleGraphMetrics.activeTab === '关系图' &&
             roleGraphMetrics.documentOverflow <= 1,
-          `权限关系页桌面导航、摘要和图形尺寸异常: ${JSON.stringify(
+          `权限关系页桌面 Tab、摘要和图形尺寸异常: ${JSON.stringify(
             roleGraphMetrics
           )}`
         )
@@ -3664,6 +3744,11 @@ export function createStyleL1Scenarios(deps) {
           .filter({ hasText: /^业务$/u })
           .waitFor({ state: 'visible', timeout: 5000 })
         await roleDropdown.waitFor({ state: 'hidden', timeout: 5000 })
+        assert.equal(
+          new URL(page.url()).searchParams.get('target'),
+          'sales',
+          '岗位选择应写入 URL 以便刷新和前进后退恢复'
+        )
         await modal
           .locator('.erp-permission-relationship__graph[aria-busy="false"]')
           .waitFor({ state: 'visible', timeout: 15_000 })
@@ -3672,23 +3757,28 @@ export function createStyleL1Scenarios(deps) {
             '.erp-markdown-mermaid[data-mermaid-status="rendered"] .erp-markdown-mermaid__canvas > svg'
           )
           .waitFor({ state: 'visible', timeout: 15_000 })
-        await expectText(modal, '仓储')
-        const navigation = modal.locator('.erp-permission-navigation')
-        await expectText(navigation, '实际侧栏 / 可用菜单')
-        await expectText(navigation, '系统推荐')
+        await menuTab.click()
+        await navigation.waitFor({ state: 'visible', timeout: 10_000 })
         await expectText(navigation, '客户档案')
         await expectText(navigation, '销售订单')
         await expectText(navigation, '库存台账')
-        await expectText(navigation, '岗位使用帮助')
-        const navigationTextBeforeModule = await navigation.innerText()
         await navigation.screenshot({
           path: path.resolve(
             outputDir,
-            'dev-permission-relationships-menu-role-desktop.png'
+            'dev-permission-relationships-menu-sales-desktop.png'
           ),
         })
+        await graphTab.click()
+        await modal
+          .locator(
+            '.erp-markdown-mermaid[data-mermaid-status="rendered"] .erp-markdown-mermaid__canvas > svg'
+          )
+          .waitFor({ state: 'visible', timeout: 15_000 })
+        const summaryTextBeforeModule = await modal
+          .getByLabel('权限关系汇总')
+          .innerText()
 
-        const moduleSelect = modal.getByLabel('选择功能模块').first()
+        const moduleSelect = modal.getByLabel('选择关系图功能模块').first()
         await moduleSelect.evaluate((node) =>
           node.scrollIntoView({ block: 'center', inline: 'nearest' })
         )
@@ -3757,6 +3847,11 @@ export function createStyleL1Scenarios(deps) {
           .filter({ hasText: /^仓储$/u })
           .waitFor({ state: 'visible', timeout: 5000 })
         await moduleDropdown.waitFor({ state: 'hidden', timeout: 5000 })
+        assert.equal(
+          new URL(page.url()).searchParams.get('module'),
+          'warehouse',
+          '功能范围应写入 URL'
+        )
         await modal
           .locator(
             '.erp-markdown-mermaid[data-mermaid-status="rendered"] .erp-markdown-mermaid__canvas > svg'
@@ -3765,9 +3860,9 @@ export function createStyleL1Scenarios(deps) {
         await expectText(modal, '查看库存')
         await expectText(modal, '库存台账')
         assert.equal(
-          await navigation.innerText(),
-          navigationTextBeforeModule,
-          '功能模块筛选不应把完整实际侧栏缩成局部菜单'
+          await modal.getByLabel('权限关系汇总').innerText(),
+          summaryTextBeforeModule,
+          '功能模块筛选不应改变顶部全局统计'
         )
         await modal.locator('.erp-permission-relationship__graph').screenshot({
           path: path.resolve(
@@ -3776,15 +3871,124 @@ export function createStyleL1Scenarios(deps) {
           ),
         })
 
-        await modal.getByText('按员工', { exact: true }).click()
+        await detailsTab.click()
+        await page.waitForURL(
+          (url) => url.searchParams.get('tab') === 'details',
+          { timeout: 10_000 }
+        )
+        await activeDetailsTab.waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          await detailsTab.getAttribute('aria-selected'),
+          'true',
+          '明细核对 Tab 应成为当前视图'
+        )
+        const detailModuleSelect = modal.getByLabel('选择明细功能模块').first()
+        const detailModuleDropdown = await openControlledAntSelectDropdown(
+          page,
+          detailModuleSelect,
+          '明细功能模块选择'
+        )
+        await selectVirtualizedAntOption(page, detailModuleDropdown, {
+          label: '权限关系明细功能范围',
+          optionLabel: '财务',
+        })
+        await detailModuleSelect
+          .locator('.ant-select-selection-item')
+          .filter({ hasText: /^财务$/u })
+          .waitFor({ state: 'visible', timeout: 5000 })
+        await detailModuleDropdown.waitFor({ state: 'hidden', timeout: 5000 })
+        assert.equal(
+          new URL(page.url()).searchParams.get('module'),
+          'finance',
+          '明细功能范围应写入 URL'
+        )
+        const detailScope = modal.getByLabel('选择权限明细范围')
+        await detailScope
+          .locator('.ant-segmented-item')
+          .filter({ hasText: '包含未授予' })
+          .click()
+        await page.waitForURL(
+          (url) => url.searchParams.get('scope') === 'all',
+          { timeout: 10_000 }
+        )
+        await expectText(modal, '查看财务报表')
+        await expectText(modal, '岗位未授予该功能')
+        await expectText(modal, '未授予')
+        await modal.screenshot({
+          path: path.resolve(
+            outputDir,
+            'dev-permission-relationships-ungranted-details.png'
+          ),
+        })
+
+        await page.reload({ waitUntil: 'domcontentloaded' })
+        await expectHeading(page, '权限关系 / Effective Access')
+        await modal.waitFor({ state: 'visible', timeout: 10_000 })
+        await activeDetailsTab.waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          await detailsTab.getAttribute('aria-selected'),
+          'true',
+          '刷新应从 URL 恢复明细核对 Tab'
+        )
+        assert.equal(
+          new URL(page.url()).searchParams.get('module'),
+          'finance',
+          '刷新应从 URL 恢复明细功能范围'
+        )
+        assert.equal(
+          new URL(page.url()).searchParams.get('scope'),
+          'all',
+          '刷新应从 URL 恢复未授予核对范围'
+        )
+        await expectText(modal, '查看财务报表')
+        await expectText(modal, '岗位未授予该功能')
+
+        await graphTab.click()
+        await page.waitForURL(
+          (url) => url.searchParams.get('tab') === 'graph',
+          { timeout: 10_000 }
+        )
         await modal
           .locator(
             '.erp-markdown-mermaid[data-mermaid-status="rendered"] .erp-markdown-mermaid__canvas > svg'
           )
           .waitFor({ state: 'visible', timeout: 15_000 })
-        await expectText(modal, '权限管理员')
+
+        await modal.getByText('按员工', { exact: true }).click()
+        assert.equal(
+          new URL(page.url()).searchParams.get('mode'),
+          'account',
+          '按员工查看方式应写入 URL'
+        )
+        assert.equal(
+          new URL(page.url()).searchParams.has('module'),
+          false,
+          '切换查看方式应清理旧功能范围'
+        )
+        const accountSelect = modal.getByLabel('选择要查看的员工').first()
+        await accountSelect.locator('.ant-select-selector').click()
+        await page
+          .locator('.ant-select-dropdown:visible .ant-select-item-option')
+          .filter({ hasText: '综合跟单' })
+          .click()
+        assert.equal(
+          new URL(page.url()).searchParams.get('target'),
+          '4',
+          '员工视图应把明确选择的多岗位账号写入 URL'
+        )
+        await modal
+          .locator(
+            '.erp-markdown-mermaid[data-mermaid-status="rendered"] .erp-markdown-mermaid__canvas > svg'
+          )
+          .waitFor({ state: 'visible', timeout: 15_000 })
+        await expectText(modal, '综合跟单')
         await expectText(modal, '业务')
         await expectText(modal, '财务')
+        await menuTab.click()
+        await page.waitForURL((url) => !url.searchParams.has('tab'), {
+          timeout: 10_000,
+        })
+        await navigation.waitFor({ state: 'visible', timeout: 10_000 })
         await expectText(navigation, '多岗位合并（2）')
         await expectText(navigation, '对账管理')
         await navigation.screenshot({
@@ -3799,6 +4003,13 @@ export function createStyleL1Scenarios(deps) {
             'dev-permission-relationships-account-desktop.png'
           ),
         })
+
+        await graphTab.click()
+        await modal
+          .locator(
+            '.erp-markdown-mermaid[data-mermaid-status="rendered"] .erp-markdown-mermaid__canvas > svg'
+          )
+          .waitFor({ state: 'visible', timeout: 15_000 })
 
         await modal
           .getByRole('button', {
@@ -3866,6 +4077,20 @@ export function createStyleL1Scenarios(deps) {
           ),
         })
 
+        await detailsTab.click()
+        await page.waitForURL(
+          (url) => url.searchParams.get('tab') === 'details',
+          { timeout: 10_000 }
+        )
+        await modal
+          .getByLabel('选择权限明细范围')
+          .locator('.ant-segmented-item')
+          .filter({ hasText: '包含未授予' })
+          .click()
+        await page.waitForURL(
+          (url) => url.searchParams.get('scope') === 'all',
+          { timeout: 10_000 }
+        )
         await page.setViewportSize({ width: 700, height: 900 })
         const narrowMetrics = await page.evaluate(() => {
           const root = document.querySelector(
@@ -3880,12 +4105,18 @@ export function createStyleL1Scenarios(deps) {
           const summary = shell?.querySelector(
             '.erp-permission-relationship__summary'
           )
-          const navigation = shell?.querySelector('.erp-permission-navigation')
-          const navigationGrid = shell?.querySelector(
-            '.erp-permission-navigation__grid'
+          const evidence = shell?.querySelector(
+            '.erp-permission-relationship__evidence'
           )
-          const navigationSections = shell?.querySelector(
-            '.erp-permission-navigation__sections'
+          const detailToolbar = shell?.querySelector(
+            '.erp-permission-relationship__detail-toolbar'
+          )
+          const tableContent = shell?.querySelector('.ant-table-content')
+          const tabs = shell?.querySelectorAll('[role="tab"]') || []
+          const tabsViewport = shell?.querySelector('.ant-tabs-nav-wrap')
+          const tabsList = shell?.querySelector('.ant-tabs-nav-list')
+          const activeTab = [...tabs].find(
+            (tab) => tab.getAttribute('aria-selected') === 'true'
           )
           const rect = shell?.getBoundingClientRect()
           return {
@@ -3900,19 +4131,24 @@ export function createStyleL1Scenarios(deps) {
               ? window.getComputedStyle(summary).gridTemplateColumns.split(' ')
                   .length
               : 0,
-            navigationColumns: navigationGrid
+            evidenceColumns: evidence
+              ? window.getComputedStyle(evidence).gridTemplateColumns.split(' ')
+                  .length
+              : 0,
+            detailToolbarColumns: detailToolbar
               ? window
-                  .getComputedStyle(navigationGrid)
+                  .getComputedStyle(detailToolbar)
                   .gridTemplateColumns.split(' ').length
               : 0,
-            navigationSectionColumns: navigationSections
-              ? window
-                  .getComputedStyle(navigationSections)
-                  .gridTemplateColumns.split(' ').length
+            tableOverflow: tableContent
+              ? tableContent.scrollWidth - tableContent.clientWidth
               : 0,
-            navigationOverflow: navigation
-              ? navigation.scrollWidth - navigation.clientWidth
-              : 0,
+            tabCount: tabs.length,
+            activeTab: activeTab?.textContent?.trim() || '',
+            tabsOverflow:
+              tabsList && tabsViewport
+                ? Math.max(0, tabsList.scrollWidth - tabsViewport.clientWidth)
+                : 0,
             viewportWidth: window.innerWidth,
             documentOverflow:
               document.documentElement.scrollWidth -
@@ -3925,24 +4161,28 @@ export function createStyleL1Scenarios(deps) {
             narrowMetrics.shellWidth > 0 &&
             narrowMetrics.toolbarColumns === 1 &&
             narrowMetrics.summaryColumns === 2 &&
-            narrowMetrics.navigationColumns === 1 &&
-            narrowMetrics.navigationSectionColumns === 1 &&
-            narrowMetrics.navigationOverflow <= 1 &&
+            narrowMetrics.evidenceColumns === 2 &&
+            narrowMetrics.detailToolbarColumns === 1 &&
+            narrowMetrics.tableOverflow > 1 &&
+            narrowMetrics.tabCount === 3 &&
+            narrowMetrics.activeTab === '明细核对' &&
+            narrowMetrics.tabsOverflow >= 0 &&
             narrowMetrics.documentOverflow <= 1,
-          `权限关系图窄屏应堆叠筛选并保持两列摘要: ${JSON.stringify(
+          `权限关系页窄屏应堆叠筛选并把表格溢出留在内部: ${JSON.stringify(
             narrowMetrics
           )}`
         )
-        await page.screenshot({
-          path: path.resolve(
-            outputDir,
-            'dev-permission-relationships-mobile-dark.png'
-          ),
-          fullPage: false,
-        })
+        await modal
+          .locator('.erp-permission-relationship__details')
+          .screenshot({
+            path: path.resolve(
+              outputDir,
+              'dev-permission-relationships-mobile-dark-details.png'
+            ),
+          })
         await assertNoHorizontalOverflow(
           page,
-          'dev-permission-relationships-mobile-dark'
+          'dev-permission-relationships-mobile-dark-details'
         )
       },
     },
@@ -4599,18 +4839,64 @@ export function createStyleL1Scenarios(deps) {
       },
       verify: async (page) => {
         await expectHeading(page, '生产订单')
+        const releaseResult = await page.evaluate(async () => {
+          const response = await fetch('/rpc/production_order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: 'style-l1-wip-readonly-release',
+              method: 'release_production_order',
+              params: {
+                production_order_id: 71,
+                expected_version: 1,
+                idempotency_key: 'style-l1-wip-readonly-release',
+              },
+            }),
+          })
+          return response.json()
+        })
+        assert.equal(releaseResult?.result?.code, 0)
+        await page.reload()
+        await expectHeading(page, '生产订单')
         await page.getByText('MO-STYLE-L1-20260713', { exact: true }).dblclick()
-        await page
+        const detailModal = page
           .locator('.ant-modal:visible')
           .filter({ hasText: '查看生产订单' })
           .last()
-          .waitFor({ state: 'visible', timeout: 10_000 })
+        await detailModal.waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(
           permissionSafeProductionReferenceRequests,
           0,
           'WIP 只读查看必须只用订单冻结快照，不得调用 PMC 编辑候选接口'
         )
         await assertTextAbsent(page, '权限不足')
+        await detailModal.locator('.ant-modal-close').click()
+        await page.getByText('MO-STYLE-L1-20260713', { exact: true }).click()
+
+        const viewRouteButton = page.getByRole('button', {
+          name: '查看工序',
+          exact: true,
+        })
+        await viewRouteButton.waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(await viewRouteButton.isEnabled(), true)
+        await viewRouteButton.click()
+
+        const routeModal = page
+          .locator('.ant-modal:visible')
+          .filter({ hasText: '查看生产工序' })
+          .last()
+        await routeModal.waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          await routeModal.getByRole('button', { name: '安排加工' }).count(),
+          0,
+          'WIP 只读岗位不得收到生产工序写入口'
+        )
+        assert.equal(
+          await routeModal.getByRole('button', { name: '拆分批次' }).count(),
+          0,
+          'WIP 只读岗位不得收到批次拆分入口'
+        )
       },
     },
     {
@@ -5833,6 +6119,12 @@ export function createStyleL1Scenarios(deps) {
                 outcome: '',
               },
             ],
+            current_responsibilities: [
+              {
+                node_instance_id: 702,
+                owner_role_key: 'finance',
+              },
+            ],
             completed_nodes: [
               {
                 id: 700,
@@ -5978,7 +6270,11 @@ export function createStyleL1Scenarios(deps) {
             .click()
           await expectText(page, '审批详情')
           await expectText(page, '出货单 · SHIP-L1-501')
-          await expectText(page, '财务 · 共同待办')
+          const approvalResponsibility = page.locator(
+            '.erp-task-action-drawer__responsibility'
+          )
+          await expectText(approvalResponsibility, '财务')
+          await expectText(approvalResponsibility, '共同待办')
           await assertTextAbsent(page, 'PROC-701-NODE-702-A1')
           await assertTextAbsent(page, '核对审批事项')
           await assertTextAbsent(page, '当前状态')
@@ -6208,8 +6504,141 @@ export function createStyleL1Scenarios(deps) {
           state: 'hidden',
           timeout: 10_000,
         })
-        await approvalDrawer.locator('.ant-drawer-close').click()
-        await approvalDrawer.waitFor({ state: 'hidden', timeout: 10_000 })
+        let showApprovalReceiptContext = false
+        const completedApprovalNodes = [
+          {
+            id: 700,
+            process_instance_id: 701,
+            node_key: 'finished_goods_quality',
+            node_type: 'domain_command',
+            attempt: 1,
+            version: 1,
+            status: 'completed',
+            outcome: 'quality_passed',
+          },
+          {
+            id: 702,
+            process_instance_id: 701,
+            node_key: 'shipment_finance_approval',
+            node_type: 'approval',
+            attempt: 1,
+            version: 2,
+            status: 'completed',
+            outcome: 'approved',
+          },
+        ]
+        const approvalReceiptContextRoute = async (route) => {
+          const body = route.request().postDataJSON() || {}
+          if (
+            !showApprovalReceiptContext ||
+            body.method !== 'get_task_process_context' ||
+            Number(body.params?.task_id || 0) !== 9101
+          ) {
+            await route.fallback()
+            return
+          }
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: body.id,
+              result: {
+                code: 0,
+                message: 'OK',
+                data: {
+                  process_context: {
+                    source: {
+                      type: 'shipment',
+                      id: 501,
+                      no: 'SHIP-L1-501',
+                    },
+                    process_instance: {
+                      id: 701,
+                      process_key: 'finished_goods_delivery',
+                      process_version: 'v1',
+                      status: 'completed',
+                      started_at: 1_800_000_000,
+                      completed_at: 1_800_000_300,
+                    },
+                    linked_node: completedApprovalNodes[1],
+                    approval_form: null,
+                    nodes: completedApprovalNodes,
+                    current_nodes: [],
+                    current_responsibilities: [],
+                    completed_nodes: completedApprovalNodes,
+                  },
+                },
+              },
+            }),
+          })
+        }
+        await page.route('**/rpc/workflow', approvalReceiptContextRoute)
+        try {
+          await approvalDrawer
+            .getByRole('button', { name: '选择处理方式', exact: true })
+            .click()
+          await approvalDrawer.getByRole('radio', { name: /审批通过/ }).click()
+          await approvalDrawer
+            .getByPlaceholder('填写审批意见和判断依据')
+            .fill('已核对出货单与当前财务放行条件')
+          await approvalDrawer.getByRole('tab', { name: /确认与结果/ }).click()
+          showApprovalReceiptContext = true
+          const approvalSubmitButton = page.locator(
+            '.erp-task-action-drawer__footer-primary button'
+          )
+          assert.equal(
+            await approvalSubmitButton.count(),
+            1,
+            '审批确认步骤应只有一个主提交按钮'
+          )
+          assert.equal(
+            (await approvalSubmitButton.innerText()).trim(),
+            '确认通过',
+            '审批主提交按钮应使用明确的通过文案'
+          )
+          await approvalSubmitButton.click()
+          const approvalReceipt = approvalDrawer.getByTestId(
+            'workflow-task-action-receipt'
+          )
+          await approvalReceipt.waitFor({ state: 'visible', timeout: 10_000 })
+          await expectText(approvalReceipt, '办理结果已确认')
+          await expectText(approvalReceipt, '流程交接结果')
+          await expectText(approvalReceipt, '流程已结束。')
+          await expectText(approvalDrawer, '本次责任岗位')
+          await expectText(approvalDrawer, '财务')
+          const approvalReceiptMetrics = await approvalDrawer.evaluate(
+            (drawer) => ({
+              handoffKind:
+                drawer.querySelector('[data-handoff-kind]')?.dataset
+                  .handoffKind || '',
+              personCount: drawer.querySelectorAll(
+                '.erp-task-action-drawer__responsibility-person'
+              ).length,
+              overflowX: drawer.scrollWidth - drawer.clientWidth,
+            })
+          )
+          assert(
+            approvalReceiptMetrics.handoffKind === 'end' &&
+              approvalReceiptMetrics.personCount === 0 &&
+              approvalReceiptMetrics.overflowX <= 1,
+            `审批成功回执应显示流程终点且不暴露具体人员: ${JSON.stringify(
+              approvalReceiptMetrics
+            )}`
+          )
+          await page.screenshot({
+            path: path.resolve(
+              outputDir,
+              'erp-task-board-approval-result-end.png'
+            ),
+          })
+          await approvalDrawer
+            .getByRole('button', { name: '完成并关闭', exact: true })
+            .click()
+          await approvalDrawer.waitFor({ state: 'hidden', timeout: 10_000 })
+        } finally {
+          await page.unroute('**/rpc/workflow', approvalReceiptContextRoute)
+        }
         await taskScopeFilter.getByText('全部任务', { exact: true }).click()
         await page.waitForFunction(
           () => new URL(window.location.href).searchParams.get('mode') !== 'approval'
@@ -6324,7 +6753,7 @@ export function createStyleL1Scenarios(deps) {
           .filter({ hasText: '常规待办' })
           .first()
         await actionableOverviewLane
-          .getByText('已显示前 5 条，共 19 条', { exact: true })
+          .getByText('已显示前 5 条，共 18 条', { exact: true })
           .waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(
           await actionableOverviewLane.locator('.erp-task-board-card').count(),
@@ -6332,7 +6761,7 @@ export function createStyleL1Scenarios(deps) {
           '任务看板总览每栏最多显示五条任务'
         )
         await actionableOverviewLane
-          .getByRole('button', { name: '查看全部 19 条', exact: true })
+          .getByRole('button', { name: '查看全部 18 条', exact: true })
           .waitFor({ state: 'visible', timeout: 10_000 })
         const readTaskBoardRefreshMetrics = () =>
           page.evaluate(() => {
@@ -6729,7 +7158,7 @@ export function createStyleL1Scenarios(deps) {
           name: /选择处理/,
         })
         const confirmStep = taskDrawer.getByRole('tab', {
-          name: /确认与提交/,
+          name: /确认与结果/,
         })
         assert.equal(
           await confirmStep.getAttribute('aria-disabled'),
@@ -6788,11 +7217,24 @@ export function createStyleL1Scenarios(deps) {
           0,
           `准备任务版本冲突失败: ${JSON.stringify(conflictMutation)}`
         )
+        const refreshedTaskBoardResponse = page.waitForResponse((response) => {
+          try {
+            return (
+              response.request().postDataJSON()?.method === 'get_task_board'
+            )
+          } catch {
+            return false
+          }
+        })
         await taskDrawer.getByRole('button', { name: '确认完成' }).click()
         await page
           .getByText('任务已被其他人更新，请刷新后重试', { exact: true })
           .waitFor({ state: 'visible', timeout: 10_000 })
         await taskDrawer.waitFor({ state: 'hidden', timeout: 10_000 })
+        await refreshedTaskBoardResponse
+        await page
+          .locator('.erp-task-board-lanes[aria-busy="false"]')
+          .waitFor({ state: 'visible', timeout: 10_000 })
         await navigationCurrentTask
           .getByRole('button', { name: '处理任务', exact: true })
           .click()
@@ -6848,7 +7290,7 @@ export function createStyleL1Scenarios(deps) {
             'erp-task-board-desktop-assignment.png'
           ),
         })
-        await taskDrawer.getByRole('tab', { name: /确认与提交/ }).click()
+        await taskDrawer.getByRole('tab', { name: /确认与结果/ }).click()
         await expectText(taskDrawer, '提交后会发生什么')
         await expectText(
           taskDrawer,
@@ -6859,6 +7301,25 @@ export function createStyleL1Scenarios(deps) {
         await page
           .getByText('任务已转交', { exact: true })
           .waitFor({ state: 'visible', timeout: 10_000 })
+        const assignmentReceipt = taskDrawer.getByTestId(
+          'workflow-task-action-receipt'
+        )
+        await assignmentReceipt.waitFor({ state: 'visible', timeout: 10_000 })
+        await expectText(assignmentReceipt, '办理结果已确认')
+        await expectText(
+          assignmentReceipt,
+          '本次操作不触发流程流转，任务仍由当前负责岗位继续办理。'
+        )
+        assert.equal(
+          await taskDrawer
+            .locator('.erp-task-action-drawer__responsibility-person')
+            .count(),
+          0,
+          '成功回执只显示岗位责任，不显示具体处理人'
+        )
+        await taskDrawer
+          .getByRole('button', { name: '完成并关闭', exact: true })
+          .click()
         await taskDrawer.waitFor({ state: 'hidden', timeout: 10_000 })
         const restoredKeyword = await page
           .getByPlaceholder('搜索任务')
@@ -7928,7 +8389,7 @@ export function createStyleL1Scenarios(deps) {
             responsibilityEmphasis
           )}`
         )
-        await wideTaskDrawer.getByRole('tab', { name: /确认与提交/ }).click()
+        await wideTaskDrawer.getByRole('tab', { name: /确认与结果/ }).click()
         await expectText(wideTaskDrawer, '提交后会发生什么')
         await expectText(
           wideTaskDrawer,
@@ -8258,6 +8719,12 @@ export function createStyleL1Scenarios(deps) {
                 version: 1,
                 status: 'active',
                 outcome: '',
+              },
+            ],
+            current_responsibilities: [
+              {
+                node_instance_id: 804,
+                owner_role_key: 'engineering',
               },
             ],
             completed_nodes: [
