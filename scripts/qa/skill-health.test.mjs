@@ -94,85 +94,63 @@ test("skill health: Git closeout keeps read-only probes and lock recovery centra
   );
   assert.match(agents, /浏览器、Vite、数据库和端口使用独立资源租约/u);
   assert.match(agents, /stage、commit 和 push 是独立动作，均先询问用户/u);
-  assert.match(skill, /协议版本为 `4`/u);
-  assert.match(skill, /一次完整申请生命周期绑定稳定 `request_id`/u);
-  assert.match(
-    skill,
-    /重复 `request_id` 复用已有状态[\s\S]*不发送可见 ACK/u,
-  );
-  assert.match(
-    skill,
-    /等待超时只表示本次等待结束[\s\S]*禁止短周期轮询/u,
-  );
-  assert.match(skill, /长测试、构建和部署命令只启动一个可复用后台进程/u);
-  assert.match(
-    skill,
-    /首次写入非 ignored 文件前[\s\S]*HEAD、index、`index\.lock`、status/u,
-  );
-  assert.match(
-    skill,
-    /worktree 干净[\s\S]*每个 dirty hunk 都可证明由当前任务创建[\s\S]*跳过队列/u,
-  );
-  assert.match(
-    skill,
-    /既有脏路径视为共享\/归属不明[\s\S]*精确 `paths` \+ `derived_paths` 的 writer lease/u,
-  );
-  assert.match(skill, /该检测不轮询、不建 registry \/ daemon/u);
-  assert.match(skill, /不回退、格式化或 stage 外部脏路径/u);
-  assert.match(skill, /`paths ∪ derived_paths` 作为写入闭包/u);
-  assert.match(skill, /未提交 `BATCH_READY` 的 `full_owned_paths`/u);
-  assert.match(
-    skill,
-    /优先完成已获授权的 ready closeout[\s\S]*显式降级为可证明的 mixed hunks[\s\S]*`WAIT_HOT_FILE`/u,
-  );
-  assert.match(skill, /未授权的 `HOLD` 只保护其已声明路径[\s\S]*不得阻塞无关路径/u);
+  assert.match(skill, /必须先完整读取全局 `\$shared-local-task-queue`/u);
+  assert.match(skill, /全局 Skill 是通用调度真源/u);
+  assert.match(skill, /协议 4 的可移植项目合同/u);
+  assert.match(skill, /唯一置顶且标题精确为 `Git 收口队列`/u);
+  assert.match(skill, /队列会话要保持可发现且不归档，但可以 idle/u);
+  assert.match(skill, /不需要持续占用执行槽/u);
+  assert.match(skill, /`paths ∪ derived_paths` 必须覆盖命令所有可能写入/u);
+  assert.match(skill, /`make data`[\s\S]*Ent 生成物[\s\S]*Atlas migration/u);
+  assert.match(skill, /项目 Skill：[\s\S]*`\.agents\/skills\/README\.md`/u);
   assert.match(skill, /同一文件即使 hunk 不同也必须串行/u);
-  assert.match(skill, /`GRANT_WRITER` 必须回显写入闭包[\s\S]*开始身份/u);
-  assert.match(skill, /`release_identity`[\s\S]*所有声明和实际写入路径/u);
-  assert.match(skill, /只暂停越界任务[\s\S]*不冻结其他已证明不重叠的 writer/u);
-  assert.match(skill, /规则升级前已经发出的 lease 不撤销/u);
-  assert.match(skill, /旧 lease 释放后立即重审等待队列/u);
-  assert.match(skill, /浏览器请求声明源码 `read_hotspots`/u);
-  assert.match(skill, /同一端口串行，不同端口不互相阻塞/u);
-  assert.match(skill, /同一可写目标或相同 schema\/migration 热点串行/u);
-  assert.match(skill, /`INDEX_LOCK_OBSERVED`/u);
-  assert.match(skill, /worker 发现锁时只发送一次/u);
-  assert.match(skill, /`STALE_INDEX_LOCK`[\s\S]*自助清理一次/u);
-  assert.match(skill, /不得再请求用户确认/u);
-  assert.match(skill, /非零字节[\s\S]*`WAIT_INDEX_LOCK_REVIEW`/u);
-  assert.match(skill, /`LOCK_CLEAR_NOTICE` 作为其 `resume_on`/u);
-  assert.match(skill, /收到任何 `WAIT_\*` 后立即结束当前 turn/u);
-  assert.match(skill, /writer grant 是 turn-scoped 写入租约/u);
-  assert.match(skill, /按 `TURN_ENDED` 仅释放该任务的 lease/u);
+  assert.match(skill, /不相交路径不得被它阻塞/u);
+  assert.match(skill, /`vite:127\.0\.0\.1:6175`/u);
+  assert.match(skill, /`vite:127\.0\.0\.1:15223`/u);
+  assert.match(skill, /本机已有 5175、8300[\s\S]*external read hotspot/u);
+  assert.match(skill, /浏览器请求必须声明 `read_hotspots`/u);
+  assert.match(skill, /同一可写数据库或同一 migration\/schema 热点串行/u);
+  assert.match(skill, /`planWriterGrants`[\s\S]*head-of-line blocking/u);
+  assert.match(skill, /目录祖先\/后代[\s\S]*保守 glob 字面前缀/u);
+  assert.match(skill, /首个通配段退到父目录判冲突/u);
+  assert.match(skill, /显式 `pathAliases`/u);
+  assert.match(skill, /双向 `read_hotspots`/u);
+  assert.match(skill, /尚未提交批次的 `full_owned_paths`/u);
+  assert.match(skill, /任一 writer\/turn 释放后必须立即重算下一组/u);
+  assert.match(skill, /`grant_turn_id`[\s\S]*`lease_id`/u);
+  assert.match(skill, /状态未知时必须 fail closed/u);
+  assert.match(skill, /旧租约自动失效/u);
+  assert.match(skill, /最后写入后立即 `WRITER_RELEASED`/u);
+  assert.match(skill, /禁止要求用户回复“继续”/u);
+  assert.match(skill, /`registerWait`[\s\S]*单次消费的 `resume_token`/u);
+  assert.match(skill, /`revalidateResumeIdentity`/u);
   assert.match(
     skill,
-    /活动 turn 已进入只读验证时发送一次 `WRITER_RELEASE_REQUIRED`/u,
+    /HEAD、index、`index\.lock`[\s\S]*声明路径哈希[\s\S]*资源状态/u,
   );
-  assert.match(skill, /验证失败或新 turn 恢复要建立新的申请生命周期/u);
-  assert.match(skill, /未报告变化登记为 `UNREPORTED_WRITES`/u);
-  assert.match(skill, /`EXACT_CLEAN_FREEZE`、`PUSH_FREEZE`、`CLOSEOUT_FREEZE` 不是协议事件/u);
-  assert.match(skill, /任何全工作树冻结请求都返回 `UNSUPPORTED_LOCK_DOMAIN`/u);
-  assert.match(skill, /`task_complete`、`next_phase` 和紧凑 `continuation_checkpoint`/u);
-  assert.match(skill, /发送后无需等待释放通知即可继续只读验证或最终收口/u);
-  assert.match(skill, /把每个 WAIT 登记为 `external` 或 `self_actionable`/u);
-  assert.match(skill, /`WAIT_SCOPE`[\s\S]*`WAIT_RECONCILE`[\s\S]*`WAIT_HOT_FILE`/u);
-  assert.match(skill, /投递一次 `RESUME_FROM_WAIT`/u);
-  assert.match(skill, /WAIT 所在 turn 必须先结束/u);
-  assert.match(skill, /同一 token 最多发送一次/u);
-  assert.match(skill, /在匹配 `resume_on` 到来前不发送自助恢复，也不轮询/u);
-  assert.match(skill, /返回 `WAIT_RESUME_TRIGGER`/u);
-  assert.match(skill, /插入当前 turn 的普通消息或 ACK 不算 fresh-turn trigger/u);
-  assert.match(skill, /未完成任务不得只回复 ACK 后结束/u);
-  assert.match(skill, /额度耗尽时模型不能继续推理、调用工具或发送消息/u);
-  assert.match(skill, /从 checkpoint 续做，不能复活旧 writer/u);
-  assert.match(skill, /发出 `PUSH_FINISHED` 或 `PUSH_FAILED` 后立即释放 push owner/u);
-  assert.match(skill, /等待远端 CI \/ Release \/ 部署结果不得维持 clean-worktree freeze/u);
-  assert.match(skill, /只阻止该目标的新 push，不阻止文件 writer/u);
-  assert.match(skill, /不保证 App 关闭或额度为零时自动运行/u);
-  assert.match(skill, /`commit_authorized` 默认且缺省为 `false`/u);
+  assert.match(skill, /`RESUME_FROM_WAIT`/u);
+  assert.match(skill, /`RESUME_ADOPTED`/u);
+  assert.match(
+    skill,
+    /`accepted=true`[\s\S]*`queued=true`[\s\S]*`top_level_task=true`[\s\S]*`target_task_id`[\s\S]*`turn_id`[\s\S]*`receipt_id`/u,
+  );
+  assert.match(skill, /`WAIT_HOST_WAKEUP`[\s\S]*不得声称已经自动唤醒/u);
+  assert.match(skill, /`claimResumeToken`/u);
+  assert.match(skill, /`RESUME_TOKEN_CONSUMED`/u);
+  assert.match(skill, /`adoptable_by_queue=true`/u);
+  assert.match(
+    skill,
+    /`WAIT → blocker RELEASE → planWriterGrants 重算 → WAKE_CONFIRMED/u,
+  );
+  assert.match(skill, /只有新的业务选择[\s\S]*`requires_user_decision=true`/u);
+  assert.doesNotMatch(skill, /请回复[“"]?继续/u);
+  assert.match(skill, /默认只阻塞 Git lane/u);
+  assert.match(skill, /`WAIT_INDEX_LOCK_REVIEW`/u);
+  assert.match(skill, /`LOCK_CLEAR_NOTICE`/u);
   assert.match(skill, /`BATCH_READY`[\s\S]*不是 Git 授权/u);
-  assert.match(skill, /`auto_local` 不能授权 Git 动作/u);
-  assert.doesNotMatch(skill, /安全批次默认自动本地提交|缺省为 `auto_local`/u);
+  assert.match(skill, /push、部署和数据库 apply 各自需要独立明确授权/u);
+  assert.match(skill, /只有用户明确说“开 Worktree 任务”/u);
+  assert.match(skill, /Handoff 必须由用户明确要求/u);
   assert.match(snapshotScript, /export GIT_OPTIONAL_LOCKS=0/u);
   assert.doesNotMatch(snapshotScript, /\b(?:rm|unlink)\b/u);
   assert.match(clearLockScript, /--queue-confirmed-no-git-owner/u);
@@ -277,15 +255,13 @@ test("skill health: rejects stale index entries and invalid short descriptions",
       "utf8",
     );
     const result = validateSkillRoot(root);
+    assert(result.errors.some((error) => error.includes("short_description")));
     assert(
-      result.errors.some((error) => error.includes("short_description")),
+      result.errors.some((error) =>
+        error.includes("expected one $plush-example"),
+      ),
     );
-    assert(
-      result.errors.some((error) => error.includes("expected one $plush-example")),
-    );
-    assert(
-      result.errors.some((error) => error.includes("$plush-missing")),
-    );
+    assert(result.errors.some((error) => error.includes("$plush-missing")));
   });
 });
 
@@ -343,7 +319,10 @@ test("skill health: testing and capability guidance avoid duplicate mandatory la
   assert.doesNotMatch(testSkill, /^\| T[0-8] /gmu);
 
   assert(capabilitySkill.split("\n").length <= 55);
-  assert.doesNotMatch(capabilitySkill, /^## Evidence Layers|1\. Product truth/u);
+  assert.doesNotMatch(
+    capabilitySkill,
+    /^## Evidence Layers|1\. Product truth/u,
+  );
   assert.match(capabilitySkill, /只核对当前问题需要的证据类型/u);
   assert.match(skillIndex, /不是 11 个开发阶段/u);
 });

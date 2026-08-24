@@ -4,19 +4,19 @@
 
 当前 11 个 Skill 是按需加载的专项工具，不是 11 个开发阶段，也不要求逐个执行或由甲方确认。普通任务只选择一个最贴近目标的 Skill；只有真实跨领域时才组合。
 
-| Skill | 适用范围 |
-| --- | --- |
-| `$plush-capability-evidence-audit` | 只读审计“做到哪、还缺什么、能否发布/交付”，分开代码、本地 QA、运行态、目标发布、恢复和客户验收 |
-| `$plush-code-review-governance` | review diff/commit/worktree；按触达面路由到领域、页面、打印和测试检查 |
-| `$plush-docs-governance` | 当前真源、文档清单、中文文件名、读者路径和 `progress.md` |
-| `$plush-domain-boundary-governance` | Workflow / Fact、Product Core、客户差异、schema/migration 设计与生成、usecase/API/RBAC 和字段真源 |
-| `$plush-git-closeout-queue` | 多个 Codex 写任务共享 Local 时协调路径级 writer、浏览器/Vite/数据库/端口资源租约、混合 hunk、Git 锁、可恢复续跑和显式 Git 收口 |
-| `$plush-page-design-governance` | 普通 ERP 页面业务语义、字段/动作/状态、原型和浏览器回归 |
-| `$plush-print-template-source-governance` | 客户 Excel/PDF/图片源、纸张版式、字段映射、模板编辑与 PDF/打印保真 |
-| `$plush-seed-import-governance` | seed、fixture、模拟数据、import dry-run、批次与数据 cleanup 边界 |
-| `$plush-manual-acceptance-governance` | 人工验收目录/批次、岗位账号/任务、浏览器/PDF 与人工证据、签收和退出清理 |
-| `$plush-test-governance` | 按影响面选择文档、领域/API、页面、真实数据库或发布验证，并治理网页 GPT 的 review-only 快照；T0-T8 只作工作台追踪键 |
-| `$plush-operations-governance` | runtime 诊断、可观测/错误、安全/隐私、发布、迁移和回滚 |
+| Skill                                     | 适用范围                                                                                                                                                                       |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `$plush-capability-evidence-audit`        | 只读审计“做到哪、还缺什么、能否发布/交付”，分开代码、本地 QA、运行态、目标发布、恢复和客户验收                                                                                 |
+| `$plush-code-review-governance`           | review diff/commit/worktree；按触达面路由到领域、页面、打印和测试检查                                                                                                          |
+| `$plush-docs-governance`                  | 当前真源、文档清单、中文文件名、读者路径和 `progress.md`                                                                                                                       |
+| `$plush-domain-boundary-governance`       | Workflow / Fact、Product Core、客户差异、schema/migration 设计与生成、usecase/API/RBAC 和字段真源                                                                              |
+| `$plush-git-closeout-queue`               | 先加载全局 `$shared-local-task-queue`，再补充 Plush 的生成物、目录/glob/别名与热点冲突、turn-bound lease、单次 resume token、可确认顶层 follow-up、安全接管和显式 Git 收口边界 |
+| `$plush-page-design-governance`           | 普通 ERP 页面业务语义、字段/动作/状态、原型和浏览器回归                                                                                                                        |
+| `$plush-print-template-source-governance` | 客户 Excel/PDF/图片源、纸张版式、字段映射、模板编辑与 PDF/打印保真                                                                                                             |
+| `$plush-seed-import-governance`           | seed、fixture、模拟数据、import dry-run、批次与数据 cleanup 边界                                                                                                               |
+| `$plush-manual-acceptance-governance`     | 人工验收目录/批次、岗位账号/任务、浏览器/PDF 与人工证据、签收和退出清理                                                                                                        |
+| `$plush-test-governance`                  | 按影响面选择文档、领域/API、页面、真实数据库或发布验证，并治理网页 GPT 的 review-only 快照；T0-T8 只作工作台追踪键                                                             |
+| `$plush-operations-governance`            | runtime 诊断、可观测/错误、安全/隐私、发布、迁移和回滚                                                                                                                         |
 
 ## 选择规则
 
