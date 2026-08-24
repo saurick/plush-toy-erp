@@ -32,7 +32,7 @@ function releaseResponse() {
   ]);
 }
 
-test("GitHub provider lists only immutable exact-SHA releases", () => {
+test("GitHub provider lists only immutable exact-SHA releases", async () => {
   let invocation;
   const provider = createGithubDeliveryProvider({
     projectRoot: process.cwd(),
@@ -41,7 +41,7 @@ test("GitHub provider lists only immutable exact-SHA releases", () => {
       return { status: 0, stdout: releaseResponse(), stderr: "" };
     },
   });
-  const versions = provider.listVersions();
+  const versions = await provider.listVersions();
   assert.equal(versions.length, 1);
   assert.equal(versions[0].gitSha, SHA);
   assert.equal(versions[0].completeAssets, true);
@@ -65,7 +65,25 @@ test("GitHub provider lists only immutable exact-SHA releases", () => {
   );
 });
 
-test("GitHub provider enriches the newest immutable release with build and digest evidence", () => {
+test("GitHub provider keeps the event loop responsive while GitHub is pending", async () => {
+  let commandFinished = false;
+  const provider = createGithubDeliveryProvider({
+    projectRoot: process.cwd(),
+    runCommand: async () => {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      commandFinished = true;
+      return { status: 0, stdout: releaseResponse(), stderr: "" };
+    },
+  });
+
+  const versionsPromise = provider.listVersions();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(commandFinished, false);
+  assert.equal((await versionsPromise).length, 1);
+});
+
+test("GitHub provider enriches the newest immutable release with build and digest evidence", async () => {
   const serverDigest = `sha256:${"1".repeat(64)}`;
   const webDigest = `sha256:${"2".repeat(64)}`;
   const releases = JSON.parse(releaseResponse());
@@ -156,17 +174,17 @@ test("GitHub provider enriches the newest immutable release with build and diges
       };
     },
   });
-  const [version] = provider.listVersions();
+  const [version] = await provider.listVersions();
   assert.equal(version.buildPerformance.cacheHitRateBasisPoints, 8_000);
   assert.deepEqual(version.imageDigests, {
     server: serverDigest,
     web: webDigest,
   });
-  provider.listVersions();
+  await provider.listVersions();
   assert.equal(assetReads, 2, "immutable detail is read once per SHA");
 });
 
-test("GitHub provider returns bounded run, job and step timings", () => {
+test("GitHub provider returns bounded run, job and step timings", async () => {
   const calls = [];
   const provider = createGithubDeliveryProvider({
     projectRoot: process.cwd(),
@@ -227,7 +245,7 @@ test("GitHub provider returns bounded run, job and step timings", () => {
     },
   });
 
-  const timings = provider.listPipelineTimings({ limit: 1 });
+  const timings = await provider.listPipelineTimings({ limit: 1 });
   assert.equal(timings.schemaVersion, "plush.delivery-pipeline-timings/v1");
   assert.equal(timings.generatedAt, "2026-08-08T02:05:00.000Z");
   assert.equal(timings.runs[0].workflow, "release");
@@ -239,7 +257,7 @@ test("GitHub provider returns bounded run, job and step timings", () => {
   assert.match(String(calls[1].at(-1)), /runs\/321\/attempts\/2\/jobs/u);
 });
 
-test("GitHub provider dispatch is fixed to main release workflow and customer", () => {
+test("GitHub provider dispatch is fixed to main release workflow and customer", async () => {
   let invocation;
   const provider = createGithubDeliveryProvider({
     projectRoot: process.cwd(),
@@ -248,7 +266,7 @@ test("GitHub provider dispatch is fixed to main release workflow and customer", 
       return { status: 0, stdout: "", stderr: "" };
     },
   });
-  const report = provider.dispatchRelease({
+  const report = await provider.dispatchRelease({
     gitSha: SHA,
     version: "2026.07.29-1",
     customer: "yoyoosun",
@@ -269,18 +287,17 @@ test("GitHub provider dispatch is fixed to main release workflow and customer", 
     "-f",
     "customer=yoyoosun",
   ]);
-  assert.throws(
-    () =>
-      provider.dispatchRelease({
-        gitSha: SHA,
-        version: "2026.07.29-1",
-        customer: "other",
-      }),
+  await assert.rejects(
+    provider.dispatchRelease({
+      gitSha: SHA,
+      version: "2026.07.29-1",
+      customer: "other",
+    }),
     /invalid/u,
   );
 });
 
-test("GitHub provider reports workflow state without exposing CLI stderr", () => {
+test("GitHub provider reports workflow state without exposing CLI stderr", async () => {
   let call = 0;
   const provider = createGithubDeliveryProvider({
     projectRoot: process.cwd(),
@@ -305,7 +322,7 @@ test("GitHub provider reports workflow state without exposing CLI stderr", () =>
       };
     },
   });
-  const status = provider.getReleaseStatus(SHA);
+  const status = await provider.getReleaseStatus(SHA);
   assert.equal(call, 2);
   assert.equal(status.status, "running");
   assert.equal(status.run.id, 123);
@@ -318,15 +335,15 @@ test("GitHub provider reports workflow state without exposing CLI stderr", () =>
       stderr: "ghp_example-secret-token",
     }),
   });
-  assert.throws(
-    () => broken.listVersions(),
+  await assert.rejects(
+    broken.listVersions(),
     (error) =>
       /exit 1/u.test(error.message) &&
       !/ghp_|secret|token/iu.test(error.message),
   );
 });
 
-test("GitHub provider selects the newest run when workflow status is unordered", () => {
+test("GitHub provider selects the newest run when workflow status is unordered", async () => {
   const provider = createGithubDeliveryProvider({
     projectRoot: process.cwd(),
     runCommand: (_command, args) => {
@@ -357,26 +374,23 @@ test("GitHub provider selects the newest run when workflow status is unordered",
       };
     },
   });
-  const status = provider.getReleaseStatus(SHA);
+  const status = await provider.getReleaseStatus(SHA);
   assert.equal(status.status, "running");
   assert.equal(status.run.id, 123);
 });
 
-test("GitHub provider sanitizes timeout, authentication and rate-limit failures", () => {
+test("GitHub provider sanitizes timeout, authentication and rate-limit failures", async () => {
   const timeout = createGithubDeliveryProvider({
     projectRoot: process.cwd(),
-    runCommand: () => ({
-      error: Object.assign(new Error("ghp_sensitive timed out"), {
+    runCommand: async () => {
+      throw Object.assign(new Error("ghp_sensitive timed out"), {
         code: "ETIMEDOUT",
-      }),
-      status: null,
-      signal: "SIGTERM",
-      stdout: "",
-      stderr: "",
-    }),
+        signal: "SIGTERM",
+      });
+    },
   });
-  assert.throws(
-    () => timeout.listVersions(),
+  await assert.rejects(
+    timeout.listVersions(),
     (error) =>
       /timed out/u.test(error.message) &&
       !/ghp_|sensitive|token/iu.test(error.message),
@@ -389,14 +403,15 @@ test("GitHub provider sanitizes timeout, authentication and rate-limit failures"
   ]) {
     const provider = createGithubDeliveryProvider({
       projectRoot: process.cwd(),
-      runCommand: () => ({
-        status: 1,
-        stdout: "",
-        stderr: rawFailure,
-      }),
+      runCommand: async () => {
+        throw Object.assign(new Error(rawFailure), {
+          code: 1,
+          stderr: rawFailure,
+        });
+      },
     });
-    assert.throws(
-      () => provider.listVersions(),
+    await assert.rejects(
+      provider.listVersions(),
       (error) =>
         /exit 1/u.test(error.message) &&
         !/401|403|429|ghp_|secret|token|authorization/iu.test(error.message),

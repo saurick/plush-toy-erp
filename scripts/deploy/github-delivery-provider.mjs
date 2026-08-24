@@ -9,8 +9,9 @@ import {
 } from "node:fs";
 import path from "node:path";
 import process from "node:process";
-import { spawnSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 
 import {
   DELIVERY_PROVIDER_CONTRACT,
@@ -50,32 +51,51 @@ const RUN_STATUSES = new Set([
   "requested",
   "pending",
 ]);
+const execFileAsync = promisify(execFile);
 
-function runGh(runCommand, args, { cwd, timeout = 30_000 } = {}) {
-  const result = runCommand("gh", args, {
-    cwd,
-    encoding: "utf8",
-    timeout,
-    maxBuffer: MAX_GITHUB_OUTPUT_BYTES,
-    env: process.env,
-  });
-  if (result.error) {
-    const timedOut =
-      result.error.code === "ETIMEDOUT" ||
-      result.error.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER" ||
-      result.signal === "SIGTERM";
+function isCommandTimeout(error, result = {}) {
+  return (
+    error?.code === "ETIMEDOUT" ||
+    error?.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER" ||
+    error?.signal === "SIGTERM" ||
+    result?.signal === "SIGTERM"
+  );
+}
+
+async function runGh(runCommand, args, { cwd, timeout = 30_000 } = {}) {
+  let result;
+  try {
+    result = await runCommand("gh", args, {
+      cwd,
+      encoding: "utf8",
+      timeout,
+      maxBuffer: MAX_GITHUB_OUTPUT_BYTES,
+      env: process.env,
+    });
+  } catch (error) {
+    if (isCommandTimeout(error)) {
+      throw new Error("GitHub adapter command timed out");
+    }
+    if (Number.isInteger(error?.code)) {
+      throw new Error(
+        `GitHub adapter command failed with exit ${String(error.code)}`,
+      );
+    }
+    throw new Error("GitHub adapter could not start gh");
+  }
+  if (result?.error) {
     throw new Error(
-      timedOut
+      isCommandTimeout(result.error, result)
         ? "GitHub adapter command timed out"
         : "GitHub adapter could not start gh",
     );
   }
-  if (result.status !== 0) {
+  if (Number.isInteger(result?.status) && result.status !== 0) {
     throw new Error(
       `GitHub adapter command failed with exit ${String(result.status)}`,
     );
   }
-  return String(result.stdout || "");
+  return String(result?.stdout || "");
 }
 
 function parseGithubUrl(value, expectedSuffix) {
@@ -318,17 +338,17 @@ function assertDownloadDirectory(projectRoot, destination) {
 
 export function createGithubDeliveryProvider({
   projectRoot = process.cwd(),
-  runCommand = spawnSync,
+  runCommand = execFileAsync,
   now = () => new Date().toISOString(),
 } = {}) {
   const root = realpathSync(projectRoot);
   const releaseDetailCache = new Map();
 
-  function readReleaseDetail(rawRelease, version) {
+  async function readReleaseDetail(rawRelease, version) {
     const cached = releaseDetailCache.get(version.gitSha);
     if (cached) return cached;
     const assets = Array.isArray(rawRelease?.assets) ? rawRelease.assets : [];
-    const readAsset = (name) => {
+    const readAsset = async (name) => {
       const asset = assets.find((item) => item?.name === name);
       if (
         !Number.isSafeInteger(asset?.id) ||
@@ -339,7 +359,7 @@ export function createGithubDeliveryProvider({
       ) {
         throw new Error("GitHub release detail asset is invalid");
       }
-      const output = runGh(
+      const output = await runGh(
         runCommand,
         [
           "api",
@@ -358,9 +378,9 @@ export function createGithubDeliveryProvider({
       }
       return JSON.parse(output);
     };
-    const artifact = readAsset("release-artifact.json");
+    const artifact = await readAsset("release-artifact.json");
     const manifest = validateReleaseManifest(
-      readAsset("release-manifest.json"),
+      await readAsset("release-manifest.json"),
     );
     if (
       artifact?.schemaVersion !== "plush-release-artifact/v1" ||
@@ -394,11 +414,11 @@ export function createGithubDeliveryProvider({
     repository: GITHUB_DELIVERY_REPOSITORY,
     workflow: GITHUB_RELEASE_WORKFLOW,
 
-    listVersions({ limit = 20 } = {}) {
+    async listVersions({ limit = 20 } = {}) {
       if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) {
         throw new Error("GitHub release list limit is invalid");
       }
-      const output = runGh(
+      const output = await runGh(
         runCommand,
         [
           "api",
@@ -429,7 +449,7 @@ export function createGithubDeliveryProvider({
         );
       if (normalized[0]) {
         try {
-          normalized[0].version = readReleaseDetail(
+          normalized[0].version = await readReleaseDetail(
             normalized[0].raw,
             normalized[0].version,
           );
@@ -440,11 +460,11 @@ export function createGithubDeliveryProvider({
       return normalized.map((item) => item.version);
     },
 
-    listPipelineTimings({ limit = 8 } = {}) {
+    async listPipelineTimings({ limit = 8 } = {}) {
       if (!Number.isSafeInteger(limit) || limit < 1 || limit > 20) {
         throw new Error("GitHub pipeline timing limit is invalid");
       }
-      const runOutput = runGh(
+      const runOutput = await runGh(
         runCommand,
         [
           "api",
@@ -477,8 +497,9 @@ export function createGithubDeliveryProvider({
             Date.parse(String(left?.created_at || "")),
         )
         .slice(0, limit);
-      const runs = selectedRuns.map((run) => {
-        const jobOutput = runGh(
+      const runs = [];
+      for (const run of selectedRuns) {
+        const jobOutput = await runGh(
           runCommand,
           [
             "api",
@@ -498,11 +519,10 @@ export function createGithubDeliveryProvider({
         ) {
           throw new Error("GitHub pipeline job response is invalid");
         }
-        return normalizePipelineRun(
-          run,
-          jobResponse.jobs.map(normalizePipelineJob),
+        runs.push(
+          normalizePipelineRun(run, jobResponse.jobs.map(normalizePipelineJob)),
         );
-      });
+      }
       return {
         schemaVersion: GITHUB_PIPELINE_TIMINGS_CONTRACT,
         generatedAt: normalizeTimestamp(now(), "timing generation"),
@@ -510,11 +530,11 @@ export function createGithubDeliveryProvider({
       };
     },
 
-    getReleaseStatus(gitSha) {
+    async getReleaseStatus(gitSha) {
       if (!SHA_PATTERN.test(String(gitSha || ""))) {
         throw new Error("release status SHA is invalid");
       }
-      const release = this.listVersions({ limit: 50 }).find(
+      const release = (await this.listVersions({ limit: 50 })).find(
         (item) => item.gitSha === gitSha,
       );
       if (release) {
@@ -526,7 +546,7 @@ export function createGithubDeliveryProvider({
           run: null,
         };
       }
-      const output = runGh(
+      const output = await runGh(
         runCommand,
         [
           "run",
@@ -572,9 +592,9 @@ export function createGithubDeliveryProvider({
       };
     },
 
-    dispatchRelease(request) {
+    async dispatchRelease(request) {
       validateReleaseDispatchRequest(request);
-      runGh(
+      await runGh(
         runCommand,
         [
           "workflow",
@@ -608,7 +628,7 @@ export function createGithubDeliveryProvider({
       };
     },
 
-    downloadRelease(gitSha, destination) {
+    async downloadRelease(gitSha, destination) {
       if (!SHA_PATTERN.test(String(gitSha || ""))) {
         throw new Error("release download SHA is invalid");
       }
@@ -635,7 +655,7 @@ export function createGithubDeliveryProvider({
       }
       mkdirSync(target, { recursive: true, mode: 0o700 });
       try {
-        runGh(
+        await runGh(
           runCommand,
           [
             "release",
@@ -695,7 +715,7 @@ function isMainModule() {
 if (isMainModule()) {
   try {
     const provider = createGithubDeliveryProvider();
-    const versions = provider.listVersions({ limit: 20 });
+    const versions = await provider.listVersions({ limit: 20 });
     console.log(JSON.stringify(versions, null, 2));
   } catch (error) {
     console.error(`[github-delivery-provider] ${error.message}`);
