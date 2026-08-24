@@ -655,20 +655,35 @@ export default function DevDatabaseMigrationPage() {
             message="该动作会写入共享开发数据库并重启本地后端"
             description="执行前会再次核对 migration / schema 指纹、目标身份与 pending revisions；不一致时直接阻断。若提交结果未知，不会自动重试。"
           />
-          <Descriptions size="small" column={1} bordered>
-            <Descriptions.Item label="升级范围">
-              {confirmationOperation?.target?.currentVersion} →{' '}
-              {confirmationOperation?.target?.latestVersion}
-            </Descriptions.Item>
-            <Descriptions.Item label="备份">
-              {confirmationOperation?.backup?.id || '未证明'}
-            </Descriptions.Item>
-            <Descriptions.Item label="恢复验证">
-              {confirmationOperation?.backup?.restoreVerified
-                ? '已通过'
-                : '未证明'}
-            </Descriptions.Item>
-          </Descriptions>
+          <Descriptions
+            size="small"
+            column={1}
+            bordered
+            items={[
+              {
+                key: 'range',
+                label: '升级范围',
+                children: (
+                  <>
+                    {confirmationOperation?.target?.currentVersion} →{' '}
+                    {confirmationOperation?.target?.latestVersion}
+                  </>
+                ),
+              },
+              {
+                key: 'backup',
+                label: '备份',
+                children: confirmationOperation?.backup?.id || '未证明',
+              },
+              {
+                key: 'restore',
+                label: '恢复验证',
+                children: confirmationOperation?.backup?.restoreVerified
+                  ? '已通过'
+                  : '未证明',
+              },
+            ]}
+          />
           <Text>请完整输入以下确认文本：</Text>
           <Text copyable code>
             {confirmationOperation?.confirmationPrompt || ''}
@@ -721,45 +736,77 @@ export default function DevDatabaseMigrationPage() {
               />
             ) : null}
             {operationDetail.plan ? (
-              <Descriptions size="small" column={1} bordered>
-                <Descriptions.Item label="计划哈希">
-                  <Text code copyable>
-                    {operationDetail.plan.hash}
-                  </Text>
-                </Descriptions.Item>
-                <Descriptions.Item label="计划准备">
-                  <DevTimestamp
-                    value={operationDetail.plan.preparedAt}
-                    missing="计划准备时间未证明"
-                  />
-                </Descriptions.Item>
-              </Descriptions>
+              <Descriptions
+                size="small"
+                column={1}
+                bordered
+                items={[
+                  {
+                    key: 'hash',
+                    label: '计划哈希',
+                    children: (
+                      <Text code copyable>
+                        {operationDetail.plan.hash}
+                      </Text>
+                    ),
+                  },
+                  {
+                    key: 'prepared-at',
+                    label: '计划准备',
+                    children: (
+                      <DevTimestamp
+                        value={operationDetail.plan.preparedAt}
+                        missing="计划准备时间未证明"
+                      />
+                    ),
+                  },
+                ]}
+              />
             ) : null}
             {operationDetail.backup ? (
-              <Descriptions size="small" column={1} bordered>
-                <Descriptions.Item label="备份 ID">
-                  {operationDetail.backup.id}
-                </Descriptions.Item>
-                <Descriptions.Item label="备份大小">
-                  {formatBytes(operationDetail.backup.sizeBytes)}
-                </Descriptions.Item>
-                <Descriptions.Item label="备份 SHA-256">
-                  <Text code copyable>
-                    {operationDetail.backup.sha256}
-                  </Text>
-                </Descriptions.Item>
-                <Descriptions.Item label="隔离恢复">
-                  {operationDetail.backup.restoreVerified
-                    ? `${operationDetail.backup.migrationBefore} → ${operationDetail.backup.migrationAfter}`
-                    : '未证明'}
-                </Descriptions.Item>
-                <Descriptions.Item label="恢复验证完成">
-                  <DevTimestamp
-                    value={operationDetail.backup.verifiedAt}
-                    missing="恢复验证时间未证明"
-                  />
-                </Descriptions.Item>
-              </Descriptions>
+              <Descriptions
+                size="small"
+                column={1}
+                bordered
+                items={[
+                  {
+                    key: 'id',
+                    label: '备份 ID',
+                    children: operationDetail.backup.id,
+                  },
+                  {
+                    key: 'size',
+                    label: '备份大小',
+                    children: formatBytes(operationDetail.backup.sizeBytes),
+                  },
+                  {
+                    key: 'sha256',
+                    label: '备份 SHA-256',
+                    children: (
+                      <Text code copyable>
+                        {operationDetail.backup.sha256}
+                      </Text>
+                    ),
+                  },
+                  {
+                    key: 'restore',
+                    label: '隔离恢复',
+                    children: operationDetail.backup.restoreVerified
+                      ? `${operationDetail.backup.migrationBefore} → ${operationDetail.backup.migrationAfter}`
+                      : '未证明',
+                  },
+                  {
+                    key: 'verified-at',
+                    label: '恢复验证完成',
+                    children: (
+                      <DevTimestamp
+                        value={operationDetail.backup.verifiedAt}
+                        missing="恢复验证时间未证明"
+                      />
+                    ),
+                  },
+                ]}
+              />
             ) : null}
             {operationDetail.source ? (
               <Text type="secondary">

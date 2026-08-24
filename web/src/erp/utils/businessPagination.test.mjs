@@ -37,6 +37,11 @@ test('businessPagination: creates Ant Design table pagination config', () => {
   assert.equal(pagination.showTotal(123, [51, 100]), '第 51-100 条 / 共 123 条')
 })
 
+test('businessPagination: keeps Ant Design page size options numeric', () => {
+  assert.deepEqual(BUSINESS_PAGE_SIZE_OPTIONS, [10, 20, 50, 100])
+  assert.equal(BUSINESS_PAGE_SIZE_OPTIONS.every(Number.isFinite), true)
+})
+
 test('businessPagination: resets current page without changing page size', () => {
   let nextValue
   resetBusinessPaginationCurrent((updater) => {

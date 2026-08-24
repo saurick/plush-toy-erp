@@ -310,34 +310,55 @@ function terminalEvidence(operation) {
 
 function renderGovernanceEvidence(row) {
   return (
-    <Descriptions size="small" column={1} bordered>
-      <Descriptions.Item label="Stable key">
-        <Text code>{row.key}</Text>
-      </Descriptions.Item>
-      <Descriptions.Item label="风险等级">{row.riskLevel}</Descriptions.Item>
-      <Descriptions.Item label="适用 profile">
-        {row.profiles.join(' / ')}
-      </Descriptions.Item>
-      <Descriptions.Item label="正式执行入口引用">
-        {row.sources.join('；')}
-      </Descriptions.Item>
-      <Descriptions.Item label="唯一验证记录">{row.evidence}</Descriptions.Item>
-      <Descriptions.Item label="失败阻断">{row.blocks}</Descriptions.Item>
-      <Descriptions.Item label="中位数">
-        {formatQualityGateDuration(row.statistics?.medianDurationMs)}
-      </Descriptions.Item>
-      <Descriptions.Item label="较慢运行参考">
-        {row.statistics?.enoughSamples
-          ? formatQualityGateDuration(row.statistics.slowerDurationMs)
-          : '暂无足够样本'}
-      </Descriptions.Item>
-      <Descriptions.Item label="与其他门禁关系">
-        {row.relationship}
-      </Descriptions.Item>
-      <Descriptions.Item label="替代或退出条件">
-        {row.exitCondition}
-      </Descriptions.Item>
-    </Descriptions>
+    <Descriptions
+      size="small"
+      column={1}
+      bordered
+      items={[
+        {
+          key: 'key',
+          label: 'Stable key',
+          children: <Text code>{row.key}</Text>,
+        },
+        { key: 'risk', label: '风险等级', children: row.riskLevel },
+        {
+          key: 'profiles',
+          label: '适用 profile',
+          children: row.profiles.join(' / '),
+        },
+        {
+          key: 'sources',
+          label: '正式执行入口引用',
+          children: row.sources.join('；'),
+        },
+        { key: 'evidence', label: '唯一验证记录', children: row.evidence },
+        { key: 'blocks', label: '失败阻断', children: row.blocks },
+        {
+          key: 'median',
+          label: '中位数',
+          children: formatQualityGateDuration(
+            row.statistics?.medianDurationMs
+          ),
+        },
+        {
+          key: 'slower',
+          label: '较慢运行参考',
+          children: row.statistics?.enoughSamples
+            ? formatQualityGateDuration(row.statistics.slowerDurationMs)
+            : '暂无足够样本',
+        },
+        {
+          key: 'relationship',
+          label: '与其他门禁关系',
+          children: row.relationship,
+        },
+        {
+          key: 'exit-condition',
+          label: '替代或退出条件',
+          children: row.exitCondition,
+        },
+      ]}
+    />
   )
 }
 
@@ -432,59 +453,99 @@ function TechnicalDetails({ operation }) {
   return (
     <details className="erp-dev-quality-technical">
       <summary>查看技术详情</summary>
-      <Descriptions size="small" column={1} bordered>
-        {operation.proofOnly ? (
-          <Descriptions.Item label="证据来源">
-            当前版本正式回执（无单独页面运行记录）
-          </Descriptions.Item>
-        ) : (
-          <Descriptions.Item label="Operation ID">
-            <Text code copyable>
-              {operation.id}
-            </Text>
-          </Descriptions.Item>
-        )}
-        <Descriptions.Item label="完整 SHA">
-          <Text code copyable>
-            {operation.repository.commit}
-          </Text>
-        </Descriptions.Item>
-        <Descriptions.Item label="工作区指纹">
-          <Text code>{operation.repository.fingerprint}</Text>
-        </Descriptions.Item>
-        <Descriptions.Item label="当前 stage id">
-          <Text code>{operation.stage}</Text>
-        </Descriptions.Item>
-        <Descriptions.Item label="验证记录">
-          {operation.receipt
-            ? `${operation.receipt.executed} 项执行 · ${operation.receipt.passed} 项通过 · ${operation.receipt.failed} 项失败 · ${operation.receipt.skipped} 项跳过`
-            : '尚未取得正式回执'}
-        </Descriptions.Item>
-        <Descriptions.Item label="缓存信息">
-          当前正式回执未登记独立缓存指标
-        </Descriptions.Item>
-        <Descriptions.Item label="清理读回">
-          {operation.cleanup.message}
-        </Descriptions.Item>
-        <Descriptions.Item label="操作开始">
-          <DevTimestamp value={operation.createdAt} missing="开始时间未证明" />
-        </Descriptions.Item>
-        <Descriptions.Item label="最近状态时间">
-          <DevTimestamp
-            value={operation.finishedAt || operation.updatedAt}
-            action={operationUpdateAction(operation)}
-            missing="更新时间未证明"
-          />
-        </Descriptions.Item>
-        {operation.cancelRequestedAt ? (
-          <Descriptions.Item label="取消请求">
-            <DevTimestamp
-              value={operation.cancelRequestedAt}
-              missing="取消请求时间未证明"
-            />
-          </Descriptions.Item>
-        ) : null}
-      </Descriptions>
+      <Descriptions
+        size="small"
+        column={1}
+        bordered
+        items={[
+          operation.proofOnly
+            ? {
+                key: 'evidence-source',
+                label: '证据来源',
+                children: '当前版本正式回执（无单独页面运行记录）',
+              }
+            : {
+                key: 'operation-id',
+                label: 'Operation ID',
+                children: (
+                  <Text code copyable>
+                    {operation.id}
+                  </Text>
+                ),
+              },
+          {
+            key: 'commit',
+            label: '完整 SHA',
+            children: (
+              <Text code copyable>
+                {operation.repository.commit}
+              </Text>
+            ),
+          },
+          {
+            key: 'fingerprint',
+            label: '工作区指纹',
+            children: <Text code>{operation.repository.fingerprint}</Text>,
+          },
+          {
+            key: 'stage',
+            label: '当前 stage id',
+            children: <Text code>{operation.stage}</Text>,
+          },
+          {
+            key: 'receipt',
+            label: '验证记录',
+            children: operation.receipt
+              ? `${operation.receipt.executed} 项执行 · ${operation.receipt.passed} 项通过 · ${operation.receipt.failed} 项失败 · ${operation.receipt.skipped} 项跳过`
+              : '尚未取得正式回执',
+          },
+          {
+            key: 'cache',
+            label: '缓存信息',
+            children: '当前正式回执未登记独立缓存指标',
+          },
+          {
+            key: 'cleanup',
+            label: '清理读回',
+            children: operation.cleanup.message,
+          },
+          {
+            key: 'created-at',
+            label: '操作开始',
+            children: (
+              <DevTimestamp
+                value={operation.createdAt}
+                missing="开始时间未证明"
+              />
+            ),
+          },
+          {
+            key: 'updated-at',
+            label: '最近状态时间',
+            children: (
+              <DevTimestamp
+                value={operation.finishedAt || operation.updatedAt}
+                action={operationUpdateAction(operation)}
+                missing="更新时间未证明"
+              />
+            ),
+          },
+          ...(operation.cancelRequestedAt
+            ? [
+                {
+                  key: 'cancel-requested-at',
+                  label: '取消请求',
+                  children: (
+                    <DevTimestamp
+                      value={operation.cancelRequestedAt}
+                      missing="取消请求时间未证明"
+                    />
+                  ),
+                },
+              ]
+            : []),
+        ]}
+      />
     </details>
   )
 }

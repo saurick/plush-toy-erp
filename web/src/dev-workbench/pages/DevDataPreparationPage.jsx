@@ -1717,51 +1717,94 @@ export default function DevDataPreparationPage() {
             }
           />
           {currentIsScenarioDemo ? (
-            <Descriptions size="small" column={1} bordered>
-              <Descriptions.Item label="甲方">
-                {customerScope.customer?.label || '未选择'}
-              </Descriptions.Item>
-              <Descriptions.Item label="固定目标">
-                {currentOperation?.targetSummary.safeTarget || '未证明'}
-              </Descriptions.Item>
-              <Descriptions.Item label="已核对 release">
-                <Text code copyable>
-                  {currentOperation?.targetSummary.releaseSha || '未证明'}
-                </Text>
-              </Descriptions.Item>
-              <Descriptions.Item label="数据库身份">
-                {currentOperation?.targetSummary.databaseName || '未证明'}
-              </Descriptions.Item>
-              <Descriptions.Item label="migration">
-                {currentOperation?.targetSummary.migrationVersion || '未证明'}
-              </Descriptions.Item>
-              <Descriptions.Item label="客户配置 revision">
-                {currentOperation?.targetSummary.customerConfigRevision ||
-                  '未证明'}
-              </Descriptions.Item>
-              <Descriptions.Item label="固定数据合同">
-                {currentOperation?.targetSummary.datasetVersion || '未证明'} /{' '}
-                {currentOperation?.targetSummary.datasetRunId || '未证明'}
-              </Descriptions.Item>
-              <Descriptions.Item label="语义摘要">
-                <Text code copyable>
-                  {currentOperation?.targetSummary.semanticDigest || '未证明'}
-                </Text>
-              </Descriptions.Item>
-              <Descriptions.Item label="回滚或清理点">
-                {currentOperation?.targetSummary.rollbackPoint || '未证明'}
-              </Descriptions.Item>
-              <Descriptions.Item label="数据范围">
+            <Descriptions
+              size="small"
+              column={1}
+              bordered
+              items={[
                 {
-                  DEV_DATA_PREPARATION_PROFILE_COPY[
-                    DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo
-                  ].scope
-                }
-              </Descriptions.Item>
-              <Descriptions.Item label="保留方式">
-                长期保留，只向前补齐，不提供一键清空或重置
-              </Descriptions.Item>
-            </Descriptions>
+                  key: 'customer',
+                  label: '甲方',
+                  children: customerScope.customer?.label || '未选择',
+                },
+                {
+                  key: 'target',
+                  label: '固定目标',
+                  children:
+                    currentOperation?.targetSummary.safeTarget || '未证明',
+                },
+                {
+                  key: 'release',
+                  label: '已核对 release',
+                  children: (
+                    <Text code copyable>
+                      {currentOperation?.targetSummary.releaseSha || '未证明'}
+                    </Text>
+                  ),
+                },
+                {
+                  key: 'database',
+                  label: '数据库身份',
+                  children:
+                    currentOperation?.targetSummary.databaseName || '未证明',
+                },
+                {
+                  key: 'migration',
+                  label: 'migration',
+                  children:
+                    currentOperation?.targetSummary.migrationVersion ||
+                    '未证明',
+                },
+                {
+                  key: 'customer-config',
+                  label: '客户配置 revision',
+                  children:
+                    currentOperation?.targetSummary.customerConfigRevision ||
+                    '未证明',
+                },
+                {
+                  key: 'dataset',
+                  label: '固定数据合同',
+                  children: (
+                    <>
+                      {currentOperation?.targetSummary.datasetVersion ||
+                        '未证明'}{' '}
+                      /{' '}
+                      {currentOperation?.targetSummary.datasetRunId || '未证明'}
+                    </>
+                  ),
+                },
+                {
+                  key: 'semantic-digest',
+                  label: '语义摘要',
+                  children: (
+                    <Text code copyable>
+                      {currentOperation?.targetSummary.semanticDigest ||
+                        '未证明'}
+                    </Text>
+                  ),
+                },
+                {
+                  key: 'rollback',
+                  label: '回滚或清理点',
+                  children:
+                    currentOperation?.targetSummary.rollbackPoint || '未证明',
+                },
+                {
+                  key: 'scope',
+                  label: '数据范围',
+                  children:
+                    DEV_DATA_PREPARATION_PROFILE_COPY[
+                      DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo
+                    ].scope,
+                },
+                {
+                  key: 'retention',
+                  label: '保留方式',
+                  children: '长期保留，只向前补齐，不提供一键清空或重置',
+                },
+              ]}
+            />
           ) : (
             <>
               <Text>请完整输入以下 exact confirmation：</Text>

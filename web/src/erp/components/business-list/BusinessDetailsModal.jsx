@@ -242,8 +242,11 @@ export default function BusinessDetailsModal({
       width={width}
       onCancel={onClose}
     >
-      <Descriptions bordered column={{ xs: 1, sm: 2, lg: 3 }} size="small">
-        {detailColumns.map((column, index) => {
+      <Descriptions
+        bordered
+        column={{ xs: 1, sm: 2, lg: 3 }}
+        size="small"
+        items={detailColumns.map((column, index) => {
           const label = getColumnLabel(column)
           const key =
             column.key ||
@@ -251,13 +254,13 @@ export default function BusinessDetailsModal({
               ? column.dataIndex.join('.')
               : column.dataIndex) ||
             `${label}-${index}`
-          return (
-            <Descriptions.Item key={key} label={label}>
-              {visibleDetailValue(detailValue(column, record || {}))}
-            </Descriptions.Item>
-          )
+          return {
+            key,
+            label,
+            children: visibleDetailValue(detailValue(column, record || {})),
+          }
         })}
-      </Descriptions>
+      />
       {lineItems ? (
         <BusinessLineItems
           config={lineItems}

@@ -109,7 +109,7 @@ import ApprovalResponsibilityPanel from './ApprovalResponsibilityPanel.jsx'
 
 const { Paragraph, Text, Title } = Typography
 
-const TABLE_PAGE_SIZE_OPTIONS = ['8', '10', '20', '50', '100']
+const TABLE_PAGE_SIZE_OPTIONS = [8, 10, 20, 50, 100]
 const DEFAULT_TABLE_PAGE_SIZE = 8
 const IS_PRODUCTION_BUILD = import.meta.env.PROD === true
 const READ_USER_PERMISSION = 'system.user.read'

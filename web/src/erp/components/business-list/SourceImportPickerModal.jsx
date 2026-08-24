@@ -394,7 +394,9 @@ export default function SourceImportPickerModal({
                     trigger={['hover', 'click', 'focus']}
                     placement="bottomLeft"
                     destroyOnHidden
-                    overlayClassName="erp-source-import-picker__selected-popover"
+                    classNames={{
+                      root: 'erp-source-import-picker__selected-popover',
+                    }}
                     content={
                       <div className="erp-source-import-picker__selected-popover-content">
                         <Text strong>

@@ -35,7 +35,7 @@ const { Paragraph, Text, Title } = Typography
 
 const DEFAULT_PAGE_SIZE = 20
 const DRAWER_FOCUS_RESTORE_FALLBACK_MS = 600
-const PAGE_SIZE_OPTIONS = ['10', '20', '50', '100']
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
 
 const riskLabelMap = {
   high: '高风险',

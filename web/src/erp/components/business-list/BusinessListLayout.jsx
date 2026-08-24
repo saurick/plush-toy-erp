@@ -1063,7 +1063,7 @@ export function SelectedItemsSummaryTag({
     <Popover
       trigger={['hover', 'click', 'focus']}
       placement="bottomLeft"
-      overlayClassName="erp-business-selected-items-popover"
+      classNames={{ root: 'erp-business-selected-items-popover' }}
       title={`已选 ${selectedCount} 条`}
       content={
         <div className="erp-business-selected-items-popover__items">

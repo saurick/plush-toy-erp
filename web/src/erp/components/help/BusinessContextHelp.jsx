@@ -176,7 +176,7 @@ export function BusinessHelpLabel({ label, pageKey = '', itemKey = '' }) {
         destroyOnHidden
         trigger={['hover', 'focus', 'click']}
         placement="top"
-        overlayClassName="erp-business-inline-help-popover"
+        classNames={{ root: 'erp-business-inline-help-popover' }}
         content={<ExplanationDetails item={item} />}
       >
         <Button
