@@ -282,6 +282,8 @@ write_files:
       #!/usr/bin/env bash
       set -euo pipefail
 
+      cd /tmp
+
       verify_go_module_env() {
         local user="$1"
         local observed

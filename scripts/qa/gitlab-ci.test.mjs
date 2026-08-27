@@ -128,6 +128,14 @@ test("R640 GitLab definitions pin identity, separate SSD data and require exact 
   assert.doesNotMatch(runnerCloudInit, /curl[^\n]*[|]\s*(?:ba)?sh/u);
 });
 
+test("Runner verifier enters a neutral cwd before cross-user checks", () => {
+  assert.match(
+    runnerCloudInit,
+    /path: \/usr\/local\/sbin\/plush-verify-runner-bootstrap[\s\S]+?set -euo pipefail\n\n      cd \/tmp[\s\S]+?runuser -u gitlab-runner -- \/usr\/local\/bin\/pnpm --version/u,
+  );
+  assert.doesNotMatch(runnerCloudInit, /chmod[^\n]*\/home\/ubuntu/u);
+});
+
 test("Runner VM bootstrap retries pinned downloads and fails closed", () => {
   const downloadCalls = runnerCloudInit.match(/^\s+download_file\s/gmu) ?? [];
   const rawCurlCalls = runnerCloudInit
