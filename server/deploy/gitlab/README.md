@@ -26,7 +26,7 @@ GitLab 不与业务 PostgreSQL、测试数据库或现有 Docker 容器共享数
 
 Runner VM 的 Go 模块下载统一由 `/etc/profile.d/plush-go-module-network.sh` 提供登录环境：`GOPROXY=https://goproxy.cn,direct`，`GOSUMDB=sum.golang.google.cn`。`goproxy.cn` 只负责在大陆网络中提供可达的模块代理；模块内容仍必须通过 Go checksum database 校验，不得设置 `GOSUMDB=off` 或改为跳过校验。
 
-`govulncheck` 固定安装 `v1.6.0`，安装命令使用上述代理和 checksum database，并保留有界重试与超时。`shfmt` 不经 Go 模块代理构建，固定下载官方 GitHub Release 的 `v3.13.1` Linux amd64 制品，核对仓库内声明的 SHA-256 后再以 `root:root 0755` 安装。最终门禁必须分别用 `ubuntu`、`root`、`gitlab-runner` 的登录 shell 读回相同的 `GOPROXY` 与 `GOSUMDB`，防止 bootstrap 成功但 CI job 回到不可达或未校验的下载路径。
+`govulncheck` 固定安装 `v1.6.0`，`shfmt` 固定安装 `v3.13.1`；两者的安装命令都使用上述代理和 checksum database，并保留有界重试与超时。Runner bootstrap 不依赖 GitHub Release CDN，避免可达性间歇变化绕过统一模块校验路径。最终门禁必须分别用 `ubuntu`、`root`、`gitlab-runner` 的登录 shell 读回相同的 `GOPROXY` 与 `GOSUMDB`，防止 bootstrap 成功但 CI job 回到不可达或未校验的下载路径。
 
 ## 公网入口
 

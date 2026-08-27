@@ -135,7 +135,7 @@ test("Runner VM bootstrap retries pinned downloads and fails closed", () => {
     .filter((line) => line.trim() === "curl \\");
   const runcmdEntries = runnerCloudInit.match(/^  - \[bash, -lc, .+\]$/gmu) ?? [];
 
-  assert.equal(downloadCalls.length, 7);
+  assert.equal(downloadCalls.length, 6);
   assert.equal(rawCurlCalls.length, 1);
   assert.match(runnerCloudInit, /--connect-timeout 20/u);
   assert.match(runnerCloudInit, /--max-time 300/u);
@@ -150,17 +150,8 @@ test("Runner VM bootstrap retries pinned downloads and fails closed", () => {
   );
   assert.match(
     runnerCloudInit,
-    /https:\/\/github[.]com\/mvdan\/sh\/releases\/download\/v3[.]13[.]1\/\$shfmt_asset/u,
+    /retry_command env GOPROXY=https:\/\/goproxy[.]cn,direct GOSUMDB=sum[.]golang[.]google[.]cn GOBIN=\/usr\/local\/bin go install mvdan[.]cc\/sh\/v3\/cmd\/shfmt@v3[.]13[.]1/u,
   );
-  assert.match(
-    runnerCloudInit,
-    /fb096c5d1ac6beabbdbaa2874d025badb03ee07929f0c9ff67563ce8c75398b1/u,
-  );
-  assert.match(
-    runnerCloudInit,
-    /install -o root -g root -m 0755 "\$work\/\$shfmt_asset" \/usr\/local\/bin\/shfmt/u,
-  );
-  assert.doesNotMatch(runnerCloudInit, /go install mvdan[.]cc\/sh/u);
   assert.match(
     runnerCloudInit,
     /retry_command env ATLAS_VERSION=v1[.]2[.]0 bash/u,

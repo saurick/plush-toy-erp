@@ -147,10 +147,7 @@ write_files:
       tar -xzf "$work/$go_archive" -C /usr/local
       ln -sfn /usr/local/go/bin/go /usr/local/bin/go
       retry_command env GOPROXY=https://goproxy.cn,direct GOSUMDB=sum.golang.google.cn GOBIN=/usr/local/bin go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
-      shfmt_asset=shfmt_v3.13.1_linux_amd64
-      download_file "https://github.com/mvdan/sh/releases/download/v3.13.1/$shfmt_asset" "$work/$shfmt_asset"
-      echo "fb096c5d1ac6beabbdbaa2874d025badb03ee07929f0c9ff67563ce8c75398b1  $work/$shfmt_asset" | sha256sum --check --strict
-      install -o root -g root -m 0755 "$work/$shfmt_asset" /usr/local/bin/shfmt
+      retry_command env GOPROXY=https://goproxy.cn,direct GOSUMDB=sum.golang.google.cn GOBIN=/usr/local/bin go install mvdan.cc/sh/v3/cmd/shfmt@v3.13.1
       download_file https://atlasgo.sh "$work/atlas-install.sh"
       echo "d2377154c7af848813fc763ad75d6c0564cdca806163ea61ad4fb634a8736751  $work/atlas-install.sh" | sha256sum --check --strict
       retry_command env ATLAS_VERSION=v1.2.0 bash "$work/atlas-install.sh" -y
