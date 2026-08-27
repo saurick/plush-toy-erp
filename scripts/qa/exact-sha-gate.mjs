@@ -49,6 +49,7 @@ const EXTRA_FINGERPRINT_FILES = Object.freeze([
   "scripts/qa/strict-receipt-identity.test.mjs",
 ]);
 const WORKFLOW_FINGERPRINT_FILES = Object.freeze([
+  ".gitlab-ci.yml",
   ".github/workflows/ci.yml",
   ".github/workflows/release.yml",
 ]);
@@ -192,7 +193,9 @@ function committedFilesFingerprint(root, sha, label, files) {
 }
 
 function repositoryIdentity(env = process.env) {
-  const fromEnvironment = String(env.GITHUB_REPOSITORY || "");
+  const fromEnvironment = String(
+    env.CI_PROJECT_PATH || env.GITHUB_REPOSITORY || "",
+  );
   if (/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u.test(fromEnvironment)) {
     return fromEnvironment;
   }
@@ -217,7 +220,7 @@ export function buildStrictReceiptIdentity(root, sha, env = process.env) {
     workflowFingerprint: committedFilesFingerprint(
       root,
       sha,
-      "github-workflows",
+      "delivery-workflows",
       WORKFLOW_FINGERPRINT_FILES,
     ),
     toolchainFingerprint: committedFilesFingerprint(
@@ -343,25 +346,45 @@ export function buildExactShaProvenance(
   env = process.env,
   conclusion = "success",
 ) {
-  if (env.GITHUB_ACTIONS !== "true") {
+  let provenance;
+  if (env.GITLAB_CI === "true") {
+    const repository = String(env.CI_PROJECT_PATH || "");
+    const refName = String(env.CI_COMMIT_REF_NAME || "");
+    const refPrefix = env.CI_COMMIT_TAG ? "refs/tags" : "refs/heads";
+    provenance = {
+      source: "gitlab-ci",
+      repository,
+      workflowRef: `${repository}/.gitlab-ci.yml@${refPrefix}/${refName}`,
+      runId: String(env.CI_PIPELINE_ID || ""),
+      runAttempt: String(env.CI_PIPELINE_IID || ""),
+      job: String(env.CI_JOB_NAME || ""),
+      eventName: String(env.CI_PIPELINE_SOURCE || ""),
+      ref: `${refPrefix}/${refName}`,
+      refName,
+      headRepository: repository,
+      conclusion,
+    };
+  } else if (env.GITHUB_ACTIONS === "true") {
+    provenance = {
+      source: "github-actions",
+      repository: String(env.GITHUB_REPOSITORY || ""),
+      workflowRef: String(env.GITHUB_WORKFLOW_REF || ""),
+      runId: String(env.GITHUB_RUN_ID || ""),
+      runAttempt: String(env.GITHUB_RUN_ATTEMPT || ""),
+      job: String(env.GITHUB_JOB || ""),
+      eventName: String(env.GITHUB_EVENT_NAME || ""),
+      ref: String(env.GITHUB_REF || ""),
+      refName: String(env.GITHUB_REF_NAME || ""),
+      headRepository: String(
+        env.GITHUB_HEAD_REPOSITORY || env.GITHUB_REPOSITORY || "",
+      ),
+      conclusion,
+    };
+  } else {
     return Object.freeze({ source: "local" });
   }
-  const provenance = {
-    source: "github-actions",
-    repository: String(env.GITHUB_REPOSITORY || ""),
-    workflowRef: String(env.GITHUB_WORKFLOW_REF || ""),
-    runId: String(env.GITHUB_RUN_ID || ""),
-    runAttempt: String(env.GITHUB_RUN_ATTEMPT || ""),
-    job: String(env.GITHUB_JOB || ""),
-    eventName: String(env.GITHUB_EVENT_NAME || ""),
-    ref: String(env.GITHUB_REF || ""),
-    refName: String(env.GITHUB_REF_NAME || ""),
-    headRepository: String(
-      env.GITHUB_HEAD_REPOSITORY || env.GITHUB_REPOSITORY || "",
-    ),
-    conclusion,
-  };
   if (
+    !["github-actions", "gitlab-ci"].includes(provenance.source) ||
     !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u.test(provenance.repository) ||
     !provenance.workflowRef ||
     !/^\d+$/u.test(provenance.runId) ||
@@ -373,7 +396,7 @@ export function buildExactShaProvenance(
     provenance.headRepository !== provenance.repository ||
     !["success", "failure"].includes(provenance.conclusion)
   ) {
-    throw new Error("GitHub Actions provenance is incomplete");
+    throw new Error("CI provenance is incomplete");
   }
   return Object.freeze(provenance);
 }
@@ -381,7 +404,7 @@ export function buildExactShaProvenance(
 function assertTerminalProvenance(provenance) {
   if (provenance?.source === "local") return;
   if (
-    provenance?.source !== "github-actions" ||
+    !["github-actions", "gitlab-ci"].includes(provenance?.source) ||
     !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u.test(
       String(provenance.repository || ""),
     ) ||

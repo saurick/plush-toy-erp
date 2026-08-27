@@ -65,16 +65,27 @@ function validateStrictManifestEvidence(manifest) {
     exitCode: 0,
   });
   const ciProvenance =
+    strict.provenance?.source === "github-actions" &&
     strict.provenance?.eventName === "push" &&
     strict.provenance?.job === "quality" &&
     String(strict.provenance?.workflowRef || "").includes(
       "/.github/workflows/ci.yml@",
     );
   const releaseFallbackProvenance =
+    strict.provenance?.source === "github-actions" &&
     strict.provenance?.eventName === "workflow_dispatch" &&
     strict.provenance?.job === "strict" &&
     String(strict.provenance?.workflowRef || "").includes(
       "/.github/workflows/release.yml@",
+    );
+  const gitlabCanonicalProvenance =
+    strict.provenance?.source === "gitlab-ci" &&
+    ["api", "push", "trigger", "web"].includes(
+      strict.provenance?.eventName,
+    ) &&
+    strict.provenance?.job === "strict" &&
+    String(strict.provenance?.workflowRef || "").includes(
+      "/.gitlab-ci.yml@",
     );
   if (
     strict.identity.gitSha !== manifest.gitSha ||
@@ -86,12 +97,13 @@ function validateStrictManifestEvidence(manifest) {
       manifest.migration?.sequenceSha256 ||
     strict.identity.customerConfigFingerprint !==
       manifest.customerConfig?.sourceSha256 ||
-    strict.provenance?.source !== "github-actions" ||
+    !["github-actions", "gitlab-ci"].includes(strict.provenance?.source) ||
     strict.provenance?.ref !== "refs/heads/main" ||
     strict.provenance?.refName !== "main" ||
     strict.provenance?.headRepository !== strict.provenance?.repository ||
     strict.provenance?.conclusion !== "success" ||
-    (!ciProvenance && !releaseFallbackProvenance)
+    (!ciProvenance && !releaseFallbackProvenance &&
+      !gitlabCanonicalProvenance)
   ) {
     throw new Error("strict release identity or CI provenance is invalid");
   }
@@ -110,7 +122,9 @@ export function validateReleaseManifest(manifest) {
     manifest?.strict?.status !== "passed" ||
     !SHA256_PATTERN.test(String(manifest?.strict?.fingerprint || "")) ||
     !SHA256_PATTERN.test(String(manifest?.strict?.receiptSha256 || "")) ||
-    manifest?.strict?.provenance?.source !== "github-actions" ||
+    !["github-actions", "gitlab-ci"].includes(
+      manifest?.strict?.provenance?.source,
+    ) ||
     !REGISTRY_REPOSITORY_PATTERN.test(
       `ghcr.io/${String(manifest?.strict?.provenance?.repository || "")}`,
     ) ||

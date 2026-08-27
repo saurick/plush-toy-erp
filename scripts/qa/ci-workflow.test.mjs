@@ -45,12 +45,13 @@ const planRuns = plan.steps.map((step) => step.run || "").join("\n");
 const qualityRuns = quality.steps.map((step) => step.run || "").join("\n");
 
 test("CI exposes one stable aggregate check over trusted plan and quality jobs", () => {
+  assert.equal(workflow.name, "GitHub Review Mirror CI");
   assert.deepEqual(Object.keys(workflow.on).sort(), [
     "pull_request",
     "push",
     "workflow_dispatch",
   ]);
-  assert.deepEqual(workflow.on.push, { branches: ["main"] });
+  assert.deepEqual(workflow.on.push, { branches: ["review/gpt/**"] });
   assert.deepEqual(workflow.permissions, {
     actions: "read",
     contents: "read",
@@ -88,6 +89,7 @@ test("CI scans the trusted history before executing candidate repository scripts
   assert.match(planRuns, /trusted_config_sha="\$PR_BASE_SHA"/u);
   assert.match(planRuns, /git show "\$trusted_config_sha:\.gitleaks\.toml"/u);
   assert.match(planRuns, /gitleaks_8\.30\.1_linux_x64\.tar\.gz/u);
+  assert.match(planRuns, /history_range=HEAD/u);
   assert.match(
     planRuns,
     /551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb/u,
@@ -98,12 +100,12 @@ test("CI scans the trusted history before executing candidate repository scripts
   assert.match(planRuns, /git log --check --format= "\$history_range"/u);
 });
 
-test("CI affected/full plan controls setup and default main produces one strict receipt", () => {
+test("GitHub review CI uses affected/full without claiming canonical main evidence", () => {
   assert.match(
     planRuns,
     /EVENT_NAME" == "pull_request"[\s\S]*gate_mode=affected/u,
   );
-  assert.match(planRuns, /EVENT_NAME" == "push"[\s\S]*gate_mode=full/u);
+  assert.match(planRuns, /EVENT_NAME" == "push"[\s\S]*gate_mode=affected/u);
   assert.match(planRuns, /REQUESTED_MODE/u);
   assert.match(planRuns, /ci-plan\.mjs/u);
   assert.match(
@@ -136,17 +138,13 @@ test("CI affected/full plan controls setup and default main produces one strict 
   );
   assert.match(qualityRuns, /affected\.sh --base "\$QA_BASE_RANGE" --run/u);
   assert.match(qualityRuns, /run-gate-with-receipt\.mjs --gate full/u);
-  assert.match(
-    qualityRuns,
-    /EVENT_NAME" == "push".*REF_NAME" == "refs\/heads\/main"[\s\S]*exact-sha-gate\.mjs[\s\S]*--main-ref origin\/main[\s\S]*--run/u,
+  assert.doesNotMatch(qualityRuns, /exact-sha-gate\.mjs/u);
+  assert.equal(
+    quality.steps.some((step) =>
+      /default-branch exact-SHA strict receipt/u.test(step.name || ""),
+    ),
+    false,
   );
-  const strictUpload = quality.steps.find(
-    (step) =>
-      step.name === "Persist the default-branch exact-SHA strict receipt",
-  );
-  assert.match(strictUpload.if, /event_name == 'push'.*refs\/heads\/main/u);
-  assert.equal(strictUpload.with.name, "strict-terminal-${{ github.sha }}");
-  assert.match(strictUpload.with.path, /output\/qa\/exact-sha/u);
 });
 
 test("CI pins actions, toolchains, database and Chromium sandbox", () => {
@@ -162,8 +160,6 @@ test("CI pins actions, toolchains, database and Chromium sandbox", () => {
     "actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
     "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
     "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
-    "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
-    "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
     "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
     "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
     "ariga/setup-atlas@2f3c785c89a15e1c0d07bcae3900fb5feb969eea",
@@ -205,19 +201,10 @@ test("CI pins actions, toolchains, database and Chromium sandbox", () => {
   assert.doesNotMatch(source, /--no-sandbox|--disable-setuid-sandbox/u);
 });
 
-test("CI preserves an auditable supersession relation without cancelling release work", () => {
-  const audit = plan.steps.find(
-    (step) => step.name === "Record superseded same-ref CI identity",
-  );
-  const upload = plan.steps.find(
-    (step) => step.name === "Persist the CI supersession audit",
-  );
-  assert.match(audit.if, /event_name == 'push'.*refs\/heads\/main/u);
-  assert.match(audit.run, /same_ref_newer_sha/u);
-  assert.match(audit.run, /supersededSha/u);
-  assert.match(audit.run, /replacementSha/u);
-  assert.match(audit.run, /actions\/workflows\/ci\.yml\/runs/u);
-  assert.equal(upload.with.name, "ci-supersession-${{ github.sha }}");
+test("GitHub review CI never duplicates the canonical main pipeline", () => {
+  assert.deepEqual(workflow.on.push, { branches: ["review/gpt/**"] });
+  assert.doesNotMatch(source, /refs\/heads\/main|branches:\n\s+- main/u);
+  assert.doesNotMatch(source, /same_ref_newer_sha|ci-supersession/u);
   assert.equal(workflow.concurrency["cancel-in-progress"], true);
 });
 

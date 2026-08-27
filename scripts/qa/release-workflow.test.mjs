@@ -46,6 +46,7 @@ const strictRuns = strict.steps.map((step) => step.run || "").join("\n");
 const publishRuns = publish.steps.map((step) => step.run || "").join("\n");
 
 test("release is manual, globally serialized and split by permission boundary", () => {
+  assert.equal(workflow.name, "Emergency Immutable Release (GitHub)");
   assert.deepEqual(Object.keys(workflow.on), ["workflow_dispatch"]);
   assert.deepEqual(Object.keys(workflow.on.workflow_dispatch.inputs).sort(), [
     "customer",

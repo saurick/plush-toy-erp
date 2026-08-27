@@ -1,0 +1,153 @@
+#cloud-config
+package_update: true
+package_upgrade: false
+ssh_pwauth: false
+disable_root: true
+packages:
+  - ca-certificates
+  - curl
+  - docker.io
+  - fonts-freefont-ttf
+  - fonts-ipafont-gothic
+  - fonts-liberation
+  - fonts-noto-color-emoji
+  - fonts-tlwg-loma-otf
+  - fonts-unifont
+  - fonts-wqy-zenhei
+  - git
+  - jq
+  - libasound2t64
+  - libatk-bridge2.0-0t64
+  - libatk1.0-0t64
+  - libatspi2.0-0t64
+  - libcairo2
+  - libcups2t64
+  - libdbus-1-3
+  - libdrm2
+  - libfontconfig1
+  - libfreetype6
+  - libgbm1
+  - libglib2.0-0t64
+  - libnspr4
+  - libnss3
+  - libpango-1.0-0
+  - libpq-dev
+  - lsof
+  - postgresql-client
+  - ripgrep
+  - shellcheck
+  - tar
+  - unzip
+  - libx11-6
+  - libxcb1
+  - libxcomposite1
+  - libxdamage1
+  - libxext6
+  - libxfixes3
+  - libxkbcommon0
+  - libxrandr2
+  - xfonts-cyrillic
+  - xfonts-scalable
+  - xvfb
+  - xz-utils
+  - yamllint
+  - zstd
+
+users:
+  - default
+  - name: gitlab-runner
+    system: true
+    groups: [docker]
+    shell: /bin/bash
+    lock_passwd: true
+
+write_files:
+  - path: /etc/sysctl.d/99-plush-runner.conf
+    permissions: '0644'
+    content: |
+      kernel.unprivileged_userns_clone=1
+      fs.inotify.max_user_watches=524288
+  - path: /etc/sudoers.d/90-plush-runner-ci
+    permissions: '0440'
+    content: |
+      gitlab-runner ALL=(root) NOPASSWD: /usr/bin/install
+  - path: /usr/local/sbin/plush-runner-toolchain
+    permissions: '0755'
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      arch=linux-x64
+      node_version=24.14.0
+      go_version=1.26.6
+      runner_version=19.3.0
+      node_archive="node-v${node_version}-${arch}.tar.xz"
+      work="$(mktemp -d)"
+      trap 'rm -rf "$work"' EXIT
+      curl --fail --location --silent --show-error "https://nodejs.org/dist/v${node_version}/${node_archive}" --output "$work/$node_archive"
+      echo "41cd79bb7877c81605a9e68ec4c91547774f46a40c67a17e34d7179ef11729df  $work/$node_archive" | sha256sum --check --strict
+      rm -rf /opt/node
+      install -d -m 0755 /opt/node
+      tar -xJf "$work/$node_archive" --strip-components=1 -C /opt/node
+      ln -sfn /opt/node/bin/node /usr/local/bin/node
+      ln -sfn /opt/node/bin/npm /usr/local/bin/npm
+      ln -sfn /opt/node/bin/npx /usr/local/bin/npx
+      ln -sfn /opt/node/bin/corepack /usr/local/bin/corepack
+      corepack enable
+      corepack prepare pnpm@10.13.1 --activate
+      go_archive="go${go_version}.linux-amd64.tar.gz"
+      curl --fail --location --silent --show-error "https://go.dev/dl/${go_archive}" --output "$work/$go_archive"
+      echo "708effb774be8237570d0add163225abbdfaf4fca28b2611df167beba4feef89  $work/$go_archive" | sha256sum --check --strict
+      rm -rf /usr/local/go
+      tar -xzf "$work/$go_archive" -C /usr/local
+      ln -sfn /usr/local/go/bin/go /usr/local/bin/go
+      GOBIN=/usr/local/bin go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+      GOBIN=/usr/local/bin go install mvdan.cc/sh/v3/cmd/shfmt@v3.13.1
+      curl --fail --location --silent --show-error https://atlasgo.sh --output "$work/atlas-install.sh"
+      echo "d2377154c7af848813fc763ad75d6c0564cdca806163ea61ad4fb634a8736751  $work/atlas-install.sh" | sha256sum --check --strict
+      ATLAS_VERSION=v1.2.0 bash "$work/atlas-install.sh" -y
+      gitleaks_archive=gitleaks_8.30.1_linux_x64.tar.gz
+      curl --fail --location --silent --show-error "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/$gitleaks_archive" --output "$work/$gitleaks_archive"
+      echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $work/$gitleaks_archive" | sha256sum --check --strict
+      tar -xzf "$work/$gitleaks_archive" -C /usr/local/bin gitleaks
+      chmod 0755 /usr/local/bin/gitleaks
+      runner_url="https://gitlab-runner-downloads.s3.amazonaws.com/v${runner_version}/binaries/gitlab-runner-linux-amd64"
+      curl --fail --location --silent --show-error "$runner_url" --output "$work/gitlab-runner-linux-amd64"
+      echo "9b642c14742b5db8622352c85f809ae6a588b6885a7d1a24caf8547e73eea7c9  $work/gitlab-runner-linux-amd64" | sha256sum --check --strict
+      install -o root -g root -m 0755 "$work/gitlab-runner-linux-amd64" /usr/local/bin/gitlab-runner
+      test "$(node --version)" = v24.14.0
+      test "$(go env GOVERSION)" = go1.26.6
+      test "$(pnpm --version)" = 10.13.1
+  - path: /usr/local/sbin/plush-register-gitlab-runner
+    permissions: '0755'
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      env_file=/etc/plush-runner/registration.env
+      test -f "$env_file"
+      test "$(stat -c %a "$env_file")" = 600
+      # shellcheck disable=SC1090
+      source "$env_file"
+      : "${GITLAB_RUNNER_TOKEN:?missing GITLAB_RUNNER_TOKEN}"
+      gitlab-runner register --non-interactive \
+        --url https://gitlab.saurick.me \
+        --token "$GITLAB_RUNNER_TOKEN" \
+        --name r640-kvm-isolated-shell \
+        --executor shell \
+        --tag-list plush,isolated,amd64 \
+        --run-untagged=false \
+        --locked=true
+      chown root:root /etc/gitlab-runner/config.toml
+      chmod 0600 /etc/gitlab-runner/config.toml
+      shred -u "$env_file"
+      systemctl enable --now gitlab-runner
+
+runcmd:
+  - [bash, -lc, 'systemctl enable --now docker']
+  - [bash, -lc, '/usr/local/sbin/plush-runner-toolchain']
+  - [bash, -lc, 'install -d -o gitlab-runner -g gitlab-runner -m 0700 /home/gitlab-runner']
+  - [bash, -lc, 'gitlab-runner install --user=gitlab-runner --working-directory=/home/gitlab-runner']
+  - [bash, -lc, 'systemctl disable --now gitlab-runner || true']
+  - [bash, -lc, 'install -d -o root -g root -m 0700 /etc/plush-runner']
+  - [bash, -lc, 'echo "Runner toolchain ready. Place a 0600 registration.env and run /usr/local/sbin/plush-register-gitlab-runner."']
+
+final_message: "Dedicated plush GitLab Runner VM bootstrap finished. Registration remains fail-closed until the protected token file is supplied."

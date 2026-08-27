@@ -66,9 +66,10 @@ export function validateDeliveryReleaseVersion(version) {
       (!DIGEST_PATTERN.test(String(version.imageDigests?.server || "")) ||
         !DIGEST_PATTERN.test(String(version.imageDigests?.web || "")))) ||
     typeof version.url !== "string" ||
-    !/^https:\/\/github\.com\/saurick\/plush-toy-erp\/releases\/tag\/artifact-[0-9a-f]{40}$/u.test(
-      version.url,
-    )
+    ![
+      /^https:\/\/github\.com\/saurick\/plush-toy-erp\/releases\/tag\/artifact-[0-9a-f]{40}$/u,
+      /^https:\/\/gitlab\.saurick\.me\/saurick\/plush-toy-erp\/-\/releases\/artifact-[0-9a-f]{40}$/u,
+    ].some((pattern) => pattern.test(version.url))
   ) {
     throw new Error("delivery release version contract is invalid");
   }

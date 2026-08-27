@@ -135,6 +135,20 @@ test("affected: CI workflow changes run the repository CI contract", () => {
   assert.equal(plan.localGate, "focused");
 });
 
+test("affected: canonical GitLab pipeline changes run the GitLab contract", () => {
+  const plan = buildAffectedPlan([".gitlab-ci.yml"], { root: ROOT });
+  assert.equal(
+    plan.commands.some((item) =>
+      item.args.includes("scripts/qa/gitlab-ci.test.mjs"),
+    ),
+    true,
+  );
+  assert.equal(
+    plan.followUps.some((item) => item.id === "remote-ci-enforcement"),
+    true,
+  );
+});
+
 test("affected: release workflow changes run the immutable release contract", () => {
   const plan = buildAffectedPlan([".github/workflows/release.yml"], {
     root: ROOT,

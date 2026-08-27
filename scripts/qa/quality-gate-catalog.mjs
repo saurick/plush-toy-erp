@@ -30,6 +30,7 @@ export const QUALITY_GATE_CATALOG = Object.freeze([
     profiles: Object.freeze(["strict"]),
     sources: Object.freeze([
       "scripts/qa/strict.sh",
+      ".gitlab-ci.yml",
       ".github/workflows/release.yml",
       "scripts/qa/run-gate-with-receipt.mjs",
     ]),
@@ -119,6 +120,7 @@ export const QUALITY_GATE_CATALOG = Object.freeze([
     riskLevel: "critical",
     profiles: Object.freeze(["strict"]),
     sources: Object.freeze([
+      ".gitlab-ci.yml",
       ".github/workflows/ci.yml",
       ".github/workflows/release.yml",
       "scripts/deploy/source-archive-release-check.mjs",
@@ -249,6 +251,7 @@ const RISK_RULES = Object.freeze([
       "SBOM 与 rollback",
     ]),
     patterns: Object.freeze([
+      /^\.gitlab-ci\.yml$/u,
       /^\.github\/workflows\//u,
       /^scripts\/deploy\//u,
       /Dockerfile|compose|release|deploy/iu,

@@ -126,19 +126,19 @@ const MANUAL_TAKEOVER_STEPS = [
   {
     title: '在 Codex 或本地终端固定代码版本',
     description:
-      '先完成必要验证与中文提交，再推送 origin/main；确认工作区干净，且本地 HEAD、origin/main 都是同一个完整 40 位 SHA。',
+      '先完成必要验证与中文提交，再推送 GitLab main，并由镜像任务同步 GitHub；确认工作区干净，且本地 HEAD、GitLab main 都是同一个完整 40 位 SHA。',
     boundary: '本页不创建 commit、不 push，也不代替代码审查。',
   },
   {
-    title: '等待 GitHub CI 证明这个 exact SHA',
+    title: '等待 GitLab CI 证明这个 exact SHA',
     description:
-      '在 GitHub Actions 核对同一 SHA 的 CI Gate 成功；失败、取消、仍在运行或来源不可信时都必须停止。',
+      '在 GitLab Pipelines 核对同一 SHA 的 CI Gate 成功；失败、取消、仍在运行或来源不可信时都必须停止。',
     boundary: '本地通过不能替代远端 CI，旧 SHA 的绿色结果也不能复用。',
   },
   {
     title: '生成不可变 Release',
     description:
-      '优先回到本页使用“发布当前 SHA”；页面不可用时，才在 GitHub 手动运行固定 Immutable Release workflow，并填写同一 exact SHA 和新版本号。',
+      '优先回到本页使用“发布当前 SHA”；页面不可用时，才在 GitLab 手动运行受保护的 release pipeline，并填写同一 exact SHA 和新版本号。GitHub workflow 仅作显式应急回退。',
     boundary: '不要手工创建、移动或覆盖 tag，也不要上传自行拼装的制品。',
   },
   {
@@ -168,7 +168,7 @@ function ManualTakeoverGuide() {
 
       <section aria-labelledby="dev-version-takeover-scope-title">
         <Title level={5} id="dev-version-takeover-scope-title">
-          三处操作各管什么
+          四处操作各管什么
         </Title>
         <div className="erp-dev-version-takeover-scope">
           <article>
@@ -176,8 +176,12 @@ function ManualTakeoverGuide() {
             <Text type="secondary">检查改动、运行测试、提交并推送代码</Text>
           </article>
           <article>
-            <Text strong>GitHub 代码托管</Text>
-            <Text type="secondary">证明远端 CI，构建并保存不可变 Release</Text>
+            <Text strong>GitLab 代码与 CI</Text>
+            <Text type="secondary">代码真源、质量门禁和不可变 Release</Text>
+          </article>
+          <article>
+            <Text strong>GitHub 只读镜像</Text>
+            <Text type="secondary">供 GPT Review 和外部代码浏览，不重复跑主链 CI</Text>
           </article>
           <article>
             <Text strong>当前页面</Text>
@@ -235,7 +239,7 @@ function ManualTakeoverGuide() {
         description="禁止 force push、跳过质量门禁、手工覆盖 tag 或 133 页面文件、在 133 构建镜像、直接执行结构性 SQL、删除数据库或 volume、全局 prune，以及在结果未证明时盲目重试。"
       />
       <Text type="secondary">
-        AI 恢复后，把最终 exact SHA、GitHub run、Release version 和 operation ID
+        AI 恢复后，把最终 exact SHA、GitLab pipeline、Release version 和 operation ID
         交给 Codex，即可从现有回执继续核验，无需重做已被可信证明的步骤。
       </Text>
     </div>
@@ -308,6 +312,8 @@ export default function DevVersionCenterPage() {
     customerReady && summarySnapshotKey === deliverySnapshotKey
   const summary = summaryInCurrentScope ? storedSummary : null
   const summaryFresh = summaryInCurrentScope && storedSummaryFresh
+  const deliveryProviderName =
+    summary?.boundaries?.provider === 'github' ? 'GitHub 应急链' : 'GitLab'
 
   const restoreOperationDetailTriggerFocus = useCallback(() => {
     const trigger = operationDetailTriggerRef.current
@@ -551,7 +557,7 @@ export default function DevVersionCenterPage() {
         }
         message.success(
           action === 'dispatch-release'
-            ? 'GitHub 发布任务已登记'
+            ? `${deliveryProviderName}发布任务已登记`
             : action === 'retry-operation'
               ? '已创建关联的新尝试'
               : action === 'prepare-promotion'
@@ -574,7 +580,14 @@ export default function DevVersionCenterPage() {
         setActionKey('')
       }
     },
-    [client, customerReady, deliverySnapshotKey, refresh, summaryFresh]
+    [
+      client,
+      customerReady,
+      deliveryProviderName,
+      deliverySnapshotKey,
+      refresh,
+      summaryFresh,
+    ]
   )
 
   const repository = summary?.repository
@@ -1153,7 +1166,9 @@ export default function DevVersionCenterPage() {
               }}
               locale={{
                 emptyText: (
-                  <Empty description="尚无完整 GitHub 不可变发布版本" />
+                  <Empty
+                    description={`尚无完整${deliveryProviderName}不可变发布版本`}
+                  />
                 ),
               }}
               scroll={{ x: 1120 }}
@@ -1273,7 +1288,7 @@ export default function DevVersionCenterPage() {
                     <Text strong>先发布制品，不会直接部署到 133</Text>
                     <Text>
                       系统会将当前干净提交的 exact SHA 交给
-                      GitHub，执行严格质量门禁并生成不可变镜像、Release
+                      {deliveryProviderName}，执行严格质量门禁并生成不可变镜像、Release
                       manifest、checksum 和 SBOM。
                     </Text>
                     <Text type="secondary">
@@ -1336,8 +1351,9 @@ export default function DevVersionCenterPage() {
           />
         ) : null}
         <DevStaticGuidance title="固定边界" hint="发布职责与安全限制">
-          GitHub 负责 CI 与不可变制品；本地 Bridge 只接受固定动作；133
-          不构建、不接受浏览器传入的命令、目录、仓库或 SSH 目标。
+          GitLab 负责代码真源、CI 与不可变制品；GitHub 仅接收单向审查镜像；本地
+          Bridge 只接受固定动作；133 不构建、不接受浏览器传入的命令、目录、仓库或
+          SSH 目标。
         </DevStaticGuidance>
 
         <section
@@ -1391,7 +1407,7 @@ export default function DevVersionCenterPage() {
               </Text>
             </Space>
           </Card>
-          <Card title="GitHub 不可变版本">
+          <Card title={`${deliveryProviderName}不可变版本`}>
             <Space direction="vertical" size={8}>
               <Text strong>{versions[0]?.version || '尚无可用版本'}</Text>
               <Text code>{shortGitSha(versions[0]?.gitSha)}</Text>
@@ -1556,7 +1572,7 @@ export default function DevVersionCenterPage() {
       <Modal
         title="发布当前 exact SHA"
         open={releaseModalOpen}
-        okText="触发 GitHub 发布"
+        okText={`触发${deliveryProviderName}发布`}
         cancelText="取消"
         confirmLoading={actionKey === 'dispatch-release'}
         cancelButtonProps={{
@@ -1585,7 +1601,7 @@ export default function DevVersionCenterPage() {
             type="info"
             showIcon
             message={`候选 SHA：${shortGitSha(repository?.commit)}`}
-            description="GitHub 对该 SHA 只执行一次 strict，构建一次制品；133 不参与构建。"
+            description={`${deliveryProviderName}对该 SHA 只执行一次 strict，构建一次制品；133 不参与构建。`}
           />
           <label htmlFor="dev-release-version">版本号</label>
           <Input

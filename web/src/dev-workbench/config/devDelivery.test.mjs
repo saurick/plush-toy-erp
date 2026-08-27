@@ -172,7 +172,7 @@ function summaryFixture() {
     timings: null,
     issues: [],
     boundaries: {
-      provider: 'github',
+      provider: 'gitlab',
       target: 'test-133',
       browserShellAccess: false,
       targetBuildAllowed: false,
@@ -639,6 +639,8 @@ test('delivery presentation helpers are deterministic and bounded', () => {
 })
 
 test('pipeline jobs and timing stages use Chinese-first presentation labels', () => {
+  assert.equal(deliveryPipelinePresentation('plan').label, '可信提交范围与影响计划')
+  assert.equal(deliveryPipelinePresentation('publish_release').label, '发布不可变制品集')
   for (const source of workflowSources) {
     const names = [...source.matchAll(/^(?: {4}name:| {6}- name:) (.+)$/gmu)]
       .map((match) => match[1].trim())
@@ -691,7 +693,7 @@ test('pipeline timings validate nested stages and identify the measured bottlene
         finishedAt: '2026-08-08T02:10:10.000Z',
         queueMs: 10_000,
         durationMs: 600_000,
-        url: 'https://github.com/saurick/plush-toy-erp/actions/runs/321',
+        url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/321',
         jobs: [
           {
             id: 654,
@@ -936,7 +938,7 @@ test('version center page does not expose shell, SSH or arbitrary target inputs'
   assert.match(source, /trigger=\{\['hover', 'click'\]\}/u)
   assert.match(source, /人工接管说明/u)
   assert.match(source, /人工接管与应急发布说明/u)
-  assert.match(source, /三处操作各管什么/u)
+  assert.match(source, /四处操作各管什么/u)
   assert.match(source, /Codex \/ 本地终端/u)
   assert.match(source, /先判断能不能继续/u)
   assert.match(source, /本页不创建 commit、不 push/u)

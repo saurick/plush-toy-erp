@@ -435,6 +435,18 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
       continue;
     }
 
+    if (file === ".gitlab-ci.yml") {
+      directTests.add("scripts/qa/gitlab-ci.test.mjs");
+      addFollowUp(
+        state,
+        "remote-ci-enforcement",
+        "T8",
+        "确认 GitLab main pipeline 的 CI Gate 成功，并独立核对 protected branch、protected variables 与 Runner 隔离配置。仓库 YAML 不能替代远端设置读回。",
+        file,
+      );
+      continue;
+    }
+
     if (file.startsWith(".github/workflows/")) {
       directTests.add(
         file === ".github/workflows/release.yml"
@@ -445,7 +457,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
         state,
         "remote-ci-enforcement",
         "T8",
-        "确认本次 GitHub Actions 运行成功；仓库 workflow 只证明 CI 定义存在，branch protection / required check 仍需独立远端设置证据。",
+        "确认 GitHub workflow 仅用于镜像审查或显式应急回退，且未与 GitLab 主链重复执行发布。仓库 workflow 不能替代远端镜像规则证据。",
         file,
       );
       continue;

@@ -1,0 +1,45 @@
+name: plush-gitlab-control
+
+services:
+  gitlab:
+    image: gitlab/gitlab-ce@sha256:f7e453ff51d1910235365085fe836e4589716d26b44d99a8aa3e2c41377f034f
+    container_name: plush-gitlab
+    hostname: ${GITLAB_HOSTNAME:-gitlab.saurick.me}
+    restart: unless-stopped
+    shm_size: 256m
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'https://${GITLAB_HOSTNAME:-gitlab.saurick.me}'
+        nginx['listen_https'] = false
+        nginx['listen_port'] = 8929
+        gitlab_rails['gitlab_shell_ssh_port'] = ${GITLAB_SSH_PUBLIC_PORT:-2224}
+        gitlab_rails['registry_enabled'] = false
+        gitlab_rails['backup_keep_time'] = ${GITLAB_BACKUP_KEEP_SECONDS:-1209600}
+        gitlab_rails['backup_path'] = '/var/opt/gitlab/backups'
+        gitlab_rails['manage_backup_path'] = true
+        gitlab_rails['backup_archive_permissions'] = 0600
+        prometheus_monitoring['enable'] = true
+        alertmanager['enable'] = false
+        letsencrypt['enable'] = false
+    ports:
+      - "127.0.0.1:${GITLAB_HTTP_PORT:-8929}:8929"
+      - "${GITLAB_SSH_BIND_ADDRESS:-192.168.0.133}:${GITLAB_SSH_PUBLIC_PORT:-2224}:22"
+    volumes:
+      - ${GITLAB_CONFIG_DIR:-/srv/gitlab/config}:/etc/gitlab
+      - ${GITLAB_LOG_DIR:-/srv/gitlab/logs}:/var/log/gitlab
+      - ${GITLAB_DATA_DIR:-/srv/gitlab/data}:/var/opt/gitlab
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:8929/-/health >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 10m
+    logging:
+      driver: json-file
+      options:
+        max-size: 50m
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          memory: ${GITLAB_MEMORY_LIMIT:-12G}

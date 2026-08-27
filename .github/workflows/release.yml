@@ -1,4 +1,4 @@
-name: Immutable Release
+name: Emergency Immutable Release (GitHub)
 
 "on":
   workflow_dispatch:

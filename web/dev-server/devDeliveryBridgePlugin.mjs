@@ -13,6 +13,7 @@ import {
   transitionDeliveryOperation,
 } from '../../scripts/deploy/delivery-operation-store.mjs'
 import { createGithubDeliveryProvider } from '../../scripts/deploy/github-delivery-provider.mjs'
+import { createGitlabDeliveryProvider } from '../../scripts/deploy/gitlab-delivery-provider.mjs'
 import { preparePromotion } from '../../scripts/deploy/promotion-controller.mjs'
 import { prepareRollback } from '../../scripts/deploy/rollback-controller.mjs'
 import { runTargetPreflightAsync } from '../../scripts/deploy/target-preflight.mjs'
@@ -379,12 +380,26 @@ function releaseDirectory(root, gitSha) {
   return path.join(root, 'output', 'dev-workbench', 'releases', gitSha)
 }
 
-function providerIssue(message) {
+function providerIssue(message, provider = 'gitlab') {
   return {
-    code: 'github_provider_unavailable',
+    code: `${provider}_provider_unavailable`,
     level: 'error',
     message,
   }
+}
+
+export function createConfiguredDeliveryProvider({
+  projectRoot,
+  env = process.env,
+} = {}) {
+  const selected = String(env.PLUSH_DELIVERY_PROVIDER || 'gitlab')
+  if (selected === 'gitlab') {
+    return createGitlabDeliveryProvider({ projectRoot, env })
+  }
+  if (selected === 'github') {
+    return createGithubDeliveryProvider({ projectRoot })
+  }
+  throw new Error('delivery provider must be gitlab or github')
 }
 
 export function createDevDeliveryService({
@@ -400,11 +415,14 @@ export function createDevDeliveryService({
   now = () => new Date().toISOString(),
   preflightTtlMs = 30_000,
   pipelineTimingTtlMs = 60_000,
+  env = process.env,
 } = {}) {
   const root = path.resolve(projectRoot || process.cwd())
   const store = operationStore || resolveDeliveryOperationStore(root)
   const deliveryProvider =
-    provider || createGithubDeliveryProvider({ projectRoot: root })
+    provider || createConfiguredDeliveryProvider({ projectRoot: root, env })
+  const providerKey = deliveryProvider.provider === 'github' ? 'github' : 'gitlab'
+  const providerName = providerKey === 'gitlab' ? 'GitLab' : 'GitHub'
   const children = new Map()
   let preflightCache = null
   let pipelineTimingCache = null
@@ -434,15 +452,18 @@ export function createDevDeliveryService({
           transitionDeliveryOperation(store, operation.id, {
             status: 'passed',
             message:
-              'immutable GitHub release and complete assets are published',
+              `immutable ${providerName} release and complete assets are published`,
             now: now(),
           })
         } else if (status.status === 'failed') {
           transitionDeliveryOperation(store, operation.id, {
             status: 'failed',
-            message: 'GitHub release workflow reached a failed terminal state',
+            message: `${providerName} release pipeline reached a failed terminal state`,
             issues: [
-              providerIssue('GitHub 发布失败；请查看固定 workflow 运行记录'),
+              providerIssue(
+                `${providerName} 发布失败；请查看固定流水线运行记录`,
+                providerKey
+              ),
             ],
             now: now(),
           })
@@ -502,7 +523,12 @@ export function createDevDeliveryService({
       })
     }
     if (versionsResult.status === 'rejected') {
-      issues.push(providerIssue('GitHub 版本列表不可用；请检查 gh 登录和网络'))
+      issues.push(
+        providerIssue(
+          `${providerName} 版本列表不可用；请检查服务端凭据和网络`,
+          providerKey
+        )
+      )
     }
     if (targetResult.status === 'rejected') {
       issues.push({
@@ -515,7 +541,7 @@ export function createDevDeliveryService({
       issues.push({
         code: 'pipeline_timings_unavailable',
         level: 'warning',
-        message: 'GitHub 流水线耗时暂不可用；发布与部署状态仍可独立核对',
+        message: `${providerName} 流水线耗时暂不可用；发布与部署状态仍可独立核对`,
       })
     }
     let backupRestoreEvidence = null
@@ -567,7 +593,7 @@ export function createDevDeliveryService({
       },
       issues,
       boundaries: {
-        provider: 'github',
+        provider: providerKey,
         target: 'test-133',
         browserShellAccess: false,
         targetBuildAllowed: false,
@@ -586,7 +612,7 @@ export function createDevDeliveryService({
     }
     const created = createOrReuseDeliveryOperation(store, {
       action: 'release',
-      target: 'github-release',
+      target: `${providerKey}-release`,
       gitSha: payload.gitSha,
       version: payload.version,
       idempotencyKey: payload.idempotencyKey,
@@ -598,7 +624,7 @@ export function createDevDeliveryService({
 
     let operation = transitionDeliveryOperation(store, created.operation.id, {
       status: 'running',
-      message: 'GitHub immutable release dispatch started',
+      message: `${providerName} immutable release dispatch started`,
       now: now(),
     })
     try {
@@ -629,7 +655,7 @@ export function createDevDeliveryService({
       operation = transitionDeliveryOperation(store, operation.id, {
         status: 'waiting',
         message:
-          'GitHub release workflow accepted; waiting for terminal assets',
+          `${providerName} release pipeline accepted; waiting for terminal assets`,
         now: now(),
       })
       return presentOperation(operation)
@@ -637,9 +663,12 @@ export function createDevDeliveryService({
       transitionDeliveryOperation(store, operation.id, {
         status: 'failed',
         message:
-          'GitHub release dispatch failed without starting a target write',
+          `${providerName} release dispatch failed without starting a target write`,
         issues: [
-          providerIssue('GitHub 发布未启动或身份不一致；未写入 133 测试服务器'),
+          providerIssue(
+            `${providerName} 发布未启动或身份不一致；未写入 133 测试服务器`,
+            providerKey
+          ),
         ],
         now: now(),
       })

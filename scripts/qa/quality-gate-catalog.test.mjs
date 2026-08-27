@@ -82,7 +82,7 @@ test("current change risk mapping covers schema, RBAC, Workflow, UI, PDF, releas
     "server/internal/biz/workflow.go",
     "web/src/erp/pages/OrderPage.jsx",
     "web/src/erp/utils/printPdf.mjs",
-    ".github/workflows/release.yml",
+    ".gitlab-ci.yml",
     "scripts/qa/scenario-demo-data.mjs",
   ]);
   assert.deepEqual(risks.map((risk) => risk.key).toSorted(), [
@@ -94,6 +94,11 @@ test("current change risk mapping covers schema, RBAC, Workflow, UI, PDF, releas
     "test-data",
     "workflow-fact",
   ]);
+  assert(
+    QUALITY_GATE_CATALOG.find((gate) => gate.key === "release-identity").sources.includes(
+      ".gitlab-ci.yml",
+    ),
+  );
 });
 
 test("gap analysis distinguishes current proof, stale result and release or UAT boundaries", () => {

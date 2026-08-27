@@ -1,231 +1,122 @@
 # 研发效能工作台与 CI/CD 实施计划 / Engineering Workbench And CI/CD Implementation Plan
 
-> 状态：Active implementation plan / 当前实施计划。
->
-> 快照：2026-07-29。
->
-> 本文不是当前发布、客户 UAT 或签收事实。易漂移状态必须在执行前重新读回。
+## 当前结论
 
-## 目标与完成定义
+仓库内实现已从“GitHub 托管主链”切换为“R640 GitLab canonical + KVM Runner + GitHub Review mirror”。本计划区分三个状态：
 
-目标是把现有 QA、制品、部署和 DEV 工作台收敛为：
+| 状态 | 当前结论 | 证据 |
+| --- | --- | --- |
+| 仓库定义 | 已实现，待定向测试和审查收口 | `.gitlab-ci.yml`、GitLab Provider、R640 deploy 定义、工作台与合同测试 |
+| Git/远端 | 未执行 | 当前任务没有 commit、push、fetch 或 GitLab/GitHub 设置授权 |
+| R640/公网运行态 | 未部署 | 当前任务没有服务器、云、DNS、FRP、Nginx、VM、数据库或服务重启授权 |
 
-> 同一 SHA 一次有效 strict、一次不可变构建、任意次数 promotion；失败不会自行启动 fresh lifecycle。
+任何本地绿色都不能把后两项改写为已完成。
 
-全部完成需要同时满足：
+## 已落仓库切片
 
-- 普通反馈不机械跑完整 strict。
-- full、strict 没有递归整套重复。
-- exact-SHA 结果按 fingerprint 幂等复用。
-- Server/Web 镜像和 manifest 一次构建、digest 部署。
-- 133 不构建源码，部署和回滚都有目标读回。
-- 工作台不持有秘密、不暴露任意命令，刷新可恢复 operation。
-- production build 和 artifact scan 不包含工作台、Bridge 或本机路径。
-- 本地、CI、制品、133、UAT 和签收证据独立。
+- [x] `.gitlab-ci.yml`：main/MR canonical plan、quality、稳定 `CI Gate`、protected exact-SHA strict 和 serialized release。
+- [x] exact-SHA terminal 与 release catalog 支持真实 `gitlab-ci` provenance，同时保留明确的 `github-actions` 应急 provenance。
+- [x] GitLab Provider：固定 URL/project/package/release/pipeline、受限下载根、token 服务端边界和 pipeline/job timing。
+- [x] Delivery Bridge 默认 GitLab，只有 `PLUSH_DELIVERY_PROVIDER=github` 才选择 GitHub fallback。
+- [x] GitHub CI 取消 main push，只保留 PR、`review/gpt/**` 和手工审查；GitHub release 标为应急。
+- [x] 工作台文案和人工接管说明改为 GitLab 主链、GitHub 单向镜像。
+- [x] R640 GitLab Compose、精确安装、备份/校验和 Runner VM cloud-init 定义。
+- [x] affected mapping、quality gate catalog、Node 分组、fast web 合同和 GitLab CI 静态门禁。
+- [x] 正式部署、QA、Web 与工程文档同步。
 
-## 当前基线
+这些勾选只表示实现已写入工作区，不表示已经 commit、push 或部署。
 
-2026-07-29 已读回：
+## 本地收口顺序
 
-| 项目 | 当前事实 |
-| --- | --- |
-| 旧 Codex 任务 `019fa48a-0088-7142-a8a5-3c079cffe6f1` | 未加载，不在运行 |
-| 重型 QA 进程 | 未发现活动的 fast/full/strict/prepare-push/lifecycle |
-| Local writer | 已等待并确认其他写任务结束；本计划任务为当前唯一顶层 writer |
-| Git | `HEAD=9376a585…`，本地 main 比 origin/main 多 3 个提交，且有大量跨任务未提交现场 |
-| GitHub | 公开仓库；现有 CI 只跑 strict，无 Release、Environment、self-hosted runner、远端部署 |
-| 本机 `output/` | 约 6.7GB；清理前必须生成保留预览 |
-| 133 | 4 vCPU、30GiB RAM、根盘 98GiB / 约 14GiB 可用、Docker 约 29GB |
-| 133 磁盘扩展 | 虚拟盘约 512GB、root LV 约 100GB；精确 VG/LV 扩容需 sudo 与 VM 快照 |
+1. 运行新增/受影响 Node 合同：GitLab Provider、exact-SHA、release catalog、GitLab/GitHub workflow、affected、quality catalog、Bridge、工作台配置和样式。
+2. 对 `.gitlab-ci.yml`、Compose、cloud-init 和 Shell 脚本做 YAML/Shell 静态检查；不执行安装、备份或远端命令。
+3. 运行 `git diff --check` 和精确变更审查，确认没有触碰外部脏路径、generated path、schema/migration 或生产配置。
+4. 根据 affected plan 判断是否需要更高成本验证。full、strict、完整 Style L1 或真实浏览器门禁仍需按测试治理另行点名授权。
+5. 向用户分别询问本地 commit、GitLab/GitHub push 和部署授权；三者不能合并推定。
 
-当前仓库公开，因此计划不在 133 安装 GitHub self-hosted runner。远端验证与构建使用 GitHub 托管 Runner；promotion 首版由本地 loopback Bridge 经固定 SSH 目标执行。
+## GitLab 部署前置证据
 
-## 执行纪律
+在取得部署授权后，重新只读检查并记录：
 
-1. 一次只实施一个可验证切片。
-2. 每个切片先跑定向测试，不从头跑 full/strict。
-3. 只有最终 clean candidate SHA 才运行一次 full 和一次 exact-SHA strict。
-4. strict 失败只记录 blocker，不自动改门禁后重跑。
-5. 不修改、清理、提交或宣称其他任务的现场。
-6. 未获得提交、推送授权前不 stage、commit、push。
-7. 未满足磁盘、备份、目标身份和 rollback point 前不部署 133。
+| 事项 | 必须证明 | 停止条件 |
+| --- | --- | --- |
+| R640 存储 | `/srv` SSD 与 `/srv/raid5` 实际 mount、余量、inode、SMART/RAID 状态 | mount 不符、降级或余量不足 |
+| 现有容器 | 名称、端口、数据目录和 restart 状态 | 8929/2224 冲突或路径重叠 |
+| KVM | `/dev/kvm`、libvirt network、VM 磁盘与资源预算 | 需要复用 GitLab 宿主 Docker socket |
+| 公网 | DNS、阿里云现有 vhost、FRP remote 18226、证书与回滚配置 | 同名站点来源不明或切换不可回滚 |
+| GitLab 镜像 | digest 与目标 CE 版本、升级路径和备份兼容 | 浮动 tag 或不支持的跳版本 |
+| Secrets | root 初始化、MFA、Runner token、project token、GHCR token、mirror key 的最小权限 | token 需要进入仓库/浏览器/日志 |
 
-## 阶段 0：现场与基础设施
+## 目标搭建顺序
 
-### 已完成
+1. 为 GitLab SSD 数据和 RAID5 backup 建立精确目录、权限和容量告警。
+2. 以 `server/deploy/gitlab/install-r640.sh` preview 检查，再用精确确认启动单个 `plush-gitlab`。
+3. 只在 R640 本机处理初始密码，立即修改、启用 MFA，创建非 root 管理员。
+4. 创建私有项目 `saurick/plush-toy-erp`，保护 main、禁止 force push，要求 merge pipeline 成功并以 `CI Gate` 作为稳定汇总 job。
+5. 创建 protected `release` environment 和三项最小权限 protected variables。
+6. 创建独立 KVM Runner VM，完成 cloud-init 后通过 `0600` 一次性 token 文件注册 locked project runner；读回 tags 与 untagged=false。
+7. 配置 GitLab push mirror 到 GitHub，只同步 protected main；GitHub main 禁止直接更新。另验证经过独立授权的 `review/gpt` 快照使用单独 GitHub remote，不成为第二条 main 写入链。
+8. 在阿里云备份旧 vhost，切换 `gitlab.saurick.me -> 18226`，完成 Nginx config test、TLS、health 和登录读回。
+9. 运行非发布 MR/main pipeline，核对 `CI Gate`、缓存、一次性 PostgreSQL 清理、Runner VM 与 R640 宿主隔离。
+10. 用专用测试版本运行一次 release pipeline，核对 v3 GitLab provenance、GHCR digest、六件 package、GitLab Release 和工作台读取。
+11. 配置每日 backup；立即生成一份备份、checksum 和在线 verify，再在一次性同版本 VM 完成恢复演练。
 
-- [x] 核对旧反复构建任务状态。
-- [x] 核对重型 QA / 构建进程。
-- [x] 等待其他 Local writer 结束。
-- [x] 读回 GitHub 仓库、workflow、Environment、runner、secret 和分支保护现状。
-- [x] 只读检查 133 CPU、内存、磁盘、LVM 形状、Docker 占用和运行容器。
-- [x] 将公开仓库 self-hosted runner 方案改为 GitHub-hosted build + local Bridge。
+任何一步失败都停在当前层，不继续把未知状态带入下一层。
 
-### 待完成
+## GitHub 与 GPT Review 验收
 
-- [x] 对 `output/` 生成保留/删除预览；默认保留最近成功、最近失败、候选及当前/回滚版本引用证据。脚本只有 preview 模式，不提供删除入口。
-- [ ] 用户在 133 做 VM 快照并提供 sudo 后，核对 `vgs/lvs/findmnt`，将 root LV 先扩到约 250GB。
-- [ ] 扩容后读回文件系统、Docker 根目录和容器状态。
-- [ ] 在所有实现收口后形成唯一 clean candidate SHA。
+- GitHub main SHA 与 GitLab main 一致，mirror 方向只有 GitLab → GitHub。
+- GitHub main push 不启动 `GitHub Review Mirror CI`。
+- 经过 `prepare-push.sh --review --remote github` 和单独 push 授权的 `review/gpt/**` 或 Draft PR 可以启动审查 CI，但结果不冒充 GitLab `CI Gate`，也不从 GitHub 合并 main。
+- GPT Review 能读取目标 SHA；finding 返回仓库处理，不在 GitHub 直接形成第二条 main 写入链。
+- GitHub emergency release 默认不运行；演练 fallback 时先证明 GitLab release 没有 active job，并在结束后切回 GitLab Provider。
 
-### 阻塞
+## 工作台验收
 
-- root LV 扩容需要 133 sudo 和 VM 快照。
-- clean candidate 需要先完成当前共享工作树的 Git 收口。
+- 默认 Provider 为 GitLab；无 `PLUSH_GITLAB_TOKEN` 时只显示服务端 Provider 不可用，不向浏览器暴露 token、原始 header 或内部栈。
+- 版本列表只接受固定 GitLab project 的 `artifact-<40sha>` Release，六件 package 不齐时不能 promotion。
+- pipeline 只接受固定 GitLab URL、合法状态、时间和 job；无 step 数据显示空列表，不估算。
+- “发布当前 SHA”只接受 clean HEAD 且由 GitLab main 精确匹配；dispatch 不直接写 133。
+- GitHub fallback 必须由服务端环境显式选择，浏览器没有 Provider 选择器。
+- 人工接管说明明确 GitLab 主链、GitHub review mirror、固定操作顺序与禁止捷径。
+- 生产 build 仍排除全部 `/__dev` 路由与 Bridge。
 
-## 阶段 1：QA 与 CI 去重
+## 备份与恢复验收
 
-### 实施
+- GitLab application backup 和 config archive 同批生成，RAID5 copy 与 checksum 权限为私密。
+- retention 只删除 `/srv/raid5/gitlab/backups` 内受管且超期的精确文件。
+- 在线 verify 通过 tar/checksum 与 `gitlab:check`，报告明确不等于恢复。
+- 一次性 VM 恢复后能登录、clone、读取 pipeline artifact、Generic Package 和 Release。
+- 恢复演练记录 GitLab 版本、backup filename/hash、config hash、开始/完成时间、结果和清理读回；不保存密码/token。
 
-- [x] 完成 `node-test-groups` / profile WIP，并让完整性扫描同时看到 tracked 与未跟踪测试。
-- [x] 明确 `database-programmability` 的归属并纳入对应组。
-- [x] 修正 `fast.sh --help` 与真实语义。
-- [x] 将便宜 preflight 放在 Web、Go、数据库、浏览器、制品之前。
-- [x] 保证 full 不完整重复 fast，strict 不完整重复 full。
-- [x] 新增 affected 入口；未知路径 fail closed 到 full。
-- [x] CI 普通 PR/push 运行 affected/full，不默认 strict。
-- [x] 新增 exact-SHA strict 入口与 gate fingerprint。
-- [x] 有效 strict 终态和同 fingerprint pre-push receipt 可复用。
-- [x] verification 可取消同 ref 旧运行；promotion/rollback 不自动取消。
+## 真实数据与双环境后续
 
-### 定向验收
+GitLab 完成不自动授权清空测试服务器。甲方真实数据 UAT 与模拟数据演示建议分成独立环境：既有稳定域名保留给 UAT，新增 `demo.yoyoosun.net` 保存可重置模拟数据；若希望语义更明确，可将真实数据入口固定为 `uat.yoyoosun.net`。
 
-```bash
-PATH=/usr/local/bin:$PATH node --test \
-  scripts/qa/run-node-tests.test.mjs \
-  scripts/qa/gate-profiles.test.mjs \
-  scripts/qa/gate-orchestration.test.mjs \
-  scripts/qa/affected.test.mjs \
-  scripts/qa/pre-push-receipt.test.mjs \
-  scripts/qa/run-gate-with-receipt.test.mjs \
-  scripts/qa/ci-workflow.test.mjs
-```
+实施前必须新增独立 deployment target、数据库、上传、Compose project、端口、备份、preflight 和 operation。两环境共享同一 Product Core 与 release digest，不复制代码或字段真源。真实数据导入/清理、域名切换和 UAT 是后续独立授权，不包含在 GitLab 部署中。
 
-通过信号：
+## 回滚与停止条件
 
-- 每个测试组在同一 profile 最多一次。
-- 同 fingerprint 复用已有终态。
-- 未知影响面进入 full。
-- strict 失败不启动下一轮 lifecycle。
+| 故障层 | 回滚/处置 | 禁止动作 |
+| --- | --- | --- |
+| GitLab 容器首次启动失败 | 保留 `/srv/gitlab` 和日志，修正单一配置或回到已固定 digest | 删除 data/config、全局 Docker prune |
+| 公网入口失败 | 恢复备份的阿里云 vhost/FRP upstream，GitLab LAN 入口保持 | 临时开放 8929 公网 |
+| Runner 不可信 | pause/delete Runner token，保留 GitLab；重建一次性 VM | 改挂宿主 Docker socket |
+| mirror 异常 | pause push mirror，GitLab main 继续作为真源 | 从 GitHub 强推覆盖 GitLab |
+| release 身份不一致 | 终止 job，保留 package/release 证据，使用新版本修复 | 覆盖同名 asset/tag 或猜 digest |
+| backup/restore 未通过 | 阻断 GitLab 升级和正式依赖切换 | 把 RAID 健康当恢复证据 |
 
-## 阶段 2：不可变制品与版本目录
+遇到以下任一条件立即停止：目标身份/挂载漂移、活动 writer/部署、端口重叠、备份不可验证、secret 可能落盘/输出、Runner 需要越过 VM、GitLab/GitHub 同时发布、release SHA 与 main 不一致、目标结果 `not_proven`、或需要数据库/域名破坏性动作但没有独立授权。
 
-### 复用真源
+## 完成定义
 
-- `scripts/deploy/release-artifact-bundle.mjs`
-- `scripts/deploy/release-artifact-verify.mjs`
-- `scripts/deploy/local-release-rehearsal.mjs`
+本任务只有在以下证据分别存在时才能说“GitLab CI/CD 已搭建完成”：
 
-### 实施
+1. 仓库实现通过定向检查并完成获准 commit/push；
+2. R640 GitLab、KVM Runner、域名/FRP/Nginx、保护规则、变量和 mirror 已实际读回；
+3. main `CI Gate` 与 exact-SHA release pipeline 各成功一次；
+4. GHCR digest、GitLab Package/Release 六件资产和工作台一致；
+5. backup、checksum、在线 verify 与隔离 restore drill 均有证据；
+6. 现有业务容器、数据、端口和公网入口无回归。
 
-- [x] 新增 provider-neutral release catalog。
-- [x] 新增独立 GitHub/GHCR publisher adapter，不改写 bundle 生成职责。
-- [x] 新增 `.github/workflows/release.yml`。
-- [x] workflow 只接受默认分支可达的 40 位 SHA。
-- [x] exact-SHA strict 通过后构建一次 linux/amd64 Server/Web 镜像。
-- [x] 使用最小 `packages: write` 权限推送 GHCR。
-- [x] 创建 GitHub Release，附 manifest、SBOM、checksums 和证据链接。
-- [x] 同 SHA/同 digest 幂等成功；同版本异 SHA/digest 阻断。
-- [x] 保留本地 tar bundle 和 verify 恢复路径。
-
-### 验收
-
-- 一个 SHA 只有一组 Server/Web digest。
-- 临时 Actions artifact 过期后仍可从 Release + GHCR 恢复。
-- manifest、平台、镜像内置 SHA、SBOM 和 checksum 可独立校验。
-- rehearsal 与将要 promotion 的制品身份相同。
-
-## 阶段 3：133 promotion 与回滚
-
-### 实施
-
-- [x] 新增固定目标 registry，首版只允许 `test-133`。
-- [x] 新增 provider-neutral promotion manifest 与执行器。
-- [x] 新增受控 rollback 执行器和资格检查。
-- [x] 本地 Bridge 通过固定 SSH 目标串行执行，不接受目标、路径或命令参数。
-- [x] 实现磁盘、容器、端口、数据库身份、当前版本和 rollback point preflight。
-- [x] 实现备份验证、digest 加载/读回、migration lock/status/plan/apply/readback。
-- [x] 实现 Compose 切换、health、ready、Web health 和 release identity 基础 smoke。
-- [ ] 接入带凭据的岗位矩阵与 PDF smoke；当前远端回执明确列为 `notProven`，不得把基础 smoke 冒充完整验收。
-- [x] 原子写入脱敏部署回执。
-- [x] rollback 禁止自动 down migration；schema 不兼容时标记 forward-fix。
-
-### 首次真实执行前置
-
-- [ ] 133 VM 快照完成。
-- [ ] root LV 扩容完成并读回。
-- [x] 用户已授权精确提交并非强制推送本计划范围。
-- [ ] exact-SHA CI 和不可变制品发布完成。
-- [ ] 133 当前版本、备份和 rollback point 精确读回。
-
-### 验收
-
-- 133 无 checkout、Node/Go build 或镜像构建。
-- 运行 SHA/content ID/migration/config 与 manifest 一致。
-- 失败发生在切换前时保持旧版本；切换后状态不明时标记 `not_proven` 并先读回。
-- rollback rehearsal 不删除数据库、volume、客户配置、上传、证书或当前运行依赖。
-
-## 阶段 4：工作台版本中心
-
-### 服务端 Bridge
-
-- [x] provider contract。
-- [x] GitHub provider adapter。
-- [x] operation store：随机 ID、幂等、`0600` 原子文件、重启恢复。
-- [x] loopback、Host/Origin/Sec-Fetch/CSRF/content-type 守卫。
-- [x] allowlist 动作和单目标串行锁。
-- [x] 脱敏 operation 状态与正式 GitHub evidence link。
-
-### 前端
-
-- [x] 总览：HEAD/dirty、GitHub 不可变版本、133 当前版本、容量 blocker 和下一步边界。
-- [x] 质量验证：既有质量区域展示 affected/full/strict 入口、当前/历史回执和失败层。
-- [x] 版本中心：版本、SHA12、制品完整性、133 当前 SHA 和 rollback 资格。
-- [x] 交付运行：选择版本、准备、显式确认、operation 跟踪和旧 manifest 回滚。
-- [x] Drawer、确认 Modal、焦点恢复、Escape、移动端、暗色和最近事件按需读取。
-- [x] 页面刷新按 operation ID 恢复，不重复目标写操作。
-- [x] Vite resolved listener 与 HMR 客户端端口必须一致；只覆盖 CLI `--port` 时启动失败，不进入自动重载循环。
-
-### 安全与生产隔离验收
-
-- 浏览器 bundle 中不存在 GitHub/SSH secret。
-- production build 不包含 `/__dev`、工作台 chunk、DEV middleware、本机绝对路径或 Bridge。
-- 任意 repo/workflow/target/path/SSH/shell/SQL/Docker 输入均被拒绝。
-
-## 阶段 5：维护与迁移
-
-- [x] workflow 只编排正式脚本。
-- [x] GitHub API 版本集中在 adapter。
-- [x] 测试 GitHub 限流、401/403、超时、重复 dispatch 和状态乱序。
-- [ ] `output/`、operation、Release 和 GHCR 建立数量 + 容量保留策略。当前已完成本地 managed output 的 5GiB 预算与数量预览；远端保留不能在首个真实版本前盲删。
-- [x] 清理先 dry-run，按 operation 与显式 SHA 引用保护当前/回滚制品；当前实现故意没有 `--apply`。
-- [x] 更新 `docs/当前真源与交接顺序.md`、部署约定、脚本 README 和进度记录。
-- [ ] 实施完成后将本计划归档到 `docs/archive/engineering/`，长期规则留在设计和脚本。
-
-## 反复构建硬规则
-
-1. 同一 gate fingerprint 最多一份有效 strict 终态。
-2. 同一 SHA 最多一组 Server/Web digest。
-3. promotion、smoke、rollback 复用已有 digest。
-4. 普通开发不默认运行 release rehearsal。
-5. verification 可以取消旧运行；deployment 不自动取消。
-6. strict 失败只返回 blocker，不自动修改并重启整套。
-7. 已有有效 receipt 直接复用。
-8. 身份不一致立即停止，不拼接历史证据判绿。
-9. full 在任何 scripts、Web、浏览器或 Go 高成本 gate 前，先只读验证
-   disposable PostgreSQL 基线的 URL、连通性和建库权限；前置不满足时数秒内
-   fail closed，不把缺配置拖到构建之后。
-
-## 当前停止条件
-
-下列条件只阻止对应高风险动作，不阻止继续完成安全的本地实现：
-
-| 条件 | 阻止 |
-| --- | --- |
-| 共享 dirty tree | final full、exact-SHA strict、制品发布、部署 |
-| 未授权 commit/push | 远端 CI、Release、GHCR、133 promotion |
-| 133 未扩盘 | 首次自动 promotion |
-| 无 VM 快照 / 备份 / rollback point | migration 和 Compose 切换 |
-| Provider/SSH/目标身份不明 | Bridge 写操作 |
-
-失败时记录 `blocked` 或 `not_proven`，不启动新的 fresh lifecycle。
+客户真实数据环境、双域名、业务 UAT、数据库清理与正式生产发布不属于上述完成定义，必须单独计划、授权和验收。

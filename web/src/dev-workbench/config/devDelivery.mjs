@@ -77,6 +77,10 @@ const IDEMPOTENCY_BASIS_LABELS = Object.freeze({
 const PIPELINE_LABELS = Object.freeze({
   ci: '持续集成流水线',
   release: '正式发布流水线',
+  plan: '可信提交范围与影响计划',
+  quality: '仓库质量检查',
+  strict: 'Exact-SHA 严格质量检查',
+  publish_release: '发布不可变制品集',
   'Trusted range and affected plan': '可信提交范围与影响计划',
   'Repository quality': '仓库质量检查',
   'CI Gate': '持续集成总门禁',
@@ -208,10 +212,17 @@ const OPERATION_MESSAGE_LABELS = Object.freeze({
     '全新数据库代与基础运行核验已通过',
   'immutable GitHub release and complete assets are published':
     'GitHub 不可变版本及完整制品已发布',
+  'immutable GitLab release and complete assets are published':
+    'GitLab 不可变版本及完整制品已发布',
   'GitHub immutable release dispatch started': '已开始触发 GitHub 不可变发布',
+  'GitLab immutable release dispatch started': '已开始触发 GitLab 不可变发布',
   'GitHub immutable release workflow accepted': 'GitHub 不可变发布流水线已受理',
   'GitHub release workflow accepted; waiting for terminal assets':
     'GitHub 发布流水线已受理，正在等待完整制品',
+  'GitHub release pipeline accepted; waiting for terminal assets':
+    'GitHub 发布流水线已受理，正在等待完整制品',
+  'GitLab release pipeline accepted; waiting for terminal assets':
+    'GitLab 发布流水线已受理，正在等待完整制品',
   'immutable release already exists with complete assets':
     '该 SHA 已存在完整不可变制品，本次直接复用',
   'requested exact SHA is already current and healthy':
@@ -235,6 +246,10 @@ const OPERATION_MESSAGE_LABELS = Object.freeze({
     '部署执行器已结束，但目标结果尚未证明',
   'GitHub release workflow reached a failed terminal state':
     'GitHub 发布流水线已失败结束',
+  'GitHub release pipeline reached a failed terminal state':
+    'GitHub 发布流水线已失败结束',
+  'GitLab release pipeline reached a failed terminal state':
+    'GitLab 发布流水线已失败结束',
   'promotion was blocked by the immediate target preflight':
     '部署被目标即时预检阻断',
   'remote promotion result could not be proven; automatic retry is disabled':
@@ -285,7 +300,7 @@ export function deliveryPipelinePresentation(value) {
   return {
     label,
     title:
-      label === original ? original : `${label}（GitHub 原名：${original}）`,
+      label === original ? original : `${label}（CI 原名：${original}）`,
   }
 }
 
@@ -628,8 +643,10 @@ function validatePipelineRun(run) {
     !SHA_PATTERN.test(String(run.gitSha || '')) ||
     !Array.isArray(run.jobs) ||
     run.jobs.length > 100 ||
-    run.url !==
-      `https://github.com/saurick/plush-toy-erp/actions/runs/${String(run.id)}`
+    ![
+      `https://github.com/saurick/plush-toy-erp/actions/runs/${String(run.id)}`,
+      `https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/${String(run.id)}`,
+    ].includes(run.url)
   ) {
     throw new Error('pipeline run is invalid')
   }
@@ -701,7 +718,7 @@ export function validateDevDeliverySummary(summary) {
     !Array.isArray(summary.operations) ||
     !Array.isArray(summary.issues) ||
     !Object.hasOwn(summary, 'timings') ||
-    summary.boundaries?.provider !== 'github' ||
+    !['gitlab', 'github'].includes(summary.boundaries?.provider) ||
     summary.boundaries?.target !== 'test-133' ||
     summary.boundaries?.browserShellAccess !== false ||
     summary.boundaries?.targetBuildAllowed !== false ||
@@ -1204,7 +1221,7 @@ export function deliveryStatusPresentation(status) {
     running: ['执行中', 'processing'],
     ready: ['待确认', 'blue'],
     launching: ['正在启动', 'processing'],
-    waiting: ['等待 GitHub', 'processing'],
+    waiting: ['等待 CI', 'processing'],
     requested: ['已请求', 'blue'],
     pending: ['等待执行', 'default'],
     in_progress: ['执行中', 'processing'],

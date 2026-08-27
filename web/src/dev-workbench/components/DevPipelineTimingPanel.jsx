@@ -192,7 +192,7 @@ export function DevPipelineStatusStrip({
             <Text type="secondary">
               {latestRun
                 ? deliveryPipelineRunModePresentation(summary.latestMode)
-                : '等待 GitHub 运行回执'}
+                : '等待 CI 运行回执'}
             </Text>
             <DevDeliveryTimestamp value={latestRun?.finishedAt} />
           </div>
@@ -308,7 +308,7 @@ export default function DevPipelineTimingPanel({
             CI/CD 效能
           </Title>
           <Text type="secondary">
-            区分完整发布、持续集成与相同 SHA 复用；数据来自 GitHub 与部署回执。
+            区分完整发布、持续集成与相同 SHA 复用；数据来自当前 CI Provider 与部署回执。
           </Text>
         </div>
         <Text type="secondary">
@@ -427,7 +427,9 @@ export default function DevPipelineTimingPanel({
                 : '最近动作没有失败步骤'}
             </Text>
             <Link href={latestRun.url} target="_blank" rel="noreferrer">
-              查看 GitHub 运行
+              {latestRun.url.includes('github.com')
+                ? '查看 GitHub 运行'
+                : '查看 GitLab pipeline'}
             </Link>
           </div>
 

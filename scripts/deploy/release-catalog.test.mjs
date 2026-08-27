@@ -165,6 +165,33 @@ test("release catalog accepts CI v3 strict identity while preserving v2 rollback
   assert.throws(() => validateReleaseManifest(sourceDrifted), /identity/u);
 });
 
+test("release catalog accepts canonical GitLab strict provenance", () => {
+  const terminal = ciStrictTerminal();
+  terminal.provenance = {
+    source: "gitlab-ci",
+    repository: "saurick/plush-toy-erp",
+    workflowRef:
+      "saurick/plush-toy-erp/.gitlab-ci.yml@refs/heads/main",
+    runId: "9001",
+    runAttempt: "27",
+    job: "strict",
+    eventName: "web",
+    ref: "refs/heads/main",
+    refName: "main",
+    headRepository: "saurick/plush-toy-erp",
+    conclusion: "success",
+  };
+  const manifest = buildReleaseManifest({
+    version: "2026.08.09-gitlab",
+    gitSha: SHA,
+    strictTerminal: terminal,
+    artifactManifest: fixtureManifest(),
+    artifactManifestSha256: HASH,
+    images: registryImages(),
+  });
+  assert.equal(validateReleaseManifest(manifest), manifest);
+});
+
 test("release catalog rejects failed strict and mutable image refs", () => {
   assert.throws(
     () =>

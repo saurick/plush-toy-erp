@@ -12,7 +12,7 @@
 | `scripts/deploy/` | [scripts/deploy/README.md](deploy/README.md) | 生产 preflight、release evidence、closeout、客户配置发布和部署证据工具 |
 | `scripts/import/` | [scripts/import/README.md](import/README.md) | 客户来源 manifest、只读提取、freeze 和 dry-run 准备边界                |
 
-当前 CI/CD 入口已经收敛为：日常修改先用 `affected`，集成候选用 `full`，不可变 Release 才对 exact SHA 运行或复用一次 `strict`；随后构建一次 Server/Web 制品，promotion、smoke 与 rollback 复用相同 digest。固定 133 目标、GitHub adapter、operation、部署与回滚命令见 [scripts/deploy/README.md](deploy/README.md)，测试分组、exact-SHA gate 与只预览的 output 保留策略见 [scripts/qa/README.md](qa/README.md)。目标机不执行源码构建。
+当前 CI/CD 入口已经收敛为：GitLab main / MR 主链先按变更运行 `affected` 或 `full`，不可变 Release 再对 exact SHA 运行一次 `strict`；随后构建一次 Server/Web 制品，promotion、smoke 与 rollback 复用相同 digest。GitHub 仅作单向 GPT Review 镜像和显式应急 workflow，不重复运行 main 主链。固定 133 目标、GitLab/GitHub provider、operation、部署与回滚命令见 [scripts/deploy/README.md](deploy/README.md)，测试分组、exact-SHA gate 与只预览的 output 保留策略见 [scripts/qa/README.md](qa/README.md)。目标机不执行源码构建。
 
 ## 总览
 
@@ -943,17 +943,17 @@ bash /Users/simon/projects/plush-toy-erp/scripts/qa/prepare-push.sh
 git push
 ```
 
-先完成 commit 并确认 worktree clean。准备脚本在建立远端 push 连接前按真实 aggregate range 复算 affected：计划能由自动命令闭合时直接运行并签发 affected 回执；命中 full local gate、仍有 required follow-up 或作为发布候选时，默认调用只报告原因并停止，逐次明确后改用 `bash scripts/qa/prepare-push.sh --full`。两类回执都绑定 HEAD/tree、remote/ref/range、gate contract、关键工具/依赖环境和 30 分钟 TTL。同一 HEAD 不要先手动重复对应 affected/full；代码、测试、依赖、migration、门禁、关键环境或远端 ref 变化后必须重新准备。多 ref 或非默认目标使用重复的 `--ref <local-ref>:<remote-ref>` 和必要的 `--remote <name>`。
+切换 GitLab 主链后，本地 remote 固定为 `origin=GitLab`、`github=GitHub`，普通 `git push` 只更新 GitLab。先完成 commit 并确认 worktree clean。准备脚本在建立远端 push 连接前按真实 aggregate range 复算 affected：计划能由自动命令闭合时直接运行并签发 affected 回执；命中 full local gate、仍有 required follow-up 或作为发布候选时，默认调用只报告原因并停止，逐次明确后改用 `bash scripts/qa/prepare-push.sh --full`。两类回执都绑定 HEAD/tree、remote/ref/range、gate contract、关键工具/依赖环境和 30 分钟 TTL。同一 HEAD 不要先手动重复对应 affected/full；代码、测试、依赖、migration、门禁、关键环境或远端 ref 变化后必须重新准备。多 ref 或非默认目标使用重复的 `--ref <local-ref>:<remote-ref>` 和必要的 `--remote <name>`。
 
 只为网页 GPT / GitHub 提供当前代码审查快照时，不创建本地分支，也不把 review 回执当作正式门禁。获得对应 Git 授权后执行：
 
 ```bash
-git fetch origin
-bash /Users/simon/projects/plush-toy-erp/scripts/qa/prepare-push.sh --review
-git push origin refs/heads/main:refs/heads/review/gpt
+git fetch github
+bash /Users/simon/projects/plush-toy-erp/scripts/qa/prepare-push.sh --review --remote github
+git push github refs/heads/main:refs/heads/review/gpt
 ```
 
-`--review` 固定使用 clean `main` 和远端 `review/gpt`，要求远端 main 与旧 review ref 都可 fast-forward 到当前 HEAD；首次只扫描 `remote-main..HEAD`，以后只扫描上次 review 到当前 HEAD。它运行提交格式与严格 secrets，记录后续正式推送应使用 affected 还是 full，但不执行它们。网页 GPT 的 findings、TODO 或规划需回到仓库核对；最终 main 推送仍重新执行上面的普通准备流程。若连接器不能稳定取得非默认 ref，或需要 GitHub/Codex 行级评论，可按需为同一 ref 建 Draft PR，评审后关闭而不合并。
+`--review` 固定使用 clean `main` 和 GitHub 远端 `review/gpt`，要求 GitHub main 与旧 review ref 都可 fast-forward 到当前 HEAD；首次只扫描 `remote-main..HEAD`，以后只扫描上次 review 到当前 HEAD。它运行提交格式与严格 secrets，记录后续正式推送应使用 affected 还是 full，但不执行它们。网页 GPT 的 findings、TODO 或规划需回到仓库核对；最终 main 推送仍对 GitLab `origin` 重新执行上面的普通准备流程。若连接器不能稳定取得非默认 ref，或需要 GitHub/Codex 行级评论，可按需为同一 ref 建 Draft PR，评审后关闭而不合并。
 
 产品范围冻结后，同一 clean exact SHA 只执行一轮匹配的 `prepare-push`。最终门禁只有发现会影响生产正确性、安全、数据完整性、权限
 或可恢复发布的缺陷时才允许改候选并重新进入 affected；fixture、mock、选择器、

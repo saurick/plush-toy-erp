@@ -79,6 +79,7 @@ function createFixture() {
   const executables = new Set(PROFILE_REQUIRED_EXECUTABLES.strict);
   const files = new Set([
     ...PROFILE_REQUIRED_FILES.strict,
+    ".gitlab-ci.yml",
     ".n-node-version",
     "server/go.mod",
     "server/go.sum",
@@ -308,6 +309,32 @@ test("exact-SHA terminal binds receipt content and GitHub provenance", () => {
   } finally {
     fixture.cleanup();
   }
+});
+
+test("exact-SHA terminal records truthful GitLab pipeline provenance", () => {
+  const gitlabEnv = {
+    GITLAB_CI: "true",
+    CI_PROJECT_PATH: "saurick/plush-toy-erp",
+    CI_PIPELINE_ID: "9001",
+    CI_PIPELINE_IID: "27",
+    CI_JOB_NAME: "strict",
+    CI_PIPELINE_SOURCE: "web",
+    CI_COMMIT_REF_NAME: "main",
+  };
+  assert.deepEqual(buildExactShaProvenance(gitlabEnv), {
+    source: "gitlab-ci",
+    repository: "saurick/plush-toy-erp",
+    workflowRef:
+      "saurick/plush-toy-erp/.gitlab-ci.yml@refs/heads/main",
+    runId: "9001",
+    runAttempt: "27",
+    job: "strict",
+    eventName: "web",
+    ref: "refs/heads/main",
+    refName: "main",
+    headRepository: "saurick/plush-toy-erp",
+    conclusion: "success",
+  });
 });
 
 test("time-sensitive refresh reruns only govulncheck and preserves deterministic identity", () => {

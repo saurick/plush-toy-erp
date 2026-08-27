@@ -178,11 +178,15 @@ test('manual takeover guide stays bounded, readable and single-column on mobile'
   )
   assert.match(
     css,
-    /[.]erp-dev-version-takeover-scope \{[\s\S]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u
+    /[.]erp-dev-version-takeover-scope \{[\s\S]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/u
   )
   assert.match(
     css,
     /[.]erp-dev-version-takeover-conditions \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/u
+  )
+  assert.match(
+    css,
+    /@media \(max-width: 1100px\)[\s\S]*[.]erp-dev-version-takeover-scope \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/u
   )
   assert.match(
     css,

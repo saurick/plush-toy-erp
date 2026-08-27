@@ -179,6 +179,7 @@ web_tests=(
   "$ROOT_DIR/web/src/dev-workbench/config/devCustomerConfig.test.mjs"
   "$ROOT_DIR/web/src/dev-workbench/config/devDataPreparation.test.mjs"
   "$ROOT_DIR/web/src/dev-workbench/config/devDatabaseMigration.test.mjs"
+  "$ROOT_DIR/web/src/dev-workbench/config/devDelivery.test.mjs"
   "$ROOT_DIR/web/src/erp/config/printTemplates.test.mjs"
   "$ROOT_DIR/web/scripts/trialDemoAccountBrowserSmoke.test.mjs"
   "$ROOT_DIR/web/scripts/realLoginSmokeShared.test.mjs"
@@ -191,6 +192,8 @@ web_tests=(
   "$ROOT_DIR/web/dev-server/devDataPreparationPlugin.test.mjs"
   "$ROOT_DIR/web/dev-server/devDatabaseMigrationRuntime.test.mjs"
   "$ROOT_DIR/web/dev-server/devDatabaseMigrationPlugin.test.mjs"
+  "$ROOT_DIR/web/dev-server/devDeliveryBridgePlugin.test.mjs"
+  "$ROOT_DIR/web/src/dev-workbench/styles/dev-version-center.test.mjs"
 )
 node "$ROOT_DIR/scripts/qa/run-test-gate.mjs" \
   --kind node --label web-contracts -- \

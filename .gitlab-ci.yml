@@ -1,0 +1,380 @@
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE =~ /^(api|trigger|web)$/ && $RELEASE_SHA != ""'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - when: never
+
+stages:
+  - plan
+  - quality
+  - gate
+  - release
+
+default:
+  tags:
+    - plush
+    - isolated
+    - amd64
+  interruptible: true
+  before_script:
+    - umask 077
+    - export PNPM_STORE_PATH="$CI_PROJECT_DIR/output/cache/gitlab/pnpm-store"
+    - export PLAYWRIGHT_BROWSERS_PATH="$CI_PROJECT_DIR/output/cache/gitlab/ms-playwright"
+    - export PATH="$(go env GOPATH)/bin:$PATH"
+    - test "$(node --version)" = "v$(tr -d '\n' < .n-node-version)"
+    - test "$(go env GOVERSION)" = "go1.26.6"
+    - test "$(pnpm --version)" = "10.13.1"
+    - test "$(atlas version 2>/dev/null | sed -n 's/^atlas version \([^ ]*\).*/\1/p')" = "v1.2.0"
+    - test "$(gitleaks version)" = "8.30.1"
+    - test "$CI_PROJECT_PATH" = "saurick/plush-toy-erp"
+    - test "$CI_DEFAULT_BRANCH" = "main"
+
+variables:
+  CI: "true"
+  DISPOSABLE_DATABASE_BASE_URL: "postgres://postgres:ci-local-password@127.0.0.1:55432/postgres?sslmode=disable"
+  RELEASE_CUSTOMER: "yoyoosun"
+  GIT_STRATEGY: fetch
+  GIT_DEPTH: "0"
+
+cache:
+  key:
+    files:
+      - web/pnpm-lock.yaml
+  paths:
+    - output/cache/gitlab/pnpm-store/
+    - output/cache/gitlab/ms-playwright/
+  policy: pull-push
+
+plan:
+  stage: plan
+  rules:
+    - if: '$RELEASE_SHA != ""'
+      when: never
+    - when: on_success
+  script:
+    - |
+      set -euo pipefail
+      zero=0000000000000000000000000000000000000000
+      empty_tree="$(git hash-object -t tree /dev/null)"
+      trusted_config_sha=HEAD
+      if [[ "$CI_PIPELINE_SOURCE" == "merge_request_event" ]]; then
+        test -n "$CI_MERGE_REQUEST_DIFF_BASE_SHA"
+        range="$CI_MERGE_REQUEST_DIFF_BASE_SHA...HEAD"
+        history_range="$(git merge-base "$CI_MERGE_REQUEST_DIFF_BASE_SHA" HEAD)..HEAD"
+        trusted_config_sha="$CI_MERGE_REQUEST_DIFF_BASE_SHA"
+        mode=affected
+      elif [[ "$CI_PIPELINE_SOURCE" == "push" ]]; then
+        if [[ "$CI_COMMIT_BEFORE_SHA" == "$zero" ]]; then
+          range="$empty_tree..HEAD"
+          history_range=HEAD
+        else
+          git cat-file -e "$CI_COMMIT_BEFORE_SHA^{commit}"
+          range="$CI_COMMIT_BEFORE_SHA..HEAD"
+          history_range="$range"
+        fi
+        mode=full
+      else
+        if git rev-parse --verify 'HEAD^' >/dev/null 2>&1; then
+          range="HEAD^..HEAD"
+          history_range="$range"
+        else
+          range="$empty_tree..HEAD"
+          history_range=HEAD
+        fi
+        mode="${QA_MODE:-full}"
+      fi
+      case "$mode" in affected|full) ;; *) echo "[gitlab-ci] invalid QA_MODE=$mode"; exit 1 ;; esac
+      git diff --check "$range"
+      git log --check --format= "$history_range"
+      trusted_config="$(mktemp)"
+      trap 'rm -f "$trusted_config"' EXIT
+      git show "$trusted_config_sha:.gitleaks.toml" > "$trusted_config"
+      gitleaks git --config "$trusted_config" --log-opts "$history_range" --no-banner --redact "$CI_PROJECT_DIR"
+      mkdir -p output/ci
+      node scripts/qa/ci-plan.mjs \
+        --range "$range" \
+        --mode "$mode" \
+        --out output/ci/plan.json
+      printf '%s\n' "$range" > output/ci/range.txt
+  artifacts:
+    expire_in: 30 days
+    paths:
+      - output/ci/plan.json
+      - output/ci/range.txt
+
+quality:
+  stage: quality
+  needs:
+    - job: plan
+      artifacts: true
+  rules:
+    - if: '$RELEASE_SHA != ""'
+      when: never
+    - when: on_success
+  timeout: 2h
+  script:
+    - |
+      set -euo pipefail
+      plan_file=output/ci/plan.json
+      range_file=output/ci/range.txt
+      test -s "$plan_file"
+      test -s "$range_file"
+      test "$(jq -r '.schemaVersion' "$plan_file")" = "plush.ci-plan/v2"
+      effective_mode="$(jq -er '.effectiveMode | select(. == "affected" or . == "full")' "$plan_file")"
+      make_data="$(jq -r '.flags.makeData' "$plan_file")"
+      needs_chromium="$(jq -r '.flags.needsChromium' "$plan_file")"
+      needs_postgres="$(jq -r '.flags.needsPostgres' "$plan_file")"
+      needs_web="$(jq -r '.flags.needsWeb' "$plan_file")"
+      source_archive="$(jq -r '.flags.sourceArchive' "$plan_file")"
+      for boolean_value in "$make_data" "$needs_chromium" "$needs_postgres" "$needs_web" "$source_archive"; do
+        case "$boolean_value" in true|false) ;; *) echo "[gitlab-ci] plan flag is not boolean"; exit 1 ;; esac
+      done
+      range="$(tr -d '\n' < "$range_file")"
+      [[ "$range" =~ ^([0-9a-f]{40}|HEAD\^)\.\.\.?HEAD$ ]]
+      postgres_name="plush-ci-postgres-$CI_PIPELINE_ID-$CI_JOB_ID"
+      cleanup() {
+        if docker inspect "$postgres_name" >/dev/null 2>&1; then
+          docker rm --force "$postgres_name" >/dev/null
+        fi
+      }
+      trap cleanup EXIT
+      if [[ "$needs_postgres" == "true" ]]; then
+        docker run --detach --rm \
+          --name "$postgres_name" \
+          --env POSTGRES_PASSWORD=ci-local-password \
+          --publish 127.0.0.1:55432:5432 \
+          --health-cmd 'pg_isready -U postgres' \
+          --health-interval 2s \
+          --health-timeout 5s \
+          --health-retries 30 \
+          postgres:18.1
+        for attempt in {1..30}; do
+          health="$(docker inspect --format '{{.State.Health.Status}}' "$postgres_name")"
+          [[ "$health" == "healthy" ]] && break
+          [[ "$health" == "unhealthy" ]] && exit 1
+          sleep 2
+        done
+        test "$(docker inspect --format '{{.State.Health.Status}}' "$postgres_name")" = healthy
+      fi
+      if [[ "$needs_web" == "true" ]]; then
+        pnpm --dir web install --frozen-lockfile
+        pnpm --dir web audit --prod --audit-level high --registry=https://registry.npmjs.org
+      fi
+      if [[ "$needs_chromium" == "true" ]]; then
+        pnpm --dir web exec playwright install chromium
+        chrome_path="$(node -e 'const { chromium } = require("./web/node_modules/playwright"); process.stdout.write(chromium.executablePath())')"
+        test -x "$chrome_path"
+        sandbox_source="$(dirname "$chrome_path")/chrome_sandbox"
+        sandbox_path=/usr/local/sbin/chrome-devel-sandbox
+        test -f "$sandbox_source"
+        sudo install -o root -g root -m 4755 "$sandbox_source" "$sandbox_path"
+        export CHROME_DEVEL_SANDBOX="$sandbox_path"
+        export ERP_PDF_CHROME_PATH="$chrome_path"
+      fi
+      if [[ "$make_data" == "true" ]]; then
+        (cd server && make data)
+        test -z "$(git status --porcelain --untracked-files=all)"
+      fi
+      if [[ "$effective_mode" == "affected" ]]; then
+        bash scripts/qa/affected.sh --base "$range" --run
+      elif [[ "$CI_PIPELINE_SOURCE" == "push" && "$CI_COMMIT_BRANCH" == "$CI_DEFAULT_BRANCH" ]]; then
+        node scripts/qa/exact-sha-gate.mjs --sha "$CI_COMMIT_SHA" --main-ref origin/main --run
+      else
+        node scripts/qa/run-gate-with-receipt.mjs --gate full
+      fi
+      if [[ "$source_archive" == "true" ]]; then
+        node scripts/deploy/source-archive-release-check.mjs --light --ref HEAD
+      fi
+      test -z "$(git status --porcelain --untracked-files=all)"
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/
+      - output/qa/exact-sha/
+      - output/dev-workbench/receipts/
+
+"CI Gate":
+  stage: gate
+  needs:
+    - job: plan
+      artifacts: false
+    - job: quality
+      artifacts: false
+  rules:
+    - if: '$RELEASE_SHA != ""'
+      when: never
+    - when: on_success
+  script:
+    - echo "[gitlab-ci] status=complete plan=success quality=success sha=$CI_COMMIT_SHA"
+
+strict:
+  stage: quality
+  interruptible: false
+  rules:
+    - if: '$RELEASE_SHA != "" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true" && $RELEASE_CUSTOMER == "yoyoosun"'
+    - when: never
+  timeout: 3h
+  script:
+    - |
+      set -euo pipefail
+      test "$RELEASE_SHA" = "$CI_COMMIT_SHA"
+      test "$RELEASE_SHA" = "$(git rev-parse HEAD)"
+      test "$RELEASE_SHA" = "$(git rev-parse origin/main)"
+      test "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH"
+      test "$CI_COMMIT_REF_PROTECTED" = "true"
+      test "$RELEASE_CUSTOMER" = yoyoosun
+      [[ "$RELEASE_VERSION" =~ ^[0-9A-Za-z]([0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$ ]]
+      postgres_name="plush-release-postgres-$CI_PIPELINE_ID-$CI_JOB_ID"
+      cleanup() {
+        if docker inspect "$postgres_name" >/dev/null 2>&1; then
+          docker rm --force "$postgres_name" >/dev/null
+        fi
+      }
+      trap cleanup EXIT
+      docker run --detach --rm \
+        --name "$postgres_name" \
+        --env POSTGRES_PASSWORD=ci-local-password \
+        --publish 127.0.0.1:55432:5432 \
+        --health-cmd 'pg_isready -U postgres' \
+        --health-interval 2s \
+        --health-timeout 5s \
+        --health-retries 30 \
+        postgres:18.1
+      for attempt in {1..30}; do
+        health="$(docker inspect --format '{{.State.Health.Status}}' "$postgres_name")"
+        [[ "$health" == "healthy" ]] && break
+        [[ "$health" == "unhealthy" ]] && exit 1
+        sleep 2
+      done
+      test "$(docker inspect --format '{{.State.Health.Status}}' "$postgres_name")" = healthy
+      pnpm --dir web install --frozen-lockfile
+      pnpm --dir web audit --prod --audit-level high --registry=https://registry.npmjs.org
+      pnpm --dir web exec playwright install chromium
+      chrome_path="$(node -e 'const { chromium } = require("./web/node_modules/playwright"); process.stdout.write(chromium.executablePath())')"
+      test -x "$chrome_path"
+      sandbox_source="$(dirname "$chrome_path")/chrome_sandbox"
+      sandbox_path=/usr/local/sbin/chrome-devel-sandbox
+      test -f "$sandbox_source"
+      sudo install -o root -g root -m 4755 "$sandbox_source" "$sandbox_path"
+      export CHROME_DEVEL_SANDBOX="$sandbox_path"
+      export ERP_PDF_CHROME_PATH="$chrome_path"
+      (cd server && make data)
+      test -z "$(git status --porcelain --untracked-files=all)"
+      node scripts/qa/exact-sha-gate.mjs --sha "$RELEASE_SHA" --main-ref origin/main --run
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/qa/exact-sha/$RELEASE_SHA/
+      - output/dev-workbench/receipts/
+
+publish_release:
+  stage: release
+  interruptible: false
+  needs:
+    - job: strict
+      artifacts: true
+  rules:
+    - if: '$RELEASE_SHA != "" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true" && $RELEASE_CUSTOMER == "yoyoosun"'
+    - when: never
+  timeout: 3h
+  environment:
+    name: release
+  resource_group: immutable-release-catalog
+  script:
+    - |
+      set -euo pipefail
+      test "$RELEASE_SHA" = "$CI_COMMIT_SHA"
+      test "$RELEASE_SHA" = "$(git rev-parse HEAD)"
+      test "$RELEASE_SHA" = "$(git rev-parse origin/main)"
+      test "$CI_COMMIT_REF_PROTECTED" = "true"
+      test -n "${GITHUB_PACKAGES_USER:-}"
+      test -n "${GITHUB_PACKAGES_TOKEN:-}"
+      test -n "${GITLAB_RELEASE_TOKEN:-}"
+      docker_config="$(mktemp -d)"
+      export DOCKER_CONFIG="$docker_config"
+      trap 'rm -rf "$docker_config"' EXIT
+      printf '%s' "$GITHUB_PACKAGES_TOKEN" | docker login ghcr.io --username "$GITHUB_PACKAGES_USER" --password-stdin
+      artifact_dir="output/releases/$RELEASE_SHA"
+      node scripts/deploy/release-artifact-bundle.mjs \
+        --execute \
+        --ref "$RELEASE_SHA" \
+        --version "$RELEASE_VERSION" \
+        --customer "$RELEASE_CUSTOMER" \
+        --out "$artifact_dir" \
+        --json
+      terminal="$(find "output/qa/exact-sha/$RELEASE_SHA" -maxdepth 1 -type f -name '*.json' ! -name '*.receipt.json' -print -quit)"
+      test -n "$terminal"
+      node scripts/deploy/github-release-publisher.mjs \
+        --artifact-dir "$artifact_dir" \
+        --strict-terminal "$terminal" \
+        --version "$RELEASE_VERSION" \
+        --repository "$CI_PROJECT_PATH" \
+        --json
+      node scripts/deploy/github-release-asset-set.mjs finalize \
+        --dir "$artifact_dir" \
+        --sha "$RELEASE_SHA" \
+        --version "$RELEASE_VERSION"
+      package_version="artifact-$RELEASE_SHA"
+      package_api="$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages"
+      package_id="$(curl --fail --silent --show-error \
+        --header "PRIVATE-TOKEN: $GITLAB_RELEASE_TOKEN" \
+        "$package_api?package_type=generic&package_name=plush-release&package_version=$package_version" \
+        | jq -r --arg version "$package_version" \
+          'map(select(.name == "plush-release" and .version == $version)) | first | .id // empty')"
+      existing_files='[]'
+      if [[ -n "$package_id" ]]; then
+        existing_files="$(curl --fail --silent --show-error \
+          --header "PRIVATE-TOKEN: $GITLAB_RELEASE_TOKEN" \
+          "$package_api/$package_id/package_files?per_page=100")"
+      fi
+      for asset in checksums.sha256 release-artifact.json release-manifest.json sbom.cdx.json server-image.tar web-image.tar; do
+        local_sha="$(sha256sum "$artifact_dir/$asset" | awk '{print $1}')"
+        remote_sha="$(jq -r --arg name "$asset" \
+          'map(select(.file_name == $name)) | first | .file_sha256 // empty' \
+          <<< "$existing_files")"
+        if [[ -n "$remote_sha" ]]; then
+          test "$remote_sha" = "$local_sha"
+          continue
+        fi
+        curl --fail --silent --show-error \
+          --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+          --upload-file "$artifact_dir/$asset" \
+          "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/plush-release/$package_version/$asset"
+      done
+      release_api="$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases/$package_version"
+      release_existing_json="$CI_PROJECT_DIR/output/ci/release-existing.json"
+      release_create_json="$CI_PROJECT_DIR/output/ci/release-create.json"
+      release_code="$(curl --silent --show-error --output "$release_existing_json" \
+        --write-out '%{http_code}' \
+        --header "PRIVATE-TOKEN: $GITLAB_RELEASE_TOKEN" \
+        "$release_api")"
+      if [[ "$release_code" == "200" ]]; then
+        test "$(jq -r .tag_name "$release_existing_json")" = "$package_version"
+        test "$(jq -r .name "$release_existing_json")" = "$RELEASE_VERSION"
+      elif [[ "$release_code" == "404" ]]; then
+        jq -n \
+          --arg name "$RELEASE_VERSION" \
+          --arg tag "$package_version" \
+          --arg ref "$RELEASE_SHA" \
+          --arg description 'Immutable exact-SHA release. Target promotion, migration, runtime readback and customer UAT remain separate evidence.' \
+          '{name:$name,tag_name:$tag,ref:$ref,description:$description}' \
+          > "$release_create_json"
+        curl --fail --silent --show-error \
+          --request POST \
+          --header "PRIVATE-TOKEN: $GITLAB_RELEASE_TOKEN" \
+          --header 'Content-Type: application/json' \
+          --data-binary @"$release_create_json" \
+          "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases"
+      else
+        echo "[gitlab-ci] release lookup failed status=$release_code"
+        exit 1
+      fi
+      curl --fail --silent --show-error \
+        --header "PRIVATE-TOKEN: $GITLAB_RELEASE_TOKEN" \
+        "$release_api" \
+        | jq -e --arg tag "$package_version" --arg name "$RELEASE_VERSION" \
+          '.tag_name == $tag and .name == $name' >/dev/null

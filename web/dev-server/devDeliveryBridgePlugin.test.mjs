@@ -16,6 +16,7 @@ import {
 import {
   DEV_DELIVERY_ACTION_API_PATH,
   DEV_DELIVERY_SESSION_API_PATH,
+  createConfiguredDeliveryProvider,
   createDevDeliveryMiddleware,
   createDevDeliveryService,
   validateDevDeliveryAction,
@@ -26,6 +27,31 @@ const SHA = 'a'.repeat(40)
 const OPERATION_ID = '11111111-1111-4111-8111-111111111111'
 const ROLLBACK_OPERATION_ID = '22222222-2222-4222-8222-222222222222'
 const IDEMPOTENCY_KEY = 'version-center:fixed:0001'
+
+test('delivery bridge defaults to GitLab and requires an explicit GitHub fallback', () => {
+  assert.equal(
+    createConfiguredDeliveryProvider({
+      projectRoot: process.cwd(),
+      env: {},
+    }).provider,
+    'gitlab'
+  )
+  assert.equal(
+    createConfiguredDeliveryProvider({
+      projectRoot: process.cwd(),
+      env: { PLUSH_DELIVERY_PROVIDER: 'github' },
+    }).provider,
+    'github'
+  )
+  assert.throws(
+    () =>
+      createConfiguredDeliveryProvider({
+        projectRoot: process.cwd(),
+        env: { PLUSH_DELIVERY_PROVIDER: 'other' },
+      }),
+    /gitlab or github/u
+  )
+})
 
 function createProject(t) {
   const root = mkdtempSync(path.join(os.tmpdir(), 'plush-delivery-bridge-'))
@@ -611,11 +637,11 @@ test('workbench does not offer generic retry for dedicated high-risk actions', a
   )
 })
 
-test('delivery summary exposes cached GitHub timings and readable operation durations', async (t) => {
+test('delivery summary exposes cached canonical CI timings and readable operation durations', async (t) => {
   const { root, store } = createProject(t)
   createOrReuseDeliveryOperation(store, {
     action: 'release',
-    target: 'github-release',
+    target: 'gitlab-release',
     gitSha: SHA,
     version: '2026.07.29-1',
     idempotencyKey: IDEMPOTENCY_KEY,
