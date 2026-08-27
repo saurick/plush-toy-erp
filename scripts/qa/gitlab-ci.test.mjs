@@ -198,3 +198,67 @@ test("Runner VM bootstrap retries pinned downloads and fails closed", () => {
     "  - [bash, -lc, '/usr/local/sbin/plush-bootstrap-gitlab-runner']",
   ]);
 });
+
+test("Runner VM bootstrap skips only exact base toolchain state", () => {
+  assert.match(runnerCloudInit, /symlink_target_is\(\) \{/u);
+  assert.match(runnerCloudInit, /\[\[ -x \/opt\/node\/bin\/node \]\]/u);
+  assert.match(
+    runnerCloudInit,
+    /symlink_target_is \/usr\/local\/bin\/node \/opt\/node\/bin\/node/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /symlink_target_is \/usr\/local\/bin\/npm \/opt\/node\/bin\/npm/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /symlink_target_is \/usr\/local\/bin\/npx \/opt\/node\/bin\/npx/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /symlink_target_is \/usr\/local\/bin\/corepack \/opt\/node\/bin\/corepack/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /\[\[ "\$\(\/usr\/local\/bin\/node --version\)" == "v\$\{node_version\}" \]\]/u,
+  );
+  assert.match(runnerCloudInit, /\[\[ -x \/opt\/pnpm\/bin\/pnpm[.]cjs \]\]/u);
+  assert.match(runnerCloudInit, /\[\[ -x \/opt\/pnpm\/bin\/pnpx[.]cjs \]\]/u);
+  assert.match(
+    runnerCloudInit,
+    /symlink_target_is \/usr\/local\/bin\/pnpm \/opt\/pnpm\/bin\/pnpm[.]cjs/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /symlink_target_is \/usr\/local\/bin\/pnpx \/opt\/pnpm\/bin\/pnpx[.]cjs/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /\[\[ "\$\(\/usr\/local\/bin\/pnpm --version\)" == "\$pnpm_version" \]\]/u,
+  );
+  assert.match(runnerCloudInit, /\[\[ -x \/usr\/local\/go\/bin\/go \]\]/u);
+  assert.match(
+    runnerCloudInit,
+    /symlink_target_is \/usr\/local\/bin\/go \/usr\/local\/go\/bin\/go/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /\[\[ "\$\(\/usr\/local\/bin\/go env GOVERSION\)" == "go\$\{go_version\}" \]\]/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /if ! node_ready; then\n\s+node_archive=[\s\S]+?sha256sum --check --strict[\s\S]+?\n\s+fi\n\s+if ! pnpm_ready; then/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /if ! pnpm_ready; then\n\s+pnpm_archive=[\s\S]+?sha512sum --check --strict[\s\S]+?\n\s+fi\n\s+if ! go_ready; then/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /if ! go_ready; then\n\s+go_archive=[\s\S]+?sha256sum --check --strict[\s\S]+?\n\s+fi\n\s+retry_command env GOPROXY=/u,
+  );
+  assert.doesNotMatch(
+    runnerCloudInit,
+    /command -v (?:node|npm|npx|corepack|pnpm|pnpx|go)/u,
+  );
+});

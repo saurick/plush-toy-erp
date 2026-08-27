@@ -119,33 +119,69 @@ write_files:
       go_version=1.26.6
       pnpm_version=10.13.1
       runner_version=19.3.0
-      node_archive="node-v${node_version}-${arch}.tar.xz"
+
+      symlink_target_is() {
+        local path="$1"
+        local expected="$2"
+        [[ -L "$path" ]] && [[ "$(readlink "$path")" == "$expected" ]]
+      }
+
+      node_ready() {
+        [[ -x /opt/node/bin/node ]] &&
+          symlink_target_is /usr/local/bin/node /opt/node/bin/node &&
+          symlink_target_is /usr/local/bin/npm /opt/node/bin/npm &&
+          symlink_target_is /usr/local/bin/npx /opt/node/bin/npx &&
+          symlink_target_is /usr/local/bin/corepack /opt/node/bin/corepack &&
+          [[ "$(/usr/local/bin/node --version)" == "v${node_version}" ]]
+      }
+
+      pnpm_ready() {
+        [[ -x /opt/pnpm/bin/pnpm.cjs ]] &&
+          [[ -x /opt/pnpm/bin/pnpx.cjs ]] &&
+          symlink_target_is /usr/local/bin/pnpm /opt/pnpm/bin/pnpm.cjs &&
+          symlink_target_is /usr/local/bin/pnpx /opt/pnpm/bin/pnpx.cjs &&
+          [[ "$(/usr/local/bin/pnpm --version)" == "$pnpm_version" ]]
+      }
+
+      go_ready() {
+        [[ -x /usr/local/go/bin/go ]] &&
+          symlink_target_is /usr/local/bin/go /usr/local/go/bin/go &&
+          [[ "$(/usr/local/bin/go env GOVERSION)" == "go${go_version}" ]]
+      }
+
       work="$(mktemp -d)"
       trap 'rm -rf "$work"' EXIT
-      download_file "https://nodejs.org/dist/v${node_version}/${node_archive}" "$work/$node_archive"
-      echo "41cd79bb7877c81605a9e68ec4c91547774f46a40c67a17e34d7179ef11729df  $work/$node_archive" | sha256sum --check --strict
-      rm -rf /opt/node
-      install -d -m 0755 /opt/node
-      tar -xJf "$work/$node_archive" --strip-components=1 -C /opt/node
-      ln -sfn /opt/node/bin/node /usr/local/bin/node
-      ln -sfn /opt/node/bin/npm /usr/local/bin/npm
-      ln -sfn /opt/node/bin/npx /usr/local/bin/npx
-      ln -sfn /opt/node/bin/corepack /usr/local/bin/corepack
-      pnpm_archive="pnpm-${pnpm_version}.tgz"
-      download_file "https://registry.npmjs.org/pnpm/-/${pnpm_archive}" "$work/$pnpm_archive"
-      echo "37ebf1a5c7a30d5fabe0c5df44ee8da4c965ca0c5af3dbab28c3a1681b70a256218d05c81c9c0dcf767ef6b8551eb5b960042b9ed4300c59242336377e01cfad  $work/$pnpm_archive" | sha512sum --check --strict
-      rm -rf /opt/pnpm
-      install -d -m 0755 /opt/pnpm
-      tar -xzf "$work/$pnpm_archive" --strip-components=1 -C /opt/pnpm
-      chmod 0755 /opt/pnpm/bin/pnpm.cjs /opt/pnpm/bin/pnpx.cjs
-      ln -sfn /opt/pnpm/bin/pnpm.cjs /usr/local/bin/pnpm
-      ln -sfn /opt/pnpm/bin/pnpx.cjs /usr/local/bin/pnpx
-      go_archive="go${go_version}.linux-amd64.tar.gz"
-      download_file "https://go.dev/dl/${go_archive}" "$work/$go_archive"
-      echo "708effb774be8237570d0add163225abbdfaf4fca28b2611df167beba4feef89  $work/$go_archive" | sha256sum --check --strict
-      rm -rf /usr/local/go
-      tar -xzf "$work/$go_archive" -C /usr/local
-      ln -sfn /usr/local/go/bin/go /usr/local/bin/go
+      if ! node_ready; then
+        node_archive="node-v${node_version}-${arch}.tar.xz"
+        download_file "https://nodejs.org/dist/v${node_version}/${node_archive}" "$work/$node_archive"
+        echo "41cd79bb7877c81605a9e68ec4c91547774f46a40c67a17e34d7179ef11729df  $work/$node_archive" | sha256sum --check --strict
+        rm -rf /opt/node
+        install -d -m 0755 /opt/node
+        tar -xJf "$work/$node_archive" --strip-components=1 -C /opt/node
+        ln -sfn /opt/node/bin/node /usr/local/bin/node
+        ln -sfn /opt/node/bin/npm /usr/local/bin/npm
+        ln -sfn /opt/node/bin/npx /usr/local/bin/npx
+        ln -sfn /opt/node/bin/corepack /usr/local/bin/corepack
+      fi
+      if ! pnpm_ready; then
+        pnpm_archive="pnpm-${pnpm_version}.tgz"
+        download_file "https://registry.npmjs.org/pnpm/-/${pnpm_archive}" "$work/$pnpm_archive"
+        echo "37ebf1a5c7a30d5fabe0c5df44ee8da4c965ca0c5af3dbab28c3a1681b70a256218d05c81c9c0dcf767ef6b8551eb5b960042b9ed4300c59242336377e01cfad  $work/$pnpm_archive" | sha512sum --check --strict
+        rm -rf /opt/pnpm
+        install -d -m 0755 /opt/pnpm
+        tar -xzf "$work/$pnpm_archive" --strip-components=1 -C /opt/pnpm
+        chmod 0755 /opt/pnpm/bin/pnpm.cjs /opt/pnpm/bin/pnpx.cjs
+        ln -sfn /opt/pnpm/bin/pnpm.cjs /usr/local/bin/pnpm
+        ln -sfn /opt/pnpm/bin/pnpx.cjs /usr/local/bin/pnpx
+      fi
+      if ! go_ready; then
+        go_archive="go${go_version}.linux-amd64.tar.gz"
+        download_file "https://go.dev/dl/${go_archive}" "$work/$go_archive"
+        echo "708effb774be8237570d0add163225abbdfaf4fca28b2611df167beba4feef89  $work/$go_archive" | sha256sum --check --strict
+        rm -rf /usr/local/go
+        tar -xzf "$work/$go_archive" -C /usr/local
+        ln -sfn /usr/local/go/bin/go /usr/local/bin/go
+      fi
       retry_command env GOPROXY=https://goproxy.cn,direct GOSUMDB=sum.golang.google.cn GOBIN=/usr/local/bin go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
       retry_command env GOPROXY=https://goproxy.cn,direct GOSUMDB=sum.golang.google.cn GOBIN=/usr/local/bin go install mvdan.cc/sh/v3/cmd/shfmt@v3.13.1
       download_file https://atlasgo.sh "$work/atlas-install.sh"
