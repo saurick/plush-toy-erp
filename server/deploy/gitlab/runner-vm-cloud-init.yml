@@ -101,6 +101,39 @@ write_files:
           "$url"
       }
 
+      download_resumable_file() {
+        local url="$1"
+        local output="$2"
+        local expected_size="$3"
+        local attempt
+        local observed_size
+
+        : >"$output"
+        for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
+          if curl \
+            --fail \
+            --location \
+            --silent \
+            --show-error \
+            --connect-timeout 20 \
+            --max-time 300 \
+            --continue-at - \
+            --output "$output" \
+            "$url"; then
+            break
+          fi
+          observed_size="$(stat -c %s "$output")"
+          if ((observed_size == expected_size)); then
+            break
+          fi
+          if ((observed_size > expected_size || attempt == 12)); then
+            return 1
+          fi
+          sleep $((attempt * 5))
+        done
+        test "$(stat -c %s "$output")" = "$expected_size"
+      }
+
       retry_command() {
         local attempt
         for attempt in 1 2 3; do
@@ -149,6 +182,37 @@ write_files:
           [[ "$(/usr/local/bin/go env GOVERSION)" == "go${go_version}" ]]
       }
 
+      owned_executable_is() {
+        local path="$1"
+        [[ -x "$path" ]] &&
+          [[ "$(stat -c '%U:%G:%a' "$path")" == root:root:755 ]]
+      }
+
+      govulncheck_ready() {
+        owned_executable_is /usr/local/bin/govulncheck &&
+          /usr/local/bin/govulncheck -version | grep -Fqx 'Scanner: govulncheck@v1.6.0'
+      }
+
+      shfmt_ready() {
+        owned_executable_is /usr/local/bin/shfmt &&
+          [[ "$(/usr/local/bin/shfmt --version)" == v3.13.1 ]]
+      }
+
+      atlas_ready() {
+        owned_executable_is /usr/local/bin/atlas &&
+          /usr/local/bin/atlas version | head -n 1 | grep -Eq 'version v?1[.]2[.]0([[:space:]]|$)'
+      }
+
+      gitleaks_ready() {
+        owned_executable_is /usr/local/bin/gitleaks &&
+          [[ "$(/usr/local/bin/gitleaks version)" == 8.30.1 ]]
+      }
+
+      runner_ready() {
+        owned_executable_is /usr/local/bin/gitlab-runner &&
+          [[ "$(/usr/local/bin/gitlab-runner --version | awk '$1 == "Version:" {print $2; exit}')" == "$runner_version" ]]
+      }
+
       work="$(mktemp -d)"
       trap 'rm -rf "$work"' EXIT
       if ! node_ready; then
@@ -182,20 +246,33 @@ write_files:
         tar -xzf "$work/$go_archive" -C /usr/local
         ln -sfn /usr/local/go/bin/go /usr/local/bin/go
       fi
-      retry_command env GOPROXY=https://goproxy.cn,direct GOSUMDB=sum.golang.google.cn GOBIN=/usr/local/bin go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
-      retry_command env GOPROXY=https://goproxy.cn,direct GOSUMDB=sum.golang.google.cn GOBIN=/usr/local/bin go install mvdan.cc/sh/v3/cmd/shfmt@v3.13.1
-      download_file https://atlasgo.sh "$work/atlas-install.sh"
-      echo "d2377154c7af848813fc763ad75d6c0564cdca806163ea61ad4fb634a8736751  $work/atlas-install.sh" | sha256sum --check --strict
-      retry_command env ATLAS_VERSION=v1.2.0 bash "$work/atlas-install.sh" -y
-      gitleaks_archive=gitleaks_8.30.1_linux_x64.tar.gz
-      download_file "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/$gitleaks_archive" "$work/$gitleaks_archive"
-      echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $work/$gitleaks_archive" | sha256sum --check --strict
-      tar -xzf "$work/$gitleaks_archive" -C /usr/local/bin gitleaks
-      chmod 0755 /usr/local/bin/gitleaks
-      runner_url="https://gitlab-runner-downloads.s3.amazonaws.com/v${runner_version}/binaries/gitlab-runner-linux-amd64"
-      download_file "$runner_url" "$work/gitlab-runner-linux-amd64"
-      echo "9b642c14742b5db8622352c85f809ae6a588b6885a7d1a24caf8547e73eea7c9  $work/gitlab-runner-linux-amd64" | sha256sum --check --strict
-      install -o root -g root -m 0755 "$work/gitlab-runner-linux-amd64" /usr/local/bin/gitlab-runner
+      if ! govulncheck_ready; then
+        retry_command env GOPROXY=https://goproxy.cn,direct GOSUMDB=sum.golang.google.cn GOBIN=/usr/local/bin go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+      fi
+      if ! shfmt_ready; then
+        retry_command env GOPROXY=https://goproxy.cn,direct GOSUMDB=sum.golang.google.cn GOBIN=/usr/local/bin go install mvdan.cc/sh/v3/cmd/shfmt@v3.13.1
+      fi
+      if ! atlas_ready; then
+        download_file https://atlasgo.sh "$work/atlas-install.sh"
+        echo "d2377154c7af848813fc763ad75d6c0564cdca806163ea61ad4fb634a8736751  $work/atlas-install.sh" | sha256sum --check --strict
+        retry_command env ATLAS_VERSION=v1.2.0 bash "$work/atlas-install.sh" -y
+      fi
+      if ! gitleaks_ready; then
+        gitleaks_archive=gitleaks_8.30.1_linux_x64.tar.gz
+        download_file "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/$gitleaks_archive" "$work/$gitleaks_archive"
+        echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $work/$gitleaks_archive" | sha256sum --check --strict
+        tar -xzf "$work/$gitleaks_archive" -C "$work" gitleaks
+        install -o root -g root -m 0755 "$work/gitleaks" /usr/local/bin/gitleaks
+      fi
+      if ! runner_ready; then
+        runner_package_url="https://s3.dualstack.us-east-1.amazonaws.com/gitlab-runner-downloads/v${runner_version}/deb/gitlab-runner_amd64.deb"
+        runner_package="$work/gitlab-runner_amd64.deb"
+        download_resumable_file "$runner_package_url" "$runner_package" 31141970
+        echo "33be78d7358b9e49be183a6144c60cd531dc1f89b4dfb83298603809d6510ca8  $runner_package" | sha256sum --check --strict
+        dpkg-deb --fsys-tarfile "$runner_package" | tar -xOf - ./usr/bin/gitlab-runner >"$work/gitlab-runner-linux-amd64"
+        echo "9b642c14742b5db8622352c85f809ae6a588b6885a7d1a24caf8547e73eea7c9  $work/gitlab-runner-linux-amd64" | sha256sum --check --strict
+        install -o root -g root -m 0755 "$work/gitlab-runner-linux-amd64" /usr/local/bin/gitlab-runner
+      fi
       test "$(node --version)" = v24.14.0
       test "$(go env GOVERSION)" = go1.26.6
       test "$(pnpm --version)" = 10.13.1
@@ -220,6 +297,11 @@ write_files:
       verify_go_module_env ubuntu
       verify_go_module_env root
       verify_go_module_env gitlab-runner
+      test "$(stat -c '%U:%G:%a' /usr/local/bin/govulncheck)" = root:root:755
+      test "$(stat -c '%U:%G:%a' /usr/local/bin/shfmt)" = root:root:755
+      test "$(stat -c '%U:%G:%a' /usr/local/bin/atlas)" = root:root:755
+      test "$(stat -c '%U:%G:%a' /usr/local/bin/gitleaks)" = root:root:755
+      test "$(stat -c '%U:%G:%a' /usr/local/bin/gitlab-runner)" = root:root:755
       atlas version | head -n 1 | grep -Eq 'version v?1[.]2[.]0([[:space:]]|$)'
       test "$(gitleaks version)" = 8.30.1
       test "$(gitlab-runner --version | awk '$1 == "Version:" {print $2; exit}')" = 19.3.0

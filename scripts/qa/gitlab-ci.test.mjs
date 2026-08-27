@@ -132,11 +132,19 @@ test("Runner VM bootstrap retries pinned downloads and fails closed", () => {
   const downloadCalls = runnerCloudInit.match(/^\s+download_file\s/gmu) ?? [];
   const rawCurlCalls = runnerCloudInit
     .split("\n")
-    .filter((line) => line.trim() === "curl \\");
+    .filter((line) => /^(?:if )?curl \\$/u.test(line.trim()));
+  const resumableDownload = runnerCloudInit.match(
+    /download_resumable_file\(\) \{[\s\S]+?\n      \}/u,
+  )?.[0];
   const runcmdEntries = runnerCloudInit.match(/^  - \[bash, -lc, .+\]$/gmu) ?? [];
 
-  assert.equal(downloadCalls.length, 6);
-  assert.equal(rawCurlCalls.length, 1);
+  assert.equal(downloadCalls.length, 5);
+  assert.equal(rawCurlCalls.length, 2);
+  assert.ok(resumableDownload);
+  assert.match(resumableDownload, /--continue-at -/u);
+  assert.match(resumableDownload, /for attempt in 1 2 3 4 5 6 7 8 9 10 11 12/u);
+  assert.match(resumableDownload, /stat -c %s/u);
+  assert.doesNotMatch(resumableDownload, /--remove-on-error|--retry(?:-|\s)/u);
   assert.match(runnerCloudInit, /--connect-timeout 20/u);
   assert.match(runnerCloudInit, /--max-time 300/u);
   assert.match(runnerCloudInit, /--retry 5/u);
@@ -255,10 +263,78 @@ test("Runner VM bootstrap skips only exact base toolchain state", () => {
   );
   assert.match(
     runnerCloudInit,
-    /if ! go_ready; then\n\s+go_archive=[\s\S]+?sha256sum --check --strict[\s\S]+?\n\s+fi\n\s+retry_command env GOPROXY=/u,
+    /if ! go_ready; then\n\s+go_archive=[\s\S]+?sha256sum --check --strict[\s\S]+?\n\s+fi\n\s+if ! govulncheck_ready; then\n\s+retry_command env GOPROXY=/u,
   );
   assert.doesNotMatch(
     runnerCloudInit,
     /command -v (?:node|npm|npx|corepack|pnpm|pnpx|go)/u,
   );
+});
+
+test("Runner VM bootstrap resumes the exact package with dual integrity checks", () => {
+  assert.match(
+    runnerCloudInit,
+    /https:\/\/s3[.]dualstack[.]us-east-1[.]amazonaws[.]com\/gitlab-runner-downloads\/v\$\{runner_version\}\/deb\/gitlab-runner_amd64[.]deb/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /download_resumable_file "\$runner_package_url" "\$runner_package" 31141970/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /33be78d7358b9e49be183a6144c60cd531dc1f89b4dfb83298603809d6510ca8  \$runner_package/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /dpkg-deb --fsys-tarfile "\$runner_package" [|] tar -xOf - [.][/]usr\/bin\/gitlab-runner/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /9b642c14742b5db8622352c85f809ae6a588b6885a7d1a24caf8547e73eea7c9  \$work\/gitlab-runner-linux-amd64/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /install -o root -g root -m 0755 "\$work\/gitlab-runner-linux-amd64" \/usr\/local\/bin\/gitlab-runner/u,
+  );
+  assert.doesNotMatch(runnerCloudInit, /dpkg(?:-deb)?\s+-i/u);
+});
+
+test("Runner VM bootstrap skips only exact secondary tools and normalizes owners", () => {
+  for (const readyCheck of [
+    "govulncheck_ready",
+    "shfmt_ready",
+    "atlas_ready",
+    "gitleaks_ready",
+    "runner_ready",
+  ]) {
+    assert.match(runnerCloudInit, new RegExp(`${readyCheck}\\(\\) \\{`, "u"));
+    assert.match(runnerCloudInit, new RegExp(`if ! ${readyCheck}; then`, "u"));
+  }
+  assert.match(
+    runnerCloudInit,
+    /\[\[ "\$\(stat -c '%U:%G:%a' "\$path"\)" == root:root:755 \]\]/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /tar -xzf "\$work\/\$gitleaks_archive" -C "\$work" gitleaks/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /install -o root -g root -m 0755 "\$work\/gitleaks" \/usr\/local\/bin\/gitleaks/u,
+  );
+  for (const binary of [
+    "govulncheck",
+    "shfmt",
+    "atlas",
+    "gitleaks",
+    "gitlab-runner",
+  ]) {
+    assert.match(
+      runnerCloudInit,
+      new RegExp(
+        `test "\\$\\(stat -c '%U:%G:%a' \/usr\/local\/bin\/${binary}\\)" = root:root:755`,
+        "u",
+      ),
+    );
+  }
 });
