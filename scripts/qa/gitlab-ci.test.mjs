@@ -135,7 +135,7 @@ test("Runner VM bootstrap retries pinned downloads and fails closed", () => {
     .filter((line) => line.trim() === "curl \\");
   const runcmdEntries = runnerCloudInit.match(/^  - \[bash, -lc, .+\]$/gmu) ?? [];
 
-  assert.equal(downloadCalls.length, 6);
+  assert.equal(downloadCalls.length, 7);
   assert.equal(rawCurlCalls.length, 1);
   assert.match(runnerCloudInit, /--connect-timeout 20/u);
   assert.match(runnerCloudInit, /--max-time 300/u);
@@ -146,8 +146,21 @@ test("Runner VM bootstrap retries pinned downloads and fails closed", () => {
   assert.match(runnerCloudInit, /--remove-on-error/u);
   assert.match(
     runnerCloudInit,
-    /retry_command env GOBIN=\/usr\/local\/bin go install golang[.]org\/x\/vuln\/cmd\/govulncheck@v1[.]6[.]0/u,
+    /retry_command env GOPROXY=https:\/\/goproxy[.]cn,direct GOSUMDB=sum[.]golang[.]google[.]cn GOBIN=\/usr\/local\/bin go install golang[.]org\/x\/vuln\/cmd\/govulncheck@v1[.]6[.]0/u,
   );
+  assert.match(
+    runnerCloudInit,
+    /https:\/\/github[.]com\/mvdan\/sh\/releases\/download\/v3[.]13[.]1\/\$shfmt_asset/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /fb096c5d1ac6beabbdbaa2874d025badb03ee07929f0c9ff67563ce8c75398b1/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /install -o root -g root -m 0755 "\$work\/\$shfmt_asset" \/usr\/local\/bin\/shfmt/u,
+  );
+  assert.doesNotMatch(runnerCloudInit, /go install mvdan[.]cc\/sh/u);
   assert.match(
     runnerCloudInit,
     /retry_command env ATLAS_VERSION=v1[.]2[.]0 bash/u,
@@ -166,6 +179,21 @@ test("Runner VM bootstrap retries pinned downloads and fails closed", () => {
     runnerCloudInit,
     /runuser -u gitlab-runner -- \/usr\/local\/bin\/pnpm --version/u,
   );
+  assert.match(
+    runnerCloudInit,
+    /path: \/etc\/profile[.]d\/plush-go-module-network[.]sh/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /export GOPROXY=https:\/\/goproxy[.]cn,direct/u,
+  );
+  assert.match(runnerCloudInit, /export GOSUMDB=sum[.]golang[.]google[.]cn/u);
+  for (const user of ["ubuntu", "root", "gitlab-runner"]) {
+    assert.match(
+      runnerCloudInit,
+      new RegExp(`verify_go_module_env ${user.replaceAll("-", "[-]")}`, "u"),
+    );
+  }
   assert.match(
     runnerCloudInit,
     /test "\$\(gitlab-runner --version [^\n]+\)" = 19[.]3[.]0/u,
