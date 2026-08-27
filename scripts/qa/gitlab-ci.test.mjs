@@ -96,6 +96,11 @@ test("GitLab jobs stay on the isolated runner and never receive the R640 host so
 });
 
 test("R640 GitLab definitions pin identity, separate SSD data and require exact execution", () => {
+  const runnerRegistration = runnerCloudInit.match(
+    /path: \/usr\/local\/sbin\/plush-register-gitlab-runner[\s\S]+?\n\nruncmd:/u,
+  )?.[0];
+
+  assert.ok(runnerRegistration);
   assert.match(compose, /^name: plush-gitlab-control$/mu);
   assert.match(
     compose,
@@ -118,8 +123,15 @@ test("R640 GitLab definitions pin identity, separate SSD data and require exact 
     runnerCloudInit,
     /9b642c14742b5db8622352c85f809ae6a588b6885a7d1a24caf8547e73eea7c9/u,
   );
-  assert.match(runnerCloudInit, /--executor shell/u);
-  assert.match(runnerCloudInit, /--run-untagged=false/u);
+  assert.match(runnerRegistration, /gitlab-runner register --non-interactive/u);
+  assert.match(runnerRegistration, /--url https:\/\/gitlab[.]saurick[.]me/u);
+  assert.match(runnerRegistration, /--token "\$GITLAB_RUNNER_TOKEN"/u);
+  assert.match(runnerRegistration, /--name r640-kvm-isolated-shell/u);
+  assert.match(runnerRegistration, /--executor shell/u);
+  assert.doesNotMatch(
+    runnerRegistration,
+    /--(?:access-level|locked|maintenance-note|maximum-timeout|paused|run-untagged|tag-list)(?:[=\s]|$)/u,
+  );
   assert.match(runnerCloudInit, /libnss3/u);
   assert.doesNotMatch(runnerCloudInit, /NOPASSWD: \/usr\/bin\/apt-get/u);
   assert.match(runnerCloudInit, /ssh_pwauth: false/u);

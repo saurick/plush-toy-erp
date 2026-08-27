@@ -344,10 +344,7 @@ write_files:
         --url https://gitlab.saurick.me \
         --token "$GITLAB_RUNNER_TOKEN" \
         --name r640-kvm-isolated-shell \
-        --executor shell \
-        --tag-list plush,isolated,amd64 \
-        --run-untagged=false \
-        --locked=true
+        --executor shell
       chown root:root /etc/gitlab-runner/config.toml
       chmod 0600 /etc/gitlab-runner/config.toml
       shred -u "$env_file"
