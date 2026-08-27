@@ -127,3 +127,55 @@ test("R640 GitLab definitions pin identity, separate SSD data and require exact 
   assert.match(runnerCloudInit, /chmod 0600 \/etc\/gitlab-runner\/config[.]toml/u);
   assert.doesNotMatch(runnerCloudInit, /curl[^\n]*[|]\s*(?:ba)?sh/u);
 });
+
+test("Runner VM bootstrap retries pinned downloads and fails closed", () => {
+  const downloadCalls = runnerCloudInit.match(/^\s+download_file\s/gmu) ?? [];
+  const rawCurlCalls = runnerCloudInit
+    .split("\n")
+    .filter((line) => line.trim() === "curl \\");
+  const runcmdEntries = runnerCloudInit.match(/^  - \[bash, -lc, .+\]$/gmu) ?? [];
+
+  assert.equal(downloadCalls.length, 6);
+  assert.equal(rawCurlCalls.length, 1);
+  assert.match(runnerCloudInit, /--connect-timeout 20/u);
+  assert.match(runnerCloudInit, /--max-time 300/u);
+  assert.match(runnerCloudInit, /--retry 5/u);
+  assert.match(runnerCloudInit, /--retry-delay 5/u);
+  assert.match(runnerCloudInit, /--retry-max-time 900/u);
+  assert.match(runnerCloudInit, /--retry-all-errors/u);
+  assert.match(runnerCloudInit, /--remove-on-error/u);
+  assert.match(
+    runnerCloudInit,
+    /retry_command env GOBIN=\/usr\/local\/bin go install golang[.]org\/x\/vuln\/cmd\/govulncheck@v1[.]6[.]0/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /retry_command env ATLAS_VERSION=v1[.]2[.]0 bash/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /37ebf1a5c7a30d5fabe0c5df44ee8da4c965ca0c5af3dbab28c3a1681b70a256218d05c81c9c0dcf767ef6b8551eb5b960042b9ed4300c59242336377e01cfad/u,
+  );
+  assert.match(runnerCloudInit, /sha512sum --check --strict/u);
+  assert.match(
+    runnerCloudInit,
+    /ln -sfn \/opt\/pnpm\/bin\/pnpm[.]cjs \/usr\/local\/bin\/pnpm/u,
+  );
+  assert.doesNotMatch(runnerCloudInit, /corepack prepare|COREPACK_HOME/u);
+  assert.match(
+    runnerCloudInit,
+    /runuser -u gitlab-runner -- \/usr\/local\/bin\/pnpm --version/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /test "\$\(gitlab-runner --version [^\n]+\)" = 19[.]3[.]0/u,
+  );
+  assert.match(runnerCloudInit, /systemctl cat gitlab-runner[.]service/u);
+  assert.match(
+    runnerCloudInit,
+    /\/usr\/local\/sbin\/plush-verify-runner-bootstrap/u,
+  );
+  assert.deepEqual(runcmdEntries, [
+    "  - [bash, -lc, '/usr/local/sbin/plush-bootstrap-gitlab-runner']",
+  ]);
+});
