@@ -39,10 +39,10 @@ import {
 } from "./affected.mjs";
 import { collectGitChangedFiles } from "./lib/git-range.mjs";
 
-export const PRE_PUSH_RECEIPT_CONTRACT = "plush.pre-push-receipt/v4";
+export const PRE_PUSH_RECEIPT_CONTRACT = "plush.pre-push-receipt/v5";
 export const PRE_PUSH_RECEIPT_TTL_MS = 30 * 60 * 1000;
 export const PRE_PUSH_ENVIRONMENT_CONTRACT = "plush.pre-push-environment/v2";
-export const PRE_PUSH_GATE_CONTRACT = "plush.pre-push-gate-tree/v3";
+export const PRE_PUSH_GATE_CONTRACT = "plush.pre-push-gate-tree/v4";
 export const PRE_PUSH_SIGNATURE_CONTRACT = "hmac-sha256/v1";
 export const REMOTE_REF_QUERY_TIMEOUT_MS = 20_000;
 export const REVIEW_PUSH_BASE_REF = "refs/heads/main";
@@ -51,6 +51,7 @@ export const REVIEW_PUSH_REMOTE_REF = "refs/heads/review/gpt";
 
 const ZERO_SHA = "0000000000000000000000000000000000000000";
 const REVIEW_PUSH_CONTRACT = "plush.review-push/v1";
+const LIVE_PUSH_CHECKS_CONTRACT = "plush.live-push-checks/v1";
 const CLOCK_SKEW_MS = 30_000;
 const REMOTE_REF_QUERY_RETRY_DELAYS_MS = Object.freeze([250, 750]);
 const RETRYABLE_REMOTE_REF_QUERY_PATTERN =
@@ -547,6 +548,32 @@ function resolveDatabaseGuard(root, pushPlan) {
   });
 }
 
+function resolveLivePushChecks(pushPlan, databaseGuard) {
+  const trackedUpstreamMirror =
+    pushPlan.refs.length === 1 && databaseGuard?.mode === "tracked-upstream";
+  return Object.freeze({
+    contract: LIVE_PUSH_CHECKS_CONTRACT,
+    refs: Object.freeze(
+      pushPlan.refs.map((ref) => {
+        const useTrackedUpstream =
+          trackedUpstreamMirror &&
+          ref.remoteSha === ZERO_SHA &&
+          ref.localRef === ref.remoteRef &&
+          ref.localRef.startsWith("refs/heads/");
+        return Object.freeze({
+          localRef: ref.localRef,
+          remoteRef: ref.remoteRef,
+          gitLogMode: useTrackedUpstream ? "tracked-upstream" : "push-range",
+          gitLogRange: useTrackedUpstream ? databaseGuard.range : ref.range,
+          gitLogBaseRef: useTrackedUpstream ? databaseGuard.baseRef : "",
+          gitLogBaseSha: useTrackedUpstream ? databaseGuard.baseSha : "",
+          secretsRange: ref.range,
+        });
+      }),
+    ),
+  });
+}
+
 function buildPushPlan({
   root,
   remoteName,
@@ -778,14 +805,17 @@ export function resolvePrePushGateDecision(
   const affectedPlan = buildAffectedPlan(changedFiles, { root });
   const selection = selectPrePushProfile(affectedPlan, { forceFull });
   const databaseGuard = resolveDatabaseGuard(root, pushPlan);
+  const liveChecks = resolveLivePushChecks(pushPlan, databaseGuard);
   return Object.freeze({
     ...selection,
     databaseGuard,
+    liveChecks,
     changedFileCount: changedFiles.length,
     planSha256: sha256(
       stableStringify({
         affectedPlan: affectedPlanEvidence(affectedPlan),
         databaseGuard,
+        liveChecks,
       }),
     ),
   });
@@ -1038,6 +1068,7 @@ export function gateContractFingerprint(root, head, gateDecision) {
     recommendedProfile: gateDecision.recommendedProfile,
     planSha256: gateDecision.planSha256,
     databaseGuard: gateDecision.databaseGuard,
+    liveChecks: gateDecision.liveChecks,
     gates:
       gateDecision.profile === "full"
         ? GATE_PROFILES.full
@@ -1322,6 +1353,8 @@ function validateReceipt({
     receipt?.gate?.planSha256 !== gateDecision.planSha256 ||
     stableStringify(receipt?.gate?.databaseGuard) !==
       stableStringify(gateDecision.databaseGuard) ||
+    stableStringify(receipt?.gate?.liveChecks) !==
+      stableStringify(gateDecision.liveChecks) ||
     receipt?.gate?.deliveryEligible !== (gateDecision.profile !== "review")
   ) {
     throw new ReceiptError("receipt_profile_mismatch");
@@ -1388,6 +1421,7 @@ function makeReceipt({
       recommendedProfile: gateDecision.recommendedProfile,
       planSha256: gateDecision.planSha256,
       databaseGuard: gateDecision.databaseGuard,
+      liveChecks: gateDecision.liveChecks,
       deliveryEligible: gateDecision.profile !== "review",
       contract: PRE_PUSH_GATE_CONTRACT,
       sha256:
@@ -1580,7 +1614,10 @@ export function preparePush(root, options, { env = process.env } = {}) {
       `[${label}] 运行 ${initialGateDecision.profile}（HEAD=${before.head.slice(0, 12)} aggregate_range=${initialPlan.aggregateRange} db_guard_range=${initialGateDecision.databaseGuard.range} files=${initialGateDecision.changedFileCount} recommended_delivery_profile=${initialGateDecision.recommendedProfile}）`,
     );
     if (reviewOnly) {
-      runLivePushChecks(root, initialPlan, env, { label });
+      runLivePushChecks(root, initialPlan, env, {
+        label,
+        gateDecision: initialGateDecision,
+      });
     } else if (initialGateDecision.profile === "full") {
       runCommand(
         "node",
@@ -1685,13 +1722,28 @@ function runLivePushChecks(
   root,
   pushPlan,
   env,
-  { label = "pre-push" } = {},
+  { label = "pre-push", gateDecision } = {},
 ) {
-  for (const ref of pushPlan.refs) {
+  const liveChecks = gateDecision?.liveChecks;
+  if (
+    liveChecks?.contract !== LIVE_PUSH_CHECKS_CONTRACT ||
+    liveChecks.refs?.length !== pushPlan.refs.length
+  ) {
+    throw new ReceiptError("invalid_live_push_checks");
+  }
+  for (const [index, ref] of pushPlan.refs.entries()) {
+    const check = liveChecks.refs[index];
+    if (
+      check?.localRef !== ref.localRef ||
+      check?.remoteRef !== ref.remoteRef ||
+      check?.secretsRange !== ref.range
+    ) {
+      throw new ReceiptError("invalid_live_push_checks");
+    }
     console.log(
-      `[${label}] 校验真实 push ref: ${ref.localRef} -> ${ref.remoteRef}`,
+      `[${label}] 校验真实 push ref: ${ref.localRef} -> ${ref.remoteRef} git_log_range=${check.gitLogRange} secrets_range=${check.secretsRange}`,
     );
-    runCommand("git", ["log", "--check", "--format=", ref.range], {
+    runCommand("git", ["log", "--check", "--format=", check.gitLogRange], {
       cwd: root,
       inherit: true,
       reason: "git_log_check_failed",
@@ -1700,7 +1752,7 @@ function runLivePushChecks(
       cwd: root,
       env: {
         ...env,
-        QA_BASE_RANGE: ref.range,
+        QA_BASE_RANGE: check.secretsRange,
         SECRETS_STRICT: "1",
       },
       inherit: true,
@@ -1794,7 +1846,7 @@ export function verifyPushHook(
       environmentSha256,
     });
 
-    runLivePushChecks(root, pushPlan, env);
+    runLivePushChecks(root, pushPlan, env, { gateDecision });
 
     const after = readRepositorySnapshot(root);
     assertSnapshotUnchanged(before, after);

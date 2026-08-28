@@ -548,7 +548,13 @@ test("local receipt has one repository-owned issuer while full and CI stay real"
   assert.match(receipt, /acquireReceiptLock/u);
   assert.match(receipt, /renameSync\(temporary, target\)/u);
   assert.match(receipt, /readFileSync\(0, "utf8"\)/u);
-  assert.match(receipt, /git", \["log", "--check", "--format=", ref\.range\]/u);
+  assert.match(
+    receipt,
+    /git", \["log", "--check", "--format=", check\.gitLogRange\]/u,
+  );
+  assert.match(receipt, /QA_BASE_RANGE: check\.secretsRange/u);
+  assert.match(receipt, /liveChecks: gateDecision\.liveChecks/u);
+  assert.match(receipt, /stableStringify\(receipt\?\.gate\?\.liveChecks\)/u);
   assert.match(receipt, /SECRETS_STRICT: "1"/u);
   assert.match(receipt, /REVIEW_PUSH_REMOTE_REF = "refs\/heads\/review\/gpt"/u);
   assert.match(receipt, /reviewReceiptPath/u);

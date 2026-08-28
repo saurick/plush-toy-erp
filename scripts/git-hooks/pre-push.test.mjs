@@ -96,7 +96,13 @@ test("pre-push delegates the real stdin contract without reopening full", () => 
   assert.doesNotMatch(hook, /scripts\/qa\/full\.sh/u);
   assert.doesNotMatch(hook, /SKIP_PRE_PUSH/u);
   assert.match(receipt, /readFileSync\(0, "utf8"\)/u);
-  assert.match(receipt, /git", \["log", "--check", "--format=", ref\.range\]/u);
+  assert.match(
+    receipt,
+    /git", \["log", "--check", "--format=", check\.gitLogRange\]/u,
+  );
+  assert.match(receipt, /QA_BASE_RANGE: check\.secretsRange/u);
+  assert.match(receipt, /liveChecks: gateDecision\.liveChecks/u);
+  assert.match(receipt, /stableStringify\(receipt\?\.gate\?\.liveChecks\)/u);
   assert.match(receipt, /SECRETS_STRICT: "1"/u);
   assert.match(receipt, /receipt\+live-range-secrets/u);
 });

@@ -272,7 +272,11 @@ function createStableReceiptEnvironment(baseEnvironment) {
 const STABLE_RECEIPT_TOOLS = createStableReceiptEnvironment(process.env);
 after(() => STABLE_RECEIPT_TOOLS.cleanup());
 
-function createFixture({ changePath = "tracked.txt" } = {}) {
+function createFixture({
+  changePath = "tracked.txt",
+  baseContent = "base\n",
+  headContent = "head\n",
+} = {}) {
   const root = mkdtempSync(path.join(os.tmpdir(), "plush-receipt-repo-"));
   const remote = mkdtempSync(path.join(os.tmpdir(), "plush-receipt-remote-"));
   git(root, ["init", "-q", "-b", "main"]);
@@ -282,7 +286,7 @@ function createFixture({ changePath = "tracked.txt" } = {}) {
   installRealReceiptFiles(root);
   installGateStubs(root);
   mkdirSync(path.dirname(path.join(root, changePath)), { recursive: true });
-  writeFileSync(path.join(root, changePath), "base\n", "utf8");
+  writeFileSync(path.join(root, changePath), baseContent, "utf8");
   const remoteSha = commit(root, "base");
   git(root, [
     "-c",
@@ -292,7 +296,7 @@ function createFixture({ changePath = "tracked.txt" } = {}) {
     "origin",
     `${remoteSha}:refs/heads/main`,
   ]);
-  writeFileSync(path.join(root, changePath), "head\n", "utf8");
+  writeFileSync(path.join(root, changePath), headContent, "utf8");
   const localSha = commit(root, "head");
   return {
     root,
@@ -1023,8 +1027,8 @@ test("receipt state cannot escape the Git common directory through a symlink", (
   }
 });
 
-test("a first same-name mirror push keeps full-history coverage while database guard uses the distinct tracked upstream", () => {
-  const fixture = createFixture();
+test("a first same-name mirror keeps full-history secrets while live hygiene uses the distinct tracked upstream", () => {
+  const fixture = createFixture({ baseContent: "historical whitespace  \n" });
   const mirror = mkdtempSync(path.join(os.tmpdir(), "plush-receipt-mirror-"));
   try {
     git(mirror, ["init", "--bare", "-q"]);
@@ -1075,6 +1079,20 @@ test("a first same-name mirror push keeps full-history coverage while database g
       receipt.gate.databaseGuard.sourceRemoteUrlSha256,
       /^[0-9a-f]{64}$/u,
     );
+    assert.deepEqual(receipt.gate.liveChecks, {
+      contract: "plush.live-push-checks/v1",
+      refs: [
+        {
+          localRef: "refs/heads/main",
+          remoteRef: "refs/heads/main",
+          gitLogMode: "tracked-upstream",
+          gitLogRange: databaseRange,
+          gitLogBaseRef: "refs/remotes/origin/main",
+          gitLogBaseSha: fixture.remoteSha,
+          secretsRange: fixture.localSha,
+        },
+      ],
+    });
 
     const pushed = runHook(fixture, {
       input: `refs/heads/main ${fixture.localSha} refs/heads/main ${ZERO_SHA}\n`,
@@ -1085,6 +1103,45 @@ test("a first same-name mirror push keeps full-history coverage while database g
     assert.deepEqual(
       readLines(gitStateFile(fixture.root, "secret-ranges.txt")),
       [fixture.localSha],
+    );
+  } finally {
+    fixture.cleanup();
+    rmSync(mirror, { recursive: true, force: true });
+  }
+});
+
+test("a first same-name mirror still blocks whitespace introduced after the tracked upstream", () => {
+  const fixture = createFixture({ headContent: "new whitespace  \n" });
+  const mirror = mkdtempSync(path.join(os.tmpdir(), "plush-receipt-mirror-"));
+  try {
+    git(mirror, ["init", "--bare", "-q"]);
+    git(fixture.root, ["remote", "add", "mirror", mirror]);
+    git(fixture.root, ["config", "branch.main.remote", "origin"]);
+    git(fixture.root, ["config", "branch.main.merge", "refs/heads/main"]);
+    git(fixture.root, [
+      "update-ref",
+      "refs/remotes/origin/main",
+      fixture.remoteSha,
+    ]);
+
+    const prepared = runPrepare(fixture.root, [
+      "--full",
+      "--remote",
+      "mirror",
+      "--ref",
+      "refs/heads/main:refs/heads/main",
+    ]);
+    assert.equal(prepared.status, 0, prepared.stderr || prepared.stdout);
+    const pushed = runHook(fixture, {
+      input: `refs/heads/main ${fixture.localSha} refs/heads/main ${ZERO_SHA}\n`,
+      remoteName: "mirror",
+      remoteLocation: mirror,
+    });
+    assert.equal(pushed.status, 2, pushed.stderr || pushed.stdout);
+    assert.match(pushed.stderr, /reason=git_log_check_failed/u);
+    assert.equal(
+      existsSync(gitStateFile(fixture.root, "secret-ranges.txt")),
+      false,
     );
   } finally {
     fixture.cleanup();
