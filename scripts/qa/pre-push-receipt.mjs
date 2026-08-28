@@ -39,10 +39,10 @@ import {
 } from "./affected.mjs";
 import { collectGitChangedFiles } from "./lib/git-range.mjs";
 
-export const PRE_PUSH_RECEIPT_CONTRACT = "plush.pre-push-receipt/v5";
+export const PRE_PUSH_RECEIPT_CONTRACT = "plush.pre-push-receipt/v6";
 export const PRE_PUSH_RECEIPT_TTL_MS = 30 * 60 * 1000;
 export const PRE_PUSH_ENVIRONMENT_CONTRACT = "plush.pre-push-environment/v2";
-export const PRE_PUSH_GATE_CONTRACT = "plush.pre-push-gate-tree/v4";
+export const PRE_PUSH_GATE_CONTRACT = "plush.pre-push-gate-tree/v5";
 export const PRE_PUSH_SIGNATURE_CONTRACT = "hmac-sha256/v1";
 export const REMOTE_REF_QUERY_TIMEOUT_MS = 20_000;
 export const REVIEW_PUSH_BASE_REF = "refs/heads/main";
@@ -52,6 +52,9 @@ export const REVIEW_PUSH_REMOTE_REF = "refs/heads/review/gpt";
 const ZERO_SHA = "0000000000000000000000000000000000000000";
 const REVIEW_PUSH_CONTRACT = "plush.review-push/v1";
 const LIVE_PUSH_CHECKS_CONTRACT = "plush.live-push-checks/v1";
+const SERVER_CI_REQUIRED_CONTRACT = "plush.server-ci-required/v1";
+const CANONICAL_GITLAB_REMOTE = "origin";
+const CANONICAL_GITLAB_REF = "refs/heads/main";
 const CLOCK_SKEW_MS = 30_000;
 const REMOTE_REF_QUERY_RETRY_DELAYS_MS = Object.freeze([250, 750]);
 const RETRYABLE_REMOTE_REF_QUERY_PATTERN =
@@ -787,10 +790,39 @@ function affectedPlanEvidence(plan) {
   };
 }
 
+function resolveServerCiRequirement(pushPlan, allowServerCi) {
+  if (
+    allowServerCi !== true ||
+    pushPlan.remoteName !== CANONICAL_GITLAB_REMOTE ||
+    pushPlan.refs.length !== 1
+  ) {
+    return null;
+  }
+  const [ref] = pushPlan.refs;
+  if (
+    ref.localRef !== CANONICAL_GITLAB_REF ||
+    ref.remoteRef !== CANONICAL_GITLAB_REF ||
+    ref.remoteSha === ZERO_SHA
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    contract: SERVER_CI_REQUIRED_CONTRACT,
+    provider: "gitlab",
+    remoteName: CANONICAL_GITLAB_REMOTE,
+    localRef: CANONICAL_GITLAB_REF,
+    remoteRef: CANONICAL_GITLAB_REF,
+    exactSha: ref.localSha,
+    requiredPipeline: "ordinary",
+    requiredTerminalJob: "CI Gate",
+    requiredBeforeRelease: true,
+  });
+}
+
 export function resolvePrePushGateDecision(
   root,
   pushPlan,
-  { forceFull = false } = {},
+  { forceFull = false, allowServerCi = false } = {},
 ) {
   if (!pushPlan?.aggregateRange) {
     throw new ReceiptError("invalid_push_range", "aggregate range is empty");
@@ -806,16 +838,30 @@ export function resolvePrePushGateDecision(
   const selection = selectPrePushProfile(affectedPlan, { forceFull });
   const databaseGuard = resolveDatabaseGuard(root, pushPlan);
   const liveChecks = resolveLivePushChecks(pushPlan, databaseGuard);
+  const serverCiRequired = resolveServerCiRequirement(
+    pushPlan,
+    allowServerCi && !forceFull,
+  );
+  const selectedGate = serverCiRequired
+    ? {
+        ...selection,
+        profile: "server-ci",
+        requiresFullConfirmation: false,
+        requiresManagedDatabase: false,
+      }
+    : selection;
   return Object.freeze({
-    ...selection,
+    ...selectedGate,
     databaseGuard,
     liveChecks,
+    serverCiRequired,
     changedFileCount: changedFiles.length,
     planSha256: sha256(
       stableStringify({
         affectedPlan: affectedPlanEvidence(affectedPlan),
         databaseGuard,
         liveChecks,
+        serverCiRequired,
       }),
     ),
   });
@@ -1025,7 +1071,7 @@ function readTreeEntries(root, head) {
 export function gateContractFingerprint(root, head, gateDecision) {
   if (
     !gateDecision ||
-    !["affected", "full", "review"].includes(gateDecision.profile)
+    !["affected", "full", "review", "server-ci"].includes(gateDecision.profile)
   ) {
     throw new ReceiptError("invalid_gate_decision");
   }
@@ -1069,12 +1115,21 @@ export function gateContractFingerprint(root, head, gateDecision) {
     planSha256: gateDecision.planSha256,
     databaseGuard: gateDecision.databaseGuard,
     liveChecks: gateDecision.liveChecks,
+    serverCiRequired: gateDecision.serverCiRequired,
     gates:
       gateDecision.profile === "full"
         ? GATE_PROFILES.full
         : gateDecision.profile === "review"
           ? ["review-only-plan", "git-log-check", "live-range-secrets"]
-          : ["affected-plan", "live-range-secrets"],
+          : gateDecision.profile === "server-ci"
+            ? [
+                "server-ci-required",
+                "exact-sha-ci-gate",
+                "source-integrity",
+                "git-log-check",
+                "live-range-secrets",
+              ]
+            : ["affected-plan", "live-range-secrets"],
     requiredFiles: requiredFiles
       .map((file) => entries.get(file))
       .sort((left, right) => left.file.localeCompare(right.file)),
@@ -1355,6 +1410,8 @@ function validateReceipt({
       stableStringify(gateDecision.databaseGuard) ||
     stableStringify(receipt?.gate?.liveChecks) !==
       stableStringify(gateDecision.liveChecks) ||
+    stableStringify(receipt?.gate?.serverCiRequired) !==
+      stableStringify(gateDecision.serverCiRequired) ||
     receipt?.gate?.deliveryEligible !== (gateDecision.profile !== "review")
   ) {
     throw new ReceiptError("receipt_profile_mismatch");
@@ -1422,6 +1479,7 @@ function makeReceipt({
       planSha256: gateDecision.planSha256,
       databaseGuard: gateDecision.databaseGuard,
       liveChecks: gateDecision.liveChecks,
+      serverCiRequired: gateDecision.serverCiRequired,
       deliveryEligible: gateDecision.profile !== "review",
       contract: PRE_PUSH_GATE_CONTRACT,
       sha256:
@@ -1510,6 +1568,15 @@ function parseHookOptions(args) {
   return options;
 }
 
+function usesDefaultServerCiProfile(options) {
+  return (
+    options.reviewOnly !== true &&
+    options.forceFull !== true &&
+    !options.remoteName &&
+    options.refspecs.length === 0
+  );
+}
+
 export function resolvePrepareMode(root, options, { env = process.env } = {}) {
   assertNoForbiddenEnvironment(env);
   const snapshot = readRepositorySnapshot(root);
@@ -1521,6 +1588,7 @@ export function resolvePrepareMode(root, options, { env = process.env } = {}) {
     ? resolveReviewGateDecision(root, pushPlan)
     : resolvePrePushGateDecision(root, pushPlan, {
         forceFull: options.forceFull,
+        allowServerCi: usesDefaultServerCiProfile(options),
       });
   if (gateDecision.requiresFullConfirmation) {
     throw new ReceiptError(
@@ -1547,6 +1615,7 @@ export function preparePush(root, options, { env = process.env } = {}) {
       ? resolveReviewGateDecision(root, pushPlan)
       : resolvePrePushGateDecision(root, pushPlan, {
           forceFull: options.forceFull,
+          allowServerCi: usesDefaultServerCiProfile(options),
         });
   const releaseLock = acquireReceiptLock(
     state,
@@ -1613,7 +1682,7 @@ export function preparePush(root, options, { env = process.env } = {}) {
     console.log(
       `[${label}] 运行 ${initialGateDecision.profile}（HEAD=${before.head.slice(0, 12)} aggregate_range=${initialPlan.aggregateRange} db_guard_range=${initialGateDecision.databaseGuard.range} files=${initialGateDecision.changedFileCount} recommended_delivery_profile=${initialGateDecision.recommendedProfile}）`,
     );
-    if (reviewOnly) {
+    if (reviewOnly || initialGateDecision.profile === "server-ci") {
       runLivePushChecks(root, initialPlan, env, {
         label,
         gateDecision: initialGateDecision,
@@ -1826,6 +1895,7 @@ export function verifyPushHook(
       ? resolveReviewGateDecision(root, pushPlan)
       : resolvePrePushGateDecision(root, pushPlan, {
           forceFull: receipt?.gate?.profile === "full",
+          allowServerCi: receipt?.gate?.profile === "server-ci",
         });
     const gateSha256 = gateContractFingerprint(
       root,
@@ -1878,10 +1948,12 @@ function printHelp() {
   bash scripts/qa/prepare-push.sh --review [--remote <name>]
 
 说明:
-  prepare 在建立真实 git push 连接前，对 clean HEAD 和真实范围复算 affected 计划。
-  计划可自动闭合时执行 affected；存在 full local gate 或 required follow-up 时停止，
-  须逐次显式使用 --full。发布候选也显式使用 --full。通过后在 Git common dir
-  签发短期本地回执。普通当前分支可不传 remote/ref；多 ref 或非默认目标逐项传 --ref。
+  默认 origin refs/heads/main -> refs/heads/main 普通推送会在连接前校验 clean HEAD/tree、
+  真实 remote/ref/range、git log、strict secrets 与 source-integrity，并签发 server-ci
+  回执；高成本门禁交由 R640 exact-SHA GitLab CI。回执只授权普通非强制 push；
+  release、package promotion 或 protected deploy 必须等待同一 exact SHA 的
+  terminal-success CI Gate。显式 --full、--review 与任何非规范目标仍保守处理。
+  普通当前分支可不传 remote/ref；多 ref 或非默认目标逐项传 --ref。
   --review 只允许 clean main 以 fast-forward 方式更新远端 review/gpt；它只运行提交
   格式与严格 secrets 检查并记录后续正式推送建议，不运行 affected/full，也不能用于
   main、tag、发布或其他 ref。pre-push hook 只读取固定回执位置，不接受调用者提供

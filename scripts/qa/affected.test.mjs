@@ -22,6 +22,23 @@ function ids(plan) {
   return plan.commands.map((item) => item.id);
 }
 
+test("affected: help explains the server-CI trust boundary", () => {
+  const output = execFileSync(
+    process.execPath,
+    [path.join(ROOT, "scripts/qa/affected.mjs"), "--help"],
+    {
+      cwd: ROOT,
+      encoding: "utf8",
+    },
+  );
+
+  assert.match(output, /origin\s+refs\/heads\/main -> refs\/heads\/main/u);
+  assert.match(output, /R640 exact-SHA GitLab CI/u);
+  assert.match(output, /回执只授权普通\s+非强制 push/u);
+  assert.match(output, /terminal-success CI Gate/u);
+  assert.doesNotMatch(output, /有 full local gate/u);
+});
+
 async function withTempGitRepo(callback) {
   const root = await mkdtemp(path.join(os.tmpdir(), "plush-affected-"));
   try {
@@ -629,9 +646,10 @@ test("affected: focused plan selects an affected pre-push receipt", () => {
     },
   );
 
-  assert.match(output, /prepare-push\.sh.*affected 回执/u);
-  assert.match(output, /发布候选仍显式使用 --full/u);
-  assert.match(output, /不代表 strict、目标环境 migration/u);
+  assert.match(output, /非 origin\/main.*affected 回执/u);
+  assert.match(output, /正式 origin\/main.*server-ci.*R640 exact-SHA CI/u);
+  assert.match(output, /只授权普通非强制 push/u);
+  assert.match(output, /受保护部署.*CI Gate 终态成功/u);
   assert.match(output, /scopes=T0,T1 max_scope=T1 local_gate=focused/u);
 });
 
@@ -646,7 +664,9 @@ test("affected: unresolved follow-ups require explicit full pre-push", () => {
   assert.equal(selection.requiresFullConfirmation, true);
   assert.equal(selection.requiresManagedDatabase, true);
   assert(selection.reasons.includes("required_follow_up:browser-regression"));
-  assert.match(formatPlan(plan, { root: ROOT }), /须逐次显式使用 --full/u);
+  const output = formatPlan(plan, { root: ROOT });
+  assert.match(output, /须逐次显式使用 --full/u);
+  assert.match(output, /正式 origin\/main.*server-ci/u);
 });
 
 test("affected: explicit full can only escalate a focused plan", () => {

@@ -55,6 +55,8 @@ GitLab HTTP 只绑定 R640 `127.0.0.1:8929`，由 FRP 到阿里云 `18226`，再
 2. `quality` 按 plan 准备 Go、Web、Atlas、Chromium 和一次性 PostgreSQL。MR 通常走 affected；main push 对 exact SHA 建 strict terminal；需要完整门禁时走 full。
 3. `CI Gate` 只在 plan 与 quality 都成功时通过，作为 protected main 的稳定 required job。
 
+默认 `origin/main` 推送前，本地 `prepare-push` 只执行并签名 clean HEAD/tree、remote/ref/range、git-log、严格 secrets 与源码完整性短门禁，不重复 Runner 的 affected/full、数据库、浏览器、测试或构建。该回执只允许普通非强制 push，不表示 CI 已成功；Release、Package promotion 和任何受保护部署必须读回同一 40 位 SHA 的不可变终态成功 `CI Gate`。生产目标只加载 CI 构建的不可变制品或镜像并执行正式 migration、health/ready 与 smoke，禁止现场重建。
+
 缓存只缩短依赖和浏览器准备时间，不能跳过 checksum、locked install、门禁、source archive 或 clean-tree 读回。pipeline artifacts 是本次运行证据，不等于不可变发布。
 
 ### exact-SHA release

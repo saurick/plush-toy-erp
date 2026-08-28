@@ -102,7 +102,17 @@ test("pre-push delegates the real stdin contract without reopening full", () => 
   );
   assert.match(receipt, /QA_BASE_RANGE: check\.secretsRange/u);
   assert.match(receipt, /liveChecks: gateDecision\.liveChecks/u);
+  assert.match(receipt, /serverCiRequired: gateDecision\.serverCiRequired/u);
   assert.match(receipt, /stableStringify\(receipt\?\.gate\?\.liveChecks\)/u);
+  assert.match(
+    receipt,
+    /stableStringify\(receipt\?\.gate\?\.serverCiRequired\)/u,
+  );
+  assert.match(receipt, /profile === "server-ci"/u);
+  assert.match(
+    receipt,
+    /allowServerCi: receipt\?\.gate\?\.profile === "server-ci"/u,
+  );
   assert.match(receipt, /SECRETS_STRICT: "1"/u);
   assert.match(receipt, /receipt\+live-range-secrets/u);
 });

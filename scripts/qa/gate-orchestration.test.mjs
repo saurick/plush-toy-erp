@@ -541,6 +541,17 @@ test("local receipt has one repository-owned issuer while full and CI stay real"
   assert.doesNotMatch(prePush, /full\.sh|SKIP_PRE_PUSH/u);
   assert.match(receipt, /PRE_PUSH_RECEIPT_TTL_MS = 30 \* 60 \* 1000/u);
   assert.match(receipt, /resolvePrePushGateDecision/u);
+  assert.match(receipt, /SERVER_CI_REQUIRED_CONTRACT/u);
+  assert.match(receipt, /profile: "server-ci"/u);
+  assert.match(receipt, /serverCiRequired: gateDecision\.serverCiRequired/u);
+  assert.match(
+    receipt,
+    /reviewOnly \|\| initialGateDecision\.profile === "server-ci"/u,
+  );
+  assert.match(
+    receipt,
+    /allowServerCi: receipt\?\.gate\?\.profile === "server-ci"/u,
+  );
   assert.match(receipt, /full_confirmation_required/u);
   assert.match(receipt, /scripts\/qa\/affected\.mjs/u);
   assert.match(receipt, /rev-parse", "--git-common-dir"/u);

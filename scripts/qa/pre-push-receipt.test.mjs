@@ -471,6 +471,15 @@ test("prepare wrapper exposes help without running full or creating receipt stat
     const result = runPrepare(fixture.root, ["--help"]);
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.match(result.stdout, /prepare-push\.sh/u);
+    assert.match(
+      result.stdout,
+      /origin refs\/heads\/main -> refs\/heads\/main/u,
+    );
+    assert.match(result.stdout, /server-ci/u);
+    assert.match(result.stdout, /R640 exact-SHA GitLab CI/u);
+    assert.match(result.stdout, /回执只授权普通非强制 push/u);
+    assert.match(result.stdout, /terminal-success CI Gate/u);
+    assert.doesNotMatch(result.stdout, /计划可自动闭合时执行 affected/u);
     assert.equal(
       existsSync(gitStateFile(fixture.root, "full-ranges.txt")),
       false,
@@ -484,48 +493,97 @@ test("prepare wrapper exposes help without running full or creating receipt stat
   }
 });
 
-test("focused changes run affected once and reuse the exact-range receipt", () => {
+test("canonical main signs a server-CI receipt without local affected or full", () => {
   const fixture = createFixture({ changePath: "docs/guide.md" });
   try {
     const env = cleanEnvironment({ DISPOSABLE_DATABASE_BASE_URL: "" });
     const first = runPrepare(fixture.root, [], env);
     assert.equal(first.status, 0, first.stderr || first.stdout);
-    assert.match(first.stdout, /status=complete profile=affected/u);
+    assert.match(first.stdout, /status=complete profile=server-ci/u);
     const state = resolveReceiptState(fixture.root);
     const receipt = JSON.parse(readFileSync(state.receiptPath, "utf8"));
-    assert.equal(receipt.gate.profile, "affected");
+    assert.equal(receipt.gate.profile, "server-ci");
     assert.equal(receipt.gate.recommendedProfile, "affected");
-    assert.deepEqual(
-      readLines(gitStateFile(fixture.root, "affected-ranges.txt")),
-      [`${fixture.remoteSha}..${fixture.localSha}`],
+    assert.deepEqual(receipt.gate.serverCiRequired, {
+      contract: "plush.server-ci-required/v1",
+      provider: "gitlab",
+      remoteName: "origin",
+      localRef: "refs/heads/main",
+      remoteRef: "refs/heads/main",
+      exactSha: fixture.localSha,
+      requiredPipeline: "ordinary",
+      requiredTerminalJob: "CI Gate",
+      requiredBeforeRelease: true,
+    });
+    assert.equal(
+      existsSync(gitStateFile(fixture.root, "affected-ranges.txt")),
+      false,
     );
     assert.equal(
       existsSync(gitStateFile(fixture.root, "full-ranges.txt")),
       false,
     );
+    assert.deepEqual(
+      readLines(gitStateFile(fixture.root, "secret-ranges.txt")),
+      [`${fixture.remoteSha}..${fixture.localSha}`],
+    );
 
     const second = runPrepare(fixture.root, [], env);
     assert.equal(second.status, 0, second.stderr || second.stdout);
-    assert.match(second.stdout, /status=reused profile=affected/u);
+    assert.match(second.stdout, /status=reused profile=server-ci/u);
     assert.equal(
-      readLines(gitStateFile(fixture.root, "affected-ranges.txt")).length,
-      1,
+      existsSync(gitStateFile(fixture.root, "affected-ranges.txt")),
+      false,
     );
 
     const pushed = runHook(fixture, { env });
     assert.equal(pushed.status, 0, pushed.stderr || pushed.stdout);
     assert.match(pushed.stdout, /coverage=receipt\+live-range-secrets/u);
+    assert.deepEqual(
+      readLines(gitStateFile(fixture.root, "secret-ranges.txt")),
+      [
+        `${fixture.remoteSha}..${fixture.localSha}`,
+        `${fixture.remoteSha}..${fixture.localSha}`,
+      ],
+    );
   } finally {
     fixture.cleanup();
   }
 });
 
-test("a high-risk plan never starts full without explicit confirmation", () => {
+test("canonical high-risk changes keep the full recommendation but run on server CI", () => {
   const fixture = createFixture();
   try {
     const result = runPrepare(
       fixture.root,
       [],
+      cleanEnvironment({ DISPOSABLE_DATABASE_BASE_URL: "" }),
+    );
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /status=complete profile=server-ci/u);
+    const receipt = JSON.parse(
+      readFileSync(resolveReceiptState(fixture.root).receiptPath, "utf8"),
+    );
+    assert.equal(receipt.gate.recommendedProfile, "full");
+    assert.equal(
+      existsSync(gitStateFile(fixture.root, "full-ranges.txt")),
+      false,
+    );
+    assert.equal(
+      existsSync(gitStateFile(fixture.root, "affected-ranges.txt")),
+      false,
+    );
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("noncanonical high-risk changes still require explicit full", () => {
+  const fixture = createFixture();
+  try {
+    const result = runPrepare(
+      fixture.root,
+      ["--ref", "refs/heads/main:refs/heads/topic"],
       cleanEnvironment({ DISPOSABLE_DATABASE_BASE_URL: "" }),
     );
     assert.equal(result.status, 2, result.stderr || result.stdout);
@@ -534,6 +592,28 @@ test("a high-risk plan never starts full without explicit confirmation", () => {
     assert.equal(
       existsSync(gitStateFile(fixture.root, "full-ranges.txt")),
       false,
+    );
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("server-CI metadata is signed and recomputed by the hook", () => {
+  const fixture = createFixture({ changePath: "docs/guide.md" });
+  try {
+    const env = cleanEnvironment({ DISPOSABLE_DATABASE_BASE_URL: "" });
+    const prepared = runPrepare(fixture.root, [], env);
+    assert.equal(prepared.status, 0, prepared.stderr || prepared.stdout);
+    const state = resolveReceiptState(fixture.root);
+    resignReceipt(state, (receipt) => {
+      receipt.gate.serverCiRequired.exactSha = fixture.remoteSha;
+    });
+    const pushed = runHook(fixture, { env });
+    assert.equal(pushed.status, 2, pushed.stderr || pushed.stdout);
+    assert.match(pushed.stderr, /reason=receipt_profile_mismatch/u);
+    assert.deepEqual(
+      readLines(gitStateFile(fixture.root, "secret-ranges.txt")),
+      [`${fixture.remoteSha}..${fixture.localSha}`],
     );
   } finally {
     fixture.cleanup();
@@ -785,9 +865,10 @@ test("affected failures and repository drift never produce a push receipt", () =
   ]) {
     const fixture = createFixture({ changePath: "docs/guide.md" });
     try {
+      git(fixture.root, ["remote", "add", "mirror", fixture.remote]);
       const result = runPrepare(
         fixture.root,
-        [],
+        ["--remote", "mirror", "--ref", "refs/heads/main:refs/heads/main"],
         cleanEnvironment({
           DISPOSABLE_DATABASE_BASE_URL: "",
           ...overrides,
