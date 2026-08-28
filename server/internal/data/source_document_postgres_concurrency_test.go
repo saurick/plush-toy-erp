@@ -80,17 +80,23 @@ func TestSourceDocumentPostgresSaveSubmitConcurrency(t *testing.T) {
 		realUC := biz.NewSalesOrderUsecase(realRepo)
 		orderDate := time.Date(2026, 7, 10, 0, 0, 0, 0, time.UTC)
 		originalQuantity := decimal.NewFromInt(10)
+		unitPrice := decimal.NewFromInt(1)
+		taxMode := biz.SalesOrderTaxModeNone
+		freightTerms := biz.SalesOrderFreightTermsExcluded
 
 		created, err := realUC.SaveSalesOrderWithItems(ctx, 0, &biz.SalesOrderMutation{
-			OrderNo:    "SO-PG-CONCURRENT-" + suffix,
-			CustomerID: customer.ID,
-			OrderDate:  orderDate,
+			OrderNo:      "SO-PG-CONCURRENT-" + suffix,
+			CustomerID:   customer.ID,
+			OrderDate:    orderDate,
+			TaxMode:      &taxMode,
+			FreightTerms: &freightTerms,
 		}, []*biz.SalesOrderItemSaveMutation{{
 			SalesOrderItemMutation: biz.SalesOrderItemMutation{
 				LineNo:          1,
 				ProductID:       product.ID,
 				UnitID:          unit.ID,
 				OrderedQuantity: originalQuantity,
+				UnitPrice:       &unitPrice,
 			},
 		}})
 		if err != nil {
@@ -108,6 +114,8 @@ func TestSourceDocumentPostgresSaveSubmitConcurrency(t *testing.T) {
 				CustomerID:      customer.ID,
 				OrderDate:       orderDate,
 				Currency:        created.Order.Currency,
+				TaxMode:         &taxMode,
+				FreightTerms:    &freightTerms,
 				ExpectedVersion: created.Order.Version,
 			}, []*biz.SalesOrderItemSaveMutation{{
 				ID: created.Items[0].ID,
@@ -116,6 +124,7 @@ func TestSourceDocumentPostgresSaveSubmitConcurrency(t *testing.T) {
 					ProductID:       product.ID,
 					UnitID:          unit.ID,
 					OrderedQuantity: decimal.NewFromInt(99),
+					UnitPrice:       &unitPrice,
 				},
 			}})
 			saveErr <- err

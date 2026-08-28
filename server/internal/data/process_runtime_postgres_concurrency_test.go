@@ -319,10 +319,17 @@ func TestProcessRuntimePostgresConcurrentSalesActivationReusesWinnerAndRoutesRev
 	unit := createTestUnit(t, ctx, client, "SALES-CONCURRENT-U-"+suffix)
 	product := createTestProduct(t, ctx, client, unit.ID, "SALES-CONCURRENT-P-"+suffix)
 	customer := createSalesOrderTestCustomer(t, ctx, client, "SALES-CONCURRENT-C-"+suffix, true)
+	quantity := decimal.RequireFromString("1.25")
+	unitPrice := decimal.NewFromInt(1)
 	order := client.SalesOrder.Create().
 		SetOrderNo("SO-CONCURRENT-ACTIVATE-" + suffix).
 		SetCustomerID(customer.ID).
 		SetOrderDate(time.Now().UTC()).
+		SetTaxMode(biz.SalesOrderTaxModeNone).
+		SetFreightTerms(biz.SalesOrderFreightTermsExcluded).
+		SetGoodsAmount(quantity).
+		SetTaxAmount(decimal.Zero).
+		SetOrderTotal(quantity).
 		SetLifecycleStatus(biz.SalesOrderStatusSubmitted).
 		SaveX(ctx)
 	client.SalesOrderItem.Create().
@@ -330,7 +337,9 @@ func TestProcessRuntimePostgresConcurrentSalesActivationReusesWinnerAndRoutesRev
 		SetLineNo(1).
 		SetProductID(product.ID).
 		SetUnitID(unit.ID).
-		SetOrderedQuantity(decimal.RequireFromString("1.25")).
+		SetOrderedQuantity(quantity).
+		SetUnitPrice(unitPrice).
+		SetAmount(quantity).
 		SaveX(ctx)
 	revision := "sales-concurrent-activation-" + suffix
 	ownerPool := "order_review"

@@ -37,10 +37,13 @@ func TestOperationalFactPostgresConcurrentSalesOrderStockReservationDoesNotExcee
 
 	salesUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, log.NewStdLogger(io.Discard)))
 	customer := createSalesOrderTestCustomer(t, ctx, client, "PG-C-RSV-SOURCE-"+fixtures.suffix, true)
+	unitPrice := decimal.NewFromInt(1)
 	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
-		OrderNo:    "PG-SO-RSV-SOURCE-" + fixtures.suffix,
-		CustomerID: customer.ID,
-		OrderDate:  time.Now(),
+		OrderNo:      "PG-SO-RSV-SOURCE-" + fixtures.suffix,
+		CustomerID:   customer.ID,
+		OrderDate:    time.Now(),
+		TaxMode:      stringPtr(biz.SalesOrderTaxModeNone),
+		FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
 	})
 	if err != nil {
 		t.Fatalf("create sourced reservation order failed: %v", err)
@@ -51,6 +54,7 @@ func TestOperationalFactPostgresConcurrentSalesOrderStockReservationDoesNotExcee
 		ProductID:       fixtures.productID,
 		UnitID:          fixtures.unitID,
 		OrderedQuantity: decimal.NewFromInt(10),
+		UnitPrice:       &unitPrice,
 	})
 	if err != nil {
 		t.Fatalf("create sourced reservation order item failed: %v", err)

@@ -25,6 +25,9 @@ const SAFE_REMOTE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u;
 const MANAGED_EXACT_SHA_MAIN_REF = "HEAD";
 const MANAGED_DATABASE_TIMEOUT_MS = 60_000;
 const MANAGED_DATABASE_POLL_MS = 250;
+const MANAGED_DATABASE_HOST_TIMEOUT_MS = 30_000;
+const MANAGED_DATABASE_HOST_POLL_MS = 1_000;
+const MANAGED_DATABASE_HOST_GREEN_SAMPLES = 3;
 
 function repositoryScope(repoRoot) {
   return createHash("sha256").update(path.resolve(repoRoot)).digest("hex");
@@ -296,6 +299,48 @@ export function readManagedLoopbackPort(container) {
   return port;
 }
 
+export function buildManagedDatabaseHostProbe({
+  password,
+  port,
+  timeoutMs = 2_000,
+} = {}) {
+  if (
+    typeof password !== "string" ||
+    password.length < 32 ||
+    !Number.isSafeInteger(port) ||
+    port < 1 ||
+    port > 65535 ||
+    !Number.isSafeInteger(timeoutMs) ||
+    timeoutMs < 1 ||
+    timeoutMs > 2_000
+  ) {
+    throw new Error("managed database host probe is invalid");
+  }
+  return Object.freeze({
+    args: Object.freeze([
+      "--host",
+      "127.0.0.1",
+      "--port",
+      String(port),
+      "--username",
+      "postgres",
+      "--dbname",
+      "postgres",
+      "--no-password",
+      "-X",
+      "--no-psqlrc",
+      "-Atq",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-c",
+      "SELECT 1",
+    ]),
+    command: "psql",
+    env: Object.freeze({ ...process.env, PGPASSWORD: password }),
+    timeout: timeoutMs,
+  });
+}
+
 function command(commandName, args, options = {}) {
   return spawnSync(commandName, args, {
     cwd: options.cwd,
@@ -398,6 +443,22 @@ function defaultRuntime({ repoRoot }) {
         throw new Error("managed database container cleanup failed");
       }
     },
+    hostReady({ password, port, timeoutMs }) {
+      const probe = buildManagedDatabaseHostProbe({
+        password,
+        port,
+        timeoutMs,
+      });
+      const result = command(probe.command, probe.args, {
+        env: probe.env,
+        timeout: probe.timeout,
+      });
+      return (
+        !result.error &&
+        result.status === 0 &&
+        String(result.stdout || "").trim() === "1"
+      );
+    },
     runGate({
       databaseURL,
       exactSha,
@@ -473,6 +534,50 @@ async function waitForHealthyContainer(runtime, spec) {
     await runtime.sleep(MANAGED_DATABASE_POLL_MS);
   }
   throw new Error("managed database readiness timed out");
+}
+
+export async function waitForManagedDatabaseHostReadiness(
+  runtime,
+  {
+    password,
+    port,
+    timeoutMs = MANAGED_DATABASE_HOST_TIMEOUT_MS,
+    pollMs = MANAGED_DATABASE_HOST_POLL_MS,
+    now = Date.now,
+  } = {},
+) {
+  if (
+    typeof runtime?.hostReady !== "function" ||
+    typeof runtime?.sleep !== "function" ||
+    typeof now !== "function" ||
+    !Number.isSafeInteger(timeoutMs) ||
+    timeoutMs < 1 ||
+    !Number.isSafeInteger(pollMs) ||
+    pollMs < 1
+  ) {
+    throw new Error("managed database host readiness contract is invalid");
+  }
+  const deadline = now() + timeoutMs;
+  let consecutive = 0;
+  while (now() < deadline) {
+    const remainingMs = deadline - now();
+    let ready = false;
+    try {
+      ready =
+        runtime.hostReady({
+          password,
+          port,
+          timeoutMs: Math.min(2_000, Math.max(1, remainingMs)),
+        }) === true;
+    } catch {
+      ready = false;
+    }
+    if (now() > deadline) break;
+    consecutive = ready ? consecutive + 1 : 0;
+    if (consecutive >= MANAGED_DATABASE_HOST_GREEN_SAMPLES) return;
+    await runtime.sleep(Math.min(pollMs, Math.max(1, deadline - now())));
+  }
+  throw new Error("managed database host readiness timed out");
 }
 
 async function removeOwnedContainer(runtime, spec) {
@@ -588,6 +693,11 @@ export async function runManagedQualityGate({
     executor.start(spec);
     const container = await waitForHealthyContainer(executor, spec);
     const port = readManagedLoopbackPort(container);
+    await waitForManagedDatabaseHostReadiness(executor, {
+      password,
+      port,
+      now: typeof executor.now === "function" ? executor.now : Date.now,
+    });
     const databaseURL = `postgres://postgres:${encodeURIComponent(password)}@127.0.0.1:${port}/postgres?sslmode=disable`;
     stdout.write(`${MANAGED_DATABASE_EVENTS.ready}\n`);
     result = await executor.runGate({

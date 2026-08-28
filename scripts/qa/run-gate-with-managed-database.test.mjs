@@ -7,12 +7,14 @@ import {
   MANAGED_DATABASE_IMAGE,
   MANAGED_DATABASE_LABELS,
   buildManagedDatabaseContainerSpec,
+  buildManagedDatabaseHostProbe,
   buildManagedQualityGateCommand,
   parseManagedDatabaseInspectResult,
   parseManagedDatabaseArgs,
   probeManagedDatabaseRuntime,
   readManagedLoopbackPort,
   runManagedQualityGate,
+  waitForManagedDatabaseHostReadiness,
 } from "./run-gate-with-managed-database.mjs";
 
 const OPERATION_ID = "123e4567-e89b-42d3-a456-426614174000";
@@ -242,6 +244,46 @@ test("managed database port readback rejects wildcard and ambiguous bindings", (
   assert.throws(() => readManagedLoopbackPort(ambiguous), /unavailable/u);
 });
 
+test("managed database host probe keeps the password out of fixed shell-free arguments", () => {
+  const probe = buildManagedDatabaseHostProbe({
+    password: PASSWORD,
+    port: 55439,
+  });
+  assert.equal(probe.command, "psql");
+  assert.equal(probe.timeout, 2_000);
+  assert.deepEqual(probe.args.slice(-2), ["-c", "SELECT 1"]);
+  assert(probe.args.includes("--no-password"));
+  assert(!probe.args.some((value) => value.includes(PASSWORD)));
+  assert.equal(probe.env.PGPASSWORD, PASSWORD);
+});
+
+test("managed database host readiness requires three consecutive green samples", async () => {
+  const samples = [true, true, false, true, true, true];
+  let nowMs = 0;
+  const timeouts = [];
+  await waitForManagedDatabaseHostReadiness(
+    {
+      hostReady({ timeoutMs }) {
+        timeouts.push(timeoutMs);
+        return samples.shift();
+      },
+      async sleep(delayMs) {
+        nowMs += delayMs;
+      },
+    },
+    {
+      password: PASSWORD,
+      port: 55439,
+      timeoutMs: 30_000,
+      pollMs: 1_000,
+      now: () => nowMs,
+    },
+  );
+  assert.equal(samples.length, 0);
+  assert.equal(timeouts.length, 6);
+  assert(timeouts.every((value) => value > 0 && value <= 2_000));
+});
+
 test("managed database inspection distinguishes confirmed absence from Docker failure", () => {
   const name = `plush-qa-${OPERATION_ID}`;
   assert.equal(
@@ -330,6 +372,10 @@ test("managed database runner passes only after the formal gate and exact cleanu
       events.push("remove");
       container = null;
     },
+    hostReady() {
+      events.push("host-ready");
+      return true;
+    },
     async runGate(options) {
       events.push("gate");
       databaseURL = options.databaseURL;
@@ -347,7 +393,14 @@ test("managed database runner passes only after the formal gate and exact cleanu
     stdout: { write: (value) => output.push(value.trim()) },
     processRef: new EventEmitter(),
   });
-  assert.deepEqual(events, ["start", "gate", "remove"]);
+  assert.deepEqual(events, [
+    "start",
+    "host-ready",
+    "host-ready",
+    "host-ready",
+    "gate",
+    "remove",
+  ]);
   assert.equal(result.code, 0);
   assert.equal(result.cleanup, "complete");
   assert.match(databaseURL, /^postgres:\/\/postgres:/u);
@@ -376,6 +429,7 @@ test("managed exact-SHA runner reuses the same owned-container cleanup lifecycle
       events.push("remove");
       container = null;
     },
+    hostReady: () => true,
     async runGate(options) {
       events.push("exact-sha");
       assert.equal(options.exactSha, EXACT_SHA);
@@ -420,6 +474,7 @@ test("managed prepare-push runner reuses the same owned-container cleanup lifecy
     remove() {
       container = null;
     },
+    hostReady: () => true,
     async runGate(options) {
       assert.equal(options.preparePush, true);
       assert.equal(options.forceFull, true);
@@ -460,6 +515,7 @@ test("managed database runner refuses a false pass when cleanup readback fails",
     },
     inspect: () => healthyContainer(spec),
     remove() {},
+    hostReady: () => true,
     async runGate(options) {
       options.onChild({ kill() {} });
       return { code: 0, signal: "" };
@@ -514,6 +570,45 @@ test("managed database runner cleans an exact container after an ambiguous start
   assert.equal(removed, true);
   assert.equal(result.code, 2);
   assert.equal(result.cleanup, "complete");
+  assert.equal(output.at(-1), MANAGED_DATABASE_EVENTS.cleanupComplete);
+});
+
+test("managed database runner cleans without launching the gate when host readiness times out", async () => {
+  const output = [];
+  let container = null;
+  let nowMs = 0;
+  let gateStarted = false;
+  const result = await runManagedQualityGate({
+    gate: "full",
+    operationId: OPERATION_ID,
+    repoRoot: "/repo",
+    runtime: {
+      probe: () => ({ ready: true, message: "ready" }),
+      start(spec) {
+        container = healthyContainer(spec);
+      },
+      inspect: () => container,
+      remove() {
+        container = null;
+      },
+      hostReady: () => false,
+      now: () => nowMs,
+      async runGate() {
+        gateStarted = true;
+        return { code: 0, signal: "" };
+      },
+      async sleep(delayMs) {
+        nowMs += delayMs;
+      },
+    },
+    randomPassword: () => PASSWORD,
+    stdout: { write: (value) => output.push(value.trim()) },
+    processRef: new EventEmitter(),
+  });
+  assert.deepEqual(result, { code: 2, cleanup: "complete" });
+  assert.equal(gateStarted, false);
+  assert.equal(container, null);
+  assert(!output.includes(MANAGED_DATABASE_EVENTS.ready));
   assert.equal(output.at(-1), MANAGED_DATABASE_EVENTS.cleanupComplete);
 });
 

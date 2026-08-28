@@ -184,14 +184,24 @@ func TestSalesProcessCommandPostgresRollsBackOnResultConflictAndFailsClosedForLe
 	if err != nil {
 		t.Fatalf("create sales customer: %v", err)
 	}
+	unit := createTestUnit(t, ctx, client, "U-ATOMIC-"+suffix)
+	product := createTestProduct(t, ctx, client, unit.ID, "P-ATOMIC-"+suffix)
+	unitPrice := decimal.NewFromInt(1)
 	createOrder := func(label string) *biz.SalesOrder {
 		row, createErr := salesRepo.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
 			OrderNo: "SO-ATOMIC-" + label + "-" + suffix, CustomerID: customer.ID,
 			CustomerSnapshot: map[string]any{"name": customer.Name}, ContactSnapshot: map[string]any{}, OrderDate: time.Now(),
-			Currency: biz.FinanceCurrencyCNY,
+			Currency: biz.FinanceCurrencyCNY, TaxMode: stringPtr(biz.SalesOrderTaxModeNone),
+			FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
 		})
 		if createErr != nil {
 			t.Fatalf("create sales order %s: %v", label, createErr)
+		}
+		if _, createErr := salesRepo.AddSalesOrderItem(ctx, &biz.SalesOrderItemMutation{
+			SalesOrderID: row.ID, LineNo: 1, ProductID: product.ID, UnitID: unit.ID,
+			OrderedQuantity: decimal.NewFromInt(1), UnitPrice: &unitPrice, Amount: &unitPrice,
+		}); createErr != nil {
+			t.Fatalf("create sales order item %s: %v", label, createErr)
 		}
 		return row
 	}
@@ -303,15 +313,17 @@ func TestInventoryPostgresShipmentProcessCommandRollsBackSKUInventoryOnResultCon
 		t.Fatalf("seed exact SKU inventory: %v", err)
 	}
 	customer := createSalesOrderTestCustomer(t, ctx, client, "C-ATOMIC-SHIP-"+fixtures.suffix, true)
+	unitPrice := decimal.NewFromInt(1)
 	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
 		OrderNo: "SO-ATOMIC-SHIP-" + fixtures.suffix, CustomerID: customer.ID, OrderDate: time.Now(),
+		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
 	})
 	if err != nil {
 		t.Fatalf("create shipment source sales order: %v", err)
 	}
 	orderItem, err := salesUC.AddSalesOrderItem(ctx, &biz.SalesOrderItemMutation{
 		SalesOrderID: order.ID, LineNo: 1, ProductID: fixtures.productID, ProductSkuID: &sku.ID,
-		UnitID: fixtures.unitID, OrderedQuantity: quantity,
+		UnitID: fixtures.unitID, OrderedQuantity: quantity, UnitPrice: &unitPrice,
 	})
 	if err != nil {
 		t.Fatalf("create shipment source sales order item: %v", err)

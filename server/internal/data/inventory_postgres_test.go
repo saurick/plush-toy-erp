@@ -801,14 +801,17 @@ func TestOperationalFactPostgresConcurrentShipmentsDoNotExceedSalesOrderLine(t *
 		t.Fatalf("seed postgres shipment inventory failed: %v", err)
 	}
 	customer := createSalesOrderTestCustomer(t, ctx, client, "PG-C-SHIP-"+fixtures.suffix, true)
+	unitPrice := decimal.NewFromInt(1)
 	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
 		OrderNo: "PG-SO-SHIP-" + fixtures.suffix, CustomerID: customer.ID, OrderDate: time.Now(),
+		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
 	})
 	if err != nil {
 		t.Fatalf("create postgres sales order failed: %v", err)
 	}
 	item, err := salesUC.AddSalesOrderItem(ctx, &biz.SalesOrderItemMutation{
-		SalesOrderID: order.ID, LineNo: 1, ProductID: fixtures.productID, UnitID: fixtures.unitID, OrderedQuantity: decimal.NewFromInt(3),
+		SalesOrderID: order.ID, LineNo: 1, ProductID: fixtures.productID, UnitID: fixtures.unitID,
+		OrderedQuantity: decimal.NewFromInt(3), UnitPrice: &unitPrice,
 	})
 	if err != nil {
 		t.Fatalf("create postgres sales order item failed: %v", err)
@@ -913,14 +916,17 @@ func TestOperationalFactPostgresCancelledShipmentRestoresSourceCandidateQuantity
 		t.Fatalf("seed postgres shipment inventory failed: %v", err)
 	}
 	customer := createSalesOrderTestCustomer(t, ctx, client, "PG-C-SHIP-CANCEL-"+fixtures.suffix, true)
+	unitPrice := decimal.NewFromInt(1)
 	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
 		OrderNo: "PG-SO-SHIP-CANCEL-" + fixtures.suffix, CustomerID: customer.ID, OrderDate: time.Now(),
+		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
 	})
 	if err != nil {
 		t.Fatalf("create postgres sales order failed: %v", err)
 	}
 	item, err := salesUC.AddSalesOrderItem(ctx, &biz.SalesOrderItemMutation{
-		SalesOrderID: order.ID, LineNo: 1, ProductID: fixtures.productID, UnitID: fixtures.unitID, OrderedQuantity: decimal.NewFromInt(2),
+		SalesOrderID: order.ID, LineNo: 1, ProductID: fixtures.productID, UnitID: fixtures.unitID,
+		OrderedQuantity: decimal.NewFromInt(2), UnitPrice: &unitPrice,
 	})
 	if err != nil {
 		t.Fatalf("create postgres sales order item failed: %v", err)
@@ -1129,12 +1135,17 @@ func TestOperationalFactPostgresConcurrentReservationReleaseAndShipmentPreserveR
 		t.Fatalf("seed postgres product inventory failed: %v", err)
 	}
 	customer := createSalesOrderTestCustomer(t, ctx, client, "PG-C-RELEASE-SHIP-"+fixtures.suffix, true)
-	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{OrderNo: "PG-SO-RELEASE-SHIP-" + fixtures.suffix, CustomerID: customer.ID, OrderDate: time.Now()})
+	unitPrice := decimal.NewFromInt(1)
+	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
+		OrderNo: "PG-SO-RELEASE-SHIP-" + fixtures.suffix, CustomerID: customer.ID, OrderDate: time.Now(),
+		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
+	})
 	if err != nil {
 		t.Fatalf("create postgres sales order failed: %v", err)
 	}
 	item, err := salesUC.AddSalesOrderItem(ctx, &biz.SalesOrderItemMutation{
-		SalesOrderID: order.ID, LineNo: 1, ProductID: fixtures.productID, UnitID: fixtures.unitID, OrderedQuantity: decimal.NewFromInt(5),
+		SalesOrderID: order.ID, LineNo: 1, ProductID: fixtures.productID, UnitID: fixtures.unitID,
+		OrderedQuantity: decimal.NewFromInt(5), UnitPrice: &unitPrice,
 	})
 	if err != nil {
 		t.Fatalf("create postgres sales order item failed: %v", err)
@@ -1223,12 +1234,17 @@ func TestOperationalFactPostgresShipmentRejectsRemainingReservationAcrossInvento
 		}
 	}
 	customer := createSalesOrderTestCustomer(t, ctx, client, "PG-C-CROSS-"+fixtures.suffix, true)
-	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{OrderNo: "PG-SO-CROSS-" + fixtures.suffix, CustomerID: customer.ID, OrderDate: time.Now()})
+	unitPrice := decimal.NewFromInt(1)
+	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
+		OrderNo: "PG-SO-CROSS-" + fixtures.suffix, CustomerID: customer.ID, OrderDate: time.Now(),
+		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
+	})
 	if err != nil {
 		t.Fatalf("create postgres sales order failed: %v", err)
 	}
 	item, err := salesUC.AddSalesOrderItem(ctx, &biz.SalesOrderItemMutation{
-		SalesOrderID: order.ID, LineNo: 1, ProductID: fixtures.productID, UnitID: fixtures.unitID, OrderedQuantity: decimal.NewFromInt(5),
+		SalesOrderID: order.ID, LineNo: 1, ProductID: fixtures.productID, UnitID: fixtures.unitID,
+		OrderedQuantity: decimal.NewFromInt(5), UnitPrice: &unitPrice,
 	})
 	if err != nil {
 		t.Fatalf("create postgres sales order item failed: %v", err)
