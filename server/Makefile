@@ -131,7 +131,7 @@ ent_migrate: atlas_check
 	"$(ATLAS_BIN)" migrate diff migrate \
 		--dir "file://internal/data/model/migrate" \
 		--to "ent://internal/data/model/schema" \
-		--dev-url "docker://postgres/18/dev?search_path=public"
+		--dev-url "docker://postgres/18.1/dev?search_path=public"
 
 # 重新计算迁移目录校验，如果改了 migration 的 sql 文件，必须重新计算校验，否则migrate_apply会报错，提示Error: checksum mismatch
 .PHONY: migrate_hash

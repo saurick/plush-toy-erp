@@ -104,6 +104,14 @@ test("migration generation pins Atlas and closes checksum/revision escape hatche
   assert.match(source, /atlas_check:/u);
   assert.match(source, /Atlas 版本必须是 \$\(ATLAS_VERSION\)/u);
   assert.match(source, /ent_migrate: atlas_check/u);
+  assert.match(
+    source,
+    /--dev-url "docker:\/\/postgres\/18\.1\/dev\?search_path=public"/u,
+  );
+  assert.doesNotMatch(
+    source,
+    /--dev-url "docker:\/\/postgres\/18\/dev\?search_path=public"/u,
+  );
   assert.match(source, /migrate_hash: atlas_check/u);
   assert.match(source, /git diff --name-only -- internal\/data\/model\/migrate/u);
   assert.match(source, /git diff --cached --name-only -- internal\/data\/model\/migrate/u);

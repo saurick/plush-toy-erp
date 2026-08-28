@@ -886,7 +886,7 @@ async function runSchemaReadback(databaseURL) {
       "--to",
       "ent://internal/data/model/schema",
       "--dev-url",
-      "docker://postgres/18/dev?search_path=public",
+      "docker://postgres/18.1/dev?search_path=public",
       "--exclude",
       "atlas_schema_revisions",
     ],
