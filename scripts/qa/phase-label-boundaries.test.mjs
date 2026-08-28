@@ -55,7 +55,12 @@ test("allows priorities, percentiles, product codes, and technical phases", () =
 });
 
 test("ignores historical and generated paths", () => {
+  const historicalFingerprint = [
+    "a971d7d96da1c27c05244542ee220e85615f57d3:scripts/qa/pha",
+    "se11-private-deployment-closure.test.mjs:generic-api-key:14",
+  ].join("");
   const result = runFixture({
+    ".gitleaksignore": historicalFingerprint,
     ["docs/archive/phase" + "8-history.md"]:
       "Phase" + " 8 historical evidence",
     "web/node_modules/example/index.js": "const phase = 2;",
@@ -63,6 +68,10 @@ test("ignores historical and generated paths", () => {
       "Phase" + " 7 generated binary fixture",
   });
   assert.equal(result.status, 0, result.stderr);
+
+  const activeResult = runFixture({ "active.md": historicalFingerprint });
+  assert.equal(activeResult.status, 1, activeResult.stdout);
+  assert.match(activeResult.stderr, /active Phase-number labels found/u);
 });
 
 test("ignores extensionless binary artifacts", () => {

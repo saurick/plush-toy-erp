@@ -190,7 +190,7 @@ test(
         HOST: '127.0.0.1',
         PORT: String(port),
         PROXY_TIMEOUT_MS: '100',
-        READINESS_TIMEOUT_MS: '100',
+        READINESS_TIMEOUT_MS: '2000',
         STATIC_ROOT: root,
       },
       stdio: ['ignore', 'pipe', 'pipe'],

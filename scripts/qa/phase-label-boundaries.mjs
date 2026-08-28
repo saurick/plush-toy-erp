@@ -22,6 +22,7 @@ const SKIP_PARTS = new Set([
 ]);
 
 const SKIP_FILES = new Set([
+  ".gitleaksignore",
   "docs/文档清单.md",
   "progress.md",
   "scripts/qa/phase-label-boundaries.mjs",

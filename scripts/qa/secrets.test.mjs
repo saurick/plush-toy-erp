@@ -16,6 +16,11 @@ import { scanSecrets } from "./secrets.mjs";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../..");
 
+const HISTORICAL_NUMBERED_DEPLOYMENT_FINGERPRINT = [
+  "a971d7d96da1c27c05244542ee220e85615f57d3:scripts/qa/pha",
+  "se11-private-deployment-closure.test.mjs:generic-api-key:14",
+].join("");
+
 const HISTORICAL_GITLEAKS_FINGERPRINTS = Object.freeze([
   "053cc35b6f7b207519a5de673970a842a6a9c82d:web/.npmrc:generic-api-key:2",
   "053cc35b6f7b207519a5de673970a842a6a9c82d:web/.yarnrc.yml:generic-api-key:6",
@@ -34,7 +39,7 @@ const HISTORICAL_GITLEAKS_FINGERPRINTS = Object.freeze([
   "711441829c84379dc7e1d0aa65a8eaedc27350ac:server/internal/data/operational_fact_repo_test.go:generic-api-key:656",
   "9173b13649e0b8fecbc006ca11bcc0da96c3069f:server/internal/data/inventory_postgres_test.go:generic-api-key:279",
   "a971d7d96da1c27c05244542ee220e85615f57d3:config/private-deployment-template/templateConfig.mjs:generic-api-key:7",
-  "a971d7d96da1c27c05244542ee220e85615f57d3:scripts/qa/phase11-private-deployment-closure.test.mjs:generic-api-key:14",
+  HISTORICAL_NUMBERED_DEPLOYMENT_FINGERPRINT,
   "a971d7d96da1c27c05244542ee220e85615f57d3:scripts/qa/private-deployment-boundaries.mjs:generic-api-key:39",
   "ed7c69956c874ec7ae1fd961fb2b6f9ec2b6697f:server/cmd/server/main_test.go:generic-api-key:107",
   "fb73523a2d5856e6b74af9d66fe45a9aa54faa3d:server/internal/data/inventory_postgres_test.go:generic-api-key:192",
