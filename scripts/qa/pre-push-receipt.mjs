@@ -39,10 +39,10 @@ import {
 } from "./affected.mjs";
 import { collectGitChangedFiles } from "./lib/git-range.mjs";
 
-export const PRE_PUSH_RECEIPT_CONTRACT = "plush.pre-push-receipt/v3";
+export const PRE_PUSH_RECEIPT_CONTRACT = "plush.pre-push-receipt/v4";
 export const PRE_PUSH_RECEIPT_TTL_MS = 30 * 60 * 1000;
 export const PRE_PUSH_ENVIRONMENT_CONTRACT = "plush.pre-push-environment/v2";
-export const PRE_PUSH_GATE_CONTRACT = "plush.pre-push-gate-tree/v2";
+export const PRE_PUSH_GATE_CONTRACT = "plush.pre-push-gate-tree/v3";
 export const PRE_PUSH_SIGNATURE_CONTRACT = "hmac-sha256/v1";
 export const REMOTE_REF_QUERY_TIMEOUT_MS = 20_000;
 export const REVIEW_PUSH_BASE_REF = "refs/heads/main";
@@ -58,6 +58,7 @@ const RETRYABLE_REMOTE_REF_QUERY_PATTERN =
 const STATE_DIRECTORY = "plush-qa/pre-push";
 const FORBIDDEN_ENVIRONMENT = Object.freeze([
   "QA_BASE_RANGE",
+  "QA_DB_GUARD_RANGE",
   "QA_GATE_COVERAGE_RECEIPT",
   "QA_GATE_ORCHESTRATOR",
   "SKIP_PRE_PUSH",
@@ -455,6 +456,97 @@ function computeAggregateRange(root, head, refs) {
   return `${mergeBase}..${head}`;
 }
 
+function conservativeDatabaseGuard(pushPlan) {
+  return Object.freeze({
+    mode: "aggregate-push-range",
+    range: pushPlan.aggregateRange,
+    baseRef: "",
+    baseSha: "",
+    sourceRemote: "",
+    sourceRemoteUrlSha256: "",
+  });
+}
+
+function resolveDatabaseGuard(root, pushPlan) {
+  const conservative = conservativeDatabaseGuard(pushPlan);
+  if (pushPlan.refs.length !== 1) return conservative;
+
+  const [ref] = pushPlan.refs;
+  if (
+    ref.remoteSha !== ZERO_SHA ||
+    ref.localRef !== ref.remoteRef ||
+    !ref.localRef.startsWith("refs/heads/")
+  ) {
+    return conservative;
+  }
+
+  const branch = ref.localRef.slice("refs/heads/".length);
+  const configuredRemote = optionalGit(root, [
+    "config",
+    "--get",
+    `branch.${branch}.remote`,
+  ]);
+  const configuredMerge = optionalGit(root, [
+    "config",
+    "--get",
+    `branch.${branch}.merge`,
+  ]);
+  if (
+    !configuredRemote ||
+    configuredRemote === "." ||
+    configuredRemote === pushPlan.remoteName ||
+    configuredMerge !== ref.localRef
+  ) {
+    return conservative;
+  }
+
+  const upstreamRef = optionalGit(root, [
+    "for-each-ref",
+    "--format=%(upstream)",
+    ref.localRef,
+  ]);
+  if (!upstreamRef) {
+    throw new ReceiptError(
+      "database_guard_upstream_missing",
+      `branch=${branch} remote=${configuredRemote}`,
+    );
+  }
+  assertSafeRef(root, upstreamRef, "database_guard_upstream_ref");
+  const upstreamSha = optionalGit(root, [
+    "rev-parse",
+    "--verify",
+    `${upstreamRef}^{commit}`,
+  ]);
+  try {
+    assertCommitSha(upstreamSha, "database_guard_upstream_sha");
+  } catch {
+    throw new ReceiptError(
+      "database_guard_upstream_missing",
+      `ref=${upstreamRef}`,
+    );
+  }
+  const ancestor = commandResult(
+    "git",
+    ["merge-base", "--is-ancestor", upstreamSha, ref.localSha],
+    { cwd: root },
+  );
+  if (ancestor.error || ancestor.status !== 0) {
+    throw new ReceiptError(
+      "database_guard_upstream_not_ancestor",
+      `ref=${upstreamRef} sha=${upstreamSha} head=${ref.localSha}`,
+    );
+  }
+  const sourceRemote = resolveRemoteLocation(root, configuredRemote);
+  return Object.freeze({
+    mode: "tracked-upstream",
+    range: `${upstreamSha}..${ref.localSha}`,
+    baseRef: upstreamRef,
+    baseSha: upstreamSha,
+    sourceRemote: configuredRemote,
+    sourceRemoteUrlSha256: sourceRemote.sha256,
+  });
+}
+
 function buildPushPlan({
   root,
   remoteName,
@@ -685,10 +777,17 @@ export function resolvePrePushGateDecision(
   });
   const affectedPlan = buildAffectedPlan(changedFiles, { root });
   const selection = selectPrePushProfile(affectedPlan, { forceFull });
+  const databaseGuard = resolveDatabaseGuard(root, pushPlan);
   return Object.freeze({
     ...selection,
+    databaseGuard,
     changedFileCount: changedFiles.length,
-    planSha256: sha256(stableStringify(affectedPlanEvidence(affectedPlan))),
+    planSha256: sha256(
+      stableStringify({
+        affectedPlan: affectedPlanEvidence(affectedPlan),
+        databaseGuard,
+      }),
+    ),
   });
 }
 
@@ -938,6 +1037,7 @@ export function gateContractFingerprint(root, head, gateDecision) {
     profile: gateDecision.profile,
     recommendedProfile: gateDecision.recommendedProfile,
     planSha256: gateDecision.planSha256,
+    databaseGuard: gateDecision.databaseGuard,
     gates:
       gateDecision.profile === "full"
         ? GATE_PROFILES.full
@@ -1220,6 +1320,8 @@ function validateReceipt({
     receipt?.gate?.profile !== gateDecision.profile ||
     receipt?.gate?.recommendedProfile !== gateDecision.recommendedProfile ||
     receipt?.gate?.planSha256 !== gateDecision.planSha256 ||
+    stableStringify(receipt?.gate?.databaseGuard) !==
+      stableStringify(gateDecision.databaseGuard) ||
     receipt?.gate?.deliveryEligible !== (gateDecision.profile !== "review")
   ) {
     throw new ReceiptError("receipt_profile_mismatch");
@@ -1285,6 +1387,7 @@ function makeReceipt({
       profile: gateDecision.profile,
       recommendedProfile: gateDecision.recommendedProfile,
       planSha256: gateDecision.planSha256,
+      databaseGuard: gateDecision.databaseGuard,
       deliveryEligible: gateDecision.profile !== "review",
       contract: PRE_PUSH_GATE_CONTRACT,
       sha256:
@@ -1474,7 +1577,7 @@ export function preparePush(root, options, { env = process.env } = {}) {
     }
 
     console.log(
-      `[${label}] 运行 ${initialGateDecision.profile}（HEAD=${before.head.slice(0, 12)} aggregate_range=${initialPlan.aggregateRange} files=${initialGateDecision.changedFileCount} recommended_delivery_profile=${initialGateDecision.recommendedProfile}）`,
+      `[${label}] 运行 ${initialGateDecision.profile}（HEAD=${before.head.slice(0, 12)} aggregate_range=${initialPlan.aggregateRange} db_guard_range=${initialGateDecision.databaseGuard.range} files=${initialGateDecision.changedFileCount} recommended_delivery_profile=${initialGateDecision.recommendedProfile}）`,
     );
     if (reviewOnly) {
       runLivePushChecks(root, initialPlan, env, { label });
@@ -1490,7 +1593,11 @@ export function preparePush(root, options, { env = process.env } = {}) {
         ],
         {
           cwd: root,
-          env: { ...env, QA_BASE_RANGE: initialPlan.aggregateRange },
+          env: {
+            ...env,
+            QA_BASE_RANGE: initialPlan.aggregateRange,
+            QA_DB_GUARD_RANGE: initialGateDecision.databaseGuard.range,
+          },
           inherit: true,
           reason: "full_gate_failed",
         },
@@ -1560,7 +1667,7 @@ export function preparePush(root, options, { env = process.env } = {}) {
     publishPrivateFile(receiptCandidate, receiptPath);
     receiptCandidate = "";
     console.log(
-      `[${label}] status=complete profile=${finalGateDecision.profile} recommended_delivery_profile=${finalGateDecision.recommendedProfile} review_only=${reviewOnly} head=${after.head} aggregate_range=${finalPlan.aggregateRange} ttl_seconds=${PRE_PUSH_RECEIPT_TTL_MS / 1000}`,
+      `[${label}] status=complete profile=${finalGateDecision.profile} recommended_delivery_profile=${finalGateDecision.recommendedProfile} review_only=${reviewOnly} head=${after.head} aggregate_range=${finalPlan.aggregateRange} db_guard_range=${finalGateDecision.databaseGuard.range} ttl_seconds=${PRE_PUSH_RECEIPT_TTL_MS / 1000}`,
     );
     return { receipt, state, reused: false };
   } catch (error) {

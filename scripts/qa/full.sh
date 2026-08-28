@@ -21,7 +21,8 @@ print_help() {
   govulncheck: 最后执行 Go 漏洞扫描，避免外部网络扰动本地 PostgreSQL 并发门禁
 
 环境变量:
-  QA_BASE_RANGE=...    指定 diff 范围供 db-guard/secrets 使用
+  QA_BASE_RANGE=...    指定真实 push 聚合范围，供严格 secrets 使用
+  QA_DB_GUARD_RANGE=... 指定数据库守卫范围；prepare-push 只在精确首次镜像场景收窄到已验证上游
   DISPOSABLE_DATABASE_BASE_URL=... 本地 PostgreSQL 管理连接基线；门禁派生唯一 disposable test 库，不写入基线库
   QA_BROWSER_SCENARIOS=...        追加浏览器诊断场景；不能替换正式门禁的工作台共享布局与新增页面治理场景
 
@@ -125,7 +126,8 @@ qa_full_environment_profile() {
 
 qa_full_shared() {
   echo "[qa:full] 运行共享基础检查，不重复 Web/Go 全量稍后覆盖的 fast 子集"
-  QA_FAST_SCOPE=base QA_NODE_TEST_PROFILE=parallel_safe \
+  QA_BASE_RANGE="${QA_DB_GUARD_RANGE:-${QA_BASE_RANGE:-}}" \
+    QA_FAST_SCOPE=base QA_NODE_TEST_PROFILE=parallel_safe \
     QA_FAST_GATE_PROFILE="$full_profile" \
     bash "$ROOT_DIR/scripts/qa/fast.sh"
 }

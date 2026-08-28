@@ -162,6 +162,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
 set -euo pipefail
 git_dir="$(git rev-parse --git-dir)"
 printf '%s\\n' "\${QA_BASE_RANGE:-default}" >> "$git_dir/full-ranges.txt"
+printf '%s\\n' "\${QA_DB_GUARD_RANGE:-default}" >> "$git_dir/db-guard-ranges.txt"
 if [[ "\${FAIL_FULL:-0}" == "1" ]]; then exit 9; fi
 if [[ "\${MUTATE_FULL_DIRTY:-0}" == "1" ]]; then printf 'dirty\\n' >> tracked.txt; fi
 if [[ "\${MUTATE_FULL_HEAD:-0}" == "1" ]]; then
@@ -194,6 +195,7 @@ function cleanEnvironment(overrides = {}) {
   const env = { ...STABLE_RECEIPT_TOOLS.env, ...overrides };
   for (const key of [
     "QA_BASE_RANGE",
+    "QA_DB_GUARD_RANGE",
     "QA_GATE_COVERAGE_RECEIPT",
     "QA_GATE_ORCHESTRATOR",
     "SKIP_PRE_PUSH",
@@ -318,11 +320,13 @@ function runHook(
   {
     input = `refs/heads/main ${fixture.localSha} refs/heads/main ${fixture.remoteSha}\n`,
     env = cleanEnvironment(),
+    remoteName = "origin",
+    remoteLocation = fixture.remote,
   } = {},
 ) {
   return spawnSync(
     "bash",
-    ["scripts/git-hooks/pre-push.sh", "origin", fixture.remote],
+    ["scripts/git-hooks/pre-push.sh", remoteName, remoteLocation],
     {
       cwd: fixture.root,
       input,
@@ -824,6 +828,10 @@ test("prepare runs full once before push and hook only runs live range gates", (
       `${fixture.remoteSha}..${fixture.localSha}`,
     ]);
     assert.deepEqual(
+      readLines(gitStateFile(fixture.root, "db-guard-ranges.txt")),
+      [`${fixture.remoteSha}..${fixture.localSha}`],
+    );
+    assert.deepEqual(
       readLines(gitStateFile(fixture.root, "secret-ranges.txt")),
       [`${fixture.remoteSha}..${fixture.localSha}`],
     );
@@ -1015,6 +1023,131 @@ test("receipt state cannot escape the Git common directory through a symlink", (
   }
 });
 
+test("a first same-name mirror push keeps full-history coverage while database guard uses the distinct tracked upstream", () => {
+  const fixture = createFixture();
+  const mirror = mkdtempSync(path.join(os.tmpdir(), "plush-receipt-mirror-"));
+  try {
+    git(mirror, ["init", "--bare", "-q"]);
+    git(fixture.root, ["remote", "add", "mirror", mirror]);
+    git(fixture.root, ["config", "branch.main.remote", "origin"]);
+    git(fixture.root, ["config", "branch.main.merge", "refs/heads/main"]);
+    git(fixture.root, [
+      "update-ref",
+      "refs/remotes/origin/main",
+      fixture.remoteSha,
+    ]);
+
+    const prepared = runPrepare(fixture.root, [
+      "--full",
+      "--remote",
+      "mirror",
+      "--ref",
+      "refs/heads/main:refs/heads/main",
+    ]);
+    assert.equal(prepared.status, 0, prepared.stderr || prepared.stdout);
+    const emptyTree = git(fixture.root, [
+      "hash-object",
+      "-t",
+      "tree",
+      "/dev/null",
+    ]);
+    const aggregateRange = `${emptyTree}..${fixture.localSha}`;
+    const databaseRange = `${fixture.remoteSha}..${fixture.localSha}`;
+    assert.deepEqual(readLines(gitStateFile(fixture.root, "full-ranges.txt")), [
+      aggregateRange,
+    ]);
+    assert.deepEqual(
+      readLines(gitStateFile(fixture.root, "db-guard-ranges.txt")),
+      [databaseRange],
+    );
+
+    const state = resolveReceiptState(fixture.root);
+    const receipt = JSON.parse(readFileSync(state.receiptPath, "utf8"));
+    assert.deepEqual(receipt.gate.databaseGuard, {
+      mode: "tracked-upstream",
+      range: databaseRange,
+      baseRef: "refs/remotes/origin/main",
+      baseSha: fixture.remoteSha,
+      sourceRemote: "origin",
+      sourceRemoteUrlSha256: receipt.gate.databaseGuard.sourceRemoteUrlSha256,
+    });
+    assert.match(
+      receipt.gate.databaseGuard.sourceRemoteUrlSha256,
+      /^[0-9a-f]{64}$/u,
+    );
+
+    const pushed = runHook(fixture, {
+      input: `refs/heads/main ${fixture.localSha} refs/heads/main ${ZERO_SHA}\n`,
+      remoteName: "mirror",
+      remoteLocation: mirror,
+    });
+    assert.equal(pushed.status, 0, pushed.stderr || pushed.stdout);
+    assert.deepEqual(
+      readLines(gitStateFile(fixture.root, "secret-ranges.txt")),
+      [fixture.localSha],
+    );
+  } finally {
+    fixture.cleanup();
+    rmSync(mirror, { recursive: true, force: true });
+  }
+});
+
+test("a first mirror push fails closed when its distinct tracked upstream is missing or divergent", () => {
+  for (const scenario of ["missing", "divergent"]) {
+    const fixture = createFixture();
+    const mirror = mkdtempSync(path.join(os.tmpdir(), "plush-receipt-mirror-"));
+    try {
+      git(mirror, ["init", "--bare", "-q"]);
+      git(fixture.root, ["remote", "add", "mirror", mirror]);
+      git(fixture.root, ["config", "branch.main.remote", "origin"]);
+      git(fixture.root, ["config", "branch.main.merge", "refs/heads/main"]);
+      if (scenario === "missing") {
+        git(fixture.root, ["update-ref", "-d", "refs/remotes/origin/main"]);
+      } else {
+        const tree = git(fixture.root, ["rev-parse", `${fixture.remoteSha}^{tree}`]);
+        const divergentSha = git(fixture.root, [
+          "-c",
+          "user.name=Receipt Test",
+          "-c",
+          "user.email=receipt@example.invalid",
+          "commit-tree",
+          tree,
+          "-m",
+          "divergent upstream",
+        ]);
+        git(fixture.root, [
+          "update-ref",
+          "refs/remotes/origin/main",
+          divergentSha,
+        ]);
+      }
+
+      const prepared = runPrepare(fixture.root, [
+        "--full",
+        "--remote",
+        "mirror",
+        "--ref",
+        "refs/heads/main:refs/heads/main",
+      ]);
+      assert.equal(prepared.status, 2, prepared.stderr || prepared.stdout);
+      assert.match(
+        prepared.stderr,
+        new RegExp(
+          `reason=database_guard_upstream_${scenario === "missing" ? "missing" : "not_ancestor"}`,
+          "u",
+        ),
+      );
+      assert.equal(
+        existsSync(gitStateFile(fixture.root, "full-ranges.txt")),
+        false,
+      );
+    } finally {
+      fixture.cleanup();
+      rmSync(mirror, { recursive: true, force: true });
+    }
+  }
+});
+
 test("new and existing refs bind one exact aggregate receipt and scan every live range", () => {
   const fixture = createFixture();
   try {
@@ -1035,6 +1168,10 @@ test("new and existing refs bind one exact aggregate receipt and scan every live
     assert.deepEqual(readLines(gitStateFile(fixture.root, "full-ranges.txt")), [
       `${emptyTree}..${fixture.localSha}`,
     ]);
+    assert.deepEqual(
+      readLines(gitStateFile(fixture.root, "db-guard-ranges.txt")),
+      [`${emptyTree}..${fixture.localSha}`],
+    );
 
     const input = [
       `refs/heads/main ${fixture.localSha} refs/heads/main ${fixture.remoteSha}`,
@@ -1195,7 +1332,7 @@ test("HEAD changes, dirty worktrees, and a held lock invalidate reuse", () => {
       );
       assert.match(
         pushed.stderr,
-        /reason=(?:receipt_repository_mismatch|dirty_worktree|receipt_lock_held)/u,
+        /reason=(?:receipt_(?:repository|profile)_mismatch|dirty_worktree|receipt_lock_held)/u,
         scenario,
       );
     } finally {
@@ -1298,6 +1435,7 @@ test("caller skip and synthetic receipt environments are rejected, not treated a
       "QA_GATE_COVERAGE_RECEIPT",
       "QA_GATE_ORCHESTRATOR",
       "QA_BASE_RANGE",
+      "QA_DB_GUARD_RANGE",
       "PRE_PUSH_RECEIPT_PATH",
     ].entries()) {
       if (index > 0) {
