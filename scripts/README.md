@@ -1195,6 +1195,10 @@ node /Users/simon/projects/plush-toy-erp/scripts/deploy/rollback-rehearsal-repor
 - `scripts/qa/secrets.sh` 在 git 仓库内扫描 diff / staged 候选文件，并始终检查候选 `.npmrc` / `.npmrc.local` / `.yarnrc.yml` 中的 npm token 明文；安装 `gitleaks` 后会继续执行通用密钥扫描。
 - 源码包没有 `.git` 时，`scripts/qa/secrets.sh` 会按脚本所在目录推导项目根目录并扫描包内文件；该模式不支持 `SECRETS_STAGED_ONLY=1` 或 git diff range。
 
+`.gitleaksignore` 只登记 30 条精确到 commit、文件、规则和行号的历史指纹：其中 28 条来自测试、示例配置或文档假值，另 2 条是同一个旧 npm classic token 在历史 `.npmrc` 与 `.yarnrc.yml` 中的重复记录。npm 已于 2025-12-09 永久吊销全部 classic token，因此该旧值不能继续认证，也不能恢复或重新创建。
+
+该基线不是路径、规则或提交级 allowlist；任何新提交、新文件、新行号或新规则命中仍会阻断 secrets 门禁。新增历史指纹必须先完成逐条证据复核，并同步精确清单回归测试，不能用扩大忽略范围代替根因判断。
+
 ## Hook 对应关系
 
 - `pre-commit` -> `scripts/git-hooks/pre-commit.sh`

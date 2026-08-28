@@ -16,6 +16,39 @@ import { scanSecrets } from "./secrets.mjs";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../..");
 
+const HISTORICAL_GITLEAKS_FINGERPRINTS = Object.freeze([
+  "053cc35b6f7b207519a5de673970a842a6a9c82d:web/.npmrc:generic-api-key:2",
+  "053cc35b6f7b207519a5de673970a842a6a9c82d:web/.yarnrc.yml:generic-api-key:6",
+  "0f39aabc470ab2cb6d49a90f66748381aa699825:server/internal/data/inventory_repo_txn_test.go:generic-api-key:212",
+  "0f39aabc470ab2cb6d49a90f66748381aa699825:server/internal/data/inventory_repo_txn_test.go:generic-api-key:265",
+  "178ed06c881a3518c97204430a1bb413820239b2:server/internal/service/jsonrpc_inventory_test.go:generic-api-key:52",
+  "23f466677f91a65a0f629dccabd34b8c7b8adbef:docs/product/business-records-data-map-draft.md:generic-api-key:35",
+  "2ce5411a819606775431936ac5c67ed0420f2693:server/cmd/server/main_test.go:generic-api-key:185",
+  "2ce5411a819606775431936ac5c67ed0420f2693:server/cmd/server/main_test.go:generic-api-key:201",
+  "3a94952c7dc40d2a708d3b40b3a572ba73b1eda7:server/cmd/server/main_test.go:generic-api-key:122",
+  "3a94952c7dc40d2a708d3b40b3a572ba73b1eda7:server/cmd/server/main_test.go:generic-api-key:137",
+  "3a94952c7dc40d2a708d3b40b3a572ba73b1eda7:server/cmd/server/main_test.go:generic-api-key:157",
+  "457e67e4079856c43cc4570bdfd9f238a57ec81a:server/cmd/server/main_test.go:generic-api-key:201",
+  "457e67e4079856c43cc4570bdfd9f238a57ec81a:server/cmd/server/main_test.go:generic-api-key:217",
+  "711441829c84379dc7e1d0aa65a8eaedc27350ac:server/internal/data/operational_fact_repo_test.go:generic-api-key:1340",
+  "711441829c84379dc7e1d0aa65a8eaedc27350ac:server/internal/data/operational_fact_repo_test.go:generic-api-key:656",
+  "9173b13649e0b8fecbc006ca11bcc0da96c3069f:server/internal/data/inventory_postgres_test.go:generic-api-key:279",
+  "a971d7d96da1c27c05244542ee220e85615f57d3:config/private-deployment-template/templateConfig.mjs:generic-api-key:7",
+  "a971d7d96da1c27c05244542ee220e85615f57d3:scripts/qa/phase11-private-deployment-closure.test.mjs:generic-api-key:14",
+  "a971d7d96da1c27c05244542ee220e85615f57d3:scripts/qa/private-deployment-boundaries.mjs:generic-api-key:39",
+  "ed7c69956c874ec7ae1fd961fb2b6f9ec2b6697f:server/cmd/server/main_test.go:generic-api-key:107",
+  "fb73523a2d5856e6b74af9d66fe45a9aa54faa3d:server/internal/data/inventory_postgres_test.go:generic-api-key:192",
+  "fb73523a2d5856e6b74af9d66fe45a9aa54faa3d:server/internal/data/inventory_postgres_test.go:generic-api-key:209",
+  "fb73523a2d5856e6b74af9d66fe45a9aa54faa3d:server/internal/data/inventory_postgres_test.go:generic-api-key:447",
+  "fb73523a2d5856e6b74af9d66fe45a9aa54faa3d:server/internal/data/inventory_postgres_test.go:generic-api-key:472",
+  "fb73523a2d5856e6b74af9d66fe45a9aa54faa3d:server/internal/data/inventory_postgres_test.go:generic-api-key:491",
+  "fb73523a2d5856e6b74af9d66fe45a9aa54faa3d:server/internal/data/inventory_postgres_test.go:generic-api-key:526",
+  "fb73523a2d5856e6b74af9d66fe45a9aa54faa3d:server/internal/data/inventory_postgres_test.go:generic-api-key:76",
+  "fb73523a2d5856e6b74af9d66fe45a9aa54faa3d:server/internal/data/inventory_postgres_test.go:generic-api-key:92",
+  "fb73523a2d5856e6b74af9d66fe45a9aa54faa3d:server/internal/data/inventory_repo_test.go:generic-api-key:636",
+  "fb73523a2d5856e6b74af9d66fe45a9aa54faa3d:server/internal/data/inventory_repo_test.go:generic-api-key:689",
+]);
+
 function git(root, args) {
   return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
 }
@@ -100,7 +133,28 @@ test("gitleaks allowlist is limited to the Atlas checksum path", async () => {
   assert.equal((config.match(/atlas\\\.sum/gu) || []).length, 1);
 });
 
-test("range mode catches a secret added and deleted within the pushed history", async () => {
+test("gitleaks historical baseline contains only exact immutable fingerprints", async () => {
+  const baseline = await readFile(
+    path.join(REPO_ROOT, ".gitleaksignore"),
+    "utf8",
+  );
+  const fingerprints = baseline
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  assert.equal(fingerprints.length, 30);
+  assert.equal(new Set(fingerprints).size, fingerprints.length);
+  assert.deepEqual(fingerprints, HISTORICAL_GITLEAKS_FINGERPRINTS);
+  for (const fingerprint of fingerprints) {
+    assert.match(
+      fingerprint,
+      /^[0-9a-f]{40}:[^:\r\n]+:generic-api-key:[1-9][0-9]*$/u,
+    );
+  }
+});
+
+test("exact historical baseline does not suppress a new history secret", async () => {
   await withRepository(async (root) => {
     const base = git(root, ["rev-parse", "HEAD"]);
     await writeFile(
@@ -111,6 +165,12 @@ test("range mode catches a secret added and deleted within the pushed history", 
     commit(root, "add secret");
     await rm(path.join(root, "temporary-secret.txt"));
     commit(root, "remove secret");
+
+    const baseline = await readFile(
+      path.join(REPO_ROOT, ".gitleaksignore"),
+      "utf8",
+    );
+    assert.equal(baseline.includes("GATE_HISTORY_SECRET_MARKER"), false);
 
     const result = scanSecrets({
       root,
