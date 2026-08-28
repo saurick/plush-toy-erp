@@ -2,7 +2,7 @@ workflow:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-    - if: '$CI_PIPELINE_SOURCE =~ /^(api|trigger|web)$/ && $RELEASE_SHA != ""'
+    - if: '$CI_PIPELINE_SOURCE =~ /^(api|trigger|web)$/ && $RELEASE_SHA'
     - if: '$CI_PIPELINE_SOURCE == "web"'
     - when: never
 
@@ -50,7 +50,7 @@ cache:
 plan:
   stage: plan
   rules:
-    - if: '$RELEASE_SHA != ""'
+    - if: '$RELEASE_SHA'
       when: never
     - when: on_success
   script:
@@ -110,7 +110,7 @@ quality:
     - job: plan
       artifacts: true
   rules:
-    - if: '$RELEASE_SHA != ""'
+    - if: '$RELEASE_SHA'
       when: never
     - when: on_success
   timeout: 2h
@@ -204,7 +204,7 @@ quality:
     - job: quality
       artifacts: false
   rules:
-    - if: '$RELEASE_SHA != ""'
+    - if: '$RELEASE_SHA'
       when: never
     - when: on_success
   script:
@@ -214,7 +214,7 @@ strict:
   stage: quality
   interruptible: false
   rules:
-    - if: '$RELEASE_SHA != "" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true" && $RELEASE_CUSTOMER == "yoyoosun"'
+    - if: '$RELEASE_SHA && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true" && $RELEASE_CUSTOMER == "yoyoosun"'
     - when: never
   timeout: 3h
   script:
@@ -278,7 +278,7 @@ publish_release:
     - job: strict
       artifacts: true
   rules:
-    - if: '$RELEASE_SHA != "" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true" && $RELEASE_CUSTOMER == "yoyoosun"'
+    - if: '$RELEASE_SHA && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true" && $RELEASE_CUSTOMER == "yoyoosun"'
     - when: never
   timeout: 3h
   environment:

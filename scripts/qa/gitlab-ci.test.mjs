@@ -63,6 +63,20 @@ test("GitLab is the canonical main and merge-request CI with one stable gate", (
 });
 
 test("GitLab release binds protected exact-SHA strict evidence and immutable assets", () => {
+  const ordinaryReleaseExclusions =
+    workflow.match(/- if: '\$RELEASE_SHA'\n      when: never/gu) ?? [];
+  const protectedReleaseRules =
+    workflow.match(
+      /- if: '\$RELEASE_SHA && \$CI_COMMIT_BRANCH == \$CI_DEFAULT_BRANCH && \$CI_COMMIT_REF_PROTECTED == "true" && \$RELEASE_CUSTOMER == "yoyoosun"'/gu,
+    ) ?? [];
+
+  assert.doesNotMatch(workflow, /\$RELEASE_SHA != ""/u);
+  assert.match(
+    workflow,
+    /CI_PIPELINE_SOURCE =~ \/\^\(api\|trigger\|web\)\$\/ && \$RELEASE_SHA/u,
+  );
+  assert.equal(ordinaryReleaseExclusions.length, 3);
+  assert.equal(protectedReleaseRules.length, 2);
   assert.match(workflow, /^strict:\n  stage: quality/mu);
   assert.match(workflow, /^publish_release:\n  stage: release/mu);
   assert.match(workflow, /resource_group: immutable-release-catalog/u);
