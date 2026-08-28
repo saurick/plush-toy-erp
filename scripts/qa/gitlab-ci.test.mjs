@@ -162,6 +162,18 @@ test("Runner verifier enters a neutral cwd before cross-user checks", () => {
   assert.doesNotMatch(runnerCloudInit, /chmod[^\n]*\/home\/ubuntu/u);
 });
 
+test("Runner VM bootstrap installs and verifies the pinned GNU Make toolchain", () => {
+  assert.equal(runnerCloudInit.match(/^  - make$/gmu)?.length ?? 0, 1);
+  assert.match(
+    runnerCloudInit,
+    /test "\$\(stat -c '%U:%G:%a' \/usr\/bin\/make\)" = root:root:755/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /test "\$\(\/usr\/bin\/make --version \| head -n 1\)" = 'GNU Make 4[.]3'/u,
+  );
+});
+
 test("Runner VM bootstrap retries pinned downloads and fails closed", () => {
   const downloadCalls = runnerCloudInit.match(/^\s+download_file\s/gmu) ?? [];
   const rawCurlCalls = runnerCloudInit

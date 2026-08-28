@@ -33,6 +33,7 @@ packages:
   - libpango-1.0-0
   - libpq-dev
   - lsof
+  - make
   - postgresql-client
   - ripgrep
   - shellcheck
@@ -295,6 +296,8 @@ write_files:
       test "$(go env GOVERSION)" = go1.26.6
       test "$(pnpm --version)" = 10.13.1
       test "$(runuser -u gitlab-runner -- /usr/local/bin/pnpm --version)" = 10.13.1
+      test "$(stat -c '%U:%G:%a' /usr/bin/make)" = root:root:755
+      test "$(/usr/bin/make --version | head -n 1)" = 'GNU Make 4.3'
       test "$(stat -c '%U:%G:%a' /etc/profile.d/plush-go-module-network.sh)" = root:root:644
       verify_go_module_env ubuntu
       verify_go_module_env root
