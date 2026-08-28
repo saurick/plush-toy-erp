@@ -25,6 +25,7 @@ default:
     - export PATH="$(go env GOPATH)/bin:$PATH"
     - test "$(node --version)" = "v$(tr -d '\n' < .n-node-version)"
     - test "$(go env GOVERSION)" = "go1.26.6"
+    - test "$(go env CGO_ENABLED)" = "1"
     - test "$(pnpm --version)" = "10.13.1"
     - test "$(atlas version 2>/dev/null | sed -n 's/^atlas version \([^ ]*\).*/\1/p')" = "v1.2.0"
     - test "$(gitleaks version)" = "8.30.1"

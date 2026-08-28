@@ -75,7 +75,7 @@ gitlab.saurick.me
    | `GITHUB_PACKAGES_TOKEN` | GitHub Packages write/read，不授 repo 管理 |
    | `GITLAB_RELEASE_TOKEN` | 当前项目 API 与 Release 管理，不授管理员权限 |
 
-6. 用 Ubuntu 24.04 cloud image 创建独立 KVM VM，应用 `runner-vm-cloud-init.yml`；cloud-init 固定安装 GNU Make 和当前 Playwright 1.58.2 Chromium 所需系统包，job 不能自行取得 apt 权限。在 GitLab 创建 project runner 后，把 token 只写入 VM 的 `/etc/plush-runner/registration.env`，权限 `0600`，再运行 `/usr/local/sbin/plush-register-gitlab-runner`。脚本注册后销毁 token 文件。
+6. 用 Ubuntu 24.04 cloud image 创建独立 KVM VM，应用 `runner-vm-cloud-init.yml`；cloud-init 固定安装 GNU Make、GCC 与当前 Playwright 1.58.2 Chromium 所需系统包，并要求 `ubuntu`、`root`、`gitlab-runner` 的 Go 环境都读回 `CGO_ENABLED=1`，job 不能自行取得 apt 权限。在 GitLab 创建 project runner 后，把 token 只写入 VM 的 `/etc/plush-runner/registration.env`，权限 `0600`，再运行 `/usr/local/sbin/plush-register-gitlab-runner`。脚本注册后销毁 token 文件。
 7. Runner 必须显示 tags `plush,isolated,amd64`、locked、run untagged=false；运行一次非发布 pipeline，核对 VM 内临时 PostgreSQL 被清理且 R640 宿主容器列表未变化。
 
 ## GitHub 单向镜像与 GPT Review

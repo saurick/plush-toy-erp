@@ -174,6 +174,24 @@ test("Runner VM bootstrap installs and verifies the pinned GNU Make toolchain", 
   );
 });
 
+test("Runner VM bootstrap installs a native compiler and fails closed without CGO", () => {
+  assert.equal(runnerCloudInit.match(/^  - gcc$/gmu)?.length ?? 0, 1);
+  assert.match(
+    runnerCloudInit,
+    /test "\$\(stat -Lc '%U:%G:%a' \/usr\/bin\/gcc\)" = root:root:755/u,
+  );
+  assert.match(runnerCloudInit, /verify_go_cgo_enabled\(\) \{/u);
+  for (const user of ["ubuntu", "root", "gitlab-runner"]) {
+    assert.match(
+      runnerCloudInit,
+      new RegExp(`verify_go_cgo_enabled ${user.replaceAll("-", "[-]")}`, "u"),
+    );
+  }
+  assert.doesNotMatch(runnerCloudInit, /(?:export\s+)?CGO_ENABLED=/u);
+  assert.match(workflow, /test "\$\(go env CGO_ENABLED\)" = "1"/u);
+  assert.doesNotMatch(workflow, /(?:export\s+)?CGO_ENABLED=/u);
+});
+
 test("Runner VM bootstrap retries pinned downloads and fails closed", () => {
   const downloadCalls = runnerCloudInit.match(/^\s+download_file\s/gmu) ?? [];
   const rawCurlCalls = runnerCloudInit
