@@ -225,6 +225,7 @@ test("dev workbench boundary: imports from ERP stay on explicit read/API adapter
     "@/erp/api/workflowApi.mjs",
     "@/erp/utils/processRuntimePresentation.mjs",
     "../../erp/api/approvalSettingsApi.mjs",
+    "../../erp/utils/approvalSettingsActivation.mjs",
     "../../erp/utils/permissionCenterAccess.mjs",
     "../../erp/utils/permissionCenterSearch.mjs",
     "../../erp/utils/permissionModuleLabels.mjs",

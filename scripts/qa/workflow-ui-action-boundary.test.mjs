@@ -382,7 +382,7 @@ test("desktop workflow task UI hides raw owner role key fallbacks", () => {
   assert.match(dashboardSource, /getWorkflowTaskOwnerRoleLabel\(record\)/u);
   assert.match(
     dashboardSource,
-    /getWorkflowTaskOwnerRoleLabel\(selectedWorkbenchTask\)/u,
+    /getWorkflowTaskOwnerRoleLabel\(\s*selectedWorkbenchTask\s*\)/u,
   );
   assert(
     !dashboardSource.includes("getWorkflowTaskAllowedActionModes"),
@@ -908,7 +908,7 @@ test("business collaboration panel delegates mutation verification to action-own
   );
   const source = readFileSync(panelPath, "utf8");
   const actionHandlerIndex = source.indexOf(
-    "await actionHandler(actionDrawerTask",
+    "const confirmedTask = await actionHandler(actionDrawerTask",
   );
 
   assert.doesNotMatch(
@@ -933,7 +933,7 @@ test("business collaboration panel delegates mutation verification to action-own
   );
   assert(
     actionHandlerIndex >= 0 &&
-      source.includes("if (succeeded !== false) closeActionDrawer()"),
+      source.includes("if (confirmedTask === false) return"),
     "collaboration panel must keep the drawer open when an action-owning handler rejects a new attempt",
   );
 });

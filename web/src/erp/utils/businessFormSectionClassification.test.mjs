@@ -65,15 +65,18 @@ test('all governed long forms use the shared section-title component', () => {
   }
 })
 
-test('sales order header follows the three audited business sections', () => {
+test('sales order header follows the six audited business sections', () => {
   assertOrdered(source('../components/sales-orders/SalesOrderForm.jsx'), [
     '订单与客户',
     '联系人与负责人',
-    '结算与交付',
+    '结算条件',
+    '税费与运费条件',
+    '交付与收货',
+    '其他说明',
   ])
 })
 
-test('long master-data variants are sectioned while the short product form stays flat', () => {
+test('master-data variants expose stable business section order', () => {
   const masterDataSource = source(
     '../components/master-data/MasterDataForm.jsx'
   )
@@ -93,7 +96,7 @@ test('long master-data variants are sectioned while the short product form stays
     '  return (\n    <>'
   )
 
-  assert(!productBlock.includes('<BusinessFormSectionTitle>'))
+  assertOrdered(productBlock, ['基本资料', '外贸信息', '计量信息'])
   assertOrdered(skuBlock, ['归属与编号', '规格属性', '计量与附件'])
   assertOrdered(processBlock, ['基本资料', '路线与加工能力'])
   assert(
@@ -141,7 +144,7 @@ test('document-style long forms follow stable business section order', () => {
     ],
     [
       '../components/shipments/ShipmentBusinessModal.jsx',
-      ['单据与客户', '计划与附件'],
+      ['单据与客户', '计划与收货', '运输与包装', '实际运费', '其他说明'],
     ],
     [
       '../components/bom/BOMVersionForms.jsx',

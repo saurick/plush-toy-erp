@@ -604,7 +604,7 @@ export default function DevPermissionRelationshipsPage() {
             role="note"
           >
             <Text type="secondary">
-              本页核对“岗位权限 ×
+              关系图是只读结果，不是新的权限配置入口；本页核对“岗位权限 ×
               当前启用配置”的只读结果；不代表某张单据在当前状态一定可操作，也不在这里保存权限配置。
             </Text>
           </div>
