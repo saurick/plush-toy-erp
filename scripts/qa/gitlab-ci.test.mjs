@@ -43,7 +43,7 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   assert.match(workflow, /^"CI Gate":\n  stage: gate/mu);
   assert.match(workflow, /node scripts\/qa\/ci-plan[.]mjs/u);
   assert.match(workflow, /bash scripts\/qa\/affected[.]sh --base/u);
-  assert.match(workflow, /^prepare:\n  stage: prepare/mu);
+  assert.match(workflow, /^prepare:\n  stage: prepare\n  timeout: 1h/mu);
   for (const shard of [
     "static",
     "node",

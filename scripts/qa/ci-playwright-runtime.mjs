@@ -547,13 +547,8 @@ function removeExactDirectory(directory) {
 async function bootstrapPackage(env, staging, root) {
   const candidate = path.join(staging, "candidate");
   mkdirSync(candidate, { mode: 0o700 });
-  const downloads = await Promise.allSettled(
-    CI_PLAYWRIGHT_RUNTIME_ASSETS.map((asset) =>
-      downloadUpstreamAsset(asset, candidate),
-    ),
-  );
-  if (downloads.some((download) => download.status === "rejected")) {
-    throw new Error("Pinned Playwright upstream archive set is incomplete");
+  for (const asset of CI_PLAYWRIGHT_RUNTIME_ASSETS) {
+    await downloadUpstreamAsset(asset, candidate);
   }
   await verifyRuntimeArchiveSet(candidate);
 

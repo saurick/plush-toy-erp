@@ -148,7 +148,7 @@ plan:
 
 prepare:
   stage: prepare
-  timeout: 20m
+  timeout: 1h
   needs:
     - job: plan
       artifacts: false

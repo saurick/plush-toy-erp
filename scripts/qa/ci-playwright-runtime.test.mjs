@@ -219,7 +219,11 @@ test("package absence is the only upstream bootstrap path", () => {
     source,
     /const signal = AbortSignal[.]timeout\(DOWNLOAD_TIMEOUT_MS\);/u,
   );
-  assert.match(source, /Promise[.]allSettled/u);
+  assert.match(
+    source,
+    /for \(const asset of CI_PLAYWRIGHT_RUNTIME_ASSETS\) \{\n    await downloadUpstreamAsset\(asset, candidate\);\n  \}/u,
+  );
+  assert.doesNotMatch(source, /Promise[.]allSettled/u);
   assert.match(source, /phase=upstream-download asset=/u);
   assert.match(source, /signal[.]aborted \? "timeout" : failureReason/u);
   for (const value of [
