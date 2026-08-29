@@ -6,6 +6,10 @@ const workflow = readFileSync(
   new URL("../../.gitlab-ci.yml", import.meta.url),
   "utf8",
 );
+const nodeVersion = readFileSync(
+  new URL("../../.n-node-version", import.meta.url),
+  "utf8",
+).trim();
 const compose = readFileSync(
   new URL("../../server/deploy/gitlab/compose.yml", import.meta.url),
   "utf8",
@@ -84,7 +88,19 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   assert.match(workflow, /ci-playwright-runtime[.]mjs seed/u);
   assert.match(workflow, /ci-playwright-runtime[.]mjs materialize/u);
   assert.match(workflow, /ci-playwright-runtime[.]mjs cleanup/u);
-  assert.match(workflow, /prefix: r640-node-playwright-v2/u);
+  const cacheKeyBlocks = [
+    ...workflow.matchAll(
+      /^ {4}key:\n {6}prefix: ([^\n]+)\n {6}files:\n((?: {8}- [^\n]+\n)+)/gmu,
+    ),
+  ];
+  assert.equal(cacheKeyBlocks.length, 2);
+  for (const [, prefix, fileRows] of cacheKeyBlocks) {
+    assert.equal(prefix, `r640-node-${nodeVersion}-playwright-v2`);
+    assert.deepEqual(
+      [...fileRows.matchAll(/^ {8}- ([^\n]+)$/gmu)].map(([, file]) => file),
+      ["scripts/qa/ci-playwright-runtime.mjs", "web/pnpm-lock.yaml"],
+    );
+  }
   assert.match(workflow, /policy: pull-push/u);
   assert.match(workflow, /policy: pull/u);
   for (const shard of ["web", "server", "browser"]) {

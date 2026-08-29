@@ -48,9 +48,8 @@ variables:
 .cache_pull: &cache_pull
   cache:
     key:
-      prefix: r640-node-playwright-v2
+      prefix: r640-node-24.14.0-playwright-v2
       files:
-        - .n-node-version
         - scripts/qa/ci-playwright-runtime.mjs
         - web/pnpm-lock.yaml
     paths:
@@ -156,9 +155,8 @@ prepare:
   <<: *main_quality_rules
   cache:
     key:
-      prefix: r640-node-playwright-v2
+      prefix: r640-node-24.14.0-playwright-v2
       files:
-        - .n-node-version
         - scripts/qa/ci-playwright-runtime.mjs
         - web/pnpm-lock.yaml
     paths:
