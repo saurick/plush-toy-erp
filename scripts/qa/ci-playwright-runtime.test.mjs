@@ -215,17 +215,37 @@ test("package absence is the only upstream bootstrap path", () => {
     /candidate = await bootstrapPackage\(env, staging, root\)/u,
   );
   assert.match(source, /const DOWNLOAD_TIMEOUT_MS = 12 \* 60 \* 1_000;/u);
-  assert.match(
-    source,
-    /const signal = AbortSignal[.]timeout\(DOWNLOAD_TIMEOUT_MS\);/u,
-  );
+  const curlStart = source.indexOf("function upstreamCurlArgs");
+  const curlEnd = source.indexOf("function runTool", curlStart);
+  assert.ok(curlStart > 0 && curlEnd > curlStart);
+  const publicCurlBlock = source.slice(curlStart, curlEnd);
+  assert.match(source, /const UPSTREAM_CURL = "\/usr\/bin\/curl";/u);
+  assert.equal(source.match(/spawnSync\(UPSTREAM_CURL/gu)?.length ?? 0, 1);
+  for (const contract of [
+    /"--fail"/u,
+    /"--location"/u,
+    /"--silent"/u,
+    /"--proto",\n\s+"=https"/u,
+    /"--proto-redir",\n\s+"=https"/u,
+    /"--connect-timeout",\n\s+"10"/u,
+    /"--max-time",\n\s+String\(DOWNLOAD_TIMEOUT_MS \/ 1_000\)/u,
+    /"--retry",\n\s+"0"/u,
+    /"--max-filesize",\n\s+String\(asset[.]size\)/u,
+    /stdio: \["ignore", "ignore", "ignore"\]/u,
+    /writeFileSync\(file, "", \{ flag: "wx", mode: 0o600 \}\)/u,
+    /rmSync\(file, \{ force: true \}\)/u,
+  ]) {
+    assert.match(publicCurlBlock, contract);
+  }
+  assert.doesNotMatch(publicCurlBlock, /CI_JOB_TOKEN|JOB-TOKEN/u);
   assert.match(
     source,
     /for \(const asset of CI_PLAYWRIGHT_RUNTIME_ASSETS\) \{\n    await downloadUpstreamAsset\(asset, candidate\);\n  \}/u,
   );
   assert.doesNotMatch(source, /Promise[.]allSettled/u);
   assert.match(source, /phase=upstream-download asset=/u);
-  assert.match(source, /signal[.]aborted \? "timeout" : failureReason/u);
+  assert.match(source, /result[?][.]status === 28/u);
+  assert.match(source, /\[18, 23, 63\][.]includes\(result[?][.]status\)/u);
   for (const value of [
     "started",
     "complete",
@@ -248,7 +268,7 @@ test("package absence is the only upstream bootstrap path", () => {
   assert.match(source, /--format=ustar/u);
   assert.match(source, /--sort=name/u);
   assert.doesNotMatch(source, /playwright["', ]+,?[ ]*"install"/u);
-  assert.doesNotMatch(source, /curl|wget/u);
+  assert.doesNotMatch(source, /wget/u);
   assert.doesNotMatch(
     source,
     /error[.](?:message|cause|stack)|String\(error\)/u,

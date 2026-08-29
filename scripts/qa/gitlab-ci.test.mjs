@@ -219,6 +219,7 @@ test("R640 GitLab definitions pin identity, separate SSD data and require exact 
     /--(?:access-level|locked|maintenance-note|maximum-timeout|paused|run-untagged|tag-list)(?:[=\s]|$)/u,
   );
   assert.match(runnerCloudInit, /libnss3/u);
+  assert.equal(runnerCloudInit.match(/^  - curl$/gmu)?.length ?? 0, 1);
   assert.match(runnerCloudInit, /plush-remove-chromium-sandbox/u);
   assert.match(runnerCloudInit, /chrome-devel-sandbox-\$1/u);
   assert.doesNotMatch(runnerCloudInit, /NOPASSWD: \/usr\/bin\/apt-get/u);

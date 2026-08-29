@@ -33,6 +33,7 @@ const PACKAGE_VERSION = "playwright-1.58.2-linux-x64-r1208-v1";
 const PACKAGE_FILE = "runtime.tar";
 const DOWNLOAD_TIMEOUT_MS = 12 * 60 * 1_000;
 const PACKAGE_TIMEOUT_MS = 10 * 60 * 1_000;
+const UPSTREAM_CURL = "/usr/bin/curl";
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
 const UPSTREAM_DOWNLOAD_STATUSES = new Set(["started", "complete", "failed"]);
@@ -372,36 +373,63 @@ function writeUpstreamDownloadStatus(asset, status, reason = null) {
   );
 }
 
+function upstreamCurlArgs(asset, file) {
+  return [
+    "--fail",
+    "--location",
+    "--silent",
+    "--proto",
+    "=https",
+    "--proto-redir",
+    "=https",
+    "--connect-timeout",
+    "10",
+    "--max-time",
+    String(DOWNLOAD_TIMEOUT_MS / 1_000),
+    "--retry",
+    "0",
+    "--max-filesize",
+    String(asset.size),
+    "--output",
+    file,
+    asset.url,
+  ];
+}
+
+function upstreamCurlFailureReason(result) {
+  if (
+    result?.error?.code === "ETIMEDOUT" ||
+    result?.signal ||
+    result?.status === 28
+  ) {
+    return "timeout";
+  }
+  if (result?.status === 22) return "availability";
+  if ([18, 23, 63].includes(result?.status)) return "response";
+  return "transport";
+}
+
 async function downloadUpstreamAsset(asset, directory) {
-  const signal = AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS);
+  const file = path.join(directory, asset.name);
   let failureReason = "transport";
   writeUpstreamDownloadStatus(asset, "started");
   try {
-    const response = await fetch(asset.url, {
-      method: "GET",
-      redirect: "follow",
-      signal,
+    writeFileSync(file, "", { flag: "wx", mode: 0o600 });
+    const result = spawnSync(UPSTREAM_CURL, upstreamCurlArgs(asset, file), {
+      cwd: directory,
+      stdio: ["ignore", "ignore", "ignore"],
+      timeout: DOWNLOAD_TIMEOUT_MS + 1_000,
     });
-    if (response.status !== 200) {
-      failureReason = "availability";
-      await response.body?.cancel();
-      throw new Error("Pinned Playwright upstream asset is unavailable");
+    if (result.error || result.status !== 0) {
+      failureReason = upstreamCurlFailureReason(result);
+      throw new Error("Pinned Playwright upstream transfer failed");
     }
-    failureReason = "response";
-    const observation = await downloadResponse(
-      response,
-      path.join(directory, asset.name),
-      { exactBytes: asset.size, maxBytes: asset.size },
-    );
     failureReason = "integrity";
-    assertRuntimeAssetObservation(asset, observation);
+    await verifyAssetFile(directory, asset);
     writeUpstreamDownloadStatus(asset, "complete");
   } catch (error) {
-    writeUpstreamDownloadStatus(
-      asset,
-      "failed",
-      signal.aborted ? "timeout" : failureReason,
-    );
+    rmSync(file, { force: true });
+    writeUpstreamDownloadStatus(asset, "failed", failureReason);
     throw error;
   }
 }
