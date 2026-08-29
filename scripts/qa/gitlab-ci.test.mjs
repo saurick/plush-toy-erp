@@ -204,19 +204,19 @@ test("Runner VM and CI pin the Docker release plugins", () => {
   }
   assert.match(
     runnerCloudInit,
-    /test "\$\(docker buildx version \| awk '\{print \$2; exit\}'\)" = v0[.]30[.]1/u,
+    /test "\$\(docker buildx version \| awk '\{print \$2; exit\}'\)" = 0[.]30[.]1/u,
   );
   assert.match(
     runnerCloudInit,
-    /test "\$\(docker compose version --short\)" = 2[.]40[.]3/u,
+    /test "\$\(docker compose version --short\)" = 2[.]40[.]3[+]ds1-0ubuntu1~24[.]04[.]1/u,
   );
   assert.match(
     defaultBeforeScript,
-    /test "\$\(docker buildx version \| awk '\{print \$2; exit\}'\)" = "v0[.]30[.]1"/u,
+    /test "\$\(docker buildx version \| awk '\{print \$2; exit\}'\)" = "0[.]30[.]1"/u,
   );
   assert.match(
     defaultBeforeScript,
-    /test "\$\(docker compose version --short\)" = "2[.]40[.]3"/u,
+    /test "\$\(docker compose version --short\)" = "2[.]40[.]3[+]ds1-0ubuntu1~24[.]04[.]1"/u,
   );
 });
 
