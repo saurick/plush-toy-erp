@@ -174,6 +174,52 @@ test("Runner VM bootstrap installs and verifies the pinned GNU Make toolchain", 
   );
 });
 
+test("Runner VM and CI pin the Docker release plugins", () => {
+  const defaultBeforeScript = workflow.match(
+    /^default:\n[\s\S]+?\n\nvariables:/mu,
+  )?.[0];
+
+  assert.ok(defaultBeforeScript);
+  assert.equal(runnerCloudInit.match(/^  - docker-buildx$/gmu)?.length ?? 0, 1);
+  assert.equal(
+    runnerCloudInit.match(/^  - docker-compose-v2$/gmu)?.length ?? 0,
+    1,
+  );
+  assert.match(
+    runnerCloudInit,
+    /dpkg-query -W -f='\$\{Status\} \$\{Version\} \$\{Architecture\}' docker-buildx\)" = 'install ok installed 0[.]30[.]1-0ubuntu1~24[.]04[.]1 amd64'/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /dpkg-query -W -f='\$\{Status\} \$\{Version\} \$\{Architecture\}' docker-compose-v2\)" = 'install ok installed 2[.]40[.]3\+ds1-0ubuntu1~24[.]04[.]1 amd64'/u,
+  );
+  for (const plugin of ["docker-buildx", "docker-compose"]) {
+    assert.match(
+      runnerCloudInit,
+      new RegExp(
+        `test "\\$\\(stat -Lc '%U:%G:%a' /usr/libexec/docker/cli-plugins/${plugin.replaceAll("-", "[-]")}\\)" = root:root:755`,
+        "u",
+      ),
+    );
+  }
+  assert.match(
+    runnerCloudInit,
+    /test "\$\(docker buildx version \| awk '\{print \$2; exit\}'\)" = v0[.]30[.]1/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /test "\$\(docker compose version --short\)" = 2[.]40[.]3/u,
+  );
+  assert.match(
+    defaultBeforeScript,
+    /test "\$\(docker buildx version \| awk '\{print \$2; exit\}'\)" = "v0[.]30[.]1"/u,
+  );
+  assert.match(
+    defaultBeforeScript,
+    /test "\$\(docker compose version --short\)" = "2[.]40[.]3"/u,
+  );
+});
+
 test("Runner VM bootstrap installs a native compiler and fails closed without CGO", () => {
   assert.equal(runnerCloudInit.match(/^  - gcc$/gmu)?.length ?? 0, 1);
   assert.match(
