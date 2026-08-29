@@ -1,10 +1,16 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
   CI_QUALITY_SHARDS,
   CI_QUALITY_SHARD_SCHEMA,
 } from "./ci-quality-shard.mjs";
+
+const source = readFileSync(
+  new URL("./ci-quality-shard.mjs", import.meta.url),
+  "utf8",
+);
 
 test("quality shard catalog covers the strict stage set exactly once", () => {
   assert.equal(CI_QUALITY_SHARD_SCHEMA, "plush.ci-quality-shard/v1");
@@ -40,4 +46,19 @@ test("quality shard catalog covers the strict stage set exactly once", () => {
     assert.ok(Object.isFrozen(value.command));
     assert.ok(Object.isFrozen(value.stages));
   }
+});
+
+test("browser-bearing shards materialize and clean the verified runtime", () => {
+  assert.match(source, /materializePlaywrightRuntime\(\{ root, env: childEnv \}\)/u);
+  assert.match(source, /cleanupPlaywrightRuntime\(\{ root, env: childEnv \}\)/u);
+  assert.match(source, /playwrightRuntimeCleanup/u);
+  assert.match(source, /runtimeMaterialized = true/u);
+  assert.doesNotMatch(
+    source,
+    /"playwright", "install", "chromium"/u,
+  );
+  assert.match(
+    source,
+    /\["server", "browser"\][.]includes\(shard\)/u,
+  );
 });

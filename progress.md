@@ -4,6 +4,13 @@
 
 ## 当前活跃事项
 
+### R640 GitLab 性能与不可变交付闭环（2026-08-29）
+
+- 已提交 / 推送：`cddd39ff87e3e2ae9cd8c0282431309bb7cb043f` 已把普通 main CI 拆为 plan、prepare、七个固定质量分片、aggregate 与 `CI Gate`，并把普通 exact-SHA terminal 接到 release 复用；同 SHA 候选只构建一次。新 publication 固定 `plush.release-manifest/v2` 七资产并绑定同一 `release-rehearsal.json`；legacy v1 六资产只读、展示、校验及既有回滚，不能补传、重封装或 promotion。通用 / GitLab / GitHub delivery provider、catalog / publisher、promotion、target cache / remote load、回滚读取和研发效能工作台已同步该边界。
+- 首次 R640 证据：自然 push pipeline `7` 的 `plan` 约 `115s` 通过，`prepare` 约 `3900s` 后失败，后续分片未运行。唯一有界 trace 证明 pnpm 765 包约 `65s` 完成，Playwright Chromium 公网下载随后停滞约 `58m51s` 并导致 `job_token_expired`；宿主 72 logical CPU / 61.5 GiB、Runner VM 合同 12 vCPU / 24 GiB 的观测未见 CPU throttling、swap、内存或 block IO 饱和，guest 内部指标因缺少可验证 host key 保持盲区。pipeline `7` 只作失败基线，不重跑、不冒充优化后 CI。
+- 当前修复：Playwright 运行包固定为 `1.58.2 / Chromium 145.0.7632.6 / revision 1208 / FFmpeg 1011`，三个上游 ZIP 已分别取得精确长度与 SHA-256。源码正在收口 package-absence-only 的 protected-main 一次自举、GitLab Generic Package 读回、内层 ZIP 校验、原始 ZIP cache、job 独立 materialize / cleanup，并只让 Web、Server/PostgreSQL、browser 三个消费者拉缓存；普通 job 不再 live install 或缓存已解压浏览器。
+- 后续 / 边界：该修复尚未形成新 commit 或 R640 绿色证据。必须先完成聚焦静态合同、精确提交与普通非强制 push，再自然观察新 SHA 的冷 / 热 CI、关键路径和资源峰值；只有普通 CI 全绿后才由正式规则与 catalog 唯一推出版本，创建 v2 七资产不可变 Release、完成同一回执演练。`test-133` 当前只读 preflight 身份不匹配，禁止 seed / reset / promotion 且不是生产；真实 production target 仍须从正式真源唯一识别并绑定 config / DB / migration / backup / rollback / health / ready / smoke，客户 UAT 不由自动化代称。
+
 ### 员工姓名与账号身份贯通（2026-08-22）
 
 - 真源 / 边界：管理员账号新增可空 `display_name` 姓名字段；账号 `username` 继续负责登录、唯一性与不可变审计身份。新建员工和资料维护要求姓名非空且最多 64 个字符，存量缺失姓名只在展示时回退账号，不做伪造回填。

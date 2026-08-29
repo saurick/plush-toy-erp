@@ -29,6 +29,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/qa/candidate-sha-freeze.test.mjs",
     "scripts/qa/canonical-runtime-audit-contract.test.mjs",
     "scripts/qa/ci-plan.test.mjs",
+    "scripts/qa/ci-playwright-runtime.test.mjs",
     "scripts/qa/ci-quality-aggregate.test.mjs",
     "scripts/qa/ci-quality-shard.test.mjs",
     "scripts/qa/core-boundary.test.mjs",

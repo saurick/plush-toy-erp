@@ -72,15 +72,48 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   assert.match(workflow, /output\/ci\/range[.]txt/u);
   assert.match(workflow, /output\/cache\/gitlab\/pnpm-store/u);
   assert.match(workflow, /export npm_config_store_dir="\$PNPM_STORE_PATH"/u);
+  assert.match(
+    workflow,
+    /export PLAYWRIGHT_RUNTIME_ARCHIVE_DIR="\$CI_PROJECT_DIR\/output\/cache\/gitlab\/playwright-runtime"/u,
+  );
+  assert.match(
+    workflow,
+    /export PLAYWRIGHT_BROWSERS_PATH="\$CI_PROJECT_DIR\/output\/runtime\/gitlab\/playwright-\$CI_JOB_ID"/u,
+  );
+  assert.match(workflow, /scripts\/qa\/ci-playwright-runtime[.]mjs/u);
+  assert.match(workflow, /ci-playwright-runtime[.]mjs seed/u);
+  assert.match(workflow, /ci-playwright-runtime[.]mjs materialize/u);
+  assert.match(workflow, /ci-playwright-runtime[.]mjs cleanup/u);
+  assert.match(workflow, /prefix: r640-node-playwright-v2/u);
   assert.match(workflow, /policy: pull-push/u);
   assert.match(workflow, /policy: pull/u);
+  for (const shard of ["web", "server", "browser"]) {
+    assert.match(
+      workflow,
+      new RegExp(
+        `^quality_${shard}:\\n  <<: \\[\\*quality_shard, \\*cache_pull\\]`,
+        "mu",
+      ),
+    );
+  }
+  for (const shard of ["static", "node", "resource", "security"]) {
+    assert.match(
+      workflow,
+      new RegExp(`^quality_${shard}:\\n  <<: \\*quality_shard`, "mu"),
+    );
+  }
+  assert.match(
+    workflow,
+    /^quality_aggregate:\n  stage: aggregate\n  <<: \*main_quality_rules/mu,
+  );
   assert.doesNotMatch(workflow, /output\/ci\/cache/u);
   assert.doesNotMatch(workflow, /\$CI_PROJECT_DIR\/[.]cache/u);
+  assert.doesNotMatch(workflow, /output\/cache\/gitlab\/ms-playwright/u);
   assert.doesNotMatch(workflow, /[.]ci-plan[.]env/u);
   assert.doesNotMatch(workflow, /reports:\n\s+dotenv:/u);
   assert.match(workflow, /[.]flags[.]needsPostgres/u);
   assert.match(workflow, /case "\$boolean_value" in true\|false/u);
-  assert.match(workflow, /playwright install chromium/u);
+  assert.doesNotMatch(workflow, /playwright install chromium/u);
   assert.doesNotMatch(workflow, /playwright install --with-deps/u);
 });
 

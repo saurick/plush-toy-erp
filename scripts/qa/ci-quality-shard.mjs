@@ -22,6 +22,10 @@ import {
   summarizeGateCategories,
 } from "./run-gate-with-receipt.mjs";
 import { summarizeGateOutput } from "./dev-workbench-receipt.mjs";
+import {
+  cleanupPlaywrightRuntime,
+  materializePlaywrightRuntime,
+} from "./ci-playwright-runtime.mjs";
 
 export const CI_QUALITY_SHARD_SCHEMA = "plush.ci-quality-shard/v1";
 export const CI_QUALITY_SHARDS = Object.freeze({
@@ -275,35 +279,25 @@ async function waitForPostgres(root, name, env) {
   throw new Error(`quality shard PostgreSQL did not become healthy for pipeline ${env.CI_PIPELINE_ID}`);
 }
 
-async function installChromium(root, env, childEnv) {
+async function materializeChromium(root, childEnv) {
   await runProcess("pnpm", ["--dir", "web", "install", "--frozen-lockfile", "--offline"], {
     cwd: root,
     env: childEnv,
   });
-  await runProcess("pnpm", ["--dir", "web", "exec", "playwright", "install", "chromium"], {
-    cwd: root,
-    env: childEnv,
-  });
-  const resolved = await runProcess(
-    process.execPath,
-    [
-      "-e",
-      'const { chromium } = require("./web/node_modules/playwright"); process.stdout.write(chromium.executablePath())',
-    ],
-    { cwd: root, env: childEnv, stream: false },
-  );
-  const chromePath = resolved.stdout.trim();
-  const sandboxSource = path.join(path.dirname(chromePath), "chrome_sandbox");
-  if (!existsSync(chromePath) || !existsSync(sandboxSource)) {
-    throw new Error("quality shard Chromium installation is incomplete");
-  }
-  const sandboxPath = `/usr/local/sbin/chrome-devel-sandbox-${env.CI_JOB_ID}`;
+  return materializePlaywrightRuntime({ root, env: childEnv });
+}
+
+async function installChromiumSandbox(
+  root,
+  childEnv,
+  sandboxSource,
+  sandboxPath,
+) {
   await runProcess(
     "sudo",
     ["install", "-o", "root", "-g", "root", "-m", "4755", sandboxSource, sandboxPath],
     { cwd: root, env: childEnv },
   );
-  return { chromePath, sandboxPath };
 }
 
 function balancedCounts(value = {}) {
@@ -341,12 +335,16 @@ export async function runCiQualityShard({
   let failure = null;
   let postgresName = "";
   let sandboxPath = "";
+  let runtimeMaterialized = false;
   const invariants = {
     dependencyAudit: shard === "security" ? "pending" : "not-applicable",
     makeData: shard === "server" ? "pending" : "not-applicable",
     sourceIntegrity: shard === "node" ? null : "not-applicable",
     databaseCleanup: shard === "server" ? "pending" : "not-applicable",
     chromiumSandboxCleanup: ["server", "browser"].includes(shard)
+      ? "pending"
+      : "not-applicable",
+    playwrightRuntimeCleanup: ["server", "browser"].includes(shard)
       ? "pending"
       : "not-applicable",
     webBuildSha256: null,
@@ -359,9 +357,16 @@ export async function runCiQualityShard({
       });
     }
     if (["server", "browser"].includes(shard)) {
-      const chromium = await installChromium(root, env, childEnv);
-      sandboxPath = chromium.sandboxPath;
-      childEnv.CHROME_DEVEL_SANDBOX = chromium.sandboxPath;
+      const chromium = await materializeChromium(root, childEnv);
+      runtimeMaterialized = true;
+      sandboxPath = `/usr/local/sbin/chrome-devel-sandbox-${env.CI_JOB_ID}`;
+      await installChromiumSandbox(
+        root,
+        childEnv,
+        chromium.sandboxSource,
+        sandboxPath,
+      );
+      childEnv.CHROME_DEVEL_SANDBOX = sandboxPath;
       childEnv.ERP_PDF_CHROME_PATH = chromium.chromePath;
     }
     if (shard === "server") {
@@ -512,6 +517,17 @@ export async function runCiQualityShard({
         failure = new Error("Chromium sandbox cleanup readback failed");
       }
     }
+    if (runtimeMaterialized) {
+      try {
+        cleanupPlaywrightRuntime({ root, env: childEnv });
+        invariants.playwrightRuntimeCleanup = "passed";
+      } catch {
+        invariants.playwrightRuntimeCleanup = "failed";
+        if (!failure) {
+          failure = new Error("Playwright runtime cleanup readback failed");
+        }
+      }
+    }
   }
 
   const timing = parseGateStageTimings(gateOutput, "strict");
@@ -565,7 +581,8 @@ export async function runCiQualityShard({
     invariants,
     cleanupPassed:
       !["failed", "pending"].includes(invariants.databaseCleanup) &&
-      !["failed", "pending"].includes(invariants.chromiumSandboxCleanup),
+      !["failed", "pending"].includes(invariants.chromiumSandboxCleanup) &&
+      !["failed", "pending"].includes(invariants.playwrightRuntimeCleanup),
     failure: failure ? safeFailure(failure) : null,
     runtime: { node: process.version, platform: process.platform, arch: process.arch },
     redaction: {

@@ -17,6 +17,20 @@ Runner VM 当前资源合同为 12 vCPU、24 GiB 内存和 SSD 系统盘，全�
 
 性能调优必须分别观测 R640 宿主机和 Runner guest：记录冷/热缓存的 job 时长、DAG 关键路径、CPU / 内存 / IO 峰值、p50、波动和近似 p95，再决定 Runner slot、分片和语言测试并行度。普通 CI 7–9 分钟、热缓存提交到部署 10–15 分钟只是稳健阶段目标；资源仍有余量且未出现排队、IO 争用、OOM、flaky 或波动扩大时，继续冲刺 6–8 分钟和 8–12 分钟，稳定更快也接受。只有资源饱和或进一步提速需要明显不成比例的复杂度时才停止；不得减少测试、放宽 fail-closed / exact-SHA、隔离或清理门禁，也不得用伪缓存命中换取数字。
 
+## Playwright 冷启动与本地运行包
+
+exact SHA `cddd39ff87e3e2ae9cd8c0282431309bb7cb043f` 的自然 push pipeline `7` 是失败证据，不是优化完成证明：`plan` 约 `115s` 通过，`prepare` 约 `3900s` 后以 `job_token_expired` 失败，后续七个分片均未执行。唯一有界失败 trace 显示 pnpm 的 765 个包约 `65s` 完成，随后 Playwright Chromium 公网下载停滞约 `58m51s`。同期 R640 宿主机为 72 logical CPU / 61.5 GiB，Runner guest 合同为 12 vCPU / 24 GiB；宿主与 VM cgroup 证据未出现 CPU throttling、swap、内存或 block IO 饱和，因此不能靠提高并发解决这次失败。guest 内部采样因没有可验证的既有 SSH host key 保持盲区。
+
+固定路由测量表明，Chrome for Testing 官方存储的完整 Chrome 约可按 `185s` 下载，Playwright CDN 的 headless shell 约 `77s`，FFmpeg 小于 `1s`；官方存储的 headless shell 约需 `973s`，不进入冷启动路径。新的运行包合同固定 `playwright 1.58.2 / Chromium 145.0.7632.6 / revision 1208 / FFmpeg 1011`，并绑定下列原始 ZIP：
+
+| 文件 | 字节数 | SHA-256 |
+| --- | ---: | --- |
+| `chrome-linux64.zip` | `175440843` | `b5e3195041af345a668d110f5daf5581961fa3608626ea588c97dd0fe81c4e38` |
+| `chrome-headless-shell-linux64.zip` | `116288461` | `2536e97d8f410df0394b3e7c4252e88ce9f239f04f3af4e247a26caf45baf49e` |
+| `ffmpeg-linux.zip` | `2376500` | `ebc74fc5b94830176a3c2914ae96bd8bc7f6a91f4f33890230f84a172ee61ccc` |
+
+只有 protected main 的自然 push `prepare` job 在同项目 Generic Package 精确返回 404 时，才允许按上述固定路由自举一次，逐项校验长度和 SHA-256、上传 `runtime.tar`，再从 GitLab 读回并校验同一内层集合。后续 job 只能消费 GitLab 本地 package 或其已校验 ZIP cache；已解压目录不进 cache，每个 job 在独立目录 materialize，核对 Chrome、headless shell、FFmpeg 和安装标记后使用，并在成功或失败时清理。job token 仅作为 Node fetch header 留在进程内存，不进入参数、输出或 cache。新 SHA 的普通 CI 在 R640 全绿前，这一实现仍只算源码候选，不得把 pipeline `7` 或路由测量写成缓存命中、完整 CI 或发布证据。
+
 ## 文件职责
 
 - `compose.yml`：固定 GitLab CE 镜像 digest，只监听宿主机 `127.0.0.1:8929` 和 LAN SSH `192.168.0.133:2224`。

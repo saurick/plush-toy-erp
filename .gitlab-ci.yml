@@ -24,7 +24,8 @@ default:
     - umask 077
     - export PNPM_STORE_PATH="$CI_PROJECT_DIR/output/cache/gitlab/pnpm-store"
     - export npm_config_store_dir="$PNPM_STORE_PATH"
-    - export PLAYWRIGHT_BROWSERS_PATH="$CI_PROJECT_DIR/output/cache/gitlab/ms-playwright"
+    - export PLAYWRIGHT_RUNTIME_ARCHIVE_DIR="$CI_PROJECT_DIR/output/cache/gitlab/playwright-runtime"
+    - export PLAYWRIGHT_BROWSERS_PATH="$CI_PROJECT_DIR/output/runtime/gitlab/playwright-$CI_JOB_ID"
     - export PATH="$(go env GOPATH)/bin:$PATH"
     - test "$(node --version)" = "v$(tr -d '\n' < .n-node-version)"
     - test "$(go env GOVERSION)" = "go1.26.6"
@@ -47,13 +48,14 @@ variables:
 .cache_pull: &cache_pull
   cache:
     key:
-      prefix: r640-node-playwright
+      prefix: r640-node-playwright-v2
       files:
         - .n-node-version
+        - scripts/qa/ci-playwright-runtime.mjs
         - web/pnpm-lock.yaml
     paths:
       - output/cache/gitlab/pnpm-store/
-      - output/cache/gitlab/ms-playwright/
+      - output/cache/gitlab/playwright-runtime/
     policy: pull
 
 .main_quality_rules: &main_quality_rules
@@ -147,34 +149,36 @@ plan:
 
 prepare:
   stage: prepare
+  timeout: 20m
   needs:
     - job: plan
       artifacts: false
   <<: *main_quality_rules
   cache:
     key:
-      prefix: r640-node-playwright
+      prefix: r640-node-playwright-v2
       files:
         - .n-node-version
+        - scripts/qa/ci-playwright-runtime.mjs
         - web/pnpm-lock.yaml
     paths:
       - output/cache/gitlab/pnpm-store/
-      - output/cache/gitlab/ms-playwright/
+      - output/cache/gitlab/playwright-runtime/
     policy: pull-push
   script:
     - |
       set -euo pipefail
       pnpm --dir web install --frozen-lockfile
-      pnpm --dir web exec playwright install chromium
+      node scripts/qa/ci-playwright-runtime.mjs seed
       (cd server && go mod download)
-      chrome_path="$(node -e 'const { chromium } = require("./web/node_modules/playwright"); process.stdout.write(chromium.executablePath())')"
-      test -x "$chrome_path"
       test -d "$PNPM_STORE_PATH"
+      test -d "$PLAYWRIGHT_RUNTIME_ARCHIVE_DIR"
+      test ! -e "$PLAYWRIGHT_BROWSERS_PATH"
       echo "[gitlab-ci] cache=prepared sha=$CI_COMMIT_SHA"
 
 .quality_shard: &quality_shard
   stage: quality
-  <<: [*cache_pull, *main_quality_rules]
+  <<: *main_quality_rules
   timeout: 2h
 
 quality_static:
@@ -208,7 +212,7 @@ quality_node:
       - output/ci/shards/node.json
 
 quality_web:
-  <<: *quality_shard
+  <<: [*quality_shard, *cache_pull]
   needs:
     - job: plan
       artifacts: true
@@ -224,7 +228,7 @@ quality_web:
       - web/build/
 
 quality_server:
-  <<: *quality_shard
+  <<: [*quality_shard, *cache_pull]
   needs:
     - job: plan
       artifacts: true
@@ -254,7 +258,7 @@ quality_resource:
       - output/ci/shards/resource.json
 
 quality_browser:
-  <<: *quality_shard
+  <<: [*quality_shard, *cache_pull]
   needs:
     - job: plan
       artifacts: true
@@ -287,7 +291,7 @@ quality_security:
 
 quality_aggregate:
   stage: aggregate
-  <<: [*cache_pull, *main_quality_rules]
+  <<: *main_quality_rules
   needs:
     - job: plan
       artifacts: true
@@ -347,13 +351,19 @@ quality_affected:
       [[ "$range" =~ ^([0-9a-f]{40}|HEAD\^)\.\.\.?HEAD$ ]]
       postgres_name="plush-ci-postgres-$CI_PIPELINE_ID-$CI_JOB_ID"
       sandbox_path=""
+      runtime_materialized=false
       cleanup() {
+        cleanup_status=0
         if docker inspect "$postgres_name" >/dev/null 2>&1; then
-          docker rm --force "$postgres_name" >/dev/null
+          docker rm --force "$postgres_name" >/dev/null || cleanup_status=1
         fi
         if [[ -n "$sandbox_path" ]]; then
-          sudo /usr/local/sbin/plush-remove-chromium-sandbox "$CI_JOB_ID"
+          sudo /usr/local/sbin/plush-remove-chromium-sandbox "$CI_JOB_ID" || cleanup_status=1
         fi
+        if [[ "$runtime_materialized" == "true" ]]; then
+          node scripts/qa/ci-playwright-runtime.mjs cleanup || cleanup_status=1
+        fi
+        return "$cleanup_status"
       }
       trap cleanup EXIT
       if [[ "$needs_postgres" == "true" ]]; then
@@ -377,12 +387,15 @@ quality_affected:
         [[ "$postgres_port" =~ ^[0-9]+$ ]]
         export DISPOSABLE_DATABASE_BASE_URL="postgres://postgres:ci-local-password@127.0.0.1:$postgres_port/postgres?sslmode=disable"
       fi
-      if [[ "$needs_web" == "true" ]]; then
+      if [[ "$needs_web" == "true" || "$needs_chromium" == "true" ]]; then
         pnpm --dir web install --frozen-lockfile
+      fi
+      if [[ "$needs_web" == "true" ]]; then
         pnpm --dir web audit --prod --audit-level high --registry=https://registry.npmjs.org
       fi
       if [[ "$needs_chromium" == "true" ]]; then
-        pnpm --dir web exec playwright install chromium
+        node scripts/qa/ci-playwright-runtime.mjs materialize
+        runtime_materialized=true
         chrome_path="$(node -e 'const { chromium } = require("./web/node_modules/playwright"); process.stdout.write(chromium.executablePath())')"
         sandbox_source="$(dirname "$chrome_path")/chrome_sandbox"
         sandbox_path="/usr/local/sbin/chrome-devel-sandbox-$CI_JOB_ID"
