@@ -31,10 +31,18 @@ const FFMPEG_REVISION = "1011";
 const PACKAGE_NAME = "plush-ci-playwright-runtime";
 const PACKAGE_VERSION = "playwright-1.58.2-linux-x64-r1208-v1";
 const PACKAGE_FILE = "runtime.tar";
-const DOWNLOAD_TIMEOUT_MS = 8 * 60 * 1_000;
+const DOWNLOAD_TIMEOUT_MS = 12 * 60 * 1_000;
 const PACKAGE_TIMEOUT_MS = 10 * 60 * 1_000;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
+const UPSTREAM_DOWNLOAD_STATUSES = new Set(["started", "complete", "failed"]);
+const UPSTREAM_DOWNLOAD_FAILURE_REASONS = new Set([
+  "transport",
+  "availability",
+  "response",
+  "integrity",
+  "timeout",
+]);
 
 export const CI_PLAYWRIGHT_RUNTIME_ASSETS = Object.freeze([
   Object.freeze({
@@ -345,22 +353,57 @@ async function downloadResponse(
   return Object.freeze({ size: observed, sha256: digest.digest("hex") });
 }
 
-async function downloadUpstreamAsset(asset, directory) {
-  const response = await fetch(asset.url, {
-    method: "GET",
-    redirect: "follow",
-    signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
-  });
-  if (response.status !== 200) {
-    await response.body?.cancel();
-    throw new Error("Pinned Playwright upstream asset is unavailable");
+function writeUpstreamDownloadStatus(asset, status, reason = null) {
+  if (
+    !CI_PLAYWRIGHT_RUNTIME_ASSETS.includes(asset) ||
+    !UPSTREAM_DOWNLOAD_STATUSES.has(status) ||
+    (status === "failed") !==
+      UPSTREAM_DOWNLOAD_FAILURE_REASONS.has(String(reason || ""))
+  ) {
+    throw new Error("Playwright upstream status evidence is invalid");
   }
-  const observation = await downloadResponse(
-    response,
-    path.join(directory, asset.name),
-    { exactBytes: asset.size, maxBytes: asset.size },
+  process.stderr.write(
+    "[ci-playwright-runtime] phase=upstream-download asset=" +
+      asset.name +
+      " status=" +
+      status +
+      (reason ? " reason=" + reason : "") +
+      "\n",
   );
-  assertRuntimeAssetObservation(asset, observation);
+}
+
+async function downloadUpstreamAsset(asset, directory) {
+  const signal = AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS);
+  let failureReason = "transport";
+  writeUpstreamDownloadStatus(asset, "started");
+  try {
+    const response = await fetch(asset.url, {
+      method: "GET",
+      redirect: "follow",
+      signal,
+    });
+    if (response.status !== 200) {
+      failureReason = "availability";
+      await response.body?.cancel();
+      throw new Error("Pinned Playwright upstream asset is unavailable");
+    }
+    failureReason = "response";
+    const observation = await downloadResponse(
+      response,
+      path.join(directory, asset.name),
+      { exactBytes: asset.size, maxBytes: asset.size },
+    );
+    failureReason = "integrity";
+    assertRuntimeAssetObservation(asset, observation);
+    writeUpstreamDownloadStatus(asset, "complete");
+  } catch (error) {
+    writeUpstreamDownloadStatus(
+      asset,
+      "failed",
+      signal.aborted ? "timeout" : failureReason,
+    );
+    throw error;
+  }
 }
 
 function runTool(command, args, cwd) {

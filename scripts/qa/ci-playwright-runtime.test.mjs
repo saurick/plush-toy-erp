@@ -214,7 +214,26 @@ test("package absence is the only upstream bootstrap path", () => {
     source,
     /candidate = await bootstrapPackage\(env, staging, root\)/u,
   );
+  assert.match(source, /const DOWNLOAD_TIMEOUT_MS = 12 \* 60 \* 1_000;/u);
+  assert.match(
+    source,
+    /const signal = AbortSignal[.]timeout\(DOWNLOAD_TIMEOUT_MS\);/u,
+  );
   assert.match(source, /Promise[.]allSettled/u);
+  assert.match(source, /phase=upstream-download asset=/u);
+  assert.match(source, /signal[.]aborted \? "timeout" : failureReason/u);
+  for (const value of [
+    "started",
+    "complete",
+    "failed",
+    "transport",
+    "availability",
+    "response",
+    "integrity",
+    "timeout",
+  ]) {
+    assert.match(source, new RegExp('"' + value + '"', "u"), value);
+  }
   assert.match(source, /method: "PUT"/u);
   assert.match(source, /"JOB-TOKEN": env[.]CI_JOB_TOKEN/u);
   assert.match(
@@ -226,4 +245,8 @@ test("package absence is the only upstream bootstrap path", () => {
   assert.match(source, /--sort=name/u);
   assert.doesNotMatch(source, /playwright["', ]+,?[ ]*"install"/u);
   assert.doesNotMatch(source, /curl|wget/u);
+  assert.doesNotMatch(
+    source,
+    /error[.](?:message|cause|stack)|String\(error\)/u,
+  );
 });
