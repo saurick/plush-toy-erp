@@ -17,6 +17,7 @@ function fixtureManifest() {
   return {
     schemaVersion: "plush-release-artifact/v1",
     passed: true,
+    releaseVersion: "2026.08.29-1",
     git: { commit: SHA },
     sourceArchive: { sha256: HASH },
     migration: { latest: "20260729000000", sequenceSha256: HASH },
@@ -88,13 +89,13 @@ function ciStrictTerminal() {
       },
     },
     provenance: {
-      source: "github-actions",
+      source: "gitlab-ci",
       repository: "saurick/plush-toy-erp",
       workflowRef:
-        "saurick/plush-toy-erp/.github/workflows/ci.yml@refs/heads/main",
+        "saurick/plush-toy-erp/.gitlab-ci.yml@refs/heads/main",
       runId: "456",
       runAttempt: "1",
-      job: "quality",
+      job: "quality_aggregate",
       eventName: "push",
       ref: "refs/heads/main",
       refName: "main",
@@ -119,15 +120,94 @@ function registryImages() {
   ];
 }
 
-test("release catalog binds strict, artifact, registry digests and rollback boundary", () => {
-  const manifest = buildReleaseManifest({
-    version: "2026.07.29-1",
+function releaseRehearsalReceipt() {
+  const runtime = {
+    serverHealth: "passed",
+    serverReady: "passed",
+    webHealth: "passed",
+    webRoot: "passed",
+    runtimeIdentity: "passed",
+    authenticatedAdmin: "passed",
+    embeddedGitSha: SHA,
+  };
+  return {
+    schemaVersion: "plush-local-release-rehearsal/v1",
+    passed: true,
+    customer: "yoyoosun",
+    generatedAt: "2026-08-29T00:00:00.000Z",
+    finishedAt: "2026-08-29T00:05:00.000Z",
+    git: { commit: SHA, head: SHA, worktreeClean: true },
+    artifact: {
+      manifestSchema: "plush-release-artifact/v1",
+      server: `sha256:${"c".repeat(64)}`,
+      web: `sha256:${"d".repeat(64)}`,
+      migrationSequenceSha256: HASH,
+      sbomSha256: HASH,
+    },
+    environment: {
+      kind: "local-isolated-release-compose",
+      composeSource: "server/deploy/compose/prod/compose.yml",
+      databaseIdentityBound: true,
+    },
+    migration: {
+      latest: "20260729000000",
+      sequenceSha256: HASH,
+      directoryValidation: "passed",
+      dryRun: "passed",
+      apply: "passed",
+      readback: "passed",
+    },
+    runtime: { initial: runtime, steadyStateRestart: runtime },
+    backupRestore: {
+      status: "passed",
+      backupSha256: "7".repeat(64),
+      backupSizeBytes: 1024,
+      dumpRetained: false,
+    },
+    recoveryRestart: {
+      status: "passed",
+      bootstrapSecretRemoved: true,
+      sameServerContentId: true,
+      sameWebContentId: true,
+      healthReadyAndLoginRecovered: true,
+      customerConfigRecovered: true,
+    },
+    cleanup: {
+      attempted: true,
+      passed: true,
+      residualContainers: 0,
+      temporaryDatabaseRetained: false,
+    },
+    failure: null,
+    redaction: {
+      containsSecrets: false,
+      containsCredentials: false,
+      containsFullDsn: false,
+      containsAbsoluteWorkspacePaths: false,
+      containsRawCustomerRows: false,
+    },
+  };
+}
+
+function buildCurrentRelease(overrides = {}) {
+  const version = overrides.version || "2026.08.29-1";
+  const artifactManifest = fixtureManifest();
+  artifactManifest.releaseVersion = version;
+  return buildReleaseManifest({
+    version,
     gitSha: SHA,
-    strictTerminal: strictTerminal(),
-    artifactManifest: fixtureManifest(),
+    strictTerminal: ciStrictTerminal(),
+    artifactManifest,
     artifactManifestSha256: HASH,
     images: registryImages(),
+    rehearsalReceipt: releaseRehearsalReceipt(),
+    rehearsalReceiptSha256: "8".repeat(64),
+    ...overrides,
   });
+}
+
+test("release catalog binds strict, artifact, registry digests and rollback boundary", () => {
+  const manifest = buildCurrentRelease({ version: "2026.07.29-1" });
   assert.equal(validateReleaseManifest(manifest), manifest);
   assert.deepEqual(
     manifest.images.map(({ kind, ref }) => ({ kind, ref })),
@@ -146,16 +226,9 @@ test("release catalog binds strict, artifact, registry digests and rollback boun
 });
 
 test("release catalog accepts CI v3 strict identity while preserving v2 rollback manifests", () => {
-  const manifest = buildReleaseManifest({
-    version: "2026.08.09-1",
-    gitSha: SHA,
-    strictTerminal: ciStrictTerminal(),
-    artifactManifest: fixtureManifest(),
-    artifactManifestSha256: HASH,
-    images: registryImages(),
-  });
+  const manifest = buildCurrentRelease({ version: "2026.08.09-1" });
   assert.equal(manifest.strict.contract, "plush.exact-sha-strict/v3");
-  assert.equal(manifest.strict.provenance.job, "quality");
+  assert.equal(manifest.strict.provenance.job, "quality_aggregate");
   assert.equal(validateReleaseManifest(manifest), manifest);
   const drifted = structuredClone(manifest);
   drifted.strict.identity.policyFingerprint = "9".repeat(64);
@@ -165,7 +238,7 @@ test("release catalog accepts CI v3 strict identity while preserving v2 rollback
   assert.throws(() => validateReleaseManifest(sourceDrifted), /identity/u);
 });
 
-test("release catalog accepts canonical GitLab strict provenance", () => {
+test("release catalog keeps legacy v1 GitLab strict provenance readable", () => {
   const terminal = ciStrictTerminal();
   terminal.provenance = {
     source: "gitlab-ci",
@@ -181,38 +254,57 @@ test("release catalog accepts canonical GitLab strict provenance", () => {
     headRepository: "saurick/plush-toy-erp",
     conclusion: "success",
   };
-  const manifest = buildReleaseManifest({
-    version: "2026.08.09-gitlab",
-    gitSha: SHA,
-    strictTerminal: terminal,
-    artifactManifest: fixtureManifest(),
-    artifactManifestSha256: HASH,
-    images: registryImages(),
-  });
+  const manifest = buildCurrentRelease({ version: "2026.08.09-gitlab" });
+  manifest.schemaVersion = "plush.release-manifest/v1";
+  manifest.strict.provenance = terminal.provenance;
+  delete manifest.rehearsal;
   assert.equal(validateReleaseManifest(manifest), manifest);
 });
 
+test("release catalog v2 binds canonical GitLab push CI to one rehearsal receipt", () => {
+  const terminal = ciStrictTerminal();
+  terminal.provenance = {
+    source: "gitlab-ci",
+    repository: "saurick/plush-toy-erp",
+    workflowRef:
+      "saurick/plush-toy-erp/.gitlab-ci.yml@refs/heads/main",
+    runId: "9002",
+    runAttempt: "28",
+    job: "quality_aggregate",
+    eventName: "push",
+    ref: "refs/heads/main",
+    refName: "main",
+    headRepository: "saurick/plush-toy-erp",
+    conclusion: "success",
+  };
+  const manifest = buildCurrentRelease({ strictTerminal: terminal });
+  assert.equal(manifest.schemaVersion, "plush.release-manifest/v2");
+  assert.equal(manifest.rehearsal.status, "passed");
+  assert.equal(manifest.rehearsal.receiptSha256, "8".repeat(64));
+  assert.equal(validateReleaseManifest(manifest), manifest);
+  const drifted = structuredClone(manifest);
+  drifted.rehearsal.cleanup.residualContainers = 1;
+  assert.throws(() => validateReleaseManifest(drifted), /rehearsal/u);
+});
+
 test("release catalog rejects failed strict and mutable image refs", () => {
+  const artifactManifest = fixtureManifest();
+  artifactManifest.releaseVersion = "2026.07.29-1";
   assert.throws(
     () =>
       buildReleaseManifest({
         version: "2026.07.29-1",
         gitSha: SHA,
         strictTerminal: strictTerminal("failed"),
-        artifactManifest: fixtureManifest(),
+        artifactManifest,
         artifactManifestSha256: HASH,
         images: registryImages(),
+        rehearsalReceipt: releaseRehearsalReceipt(),
+        rehearsalReceiptSha256: "8".repeat(64),
       }),
     /passed exact-SHA/u,
   );
-  const manifest = buildReleaseManifest({
-    version: "2026.07.29-1",
-    gitSha: SHA,
-    strictTerminal: strictTerminal(),
-    artifactManifest: fixtureManifest(),
-    artifactManifestSha256: HASH,
-    images: registryImages(),
-  });
+  const manifest = buildCurrentRelease({ version: "2026.07.29-1" });
   manifest.images[0].ref = `${manifest.images[0].repository}:latest`;
   assert.throws(() => validateReleaseManifest(manifest), /image is invalid/u);
 });
@@ -221,16 +313,16 @@ test("release catalog write is idempotent but never overwrites another identity"
   const root = mkdtempSync(path.join(os.tmpdir(), "plush-release-catalog-"));
   try {
     const file = path.join(root, "release-manifest.json");
-    const manifest = buildReleaseManifest({
-      version: "2026.07.29-1",
-      gitSha: SHA,
-      strictTerminal: strictTerminal(),
-      artifactManifest: fixtureManifest(),
-      artifactManifestSha256: HASH,
-      images: registryImages(),
-    });
+    const manifest = buildCurrentRelease({ version: "2026.07.29-1" });
     assert.equal(writeReleaseManifest(file, manifest).reused, false);
     assert.equal(writeReleaseManifest(file, manifest).reused, true);
+    const legacy = structuredClone(manifest);
+    legacy.schemaVersion = "plush.release-manifest/v1";
+    delete legacy.rehearsal;
+    assert.throws(
+      () => writeReleaseManifest(path.join(root, "legacy.json"), legacy),
+      /only release manifest v2/u,
+    );
     const changed = JSON.parse(readFileSync(file, "utf8"));
     changed.version = "2026.07.29-2";
     assert.throws(

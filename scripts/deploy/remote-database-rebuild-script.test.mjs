@@ -22,6 +22,7 @@ test("remote database rebuild accepts only the fixed test-133 contract", () => {
     source,
     /(?:--host|--path|--project|--database|--data-dir|--command|eval\s)/u,
   );
+  assert.match(source, /plush[.]release-manifest\/v2/u);
 });
 
 test("remote database rebuild preserves predecessor and backup without deletion", () => {

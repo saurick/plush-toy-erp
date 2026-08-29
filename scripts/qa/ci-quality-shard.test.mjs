@@ -1,0 +1,43 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  CI_QUALITY_SHARDS,
+  CI_QUALITY_SHARD_SCHEMA,
+} from "./ci-quality-shard.mjs";
+
+test("quality shard catalog covers the strict stage set exactly once", () => {
+  assert.equal(CI_QUALITY_SHARD_SCHEMA, "plush.ci-quality-shard/v1");
+  assert.deepEqual(Object.keys(CI_QUALITY_SHARDS), [
+    "static",
+    "node",
+    "web",
+    "server",
+    "resource",
+    "browser",
+    "security",
+  ]);
+  const stages = Object.values(CI_QUALITY_SHARDS).flatMap((value) => value.stages);
+  assert.equal(new Set(stages).size, stages.length);
+  assert.deepEqual(new Set(stages), new Set([
+    "strict_profile",
+    "shellcheck",
+    "shfmt",
+    "yamllint",
+    "environment_profile",
+    "shared",
+    "secrets",
+    "web",
+    "server",
+    "resource_sensitive_node",
+    "critical_postgres",
+    "browser",
+    "govulncheck",
+  ]));
+  for (const [shard, value] of Object.entries(CI_QUALITY_SHARDS)) {
+    assert.equal(value.job, `quality_${shard}`);
+    assert.ok(Object.isFrozen(value));
+    assert.ok(Object.isFrozen(value.command));
+    assert.ok(Object.isFrozen(value.stages));
+  }
+});

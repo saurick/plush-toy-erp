@@ -16,9 +16,13 @@ import { pathToFileURL } from "node:url";
 
 import { sha256File } from "../lib/file-digest.mjs";
 import { assertReleaseArtifactManifest } from "./release-artifact-bundle.mjs";
-import { validateReleaseManifest } from "./release-catalog.mjs";
+import {
+  validateReleaseArtifactBinding,
+  validateReleaseManifest,
+  validateReleaseRehearsalReceipt,
+} from "./release-catalog.mjs";
 
-export const RELEASE_ASSET_NAMES = Object.freeze([
+export const LEGACY_RELEASE_ASSET_NAMES = Object.freeze([
   "checksums.sha256",
   "release-artifact.json",
   "release-manifest.json",
@@ -26,8 +30,19 @@ export const RELEASE_ASSET_NAMES = Object.freeze([
   "server-image.tar",
   "web-image.tar",
 ]);
+export const RELEASE_ASSET_NAMES = Object.freeze([
+  ...LEGACY_RELEASE_ASSET_NAMES.slice(0, 3),
+  "release-rehearsal.json",
+  ...LEGACY_RELEASE_ASSET_NAMES.slice(3),
+]);
+export const LEGACY_CHECKSUM_PAYLOAD_NAMES = Object.freeze(
+  LEGACY_RELEASE_ASSET_NAMES.filter((name) => name !== "checksums.sha256"),
+);
 export const CHECKSUM_PAYLOAD_NAMES = Object.freeze(
   RELEASE_ASSET_NAMES.filter((name) => name !== "checksums.sha256"),
+);
+const LEGACY_SMALL_RELEASE_ASSET_NAMES = Object.freeze(
+  LEGACY_RELEASE_ASSET_NAMES.filter((name) => !name.endsWith("-image.tar")),
 );
 export const SMALL_RELEASE_ASSET_NAMES = Object.freeze(
   RELEASE_ASSET_NAMES.filter((name) => !name.endsWith("-image.tar")),
@@ -60,10 +75,13 @@ export function parseReleaseChecksums(source) {
       throw new Error("release checksum catalog is malformed");
     entries.set(match[2], match[1]);
   }
-  if (
-    entries.size !== CHECKSUM_PAYLOAD_NAMES.length ||
-    CHECKSUM_PAYLOAD_NAMES.some((name) => !entries.has(name))
-  ) {
+  const exactCurrent =
+    entries.size === CHECKSUM_PAYLOAD_NAMES.length &&
+    CHECKSUM_PAYLOAD_NAMES.every((name) => entries.has(name));
+  const exactLegacy =
+    entries.size === LEGACY_CHECKSUM_PAYLOAD_NAMES.length &&
+    LEGACY_CHECKSUM_PAYLOAD_NAMES.every((name) => entries.has(name));
+  if (!exactCurrent && !exactLegacy) {
     throw new Error(
       "release checksum catalog must cover every payload exactly once",
     );
@@ -93,10 +111,9 @@ export function finalizeReleaseChecksums(directory) {
 }
 
 function assertManifestIdentity(directory, sha, version) {
+  const artifactFile = path.join(directory, "release-artifact.json");
   const artifact = assertReleaseArtifactManifest(
-    JSON.parse(
-      readFileSync(path.join(directory, "release-artifact.json"), "utf8"),
-    ),
+    JSON.parse(readFileSync(artifactFile, "utf8")),
   );
   const release = validateReleaseManifest(
     JSON.parse(
@@ -112,7 +129,42 @@ function assertManifestIdentity(directory, sha, version) {
   ) {
     throw new Error("release assets do not match requested identity");
   }
+  validateReleaseArtifactBinding(release, artifact, sha256File(artifactFile));
   return { artifact, release };
+}
+
+function expectedNamesForManifest(manifest) {
+  return manifest.schemaVersion === "plush.release-manifest/v2"
+    ? RELEASE_ASSET_NAMES
+    : LEGACY_RELEASE_ASSET_NAMES;
+}
+
+function assertChecksumShape(checksums, manifest) {
+  const expected = expectedNamesForManifest(manifest).filter(
+    (name) => name !== "checksums.sha256",
+  );
+  if (
+    checksums.size !== expected.length ||
+    expected.some((name) => !checksums.has(name))
+  ) {
+    throw new Error("release checksum catalog does not match manifest version");
+  }
+}
+
+function assertRehearsalAsset(root, artifact, release, sha, version) {
+  if (release.schemaVersion !== "plush.release-manifest/v2") return;
+  const receiptFile = path.join(root, "release-rehearsal.json");
+  const receipt = validateReleaseRehearsalReceipt(
+    JSON.parse(readFileSync(receiptFile, "utf8")),
+    artifact,
+    { sha, version, customer: "yoyoosun" },
+  );
+  if (
+    sha256File(receiptFile) !== release.rehearsal?.receiptSha256 ||
+    receipt.git.commit !== release.gitSha
+  ) {
+    throw new Error("release rehearsal asset does not match release manifest");
+  }
 }
 
 function assetDescriptor(file, name) {
@@ -134,18 +186,23 @@ export function inspectLocalReleaseAssets(directory, { sha, version }) {
     JSON.stringify(names) !== JSON.stringify([...RELEASE_ASSET_NAMES].sort())
   ) {
     throw new Error(
-      "release directory must contain exactly the six public assets",
+      "release directory must contain exactly the seven v2 public assets",
     );
   }
-  assertManifestIdentity(root, sha, version);
+  const { artifact, release } = assertManifestIdentity(root, sha, version);
+  if (release.schemaVersion !== "plush.release-manifest/v2") {
+    throw new Error("new publication requires a v2 release manifest");
+  }
   const checksums = parseReleaseChecksums(
     readFileSync(path.join(root, "checksums.sha256"), "utf8"),
   );
+  assertChecksumShape(checksums, release);
   for (const [name, expected] of checksums) {
     if (sha256File(path.join(root, name)) !== expected) {
       throw new Error(`release checksum mismatch: ${name}`);
     }
   }
+  assertRehearsalAsset(root, artifact, release, sha, version);
   return RELEASE_ASSET_NAMES.map((name) =>
     assetDescriptor(path.join(root, name), name),
   );
@@ -168,11 +225,19 @@ export function analyzeReleaseCatalog({ releases, sha, version, localAssets }) {
   }
   const release = identity.release;
   const expected = new Map(localAssets.map((asset) => [asset.name, asset]));
+  const expectedNames =
+    expected.size === RELEASE_ASSET_NAMES.length &&
+    RELEASE_ASSET_NAMES.every((name) => expected.has(name))
+      ? RELEASE_ASSET_NAMES
+      : LEGACY_RELEASE_ASSET_NAMES;
   if (
-    expected.size !== RELEASE_ASSET_NAMES.length ||
-    RELEASE_ASSET_NAMES.some((name) => !expected.has(name))
+    expected.size !== expectedNames.length ||
+    expectedNames.some((name) => !expected.has(name))
   ) {
     throw new Error("local release asset set is incomplete");
+  }
+  if (release.draft && expectedNames === LEGACY_RELEASE_ASSET_NAMES) {
+    throw new Error("legacy v1 drafts cannot be published or repackaged");
   }
   const remote = new Map();
   for (const asset of release.assets || []) {
@@ -189,9 +254,12 @@ export function analyzeReleaseCatalog({ releases, sha, version, localAssets }) {
     }
     remote.set(asset.name, asset);
   }
-  const missingAssets = RELEASE_ASSET_NAMES.filter((name) => !remote.has(name));
+  const missingAssets = expectedNames.filter((name) => !remote.has(name));
   if (!release.draft && missingAssets.length > 0) {
     throw new Error("published immutable release is incomplete");
+  }
+  if (release.draft && remote.size > 0 && missingAssets.length > 0) {
+    throw new Error("partial draft releases cannot be resumed or repackaged");
   }
   return Object.freeze({
     state: release.draft ? "draft" : "published",
@@ -230,13 +298,20 @@ export function inspectReleaseIdentity({ releases, sha, version }) {
 
 function expectedAssetsFromDownloaded(directory, sha, version) {
   const root = path.resolve(directory);
-  for (const name of SMALL_RELEASE_ASSET_NAMES)
+  for (const name of LEGACY_SMALL_RELEASE_ASSET_NAMES)
     plainFile(path.join(root, name), name);
-  const { artifact } = assertManifestIdentity(root, sha, version);
+  const { artifact, release } = assertManifestIdentity(root, sha, version);
+  const expectedNames = expectedNamesForManifest(release);
+  const smallNames = expectedNames.filter(
+    (name) => !name.endsWith("-image.tar"),
+  );
+  for (const name of smallNames) plainFile(path.join(root, name), name);
   const checksums = parseReleaseChecksums(
     readFileSync(path.join(root, "checksums.sha256"), "utf8"),
   );
-  const descriptors = SMALL_RELEASE_ASSET_NAMES.map((name) =>
+  assertChecksumShape(checksums, release);
+  assertRehearsalAsset(root, artifact, release, sha, version);
+  const descriptors = smallNames.map((name) =>
     assetDescriptor(path.join(root, name), name),
   );
   for (const descriptor of descriptors.filter(

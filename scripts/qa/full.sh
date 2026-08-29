@@ -5,6 +5,7 @@ print_help() {
   cat <<'USAGE'
 用法:
   bash scripts/qa/full.sh
+  bash scripts/qa/full.sh --ci-shard node|web|server|resource|browser|security
 
 作用:
   执行一次完整本地质量检查。high-risk 或发布候选由 prepare-push.sh --full 在建立远端连接前调用。
@@ -39,11 +40,25 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   exit 0
 fi
 
+ci_shard=""
+if [[ $# -eq 2 && "${1:-}" == "--ci-shard" ]]; then
+  ci_shard="$2"
+  shift 2
+fi
+
 if [[ $# -gt 0 ]]; then
   echo "[qa:full] 不支持的参数: $*"
   print_help
   exit 1
 fi
+
+case "$ci_shard" in
+"" | node | web | server | resource | browser | security) ;;
+*)
+  echo "[qa:full] status=incomplete reason=invalid_ci_shard shard=$ci_shard"
+  exit 2
+  ;;
+esac
 
 full_profile="${QA_FULL_PROFILE:-full}"
 case "$full_profile" in
@@ -85,6 +100,24 @@ fi
 
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
+
+if [[ -n "$ci_shard" ]]; then
+  if [[ "${GITLAB_CI:-}" != "true" ||
+    "${CI_PROJECT_PATH:-}" != "saurick/plush-toy-erp" ||
+    "${CI_DEFAULT_BRANCH:-}" != "main" ||
+    "${CI_COMMIT_BRANCH:-}" != "main" ||
+    "${CI_COMMIT_REF_PROTECTED:-}" != "true" ||
+    ! "${CI_COMMIT_SHA:-}" =~ ^[0-9a-f]{40}$ ||
+    "$(git rev-parse HEAD)" != "${CI_COMMIT_SHA:-}" ||
+    "$full_profile" != "strict" ]]; then
+    echo "[qa:full] status=incomplete reason=untrusted_ci_shard_context shard=$ci_shard"
+    exit 2
+  fi
+  if [[ -n "$(git status --porcelain=v1 --untracked-files=all)" ]]; then
+    echo "[qa:full] status=incomplete reason=dirty_ci_shard shard=$ci_shard"
+    exit 2
+  fi
+fi
 
 # ROOT_DIR pins the Bash toolchain helper used by this gate and its child scripts.
 # shellcheck source=scripts/lib/bash.sh
@@ -228,19 +261,44 @@ qa_full_govulncheck() {
   GOVULNCHECK_STRICT=1 bash "$ROOT_DIR/scripts/qa/govulncheck.sh"
 }
 
-qa_run_stage "$full_profile" environment_profile qa_full_environment_profile
-qa_run_stage "$full_profile" secrets qa_full_secrets
-qa_run_parallel_stages \
-  "$full_profile" \
-  shared qa_full_shared \
-  web qa_full_web \
-  server qa_full_server
-qa_run_stage \
-  "$full_profile" \
-  resource_sensitive_node \
-  qa_full_resource_sensitive_node
-qa_run_stage "$full_profile" critical_postgres qa_full_critical_postgres
-qa_run_stage "$full_profile" browser qa_full_browser
-qa_run_stage "$full_profile" govulncheck qa_full_govulncheck
+case "$ci_shard" in
+node)
+  qa_run_stage strict secrets qa_full_secrets
+  qa_run_stage strict shared qa_full_shared
+  ;;
+web)
+  qa_run_stage strict web qa_full_web
+  ;;
+server)
+  qa_run_stage strict environment_profile qa_full_environment_profile
+  qa_run_stage strict server qa_full_server
+  qa_run_stage strict critical_postgres qa_full_critical_postgres
+  ;;
+resource)
+  qa_run_stage strict resource_sensitive_node qa_full_resource_sensitive_node
+  ;;
+browser)
+  qa_run_stage strict browser qa_full_browser
+  ;;
+security)
+  qa_run_stage strict govulncheck qa_full_govulncheck
+  ;;
+"")
+  qa_run_stage "$full_profile" environment_profile qa_full_environment_profile
+  qa_run_stage "$full_profile" secrets qa_full_secrets
+  qa_run_parallel_stages \
+    "$full_profile" \
+    shared qa_full_shared \
+    web qa_full_web \
+    server qa_full_server
+  qa_run_stage \
+    "$full_profile" \
+    resource_sensitive_node \
+    qa_full_resource_sensitive_node
+  qa_run_stage "$full_profile" critical_postgres qa_full_critical_postgres
+  qa_run_stage "$full_profile" browser qa_full_browser
+  qa_run_stage "$full_profile" govulncheck qa_full_govulncheck
+  ;;
+esac
 
-echo "[qa:full] profile=$full_profile status=complete 全部门禁通过"
+echo "[qa:full] profile=$full_profile shard=${ci_shard:-all} status=complete 全部门禁通过"

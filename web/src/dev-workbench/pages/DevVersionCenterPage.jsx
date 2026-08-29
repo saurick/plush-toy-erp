@@ -826,7 +826,11 @@ export default function DevVersionCenterPage() {
           <StatusTag status={value} />
           <Text type="secondary">
             {record.completeAssets
-              ? `${record.assets.length} 项制品齐全`
+              ? record.promotionEligible
+                ? 'v2 · 7 项制品 · 可部署'
+                : record.assets.includes('release-rehearsal.json')
+                  ? 'v2 · 7 项制品 · 证据未闭合'
+                  : 'v1 · 6 项制品 · 仅旧版回滚'
               : '制品不完整'}
           </Text>
         </Space>
@@ -882,7 +886,10 @@ export default function DevVersionCenterPage() {
           targetPassed &&
           !hasOpenOperation &&
           !isMutationRunning
-        const promotionEligible = baseEligible && actionKind === 'promote'
+        const promotionEligible =
+          baseEligible &&
+          actionKind === 'promote' &&
+          record.promotionEligible === true
         const rollbackEligible =
           baseEligible &&
           actionKind === 'rollback' &&
@@ -898,6 +905,8 @@ export default function DevVersionCenterPage() {
                 ? '133 只读预检未通过，先处理容量或运行态阻断'
                 : !record.completeAssets
                   ? '不可变发布制品不完整'
+                  : !record.promotionEligible && actionKind === 'promote'
+                    ? '旧 v1 六资产版本仅可读取和回滚，不能用于新部署'
                   : record.gitSha === currentTargetSha
                     ? '该 exact SHA 已在 133 运行'
                     : actionKind === 'rollback'
@@ -1419,7 +1428,11 @@ export default function DevVersionCenterPage() {
               />
               <Text type="secondary">
                 {versions[0]?.completeAssets
-                  ? '发布制品齐全'
+                  ? versions[0]?.promotionEligible
+                    ? 'v2 七资产齐全，演练回执已绑定'
+                    : versions[0]?.assets.includes('release-rehearsal.json')
+                      ? 'v2 七资产存在，但演练证据未闭合'
+                      : 'v1 六资产齐全，仅保留读取与旧版回滚'
                   : '等待完整 release assets'}
               </Text>
             </Space>

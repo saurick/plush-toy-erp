@@ -3,8 +3,13 @@ import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 
 import { getDeploymentTarget } from "./deployment-targets.mjs";
+import { assertReleaseArtifactManifest } from "./release-artifact-bundle.mjs";
 import { verifyReleaseArtifact } from "./release-artifact-verify.mjs";
-import { sha256File, validateReleaseManifest } from "./release-catalog.mjs";
+import {
+  sha256File,
+  validateReleaseArtifactBinding,
+  validateReleaseManifest,
+} from "./release-catalog.mjs";
 
 export const TARGET_RELEASE_CACHE_CONTRACT = "plush.target-release-cache/v1";
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
@@ -75,13 +80,10 @@ export function buildTargetReleaseCacheIdentity({
     512 * 1024,
   );
   verifyReleaseArtifact(artifactFile);
-  const artifact = JSON.parse(readFileSync(artifactFile, "utf8"));
-  if (
-    artifact.git?.commit !== manifest.gitSha ||
-    sha256File(artifactFile) !== manifest.artifact.manifestSha256
-  ) {
-    throw new Error("target cache artifact does not match release manifest");
-  }
+  const artifact = assertReleaseArtifactManifest(
+    JSON.parse(readFileSync(artifactFile, "utf8")),
+  );
+  validateReleaseArtifactBinding(manifest, artifact, sha256File(artifactFile));
   const imageArtifacts = new Map(
     artifact.images.map((image) => [image.kind, image]),
   );
@@ -191,11 +193,12 @@ validate_candidate() {
   [[ "$(sha256sum "$candidate/server-image.tar" | awk '{print $1}')" == "$server_archive_sha" ]]
   [[ "$(sha256sum "$candidate/web-image.tar" | awk '{print $1}')" == "$web_archive_sha" ]]
   jq -e --arg sha "$git_sha" --arg version "$version" --arg serverDigest "$server_digest" --arg webDigest "$web_digest" \
-    '.schemaVersion == "plush.release-manifest/v1" and .gitSha == $sha and .version == $version and
+    '((.schemaVersion == "plush.release-manifest/v1") or (.schemaVersion == "plush.release-manifest/v2")) and
+     .gitSha == $sha and .version == $version and
      ([.images[] | select(.kind == "server") | .digest] == [$serverDigest]) and
      ([.images[] | select(.kind == "web") | .digest] == [$webDigest])' "$candidate/release-manifest.json" >/dev/null
-  jq -e --arg sha "$git_sha" --arg serverId "$server_content_id" --arg webId "$web_content_id" \
-    '.schemaVersion == "plush-release-artifact/v1" and .git.commit == $sha and
+  jq -e --arg sha "$git_sha" --arg version "$version" --arg serverId "$server_content_id" --arg webId "$web_content_id" \
+    '.schemaVersion == "plush-release-artifact/v1" and .git.commit == $sha and .releaseVersion == $version and
      ([.images[] | select(.kind == "server") | .contentId] == [$serverId]) and
      ([.images[] | select(.kind == "web") | .contentId] == [$webId])' "$candidate/release-artifact.json" >/dev/null
   actual_server_manifest="$(portable_manifest_digest "$candidate/server-image.tar" "$server_ref" "$server_content_id")"

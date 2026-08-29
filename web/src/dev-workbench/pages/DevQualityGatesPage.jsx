@@ -51,7 +51,7 @@ import {
   selectDisplayedQualityGateOperation,
 } from '../config/devQualityGates.mjs'
 
-const { Paragraph, Text, Title } = Typography
+const { Link, Paragraph, Text, Title } = Typography
 const POLL_INTERVAL_MS = 1500
 const SOURCE_PATH = 'scripts/qa/README.md'
 const EMPTY_VIEW_STATE = Object.freeze({
@@ -444,6 +444,93 @@ function ContextStrip({ summary, view, onReturnRun }) {
           返回运行
         </Button>
       ) : null}
+    </section>
+  )
+}
+
+const SERVER_EVIDENCE_STATUS = Object.freeze({
+  passed: Object.freeze({ label: '普通 CI 已通过', color: 'success' }),
+  running: Object.freeze({ label: '普通 CI 运行中', color: 'processing' }),
+  failed: Object.freeze({ label: '普通 CI 未通过', color: 'error' }),
+  missing: Object.freeze({ label: '当前 SHA 无记录', color: 'default' }),
+  unavailable: Object.freeze({ label: '服务器证据不可读', color: 'default' }),
+})
+
+function ServerCiEvidencePanel({ summary }) {
+  const evidence = summary?.serverEvidence
+  if (!evidence) return null
+  const status =
+    SERVER_EVIDENCE_STATUS[evidence.status] ||
+    SERVER_EVIDENCE_STATUS.unavailable
+  return (
+    <section
+      className="erp-dev-quality-server-evidence"
+      aria-label="R640 服务器质量证据"
+    >
+      <div className="erp-dev-quality-section-heading">
+        <div className="erp-dev-quality-server-evidence__heading-copy">
+          <Text strong>R640 服务器 exact-SHA 证据</Text>
+          <Text type="secondary">
+            普通 push CI、七个固定分片、聚合回执与 CI Gate
+          </Text>
+        </div>
+        <Tag color={status.color}>{status.label}</Tag>
+      </div>
+      <div className="erp-dev-quality-server-evidence__facts">
+        <div>
+          <Text type="secondary">绑定提交</Text>
+          <Text code>{shortCommit(evidence.gitSha)}</Text>
+        </div>
+        <div>
+          <Text type="secondary">流水线</Text>
+          {evidence.pipeline?.url ? (
+            <Link
+              href={evidence.pipeline.url}
+              target="_blank"
+              rel="noreferrer"
+            >
+              #{evidence.pipeline.id}
+            </Link>
+          ) : (
+            <Text>尚未证明</Text>
+          )}
+        </div>
+        <div>
+          <Text type="secondary">服务器总耗时</Text>
+          <Text strong>
+            {formatQualityGateDuration(evidence.pipeline?.durationMs)}
+          </Text>
+        </div>
+        <div>
+          <Text type="secondary">完成时间</Text>
+          <DevTimestamp
+            value={evidence.pipeline?.finishedAt}
+            missing="尚未完成"
+          />
+        </div>
+      </div>
+      <Text>{evidence.message}</Text>
+      {evidence.jobs.length ? (
+        <details className="erp-dev-quality-server-evidence__jobs">
+          <summary>查看服务器 job 耗时</summary>
+          <Space wrap size={[6, 6]}>
+            {evidence.jobs.map((job) => (
+              <Tag
+                key={job.id}
+                color={job.conclusion === 'success' ? 'success' : 'error'}
+              >
+                {job.name} · {formatQualityGateDuration(job.durationMs)}
+              </Tag>
+            ))}
+          </Space>
+        </details>
+      ) : null}
+      <Text type="secondary">
+        证据分层：服务器只证明已提交 SHA；本机 dirty 状态与本地回执不会被覆盖。
+        {evidence.notProven?.length
+          ? ` 尚未证明：${evidence.notProven.join('、')}。`
+          : ''}
+      </Text>
     </section>
   )
 }
@@ -1743,8 +1830,8 @@ export default function DevQualityGatesPage() {
             </Title>
           </Space>
           <Paragraph>
-            运行正式 full /
-            strict，查看真实阶段与耗时，并判断当前结果能否继续提交或发布。
+            分层查看 R640 exact-SHA CI 与本机 full / strict 回执，确认已提交版本和
+            当前未提交改动分别证明到哪里。
           </Paragraph>
         </div>
         <Button
@@ -1816,6 +1903,8 @@ export default function DevQualityGatesPage() {
             </Space>
           }
         />
+
+        <ServerCiEvidencePanel summary={summary} />
 
         <section
           className="erp-dev-quality-actions"

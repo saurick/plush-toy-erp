@@ -19,6 +19,7 @@ import {
 import {
   buildExactShaProvenance,
   buildExactShaPlan,
+  finalizeExactShaGateFromReceipt,
   readExactShaTerminal,
   refreshExactShaTimeSensitiveCheck,
   runExactShaGate,
@@ -89,6 +90,14 @@ function createFixture() {
     "web/Dockerfile",
     "scripts/qa/strict-receipt-identity.mjs",
     "scripts/qa/strict-receipt-identity.test.mjs",
+    "scripts/qa/ci-quality-shard.mjs",
+    "scripts/qa/ci-quality-shard.test.mjs",
+    "scripts/qa/ci-quality-aggregate.mjs",
+    "scripts/qa/ci-quality-aggregate.test.mjs",
+    "scripts/deploy/gitlab-strict-terminal-reuse.mjs",
+    "scripts/deploy/gitlab-strict-terminal-reuse.test.mjs",
+    "scripts/deploy/gitlab-release-candidate.mjs",
+    "scripts/deploy/gitlab-release-candidate.test.mjs",
     "server/internal/data/model/migrate/20260101000000_init.sql",
     "config/customers/yoyoosun/customerPackage.mjs",
     "config/customers/yoyoosun/roleFlowMatrix.mjs",
@@ -156,6 +165,27 @@ test("exact-SHA passed terminal is reused without running strict again", () => {
     assert.equal(second.reused, true);
     assert.equal(second.terminal.status, "passed");
     assert.equal(runs, 1);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("exact-SHA aggregate signs an existing complete strict receipt", () => {
+  const fixture = createFixture();
+  try {
+    const plan = buildExactShaPlan(fixture.root, { sha: fixture.sha });
+    writeReceipt(plan, "passed");
+    const result = finalizeExactShaGateFromReceipt(
+      fixture.root,
+      { sha: fixture.sha },
+      {
+        startedAt: "2026-08-29T00:00:00.000Z",
+        now: () => new Date("2026-08-29T00:01:00.000Z"),
+      },
+    );
+    assert.equal(result.terminal.status, "passed");
+    assert.equal(result.terminal.receipt.sha256.length, 64);
+    assert.equal(result.reused, false);
   } finally {
     fixture.cleanup();
   }

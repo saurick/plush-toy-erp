@@ -90,7 +90,14 @@ function summaryFixture() {
         version: '2026.07.29-1',
         publishedAt: '2026-07-29T01:00:00.000Z',
         url: `https://github.com/saurick/plush-toy-erp/releases/tag/artifact-${SHA}`,
-        assets: ['release-manifest.json'],
+        assets: [
+          'checksums.sha256',
+          'release-artifact.json',
+          'release-manifest.json',
+          'sbom.cdx.json',
+          'server-image.tar',
+          'web-image.tar',
+        ],
         artifactSummary: {
           totalBytes: 1_265_345_566,
           serverImageBytes: 1_029_740_032,
@@ -111,6 +118,7 @@ function summaryFixture() {
           web: `sha256:${'d'.repeat(64)}`,
         },
         completeAssets: true,
+        promotionEligible: false,
       },
     ],
     target: null,

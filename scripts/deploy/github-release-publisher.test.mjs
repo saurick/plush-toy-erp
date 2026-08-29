@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import test from "node:test";
 
 import { parseDockerPushDigest } from "./github-release-publisher.mjs";
@@ -33,4 +35,21 @@ digest: sha256:${"b".repeat(64)}
       ),
     /one immutable digest/u,
   );
+});
+
+test("publisher validates the fixed rehearsal receipt before image publication", () => {
+  const source = readFileSync(
+    path.join(import.meta.dirname, "github-release-publisher.mjs"),
+    "utf8",
+  );
+  const receiptValidation = source.indexOf("validateReleaseRehearsalReceipt(");
+  const publicationValidation = source.indexOf(
+    "validateReleasePublicationEvidence(",
+  );
+  const imagePublication = source.indexOf("artifactManifest.images.map(");
+  assert(receiptValidation >= 0);
+  assert(publicationValidation > receiptValidation);
+  assert(receiptValidation < imagePublication);
+  assert(publicationValidation < imagePublication);
+  assert.match(source, /artifact-dir\/release-rehearsal[.]json/u);
 });

@@ -8,11 +8,13 @@ import { fileURLToPath } from 'node:url'
 import { loadConfigFromFile } from 'vite'
 
 import {
+  DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA,
   QUALITY_GATE_TIMEOUT_MS,
   buildDevQualityGateCommand,
   createDevQualityGateMiddleware,
   createDevQualityGatePlugin,
   createDevQualityGateService,
+  projectDevQualityGateServerEvidence,
   resolveDevQualityGateEnvironment,
   validateDevQualityGateAction,
   validateDevQualityGateCancel,
@@ -125,6 +127,59 @@ test('quality gate action accepts only fixed full or strict intent', () => {
       validateDevQualityGateAction({ action: 'run', payload })
     )
   }
+})
+
+test('quality gate projects R640 exact-SHA CI separately from local dirty state', () => {
+  const names = [
+    'plan',
+    'prepare',
+    'quality_static',
+    'quality_node',
+    'quality_web',
+    'quality_server',
+    'quality_resource',
+    'quality_browser',
+    'quality_security',
+    'quality_aggregate',
+    'CI Gate',
+  ]
+  const evidence = projectDevQualityGateServerEvidence(
+    {
+      schemaVersion: 'plush.delivery-pipeline-timings/v1',
+      runs: [
+        {
+          id: 91,
+          attempt: 17,
+          workflow: 'ci',
+          event: 'push',
+          status: 'completed',
+          conclusion: 'success',
+          gitSha: REPOSITORY.commit,
+          queueMs: 3000,
+          durationMs: 420000,
+          finishedAt: '2026-08-29T01:07:00.000Z',
+          url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/91',
+          jobs: names.map((name, index) => ({
+            id: index + 1,
+            name,
+            status: 'completed',
+            conclusion: 'success',
+            durationMs: (index + 1) * 1000,
+          })),
+        },
+      ],
+    },
+    REPOSITORY
+  )
+  assert.equal(
+    evidence.schemaVersion,
+    DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA
+  )
+  assert.equal(evidence.status, 'passed')
+  assert.equal(evidence.current, true)
+  assert.equal(evidence.coversWorkingTree, false)
+  assert.equal(evidence.jobs.length, names.length)
+  assert.match(evidence.message, /不覆盖本机未提交改动/u)
 })
 
 test('quality gate command uses only fixed formal runners', () => {
@@ -751,6 +806,17 @@ test('quality gate summary reuses only a passed receipt for the current clean SH
     env: DATABASE_ENV,
     readRepositoryState: async () => cleanRepository,
     readReceipt: (profile) => (profile === 'strict' ? passedReceipt : null),
+    loadServerEvidence: () => ({
+      schemaVersion: DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA,
+      status: 'passed',
+      current: true,
+      coversWorkingTree: true,
+      gitSha: cleanRepository.commit,
+      pipeline: null,
+      jobs: [],
+      message: 'R640 exact-SHA CI 已通过',
+      notProven: ['不可变 Release'],
+    }),
   })
 
   const summary = await service.summary()
@@ -758,6 +824,42 @@ test('quality gate summary reuses only a passed receipt for the current clean SH
   assert.equal(summary.proofs.strict.releaseEligible, true)
   assert.equal(summary.proofs.strict.reused, true)
   assert.equal(summary.status.tone, 'success')
+  assert.match(summary.status.title, /R640/u)
+})
+
+test('quality gate never promotes a local receipt without R640 exact-SHA evidence', async (t) => {
+  const root = await project(t)
+  const cleanRepository = {
+    ...REPOSITORY,
+    dirty: false,
+    fingerprint: 'd'.repeat(64),
+  }
+  const service = createDevQualityGateService({
+    projectRoot: root,
+    env: DATABASE_ENV,
+    readRepositoryState: async () => cleanRepository,
+    readReceipt: (profile) =>
+      profile === 'strict'
+        ? { ...formalReceipt('strict'), treeState: 'clean' }
+        : null,
+    loadServerEvidence: () => ({
+      schemaVersion: DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA,
+      status: 'missing',
+      current: false,
+      coversWorkingTree: false,
+      gitSha: cleanRepository.commit,
+      pipeline: null,
+      jobs: [],
+      message: '当前 SHA 无服务器证据',
+      notProven: ['当前 exact SHA 的 R640 普通 CI'],
+    }),
+  })
+
+  const summary = await service.summary()
+  assert.equal(summary.proofs.strict.releaseEligible, false)
+  assert.equal(summary.status.releaseEligible, false)
+  assert.equal(summary.status.tone, 'warning')
+  assert.match(summary.status.title, /仍缺 R640/u)
 })
 
 test('quality gate summary keeps current proof authoritative when rerun environment is unavailable', async (t) => {
@@ -780,12 +882,23 @@ test('quality gate summary keeps current proof authoritative when rerun environm
     }),
     readRepositoryState: async () => cleanRepository,
     readReceipt: (profile) => (profile === 'strict' ? passedReceipt : null),
+    loadServerEvidence: () => ({
+      schemaVersion: DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA,
+      status: 'passed',
+      current: true,
+      coversWorkingTree: true,
+      gitSha: cleanRepository.commit,
+      pipeline: null,
+      jobs: [],
+      message: 'R640 exact-SHA CI 已通过',
+      notProven: ['不可变 Release'],
+    }),
   })
 
   const summary = await service.summary()
   assert.equal(summary.environment.disposableDatabaseReady, false)
   assert.equal(summary.status.tone, 'success')
-  assert.match(summary.status.title, /当前版本已通过/u)
+  assert.match(summary.status.title, /当前版本已通过 R640/u)
 })
 
 test('quality gate recovery stops an orphaned process group and then fails closed', async (t) => {

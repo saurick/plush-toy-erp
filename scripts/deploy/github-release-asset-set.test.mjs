@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  LEGACY_RELEASE_ASSET_NAMES,
   RELEASE_ASSET_NAMES,
   analyzeReleaseCatalog,
   parseReleaseChecksums,
@@ -32,26 +33,47 @@ test("release checksum catalog covers every payload once", () => {
     .map((name, index) => `${String(index + 1).repeat(64)}  ${name}`)
     .join("\n");
   const parsed = parseReleaseChecksums(`${source}\n`);
-  assert.equal(parsed.size, 5);
+  assert.equal(parsed.size, 6);
+  const legacySource = LEGACY_RELEASE_ASSET_NAMES.filter(
+    (name) => name !== "checksums.sha256",
+  )
+    .map((name, index) => `${String(index + 1).repeat(64)}  ${name}`)
+    .join("\n");
+  assert.equal(parseReleaseChecksums(`${legacySource}\n`).size, 5);
   assert.throws(
     () => parseReleaseChecksums(source.replace(/web-image\.tar/u, "server-image.tar")),
     /malformed|cover/u,
   );
 });
 
-test("release plan supports missing and resumable exact drafts", () => {
+test("release plan supports a new publication but rejects partial draft supplementation", () => {
   assert.deepEqual(
     analyzeReleaseCatalog({ releases: [], sha, version, localAssets: assets }),
     { state: "missing", releaseId: null, missingAssets: [...RELEASE_ASSET_NAMES] },
   );
-  const partial = analyzeReleaseCatalog({
-    releases: [release({ assets: assets.slice(0, 2) })],
-    sha,
-    version,
-    localAssets: assets,
-  });
-  assert.equal(partial.state, "draft");
-  assert.deepEqual(partial.missingAssets, RELEASE_ASSET_NAMES.slice(2));
+  assert.throws(
+    () =>
+      analyzeReleaseCatalog({
+        releases: [release({ assets: assets.slice(0, 2) })],
+        sha,
+        version,
+        localAssets: assets,
+      }),
+    /cannot be resumed/u,
+  );
+  const legacyAssets = assets.filter((asset) =>
+    LEGACY_RELEASE_ASSET_NAMES.includes(asset.name),
+  );
+  assert.throws(
+    () =>
+      analyzeReleaseCatalog({
+        releases: [release({ assets: legacyAssets })],
+        sha,
+        version,
+        localAssets: legacyAssets,
+      }),
+    /legacy v1 drafts/u,
+  );
 });
 
 test("published release requires the exact complete asset set", () => {

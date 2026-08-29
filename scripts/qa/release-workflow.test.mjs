@@ -90,6 +90,13 @@ test("release identity is current workflow SHA and exact current main, not an an
   assert.match(validateRuns, /only the fixed yoyoosun customer package/u);
 });
 
+test("GitHub emergency release fails before checkout, login, build or upload", () => {
+  assert.match(validate.steps[0].name, /Fail closed before/u);
+  assert.match(validate.steps[0].run, /disabled until/u);
+  assert.match(validate.steps[0].run, /exit 1/u);
+  assert.equal(validate.steps[0]["continue-on-error"], undefined);
+});
+
 test("release recovers only provenance-bound strict evidence before starting the heavy job", () => {
   const recoverIndex = validate.steps.findIndex((step) =>
     /provenance-bound strict/u.test(step.name),
@@ -115,7 +122,7 @@ test("release recovers only provenance-bound strict evidence before starting the
   assert.match(refresh.run, /--refresh-check vulnerabilityDatabase/u);
 });
 
-test("publish uses a verified resumable draft and exact six-asset set", () => {
+test("disabled publish graph still recognizes the exact v2 seven-asset set", () => {
   assert.match(publish.if, /needs\.validate\.result == 'success'/u);
   assert.match(publish.if, /needs\.strict\.result == 'success'/u);
   assert.match(publish.if, /strict_reused == 'true'/u);
@@ -145,7 +152,7 @@ test("publish uses a verified resumable draft and exact six-asset set", () => {
   assert.match(publishRuns, /download_release_assets/u);
   assert.match(
     publishRuns,
-    /for asset in checksums\.sha256 release-artifact\.json release-manifest\.json sbom\.cdx\.json server-image\.tar web-image\.tar/u,
+    /for asset in checksums\.sha256 release-artifact\.json release-manifest\.json release-rehearsal\.json sbom\.cdx\.json server-image\.tar web-image\.tar/u,
   );
   assert.match(publishRuns, /gh release edit "\$release_tag".*--draft=false/u);
   assert.match(publishRuns, /github-release-asset-set\.mjs verify-published/u);
@@ -154,6 +161,7 @@ test("publish uses a verified resumable draft and exact six-asset set", () => {
     "checksums.sha256",
     "release-artifact.json",
     "release-manifest.json",
+    "release-rehearsal.json",
     "sbom.cdx.json",
     "server-image.tar",
     "web-image.tar",

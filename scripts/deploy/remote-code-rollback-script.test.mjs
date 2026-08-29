@@ -36,6 +36,10 @@ test("remote code rollback is fixed to test-133 and has no build or database mut
   assert.match(source, /--no-build --pull never/u);
   assert.match(source, /migration[.]sequenceSha256/u);
   assert.match(source, /customerConfig[.]sourceSha256/u);
+  assert.match(source, /plush[.]release-manifest\/v2/u);
+  assert.match(source, /releaseVersion == \$version/u);
+  assert.match(source, /artifact checksum does not match the release manifest/u);
+  assert.match(source, /artifact fields do not match the release manifest/u);
   assert.doesNotMatch(source, /docker (?:build|compose build)/u);
   assert.doesNotMatch(
     source,

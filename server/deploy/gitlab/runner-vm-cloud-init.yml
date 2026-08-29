@@ -74,7 +74,20 @@ write_files:
   - path: /etc/sudoers.d/90-plush-runner-ci
     permissions: '0440'
     content: |
-      gitlab-runner ALL=(root) NOPASSWD: /usr/bin/install
+      gitlab-runner ALL=(root) NOPASSWD: /usr/bin/install, /usr/local/sbin/plush-remove-chromium-sandbox *
+  - path: /usr/local/sbin/plush-remove-chromium-sandbox
+    permissions: '0755'
+    owner: root:root
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      [[ $# -eq 1 && "$1" =~ ^[0-9]+$ ]]
+      sandbox="/usr/local/sbin/chrome-devel-sandbox-$1"
+      if [[ -e "$sandbox" ]]; then
+        [[ -f "$sandbox" && ! -L "$sandbox" ]]
+        rm -f -- "$sandbox"
+      fi
+      test ! -e "$sandbox"
   - path: /etc/profile.d/plush-go-module-network.sh
     permissions: '0644'
     content: |
@@ -335,6 +348,7 @@ write_files:
       test "$(systemctl is-active gitlab-runner 2>/dev/null || true)" = inactive
       test "$(systemctl is-enabled gitlab-runner 2>/dev/null || true)" = disabled
       test -x /usr/local/sbin/plush-register-gitlab-runner
+      test "$(stat -c '%U:%G:%a' /usr/local/sbin/plush-remove-chromium-sandbox)" = root:root:755
       test ! -e /etc/plush-runner/registration.env
   - path: /usr/local/sbin/plush-bootstrap-gitlab-runner
     permissions: '0755'
@@ -366,6 +380,21 @@ write_files:
         --token "$GITLAB_RUNNER_TOKEN" \
         --name r640-kvm-isolated-shell \
         --executor shell
+      config=/etc/gitlab-runner/config.toml
+      temporary="$(mktemp /etc/gitlab-runner/config.toml.XXXXXX)"
+      trap 'rm -f "$temporary"' EXIT
+      awk '
+        /^concurrent = / { print "concurrent = 4"; concurrent += 1; next }
+        /^[[:space:]]*limit = / { next }
+        /^\[\[runners\]\]$/ { print; print "  limit = 4"; runners += 1; next }
+        { print }
+        END { if (concurrent != 1 || runners != 1) exit 42 }
+      ' "$config" > "$temporary"
+      install -o root -g root -m 0600 "$temporary" "$config"
+      rm -f "$temporary"
+      trap - EXIT
+      test "$(awk '$1 == "concurrent" { print $3 }' "$config")" = 4
+      test "$(awk '$1 == "limit" { print $3 }' "$config")" = 4
       chown root:root /etc/gitlab-runner/config.toml
       chmod 0600 /etc/gitlab-runner/config.toml
       shred -u "$env_file"

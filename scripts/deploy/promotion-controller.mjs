@@ -21,7 +21,12 @@ import {
   validatePromotionManifest,
   writePromotionManifest,
 } from "./promotion-manifest.mjs";
-import { validateReleaseManifest } from "./release-catalog.mjs";
+import { assertReleaseArtifactManifest } from "./release-artifact-bundle.mjs";
+import {
+  validateReleaseArtifactBinding,
+  validateReleaseManifest,
+  validateReleaseRehearsalReceipt,
+} from "./release-catalog.mjs";
 import { runTargetPreflight } from "./target-preflight.mjs";
 
 const MAX_MANIFEST_BYTES = 512 * 1024;
@@ -81,6 +86,31 @@ export async function preparePromotion(
   const releaseInput = readPlainJson(releaseManifestPath);
   const releaseManifest = validateReleaseManifest(releaseInput.value);
   const releaseManifestSha256 = sha256File(releaseInput.absolute);
+  const releaseDirectory = path.dirname(releaseInput.absolute);
+  const artifactInput = readPlainJson(
+    path.join(releaseDirectory, "release-artifact.json"),
+  );
+  const artifact = assertReleaseArtifactManifest(artifactInput.value);
+  const rehearsalInput = readPlainJson(
+    path.join(releaseDirectory, "release-rehearsal.json"),
+  );
+  validateReleaseRehearsalReceipt(rehearsalInput.value, artifact, {
+    sha: releaseManifest.gitSha,
+    version: releaseManifest.version,
+    customer: "yoyoosun",
+  });
+  const rehearsalReceiptSha256 = sha256File(rehearsalInput.absolute);
+  validateReleaseArtifactBinding(
+    releaseManifest,
+    artifact,
+    sha256File(artifactInput.absolute),
+  );
+  if (
+    releaseManifest.schemaVersion !== "plush.release-manifest/v2" ||
+    rehearsalReceiptSha256 !== releaseManifest.rehearsal?.receiptSha256
+  ) {
+    throw new Error("promotion requires the exact v2 seven-asset evidence");
+  }
   const created = createOrReuseDeliveryOperation(store, {
     action: "promote",
     target: targetKey,
@@ -90,6 +120,7 @@ export async function preparePromotion(
     retryOfOperationId,
     metadata: {
       releaseManifestSha256,
+      rehearsalReceiptSha256,
       source: "version-center",
     },
     now: now(),

@@ -60,6 +60,19 @@ const PIPELINE_STATUSES = new Set([
   'pending',
 ])
 const DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/u
+const LEGACY_RELEASE_ASSETS = Object.freeze([
+  'checksums.sha256',
+  'release-artifact.json',
+  'release-manifest.json',
+  'sbom.cdx.json',
+  'server-image.tar',
+  'web-image.tar',
+])
+const CURRENT_RELEASE_ASSETS = Object.freeze([
+  ...LEGACY_RELEASE_ASSETS.slice(0, 3),
+  'release-rehearsal.json',
+  ...LEGACY_RELEASE_ASSETS.slice(3),
+])
 const IDEMPOTENCY_BASIS = Object.freeze([
   'action',
   'target',
@@ -129,6 +142,8 @@ const PIPELINE_LABELS = Object.freeze({
     '确认计划与所选质量检查全部完成',
   'Check out the requested exact SHA without credentials':
     '无凭据检出指定 Exact-SHA',
+  'Fail closed before any emergency release side effect':
+    '应急发布副作用前封闭失败',
   'Validate current-main identity and complete existing release':
     '校验当前主线身份与既有发布完整性',
   'Recover a provenance-bound strict terminal before heavy setup':
@@ -166,6 +181,8 @@ const PIPELINE_LABELS = Object.freeze({
     '各运行镜像只构建一次并按摘要发布',
   'Create or resume a verified draft, then publish it':
     '创建或恢复已校验草稿并发布',
+  'Create a verified empty draft, then publish it':
+    '创建已校验的空草稿并发布',
   'Publish immutable release': '发布不可变版本',
   'Build both images': '并行构建服务端与 Web 镜像',
   'Publish assets': '发布制品',
@@ -679,6 +696,12 @@ export function validatePipelineTimings(timings) {
 
 function validateVersion(version) {
   assertObject(version, 'delivery version')
+  const assets = Array.isArray(version.assets) ? version.assets : []
+  const exactAssets = (expected) =>
+    assets.length === expected.length &&
+    [...expected].sort().every((asset, index) => assets[index] === asset)
+  const completeAssets =
+    exactAssets(LEGACY_RELEASE_ASSETS) || exactAssets(CURRENT_RELEASE_ASSETS)
   if (
     !SHA_PATTERN.test(String(version.gitSha || '')) ||
     !VERSION_PATTERN.test(String(version.version || '')) ||
@@ -688,7 +711,13 @@ function validateVersion(version) {
     !TIMESTAMP_WITH_TIME_ZONE_PATTERN.test(version.publishedAt) ||
     !Number.isFinite(Date.parse(version.publishedAt)) ||
     typeof version.completeAssets !== 'boolean' ||
+    typeof version.promotionEligible !== 'boolean' ||
     !Array.isArray(version.assets) ||
+    assets.some((asset, index) => index > 0 && assets[index - 1] >= asset) ||
+    version.completeAssets !== completeAssets ||
+    (version.promotionEligible &&
+      (version.status !== 'published' ||
+        !exactAssets(CURRENT_RELEASE_ASSETS))) ||
     !version.artifactSummary ||
     ['totalBytes', 'serverImageBytes', 'webImageBytes', 'sbomBytes'].some(
       (key) =>

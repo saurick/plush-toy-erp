@@ -2,29 +2,33 @@
 
 ## 当前结论
 
-仓库内实现已从“GitHub 托管主链”切换为“R640 GitLab canonical + KVM Runner + GitHub Review mirror”。本计划区分三个状态：
+仓库与运行主链已从“GitHub 托管主链”切换为“R640 GitLab canonical + KVM Runner + GitHub Review mirror”。本计划只记录稳定合同和完成标准；当前 SHA、pipeline、Release、Runner 资源、backup/restore 和目标环境必须从对应真源实时读回，不从勾选或历史结论推导。
 
 | 状态 | 当前结论 | 证据 |
 | --- | --- | --- |
-| 仓库定义 | 已实现，待定向测试和审查收口 | `.gitlab-ci.yml`、GitLab Provider、R640 deploy 定义、工作台与合同测试 |
-| Git/远端 | 未执行 | 当前任务没有 commit、push、fetch 或 GitLab/GitHub 设置授权 |
-| R640/公网运行态 | 未部署 | 当前任务没有服务器、云、DNS、FRP、Nginx、VM、数据库或服务重启授权 |
+| 仓库定义 | R640 分片 DAG、普通 CI evidence 复用、单次制品构建、冻结演练和 v2 Release 合同由正式代码/测试/文档守住 | `.gitlab-ci.yml`、CI/release 脚本、R640 cloud-init、工作台与合同测试 |
+| Git/远端 | GitLab `origin/main` 是 canonical，GitHub 是 protected-main 单向 mirror 和应急路径 | 当前结论以 exact remote SHA、protected branch 与 pipeline API 读回为准 |
+| R640/公网运行态 | GitLab、公网入口和独立 KVM Runner 已是实际主链；Runner 重建合同为 12 vCPU / 24 GiB / `concurrent=4` | 当前配置、资源、job 和 backup/restore 仍必须从 R640 实时读回 |
+| 业务目标 | `test-133` 只是 customer-trial，不是正式生产 | 正式生产需独立 exact target/environment、数据库、备份、回滚点、入口与 smoke 登记 |
 
-任何本地绿色都不能把后两项改写为已完成。
+任何本地绿色都不能改写远端、不可变制品、发布演练、目标部署或客户 UAT 层的状态。
 
 ## 已落仓库切片
 
-- [x] `.gitlab-ci.yml`：main/MR canonical plan、quality、稳定 `CI Gate`、protected exact-SHA strict 和 serialized release。
+- [x] `.gitlab-ci.yml`：main/MR canonical plan；main 的唯一 prepare cache writer、七个固定 quality 分片、aggregate、稳定 `CI Gate` 和 serialized release。
+- [x] 普通 push CI 的 terminal/receipt/manifest 按 exact pipeline/job/SHA 固化；release 服务器端验证 protected main 与全部 DAG job 后复用，不重跑 strict。
+- [x] 同 SHA 的五件候选制品只构建一次并冻结成 `candidate.tar`；同 bytes 隔离演练回执另行冻结，新 publication 固定用 v2 七资产同时绑定 CI、artifact、rehearsal 和 GHCR digest。旧 v1 六资产只读、展示、校验和既有回滚兼容，不能 promotion。
 - [x] exact-SHA terminal 与 release catalog 支持真实 `gitlab-ci` provenance，同时保留明确的 `github-actions` 应急 provenance。
 - [x] GitLab Provider：固定 URL/project/package/release/pipeline、受限下载根、token 服务端边界和 pipeline/job timing。
 - [x] Delivery Bridge 默认 GitLab，只有 `PLUSH_DELIVERY_PROVIDER=github` 才选择 GitHub fallback。
-- [x] GitHub CI 取消 main push，只保留 PR、`review/gpt/**` 和手工审查；GitHub release 标为应急。
-- [x] 工作台文案和人工接管说明改为 GitLab 主链、GitHub 单向镜像。
+- [x] GitHub CI 取消 main push，只保留 PR、`review/gpt/**` 和手工审查；GitHub emergency release 在完整接入 canonical v2 七资产与同一演练回执前，于任何 checkout、登录、构建或上传前失败关闭。
+- [x] 质量工程页面分开展示当前 committed SHA 的 R640 普通 CI 与 Local dirty/本地回执；只有服务器 exact-SHA 证据可提升发布资格，版本中心只从 GitLab 的真实 pipeline、Release/Package 和 target operation 展示效能与交付状态。
+- [x] 性能证据区分 R640 宿主与 Runner guest，按冷/热缓存保存 job、关键路径、CPU/内存/IO 峰值、p50、波动和近似 p95；阶段目标不是停止线，资源仍有余量时继续提速且不降低覆盖、隔离、清理或 fail-closed。
 - [x] R640 GitLab Compose、精确安装、备份/校验和 Runner VM cloud-init 定义。
 - [x] affected mapping、quality gate catalog、Node 分组、fast web 合同和 GitLab CI 静态门禁。
 - [x] 正式部署、QA、Web 与工程文档同步。
 
-这些勾选只表示实现已写入工作区，不表示已经 commit、push 或部署。
+这些勾选只表示长期实现合同，不表示任何指定 SHA 已经 commit、push、CI 绿灯、发布或部署。
 
 ## 本地收口顺序
 
@@ -32,7 +36,7 @@
 2. 对 `.gitlab-ci.yml`、Compose、cloud-init 和 Shell 脚本做 YAML/Shell 静态检查；不执行安装、备份或远端命令。
 3. 运行 `git diff --check` 和精确变更审查，确认没有触碰外部脏路径、generated path、schema/migration 或生产配置。
 4. 根据 affected plan 判断是否需要更高成本验证。full、strict、完整 Style L1 或真实浏览器门禁仍需按测试治理另行点名授权。
-5. 向用户分别询问本地 commit、GitLab/GitHub push 和部署授权；三者不能合并推定。
+5. commit、GitLab/GitHub push、发布和目标部署继续按当前用户授权范围分层执行；一层完成不自动推定后一层。
 
 ## GitLab 部署前置证据
 
@@ -58,7 +62,7 @@
 7. 配置 GitLab push mirror 到 GitHub，只同步 protected main；GitHub main 禁止直接更新。另验证经过独立授权的 `review/gpt` 快照使用单独 GitHub remote，不成为第二条 main 写入链。
 8. 在阿里云备份旧 vhost，切换 `gitlab.saurick.me -> 18226`，完成 Nginx config test、TLS、health 和登录读回。
 9. 运行非发布 MR/main pipeline，核对 `CI Gate`、缓存、一次性 PostgreSQL 清理、Runner VM 与 R640 宿主隔离。
-10. 用专用测试版本运行一次 release pipeline，核对 v3 GitLab provenance、GHCR digest、六件 package、GitLab Release 和工作台读取。
+10. 用合法正式版本运行 release pipeline，核对普通 push CI terminal 复用、单次 candidate build、同 bytes rehearsal、v2 manifest、GHCR digest、含同一 `release-rehearsal.json` 的七资产 package、GitLab Release 和工作台读取。
 11. 配置每日 backup；立即生成一份备份、checksum 和在线 verify，再在一次性同版本 VM 完成恢复演练。
 
 任何一步失败都停在当前层，不继续把未知状态带入下一层。
@@ -69,13 +73,14 @@
 - GitHub main push 不启动 `GitHub Review Mirror CI`。
 - 经过 `prepare-push.sh --review --remote github` 和单独 push 授权的 `review/gpt/**` 或 Draft PR 可以启动审查 CI，但结果不冒充 GitLab `CI Gate`，也不从 GitHub 合并 main。
 - GPT Review 能读取目标 SHA；finding 返回仓库处理，不在 GitHub 直接形成第二条 main 写入链。
-- GitHub emergency release 默认不运行；演练 fallback 时先证明 GitLab release 没有 active job，并在结束后切回 GitLab Provider。
+- GitHub emergency release 当前固定在任何副作用前失败关闭；只有未来完整支持 canonical v2 七资产和同一演练回执后，fallback 演练才可另行评审。
 
 ## 工作台验收
 
 - 默认 Provider 为 GitLab；无 `PLUSH_GITLAB_TOKEN` 时只显示服务端 Provider 不可用，不向浏览器暴露 token、原始 header 或内部栈。
-- 版本列表只接受固定 GitLab project 的 `artifact-<40sha>` Release，六件 package 不齐时不能 promotion。
-- pipeline 只接受固定 GitLab URL、合法状态、时间和 job；无 step 数据显示空列表，不估算。
+- 版本列表只接受固定 GitLab project 的 `artifact-<40sha>` Release；只有 v2 七资产与同一演练回执完整时才可 promotion，v1 六资产只读/回滚且 `promotionEligible=false`。
+- 质量工程只把当前 committed SHA 的普通 push CI 投影为服务器证据，必须包含 plan、prepare、七分片、aggregate 和 `CI Gate`；Local dirty 和本地回执单独展示。
+- 版本中心 pipeline 只接受固定 GitLab URL、合法状态、时间和 job；无 step 数据显示空列表，不估算。版本与部署只展示真实不可变 Release/Package 和 target operation。
 - “发布当前 SHA”只接受 clean HEAD 且由 GitLab main 精确匹配；dispatch 不直接写 133。
 - GitHub fallback 必须由服务端环境显式选择，浏览器没有 Provider 选择器。
 - 人工接管说明明确 GitLab 主链、GitHub review mirror、固定操作顺序与禁止捷径。
@@ -115,7 +120,7 @@ GitLab 完成不自动授权清空测试服务器。甲方真实数据 UAT 与�
 1. 仓库实现通过定向检查并完成获准 commit/push；
 2. R640 GitLab、KVM Runner、域名/FRP/Nginx、保护规则、变量和 mirror 已实际读回；
 3. main `CI Gate` 与 exact-SHA release pipeline 各成功一次；
-4. GHCR digest、GitLab Package/Release 六件资产和工作台一致；
+4. GHCR digest、GitLab Package/Release v2 七资产、同一演练回执和工作台一致；
 5. backup、checksum、在线 verify 与隔离 restore drill 均有证据；
 6. 现有业务容器、数据、端口和公网入口无回归。
 

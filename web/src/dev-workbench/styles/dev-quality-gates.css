@@ -62,6 +62,53 @@
   border-inline-start: 4px solid var(--erp-primary, #2b8a3e);
 }
 
+.erp-dev-quality-server-evidence {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--erp-border, #dce8dd);
+  border-radius: 10px;
+  background: var(--erp-surface-bg-soft, #f7faf7);
+}
+
+.erp-dev-quality-server-evidence__heading-copy,
+.erp-dev-quality-server-evidence__facts > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.erp-dev-quality-server-evidence__facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.erp-dev-quality-server-evidence__facts > div {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--erp-surface-bg, #fff);
+}
+
+.erp-dev-quality-server-evidence .ant-typography,
+.erp-dev-quality-server-evidence__jobs .ant-tag {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-quality-server-evidence__jobs > summary {
+  width: fit-content;
+  color: var(--erp-primary, #2b8a3e);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.erp-dev-quality-server-evidence__jobs[open] {
+  display: grid;
+  gap: 8px;
+}
+
 .erp-dev-quality-actions {
   display: grid;
   gap: 10px;
@@ -749,6 +796,10 @@
 }
 
 @media (max-width: 900px) {
+  .erp-dev-quality-server-evidence__facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .erp-dev-quality-context dl {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -835,6 +886,10 @@
   }
 
   .erp-dev-quality-operation__facts {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-dev-quality-server-evidence__facts {
     grid-template-columns: 1fr;
   }
 

@@ -174,6 +174,7 @@ test("rollback uses the live release control script, not the historical target s
     source,
     /\$\{target[.]manifest[.]gitSha\}:scripts\/deploy\/remote-code-rollback[.]sh/u,
   );
+  assert.match(source, /validateReleaseArtifactBinding/u);
   const remoteSource = readFileSync(
     new URL("./remote-code-rollback.sh", import.meta.url),
     "utf8",

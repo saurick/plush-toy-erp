@@ -5,6 +5,28 @@ export const DELIVERY_PROVIDER_RELEASE_STATUS_CONTRACT =
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
 const VERSION_PATTERN = /^[0-9A-Za-z](?:[0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$/u;
 const DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/u;
+export const LEGACY_DELIVERY_RELEASE_ASSETS = Object.freeze([
+  "checksums.sha256",
+  "release-artifact.json",
+  "release-manifest.json",
+  "sbom.cdx.json",
+  "server-image.tar",
+  "web-image.tar",
+]);
+export const DELIVERY_RELEASE_ASSETS = Object.freeze([
+  ...LEGACY_DELIVERY_RELEASE_ASSETS.slice(0, 3),
+  "release-rehearsal.json",
+  ...LEGACY_DELIVERY_RELEASE_ASSETS.slice(3),
+]);
+const ALLOWED_DELIVERY_RELEASE_ASSETS = new Set(DELIVERY_RELEASE_ASSETS);
+
+function exactAssetSet(assets, expected) {
+  const sorted = [...expected].sort();
+  return (
+    assets.length === sorted.length &&
+    assets.every((asset, index) => asset === sorted[index])
+  );
+}
 
 function validSize(value) {
   return Number.isSafeInteger(value) && value >= 0;
@@ -39,19 +61,18 @@ export function validateDeliveryReleaseVersion(version) {
     typeof version.publishedAt !== "string" ||
     Number.isNaN(Date.parse(version.publishedAt)) ||
     typeof version.completeAssets !== "boolean" ||
+    typeof version.promotionEligible !== "boolean" ||
     !Array.isArray(version.assets) ||
-    version.assets.some(
-      (asset) =>
-        ![
-          "checksums.sha256",
-          "release-artifact.json",
-          "release-manifest.json",
-          "sbom.cdx.json",
-          "server-image.tar",
-          "web-image.tar",
-        ].includes(asset),
-    ) ||
+    version.assets.some((asset) => !ALLOWED_DELIVERY_RELEASE_ASSETS.has(asset)) ||
     new Set(version.assets).size !== version.assets.length ||
+    version.assets.some((asset, index) => index > 0 && version.assets[index - 1] >= asset) ||
+    (version.completeAssets !==
+      (exactAssetSet(version.assets, DELIVERY_RELEASE_ASSETS) ||
+        exactAssetSet(version.assets, LEGACY_DELIVERY_RELEASE_ASSETS))) ||
+    (version.promotionEligible &&
+      (version.status !== "published" ||
+        !version.completeAssets ||
+        !exactAssetSet(version.assets, DELIVERY_RELEASE_ASSETS))) ||
     !version.artifactSummary ||
     !validSize(version.artifactSummary.totalBytes) ||
     !validSize(version.artifactSummary.serverImageBytes) ||

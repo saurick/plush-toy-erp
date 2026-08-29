@@ -10,6 +10,8 @@ import { assertReleaseArtifactManifest } from "./release-artifact-bundle.mjs";
 import {
   buildReleaseManifest,
   sha256File,
+  validateReleasePublicationEvidence,
+  validateReleaseRehearsalReceipt,
   writeReleaseManifest,
 } from "./release-catalog.mjs";
 
@@ -156,7 +158,14 @@ function publishImage({
 }
 
 export function publishGitHubReleaseArtifact(
-  { artifactDir, strictTerminalPath, version, repository, out },
+  {
+    artifactDir,
+    strictTerminalPath,
+    rehearsalReceiptPath,
+    version,
+    repository,
+    out,
+  },
   { root = process.cwd(), run = runCommand } = {},
 ) {
   if (!REPOSITORY_PATTERN.test(String(repository || ""))) {
@@ -172,6 +181,34 @@ export function publishGitHubReleaseArtifact(
     readFileSync(path.resolve(root, strictTerminalPath), "utf8"),
   );
   const gitSha = artifactManifest.git.commit;
+  const resolvedRehearsalReceiptPath = path.resolve(
+    root,
+    rehearsalReceiptPath,
+  );
+  if (
+    resolvedRehearsalReceiptPath !==
+    path.join(resolvedArtifactDir, "release-rehearsal.json")
+  ) {
+    throw new Error(
+      "new publication requires artifact-dir/release-rehearsal.json",
+    );
+  }
+  const rehearsalReceipt = validateReleaseRehearsalReceipt(
+    JSON.parse(readFileSync(resolvedRehearsalReceiptPath, "utf8")),
+    artifactManifest,
+    { sha: gitSha, version, customer: "yoyoosun" },
+  );
+  const artifactManifestSha256 = sha256File(artifactPath);
+  const rehearsalReceiptSha256 = sha256File(resolvedRehearsalReceiptPath);
+  validateReleasePublicationEvidence({
+    version,
+    gitSha,
+    strictTerminal,
+    artifactManifest,
+    artifactManifestSha256,
+    rehearsalReceipt,
+    rehearsalReceiptSha256,
+  });
   const embeddedReleaseVersion = artifactManifest.releaseVersion;
   if (
     embeddedReleaseVersion !== undefined &&
@@ -197,8 +234,11 @@ export function publishGitHubReleaseArtifact(
     gitSha,
     strictTerminal,
     artifactManifest,
-    artifactManifestSha256: sha256File(artifactPath),
+    artifactManifestSha256,
     images,
+    createdAt: rehearsalReceipt.finishedAt,
+    rehearsalReceipt,
+    rehearsalReceiptSha256,
   });
   const outputPath = path.resolve(
     root,
@@ -212,6 +252,7 @@ function parseArgs(argv) {
   const options = {
     artifactDir: "",
     strictTerminalPath: "",
+    rehearsalReceiptPath: "",
     version: "",
     repository: "",
     out: "",
@@ -226,6 +267,7 @@ function parseArgs(argv) {
     const mapping = {
       "--artifact-dir": "artifactDir",
       "--strict-terminal": "strictTerminalPath",
+      "--rehearsal-receipt": "rehearsalReceiptPath",
       "--version": "version",
       "--repository": "repository",
       "--out": "out",
@@ -253,6 +295,7 @@ function printHelp() {
   node scripts/deploy/github-release-publisher.mjs \\
     --artifact-dir output/releases/<sha> \\
     --strict-terminal output/qa/exact-sha/<sha>/<fingerprint>.json \\
+    --rehearsal-receipt output/releases/<sha>/release-rehearsal.json \\
     --version <version> --repository <owner/name> [--out <file>] [--json]
 
 The caller must authenticate Docker to ghcr.io first. This adapter never accepts
@@ -269,6 +312,7 @@ function main() {
   for (const field of [
     "artifactDir",
     "strictTerminalPath",
+    "rehearsalReceiptPath",
     "version",
     "repository",
   ]) {

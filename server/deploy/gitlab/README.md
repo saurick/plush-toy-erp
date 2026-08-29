@@ -9,9 +9,13 @@
 | GitLab config、PostgreSQL、repositories、artifacts | R640 SSD：`/srv/gitlab` | 随机 I/O 和数据库延迟敏感 | 由 GitLab backup + config archive 恢复 |
 | GitLab 备份副本 | R640 RAID5：`/srv/raid5/gitlab/backups` | 容量和单盘故障容忍优先 | 仍需异机/离线副本，RAID 不是备份 |
 | Runner VM 系统盘与 job cache | R640 SSD 上的独立 KVM qcow2 | 构建 I/O 与 GitLab 数据隔离 | Runner 可重建，不保存业务真源 |
-| 发布镜像 | GHCR digest | 复用现有目标机加载和 release manifest 合同 | GitLab Release 保存六件可移植制品 |
+| 发布镜像 | GHCR digest | 复用现有目标机加载和 release manifest 合同 | 新 GitLab Release 保存 v2 七资产（含同一演练回执）；legacy v1 六资产只读/回滚 |
 
 GitLab 不与业务 PostgreSQL、测试数据库或现有 Docker 容器共享数据目录。Runner 运行在独立 KVM VM 内，只获得 VM 内的 Docker socket；不得挂载 R640 宿主机 `/var/run/docker.sock`。
+
+Runner VM 当前资源合同为 12 vCPU、24 GiB 内存和 SSD 系统盘，全局 `concurrent=4`且唯一 project runner `limit=4`。该并发度只服务于七个固定质量分片；PostgreSQL 容器名和 loopback 端口、Chromium sandbox、浏览器锁与输出目录都按 pipeline/job 隔离。若资源实测出现 OOM、长时间 iowait、数据库或浏览器交叉污染，先降低该两个数值并重跑完整证据，不通过跳过测试保速。
+
+性能调优必须分别观测 R640 宿主机和 Runner guest：记录冷/热缓存的 job 时长、DAG 关键路径、CPU / 内存 / IO 峰值、p50、波动和近似 p95，再决定 Runner slot、分片和语言测试并行度。普通 CI 7–9 分钟、热缓存提交到部署 10–15 分钟只是稳健阶段目标；资源仍有余量且未出现排队、IO 争用、OOM、flaky 或波动扩大时，继续冲刺 6–8 分钟和 8–12 分钟，稳定更快也接受。只有资源饱和或进一步提速需要明显不成比例的复杂度时才停止；不得减少测试、放宽 fail-closed / exact-SHA、隔离或清理门禁，也不得用伪缓存命中换取数字。
 
 ## 文件职责
 
@@ -88,7 +92,7 @@ gitlab.saurick.me
 - GitHub 禁止直接写 `main`，主分支变化只来自 GitLab push mirror；
 - 本地 remote 固定为 `origin=GitLab`、`github=GitHub`；需要 GPT Review 时，取得单独 push 授权后使用既有 `prepare-push.sh --review --remote github` 将同一 clean main SHA 推到 GitHub `review/gpt`，不把该审查 ref 设为 protected，也不从 GitHub 合并 main；
 - GitHub `GitHub Review Mirror CI` 只响应 PR、`review/gpt/**` 和手动运行，不响应镜像 main；
-- GitHub `Emergency Immutable Release (GitHub)` 只作显式应急回退，不与 GitLab release pipeline 同时执行。
+- GitHub `Emergency Immutable Release (GitHub)` 当前在 checkout、登录、构建或上传前固定失败关闭；只有未来完整支持 canonical v2 七资产与同一演练回执后才可另行恢复，且不得与 GitLab release pipeline 同时执行。
 
 GPT Review 读取 GitHub main 镜像或显式 `review/gpt` 快照即可；审查意见回到当前任务处理，GitHub 不成为字段、发布或部署真源。
 
@@ -107,6 +111,8 @@ sudo bash server/deploy/gitlab/gitlab-backup-verify.sh
 
 升级前先固定当前 compose digest、GitLab 版本、最新已验证备份和回滚窗口；按 GitLab 支持的逐版本升级路径修改 digest。不得使用浮动 `latest`，不得在失败时删除 `/srv/gitlab` 或 RAID5 备份。
 
-## 当前未执行事项
+## 运行态证据与重建边界
 
-本目录只完成仓库内可审查定义。创建容器、VM、DNS/FRP/Nginx、GitLab 项目、Runner、变量、镜像规则、备份定时器、push mirror 和首次 pipeline 都属于目标运行态写入，必须在再次核对现场后取得部署/远端授权。
+R640 GitLab、独立 KVM Runner、公网入口、protected main、GitHub 单向 mirror 和 main pipeline 已进入实际运行主链。本文档只固定重建和安全合同，不把某次历史绿灯写成当前运行证明；当前 SHA、Runner 配置、pipeline/job 终态、Package/Release、backup/restore 仍必须从 GitLab API、Runner VM 和对应脱敏回执实时读回。
+
+`runner-vm-cloud-init.yml` 是新建或重建 Runner VM 的正式定义，不会被普通 CI job 自动应用。线上参数与该定义漂移时，只在无活动 job 的有界窗口内备份精确 config、修正、重启 Runner 并读回；不回显 token，不把 live 手工改动作为唯一真源。

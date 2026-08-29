@@ -447,7 +447,8 @@ export function createDevDeliveryService({
         if (
           status.status === 'published' &&
           status.release?.version === operation.version &&
-          status.release?.completeAssets === true
+          status.release?.completeAssets === true &&
+          status.release?.promotionEligible === true
         ) {
           transitionDeliveryOperation(store, operation.id, {
             status: 'passed',
@@ -634,7 +635,8 @@ export function createDevDeliveryService({
       if (existing.status === 'published') {
         if (
           existing.release?.version !== operation.version ||
-          existing.release?.completeAssets !== true
+          existing.release?.completeAssets !== true ||
+          existing.release?.promotionEligible !== true
         ) {
           throw new Error('published release identity is inconsistent')
         }
@@ -688,9 +690,10 @@ export function createDevDeliveryService({
       !release ||
       release.version !== payload.version ||
       release.status !== 'published' ||
-      release.completeAssets !== true
+      release.completeAssets !== true ||
+      release.promotionEligible !== true
     ) {
-      throw new Error('published immutable release is not ready')
+      throw new Error('published v2 seven-asset release is not ready')
     }
     const destination = releaseDirectory(root, payload.gitSha)
     const downloaded = await Promise.resolve(

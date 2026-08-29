@@ -30,7 +30,7 @@ const runnerCloudInit = readFileSync(
   "utf8",
 );
 
-test("GitLab is the canonical main and merge-request CI with one stable gate", () => {
+test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", () => {
   assert.match(workflow, /CI_PIPELINE_SOURCE == "merge_request_event"/u);
   assert.match(
     workflow,
@@ -39,7 +39,26 @@ test("GitLab is the canonical main and merge-request CI with one stable gate", (
   assert.match(workflow, /^"CI Gate":\n  stage: gate/mu);
   assert.match(workflow, /node scripts\/qa\/ci-plan[.]mjs/u);
   assert.match(workflow, /bash scripts\/qa\/affected[.]sh --base/u);
-  assert.match(workflow, /scripts\/qa\/exact-sha-gate[.]mjs/u);
+  assert.match(workflow, /^prepare:\n  stage: prepare/mu);
+  for (const shard of [
+    "static",
+    "node",
+    "web",
+    "server",
+    "resource",
+    "browser",
+    "security",
+  ]) {
+    assert.match(workflow, new RegExp(`^quality_${shard}:`, "mu"));
+    assert.match(
+      workflow,
+      new RegExp(`ci-quality-shard[.]mjs --shard ${shard}`, "u"),
+    );
+  }
+  assert.match(workflow, /^quality_aggregate:\n  stage: aggregate/mu);
+  assert.match(workflow, /ci-quality-aggregate[.]mjs/u);
+  assert.match(workflow, /plush-ci-evidence/u);
+  assert.match(workflow, /quality_browser:[\s\S]+?job: quality_web\n      artifacts: true/u);
   assert.match(workflow, /history_range=HEAD/u);
   assert.match(
     workflow,
@@ -52,6 +71,9 @@ test("GitLab is the canonical main and merge-request CI with one stable gate", (
   assert.match(workflow, /output\/ci\/plan[.]json/u);
   assert.match(workflow, /output\/ci\/range[.]txt/u);
   assert.match(workflow, /output\/cache\/gitlab\/pnpm-store/u);
+  assert.match(workflow, /export npm_config_store_dir="\$PNPM_STORE_PATH"/u);
+  assert.match(workflow, /policy: pull-push/u);
+  assert.match(workflow, /policy: pull/u);
   assert.doesNotMatch(workflow, /output\/ci\/cache/u);
   assert.doesNotMatch(workflow, /\$CI_PROJECT_DIR\/[.]cache/u);
   assert.doesNotMatch(workflow, /[.]ci-plan[.]env/u);
@@ -62,22 +84,13 @@ test("GitLab is the canonical main and merge-request CI with one stable gate", (
   assert.doesNotMatch(workflow, /playwright install --with-deps/u);
 });
 
-test("GitLab release binds protected exact-SHA strict evidence and immutable assets", () => {
-  const ordinaryReleaseExclusions =
-    workflow.match(/- if: '\$RELEASE_SHA'\n      when: never/gu) ?? [];
-  const protectedReleaseRules =
-    workflow.match(
-      /- if: '\$RELEASE_SHA && \$CI_COMMIT_BRANCH == \$CI_DEFAULT_BRANCH && \$CI_COMMIT_REF_PROTECTED == "true" && \$RELEASE_CUSTOMER == "yoyoosun"'/gu,
-    ) ?? [];
-
+test("GitLab release reuses push CI, builds one candidate and freezes rehearsal evidence", () => {
   assert.doesNotMatch(workflow, /\$RELEASE_SHA != ""/u);
   assert.match(
     workflow,
     /CI_PIPELINE_SOURCE =~ \/\^\(api\|trigger\|web\)\$\/ && \$RELEASE_SHA/u,
   );
-  assert.equal(ordinaryReleaseExclusions.length, 3);
-  assert.equal(protectedReleaseRules.length, 2);
-  assert.match(workflow, /^strict:\n  stage: quality/mu);
+  assert.doesNotMatch(workflow, /^strict:/mu);
   assert.match(workflow, /^publish_release:\n  stage: release/mu);
   assert.match(workflow, /resource_group: immutable-release-catalog/u);
   assert.match(workflow, /test "\$RELEASE_SHA" = "\$CI_COMMIT_SHA"/u);
@@ -86,19 +99,27 @@ test("GitLab release binds protected exact-SHA strict evidence and immutable ass
     /test "\$RELEASE_SHA" = "\$\(git rev-parse origin\/main\)"/u,
   );
   assert.match(workflow, /CI_COMMIT_REF_PROTECTED/u);
+  assert.match(workflow, /gitlab-strict-terminal-reuse[.]mjs/u);
+  assert.match(workflow, /gitlab-release-candidate[.]mjs recover/u);
+  assert.match(workflow, /gitlab-release-candidate[.]mjs prepare/u);
+  assert.match(workflow, /local-release-rehearsal[.]mjs/u);
+  assert.match(workflow, /--rehearsal-receipt/u);
+  assert.match(workflow, /plush-release-candidate/u);
+  assert.match(workflow, /plush-release-rehearsal/u);
+  assert.equal(
+    workflow.match(/release-artifact-bundle[.]mjs/gu)?.length ?? 0,
+    1,
+  );
   assert.match(workflow, /GITHUB_PACKAGES_TOKEN/u);
   assert.match(workflow, /GITLAB_RELEASE_TOKEN/u);
   assert.match(workflow, /JOB-TOKEN: \$CI_JOB_TOKEN/u);
-  for (const asset of [
-    "checksums.sha256",
-    "release-artifact.json",
-    "release-manifest.json",
-    "sbom.cdx.json",
-    "server-image.tar",
-    "web-image.tar",
-  ]) {
-    assert.match(workflow, new RegExp(asset.replaceAll(".", "[.]"), "u"));
-  }
+  assert.match(workflow, /github-release-asset-set[.]mjs finalize/u);
+  assert.match(workflow, /output\/ci\/release-assets[.]json/u);
+  assert.match(
+    workflow,
+    /jq -r '[.]assets\[\][.]name' output\/ci\/release-assets[.]json/u,
+  );
+  assert.match(workflow, /refusing supplementation/u);
 });
 
 test("GitLab jobs stay on the isolated runner and never receive the R640 host socket", () => {
@@ -142,11 +163,15 @@ test("R640 GitLab definitions pin identity, separate SSD data and require exact 
   assert.match(runnerRegistration, /--token "\$GITLAB_RUNNER_TOKEN"/u);
   assert.match(runnerRegistration, /--name r640-kvm-isolated-shell/u);
   assert.match(runnerRegistration, /--executor shell/u);
+  assert.match(runnerRegistration, /concurrent = 4/u);
+  assert.match(runnerRegistration, /limit = 4/u);
   assert.doesNotMatch(
     runnerRegistration,
     /--(?:access-level|locked|maintenance-note|maximum-timeout|paused|run-untagged|tag-list)(?:[=\s]|$)/u,
   );
   assert.match(runnerCloudInit, /libnss3/u);
+  assert.match(runnerCloudInit, /plush-remove-chromium-sandbox/u);
+  assert.match(runnerCloudInit, /chrome-devel-sandbox-\$1/u);
   assert.doesNotMatch(runnerCloudInit, /NOPASSWD: \/usr\/bin\/apt-get/u);
   assert.match(runnerCloudInit, /ssh_pwauth: false/u);
   assert.match(runnerCloudInit, /disable_root: true/u);

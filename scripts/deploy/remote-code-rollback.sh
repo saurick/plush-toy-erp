@@ -481,8 +481,10 @@ jq -e -s \
   --arg fromSha "$from_sha" \
   --arg toSha "$to_sha" \
   --arg toVersion "$to_version" \
-  '.[0].schemaVersion == "plush.release-manifest/v1" and
-   .[1].schemaVersion == "plush.release-manifest/v1" and
+  '((.[0].schemaVersion == "plush.release-manifest/v1") or
+    (.[0].schemaVersion == "plush.release-manifest/v2")) and
+   ((.[1].schemaVersion == "plush.release-manifest/v1") or
+    (.[1].schemaVersion == "plush.release-manifest/v2")) and
    .[0].gitSha == $fromSha and
    .[1].gitSha == $toSha and
    .[1].version == $toVersion and
@@ -495,13 +497,33 @@ jq -e -s \
   "$incoming/release-manifest.json" >/dev/null
 jq -e \
   --arg sha "$to_sha" \
+  --arg version "$to_version" \
   '.schemaVersion == "plush-release-artifact/v1" and
    .passed == true and
    .git.commit == $sha and
    .git.head == $sha and
    .git.worktreeClean == true and
+   .releaseVersion == $version and
    (.images | length) == 2' \
   "$incoming/release-artifact.json" >/dev/null
+actual_artifact_sha256="$(sha256sum "$incoming/release-artifact.json" | awk '{print $1}')"
+[[ "$actual_artifact_sha256" == "$(jq -r '.artifact.manifestSha256' "$incoming/release-manifest.json")" ]] ||
+  fail "rollback artifact checksum does not match the release manifest"
+jq -e -s '
+  .[0] as $release |
+  .[1] as $artifact |
+  ($artifact.releaseVersion == $release.version) and
+  ($release.artifact.sourceArchiveSha256 == $artifact.sourceArchive.sha256) and
+  ($release.migration.latest == $artifact.migration.latest) and
+  ($release.migration.sequenceSha256 == $artifact.migration.sequenceSha256) and
+  ($release.customerConfig.sourceSha256 == $artifact.customerConfig.sourceSha256) and
+  ($release.sbom.sha256 == $artifact.sbom.sha256) and
+  (($release.images | map({kind, sourceContentId, platform}) | sort_by(.kind)) ==
+   ($artifact.images | map({kind, sourceContentId: .contentId, platform}) | sort_by(.kind)))
+' \
+  "$incoming/release-manifest.json" \
+  "$incoming/release-artifact.json" >/dev/null ||
+  fail "rollback artifact fields do not match the release manifest"
 
 source_sha256="$(jq -r '.sourceArchive.sha256' "$incoming/release-artifact.json")"
 sbom_sha256="$(jq -r '.sbom.sha256' "$incoming/release-artifact.json")"

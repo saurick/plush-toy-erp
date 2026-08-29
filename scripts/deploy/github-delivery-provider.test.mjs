@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 
 import {
   GITHUB_API_VERSION,
   GITHUB_DELIVERY_REPOSITORY,
-  GITHUB_RELEASE_WORKFLOW,
   createGithubDeliveryProvider,
 } from "./github-delivery-provider.mjs";
 
@@ -93,7 +93,47 @@ test("GitHub provider enriches the newest immutable release with build and diges
   }));
   const artifact = {
     schemaVersion: "plush-release-artifact/v1",
-    git: { commit: SHA },
+    passed: true,
+    releaseVersion: "2026.07.29-1",
+    git: { commit: SHA, head: SHA, worktreeClean: true },
+    sourceArchive: {
+      sha256: "5".repeat(64),
+      secretScan: "passed",
+    },
+    migration: {
+      latest: "20260730161955",
+      sequenceSha256: "6".repeat(64),
+    },
+    customerConfig: { sourceSha256: "7".repeat(64) },
+    sbom: { file: "sbom.cdx.json", sha256: "7".repeat(64) },
+    images: [
+      {
+        kind: "server",
+        contentId: `sha256:${"8".repeat(64)}`,
+        gitSha: SHA,
+        releaseVersion: "2026.07.29-1",
+        platform: "linux/amd64",
+        archive: {
+          file: "server-image.tar",
+          sha256: "a".repeat(64),
+          sizeBytes: 100,
+        },
+        metadataSecretScan: { passed: true },
+      },
+      {
+        kind: "web",
+        contentId: `sha256:${"9".repeat(64)}`,
+        gitSha: SHA,
+        releaseVersion: "2026.07.29-1",
+        platform: "linux/amd64",
+        archive: {
+          file: "web-image.tar",
+          sha256: "b".repeat(64),
+          sizeBytes: 100,
+        },
+        metadataSecretScan: { passed: true },
+      },
+    ],
     performance: {
       build: {
         schemaVersion: "plush.release-build-performance/v1",
@@ -125,12 +165,18 @@ test("GitHub provider enriches the newest immutable release with build and diges
         job: "strict",
       },
     },
-    artifact: { manifestSha256: "5".repeat(64) },
+    artifact: {
+      manifestSha256: createHash("sha256")
+        .update(JSON.stringify(artifact))
+        .digest("hex"),
+      sourceArchiveSha256: artifact.sourceArchive.sha256,
+    },
     migration: {
       latest: "20260730161955",
       sequenceSha256: "6".repeat(64),
     },
     customerConfig: { sourceSha256: "7".repeat(64) },
+    sbom: { sha256: artifact.sbom.sha256 },
     images: [
       {
         kind: "server",
@@ -138,6 +184,7 @@ test("GitHub provider enriches the newest immutable release with build and diges
         digest: serverDigest,
         ref: `ghcr.io/saurick/plush-toy-erp-server@${serverDigest}`,
         sourceContentId: `sha256:${"8".repeat(64)}`,
+        platform: "linux/amd64",
       },
       {
         kind: "web",
@@ -145,6 +192,7 @@ test("GitHub provider enriches the newest immutable release with build and diges
         digest: webDigest,
         ref: `ghcr.io/saurick/plush-toy-erp-web@${webDigest}`,
         sourceContentId: `sha256:${"9".repeat(64)}`,
+        platform: "linux/amd64",
       },
     ],
     redaction: {
@@ -180,6 +228,7 @@ test("GitHub provider enriches the newest immutable release with build and diges
     server: serverDigest,
     web: webDigest,
   });
+  assert.equal(version.promotionEligible, false);
   await provider.listVersions();
   assert.equal(assetReads, 2, "immutable detail is read once per SHA");
 });
@@ -257,7 +306,7 @@ test("GitHub provider returns bounded run, job and step timings", async () => {
   assert.match(String(calls[1].at(-1)), /runs\/321\/attempts\/2\/jobs/u);
 });
 
-test("GitHub provider dispatch is fixed to main release workflow and customer", async () => {
+test("GitHub provider fails closed before emergency workflow dispatch", async () => {
   let invocation;
   const provider = createGithubDeliveryProvider({
     projectRoot: process.cwd(),
@@ -266,27 +315,15 @@ test("GitHub provider dispatch is fixed to main release workflow and customer", 
       return { status: 0, stdout: "", stderr: "" };
     },
   });
-  const report = await provider.dispatchRelease({
-    gitSha: SHA,
-    version: "2026.07.29-1",
-    customer: "yoyoosun",
-  });
-  assert.equal(report.status, "accepted");
-  assert.deepEqual(invocation.args, [
-    "workflow",
-    "run",
-    GITHUB_RELEASE_WORKFLOW,
-    "--repo",
-    GITHUB_DELIVERY_REPOSITORY,
-    "--ref",
-    "main",
-    "-f",
-    `sha=${SHA}`,
-    "-f",
-    "version=2026.07.29-1",
-    "-f",
-    "customer=yoyoosun",
-  ]);
+  await assert.rejects(
+    provider.dispatchRelease({
+      gitSha: SHA,
+      version: "2026.07.29-1",
+      customer: "yoyoosun",
+    }),
+    /disabled before workflow dispatch/u,
+  );
+  assert.equal(invocation, undefined);
   await assert.rejects(
     provider.dispatchRelease({
       gitSha: SHA,

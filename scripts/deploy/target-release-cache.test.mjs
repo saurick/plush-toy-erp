@@ -131,6 +131,7 @@ test("target cache probe and prepare use fixed SSH scripts and fail closed", () 
     true,
   );
   assert.match(calls[0].input, /invalid formal cache/u);
+  assert.match(calls[0].input, /releaseVersion == \$version/u);
   assert.match(calls[1].input, /\.target-cache\.json/u);
   assert.match(calls[2].input, /rm -rf -- "\$incoming"/u);
   assert.match(calls[2].input, /! -L "\$incoming"/u);

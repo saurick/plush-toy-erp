@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 
 import {
@@ -8,6 +9,7 @@ import {
   GITLAB_RELEASE_ASSETS,
   createGitlabDeliveryProvider,
 } from "./gitlab-delivery-provider.mjs";
+import { buildReleaseManifest } from "./release-catalog.mjs";
 
 const SHA = "a".repeat(40);
 const TOKEN = "test-token-never-returned";
@@ -26,6 +28,7 @@ function releaseFixture() {
     created_at: "2026-08-27T01:00:00Z",
     released_at: "2026-08-27T02:00:00Z",
     upcoming_release: false,
+    commit: { id: SHA },
     _links: {
       self: `${GITLAB_DELIVERY_BASE_URL}/${GITLAB_DELIVERY_PROJECT}/-/releases/artifact-${SHA}`,
     },
@@ -36,6 +39,7 @@ function packageFiles() {
   return GITLAB_RELEASE_ASSETS.map((file_name, index) => ({
     file_name,
     size: (index + 1) * 100,
+    file_sha256: "0".repeat(64),
   }));
 }
 
@@ -132,7 +136,150 @@ function releaseDetailFixture() {
       containsAbsoluteWorkspacePaths: false,
     },
   };
-  return { artifact, manifest, serverDigest, webDigest };
+  Object.assign(artifact, {
+    passed: true,
+    releaseVersion: "2026.08.27-1",
+    git: { commit: SHA, head: SHA, worktreeClean: true },
+    sourceArchive: { sha256: hash, secretScan: "passed" },
+    migration: { latest: "20260730161955", sequenceSha256: hash },
+    customerConfig: { sourceSha256: hash },
+    sbom: { file: "sbom.cdx.json", sha256: hash },
+    images: [
+      {
+        kind: "server",
+        contentId: `sha256:${"8".repeat(64)}`,
+        gitSha: SHA,
+        releaseVersion: "2026.08.27-1",
+        platform: "linux/amd64",
+        archive: {
+          file: "server-image.tar",
+          sha256: "a".repeat(64),
+          sizeBytes: 100,
+        },
+        metadataSecretScan: { passed: true },
+      },
+      {
+        kind: "web",
+        contentId: `sha256:${"9".repeat(64)}`,
+        gitSha: SHA,
+        releaseVersion: "2026.08.27-1",
+        platform: "linux/amd64",
+        archive: {
+          file: "web-image.tar",
+          sha256: "b".repeat(64),
+          sizeBytes: 100,
+        },
+        metadataSecretScan: { passed: true },
+      },
+    ],
+  });
+  const runtime = {
+    serverHealth: "passed",
+    serverReady: "passed",
+    webHealth: "passed",
+    webRoot: "passed",
+    runtimeIdentity: "passed",
+    authenticatedAdmin: "passed",
+    embeddedGitSha: SHA,
+  };
+  const receipt = {
+    schemaVersion: "plush-local-release-rehearsal/v1",
+    passed: true,
+    customer: "yoyoosun",
+    generatedAt: "2026-08-27T01:30:00.000Z",
+    finishedAt: "2026-08-27T01:45:00.000Z",
+    git: { commit: SHA, head: SHA, worktreeClean: true },
+    artifact: {
+      manifestSchema: artifact.schemaVersion,
+      server: artifact.images[0].contentId,
+      web: artifact.images[1].contentId,
+      migrationSequenceSha256: hash,
+      sbomSha256: hash,
+    },
+    environment: {
+      kind: "local-isolated-release-compose",
+      composeSource: "server/deploy/compose/prod/compose.yml",
+      databaseIdentityBound: true,
+    },
+    migration: {
+      ...artifact.migration,
+      directoryValidation: "passed",
+      dryRun: "passed",
+      apply: "passed",
+      readback: "passed",
+    },
+    runtime: { initial: runtime, steadyStateRestart: runtime },
+    backupRestore: {
+      status: "passed",
+      backupSha256: "c".repeat(64),
+      backupSizeBytes: 1,
+      dumpRetained: false,
+    },
+    recoveryRestart: {
+      status: "passed",
+      bootstrapSecretRemoved: true,
+      sameServerContentId: true,
+      sameWebContentId: true,
+      healthReadyAndLoginRecovered: true,
+      customerConfigRecovered: true,
+    },
+    cleanup: {
+      attempted: true,
+      passed: true,
+      residualContainers: 0,
+      temporaryDatabaseRetained: false,
+    },
+    failure: null,
+    redaction: {
+      containsSecrets: false,
+      containsCredentials: false,
+      containsFullDsn: false,
+      containsAbsoluteWorkspacePaths: false,
+      containsRawCustomerRows: false,
+    },
+  };
+  const strictTerminal = {
+    contract: "plush.exact-sha-strict/v3",
+    profile: "strict",
+    gitSha: SHA,
+    fingerprint: "3".repeat(64),
+    status: "passed",
+    receipt: { sha256: "4".repeat(64) },
+    identity: manifest.strict.identity,
+    checks: manifest.strict.checks,
+    timeSensitiveChecks: manifest.strict.timeSensitiveChecks,
+    provenance: {
+      ...manifest.strict.provenance,
+      job: "quality_aggregate",
+      eventName: "push",
+    },
+  };
+  const receiptSha256 = createHash("sha256")
+    .update(JSON.stringify(receipt))
+    .digest("hex");
+  const artifactManifestSha256 = createHash("sha256")
+    .update(JSON.stringify(artifact))
+    .digest("hex");
+  return {
+    artifact,
+    manifest: buildReleaseManifest({
+      version: "2026.08.27-1",
+      gitSha: SHA,
+      strictTerminal,
+      artifactManifest: artifact,
+      artifactManifestSha256,
+      images: manifest.images.map(({ kind, repository, digest }) => ({
+        kind,
+        repository,
+        digest,
+      })),
+      rehearsalReceipt: receipt,
+      rehearsalReceiptSha256: receiptSha256,
+    }),
+    receipt,
+    serverDigest,
+    webDigest,
+  };
 }
 
 test("GitLab provider lists immutable releases from the fixed project and package", async () => {
@@ -163,7 +310,7 @@ test("GitLab provider lists immutable releases from the fixed project and packag
   const [version] = await provider.listVersions();
   assert.equal(version.gitSha, SHA);
   assert.equal(version.completeAssets, true);
-  assert.equal(version.artifactSummary.totalBytes, 2_100);
+  assert.equal(version.artifactSummary.totalBytes, 2_800);
   assert.equal(provider.provider, "gitlab");
   assert.equal(
     seen.every(
@@ -181,12 +328,16 @@ test("GitLab provider enriches the newest release with build and digest evidence
   const bodies = {
     "release-artifact.json": JSON.stringify(detail.artifact),
     "release-manifest.json": JSON.stringify(detail.manifest),
+    "release-rehearsal.json": JSON.stringify(detail.receipt),
   };
   const files = packageFiles().map((file) => ({
     ...file,
     size: bodies[file.file_name]
       ? Buffer.byteLength(bodies[file.file_name])
       : file.size,
+    file_sha256: bodies[file.file_name]
+      ? createHash("sha256").update(bodies[file.file_name]).digest("hex")
+      : file.file_sha256,
   }));
   const provider = createGitlabDeliveryProvider({
     projectRoot: process.cwd(),
@@ -215,6 +366,7 @@ test("GitLab provider enriches the newest release with build and digest evidence
     server: detail.serverDigest,
     web: detail.webDigest,
   });
+  assert.equal(version.promotionEligible, true);
 });
 
 test("GitLab provider normalizes pipeline and job timings", async () => {

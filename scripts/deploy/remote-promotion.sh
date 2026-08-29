@@ -7,7 +7,7 @@ print_help() {
 Usage:
   bash remote-promotion.sh promote \
     <operation-id> <40-sha> <version> <release-manifest-sha256> \
-    <promotion-fingerprint> <confirmation>
+    <release-rehearsal-sha256> <promotion-fingerprint> <confirmation>
 
 This script is not a general remote shell. It only operates on the committed
 test-133 target contract and an already transferred, checksum-bound package.
@@ -25,8 +25,9 @@ operation_id="${2:-}"
 release_sha="${3:-}"
 release_version="${4:-}"
 release_manifest_sha256="${5:-}"
-promotion_fingerprint="${6:-}"
-confirmation="${7:-}"
+release_rehearsal_sha256="${6:-}"
+promotion_fingerprint="${7:-}"
+confirmation="${8:-}"
 
 target=test-133
 root=/home/simon/plush-toy-erp-v5
@@ -120,6 +121,8 @@ portable_archive_manifest_digest() {
 [[ "$release_version" =~ $version_pattern ]] || fail "invalid release version"
 [[ "$release_manifest_sha256" =~ $sha256_pattern ]] ||
   fail "invalid release manifest SHA-256"
+[[ "$release_rehearsal_sha256" =~ $sha256_pattern ]] ||
+  fail "invalid release rehearsal SHA-256"
 [[ "$promotion_fingerprint" =~ $sha256_pattern ]] ||
   fail "invalid promotion fingerprint"
 [[ "$confirmation" == "PROMOTE:$target:$release_sha:$operation_id" ]] ||
@@ -259,6 +262,7 @@ write_receipt() {
     --arg gitSha "$release_sha" \
     --arg version "$release_version" \
     --arg releaseManifestSha256 "$release_manifest_sha256" \
+    --arg releaseRehearsalSha256 "$release_rehearsal_sha256" \
     --arg promotionFingerprint "$promotion_fingerprint" \
     --arg stage "$stage" \
     --arg issueCode "$issue_code" \
@@ -285,6 +289,7 @@ write_receipt() {
       gitSha: $gitSha,
       version: $version,
       releaseManifestSha256: $releaseManifestSha256,
+      releaseRehearsalSha256: $releaseRehearsalSha256,
       promotionFingerprint: $promotionFingerprint,
       stage: $stage,
       issueCode: $issueCode,
@@ -427,6 +432,7 @@ required_files=(
   release-manifest.json
   release-artifact.json
   promotion-manifest.json
+  release-rehearsal.json
   sbom.cdx.json
   source.tar
   server-image.tar
@@ -472,41 +478,60 @@ jq -e \
   --arg sha "$release_sha" \
   --arg version "$release_version" \
   --arg artifactSha "$(sha256sum "$incoming/release-artifact.json" | awk '{print $1}')" \
-  '.schemaVersion == "plush.release-manifest/v1" and
+  '.schemaVersion == "plush.release-manifest/v2" and
    .passed == true and
    .gitSha == $sha and
    .version == $version and
    .strict.status == "passed" and
+   .rehearsal.status == "passed" and
+   (.rehearsal.receiptSha256 | test("^[0-9a-f]{64}$")) and
+   .rehearsal.cleanup.passed == true and
+   .rehearsal.cleanup.residualContainers == 0 and
    .artifact.manifestSha256 == $artifactSha and
    .rollback.databaseDownMigrationAutomatic == false' \
   "$incoming/release-manifest.json" >/dev/null
+actual_release_rehearsal_sha256="$(sha256sum "$incoming/release-rehearsal.json" | awk '{print $1}')"
+[[ "$actual_release_rehearsal_sha256" == "$release_rehearsal_sha256" &&
+  "$actual_release_rehearsal_sha256" == "$(jq -r '.rehearsal.receiptSha256' "$incoming/release-manifest.json")" ]] ||
+  fail "release rehearsal checksum does not match the release manifest"
 jq -e \
   --arg operationId "$operation_id" \
   --arg sha "$release_sha" \
   --arg fingerprint "$promotion_fingerprint" \
+  --arg rehearsalSha256 "$release_rehearsal_sha256" \
   '.schemaVersion == "plush.promotion-manifest/v1" and
    .status == "eligible" and
    .operationId == $operationId and
    .target.key == "test-133" and
    .release.gitSha == $sha and
+   .release.rehearsalReceiptFile == "release-rehearsal.json" and
+   .release.rehearsalReceiptSha256 == $rehearsalSha256 and
    .fingerprint == $fingerprint and
    .rollback.automaticDatabaseDownMigration == false' \
   "$incoming/promotion-manifest.json" >/dev/null
 jq -e \
   --arg sha "$release_sha" \
+  --arg version "$release_version" \
   '.schemaVersion == "plush-release-artifact/v1" and
    .passed == true and
    .git.commit == $sha and
    .git.head == $sha and
    .git.worktreeClean == true and
+   .releaseVersion == $version and
    (.images | length) == 2' \
   "$incoming/release-artifact.json" >/dev/null
 jq -e -s '
   .[0] as $release |
   .[1] as $artifact |
   .[2] as $promotion |
-  (($release.images | map({kind, sourceContentId}) | sort_by(.kind)) ==
-   ($artifact.images | map({kind, sourceContentId: .contentId}) | sort_by(.kind))) and
+  ($artifact.releaseVersion == $release.version) and
+  ($release.artifact.sourceArchiveSha256 == $artifact.sourceArchive.sha256) and
+  ($release.migration.latest == $artifact.migration.latest) and
+  ($release.migration.sequenceSha256 == $artifact.migration.sequenceSha256) and
+  ($release.customerConfig.sourceSha256 == $artifact.customerConfig.sourceSha256) and
+  ($release.sbom.sha256 == $artifact.sbom.sha256) and
+  (($release.images | map({kind, sourceContentId, platform}) | sort_by(.kind)) ==
+   ($artifact.images | map({kind, sourceContentId: .contentId, platform}) | sort_by(.kind))) and
   (($promotion.release.images | map({kind, sourceContentId}) | sort_by(.kind)) ==
    ($artifact.images | map({kind, sourceContentId: .contentId}) | sort_by(.kind))) and
   ($promotion.release.artifactManifestSha256 == $release.artifact.manifestSha256) and
@@ -515,6 +540,86 @@ jq -e -s '
   "$incoming/release-manifest.json" \
   "$incoming/release-artifact.json" \
   "$incoming/promotion-manifest.json" >/dev/null
+jq -e -s \
+  --arg sha "$release_sha" \
+  'def runtime_ok($value; $gitSha):
+     $value.serverHealth == "passed" and
+     $value.serverReady == "passed" and
+     $value.webHealth == "passed" and
+     $value.webRoot == "passed" and
+     $value.runtimeIdentity == "passed" and
+     $value.authenticatedAdmin == "passed" and
+     $value.embeddedGitSha == $gitSha;
+   .[0] as $receipt |
+   .[1] as $artifact |
+   .[2] as $release |
+   ($artifact.images | map({key: .kind, value: .contentId}) | from_entries) as $content |
+   $receipt.schemaVersion == "plush-local-release-rehearsal/v1" and
+   $receipt.passed == true and
+   $receipt.customer == "yoyoosun" and
+   $receipt.git.commit == $sha and
+   $receipt.git.head == $sha and
+   $receipt.git.worktreeClean == true and
+   $receipt.artifact.manifestSchema == $artifact.schemaVersion and
+   $receipt.artifact.server == $content.server and
+   $receipt.artifact.web == $content.web and
+   $receipt.artifact.migrationSequenceSha256 == $artifact.migration.sequenceSha256 and
+   $receipt.artifact.sbomSha256 == $artifact.sbom.sha256 and
+   $receipt.environment.kind == "local-isolated-release-compose" and
+   $receipt.environment.databaseIdentityBound == true and
+   $receipt.environment.composeSource == "server/deploy/compose/prod/compose.yml" and
+   $receipt.migration.latest == $artifact.migration.latest and
+   $receipt.migration.sequenceSha256 == $artifact.migration.sequenceSha256 and
+   $receipt.migration.directoryValidation == "passed" and
+   $receipt.migration.dryRun == "passed" and
+   $receipt.migration.apply == "passed" and
+   $receipt.migration.readback == "passed" and
+   runtime_ok($receipt.runtime.initial; $sha) and
+   runtime_ok($receipt.runtime.steadyStateRestart; $sha) and
+   $receipt.backupRestore.status == "passed" and
+   ($receipt.backupRestore.backupSha256 | test("^[0-9a-f]{64}$")) and
+   ($receipt.backupRestore.backupSizeBytes | type) == "number" and
+   $receipt.backupRestore.backupSizeBytes >= 1 and
+   $receipt.backupRestore.dumpRetained == false and
+   $receipt.recoveryRestart.status == "passed" and
+   $receipt.recoveryRestart.bootstrapSecretRemoved == true and
+   $receipt.recoveryRestart.sameServerContentId == true and
+   $receipt.recoveryRestart.sameWebContentId == true and
+   $receipt.recoveryRestart.healthReadyAndLoginRecovered == true and
+   $receipt.recoveryRestart.customerConfigRecovered == true and
+   $receipt.cleanup.attempted == true and
+   $receipt.cleanup.passed == true and
+   $receipt.cleanup.residualContainers == 0 and
+   $receipt.cleanup.temporaryDatabaseRetained == false and
+   $receipt.failure == null and
+   $receipt.redaction.containsSecrets == false and
+   $receipt.redaction.containsCredentials == false and
+   $receipt.redaction.containsFullDsn == false and
+   $receipt.redaction.containsAbsoluteWorkspacePaths == false and
+   $receipt.redaction.containsRawCustomerRows == false and
+   $receipt.schemaVersion == $release.rehearsal.contract and
+   $receipt.generatedAt == $release.rehearsal.generatedAt and
+   $receipt.finishedAt == $release.rehearsal.finishedAt and
+   $receipt.git.commit == $release.rehearsal.gitSha and
+   $receipt.artifact.manifestSchema == $release.rehearsal.artifact.manifestSchema and
+   $receipt.artifact.server == $release.rehearsal.artifact.serverContentId and
+   $receipt.artifact.web == $release.rehearsal.artifact.webContentId and
+   $receipt.artifact.migrationSequenceSha256 == $release.rehearsal.artifact.migrationSequenceSha256 and
+   $receipt.artifact.sbomSha256 == $release.rehearsal.artifact.sbomSha256' \
+  "$incoming/release-rehearsal.json" \
+  "$incoming/release-artifact.json" \
+  "$incoming/release-manifest.json" >/dev/null
+rehearsal_archive=$operation_dir/release-rehearsal.json
+if [[ -e "$rehearsal_archive" ]]; then
+  [[ -f "$rehearsal_archive" && ! -L "$rehearsal_archive" ]] ||
+    fail "archived release rehearsal receipt is invalid"
+  cmp --silent "$incoming/release-rehearsal.json" "$rehearsal_archive" ||
+    fail "archived release rehearsal receipt conflicts with this operation"
+else
+  cp "$incoming/release-rehearsal.json" "$rehearsal_archive.tmp"
+  chmod 600 "$rehearsal_archive.tmp"
+  mv "$rehearsal_archive.tmp" "$rehearsal_archive"
+fi
 
 source_sha256="$(jq -r '.sourceArchive.sha256' "$incoming/release-artifact.json")"
 sbom_sha256="$(jq -r '.sbom.sha256' "$incoming/release-artifact.json")"
@@ -878,6 +983,7 @@ rm -f \
   "$incoming/promotion-manifest.json" \
   "$incoming/release-artifact.json" \
   "$incoming/release-manifest.json" \
+  "$incoming/release-rehearsal.json" \
   "$incoming/remote-promotion.sh" \
   "$incoming/sbom.cdx.json" \
   "$incoming/server-image.tar" \

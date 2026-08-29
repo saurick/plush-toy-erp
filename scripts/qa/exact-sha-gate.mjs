@@ -47,6 +47,14 @@ const EXTRA_FINGERPRINT_FILES = Object.freeze([
   "web/pnpm-lock.yaml",
   "scripts/qa/strict-receipt-identity.mjs",
   "scripts/qa/strict-receipt-identity.test.mjs",
+  "scripts/qa/ci-quality-shard.mjs",
+  "scripts/qa/ci-quality-shard.test.mjs",
+  "scripts/qa/ci-quality-aggregate.mjs",
+  "scripts/qa/ci-quality-aggregate.test.mjs",
+  "scripts/deploy/gitlab-strict-terminal-reuse.mjs",
+  "scripts/deploy/gitlab-strict-terminal-reuse.test.mjs",
+  "scripts/deploy/gitlab-release-candidate.mjs",
+  "scripts/deploy/gitlab-release-candidate.test.mjs",
 ]);
 const WORKFLOW_FINGERPRINT_FILES = Object.freeze([
   ".gitlab-ci.yml",
@@ -482,6 +490,85 @@ function atomicWriteJson(file, value) {
   }
 }
 
+function terminalFromReceipt(
+  plan,
+  { exitCode, startedAt, finishedAt, env = process.env },
+) {
+  const receiptEvidence = readReceiptEvidence(plan);
+  const terminalStatus = exitCode === 0 ? "passed" : "failed";
+  if (receiptEvidence.status !== terminalStatus) {
+    throw new Error("exact-SHA strict result and receipt status differ");
+  }
+  const terminal = {
+    contract: EXACT_SHA_GATE_CONTRACT,
+    profile: "strict",
+    gitSha: plan.gitSha,
+    mainRef: plan.mainRef,
+    fingerprint: plan.fingerprint,
+    identity: plan.identity,
+    status: terminalStatus,
+    exitCode,
+    startedAt,
+    finishedAt,
+    receipt: {
+      path: plan.receiptRelativePath,
+      sha256: receiptEvidence.sha256,
+    },
+    checks: receiptEvidence.checks,
+    timeSensitiveChecks: {
+      vulnerabilityDatabase: {
+        status: terminalStatus === "passed" ? "passed" : "failed",
+        checkedAt: startedAt,
+        validUntil: new Date(
+          Date.parse(startedAt) + TIME_SENSITIVE_VALIDITY_MS,
+        ).toISOString(),
+      },
+    },
+    provenance: buildExactShaProvenance(
+      env,
+      terminalStatus === "passed" ? "success" : "failure",
+    ),
+    runtime: {
+      node: process.version,
+      platform: process.platform,
+      arch: process.arch,
+    },
+  };
+  if (terminalStatus === "passed") validateStrictReceiptEvidence(terminal);
+  atomicWriteJson(plan.terminalPath, terminal);
+  return terminal;
+}
+
+export function finalizeExactShaGateFromReceipt(
+  root,
+  options,
+  { now = () => new Date(), env = process.env, startedAt = "" } = {},
+) {
+  const plan = buildExactShaPlan(root, { ...options, env });
+  const existing = readExactShaTerminal(plan);
+  if (existing) return { plan, terminal: existing, reused: true };
+  assertCleanExactHead(root, plan.gitSha);
+  const finished = now();
+  const finishedAt = finished.toISOString();
+  const effectiveStartedAt = startedAt || finishedAt;
+  if (
+    Number.isNaN(Date.parse(effectiveStartedAt)) ||
+    Date.parse(effectiveStartedAt) > Date.parse(finishedAt)
+  ) {
+    throw new Error("aggregated exact-SHA start time is invalid");
+  }
+  const terminal = terminalFromReceipt(plan, {
+    exitCode: 0,
+    startedAt: effectiveStartedAt,
+    finishedAt,
+    env,
+  });
+  console.log(
+    `[qa:exact-sha] status=terminal result=${terminal.status} sha=${plan.gitSha} fingerprint=${plan.fingerprint} source=aggregate`,
+  );
+  return { plan, terminal, reused: false };
+}
+
 export function runExactShaGate(
   root,
   options,
@@ -516,50 +603,12 @@ export function runExactShaGate(
   if (result?.error) throw result.error;
   const exitCode = Number.isInteger(result?.status) ? result.status : 1;
   assertCleanExactHead(root, plan.gitSha);
-  const receiptEvidence = readReceiptEvidence(plan);
-  const terminalStatus = exitCode === 0 ? "passed" : "failed";
-  if (receiptEvidence.status !== terminalStatus) {
-    throw new Error("exact-SHA strict result and receipt status differ");
-  }
-  const terminal = {
-    contract: EXACT_SHA_GATE_CONTRACT,
-    profile: "strict",
-    gitSha: plan.gitSha,
-    mainRef: plan.mainRef,
-    fingerprint: plan.fingerprint,
-    identity: plan.identity,
-    status: terminalStatus,
+  const terminal = terminalFromReceipt(plan, {
     exitCode,
     startedAt,
     finishedAt: now().toISOString(),
-    receipt: {
-      path: plan.receiptRelativePath,
-      sha256: receiptEvidence.sha256,
-    },
-    checks: receiptEvidence.checks,
-    timeSensitiveChecks: {
-      vulnerabilityDatabase: {
-        status: terminalStatus === "passed" ? "passed" : "failed",
-        checkedAt: startedAt,
-        validUntil: new Date(
-          Date.parse(startedAt) + TIME_SENSITIVE_VALIDITY_MS,
-        ).toISOString(),
-      },
-    },
-    provenance: buildExactShaProvenance(
-      env,
-      terminalStatus === "passed" ? "success" : "failure",
-    ),
-    runtime: {
-      node: process.version,
-      platform: process.platform,
-      arch: process.arch,
-    },
-  };
-  if (terminalStatus === "passed") {
-    validateStrictReceiptEvidence(terminal);
-  }
-  atomicWriteJson(plan.terminalPath, terminal);
+    env,
+  });
   console.log(
     `[qa:exact-sha] status=terminal result=${terminal.status} sha=${plan.gitSha} fingerprint=${plan.fingerprint}`,
   );

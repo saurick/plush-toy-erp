@@ -65,6 +65,14 @@ const QA_RUNTIME_MODULE_URLS = Object.freeze({
       'run-gate-with-managed-database.mjs'
     )
   ).href,
+  gitlabDelivery: pathToFileURL(
+    path.join(
+      QA_RUNTIME_ROOT,
+      'scripts',
+      'deploy',
+      'gitlab-delivery-provider.mjs'
+    )
+  ).href,
   receiptGate: pathToFileURL(
     path.join(QA_RUNTIME_ROOT, 'scripts', 'qa', 'run-gate-with-receipt.mjs')
   ).href,
@@ -107,6 +115,8 @@ const STAGE_MESSAGES = Object.freeze({
   web: '正在运行 Web 测试与生产构建',
   browser: '正在运行真实浏览器回归',
   server: '正在运行隔离数据库、迁移与 Server 测试',
+  resource_sensitive_node: '正在运行资源敏感发布合同',
+  critical_postgres: '正在运行关键 PostgreSQL 合同',
   govulncheck: '正在运行 Go 可达漏洞检查',
 })
 
@@ -501,6 +511,7 @@ function statusProjection({
   repository,
   environment,
   currentOperation,
+  serverEvidence,
   strictProof,
 }) {
   if (currentOperation) {
@@ -539,24 +550,60 @@ function statusProjection({
       notProven: ['干净 exact SHA', '目标环境发布', '客户 UAT'],
     }
   }
-  if (strictProof.releaseEligible) {
+  if (
+    serverEvidence?.status === 'passed' &&
+    serverEvidence.current === true &&
+    serverEvidence.coversWorkingTree === true
+  ) {
     return {
       tone: 'success',
-      title: '当前版本已通过严格门禁',
-      description: '严格结果属于当前干净版本，可以进入版本发布。',
+      title: '当前版本已通过 R640 严格门禁',
+      description:
+        '普通 push CI、七个固定分片、聚合回执与 CI Gate 均绑定当前干净 exact SHA，可以进入版本发布。',
       releaseEligible: true,
       recommendation: '前往版本发布，继续核对制品、目标环境和回滚证据。',
       notProven: ['目标环境发布', '客户 UAT'],
     }
   }
-  if (strictProof.current) {
+  if (serverEvidence?.status === 'running') {
+    return {
+      tone: 'info',
+      title: 'R640 正在验证当前版本',
+      description: '服务器普通 push CI 尚未形成终态，当前不能进入版本发布。',
+      releaseEligible: false,
+      recommendation: '等待 R640 exact-SHA CI Gate 形成终态。',
+      notProven: ['当前版本 R640 严格门禁', '目标环境发布', '客户 UAT'],
+    }
+  }
+  if (serverEvidence?.status === 'failed') {
     return {
       tone: 'error',
-      title: '当前版本严格门禁未通过',
-      description: '最近失败结果属于当前干净版本，不能进入版本发布。',
+      title: '当前版本 R640 严格门禁未通过',
+      description: '服务器普通 push CI 未形成完整通过证据，不能进入版本发布。',
+      releaseEligible: false,
+      recommendation: '先修复 R640 第一失败阶段，再由新 exact SHA 重新运行。',
+      notProven: ['当前版本 R640 严格门禁', '目标环境发布', '客户 UAT'],
+    }
+  }
+  if (strictProof.current) {
+    if (strictProof.receipt?.status === 'passed') {
+      return {
+        tone: 'warning',
+        title: '本地严格门禁已通过，仍缺 R640 证据',
+        description:
+          '本地回执属于当前干净版本，但不能替代 protected main 的服务器 exact-SHA CI。',
+        releaseEligible: false,
+        recommendation: '等待或运行当前 SHA 的 R640 普通 push CI。',
+        notProven: ['当前版本 R640 严格门禁', '目标环境发布', '客户 UAT'],
+      }
+    }
+    return {
+      tone: 'error',
+      title: '当前版本本地严格门禁未通过',
+      description: '最近本地失败结果属于当前干净版本，且没有可复用的 R640 通过证据。',
       releaseEligible: false,
       recommendation: '先修复第一失败阶段，再重新运行严格门禁。',
-      notProven: ['当前版本严格门禁', '目标环境发布', '客户 UAT'],
+      notProven: ['当前版本本地严格门禁', '当前版本 R640 严格门禁', '目标环境发布', '客户 UAT'],
     }
   }
   if (!environment.disposableDatabaseReady) {
@@ -587,6 +634,123 @@ function statusProjection({
     releaseEligible: false,
     recommendation: '运行严格门禁。',
     notProven: ['当前版本严格门禁', '目标环境发布', '客户 UAT'],
+  }
+}
+
+export const DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA =
+  'plush.dev-quality-gate-server-evidence/v1'
+const SERVER_CI_JOB_NAMES = Object.freeze([
+  'plan',
+  'prepare',
+  'quality_static',
+  'quality_node',
+  'quality_web',
+  'quality_server',
+  'quality_resource',
+  'quality_browser',
+  'quality_security',
+  'quality_aggregate',
+  'CI Gate',
+])
+
+function unavailableServerEvidence(message) {
+  return {
+    schemaVersion: DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA,
+    status: 'unavailable',
+    current: false,
+    coversWorkingTree: false,
+    gitSha: '',
+    pipeline: null,
+    jobs: [],
+    message,
+    notProven: ['当前 exact SHA 的 R640 普通 CI'],
+  }
+}
+
+export function projectDevQualityGateServerEvidence(timings, repository) {
+  if (
+    timings?.schemaVersion !== 'plush.delivery-pipeline-timings/v1' ||
+    !Array.isArray(timings?.runs) ||
+    !/^[0-9a-f]{40}$/u.test(String(repository?.commit || '')) ||
+    typeof repository?.dirty !== 'boolean'
+  ) {
+    throw new Error('server CI timing evidence is invalid')
+  }
+  const exactRuns = timings.runs.filter(
+    (run) =>
+      run?.workflow === 'ci' &&
+      run?.event === 'push' &&
+      run?.gitSha === repository.commit
+  )
+  if (exactRuns.length === 0) {
+    return {
+      schemaVersion: DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA,
+      status: 'missing',
+      current: false,
+      coversWorkingTree: false,
+      gitSha: repository.commit,
+      pipeline: null,
+      jobs: [],
+      message: 'R640 尚无绑定当前已提交 SHA 的普通 push CI 记录。',
+      notProven: ['当前 exact SHA 的 R640 普通 CI'],
+    }
+  }
+  const projectRun = (run) => {
+    const latestJobs = new Map()
+    for (const job of run.jobs || []) {
+      if (!latestJobs.has(job.name) || job.id > latestJobs.get(job.name).id) {
+        latestJobs.set(job.name, job)
+      }
+    }
+    const jobs = SERVER_CI_JOB_NAMES.map((name) => latestJobs.get(name)).filter(
+      Boolean
+    )
+    const passed =
+      run.status === 'completed' &&
+      run.conclusion === 'success' &&
+      jobs.length === SERVER_CI_JOB_NAMES.length &&
+      jobs.every(
+        (job) => job.status === 'completed' && job.conclusion === 'success'
+      )
+    return { run, jobs, passed }
+  }
+  const candidates = exactRuns.map(projectRun)
+  const selected =
+    candidates.find((candidate) => candidate.passed) || candidates[0]
+  const active = selected.run.status !== 'completed'
+  const status = selected.passed ? 'passed' : active ? 'running' : 'failed'
+  return {
+    schemaVersion: DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA,
+    status,
+    current: true,
+    coversWorkingTree: selected.passed && !repository.dirty,
+    gitSha: repository.commit,
+    pipeline: {
+      id: selected.run.id,
+      attempt: selected.run.attempt,
+      url: selected.run.url,
+      status: selected.run.status,
+      conclusion: selected.run.conclusion,
+      queueMs: selected.run.queueMs,
+      durationMs: selected.run.durationMs,
+      finishedAt: selected.run.finishedAt,
+    },
+    jobs: selected.jobs.map((job) => ({
+      id: job.id,
+      name: job.name,
+      conclusion: job.conclusion,
+      durationMs: job.durationMs,
+    })),
+    message: selected.passed
+      ? repository.dirty
+        ? 'R640 已证明当前提交 SHA；该证据不覆盖本机未提交改动。'
+        : 'R640 已通过当前 exact SHA 的完整分片、聚合与 CI Gate。'
+      : active
+        ? 'R640 正在验证当前 exact SHA。'
+        : 'R640 当前 exact SHA 的普通 CI 未形成完整通过证据。',
+    notProven: repository.dirty
+      ? ['本机未提交改动', '不可变 Release', '目标部署', '客户 UAT']
+      : ['不可变 Release', '目标部署', '客户 UAT'],
   }
 }
 
@@ -632,6 +796,7 @@ export function createDevQualityGateService({
   randomOperationId = randomUUID,
   readRepositoryState = readRepositoryIdentity,
   readReceipt,
+  loadServerEvidence,
   collectChanges,
   resolveNodeRuntime = resolveProjectNodeRuntime,
   launchProcess = (spec) => startFixedQualityProcess(spec),
@@ -647,6 +812,7 @@ export function createDevQualityGateService({
   const active = new Map()
   const orphanStopTimers = new Map()
   let environmentReadinessCache = null
+  let serverEvidenceCache = null
   const loadReceipt =
     readReceipt || ((profile) => readFixedQualityGateReceipt(root, profile))
   const loadChangedFiles =
@@ -672,6 +838,53 @@ export function createDevQualityGateService({
     })
     environmentReadinessCache = {
       expiresAt: timestamp + 8_000,
+      value,
+    }
+    return value
+  }
+
+  async function loadServerCiEvidence(repository) {
+    const timestamp = Date.now()
+    const cacheKey = `${repository.commit}:${repository.dirty ? 'dirty' : 'clean'}`
+    if (
+      serverEvidenceCache?.key === cacheKey &&
+      serverEvidenceCache.expiresAt > timestamp
+    ) {
+      return serverEvidenceCache.value
+    }
+    let value
+    try {
+      if (loadServerEvidence) {
+        value = await loadServerEvidence({ repository, root })
+      } else if (!String(env.PLUSH_GITLAB_TOKEN || '')) {
+        value = unavailableServerEvidence(
+          '未登记只读 GitLab 凭据，当前仅显示本机回执。'
+        )
+      } else {
+        const { createGitlabDeliveryProvider } =
+          await loadQaRuntimeModule('gitlabDelivery')
+        const provider = createGitlabDeliveryProvider({
+          projectRoot: root,
+          env,
+        })
+        value = projectDevQualityGateServerEvidence(
+          await provider.listPipelineTimings({ limit: 8 }),
+          repository
+        )
+      }
+      if (
+        value?.schemaVersion !== DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA
+      ) {
+        throw new Error('server CI evidence projection is invalid')
+      }
+    } catch {
+      value = unavailableServerEvidence(
+        'R640 CI 证据暂时不可读取，本机回执不受影响。'
+      )
+    }
+    serverEvidenceCache = {
+      key: cacheKey,
+      expiresAt: timestamp + 15_000,
       value,
     }
     return value
@@ -1267,10 +1480,18 @@ export function createDevQualityGateService({
       operations.find((operation) =>
         DEV_QUALITY_GATE_ACTIVE_STATUSES.includes(operation.status)
       ) || null
-    const [environment, receiptGateModule] = await Promise.all([
+    const [environment, receiptGateModule, serverEvidence] = await Promise.all([
       loadEnvironmentReadiness(),
       loadQaRuntimeModule('receiptGate'),
+      loadServerCiEvidence(repository),
     ])
+    proofs.strict = {
+      ...proofs.strict,
+      releaseEligible:
+        serverEvidence.status === 'passed' &&
+        serverEvidence.current === true &&
+        serverEvidence.coversWorkingTree === true,
+    }
     const parallelStageIds = new Set(
       receiptGateModule.RECEIPT_GATE_PARALLEL_STAGE_IDS
     )
@@ -1283,6 +1504,7 @@ export function createDevQualityGateService({
       generatedAt: now().toISOString(),
       repository,
       environment: publicEnvironment(environment),
+      serverEvidence,
       busy: busyProjection(readDevQaExecutionLock(store)),
       profiles: Object.fromEntries(
         DEV_QUALITY_GATE_PROFILES.map((profile) => [
@@ -1318,6 +1540,7 @@ export function createDevQualityGateService({
         repository,
         environment,
         currentOperation,
+        serverEvidence,
         strictProof: proofs.strict,
       }),
     }

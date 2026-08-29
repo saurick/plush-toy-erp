@@ -27,10 +27,15 @@ import {
   assertLocalRsync,
   buildFixedTargetRsyncTransfer,
 } from "./fixed-target-rsync.mjs";
+import { assertReleaseArtifactManifest } from "./release-artifact-bundle.mjs";
 import { verifyReleaseArtifact } from "./release-artifact-verify.mjs";
 import { readRollbackPlan } from "./rollback-controller.mjs";
 import { validateRollbackManifest } from "./rollback-manifest.mjs";
-import { sha256File, validateReleaseManifest } from "./release-catalog.mjs";
+import {
+  sha256File,
+  validateReleaseArtifactBinding,
+  validateReleaseManifest,
+} from "./release-catalog.mjs";
 import { runTargetPreflight } from "./target-preflight.mjs";
 import { validateRemoteStageTimings } from "./remote-stage-timings.mjs";
 import {
@@ -167,13 +172,14 @@ export function prepareRollbackTransfer(
     throw new Error("rollback release manifests do not match the plan");
   }
   const artifactFile = safeBundleFile(bundle, "release-artifact.json");
-  const artifact = JSON.parse(readFileSync(artifactFile, "utf8"));
-  if (
-    sha256File(artifactFile) !== target.manifest.artifact.manifestSha256 ||
-    artifact?.git?.commit !== target.manifest.gitSha
-  ) {
-    throw new Error("rollback artifact does not match the target release");
-  }
+  const artifact = assertReleaseArtifactManifest(
+    JSON.parse(readFileSync(artifactFile, "utf8")),
+  );
+  validateReleaseArtifactBinding(
+    target.manifest,
+    artifact,
+    sha256File(artifactFile),
+  );
   verifyReleaseArtifact(artifactFile);
   const sbomSource = safeBundleFile(bundle, artifact.sbom.file);
   const imageByKind = new Map(

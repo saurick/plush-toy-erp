@@ -29,8 +29,14 @@ import {
 } from "./fixed-target-rsync.mjs";
 import { readPromotionPlan } from "./promotion-controller.mjs";
 import { validatePromotionManifest } from "./promotion-manifest.mjs";
+import { assertReleaseArtifactManifest } from "./release-artifact-bundle.mjs";
 import { verifyReleaseArtifact } from "./release-artifact-verify.mjs";
-import { sha256File, validateReleaseManifest } from "./release-catalog.mjs";
+import {
+  sha256File,
+  validateReleaseArtifactBinding,
+  validateReleaseManifest,
+  validateReleaseRehearsalReceipt,
+} from "./release-catalog.mjs";
 import { runTargetPreflight } from "./target-preflight.mjs";
 import { validateRemoteStageTimings } from "./remote-stage-timings.mjs";
 import {
@@ -71,6 +77,7 @@ const TRANSFER_FILES = Object.freeze([
   "promotion-manifest.json",
   "release-artifact.json",
   "release-manifest.json",
+  "release-rehearsal.json",
   "remote-promotion.sh",
   "sbom.cdx.json",
   "server-image.tar",
@@ -161,14 +168,39 @@ export function preparePromotionTransfer(
     throw new Error("release manifest does not match the promotion plan");
   }
   const artifactFile = safeBundleFile(bundle, "release-artifact.json");
-  const artifact = JSON.parse(readFileSync(artifactFile, "utf8"));
+  const artifact = assertReleaseArtifactManifest(
+    JSON.parse(readFileSync(artifactFile, "utf8")),
+  );
+  validateReleaseArtifactBinding(
+    releaseManifest,
+    artifact,
+    sha256File(artifactFile),
+  );
   if (
-    sha256File(artifactFile) !== releaseManifest.artifact.manifestSha256 ||
     artifact?.git?.commit !== releaseManifest.gitSha
   ) {
     throw new Error("release artifact does not match the immutable release");
   }
   verifyReleaseArtifact(artifactFile);
+  const rehearsalFile = safeBundleFile(bundle, "release-rehearsal.json");
+  const rehearsalReceipt = validateReleaseRehearsalReceipt(
+    JSON.parse(readFileSync(rehearsalFile, "utf8")),
+    artifact,
+    {
+      sha: releaseManifest.gitSha,
+      version: releaseManifest.version,
+      customer: "yoyoosun",
+    },
+  );
+  if (
+    releaseManifest.schemaVersion !== "plush.release-manifest/v2" ||
+    sha256File(rehearsalFile) !== releaseManifest.rehearsal?.receiptSha256 ||
+    sha256File(rehearsalFile) !== plan.release.rehearsalReceiptSha256 ||
+    plan.release.rehearsalReceiptFile !== "release-rehearsal.json" ||
+    rehearsalReceipt.git.commit !== plan.release.gitSha
+  ) {
+    throw new Error("release rehearsal receipt does not match the promotion plan");
+  }
   const sbomSource = safeBundleFile(bundle, artifact.sbom.file);
   const imageByKind = new Map(
     artifact.images.map((image) => [
@@ -200,6 +232,11 @@ export function preparePromotionTransfer(
   }
   mkdirSync(destination, { recursive: true, mode: 0o700 });
   try {
+    copyBoundedFile(
+      rehearsalFile,
+      path.join(destination, "release-rehearsal.json"),
+      4 * 1024 * 1024,
+    );
     if (!cachedPackage) {
       copyBoundedFile(
         releaseManifestFile,
@@ -264,6 +301,7 @@ export function preparePromotionTransfer(
     }
     const immutableChecksums = {
       "release-manifest.json": sha256File(releaseManifestFile),
+      "release-rehearsal.json": sha256File(rehearsalFile),
       "release-artifact.json": sha256File(artifactFile),
       "sbom.cdx.json": artifact.sbom.sha256,
       "server-image.tar": artifact.images.find(
@@ -286,6 +324,7 @@ export function preparePromotionTransfer(
     const files = cachedPackage
       ? [
           "promotion-manifest.json",
+          "release-rehearsal.json",
           "remote-promotion.sh",
           "transfer-checksums.sha256",
         ]
@@ -362,6 +401,7 @@ export function validateRemotePromotionReceipt(receipt, expected) {
       "promotionFingerprint",
       "redaction",
       "releaseManifestSha256",
+      "releaseRehearsalSha256",
       "rollbackPoint",
       "schemaVersion",
       "stage",
@@ -413,6 +453,7 @@ export function validateRemotePromotionReceipt(receipt, expected) {
     receipt?.gitSha !== expected.gitSha ||
     receipt?.version !== expected.version ||
     receipt?.releaseManifestSha256 !== expected.releaseManifestSha256 ||
+    receipt?.releaseRehearsalSha256 !== expected.releaseRehearsalSha256 ||
     receipt?.promotionFingerprint !== expected.promotionFingerprint ||
     !/^[a-z][a-z0-9_]{2,63}$/u.test(String(receipt?.stage || "")) ||
     !ISSUE_PATTERN.test(String(receipt?.issueCode || "")) ||
@@ -667,6 +708,7 @@ export function executePromotion(
         operation.gitSha,
         operation.version,
         plan.release.manifestSha256,
+        plan.release.rehearsalReceiptSha256,
         plan.fingerprint,
         confirmation,
       ],
@@ -684,6 +726,7 @@ export function executePromotion(
         gitSha: operation.gitSha,
         version: operation.version,
         releaseManifestSha256: plan.release.manifestSha256,
+        releaseRehearsalSha256: plan.release.rehearsalReceiptSha256,
         promotionFingerprint: plan.fingerprint,
       });
     } catch (error) {
@@ -713,6 +756,7 @@ export function executePromotion(
         ...operation.metadata,
         remoteStage: receipt.stage,
         backupSha256: receipt.rollbackPoint.backupSha256,
+        releaseRehearsalSha256: receipt.releaseRehearsalSha256,
         backupSizeBytes: receipt.rollbackPoint.backupSizeBytes,
         serverContentId: receipt.images.serverContentId,
         webContentId: receipt.images.webContentId,

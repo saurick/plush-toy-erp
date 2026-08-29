@@ -2,12 +2,13 @@ import { validateDevDeliverySummary } from '../../src/dev-workbench/config/devDe
 import { createQualityGateStyleSummary } from './devQualityGateScenarios.mjs'
 
 const ASSETS = [
+  'checksums.sha256',
+  'release-artifact.json',
   'release-manifest.json',
-  'checksums.txt',
-  'server-image.tar.zst',
-  'web-image.tar.zst',
-  'server-sbom.spdx.json',
-  'web-sbom.spdx.json',
+  'release-rehearsal.json',
+  'sbom.cdx.json',
+  'server-image.tar',
+  'web-image.tar',
 ]
 
 function deliverySha(index) {
@@ -93,6 +94,7 @@ export function createVersionCenterSummary() {
         web: `sha256:${'d'.repeat(64)}`,
       },
       completeAssets: true,
+      promotionEligible: true,
     }
   })
   const currentVersion = versions[7]

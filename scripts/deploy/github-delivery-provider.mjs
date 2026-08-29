@@ -7,6 +7,7 @@ import {
   realpathSync,
   rmSync,
 } from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import process from "node:process";
 import { execFile } from "node:child_process";
@@ -14,26 +15,27 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import {
+  DELIVERY_RELEASE_ASSETS,
   DELIVERY_PROVIDER_CONTRACT,
   DELIVERY_PROVIDER_RELEASE_STATUS_CONTRACT,
+  LEGACY_DELIVERY_RELEASE_ASSETS,
   validateDeliveryReleaseVersion,
   validateReleaseDispatchRequest,
 } from "./delivery-provider.mjs";
-import { validateReleaseManifest } from "./release-catalog.mjs";
+import { assertReleaseArtifactManifest } from "./release-artifact-bundle.mjs";
+import {
+  validateReleaseArtifactBinding,
+  validateReleaseManifest,
+  validateReleaseRehearsalReceipt,
+} from "./release-catalog.mjs";
 
 export const GITHUB_API_VERSION = "2022-11-28";
 export const GITHUB_DELIVERY_REPOSITORY = "saurick/plush-toy-erp";
 export const GITHUB_RELEASE_WORKFLOW = "release.yml";
 export const GITHUB_PIPELINE_TIMINGS_CONTRACT =
   "plush.delivery-pipeline-timings/v1";
-export const GITHUB_RELEASE_ASSETS = Object.freeze([
-  "checksums.sha256",
-  "release-artifact.json",
-  "release-manifest.json",
-  "sbom.cdx.json",
-  "server-image.tar",
-  "web-image.tar",
-]);
+export const GITHUB_LEGACY_RELEASE_ASSETS = LEGACY_DELIVERY_RELEASE_ASSETS;
+export const GITHUB_RELEASE_ASSETS = DELIVERY_RELEASE_ASSETS;
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
 const SHA256_DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/u;
@@ -52,6 +54,24 @@ const RUN_STATUSES = new Set([
   "pending",
 ]);
 const execFileAsync = promisify(execFile);
+
+function exactAssetSet(assets, expected) {
+  const sorted = [...expected].sort();
+  return (
+    assets.length === sorted.length &&
+    assets.every((asset, index) => asset === sorted[index])
+  );
+}
+
+function expectedAssetsForManifest(manifest) {
+  return manifest.schemaVersion === "plush.release-manifest/v2"
+    ? GITHUB_RELEASE_ASSETS
+    : GITHUB_LEGACY_RELEASE_ASSETS;
+}
+
+function sha256Text(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
 
 function isCommandTimeout(error, result = {}) {
   return (
@@ -115,6 +135,14 @@ function normalizeRelease(raw) {
     throw new Error("GitHub release identity is invalid");
   }
   const rawAssets = Array.isArray(raw.assets) ? raw.assets : [];
+  if (
+    rawAssets.some(
+      (asset) =>
+        !GITHUB_RELEASE_ASSETS.includes(String(asset?.name || "")),
+    )
+  ) {
+    throw new Error("GitHub release contains an unknown asset");
+  }
   const assets = rawAssets
     .map((asset) => String(asset?.name || ""))
     .filter((name) => GITHUB_RELEASE_ASSETS.includes(name))
@@ -155,10 +183,9 @@ function normalizeRelease(raw) {
     buildPerformance: null,
     imageDigests: null,
     completeAssets:
-      assets.length === GITHUB_RELEASE_ASSETS.length &&
-      assets.every(
-        (asset, index) => asset === [...GITHUB_RELEASE_ASSETS].sort()[index],
-      ),
+      exactAssetSet(assets, GITHUB_RELEASE_ASSETS) ||
+      exactAssetSet(assets, GITHUB_LEGACY_RELEASE_ASSETS),
+    promotionEligible: false,
   });
 }
 
@@ -376,12 +403,15 @@ export function createGithubDeliveryProvider({
       if (Buffer.byteLength(output) > MAX_RELEASE_DETAIL_BYTES) {
         throw new Error("GitHub release detail response is too large");
       }
-      return JSON.parse(output);
+      return { value: JSON.parse(output), sha256: sha256Text(output) };
     };
-    const artifact = await readAsset("release-artifact.json");
+    const artifactAsset = await readAsset("release-artifact.json");
+    const artifact = assertReleaseArtifactManifest(artifactAsset.value);
+    const manifestAsset = await readAsset("release-manifest.json");
     const manifest = validateReleaseManifest(
-      await readAsset("release-manifest.json"),
+      manifestAsset.value,
     );
+    validateReleaseArtifactBinding(manifest, artifact, artifactAsset.sha256);
     if (
       artifact?.schemaVersion !== "plush-release-artifact/v1" ||
       artifact?.git?.commit !== version.gitSha ||
@@ -389,6 +419,24 @@ export function createGithubDeliveryProvider({
       manifest.version !== version.version
     ) {
       throw new Error("GitHub release detail identity is invalid");
+    }
+    let promotionEligible = false;
+    if (manifest.schemaVersion === "plush.release-manifest/v2") {
+      if (!exactAssetSet(version.assets, GITHUB_RELEASE_ASSETS)) {
+        throw new Error("GitHub v2 release assets are incomplete");
+      }
+      const rehearsalAsset = await readAsset("release-rehearsal.json");
+      validateReleaseRehearsalReceipt(rehearsalAsset.value, artifact, {
+        sha: version.gitSha,
+        version: version.version,
+        customer: "yoyoosun",
+      });
+      if (rehearsalAsset.sha256 !== manifest.rehearsal?.receiptSha256) {
+        throw new Error("GitHub release rehearsal digest is invalid");
+      }
+      promotionEligible = true;
+    } else if (!exactAssetSet(version.assets, GITHUB_LEGACY_RELEASE_ASSETS)) {
+      throw new Error("GitHub legacy release assets are incomplete");
     }
     const imageDigests = Object.fromEntries(
       manifest.images.map((image) => [image.kind, image.digest]),
@@ -403,6 +451,7 @@ export function createGithubDeliveryProvider({
       ...version,
       buildPerformance: artifact?.performance?.build || null,
       imageDigests,
+      promotionEligible,
     });
     releaseDetailCache.set(version.gitSha, detail);
     return detail;
@@ -447,14 +496,25 @@ export function createGithubDeliveryProvider({
             Date.parse(right.version.publishedAt) -
             Date.parse(left.version.publishedAt),
         );
-      if (normalized[0]) {
+      for (let index = 0; index < normalized.length; index += 1) {
+        const item = normalized[index];
+        const requiresPromotionEvidence = exactAssetSet(
+          item.version.assets,
+          GITHUB_RELEASE_ASSETS,
+        );
+        if (
+          !item.version.completeAssets ||
+          (!requiresPromotionEvidence && index !== 0)
+        ) {
+          continue;
+        }
         try {
-          normalized[0].version = await readReleaseDetail(
-            normalized[0].raw,
-            normalized[0].version,
+          item.version = await readReleaseDetail(
+            item.raw,
+            item.version,
           );
         } catch {
-          // Asset names and byte sizes remain usable; detail metrics fail closed as null.
+          // Names and byte sizes remain readable; invalid detail evidence stays non-promotable.
         }
       }
       return normalized.map((item) => item.version);
@@ -594,38 +654,9 @@ export function createGithubDeliveryProvider({
 
     async dispatchRelease(request) {
       validateReleaseDispatchRequest(request);
-      await runGh(
-        runCommand,
-        [
-          "workflow",
-          "run",
-          GITHUB_RELEASE_WORKFLOW,
-          "--repo",
-          GITHUB_DELIVERY_REPOSITORY,
-          "--ref",
-          "main",
-          "-f",
-          `sha=${request.gitSha}`,
-          "-f",
-          `version=${request.version}`,
-          "-f",
-          "customer=yoyoosun",
-        ],
-        { cwd: root },
+      throw new Error(
+        "GitHub emergency publication is disabled before workflow dispatch",
       );
-      return {
-        schemaVersion: "plush.delivery-provider-dispatch/v1",
-        provider: "github",
-        repository: GITHUB_DELIVERY_REPOSITORY,
-        workflow: GITHUB_RELEASE_WORKFLOW,
-        gitSha: request.gitSha,
-        version: request.version,
-        status: "accepted",
-        redaction: {
-          containsToken: false,
-          containsCredentials: false,
-        },
-      };
     },
 
     async downloadRelease(gitSha, destination) {
@@ -635,12 +666,7 @@ export function createGithubDeliveryProvider({
       const target = assertDownloadDirectory(root, destination);
       if (existsSync(target)) {
         const files = readdirSync(target).sort();
-        if (
-          files.length === GITHUB_RELEASE_ASSETS.length &&
-          files.every(
-            (file, index) => file === [...GITHUB_RELEASE_ASSETS].sort()[index],
-          )
-        ) {
+        if (files.includes("release-manifest.json")) {
           const releaseManifest = validateReleaseManifest(
             JSON.parse(
               readBoundedManifest(path.join(target, "release-manifest.json")),
@@ -648,6 +674,34 @@ export function createGithubDeliveryProvider({
           );
           if (releaseManifest.gitSha !== gitSha) {
             throw new Error("cached GitHub release identity is invalid");
+          }
+          const expected = [
+            ...expectedAssetsForManifest(releaseManifest),
+          ].sort();
+          if (!exactAssetSet(files, expected)) {
+            throw new Error("cached GitHub release asset set is invalid");
+          }
+          const artifactText = readBoundedManifest(
+            path.join(target, "release-artifact.json"),
+          );
+          const artifact = assertReleaseArtifactManifest(JSON.parse(artifactText));
+          validateReleaseArtifactBinding(
+            releaseManifest,
+            artifact,
+            sha256Text(artifactText),
+          );
+          if (releaseManifest.schemaVersion === "plush.release-manifest/v2") {
+            const receiptText = readBoundedManifest(
+              path.join(target, "release-rehearsal.json"),
+            );
+            validateReleaseRehearsalReceipt(JSON.parse(receiptText), artifact, {
+              sha: gitSha,
+              version: releaseManifest.version,
+              customer: "yoyoosun",
+            });
+            if (sha256Text(receiptText) !== releaseManifest.rehearsal?.receiptSha256) {
+              throw new Error("cached GitHub rehearsal digest is invalid");
+            }
           }
           return { directory: target, reused: true, assets: files };
         }
@@ -669,13 +723,6 @@ export function createGithubDeliveryProvider({
           { cwd: root, timeout: 10 * 60_000 },
         );
         const files = readdirSync(target).sort();
-        const expected = [...GITHUB_RELEASE_ASSETS].sort();
-        if (
-          files.length !== expected.length ||
-          files.some((file, index) => file !== expected[index])
-        ) {
-          throw new Error("downloaded GitHub release assets are incomplete");
-        }
         const releaseManifest = validateReleaseManifest(
           JSON.parse(
             readBoundedManifest(path.join(target, "release-manifest.json")),
@@ -683,6 +730,32 @@ export function createGithubDeliveryProvider({
         );
         if (releaseManifest.gitSha !== gitSha) {
           throw new Error("downloaded GitHub release SHA does not match");
+        }
+        const expected = [...expectedAssetsForManifest(releaseManifest)].sort();
+        if (!exactAssetSet(files, expected)) {
+          throw new Error("downloaded GitHub release assets are incomplete");
+        }
+        const artifactText = readBoundedManifest(
+          path.join(target, "release-artifact.json"),
+        );
+        const artifact = assertReleaseArtifactManifest(JSON.parse(artifactText));
+        validateReleaseArtifactBinding(
+          releaseManifest,
+          artifact,
+          sha256Text(artifactText),
+        );
+        if (releaseManifest.schemaVersion === "plush.release-manifest/v2") {
+          const receiptText = readBoundedManifest(
+            path.join(target, "release-rehearsal.json"),
+          );
+          validateReleaseRehearsalReceipt(JSON.parse(receiptText), artifact, {
+            sha: gitSha,
+            version: releaseManifest.version,
+            customer: "yoyoosun",
+          });
+          if (sha256Text(receiptText) !== releaseManifest.rehearsal?.receiptSha256) {
+            throw new Error("downloaded GitHub rehearsal digest is invalid");
+          }
         }
         return { directory: target, reused: false, assets: files };
       } catch (error) {

@@ -5,6 +5,7 @@ print_help() {
   cat <<'USAGE'
 用法:
   bash scripts/qa/strict.sh
+  bash scripts/qa/strict.sh --ci-shard static
 
 作用:
   执行严格质量检查。先运行 strict 独有的 shell / YAML 静态检查，
@@ -30,7 +31,13 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   exit 0
 fi
 
-if [[ $# -gt 0 ]]; then
+ci_shard=""
+if [[ $# -eq 2 && "${1:-}" == "--ci-shard" ]]; then
+  ci_shard="$2"
+  shift 2
+fi
+
+if [[ $# -gt 0 || (-n "$ci_shard" && "$ci_shard" != "static") ]]; then
   echo "[qa:strict] 不支持的参数: $*"
   print_help
   exit 1
@@ -58,6 +65,20 @@ done
 
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
+
+if [[ -n "$ci_shard" ]]; then
+  if [[ "${GITLAB_CI:-}" != "true" ||
+    "${CI_PROJECT_PATH:-}" != "saurick/plush-toy-erp" ||
+    "${CI_DEFAULT_BRANCH:-}" != "main" ||
+    "${CI_COMMIT_BRANCH:-}" != "main" ||
+    "${CI_COMMIT_REF_PROTECTED:-}" != "true" ||
+    ! "${CI_COMMIT_SHA:-}" =~ ^[0-9a-f]{40}$ ||
+    "$(git rev-parse HEAD)" != "${CI_COMMIT_SHA:-}" ||
+    -n "$(git status --porcelain=v1 --untracked-files=all)" ]]; then
+    echo "[qa:strict] status=incomplete reason=untrusted_ci_shard_context shard=$ci_shard"
+    exit 2
+  fi
+fi
 
 # ROOT_DIR pins the Bash toolchain helper used by this gate and its child scripts.
 # shellcheck source=scripts/lib/bash.sh
@@ -100,6 +121,11 @@ qa_run_stage strict strict_profile qa_strict_profile
 qa_run_stage strict shellcheck qa_strict_shellcheck
 qa_run_stage strict shfmt qa_strict_shfmt
 qa_run_stage strict yamllint qa_strict_yamllint
+
+if [[ "$ci_shard" == "static" ]]; then
+  echo "[qa:strict] shard=static status=complete 严格静态门禁通过"
+  exit 0
+fi
 
 echo "[qa:strict] 单次运行 full 超集基线、零 warning 与扩展浏览器场景"
 QA_FULL_PROFILE=strict \

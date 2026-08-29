@@ -375,7 +375,8 @@ rm -f -- "$secret_file"
 jq -e \
   --arg sha "$release_sha" \
   --arg version "$release_version" \
-  '.schemaVersion == "plush.release-manifest/v1" and
+  '((.schemaVersion == "plush.release-manifest/v1") or
+    (.schemaVersion == "plush.release-manifest/v2")) and
    .passed == true and .gitSha == $sha and .version == $version and
    .strict.status == "passed" and .rollback.databaseDownMigrationAutomatic == false' \
   "$incoming/release-manifest.json" >/dev/null

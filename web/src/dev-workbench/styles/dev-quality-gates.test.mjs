@@ -42,6 +42,15 @@ test('quality gates styles: environment readiness stays page-owned and compact',
   assert.doesNotMatch(css, /^\.ant-alert\s*\{/mu)
 })
 
+test('quality gates styles: R640 evidence stays compact and responsive', () => {
+  assert.match(css, /\.erp-dev-quality-server-evidence/u)
+  assert.match(css, /\.erp-dev-quality-server-evidence__facts/u)
+  assert.match(
+    css,
+    /@media \(max-width: 600px\)[\s\S]*?\.erp-dev-quality-server-evidence__facts[\s\S]*?grid-template-columns:\s*1fr/u
+  )
+})
+
 test('quality gates styles: use project theme tokens instead of missing Ant CSS variables', () => {
   assert.doesNotMatch(css, /--ant-color-/u)
   for (const token of [

@@ -6,9 +6,9 @@
 
 **R640 GitLab 代码真源与 CI/CD + 独立 KVM Runner VM + GitHub 单向 GPT Review 镜像 + GHCR digest 镜像 + GitLab Release 可移植制品 + 本地 loopback Bridge + 固定目标 operation。**
 
-GitLab 和 GitHub 不并列承担 main CI。GitLab 负责 protected main、merge request、`CI Gate`、exact-SHA strict、Generic Package 与 Release；GitHub main 只接收 push mirror，另保留经过独立授权的 `review/gpt/**` 审查快照、审查 CI 和明确应急 release。工作台读取 GitLab 证据，不复制一套 CI 状态机。
+GitLab 和 GitHub 不并列承担 main CI。GitLab 负责 protected main、merge request、七分片 exact-SHA aggregate、`CI Gate`、Generic Package 与 Release；GitHub main 只接收 push mirror，另保留经过独立授权的 `review/gpt/**` 审查快照、审查 CI 和明确应急 release。工作台读取 GitLab 证据，不复制一套 CI 状态机。
 
-仓库内定义不等于目标运行态已经搭建。容器、VM、域名、FRP、Runner、项目设置、变量、mirror、首次 pipeline 和备份定时器仍需分别取得远端写入与部署授权后读回。
+R640 GitLab、KVM Runner、公网入口、protected main 和 mirror 已是实际主链，但仓库定义和历史绿灯都不能代替当前读回。每次结论仍分别绑定当前 pipeline/job、CI evidence Package、Release Package、Runner 配置、backup/restore、目标 operation 与 UAT。
 
 ## 拓扑与职责
 
@@ -51,13 +51,16 @@ GitLab HTTP 只绑定 R640 `127.0.0.1:8929`，由 FRP 到阿里云 `18226`，再
 
 `.gitlab-ci.yml` 是唯一 canonical 编排：
 
-1. `plan` 根据 MR base、push before SHA 或手工范围建立可信 diff，先做 diff/log 检查和 gitleaks，再生成 `ci-plan`。
-2. `quality` 按 plan 准备 Go、Web、Atlas、Chromium 和一次性 PostgreSQL。MR 通常走 affected；main push 对 exact SHA 建 strict terminal；需要完整门禁时走 full。
-3. `CI Gate` 只在 plan 与 quality 都成功时通过，作为 protected main 的稳定 required job。
+1. `plan` 根据 MR base、push before SHA 或手工范围建立可信 diff，先做 diff/log 检查和可信基线 gitleaks，再生成带 digest 的 `ci-plan` / range / trust。
+2. MR 保留 plan-driven affected/full 单 job。main push 先由唯一 `prepare` cache writer 预热 locked pnpm/Playwright/Go 依赖，然后用最多四个 Runner slot 运行 static、Node contracts、Web、Server/PostgreSQL、resource-sensitive、browser 和 security 七个固定分片。browser 只等待同 SHA Web build，其他分片不建人工依赖。
+3. `quality_aggregate` 要求七个回执、阶段并集、分类执行数、source archive、依赖审计、`make data`、Web build digest、PostgreSQL/Chromium/browser 清理全部同 SHA 且通过，再签发标准 v3 strict terminal。
+4. `CI Gate` 只在对应 main aggregate 或 MR quality 成功时通过；main push 还会把 terminal、receipt 和 manifest 固化到 exact pipeline/job/SHA 的 `plush-ci-evidence` Package，作为 protected main 的稳定 required job 和后续 release 唯一可复用证据。
 
 默认 `origin/main` 推送前，本地 `prepare-push` 只执行并签名 clean HEAD/tree、remote/ref/range、git-log、严格 secrets 与源码完整性短门禁，不重复 Runner 的 affected/full、数据库、浏览器、测试或构建。该回执只允许普通非强制 push，不表示 CI 已成功；Release、Package promotion 和任何受保护部署必须读回同一 40 位 SHA 的不可变终态成功 `CI Gate`。生产目标只加载 CI 构建的不可变制品或镜像并执行正式 migration、health/ready 与 smoke，禁止现场重建。
 
-缓存只缩短依赖和浏览器准备时间，不能跳过 checksum、locked install、门禁、source archive 或 clean-tree 读回。pipeline artifacts 是本次运行证据，不等于不可变发布。
+缓存只缩短依赖和浏览器准备时间，不能跳过 checksum、locked/offline install、门禁、source archive 或 clean-tree 读回。分片只 pull cache，不并发回写同一 key。pipeline artifacts 是本次运行内证据；只有 `CI Gate` 上传且经 release 服务器端重新校验的 exact Package 才能跨 pipeline 复用，仍不等于不可变 Release。
+
+性能结论必须把 R640 宿主与 Runner guest 分开，并同时报告冷/热缓存、各 job 时长、关键路径、CPU / 内存 / IO 峰值、p50、波动和近似 p95。7–9 分钟普通 CI 与 10–15 分钟热缓存提交到部署只是阶段目标；若 guest 和宿主仍有实测余量且没有排队、IO 争用、OOM、flaky 或波动扩大，就继续调整 Runner 并发、DAG shard 和各语言测试并行度，冲刺 6–8 分钟与 8–12 分钟，稳定更快也接受。停止条件是资源饱和或复杂度收益明显失衡，不是达到某个时间；完整覆盖、fail-closed、exact-SHA、数据库/浏览器/端口隔离和清理始终不降级。
 
 ### exact-SHA release
 
@@ -66,10 +69,10 @@ release 只能从受保护 main 的 web/API/trigger pipeline 发起，且满足�
 - `RELEASE_SHA == CI_COMMIT_SHA`；
 - customer 固定 `yoyoosun`；
 - 版本号符合固定合同；
-- job 名固定为 `strict`，真实 provenance 为 `gitlab-ci`；
+- 可回读同 SHA 的 protected-main push pipeline、全部分片、`quality_aggregate`、`CI Gate` 与 exact evidence Package；
 - protected environment `release` 与 masked/protected secrets 可用。
 
-`strict` 对该 SHA 生成 v3 terminal，绑定 repository、source archive、policy、workflow、toolchain、migration、dependency lock、客户配置、分类检查数量以及 pipeline ID/IID/job/source/ref。`publish_release` 读取同一 terminal，只构建一次 Server/Web bundle，把镜像推到 `ghcr.io/saurick/plush-toy-erp-{server,web}` 并取得 digest，再上传固定六件制品：
+`publish_release` 从 `plush-ci-evidence` 恢复普通 push CI 的 v3 terminal，其 provenance job 固定为 `quality_aggregate`，不重跑 strict。`plush-release-candidate/artifact-<sha>/candidate.tar` 不存在时才构建一次 Server/Web bundle；后续重试只恢复同一 archive。同一候选包完成 migration、health/ready、smoke、备份恢复、重启恢复和零残留演练，回执在 `plush-release-rehearsal/artifact-<sha>` 冻结。只有这三层 exact 身份通过后，registry publisher 才把候选包内的同一镜像推到 `ghcr.io/saurick/plush-toy-erp-{server,web}` 取得 digest，并生成带演练 digest 的 `plush.release-manifest/v2` 与固定七资产：
 
 1. `checksums.sha256`
 2. `release-artifact.json`
@@ -77,14 +80,15 @@ release 只能从受保护 main 的 web/API/trigger pipeline 发起，且满足�
 4. `sbom.cdx.json`
 5. `server-image.tar`
 6. `web-image.tar`
+7. `release-rehearsal.json`
 
-Generic Package version 与 Release tag 固定为 `artifact-<40sha>`。已存在文件只有 SHA-256 与本地一致时才复用；同名异内容失败关闭。Release、Package、GHCR digest、manifest 和目标 promotion 必须指向同一 SHA。
+Generic Package version 与 Release tag 固定为 `artifact-<40sha>`。已存在文件只有 SHA-256 与冻结候选包一致时才复用；同名异内容、同版本异 SHA、同 SHA 异版本或演练不完整均失败关闭。Release、Package、GHCR digest、manifest、`release-rehearsal.json` 和目标 promotion 必须指向同一 SHA、同一 artifact/rehearsal digest。旧 v1 六资产只允许精确读取、展示、校验和既有回滚点兼容，`promotionEligible=false`；不得补传、重新封装或作为新 promotion 输入。
 
 ## 双 Provider 边界
 
 `scripts/deploy/gitlab-delivery-provider.mjs` 是默认 Provider，固定 GitLab base URL、项目、Generic Package、release tag、pipeline API 和本地下载根。它从服务端环境读取 `PLUSH_GITLAB_TOKEN`，限制 JSON 大小、asset 名、文件大小、URL、SHA、版本和符号链接路径，返回值不含 token。
 
-`scripts/deploy/github-delivery-provider.mjs` 仅在服务端显式设置 `PLUSH_DELIVERY_PROVIDER=github` 时作为应急 fallback。两者实现同一 provider-neutral 合同；浏览器不知道 token，也不能选择 Provider。切换 fallback 是运维决定，不是 UI 参数。
+`scripts/deploy/github-delivery-provider.mjs` 继续读取 GitHub 历史/应急 Release，并把 v1 六资产投影为只读、可回滚但不可 promotion。当前 GitHub emergency workflow 在 checkout、registry 登录、构建和上传前固定失败关闭；只有未来完整支持 canonical v2 七资产与同一演练回执后，才能另行恢复写入。浏览器不知道 token，也不能选择 Provider。
 
 GitLab Jobs API 当前只提供 job 级时间时，工作台展示真实 job 窗口和空 steps，不推算或伪造 GitHub 式 step timing。GitHub 历史/应急运行仍可按原合同展示。
 
@@ -108,9 +112,11 @@ GPT Review 的 finding 是审查输入，不是仓库事实。修复仍回到 Gi
 
 工作台不把本地绿色、GitLab pipeline、GitLab Release、目标 smoke、备份恢复、岗位矩阵或客户 UAT 合成一个“全部完成”。每层单独显示来源与时间；缺失或非法时间显示“未证明”。
 
+`/__dev/quality-gates` 另外读取当前 committed SHA 的 R640 普通 push CI，明确展示 pipeline 与十一个固定 job 耗时。该服务器证据不覆盖 Local dirty 状态或本地 full/strict 回执；只有当前干净 SHA 的 R640 普通 CI 完整通过，质量工程与版本中心才把 `releaseEligible` 提升为真。本地 strict 即使通过也只保留为 Local 回执，不能替代 protected main 证据；未登记只读 token、API 不可达或 SHA 无 push 记录时只显示不可读/缺失，不制造绿色证据。
+
 ## 目标环境与真实数据
 
-`test-133` 仍是当前唯一可执行 target。promotion 只 load/pull 已发布 digest，随后执行固定 preflight、backup、migration、Compose、health/ready、公网 SHA 和资源读回。失败、blocked 或 `not_proven` 不自动重试。
+`test-133` 仍是当前唯一可执行 target，用途固定为 customer-trial。promotion 只 load/pull 已发布 digest，随后执行固定 preflight、backup、migration、Compose、health/ready、公网 SHA 和资源读回。失败、blocked 或 `not_proven` 不自动重试。正式生产必须另有精确 target/environment、数据库、备份、回滚点、入口和 smoke 合同；不得把 133 重命名或默认解释为生产。
 
 甲方开始使用真实数据时，不清空唯一环境后继续混用。推荐：
 
@@ -144,7 +150,7 @@ GitLab 升级固定镜像 digest，遵循官方逐版本路径。升级前固定
 | 仓库定义已实现 | YAML、Provider、脚本、文档和测试合同存在 | GitLab/R640 已部署 |
 | 本地定向测试通过 | 受影响代码合同当前可执行 | Runner、mirror、域名、备份运行正常 |
 | GitLab pipeline 通过 | 固定 SHA 的远端 QA/strict 与 artifact | 目标环境已发布 |
-| Release/Package 完整 | 六件制品、GHCR digest 和 manifest 身份 | migration、health、UAT |
+| Release/Package 完整 | v2 七资产、GHCR digest、manifest 与同一演练回执身份；或明确标记不可 promotion 的 legacy v1 六资产 | migration、health、UAT |
 | target operation passed | 目标制品、migration、运行和公开入口读回 | 客户业务结果与签收 |
 | 客户 UAT | 指定岗位与数据在固定版本的真实使用结果 | 下一版本或其他环境 |
 

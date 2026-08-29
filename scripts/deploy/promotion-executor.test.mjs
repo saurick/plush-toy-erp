@@ -38,6 +38,7 @@ function receipt(overrides = {}) {
     gitSha: SHA,
     version: "2026.07.29-1",
     releaseManifestSha256: HASH,
+    releaseRehearsalSha256: "9".repeat(64),
     promotionFingerprint: "c".repeat(64),
     stage: "passed",
     issueCode: "none",
@@ -106,6 +107,7 @@ const expected = {
   gitSha: SHA,
   version: "2026.07.29-1",
   releaseManifestSha256: HASH,
+  releaseRehearsalSha256: "9".repeat(64),
   promotionFingerprint: "c".repeat(64),
 };
 
@@ -286,6 +288,7 @@ test("promotion executor contains no target build or automatic retry path", () =
   assert.doesNotMatch(source, /["']scp["']/u);
   assert.match(source, /targetWriteStarted: false/u);
   assert.match(source, /automatic retry is disabled/u);
+  assert.match(source, /release-rehearsal[.]json/u);
   const prepareIndex = source.indexOf("prepareCache(");
   const transferTimerIndex = source.indexOf(
     "const transferStartedAt = Date.now()",

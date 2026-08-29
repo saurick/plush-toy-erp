@@ -49,6 +49,17 @@ test("remote promotion builds nothing and never runs automatic down migration", 
   assert.doesNotMatch(source, /atlas\s+migrate\s+down|down[_-]?migration/u);
   assert.match(source, /automaticDownMigration: false/u);
   assert.match(source, /--no-build --pull never/u);
+  assert.match(source, /plush[.]release-manifest\/v2/u);
+  assert.match(source, /rehearsal[.]receiptSha256/u);
+  assert.match(source, /release-rehearsal[.]json/u);
+  assert.match(source, /releaseRehearsalSha256/u);
+  assert.match(source, /release_rehearsal_sha256="[$][{]6:-[}]"/u);
+  assert.match(source, /rehearsal[.]cleanup[.]residualContainers == 0/u);
+  assert.match(source, /artifact[.]releaseVersion == \$release[.]version/u);
+  assert.match(
+    source,
+    /release[.]artifact[.]sourceArchiveSha256 == \$artifact[.]sourceArchive[.]sha256/u,
+  );
 });
 
 test("remote promotion fixes backup migration identity and unknown-outcome behavior", () => {

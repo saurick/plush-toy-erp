@@ -63,6 +63,11 @@ export function validatePromotionManifest(manifest) {
     !SHA256_PATTERN.test(String(manifest?.release?.manifestSha256 || "")) ||
     !SHA256_PATTERN.test(String(manifest?.release?.artifactManifestSha256 || "")) ||
     manifest?.release?.strictStatus !== "passed" ||
+    manifest?.release?.rehearsalStatus !== "passed" ||
+    manifest?.release?.rehearsalReceiptFile !== "release-rehearsal.json" ||
+    !SHA256_PATTERN.test(
+      String(manifest?.release?.rehearsalReceiptSha256 || ""),
+    ) ||
     !Array.isArray(manifest?.release?.images) ||
     manifest.release.images.length !== 2 ||
     !Array.isArray(manifest?.blockers) ||
@@ -118,6 +123,13 @@ export function buildPromotionManifest({
     throw new Error("promotion identity is invalid");
   }
   if (
+    release.schemaVersion !== "plush.release-manifest/v2" ||
+    release.rehearsal?.status !== "passed" ||
+    release.rehearsal?.cleanup?.residualContainers !== 0
+  ) {
+    throw new Error("promotion requires a release v2 rehearsal receipt");
+  }
+  if (
     targetPreflight?.schemaVersion !== "plush.target-preflight/v1" ||
     targetPreflight?.target !== "test-133" ||
     targetPreflight?.customer !== "yoyoosun" ||
@@ -152,6 +164,9 @@ export function buildPromotionManifest({
       sourceArchiveSha256: release.artifact.sourceArchiveSha256,
       strictFingerprint: release.strict.fingerprint,
       strictStatus: release.strict.status,
+      rehearsalReceiptSha256: release.rehearsal.receiptSha256,
+      rehearsalReceiptFile: "release-rehearsal.json",
+      rehearsalStatus: release.rehearsal.status,
       migration: release.migration,
       customerConfig: release.customerConfig,
       images: release.images.map((image) => ({

@@ -39,6 +39,10 @@ jobs:
       strict_artifact_digest: ${{ steps.recover.outputs.strict_artifact_digest }}
       refresh_checks: ${{ steps.recover.outputs.refresh_checks }}
     steps:
+      - name: Fail closed before any emergency release side effect
+        run: |
+          echo "GitHub emergency publication is disabled until it can consume the canonical GitLab rehearsal receipt and publish the v2 seven-asset set."
+          exit 1
       - name: Check out the requested exact SHA without credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -101,6 +105,7 @@ jobs:
               --pattern checksums.sha256 \
               --pattern release-artifact.json \
               --pattern release-manifest.json \
+              --pattern release-rehearsal.json \
               --pattern sbom.cdx.json \
               --pattern server-image.tar \
               --pattern web-image.tar \
@@ -432,6 +437,7 @@ jobs:
           node scripts/deploy/github-release-publisher.mjs \
             --artifact-dir "output/releases/$RELEASE_SHA" \
             --strict-terminal "$terminal" \
+            --rehearsal-receipt "output/releases/$RELEASE_SHA/release-rehearsal.json" \
             --version "$RELEASE_VERSION" \
             --repository "$GITHUB_REPOSITORY" \
             --json
@@ -439,7 +445,7 @@ jobs:
             --dir "output/releases/$RELEASE_SHA" \
             --sha "$RELEASE_SHA" \
             --version "$RELEASE_VERSION"
-      - name: Create or resume a verified draft, then publish it
+      - name: Create a verified empty draft, then publish it
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_SHA: ${{ inputs.sha }}
@@ -491,6 +497,7 @@ jobs:
               --pattern checksums.sha256 \
               --pattern release-artifact.json \
               --pattern release-manifest.json \
+              --pattern release-rehearsal.json \
               --pattern sbom.cdx.json \
               --pattern server-image.tar \
               --pattern web-image.tar \
@@ -498,7 +505,7 @@ jobs:
           }
           compare_release_assets() {
             downloaded_dir="$1"
-            for asset in checksums.sha256 release-artifact.json release-manifest.json sbom.cdx.json server-image.tar web-image.tar; do
+            for asset in checksums.sha256 release-artifact.json release-manifest.json release-rehearsal.json sbom.cdx.json server-image.tar web-image.tar; do
               cmp --silent "$artifact_dir/$asset" "$downloaded_dir/$asset"
             done
           }
@@ -529,7 +536,7 @@ jobs:
           for asset in "${missing[@]}"; do
             [[ -z "$asset" ]] && continue
             case "$asset" in
-              checksums.sha256|release-artifact.json|release-manifest.json|sbom.cdx.json|server-image.tar|web-image.tar) ;;
+              checksums.sha256|release-artifact.json|release-manifest.json|release-rehearsal.json|sbom.cdx.json|server-image.tar|web-image.tar) ;;
               *) echo "[release] unsafe missing asset: $asset"; exit 1 ;;
             esac
             gh release upload "$release_tag" "$artifact_dir/$asset" --repo "$GITHUB_REPOSITORY"

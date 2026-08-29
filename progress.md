@@ -258,3 +258,15 @@
 - 真源 / 逻辑：客户和供应商档案只提供新单默认值，订单与出货保存各自冻结快照；销售金额由后端按明细唯一计算，草稿允许价格暂缺但提交 / 生效前必须完整；实际运费只属于出货事实，不自动生成应付、付款或其他财务事实。来源切换、取消税率和不需要发票时同步清理依赖残值，历史记录缺值保持未填写，不猜测回填。
 - Schema / 文档：新增一条仅增加可空列与约束的 Atlas migration，完成 Ent 生成、`atlas.sum`、数据字典、业务公式、订单采购与主数据边界文档同步；migration 尚未连接或 apply 任何数据库，也未发布或部署。
 - 验证 / 边界：Go `internal/biz`、`internal/service`、`internal/data` 定向包，前端 Node `130 / 130`、目标 ESLint、Schema / 文档 `7 / 7`、Vite production build（`3391` modules）、`make data`、`scripts/qa/db-guard.sh` 与 `git diff --check` 通过。当前无可复用本地运行服务，未做真实浏览器回归；高成本 full / strict、Style L1、PostgreSQL migration smoke、客户 UAT 均未执行，也未 stage、commit 或 push。
+
+### R640 CI DAG 与不可变发布复用收口（2026-08-29）
+
+- 性能根因：优化前 R640 普通 main pipeline 的关键路径是单个 `quality` job，两个连续样本约为 13.5 分钟，其中 quality 约 13.1–13.4 分钟；Node contracts、resource-sensitive、Server/PostgreSQL、Web 和 browser 虽有独立资源边界，仍被单 job 串行包装。
+- CI 合同：main push 改为 `plan → prepare → 七分片 DAG → quality_aggregate → CI Gate`。七个分片精确覆盖 static、Node、Web、Server/PostgreSQL、resource-sensitive、browser 和 security；仍要求全阶段并集、非零执行、零 skip、source archive、依赖审计、`make data`、Web build digest 和 PostgreSQL/Chromium/browser 清理读回。MR 保留 affected，不为提速减少测试。
+- 资源与缓存：Runner 重建合同固定 12 vCPU、24 GiB、`concurrent=4` 与单 runner `limit=4`；`prepare` 是唯一 cache writer，分片只 pull。PostgreSQL 使用 pipeline/job 唯一容器与动态 loopback 端口，Chromium sandbox 按 job 唯一并通过固定 root helper 清理，browser 仍使用跨 checkout 锁。任一资源读回失败都不生成绿色 aggregate。
+- 性能停止条件：7–9 分钟普通 CI 与 10–15 分钟热缓存提交到部署只作为稳健阶段目标；后续实测必须区分 R640 宿主和 Runner guest，覆盖冷/热缓存、job、关键路径、CPU/内存/IO 峰值、p50、波动和近似 p95。若资源仍有余量就继续冲刺 6–8 分钟与 8–12 分钟；只有饱和、排队/IO 争用、OOM、flaky、波动扩大或复杂度收益失衡才停，不以减测、放宽门禁或伪缓存换速度。
+- 发布去重：普通 push `CI Gate` 将 terminal、receipt 和 manifest 固化到 exact pipeline/job/SHA 的 `plush-ci-evidence` Package；release 服务器端重新校验 protected main 和全部 DAG jobs 后直接复用，不重跑 strict。同 SHA 仅首次构建五件候选制品并冻结为 `candidate.tar`；演练复用同一 bytes，回执另行冻结，最后的 v2 Release manifest 同时绑定 CI、artifact、rehearsal 和 GHCR digest。promotion、rollback 和 database rebuild 不回到测试或构建。
+- 七资产兼容：新 publication 与新 promotion 固定为 `plush.release-manifest/v2` 七资产，必须校验、传递并在目标归档 manifest 绑定的同一 `release-rehearsal.json`；目标只验证、load 和运行检查，不重建。旧 v1 六资产只保留精确读取、展示、校验和既有回滚点兼容，`promotionEligible=false`，不得补传、重封装或进入新 promotion；GitHub emergency 在完整接线前于任何副作用前失败关闭。
+- 工作台与边界：质量工程页面单独展示当前 committed SHA 的 R640 普通 push CI 和 job 耗时，Local dirty/本地回执仍分层；版本中心仍只读取真实 GitLab pipeline、不可变 Release/Package 和 target operation。`test-133` 仍只是 customer-trial，不能冒充正式生产；当前 pipeline 耗时、版本、制品 digest、演练、目标部署和 UAT 必须从各自回执读取，不由本过程记录宣称。
+- 当前目标边界：固定只读 `target-preflight --target test-133` 的最近证据是远端目标身份与合同不匹配，因此在重新读回并定位 config、数据库、版本或目标身份漂移前，不对 133 seed、reset 或 promotion。该阻断不把 133 升格为生产，也不替代继续从正式 registry 识别独立生产 target。
+- 安全处置：运行态诊断期间对 Runner 认证信息可能进入工具输出的情形按泄露处理，旧 token 已失效并完成无回显轮换。后续诊断只读取脱敏身份和状态，不输出 token 值。

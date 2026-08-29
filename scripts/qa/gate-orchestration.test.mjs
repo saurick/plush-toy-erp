@@ -628,3 +628,37 @@ test("full overlaps only independent shared, Web and Server stages", () => {
   assert.match(full, /run-node-tests\.mjs" --profile resource_sensitive/u);
   assert.match(full, /QA_FAST_GATE_PROFILE="\$full_profile"/u);
 });
+
+test("GitLab quality shards are fixed, trusted and preserve every strict stage", () => {
+  const full = read("scripts/qa/full.sh");
+  const strict = read("scripts/qa/strict.sh");
+  assert.match(
+    full,
+    /--ci-shard node\|web\|server\|resource\|browser\|security/u,
+  );
+  assert.match(full, /untrusted_ci_shard_context/u);
+  assert.match(full, /dirty_ci_shard/u);
+  for (const contract of [
+    ["node", "secrets", "shared"],
+    ["web", "web"],
+    ["server", "environment_profile", "server", "critical_postgres"],
+    ["resource", "resource_sensitive_node"],
+    ["browser", "browser"],
+    ["security", "govulncheck"],
+  ]) {
+    const [shard, ...stages] = contract;
+    const body = full.match(
+      new RegExp(`${shard}\\)\\n([\\s\\S]*?)(?=\\n[a-z]+\\)|\\n""\\))`, "u"),
+    )?.[1];
+    assert.ok(body, `missing ${shard} shard`);
+    for (const stage of stages) {
+      assert.match(body, new RegExp(`qa_run_stage strict ${stage}`, "u"));
+    }
+  }
+  assert.match(strict, /--ci-shard static/u);
+  assert.match(strict, /untrusted_ci_shard_context/u);
+  assert.match(strict, /qa_run_stage strict strict_profile/u);
+  assert.match(strict, /qa_run_stage strict shellcheck/u);
+  assert.match(strict, /qa_run_stage strict shfmt/u);
+  assert.match(strict, /qa_run_stage strict yamllint/u);
+});
