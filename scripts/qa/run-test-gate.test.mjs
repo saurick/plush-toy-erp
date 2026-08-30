@@ -18,11 +18,25 @@ const passingNodeSummary = [
 ].join("\n");
 
 test("test gate preserves child failure before summary proof", () => {
-  assert.deepEqual(evaluateTestGate({ kind: "node", status: 7, stdout: passingNodeSummary }), {
-    ok: false,
-    reason: "child-exit",
-    exitCode: 7,
-  });
+  assert.deepEqual(
+    evaluateTestGate({ kind: "node", status: 7, stdout: passingNodeSummary }),
+    {
+      ok: false,
+      reason: "child-exit",
+      exitCode: 7,
+      result: {
+        ok: true,
+        tests: 1,
+        pass: 1,
+        fail: 0,
+        cancelled: 0,
+        skipped: 0,
+        todo: 0,
+        missing: [],
+        duplicate: [],
+      },
+    },
+  );
 });
 
 test("test gate accepts a successful Node summary", () => {
@@ -148,6 +162,51 @@ test("test gate accepts one valid Go exclusion option and rejects unsafe variant
         "go",
       ]),
     /valid regex/u,
+  );
+});
+
+test("test gate accepts only one declared output mode", () => {
+  const parsed = parseArgs([
+    "--kind",
+    "node",
+    "--label",
+    "web-all",
+    "--output-mode",
+    "summary",
+    "--",
+    "node",
+    "--test",
+  ]);
+  assert.equal(parsed.outputMode, "summary");
+  assert.throws(
+    () =>
+      parseArgs([
+        "--kind",
+        "node",
+        "--label",
+        "web-all",
+        "--output-mode",
+        "summary",
+        "--output-mode",
+        "full",
+        "--",
+        "node",
+      ]),
+    /provided only once/u,
+  );
+  assert.throws(
+    () =>
+      parseArgs([
+        "--kind",
+        "node",
+        "--label",
+        "web-all",
+        "--output-mode",
+        "quiet",
+        "--",
+        "node",
+      ]),
+    /must be full or summary/u,
   );
 });
 

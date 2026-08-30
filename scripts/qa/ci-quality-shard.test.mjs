@@ -62,3 +62,11 @@ test("browser-bearing shards materialize and clean the verified runtime", () => 
     /\["server", "browser"\][.]includes\(shard\)/u,
   );
 });
+
+test("Node and Web shards install the cached Web dependencies offline", () => {
+  assert.match(source, /\["node", "web"\][.]includes\(shard\)/u);
+  assert.match(
+    source,
+    /\["--dir", "web", "install", "--frozen-lockfile", "--offline"\]/u,
+  );
+});

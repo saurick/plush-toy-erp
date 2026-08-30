@@ -88,31 +88,49 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   assert.match(workflow, /ci-playwright-runtime[.]mjs seed/u);
   assert.match(workflow, /ci-playwright-runtime[.]mjs materialize/u);
   assert.match(workflow, /ci-playwright-runtime[.]mjs cleanup/u);
-  const cacheKeyBlocks = [
-    ...workflow.matchAll(
-      /^ {4}key:\n {6}prefix: ([^\n]+)\n {6}files:\n((?: {8}- [^\n]+\n)+)/gmu,
+  assert.match(
+    workflow,
+    new RegExp(
+      `^[.]pnpm_cache_pull: &pnpm_cache_pull\\n  cache:\\n    - &pnpm_cache_entry\\n      key:\\n        prefix: r640-node-${nodeVersion}-pnpm-v1\\n        files:\\n          - web/pnpm-lock[.]yaml\\n      paths:\\n        - output/cache/gitlab/pnpm-store/\\n      policy: pull`,
+      "mu",
     ),
-  ];
-  assert.equal(cacheKeyBlocks.length, 2);
-  for (const [, prefix, fileRows] of cacheKeyBlocks) {
-    assert.equal(prefix, `r640-node-${nodeVersion}-playwright-v2`);
-    assert.deepEqual(
-      [...fileRows.matchAll(/^ {8}- ([^\n]+)$/gmu)].map(([, file]) => file),
-      ["scripts/qa/ci-playwright-runtime.mjs", "web/pnpm-lock.yaml"],
-    );
-  }
+  );
+  assert.match(
+    workflow,
+    new RegExp(
+      `^[.]browser_cache_pull: &browser_cache_pull\\n  cache:\\n    - \\*pnpm_cache_entry\\n    - &playwright_cache_entry\\n      key:\\n        prefix: r640-node-${nodeVersion}-playwright-v3\\n        files:\\n          - scripts/qa/ci-playwright-runtime[.]mjs\\n          - web/pnpm-lock[.]yaml\\n      paths:\\n        - output/cache/gitlab/playwright-runtime/\\n      policy: pull`,
+      "mu",
+    ),
+  );
+  assert.match(
+    workflow,
+    /prepare:[\s\S]+?cache:\n    - <<: \*pnpm_cache_entry\n      policy: pull-push\n    - <<: \*playwright_cache_entry\n      policy: pull-push/u,
+  );
   assert.match(workflow, /policy: pull-push/u);
   assert.match(workflow, /policy: pull/u);
-  for (const shard of ["web", "server", "browser"]) {
+  for (const shard of ["node", "web"]) {
     assert.match(
       workflow,
       new RegExp(
-        `^quality_${shard}:\\n  <<: \\[\\*quality_shard, \\*cache_pull\\]`,
+        `^quality_${shard}:\\n  <<: \\[\\*quality_shard, \\*pnpm_cache_pull\\]`,
         "mu",
       ),
     );
   }
-  for (const shard of ["static", "node", "resource", "security"]) {
+  for (const shard of ["server", "browser"]) {
+    assert.match(
+      workflow,
+      new RegExp(
+        `^quality_${shard}:\\n  <<: \\[\\*quality_shard, \\*browser_cache_pull\\]`,
+        "mu",
+      ),
+    );
+  }
+  assert.match(
+    workflow,
+    /^quality_affected:\n  stage: quality\n  <<: \*browser_cache_pull/mu,
+  );
+  for (const shard of ["static", "resource", "security"]) {
     assert.match(
       workflow,
       new RegExp(`^quality_${shard}:\\n  <<: \\*quality_shard`, "mu"),

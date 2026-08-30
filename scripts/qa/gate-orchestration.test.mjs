@@ -422,7 +422,11 @@ test("fixed full and strict gates cannot disappear behind file or package probes
   );
   assert.match(
     full,
-    /--kind go --label server-all\s+\\\s+--exclude-skip-pattern "\$CRITICAL_POSTGRES_TEST_PATTERN" --/u,
+    /--kind go --label server-all\s+\\\s+--exclude-skip-pattern "\$CRITICAL_POSTGRES_TEST_PATTERN"\s+\\\s+"\$\{test_gate_output_args\[@\]\}" --/u,
+  );
+  assert.match(
+    full,
+    /if \[\[ -n "\$ci_shard" \]\]; then\s+test_gate_output_args=\(--output-mode summary\)/u,
   );
   assert.match(
     full,

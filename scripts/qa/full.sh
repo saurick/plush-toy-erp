@@ -69,6 +69,11 @@ full | strict) ;;
   ;;
 esac
 
+test_gate_output_args=()
+if [[ -n "$ci_shard" ]]; then
+  test_gate_output_args=(--output-mode summary)
+fi
+
 for variable in QA_GATE_COVERAGE_RECEIPT QA_GATE_ORCHESTRATOR; do
   if [[ -n "${!variable:-}" ]]; then
     echo "[qa:full] status=incomplete reason=forbidden_coverage variable=$variable"
@@ -189,7 +194,7 @@ qa_full_web() {
   fi
   qa_run_substep "$full_profile" web web_test \
     node "$ROOT_DIR/scripts/qa/run-test-gate.mjs" \
-    --kind node --label web-all -- \
+    --kind node --label web-all "${test_gate_output_args[@]}" -- \
     "$PNPM_BIN" test --test-reporter=tap
   qa_run_substep "$full_profile" web production_build \
     env NODE_ENV=production "$PNPM_BIN" build
@@ -242,7 +247,8 @@ qa_full_server() {
   ERP_PDF_CHROMIUM_INTEGRATION=1 \
     node "$ROOT_DIR/scripts/qa/run-test-gate.mjs" \
     --kind go --label server-all \
-    --exclude-skip-pattern "$CRITICAL_POSTGRES_TEST_PATTERN" -- \
+    --exclude-skip-pattern "$CRITICAL_POSTGRES_TEST_PATTERN" \
+    "${test_gate_output_args[@]}" -- \
     go test -count=1 -json -skip "$CRITICAL_POSTGRES_TEST_PATTERN" ./...
   make build
 }

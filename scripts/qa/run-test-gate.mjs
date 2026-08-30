@@ -16,16 +16,29 @@ export function evaluateTestGate({
   excludedSkipPattern = "",
 }) {
   if (error) throw error;
-  if (status !== 0) {
-    return { ok: false, reason: "child-exit", exitCode: status ?? 1 };
+  let result = null;
+  try {
+    result =
+      kind === "node"
+        ? verifyNodeTestSummary(`${stdout}\n${stderr}`)
+        : kind === "go"
+          ? verifyGoTestJson(stdout, [], { excludedSkipPattern })
+          : null;
+  } catch (summaryError) {
+    if (status !== 0) {
+      return { ok: false, reason: "child-exit", exitCode: status ?? 1 };
+    }
+    throw summaryError;
   }
-  const result =
-    kind === "node"
-      ? verifyNodeTestSummary(`${stdout}\n${stderr}`)
-      : kind === "go"
-        ? verifyGoTestJson(stdout, [], { excludedSkipPattern })
-        : null;
   if (!result) throw new Error(`unsupported test kind: ${kind}`);
+  if (status !== 0) {
+    return {
+      ok: false,
+      reason: "child-exit",
+      exitCode: status ?? 1,
+      result,
+    };
+  }
   return { ok: result.ok, reason: result.ok ? "complete" : "invalid-summary", result };
 }
 
@@ -42,8 +55,14 @@ export function formatIncompleteSummary(kind, result) {
 export function parseArgs(argv) {
   const separator = argv.indexOf("--");
   if (separator < 0) throw new Error("expected -- before the test command");
-  const options = { kind: "", label: "", excludedSkipPattern: "" };
+  const options = {
+    kind: "",
+    label: "",
+    excludedSkipPattern: "",
+    outputMode: "full",
+  };
   let excludedSkipPatternSeen = false;
+  let outputModeSeen = false;
   for (let index = 0; index < separator; index += 1) {
     const arg = argv[index];
     if (arg === "--kind" || arg === "--label") {
@@ -64,12 +83,27 @@ export function parseArgs(argv) {
       excludedSkipPatternSeen = true;
       continue;
     }
+    if (arg === "--output-mode") {
+      if (outputModeSeen) {
+        throw new Error("--output-mode may be provided only once");
+      }
+      const value = argv[++index];
+      if (!value || index >= separator) {
+        throw new Error("--output-mode requires a value");
+      }
+      options.outputMode = value;
+      outputModeSeen = true;
+      continue;
+    }
     throw new Error(`unsupported argument: ${arg}`);
   }
   if (!new Set(["node", "go"]).has(options.kind)) {
     throw new Error("--kind must be node or go");
   }
   if (!options.label) throw new Error("--label is required");
+  if (!new Set(["full", "summary"]).has(options.outputMode)) {
+    throw new Error("--output-mode must be full or summary");
+  }
   if (excludedSkipPatternSeen && options.kind !== "go") {
     throw new Error("--exclude-skip-pattern is supported only for --kind go");
   }
@@ -110,7 +144,9 @@ async function main() {
     env: process.env,
     maxBuffer: 256 * 1024 * 1024,
   });
-  await emitCapturedOutput(child);
+  if (options.outputMode === "full") {
+    await emitCapturedOutput(child);
+  }
   const outcome = evaluateTestGate({
     kind: options.kind,
     status: child.status,

@@ -350,7 +350,7 @@ export async function runCiQualityShard({
     webBuildSha256: null,
   };
   try {
-    if (shard === "web") {
+    if (["node", "web"].includes(shard)) {
       await runProcess("pnpm", ["--dir", "web", "install", "--frozen-lockfile", "--offline"], {
         cwd: root,
         env: childEnv,

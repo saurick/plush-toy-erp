@@ -45,17 +45,29 @@ variables:
   GIT_STRATEGY: fetch
   GIT_DEPTH: "0"
 
-.cache_pull: &cache_pull
+.pnpm_cache_pull: &pnpm_cache_pull
   cache:
-    key:
-      prefix: r640-node-24.14.0-playwright-v2
-      files:
-        - scripts/qa/ci-playwright-runtime.mjs
-        - web/pnpm-lock.yaml
-    paths:
-      - output/cache/gitlab/pnpm-store/
-      - output/cache/gitlab/playwright-runtime/
-    policy: pull
+    - &pnpm_cache_entry
+      key:
+        prefix: r640-node-24.14.0-pnpm-v1
+        files:
+          - web/pnpm-lock.yaml
+      paths:
+        - output/cache/gitlab/pnpm-store/
+      policy: pull
+
+.browser_cache_pull: &browser_cache_pull
+  cache:
+    - *pnpm_cache_entry
+    - &playwright_cache_entry
+      key:
+        prefix: r640-node-24.14.0-playwright-v3
+        files:
+          - scripts/qa/ci-playwright-runtime.mjs
+          - web/pnpm-lock.yaml
+      paths:
+        - output/cache/gitlab/playwright-runtime/
+      policy: pull
 
 .main_quality_rules: &main_quality_rules
   rules:
@@ -154,15 +166,10 @@ prepare:
       artifacts: false
   <<: *main_quality_rules
   cache:
-    key:
-      prefix: r640-node-24.14.0-playwright-v2
-      files:
-        - scripts/qa/ci-playwright-runtime.mjs
-        - web/pnpm-lock.yaml
-    paths:
-      - output/cache/gitlab/pnpm-store/
-      - output/cache/gitlab/playwright-runtime/
-    policy: pull-push
+    - <<: *pnpm_cache_entry
+      policy: pull-push
+    - <<: *playwright_cache_entry
+      policy: pull-push
   script:
     - |
       set -euo pipefail
@@ -195,7 +202,7 @@ quality_static:
       - output/ci/shards/static.json
 
 quality_node:
-  <<: *quality_shard
+  <<: [*quality_shard, *pnpm_cache_pull]
   needs:
     - job: plan
       artifacts: true
@@ -210,7 +217,7 @@ quality_node:
       - output/ci/shards/node.json
 
 quality_web:
-  <<: [*quality_shard, *cache_pull]
+  <<: [*quality_shard, *pnpm_cache_pull]
   needs:
     - job: plan
       artifacts: true
@@ -226,7 +233,7 @@ quality_web:
       - web/build/
 
 quality_server:
-  <<: [*quality_shard, *cache_pull]
+  <<: [*quality_shard, *browser_cache_pull]
   needs:
     - job: plan
       artifacts: true
@@ -256,7 +263,7 @@ quality_resource:
       - output/ci/shards/resource.json
 
 quality_browser:
-  <<: [*quality_shard, *cache_pull]
+  <<: [*quality_shard, *browser_cache_pull]
   needs:
     - job: plan
       artifacts: true
@@ -320,7 +327,7 @@ quality_aggregate:
 
 quality_affected:
   stage: quality
-  <<: *cache_pull
+  <<: *browser_cache_pull
   needs:
     - job: plan
       artifacts: true

@@ -27,6 +27,14 @@ test('shared DEV delivery route serves the validated fixture without live target
   assert.equal(registeredPattern, '**/__dev/api/delivery/summary')
   assert.equal(typeof registeredHandler, 'function')
   assert.deepEqual(summary, createVersionCenterSummary())
+  assert.deepEqual(summary.releaseVersionPolicy, {
+    schemaVersion: 'plush.release-version-catalog/v1',
+    timeZone: 'Asia/Shanghai',
+    date: '2026.08.09',
+    nextVersion: '2026.08.09-1',
+    officialVersionCount: 14,
+    dateVersionCount: 0,
+  })
 
   let response = null
   await registeredHandler({

@@ -212,6 +212,14 @@ export function createVersionCenterSummary() {
     schemaVersion: 'plush.dev-delivery-summary/v1',
     status: 'success',
     generatedAt: '2026-08-09T02:00:00.000Z',
+    releaseVersionPolicy: {
+      schemaVersion: 'plush.release-version-catalog/v1',
+      timeZone: 'Asia/Shanghai',
+      date: '2026.08.09',
+      nextVersion: '2026.08.09-1',
+      officialVersionCount: versions.length,
+      dateVersionCount: 0,
+    },
     repository: {
       commit: versions[0].gitSha,
       dirty: false,
