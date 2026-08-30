@@ -282,6 +282,102 @@ function normalizeSha256(value, field) {
   return normalized;
 }
 
+function readImageArchiveJson(archivePath, member, repoRoot, runCommand) {
+  const raw = runCommand({
+    command: "tar",
+    args: ["-xOf", archivePath, member],
+    cwd: repoRoot,
+    label: `read image archive member ${member}`,
+  });
+  try {
+    return { raw, value: JSON.parse(raw) };
+  } catch {
+    throw new ReleaseArtifactError(
+      `image archive member is not JSON: ${member}`,
+    );
+  }
+}
+
+export function inspectPortableImageArchiveIdentity(
+  archivePath,
+  image,
+  repoRoot,
+  runCommand = runArtifactCommand,
+) {
+  const dockerManifest = readImageArchiveJson(
+    archivePath,
+    "manifest.json",
+    repoRoot,
+    runCommand,
+  ).value;
+  const entry =
+    Array.isArray(dockerManifest) && dockerManifest.length === 1
+      ? dockerManifest[0]
+      : null;
+  const configPath = String(entry?.Config || "");
+  const configMatch = configPath.match(/^blobs\/sha256\/([0-9a-f]{64})$/u);
+  const configDigest = configMatch ? `sha256:${configMatch[1]}` : "";
+  if (
+    !configMatch ||
+    !Array.isArray(entry?.RepoTags) ||
+    entry.RepoTags.length !== 1 ||
+    entry.RepoTags[0] !== image.ref ||
+    (image.contentId !== undefined && image.contentId !== configDigest)
+  ) {
+    throw new ReleaseArtifactError(
+      `${image.kind} image archive tag or config identity is invalid`,
+    );
+  }
+  const archiveConfig = readImageArchiveJson(
+    archivePath,
+    configPath,
+    repoRoot,
+    runCommand,
+  );
+  if (sha256Buffer(archiveConfig.raw) !== configMatch[1]) {
+    throw new ReleaseArtifactError(
+      `${image.kind} image archive config checksum does not match`,
+    );
+  }
+  const index = readImageArchiveJson(
+    archivePath,
+    "index.json",
+    repoRoot,
+    runCommand,
+  ).value;
+  const manifestDigest =
+    index?.schemaVersion === 2 && index?.manifests?.length === 1
+      ? String(index.manifests[0]?.digest || "")
+      : "";
+  if (
+    !IMAGE_ID_PATTERN.test(manifestDigest) ||
+    (image.archive?.manifestDigest !== undefined &&
+      image.archive.manifestDigest !== manifestDigest)
+  ) {
+    throw new ReleaseArtifactError(
+      `${image.kind} image archive manifest identity is invalid`,
+    );
+  }
+  const manifestMember = `blobs/sha256/${manifestDigest.slice("sha256:".length)}`;
+  const archiveManifest = readImageArchiveJson(
+    archivePath,
+    manifestMember,
+    repoRoot,
+    runCommand,
+  );
+  if (
+    sha256Buffer(archiveManifest.raw) !==
+      manifestDigest.slice("sha256:".length) ||
+    archiveManifest.value?.schemaVersion !== 2 ||
+    archiveManifest.value?.config?.digest !== configDigest
+  ) {
+    throw new ReleaseArtifactError(
+      `${image.kind} image archive manifest does not bind the config identity`,
+    );
+  }
+  return { configDigest, manifestDigest };
+}
+
 function writeJSON(filePath, value) {
   writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, {
     mode: 0o600,
@@ -674,6 +770,7 @@ async function imageArtifact({
   outputDir,
   runCommand,
   streamArchive,
+  inspectArchiveIdentity,
 }) {
   runCommand({
     command: "docker",
@@ -688,10 +785,25 @@ async function imageArtifact({
   const tarPath = path.join(outputDir, tarFile);
   const { saveDurationMs, compressionDurationMs, uncompressedSizeBytes } =
     await streamArchive({ fixedRef, tarPath, repoRoot });
+  const archiveIdentity = inspectArchiveIdentity(
+    tarPath,
+    { kind, ref: fixedRef },
+    repoRoot,
+    runCommand,
+  );
+  if (
+    ![archiveIdentity.configDigest, archiveIdentity.manifestDigest].includes(
+      image.Id,
+    )
+  ) {
+    throw new ReleaseArtifactError(
+      `${kind} local image identity does not match its portable archive`,
+    );
+  }
   return {
     kind,
     ref: fixedRef,
-    contentId: image.Id,
+    contentId: archiveIdentity.configDigest,
     platform: `${image.Os}/${image.Architecture}`,
     gitSha: commit,
     releaseVersion,
@@ -705,6 +817,7 @@ async function imageArtifact({
       compressionLevel: IMAGE_ARCHIVE_COMPRESSION_LEVEL,
       compressionDurationMs,
       uncompressedSizeBytes,
+      manifestDigest: archiveIdentity.manifestDigest,
     },
     metadataSecretScan,
   };
@@ -778,6 +891,9 @@ export function assertReleaseArtifactManifest(manifest) {
   for (const image of manifest.images) {
     assertPlainRelativeFile(image?.archive?.file, "image archive file");
     const compression = image?.archive?.compression;
+    const optionalManifestDigest =
+      image?.archive?.manifestDigest === undefined ||
+      IMAGE_ID_PATTERN.test(String(image.archive.manifestDigest));
     const compressionEvidenceValid =
       compression === undefined
         ? image?.archive?.compressionLevel === undefined &&
@@ -805,6 +921,7 @@ export function assertReleaseArtifactManifest(manifest) {
         (!Number.isSafeInteger(image.archive.saveDurationMs) ||
           image.archive.saveDurationMs < 0)) ||
       !compressionEvidenceValid ||
+      !optionalManifestDigest ||
       image?.metadataSecretScan?.passed !== true
     ) {
       throw new ReleaseArtifactError(
@@ -866,6 +983,9 @@ export async function buildReleaseArtifact(options = {}, runtime = {}) {
   mkdirSync(temporaryDir, { mode: 0o700 });
   const runCommand = runtime.runCommand || runArtifactCommand;
   const streamArchive = runtime.streamImageArchive || streamImageArchive;
+  const inspectArchiveIdentity =
+    runtime.inspectPortableImageArchiveIdentity ||
+    inspectPortableImageArchiveIdentity;
   try {
     const createdAt = new Date().toISOString();
     const migration = buildMigrationEvidence({
@@ -914,6 +1034,7 @@ export async function buildReleaseArtifact(options = {}, runtime = {}) {
         outputDir: temporaryDir,
         runCommand,
         streamArchive,
+        inspectArchiveIdentity,
       }),
       await imageArtifact({
         kind: "web",
@@ -925,6 +1046,7 @@ export async function buildReleaseArtifact(options = {}, runtime = {}) {
         outputDir: temporaryDir,
         runCommand,
         streamArchive,
+        inspectArchiveIdentity,
       }),
     ];
     const manifest = assertReleaseArtifactManifest({

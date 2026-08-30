@@ -49,6 +49,10 @@ const manifest = {
       file: `${kind}.tar`,
       sha256: "f".repeat(64),
       sizeBytes: 1,
+      manifestDigest: `sha256:${kind === "server" ? "3" : "4"}`.padEnd(
+        71,
+        kind === "server" ? "3" : "4",
+      ),
     },
     metadataSecretScan: { passed: true },
   })),
@@ -161,10 +165,7 @@ test("local release rehearsal environment binds isolated database fixed images a
   assert.equal(built.values.WEB_IMAGE, `plush-toy-erp-web:yoyoosun-${commit}`);
   assert.equal(built.values.POSTGRES_IMAGE, "postgres:18.1");
   assert.equal(built.values.POSTGRES_APP_PASSWORD, "app-password");
-  assert.equal(
-    built.values.POSTGRES_MIGRATOR_PASSWORD,
-    "migrator-password",
-  );
+  assert.equal(built.values.POSTGRES_MIGRATOR_PASSWORD, "migrator-password");
   assert.equal(built.values.POSTGRES_BACKUP_PASSWORD, "backup-password");
   assert.equal(built.values.JAEGER_IMAGE, "jaegertracing/all-in-one:1.76.0");
   assert.equal(built.values.ERP_DEBUG_ENV, "prod");
@@ -313,7 +314,8 @@ test("local release rehearsal bootstraps admin only through a verified no-port o
           context.project,
           "app-server",
           manifest.images.find((item) => item.kind === "server").ref,
-          manifest.images.find((item) => item.kind === "server").contentId,
+          manifest.images.find((item) => item.kind === "server").archive
+            .manifestDigest,
           runCall.args[runCall.args.indexOf("--label") + 1].split("=")[1],
           "true",
           "0",

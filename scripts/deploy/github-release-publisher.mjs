@@ -71,15 +71,19 @@ function inspectImage(root, ref, run = runCommand) {
   return parsed[0];
 }
 
-function assertLoadedImage(image, source, gitSha, releaseVersion) {
+export function assertLoadedImage(image, source, gitSha, releaseVersion) {
   const embeddedSha = (image?.Config?.Env || [])
     .find((item) => item.startsWith("GIT_SHA="))
     ?.slice("GIT_SHA=".length);
   const embeddedReleaseVersion = (image?.Config?.Env || [])
     .find((item) => item.startsWith("RELEASE_VERSION="))
     ?.slice("RELEASE_VERSION=".length);
+  const allowedImageIds = [
+    source.contentId,
+    source.archive?.manifestDigest,
+  ].filter(Boolean);
   if (
-    image?.Id !== source.contentId ||
+    !allowedImageIds.includes(image?.Id) ||
     image?.Os !== "linux" ||
     image?.Architecture !== "amd64" ||
     embeddedSha !== gitSha ||
@@ -181,10 +185,7 @@ export function publishGitHubReleaseArtifact(
     readFileSync(path.resolve(root, strictTerminalPath), "utf8"),
   );
   const gitSha = artifactManifest.git.commit;
-  const resolvedRehearsalReceiptPath = path.resolve(
-    root,
-    rehearsalReceiptPath,
-  );
+  const resolvedRehearsalReceiptPath = path.resolve(root, rehearsalReceiptPath);
   if (
     resolvedRehearsalReceiptPath !==
     path.join(resolvedArtifactDir, "release-rehearsal.json")

@@ -3,7 +3,10 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
-import { parseDockerPushDigest } from "./github-release-publisher.mjs";
+import {
+  assertLoadedImage,
+  parseDockerPushDigest,
+} from "./github-release-publisher.mjs";
 
 test("GitHub publisher extracts one immutable digest from docker push", () => {
   assert.equal(
@@ -34,6 +37,32 @@ digest: sha256:${"b".repeat(64)}
 `,
       ),
     /one immutable digest/u,
+  );
+});
+
+test("GitHub publisher accepts the same archive manifest identity on a containerd image store", () => {
+  const gitSha = "a".repeat(40);
+  const releaseVersion = "2026.08.31-2";
+  const manifestDigest = `sha256:${"b".repeat(64)}`;
+  const source = {
+    kind: "server",
+    contentId: `sha256:${"c".repeat(64)}`,
+    archive: { manifestDigest },
+  };
+  assert.doesNotThrow(() =>
+    assertLoadedImage(
+      {
+        Id: manifestDigest,
+        Os: "linux",
+        Architecture: "amd64",
+        Config: {
+          Env: [`GIT_SHA=${gitSha}`, `RELEASE_VERSION=${releaseVersion}`],
+        },
+      },
+      source,
+      gitSha,
+      releaseVersion,
+    ),
   );
 });
 

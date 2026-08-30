@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import { spawn } from "node:child_process";
 import {
   existsSync,
@@ -20,6 +21,7 @@ import {
   buildCustomerConfigEvidence,
   buildDependencySbom,
   buildMigrationEvidence,
+  inspectPortableImageArchiveIdentity,
   parseReleaseArtifactArgs,
   resolveReleaseOutput,
   streamImageArchive,
@@ -217,6 +219,51 @@ test("release image archive aborts docker and removes partial output when zstd f
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("portable image identity is derived from the archive config, not the local image store id", () => {
+  const config = JSON.stringify({ architecture: "amd64", os: "linux" });
+  const configDigest = `sha256:${crypto
+    .createHash("sha256")
+    .update(config)
+    .digest("hex")}`;
+  const manifest = JSON.stringify({
+    schemaVersion: 2,
+    config: { digest: configDigest },
+  });
+  const manifestDigest = `sha256:${crypto
+    .createHash("sha256")
+    .update(manifest)
+    .digest("hex")}`;
+  const image = { kind: "server", ref: `example/server:${commit}` };
+  const members = new Map([
+    [
+      "manifest.json",
+      JSON.stringify([
+        {
+          Config: `blobs/sha256/${configDigest.slice("sha256:".length)}`,
+          RepoTags: [image.ref],
+        },
+      ]),
+    ],
+    [
+      "index.json",
+      JSON.stringify({
+        schemaVersion: 2,
+        manifests: [{ digest: manifestDigest }],
+      }),
+    ],
+    [`blobs/sha256/${configDigest.slice("sha256:".length)}`, config],
+    [`blobs/sha256/${manifestDigest.slice("sha256:".length)}`, manifest],
+  ]);
+
+  const identity = inspectPortableImageArchiveIdentity(
+    "/fixture/server-image.tar",
+    image,
+    "/fixture",
+    ({ args }) => members.get(args[2]),
+  );
+  assert.deepEqual(identity, { configDigest, manifestDigest });
 });
 
 test("release artifact derives migration sequence and customer source identity from committed files", () => {
@@ -505,6 +552,13 @@ test("release artifact builder normalizes the source hash and writes complete ch
       uncompressedSizeBytes: Buffer.byteLength(source),
     };
   };
+  const inspectArchiveIdentity = (_tarPath, image) => {
+    const digit = image.kind === "server" ? "2" : "3";
+    return {
+      configDigest: `sha256:${digit.repeat(64)}`,
+      manifestDigest: `sha256:${(image.kind === "server" ? "4" : "5").repeat(64)}`,
+    };
+  };
 
   try {
     const report = await buildReleaseArtifact(
@@ -542,6 +596,7 @@ test("release artifact builder normalizes the source hash and writes complete ch
         }),
         runCommand,
         streamImageArchive: streamArchive,
+        inspectPortableImageArchiveIdentity: inspectArchiveIdentity,
       },
     );
     const output = path.join(root, report.outputDirectory);
@@ -560,6 +615,11 @@ test("release artifact builder normalizes the source hash and writes complete ch
     );
     assert.equal(manifest.performance.build.cacheHitRateBasisPoints, 7_500);
     assert.equal(manifest.images.length, 2);
+    assert(
+      manifest.images.every((image) =>
+        /^sha256:[a-f0-9]{64}$/u.test(image.archive.manifestDigest),
+      ),
+    );
     assert(
       manifest.images.every((image) =>
         Number.isSafeInteger(image.archive.saveDurationMs),

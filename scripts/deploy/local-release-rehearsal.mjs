@@ -339,13 +339,7 @@ export function reconcileRehearsalDatabaseRoles(context) {
   );
   composeCommand(
     context,
-    [
-      "exec",
-      "-T",
-      "postgres",
-      "/usr/local/bin/plush-database-roles",
-      "verify",
-    ],
+    ["exec", "-T", "postgres", "/usr/local/bin/plush-database-roles", "verify"],
     "verify isolated release database roles",
   );
   return {
@@ -1090,6 +1084,10 @@ function assertAdminBootstrapContainerIdentity(
     (item) => item.kind === "server",
   );
   const actual = inspectAdminBootstrapContainer(context, containerId);
+  const allowedImageIds = [
+    serverImage.contentId,
+    serverImage.archive?.manifestDigest,
+  ].filter(Boolean);
   if (
     !CONTAINER_ID_PATTERN.test(containerId) ||
     actual.id !== containerId ||
@@ -1097,7 +1095,7 @@ function assertAdminBootstrapContainerIdentity(
     actual.project !== context.project ||
     actual.service !== "app-server" ||
     actual.imageRef !== serverImage.ref ||
-    actual.imageId !== serverImage.contentId ||
+    !allowedImageIds.includes(actual.imageId) ||
     actual.operation !== operationId
   ) {
     throw new RehearsalError(
