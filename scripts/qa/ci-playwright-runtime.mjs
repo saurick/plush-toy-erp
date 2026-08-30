@@ -31,7 +31,7 @@ const FFMPEG_REVISION = "1011";
 const PACKAGE_NAME = "plush-ci-playwright-runtime";
 const PACKAGE_VERSION = "playwright-1.58.2-linux-x64-r1208-v1";
 const PACKAGE_FILE = "runtime.tar";
-const DOWNLOAD_TIMEOUT_MS = 12 * 60 * 1_000;
+const DOWNLOAD_TIMEOUT_MS = 20 * 60 * 1_000;
 const PACKAGE_TIMEOUT_MS = 10 * 60 * 1_000;
 const UPSTREAM_CURL = "/usr/bin/curl";
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
@@ -50,7 +50,7 @@ export const CI_PLAYWRIGHT_RUNTIME_ASSETS = Object.freeze([
     name: "chrome-linux64.zip",
     size: 175_440_843,
     sha256: "b5e3195041af345a668d110f5daf5581961fa3608626ea588c97dd0fe81c4e38",
-    url: "https://storage.googleapis.com/chrome-for-testing-public/145.0.7632.6/linux64/chrome-linux64.zip",
+    url: "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/145.0.7632.6/linux64/chrome-linux64.zip",
     directory: "chromium-1208",
     executable: path.join("chrome-linux64", "chrome"),
     sandbox: path.join("chrome-linux64", "chrome_sandbox"),
@@ -59,7 +59,7 @@ export const CI_PLAYWRIGHT_RUNTIME_ASSETS = Object.freeze([
     name: "chrome-headless-shell-linux64.zip",
     size: 116_288_461,
     sha256: "2536e97d8f410df0394b3e7c4252e88ce9f239f04f3af4e247a26caf45baf49e",
-    url: "https://cdn.playwright.dev/builds/cft/145.0.7632.6/linux64/chrome-headless-shell-linux64.zip",
+    url: "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/145.0.7632.6/linux64/chrome-headless-shell-linux64.zip",
     directory: "chromium_headless_shell-1208",
     executable: path.join(
       "chrome-headless-shell-linux64",

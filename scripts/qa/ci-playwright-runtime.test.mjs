@@ -72,14 +72,14 @@ test("Playwright runtime pins one exact Linux archive set", () => {
         size: 175_440_843,
         sha256:
           "b5e3195041af345a668d110f5daf5581961fa3608626ea588c97dd0fe81c4e38",
-        url: "https://storage.googleapis.com/chrome-for-testing-public/145.0.7632.6/linux64/chrome-linux64.zip",
+        url: "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/145.0.7632.6/linux64/chrome-linux64.zip",
       },
       {
         name: "chrome-headless-shell-linux64.zip",
         size: 116_288_461,
         sha256:
           "2536e97d8f410df0394b3e7c4252e88ce9f239f04f3af4e247a26caf45baf49e",
-        url: "https://cdn.playwright.dev/builds/cft/145.0.7632.6/linux64/chrome-headless-shell-linux64.zip",
+        url: "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/145.0.7632.6/linux64/chrome-headless-shell-linux64.zip",
       },
       {
         name: "ffmpeg-linux.zip",
@@ -214,7 +214,7 @@ test("package absence is the only upstream bootstrap path", () => {
     source,
     /candidate = await bootstrapPackage\(env, staging, root\)/u,
   );
-  assert.match(source, /const DOWNLOAD_TIMEOUT_MS = 12 \* 60 \* 1_000;/u);
+  assert.match(source, /const DOWNLOAD_TIMEOUT_MS = 20 \* 60 \* 1_000;/u);
   const curlStart = source.indexOf("function upstreamCurlArgs");
   const curlEnd = source.indexOf("function runTool", curlStart);
   assert.ok(curlStart > 0 && curlEnd > curlStart);
