@@ -408,7 +408,7 @@ test("local release rehearsal bootstraps admin only through a verified no-port o
   assert.ok(runCall);
   assert.equal(runCall.env.APP_ADMIN_PASSWORD, operationPassword);
   assert.ok(runCall.args.includes("--no-deps"));
-  assert.ok(runCall.args.includes("--rm"));
+  assert.equal(runCall.args.includes("--rm"), false);
   assert.ok(runCall.args.includes("--pull"));
   assert.ok(runCall.args.includes("never"));
   assert.ok(runCall.args.includes("APP_ADMIN_PASSWORD"));
@@ -423,6 +423,9 @@ test("local release rehearsal bootstraps admin only through a verified no-port o
     ),
     false,
   );
+  const removeCall = calls.find((item) => item.args?.[0] === "rm");
+  assert.ok(removeCall);
+  assert.deepEqual(removeCall.args, ["rm", "--force", containerId]);
   const readbackCall = calls.find((item) => item.args?.[0] === "exec");
   assert.ok(readbackCall);
   assert.ok(readbackCall.args.includes("-i"));

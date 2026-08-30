@@ -1241,7 +1241,6 @@ export async function bootstrapRehearsalAdmin(context) {
         "-d",
         "-T",
         "--no-deps",
-        "--rm",
         "--pull",
         "never",
         "--name",
