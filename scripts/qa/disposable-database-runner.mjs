@@ -88,6 +88,51 @@ function commandResult(command, args, options = {}) {
   return String(result.stdout || "");
 }
 
+const SAFE_GO_IDENTITY_PATTERN = /^[A-Za-z0-9_./-]+$/u;
+
+export function summarizeCriticalPostgresFailure({
+  error,
+  signal = "",
+  status,
+  stdout = "",
+} = {}) {
+  const failedTests = new Set();
+  const failedPackages = new Set();
+  for (const line of String(stdout).split("\n")) {
+    let event;
+    try {
+      event = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (event?.Action !== "fail") continue;
+    const testName = String(event.Test || "");
+    const packageName = String(event.Package || "");
+    if (
+      testName &&
+      testName.length <= 200 &&
+      SAFE_GO_IDENTITY_PATTERN.test(testName)
+    ) {
+      failedTests.add(testName);
+    } else if (
+      packageName &&
+      packageName.length <= 200 &&
+      SAFE_GO_IDENTITY_PATTERN.test(packageName)
+    ) {
+      failedPackages.add(packageName);
+    }
+  }
+  if (failedTests.size > 0) {
+    return `tests=${[...failedTests].sort().slice(0, 8).join(",")}`;
+  }
+  if (failedPackages.size > 0) {
+    return `packages=${[...failedPackages].sort().slice(0, 8).join(",")}`;
+  }
+  if (error) return "process_launch_failed";
+  if (signal) return `process_signal=${String(signal).slice(0, 20)}`;
+  return `process_exit=${Number.isInteger(status) ? status : "unknown"} structured_failure=absent`;
+}
+
 function defaultRuntime(repoRoot) {
   const serverRoot = path.join(repoRoot, "server");
   const queryExists = (adminURL, databaseName) => {
@@ -179,7 +224,7 @@ function defaultRuntime(repoRoot) {
       );
     },
     verifyCriticalPostgres(databaseURL) {
-      const output = commandResult(
+      const result = spawnSync(
         "bash",
         [
           path.join(repoRoot, "scripts/purchase-receipt-pg.sh"),
@@ -187,10 +232,18 @@ function defaultRuntime(repoRoot) {
         ],
         {
           cwd: serverRoot,
+          encoding: "utf8",
           env: { ...process.env, PURCHASE_RECEIPT_PG_DB_URL: databaseURL },
-          failure: "critical PostgreSQL verification failed",
+          maxBuffer: 512 * 1024 * 1024,
+          stdio: ["ignore", "pipe", "pipe"],
         },
       );
+      if (result.error || result.status !== 0) {
+        throw new Error(
+          `critical PostgreSQL verification failed: ${summarizeCriticalPostgresFailure(result)}`,
+        );
+      }
+      const output = String(result.stdout || "");
       return {
         outputLines: output.split("\n").filter(Boolean).length,
         status: "passed",

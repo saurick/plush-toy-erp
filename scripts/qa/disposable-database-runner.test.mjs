@@ -6,6 +6,7 @@ import {
   DISPOSABLE_DATABASE_RUN_SCHEMA,
   installDisposableDatabaseCancellationHandlers,
   runDisposableDatabaseLifecycle,
+  summarizeCriticalPostgresFailure,
   validateDisposableWorkflow,
 } from "./disposable-database-runner.mjs";
 
@@ -132,4 +133,37 @@ test("disposable database runner keeps signal handling alive until cleanup can f
   assert.equal(cancellation.signal, "SIGTERM");
   assert.equal(processRef.listenerCount("SIGTERM"), 0);
   assert.equal(processRef.listenerCount("SIGINT"), 0);
+});
+
+test("critical PostgreSQL failure summary keeps safe failed-test identity", () => {
+  const stdout = [
+    JSON.stringify({
+      Action: "fail",
+      Package: "github.com/saurick/plush-toy-erp/server/internal/data",
+      Test: "TestInventoryPostgresConcurrentOutbound/one-winner",
+    }),
+    JSON.stringify({
+      Action: "fail",
+      Package: "github.com/saurick/plush-toy-erp/server/internal/data",
+    }),
+  ].join("\n");
+  assert.equal(
+    summarizeCriticalPostgresFailure({ status: 1, stdout }),
+    "tests=TestInventoryPostgresConcurrentOutbound/one-winner",
+  );
+});
+
+test("critical PostgreSQL failure summary rejects raw unstructured output", () => {
+  assert.equal(
+    summarizeCriticalPostgresFailure({
+      status: 1,
+      stdout:
+        "postgres://tester:local-secret@127.0.0.1:55432/example failed without JSON",
+    }),
+    "process_exit=1 structured_failure=absent",
+  );
+  assert.equal(
+    summarizeCriticalPostgresFailure({ signal: "SIGKILL" }),
+    "process_signal=SIGKILL",
+  );
 });
