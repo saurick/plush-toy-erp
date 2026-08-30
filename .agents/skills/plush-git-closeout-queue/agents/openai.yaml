@@ -1,4 +1,0 @@
-interface:
-  display_name: "Plush Git Closeout Queue"
-  short_description: "协调 Plush 精确租约、冲突规划与可确认续跑闭环"
-  default_prompt: "Use $plush-git-closeout-queue after $shared-local-task-queue to coordinate Plush-specific exact writer/resource closures, turn-bound leases, persistent single-use resume tokens, confirmed top-level task follow-up, safe explicit queue adoption, lock recovery, and separately authorized Git closeout. Return WAIT_HOST_WAKEUP when the host cannot confirm a queued follow-up turn."

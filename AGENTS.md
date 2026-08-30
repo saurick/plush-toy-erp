@@ -33,8 +33,9 @@
 - 项目负责人和 Codex 只实现当前目标所需最小闭环，不把模型自行推断当作需求；真源、状态、权限、异常恢复、测试和基础易用性仅补必要项，任务外发现只报告。优先复用和简单方案；只有当前目标或正确性、安全、数据完整性、可运维性确实需要时才增加复杂度，并说明理由。
 - 默认循环是“甲方目标或痛点 → Codex 实现与验证 → 经明确授权发布固定版本 → 甲方使用反馈 → 缺陷、细化或新需求”。按一个可验证业务切片完成，不建需求编号或多阶段计划；正式代码和文档不用历史 Phase/P 编号，`P0/P1/P2` 只表示风险优先级。
 - 开始和收口检查 worktree，保留其他任务或用户已有改动，不回退、格式化、删除、stage 或宣称为本轮成果。
-- Local 任务首次写文件前，用 `GIT_OPTIONAL_LOCKS=0` 或 `.agents/skills/plush-git-closeout-queue/scripts/readonly-git-snapshot.sh` 一次记录 HEAD、index、`index.lock` 与 status；共享 Local 不运行普通 `git status`。worktree 干净，或全部脏 hunk 都可证明由当前任务创建时，才可跳过队列；否则既有脏路径视为共享/归属不明，加载 `$plush-git-closeout-queue`，取得“精确路径 + 可能派生路径”writer lease 后再写。不得轮询或新建 registry / daemon，也不得回退、格式化、stage 外部脏路径；闭包无重叠和全仓连带写入的 grant 可并行，同一文件、派生目标或归属不明必须串行，高风险事项仍按专项治理。
-- writer request / grant 声明精确路径、派生写入、禁用的全仓命令和开始身份；grant 只覆盖匹配 `inProgress` turn 的连续写入，release 回报实际路径与结束身份。最后写入后立即 release；只读验证、远端等待、额度中断或 turn 结束不占租约。越界只暂停越界任务。Git index / stage / commit / stash / rebase 保持全仓唯一 owner；浏览器、Vite、数据库和端口使用独立资源租约，仅在资源冲突或读取热点与 writer 重叠时等待。
+- 所有项目任务（Goal、普通实现、文档、测试、诊断、运行与发布准备）各自完成业务切片、验证和必要回滚；Goal 只是一种普通任务来源。任务结束时若产生仓库改动，最终回复只留一份被动 `Git handoff record`，不在仓库或任务系统登记、聚合或调度记录。
+- `Git handoff record` 仅包含：精确文件或 hunk、建议 commit 分组、简体中文提交意图、已完成验证、未完成验证、需排除的外部脏文件，以及 commit / push 是否已获授权。它只是当次交接证据，不是 Git 授权，也不保存跨会话 owner、lease、等待、唤醒或状态广播。
+- Local 任务首次写入前和任务收口时，用 `GIT_OPTIONAL_LOCKS=0` 读取实时 HEAD、index、`index.lock`、status 和 scoped diff；共享 Local 不运行普通 `git status`。普通个人单 writer 按精确范围继续并保留外部脏现场；只有真实并发 writer、混合 hunk 或 index / `index.lock` 冲突时，才临时串行当前重叠路径或 Git 动作并重新读回，同一时点只能有一个 Git index 操作者。无法证明安全时停止相关写入或 Git 动作并报告，不建立任务调度、资源租约、registry、daemon、轮询、定时唤醒或消息广播。
 - stage、commit 和 push 是独立动作，均先询问用户；完成实现或验证不自动取得 Git 授权。
 - 本仓库不恢复单独执行规格目录、短任务模板或本地审查报告目录。
 
@@ -50,7 +51,7 @@
 - 当前入口见 `.agents/skills/README.md`。默认只选一个主 skill，真实跨领域/页面/打印/测试/operations 时再组合。
 - 运行诊断、可观测/错误、安全隐私、发布和回滚统一使用 `$plush-operations-governance`。
 - 提示词整理仅在明确需要时显式使用全局 `$prompt-governance`。
-- 只有真实并发 writer、混合 hunk、Git 锁或遗留现场需要协调时才使用 `$plush-git-closeout-queue`；普通个人开发不加载它。真正执行复杂提交或推送时再使用全局 `$git-closeout-coordination`。
+- Git 改动按上节生成被动记录；只有用户明确要求 commit 或 push 且实时现场确属复杂收口时，才使用全局 `$git-closeout-coordination`，不保留项目级 Git 收口 Skill。
 - 修改 skill 时同步 README/metadata/引用，运行 validator、YAML/metadata 扫描和 `git diff --check`。
 
 ## Product Core 与客户差异

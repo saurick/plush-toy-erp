@@ -56,14 +56,14 @@
 - 基线：GitHub 最近四次 CI 总耗时中位数为 `538.5s`，最近一次 `539s`，最长 quality job `501s`、主门禁 step `399s`；最近四次 Immutable Release 中位数为 `896.5s`，最近一次 `927s`，其中 strict job `542s`、publish job `362s`、镜像与制品阶段约 `264s`。当前公开 Release `2026.08.08-5 / 0e1dba7f8442e57ad59c11a3ce5541811e6c8f5d` 的 Server / Web tar 分别为 `1,029,740,032 / 235,604,992 bytes`。历史同正式 promotion 的 `1,328,210,048 bytes` 操作窗口约 `66.5s`，只作为旧口径传输下限参考；新实现改为计量实际 rsync 调用。
 - 当前实现：保持 Exact-SHA、strict provenance、六项 Release 与 promotion 门禁不变；CI / strict 增加 checksum 后可复用的 gitleaks、固定 Go 工具、pnpm store 和 Playwright Chromium cache；Release 以一次 Buildx Bake 共享图并行调度 Server / Web、按 target 使用 GHA cache，并把 pnpm / APT / 固定 Chromium 置于稳定 Docker 层。Release artifact、GitHub Provider、promotion operation 与 DEV-only 版本中心贯通构建命中、归档大小、digest、实际传输耗时 / 速率、观测关键路径、版本和失败原因。
 - 数据库边界：本轮基线 inventory 只发现长期 `plush_erp`；先前 disposable `plush_erp_ci_populated_6974_17055` 已按 archive / restore / drop 流程清理并读回零残留。后续 cold / hot 与本地 release rehearsal 继续复用统一隔离 lifecycle，临时库必须绑定 run ID 并在成功或失败后精确清理，不触碰长期库、133 逻辑库、当前版本或回滚数据代。
-- 当前状态：代码和合同测试正在当前 writer 范围内收口，尚未 stage、commit、push、生成新 immutable Release 或修改 133。当前 133 只读预检仍通过，但运行 Server / Web SHA 均为旧远端 `0e1dba7f8442e57ad59c11a3ce5541811e6c8f5d`；只有完成本地 cold + 三次 hot + 同 SHA 幂等演练、独立取得 Git 授权、正式 CI / Release、promotion、真实浏览器、新旧版本回滚 / 前滚和临时库零残留后才能改写为完成。
+- 当前状态：代码和合同测试正在当前任务范围内收口，尚未 stage、commit、push、生成新 immutable Release 或修改 133。当前 133 只读预检仍通过，但运行 Server / Web SHA 均为旧远端 `0e1dba7f8442e57ad59c11a3ce5541811e6c8f5d`；只有完成本地 cold + 三次 hot + 同 SHA 幂等演练、独立取得 Git 授权、正式 CI / Release、promotion、真实浏览器、新旧版本回滚 / 前滚和临时库零残留后才能改写为完成。
 
 ### 夜间发布门禁与 test-133
 
 - 完成：`acc4538e8374e6ff94cb06d892e2994e8f59f7ec` 已普通推送并完成 exact-SHA `prepare-push 5387 / 5387`、GitHub CI run `30602758373` 和 Immutable Release run `30603201549`；release `2026.07.31-2` / tag `artifact-acc4538e8374e6ff94cb06d892e2994e8f59f7ec` 的 Server / Web 不可变制品已按正式 promotion 流程部署到 `customer-trial-133`。operation `f6de0aa4-c9b4-441c-a6d0-45d418546ab8` 在 fresh backup、restore rehearsal、串行 Atlas 锁和已授权 trigger / function 移除后通过，目标读回 current migration `20260730161955`、pending `0`、runtime SHA 与 OCI image ID 精确匹配；基础 Web / health / ready、`11 / 11` 登录矩阵、SMS、active config 和 PDF 技术 smoke 共 `9 / 9` 通过。
 - 当前阻断与根因：目标专用 `customer-trial-133` V7 manifest 已完成离线变换和服务端 validate，但 publish 确定性返回 `40010 所选岗位当前未开启审批功能`，未进入 activate，V5 继续保持 active。目标 `rbac_options` 权威读回显示固定审批池主办岗位 `sales`、`purchase`、`finance` 仍缺少持久化 `workflow.task.approve`；当前代码的 builtin role 定义已向业务岗位附加该权限，但启动 seed 按治理约定保留旧库已选择的业务权限，且既有 migration 只前向补过 `workflow.task.reject`，因此老数据库不会自动收敛。
 - 修复与当前门禁：additive / idempotent migration 已提交、以一次性 PostgreSQL 升级夹具验证精确三岗位、已有绑定不升版、无关岗位不受影响、重复执行幂等，并由 `9e77aed7189c0d79c74a1576392487920d1841ea` 的完整本地门禁 `5388 / 5388`、GitHub CI run `30605780213` 全绿。Immutable Release run `30606218045` 的 Ent / Atlas 零漂移已通过，但 strict Web `2070` 项唯一失败：隐私单测在 Node 文件并发执行时读取共享真实 checkout，仓库 identity 在两次快照间变化而按生产合同 fail closed。该用例的目标只是证明 `runContext` 不含本机路径、用户名、remote 或 token，现改用同文件已有 canonical synthetic repository 输入；生产 `readRepositoryIdentity`、identity 漂移阻断和各自专门测试均不变，不通过 rerun、删除测试或放宽门禁掩盖失败。
-- 下一步 / 风险：release run `30606218045` 未进入镜像构建，没有生成新 tag、GitHub Release 或 assets。本测试隔离修复由唯一 Git 收口队列提交后，必须绑定新 clean SHA 从头重跑完整本地门禁、普通非强制 push、同 SHA CI / 新 release，并只用新的不可变制品再次 promotion 到 `customer-trial-133`；fresh backup、migration plan / apply / status、V7 publish / activate / 权威读回和规定 smoke 必须全部重新取证。任何目标漂移、备份 / restore rehearsal 失败、migration 非预期、远端并发或 digest 不匹配均 fail closed。生产保持 `NOT_RUN`，客户 UAT 保持 `NOT_CLAIMED`，`4 / 4 / 3` 场景业务造数保持 `NOT_RUN`。
+- 下一步 / 风险：release run `30606218045` 未进入镜像构建，没有生成新 tag、GitHub Release 或 assets。本测试隔离修复只有在用户明确授权后，才能基于当时实时 HEAD、index 和 worktree 按精确范围提交；随后必须绑定新 clean SHA 从头重跑完整本地门禁、普通非强制 push、同 SHA CI / 新 release，并只用新的不可变制品再次 promotion 到 `customer-trial-133`；fresh backup、migration plan / apply / status、V7 publish / activate / 权威读回和规定 smoke 必须全部重新取证。任何目标漂移、备份 / restore rehearsal 失败、migration 非预期、远端并发或 digest 不匹配均 fail closed。生产保持 `NOT_RUN`，客户 UAT 保持 `NOT_CLAIMED`，`4 / 4 / 3` 场景业务造数保持 `NOT_RUN`。
 
 ### 库存预留与采购入库权威投影
 
@@ -125,8 +125,8 @@
 - 边界：收付款与核销原本已使用完整分页导出，保持不重复改造；生产异常处置继续只提供列顺序，不开放缺少独立业务数据边界的导出。看板、权限 / 配置、系统操作记录和纯 Workflow 任务页不机械套用该工具。
 - 验证：锁定 Node `24.14.0` 下，本批 API、页面、可见字段、请求生命周期和 12 页全局合同定向执行 `250 / 250` 通过；Web 全量为 `2060 / 2064`，剩余 4 项仅来自并行中的字段联动 QA wrapper 与开发页导航 / 英文标签批次。Web 全量 ESLint、CSS stylelint 和 overall `git diff --check` 通过。
 - 浏览器：复用当前外部 Style L1 服务执行生产订单刷新手机布局场景 `1 / 1`；另以真实 Chromium 打开生产订单列顺序弹窗并实际下载 CSV，读回生产订单业务内容，1440px 下页面 `scrollWidth = clientWidth = 1440`。
-- 阻塞 / 风险：Vite build 当前被任务外 `devQaTestingPlugin.mjs` 静态导入带 shebang CLI 的配置打包问题阻断；责任批次已定位并排队修复，本批未越权修改或等待。当前仍未部署、未做目标岗位 smoke / 客户 UAT，也未 stage、commit 或 push。
-- 下一步：待 dev-testing 批次修复并释放热点后复跑 Vite build 与全量测试摘要；如用户授权，再由统一 Git 收口队列按本批精确路径处理本地提交，push 仍需单独授权。
+- 阻塞 / 风险：Vite build 当前被任务外 `devQaTestingPlugin.mjs` 静态导入带 shebang CLI 的配置打包问题阻断；责任范围已定位，本批未越权修改或等待。当前仍未部署、未做目标岗位 smoke / 客户 UAT，也未 stage、commit 或 push。
+- 下一步：待 dev-testing 批次修复并释放热点后复跑 Vite build 与全量测试摘要；如用户授权，再读取当时实时 Git 现场并按本批精确路径或 hunk 处理本地提交，push 仍需单独授权。
 
 ### 开发测试固定动作
 
@@ -134,11 +134,11 @@
 - 完成：新增 testing operation store 和覆盖 / 固定动作共用的全局 QA 锁；Vite development-only Bridge 固定映射 `fast.sh` 带回执门禁、九岗位 JSON-RPC 权限巡检和字段联动 runner，并在执行前后复核仓库身份。岗位巡检缺少本地后端或演示账号凭据时明确为 `blocked`，预期业务写入为零，不等于完整角色协同闭环；生产 build 不注册这些接口。
 - 完成：`run-gate-with-receipt.mjs` 增加 repository identity 前后复核；baseline 在 Web coverage 前先执行 error-code `--check`，再直接使用项目 Node native coverage，避免 package `pretest` 自行改写 tracked 生成物。字段联动 TAP 与报告改为 staging 生成并在测试、builder 和身份复核均通过后提升 canonical 报告，失败时保留上一份证据。
 - 完成：新测试登记到 fast Node 分组和 `fast.sh` Web 固定清单，fast profile required files 同步覆盖 operation store、全局锁、runner、插件、client 和页面；`scripts/qa/README.md`、`web/README.md` 与自动化测试策略同步五项优先级、全局串行边界、11 个 coverage 阶段及证据不互相替代的口径。
-- 修正：writer 释放后的真实 Chromium 读回确认桌面、390px 移动端与暗色页面布局可读且无页面级横向溢出，同时暴露旧 Vite 进程未注册 testing API，以及 Vite / esbuild 配置打包会把带 shebang 的 `affected.mjs` 静态内联到非首位置。testing Bridge 已改为仅在 plan 请求时通过非字面量 file URL 动态导入，并新增 `loadConfigFromFile` development serve 回归；固定动作在 summary 尚未成功读回或读取失败时也改为 fail closed 禁用，避免告警与按钮状态相反。
+- 修正：相关文件写入完成后的真实 Chromium 读回确认桌面、390px 移动端与暗色页面布局可读且无页面级横向溢出，同时暴露旧 Vite 进程未注册 testing API，以及 Vite / esbuild 配置打包会把带 shebang 的 `affected.mjs` 静态内联到非首位置。testing Bridge 已改为仅在 plan 请求时通过非字面量 file URL 动态导入，并新增 `loadConfigFromFile` development serve 回归；固定动作在 summary 尚未成功读回或读取失败时也改为 fail closed 禁用，避免告警与按钮状态相反。
 - 验证：全局锁、testing store、门禁回执、collector、字段联动、fast profile、两个 operation client、两个 Vite Bridge、插件注册、清单完整性与页面合同最终定向执行 `96 / 96` 通过；fast profile 读回 `13` 个 gates / `186` 个 required files，文档清单 `5 / 5` 通过，触达 ESLint、Prettier、全量 Stylelint、Vite development config 加载和 overall `git diff --check` 通过。
 - 验证边界：独立 `15201` 开发服务的真实 Chromium 已生成当时 `237` 个改动文件的验证计划，建议 T0 / T1 / T2 / T3 / T4 / T5 / T7 / T8；testing summary 成功读回前 P0 / P1 固定动作全部 fail closed 禁用。九岗位巡检在本地 `8300/healthz=200` 但演示凭据缺失时正确保持 `blocked`，字段联动动作通过并原子发布报告；1600px、390px 与暗色页面可读，390px 下 `scrollWidth = clientWidth = 390`，控制台 error 为 0。夜间发布初始 fast 为 `524 / 530`、Web full 为 `2066 / 2070`；已定位并最小修正全部确定性失败，当前只完成相关定向回归，尚未把它们描述为 full 全绿。
-- 下一步：旧 coverage baseline 绑定旧 fingerprint，结果原本即为 `issues`，不能复用为本次 clean SHA 证据。收口队列产生新提交后重跑 fast、Web full 与 `prepare-push`；演示凭据可用后才执行九岗位真实登录，并按 T2 / T7 / T8 分别补 migration、业务集成 / 浏览器和发布证据。
-- 阻塞 / 风险：本轮尚未连接 PostgreSQL、运行真实业务浏览器写链或目标环境部署 / smoke；后续任何代码变化都会使当前定向证据过期。本批由唯一 writer grant 管理，尚未 stage、commit 或 push。
+- 下一步：旧 coverage baseline 绑定旧 fingerprint，结果原本即为 `issues`，不能复用为本次 clean SHA 证据。用户明确授权并从实时 Git 现场产生新提交后重跑 fast、Web full 与 `prepare-push`；演示凭据可用后才执行九岗位真实登录，并按 T2 / T7 / T8 分别补 migration、业务集成 / 浏览器和发布证据。
+- 阻塞 / 风险：本轮尚未连接 PostgreSQL、运行真实业务浏览器写链或目标环境部署 / smoke；后续任何代码变化都会使当前定向证据过期。本批尚未 stage、commit 或 push。
 
 ### 业务写入唯一入口治理
 
@@ -155,7 +155,7 @@
 ## 下一步与停止条件
 
 1. 本次一次性夜间任务已获最小门禁修复、本地提交、普通 push `main`、GitHub CI / release 和仅部署 test-133 的明确授权；生产、客户 UAT、force / 历史改写、CI 放宽及破坏性 migration / data change仍未授权。
-2. writer 释放后由唯一 Git 收口队列精确本地提交；重新核对 clean worktree、index、lock 和 latest SHA，只有该 SHA 才运行 `bash scripts/qa/prepare-push.sh`。
+2. 用户明确授权提交后，重新核对实时 worktree、index、lock 与精确路径 / hunk，再由当次唯一 Git index 操作者本地提交；只有提交后的 clean SHA 才运行 `bash scripts/qa/prepare-push.sh`。
 3. push 前 fetch 并比对远端 OID；有远端并发漂移即 fail closed，禁止覆盖。CI / release 任一确定性失败只允许最小修复并从新 SHA 全链重走。
 4. promotion 前必须再次确认 target 身份、fresh backup / rollback point、Atlas status / plan、migration 性质和锁；任何受禁 pending migration、身份不明、备份失败或 digest / runtime 漂移都停止，不进入生产。
 
@@ -164,7 +164,7 @@
 - 当前稳定客户 key 为 `yoyoosun`。Product Core、客户 Private 仓和目标部署必须各自固定版本并独立读回；真实客户资料、导入批准和 UAT 不由本地或 CI 绿色替代。
 - 133 上较早固定 V5 的技术试用证据不能证明当前 Product Core HEAD。客户配置 V7、V5 → V7 激活边界、目标 migration 和岗位 smoke 都必须以本次 promotion 后的目标读回为准。
 - Workflow task 完成不等于 Fact posted；Source Document、ProcessRuntime、Fact、RBAC 和客户配置继续遵守正式文档与领域 usecase 边界。
-- Git、CI、Release、promotion 和部署只允许一个收口 owner 串行推进。
+- Git index 同一时点只允许一个操作者；CI、Release、promotion 和部署分别按当前明确授权与正式流程串行执行，不保存跨任务 owner。
 
 ## 归档索引
 
@@ -237,12 +237,12 @@
 - 数据库 / 边界：本地 full 与 rehearsal 结束后 disposable 数据库、演练容器和卷均为零；133 promotion 的临时恢复库已清理，正式数据库保持 `plush_erp_uat_20260716_v5`。另有迁移停在 `20260715161753` 的历史前身库，零连接但 schema 与当前不同，现有治理工具按长生命周期目标库拒绝删除；它作为受保护回滚资产保留，只有单独完成归档、恢复证明与唯一数据复核后才允许受控删除。发布与恢复演练不等于客户岗位 UAT 或签收。
 - 本轮续办：把先前独立维护的 `admin.yoyoosun.net` 入口正式纳入固定 `test-133` registry、只读 preflight、promotion 和 rollback 阶段，要求公网容器、健康、Provider 能力与 Compose `GIT_SHA` 一致；回滚控制器固定取当前 live exact SHA，旧版本只提供源码和制品。工作台改为四列环境摘要，分开比较完整发布、相同 SHA 复用与 CI，中文主标签覆盖阶段和状态事件，重复发布当前完整 SHA 时给出可执行引导。仍不新增流水线、数据库、指标服务或服务器构建路径。
 
-### Writer turn 租约与漏释放恢复（2026-08-06）
+### 被动 Git handoff record 治理（2026-08-30）
 
-- 根因：共享 Local 中曾有任务完成文件写入并结束 turn，却漏发 `WRITER_RELEASED`；队列继续把旧 grant 当作活动 writer，造成后续任务错误等待。现场 index 为空、无 `index.lock`，因此不是 Git 锁故障。
-- 修正：writer grant 只绑定收到授权的当前 `inProgress` turn 与连续写入阶段；进入只读验证、最终回复或 turn 结束前必须释放，恢复任务、验证后补写或新 turn 必须重新申请。队列在同一 wake 复核 owner；`idle`、`notLoaded`、completed、error、cancelled 或 turn 不匹配时按 `TURN_ENDED` 失效并继续放行。漏报写入记为 `UNREPORTED_WRITES`、保留现场但不续租；只有重叠归属无法隔离时才进入 `WAIT_HOT_FILE`。
-- 门禁 / 验证：AGENTS 合同、队列 Skill 生命周期和 `skill-health` 静态守卫已同步；项目 Skill health、回归测试 `5 / 5`、文档合同 `20 / 20`、affected、AGENTS 体积与 `git diff --check` 通过。系统 Python quick validator 因环境缺少 `PyYAML` 未运行，仓库内 YAML、metadata、引用与 Skill validator 已通过。
-- 边界：本批只修改协调规则、Skill、静态门禁和本节过程记录；不改变业务、schema、migration、数据库或发布。规则只有精确批次提交进入 HEAD 后才正式生效；当前未 stage、commit 或 push。
+- 完成：项目内 Goal、实现、文档、测试、诊断、运行与发布准备任务统一各自完成业务切片、验证和必要回滚；只要留下仓库改动，收口时只输出一份被动 `Git handoff record`，不登记或调度其他任务。
+- 记录：只交接精确文件 / hunk、建议 commit 分组、简体中文提交意图、已完成与未完成验证、外部脏文件排除项及 commit / push 授权状态；它不保存跨会话状态，也不等于 Git 授权。
+- 安全：首次写入和收口都读取实时 HEAD、index、`index.lock`、status 与 scoped diff；普通单 writer 直接按精确范围工作，真实并发、混合 hunk 或 index 冲突只临时串行当前动作，无法证明安全即停止并报告。
+- 边界：旧的任务调度与租约机制及其项目 / 全局 Skill、脚本、metadata 和测试已移除；全局 Git 收口只在用户明确要求 commit 或 push 时一次性读取实时现场。本批未处理业务、schema、migration、数据库、运行资源或发布，也未 stage、commit 或 push。
 
 ### 个人信息告知与系统使用规则（2026-08-11）
 
