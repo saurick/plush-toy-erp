@@ -113,8 +113,11 @@ function issueDescription(issues = []) {
   return issues.map((issue) => issue.message).join('；')
 }
 
-function operationActionLabel(action) {
+function operationActionLabel(action, promotionMode = null) {
   if (action === 'release') return '发布制品'
+  if (action === 'promote' && promotionMode === 'initialize') {
+    return '首次部署（Explicit Promotion）'
+  }
   if (action === 'promote') return '显式版本提升（Explicit Promotion）'
   if (action === 'rebuild-database') return '重建目标数据库'
   return '回滚'
@@ -623,9 +626,10 @@ export default function DevVersionCenterPage() {
     (target) => target.key === selectedTargetKey
   )
   const target = selectedTargetDescriptor?.preflight || null
+  const initializationPreflight =
+    selectedTargetDescriptor?.initializationPreflight || null
   const versions = (summary?.versions || []).map(
-    (version) =>
-      deliveryVersionForTarget(version, selectedTargetKey) || version
+    (version) => deliveryVersionForTarget(version, selectedTargetKey) || version
   )
   const releaseVersion = summary?.releaseVersionPolicy?.nextVersion || ''
   const operations = summary?.operations || []
@@ -664,6 +668,11 @@ export default function DevVersionCenterPage() {
   )
   const publicEntry = target?.remote?.publicEntry
   const targetPassed = target?.status === 'passed'
+  const initializationReady = Boolean(
+    initializationPreflight?.status === 'eligible' &&
+      initializationPreflight?.remote?.rootState === 'absent' &&
+      initializationPreflight?.blockers?.length === 0
+  )
   const headAlreadyPublished = Boolean(
     currentHeadRelease?.status === 'published' &&
       currentHeadRelease?.completeAssets === true
@@ -925,17 +934,19 @@ export default function DevVersionCenterPage() {
       align: 'right',
       render: (_value, record) => {
         const actionKind = deliveryVersionActionKind(record)
+        const targetActionReady =
+          actionKind === 'initialize' ? initializationReady : targetPassed
         const baseEligible =
           summaryFresh &&
           record.status === 'published' &&
           record.completeAssets === true &&
           record.gitSha !== currentTargetSha &&
-          targetPassed &&
+          targetActionReady &&
           !hasOpenOperation &&
           !isMutationRunning
         const promotionEligible =
           baseEligible &&
-          actionKind === 'promote' &&
+          ['initialize', 'promote'].includes(actionKind) &&
           record.promotionEligible === true
         const rollbackEligible =
           baseEligible &&
@@ -948,11 +959,14 @@ export default function DevVersionCenterPage() {
             ? '正在核对最新状态；上次结果只供查看，暂不能执行'
             : hasOpenOperation
               ? '已有未结束的 operation，请先完成或核对该操作'
-              : !targetPassed
-                ? `${selectedTargetDefinition.shortLabel}只读预检未通过，先处理容量或运行态阻断`
+              : !targetActionReady
+                ? actionKind === 'initialize'
+                  ? `${selectedTargetDefinition.shortLabel}首次部署预检未通过，先处理容量、基础镜像或资源冲突`
+                  : `${selectedTargetDefinition.shortLabel}只读预检未通过，先处理容量或运行态阻断`
                 : !record.completeAssets
                   ? '不可变发布制品不完整'
-                  : !record.promotionEligible && actionKind === 'promote'
+                  : !record.promotionEligible &&
+                      ['initialize', 'promote'].includes(actionKind)
                     ? '旧 v1 六资产版本仅可读取和回滚，不能用于新部署'
                     : record.gitSha === currentTargetSha
                       ? `该 exact SHA 已在${selectedTargetDefinition.shortLabel}运行`
@@ -986,7 +1000,7 @@ export default function DevVersionCenterPage() {
                   )
                 }
               >
-                准备版本提升
+                {actionKind === 'initialize' ? '准备首次部署' : '准备版本提升'}
               </Button>
             </Tooltip>
             <Tooltip
@@ -1060,7 +1074,11 @@ export default function DevVersionCenterPage() {
               setConfirmationText('')
             }}
           >
-            {record.action === 'rollback' ? '确认回滚' : '确认版本提升'}
+            {record.action === 'rollback'
+              ? '确认回滚'
+              : record.promotionMode === 'initialize'
+                ? '确认首次部署'
+                : '确认版本提升'}
           </Button>
         ) : retryable ? (
           <Tooltip
@@ -1105,7 +1123,9 @@ export default function DevVersionCenterPage() {
       key: 'action',
       render: (_value, record) => (
         <Space direction="vertical" size={2}>
-          <Text strong>{operationActionLabel(record.action)}</Text>
+          <Text strong>
+            {operationActionLabel(record.action, record.promotionMode)}
+          </Text>
           <Text type="secondary" code>
             {record.id.slice(0, 8)}
           </Text>
@@ -1443,7 +1463,8 @@ export default function DevVersionCenterPage() {
         <DevStaticGuidance title="固定边界" hint="发布职责与安全限制">
           GitLab 负责代码真源、CI 与不可变制品；GitHub 仅接收单向审查镜像；本地
           Bridge 只接受固定动作；demo 与 test
-          均不构建、不接受浏览器传入的命令、目录、仓库或 SSH 目标。两个目标共享不可变版本，但数据库、附件、运行资源、备份与回滚点相互隔离。
+          均不构建、不接受浏览器传入的命令、目录、仓库或 SSH
+          目标。两个目标共享不可变版本，但数据库、附件、运行资源、备份与回滚点相互隔离。
         </DevStaticGuidance>
 
         <section
@@ -1470,11 +1491,15 @@ export default function DevVersionCenterPage() {
             {DEV_DELIVERY_TARGETS.map((item) => (
               <article
                 key={item.key}
-                data-selected={item.key === selectedTargetKey ? 'true' : 'false'}
+                data-selected={
+                  item.key === selectedTargetKey ? 'true' : 'false'
+                }
               >
                 <Space wrap size={6}>
                   <Text strong>{item.label}</Text>
-                  <Tag color={item.key === selectedTargetKey ? 'blue' : 'default'}>
+                  <Tag
+                    color={item.key === selectedTargetKey ? 'blue' : 'default'}
+                  >
                     {item.key}
                   </Tag>
                 </Space>
@@ -1556,18 +1581,37 @@ export default function DevVersionCenterPage() {
               </Text>
             </Space>
           </Card>
-          <Card title={`${selectedTargetDefinition.label} · ${selectedTargetKey}`}>
+          <Card
+            title={`${selectedTargetDefinition.label} · ${selectedTargetKey}`}
+          >
             <Space direction="vertical" size={8}>
               <Text code>{shortGitSha(currentTargetSha)}</Text>
-              <Tag color={targetPassed ? 'success' : 'warning'}>
-                {targetPassed ? '只读预检通过' : '只读预检阻断'}
+              <Tag
+                color={
+                  targetPassed
+                    ? 'success'
+                    : initializationReady
+                      ? 'processing'
+                      : 'warning'
+                }
+              >
+                {targetPassed
+                  ? '运行态只读预检通过'
+                  : initializationReady
+                    ? '首次部署预检通过'
+                    : '目标预检阻断'}
               </Tag>
               <Text type="secondary">
                 可用空间{' '}
-                {formatDeliveryBytes(target?.remote?.capacity?.availableBytes)}
+                {formatDeliveryBytes(
+                  target?.remote?.capacity?.availableBytes ??
+                    initializationPreflight?.remote?.capacity?.availableBytes
+                )}
                 {' / '}最低要求{' '}
                 {formatDeliveryBytes(
-                  target?.remote?.capacity?.minimumAvailableBytes
+                  target?.remote?.capacity?.minimumAvailableBytes ??
+                    initializationPreflight?.remote?.capacity
+                      ?.minimumAvailableBytes
                 )}
               </Text>
             </Space>
@@ -1588,7 +1632,9 @@ export default function DevVersionCenterPage() {
                 {publicEntry?.provider === 'passed' ? '通过' : '未通过'}
               </Text>
               <Link
-                href={publicEntry?.endpoint || selectedTargetDefinition.endpoint}
+                href={
+                  publicEntry?.endpoint || selectedTargetDefinition.endpoint
+                }
                 target="_blank"
                 rel="noreferrer"
               >
@@ -1617,7 +1663,10 @@ export default function DevVersionCenterPage() {
                   >
                     <div className="erp-dev-version-current-operation__detail">
                       <Text strong>
-                        {operationActionLabel(operation.action)}
+                        {operationActionLabel(
+                          operation.action,
+                          operation.promotionMode
+                        )}
                       </Text>
                       <Text type="secondary" code>
                         {operation.id.slice(0, 8)}
@@ -1983,13 +2032,17 @@ export default function DevVersionCenterPage() {
         title={
           confirmOperation?.action === 'rollback'
             ? `确认代码回滚到 ${deliveryTargetLabel(confirmOperation?.target)}`
-            : `确认显式版本提升（Explicit Promotion）至 ${deliveryTargetLabel(confirmOperation?.target)}`
+            : confirmOperation?.promotionMode === 'initialize'
+              ? `确认首次部署（Explicit Promotion）至 ${deliveryTargetLabel(confirmOperation?.target)}`
+              : `确认显式版本提升（Explicit Promotion）至 ${deliveryTargetLabel(confirmOperation?.target)}`
         }
         open={Boolean(confirmOperation)}
         okText={
           confirmOperation?.action === 'rollback'
             ? '开始回滚'
-            : '开始版本提升'
+            : confirmOperation?.promotionMode === 'initialize'
+              ? '开始首次部署'
+              : '开始版本提升'
         }
         cancelText="取消"
         confirmLoading={actionKey === `execute:${confirmOperation?.id || ''}`}

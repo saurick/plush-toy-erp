@@ -21,6 +21,7 @@ import {
   buildReleaseVersionCatalog,
 } from '../../scripts/deploy/release-version-catalog.mjs'
 import { runTargetPreflightAsync } from '../../scripts/deploy/target-preflight.mjs'
+import { runTargetInitializationPreflightAsync } from '../../scripts/deploy/target-initialization-preflight.mjs'
 import { classifyGitAncestryRelation } from '../../scripts/deploy/git-ancestry-relation.mjs'
 import {
   SUPPORTED_DEPLOYMENT_TARGET_KEYS,
@@ -85,10 +86,29 @@ function bindVersionActions({
   return versions.map((version) => {
     const actionsByTarget = Object.fromEntries(
       DELIVERY_TARGET_KEYS.map((targetKey) => {
-        const target = targetEvidence.get(targetKey)
+        const evidence = targetEvidence.get(targetKey)
+        const target = evidence?.preflight
+        const initialization = evidence?.initializationPreflight
         const serverSha = target?.remote?.runtime?.serverSha
         const webSha = target?.remote?.runtime?.webSha
-        if (!SHA_PATTERN.test(String(serverSha || '')) || serverSha !== webSha) {
+        if (
+          !SHA_PATTERN.test(String(serverSha || '')) ||
+          serverSha !== webSha
+        ) {
+          if (
+            initialization?.status === 'eligible' &&
+            initialization?.target === targetKey &&
+            initialization?.remote?.rootState === 'absent' &&
+            initialization?.blockers?.length === 0
+          ) {
+            return [
+              targetKey,
+              {
+                actionClass: 'initialize',
+                actionReason: 'pristine_target_initialization_available',
+              },
+            ]
+          }
           return [
             targetKey,
             {
@@ -263,6 +283,11 @@ function publicOperation(
     Date.parse(operation.updatedAt) - Date.parse(operation.createdAt)
   )
   const metadata = operation.metadata || {}
+  const promotionMode =
+    operation.action === 'promote' &&
+    ['initialize', 'upgrade'].includes(metadata.promotionMode)
+      ? metadata.promotionMode
+      : null
   const remoteStages = Array.isArray(operation.metadata?.remoteStageTimings)
     ? operation.metadata.remoteStageTimings
         .filter(
@@ -379,6 +404,7 @@ function publicOperation(
   return {
     id: operation.id,
     action: operation.action,
+    promotionMode,
     target: operation.target,
     gitSha: operation.gitSha,
     version: operation.version,
@@ -477,6 +503,7 @@ export function createDevDeliveryService({
   operationStore,
   readRepositoryState = readRepositoryIdentity,
   runPreflight = runTargetPreflightAsync,
+  runInitializationPreflight = runTargetInitializationPreflightAsync,
   classifyRelation = classifyGitAncestryRelation,
   preparePromotionAction = preparePromotion,
   prepareRollbackAction = prepareRollback,
@@ -496,6 +523,7 @@ export function createDevDeliveryService({
   const providerName = providerKey === 'gitlab' ? 'GitLab' : 'GitHub'
   const children = new Map()
   const preflightCache = new Map()
+  const initializationPreflightCache = new Map()
   let pipelineTimingCache = null
 
   function presentOperation(operation, options = {}) {
@@ -551,11 +579,7 @@ export function createDevDeliveryService({
     }
     const currentTime = Date.now()
     const cached = preflightCache.get(targetKey)
-    if (
-      !force &&
-      cached &&
-      currentTime - cached.readAt < preflightTtlMs
-    ) {
+    if (!force && cached && currentTime - cached.readAt < preflightTtlMs) {
       return cached.value
     }
     const value = await Promise.resolve(runPreflight(targetKey))
@@ -583,6 +607,31 @@ export function createDevDeliveryService({
     return value
   }
 
+  async function readTargetInitializationPreflight(
+    targetKey,
+    { force = false } = {}
+  ) {
+    if (!isDeliveryTarget(targetKey)) {
+      throw new Error('delivery target is not registered')
+    }
+    const currentTime = Date.now()
+    const cached = initializationPreflightCache.get(targetKey)
+    if (!force && cached && currentTime - cached.readAt < preflightTtlMs) {
+      return cached.value
+    }
+    const value = await Promise.resolve(runInitializationPreflight(targetKey))
+    if (value?.target !== targetKey) {
+      throw new Error(
+        'target initialization preflight identity does not match the request'
+      )
+    }
+    initializationPreflightCache.set(targetKey, {
+      readAt: currentTime,
+      value,
+    })
+    return value
+  }
+
   async function getSummary({ forcePreflight = false } = {}) {
     await reconcileWaitingOperations()
     const [repositoryResult, versionsResult, timingsResult, ...targetResults] =
@@ -594,6 +643,23 @@ export function createDevDeliveryService({
           readTargetPreflight(targetKey, { force: forcePreflight })
         ),
       ])
+    const initializationResults = await Promise.allSettled(
+      DELIVERY_TARGET_KEYS.map((targetKey, index) => {
+        const preflight =
+          targetResults[index]?.status === 'fulfilled'
+            ? targetResults[index].value
+            : null
+        const serverSha = preflight?.remote?.runtime?.serverSha
+        const webSha = preflight?.remote?.runtime?.webSha
+        const existingRuntimeIdentity =
+          SHA_PATTERN.test(String(serverSha || '')) && serverSha === webSha
+        return preflight?.status === 'passed' || existingRuntimeIdentity
+          ? Promise.resolve(null)
+          : readTargetInitializationPreflight(targetKey, {
+              force: forcePreflight,
+            })
+      })
+    )
     const issues = []
     const generatedAt = now()
     let releaseVersionPolicy = null
@@ -630,7 +696,15 @@ export function createDevDeliveryService({
       const definition = getDeploymentTarget(targetKey)
       const result = targetResults[index]
       const preflight = result?.status === 'fulfilled' ? result.value : null
-      if (preflight) targetEvidence.set(targetKey, preflight)
+      const initializationResult = initializationResults[index]
+      const initializationPreflight =
+        initializationResult?.status === 'fulfilled'
+          ? initializationResult.value
+          : null
+      targetEvidence.set(targetKey, {
+        preflight,
+        initializationPreflight,
+      })
       if (!preflight) {
         issues.push({
           code: `target_preflight_unavailable_${targetKey.replaceAll('-', '_')}`,
@@ -643,6 +717,7 @@ export function createDevDeliveryService({
         purpose: definition.purpose,
         endpoint: definition.publicEntry.endpoint,
         preflight,
+        initializationPreflight,
       }
     })
     if (timingsResult.status === 'rejected') {
@@ -653,17 +728,15 @@ export function createDevDeliveryService({
       })
     }
     let backupRestoreEvidence = null
-    if (
-      targetEvidence.get('customer-test-133')?.target &&
-      targetEvidence.get('customer-test-133')?.customer
-    ) {
-      const customerTestTarget = targetEvidence.get('customer-test-133')
+    const customerTestPreflight =
+      targetEvidence.get('customer-test-133')?.preflight
+    if (customerTestPreflight?.target && customerTestPreflight?.customer) {
       try {
         backupRestoreEvidence = await Promise.resolve(
           readRecoveryEvidence({
             projectRoot: root,
-            target: customerTestTarget.target,
-            customer: customerTestTarget.customer,
+            target: customerTestPreflight.target,
+            customer: customerTestPreflight.customer,
             environment: 'customer-clean-acceptance',
           })
         )
@@ -691,7 +764,7 @@ export function createDevDeliveryService({
             })
           : [],
       releaseVersionPolicy,
-      target: targetEvidence.get('demo-133') || null,
+      target: targetEvidence.get('demo-133')?.preflight || null,
       targets,
       timings:
         timingsResult.status === 'fulfilled' ? timingsResult.value : null,
@@ -840,7 +913,7 @@ export function createDevDeliveryService({
           operationStore: store,
           retryOfOperationId,
         },
-        { runPreflight, now }
+        { runPreflight, runInitializationPreflight, now }
       )
     )
     preflightCache.delete(payload.target)

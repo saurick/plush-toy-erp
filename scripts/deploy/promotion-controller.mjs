@@ -28,9 +28,17 @@ import {
   validateReleaseRehearsalReceipt,
 } from "./release-catalog.mjs";
 import { runTargetPreflight } from "./target-preflight.mjs";
+import {
+  buildTargetInitializationManifest,
+  isTargetInitializationManifest,
+  validateTargetInitializationManifest,
+  writeTargetInitializationManifest,
+} from "./target-initialization-manifest.mjs";
+import { runTargetInitializationPreflight } from "./target-initialization-preflight.mjs";
 import { classifyGitAncestryRelation } from "./git-ancestry-relation.mjs";
 
 const MAX_MANIFEST_BYTES = 512 * 1024;
+const SHA_PATTERN = /^[0-9a-f]{40}$/u;
 
 function readPlainJson(file, maximumBytes = MAX_MANIFEST_BYTES) {
   const absolute = realpathSync(file);
@@ -67,7 +75,10 @@ function issueForBlocker(code) {
 export function readPromotionPlan(store, operationId) {
   const file = promotionPlanFile(store, operationId);
   if (!existsSync(file)) return null;
-  return validatePromotionManifest(readPlainJson(file).value);
+  const value = readPlainJson(file).value;
+  return isTargetInitializationManifest(value)
+    ? validateTargetInitializationManifest(value)
+    : validatePromotionManifest(value);
 }
 
 export async function preparePromotion(
@@ -81,6 +92,7 @@ export async function preparePromotion(
   },
   {
     runPreflight = runTargetPreflight,
+    runInitializationPreflight = runTargetInitializationPreflight,
     classifyRelation = classifyGitAncestryRelation,
     now = () => new Date().toISOString(),
   } = {},
@@ -145,28 +157,57 @@ export async function preparePromotion(
   });
   try {
     const targetPreflight = await runPreflight(targetKey);
-    const ancestry = classifyRelation({
-      repoRoot: root,
-      currentGitSha: targetPreflight.remote?.runtime?.serverSha,
-      candidateGitSha: releaseManifest.gitSha,
-    });
-    const plan = buildPromotionManifest({
-      operationId: operation.id,
-      releaseManifest,
-      releaseManifestSha256,
-      targetPreflight,
-      ancestry,
-      createdAt: now(),
-    });
-    writePromotionManifest(promotionPlanFile(store, operation.id), plan);
+    const runtimeServerSha = targetPreflight.remote?.runtime?.serverSha;
+    const runtimeWebSha = targetPreflight.remote?.runtime?.webSha;
+    const existingRuntimeIdentity =
+      SHA_PATTERN.test(String(runtimeServerSha || "")) &&
+      runtimeServerSha === runtimeWebSha;
+    let plan;
+    let promotionMode;
+    if (targetPreflight.status === "passed" || existingRuntimeIdentity) {
+      const ancestry = classifyRelation({
+        repoRoot: root,
+        currentGitSha: targetPreflight.remote?.runtime?.serverSha,
+        candidateGitSha: releaseManifest.gitSha,
+      });
+      plan = buildPromotionManifest({
+        operationId: operation.id,
+        releaseManifest,
+        releaseManifestSha256,
+        targetPreflight,
+        ancestry,
+        createdAt: now(),
+      });
+      writePromotionManifest(promotionPlanFile(store, operation.id), plan);
+      promotionMode = "upgrade";
+    } else {
+      const initializationPreflight =
+        await runInitializationPreflight(targetKey);
+      plan = buildTargetInitializationManifest({
+        operationId: operation.id,
+        releaseManifest,
+        releaseManifestSha256,
+        initializationPreflight,
+        createdAt: now(),
+      });
+      writeTargetInitializationManifest(
+        promotionPlanFile(store, operation.id),
+        plan,
+      );
+      promotionMode = "initialize";
+    }
     if (plan.status === "blocked") {
       operation = transitionDeliveryOperation(store, operation.id, {
         status: "blocked",
-        message: "promotion is blocked by fixed-target preflight",
+        message:
+          promotionMode === "initialize"
+            ? "target initialization is blocked by the pristine-target preflight"
+            : "promotion is blocked by fixed-target preflight",
         issues: plan.blockers.map(issueForBlocker),
         metadata: {
           ...operation.metadata,
           promotionFingerprint: plan.fingerprint,
+          promotionMode,
         },
         now: now(),
       });
@@ -177,6 +218,7 @@ export async function preparePromotion(
         metadata: {
           ...operation.metadata,
           promotionFingerprint: plan.fingerprint,
+          promotionMode,
           noTargetWriteRequired: true,
         },
         now: now(),
@@ -189,6 +231,7 @@ export async function preparePromotion(
         metadata: {
           ...operation.metadata,
           promotionFingerprint: plan.fingerprint,
+          promotionMode,
         },
         now: now(),
       });

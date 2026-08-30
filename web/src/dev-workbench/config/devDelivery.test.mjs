@@ -148,6 +148,7 @@ function summaryFixture() {
       purpose: target.purpose,
       endpoint: target.endpoint,
       preflight: null,
+      initializationPreflight: null,
     })),
     operations: [
       {
@@ -354,20 +355,20 @@ test('delivery summary requires both target contracts and no-shell boundaries', 
   }
   const deployed = summaryFixture()
   deployed.target = {
-      target: 'demo-133',
-      purpose: 'project-demo-simulated',
-      status: 'passed',
-      remote: {
-        runtime: { serverSha: SHA, webSha: SHA },
-        publicEntry: {
-          status: 'passed',
-          container: `plush-toy-erp-demo-web-public-${SHA.slice(0, 8)}`,
-          gitSha: SHA,
-          health: 'passed',
-          provider: 'passed',
-          endpoint: 'https://demo.yoyoosun.net',
-        },
+    target: 'demo-133',
+    purpose: 'project-demo-simulated',
+    status: 'passed',
+    remote: {
+      runtime: { serverSha: SHA, webSha: SHA },
+      publicEntry: {
+        status: 'passed',
+        container: `plush-toy-erp-demo-web-public-${SHA.slice(0, 8)}`,
+        gitSha: SHA,
+        health: 'passed',
+        provider: 'passed',
+        endpoint: 'https://demo.yoyoosun.net',
       },
+    },
   }
   deployed.targets = deployed.targets.map((descriptor) =>
     descriptor.key === 'demo-133'
@@ -375,6 +376,57 @@ test('delivery summary requires both target contracts and no-shell boundaries', 
       : descriptor
   )
   assert.equal(validateDevDeliverySummary(deployed).target.status, 'passed')
+  const initializationEvidence = {
+    schemaVersion: 'plush.target-initialization-preflight/v1',
+    generatedAt: '2026-07-29T01:00:00.000Z',
+    status: 'eligible',
+    target: 'customer-test-133',
+    purpose: 'customer-clean-acceptance',
+    customer: 'yoyoosun',
+    trialTarget: 'customer-trial-133',
+    remote: {
+      schemaVersion: 'plush.remote-target-initialization-preflight/v1',
+      status: 'eligible',
+      target: 'customer-test-133',
+      host: { hostname: 'R640', user: 'simon' },
+      rootState: 'absent',
+      conflicts: {
+        targetContainers: 0,
+        targetNetworks: 0,
+        publicContainers: 0,
+        tcpPorts: 0,
+        udpPorts: 0,
+      },
+      capacity: {
+        availableBytes: 64 * 1024 ** 3,
+        minimumAvailableBytes: 30 * 1024 ** 3,
+      },
+      tooling: 'passed',
+      atlas: 'passed',
+      baseImages: 'passed',
+      blockers: [],
+    },
+    blockers: [],
+    nextAction:
+      'initialize this pristine registered target from one immutable release',
+    redaction: {
+      containsSecrets: false,
+      containsCredentials: false,
+      containsSshTarget: false,
+      containsAbsolutePaths: false,
+    },
+  }
+  const pristine = summaryFixture()
+  pristine.targets = pristine.targets.map((descriptor) =>
+    descriptor.key === 'customer-test-133'
+      ? { ...descriptor, initializationPreflight: initializationEvidence }
+      : descriptor
+  )
+  assert.equal(
+    validateDevDeliverySummary(pristine).targets[1].initializationPreflight
+      .status,
+    'eligible'
+  )
   const mismatchedPublicEntry = {
     ...deployed.target,
     remote: {
@@ -399,18 +451,18 @@ test('delivery summary requires both target contracts and no-shell boundaries', 
     /target evidence/u
   )
   const blockedEvidence = {
-      ...deployed.target,
-      status: 'blocked',
-      remote: {
-        runtime: { serverSha: SHA, webSha: 'unknown' },
-        publicEntry: {
-          ...deployed.target.remote.publicEntry,
-          status: 'blocked',
-          gitSha: 'unknown',
-          health: 'failed',
-          provider: 'failed',
-        },
+    ...deployed.target,
+    status: 'blocked',
+    remote: {
+      runtime: { serverSha: SHA, webSha: 'unknown' },
+      publicEntry: {
+        ...deployed.target.remote.publicEntry,
+        status: 'blocked',
+        gitSha: 'unknown',
+        health: 'failed',
+        provider: 'failed',
       },
+    },
   }
   const blockedTarget = {
     ...deployed,
@@ -960,6 +1012,14 @@ test('version actions use Git ancestry classes rather than publication time', ()
   assert.equal(
     deliveryVersionActionKind({
       gitSha: SHA,
+      actionClass: 'initialize',
+      actionReason: 'pristine_target_initialization_available',
+    }),
+    'initialize'
+  )
+  assert.equal(
+    deliveryVersionActionKind({
+      gitSha: SHA,
       publishedAt: '2026-07-29T01:00:00.000Z',
       actionClass: 'promote',
       actionReason: 'candidate_descends_from_current',
@@ -996,6 +1056,7 @@ test('version center page does not expose shell, SSH or arbitrary target inputs'
   assert.match(source, /DEV_DELIVERY_TARGETS/u)
   assert.match(source, /test 甲方测试验收环境/u)
   assert.match(source, /demo 项目演练造数环境/u)
+  assert.doesNotMatch(source, /admin\.yoyoosun\.net/u)
   assert.match(source, /查看详情/u)
   assert.match(source, /确认回滚/u)
   assert.match(source, /公网入口/u)

@@ -85,8 +85,7 @@ function releaseManifest({ artifactSha256, receiptSha256 }) {
       provenance: {
         source: "gitlab-ci",
         repository: "saurick/plush-toy-erp",
-        workflowRef:
-          "saurick/plush-toy-erp/.gitlab-ci.yml@refs/heads/main",
+        workflowRef: "saurick/plush-toy-erp/.gitlab-ci.yml@refs/heads/main",
         runId: "123",
         runAttempt: "1",
         job: "quality_aggregate",
@@ -330,6 +329,50 @@ function targetPreflight(blocked = false) {
   };
 }
 
+function targetInitializationPreflight(status = "blocked") {
+  const eligible = status === "eligible";
+  return {
+    schemaVersion: "plush.target-initialization-preflight/v1",
+    status,
+    target: "demo-133",
+    purpose: "project-demo-simulated",
+    customer: "yoyoosun",
+    trialTarget: "customer-trial-133",
+    remote: {
+      schemaVersion: "plush.remote-target-initialization-preflight/v1",
+      status,
+      target: "demo-133",
+      host: { hostname: "r640", user: "simon" },
+      rootState: eligible ? "absent" : "present",
+      conflicts: {
+        targetContainers: 0,
+        targetNetworks: 0,
+        publicContainers: 0,
+        tcpPorts: 0,
+        udpPorts: 0,
+      },
+      capacity: {
+        availableBytes: 40 * 1024 ** 3,
+        minimumAvailableBytes: 30 * 1024 ** 3,
+      },
+      tooling: "passed",
+      atlas: "passed",
+      baseImages: "passed",
+      blockers: eligible ? [] : ["initialization_root_not_absent"],
+    },
+    blockers: eligible ? [] : ["initialization_root_not_absent"],
+    nextAction: eligible
+      ? "initialize this pristine registered target from one immutable release"
+      : "resolve the fixed initialization blockers without taking over partial state",
+    redaction: {
+      containsSecrets: false,
+      containsCredentials: false,
+      containsSshTarget: false,
+      containsAbsolutePaths: false,
+    },
+  };
+}
+
 function fixture(t) {
   const root = mkdtempSync(path.join(os.tmpdir(), "promotion-controller-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
@@ -393,9 +436,52 @@ test("promotion preparation awaits one read-only preflight and becomes ready", a
   );
 });
 
-test("promotion preparation persists disk blocker as a terminal operation", async (t) => {
+test("a pristine registered target becomes one explicit initialization promotion", async (t) => {
+  const data = fixture(t);
+  let initializationCalls = 0;
+  const absentTarget = targetPreflight(true);
+  absentTarget.remote.runtime = {
+    serverSha: "unknown",
+    webSha: "unknown",
+    serverHealth: "failed",
+    serverReady: "failed",
+    webHealth: "failed",
+  };
+  const report = await preparePromotion(
+    {
+      repoRoot: data.root,
+      releaseManifestPath: data.releaseManifestPath,
+      targetKey: "demo-133",
+      idempotencyKey: `${IDEMPOTENCY_KEY}:initialize`,
+      operationStore: data.store,
+    },
+    {
+      classifyRelation: () => {
+        throw new Error("ancestry must not run for an absent target");
+      },
+      runPreflight: () => absentTarget,
+      runInitializationPreflight: () => {
+        initializationCalls += 1;
+        return targetInitializationPreflight("eligible");
+      },
+    },
+  );
+
+  assert.equal(report.operation.status, "ready");
+  assert.equal(report.operation.metadata.promotionMode, "initialize");
+  assert.equal(report.plan.mode, "initialize");
+  assert.equal(report.plan.before.targetState, "absent");
+  assert.equal(initializationCalls, 1);
+  assert.equal(
+    readPromotionPlan(data.store, report.operation.id).schemaVersion,
+    "plush.target-initialization-manifest/v1",
+  );
+});
+
+test("promotion preparation preserves existing-target blockers without reclassifying initialization", async (t) => {
   const data = fixture(t);
   let preflightCalls = 0;
+  let initializationCalls = 0;
   const request = {
     repoRoot: data.root,
     releaseManifestPath: data.releaseManifestPath,
@@ -405,6 +491,10 @@ test("promotion preparation persists disk blocker as a terminal operation", asyn
   };
   const first = await preparePromotion(request, {
     classifyRelation,
+    runInitializationPreflight: () => {
+      initializationCalls += 1;
+      return targetInitializationPreflight();
+    },
     runPreflight: () => {
       preflightCalls += 1;
       return targetPreflight(true);
@@ -420,6 +510,8 @@ test("promotion preparation persists disk blocker as a terminal operation", asyn
   assert.equal(first.operation.status, "blocked");
   assert.equal(second.operation.status, "blocked");
   assert.equal(preflightCalls, 1);
+  assert.equal(initializationCalls, 0);
+  assert.equal(first.operation.metadata.promotionMode, "upgrade");
   assert.deepEqual(first.plan.blockers, ["target_disk_capacity_low"]);
   assert.doesNotMatch(
     readFileSync(
@@ -428,6 +520,45 @@ test("promotion preparation persists disk blocker as a terminal operation", asyn
     ),
     /192\.168|\/home\/simon|password|token/iu,
   );
+});
+
+test("an unidentifiable partial target is blocked without claiming pristine state", async (t) => {
+  const data = fixture(t);
+  const blocked = targetPreflight(true);
+  blocked.remote.runtime = {
+    serverSha: "unknown",
+    webSha: "unknown",
+    serverHealth: "failed",
+    serverReady: "failed",
+    webHealth: "failed",
+  };
+  const report = await preparePromotion(
+    {
+      repoRoot: data.root,
+      releaseManifestPath: data.releaseManifestPath,
+      targetKey: "demo-133",
+      idempotencyKey: `${IDEMPOTENCY_KEY}:partial-target`,
+      operationStore: data.store,
+    },
+    {
+      classifyRelation: () => {
+        throw new Error("ancestry must not run without a runtime identity");
+      },
+      runPreflight: () => blocked,
+      runInitializationPreflight: () => targetInitializationPreflight(),
+    },
+  );
+
+  assert.equal(report.operation.status, "blocked");
+  assert.equal(report.plan.mode, "initialize");
+  assert.deepEqual(report.plan.before, {
+    targetState: "present",
+    runtimeSha: "unknown",
+    backupState: "unknown",
+    availableBytes: 40 * 1024 ** 3,
+    minimumAvailableBytes: 30 * 1024 ** 3,
+  });
+  assert.deepEqual(report.plan.blockers, ["initialization_root_not_absent"]);
 });
 
 test("promotion controller CLI exposes explicit terminal retry lineage", () => {
@@ -462,6 +593,7 @@ test("explicit terminal retry creates a distinct ready operation lineage", async
     { ...common, idempotencyKey: IDEMPOTENCY_KEY },
     {
       classifyRelation,
+      runInitializationPreflight: () => targetInitializationPreflight(),
       runPreflight: () => {
         preflightCalls += 1;
         return targetPreflight(true);

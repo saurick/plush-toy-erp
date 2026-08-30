@@ -6,7 +6,9 @@ import test from "node:test";
 
 import {
   REMOTE_PROMOTION_RECEIPT_CONTRACT,
+  REMOTE_TARGET_INITIALIZATION_RECEIPT_CONTRACT,
   validateRemotePromotionReceipt,
+  validateRemoteTargetInitializationReceipt,
 } from "./promotion-executor.mjs";
 
 const SHA = "a".repeat(40);
@@ -112,6 +114,82 @@ const expected = {
   promotionFingerprint: "c".repeat(64),
 };
 
+const initializationExpected = {
+  operationId: OPERATION_ID,
+  targetKey: "demo-133",
+  gitSha: SHA,
+  version: "2026.07.29-1",
+  migration: "20260729000000",
+  releaseManifestSha256: HASH,
+  releaseRehearsalSha256: "9".repeat(64),
+  initializationFingerprint: "c".repeat(64),
+};
+
+function initializationReceipt(overrides = {}) {
+  return {
+    schemaVersion: REMOTE_TARGET_INITIALIZATION_RECEIPT_CONTRACT,
+    status: "passed",
+    operationId: OPERATION_ID,
+    target: "demo-133",
+    gitSha: SHA,
+    version: "2026.07.29-1",
+    releaseManifestSha256: HASH,
+    releaseRehearsalSha256: "9".repeat(64),
+    initializationFingerprint: "c".repeat(64),
+    stage: "passed",
+    issueCode: "none",
+    before: { targetState: "absent" },
+    images: {
+      serverContentId: `sha256:${"e".repeat(64)}`,
+      webContentId: `sha256:${"f".repeat(64)}`,
+    },
+    migration: {
+      applyStarted: true,
+      automaticDownMigration: false,
+      readback: "20260729000000",
+    },
+    bootstrap: {
+      started: true,
+      completed: true,
+      secretPersistedOnTarget: false,
+    },
+    rollbackPoint: {
+      backupAlias: `initial-${SHA.slice(0, 12)}-${OPERATION_ID}`,
+      backupSha256: "1".repeat(64),
+      backupSizeBytes: 612_412,
+      restoreChecked: true,
+    },
+    checks: {
+      staticConfig: true,
+      releaseIdentity: true,
+      health: true,
+      ready: true,
+      basicSmoke: true,
+      publicEntry: true,
+      backupRestore: true,
+      dataEnvironment: true,
+    },
+    rollback: {
+      complete: true,
+      retainedTarget: true,
+      preservesOtherTargets: true,
+    },
+    finishedAt: "2026-07-29T04:00:00Z",
+    redaction: {
+      containsSecrets: false,
+      containsCredentials: false,
+      containsAbsolutePaths: false,
+      containsRawEnvironmentValues: false,
+      containsRawLogs: false,
+    },
+    notProven: [
+      "demo seed or customer-test business acceptance data",
+      "customer UAT and sign-off",
+    ],
+    ...overrides,
+  };
+}
+
 test("promotion executor accepts only an identity-bound redacted receipt", () => {
   assert.equal(
     validateRemotePromotionReceipt(receipt(), expected).status,
@@ -152,6 +230,72 @@ test("promotion executor accepts only an identity-bound redacted receipt", () =>
         expected,
       ),
     /timing contract/u,
+  );
+});
+
+test("target initialization receipt binds pristine state, backup and rollback", () => {
+  assert.equal(
+    validateRemoteTargetInitializationReceipt(
+      initializationReceipt(),
+      initializationExpected,
+    ).status,
+    "passed",
+  );
+  assert.throws(
+    () =>
+      validateRemoteTargetInitializationReceipt(
+        initializationReceipt({
+          rollback: {
+            complete: true,
+            retainedTarget: false,
+            preservesOtherTargets: true,
+          },
+        }),
+        initializationExpected,
+      ),
+    /inconsistent/u,
+  );
+  assert.equal(
+    validateRemoteTargetInitializationReceipt(
+      initializationReceipt({
+        status: "failed",
+        stage: "database_start",
+        issueCode: "initialization_rolled_back",
+        images: {
+          serverContentId: "unknown",
+          webContentId: "unknown",
+        },
+        migration: {
+          applyStarted: false,
+          automaticDownMigration: false,
+          readback: "unknown",
+        },
+        bootstrap: {
+          started: false,
+          completed: false,
+          secretPersistedOnTarget: false,
+        },
+        rollbackPoint: {
+          backupAlias: `initial-${SHA.slice(0, 12)}-${OPERATION_ID}`,
+          backupSha256: "none",
+          backupSizeBytes: 0,
+          restoreChecked: false,
+        },
+        checks: Object.fromEntries(
+          Object.keys(initializationReceipt().checks).map((key) => [
+            key,
+            false,
+          ]),
+        ),
+        rollback: {
+          complete: true,
+          retainedTarget: false,
+          preservesOtherTargets: true,
+        },
+      }),
+      initializationExpected,
+    ).status,
+    "failed",
   );
 });
 

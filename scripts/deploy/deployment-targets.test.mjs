@@ -17,6 +17,7 @@ test("deployment registry exposes only the isolated demo and customer-test targe
     registry.targets.map((target) => target.key),
     ["demo-133", "customer-test-133"],
   );
+  assert.doesNotMatch(JSON.stringify(registry), /admin\.yoyoosun\.net/u);
   const demo = getDeploymentTarget("demo-133", registry);
   assert.equal(demo.purpose, "project-demo-simulated");
   assert.equal(demo.ssh.host, "192.168.0.133");
@@ -59,7 +60,10 @@ test("deployment registry exposes only the isolated demo and customer-test targe
   const customerTest = getDeploymentTarget("customer-test-133", registry);
   assert.equal(customerTest.purpose, "customer-clean-acceptance");
   assert.equal(customerTest.trialTarget, "none");
-  assert.equal(customerTest.filesystem.root, "/home/simon/plush-toy-erp-test-v1");
+  assert.equal(
+    customerTest.filesystem.root,
+    "/home/simon/plush-toy-erp-test-v1",
+  );
   assert.equal(customerTest.compose.projectName, "plush-toy-erp-test-v1");
   assert.equal(customerTest.database.name, "plush_erp_customer_test_v1");
   assert.equal(customerTest.runtime.postgres.hostPort, 55437);
@@ -71,6 +75,7 @@ test("deployment registry exposes only the isolated demo and customer-test targe
   assert.equal(customerTest.runtime.web.hostPort, 5205);
   assert.equal(customerTest.publicEntry.endpoint, "https://test.yoyoosun.net");
   assert.throws(() => getDeploymentTarget("admin"), /unsupported/u);
+  assert.throws(() => getDeploymentTarget("admin-133"), /unsupported/u);
   assert.throws(() => getDeploymentTarget("test-133"), /unsupported/u);
 });
 
@@ -93,7 +98,8 @@ test("deployment registry refuses extra targets paths and commands", () => {
   );
 
   const sharedDatabase = structuredClone(loadDeploymentTargetRegistry());
-  sharedDatabase.targets[1].database.name = sharedDatabase.targets[0].database.name;
+  sharedDatabase.targets[1].database.name =
+    sharedDatabase.targets[0].database.name;
   assert.throws(
     () => validateDeploymentTargetRegistry(sharedDatabase),
     /database identity is invalid|database identities must be isolated/u,

@@ -66,7 +66,7 @@ while [[ $# -gt 0 ]]; do
     shift 2
     ;;
   -h | --help)
-    echo "用法: bash deployments/yoyoosun/scripts/cutover-public-web.sh --image <immutable-web-image> --release <40sha> --current-container <name> --endpoint <https-url> --api-origin http://app-server:8300 [--network <compose-network>] [--container-prefix <prefix>] [--host-port <port>] [--candidate-port <port>] [--execute --confirm PUBLIC_WEB_CUTOVER:<old>:<40sha>]"
+    echo "用法: bash deployments/yoyoosun/scripts/cutover-public-web.sh --image <immutable-web-image> --release <40sha> --current-container <name|none> --endpoint <https-url> --api-origin http://app-server:8300 [--network <compose-network>] [--container-prefix <prefix>] [--host-port <port>] [--candidate-port <port>] [--execute --confirm PUBLIC_WEB_CUTOVER:<old|none>:<40sha>]"
     exit 0
     ;;
   *) fail "不支持的参数: $1" ;;
@@ -75,7 +75,7 @@ done
 
 [[ "$release" =~ ^[0-9a-f]{40}$ ]] || fail "--release 必须是 40 位小写 Git SHA"
 [[ -n "$image" && "$image" != *:latest && "$image" != *:dev ]] || fail "--image 必须是不可变 tag"
-[[ "$current_container" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]+$ ]] || fail "--current-container 不合法"
+[[ "$current_container" == none || "$current_container" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]+$ ]] || fail "--current-container 不合法"
 [[ "$endpoint" =~ ^https://[^/@[:space:]]+/?$ ]] || fail "--endpoint 必须是无凭据 HTTPS 根地址"
 [[ "$api_origin" == "http://app-server:8300" ]] || fail "--api-origin 必须精确指向 Compose app-server"
 [[ "$container_prefix" =~ ^[a-z0-9][a-z0-9_.-]*-$ ]] || fail "--container-prefix 不合法"
@@ -103,7 +103,12 @@ command -v python3 >/dev/null 2>&1 || fail "缺少 python3"
 docker image inspect "$image" >/dev/null 2>&1 || fail "目标镜像不存在"
 image_release="$(docker image inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$image" | awk -F= '$1 == "GIT_SHA" { value=$0; sub(/^[^=]*=/, "", value); count++ } END { if (count == 1) print value }')"
 [[ "$image_release" == "$release" ]] || fail "目标镜像 GIT_SHA 与 release 不一致"
-docker inspect "$current_container" >/dev/null 2>&1 || fail "当前公网容器不存在"
+if [[ "$current_container" == none ]]; then
+  existing_public_count="$({ docker ps -aq --format '{{.Names}}' | grep -E "^${container_prefix}" || true; } | wc -l | tr -d ' ')"
+  [[ "$existing_public_count" == 0 ]] || fail "首次公网入口要求目标前缀容器完全不存在"
+else
+  docker inspect "$current_container" >/dev/null 2>&1 || fail "当前公网容器不存在"
+fi
 docker network inspect "$network" >/dev/null 2>&1 || fail "目标 Docker network 不存在"
 
 short_release="${release:0:8}"
@@ -150,13 +155,15 @@ if [[ "$execute" -eq 0 ]]; then
 fi
 [[ "$confirmation" == "$confirm_text" ]] || fail "确认词不匹配"
 
-current_release="$(container_release "$current_container")"
-[[ "$current_release" =~ ^[0-9a-f]{40}$ ]] || fail "当前公网容器没有可信 GIT_SHA"
-if [[ "$current_release" == "$release" ]]; then
-  wait_http_health "http://127.0.0.1:$host_port/healthz" || fail "当前公网入口未健康"
-  assert_provider_capabilities "$endpoint" || fail "当前公网入口未满足 provider 合同"
-  echo "[cutover-public-web] passed current=$current_container rollback=$current_container release=$release provider=true reused=true"
-  exit 0
+if [[ "$current_container" != none ]]; then
+  current_release="$(container_release "$current_container")"
+  [[ "$current_release" =~ ^[0-9a-f]{40}$ ]] || fail "当前公网容器没有可信 GIT_SHA"
+  if [[ "$current_release" == "$release" ]]; then
+    wait_http_health "http://127.0.0.1:$host_port/healthz" || fail "当前公网入口未健康"
+    assert_provider_capabilities "$endpoint" || fail "当前公网入口未满足 provider 合同"
+    echo "[cutover-public-web] passed current=$current_container rollback=$current_container release=$release provider=true reused=true"
+    exit 0
+  fi
 fi
 
 docker rm -f "$candidate" >/dev/null 2>&1 || true
@@ -189,13 +196,17 @@ docker run -d \
 wait_http_health "http://127.0.0.1:$candidate_port/healthz" || fail "候选前端未健康"
 
 assert_provider_capabilities "http://127.0.0.1:$candidate_port" || fail "候选前端 SMS 能力未匹配 provider 合同"
-docker update --restart=no "$current_container" >/dev/null
-docker stop "$current_container" >/dev/null
+if [[ "$current_container" != none ]]; then
+  docker update --restart=no "$current_container" >/dev/null
+  docker stop "$current_container" >/dev/null
+fi
 
 rollback_old() {
   docker rm -f "$next_container" >/dev/null 2>&1 || true
-  docker update --restart=always "$current_container" >/dev/null 2>&1 || true
-  docker start "$current_container" >/dev/null 2>&1 || true
+  if [[ "$current_container" != none ]]; then
+    docker update --restart=always "$current_container" >/dev/null 2>&1 || true
+    docker start "$current_container" >/dev/null 2>&1 || true
+  fi
 }
 
 if ! docker run -d \

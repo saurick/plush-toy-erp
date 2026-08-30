@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { randomBytes } from "node:crypto";
 import {
   copyFileSync,
   existsSync,
@@ -38,6 +39,11 @@ import {
   validateReleaseRehearsalReceipt,
 } from "./release-catalog.mjs";
 import { runTargetPreflight } from "./target-preflight.mjs";
+import {
+  isTargetInitializationManifest,
+  validateTargetInitializationManifest,
+} from "./target-initialization-manifest.mjs";
+import { runTargetInitializationPreflight } from "./target-initialization-preflight.mjs";
 import { classifyGitAncestryRelation } from "./git-ancestry-relation.mjs";
 import { validateRemoteStageTimings } from "./remote-stage-timings.mjs";
 import {
@@ -50,6 +56,10 @@ import {
 
 export const REMOTE_PROMOTION_RECEIPT_CONTRACT =
   "plush.remote-promotion-receipt/v3";
+export const REMOTE_TARGET_INITIALIZATION_RECEIPT_CONTRACT =
+  "plush.remote-target-initialization-receipt/v1";
+export const TARGET_INITIALIZATION_RECEIPT_FILE_SUFFIX =
+  ".target-initialization.json";
 
 const UUID_V4_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
@@ -153,7 +163,9 @@ export function preparePromotionTransfer(
 ) {
   const root = realpathSync(repoRoot);
   const bundle = realpathSync(bundleDir);
-  const plan = validatePromotionManifest(promotionPlan);
+  const plan = isTargetInitializationManifest(promotionPlan)
+    ? validateTargetInitializationManifest(promotionPlan)
+    : validatePromotionManifest(promotionPlan);
   if (plan.status !== "eligible") {
     throw new Error("only an eligible promotion plan can be transferred");
   }
@@ -177,9 +189,7 @@ export function preparePromotionTransfer(
     artifact,
     sha256File(artifactFile),
   );
-  if (
-    artifact?.git?.commit !== releaseManifest.gitSha
-  ) {
+  if (artifact?.git?.commit !== releaseManifest.gitSha) {
     throw new Error("release artifact does not match the immutable release");
   }
   verifyReleaseArtifact(artifactFile);
@@ -200,7 +210,9 @@ export function preparePromotionTransfer(
     plan.release.rehearsalReceiptFile !== "release-rehearsal.json" ||
     rehearsalReceipt.git.commit !== plan.release.gitSha
   ) {
-    throw new Error("release rehearsal receipt does not match the promotion plan");
+    throw new Error(
+      "release rehearsal receipt does not match the promotion plan",
+    );
   }
   const sbomSource = safeBundleFile(bundle, artifact.sbom.file);
   const imageByKind = new Map(
@@ -268,12 +280,15 @@ export function preparePromotionTransfer(
       `${JSON.stringify(plan, null, 2)}\n`,
       { mode: 0o600 },
     );
+    const remoteScriptRelative = isTargetInitializationManifest(plan)
+      ? "scripts/deploy/remote-target-initialization.sh"
+      : "scripts/deploy/remote-promotion.sh";
     writeFileSync(
       path.join(destination, "remote-promotion.sh"),
       sourceFileAtCommit(
         root,
         releaseManifest.gitSha,
-        "scripts/deploy/remote-promotion.sh",
+        remoteScriptRelative,
         runCommand,
       ),
       { mode: 0o600 },
@@ -357,6 +372,551 @@ export function preparePromotionTransfer(
   } catch (error) {
     rmSync(destination, { recursive: true, force: true });
     throw error;
+  }
+}
+
+const INITIALIZATION_SECRET_KEYS = Object.freeze([
+  "POSTGRES_PASSWORD",
+  "POSTGRES_APP_PASSWORD",
+  "POSTGRES_MIGRATOR_PASSWORD",
+  "POSTGRES_BACKUP_PASSWORD",
+  "APP_JWT_SECRET",
+  "APP_ADMIN_PASSWORD",
+]);
+
+function generateTargetInitializationSecrets() {
+  return Object.freeze({
+    POSTGRES_PASSWORD: randomBytes(32).toString("base64url"),
+    POSTGRES_APP_PASSWORD: randomBytes(32).toString("base64url"),
+    POSTGRES_MIGRATOR_PASSWORD: randomBytes(32).toString("base64url"),
+    POSTGRES_BACKUP_PASSWORD: randomBytes(32).toString("base64url"),
+    APP_JWT_SECRET: randomBytes(48).toString("base64url"),
+    APP_ADMIN_PASSWORD: `A${randomBytes(8).toString("hex")}a9`,
+  });
+}
+
+function validateTargetInitializationSecrets(value) {
+  if (!hasExactKeys(value, INITIALIZATION_SECRET_KEYS)) {
+    throw new Error("target initialization secret bundle is invalid");
+  }
+  for (const key of INITIALIZATION_SECRET_KEYS.slice(0, -1)) {
+    if (!/^[A-Za-z0-9._~-]{20,128}$/u.test(String(value[key] || ""))) {
+      throw new Error("target initialization runtime secret shape is invalid");
+    }
+  }
+  if (!/^[A-Za-z0-9!._~-]{8,20}$/u.test(value.APP_ADMIN_PASSWORD)) {
+    throw new Error(
+      "target initialization administrator secret shape is invalid",
+    );
+  }
+  return value;
+}
+
+function writeTargetInitializationSecrets(destination, value) {
+  const secrets = validateTargetInitializationSecrets(value);
+  const file = path.join(destination, "target-initialization.secret");
+  writeFileSync(
+    file,
+    `${INITIALIZATION_SECRET_KEYS.map((key) => `${key}=${secrets[key]}`).join("\n")}\n`,
+    { encoding: "utf8", flag: "wx", mode: 0o600 },
+  );
+  return file;
+}
+
+function persistTargetBootstrapAccess(store, targetKey, operationId, password) {
+  const directory = path.join(store, "access");
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  const file = path.join(
+    directory,
+    `${targetKey}-${operationId}.initial-admin-password`,
+  );
+  writeFileSync(file, `${password}\n`, {
+    encoding: "utf8",
+    flag: "wx",
+    mode: 0o600,
+  });
+  return file;
+}
+
+function persistTargetInitializationReceipt(store, receipt) {
+  const directory = path.join(store, "receipts");
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  const file = path.join(
+    directory,
+    `${receipt.operationId}${TARGET_INITIALIZATION_RECEIPT_FILE_SUFFIX}`,
+  );
+  writeFileSync(file, `${JSON.stringify(receipt, null, 2)}\n`, {
+    encoding: "utf8",
+    flag: "wx",
+    mode: 0o600,
+  });
+  return file;
+}
+
+const PREPARE_TARGET_INITIALIZATION_ROOT = String.raw`set -Eeuo pipefail
+umask 077
+operation_id="$1"
+target="$2"
+case "$target" in
+  demo-133) root=/home/simon/plush-toy-erp-demo-v1 ;;
+  customer-test-133) root=/home/simon/plush-toy-erp-test-v1 ;;
+  *) exit 64 ;;
+esac
+[[ "$operation_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]
+[[ ! -e "$root" && ! -L "$root" ]]
+created=0
+cleanup() {
+  local code=$?
+  trap - ERR
+  if [[ "$created" == 1 ]]; then
+    rm -f -- "$root/.initialization-owner.json.next" "$root/.initialization-owner.json" 2>/dev/null || true
+    rmdir "$root/incoming/$operation_id" "$root/incoming" "$root" 2>/dev/null || true
+  fi
+  exit "$code"
+}
+trap cleanup ERR
+mkdir "$root"
+created=1
+chmod 700 "$root"
+jq -n --arg schemaVersion "plush.target-initialization-owner/v1" --arg operationId "$operation_id" --arg target "$target" \
+  '{schemaVersion:$schemaVersion,operationId:$operationId,target:$target}' >"$root/.initialization-owner.json.next"
+chmod 600 "$root/.initialization-owner.json.next"
+mv "$root/.initialization-owner.json.next" "$root/.initialization-owner.json"
+mkdir -p "$root/incoming/$operation_id"
+chmod 700 "$root/incoming" "$root/incoming/$operation_id"
+trap - ERR
+`;
+
+const CLEANUP_TARGET_INITIALIZATION_ROOT = String.raw`set -euo pipefail
+operation_id="$1"
+target="$2"
+case "$target" in
+  demo-133) root=/home/simon/plush-toy-erp-demo-v1 ;;
+  customer-test-133) root=/home/simon/plush-toy-erp-test-v1 ;;
+  *) exit 64 ;;
+esac
+marker=$root/.initialization-owner.json
+[[ "$operation_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]
+[[ -d "$root" && ! -L "$root" && -f "$marker" && ! -L "$marker" ]]
+[[ "$(stat -c '%u' "$root")" == "$(id -u)" && "$(stat -c '%u' "$marker")" == "$(id -u)" ]]
+jq -e --arg operationId "$operation_id" --arg target "$target" \
+  '.schemaVersion == "plush.target-initialization-owner/v1" and .operationId == $operationId and .target == $target' \
+  "$marker" >/dev/null
+rm -rf -- "$root"
+[[ ! -e "$root" && ! -L "$root" ]]
+`;
+
+export function validateRemoteTargetInitializationReceipt(receipt, expected) {
+  const serverContentId = String(receipt?.images?.serverContentId || "");
+  const webContentId = String(receipt?.images?.webContentId || "");
+  const backupSha256 = String(receipt?.rollbackPoint?.backupSha256 || "");
+  const backupSizeBytes = receipt?.rollbackPoint?.backupSizeBytes;
+  const failedBackup =
+    backupSha256 === "none" &&
+    backupSizeBytes === 0 &&
+    receipt?.rollbackPoint?.restoreChecked === false;
+  const passedBackup =
+    SHA256_PATTERN.test(backupSha256) &&
+    Number.isSafeInteger(backupSizeBytes) &&
+    backupSizeBytes > 0 &&
+    receipt?.rollbackPoint?.restoreChecked === true;
+  if (
+    !hasExactKeys(receipt, [
+      "before",
+      "bootstrap",
+      "checks",
+      "finishedAt",
+      "gitSha",
+      "images",
+      "initializationFingerprint",
+      "issueCode",
+      "migration",
+      "notProven",
+      "operationId",
+      "redaction",
+      "releaseManifestSha256",
+      "releaseRehearsalSha256",
+      "rollback",
+      "rollbackPoint",
+      "schemaVersion",
+      "stage",
+      "status",
+      "target",
+      "version",
+    ]) ||
+    !hasExactKeys(receipt?.before, ["targetState"]) ||
+    !hasExactKeys(receipt?.images, ["serverContentId", "webContentId"]) ||
+    !hasExactKeys(receipt?.migration, [
+      "applyStarted",
+      "automaticDownMigration",
+      "readback",
+    ]) ||
+    !hasExactKeys(receipt?.bootstrap, [
+      "completed",
+      "secretPersistedOnTarget",
+      "started",
+    ]) ||
+    !hasExactKeys(receipt?.rollbackPoint, [
+      "backupAlias",
+      "backupSha256",
+      "backupSizeBytes",
+      "restoreChecked",
+    ]) ||
+    !hasExactKeys(receipt?.checks, [
+      "backupRestore",
+      "basicSmoke",
+      "dataEnvironment",
+      "health",
+      "publicEntry",
+      "ready",
+      "releaseIdentity",
+      "staticConfig",
+    ]) ||
+    !hasExactKeys(receipt?.rollback, [
+      "complete",
+      "preservesOtherTargets",
+      "retainedTarget",
+    ]) ||
+    !hasExactKeys(receipt?.redaction, [
+      "containsAbsolutePaths",
+      "containsCredentials",
+      "containsRawEnvironmentValues",
+      "containsRawLogs",
+      "containsSecrets",
+    ]) ||
+    receipt?.schemaVersion !== REMOTE_TARGET_INITIALIZATION_RECEIPT_CONTRACT ||
+    !["passed", "failed", "not_proven"].includes(receipt?.status) ||
+    receipt?.operationId !== expected.operationId ||
+    receipt?.target !== expected.targetKey ||
+    receipt?.gitSha !== expected.gitSha ||
+    receipt?.version !== expected.version ||
+    receipt?.releaseManifestSha256 !== expected.releaseManifestSha256 ||
+    receipt?.releaseRehearsalSha256 !== expected.releaseRehearsalSha256 ||
+    receipt?.initializationFingerprint !== expected.initializationFingerprint ||
+    receipt?.before?.targetState !== "absent" ||
+    receipt?.rollbackPoint?.backupAlias !==
+      `initial-${expected.gitSha.slice(0, 12)}-${expected.operationId}` ||
+    receipt?.migration?.automaticDownMigration !== false ||
+    receipt?.bootstrap?.secretPersistedOnTarget !== false ||
+    receipt?.rollback?.preservesOtherTargets !== true ||
+    !ISSUE_PATTERN.test(String(receipt?.issueCode || "")) ||
+    !/^[a-z][a-z0-9_]{2,63}$/u.test(String(receipt?.stage || "")) ||
+    typeof receipt?.migration?.applyStarted !== "boolean" ||
+    typeof receipt?.bootstrap?.started !== "boolean" ||
+    typeof receipt?.bootstrap?.completed !== "boolean" ||
+    typeof receipt?.rollback?.complete !== "boolean" ||
+    typeof receipt?.rollback?.retainedTarget !== "boolean" ||
+    !Array.isArray(receipt?.notProven) ||
+    receipt.notProven.length !== 2 ||
+    receipt?.redaction?.containsSecrets !== false ||
+    receipt?.redaction?.containsCredentials !== false ||
+    receipt?.redaction?.containsAbsolutePaths !== false ||
+    receipt?.redaction?.containsRawEnvironmentValues !== false ||
+    receipt?.redaction?.containsRawLogs !== false ||
+    typeof receipt?.finishedAt !== "string" ||
+    Number.isNaN(Date.parse(receipt.finishedAt)) ||
+    JSON.stringify(receipt).length > MAX_RECEIPT_BYTES ||
+    !(failedBackup || passedBackup)
+  ) {
+    throw new Error("remote target initialization receipt contract is invalid");
+  }
+  const passed = receipt.status === "passed";
+  if (
+    (passed &&
+      (receipt.issueCode !== "none" ||
+        !IMAGE_ID_PATTERN.test(serverContentId) ||
+        !IMAGE_ID_PATTERN.test(webContentId) ||
+        !passedBackup ||
+        receipt.migration.readback !== expected.migration ||
+        !receipt.migration.applyStarted ||
+        !receipt.bootstrap.started ||
+        !receipt.bootstrap.completed ||
+        !receipt.rollback.complete ||
+        !receipt.rollback.retainedTarget ||
+        Object.values(receipt.checks).some((value) => value !== true))) ||
+    (!passed &&
+      (receipt.issueCode === "none" ||
+        receipt.rollback.retainedTarget ||
+        (receipt.status === "failed" && !receipt.rollback.complete)))
+  ) {
+    throw new Error(
+      "remote target initialization receipt status is inconsistent",
+    );
+  }
+  return receipt;
+}
+
+function initializationTerminalIssue(status) {
+  if (status === "passed") return [];
+  return [
+    {
+      code:
+        status === "failed"
+          ? "target_initialization_failed"
+          : "target_initialization_outcome_unknown",
+      level: "error",
+      message:
+        status === "failed"
+          ? "目标初始化失败且已完成精确回滚，未自动重试"
+          : "目标初始化结果或回滚状态未知，必须先读回",
+    },
+  ];
+}
+
+function executeTargetInitialization(
+  {
+    root,
+    store,
+    operation,
+    plan,
+    bundleDir,
+    releaseManifestPath,
+    confirmation,
+  },
+  { runCommand, runInitializationPreflight, now, createInitializationSecrets },
+) {
+  const immediate = runInitializationPreflight(plan.target.key);
+  if (
+    immediate.status !== "eligible" ||
+    immediate.target !== plan.target.key ||
+    immediate.remote?.rootState !== "absent" ||
+    immediate.blockers?.length !== 0 ||
+    immediate.remote?.capacity?.availableBytes <
+      immediate.remote?.capacity?.minimumAvailableBytes
+  ) {
+    operation = transitionDeliveryOperation(store, operation.id, {
+      status: "blocked",
+      message:
+        "target initialization was blocked by the immediate pristine-target preflight",
+      issues: (immediate.blockers?.length
+        ? immediate.blockers
+        : ["target_initialization_precondition_changed"]
+      ).map((code) => ({
+        code,
+        level: "error",
+        message: `目标初始化即时预检阻断：${code}`,
+      })),
+      now: now(),
+    });
+    return {
+      schemaVersion: "plush.promotion-execution/v1",
+      operation,
+      targetWriteStarted: false,
+      receipt: null,
+    };
+  }
+
+  const transferRoot = path.join(
+    store,
+    "transfers",
+    `${operation.id}-${operation.requestFingerprint.slice(0, 12)}-initialize`,
+  );
+  const target = getDeploymentTarget(plan.target.key);
+  const sshArgs = fixedSshArgs(target);
+  let accessFile = null;
+  let remoteRootPrepared = false;
+  let remoteExecutionInvoked = false;
+  let validatedReceipt = null;
+  try {
+    const transfer = preparePromotionTransfer(
+      {
+        repoRoot: root,
+        bundleDir,
+        releaseManifestPath,
+        promotionPlan: plan,
+        destination: transferRoot,
+      },
+      { runCommand },
+    );
+    const secrets = validateTargetInitializationSecrets(
+      createInitializationSecrets(),
+    );
+    const secretFile = writeTargetInitializationSecrets(transferRoot, secrets);
+    transfer.files.push(path.basename(secretFile));
+    transfer.totalBytes += statSync(secretFile).size;
+    accessFile = persistTargetBootstrapAccess(
+      store,
+      plan.target.key,
+      operation.id,
+      secrets.APP_ADMIN_PASSWORD,
+    );
+    assertLocalRsync(runCommand);
+    const rsyncTransfer = buildFixedTargetRsyncTransfer({
+      target,
+      operationId: operation.id,
+      sourceFiles: transfer.files.map((file) => path.join(transferRoot, file)),
+    });
+    operation = transitionDeliveryOperation(store, operation.id, {
+      status: "running",
+      message:
+        "pristine target initialization started with the fixed release contract",
+      metadata: {
+        ...operation.metadata,
+        promotionMode: "initialize",
+        transferBytes: transfer.totalBytes,
+        bootstrapAccessStored: true,
+      },
+      now: now(),
+    });
+    runChecked(
+      runCommand,
+      "ssh",
+      [...sshArgs, "bash", "-s", "--", operation.id, target.key],
+      { input: PREPARE_TARGET_INITIALIZATION_ROOT, timeout: 30_000 },
+      "prepare pristine target initialization root",
+    );
+    remoteRootPrepared = true;
+    runChecked(
+      runCommand,
+      rsyncTransfer.command,
+      rsyncTransfer.args,
+      { timeout: 10 * 60_000 },
+      "transfer immutable target initialization package",
+    );
+    const remoteScript = `${target.filesystem.root}/incoming/${operation.id}/remote-promotion.sh`;
+    remoteExecutionInvoked = true;
+    const result = runCommand(
+      "ssh",
+      [
+        ...sshArgs,
+        "bash",
+        remoteScript,
+        "initialize",
+        target.key,
+        operation.id,
+        operation.gitSha,
+        operation.version,
+        plan.release.manifestSha256,
+        plan.release.rehearsalReceiptSha256,
+        plan.fingerprint,
+        confirmation,
+      ],
+      {
+        encoding: "utf8",
+        maxBuffer: 1024 * 1024,
+        timeout: 60 * 60_000,
+      },
+    );
+    try {
+      validatedReceipt = validateRemoteTargetInitializationReceipt(
+        JSON.parse(String(result.stdout || "").trim()),
+        {
+          operationId: operation.id,
+          targetKey: target.key,
+          gitSha: operation.gitSha,
+          version: operation.version,
+          migration: plan.release.migration.latest,
+          releaseManifestSha256: plan.release.manifestSha256,
+          releaseRehearsalSha256: plan.release.rehearsalReceiptSha256,
+          initializationFingerprint: plan.fingerprint,
+        },
+      );
+    } catch (error) {
+      throw new Error(
+        `remote initialization receipt is unavailable or invalid: ${error.message}`,
+      );
+    }
+    if (result.error) {
+      throw new Error(
+        `remote target initialization SSH failed: ${result.error.message}`,
+      );
+    }
+    if (
+      (result.status === 0) !== (validatedReceipt.status === "passed") &&
+      !(result.status !== 0 && validatedReceipt.status !== "passed")
+    ) {
+      throw new Error(
+        "remote target initialization exit status contradicts its receipt",
+      );
+    }
+    const receiptFile = persistTargetInitializationReceipt(
+      store,
+      validatedReceipt,
+    );
+    if (
+      validatedReceipt.status !== "passed" &&
+      accessFile &&
+      existsSync(accessFile)
+    ) {
+      rmSync(accessFile);
+    }
+    operation = transitionDeliveryOperation(store, operation.id, {
+      status: validatedReceipt.status,
+      message:
+        validatedReceipt.status === "passed"
+          ? "pristine target initialization and public readback passed"
+          : validatedReceipt.status === "failed"
+            ? "target initialization failed and exact rollback passed"
+            : "target initialization outcome requires readback",
+      issues: initializationTerminalIssue(validatedReceipt.status),
+      metadata: {
+        ...operation.metadata,
+        remoteStage: validatedReceipt.stage,
+        backupSha256: validatedReceipt.rollbackPoint.backupSha256,
+        backupSizeBytes: validatedReceipt.rollbackPoint.backupSizeBytes,
+        migrationReadback: validatedReceipt.migration.readback,
+        serverContentId: validatedReceipt.images.serverContentId,
+        webContentId: validatedReceipt.images.webContentId,
+        initializationReceiptFile: path.relative(store, receiptFile),
+        initializationReceiptSha256: sha256File(receiptFile),
+      },
+      now: now(),
+    });
+    return {
+      schemaVersion: "plush.promotion-execution/v1",
+      operation,
+      targetWriteStarted: true,
+      receipt: validatedReceipt,
+    };
+  } catch (error) {
+    let cleanupProven = !remoteRootPrepared;
+    if (remoteRootPrepared && !remoteExecutionInvoked) {
+      try {
+        runChecked(
+          runCommand,
+          "ssh",
+          [...sshArgs, "bash", "-s", "--", operation.id, target.key],
+          { input: CLEANUP_TARGET_INITIALIZATION_ROOT, timeout: 60_000 },
+          "clean pristine target initialization root",
+        );
+        cleanupProven = true;
+      } catch {
+        cleanupProven = false;
+      }
+    }
+    const terminalReceipt = validatedReceipt;
+    const knownRolledBack =
+      terminalReceipt?.status === "failed" && terminalReceipt.rollback.complete;
+    const effectiveCleanupProven = cleanupProven || knownRolledBack;
+    if (effectiveCleanupProven && accessFile && existsSync(accessFile)) {
+      rmSync(accessFile);
+    }
+    const current = readDeliveryOperation(store, operation.id);
+    if (["ready", "launching", "running"].includes(current.status)) {
+      const outcomeUnknown = remoteExecutionInvoked && !knownRolledBack;
+      operation = transitionDeliveryOperation(store, operation.id, {
+        status:
+          outcomeUnknown || !effectiveCleanupProven ? "not_proven" : "failed",
+        message:
+          outcomeUnknown || !effectiveCleanupProven
+            ? "target initialization result or cleanup is unproven; automatic retry is disabled"
+            : remoteExecutionInvoked
+              ? "target initialization failed and exact rollback passed"
+              : "target initialization preparation or transfer failed before remote execution",
+        issues: initializationTerminalIssue(
+          outcomeUnknown || !effectiveCleanupProven ? "not_proven" : "failed",
+        ),
+        now: now(),
+      });
+    }
+    if (!effectiveCleanupProven && !remoteExecutionInvoked) {
+      throw new Error(
+        `${error.message}; target initialization cleanup is unproven`,
+      );
+    }
+    throw error;
+  } finally {
+    rmSync(transferRoot, { recursive: true, force: true });
   }
 }
 
@@ -571,11 +1131,13 @@ export function executePromotion(
   {
     runCommand = spawnSync,
     runPreflight = runTargetPreflight,
+    runInitializationPreflight = runTargetInitializationPreflight,
     classifyRelation = classifyGitAncestryRelation,
     buildCacheIdentity = buildTargetReleaseCacheIdentity,
     cleanupCache = cleanupPreparedTargetReleaseIncoming,
     probeCache = probeTargetReleaseCache,
     prepareCache = prepareTargetReleaseIncoming,
+    createInitializationSecrets = generateTargetInitializationSecrets,
     now = () => new Date().toISOString(),
   } = {},
 ) {
@@ -604,6 +1166,25 @@ export function executePromotion(
   if (confirmation !== expectedConfirmation) {
     throw new Error(
       `explicit confirmation is required: ${expectedConfirmation}`,
+    );
+  }
+  if (isTargetInitializationManifest(plan)) {
+    return executeTargetInitialization(
+      {
+        root,
+        store,
+        operation,
+        plan,
+        bundleDir,
+        releaseManifestPath,
+        confirmation,
+      },
+      {
+        runCommand,
+        runInitializationPreflight,
+        now,
+        createInitializationSecrets,
+      },
     );
   }
   const immediatePreflight = runPreflight(targetKey);

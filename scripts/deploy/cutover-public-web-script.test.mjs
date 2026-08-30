@@ -160,3 +160,85 @@ test("public web cutover rejects admin because it is not a deployment environmen
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /admin 不是部署环境/u);
 });
+
+test("public web cutover can create one first entry without inventing an old environment", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "public-web-initialize-"));
+  const binDir = path.join(root, "bin");
+  const dockerLog = path.join(root, "docker.log");
+  fs.mkdirSync(binDir);
+  fs.writeFileSync(
+    path.join(binDir, "docker"),
+    `#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\\n' "$*" >>"$FAKE_DOCKER_LOG"
+if [[ "$1 $2" == "image inspect" && "$3" == "--format" ]]; then
+  printf 'GIT_SHA=${release}\\n'
+elif [[ "$1" == "inspect" && "$2" == "plush-toy-erp-demo-v1_default" ]]; then
+  :
+elif [[ "$1" == "inspect" ]]; then
+  exit 1
+elif [[ "$1" == "run" ]]; then
+  printf 'fake-container-id\\n'
+fi
+`,
+    "utf8",
+  );
+  fs.chmodSync(path.join(binDir, "docker"), 0o755);
+  fs.writeFileSync(
+    path.join(binDir, "curl"),
+    `#!/usr/bin/env bash
+set -euo pipefail
+url="\${@: -1}"
+if [[ "$url" == */healthz ]]; then
+  printf '200'
+else
+  printf '%s\\n' '{"result":{"code":0,"data":{"sms_login":{"enabled":true,"mode":"provider","mock_delivery":false}}}}'
+fi
+`,
+    "utf8",
+  );
+  fs.chmodSync(path.join(binDir, "curl"), 0o755);
+
+  const result = spawnSync(
+    "bash",
+    [
+      scriptPath,
+      "--image",
+      "plush-toy-erp-web:yoyoosun-immutable",
+      "--release",
+      release,
+      "--current-container",
+      "none",
+      "--endpoint",
+      "https://demo.yoyoosun.net",
+      "--api-origin",
+      "http://app-server:8300",
+      "--network",
+      "plush-toy-erp-demo-v1_default",
+      "--container-prefix",
+      "plush-toy-erp-demo-web-public-",
+      "--host-port",
+      "5176",
+      "--candidate-port",
+      "15176",
+      "--execute",
+      "--confirm",
+      `PUBLIC_WEB_CUTOVER:none:${release}`,
+    ],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: `${binDir}:${process.env.PATH}`,
+        FAKE_DOCKER_LOG: dockerLog,
+      },
+    },
+  );
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stdout, /rollback=none .*reused=false/u);
+  const dockerCalls = fs.readFileSync(dockerLog, "utf8");
+  assert.doesNotMatch(dockerCalls, /update --restart=no none|stop none/u);
+  assert.match(dockerCalls, /0\.0\.0\.0:5176:5175/u);
+});

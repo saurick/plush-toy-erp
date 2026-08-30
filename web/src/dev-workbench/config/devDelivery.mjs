@@ -98,6 +98,7 @@ const CURRENT_RELEASE_ASSETS = Object.freeze([
 ])
 const DELIVERY_VERSION_ACTION_REASONS = Object.freeze({
   current: new Set(['exact_sha_current']),
+  initialize: new Set(['pristine_target_initialization_available']),
   promote: new Set(['candidate_descends_from_current']),
   rollback: new Set(['candidate_is_ancestor_of_current']),
   blocked: new Set([
@@ -573,6 +574,10 @@ function validateOperation(operation) {
   if (
     typeof operation.id !== 'string' ||
     !DELIVERY_OPERATION_ACTIONS.has(operation.action) ||
+    (operation.promotionMode !== undefined &&
+      operation.promotionMode !== null &&
+      (operation.action !== 'promote' ||
+        !['initialize', 'upgrade'].includes(operation.promotionMode))) ||
     !SHA_PATTERN.test(String(operation.gitSha || '')) ||
     !VERSION_PATTERN.test(String(operation.version || '')) ||
     !OPERATION_STATUSES.has(operation.status) ||
@@ -820,7 +825,8 @@ export function validateDevDeliverySummary(summary) {
     !['gitlab', 'github'].includes(summary.boundaries?.provider) ||
     summary.boundaries?.target !== 'demo-133' ||
     !Array.isArray(summary.boundaries?.targets) ||
-    summary.boundaries.targets.join(',') !== DEV_DELIVERY_TARGET_KEYS.join(',') ||
+    summary.boundaries.targets.join(',') !==
+      DEV_DELIVERY_TARGET_KEYS.join(',') ||
     summary.boundaries?.browserShellAccess !== false ||
     summary.boundaries?.targetBuildAllowed !== false ||
     summary.boundaries?.automaticRetryAllowed !== false
@@ -862,7 +868,9 @@ export function validateDevDeliverySummary(summary) {
       !['passed', 'failed'].includes(publicEntry?.provider) ||
       typeof publicEntry?.container !== 'string' ||
       (publicEntry.container !== 'unknown' &&
-        !new RegExp(`^${prefix}[0-9a-f]{8}$`, 'u').test(publicEntry.container)) ||
+        !new RegExp(`^${prefix}[0-9a-f]{8}$`, 'u').test(
+          publicEntry.container
+        )) ||
       (publicEntry.gitSha !== 'unknown' &&
         !SHA_PATTERN.test(String(publicEntry.gitSha || ''))) ||
       publicEntry?.endpoint !== definition.endpoint ||
@@ -875,17 +883,79 @@ export function validateDevDeliverySummary(summary) {
       throw new Error('delivery target evidence is invalid')
     }
   }
+  const validateInitializationEvidence = (initialization, definition) => {
+    if (initialization === null) return
+    const remote = initialization?.remote
+    const conflicts = remote?.conflicts
+    const capacity = remote?.capacity
+    if (
+      initialization?.schemaVersion !==
+        'plush.target-initialization-preflight/v1' ||
+      initialization?.target !== definition.key ||
+      initialization?.purpose !== definition.purpose ||
+      !['eligible', 'blocked'].includes(initialization?.status) ||
+      remote?.schemaVersion !==
+        'plush.remote-target-initialization-preflight/v1' ||
+      remote?.target !== definition.key ||
+      remote?.status !== initialization.status ||
+      !['absent', 'present'].includes(remote?.rootState) ||
+      !['passed', 'blocked'].includes(remote?.tooling) ||
+      !['passed', 'blocked'].includes(remote?.atlas) ||
+      !['passed', 'blocked'].includes(remote?.baseImages) ||
+      !Array.isArray(initialization?.blockers) ||
+      JSON.stringify(initialization.blockers) !==
+        JSON.stringify(remote?.blockers) ||
+      initialization.blockers.some(
+        (blocker) => !/^[a-z][a-z0-9_]{2,63}$/u.test(blocker)
+      ) ||
+      !conflicts ||
+      Object.keys(conflicts).sort().join(',') !==
+        [
+          'publicContainers',
+          'targetContainers',
+          'targetNetworks',
+          'tcpPorts',
+          'udpPorts',
+        ].join(',') ||
+      Object.values(conflicts).some(
+        (value) => !Number.isSafeInteger(value) || value < 0
+      ) ||
+      !Number.isSafeInteger(capacity?.availableBytes) ||
+      capacity.availableBytes < 0 ||
+      capacity?.minimumAvailableBytes !== 30 * 1024 ** 3 ||
+      initialization?.redaction?.containsSecrets !== false ||
+      initialization?.redaction?.containsCredentials !== false ||
+      initialization?.redaction?.containsSshTarget !== false ||
+      initialization?.redaction?.containsAbsolutePaths !== false ||
+      (initialization.status === 'eligible' &&
+        (initialization.blockers.length !== 0 ||
+          remote.rootState !== 'absent' ||
+          remote.tooling !== 'passed' ||
+          remote.atlas !== 'passed' ||
+          remote.baseImages !== 'passed' ||
+          Object.values(conflicts).some((value) => value !== 0))) ||
+      (initialization.status === 'blocked' &&
+        initialization.blockers.length === 0)
+    ) {
+      throw new Error('delivery target initialization evidence is invalid')
+    }
+  }
   for (const [index, descriptor] of summary.targets.entries()) {
     const definition = DEV_DELIVERY_TARGETS[index]
     if (
       descriptor?.key !== definition.key ||
       descriptor?.purpose !== definition.purpose ||
       descriptor?.endpoint !== definition.endpoint ||
-      !Object.hasOwn(descriptor, 'preflight')
+      !Object.hasOwn(descriptor, 'preflight') ||
+      !Object.hasOwn(descriptor, 'initializationPreflight')
     ) {
       throw new Error('delivery target descriptor is invalid')
     }
     validateTargetEvidence(descriptor.preflight, definition)
+    validateInitializationEvidence(
+      descriptor.initializationPreflight,
+      definition
+    )
   }
   if (
     JSON.stringify(summary.target) !==
@@ -1372,7 +1442,9 @@ export function deliveryVersionActionKind(version) {
   if (!version || !SHA_PATTERN.test(String(version.gitSha || ''))) {
     return 'blocked'
   }
-  return ['promote', 'rollback', 'current'].includes(version.actionClass)
+  return ['initialize', 'promote', 'rollback', 'current'].includes(
+    version.actionClass
+  )
     ? version.actionClass
     : 'blocked'
 }

@@ -443,11 +443,78 @@ test('delivery summary binds version actions to Git ancestry instead of timestam
   const result = await service.summary()
   assert.equal(result.versions[0].publishedAt, version.publishedAt)
   assert.equal(result.versions[0].actionClass, 'promote')
-  assert.equal(result.versions[0].actionsByTarget['demo-133'].actionClass, 'promote')
+  assert.equal(
+    result.versions[0].actionsByTarget['demo-133'].actionClass,
+    'promote'
+  )
   assert.equal(
     result.versions[0].actionReason,
     'candidate_descends_from_current'
   )
+})
+
+test('delivery summary exposes explicit initialization only for pristine eligible targets', async (t) => {
+  const { root, store } = createProject(t)
+  const service = createDevDeliveryService({
+    projectRoot: root,
+    operationStore: store,
+    provider: {
+      listVersions: () => [
+        {
+          gitSha: SHA,
+          version: '2026.07.29-1',
+          publishedAt: '2026-07-29T01:00:00.000Z',
+        },
+      ],
+      getReleaseStatus: () => ({ status: 'missing' }),
+      dispatchRelease: () => {},
+      downloadRelease: () => {},
+    },
+    readRepositoryState: () => ({
+      commit: SHA,
+      dirty: false,
+      fingerprint: 'd'.repeat(64),
+    }),
+    runPreflight: (targetKey) => ({
+      status: 'blocked',
+      target: targetKey,
+      purpose:
+        targetKey === 'customer-test-133'
+          ? 'customer-clean-acceptance'
+          : 'project-demo-simulated',
+      remote: {
+        runtime: { serverSha: 'unknown', webSha: 'unknown' },
+      },
+    }),
+    runInitializationPreflight: (targetKey) => ({
+      schemaVersion: 'plush.target-initialization-preflight/v1',
+      status: targetKey === 'demo-133' ? 'eligible' : 'blocked',
+      target: targetKey,
+      purpose:
+        targetKey === 'customer-test-133'
+          ? 'customer-clean-acceptance'
+          : 'project-demo-simulated',
+      remote: {
+        rootState: 'absent',
+      },
+      blockers:
+        targetKey === 'demo-133'
+          ? []
+          : ['initialization_base_image_unavailable'],
+    }),
+    readRecoveryEvidence: () => null,
+  })
+
+  const result = await service.summary()
+  assert.deepEqual(result.versions[0].actionsByTarget['demo-133'], {
+    actionClass: 'initialize',
+    actionReason: 'pristine_target_initialization_available',
+  })
+  assert.deepEqual(result.versions[0].actionsByTarget['customer-test-133'], {
+    actionClass: 'blocked',
+    actionReason: 'target_identity_unavailable',
+  })
+  assert.equal(result.targets[0].initializationPreflight.status, 'eligible')
 })
 
 test('delivery middleware requires loopback, same-origin and CSRF for writes', async () => {
