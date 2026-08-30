@@ -15,6 +15,7 @@ import path from "node:path";
 import process from "node:process";
 
 import { validateReleaseManifest } from "./release-catalog.mjs";
+import { validateGitAncestryRelation } from "./git-ancestry-relation.mjs";
 
 export const ROLLBACK_MANIFEST_CONTRACT = "plush.rollback-manifest/v1";
 
@@ -70,6 +71,7 @@ function releaseIdentity(manifest, manifestSha256) {
 }
 
 export function validateRollbackManifest(manifest) {
+  const ancestry = validateGitAncestryRelation(manifest?.ancestry);
   if (
     manifest?.schemaVersion !== ROLLBACK_MANIFEST_CONTRACT ||
     !["eligible", "blocked", "already_current"].includes(manifest?.status) ||
@@ -78,6 +80,8 @@ export function validateRollbackManifest(manifest) {
     manifest?.target?.customer !== "yoyoosun" ||
     !SHA_PATTERN.test(String(manifest?.from?.gitSha || "")) ||
     !SHA_PATTERN.test(String(manifest?.to?.gitSha || "")) ||
+    ancestry.currentGitSha !== manifest?.from?.gitSha ||
+    ancestry.candidateGitSha !== manifest?.to?.gitSha ||
     !SHA256_PATTERN.test(String(manifest?.from?.manifestSha256 || "")) ||
     !SHA256_PATTERN.test(String(manifest?.to?.manifestSha256 || "")) ||
     !SHA256_PATTERN.test(String(manifest?.from?.migration?.sequenceSha256 || "")) ||
@@ -117,13 +121,15 @@ export function validateRollbackManifest(manifest) {
     (manifest.status === "blocked") !== (manifest.blockers.length > 0) ||
     (manifest.status === "eligible" &&
       (manifest.from.gitSha === manifest.to.gitSha ||
+        ancestry.actionClass !== "rollback" ||
         manifest.from.migration.latest !== manifest.to.migration.latest ||
         manifest.from.migration.sequenceSha256 !==
           manifest.to.migration.sequenceSha256 ||
         manifest.from.customerConfig.sourceSha256 !==
           manifest.to.customerConfig.sourceSha256)) ||
     (manifest.status === "already_current" &&
-      manifest.from.gitSha !== manifest.to.gitSha) ||
+      (manifest.from.gitSha !== manifest.to.gitSha ||
+        ancestry.actionClass !== "current")) ||
     manifest.rollback?.mode !== "code_and_images_only" ||
     manifest.rollback?.automaticDatabaseDownMigration !== false ||
     manifest.rollback?.databaseRestoreAutomatic !== false ||
@@ -145,6 +151,7 @@ export function buildRollbackManifest({
   targetReleaseManifest,
   targetReleaseManifestSha256,
   targetPreflight,
+  ancestry,
   createdAt = new Date().toISOString(),
 }) {
   if (!UUID_V4_PATTERN.test(String(operationId || ""))) {
@@ -158,6 +165,13 @@ export function buildRollbackManifest({
     targetReleaseManifest,
     targetReleaseManifestSha256,
   );
+  const gitRelation = validateGitAncestryRelation(ancestry);
+  if (
+    gitRelation.currentGitSha !== from.gitSha ||
+    gitRelation.candidateGitSha !== to.gitSha
+  ) {
+    throw new Error("rollback ancestry does not match the release pair");
+  }
   if (
     targetPreflight?.schemaVersion !== "plush.target-preflight/v1" ||
     targetPreflight?.target !== "test-133" ||
@@ -181,6 +195,9 @@ export function buildRollbackManifest({
   ) {
     blockers.add("rollback_customer_config_incompatible");
   }
+  if (!["rollback", "current"].includes(gitRelation.actionClass)) {
+    blockers.add("rollback_git_relation_not_behind");
+  }
   const sortedBlockers = [...blockers].sort();
   const status =
     sortedBlockers.length > 0
@@ -199,6 +216,7 @@ export function buildRollbackManifest({
       customer: "yoyoosun",
       trialTarget: "customer-trial-133",
     },
+    ancestry: gitRelation,
     from,
     to,
     before: {

@@ -41,7 +41,7 @@ test("GitHub provider lists only immutable exact-SHA releases", async () => {
       return { status: 0, stdout: releaseResponse(), stderr: "" };
     },
   });
-  const versions = await provider.listVersions();
+  const versions = await provider.listVersions({ limit: 100 });
   assert.equal(versions.length, 1);
   assert.equal(versions[0].gitSha, SHA);
   assert.equal(versions[0].completeAssets, true);
@@ -56,6 +56,11 @@ test("GitHub provider lists only immutable exact-SHA releases", async () => {
   assert.equal(invocation.command, "gh");
   assert(
     invocation.args.includes(`X-GitHub-Api-Version: ${GITHUB_API_VERSION}`),
+  );
+  assert(
+    invocation.args.includes(
+      "repos/saurick/plush-toy-erp/releases?per_page=100",
+    ),
   );
   assert.equal(
     Object.keys(invocation.options).some((key) =>
@@ -320,6 +325,7 @@ test("GitHub provider fails closed before emergency workflow dispatch", async ()
       gitSha: SHA,
       version: "2026.07.29-1",
       customer: "yoyoosun",
+      versionReference: "2026-07-29T01:00:00.000Z",
     }),
     /disabled before workflow dispatch/u,
   );
@@ -329,6 +335,7 @@ test("GitHub provider fails closed before emergency workflow dispatch", async ()
       gitSha: SHA,
       version: "2026.07.29-1",
       customer: "other",
+      versionReference: "2026-07-29T01:00:00.000Z",
     }),
     /invalid/u,
   );

@@ -366,6 +366,57 @@ test('delivery summary binds a recovery receipt to registered target identity', 
   ])
 })
 
+test('delivery summary binds version actions to Git ancestry instead of timestamps', async (t) => {
+  const { root, store } = createProject(t)
+  const currentSha = 'b'.repeat(40)
+  const version = {
+    gitSha: SHA,
+    version: '2026.07.29-1',
+    publishedAt: '2025-01-01T00:00:00.000Z',
+  }
+  const service = createDevDeliveryService({
+    projectRoot: root,
+    operationStore: store,
+    provider: {
+      listVersions: () => [version],
+      getReleaseStatus: () => ({ status: 'missing' }),
+      dispatchRelease: () => {},
+      downloadRelease: () => {},
+    },
+    readRepositoryState: () => ({
+      commit: SHA,
+      dirty: false,
+      fingerprint: 'd'.repeat(64),
+    }),
+    runPreflight: () => ({
+      status: 'passed',
+      target: 'test-133',
+      customer: 'yoyoosun',
+      trialTarget: 'customer-trial-133',
+      remote: {
+        runtime: { serverSha: currentSha, webSha: currentSha },
+      },
+    }),
+    classifyRelation: ({ currentGitSha, candidateGitSha }) => ({
+      schemaVersion: 'plush.git-ancestry-relation/v1',
+      currentGitSha,
+      candidateGitSha,
+      relation: 'ahead',
+      actionClass: 'promote',
+      actionReason: 'candidate_descends_from_current',
+    }),
+    readRecoveryEvidence: () => null,
+  })
+
+  const result = await service.summary()
+  assert.equal(result.versions[0].publishedAt, version.publishedAt)
+  assert.equal(result.versions[0].actionClass, 'promote')
+  assert.equal(
+    result.versions[0].actionReason,
+    'candidate_descends_from_current'
+  )
+})
+
 test('delivery middleware requires loopback, same-origin and CSRF for writes', async () => {
   const calls = []
   const middleware = createDevDeliveryMiddleware({
@@ -449,12 +500,14 @@ test('delivery middleware requires loopback, same-origin and CSRF for writes', a
 test('release dispatch is idempotent and never writes the target', async (t) => {
   const { root, store } = createProject(t)
   let dispatchCount = 0
+  let dispatchedVersionReference = null
   const provider = {
     getReleaseStatus() {
       return { status: 'missing', release: null }
     },
-    dispatchRelease() {
+    dispatchRelease(input) {
       dispatchCount += 1
+      dispatchedVersionReference = input.versionReference
       return { status: 'accepted' }
     },
     listVersions() {
@@ -468,6 +521,7 @@ test('release dispatch is idempotent and never writes the target', async (t) => 
     projectRoot: root,
     operationStore: store,
     provider,
+    now: () => '2026-07-29T01:00:00.000Z',
     readRepositoryState: async () => ({
       commit: SHA,
       dirty: false,
@@ -505,6 +559,7 @@ test('release dispatch is idempotent and never writes the target', async (t) => 
     'delivery_inputs',
   ])
   assert.equal(dispatchCount, 1)
+  assert.equal(dispatchedVersionReference, '2026-07-29T01:00:00.000Z')
 })
 
 test('failed release can create one linked explicit retry attempt', async (t) => {
@@ -513,6 +568,7 @@ test('failed release can create one linked explicit retry attempt', async (t) =>
   const service = createDevDeliveryService({
     projectRoot: root,
     operationStore: store,
+    now: () => '2026-07-29T01:00:00.000Z',
     provider: {
       getReleaseStatus: () => ({ status: 'missing', release: null }),
       dispatchRelease() {

@@ -16,7 +16,6 @@ import {
   DEV_VERSION_CENTER_VIEW_VERSIONS,
   createDeliveryIdempotencyKey,
   createDevDeliveryClient,
-  defaultReleaseVersion,
   deliveryOperationMessagePresentation,
   deliveryIdempotencyPresentation,
   deliveryPipelinePresentation,
@@ -76,6 +75,14 @@ function summaryFixture() {
     schemaVersion: 'plush.dev-delivery-summary/v1',
     status: 'success',
     generatedAt: '2026-07-29T01:00:00.000Z',
+    releaseVersionPolicy: {
+      schemaVersion: 'plush.release-version-catalog/v1',
+      timeZone: 'Asia/Shanghai',
+      date: '2026.07.29',
+      nextVersion: '2026.07.29-2',
+      officialVersionCount: 1,
+      dateVersionCount: 1,
+    },
     repository: {
       commit: SHA,
       dirty: false,
@@ -119,6 +126,8 @@ function summaryFixture() {
         },
         completeAssets: true,
         promotionEligible: false,
+        actionClass: 'blocked',
+        actionReason: 'target_identity_unavailable',
       },
     ],
     target: null,
@@ -604,7 +613,6 @@ test('delivery presentation helpers are deterministic and bounded', () => {
     deliveryRetryPresentation({ reason: 'action_not_retryable' }),
     '该动作须返回专用流程处理，不能在此重试'
   )
-  assert.equal(defaultReleaseVersion(new Date(2026, 6, 29)), '2026.07.29-1')
   assert.equal(shortGitSha(SHA), 'aaaaaaaaaaaa')
   assert.equal(shortGitSha('bad'), '未证明')
   assert.equal(formatDeliveryBytes(30 * 1024 ** 3), '30.0 GiB')
@@ -647,8 +655,14 @@ test('delivery presentation helpers are deterministic and bounded', () => {
 })
 
 test('pipeline jobs and timing stages use Chinese-first presentation labels', () => {
-  assert.equal(deliveryPipelinePresentation('plan').label, '可信提交范围与影响计划')
-  assert.equal(deliveryPipelinePresentation('publish_release').label, '发布不可变制品集')
+  assert.equal(
+    deliveryPipelinePresentation('plan').label,
+    '可信提交范围与影响计划'
+  )
+  assert.equal(
+    deliveryPipelinePresentation('publish_release').label,
+    '发布不可变制品集'
+  )
   for (const source of workflowSources) {
     const names = [...source.matchAll(/^(?: {4}name:| {6}- name:) (.+)$/gmu)]
       .map((match) => match[1].trim())
@@ -892,39 +906,42 @@ test('dev summary snapshots stay in memory, deduplicate refreshes and retain the
   assert.equal(readDevSummarySnapshot(key), null)
 })
 
-test('version actions distinguish newer promotion from older rollback', () => {
+test('version actions use Git ancestry classes rather than publication time', () => {
   const current = {
     gitSha: 'b'.repeat(40),
-    publishedAt: '2026-07-29T02:00:00.000Z',
+    actionClass: 'current',
+    actionReason: 'exact_sha_current',
   }
   assert.equal(
-    deliveryVersionActionKind(
-      {
-        gitSha: SHA,
-        publishedAt: '2026-07-29T03:00:00.000Z',
-      },
-      current
-    ),
+    deliveryVersionActionKind({
+      gitSha: SHA,
+      publishedAt: '2026-07-29T01:00:00.000Z',
+      actionClass: 'promote',
+      actionReason: 'candidate_descends_from_current',
+    }),
     'promote'
   )
   assert.equal(
-    deliveryVersionActionKind(
-      {
-        gitSha: SHA,
-        publishedAt: '2026-07-29T01:00:00.000Z',
-      },
-      current
-    ),
+    deliveryVersionActionKind({
+      gitSha: SHA,
+      publishedAt: '2026-07-29T03:00:00.000Z',
+      actionClass: 'rollback',
+      actionReason: 'candidate_is_ancestor_of_current',
+    }),
     'rollback'
   )
-  assert.equal(deliveryVersionActionKind(current, current), 'current')
+  assert.equal(deliveryVersionActionKind(current), 'current')
   assert.equal(
-    deliveryVersionActionKind({ gitSha: SHA, publishedAt: '' }, current),
+    deliveryVersionActionKind({
+      gitSha: SHA,
+      actionClass: 'blocked',
+      actionReason: 'git_histories_diverged',
+    }),
     'blocked'
   )
   assert.equal(
-    deliveryVersionActionKind({ gitSha: SHA, publishedAt: '' }, null),
-    'promote'
+    deliveryVersionActionKind({ gitSha: SHA, publishedAt: '' }),
+    'blocked'
   )
 })
 
@@ -1075,6 +1092,12 @@ test('delivery pages expose one canonical dangerous action and lock concurrent m
     versionCenterPageSource,
     /cancelButtonProps=\{\{[\s\S]*?disabled: actionKey === 'dispatch-release'/u
   )
+  assert.match(versionCenterPageSource, /正式版本号（由发布目录自动生成）/u)
+  assert.match(
+    versionCenterPageSource,
+    /value=\{releaseVersion\}[\s\S]*?readOnly/u
+  )
+  assert.doesNotMatch(versionCenterPageSource, /setReleaseVersion/u)
 })
 
 test('delivery pages keep cached summaries visible while rechecking and gate writes on fresh state', () => {

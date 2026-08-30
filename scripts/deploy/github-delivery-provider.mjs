@@ -464,7 +464,7 @@ export function createGithubDeliveryProvider({
     workflow: GITHUB_RELEASE_WORKFLOW,
 
     async listVersions({ limit = 20 } = {}) {
-      if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) {
+      if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
         throw new Error("GitHub release list limit is invalid");
       }
       const output = await runGh(

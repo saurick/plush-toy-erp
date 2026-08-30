@@ -16,7 +16,12 @@ import { createGithubDeliveryProvider } from '../../scripts/deploy/github-delive
 import { createGitlabDeliveryProvider } from '../../scripts/deploy/gitlab-delivery-provider.mjs'
 import { preparePromotion } from '../../scripts/deploy/promotion-controller.mjs'
 import { prepareRollback } from '../../scripts/deploy/rollback-controller.mjs'
+import {
+  assertOfficialReleaseVersion,
+  buildReleaseVersionCatalog,
+} from '../../scripts/deploy/release-version-catalog.mjs'
 import { runTargetPreflightAsync } from '../../scripts/deploy/target-preflight.mjs'
+import { classifyGitAncestryRelation } from '../../scripts/deploy/git-ancestry-relation.mjs'
 import { readRepositoryIdentity } from '../../scripts/qa/lib/repository-identity.mjs'
 import {
   isLoopbackHostHeader,
@@ -59,6 +64,45 @@ const REMOTE_STAGE_LABELS = Object.freeze({
   static_preflight: '静态预检',
   service_switch: '服务切换',
 })
+
+function blockedVersionAction(version, actionReason) {
+  return {
+    ...version,
+    actionClass: 'blocked',
+    actionReason,
+  }
+}
+
+function bindVersionActions({
+  classifyRelation,
+  projectRoot,
+  target,
+  versions,
+}) {
+  const serverSha = target?.remote?.runtime?.serverSha
+  const webSha = target?.remote?.runtime?.webSha
+  if (!SHA_PATTERN.test(String(serverSha || '')) || serverSha !== webSha) {
+    return versions.map((version) =>
+      blockedVersionAction(version, 'target_identity_unavailable')
+    )
+  }
+  return versions.map((version) => {
+    try {
+      const relation = classifyRelation({
+        repoRoot: projectRoot,
+        currentGitSha: serverSha,
+        candidateGitSha: version.gitSha,
+      })
+      return {
+        ...version,
+        actionClass: relation.actionClass,
+        actionReason: relation.actionReason,
+      }
+    } catch {
+      return blockedVersionAction(version, 'git_ancestry_unavailable')
+    }
+  })
+}
 
 function assertExactKeys(value, expected, field) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -408,6 +452,7 @@ export function createDevDeliveryService({
   operationStore,
   readRepositoryState = readRepositoryIdentity,
   runPreflight = runTargetPreflightAsync,
+  classifyRelation = classifyGitAncestryRelation,
   preparePromotionAction = preparePromotion,
   prepareRollbackAction = prepareRollback,
   readRecoveryEvidence = readLatestBackupRestoreEvidence,
@@ -421,7 +466,8 @@ export function createDevDeliveryService({
   const store = operationStore || resolveDeliveryOperationStore(root)
   const deliveryProvider =
     provider || createConfiguredDeliveryProvider({ projectRoot: root, env })
-  const providerKey = deliveryProvider.provider === 'github' ? 'github' : 'gitlab'
+  const providerKey =
+    deliveryProvider.provider === 'github' ? 'github' : 'gitlab'
   const providerName = providerKey === 'gitlab' ? 'GitLab' : 'GitHub'
   const children = new Map()
   let preflightCache = null
@@ -452,8 +498,7 @@ export function createDevDeliveryService({
         ) {
           transitionDeliveryOperation(store, operation.id, {
             status: 'passed',
-            message:
-              `immutable ${providerName} release and complete assets are published`,
+            message: `immutable ${providerName} release and complete assets are published`,
             now: now(),
           })
         } else if (status.status === 'failed') {
@@ -511,11 +556,13 @@ export function createDevDeliveryService({
     const [repositoryResult, versionsResult, targetResult, timingsResult] =
       await Promise.allSettled([
         readRepositoryState(root),
-        Promise.resolve(deliveryProvider.listVersions({ limit: 20 })),
+        Promise.resolve(deliveryProvider.listVersions({ limit: 100 })),
         readTargetPreflight({ force: forcePreflight }),
         readPipelineTimings(),
       ])
     const issues = []
+    const generatedAt = now()
+    let releaseVersionPolicy = null
     if (repositoryResult.status === 'rejected') {
       issues.push({
         code: 'repository_identity_unavailable',
@@ -530,6 +577,19 @@ export function createDevDeliveryService({
           providerKey
         )
       )
+    } else {
+      try {
+        releaseVersionPolicy = buildReleaseVersionCatalog({
+          versions: versionsResult.value,
+          reference: generatedAt,
+        })
+      } catch {
+        issues.push({
+          code: 'release_version_catalog_invalid',
+          level: 'error',
+          message: '正式版本目录不一致，禁止创建新发布',
+        })
+      }
     }
     if (targetResult.status === 'rejected') {
       issues.push({
@@ -572,11 +632,20 @@ export function createDevDeliveryService({
     return {
       schemaVersion: 'plush.dev-delivery-summary/v1',
       status: issues.length === 0 ? 'success' : 'partial',
-      generatedAt: now(),
+      generatedAt,
       repository:
         repositoryResult.status === 'fulfilled' ? repositoryResult.value : null,
       versions:
-        versionsResult.status === 'fulfilled' ? versionsResult.value : [],
+        versionsResult.status === 'fulfilled'
+          ? bindVersionActions({
+              classifyRelation,
+              projectRoot: root,
+              target:
+                targetResult.status === 'fulfilled' ? targetResult.value : null,
+              versions: versionsResult.value,
+            })
+          : [],
+      releaseVersionPolicy,
       target: targetResult.status === 'fulfilled' ? targetResult.value : null,
       timings:
         timingsResult.status === 'fulfilled' ? timingsResult.value : null,
@@ -629,6 +698,7 @@ export function createDevDeliveryService({
       now: now(),
     })
     try {
+      const versionReference = now()
       const existing = await Promise.resolve(
         deliveryProvider.getReleaseStatus(operation.gitSha)
       )
@@ -647,25 +717,36 @@ export function createDevDeliveryService({
         })
         return presentOperation(operation)
       }
+      if (retryOfOperationId === null) {
+        const policy = assertOfficialReleaseVersion({
+          versions: await Promise.resolve(
+            deliveryProvider.listVersions({ limit: 100 })
+          ),
+          reference: versionReference,
+          requested: operation.version,
+        })
+        if (policy.nextVersion !== operation.version) {
+          throw new Error('release version catalog changed before dispatch')
+        }
+      }
       await Promise.resolve(
         deliveryProvider.dispatchRelease({
           gitSha: operation.gitSha,
           version: operation.version,
           customer: 'yoyoosun',
+          versionReference,
         })
       )
       operation = transitionDeliveryOperation(store, operation.id, {
         status: 'waiting',
-        message:
-          `${providerName} release pipeline accepted; waiting for terminal assets`,
+        message: `${providerName} release pipeline accepted; waiting for terminal assets`,
         now: now(),
       })
       return presentOperation(operation)
     } catch (error) {
       transitionDeliveryOperation(store, operation.id, {
         status: 'failed',
-        message:
-          `${providerName} release dispatch failed without starting a target write`,
+        message: `${providerName} release dispatch failed without starting a target write`,
         issues: [
           providerIssue(
             `${providerName} 发布未启动或身份不一致；未写入 133 测试服务器`,

@@ -17,6 +17,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { validateReleaseManifest } from "./release-catalog.mjs";
+import { validateGitAncestryRelation } from "./git-ancestry-relation.mjs";
 
 export const PROMOTION_MANIFEST_CONTRACT = "plush.promotion-manifest/v1";
 
@@ -51,6 +52,7 @@ function manifestFingerprint(manifest) {
 }
 
 export function validatePromotionManifest(manifest) {
+  const ancestry = validateGitAncestryRelation(manifest?.ancestry);
   if (
     manifest?.schemaVersion !== PROMOTION_MANIFEST_CONTRACT ||
     !["eligible", "blocked", "already_current"].includes(manifest?.status) ||
@@ -70,6 +72,8 @@ export function validatePromotionManifest(manifest) {
     ) ||
     !Array.isArray(manifest?.release?.images) ||
     manifest.release.images.length !== 2 ||
+    ancestry.currentGitSha !== manifest?.before?.runtimeSha ||
+    ancestry.candidateGitSha !== manifest?.release?.gitSha ||
     !Array.isArray(manifest?.blockers) ||
     manifest.blockers.some((item) => !BLOCKER_PATTERN.test(item)) ||
     new Set(manifest.blockers).size !== manifest.blockers.length ||
@@ -94,7 +98,9 @@ export function validatePromotionManifest(manifest) {
   if (
     manifest.status === "blocked" !== (manifest.blockers.length > 0) ||
     (manifest.status === "already_current" &&
-      manifest.before?.runtimeSha !== manifest.release.gitSha) ||
+      (manifest.before?.runtimeSha !== manifest.release.gitSha ||
+        ancestry.actionClass !== "current")) ||
+    (manifest.status === "eligible" && ancestry.actionClass !== "promote") ||
     manifest.rollback?.automaticDatabaseDownMigration !== false ||
     manifest.rollback?.freshPreMigrationBackupRequired !== true ||
     manifest.redaction?.containsSecrets !== false ||
@@ -113,6 +119,7 @@ export function buildPromotionManifest({
   releaseManifest,
   releaseManifestSha256,
   targetPreflight,
+  ancestry,
   createdAt = new Date().toISOString(),
 }) {
   const release = validateReleaseManifest(releaseManifest);
@@ -138,7 +145,18 @@ export function buildPromotionManifest({
     throw new Error("fixed target preflight is required");
   }
   const runtimeSha = targetPreflight.remote?.runtime?.serverSha || "unknown";
-  const blockers = [...new Set(targetPreflight.blockers || [])].sort();
+  const gitRelation = validateGitAncestryRelation(ancestry);
+  if (
+    gitRelation.currentGitSha !== runtimeSha ||
+    gitRelation.candidateGitSha !== release.gitSha
+  ) {
+    throw new Error("promotion ancestry does not match the target and release");
+  }
+  const blockerSet = new Set(targetPreflight.blockers || []);
+  if (!["promote", "current"].includes(gitRelation.actionClass)) {
+    blockerSet.add("promotion_git_relation_not_ahead");
+  }
+  const blockers = [...blockerSet].sort();
   const status =
     blockers.length > 0
       ? "blocked"
@@ -156,6 +174,7 @@ export function buildPromotionManifest({
       customer: "yoyoosun",
       trialTarget: "customer-trial-133",
     },
+    ancestry: gitRelation,
     release: {
       version: release.version,
       gitSha: release.gitSha,

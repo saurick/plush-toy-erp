@@ -25,6 +25,8 @@ const DEV_VERSION_CENTER_VIEW_VALUES = new Set([
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/u
 const VERSION_PATTERN = /^[0-9A-Za-z](?:[0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$/u
+const OFFICIAL_VERSION_PATTERN =
+  /^[0-9]{4}[.][0-9]{2}[.][0-9]{2}-[1-9][0-9]{0,3}$/u
 const TIMESTAMP_WITH_TIME_ZONE_PATTERN =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:[.]\d+)?(?:Z|[+-]\d{2}:\d{2})$/u
 const OPERATION_STATUSES = new Set([
@@ -73,6 +75,16 @@ const CURRENT_RELEASE_ASSETS = Object.freeze([
   'release-rehearsal.json',
   ...LEGACY_RELEASE_ASSETS.slice(3),
 ])
+const DELIVERY_VERSION_ACTION_REASONS = Object.freeze({
+  current: new Set(['exact_sha_current']),
+  promote: new Set(['candidate_descends_from_current']),
+  rollback: new Set(['candidate_is_ancestor_of_current']),
+  blocked: new Set([
+    'git_histories_diverged',
+    'git_ancestry_unavailable',
+    'target_identity_unavailable',
+  ]),
+})
 const IDEMPOTENCY_BASIS = Object.freeze([
   'action',
   'target',
@@ -126,8 +138,7 @@ const PIPELINE_LABELS = Object.freeze({
   'Install full-gate system and Go tools': '安装完整门禁系统与 Go 工具',
   'Install locked Web dependencies when selected': '按需安装锁定的 Web 依赖',
   'Audit production Web dependencies': '审计生产 Web 依赖',
-  'Audit production Web dependencies when selected':
-    '按需审计生产 Web 依赖',
+  'Audit production Web dependencies when selected': '按需审计生产 Web 依赖',
   'Install and verify Chromium only for full':
     '仅在完整门禁安装并校验 Chromium',
   'Prove Ent and Atlas generation when selected':
@@ -181,8 +192,7 @@ const PIPELINE_LABELS = Object.freeze({
     '各运行镜像只构建一次并按摘要发布',
   'Create or resume a verified draft, then publish it':
     '创建或恢复已校验草稿并发布',
-  'Create a verified empty draft, then publish it':
-    '创建已校验的空草稿并发布',
+  'Create a verified empty draft, then publish it': '创建已校验的空草稿并发布',
   'Publish immutable release': '发布不可变版本',
   'Build both images': '并行构建服务端与 Web 镜像',
   'Publish assets': '发布制品',
@@ -316,8 +326,7 @@ export function deliveryPipelinePresentation(value) {
   if (!label) label = '其他流水线环节'
   return {
     label,
-    title:
-      label === original ? original : `${label}（CI 原名：${original}）`,
+    title: label === original ? original : `${label}（CI 原名：${original}）`,
   }
 }
 
@@ -712,6 +721,9 @@ function validateVersion(version) {
     !Number.isFinite(Date.parse(version.publishedAt)) ||
     typeof version.completeAssets !== 'boolean' ||
     typeof version.promotionEligible !== 'boolean' ||
+    !DELIVERY_VERSION_ACTION_REASONS[version.actionClass]?.has(
+      version.actionReason
+    ) ||
     !Array.isArray(version.assets) ||
     assets.some((asset, index) => index > 0 && assets[index - 1] >= asset) ||
     version.completeAssets !== completeAssets ||
@@ -738,6 +750,25 @@ function validateVersion(version) {
   return version
 }
 
+function validateReleaseVersionPolicy(value) {
+  if (
+    !value ||
+    value.schemaVersion !== 'plush.release-version-catalog/v1' ||
+    value.timeZone !== 'Asia/Shanghai' ||
+    !/^[0-9]{4}[.][0-9]{2}[.][0-9]{2}$/u.test(String(value.date || '')) ||
+    !OFFICIAL_VERSION_PATTERN.test(String(value.nextVersion || '')) ||
+    !String(value.nextVersion).startsWith(`${value.date}-`) ||
+    !Number.isSafeInteger(value.officialVersionCount) ||
+    value.officialVersionCount < 0 ||
+    !Number.isSafeInteger(value.dateVersionCount) ||
+    value.dateVersionCount < 0 ||
+    value.dateVersionCount > value.officialVersionCount
+  ) {
+    throw new Error('release version policy is invalid')
+  }
+  return value
+}
+
 export function validateDevDeliverySummary(summary) {
   assertObject(summary, 'delivery summary')
   if (
@@ -747,6 +778,7 @@ export function validateDevDeliverySummary(summary) {
     !Array.isArray(summary.operations) ||
     !Array.isArray(summary.issues) ||
     !Object.hasOwn(summary, 'timings') ||
+    !Object.hasOwn(summary, 'releaseVersionPolicy') ||
     !['gitlab', 'github'].includes(summary.boundaries?.provider) ||
     summary.boundaries?.target !== 'test-133' ||
     summary.boundaries?.browserShellAccess !== false ||
@@ -754,6 +786,12 @@ export function validateDevDeliverySummary(summary) {
     summary.boundaries?.automaticRetryAllowed !== false
   ) {
     throw new Error('delivery summary contract is invalid')
+  }
+  if (summary.releaseVersionPolicy === null && summary.status === 'success') {
+    throw new Error('delivery release version policy is unavailable')
+  }
+  if (summary.releaseVersionPolicy !== null) {
+    validateReleaseVersionPolicy(summary.releaseVersionPolicy)
   }
   if (
     summary.repository !== null &&
@@ -941,13 +979,6 @@ export function deliveryRetryPresentation(value) {
     operation_in_progress: '操作进行中',
   }
   return labels[value?.reason] || '重试状态未证明'
-}
-
-export function defaultReleaseVersion(date = new Date()) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}.${month}.${day}-1`
 }
 
 export function shortGitSha(value) {
@@ -1272,22 +1303,11 @@ export function deliveryStatusPresentation(status) {
   return { label, color }
 }
 
-export function deliveryVersionActionKind(version, currentVersion) {
+export function deliveryVersionActionKind(version) {
   if (!version || !SHA_PATTERN.test(String(version.gitSha || ''))) {
     return 'blocked'
   }
-  if (!currentVersion) return 'promote'
-  if (version.gitSha === currentVersion.gitSha) return 'current'
-  const versionPublishedAt = Date.parse(String(version.publishedAt || ''))
-  const currentPublishedAt = Date.parse(
-    String(currentVersion.publishedAt || '')
-  )
-  if (
-    !Number.isFinite(versionPublishedAt) ||
-    !Number.isFinite(currentPublishedAt) ||
-    versionPublishedAt === currentPublishedAt
-  ) {
-    return 'blocked'
-  }
-  return versionPublishedAt < currentPublishedAt ? 'rollback' : 'promote'
+  return ['promote', 'rollback', 'current'].includes(version.actionClass)
+    ? version.actionClass
+    : 'blocked'
 }

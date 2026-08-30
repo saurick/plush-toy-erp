@@ -37,6 +37,7 @@ import {
   validateReleaseManifest,
 } from "./release-catalog.mjs";
 import { runTargetPreflight } from "./target-preflight.mjs";
+import { classifyGitAncestryRelation } from "./git-ancestry-relation.mjs";
 import { validateRemoteStageTimings } from "./remote-stage-timings.mjs";
 import {
   buildTargetReleaseCacheIdentity,
@@ -521,6 +522,7 @@ export function executeRollback(
   {
     runCommand = spawnSync,
     runPreflight = runTargetPreflight,
+    classifyRelation = classifyGitAncestryRelation,
     buildCacheIdentity = buildTargetReleaseCacheIdentity,
     cleanupCache = cleanupPreparedTargetReleaseIncoming,
     probeCache = probeTargetReleaseCache,
@@ -553,22 +555,39 @@ export function executeRollback(
     );
   }
   const immediatePreflight = runPreflight("test-133");
+  const blockers = new Set(immediatePreflight.blockers || []);
   if (
     immediatePreflight.status !== "passed" ||
     immediatePreflight.remote.runtime.serverSha !== plan.from.gitSha ||
     immediatePreflight.remote.runtime.webSha !== plan.from.gitSha
   ) {
-    const blockers = new Set(immediatePreflight.blockers || []);
     if (
       immediatePreflight.remote?.runtime?.serverSha !== plan.from.gitSha ||
       immediatePreflight.remote?.runtime?.webSha !== plan.from.gitSha
     ) {
       blockers.add("rollback_current_release_mismatch");
     }
+  }
+  try {
+    const immediateAncestry = classifyRelation({
+      repoRoot: root,
+      currentGitSha: immediatePreflight.remote?.runtime?.serverSha,
+      candidateGitSha: plan.to.gitSha,
+    });
+    if (
+      immediateAncestry.actionClass !== "rollback" ||
+      JSON.stringify(immediateAncestry) !== JSON.stringify(plan.ancestry)
+    ) {
+      blockers.add("rollback_git_relation_not_behind");
+    }
+  } catch {
+    blockers.add("rollback_git_relation_not_behind");
+  }
+  if (immediatePreflight.status !== "passed" || blockers.size > 0) {
     operation = transitionDeliveryOperation(store, operation.id, {
       status: "blocked",
       message: "rollback was blocked by the immediate target readback",
-      issues: [...blockers].map((code) => ({
+      issues: [...blockers].sort().map((code) => ({
         code,
         level: "error",
         message: `目标即时回滚预检阻断：${code}`,

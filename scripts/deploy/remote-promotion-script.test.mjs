@@ -94,6 +94,16 @@ test("remote promotion verifies content-addressed cache and skips only exact ima
   );
 });
 
+test("remote promotion rechecks frozen Git ancestry and runtime before cache writes", () => {
+  assert.match(source, /plush[.]git-ancestry-relation\/v1/u);
+  assert.match(source, /candidate_descends_from_current/u);
+  const runtimeCheck = source.indexOf(
+    'fail "target runtime or Git ancestry changed after promotion qualification"',
+  );
+  const cacheWrite = source.indexOf('mkdir -p "$cache_root"', runtimeCheck);
+  assert.ok(runtimeCheck >= 0 && runtimeCheck < cacheWrite);
+});
+
 test("remote promotion cleans only materialization created by the current operation", () => {
   assert.match(source, /cleanup_transient_materialization/u);
   assert.match(source, /cache_materializing_created=1/u);

@@ -19,7 +19,7 @@ flowchart LR
   G -->|main / MR pipeline| R["KVM Runner VM<br/>isolated shell + VM Docker"]
   G -->|protected push mirror| H["GitHub<br/>GPT Review mirror"]
   R -->|image by digest| C["GHCR"]
-  R -->|six immutable assets| P["GitLab Package + Release"]
+  R -->|v2 seven immutable assets| P["GitLab Package + Release"]
   W["DEV-only version center"] -->|loopback fixed API| B["Delivery Bridge"]
   B -->|read/dispatch| G
   B -->|download exact assets| P
@@ -68,11 +68,13 @@ release 只能从受保护 main 的 web/API/trigger pipeline 发起，且满足�
 
 - `RELEASE_SHA == CI_COMMIT_SHA`；
 - customer 固定 `yoyoosun`；
-- 版本号符合固定合同；
+- 版本号由 Bridge 服务端以 `Asia/Shanghai` 日历日和当前 Release catalog 唯一推导为 `YYYY.MM.DD-N`，浏览器只读且不得手工改写；
 - 可回读同 SHA 的 protected-main push pipeline、全部分片、`quality_aggregate`、`CI Gate` 与 exact evidence Package；
 - protected environment `release` 与 masked/protected secrets 可用。
 
 `publish_release` 从 `plush-ci-evidence` 恢复普通 push CI 的 v3 terminal，其 provenance job 固定为 `quality_aggregate`，不重跑 strict。`plush-release-candidate/artifact-<sha>/candidate.tar` 不存在时才构建一次 Server/Web bundle；后续重试只恢复同一 archive。同一候选包完成 migration、health/ready、smoke、备份恢复、重启恢复和零残留演练，回执在 `plush-release-rehearsal/artifact-<sha>` 冻结。只有这三层 exact 身份通过后，registry publisher 才把候选包内的同一镜像推到 `ghcr.io/saurick/plush-toy-erp-{server,web}` 取得 digest，并生成带演练 digest 的 `plush.release-manifest/v2` 与固定七资产：
+
+创建 pipeline 时 Bridge 同时传入带时区的版本参考时刻；GitLab 在首次候选构建前重新读取 catalog，只接受与 pipeline 创建时刻相差不超过 10 分钟的同一下一版本。已冻结候选的显式重试保持原版本，不再发号；无候选且 catalog 已前进时必须新建发布，不得占用旧序号。
 
 1. `checksums.sha256`
 2. `release-artifact.json`
@@ -82,7 +84,7 @@ release 只能从受保护 main 的 web/API/trigger pipeline 发起，且满足�
 6. `web-image.tar`
 7. `release-rehearsal.json`
 
-Generic Package version 与 Release tag 固定为 `artifact-<40sha>`。已存在文件只有 SHA-256 与冻结候选包一致时才复用；同名异内容、同版本异 SHA、同 SHA 异版本或演练不完整均失败关闭。Release、Package、GHCR digest、manifest、`release-rehearsal.json` 和目标 promotion 必须指向同一 SHA、同一 artifact/rehearsal digest。旧 v1 六资产只允许精确读取、展示、校验和既有回滚点兼容，`promotionEligible=false`；不得补传、重新封装或作为新 promotion 输入。
+Generic Package version 与 Release tag 固定为 `artifact-<40sha>`。重试时先逐项校验现有 v2 文件的名称、大小和 SHA-256，只续传完全一致子集所缺的资产，并在创建或复用 Release 前读回完整七资产；未知文件、重复文件、同名异内容、同版本异 SHA、同 SHA 异版本或演练不完整均失败关闭。Release、Package、GHCR digest、manifest、`release-rehearsal.json` 和目标 promotion 必须指向同一 SHA、同一 artifact/rehearsal digest。旧 v1 六资产只允许精确读取、展示、校验和既有回滚点兼容，`promotionEligible=false`；不得补传、重新封装或作为新 promotion 输入。
 
 ## 双 Provider 边界
 

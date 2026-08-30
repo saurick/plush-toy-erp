@@ -12,6 +12,17 @@ const TO_SHA = "b".repeat(40);
 const HASH = "c".repeat(64);
 const OPERATION_ID = "11111111-1111-4111-8111-111111111111";
 
+function ancestry() {
+  return {
+    schemaVersion: "plush.git-ancestry-relation/v1",
+    currentGitSha: FROM_SHA,
+    candidateGitSha: TO_SHA,
+    relation: "behind",
+    actionClass: "rollback",
+    actionReason: "candidate_is_ancestor_of_current",
+  };
+}
+
 function release(gitSha, overrides = {}) {
   return {
     schemaVersion: "plush.release-manifest/v1",
@@ -79,6 +90,7 @@ test("rollback qualification permits only equal migration and config identity", 
     targetReleaseManifest: release(TO_SHA),
     targetReleaseManifestSha256: "6".repeat(64),
     targetPreflight: preflight(),
+    ancestry: ancestry(),
   });
   assert.equal(validateRollbackManifest(manifest).status, "eligible");
   assert.equal(manifest.rollback.mode, "code_and_images_only");
@@ -100,6 +112,7 @@ test("rollback qualification blocks schema, config and runtime mismatch", () => 
     }),
     targetReleaseManifestSha256: "6".repeat(64),
     targetPreflight: preflight("9".repeat(40)),
+    ancestry: ancestry(),
   });
   assert.equal(manifest.status, "blocked");
   assert.deepEqual(manifest.blockers, [
@@ -117,6 +130,7 @@ test("rollback qualification preserves target preflight blockers", () => {
     targetReleaseManifest: release(TO_SHA),
     targetReleaseManifestSha256: "6".repeat(64),
     targetPreflight: preflight(FROM_SHA, ["target_disk_capacity_low"]),
+    ancestry: ancestry(),
   });
   assert.equal(manifest.status, "blocked");
   assert.deepEqual(manifest.blockers, ["target_disk_capacity_low"]);

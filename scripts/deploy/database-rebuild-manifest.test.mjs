@@ -20,6 +20,22 @@ const SHA = "a".repeat(40);
 const HASH = "b".repeat(64);
 const OPERATION_ID = "123e4567-e89b-42d3-a456-426614174000";
 
+function ancestry(currentGitSha = SHA, relation = "current") {
+  const table = {
+    current: ["current", "exact_sha_current"],
+    diverged: ["blocked", "git_histories_diverged"],
+  };
+  const [actionClass, actionReason] = table[relation];
+  return {
+    schemaVersion: "plush.git-ancestry-relation/v1",
+    currentGitSha,
+    candidateGitSha: SHA,
+    relation,
+    actionClass,
+    actionReason,
+  };
+}
+
 function releaseManifest() {
   return {
     schemaVersion: "plush.release-manifest/v1",
@@ -98,6 +114,7 @@ test("database rebuild plan binds a fresh physical generation and two rollback p
     releaseManifest: releaseManifest(),
     releaseManifestSha256: HASH,
     targetPreflight: targetPreflight(),
+    ancestry: ancestry(),
     createdAt: "2026-08-03T12:00:00.000Z",
   });
   assert.equal(manifest.status, "eligible");
@@ -119,9 +136,11 @@ test("database rebuild plan blocks runtime drift and target preflight failures",
     releaseManifest: releaseManifest(),
     releaseManifestSha256: HASH,
     targetPreflight: targetPreflight({ runtimeSha: "9".repeat(40) }),
+    ancestry: ancestry("9".repeat(40), "diverged"),
   });
   assert.equal(drifted.status, "blocked");
   assert.deepEqual(drifted.blockers, [
+    "database_rebuild_git_relation_not_current",
     "database_rebuild_runtime_release_mismatch",
   ]);
   const blocked = buildDatabaseRebuildManifest({
@@ -129,6 +148,7 @@ test("database rebuild plan blocks runtime drift and target preflight failures",
     releaseManifest: releaseManifest(),
     releaseManifestSha256: HASH,
     targetPreflight: targetPreflight({ blocked: true }),
+    ancestry: ancestry(),
   });
   assert.equal(blocked.status, "blocked");
   assert.deepEqual(blocked.blockers, ["target_disk_capacity_low"]);
@@ -141,6 +161,7 @@ test("database rebuild plan blocks runtime drift and target preflight failures",
       status: "blocked",
       blockers: [],
     },
+    ancestry: ancestry(),
   });
   assert.equal(blockerWithoutDetail.status, "blocked");
   assert.deepEqual(blockerWithoutDetail.blockers, [
@@ -157,6 +178,7 @@ test("database rebuild plan is private, immutable and redacted", (t) => {
     releaseManifest: releaseManifest(),
     releaseManifestSha256: HASH,
     targetPreflight: targetPreflight(),
+    ancestry: ancestry(),
   });
   assert.equal(writeDatabaseRebuildManifest(file, manifest).reused, false);
   assert.equal(writeDatabaseRebuildManifest(file, manifest).reused, true);

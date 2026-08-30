@@ -24,6 +24,20 @@ const CURRENT_SHA = "b".repeat(40);
 const IDEMPOTENCY_KEY =
   "promotion:test-133:123e4567-e89b-42d3-a456-426614174000";
 
+function classifyRelation({ currentGitSha, candidateGitSha }) {
+  const current = currentGitSha === candidateGitSha;
+  return {
+    schemaVersion: "plush.git-ancestry-relation/v1",
+    currentGitSha,
+    candidateGitSha,
+    relation: current ? "current" : "ahead",
+    actionClass: current ? "current" : "promote",
+    actionReason: current
+      ? "exact_sha_current"
+      : "candidate_descends_from_current",
+  };
+}
+
 function releaseManifest({ artifactSha256, receiptSha256 }) {
   const strict = releaseManifestStrictEvidenceFixture();
   const counts = { executed: 1, passed: 1, failed: 0, skipped: 0 };
@@ -350,6 +364,7 @@ test("promotion preparation awaits one read-only preflight and becomes ready", a
   const data = fixture(t);
   let preflightCalls = 0;
   const runtime = {
+    classifyRelation,
     now: (() => {
       let second = 0;
       return () => `2026-07-29T03:00:0${second++}.000Z`;
@@ -389,12 +404,14 @@ test("promotion preparation persists disk blocker as a terminal operation", asyn
     operationStore: data.store,
   };
   const first = await preparePromotion(request, {
+    classifyRelation,
     runPreflight: () => {
       preflightCalls += 1;
       return targetPreflight(true);
     },
   });
   const second = await preparePromotion(request, {
+    classifyRelation,
     runPreflight: () => {
       preflightCalls += 1;
       return targetPreflight(false);
@@ -444,6 +461,7 @@ test("explicit terminal retry creates a distinct ready operation lineage", async
   const first = await preparePromotion(
     { ...common, idempotencyKey: IDEMPOTENCY_KEY },
     {
+      classifyRelation,
       runPreflight: () => {
         preflightCalls += 1;
         return targetPreflight(true);
@@ -457,6 +475,7 @@ test("explicit terminal retry creates a distinct ready operation lineage", async
       retryOfOperationId: first.operation.id,
     },
     {
+      classifyRelation,
       runPreflight: () => {
         preflightCalls += 1;
         return targetPreflight(false);

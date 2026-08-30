@@ -38,6 +38,7 @@ packages:
   - lsof
   - make
   - postgresql-client
+  - qemu-guest-agent
   - ripgrep
   - shellcheck
   - tar
@@ -62,7 +63,7 @@ users:
   - name: gitlab-runner
     system: true
     groups: [docker]
-    shell: /bin/bash
+    shell: /usr/sbin/nologin
     lock_passwd: true
 
 write_files:
@@ -93,6 +94,76 @@ write_files:
     content: |
       export GOPROXY=https://goproxy.cn,direct
       export GOSUMDB=sum.golang.google.cn
+  - path: /etc/profile.d/plush-gitlab-canonical-route.sh
+    permissions: '0644'
+    owner: root:root
+    content: |
+      case ",${NO_PROXY:-}," in
+        *,gitlab.saurick.me,*) ;;
+        *) export NO_PROXY="${NO_PROXY:+${NO_PROXY},}gitlab.saurick.me" ;;
+      esac
+      case ",${no_proxy:-}," in
+        *,gitlab.saurick.me,*) ;;
+        *) export no_proxy="${no_proxy:+${no_proxy},}gitlab.saurick.me" ;;
+      esac
+  - path: /etc/systemd/system/gitlab-runner.service.d/20-plush-canonical-gitlab-route.conf
+    permissions: '0644'
+    owner: root:root
+    content: |
+      [Service]
+      Environment="NO_PROXY=gitlab.saurick.me"
+      Environment="no_proxy=gitlab.saurick.me"
+  - path: /usr/local/sbin/plush-configure-gitlab-route
+    permissions: '0755'
+    owner: root:root
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      canonical_host=gitlab.saurick.me
+      canonical_ip=192.168.124.1
+      hosts_file=/etc/hosts
+
+      test "$EUID" = 0
+      test -f "$hosts_file"
+      test ! -L "$hosts_file"
+
+      count_host_entries() {
+        awk -v host="$canonical_host" '
+          {
+            for (field = 2; field <= NF; field += 1) {
+              if ($field == host) {
+                count += 1
+                break
+              }
+            }
+          }
+          END { print count + 0 }
+        ' "$hosts_file"
+      }
+
+      count_exact_entries() {
+        awk -v host="$canonical_host" -v ip="$canonical_ip" '
+          NF == 2 && $1 == ip && $2 == host { count += 1 }
+          END { print count + 0 }
+        ' "$hosts_file"
+      }
+
+      host_count="$(count_host_entries)"
+      exact_count="$(count_exact_entries)"
+      test "$host_count" = "$exact_count"
+      case "$exact_count" in
+        0) printf '%s %s\n' "$canonical_ip" "$canonical_host" >>"$hosts_file" ;;
+        1) ;;
+        *) exit 42 ;;
+      esac
+
+      test "$(count_host_entries)" = 1
+      test "$(count_exact_entries)" = 1
+      test "$(getent ahostsv4 "$canonical_host" | awk '{ print $1 }' | sort -u)" = "$canonical_ip"
+      test "$(stat -c '%U:%G:%a' /etc/profile.d/plush-gitlab-canonical-route.sh)" = root:root:644
+      test "$(stat -c '%U:%G:%a' /etc/systemd/system/gitlab-runner.service.d/20-plush-canonical-gitlab-route.conf)" = root:root:644
+      systemctl daemon-reload
   - path: /usr/local/sbin/plush-runner-toolchain
     permissions: '0755'
     content: |
@@ -304,13 +375,13 @@ write_files:
       verify_go_module_env() {
         local user="$1"
         local observed
-        observed="$(runuser -l "$user" -c 'printf "%s\n%s" "$GOPROXY" "$GOSUMDB"')"
+        observed="$(runuser -l "$user" -s /bin/bash -c 'printf "%s\n%s" "$GOPROXY" "$GOSUMDB"')"
         test "$observed" = $'https://goproxy.cn,direct\nsum.golang.google.cn'
       }
 
       verify_go_cgo_enabled() {
         local user="$1"
-        test "$(runuser -l "$user" -c '/usr/local/bin/go env CGO_ENABLED')" = 1
+        test "$(runuser -l "$user" -s /bin/bash -c '/usr/local/bin/go env CGO_ENABLED')" = 1
       }
 
       test "$(node --version)" = v24.14.0
@@ -327,6 +398,18 @@ write_files:
       test "$(stat -c '%U:%G:%a' /usr/bin/make)" = root:root:755
       test "$(/usr/bin/make --version | head -n 1)" = 'GNU Make 4.3'
       test "$(stat -c '%U:%G:%a' /etc/profile.d/plush-go-module-network.sh)" = root:root:644
+      test "$(stat -c '%U:%G:%a' /etc/profile.d/plush-gitlab-canonical-route.sh)" = root:root:644
+      test "$(stat -c '%U:%G:%a' /etc/systemd/system/gitlab-runner.service.d/20-plush-canonical-gitlab-route.conf)" = root:root:644
+      test "$(getent passwd gitlab-runner | cut -d: -f7)" = /usr/sbin/nologin
+      test "$(dpkg-query -W -f='${Status} ${Architecture}' qemu-guest-agent)" = 'install ok installed amd64'
+      test "$(systemctl is-active qemu-guest-agent)" = active
+      case "$(systemctl is-enabled qemu-guest-agent)" in
+        enabled|static|indirect) ;;
+        *) exit 43 ;;
+      esac
+      test -c /dev/virtio-ports/org.qemu.guest_agent.0
+      test "$(awk '$1 == "192.168.124.1" && NF == 2 && $2 == "gitlab.saurick.me" { count += 1 } END { print count + 0 }' /etc/hosts)" = 1
+      test "$(getent ahostsv4 gitlab.saurick.me | awk '{ print $1 }' | sort -u)" = 192.168.124.1
       verify_go_module_env ubuntu
       verify_go_module_env root
       verify_go_module_env gitlab-runner
@@ -357,10 +440,12 @@ write_files:
       set -euo pipefail
 
       systemctl enable --now docker
+      systemctl start qemu-guest-agent
       /usr/local/sbin/plush-runner-toolchain
       install -d -o gitlab-runner -g gitlab-runner -m 0700 /home/gitlab-runner
       gitlab-runner install --user=gitlab-runner --working-directory=/home/gitlab-runner
       systemctl disable --now gitlab-runner
+      /usr/local/sbin/plush-configure-gitlab-route
       install -d -o root -g root -m 0700 /etc/plush-runner
       /usr/local/sbin/plush-verify-runner-bootstrap
       echo "Runner toolchain ready. Place a 0600 registration.env and run /usr/local/sbin/plush-register-gitlab-runner."
@@ -372,6 +457,30 @@ write_files:
       env_file=/etc/plush-runner/registration.env
       test -f "$env_file"
       test "$(stat -c %a "$env_file")" = 600
+
+      verify_canonical_gitlab() {
+        local http_status
+        http_status="$(env \
+          -u ALL_PROXY -u HTTPS_PROXY -u HTTP_PROXY \
+          -u all_proxy -u https_proxy -u http_proxy \
+          NO_PROXY=gitlab.saurick.me no_proxy=gitlab.saurick.me \
+          curl --fail --silent --show-error --output /dev/null \
+            --connect-timeout 10 --max-time 30 --write-out '%{http_code}' \
+            https://gitlab.saurick.me/)"
+        [[ "$http_status" =~ ^[23][0-9][0-9]$ ]]
+        env \
+          -u ALL_PROXY -u HTTPS_PROXY -u HTTP_PROXY \
+          -u all_proxy -u https_proxy -u http_proxy \
+          NO_PROXY=gitlab.saurick.me no_proxy=gitlab.saurick.me \
+          node --input-type=module -e '
+            const response = await fetch("https://gitlab.saurick.me/");
+            if (response.status < 200 || response.status >= 400) process.exit(1);
+            await response.body?.cancel();
+          '
+      }
+
+      /usr/local/sbin/plush-configure-gitlab-route
+      verify_canonical_gitlab
       # shellcheck disable=SC1090
       source "$env_file"
       : "${GITLAB_RUNNER_TOKEN:?missing GITLAB_RUNNER_TOKEN}"
@@ -399,6 +508,17 @@ write_files:
       chmod 0600 /etc/gitlab-runner/config.toml
       shred -u "$env_file"
       systemctl enable --now gitlab-runner
+      test "$(systemctl is-active gitlab-runner)" = active
+      test "$(systemctl is-enabled gitlab-runner)" = enabled
+      service_environment="$(systemctl show --property=Environment --value gitlab-runner.service | tr ' ' '\n')"
+      grep -Fqx 'NO_PROXY=gitlab.saurick.me' <<<"$service_environment"
+      grep -Fqx 'no_proxy=gitlab.saurick.me' <<<"$service_environment"
+      runner_pid="$(systemctl show --property=MainPID --value gitlab-runner.service)"
+      [[ "$runner_pid" =~ ^[1-9][0-9]*$ ]]
+      process_environment="$(tr '\0' '\n' <"/proc/$runner_pid/environ")"
+      grep -Fqx 'NO_PROXY=gitlab.saurick.me' <<<"$process_environment"
+      grep -Fqx 'no_proxy=gitlab.saurick.me' <<<"$process_environment"
+      test "$(runuser -l gitlab-runner -s /bin/bash -c 'printf "%s\n%s" "$NO_PROXY" "$no_proxy"')" = $'gitlab.saurick.me\ngitlab.saurick.me'
 
 runcmd:
   - [bash, -lc, '/usr/local/sbin/plush-bootstrap-gitlab-runner']

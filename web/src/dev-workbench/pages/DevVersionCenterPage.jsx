@@ -47,7 +47,6 @@ import {
   DEV_VERSION_CENTER_VIEW_VERSIONS,
   createDeliveryIdempotencyKey,
   createDevDeliveryClient,
-  defaultReleaseVersion,
   deliveryIdempotencyPresentation,
   deliveryOperationMessagePresentation,
   deliveryRetryPresentation,
@@ -181,7 +180,9 @@ function ManualTakeoverGuide() {
           </article>
           <article>
             <Text strong>GitHub 只读镜像</Text>
-            <Text type="secondary">供 GPT Review 和外部代码浏览，不重复跑主链 CI</Text>
+            <Text type="secondary">
+              供 GPT Review 和外部代码浏览，不重复跑主链 CI
+            </Text>
           </article>
           <article>
             <Text strong>当前页面</Text>
@@ -239,8 +240,9 @@ function ManualTakeoverGuide() {
         description="禁止 force push、跳过质量门禁、手工覆盖 tag 或 133 页面文件、在 133 构建镜像、直接执行结构性 SQL、删除数据库或 volume、全局 prune，以及在结果未证明时盲目重试。"
       />
       <Text type="secondary">
-        AI 恢复后，把最终 exact SHA、GitLab pipeline、Release version 和 operation ID
-        交给 Codex，即可从现有回执继续核验，无需重做已被可信证明的步骤。
+        AI 恢复后，把最终 exact SHA、GitLab pipeline、Release version 和
+        operation ID 交给
+        Codex，即可从现有回执继续核验，无需重做已被可信证明的步骤。
       </Text>
     </div>
   )
@@ -288,7 +290,6 @@ export default function DevVersionCenterPage() {
   const [loadError, setLoadError] = useState('')
   const [manualTakeoverOpen, setManualTakeoverOpen] = useState(false)
   const [releaseModalOpen, setReleaseModalOpen] = useState(false)
-  const [releaseVersion, setReleaseVersion] = useState(defaultReleaseVersion())
   const [confirmOperation, setConfirmOperation] = useState(null)
   const [confirmationText, setConfirmationText] = useState('')
   const [operationDetail, setOperationDetail] = useState(null)
@@ -593,6 +594,7 @@ export default function DevVersionCenterPage() {
   const repository = summary?.repository
   const target = summary?.target
   const versions = summary?.versions || []
+  const releaseVersion = summary?.releaseVersionPolicy?.nextVersion || ''
   const operations = summary?.operations || []
   const openOperations = operations.filter((operation) =>
     OPEN_OPERATION_STATUSES.has(operation.status)
@@ -625,6 +627,7 @@ export default function DevVersionCenterPage() {
     summaryFresh &&
       repository &&
       !repository.dirty &&
+      Boolean(releaseVersion) &&
       !headAlreadyPublished &&
       !hasOpenOperation &&
       !isMutationRunning
@@ -637,11 +640,13 @@ export default function DevVersionCenterPage() {
         ? '已有未结束的操作'
         : repository?.dirty
           ? '当前工作树有改动，不能创建 exact-SHA 发布'
-          : headAlreadyPublished
-            ? repository?.commit === currentTargetSha
-              ? '当前 SHA 已发布并部署，无需重复发布'
-              : '当前 SHA 已有完整不可变制品，请在版本列表准备部署'
-            : '当前仓库身份不可用，不能创建 exact-SHA 发布'
+          : !releaseVersion
+            ? '正式版本目录不可用，不能创建新发布'
+            : headAlreadyPublished
+              ? repository?.commit === currentTargetSha
+                ? '当前 SHA 已发布并部署，无需重复发布'
+                : '当前 SHA 已有完整不可变制品，请在版本列表准备部署'
+              : '当前仓库身份不可用，不能创建 exact-SHA 发布'
   const strictProof = qualityGateSummary?.proofs?.strict
   const qualityGateIdentityCurrent = Boolean(
     repository &&
@@ -749,7 +754,7 @@ export default function DevVersionCenterPage() {
       'dispatch-release',
       {
         gitSha: repository.commit,
-        version: releaseVersion.trim(),
+        version: releaseVersion,
         idempotencyKey: createDeliveryIdempotencyKey('release'),
       }
     )
@@ -874,10 +879,7 @@ export default function DevVersionCenterPage() {
       key: 'actions',
       align: 'right',
       render: (_value, record) => {
-        const actionKind = deliveryVersionActionKind(
-          record,
-          currentTargetRelease
-        )
+        const actionKind = deliveryVersionActionKind(record)
         const baseEligible =
           summaryFresh &&
           record.status === 'published' &&
@@ -907,13 +909,18 @@ export default function DevVersionCenterPage() {
                   ? '不可变发布制品不完整'
                   : !record.promotionEligible && actionKind === 'promote'
                     ? '旧 v1 六资产版本仅可读取和回滚，不能用于新部署'
-                  : record.gitSha === currentTargetSha
-                    ? '该 exact SHA 已在 133 运行'
-                    : actionKind === 'rollback'
-                      ? '该版本早于 133 当前版本，应先检查回滚资格'
-                      : actionKind === 'blocked'
-                        ? '版本发布时间顺序不可证明，禁止猜测部署或回滚'
-                        : ''
+                    : record.gitSha === currentTargetSha
+                      ? '该 exact SHA 已在 133 运行'
+                      : actionKind === 'rollback'
+                        ? '该版本是 133 当前版本的 Git 祖先，应先检查回滚资格'
+                        : actionKind === 'blocked'
+                          ? record.actionReason === 'git_histories_diverged'
+                            ? '该版本与 133 当前版本的 Git 历史已分叉，禁止部署或回滚'
+                            : record.actionReason ===
+                                'target_identity_unavailable'
+                              ? '133 当前 exact SHA 不可用，无法判断部署方向'
+                              : 'Git 祖先关系不可证明，禁止猜测部署或回滚'
+                          : ''
         return (
           <Space wrap>
             <Tooltip title={promotionEligible ? '' : promotionExplanation}>
@@ -1297,7 +1304,8 @@ export default function DevVersionCenterPage() {
                     <Text strong>先发布制品，不会直接部署到 133</Text>
                     <Text>
                       系统会将当前干净提交的 exact SHA 交给
-                      {deliveryProviderName}，执行严格质量门禁并生成不可变镜像、Release
+                      {deliveryProviderName}
+                      ，执行严格质量门禁并生成不可变镜像、Release
                       manifest、checksum 和 SBOM。
                     </Text>
                     <Text type="secondary">
@@ -1361,8 +1369,8 @@ export default function DevVersionCenterPage() {
         ) : null}
         <DevStaticGuidance title="固定边界" hint="发布职责与安全限制">
           GitLab 负责代码真源、CI 与不可变制品；GitHub 仅接收单向审查镜像；本地
-          Bridge 只接受固定动作；133 不构建、不接受浏览器传入的命令、目录、仓库或
-          SSH 目标。
+          Bridge 只接受固定动作；133
+          不构建、不接受浏览器传入的命令、目录、仓库或 SSH 目标。
         </DevStaticGuidance>
 
         <section
@@ -1598,7 +1606,7 @@ export default function DevVersionCenterPage() {
           disabled:
             !summaryFresh ||
             !/^[0-9A-Za-z](?:[0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$/u.test(
-              releaseVersion.trim()
+              releaseVersion
             ),
         }}
         onOk={submitRelease}
@@ -1614,16 +1622,17 @@ export default function DevVersionCenterPage() {
             type="info"
             showIcon
             message={`候选 SHA：${shortGitSha(repository?.commit)}`}
-            description={`${deliveryProviderName}对该 SHA 只执行一次 strict，构建一次制品；133 不参与构建。`}
+            description={`${deliveryProviderName}复用该 SHA 已完成的普通 CI 证据，只构建一次制品；133 不参与构建。`}
           />
-          <label htmlFor="dev-release-version">版本号</label>
+          <label htmlFor="dev-release-version">
+            正式版本号（由发布目录自动生成）
+          </label>
           <Input
             id="dev-release-version"
-            autoFocus
             aria-label="发布版本号"
             value={releaseVersion}
             maxLength={64}
-            onChange={(event) => setReleaseVersion(event.target.value)}
+            readOnly
           />
         </Space>
       </Modal>

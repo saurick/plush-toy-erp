@@ -307,11 +307,15 @@ test("GitLab provider lists immutable releases from the fixed project and packag
     },
   });
 
-  const [version] = await provider.listVersions();
+  const [version] = await provider.listVersions({ limit: 100 });
   assert.equal(version.gitSha, SHA);
   assert.equal(version.completeAssets, true);
   assert.equal(version.artifactSummary.totalBytes, 2_800);
   assert.equal(provider.provider, "gitlab");
+  assert.equal(
+    seen.some(({ url }) => url.includes("/releases?per_page=100")),
+    true,
+  );
   assert.equal(
     seen.every(
       ({ url, options }) =>
@@ -447,9 +451,12 @@ test("GitLab provider dispatches only the exact current main SHA", async () => {
     gitSha: SHA,
     version: "2026.08.27-1",
     customer: "yoyoosun",
+    versionReference: "2026-08-27T01:00:00.000Z",
   });
   assert.equal(result.provider, "gitlab");
   assert.match(dispatchBody, /RELEASE_SHA/u);
+  assert.match(dispatchBody, /RELEASE_VERSION_REFERENCE/u);
+  assert.match(dispatchBody, /2026-08-27T01%3A00%3A00[.]000Z/u);
   assert.match(dispatchBody, new RegExp(SHA, "u"));
   assert.equal(JSON.stringify(result).includes(TOKEN), false);
 });

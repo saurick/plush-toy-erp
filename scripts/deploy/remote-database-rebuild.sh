@@ -389,10 +389,23 @@ jq -e \
    .status == "eligible" and .operationId == $operationId and
    .target.key == "test-133" and .target.database == $database and
    .release.gitSha == $sha and .fingerprint == $fingerprint and
+   .ancestry.schemaVersion == "plush.git-ancestry-relation/v1" and
+   .ancestry.currentGitSha == $sha and
+   .ancestry.candidateGitSha == $sha and
+   .ancestry.relation == "current" and
+   .ancestry.actionClass == "current" and
+   .ancestry.actionReason == "exact_sha_current" and
    .rollback.preservePreviousDataDirectory == true and
    .rollback.preserveFreshBackup == true and
    .rollback.automaticDataDeletion == false' \
   "$incoming/database-rebuild-manifest.json" >/dev/null
+qualified_runtime_sha="$(docker inspect plush-toy-erp-v5-server --format '{{range .Config.Env}}{{println .}}{{end}}' |
+  sed -n 's/^GIT_SHA=//p' | head -n1)"
+qualified_runtime_web_sha="$(docker inspect plush-toy-erp-v5-web-desktop --format '{{range .Config.Env}}{{println .}}{{end}}' |
+  sed -n 's/^GIT_SHA=//p' | head -n1)"
+[[ "$qualified_runtime_sha" == "$release_sha" &&
+  "$qualified_runtime_web_sha" == "$release_sha" ]] ||
+  fail "target runtime or Git ancestry changed after database rebuild qualification"
 expected_migration="$(jq -er '.migration.latest' "$incoming/release-manifest.json")"
 migration_sequence_sha256="$(jq -er '.migration.sequenceSha256' "$incoming/release-manifest.json")"
 [[ "$migration_sequence_sha256" =~ ^[0-9a-f]{64}$ ]] ||

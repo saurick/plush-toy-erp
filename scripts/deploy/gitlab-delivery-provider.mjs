@@ -636,7 +636,7 @@ export function createGitlabDeliveryProvider({
     workflow: ".gitlab-ci.yml",
 
     async listVersions({ limit = 20 } = {}) {
-      if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) {
+      if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
         throw new Error("GitLab release list limit is invalid");
       }
       const [releases, packages] = await Promise.all([
@@ -774,6 +774,7 @@ export function createGitlabDeliveryProvider({
         ["RELEASE_SHA", dispatch.gitSha],
         ["RELEASE_VERSION", dispatch.version],
         ["RELEASE_CUSTOMER", dispatch.customer],
+        ["RELEASE_VERSION_REFERENCE", dispatch.versionReference],
       ].forEach(([key, value], index) => {
         body.set(`variables[${String(index)}][key]`, key);
         body.set(`variables[${String(index)}][value]`, value);

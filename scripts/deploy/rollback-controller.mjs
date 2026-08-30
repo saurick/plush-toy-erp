@@ -16,6 +16,7 @@ import {
 } from "./rollback-manifest.mjs";
 import { sha256File, validateReleaseManifest } from "./release-catalog.mjs";
 import { runTargetPreflight } from "./target-preflight.mjs";
+import { classifyGitAncestryRelation } from "./git-ancestry-relation.mjs";
 
 const MAX_MANIFEST_BYTES = 512 * 1024;
 
@@ -49,6 +50,8 @@ function issueForBlocker(code) {
       "目标版本 migration 序列不同，只能 forward-fix 或显式恢复备份",
     rollback_customer_config_incompatible:
       "目标版本客户配置源指纹不同，禁止普通代码回滚",
+    rollback_git_relation_not_behind:
+      "目标 SHA 不是 133 当前 SHA 的祖先，禁止按发布时间猜测回滚方向",
   };
   return {
     code,
@@ -83,6 +86,7 @@ export async function prepareRollback(
   },
   {
     runPreflight = runTargetPreflight,
+    classifyRelation = classifyGitAncestryRelation,
     now = () => new Date().toISOString(),
   } = {},
 ) {
@@ -127,6 +131,11 @@ export async function prepareRollback(
   });
   try {
     const targetPreflight = await runPreflight("test-133");
+    const ancestry = classifyRelation({
+      repoRoot: root,
+      currentGitSha: current.manifest.gitSha,
+      candidateGitSha: target.manifest.gitSha,
+    });
     const plan = buildRollbackManifest({
       operationId: operation.id,
       currentReleaseManifest: current.manifest,
@@ -134,6 +143,7 @@ export async function prepareRollback(
       targetReleaseManifest: target.manifest,
       targetReleaseManifestSha256: targetManifestSha256,
       targetPreflight,
+      ancestry,
       createdAt: now(),
     });
     writeRollbackManifest(rollbackPlanFile(store, operation.id), plan);

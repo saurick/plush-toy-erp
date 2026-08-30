@@ -80,6 +80,16 @@ test("remote rollback reuses only checksum-bound retained content", () => {
   );
 });
 
+test("remote rollback rechecks frozen Git ancestry and runtime before cache writes", () => {
+  assert.match(source, /plush[.]git-ancestry-relation\/v1/u);
+  assert.match(source, /candidate_is_ancestor_of_current/u);
+  const runtimeCheck = source.indexOf(
+    'fail "current runtime SHA or Git ancestry changed after rollback qualification"',
+  );
+  const cacheWrite = source.indexOf('mkdir -p "$cache_root"', runtimeCheck);
+  assert.ok(runtimeCheck >= 0 && runtimeCheck < cacheWrite);
+});
+
 test("remote rollback cleans only materialization created by the current operation", () => {
   assert.match(source, /cleanup_transient_materialization/u);
   assert.match(source, /cache_materializing_created=1/u);

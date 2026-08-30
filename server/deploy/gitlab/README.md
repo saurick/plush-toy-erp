@@ -36,7 +36,7 @@ exact SHA `cddd39ff87e3e2ae9cd8c0282431309bb7cb043f` 的自然 push pipeline `7`
 - `compose.yml`：固定 GitLab CE 镜像 digest，只监听宿主机 `127.0.0.1:8929` 和 LAN SSH `192.168.0.133:2224`。
 - `.env.example`：非敏感路径与端口模板；实际 `.env` 不进入 Git。
 - `install-r640.sh`：默认只读预检；只有精确 `--execute --confirm` 才创建目录并启动单个 GitLab 服务。
-- `runner-vm-cloud-init.yml`：专用 Ubuntu Runner VM 的工具链与 fail-closed 注册入口。
+- `runner-vm-cloud-init.yml`：专用 Ubuntu Runner VM 的工具链、QEMU Guest Agent、canonical 内网路由与 fail-closed 注册入口。
 - `gitlab-backup.sh`：生成 GitLab 应用备份、config archive 和 RAID5 checksum；默认只预览。
 - `gitlab-backup-verify.sh`：只校验归档、checksum 与当前 GitLab 自检，不会覆盖在线实例。
 
@@ -52,9 +52,21 @@ Runner VM 的 Go 模块下载统一由 `/etc/profile.d/plush-go-module-network.s
 
 GitLab Runner 使用官方版本化 `gitlab-runner_amd64.deb` 作为压缩传输载体，只在本轮私有临时目录内有界续传。脚本先校验包的精确长度与 SHA-256，再通过 `dpkg-deb --fsys-tarfile` 只提取 `/usr/bin/gitlab-runner`，并再次校验二进制 SHA-256 后原子安装；不会执行 `dpkg -i`、maintainer script 或包自带的服务动作。普通小文件仍使用失败即删除的下载路径，避免把不完整内容误作可复用制品。
 
-## 公网入口
+## Runner canonical 内网路由
 
-唯一建议链路为：
+Runner 和 shell job 始终使用 canonical 身份 `https://gitlab.saurick.me`，但在 Runner VM 内只把该主机名解析到 KVM bridge gateway `192.168.124.1`。`runner-vm-cloud-init.yml` 负责以下可重建合同：
+
+- `/etc/hosts` 只能有一条 `192.168.124.1 gitlab.saurick.me`；发现同名冲突或重复时 fail closed，不覆盖其他映射。
+- systemd Runner 服务和登录 shell 同时继承大小写 `NO_PROXY/no_proxy` 的 exact-host 绕过，Node native fetch 与 curl 共用同一 canonical 路径。
+- `gitlab-runner` 账号的 passwd shell 固定为 `/usr/sbin/nologin`；GitLab shell executor 仍显式使用 `/bin/bash --login`，bootstrap 的跨用户验证也必须显式指定 `/bin/bash`。
+- `qemu-guest-agent` 随 VM 安装并启动，QEMU channel、服务存活和持久化状态进入 bootstrap 门禁；它只提供宿主机管理和只读身份证明，不成为 CI 凭据通道。
+- 注册前必须以系统信任链分别通过 curl 与 Node 的无认证 canonical GET；注册后还要读回 Runner service 配置环境和实际主进程环境。任一环节不绿，不消费注册 token，也不启动 Runner。
+
+R640 侧必须先有只监听 bridge/LAN 443 的 canonical TLS proxy，并保留已有 Tailscale 监听。UFW 只允许 `192.168.124.0/24` 经 KVM bridge 接口访问目标 `192.168.124.1/tcp/443`；不得改成 wildcard 443、LAN 全网放行或公网 FRP 绕行。主机防火墙、proxy listener、Runner 自然解析、系统信任链 curl 和 Node fetch 必须一起读回，单独的 `/etc/hosts` 或端口监听不算可达性证明。
+
+## 公网入口（独立可选）
+
+公网入口不参与 Runner canonical 内网路由，也不能替代上述 bridge、NO_PROXY 和系统信任链门禁。若未来明确启用公网访问，建议链路为：
 
 ```text
 gitlab.saurick.me
@@ -93,7 +105,7 @@ gitlab.saurick.me
    | `GITHUB_PACKAGES_TOKEN` | GitHub Packages write/read，不授 repo 管理 |
    | `GITLAB_RELEASE_TOKEN` | 当前项目 API 与 Release 管理，不授管理员权限 |
 
-6. 用 Ubuntu 24.04 cloud image 创建独立 KVM VM，应用 `runner-vm-cloud-init.yml`；cloud-init 固定安装 GNU Make、GCC、Docker Buildx v0.30.1、Docker Compose v2.40.3 与当前 Playwright 1.58.2 Chromium 所需系统包，并要求 `ubuntu`、`root`、`gitlab-runner` 的 Go 环境都读回 `CGO_ENABLED=1`，job 不能自行取得 apt 权限。在 GitLab 创建 project runner 后，把 token 只写入 VM 的 `/etc/plush-runner/registration.env`，权限 `0600`，再运行 `/usr/local/sbin/plush-register-gitlab-runner`。脚本注册后销毁 token 文件。
+6. 用 Ubuntu 24.04 cloud image 创建独立 KVM VM，应用 `runner-vm-cloud-init.yml`；cloud-init 固定安装 GNU Make、GCC、QEMU Guest Agent、Docker Buildx v0.30.1、Docker Compose v2.40.3 与当前 Playwright 1.58.2 Chromium 所需系统包，并要求 `ubuntu`、`root`、`gitlab-runner` 的 Go 环境都读回 `CGO_ENABLED=1`，job 不能自行取得 apt 权限。先在 R640 完成上一节的 proxy listener 与精确 UFW bridge 规则并读回，再在 GitLab 创建 project runner，把 token 只写入 VM 的 `/etc/plush-runner/registration.env`，权限 `0600`，运行 `/usr/local/sbin/plush-register-gitlab-runner`。脚本会先证明 canonical curl/Node 路径，注册成功后销毁 token 文件并验证 Runner 进程环境。
 7. Runner 必须显示 tags `plush,isolated,amd64`、locked、run untagged=false；运行一次非发布 pipeline，核对 VM 内临时 PostgreSQL 被清理且 R640 宿主容器列表未变化。
 
 ## GitHub 单向镜像与 GPT Review
@@ -129,4 +141,4 @@ sudo bash server/deploy/gitlab/gitlab-backup-verify.sh
 
 R640 GitLab、独立 KVM Runner、公网入口、protected main、GitHub 单向 mirror 和 main pipeline 已进入实际运行主链。本文档只固定重建和安全合同，不把某次历史绿灯写成当前运行证明；当前 SHA、Runner 配置、pipeline/job 终态、Package/Release、backup/restore 仍必须从 GitLab API、Runner VM 和对应脱敏回执实时读回。
 
-`runner-vm-cloud-init.yml` 是新建或重建 Runner VM 的正式定义，不会被普通 CI job 自动应用。线上参数与该定义漂移时，只在无活动 job 的有界窗口内备份精确 config、修正、重启 Runner 并读回；不回显 token，不把 live 手工改动作为唯一真源。
+`runner-vm-cloud-init.yml` 是新建或重建 Runner VM 的正式定义，不会被普通 CI job 自动应用。线上参数与该定义漂移时，只在无活动 job 的有界窗口内备份精确 config、修正、重启 Runner 并读回；不回显 token，不把 live 手工改动作为唯一真源。R640 的 UFW bridge 规则和 canonical TLS proxy 属于宿主机前置状态，Runner VM 重建不会替它们补写；每次重建都必须重新完成宿主 listener/firewall 与 guest curl/Node 的双边读回。

@@ -38,6 +38,7 @@ import {
   validateReleaseRehearsalReceipt,
 } from "./release-catalog.mjs";
 import { runTargetPreflight } from "./target-preflight.mjs";
+import { classifyGitAncestryRelation } from "./git-ancestry-relation.mjs";
 import { validateRemoteStageTimings } from "./remote-stage-timings.mjs";
 import {
   buildTargetReleaseCacheIdentity,
@@ -570,6 +571,7 @@ export function executePromotion(
   {
     runCommand = spawnSync,
     runPreflight = runTargetPreflight,
+    classifyRelation = classifyGitAncestryRelation,
     buildCacheIdentity = buildTargetReleaseCacheIdentity,
     cleanupCache = cleanupPreparedTargetReleaseIncoming,
     probeCache = probeTargetReleaseCache,
@@ -601,11 +603,34 @@ export function executePromotion(
     );
   }
   const immediatePreflight = runPreflight("test-133");
-  if (immediatePreflight.status !== "passed") {
+  const immediateBlockers = new Set(immediatePreflight.blockers || []);
+  const immediateRuntime = immediatePreflight.remote?.runtime;
+  if (
+    immediateRuntime?.serverSha !== plan.ancestry.currentGitSha ||
+    immediateRuntime?.webSha !== plan.ancestry.currentGitSha
+  ) {
+    immediateBlockers.add("promotion_target_changed_since_plan");
+  }
+  try {
+    const immediateAncestry = classifyRelation({
+      repoRoot: root,
+      currentGitSha: immediateRuntime?.serverSha,
+      candidateGitSha: plan.release.gitSha,
+    });
+    if (
+      immediateAncestry.actionClass !== "promote" ||
+      JSON.stringify(immediateAncestry) !== JSON.stringify(plan.ancestry)
+    ) {
+      immediateBlockers.add("promotion_git_relation_not_ahead");
+    }
+  } catch {
+    immediateBlockers.add("promotion_git_relation_not_ahead");
+  }
+  if (immediatePreflight.status !== "passed" || immediateBlockers.size > 0) {
     operation = transitionDeliveryOperation(store, operation.id, {
       status: "blocked",
       message: "promotion was blocked by the immediate target preflight",
-      issues: immediatePreflight.blockers.map((code) => ({
+      issues: [...immediateBlockers].sort().map((code) => ({
         code,
         level: "error",
         message: `目标即时预检阻断：${code}`,

@@ -103,7 +103,11 @@ export function validateReleaseDispatchRequest(request) {
     typeof request !== "object" ||
     !SHA_PATTERN.test(String(request.gitSha || "")) ||
     !VERSION_PATTERN.test(String(request.version || "")) ||
-    request.customer !== "yoyoosun"
+    request.customer !== "yoyoosun" ||
+    !/(?:Z|[+-][0-9]{2}:[0-9]{2})$/u.test(
+      String(request.versionReference || ""),
+    ) ||
+    Number.isNaN(Date.parse(request.versionReference))
   ) {
     throw new Error("release dispatch request is invalid");
   }

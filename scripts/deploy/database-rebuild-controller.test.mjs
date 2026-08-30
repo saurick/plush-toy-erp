@@ -23,6 +23,18 @@ const SHA = "a".repeat(40);
 const IDEMPOTENCY_KEY =
   "rebuild-database:test-133:123e4567-e89b-42d3-a456-426614174000";
 
+function classifyRelation({ currentGitSha, candidateGitSha }) {
+  const current = currentGitSha === candidateGitSha;
+  return {
+    schemaVersion: "plush.git-ancestry-relation/v1",
+    currentGitSha,
+    candidateGitSha,
+    relation: current ? "current" : "diverged",
+    actionClass: current ? "current" : "blocked",
+    actionReason: current ? "exact_sha_current" : "git_histories_diverged",
+  };
+}
+
 function releaseManifest() {
   return {
     schemaVersion: "plush.release-manifest/v1",
@@ -123,6 +135,7 @@ test("database rebuild preparation becomes ready and reuses its operation", (t) 
     operationStore: data.store,
   };
   const runtime = {
+    classifyRelation,
     runPreflight: () => {
       calls += 1;
       return preflight();
@@ -152,7 +165,10 @@ test("database rebuild preparation persists a terminal blocker", (t) => {
       idempotencyKey: IDEMPOTENCY_KEY,
       operationStore: data.store,
     },
-    { runPreflight: () => preflight({ blocked: true }) },
+    {
+      classifyRelation,
+      runPreflight: () => preflight({ blocked: true }),
+    },
   );
   assert.equal(report.operation.status, "blocked");
   assert.deepEqual(report.plan.blockers, ["target_migration_lock_held"]);
@@ -196,6 +212,7 @@ test("explicit terminal database rebuild retry creates a distinct ready lineage"
   const first = prepareDatabaseRebuild(
     { ...common, idempotencyKey: IDEMPOTENCY_KEY },
     {
+      classifyRelation,
       runPreflight: () => {
         preflightCalls += 1;
         return preflight({ blocked: true });
@@ -209,6 +226,7 @@ test("explicit terminal database rebuild retry creates a distinct ready lineage"
       retryOfOperationId: first.operation.id,
     },
     {
+      classifyRelation,
       runPreflight: () => {
         preflightCalls += 1;
         return preflight();

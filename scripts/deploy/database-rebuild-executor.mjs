@@ -31,6 +31,7 @@ import {
 } from "./fixed-target-rsync.mjs";
 import { sha256File, validateReleaseManifest } from "./release-catalog.mjs";
 import { runTargetPreflight } from "./target-preflight.mjs";
+import { classifyGitAncestryRelation } from "./git-ancestry-relation.mjs";
 
 export const REMOTE_DATABASE_REBUILD_RECEIPT_CONTRACT =
   "plush.remote-database-rebuild-receipt/v1";
@@ -439,6 +440,7 @@ export function executeDatabaseRebuild(
   {
     runCommand = spawnSync,
     runPreflight = runTargetPreflight,
+    classifyRelation = classifyGitAncestryRelation,
     now = () => new Date().toISOString(),
     createSecret = generateBootstrapSecret,
   } = {},
@@ -477,6 +479,21 @@ export function executeDatabaseRebuild(
   }
   if (immediateRuntime?.databaseName !== plan.target.database) {
     immediateBlockers.push("database_rebuild_target_database_mismatch");
+  }
+  try {
+    const immediateAncestry = classifyRelation({
+      repoRoot: root,
+      currentGitSha: immediateRuntime?.serverSha,
+      candidateGitSha: plan.release.gitSha,
+    });
+    if (
+      immediateAncestry.actionClass !== "current" ||
+      JSON.stringify(immediateAncestry) !== JSON.stringify(plan.ancestry)
+    ) {
+      immediateBlockers.push("database_rebuild_git_relation_not_current");
+    }
+  } catch {
+    immediateBlockers.push("database_rebuild_git_relation_not_current");
   }
   if (
     immediatePreflight.status !== "passed" &&

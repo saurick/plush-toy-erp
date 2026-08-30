@@ -44,6 +44,20 @@ test("remote database rebuild serializes the switch and freezes unknown outcomes
   assert.match(source, /recover_predecessor_before_migration/u);
 });
 
+test("remote database rebuild binds the frozen current Git relation before lifecycle writes", () => {
+  assert.match(source, /plush[.]git-ancestry-relation\/v1/u);
+  assert.match(source, /ancestry[.]relation == "current"/u);
+  assert.match(source, /ancestry[.]actionClass == "current"/u);
+  const runtimeCheck = source.indexOf(
+    'fail "target runtime or Git ancestry changed after database rebuild qualification"',
+  );
+  const backupStage = source.indexOf(
+    "stage=fresh_backup_and_restore_check",
+    runtimeCheck,
+  );
+  assert.ok(runtimeCheck >= 0 && runtimeCheck < backupStage);
+});
+
 test("remote database rebuild emits an inherited subshell failure receipt once", () => {
   assert.match(
     source,

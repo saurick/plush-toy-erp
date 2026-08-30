@@ -472,6 +472,12 @@ jq -e \
    .target.key == "test-133" and
    .from.gitSha == $fromSha and
    .to.gitSha == $toSha and
+   .ancestry.schemaVersion == "plush.git-ancestry-relation/v1" and
+   .ancestry.currentGitSha == $fromSha and
+   .ancestry.candidateGitSha == $toSha and
+   .ancestry.relation == "behind" and
+   .ancestry.actionClass == "rollback" and
+   .ancestry.actionReason == "candidate_is_ancestor_of_current" and
    .fingerprint == $fingerprint and
    .rollback.mode == "code_and_images_only" and
    .rollback.automaticDatabaseDownMigration == false and
@@ -551,6 +557,22 @@ web_archive_manifest_digest="$(
     "$incoming/web-image.tar" "$web_ref" "$web_content_id"
 )"
 
+enter_stage target_identity_recheck
+available_bytes="$(df -B1 --output=avail / | awk 'NR==2 {print $1}')"
+[[ "$available_bytes" =~ ^[0-9]+$ &&
+  "$available_bytes" -ge "$minimum_available_bytes" ]] ||
+  fail "target disk capacity is below the fixed minimum"
+runtime_server_sha="$(docker inspect plush-toy-erp-v5-server --format '{{range .Config.Env}}{{println .}}{{end}}' |
+  sed -n 's/^GIT_SHA=//p' | head -n1)"
+runtime_web_sha="$(docker inspect plush-toy-erp-v5-web-desktop --format '{{range .Config.Env}}{{println .}}{{end}}' |
+  sed -n 's/^GIT_SHA=//p' | head -n1)"
+[[ "$runtime_server_sha" == "$from_sha" && "$runtime_web_sha" == "$from_sha" ]] ||
+  fail "current runtime SHA or Git ancestry changed after rollback qualification"
+curl --fail --silent --show-error --max-time 10 \
+  http://127.0.0.1:8315/readyz >/dev/null
+curl --fail --silent --show-error --max-time 10 \
+  http://127.0.0.1:5185/healthz >/dev/null
+
 mkdir -p "$cache_root"
 chmod 700 "$cache_root"
 formal_cache=$cache_root/$target_manifest_sha256
@@ -585,22 +607,6 @@ else
   mv "$cache_materializing" "$formal_cache"
   cache_materializing_created=0
 fi
-
-enter_stage target_identity_recheck
-available_bytes="$(df -B1 --output=avail / | awk 'NR==2 {print $1}')"
-[[ "$available_bytes" =~ ^[0-9]+$ &&
-  "$available_bytes" -ge "$minimum_available_bytes" ]] ||
-  fail "target disk capacity is below the fixed minimum"
-runtime_server_sha="$(docker inspect plush-toy-erp-v5-server --format '{{range .Config.Env}}{{println .}}{{end}}' |
-  sed -n 's/^GIT_SHA=//p' | head -n1)"
-runtime_web_sha="$(docker inspect plush-toy-erp-v5-web-desktop --format '{{range .Config.Env}}{{println .}}{{end}}' |
-  sed -n 's/^GIT_SHA=//p' | head -n1)"
-[[ "$runtime_server_sha" == "$from_sha" && "$runtime_web_sha" == "$from_sha" ]] ||
-  fail "current runtime SHA changed after rollback qualification"
-curl --fail --silent --show-error --max-time 10 \
-  http://127.0.0.1:8315/readyz >/dev/null
-curl --fail --silent --show-error --max-time 10 \
-  http://127.0.0.1:5185/healthz >/dev/null
 
 enter_stage release_materialization
 if [[ -e "$release_dir" ]]; then

@@ -15,6 +15,17 @@ const FROM_SHA = "a".repeat(40);
 const TO_SHA = "b".repeat(40);
 const HASH = "c".repeat(64);
 
+function classifyRelation({ currentGitSha, candidateGitSha }) {
+  return {
+    schemaVersion: "plush.git-ancestry-relation/v1",
+    currentGitSha,
+    candidateGitSha,
+    relation: "behind",
+    actionClass: "rollback",
+    actionReason: "candidate_is_ancestor_of_current",
+  };
+}
+
 function manifest(gitSha, migrationHash = HASH) {
   return {
     schemaVersion: "plush.release-manifest/v1",
@@ -107,6 +118,7 @@ test("rollback controller awaits preflight and produces one idempotent ready ope
     operationStore: fixture.store,
   };
   const first = await prepareRollback(input, {
+    classifyRelation,
     runPreflight: async () => preflight(),
   });
   const second = await prepareRollback(input, {
@@ -134,7 +146,7 @@ test("rollback controller persists incompatible schema as terminal blocked", asy
       idempotencyKey: "rollback-controller:blocked:0001",
       operationStore: fixture.store,
     },
-    { runPreflight: () => preflight() },
+    { classifyRelation, runPreflight: () => preflight() },
   );
   assert.equal(report.operation.status, "blocked");
   assert.deepEqual(report.plan.blockers, ["rollback_migration_incompatible"]);

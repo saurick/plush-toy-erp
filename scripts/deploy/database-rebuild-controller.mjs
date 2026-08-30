@@ -24,6 +24,7 @@ import {
   validateReleaseManifest,
 } from "./release-catalog.mjs";
 import { runTargetPreflight } from "./target-preflight.mjs";
+import { classifyGitAncestryRelation } from "./git-ancestry-relation.mjs";
 
 const MAX_MANIFEST_BYTES = 512 * 1024;
 
@@ -53,6 +54,8 @@ function issueForBlocker(code) {
       "133 当前逻辑数据库不符合固定验收目标合同",
     database_rebuild_target_preflight_blocked:
       "133 当前预检未通过且未提供可安全执行的精确资格证据",
+    database_rebuild_git_relation_not_current:
+      "数据库重建只能绑定 133 当前正在运行的 exact SHA",
     target_disk_capacity_low: "133 根盘可用空间低于固定安全线",
     target_capacity_unknown: "无法证明 133 根盘容量",
     target_migration_lock_held: "133 migration lock 正在被其他操作持有",
@@ -87,6 +90,7 @@ export function prepareDatabaseRebuild(
   },
   {
     runPreflight = runTargetPreflight,
+    classifyRelation = classifyGitAncestryRelation,
     now = () => new Date().toISOString(),
   } = {},
 ) {
@@ -128,11 +132,17 @@ export function prepareDatabaseRebuild(
   });
   try {
     const targetPreflight = runPreflight("test-133");
+    const ancestry = classifyRelation({
+      repoRoot: root,
+      currentGitSha: targetPreflight.remote?.runtime?.serverSha,
+      candidateGitSha: release.manifest.gitSha,
+    });
     const plan = buildDatabaseRebuildManifest({
       operationId: operation.id,
       releaseManifest: release.manifest,
       releaseManifestSha256,
       targetPreflight,
+      ancestry,
       createdAt: now(),
     });
     writeDatabaseRebuildManifest(planFile(store, operation.id), plan);

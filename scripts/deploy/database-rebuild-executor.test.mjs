@@ -35,6 +35,18 @@ const MANIFEST_HASH = "b".repeat(64);
 const FINGERPRINT = "c".repeat(64);
 const MIGRATION = "20260731124000";
 
+function classifyRelation({ currentGitSha, candidateGitSha }) {
+  const current = currentGitSha === candidateGitSha;
+  return {
+    schemaVersion: "plush.git-ancestry-relation/v1",
+    currentGitSha,
+    candidateGitSha,
+    relation: current ? "current" : "diverged",
+    actionClass: current ? "current" : "blocked",
+    actionReason: current ? "exact_sha_current" : "git_histories_diverged",
+  };
+}
+
 function receipt(overrides = {}) {
   return {
     schemaVersion: REMOTE_DATABASE_REBUILD_RECEIPT_CONTRACT,
@@ -195,7 +207,7 @@ function executableFixture(t, suffix) {
       idempotencyKey: `rebuild-database:test-133:${suffix}`,
       operationStore: store,
     },
-    { runPreflight: () => preflight() },
+    { classifyRelation, runPreflight: () => preflight() },
   );
   return { root, releasePath, store, prepared };
 }
@@ -291,6 +303,10 @@ test("database rebuild transfer keeps the secret private and outside checksums",
     releaseManifest: releaseManifest(),
     releaseManifestSha256: releaseHash,
     targetPreflight: preflight(),
+    ancestry: classifyRelation({
+      currentGitSha: SHA,
+      candidateGitSha: SHA,
+    }),
   });
   const destination = path.join(root, "output", "transfer");
   const runCommand = (command, args) => {
@@ -382,6 +398,7 @@ test("database rebuild executor persists the validated redacted receipt for down
     },
     {
       runPreflight: () => preflight(),
+      classifyRelation,
       runCommand,
       createSecret: () => "FreshAdmin9!abcd",
     },
@@ -442,6 +459,7 @@ test("database rebuild executor blocks an unexplained immediate preflight failur
         status: "blocked",
         blockers: [],
       }),
+      classifyRelation,
       runCommand: () => {
         commands += 1;
         return { status: 0, stdout: "", stderr: "" };
@@ -497,6 +515,7 @@ test("database rebuild executor removes the remote secret after a partial transf
         },
         {
           runPreflight: () => preflight(),
+          classifyRelation,
           runCommand,
           createSecret: () => "FreshAdmin9!abcd",
         },
@@ -556,6 +575,7 @@ test("database rebuild executor freezes a partial transfer when secret cleanup i
         },
         {
           runPreflight: () => preflight(),
+          classifyRelation,
           runCommand,
           createSecret: () => "FreshAdmin9!abcd",
         },

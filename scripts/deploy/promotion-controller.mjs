@@ -28,6 +28,7 @@ import {
   validateReleaseRehearsalReceipt,
 } from "./release-catalog.mjs";
 import { runTargetPreflight } from "./target-preflight.mjs";
+import { classifyGitAncestryRelation } from "./git-ancestry-relation.mjs";
 
 const MAX_MANIFEST_BYTES = 512 * 1024;
 
@@ -53,6 +54,8 @@ function issueForBlocker(code) {
     target_capacity_unknown: "无法证明 133 根盘容量",
     target_migration_lock_held: "133 migration lock 正在被其他操作持有",
     target_runtime_sha_mismatch: "133 Server/Web 当前 SHA 不一致",
+    promotion_git_relation_not_ahead:
+      "发布 SHA 不是 133 当前 SHA 的后继，禁止按发布时间猜测部署方向",
   };
   return {
     code,
@@ -78,6 +81,7 @@ export async function preparePromotion(
   },
   {
     runPreflight = runTargetPreflight,
+    classifyRelation = classifyGitAncestryRelation,
     now = () => new Date().toISOString(),
   } = {},
 ) {
@@ -141,11 +145,17 @@ export async function preparePromotion(
   });
   try {
     const targetPreflight = await runPreflight(targetKey);
+    const ancestry = classifyRelation({
+      repoRoot: root,
+      currentGitSha: targetPreflight.remote?.runtime?.serverSha,
+      candidateGitSha: releaseManifest.gitSha,
+    });
     const plan = buildPromotionManifest({
       operationId: operation.id,
       releaseManifest,
       releaseManifestSha256,
       targetPreflight,
+      ancestry,
       createdAt: now(),
     });
     writePromotionManifest(promotionPlanFile(store, operation.id), plan);

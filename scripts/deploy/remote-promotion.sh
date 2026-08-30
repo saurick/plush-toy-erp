@@ -504,6 +504,12 @@ jq -e \
    .operationId == $operationId and
    .target.key == "test-133" and
    .release.gitSha == $sha and
+   .ancestry.schemaVersion == "plush.git-ancestry-relation/v1" and
+   .ancestry.currentGitSha == .before.runtimeSha and
+   .ancestry.candidateGitSha == $sha and
+   .ancestry.relation == "ahead" and
+   .ancestry.actionClass == "promote" and
+   .ancestry.actionReason == "candidate_descends_from_current" and
    .release.rehearsalReceiptFile == "release-rehearsal.json" and
    .release.rehearsalReceiptSha256 == $rehearsalSha256 and
    .fingerprint == $fingerprint and
@@ -654,6 +660,22 @@ web_archive_manifest_digest="$(
     "$incoming/web-image.tar" "$web_ref" "$web_content_id"
 )"
 
+enter_stage capacity_recheck
+available_bytes="$(df -B1 --output=avail / | awk 'NR==2 {print $1}')"
+[[ "$available_bytes" =~ ^[0-9]+$ &&
+  "$available_bytes" -ge "$minimum_available_bytes" ]] ||
+  fail "target disk capacity is below the fixed minimum"
+frozen_current_sha="$(jq -er '.ancestry.currentGitSha' "$incoming/promotion-manifest.json")"
+runtime_server_sha="$(docker inspect plush-toy-erp-v5-server --format '{{range .Config.Env}}{{println .}}{{end}}' |
+  sed -n 's/^GIT_SHA=//p' | head -n1)"
+runtime_web_sha="$(docker inspect plush-toy-erp-v5-web-desktop --format '{{range .Config.Env}}{{println .}}{{end}}' |
+  sed -n 's/^GIT_SHA=//p' | head -n1)"
+[[ "$frozen_current_sha" =~ $sha_pattern &&
+  "$runtime_server_sha" == "$frozen_current_sha" &&
+  "$runtime_web_sha" == "$frozen_current_sha" ]] ||
+  fail "target runtime or Git ancestry changed after promotion qualification"
+current_before_sha="$runtime_server_sha"
+
 mkdir -p "$cache_root"
 chmod 700 "$cache_root"
 formal_cache=$cache_root/$release_manifest_sha256
@@ -688,12 +710,6 @@ else
   mv "$cache_materializing" "$formal_cache"
   cache_materializing_created=0
 fi
-
-enter_stage capacity_recheck
-available_bytes="$(df -B1 --output=avail / | awk 'NR==2 {print $1}')"
-[[ "$available_bytes" =~ ^[0-9]+$ &&
-  "$available_bytes" -ge "$minimum_available_bytes" ]] ||
-  fail "target disk capacity is below the fixed minimum"
 
 enter_stage release_materialization
 if [[ -e "$release_dir" ]]; then
@@ -763,11 +779,6 @@ for image_ref in "$server_ref" "$web_ref"; do
   [[ "$image_platform" == linux/amd64 && "$image_sha" == "$release_sha" ]] ||
     fail "loaded image platform or embedded release identity does not match"
 done
-
-current_before_sha="$(docker inspect plush-toy-erp-v5-server --format '{{range .Config.Env}}{{println .}}{{end}}' |
-  sed -n 's/^GIT_SHA=//p' | head -n1)"
-[[ "$current_before_sha" =~ $sha_pattern ]] ||
-  fail "current runtime SHA is unavailable"
 
 enter_stage fresh_backup_and_restore_check
 postgres_cid="$(docker ps -q \

@@ -2,7 +2,7 @@ workflow:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-    - if: '$CI_PIPELINE_SOURCE =~ /^(api|trigger|web)$/ && $RELEASE_SHA'
+    - if: '$CI_PIPELINE_SOURCE =~ /^(api|trigger|web)$/ && $RELEASE_SHA && $RELEASE_VERSION && $RELEASE_VERSION_REFERENCE'
     - if: '$CI_PIPELINE_SOURCE == "web"'
     - when: never
 
@@ -463,7 +463,7 @@ publish_release:
   stage: release
   interruptible: false
   rules:
-    - if: '$RELEASE_SHA && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true" && $RELEASE_CUSTOMER == "yoyoosun"'
+    - if: '$RELEASE_SHA && $RELEASE_VERSION && $RELEASE_VERSION_REFERENCE && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true" && $RELEASE_CUSTOMER == "yoyoosun"'
     - when: never
   timeout: 4h
   environment:
@@ -478,6 +478,7 @@ publish_release:
       test "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH"
       test "$CI_COMMIT_REF_PROTECTED" = "true"
       test "$RELEASE_CUSTOMER" = yoyoosun
+      test -n "$RELEASE_VERSION_REFERENCE"
       [[ "$RELEASE_VERSION" =~ ^[0-9A-Za-z]([0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$ ]]
       test -n "${GITHUB_PACKAGES_USER:-}"
       test -n "${GITHUB_PACKAGES_TOKEN:-}"
@@ -525,6 +526,16 @@ publish_release:
       case "$candidate_status" in
         0) ;;
         3)
+          curl --fail --silent --show-error \
+            --header "PRIVATE-TOKEN: $GITLAB_RELEASE_TOKEN" \
+            "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases?per_page=100&order_by=released_at&sort=desc" \
+            > output/ci/release-version-catalog.json
+          node scripts/deploy/release-version-catalog.mjs verify \
+            --catalog output/ci/release-version-catalog.json \
+            --reference "$RELEASE_VERSION_REFERENCE" \
+            --observed-at "$CI_PIPELINE_CREATED_AT" \
+            --requested "$RELEASE_VERSION" \
+            --json
           test ! -e "$artifact_dir"
           node scripts/deploy/release-artifact-bundle.mjs \
             --execute \
@@ -604,41 +615,62 @@ publish_release:
 
       package_version="artifact-$RELEASE_SHA"
       package_api="$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages"
-      package_id="$(curl --fail --silent --show-error \
+      package_catalog=output/ci/release-package-catalog.json
+      package_id_file=output/ci/release-package-id
+      package_files=output/ci/release-package-files.json
+      missing_assets=output/ci/release-missing-assets.txt
+      curl --fail --silent --show-error \
         --header "PRIVATE-TOKEN: $GITLAB_RELEASE_TOKEN" \
-        "$package_api?package_type=generic&package_name=plush-release&package_version=$package_version" \
-        | jq -r --arg version "$package_version" \
-          'map(select(.name == "plush-release" and .version == $version)) | first | .id // empty')"
-      existing_files='[]'
+        "$package_api?package_type=generic&package_name=plush-release&package_version=$package_version&per_page=100" \
+        > "$package_catalog"
+      node scripts/deploy/gitlab-release-publication.mjs select \
+        --catalog "$package_catalog" \
+        --version "$package_version" \
+        --package-id-out "$package_id_file" \
+        --json
+      package_id="$(tr -d '\n' < "$package_id_file")"
       if [[ -n "$package_id" ]]; then
-        existing_files="$(curl --fail --silent --show-error \
+        curl --fail --silent --show-error \
           --header "PRIVATE-TOKEN: $GITLAB_RELEASE_TOKEN" \
-          "$package_api/$package_id/package_files?per_page=100")"
-        existing_names="$(jq -r \
-          'map(.file_name) | sort | join(",")' <<< "$existing_files")"
-        expected_names="$(jq -r \
-          '[.assets[].name] | sort | join(",")' output/ci/release-assets.json)"
-        if [[ "$existing_names" != "$expected_names" ]]; then
-          echo "[gitlab-ci] existing package is not an exact v2 seven-asset publication; refusing supplementation"
-          exit 1
-        fi
+          "$package_api/$package_id/package_files?per_page=100" \
+          > "$package_files"
+      else
+        printf '[]\n' > "$package_files"
       fi
+      node scripts/deploy/gitlab-release-publication.mjs plan \
+        --local output/ci/release-assets.json \
+        --remote "$package_files" \
+        --missing-out "$missing_assets" \
+        --json
       while IFS= read -r asset; do
-        local_sha="$(sha256sum "$artifact_dir/$asset" | awk '{print $1}')"
-        remote_sha="$(jq -r --arg name "$asset" \
-          'map(select(.file_name == $name)) | first | .file_sha256 // empty' \
-          <<< "$existing_files")"
-        if [[ -n "$remote_sha" ]]; then
-          test "$remote_sha" = "$local_sha"
-          continue
-        fi
+        test -n "$asset"
         curl --fail --silent --show-error \
           --retry 4 --retry-delay 3 --retry-all-errors \
           --connect-timeout 20 --max-time 7200 \
           --header "JOB-TOKEN: $CI_JOB_TOKEN" \
           --upload-file "$artifact_dir/$asset" \
           "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/plush-release/$package_version/$asset"
-      done < <(jq -r '.assets[].name' output/ci/release-assets.json)
+      done < "$missing_assets"
+
+      curl --fail --silent --show-error \
+        --header "PRIVATE-TOKEN: $GITLAB_RELEASE_TOKEN" \
+        "$package_api?package_type=generic&package_name=plush-release&package_version=$package_version&per_page=100" \
+        > "$package_catalog"
+      node scripts/deploy/gitlab-release-publication.mjs select \
+        --catalog "$package_catalog" \
+        --version "$package_version" \
+        --package-id-out "$package_id_file" \
+        --json
+      package_id="$(tr -d '\n' < "$package_id_file")"
+      test -n "$package_id"
+      curl --fail --silent --show-error \
+        --header "PRIVATE-TOKEN: $GITLAB_RELEASE_TOKEN" \
+        "$package_api/$package_id/package_files?per_page=100" \
+        > "$package_files"
+      node scripts/deploy/gitlab-release-publication.mjs verify \
+        --local output/ci/release-assets.json \
+        --remote "$package_files" \
+        --json
 
       release_api="$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases/$package_version"
       release_existing_json=output/ci/release-existing.json

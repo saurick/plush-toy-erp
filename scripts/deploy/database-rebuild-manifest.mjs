@@ -14,6 +14,7 @@ import {
 import path from "node:path";
 
 import { validateReleaseManifest } from "./release-catalog.mjs";
+import { validateGitAncestryRelation } from "./git-ancestry-relation.mjs";
 
 export const DATABASE_REBUILD_MANIFEST_CONTRACT =
   "plush.database-rebuild-manifest/v1";
@@ -50,6 +51,7 @@ function manifestFingerprint(manifest) {
 }
 
 export function validateDatabaseRebuildManifest(manifest) {
+  const ancestry = validateGitAncestryRelation(manifest?.ancestry);
   if (
     manifest?.schemaVersion !== DATABASE_REBUILD_MANIFEST_CONTRACT ||
     !["eligible", "blocked"].includes(manifest?.status) ||
@@ -61,6 +63,8 @@ export function validateDatabaseRebuildManifest(manifest) {
     manifest?.target?.database !== DATABASE ||
     manifest?.target?.dataDirectoryAlias !== "test-133-primary" ||
     !SHA_PATTERN.test(String(manifest?.release?.gitSha || "")) ||
+    ancestry.currentGitSha !== manifest?.before?.runtimeSha ||
+    ancestry.candidateGitSha !== manifest?.release?.gitSha ||
     !SHA256_PATTERN.test(String(manifest?.release?.manifestSha256 || "")) ||
     !SHA256_PATTERN.test(
       String(manifest?.release?.artifactManifestSha256 || ""),
@@ -81,6 +85,7 @@ export function validateDatabaseRebuildManifest(manifest) {
   }
   if (
     manifest.status === "blocked" !== (manifest.blockers.length > 0) ||
+    (manifest.status === "eligible" && ancestry.actionClass !== "current") ||
     manifest.rollback?.preservePreviousDataDirectory !== true ||
     manifest.rollback?.preserveFreshBackup !== true ||
     manifest.rollback?.automaticDataDeletion !== false ||
@@ -108,6 +113,7 @@ export function buildDatabaseRebuildManifest({
   releaseManifest,
   releaseManifestSha256,
   targetPreflight,
+  ancestry,
   createdAt = new Date().toISOString(),
 }) {
   const release = validateReleaseManifest(releaseManifest);
@@ -129,6 +135,13 @@ export function buildDatabaseRebuildManifest({
   const runtimeSha =
     targetPreflight.remote?.runtime?.serverSha || "unknown";
   const webSha = targetPreflight.remote?.runtime?.webSha || "unknown";
+  const gitRelation = validateGitAncestryRelation(ancestry);
+  if (
+    gitRelation.currentGitSha !== runtimeSha ||
+    gitRelation.candidateGitSha !== release.gitSha
+  ) {
+    throw new Error("database rebuild ancestry does not match target release");
+  }
   const databaseName =
     targetPreflight.remote?.runtime?.databaseName || "unknown";
   const blockers = new Set(targetPreflight.blockers || []);
@@ -140,6 +153,9 @@ export function buildDatabaseRebuildManifest({
   }
   if (databaseName !== DATABASE) {
     blockers.add("database_rebuild_target_database_mismatch");
+  }
+  if (gitRelation.actionClass !== "current") {
+    blockers.add("database_rebuild_git_relation_not_current");
   }
   const blockerList = [...blockers].sort();
   const manifest = {
@@ -155,6 +171,7 @@ export function buildDatabaseRebuildManifest({
       database: DATABASE,
       dataDirectoryAlias: "test-133-primary",
     },
+    ancestry: gitRelation,
     release: {
       version: release.version,
       gitSha: release.gitSha,

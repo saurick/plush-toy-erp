@@ -137,7 +137,7 @@ test("GitLab release reuses push CI, builds one candidate and freezes rehearsal 
   assert.doesNotMatch(workflow, /\$RELEASE_SHA != ""/u);
   assert.match(
     workflow,
-    /CI_PIPELINE_SOURCE =~ \/\^\(api\|trigger\|web\)\$\/ && \$RELEASE_SHA/u,
+    /CI_PIPELINE_SOURCE =~ \/\^\(api\|trigger\|web\)\$\/ && \$RELEASE_SHA && \$RELEASE_VERSION && \$RELEASE_VERSION_REFERENCE/u,
   );
   assert.doesNotMatch(workflow, /^strict:/mu);
   assert.match(workflow, /^publish_release:\n  stage: release/mu);
@@ -151,6 +151,10 @@ test("GitLab release reuses push CI, builds one candidate and freezes rehearsal 
   assert.match(workflow, /gitlab-strict-terminal-reuse[.]mjs/u);
   assert.match(workflow, /gitlab-release-candidate[.]mjs recover/u);
   assert.match(workflow, /gitlab-release-candidate[.]mjs prepare/u);
+  assert.match(workflow, /release-version-catalog[.]mjs verify/u);
+  assert.match(workflow, /test -n "\$RELEASE_VERSION_REFERENCE"/u);
+  assert.match(workflow, /--reference "\$RELEASE_VERSION_REFERENCE"/u);
+  assert.match(workflow, /--observed-at "\$CI_PIPELINE_CREATED_AT"/u);
   assert.match(workflow, /local-release-rehearsal[.]mjs/u);
   assert.match(workflow, /--rehearsal-receipt/u);
   assert.match(workflow, /plush-release-candidate/u);
@@ -166,9 +170,12 @@ test("GitLab release reuses push CI, builds one candidate and freezes rehearsal 
   assert.match(workflow, /output\/ci\/release-assets[.]json/u);
   assert.match(
     workflow,
-    /jq -r '[.]assets\[\][.]name' output\/ci\/release-assets[.]json/u,
+    /gitlab-release-publication[.]mjs plan/u,
   );
-  assert.match(workflow, /refusing supplementation/u);
+  assert.match(workflow, /--missing-out "\$missing_assets"/u);
+  assert.match(workflow, /done < "\$missing_assets"/u);
+  assert.match(workflow, /gitlab-release-publication[.]mjs verify/u);
+  assert.doesNotMatch(workflow, /refusing supplementation/u);
 });
 
 test("GitLab jobs stay on the isolated runner and never receive the R640 host socket", () => {
@@ -235,6 +242,61 @@ test("Runner verifier enters a neutral cwd before cross-user checks", () => {
     /path: \/usr\/local\/sbin\/plush-verify-runner-bootstrap[\s\S]+?set -euo pipefail\n\n      cd \/tmp[\s\S]+?runuser -u gitlab-runner -- \/usr\/local\/bin\/pnpm --version/u,
   );
   assert.doesNotMatch(runnerCloudInit, /chmod[^\n]*\/home\/ubuntu/u);
+});
+
+test("Runner VM rebuild preserves QGA and the internal canonical GitLab route", () => {
+  const routeConfigurator = runnerCloudInit.match(
+    /path: \/usr\/local\/sbin\/plush-configure-gitlab-route[\s\S]+?\n  - path: \/usr\/local\/sbin\/plush-runner-toolchain/u,
+  )?.[0];
+  const runnerRegistration = runnerCloudInit.match(
+    /path: \/usr\/local\/sbin\/plush-register-gitlab-runner[\s\S]+?\n\nruncmd:/u,
+  )?.[0];
+
+  assert.ok(routeConfigurator);
+  assert.ok(runnerRegistration);
+  assert.equal(
+    runnerCloudInit.match(/^  - qemu-guest-agent$/gmu)?.length ?? 0,
+    1,
+  );
+  assert.match(
+    runnerCloudInit,
+    /name: gitlab-runner[\s\S]+?shell: \/usr\/sbin\/nologin/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /path: \/etc\/profile[.]d\/plush-gitlab-canonical-route[.]sh[\s\S]+?NO_PROXY=.*gitlab[.]saurick[.]me[\s\S]+?no_proxy=.*gitlab[.]saurick[.]me/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /path: \/etc\/systemd\/system\/gitlab-runner[.]service[.]d\/20-plush-canonical-gitlab-route[.]conf[\s\S]+?Environment="NO_PROXY=gitlab[.]saurick[.]me"[\s\S]+?Environment="no_proxy=gitlab[.]saurick[.]me"/u,
+  );
+  assert.match(routeConfigurator, /canonical_ip=192[.]168[.]124[.]1/u);
+  assert.match(routeConfigurator, /test "\$host_count" = "\$exact_count"/u);
+  assert.match(routeConfigurator, /case "\$exact_count" in/u);
+  assert.match(routeConfigurator, /systemctl daemon-reload/u);
+  assert.match(runnerCloudInit, /systemctl start qemu-guest-agent/u);
+  assert.match(
+    runnerCloudInit,
+    /test -c \/dev\/virtio-ports\/org[.]qemu[.]guest_agent[.]0/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /runuser -l "\$user" -s \/bin\/bash -c/u,
+  );
+  assert.match(runnerRegistration, /verify_canonical_gitlab/u);
+  assert.match(
+    runnerRegistration,
+    /NO_PROXY=gitlab[.]saurick[.]me no_proxy=gitlab[.]saurick[.]me[\s\S]+?curl[\s\S]+?https:\/\/gitlab[.]saurick[.]me\//u,
+  );
+  assert.match(
+    runnerRegistration,
+    /node --input-type=module -e '[\s\S]+?fetch\("https:\/\/gitlab[.]saurick[.]me\/"\)/u,
+  );
+  assert.match(
+    runnerRegistration,
+    /systemctl show --property=MainPID --value gitlab-runner[.]service/u,
+  );
+  assert.match(runnerRegistration, /<"\/proc\/\$runner_pid\/environ"/u);
 });
 
 test("Runner VM bootstrap installs and verifies the pinned GNU Make toolchain", () => {

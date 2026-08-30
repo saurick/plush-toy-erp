@@ -20,6 +20,20 @@ const CURRENT_SHA = "b".repeat(40);
 const HASH = "c".repeat(64);
 const OPERATION_ID = "123e4567-e89b-42d3-a456-426614174000";
 
+function ancestry(currentGitSha = CURRENT_SHA, candidateGitSha = SHA) {
+  const current = currentGitSha === candidateGitSha;
+  return {
+    schemaVersion: "plush.git-ancestry-relation/v1",
+    currentGitSha,
+    candidateGitSha,
+    relation: current ? "current" : "ahead",
+    actionClass: current ? "current" : "promote",
+    actionReason: current
+      ? "exact_sha_current"
+      : "candidate_descends_from_current",
+  };
+}
+
 function releaseManifest() {
   const strict = releaseManifestStrictEvidenceFixture();
   const counts = { executed: 1, passed: 1, failed: 0, skipped: 0 };
@@ -210,6 +224,7 @@ test("promotion manifest binds release target preflight and rollback boundary", 
     releaseManifest: releaseManifest(),
     releaseManifestSha256: HASH,
     targetPreflight: preflight(),
+    ancestry: ancestry(),
     createdAt: "2026-07-29T03:00:00.000Z",
   });
   assert.equal(manifest.status, "eligible");
@@ -233,6 +248,7 @@ test("promotion manifest preserves capacity blocker and detects already-current"
       status: "blocked",
       blockers: ["target_disk_capacity_low"],
     }),
+    ancestry: ancestry(),
   });
   assert.equal(blocked.status, "blocked");
   assert.deepEqual(blocked.blockers, ["target_disk_capacity_low"]);
@@ -251,6 +267,7 @@ test("promotion manifest preserves capacity blocker and detects already-current"
         },
       },
     }),
+    ancestry: ancestry(SHA, SHA),
   });
   assert.equal(current.status, "already_current");
 });
@@ -264,6 +281,7 @@ test("promotion manifest is private idempotent and immutable", () => {
       releaseManifest: releaseManifest(),
       releaseManifestSha256: HASH,
       targetPreflight: preflight(),
+      ancestry: ancestry(),
     });
     assert.equal(writePromotionManifest(file, manifest).reused, false);
     assert.equal(writePromotionManifest(file, manifest).reused, true);

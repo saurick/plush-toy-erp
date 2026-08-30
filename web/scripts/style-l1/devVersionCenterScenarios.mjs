@@ -98,6 +98,18 @@ export function createVersionCenterSummary() {
     }
   })
   const currentVersion = versions[7]
+  versions.forEach((version, index) => {
+    if (index < 7) {
+      version.actionClass = 'promote'
+      version.actionReason = 'candidate_descends_from_current'
+    } else if (index === 7) {
+      version.actionClass = 'current'
+      version.actionReason = 'exact_sha_current'
+    } else {
+      version.actionClass = 'rollback'
+      version.actionReason = 'candidate_is_ancestor_of_current'
+    }
+  })
   const readyVersion = versions[6]
   const openOperation = {
     id: 'f0000001-0000-4000-8000-000000000001',
