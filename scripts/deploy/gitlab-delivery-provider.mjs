@@ -769,15 +769,17 @@ export function createGitlabDeliveryProvider({
       if (branch?.commit?.id !== dispatch.gitSha) {
         throw new Error("GitLab main does not match the requested exact SHA");
       }
-      const body = new URLSearchParams({ ref: "main" });
-      [
-        ["RELEASE_SHA", dispatch.gitSha],
-        ["RELEASE_VERSION", dispatch.version],
-        ["RELEASE_CUSTOMER", dispatch.customer],
-        ["RELEASE_VERSION_REFERENCE", dispatch.versionReference],
-      ].forEach(([key, value], index) => {
-        body.set(`variables[${String(index)}][key]`, key);
-        body.set(`variables[${String(index)}][value]`, value);
+      const body = JSON.stringify({
+        ref: "main",
+        variables: [
+          { key: "RELEASE_SHA", value: dispatch.gitSha },
+          { key: "RELEASE_VERSION", value: dispatch.version },
+          { key: "RELEASE_CUSTOMER", value: dispatch.customer },
+          {
+            key: "RELEASE_VERSION_REFERENCE",
+            value: dispatch.versionReference,
+          },
+        ],
       });
       const pipelineValue = await requestJson(
         request,
@@ -786,7 +788,7 @@ export function createGitlabDeliveryProvider({
         {
           method: "POST",
           body,
-          contentType: "application/x-www-form-urlencoded",
+          contentType: "application/json",
         },
       );
       if (

@@ -428,7 +428,7 @@ test("GitLab provider normalizes pipeline and job timings", async () => {
 });
 
 test("GitLab provider dispatches only the exact current main SHA", async () => {
-  let dispatchBody;
+  let dispatchOptions;
   const provider = createGitlabDeliveryProvider({
     projectRoot: process.cwd(),
     env: { PLUSH_GITLAB_TOKEN: TOKEN },
@@ -437,7 +437,7 @@ test("GitLab provider dispatches only the exact current main SHA", async () => {
         return json({ commit: { id: SHA } });
       }
       if (url.endsWith("/pipeline")) {
-        dispatchBody = String(options.body);
+        dispatchOptions = options;
         return json({
           id: 92,
           sha: SHA,
@@ -454,10 +454,20 @@ test("GitLab provider dispatches only the exact current main SHA", async () => {
     versionReference: "2026-08-27T01:00:00.000Z",
   });
   assert.equal(result.provider, "gitlab");
-  assert.match(dispatchBody, /RELEASE_SHA/u);
-  assert.match(dispatchBody, /RELEASE_VERSION_REFERENCE/u);
-  assert.match(dispatchBody, /2026-08-27T01%3A00%3A00[.]000Z/u);
-  assert.match(dispatchBody, new RegExp(SHA, "u"));
+  assert.equal(dispatchOptions.method, "POST");
+  assert.equal(dispatchOptions.headers["Content-Type"], "application/json");
+  assert.deepEqual(JSON.parse(dispatchOptions.body), {
+    ref: "main",
+    variables: [
+      { key: "RELEASE_SHA", value: SHA },
+      { key: "RELEASE_VERSION", value: "2026.08.27-1" },
+      { key: "RELEASE_CUSTOMER", value: "yoyoosun" },
+      {
+        key: "RELEASE_VERSION_REFERENCE",
+        value: "2026-08-27T01:00:00.000Z",
+      },
+    ],
+  });
   assert.equal(JSON.stringify(result).includes(TOKEN), false);
 });
 
