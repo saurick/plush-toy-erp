@@ -67,8 +67,24 @@ export const CI_QUALITY_SHARDS = Object.freeze({
 });
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
+const TAGGED_SHA256_PATTERN = /^sha256:[0-9a-f]{64}$/u;
 const RANGE_PATTERN = /^(?:[0-9a-f]{40}|HEAD\^)\.\.\.?HEAD$/u;
 const MAX_CAPTURE_BYTES = 512 * 1024 * 1024;
+
+export function hasCompleteSourceArchiveLightEvidence(
+  report,
+  { gitSha, customer },
+) {
+  return (
+    report?.lightCheckPassed === true &&
+    report?.repositoryBoundary?.passed === true &&
+    report?.commit === gitSha &&
+    report?.head === gitSha &&
+    report?.refIsHead === true &&
+    report?.customer === customer &&
+    TAGGED_SHA256_PATTERN.test(String(report?.archiveSha256 || ""))
+  );
+}
 
 function stableValue(value) {
   if (Array.isArray(value)) return value.map(stableValue);
@@ -459,15 +475,10 @@ export async function runCiQualityShard({
         { cwd: root, env: childEnv, stream: false },
       );
       const report = JSON.parse(source.stdout);
-      if (
-        report?.lightCheckPassed !== true ||
-        report?.repositoryBoundary?.passed !== true ||
-        report?.commit !== env.CI_COMMIT_SHA ||
-        report?.head !== env.CI_COMMIT_SHA ||
-        report?.refIsHead !== true ||
-        report?.customer !== "yoyoosun" ||
-        !/^[0-9a-f]{64}$/u.test(String(report?.archiveSha256 || ""))
-      ) {
+      if (!hasCompleteSourceArchiveLightEvidence(report, {
+        gitSha: env.CI_COMMIT_SHA,
+        customer: "yoyoosun",
+      })) {
         throw new Error("source archive light evidence is incomplete");
       }
       invariants.sourceIntegrity = {

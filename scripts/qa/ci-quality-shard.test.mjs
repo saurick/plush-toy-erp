@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   CI_QUALITY_SHARDS,
   CI_QUALITY_SHARD_SCHEMA,
+  hasCompleteSourceArchiveLightEvidence,
 } from "./ci-quality-shard.mjs";
 
 const source = readFileSync(
@@ -68,5 +69,32 @@ test("Node and Web shards install the cached Web dependencies offline", () => {
   assert.match(
     source,
     /\["--dir", "web", "install", "--frozen-lockfile", "--offline"\]/u,
+  );
+});
+
+test("Node shard accepts only the tagged source-archive SHA-256 contract", () => {
+  const gitSha = "a".repeat(40);
+  const evidence = {
+    lightCheckPassed: true,
+    repositoryBoundary: { passed: true },
+    commit: gitSha,
+    head: gitSha,
+    refIsHead: true,
+    customer: "yoyoosun",
+    archiveSha256: `sha256:${"b".repeat(64)}`,
+  };
+  assert.equal(
+    hasCompleteSourceArchiveLightEvidence(evidence, {
+      gitSha,
+      customer: "yoyoosun",
+    }),
+    true,
+  );
+  assert.equal(
+    hasCompleteSourceArchiveLightEvidence(
+      { ...evidence, archiveSha256: "b".repeat(64) },
+      { gitSha, customer: "yoyoosun" },
+    ),
+    false,
   );
 });

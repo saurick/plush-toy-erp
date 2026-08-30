@@ -173,6 +173,8 @@ prepare:
   script:
     - |
       set -euo pipefail
+      test "$(stat -c '%U:%G:%a' /usr/local/sbin/plush-remove-chromium-sandbox)" = root:root:755
+      sudo -n -l /usr/local/sbin/plush-remove-chromium-sandbox "$CI_JOB_ID" >/dev/null
       pnpm --dir web install --frozen-lockfile
       node scripts/qa/ci-playwright-runtime.mjs seed
       (cd server && go mod download)

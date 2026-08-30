@@ -90,6 +90,10 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   assert.match(workflow, /ci-playwright-runtime[.]mjs cleanup/u);
   assert.match(
     workflow,
+    /test "\$\(stat -c '%U:%G:%a' \/usr\/local\/sbin\/plush-remove-chromium-sandbox\)" = root:root:755\n {6}sudo -n -l \/usr\/local\/sbin\/plush-remove-chromium-sandbox "\$CI_JOB_ID" >\/dev\/null/u,
+  );
+  assert.match(
+    workflow,
     new RegExp(
       `^[.]pnpm_cache_pull: &pnpm_cache_pull\\n  cache:\\n    - &pnpm_cache_entry\\n      key:\\n        prefix: r640-node-${nodeVersion}-pnpm-v1\\n        files:\\n          - web/pnpm-lock[.]yaml\\n      paths:\\n        - output/cache/gitlab/pnpm-store/\\n      policy: pull`,
       "mu",

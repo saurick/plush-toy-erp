@@ -23,6 +23,8 @@ exact SHA `cddd39ff87e3e2ae9cd8c0282431309bb7cb043f` 的自然 push pipeline `7`
 
 exact SHA `13d392524fdd414296503dbcf05bb4064bd18fea` 的自然 push pipeline `15` 已证明冷种子闭环本身有效：`prepare` 在约 `2m15s` 内完成 765 个 pnpm 包、一次 Runner 本地种子消费、Generic Package 上传与读回，精确种子目录随后不存在。该流水线仍是失败证据：Node 分片因未离线安装 Web 依赖而找不到 `playwright`，Web 分片因 DEV 版本中心 fixture 缺少当前 `releaseVersionPolicy` 合同而失败，Server 逐测试 Go JSON trace 超过 GitLab 4 MiB 日志上限，浏览器、聚合与 `CI Gate` 按 DAG 跳过。后续修复必须产生新 SHA；不得重试 pipeline `15`，也不得把其局部绿色写成完整 CI 或发布证明。
 
+exact SHA `3aba488752b04e3b930ea181aa04e11d5f143cb8` 的自然 push pipeline `16` 进一步证明缓存与主要质量阶段绿色：Static、Web、Resource、Security 通过；Server 的 3634 项 Go 测试和关键 PostgreSQL、Browser 的真实 Chromium smoke 均通过。该流水线仍是失败证据：Node 的后置 source archive 校验错误地把合法 `sha256:<64hex>` 当成裸 digest；当前 Runner 又漂移为缺失 cloud-init 已声明的 sandbox 清理 helper 与精确 sudo 入口，使 Server / Browser 在测试后清理阶段失败并留下 job 113 / 115 两个 sandbox。运维闭环已按仓库声明恢复精确 root-owned helper 和单命令 sudo drop-in、经全局 `visudo` 与 CI 用户调用验证后删除这两个残留；后续 `prepare` 会在任何 cache 写入前先校验该清理入口。不得重试 pipeline `16`，修复仍须新 SHA 的自然流水线证明。
+
 CI 冷启动因此不再承担公网下载。运行包合同固定 `playwright 1.58.2 / Chromium 145.0.7632.6 / revision 1208 / FFmpeg 1011`，并绑定下列原始 ZIP：
 
 | 文件 | 字节数 | SHA-256 |
@@ -33,7 +35,7 @@ CI 冷启动因此不再承担公网下载。运行包合同固定 `playwright 1
 
 只有 protected main 的自然 push `prepare` job 在同项目 Generic Package 精确返回 404 时，才允许消费一次 Runner 本地冷种子。运维 owner 在 CI 外下载上述三个公开固定文件，逐项核对长度和 SHA-256，再通过受信 SSH 写入 `/home/gitlab-runner/.plush-ci-playwright-runtime-seed-playwright-1.58.2-linux-x64-r1208-v1`：目录必须为当前 `gitlab-runner` uid、真实目录、`0700`，且只含三个当前 uid、真实普通文件、`0600` 的精确 basename。`prepare` 会在任何 package 写入前再次检查身份、mode、inventory、长度和 SHA-256，只把校验后的副本打为 `runtime.tar`，用内存中的 job token 上传 GitLab Generic Package，再下载、解包并复核同一内层集合；成功或失败后仅删除已经完整接受的精确本地种子目录。种子缺失或任何身份/内容歧义立即失败，不回退到 Runner 公网下载。
 
-后续 job 只能消费 GitLab 本地 package 或其已校验 ZIP cache；含 job token 的 package GET/PUT 继续使用 Node fetch，token 只作为内存 header，不进入参数、输出或 cache。已解压目录不进 cache，每个 job 在独立目录 materialize，核对 Chrome、headless shell、FFmpeg 和安装标记后使用，并在成功或失败时清理。R640 普通 CI 全绿前，不得把 pipeline `7`、`11`、`13`、`14`、`15` 或局部路由采样写成完整 CI 或发布证据。
+后续 job 只能消费 GitLab 本地 package 或其已校验 ZIP cache；含 job token 的 package GET/PUT 继续使用 Node fetch，token 只作为内存 header，不进入参数、输出或 cache。已解压目录不进 cache，每个 job 在独立目录 materialize，核对 Chrome、headless shell、FFmpeg 和安装标记后使用，并在成功或失败时清理。R640 普通 CI 全绿前，不得把 pipeline `7`、`11`、`13`、`14`、`15`、`16` 或局部路由采样写成完整 CI 或发布证据。
 
 ## 文件职责
 
