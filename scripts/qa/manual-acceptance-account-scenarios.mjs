@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import {
   CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
   CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+  CUSTOMER_TRIAL_133_ORIGIN,
   CUSTOMER_TRIAL_133_TARGET,
   LOCAL_DEV_TARGET,
   SCENARIO_DEMO_TARGET,
@@ -102,7 +103,10 @@ export function normalizeAccountScenarioBackendURL(value) {
   if (!new Set(["http:", "https:"]).has(url.protocol)) {
     throw new CliError("backend URL must use http or https", 2);
   }
-  if (!LOCAL_HOSTS.has(url.hostname)) {
+  if (
+    !LOCAL_HOSTS.has(url.hostname) &&
+    url.origin !== CUSTOMER_TRIAL_133_ORIGIN
+  ) {
     throw new CliError(
       `refuse account scenario writes outside this computer: ${url.origin}`,
       2,
@@ -1721,13 +1725,13 @@ fresh 库配置激活前只创建或读回固定十个单岗位账号：
 本入口保留目标环境的十个正式验收账号，只准备“已停用”“业务与采购兼任”
 和“未分配岗位”三个补充验收账号。密码必须为 8 到 20 位。
 
-  本地只允许 demo_* 和 MANUAL_ACCEPTANCE_PASSWORD；133 只允许 uat_*，并固定
+  本地只允许 demo_* 和 MANUAL_ACCEPTANCE_PASSWORD；demo-133 只允许 uat_*，并固定
   使用 12345678。MANUAL_ACCEPTANCE_UAT_PASSWORD 如提供只能等于该固定值。
-  fresh 本地专用库和 133 都必须设置精确的 MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM，
+  fresh 本地专用库和 demo-133 都必须设置精确的 MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM，
   只创建或读回固定十个单岗位账号。
 
-  133 试用环境必须通过 127.0.0.1:18375 SSH 隧道，并显式提供：
-  --target customer-trial-133 --data-version 2026.08.15-v6 --run-id 20260815-V6 --database-name plush_erp_uat_20260716_v5
+  demo 演练造数环境必须通过 https://demo.yoyoosun.net 系统信任 TLS 入口，并显式提供：
+  --target customer-trial-133 --data-version 2026.08.15-v6 --run-id 20260815-V6 --database-name plush_erp_demo_v1
 同时设置绑定目标的 MANUAL_ACCEPTANCE_TARGET_CONFIRM 与
   MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON。
 远端只核对岗位权限，不修改岗位权限。`;

@@ -121,8 +121,13 @@ function writeFixture({
     "utf8",
   );
   fs.writeFileSync(
-    path.join(composeDir, "compose.customer-trial-133.yml"),
-    "name: plush-toy-erp-v5\n",
+    path.join(composeDir, "compose.demo-133.yml"),
+    "name: plush-toy-erp-demo-v1\n",
+    "utf8",
+  );
+  fs.writeFileSync(
+    path.join(composeDir, "compose.customer-test-133.yml"),
+    "name: plush-toy-erp-test-v1\n",
     "utf8",
   );
   fs.copyFileSync(
@@ -221,38 +226,80 @@ function runPreflight(
   });
 }
 
-function configureExactCustomerTrialFixture(
+const deploymentTargetFixtures = Object.freeze({
+  "demo-133": Object.freeze({
+    key: "demo-133",
+    project: "plush-toy-erp-demo-v1",
+    database: "plush_erp_demo_v1",
+    root: "/home/simon/plush-toy-erp-demo-v1",
+    override: "compose.demo-133.yml",
+    trialEnabled: "1",
+    trialTarget: "customer-trial-133",
+    ports: Object.freeze({
+      POSTGRES_PORT: "55436",
+      APP_HTTP_PORT: "8325",
+      WEB_DESKTOP_PORT: "5195",
+      JAEGER_5775_PORT: "61001",
+      JAEGER_6831_PORT: "61002",
+      JAEGER_6832_PORT: "61003",
+      JAEGER_5778_PORT: "61004",
+      JAEGER_UI_PORT: "61005",
+      JAEGER_14268_PORT: "61006",
+      JAEGER_14250_PORT: "61007",
+      JAEGER_9411_PORT: "61008",
+      JAEGER_OTLP_GRPC_PORT: "61009",
+      JAEGER_OTLP_HTTP_PORT: "61010",
+    }),
+  }),
+  "customer-test-133": Object.freeze({
+    key: "customer-test-133",
+    project: "plush-toy-erp-test-v1",
+    database: "plush_erp_customer_test_v1",
+    root: "/home/simon/plush-toy-erp-test-v1",
+    override: "compose.customer-test-133.yml",
+    trialEnabled: "0",
+    trialTarget: "",
+    ports: Object.freeze({
+      POSTGRES_PORT: "55437",
+      APP_HTTP_PORT: "8335",
+      WEB_DESKTOP_PORT: "5205",
+      JAEGER_5775_PORT: "62001",
+      JAEGER_6831_PORT: "62002",
+      JAEGER_6832_PORT: "62003",
+      JAEGER_5778_PORT: "62004",
+      JAEGER_UI_PORT: "62005",
+      JAEGER_14268_PORT: "62006",
+      JAEGER_14250_PORT: "62007",
+      JAEGER_9411_PORT: "62008",
+      JAEGER_OTLP_GRPC_PORT: "62009",
+      JAEGER_OTLP_HTTP_PORT: "62010",
+    }),
+  }),
+});
+
+function configureExactDeploymentTargetFixture(
   fixture,
   {
-    dsn = "postgres://erp_app:test-app-password-12345@postgres:5432/plush_erp_uat_20260716_v5?sslmode=disable",
+    targetKey = "demo-133",
+    dsn,
   } = {},
 ) {
+  const target = deploymentTargetFixtures[targetKey];
+  assert.ok(target, `unknown fixture deployment target: ${targetKey}`);
+  const exactDsn =
+    dsn ??
+    `postgres://erp_app:test-app-password-12345@postgres:5432/${target.database}?sslmode=disable`;
   const replacements = new Map([
-    ["PROJECT_SLUG", "plush-toy-erp-v5"],
+    ["PROJECT_SLUG", target.project],
     ["ERP_CUSTOMER_KEY", "yoyoosun"],
-    ["POSTGRES_DSN", dsn],
-    ["POSTGRES_DB", "plush_erp_uat_20260716_v5"],
-    ["POSTGRES_DATA_DIR", "/home/simon/plush-toy-erp-v5/data/postgres"],
-    [
-      "MIGRATION_LOCK_FILE",
-      "/home/simon/plush-toy-erp-v5/run/atlas-migrate.lock",
-    ],
-    ["POSTGRES_PORT", "55435"],
-    ["APP_HTTP_PORT", "8315"],
+    ["POSTGRES_DSN", exactDsn],
+    ["POSTGRES_DB", target.database],
+    ["POSTGRES_DATA_DIR", `${target.root}/data/postgres`],
+    ["MIGRATION_LOCK_FILE", `${target.root}/run/atlas-migrate.lock`],
     ["WEB_DESKTOP_BIND_ADDR", "127.0.0.1"],
-    ["WEB_DESKTOP_PORT", "5185"],
-    ["JAEGER_5775_PORT", "45775"],
-    ["JAEGER_6831_PORT", "46831"],
-    ["JAEGER_6832_PORT", "46832"],
-    ["JAEGER_5778_PORT", "45778"],
-    ["JAEGER_UI_PORT", "46687"],
-    ["JAEGER_14268_PORT", "54268"],
-    ["JAEGER_14250_PORT", "54250"],
-    ["JAEGER_9411_PORT", "49411"],
-    ["JAEGER_OTLP_GRPC_PORT", "44317"],
-    ["JAEGER_OTLP_HTTP_PORT", "44318"],
-    ["ERP_ALLOW_CUSTOMER_TRIAL_CONFIG", "1"],
-    ["ERP_CUSTOMER_TRIAL_TARGET", "customer-trial-133"],
+    ...Object.entries(target.ports),
+    ["ERP_ALLOW_CUSTOMER_TRIAL_CONFIG", target.trialEnabled],
+    ["ERP_CUSTOMER_TRIAL_TARGET", target.trialTarget],
   ]);
   const env = fs
     .readFileSync(fixture.envFile, "utf8")
@@ -280,33 +327,53 @@ function configureExactCustomerTrialFixture(
       ),
     "utf8",
   );
+  fixture.deploymentTarget = target;
 }
 
-function trialOverrideArgs(fixture) {
+function deploymentTargetArgs(fixture) {
+  const target = fixture.deploymentTarget ?? deploymentTargetFixtures["demo-133"];
   return [
+    "--deployment-target",
+    target.key,
     "--compose-override",
-    path.join(fixture.composeDir, "compose.customer-trial-133.yml"),
+    path.join(fixture.composeDir, target.override),
   ];
 }
 
-function runTrialPreflight(
+function runDeploymentTargetPreflight(
   fixture,
   extraArgs = [],
   { env = {}, includeExpectedRelease = true } = {},
 ) {
+  const target = fixture.deploymentTarget ?? deploymentTargetFixtures["demo-133"];
   const fakeBin = createFakeRuntimeBin(fixture.root);
   return runPreflight(fixture, extraArgs, {
     skipComposeConfig: false,
     includeExpectedRelease,
     env: {
       PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
-      FAKE_RUNTIME_COMPOSE_PROJECT: "plush-toy-erp-v5",
+      FAKE_RUNTIME_TARGET_PROJECT: target.project,
+      FAKE_RUNTIME_COMPOSE_PROJECT: target.project,
+      FAKE_RUNTIME_POSTGRES_MOUNT: `${target.root}/data/postgres`,
+      FAKE_RUNTIME_POSTGRES_DSN: `postgres://erp_app:test-app-password-12345@postgres:5432/${target.database}?sslmode=disable`,
+      FAKE_RUNTIME_TRIAL_ALLOW: target.trialEnabled,
+      FAKE_RUNTIME_TRIAL_TARGET: target.trialTarget,
+      ...Object.fromEntries(
+        Object.entries(target.ports).map(([key, value]) => [
+          `FAKE_RUNTIME_${key}`,
+          value,
+        ]),
+      ),
       FAKE_RUNTIME_EXPECTED_RELEASE: fixture.expectedRelease,
       FAKE_RUNTIME_AUTH_SMS_MODE: "provider",
       ...env,
     },
   });
 }
+
+const configureExactCustomerTrialFixture = configureExactDeploymentTargetFixture;
+const trialOverrideArgs = deploymentTargetArgs;
+const runTrialPreflight = runDeploymentTargetPreflight;
 
 function createFakeRuntimeBin(root) {
   const binDir = path.join(root, "bin");
@@ -378,19 +445,19 @@ if [[ "\${1:-}" == "port" ]]; then
   cid="\${2:-}"
   container_port="\${3:-}"
   case "$cid:$container_port" in
-  postgres-cid:5432/tcp) host_port=55435 ;;
-  app-server-cid:8300/tcp) host_port=8315 ;;
-  web-desktop-cid:5175/tcp) host_port=5185 ;;
-  jaeger-cid:5775/udp) host_port=45775 ;;
-  jaeger-cid:6831/udp) host_port=46831 ;;
-  jaeger-cid:6832/udp) host_port=46832 ;;
-  jaeger-cid:5778/tcp) host_port=45778 ;;
-  jaeger-cid:16686/tcp) host_port=46687 ;;
-  jaeger-cid:14268/tcp) host_port=54268 ;;
-  jaeger-cid:14250/tcp) host_port=54250 ;;
-  jaeger-cid:9411/tcp) host_port=49411 ;;
-  jaeger-cid:4317/tcp) host_port=44317 ;;
-  jaeger-cid:4318/tcp) host_port=44318 ;;
+  postgres-cid:5432/tcp) host_port="\${FAKE_RUNTIME_POSTGRES_PORT:-5435}" ;;
+  app-server-cid:8300/tcp) host_port="\${FAKE_RUNTIME_APP_HTTP_PORT:-8300}" ;;
+  web-desktop-cid:5175/tcp) host_port="\${FAKE_RUNTIME_WEB_DESKTOP_PORT:-5175}" ;;
+  jaeger-cid:5775/udp) host_port="\${FAKE_RUNTIME_JAEGER_5775_PORT:-15775}" ;;
+  jaeger-cid:6831/udp) host_port="\${FAKE_RUNTIME_JAEGER_6831_PORT:-16831}" ;;
+  jaeger-cid:6832/udp) host_port="\${FAKE_RUNTIME_JAEGER_6832_PORT:-16832}" ;;
+  jaeger-cid:5778/tcp) host_port="\${FAKE_RUNTIME_JAEGER_5778_PORT:-15778}" ;;
+  jaeger-cid:16686/tcp) host_port="\${FAKE_RUNTIME_JAEGER_UI_PORT:-16687}" ;;
+  jaeger-cid:14268/tcp) host_port="\${FAKE_RUNTIME_JAEGER_14268_PORT:-24268}" ;;
+  jaeger-cid:14250/tcp) host_port="\${FAKE_RUNTIME_JAEGER_14250_PORT:-24250}" ;;
+  jaeger-cid:9411/tcp) host_port="\${FAKE_RUNTIME_JAEGER_9411_PORT:-19411}" ;;
+  jaeger-cid:4317/tcp) host_port="\${FAKE_RUNTIME_JAEGER_OTLP_GRPC_PORT:-14317}" ;;
+  jaeger-cid:4318/tcp) host_port="\${FAKE_RUNTIME_JAEGER_OTLP_HTTP_PORT:-14318}" ;;
   *) exit 1 ;;
   esac
   if [[ "\${FAKE_RUNTIME_PORT_DRIFT_TARGET:-}" == "$cid:$container_port" ]]; then
@@ -436,10 +503,10 @@ if [[ "\${1:-}" == "inspect" ]]; then
     printf '%s\n' "$runtime_image_id"
   elif [[ "$*" == *'{{.Name}}'* ]]; then
     case "$cid" in
-    postgres-cid) container_name=plush-toy-erp-v5-postgres ;;
-    jaeger-cid) container_name=plush-toy-erp-v5-jaeger ;;
-    app-server-cid) container_name=plush-toy-erp-v5-server ;;
-    web-desktop-cid) container_name=plush-toy-erp-v5-web-desktop ;;
+    postgres-cid) container_name="\${FAKE_RUNTIME_TARGET_PROJECT:-plush-toy-erp-prod}-postgres" ;;
+    jaeger-cid) container_name="\${FAKE_RUNTIME_TARGET_PROJECT:-plush-toy-erp-prod}-jaeger" ;;
+    app-server-cid) container_name="\${FAKE_RUNTIME_TARGET_PROJECT:-plush-toy-erp-prod}-server" ;;
+    web-desktop-cid) container_name="\${FAKE_RUNTIME_TARGET_PROJECT:-plush-toy-erp-prod}-web-desktop" ;;
     *) container_name=unknown ;;
     esac
     if [[ "\${FAKE_RUNTIME_NAME_DRIFT_SERVICE:-}" == "$cid" ]]; then
@@ -449,7 +516,7 @@ if [[ "\${1:-}" == "inspect" ]]; then
   elif [[ "$*" == *'com.docker.compose.project'* ]]; then
     printf '%s\n' "\${FAKE_RUNTIME_COMPOSE_PROJECT:-plush-toy-erp-prod}"
   elif [[ "$*" == *'.Mounts'* ]]; then
-    printf '%s\n' "\${FAKE_RUNTIME_POSTGRES_MOUNT:-/home/simon/plush-toy-erp-v5/data/postgres}"
+    printf '%s\n' "\${FAKE_RUNTIME_POSTGRES_MOUNT:-/data/plush/postgres}"
   elif [[ "$*" == *'.Config.User'* ]]; then
     printf '%s\n' "\${FAKE_RUNTIME_APP_USER:-app}"
   elif [[ "$*" == *'.HostConfig.SecurityOpt'* ]]; then
@@ -468,9 +535,9 @@ if [[ "\${1:-}" == "inspect" ]]; then
       printf 'BOOTSTRAP_ADMIN_ONCE=%s\n' "\${FAKE_RUNTIME_BOOTSTRAP_ADMIN_ONCE:-false}"
       printf 'ERP_CUSTOMER_KEY=%s\n' "\${FAKE_RUNTIME_CUSTOMER_KEY:-yoyoosun}"
       printf 'ERP_DEBUG_ENV=%s\n' "\${FAKE_RUNTIME_DEBUG_ENV:-prod}"
-      printf 'ERP_ALLOW_CUSTOMER_TRIAL_CONFIG=%s\n' "\${FAKE_RUNTIME_TRIAL_ALLOW:-1}"
-      printf 'ERP_CUSTOMER_TRIAL_TARGET=%s\n' "\${FAKE_RUNTIME_TRIAL_TARGET:-customer-trial-133}"
-      printf 'POSTGRES_DSN=%s\n' "\${FAKE_RUNTIME_POSTGRES_DSN:-postgres://erp_app:test-app-password-12345@postgres:5432/plush_erp_uat_20260716_v5?sslmode=disable}"
+      printf 'ERP_ALLOW_CUSTOMER_TRIAL_CONFIG=%s\n' "\${FAKE_RUNTIME_TRIAL_ALLOW:-0}"
+      printf 'ERP_CUSTOMER_TRIAL_TARGET=%s\n' "\${FAKE_RUNTIME_TRIAL_TARGET:-}"
+      printf 'POSTGRES_DSN=%s\n' "\${FAKE_RUNTIME_POSTGRES_DSN:-postgres://erp_app:test-app-password-12345@postgres:5432/plush_erp?sslmode=disable}"
       if [[ "\${FAKE_RUNTIME_APP_PASSWORD_PRESENT:-0}" == "1" ]]; then
         printf 'APP_ADMIN_PASSWORD=%s\n' "\${FAKE_RUNTIME_APP_PASSWORD:-runtime-sensitive-secret}"
       fi
@@ -548,7 +615,27 @@ test("production preflight resolves a packaged source root without Git metadata"
     cwd: fixture.root,
     env: {
       PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
-      FAKE_RUNTIME_COMPOSE_PROJECT: "plush-toy-erp-v5",
+      FAKE_RUNTIME_TARGET_PROJECT: "plush-toy-erp-demo-v1",
+      FAKE_RUNTIME_COMPOSE_PROJECT: "plush-toy-erp-demo-v1",
+      FAKE_RUNTIME_POSTGRES_MOUNT:
+        "/home/simon/plush-toy-erp-demo-v1/data/postgres",
+      FAKE_RUNTIME_POSTGRES_DSN:
+        "postgres://erp_app:test-app-password-12345@postgres:5432/plush_erp_demo_v1?sslmode=disable",
+      FAKE_RUNTIME_POSTGRES_PORT: "55436",
+      FAKE_RUNTIME_APP_HTTP_PORT: "8325",
+      FAKE_RUNTIME_WEB_DESKTOP_PORT: "5195",
+      FAKE_RUNTIME_JAEGER_5775_PORT: "61001",
+      FAKE_RUNTIME_JAEGER_6831_PORT: "61002",
+      FAKE_RUNTIME_JAEGER_6832_PORT: "61003",
+      FAKE_RUNTIME_JAEGER_5778_PORT: "61004",
+      FAKE_RUNTIME_JAEGER_UI_PORT: "61005",
+      FAKE_RUNTIME_JAEGER_14268_PORT: "61006",
+      FAKE_RUNTIME_JAEGER_14250_PORT: "61007",
+      FAKE_RUNTIME_JAEGER_9411_PORT: "61008",
+      FAKE_RUNTIME_JAEGER_OTLP_GRPC_PORT: "61009",
+      FAKE_RUNTIME_JAEGER_OTLP_HTTP_PORT: "61010",
+      FAKE_RUNTIME_TRIAL_ALLOW: "1",
+      FAKE_RUNTIME_TRIAL_TARGET: "customer-trial-133",
       FAKE_RUNTIME_EXPECTED_RELEASE: fixture.expectedRelease,
       FAKE_RUNTIME_AUTH_SMS_MODE: "provider",
     },
@@ -958,7 +1045,7 @@ test("production preflight canonical runtime may derive the current Git release"
   assert.match(result.stdout, new RegExp(`release=${currentRelease}`, "u"));
 });
 
-test("production preflight customer-trial runtime requires an explicit exact release", async (t) => {
+test("production preflight registered runtime requires an explicit exact release", async (t) => {
   await t.test("missing", () => {
     const fixture = writeFixture();
     configureExactCustomerTrialFixture(fixture);
@@ -1035,7 +1122,7 @@ test("production preflight runtime image and release identity fail closed", asyn
   }
 });
 
-test("production preflight verifies every customer-trial runtime service uses the V5 Compose project", () => {
+test("production preflight verifies every registered demo runtime service uses its isolated Compose project", () => {
   const fixture = writeFixture();
   configureExactCustomerTrialFixture(fixture);
   const result = runTrialPreflight(fixture, [
@@ -1046,11 +1133,11 @@ test("production preflight verifies every customer-trial runtime service uses th
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(
     result.stdout,
-    /运行态容器名、project、端口、PostgreSQL 挂载和 app 试用身份一致/u,
+    /demo-133 运行态容器名、project、端口、PostgreSQL 挂载和数据环境身份一致/u,
   );
 });
 
-test("production preflight rejects a customer-trial service from the canonical production project", () => {
+test("production preflight rejects a registered target service from the canonical production project", () => {
   const fixture = writeFixture();
   configureExactCustomerTrialFixture(fixture);
   const result = runTrialPreflight(
@@ -1064,10 +1151,10 @@ test("production preflight rejects a customer-trial service from the canonical p
   );
 
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /不属于独立 Compose project plush-toy-erp-v5/u);
+  assert.match(result.stderr, /demo-133 运行态服务 postgres 不属于登记 Compose project/u);
 });
 
-test("production preflight rejects V5 runtime container name drift", () => {
+test("production preflight rejects registered runtime container name drift", () => {
   const fixture = writeFixture();
   configureExactCustomerTrialFixture(fixture);
   const result = runTrialPreflight(
@@ -1082,10 +1169,10 @@ test("production preflight rejects V5 runtime container name drift", () => {
   );
 
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /容器名不符合 V5 独立身份/u);
+  assert.match(result.stderr, /容器名不符合登记身份/u);
 });
 
-test("production preflight rejects V5 runtime host port drift", () => {
+test("production preflight rejects registered runtime host port drift", () => {
   const fixture = writeFixture();
   configureExactCustomerTrialFixture(fixture);
   const result = runTrialPreflight(
@@ -1100,10 +1187,10 @@ test("production preflight rejects V5 runtime host port drift", () => {
   );
 
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /端口 8300\/tcp 未精确绑定 V5 独立宿主端口/u);
+  assert.match(result.stderr, /端口 8300\/tcp 未精确绑定登记宿主端口/u);
 });
 
-test("production preflight rejects a publicly bound V5 runtime web port", () => {
+test("production preflight rejects a publicly bound registered runtime web port", () => {
   const fixture = writeFixture();
   configureExactCustomerTrialFixture(fixture);
   const result = runTrialPreflight(
@@ -1115,11 +1202,11 @@ test("production preflight rejects a publicly bound V5 runtime web port", () => 
   assert.notEqual(result.status, 0);
   assert.match(
     result.stderr,
-    /web-desktop 端口 5175\/tcp 未精确绑定 V5 独立宿主端口/u,
+    /web-desktop 端口 5175\/tcp 未精确绑定登记宿主端口/u,
   );
 });
 
-test("production preflight rejects V5 runtime PostgreSQL mount drift", () => {
+test("production preflight rejects registered runtime PostgreSQL mount drift", () => {
   const fixture = writeFixture();
   configureExactCustomerTrialFixture(fixture);
   const result = runTrialPreflight(
@@ -1134,10 +1221,10 @@ test("production preflight rejects V5 runtime PostgreSQL mount drift", () => {
   );
 
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /PostgreSQL 挂载源不符合 V5 独立数据目录/u);
+  assert.match(result.stderr, /PostgreSQL 挂载源不符合登记数据目录/u);
 });
 
-test("production preflight rejects V5 runtime app trial identity drift", () => {
+test("production preflight rejects registered runtime data-environment identity drift", () => {
   const fixture = writeFixture();
   configureExactCustomerTrialFixture(fixture);
   const result = runTrialPreflight(
@@ -1149,11 +1236,11 @@ test("production preflight rejects V5 runtime app trial identity drift", () => {
   assert.notEqual(result.status, 0);
   assert.match(
     result.stderr,
-    /试用身份变量不符合合同: ERP_CUSTOMER_TRIAL_TARGET/u,
+    /数据环境身份变量不符合合同: ERP_CUSTOMER_TRIAL_TARGET/u,
   );
 });
 
-test("production preflight rejects V5 runtime app DSN drift without leaking it", () => {
+test("production preflight rejects registered runtime app DSN drift without leaking it", () => {
   const fixture = writeFixture();
   configureExactCustomerTrialFixture(fixture);
   const runtimeSecret = "runtime-dsn-password-must-not-leak";
@@ -1170,7 +1257,7 @@ test("production preflight rejects V5 runtime app DSN drift without leaking it",
   assert.notEqual(result.status, 0);
   assert.match(
     result.stderr,
-    /POSTGRES_DSN 必须使用 erp_app 精确指向登记的试用数据库/u,
+    /POSTGRES_DSN 不符合登记数据库合同/u,
   );
   assert.doesNotMatch(result.stdout, new RegExp(runtimeSecret));
   assert.doesNotMatch(result.stderr, new RegExp(runtimeSecret));
@@ -1393,15 +1480,22 @@ test("production preflight rejects a steady Compose admin password mapping", () 
   assert.match(result.stderr, /不得映射 APP_ADMIN_PASSWORD/);
 });
 
-test("production preflight allows the exact isolated customer-trial-133 database", () => {
-  const fixture = writeFixture();
-  configureExactCustomerTrialFixture(fixture);
+test("production preflight allows both exact isolated registered databases", async (t) => {
+  for (const targetKey of ["demo-133", "customer-test-133"]) {
+    await t.test(targetKey, () => {
+      const fixture = writeFixture();
+      configureExactDeploymentTargetFixture(fixture, { targetKey });
 
-  const result = runTrialPreflight(fixture, trialOverrideArgs(fixture));
-  assert.equal(result.status, 0, result.stderr);
+      const result = runDeploymentTargetPreflight(
+        fixture,
+        deploymentTargetArgs(fixture),
+      );
+      assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    });
+  }
 });
 
-test("production preflight requires a loopback web bind for customer-trial-133", () => {
+test("production preflight requires a loopback web bind for registered targets", () => {
   const fixture = writeFixture();
   configureExactCustomerTrialFixture(fixture);
   fs.writeFileSync(
@@ -1418,34 +1512,34 @@ test("production preflight requires a loopback web bind for customer-trial-133",
   assert.notEqual(result.status, 0);
   assert.match(
     result.stderr,
-    /customer-trial-133 前端宿主机端口必须绑定 WEB_DESKTOP_BIND_ADDR=127\.0\.0\.1/u,
+    /demo-133 前端宿主机端口必须绑定 127\.0\.0\.1/u,
   );
 });
 
-test("production preflight invokes V5 Compose with an explicit project and both files", () => {
+test("production preflight invokes registered Compose with an explicit project and both files", () => {
   const fixture = writeFixture();
   configureExactCustomerTrialFixture(fixture);
   const argsLog = path.join(fixture.root, "compose-args.log");
   const result = runTrialPreflight(fixture, trialOverrideArgs(fixture), {
     env: {
       FAKE_COMPOSE_ARGS_LOG: argsLog,
-      FAKE_COMPOSE_REQUIRED_PROJECT: "plush-toy-erp-v5",
+      FAKE_COMPOSE_REQUIRED_PROJECT: "plush-toy-erp-demo-v1",
     },
   });
 
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(
     result.stdout,
-    /docker compose config 解析的 project=plush-toy-erp-v5/u,
+    /docker compose config 解析的 project=plush-toy-erp-demo-v1/u,
   );
   const invocation = fs.readFileSync(argsLog, "utf8");
-  assert.match(invocation, /-p plush-toy-erp-v5/u);
+  assert.match(invocation, /-p plush-toy-erp-demo-v1/u);
   assert.match(invocation, /-f .*\/compose\.yml/u);
-  assert.match(invocation, /-f .*\/compose\.customer-trial-133\.yml/u);
+  assert.match(invocation, /-f .*\/compose\.demo-133\.yml/u);
   assert.match(invocation, /config/u);
 });
 
-test("production preflight rejects a resolved V5 Compose project drift", () => {
+test("production preflight rejects a resolved registered Compose project drift", () => {
   const fixture = writeFixture();
   configureExactCustomerTrialFixture(fixture);
   const result = runTrialPreflight(fixture, trialOverrideArgs(fixture), {
@@ -1455,29 +1549,29 @@ test("production preflight rejects a resolved V5 Compose project drift", () => {
   assert.notEqual(result.status, 0);
   assert.match(
     result.stderr,
-    /解析后的 Compose project 必须是 plush-toy-erp-v5/u,
+    /解析后的 Compose project 不符合登记合同/u,
   );
 });
 
-test("production preflight forbids skipping resolved Compose config for V5", () => {
+test("production preflight forbids skipping resolved Compose config for registered targets", () => {
   const fixture = writeFixture();
   configureExactCustomerTrialFixture(fixture);
   const result = runPreflight(fixture, trialOverrideArgs(fixture));
 
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /customer-trial-133 禁止 --skip-compose-config/u);
+  assert.match(result.stderr, /demo-133 禁止 --skip-compose-config/u);
 });
 
-test("production preflight enforces exact V5 data and migration lock paths", () => {
+test("production preflight enforces exact registered data and migration lock paths", () => {
   for (const [key, replacement, expected] of [
     [
       "POSTGRES_DATA_DIR",
-      "/Users/simon/plush-toy-erp-v5/data/postgres",
-      /POSTGRES_DATA_DIR=\/home\/simon\/plush-toy-erp-v5\/data\/postgres/u,
+      "/Users/simon/plush-toy-erp-demo-v1/data/postgres",
+      /demo-133 的 POSTGRES_DATA_DIR 不符合登记合同/u,
     ],
     [
       "MIGRATION_LOCK_FILE",
-      "/home/simon/plush-toy-erp-v5/run/../atlas-migrate.lock",
+      "/home/simon/plush-toy-erp-demo-v1/run/../atlas-migrate.lock",
       /不得包含重复分隔符或 \. \/ \.\./u,
     ],
   ]) {
@@ -1499,7 +1593,7 @@ test("production preflight enforces exact V5 data and migration lock paths", () 
   }
 });
 
-test("production preflight rejects customer-trial opt-in outside its exact database", () => {
+test("production preflight rejects demo opt-in outside its exact database", () => {
   const fixture = writeFixture();
   configureExactCustomerTrialFixture(fixture, {
     dsn: "postgres://postgres:test-production-password@postgres:5432/plush_erp?sslmode=disable",
@@ -1510,10 +1604,10 @@ test("production preflight rejects customer-trial opt-in outside its exact datab
   assert.match(result.stderr, /POSTGRES_DSN 必须精确使用 erp_app/);
 });
 
-test("production preflight rejects extra customer-trial DSN query options", () => {
+test("production preflight rejects extra registered-target DSN query options", () => {
   const fixture = writeFixture();
   configureExactCustomerTrialFixture(fixture, {
-    dsn: "postgres://postgres:test-production-password@postgres:5432/plush_erp_uat_20260716_v5?sslmode=disable&target_session_attrs=read-write",
+    dsn: "postgres://postgres:test-production-password@postgres:5432/plush_erp_demo_v1?sslmode=disable&target_session_attrs=read-write",
   });
 
   const result = runTrialPreflight(fixture, trialOverrideArgs(fixture));
@@ -1521,49 +1615,67 @@ test("production preflight rejects extra customer-trial DSN query options", () =
   assert.match(result.stderr, /POSTGRES_DSN 必须精确使用 erp_app/);
 });
 
-test("production preflight rejects customer-trial without its Compose project override", () => {
+test("production preflight rejects a registered target without its Compose project override", () => {
   const fixture = writeFixture();
   configureExactCustomerTrialFixture(fixture);
 
-  const result = runPreflight(fixture);
+  const result = runPreflight(fixture, ["--deployment-target", "demo-133"]);
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /必须显式传入 --compose-override/u);
+  assert.match(result.stderr, /必须显式传入受控 Compose override/u);
 });
 
-test("production preflight rejects a customer-trial Compose override with extra mutations", () => {
+test("production preflight excludes admin and undeclared environment names", async (t) => {
+  for (const targetKey of ["admin", "admin-133", "erp", "test-133"]) {
+    await t.test(targetKey, () => {
+      const fixture = writeFixture();
+      const result = runPreflight(fixture, [
+        "--deployment-target",
+        targetKey,
+      ]);
+
+      assert.notEqual(result.status, 0);
+      assert.match(
+        result.stderr,
+        /只允许 demo-133 或 customer-test-133/u,
+      );
+    });
+  }
+});
+
+test("production preflight rejects a registered Compose override with extra mutations", () => {
   const fixture = writeFixture();
   configureExactCustomerTrialFixture(fixture);
   fs.appendFileSync(
-    path.join(fixture.composeDir, "compose.customer-trial-133.yml"),
+    path.join(fixture.composeDir, "compose.demo-133.yml"),
     "services:\n  postgres:\n    ports: []\n",
   );
 
   const result = runTrialPreflight(fixture, trialOverrideArgs(fixture));
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /只能声明 name: plush-toy-erp-v5/u);
+  assert.match(result.stderr, /Compose override 只能声明登记 project/u);
 });
 
-test("production preflight rejects customer-trial host port collisions", () => {
+test("production preflight rejects registered target host port collisions", () => {
   const fixture = writeFixture();
   configureExactCustomerTrialFixture(fixture);
   fs.writeFileSync(
     fixture.envFile,
     fs
       .readFileSync(fixture.envFile, "utf8")
-      .replace("APP_HTTP_PORT=8315", "APP_HTTP_PORT=8300"),
+      .replace("APP_HTTP_PORT=8325", "APP_HTTP_PORT=8300"),
   );
 
   const result = runTrialPreflight(fixture, trialOverrideArgs(fixture));
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /必须使用独立 APP_HTTP_PORT=8315/u);
+  assert.match(result.stderr, /demo-133 的 APP_HTTP_PORT 不符合登记合同/u);
 });
 
-test("production preflight rejects a Compose override outside customer-trial", () => {
+test("production preflight rejects a registered Compose override without matching env identity", () => {
   const fixture = writeFixture();
 
   const result = runPreflight(fixture, trialOverrideArgs(fixture));
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /非 customer-trial-133 运行禁止传入/u);
+  assert.match(result.stderr, /登记目标只允许 ERP_CUSTOMER_KEY=yoyoosun/u);
 });
 
 test("production preflight rejects a target marker while customer-trial is disabled", () => {

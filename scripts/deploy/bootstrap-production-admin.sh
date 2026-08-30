@@ -4,41 +4,29 @@ set -euo pipefail
 umask 077
 
 print_help() {
-  cat <<'USAGE'
-用法:
-  APP_ADMIN_PASSWORD='<ephemeral-secret>' \
-    bash scripts/deploy/bootstrap-production-admin.sh \
-      --env-file server/deploy/compose/prod/.env \
-      [--compose-override server/deploy/compose/prod/compose.customer-trial-133.yml] \
-      --expected-database <database> \
-      --expected-migration <atlas-version> \
-      --expected-release <40-lowercase-git-sha> \
-      --confirm 'BOOTSTRAP_PRODUCTION_ADMIN:<project>:<database>:<username>:<migration>:<release>'
-
-作用:
-  在已经完成 migration 的 fresh production PostgreSQL 中，通过 app-server 镜像的一次性
-  Compose 容器创建首个超级管理员。服务端会先初始化内置 RBAC，再以同一事务写入管理员、
-  immutable runtime marker 和 completed runtime audit event。
-
-  边界:
-  - 不执行 migration，不启动常驻 app-server，不发布端口，不激活客户配置。
-  - APP_ADMIN_PASSWORD 只允许通过当前进程环境传入；不得写入 .env 或命令参数。
-  - 同一 Compose project / database 同时由私有原子锁和 PostgreSQL session advisory lock 串行；
-    已有锁一律停止，不自动删除陈旧锁。
-  - 身份可完整证明时，成功或失败都会停止并删除一次性容器，并清理 password 变量。
-    容器发现、身份或清理不确定时保留 advisory/file lock 现场，禁止自动重试。
-  - marker 已提交后的任何读回失败都不会自动删除或重跑 bootstrap。
-
-参数:
-  --env-file <path>              steady production env，必须 once=false 且无 password key
-  --compose-dir <path>           默认 server/deploy/compose/prod
-  --compose-override <path>      仅 customer-trial-133 使用的受控 Compose project override
-  --expected-database <name>     本次唯一目标数据库
-  --expected-migration <version> 目标 Atlas current version
-  --expected-release <sha>       app-server 镜像内 GIT_SHA
-  --confirm <text>               与 project/database/user/migration/release 绑定的精确确认串
-  --timeout-seconds <1-300>      marker 等待上限，默认 120 秒
-USAGE
+  printf '%s\n' \
+    '用法:' \
+    "  APP_ADMIN_PASSWORD='<ephemeral-secret>' bash scripts/deploy/bootstrap-production-admin.sh \\" \
+    "    --deployment-target <demo-133|customer-test-133> \\" \
+    "    --env-file <path> --compose-override <path> \\" \
+    "    --expected-database <database> --expected-migration <atlas-version> \\" \
+    "    --expected-release <40-sha> --confirm 'BOOTSTRAP_PRODUCTION_ADMIN:<project>:<database>:<username>:<migration>:<release>'" \
+    '' \
+    '作用：在已完成 migration 的登记目标 PostgreSQL 中，通过一次性 app-server 容器初始化内置 RBAC、首个超级管理员、runtime marker 和审计回执。' \
+    '' \
+    '边界：不执行 migration，不启动常驻服务，不发布端口；密码只允许通过当前进程环境传入，不写入 env 或参数。' \
+    '同一 project/database 由私有文件锁和 PostgreSQL advisory lock 串行；已有锁或身份/清理不确定时停止，不自动重试。' \
+    '' \
+    '参数：' \
+    '  --deployment-target <key>      仅允许 demo-133 或 customer-test-133' \
+    '  --env-file <path>              steady target env，必须 once=false 且无 password key' \
+    '  --compose-dir <path>           默认 server/deploy/compose/prod' \
+    '  --compose-override <path>      必须精确匹配登记目标 override' \
+    '  --expected-database <name>     本次唯一目标数据库' \
+    '  --expected-migration <version> 目标 Atlas current version' \
+    '  --expected-release <sha>       app-server 镜像内 GIT_SHA' \
+    '  --confirm <text>               与 project/database/user/migration/release 绑定的精确确认串' \
+    '  --timeout-seconds <1-300>      marker 等待上限，默认 120 秒'
 }
 
 fail() {
@@ -512,6 +500,7 @@ else
 fi
 compose_dir="server/deploy/compose/prod"
 compose_override=""
+deployment_target=""
 env_file=""
 expected_database=""
 expected_migration=""
@@ -544,6 +533,10 @@ advisory_lock_error=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+  --deployment-target)
+    deployment_target="${2:-}"
+    shift 2
+    ;;
   --env-file)
     env_file="${2:-}"
     shift 2
@@ -589,6 +582,23 @@ done
 cd "$root_dir"
 
 [[ -n "$env_file" ]] || fail "必须传入 --env-file"
+case "$deployment_target" in
+demo-133)
+  target_project=plush-toy-erp-demo-v1
+  target_database=plush_erp_demo_v1
+  target_override_name=compose.demo-133.yml
+  target_trial_enabled=1
+  target_trial_marker=customer-trial-133
+  ;;
+customer-test-133)
+  target_project=plush-toy-erp-test-v1
+  target_database=plush_erp_customer_test_v1
+  target_override_name=compose.customer-test-133.yml
+  target_trial_enabled=0
+  target_trial_marker=""
+  ;;
+*) fail "--deployment-target 只允许 demo-133 或 customer-test-133；admin 不是部署环境" ;;
+esac
 [[ -f "$env_file" ]] || fail "env 文件不存在或不是普通文件"
 [[ ! -L "$env_file" ]] || fail "env 文件不得是符号链接"
 [[ -r "$env_file" ]] || fail "env 文件不可读"
@@ -643,7 +653,11 @@ erp_customer_trial_target="$(env_value_of ERP_CUSTOMER_TRIAL_TARGET "$normalized
 [[ "$admin_username" =~ ^[A-Za-z0-9._-]+$ ]] || fail "APP_ADMIN_USERNAME 必须是稳定无空白 key"
 [[ "$bootstrap_once" == "false" ]] || fail "steady env 的 BOOTSTRAP_ADMIN_ONCE 必须为 false"
 [[ "$erp_allow_customer_trial_config" == "0" || "$erp_allow_customer_trial_config" == "1" ]] || fail "ERP_ALLOW_CUSTOMER_TRIAL_CONFIG 必须显式为 0 或 1"
+[[ "$project_slug" == "$target_project" ]] || fail "$deployment_target 的 PROJECT_SLUG 不符合登记合同"
+[[ "$expected_database" == "$target_database" ]] || fail "$deployment_target 的 --expected-database 不符合登记合同"
 [[ "$postgres_db" == "$expected_database" ]] || fail "POSTGRES_DB 与 --expected-database 不一致"
+[[ "$erp_allow_customer_trial_config" == "$target_trial_enabled" ]] || fail "$deployment_target 的 ERP_ALLOW_CUSTOMER_TRIAL_CONFIG 不符合登记合同"
+[[ "$erp_customer_trial_target" == "$target_trial_marker" ]] || fail "$deployment_target 的 ERP_CUSTOMER_TRIAL_TARGET 不符合登记合同"
 postgres_dsn_pattern="^postgres(ql)?://([^:/?#@]+):([^/?#@]+)@postgres:5432/${expected_database}\\?sslmode=disable$"
 [[ "$postgres_dsn" =~ $postgres_dsn_pattern ]] || fail "POSTGRES_DSN 必须精确为单一 postgres[ql]://user:pass@postgres:5432/$expected_database?sslmode=disable，禁止额外 query、multi-host 或 fallback"
 dsn_user="${BASH_REMATCH[2]}"
@@ -661,46 +675,37 @@ while IFS='=' read -r key _value; do
   fi
 done <"$normalized_env"
 
-for key in COMPOSE_FILE COMPOSE_PROJECT_NAME COMPOSE_PROFILES COMPOSE_ENV_FILES COMPOSE_PATH_SEPARATOR DOCKER_HOST DOCKER_CONTEXT DOCKER_TLS_VERIFY DOCKER_CERT_PATH ERP_ALLOW_LOCAL_TEST_CUSTOMER_CONFIG ERP_ALLOW_TEST_DB_AS_DEV ERP_ROLE_DEMO_PASSWORD; do
+for key in COMPOSE_FILE COMPOSE_PROJECT_NAME COMPOSE_PROFILES COMPOSE_ENV_FILES COMPOSE_PATH_SEPARATOR DOCKER_HOST DOCKER_CONTEXT DOCKER_TLS_VERIFY DOCKER_CERT_PATH DEPLOYMENT_TARGET_KEY ERP_ALLOW_LOCAL_TEST_CUSTOMER_CONFIG ERP_ALLOW_TEST_DB_AS_DEV ERP_ROLE_DEMO_PASSWORD; do
   if printenv "$key" >/dev/null 2>&1; then
     fail "bootstrap 环境不得设置目标覆盖变量: $key"
   fi
 done
 
 compose_file="$compose_dir/compose.yml"
-trial_compose_override="$compose_dir/compose.customer-trial-133.yml"
+target_compose_override="$compose_dir/$target_override_name"
 preflight_script="$root_dir/scripts/deploy/production-preflight.sh"
 [[ -f "$compose_file" ]] || fail "Compose 文件不存在"
-compose_project_source="$compose_file"
-if [[ "$erp_allow_customer_trial_config" == "1" ]]; then
-  [[ "$erp_customer_trial_target" == "customer-trial-133" ]] || fail "远端验收客户配置只允许 target=customer-trial-133"
-  [[ -n "$compose_override" ]] || fail "customer-trial-133 必须显式传入 --compose-override $trial_compose_override"
-  [[ -f "$compose_override" && ! -L "$compose_override" ]] || fail "customer-trial-133 Compose override 不存在、不是普通文件或是符号链接"
-  compose_override_real="$(cd "$(dirname "$compose_override")" && printf '%s/%s' "$(pwd -P)" "$(basename "$compose_override")")"
-  trial_compose_override_real="$(cd "$(dirname "$trial_compose_override")" && printf '%s/%s' "$(pwd -P)" "$(basename "$trial_compose_override")")"
-  [[ "$compose_override_real" == "$trial_compose_override_real" ]] || fail "customer-trial-133 只能使用受控 Compose override: $trial_compose_override"
-  compose_override_contract="$(awk '
-    {
-      line = $0
-      sub(/^[[:space:]]+/, "", line)
-      sub(/[[:space:]]+$/, "", line)
-      if (line != "" && line !~ /^#/) print line
-    }
-  ' "$compose_override")"
-  [[ "$compose_override_contract" == "name: plush-toy-erp-v5" ]] || fail "customer-trial-133 Compose override 只能声明 name: plush-toy-erp-v5"
-  compose_project_source="$compose_override"
-else
-  [[ -z "$erp_customer_trial_target" ]] || fail "ERP_ALLOW_CUSTOMER_TRIAL_CONFIG=0 时 ERP_CUSTOMER_TRIAL_TARGET 必须为空"
-  [[ -z "$compose_override" ]] || fail "非 customer-trial-133 运行禁止传入 Compose override"
-fi
+[[ -n "$compose_override" ]] || fail "$deployment_target 必须显式传入 --compose-override $target_compose_override"
+[[ -f "$compose_override" && ! -L "$compose_override" ]] || fail "$deployment_target Compose override 不存在、不是普通文件或是符号链接"
+compose_override_real="$(cd "$(dirname "$compose_override")" && printf '%s/%s' "$(pwd -P)" "$(basename "$compose_override")")"
+target_compose_override_real="$(cd "$(dirname "$target_compose_override")" && printf '%s/%s' "$(pwd -P)" "$(basename "$target_compose_override")")"
+[[ "$compose_override_real" == "$target_compose_override_real" ]] || fail "$deployment_target 只能使用登记的 Compose override"
+compose_override_contract="$(awk '
+  {
+    line = $0
+    sub(/^[[:space:]]+/, "", line)
+    sub(/[[:space:]]+$/, "", line)
+    if (line != "" && line !~ /^#/) print line
+  }
+' "$compose_override")"
+[[ "$compose_override_contract" == "name: $target_project" ]] || fail "$deployment_target Compose override 只能声明登记 project"
+compose_project_source="$compose_override"
 compose_project_count="$(awk '/^name:[[:space:]]*/ { count++ } END { print count + 0 }' "$compose_project_source")"
 [[ "$compose_project_count" -eq 1 ]] || fail "Compose 必须且只能声明一个顶层 name"
 compose_project="$(awk '/^name:[[:space:]]*/ { sub(/^name:[[:space:]]*/, ""); print; exit }' "$compose_project_source")"
 compose_project="$(trim "$compose_project")"
 [[ "$compose_project" =~ ^[a-z0-9][a-z0-9_-]{0,63}$ ]] || fail "Compose 顶层 name 必须是稳定的小写 project key"
-if [[ "$erp_allow_customer_trial_config" == "1" ]]; then
-  [[ "$compose_project" == "plush-toy-erp-v5" && "$project_slug" == "$compose_project" ]] || fail "customer-trial-133 的 PROJECT_SLUG 与 Compose project 必须同为 plush-toy-erp-v5"
-fi
+[[ "$compose_project" == "$target_project" && "$project_slug" == "$compose_project" ]] || fail "$deployment_target 的 PROJECT_SLUG 与 Compose project 不符合登记合同"
 migration_lock_dir="$(dirname "$migration_lock_file")"
 acquire_bootstrap_lock "$migration_lock_dir" "$compose_project" "$expected_database"
 compose_files=("$compose_file")
@@ -714,7 +719,7 @@ done
 command -v docker >/dev/null 2>&1 || fail "缺少 docker"
 docker compose -p "$compose_project" version >/dev/null 2>&1 || fail "需要 Docker Compose v2"
 
-preflight_args=(--env-file "$env_snapshot" --compose-dir "$compose_dir")
+preflight_args=(--deployment-target "$deployment_target" --env-file "$env_snapshot" --compose-dir "$compose_dir")
 [[ -z "$compose_override" ]] || preflight_args+=(--compose-override "$compose_override")
 bash "$preflight_script" "${preflight_args[@]}"
 

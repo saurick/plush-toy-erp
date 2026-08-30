@@ -13734,6 +13734,31 @@ export function createStyleL1Scenarios(deps) {
               environmentCardCount: document.querySelectorAll(
                 '.erp-dev-environment-card'
               ).length,
+              operationOverviewCount: document.querySelectorAll(
+                '.erp-dev-delivery-operation-overview'
+              ).length,
+              operationFactLabels: Array.from(
+                document.querySelectorAll(
+                  '.erp-dev-delivery-operation-overview__facts article > span:first-child'
+                )
+              ).map((element) => element.textContent?.trim() || ''),
+              operationHistoryHref:
+                document
+                  .querySelector(
+                    '.erp-dev-delivery-operation-overview__facts a'
+                  )
+                  ?.getAttribute('href') || '',
+              operationSeparationVisible: Boolean(
+                Array.from(
+                  document.querySelectorAll(
+                    '.erp-dev-delivery-operation-overview .ant-typography'
+                  )
+                ).some((element) =>
+                  String(element.textContent || '').includes(
+                    '不会伪装成工作台操作记录'
+                  )
+                )
+              ),
             }
           }, devPage.rootSelector)
 
@@ -13780,9 +13805,30 @@ export function createStyleL1Scenarios(deps) {
           )
           assert.equal(
             metrics.environmentCardCount,
-            devPage.path === '/__dev/delivery' ? 3 : 0,
-            `交付运行总览应展示三个环境目标卡，其他开发页不重复展示: ${devPage.path} ${JSON.stringify(metrics)}`
+            devPage.path === '/__dev/delivery' ? 4 : 0,
+            `交付运行总览应展示本地、demo、test 与隔离验收事实，其他开发页不重复展示: ${devPage.path} ${JSON.stringify(metrics)}`
           )
+          if (devPage.path === '/__dev/delivery') {
+            assert.deepEqual(
+              {
+                overview: metrics.operationOverviewCount,
+                labels: metrics.operationFactLabels,
+                historyHref: metrics.operationHistoryHref,
+                separation: metrics.operationSeparationVisible,
+              },
+              {
+                overview: 1,
+                labels: ['最近操作', '最严重阻断', '最后核对'],
+                historyHref: '/__dev/version-center?view=history',
+                separation: true,
+              },
+              `交付首页应直接展示工作台操作摘要、完整记录入口和远端活动分界: ${JSON.stringify(metrics)}`
+            )
+            await page.screenshot({
+              path: path.join(outputDir, 'dev-delivery-overview-mobile.png'),
+              fullPage: true,
+            })
+          }
           if (devPage.path === '/__dev/') {
             assert(
               metrics.overviewStageCount === 3 &&
@@ -14083,6 +14129,31 @@ export function createStyleL1Scenarios(deps) {
               openEnvironmentDetailsCount: document.querySelectorAll(
                 '.erp-dev-environment-card details[open]'
               ).length,
+              operationOverviewCount: document.querySelectorAll(
+                '.erp-dev-delivery-operation-overview'
+              ).length,
+              operationFactLabels: Array.from(
+                document.querySelectorAll(
+                  '.erp-dev-delivery-operation-overview__facts article > span:first-child'
+                )
+              ).map((element) => element.textContent?.trim() || ''),
+              operationHistoryHref:
+                document
+                  .querySelector(
+                    '.erp-dev-delivery-operation-overview__facts a'
+                  )
+                  ?.getAttribute('href') || '',
+              operationSeparationVisible: Boolean(
+                Array.from(
+                  document.querySelectorAll(
+                    '.erp-dev-delivery-operation-overview .ant-typography'
+                  )
+                ).some((element) =>
+                  String(element.textContent || '').includes(
+                    '不会伪装成工作台操作记录'
+                  )
+                )
+              ),
               cards: cards.map((card) => {
                 const body = card.querySelector('.erp-dev-hub-card__body')
                 const title = card.querySelector('.erp-dev-hub-card__title')
@@ -14123,9 +14194,28 @@ export function createStyleL1Scenarios(deps) {
               cards: metrics.environmentCardCount,
               openDetails: metrics.openEnvironmentDetailsCount,
             },
-            { evidence: 1, cards: 3, openDetails: 0 },
-            `交付运行总览应独占双环境事实并默认保持紧凑: ${JSON.stringify(metrics)}`
+            { evidence: 1, cards: 4, openDetails: 0 },
+            `交付运行总览应独占双环境与两类验证事实并默认保持紧凑: ${JSON.stringify(metrics)}`
           )
+          assert.deepEqual(
+            {
+              overview: metrics.operationOverviewCount,
+              labels: metrics.operationFactLabels,
+              historyHref: metrics.operationHistoryHref,
+              separation: metrics.operationSeparationVisible,
+            },
+            {
+              overview: 1,
+              labels: ['最近操作', '最严重阻断', '最后核对'],
+              historyHref: '/__dev/version-center?view=history',
+              separation: true,
+            },
+            `交付首页应直接展示工作台操作摘要、完整记录入口和远端活动分界: ${JSON.stringify(metrics)}`
+          )
+          await page.screenshot({
+            path: path.join(outputDir, 'dev-delivery-overview-desktop-dark.png'),
+            fullPage: true,
+          })
           assert.equal(
             metrics.legacyReceiptPanelCount,
             0,

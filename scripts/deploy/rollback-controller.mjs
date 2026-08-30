@@ -17,6 +17,7 @@ import {
 import { sha256File, validateReleaseManifest } from "./release-catalog.mjs";
 import { runTargetPreflight } from "./target-preflight.mjs";
 import { classifyGitAncestryRelation } from "./git-ancestry-relation.mjs";
+import { getDeploymentTarget } from "./deployment-targets.mjs";
 
 const MAX_MANIFEST_BYTES = 512 * 1024;
 
@@ -92,16 +93,14 @@ export async function prepareRollback(
 ) {
   const root = realpathSync(repoRoot || process.cwd());
   const store = operationStore || resolveDeliveryOperationStore(root);
-  if (targetKey !== "test-133") {
-    throw new Error("only the fixed test-133 rollback target is supported");
-  }
+  getDeploymentTarget(targetKey);
   const current = readReleaseManifest(currentReleaseManifestPath);
   const target = readReleaseManifest(targetReleaseManifestPath);
   const currentManifestSha256 = sha256File(current.absolute);
   const targetManifestSha256 = sha256File(target.absolute);
   const created = createOrReuseDeliveryOperation(store, {
     action: "rollback",
-    target: "test-133",
+    target: targetKey,
     gitSha: target.manifest.gitSha,
     version: target.manifest.version,
     idempotencyKey,
@@ -130,7 +129,7 @@ export async function prepareRollback(
     now: now(),
   });
   try {
-    const targetPreflight = await runPreflight("test-133");
+    const targetPreflight = await runPreflight(targetKey);
     const ancestry = classifyRelation({
       repoRoot: root,
       currentGitSha: current.manifest.gitSha,
@@ -281,7 +280,7 @@ if (isMainModule()) {
   node scripts/deploy/rollback-controller.mjs \\
     --current-manifest <release-manifest.json> \\
     --target-manifest <release-manifest.json> \\
-    --target test-133 --idempotency-key <stable-random-key> [--json]
+    --target <demo-133|customer-test-133> --idempotency-key <stable-random-key> [--json]
 
 This command only prepares a code-and-images rollback plan. It never performs
 database down migration, backup restore, target writes or automatic retry.`);

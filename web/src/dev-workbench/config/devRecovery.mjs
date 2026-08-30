@@ -33,7 +33,8 @@ export const DEV_DRILL_RECOVERY_CATALOG = Object.freeze([
     title: '相同 SHA 幂等与缓存核验',
     objective: '证明重复请求不会重建、重传或产生第二次目标写入。',
     cadence: '发布链路或缓存合同变化后；稳定期每月一次',
-    trigger: '制品缓存、传输、Docker load 或 promotion 脚本变化',
+    trigger:
+      '制品缓存、传输、Docker load 或显式版本提升（Explicit Promotion）脚本变化',
     risk: 'controlled_target',
     surface: 'version_center',
     evidence: Object.freeze([
@@ -97,7 +98,7 @@ export const DEV_DRILL_RECOVERY_CATALOG = Object.freeze([
       'DNS / Provider / 浏览器资源一致性',
     ]),
     boundary:
-      '当前未登记第二目标；不能复制 test-133 凭据或在页面临时输入主机、路径和命令。',
+      'demo 与 test 已登记为独立目标；不得共享凭据、数据库、持久目录，也不能在页面临时输入主机、路径和命令。',
   }),
   Object.freeze({
     key: 'fault-injection',

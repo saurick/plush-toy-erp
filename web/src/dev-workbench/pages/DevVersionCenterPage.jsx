@@ -18,6 +18,7 @@ import {
   List,
   Modal,
   Popover,
+  Segmented,
   Space,
   Table,
   Tag,
@@ -39,6 +40,7 @@ import { buildDevCustomerSnapshotKey } from '../config/devCustomerScope.mjs'
 import {
   DEV_DELIVERY_SOURCE_PATH,
   DEV_DELIVERY_SUMMARY_SNAPSHOT_KEY,
+  DEV_DELIVERY_TARGETS,
   DEV_VERSION_CENTER_HISTORY_PAGE_SIZE,
   DEV_VERSION_CENTER_VERSION_PAGE_SIZE,
   DEV_VERSION_CENTER_VIEW_HISTORY,
@@ -53,6 +55,7 @@ import {
   deliveryStatusPresentation,
   deliveryTargetCachePresentation,
   deliveryVersionActionKind,
+  deliveryVersionForTarget,
   formatDeliveryBytes,
   formatDeliveryDuration,
   formatDeliveryRate,
@@ -112,13 +115,33 @@ function issueDescription(issues = []) {
 
 function operationActionLabel(action) {
   if (action === 'release') return '发布制品'
-  if (action === 'promote') return '部署 133'
-  if (action === 'rebuild-database') return '重建 133 数据库'
+  if (action === 'promote') return '显式版本提升（Explicit Promotion）'
+  if (action === 'rebuild-database') return '重建目标数据库'
   return '回滚'
+}
+
+function deliveryTargetLabel(targetKey) {
+  return (
+    DEV_DELIVERY_TARGETS.find((target) => target.key === targetKey)?.label ||
+    targetKey ||
+    '目标未证明'
+  )
 }
 
 function operationUpdateAction(operation) {
   return operation?.terminal ? '完成于' : '更新于'
+}
+
+function operationHistoryStatePresentation(state) {
+  return (
+    {
+      loading: { label: '加载中', color: 'processing' },
+      normal: { label: '已读回', color: 'success' },
+      empty: { label: '暂无记录', color: 'default' },
+      failure: { label: '不可读', color: 'error' },
+      stale: { label: '上次结果', color: 'warning' },
+    }[state] || { label: '不可读', color: 'error' }
+  )
 }
 
 const MANUAL_TAKEOVER_STEPS = [
@@ -141,10 +164,10 @@ const MANUAL_TAKEOVER_STEPS = [
     boundary: '不要手工创建、移动或覆盖 tag，也不要上传自行拼装的制品。',
   },
   {
-    title: '在本页部署到 test-133',
+    title: '在本页发起显式版本提升（Explicit Promotion）',
     description:
-      '刷新状态并选择已发布版本，依次执行“准备部署”和“确认部署”；沿用既有 checksum、备份、migration、Compose、health/ready 与公网读回。',
-    boundary: '133 只加载已构建制品，不在目标服务器构建镜像。',
+      '先选择 demo 项目演练造数环境或 test 甲方测试验收环境，再选择已发布版本，依次执行“准备版本提升”和“确认版本提升”；系统沿用既有 checksum、备份、migration、Compose、health/ready 与公网读回。',
+    boundary: '两个固定目标都只加载已构建制品，不在目标服务器构建镜像。',
   },
   {
     title: '核对结果，必要时走正式回滚',
@@ -237,7 +260,7 @@ function ManualTakeoverGuide() {
         type="warning"
         showIcon
         message="应急不等于绕过"
-        description="禁止 force push、跳过质量门禁、手工覆盖 tag 或 133 页面文件、在 133 构建镜像、直接执行结构性 SQL、删除数据库或 volume、全局 prune，以及在结果未证明时盲目重试。"
+        description="禁止 force push、跳过质量门禁、手工覆盖 tag 或目标页面文件、在目标服务器构建镜像、直接执行结构性 SQL、删除数据库或 volume、全局 prune，以及在结果未证明时盲目重试。"
       />
       <Text type="secondary">
         AI 恢复后，把最终 exact SHA、GitLab pipeline、Release version 和
@@ -297,6 +320,7 @@ export default function DevVersionCenterPage() {
   const [operationPollError, setOperationPollError] = useState('')
   const [versionPage, setVersionPage] = useState(1)
   const [historyPage, setHistoryPage] = useState(1)
+  const [selectedTargetKey, setSelectedTargetKey] = useState('demo-133')
   const [qualityGateSummary, setQualityGateSummary] = useState(null)
   const [qualityGateError, setQualityGateError] = useState('')
   const mutationInFlightRef = useRef(false)
@@ -592,8 +616,17 @@ export default function DevVersionCenterPage() {
   )
 
   const repository = summary?.repository
-  const target = summary?.target
-  const versions = summary?.versions || []
+  const selectedTargetDefinition =
+    DEV_DELIVERY_TARGETS.find((target) => target.key === selectedTargetKey) ||
+    DEV_DELIVERY_TARGETS[0]
+  const selectedTargetDescriptor = summary?.targets?.find(
+    (target) => target.key === selectedTargetKey
+  )
+  const target = selectedTargetDescriptor?.preflight || null
+  const versions = (summary?.versions || []).map(
+    (version) =>
+      deliveryVersionForTarget(version, selectedTargetKey) || version
+  )
   const releaseVersion = summary?.releaseVersionPolicy?.nextVersion || ''
   const operations = summary?.operations || []
   const openOperations = operations.filter((operation) =>
@@ -601,6 +634,18 @@ export default function DevVersionCenterPage() {
   )
   const historyOperations = operations.filter(
     (operation) => !OPEN_OPERATION_STATUSES.has(operation.status)
+  )
+  const operationHistoryState = initialLoading
+    ? 'loading'
+    : loadError && !summary
+      ? 'failure'
+      : summary && !summaryFresh
+        ? 'stale'
+        : historyOperations.length === 0
+          ? 'empty'
+          : 'normal'
+  const operationHistoryPresentation = operationHistoryStatePresentation(
+    operationHistoryState
   )
   const pollingOperation = operations.find((operation) =>
     POLLING_OPERATION_STATUSES.has(operation.status)
@@ -645,7 +690,7 @@ export default function DevVersionCenterPage() {
             : headAlreadyPublished
               ? repository?.commit === currentTargetSha
                 ? '当前 SHA 已发布并部署，无需重复发布'
-                : '当前 SHA 已有完整不可变制品，请在版本列表准备部署'
+                : '当前 SHA 已有完整不可变制品，请在版本列表准备版本提升'
               : '当前仓库身份不可用，不能创建 exact-SHA 发布'
   const strictProof = qualityGateSummary?.proofs?.strict
   const qualityGateIdentityCurrent = Boolean(
@@ -865,7 +910,7 @@ export default function DevVersionCenterPage() {
       ),
     },
     {
-      title: '133',
+      title: selectedTargetDefinition.shortLabel,
       key: 'target',
       render: (_value, record) =>
         record.gitSha === currentTargetSha ? (
@@ -904,21 +949,21 @@ export default function DevVersionCenterPage() {
             : hasOpenOperation
               ? '已有未结束的 operation，请先完成或核对该操作'
               : !targetPassed
-                ? '133 只读预检未通过，先处理容量或运行态阻断'
+                ? `${selectedTargetDefinition.shortLabel}只读预检未通过，先处理容量或运行态阻断`
                 : !record.completeAssets
                   ? '不可变发布制品不完整'
                   : !record.promotionEligible && actionKind === 'promote'
                     ? '旧 v1 六资产版本仅可读取和回滚，不能用于新部署'
                     : record.gitSha === currentTargetSha
-                      ? '该 exact SHA 已在 133 运行'
+                      ? `该 exact SHA 已在${selectedTargetDefinition.shortLabel}运行`
                       : actionKind === 'rollback'
-                        ? '该版本是 133 当前版本的 Git 祖先，应先检查回滚资格'
+                        ? `该版本是${selectedTargetDefinition.shortLabel}当前版本的 Git 祖先，应先检查回滚资格`
                         : actionKind === 'blocked'
                           ? record.actionReason === 'git_histories_diverged'
-                            ? '该版本与 133 当前版本的 Git 历史已分叉，禁止部署或回滚'
+                            ? `该版本与${selectedTargetDefinition.shortLabel}当前版本的 Git 历史已分叉，禁止部署或回滚`
                             : record.actionReason ===
                                 'target_identity_unavailable'
-                              ? '133 当前 exact SHA 不可用，无法判断部署方向'
+                              ? `${selectedTargetDefinition.shortLabel}当前 exact SHA 不可用，无法判断部署方向`
                               : 'Git 祖先关系不可证明，禁止猜测部署或回滚'
                           : ''
         return (
@@ -935,13 +980,13 @@ export default function DevVersionCenterPage() {
                     {
                       gitSha: record.gitSha,
                       version: record.version,
-                      target: 'test-133',
+                      target: selectedTargetKey,
                       idempotencyKey: createDeliveryIdempotencyKey('promote'),
                     }
                   )
                 }
               >
-                准备部署
+                准备版本提升
               </Button>
             </Tooltip>
             <Tooltip
@@ -950,9 +995,9 @@ export default function DevVersionCenterPage() {
                   ? '只准备资格检查；migration 或客户配置指纹不一致会阻断'
                   : currentTargetRelease
                     ? actionKind === 'promote'
-                      ? '该版本不早于 133 当前版本，应走部署'
+                      ? `该版本不早于${selectedTargetDefinition.shortLabel}当前版本，应走显式版本提升`
                       : promotionExplanation
-                    : '133 当前 SHA 没有完整不可变 manifest，不能普通回滚'
+                    : `${selectedTargetDefinition.shortLabel}当前 SHA 没有完整不可变 manifest，不能普通回滚`
               }
             >
               <Button
@@ -968,7 +1013,7 @@ export default function DevVersionCenterPage() {
                       fromVersion: currentTargetRelease.version,
                       toGitSha: record.gitSha,
                       toVersion: record.version,
-                      target: 'test-133',
+                      target: selectedTargetKey,
                       idempotencyKey: createDeliveryIdempotencyKey('rollback'),
                     }
                   )
@@ -1015,7 +1060,7 @@ export default function DevVersionCenterPage() {
               setConfirmationText('')
             }}
           >
-            {record.action === 'rollback' ? '确认回滚' : '确认部署'}
+            {record.action === 'rollback' ? '确认回滚' : '确认版本提升'}
           </Button>
         ) : retryable ? (
           <Tooltip
@@ -1066,6 +1111,11 @@ export default function DevVersionCenterPage() {
           </Text>
         </Space>
       ),
+    },
+    {
+      title: '目标',
+      key: 'target',
+      render: (_value, record) => deliveryTargetLabel(record.target),
     },
     {
       title: '版本身份',
@@ -1204,7 +1254,6 @@ export default function DevVersionCenterPage() {
           <DevPipelineTimingPanel
             timings={summary?.timings}
             versions={versions}
-            operations={operations}
           />
         </section>
       ),
@@ -1219,9 +1268,30 @@ export default function DevVersionCenterPage() {
           aria-label="操作记录"
         >
           <Card
-            title="已结束的发布与部署"
+            title="工作台操作记录（已结束）"
             className="erp-dev-version-table-card"
+            extra={
+              <Tag color={operationHistoryPresentation.color}>
+                {operationHistoryPresentation.label}
+              </Tag>
+            }
           >
+            {operationHistoryState === 'stale' ? (
+              <Alert
+                type="warning"
+                showIcon
+                message="当前显示上次成功读回的操作记录"
+                description="最新 operation store 不可读或仍在重新核对；记录可查看，但所有写操作保持停用。"
+              />
+            ) : null}
+            {operationHistoryState === 'failure' ? (
+              <Alert
+                type="error"
+                showIcon
+                message="工作台 operation store 当前不可读"
+                description="未使用 GitLab Pipeline、Package、Release、Codex 对话或普通 SSH 动作补造操作记录。"
+              />
+            ) : null}
             <Table
               rowKey="id"
               columns={operationColumns}
@@ -1238,7 +1308,9 @@ export default function DevVersionCenterPage() {
                   changeTablePage(setHistoryPage, historyTableRef, nextPage),
               }}
               locale={{
-                emptyText: <Empty description="尚无已结束的发布或部署操作" />,
+                emptyText: (
+                  <Empty description="尚无工作台发起并已结束的 release、promotion、rebuild 或 rollback" />
+                ),
               }}
               scroll={{ x: 980 }}
             />
@@ -1260,8 +1332,9 @@ export default function DevVersionCenterPage() {
             版本发布与部署中心
           </Title>
           <Paragraph className="erp-dev-hub-summary">
-            以 exact SHA 选择不可变版本，只部署到固定 test-133。每次动作有独立
-            operation；失败、阻断或结果未证明后不会自动重试。
+            以 exact SHA 选择同一不可变版本，分别显式提升到 demo
+            项目演练造数环境或 test 甲方测试验收环境。每个目标、每次动作都有独立
+            operation；代码推送不会自动部署，失败、阻断或结果未证明后不会自动重试。
           </Paragraph>
         </div>
         <Space direction="vertical" size={4}>
@@ -1301,7 +1374,7 @@ export default function DevVersionCenterPage() {
                     size={4}
                     style={{ maxWidth: 360 }}
                   >
-                    <Text strong>先发布制品，不会直接部署到 133</Text>
+                    <Text strong>先发布制品，不会直接部署到任一目标</Text>
                     <Text>
                       系统会将当前干净提交的 exact SHA 交给
                       {deliveryProviderName}
@@ -1309,7 +1382,7 @@ export default function DevVersionCenterPage() {
                       manifest、checksum 和 SBOM。
                     </Text>
                     <Text type="secondary">
-                      发布完成后，仍需在版本列表中依次执行“准备部署”和“确认部署”。
+                      发布完成后，仍需在版本列表中依次执行“准备版本提升”和“确认版本提升”。
                     </Text>
                   </Space>
                 }
@@ -1334,7 +1407,7 @@ export default function DevVersionCenterPage() {
         scope={customerScope}
         onChange={customerScope.selectCustomer}
         disabled={isMutationRunning}
-        note="版本、部署与回滚只读取所选甲方的固定目标；当前永绅对应 test-133，不接受任意主机。"
+        note="版本、部署与回滚只读取永绅登记的 demo 与 test 两个固定目标；admin 仅是应用管理入口，不属于部署环境。"
         invalidDescription="当前甲方没有登记发布目标；版本、部署、回滚与目标状态读取均已停止。"
       />
 
@@ -1369,9 +1442,47 @@ export default function DevVersionCenterPage() {
         ) : null}
         <DevStaticGuidance title="固定边界" hint="发布职责与安全限制">
           GitLab 负责代码真源、CI 与不可变制品；GitHub 仅接收单向审查镜像；本地
-          Bridge 只接受固定动作；133
-          不构建、不接受浏览器传入的命令、目录、仓库或 SSH 目标。
+          Bridge 只接受固定动作；demo 与 test
+          均不构建、不接受浏览器传入的命令、目录、仓库或 SSH 目标。两个目标共享不可变版本，但数据库、附件、运行资源、备份与回滚点相互隔离。
         </DevStaticGuidance>
+
+        <section
+          className="erp-dev-version-target-selector"
+          aria-label="部署目标选择"
+        >
+          <div className="erp-dev-version-target-selector__heading">
+            <div>
+              <Text strong>当前操作目标</Text>
+              <Text type="secondary">
+                先选目标，再查看该目标的版本方向、预检、promotion 与回滚资格。
+              </Text>
+            </div>
+            <Segmented
+              value={selectedTargetKey}
+              options={DEV_DELIVERY_TARGETS.map((item) => ({
+                label: item.label,
+                value: item.key,
+              }))}
+              onChange={setSelectedTargetKey}
+            />
+          </div>
+          <div className="erp-dev-version-target-selector__boundaries">
+            {DEV_DELIVERY_TARGETS.map((item) => (
+              <article
+                key={item.key}
+                data-selected={item.key === selectedTargetKey ? 'true' : 'false'}
+              >
+                <Space wrap size={6}>
+                  <Text strong>{item.label}</Text>
+                  <Tag color={item.key === selectedTargetKey ? 'blue' : 'default'}>
+                    {item.key}
+                  </Tag>
+                </Space>
+                <Text type="secondary">{item.dataBoundary}</Text>
+              </article>
+            ))}
+          </div>
+        </section>
 
         <section
           className="erp-dev-version-quality-gate-summary"
@@ -1445,7 +1556,7 @@ export default function DevVersionCenterPage() {
               </Text>
             </Space>
           </Card>
-          <Card title="test-133">
+          <Card title={`${selectedTargetDefinition.label} · ${selectedTargetKey}`}>
             <Space direction="vertical" size={8}>
               <Text code>{shortGitSha(currentTargetSha)}</Text>
               <Tag color={targetPassed ? 'success' : 'warning'}>
@@ -1468,7 +1579,7 @@ export default function DevVersionCenterPage() {
                 color={publicEntry?.status === 'passed' ? 'success' : 'warning'}
               >
                 {publicEntry?.status === 'passed'
-                  ? '入口与 133 版本一致'
+                  ? `入口与${selectedTargetDefinition.shortLabel}版本一致`
                   : '入口未完成证明'}
               </Tag>
               <Text type="secondary">
@@ -1477,7 +1588,7 @@ export default function DevVersionCenterPage() {
                 {publicEntry?.provider === 'passed' ? '通过' : '未通过'}
               </Text>
               <Link
-                href={publicEntry?.endpoint || 'https://admin.yoyoosun.net'}
+                href={publicEntry?.endpoint || selectedTargetDefinition.endpoint}
                 target="_blank"
                 rel="noreferrer"
               >
@@ -1622,7 +1733,7 @@ export default function DevVersionCenterPage() {
             type="info"
             showIcon
             message={`候选 SHA：${shortGitSha(repository?.commit)}`}
-            description={`${deliveryProviderName}复用该 SHA 已完成的普通 CI 证据，只构建一次制品；133 不参与构建。`}
+            description={`${deliveryProviderName}复用该 SHA 已完成的普通 CI 证据，只构建一次制品；demo 与 test 均不参与构建。`}
           />
           <label htmlFor="dev-release-version">
             正式版本号（由发布目录自动生成）
@@ -1764,7 +1875,7 @@ export default function DevVersionCenterPage() {
                   </Text>
                 </div>
                 <div>
-                  <Text type="secondary">133 内容缓存</Text>
+                  <Text type="secondary">目标内容缓存</Text>
                   <Text strong>{operationCachePresentation.status}</Text>
                 </div>
                 <div>
@@ -1871,12 +1982,14 @@ export default function DevVersionCenterPage() {
       <Modal
         title={
           confirmOperation?.action === 'rollback'
-            ? '确认代码回滚到 test-133'
-            : '确认部署到 test-133'
+            ? `确认代码回滚到 ${deliveryTargetLabel(confirmOperation?.target)}`
+            : `确认显式版本提升（Explicit Promotion）至 ${deliveryTargetLabel(confirmOperation?.target)}`
         }
         open={Boolean(confirmOperation)}
         okText={
-          confirmOperation?.action === 'rollback' ? '开始回滚' : '开始部署'
+          confirmOperation?.action === 'rollback'
+            ? '开始回滚'
+            : '开始版本提升'
         }
         cancelText="取消"
         confirmLoading={actionKey === `execute:${confirmOperation?.id || ''}`}
@@ -1926,7 +2039,7 @@ export default function DevVersionCenterPage() {
             message={
               confirmOperation?.action === 'rollback'
                 ? '该动作只回滚代码和镜像'
-                : '该动作会写入 133 测试服务器'
+                : `该动作会写入 ${deliveryTargetLabel(confirmOperation?.target)}`
             }
             description={
               confirmOperation?.action === 'rollback'

@@ -40,7 +40,8 @@
   ],
   "customerTrial133": {
     "target": "customer-trial-133",
-    "databaseName": "plush_erp_uat_20260716_v5",
+    "deploymentTarget": "demo-133",
+    "databaseName": "plush_erp_demo_v1",
     "databaseLifecycle": "long-lived-registered-target",
     "minimumMigration": "20260714165115",
     "configRevision": "yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1",

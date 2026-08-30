@@ -67,7 +67,7 @@ function release(gitSha, overrides = {}) {
 function preflight(runtimeSha = FROM_SHA, blockers = []) {
   return {
     schemaVersion: "plush.target-preflight/v1",
-    target: "test-133",
+    target: "demo-133",
     customer: "yoyoosun",
     blockers,
     remote: {

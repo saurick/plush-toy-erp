@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 
 import { validateReleaseManifest } from "./release-catalog.mjs";
 import { validateGitAncestryRelation } from "./git-ancestry-relation.mjs";
+import { getDeploymentTarget } from "./deployment-targets.mjs";
 
 export const PROMOTION_MANIFEST_CONTRACT = "plush.promotion-manifest/v1";
 
@@ -53,14 +54,14 @@ function manifestFingerprint(manifest) {
 
 export function validatePromotionManifest(manifest) {
   const ancestry = validateGitAncestryRelation(manifest?.ancestry);
+  const target = getDeploymentTarget(manifest?.target?.key);
   if (
     manifest?.schemaVersion !== PROMOTION_MANIFEST_CONTRACT ||
     !["eligible", "blocked", "already_current"].includes(manifest?.status) ||
     !UUID_V4_PATTERN.test(String(manifest?.operationId || "")) ||
-    manifest?.target?.key !== "test-133" ||
-    manifest?.target?.purpose !== "customer-trial" ||
-    manifest?.target?.customer !== "yoyoosun" ||
-    manifest?.target?.trialTarget !== "customer-trial-133" ||
+    manifest?.target?.purpose !== target.purpose ||
+    manifest?.target?.customer !== target.customer ||
+    manifest?.target?.trialTarget !== target.trialTarget ||
     !SHA_PATTERN.test(String(manifest?.release?.gitSha || "")) ||
     !SHA256_PATTERN.test(String(manifest?.release?.manifestSha256 || "")) ||
     !SHA256_PATTERN.test(String(manifest?.release?.artifactManifestSha256 || "")) ||
@@ -138,12 +139,13 @@ export function buildPromotionManifest({
   }
   if (
     targetPreflight?.schemaVersion !== "plush.target-preflight/v1" ||
-    targetPreflight?.target !== "test-133" ||
+    !targetPreflight?.target ||
     targetPreflight?.customer !== "yoyoosun" ||
     !["passed", "blocked"].includes(targetPreflight?.status)
   ) {
     throw new Error("fixed target preflight is required");
   }
+  const target = getDeploymentTarget(targetPreflight.target);
   const runtimeSha = targetPreflight.remote?.runtime?.serverSha || "unknown";
   const gitRelation = validateGitAncestryRelation(ancestry);
   if (
@@ -169,10 +171,10 @@ export function buildPromotionManifest({
     operationId,
     createdAt,
     target: {
-      key: "test-133",
-      purpose: "customer-trial",
-      customer: "yoyoosun",
-      trialTarget: "customer-trial-133",
+      key: target.key,
+      purpose: target.purpose,
+      customer: target.customer,
+      trialTarget: target.trialTarget,
     },
     ancestry: gitRelation,
     release: {
@@ -213,7 +215,7 @@ export function buildPromotionManifest({
       "create and restore-check a fresh pre-migration backup",
       "load images and read back content IDs plus embedded GIT_SHA",
       "run migration status, audit and dry-run",
-      "stop only test-133 application services and apply migration under lock",
+      `stop only ${target.key} application services and apply migration under lock`,
       "start by fixed Compose identity and verify runtime release",
       "run health, ready and target smoke",
       "write an atomic redacted receipt and preserve the rollback point",

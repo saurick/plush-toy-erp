@@ -36,22 +36,68 @@ fi
 APPLY_MODE=0
 STATUS_ONLY=0
 RECONCILE_PERMISSIONS=0
-TRIAL_MODE=0
-TRIAL_COMPOSE_PROJECT=plush-toy-erp-v5
-TRIAL_POSTGRES_DB=plush_erp_uat_20260716_v5
-TRIAL_POSTGRES_DATA_DIR=/home/simon/plush-toy-erp-v5/data/postgres
-TRIAL_MIGRATION_LOCK_FILE=/home/simon/plush-toy-erp-v5/run/atlas-migrate.lock
-TRIAL_COMPOSE_OVERRIDE_FILE=$SCRIPT_DIR/compose.customer-trial-133.yml
-TRIAL_COMPOSE_ENV_FILE=/home/simon/plush-toy-erp-v5/runtime/.env.customer-trial-133
-TRIAL_MIG_DIR=$SERVER_ROOT/internal/data/model/migrate
-TRIAL_ATLAS_BIN=/home/simon/plush-toy-erp-v5/tools/atlas/v1.2.0/atlas
-TRIAL_PSQL_BIN=psql
-TRIAL_POPULATED_UPGRADE_PREFLIGHT=$SERVER_ROOT/../scripts/qa/populated-upgrade-preflight.sh
-TRIAL_RUNTIME_DB_NAME=""
+DEPLOYMENT_TARGET_KEY=$(printenv DEPLOYMENT_TARGET_KEY 2>/dev/null || true)
+REGISTERED_TARGET_MODE=0
+TARGET_COMPOSE_PROJECT=""
+TARGET_POSTGRES_DB=""
+TARGET_ROOT=""
+TARGET_POSTGRES_DATA_DIR=""
+TARGET_MIGRATION_LOCK_FILE=""
+TARGET_COMPOSE_OVERRIDE_FILE=""
+TARGET_COMPOSE_ENV_FILE=""
+TARGET_MIG_DIR=$SERVER_ROOT/internal/data/model/migrate
+TARGET_ATLAS_BIN=""
+TARGET_PSQL_BIN=psql
+TARGET_POPULATED_UPGRADE_PREFLIGHT=$SERVER_ROOT/../scripts/qa/populated-upgrade-preflight.sh
+TARGET_RUNTIME_DB_NAME=""
+TARGET_POSTGRES_PORT=""
+TARGET_APP_HTTP_PORT=""
+TARGET_WEB_DESKTOP_PORT=""
+TARGET_TRIAL_ENABLED=""
+TARGET_TRIAL_TARGET=""
+TARGET_JAEGER_PORTS=""
 
 fail() {
   echo "ERROR: $*" >&2
   exit 1
+}
+
+configure_registered_target() {
+  case "$DEPLOYMENT_TARGET_KEY" in
+  "") return ;;
+  demo-133)
+    TARGET_COMPOSE_PROJECT=plush-toy-erp-demo-v1
+    TARGET_POSTGRES_DB=plush_erp_demo_v1
+    TARGET_ROOT=/home/simon/plush-toy-erp-demo-v1
+    TARGET_COMPOSE_OVERRIDE_FILE=$SCRIPT_DIR/compose.demo-133.yml
+    TARGET_COMPOSE_ENV_FILE=$TARGET_ROOT/runtime/.env.demo-133
+    TARGET_POSTGRES_PORT=55436
+    TARGET_APP_HTTP_PORT=8325
+    TARGET_WEB_DESKTOP_PORT=5195
+    TARGET_TRIAL_ENABLED=1
+    TARGET_TRIAL_TARGET=customer-trial-133
+    TARGET_JAEGER_PORTS='JAEGER_5775_PORT=61001 JAEGER_6831_PORT=61002 JAEGER_6832_PORT=61003 JAEGER_5778_PORT=61004 JAEGER_UI_PORT=61005 JAEGER_14268_PORT=61006 JAEGER_14250_PORT=61007 JAEGER_9411_PORT=61008 JAEGER_OTLP_GRPC_PORT=61009 JAEGER_OTLP_HTTP_PORT=61010'
+    ;;
+  customer-test-133)
+    TARGET_COMPOSE_PROJECT=plush-toy-erp-test-v1
+    TARGET_POSTGRES_DB=plush_erp_customer_test_v1
+    TARGET_ROOT=/home/simon/plush-toy-erp-test-v1
+    TARGET_COMPOSE_OVERRIDE_FILE=$SCRIPT_DIR/compose.customer-test-133.yml
+    TARGET_COMPOSE_ENV_FILE=$TARGET_ROOT/runtime/.env.customer-test-133
+    TARGET_POSTGRES_PORT=55437
+    TARGET_APP_HTTP_PORT=8335
+    TARGET_WEB_DESKTOP_PORT=5205
+    TARGET_TRIAL_ENABLED=0
+    TARGET_TRIAL_TARGET=""
+    TARGET_JAEGER_PORTS='JAEGER_5775_PORT=62001 JAEGER_6831_PORT=62002 JAEGER_6832_PORT=62003 JAEGER_5778_PORT=62004 JAEGER_UI_PORT=62005 JAEGER_14268_PORT=62006 JAEGER_14250_PORT=62007 JAEGER_9411_PORT=62008 JAEGER_OTLP_GRPC_PORT=62009 JAEGER_OTLP_HTTP_PORT=62010'
+    ;;
+  *) fail "DEPLOYMENT_TARGET_KEY 只允许 demo-133 或 customer-test-133；admin 不是部署环境" ;;
+  esac
+
+  REGISTERED_TARGET_MODE=1
+  TARGET_POSTGRES_DATA_DIR=$TARGET_ROOT/data/postgres
+  TARGET_MIGRATION_LOCK_FILE=$TARGET_ROOT/run/atlas-migrate.lock
+  TARGET_ATLAS_BIN=$TARGET_ROOT/tools/atlas/v1.2.0/atlas
 }
 
 usage() {
@@ -68,15 +114,16 @@ usage() {
 可选环境变量:
   COMPOSE_FILE   compose 文件路径（默认同目录 compose.yml）
   COMPOSE_OVERRIDE_FILE
-                 133 V5 受控 override；必须是同目录 compose.customer-trial-133.yml
+                 登记目标受控 override；必须与 DEPLOYMENT_TARGET_KEY 精确匹配
   COMPOSE_ENV_FILE
-                 使用 133 V5 override 时必须精确指向
-                 /home/simon/plush-toy-erp-v5/runtime/.env.customer-trial-133
+                 登记目标受控运行 env；必须位于对应独立目标根目录
+  DEPLOYMENT_TARGET_KEY
+                 只允许 demo-133 或 customer-test-133；admin 不是部署环境
   MIG_DIR        迁移目录（默认 server/internal/data/model/migrate）
   POSTGRES_SERVICE  compose 里的 Postgres 服务名（默认 postgres）
   APP_SERVICE    compose 里的后端服务名（默认 app-server）；正式 apply 时必须已停止
   ATLAS_BIN      宿主机 Atlas 二进制路径（普通部署默认 /usr/local/bin/atlas；
-                 customer-trial-133 固定使用目标根目录内的 v1.2.0，拒绝覆盖）
+                 登记目标固定使用各自目标根目录内的 v1.2.0，拒绝覆盖）
   ATLAS_REQUIRED_VERSION
                  固定 Atlas 版本（默认 v1.2.0）
   POSTGRES_HOST  宿主机访问 PostgreSQL 的地址（默认 127.0.0.1）
@@ -124,12 +171,14 @@ if [ "$APPLY_MODE" -eq 1 ] && [ "$STATUS_ONLY" -eq 1 ]; then
   fail "--apply 与 --status-only 不能同时使用"
 fi
 
+configure_registered_target
+
 if [ ! -f "$COMPOSE_FILE" ]; then
   echo "ERROR: compose 文件不存在: $COMPOSE_FILE" >&2
   exit 1
 fi
 
-trial_env_keys() {
+target_env_keys() {
   awk '
 		{
 			line = $0
@@ -149,7 +198,7 @@ trial_env_keys() {
 	' "$COMPOSE_ENV_FILE"
 }
 
-trial_env_value() {
+target_env_value() {
   wanted_key=$1
   awk -v wanted_key="$wanted_key" '
 		{
@@ -173,41 +222,42 @@ trial_env_value() {
 	' "$COMPOSE_ENV_FILE"
 }
 
-require_trial_env_value() {
+require_target_env_value() {
   env_key=$1
   expected_value=$2
-  actual_value=$(trial_env_value "$env_key")
+  actual_value=$(target_env_value "$env_key")
   if [ "$actual_value" != "$expected_value" ]; then
-    fail "customer-trial-133 必须在受控 env 中使用 ${env_key}=${expected_value}"
+    fail "$DEPLOYMENT_TARGET_KEY 必须在受控 env 中使用 ${env_key}=${expected_value}"
   fi
 }
 
-validate_trial_compose_inputs() {
-  [ "$COMPOSE_FILE_WAS_SET" -eq 0 ] || fail "customer-trial-133 迁移禁止通过宿主环境覆盖 COMPOSE_FILE"
-  [ ! -L "$COMPOSE_FILE" ] || fail "customer-trial-133 base Compose 不得是符号链接"
-  [ "$(basename -- "$COMPOSE_FILE")" = "compose.yml" ] || fail "customer-trial-133 base Compose 必须是同目录 compose.yml"
+validate_registered_target_inputs() {
+  [ "$COMPOSE_FILE_WAS_SET" -eq 0 ] || fail "$DEPLOYMENT_TARGET_KEY 迁移禁止通过宿主环境覆盖 COMPOSE_FILE"
+  [ ! -L "$COMPOSE_FILE" ] || fail "$DEPLOYMENT_TARGET_KEY base Compose 不得是符号链接"
+  [ "$(basename -- "$COMPOSE_FILE")" = "compose.yml" ] || fail "$DEPLOYMENT_TARGET_KEY base Compose 必须是同目录 compose.yml"
 
-  [ -n "$COMPOSE_ENV_FILE" ] || fail "customer-trial-133 必须显式设置 COMPOSE_ENV_FILE=$TRIAL_COMPOSE_ENV_FILE"
-  [ "$(basename -- "$COMPOSE_OVERRIDE_FILE")" = "compose.customer-trial-133.yml" ] || fail "customer-trial-133 只能使用受控 Compose override"
-  [ "$(basename -- "$COMPOSE_ENV_FILE")" = ".env.customer-trial-133" ] || fail "customer-trial-133 只能使用受控 .env.customer-trial-133"
-  [ -f "$COMPOSE_OVERRIDE_FILE" ] && [ ! -L "$COMPOSE_OVERRIDE_FILE" ] || fail "customer-trial-133 Compose override 不存在、不是普通文件或是符号链接"
-  [ -f "$COMPOSE_ENV_FILE" ] && [ ! -L "$COMPOSE_ENV_FILE" ] || fail "customer-trial-133 env 不存在、不是普通文件或是符号链接"
+  [ -n "$COMPOSE_OVERRIDE_FILE" ] || fail "$DEPLOYMENT_TARGET_KEY 必须显式设置 COMPOSE_OVERRIDE_FILE=$TARGET_COMPOSE_OVERRIDE_FILE"
+  [ -n "$COMPOSE_ENV_FILE" ] || fail "$DEPLOYMENT_TARGET_KEY 必须显式设置 COMPOSE_ENV_FILE=$TARGET_COMPOSE_ENV_FILE"
+  [ "$(basename -- "$COMPOSE_OVERRIDE_FILE")" = "$(basename -- "$TARGET_COMPOSE_OVERRIDE_FILE")" ] || fail "$DEPLOYMENT_TARGET_KEY 只能使用登记的 Compose override"
+  [ "$(basename -- "$COMPOSE_ENV_FILE")" = "$(basename -- "$TARGET_COMPOSE_ENV_FILE")" ] || fail "$DEPLOYMENT_TARGET_KEY 只能使用登记的运行 env"
+  [ -f "$COMPOSE_OVERRIDE_FILE" ] && [ ! -L "$COMPOSE_OVERRIDE_FILE" ] || fail "$DEPLOYMENT_TARGET_KEY Compose override 不存在、不是普通文件或是符号链接"
+  [ -f "$COMPOSE_ENV_FILE" ] && [ ! -L "$COMPOSE_ENV_FILE" ] || fail "$DEPLOYMENT_TARGET_KEY env 不存在、不是普通文件或是符号链接"
 
   compose_dir_real=$(CDPATH='' cd -- "$(dirname -- "$COMPOSE_FILE")" 2>/dev/null && pwd -P) || fail "无法解析 base Compose 目录"
   override_dir_real=$(CDPATH='' cd -- "$(dirname -- "$COMPOSE_OVERRIDE_FILE")" 2>/dev/null && pwd -P) || fail "无法解析 Compose override 目录"
   env_dir_real=$(CDPATH='' cd -- "$(dirname -- "$COMPOSE_ENV_FILE")" 2>/dev/null && pwd -P) || fail "无法解析 Compose env 目录"
-  [ "$override_dir_real" = "$compose_dir_real" ] || fail "customer-trial-133 Compose override 必须与 base Compose 同目录"
+  [ "$override_dir_real" = "$compose_dir_real" ] || fail "$DEPLOYMENT_TARGET_KEY Compose override 必须与 base Compose 同目录"
   compose_override_real=$override_dir_real/$(basename -- "$COMPOSE_OVERRIDE_FILE")
-  trusted_override_dir_real=$(CDPATH='' cd -- "$(dirname -- "$TRIAL_COMPOSE_OVERRIDE_FILE")" 2>/dev/null && pwd -P) || fail "无法解析受控 Compose override 目录"
-  trusted_override_real=$trusted_override_dir_real/$(basename -- "$TRIAL_COMPOSE_OVERRIDE_FILE")
-  [ "$compose_override_real" = "$trusted_override_real" ] || fail "customer-trial-133 只能使用当前 release 的受控 Compose override"
+  trusted_override_dir_real=$(CDPATH='' cd -- "$(dirname -- "$TARGET_COMPOSE_OVERRIDE_FILE")" 2>/dev/null && pwd -P) || fail "无法解析受控 Compose override 目录"
+  trusted_override_real=$trusted_override_dir_real/$(basename -- "$TARGET_COMPOSE_OVERRIDE_FILE")
+  [ "$compose_override_real" = "$trusted_override_real" ] || fail "$DEPLOYMENT_TARGET_KEY 只能使用当前 release 的受控 Compose override"
   compose_env_real=$env_dir_real/$(basename -- "$COMPOSE_ENV_FILE")
-  [ "$compose_env_real" = "$TRIAL_COMPOSE_ENV_FILE" ] || fail "customer-trial-133 只能使用受控运行 env: $TRIAL_COMPOSE_ENV_FILE"
+  [ "$compose_env_real" = "$TARGET_COMPOSE_ENV_FILE" ] || fail "$DEPLOYMENT_TARGET_KEY 只能使用登记的运行 env"
 
   env_owner_uid=$(stat -c '%u' "$COMPOSE_ENV_FILE" 2>/dev/null || stat -f '%u' "$COMPOSE_ENV_FILE" 2>/dev/null || true)
   env_mode=$(stat -c '%a' "$COMPOSE_ENV_FILE" 2>/dev/null || stat -f '%Lp' "$COMPOSE_ENV_FILE" 2>/dev/null || true)
-  [ "$env_owner_uid" = "$(id -u)" ] || fail "customer-trial-133 env 必须归当前执行用户所有"
-  [ "$env_mode" = "600" ] || fail "customer-trial-133 env 权限必须为 0600"
+  [ "$env_owner_uid" = "$(id -u)" ] || fail "$DEPLOYMENT_TARGET_KEY env 必须归当前执行用户所有"
+  [ "$env_mode" = "600" ] || fail "$DEPLOYMENT_TARGET_KEY env 权限必须为 0600"
 
   override_contract=$(awk '
 		{
@@ -217,7 +267,7 @@ validate_trial_compose_inputs() {
 			if (line != "" && line !~ /^#/) print line
 		}
 	' "$COMPOSE_OVERRIDE_FILE")
-  [ "$override_contract" = "name: plush-toy-erp-v5" ] || fail "customer-trial-133 Compose override 只能声明 name: plush-toy-erp-v5"
+  [ "$override_contract" = "name: $TARGET_COMPOSE_PROJECT" ] || fail "$DEPLOYMENT_TARGET_KEY Compose override 只能声明登记 project"
 
   for ambient_key in \
     COMPOSE_PROJECT_NAME COMPOSE_PROFILES COMPOSE_ENV_FILES COMPOSE_PATH_SEPARATOR \
@@ -225,85 +275,76 @@ validate_trial_compose_inputs() {
     DB_URL POSTGRES_HOST POSTGRES_HOST_PORT POSTGRES_SERVICE APP_SERVICE MIGRATION_LOCK_FILE \
     MIG_DIR ATLAS_BIN PSQL_BIN POPULATED_UPGRADE_PREFLIGHT; do
     if printenv "$ambient_key" >/dev/null 2>&1; then
-      fail "customer-trial-133 迁移环境不得设置目标覆盖变量: $ambient_key"
+      fail "$DEPLOYMENT_TARGET_KEY 迁移环境不得设置目标覆盖变量: $ambient_key"
     fi
   done
 
-  if ! TRIAL_ENV_KEYS=$(trial_env_keys); then
-    fail "customer-trial-133 env 包含非法行或变量名"
+  if ! TARGET_ENV_KEYS=$(target_env_keys); then
+    fail "$DEPLOYMENT_TARGET_KEY env 包含非法行或变量名"
   fi
-  [ -n "$TRIAL_ENV_KEYS" ] || fail "customer-trial-133 env 不得为空"
-  duplicate_env_key=$(printf '%s\n' "$TRIAL_ENV_KEYS" | sort | uniq -d | head -n1 || true)
-  [ -z "$duplicate_env_key" ] || fail "customer-trial-133 env 变量必须唯一: $duplicate_env_key"
-  for env_key in $TRIAL_ENV_KEYS; do
+  [ -n "$TARGET_ENV_KEYS" ] || fail "$DEPLOYMENT_TARGET_KEY env 不得为空"
+  duplicate_env_key=$(printf '%s\n' "$TARGET_ENV_KEYS" | sort | uniq -d | head -n1 || true)
+  [ -z "$duplicate_env_key" ] || fail "$DEPLOYMENT_TARGET_KEY env 变量必须唯一: $duplicate_env_key"
+  for env_key in $TARGET_ENV_KEYS; do
     case "$env_key" in
-    COMPOSE_* | DOCKER_* | DB_URL | POSTGRES_HOST | POSTGRES_HOST_PORT | POSTGRES_SERVICE | APP_SERVICE | MIG_DIR | ATLAS_BIN | PSQL_BIN | POPULATED_UPGRADE_PREFLIGHT)
-      fail "customer-trial-133 env 不得声明目标覆盖变量: $env_key"
+    COMPOSE_* | DOCKER_* | DEPLOYMENT_TARGET_KEY | DB_URL | POSTGRES_HOST | POSTGRES_HOST_PORT | POSTGRES_SERVICE | APP_SERVICE | MIG_DIR | ATLAS_BIN | PSQL_BIN | POPULATED_UPGRADE_PREFLIGHT)
+      fail "$DEPLOYMENT_TARGET_KEY env 不得声明目标覆盖变量: $env_key"
       ;;
     esac
     if printenv "$env_key" >/dev/null 2>&1; then
-      fail "宿主环境不得覆盖 customer-trial-133 env 变量: $env_key"
+      fail "宿主环境不得覆盖 $DEPLOYMENT_TARGET_KEY env 变量: $env_key"
     fi
   done
 
-  require_trial_env_value PROJECT_SLUG plush-toy-erp-v5
-  require_trial_env_value ERP_CUSTOMER_KEY yoyoosun
-  require_trial_env_value POSTGRES_DB plush_erp_uat_20260716_v5
-  require_trial_env_value ERP_ALLOW_CUSTOMER_TRIAL_CONFIG 1
-  require_trial_env_value ERP_CUSTOMER_TRIAL_TARGET customer-trial-133
-  trial_admin_password=$(trial_env_value POSTGRES_PASSWORD)
-  trial_app_password=$(trial_env_value POSTGRES_APP_PASSWORD)
-  trial_migrator_password=$(trial_env_value POSTGRES_MIGRATOR_PASSWORD)
-  trial_backup_password=$(trial_env_value POSTGRES_BACKUP_PASSWORD)
-  for role_password in "$trial_app_password" "$trial_migrator_password" "$trial_backup_password"; do
+  require_target_env_value PROJECT_SLUG "$TARGET_COMPOSE_PROJECT"
+  require_target_env_value ERP_CUSTOMER_KEY yoyoosun
+  require_target_env_value POSTGRES_DB "$TARGET_POSTGRES_DB"
+  require_target_env_value ERP_ALLOW_CUSTOMER_TRIAL_CONFIG "$TARGET_TRIAL_ENABLED"
+  require_target_env_value ERP_CUSTOMER_TRIAL_TARGET "$TARGET_TRIAL_TARGET"
+  target_admin_password=$(target_env_value POSTGRES_PASSWORD)
+  target_app_password=$(target_env_value POSTGRES_APP_PASSWORD)
+  target_migrator_password=$(target_env_value POSTGRES_MIGRATOR_PASSWORD)
+  target_backup_password=$(target_env_value POSTGRES_BACKUP_PASSWORD)
+  for role_password in "$target_app_password" "$target_migrator_password" "$target_backup_password"; do
     case "$role_password" in
-    "" | *[!A-Za-z0-9._~-]*) fail "customer-trial-133 数据库角色密码必须是 20-128 位 URL-safe 值" ;;
+    "" | *[!A-Za-z0-9._~-]*) fail "$DEPLOYMENT_TARGET_KEY 数据库角色密码必须是 20-128 位 URL-safe 值" ;;
     esac
     [ "${#role_password}" -ge 20 ] && [ "${#role_password}" -le 128 ] ||
-      fail "customer-trial-133 数据库角色密码必须是 20-128 位 URL-safe 值"
+      fail "$DEPLOYMENT_TARGET_KEY 数据库角色密码必须是 20-128 位 URL-safe 值"
   done
-  [ "$trial_app_password" != "$trial_migrator_password" ] &&
-    [ "$trial_app_password" != "$trial_backup_password" ] &&
-    [ "$trial_migrator_password" != "$trial_backup_password" ] &&
-    [ "$trial_admin_password" != "$trial_app_password" ] &&
-    [ "$trial_admin_password" != "$trial_migrator_password" ] &&
-    [ "$trial_admin_password" != "$trial_backup_password" ] ||
-    fail "customer-trial-133 管理员、应用、迁移和备份密码必须彼此不同"
-  require_trial_env_value POSTGRES_BIND_ADDR 127.0.0.1
-  require_trial_env_value APP_HTTP_BIND_ADDR 127.0.0.1
-  require_trial_env_value WEB_DESKTOP_BIND_ADDR 127.0.0.1
+  [ "$target_app_password" != "$target_migrator_password" ] &&
+    [ "$target_app_password" != "$target_backup_password" ] &&
+    [ "$target_migrator_password" != "$target_backup_password" ] &&
+    [ "$target_admin_password" != "$target_app_password" ] &&
+    [ "$target_admin_password" != "$target_migrator_password" ] &&
+    [ "$target_admin_password" != "$target_backup_password" ] ||
+    fail "$DEPLOYMENT_TARGET_KEY 管理员、应用、迁移和备份密码必须彼此不同"
+  require_target_env_value POSTGRES_BIND_ADDR 127.0.0.1
+  require_target_env_value APP_HTTP_BIND_ADDR 127.0.0.1
+  require_target_env_value WEB_DESKTOP_BIND_ADDR 127.0.0.1
   for port_contract in \
-    POSTGRES_PORT=55435 \
-    APP_HTTP_PORT=8315 \
-    WEB_DESKTOP_PORT=5185 \
-    JAEGER_5775_PORT=45775 \
-    JAEGER_6831_PORT=46831 \
-    JAEGER_6832_PORT=46832 \
-    JAEGER_5778_PORT=45778 \
-    JAEGER_UI_PORT=46687 \
-    JAEGER_14268_PORT=54268 \
-    JAEGER_14250_PORT=54250 \
-    JAEGER_9411_PORT=49411 \
-    JAEGER_OTLP_GRPC_PORT=44317 \
-    JAEGER_OTLP_HTTP_PORT=44318; do
+    POSTGRES_PORT=$TARGET_POSTGRES_PORT \
+    APP_HTTP_PORT=$TARGET_APP_HTTP_PORT \
+    WEB_DESKTOP_PORT=$TARGET_WEB_DESKTOP_PORT \
+    $TARGET_JAEGER_PORTS; do
     port_key=${port_contract%%=*}
     port_value=${port_contract#*=}
-    require_trial_env_value "$port_key" "$port_value"
+    require_target_env_value "$port_key" "$port_value"
   done
 
-  require_trial_env_value POSTGRES_DATA_DIR "$TRIAL_POSTGRES_DATA_DIR"
-  require_trial_env_value MIGRATION_LOCK_FILE "$TRIAL_MIGRATION_LOCK_FILE"
-  MIG_DIR=$TRIAL_MIG_DIR
-  ATLAS_BIN=$TRIAL_ATLAS_BIN
-  PSQL_BIN=$TRIAL_PSQL_BIN
-  POPULATED_UPGRADE_PREFLIGHT=$TRIAL_POPULATED_UPGRADE_PREFLIGHT
-  MIGRATION_LOCK_FILE=$TRIAL_MIGRATION_LOCK_FILE
-  TRIAL_MODE=1
+  require_target_env_value POSTGRES_DATA_DIR "$TARGET_POSTGRES_DATA_DIR"
+  require_target_env_value MIGRATION_LOCK_FILE "$TARGET_MIGRATION_LOCK_FILE"
+  MIG_DIR=$TARGET_MIG_DIR
+  ATLAS_BIN=$TARGET_ATLAS_BIN
+  PSQL_BIN=$TARGET_PSQL_BIN
+  POPULATED_UPGRADE_PREFLIGHT=$TARGET_POPULATED_UPGRADE_PREFLIGHT
+  MIGRATION_LOCK_FILE=$TARGET_MIGRATION_LOCK_FILE
 }
 
-if [ -n "$COMPOSE_OVERRIDE_FILE" ] || [ -n "$COMPOSE_ENV_FILE" ]; then
-  [ -n "$COMPOSE_OVERRIDE_FILE" ] || fail "COMPOSE_ENV_FILE 只能与 customer-trial-133 override 成对使用"
-  validate_trial_compose_inputs
+if [ "$REGISTERED_TARGET_MODE" -eq 1 ]; then
+  validate_registered_target_inputs
+elif [ -n "$COMPOSE_OVERRIDE_FILE" ] || [ -n "$COMPOSE_ENV_FILE" ]; then
+  fail "未选择登记目标时禁止使用 Compose override 或 target env"
 fi
 
 if [ ! -d "$MIG_DIR" ]; then
@@ -318,8 +359,8 @@ fi
 
 if ! command -v "$ATLAS_BIN" >/dev/null 2>&1; then
   echo "ERROR: 未找到宿主机 Atlas: $ATLAS_BIN" >&2
-  if [ "$TRIAL_MODE" -eq 1 ]; then
-    echo "请先通过正式发布流程准备 customer-trial-133 固定 Atlas v1.2.0，不要覆盖系统 Atlas 或使用容器执行线上迁移。" >&2
+  if [ "$REGISTERED_TARGET_MODE" -eq 1 ]; then
+    echo "请先通过正式发布流程准备 $DEPLOYMENT_TARGET_KEY 固定 Atlas v1.2.0，不要覆盖系统 Atlas 或使用容器执行线上迁移。" >&2
   else
     echo "请先在服务器安装 Atlas 到 /usr/local/bin/atlas，不要使用 arigaio/atlas 容器执行线上迁移。" >&2
   fi
@@ -562,8 +603,8 @@ trap finalize_migration_run EXIT INT TERM
 
 compose() {
   if docker compose version >/dev/null 2>&1; then
-    if [ "$TRIAL_MODE" -eq 1 ]; then
-      docker compose --env-file "$COMPOSE_ENV_FILE" -p "$TRIAL_COMPOSE_PROJECT" -f "$COMPOSE_FILE" -f "$COMPOSE_OVERRIDE_FILE" "$@"
+    if [ "$REGISTERED_TARGET_MODE" -eq 1 ]; then
+      docker compose --env-file "$COMPOSE_ENV_FILE" -p "$TARGET_COMPOSE_PROJECT" -f "$COMPOSE_FILE" -f "$COMPOSE_OVERRIDE_FILE" "$@"
     else
       docker compose -f "$COMPOSE_FILE" "$@"
     fi
@@ -571,8 +612,8 @@ compose() {
   fi
 
   if command -v docker-compose >/dev/null 2>&1; then
-    if [ "$TRIAL_MODE" -eq 1 ]; then
-      docker-compose --env-file "$COMPOSE_ENV_FILE" -p "$TRIAL_COMPOSE_PROJECT" -f "$COMPOSE_FILE" -f "$COMPOSE_OVERRIDE_FILE" "$@"
+    if [ "$REGISTERED_TARGET_MODE" -eq 1 ]; then
+      docker-compose --env-file "$COMPOSE_ENV_FILE" -p "$TARGET_COMPOSE_PROJECT" -f "$COMPOSE_FILE" -f "$COMPOSE_OVERRIDE_FILE" "$@"
     else
       docker-compose -f "$COMPOSE_FILE" "$@"
     fi
@@ -583,25 +624,25 @@ compose() {
   exit 1
 }
 
-validate_trial_container_identity() {
+validate_registered_target_container_identity() {
   container_id=$1
   expected_name=$2
   service_name=$3
   runtime_project=$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$container_id" 2>/dev/null || true)
-  [ "$runtime_project" = "$TRIAL_COMPOSE_PROJECT" ] || fail "customer-trial-133 ${service_name} 容器不属于 Compose project $TRIAL_COMPOSE_PROJECT"
+  [ "$runtime_project" = "$TARGET_COMPOSE_PROJECT" ] || fail "$DEPLOYMENT_TARGET_KEY ${service_name} 容器不属于 Compose project $TARGET_COMPOSE_PROJECT"
   runtime_name=$(docker inspect --format '{{.Name}}' "$container_id" 2>/dev/null || true)
   runtime_name=${runtime_name#/}
-  [ "$runtime_name" = "$expected_name" ] || fail "customer-trial-133 ${service_name} 容器名必须是 $expected_name"
+  [ "$runtime_name" = "$expected_name" ] || fail "$DEPLOYMENT_TARGET_KEY ${service_name} 容器名必须是 $expected_name"
 }
 
 APP_CID=""
-if [ "$TRIAL_MODE" -eq 1 ]; then
+if [ "$REGISTERED_TARGET_MODE" -eq 1 ]; then
   APP_CIDS=$(compose ps -q "$APP_SERVICE" 2>/dev/null || true)
   APP_CID_COUNT=$(printf '%s\n' "$APP_CIDS" | awk 'NF { count++ } END { print count + 0 }')
-  [ "$APP_CID_COUNT" -le 1 ] || fail "customer-trial-133 app-server 必须唯一"
+  [ "$APP_CID_COUNT" -le 1 ] || fail "$DEPLOYMENT_TARGET_KEY app-server 必须唯一"
   APP_CID=$(printf '%s\n' "$APP_CIDS" | awk 'NF { print; exit }')
   if [ -n "$APP_CID" ]; then
-    validate_trial_container_identity "$APP_CID" "plush-toy-erp-v5-server" app-server
+    validate_registered_target_container_identity "$APP_CID" "$TARGET_COMPOSE_PROJECT-server" app-server
   fi
 elif [ "$APPLY_MODE" -eq 1 ] || [ "$RECONCILE_PERMISSIONS" -eq 1 ]; then
   APP_CID=$(compose ps -q "$APP_SERVICE" 2>/dev/null | head -n1 || true)
@@ -640,20 +681,20 @@ urlencode() {
   printf '%s' "$output"
 }
 
-if [ "$TRIAL_MODE" -eq 1 ]; then
+if [ "$REGISTERED_TARGET_MODE" -eq 1 ]; then
   POSTGRES_CIDS=$(compose ps -q "$POSTGRES_SERVICE" 2>/dev/null || true)
   POSTGRES_CID_COUNT=$(printf '%s\n' "$POSTGRES_CIDS" | awk 'NF { count++ } END { print count + 0 }')
-  [ "$POSTGRES_CID_COUNT" -eq 1 ] || fail "customer-trial-133 Postgres 服务必须精确存在一个容器"
+  [ "$POSTGRES_CID_COUNT" -eq 1 ] || fail "$DEPLOYMENT_TARGET_KEY Postgres 服务必须精确存在一个容器"
   POSTGRES_CID=$(printf '%s\n' "$POSTGRES_CIDS" | awk 'NF { print; exit }')
-  validate_trial_container_identity "$POSTGRES_CID" "plush-toy-erp-v5-postgres" postgres
+  validate_registered_target_container_identity "$POSTGRES_CID" "$TARGET_COMPOSE_PROJECT-postgres" postgres
 
-  TRIAL_POSTGRES_BINDING=$(docker inspect --format '{{range (index .NetworkSettings.Ports "5432/tcp")}}{{printf "%s|%s\n" .HostIp .HostPort}}{{end}}' "$POSTGRES_CID" 2>/dev/null || true)
-  [ "$TRIAL_POSTGRES_BINDING" = "127.0.0.1|55435" ] || fail "customer-trial-133 Postgres 必须唯一绑定 127.0.0.1:55435"
-  TRIAL_POSTGRES_MOUNT=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql"}}{{printf "%s|%s\n" .Type .Source}}{{end}}{{end}}' "$POSTGRES_CID" 2>/dev/null || true)
-  [ "$TRIAL_POSTGRES_MOUNT" = "bind|$TRIAL_POSTGRES_DATA_DIR" ] || fail "customer-trial-133 Postgres 数据挂载与受控 env 不一致"
-  TRIAL_RUNTIME_DB_NAME=$(docker exec "$POSTGRES_CID" sh -lc 'printf "%s" "$POSTGRES_DB"' 2>/dev/null || true)
-  [ "$TRIAL_RUNTIME_DB_NAME" = "$TRIAL_POSTGRES_DB" ] || fail "customer-trial-133 Postgres 容器内 POSTGRES_DB 必须是 $TRIAL_POSTGRES_DB"
-  POSTGRES_HOST_PORT=55435
+  TARGET_POSTGRES_BINDING=$(docker inspect --format '{{range (index .NetworkSettings.Ports "5432/tcp")}}{{printf "%s|%s\n" .HostIp .HostPort}}{{end}}' "$POSTGRES_CID" 2>/dev/null || true)
+  [ "$TARGET_POSTGRES_BINDING" = "127.0.0.1|$TARGET_POSTGRES_PORT" ] || fail "$DEPLOYMENT_TARGET_KEY Postgres 必须唯一绑定登记的 loopback 端口"
+  TARGET_POSTGRES_MOUNT=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql"}}{{printf "%s|%s\n" .Type .Source}}{{end}}{{end}}' "$POSTGRES_CID" 2>/dev/null || true)
+  [ "$TARGET_POSTGRES_MOUNT" = "bind|$TARGET_POSTGRES_DATA_DIR" ] || fail "$DEPLOYMENT_TARGET_KEY Postgres 数据挂载与受控 env 不一致"
+  TARGET_RUNTIME_DB_NAME=$(docker exec "$POSTGRES_CID" sh -lc 'printf "%s" "$POSTGRES_DB"' 2>/dev/null || true)
+  [ "$TARGET_RUNTIME_DB_NAME" = "$TARGET_POSTGRES_DB" ] || fail "$DEPLOYMENT_TARGET_KEY Postgres 容器内 POSTGRES_DB 不符合登记合同"
+  POSTGRES_HOST_PORT=$TARGET_POSTGRES_PORT
 else
   POSTGRES_CID=$(compose ps -q "$POSTGRES_SERVICE" 2>/dev/null | head -n1 || true)
 fi
@@ -672,8 +713,8 @@ fi
 PERMISSION_RESULT=verified
 
 if [ -z "${DB_URL:-}" ]; then
-  if [ "$TRIAL_MODE" -eq 1 ]; then
-    DB_NAME=$TRIAL_RUNTIME_DB_NAME
+  if [ "$REGISTERED_TARGET_MODE" -eq 1 ]; then
+    DB_NAME=$TARGET_RUNTIME_DB_NAME
   else
     DB_NAME=$(docker exec "$POSTGRES_CID" sh -lc 'printf "%s" "$POSTGRES_DB"')
   fi
@@ -976,10 +1017,11 @@ capture_schema_readback() {
 
 echo "==> 迁移目录: $MIG_DIR"
 echo "==> compose 文件: $COMPOSE_FILE"
-if [ "$TRIAL_MODE" -eq 1 ]; then
-  echo "==> compose 验收覆盖: $COMPOSE_OVERRIDE_FILE"
-  echo "==> compose 验收环境: $COMPOSE_ENV_FILE"
-  echo "==> compose project: $TRIAL_COMPOSE_PROJECT"
+if [ "$REGISTERED_TARGET_MODE" -eq 1 ]; then
+  echo "==> deployment target: $DEPLOYMENT_TARGET_KEY"
+  echo "==> compose target override: $COMPOSE_OVERRIDE_FILE"
+  echo "==> compose target env: $COMPOSE_ENV_FILE"
+  echo "==> compose project: $TARGET_COMPOSE_PROJECT"
 fi
 echo "==> Postgres 容器: $POSTGRES_CID"
 echo "==> Atlas: $ATLAS_BIN ($ATLAS_REQUIRED_VERSION)"

@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   CI_QUALITY_AGGREGATE_SCHEMA,
   CI_EVIDENCE_MANIFEST_SCHEMA,
+  matchesStrictSourceArchive,
   validateCiQualityShardSet,
 } from "./ci-quality-aggregate.mjs";
 import {
@@ -88,6 +89,23 @@ async function receipts() {
 test("aggregate contracts keep v3 strict evidence external shape", () => {
   assert.equal(CI_QUALITY_AGGREGATE_SCHEMA, "plush.gitlab-strict-aggregate/v1");
   assert.equal(CI_EVIDENCE_MANIFEST_SCHEMA, "plush.gitlab-ci-evidence/v1");
+});
+
+test("aggregate matches the tagged shard archive digest to strict plain SHA-256", () => {
+  assert.equal(
+    matchesStrictSourceArchive(
+      { status: "passed", archiveSha256: `sha256:${digest}` },
+      { sourceArchiveSha256: digest },
+    ),
+    true,
+  );
+  assert.equal(
+    matchesStrictSourceArchive(
+      { status: "passed", archiveSha256: digest },
+      { sourceArchiveSha256: digest },
+    ),
+    false,
+  );
 });
 
 test("aggregate rejects missing, duplicate and failed shards", async () => {

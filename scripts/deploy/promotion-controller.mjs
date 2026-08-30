@@ -291,7 +291,7 @@ if (isMainModule()) {
       console.log(`Usage:
   node scripts/deploy/promotion-controller.mjs \\
     --release-manifest <release-manifest.json> \\
-    --target test-133 \\
+    --target <demo-133|customer-test-133> \\
     --idempotency-key <stable-random-key> \
     [--retry-of-operation-id <terminal-operation-id>] [--json]
 

@@ -34,7 +34,7 @@ function receipt(overrides = {}) {
     schemaVersion: REMOTE_PROMOTION_RECEIPT_CONTRACT,
     status: "passed",
     operationId: OPERATION_ID,
-    target: "test-133",
+    target: "demo-133",
     gitSha: SHA,
     version: "2026.07.29-1",
     releaseManifestSha256: HASH,
@@ -104,6 +104,7 @@ function receipt(overrides = {}) {
 
 const expected = {
   operationId: OPERATION_ID,
+  targetKey: "demo-133",
   gitSha: SHA,
   version: "2026.07.29-1",
   releaseManifestSha256: HASH,
@@ -274,7 +275,7 @@ test("promotion executor help requires ready operation and explicit confirmation
   });
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /operation must already be ready/iu);
-  assert.match(result.stdout, /PROMOTE:test-133/u);
+  assert.match(result.stdout, /PROMOTE:<target>/u);
 });
 
 test("promotion executor contains no target build or automatic retry path", () => {

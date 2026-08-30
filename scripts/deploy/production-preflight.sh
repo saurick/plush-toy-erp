@@ -5,7 +5,7 @@ umask 077
 print_help() {
   cat <<'USAGE'
 用法:
-  bash scripts/deploy/production-preflight.sh --env-file server/deploy/compose/prod/.env
+  bash scripts/deploy/production-preflight.sh --deployment-target demo-133 --env-file <path>
   bash scripts/deploy/production-preflight.sh --env-file server/deploy/compose/prod/.env --runtime
   bash scripts/deploy/production-preflight.sh --env-file server/deploy/compose/prod/.env --out deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/production-preflight-report.txt
   bash scripts/deploy/production-preflight.sh --example
@@ -17,13 +17,15 @@ print_help() {
 参数:
   --env-file <path>      生产运行时 env 文件；该模式阻断 placeholder
   --compose-dir <path>   Compose 目录，默认 server/deploy/compose/prod
+  --deployment-target <demo-133|customer-test-133>
+                         登记的非生产部署目标；admin 不是部署环境
   --compose-override <path>
-                         仅 133 V5 隔离验收栈使用的受控 Compose project override
+                         登记目标必须使用的受控 Compose project override
   --runtime              额外检查容器运行状态和健康检查
   --expected-release <40sha>
-                         runtime 期望的不可变 Git release；133 V5 必须显式传入
+                         runtime 期望的不可变 Git release；登记目标必须显式传入
   --example              只检查 .env.example 结构，允许 placeholder，不能当生产放行
-  --skip-compose-config  仅 example / 非 runtime 诊断可跳过 Compose config；133 V5 与 --runtime 禁止跳过
+  --skip-compose-config  仅 example / 非 runtime 诊断可跳过 Compose config；登记目标与 --runtime 禁止跳过
   --out <path>           同步写入脱敏检查报告；父目录必须已存在
 USAGE
 }
@@ -97,7 +99,7 @@ validate_absolute_path_without_aliases() {
 
   # macOS 本机只能静态审查 133 的 /home/simon 合同；它的 /home 是本机 automount，
   # 不是目标机文件系统证据。在 133/Linux 执行时仍会逐段检查所有已存在的父路径。
-  if [[ "$(uname -s)" == "Darwin" && "$path" == /home/simon/plush-toy-erp-v5/* && ! -e /home/simon ]]; then
+  if [[ "$(uname -s)" == "Darwin" && "$path" == /home/simon/plush-toy-erp-*/* && ! -e /home/simon ]]; then
     return
   fi
 
@@ -151,6 +153,15 @@ runtime_check=0
 skip_compose_config=0
 out_file=""
 expected_release=""
+deployment_target=""
+registered_target_mode=0
+target_project=""
+target_database=""
+target_data_dir=""
+target_lock_file=""
+target_override_name=""
+target_trial_enabled=""
+target_trial_target=""
 env_source_file=""
 env_source_owner_uid=""
 env_source_mode=""
@@ -172,6 +183,10 @@ while [[ $# -gt 0 ]]; do
     ;;
   --compose-override)
     compose_override="${2:-}"
+    shift 2
+    ;;
+  --deployment-target)
+    deployment_target="${2:-}"
     shift 2
     ;;
   --runtime)
@@ -215,9 +230,48 @@ if [[ -n "$out_file" ]]; then
 fi
 
 compose_file="$compose_dir/compose.yml"
-trial_compose_override="$compose_dir/compose.customer-trial-133.yml"
 migrate_script="$compose_dir/migrate_online.sh"
 chromium_seccomp_profile="$compose_dir/chromium-seccomp.json"
+
+case "$deployment_target" in
+"") ;;
+demo-133)
+  registered_target_mode=1
+  target_project=plush-toy-erp-demo-v1
+  target_database=plush_erp_demo_v1
+  target_data_dir=/home/simon/plush-toy-erp-demo-v1/data/postgres
+  target_lock_file=/home/simon/plush-toy-erp-demo-v1/run/atlas-migrate.lock
+  target_override_name=compose.demo-133.yml
+  target_trial_enabled=1
+  target_trial_target=customer-trial-133
+  target_ports=(
+    POSTGRES_PORT=55436 APP_HTTP_PORT=8325 WEB_DESKTOP_PORT=5195
+    JAEGER_5775_PORT=61001 JAEGER_6831_PORT=61002 JAEGER_6832_PORT=61003
+    JAEGER_5778_PORT=61004 JAEGER_UI_PORT=61005 JAEGER_14268_PORT=61006
+    JAEGER_14250_PORT=61007 JAEGER_9411_PORT=61008
+    JAEGER_OTLP_GRPC_PORT=61009 JAEGER_OTLP_HTTP_PORT=61010
+  )
+  ;;
+customer-test-133)
+  registered_target_mode=1
+  target_project=plush-toy-erp-test-v1
+  target_database=plush_erp_customer_test_v1
+  target_data_dir=/home/simon/plush-toy-erp-test-v1/data/postgres
+  target_lock_file=/home/simon/plush-toy-erp-test-v1/run/atlas-migrate.lock
+  target_override_name=compose.customer-test-133.yml
+  target_trial_enabled=0
+  target_trial_target=""
+  target_ports=(
+    POSTGRES_PORT=55437 APP_HTTP_PORT=8335 WEB_DESKTOP_PORT=5205
+    JAEGER_5775_PORT=62001 JAEGER_6831_PORT=62002 JAEGER_6832_PORT=62003
+    JAEGER_5778_PORT=62004 JAEGER_UI_PORT=62005 JAEGER_14268_PORT=62006
+    JAEGER_14250_PORT=62007 JAEGER_9411_PORT=62008
+    JAEGER_OTLP_GRPC_PORT=62009 JAEGER_OTLP_HTTP_PORT=62010
+  )
+  ;;
+*) fail "不支持的部署目标；只允许 demo-133 或 customer-test-133" ;;
+esac
+target_compose_override="$compose_dir/$target_override_name"
 
 [[ -n "$env_file" ]] || fail "必须传入 --env-file，或使用 --example 只检查样例结构"
 if [[ "$env_file" == /* ]]; then
@@ -420,8 +474,7 @@ else
   if [[ "$erp_customer_key" == "yoyoosun" ]]; then
     command -v python3 >/dev/null 2>&1 || fail "yoyoosun 运行合同校验需要 python3"
     [[ -f "$runtime_contract_file" && ! -L "$runtime_contract_file" ]] || fail "缺少 yoyoosun 运行合同: $runtime_contract_file"
-    expected_auth_sms_mode="$(
-      python3 - "$runtime_contract_file" <<'PY'
+    expected_auth_sms_mode="$(python3 -c '
 import json
 import sys
 
@@ -445,8 +498,7 @@ valid = (
 if not valid:
     raise SystemExit(1)
 print(sms["requiredMode"])
-PY
-    )" || fail "yoyoosun 运行合同结构不合法"
+' "$runtime_contract_file")" || fail "yoyoosun 运行合同结构不合法"
     [[ "$app_auth_sms_mode" == "$expected_auth_sms_mode" ]] || fail "yoyoosun SMS 模式必须匹配运行合同: expected=$expected_auth_sms_mode actual=${app_auth_sms_mode:-missing}"
     ok "yoyoosun SMS 运行合同已绑定: mode=$expected_auth_sms_mode contract_sha256=$(sha256_file "$runtime_contract_file")"
   fi
@@ -486,41 +538,27 @@ PY
   [[ "$erp_debug_cleanup_enabled" == "false" ]] || fail "ERP_DEBUG_CLEANUP_ENABLED 必须为 false"
   [[ "$erp_debug_business_clear_enabled" == "false" ]] || fail "ERP_DEBUG_BUSINESS_CLEAR_ENABLED 必须为 false"
   [[ "$erp_allow_customer_trial_config" == "0" || "$erp_allow_customer_trial_config" == "1" ]] || fail "ERP_ALLOW_CUSTOMER_TRIAL_CONFIG 必须为 0 或 1"
-  if [[ "$erp_allow_customer_trial_config" == "1" ]]; then
-    [[ "$erp_customer_trial_target" == "customer-trial-133" ]] || fail "远端验收客户配置只允许 target=customer-trial-133"
-    [[ "$erp_customer_key" == "yoyoosun" ]] || fail "远端验收客户配置只允许 ERP_CUSTOMER_KEY=yoyoosun"
-    [[ "$project_slug" == "plush-toy-erp-v5" ]] || fail "customer-trial-133 必须使用独立 PROJECT_SLUG=plush-toy-erp-v5"
-    [[ "$postgres_database" == "plush_erp_uat_20260716_v5" ]] || fail "customer-trial-133 必须使用独立 POSTGRES_DB=plush_erp_uat_20260716_v5"
-    [[ "$postgres_dsn" =~ ^postgres://erp_app:[A-Za-z0-9._~-]{20,128}@postgres:5432/plush_erp_uat_20260716_v5\?sslmode=disable$ ]] || fail "远端验收客户配置 POSTGRES_DSN 必须由 erp_app 精确指向单一 postgres:5432/plush_erp_uat_20260716_v5"
-    [[ "$postgres_data_dir" == "/home/simon/plush-toy-erp-v5/data/postgres" ]] || fail "customer-trial-133 必须使用独立 POSTGRES_DATA_DIR=/home/simon/plush-toy-erp-v5/data/postgres"
-    [[ "$migration_lock_file" == "/home/simon/plush-toy-erp-v5/run/atlas-migrate.lock" ]] || fail "customer-trial-133 必须使用独立 MIGRATION_LOCK_FILE=/home/simon/plush-toy-erp-v5/run/atlas-migrate.lock"
-    [[ "$web_desktop_bind_addr" == "127.0.0.1" ]] || fail "customer-trial-133 前端宿主机端口必须绑定 WEB_DESKTOP_BIND_ADDR=127.0.0.1"
-    for trial_port in \
-      POSTGRES_PORT=55435 \
-      APP_HTTP_PORT=8315 \
-      WEB_DESKTOP_PORT=5185 \
-      JAEGER_5775_PORT=45775 \
-      JAEGER_6831_PORT=46831 \
-      JAEGER_6832_PORT=46832 \
-      JAEGER_5778_PORT=45778 \
-      JAEGER_UI_PORT=46687 \
-      JAEGER_14268_PORT=54268 \
-      JAEGER_14250_PORT=54250 \
-      JAEGER_9411_PORT=49411 \
-      JAEGER_OTLP_GRPC_PORT=44317 \
-      JAEGER_OTLP_HTTP_PORT=44318; do
-      trial_port_key="${trial_port%%=*}"
-      trial_port_expected="${trial_port#*=}"
-      trial_port_actual="$(value_of "$trial_port_key")"
-      [[ "$trial_port_actual" == "$trial_port_expected" ]] || fail "customer-trial-133 必须使用独立 ${trial_port_key}=${trial_port_expected}"
+  if [[ "$registered_target_mode" -eq 1 ]]; then
+    [[ "$erp_customer_key" == "yoyoosun" ]] || fail "登记目标只允许 ERP_CUSTOMER_KEY=yoyoosun"
+    [[ "$project_slug" == "$target_project" ]] || fail "$deployment_target 的 PROJECT_SLUG 不符合登记合同"
+    [[ "$postgres_database" == "$target_database" ]] || fail "$deployment_target 的 POSTGRES_DB 不符合登记合同"
+    [[ "$postgres_data_dir" == "$target_data_dir" ]] || fail "$deployment_target 的 POSTGRES_DATA_DIR 不符合登记合同"
+    [[ "$migration_lock_file" == "$target_lock_file" ]] || fail "$deployment_target 的 MIGRATION_LOCK_FILE 不符合登记合同"
+    [[ "$erp_allow_customer_trial_config" == "$target_trial_enabled" ]] || fail "$deployment_target 的试用配置开关不符合登记合同"
+    [[ "$erp_customer_trial_target" == "$target_trial_target" ]] || fail "$deployment_target 的数据环境身份不符合登记合同"
+    [[ "$web_desktop_bind_addr" == "127.0.0.1" ]] || fail "$deployment_target 前端宿主机端口必须绑定 127.0.0.1"
+    for target_port in "${target_ports[@]}"; do
+      target_port_key="${target_port%%=*}"
+      target_port_expected="${target_port#*=}"
+      target_port_actual="$(value_of "$target_port_key")"
+      [[ "$target_port_actual" == "$target_port_expected" ]] || fail "$deployment_target 的 ${target_port_key} 不符合登记合同"
     done
 
-    [[ -n "$compose_override" ]] || fail "customer-trial-133 必须显式传入 --compose-override $trial_compose_override"
-    [[ -f "$compose_override" ]] || fail "customer-trial-133 Compose override 不存在: $compose_override"
-    [[ ! -L "$compose_override" ]] || fail "customer-trial-133 Compose override 不得是符号链接"
+    [[ -n "$compose_override" ]] || fail "$deployment_target 必须显式传入受控 Compose override"
+    [[ -f "$compose_override" && ! -L "$compose_override" ]] || fail "$deployment_target Compose override 不存在、不是普通文件或是符号链接"
     compose_override_real="$(cd "$(dirname "$compose_override")" && printf '%s/%s' "$(pwd -P)" "$(basename "$compose_override")")"
-    trial_compose_override_real="$(cd "$(dirname "$trial_compose_override")" && printf '%s/%s' "$(pwd -P)" "$(basename "$trial_compose_override")")"
-    [[ "$compose_override_real" == "$trial_compose_override_real" ]] || fail "customer-trial-133 只能使用受控 Compose override: $trial_compose_override"
+    target_compose_override_real="$(cd "$(dirname "$target_compose_override")" && printf '%s/%s' "$(pwd -P)" "$(basename "$target_compose_override")")"
+    [[ "$compose_override_real" == "$target_compose_override_real" ]] || fail "$deployment_target 只能使用登记的 Compose override"
     compose_override_contract="$(awk '
       {
         line = $0
@@ -529,10 +567,14 @@ PY
         if (line != "" && line !~ /^#/) print line
       }
     ' "$compose_override")"
-    [[ "$compose_override_contract" == "name: plush-toy-erp-v5" ]] || fail "customer-trial-133 Compose override 只能声明 name: plush-toy-erp-v5"
+    [[ "$compose_override_contract" == "name: $target_project" ]] || fail "$deployment_target Compose override 只能声明登记 project"
   else
-    [[ -z "$erp_customer_trial_target" ]] || fail "ERP_ALLOW_CUSTOMER_TRIAL_CONFIG=0 时 ERP_CUSTOMER_TRIAL_TARGET 必须为空"
-    [[ -z "$compose_override" ]] || fail "非 customer-trial-133 运行禁止传入 Compose override"
+    [[ -z "$deployment_target" ]] || fail "部署目标不符合登记合同"
+    [[ -z "$compose_override" ]] || fail "未选择登记目标时禁止传入 Compose override"
+    if [[ "$erp_allow_customer_trial_config" == "1" ]]; then
+      fail "试用配置只能由登记的 demo-133 目标启用"
+    fi
+    [[ -z "$erp_customer_trial_target" ]] || fail "试用配置关闭时 ERP_CUSTOMER_TRIAL_TARGET 必须为空"
   fi
   [[ "$erp_pdf_warmup" == "async" ]] || fail "ERP_PDF_WARMUP 生产发布必须显式为 async；off 只允许故障隔离，不能作为 release-ready 配置"
   [[ "$postgres_bind_addr" == "127.0.0.1" ]] || fail "POSTGRES_BIND_ADDR 必须为 127.0.0.1，避免 PostgreSQL 暴露到公网或办公网"
@@ -603,8 +645,8 @@ ok "Compose、低配部署边界和 migration 脚本通过"
 if [[ "$runtime_check" -eq 1 ]]; then
   [[ "$mode" != "example" ]] || fail "--example 不得与 --runtime 同时使用"
   if [[ -z "$expected_release" ]]; then
-    if [[ "${erp_allow_customer_trial_config:-0}" == "1" ]]; then
-      fail "customer-trial-133 --runtime 必须显式传入 --expected-release <40sha>"
+    if [[ "$registered_target_mode" -eq 1 ]]; then
+      fail "$deployment_target --runtime 必须显式传入 --expected-release <40sha>"
     fi
     expected_release="$(git rev-parse HEAD 2>/dev/null || true)"
   fi
@@ -612,15 +654,15 @@ if [[ "$runtime_check" -eq 1 ]]; then
 fi
 
 compose_args=(--env-file "$env_file" -f "$compose_file")
-if [[ "${erp_allow_customer_trial_config:-0}" == "1" ]]; then
-  compose_args=(-p plush-toy-erp-v5 "${compose_args[@]}")
+if [[ "$registered_target_mode" -eq 1 ]]; then
+  compose_args=(-p "$target_project" "${compose_args[@]}")
 fi
 if [[ -n "$compose_override" ]]; then
   compose_args+=(-f "$compose_override")
 fi
 
-if [[ "${erp_allow_customer_trial_config:-0}" == "1" && "$skip_compose_config" -eq 1 ]]; then
-  fail "customer-trial-133 禁止 --skip-compose-config，必须解析真实 Compose project"
+if [[ "$registered_target_mode" -eq 1 && "$skip_compose_config" -eq 1 ]]; then
+  fail "$deployment_target 禁止 --skip-compose-config，必须解析真实 Compose project"
 fi
 if [[ "$runtime_check" -eq 1 && "$skip_compose_config" -eq 1 ]]; then
   fail "--runtime 禁止 --skip-compose-config"
@@ -639,10 +681,10 @@ if [[ "$skip_compose_config" -eq 0 ]]; then
   fi
 
   if [[ ${#compose_config_cmd[@]} -gt 0 ]]; then
-    if [[ "${erp_allow_customer_trial_config:-0}" == "1" ]]; then
+    if [[ "$registered_target_mode" -eq 1 ]]; then
       resolved_compose_config=""
       if ! resolved_compose_config="$("${compose_config_cmd[@]}" config 2>/dev/null)"; then
-        fail "customer-trial-133 docker compose config 失败"
+        fail "$deployment_target docker compose config 失败"
       fi
       resolved_compose_name="$(printf '%s\n' "$resolved_compose_config" | awk '
         /^name:[[:space:]]*/ {
@@ -653,8 +695,8 @@ if [[ "$skip_compose_config" -eq 0 ]]; then
         }
       ')"
       unset resolved_compose_config
-      [[ "$resolved_compose_name" == "plush-toy-erp-v5" ]] || fail "customer-trial-133 解析后的 Compose project 必须是 plush-toy-erp-v5"
-      ok "docker compose config 解析的 project=plush-toy-erp-v5"
+      [[ "$resolved_compose_name" == "$target_project" ]] || fail "$deployment_target 解析后的 Compose project 不符合登记合同"
+      ok "docker compose config 解析的 project=$target_project"
     else
       "${compose_config_cmd[@]}" config -q >/dev/null
       ok "docker compose config -q 通过"
@@ -729,69 +771,70 @@ if [[ "$runtime_check" -eq 1 ]]; then
     esac
   }
 
-  if [[ "${erp_allow_customer_trial_config:-0}" == "1" ]]; then
+  if [[ "$registered_target_mode" -eq 1 ]]; then
     for runtime_service_contract in \
-      postgres=plush-toy-erp-v5-postgres \
-      jaeger=plush-toy-erp-v5-jaeger \
-      app-server=plush-toy-erp-v5-server \
-      web-desktop=plush-toy-erp-v5-web-desktop; do
+      postgres="$target_project-postgres" \
+      jaeger="$target_project-jaeger" \
+      app-server="$target_project-server" \
+      web-desktop="$target_project-web-desktop"; do
       service="${runtime_service_contract%%=*}"
       expected_container_name="${runtime_service_contract#*=}"
       cid="$(runtime_cid_for_service "$service")"
       runtime_container_name="$(docker inspect --format '{{.Name}}' "$cid" 2>/dev/null || true)"
       runtime_container_name="$(trim "${runtime_container_name#/}")"
-      [[ "$runtime_container_name" == "$expected_container_name" ]] || fail "customer-trial-133 运行态服务 $service 容器名不符合 V5 独立身份"
+      [[ "$runtime_container_name" == "$expected_container_name" ]] || fail "$deployment_target 运行态服务 $service 容器名不符合登记身份"
       runtime_compose_project="$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$cid" 2>/dev/null || true)"
       runtime_compose_project="$(trim "$runtime_compose_project")"
-      [[ "$runtime_compose_project" == "plush-toy-erp-v5" ]] || fail "customer-trial-133 运行态服务 $service 不属于独立 Compose project plush-toy-erp-v5"
+      [[ "$runtime_compose_project" == "$target_project" ]] || fail "$deployment_target 运行态服务 $service 不属于登记 Compose project"
     done
 
     for runtime_port_contract in \
-      postgres:5432/tcp=55435 \
-      app-server:8300/tcp=8315 \
-      web-desktop:5175/tcp=5185 \
-      jaeger:5775/udp=45775 \
-      jaeger:6831/udp=46831 \
-      jaeger:6832/udp=46832 \
-      jaeger:5778/tcp=45778 \
-      jaeger:16686/tcp=46687 \
-      jaeger:14268/tcp=54268 \
-      jaeger:14250/tcp=54250 \
-      jaeger:9411/tcp=49411 \
-      jaeger:4317/tcp=44317 \
-      jaeger:4318/tcp=44318; do
-      runtime_port_target="${runtime_port_contract%%=*}"
-      runtime_expected_host_port="${runtime_port_contract#*=}"
-      runtime_port_service="${runtime_port_target%%:*}"
-      runtime_container_port="${runtime_port_target#*:}"
+      postgres:5432/tcp:POSTGRES_PORT \
+      app-server:8300/tcp:APP_HTTP_PORT \
+      web-desktop:5175/tcp:WEB_DESKTOP_PORT \
+      jaeger:5775/udp:JAEGER_5775_PORT \
+      jaeger:6831/udp:JAEGER_6831_PORT \
+      jaeger:6832/udp:JAEGER_6832_PORT \
+      jaeger:5778/tcp:JAEGER_5778_PORT \
+      jaeger:16686/tcp:JAEGER_UI_PORT \
+      jaeger:14268/tcp:JAEGER_14268_PORT \
+      jaeger:14250/tcp:JAEGER_14250_PORT \
+      jaeger:9411/tcp:JAEGER_9411_PORT \
+      jaeger:4317/tcp:JAEGER_OTLP_GRPC_PORT \
+      jaeger:4318/tcp:JAEGER_OTLP_HTTP_PORT; do
+      runtime_port_service="${runtime_port_contract%%:*}"
+      runtime_port_tail="${runtime_port_contract#*:}"
+      runtime_container_port="${runtime_port_tail%:*}"
+      runtime_port_env_key="${runtime_port_tail##*:}"
+      runtime_expected_host_port="$(value_of "$runtime_port_env_key")"
       runtime_port_cid="$(runtime_cid_for_service "$runtime_port_service")"
       runtime_host_binding="$(docker port "$runtime_port_cid" "$runtime_container_port" 2>/dev/null || true)"
       runtime_host_binding="$(trim "$runtime_host_binding")"
-      [[ "$runtime_host_binding" == "127.0.0.1:$runtime_expected_host_port" ]] || fail "customer-trial-133 运行态服务 $runtime_port_service 端口 $runtime_container_port 未精确绑定 V5 独立宿主端口"
+      [[ "$runtime_host_binding" == "127.0.0.1:$runtime_expected_host_port" ]] || fail "$deployment_target 运行态服务 $runtime_port_service 端口 $runtime_container_port 未精确绑定登记宿主端口"
     done
 
     runtime_postgres_mount="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql"}}{{.Source}}{{println}}{{end}}{{end}}' "$postgres_cid" 2>/dev/null || true)"
     runtime_postgres_mount="$(trim "$runtime_postgres_mount")"
-    [[ "$runtime_postgres_mount" == "/home/simon/plush-toy-erp-v5/data/postgres" ]] || fail "customer-trial-133 运行态 PostgreSQL 挂载源不符合 V5 独立数据目录"
+    [[ "$runtime_postgres_mount" == "$target_data_dir" ]] || fail "$deployment_target 运行态 PostgreSQL 挂载源不符合登记数据目录"
 
     runtime_trial_app_env="$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$app_cid" 2>/dev/null || true)"
     for runtime_app_contract in \
       ERP_CUSTOMER_KEY=yoyoosun \
       ERP_DEBUG_ENV=prod \
-      ERP_ALLOW_CUSTOMER_TRIAL_CONFIG=1 \
-      ERP_CUSTOMER_TRIAL_TARGET=customer-trial-133; do
+      ERP_ALLOW_CUSTOMER_TRIAL_CONFIG="$target_trial_enabled" \
+      ERP_CUSTOMER_TRIAL_TARGET="$target_trial_target"; do
       runtime_app_key="${runtime_app_contract%%=*}"
       runtime_app_expected="${runtime_app_contract#*=}"
       runtime_app_count="$(printf '%s\n' "$runtime_trial_app_env" | awk -F= -v key="$runtime_app_key" '$1 == key { count++ } END { print count + 0 }')"
       runtime_app_actual="$(printf '%s\n' "$runtime_trial_app_env" | awk -F= -v key="$runtime_app_key" '$1 == key { value = $0; sub(/^[^=]*=/, "", value) } END { print value }')"
-      [[ "$runtime_app_count" == "1" && "$runtime_app_actual" == "$runtime_app_expected" ]] || fail "customer-trial-133 运行态 app-server 试用身份变量不符合合同: $runtime_app_key"
+      [[ "$runtime_app_count" == "1" && "$runtime_app_actual" == "$runtime_app_expected" ]] || fail "$deployment_target 运行态 app-server 数据环境身份变量不符合合同: $runtime_app_key"
     done
     runtime_app_dsn_count="$(printf '%s\n' "$runtime_trial_app_env" | awk -F= '$1 == "POSTGRES_DSN" { count++ } END { print count + 0 }')"
     runtime_app_dsn="$(printf '%s\n' "$runtime_trial_app_env" | awk -F= '$1 == "POSTGRES_DSN" { value = $0; sub(/^[^=]*=/, "", value) } END { print value }')"
-    [[ "$runtime_app_dsn_count" == "1" ]] || fail "customer-trial-133 运行态 app-server 必须只有一个 POSTGRES_DSN"
-    [[ "$runtime_app_dsn" =~ ^postgres://erp_app:[A-Za-z0-9._~-]{20,128}@postgres:5432/plush_erp_uat_20260716_v5\?sslmode=disable$ ]] || fail "customer-trial-133 运行态 app-server POSTGRES_DSN 必须使用 erp_app 精确指向登记的试用数据库"
+    [[ "$runtime_app_dsn_count" == "1" ]] || fail "$deployment_target 运行态 app-server 必须只有一个 POSTGRES_DSN"
+    [[ "$runtime_app_dsn" == "$expected_postgres_dsn" ]] || fail "$deployment_target 运行态 app-server POSTGRES_DSN 不符合登记数据库合同"
     unset runtime_trial_app_env runtime_app_dsn
-    ok "customer-trial-133 运行态容器名、project、端口、PostgreSQL 挂载和 app 试用身份一致"
+    ok "$deployment_target 运行态容器名、project、端口、PostgreSQL 挂载和数据环境身份一致"
   fi
 
   runtime_app_env="$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$app_cid" 2>/dev/null || true)"

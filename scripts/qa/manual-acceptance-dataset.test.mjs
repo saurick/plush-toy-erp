@@ -336,7 +336,7 @@ function trialDatabaseRebuildReceipt(
     schemaVersion: "plush.remote-database-rebuild-receipt/v1",
     status: "passed",
     operationId,
-    target: "test-133",
+    target: "demo-133",
     gitSha: attestation.release,
     version: "2026.08.20-1",
     releaseManifestSha256: "a".repeat(64),
@@ -344,7 +344,7 @@ function trialDatabaseRebuildReceipt(
     stage: "passed",
     issueCode: "none",
     database: {
-      logicalName: "plush_erp_uat_20260716_v5",
+      logicalName: "plush_erp_demo_v1",
       previousDataAlias: `rollback-${attestation.release.slice(0, 12)}-${operationId.slice(0, 8)}`,
       dataSwitchStarted: true,
       predecessorRecovered: false,
@@ -454,7 +454,7 @@ function trialBaselineFetch(nonEmptyKey = "") {
     } else if (request.method === "capabilities") {
       data = {
         environment: "remote",
-        databaseName: "plush_erp_uat_20260716_v5",
+        databaseName: "plush_erp_demo_v1",
         seedEnabled: false,
         seedAllowed: false,
         cleanupEnabled: false,
@@ -2870,7 +2870,7 @@ test("core RPC verifier uses one admin read-only preflight and returns only stab
           : request.method === "capabilities"
             ? {
                 environment: "remote",
-                databaseName: "plush_erp_uat_20260716_v5",
+                databaseName: "plush_erp_demo_v1",
                 seedEnabled: false,
                 seedAllowed: false,
                 cleanupEnabled: false,
@@ -2952,7 +2952,7 @@ test("core RPC verifier uses one admin read-only preflight and returns only stab
     fetchImpl: makeFetch(),
   });
   assert.deepEqual(verified, {
-    databaseName: "plush_erp_uat_20260716_v5",
+    databaseName: "plush_erp_demo_v1",
     configRevision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
     configProductVersion: CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
     configApplyPurpose: CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
@@ -2961,7 +2961,7 @@ test("core RPC verifier uses one admin read-only preflight and returns only stab
     runtimeIdentity: {
       scope: "release-v1",
       proof: "matched-v1",
-      databaseName: "plush_erp_uat_20260716_v5",
+      databaseName: "plush_erp_demo_v1",
       release: binding.targetAttestation.release,
       migration: binding.targetAttestation.migration,
     },
@@ -2988,7 +2988,7 @@ test("core RPC verifier uses one admin read-only preflight and returns only stab
     .update(
       [
         "release-v1",
-        "plush_erp_uat_20260716_v5",
+        "plush_erp_demo_v1",
         binding.targetAttestation.release,
         binding.targetAttestation.migration,
       ].join("\n"),
@@ -3034,14 +3034,14 @@ test("empty baseline verifier binds runtime and config, proves exact core, and r
   const binding = {
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
     policyTarget: CUSTOMER_TRIAL_133_TARGET,
-    databaseName: "plush_erp_uat_20260716_v5",
+    databaseName: "plush_erp_demo_v1",
     datasetKey: "yoyoosun-manual-acceptance",
     dataVersion: "2026.08.15-v6",
     runId: "20260815-V6",
     targetAttestation: trialAttestation(),
     adminPassword: "admin-password",
     coreReport: {
-      databaseName: "plush_erp_uat_20260716_v5",
+      databaseName: "plush_erp_demo_v1",
       configRevision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
       configProductVersion: CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
       configApplyPurpose: CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
@@ -3075,7 +3075,7 @@ test("empty baseline verifier binds runtime and config, proves exact core, and r
       } else if (request.method === "capabilities") {
         data = {
           environment: "remote",
-          databaseName: "plush_erp_uat_20260716_v5",
+          databaseName: "plush_erp_demo_v1",
           seedEnabled: false,
           seedAllowed: false,
           cleanupEnabled: false,
@@ -3333,7 +3333,7 @@ test("core preflight uses live debug capabilities and stops before business-code
         ? { access_token: "admin-token" }
         : {
             environment: "remote",
-            databaseName: "plush_erp_uat_20260716_v5",
+            databaseName: "plush_erp_demo_v1",
             seedEnabled: false,
             seedAllowed: false,
             cleanupEnabled: false,

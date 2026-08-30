@@ -450,7 +450,7 @@ export function validateRemotePromotionReceipt(receipt, expected) {
     receipt?.schemaVersion !== REMOTE_PROMOTION_RECEIPT_CONTRACT ||
     !["passed", "failed", "not_proven"].includes(receipt?.status) ||
     receipt?.operationId !== expected.operationId ||
-    receipt?.target !== "test-133" ||
+    receipt?.target !== expected.targetKey ||
     receipt?.gitSha !== expected.gitSha ||
     receipt?.version !== expected.version ||
     receipt?.releaseManifestSha256 !== expected.releaseManifestSha256 ||
@@ -596,13 +596,17 @@ export function executePromotion(
   ) {
     throw new Error("promotion operation is not in the eligible ready state");
   }
-  const expectedConfirmation = `PROMOTE:test-133:${operation.gitSha}:${operation.id}`;
+  const targetKey = plan.target.key;
+  if (operation.target !== targetKey) {
+    throw new Error("promotion operation target does not match its plan");
+  }
+  const expectedConfirmation = `PROMOTE:${targetKey}:${operation.gitSha}:${operation.id}`;
   if (confirmation !== expectedConfirmation) {
     throw new Error(
       `explicit confirmation is required: ${expectedConfirmation}`,
     );
   }
-  const immediatePreflight = runPreflight("test-133");
+  const immediatePreflight = runPreflight(targetKey);
   const immediateBlockers = new Set(immediatePreflight.blockers || []);
   const immediateRuntime = immediatePreflight.remote?.runtime;
   if (
@@ -654,7 +658,7 @@ export function executePromotion(
     bundleDir,
     releaseManifestPath,
   });
-  const cacheProbe = probeCache(cacheIdentity, { runCommand });
+  const cacheProbe = probeCache(cacheIdentity, { runCommand, targetKey });
   const avoidedTransfer = estimateAvoidedTransferDuration(
     cacheProbe.avoidedBytes,
     listDeliveryOperations(store, { limit: 200 }),
@@ -669,7 +673,7 @@ export function executePromotion(
     },
     { runCommand, cachedPackage: cacheProbe.packageHit },
   );
-  const target = getDeploymentTarget("test-133");
+  const target = getDeploymentTarget(targetKey);
   const sshArgs = fixedSshArgs(target);
   assertLocalRsync(runCommand);
   const rsyncTransfer = buildFixedTargetRsyncTransfer({
@@ -702,7 +706,7 @@ export function executePromotion(
   try {
     prepareCache(
       { operationId: operation.id, identity: cacheIdentity, probe: cacheProbe },
-      { runCommand },
+      { runCommand, targetKey },
     );
     targetPrepared = true;
     const transferStartedAt = Date.now();
@@ -729,6 +733,7 @@ export function executePromotion(
         "bash",
         remoteScript,
         "promote",
+        targetKey,
         operation.id,
         operation.gitSha,
         operation.version,
@@ -747,6 +752,7 @@ export function executePromotion(
     let receipt;
     try {
       receipt = validateRemotePromotionReceipt(JSON.parse(rawReceipt), {
+        targetKey,
         operationId: operation.id,
         gitSha: operation.gitSha,
         version: operation.version,
@@ -813,7 +819,7 @@ export function executePromotion(
     let executionError = error;
     if (!remoteStarted && targetPrepared) {
       try {
-        cleanupCache(operation.id, { runCommand });
+        cleanupCache(operation.id, { runCommand, targetKey });
       } catch (cleanupError) {
         executionError = new Error(
           `${error.message}; target incoming cleanup failed: ${cleanupError.message}`,
@@ -918,7 +924,7 @@ if (isMainModule()) {
     --operation-id <uuid-v4> \\
     --bundle-dir <immutable-release-directory> \\
     --release-manifest <release-manifest.json> \\
-    --confirmation PROMOTE:test-133:<sha>:<operation-id> [--json]
+    --confirmation PROMOTE:<target>:<sha>:<operation-id> [--json]
 
 The operation must already be ready. A terminal or unknown operation is never
 automatically retried. The browser-facing Bridge chooses all local paths.`);

@@ -78,7 +78,7 @@ test("avoided transfer time is estimated only from a measured cold target operat
   );
 });
 
-test("target cache probe and prepare use fixed SSH scripts and fail closed", () => {
+test("both target cache paths use fixed SSH scripts and fail closed", () => {
   const identity = {
     contract: TARGET_RELEASE_CACHE_CONTRACT,
     gitSha: SHA,
@@ -113,15 +113,18 @@ test("target cache probe and prepare use fixed SSH scripts and fail closed", () 
       })}\n`,
     };
   };
-  const probe = probeTargetReleaseCache(identity, { runCommand });
-  prepareTargetReleaseIncoming(
-    { operationId: "123e4567-e89b-42d3-a456-426614174000", identity, probe },
-    { runCommand },
-  );
-  cleanupPreparedTargetReleaseIncoming("123e4567-e89b-42d3-a456-426614174000", {
-    runCommand,
-  });
-  assert.equal(calls.length, 3);
+  for (const targetKey of ["demo-133", "customer-test-133"]) {
+    const probe = probeTargetReleaseCache(identity, { runCommand, targetKey });
+    prepareTargetReleaseIncoming(
+      { operationId: "123e4567-e89b-42d3-a456-426614174000", identity, probe },
+      { runCommand, targetKey },
+    );
+    cleanupPreparedTargetReleaseIncoming(
+      "123e4567-e89b-42d3-a456-426614174000",
+      { runCommand, targetKey },
+    );
+  }
+  assert.equal(calls.length, 6);
   assert.equal(
     calls.every((call) => call.command === "ssh"),
     true,
@@ -130,9 +133,27 @@ test("target cache probe and prepare use fixed SSH scripts and fail closed", () 
     calls.every((call) => call.args.includes("BatchMode=yes")),
     true,
   );
-  assert.match(calls[0].input, /invalid formal cache/u);
-  assert.match(calls[0].input, /releaseVersion == \$version/u);
-  assert.match(calls[1].input, /\.target-cache\.json/u);
-  assert.match(calls[2].input, /rm -rf -- "\$incoming"/u);
-  assert.match(calls[2].input, /! -L "\$incoming"/u);
+  for (const offset of [0, 3]) {
+    assert.match(calls[offset].input, /invalid formal cache/u);
+    assert.match(calls[offset].input, /releaseVersion == \$version/u);
+    assert.match(calls[offset + 1].input, /\.target-cache\.json/u);
+    assert.match(calls[offset + 2].input, /rm -rf -- "\$incoming"/u);
+    assert.match(calls[offset + 2].input, /! -L "\$incoming"/u);
+  }
+  assert.equal(
+    calls
+      .slice(0, 3)
+      .every((call) =>
+        call.input.includes("root=/home/simon/plush-toy-erp-demo-v1"),
+      ),
+    true,
+  );
+  assert.equal(
+    calls
+      .slice(3)
+      .every((call) =>
+        call.input.includes("root=/home/simon/plush-toy-erp-test-v1"),
+      ),
+    true,
+  );
 });

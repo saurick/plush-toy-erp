@@ -4,6 +4,7 @@ name: GitHub Review Mirror CI
   pull_request:
   push:
     branches:
+      - "review/gpt"
       - "review/gpt/**"
   workflow_dispatch:
     inputs:

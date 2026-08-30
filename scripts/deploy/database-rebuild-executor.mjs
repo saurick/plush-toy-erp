@@ -286,13 +286,13 @@ export function validateRemoteDatabaseRebuildReceipt(receipt, expected) {
     receipt?.schemaVersion !== REMOTE_DATABASE_REBUILD_RECEIPT_CONTRACT ||
     !["passed", "failed", "not_proven"].includes(receipt?.status) ||
     receipt?.operationId !== expected.operationId ||
-    receipt?.target !== "test-133" ||
+    receipt?.target !== expected.targetKey ||
     receipt?.gitSha !== expected.gitSha ||
     receipt?.version !== expected.version ||
     receipt?.releaseManifestSha256 !== expected.releaseManifestSha256 ||
     receipt?.databaseRebuildFingerprint !==
       expected.databaseRebuildFingerprint ||
-    receipt?.database?.logicalName !== "plush_erp_uat_20260716_v5" ||
+    receipt?.database?.logicalName !== expected.databaseName ||
     receipt?.database?.previousDataAlias !==
       `rollback-${expected.gitSha.slice(0, 12)}-${expected.operationId.slice(0, 8)}` ||
     receipt?.database?.automaticDeletion !== false ||
@@ -385,8 +385,13 @@ function fixedSshArgs(target) {
 const PREPARE_REMOTE_INCOMING = String.raw`set -euo pipefail
 umask 077
 operation_id="$1"
+target="$2"
 [[ "$operation_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]
-root=/home/simon/plush-toy-erp-v5
+case "$target" in
+  demo-133) root=/home/simon/plush-toy-erp-demo-v1 ;;
+  customer-test-133) root=/home/simon/plush-toy-erp-test-v1 ;;
+  *) exit 64 ;;
+esac
 incoming_root=$root/incoming
 incoming=$incoming_root/$operation_id
 mkdir -p "$incoming_root"
@@ -403,8 +408,13 @@ chmod 700 "$incoming"
 const REMOVE_REMOTE_BOOTSTRAP_SECRET = String.raw`set -euo pipefail
 umask 077
 operation_id="$1"
+target="$2"
 [[ "$operation_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]
-root=/home/simon/plush-toy-erp-v5
+case "$target" in
+  demo-133) root=/home/simon/plush-toy-erp-demo-v1 ;;
+  customer-test-133) root=/home/simon/plush-toy-erp-test-v1 ;;
+  *) exit 64 ;;
+esac
 incoming=$root/incoming/$operation_id
 if [[ -e "$incoming" ]]; then
   [[ -d "$incoming" && ! -L "$incoming" ]]
@@ -462,13 +472,13 @@ export function executeDatabaseRebuild(
   ) {
     throw new Error("database rebuild operation is not eligible and ready");
   }
-  const expectedConfirmation = `REBUILD_DATABASE:test-133:${operation.gitSha}:${operation.id}`;
+  const expectedConfirmation = `REBUILD_DATABASE:${plan.target.key}:${operation.gitSha}:${operation.id}`;
   if (confirmation !== expectedConfirmation) {
     throw new Error(
       `explicit confirmation is required: ${expectedConfirmation}`,
     );
   }
-  const immediatePreflight = runPreflight("test-133");
+  const immediatePreflight = runPreflight(plan.target.key);
   const immediateRuntime = immediatePreflight.remote?.runtime;
   const immediateBlockers = [...(immediatePreflight.blockers || [])];
   if (
@@ -535,7 +545,7 @@ export function executeDatabaseRebuild(
     },
     { runCommand, createSecret },
   );
-  const target = getDeploymentTarget("test-133");
+  const target = getDeploymentTarget(plan.target.key);
   const sshArgs = fixedSshArgs(target);
   assertLocalRsync(runCommand);
   const rsyncTransfer = buildFixedTargetRsyncTransfer({
@@ -558,7 +568,7 @@ export function executeDatabaseRebuild(
     runChecked(
       runCommand,
       "ssh",
-      [...sshArgs, "bash", "-s", "--", operation.id],
+      [...sshArgs, "bash", "-s", "--", operation.id, target.key],
       { input: PREPARE_REMOTE_INCOMING, timeout: 30_000 },
       "prepare fixed remote database rebuild directory",
     );
@@ -579,6 +589,7 @@ export function executeDatabaseRebuild(
         "bash",
         remoteScript,
         "rebuild-database",
+        target.key,
         operation.id,
         operation.gitSha,
         operation.version,
@@ -597,6 +608,8 @@ export function executeDatabaseRebuild(
     try {
       receipt = validateRemoteDatabaseRebuildReceipt(JSON.parse(rawReceipt), {
         operationId: operation.id,
+        targetKey: target.key,
+        databaseName: target.database.name,
         gitSha: operation.gitSha,
         version: operation.version,
         migration: plan.release.migration.latest,
@@ -674,7 +687,7 @@ export function executeDatabaseRebuild(
         runChecked(
           runCommand,
           "ssh",
-          [...sshArgs, "bash", "-s", "--", operation.id],
+          [...sshArgs, "bash", "-s", "--", operation.id, target.key],
           { input: REMOVE_REMOTE_BOOTSTRAP_SECRET, timeout: 30_000 },
           "remove fixed remote database rebuild bootstrap secret",
         );
@@ -769,7 +782,7 @@ if (isMainModule()) {
   node scripts/deploy/database-rebuild-executor.mjs \\
     --operation-id <uuid-v4> \\
     --release-manifest <release-manifest.json> \\
-    --confirmation REBUILD_DATABASE:test-133:<sha>:<operation-id> [--json]
+    --confirmation REBUILD_DATABASE:<target>:<sha>:<operation-id> [--json]
 
 The operation must already be ready. The executor retains the predecessor data
 directory and backup, never deletes a database generation, and never retries an

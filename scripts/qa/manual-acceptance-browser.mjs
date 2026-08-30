@@ -144,7 +144,7 @@ function requiredText(value, label) {
   return text;
 }
 
-export function normalizeLocalBrowserURL(value, label = "URL") {
+export function normalizeManualAcceptanceBrowserURL(value, label = "URL") {
   let url;
   try {
     url = new URL(requiredText(value, label));
@@ -161,9 +161,12 @@ export function normalizeLocalBrowserURL(value, label = "URL") {
       2,
     );
   }
-  if (!LOCAL_HOSTS.has(url.hostname)) {
+  if (
+    !LOCAL_HOSTS.has(url.hostname) &&
+    url.origin !== CUSTOMER_TRIAL_133_ORIGIN
+  ) {
     throw new BrowserAcceptanceError(
-      `${label} must stay on this computer: ${url.origin}`,
+      `${label} must be local or the registered customer-trial TLS origin`,
       2,
     );
   }
@@ -175,6 +178,8 @@ export function normalizeLocalBrowserURL(value, label = "URL") {
   }
   return url.origin;
 }
+
+export const normalizeLocalBrowserURL = normalizeManualAcceptanceBrowserURL;
 
 export function resolveManualAcceptanceBrowserReportPath(value = "") {
   const target = value ? path.resolve(REPO_ROOT, value) : DEFAULT_REPORT_PATH;
@@ -361,9 +366,11 @@ export function buildManualAcceptanceBrowserPlan({
     customerKey: catalog.meta.customerKey,
     companyName: COMPANY_NAME,
     systemName: catalog.meta.systemName,
-    baseURL: baseURL ? normalizeLocalBrowserURL(baseURL, "--base-url") : "",
+    baseURL: baseURL
+      ? normalizeManualAcceptanceBrowserURL(baseURL, "--base-url")
+      : "",
     backendURL: backendURL
-      ? normalizeLocalBrowserURL(backendURL, "--backend-url")
+      ? normalizeManualAcceptanceBrowserURL(backendURL, "--backend-url")
       : "",
     target: accountSet.target,
     accountKind: accountSet.accountKind,
@@ -573,10 +580,10 @@ export function getManualAcceptanceBrowserHelp() {
     --backend-url http://127.0.0.1:8310
 
 说明：
-  只允许 localhost / 127.0.0.1 / ::1，不接受带凭据、路径、查询参数或跳转的 URL。
+  只允许 localhost / 127.0.0.1 / ::1 或精确 https://demo.yoyoosun.net，不接受带凭据、路径、查询参数或跳转的 URL。
   真实验收只登录、读页面和切换只读页签，不点击新增、编辑、提交、完成、取消或过账动作。
   非 plan 模式必须提供同一 runner 生成的 dataset、source、facts 和 readiness 规范报告；缺少附件或岗位场景也会失败。
-  本地报告只登录 demo_* 并读取 MANUAL_ACCEPTANCE_PASSWORD；customer-trial-133 只登录 uat_* 并固定使用 12345678，MANUAL_ACCEPTANCE_UAT_PASSWORD 如提供不得漂移，并使用 127.0.0.1:18375 SSH 隧道、对应报告和 --target-attestation-json。
+  本地报告只登录 demo_* 并读取 MANUAL_ACCEPTANCE_PASSWORD；customer-trial-133 只登录 uat_* 并固定使用 12345678，MANUAL_ACCEPTANCE_UAT_PASSWORD 如提供不得漂移，并使用精确系统信任 TLS 入口、对应报告和 --target-attestation-json。
   报告默认写入 output/qa/manual-acceptance/browser/report.json，不保存密码或登录令牌。
 `;
 }
@@ -4375,8 +4382,11 @@ export async function runManualAcceptanceBrowser(
   } = {},
   runtime = {},
 ) {
-  const normalizedBaseURL = normalizeLocalBrowserURL(baseURL, "--base-url");
-  const normalizedBackendURL = normalizeLocalBrowserURL(
+  const normalizedBaseURL = normalizeManualAcceptanceBrowserURL(
+    baseURL,
+    "--base-url",
+  );
+  const normalizedBackendURL = normalizeManualAcceptanceBrowserURL(
     backendURL,
     "--backend-url",
   );

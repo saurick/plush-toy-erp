@@ -20,7 +20,7 @@ import (
 const (
 	testMigration = "20260716123456"
 	testRelease   = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-	testDSN       = "postgres://postgres:runtime-password@postgres:5432/plush_erp_uat_20260716_v5?sslmode=disable"
+	testDSN       = "postgres://postgres:runtime-password@postgres:5432/plush_erp_demo_v1?sslmode=disable"
 )
 
 func validOptions() options {

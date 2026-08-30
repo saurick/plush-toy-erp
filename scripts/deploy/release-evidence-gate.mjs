@@ -43,7 +43,8 @@ function loadCredentialContract() {
     contract?.schemaVersion === "yoyoosun-credential-contract/v4" &&
     contract?.customerCode === "yoyoosun" &&
     contract?.target?.key === "customer-trial-133" &&
-    contract?.target?.database === "plush_erp_uat_20260716_v5" &&
+    contract?.target?.deploymentTarget === "demo-133" &&
+    contract?.target?.database === "plush_erp_demo_v1" &&
     contract?.target?.datasetVersion === "2026.08.15-v6" &&
     admin?.username === "admin" &&
     admin?.environmentVariable === "MANUAL_ACCEPTANCE_ADMIN_PASSWORD" &&

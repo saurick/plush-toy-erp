@@ -95,7 +95,7 @@ export const DEV_DATA_PREPARATION_PROFILE_COPY = Object.freeze({
     title: '长期业务场景数据',
     shortTitle: 'Scenario Demo',
     purpose:
-      '在本地开发或 133 测试的固定目标上准备同一语义的长期模拟场景，不是完整验收',
+      '在本地开发或 demo-133 固定目标上准备同一语义的长期模拟场景，不是完整验收',
     retention:
       '固定批次同批精确复用 / 读回；只补齐缺项，不清空已有数据。岗位到期时间是固定快照，不会随当天滚动。',
     cleanup:
@@ -108,15 +108,15 @@ export const DEV_DATA_PREPARATION_PROFILE_COPY = Object.freeze({
     badgeColor: 'default',
     prepareButtonLabel: '生成业务场景测试数据',
     prepareDescription:
-      '在当前目标卡内先权威读回目标身份，再打开二次确认；133 不接受主机、端口、DSN 或命令参数。',
+      '在当前目标卡内先权威读回目标身份，再打开二次确认；demo 不接受主机、端口、DSN 或命令参数。',
     confirmationDescription:
-      '本地会通过正式配置 API 对齐跟踪配置；133 必须同时绑定 release、migration、V8 客户配置、数据版本与新回滚点。两端都不清空历史。',
+      '本地会通过正式配置 API 对齐跟踪配置；demo 必须同时绑定 release、migration、V8 客户配置、数据版本与新回滚点。两端都不清空历史。',
     successDescription:
       '业务场景演示数据已精确读回并长期保留；人工验收仍未完成，本结果不是完整验收。',
     cleanupBoundary: '只向前补齐，不支持批次清理或重置',
     steps: Object.freeze([
       '权威读回当前目标的 release、数据库、migration、客户配置与数据合同',
-      '本地稳定对齐跟踪配置；133 在目标卡内核对 attestation 与新回滚点',
+      '本地稳定对齐跟踪配置；demo 在目标卡内核对 attestation 与新回滚点',
       '通过正式 Source / ProcessRuntime / Fact 路径执行；固定批次精确复用 / 读回，半批或漂移阻断',
     ]),
   }),
@@ -527,6 +527,7 @@ function validateDatasetEnvironmentContract(contract) {
       'configRevision',
       'databaseLifecycle',
       'databaseName',
+      'deploymentTarget',
       'minimumMigration',
       'target',
     ],
@@ -543,7 +544,8 @@ function validateDatasetEnvironmentContract(contract) {
     contract.unitCount !== 11 ||
     contract.warehouseCount !== 4 ||
     contract.customerTrial133.target !== 'customer-trial-133' ||
-    contract.customerTrial133.databaseName !== 'plush_erp_uat_20260716_v5' ||
+    contract.customerTrial133.deploymentTarget !== 'demo-133' ||
+    contract.customerTrial133.databaseName !== 'plush_erp_demo_v1' ||
     contract.customerTrial133.databaseLifecycle !==
       'long-lived-registered-target' ||
     !/^20[0-9]{12}$/u.test(

@@ -301,7 +301,7 @@ test('devHub: fifteen dev pages share the backend-style workspace shell', () => 
   })
 })
 
-test('devHub: delivery overview owns the local, 133, and isolated evidence comparison', () => {
+test('devHub: delivery overview owns the local, demo, test, and isolated evidence comparison', () => {
   assert.doesNotMatch(devPageNavSource, /DevEnvironmentEvidencePanel/u)
   assert.match(devPageNavSource, /控制端：本地 DEV-only/u)
   assert.match(

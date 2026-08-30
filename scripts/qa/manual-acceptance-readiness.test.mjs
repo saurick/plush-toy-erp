@@ -2516,7 +2516,7 @@ test("CLI and exported verification reject external backends before the first fe
         adminPassword: "local-admin-password",
         fetchImpl,
       }),
-    /registered SSH tunnel|完全一致/u,
+    /registered system-trusted TLS origin|完全一致/u,
   );
   await assert.rejects(
     () =>
@@ -2538,13 +2538,13 @@ test("CLI and exported verification reject external backends before the first fe
           fetchImpl,
         },
       ),
-    /registered SSH tunnel|完全一致/u,
+    /registered system-trusted TLS origin|完全一致/u,
   );
   assert.equal(fetchCalls, 0);
 });
 
 test("registered customer-trial-133 verification requires explicit confirmation and attestation", async () => {
-  const backendURL = "http://127.0.0.1:18375";
+  const backendURL = "https://demo.yoyoosun.net";
   const target = "customer-trial-133";
   const remoteRuntime = {
     environment: "remote",
@@ -2692,7 +2692,7 @@ test("local and 133 database mismatches stop before the first network request", 
     /--backend-url 和 --database-name 必须与业务记录报告完全一致/u,
   );
 
-  const backendURL = "http://127.0.0.1:18375";
+  const backendURL = "https://demo.yoyoosun.net";
   const remoteRuntime = {
     environment: "remote",
     customerKey: "yoyoosun",

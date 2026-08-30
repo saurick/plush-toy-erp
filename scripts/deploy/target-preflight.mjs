@@ -23,6 +23,7 @@ const REPORT_KEYS = Object.freeze([
   "MINIMUM_AVAILABLE_BYTES",
   "CAPACITY_STATUS",
   "ENV_STATUS",
+  "RESOURCE_IDENTITY_STATUS",
   "COMPOSE_STATUS",
   "DATABASE_STATUS",
   "DATABASE_NAME",
@@ -70,36 +71,62 @@ const REPORT_KEYS = Object.freeze([
 // This script is streamed over an already-pinned SSH connection. It contains
 // the complete target contract and accepts no remote path, project, database,
 // endpoint or command input.
-export const REMOTE_TARGET_PREFLIGHT_SCRIPT = String.raw`#!/usr/bin/env bash
+const REMOTE_TARGET_PREFLIGHT_SCRIPT_TEMPLATE = String.raw`#!/usr/bin/env bash
 set -euo pipefail
 umask 077
 
-target_key=test-133
-expected_hostname=simon
-expected_user=simon
-root=/home/simon/plush-toy-erp-v5
-current=/home/simon/plush-toy-erp-v5/current
-releases=/home/simon/plush-toy-erp-v5/releases
-cache_root=/home/simon/plush-toy-erp-v5/release-cache
-operations_root=/home/simon/plush-toy-erp-v5/operations
-incoming_root=/home/simon/plush-toy-erp-v5/incoming
-runtime_env=/home/simon/plush-toy-erp-v5/runtime/.env.customer-trial-133
-compose_dir=/home/simon/plush-toy-erp-v5/current/server/deploy/compose/prod
+target_key=__TARGET_KEY__
+expected_hostname=__EXPECTED_HOSTNAME__
+expected_user=__EXPECTED_USER__
+root=__ROOT__
+current=__CURRENT__
+releases=__RELEASES__
+cache_root=__ROOT__/release-cache
+operations_root=__OPERATION_ROOT__
+incoming_root=__ROOT__/incoming
+runtime_env=__RUNTIME_ENV__
+compose_dir=__CURRENT__/server/deploy/compose/prod
 compose_base="$compose_dir/compose.yml"
-compose_override="$compose_dir/compose.customer-trial-133.yml"
-project=plush-toy-erp-v5
-database=plush_erp_uat_20260716_v5
-migration_lock=/home/simon/plush-toy-erp-v5/run/atlas-migrate.lock
-minimum_available_bytes=32212254720
-public_endpoint=https://admin.yoyoosun.net
-public_network=plush-toy-erp-v5_default
-trial_atlas_bin=/home/simon/plush-toy-erp-v5/tools/atlas/v1.2.0/atlas
+compose_override="$compose_dir/__COMPOSE_OVERRIDE__"
+project=__PROJECT__
+database=__DATABASE__
+trial_target=__TRIAL_TARGET__
+migration_lock=__MIGRATION_LOCK__
+postgres_bind=__POSTGRES_BIND__
+postgres_port=__POSTGRES_PORT__
+postgres_data_directory=__POSTGRES_DATA_DIRECTORY__
+app_bind=__APP_BIND__
+app_port=__APP_PORT__
+web_bind=__WEB_BIND__
+web_port=__WEB_PORT__
+jaeger_bind=__JAEGER_BIND__
+jaeger_5775_port=__JAEGER_5775_PORT__
+jaeger_6831_port=__JAEGER_6831_PORT__
+jaeger_6832_port=__JAEGER_6832_PORT__
+jaeger_5778_port=__JAEGER_5778_PORT__
+jaeger_ui_port=__JAEGER_UI_PORT__
+jaeger_14268_port=__JAEGER_14268_PORT__
+jaeger_14250_port=__JAEGER_14250_PORT__
+jaeger_9411_port=__JAEGER_9411_PORT__
+jaeger_otlp_grpc_port=__JAEGER_OTLP_GRPC_PORT__
+jaeger_otlp_http_port=__JAEGER_OTLP_HTTP_PORT__
+minimum_available_bytes=__MINIMUM_AVAILABLE_BYTES__
+public_endpoint=__PUBLIC_ENDPOINT__
+public_network=__PUBLIC_NETWORK__
+public_container_prefix=__PUBLIC_CONTAINER_PREFIX__
+public_host_port=__PUBLIC_HOST_PORT__
+server_endpoint=__SERVER_ENDPOINT__
+web_endpoint=__WEB_ENDPOINT__
+server_container="\${project}-server"
+web_container="\${project}-web-desktop"
+trial_atlas_bin=__ROOT__/tools/atlas/v1.2.0/atlas
 trial_atlas_required_version=v1.2.0
 
 status=passed
 blockers=()
 capacity_status=passed
 env_status=passed
+resource_identity_status=passed
 compose_status=passed
 database_status=passed
 migration_version=unknown
@@ -235,15 +262,50 @@ if plain_file "$runtime_env"; then
     env_status=blocked
     block target_customer_mismatch
   }
-  [[ "$(env_value ERP_CUSTOMER_TRIAL_TARGET)" == customer-trial-133 ]] || {
+  runtime_trial_target="$(env_value ERP_CUSTOMER_TRIAL_TARGET)"
+  runtime_trial_enabled="$(env_value ERP_ALLOW_CUSTOMER_TRIAL_CONFIG)"
+  if [[ "$trial_target" == none ]]; then
+    [[ -z "$runtime_trial_target" && "$runtime_trial_enabled" == 0 ]] || {
+      env_status=blocked
+      block target_trial_identity_mismatch
+    }
+  elif [[ "$runtime_trial_target" != "$trial_target" || "$runtime_trial_enabled" != 1 ]]; then
     env_status=blocked
     block target_trial_identity_mismatch
-  }
+  fi
   [[ "$(env_value POSTGRES_DB)" == "$database" ]] || {
     env_status=blocked
     database_status=blocked
     block target_database_mismatch
   }
+  resource_identity_mismatch=0
+  [[ "$(env_value POSTGRES_BIND_ADDR)" == "$postgres_bind" ]] || resource_identity_mismatch=1
+  [[ "$(env_value POSTGRES_PORT)" == "$postgres_port" ]] || resource_identity_mismatch=1
+  [[ "$(env_value POSTGRES_DATA_DIR)" == "$postgres_data_directory" ]] || resource_identity_mismatch=1
+  [[ "$(env_value APP_HTTP_BIND_ADDR)" == "$app_bind" ]] || resource_identity_mismatch=1
+  [[ "$(env_value APP_HTTP_PORT)" == "$app_port" ]] || resource_identity_mismatch=1
+  [[ "$(env_value WEB_DESKTOP_BIND_ADDR)" == "$web_bind" ]] || resource_identity_mismatch=1
+  [[ "$(env_value WEB_DESKTOP_PORT)" == "$web_port" ]] || resource_identity_mismatch=1
+  [[ "$(env_value JAEGER_BIND_ADDR)" == "$jaeger_bind" ]] || resource_identity_mismatch=1
+  [[ "$(env_value JAEGER_5775_PORT)" == "$jaeger_5775_port" ]] || resource_identity_mismatch=1
+  [[ "$(env_value JAEGER_6831_PORT)" == "$jaeger_6831_port" ]] || resource_identity_mismatch=1
+  [[ "$(env_value JAEGER_6832_PORT)" == "$jaeger_6832_port" ]] || resource_identity_mismatch=1
+  [[ "$(env_value JAEGER_5778_PORT)" == "$jaeger_5778_port" ]] || resource_identity_mismatch=1
+  [[ "$(env_value JAEGER_UI_PORT)" == "$jaeger_ui_port" ]] || resource_identity_mismatch=1
+  [[ "$(env_value JAEGER_14268_PORT)" == "$jaeger_14268_port" ]] || resource_identity_mismatch=1
+  [[ "$(env_value JAEGER_14250_PORT)" == "$jaeger_14250_port" ]] || resource_identity_mismatch=1
+  [[ "$(env_value JAEGER_9411_PORT)" == "$jaeger_9411_port" ]] || resource_identity_mismatch=1
+  [[ "$(env_value JAEGER_OTLP_GRPC_PORT)" == "$jaeger_otlp_grpc_port" ]] || resource_identity_mismatch=1
+  [[ "$(env_value JAEGER_OTLP_HTTP_PORT)" == "$jaeger_otlp_http_port" ]] || resource_identity_mismatch=1
+  if (( resource_identity_mismatch != 0 )); then
+    env_status=blocked
+    resource_identity_status=blocked
+    block target_runtime_resource_mismatch
+  fi
+  if ! plain_directory "$postgres_data_directory"; then
+    resource_identity_status=blocked
+    block target_postgres_data_directory_invalid
+  fi
   debug_env="$(env_value ERP_DEBUG_ENV)"
   debug_seed_enabled="$(env_value ERP_DEBUG_SEED_ENABLED)"
   debug_cleanup_enabled="$(env_value ERP_DEBUG_CLEANUP_ENABLED)"
@@ -261,6 +323,7 @@ if plain_file "$runtime_env"; then
   fi
 else
   env_status=blocked
+  resource_identity_status=blocked
 fi
 
 clean_env=(
@@ -301,14 +364,14 @@ read_git_sha() {
     head -n1
 }
 
-if inspect_container plush-toy-erp-v5-server app-server; then
-  server_sha="$(read_git_sha plush-toy-erp-v5-server)"
+if inspect_container "$server_container" app-server; then
+  server_sha="$(read_git_sha "$server_container")"
 else
   compose_status=blocked
   block target_server_container_invalid
 fi
-if inspect_container plush-toy-erp-v5-web-desktop web-desktop; then
-  web_sha="$(read_git_sha plush-toy-erp-v5-web-desktop)"
+if inspect_container "$web_container" web-desktop; then
+  web_sha="$(read_git_sha "$web_container")"
 else
   compose_status=blocked
   block target_web_container_invalid
@@ -318,19 +381,19 @@ if [[ ! "$server_sha" =~ ^[0-9a-f]{40}$ || ! "$web_sha" =~ ^[0-9a-f]{40}$ || "$s
   block target_runtime_sha_mismatch
 fi
 
-curl --fail --silent --show-error --max-time 5 http://127.0.0.1:8315/healthz >/dev/null 2>&1 &&
+curl --fail --silent --show-error --max-time 5 "$server_endpoint/healthz" >/dev/null 2>&1 &&
   server_health=passed ||
   block target_server_health_failed
-curl --fail --silent --show-error --max-time 5 http://127.0.0.1:8315/readyz >/dev/null 2>&1 &&
+curl --fail --silent --show-error --max-time 5 "$server_endpoint/readyz" >/dev/null 2>&1 &&
   server_ready=passed ||
   block target_server_ready_failed
-curl --fail --silent --show-error --max-time 5 http://127.0.0.1:5185/healthz >/dev/null 2>&1 &&
+curl --fail --silent --show-error --max-time 5 "$web_endpoint/healthz" >/dev/null 2>&1 &&
   web_health=passed ||
   block target_web_health_failed
 
 public_containers="$(
   docker ps --format '{{.Names}}' 2>/dev/null |
-    sed -n '/^plush-toy-erp-web-public-[0-9a-f]\{8\}$/p'
+    grep -E "^\${public_container_prefix}[0-9a-f]{8}$" || true
 )"
 public_container_count="$(printf '%s\n' "$public_containers" | sed '/^$/d' | wc -l | tr -d ' ')"
 if [[ "$public_container_count" == 1 ]]; then
@@ -342,11 +405,11 @@ if [[ "$public_container_count" == 1 ]]; then
     block target_public_entry_network_mismatch
   fi
   if ! docker port "$public_container" 5175/tcp 2>/dev/null |
-    grep -Fxq '0.0.0.0:5175'; then
+    grep -Fxq "0.0.0.0:$public_host_port"; then
     block target_public_entry_port_mismatch
   fi
   curl --fail --silent --show-error --max-time 5 \
-    http://127.0.0.1:5175/healthz >/dev/null 2>&1 &&
+    "http://127.0.0.1:$public_host_port/healthz" >/dev/null 2>&1 &&
     public_health=passed ||
     block target_public_entry_health_failed
   if curl -fsS --max-time 8 \
@@ -381,7 +444,7 @@ fi
 protected_release_shas="$(printf '%s\n' "$server_sha" "$web_sha" "$public_sha")"
 all_public_containers="$({
   docker ps -a --format '{{.Names}}' 2>/dev/null || true
-} | sed -n '/^plush-toy-erp-web-public-[0-9a-f]\{8\}$/p')"
+} | grep -E "^\${public_container_prefix}[0-9a-f]{8}$" || true)"
 while IFS= read -r container_name; do
   [[ -n "$container_name" ]] || continue
   container_sha="$(read_git_sha "$container_name")"
@@ -533,6 +596,7 @@ printf '%s\n' \
   "MINIMUM_AVAILABLE_BYTES=$minimum_available_bytes" \
   "CAPACITY_STATUS=$capacity_status" \
   "ENV_STATUS=$env_status" \
+  "RESOURCE_IDENTITY_STATUS=$resource_identity_status" \
   "COMPOSE_STATUS=$compose_status" \
   "DATABASE_STATUS=$database_status" \
   "DATABASE_NAME=$database" \
@@ -577,6 +641,72 @@ printf '%s\n' \
   "BLOCKERS=$blockers_csv"
 `.replaceAll("\\${", "${");
 
+function assertTemplateValue(value, field) {
+  const text = String(value || "");
+  if (!text || /[\s'"`$\\]/u.test(text)) {
+    throw new Error(`${field} is unsafe for the fixed remote template`);
+  }
+  return text;
+}
+
+export function buildRemoteTargetPreflightScript(target) {
+  const replacements = {
+    __TARGET_KEY__: target.key,
+    __EXPECTED_HOSTNAME__: target.ssh.expectedHostname,
+    __EXPECTED_USER__: target.ssh.user,
+    __ROOT__: target.filesystem.root,
+    __CURRENT__: target.filesystem.current,
+    __RELEASES__: target.filesystem.releases,
+    __OPERATION_ROOT__: target.filesystem.operationRoot,
+    __RUNTIME_ENV__: target.filesystem.runtimeEnv,
+    __COMPOSE_OVERRIDE__: target.compose.overrideFile,
+    __PROJECT__: target.compose.projectName,
+    __DATABASE__: target.database.name,
+    __TRIAL_TARGET__: target.trialTarget,
+    __MIGRATION_LOCK__: target.database.migrationLock,
+    __POSTGRES_BIND__: target.runtime.postgres.bindAddress,
+    __POSTGRES_PORT__: target.runtime.postgres.hostPort,
+    __POSTGRES_DATA_DIRECTORY__: target.runtime.postgres.dataDirectory,
+    __APP_BIND__: target.runtime.app.bindAddress,
+    __APP_PORT__: target.runtime.app.hostPort,
+    __WEB_BIND__: target.runtime.web.bindAddress,
+    __WEB_PORT__: target.runtime.web.hostPort,
+    __JAEGER_BIND__: target.runtime.jaeger.bindAddress,
+    __JAEGER_5775_PORT__: target.runtime.jaeger.ports.agentCompact,
+    __JAEGER_6831_PORT__: target.runtime.jaeger.ports.agentThriftCompact,
+    __JAEGER_6832_PORT__: target.runtime.jaeger.ports.agentThriftBinary,
+    __JAEGER_5778_PORT__: target.runtime.jaeger.ports.config,
+    __JAEGER_UI_PORT__: target.runtime.jaeger.ports.ui,
+    __JAEGER_14268_PORT__: target.runtime.jaeger.ports.collectorHttp,
+    __JAEGER_14250_PORT__: target.runtime.jaeger.ports.collectorGrpc,
+    __JAEGER_9411_PORT__: target.runtime.jaeger.ports.zipkin,
+    __JAEGER_OTLP_GRPC_PORT__: target.runtime.jaeger.ports.otlpGrpc,
+    __JAEGER_OTLP_HTTP_PORT__: target.runtime.jaeger.ports.otlpHttp,
+    __MINIMUM_AVAILABLE_BYTES__: target.capacity.minimumAvailableBytes,
+    __PUBLIC_ENDPOINT__: target.publicEntry.endpoint,
+    __PUBLIC_NETWORK__: target.publicEntry.network,
+    __PUBLIC_CONTAINER_PREFIX__: target.publicEntry.containerPrefix,
+    __PUBLIC_HOST_PORT__: target.publicEntry.hostPort,
+    __SERVER_ENDPOINT__: target.endpoints.server,
+    __WEB_ENDPOINT__: target.endpoints.web,
+  };
+  let script = REMOTE_TARGET_PREFLIGHT_SCRIPT_TEMPLATE;
+  for (const [placeholder, value] of Object.entries(replacements)) {
+    script = script.replaceAll(
+      placeholder,
+      assertTemplateValue(value, placeholder),
+    );
+  }
+  if (/__[A-Z0-9_]+__/u.test(script)) {
+    throw new Error("remote target preflight template is incomplete");
+  }
+  return script;
+}
+
+export const REMOTE_TARGET_PREFLIGHT_SCRIPT = buildRemoteTargetPreflightScript(
+  getDeploymentTarget("demo-133"),
+);
+
 function assertEnum(value, values, field) {
   if (!values.includes(value)) throw new Error(`${field} is invalid`);
   return value;
@@ -593,7 +723,10 @@ function parseSafeInteger(value, field) {
   return parsed;
 }
 
-export function parseRemoteTargetPreflight(raw) {
+export function parseRemoteTargetPreflight(
+  raw,
+  target = getDeploymentTarget("demo-133"),
+) {
   if (
     typeof raw !== "string" ||
     raw.length === 0 ||
@@ -620,10 +753,10 @@ export function parseRemoteTargetPreflight(raw) {
   }
   if (
     values.SCHEMA_VERSION !== REMOTE_TARGET_PREFLIGHT_CONTRACT ||
-    values.TARGET !== "test-133" ||
-    values.HOSTNAME !== "simon" ||
-    values.USER !== "simon" ||
-    values.DATABASE_NAME !== "plush_erp_uat_20260716_v5"
+    values.TARGET !== target.key ||
+    values.HOSTNAME !== target.ssh.expectedHostname ||
+    values.USER !== target.ssh.user ||
+    values.DATABASE_NAME !== target.database.name
   ) {
     throw new Error("remote target identity does not match the fixed contract");
   }
@@ -714,6 +847,7 @@ export function parseRemoteTargetPreflight(raw) {
     },
     runtime: {
       env: checkStatus("ENV_STATUS"),
+      resourceIdentity: checkStatus("RESOURCE_IDENTITY_STATUS"),
       compose: checkStatus("COMPOSE_STATUS"),
       database: checkStatus("DATABASE_STATUS"),
       databaseName: values.DATABASE_NAME,
@@ -774,7 +908,7 @@ export function parseRemoteTargetPreflight(raw) {
       gitSha: sha(values.PUBLIC_SHA, "public entry SHA"),
       health: healthStatus("PUBLIC_HEALTH"),
       provider: healthStatus("PUBLIC_PROVIDER"),
-      endpoint: "https://admin.yoyoosun.net",
+      endpoint: target.publicEntry.endpoint,
     },
     locks: {
       migration: assertEnum(
@@ -863,9 +997,10 @@ export function parseRemoteTargetPreflight(raw) {
       report.retention.manualReviewReleaseCount !==
       report.retention.releaseDirectoryCount ||
     (report.publicEntry.container !== "unknown" &&
-      !/^plush-toy-erp-web-public-[0-9a-f]{8}$/u.test(
-        report.publicEntry.container,
-      )) ||
+      !new RegExp(
+        `^${target.publicEntry.containerPrefix.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}[0-9a-f]{8}$`,
+        "u",
+      ).test(report.publicEntry.container)) ||
     (report.status === "passed" &&
       (!SHA_PATTERN.test(report.runtime.serverSha) ||
         report.runtime.serverSha !== report.runtime.webSha ||
@@ -941,7 +1076,7 @@ export function runTargetPreflight(
   const target = getDeploymentTarget(targetKey);
   const args = targetSshArgs(target);
   const result = runCommand("ssh", args, {
-    input: REMOTE_TARGET_PREFLIGHT_SCRIPT,
+    input: buildRemoteTargetPreflightScript(target),
     encoding: "utf8",
     timeout: timeoutMs,
     maxBuffer: 1024 * 1024,
@@ -957,7 +1092,10 @@ export function runTargetPreflight(
       `target preflight SSH failed with exit ${String(result.status)}`,
     );
   }
-  const remote = parseRemoteTargetPreflight(String(result.stdout || ""));
+  const remote = parseRemoteTargetPreflight(
+    String(result.stdout || ""),
+    target,
+  );
   return publicTargetPreflight(target, remote, now);
 }
 
@@ -1018,7 +1156,7 @@ export async function runTargetPreflightAsync(
           resolve(
             publicTargetPreflight(
               target,
-              parseRemoteTargetPreflight(stdout),
+              parseRemoteTargetPreflight(stdout, target),
               now,
             ),
           );
@@ -1038,7 +1176,7 @@ export async function runTargetPreflightAsync(
       child.kill("SIGTERM");
       finish(() => reject(new Error("target preflight SSH timed out")));
     }, timeoutMs);
-    child.stdin.end(REMOTE_TARGET_PREFLIGHT_SCRIPT);
+    child.stdin.end(buildRemoteTargetPreflightScript(target));
   });
 }
 
@@ -1085,7 +1223,7 @@ if (isMainModule()) {
     const options = parseArgs(process.argv.slice(2));
     if (options.help) {
       console.log(`Usage:
-  node scripts/deploy/target-preflight.mjs --target test-133 [--json]
+  node scripts/deploy/target-preflight.mjs --target <demo-133|customer-test-133> [--json]
 
 Runs read-only checks through the fixed target registry. The CLI accepts no SSH
 host, path, project, database, endpoint or command parameter.`);

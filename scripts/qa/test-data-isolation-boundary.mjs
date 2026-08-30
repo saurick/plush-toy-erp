@@ -330,9 +330,9 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "scripts/qa/manual-acceptance-target-policy.mjs",
         pattern:
-          /CUSTOMER_TRIAL_133_TARGET = "customer-trial-133"[\s\S]{0,360}CUSTOMER_TRIAL_133_ORIGIN = "http:\/\/127\.0\.0\.1:18375"/u,
+          /CUSTOMER_TRIAL_133_TARGET = "customer-trial-133"[\s\S]{0,520}CUSTOMER_TRIAL_133_ORIGIN = "https:\/\/demo\.yoyoosun\.net"/u,
         message:
-          "customer-trial-133 must keep its exact registered SSH tunnel origin",
+          "customer-trial-133 must keep its exact system-trusted TLS origin",
       },
       {
         path: "scripts/qa/manual-acceptance-target-policy.mjs",

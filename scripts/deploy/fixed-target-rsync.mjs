@@ -7,14 +7,18 @@ const MINIMUM_RSYNC_MAJOR = 3;
 const FIXED_REMOTE_RSYNC_PATH = "/usr/bin/rsync";
 
 function assertFixedTarget(target) {
+  const roots = {
+    "demo-133": "/home/simon/plush-toy-erp-demo-v1",
+    "customer-test-133": "/home/simon/plush-toy-erp-test-v1",
+  };
   if (
-    target?.key !== "test-133" ||
+    !Object.hasOwn(roots, target?.key) ||
     target?.ssh?.host !== "192.168.0.133" ||
     target?.ssh?.port !== 22 ||
     target?.ssh?.user !== "simon" ||
-    target?.filesystem?.root !== "/home/simon/plush-toy-erp-v5"
+    target?.filesystem?.root !== roots[target.key]
   ) {
-    throw new Error("rsync target does not match the fixed test-133 contract");
+    throw new Error("rsync target does not match a registered fixed contract");
   }
 }
 

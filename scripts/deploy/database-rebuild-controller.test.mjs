@@ -21,7 +21,7 @@ import { releaseManifestStrictEvidenceFixture } from "./release-catalog-test-fix
 
 const SHA = "a".repeat(40);
 const IDEMPOTENCY_KEY =
-  "rebuild-database:test-133:123e4567-e89b-42d3-a456-426614174000";
+  "rebuild-database:customer-test-133:123e4567-e89b-42d3-a456-426614174000";
 
 function classifyRelation({ currentGitSha, candidateGitSha }) {
   const current = currentGitSha === candidateGitSha;
@@ -87,7 +87,7 @@ function preflight({ blocked = false, sha = SHA } = {}) {
   return {
     schemaVersion: "plush.target-preflight/v1",
     status: blocked ? "blocked" : "passed",
-    target: "test-133",
+    target: "customer-test-133",
     customer: "yoyoosun",
     blockers: blocked ? ["target_migration_lock_held"] : [],
     remote: {
@@ -96,7 +96,7 @@ function preflight({ blocked = false, sha = SHA } = {}) {
         minimumAvailableBytes: 30 * 1024 ** 3,
       },
       runtime: {
-        databaseName: "plush_erp_uat_20260716_v5",
+        databaseName: "plush_erp_customer_test_v1",
         serverSha: sha,
         webSha: sha,
         serverHealth: "passed",
@@ -130,7 +130,7 @@ test("database rebuild preparation becomes ready and reuses its operation", (t) 
   const request = {
     repoRoot: data.root,
     releaseManifestPath: data.releaseManifestPath,
-    targetKey: "test-133",
+    targetKey: "customer-test-133",
     idempotencyKey: IDEMPOTENCY_KEY,
     operationStore: data.store,
   };
@@ -161,7 +161,7 @@ test("database rebuild preparation persists a terminal blocker", (t) => {
     {
       repoRoot: data.root,
       releaseManifestPath: data.releaseManifestPath,
-      targetKey: "test-133",
+      targetKey: "customer-test-133",
       idempotencyKey: IDEMPOTENCY_KEY,
       operationStore: data.store,
     },
@@ -186,7 +186,7 @@ test("database rebuild controller CLI exposes explicit terminal retry lineage", 
     "--release-manifest",
     "output/releases/example/release-manifest.json",
     "--target",
-    "test-133",
+    "customer-test-133",
     "--idempotency-key",
     "database-rebuild-retry-example",
     "--retry-of-operation-id",
@@ -206,7 +206,7 @@ test("explicit terminal database rebuild retry creates a distinct ready lineage"
   const common = {
     repoRoot: data.root,
     releaseManifestPath: data.releaseManifestPath,
-    targetKey: "test-133",
+    targetKey: "customer-test-133",
     operationStore: data.store,
   };
   const first = prepareDatabaseRebuild(

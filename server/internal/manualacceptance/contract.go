@@ -40,6 +40,7 @@ type Warehouse struct {
 
 type CustomerTrial133 struct {
 	Target                       string `json:"target"`
+	DeploymentTarget             string `json:"deploymentTarget"`
 	DatabaseName                 string `json:"databaseName"`
 	DatabaseLifecycle            string `json:"databaseLifecycle"`
 	MinimumMigration             string `json:"minimumMigration"`
@@ -148,7 +149,8 @@ func Validate(contract Contract) error {
 	}
 	target := contract.CustomerTrial133
 	if target.Target != "customer-trial-133" ||
-		target.DatabaseName != "plush_erp_uat_20260716_v5" ||
+		target.DeploymentTarget != "demo-133" ||
+		target.DatabaseName != "plush_erp_demo_v1" ||
 		target.DatabaseLifecycle != "long-lived-registered-target" ||
 		!regexp.MustCompile(`^[0-9]{14}$`).MatchString(target.MinimumMigration) ||
 		!strings.Contains(target.ConfigRevision, "package-v8") ||

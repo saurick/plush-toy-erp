@@ -192,11 +192,11 @@ test("scenario demo runtime identity and active local customer config fail close
   );
 });
 
-test("customer-trial-133 is registered only through the loopback SSH tunnel", () => {
+test("customer-trial-133 is registered only through the system-trusted demo TLS endpoint", () => {
   const policy = resolveManualAcceptanceTarget(remotePolicyInput);
   assert.equal(policy.target, CUSTOMER_TRIAL_133_TARGET);
   assert.equal(policy.external, true);
-  assert.equal(policy.transport, "ssh-tunnel");
+  assert.equal(policy.transport, "system-trusted-tls");
 
   assert.throws(
     () =>
@@ -204,7 +204,7 @@ test("customer-trial-133 is registered only through the loopback SSH tunnel", ()
         ...remotePolicyInput,
         backendURL: "http://192.168.0.133:5175",
       }),
-    /SSH tunnel origin/u,
+    /system-trusted TLS origin/u,
   );
 });
 
@@ -230,7 +230,7 @@ test("target policy rejects every unregistered or implicit external target", () 
   ]) {
     assert.throws(
       () => resolveManualAcceptanceTarget(input),
-      /reserved for|refuse external backend|registered SSH tunnel origin|requires backend URL/u,
+      /reserved for|refuse external backend|registered system-trusted TLS origin|requires backend URL/u,
     );
   }
 });

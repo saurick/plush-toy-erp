@@ -117,8 +117,64 @@
 
 .erp-dev-environment-evidence__grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
+}
+
+.erp-dev-delivery-operation-overview {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin-bottom: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--dev-env-border);
+  border-inline-start: 3px solid var(--ant-color-primary, #1677ff);
+  border-radius: 10px;
+  background: var(--dev-env-surface);
+}
+
+.erp-dev-delivery-operation-overview > header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.erp-dev-delivery-operation-overview > header > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.erp-dev-delivery-operation-overview__scope,
+.erp-dev-delivery-operation-overview > .ant-typography {
+  color: var(--dev-env-muted);
+}
+
+.erp-dev-delivery-operation-overview__facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.erp-dev-delivery-operation-overview__facts > article {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--dev-env-fill);
+}
+
+.erp-dev-delivery-operation-overview__facts span {
+  color: var(--dev-env-muted);
+  font-size: 12px;
+}
+
+.erp-dev-delivery-operation-overview__facts strong,
+.erp-dev-delivery-operation-overview__facts .ant-typography {
+  overflow-wrap: anywhere;
 }
 
 .erp-dev-environment-card {
@@ -134,7 +190,11 @@
   background: var(--dev-env-fill);
 }
 
-.erp-dev-environment-card--trial {
+.erp-dev-environment-card--test {
+  --dev-env-accent: #b45309;
+}
+
+.erp-dev-environment-card--demo {
   --dev-env-accent: #7c3aed;
 }
 
@@ -564,6 +624,10 @@
     scroll-padding-inline: 1px;
     scroll-snap-type: inline mandatory;
     scrollbar-gutter: stable;
+  }
+
+  .erp-dev-delivery-operation-overview__facts {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .erp-dev-environment-evidence__grid:focus-visible {

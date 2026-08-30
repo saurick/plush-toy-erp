@@ -1299,7 +1299,7 @@ function assertFreshDatabaseRebuildProof(targetAdapter, verified) {
     !isPlainRecord(proof) ||
     proof.contract !== MANUAL_ACCEPTANCE_DATABASE_REBUILD_PROOF_CONTRACT ||
     proof.status !== "passed" ||
-    proof.deploymentTarget !== "test-133" ||
+    proof.deploymentTarget !== "demo-133" ||
     proof.databaseName !== verified.databaseName ||
     proof.release !== verified.runtimeIdentity.release ||
     proof.migration !== verified.runtimeIdentity.migration ||

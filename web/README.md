@@ -497,7 +497,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 
 #### 版本发布与部署中心 `/__dev/version-center`
 
-- 页面只在 development serve 中存在，展示当前 HEAD/dirty、GitLab 不可变版本、固定 `test-133` 当前 SHA、容量 blocker 和 operation 状态。它不把本地、CI、制品、目标 smoke 或 UAT 合并成一个绿色结论。
+- 页面只在 development serve 中存在，展示当前 HEAD/dirty、GitLab 不可变版本、`demo-133` 与 `customer-test-133` 的当前 SHA、容量 blocker 和 operation 状态。它不把本地、CI、制品、目标 smoke 或验收合并成一个绿色结论；`admin.yoyoosun.net` 不是部署 target。
 - 页面顶部常驻四项关键状态、未结束 operation 与交付速览；下方以 URL 可恢复的 `版本与部署 / CI/CD 效能 / 操作记录` 三个视图分流阅读。最近最多 20 个不可变版本固定每页 6 条，已结束操作每页 10 条；切换视图不重新请求摘要，也不会停止未结束 operation 的轮询。
 - 顶部“人工接管说明”只解释 AI 不可用或用户亲自操作时如何沿用同一正式链路：Codex / 本地终端负责验证和中文提交，GitLab 负责代码真源、CI 与不可变 Release，GitHub 只接收 GPT Review 镜像，当前页面负责发布制品、部署、回滚和查看回执。说明会先区分可继续与必须停止的证据，再给出固定顺序和禁止捷径；它不创建 commit、push、tag、凭据输入、后台调度或第二套发布动作。
 - “CI/CD 效能”直接读取固定 GitLab 项目最近 pipeline、job 与时间；GitLab Jobs API 不提供 GitHub 式 step 时间时，界面保持 job 级证据，不伪造步骤。页面分别显示统计读取时间及最近动作、完整发布、制品和真实部署的事件时间，并默认展示观测关键路径、最长可见环节和建议复核点；全部 job 按需展开，不自动并发、重跑或复制 GitLab 状态。

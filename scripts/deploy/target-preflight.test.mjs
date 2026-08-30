@@ -31,16 +31,17 @@ function remoteReport(overrides = {}) {
   const values = {
     SCHEMA_VERSION: REMOTE_TARGET_PREFLIGHT_CONTRACT,
     STATUS: "passed",
-    TARGET: "test-133",
-    HOSTNAME: "simon",
+    TARGET: "demo-133",
+    HOSTNAME: "r640",
     USER: "simon",
     ROOT_AVAILABLE_BYTES: String(40 * 1024 ** 3),
     MINIMUM_AVAILABLE_BYTES: String(30 * 1024 ** 3),
     CAPACITY_STATUS: "passed",
     ENV_STATUS: "passed",
+    RESOURCE_IDENTITY_STATUS: "passed",
     COMPOSE_STATUS: "passed",
     DATABASE_STATUS: "passed",
-    DATABASE_NAME: "plush_erp_uat_20260716_v5",
+    DATABASE_NAME: "plush_erp_demo_v1",
     MIGRATION_VERSION: "20260728100514",
     ACTIVE_CONFIG_REVISION:
       "yoyoosun-customer-trial-133-package-v7.runtime-manifest-v1",
@@ -59,7 +60,7 @@ function remoteReport(overrides = {}) {
     SERVER_READY: "passed",
     WEB_HEALTH: "passed",
     PUBLIC_ENTRY_STATUS: "passed",
-    PUBLIC_CONTAINER: `plush-toy-erp-web-public-${SHA.slice(0, 8)}`,
+    PUBLIC_CONTAINER: `plush-toy-erp-demo-web-public-${SHA.slice(0, 8)}`,
     PUBLIC_SHA: SHA,
     PUBLIC_HEALTH: "passed",
     PUBLIC_PROVIDER: "passed",
@@ -91,6 +92,7 @@ function remoteReport(overrides = {}) {
 test("target preflight parser returns bounded redacted evidence", () => {
   const report = parseRemoteTargetPreflight(remoteReport());
   assert.equal(report.status, "passed");
+  assert.equal(report.runtime.resourceIdentity, "passed");
   assert.equal(report.runtime.serverSha, SHA);
   assert.equal(report.runtime.migrationVersion, "20260728100514");
   assert.deepEqual(report.runtime.activeCustomerConfig, {
@@ -108,7 +110,7 @@ test("target preflight parser returns bounded redacted evidence", () => {
     businessDataClearAllowed: false,
   });
   assert.equal(report.publicEntry.gitSha, SHA);
-  assert.equal(report.publicEntry.endpoint, "https://admin.yoyoosun.net");
+  assert.equal(report.publicEntry.endpoint, "https://demo.yoyoosun.net");
   assert.equal(report.backup.freshBackupRequiredForPromotion, true);
   assert.deepEqual(report.archiveTooling, {
     status: "passed",
@@ -208,7 +210,7 @@ test("target preflight parser fails closed on identity and blocker drift", () =>
 
 test("target preflight uses only fixed SSH destination and streamed script", () => {
   let invocation;
-  const report = runTargetPreflight("test-133", {
+  const report = runTargetPreflight("demo-133", {
     now: "2026-07-29T02:00:00.000Z",
     runCommand: (command, args, options) => {
       invocation = { command, args, options };
@@ -256,7 +258,7 @@ test("async target preflight keeps the dev server event loop non-blocking and bo
     };
     return child;
   };
-  const report = await runTargetPreflightAsync("test-133", {
+  const report = await runTargetPreflightAsync("demo-133", {
     spawnCommand,
     now: "2026-08-08T03:00:00.000Z",
     timeoutMs: 100,
@@ -266,7 +268,7 @@ test("async target preflight keeps the dev server event loop non-blocking and bo
   assert.equal(killed, false);
 
   await assert.rejects(
-    runTargetPreflightAsync("test-133", {
+    runTargetPreflightAsync("demo-133", {
       timeoutMs: 5,
       spawnCommand: () => {
         const child = new EventEmitter();
@@ -310,7 +312,7 @@ printf '%s' "$TARGET_PREFLIGHT_FAKE_SSH_REPORT"
       [
         path.join(import.meta.dirname, "target-preflight.mjs"),
         "--target",
-        "test-133",
+        "demo-133",
         "--json",
       ],
       {
@@ -360,7 +362,7 @@ test("remote target preflight script is read-only and contains no build command"
   assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /target_rsync_unavailable/u);
   assert.match(
     REMOTE_TARGET_PREFLIGHT_SCRIPT,
-    /trial_atlas_bin=\/home\/simon\/plush-toy-erp-v5\/tools\/atlas\/v1[.]2[.]0\/atlas/u,
+    /trial_atlas_bin=\/home\/simon\/plush-toy-erp-demo-v1\/tools\/atlas\/v1[.]2[.]0\/atlas/u,
   );
   assert.match(
     REMOTE_TARGET_PREFLIGHT_SCRIPT,

@@ -1285,7 +1285,7 @@ test("registered 133 apply rejects missing target confirmation before RPC", asyn
   report.dataVersion = CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION;
   report.runId = CURRENT_MANUAL_ACCEPTANCE_RUN_ID;
   report.target = "customer-trial-133";
-  report.backendURL = "http://127.0.0.1:18375";
+  report.backendURL = "https://demo.yoyoosun.net";
   report.databaseName = CUSTOMER_TRIAL_133_DATABASE;
   report.referenceRecords.sourceDrivenFacts.dataVersion = report.dataVersion;
   report.referenceRecords.sourceDrivenFacts.runId = report.runId;

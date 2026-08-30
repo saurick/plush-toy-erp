@@ -17,7 +17,7 @@
 | `node scripts/qa/yoyoosun-role-jsonrpc-access.mjs --report output/qa/yoyoosun-role-jsonrpc-access/report.json`                      | 使用九岗位演示账号真实登录，逐岗验证允许读取、越权写入被拒绝和前后任务总量不串权；凭据只从服务端进程环境读取，预期业务写入为零，不等于完整角色协同闭环                                                                                                                                                                                                                                                                                                                                                                                                                                       | 本地后端与演示账号凭据就绪后                     |
 | `bash scripts/qa/prepare-push.sh`                                                                                                   | 默认仅对单一 `origin/main` 签发 30 分钟 `server-ci` 回执：复算 affected 风险，但本地只运行 remote/ref/range、git-log、严格 secrets 与源码完整性短门禁；高成本测试/构建由 R640 exact-SHA CI 执行。非标准目标保持 affected/full 保守合同                                                                                                                                                                                                                                                                                                                                                         | commit 后、立即 push 前                          |
 | `bash scripts/qa/prepare-push.sh --full`                                                                                            | 经明确授权后处理 high-risk 计划或发布候选；完整执行 full，并在前后身份和容器清理读回一致后签发同类短期回执                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | full 已明确确认、发布候选准备时                  |
-| `bash scripts/qa/prepare-push.sh --review`                                                                                          | 为网页 GPT / GitHub 审查签发独立 review-only 回执；固定 clean `main -> review/gpt` 且只允许 fast-forward，只跑提交格式与逐范围严格 secrets，并记录正式推送建议但不执行 affected/full                                                                                                                                                                                                                                                                                                                                                                                                    | 获得 Git 授权后、只更新审查快照时                |
+| `bash scripts/qa/prepare-push.sh --review --remote github`                                                                         | 为网页 GPT / GitHub 审查签发独立 review-only 回执；固定 GitHub clean `main -> review/gpt` 且只允许 fast-forward，只跑提交格式与逐范围严格 secrets，并记录正式推送建议但不执行 affected/full                                                                                                                                                                                                                                                                                                                                                                                             | 获得 Git 授权后、只更新审查快照时                |
 | `node scripts/qa/skill-health.mjs`                                                                                                  | 检查项目 Skill frontmatter、目录名、metadata、README 索引和相对引用；`affected` 对 Skill 变更会直接执行，不再只提示 follow-up                                                                                                                                                                                                                                                                                                                                                                                                                                                                | 修改 `.agents/skills/**` 后                      |
 | `node scripts/qa/erp-field-linkage.mjs`                                                                                             | 运行字段联动专项，前后绑定同一仓库指纹，并把脱敏结构化证据写入 `output/qa/coverage/field-linkage.latest.json`；只证明该专项，不代表整仓覆盖                                                                                                                                                                                                                                                                                                                                                                                                                                                  | 修改字段来源、映射、回显或打印链路后             |
 | `node scripts/qa/test-coverage-collect.mjs --profile baseline --write`                                                              | 在同一仓库身份下运行非数据库 baseline，采集 Go / Web 代码覆盖、显式业务场景、字段联动、导入合同和受影响验证范围（内部键 T0-T8），再原子写入证据并聚合 latest；运行期身份变化即失败                                                                                                                                                                                                                                                                                                                                                                                                           | 刷新开发工作台真实覆盖证据前                     |
@@ -37,7 +37,7 @@
 | `node scripts/qa/database-cleanup.mjs --database-name <name> --inventory <report> --manifest <manifest> --print-confirmation`       | 从同一 inventory 与 archive manifest 生成精确确认串；正式 cleanup 还需通过环境提供 admin URL、传入确认串和输出报告，成功后读回源库已不存在。登记 106 仅在三个命令均显式加 `--allow-registered-development` 时开放；长期或未分类库始终拒绝                                                                                                                                                                                                                                                                                                                                                    | archive / restore 已通过后清理同一 disposable 库 |
 | `sh scripts/qa/populated-upgrade-preflight.sh --audit <populated-upgrade\|customer-config-cutover\|database-constraints> ...`       | 对指定数据库运行固定 allowlist 的 migration 只读审计；不执行 migration 或自动数据治理                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | 跨越存量升级、客户配置切换或关键约束收紧前       |
 | `.gitlab-ci.yml`                                                                                                                    | canonical `plan → prepare → 七分片 DAG → aggregate → CI Gate`；MR 保留 affected，main 普通 CI 签发可复用 exact-SHA 证据，受保护 release 不重跑 strict，同 SHA 只构建一次候选制品并冻结演练回执后登记 GitLab Package/Release                                                                                                                                                                                      | GitLab main、merge request、受保护 release       |
-| `.github/workflows/ci.yml`                                                                                                          | GitHub Review Mirror CI；只响应 PR、`review/gpt/**` 与手工运行，不响应镜像 main，也不签发 canonical exact-SHA 回执                                                                                                                                                                                                                                                        | GPT Review 镜像审查                              |
+| `.github/workflows/ci.yml`                                                                                                          | GitHub Review Mirror CI；只响应 PR、精确 `review/gpt`、`review/gpt/**` 与手工运行，不响应镜像 main，也不签发 canonical exact-SHA 回执                                                                                                                                                                                                                                    | GPT Review 镜像审查                              |
 | `.github/workflows/release.yml`                                                                                                     | GitHub 应急发布保护壳；在 canonical v2 七资产与同一演练回执完整接入前，于 checkout、登录、构建或上传前固定失败关闭，禁止六资产部分发布                                                                                                                                                                                                                                  | 应急发布合同回归                                 |
 | `node scripts/qa/docs-inventory.test.mjs`                                                                                           | 检查当前维护 Markdown 是否登记到 `docs/文档清单.md`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | 新增、删除、重命名 README 或长期文档后           |
 | `node --test scripts/qa/schema-docs.test.mjs`                                                                                       | 校验 Ent generated migration descriptor、74 表业务语义 catalog 与 8 份生成数据字典零漂移；不连接数据库                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | 调整 schema、catalog、生成器或数据库文档后       |
@@ -128,13 +128,13 @@ GitLab Runner 工具链读取 `.n-node-version`、`web/package.json#packageManag
 
 ## 全页面试用验收数据
 
-当前唯一整批合同是 `2026.08.15-v6 / 20260815-V6`。本地开发库和 133 试用库使用同一套业务含义、数量与状态矩阵，但数据库 ID 各自独立，不能复制表行或用“编号相同”代替读回证明。正式部署默认不执行这套数据。
+当前唯一整批合同是 `2026.08.15-v6 / 20260815-V6`。本地隔离库和 `demo-133` 使用同一套业务含义、数量与状态矩阵，但数据库 ID 各自独立，不能复制表行或用“编号相同”代替读回证明。正式部署默认不执行这套数据；`customer-test-133` 是甲方干净测试/验收环境，禁止重放本合同。
 
-`dataVersion` 表示一轮可重复、可验收的冻结业务数据基线，不是 Git commit、代码版本或 operation 版本。纯样式、重构、性能优化及不改变数据结果的修复继续使用当前 V6；每次开发或甲方反馈仍以新的 operation / batch、隔离库和 exact commit 留证。只有单位含义、记录结构、生命周期 / 状态、业务链映射、稳定编码或数量合同发生不兼容变化，或准备冻结下一轮甲方测试基线时，才集中升级 `dataVersion`。已持久落到本地或 133 的冻结版本不得静默改写；旧基线保留用于说明当时测试内容，新基线用于下一轮 UAT。
+`dataVersion` 表示一轮可重复、可验收的冻结模拟数据基线，不是 Git commit、代码版本或 operation 版本。纯样式、重构、性能优化及不改变数据结果的修复继续使用当前 V6；每次开发反馈仍以新的 operation / batch、隔离库和 exact commit 留证。只有单位含义、记录结构、生命周期 / 状态、业务链映射、稳定编码或数量合同发生不兼容变化，才集中升级 `dataVersion`。已持久落到本地或 demo 的冻结版本不得静默改写；旧基线保留用于说明当时测试内容。
 
-133 的 V5 使用独立 Compose project `plush-toy-erp-v5`：命令必须显式带 `-p plush-toy-erp-v5`，并同时带 `compose.yml` 与只声明 project name 的 `compose.customer-trial-133.yml`。PostgreSQL 为 `127.0.0.1:55435`、后端 HTTP 为 `8315`、前端为 `5185`；Jaeger 端口组为 `45775 / 46831 / 46832 / 45778 / 46687 / 54268 / 54250 / 49411 / 44317 / 44318`。PostgreSQL 只能挂载 `/home/simon/plush-toy-erp-v5/data/postgres`，migration 锁只能使用 `/home/simon/plush-toy-erp-v5/run/atlas-migrate.lock`；旧 `plush-toy-erp-prod` 栈及其 `5435` 端口保留作回滚。任何直连数据库的辅助工具也必须命中 `55435 / plush_erp_uat_20260716_v5`，不能误连旧栈；正常整批造数仍只走后端 API。
+`demo-133` 使用独立 Compose project `plush-toy-erp-demo-v1`、数据库 `plush_erp_demo_v1`、根目录 `/home/simon/plush-toy-erp-demo-v1`，PostgreSQL / API / Web 端口为 `55436 / 8325 / 5195`。所有精确路径、锁、Jaeger 端口和公网入口以 `scripts/deploy/deployment-targets.json` 为真源；正常整批造数只走后端 API。
 
-133 造数前必须先在固定 release 上按 `status -> dry-run -> stop V5 app-server -> apply -> status` 完成 migration，不停旧栈也不停 V5 PostgreSQL。精确命令以 [Compose 迁移脚本](../../server/deploy/compose/prod/README.md#迁移脚本) 为唯一运维入口。运行 env 必须由当前用户持有、精确 `0600` 且无符号链接父路径；preflight 只使用其私有快照并在结束时复核原文件。启动后必须传 `production-preflight.sh --runtime --expected-release <40sha>`，同时证明四服务 image ref / content ID 和 app / web `GIT_SHA` 都绑定同一 release，才能进入配置激活与整批造数。
+demo 造数前必须先在固定 release 上完成登记 target 的 migration、preflight 和 runtime identity 读回。精确命令以 [Compose 迁移脚本](../../server/deploy/compose/prod/README.md#迁移脚本) 为唯一运维入口。运行 env 必须由当前用户持有、精确 `0600` 且无符号链接父路径；启动后必须以 `production-preflight.sh --runtime --expected-release <40sha>` 证明服务 image/content identity 与 app/web `GIT_SHA` 都绑定同一 release，才能进入配置激活与整批造数。
 
 51 个正式验收目标统一登记在 `manual-acceptance-page-data-contract.mjs`。每页只能引用共享的 `role / source / task / facts / catalog` 阶段，不允许页面自带 builder、脚本或另一套 fixture；业务看板可以同时消费多个共享阶段，但不能另造页面数据。`manual-acceptance-dataset-runner.mjs` 直接消费相同的阶段入口。新增页面、probe 或入口发生漏登、重复或分叉时，readiness 合同测试会 fail closed。
 
@@ -154,7 +154,7 @@ GitLab Runner 工具链读取 `.n-node-version`、`web/package.json#packageManag
 
 模拟数据沿用永绅原文件的简短习惯，例如款号与品名分开、规格写成“米白·小号”、材料写成“米白短毛绒”、环节写成“裁片 / 车缝 / 电绣”，备注用“分两批交货”“颜色按样板”这类日常说法。用户可见来源编号使用 `YS6-*`，岗位任务使用 `YS-V6-*`；模拟身份还由 `datasetKey / dataVersion / runId` 和报告统一证明。原文件只用于理解字段和用词，不直接导入真实行。
 
-| 阶段                                                     | 本地                                                                                                    | 133 试用库                                                                                                  |
+| 阶段                                                     | 本地                                                                                                    | demo-133 演练造数库                                                                                          |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | fresh 前置与基础资料                                     | 全新专用库 migration 后显式应用 local-test 配置并只创建 1 个单位、4 个仓库；runner 先做空业务库基线门禁 | 全新独立库先 bootstrap 管理员、应用 customer-trial 配置，再运行镜像内受控 core bootstrap；禁止通用远程 seed |
 | 岗位账号                                                 | runner 在空库基线通过后创建或精确核对十个岗位账号，并调和三类场景账号                                   | 同一入口、同一规则；不得复用本地账号行或数据库 ID                                                           |
@@ -253,78 +253,48 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<8-to-20-character-admin-password>' \
 
 本地 `--apply` 同时要求显式后端、`plush_erp_acceptance_*` 数据库名和数据库绑定确认串；端口 `8300` 在参数解析阶段直接拒绝。运行态数据库摘要不匹配时，runner 在认证前停止，不会创建登录会话，也不会进入 `role` 或任何业务写阶段。
 
-133 仍使用同一命令和 runner，但必须额外传入 dry-run 计划给出的精确确认串，以及绑定当前 40 位小写 commit、至少 `20260714165115` 的 14 位 migration 和全部 debug=false 的 attestation。探针会把声明与当前容器 `GIT_SHA`、实际连接库和 Atlas 最新 revision 做只读核对；未冻结并部署同一代码版本时不得写入。
+`demo-133` 仍使用同一命令和 runner，但部署 target 与内部数据 target 必须严格分层：远端 target 是 `demo-133`，内部模拟数据合同仍是 `customer-trial-133`。执行时必须额外传入 dry-run 计划给出的精确确认串，并绑定当前 40 位小写 commit、至少 `20260714165115` 的 14 位 migration、数据库 `plush_erp_demo_v1` 和全部 debug=false 的 attestation。探针会把声明与当前容器 `GIT_SHA`、实际连接库和 Atlas 最新 revision 做只读核对；未冻结并部署同一代码版本时不得写入。
 
-下面是 133 在 migration、一次性管理员和 SSH 隧道已经就绪后的完整可执行链。先在本机通过 `18375` 后端隧道应用 V6 配置；`<release>` 与 `<migration>` 必须替换成当前容器和 Atlas 的精确读回值：
+远端执行顺序固定为：
+
+1. 通过 `demo-133` 的受控 preflight 与 runtime identity 证明 Compose、端口、数据库、release、migration 和公网入口。
+2. 若要求 fresh，先完成 `demo-133` database rebuild，并取得原子保存的 passed receipt；receipt 必须绑定备份恢复、旧/新 PostgreSQL generation 与 rollback point。
+3. 用内部 `customer-trial-133` target 依次完成正式账号、客户配置、镜像内 core bootstrap 和唯一顶层 dataset runner。
+4. runner 仍在任何业务写入前通过正式 API 证明受管业务对象为零，并核对当前 release、migration、逻辑数据库与物理 generation。
+5. 总回执固定保存于 `output/qa/manual-acceptance/datasets/2026.08.15-v6/customer-trial-133/dataset/apply-report.json`；不得跳过总回执拼接分阶段报告。
+
+客户配置必须先独立应用并读回为 active；凭据和完整 attestation 只从受控进程环境传入，不写入命令或回执：
 
 ```bash
-export MANUAL_ACCEPTANCE_TARGET_CONFIRM='APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.08.15-v6:20260815-V6'
-export MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON='{"target":"customer-trial-133","origin":"http://127.0.0.1:18375","customerKey":"yoyoosun","environment":"prod","release":"<40-character-lowercase-release>","migration":"<14-digit-migration>","debug":{"seedEnabled":false,"seedAllowed":false,"cleanupEnabled":false,"cleanupAllowed":false,"businessDataClearEnabled":false,"businessDataClearAllowed":false}}'
-
-MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM='BOOTSTRAP_FORMAL_MANUAL_ACCEPTANCE_ACCOUNTS:customer-trial-133:2026.08.15-v6:20260815-V6' \
+MANUAL_ACCEPTANCE_TARGET_CONFIRM='APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.08.15-v6:20260815-V6' \
+MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON='<fixed-safe-attestation-json>' \
 MANUAL_ACCEPTANCE_ADMIN_USERNAME=admin \
 MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<fresh-bootstrap-admin-password>' \
-MANUAL_ACCEPTANCE_UAT_PASSWORD='12345678' \
-  node scripts/qa/manual-acceptance-account-scenarios.mjs \
-    --apply \
-    --formal-accounts-only \
-    --target customer-trial-133 \
-    --backend-url http://127.0.0.1:18375 \
-    --database-name plush_erp_uat_20260716_v5 \
-    --data-version 2026.08.15-v6 \
-    --run-id 20260815-V6 \
-    --json
-
-MANUAL_ACCEPTANCE_ADMIN_USERNAME=admin \
-MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<fresh-bootstrap-admin-password>' \
-MANUAL_ACCEPTANCE_UAT_PASSWORD='12345678' \
+MANUAL_ACCEPTANCE_UAT_PASSWORD='<different-demo-password>' \
   node scripts/qa/manual-acceptance-customer-config.mjs \
     --apply \
-    --preview-manifest output/qa/manual-acceptance-dataset/yoyoosun-runtime-manifest-preview.json \
     --target customer-trial-133 \
-    --backend-url http://127.0.0.1:18375 \
-    --database-name plush_erp_uat_20260716_v5 \
+    --preview-manifest output/qa/manual-acceptance-dataset/yoyoosun-runtime-manifest-preview.json \
+    --backend-url '<controlled-demo-backend>' \
+    --database-name plush_erp_demo_v1 \
     --data-version 2026.08.15-v6 \
     --run-id 20260815-V6 \
     --out output/qa/manual-acceptance/datasets/2026.08.15-v6/customer-trial-133/customer-config
 ```
 
-配置读回为 active 后，在 133 的固定 release 目录运行镜像内 core bootstrap。preflight 与该命令必须在同一个干净 shell 中执行；若宿主已定义 env-file 同名键、`COMPOSE_*` project/file/profile/env-file/path-separator 或 `DOCKER_HOST / DOCKER_CONTEXT / DOCKER_TLS_VERIFY / DOCKER_CERT_PATH`，先 `unset` 后再继续：
-
 ```bash
-cd /home/simon/plush-toy-erp-v5/current/server/deploy/compose/prod
-docker compose \
-  -p plush-toy-erp-v5 \
-  --env-file /home/simon/plush-toy-erp-v5/runtime/.env.customer-trial-133 \
-  -f /home/simon/plush-toy-erp-v5/current/server/deploy/compose/prod/compose.yml \
-  -f /home/simon/plush-toy-erp-v5/current/server/deploy/compose/prod/compose.customer-trial-133.yml \
-  run --rm -T --no-deps --pull never \
-  app-server /app/bootstrap-manual-acceptance-core \
-    --expected-database plush_erp_uat_20260716_v5 \
-    --expected-migration '<14-digit-migration>' \
-    --expected-release '<40-character-lowercase-release>' \
-    --confirm 'BOOTSTRAP_MANUAL_ACCEPTANCE_CORE:customer-trial-133:yoyoosun:plush_erp_uat_20260716_v5:yoyoosun-manual-acceptance:2026.08.15-v6:20260815-V6:<14-digit-migration>:<40-character-lowercase-release>'
+node scripts/qa/manual-acceptance-dataset.mjs \
+  --apply \
+  --target customer-trial-133 \
+  --backend-url '<controlled-demo-backend>' \
+  --data-version 2026.08.15-v6 \
+  --run-id 20260815-V6 \
+  --confirm APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.08.15-v6:20260815-V6 \
+  --target-attestation-json '<fixed-safe-attestation-json>' \
+  --database-rebuild-receipt output/dev-workbench/delivery-operations/receipts/<database-rebuild-operation-id>.database-rebuild.json
 ```
 
-回到本机，通过同一隧道执行唯一顶层 runner：
-
-```bash
-MANUAL_ACCEPTANCE_UAT_PASSWORD='12345678' \
-MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<fresh-bootstrap-admin-password>' \
-  node scripts/qa/manual-acceptance-dataset.mjs \
-    --apply \
-    --target customer-trial-133 \
-    --backend-url http://127.0.0.1:18375 \
-    --data-version 2026.08.15-v6 \
-    --run-id 20260815-V6 \
-    --confirm APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.08.15-v6:20260815-V6 \
-    --target-attestation-json "$MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON" \
-    --database-rebuild-receipt output/dev-workbench/delivery-operations/receipts/<database-rebuild-operation-id>.database-rebuild.json
-```
-
-该命令完成后，规范总回执必须位于 `output/qa/manual-acceptance/datasets/2026.08.15-v6/customer-trial-133/dataset/apply-report.json`。不得跳过总回执，直接拼接分阶段报告去跑浏览器。
-
-`--database-rebuild-receipt` 只接受固定 `test-133` 重建执行器原子保存的脱敏 passed 回执，并同时核对当前 release、migration、逻辑数据库和已切换的物理 PostgreSQL generation。runner 随后仍会在写入前通过正式 API 实时证明全部受管业务对象为零；历史回执、错误 SHA、相同 system identifier 或当前非空都会停止。未提供该回执的 133 与 scenario-demo 继续按长期库语义保留历史，不能进入要求 fresh baseline 的完整浏览器验收。
+登录输入只从受控进程环境或凭据合同进入，不写进命令示例、仓库或回执。历史回执、错误 SHA、相同 system identifier 或当前非空都会停止。长期 scenario-demo 可按其既有长期库语义保留历史，但不能冒充 fresh full acceptance。
 
 首次执行前，该目标的规范总回执必须不存在。若某阶段失败，或完整成功后需要证明同批幂等重放，保留原回执，并在完全相同的目标、版本、批次、后端和带外证明参数后追加 `--resume-report output/qa/manual-acceptance/datasets/2026.08.15-v6/<target>/dataset/apply-report.json`。禁止删除回执后重新冒充 fresh apply；resume 会重验 core、客户配置、数据库、release / migration、连续阶段和各组件 digest。
 
@@ -502,7 +472,7 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
     --database-name plush_erp_acceptance_20260728_delivery_dev
 ```
 
-手工验收数据不是压测数据。容量和压力入口只能使用一次性隔离数据库；共享开发库与 133 试用库都不得拿来压测。容量幂等探针必须通过 `--task-source-type / --task-source-id` 绑定同批 `trial_pmc_work` 模拟任务，并校验 `simulated_only / trial_task` 标记；不得借用正式来源生成任务。ignored 本地报告也不等于目标服务器的发布证据。
+手工验收数据不是压测数据。容量和压力入口只能使用一次性隔离数据库；共享开发库与 demo-133 演练造数库都不得拿来压测。容量幂等探针必须通过 `--task-source-type / --task-source-id` 绑定同批 `trial_pmc_work` 模拟任务，并校验 `simulated_only / trial_task` 标记；不得借用正式来源生成任务。ignored 本地报告也不等于目标服务器的发布证据。
 
 ## 按影响面选择 / Affected Tests
 

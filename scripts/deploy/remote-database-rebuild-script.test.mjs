@@ -7,11 +7,16 @@ import test from "node:test";
 const script = path.join(import.meta.dirname, "remote-database-rebuild.sh");
 const source = readFileSync(script, "utf8");
 
-test("remote database rebuild accepts only the fixed test-133 contract", () => {
-  assert.match(source, /target=test-133/u);
-  assert.match(source, /root=\/home\/simon\/plush-toy-erp-v5/u);
-  assert.match(source, /project=plush-toy-erp-v5/u);
-  assert.match(source, /database=plush_erp_uat_20260716_v5/u);
+test("remote database rebuild accepts only the two isolated registered targets", () => {
+  assert.match(source, /demo-133\)/u);
+  assert.match(source, /customer-test-133\)/u);
+  assert.match(source, /root=\/home\/simon\/plush-toy-erp-demo-v1/u);
+  assert.match(source, /root=\/home\/simon\/plush-toy-erp-test-v1/u);
+  assert.match(source, /project=plush-toy-erp-demo-v1/u);
+  assert.match(source, /project=plush-toy-erp-test-v1/u);
+  assert.match(source, /database=plush_erp_demo_v1/u);
+  assert.match(source, /database=plush_erp_customer_test_v1/u);
+  assert.doesNotMatch(source, /admin-133\)|target=admin/u);
   assert.match(source, /data_dir=\$root\/data\/postgres/u);
   assert.match(source, /minimum_available_bytes=32212254720/u);
   assert.match(
@@ -23,6 +28,7 @@ test("remote database rebuild accepts only the fixed test-133 contract", () => {
     /(?:--host|--path|--project|--database|--data-dir|--command|eval\s)/u,
   );
   assert.match(source, /plush[.]release-manifest\/v2/u);
+  assert.match(source, /--deployment-target "\$target"/u);
 });
 
 test("remote database rebuild preserves predecessor and backup without deletion", () => {
@@ -204,5 +210,5 @@ test("remote database rebuild help and shell syntax are no-write", () => {
     { encoding: "utf8" },
   );
   assert.notEqual(invalid.status, 0);
-  assert.match(invalid.stderr, /invalid operation id/u);
+  assert.match(invalid.stderr, /unsupported target/u);
 });

@@ -413,7 +413,7 @@ export function validateRemoteRollbackReceipt(receipt, expected) {
     receipt?.schemaVersion !== REMOTE_ROLLBACK_RECEIPT_CONTRACT ||
     !["passed", "failed", "not_proven"].includes(receipt?.status) ||
     receipt?.operationId !== expected.operationId ||
-    receipt?.target !== "test-133" ||
+    receipt?.target !== expected.targetKey ||
     receipt?.fromGitSha !== expected.fromGitSha ||
     receipt?.toGitSha !== expected.toGitSha ||
     receipt?.toVersion !== expected.toVersion ||
@@ -537,10 +537,11 @@ export function executeRollback(
   const store = operationStore || resolveDeliveryOperationStore(root);
   let operation = readDeliveryOperation(store, operationId);
   const plan = readRollbackPlan(store, operationId);
+  const targetKey = plan?.target?.key;
   if (
     !["ready", "launching"].includes(operation.status) ||
     operation.action !== "rollback" ||
-    operation.target !== "test-133" ||
+    operation.target !== targetKey ||
     !plan ||
     plan.status !== "eligible" ||
     operation.gitSha !== plan.to.gitSha ||
@@ -548,13 +549,13 @@ export function executeRollback(
   ) {
     throw new Error("rollback operation is not in the eligible ready state");
   }
-  const expectedConfirmation = `ROLLBACK:test-133:${plan.from.gitSha}:${plan.to.gitSha}:${operation.id}`;
+  const expectedConfirmation = `ROLLBACK:${targetKey}:${plan.from.gitSha}:${plan.to.gitSha}:${operation.id}`;
   if (confirmation !== expectedConfirmation) {
     throw new Error(
       `explicit rollback confirmation is required: ${expectedConfirmation}`,
     );
   }
-  const immediatePreflight = runPreflight("test-133");
+  const immediatePreflight = runPreflight(targetKey);
   const blockers = new Set(immediatePreflight.blockers || []);
   if (
     immediatePreflight.status !== "passed" ||
@@ -611,7 +612,7 @@ export function executeRollback(
     bundleDir: targetBundleDir,
     releaseManifestPath: targetReleaseManifestPath,
   });
-  const cacheProbe = probeCache(cacheIdentity, { runCommand });
+  const cacheProbe = probeCache(cacheIdentity, { runCommand, targetKey });
   const avoidedTransfer = estimateAvoidedTransferDuration(
     cacheProbe.avoidedBytes,
     listDeliveryOperations(store, { limit: 200 }),
@@ -645,7 +646,7 @@ export function executeRollback(
     throw error;
   }
 
-  const target = getDeploymentTarget("test-133");
+  const target = getDeploymentTarget(targetKey);
   const sshArgs = fixedSshArgs(target);
   assertLocalRsync(runCommand);
   const rsyncTransfer = buildFixedTargetRsyncTransfer({
@@ -683,7 +684,7 @@ export function executeRollback(
   try {
     prepareCache(
       { operationId: operation.id, identity: cacheIdentity, probe: cacheProbe },
-      { runCommand },
+      { runCommand, targetKey },
     );
     targetPrepared = true;
     const transferStartedAt = Date.now();
@@ -710,6 +711,7 @@ export function executeRollback(
         "bash",
         remoteScript,
         "rollback",
+        targetKey,
         operation.id,
         plan.from.gitSha,
         plan.to.gitSha,
@@ -727,6 +729,7 @@ export function executeRollback(
     );
     const rawReceipt = String(result.stdout || "").trim();
     const receipt = validateRemoteRollbackReceipt(JSON.parse(rawReceipt), {
+      targetKey,
       operationId: operation.id,
       fromGitSha: plan.from.gitSha,
       toGitSha: plan.to.gitSha,
@@ -782,7 +785,7 @@ export function executeRollback(
     let executionError = error;
     if (!remoteStarted && targetPrepared) {
       try {
-        cleanupCache(operation.id, { runCommand });
+        cleanupCache(operation.id, { runCommand, targetKey });
       } catch (cleanupError) {
         executionError = new Error(
           `${error.message}; target incoming cleanup failed: ${cleanupError.message}`,
@@ -891,7 +894,7 @@ if (isMainModule()) {
     --current-manifest <release-manifest.json> \\
     --target-bundle-dir <immutable-release-directory> \\
     --target-manifest <release-manifest.json> \\
-    --confirmation ROLLBACK:test-133:<from-sha>:<to-sha>:<operation-id> [--json]
+    --confirmation ROLLBACK:<target>:<from-sha>:<to-sha>:<operation-id> [--json]
 
 The operation must already be ready. This executor changes code and images
 only; it never builds, performs a database down migration, restores a database

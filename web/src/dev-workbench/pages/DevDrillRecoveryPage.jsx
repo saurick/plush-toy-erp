@@ -541,7 +541,7 @@ export default function DevDrillRecoveryPage() {
               <SafetyCertificateOutlined aria-hidden="true" />
               <div>
                 <Paragraph>
-                  继续使用 clean exact SHA、GitHub
+                  继续使用 clean exact SHA、GitLab
                   CI、不可变版本、固定目标和结果读回；不复制容易漂移的命令清单。
                 </Paragraph>
                 <Text type="secondary">

@@ -16,8 +16,9 @@ const IDENTITY = Object.freeze({
 test("fixed backup script binds 133 identity and uses the read-only backup role", () => {
   const script = buildCustomerTrial133BackupScript(IDENTITY);
 
-  assert.match(script, /plush_erp_uat_20260716_v5/u);
-  assert.match(script, /plush-toy-erp-v5-server/u);
+  assert.match(script, /plush_erp_demo_v1/u);
+  assert.match(script, /plush-toy-erp-demo-v1/u);
+  assert.doesNotMatch(script, /plush-toy-erp-v5|plush_erp_uat_20260716_v5/u);
   assert.match(script, /username erp_backup/u);
   assert.match(script, /default_transaction_read_only/u);
   assert.match(script, /pg_dump/u);
@@ -49,7 +50,7 @@ test("backup report is exact, target-bound, positive-sized, and path-free", () =
     "STATUS=passed",
     `BACKUP_ALIAS=${IDENTITY.backupAlias}`,
     `RELEASE_SHA=${IDENTITY.releaseSha}`,
-    "DATABASE_NAME=plush_erp_uat_20260716_v5",
+    "DATABASE_NAME=plush_erp_demo_v1",
     `MIGRATION_VERSION=${IDENTITY.migrationVersion}`,
     `SHA256=${"b".repeat(64)}`,
     "SIZE_BYTES=4096",

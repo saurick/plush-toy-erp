@@ -5034,7 +5034,7 @@ function usage() {
       --out output/qa/manual-acceptance/datasets/2026.08.15-v6/local/source
 
 写入已登记的 133 客户试用环境还必须显式提供：
-  --target customer-trial-133 --backend-url http://127.0.0.1:18375 \\
+  --target customer-trial-133 --backend-url https://demo.yoyoosun.net \\
   --data-version 2026.08.15-v6 --run-id 20260815-V6
 并设置绑定 target / dataVersion / runId 的 MANUAL_ACCEPTANCE_TARGET_CONFIRM，
 以及包含精确 origin/customer/release/migration/debug 开关的

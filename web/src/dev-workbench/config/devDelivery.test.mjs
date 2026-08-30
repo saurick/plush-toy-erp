@@ -8,6 +8,7 @@ import {
   DEV_DELIVERY_SESSION_API_PATH,
   DEV_DELIVERY_SOURCE_PATH,
   DEV_DELIVERY_SUMMARY_API_PATH,
+  DEV_DELIVERY_TARGETS,
   DEV_VERSION_CENTER_HISTORY_PAGE_SIZE,
   DEV_VERSION_CENTER_ROUTE,
   DEV_VERSION_CENTER_VERSION_PAGE_SIZE,
@@ -25,6 +26,7 @@ import {
   deliveryStatusPresentation,
   deliveryTargetCachePresentation,
   deliveryVersionActionKind,
+  deliveryVersionForTarget,
   findLatestTransferredPromotion,
   formatDeliveryBytes,
   formatDeliveryDuration,
@@ -128,9 +130,25 @@ function summaryFixture() {
         promotionEligible: false,
         actionClass: 'blocked',
         actionReason: 'target_identity_unavailable',
+        actionsByTarget: {
+          'customer-test-133': {
+            actionClass: 'blocked',
+            actionReason: 'target_identity_unavailable',
+          },
+          'demo-133': {
+            actionClass: 'blocked',
+            actionReason: 'target_identity_unavailable',
+          },
+        },
       },
     ],
     target: null,
+    targets: DEV_DELIVERY_TARGETS.map((target) => ({
+      key: target.key,
+      purpose: target.purpose,
+      endpoint: target.endpoint,
+      preflight: null,
+    })),
     operations: [
       {
         id: '11111111-1111-4111-8111-111111111111',
@@ -190,7 +208,8 @@ function summaryFixture() {
     issues: [],
     boundaries: {
       provider: 'gitlab',
-      target: 'test-133',
+      target: 'demo-133',
+      targets: ['demo-133', 'customer-test-133'],
       browserShellAccess: false,
       targetBuildAllowed: false,
       automaticRetryAllowed: false,
@@ -292,7 +311,7 @@ test('target cache metrics require exact identity evidence and use Chinese prese
   )
 })
 
-test('delivery summary requires provider, target and no-shell boundaries', () => {
+test('delivery summary requires both target contracts and no-shell boundaries', () => {
   assert.equal(validateDevDeliverySummary(summaryFixture()).status, 'success')
   assert.throws(
     () =>
@@ -333,44 +352,53 @@ test('delivery summary requires provider, target and no-shell boundaries', () =>
       /version/u
     )
   }
-  const deployed = {
-    ...summaryFixture(),
-    target: {
+  const deployed = summaryFixture()
+  deployed.target = {
+      target: 'demo-133',
+      purpose: 'project-demo-simulated',
       status: 'passed',
       remote: {
         runtime: { serverSha: SHA, webSha: SHA },
         publicEntry: {
           status: 'passed',
-          container: `plush-toy-erp-web-public-${SHA.slice(0, 8)}`,
+          container: `plush-toy-erp-demo-web-public-${SHA.slice(0, 8)}`,
           gitSha: SHA,
           health: 'passed',
           provider: 'passed',
-          endpoint: 'https://admin.yoyoosun.net',
+          endpoint: 'https://demo.yoyoosun.net',
         },
+      },
+  }
+  deployed.targets = deployed.targets.map((descriptor) =>
+    descriptor.key === 'demo-133'
+      ? { ...descriptor, preflight: deployed.target }
+      : descriptor
+  )
+  assert.equal(validateDevDeliverySummary(deployed).target.status, 'passed')
+  const mismatchedPublicEntry = {
+    ...deployed.target,
+    remote: {
+      ...deployed.target.remote,
+      publicEntry: {
+        ...deployed.target.remote.publicEntry,
+        gitSha: 'f'.repeat(40),
       },
     },
   }
-  assert.equal(validateDevDeliverySummary(deployed).target.status, 'passed')
   assert.throws(
     () =>
       validateDevDeliverySummary({
         ...deployed,
-        target: {
-          ...deployed.target,
-          remote: {
-            ...deployed.target.remote,
-            publicEntry: {
-              ...deployed.target.remote.publicEntry,
-              gitSha: 'f'.repeat(40),
-            },
-          },
-        },
+        target: mismatchedPublicEntry,
+        targets: deployed.targets.map((descriptor) =>
+          descriptor.key === 'demo-133'
+            ? { ...descriptor, preflight: mismatchedPublicEntry }
+            : descriptor
+        ),
       }),
     /target evidence/u
   )
-  const blockedTarget = {
-    ...deployed,
-    target: {
+  const blockedEvidence = {
       ...deployed.target,
       status: 'blocked',
       remote: {
@@ -383,7 +411,15 @@ test('delivery summary requires provider, target and no-shell boundaries', () =>
           provider: 'failed',
         },
       },
-    },
+  }
+  const blockedTarget = {
+    ...deployed,
+    target: blockedEvidence,
+    targets: deployed.targets.map((descriptor) =>
+      descriptor.key === 'demo-133'
+        ? { ...descriptor, preflight: blockedEvidence }
+        : descriptor
+    ),
   }
   assert.equal(
     validateDevDeliverySummary(blockedTarget).target.status,
@@ -413,7 +449,7 @@ test('delivery summary accepts dedicated database rebuild records without generi
     {
       ...summary.operations[0],
       action: 'rebuild-database',
-      target: 'test-133',
+      target: 'customer-test-133',
       status: 'failed',
       stages: summary.operations[0].stages.map((stage) => ({
         ...stage,
@@ -523,7 +559,8 @@ test('delivery client reuses one CSRF session and posts only the fixed action en
         return response({
           schemaVersion: 'plush.dev-delivery-session/v1',
           csrfToken: 'c'.repeat(43),
-          target: 'test-133',
+          target: 'demo-133',
+          targets: ['demo-133', 'customer-test-133'],
         })
       }
       if (url === DEV_DELIVERY_SUMMARY_API_PATH) {
@@ -583,6 +620,14 @@ test('delivery client reuses one CSRF session and posts only the fixed action en
   })
 })
 
+test('delivery version actions remain isolated by deployment target', () => {
+  const version = summaryFixture().versions[0]
+  const demoVersion = deliveryVersionForTarget(version, 'demo-133')
+  assert.equal(demoVersion.actionClass, 'blocked')
+  assert.equal(demoVersion.gitSha, SHA)
+  assert.equal(deliveryVersionForTarget(version, 'unknown'), null)
+})
+
 test('delivery presentation helpers are deterministic and bounded', () => {
   assert.equal(
     createDeliveryIdempotencyKey(
@@ -636,7 +681,7 @@ test('delivery presentation helpers are deterministic and bounded', () => {
     deliveryOperationMessagePresentation(
       'target promotion and basic runtime verification passed'
     ).label,
-    '133 部署与基础运行核验已通过'
+    '133 显式版本提升与基础运行核验已通过'
   )
   assert.equal(
     deliveryOperationMessagePresentation(
@@ -948,18 +993,20 @@ test('version actions use Git ancestry classes rather than publication time', ()
 test('version center page does not expose shell, SSH or arbitrary target inputs', () => {
   const source = versionCenterPageSource
   assert.match(source, /exact SHA/u)
-  assert.match(source, /test-133/u)
+  assert.match(source, /DEV_DELIVERY_TARGETS/u)
+  assert.match(source, /test 甲方测试验收环境/u)
+  assert.match(source, /demo 项目演练造数环境/u)
   assert.match(source, /查看详情/u)
   assert.match(source, /确认回滚/u)
   assert.match(source, /公网入口/u)
-  assert.match(source, /入口与 133 版本一致/u)
+  assert.match(source, /入口与.*版本一致/u)
   assert.match(source, /headAlreadyPublished/u)
   assert.match(source, /当前 SHA 已发布并部署，无需重复发布/u)
   assert.match(source, /deliveryOperationMessagePresentation/u)
-  assert.match(source, /重建 133 数据库/u)
+  assert.match(source, /重建目标数据库/u)
   assert.match(source, /查看发布当前 SHA 说明/u)
-  assert.match(source, /先发布制品，不会直接部署到 133/u)
-  assert.match(source, /“准备部署”和“确认部署”/u)
+  assert.match(source, /先发布制品，不会直接部署到任一目标/u)
+  assert.match(source, /“准备版本提升”和“确认版本提升”/u)
   assert.match(source, /trigger=\{\['hover', 'click'\]\}/u)
   assert.match(source, /人工接管说明/u)
   assert.match(source, /人工接管与应急发布说明/u)
@@ -967,7 +1014,8 @@ test('version center page does not expose shell, SSH or arbitrary target inputs'
   assert.match(source, /Codex \/ 本地终端/u)
   assert.match(source, /先判断能不能继续/u)
   assert.match(source, /本页不创建 commit、不 push/u)
-  assert.match(source, /在本页部署到 test-133/u)
+  assert.match(source, /显式版本提升（Explicit Promotion）/u)
+  assert.match(source, /代码推送不会自动部署/u)
   assert.match(source, /应急不等于绕过/u)
   assert.match(source, /禁止 force push、跳过质量门禁/u)
   assert.match(source, /manualTakeoverTriggerRef/u)

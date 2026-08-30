@@ -22,6 +22,10 @@ import {
 } from '../../scripts/deploy/release-version-catalog.mjs'
 import { runTargetPreflightAsync } from '../../scripts/deploy/target-preflight.mjs'
 import { classifyGitAncestryRelation } from '../../scripts/deploy/git-ancestry-relation.mjs'
+import {
+  SUPPORTED_DEPLOYMENT_TARGET_KEYS,
+  getDeploymentTarget,
+} from '../../scripts/deploy/deployment-targets.mjs'
 import { readRepositoryIdentity } from '../../scripts/qa/lib/repository-identity.mjs'
 import {
   isLoopbackHostHeader,
@@ -45,6 +49,9 @@ const OPERATION_PATH_PATTERN = new RegExp(
   'u'
 )
 const TERMINAL_STATUSES = new Set(['passed', 'failed', 'blocked', 'not_proven'])
+const DELIVERY_TARGET_KEYS = Object.freeze([
+  ...SUPPORTED_DEPLOYMENT_TARGET_KEYS,
+])
 const REMOTE_STAGE_LABELS = Object.freeze({
   package_verification: '制品包校验',
   capacity_recheck: '容量复核',
@@ -65,41 +72,59 @@ const REMOTE_STAGE_LABELS = Object.freeze({
   service_switch: '服务切换',
 })
 
-function blockedVersionAction(version, actionReason) {
-  return {
-    ...version,
-    actionClass: 'blocked',
-    actionReason,
-  }
+function isDeliveryTarget(value) {
+  return DELIVERY_TARGET_KEYS.includes(String(value || ''))
 }
 
 function bindVersionActions({
   classifyRelation,
   projectRoot,
-  target,
+  targetEvidence,
   versions,
 }) {
-  const serverSha = target?.remote?.runtime?.serverSha
-  const webSha = target?.remote?.runtime?.webSha
-  if (!SHA_PATTERN.test(String(serverSha || '')) || serverSha !== webSha) {
-    return versions.map((version) =>
-      blockedVersionAction(version, 'target_identity_unavailable')
-    )
-  }
   return versions.map((version) => {
-    try {
-      const relation = classifyRelation({
-        repoRoot: projectRoot,
-        currentGitSha: serverSha,
-        candidateGitSha: version.gitSha,
+    const actionsByTarget = Object.fromEntries(
+      DELIVERY_TARGET_KEYS.map((targetKey) => {
+        const target = targetEvidence.get(targetKey)
+        const serverSha = target?.remote?.runtime?.serverSha
+        const webSha = target?.remote?.runtime?.webSha
+        if (!SHA_PATTERN.test(String(serverSha || '')) || serverSha !== webSha) {
+          return [
+            targetKey,
+            {
+              actionClass: 'blocked',
+              actionReason: 'target_identity_unavailable',
+            },
+          ]
+        }
+        try {
+          const relation = classifyRelation({
+            repoRoot: projectRoot,
+            currentGitSha: serverSha,
+            candidateGitSha: version.gitSha,
+          })
+          return [
+            targetKey,
+            {
+              actionClass: relation.actionClass,
+              actionReason: relation.actionReason,
+            },
+          ]
+        } catch {
+          return [
+            targetKey,
+            {
+              actionClass: 'blocked',
+              actionReason: 'git_ancestry_unavailable',
+            },
+          ]
+        }
       })
-      return {
-        ...version,
-        actionClass: relation.actionClass,
-        actionReason: relation.actionReason,
-      }
-    } catch {
-      return blockedVersionAction(version, 'git_ancestry_unavailable')
+    )
+    return {
+      ...version,
+      ...actionsByTarget['demo-133'],
+      actionsByTarget,
     }
   })
 }
@@ -143,7 +168,7 @@ export function validateDevDeliveryAction(value) {
     if (
       !SHA_PATTERN.test(String(value.payload.gitSha || '')) ||
       !VERSION_PATTERN.test(String(value.payload.version || '')) ||
-      value.payload.target !== 'test-133' ||
+      !isDeliveryTarget(value.payload.target) ||
       !IDEMPOTENCY_PATTERN.test(String(value.payload.idempotencyKey || ''))
     ) {
       throw new Error('promotion preparation payload is invalid')
@@ -180,7 +205,7 @@ export function validateDevDeliveryAction(value) {
       !SHA_PATTERN.test(String(value.payload.toGitSha || '')) ||
       !VERSION_PATTERN.test(String(value.payload.toVersion || '')) ||
       value.payload.fromGitSha === value.payload.toGitSha ||
-      value.payload.target !== 'test-133' ||
+      !isDeliveryTarget(value.payload.target) ||
       !IDEMPOTENCY_PATTERN.test(String(value.payload.idempotencyKey || ''))
     ) {
       throw new Error('rollback preparation payload is invalid')
@@ -229,9 +254,9 @@ function publicOperation(
     operation.status !== 'ready'
       ? ''
       : operation.action === 'promote'
-        ? `PROMOTE:test-133:${operation.gitSha}:${operation.id}`
+        ? `PROMOTE:${operation.target}:${operation.gitSha}:${operation.id}`
         : operation.action === 'rollback'
-          ? `ROLLBACK:test-133:${operation.metadata.currentGitSha}:${operation.gitSha}:${operation.id}`
+          ? `ROLLBACK:${operation.target}:${operation.metadata.currentGitSha}:${operation.gitSha}:${operation.id}`
           : ''
   const durationMs = Math.max(
     0,
@@ -470,7 +495,7 @@ export function createDevDeliveryService({
     deliveryProvider.provider === 'github' ? 'github' : 'gitlab'
   const providerName = providerKey === 'gitlab' ? 'GitLab' : 'GitHub'
   const children = new Map()
-  let preflightCache = null
+  const preflightCache = new Map()
   let pipelineTimingCache = null
 
   function presentOperation(operation, options = {}) {
@@ -520,17 +545,24 @@ export function createDevDeliveryService({
     }
   }
 
-  async function readTargetPreflight({ force = false } = {}) {
+  async function readTargetPreflight(targetKey, { force = false } = {}) {
+    if (!isDeliveryTarget(targetKey)) {
+      throw new Error('delivery target is not registered')
+    }
     const currentTime = Date.now()
+    const cached = preflightCache.get(targetKey)
     if (
       !force &&
-      preflightCache &&
-      currentTime - preflightCache.readAt < preflightTtlMs
+      cached &&
+      currentTime - cached.readAt < preflightTtlMs
     ) {
-      return preflightCache.value
+      return cached.value
     }
-    const value = await Promise.resolve(runPreflight('test-133'))
-    preflightCache = { readAt: currentTime, value }
+    const value = await Promise.resolve(runPreflight(targetKey))
+    if (value?.target !== targetKey) {
+      throw new Error('target preflight identity does not match the request')
+    }
+    preflightCache.set(targetKey, { readAt: currentTime, value })
     return value
   }
 
@@ -553,12 +585,14 @@ export function createDevDeliveryService({
 
   async function getSummary({ forcePreflight = false } = {}) {
     await reconcileWaitingOperations()
-    const [repositoryResult, versionsResult, targetResult, timingsResult] =
+    const [repositoryResult, versionsResult, timingsResult, ...targetResults] =
       await Promise.allSettled([
         readRepositoryState(root),
         Promise.resolve(deliveryProvider.listVersions({ limit: 100 })),
-        readTargetPreflight({ force: forcePreflight }),
         readPipelineTimings(),
+        ...DELIVERY_TARGET_KEYS.map((targetKey) =>
+          readTargetPreflight(targetKey, { force: forcePreflight })
+        ),
       ])
     const issues = []
     const generatedAt = now()
@@ -591,13 +625,26 @@ export function createDevDeliveryService({
         })
       }
     }
-    if (targetResult.status === 'rejected') {
-      issues.push({
-        code: 'target_preflight_unavailable',
-        level: 'error',
-        message: '133 只读预检不可用；未启动任何目标写操作',
-      })
-    }
+    const targetEvidence = new Map()
+    const targets = DELIVERY_TARGET_KEYS.map((targetKey, index) => {
+      const definition = getDeploymentTarget(targetKey)
+      const result = targetResults[index]
+      const preflight = result?.status === 'fulfilled' ? result.value : null
+      if (preflight) targetEvidence.set(targetKey, preflight)
+      if (!preflight) {
+        issues.push({
+          code: `target_preflight_unavailable_${targetKey.replaceAll('-', '_')}`,
+          level: 'error',
+          message: `${targetKey} 只读预检不可用；未启动任何目标写操作`,
+        })
+      }
+      return {
+        key: targetKey,
+        purpose: definition.purpose,
+        endpoint: definition.publicEntry.endpoint,
+        preflight,
+      }
+    })
     if (timingsResult.status === 'rejected') {
       issues.push({
         code: 'pipeline_timings_unavailable',
@@ -607,18 +654,17 @@ export function createDevDeliveryService({
     }
     let backupRestoreEvidence = null
     if (
-      targetResult.status === 'fulfilled' &&
-      targetResult.value?.target &&
-      targetResult.value?.customer &&
-      targetResult.value?.trialTarget
+      targetEvidence.get('customer-test-133')?.target &&
+      targetEvidence.get('customer-test-133')?.customer
     ) {
+      const customerTestTarget = targetEvidence.get('customer-test-133')
       try {
         backupRestoreEvidence = await Promise.resolve(
           readRecoveryEvidence({
             projectRoot: root,
-            target: targetResult.value.target,
-            customer: targetResult.value.customer,
-            environment: targetResult.value.trialTarget,
+            target: customerTestTarget.target,
+            customer: customerTestTarget.customer,
+            environment: 'customer-clean-acceptance',
           })
         )
       } catch {
@@ -640,13 +686,13 @@ export function createDevDeliveryService({
           ? bindVersionActions({
               classifyRelation,
               projectRoot: root,
-              target:
-                targetResult.status === 'fulfilled' ? targetResult.value : null,
+              targetEvidence,
               versions: versionsResult.value,
             })
           : [],
       releaseVersionPolicy,
-      target: targetResult.status === 'fulfilled' ? targetResult.value : null,
+      target: targetEvidence.get('demo-133') || null,
+      targets,
       timings:
         timingsResult.status === 'fulfilled' ? timingsResult.value : null,
       operations: (() => {
@@ -664,7 +710,8 @@ export function createDevDeliveryService({
       issues,
       boundaries: {
         provider: providerKey,
-        target: 'test-133',
+        target: 'demo-133',
+        targets: DELIVERY_TARGET_KEYS,
         browserShellAccess: false,
         targetBuildAllowed: false,
         automaticRetryAllowed: false,
@@ -749,7 +796,7 @@ export function createDevDeliveryService({
         message: `${providerName} release dispatch failed without starting a target write`,
         issues: [
           providerIssue(
-            `${providerName} 发布未启动或身份不一致；未写入 133 测试服务器`,
+            `${providerName} 发布未启动或身份不一致；未写入任何 demo/test 部署目标`,
             providerKey
           ),
         ],
@@ -788,7 +835,7 @@ export function createDevDeliveryService({
             downloaded.directory,
             'release-manifest.json'
           ),
-          targetKey: 'test-133',
+          targetKey: payload.target,
           idempotencyKey: payload.idempotencyKey,
           operationStore: store,
           retryOfOperationId,
@@ -796,7 +843,7 @@ export function createDevDeliveryService({
         { runPreflight, now }
       )
     )
-    preflightCache = null
+    preflightCache.delete(payload.target)
     return {
       operation: presentOperation(result.operation),
       plan: result.plan,
@@ -851,7 +898,7 @@ export function createDevDeliveryService({
             targetDownload.directory,
             'release-manifest.json'
           ),
-          targetKey: 'test-133',
+          targetKey: payload.target,
           idempotencyKey: payload.idempotencyKey,
           operationStore: store,
           retryOfOperationId,
@@ -859,7 +906,7 @@ export function createDevDeliveryService({
         { runPreflight, now }
       )
     )
-    preflightCache = null
+    preflightCache.delete(payload.target)
     return {
       operation: presentOperation(result.operation),
       plan: result.plan,
@@ -893,7 +940,7 @@ export function createDevDeliveryService({
         {
           gitSha: previous.gitSha,
           version: previous.version,
-          target: 'test-133',
+          target: previous.target,
           idempotencyKey: payload.idempotencyKey,
         },
         retryOptions
@@ -906,7 +953,7 @@ export function createDevDeliveryService({
           fromVersion: previous.metadata.currentVersion,
           toGitSha: previous.gitSha,
           toVersion: previous.version,
-          target: 'test-133',
+          target: previous.target,
           idempotencyKey: payload.idempotencyKey,
         },
         retryOptions
@@ -956,17 +1003,17 @@ export function createDevDeliveryService({
 
   function executeFixedPromotion(payload) {
     if (children.size > 0) {
-      throw new Error('another test-133 target action is already running')
+      throw new Error('another delivery target action is already running')
     }
     let operation = readDeliveryOperation(store, payload.operationId)
     if (
       operation.action !== 'promote' ||
-      operation.target !== 'test-133' ||
+      !isDeliveryTarget(operation.target) ||
       operation.status !== 'ready'
     ) {
       throw new Error('promotion operation is not ready')
     }
-    const expected = `PROMOTE:test-133:${operation.gitSha}:${operation.id}`
+    const expected = `PROMOTE:${operation.target}:${operation.gitSha}:${operation.id}`
     if (payload.confirmation !== expected) {
       throw new Error('explicit promotion confirmation does not match')
     }
@@ -1024,19 +1071,19 @@ export function createDevDeliveryService({
 
   function executeFixedRollback(payload) {
     if (children.size > 0) {
-      throw new Error('another test-133 target action is already running')
+      throw new Error('another delivery target action is already running')
     }
     let operation = readDeliveryOperation(store, payload.operationId)
     if (
       operation.action !== 'rollback' ||
-      operation.target !== 'test-133' ||
+      !isDeliveryTarget(operation.target) ||
       operation.status !== 'ready' ||
       !SHA_PATTERN.test(String(operation.metadata?.currentGitSha || ''))
     ) {
       throw new Error('rollback operation is not ready')
     }
     const expected =
-      `ROLLBACK:test-133:${operation.metadata.currentGitSha}:` +
+      `ROLLBACK:${operation.target}:${operation.metadata.currentGitSha}:` +
       `${operation.gitSha}:${operation.id}`
     if (payload.confirmation !== expected) {
       throw new Error('explicit rollback confirmation does not match')
@@ -1249,7 +1296,8 @@ export function createDevDeliveryMiddleware({
         sendJson(response, 200, {
           schemaVersion: 'plush.dev-delivery-session/v1',
           csrfToken,
-          target: 'test-133',
+          target: 'demo-133',
+          targets: DELIVERY_TARGET_KEYS,
         })
         return
       }

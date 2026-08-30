@@ -1,10 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ReloadOutlined } from '@ant-design/icons'
 import { Button, Skeleton, Tag, theme, Typography } from 'antd'
+import { Link as RouterLink } from 'react-router-dom'
 import DevTimestamp from './DevTimestamp.jsx'
 import { createDevDataPreparationClient } from '../config/devDataPreparation.mjs'
-import { createDevDeliveryClient } from '../config/devDelivery.mjs'
 import {
+  createDevDeliveryClient,
+  DEV_VERSION_CENTER_ROUTE,
+  DEV_VERSION_CENTER_VIEW_HISTORY,
+} from '../config/devDelivery.mjs'
+import {
+  buildDevDeliveryOperationOverview,
   buildDevEnvironmentEvidence,
   devEnvironmentEvidenceStatusPresentation,
 } from '../config/devEnvironmentEvidence.mjs'
@@ -128,6 +134,78 @@ function EnvironmentCard({ card, loading }) {
   )
 }
 
+const OPERATION_OVERVIEW_PRESENTATION = Object.freeze({
+  loading: Object.freeze({ label: '读取中', color: 'processing' }),
+  normal: Object.freeze({ label: '已读回', color: 'success' }),
+  empty: Object.freeze({ label: '暂无记录', color: 'default' }),
+  failure: Object.freeze({ label: '读取失败', color: 'error' }),
+  stale: Object.freeze({ label: '结果已过期', color: 'warning' }),
+})
+
+function DeliveryOperationOverview({ summary, error, loading }) {
+  const overview = buildDevDeliveryOperationOverview({
+    summary,
+    error,
+    loading,
+  })
+  const presentation =
+    OPERATION_OVERVIEW_PRESENTATION[overview.state] ||
+    OPERATION_OVERVIEW_PRESENTATION.failure
+  return (
+    <section
+      className="erp-dev-delivery-operation-overview"
+      aria-labelledby="dev-delivery-operation-overview-title"
+    >
+      <header>
+        <div>
+          <strong id="dev-delivery-operation-overview-title">
+            最近工作台操作
+          </strong>
+          <span className="erp-dev-delivery-operation-overview__scope">
+            仅记录由工作台发起的 release、promotion、rebuild 与 rollback。
+          </span>
+        </div>
+        <Tag color={presentation.color}>{presentation.label}</Tag>
+      </header>
+      {overview.state === 'loading' ? (
+        <Skeleton active paragraph={{ rows: 2 }} title={false} />
+      ) : (
+        <div className="erp-dev-delivery-operation-overview__facts">
+          <article>
+            <span>最近操作</span>
+            <strong>{overview.recentOperation}</strong>
+            <DevTimestamp
+              value={overview.recentOperationAt}
+              action="更新于"
+              missing="尚无 operation 时间"
+            />
+          </article>
+          <article>
+            <span>最严重阻断</span>
+            <strong>{overview.strongestBlocker}</strong>
+          </article>
+          <article>
+            <span>最后核对</span>
+            <DevTimestamp
+              value={overview.lastCheckedAt}
+              action="读回于"
+              missing="最后核对时间未证明"
+            />
+            <RouterLink
+              to={`${DEV_VERSION_CENTER_ROUTE}?view=${DEV_VERSION_CENTER_VIEW_HISTORY}`}
+            >
+              查看完整工作台操作记录
+            </RouterLink>
+          </article>
+        </div>
+      )}
+      <Text type="secondary">
+        GitLab Pipeline、Package 与 Release 只在“远端 CI/CD 活动”中展示，不会伪装成工作台操作记录。
+      </Text>
+    </section>
+  )
+}
+
 export default function DevEnvironmentEvidencePanel() {
   const { token } = theme.useToken()
   const requestVersionRef = useRef(0)
@@ -182,7 +260,7 @@ export default function DevEnvironmentEvidencePanel() {
         if (requestVersion !== requestVersionRef.current) return
         setState((current) => ({
           ...current,
-          deliveryError: '133 目标证据读取失败',
+          deliveryError: '双目标交付证据读取失败',
         }))
       })
       .finally(() => {
@@ -240,10 +318,15 @@ export default function DevEnvironmentEvidencePanel() {
           权威读回
         </Button>
       </header>
+      <DeliveryOperationOverview
+        summary={state.deliverySummary}
+        error={state.deliveryError}
+        loading={state.deliveryLoading}
+      />
       <div
         className="erp-dev-environment-evidence__grid"
         role="region"
-        aria-label="本地开发、133 测试与隔离完整验收目标事实"
+        aria-label="本地开发、demo 项目演练造数、test 甲方测试验收与隔离完整验收目标事实"
         // 横向事实对比区需要键盘焦点，才能在窄屏使用方向键滚动。
         // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
         tabIndex={0}
@@ -253,7 +336,7 @@ export default function DevEnvironmentEvidencePanel() {
             key={card.key}
             card={card}
             loading={
-              card.key === 'customer-trial-133'
+              ['demo-133', 'customer-test-133'].includes(card.key)
                 ? state.dataLoading || state.deliveryLoading
                 : state.dataLoading
             }

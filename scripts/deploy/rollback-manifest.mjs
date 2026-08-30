@@ -16,6 +16,7 @@ import process from "node:process";
 
 import { validateReleaseManifest } from "./release-catalog.mjs";
 import { validateGitAncestryRelation } from "./git-ancestry-relation.mjs";
+import { getDeploymentTarget } from "./deployment-targets.mjs";
 
 export const ROLLBACK_MANIFEST_CONTRACT = "plush.rollback-manifest/v1";
 
@@ -72,12 +73,14 @@ function releaseIdentity(manifest, manifestSha256) {
 
 export function validateRollbackManifest(manifest) {
   const ancestry = validateGitAncestryRelation(manifest?.ancestry);
+  const target = getDeploymentTarget(manifest?.target?.key);
   if (
     manifest?.schemaVersion !== ROLLBACK_MANIFEST_CONTRACT ||
     !["eligible", "blocked", "already_current"].includes(manifest?.status) ||
     !UUID_V4_PATTERN.test(String(manifest?.operationId || "")) ||
-    manifest?.target?.key !== "test-133" ||
-    manifest?.target?.customer !== "yoyoosun" ||
+    manifest?.target?.purpose !== target.purpose ||
+    manifest?.target?.customer !== target.customer ||
+    manifest?.target?.trialTarget !== target.trialTarget ||
     !SHA_PATTERN.test(String(manifest?.from?.gitSha || "")) ||
     !SHA_PATTERN.test(String(manifest?.to?.gitSha || "")) ||
     ancestry.currentGitSha !== manifest?.from?.gitSha ||
@@ -174,11 +177,12 @@ export function buildRollbackManifest({
   }
   if (
     targetPreflight?.schemaVersion !== "plush.target-preflight/v1" ||
-    targetPreflight?.target !== "test-133" ||
+    !targetPreflight?.target ||
     targetPreflight?.customer !== "yoyoosun"
   ) {
     throw new Error("fixed target preflight is required for rollback");
   }
+  const target = getDeploymentTarget(targetPreflight.target);
   const blockers = new Set(targetPreflight.blockers || []);
   const runtimeSha = targetPreflight.remote?.runtime?.serverSha || "unknown";
   if (runtimeSha !== from.gitSha) {
@@ -211,10 +215,10 @@ export function buildRollbackManifest({
     operationId,
     createdAt,
     target: {
-      key: "test-133",
-      purpose: "customer-trial",
-      customer: "yoyoosun",
-      trialTarget: "customer-trial-133",
+      key: target.key,
+      purpose: target.purpose,
+      customer: target.customer,
+      trialTarget: target.trialTarget,
     },
     ancestry: gitRelation,
     from,

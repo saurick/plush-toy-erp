@@ -27,9 +27,12 @@ epoch_millis`,
   return result.stdout.trim();
 }
 
-test("remote code rollback is fixed to test-133 and has no build or database mutation", () => {
-  assert.match(source, /target=test-133/u);
-  assert.match(source, /root=\/home\/simon\/plush-toy-erp-v5/u);
+test("remote code rollback is fixed to the two registered targets and has no build or database mutation", () => {
+  assert.match(source, /demo-133\)/u);
+  assert.match(source, /customer-test-133\)/u);
+  assert.match(source, /root=\/home\/simon\/plush-toy-erp-demo-v1/u);
+  assert.match(source, /root=\/home\/simon\/plush-toy-erp-test-v1/u);
+  assert.doesNotMatch(source, /admin[.]yoyoosun[.]net|target=admin/u);
   assert.match(source, /code_and_images_only/u);
   assert.match(source, /automaticDatabaseDownMigration == false/u);
   assert.match(source, /databaseRestoreAutomatic == false/u);

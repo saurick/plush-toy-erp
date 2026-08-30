@@ -16,7 +16,8 @@ test("V6 core contract keeps source units distinct and simulation-only", () => {
   assert.equal(MANUAL_ACCEPTANCE_CORE_CONTRACT.realCustomerImport, false);
   assert.deepEqual(MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133, {
     target: "customer-trial-133",
-    databaseName: "plush_erp_uat_20260716_v5",
+    deploymentTarget: "demo-133",
+    databaseName: "plush_erp_demo_v1",
     databaseLifecycle: "long-lived-registered-target",
     minimumMigration: "20260714165115",
     configRevision:

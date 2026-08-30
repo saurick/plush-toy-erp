@@ -59,9 +59,7 @@ if [[ -n "$phone_secret" ]]; then
   [[ "$phone_secret" == "\${FAKE_SMS_PHONE:-13800138000}" ]]
   phone_bound=true
 fi
-cat <<JSON
-{"generatedAt":"2026-07-22T08:00:00Z","target":"customer-trial-133","datasetVersion":"2026.08.15-v6","migrationVersion":"${migration}","customerRevision":"yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1","release":"${release}","operationId":"${operationId}","adminAccounts":1,"accountKind":"customer-uat","roleAccounts":10,"revokedSessions":3,"authVersionIncremented":true,"auditSource":"manual_acceptance_password_rotation","phoneBound":$phone_bound,"replayed":false,"accounts":[{"username":"admin","authVersion":2,"revokedSessions":1,"phoneBound":$phone_bound},{"username":"uat_admin","authVersion":2,"revokedSessions":1,"phoneBound":false},{"username":"uat_boss","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_engineering","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_finance","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_pmc","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_production","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_purchase","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_quality","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_sales","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_warehouse","authVersion":2,"revokedSessions":1,"phoneBound":false}]}
-JSON
+printf '{"generatedAt":"2026-07-22T08:00:00Z","target":"customer-trial-133","datasetVersion":"2026.08.15-v6","migrationVersion":"${migration}","customerRevision":"yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1","release":"${release}","operationId":"${operationId}","adminAccounts":1,"accountKind":"customer-uat","roleAccounts":10,"revokedSessions":3,"authVersionIncremented":true,"auditSource":"manual_acceptance_password_rotation","phoneBound":%s,"replayed":false,"accounts":[{"username":"admin","authVersion":2,"revokedSessions":1,"phoneBound":%s},{"username":"uat_admin","authVersion":2,"revokedSessions":1,"phoneBound":false},{"username":"uat_boss","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_engineering","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_finance","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_pmc","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_production","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_purchase","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_quality","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_sales","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_warehouse","authVersion":2,"revokedSessions":1,"phoneBound":false}]}\n' "$phone_bound" "$phone_bound"
 `,
   );
   return {
@@ -86,7 +84,7 @@ function run(f, env = {}) {
       "--operation-id",
       operationId,
       "--backup-file",
-      "/home/simon/plush-toy-erp-v5/backups/pre-rotation.dump",
+      "/home/simon/plush-toy-erp-demo-v1/backups/pre-rotation.dump",
       "--backup-sha256",
       backupSha,
       "--report",

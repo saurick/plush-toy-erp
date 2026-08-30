@@ -11,17 +11,24 @@ const scriptPath = path.join(
   "scripts/deploy/bootstrap-production-admin.sh",
 );
 const scriptSource = fs.readFileSync(scriptPath, "utf8");
-const expectedDatabase = "plush_erp_bootstrap_test";
-const trialDatabase = "plush_erp_uat_20260716_v5";
-const trialProject = "plush-toy-erp-v5";
-const productionTrialDataDir = "/home/simon/plush-toy-erp-v5/data/postgres";
+const expectedDatabase = "plush_erp_demo_v1";
+const trialDatabase = expectedDatabase;
+const trialProject = "plush-toy-erp-demo-v1";
+const productionTrialDataDir =
+  "/home/simon/plush-toy-erp-demo-v1/data/postgres";
 const productionTrialLockFile =
-  "/home/simon/plush-toy-erp-v5/run/atlas-migrate.lock";
+  "/home/simon/plush-toy-erp-demo-v1/run/atlas-migrate.lock";
+const customerTestDatabase = "plush_erp_customer_test_v1";
+const customerTestProject = "plush-toy-erp-test-v1";
+const productionCustomerTestDataDir =
+  "/home/simon/plush-toy-erp-test-v1/data/postgres";
+const productionCustomerTestLockFile =
+  "/home/simon/plush-toy-erp-test-v1/run/atlas-migrate.lock";
 const expectedMigration = "20260715161753";
 const expectedRelease = "a".repeat(40);
 const adminPassword = "FreshAdmin9!";
 const postgresAppPassword = "test-app-password-12345";
-const postgresDSN = `postgres://erp_app:${postgresAppPassword}@postgres:5432/plush_erp_bootstrap_test?sslmode=disable`;
+const postgresDSN = `postgres://erp_app:${postgresAppPassword}@postgres:5432/${expectedDatabase}?sslmode=disable`;
 const fixtureScratchRoot = path.join(repoRoot, "output", "qa-tmp");
 // Aggregate Node tests run files concurrently; this only gives fixture scheduling headroom.
 const fixtureProcessTimeoutMs = 30_000;
@@ -93,6 +100,13 @@ function writeFixture(t) {
   const trialDataDir = path.join(trialRoot, "data/postgres");
   const trialLockDir = path.join(trialRoot, "run");
   const trialLockFile = path.join(trialLockDir, "atlas-migrate.lock");
+  const customerTestRoot = path.join(root, customerTestProject);
+  const customerTestDataDir = path.join(customerTestRoot, "data/postgres");
+  const customerTestLockDir = path.join(customerTestRoot, "run");
+  const customerTestLockFile = path.join(
+    customerTestLockDir,
+    "atlas-migrate.lock",
+  );
   const fixturePreflight = path.join(root, "production-preflight.sh");
   const fixtureBootstrap = path.join(root, "bootstrap-production-admin.sh");
   fs.mkdirSync(composeDir, { recursive: true });
@@ -101,8 +115,11 @@ function writeFixture(t) {
   fs.mkdirSync(lockDir, { recursive: true, mode: 0o700 });
   fs.mkdirSync(trialDataDir, { recursive: true, mode: 0o700 });
   fs.mkdirSync(trialLockDir, { recursive: true, mode: 0o700 });
+  fs.mkdirSync(customerTestDataDir, { recursive: true, mode: 0o700 });
+  fs.mkdirSync(customerTestLockDir, { recursive: true, mode: 0o700 });
   fs.chmodSync(lockDir, 0o700);
   fs.chmodSync(trialLockDir, 0o700);
+  fs.chmodSync(customerTestLockDir, 0o700);
 
   const productionPreflightPath = path.join(
     repoRoot,
@@ -114,9 +131,19 @@ function writeFixture(t) {
     fixturePreflightSource,
     new RegExp(productionTrialLockFile, "u"),
   );
+  assert.match(
+    fixturePreflightSource,
+    new RegExp(productionCustomerTestDataDir, "u"),
+  );
+  assert.match(
+    fixturePreflightSource,
+    new RegExp(productionCustomerTestLockFile, "u"),
+  );
   fixturePreflightSource = fixturePreflightSource
     .replaceAll(productionTrialDataDir, trialDataDir)
-    .replaceAll(productionTrialLockFile, trialLockFile);
+    .replaceAll(productionTrialLockFile, trialLockFile)
+    .replaceAll(productionCustomerTestDataDir, customerTestDataDir)
+    .replaceAll(productionCustomerTestLockFile, customerTestLockFile);
   fs.writeFileSync(fixturePreflight, fixturePreflightSource, "utf8");
   fs.chmodSync(fixturePreflight, 0o755);
 
@@ -144,9 +171,18 @@ function writeFixture(t) {
   fs.chmodSync(path.join(composeDir, "migrate_online.sh"), 0o755);
   const composeOverride = path.join(
     composeDir,
-    "compose.customer-trial-133.yml",
+    "compose.demo-133.yml",
   );
   fs.writeFileSync(composeOverride, `name: ${trialProject}\n`, "utf8");
+  const customerTestComposeOverride = path.join(
+    composeDir,
+    "compose.customer-test-133.yml",
+  );
+  fs.writeFileSync(
+    customerTestComposeOverride,
+    `name: ${customerTestProject}\n`,
+    "utf8",
+  );
 
   const mktempPath = path.join(binDir, "mktemp");
   fs.writeFileSync(
@@ -167,8 +203,8 @@ exec /usr/bin/mktemp "$template"
   fs.writeFileSync(
     envFile,
     [
-      "PROJECT_SLUG=plush-toy-erp",
-      "ERP_CUSTOMER_KEY=demo",
+      `PROJECT_SLUG=${trialProject}`,
+      "ERP_CUSTOMER_KEY=yoyoosun",
       "APP_IMAGE=plush-toy-erp-server:bootstrap-test",
       "WEB_IMAGE=plush-toy-erp-web:bootstrap-test",
       "POSTGRES_IMAGE=postgres:18.1",
@@ -181,16 +217,23 @@ exec /usr/bin/mktemp "$template"
       "POSTGRES_BACKUP_PASSWORD=test-backup-password-123",
       `POSTGRES_DB=${expectedDatabase}`,
       "POSTGRES_USER=postgres",
-      "POSTGRES_DATA_DIR=/data/plush-toy-erp/postgres",
-      `MIGRATION_LOCK_FILE=${path.join(lockDir, "atlas-migrate.lock")}`,
+      `POSTGRES_DATA_DIR=${trialDataDir}`,
+      `MIGRATION_LOCK_FILE=${trialLockFile}`,
       "POSTGRES_BIND_ADDR=127.0.0.1",
+      "POSTGRES_PORT=55436",
       "TRACE_ENDPOINT=jaeger:4318",
       "TRACE_RATIO=0.1",
       "WEB_API_ORIGIN=http://app-server:8300",
       "APP_HTTP_BIND_ADDR=127.0.0.1",
-      "WEB_DESKTOP_BIND_ADDR=0.0.0.0",
+      "APP_HTTP_PORT=8325",
+      "WEB_DESKTOP_BIND_ADDR=127.0.0.1",
+      "WEB_DESKTOP_PORT=5195",
       `APP_JWT_SECRET=${"j".repeat(40)}`,
-      "APP_AUTH_SMS_MODE=disabled",
+      "APP_AUTH_SMS_MODE=provider",
+      "APP_AUTH_SMS_ALIYUN_ACCESS_KEY_ID=fixture-access-key-id",
+      "APP_AUTH_SMS_ALIYUN_ACCESS_KEY_SECRET=fixture-access-key-secret",
+      "APP_AUTH_SMS_ALIYUN_SIGN_NAME=fixture-sign-name",
+      "APP_AUTH_SMS_ALIYUN_TEMPLATE_CODE=fixture-template-code",
       "APP_ADMIN_USERNAME=admin",
       "BOOTSTRAP_ADMIN_ONCE=false",
       "ERP_DEBUG_ENV=prod",
@@ -198,10 +241,20 @@ exec /usr/bin/mktemp "$template"
       "ERP_DEBUG_CLEANUP_ENABLED=false",
       "ERP_DEBUG_BUSINESS_CLEAR_ENABLED=false",
       "ERP_DEBUG_CLEANUP_SCOPE=none",
-      "ERP_ALLOW_CUSTOMER_TRIAL_CONFIG=0",
-      "ERP_CUSTOMER_TRIAL_TARGET=",
+      "ERP_ALLOW_CUSTOMER_TRIAL_CONFIG=1",
+      "ERP_CUSTOMER_TRIAL_TARGET=customer-trial-133",
       "ERP_PDF_WARMUP=async",
       "JAEGER_BIND_ADDR=127.0.0.1",
+      "JAEGER_5775_PORT=61001",
+      "JAEGER_6831_PORT=61002",
+      "JAEGER_6832_PORT=61003",
+      "JAEGER_5778_PORT=61004",
+      "JAEGER_UI_PORT=61005",
+      "JAEGER_14268_PORT=61006",
+      "JAEGER_14250_PORT=61007",
+      "JAEGER_9411_PORT=61008",
+      "JAEGER_OTLP_GRPC_PORT=61009",
+      "JAEGER_OTLP_HTTP_PORT=61010",
       "",
     ].join("\n"),
     { mode: 0o600 },
@@ -297,11 +350,11 @@ if [[ "\${1:-}" == "inspect" ]]; then
     exit 0
   fi
   if [[ "$*" == *'com.docker.compose.project'* ]]; then
-    printf '%s\n' "\${FAKE_POSTGRES_COMPOSE_PROJECT:-plush-toy-erp-prod}"
+    printf '%s\n' "\${FAKE_POSTGRES_COMPOSE_PROJECT:-${trialProject}}"
     exit 0
   fi
   if [[ "$*" == *'{{.Name}}'* ]]; then
-    printf '%s\n' "\${FAKE_POSTGRES_CONTAINER_NAME:-/plush-toy-erp-postgres}"
+    printf '%s\n' "\${FAKE_POSTGRES_CONTAINER_NAME:-/${trialProject}-postgres}"
     exit 0
   fi
   if [[ "$*" == *'.State.Status'* ]]; then
@@ -513,7 +566,7 @@ fi
     envFile,
     binDir,
     stateDir,
-    lockDir,
+    lockDir: trialLockDir,
     composeOverride,
     dockerLog: path.join(root, "docker-args.log"),
     secretEnvLog: path.join(root, "docker-secret-env.log"),
@@ -521,6 +574,10 @@ fi
     trialDataDir,
     trialLockDir,
     trialLockFile,
+    customerTestDataDir,
+    customerTestLockDir,
+    customerTestLockFile,
+    customerTestComposeOverride,
   };
 }
 
@@ -559,20 +616,49 @@ function configureTrialFixture(fixture) {
     MIGRATION_LOCK_FILE: fixture.trialLockFile,
     ERP_ALLOW_CUSTOMER_TRIAL_CONFIG: "1",
     ERP_CUSTOMER_TRIAL_TARGET: "customer-trial-133",
-    POSTGRES_PORT: "55435",
-    APP_HTTP_PORT: "8315",
+    POSTGRES_PORT: "55436",
+    APP_HTTP_PORT: "8325",
     WEB_DESKTOP_BIND_ADDR: "127.0.0.1",
-    WEB_DESKTOP_PORT: "5185",
-    JAEGER_5775_PORT: "45775",
-    JAEGER_6831_PORT: "46831",
-    JAEGER_6832_PORT: "46832",
-    JAEGER_5778_PORT: "45778",
-    JAEGER_UI_PORT: "46687",
-    JAEGER_14268_PORT: "54268",
-    JAEGER_14250_PORT: "54250",
-    JAEGER_9411_PORT: "49411",
-    JAEGER_OTLP_GRPC_PORT: "44317",
-    JAEGER_OTLP_HTTP_PORT: "44318",
+    WEB_DESKTOP_PORT: "5195",
+    JAEGER_5775_PORT: "61001",
+    JAEGER_6831_PORT: "61002",
+    JAEGER_6832_PORT: "61003",
+    JAEGER_5778_PORT: "61004",
+    JAEGER_UI_PORT: "61005",
+    JAEGER_14268_PORT: "61006",
+    JAEGER_14250_PORT: "61007",
+    JAEGER_9411_PORT: "61008",
+    JAEGER_OTLP_GRPC_PORT: "61009",
+    JAEGER_OTLP_HTTP_PORT: "61010",
+  });
+}
+
+function configureCustomerTestFixture(fixture) {
+  fixture.lockDir = fixture.customerTestLockDir;
+  fixture.composeOverride = fixture.customerTestComposeOverride;
+  replaceEnvValues(fixture.envFile, {
+    PROJECT_SLUG: customerTestProject,
+    ERP_CUSTOMER_KEY: "yoyoosun",
+    POSTGRES_DSN: `postgres://erp_app:${postgresAppPassword}@postgres:5432/${customerTestDatabase}?sslmode=disable`,
+    POSTGRES_DB: customerTestDatabase,
+    POSTGRES_DATA_DIR: fixture.customerTestDataDir,
+    MIGRATION_LOCK_FILE: fixture.customerTestLockFile,
+    ERP_ALLOW_CUSTOMER_TRIAL_CONFIG: "0",
+    ERP_CUSTOMER_TRIAL_TARGET: "",
+    POSTGRES_PORT: "55437",
+    APP_HTTP_PORT: "8335",
+    WEB_DESKTOP_BIND_ADDR: "127.0.0.1",
+    WEB_DESKTOP_PORT: "5205",
+    JAEGER_5775_PORT: "62001",
+    JAEGER_6831_PORT: "62002",
+    JAEGER_6832_PORT: "62003",
+    JAEGER_5778_PORT: "62004",
+    JAEGER_UI_PORT: "62005",
+    JAEGER_14268_PORT: "62006",
+    JAEGER_14250_PORT: "62007",
+    JAEGER_9411_PORT: "62008",
+    JAEGER_OTLP_GRPC_PORT: "62009",
+    JAEGER_OTLP_HTTP_PORT: "62010",
   });
 }
 
@@ -592,8 +678,9 @@ function helperRunSpec(
     expectedDatabaseArg = expectedDatabase,
     expectedMigrationArg = expectedMigration,
     expectedReleaseArg = expectedRelease,
-    composeOverride = "",
-    projectSlug = "plush-toy-erp",
+    composeOverride = fixture.composeOverride,
+    projectSlug = trialProject,
+    deploymentTarget = "demo-133",
     confirmation,
     timeoutSeconds = "2",
     env = {},
@@ -612,6 +699,7 @@ function helperRunSpec(
     "DOCKER_CONTEXT",
     "DOCKER_TLS_VERIFY",
     "DOCKER_CERT_PATH",
+    "DEPLOYMENT_TARGET_KEY",
     "ERP_ALLOW_LOCAL_TEST_CUSTOMER_CONFIG",
     "ERP_ALLOW_TEST_DB_AS_DEV",
     "ERP_ROLE_DEMO_PASSWORD",
@@ -635,6 +723,8 @@ function helperRunSpec(
     `BOOTSTRAP_PRODUCTION_ADMIN:${projectSlug}:${expectedDatabaseArg}:admin:${expectedMigrationArg}:${expectedReleaseArg}`;
   const args = [
     fixture.scriptPath,
+    "--deployment-target",
+    deploymentTarget,
     "--env-file",
     fixture.envFile,
     "--compose-dir",
@@ -757,7 +847,7 @@ function startHelper(fixture, options = {}) {
 
 function bootstrapLockPath(
   fixture,
-  { project = "plush-toy-erp-prod", database = expectedDatabase } = {},
+  { project = trialProject, database = expectedDatabase } = {},
 ) {
   return path.join(
     fixture.lockDir,
@@ -802,7 +892,7 @@ test("bootstrap production admin uses one secret-safe one-shot and reads back al
     dockerLog,
     /run -d -T --no-deps --rm --pull never .* --label erp\.plush\.admin-bootstrap\.operation=[0-9a-f]{32} -e APP_ADMIN_PASSWORD -e BOOTSTRAP_ADMIN_ONCE=true app-server/u,
   );
-  assert.match(dockerLog, /compose -p plush-toy-erp-prod --env-file/u);
+  assert.match(dockerLog, /compose -p plush-toy-erp-demo-v1 --env-file/u);
   assert.match(dockerLog, /exec -T postgres psql .* -f -/u);
   assert.doesNotMatch(dockerLog, /exec -T postgres psql .* -c /u);
   assert.doesNotMatch(dockerLog, / service-ports | -P | up /u);
@@ -846,7 +936,7 @@ test("bootstrap production admin falls back to scalar BSD stat semantics", (t) =
   assertSecretSafe(result, fixture);
 });
 
-test("bootstrap production admin binds the customer-trial-133 override, lock and all Compose calls", async (t) => {
+test("bootstrap production admin binds the demo-133 override, lock and all Compose calls", async (t) => {
   const fixture = writeFixture(t);
   configureTrialFixture(fixture);
   const releasePath = path.join(fixture.stateDir, "release-compose-version");
@@ -889,9 +979,39 @@ test("bootstrap production admin binds the customer-trial-133 override, lock and
   assertSecretSafe(result, fixture);
 });
 
-test("bootstrap production admin rejects every drift from the exact customer-trial-133 data, lock and Jaeger contract", (t) => {
+test("bootstrap production admin binds the isolated customer-test-133 contract", (t) => {
+  const fixture = writeFixture(t);
+  configureCustomerTestFixture(fixture);
+  const result = runHelper(fixture, {
+    deploymentTarget: "customer-test-133",
+    composeOverride: fixture.customerTestComposeOverride,
+    projectSlug: customerTestProject,
+    expectedDatabaseArg: customerTestDatabase,
+    env: {
+      FAKE_RUNTIME_POSTGRES_DB: customerTestDatabase,
+      FAKE_CURRENT_DATABASE: customerTestDatabase,
+      FAKE_POSTGRES_COMPOSE_PROJECT: customerTestProject,
+      FAKE_POSTGRES_CONTAINER_NAME: `/${customerTestProject}-postgres`,
+      FAKE_RESOLVED_COMPOSE_PROJECT: customerTestProject,
+    },
+  });
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  const dockerLog = fs.readFileSync(fixture.dockerLog, "utf8");
+  assert.match(dockerLog, /compose -p plush-toy-erp-test-v1 --env-file/u);
+  assert.match(
+    dockerLog,
+    new RegExp(
+      `-f ${fixture.customerTestComposeOverride.replaceAll("/", "\\/")}`,
+      "u",
+    ),
+  );
+  assertSecretSafe(result, fixture);
+});
+
+test("bootstrap production admin rejects every drift from the exact demo-133 data, lock and Jaeger contract", (t) => {
   const cases = [
-    ["POSTGRES_DATA_DIR", "/home/simon/plush-toy-erp-v5/data/other"],
+    ["POSTGRES_DATA_DIR", "/home/simon/plush-toy-erp-demo-v1/data/other"],
     ["MIGRATION_LOCK_FILE", path.join("__alternate__", "atlas-migrate.lock")],
     ["WEB_DESKTOP_BIND_ADDR", "0.0.0.0"],
     ["JAEGER_5775_PORT", "25775"],
@@ -929,7 +1049,13 @@ test("bootstrap production admin rejects every drift from the exact customer-tri
       },
     });
     assert.notEqual(result.status, 0, key);
-    assert.match(result.stderr, new RegExp(key, "u"), key);
+    assert.match(
+      result.stderr,
+      key === "WEB_DESKTOP_BIND_ADDR"
+        ? /前端宿主机端口必须绑定 127\.0\.0\.1/u
+        : new RegExp(key, "u"),
+      key,
+    );
     assert.equal(
       fs.existsSync(path.join(fixture.stateDir, "started")),
       false,
@@ -944,12 +1070,12 @@ test("bootstrap production admin rejects missing or out-of-scope Compose overrid
   {
     const fixture = writeFixture(t);
     const result = runHelper(fixture, {
-      composeOverride: fixture.composeOverride,
+      deploymentTarget: "admin",
     });
     assert.notEqual(result.status, 0);
     assert.match(
       result.stderr,
-      /非 customer-trial-133 运行禁止传入 Compose override/u,
+      /只允许 demo-133 或 customer-test-133；admin 不是部署环境/u,
     );
     assert.equal(fs.existsSync(fixture.dockerLog), false);
     assertSecretSafe(result, fixture);
@@ -958,6 +1084,7 @@ test("bootstrap production admin rejects missing or out-of-scope Compose overrid
     const fixture = writeFixture(t);
     configureTrialFixture(fixture);
     const result = runHelper(fixture, {
+      composeOverride: "",
       projectSlug: trialProject,
       expectedDatabaseArg: trialDatabase,
     });
@@ -987,7 +1114,7 @@ test("bootstrap production admin serializes the same Compose project and databas
   assert.equal(fs.statSync(lockPath).mode & 0o777, 0o700);
   assert.equal(fs.statSync(ownerPath).mode & 0o777, 0o600);
   const owner = fs.readFileSync(ownerPath, "utf8");
-  assert.match(owner, /plush-toy-erp-prod/u);
+  assert.match(owner, /plush-toy-erp-demo-v1/u);
   assert.match(owner, new RegExp(expectedDatabase, "u"));
   assert.doesNotMatch(
     owner,
@@ -1012,64 +1139,22 @@ test("bootstrap production admin serializes the same Compose project and databas
   assertSecretSafe(firstResult, fixture);
 });
 
-test("bootstrap production admin serializes the same database across different private file lock roots", async (t) => {
+test("bootstrap production admin rejects an alternate registered-target lock root before Docker", (t) => {
   const fixture = writeFixture(t);
-  const subprocessHandshakeTimeoutMs = 15_000;
-  const releasePath = path.join(fixture.stateDir, "release-current-database");
-  const first = startHelper(fixture, {
-    env: { FAKE_BLOCK_CURRENT_DATABASE: "1" },
-  });
-  t.after(() => {
-    if (fs.existsSync(fixture.stateDir)) {
-      fs.writeFileSync(releasePath, "release\n");
-    }
-    if (first.child.exitCode === null) first.child.kill("SIGTERM");
-  });
-
-  await waitForPath(
-    path.join(fixture.stateDir, "advisory-ready"),
-    subprocessHandshakeTimeoutMs,
-  );
-  await waitForPath(
-    path.join(fixture.stateDir, "current-database-entered"),
-    subprocessHandshakeTimeoutMs,
-  );
-
   const secondLockDir = path.join(fixture.root, "alternate-lock-root");
   fs.mkdirSync(secondLockDir, { mode: 0o700 });
   fs.chmodSync(secondLockDir, 0o700);
-  const secondEnvFile = path.join(fixture.root, ".env.second-lock-root");
-  fs.copyFileSync(fixture.envFile, secondEnvFile);
-  fs.chmodSync(secondEnvFile, 0o600);
-  replaceEnvValues(secondEnvFile, {
+  replaceEnvValues(fixture.envFile, {
     MIGRATION_LOCK_FILE: path.join(secondLockDir, "atlas-migrate.lock"),
   });
-  const secondFixture = {
-    ...fixture,
-    envFile: secondEnvFile,
-    lockDir: secondLockDir,
-  };
 
-  const second = runHelper(secondFixture);
-  assert.notEqual(second.status, 0);
-  assert.match(second.stderr, /advisory lock 已被占用/u);
-  assert.match(second.stderr, /跨文件锁目录并发/u);
+  const result = runHelper(fixture);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /MIGRATION_LOCK_FILE 不符合登记合同/u);
   assert.equal(fs.existsSync(path.join(fixture.stateDir, "started")), false);
-  assert.equal(fs.existsSync(bootstrapLockPath(secondFixture)), false);
+  assert.equal(fs.existsSync(path.join(fixture.stateDir, "advisory-ready")), false);
   assert.equal(fs.existsSync(fixture.secretEnvLog), false);
-
-  fs.writeFileSync(releasePath, "release\n");
-  const firstResult = await first.result;
-  assert.equal(
-    firstResult.status,
-    0,
-    `${firstResult.stdout}\n${firstResult.stderr}`,
-  );
-  assert.equal(
-    fs.existsSync(path.join(fixture.stateDir, "advisory-lock")),
-    false,
-  );
-  assertSecretSafe(firstResult, fixture);
+  assertSecretSafe(result, fixture);
 });
 
 test("bootstrap production admin rejects busy or abnormal PostgreSQL advisory locks before one-shot", (t) => {
@@ -1288,7 +1373,7 @@ test("bootstrap production admin rejects the wrong PostgreSQL Compose label or c
     ],
     [
       { FAKE_POSTGRES_CONTAINER_NAME: "/wrong-postgres" },
-      /容器名必须精确为 plush-toy-erp-postgres/u,
+      /容器名必须精确为 plush-toy-erp-demo-v1-postgres/u,
     ],
   ];
   for (const [env, expected] of cases) {
@@ -1657,16 +1742,16 @@ test("bootstrap production admin script keeps the compose one-shot fail-closed",
   assert.match(preflightSource, new RegExp(productionTrialDataDir, "u"));
   assert.match(preflightSource, new RegExp(productionTrialLockFile, "u"));
   for (const exactPort of [
-    "JAEGER_5775_PORT=45775",
-    "JAEGER_6831_PORT=46831",
-    "JAEGER_6832_PORT=46832",
-    "JAEGER_5778_PORT=45778",
-    "JAEGER_UI_PORT=46687",
-    "JAEGER_14268_PORT=54268",
-    "JAEGER_14250_PORT=54250",
-    "JAEGER_9411_PORT=49411",
-    "JAEGER_OTLP_GRPC_PORT=44317",
-    "JAEGER_OTLP_HTTP_PORT=44318",
+    "JAEGER_5775_PORT=61001",
+    "JAEGER_6831_PORT=61002",
+    "JAEGER_6832_PORT=61003",
+    "JAEGER_5778_PORT=61004",
+    "JAEGER_UI_PORT=61005",
+    "JAEGER_14268_PORT=61006",
+    "JAEGER_14250_PORT=61007",
+    "JAEGER_9411_PORT=61008",
+    "JAEGER_OTLP_GRPC_PORT=61009",
+    "JAEGER_OTLP_HTTP_PORT=61010",
   ]) {
     assert.match(preflightSource, new RegExp(exactPort, "u"));
   }

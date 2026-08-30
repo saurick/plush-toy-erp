@@ -92,7 +92,7 @@ function createFixture(t, migrationHash = HASH) {
 function preflight(blockers = []) {
   return {
     schemaVersion: "plush.target-preflight/v1",
-    target: "test-133",
+    target: "demo-133",
     customer: "yoyoosun",
     blockers,
     remote: {
@@ -113,7 +113,7 @@ test("rollback controller awaits preflight and produces one idempotent ready ope
     repoRoot: fixture.root,
     currentReleaseManifestPath: fixture.currentManifest,
     targetReleaseManifestPath: fixture.targetManifest,
-    targetKey: "test-133",
+    targetKey: "demo-133",
     idempotencyKey: "rollback-controller:fixed:0001",
     operationStore: fixture.store,
   };
@@ -142,7 +142,7 @@ test("rollback controller persists incompatible schema as terminal blocked", asy
       repoRoot: fixture.root,
       currentReleaseManifestPath: fixture.currentManifest,
       targetReleaseManifestPath: fixture.targetManifest,
-      targetKey: "test-133",
+      targetKey: "demo-133",
       idempotencyKey: "rollback-controller:blocked:0001",
       operationStore: fixture.store,
     },

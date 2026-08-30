@@ -5,12 +5,12 @@ umask 077
 print_help() {
   cat <<'USAGE'
 Usage:
-  bash remote-code-rollback.sh rollback \
+  bash remote-code-rollback.sh rollback <demo-133|customer-test-133> \
     <operation-id> <from-40-sha> <to-40-sha> <to-version> \
     <current-manifest-sha256> <target-manifest-sha256> \
     <rollback-fingerprint> <confirmation>
 
-This fixed test-133 script rolls back code and images only. It never builds,
+This registered-target script rolls back code and images only. It never builds,
 runs a database down migration, restores a database or retries an unknown
 operation.
 USAGE
@@ -22,27 +22,56 @@ USAGE
 }
 
 action="${1:-}"
-operation_id="${2:-}"
-from_sha="${3:-}"
-to_sha="${4:-}"
-to_version="${5:-}"
-current_manifest_sha256="${6:-}"
-target_manifest_sha256="${7:-}"
-rollback_fingerprint="${8:-}"
-confirmation="${9:-}"
+target="${2:-}"
+operation_id="${3:-}"
+from_sha="${4:-}"
+to_sha="${5:-}"
+to_version="${6:-}"
+current_manifest_sha256="${7:-}"
+target_manifest_sha256="${8:-}"
+rollback_fingerprint="${9:-}"
+confirmation="${10:-}"
 
-target=test-133
-root=/home/simon/plush-toy-erp-v5
+case "$target" in
+demo-133)
+  root=/home/simon/plush-toy-erp-demo-v1
+  runtime_env=$root/runtime/.env.demo-133
+  public_endpoint=https://demo.yoyoosun.net
+  public_network=plush-toy-erp-demo-v1_default
+  public_container_prefix=plush-toy-erp-demo-web-public-
+  public_host_port=5176
+  public_candidate_port=15176
+  project=plush-toy-erp-demo-v1
+  compose_override_name=compose.demo-133.yml
+  server_endpoint=http://127.0.0.1:8325
+  web_endpoint=http://127.0.0.1:5195
+  ;;
+customer-test-133)
+  root=/home/simon/plush-toy-erp-test-v1
+  runtime_env=$root/runtime/.env.customer-test-133
+  public_endpoint=https://test.yoyoosun.net
+  public_network=plush-toy-erp-test-v1_default
+  public_container_prefix=plush-toy-erp-test-web-public-
+  public_host_port=5177
+  public_candidate_port=15177
+  project=plush-toy-erp-test-v1
+  compose_override_name=compose.customer-test-133.yml
+  server_endpoint=http://127.0.0.1:8335
+  web_endpoint=http://127.0.0.1:5205
+  ;;
+*)
+  printf '[remote-code-rollback] unsupported target\n' >&2
+  exit 1
+  ;;
+esac
 incoming_root=$root/incoming
 cache_root=$root/release-cache
 releases_root=$root/releases
-runtime_env=$root/runtime/.env.customer-trial-133
-public_endpoint=https://admin.yoyoosun.net
-public_network=plush-toy-erp-v5_default
 operations_root=$root/operations
 run_root=$root/run
 current=$root/current
-project=plush-toy-erp-v5
+server_container=$project-server
+web_container=$project-web-desktop
 minimum_available_bytes=32212254720
 promotion_lock=$run_root/promotion.lock
 
@@ -127,7 +156,7 @@ portable_archive_manifest_digest() {
   fail "invalid rollback checksum"
 [[ "$confirmation" == "ROLLBACK:$target:$from_sha:$to_sha:$operation_id" ]] ||
   fail "rollback confirmation does not match"
-[[ "$(hostname)" == simon && "$(id -un)" == simon ]] ||
+[[ "$(hostname)" == r640 && "$(id -un)" == simon ]] ||
   fail "remote host/user identity does not match"
 
 incoming=$incoming_root/$operation_id
@@ -353,12 +382,12 @@ recover_previous() {
     -p "$project" \
     --env-file "$runtime_env" \
     -f "$current/server/deploy/compose/prod/compose.yml" \
-    -f "$current/server/deploy/compose/prod/compose.customer-trial-133.yml" \
+    -f "$current/server/deploy/compose/prod/$compose_override_name" \
     up -d --no-build --pull never app-server web-desktop \
     >>"$log_file" 2>&1 || return 1
   curl --fail --silent --show-error --max-time 10 \
-    http://127.0.0.1:8315/readyz >/dev/null 2>&1 || return 1
-  recovered_sha="$(docker inspect plush-toy-erp-v5-server --format '{{range .Config.Env}}{{println .}}{{end}}' |
+    "$server_endpoint/readyz" >/dev/null 2>&1 || return 1
+  recovered_sha="$(docker inspect "$server_container" --format '{{range .Config.Env}}{{println .}}{{end}}' |
     sed -n 's/^GIT_SHA=//p' | head -n1)"
   [[ "$recovered_sha" == "$from_sha" ]]
 }
@@ -432,6 +461,7 @@ for required_file in "${required_files[@]}"; do
 done
 jq -e \
   --arg operationId "$operation_id" \
+  --arg target "$target" \
   --arg manifest "$target_manifest_sha256" \
   '.schemaVersion == "plush.target-release-cache/v1" and
    .operationId == $operationId and
@@ -469,7 +499,7 @@ jq -e \
   '.schemaVersion == "plush.rollback-manifest/v1" and
    .status == "eligible" and
    .operationId == $operationId and
-   .target.key == "test-133" and
+   .target.key == $target and
    .from.gitSha == $fromSha and
    .to.gitSha == $toSha and
    .ancestry.schemaVersion == "plush.git-ancestry-relation/v1" and
@@ -562,16 +592,16 @@ available_bytes="$(df -B1 --output=avail / | awk 'NR==2 {print $1}')"
 [[ "$available_bytes" =~ ^[0-9]+$ &&
   "$available_bytes" -ge "$minimum_available_bytes" ]] ||
   fail "target disk capacity is below the fixed minimum"
-runtime_server_sha="$(docker inspect plush-toy-erp-v5-server --format '{{range .Config.Env}}{{println .}}{{end}}' |
+runtime_server_sha="$(docker inspect "$server_container" --format '{{range .Config.Env}}{{println .}}{{end}}' |
   sed -n 's/^GIT_SHA=//p' | head -n1)"
-runtime_web_sha="$(docker inspect plush-toy-erp-v5-web-desktop --format '{{range .Config.Env}}{{println .}}{{end}}' |
+runtime_web_sha="$(docker inspect "$web_container" --format '{{range .Config.Env}}{{println .}}{{end}}' |
   sed -n 's/^GIT_SHA=//p' | head -n1)"
 [[ "$runtime_server_sha" == "$from_sha" && "$runtime_web_sha" == "$from_sha" ]] ||
   fail "current runtime SHA or Git ancestry changed after rollback qualification"
 curl --fail --silent --show-error --max-time 10 \
-  http://127.0.0.1:8315/readyz >/dev/null
+  "$server_endpoint/readyz" >/dev/null
 curl --fail --silent --show-error --max-time 10 \
-  http://127.0.0.1:5185/healthz >/dev/null
+  "$web_endpoint/healthz" >/dev/null
 
 mkdir -p "$cache_root"
 chmod 700 "$cache_root"
@@ -687,7 +717,7 @@ enter_stage static_preflight
   "$(stat -c '%u' "$runtime_env")" == "$(id -u)" &&
   "$(stat -c '%a' "$runtime_env")" == 600 ]] ||
   fail "target runtime env is invalid"
-env_backup="$root/runtime/.env.customer-trial-133.bak-before-rollback-${from_sha:0:8}-${operation_id:0:8}"
+env_backup="$runtime_env.bak-before-rollback-${from_sha:0:8}-${operation_id:0:8}"
 [[ ! -e "$env_backup" ]] || fail "rollback env backup already exists"
 cp "$runtime_env" "$env_backup"
 chmod 600 "$env_backup"
@@ -698,7 +728,7 @@ env_changed=1
 
 compose_dir=$release_dir/server/deploy/compose/prod
 compose_base=$compose_dir/compose.yml
-compose_override=$compose_dir/compose.customer-trial-133.yml
+compose_override=$compose_dir/$compose_override_name
 preflight_script=$release_dir/scripts/deploy/production-preflight.sh
 [[ -f "$compose_base" && -f "$compose_override" && -x "$preflight_script" ]] ||
   fail "target rollback release entrypoints are incomplete"
@@ -710,6 +740,7 @@ compose=(
   -f "$compose_override"
 )
 "${clean_env[@]}" bash "$preflight_script" \
+  --deployment-target "$target" \
   --env-file "$runtime_env" \
   --compose-dir "$compose_dir" \
   --compose-override "$compose_override" \
@@ -724,6 +755,7 @@ service_switch_started=1
 
 enter_stage runtime_verified
 "${clean_env[@]}" bash "$preflight_script" \
+  --deployment-target "$target" \
   --env-file "$runtime_env" \
   --compose-dir "$compose_dir" \
   --compose-override "$compose_override" \
@@ -732,14 +764,14 @@ enter_stage runtime_verified
   --out "$operation_dir/rollback-preflight-report.txt" \
   >>"$log_file" 2>&1
 curl --fail --silent --show-error --max-time 10 \
-  http://127.0.0.1:8315/healthz >/dev/null
+  "$server_endpoint/healthz" >/dev/null
 curl --fail --silent --show-error --max-time 10 \
-  http://127.0.0.1:8315/readyz >/dev/null
+  "$server_endpoint/readyz" >/dev/null
 curl --fail --silent --show-error --max-time 10 \
-  http://127.0.0.1:5185/healthz >/dev/null
-runtime_server_sha="$(docker inspect plush-toy-erp-v5-server --format '{{range .Config.Env}}{{println .}}{{end}}' |
+  "$web_endpoint/healthz" >/dev/null
+runtime_server_sha="$(docker inspect "$server_container" --format '{{range .Config.Env}}{{println .}}{{end}}' |
   sed -n 's/^GIT_SHA=//p' | head -n1)"
-runtime_web_sha="$(docker inspect plush-toy-erp-v5-web-desktop --format '{{range .Config.Env}}{{println .}}{{end}}' |
+runtime_web_sha="$(docker inspect "$web_container" --format '{{range .Config.Env}}{{println .}}{{end}}' |
   sed -n 's/^GIT_SHA=//p' | head -n1)"
 [[ "$runtime_server_sha" == "$to_sha" && "$runtime_web_sha" == "$to_sha" ]] ||
   fail "rollback runtime release identity does not match"
@@ -750,7 +782,7 @@ public_cutover_script=$current/deployments/yoyoosun/scripts/cutover-public-web.s
   fail "public entry cutover script is unavailable"
 public_containers="$(
   docker ps --format '{{.Names}}' |
-    sed -n '/^plush-toy-erp-web-public-[0-9a-f]\{8\}$/p'
+    grep -E "^${public_container_prefix}[0-9a-f]{8}$" || true
 )"
 public_container_count="$(printf '%s\n' "$public_containers" | sed '/^$/d' | wc -l | tr -d ' ')"
 [[ "$public_container_count" == 1 ]] || fail "public entry container is not unique"
@@ -761,11 +793,14 @@ bash "$public_cutover_script" \
   --endpoint "$public_endpoint" \
   --api-origin http://app-server:8300 \
   --network "$public_network" \
+  --container-prefix "$public_container_prefix" \
+  --host-port "$public_host_port" \
+  --candidate-port "$public_candidate_port" \
   --execute \
   --confirm "PUBLIC_WEB_CUTOVER:$public_containers:$to_sha" \
   >>"$log_file" 2>&1
 public_runtime_sha="$(
-  docker inspect "plush-toy-erp-web-public-${to_sha:0:8}" \
+  docker inspect "${public_container_prefix}${to_sha:0:8}" \
     --format '{{range .Config.Env}}{{println .}}{{end}}' |
     sed -n 's/^GIT_SHA=//p' | head -n1
 )"

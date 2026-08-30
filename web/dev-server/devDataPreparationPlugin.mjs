@@ -38,6 +38,7 @@ import {
 import { buildManualAcceptancePageDataContract } from '../../scripts/qa/manual-acceptance-page-data-contract.mjs'
 import {
   CUSTOMER_TRIAL_133_DATABASE,
+  CUSTOMER_TRIAL_133_DEPLOYMENT_TARGET,
   CUSTOMER_TRIAL_133_ORIGIN,
   CUSTOMER_TRIAL_133_TARGET,
   CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
@@ -115,6 +116,8 @@ const MANUAL_ACCEPTANCE_ENVIRONMENT_CONTRACT = Object.freeze({
   warehouseCount: MANUAL_ACCEPTANCE_CORE_CONTRACT.warehouses.length,
   customerTrial133: Object.freeze({
     target: MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.target,
+    deploymentTarget:
+      MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.deploymentTarget,
     databaseName: MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.databaseName,
     databaseLifecycle:
       MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.databaseLifecycle,
@@ -159,14 +162,14 @@ export const DEV_DATA_PREPARATION_PROFILES = Object.freeze([
     key: 'scenario-demo',
     title: '长期业务场景数据',
     purpose:
-      '本地开发与 133 测试分别按固定目标身份，共用同一 V6 语义精确创建或读回 Source、ProcessRuntime 与 Fact 场景',
+      '本地开发与 demo-133 分别按固定目标身份，共用同一 V6 语义精确创建或读回 Source、ProcessRuntime 与 Fact 场景',
     writesDatabase: true,
     dataRetention: 'long-lived',
     cleanupMode: 'forward-only',
     exactCleanCommitRequired: false,
     requiredEnvironment: Object.freeze([
       '登记本地开发库与本机 8300 后端',
-      '登记 133 试用库、固定隧道与带外证明',
+      '登记 demo 演练库、固定隧道与带外证明',
     ]),
   }),
 ])
@@ -687,7 +690,7 @@ function scenarioDemoPlanFingerprint(stdout, repository, target) {
     plan.target?.targetFingerprint !== target.targetFingerprint ||
     plan.target?.disposable !== false ||
     plan.target?.registeredTargetOnly !== true ||
-    plan.target?.loopbackBackendOnly !== true ||
+    plan.target?.registeredEndpointOnly !== true ||
     plan.canonicalRunner?.stageCount !==
       MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.length ||
     plan.canonicalRunner?.semanticDigest !== plan.semanticDigest ||
@@ -1090,7 +1093,8 @@ export function createDevDataPreparationService({
   environment = process.env,
   now = () => new Date(),
   random = randomBytes,
-  readCustomerTrialPreflight = () => runTargetPreflightAsync('test-133'),
+  readCustomerTrialPreflight = () =>
+    runTargetPreflightAsync(CUSTOMER_TRIAL_133_DEPLOYMENT_TARGET),
   createCustomerTrialBackup = createCustomerTrial133DataBackup,
   processId = process.pid,
   isProcessAlive = (pid) => {
@@ -1230,13 +1234,14 @@ export function createDevDataPreparationService({
       ].every((value) => value === false)
     if (
       report?.status !== 'passed' ||
-      report?.target !== 'test-133' ||
+      report?.target !== CUSTOMER_TRIAL_133_DEPLOYMENT_TARGET ||
       report?.trialTarget !== CUSTOMER_TRIAL_133_TARGET ||
       report?.customer !== 'yoyoosun' ||
       runtime?.serverSha !== repository.commit ||
       runtime?.webSha !== repository.commit ||
       report?.remote?.publicEntry?.gitSha !== repository.commit ||
       runtime?.databaseName !== CUSTOMER_TRIAL_133_DATABASE ||
+      runtime?.resourceIdentity !== 'passed' ||
       !/^20[0-9]{12}$/u.test(String(runtime?.migrationVersion || '')) ||
       runtime.migrationVersion <
         MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration ||
@@ -1298,7 +1303,7 @@ export function createDevDataPreparationService({
       preflight: report,
       summary: Object.freeze({
         targetKey: CUSTOMER_TRIAL_133_TARGET,
-        safeTarget: `${CUSTOMER_TRIAL_133_TARGET}:${runtime.databaseName}`,
+        safeTarget: `${CUSTOMER_TRIAL_133_DEPLOYMENT_TARGET}:${runtime.databaseName}`,
         targetFingerprint: fingerprint,
         preflightFingerprint: '0'.repeat(64),
         disposable: false,
@@ -1437,7 +1442,7 @@ export function createDevDataPreparationService({
     const target = {
       scenarioDemo133: {
         status: 'not_proven',
-        safeTarget: `${CUSTOMER_TRIAL_133_TARGET}:${CUSTOMER_TRIAL_133_DATABASE}`,
+        safeTarget: `${CUSTOMER_TRIAL_133_DEPLOYMENT_TARGET}:${CUSTOMER_TRIAL_133_DATABASE}`,
         databaseName: CUSTOMER_TRIAL_133_DATABASE,
         migrationVersion:
           MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,

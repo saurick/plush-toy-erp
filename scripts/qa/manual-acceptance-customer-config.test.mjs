@@ -228,7 +228,7 @@ test("help documents both dedicated local and registered 133 backends", async ()
   const result = await runManualAcceptanceCustomerConfig({ argv: ["--help"] });
   assert.equal(result.help, true);
   assert.match(result.usage, /Dedicated local backend/u);
-  assert.match(result.usage, /customer-trial-133 SSH tunnel/u);
+  assert.match(result.usage, /customer-trial-133 TLS endpoint/u);
   assert.doesNotMatch(result.usage, /Must be the registered/u);
 });
 
@@ -259,7 +259,7 @@ test("QA README provides a complete local and 133 config-to-dataset chain", asyn
   );
   assert.doesNotMatch(
     qaReadme,
-    /manual-acceptance-dataset\.mjs[\s\S]{0,400}--target customer-trial-133[\s\S]{0,240}--database-name plush_erp_uat_20260716_v5/u,
+    /manual-acceptance-dataset\.mjs[\s\S]{0,400}--target customer-trial-133[\s\S]{0,240}--database-name plush_erp_demo_v1/u,
     "QA README must let the registered 133 target policy supply the database identity",
   );
   assert.match(

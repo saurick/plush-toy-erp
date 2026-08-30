@@ -3,17 +3,15 @@ set -Eeuo pipefail
 umask 077
 
 print_help() {
-  cat <<'USAGE'
-Usage:
-  bash remote-database-rebuild.sh rebuild-database \
-    <operation-id> <40-sha> <version> <release-manifest-sha256> \
-    <database-rebuild-fingerprint> <confirmation>
-
-This fixed test-133 executor replaces the physical PostgreSQL data generation
-while retaining the same registered logical database name. It first creates and
-restore-checks a fresh backup, preserves the predecessor data directory, and
-never deletes either generation. It does not retry a terminal or unknown run.
-USAGE
+  printf '%s\n' \
+    'Usage:' \
+    "  bash remote-database-rebuild.sh rebuild-database <demo-133|customer-test-133> \\" \
+    "    <operation-id> <40-sha> <version> <release-manifest-sha256> \\" \
+    '    <database-rebuild-fingerprint> <confirmation>' \
+    '' \
+    'This registered-target executor replaces one physical PostgreSQL data generation while retaining its logical database name.' \
+    'It creates and restore-checks a fresh backup, preserves the predecessor data directory, never deletes either generation,' \
+    'and never retries a terminal or unknown operation.'
 }
 
 [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && {
@@ -22,23 +20,43 @@ USAGE
 }
 
 action="${1:-}"
-operation_id="${2:-}"
-release_sha="${3:-}"
-release_version="${4:-}"
-release_manifest_sha256="${5:-}"
-rebuild_fingerprint="${6:-}"
-confirmation="${7:-}"
+target="${2:-}"
+operation_id="${3:-}"
+release_sha="${4:-}"
+release_version="${5:-}"
+release_manifest_sha256="${6:-}"
+rebuild_fingerprint="${7:-}"
+confirmation="${8:-}"
 
-target=test-133
-root=/home/simon/plush-toy-erp-v5
+case "$target" in
+demo-133)
+  root=/home/simon/plush-toy-erp-demo-v1
+  runtime_env=$root/runtime/.env.demo-133
+  project=plush-toy-erp-demo-v1
+  database=plush_erp_demo_v1
+  compose_override_name=compose.demo-133.yml
+  server_endpoint=http://127.0.0.1:8325
+  web_endpoint=http://127.0.0.1:5195
+  ;;
+customer-test-133)
+  root=/home/simon/plush-toy-erp-test-v1
+  runtime_env=$root/runtime/.env.customer-test-133
+  project=plush-toy-erp-test-v1
+  database=plush_erp_customer_test_v1
+  compose_override_name=compose.customer-test-133.yml
+  server_endpoint=http://127.0.0.1:8335
+  web_endpoint=http://127.0.0.1:5205
+  ;;
+*)
+  printf '[remote-database-rebuild] unsupported target\n' >&2
+  exit 1
+  ;;
+esac
 incoming_root=$root/incoming
 operations_root=$root/operations
 backups_root=$root/backups
 run_root=$root/run
 current=$root/current
-runtime_env=$root/runtime/.env.customer-trial-133
-project=plush-toy-erp-v5
-database=plush_erp_uat_20260716_v5
 data_dir=$root/data/postgres
 minimum_available_bytes=32212254720
 operation_lock=$run_root/promotion.lock
@@ -63,7 +81,7 @@ fail() {
   fail "invalid database rebuild fingerprint"
 [[ "$confirmation" == "REBUILD_DATABASE:$target:$release_sha:$operation_id" ]] ||
   fail "database rebuild confirmation does not match"
-[[ "$(hostname)" == simon && "$(id -un)" == simon ]] ||
+[[ "$(hostname)" == r640 && "$(id -un)" == simon ]] ||
   fail "remote host/user identity does not match"
 
 incoming=$incoming_root/$operation_id
@@ -251,7 +269,7 @@ write_receipt() {
 
 restore_database_cleanup() {
   if [[ "$restore_database_created" -eq 1 ]]; then
-    docker exec plush-toy-erp-v5-postgres sh -ceu \
+    docker exec "$project-postgres" sh -ceu \
       'dropdb --if-exists --force -U "$POSTGRES_USER" "$1"' \
       sh "$restore_database" >/dev/null 2>&1 || true
     restore_database_created=0
@@ -277,6 +295,7 @@ recover_predecessor_before_migration() {
   "${clean_env[@]}" "${compose[@]}" up -d --no-build --pull never \
     postgres jaeger app-server web-desktop >>"$log_file" 2>&1 || return 1
   "${clean_env[@]}" bash "$preflight_script" \
+    --deployment-target "$target" \
     --env-file "$runtime_env" \
     --compose-dir "$compose_dir" \
     --compose-override "$compose_override" \
@@ -295,6 +314,7 @@ restore_predecessor_runtime_before_switch() {
   "${clean_env[@]}" "${compose[@]}" up -d --no-build --pull never \
     postgres jaeger app-server web-desktop >>"$log_file" 2>&1 || return 1
   "${clean_env[@]}" bash "$preflight_script" \
+    --deployment-target "$target" \
     --env-file "$runtime_env" \
     --compose-dir "$compose_dir" \
     --compose-override "$compose_override" \
@@ -387,7 +407,7 @@ jq -e \
   --arg database "$database" \
   '.schemaVersion == "plush.database-rebuild-manifest/v1" and
    .status == "eligible" and .operationId == $operationId and
-   .target.key == "test-133" and .target.database == $database and
+   .target.key == $target and .target.database == $database and
    .release.gitSha == $sha and .fingerprint == $fingerprint and
    .ancestry.schemaVersion == "plush.git-ancestry-relation/v1" and
    .ancestry.currentGitSha == $sha and
@@ -399,9 +419,9 @@ jq -e \
    .rollback.preserveFreshBackup == true and
    .rollback.automaticDataDeletion == false' \
   "$incoming/database-rebuild-manifest.json" >/dev/null
-qualified_runtime_sha="$(docker inspect plush-toy-erp-v5-server --format '{{range .Config.Env}}{{println .}}{{end}}' |
+qualified_runtime_sha="$(docker inspect "$project-server" --format '{{range .Config.Env}}{{println .}}{{end}}' |
   sed -n 's/^GIT_SHA=//p' | head -n1)"
-qualified_runtime_web_sha="$(docker inspect plush-toy-erp-v5-web-desktop --format '{{range .Config.Env}}{{println .}}{{end}}' |
+qualified_runtime_web_sha="$(docker inspect "$project-web-desktop" --format '{{range .Config.Env}}{{println .}}{{end}}' |
   sed -n 's/^GIT_SHA=//p' | head -n1)"
 [[ "$qualified_runtime_sha" == "$release_sha" &&
   "$qualified_runtime_web_sha" == "$release_sha" ]] ||
@@ -436,7 +456,7 @@ jq -e \
 
 compose_dir=$current/server/deploy/compose/prod
 compose_base=$compose_dir/compose.yml
-compose_override=$compose_dir/compose.customer-trial-133.yml
+compose_override=$compose_dir/$compose_override_name
 preflight_script=$current/scripts/deploy/production-preflight.sh
 migrate_script=$compose_dir/migrate_online.sh
 bootstrap_script=$current/scripts/deploy/bootstrap-production-admin.sh
@@ -460,6 +480,7 @@ compose=(
 )
 
 "${clean_env[@]}" bash "$preflight_script" \
+  --deployment-target "$target" \
   --env-file "$runtime_env" \
   --compose-dir "$compose_dir" \
   --compose-override "$compose_override" \
@@ -490,9 +511,9 @@ postgres_data_gid="$(docker exec "$postgres_cid" id -g postgres)"
 postgres_mount="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql"}}{{printf "%s|%s" .Type .Source}}{{end}}{{end}}' "$postgres_cid")"
 [[ "$postgres_mount" == "bind|$data_dir" ]] ||
   fail "target PostgreSQL data mount does not match the fixed directory"
-runtime_sha="$(docker inspect plush-toy-erp-v5-server --format '{{range .Config.Env}}{{println .}}{{end}}' |
+runtime_sha="$(docker inspect "$project-server" --format '{{range .Config.Env}}{{println .}}{{end}}' |
   sed -n 's/^GIT_SHA=//p' | head -n1)"
-runtime_web_sha="$(docker inspect plush-toy-erp-v5-web-desktop --format '{{range .Config.Env}}{{println .}}{{end}}' |
+runtime_web_sha="$(docker inspect "$project-web-desktop" --format '{{range .Config.Env}}{{println .}}{{end}}' |
   sed -n 's/^GIT_SHA=//p' | head -n1)"
 [[ "$runtime_sha" == "$release_sha" && "$runtime_web_sha" == "$release_sha" ]] ||
   fail "target runtime release changed after qualification"
@@ -588,12 +609,14 @@ write_state running
 "${clean_env[@]}" \
   "COMPOSE_OVERRIDE_FILE=$compose_override" \
   "COMPOSE_ENV_FILE=$runtime_env" \
+  "DEPLOYMENT_TARGET_KEY=$target" \
   "EXPECTED_MIGRATION_SEQUENCE_SHA256=$migration_sequence_sha256" \
   "RELEASE_SHA=$release_sha" \
   sh "$migrate_script" --status-only >>"$log_file" 2>&1
 "${clean_env[@]}" \
   "COMPOSE_OVERRIDE_FILE=$compose_override" \
   "COMPOSE_ENV_FILE=$runtime_env" \
+  "DEPLOYMENT_TARGET_KEY=$target" \
   "EXPECTED_MIGRATION_SEQUENCE_SHA256=$migration_sequence_sha256" \
   "RELEASE_SHA=$release_sha" \
   sh "$migrate_script" >>"$log_file" 2>&1
@@ -604,6 +627,7 @@ write_state running
 "${clean_env[@]}" \
   "COMPOSE_OVERRIDE_FILE=$compose_override" \
   "COMPOSE_ENV_FILE=$runtime_env" \
+  "DEPLOYMENT_TARGET_KEY=$target" \
   "MIGRATION_MAINTENANCE_CONFIRMED=1" \
   "EXPECTED_MIGRATION_SEQUENCE_SHA256=$migration_sequence_sha256" \
   "RELEASE_SHA=$release_sha" \
@@ -614,6 +638,7 @@ write_state running
 "${clean_env[@]}" \
   "COMPOSE_OVERRIDE_FILE=$compose_override" \
   "COMPOSE_ENV_FILE=$runtime_env" \
+  "DEPLOYMENT_TARGET_KEY=$target" \
   "EXPECTED_MIGRATION_SEQUENCE_SHA256=$migration_sequence_sha256" \
   "RELEASE_SHA=$release_sha" \
   sh "$migrate_script" --status-only >>"$log_file" 2>&1
@@ -638,6 +663,7 @@ write_state running
   export HOME USER LOGNAME PATH
   export APP_ADMIN_PASSWORD="$admin_secret"
   bash "$bootstrap_script" \
+    --deployment-target "$target" \
     --env-file "$runtime_env" \
     --compose-dir "$compose_dir" \
     --compose-override "$compose_override" \
@@ -692,6 +718,7 @@ write_state running
 "${clean_env[@]}" "${compose[@]}" up -d --no-build --pull never \
   postgres jaeger app-server web-desktop >>"$log_file" 2>&1
 "${clean_env[@]}" bash "$preflight_script" \
+  --deployment-target "$target" \
   --env-file "$runtime_env" \
   --compose-dir "$compose_dir" \
   --compose-override "$compose_override" \
@@ -700,14 +727,14 @@ write_state running
   --out "$operation_dir/fresh-runtime-preflight-report.txt" \
   >>"$log_file" 2>&1
 curl --fail --silent --show-error --max-time 10 \
-  http://127.0.0.1:8315/healthz >/dev/null
+  "$server_endpoint/healthz" >/dev/null
 curl --fail --silent --show-error --max-time 10 \
-  http://127.0.0.1:8315/readyz >/dev/null
+  "$server_endpoint/readyz" >/dev/null
 curl --fail --silent --show-error --max-time 10 \
-  http://127.0.0.1:5185/healthz >/dev/null
-runtime_sha="$(docker inspect plush-toy-erp-v5-server --format '{{range .Config.Env}}{{println .}}{{end}}' |
+  "$web_endpoint/healthz" >/dev/null
+runtime_sha="$(docker inspect "$project-server" --format '{{range .Config.Env}}{{println .}}{{end}}' |
   sed -n 's/^GIT_SHA=//p' | head -n1)"
-runtime_web_sha="$(docker inspect plush-toy-erp-v5-web-desktop --format '{{range .Config.Env}}{{println .}}{{end}}' |
+runtime_web_sha="$(docker inspect "$project-web-desktop" --format '{{range .Config.Env}}{{println .}}{{end}}' |
   sed -n 's/^GIT_SHA=//p' | head -n1)"
 [[ "$runtime_sha" == "$release_sha" && "$runtime_web_sha" == "$release_sha" ]] ||
   fail "fresh runtime release identity does not match"

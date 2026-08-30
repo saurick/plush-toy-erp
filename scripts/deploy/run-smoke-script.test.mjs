@@ -10,6 +10,7 @@ const scriptPath = path.join(
   repoRoot,
   "deployments/yoyoosun/scripts/run-smoke.sh",
 );
+const scriptSource = fs.readFileSync(scriptPath, "utf8");
 const credentialContract = JSON.parse(
   fs.readFileSync(
     path.join(repoRoot, "deployments/yoyoosun/env/credential.contract.json"),
@@ -169,6 +170,10 @@ test("run smoke help is runnable", () => {
   assert.match(result.stdout, /--admin-password-env/);
   assert.match(result.stdout, /--uat-password-env/);
   assert.match(result.stdout, /--print-input-template/);
+});
+
+test("run smoke keeps public TLS verification enabled", () => {
+  assert.doesNotMatch(scriptSource, /(?:^|\s)(?:-k|--insecure)(?:\s|$)/mu);
 });
 
 test("run smoke input template is no-write and does not require endpoint", () => {

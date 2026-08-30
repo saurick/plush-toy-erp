@@ -1,216 +1,149 @@
 # 部署脚本 / Deploy Scripts
 
-本文是 `scripts/deploy/` 的目录入口。部署主路径和目标环境边界仍以 [server/deploy/README.md](../../server/deploy/README.md)、[server/deploy/compose/prod/README.md](../../server/deploy/compose/prod/README.md) 和 [docs/部署约定.md](../../docs/部署约定.md) 为准。
+本文是 `scripts/deploy/` 的入口。Compose、环境与运行边界以 [server/deploy/README.md](../../server/deploy/README.md)、[Compose 部署说明](../../server/deploy/compose/prod/README.md) 和 [部署约定](../../docs/部署约定.md) 为准。
 
-## 目录职责
+## 当前环境合同
 
-`scripts/deploy/` 放生产 preflight、release evidence、客户配置发布证据、closeout plan / runner 和部署资料包检查工具。多数脚本默认只读或 report-only；真实执行必须显式确认，并满足对应 evidence、备份、smoke、权限和脱敏前置。
+部署 target 的唯一真源是 `deployment-targets.json`：
+
+| target | 用途 | 公网入口 | 数据规则 |
+| --- | --- | --- | --- |
+| `demo-133` | 项目方造数、演练、培训与回归 | `demo.yoyoosun.net` | 可经受控 rebuild 恢复 seed / fixture / 模拟数据 |
+| `customer-test-133` | 甲方测试与验收 | `test.yoyoosun.net` | 交付前经备份和回滚验证恢复干净业务基线，甲方自行录入真实测试数据 |
+
+`erp` 是未来生产环境，尚未登记为可执行 target。`admin.yoyoosun.net` 不是部署环境，不能进入 target registry、环境变量映射、数据清理、preflight、健康检查、release、promotion、smoke 或 rollback。`customer-trial-133` 只是 `demo-133` 内部模拟数据合同，不是第三个部署 target。
 
 ## 常用入口
 
-| 入口                                                          | 用途                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | 是否执行目标动作                                                   |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| `bash scripts/deploy/production-preflight.sh`                 | 检查生产 env、Compose、固定镜像 tag、migration、PDF warmup / Chromium 版本和低配部署边界；yoyoosun 还会加载不含密钥的 runtime contract，要求 env、容器和公开 `auth.capabilities` 三层均为 SMS provider；运行 env 必须由当前用户持有且精确 `0600`，无 symlink 父路径，并通过私有快照阻断 TOCTOU；133 V5 还要求受控 override、显式 `-p plush-toy-erp-v5` 并解析真实 project；release evidence 必须用 `--runtime --expected-release <40sha>` 复核四服务唯一容器、env image ref、image / container content ID、app / web `GIT_SHA`、容器名、project、端口、挂载、app 身份、warmup、包版本和 health / ready | 否，只检查                                                         |
-| `bash scripts/deploy/scheduled-postgres-backup.sh`            | 先验证 `erp_backup` 只读权限，再通过生产 Compose 生成 custom dump，校验可读性与 SHA-256，原子写入本地并以 `age` 加密复制到异地目录；只清理超期受管文件                                                                                                                                                                                                                                                                                                                                                                                                                                                 | 是；写备份目录，正式模式要求异地加密副本                           |
-| `bash scripts/deploy/verify-scheduled-postgres-backup.sh`     | 选择最新异地 `dump.age`，校验 checksum、私密解密并恢复到一次性 PostgreSQL，输出备份年龄、恢复耗时、表数量与 migration 版本的脱敏报告                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | 是；只创建并删除一次性恢复容器，不改目标数据库                     |
-| `bash scripts/deploy/bootstrap-production-admin.sh`           | 在已迁移的全新目标库中，用当前固定镜像的一次性 Compose 容器创建首个超级管理员，并精确读回数据库、release、migration、marker、audit 和内置 RBAC；密码只从当前进程环境临时注入                                                                                                                                                                                                                                                                                                                                                                                                                           | 是；仅允许全新库显式确认后执行一次                                 |
-| `bash deployments/yoyoosun/scripts/rotate-credentials-133.sh` | 在已有备份且目标 release / migration / operation id 精确绑定后，按版本化凭据合同经 SSH stdin 原子恢复固定 `admin/adminadmin` 与全部 `uat_*/12345678`；不接受外部密码覆盖，SMS 手机号仅在发布工作站 Keychain 已人工录入时绑定，持久 marker 使未知结果可按同 operation id 安全重放                                                                                                                                                                                                                                                                                                               | 是；仅允许精确 133 目标显式确认后执行                              |
-| `node scripts/deploy/release-evidence-status.mjs`             | 只读汇总 release evidence 目录状态、缺口和下一步                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | 否，只读                                                           |
-| `node scripts/deploy/release-evidence-gate.mjs`               | 校验 release evidence 是否满足门禁                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | 否，只校验证据                                                     |
-| `node scripts/deploy/release-evidence-closeout-plan.mjs`      | 从 status 生成分组 closeout action 和缺失输入                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | 否，只生成计划                                                     |
-| `node scripts/deploy/release-evidence-closeout-runner.mjs`    | materialize closeout plan；默认 report-only，显式确认后才执行可运行机器步骤                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | 默认否，`--execute` 才执行                                         |
-| `node scripts/deploy/customer-config-release-readiness.mjs`   | 聚合客户配置 manifest、release evidence、activation gate 和读回证据                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | 否，只聚合证据                                                     |
-| `node scripts/deploy/customer-config-release-execute.mjs`     | 客户配置 validate / publish / activate / rollback 执行器                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | 默认否，显式确认后才调用 JSON-RPC                                  |
-| `node scripts/deploy/source-archive-release-check.mjs`        | 从指定 committed Git ref 构建临时源码包并检查构建输入闭包；`--light` 还在解包后校验活跃 Markdown 本地链接和客户 Web overlay，`--execute --docker` 以一次 Buildx Bake 共享图并行调度 `server/Dockerfile` 的两个 runtime target，Web 与 Go 各编译一次，并把同一已校验正式版本与 40 位 Git SHA 注入前端和运行镜像                                                                                                                                                                                                                                                                                           | 默认否；`--execute` 运行独立的发布、恢复与回滚验证（T8）源码包检查 |
-| `node scripts/deploy/release-artifact-bundle.mjs`             | 从 clean current HEAD 的 committed archive 构建 `linux/amd64` Server / Web 镜像，固定由 catalog 推导并校验的正式版本与 40 位 SHA，保存 loadable tar、content ID、checksum、CycloneDX 依赖 SBOM、migration 序列、客户配置源指纹，以及构建缓存与各镜像归档耗时；SBOM 只统计实际发布 Dockerfile 的基座，已存在输出目录拒绝覆盖                                                                                                                                                                                                                                                                                               | 默认否；`--execute` 才构建本机制品                                 |
-| `node scripts/deploy/release-artifact-verify.mjs`             | 校验制品 manifest、SBOM 和镜像 tar 的大小 / checksum；`--load` 进一步加载并读回 OCI config / manifest 双身份、平台、内置 `RELEASE_VERSION` 与 `GIT_SHA`                                                                                                                                                                                                                                                                                                                                                                                                                                                | 默认只读；`--load` 会加载本地镜像                                  |
-| `node scripts/deploy/local-release-rehearsal.mjs`             | 使用上述同一不可变制品和唯一生产 Compose，在一次性 `plush_erp_release_<run-id>` 完成 migration、health / ready / runtime identity、管理员登录、本地测试配置 validate / publish / activate / effective readback、PDF、备份恢复和移除 bootstrap secret 后的重启恢复；本地配置写入额外绑定 exact run ID、同名数据库和启动前 PostgreSQL system identifier，并只在该临时库把配置所需审批岗位绑定到一次性超级管理员，以证明 fresh database 的 publish 门禁而不建立可复用试用账号；不复用 106 / 133 门禁，成功或失败均写脱敏回执并执行精确清理                                                                | 默认否；`--execute` 才启动本地隔离环境                             |
+| 入口 | 职责 | 写入边界 |
+| --- | --- | --- |
+| `deployment-targets.mjs` | 读取两个固定 target 的脱敏投影 | 只读 |
+| `target-preflight.mjs` | 读回容量、Compose、端口、数据库、当前 SHA、锁、rollback point 与对应公网入口 | 只读，不创建备份或切换版本 |
+| `production-preflight.sh` | 校验 runtime env、固定镜像、Compose、migration、PDF、健康与目标身份 | 默认只读；`--runtime` 仍只核对 |
+| `release-artifact-bundle.mjs` | 从 clean committed archive 构建一次 `linux/amd64` Server/Web 制品、SBOM 与 manifest | `--execute` 才构建本机制品 |
+| `release-artifact-verify.mjs` | 校验 manifest、SBOM、image tar 与内置 release identity | 默认只读；`--load` 会加载本地镜像 |
+| `local-release-rehearsal.mjs` | 用同一不可变 bytes 在一次性环境完成 migration、health/ready、登录、PDF、备份恢复与零残留 | `--execute` 才启动隔离环境 |
+| `promotion-controller.mjs` | 校验 v2 七资产、rehearsal、即时 target preflight，创建 ready operation | 不写目标 |
+| `promotion-executor.mjs` | 执行已确认的固定 target promotion 并读回公网 exact SHA | 写单一目标；失败按 operation 回滚 |
+| `rollback-controller.mjs` | 校验旧 manifest、migration 与客户配置兼容性 | 不写目标 |
+| `rollback-executor.mjs` | 回滚 Compose / 公网入口到兼容旧版本 | 不 down migration，不自动恢复数据库 |
+| `database-rebuild-controller.mjs` | 为指定 target 生成备份、物理数据代和空基线资格计划 | 不停服务、不备份、不迁移 |
+| `database-rebuild-executor.mjs` | 执行 ready rebuild operation | 会停单一 target、备份并切换其 PostgreSQL 数据目录 |
+| `bootstrap-production-admin.sh` | 在已迁移 fresh 数据库创建首个管理员并读回 marker/audit/RBAC | 只允许 fresh target 的一次性确认窗口 |
+| `release-evidence-status.mjs` / `release-evidence-gate.mjs` | 汇总并校验 release evidence | 只读 |
 
-## GitLab 主发布、GitHub 应急、固定目标与 Operation
+所有浏览器动作只传 operation intent、固定 target、版本和确认串；浏览器不能传 repo、路径、SSH、env、shell、SQL、Docker 命令或凭据。
 
-| 入口                                                                | 职责                                                                                                                                                                                                                   | 写入边界                                                                                                   |
-| ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `node scripts/qa/exact-sha-gate.mjs`                                | 为默认分支可达的 clean exact SHA 计算 gate fingerprint，并运行或复用唯一 strict 终态                                                                                                                                   | `--run` 只运行 strict，不发布或部署                                                                        |
-| `node scripts/deploy/gitlab-strict-terminal-reuse.mjs`              | 从 protected main 的成功 push pipeline 和 exact Package 下载、校验、恢复标准 strict terminal/receipt；要求 plan、prepare、七分片、aggregate 和 `CI Gate` 同 pipeline 绿灯 | 只复用普通 CI 的服务器证据，不重跑 strict，不构建制品                                          |
-| `node scripts/deploy/gitlab-release-candidate.mjs`                  | 冻结或恢复 exact SHA 的唯一 `candidate.tar`，校验同一五件 build 输出、单次构建身份、服务器 digest、演练回执与正式 v2 Release 七资产 | Package 不存在才允许首次构建/演练；同名异内容、部分证据或版本/SHA 冲突均失败关闭                     |
-| `node scripts/deploy/release-version-catalog.mjs`                  | 以 `Asia/Shanghai` 日历日和 live Release catalog 唯一推导 `YYYY.MM.DD-N`，并把版本参考时刻绑定到 pipeline 创建窗口                                                     | Bridge 只读展示下一版本；首次候选构建前由 GitLab 再校验，不允许手工发号             |
-| `node scripts/deploy/github-release-publisher.mjs`                  | 读取已冻结 bundle、普通 CI strict 终态与同制品演练回执，推送固定 GHCR 镜像并生成 provider-neutral v2 Release manifest；文件名保留历史 provider 名，职责只是 registry publisher | GitLab 主 release 与 GitHub 应急 workflow 都只按 exact SHA 调用，不访问浏览器                              |
-| `node scripts/deploy/gitlab-delivery-provider.mjs`                  | 固定 `gitlab.saurick.me/saurick/plush-toy-erp`、Generic Package、v2 七资产、v1 六资产只读兼容与下载根；读取 pipeline/job 耗时并触发受保护 release pipeline                                                                  | 默认 Provider；只有 v2 七资产可 promotion，token 只在本地 Bridge 服务端环境，响应严格脱敏                   |
-| `node scripts/deploy/github-delivery-provider.mjs`                  | 固定 GitHub 镜像仓库与历史/应急 Release 的只读 adapter                                                                                                                           | v1 六资产只读和回滚兼容；新 dispatch 在任何 GitHub 调用前失败关闭，等待 canonical v2 七资产接线             |
-| `node scripts/deploy/target-preflight.mjs --target test-133 --json` | 通过固定 SSH 目标只读检查容量、Compose、容器、端口、数据库、当前 SHA、锁、rollback point，以及 `admin.yoyoosun.net` 公网入口的容器、健康、Provider 能力和 SHA 一致性                                                   | 只读，不创建备份或切换版本；工作台使用异步有界 SSH，目标无响应时不阻塞 Vite 事件循环                       |
-| `node scripts/deploy/database-rebuild-controller.mjs`               | 把已 promotion 且正在 133 运行的不可变 release、即时只读 preflight、固定逻辑库和 fresh 物理数据代绑定为数据库重建 operation                                                                                            | 只生成资格计划，不停服务、不备份、不迁移                                                                   |
-| `node scripts/deploy/database-rebuild-executor.mjs`                 | 对 ready operation 再跑即时 preflight，以一次性确认串执行固定 133 数据库重建，并校验脱敏终态回执                                                                                                                       | 是；会停固定栈、备份并切换 PostgreSQL 数据目录                                                             |
-| `node scripts/deploy/promotion-controller.mjs`                      | 校验 v2 七资产、同一 `release-rehearsal.json` 与即时 preflight，创建或复用待确认 promotion operation；终态失败后只允许用 `--retry-of-operation-id <terminal-id>` 建立下一次显式审计链路                            | v1 六资产不可 promotion；不执行目标写入，不自动重试                                                       |
-| `node scripts/deploy/promotion-executor.mjs`                        | 对已 ready operation 重新核对身份，连同 manifest 绑定的演练回执执行固定 133 promotion，并把公网入口切到同一不可变 Web 镜像后读回                                                                                    | 目标只验证、归档和 load，不重建；公网切换失败会恢复旧入口并使 operation 失败关闭                           |
-| `node scripts/deploy/rollback-controller.mjs`                       | 比较当前/目标 manifest；migration 序列和客户配置源指纹不同即阻断                                                                                                                                                       | 不执行目标写入                                                                                             |
-| `node scripts/deploy/rollback-executor.mjs`                         | 对已 ready operation 执行 Compose 与公网入口的代码和镜像回滚；控制脚本取自当前 live exact SHA，目标旧版本只提供源码和制品                                                                                              | 不 down migration、不自动恢复数据库，也不重新导入旧版编排缺陷                                              |
-| `node scripts/deploy/target-release-cache.mjs`                      | 按 release manifest SHA、归档 checksum、Server/Web registry digest、Docker content ID 和镜像内完整 `GIT_SHA` 只读探测 133 当前/回滚保留制品；身份全部一致才为 executor 预置 operation incoming                         | 不按 tag 或文件名宽松命中；无效缓存失败关闭，不构建、不 prune、不删除数据库或 volume                       |
+## GitLab 主链与不可变发布
 
-`delivery-operation-store.mjs` 在 ignored `output/dev-workbench/delivery-operations/` 使用幂等键、交付意图指纹、`0600` 文件和原子独占创建保存状态。同一动作、固定目标、Exact-SHA、版本与发布输入即使来自不同窗口和不同幂等键，也只认领一个 operation；跨进程竞争由确定性 operation ID 和原子文件认领收口，不依赖浏览器存储。`failed / blocked` 只能显式创建带父 operation 和尝试次数的新 operation，旧终态保持不可变；`launching / running` 在 Bridge 重启后仍一律冻结为 `not_proven`，必须先读回目标，不能自动或手工盲重试。`remote-promotion.sh` 与 `remote-code-rollback.sh` 的 v3 终态回执同时记录固定阶段顺序、每阶段耗时、内容缓存命中、避免传输字节、是否跳过 Docker load 和总耗时；失败时最后一项必须是实际失败阶段，passed 时不得缺阶段。`remote-promotion.sh`、`remote-database-rebuild.sh` 与 `remote-code-rollback.sh` 是对应 executor 传输后调用的固定目标实现，不是人工拼接参数的通用远程入口。
+`.gitlab-ci.yml` 是 canonical CI/CD：main 的 prepare cache writer 后，通过隔离 GitLab Job/DAG 并行执行七个固定质量分片；每个 Node job 内保持 `--test-concurrency=1`，`resource_sensitive` 串行。aggregate 与 `CI Gate` 绑定 exact SHA、strict/full、零 skip、security、receipt 和 evidence。
 
-固定 `test-133` 的 promotion、rollback 和数据库重建包统一使用 `rsync 3.x over SSH` 传输到 operation 专属 `incoming` 目录。promotion / rollback 先只读探测正式 `release-cache/<manifest-sha>` 与历史 operation 保留制品；全部五项内容身份一致时可跳过重复 image tar，目标已有精确 Docker image 时再跳过 `docker load`。新 promotion 即使命中缓存也必须单独传递、校验并归档 manifest 绑定的同一 `release-rehearsal.json`；migration、Compose、health / ready、业务 smoke 和公网入口 exact-SHA 读回仍完整执行。缓存缺失走既有完整 checksum-bound rsync；存在同 manifest 但任一 checksum、digest、content ID、演练回执或 `GIT_SHA` 不一致时失败关闭。传输仍固定目标、端口、远端 `/usr/bin/rsync`、严格 host key、精确文件白名单、私有文件权限与十分钟超时，不启用 `--delete` 或无收益的压缩；不会全局 prune，也不删除数据库、volume、env、证书、当前及规定回滚版本。operation 记录实传字节、rsync 时长、有效吞吐、避免传输字节和按最近冷路径吞吐估算的节省时间；目标 preflight 会在缺少兼容 rsync 时阻断，不退回 SCP 或其他隐式路径。
+release pipeline 只复用同一 protected main push pipeline 的完整终态，不重跑 strict；随后：
 
-DEV-only `/__dev/version-center` 只暴露六个动作：`dispatch-release`、`prepare-promotion`、`execute-promotion`、`prepare-rollback`、`execute-rollback`、`retry-operation`。最后一个动作只接受旧 operation ID 和新幂等键，服务端从旧 operation 恢复原动作与固定身份；浏览器不能改写 SHA、版本、目标或发布输入。浏览器也不能提供 repo、workflow、路径、SSH、环境变量、shell、SQL 或 Docker 命令；同一时刻只允许一个 test-133 执行器。页面继续使用 `版本与部署 / CI/CD 效能 / 操作记录` 三个视图，不为幂等新增菜单；操作记录和详情用中文展示尝试次数、重复请求合并数、命中依据与重试边界。CI/CD 效能区按完整发布、相同 SHA 复用和 CI 分别展示中位数，以运行完成、制品发布和部署完成时间区分事件时间与统计读取时间，并默认展示 CI strict 可信复用、观测关键路径、最长环节、失败原因、BuildKit 命中、制品大小、133 缓存命中/依据、避免字节/估算时间、Docker load 结果及仍执行的 migration / health / ready / 公网读回；公网入口与 133 SHA 一致性位于首屏。完整 job / step 和 operation 阶段按需展开，job 初始收起并支持逐项或统一展开 / 收起；中文为主、原始英文仅用于追溯，不建立第二套流水线状态。
+1. 构建或恢复该 SHA 的唯一 `candidate.tar`。
+2. 用候选包内同一 bytes 完成隔离 release rehearsal。
+3. 推送同一镜像并取得 registry digest。
+4. 登记 v2 七资产：checksums、artifact manifest、release manifest、SBOM、两个 image tar 与同一 `release-rehearsal.json`。
+5. 由使用者显式发起 promotion；main push 不自动部署 demo 或 test。
 
-DEV-only `/__dev/drill-recovery` 只读复用上述版本摘要、固定目标 preflight 和既有 operation，把目标健康、相同 SHA 幂等、回滚前滚、隔离恢复、新目标切换与未来故障注入按 P0 / P1 / P2 展示建议频率、触发条件和证据缺口。它不新增 Bridge action、命令入口或演练状态库；普通部署不冒充演练，相同 SHA 只认 no-target-write 回执，回滚只在随后已前滚回当前 exact SHA 时显示完整证据。新服务器或正式环境必须先进入 deployment target registry 并补独立 preflight；故障注入在隔离环境和固定执行器建立前保持禁用。
+旧 v1 六资产只读、展示和既有回滚兼容，`promotionEligible=false`。同版本异 SHA、digest、rehearsal 或资产内容一律失败关闭。
 
-### 133 同逻辑库物理重建
+## Operation 真源
 
-数据库重建只用于已经完成不可变 release promotion、但需要从空业务基线重放 133 验收数据的受控窗口。它继续使用逻辑库 `plush_erp_uat_20260716_v5`，不新造运行时数据库别名：执行器先对旧库做 fresh `pg_dump` 和临时恢复校验，再停止固定 V5 栈，把旧 PostgreSQL 数据目录移到 operation 绑定的 rollback alias，初始化 fresh 物理数据目录，完成 migration、一次性管理员 bootstrap、空业务 SQL 基线和 release / health / ready 读回。旧数据目录和 dump 均保留，不自动删除，也不执行 down migration。
+`delivery-operation-store.mjs` 在 ignored `output/dev-workbench/delivery-operations/` 使用 `0600` 原子文件保存工作台 operation。只有工作台发起的 release、promotion、database rebuild 和 rollback 才是“工作台操作记录”。
 
-先运行 plan-only controller；只有 `operation.status=ready` 才能复制其 UUID 组成精确确认串：
+GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，由 GitLab Provider 单独读取；它们不会被伪造成 operation。Codex 聊天、普通 SSH、手工排障和没有正式回执的动作也不会进入 operation store。
+
+同一动作、target、Exact-SHA、版本和发布输入只认领一个 operation；不同窗口的同一意图会合并。`failed / blocked` 只能显式建立父子重试链；`launching / running` 在 Bridge 重启后冻结为 `not_proven`，必须先读回目标，不能自动重试。
+
+`/__dev/delivery` 首屏显示最近 operation、最严重阻断、最后核对时间和完整记录入口；`/__dev/version-center?view=history` 读取同一持久化 store，并明确显示加载、正常、空、失败和过期状态。
+
+## Promotion 与传输
+
+两个 target 的 promotion / rollback / database rebuild 使用固定 SSH 和 `rsync 3.x`，只向 operation 专属 `incoming` 目录传输 manifest 白名单。允许按 manifest SHA、checksum、registry digest、Docker content ID 和镜像内完整 `GIT_SHA` 命中 release cache；缓存不完整或身份不一致时失败关闭。
+
+即使命中缓存，migration、Compose、health、ready、业务 smoke 与对应公网 exact-SHA 仍完整执行。传输不使用 `--delete`，不全局 prune，不删除数据库、volume、env、证书、当前版本或规定回滚版本。
+
+## 数据库重建
+
+数据库重建不是通用清库工具。执行前必须：
+
+1. 目标已运行同一不可变 release。
+2. controller 即时 preflight 为 `ready`。
+3. fresh dump 已创建并在隔离恢复中验证。
+4. 旧物理数据目录、dump 与 rollback identity 可读回。
+5. 只停止目标自身的 app/web/PostgreSQL，不影响另一个环境。
+
+`demo-133` 的受控重建可以随后重放 `customer-trial-133` 模拟数据。`customer-test-133` 的受控重建只建立甲方干净业务基线，不重放 demo seed/fixture。没有数据分类和恢复证明时不得执行重建；本轮 target 登记不代表已授权或已完成清理。
 
 ```bash
 node scripts/deploy/database-rebuild-controller.mjs \
   --release-manifest '<exact-release-manifest.json>' \
-  --target test-133 \
-  --idempotency-key 'rebuild-database:test-133:<release>:<change-id>' \
+  --target '<demo-133|customer-test-133>' \
+  --idempotency-key 'rebuild-database:<target>:<release>:<change-id>' \
   --json
 
 node scripts/deploy/database-rebuild-executor.mjs \
   --operation-id '<ready-operation-uuid>' \
   --release-manifest '<same-exact-release-manifest.json>' \
-  --confirmation 'REBUILD_DATABASE:test-133:<40-character-release>:<ready-operation-uuid>' \
+  --confirmation 'REBUILD_DATABASE:<target>:<40-character-release>:<ready-operation-uuid>' \
   --json
 ```
 
-执行器返回 `failed` 只表示失败发生在已证明恢复的边界；返回 `not_proven` 表示服务恢复、物理切换或 migration 结果未被证明，必须先在目标读回数据目录、容器、migration 和运行 SHA，禁止自动重试或另起 operation 覆盖现场。`passed` 只证明 fresh 物理库、首个管理员、空业务基线和基础运行态；客户配置、core、九岗位数据、51 项浏览器/PDF、凭据轮换、11 账号 smoke 和客户 UAT 仍须逐层完成。成功回执返回的本地 bootstrap secret 文件只用于后续受控初始化，凭据轮换完成后必须删除，不能写入 steady env、日志或 evidence。
+`failed` 只表示旧运行态已被证明恢复；`not_proven` 必须先只读核对目标，不得重试。
 
-`source-archive-release-check.mjs` 始终从 committed tree 创建临时 archive，不把当前 dirty worktree 混入源码包。默认 plan 和 `--light` 只提供源码包结构诊断；`--light` 会直接扫描解包后的活跃 Markdown 本地链接，因此被 `export-ignore` 排除的客户资料不能继续被源码包内文档引用。`--execute` 仍要求 clean worktree，并通过 archive 内的 `scripts/lib/pnpm.sh` 解析与 `web/package.json` 锁定版本一致的 Node / pnpm，不直接信任 raw `PATH` 中的 pnpm。带 `--docker` 时只使用 `server/Dockerfile`：Buildx Bake 在同一调用中并行调度 `web-runtime` 与 `server-runtime`，共享同一个 `web-builder`，两个镜像均固定为 `linux/amd64`，并写入同一 `RELEASE_VERSION` 与 40 位 `GIT_SHA`；前端静态包也在编译时写入这组身份，供后台和手机端与公开 `system.version` 回读核对。GitHub Release 使用按 target 隔离的 GHA cache，本机默认使用当前 builder cache；缓存只缩短计算，不能替代 committed archive、checksum、平台或版本身份校验。该入口是独立的发布、恢复与回滚验证（T8）源码包检查，不替代 `fast.sh` / `full.sh` / `strict.sh`，也不证明目标环境发布、migration、smoke、release evidence 或人工签收已经完成。
+## 一次性管理员
 
-```bash
-node scripts/deploy/source-archive-release-check.mjs --ref HEAD --json
-node scripts/deploy/source-archive-release-check.mjs --light --ref HEAD --json
-# 只在 clean worktree 且准备执行独立源码包构建检查时运行：
-node scripts/deploy/source-archive-release-check.mjs --execute --ref HEAD
-# 构建正式双 runtime 图并输出 BuildKit 命中统计：
-RELEASE_BUILDKIT_CACHE_MODE=builder \
-  node scripts/deploy/source-archive-release-check.mjs --execute --docker --ref HEAD --json
-```
-
-## 不可变制品与本地发布演练
-
-正式 promotion 使用下面的串行证据路径；每一步失败都停在当前层，不能复用旧 SHA、旧镜像或历史回执拼接成功：
-
-1. clean exact SHA 完成非强制 push，等待 R640 普通 main CI 的七分片、aggregate 和 `CI Gate` 全绿；该 push pipeline 是 release 可复用的唯一 strict 证据，release 不重跑 full/strict。
-2. protected release job 先从 exact pipeline/job/SHA 的 `plush-ci-evidence` Package 恢复 terminal/receipt，再检查该 SHA 是当前 protected main。历史绿灯、web pipeline、其他 job 或本地回执都不可代替。
-3. `plush-release-candidate/artifact-<sha>/candidate.tar` 不存在时，从当前 committed archive 只构建一次 Server/Web bundle；上传并读回 SHA-256 后冻结。重试和后续阶段只恢复该 archive，不从源码重建。
-4. 使用候选包内同一五件 bytes 运行隔离发布演练：唯一生产 Compose、migration validate/dry-run/apply/readback、health/ready、release identity、管理员登录、PDF、备份恢复、去掉 bootstrap secret 后重启和零残留。演练回执在 `plush-release-rehearsal/artifact-<sha>` 冻结，重试不重跑已证明的演练。
-5. registry publisher 推送候选包内同一镜像并取得 GHCR digest，只用普通 CI terminal、制品 manifest 和冻结演练回执生成 v2 Release manifest；七项正式 assets（含同一 `release-rehearsal.json`）与 GitLab Release tag 均绑定 `artifact-<sha>`。v1 六资产只保留精确读取和既有回滚兼容，不得补传、重封装或 promotion。
-6. 只有已登记目标的 exact target/environment、rollback point、backup、migration、health/ready 和 smoke 都可读回时才 promotion；目标机只 load/pull 已发布制品，禁止构建。`test-133` 是 customer-trial 目标，不得因为它可执行就冒充正式生产。
+fresh 数据库完成 Atlas migration 后、常驻 `app-server` 启动前，使用：
 
 ```bash
-node scripts/deploy/release-artifact-bundle.mjs \
-  --execute \
-  --ref HEAD \
-  --version '<release-version>' \
-  --out "output/releases/$(git rev-parse HEAD)"
-
-node scripts/deploy/release-artifact-verify.mjs \
-  --manifest "output/releases/$(git rev-parse HEAD)/release-artifact.json" \
-  --load
-
-node scripts/deploy/local-release-rehearsal.mjs \
-  --execute \
-  --manifest "output/releases/$(git rev-parse HEAD)/release-artifact.json"
-```
-
-本地演练的详细 receipt 写入 ignored `output/dev-workbench/release-rehearsal/`，工作台固定槽位写入 `output/dev-workbench/receipts/release-rehearsal-latest.json`。passed 必须同时满足非零执行、零失败、零 skip、同一 SHA / content ID、migration readback、备份恢复、steady-state 重启和零残留；它仍不证明 133、客户 UAT 或签收。
-
-## 全新库首次管理员
-
-全新生产形态数据库完成 Atlas migration 后、常驻 `app-server` 启动前，使用受控入口创建首个管理员。steady `.env` 必须保持 `BOOTSTRAP_ADMIN_ONCE=false`，也不得包含 `APP_ADMIN_PASSWORD`；密码只在当前命令环境中短暂存在。脚本拒绝本地开发默认密码 `adminadmin`，不会覆盖已有管理员，也不会在 marker 已提交后自动回滚或重跑。
-
-```bash
-APP_ADMIN_PASSWORD='<8-to-20-character-ephemeral-secret>' \
+APP_ADMIN_PASSWORD='<ephemeral-secret>' \
   bash scripts/deploy/bootstrap-production-admin.sh \
-    --env-file server/deploy/compose/prod/.env \
+    --deployment-target '<demo-133|customer-test-133>' \
+    --env-file '<absolute-runtime-env>' \
     --expected-database '<exact-database>' \
     --expected-migration '<14-digit-atlas-version>' \
     --expected-release '<40-character-lowercase-git-sha>' \
     --confirm 'BOOTSTRAP_PRODUCTION_ADMIN:<project>:<database>:<username>:<migration>:<release>'
 ```
 
-成功回执必须同时包含 `status=complete`、精确 database / migration / release、`admin_bootstrap.completed` marker、唯一 completed audit，以及非零内置 permission / role / role-permission 数量。该回执只证明首个管理员和 RBAC 初始化，不证明客户配置、模拟验收数据、health / ready 或页面验收。
+steady env 必须保持 `BOOTSTRAP_ADMIN_ONCE=false` 且不包含 `APP_ADMIN_PASSWORD`。成功只证明管理员、marker、audit 和 RBAC 初始化，不证明客户配置、数据、健康或验收。
 
-## 客户配置读回 preflight
+## Release Evidence
 
-`customer-config-release-readiness.mjs --readback-preflight-report <path>` 只读取本地 manifest、执行器报告和目标 smoke 脱敏报告的结构，用于确认 `customer_config.get_effective_session` 读回证据还缺什么；它不调用后端、不读取管理员 token、不写 release evidence、不发布 / 激活 / rollback，也不导入业务数据。报告里的 `targetSmoke.customerConfigEffectiveSession.responseBodyStored` 表示目标 smoke 是否实际保存了响应正文，合规值应为 `false`；`responseBodyNotStored=true` 才表示 `responseBodyStored=false` 的脱敏证据已经存在。
+正式 evidence 逐层绑定：
 
-## Release Evidence 主路径
+- committed SHA、image content ID / registry digest、SBOM 与 migration 序列；
+- 同 bytes release rehearsal；
+- target preflight、backup/restore、migration、Compose、health、ready 与公网 exact SHA；
+- smoke 的 HTTP、登录、客户配置 effective session 和 PDF 脱敏摘要；
+- target-specific rollback point。
 
-1. 先用 `release-evidence-status.mjs` 看缺口。
-2. 用 `release-evidence-closeout-plan.mjs` 判断本机输入是否足够。
-3. 只在 action `canRun=true` 且已确认真实输入时，才用 `release-evidence-closeout-runner.mjs --execute`。
-4. 每次写入证据后重新跑 status / gate。
-5. release gate 通过只说明 evidence 文件满足门禁，不替代真实目标环境执行记录、人工签收或回滚演练。
-
-正式 `production-preflight-report.txt` 必须在目标 Compose 服务启动后使用 `production-preflight.sh --runtime --expected-release <40sha> --out ...` 生成，并包含运行态 Compose、四服务镜像 / release 一致、`ERP_PDF_WARMUP=async`、Chromium / chromium-common exact pin 和 health / ready 通过记录。正式 `smoke-test-report.json` 还必须包含唯一 `template-pdf-render` 检查，记录 `200`、`application/pdf`、64 位 hex SHA-256、正数字节数和 `responseBodyStored=false`。`run-smoke.sh` 不带 backend / revision / token 时的 web-only 输出只用于快速诊断，不得作为 release evidence，release gate 会因缺少真实 PDF 证据而拒绝。
-
-133 V5 是与旧栈并存的独立验收环境。其所有 preflight、一次性管理员、core bootstrap、`up`、`ps` 和 runtime 检查都必须同时使用 `compose.yml` 与受控 `compose.customer-trial-133.yml`，Compose 命令必须显式带 `-p plush-toy-erp-v5`；不得只改 `PROJECT_SLUG` 后仍落入 canonical `plush-toy-erp-prod` project。固定数据目录为 `/home/simon/plush-toy-erp-v5/data/postgres`，固定 migration 锁为 `/home/simon/plush-toy-erp-v5/run/atlas-migrate.lock`；它们不接受相对路径、dot segment 或符号链接。Jaeger V5 独立端口组为 `45775 / 46831 / 46832 / 45778 / 46687 / 54268 / 54250 / 49411 / 44317 / 44318`。
-
-133 上从固定 release 根目录执行，并使用 release 之外的绝对 env 路径：
-
-```bash
-cd /home/simon/plush-toy-erp-v5/current
-bash scripts/deploy/production-preflight.sh \
-  --env-file /home/simon/plush-toy-erp-v5/runtime/.env.customer-trial-133 \
-  --compose-dir /home/simon/plush-toy-erp-v5/current/server/deploy/compose/prod \
-  --compose-override /home/simon/plush-toy-erp-v5/current/server/deploy/compose/prod/compose.customer-trial-133.yml
-
-docker compose \
-  -p plush-toy-erp-v5 \
-  --env-file /home/simon/plush-toy-erp-v5/runtime/.env.customer-trial-133 \
-  -f /home/simon/plush-toy-erp-v5/current/server/deploy/compose/prod/compose.yml \
-  -f /home/simon/plush-toy-erp-v5/current/server/deploy/compose/prod/compose.customer-trial-133.yml \
-  config
-```
-
-preflight 与后续 Compose 使用同一个干净 shell。只要宿主已定义 env-file 中任一同名键，或 `COMPOSE_PROJECT_NAME / COMPOSE_FILE / COMPOSE_PROFILES / COMPOSE_ENV_FILES / COMPOSE_PATH_SEPARATOR / DOCKER_HOST / DOCKER_CONTEXT / DOCKER_TLS_VERIFY / DOCKER_CERT_PATH`，preflight 就会只报键名并停止；先 `unset` 后再重试，不要把宿主值复制回 env-file。
-
-133 V5 migration 必须从固定 release 的 Compose 目录调用，运行 env 仍位于 release 外。下面四步顺序不得跳过：
-
-```bash
-cd /home/simon/plush-toy-erp-v5/current/server/deploy/compose/prod
-export COMPOSE_OVERRIDE_FILE=/home/simon/plush-toy-erp-v5/current/server/deploy/compose/prod/compose.customer-trial-133.yml
-export COMPOSE_ENV_FILE=/home/simon/plush-toy-erp-v5/runtime/.env.customer-trial-133
-
-sh ./migrate_online.sh --status-only
-sh ./migrate_online.sh
-MIGRATION_MAINTENANCE_CONFIRMED=1 sh ./migrate_online.sh --apply
-sh ./migrate_online.sh --status-only
-```
-
-apply 前必须用同一组显式 `-p / --env-file / -f / -f` Compose 参数只停止 V5 `app-server`，保持 V5 PostgreSQL 运行；不影响旧 `plush-toy-erp-prod` 栈。完整、可直接复制的 stop/apply 命令以 [Compose 部署说明](../../server/deploy/compose/prod/README.md#迁移脚本) 为唯一运维入口。133 V5 不允许用宿主环境或 env 文件覆盖 `MIG_DIR / ATLAS_BIN / PSQL_BIN / POPULATED_UPGRADE_PREFLIGHT`。
+`release-evidence-gate.mjs` 通过只说明 evidence 文件满足合同，不替代目标实时运行、数据身份、客户 UAT 或签收。
 
 ## 安全边界
 
-- 不在低配目标服务器上构建镜像、前端包或 Go 二进制；目标服务器只负责加载制品、启动服务、执行 migration 和部署后检查。
-- `--backend-url`、`--endpoint`、`SMOKE_ENDPOINT`、`SMOKE_BACKEND_URL` 不得包含 URL 账号密码。
-- 报告只保存 repo-relative path、alias、hash、env key 名和脱敏摘要，不保存 token、完整 DSN、完整凭据 URL 或本机绝对路径。
-- `--execute` 类操作必须有脚本要求的确认环境变量，且不得执行 blocked action 或人工签收步骤。
+- 目标机只 load / pull 制品、migration、启动和检查，不从源码构建。
+- endpoint 和 backend URL 不得携带账号密码。
+- 报告不保存 token、完整 DSN、凭据、客户正文、本机绝对路径或原始错误。
+- secret 只从受控进程环境、stdin 或凭据存储进入需要它的单一进程。
+- 不把 demo/test 的数据库、上传、backup、operation 或 rollback point 交叉复用。
+- 不把 `admin.yoyoosun.net` 作为环境别名或兼容 target。
 
 ## 修改后验证
 
-调整 deploy 脚本后，优先运行对应测试文件，例如：
-
 ```bash
-node --test scripts/deploy/release-evidence-status.test.mjs
-node --test scripts/deploy/release-evidence-closeout-plan.test.mjs
-node --test scripts/deploy/production-preflight.test.mjs
-node --test scripts/deploy/bootstrap-production-admin.test.mjs
-node --test scripts/deploy/run-smoke-script.test.mjs
-node --test scripts/deploy/customer-config-release-readiness.test.mjs
-node --test scripts/deploy/source-archive-release-check.test.mjs
-node --test scripts/deploy/database-rebuild-manifest.test.mjs \
+node --test scripts/deploy/deployment-targets.test.mjs \
+  scripts/deploy/target-preflight.test.mjs \
+  scripts/deploy/production-preflight.test.mjs \
+  scripts/deploy/promotion-controller.test.mjs \
+  scripts/deploy/promotion-executor.test.mjs \
+  scripts/deploy/rollback-controller.test.mjs \
+  scripts/deploy/rollback-executor.test.mjs \
   scripts/deploy/database-rebuild-controller.test.mjs \
-  scripts/deploy/database-rebuild-executor.test.mjs \
-  scripts/deploy/remote-database-rebuild-script.test.mjs
-```
+  scripts/deploy/database-rebuild-executor.test.mjs
 
-涉及发布证据口径时，再补：
-
-```bash
-node --test scripts/deploy/release-evidence-gate.test.mjs
 git diff --check
 ```
+
+根据影响面再补 full、strict、真实浏览器、release 或目标 smoke；不要用局部绿色冒充完整交付。

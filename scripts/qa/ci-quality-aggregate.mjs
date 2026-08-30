@@ -37,6 +37,14 @@ import {
 
 export const CI_QUALITY_AGGREGATE_SCHEMA = "plush.gitlab-strict-aggregate/v1";
 export const CI_EVIDENCE_MANIFEST_SCHEMA = "plush.gitlab-ci-evidence/v1";
+
+export function matchesStrictSourceArchive(sourceIntegrity, strictIdentity) {
+  return (
+    sourceIntegrity?.status === "passed" &&
+    sourceIntegrity.archiveSha256 ===
+      `sha256:${strictIdentity.sourceArchiveSha256}`
+  );
+}
 const TRUST_SCHEMA = "plush.gitlab-ci-trust/v1";
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
@@ -257,8 +265,7 @@ export async function aggregateCiQuality({
   const strictIdentity = buildStrictReceiptIdentity(root, env.CI_COMMIT_SHA, env);
   const sourceIntegrity = byShard.get("node").invariants.sourceIntegrity;
   if (
-    sourceIntegrity?.status !== "passed" ||
-    sourceIntegrity.archiveSha256 !== strictIdentity.sourceArchiveSha256 ||
+    !matchesStrictSourceArchive(sourceIntegrity, strictIdentity) ||
     sourceIntegrity.repositoryBoundary !== "passed" ||
     sourceIntegrity.overlayCustomer !== "yoyoosun" ||
     byShard.get("security").invariants.dependencyAudit !== "passed" ||

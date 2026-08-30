@@ -394,7 +394,7 @@ test("attachment report batch binds exact dataset identity and registered target
   assert.equal(resolvedLocal.policy.target, "local-dev");
 
   const target = CUSTOMER_TRIAL_133_TARGET;
-  const backendURL = "http://127.0.0.1:18375";
+  const backendURL = "https://demo.yoyoosun.net";
   const remoteRuntime = {
     environment: "remote",
     customerKey: "yoyoosun",
@@ -473,7 +473,7 @@ test("attachment batch rejects local and 133 database drift before report accept
 
   const remote = reports({
     target: CUSTOMER_TRIAL_133_TARGET,
-    backendURL: "http://127.0.0.1:18375",
+    backendURL: "https://demo.yoyoosun.net",
   });
   remote.factReport.databaseName = "plush_erp_uat_wrong";
   assert.throws(

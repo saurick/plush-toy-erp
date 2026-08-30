@@ -60,7 +60,7 @@ export const CUSTOMER_CONFIG_USAGE = `manual-acceptance customer-config helper
 Report only (default; no network call):
   node scripts/qa/manual-acceptance-customer-config.mjs
 
-Apply through the registered SSH tunnel and the standard JSON-RPC boundary:
+Apply through the registered system-trusted TLS demo endpoint and the standard JSON-RPC boundary:
   MANUAL_ACCEPTANCE_TARGET_CONFIRM='<exact target confirmation>' \\
   MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON='<target attestation JSON>' \\
   MANUAL_ACCEPTANCE_ADMIN_USERNAME='admin' \\
@@ -72,7 +72,7 @@ Options:
   --apply                    Execute validate, publish, transition check, activate and readback.
   --preview-manifest <path>  Preview-only yoyoosun runtime manifest source.
   --out <dir>                Report directory outside deployments evidence.
-  --backend-url <url>        Dedicated local backend or registered customer-trial-133 SSH tunnel.
+  --backend-url <url>        Dedicated local backend or registered customer-trial-133 TLS endpoint.
   --target <target>          local-dev or customer-trial-133.
   --database-name <name>     Exact fresh acceptance database identity.
   --data-version <version>   Must be ${CUSTOMER_CONFIG_DATA_VERSION}.

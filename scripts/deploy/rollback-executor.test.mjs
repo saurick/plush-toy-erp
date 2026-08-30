@@ -27,6 +27,7 @@ const ROLLBACK_STAGES = [
 function expected() {
   return {
     operationId: OPERATION_ID,
+    targetKey: "demo-133",
     fromGitSha: FROM_SHA,
     toGitSha: TO_SHA,
     toVersion: "2026.07.29-1",
@@ -60,7 +61,7 @@ function receipt(status = "passed") {
     schemaVersion: REMOTE_ROLLBACK_RECEIPT_CONTRACT,
     status,
     operationId: OPERATION_ID,
-    target: "test-133",
+    target: "demo-133",
     fromGitSha: FROM_SHA,
     toGitSha: TO_SHA,
     toVersion: "2026.07.29-1",
@@ -196,7 +197,7 @@ test("rollback executor has explicit confirmation and no automatic retry path", 
   );
   assert.match(
     source,
-    /ROLLBACK:test-133:\$\{plan[.]from[.]gitSha\}:\$\{plan[.]to[.]gitSha\}/u,
+    /ROLLBACK:\$\{targetKey\}:\$\{plan[.]from[.]gitSha\}:\$\{plan[.]to[.]gitSha\}/u,
   );
   assert.match(source, /automatic retry is disabled/u);
   assert.match(source, /databaseChangedByExecutor: false/u);

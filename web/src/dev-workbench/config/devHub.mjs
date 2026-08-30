@@ -247,17 +247,17 @@ export const DEV_HUB_ITEMS = Object.freeze([
     group: '交付治理 / Delivery',
     route: DEV_VERSION_CENTER_ROUTE,
     source: 'docs/engineering/研发效能工作台与CI-CD设计.md',
-    truthSource: 'GitHub 不可变制品、固定目标预检与 operation 回执',
+    truthSource: 'GitLab 不可变制品、固定目标预检与 operation 回执',
     status: '本地受控编排 / Local controlled actions',
     guardrails: Object.freeze([
-      '固定 GitHub 仓库 / Fixed repository',
-      '固定 test-133 / Fixed target',
+      '固定 GitLab 项目 / Fixed repository',
+      '固定 demo / test 双目标 / Fixed targets',
       '明确确认 / Explicit confirmation',
       '终态不重试 / No terminal retry',
       '不进生产构建 / No prod build',
     ]),
     description:
-      '选择 exact-SHA 版本、查看 133 容量与运行身份、准备部署并追踪幂等操作；浏览器不能传入命令、路径、SSH 或任意目标。',
+      '选择 exact-SHA 版本、分别查看 demo / test 容量与运行身份、准备显式版本提升并追踪幂等操作；浏览器不能传入命令、路径、SSH 或任意目标。',
   }),
   Object.freeze({
     key: 'drill-recovery',

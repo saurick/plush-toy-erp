@@ -10,7 +10,8 @@ const BACKUP_ALIAS_PATTERN = /^pre-data-[0-9a-f]{12}-d[0-9]{12}_[0-9a-f]{8}$/u;
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 const MIGRATION_PATTERN = /^20[0-9]{12}$/u;
-const DATABASE_NAME = "plush_erp_uat_20260716_v5";
+const DATA_DEPLOYMENT_TARGET = getDeploymentTarget("demo-133");
+const DATABASE_NAME = DATA_DEPLOYMENT_TARGET.database.name;
 const REPORT_KEYS = Object.freeze([
   "BACKUP_ALIAS",
   "CREATED_AT",
@@ -41,14 +42,14 @@ export function buildCustomerTrial133BackupScript(identity) {
 set -euo pipefail
 umask 077
 
-expected_hostname=simon
-expected_user=simon
-root=/home/simon/plush-toy-erp-v5
-runtime_env="$root/runtime/.env.customer-trial-133"
+expected_hostname=${DATA_DEPLOYMENT_TARGET.ssh.expectedHostname}
+expected_user=${DATA_DEPLOYMENT_TARGET.ssh.user}
+root=${DATA_DEPLOYMENT_TARGET.filesystem.root}
+runtime_env=${DATA_DEPLOYMENT_TARGET.filesystem.runtimeEnv}
 backup_dir="$root/backups"
 operation_dir="$root/operations/data-preparation-backups"
 lock_file="$root/run/data-preparation-backup.lock"
-project=plush-toy-erp-v5
+project=${DATA_DEPLOYMENT_TARGET.compose.projectName}
 database=${DATABASE_NAME}
 backup_alias=${backupAlias}
 expected_release=${releaseSha}
@@ -119,9 +120,9 @@ flock -n 9
 
 [[ ! -e "$backup_file" && ! -e "$checksum_file" && ! -e "$receipt_file" ]]
 
-server_identity="$(docker inspect plush-toy-erp-v5-server --format '{{.State.Running}}|{{index .Config.Labels "com.docker.compose.project"}}|{{index .Config.Labels "com.docker.compose.service"}}' 2>/dev/null)"
+server_identity="$(docker inspect "$project-server" --format '{{.State.Running}}|{{index .Config.Labels "com.docker.compose.project"}}|{{index .Config.Labels "com.docker.compose.service"}}' 2>/dev/null)"
 [[ "$server_identity" == "true|$project|app-server" ]]
-server_sha="$(docker inspect plush-toy-erp-v5-server --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^GIT_SHA=//p' | head -n1)"
+server_sha="$(docker inspect "$project-server" --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^GIT_SHA=//p' | head -n1)"
 [[ "$server_sha" == "$expected_release" ]]
 
 postgres_cid="$(docker ps -q --filter "label=com.docker.compose.project=$project" --filter "label=com.docker.compose.service=postgres")"
@@ -278,7 +279,7 @@ export async function createCustomerTrial133DataBackup(
   { spawnCommand = spawn, timeoutMs = 15 * 60 * 1000 } = {},
 ) {
   const expected = validateIdentity(identity);
-  const target = getDeploymentTarget("test-133");
+  const target = DATA_DEPLOYMENT_TARGET;
   const child = spawnCommand("ssh", sshArgs(target), {
     env: process.env,
     stdio: ["pipe", "pipe", "pipe"],

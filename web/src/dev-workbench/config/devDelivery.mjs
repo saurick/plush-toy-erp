@@ -16,6 +16,27 @@ export const DEV_VERSION_CENTER_VIEW_PIPELINE = 'pipeline'
 export const DEV_VERSION_CENTER_VIEW_HISTORY = 'history'
 export const DEV_VERSION_CENTER_VERSION_PAGE_SIZE = 6
 export const DEV_VERSION_CENTER_HISTORY_PAGE_SIZE = 10
+export const DEV_DELIVERY_TARGETS = Object.freeze([
+  Object.freeze({
+    key: 'demo-133',
+    label: 'demo 项目演练造数',
+    shortLabel: 'demo 环境',
+    purpose: 'project-demo-simulated',
+    endpoint: 'https://demo.yoyoosun.net',
+    dataBoundary: '保留 seed / fixture / 模拟业务数据',
+  }),
+  Object.freeze({
+    key: 'customer-test-133',
+    label: 'test 甲方测试验收',
+    shortLabel: 'test 环境',
+    purpose: 'customer-clean-acceptance',
+    endpoint: 'https://test.yoyoosun.net',
+    dataBoundary: '每轮交付前恢复干净基线；由甲方录入真实测试数据',
+  }),
+])
+const DEV_DELIVERY_TARGET_KEYS = Object.freeze(
+  DEV_DELIVERY_TARGETS.map((target) => target.key)
+)
 
 const DEV_VERSION_CENTER_VIEW_VALUES = new Set([
   DEV_VERSION_CENTER_VIEW_VERSIONS,
@@ -216,9 +237,9 @@ const OPERATION_MESSAGE_LABELS = Object.freeze({
   'read-only fixed-target database rebuild qualification started':
     '已开始固定 133 数据库重建资格检查',
   'promotion plan is eligible and requires explicit confirmation':
-    '部署资格已通过，等待明确确认',
+    '显式版本提升资格已通过，等待明确确认',
   'promotion plan is eligible; explicit confirmation is required':
-    '部署资格已通过，等待明确确认',
+    '显式版本提升资格已通过，等待明确确认',
   'rollback plan is eligible and requires explicit confirmation':
     '回滚资格已通过，等待明确确认',
   'code-only rollback is eligible; explicit confirmation is required':
@@ -226,13 +247,13 @@ const OPERATION_MESSAGE_LABELS = Object.freeze({
   'database rebuild is eligible; exact destructive-scope confirmation is required':
     '数据库重建资格已通过，等待精确破坏范围确认',
   'target write started with the fixed promotion contract':
-    '已按固定部署合同开始写入目标',
+    '已按固定版本提升合同开始写入目标',
   'code-only target rollback started with the fixed contract':
     '已按固定合同开始仅代码回滚',
   'target write started with the fixed database rebuild contract':
     '已按固定合同开始重建 133 数据库',
   'target promotion and basic runtime verification passed':
-    '133 部署与基础运行核验已通过',
+    '133 显式版本提升与基础运行核验已通过',
   'code-only rollback and basic runtime verification passed':
     '代码回滚与基础运行核验已通过',
   'fresh database generation and basic runtime verification passed':
@@ -255,22 +276,24 @@ const OPERATION_MESSAGE_LABELS = Object.freeze({
   'requested exact SHA is already current and healthy':
     '该 Exact-SHA 已在 133 健康运行',
   'requested rollback SHA is already current': '目标回滚 SHA 已是当前版本',
-  'promotion is blocked by fixed-target preflight': '部署被固定目标预检阻断',
+  'promotion is blocked by fixed-target preflight':
+    '显式版本提升被固定目标预检阻断',
   'code-only rollback is blocked by fixed qualification':
     '仅代码回滚被固定资格检查阻断',
   'database rebuild is blocked by fixed-target qualification':
     '数据库重建被固定目标资格检查阻断',
   'promotion preparation failed without starting a target write':
-    '部署准备失败，未开始写入目标',
+    '版本提升准备失败，未开始写入目标',
   'rollback qualification failed without starting a target write':
     '回滚资格检查失败，未开始写入目标',
   'database rebuild qualification failed without starting a target write':
     '数据库重建资格检查失败，未开始目标写入',
-  'promotion executor child is launching': '部署执行器正在启动',
+  'promotion executor child is launching': '版本提升执行器正在启动',
   'rollback executor child is launching': '回滚执行器正在启动',
-  'promotion executor did not start a target write': '部署执行器未开始写入目标',
+  'promotion executor did not start a target write':
+    '版本提升执行器未开始写入目标',
   'promotion executor ended while target outcome was unknown':
-    '部署执行器已结束，但目标结果尚未证明',
+    '版本提升执行器已结束，但目标结果尚未证明',
   'GitHub release workflow reached a failed terminal state':
     'GitHub 发布流水线已失败结束',
   'GitHub release pipeline reached a failed terminal state':
@@ -278,11 +301,11 @@ const OPERATION_MESSAGE_LABELS = Object.freeze({
   'GitLab release pipeline reached a failed terminal state':
     'GitLab 发布流水线已失败结束',
   'promotion was blocked by the immediate target preflight':
-    '部署被目标即时预检阻断',
+    '显式版本提升被目标即时预检阻断',
   'remote promotion result could not be proven; automatic retry is disabled':
-    '远端部署结果无法证明，已禁止自动重试',
+    '远端版本提升结果无法证明，已禁止自动重试',
   'promotion package transfer failed before remote execution':
-    '部署包在远端执行前传输失败',
+    '版本提升包在远端执行前传输失败',
   'rollback was blocked by the immediate target readback':
     '回滚被目标即时读回阻断',
   'rollback package preparation failed before target write':
@@ -298,8 +321,9 @@ const OPERATION_MESSAGE_LABELS = Object.freeze({
   'database rebuild transfer failed before remote execution':
     '数据库重建包在远端执行前传输失败',
   'target promotion failed before migration apply':
-    '目标部署在数据库迁移前失败',
-  'target promotion outcome requires readback': '目标部署结果需要重新读回确认',
+    '目标版本提升在数据库迁移前失败',
+  'target promotion outcome requires readback':
+    '目标版本提升结果需要重新读回确认',
   'process restarted while target outcome was unknown; read back before retry':
     '进程重启时目标结果未知，重试前必须先读回',
 })
@@ -711,6 +735,7 @@ function validateVersion(version) {
     [...expected].sort().every((asset, index) => assets[index] === asset)
   const completeAssets =
     exactAssets(LEGACY_RELEASE_ASSETS) || exactAssets(CURRENT_RELEASE_ASSETS)
+  const { actionsByTarget } = version
   if (
     !SHA_PATTERN.test(String(version.gitSha || '')) ||
     !VERSION_PATTERN.test(String(version.version || '')) ||
@@ -724,6 +749,17 @@ function validateVersion(version) {
     !DELIVERY_VERSION_ACTION_REASONS[version.actionClass]?.has(
       version.actionReason
     ) ||
+    !actionsByTarget ||
+    Object.keys(actionsByTarget).sort().join(',') !==
+      [...DEV_DELIVERY_TARGET_KEYS].sort().join(',') ||
+    DEV_DELIVERY_TARGET_KEYS.some(
+      (targetKey) =>
+        !DELIVERY_VERSION_ACTION_REASONS[
+          actionsByTarget[targetKey]?.actionClass
+        ]?.has(actionsByTarget[targetKey]?.actionReason)
+    ) ||
+    version.actionClass !== actionsByTarget['demo-133'].actionClass ||
+    version.actionReason !== actionsByTarget['demo-133'].actionReason ||
     !Array.isArray(version.assets) ||
     assets.some((asset, index) => index > 0 && assets[index - 1] >= asset) ||
     version.completeAssets !== completeAssets ||
@@ -775,12 +811,16 @@ export function validateDevDeliverySummary(summary) {
     summary.schemaVersion !== 'plush.dev-delivery-summary/v1' ||
     !['success', 'partial'].includes(summary.status) ||
     !Array.isArray(summary.versions) ||
+    !Array.isArray(summary.targets) ||
+    summary.targets.length !== DEV_DELIVERY_TARGETS.length ||
     !Array.isArray(summary.operations) ||
     !Array.isArray(summary.issues) ||
     !Object.hasOwn(summary, 'timings') ||
     !Object.hasOwn(summary, 'releaseVersionPolicy') ||
     !['gitlab', 'github'].includes(summary.boundaries?.provider) ||
-    summary.boundaries?.target !== 'test-133' ||
+    summary.boundaries?.target !== 'demo-133' ||
+    !Array.isArray(summary.boundaries?.targets) ||
+    summary.boundaries.targets.join(',') !== DEV_DELIVERY_TARGET_KEYS.join(',') ||
     summary.boundaries?.browserShellAccess !== false ||
     summary.boundaries?.targetBuildAllowed !== false ||
     summary.boundaries?.automaticRetryAllowed !== false
@@ -801,13 +841,20 @@ export function validateDevDeliverySummary(summary) {
   ) {
     throw new Error('delivery repository identity is invalid')
   }
-  if (summary.target !== null) {
-    const runtime = summary.target?.remote?.runtime
-    const publicEntry = summary.target?.remote?.publicEntry
+  const validateTargetEvidence = (target, definition) => {
+    if (target === null) return
+    const runtime = target?.remote?.runtime
+    const publicEntry = target?.remote?.publicEntry
     const validTargetSha = (value) =>
       value === 'unknown' || SHA_PATTERN.test(String(value || ''))
+    const prefix =
+      definition.key === 'demo-133'
+        ? 'plush-toy-erp-demo-web-public-'
+        : 'plush-toy-erp-test-web-public-'
     if (
-      !['passed', 'blocked'].includes(summary.target?.status) ||
+      target?.target !== definition.key ||
+      target?.purpose !== definition.purpose ||
+      !['passed', 'blocked'].includes(target?.status) ||
       !validTargetSha(runtime?.serverSha) ||
       !validTargetSha(runtime?.webSha) ||
       !['passed', 'blocked'].includes(publicEntry?.status) ||
@@ -815,13 +862,11 @@ export function validateDevDeliverySummary(summary) {
       !['passed', 'failed'].includes(publicEntry?.provider) ||
       typeof publicEntry?.container !== 'string' ||
       (publicEntry.container !== 'unknown' &&
-        !/^plush-toy-erp-web-public-[0-9a-f]{8}$/u.test(
-          publicEntry.container
-        )) ||
+        !new RegExp(`^${prefix}[0-9a-f]{8}$`, 'u').test(publicEntry.container)) ||
       (publicEntry.gitSha !== 'unknown' &&
         !SHA_PATTERN.test(String(publicEntry.gitSha || ''))) ||
-      publicEntry?.endpoint !== 'https://admin.yoyoosun.net' ||
-      (summary.target.status === 'passed' &&
+      publicEntry?.endpoint !== definition.endpoint ||
+      (target.status === 'passed' &&
         (!SHA_PATTERN.test(runtime.serverSha) ||
           runtime.serverSha !== runtime.webSha ||
           publicEntry.status !== 'passed' ||
@@ -829,6 +874,24 @@ export function validateDevDeliverySummary(summary) {
     ) {
       throw new Error('delivery target evidence is invalid')
     }
+  }
+  for (const [index, descriptor] of summary.targets.entries()) {
+    const definition = DEV_DELIVERY_TARGETS[index]
+    if (
+      descriptor?.key !== definition.key ||
+      descriptor?.purpose !== definition.purpose ||
+      descriptor?.endpoint !== definition.endpoint ||
+      !Object.hasOwn(descriptor, 'preflight')
+    ) {
+      throw new Error('delivery target descriptor is invalid')
+    }
+    validateTargetEvidence(descriptor.preflight, definition)
+  }
+  if (
+    JSON.stringify(summary.target) !==
+    JSON.stringify(summary.targets[0].preflight)
+  ) {
+    throw new Error('delivery primary target projection is inconsistent')
   }
   summary.versions.forEach(validateVersion)
   summary.operations.forEach(validateOperation)
@@ -873,7 +936,9 @@ export function createDevDeliveryClient({ fetchImpl = globalThis.fetch } = {}) {
       payload?.schemaVersion !== 'plush.dev-delivery-session/v1' ||
       typeof payload.csrfToken !== 'string' ||
       payload.csrfToken.length < 32 ||
-      payload.target !== 'test-133'
+      payload.target !== 'demo-133' ||
+      !Array.isArray(payload.targets) ||
+      payload.targets.join(',') !== DEV_DELIVERY_TARGET_KEYS.join(',')
     ) {
       throw new Error('版本中心会话校验失败')
     }
@@ -1310,4 +1375,13 @@ export function deliveryVersionActionKind(version) {
   return ['promote', 'rollback', 'current'].includes(version.actionClass)
     ? version.actionClass
     : 'blocked'
+}
+
+export function deliveryVersionForTarget(version, targetKey) {
+  if (!DEV_DELIVERY_TARGET_KEYS.includes(String(targetKey || ''))) {
+    return null
+  }
+  const action = version?.actionsByTarget?.[targetKey]
+  if (!action) return null
+  return { ...version, ...action }
 }

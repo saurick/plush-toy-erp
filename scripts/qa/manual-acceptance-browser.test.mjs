@@ -198,7 +198,7 @@ async function datasetApplyEvidenceFixture({ remote = false } = {}) {
   const runtimeAttestation = remote
     ? {
         target: "customer-trial-133",
-        origin: "http://127.0.0.1:18375",
+        origin: "https://demo.yoyoosun.net",
         customerKey: "yoyoosun",
         environment: "prod",
         release: "f".repeat(40),
@@ -219,9 +219,9 @@ async function datasetApplyEvidenceFixture({ remote = false } = {}) {
     runId: "20260815-V6",
     sourceRunId: "20260815-V6",
     target: remote ? "customer-trial-133" : "local-dev",
-    backendURL: remote ? "http://127.0.0.1:18375" : "http://127.0.0.1:8310",
+    backendURL: remote ? "https://demo.yoyoosun.net" : "http://127.0.0.1:8310",
     databaseName: remote
-      ? "plush_erp_uat_20260716_v5"
+      ? "plush_erp_demo_v1"
       : "plush_erp_acceptance_local_fixture_dev",
     semanticDigest: "d".repeat(64),
     sourcePrefix: "YS6",
@@ -511,7 +511,7 @@ test("manual acceptance browser plan covers all 51 catalog targets and ten forma
 
   const uatPlan = buildManualAcceptanceBrowserPlan({
     baseURL: "http://127.0.0.1:15200",
-    backendURL: "http://127.0.0.1:18375",
+    backendURL: "https://demo.yoyoosun.net",
     target: "customer-trial-133",
   });
   assert.equal(
@@ -641,7 +641,7 @@ test("browser and backend URLs fail closed outside localhost", () => {
   );
 });
 
-test("CLI requires explicit local frontend and backend origins", () => {
+test("CLI requires explicit local or registered trial frontend and backend origins", () => {
   assert.throws(
     () => parseManualAcceptanceBrowserArgs([]),
     /--base-url is required/,
@@ -654,7 +654,7 @@ test("CLI requires explicit local frontend and backend origins", () => {
         "--backend-url",
         "http://127.0.0.1:8300",
       ]),
-    /must stay on this computer/,
+    /must be local or the registered customer-trial TLS origin/,
   );
   const parsed = parseManualAcceptanceBrowserArgs([
     "--plan",
@@ -912,8 +912,8 @@ test("remote browser evidence binds the exact readiness batch and canonical repo
     runId: "20260815-V6",
     sourceRunId: "20260815-V6",
     target: "customer-trial-133",
-    backendURL: "http://127.0.0.1:18375",
-    databaseName: "plush_erp_uat_20260716_v5",
+    backendURL: "https://demo.yoyoosun.net",
+    databaseName: "plush_erp_demo_v1",
     semanticDigest: "digest-v5",
     sourcePrefix: "YS6",
     configRevision: "customer-trial-v5",

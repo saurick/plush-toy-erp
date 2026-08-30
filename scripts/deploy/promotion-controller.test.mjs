@@ -22,7 +22,7 @@ import { releaseManifestStrictEvidenceFixture } from "./release-catalog-test-fix
 const SHA = "a".repeat(40);
 const CURRENT_SHA = "b".repeat(40);
 const IDEMPOTENCY_KEY =
-  "promotion:test-133:123e4567-e89b-42d3-a456-426614174000";
+  "promotion:demo-133:123e4567-e89b-42d3-a456-426614174000";
 
 function classifyRelation({ currentGitSha, candidateGitSha }) {
   const current = currentGitSha === candidateGitSha;
@@ -307,7 +307,7 @@ function targetPreflight(blocked = false) {
   return {
     schemaVersion: "plush.target-preflight/v1",
     status: blocked ? "blocked" : "passed",
-    target: "test-133",
+    target: "demo-133",
     customer: "yoyoosun",
     blockers: blocked ? ["target_disk_capacity_low"] : [],
     remote: {
@@ -377,7 +377,7 @@ test("promotion preparation awaits one read-only preflight and becomes ready", a
   const request = {
     repoRoot: data.root,
     releaseManifestPath: data.releaseManifestPath,
-    targetKey: "test-133",
+    targetKey: "demo-133",
     idempotencyKey: IDEMPOTENCY_KEY,
     operationStore: data.store,
   };
@@ -399,7 +399,7 @@ test("promotion preparation persists disk blocker as a terminal operation", asyn
   const request = {
     repoRoot: data.root,
     releaseManifestPath: data.releaseManifestPath,
-    targetKey: "test-133",
+    targetKey: "demo-133",
     idempotencyKey: IDEMPOTENCY_KEY,
     operationStore: data.store,
   };
@@ -435,7 +435,7 @@ test("promotion controller CLI exposes explicit terminal retry lineage", () => {
     "--release-manifest",
     "output/releases/example/release-manifest.json",
     "--target",
-    "test-133",
+    "demo-133",
     "--idempotency-key",
     "promotion-retry-example",
     "--retry-of-operation-id",
@@ -455,7 +455,7 @@ test("explicit terminal retry creates a distinct ready operation lineage", async
   const common = {
     repoRoot: data.root,
     releaseManifestPath: data.releaseManifestPath,
-    targetKey: "test-133",
+    targetKey: "demo-133",
     operationStore: data.store,
   };
   const first = await preparePromotion(

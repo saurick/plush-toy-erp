@@ -49,11 +49,11 @@ function createFixture({ useSystemFlock = false } = {}) {
   const migrateDir = path.join(root, "migrations");
   const fixtureMigrateScript = path.join(root, "migrate_online.sh");
   const composeFile = path.join(root, "compose.yml");
-  const composeOverrideFile = path.join(root, "compose.customer-trial-133.yml");
-  const composeEnvFile = path.join(root, "runtime", ".env.customer-trial-133");
-  const trialRoot = path.join(root, "plush-toy-erp-v5");
-  const trialPostgresDataDir = path.join(trialRoot, "data/postgres");
-  const trialMigrationLockFile = path.join(trialRoot, "run/atlas-migrate.lock");
+  const composeOverrideFile = path.join(root, "compose.demo-133.yml");
+  const composeEnvFile = path.join(root, "runtime", ".env.demo-133");
+  const targetRoot = path.join(root, "plush-toy-erp-demo-v1");
+  const targetPostgresDataDir = path.join(targetRoot, "data/postgres");
+  const targetMigrationLockFile = path.join(targetRoot, "run/atlas-migrate.lock");
   const atlasLog = path.join(root, "atlas.log");
   const atlasState = path.join(root, "atlas.state");
   const psqlLog = path.join(root, "psql.log");
@@ -77,40 +77,33 @@ function createFixture({ useSystemFlock = false } = {}) {
   );
   fs.writeFileSync(path.join(migrateDir, "atlas.sum"), "h1:test\n", "utf8");
   fs.mkdirSync(path.dirname(composeEnvFile), { recursive: true });
-  const productionDataContract =
-    "TRIAL_POSTGRES_DATA_DIR=/home/simon/plush-toy-erp-v5/data/postgres";
-  const productionLockContract =
-    "TRIAL_MIGRATION_LOCK_FILE=/home/simon/plush-toy-erp-v5/run/atlas-migrate.lock";
+  const productionRootContract =
+    "TARGET_ROOT=/home/simon/plush-toy-erp-demo-v1";
   const productionEnvContract =
-    "TRIAL_COMPOSE_ENV_FILE=/home/simon/plush-toy-erp-v5/runtime/.env.customer-trial-133";
+    "TARGET_COMPOSE_ENV_FILE=$TARGET_ROOT/runtime/.env.demo-133";
   const productionMigrateDirContract =
-    "TRIAL_MIG_DIR=$SERVER_ROOT/internal/data/model/migrate";
+    "TARGET_MIG_DIR=$SERVER_ROOT/internal/data/model/migrate";
   const productionAtlasContract =
-    "TRIAL_ATLAS_BIN=/home/simon/plush-toy-erp-v5/tools/atlas/v1.2.0/atlas";
+    "TARGET_ATLAS_BIN=$TARGET_ROOT/tools/atlas/v1.2.0/atlas";
   const productionPreflightContract =
-    "TRIAL_POPULATED_UPGRADE_PREFLIGHT=$SERVER_ROOT/../scripts/qa/populated-upgrade-preflight.sh";
+    "TARGET_POPULATED_UPGRADE_PREFLIGHT=$SERVER_ROOT/../scripts/qa/populated-upgrade-preflight.sh";
   let fixtureMigrateSource = fs.readFileSync(migrateScript, "utf8");
   assert.match(
     fixtureMigrateSource,
     /ATLAS_BIN="\$\{ATLAS_BIN:-\/usr\/local\/bin\/atlas\}"/u,
   );
-  assert.match(fixtureMigrateSource, new RegExp(productionDataContract, "u"));
-  assert.match(fixtureMigrateSource, new RegExp(productionLockContract, "u"));
+  assert.match(fixtureMigrateSource, new RegExp(productionRootContract, "u"));
   fixtureMigrateSource = fixtureMigrateSource
     .replace(
-      productionDataContract,
-      `TRIAL_POSTGRES_DATA_DIR=${trialPostgresDataDir}`,
+      productionRootContract,
+      `TARGET_ROOT=${targetRoot}`,
     )
-    .replace(
-      productionLockContract,
-      `TRIAL_MIGRATION_LOCK_FILE=${trialMigrationLockFile}`,
-    )
-    .replace(productionEnvContract, `TRIAL_COMPOSE_ENV_FILE=${composeEnvFile}`)
-    .replace(productionMigrateDirContract, `TRIAL_MIG_DIR=${migrateDir}`)
-    .replace(productionAtlasContract, `TRIAL_ATLAS_BIN=${atlasBin}`)
+    .replace(productionEnvContract, `TARGET_COMPOSE_ENV_FILE=${composeEnvFile}`)
+    .replace(productionMigrateDirContract, `TARGET_MIG_DIR=${migrateDir}`)
+    .replace(productionAtlasContract, `TARGET_ATLAS_BIN=${atlasBin}`)
     .replace(
       productionPreflightContract,
-      `TRIAL_POPULATED_UPGRADE_PREFLIGHT=${populatedUpgradePreflight}`,
+      `TARGET_POPULATED_UPGRADE_PREFLIGHT=${populatedUpgradePreflight}`,
     );
   fs.writeFileSync(fixtureMigrateScript, fixtureMigrateSource, "utf8");
   fs.chmodSync(fixtureMigrateScript, 0o755);
@@ -147,20 +140,20 @@ if [ "$1" = "inspect" ] && [ "$2" = "--format" ]; then
   case "$template" in
     *com.docker.compose.project*)
       if [ "$container_id" = "\${APP_SERVER_CID:-}" ]; then
-        printf '%s\n' "\${FAKE_APP_PROJECT:-plush-toy-erp-v5}"
+        printf '%s\n' "\${FAKE_APP_PROJECT:-plush-toy-erp-demo-v1}"
       else
-        printf '%s\n' "\${FAKE_POSTGRES_PROJECT:-plush-toy-erp-v5}"
+        printf '%s\n' "\${FAKE_POSTGRES_PROJECT:-plush-toy-erp-demo-v1}"
       fi
       ;;
     '{{.Name}}')
       if [ "$container_id" = "\${APP_SERVER_CID:-}" ]; then
-        printf '/%s\n' "\${FAKE_APP_NAME:-plush-toy-erp-v5-server}"
+        printf '/%s\n' "\${FAKE_APP_NAME:-plush-toy-erp-demo-v1-server}"
       else
-        printf '/%s\n' "\${FAKE_POSTGRES_NAME:-plush-toy-erp-v5-postgres}"
+        printf '/%s\n' "\${FAKE_POSTGRES_NAME:-plush-toy-erp-demo-v1-postgres}"
       fi
       ;;
     *NetworkSettings.Ports*)
-      printf '%s\n' "\${FAKE_POSTGRES_BINDING:-127.0.0.1|55435}"
+      printf '%s\n' "\${FAKE_POSTGRES_BINDING:-127.0.0.1|55436}"
       ;;
     *Mounts*)
       printf 'bind|%s\n' "$FAKE_POSTGRES_DATA_DIR"
@@ -321,8 +314,8 @@ flock($lock_handle, LOCK_EX) or die "flock fd $fd failed: $!\\n";
     composeFile,
     composeOverrideFile,
     composeEnvFile,
-    trialPostgresDataDir,
-    trialMigrationLockFile,
+    targetPostgresDataDir,
+    targetMigrationLockFile,
     lockDir,
     lockFile,
     atlasLog,
@@ -351,13 +344,13 @@ flock($lock_handle, LOCK_EX) or die "flock fd $fd failed: $!\\n";
   };
 }
 
-function configureCustomerTrialFixture(fixture, replacements = {}) {
-  const postgresDataDir = fixture.trialPostgresDataDir;
-  const migrationLockFile = fixture.trialMigrationLockFile;
+function configureRegisteredDemoFixture(fixture, replacements = {}) {
+  const postgresDataDir = fixture.targetPostgresDataDir;
+  const migrationLockFile = fixture.targetMigrationLockFile;
   const values = new Map([
-    ["PROJECT_SLUG", "plush-toy-erp-v5"],
+    ["PROJECT_SLUG", "plush-toy-erp-demo-v1"],
     ["ERP_CUSTOMER_KEY", "yoyoosun"],
-    ["POSTGRES_DB", "plush_erp_uat_20260716_v5"],
+    ["POSTGRES_DB", "plush_erp_demo_v1"],
     ["POSTGRES_USER", "postgres"],
     ["POSTGRES_PASSWORD", "test-postgres-password"],
     ["POSTGRES_APP_PASSWORD", "test-app-password-12345"],
@@ -368,19 +361,19 @@ function configureCustomerTrialFixture(fixture, replacements = {}) {
     ["POSTGRES_BIND_ADDR", "127.0.0.1"],
     ["APP_HTTP_BIND_ADDR", "127.0.0.1"],
     ["WEB_DESKTOP_BIND_ADDR", "127.0.0.1"],
-    ["POSTGRES_PORT", "55435"],
-    ["APP_HTTP_PORT", "8315"],
-    ["WEB_DESKTOP_PORT", "5185"],
-    ["JAEGER_5775_PORT", "45775"],
-    ["JAEGER_6831_PORT", "46831"],
-    ["JAEGER_6832_PORT", "46832"],
-    ["JAEGER_5778_PORT", "45778"],
-    ["JAEGER_UI_PORT", "46687"],
-    ["JAEGER_14268_PORT", "54268"],
-    ["JAEGER_14250_PORT", "54250"],
-    ["JAEGER_9411_PORT", "49411"],
-    ["JAEGER_OTLP_GRPC_PORT", "44317"],
-    ["JAEGER_OTLP_HTTP_PORT", "44318"],
+    ["POSTGRES_PORT", "55436"],
+    ["APP_HTTP_PORT", "8325"],
+    ["WEB_DESKTOP_PORT", "5195"],
+    ["JAEGER_5775_PORT", "61001"],
+    ["JAEGER_6831_PORT", "61002"],
+    ["JAEGER_6832_PORT", "61003"],
+    ["JAEGER_5778_PORT", "61004"],
+    ["JAEGER_UI_PORT", "61005"],
+    ["JAEGER_14268_PORT", "61006"],
+    ["JAEGER_14250_PORT", "61007"],
+    ["JAEGER_9411_PORT", "61008"],
+    ["JAEGER_OTLP_GRPC_PORT", "61009"],
+    ["JAEGER_OTLP_HTTP_PORT", "61010"],
     ["ERP_ALLOW_CUSTOMER_TRIAL_CONFIG", "1"],
     ["ERP_CUSTOMER_TRIAL_TARGET", "customer-trial-133"],
   ]);
@@ -390,7 +383,7 @@ function configureCustomerTrialFixture(fixture, replacements = {}) {
 
   fs.writeFileSync(
     fixture.composeOverrideFile,
-    "# V5 isolated compose project\nname: plush-toy-erp-v5\n",
+    "# registered demo compose project\nname: plush-toy-erp-demo-v1\n",
     "utf8",
   );
   fs.writeFileSync(
@@ -427,8 +420,121 @@ function configureCustomerTrialFixture(fixture, replacements = {}) {
 
   fixture.env.COMPOSE_OVERRIDE_FILE = fixture.composeOverrideFile;
   fixture.env.COMPOSE_ENV_FILE = fixture.composeEnvFile;
+  fixture.env.DEPLOYMENT_TARGET_KEY = "demo-133";
   fixture.env.FAKE_POSTGRES_DATA_DIR = values.get("POSTGRES_DATA_DIR");
   fixture.env.FAKE_POSTGRES_DB = values.get("POSTGRES_DB");
+  return { values, postgresDataDir, migrationLockFile };
+}
+
+const configureCustomerTrialFixture = configureRegisteredDemoFixture;
+
+function configureRegisteredCustomerTestFixture(fixture) {
+  const targetRoot = path.join(fixture.root, "plush-toy-erp-test-v1");
+  const postgresDataDir = path.join(targetRoot, "data/postgres");
+  const migrationLockFile = path.join(targetRoot, "run/atlas-migrate.lock");
+  const composeOverrideFile = path.join(
+    fixture.root,
+    "compose.customer-test-133.yml",
+  );
+  const composeEnvFile = path.join(
+    fixture.root,
+    "runtime",
+    ".env.customer-test-133",
+  );
+  const productionRootContract =
+    "TARGET_ROOT=/home/simon/plush-toy-erp-test-v1";
+  const productionEnvContract =
+    "TARGET_COMPOSE_ENV_FILE=$TARGET_ROOT/runtime/.env.customer-test-133";
+  const source = fs
+    .readFileSync(fixture.migrateScript, "utf8")
+    .replace(productionRootContract, `TARGET_ROOT=${targetRoot}`)
+    .replace(
+      productionEnvContract,
+      `TARGET_COMPOSE_ENV_FILE=${composeEnvFile}`,
+    );
+  assert.notEqual(source, fs.readFileSync(fixture.migrateScript, "utf8"));
+  fs.writeFileSync(fixture.migrateScript, source, "utf8");
+
+  fixture.composeOverrideFile = composeOverrideFile;
+  fixture.composeEnvFile = composeEnvFile;
+  const values = new Map([
+    ["PROJECT_SLUG", "plush-toy-erp-test-v1"],
+    ["ERP_CUSTOMER_KEY", "yoyoosun"],
+    ["POSTGRES_DB", "plush_erp_customer_test_v1"],
+    ["POSTGRES_USER", "postgres"],
+    ["POSTGRES_PASSWORD", "test-postgres-password"],
+    ["POSTGRES_APP_PASSWORD", "test-app-password-12345"],
+    ["POSTGRES_MIGRATOR_PASSWORD", "test-migrator-password-123"],
+    ["POSTGRES_BACKUP_PASSWORD", "test-backup-password-123"],
+    ["POSTGRES_DATA_DIR", postgresDataDir],
+    ["MIGRATION_LOCK_FILE", migrationLockFile],
+    ["POSTGRES_BIND_ADDR", "127.0.0.1"],
+    ["APP_HTTP_BIND_ADDR", "127.0.0.1"],
+    ["WEB_DESKTOP_BIND_ADDR", "127.0.0.1"],
+    ["POSTGRES_PORT", "55437"],
+    ["APP_HTTP_PORT", "8335"],
+    ["WEB_DESKTOP_PORT", "5205"],
+    ["JAEGER_5775_PORT", "62001"],
+    ["JAEGER_6831_PORT", "62002"],
+    ["JAEGER_6832_PORT", "62003"],
+    ["JAEGER_5778_PORT", "62004"],
+    ["JAEGER_UI_PORT", "62005"],
+    ["JAEGER_14268_PORT", "62006"],
+    ["JAEGER_14250_PORT", "62007"],
+    ["JAEGER_9411_PORT", "62008"],
+    ["JAEGER_OTLP_GRPC_PORT", "62009"],
+    ["JAEGER_OTLP_HTTP_PORT", "62010"],
+    ["ERP_ALLOW_CUSTOMER_TRIAL_CONFIG", "0"],
+    ["ERP_CUSTOMER_TRIAL_TARGET", ""],
+  ]);
+
+  fs.writeFileSync(
+    composeOverrideFile,
+    "name: plush-toy-erp-test-v1\n",
+    "utf8",
+  );
+  fs.writeFileSync(
+    composeEnvFile,
+    `${[...values].map(([key, value]) => `${key}=${value}`).join("\n")}\n`,
+    "utf8",
+  );
+  fs.chmodSync(composeEnvFile, 0o600);
+
+  for (const key of [
+    "DB_URL",
+    "MIGRATION_LOCK_FILE",
+    "POSTGRES_HOST",
+    "POSTGRES_HOST_PORT",
+    "POSTGRES_SERVICE",
+    "APP_SERVICE",
+    "COMPOSE_FILE",
+    "MIG_DIR",
+    "ATLAS_BIN",
+    "PSQL_BIN",
+    "POPULATED_UPGRADE_PREFLIGHT",
+    ...values.keys(),
+    "COMPOSE_PROJECT_NAME",
+    "COMPOSE_PROFILES",
+    "COMPOSE_ENV_FILES",
+    "COMPOSE_PATH_SEPARATOR",
+    "DOCKER_HOST",
+    "DOCKER_CONTEXT",
+    "DOCKER_TLS_VERIFY",
+    "DOCKER_CERT_PATH",
+  ]) {
+    delete fixture.env[key];
+  }
+
+  Object.assign(fixture.env, {
+    COMPOSE_OVERRIDE_FILE: composeOverrideFile,
+    COMPOSE_ENV_FILE: composeEnvFile,
+    DEPLOYMENT_TARGET_KEY: "customer-test-133",
+    FAKE_POSTGRES_DATA_DIR: postgresDataDir,
+    FAKE_POSTGRES_DB: "plush_erp_customer_test_v1",
+    FAKE_POSTGRES_PROJECT: "plush-toy-erp-test-v1",
+    FAKE_POSTGRES_NAME: "plush-toy-erp-test-v1-postgres",
+    FAKE_POSTGRES_BINDING: "127.0.0.1|55437",
+  });
   return { values, postgresDataDir, migrationLockFile };
 }
 
@@ -507,7 +613,7 @@ async function waitForLine(filePath, expected, timeoutMs = 10000) {
   throw new Error(`timed out waiting for ${expected}`);
 }
 
-test("migrate_online canonical 模式保持单 compose 文件且不注入 V5 project", () => {
+test("migrate_online canonical 模式保持单 compose 文件且不注入登记目标 project", () => {
   const fixture = createFixture();
   try {
     const result = runMigration(fixture, ["--status-only"]);
@@ -515,7 +621,7 @@ test("migrate_online canonical 模式保持单 compose 文件且不注入 V5 pro
     assert.deepEqual(readLines(fixture.composeLog), [
       `compose -f ${fixture.composeFile} ps -q postgres`,
     ]);
-    assert.doesNotMatch(result.stdout, /plush-toy-erp-v5/u);
+    assert.doesNotMatch(result.stdout, /plush-toy-erp-demo-v1/u);
   } finally {
     fs.rmSync(fixture.root, { recursive: true, force: true });
   }
@@ -557,13 +663,13 @@ test("migrate_online canonical 模式继续允许既有 COMPOSE_FILE 覆盖", ()
     assert.deepEqual(readLines(fixture.composeLog), [
       `compose -f ${alternateComposeFile} ps -q postgres`,
     ]);
-    assert.doesNotMatch(result.stdout, /plush-toy-erp-v5/u);
+    assert.doesNotMatch(result.stdout, /plush-toy-erp-demo-v1/u);
   } finally {
     fs.rmSync(fixture.root, { recursive: true, force: true });
   }
 });
 
-test("migrate_online V5 使用精确 env、project 与双 compose 文件并读回容器身份", () => {
+test("migrate_online demo 使用精确 env、project 与双 compose 文件并读回容器身份", () => {
   const fixture = createFixture();
   try {
     configureCustomerTrialFixture(fixture);
@@ -572,7 +678,7 @@ test("migrate_online V5 使用精确 env、project 与双 compose 文件并读�
     });
 
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-    const composePrefix = `compose --env-file ${fixture.composeEnvFile} -p plush-toy-erp-v5 -f ${fixture.composeFile} -f ${fixture.composeOverrideFile}`;
+    const composePrefix = `compose --env-file ${fixture.composeEnvFile} -p plush-toy-erp-demo-v1 -f ${fixture.composeFile} -f ${fixture.composeOverrideFile}`;
     assert.deepEqual(readLines(fixture.composeLog), [
       `${composePrefix} ps -q app-server`,
       `${composePrefix} ps -q postgres`,
@@ -583,10 +689,10 @@ test("migrate_online V5 使用精确 env、project 与双 compose 文件并读�
       "schema-readback",
     ]);
     assert.deepEqual(readLines(fixture.psqlLog), [
-      "host=127.0.0.1|port=55435|database=plush_erp_uat_20260716_v5|user=erp_migrator|password_present=1|sslmode=disable",
-      "host=127.0.0.1|port=55435|database=plush_erp_uat_20260716_v5|user=erp_migrator|password_present=1|sslmode=disable",
+      "host=127.0.0.1|port=55436|database=plush_erp_demo_v1|user=erp_migrator|password_present=1|sslmode=disable",
+      "host=127.0.0.1|port=55436|database=plush_erp_demo_v1|user=erp_migrator|password_present=1|sslmode=disable",
     ]);
-    assert.match(result.stdout, /compose project: plush-toy-erp-v5/u);
+    assert.match(result.stdout, /compose project: plush-toy-erp-demo-v1/u);
     assert.doesNotMatch(result.stdout, /test-postgres-password/u);
     assert.doesNotMatch(result.stderr, /test-postgres-password/u);
   } finally {
@@ -594,7 +700,61 @@ test("migrate_online V5 使用精确 env、project 与双 compose 文件并读�
   }
 });
 
-test("migrate_online V5 override 合同对缺失、漂移和额外服务 fail closed", async (t) => {
+test("migrate_online customer-test 使用独立 env、project、端口和数据库", () => {
+  const fixture = createFixture();
+  try {
+    configureRegisteredCustomerTestFixture(fixture);
+    const result = runMigration(fixture, ["--status-only"]);
+
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    const composePrefix = `compose --env-file ${fixture.composeEnvFile} -p plush-toy-erp-test-v1 -f ${fixture.composeFile} -f ${fixture.composeOverrideFile}`;
+    assert.deepEqual(readLines(fixture.composeLog), [
+      `${composePrefix} ps -q app-server`,
+      `${composePrefix} ps -q postgres`,
+    ]);
+    assert.deepEqual(atlasPhases(fixture.atlasLog), [
+      "validate",
+      "status",
+      "schema-readback",
+    ]);
+    assert.deepEqual(readLines(fixture.psqlLog), [
+      "host=127.0.0.1|port=55437|database=plush_erp_customer_test_v1|user=erp_migrator|password_present=1|sslmode=disable",
+      "host=127.0.0.1|port=55437|database=plush_erp_customer_test_v1|user=erp_migrator|password_present=1|sslmode=disable",
+    ]);
+    assert.match(result.stdout, /deployment target: customer-test-133/u);
+    assert.match(result.stdout, /compose project: plush-toy-erp-test-v1/u);
+    assert.doesNotMatch(result.stdout, /test-postgres-password/u);
+    assert.doesNotMatch(result.stderr, /test-postgres-password/u);
+  } finally {
+    fs.rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("migrate_online 在任何 Compose、Atlas 或数据库动作前排除 admin 和未启用环境", async (t) => {
+  for (const targetKey of ["admin", "admin-133", "erp", "test-133"]) {
+    await t.test(targetKey, () => {
+      const fixture = createFixture();
+      try {
+        const result = runMigration(fixture, ["--status-only"], {
+          DEPLOYMENT_TARGET_KEY: targetKey,
+        });
+
+        assert.notEqual(result.status, 0);
+        assert.match(
+          result.stderr,
+          /只允许 demo-133 或 customer-test-133；admin 不是部署环境/u,
+        );
+        assert.deepEqual(readLines(fixture.composeLog), []);
+        assert.deepEqual(atlasPhases(fixture.atlasLog), []);
+        assert.deepEqual(readLines(fixture.psqlLog), []);
+      } finally {
+        fs.rmSync(fixture.root, { recursive: true, force: true });
+      }
+    });
+  }
+});
+
+test("migrate_online 登记目标 override 合同对缺失、漂移和额外服务 fail closed", async (t) => {
   const cases = [
     {
       name: "override 缺失",
@@ -612,18 +772,18 @@ test("migrate_online V5 override 合同对缺失、漂移和额外服务 fail cl
           "utf8",
         );
       },
-      expected: /只能声明 name: plush-toy-erp-v5/u,
+      expected: /Compose override 只能声明登记 project/u,
     },
     {
       name: "额外服务",
       mutate(fixture) {
         fs.writeFileSync(
           fixture.composeOverrideFile,
-          "name: plush-toy-erp-v5\nservices:\n  postgres: {}\n",
+          "name: plush-toy-erp-demo-v1\nservices:\n  postgres: {}\n",
           "utf8",
         );
       },
-      expected: /只能声明 name: plush-toy-erp-v5/u,
+      expected: /Compose override 只能声明登记 project/u,
     },
     {
       name: "override 不在 base 同目录",
@@ -632,7 +792,7 @@ test("migrate_online V5 override 合同对缺失、漂移和额外服务 fail cl
         fs.mkdirSync(otherDir);
         const otherOverride = path.join(
           otherDir,
-          "compose.customer-trial-133.yml",
+          "compose.demo-133.yml",
         );
         fs.renameSync(fixture.composeOverrideFile, otherOverride);
         fixture.env.COMPOSE_OVERRIDE_FILE = otherOverride;
@@ -659,7 +819,7 @@ test("migrate_online V5 override 合同对缺失、漂移和额外服务 fail cl
   }
 });
 
-test("migrate_online V5 拒绝 override 或 env 符号链接", async (t) => {
+test("migrate_online 登记目标拒绝 override 或 env 符号链接", async (t) => {
   for (const kind of ["override", "env"]) {
     await t.test(kind, () => {
       const fixture = createFixture();
@@ -684,7 +844,7 @@ test("migrate_online V5 拒绝 override 或 env 符号链接", async (t) => {
   }
 });
 
-test("migrate_online V5 强制精确 runtime env 文件与端口合同", async (t) => {
+test("migrate_online 登记目标强制精确 runtime env 文件与端口合同", async (t) => {
   await t.test("env 文件缺失", () => {
     const fixture = createFixture();
     try {
@@ -708,7 +868,7 @@ test("migrate_online V5 强制精确 runtime env 文件与端口合同", async (
       fixture.env.COMPOSE_ENV_FILE = wrongEnvFile;
       const result = runMigration(fixture, ["--status-only"]);
       assert.notEqual(result.status, 0);
-      assert.match(result.stderr, /只能使用受控 .env.customer-trial-133/u);
+      assert.match(result.stderr, /只能使用登记的运行 env/u);
       assert.deepEqual(atlasPhases(fixture.atlasLog), []);
     } finally {
       fs.rmSync(fixture.root, { recursive: true, force: true });
@@ -730,20 +890,20 @@ test("migrate_online V5 强制精确 runtime env 文件与端口合同", async (
     }
   });
 
-  await t.test("V5 端口漂移", () => {
+  await t.test("demo 端口漂移", () => {
     const fixture = createFixture();
     try {
       configureCustomerTrialFixture(fixture, { JAEGER_UI_PORT: "26687" });
       const result = runMigration(fixture, ["--status-only"]);
       assert.notEqual(result.status, 0);
-      assert.match(result.stderr, /JAEGER_UI_PORT=46687/u);
+      assert.match(result.stderr, /JAEGER_UI_PORT=61005/u);
       assert.deepEqual(atlasPhases(fixture.atlasLog), []);
     } finally {
       fs.rmSync(fixture.root, { recursive: true, force: true });
     }
   });
 
-  await t.test("V5 前端宿主绑定漂移", () => {
+  await t.test("demo 前端宿主绑定漂移", () => {
     const fixture = createFixture();
     try {
       configureCustomerTrialFixture(fixture, {
@@ -764,7 +924,7 @@ test("migrate_online V5 强制精确 runtime env 文件与端口合同", async (
       configureCustomerTrialFixture(fixture, {
         POSTGRES_DATA_DIR: path.join(
           fixture.root,
-          "other/plush-toy-erp-v5/data/postgres",
+          "other/plush-toy-erp-demo-v1/data/postgres",
         ),
       });
       const result = runMigration(fixture, ["--status-only"]);
@@ -782,7 +942,7 @@ test("migrate_online V5 强制精确 runtime env 文件与端口合同", async (
       configureCustomerTrialFixture(fixture, {
         MIGRATION_LOCK_FILE: path.join(
           fixture.root,
-          "other/plush-toy-erp-v5/run/atlas-migrate.lock",
+          "other/plush-toy-erp-demo-v1/run/atlas-migrate.lock",
         ),
       });
       const result = runMigration(fixture, ["--status-only"]);
@@ -795,7 +955,7 @@ test("migrate_online V5 强制精确 runtime env 文件与端口合同", async (
   });
 });
 
-test("migrate_online V5 拒绝 ambient Compose、Docker 与 env-file 同名覆盖", async (t) => {
+test("migrate_online 登记目标拒绝 ambient Compose、Docker 与 env-file 同名覆盖", async (t) => {
   const cases = [
     ["COMPOSE_FILE", null, /覆盖 COMPOSE_FILE/u],
     ["COMPOSE_PROJECT_NAME", "plush-toy-erp-prod", /COMPOSE_PROJECT_NAME/u],
@@ -831,7 +991,7 @@ test("migrate_online V5 拒绝 ambient Compose、Docker 与 env-file 同名覆�
   }
 });
 
-test("migrate_online V5 拒绝 env 文件覆盖受信任迁移工具链", async (t) => {
+test("migrate_online 登记目标拒绝 env 文件覆盖受信任迁移工具链", async (t) => {
   for (const key of [
     "MIG_DIR",
     "ATLAS_BIN",
@@ -856,7 +1016,7 @@ test("migrate_online V5 拒绝 env 文件覆盖受信任迁移工具链", async 
   }
 });
 
-test("migrate_online V5 对错误 CID、project、name、port、mount 与 DB fail closed", async (t) => {
+test("migrate_online 登记目标对错误 CID、project、name、port、mount 与 DB fail closed", async (t) => {
   const cases = [
     {
       name: "Postgres CID 缺失",
@@ -871,17 +1031,17 @@ test("migrate_online V5 对错误 CID、project、name、port、mount 与 DB fai
     {
       name: "Postgres project 错误",
       env: { FAKE_POSTGRES_PROJECT: "plush-toy-erp-prod" },
-      expected: /不属于 Compose project plush-toy-erp-v5/u,
+      expected: /不属于 Compose project plush-toy-erp-demo-v1/u,
     },
     {
       name: "Postgres container name 错误",
       env: { FAKE_POSTGRES_NAME: "plush-toy-erp-postgres" },
-      expected: /容器名必须是 plush-toy-erp-v5-postgres/u,
+      expected: /容器名必须是 plush-toy-erp-demo-v1-postgres/u,
     },
     {
       name: "Postgres host port 错误",
       env: { FAKE_POSTGRES_BINDING: "127.0.0.1|5435" },
-      expected: /127\.0\.0\.1:55435/u,
+      expected: /必须唯一绑定登记的 loopback 端口/u,
     },
     {
       name: "Postgres mount 错误",
@@ -891,7 +1051,7 @@ test("migrate_online V5 对错误 CID、project、name、port、mount 与 DB fai
     {
       name: "Postgres DB 错误",
       env: { FAKE_POSTGRES_DB: "plush_erp" },
-      expected: /POSTGRES_DB 必须是 plush_erp_uat_20260716_v5/u,
+      expected: /POSTGRES_DB 不符合登记合同/u,
     },
     {
       name: "app-server project 错误",
@@ -899,7 +1059,7 @@ test("migrate_online V5 对错误 CID、project、name、port、mount 与 DB fai
         APP_SERVER_CID: "app-test-cid",
         FAKE_APP_PROJECT: "plush-toy-erp-prod",
       },
-      expected: /app-server 容器不属于 Compose project plush-toy-erp-v5/u,
+      expected: /app-server 容器不属于 Compose project plush-toy-erp-demo-v1/u,
     },
   ];
 

@@ -67,9 +67,17 @@ fi
     "--current-container",
     current,
     "--endpoint",
-    "https://admin.yoyoosun.net",
+    "https://demo.yoyoosun.net",
     "--api-origin",
     "http://app-server:8300",
+    "--network",
+    "plush-toy-erp-demo-v1_default",
+    "--container-prefix",
+    "plush-toy-erp-demo-web-public-",
+    "--host-port",
+    "5176",
+    "--candidate-port",
+    "15176",
     "--execute",
     "--confirm",
     `PUBLIC_WEB_CUTOVER:${current}:${release}`,
@@ -89,8 +97,8 @@ fi
   assert.match(result.stdout, /passed .*provider=true/);
   const dockerCalls = fs.readFileSync(dockerLog, "utf8");
   assert.doesNotMatch(dockerCalls, /State\.Health\.Status/);
-  assert.match(dockerCalls, /127\.0\.0\.1:15175:5175/);
-  assert.match(dockerCalls, /0\.0\.0\.0:5175:5175/);
+  assert.match(dockerCalls, /127\.0\.0\.1:15176:5175/);
+  assert.match(dockerCalls, /0\.0\.0\.0:5176:5175/);
   assert.match(
     dockerCalls,
     /update --restart=no plush-toy-erp-web-old[\s\S]*stop plush-toy-erp-web-old/u,
@@ -120,4 +128,35 @@ fi
   assert.equal(reused.status, 0, `${reused.stdout}\n${reused.stderr}`);
   assert.match(reused.stdout, /reused=true/u);
   assert.doesNotMatch(fs.readFileSync(dockerLog, "utf8"), /run -d|stop /u);
+});
+
+test("public web cutover rejects admin because it is not a deployment environment", () => {
+  const result = spawnSync(
+    "bash",
+    [
+      scriptPath,
+      "--image",
+      "plush-toy-erp-web:yoyoosun-immutable",
+      "--release",
+      release,
+      "--current-container",
+      "plush-toy-erp-web-old",
+      "--endpoint",
+      "https://admin.yoyoosun.net",
+      "--api-origin",
+      "http://app-server:8300",
+      "--network",
+      "plush-toy-erp-demo-v1_default",
+      "--container-prefix",
+      "plush-toy-erp-demo-web-public-",
+      "--host-port",
+      "5176",
+      "--candidate-port",
+      "15176",
+    ],
+    { cwd: repoRoot, encoding: "utf8" },
+  );
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /admin 不是部署环境/u);
 });

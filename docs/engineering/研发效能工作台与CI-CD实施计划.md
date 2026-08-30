@@ -9,7 +9,7 @@
 | 仓库定义 | R640 分片 DAG、普通 CI evidence 复用、单次制品构建、冻结演练和 v2 Release 合同由正式代码/测试/文档守住 | `.gitlab-ci.yml`、CI/release 脚本、R640 cloud-init、工作台与合同测试 |
 | Git/远端 | GitLab `origin/main` 是 canonical，GitHub 是 protected-main 单向 mirror 和应急路径 | 当前结论以 exact remote SHA、protected branch 与 pipeline API 读回为准 |
 | R640/公网运行态 | GitLab、公网入口和独立 KVM Runner 已是实际主链；Runner 重建合同为 12 vCPU / 24 GiB / `concurrent=4` | 当前配置、资源、job 和 backup/restore 仍必须从 R640 实时读回 |
-| 业务目标 | `test-133` 只是 customer-trial，不是正式生产 | 正式生产需独立 exact target/environment、数据库、备份、回滚点、入口与 smoke 登记 |
+| 业务目标 | `demo-133` 是项目方模拟数据环境，`customer-test-133` 是甲方干净测试/验收环境；二者均非生产 | 两目标同 digest、运行与数据完全隔离；未来 `erp` 需另行正式启用 |
 
 任何本地绿色都不能改写远端、不可变制品、发布演练、目标部署或客户 UAT 层的状态。
 
@@ -81,7 +81,7 @@
 - 版本列表只接受固定 GitLab project 的 `artifact-<40sha>` Release；只有 v2 七资产与同一演练回执完整时才可 promotion，v1 六资产只读/回滚且 `promotionEligible=false`。
 - 质量工程只把当前 committed SHA 的普通 push CI 投影为服务器证据，必须包含 plan、prepare、七分片、aggregate 和 `CI Gate`；Local dirty 和本地回执单独展示。
 - 版本中心 pipeline 只接受固定 GitLab URL、合法状态、时间和 job；无 step 数据显示空列表，不估算。版本与部署只展示真实不可变 Release/Package 和 target operation。
-- “发布当前 SHA”只接受 clean HEAD 且由 GitLab main 精确匹配；dispatch 不直接写 133。
+- “发布当前 SHA”只接受 clean HEAD 且由 GitLab main 精确匹配；dispatch 只生成不可变版本，不自动写 demo 或 test。
 - GitHub fallback 必须由服务端环境显式选择，浏览器没有 Provider 选择器。
 - 人工接管说明明确 GitLab 主链、GitHub review mirror、固定操作顺序与禁止捷径。
 - 生产 build 仍排除全部 `/__dev` 路由与 Bridge。
@@ -94,11 +94,17 @@
 - 一次性 VM 恢复后能登录、clone、读取 pipeline artifact、Generic Package 和 Release。
 - 恢复演练记录 GitLab 版本、backup filename/hash、config hash、开始/完成时间、结果和清理读回；不保存密码/token。
 
-## 真实数据与双环境后续
+## demo、test 与未来生产
 
-GitLab 完成不自动授权清空测试服务器。甲方真实数据 UAT 与模拟数据演示建议分成独立环境：既有稳定域名保留给 UAT，新增 `demo.yoyoosun.net` 保存可重置模拟数据；若希望语义更明确，可将真实数据入口固定为 `uat.yoyoosun.net`。
+当前可执行 target 是 `demo-133` 与 `customer-test-133`：
 
-实施前必须新增独立 deployment target、数据库、上传、Compose project、端口、备份、preflight 和 operation。两环境共享同一 Product Core 与 release digest，不复制代码或字段真源。真实数据导入/清理、域名切换和 UAT 是后续独立授权，不包含在 GitLab 部署中。
+- `demo.yoyoosun.net`：项目方造数、演练、培训和回归，允许经受控流程重建 seed / fixture / 模拟数据。
+- `test.yoyoosun.net`：甲方测试与验收；每轮交付前按正式 rebuild 合同恢复干净业务基线，由甲方自行录入真实测试数据。
+- `erp.yoyoosun.net`：未来生产，尚未启用，不能提前进入工作台或流水线可执行目标。
+
+demo 与 test 共享同一 Product Core 与不可变 release digest，不复制代码或字段真源；数据库、上传、Compose project、端口、runtime env、备份、rollback point、operation 与 smoke 全部独立。demo 造数不得污染 test，test 重建不得影响 demo。
+
+`admin.yoyoosun.net` 不属于部署环境，只能按应用自身管理入口语义存在；它不进入 CI/CD 环境矩阵、target registry、数据清理、健康检查、发布验证或回滚。当前目标登记也不代表已执行 test 数据清理；写入前仍要实时绑定数据类别、保留项、备份和恢复证明。
 
 ## 回滚与停止条件
 
@@ -124,4 +130,4 @@ GitLab 完成不自动授权清空测试服务器。甲方真实数据 UAT 与�
 5. backup、checksum、在线 verify 与隔离 restore drill 均有证据；
 6. 现有业务容器、数据、端口和公网入口无回归。
 
-客户真实数据环境、双域名、业务 UAT、数据库清理与正式生产发布不属于上述完成定义，必须单独计划、授权和验收。
+demo/test 的真实部署、数据隔离与公网验收仍需绑定同一候选 SHA/digest 分别完成；test 数据清理和未来 erp 生产发布是独立高风险切片，不能由 GitLab 或工作台本地绿色推定完成。

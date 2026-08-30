@@ -80,7 +80,7 @@ function shortHash(value) {
 
 function operationTargetLabel(targetKey) {
   if (targetKey === DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133) {
-    return '133 测试'
+    return 'demo 演练造数'
   }
   if (targetKey === DEV_DATA_PREPARATION_TARGET_KEYS.isolatedLocal) {
     return '本地隔离验收'
@@ -371,7 +371,7 @@ function DatasetEnvironmentContract({ summary }) {
     },
     {
       key: 'trial',
-      title: '133 试用数据',
+      title: 'demo 演练造数',
       target: contract.customerTrial133.databaseName,
       status: trialScenarioReadback ? '已独立读回' : '待目标回执',
       color: trialScenarioReadback ? 'success' : 'default',
@@ -1431,7 +1431,7 @@ export default function DevDataPreparationPage() {
                 })}
                 <div className="erp-dev-data-preflight-row">
                   <div>
-                    <Text strong>133 测试场景目标</Text>
+                    <Text strong>demo 模拟场景目标</Text>
                     <Text type="secondary">
                       当前页面只保存登记身份；点击准备后才做权威 target
                       preflight，不会自动创建写操作。
@@ -1521,7 +1521,7 @@ export default function DevDataPreparationPage() {
                       {
                         value:
                           DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133,
-                        label: '133 测试',
+                        label: 'demo 项目演练造数',
                       },
                     ]}
                   />

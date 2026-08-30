@@ -88,7 +88,7 @@ function targetPreflight({ runtimeSha = SHA, blocked = false } = {}) {
   return {
     schemaVersion: "plush.target-preflight/v1",
     status: blocked ? "blocked" : "passed",
-    target: "test-133",
+    target: "customer-test-133",
     customer: "yoyoosun",
     blockers: blocked ? ["target_disk_capacity_low"] : [],
     remote: {
@@ -97,7 +97,7 @@ function targetPreflight({ runtimeSha = SHA, blocked = false } = {}) {
         minimumAvailableBytes: 30 * 1024 ** 3,
       },
       runtime: {
-        databaseName: "plush_erp_uat_20260716_v5",
+        databaseName: "plush_erp_customer_test_v1",
         serverSha: runtimeSha,
         webSha: runtimeSha,
         serverHealth: "passed",

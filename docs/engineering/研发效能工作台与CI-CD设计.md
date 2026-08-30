@@ -23,7 +23,7 @@ flowchart LR
   W["DEV-only version center"] -->|loopback fixed API| B["Delivery Bridge"]
   B -->|read/dispatch| G
   B -->|download exact assets| P
-  B -->|confirmed operation| T["test-133 / registered target"]
+  B -->|confirmed operation| T["demo-133 / customer-test-133"]
   C --> T
 ```
 
@@ -35,7 +35,7 @@ flowchart LR
 | GHCR | 保存按 digest 固定的 Server/Web 镜像 | tag 不能替代 manifest digest |
 | Delivery Bridge | 固定 Provider、固定动作、operation 与目标执行器 | 浏览器不能传 repo、host、path、shell、SQL、Docker 或 secret |
 | 研发效能工作台 | 展示证据、选择固定版本、显式确认 | 不成为 CI、部署、数据库或凭据真源 |
-| test/UAT 目标 | load/pull 制品、migration、运行与 readback | 不从源码构建，不把 smoke 冒充客户 UAT |
+| demo / test 目标 | load/pull 制品、migration、运行与 readback | 不从源码构建，不共用持久数据，不把 smoke 冒充客户验收 |
 
 ## R640 存储与进程隔离
 
@@ -56,7 +56,7 @@ GitLab HTTP 只绑定 R640 `127.0.0.1:8929`，由 FRP 到阿里云 `18226`，再
 3. `quality_aggregate` 要求七个回执、阶段并集、分类执行数、source archive、依赖审计、`make data`、Web build digest、PostgreSQL/Chromium/browser 清理全部同 SHA 且通过，再签发标准 v3 strict terminal。
 4. `CI Gate` 只在对应 main aggregate 或 MR quality 成功时通过；main push 还会把 terminal、receipt 和 manifest 固化到 exact pipeline/job/SHA 的 `plush-ci-evidence` Package，作为 protected main 的稳定 required job 和后续 release 唯一可复用证据。
 
-默认 `origin/main` 推送前，本地 `prepare-push` 只执行并签名 clean HEAD/tree、remote/ref/range、git-log、严格 secrets 与源码完整性短门禁，不重复 Runner 的 affected/full、数据库、浏览器、测试或构建。该回执只允许普通非强制 push，不表示 CI 已成功；Release、Package promotion 和任何受保护部署必须读回同一 40 位 SHA 的不可变终态成功 `CI Gate`。生产目标只加载 CI 构建的不可变制品或镜像并执行正式 migration、health/ready 与 smoke，禁止现场重建。
+默认 `origin/main` 推送前，本地 `prepare-push` 只执行并签名 clean HEAD/tree、remote/ref/range、git-log、严格 secrets 与源码完整性短门禁，不重复 Runner 的 affected/full、数据库、浏览器、测试或构建。该回执只允许普通非强制 push，不表示 CI 已成功；Release、Package 显式版本提升（Explicit Promotion）和任何受保护部署必须读回同一 40 位 SHA 的不可变终态成功 `CI Gate`。生产目标只加载 CI 构建的不可变制品或镜像并执行正式 migration、health/ready 与 smoke，禁止现场重建。
 
 缓存只缩短依赖和浏览器准备时间，不能跳过 checksum、locked/offline install、门禁、source archive 或 clean-tree 读回。分片只 pull cache，不并发回写同一 key。pipeline artifacts 是本次运行内证据；只有 `CI Gate` 上传且经 release 服务器端重新校验的 exact Package 才能跨 pipeline 复用，仍不等于不可变 Release。
 
@@ -84,13 +84,13 @@ release 只能从受保护 main 的 web/API/trigger pipeline 发起，且满足�
 6. `web-image.tar`
 7. `release-rehearsal.json`
 
-Generic Package version 与 Release tag 固定为 `artifact-<40sha>`。重试时先逐项校验现有 v2 文件的名称、大小和 SHA-256，只续传完全一致子集所缺的资产，并在创建或复用 Release 前读回完整七资产；未知文件、重复文件、同名异内容、同版本异 SHA、同 SHA 异版本或演练不完整均失败关闭。Release、Package、GHCR digest、manifest、`release-rehearsal.json` 和目标 promotion 必须指向同一 SHA、同一 artifact/rehearsal digest。旧 v1 六资产只允许精确读取、展示、校验和既有回滚点兼容，`promotionEligible=false`；不得补传、重新封装或作为新 promotion 输入。
+Generic Package version 与 Release tag 固定为 `artifact-<40sha>`。重试时先逐项校验现有 v2 文件的名称、大小和 SHA-256，只续传完全一致子集所缺的资产，并在创建或复用 Release 前读回完整七资产；未知文件、重复文件、同名异内容、同版本异 SHA、同 SHA 异版本或演练不完整均失败关闭。Release、Package、GHCR digest、manifest、`release-rehearsal.json` 和目标显式版本提升（Explicit Promotion）必须指向同一 SHA、同一 artifact/rehearsal digest。旧 v1 六资产只允许精确读取、展示、校验和既有回滚点兼容，`promotionEligible=false`；不得补传、重新封装或作为新版本提升输入。
 
 ## 双 Provider 边界
 
 `scripts/deploy/gitlab-delivery-provider.mjs` 是默认 Provider，固定 GitLab base URL、项目、Generic Package、release tag、pipeline API 和本地下载根。它从服务端环境读取 `PLUSH_GITLAB_TOKEN`，限制 JSON 大小、asset 名、文件大小、URL、SHA、版本和符号链接路径，返回值不含 token。
 
-`scripts/deploy/github-delivery-provider.mjs` 继续读取 GitHub 历史/应急 Release，并把 v1 六资产投影为只读、可回滚但不可 promotion。当前 GitHub emergency workflow 在 checkout、registry 登录、构建和上传前固定失败关闭；只有未来完整支持 canonical v2 七资产与同一演练回执后，才能另行恢复写入。浏览器不知道 token，也不能选择 Provider。
+`scripts/deploy/github-delivery-provider.mjs` 继续读取 GitHub 历史/应急 Release，并把 v1 六资产投影为只读、可回滚但不可用于显式版本提升（Explicit Promotion）。当前 GitHub emergency workflow 在 checkout、registry 登录、构建和上传前固定失败关闭；只有未来完整支持 canonical v2 七资产与同一演练回执后，才能另行恢复写入。浏览器不知道 token，也不能选择 Provider。
 
 GitLab Jobs API 当前只提供 job 级时间时，工作台展示真实 job 窗口和空 steps，不推算或伪造 GitHub 式 step timing。GitHub 历史/应急运行仍可按原合同展示。
 
@@ -106,10 +106,10 @@ GPT Review 的 finding 是审查输入，不是仓库事实。修复仍回到 Gi
 
 `/__dev/version-center` 只在 development serve 存在，继续使用同一 Delivery Bridge 与 operation store：
 
-- 顶部区分本地候选、GitLab 不可变版本、test-133 当前版本和容量/阻塞；
+- 顶部区分本地候选、GitLab 不可变版本、demo / test 各自当前版本和容量/阻塞；
 - `版本与部署` 读取 GitLab Release 与 package 完整性；
 - `CI/CD 效能` 展示 pipeline/job、完整发布与 exact-SHA 复用、BuildKit、制品大小、传输和目标阶段；
-- `操作记录` 展示发布、promotion、rollback 和 database rebuild 的状态、幂等与脱敏事件；
+- `操作记录` 展示发布、显式版本提升（Explicit Promotion）、rollback 和 database rebuild 的状态、幂等与脱敏事件；
 - 人工接管说明明确 GitLab 主链、GitHub 只读镜像和固定操作顺序。
 
 工作台不把本地绿色、GitLab pipeline、GitLab Release、目标 smoke、备份恢复、岗位矩阵或客户 UAT 合成一个“全部完成”。每层单独显示来源与时间；缺失或非法时间显示“未证明”。
@@ -118,16 +118,15 @@ GPT Review 的 finding 是审查输入，不是仓库事实。修复仍回到 Gi
 
 ## 目标环境与真实数据
 
-`test-133` 仍是当前唯一可执行 target，用途固定为 customer-trial。promotion 只 load/pull 已发布 digest，随后执行固定 preflight、backup、migration、Compose、health/ready、公网 SHA 和资源读回。失败、blocked 或 `not_proven` 不自动重试。正式生产必须另有精确 target/environment、数据库、备份、回滚点、入口和 smoke 合同；不得把 133 重命名或默认解释为生产。
+当前可执行 target 只有 `demo-133` 与 `customer-test-133`。显式版本提升（Explicit Promotion）只 load/pull 已发布 digest，随后执行固定 preflight、backup、migration、Compose、health/ready、公网 SHA 和资源读回；它必须由使用者明确发起，`main` push 不会自动部署。失败、blocked 或 `not_proven` 不自动重试。
 
-甲方开始使用真实数据时，不清空唯一环境后继续混用。推荐：
-
-| 环境 | 域名建议 | 数据 | 用途 |
+| 环境 | 公网入口 | 数据与用途 | 重建边界 |
 | --- | --- | --- | --- |
-| 客户 UAT | 保留既有 `admin.yoyoosun.net` 或迁为 `uat.yoyoosun.net` | 甲方受控真实数据 | 岗位试用与 UAT，不自动重置 |
-| 模拟演示 | `demo.yoyoosun.net` | seed/fixture/模拟业务事实 | 开发回归、培训和可重置演示 |
+| demo / `demo-133` | `demo.yoyoosun.net` | 项目方造数、演练、培训和回归；允许 seed/fixture/模拟业务事实 | 只走受控重建，必须保留自己的备份与回滚点 |
+| test / `customer-test-133` | `test.yoyoosun.net` | 甲方测试/验收；交付前恢复干净业务基线，由甲方自行录入真实测试数据 | 清理前必须有可恢复备份、恢复验证和精确回滚点，不使用临时 SQL |
+| erp | `erp.yoyoosun.net` | 未来正式生产 | 当前未登记、未启用，不能从工作台执行 |
 
-两环境部署同一 release digest，但数据库、上传、Compose project、端口、备份、目标 registry、preflight 与 operation 必须独立。第二环境在正式登记前不可从工作台执行。真实资料进入客户 Private 仓或经确认的受控存储，不进入 Product Core、CI artifacts 或公开 GitHub 镜像。
+demo 与 test 必须使用同一 release digest，但数据库、上传目录、Compose project、宿主端口、运行 env、备份、回滚点、target registry、preflight、operation 和 smoke 全部独立。demo 造数不得进入 test；test 清理不得影响 demo。`admin.yoyoosun.net` 不是部署环境，只能按应用自身的管理入口语义存在，绝不进入 CI/CD 环境矩阵、目标 registry、环境变量映射、数据清理、健康检查、发布验证或回滚流程。真实资料进入客户 Private 仓或经确认的受控存储，不进入 Product Core、CI artifacts 或公开 GitHub 镜像。
 
 ## Secrets、权限与审计
 
@@ -152,7 +151,7 @@ GitLab 升级固定镜像 digest，遵循官方逐版本路径。升级前固定
 | 仓库定义已实现 | YAML、Provider、脚本、文档和测试合同存在 | GitLab/R640 已部署 |
 | 本地定向测试通过 | 受影响代码合同当前可执行 | Runner、mirror、域名、备份运行正常 |
 | GitLab pipeline 通过 | 固定 SHA 的远端 QA/strict 与 artifact | 目标环境已发布 |
-| Release/Package 完整 | v2 七资产、GHCR digest、manifest 与同一演练回执身份；或明确标记不可 promotion 的 legacy v1 六资产 | migration、health、UAT |
+| Release/Package 完整 | v2 七资产、GHCR digest、manifest 与同一演练回执身份；或明确标记不可用于显式版本提升（Explicit Promotion）的 legacy v1 六资产 | migration、health、UAT |
 | target operation passed | 目标制品、migration、运行和公开入口读回 | 客户业务结果与签收 |
 | 客户 UAT | 指定岗位与数据在固定版本的真实使用结果 | 下一版本或其他环境 |
 

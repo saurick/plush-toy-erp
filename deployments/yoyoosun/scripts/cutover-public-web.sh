@@ -9,7 +9,10 @@ endpoint=""
 api_origin=""
 execute=0
 confirmation=""
-network="plush-toy-erp-v5_default"
+network=""
+container_prefix=""
+host_port=""
+candidate_port=""
 
 fail() {
   echo "[cutover-public-web] ERROR: $*" >&2
@@ -42,6 +45,18 @@ while [[ $# -gt 0 ]]; do
     network="${2:-}"
     shift 2
     ;;
+  --container-prefix)
+    container_prefix="${2:-}"
+    shift 2
+    ;;
+  --host-port)
+    host_port="${2:-}"
+    shift 2
+    ;;
+  --candidate-port)
+    candidate_port="${2:-}"
+    shift 2
+    ;;
   --execute)
     execute=1
     shift
@@ -51,7 +66,7 @@ while [[ $# -gt 0 ]]; do
     shift 2
     ;;
   -h | --help)
-    echo "用法: bash deployments/yoyoosun/scripts/cutover-public-web.sh --image <immutable-web-image> --release <40sha> --current-container <name> --endpoint <https-url> --api-origin http://app-server:8300 [--execute --confirm PUBLIC_WEB_CUTOVER:<old>:<40sha>]"
+    echo "用法: bash deployments/yoyoosun/scripts/cutover-public-web.sh --image <immutable-web-image> --release <40sha> --current-container <name> --endpoint <https-url> --api-origin http://app-server:8300 [--network <compose-network>] [--container-prefix <prefix>] [--host-port <port>] [--candidate-port <port>] [--execute --confirm PUBLIC_WEB_CUTOVER:<old>:<40sha>]"
     exit 0
     ;;
   *) fail "不支持的参数: $1" ;;
@@ -62,7 +77,25 @@ done
 [[ -n "$image" && "$image" != *:latest && "$image" != *:dev ]] || fail "--image 必须是不可变 tag"
 [[ "$current_container" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]+$ ]] || fail "--current-container 不合法"
 [[ "$endpoint" =~ ^https://[^/@[:space:]]+/?$ ]] || fail "--endpoint 必须是无凭据 HTTPS 根地址"
-[[ "$api_origin" == "http://app-server:8300" ]] || fail "--api-origin 必须精确指向 V5 Compose app-server"
+[[ "$api_origin" == "http://app-server:8300" ]] || fail "--api-origin 必须精确指向 Compose app-server"
+[[ "$container_prefix" =~ ^[a-z0-9][a-z0-9_.-]*-$ ]] || fail "--container-prefix 不合法"
+[[ "$host_port" =~ ^[0-9]+$ && "$host_port" -ge 1024 && "$host_port" -le 65535 ]] || fail "--host-port 不合法"
+[[ "$candidate_port" =~ ^[0-9]+$ && "$candidate_port" -ge 1024 && "$candidate_port" -le 65535 && "$candidate_port" != "$host_port" ]] || fail "--candidate-port 不合法"
+case "${endpoint%/}" in
+https://demo.yoyoosun.net)
+  [[ "$network" == "plush-toy-erp-demo-v1_default" &&
+    "$container_prefix" == "plush-toy-erp-demo-web-public-" &&
+    "$host_port" == 5176 && "$candidate_port" == 15176 ]] ||
+    fail "demo 公网入口参数不符合登记合同"
+  ;;
+https://test.yoyoosun.net)
+  [[ "$network" == "plush-toy-erp-test-v1_default" &&
+    "$container_prefix" == "plush-toy-erp-test-web-public-" &&
+    "$host_port" == 5177 && "$candidate_port" == 15177 ]] ||
+    fail "test 公网入口参数不符合登记合同"
+  ;;
+*) fail "公网入口只允许已登记的 demo 或 test；admin 不是部署环境" ;;
+esac
 command -v docker >/dev/null 2>&1 || fail "缺少 docker"
 command -v curl >/dev/null 2>&1 || fail "缺少 curl"
 command -v python3 >/dev/null 2>&1 || fail "缺少 python3"
@@ -74,8 +107,8 @@ docker inspect "$current_container" >/dev/null 2>&1 || fail "当前公网容器�
 docker network inspect "$network" >/dev/null 2>&1 || fail "目标 Docker network 不存在"
 
 short_release="${release:0:8}"
-candidate="plush-toy-erp-web-public-candidate-$short_release"
-next_container="plush-toy-erp-web-public-$short_release"
+candidate="${container_prefix}candidate-$short_release"
+next_container="${container_prefix}$short_release"
 confirm_text="PUBLIC_WEB_CUTOVER:$current_container:$release"
 
 wait_http_health() {
@@ -120,7 +153,7 @@ fi
 current_release="$(container_release "$current_container")"
 [[ "$current_release" =~ ^[0-9a-f]{40}$ ]] || fail "当前公网容器没有可信 GIT_SHA"
 if [[ "$current_release" == "$release" ]]; then
-  wait_http_health "http://127.0.0.1:5175/healthz" || fail "当前公网入口未健康"
+  wait_http_health "http://127.0.0.1:$host_port/healthz" || fail "当前公网入口未健康"
   assert_provider_capabilities "$endpoint" || fail "当前公网入口未满足 provider 合同"
   echo "[cutover-public-web] passed current=$current_container rollback=$current_container release=$release provider=true reused=true"
   exit 0
@@ -150,12 +183,12 @@ docker run -d \
   --label io.plush-toy-erp.public-entry=candidate \
   --label "io.plush-toy-erp.release=$release" \
   -e "API_ORIGIN=$api_origin" \
-  -p 127.0.0.1:15175:5175 \
+  -p "127.0.0.1:$candidate_port:5175" \
   "$image" >/dev/null
 
-wait_http_health "http://127.0.0.1:15175/healthz" || fail "候选前端未健康"
+wait_http_health "http://127.0.0.1:$candidate_port/healthz" || fail "候选前端未健康"
 
-assert_provider_capabilities "http://127.0.0.1:15175" || fail "候选前端 SMS 能力未匹配 provider 合同"
+assert_provider_capabilities "http://127.0.0.1:$candidate_port" || fail "候选前端 SMS 能力未匹配 provider 合同"
 docker update --restart=no "$current_container" >/dev/null
 docker stop "$current_container" >/dev/null
 
@@ -173,13 +206,13 @@ if ! docker run -d \
   --label io.plush-toy-erp.public-entry=current \
   --label "io.plush-toy-erp.release=$release" \
   -e "API_ORIGIN=$api_origin" \
-  -p 0.0.0.0:5175:5175 \
+  -p "0.0.0.0:$host_port:5175" \
   "$image" >/dev/null; then
   rollback_old
   fail "新公网容器启动失败，已尝试恢复旧入口"
 fi
 
-if ! wait_http_health "http://127.0.0.1:5175/healthz" ||
+if ! wait_http_health "http://127.0.0.1:$host_port/healthz" ||
   ! assert_provider_capabilities "$endpoint"; then
   rollback_old
   fail "公网切流后验证失败，已尝试恢复旧入口"

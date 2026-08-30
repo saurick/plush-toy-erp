@@ -109,12 +109,22 @@ export function createVersionCenterSummary() {
       version.actionClass = 'rollback'
       version.actionReason = 'candidate_is_ancestor_of_current'
     }
+    version.actionsByTarget = {
+      'customer-test-133': {
+        actionClass: version.actionClass,
+        actionReason: version.actionReason,
+      },
+      'demo-133': {
+        actionClass: version.actionClass,
+        actionReason: version.actionReason,
+      },
+    }
   })
   const readyVersion = versions[6]
   const openOperation = {
     id: 'f0000001-0000-4000-8000-000000000001',
     action: 'promote',
-    target: 'test-133',
+    target: 'customer-test-133',
     gitSha: readyVersion.gitSha,
     version: readyVersion.version,
     status: 'ready',
@@ -123,7 +133,7 @@ export function createVersionCenterSummary() {
     createdAt: '2026-08-09T01:00:00.000Z',
     updatedAt: '2026-08-09T01:00:30.000Z',
     durationMs: 30_000,
-    confirmationRequired: `DEPLOY ${readyVersion.gitSha} TO test-133`,
+    confirmationRequired: `DEPLOY ${readyVersion.gitSha} TO customer-test-133`,
     stages: [
       {
         id: 'preflight',
@@ -156,7 +166,7 @@ export function createVersionCenterSummary() {
     return {
       id: operationId,
       action: isPromotion ? 'promote' : 'release',
-      target: isPromotion ? 'test-133' : 'github-release',
+      target: isPromotion ? 'customer-test-133' : 'github-release',
       gitSha: version.gitSha,
       version: version.version,
       status,
@@ -184,7 +194,7 @@ export function createVersionCenterSummary() {
               {
                 code: 'release_dispatch_failed',
                 level: 'error',
-                message: '发布调度失败，未写入 133',
+                message: '发布调度失败，未写入任何 demo/test 目标',
               },
             ]
           : [],
@@ -207,6 +217,53 @@ export function createVersionCenterSummary() {
       retry: operationRetry(status),
     }
   })
+  const targetPreflight = ({
+    target,
+    purpose,
+    endpoint,
+    containerPrefix,
+    trialTarget,
+  }) => ({
+    schemaVersion: 'plush.target-preflight/v1',
+    generatedAt: '2026-08-09T02:00:00.000Z',
+    status: 'passed',
+    target,
+    purpose,
+    customer: 'yoyoosun',
+    trialTarget,
+    remote: {
+      runtime: {
+        serverSha: currentVersion.gitSha,
+        webSha: currentVersion.gitSha,
+      },
+      capacity: {
+        availableBytes: 80_000_000_000,
+        minimumAvailableBytes: 20_000_000_000,
+      },
+      publicEntry: {
+        status: 'passed',
+        container: `${containerPrefix}${currentVersion.gitSha.slice(0, 8)}`,
+        gitSha: currentVersion.gitSha,
+        health: 'passed',
+        provider: 'passed',
+        endpoint,
+      },
+    },
+  })
+  const customerTestTarget = targetPreflight({
+    target: 'customer-test-133',
+    purpose: 'customer-clean-acceptance',
+    endpoint: 'https://test.yoyoosun.net',
+    containerPrefix: 'plush-toy-erp-test-web-public-',
+    trialTarget: 'none',
+  })
+  const demoTarget = targetPreflight({
+    target: 'demo-133',
+    purpose: 'project-demo-simulated',
+    endpoint: 'https://demo.yoyoosun.net',
+    containerPrefix: 'plush-toy-erp-demo-web-public-',
+    trialTarget: 'customer-trial-133',
+  })
 
   return validateDevDeliverySummary({
     schemaVersion: 'plush.dev-delivery-summary/v1',
@@ -226,33 +283,21 @@ export function createVersionCenterSummary() {
       fingerprint: 'b'.repeat(64),
     },
     versions,
-    target: {
-      schemaVersion: 'plush.target-preflight/v1',
-      generatedAt: '2026-08-09T02:00:00.000Z',
-      status: 'passed',
-      target: 'test-133',
-      purpose: 'customer-trial',
-      customer: 'yoyoosun',
-      trialTarget: 'customer-trial-133',
-      remote: {
-        runtime: {
-          serverSha: currentVersion.gitSha,
-          webSha: currentVersion.gitSha,
-        },
-        capacity: {
-          availableBytes: 80_000_000_000,
-          minimumAvailableBytes: 20_000_000_000,
-        },
-        publicEntry: {
-          status: 'passed',
-          container: `plush-toy-erp-web-public-${currentVersion.gitSha.slice(0, 8)}`,
-          gitSha: currentVersion.gitSha,
-          health: 'passed',
-          provider: 'passed',
-          endpoint: 'https://admin.yoyoosun.net',
-        },
+    target: demoTarget,
+    targets: [
+      {
+        key: 'demo-133',
+        purpose: 'project-demo-simulated',
+        endpoint: 'https://demo.yoyoosun.net',
+        preflight: demoTarget,
       },
-    },
+      {
+        key: 'customer-test-133',
+        purpose: 'customer-clean-acceptance',
+        endpoint: 'https://test.yoyoosun.net',
+        preflight: customerTestTarget,
+      },
+    ],
     operations: [openOperation, ...historyOperations],
     timings: {
       schemaVersion: 'plush.delivery-pipeline-timings/v1',
@@ -329,7 +374,8 @@ export function createVersionCenterSummary() {
     issues: [],
     boundaries: {
       provider: 'github',
-      target: 'test-133',
+      target: 'demo-133',
+      targets: ['demo-133', 'customer-test-133'],
       browserShellAccess: false,
       targetBuildAllowed: false,
       automaticRetryAllowed: false,
@@ -507,7 +553,7 @@ export function createDevVersionCenterScenarios({
         )
         const latestVersionSummary = page
           .locator('.erp-dev-version-summary .ant-card')
-          .filter({ hasText: 'GitHub 不可变版本' })
+          .filter({ hasText: 'GitHub 应急链不可变版本' })
         const latestPublishedAt = latestVersionSummary.locator(
           '.erp-dev-latest-version-published-at time'
         )
@@ -533,7 +579,10 @@ export function createDevVersionCenterScenarios({
           String(await versions.locator('.ant-pagination').textContent()),
           /1-6 \/ 共 14 个版本/u
         )
-        assert.match(String(await currentOperation.textContent()), /确认部署/u)
+        assert.match(
+          String(await currentOperation.textContent()),
+          /确认版本提升/u
+        )
         assert.match(String(await currentOperation.textContent()), /f0000001/u)
         const desktopVersionTimes = visibleTableRows(versions).locator(
           '.erp-dev-version-published-at time'
@@ -577,7 +626,7 @@ export function createDevVersionCenterScenarios({
         })
         await waitForAntdModalMotion(page, desktopTakeoverDialog)
         await desktopTakeoverDialog
-          .getByText('三处操作各管什么', { exact: true })
+          .getByText('四处操作各管什么', { exact: true })
           .waitFor()
         await desktopTakeoverDialog
           .getByText('人工接管顺序', { exact: true })
@@ -605,8 +654,8 @@ export function createDevVersionCenterScenarios({
         )
         assert.equal(
           desktopTakeoverMetrics.scopeColumns.trim().split(/\s+/u).length,
-          3,
-          `桌面人工接管职责应保持三列: ${JSON.stringify(desktopTakeoverMetrics)}`
+          4,
+          `桌面人工接管职责应保持四列: ${JSON.stringify(desktopTakeoverMetrics)}`
         )
         assert(
           desktopTakeoverMetrics.left >= -1 &&
@@ -642,7 +691,7 @@ export function createDevVersionCenterScenarios({
         await page.getByRole('button', { name: '查看完整效能' }).click()
         await waitForView(page, 'pipeline')
         await page
-          .getByRole('heading', { name: 'CI/CD 效能' })
+          .getByRole('heading', { name: '远端 CI/CD 活动' })
           .waitFor({ state: 'visible' })
         assert.equal(desktopSummaryRequests, initialDesktopSummaryRequests)
         assert.equal(await currentOperation.isVisible(), true)
@@ -653,8 +702,13 @@ export function createDevVersionCenterScenarios({
         await pipeline.getByText('观测关键路径').waitFor({ state: 'visible' })
         await pipeline.getByText('耗时最长环节').waitFor({ state: 'visible' })
         assert(
-          (await pipeline.locator('time').count()) >= 4,
-          'CI/CD 摘要应分别显示运行、发布、制品和部署事件时间'
+          (await pipeline.locator('time').count()) >= 3,
+          'CI/CD 摘要应分别显示运行、完整发布和制品发布时间'
+        )
+        assert.equal(
+          await pipeline.getByText('最近工作台部署回执').count(),
+          0,
+          '远端 CI/CD 活动不得混入工作台 operation 回执'
         )
         assert.equal(
           await fullTimingDetails.evaluate((element) => element.open),
@@ -910,7 +964,7 @@ export function createDevVersionCenterScenarios({
           1
         )
         await currentOperation
-          .getByRole('button', { name: '确认部署' })
+          .getByRole('button', { name: '确认版本提升' })
           .waitFor({ state: 'visible' })
         assert.equal(
           await currentOperation

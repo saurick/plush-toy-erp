@@ -24,6 +24,10 @@ const CACHE_BASIS = Object.freeze([
   "docker_content_id",
   "embedded_git_sha",
 ]);
+const FIXED_CACHE_ROOTS = new Set([
+  "/home/simon/plush-toy-erp-demo-v1",
+  "/home/simon/plush-toy-erp-test-v1",
+]);
 
 function plainFile(file, maximumBytes = 2 * 1024 ** 3) {
   const stat = lstatSync(file);
@@ -158,8 +162,8 @@ function identityArgs(identity) {
   ];
 }
 
-const CACHE_PROBE_SCRIPT = String.raw`set -euo pipefail
-root=/home/simon/plush-toy-erp-v5
+const CACHE_PROBE_SCRIPT_TEMPLATE = String.raw`set -euo pipefail
+root=__ROOT__
 cache_root=$root/release-cache
 incoming_root=$root/incoming
 git_sha="$1"; shift; version="$1"; shift; manifest_sha="$1"; shift; artifact_sha="$1"; shift
@@ -242,6 +246,14 @@ jq -n --arg schemaVersion "plush.target-release-cache/v1" --arg manifest "$manif
   '{schemaVersion:$schemaVersion,releaseManifestSha256:$manifest,packageHit:true,imageHit:$imageHit,cacheSource:$source,sourceToken:$token,avoidedBytes:$avoidedBytes,basis:["release_manifest_sha256","archive_sha256","registry_digest","docker_content_id","embedded_git_sha"]}'
 `;
 
+function targetScript(template, target) {
+  const root = String(target?.filesystem?.root || "");
+  if (!FIXED_CACHE_ROOTS.has(root)) {
+    throw new Error("target release cache root is invalid");
+  }
+  return template.replaceAll("__ROOT__", root);
+}
+
 export function validateTargetCacheProbe(value, expectedManifestSha256) {
   if (
     value?.schemaVersion !== TARGET_RELEASE_CACHE_CONTRACT ||
@@ -301,14 +313,14 @@ export function estimateAvoidedTransferDuration(avoidedBytes, operations) {
 
 export function probeTargetReleaseCache(
   identity,
-  { runCommand = spawnSync } = {},
+  { runCommand = spawnSync, targetKey = "demo-133" } = {},
 ) {
-  const target = getDeploymentTarget("test-133");
+  const target = getDeploymentTarget(targetKey);
   const raw = runChecked(
     runCommand,
     "ssh",
     [...fixedSshArgs(target), "bash", "-s", "--", ...identityArgs(identity)],
-    { input: CACHE_PROBE_SCRIPT, timeout: 5 * 60_000 },
+    { input: targetScript(CACHE_PROBE_SCRIPT_TEMPLATE, target), timeout: 5 * 60_000 },
     "read target release cache",
   );
   return validateTargetCacheProbe(
@@ -317,9 +329,9 @@ export function probeTargetReleaseCache(
   );
 }
 
-const PREPARE_CACHE_SCRIPT = String.raw`set -euo pipefail
+const PREPARE_CACHE_SCRIPT_TEMPLATE = String.raw`set -euo pipefail
 umask 077
-root=/home/simon/plush-toy-erp-v5
+root=__ROOT__
 operation_id="$1"; shift; manifest_sha="$1"; shift; package_hit="$1"; shift; image_hit="$1"; shift
 source_kind="$1"; shift; source_token="$1"; shift; avoided_bytes="$1"; shift; artifact_sha="$1"; shift
 source_sha="$1"; shift; sbom_sha="$1"; shift; server_archive_sha="$1"; shift; web_archive_sha="$1"
@@ -364,13 +376,13 @@ chmod 600 "$incoming/.target-cache.json"
 
 export function prepareTargetReleaseIncoming(
   { operationId, identity, probe },
-  { runCommand = spawnSync } = {},
+  { runCommand = spawnSync, targetKey = "demo-133" } = {},
 ) {
   if (!UUID_V4_PATTERN.test(String(operationId || ""))) {
     throw new Error("target cache operation id is invalid");
   }
   validateTargetCacheProbe(probe, identity.releaseManifestSha256);
-  const target = getDeploymentTarget("test-133");
+  const target = getDeploymentTarget(targetKey);
   runChecked(
     runCommand,
     "ssh",
@@ -392,14 +404,17 @@ export function prepareTargetReleaseIncoming(
       identity.serverArchiveSha256,
       identity.webArchiveSha256,
     ],
-    { input: PREPARE_CACHE_SCRIPT, timeout: 5 * 60_000 },
+    {
+      input: targetScript(PREPARE_CACHE_SCRIPT_TEMPLATE, target),
+      timeout: 5 * 60_000,
+    },
     "prepare target release cache",
   );
   return probe;
 }
 
-const CLEANUP_PREPARED_INCOMING_SCRIPT = String.raw`set -euo pipefail
-root=/home/simon/plush-toy-erp-v5
+const CLEANUP_PREPARED_INCOMING_SCRIPT_TEMPLATE = String.raw`set -euo pipefail
+root=__ROOT__
 operation_id="$1"
 [[ "$operation_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]
 incoming=$root/incoming/$operation_id
@@ -410,17 +425,20 @@ rm -rf -- "$incoming"
 
 export function cleanupPreparedTargetReleaseIncoming(
   operationId,
-  { runCommand = spawnSync } = {},
+  { runCommand = spawnSync, targetKey = "demo-133" } = {},
 ) {
   if (!UUID_V4_PATTERN.test(String(operationId || ""))) {
     throw new Error("target cache cleanup operation id is invalid");
   }
-  const target = getDeploymentTarget("test-133");
+  const target = getDeploymentTarget(targetKey);
   runChecked(
     runCommand,
     "ssh",
     [...fixedSshArgs(target), "bash", "-s", "--", operationId],
-    { input: CLEANUP_PREPARED_INCOMING_SCRIPT, timeout: 60_000 },
+    {
+      input: targetScript(CLEANUP_PREPARED_INCOMING_SCRIPT_TEMPLATE, target),
+      timeout: 60_000,
+    },
     "clean prepared target incoming",
   );
 }

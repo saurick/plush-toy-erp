@@ -31,7 +31,7 @@ const (
 	smsPhoneEnv             = "MANUAL_ACCEPTANCE_SMS_PHONE"
 	registeredAdminPassword = "adminadmin"
 	dsnEnv                  = "POSTGRES_DSN"
-	customerTrial133Port    = "55435"
+	customerTrial133Port    = "55436"
 
 	localCustomerConfigProductVersion = "local-customer-package-test-apply"
 	localCustomerConfigApplyPurpose   = "local_test_apply"

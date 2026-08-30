@@ -233,7 +233,7 @@ function sourceReport({ remote = false } = {}) {
     dataVersion: DATA_VERSION,
     runId: RUN_ID,
     target: remote ? "customer-trial-133" : "local-dev",
-    backendURL: remote ? "http://127.0.0.1:18375" : LOCAL_BACKEND_URL,
+    backendURL: remote ? "https://demo.yoyoosun.net" : LOCAL_BACKEND_URL,
     databaseName: remote ? CUSTOMER_TRIAL_133_DATABASE : LOCAL_DATABASE_NAME,
     semanticDigest: "digest-v2",
     prefix: "YS5",
@@ -2686,7 +2686,7 @@ test("facts-only apply verifies the purchase prerequisite without rewriting it",
 function attestation() {
   return {
     target: "customer-trial-133",
-    origin: "http://127.0.0.1:18375",
+    origin: "https://demo.yoyoosun.net",
     customerKey: "yoyoosun",
     environment: "prod",
     release: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

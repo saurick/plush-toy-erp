@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-const validDSN = "postgres://postgres:runtime-password@postgres:5432/plush_erp_uat_20260716_v5?sslmode=disable"
+const validDSN = "postgres://postgres:runtime-password@postgres:5432/plush_erp_demo_v1?sslmode=disable"
 
 func env(values map[string]string) func(string) string {
 	return func(key string) string { return values[key] }
@@ -53,14 +53,14 @@ func TestResolveGateRejectsEveryPartialOrMismatchedBoundary(t *testing.T) {
 		{name: "false-like opt in", dsn: validDSN, values: map[string]string{AllowEnv: "false", TargetEnv: ExpectedTarget, DebugEnv: "prod"}},
 		{name: "wrong target", dsn: validDSN, values: map[string]string{AllowEnv: "1", TargetEnv: "customer-trial-local", DebugEnv: "prod"}},
 		{name: "production alias is not exact", dsn: validDSN, values: map[string]string{AllowEnv: "1", TargetEnv: ExpectedTarget, DebugEnv: "production"}},
-		{name: "local host", dsn: "postgres://postgres:runtime-password@127.0.0.1:5432/plush_erp_uat_20260716_v5?sslmode=disable", values: map[string]string{AllowEnv: "1", TargetEnv: ExpectedTarget, DebugEnv: "prod"}},
+		{name: "local host", dsn: "postgres://postgres:runtime-password@127.0.0.1:5432/plush_erp_demo_v1?sslmode=disable", values: map[string]string{AllowEnv: "1", TargetEnv: ExpectedTarget, DebugEnv: "prod"}},
 		{name: "wrong database", dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp?sslmode=disable", values: map[string]string{AllowEnv: "1", TargetEnv: ExpectedTarget, DebugEnv: "prod"}},
-		{name: "wrong port", dsn: "postgres://postgres:runtime-password@postgres:5435/plush_erp_uat_20260716_v5?sslmode=disable", values: map[string]string{AllowEnv: "1", TargetEnv: ExpectedTarget, DebugEnv: "prod"}},
-		{name: "implicit port", dsn: "postgres://postgres:runtime-password@postgres/plush_erp_uat_20260716_v5?sslmode=disable", values: map[string]string{AllowEnv: "1", TargetEnv: ExpectedTarget, DebugEnv: "prod"}},
+		{name: "wrong port", dsn: "postgres://postgres:runtime-password@postgres:5435/plush_erp_demo_v1?sslmode=disable", values: map[string]string{AllowEnv: "1", TargetEnv: ExpectedTarget, DebugEnv: "prod"}},
+		{name: "implicit port", dsn: "postgres://postgres:runtime-password@postgres/plush_erp_demo_v1?sslmode=disable", values: map[string]string{AllowEnv: "1", TargetEnv: ExpectedTarget, DebugEnv: "prod"}},
 		{name: "extra query", dsn: validDSN + "&application_name=trial", values: map[string]string{AllowEnv: "1", TargetEnv: ExpectedTarget, DebugEnv: "prod"}},
 		{name: "duplicate sslmode", dsn: validDSN + "&sslmode=disable", values: map[string]string{AllowEnv: "1", TargetEnv: ExpectedTarget, DebugEnv: "prod"}},
-		{name: "tls enabled", dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp_uat_20260716_v5?sslmode=require", values: map[string]string{AllowEnv: "1", TargetEnv: ExpectedTarget, DebugEnv: "prod"}},
-		{name: "multi host", dsn: "postgres://postgres:runtime-password@postgres,other:5432/plush_erp_uat_20260716_v5?sslmode=disable", values: map[string]string{AllowEnv: "1", TargetEnv: ExpectedTarget, DebugEnv: "prod"}},
+		{name: "tls enabled", dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp_demo_v1?sslmode=require", values: map[string]string{AllowEnv: "1", TargetEnv: ExpectedTarget, DebugEnv: "prod"}},
+		{name: "multi host", dsn: "postgres://postgres:runtime-password@postgres,other:5432/plush_erp_demo_v1?sslmode=disable", values: map[string]string{AllowEnv: "1", TargetEnv: ExpectedTarget, DebugEnv: "prod"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

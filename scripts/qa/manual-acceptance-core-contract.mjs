@@ -31,8 +31,11 @@ function deepFreeze(value) {
 
 function dataSemanticValue(contract) {
   const value = structuredClone(contract);
-  // The previous activation tuple is a deployment bridge, not part of the
-  // V6 business-data topology. Keep existing V6 Scenario receipts stable.
+  // Deployment placement is not part of the V6 business-data topology. Keep
+  // existing V6 Scenario receipts stable while moving the simulated dataset
+  // from the customer-data test database to the isolated demo target.
+  value.customerTrial133.databaseName = "plush_erp_uat_20260716_v5";
+  delete value.customerTrial133.deploymentTarget;
   delete value.customerTrial133.previousConfigProductVersion;
   delete value.customerTrial133.previousDatasetVersion;
   return value;
@@ -88,7 +91,8 @@ export function validateManualAcceptanceCoreContract(contract) {
   const target = contract.customerTrial133;
   if (
     target?.target !== "customer-trial-133" ||
-    target?.databaseName !== "plush_erp_uat_20260716_v5" ||
+    target?.deploymentTarget !== "demo-133" ||
+    target?.databaseName !== "plush_erp_demo_v1" ||
     target?.databaseLifecycle !== "long-lived-registered-target" ||
     !/^[0-9]{14}$/u.test(String(target?.minimumMigration || "")) ||
     !String(target?.configRevision || "").includes("package-v8") ||

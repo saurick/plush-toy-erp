@@ -194,11 +194,23 @@ test('delivery action contract accepts fixed actions and bounded explicit retry'
       payload: {
         gitSha: SHA,
         version: '2026.07.29-1',
-        target: 'test-133',
+        target: 'customer-test-133',
         idempotencyKey: IDEMPOTENCY_KEY,
       },
     }).action,
     'prepare-promotion'
+  )
+  assert.equal(
+    validateDevDeliveryAction({
+      action: 'prepare-promotion',
+      payload: {
+        gitSha: SHA,
+        version: '2026.07.29-1',
+        target: 'demo-133',
+        idempotencyKey: IDEMPOTENCY_KEY,
+      },
+    }).payload.target,
+    'demo-133'
   )
   assert.throws(
     () =>
@@ -242,7 +254,7 @@ test('delivery action contract accepts fixed actions and bounded explicit retry'
         fromVersion: '2026.07.29-2',
         toGitSha: 'b'.repeat(40),
         toVersion: '2026.07.29-1',
-        target: 'test-133',
+        target: 'customer-test-133',
         idempotencyKey: IDEMPOTENCY_KEY,
       },
     }).action,
@@ -287,12 +299,12 @@ test('recovery evidence reader exposes only the newest strict passed receipt', (
 
   const receipt = readLatestBackupRestoreEvidence({
     projectRoot: root,
-    target: 'test-133',
+    target: 'customer-test-133',
     customer: 'yoyoosun',
     environment: 'customer-trial-133',
   })
   assert.equal(receipt.status, 'passed')
-  assert.equal(receipt.target, 'test-133')
+  assert.equal(receipt.target, 'customer-test-133')
   assert.equal(receipt.customer, 'yoyoosun')
   assert.equal(receipt.releaseVersion, SHA)
   assert.equal(receipt.verifiedAt, '2026-08-14T14:56:26.000Z')
@@ -316,7 +328,7 @@ test('recovery evidence reader rejects a report that does not prove cleanup', (t
   assert.equal(
     readLatestBackupRestoreEvidence({
       projectRoot: root,
-      target: 'test-133',
+      target: 'customer-test-133',
       customer: 'yoyoosun',
       environment: 'customer-trial-133',
     }),
@@ -342,11 +354,19 @@ test('delivery summary binds a recovery receipt to registered target identity', 
       dirty: false,
       fingerprint: 'd'.repeat(64),
     }),
-    runPreflight: () => ({
+    runPreflight: (targetKey) => ({
       status: 'passed',
-      target: 'test-133',
-      customer: 'yoyoosun',
-      trialTarget: 'customer-trial-133',
+      target: targetKey,
+      purpose:
+        targetKey === 'customer-test-133'
+          ? 'customer-clean-acceptance'
+          : 'project-demo-simulated',
+      ...(targetKey === 'customer-test-133'
+        ? {
+            customer: 'yoyoosun',
+            trialTarget: 'customer-trial-133',
+          }
+        : {}),
     }),
     readRecoveryEvidence(context) {
       contexts.push(context)
@@ -355,13 +375,17 @@ test('delivery summary binds a recovery receipt to registered target identity', 
   })
 
   const result = await service.summary()
+  assert.deepEqual(
+    result.targets.map((target) => target.key),
+    ['demo-133', 'customer-test-133']
+  )
   assert.strictEqual(result.recovery.backupRestore, receipt)
   assert.deepEqual(contexts, [
     {
       projectRoot: root,
-      target: 'test-133',
+      target: 'customer-test-133',
       customer: 'yoyoosun',
-      environment: 'customer-trial-133',
+      environment: 'customer-clean-acceptance',
     },
   ])
 })
@@ -388,11 +412,19 @@ test('delivery summary binds version actions to Git ancestry instead of timestam
       dirty: false,
       fingerprint: 'd'.repeat(64),
     }),
-    runPreflight: () => ({
+    runPreflight: (targetKey) => ({
       status: 'passed',
-      target: 'test-133',
-      customer: 'yoyoosun',
-      trialTarget: 'customer-trial-133',
+      target: targetKey,
+      purpose:
+        targetKey === 'customer-test-133'
+          ? 'customer-clean-acceptance'
+          : 'project-demo-simulated',
+      ...(targetKey === 'customer-test-133'
+        ? {
+            customer: 'yoyoosun',
+            trialTarget: 'customer-trial-133',
+          }
+        : {}),
       remote: {
         runtime: { serverSha: currentSha, webSha: currentSha },
       },
@@ -411,6 +443,7 @@ test('delivery summary binds version actions to Git ancestry instead of timestam
   const result = await service.summary()
   assert.equal(result.versions[0].publishedAt, version.publishedAt)
   assert.equal(result.versions[0].actionClass, 'promote')
+  assert.equal(result.versions[0].actionsByTarget['demo-133'].actionClass, 'promote')
   assert.equal(
     result.versions[0].actionReason,
     'candidate_descends_from_current'
@@ -620,7 +653,7 @@ test('workbench retry refuses an unknown target outcome', async (t) => {
   const { root, store } = createProject(t)
   const created = createOrReuseDeliveryOperation(store, {
     action: 'promote',
-    target: 'test-133',
+    target: 'customer-test-133',
     gitSha: SHA,
     version: '2026.07.29-1',
     idempotencyKey: 'version-center:promote:fixed-0001',
@@ -659,7 +692,7 @@ test('workbench does not offer generic retry for dedicated high-risk actions', a
   const { root, store } = createProject(t)
   const created = createOrReuseDeliveryOperation(store, {
     action: 'rebuild-database',
-    target: 'test-133',
+    target: 'customer-test-133',
     gitSha: SHA,
     version: '2026.07.29-1',
     idempotencyKey: 'version-center:rebuild:fixed-0001',
@@ -757,7 +790,14 @@ test('delivery summary exposes cached canonical CI timings and readable operatio
       dirty: false,
       fingerprint: 'b'.repeat(64),
     }),
-    runPreflight: () => ({ status: 'passed' }),
+    runPreflight: (targetKey) => ({
+      status: 'passed',
+      target: targetKey,
+      purpose:
+        targetKey === 'customer-test-133'
+          ? 'customer-clean-acceptance'
+          : 'project-demo-simulated',
+    }),
   })
 
   const first = await service.summary()
@@ -805,7 +845,7 @@ test('promotion executor is launched once and an unstarted child fails closed', 
   const { root, store } = createProject(t)
   createOrReuseDeliveryOperation(store, {
     action: 'promote',
-    target: 'test-133',
+    target: 'customer-test-133',
     gitSha: SHA,
     version: '2026.07.29-1',
     idempotencyKey: IDEMPOTENCY_KEY,
@@ -822,7 +862,7 @@ test('promotion executor is launched once and an unstarted child fails closed', 
   const currentSha = 'b'.repeat(40)
   createOrReuseDeliveryOperation(store, {
     action: 'rollback',
-    target: 'test-133',
+    target: 'customer-test-133',
     gitSha: 'c'.repeat(40),
     version: '2026.07.28-1',
     idempotencyKey: 'version-center:rollback:fixed-0002',
@@ -863,7 +903,7 @@ test('promotion executor is launched once and an unstarted child fails closed', 
       return child
     },
   })
-  const confirmation = `PROMOTE:test-133:${SHA}:${OPERATION_ID}`
+  const confirmation = `PROMOTE:customer-test-133:${SHA}:${OPERATION_ID}`
   const accepted = await service.act({
     action: 'execute-promotion',
     payload: { operationId: OPERATION_ID, confirmation },
@@ -882,7 +922,7 @@ test('promotion executor is launched once and an unstarted child fails closed', 
       action: 'execute-rollback',
       payload: {
         operationId: ROLLBACK_OPERATION_ID,
-        confirmation: `ROLLBACK:test-133:${currentSha}:${'c'.repeat(40)}:${ROLLBACK_OPERATION_ID}`,
+        confirmation: `ROLLBACK:customer-test-133:${currentSha}:${'c'.repeat(40)}:${ROLLBACK_OPERATION_ID}`,
       },
     }),
     /already running/u
@@ -896,7 +936,7 @@ test('a synchronous executor start failure is terminal and is not retried', asyn
   const { root, store } = createProject(t)
   createOrReuseDeliveryOperation(store, {
     action: 'promote',
-    target: 'test-133',
+    target: 'customer-test-133',
     gitSha: SHA,
     version: '2026.07.29-1',
     idempotencyKey: IDEMPOTENCY_KEY,
@@ -925,7 +965,7 @@ test('a synchronous executor start failure is terminal and is not retried', asyn
       throw new Error('executor unavailable')
     },
   })
-  const confirmation = `PROMOTE:test-133:${SHA}:${OPERATION_ID}`
+  const confirmation = `PROMOTE:customer-test-133:${SHA}:${OPERATION_ID}`
   await assert.rejects(
     service.act({
       action: 'execute-promotion',
@@ -950,7 +990,7 @@ test('rollback executor uses the operation-bound current and target versions', a
   const currentSha = 'b'.repeat(40)
   createOrReuseDeliveryOperation(store, {
     action: 'rollback',
-    target: 'test-133',
+    target: 'customer-test-133',
     gitSha: SHA,
     version: '2026.07.29-1',
     idempotencyKey: IDEMPOTENCY_KEY,
@@ -985,7 +1025,7 @@ test('rollback executor uses the operation-bound current and target versions', a
       return child
     },
   })
-  const confirmation = `ROLLBACK:test-133:${currentSha}:${SHA}:${OPERATION_ID}`
+  const confirmation = `ROLLBACK:customer-test-133:${currentSha}:${SHA}:${OPERATION_ID}`
   const accepted = await service.act({
     action: 'execute-rollback',
     payload: { operationId: OPERATION_ID, confirmation },
@@ -1005,7 +1045,7 @@ test('workbench startup freezes an interrupted launch as not_proven', (t) => {
   const { root, store } = createProject(t)
   createOrReuseDeliveryOperation(store, {
     action: 'promote',
-    target: 'test-133',
+    target: 'customer-test-133',
     gitSha: SHA,
     version: '2026.07.29-1',
     idempotencyKey: IDEMPOTENCY_KEY,

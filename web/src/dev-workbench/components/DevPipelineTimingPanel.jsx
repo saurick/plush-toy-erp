@@ -11,7 +11,6 @@ import {
   formatDeliveryBytes,
   formatDeliveryDuration,
   formatDeliveryPercent,
-  formatDeliveryRate,
   formatDeliveryTimestamp,
   shortGitSha,
   summarizePipelineTimings,
@@ -166,7 +165,7 @@ export function DevPipelineStatusStrip({
       >
         <div className="erp-dev-pipeline-status-strip__metrics">
           <div>
-            <Text type="secondary">最近 CI/CD</Text>
+            <Text type="secondary">最近远端 CI/CD</Text>
             <Space size={8} wrap>
               <Tag
                 color={
@@ -227,7 +226,7 @@ export function DevPipelineStatusStrip({
             />
           </div>
           <div>
-            <Text type="secondary">最近真实部署</Text>
+            <Text type="secondary">最近工作台部署回执</Text>
             <Text strong>
               {deploymentOperation
                 ? formatDeliveryDuration(deploymentOperation.durationMs)
@@ -246,36 +245,16 @@ export function DevPipelineStatusStrip({
   )
 }
 
-export default function DevPipelineTimingPanel({
-  timings,
-  versions = [],
-  operations = [],
-}) {
+export default function DevPipelineTimingPanel({ timings, versions = [] }) {
   const summary = summarizePipelineTimings(timings)
   const { latest: latestRun, analysisRun } = summary
   const [release = null] = versions
-  const deploymentOperation = findLatestTransferredPromotion(operations)
-  const targetCache = deliveryTargetCachePresentation(
-    deploymentOperation?.metrics
-  )
   const strictJob = summary.latestFullRelease?.jobs.find(
     (job) => job.name === 'Exact-SHA strict quality'
   )
   const publishJob = summary.latestFullRelease?.jobs.find(
     (job) => job.name === 'Publish immutable artifact set'
   )
-  const transferShare =
-    Number.isSafeInteger(deploymentOperation?.metrics?.transferDurationMs) &&
-    deploymentOperation.durationMs > 0
-      ? Math.min(
-          100,
-          Math.round(
-            (deploymentOperation.metrics.transferDurationMs /
-              deploymentOperation.durationMs) *
-              100
-          )
-        )
-      : null
   const analysisJobs = analysisRun?.jobs || []
   const [expandedJobIds, setExpandedJobIds] = React.useState([])
 
@@ -305,10 +284,11 @@ export default function DevPipelineTimingPanel({
       <div className="erp-dev-pipeline-timing__head">
         <div>
           <Title level={2} id="dev-pipeline-timing-title">
-            CI/CD 效能
+            远端 CI/CD 活动
           </Title>
           <Text type="secondary">
-            区分完整发布、持续集成与相同 SHA 复用；数据来自当前 CI Provider 与部署回执。
+            这里只展示当前 CI Provider 的 Pipeline、Package 与 Release；工作台
+            operation 只进入“当前操作”和“操作记录”。
           </Text>
         </div>
         <Text type="secondary">
@@ -381,27 +361,6 @@ export default function DevPipelineTimingPanel({
                 action="发布于"
                 missing="发布时间未证明"
               />
-            </div>
-            <div>
-              <Text type="secondary">最近真实部署与传输</Text>
-              <strong>
-                {deploymentOperation
-                  ? formatDeliveryDuration(deploymentOperation.durationMs)
-                  : '尚无真实部署'}
-              </strong>
-              <Text>
-                {deploymentOperation
-                  ? `${targetCache.status} · 实传 ${formatDeliveryBytes(deploymentOperation.metrics.transferBytes)} · ${formatDeliveryDuration(deploymentOperation.metrics.transferDurationMs)}`
-                  : '等待包含制品传输的部署回执'}
-              </Text>
-              <Text type="secondary">
-                {deploymentOperation
-                  ? deploymentOperation.metrics.targetCacheHit
-                    ? `避免传输 ${formatDeliveryBytes(deploymentOperation.metrics.avoidedTransferBytes)} · 估算节省 ${formatDeliveryDuration(deploymentOperation.metrics.avoidedTransferDurationMs)} · ${deploymentOperation.metrics.dockerLoadSkipped ? '已跳过 Docker load' : '仍执行 Docker load'}`
-                    : `${formatDeliveryRate(deploymentOperation.metrics.transferBytesPerSecond)}${transferShare === null ? '' : ` · 占总耗时 ${String(transferShare)}%`}`
-                  : '相同 SHA 复用不计为目标写入'}
-              </Text>
-              <DevDeliveryTimestamp value={deploymentOperation?.updatedAt} />
             </div>
           </div>
 

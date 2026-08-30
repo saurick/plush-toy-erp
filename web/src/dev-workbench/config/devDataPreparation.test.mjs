@@ -249,7 +249,8 @@ function summaryFixture() {
       warehouseCount: 4,
       customerTrial133: {
         target: 'customer-trial-133',
-        databaseName: 'plush_erp_uat_20260716_v5',
+        deploymentTarget: 'demo-133',
+        databaseName: 'plush_erp_demo_v1',
         databaseLifecycle: 'long-lived-registered-target',
         minimumMigration: '20260728100514',
         configRevision:
@@ -279,8 +280,8 @@ function summaryFixture() {
       },
       scenarioDemo133: {
         status: 'not_proven',
-        safeTarget: 'customer-trial-133:plush_erp_uat_20260716_v5',
-        databaseName: 'plush_erp_uat_20260716_v5',
+        safeTarget: 'customer-trial-133:plush_erp_demo_v1',
+        databaseName: 'plush_erp_demo_v1',
         migrationVersion: '20260728100514',
         customerConfigRevision:
           'yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1',
@@ -378,7 +379,7 @@ test('scenario demo copy keeps one-click review, forward-only and acceptance bou
   assert.equal(copy.prepareButtonLabel, '生成业务场景测试数据')
   assert.match(copy.prepareDescription, /权威读回目标身份/u)
   assert.match(copy.prepareDescription, /二次确认/u)
-  assert.match(copy.prepareDescription, /133/u)
+  assert.match(copy.prepareDescription, /demo/u)
   assert.match(copy.prepareDescription, /DSN/u)
   assert.match(copy.confirmationDescription, /release/u)
   assert.match(copy.confirmationDescription, /不清空历史/u)
@@ -600,13 +601,13 @@ test('scenario demo readback binds the fixed batch and rejects half batches or d
 
   const remoteTargetSummary = {
     targetKey: DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133,
-    safeTarget: 'customer-trial-133:plush_erp_uat_20260716_v5',
+    safeTarget: 'customer-trial-133:plush_erp_demo_v1',
     targetFingerprint: '7'.repeat(64),
     preflightFingerprint: '8'.repeat(64),
     disposable: false,
     automaticCleanup: false,
     releaseSha: 'd'.repeat(40),
-    databaseName: 'plush_erp_uat_20260716_v5',
+    databaseName: 'plush_erp_demo_v1',
     migrationVersion: '20260728100514',
     customerConfigRevision:
       'yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1',
@@ -1006,7 +1007,7 @@ test('page defaults to the latest business-chain regression while retaining dail
   assert.match(pageSource, /DatasetEnvironmentContract/u)
   assert.match(pageSource, /统一数据合同/u)
   assert.match(pageSource, /本地长期数据/u)
-  assert.match(pageSource, /133 试用数据/u)
+  assert.match(pageSource, /demo 演练造数/u)
   assert.match(pageSource, /隔离完整验收/u)
   assert.match(pageSource, /不是永绅真实客户导入/u)
   assert.match(pageSource, /选择只影响计划下钻/u)

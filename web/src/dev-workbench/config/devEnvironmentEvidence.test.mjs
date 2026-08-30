@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  buildDevDeliveryOperationOverview,
   buildDevEnvironmentEvidence,
   devEnvironmentEvidenceStatusPresentation,
 } from './devEnvironmentEvidence.mjs'
@@ -43,7 +44,7 @@ function dataSummaryFixture() {
       unitCount: 11,
       warehouseCount: 4,
       customerTrial133: {
-        databaseName: 'plush_erp_uat_20260716_v5',
+        databaseName: 'plush_erp_demo_v1',
         minimumMigration: '20260728100514',
         configRevision:
           'yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1',
@@ -92,7 +93,7 @@ function addTrialReadback(summary) {
       'scenario-demo',
       {
         targetKey: 'customer-trial-133',
-        databaseName: 'plush_erp_uat_20260716_v5',
+        databaseName: 'plush_erp_demo_v1',
         release: COMMIT,
         migrationVersion: '20260728100514',
         customerConfigRevision:
@@ -114,16 +115,16 @@ function addTrialReadback(summary) {
 }
 
 function deliverySummaryFixture() {
-  return {
-    generatedAt: GENERATED_AT,
-    target: {
+  const target = (key, purpose, databaseName, endpoint) => ({
+      target: key,
+      purpose,
       generatedAt: GENERATED_AT,
       status: 'passed',
       remote: {
         runtime: {
           serverSha: COMMIT,
           webSha: COMMIT,
-          databaseName: 'plush_erp_uat_20260716_v5',
+          databaseName,
           migrationVersion: '20260728100514',
           activeCustomerConfig: {
             revision:
@@ -135,18 +136,48 @@ function deliverySummaryFixture() {
           serverReady: 'passed',
           webHealth: 'passed',
         },
-        publicEntry: { status: 'passed' },
+        publicEntry: { status: 'passed', endpoint },
         backup: {
           tooling: 'passed',
           latestSha256: '1'.repeat(64),
           latestSizeBytes: 1024,
         },
       },
-    },
+  })
+  const demo = target(
+    'demo-133',
+    'project-demo-simulated',
+    'plush_erp_demo_v1',
+    'https://demo.yoyoosun.net'
+  )
+  const customerTest = target(
+    'customer-test-133',
+    'customer-clean-acceptance',
+    'plush_erp_customer_test_v1',
+    'https://test.yoyoosun.net'
+  )
+  return {
+    generatedAt: GENERATED_AT,
+    target: demo,
+    targets: [
+      {
+        key: 'demo-133',
+        purpose: 'project-demo-simulated',
+        endpoint: 'https://demo.yoyoosun.net',
+        preflight: demo,
+      },
+      {
+        key: 'customer-test-133',
+        purpose: 'customer-clean-acceptance',
+        endpoint: 'https://test.yoyoosun.net',
+        preflight: customerTest,
+      },
+    ],
+    operations: [],
   }
 }
 
-test('environment evidence keeps one local controller and three explicit targets', () => {
+test('environment evidence keeps one controller and four explicit targets', () => {
   const evidence = buildDevEnvironmentEvidence({
     dataSummary: dataSummaryFixture(),
     deliverySummary: deliverySummaryFixture(),
@@ -155,21 +186,24 @@ test('environment evidence keeps one local controller and three explicit targets
   assert.equal(evidence.controller, '本地 DEV-only')
   assert.deepEqual(
     evidence.cards.map(({ key }) => key),
-    ['local-development', 'customer-trial-133', 'isolated-acceptance']
+    ['local-development', 'demo-133', 'customer-test-133', 'isolated-acceptance']
   )
   assert.equal(evidence.cards[0].status, 'success')
   assert.equal(evidence.cards[1].status, 'not_proven')
-  assert.match(evidence.cards[1].nextAction, /133 目标卡/u)
-  assert.equal(evidence.cards[2].status, 'success')
+  assert.match(evidence.cards[1].nextAction, /demo 目标卡/u)
+  assert.equal(evidence.cards[2].status, 'not_proven')
+  assert.match(evidence.cards[2].nextAction, /备份/u)
+  assert.equal(evidence.cards[3].status, 'success')
 })
 
-test('local and 133 failures remain independent', () => {
+test('local and remote target failures remain independent', () => {
   const localFailed = buildDevEnvironmentEvidence({
     dataError: '本地读取失败',
     deliverySummary: deliverySummaryFixture(),
   })
   assert.equal(localFailed.cards[0].status, 'failed')
   assert.notEqual(localFailed.cards[1].status, 'failed')
+  assert.notEqual(localFailed.cards[2].status, 'failed')
 
   const remoteFailed = buildDevEnvironmentEvidence({
     dataSummary: dataSummaryFixture(),
@@ -177,25 +211,26 @@ test('local and 133 failures remain independent', () => {
   })
   assert.equal(remoteFailed.cards[0].status, 'success')
   assert.equal(remoteFailed.cards[1].status, 'failed')
-  assert.equal(remoteFailed.cards[2].status, 'success')
+  assert.equal(remoteFailed.cards[2].status, 'failed')
+  assert.equal(remoteFailed.cards[3].status, 'success')
 })
 
-test('133 becomes green only after the current target-bound persistent readback', () => {
+test('demo becomes green only after its current target-bound persistent readback', () => {
   const evidence = buildDevEnvironmentEvidence({
     dataSummary: addTrialReadback(dataSummaryFixture()),
     deliverySummary: deliverySummaryFixture(),
   })
 
   assert.equal(evidence.cards[1].status, 'success')
-  assert.equal(evidence.cards[1].datasetEvidence, '133 持久数据已独立读回')
+  assert.equal(evidence.cards[1].datasetEvidence, 'demo UAT 造数已独立持久读回')
   assert.match(evidence.cards[1].rollbackBoundary, /新回滚点/u)
   assert.equal(evidence.cards[0].status, 'success')
 })
 
 test('stale release, config or dataset evidence never becomes green', () => {
   const delivery = deliverySummaryFixture()
-  delivery.target.remote.runtime.serverSha = '9'.repeat(40)
-  delivery.target.remote.runtime.webSha = '9'.repeat(40)
+  delivery.targets[0].preflight.remote.runtime.serverSha = '9'.repeat(40)
+  delivery.targets[0].preflight.remote.runtime.webSha = '9'.repeat(40)
   const evidence = buildDevEnvironmentEvidence({
     dataSummary: dataSummaryFixture(),
     deliverySummary: delivery,
@@ -209,6 +244,66 @@ test('stale release, config or dataset evidence never becomes green', () => {
   assert.equal(
     buildDevEnvironmentEvidence({ dataSummary: staleData }).cards[0].status,
     'not_proven'
+  )
+})
+
+test('delivery operation overview separates normal, empty, stale and failure states', () => {
+  const operationSummary = {
+    generatedAt: GENERATED_AT,
+    issues: [],
+    operations: [
+      {
+        action: 'promote',
+        target: 'demo-133',
+        status: 'failed',
+        updatedAt: GENERATED_AT,
+      },
+    ],
+  }
+  const currentTime = Date.parse(GENERATED_AT) + 60_000
+  assert.equal(
+    buildDevDeliveryOperationOverview({
+      summary: operationSummary,
+      now: currentTime,
+    }).state,
+    'normal'
+  )
+  assert.match(
+    buildDevDeliveryOperationOverview({
+      summary: operationSummary,
+      now: currentTime,
+    }).strongestBlocker,
+    /demo-133 · failed/u
+  )
+  assert.equal(
+    buildDevDeliveryOperationOverview({
+      summary: { ...operationSummary, operations: [] },
+      now: currentTime,
+    }).state,
+    'empty'
+  )
+  assert.equal(
+    buildDevDeliveryOperationOverview({
+      summary: operationSummary,
+      now: currentTime + 180_000,
+    }).state,
+    'stale'
+  )
+  assert.equal(
+    buildDevDeliveryOperationOverview({ error: 'unreadable' }).state,
+    'failure'
+  )
+  assert.equal(
+    buildDevDeliveryOperationOverview({
+      summary: operationSummary,
+      error: 'latest readback failed',
+      now: currentTime,
+    }).state,
+    'stale'
+  )
+  assert.equal(
+    buildDevDeliveryOperationOverview({ loading: true }).state,
+    'loading'
   )
 })
 

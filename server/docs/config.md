@@ -98,7 +98,7 @@
 - 这组字段决定用户 token 签名和默认管理员初始化逻辑。
 - 必须替换仓库里的默认 JWT 密钥。登记的本地开发库中，管理员账号或密码留空时分别使用 `admin` / `adminadmin`；`config.local.yaml`、显式配置字段或 `APP_ADMIN_*` 会覆盖对应默认值。
 - 本地默认值只用于首次创建缺失管理员，不会在每次启动时重置已有账号。已有开发库凭据漂移时使用 `make reset_local_admin_password`；该命令只接受登记开发库、要求账号绑定的精确确认、递增认证版本并撤销旧会话。
-- 生产和 133 试用环境没有这组本地默认值。生产新库只有在 `BOOTSTRAP_ADMIN_ONCE=true` 时才允许通过 `APP_ADMIN_PASSWORD` 临时注入独立密码。
+- demo/test 目标与未来生产环境都没有这组本地默认值。目标新库只有在受控 bootstrap 明确开启 `BOOTSTRAP_ADMIN_ONCE=true` 时，才允许通过 `APP_ADMIN_PASSWORD` 临时注入独立密码。
 - `data.auth.sms.mode` 控制短信登录运行时能力，当前支持 `disabled`、`mock` 和 `provider`：
   - `disabled`：关闭短信登录，`auth.capabilities` 返回不可用，`send_sms_code` / `sms_login` 返回 `AuthSMSLoginDisabled`。
   - `mock`：仅用于 local / dev / test，后端返回 `mock_code` 方便本地回归。

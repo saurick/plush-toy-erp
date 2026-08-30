@@ -20,7 +20,7 @@ import {
 
 const SHA = "a".repeat(40);
 const OPERATION_ID = "123e4567-e89b-42d3-a456-426614174000";
-const IDEMPOTENCY_KEY = "deploy:test-133:123e4567-e89b-42d3-a456-426614174000";
+const IDEMPOTENCY_KEY = "deploy:customer-test-133:123e4567-e89b-42d3-a456-426614174000";
 
 function runChild(moduleUrl, store, key) {
   const source = `
@@ -77,7 +77,7 @@ test("delivery operation store creates private idempotent records", (t) => {
   const fixture = createStore(t);
   const request = {
     action: "promote",
-    target: "test-133",
+    target: "customer-test-133",
     gitSha: SHA,
     version: "2026.07.29-1",
     idempotencyKey: IDEMPOTENCY_KEY,
@@ -237,7 +237,7 @@ test("unknown target outcome cannot be retried", (t) => {
   const { store } = createStore(t);
   const first = createOrReuseDeliveryOperation(store, {
     action: "promote",
-    target: "test-133",
+    target: "customer-test-133",
     gitSha: SHA,
     version: "2026.07.29-1",
     metadata: { source: "version-center" },
@@ -259,7 +259,7 @@ test("unknown target outcome cannot be retried", (t) => {
     () =>
       createOrReuseDeliveryOperation(store, {
         action: "promote",
-        target: "test-133",
+        target: "customer-test-133",
         gitSha: SHA,
         version: "2026.07.29-1",
         metadata: { source: "version-center" },
@@ -300,7 +300,7 @@ test("delivery operation terminal states cannot start another lifecycle", (t) =>
   const { store } = createStore(t);
   createOrReuseDeliveryOperation(store, {
     action: "promote",
-    target: "test-133",
+    target: "customer-test-133",
     gitSha: SHA,
     version: "2026.07.29-1",
     idempotencyKey: IDEMPOTENCY_KEY,
@@ -339,7 +339,7 @@ test("interrupted target writes become not_proven and never auto-retry", (t) => 
   const { store } = createStore(t);
   createOrReuseDeliveryOperation(store, {
     action: "promote",
-    target: "test-133",
+    target: "customer-test-133",
     gitSha: SHA,
     version: "2026.07.29-1",
     idempotencyKey: IDEMPOTENCY_KEY,
@@ -368,7 +368,7 @@ test("ready operation can execute once without creating another identity", (t) =
   const { store } = createStore(t);
   createOrReuseDeliveryOperation(store, {
     action: "promote",
-    target: "test-133",
+    target: "customer-test-133",
     gitSha: SHA,
     version: "2026.07.29-1",
     idempotencyKey: IDEMPOTENCY_KEY,
@@ -397,7 +397,7 @@ test("operation listing is bounded and startup recovery freezes running work", (
   const { store } = createStore(t);
   createOrReuseDeliveryOperation(store, {
     action: "promote",
-    target: "test-133",
+    target: "customer-test-133",
     gitSha: SHA,
     version: "2026.07.29-1",
     idempotencyKey: IDEMPOTENCY_KEY,
@@ -455,7 +455,7 @@ test("launched child is frozen as not_proven when the workbench restarts", (t) =
   const { store } = createStore(t);
   createOrReuseDeliveryOperation(store, {
     action: "promote",
-    target: "test-133",
+    target: "customer-test-133",
     gitSha: SHA,
     version: "2026.07.29-1",
     idempotencyKey: IDEMPOTENCY_KEY,
@@ -490,7 +490,7 @@ test("delivery operation metadata rejects secrets paths and arbitrary output roo
     () =>
       createOrReuseDeliveryOperation(store, {
         action: "promote",
-        target: "test-133",
+        target: "customer-test-133",
         gitSha: SHA,
         version: "2026.07.29-1",
         idempotencyKey: IDEMPOTENCY_KEY,
@@ -503,7 +503,7 @@ test("delivery operation metadata rejects secrets paths and arbitrary output roo
     () =>
       createOrReuseDeliveryOperation(store, {
         action: "promote",
-        target: "test-133",
+        target: "customer-test-133",
         gitSha: SHA,
         version: "2026.07.29-1",
         idempotencyKey: IDEMPOTENCY_KEY,

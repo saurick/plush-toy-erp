@@ -326,7 +326,7 @@ func TestApplyLocalAdminCredentialDefaultsSkipsRemoteTarget(t *testing.T) {
 	t.Parallel()
 
 	cfg := &conf.Data{Postgres: &conf.Data_Postgres{
-		Dsn: "postgres://postgres:secret@192.168.0.133:5435/plush_erp_uat_20260716_v5?sslmode=disable",
+		Dsn: "postgres://postgres:secret@192.168.0.133:5435/plush_erp_demo_v1?sslmode=disable",
 	}}
 	applyLocalAdminCredentialDefaults("./configs/dev/config.yaml", cfg, func(string) string { return "" })
 	if cfg.Auth != nil {
@@ -709,7 +709,7 @@ func TestValidateCustomerTrialConfigRuntimeAcceptsRegisteredTarget(t *testing.T)
 	t.Parallel()
 
 	cfg := &conf.Data{Postgres: &conf.Data_Postgres{
-		Dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp_uat_20260716_v5?sslmode=disable",
+		Dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp_demo_v1?sslmode=disable",
 	}}
 	getenv := func(key string) string {
 		switch key {
@@ -732,7 +732,7 @@ func TestValidateCustomerTrialConfigRuntimeRejectsPartialOptIn(t *testing.T) {
 	t.Parallel()
 
 	cfg := &conf.Data{Postgres: &conf.Data_Postgres{
-		Dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp_uat_20260716_v5?sslmode=disable",
+		Dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp_demo_v1?sslmode=disable",
 	}}
 	getenv := func(key string) string {
 		if key == customertrialconfig.TargetEnv {

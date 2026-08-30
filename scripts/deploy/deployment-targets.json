@@ -2,46 +2,153 @@
   "schemaVersion": "plush.deployment-target-registry/v1",
   "targets": [
     {
-      "key": "test-133",
+      "key": "demo-133",
       "enabled": true,
-      "purpose": "customer-trial",
+      "purpose": "project-demo-simulated",
       "customer": "yoyoosun",
       "trialTarget": "customer-trial-133",
       "ssh": {
         "host": "192.168.0.133",
         "port": 22,
         "user": "simon",
-        "expectedHostname": "simon"
+        "expectedHostname": "r640"
       },
       "filesystem": {
-        "root": "/home/simon/plush-toy-erp-v5",
-        "current": "/home/simon/plush-toy-erp-v5/current",
-        "releases": "/home/simon/plush-toy-erp-v5/releases",
-        "runtimeEnv": "/home/simon/plush-toy-erp-v5/runtime/.env.customer-trial-133",
-        "operationRoot": "/home/simon/plush-toy-erp-v5/operations"
+        "root": "/home/simon/plush-toy-erp-demo-v1",
+        "current": "/home/simon/plush-toy-erp-demo-v1/current",
+        "releases": "/home/simon/plush-toy-erp-demo-v1/releases",
+        "runtimeEnv": "/home/simon/plush-toy-erp-demo-v1/runtime/.env.demo-133",
+        "operationRoot": "/home/simon/plush-toy-erp-demo-v1/operations"
       },
       "compose": {
-        "projectName": "plush-toy-erp-v5",
+        "projectName": "plush-toy-erp-demo-v1",
         "directory": "server/deploy/compose/prod",
         "baseFile": "compose.yml",
-        "overrideFile": "compose.customer-trial-133.yml",
+        "overrideFile": "compose.demo-133.yml",
         "serverService": "app-server",
         "webService": "web-desktop",
         "postgresService": "postgres"
       },
       "database": {
-        "name": "plush_erp_uat_20260716_v5",
-        "migrationLock": "/home/simon/plush-toy-erp-v5/run/atlas-migrate.lock"
+        "name": "plush_erp_demo_v1",
+        "migrationLock": "/home/simon/plush-toy-erp-demo-v1/run/atlas-migrate.lock"
+      },
+      "runtime": {
+        "postgres": {
+          "bindAddress": "127.0.0.1",
+          "hostPort": 55436,
+          "dataDirectory": "/home/simon/plush-toy-erp-demo-v1/data/postgres"
+        },
+        "app": {
+          "bindAddress": "127.0.0.1",
+          "hostPort": 8325
+        },
+        "web": {
+          "bindAddress": "127.0.0.1",
+          "hostPort": 5195
+        },
+        "jaeger": {
+          "bindAddress": "127.0.0.1",
+          "ports": {
+            "agentCompact": 61001,
+            "agentThriftCompact": 61002,
+            "agentThriftBinary": 61003,
+            "config": 61004,
+            "ui": 61005,
+            "collectorHttp": 61006,
+            "collectorGrpc": 61007,
+            "zipkin": 61008,
+            "otlpGrpc": 61009,
+            "otlpHttp": 61010
+          }
+        }
       },
       "endpoints": {
-        "web": "http://127.0.0.1:5185",
-        "server": "http://127.0.0.1:8315"
+        "web": "http://127.0.0.1:5195",
+        "server": "http://127.0.0.1:8325"
       },
       "publicEntry": {
-        "endpoint": "https://admin.yoyoosun.net",
-        "containerPrefix": "plush-toy-erp-web-public-",
-        "network": "plush-toy-erp-v5_default",
-        "hostPort": 5175,
+        "endpoint": "https://demo.yoyoosun.net",
+        "containerPrefix": "plush-toy-erp-demo-web-public-",
+        "network": "plush-toy-erp-demo-v1_default",
+        "hostPort": 5176,
+        "apiOrigin": "http://app-server:8300"
+      },
+      "capacity": {
+        "minimumAvailableBytes": 32212254720
+      }
+    },
+    {
+      "key": "customer-test-133",
+      "enabled": true,
+      "purpose": "customer-clean-acceptance",
+      "customer": "yoyoosun",
+      "trialTarget": "none",
+      "ssh": {
+        "host": "192.168.0.133",
+        "port": 22,
+        "user": "simon",
+        "expectedHostname": "r640"
+      },
+      "filesystem": {
+        "root": "/home/simon/plush-toy-erp-test-v1",
+        "current": "/home/simon/plush-toy-erp-test-v1/current",
+        "releases": "/home/simon/plush-toy-erp-test-v1/releases",
+        "runtimeEnv": "/home/simon/plush-toy-erp-test-v1/runtime/.env.customer-test-133",
+        "operationRoot": "/home/simon/plush-toy-erp-test-v1/operations"
+      },
+      "compose": {
+        "projectName": "plush-toy-erp-test-v1",
+        "directory": "server/deploy/compose/prod",
+        "baseFile": "compose.yml",
+        "overrideFile": "compose.customer-test-133.yml",
+        "serverService": "app-server",
+        "webService": "web-desktop",
+        "postgresService": "postgres"
+      },
+      "database": {
+        "name": "plush_erp_customer_test_v1",
+        "migrationLock": "/home/simon/plush-toy-erp-test-v1/run/atlas-migrate.lock"
+      },
+      "runtime": {
+        "postgres": {
+          "bindAddress": "127.0.0.1",
+          "hostPort": 55437,
+          "dataDirectory": "/home/simon/plush-toy-erp-test-v1/data/postgres"
+        },
+        "app": {
+          "bindAddress": "127.0.0.1",
+          "hostPort": 8335
+        },
+        "web": {
+          "bindAddress": "127.0.0.1",
+          "hostPort": 5205
+        },
+        "jaeger": {
+          "bindAddress": "127.0.0.1",
+          "ports": {
+            "agentCompact": 62001,
+            "agentThriftCompact": 62002,
+            "agentThriftBinary": 62003,
+            "config": 62004,
+            "ui": 62005,
+            "collectorHttp": 62006,
+            "collectorGrpc": 62007,
+            "zipkin": 62008,
+            "otlpGrpc": 62009,
+            "otlpHttp": 62010
+          }
+        }
+      },
+      "endpoints": {
+        "web": "http://127.0.0.1:5205",
+        "server": "http://127.0.0.1:8335"
+      },
+      "publicEntry": {
+        "endpoint": "https://test.yoyoosun.net",
+        "containerPrefix": "plush-toy-erp-test-web-public-",
+        "network": "plush-toy-erp-test-v1_default",
+        "hostPort": 5177,
         "apiOrigin": "http://app-server:8300"
       },
       "capacity": {

@@ -17,7 +17,7 @@ function operation({
   action,
   gitSha,
   updatedAt,
-  target = 'test-133',
+  target = 'customer-test-133',
   message = 'target promotion and basic runtime verification passed',
 }) {
   return {
@@ -36,7 +36,7 @@ function backupRestoreReceipt(overrides = {}) {
   return {
     schemaVersion: 'plush.backup-restore-evidence/v1',
     status: 'passed',
-    target: 'test-133',
+    target: 'customer-test-133',
     customer: 'yoyoosun',
     environment: 'customer-trial-133',
     releaseVersion: CURRENT_SHA,
@@ -62,12 +62,12 @@ function summary({
 } = {}) {
   return {
     generatedAt: '2026-08-10T01:00:00.000Z',
-    boundaries: { target: 'test-133' },
+    boundaries: { target: 'customer-test-133' },
     target: {
       schemaVersion: 'plush.target-preflight/v1',
       generatedAt: '2026-08-10T00:59:00.000Z',
       status: targetStatus,
-      target: 'test-133',
+      target: 'customer-test-133',
       purpose: 'customer-trial',
       customer: 'yoyoosun',
       trialTarget: 'customer-trial-133',
@@ -142,7 +142,7 @@ test('devRecovery: 演练目录按 P0、P1、P2 排序且不暴露任意执行�
 
 test('devRecovery: 目标展示使用业务环境语义并保留技术 key', () => {
   assert.deepEqual(resolveDevRecoveryTarget(summary()), {
-    key: 'test-133',
+    key: 'customer-test-133',
     label: '客户试用环境',
     purpose: 'customer-trial',
     customer: 'yoyoosun',

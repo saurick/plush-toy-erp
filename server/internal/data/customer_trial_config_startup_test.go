@@ -88,7 +88,7 @@ func TestValidateActiveCustomerTrialConfigRequiresExactRuntimeOptIn(t *testing.T
 				"applyPurpose":   customertrialconfig.ApplyPurpose,
 				"datasetVersion": identity.datasetVersion,
 				"target":         customertrialconfig.ExpectedTarget,
-			}, "plush_erp_uat_20260716_v5", "trial-system", nil)
+			}, "plush_erp_demo_v1", "trial-system", nil)
 			defer func() { _ = db.Close() }()
 			if err := validateActiveCustomerTrialConfig(context.Background(), db, false, ""); err == nil {
 				t.Fatal("expected active trial revision to be rejected while gate is disabled")
@@ -105,7 +105,7 @@ func TestValidateActiveCustomerTrialConfigAllowsExactEnabledRuntime(t *testing.T
 		"applyPurpose":   customertrialconfig.ApplyPurpose,
 		"datasetVersion": customertrialconfig.DatasetVersion,
 		"target":         customertrialconfig.ExpectedTarget,
-	}, "plush_erp_uat_20260716_v5", "trial-system", nil)
+	}, "plush_erp_demo_v1", "trial-system", nil)
 	defer func() { _ = db.Close() }()
 	if err := validateActiveCustomerTrialConfig(context.Background(), db, true, ""); err != nil {
 		t.Fatalf("validateActiveCustomerTrialConfig() error = %v", err)
@@ -120,7 +120,7 @@ func TestValidateActiveCustomerTrialConfigAllowsExactPreviousIdentityDuringV8Act
 		"applyPurpose":   customertrialconfig.ApplyPurpose,
 		"datasetVersion": customertrialconfig.PreviousActiveDatasetVersion,
 		"target":         customertrialconfig.ExpectedTarget,
-	}, "plush_erp_uat_20260716_v5", "trial-system", nil)
+	}, "plush_erp_demo_v1", "trial-system", nil)
 	defer func() { _ = db.Close() }()
 	if err := validateActiveCustomerTrialConfig(context.Background(), db, true, ""); err != nil {
 		t.Fatalf("validateActiveCustomerTrialConfig() error = %v", err)
@@ -135,7 +135,7 @@ func TestValidateActiveCustomerTrialConfigRejectsReservedVersionDrift(t *testing
 		"applyPurpose":   customertrialconfig.ApplyPurpose,
 		"datasetVersion": "2026.07.15-v1",
 		"target":         customertrialconfig.ExpectedTarget,
-	}, "plush_erp_uat_20260716_v5", "trial-system", nil)
+	}, "plush_erp_demo_v1", "trial-system", nil)
 	defer func() { _ = db.Close() }()
 	if err := validateActiveCustomerTrialConfig(context.Background(), db, true, ""); err == nil {
 		t.Fatal("expected reserved customer-trial version drift to be rejected")

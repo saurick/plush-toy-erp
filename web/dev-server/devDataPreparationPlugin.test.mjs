@@ -449,7 +449,7 @@ test('scenario demo binds the fixed V6 plan, needs no browser credential input, 
             targetFingerprint: SCENARIO_TARGET_FINGERPRINT,
             disposable: false,
             registeredTargetOnly: true,
-            loopbackBackendOnly: true,
+            registeredEndpointOnly: true,
           },
           canonicalRunner: {
             stageCount: 9,
@@ -582,7 +582,7 @@ test('133 scenario creates and verifies a fresh target-bound backup before canon
   const order = []
   const planDigest = '8'.repeat(64)
   const migrationVersion = '20260728100514'
-  const databaseName = 'plush_erp_uat_20260716_v5'
+  const databaseName = 'plush_erp_demo_v1'
   const configRevision =
     'yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1'
   const configProductVersion = 'customer-trial-133-test-2026.08.15-v6'
@@ -594,11 +594,12 @@ test('133 scenario creates and verifies a fresh target-bound backup before canon
   })
   const preflight = {
     status: 'passed',
-    target: 'test-133',
+    target: 'demo-133',
     trialTarget: 'customer-trial-133',
     customer: 'yoyoosun',
     remote: {
       runtime: {
+        resourceIdentity: 'passed',
         serverSha: REPOSITORY.commit,
         webSha: REPOSITORY.commit,
         databaseName,
@@ -646,7 +647,7 @@ test('133 scenario creates and verifies a fresh target-bound backup before canon
           dataVersion: '2026.08.15-v6',
           runId: '20260815-V6',
           semanticDigest: SCENARIO_SEMANTIC_DIGEST,
-          backendURL: 'http://127.0.0.1:18375',
+          backendURL: 'https://demo.yoyoosun.net',
           databaseName,
           migrationVersion,
           repository: REPOSITORY,
@@ -654,7 +655,7 @@ test('133 scenario creates and verifies a fresh target-bound backup before canon
             targetFingerprint,
             disposable: false,
             registeredTargetOnly: true,
-            loopbackBackendOnly: true,
+            registeredEndpointOnly: true,
           },
           canonicalRunner: {
             stageCount: 9,
@@ -1156,7 +1157,7 @@ test('full acceptance prepare freezes the fixed lifecycle plan without executing
       warehouseCount: 4,
       simulatedOnly: true,
       realCustomerImport: false,
-      trialDatabase: 'plush_erp_uat_20260716_v5',
+      trialDatabase: 'plush_erp_demo_v1',
       trialDatabaseLifecycle: 'long-lived-registered-target',
     }
   )
@@ -1819,7 +1820,7 @@ test('profile metadata states retention, cleanup, and browser-safe requirements 
   )
   assert.deepEqual(scenario.requiredEnvironment, [
     '登记本地开发库与本机 8300 后端',
-    '登记 133 试用库、固定隧道与带外证明',
+    '登记 demo 演练库、固定隧道与带外证明',
   ])
   assert.equal(
     scenario.requiredEnvironment.some((value) =>

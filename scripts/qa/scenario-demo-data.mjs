@@ -350,7 +350,7 @@ export function buildScenarioDemoPlan({
       targetFingerprint,
       disposable: false,
       registeredTargetOnly: true,
-      loopbackBackendOnly: true,
+      registeredEndpointOnly: true,
     },
     migrationFingerprint,
     migrationVersion,

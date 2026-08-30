@@ -1,88 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+support_script="$script_dir/run-smoke-support.mjs"
+
 print_help() {
-  cat <<'USAGE'
-用法:
-  bash deployments/yoyoosun/scripts/run-smoke.sh \
-    --endpoint https://erp.example.invalid \
-    --backend-url http://127.0.0.1:8300 \
-    --release-version <40-character-lowercase-git-sha> \
-    --environment customer-trial \
-    --report output/yoyoosun-smoke.json \
-    --admin-username admin \
-    --admin-password-env MANUAL_ACCEPTANCE_ADMIN_PASSWORD \
-    --uat-password-env MANUAL_ACCEPTANCE_UAT_PASSWORD \
-    --sms-phone-env MANUAL_ACCEPTANCE_SMS_PHONE \
-    --customer-config-revision yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1 \
-    --admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN
-
-Input template only:
-  bash deployments/yoyoosun/scripts/run-smoke.sh --print-input-template
-
-说明:
-  做轻量 health / route / auth capabilities / credential login matrix / customer_config effective session smoke；
-  带管理员 token 时还会真实生成最小 PDF，不创建业务事实。133 的 admin 与 UAT 密码
-  固定从凭据合同读取，环境变量只保留调用参数兼容且不能覆盖合同值；
-  短信手机号只有人工录入对应环境变量时才校验。报告不保存密码、token、手机号或原始 profile。
-USAGE
+  node "$support_script" help
 }
 
 print_input_template() {
-  cat <<'JSON'
-{
-  "scope": "yoyoosun-run-smoke-input-template",
-  "customer": "yoyoosun",
-  "writesReport": false,
-  "writesDatabase": false,
-  "callsEndpoint": false,
-  "callsBackend": false,
-  "callsCustomerConfig": false,
-  "readsAdminToken": false,
-  "secretInputs": [
-    "CUSTOMER_CONFIG_ADMIN_TOKEN or the environment variable named by --admin-token-env",
-    "optional SMS phone from the environment variable named by --sms-phone-env"
-  ],
-  "requiredInputs": [
-    "public ERP endpoint without username/password",
-    "release version",
-    "environment",
-    "smoke report path",
-    "optional backend URL without username/password",
-    "credential contract admin username and password environment variable names when backend URL is provided",
-    "customer config revision when active revision readback is required",
-    "admin token env name when customer config readback is required"
-  ],
-  "checks": [
-    "web-healthz",
-    "web-readyz",
-    "server-healthz when --backend-url is provided",
-    "server-readyz when --backend-url is provided",
-    "login-page",
-    "mobile-role-route",
-    "credential-login-matrix (admin + 10 uat identities and 11 unique tokens; exact admin phone binding only when configured)",
-    "auth-sms-capabilities (provider/enabled/not-mock)",
-    "customer-config-effective-session when --customer-config-revision is provided",
-    "template-pdf-render when --customer-config-revision and an admin token are provided"
-  ],
-  "commands": [
-    "bash deployments/yoyoosun/scripts/run-smoke.sh --endpoint https://erp.example.invalid --backend-url https://api.example.invalid --release-version <release-version> --environment customer-trial --report deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/smoke-test-report.json --admin-username admin --admin-password-env MANUAL_ACCEPTANCE_ADMIN_PASSWORD --uat-password-env MANUAL_ACCEPTANCE_UAT_PASSWORD --sms-phone-env MANUAL_ACCEPTANCE_SMS_PHONE",
-    "CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' bash deployments/yoyoosun/scripts/run-smoke.sh --endpoint https://erp.example.invalid --backend-url https://api.example.invalid --release-version <release-version> --environment customer-trial --report deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/smoke-test-report.json --admin-username admin --admin-password-env MANUAL_ACCEPTANCE_ADMIN_PASSWORD --uat-password-env MANUAL_ACCEPTANCE_UAT_PASSWORD --sms-phone-env MANUAL_ACCEPTANCE_SMS_PHONE --customer-config-revision yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1 --admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN"
-  ],
-  "requiredReadbackEvidence": [
-    "check name=auth-sms-capabilities, target=jsonrpc:auth.capabilities, expectedMode=provider, enabled=true, mockDelivery=false, responseBodyStored=false",
-    "check name=credential-login-matrix, target=jsonrpc:auth.admin_login, totalAuthenticated=11, uniqueTokensObserved=true, phoneConfigured=false or phoneBound=true, responseBodyStored=false",
-    "check name=customer-config-effective-session",
-    "target=jsonrpc:customer_config.get_effective_session",
-    "expectedRevision matches the activated customer config revision",
-    "tokenSourceEnv is recorded",
-    "responseBodyStored=false",
-    "template-pdf-render returns HTTP 200 with application/pdf, starts with %PDF, and records only contentType/sha256/sizeBytes with responseBodyStored=false",
-    "report backendEndpointAlias matches the release executor report backendEndpointAlias"
-  ],
-  "boundary": "This template does not call endpoints, read secrets, call customer_config, write smoke-test-report.json, write database rows, import business data, or prove active revision readback. Real proof requires running the smoke command against the target backend with the fixed credential contract plus an admin token env when customer configuration readback is requested; the report stores only aggregate login evidence, usernames, source labels, env keys, and redacted customer-config evidence."
-}
-JSON
+  node "$support_script" input-template
 }
 
 endpoint=""
@@ -208,79 +135,13 @@ validate_http_url "--endpoint" "$endpoint"
 if [[ -n "$backend_url" ]]; then
   reject_url_credentials "--backend-url" "$backend_url"
   validate_http_url "--backend-url" "$backend_url"
-  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
   credential_contract="$script_dir/../env/credential.contract.json"
   [[ -f "$credential_contract" ]] || {
     echo "[run-smoke] credential contract is missing: $credential_contract"
     exit 1
   }
   IFS=$'\t' read -r contract_admin_username contract_admin_password contract_admin_password_env contract_admin_password_source contract_uat_password contract_uat_password_env contract_uat_password_source contract_uat_usernames_csv credential_contract_schema contract_sms_phone_env contract_target contract_database contract_dataset contract_sha256 < <(
-    node - "$credential_contract" <<'NODE'
-const fs = require("node:fs");
-const file = process.argv[2];
-const contract = JSON.parse(fs.readFileSync(file, "utf8"));
-const admin = contract?.credentials?.admin;
-const uat = contract?.credentials?.uat;
-const sms = contract?.smsLoginIdentity;
-const envKey = /^[A-Za-z_][A-Za-z0-9_]*$/;
-const username = /^[A-Za-z0-9_]+$/;
-const expectedUATUsernames = [
-  "uat_boss", "uat_sales", "uat_purchase", "uat_production", "uat_warehouse",
-  "uat_quality", "uat_finance", "uat_pmc", "uat_engineering", "uat_admin",
-];
-const valid =
-  contract?.schemaVersion === "yoyoosun-credential-contract/v4" &&
-  contract?.customerCode === "yoyoosun" &&
-  contract?.target?.key === "customer-trial-133" &&
-  contract?.target?.database === "plush_erp_uat_20260716_v5" &&
-  contract?.target?.datasetVersion === "2026.08.15-v6" &&
-  username.test(admin?.username || "") &&
-  admin?.environmentVariable === "MANUAL_ACCEPTANCE_ADMIN_PASSWORD" &&
-  admin?.credentialSource === "contract-fixed-test" &&
-  admin?.fixedTestPassword === "adminadmin" &&
-  uat?.environmentVariable === "MANUAL_ACCEPTANCE_UAT_PASSWORD" &&
-  uat?.credentialSource === "contract-fixed-test" &&
-  uat?.fixedTestPassword === "12345678" &&
-  JSON.stringify(uat?.usernames) === JSON.stringify(expectedUATUsernames) &&
-  uat.usernames.every((value) => username.test(value) && value.startsWith("uat_")) &&
-  !uat.usernames.includes(admin.username) &&
-  sms?.username === admin.username &&
-  envKey.test(sms?.environmentVariable || "") &&
-  sms?.phoneRequiredWhenProviderEnabled === false &&
-  sms?.verifyPhoneIdentityWhenConfigured === true &&
-  sms?.keychain?.service === "plush-toy-erp-yoyoosun-sms-phone" &&
-  sms?.keychain?.account === "customer-trial-133:admin" &&
-  contract?.policy?.passwordsMustDiffer === true &&
-  JSON.stringify(contract?.policy?.registeredSimplePasswordTargets) === JSON.stringify(["local-dev", "customer-trial-133"]) &&
-  contract.policy.customerTrialUsesFixedPublicTestCredentials === true &&
-  contract.policy.rotateAfterCreateRestoreOrRollback === true &&
-  contract.policy.revokeExistingSessionsOnRotation === true &&
-  contract.policy.requireCredentialLoginMatrixBeforeCutover === true &&
-  contract?.redaction?.containsSecrets === false &&
-  contract.redaction.contractContainsPublicTestPasswords === true &&
-  contract.redaction.storePasswords === false &&
-  contract.redaction.storeTokens === false &&
-  contract.redaction.storePhoneNumber === false &&
-  contract.redaction.storeRawProfiles === false;
-if (!valid) throw new Error("invalid yoyoosun credential contract");
-const crypto = require("node:crypto");
-process.stdout.write([
-  admin.username,
-  admin.fixedTestPassword,
-  admin.environmentVariable,
-  admin.credentialSource,
-  uat.fixedTestPassword,
-  uat.environmentVariable,
-  uat.credentialSource,
-  uat.usernames.join(","),
-  contract.schemaVersion,
-  sms.environmentVariable,
-  contract.target.key,
-  contract.target.database,
-  contract.target.datasetVersion,
-  crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex"),
-].join("\t") + "\n");
-NODE
+    node "$support_script" credential-contract "$credential_contract"
   )
   [[ "$admin_username" == "$contract_admin_username" ]] || {
     echo "[run-smoke] --admin-username must match credential contract"
@@ -391,7 +252,7 @@ for check in "${checks[@]}"; do
   name="${check%%:*}"
   url="${check#*:}"
   status="fail"
-  http_code="$(curl -k --connect-timeout 2 --max-time 10 --retry 3 --retry-delay 1 --retry-connrefused -sS -o /dev/null -w '%{http_code}' "$url" || true)"
+  http_code="$(curl --connect-timeout 2 --max-time 10 --retry 3 --retry-delay 1 --retry-connrefused -sS -o /dev/null -w '%{http_code}' "$url" || true)"
   if [[ "$http_code" =~ ^(200|302|401|403)$ ]]; then
     status="pass"
     passed=$((passed + 1))
@@ -431,7 +292,7 @@ fs.writeFileSync(process.argv[1], JSON.stringify({
   params: { username: parts[0], password: parts[1] },
 }));
 ' "$request_file"
-    curl -k --connect-timeout 2 --max-time 10 --retry 1 --retry-delay 1 --retry-connrefused \
+    curl --connect-timeout 2 --max-time 10 --retry 1 --retry-delay 1 --retry-connrefused \
       -sS -H "Content-Type: application/json" -H "Accept: application/json" \
       --data-binary "@$request_file" -o "$response_file" "$backend_url/rpc/auth" || true
     : >"$request_file"
@@ -513,7 +374,7 @@ if [[ -n "$backend_url" ]]; then
 fi
 auth_payload='{"jsonrpc":"2.0","id":"auth-capabilities-smoke","method":"capabilities","params":{}}'
 auth_response="$(
-  curl -k --connect-timeout 2 --max-time 10 --retry 3 --retry-delay 1 --retry-connrefused \
+  curl --connect-timeout 2 --max-time 10 --retry 3 --retry-delay 1 --retry-connrefused \
     -sS \
     -H "Content-Type: application/json" \
     -H "Accept: application/json" \
@@ -521,21 +382,7 @@ auth_response="$(
     "$auth_rpc_base_url/rpc/auth" || true
 )"
 auth_status="fail"
-if SMOKE_RESPONSE="$auth_response" node <<'NODE'; then
-try {
-  const parsed = JSON.parse(process.env.SMOKE_RESPONSE || "");
-  const sms = parsed?.result?.data?.sms_login;
-  const ok = parsed?.jsonrpc === "2.0" &&
-    parsed?.id === "auth-capabilities-smoke" &&
-    parsed?.result?.code === 0 &&
-    sms?.enabled === true &&
-    sms?.mode === "provider" &&
-    sms?.mock_delivery === false;
-  process.exit(ok ? 0 : 1);
-} catch {
-  process.exit(1);
-}
-NODE
+if SMOKE_RESPONSE="$auth_response" node "$support_script" auth-capabilities; then
   auth_status="pass"
 fi
 if [[ "$auth_status" == "pass" ]]; then
@@ -558,7 +405,7 @@ if [[ -n "$customer_config_revision" ]]; then
     customer_response_file="$smoke_tmp_dir/customer-config-response.json"
     : >"$customer_response_file"
     chmod 600 "$customer_response_file"
-    curl --config "$auth_curl_config" -k --connect-timeout 2 --max-time 10 --retry 3 --retry-delay 1 --retry-connrefused \
+    curl --config "$auth_curl_config" --connect-timeout 2 --max-time 10 --retry 3 --retry-delay 1 --retry-connrefused \
       -sS -H "Content-Type: application/json" -H "Accept: application/json" \
       -d "$payload" -o "$customer_response_file" "$rpc_base_url/rpc/customer_config" || true
     if node -e '
@@ -607,7 +454,7 @@ try {
   if [[ -n "$token" ]]; then
     pdf_payload='{"title":"Release PDF Smoke","file_name":"release-pdf-smoke.pdf","template_key":"material-purchase-contract","html":"<!doctype html><html><body><p>release-pdf-smoke</p></body></html>"}'
     pdf_curl_meta="$(
-      curl --config "$auth_curl_config" -k --connect-timeout 2 --max-time 45 --retry 1 --retry-delay 1 --retry-connrefused \
+      curl --config "$auth_curl_config" --connect-timeout 2 --max-time 45 --retry 1 --retry-delay 1 --retry-connrefused \
         -sS \
         -o "$pdf_body" \
         -w '%{http_code}|%{content_type}' \
@@ -622,14 +469,7 @@ try {
     pdf_signature="$(LC_ALL=C dd if="$pdf_body" bs=4 count=1 2>/dev/null || true)"
     if [[ "$pdf_http_code" == "200" && "$pdf_content_type" == "application/pdf" && -s "$pdf_body" && "$pdf_signature" == "%PDF" ]]; then
       pdf_size_bytes="$(wc -c <"$pdf_body" | tr -d '[:space:]')"
-      pdf_sha256="$(
-        node - "$pdf_body" <<'NODE'
-const fs = require("node:fs");
-const crypto = require("node:crypto");
-const file = process.argv[2];
-process.stdout.write(crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex"));
-NODE
-      )"
+      pdf_sha256="$(node "$support_script" sha256 "$pdf_body")"
       pdf_status="pass"
     fi
   fi

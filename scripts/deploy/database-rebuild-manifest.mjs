@@ -15,6 +15,7 @@ import path from "node:path";
 
 import { validateReleaseManifest } from "./release-catalog.mjs";
 import { validateGitAncestryRelation } from "./git-ancestry-relation.mjs";
+import { getDeploymentTarget } from "./deployment-targets.mjs";
 
 export const DATABASE_REBUILD_MANIFEST_CONTRACT =
   "plush.database-rebuild-manifest/v1";
@@ -24,7 +25,6 @@ const UUID_V4_PATTERN =
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 const BLOCKER_PATTERN = /^[a-z][a-z0-9_]{2,63}$/u;
-const DATABASE = "plush_erp_uat_20260716_v5";
 
 function stableValue(value) {
   if (Array.isArray(value)) return value.map(stableValue);
@@ -52,16 +52,16 @@ function manifestFingerprint(manifest) {
 
 export function validateDatabaseRebuildManifest(manifest) {
   const ancestry = validateGitAncestryRelation(manifest?.ancestry);
+  const target = getDeploymentTarget(manifest?.target?.key);
   if (
     manifest?.schemaVersion !== DATABASE_REBUILD_MANIFEST_CONTRACT ||
     !["eligible", "blocked"].includes(manifest?.status) ||
     !UUID_V4_PATTERN.test(String(manifest?.operationId || "")) ||
-    manifest?.target?.key !== "test-133" ||
-    manifest?.target?.purpose !== "customer-trial" ||
+    manifest?.target?.purpose !== target.purpose ||
     manifest?.target?.customer !== "yoyoosun" ||
-    manifest?.target?.trialTarget !== "customer-trial-133" ||
-    manifest?.target?.database !== DATABASE ||
-    manifest?.target?.dataDirectoryAlias !== "test-133-primary" ||
+    manifest?.target?.trialTarget !== target.trialTarget ||
+    manifest?.target?.database !== target.database.name ||
+    manifest?.target?.dataDirectoryAlias !== `${target.key}-primary` ||
     !SHA_PATTERN.test(String(manifest?.release?.gitSha || "")) ||
     ancestry.currentGitSha !== manifest?.before?.runtimeSha ||
     ancestry.candidateGitSha !== manifest?.release?.gitSha ||
@@ -125,12 +125,13 @@ export function buildDatabaseRebuildManifest({
   }
   if (
     targetPreflight?.schemaVersion !== "plush.target-preflight/v1" ||
-    targetPreflight?.target !== "test-133" ||
+    !targetPreflight?.target ||
     targetPreflight?.customer !== "yoyoosun" ||
     !["passed", "blocked"].includes(targetPreflight?.status)
   ) {
     throw new Error("fixed target preflight is required");
   }
+  const target = getDeploymentTarget(targetPreflight.target);
 
   const runtimeSha =
     targetPreflight.remote?.runtime?.serverSha || "unknown";
@@ -151,7 +152,7 @@ export function buildDatabaseRebuildManifest({
   if (runtimeSha !== release.gitSha || webSha !== release.gitSha) {
     blockers.add("database_rebuild_runtime_release_mismatch");
   }
-  if (databaseName !== DATABASE) {
+  if (databaseName !== target.database.name) {
     blockers.add("database_rebuild_target_database_mismatch");
   }
   if (gitRelation.actionClass !== "current") {
@@ -164,12 +165,12 @@ export function buildDatabaseRebuildManifest({
     operationId,
     createdAt,
     target: {
-      key: "test-133",
-      purpose: "customer-trial",
+      key: target.key,
+      purpose: target.purpose,
       customer: "yoyoosun",
-      trialTarget: "customer-trial-133",
-      database: DATABASE,
-      dataDirectoryAlias: "test-133-primary",
+      trialTarget: target.trialTarget,
+      database: target.database.name,
+      dataDirectoryAlias: `${target.key}-primary`,
     },
     ancestry: gitRelation,
     release: {
@@ -197,7 +198,7 @@ export function buildDatabaseRebuildManifest({
     steps: [
       "verify the immutable current release and fixed target identity",
       "take a fresh backup of the populated predecessor and restore-check it",
-      "stop only the fixed test-133 application and PostgreSQL services",
+      `stop only the fixed ${target.key} application and PostgreSQL services`,
       "move the predecessor data directory to an immutable rollback alias",
       "initialize a fresh physical PostgreSQL data directory with the same logical database name",
       "run migration status, audit, dry-run, apply and status readback",
@@ -223,9 +224,9 @@ export function buildDatabaseRebuildManifest({
       afterSwitchUnknownAction: "read_back_before_any_retry",
     },
     notProven: [
-      "customer configuration activation and effective-session readback",
-      "nine-stage acceptance dataset apply and 52-page browser/PDF regression",
-      "credential rotation and 11-account role smoke",
+      "customer configuration and effective-session readback",
+      "customer clean-baseline login and browser/PDF regression",
+      "customer account ownership and role smoke",
       "customer UAT and sign-off",
     ],
     redaction: {

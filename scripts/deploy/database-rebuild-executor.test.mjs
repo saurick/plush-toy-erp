@@ -52,7 +52,7 @@ function receipt(overrides = {}) {
     schemaVersion: REMOTE_DATABASE_REBUILD_RECEIPT_CONTRACT,
     status: "passed",
     operationId: OPERATION_ID,
-    target: "test-133",
+    target: "customer-test-133",
     gitSha: SHA,
     version: "2026.08.03-1",
     releaseManifestSha256: MANIFEST_HASH,
@@ -60,7 +60,7 @@ function receipt(overrides = {}) {
     stage: "passed",
     issueCode: "none",
     database: {
-      logicalName: "plush_erp_uat_20260716_v5",
+      logicalName: "plush_erp_customer_test_v1",
       previousDataAlias: `rollback-${SHA.slice(0, 12)}-${OPERATION_ID.slice(0, 8)}`,
       dataSwitchStarted: true,
       predecessorRecovered: false,
@@ -114,6 +114,8 @@ function receipt(overrides = {}) {
 
 const expected = {
   operationId: OPERATION_ID,
+  targetKey: "customer-test-133",
+  databaseName: "plush_erp_customer_test_v1",
   gitSha: SHA,
   version: "2026.08.03-1",
   migration: MIGRATION,
@@ -170,7 +172,7 @@ function preflight() {
   return {
     schemaVersion: "plush.target-preflight/v1",
     status: "passed",
-    target: "test-133",
+    target: "customer-test-133",
     customer: "yoyoosun",
     blockers: [],
     remote: {
@@ -179,7 +181,7 @@ function preflight() {
         minimumAvailableBytes: 30 * 1024 ** 3,
       },
       runtime: {
-        databaseName: "plush_erp_uat_20260716_v5",
+        databaseName: "plush_erp_customer_test_v1",
         serverSha: SHA,
         webSha: SHA,
         serverHealth: "passed",
@@ -203,8 +205,8 @@ function executableFixture(t, suffix) {
     {
       repoRoot: root,
       releaseManifestPath: releasePath,
-      targetKey: "test-133",
-      idempotencyKey: `rebuild-database:test-133:${suffix}`,
+      targetKey: "customer-test-133",
+      idempotencyKey: `rebuild-database:customer-test-133:${suffix}`,
       operationStore: store,
     },
     { classifyRelation, runPreflight: () => preflight() },
@@ -393,7 +395,7 @@ test("database rebuild executor persists the validated redacted receipt for down
       repoRoot: root,
       operationId: prepared.operation.id,
       releaseManifestPath: releasePath,
-      confirmation: `REBUILD_DATABASE:test-133:${SHA}:${prepared.operation.id}`,
+      confirmation: `REBUILD_DATABASE:customer-test-133:${SHA}:${prepared.operation.id}`,
       operationStore: store,
     },
     {
@@ -450,7 +452,7 @@ test("database rebuild executor blocks an unexplained immediate preflight failur
       repoRoot: root,
       operationId: prepared.operation.id,
       releaseManifestPath: releasePath,
-      confirmation: `REBUILD_DATABASE:test-133:${SHA}:${prepared.operation.id}`,
+      confirmation: `REBUILD_DATABASE:customer-test-133:${SHA}:${prepared.operation.id}`,
       operationStore: store,
     },
     {
@@ -510,7 +512,7 @@ test("database rebuild executor removes the remote secret after a partial transf
           repoRoot: root,
           operationId: prepared.operation.id,
           releaseManifestPath: releasePath,
-          confirmation: `REBUILD_DATABASE:test-133:${SHA}:${prepared.operation.id}`,
+          confirmation: `REBUILD_DATABASE:customer-test-133:${SHA}:${prepared.operation.id}`,
           operationStore: store,
         },
         {
@@ -570,7 +572,7 @@ test("database rebuild executor freezes a partial transfer when secret cleanup i
           repoRoot: root,
           operationId: prepared.operation.id,
           releaseManifestPath: releasePath,
-          confirmation: `REBUILD_DATABASE:test-133:${SHA}:${prepared.operation.id}`,
+          confirmation: `REBUILD_DATABASE:customer-test-133:${SHA}:${prepared.operation.id}`,
           operationStore: store,
         },
         {
@@ -595,6 +597,7 @@ test("database rebuild executor help requires exact confirmation", () => {
     { encoding: "utf8" },
   );
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /REBUILD_DATABASE:test-133/u);
+  assert.match(result.stdout, /REBUILD_DATABASE:<target>/u);
+  assert.doesNotMatch(result.stdout, /admin/u);
   assert.match(result.stdout, /never deletes a database generation/iu);
 });

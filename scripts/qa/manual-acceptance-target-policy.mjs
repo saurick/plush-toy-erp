@@ -19,10 +19,11 @@ export const SCENARIO_DEMO_ORIGIN = DEFAULT_LOCAL_BACKEND_URL;
 export const LOCAL_MANUAL_ACCEPTANCE_DATABASE_EXAMPLE =
   "plush_erp_acceptance_local_run_dev";
 export const CUSTOMER_TRIAL_133_TARGET = "customer-trial-133";
-// Customer-trial writes carry administrator credentials and bearer tokens. Keep
-// the registered endpoint on loopback so callers must reach 133 through an SSH
-// tunnel instead of sending those secrets over plaintext LAN HTTP.
-export const CUSTOMER_TRIAL_133_ORIGIN = "http://127.0.0.1:18375";
+export const CUSTOMER_TRIAL_133_DEPLOYMENT_TARGET =
+  MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.deploymentTarget;
+// Remote simulated-data writes carry administrator credentials and bearer
+// tokens. They may use only the exact system-trusted HTTPS demo endpoint.
+export const CUSTOMER_TRIAL_133_ORIGIN = "https://demo.yoyoosun.net";
 export const CUSTOMER_TRIAL_133_DATABASE =
   MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.databaseName;
 export const CUSTOMER_TRIAL_133_MIN_MIGRATION =
@@ -50,6 +51,7 @@ export const MANUAL_ACCEPTANCE_DATASET_KEY =
 export const MANUAL_ACCEPTANCE_TARGET_PROFILES = Object.freeze({
   [CUSTOMER_TRIAL_133_TARGET]: Object.freeze({
     target: CUSTOMER_TRIAL_133_TARGET,
+    deploymentTarget: CUSTOMER_TRIAL_133_DEPLOYMENT_TARGET,
     origin: CUSTOMER_TRIAL_133_ORIGIN,
     attestationEnvironment: "prod",
     runtimeEnvironment: "remote",
@@ -264,7 +266,7 @@ export function resolveManualAcceptanceTarget({
       dataVersion: identity.dataVersion,
       runId: identity.runId,
       external: true,
-      transport: "ssh-tunnel",
+      transport: "system-trusted-tls",
       databaseName: CUSTOMER_TRIAL_133_DATABASE,
     });
   }
@@ -272,7 +274,7 @@ export function resolveManualAcceptanceTarget({
   if (LOCAL_HOSTS.has(hostname)) {
     if (requestedTarget && requestedTarget !== LOCAL_DEV_TARGET) {
       throw new ManualAcceptanceTargetPolicyError(
-        `${requestedTarget} must use its registered SSH tunnel origin`,
+        `${requestedTarget} must use its registered system-trusted TLS origin`,
       );
     }
     const localDatabaseName = requestedDatabaseName
@@ -292,12 +294,12 @@ export function resolveManualAcceptanceTarget({
 
   if (requestedTarget !== CUSTOMER_TRIAL_133_TARGET) {
     throw new ManualAcceptanceTargetPolicyError(
-      `refuse external backend ${url.origin}; ${CUSTOMER_TRIAL_133_TARGET} writes require the registered SSH tunnel origin`,
+      `refuse external backend ${url.origin}; ${CUSTOMER_TRIAL_133_TARGET} writes require the registered system-trusted TLS origin`,
     );
   }
   if (normalizedBackendURL !== CUSTOMER_TRIAL_133_ORIGIN) {
     throw new ManualAcceptanceTargetPolicyError(
-      `${CUSTOMER_TRIAL_133_TARGET} requires registered SSH tunnel origin ${CUSTOMER_TRIAL_133_ORIGIN}`,
+      `${CUSTOMER_TRIAL_133_TARGET} requires registered system-trusted TLS origin ${CUSTOMER_TRIAL_133_ORIGIN}`,
     );
   }
 
@@ -550,7 +552,7 @@ export async function assertManualAcceptanceRuntimeIdentityPrecondition({
     ? requiredIdentity(
         resolved.databaseName,
         "runtime databaseName",
-        /^plush_erp_uat_[a-z0-9_]+$/u,
+        /^plush_erp_[a-z0-9_]+$/u,
         "the registered acceptance database identity",
       )
     : resolved.target === SCENARIO_DEMO_TARGET

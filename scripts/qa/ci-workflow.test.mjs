@@ -51,7 +51,9 @@ test("CI exposes one stable aggregate check over trusted plan and quality jobs",
     "push",
     "workflow_dispatch",
   ]);
-  assert.deepEqual(workflow.on.push, { branches: ["review/gpt/**"] });
+  assert.deepEqual(workflow.on.push, {
+    branches: ["review/gpt", "review/gpt/**"],
+  });
   assert.deepEqual(workflow.permissions, {
     actions: "read",
     contents: "read",
@@ -202,7 +204,9 @@ test("CI pins actions, toolchains, database and Chromium sandbox", () => {
 });
 
 test("GitHub review CI never duplicates the canonical main pipeline", () => {
-  assert.deepEqual(workflow.on.push, { branches: ["review/gpt/**"] });
+  assert.deepEqual(workflow.on.push, {
+    branches: ["review/gpt", "review/gpt/**"],
+  });
   assert.doesNotMatch(source, /refs\/heads\/main|branches:\n\s+- main/u);
   assert.doesNotMatch(source, /same_ref_newer_sha|ci-supersession/u);
   assert.equal(workflow.concurrency["cancel-in-progress"], true);

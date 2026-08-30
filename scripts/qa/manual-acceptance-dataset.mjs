@@ -263,6 +263,8 @@ export async function readManualAcceptanceDatabaseRebuildReceipt(
     const plan = readDatabaseRebuildPlan(store, operationId);
     validateRemoteDatabaseRebuildReceipt(receipt, {
       operationId,
+      targetKey: plan.target.key,
+      databaseName: plan.target.database,
       gitSha: operation.gitSha,
       version: operation.version,
       migration: plan.release.migration.latest,
@@ -272,7 +274,7 @@ export async function readManualAcceptanceDatabaseRebuildReceipt(
     const receiptSha256 = createHash("sha256").update(raw).digest("hex");
     if (
       operation.action !== "rebuild-database" ||
-      operation.target !== "test-133" ||
+      operation.target !== plan.target.key ||
       operation.status !== "passed" ||
       plan.status !== "eligible" ||
       plan.operationId !== operationId ||
@@ -331,6 +333,8 @@ export function buildManualAcceptanceDatabaseRebuildProof({
   try {
     receipt = validateRemoteDatabaseRebuildReceipt(receipt, {
       operationId: receipt?.operationId,
+      targetKey: "demo-133",
+      databaseName: target.databaseName,
       gitSha: targetAttestation.release,
       version: receipt?.version,
       migration: targetAttestation.migration,
@@ -344,6 +348,7 @@ export function buildManualAcceptanceDatabaseRebuildProof({
   }
   if (
     receipt.status !== "passed" ||
+    receipt.target !== "demo-133" ||
     receipt.schemaVersion !== REMOTE_DATABASE_REBUILD_RECEIPT_CONTRACT ||
     receipt.database.logicalName !== target.databaseName
   ) {

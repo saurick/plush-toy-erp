@@ -88,19 +88,19 @@ func TestValidateTargetDSNSeparatesLocalAnd133(t *testing.T) {
 		{name: "local IPv4", target: targetLocalDev, dsn: "postgres://user:secret@127.0.0.1:55432/plush_erp_acceptance_local_fixture_dev?sslmode=disable"},
 		{name: "local hostname", target: targetLocalDev, dsn: "postgres://user:secret@localhost:55432/plush_erp_acceptance_other_run_dev?sslmode=disable"},
 		{name: "local IPv6", target: targetLocalDev, dsn: "postgres://user:secret@[::1]:55432/plush_erp_acceptance_ipv6_run_dev?sslmode=disable"},
-		{name: "local rejects 133", target: targetLocalDev, dsn: "postgres://user:secret@192.168.0.133:55435/plush_erp_uat_20260716_v5?sslmode=disable", wantErr: "loopback"},
+		{name: "local rejects 133", target: targetLocalDev, dsn: "postgres://user:secret@192.168.0.133:55436/plush_erp_demo_v1?sslmode=disable", wantErr: "loopback"},
 		{name: "local rejects unregistered remote", target: targetLocalDev, dsn: "postgres://user:secret@192.168.0.88:5432/plush_erp_acceptance_local_fixture_dev?sslmode=disable", wantErr: "loopback"},
 		{name: "local rejects shared dev database", target: targetLocalDev, dsn: "postgres://user:secret@127.0.0.1:55432/plush_erp_simon_dev?sslmode=disable", wantErr: "plush_erp_acceptance_<run-id>_dev"},
 		{name: "local rejects generic database", target: targetLocalDev, dsn: "postgres://user:secret@127.0.0.1:55432/plush_erp?sslmode=disable", wantErr: "plush_erp_acceptance_<run-id>_dev"},
 		{name: "local rejects browser action database", target: targetLocalDev, dsn: "postgres://user:secret@127.0.0.1:55432/plush_erp_acceptance_local_fixture_browser_actions_dev?sslmode=disable", wantErr: "plush_erp_acceptance_<run-id>_dev"},
-		{name: "133 host loopback", target: targetCustomerTrial133, dsn: "postgres://user:secret@127.0.0.1:55435/plush_erp_uat_20260716_v5?sslmode=disable"},
-		{name: "133 postgresql URL and escaped password", target: targetCustomerTrial133, dsn: "postgresql://user:secret%40value%3A1@localhost:55435/plush_erp_uat_20260716_v5?sslmode=disable"},
-		{name: "133 exact compose endpoint", target: targetCustomerTrial133, dsn: "postgres://user:secret@postgres:5432/plush_erp_uat_20260716_v5?sslmode=disable"},
-		{name: "133 rejects arbitrary compose host", target: targetCustomerTrial133, dsn: "postgres://user:secret@database:5432/plush_erp_uat_20260716_v5?sslmode=disable", wantErr: "exact host"},
-		{name: "133 rejects LAN credentials", target: targetCustomerTrial133, dsn: "postgres://user:secret@192.168.0.133:55435/plush_erp_uat_20260716_v5?sslmode=disable", wantErr: "loopback"},
-		{name: "133 rejects live db", target: targetCustomerTrial133, dsn: "postgres://user:secret@127.0.0.1:55435/plush_erp?sslmode=disable", wantErr: "isolated database"},
-		{name: "133 wrong db", target: targetCustomerTrial133, dsn: "postgres://user:secret@127.0.0.1:55435/other?sslmode=disable", wantErr: "isolated database"},
-		{name: "133 rejects retired stack port", target: targetCustomerTrial133, dsn: "postgres://user:secret@127.0.0.1:5435/plush_erp_uat_20260716_v5?sslmode=disable", wantErr: "55435"},
+		{name: "133 host loopback", target: targetCustomerTrial133, dsn: "postgres://user:secret@127.0.0.1:55436/plush_erp_demo_v1?sslmode=disable"},
+		{name: "133 postgresql URL and escaped password", target: targetCustomerTrial133, dsn: "postgresql://user:secret%40value%3A1@localhost:55436/plush_erp_demo_v1?sslmode=disable"},
+		{name: "133 exact compose endpoint", target: targetCustomerTrial133, dsn: "postgres://user:secret@postgres:5432/plush_erp_demo_v1?sslmode=disable"},
+		{name: "133 rejects arbitrary compose host", target: targetCustomerTrial133, dsn: "postgres://user:secret@database:5432/plush_erp_demo_v1?sslmode=disable", wantErr: "exact host"},
+		{name: "133 rejects LAN credentials", target: targetCustomerTrial133, dsn: "postgres://user:secret@192.168.0.133:55436/plush_erp_demo_v1?sslmode=disable", wantErr: "loopback"},
+		{name: "133 rejects live db", target: targetCustomerTrial133, dsn: "postgres://user:secret@127.0.0.1:55436/plush_erp?sslmode=disable", wantErr: "isolated database"},
+		{name: "133 wrong db", target: targetCustomerTrial133, dsn: "postgres://user:secret@127.0.0.1:55436/other?sslmode=disable", wantErr: "isolated database"},
+		{name: "133 rejects retired stack port", target: targetCustomerTrial133, dsn: "postgres://user:secret@127.0.0.1:5435/plush_erp_demo_v1?sslmode=disable", wantErr: "55436"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -310,47 +310,47 @@ func TestValidateTargetDSNRejectsURLAndPGXOverrideAttacks(t *testing.T) {
 		{
 			name:   "133 host query override",
 			target: targetCustomerTrial133,
-			dsn:    "postgres://user:top-secret@127.0.0.1:55435/plush_erp_uat_20260716_v5?sslmode=disable&host=192.168.0.133",
+			dsn:    "postgres://user:top-secret@127.0.0.1:55436/plush_erp_demo_v1?sslmode=disable&host=192.168.0.133",
 		},
 		{
 			name:   "133 port query override",
 			target: targetCustomerTrial133,
-			dsn:    "postgres://user:top-secret@127.0.0.1:55435/plush_erp_uat_20260716_v5?port=5432&sslmode=disable",
+			dsn:    "postgres://user:top-secret@127.0.0.1:55436/plush_erp_demo_v1?port=5432&sslmode=disable",
 		},
 		{
 			name:   "133 database query override",
 			target: targetCustomerTrial133,
-			dsn:    "postgres://user:top-secret@127.0.0.1:55435/plush_erp_uat_20260716_v5?sslmode=disable&dbname=plush_erp",
+			dsn:    "postgres://user:top-secret@127.0.0.1:55436/plush_erp_demo_v1?sslmode=disable&dbname=plush_erp",
 		},
 		{
 			name:   "133 user query override",
 			target: targetCustomerTrial133,
-			dsn:    "postgres://user:top-secret@127.0.0.1:55435/plush_erp_uat_20260716_v5?sslmode=disable&user=postgres",
+			dsn:    "postgres://user:top-secret@127.0.0.1:55436/plush_erp_demo_v1?sslmode=disable&user=postgres",
 		},
 		{
 			name:   "133 multi host URL",
 			target: targetCustomerTrial133,
-			dsn:    "postgres://user:top-secret@127.0.0.1,192.168.0.133:55435/plush_erp_uat_20260716_v5?sslmode=disable",
+			dsn:    "postgres://user:top-secret@127.0.0.1,192.168.0.133:55436/plush_erp_demo_v1?sslmode=disable",
 		},
 		{
 			name:   "133 duplicate sslmode",
 			target: targetCustomerTrial133,
-			dsn:    "postgres://user:top-secret@127.0.0.1:55435/plush_erp_uat_20260716_v5?sslmode=disable&sslmode=disable",
+			dsn:    "postgres://user:top-secret@127.0.0.1:55436/plush_erp_demo_v1?sslmode=disable&sslmode=disable",
 		},
 		{
 			name:   "133 extra query",
 			target: targetCustomerTrial133,
-			dsn:    "postgres://user:top-secret@127.0.0.1:55435/plush_erp_uat_20260716_v5?sslmode=disable&target_session_attrs=read-write",
+			dsn:    "postgres://user:top-secret@127.0.0.1:55436/plush_erp_demo_v1?sslmode=disable&target_session_attrs=read-write",
 		},
 		{
 			name:   "133 TLS mode",
 			target: targetCustomerTrial133,
-			dsn:    "postgres://user:top-secret@127.0.0.1:55435/plush_erp_uat_20260716_v5?sslmode=require",
+			dsn:    "postgres://user:top-secret@127.0.0.1:55436/plush_erp_demo_v1?sslmode=require",
 		},
 		{
 			name:   "133 fragment",
 			target: targetCustomerTrial133,
-			dsn:    "postgres://user:top-secret@127.0.0.1:55435/plush_erp_uat_20260716_v5?sslmode=disable#dbname=plush_erp",
+			dsn:    "postgres://user:top-secret@127.0.0.1:55436/plush_erp_demo_v1?sslmode=disable#dbname=plush_erp",
 		},
 	}
 
@@ -369,9 +369,9 @@ func TestValidateTargetDSNRejectsURLAndPGXOverrideAttacks(t *testing.T) {
 
 func TestValidateTargetDSNRequiresExplicitCredentials(t *testing.T) {
 	tests := []string{
-		"postgres://127.0.0.1:55435/plush_erp_uat_20260716_v5?sslmode=disable",
-		"postgres://user@127.0.0.1:55435/plush_erp_uat_20260716_v5?sslmode=disable",
-		"postgres://user:@127.0.0.1:55435/plush_erp_uat_20260716_v5?sslmode=disable",
+		"postgres://127.0.0.1:55436/plush_erp_demo_v1?sslmode=disable",
+		"postgres://user@127.0.0.1:55436/plush_erp_demo_v1?sslmode=disable",
+		"postgres://user:@127.0.0.1:55436/plush_erp_demo_v1?sslmode=disable",
 	}
 	for _, dsn := range tests {
 		if err := validateTargetDSN(targetCustomerTrial133, currentDatasetVersion, dsn); err == nil {
@@ -384,7 +384,7 @@ func TestValidateTargetDSNRejectsUnknown133DatasetVersion(t *testing.T) {
 	err := validateTargetDSN(
 		targetCustomerTrial133,
 		"2026.07.15-v1",
-		"postgres://user:secret@127.0.0.1:55435/plush_erp_uat_20260716_v5?sslmode=disable",
+		"postgres://user:secret@127.0.0.1:55436/plush_erp_demo_v1?sslmode=disable",
 	)
 	if err == nil || !strings.Contains(err.Error(), currentDatasetVersion) {
 		t.Fatalf("validateTargetDSN() error = %v, want dataset version failure", err)

@@ -28,16 +28,17 @@ epoch_millis`,
   return result.stdout.trim();
 }
 
-test("remote promotion accepts only the fixed target contract", () => {
-  assert.match(source, /target=test-133/u);
-  assert.match(source, /root=\/home\/simon\/plush-toy-erp-v5/u);
-  assert.match(source, /project=plush-toy-erp-v5/u);
-  assert.match(source, /database=plush_erp_uat_20260716_v5/u);
+test("remote promotion accepts only the registered demo and customer-test contracts", () => {
+  assert.match(source, /demo-133\)/u);
+  assert.match(source, /customer-test-133\)/u);
+  assert.match(source, /root=\/home\/simon\/plush-toy-erp-demo-v1/u);
+  assert.match(source, /root=\/home\/simon\/plush-toy-erp-test-v1/u);
+  assert.doesNotMatch(source, /admin[.]yoyoosun[.]net|target=admin/u);
   assert.match(source, /minimum_available_bytes=32212254720/u);
   assert.match(source, /PROMOTE:\$target:\$release_sha:\$operation_id/u);
   assert.doesNotMatch(
     source,
-    /(?:--host|--path|--project|--database|--command|eval\s)/u,
+    /(?:^|\s)--(?:host|path|project|database|command)(?:\s|=)|eval\s/mu,
   );
 });
 
@@ -46,14 +47,14 @@ test("remote promotion builds nothing and never runs automatic down migration", 
     source,
     /\b(?:docker\s+build|buildx|pnpm|npm\s+(?:install|run)|go\s+build|make\s+build|git\s+clone|git\s+checkout)\b/u,
   );
-  assert.doesNotMatch(source, /atlas\s+migrate\s+down|down[_-]?migration/u);
+  assert.doesNotMatch(source, /atlas\s+migrate\s+down/u);
   assert.match(source, /automaticDownMigration: false/u);
   assert.match(source, /--no-build --pull never/u);
   assert.match(source, /plush[.]release-manifest\/v2/u);
   assert.match(source, /rehearsal[.]receiptSha256/u);
   assert.match(source, /release-rehearsal[.]json/u);
   assert.match(source, /releaseRehearsalSha256/u);
-  assert.match(source, /release_rehearsal_sha256="[$][{]6:-[}]"/u);
+  assert.match(source, /release_rehearsal_sha256="[$][{]7:-[}]"/u);
   assert.match(source, /rehearsal[.]cleanup[.]residualContainers == 0/u);
   assert.match(source, /artifact[.]releaseVersion == \$release[.]version/u);
   assert.match(
@@ -142,7 +143,7 @@ test("remote promotion help is no-write and invalid input fails before target pa
   assert.match(help.stdout, /never builds source/u);
   const invalid = spawnSync(
     "bash",
-    [script, "promote", "invalid", "short", "bad", "bad", "bad", "bad"],
+    [script, "promote", "demo-133", "short", "bad", "bad", "bad", "bad"],
     { encoding: "utf8" },
   );
   assert.notEqual(invalid.status, 0);

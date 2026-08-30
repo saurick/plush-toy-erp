@@ -194,7 +194,7 @@ function preflight(overrides = {}) {
   return {
     schemaVersion: "plush.target-preflight/v1",
     status: "passed",
-    target: "test-133",
+    target: "demo-133",
     customer: "yoyoosun",
     blockers: [],
     remote: {

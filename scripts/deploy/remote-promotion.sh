@@ -5,12 +5,12 @@ umask 077
 print_help() {
   cat <<'USAGE'
 Usage:
-  bash remote-promotion.sh promote \
+  bash remote-promotion.sh promote <demo-133|customer-test-133> \
     <operation-id> <40-sha> <version> <release-manifest-sha256> \
     <release-rehearsal-sha256> <promotion-fingerprint> <confirmation>
 
 This script is not a general remote shell. It only operates on the committed
-test-133 target contract and an already transferred, checksum-bound package.
+registered target contract and an already transferred, checksum-bound package.
 It never builds source or automatically retries a terminal/unknown operation.
 USAGE
 }
@@ -21,28 +21,59 @@ USAGE
 }
 
 action="${1:-}"
-operation_id="${2:-}"
-release_sha="${3:-}"
-release_version="${4:-}"
-release_manifest_sha256="${5:-}"
-release_rehearsal_sha256="${6:-}"
-promotion_fingerprint="${7:-}"
-confirmation="${8:-}"
+target="${2:-}"
+operation_id="${3:-}"
+release_sha="${4:-}"
+release_version="${5:-}"
+release_manifest_sha256="${6:-}"
+release_rehearsal_sha256="${7:-}"
+promotion_fingerprint="${8:-}"
+confirmation="${9:-}"
 
-target=test-133
-root=/home/simon/plush-toy-erp-v5
+case "$target" in
+demo-133)
+  root=/home/simon/plush-toy-erp-demo-v1
+  runtime_env=$root/runtime/.env.demo-133
+  public_endpoint=https://demo.yoyoosun.net
+  public_network=plush-toy-erp-demo-v1_default
+  public_container_prefix=plush-toy-erp-demo-web-public-
+  public_host_port=5176
+  public_candidate_port=15176
+  project=plush-toy-erp-demo-v1
+  database=plush_erp_demo_v1
+  compose_override_name=compose.demo-133.yml
+  server_endpoint=http://127.0.0.1:8325
+  web_endpoint=http://127.0.0.1:5195
+  ;;
+customer-test-133)
+  root=/home/simon/plush-toy-erp-test-v1
+  runtime_env=$root/runtime/.env.customer-test-133
+  public_endpoint=https://test.yoyoosun.net
+  public_network=plush-toy-erp-test-v1_default
+  public_container_prefix=plush-toy-erp-test-web-public-
+  public_host_port=5177
+  public_candidate_port=15177
+  project=plush-toy-erp-test-v1
+  database=plush_erp_customer_test_v1
+  compose_override_name=compose.customer-test-133.yml
+  server_endpoint=http://127.0.0.1:8335
+  web_endpoint=http://127.0.0.1:5205
+  ;;
+*)
+  printf '[remote-promotion] unsupported target\n' >&2
+  exit 1
+  ;;
+esac
 incoming_root=$root/incoming
 cache_root=$root/release-cache
 releases_root=$root/releases
-runtime_env=$root/runtime/.env.customer-trial-133
-public_endpoint=https://admin.yoyoosun.net
-public_network=plush-toy-erp-v5_default
 backups_root=$root/backups
 operations_root=$root/operations
 run_root=$root/run
 current=$root/current
-project=plush-toy-erp-v5
-database=plush_erp_uat_20260716_v5
+postgres_container=$project-postgres
+server_container=$project-server
+web_container=$project-web-desktop
 minimum_available_bytes=32212254720
 promotion_lock=$run_root/promotion.lock
 
@@ -127,7 +158,7 @@ portable_archive_manifest_digest() {
   fail "invalid promotion fingerprint"
 [[ "$confirmation" == "PROMOTE:$target:$release_sha:$operation_id" ]] ||
   fail "promotion confirmation does not match"
-[[ "$(hostname)" == simon && "$(id -un)" == simon ]] ||
+[[ "$(hostname)" == r640 && "$(id -un)" == simon ]] ||
   fail "remote host/user identity does not match"
 
 incoming=$incoming_root/$operation_id
@@ -347,7 +378,7 @@ write_receipt() {
 
 restore_database_cleanup() {
   if [[ "$restore_database_created" -eq 1 ]]; then
-    docker exec plush-toy-erp-v5-postgres sh -ceu \
+    docker exec "$postgres_container" sh -ceu \
       'dropdb --if-exists --force -U "$POSTGRES_USER" "$1"' \
       sh "$restore_database" >/dev/null 2>&1 || true
     restore_database_created=0
@@ -393,7 +424,7 @@ recover_before_migration() {
       -p "$project" \
       --env-file "$runtime_env" \
       -f "$current/server/deploy/compose/prod/compose.yml" \
-      -f "$current/server/deploy/compose/prod/compose.customer-trial-133.yml" \
+      -f "$current/server/deploy/compose/prod/$compose_override_name" \
       up -d --no-build --pull never app-server web-desktop \
       >>"$log_file" 2>&1 || true
   fi
@@ -496,13 +527,14 @@ actual_release_rehearsal_sha256="$(sha256sum "$incoming/release-rehearsal.json" 
   fail "release rehearsal checksum does not match the release manifest"
 jq -e \
   --arg operationId "$operation_id" \
+  --arg target "$target" \
   --arg sha "$release_sha" \
   --arg fingerprint "$promotion_fingerprint" \
   --arg rehearsalSha256 "$release_rehearsal_sha256" \
   '.schemaVersion == "plush.promotion-manifest/v1" and
    .status == "eligible" and
    .operationId == $operationId and
-   .target.key == "test-133" and
+   .target.key == $target and
    .release.gitSha == $sha and
    .ancestry.schemaVersion == "plush.git-ancestry-relation/v1" and
    .ancestry.currentGitSha == .before.runtimeSha and
@@ -666,9 +698,9 @@ available_bytes="$(df -B1 --output=avail / | awk 'NR==2 {print $1}')"
   "$available_bytes" -ge "$minimum_available_bytes" ]] ||
   fail "target disk capacity is below the fixed minimum"
 frozen_current_sha="$(jq -er '.ancestry.currentGitSha' "$incoming/promotion-manifest.json")"
-runtime_server_sha="$(docker inspect plush-toy-erp-v5-server --format '{{range .Config.Env}}{{println .}}{{end}}' |
+runtime_server_sha="$(docker inspect "$server_container" --format '{{range .Config.Env}}{{println .}}{{end}}' |
   sed -n 's/^GIT_SHA=//p' | head -n1)"
-runtime_web_sha="$(docker inspect plush-toy-erp-v5-web-desktop --format '{{range .Config.Env}}{{println .}}{{end}}' |
+runtime_web_sha="$(docker inspect "$web_container" --format '{{range .Config.Env}}{{println .}}{{end}}' |
   sed -n 's/^GIT_SHA=//p' | head -n1)"
 [[ "$frozen_current_sha" =~ $sha_pattern &&
   "$runtime_server_sha" == "$frozen_current_sha" &&
@@ -839,7 +871,7 @@ enter_stage env_and_static_preflight
   "$(stat -c '%u' "$runtime_env")" == "$(id -u)" &&
   "$(stat -c '%a' "$runtime_env")" == 600 ]] ||
   fail "target runtime env is invalid"
-env_backup="$root/runtime/.env.customer-trial-133.bak-before-${release_sha:0:12}-${operation_id:0:8}"
+env_backup="$runtime_env.bak-before-${release_sha:0:12}-${operation_id:0:8}"
 [[ ! -e "$env_backup" ]] || fail "operation env backup already exists"
 cp "$runtime_env" "$env_backup"
 chmod 600 "$env_backup"
@@ -850,7 +882,7 @@ env_changed=1
 
 compose_dir=$release_dir/server/deploy/compose/prod
 compose_base=$compose_dir/compose.yml
-compose_override=$compose_dir/compose.customer-trial-133.yml
+compose_override=$compose_dir/$compose_override_name
 preflight_script=$release_dir/scripts/deploy/production-preflight.sh
 migrate_script=$compose_dir/migrate_online.sh
 [[ -f "$compose_base" && -f "$compose_override" &&
@@ -873,6 +905,7 @@ compose=(
 )
 
 "${clean_env[@]}" bash "$preflight_script" \
+  --deployment-target "$target" \
   --env-file "$runtime_env" \
   --compose-dir "$compose_dir" \
   --compose-override "$compose_override" \
@@ -896,6 +929,7 @@ enter_stage migration_plan
 "${clean_env[@]}" \
   "COMPOSE_OVERRIDE_FILE=$compose_override" \
   "COMPOSE_ENV_FILE=$runtime_env" \
+  "DEPLOYMENT_TARGET_KEY=$target" \
   "MIGRATION_MAINTENANCE_CONFIRMED=1" \
   "EXPECTED_MIGRATION_SEQUENCE_SHA256=$migration_sequence_sha256" \
   "RELEASE_SHA=$release_sha" \
@@ -907,6 +941,7 @@ migration_apply_started=1
 "${clean_env[@]}" \
   "COMPOSE_OVERRIDE_FILE=$compose_override" \
   "COMPOSE_ENV_FILE=$runtime_env" \
+  "DEPLOYMENT_TARGET_KEY=$target" \
   "MIGRATION_MAINTENANCE_CONFIRMED=1" \
   "EXPECTED_MIGRATION_SEQUENCE_SHA256=$migration_sequence_sha256" \
   "RELEASE_SHA=$release_sha" \
@@ -917,6 +952,7 @@ enter_stage migration_applied
 "${clean_env[@]}" \
   "COMPOSE_OVERRIDE_FILE=$compose_override" \
   "COMPOSE_ENV_FILE=$runtime_env" \
+  "DEPLOYMENT_TARGET_KEY=$target" \
   "EXPECTED_MIGRATION_SEQUENCE_SHA256=$migration_sequence_sha256" \
   "RELEASE_SHA=$release_sha" \
   "APPLICATION_IMAGE_DIGEST=$server_content_id" \
@@ -928,6 +964,7 @@ enter_stage compose_start
 
 enter_stage runtime_verified
 "${clean_env[@]}" bash "$preflight_script" \
+  --deployment-target "$target" \
   --env-file "$runtime_env" \
   --compose-dir "$compose_dir" \
   --compose-override "$compose_override" \
@@ -936,14 +973,14 @@ enter_stage runtime_verified
   --out "$operation_dir/production-preflight-report.txt" \
   >>"$log_file" 2>&1
 curl --fail --silent --show-error --max-time 10 \
-  http://127.0.0.1:8315/healthz >/dev/null
+  "$server_endpoint/healthz" >/dev/null
 curl --fail --silent --show-error --max-time 10 \
-  http://127.0.0.1:8315/readyz >/dev/null
+  "$server_endpoint/readyz" >/dev/null
 curl --fail --silent --show-error --max-time 10 \
-  http://127.0.0.1:5185/healthz >/dev/null
-runtime_server_sha="$(docker inspect plush-toy-erp-v5-server --format '{{range .Config.Env}}{{println .}}{{end}}' |
+  "$web_endpoint/healthz" >/dev/null
+runtime_server_sha="$(docker inspect "$server_container" --format '{{range .Config.Env}}{{println .}}{{end}}' |
   sed -n 's/^GIT_SHA=//p' | head -n1)"
-runtime_web_sha="$(docker inspect plush-toy-erp-v5-web-desktop --format '{{range .Config.Env}}{{println .}}{{end}}' |
+runtime_web_sha="$(docker inspect "$web_container" --format '{{range .Config.Env}}{{println .}}{{end}}' |
   sed -n 's/^GIT_SHA=//p' | head -n1)"
 [[ "$runtime_server_sha" == "$release_sha" && "$runtime_web_sha" == "$release_sha" ]] ||
   fail "runtime release identity does not match"
@@ -954,7 +991,7 @@ public_cutover_script=$release_dir/deployments/yoyoosun/scripts/cutover-public-w
   fail "public entry cutover script is unavailable"
 public_containers="$(
   docker ps --format '{{.Names}}' |
-    sed -n '/^plush-toy-erp-web-public-[0-9a-f]\{8\}$/p'
+    grep -E "^${public_container_prefix}[0-9a-f]{8}$" || true
 )"
 public_container_count="$(printf '%s\n' "$public_containers" | sed '/^$/d' | wc -l | tr -d ' ')"
 [[ "$public_container_count" == 1 ]] || fail "public entry container is not unique"
@@ -965,11 +1002,14 @@ bash "$public_cutover_script" \
   --endpoint "$public_endpoint" \
   --api-origin http://app-server:8300 \
   --network "$public_network" \
+  --container-prefix "$public_container_prefix" \
+  --host-port "$public_host_port" \
+  --candidate-port "$public_candidate_port" \
   --execute \
   --confirm "PUBLIC_WEB_CUTOVER:$public_containers:$release_sha" \
   >>"$log_file" 2>&1
 public_runtime_sha="$(
-  docker inspect "plush-toy-erp-web-public-${release_sha:0:8}" \
+  docker inspect "${public_container_prefix}${release_sha:0:8}" \
     --format '{{range .Config.Env}}{{println .}}{{end}}' |
     sed -n 's/^GIT_SHA=//p' | head -n1
 )"

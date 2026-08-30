@@ -158,7 +158,7 @@ func TestRegisterHealthRoutesReadyzVerifiesRuntimeIdentityWithoutAuthentication(
 	const migration = "20260714165115"
 	t.Setenv("GIT_SHA", release)
 	mock.ExpectQuery(`SELECT current_database\(\)`).WillReturnRows(
-		sqlmock.NewRows([]string{"current_database"}).AddRow("plush_erp_uat_20260716_v5"),
+		sqlmock.NewRows([]string{"current_database"}).AddRow("plush_erp_demo_v1"),
 	)
 	mock.ExpectQuery(`SELECT version[\s\S]+atlas_schema_revisions`).WillReturnRows(
 		sqlmock.NewRows([]string{"version"}).AddRow(migration),
@@ -173,7 +173,7 @@ func TestRegisterHealthRoutesReadyzVerifiesRuntimeIdentityWithoutAuthentication(
 		runtimeIdentityDigestHeader,
 		hex.EncodeToString(runtimeIdentityDigest(
 			runtimeIdentityReleaseScope,
-			"plush_erp_uat_20260716_v5",
+			"plush_erp_demo_v1",
 			release,
 			migration,
 		)),
@@ -217,7 +217,7 @@ func TestRegisterHealthRoutesReadyzRejectsRuntimeIdentityMismatchWithoutDisclosi
 		runtimeIdentityDigestHeader,
 		hex.EncodeToString(runtimeIdentityDigest(
 			runtimeIdentityDatabaseScope,
-			"plush_erp_uat_20260716_v5",
+			"plush_erp_demo_v1",
 			"",
 			"",
 		)),

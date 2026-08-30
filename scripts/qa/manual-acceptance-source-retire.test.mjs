@@ -215,7 +215,7 @@ test("retirement CLI keeps local dry-run default and permits only the registered
         "--run-id",
         "REMOTE",
       ]),
-    /refuse external backend|registered SSH tunnel origin/u,
+    /refuse external backend|registered system-trusted TLS origin/u,
   );
 });
 
@@ -348,7 +348,7 @@ test("direct retirement rejects an external plan before login", async () => {
           throw new Error("fetch must not run for an external plan");
         },
       }),
-    /refuse external backend|registered SSH tunnel origin/u,
+    /refuse external backend|registered system-trusted TLS origin/u,
   );
   assert.equal(fetchCalls, 0);
 });
