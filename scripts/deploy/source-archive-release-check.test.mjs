@@ -616,6 +616,8 @@ test("Docker release mode compiles Web and Go once through one shared graph", as
     );
     assert.deepEqual(bakeSpec.args.slice(0, 2), ["buildx", "bake"]);
     assert(bakeSpec.args.includes("rawjson"));
+    assert(bakeSpec.args.includes("--provenance=false"));
+    assert(bakeSpec.args.includes("--sbom=false"));
     assert.deepEqual(bakeDefinition.group.default.targets, [
       "release-web",
       "release-server",

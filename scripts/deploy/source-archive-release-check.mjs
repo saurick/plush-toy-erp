@@ -764,6 +764,8 @@ async function runReleaseBuilds({
           bakePath,
           "--progress",
           "rawjson",
+          "--provenance=false",
+          "--sbom=false",
           ...(environment.RELEASE_BUILDX_BUILDER
             ? ["--builder", environment.RELEASE_BUILDX_BUILDER]
             : []),
