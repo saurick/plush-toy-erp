@@ -31,7 +31,7 @@ export function createDevDrillRecoveryScenarios({
           'page',
           '交付运行菜单必须明确标记当前演练与恢复入口'
         )
-        await page.getByText('客户试用环境', { exact: true }).waitFor()
+        await page.getByText('项目方演练造数环境', { exact: true }).waitFor()
         assert.equal(
           await page.locator('.erp-dev-environment-evidence').count(),
           0,
@@ -111,7 +111,7 @@ export function createDevDrillRecoveryScenarios({
         await expectHeading(page, '演练与恢复中心')
         await clickERPThemeOption(page, '暗色')
         await page.evaluate(() => window.scrollTo(0, 0))
-        await page.getByText('客户试用环境', { exact: true }).waitFor()
+        await page.getByText('项目方演练造数环境', { exact: true }).waitFor()
         assert.equal(
           await page.locator('.erp-dev-environment-evidence').count(),
           0,

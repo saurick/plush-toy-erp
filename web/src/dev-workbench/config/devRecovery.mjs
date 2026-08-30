@@ -285,8 +285,10 @@ export function resolveDevRecoveryTarget(summary = {}) {
   const key = target.target || summary.boundaries?.target || '未登记目标'
   const purpose = target.purpose || 'unknown'
   const label =
-    purpose === 'customer-trial'
-      ? '客户试用环境'
+    purpose === 'project-demo-simulated'
+      ? '项目方演练造数环境'
+      : purpose === 'customer-clean-acceptance'
+        ? '甲方测试验收环境'
       : purpose === 'production'
         ? '正式生产环境'
         : '受控交付环境'

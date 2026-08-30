@@ -17,7 +17,7 @@ function operation({
   action,
   gitSha,
   updatedAt,
-  target = 'customer-test-133',
+  target = 'demo-133',
   message = 'target promotion and basic runtime verification passed',
 }) {
   return {
@@ -36,7 +36,7 @@ function backupRestoreReceipt(overrides = {}) {
   return {
     schemaVersion: 'plush.backup-restore-evidence/v1',
     status: 'passed',
-    target: 'customer-test-133',
+    target: 'demo-133',
     customer: 'yoyoosun',
     environment: 'customer-trial-133',
     releaseVersion: CURRENT_SHA,
@@ -62,13 +62,13 @@ function summary({
 } = {}) {
   return {
     generatedAt: '2026-08-10T01:00:00.000Z',
-    boundaries: { target: 'customer-test-133' },
+    boundaries: { target: 'demo-133' },
     target: {
       schemaVersion: 'plush.target-preflight/v1',
       generatedAt: '2026-08-10T00:59:00.000Z',
       status: targetStatus,
-      target: 'customer-test-133',
-      purpose: 'customer-trial',
+      target: 'demo-133',
+      purpose: 'project-demo-simulated',
       customer: 'yoyoosun',
       trialTarget: 'customer-trial-133',
       remote: {
@@ -142,12 +142,29 @@ test('devRecovery: 演练目录按 P0、P1、P2 排序且不暴露任意执行�
 
 test('devRecovery: 目标展示使用业务环境语义并保留技术 key', () => {
   assert.deepEqual(resolveDevRecoveryTarget(summary()), {
-    key: 'customer-test-133',
-    label: '客户试用环境',
-    purpose: 'customer-trial',
+    key: 'demo-133',
+    label: '项目方演练造数环境',
+    purpose: 'project-demo-simulated',
     customer: 'yoyoosun',
     trialTarget: 'customer-trial-133',
   })
+  assert.deepEqual(
+    resolveDevRecoveryTarget({
+      boundaries: { target: 'customer-test-133' },
+      target: {
+        target: 'customer-test-133',
+        purpose: 'customer-clean-acceptance',
+        customer: 'yoyoosun',
+      },
+    }),
+    {
+      key: 'customer-test-133',
+      label: '甲方测试验收环境',
+      purpose: 'customer-clean-acceptance',
+      customer: 'yoyoosun',
+      trialTarget: '',
+    }
+  )
   assert.deepEqual(
     resolveDevRecoveryTarget({
       boundaries: { target: 'prod-primary' },
@@ -195,7 +212,7 @@ test('devRecovery: 只把精确幂等和完整回滚再前滚 operation 认作�
       ],
     })
   )
-  assert.equal(overview.target.label, '客户试用环境')
+  assert.equal(overview.target.label, '项目方演练造数环境')
   assert.equal(overview.currentSha, CURRENT_SHA)
   assert.equal(overview.publicSha, CURRENT_SHA)
   assert.deepEqual(
