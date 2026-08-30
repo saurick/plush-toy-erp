@@ -575,10 +575,12 @@ else
   fi
 fi
 
-latest_backup="$(find "$root/backups" -maxdepth 1 -type f -name '*.dump' -size +0c -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -n1 | cut -d' ' -f2-)"
-if [[ -n "$latest_backup" && -f "$latest_backup" && ! -L "$latest_backup" ]]; then
-  latest_backup_sha256="$(sha256sum "$latest_backup" | awk '{print $1}')"
-  latest_backup_size_bytes="$(stat -c '%s' "$latest_backup")"
+if plain_directory "$root/backups"; then
+  latest_backup="$(find "$root/backups" -maxdepth 1 -type f -name '*.dump' -size +0c -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -n1 | cut -d' ' -f2-)"
+  if [[ -n "$latest_backup" && -f "$latest_backup" && ! -L "$latest_backup" ]]; then
+    latest_backup_sha256="$(sha256sum "$latest_backup" | awk '{print $1}')"
+    latest_backup_size_bytes="$(stat -c '%s' "$latest_backup")"
+  fi
 fi
 
 blockers_csv=none
@@ -781,6 +783,57 @@ export function parseRemoteTargetPreflight(
     if (value !== "false") throw new Error(`${field} must be false`);
     return false;
   };
+  const envStatus = checkStatus("ENV_STATUS");
+  const debugValues = [
+    values.DEBUG_ENV,
+    values.DEBUG_SEED_ENABLED,
+    values.DEBUG_SEED_ALLOWED,
+    values.DEBUG_CLEANUP_ENABLED,
+    values.DEBUG_CLEANUP_ALLOWED,
+    values.DEBUG_BUSINESS_CLEAR_ENABLED,
+    values.DEBUG_BUSINESS_CLEAR_ALLOWED,
+  ];
+  const debugUnobserved = debugValues.every((value) => value === "unknown");
+  if (debugUnobserved && envStatus !== "blocked") {
+    throw new Error("unobserved debug capabilities require blocked env");
+  }
+  const debug = debugUnobserved
+    ? {
+        environment: "unknown",
+        seedEnabled: "unknown",
+        seedAllowed: "unknown",
+        cleanupEnabled: "unknown",
+        cleanupAllowed: "unknown",
+        businessDataClearEnabled: "unknown",
+        businessDataClearAllowed: "unknown",
+      }
+    : {
+        environment: assertEnum(values.DEBUG_ENV, ["prod"], "debug env"),
+        seedEnabled: strictFalse(
+          values.DEBUG_SEED_ENABLED,
+          "debug seed enabled",
+        ),
+        seedAllowed: strictFalse(
+          values.DEBUG_SEED_ALLOWED,
+          "debug seed allowed",
+        ),
+        cleanupEnabled: strictFalse(
+          values.DEBUG_CLEANUP_ENABLED,
+          "debug cleanup enabled",
+        ),
+        cleanupAllowed: strictFalse(
+          values.DEBUG_CLEANUP_ALLOWED,
+          "debug cleanup allowed",
+        ),
+        businessDataClearEnabled: strictFalse(
+          values.DEBUG_BUSINESS_CLEAR_ENABLED,
+          "debug business clear enabled",
+        ),
+        businessDataClearAllowed: strictFalse(
+          values.DEBUG_BUSINESS_CLEAR_ALLOWED,
+          "debug business clear allowed",
+        ),
+      };
   const migrationVersion = values.MIGRATION_VERSION;
   if (
     migrationVersion !== "unknown" &&
@@ -846,7 +899,7 @@ export function parseRemoteTargetPreflight(
       ),
     },
     runtime: {
-      env: checkStatus("ENV_STATUS"),
+      env: envStatus,
       resourceIdentity: checkStatus("RESOURCE_IDENTITY_STATUS"),
       compose: checkStatus("COMPOSE_STATUS"),
       database: checkStatus("DATABASE_STATUS"),
@@ -866,33 +919,7 @@ export function parseRemoteTargetPreflight(
           "active dataset version",
         ),
       },
-      debug: {
-        environment: assertEnum(values.DEBUG_ENV, ["prod"], "debug env"),
-        seedEnabled: strictFalse(
-          values.DEBUG_SEED_ENABLED,
-          "debug seed enabled",
-        ),
-        seedAllowed: strictFalse(
-          values.DEBUG_SEED_ALLOWED,
-          "debug seed allowed",
-        ),
-        cleanupEnabled: strictFalse(
-          values.DEBUG_CLEANUP_ENABLED,
-          "debug cleanup enabled",
-        ),
-        cleanupAllowed: strictFalse(
-          values.DEBUG_CLEANUP_ALLOWED,
-          "debug cleanup allowed",
-        ),
-        businessDataClearEnabled: strictFalse(
-          values.DEBUG_BUSINESS_CLEAR_ENABLED,
-          "debug business clear enabled",
-        ),
-        businessDataClearAllowed: strictFalse(
-          values.DEBUG_BUSINESS_CLEAR_ALLOWED,
-          "debug business clear allowed",
-        ),
-      },
+      debug,
       serverSha: sha(values.SERVER_SHA, "server SHA"),
       webSha: sha(values.WEB_SHA, "web SHA"),
       serverHealth: healthStatus("SERVER_HEALTH"),

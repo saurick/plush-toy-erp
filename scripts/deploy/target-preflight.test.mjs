@@ -208,6 +208,59 @@ test("target preflight parser fails closed on identity and blocker drift", () =>
   );
 });
 
+test("target preflight preserves a safe blocked report before runtime env exists", () => {
+  const report = parseRemoteTargetPreflight(
+    remoteReport({
+      STATUS: "blocked",
+      ENV_STATUS: "blocked",
+      RESOURCE_IDENTITY_STATUS: "blocked",
+      COMPOSE_STATUS: "blocked",
+      DATABASE_STATUS: "blocked",
+      MIGRATION_VERSION: "unknown",
+      ACTIVE_CONFIG_REVISION: "unknown",
+      ACTIVE_CONFIG_PRODUCT_VERSION: "unknown",
+      ACTIVE_DATASET_VERSION: "unknown",
+      DEBUG_ENV: "unknown",
+      DEBUG_SEED_ENABLED: "unknown",
+      DEBUG_SEED_ALLOWED: "unknown",
+      DEBUG_CLEANUP_ENABLED: "unknown",
+      DEBUG_CLEANUP_ALLOWED: "unknown",
+      DEBUG_BUSINESS_CLEAR_ENABLED: "unknown",
+      DEBUG_BUSINESS_CLEAR_ALLOWED: "unknown",
+      SERVER_SHA: "unknown",
+      WEB_SHA: "unknown",
+      SERVER_HEALTH: "failed",
+      SERVER_READY: "failed",
+      WEB_HEALTH: "failed",
+      PUBLIC_ENTRY_STATUS: "blocked",
+      PUBLIC_CONTAINER: "unknown",
+      PUBLIC_SHA: "unknown",
+      PUBLIC_HEALTH: "failed",
+      PUBLIC_PROVIDER: "failed",
+      BACKUP_TOOLING_STATUS: "blocked",
+      LATEST_BACKUP_SHA256: "none",
+      LATEST_BACKUP_SIZE_BYTES: "0",
+      BLOCKERS: "target_directory_invalid,target_file_invalid",
+    }),
+  );
+
+  assert.equal(report.status, "blocked");
+  assert.equal(report.runtime.env, "blocked");
+  assert.deepEqual(report.runtime.debug, {
+    environment: "unknown",
+    seedEnabled: "unknown",
+    seedAllowed: "unknown",
+    cleanupEnabled: "unknown",
+    cleanupAllowed: "unknown",
+    businessDataClearEnabled: "unknown",
+    businessDataClearAllowed: "unknown",
+  });
+  assert.deepEqual(report.blockers, [
+    "target_directory_invalid",
+    "target_file_invalid",
+  ]);
+});
+
 test("target preflight uses only fixed SSH destination and streamed script", () => {
   let invocation;
   const report = runTargetPreflight("demo-133", {
@@ -383,6 +436,10 @@ test("remote target preflight script is read-only and contains no build command"
     /tar --help 2>\/dev\/null \| grep -Fq -- '--zstd'/u,
   );
   assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /retention_mode=preview_only/u);
+  assert.match(
+    REMOTE_TARGET_PREFLIGHT_SCRIPT,
+    /if plain_directory "\$root\/backups"; then\n\s+latest_backup=/u,
+  );
   assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /release-cache/u);
   assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /PUBLIC_ENTRY_STATUS/u);
   assert.match(
