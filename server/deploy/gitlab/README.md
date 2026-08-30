@@ -19,9 +19,9 @@ Runner VM 当前资源合同为 12 vCPU、24 GiB 内存和 SSD 系统盘，全�
 
 ## Playwright 冷启动与本地运行包
 
-exact SHA `cddd39ff87e3e2ae9cd8c0282431309bb7cb043f` 的自然 push pipeline `7` 是失败证据，不是优化完成证明：`plan` 约 `115s` 通过，`prepare` 约 `3900s` 后以 `job_token_expired` 失败，后续七个分片均未执行。唯一有界失败 trace 显示 pnpm 的 765 个包约 `65s` 完成，随后 Playwright Chromium 公网下载停滞约 `58m51s`。后续 exact SHA `3b1257c5f8053ce4463bf9b12111d24f42d82c89` 的自然 push pipeline `11` 已把冷下载改为串行，但第一个 `chrome-linux64.zip` 仍在 `720.035171s` 后超时。exact SHA `042f701ba1ceed4b4255d357306831f22f938a90` 的自然 push pipeline `13` 再次证明 Google Storage 单连接在 Runner 上无法满足 12 分钟边界：765 个 pnpm 包约 `64s` 完成，首个 CFT 大包仍精确超时，后续分片未运行。经已验证 Runner 管理入口做只读采样后，DNS、系统信任和代理边界均正常；同一大包的 Storage 路径约 `130 KB/s`，Google 官方 edge 路径约 `210–258 KB/s`，根因是固定上游路径吞吐而非 CPU、内存、磁盘或并发。候选修正因此只把两个 CFT 大包绑定到 Google 官方 edge 路径，并将每个资产的一次性硬上限调整为 20 分钟；不增加 retry、镜像 fallback 或并行竞争，长度、SHA-256、归档、GitLab 上传与读回合同保持不变。该候选仍须由新的自然 pipeline 证明，不能把采样写成种子成功。
+exact SHA `cddd39ff87e3e2ae9cd8c0282431309bb7cb043f` 的自然 push pipeline `7` 是失败证据，不是优化完成证明：`plan` 约 `115s` 通过，`prepare` 约 `3900s` 后以 `job_token_expired` 失败，后续七个分片均未执行。唯一有界失败 trace 显示 pnpm 的 765 个包约 `65s` 完成，随后 Playwright Chromium 公网下载停滞约 `58m51s`。后续 pipeline `11` 已把冷下载改为串行，但第一个 `chrome-linux64.zip` 仍在 12 分钟后超时；pipeline `13` 再次证明 Google Storage 单连接无法满足该边界。exact SHA `7f4120cae6f6de3eeb81d9699b62eff995a37c8f` 的自然 push pipeline `14` 把两个 CFT 大包固定到 Google 官方 edge，并把每个请求延长到 20 分钟；765 个 pnpm 包约 `75s` 完成，但第一个 `chrome-linux64.zip` 仍精确超时，后续分片未运行。该证据否定了“只换 CDN 或继续加长 CI 超时”的方向：局部吞吐采样不能替代完整传输，根因仍是 Runner 公网链路对 175 MB 固定包不具备可接受的有界吞吐。
 
-固定路由测量表明，Chrome for Testing 官方存储的完整 Chrome 约可按 `185s` 下载，Playwright CDN 的 headless shell 约 `77s`，FFmpeg 小于 `1s`；官方存储的 headless shell 约需 `973s`，不进入冷启动路径。新的运行包合同固定 `playwright 1.58.2 / Chromium 145.0.7632.6 / revision 1208 / FFmpeg 1011`，并绑定下列原始 ZIP：
+CI 冷启动因此不再承担公网下载。运行包合同固定 `playwright 1.58.2 / Chromium 145.0.7632.6 / revision 1208 / FFmpeg 1011`，并绑定下列原始 ZIP：
 
 | 文件 | 字节数 | SHA-256 |
 | --- | ---: | --- |
@@ -29,7 +29,9 @@ exact SHA `cddd39ff87e3e2ae9cd8c0282431309bb7cb043f` 的自然 push pipeline `7`
 | `chrome-headless-shell-linux64.zip` | `116288461` | `2536e97d8f410df0394b3e7c4252e88ce9f239f04f3af4e247a26caf45baf49e` |
 | `ffmpeg-linux.zip` | `2376500` | `ebc74fc5b94830176a3c2914ae96bd8bc7f6a91f4f33890230f84a172ee61ccc` |
 
-只有 protected main 的自然 push `prepare` job 在同项目 Generic Package 精确返回 404 时，才允许按上述固定路由自举一次。三个公开上游 ZIP 由 Runner 已固定安装的 `/usr/bin/curl` 串行下载：每项只发起一次、禁止 retry、限定 HTTPS 跳转和 20 分钟上限，且不输出原始错误；两个 CFT 大包固定使用 Google 官方 edge 路径，FFmpeg 固定使用 Playwright CDN。下载后仍逐项校验长度和 SHA-256，再上传 `runtime.tar`，并从 GitLab 读回校验同一内层集合。含 job token 的 GitLab package GET/PUT 继续使用 Node fetch，token 只作为内存 header，不进入参数、输出或 cache。后续 job 只能消费 GitLab 本地 package 或其已校验 ZIP cache；已解压目录不进 cache，每个 job 在独立目录 materialize，核对 Chrome、headless shell、FFmpeg 和安装标记后使用，并在成功或失败时清理。新的公开下载传输仍须由新 exact SHA 的自然 pipeline 证明；R640 普通 CI 全绿前，不得把 pipeline `7`、`11`、`13` 或只读路由采样写成缓存命中、完整 CI 或发布证据。
+只有 protected main 的自然 push `prepare` job 在同项目 Generic Package 精确返回 404 时，才允许消费一次 Runner 本地冷种子。运维 owner 在 CI 外下载上述三个公开固定文件，逐项核对长度和 SHA-256，再通过受信 SSH 写入 `/home/gitlab-runner/.plush-ci-playwright-runtime-seed-playwright-1.58.2-linux-x64-r1208-v1`：目录必须为当前 `gitlab-runner` uid、真实目录、`0700`，且只含三个当前 uid、真实普通文件、`0600` 的精确 basename。`prepare` 会在任何 package 写入前再次检查身份、mode、inventory、长度和 SHA-256，只把校验后的副本打为 `runtime.tar`，用内存中的 job token 上传 GitLab Generic Package，再下载、解包并复核同一内层集合；成功或失败后仅删除已经完整接受的精确本地种子目录。种子缺失或任何身份/内容歧义立即失败，不回退到 Runner 公网下载。
+
+后续 job 只能消费 GitLab 本地 package 或其已校验 ZIP cache；含 job token 的 package GET/PUT 继续使用 Node fetch，token 只作为内存 header，不进入参数、输出或 cache。已解压目录不进 cache，每个 job 在独立目录 materialize，核对 Chrome、headless shell、FFmpeg 和安装标记后使用，并在成功或失败时清理。R640 普通 CI 全绿前，不得把 pipeline `7`、`11`、`13`、`14` 或局部路由采样写成缓存命中、完整 CI 或发布证据。
 
 ## 文件职责
 

@@ -4,6 +4,8 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   chmodSync,
+  constants as fsConstants,
+  copyFileSync,
   createReadStream,
   existsSync,
   lstatSync,
@@ -31,19 +33,11 @@ const FFMPEG_REVISION = "1011";
 const PACKAGE_NAME = "plush-ci-playwright-runtime";
 const PACKAGE_VERSION = "playwright-1.58.2-linux-x64-r1208-v1";
 const PACKAGE_FILE = "runtime.tar";
-const DOWNLOAD_TIMEOUT_MS = 20 * 60 * 1_000;
 const PACKAGE_TIMEOUT_MS = 10 * 60 * 1_000;
-const UPSTREAM_CURL = "/usr/bin/curl";
+export const CI_PLAYWRIGHT_RUNTIME_LOCAL_SEED_DIRECTORY =
+  "/home/gitlab-runner/.plush-ci-playwright-runtime-seed-" + PACKAGE_VERSION;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
-const UPSTREAM_DOWNLOAD_STATUSES = new Set(["started", "complete", "failed"]);
-const UPSTREAM_DOWNLOAD_FAILURE_REASONS = new Set([
-  "transport",
-  "availability",
-  "response",
-  "integrity",
-  "timeout",
-]);
 
 export const CI_PLAYWRIGHT_RUNTIME_ASSETS = Object.freeze([
   Object.freeze({
@@ -155,6 +149,40 @@ async function verifyAssetFile(directory, asset) {
     size: observed.size,
     sha256: await sha256File(file),
   });
+}
+
+function assertRunnerLocalSeedIdentity(directory) {
+  if (process.platform !== "linux" || typeof process.getuid !== "function") {
+    throw new Error("Runner-local Playwright seed requires Linux identity");
+  }
+  const uid = process.getuid();
+  const observedDirectory = lstatSync(directory);
+  if (
+    !observedDirectory.isDirectory() ||
+    observedDirectory.isSymbolicLink() ||
+    observedDirectory.uid !== uid ||
+    (observedDirectory.mode & 0o777) !== 0o700
+  ) {
+    throw new Error("Runner-local Playwright seed directory is untrusted");
+  }
+  assertExactEntries(directory, ASSET_NAMES);
+  for (const asset of CI_PLAYWRIGHT_RUNTIME_ASSETS) {
+    const observedFile = lstatSync(path.join(directory, asset.name));
+    if (
+      !observedFile.isFile() ||
+      observedFile.isSymbolicLink() ||
+      observedFile.uid !== uid ||
+      (observedFile.mode & 0o777) !== 0o600
+    ) {
+      throw new Error("Runner-local Playwright seed file is untrusted");
+    }
+  }
+}
+
+async function verifyRunnerLocalSeed(directory) {
+  assertRunnerLocalSeedIdentity(directory);
+  await verifyRuntimeArchiveSet(directory);
+  assertRunnerLocalSeedIdentity(directory);
 }
 
 export async function verifyRuntimeArchiveSet(directory) {
@@ -354,86 +382,6 @@ async function downloadResponse(
   return Object.freeze({ size: observed, sha256: digest.digest("hex") });
 }
 
-function writeUpstreamDownloadStatus(asset, status, reason = null) {
-  if (
-    !CI_PLAYWRIGHT_RUNTIME_ASSETS.includes(asset) ||
-    !UPSTREAM_DOWNLOAD_STATUSES.has(status) ||
-    (status === "failed") !==
-      UPSTREAM_DOWNLOAD_FAILURE_REASONS.has(String(reason || ""))
-  ) {
-    throw new Error("Playwright upstream status evidence is invalid");
-  }
-  process.stderr.write(
-    "[ci-playwright-runtime] phase=upstream-download asset=" +
-      asset.name +
-      " status=" +
-      status +
-      (reason ? " reason=" + reason : "") +
-      "\n",
-  );
-}
-
-function upstreamCurlArgs(asset, file) {
-  return [
-    "--fail",
-    "--location",
-    "--silent",
-    "--proto",
-    "=https",
-    "--proto-redir",
-    "=https",
-    "--connect-timeout",
-    "10",
-    "--max-time",
-    String(DOWNLOAD_TIMEOUT_MS / 1_000),
-    "--retry",
-    "0",
-    "--max-filesize",
-    String(asset.size),
-    "--output",
-    file,
-    asset.url,
-  ];
-}
-
-function upstreamCurlFailureReason(result) {
-  if (
-    result?.error?.code === "ETIMEDOUT" ||
-    result?.signal ||
-    result?.status === 28
-  ) {
-    return "timeout";
-  }
-  if (result?.status === 22) return "availability";
-  if ([18, 23, 63].includes(result?.status)) return "response";
-  return "transport";
-}
-
-async function downloadUpstreamAsset(asset, directory) {
-  const file = path.join(directory, asset.name);
-  let failureReason = "transport";
-  writeUpstreamDownloadStatus(asset, "started");
-  try {
-    writeFileSync(file, "", { flag: "wx", mode: 0o600 });
-    const result = spawnSync(UPSTREAM_CURL, upstreamCurlArgs(asset, file), {
-      cwd: directory,
-      stdio: ["ignore", "ignore", "ignore"],
-      timeout: DOWNLOAD_TIMEOUT_MS + 1_000,
-    });
-    if (result.error || result.status !== 0) {
-      failureReason = upstreamCurlFailureReason(result);
-      throw new Error("Pinned Playwright upstream transfer failed");
-    }
-    failureReason = "integrity";
-    await verifyAssetFile(directory, asset);
-    writeUpstreamDownloadStatus(asset, "complete");
-  } catch (error) {
-    rmSync(file, { force: true });
-    writeUpstreamDownloadStatus(asset, "failed", failureReason);
-    throw error;
-  }
-}
-
 function runTool(command, args, cwd) {
   const result = spawnSync(command, args, {
     cwd,
@@ -572,12 +520,7 @@ function removeExactDirectory(directory) {
   }
 }
 
-async function bootstrapPackage(env, staging, root) {
-  const candidate = path.join(staging, "candidate");
-  mkdirSync(candidate, { mode: 0o700 });
-  for (const asset of CI_PLAYWRIGHT_RUNTIME_ASSETS) {
-    await downloadUpstreamAsset(asset, candidate);
-  }
+async function publishRuntimePackage(env, staging, root, candidate) {
   await verifyRuntimeArchiveSet(candidate);
 
   const bundle = path.join(staging, PACKAGE_FILE);
@@ -595,6 +538,50 @@ async function bootstrapPackage(env, staging, root) {
   extractBundle(readbackBundle, readback, root);
   await verifyRuntimeArchiveSet(readback);
   return readback;
+}
+
+async function bootstrapPackageFromRunnerLocalSeed(env, staging, root) {
+  const seedDirectory = CI_PLAYWRIGHT_RUNTIME_LOCAL_SEED_DIRECTORY;
+  const candidate = path.join(staging, "candidate");
+  mkdirSync(candidate, { mode: 0o700 });
+  let seedAccepted = false;
+  process.stderr.write(
+    "[ci-playwright-runtime] phase=runner-local-seed status=started\n",
+  );
+  try {
+    await verifyRunnerLocalSeed(seedDirectory);
+    seedAccepted = true;
+    for (const asset of CI_PLAYWRIGHT_RUNTIME_ASSETS) {
+      const destination = path.join(candidate, asset.name);
+      copyFileSync(
+        path.join(seedDirectory, asset.name),
+        destination,
+        fsConstants.COPYFILE_EXCL,
+      );
+      chmodSync(destination, 0o600);
+    }
+    await verifyRuntimeArchiveSet(candidate);
+    const readback = await publishRuntimePackage(
+      env,
+      staging,
+      root,
+      candidate,
+    );
+    process.stderr.write(
+      "[ci-playwright-runtime] phase=runner-local-seed status=complete\n",
+    );
+    return readback;
+  } catch (error) {
+    process.stderr.write(
+      "[ci-playwright-runtime] phase=runner-local-seed status=failed\n",
+    );
+    throw error;
+  } finally {
+    if (seedAccepted && existsSync(seedDirectory)) {
+      await verifyRunnerLocalSeed(seedDirectory);
+      removeExactDirectory(seedDirectory);
+    }
+  }
 }
 
 export async function ensurePlaywrightRuntimeArchives({
@@ -631,7 +618,14 @@ export async function ensurePlaywrightRuntimeArchives({
           "GitLab Playwright runtime package is absent outside the protected prepare job",
         );
       }
-      candidate = await bootstrapPackage(env, staging, root);
+      if (!existsSync(CI_PLAYWRIGHT_RUNTIME_LOCAL_SEED_DIRECTORY)) {
+        throw new Error("Runner-local Playwright seed is absent");
+      }
+      candidate = await bootstrapPackageFromRunnerLocalSeed(
+        env,
+        staging,
+        root,
+      );
     }
     renameSync(candidate, archiveDirectory);
     const verified = await verifyRuntimeArchiveSet(archiveDirectory);

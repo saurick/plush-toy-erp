@@ -9,6 +9,7 @@ import {
   canBootstrapRuntimePackage,
   CI_PLAYWRIGHT_RUNTIME,
   CI_PLAYWRIGHT_RUNTIME_ASSETS,
+  CI_PLAYWRIGHT_RUNTIME_LOCAL_SEED_DIRECTORY,
   CI_PLAYWRIGHT_RUNTIME_SCHEMA,
   expectedRuntimePaths,
   runtimePackageUrl,
@@ -207,57 +208,39 @@ test("runtime paths separate verified archives from each job extraction", () => 
   );
 });
 
-test("package absence is the only upstream bootstrap path", () => {
+test("package absence only consumes one exact Runner-local cold seed", () => {
   assert.match(source, /if \(response[.]status === 404\)/u);
   assert.match(source, /if \(!canBootstrapRuntimePackage\(env\)\)/u);
   assert.match(
     source,
-    /candidate = await bootstrapPackage\(env, staging, root\)/u,
+    /candidate = await bootstrapPackageFromRunnerLocalSeed\(/u,
   );
-  assert.match(source, /const DOWNLOAD_TIMEOUT_MS = 20 \* 60 \* 1_000;/u);
-  const curlStart = source.indexOf("function upstreamCurlArgs");
-  const curlEnd = source.indexOf("function runTool", curlStart);
-  assert.ok(curlStart > 0 && curlEnd > curlStart);
-  const publicCurlBlock = source.slice(curlStart, curlEnd);
-  assert.match(source, /const UPSTREAM_CURL = "\/usr\/bin\/curl";/u);
-  assert.equal(source.match(/spawnSync\(UPSTREAM_CURL/gu)?.length ?? 0, 1);
-  for (const contract of [
-    /"--fail"/u,
-    /"--location"/u,
-    /"--silent"/u,
-    /"--proto",\n\s+"=https"/u,
-    /"--proto-redir",\n\s+"=https"/u,
-    /"--connect-timeout",\n\s+"10"/u,
-    /"--max-time",\n\s+String\(DOWNLOAD_TIMEOUT_MS \/ 1_000\)/u,
-    /"--retry",\n\s+"0"/u,
-    /"--max-filesize",\n\s+String\(asset[.]size\)/u,
-    /stdio: \["ignore", "ignore", "ignore"\]/u,
-    /writeFileSync\(file, "", \{ flag: "wx", mode: 0o600 \}\)/u,
-    /rmSync\(file, \{ force: true \}\)/u,
-  ]) {
-    assert.match(publicCurlBlock, contract);
-  }
-  assert.doesNotMatch(publicCurlBlock, /CI_JOB_TOKEN|JOB-TOKEN/u);
+  assert.equal(
+    CI_PLAYWRIGHT_RUNTIME_LOCAL_SEED_DIRECTORY,
+    "/home/gitlab-runner/.plush-ci-playwright-runtime-seed-playwright-1.58.2-linux-x64-r1208-v1",
+  );
   assert.match(
     source,
-    /for \(const asset of CI_PLAYWRIGHT_RUNTIME_ASSETS\) \{\n    await downloadUpstreamAsset\(asset, candidate\);\n  \}/u,
+    /if \(!existsSync\(CI_PLAYWRIGHT_RUNTIME_LOCAL_SEED_DIRECTORY\)\)/u,
   );
-  assert.doesNotMatch(source, /Promise[.]allSettled/u);
-  assert.match(source, /phase=upstream-download asset=/u);
-  assert.match(source, /result[?][.]status === 28/u);
-  assert.match(source, /\[18, 23, 63\][.]includes\(result[?][.]status\)/u);
-  for (const value of [
-    "started",
-    "complete",
-    "failed",
-    "transport",
-    "availability",
-    "response",
-    "integrity",
-    "timeout",
-  ]) {
-    assert.match(source, new RegExp('"' + value + '"', "u"), value);
-  }
+  assert.match(source, /process[.]platform !== "linux"/u);
+  assert.match(source, /observedDirectory[.]uid !== uid/u);
+  assert.match(source, /\(observedDirectory[.]mode & 0o777\) !== 0o700/u);
+  assert.match(source, /observedFile[.]uid !== uid/u);
+  assert.match(source, /\(observedFile[.]mode & 0o777\) !== 0o600/u);
+  assert.match(source, /assertExactEntries\(directory, ASSET_NAMES\)/u);
+  assert.match(
+    source,
+    /copyFileSync\(\n\s+path[.]join\(seedDirectory, asset[.]name\),\n\s+destination,\n\s+fsConstants[.]COPYFILE_EXCL/u,
+  );
+  assert.match(source, /chmodSync\(destination, 0o600\)/u);
+  assert.match(source, /await verifyRuntimeArchiveSet\(candidate\)/u);
+  assert.match(source, /await verifyRunnerLocalSeed\(seedDirectory\)/u);
+  assert.match(source, /removeExactDirectory\(seedDirectory\)/u);
+  assert.match(source, /phase=runner-local-seed status=started/u);
+  assert.match(source, /phase=runner-local-seed status=complete/u);
+  assert.match(source, /phase=runner-local-seed status=failed/u);
+  assert.doesNotMatch(source, /downloadUpstreamAsset|UPSTREAM_CURL/u);
   assert.match(source, /method: "PUT"/u);
   assert.match(source, /"JOB-TOKEN": env[.]CI_JOB_TOKEN/u);
   assert.match(
