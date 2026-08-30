@@ -8,6 +8,7 @@ import {
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   realpathSync,
   rmSync,
@@ -31,6 +32,7 @@ import { buildLocalTestApplyRuntimeManifest } from "../qa/customer-config-runtim
 import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
 
 const RECEIPT_SCHEMA = "plush-local-release-rehearsal/v1";
+const REHEARSAL_POSTGRES_IMAGE = "postgres:18.1";
 const COMMIT_PATTERN = /^[a-f0-9]{40}$/u;
 const MIGRATION_PATTERN = /^[0-9]{14}$/u;
 const RUN_ID_PATTERN = /^[a-z0-9][a-z0-9_]{7,44}$/u;
@@ -218,7 +220,7 @@ export function buildRehearsalEnvironment({
     ERP_CUSTOMER_KEY: manifest.customer,
     APP_IMAGE: serverImage.ref,
     WEB_IMAGE: webImage.ref,
-    POSTGRES_IMAGE: "postgres:18.1",
+    POSTGRES_IMAGE: REHEARSAL_POSTGRES_IMAGE,
     JAEGER_IMAGE: "jaegertracing/all-in-one:1.76.0",
     TZ: "Asia/Shanghai",
     ...databasePasswords,
@@ -1571,6 +1573,80 @@ function currentGitState(repoRoot, runCommand) {
   return { head, clean: status === "" };
 }
 
+export function cleanupRehearsalWorkspace(context) {
+  const temporaryRoot = realpathSync(os.tmpdir());
+  const workspace = realpathSync(context.workspace);
+  const expectedPrefix = `${temporaryRoot}${path.sep}plush-release-rehearsal-`;
+  const uid = process.getuid?.();
+  const gid = process.getgid?.();
+  const workspaceStat = lstatSync(workspace);
+  if (
+    !Number.isSafeInteger(uid) ||
+    !Number.isSafeInteger(gid) ||
+    !workspace.startsWith(expectedPrefix) ||
+    workspaceStat.isSymbolicLink() ||
+    !workspaceStat.isDirectory() ||
+    workspaceStat.uid !== uid
+  ) {
+    throw new RehearsalError(
+      "cleanup",
+      "release rehearsal workspace identity is invalid",
+    );
+  }
+
+  const postgresPath = path.join(workspace, "postgres");
+  if (existsSync(postgresPath)) {
+    if (lstatIsSymlink(postgresPath) || !statSync(postgresPath).isDirectory()) {
+      throw new RehearsalError(
+        "cleanup",
+        "release rehearsal PostgreSQL path is unsafe",
+      );
+    }
+    context.runCommand({
+      command: "docker",
+      args: [
+        "run",
+        "--rm",
+        "--pull=never",
+        "--network=none",
+        "--read-only",
+        "--cap-drop=ALL",
+        "--cap-add=DAC_OVERRIDE",
+        "--cap-add=CHOWN",
+        "--security-opt=no-new-privileges",
+        "--pids-limit=32",
+        "--memory=64m",
+        "--cpus=0.25",
+        "--mount",
+        `type=bind,src=${postgresPath},dst=/cleanup`,
+        "--entrypoint",
+        "/bin/sh",
+        REHEARSAL_POSTGRES_IMAGE,
+        "-c",
+        'rm -rf -- /cleanup/* /cleanup/.[!.]* /cleanup/..?* && chown 0:0 /cleanup && chmod 0700 /cleanup && chown "$1:$2" /cleanup',
+        "cleanup",
+        String(uid),
+        String(gid),
+      ],
+      cwd: context.repoRoot,
+      label: "clear isolated release PostgreSQL workspace",
+    });
+    if (readdirSync(postgresPath).length !== 0) {
+      throw new RehearsalError(
+        "cleanup",
+        "release rehearsal PostgreSQL workspace is not empty",
+      );
+    }
+  }
+  rmSync(workspace, { recursive: true, force: true });
+  if (existsSync(workspace)) {
+    throw new RehearsalError(
+      "cleanup",
+      "release rehearsal workspace was not removed",
+    );
+  }
+}
+
 export async function runLocalReleaseRehearsal(options = {}, runtime = {}) {
   const repoRoot = realpathSync(runtime.repoRoot || process.cwd());
   const runCommand = runtime.runCommand || runRehearsalCommand;
@@ -1642,6 +1718,7 @@ export async function runLocalReleaseRehearsal(options = {}, runtime = {}) {
   const encodedPassword = encodeURIComponent(postgresPassword);
   const context = {
     repoRoot,
+    workspace,
     serverRoot: path.join(repoRoot, "server"),
     migrationDir: path.join(repoRoot, "server/internal/data/model/migrate"),
     composeFile,
@@ -1841,7 +1918,7 @@ export async function runLocalReleaseRehearsal(options = {}, runtime = {}) {
         .split(/\r?\n/u)
         .filter(Boolean);
       receipt.cleanup.residualContainers = residual.length;
-      receipt.cleanup.passed = residual.length === 0;
+      receipt.cleanup.passed = false;
       receipt.cleanup.temporaryDatabaseRetained = residual.length > 0;
       if (residual.length > 0 && !failure) {
         failure = new RehearsalError(
@@ -1850,6 +1927,11 @@ export async function runLocalReleaseRehearsal(options = {}, runtime = {}) {
         );
         receipt.failure = sanitizeFailure(failure);
         receipt.passed = false;
+      }
+      if (residual.length === 0) {
+        cleanupRehearsalWorkspace(context);
+        receipt.cleanup.passed = true;
+        receipt.cleanup.temporaryDatabaseRetained = false;
       }
     } catch (error) {
       receipt.cleanup.residualContainers = null;
@@ -1860,9 +1942,6 @@ export async function runLocalReleaseRehearsal(options = {}, runtime = {}) {
         receipt.failure = sanitizeFailure(error);
         receipt.passed = false;
       }
-    }
-    if (receipt.cleanup.passed) {
-      rmSync(workspace, { recursive: true, force: true });
     }
     receipt.finishedAt = new Date().toISOString();
     try {

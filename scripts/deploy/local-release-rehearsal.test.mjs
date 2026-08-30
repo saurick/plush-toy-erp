@@ -1,4 +1,12 @@
 import assert from "node:assert/strict";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
@@ -9,6 +17,7 @@ import {
   bootstrapRehearsalApprovalEligibility,
   buildRehearsalAdminPassword,
   buildRehearsalEnvironment,
+  cleanupRehearsalWorkspace,
   formatRehearsalEnv,
   parseLocalRehearsalArgs,
   reconcileRehearsalDatabaseRoles,
@@ -108,6 +117,61 @@ test("local release rehearsal command wrapper carries SQL only through stdin", (
     label: "stdin contract",
   });
   assert.equal(output, "SELECT 1;\n");
+});
+
+test("local release rehearsal removes container-owned PostgreSQL state through one locked-down helper", () => {
+  const workspace = mkdtempSync(
+    path.join(os.tmpdir(), "plush-release-rehearsal-cleanup_test-"),
+  );
+  const postgresPath = path.join(workspace, "postgres");
+  mkdirSync(postgresPath, { mode: 0o700 });
+  writeFileSync(path.join(postgresPath, "PG_VERSION"), "18\n");
+  writeFileSync(path.join(workspace, "release.env"), "SECRET=not-forwarded\n", {
+    mode: 0o600,
+  });
+  const calls = [];
+
+  cleanupRehearsalWorkspace({
+    repoRoot: "/workspace/plush-toy-erp",
+    workspace,
+    runCommand(call) {
+      calls.push(call);
+      rmSync(postgresPath, { recursive: true, force: true });
+      mkdirSync(postgresPath, { mode: 0o700 });
+      return "";
+    },
+  });
+
+  assert.equal(existsSync(workspace), false);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].command, "docker");
+  assert.deepEqual(calls[0].args.slice(0, 13), [
+    "run",
+    "--rm",
+    "--pull=never",
+    "--network=none",
+    "--read-only",
+    "--cap-drop=ALL",
+    "--cap-add=DAC_OVERRIDE",
+    "--cap-add=CHOWN",
+    "--security-opt=no-new-privileges",
+    "--pids-limit=32",
+    "--memory=64m",
+    "--cpus=0.25",
+    "--mount",
+  ]);
+  assert.equal(
+    calls[0].args.includes("postgres:18.1"),
+    true,
+  );
+  assert.equal(
+    calls[0].args.some((value) => value.includes("chown 0:0 /cleanup")),
+    true,
+  );
+  assert.equal(
+    calls[0].args.some((value) => value.includes("not-forwarded")),
+    false,
+  );
 });
 
 test("local release rehearsal keeps workbench artifact paths inside the repository", () => {
