@@ -33,6 +33,7 @@ import {
   formatDeliveryPercent,
   formatDeliveryRate,
   formatDeliveryTimestamp,
+  isDevInitialCustomerConfigActivationReady,
   resolveDevOperationHistoryState,
   resolveDevVersionCenterView,
   shortGitSha,
@@ -693,6 +694,53 @@ test('delivery version actions remain isolated by deployment target', () => {
   assert.equal(demoVersion.actionClass, 'blocked')
   assert.equal(demoVersion.gitSha, SHA)
   assert.equal(deliveryVersionForTarget(version, 'unknown'), null)
+})
+
+test('version center defers only the proven first customer-config activation blocker', () => {
+  const target = {
+    status: 'blocked',
+    blockers: ['target_customer_config_readback_failed'],
+    remote: {
+      runtime: {
+        customerConfigState: 'absent',
+        database: 'blocked',
+        serverSha: SHA,
+        webSha: SHA,
+        activeCustomerConfig: {
+          revision: 'unknown',
+          productVersion: 'unknown',
+          datasetVersion: 'unknown',
+        },
+      },
+    },
+  }
+  assert.equal(isDevInitialCustomerConfigActivationReady(target), true)
+  assert.equal(
+    isDevInitialCustomerConfigActivationReady({
+      ...target,
+      blockers: [
+        'target_customer_config_readback_failed',
+        'target_server_health_failed',
+      ],
+    }),
+    false
+  )
+  assert.equal(
+    isDevInitialCustomerConfigActivationReady(target, 'rollback'),
+    false
+  )
+  assert.equal(
+    isDevInitialCustomerConfigActivationReady({
+      ...target,
+      remote: {
+        runtime: {
+          ...target.remote.runtime,
+          customerConfigState: 'invalid',
+        },
+      },
+    }),
+    false
+  )
 })
 
 test('delivery presentation helpers are deterministic and bounded', () => {

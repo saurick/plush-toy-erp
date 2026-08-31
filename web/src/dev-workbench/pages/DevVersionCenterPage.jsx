@@ -59,6 +59,7 @@ import {
   formatDeliveryBytes,
   formatDeliveryDuration,
   formatDeliveryRate,
+  isDevInitialCustomerConfigActivationReady,
   resolveDevOperationHistoryState,
   resolveDevVersionCenterView,
   shortGitSha,
@@ -933,8 +934,12 @@ export default function DevVersionCenterPage() {
       align: 'right',
       render: (_value, record) => {
         const actionKind = deliveryVersionActionKind(record)
+        const initialCustomerConfigActivationReady =
+          isDevInitialCustomerConfigActivationReady(target, actionKind)
         const targetActionReady =
-          actionKind === 'initialize' ? initializationReady : targetPassed
+          actionKind === 'initialize'
+            ? initializationReady
+            : targetPassed || initialCustomerConfigActivationReady
         const baseEligible =
           summaryFresh &&
           record.status === 'published' &&

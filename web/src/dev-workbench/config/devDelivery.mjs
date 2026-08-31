@@ -1467,6 +1467,28 @@ export function deliveryVersionActionKind(version) {
     : 'blocked'
 }
 
+export function isDevInitialCustomerConfigActivationReady(
+  target,
+  actionKind = 'promote'
+) {
+  const runtime = target?.remote?.runtime
+  const activeConfig = runtime?.activeCustomerConfig
+  return Boolean(
+    actionKind === 'promote' &&
+      target?.status === 'blocked' &&
+      Array.isArray(target?.blockers) &&
+      target.blockers.length === 1 &&
+      target.blockers[0] === 'target_customer_config_readback_failed' &&
+      runtime?.customerConfigState === 'absent' &&
+      runtime?.database === 'blocked' &&
+      SHA_PATTERN.test(String(runtime?.serverSha || '')) &&
+      runtime.serverSha === runtime.webSha &&
+      activeConfig?.revision === 'unknown' &&
+      activeConfig?.productVersion === 'unknown' &&
+      activeConfig?.datasetVersion === 'unknown'
+  )
+}
+
 export function deliveryVersionForTarget(version, targetKey) {
   if (!DEV_DELIVERY_TARGET_KEYS.includes(String(targetKey || ''))) {
     return null
