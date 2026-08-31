@@ -353,7 +353,31 @@ test("GitLab CI gate keeps its evidence token out of curl argv", () => {
   assert.match(gate, /curl --config "\$job_token_config"/u);
   assert.match(gate, /cleanup_evidence_credentials/u);
   assert.match(gate, /test ! -e "\$job_token_config"/u);
+  assert.equal(
+    gate.includes(
+      '[[ "$CI_JOB_TOKEN" =~ ^[A-Za-z0-9_.-]{20,4096}$ ]]',
+    ),
+    true,
+  );
   assert.doesNotMatch(gate, /--header\s+"JOB-TOKEN:/u);
+});
+
+test("every job-token consumer accepts GitLab 19 JWT-sized credentials", () => {
+  assert.equal(
+    workflow.split('[[ "$CI_JOB_TOKEN" =~ ^[A-Za-z0-9_.-]{20,4096}$ ]]')
+      .length - 1,
+    3,
+  );
+  assert.equal(
+    workflow.includes(
+      '[[ "$GITLAB_RELEASE_TOKEN" =~ ^[A-Za-z0-9_.-]{20,512}$ ]]',
+    ),
+    true,
+  );
+  assert.equal(
+    workflow.includes('CI_JOB_TOKEN" =~ ^[A-Za-z0-9_.-]{20,512}'),
+    false,
+  );
 });
 
 test("historical source backfill is one protected internal job and cannot rewrite formal assets", () => {

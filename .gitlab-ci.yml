@@ -592,7 +592,7 @@ quality_affected:
         for asset in terminal.json receipt.json evidence-manifest.json; do
           test -s "$evidence_dir/$asset"
         done
-        [[ "$CI_JOB_TOKEN" =~ ^[A-Za-z0-9_.-]{20,512}$ ]]
+        [[ "$CI_JOB_TOKEN" =~ ^[A-Za-z0-9_.-]{20,4096}$ ]]
         job_token_config=output/ci/ci-gate-job-token.curl
         cleanup_evidence_credentials() {
           rm -f -- "$job_token_config"
@@ -640,7 +640,7 @@ publish_release:
       test -n "${GITHUB_PACKAGES_USER:-}"
       test -n "${GITHUB_PACKAGES_TOKEN:-}"
       test -n "${GITLAB_RELEASE_TOKEN:-}"
-      [[ "$CI_JOB_TOKEN" =~ ^[A-Za-z0-9_.-]{20,512}$ ]]
+      [[ "$CI_JOB_TOKEN" =~ ^[A-Za-z0-9_.-]{20,4096}$ ]]
       [[ "$GITLAB_RELEASE_TOKEN" =~ ^[A-Za-z0-9_.-]{20,512}$ ]]
       mkdir -p output/ci
       release_args=(
@@ -948,7 +948,7 @@ backfill_release_source:
       git cat-file -e "$BACKFILL_RELEASE_SOURCE_SHA^{commit}"
       git merge-base --is-ancestor "$BACKFILL_RELEASE_SOURCE_SHA" "$CI_COMMIT_SHA"
       test -n "${GITLAB_RELEASE_TOKEN:-}"
-      [[ "$CI_JOB_TOKEN" =~ ^[A-Za-z0-9_.-]{20,512}$ ]]
+      [[ "$CI_JOB_TOKEN" =~ ^[A-Za-z0-9_.-]{20,4096}$ ]]
       [[ "$GITLAB_RELEASE_TOKEN" =~ ^[A-Za-z0-9_.-]{20,512}$ ]]
 
       package_version="artifact-$BACKFILL_RELEASE_SOURCE_SHA"
