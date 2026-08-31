@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import {
+  classifyImmediatePromotionPreflight,
   REMOTE_PROMOTION_RECEIPT_CONTRACT,
   REMOTE_TARGET_INITIALIZATION_RECEIPT_CONTRACT,
   validateRemotePromotionReceipt,
@@ -30,6 +31,34 @@ const PROMOTION_STAGES = [
   "public_entry_switch",
   "current_source_switch",
 ];
+
+function blockedAbsentCustomerConfigPreflight(overrides = {}) {
+  return {
+    status: "blocked",
+    blockers: ["target_customer_config_readback_failed"],
+    remote: {
+      runtime: {
+        database: "blocked",
+        customerConfigState: "absent",
+        serverSha: "d".repeat(40),
+        webSha: "d".repeat(40),
+        activeCustomerConfig: {
+          revision: "unknown",
+          productVersion: "unknown",
+          datasetVersion: "unknown",
+        },
+      },
+    },
+    ...overrides,
+  };
+}
+
+const promotionRelation = Object.freeze({
+  actionClass: "promote",
+  actionReason: "candidate_is_descendant",
+  currentGitSha: "d".repeat(40),
+  candidateGitSha: SHA,
+});
 
 function receipt(overrides = {}) {
   return {
@@ -231,6 +260,67 @@ test("promotion executor accepts only an identity-bound redacted receipt", () =>
       ),
     /timing contract/u,
   );
+});
+
+test("promotion executor defers only the exact planned first customer config activation blocker", () => {
+  assert.deepEqual(
+    classifyImmediatePromotionPreflight({
+      targetPreflight: blockedAbsentCustomerConfigPreflight(),
+      gitRelation: promotionRelation,
+      customerConfigActivationRequiredAfterPromotion: true,
+    }),
+    {
+      status: "passed",
+      blockers: [],
+      customerConfigActivationDeferred: true,
+    },
+  );
+
+  assert.deepEqual(
+    classifyImmediatePromotionPreflight({
+      targetPreflight: blockedAbsentCustomerConfigPreflight({
+        blockers: [
+          "target_customer_config_readback_failed",
+          "target_public_entry_failed",
+        ],
+      }),
+      gitRelation: promotionRelation,
+      customerConfigActivationRequiredAfterPromotion: true,
+    }),
+    {
+      status: "passed",
+      blockers: ["target_public_entry_failed"],
+      customerConfigActivationDeferred: true,
+    },
+  );
+});
+
+test("promotion executor keeps invalid, unplanned and non-promote customer config blockers closed", () => {
+  const invalid = blockedAbsentCustomerConfigPreflight();
+  invalid.remote.runtime.customerConfigState = "invalid";
+  for (const [targetPreflight, gitRelation, planned] of [
+    [invalid, promotionRelation, true],
+    [blockedAbsentCustomerConfigPreflight(), promotionRelation, false],
+    [
+      blockedAbsentCustomerConfigPreflight(),
+      { ...promotionRelation, actionClass: "current" },
+      true,
+    ],
+    [blockedAbsentCustomerConfigPreflight(), null, true],
+  ]) {
+    assert.deepEqual(
+      classifyImmediatePromotionPreflight({
+        targetPreflight,
+        gitRelation,
+        customerConfigActivationRequiredAfterPromotion: planned,
+      }),
+      {
+        status: "blocked",
+        blockers: ["target_customer_config_readback_failed"],
+        customerConfigActivationDeferred: false,
+      },
+    );
+  }
 });
 
 test("target initialization receipt binds pristine state, backup and rollback", () => {

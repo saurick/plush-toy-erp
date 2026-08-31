@@ -29,7 +29,10 @@ import {
   buildFixedTargetRsyncTransfer,
 } from "./fixed-target-rsync.mjs";
 import { readPromotionPlan } from "./promotion-controller.mjs";
-import { validatePromotionManifest } from "./promotion-manifest.mjs";
+import {
+  isInitialCustomerConfigActivationTransition,
+  validatePromotionManifest,
+} from "./promotion-manifest.mjs";
 import { assertReleaseArtifactManifest } from "./release-artifact-bundle.mjs";
 import { verifyReleaseArtifact } from "./release-artifact-verify.mjs";
 import {
@@ -1119,6 +1122,27 @@ function terminalIssue(status) {
   ];
 }
 
+export function classifyImmediatePromotionPreflight({
+  targetPreflight,
+  gitRelation,
+  customerConfigActivationRequiredAfterPromotion,
+}) {
+  const blockerSet = new Set(targetPreflight?.blockers || []);
+  const customerConfigActivationDeferred =
+    customerConfigActivationRequiredAfterPromotion === true &&
+    isInitialCustomerConfigActivationTransition(targetPreflight, gitRelation);
+  if (customerConfigActivationDeferred) {
+    blockerSet.delete("target_customer_config_readback_failed");
+  }
+  return {
+    status: customerConfigActivationDeferred
+      ? "passed"
+      : targetPreflight?.status,
+    blockers: [...blockerSet].sort(),
+    customerConfigActivationDeferred,
+  };
+}
+
 export function executePromotion(
   {
     repoRoot,
@@ -1188,30 +1212,37 @@ export function executePromotion(
     );
   }
   const immediatePreflight = runPreflight(targetKey);
-  const immediateBlockers = new Set(immediatePreflight.blockers || []);
   const immediateRuntime = immediatePreflight.remote?.runtime;
+  let immediateAncestry;
+  try {
+    immediateAncestry = classifyRelation({
+      repoRoot: root,
+      currentGitSha: immediateRuntime?.serverSha,
+      candidateGitSha: plan.release.gitSha,
+    });
+  } catch {
+    immediateAncestry = null;
+  }
+  const immediateGate = classifyImmediatePromotionPreflight({
+    targetPreflight: immediatePreflight,
+    gitRelation: immediateAncestry,
+    customerConfigActivationRequiredAfterPromotion:
+      plan.before.customerConfigActivationRequiredAfterPromotion,
+  });
+  const immediateBlockers = new Set(immediateGate.blockers);
   if (
     immediateRuntime?.serverSha !== plan.ancestry.currentGitSha ||
     immediateRuntime?.webSha !== plan.ancestry.currentGitSha
   ) {
     immediateBlockers.add("promotion_target_changed_since_plan");
   }
-  try {
-    const immediateAncestry = classifyRelation({
-      repoRoot: root,
-      currentGitSha: immediateRuntime?.serverSha,
-      candidateGitSha: plan.release.gitSha,
-    });
-    if (
-      immediateAncestry.actionClass !== "promote" ||
-      JSON.stringify(immediateAncestry) !== JSON.stringify(plan.ancestry)
-    ) {
-      immediateBlockers.add("promotion_git_relation_not_ahead");
-    }
-  } catch {
+  if (
+    immediateAncestry?.actionClass !== "promote" ||
+    JSON.stringify(immediateAncestry) !== JSON.stringify(plan.ancestry)
+  ) {
     immediateBlockers.add("promotion_git_relation_not_ahead");
   }
-  if (immediatePreflight.status !== "passed" || immediateBlockers.size > 0) {
+  if (immediateGate.status !== "passed" || immediateBlockers.size > 0) {
     operation = transitionDeliveryOperation(store, operation.id, {
       status: "blocked",
       message: "promotion was blocked by the immediate target preflight",

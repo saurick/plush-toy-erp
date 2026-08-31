@@ -130,7 +130,7 @@ export function validatePromotionManifest(manifest) {
   return manifest;
 }
 
-function isInitialCustomerConfigActivationTransition(
+export function isInitialCustomerConfigActivationTransition(
   targetPreflight,
   gitRelation,
 ) {
@@ -138,7 +138,7 @@ function isInitialCustomerConfigActivationTransition(
   const activeConfig = runtime?.activeCustomerConfig;
   return (
     targetPreflight?.status === "blocked" &&
-    gitRelation.actionClass === "promote" &&
+    gitRelation?.actionClass === "promote" &&
     targetPreflight.blockers.includes(
       "target_customer_config_readback_failed",
     ) &&
