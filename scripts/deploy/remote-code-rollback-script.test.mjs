@@ -70,6 +70,14 @@ test("remote code rollback requires exact confirmation, lock and receipt", () =>
   );
 });
 
+test("remote rollback normalizes the runtime identity proxy contract", () => {
+  assert.match(
+    source,
+    /WEB_PROXY_PREFIXES=\/rpc,\/templates,\/readyz\/runtime-identity/u,
+  );
+  assert.match(source, /proxy_count != 1/u);
+});
+
 test("remote rollback reuses only checksum-bound retained content", () => {
   assert.match(source, /plush[.]target-release-cache\/v1/u);
   assert.match(source, /target_manifest_sha256/u);

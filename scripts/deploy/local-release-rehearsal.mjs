@@ -248,7 +248,7 @@ export function buildRehearsalEnvironment({
     TRACE_ENDPOINT: "jaeger:4318",
     TRACE_RATIO: "0",
     WEB_API_ORIGIN: "http://app-server:8300",
-    WEB_PROXY_PREFIXES: "/rpc,/templates",
+    WEB_PROXY_PREFIXES: "/rpc,/templates,/readyz/runtime-identity",
     WEB_PROXY_TIMEOUT_MS: "30000",
     ERP_PDF_CHROME_PATH: "/usr/bin/chromium",
     ERP_PDF_RENDER_CONCURRENCY: "2",

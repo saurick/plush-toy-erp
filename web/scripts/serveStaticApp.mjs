@@ -52,7 +52,10 @@ const staticRoot = path.resolve(
   process.env.STATIC_ROOT || path.join(appRoot, app.buildDir)
 )
 const apiOrigin = (process.env.API_ORIGIN || '').replace(/\/+$/, '')
-const proxyPrefixes = (process.env.PROXY_PREFIXES || '/rpc,/templates')
+const proxyPrefixes = (
+  process.env.PROXY_PREFIXES ||
+  '/rpc,/templates,/readyz/runtime-identity'
+)
   .split(',')
   .map((item) => item.trim())
   .filter(Boolean)

@@ -50,6 +50,7 @@ function writeFixture({
       "TRACE_ENDPOINT=http://jaeger:4318/v1/traces",
       "TRACE_RATIO=0.1",
       "WEB_API_ORIGIN=https://erp.yoyoosun.local",
+      "WEB_PROXY_PREFIXES=/rpc,/templates,/readyz/runtime-identity",
       "APP_HTTP_BIND_ADDR=127.0.0.1",
       "APP_HTTP_PORT=8300",
       "WEB_DESKTOP_BIND_ADDR=0.0.0.0",
@@ -590,6 +591,23 @@ test("production preflight accepts a prepared runtime env without docker config"
 
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /all checks passed/);
+});
+
+test("production preflight requires the exact runtime identity proxy contract", () => {
+  const fixture = writeFixture();
+  fs.writeFileSync(
+    fixture.envFile,
+    fs
+      .readFileSync(fixture.envFile, "utf8")
+      .replace(
+        "WEB_PROXY_PREFIXES=/rpc,/templates,/readyz/runtime-identity",
+        "WEB_PROXY_PREFIXES=/rpc,/templates",
+      ),
+  );
+
+  const result = runPreflight(fixture);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /WEB_PROXY_PREFIXES 必须保留/u);
 });
 
 test("production preflight resolves a packaged source root without Git metadata", () => {
@@ -1845,6 +1863,12 @@ test("production artifacts pin the verified Chromium build and async warmup", ()
     webDockerfile,
     /^ENV VITE_RELEASE_VERSION=\$\{RELEASE_VERSION\}$/mu,
   );
+  for (const runtimeDockerfile of [dockerfile, webDockerfile]) {
+    assert.match(
+      runtimeDockerfile,
+      /^ENV PROXY_PREFIXES=\/rpc,\/templates,\/readyz\/runtime-identity$/mu,
+    );
+  }
   assert.match(dockerfile, /useradd --system --uid 10001 --gid app/);
   assert.match(productionCompose, /seccomp=\.\/chromium-seccomp\.json/);
   assert.doesNotMatch(
@@ -1859,6 +1883,10 @@ test("production artifacts pin the verified Chromium build and async warmup", ()
   });
   for (const envExample of [prodEnv, customerEnv]) {
     assert.match(envExample, /^ERP_PDF_WARMUP=async$/m);
+    assert.match(
+      envExample,
+      /^WEB_PROXY_PREFIXES=\/rpc,\/templates,\/readyz\/runtime-identity$/mu,
+    );
     assert.doesNotMatch(envExample, /ERP_PDF_WARMUP_ENABLED/);
   }
   assert.match(

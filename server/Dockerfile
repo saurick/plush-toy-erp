@@ -69,7 +69,7 @@ ENV HOST=0.0.0.0
 ENV APP_ID=desktop
 ENV PORT=5175
 ENV API_ORIGIN=
-ENV PROXY_PREFIXES=/rpc,/templates
+ENV PROXY_PREFIXES=/rpc,/templates,/readyz/runtime-identity
 ENV PROXY_TIMEOUT_MS=30000
 
 WORKDIR /app

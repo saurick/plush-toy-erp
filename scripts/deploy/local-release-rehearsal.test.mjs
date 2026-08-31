@@ -238,6 +238,10 @@ test("local release rehearsal environment binds isolated database fixed images a
   assert.equal(built.values.ERP_ALLOW_RELEASE_REHEARSAL_CUSTOMER_CONFIG, "1");
   assert.equal(built.values.ERP_RELEASE_REHEARSAL_ID, "release_20260728");
   assert.equal(
+    built.values.WEB_PROXY_PREFIXES,
+    "/rpc,/templates,/readyz/runtime-identity",
+  );
+  assert.equal(
     "ERP_RELEASE_REHEARSAL_PG_SYSTEM_IDENTIFIER" in built.values,
     false,
   );

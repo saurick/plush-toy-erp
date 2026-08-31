@@ -36,6 +36,10 @@ test("target initializer preserves isolated target identities and first-cutover 
     source,
     /docker (?:compose )?build|docker system prune|docker volume prune/u,
   );
+  assert.match(
+    source,
+    /WEB_PROXY_PREFIXES=\/rpc,\/templates,\/readyz\/runtime-identity/u,
+  );
 });
 
 test("target initializer keeps bootstrap secrets transient and rollback owner-bound", () => {

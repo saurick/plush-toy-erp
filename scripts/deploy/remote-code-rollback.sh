@@ -704,11 +704,18 @@ update_env_image_refs() {
   local source="$1"
   local destination="$2"
   awk -v app_ref="$server_ref" -v web_ref="$web_ref" '
-    BEGIN { app_count=0; web_count=0 }
+    BEGIN { app_count=0; web_count=0; proxy_count=0 }
     /^APP_IMAGE=/ { print "APP_IMAGE=" app_ref; app_count++; next }
     /^WEB_IMAGE=/ { print "WEB_IMAGE=" web_ref; web_count++; next }
+    /^WEB_PROXY_PREFIXES=/ {
+      print "WEB_PROXY_PREFIXES=/rpc,/templates,/readyz/runtime-identity"
+      proxy_count++
+      next
+    }
     { print }
-    END { if (app_count != 1 || web_count != 1) exit 42 }
+    END {
+      if (app_count != 1 || web_count != 1 || proxy_count != 1) exit 42
+    }
   ' "$source" >"$destination"
 }
 

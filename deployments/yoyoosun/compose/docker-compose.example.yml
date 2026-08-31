@@ -21,7 +21,7 @@ x-web-app-common: &web-app-common
   environment: &web-app-environment
     TZ: "${TZ:-Asia/Shanghai}"
     API_ORIGIN: "${WEB_API_ORIGIN:-http://app-server:8300}"
-    PROXY_PREFIXES: "${WEB_PROXY_PREFIXES:-/rpc,/templates}"
+    PROXY_PREFIXES: "${WEB_PROXY_PREFIXES:-/rpc,/templates,/readyz/runtime-identity}"
     PROXY_TIMEOUT_MS: "${WEB_PROXY_TIMEOUT_MS:-30000}"
     READINESS_TIMEOUT_MS: "${WEB_READINESS_TIMEOUT_MS:-2000}"
     SHUTDOWN_TIMEOUT_MS: "${WEB_SHUTDOWN_TIMEOUT_MS:-10000}"

@@ -154,6 +154,13 @@ test(
         response.end(readinessStatus === 200 ? 'ready' : 'not ready')
         return
       }
+      if (request.url === '/readyz/runtime-identity') {
+        response.writeHead(200, {
+          'x-erp-runtime-identity-proof': 'matched-v1',
+        })
+        response.end('runtime identity matched')
+        return
+      }
       if (request.url === '/rpc/echo') {
         removedRequestHeader = request.headers['x-remove-me']
         response.writeHead(201, {
@@ -189,6 +196,7 @@ test(
         API_ORIGIN: `http://127.0.0.1:${backendPort}`,
         HOST: '127.0.0.1',
         PORT: String(port),
+        PROXY_PREFIXES: '/rpc,/templates,/readyz/runtime-identity',
         PROXY_TIMEOUT_MS: '100',
         READINESS_TIMEOUT_MS: '2000',
         STATIC_ROOT: root,
@@ -218,6 +226,17 @@ test(
     assert.equal(
       (await requestServer({ port, pathname: '/readyz' })).statusCode,
       503
+    )
+
+    const runtimeIdentity = await requestServer({
+      port,
+      pathname: '/readyz/runtime-identity',
+    })
+    assert.equal(runtimeIdentity.statusCode, 200)
+    assert.equal(runtimeIdentity.body, 'runtime identity matched')
+    assert.equal(
+      runtimeIdentity.headers['x-erp-runtime-identity-proof'],
+      'matched-v1'
     )
 
     const proxied = await requestServer({

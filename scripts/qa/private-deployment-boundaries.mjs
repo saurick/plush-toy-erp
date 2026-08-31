@@ -131,6 +131,12 @@ function validateTemplate(config, repoRoot = process.cwd()) {
     "reference env must pin ERP_CUSTOMER_KEY",
   );
   assert(
+    referenceEnv.includes(
+      "WEB_PROXY_PREFIXES=/rpc,/templates,/readyz/runtime-identity",
+    ),
+    "reference env must preserve the runtime identity proxy contract",
+  );
+  assert(
     !referenceEnv.includes("FILE_STORAGE_DIR"),
     "reference env must not invent an application file store",
   );

@@ -332,6 +332,7 @@ required_keys=(
   TRACE_ENDPOINT
   TRACE_RATIO
   WEB_API_ORIGIN
+  WEB_PROXY_PREFIXES
   APP_HTTP_BIND_ADDR
   WEB_DESKTOP_BIND_ADDR
   APP_JWT_SECRET
@@ -439,6 +440,7 @@ else
   postgres_bind_addr="$(value_of POSTGRES_BIND_ADDR)"
   app_http_bind_addr="$(value_of APP_HTTP_BIND_ADDR)"
   web_desktop_bind_addr="$(value_of WEB_DESKTOP_BIND_ADDR)"
+  web_proxy_prefixes="$(value_of WEB_PROXY_PREFIXES)"
   postgres_dsn="$(value_of POSTGRES_DSN)"
   postgres_password="$(value_of POSTGRES_PASSWORD)"
   postgres_app_password="$(value_of POSTGRES_APP_PASSWORD)"
@@ -517,6 +519,8 @@ print(sms["requiredMode"])
   [[ "$web_image" != *":dev" && "$web_image" != *":latest" ]] || fail "WEB_IMAGE 不能使用 :dev 或 :latest"
   [[ "$postgres_image" != *":dev" && "$postgres_image" != *":latest" ]] || fail "POSTGRES_IMAGE 不能使用 :dev 或 :latest"
   [[ "$jaeger_image" != *":dev" && "$jaeger_image" != *":latest" ]] || fail "JAEGER_IMAGE 不能使用 :dev 或 :latest"
+  [[ "$web_proxy_prefixes" == "/rpc,/templates,/readyz/runtime-identity" ]] ||
+    fail "WEB_PROXY_PREFIXES 必须保留 RPC、模板和运行身份探针的精确代理合同"
   [[ "$app_auth_sms_mode" != "mock" ]] || fail "APP_AUTH_SMS_MODE 生产环境不能使用 mock"
   if [[ "$app_auth_sms_mode" == "provider" ]]; then
     provider_required_keys=(

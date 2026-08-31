@@ -504,7 +504,7 @@ postgres_dsn="postgres://erp_app:${secret_values[POSTGRES_APP_PASSWORD]}@postgre
   printf 'POSTGRES_DB=%s\nPOSTGRES_USER=postgres\n' "$database"
   printf 'POSTGRES_DATA_DIR=%s\nMIGRATION_LOCK_FILE=%s\n' "$data_dir" "$root/run/atlas-migrate.lock"
   printf 'TRACE_ENDPOINT=jaeger:4318\nTRACE_RATIO=0.1\n'
-  printf 'WEB_API_ORIGIN=http://app-server:8300\nWEB_PROXY_PREFIXES=/rpc,/templates\n'
+  printf 'WEB_API_ORIGIN=http://app-server:8300\nWEB_PROXY_PREFIXES=/rpc,/templates,/readyz/runtime-identity\n'
   printf 'WEB_PROXY_TIMEOUT_MS=30000\nWEB_READINESS_TIMEOUT_MS=2000\nWEB_SHUTDOWN_TIMEOUT_MS=10000\n'
   printf 'ERP_PDF_CHROME_PATH=/usr/bin/chromium\nERP_PDF_RENDER_CONCURRENCY=4\nERP_PDF_QUEUE_CAPACITY=2\nERP_PDF_WARMUP=async\n'
   printf 'APP_JWT_SECRET=%s\n' "${secret_values[APP_JWT_SECRET]}"

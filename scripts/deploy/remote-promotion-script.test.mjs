@@ -63,6 +63,14 @@ test("remote promotion builds nothing and never runs automatic down migration", 
   );
 });
 
+test("remote promotion normalizes the runtime identity proxy contract", () => {
+  assert.match(
+    source,
+    /WEB_PROXY_PREFIXES=\/rpc,\/templates,\/readyz\/runtime-identity/u,
+  );
+  assert.match(source, /proxy_count != 1/u);
+});
+
 test("remote promotion fixes backup migration identity and unknown-outcome behavior", () => {
   assert.match(source, /pg_dump -Fc --no-owner --no-privileges/u);
   assert.match(source, /pg_restore --exit-on-error/u);
