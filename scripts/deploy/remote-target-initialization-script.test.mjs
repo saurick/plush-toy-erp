@@ -100,7 +100,11 @@ test("target initializer validates immutable release and restored backup before 
     /pg_restore --exit-on-error --no-owner --no-privileges/u,
   );
   assert.match(source, /restored_table_count/u);
-  assert.match(source, /system\.version/u);
+  assert.match(
+    source,
+    /"method":"version"[\s\S]*"\$web_endpoint\/rpc\/system"/u,
+  );
+  assert.doesNotMatch(source, /"method":"system\.version"/u);
   assert.match(source, /\.result\.data\.git_sha == \$sha/u);
   assert.match(source, /\.result\.data\.release_version == \$version/u);
 });

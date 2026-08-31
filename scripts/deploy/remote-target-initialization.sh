@@ -609,7 +609,7 @@ curl -fsS --max-time 10 "$web_endpoint/healthz" >/dev/null
 
 stage=basic_smoke
 curl -fsS --max-time 10 -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":"target-init","method":"system.version","params":{}}' \
+  -d '{"jsonrpc":"2.0","id":"target-init","method":"version","params":{}}' \
   "$web_endpoint/rpc/system" | jq -e --arg sha "$release_sha" --arg version "$release_version" \
   '.result.code == 0 and .result.data.git_sha == $sha and .result.data.release_version == $version and .result.data.formal == true' \
   >/dev/null
