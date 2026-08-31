@@ -101,7 +101,8 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
     /PURCHASE_RECEIPT_PG_DB_URL="\$DISPOSABLE_DATABASE_BASE_URL"[\s\S]*make populated_upgrade_pg_test[\s\S]*disposable-database-runner\.mjs"[\s\S]*--profile ci[\s\S]*--workflow critical-postgres/u,
     'full must create, migrate, test, and clean a per-run PostgreSQL database',
   )
-  const serverBody = full.match(/qa_full_server\(\) \{([\s\S]*?)\n\}/u)?.[1] || ''
+  const serverBody = full.match(/qa_full_server_core\(\) \{([\s\S]*?)\n\}/u)?.[1] || ''
+  assert.notEqual(serverBody, '', 'server core function must remain extractable')
   const criticalBody =
     full.match(/qa_full_critical_postgres\(\) \{([\s\S]*?)\n\}/u)?.[1] || ''
   assert.doesNotMatch(serverBody, /--workflow critical-postgres/u)

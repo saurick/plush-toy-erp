@@ -561,12 +561,7 @@ async function bootstrapPackageFromRunnerLocalSeed(env, staging, root) {
       chmodSync(destination, 0o600);
     }
     await verifyRuntimeArchiveSet(candidate);
-    const readback = await publishRuntimePackage(
-      env,
-      staging,
-      root,
-      candidate,
-    );
+    const readback = await publishRuntimePackage(env, staging, root, candidate);
     process.stderr.write(
       "[ci-playwright-runtime] phase=runner-local-seed status=complete\n",
     );
@@ -621,11 +616,7 @@ export async function ensurePlaywrightRuntimeArchives({
       if (!existsSync(CI_PLAYWRIGHT_RUNTIME_LOCAL_SEED_DIRECTORY)) {
         throw new Error("Runner-local Playwright seed is absent");
       }
-      candidate = await bootstrapPackageFromRunnerLocalSeed(
-        env,
-        staging,
-        root,
-      );
+      candidate = await bootstrapPackageFromRunnerLocalSeed(env, staging, root);
     }
     renameSync(candidate, archiveDirectory);
     const verified = await verifyRuntimeArchiveSet(archiveDirectory);
@@ -730,6 +721,17 @@ export function cleanupPlaywrightRuntime({
   assertGitLabIdentity(env);
   const { browserDirectory } = expectedRuntimePaths(root, env);
   removeExactDirectory(browserDirectory);
+  const runtimeParent = path.dirname(browserDirectory);
+  const stagingPrefix = `.playwright-${env.CI_JOB_ID}-`;
+  if (existsSync(runtimeParent)) {
+    for (const entry of readdirSync(runtimeParent, { withFileTypes: true })) {
+      if (!entry.name.startsWith(stagingPrefix)) continue;
+      if (!entry.isDirectory() || entry.isSymbolicLink()) {
+        throw new Error("Playwright runtime staging identity is invalid");
+      }
+      removeExactDirectory(path.join(runtimeParent, entry.name));
+    }
+  }
   return Object.freeze({
     schemaVersion: CI_PLAYWRIGHT_RUNTIME_SCHEMA,
     status: "cleaned",

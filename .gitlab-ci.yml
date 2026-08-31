@@ -187,6 +187,49 @@ prepare:
   stage: quality
   <<: *main_quality_rules
   timeout: 2h
+  after_script:
+    - |
+      set +e
+      cleanup_status=0
+      export PLAYWRIGHT_RUNTIME_ARCHIVE_DIR="$CI_PROJECT_DIR/output/cache/gitlab/playwright-runtime"
+      export PLAYWRIGHT_BROWSERS_PATH="$CI_PROJECT_DIR/output/runtime/gitlab/playwright-$CI_JOB_ID"
+      case "$CI_JOB_NAME" in
+        quality_server_core|quality_server_critical_postgres)
+          postgres_name="plush-ci-postgres-$CI_PIPELINE_ID-$CI_JOB_ID"
+          exact_name="$(docker ps --all --filter "name=^/$postgres_name$" --format '{{.Names}}' 2>/dev/null)" || cleanup_status=1
+          if [[ "$exact_name" == "$postgres_name" ]]; then
+            owned_name="$(docker ps --all --filter "name=^/$postgres_name$" --filter 'label=com.plush.ci.owner=quality-shard' --filter "label=com.plush.ci.pipeline=$CI_PIPELINE_ID" --filter "label=com.plush.ci.job=$CI_JOB_ID" --format '{{.Names}}' 2>/dev/null)" || cleanup_status=1
+            if [[ "$owned_name" == "$postgres_name" ]]; then
+              docker rm --force "$postgres_name" >/dev/null 2>&1 || cleanup_status=1
+            else
+              cleanup_status=1
+            fi
+          elif [[ -n "$exact_name" ]]; then
+            cleanup_status=1
+          fi
+          residual="$(docker ps --all --filter "name=^/$postgres_name$" --format '{{.Names}}' 2>/dev/null)" || cleanup_status=1
+          [[ -z "$residual" ]] || cleanup_status=1
+          ;;
+      esac
+      case "$CI_JOB_NAME" in
+        quality_server_core|quality_browser)
+          sandbox_path="/usr/local/sbin/chrome-devel-sandbox-$CI_JOB_ID"
+          sandbox_source="$PLAYWRIGHT_BROWSERS_PATH/chromium-1208/chrome-linux64/chrome_sandbox"
+          if [[ -e "$sandbox_path" ]]; then
+            if [[ -f "$sandbox_path" && ! -L "$sandbox_path" && -f "$sandbox_source" ]] && cmp -s "$sandbox_path" "$sandbox_source"; then
+              sudo -n /usr/local/sbin/plush-remove-chromium-sandbox "$CI_JOB_ID" >/dev/null 2>&1 || cleanup_status=1
+            else
+              cleanup_status=1
+            fi
+          fi
+          [[ ! -e "$sandbox_path" ]] || cleanup_status=1
+          node scripts/qa/ci-playwright-runtime.mjs cleanup >/dev/null 2>&1 || cleanup_status=1
+          ;;
+      esac
+      if [[ "$cleanup_status" -ne 0 ]]; then
+        echo "[gitlab-ci] quality shard emergency cleanup is incomplete"
+        exit 1
+      fi
 
 quality_static:
   <<: *quality_shard
@@ -263,7 +306,7 @@ quality_resource_runtime:
     paths:
       - output/ci/resource-lanes/runtime.json
 
-quality_web:
+quality_web_validation:
   <<: [*quality_shard, *pnpm_cache_pull]
   needs:
     - job: plan
@@ -271,21 +314,85 @@ quality_web:
     - job: prepare
       artifacts: false
   script:
-    - node scripts/qa/ci-quality-shard.mjs --shard web
+    - node scripts/qa/ci-quality-shard.mjs --shard web --lane validation
   artifacts:
     when: always
     expire_in: 90 days
     paths:
-      - output/ci/shards/web.json
+      - output/ci/workload-lanes/web/validation.json
+
+quality_web_build:
+  <<: [*quality_shard, *pnpm_cache_pull]
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+  script:
+    - node scripts/qa/ci-quality-shard.mjs --shard web --lane build
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/workload-lanes/web/build.json
       - web/build/
 
-quality_server:
+quality_server_core:
   <<: [*quality_shard, *browser_cache_pull]
   needs:
     - job: plan
       artifacts: true
     - job: prepare
       artifacts: false
+  script:
+    - node scripts/qa/ci-quality-shard.mjs --shard server --lane core
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/workload-lanes/server/core.json
+
+quality_server_critical_postgres:
+  <<: *quality_shard
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+  script:
+    - node scripts/qa/ci-quality-shard.mjs --shard server --lane critical
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/workload-lanes/server/critical.json
+
+quality_web:
+  <<: *quality_shard
+  needs:
+    - job: plan
+      artifacts: true
+    - job: quality_web_validation
+      artifacts: true
+    - job: quality_web_build
+      artifacts: true
+  script:
+    - node scripts/qa/ci-quality-shard.mjs --shard web
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/shards/web.json
+
+quality_server:
+  <<: *quality_shard
+  needs:
+    - job: plan
+      artifacts: true
+    - job: quality_server_core
+      artifacts: true
+    - job: quality_server_critical_postgres
+      artifacts: true
   script:
     - node scripts/qa/ci-quality-shard.mjs --shard server
   artifacts:
@@ -339,7 +446,7 @@ quality_browser:
       artifacts: true
     - job: prepare
       artifacts: false
-    - job: quality_web
+    - job: quality_web_build
       artifacts: true
   script:
     - node scripts/qa/ci-quality-shard.mjs --shard browser
