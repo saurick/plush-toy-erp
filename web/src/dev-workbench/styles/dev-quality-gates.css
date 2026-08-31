@@ -68,6 +68,7 @@
   min-width: 0;
   padding: 14px 16px;
   border: 1px solid var(--erp-border, #dce8dd);
+  border-inline-start: 4px solid var(--erp-primary, #2b8a3e);
   border-radius: 10px;
   background: var(--erp-surface-bg-soft, #f7faf7);
 }
@@ -115,9 +116,10 @@
   padding: 14px 16px;
   border: 1px solid var(--erp-border, #dce8dd);
   border-radius: 10px;
-  background: var(--erp-surface-bg, #fff);
+  background: var(--erp-surface-bg-soft, #f7faf7);
 }
 
+.erp-dev-quality-actions__heading,
 .erp-dev-quality-actions__buttons,
 .erp-dev-quality-actions__durations,
 .erp-dev-quality-actions__environment {
@@ -125,6 +127,21 @@
   flex-wrap: wrap;
   gap: 8px 16px;
   align-items: center;
+}
+
+.erp-dev-quality-actions__heading {
+  justify-content: space-between;
+}
+
+.erp-dev-quality-actions__heading > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.erp-dev-quality-actions__heading .ant-typography {
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .erp-dev-quality-actions__primary {
@@ -233,7 +250,7 @@
 .erp-dev-quality-context dl {
   display: grid;
   flex: 1;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 8px 16px;
   min-width: 0;
   margin: 0;

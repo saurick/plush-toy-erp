@@ -44,10 +44,26 @@ test('quality gates styles: environment readiness stays page-owned and compact',
 
 test('quality gates styles: R640 evidence stays compact and responsive', () => {
   assert.match(css, /\.erp-dev-quality-server-evidence/u)
+  assert.match(
+    css,
+    /\.erp-dev-quality-server-evidence[\s\S]*?border-inline-start:\s*4px solid var\(--erp-primary/u
+  )
   assert.match(css, /\.erp-dev-quality-server-evidence__facts/u)
   assert.match(
     css,
     /@media \(max-width: 600px\)[\s\S]*?\.erp-dev-quality-server-evidence__facts[\s\S]*?grid-template-columns:\s*1fr/u
+  )
+})
+
+test('quality gates styles: local diagnostics remain visibly secondary', () => {
+  assert.match(css, /\.erp-dev-quality-actions__heading/u)
+  assert.match(
+    css,
+    /\.erp-dev-quality-actions[\s\S]*?background:\s*var\(--erp-surface-bg-soft/u
+  )
+  assert.match(
+    css,
+    /\.erp-dev-quality-context dl[\s\S]*?repeat\(auto-fit, minmax\(170px, 1fr\)\)/u
   )
 })
 

@@ -114,6 +114,33 @@ function summary(overrides = {}) {
         receipt: null,
       },
     },
+    serverEvidence: {
+      schemaVersion: 'plush.dev-quality-gate-server-evidence/v1',
+      status: 'passed',
+      current: true,
+      coversWorkingTree: true,
+      gitSha: 'a'.repeat(40),
+      pipeline: {
+        id: 39,
+        attempt: 39,
+        url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/39',
+        status: 'completed',
+        conclusion: 'success',
+        queueMs: 3_500,
+        durationMs: 395_000,
+        finishedAt: NOW,
+      },
+      jobs: [
+        {
+          id: 390,
+          name: 'CI Gate',
+          conclusion: 'success',
+          durationMs: 2_000,
+        },
+      ],
+      message: 'R640 已通过当前 exact SHA 的完整分片、聚合与 CI Gate。',
+      notProven: ['不可变 Release', '目标部署', '客户 UAT'],
+    },
     status: {
       tone: 'info',
       title: '严格门禁正在运行',
@@ -185,7 +212,7 @@ test('quality gates config: route, three views and per-view query contracts stay
   assert.deepEqual(VIEW_KEYS, ['run', 'governance', 'gaps'])
   assert.deepEqual(
     VIEW_ITEMS.map((item) => item.label),
-    ['运行与结果', '门禁治理', '覆盖缺口']
+    ['本机诊断', '门禁治理', '覆盖缺口']
   )
   assert.deepEqual(QUERY_KEYS, {
     view: 'view',
@@ -462,12 +489,29 @@ test('quality gates config: summary preserves one shared operation truth', () =>
   assert.equal(normalized.repository.commit, 'a'.repeat(40))
   assert.equal(normalized.busy.kind, 'quality')
   assert.deepEqual(normalized.profiles.strict.substeps, {})
+  assert.equal(normalized.serverEvidence.pipeline.id, 39)
+  assert.equal(normalized.serverEvidence.jobs[0].name, 'CI Gate')
   assert.throws(
     () =>
       normalizeDevQualityGateSummary(
         summary({ currentOperation: operation({ id: REQUEST_ID }) })
       ),
     /inconsistent/u
+  )
+  assert.throws(
+    () =>
+      normalizeDevQualityGateSummary(
+        summary({
+          serverEvidence: {
+            ...summary().serverEvidence,
+            pipeline: {
+              ...summary().serverEvidence.pipeline,
+              url: 'https://example.com/pipelines/39',
+            },
+          },
+        })
+      ),
+    /pipeline is invalid/u
   )
 })
 
@@ -621,6 +665,11 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
   assert.match(pageSource, /buildQualityGateHistoryTrend/u)
   assert.match(pageSource, /buildQualityGateCoverageMatrix/u)
   assert.match(pageSource, /当前正式回执/u)
+  assert.match(pageSource, /R640 服务器门禁/u)
+  assert.match(pageSource, /正式主路径/u)
+  assert.match(pageSource, /本机诊断（按需）/u)
+  assert.match(pageSource, /本机最近诊断/u)
+  assert.doesNotMatch(pageSource, /严格门禁：发版前验证/u)
   assert.match(pageSource, /\? '预计剩余'[\s\S]*?: '运行状态'/u)
   assert.doesNotMatch(pageSource, /Fixed quality evidence/u)
   assert.match(taskNavSource, /aria-controls/u)

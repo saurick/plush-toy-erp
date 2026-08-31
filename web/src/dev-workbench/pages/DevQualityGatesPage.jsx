@@ -64,7 +64,10 @@ const EMPTY_ASYNC_VIEW_STATE = Object.freeze({
   loading: false,
   error: '',
 })
-const PROFILE_LABELS = Object.freeze({ full: '完整门禁', strict: '严格门禁' })
+const PROFILE_LABELS = Object.freeze({
+  full: '本机完整诊断',
+  strict: '本机严格诊断',
+})
 const STAGE_STATUS = Object.freeze({
   pending: Object.freeze({ label: '等待运行', color: 'default' }),
   running: Object.freeze({ label: '正在运行', color: 'processing' }),
@@ -396,6 +399,13 @@ function operationUpdateAction(operation) {
 }
 
 function ContextStrip({ summary, view, onReturnRun }) {
+  const serverEvidence = summary?.serverEvidence
+  const serverStatus =
+    SERVER_EVIDENCE_STATUS[serverEvidence?.status] ||
+    SERVER_EVIDENCE_STATUS.unavailable
+  const serverLabel = serverEvidence?.pipeline?.id
+    ? `${serverStatus.label} · #${serverEvidence.pipeline.id}`
+    : serverStatus.label
   const strictProof = summary?.proofs?.strict
   const strictStatus =
     summary?.currentOperation?.profile === 'strict'
@@ -426,7 +436,11 @@ function ContextStrip({ summary, view, onReturnRun }) {
           <dd>{summary?.repository?.dirty ? '有未提交改动' : '干净'}</dd>
         </div>
         <div>
-          <dt>严格门禁</dt>
+          <dt>R640 CI</dt>
+          <dd>{serverLabel}</dd>
+        </div>
+        <div>
+          <dt>本机诊断</dt>
           <dd>{strictStatus || '尚未运行'}</dd>
         </div>
         <div>
@@ -469,12 +483,15 @@ function ServerCiEvidencePanel({ summary }) {
     >
       <div className="erp-dev-quality-section-heading">
         <div className="erp-dev-quality-server-evidence__heading-copy">
-          <Text strong>R640 服务器 exact-SHA 证据</Text>
+          <Title level={2}>R640 服务器门禁</Title>
           <Text type="secondary">
-            普通 push CI、七个固定分片、聚合回执与 CI Gate
+            正式主路径 · 当前提交的普通 push CI、七个固定分片、聚合回执与 CI Gate
           </Text>
         </div>
-        <Tag color={status.color}>{status.label}</Tag>
+        <Space wrap size={6}>
+          <Tag color="blue">正式主路径</Tag>
+          <Tag color={status.color}>{status.label}</Tag>
+        </Space>
       </div>
       <div className="erp-dev-quality-server-evidence__facts">
         <div>
@@ -977,10 +994,10 @@ function GateExecutionFlow({ summary, operation, profile }) {
   }
 
   return (
-    <section className="erp-dev-quality-flow" aria-label="门禁执行轨道">
+    <section className="erp-dev-quality-flow" aria-label="本机诊断执行轨道">
       <div className="erp-dev-quality-flow__heading">
         <div>
-          <Text strong>门禁执行轨道</Text>
+          <Text strong>本机诊断执行轨道</Text>
           <Text type="secondary">
             {profile === 'strict'
               ? `先运行 ${strictExtraCount} 个 strict 附加检查，再进入 full 共用主路径。`
@@ -1144,7 +1161,7 @@ function RunView({
                     <Tag color="blue">当前正式回执</Tag>
                   ) : null}
                   {operation.displayContext === 'history' ? (
-                    <Tag color="warning">历史运行</Tag>
+                    <Tag color="warning">本机历史</Tag>
                   ) : null}
                 </Space>
                 <Paragraph>{operation.message}</Paragraph>
@@ -1239,9 +1256,11 @@ function RunView({
       >
         <div className="erp-dev-quality-section-heading">
           <Title id="quality-history-title" level={2}>
-            最近运行
+            本机最近诊断
           </Title>
-          <Text type="secondary">每种门禁最多保留最近 20 次脱敏记录</Text>
+          <Text type="secondary">
+            每种本机诊断最多保留最近 20 次脱敏记录；不混入 GitLab 流水线
+          </Text>
         </div>
         <QualityGateHistoryTrend
           operations={summary?.operations || []}
@@ -1261,7 +1280,7 @@ function RunView({
       <Text type="secondary" className="erp-dev-quality-action-status">
         {actionProfile
           ? `正在启动${PROFILE_LABELS[actionProfile]}`
-          : '运行完成后不会自动提交、推送、发布或部署。'}
+          : '本机诊断完成后不会自动提交、推送、发布或部署，也不替代 R640 CI Gate。'}
       </Text>
     </div>
   )
@@ -1821,7 +1840,7 @@ export default function DevQualityGatesPage() {
       <header className="erp-dev-quality-header">
         <div>
           <Text className="erp-dev-quality-header__eyebrow">
-            本机开发工具 · 固定质量证据
+            研发效能工作台 · 服务器证据优先
           </Text>
           <Space align="center" size={10}>
             <SafetyCertificateOutlined className="erp-dev-quality-header__icon" />
@@ -1830,11 +1849,12 @@ export default function DevQualityGatesPage() {
             </Title>
           </Space>
           <Paragraph>
-            分层查看 R640 exact-SHA CI 与本机 full / strict 回执，确认已提交版本和
-            当前未提交改动分别证明到哪里。
+            先核对当前提交的 R640 exact-SHA CI，再按需使用本机 full / strict
+            诊断未提交改动；两类证据分开记录。
           </Paragraph>
         </div>
         <Button
+          type="primary"
           icon={<ReloadOutlined />}
           loading={refreshing}
           onClick={refresh}
@@ -1908,18 +1928,26 @@ export default function DevQualityGatesPage() {
 
         <section
           className="erp-dev-quality-actions"
-          aria-label="质量门禁主操作"
+          aria-label="本机质量诊断操作"
         >
+          <div className="erp-dev-quality-actions__heading">
+            <div>
+              <Text strong>本机诊断（按需）</Text>
+              <Text type="secondary">
+                用于定位当前工作区问题；正式 main 门禁由推送后的 R640 CI 执行。
+              </Text>
+            </div>
+            <Tag>不替代服务器 CI</Tag>
+          </div>
           <div className="erp-dev-quality-actions__buttons">
             <div className="erp-dev-quality-actions__primary">
               <Button
-                type="primary"
                 size="large"
                 disabled={!canRun}
                 loading={actionProfile === 'strict'}
                 onClick={() => start('strict')}
               >
-                运行严格门禁
+                运行本机严格诊断
               </Button>
               <Tooltip
                 title="严格门禁比完整门禁多检查工具链、Shell 与 YAML，并生成绑定当前仓库身份的正式回执；若工作区有未提交改动，结果只证明当前工作区，不能作为干净 exact SHA 的发布证明。"
@@ -1932,7 +1960,7 @@ export default function DevQualityGatesPage() {
                   size="small"
                   className="erp-dev-quality-actions__help"
                   icon={<QuestionCircleOutlined />}
-                  aria-label="为什么优先推荐严格门禁"
+                  aria-label="什么时候运行本机严格诊断"
                 />
               </Tooltip>
             </div>
@@ -1942,16 +1970,16 @@ export default function DevQualityGatesPage() {
               loading={actionProfile === 'full'}
               onClick={() => start('full')}
             >
-              运行完整门禁
+              运行本机完整诊断
             </Button>
           </div>
           <div className="erp-dev-quality-actions__durations">
             <Text>
-              严格门禁：发版前验证 · 最近实际耗时{' '}
+              本机严格诊断：按需定位严格门禁问题 · 最近实际耗时{' '}
               {formatQualityGateDuration(profileDuration(summary, 'strict'))}
             </Text>
             <Text>
-              完整门禁：日常完整验证 · 最近实际耗时{' '}
+              本机完整诊断：按需定位完整门禁问题 · 最近实际耗时{' '}
               {formatQualityGateDuration(profileDuration(summary, 'full'))}
             </Text>
           </div>

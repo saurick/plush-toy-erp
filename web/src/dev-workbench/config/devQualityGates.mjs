@@ -10,6 +10,8 @@ export const DEV_QUALITY_GATE_GAPS_API_PATH = `${DEV_QUALITY_GATE_API_PATH}/gaps
 export const DEV_QUALITY_GATE_OPERATION_API_PREFIX = `${DEV_QUALITY_GATE_API_PATH}/operations`
 export const DEV_QUALITY_GATE_OPERATION_SCHEMA =
   'plush.dev-quality-gate-operation-public/v1'
+export const DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA =
+  'plush.dev-quality-gate-server-evidence/v1'
 
 export const QUERY_KEYS = Object.freeze({
   view: 'view',
@@ -23,8 +25,9 @@ export const QUERY_KEYS = Object.freeze({
 export const VIEW_ITEMS = Object.freeze([
   Object.freeze({
     value: 'run',
-    label: '运行与结果',
-    description: '运行 full 或 strict，并查看当前状态和真实耗时。',
+    label: '本机诊断',
+    description:
+      '按需运行本机 full 或 strict 诊断；正式主路径以当前 SHA 的 R640 CI Gate 为准。',
   }),
   Object.freeze({
     value: 'governance',
@@ -79,6 +82,28 @@ const OPERATION_STATUSES = Object.freeze([
   'not_proven',
 ])
 const STAGE_STATUSES = Object.freeze(['pending', 'running', 'passed', 'failed'])
+const SERVER_EVIDENCE_STATUSES = Object.freeze([
+  'passed',
+  'running',
+  'failed',
+  'missing',
+  'unavailable',
+])
+const PIPELINE_STATUSES = Object.freeze([
+  'queued',
+  'in_progress',
+  'completed',
+  'waiting',
+  'requested',
+  'pending',
+])
+const PIPELINE_CONCLUSIONS = Object.freeze([
+  '',
+  'success',
+  'failure',
+  'cancelled',
+  'skipped',
+])
 const STATUS_META = Object.freeze({
   queued: Object.freeze({ label: '等待启动', tone: 'processing' }),
   running: Object.freeze({ label: '正在运行', tone: 'processing' }),
@@ -414,6 +439,127 @@ function normalizeProfiles(profiles) {
   )
 }
 
+function normalizeServerEvidenceDuration(value, field) {
+  if (value === null) return null
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`${field} is invalid`)
+  }
+  return value
+}
+
+function normalizeServerEvidenceJob(job) {
+  assertExactKeys(
+    job,
+    ['conclusion', 'durationMs', 'id', 'name'],
+    'quality server evidence job'
+  )
+  if (
+    !Number.isSafeInteger(job.id) ||
+    job.id < 1 ||
+    !PIPELINE_CONCLUSIONS.includes(job.conclusion)
+  ) {
+    throw new Error('quality server evidence job is invalid')
+  }
+  return {
+    ...job,
+    name: safeText(job.name, 'quality server evidence job name', { max: 120 }),
+    durationMs: normalizeServerEvidenceDuration(
+      job.durationMs,
+      'quality server evidence job duration'
+    ),
+  }
+}
+
+function normalizeServerEvidencePipeline(pipeline) {
+  if (pipeline === null) return null
+  assertExactKeys(
+    pipeline,
+    [
+      'attempt',
+      'conclusion',
+      'durationMs',
+      'finishedAt',
+      'id',
+      'queueMs',
+      'status',
+      'url',
+    ],
+    'quality server evidence pipeline'
+  )
+  if (
+    !Number.isSafeInteger(pipeline.id) ||
+    pipeline.id < 1 ||
+    !Number.isSafeInteger(pipeline.attempt) ||
+    pipeline.attempt < 1 ||
+    !PIPELINE_STATUSES.includes(pipeline.status) ||
+    !PIPELINE_CONCLUSIONS.includes(pipeline.conclusion) ||
+    (pipeline.finishedAt !== null && !isIsoDate(pipeline.finishedAt)) ||
+    pipeline.url !==
+      `https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/${String(pipeline.id)}`
+  ) {
+    throw new Error('quality server evidence pipeline is invalid')
+  }
+  return {
+    ...pipeline,
+    queueMs: normalizeServerEvidenceDuration(
+      pipeline.queueMs,
+      'quality server evidence pipeline queue duration'
+    ),
+    durationMs: normalizeServerEvidenceDuration(
+      pipeline.durationMs,
+      'quality server evidence pipeline duration'
+    ),
+  }
+}
+
+function normalizeServerEvidence(evidence) {
+  assertExactKeys(
+    evidence,
+    [
+      'coversWorkingTree',
+      'current',
+      'gitSha',
+      'jobs',
+      'message',
+      'notProven',
+      'pipeline',
+      'schemaVersion',
+      'status',
+    ],
+    'quality server evidence'
+  )
+  if (
+    evidence.schemaVersion !== DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA ||
+    !SERVER_EVIDENCE_STATUSES.includes(evidence.status) ||
+    typeof evidence.current !== 'boolean' ||
+    typeof evidence.coversWorkingTree !== 'boolean' ||
+    !Array.isArray(evidence.jobs) ||
+    evidence.jobs.length > 20 ||
+    !Array.isArray(evidence.notProven) ||
+    evidence.notProven.length > 20 ||
+    (evidence.gitSha !== '' && !COMMIT_PATTERN.test(evidence.gitSha))
+  ) {
+    throw new Error('quality server evidence is invalid')
+  }
+  const pipeline = normalizeServerEvidencePipeline(evidence.pipeline)
+  if (
+    (['passed', 'running', 'failed'].includes(evidence.status) && !pipeline) ||
+    (['missing', 'unavailable'].includes(evidence.status) && pipeline) ||
+    (evidence.coversWorkingTree && evidence.status !== 'passed')
+  ) {
+    throw new Error('quality server evidence state is inconsistent')
+  }
+  return {
+    ...evidence,
+    pipeline,
+    jobs: evidence.jobs.map(normalizeServerEvidenceJob),
+    message: safeText(evidence.message, 'quality server evidence message'),
+    notProven: evidence.notProven.map((item) =>
+      safeText(item, 'quality server evidence missing item', { max: 200 })
+    ),
+  }
+}
+
 export function normalizeDevQualityGateSummary(summary) {
   assertExactKeys(
     summary,
@@ -427,6 +573,7 @@ export function normalizeDevQualityGateSummary(summary) {
       'proofs',
       'repository',
       'schemaVersion',
+      'serverEvidence',
       'status',
     ],
     'quality gate summary'
@@ -469,6 +616,7 @@ export function normalizeDevQualityGateSummary(summary) {
   return {
     ...summary,
     repository: normalizeRepository(summary.repository),
+    serverEvidence: normalizeServerEvidence(summary.serverEvidence),
     environment: {
       disposableDatabaseReady: Boolean(
         summary.environment.disposableDatabaseReady
