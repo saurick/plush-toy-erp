@@ -80,7 +80,11 @@ test("remote promotion fixes backup migration identity and unknown-outcome behav
   assert.match(source, /write_receipt not_proven/u);
   assert.match(source, /unknown prior target outcome; read back before retry/u);
   assert.match(source, /flock -n 9/u);
-  assert.match(source, /plush[.]remote-promotion-receipt\/v3/u);
+  assert.match(source, /plush[.]remote-promotion-receipt\/v5/u);
+  assert.match(source, /credentialCleanupProven/u);
+  assert.match(source, /trap on_signal HUP INT TERM/u);
+  assert.match(source, /trap on_exit EXIT/u);
+  assert.match(source, /enter_stage artifact_fetch/u);
   assert.match(source, /enter_stage package_verification/u);
   assert.match(source, /durationMs: \$durationMs/u);
   assert.match(source, /timings: \$timings/u);
@@ -90,13 +94,56 @@ test("remote promotion fixes backup migration identity and unknown-outcome behav
   assert.match(source, /applyStarted: \(\$migrationApplyStarted == 1\)/u);
 });
 
+test("remote promotion reports failed only after proving the previous runtime and public entry", () => {
+  const recovery = source.match(
+    /recover_before_migration\(\) \{[\s\S]+?\n\}/u,
+  )?.[0];
+  assert.ok(recovery);
+  assert.match(recovery, /up -d --no-build --pull never postgres jaeger app-server web-desktop/u);
+  assert.match(recovery, /\$server_endpoint\/healthz/u);
+  assert.match(recovery, /\$server_endpoint\/readyz/u);
+  assert.match(recovery, /\$web_endpoint\/healthz/u);
+  assert.match(recovery, /recovered_server_sha/u);
+  assert.match(recovery, /recovered_web_sha/u);
+  assert.match(recovery, /recovered_public_sha/u);
+  assert.match(recovery, /cutover-public-web[.]sh/u);
+  assert.match(
+    recovery,
+    /up -d --no-build --pull never postgres jaeger app-server web-desktop \\\n+    >>"\$log_file" 2>&1 \|\| return 1/u,
+  );
+  assert.match(
+    source,
+    /recovery_proven" -ne 1[\s\S]+?write_receipt not_proven promotion_previous_release_recovery_not_proven/u,
+  );
+  assert.match(
+    source,
+    /recovery_required" -eq 1[\s\S]+?write_receipt failed promotion_failed_previous_release_restored/u,
+  );
+  assert.match(source, /runtime_stop_started=1\n"\$\{clean_env\[@\]\}"/u);
+});
+
+test("remote promotion acquires the exact formal release on R640 before package verification", () => {
+  assert.match(source, /source "\$incoming\/remote-release-acquire[.]sh"/u);
+  assert.match(source, /acquire_target_release/u);
+  assert.match(source, /target-release-fetch[.]json/u);
+  assert.match(source, /acquisitionMode/u);
+  assert.match(source, /catalogAndChecksumsVerified/u);
+  const trapIndex = source.indexOf("trap on_error ERR");
+  const tokenRead = source.indexOf("IFS= read -r target_fetch_token || true");
+  const acquireIndex = source.indexOf("acquire_target_release", tokenRead);
+  assert.ok(trapIndex >= 0 && trapIndex < tokenRead && tokenRead < acquireIndex);
+  assert.doesNotMatch(source, /target-release-fetch[.]secret/u);
+});
+
 test("remote promotion verifies content-addressed cache and skips only exact image load", () => {
-  assert.match(source, /plush[.]target-release-cache\/v1/u);
+  assert.match(source, /plush[.]target-release-cache\/v2/u);
+  assert.match(source, /cache_root=\$root\/release-cache-v2/u);
   assert.match(source, /release_manifest_sha256/u);
   assert.match(source, /cache_avoided_bytes/u);
   assert.match(source, /dockerLoadSkipped: \$cacheImageHit/u);
   assert.match(source, /if \[\[ "\$cache_image_hit" != true \]\]/u);
   assert.match(source, /formal release cache identity conflicts/u);
+  assert.match(source, /formal release cache inventory is invalid/u);
   assert.match(
     source,
     /stillExecuted: \["migration", "health", "ready", "public_entry"\]/u,
@@ -122,6 +169,30 @@ test("remote promotion cleans only materialization created by the current operat
   assert.match(source, /! -L "\$candidate"/u);
   assert.match(source, /stat -c '%u'/u);
   assert.match(source, /rm -rf -- "\$candidate"/u);
+  assert.match(source, /fetch_payloads_published=0/u);
+});
+
+test("remote promotion removes the complete incoming control and payload inventory on success", () => {
+  const cleanup = source.slice(source.lastIndexOf("enter_stage passed"));
+  for (const name of [
+    ".target-cache.json",
+    "checksums.sha256",
+    "promotion-manifest.json",
+    "release-artifact.json",
+    "release-manifest.json",
+    "release-rehearsal.json",
+    "remote-promotion.sh",
+    "remote-release-acquire.sh",
+    "sbom.cdx.json",
+    "server-image.tar",
+    "source.tar",
+    "target-release-fetch.json",
+    "transfer-checksums.sha256",
+    "web-image.tar",
+  ]) {
+    assert.match(cleanup, new RegExp(`\\$incoming/${name.replaceAll(".", "[.]")}`, "u"), name);
+  }
+  assert.match(cleanup, /rmdir "\$incoming"/u);
 });
 
 test("remote promotion restores only the trusted database role script mode after safe extraction", () => {

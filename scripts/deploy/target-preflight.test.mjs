@@ -482,7 +482,14 @@ test("remote target preflight script is read-only and contains no build command"
     REMOTE_TARGET_PREFLIGHT_SCRIPT,
     /if plain_directory "\$root\/backups"; then\n\s+latest_backup=/u,
   );
-  assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /release-cache/u);
+  assert.match(
+    REMOTE_TARGET_PREFLIGHT_SCRIPT,
+    /cache_roots=\([^\n]*\/release-cache [^\n]*\/release-cache-v2\)/u,
+  );
+  assert.match(
+    REMOTE_TARGET_PREFLIGHT_SCRIPT,
+    /for cache_root in "\$\{cache_roots\[@\]\}"; do/u,
+  );
   assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /PUBLIC_ENTRY_STATUS/u);
   assert.match(
     REMOTE_TARGET_PREFLIGHT_SCRIPT,

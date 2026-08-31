@@ -12,7 +12,7 @@
 | `scripts/deploy/` | [scripts/deploy/README.md](deploy/README.md) | 生产 preflight、release evidence、closeout、客户配置发布和部署证据工具 |
 | `scripts/import/` | [scripts/import/README.md](import/README.md) | 客户来源 manifest、只读提取、freeze 和 dry-run 准备边界                |
 
-当前 CI/CD 入口已经收敛为：GitLab main / MR 主链按变更运行 `affected` 或 `full`；不可变 Release 从 protected main 的同一 exact SHA 普通 push pipeline 恢复完整 `CI Gate` 证据，不重跑 strict，再只构建一次 Server/Web 候选。正式版本由 Bridge 服务端按上海日历日和 live Release catalog 唯一推导，工作台只读展示，GitLab 在首次候选构建前再校验同一版本及调度时刻。正式 v2 Release 固定发布七资产并绑定同一演练回执；同版本中断后只允许校验并续传内容完全一致的缺失资产，随后必须整包读回。promotion、smoke 与 rollback 复用相同 digest。GitHub 仅作单向 GPT Review 镜像和显式应急 workflow，不重复运行 main 主链。固定 133 目标、GitLab/GitHub provider、operation、部署与回滚命令见 [scripts/deploy/README.md](deploy/README.md)，测试分组、exact-SHA gate 与只预览的 output 保留策略见 [scripts/qa/README.md](qa/README.md)。目标机不执行源码构建。
+当前 CI/CD 入口已经收敛为：GitLab main / MR 主链按变更运行 `affected` 或 `full`；不可变 Release 从 protected main 的同一 exact SHA 普通 push pipeline 恢复完整 `CI Gate` 证据，不重跑 strict，再只构建一次 Server/Web 候选。正式版本由 Bridge 服务端按上海日历日和 live Release catalog 唯一推导，工作台只读展示，GitLab 在首次候选构建前再校验同一版本及调度时刻。正式 v2 Release 固定发布七资产、同一演练回执及独立 source Package；同版本中断后只允许校验并续传内容完全一致的缺失资产，随后必须整包读回。Mac 只发送显式 operation 与小型控制包，R640 目标经固定同机内网 GitLab TLS 入口直接取得、校验和缓存七资产与 `source.tar`；promotion、smoke 与 rollback 复用相同 digest，不允许回退到 Mac 大文件中转。GitHub 仅作单向 GPT Review 镜像和显式应急 workflow，不重复运行 main 主链。固定 133 目标、GitLab/GitHub provider、operation、部署与回滚命令见 [scripts/deploy/README.md](deploy/README.md)，测试分组、exact-SHA gate 与只预览的 output 保留策略见 [scripts/qa/README.md](qa/README.md)。目标机不执行源码构建。
 
 ## 总览
 

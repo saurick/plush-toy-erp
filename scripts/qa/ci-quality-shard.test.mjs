@@ -49,7 +49,7 @@ test("quality shard catalog covers the strict stage set exactly once", () => {
   }
 });
 
-test("browser-bearing shards materialize and clean the verified runtime", () => {
+test("only the Browser canonical shard materializes and cleans its verified runtime", () => {
   assert.match(source, /materializePlaywrightRuntime\(\{ root, env: childEnv \}\)/u);
   assert.match(source, /cleanupPlaywrightRuntime\(\{ root, env: childEnv \}\)/u);
   assert.match(source, /playwrightRuntimeCleanup/u);
@@ -60,16 +60,34 @@ test("browser-bearing shards materialize and clean the verified runtime", () => 
   );
   assert.match(
     source,
-    /\["server", "browser"\][.]includes\(shard\)/u,
+    /if \(shard === "browser"\)/u,
   );
 });
 
-test("Node and Web shards install the cached Web dependencies offline", () => {
-  assert.match(source, /\["node", "web"\][.]includes\(shard\)/u);
+test("only the Node canonical shard installs cached Web dependencies", () => {
+  assert.match(source, /if \(shard === "node"\)/u);
   assert.match(
     source,
     /\["--dir", "web", "install", "--frozen-lockfile", "--offline"\]/u,
   );
+});
+
+test("Web and Server canonical shards fan in internal lanes without rerunning resources", () => {
+  assert.match(source, /loadCiQualityStageLaneSet/u);
+  assert.match(source, /QA_CI_WEB_LANES = "verified"/u);
+  assert.match(source, /QA_CI_SERVER_LANES = "verified"/u);
+  assert.match(source, /directory: `output\/ci\/\$\{shard\}-lanes`/u);
+  assert.match(source, /webLanes: shard === "web"/u);
+  assert.match(source, /serverLanes: shard === "server"/u);
+  assert.doesNotMatch(source, /plush-ci-postgres-/u);
+});
+
+test("Browser trusts only the exact Web build lane artifact", () => {
+  assert.match(source, /readCiQualityStageLaneReceipt/u);
+  assert.match(source, /file: "output\/ci\/web-lanes\/build[.]json"/u);
+  assert.match(source, /lane: "build"/u);
+  assert.match(source, /webReceipt[.]webBuildSha256 !== webBuildSha256/u);
+  assert.doesNotMatch(source, /output[\/]ci[\/]shards[\/]web[.]json/u);
 });
 
 test("Node shard fans in internal lanes while preserving one external shard", () => {

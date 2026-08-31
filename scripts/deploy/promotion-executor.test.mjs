@@ -6,6 +6,7 @@ import test from "node:test";
 
 import {
   classifyImmediatePromotionPreflight,
+  consumeTargetReleaseFetchCredential,
   REMOTE_PROMOTION_RECEIPT_CONTRACT,
   REMOTE_TARGET_INITIALIZATION_RECEIPT_CONTRACT,
   validateRemotePromotionReceipt,
@@ -16,6 +17,7 @@ const SHA = "a".repeat(40);
 const HASH = "b".repeat(64);
 const OPERATION_ID = "123e4567-e89b-42d3-a456-426614174000";
 const PROMOTION_STAGES = [
+  "artifact_fetch",
   "package_verification",
   "capacity_recheck",
   "release_materialization",
@@ -31,6 +33,19 @@ const PROMOTION_STAGES = [
   "public_entry_switch",
   "current_source_switch",
 ];
+
+test("promotion executor consumes the inherited target fetch credential once", () => {
+  const env = {
+    KEEP_ME: "safe",
+    PLUSH_GITLAB_TARGET_FETCH_TOKEN: "target-fetch-token",
+  };
+  assert.equal(
+    consumeTargetReleaseFetchCredential(env),
+    "target-fetch-token",
+  );
+  assert.deepEqual(env, { KEEP_ME: "safe" });
+  assert.equal(consumeTargetReleaseFetchCredential(env), undefined);
+});
 
 function blockedAbsentCustomerConfigPreflight(overrides = {}) {
   return {
@@ -74,6 +89,13 @@ function receipt(overrides = {}) {
     stage: "passed",
     issueCode: "none",
     before: { runtimeSha: "d".repeat(40) },
+    acquisition: {
+      mode: "target_cache",
+      downloadedBytes: 0,
+      expectedBytes: 0,
+      catalogAndChecksumsVerified: true,
+      credentialCleanupProven: true,
+    },
     cache: {
       packageHit: true,
       imageHit: true,
@@ -141,6 +163,7 @@ const expected = {
   releaseManifestSha256: HASH,
   releaseRehearsalSha256: "9".repeat(64),
   promotionFingerprint: "c".repeat(64),
+  acquisitionExpectedBytes: 0,
 };
 
 const initializationExpected = {
@@ -152,6 +175,7 @@ const initializationExpected = {
   releaseManifestSha256: HASH,
   releaseRehearsalSha256: "9".repeat(64),
   initializationFingerprint: "c".repeat(64),
+  acquisitionExpectedBytes: 581_043_372,
 };
 
 function initializationReceipt(overrides = {}) {
@@ -168,6 +192,14 @@ function initializationReceipt(overrides = {}) {
     stage: "passed",
     issueCode: "none",
     before: { targetState: "absent" },
+    acquisition: {
+      mode: "gitlab_internal",
+      downloadedBytes: 581_043_372,
+      expectedBytes: 581_043_372,
+      durationMs: 4_000,
+      catalogAndChecksumsVerified: true,
+      credentialCleanupProven: true,
+    },
     images: {
       serverContentId: `sha256:${"e".repeat(64)}`,
       webContentId: `sha256:${"f".repeat(64)}`,
@@ -382,10 +414,137 @@ test("target initialization receipt binds pristine state, backup and rollback", 
           retainedTarget: false,
           preservesOtherTargets: true,
         },
+        acquisition: {
+          mode: "gitlab_internal",
+          downloadedBytes: 581_043_372,
+          expectedBytes: 581_043_372,
+          durationMs: 4_000,
+          catalogAndChecksumsVerified: true,
+          credentialCleanupProven: true,
+        },
       }),
       initializationExpected,
     ).status,
     "failed",
+  );
+  assert.equal(
+    validateRemoteTargetInitializationReceipt(
+      initializationReceipt({
+        status: "failed",
+        stage: "artifact_fetch",
+        issueCode: "initialization_rolled_back",
+        images: { serverContentId: "unknown", webContentId: "unknown" },
+        migration: {
+          applyStarted: false,
+          automaticDownMigration: false,
+          readback: "unknown",
+        },
+        bootstrap: {
+          started: false,
+          completed: false,
+          secretPersistedOnTarget: false,
+        },
+        rollbackPoint: {
+          backupAlias: `initial-${SHA.slice(0, 12)}-${OPERATION_ID}`,
+          backupSha256: "none",
+          backupSizeBytes: 0,
+          restoreChecked: false,
+        },
+        checks: Object.fromEntries(
+          Object.keys(initializationReceipt().checks).map((key) => [key, false]),
+        ),
+        rollback: {
+          complete: true,
+          retainedTarget: false,
+          preservesOtherTargets: true,
+        },
+        acquisition: {
+          mode: "none",
+          downloadedBytes: 0,
+          expectedBytes: 581_043_372,
+          durationMs: 200,
+          catalogAndChecksumsVerified: false,
+          credentialCleanupProven: true,
+        },
+      }),
+      initializationExpected,
+    ).stage,
+    "artifact_fetch",
+  );
+  assert.throws(
+    () =>
+      validateRemoteTargetInitializationReceipt(
+        initializationReceipt({
+          status: "failed",
+          stage: "database_start",
+          issueCode: "initialization_rolled_back",
+          images: { serverContentId: "unknown", webContentId: "unknown" },
+          migration: {
+            applyStarted: false,
+            automaticDownMigration: false,
+            readback: "unknown",
+          },
+          bootstrap: {
+            started: false,
+            completed: false,
+            secretPersistedOnTarget: false,
+          },
+          rollbackPoint: {
+            backupAlias: `initial-${SHA.slice(0, 12)}-${OPERATION_ID}`,
+            backupSha256: "none",
+            backupSizeBytes: 0,
+            restoreChecked: false,
+          },
+          checks: Object.fromEntries(
+            Object.keys(initializationReceipt().checks).map((key) => [key, false]),
+          ),
+          rollback: {
+            complete: true,
+            retainedTarget: false,
+            preservesOtherTargets: true,
+          },
+          acquisition: {
+            mode: "none",
+            downloadedBytes: 0,
+            expectedBytes: 581_043_372,
+            durationMs: 200,
+            catalogAndChecksumsVerified: false,
+            credentialCleanupProven: true,
+          },
+        }),
+        initializationExpected,
+      ),
+    /contract/u,
+  );
+  assert.throws(
+    () =>
+      validateRemoteTargetInitializationReceipt(
+        initializationReceipt({
+          acquisition: {
+            mode: "target_cache",
+            downloadedBytes: 0,
+            expectedBytes: 0,
+            durationMs: 1,
+            catalogAndChecksumsVerified: true,
+            credentialCleanupProven: true,
+          },
+        }),
+        initializationExpected,
+      ),
+    /contract/u,
+  );
+  assert.throws(
+    () =>
+      validateRemoteTargetInitializationReceipt(
+        initializationReceipt({
+          acquisition: {
+            ...initializationReceipt().acquisition,
+            downloadedBytes: 581_043_371,
+          },
+        }),
+        initializationExpected,
+      ),
+    /contract/u,
   );
 });
 
@@ -394,9 +553,12 @@ test("failed and unknown receipts cannot masquerade as passed", () => {
     status: "failed",
     stage: "capacity_recheck",
     issueCode: "promotion_failed_before_migration",
-    timings: PROMOTION_STAGES.slice(0, 2).map((id, index) => ({
+    timings: PROMOTION_STAGES.slice(
+      0,
+      PROMOTION_STAGES.indexOf("capacity_recheck") + 1,
+    ).map((id) => ({
       id,
-      status: index === 1 ? "failed" : "passed",
+      status: id === "capacity_recheck" ? "failed" : "passed",
       durationMs: 1_000,
     })),
     checks: {
@@ -410,6 +572,20 @@ test("failed and unknown receipts cannot masquerade as passed", () => {
   assert.equal(
     validateRemotePromotionReceipt(failed, expected).status,
     "failed",
+  );
+  assert.throws(
+    () =>
+      validateRemotePromotionReceipt(
+        {
+          ...failed,
+          acquisition: {
+            ...failed.acquisition,
+            credentialCleanupProven: false,
+          },
+        },
+        expected,
+      ),
+    /inconsistent/u,
   );
   const migrationPlanIndex = PROMOTION_STAGES.indexOf("migration_plan");
   const migrationPlanFailure = receipt({
@@ -459,6 +635,11 @@ test("failed and unknown receipts cannot masquerade as passed", () => {
     stage: "package_verification",
     issueCode: "promotion_failed_before_migration",
     timings: [
+      {
+        id: "artifact_fetch",
+        status: "passed",
+        durationMs: 1_000,
+      },
       {
         id: "package_verification",
         status: "failed",
@@ -524,18 +705,77 @@ test("promotion executor contains no target build or automatic retry path", () =
   assert.match(source, /targetWriteStarted: false/u);
   assert.match(source, /automatic retry is disabled/u);
   assert.match(source, /release-rehearsal[.]json/u);
-  const prepareIndex = source.indexOf("prepareCache(");
-  const transferTimerIndex = source.indexOf(
-    "const transferStartedAt = Date.now()",
+  assert.match(source, /PLUSH_GITLAB_TARGET_FETCH_TOKEN/u);
+  assert.doesNotMatch(source, /process[.]env[.]PLUSH_GITLAB_TOKEN/u);
+  assert.match(source, /input: targetFetchToken \? `\$\{targetFetchToken\}\\n` : ""/u);
+  assert.match(source, /input: `\$\{targetFetchToken\}\\n`/u);
+  assert.doesNotMatch(source, /target-release-fetch[.]secret/u);
+  const controlTransfer = source.match(
+    /const CONTROL_TRANSFER_FILES = Object[.]freeze\(\[[\s\S]+?\]\);/u,
+  )?.[0];
+  assert.ok(controlTransfer);
+  for (const file of [
+    "checksums.sha256",
+    "release-artifact.json",
+    "release-manifest.json",
+    "release-rehearsal.json",
+    "sbom.cdx.json",
+    "server-image.tar",
+    "source.tar",
+    "web-image.tar",
+  ]) {
+    assert.doesNotMatch(
+      controlTransfer,
+      new RegExp(`"${file.replaceAll(".", "[.]")}"`, "u"),
+    );
+  }
+  for (const file of [
+    "promotion-manifest.json",
+    "remote-promotion.sh",
+    "remote-release-acquire.sh",
+    "transfer-checksums.sha256",
+  ]) {
+    assert.match(
+      controlTransfer,
+      new RegExp(`"${file.replaceAll(".", "[.]")}"`, "u"),
+    );
+  }
+  const upgradeRoot = source.lastIndexOf("const transferRoot = path.join(");
+  const cleanupBoundary = source.indexOf(
+    "rmSync(transferRoot, { recursive: true, force: true })",
+    upgradeRoot,
   );
-  const rsyncIndex = source.indexOf('"transfer immutable promotion package"');
+  const cleanupTry = source.indexOf("try {", upgradeRoot);
+  for (const guardedStep of [
+    "transfer = preparePromotionTransfer(",
+    "assertLocalRsync(runCommand)",
+    'status: "running"',
+  ]) {
+    const step = source.indexOf(guardedStep, upgradeRoot);
+    assert.ok(
+      cleanupTry >= 0 && cleanupTry < step && step < cleanupBoundary,
+      `${guardedStep} must stay inside the exact local transfer cleanup boundary`,
+    );
+  }
+  assert.match(source, /targetPrepared = true;\s+prepareCache\(/u);
+  assert.match(
+    source,
+    /const outcomeUnknown = remoteStarted \|\| !targetCleanupProven/u,
+  );
+  const prepareIndex = source.indexOf("prepareCache(");
+  const transferTimerIndex = source.lastIndexOf(
+    "const controlTransferStartedAt = Date.now()",
+  );
+  const rsyncIndex = source.indexOf('"transfer promotion control package"');
   assert(
     prepareIndex < transferTimerIndex && transferTimerIndex < rsyncIndex,
     "transfer timing must measure rsync without counting remote directory preparation",
   );
   for (const metric of [
-    "transferDurationMs",
-    "transferBytesPerSecond",
+    "controlTransferDurationMs",
+    "controlTransferBytesPerSecond",
+    "targetAcquisitionDurationMs",
+    "targetAcquisitionBytesPerSecond",
     "serverArchiveBytes",
     "webArchiveBytes",
     "serverDigest",
@@ -546,4 +786,9 @@ test("promotion executor contains no target build or automatic retry path", () =
   ]) {
     assert.match(source, new RegExp(`\\b${metric}\\b`, "u"));
   }
+  assert.equal(
+    source.match(/bootstrapAccessStored: Boolean\(accessFile && existsSync\(accessFile\)\)/gu)?.length,
+    2,
+    "both terminal initialization paths must report the actual access-file state",
+  );
 });

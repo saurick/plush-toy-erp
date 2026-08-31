@@ -85,6 +85,28 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
       new RegExp(`output/ci/resource-lanes/${lane}[.]json`, "u"),
     );
   }
+  for (const [shard, lanes] of Object.entries({
+    web: ["checks", "build"],
+    server: ["core", "critical_postgres"],
+  })) {
+    for (const lane of lanes) {
+      assert.match(
+        workflow,
+        new RegExp(`^quality_${shard}_${lane}:`, "mu"),
+      );
+      assert.match(
+        workflow,
+        new RegExp(
+          `ci-quality-stage-lane[.]mjs --shard ${shard} --lane ${lane}`,
+          "u",
+        ),
+      );
+      assert.match(
+        workflow,
+        new RegExp(`output/ci/${shard}-lanes/${lane}[.]json`, "u"),
+      );
+    }
+  }
   assert.doesNotMatch(workflow, /^quality_node_runtime:/mu);
   assert.match(
     workflow,
@@ -93,6 +115,14 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   assert.match(
     workflow,
     /quality_resource:[\s\S]+?job: quality_resource_contract\n      artifacts: true[\s\S]+?job: quality_resource_runtime\n      artifacts: true[\s\S]+?ci-quality-shard[.]mjs --shard resource/u,
+  );
+  assert.match(
+    workflow,
+    /quality_web:[\s\S]+?job: quality_web_checks\n      artifacts: true[\s\S]+?job: quality_web_build\n      artifacts: true[\s\S]+?ci-quality-shard[.]mjs --shard web/u,
+  );
+  assert.match(
+    workflow,
+    /quality_server:[\s\S]+?job: quality_server_core\n      artifacts: true[\s\S]+?job: quality_server_critical_postgres\n      artifacts: true[\s\S]+?ci-quality-shard[.]mjs --shard server/u,
   );
   assert.ok(
     workflow.indexOf("quality_node_release:") <
@@ -115,10 +145,18 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
     aggregateBlock,
     /quality_resource_(?:contract|runtime)/u,
   );
+  assert.doesNotMatch(
+    aggregateBlock,
+    /quality_(?:web_(?:checks|build)|server_(?:core|critical_postgres))/u,
+  );
   assert.match(workflow, /^quality_aggregate:\n  stage: aggregate/mu);
   assert.match(workflow, /ci-quality-aggregate[.]mjs/u);
   assert.match(workflow, /plush-ci-evidence/u);
-  assert.match(workflow, /quality_browser:[\s\S]+?job: quality_web\n      artifacts: true/u);
+  assert.match(workflow, /quality_browser:[\s\S]+?job: quality_web_build\n      artifacts: true/u);
+  assert.doesNotMatch(
+    workflow.match(/^quality_browser:[\s\S]+?^quality_security:/mu)?.[0] || "",
+    /job: quality_web\n/u,
+  );
   assert.match(workflow, /history_range=HEAD/u);
   assert.match(
     workflow,
@@ -168,7 +206,13 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   );
   assert.match(workflow, /policy: pull-push/u);
   assert.match(workflow, /policy: pull/u);
-  for (const shard of ["node_release", "node_core", "node", "web"]) {
+  for (const shard of [
+    "node_release",
+    "node_core",
+    "node",
+    "web_checks",
+    "web_build",
+  ]) {
     assert.match(
       workflow,
       new RegExp(
@@ -177,7 +221,7 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
       ),
     );
   }
-  for (const shard of ["server", "browser"]) {
+  for (const shard of ["server_core", "browser"]) {
     assert.match(
       workflow,
       new RegExp(
@@ -195,6 +239,9 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
     "resource_contract",
     "resource_runtime",
     "resource",
+    "web",
+    "server_critical_postgres",
+    "server",
     "security",
   ]) {
     assert.match(
@@ -218,6 +265,10 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
 });
 
 test("GitLab release reuses push CI, builds one candidate and freezes rehearsal evidence", () => {
+  const publish = workflow.match(
+    /^publish_release:[\s\S]+?(?=^backfill_release_source:)/mu,
+  )?.[0];
+  assert.ok(publish);
   assert.doesNotMatch(workflow, /\$RELEASE_SHA != ""/u);
   assert.match(
     workflow,
@@ -249,7 +300,18 @@ test("GitLab release reuses push CI, builds one candidate and freezes rehearsal 
   );
   assert.match(workflow, /GITHUB_PACKAGES_TOKEN/u);
   assert.match(workflow, /GITLAB_RELEASE_TOKEN/u);
-  assert.match(workflow, /JOB-TOKEN: \$CI_JOB_TOKEN/u);
+  assert.match(publish, /printf 'header = "JOB-TOKEN: %s"/u);
+  assert.match(publish, /--config "\$job_token_config"/u);
+  assert.match(publish, /--config "\$private_token_config"/u);
+  assert.match(
+    publish,
+    /chmod 0600 "\$job_token_config" "\$private_token_config"/u,
+  );
+  assert.match(publish, /cleanup_publish_credentials/u);
+  assert.doesNotMatch(
+    publish,
+    /--header\s+"(?:PRIVATE|JOB)-TOKEN:/u,
+  );
   assert.match(workflow, /github-release-asset-set[.]mjs finalize/u);
   assert.match(workflow, /output\/ci\/release-assets[.]json/u);
   assert.match(
@@ -259,7 +321,95 @@ test("GitLab release reuses push CI, builds one candidate and freezes rehearsal 
   assert.match(workflow, /--missing-out "\$missing_assets"/u);
   assert.match(workflow, /done < "\$missing_assets"/u);
   assert.match(workflow, /gitlab-release-publication[.]mjs verify/u);
+  assert.match(
+    workflow,
+    /git archive --format=tar --output="\$source_archive" "\$RELEASE_SHA"/u,
+  );
+  assert.match(
+    workflow,
+    /[.]sourceArchive[.]sha256[\s\S]+?sha256sum "\$source_archive"/u,
+  );
+  assert.match(workflow, /gitlab-release-publication[.]mjs plan-source/u);
+  assert.match(workflow, /gitlab-release-publication[.]mjs verify-source/u);
+  assert.match(
+    workflow,
+    /packages\/generic\/plush-release-source\/\$package_version\/source[.]tar/u,
+  );
+  assert.ok(
+    workflow.indexOf("gitlab-release-publication.mjs verify-source") <
+      workflow.indexOf('release_api="$CI_API_V4_URL'),
+    "the exact source package must be verified before the GitLab Release is created",
+  );
   assert.doesNotMatch(workflow, /refusing supplementation/u);
+});
+
+test("GitLab CI gate keeps its evidence token out of curl argv", () => {
+  const gate = workflow.match(
+    /^"CI Gate":[\s\S]+?(?=^publish_release:)/mu,
+  )?.[0];
+  assert.ok(gate);
+  assert.match(gate, /job_token_config=output\/ci\/ci-gate-job-token[.]curl/u);
+  assert.match(gate, /chmod 0600 "\$job_token_config"/u);
+  assert.match(gate, /curl --config "\$job_token_config"/u);
+  assert.match(gate, /cleanup_evidence_credentials/u);
+  assert.match(gate, /test ! -e "\$job_token_config"/u);
+  assert.doesNotMatch(gate, /--header\s+"JOB-TOKEN:/u);
+});
+
+test("historical source backfill is one protected internal job and cannot rewrite formal assets", () => {
+  assert.match(
+    workflow,
+    /CI_PIPELINE_SOURCE =~ \/\^\(api\|web\)\$\/ && \$BACKFILL_RELEASE_SOURCE_SHA/u,
+  );
+  const backfill = workflow.match(/^backfill_release_source:[\s\S]+$/mu)?.[0];
+  assert.ok(backfill);
+  assert.match(backfill, /resource_group: immutable-release-catalog/u);
+  assert.match(backfill, /CI_COMMIT_REF_PROTECTED/u);
+  assert.match(backfill, /git merge-base --is-ancestor/u);
+  assert.match(
+    backfill,
+    /git archive --format=tar --output="\$source_archive" "\$BACKFILL_RELEASE_SOURCE_SHA"/u,
+  );
+  assert.match(backfill, /validate-source-backfill/u);
+  assert.match(backfill, /gitlab-release-publication[.]mjs plan-source/u);
+  assert.match(backfill, /gitlab-release-publication[.]mjs verify-source/u);
+  assert.match(
+    backfill,
+    /packages\/generic\/plush-release-source\/\$package_version\/source[.]tar/u,
+  );
+  assert.equal(backfill.match(/--upload-file/gu)?.length ?? 0, 1);
+  assert.doesNotMatch(
+    backfill,
+    /packages\/generic\/plush-release\/\$package_version\/[^$]/u,
+  );
+  assert.doesNotMatch(backfill, /release-artifact-bundle|releases\?/u);
+  assert.ok(
+    backfill.indexOf("validate-source-backfill") <
+      backfill.indexOf('--upload-file "$source_archive"'),
+    "the historical formal release must be validated before source upload",
+  );
+  assert.match(
+    backfill,
+    /rm -f -- "\$job_token_config" "\$private_token_config"/u,
+  );
+  assert.match(
+    backfill,
+    /chmod 0600 "\$job_token_config" "\$private_token_config"/u,
+  );
+  assert.match(backfill, /test ! -e "\$job_token_config"/u);
+  assert.match(backfill, /test ! -e "\$private_token_config"/u);
+  assert.match(
+    backfill,
+    /printf 'header = "PRIVATE-TOKEN: %s"\\n' "\$GITLAB_RELEASE_TOKEN" > "\$private_token_config"/u,
+  );
+  assert.doesNotMatch(
+    backfill,
+    /curl[^\n]*(?:PRIVATE-TOKEN|GITLAB_RELEASE_TOKEN)/u,
+  );
+  assert.doesNotMatch(
+    backfill,
+    /--header\s+"(?:PRIVATE|DEPLOY)-TOKEN:/u,
+  );
 });
 
 test("GitLab jobs stay on the isolated runner and never receive the R640 host socket", () => {

@@ -65,7 +65,7 @@ customer-test-133)
   ;;
 esac
 incoming_root=$root/incoming
-cache_root=$root/release-cache
+cache_root=$root/release-cache-v2
 releases_root=$root/releases
 backups_root=$root/backups
 operations_root=$root/operations
@@ -174,6 +174,7 @@ restore_database_created=0
 stage=initial
 migration_apply_started=0
 env_changed=0
+runtime_stop_started=0
 env_backup=""
 current_before_sha=unknown
 backup_sha256=none
@@ -187,6 +188,14 @@ cache_image_hit=false
 cache_source=none
 cache_avoided_bytes=0
 cache_basis='[]'
+acquisition_mode=none
+acquisition_downloaded_bytes=0
+acquisition_expected_bytes=0
+acquisition_verified=false
+credential_cleanup_proven=false
+fetch_materializing=""
+fetch_materializing_created=0
+fetch_payloads_published=0
 cache_materializing=""
 cache_materializing_created=0
 release_materializing=""
@@ -286,7 +295,7 @@ write_receipt() {
   finished_epoch_ms="$(epoch_millis)"
   duration_ms=$((finished_epoch_ms - operation_started_epoch_ms))
   jq -n \
-    --arg schemaVersion "plush.remote-promotion-receipt/v3" \
+    --arg schemaVersion "plush.remote-promotion-receipt/v5" \
     --arg status "$status" \
     --arg operationId "$operation_id" \
     --arg target "$target" \
@@ -312,6 +321,11 @@ write_receipt() {
     --arg cacheSource "$cache_source" \
     --argjson cacheAvoidedBytes "$cache_avoided_bytes" \
     --argjson cacheBasis "$cache_basis" \
+    --arg acquisitionMode "$acquisition_mode" \
+    --argjson acquisitionDownloadedBytes "$acquisition_downloaded_bytes" \
+    --argjson acquisitionExpectedBytes "$acquisition_expected_bytes" \
+    --argjson acquisitionVerified "$acquisition_verified" \
+    --argjson credentialCleanupProven "$credential_cleanup_proven" \
     '{
       schemaVersion: $schemaVersion,
       status: $status,
@@ -333,6 +347,13 @@ write_receipt() {
         dockerLoadSkipped: $cacheImageHit,
         basis: $cacheBasis,
         stillExecuted: ["migration", "health", "ready", "public_entry"]
+      },
+      acquisition: {
+        mode: $acquisitionMode,
+        downloadedBytes: $acquisitionDownloadedBytes,
+        expectedBytes: $acquisitionExpectedBytes,
+        catalogAndChecksumsVerified: $acquisitionVerified,
+        credentialCleanupProven: $credentialCleanupProven
       },
       images: {
         serverContentId: $serverContentId,
@@ -387,6 +408,31 @@ restore_database_cleanup() {
 
 cleanup_transient_materialization() {
   local candidate
+  credential_cleanup_proven=false
+  unset target_fetch_token
+  if [[ "$fetch_payloads_published" -eq 1 ]]; then
+    rm -f -- \
+      "$incoming/checksums.sha256" "$incoming/release-artifact.json" \
+      "$incoming/release-manifest.json" "$incoming/release-rehearsal.json" \
+      "$incoming/sbom.cdx.json" "$incoming/server-image.tar" \
+      "$incoming/source.tar" "$incoming/web-image.tar" 2>/dev/null || true
+    fetch_payloads_published=0
+  fi
+  if [[ "$fetch_materializing_created" -eq 1 ]]; then
+    candidate="$fetch_materializing"
+    if [[ "$candidate" == "$incoming/.acquire-$operation_id" &&
+      -d "$candidate" && ! -L "$candidate" &&
+      "$(stat -c '%u' "$candidate" 2>/dev/null || true)" == "$(id -u)" ]]; then
+      rm -rf -- "$candidate" ||
+        printf '[remote-promotion] failed to clean acquisition materialization\n' >&2
+    fi
+    fetch_materializing_created=0
+  fi
+  if [[ -z "${target_fetch_token+x}" &&
+    (-z "$fetch_materializing" ||
+    (! -e "$fetch_materializing/curl.conf" && ! -L "$fetch_materializing/curl.conf")) ]]; then
+    credential_cleanup_proven=true
+  fi
   if [[ "$cache_materializing_created" -eq 1 ]]; then
     candidate="$cache_materializing"
     if [[ "$candidate" == "$cache_root/.materializing-$operation_id" &&
@@ -410,47 +456,143 @@ cleanup_transient_materialization() {
 }
 
 recover_before_migration() {
+  local recovered_public_containers
+  local recovered_public_count
+  local recovered_public_image
+  local recovered_public_sha
+  local recovered_server_sha
+  local recovered_web_sha
+  local recovery_cutover_script
+  local recovery_required=0
+  if [[ "$env_changed" -eq 1 || "$runtime_stop_started" -eq 1 ]]; then
+    recovery_required=1
+  fi
+  [[ "$recovery_required" -eq 1 ]] || return 0
+  [[ "$current_before_sha" =~ $sha_pattern ]] || return 1
   if [[ "$env_changed" -eq 1 && -n "$env_backup" && -f "$env_backup" ]]; then
     cp "$env_backup" "$runtime_env.recovering"
     chmod 600 "$runtime_env.recovering"
     mv -f "$runtime_env.recovering" "$runtime_env"
     env_changed=0
+  elif [[ "$env_changed" -eq 1 ]]; then
+    return 1
   fi
-  if [[ "$migration_apply_started" -eq 0 && -d "$current" && ! -L "$current" ]]; then
-    env -i \
-      "HOME=$HOME" "USER=$(id -un)" "LOGNAME=$(id -un)" \
-      "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
-      docker compose \
-      -p "$project" \
-      --env-file "$runtime_env" \
-      -f "$current/server/deploy/compose/prod/compose.yml" \
-      -f "$current/server/deploy/compose/prod/$compose_override_name" \
-      up -d --no-build --pull never app-server web-desktop \
-      >>"$log_file" 2>&1 || true
-  fi
+  [[ "$migration_apply_started" -eq 0 && -d "$current" && ! -L "$current" ]] ||
+    return 1
+  env -i \
+    "HOME=$HOME" "USER=$(id -un)" "LOGNAME=$(id -un)" \
+    "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+    docker compose \
+    -p "$project" \
+    --env-file "$runtime_env" \
+    -f "$current/server/deploy/compose/prod/compose.yml" \
+    -f "$current/server/deploy/compose/prod/$compose_override_name" \
+    up -d --no-build --pull never postgres jaeger app-server web-desktop \
+    >>"$log_file" 2>&1 || return 1
+  curl --fail --silent --show-error --max-time 10 \
+    "$server_endpoint/healthz" >/dev/null 2>&1 || return 1
+  curl --fail --silent --show-error --max-time 10 \
+    "$server_endpoint/readyz" >/dev/null 2>&1 || return 1
+  curl --fail --silent --show-error --max-time 10 \
+    "$web_endpoint/healthz" >/dev/null 2>&1 || return 1
+  recovered_server_sha="$(docker inspect "$server_container" --format '{{range .Config.Env}}{{println .}}{{end}}' |
+    sed -n 's/^GIT_SHA=//p' | head -n1)"
+  recovered_web_sha="$(docker inspect "$web_container" --format '{{range .Config.Env}}{{println .}}{{end}}' |
+    sed -n 's/^GIT_SHA=//p' | head -n1)"
+  [[ "$recovered_server_sha" == "$current_before_sha" &&
+    "$recovered_web_sha" == "$current_before_sha" ]] || return 1
+  recovered_public_containers="$(
+    docker ps --format '{{.Names}}' |
+      grep -E "^${public_container_prefix}[0-9a-f]{8}$" || true
+  )"
+  recovered_public_count="$(printf '%s\n' "$recovered_public_containers" | sed '/^$/d' | wc -l | tr -d ' ')"
+  [[ "$recovered_public_count" == 1 ]] || return 1
+  recovered_public_sha="$(docker inspect "$recovered_public_containers" \
+    --format '{{range .Config.Env}}{{println .}}{{end}}' |
+    sed -n 's/^GIT_SHA=//p' | head -n1)"
+  recovered_public_image="$(docker inspect "$recovered_public_containers" --format '{{.Config.Image}}')"
+  [[ "$recovered_public_sha" == "$current_before_sha" &&
+    -n "$recovered_public_image" ]] || return 1
+  recovery_cutover_script=$current/deployments/yoyoosun/scripts/cutover-public-web.sh
+  [[ -f "$recovery_cutover_script" && ! -L "$recovery_cutover_script" ]] ||
+    return 1
+  bash "$recovery_cutover_script" \
+    --image "$recovered_public_image" \
+    --release "$current_before_sha" \
+    --current-container "$recovered_public_containers" \
+    --endpoint "$public_endpoint" \
+    --api-origin http://app-server:8300 \
+    --network "$public_network" \
+    --container-prefix "$public_container_prefix" \
+    --host-port "$public_host_port" \
+    --candidate-port "$public_candidate_port" \
+    --execute \
+    --confirm "PUBLIC_WEB_CUTOVER:$recovered_public_containers:$current_before_sha" \
+    >>"$log_file" 2>&1 || return 1
+  runtime_stop_started=0
 }
 
 on_error() {
   local exit_code=$?
+  local recovery_required=0
+  local recovery_proven=1
   trap - ERR
   cleanup_transient_materialization
   restore_database_cleanup
-  if [[ "$migration_apply_started" -eq 0 ]]; then
-    recover_before_migration
-    write_receipt failed promotion_failed_before_migration
-  else
+  if [[ "$migration_apply_started" -eq 0 &&
+    ("$env_changed" -eq 1 || "$runtime_stop_started" -eq 1) ]]; then
+    recovery_required=1
+    recover_before_migration || recovery_proven=0
+  fi
+  if [[ "$credential_cleanup_proven" != true ]]; then
+    write_receipt not_proven promotion_credential_cleanup_not_proven
+  elif [[ "$migration_apply_started" -ne 0 ]]; then
     write_receipt not_proven promotion_outcome_unknown_after_migration_start
+  elif [[ "$recovery_proven" -ne 1 ]]; then
+    write_receipt not_proven promotion_previous_release_recovery_not_proven
+  elif [[ "$recovery_required" -eq 1 ]]; then
+    write_receipt failed promotion_failed_previous_release_restored
+  else
+    write_receipt failed promotion_failed_before_target_change
   fi
   cat "$receipt"
   printf '[remote-promotion] failed at stage=%s exit=%s\n' "$stage" "$exit_code" >&2
   exit "$exit_code"
 }
+on_signal() {
+  trap - ERR HUP INT TERM
+  cleanup_transient_materialization
+  restore_database_cleanup
+  if [[ "$migration_apply_started" -eq 0 &&
+    ("$env_changed" -eq 1 || "$runtime_stop_started" -eq 1) ]]; then
+    recover_before_migration || true
+  fi
+  write_receipt not_proven promotion_interrupted
+  cat "$receipt"
+  exit 130
+}
+on_exit() {
+  cleanup_transient_materialization
+  restore_database_cleanup
+}
 trap on_error ERR
-trap restore_database_cleanup EXIT
+trap on_signal HUP INT TERM
+trap on_exit EXIT
 
 : >"$log_file"
 chmod 600 "$log_file"
 write_state running
+
+[[ -f "$incoming/remote-release-acquire.sh" &&
+  ! -L "$incoming/remote-release-acquire.sh" ]] ||
+  fail "target release acquisition helper is invalid"
+# shellcheck source=scripts/deploy/remote-release-acquire.sh
+source "$incoming/remote-release-acquire.sh"
+target_fetch_token=""
+IFS= read -r target_fetch_token || true
+
+enter_stage artifact_fetch
+acquire_target_release
 
 enter_stage package_verification
 [[ -d "$incoming" && ! -L "$incoming" ]] ||
@@ -460,6 +602,7 @@ incoming_uid="$(stat -c '%u' "$incoming")"
   fail "incoming package ownership is invalid"
 required_files=(
   .target-cache.json
+  checksums.sha256
   release-manifest.json
   release-artifact.json
   promotion-manifest.json
@@ -469,6 +612,8 @@ required_files=(
   server-image.tar
   web-image.tar
   remote-promotion.sh
+  remote-release-acquire.sh
+  target-release-fetch.json
   transfer-checksums.sha256
 )
 for required_file in "${required_files[@]}"; do
@@ -478,7 +623,7 @@ done
 jq -e \
   --arg operationId "$operation_id" \
   --arg manifest "$release_manifest_sha256" \
-  '.schemaVersion == "plush.target-release-cache/v1" and
+  '.schemaVersion == "plush.target-release-cache/v2" and
    .operationId == $operationId and
    .releaseManifestSha256 == $manifest and
    (.packageHit | type == "boolean") and
@@ -712,8 +857,10 @@ mkdir -p "$cache_root"
 chmod 700 "$cache_root"
 formal_cache=$cache_root/$release_manifest_sha256
 immutable_cache_files=(
+  checksums.sha256
   release-manifest.json
   release-artifact.json
+  release-rehearsal.json
   sbom.cdx.json
   source.tar
   server-image.tar
@@ -723,6 +870,8 @@ if [[ -e "$formal_cache" ]]; then
   [[ -d "$formal_cache" && ! -L "$formal_cache" &&
     "$(stat -c '%u' "$formal_cache")" == "$(id -u)" ]] ||
     fail "formal release cache is invalid"
+  [[ "$(find "$formal_cache" -mindepth 1 -maxdepth 1 -printf '.' | wc -c | tr -d ' ')" == "${#immutable_cache_files[@]}" ]] ||
+    fail "formal release cache inventory is invalid"
   for cache_file in "${immutable_cache_files[@]}"; do
     [[ -f "$formal_cache/$cache_file" && ! -L "$formal_cache/$cache_file" &&
       "$(stat -c '%u' "$formal_cache/$cache_file")" == "$(id -u)" ]] ||
@@ -797,6 +946,10 @@ cmp --silent \
   "$incoming/remote-promotion.sh" \
   "$release_dir/scripts/deploy/remote-promotion.sh" ||
   fail "remote promotion script is not part of the exact source archive"
+cmp --silent \
+  "$incoming/remote-release-acquire.sh" \
+  "$release_dir/scripts/deploy/remote-release-acquire.sh" ||
+  fail "release acquisition helper is not part of the exact source archive"
 
 enter_stage image_load_and_readback
 if [[ "$cache_image_hit" != true ]]; then
@@ -923,6 +1076,7 @@ compose=(
   >>"$log_file" 2>&1
 
 enter_stage maintenance_window
+runtime_stop_started=1
 "${clean_env[@]}" "${compose[@]}" stop app-server web-desktop \
   >>"$log_file" 2>&1
 "${clean_env[@]}" "${compose[@]}" up -d --no-build --pull never postgres \
@@ -1042,15 +1196,18 @@ env_changed=0
 write_receipt passed none
 rm -f \
   "$incoming/.target-cache.json" \
+  "$incoming/checksums.sha256" \
   "$incoming/promotion-manifest.json" \
   "$incoming/release-artifact.json" \
   "$incoming/release-manifest.json" \
   "$incoming/release-rehearsal.json" \
   "$incoming/remote-promotion.sh" \
+  "$incoming/remote-release-acquire.sh" \
   "$incoming/sbom.cdx.json" \
   "$incoming/server-image.tar" \
   "$incoming/source.tar" \
   "$incoming/transfer-checksums.sha256" \
+  "$incoming/target-release-fetch.json" \
   "$incoming/web-image.tar"
 rmdir "$incoming"
 cat "$receipt"

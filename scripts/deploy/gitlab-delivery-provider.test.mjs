@@ -1,5 +1,13 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import path from "node:path";
 import test from "node:test";
 
 import {
@@ -7,9 +15,11 @@ import {
   GITLAB_DELIVERY_PACKAGE,
   GITLAB_DELIVERY_PROJECT,
   GITLAB_RELEASE_ASSETS,
+  GITLAB_SOURCE_PACKAGE,
   createGitlabDeliveryProvider,
 } from "./gitlab-delivery-provider.mjs";
 import { buildReleaseManifest } from "./release-catalog.mjs";
+import { buildTargetReleaseCacheIdentity } from "./target-release-cache.mjs";
 
 const SHA = "a".repeat(40);
 const TOKEN = "test-token-never-returned";
@@ -147,6 +157,7 @@ function releaseDetailFixture() {
     images: [
       {
         kind: "server",
+        ref: `plush-toy-erp-server:yoyoosun-${SHA}`,
         contentId: `sha256:${"8".repeat(64)}`,
         gitSha: SHA,
         releaseVersion: "2026.08.27-1",
@@ -160,6 +171,7 @@ function releaseDetailFixture() {
       },
       {
         kind: "web",
+        ref: `plush-toy-erp-web:yoyoosun-${SHA}`,
         contentId: `sha256:${"9".repeat(64)}`,
         gitSha: SHA,
         releaseVersion: "2026.08.27-1",
@@ -348,6 +360,14 @@ test("GitLab provider enriches the newest release with build and digest evidence
     env: { PLUSH_GITLAB_TOKEN: TOKEN },
     request: async (url) => {
       if (url.includes("/releases?")) return json([releaseFixture()]);
+      if (url.includes("/packages?") && url.includes("package_name=plush-release-source")) {
+        return json([{
+          id: 42,
+          package_type: "generic",
+          name: GITLAB_SOURCE_PACKAGE,
+          version: `artifact-${SHA}`,
+        }]);
+      }
       if (url.includes("/packages?")) {
         return json([
           {
@@ -359,6 +379,13 @@ test("GitLab provider enriches the newest release with build and digest evidence
         ]);
       }
       if (url.includes("/packages/41/package_files")) return json(files);
+      if (url.includes("/packages/42/package_files")) {
+        return json([{
+          file_name: "source.tar",
+          size: 101,
+          file_sha256: detail.artifact.sourceArchive.sha256,
+        }]);
+      }
       const asset = Object.keys(bodies).find((name) => url.endsWith(`/${name}`));
       if (asset) return new Response(bodies[asset], { status: 200 });
       throw new Error(`unexpected URL: ${url}`);
@@ -471,14 +498,168 @@ test("GitLab provider dispatches only the exact current main SHA", async () => {
   assert.equal(JSON.stringify(result).includes(TOKEN), false);
 });
 
-test("GitLab provider rejects release downloads outside the fixed output root", async () => {
+test("GitLab provider exposes no Mac full-release download path", () => {
   const provider = createGitlabDeliveryProvider({
     projectRoot: process.cwd(),
     env: { PLUSH_GITLAB_TOKEN: TOKEN },
     request: async () => json([]),
   });
-  await assert.rejects(
-    provider.downloadRelease(SHA, "/tmp/plush-release"),
-    /fixed output root/u,
+  assert.equal(provider.downloadRelease, undefined);
+  assert.equal(typeof provider.downloadReleaseControl, "function");
+});
+
+test("GitLab provider rejects duplicate formal package identities", async () => {
+  const provider = createGitlabDeliveryProvider({
+    projectRoot: process.cwd(),
+    env: { PLUSH_GITLAB_TOKEN: TOKEN },
+    request: async (url) => {
+      if (url.includes("/packages?")) {
+        return json([41, 42].map((id) => ({
+          id,
+          package_type: "generic",
+          name: GITLAB_DELIVERY_PACKAGE,
+          version: `artifact-${SHA}`,
+        })));
+      }
+      throw new Error(`unexpected URL: ${url}`);
+    },
+  });
+  const destination = path.join(
+    process.cwd(),
+    "output",
+    "dev-workbench",
+    "release-controls",
+    "duplicate-formal-package",
   );
+  await assert.rejects(
+    provider.downloadReleaseControl(SHA, destination),
+    /not unique/u,
+  );
+});
+
+test("GitLab provider downloads only bounded control evidence for target-direct acquisition", async () => {
+  const detail = releaseDetailFixture();
+  const bodies = {
+    "release-artifact.json": JSON.stringify(detail.artifact),
+    "release-manifest.json": JSON.stringify(detail.manifest),
+    "release-rehearsal.json": JSON.stringify(detail.receipt),
+  };
+  const digests = Object.fromEntries(
+    Object.entries(bodies).map(([name, body]) => [
+      name,
+      createHash("sha256").update(body).digest("hex"),
+    ]),
+  );
+  const largeDigests = {
+    "sbom.cdx.json": detail.artifact.sbom.sha256,
+    "server-image.tar": detail.artifact.images[0].archive.sha256,
+    "web-image.tar": detail.artifact.images[1].archive.sha256,
+  };
+  bodies["checksums.sha256"] = `${Object.entries({
+    ...digests,
+    ...largeDigests,
+  })
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, digest]) => `${digest}  ${name}`)
+    .join("\n")}\n`;
+  digests["checksums.sha256"] = createHash("sha256")
+    .update(bodies["checksums.sha256"])
+    .digest("hex");
+  const formalFiles = GITLAB_RELEASE_ASSETS.map((file_name) => {
+    const body = bodies[file_name];
+    const archive = detail.artifact.images.find(
+      (image) => image.archive.file === file_name,
+    );
+    return {
+      file_name,
+      size: body ? Buffer.byteLength(body) : archive?.archive?.sizeBytes || 101,
+      file_sha256: digests[file_name] || largeDigests[file_name],
+    };
+  });
+  const sourcePackage = {
+    file_name: "source.tar",
+    size: 1_048_576,
+    file_sha256: detail.artifact.sourceArchive.sha256,
+  };
+  const requestedAssets = [];
+  const provider = createGitlabDeliveryProvider({
+    projectRoot: process.cwd(),
+    env: { PLUSH_GITLAB_TOKEN: TOKEN },
+    request: async (url) => {
+      if (url.includes("/packages?") && url.includes("package_name=plush-release-source")) {
+        return json([
+          {
+            id: 42,
+            package_type: "generic",
+            name: GITLAB_SOURCE_PACKAGE,
+            version: `artifact-${SHA}`,
+          },
+        ]);
+      }
+      if (url.includes("/packages?")) {
+        return json([
+          {
+            id: 41,
+            package_type: "generic",
+            name: GITLAB_DELIVERY_PACKAGE,
+            version: `artifact-${SHA}`,
+          },
+        ]);
+      }
+      if (url.includes("/packages/41/package_files")) return json(formalFiles);
+      if (url.includes("/packages/42/package_files")) return json([sourcePackage]);
+      const asset = Object.keys(bodies).find((name) => url.endsWith(`/${name}`));
+      if (asset) {
+        requestedAssets.push(asset);
+        return new Response(bodies[asset], { status: 200 });
+      }
+      throw new Error(`unexpected URL: ${url}`);
+    },
+  });
+  const outputRoot = path.join(
+    process.cwd(),
+    "output",
+    "dev-workbench",
+    "release-controls",
+  );
+  mkdirSync(outputRoot, { recursive: true });
+  const temporaryRoot = mkdtempSync(path.join(outputRoot, "provider-control-"));
+  const destination = path.join(temporaryRoot, SHA);
+  try {
+    const result = await provider.downloadReleaseControl(SHA, destination);
+    assert.equal(result.reused, false);
+    assert.deepEqual(requestedAssets.sort(), Object.keys(bodies).sort());
+    assert.equal(result.fetch.source.file.size, sourcePackage.size);
+    assert.equal(JSON.stringify(result).includes(TOKEN), false);
+    assert.deepEqual(result.assets, [
+      "checksums.sha256",
+      "release-artifact.json",
+      "release-manifest.json",
+      "release-rehearsal.json",
+      "target-release-fetch.json",
+    ]);
+    const cacheIdentity = buildTargetReleaseCacheIdentity({
+      bundleDir: destination,
+      releaseManifestPath: path.join(destination, "release-manifest.json"),
+    });
+    assert.equal(cacheIdentity.gitSha, SHA);
+    assert.equal(
+      cacheIdentity.sourceArchiveSha256,
+      detail.artifact.sourceArchive.sha256,
+    );
+    const reused = await provider.downloadReleaseControl(SHA, destination);
+    assert.equal(reused.reused, true);
+    assert.deepEqual(requestedAssets.sort(), Object.keys(bodies).sort());
+
+    const fetchFile = path.join(destination, "target-release-fetch.json");
+    const stale = JSON.parse(readFileSync(fetchFile, "utf8"));
+    stale.source.file.sha256 = "e".repeat(64);
+    writeFileSync(fetchFile, `${JSON.stringify(stale)}\n`);
+    await assert.rejects(
+      provider.downloadReleaseControl(SHA, destination),
+      /stale or invalid/u,
+    );
+  } finally {
+    rmSync(temporaryRoot, { recursive: true, force: true });
+  }
 });

@@ -9,6 +9,15 @@ const scriptPath = new URL(
 );
 const source = readFileSync(scriptPath, "utf8");
 
+function shellArray(name) {
+  const match = source.match(new RegExp(`${name}=\\(\\n([\\s\\S]*?)\\n\\)`, "u"));
+  assert.ok(match, `${name} must be declared`);
+  return match[1]
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
 test("target initializer is valid Bash and accepts only demo and customer test", () => {
   const syntax = spawnSync("bash", ["-n", scriptPath.pathname], {
     encoding: "utf8",
@@ -61,6 +70,41 @@ test("target initializer keeps bootstrap secrets transient and rollback owner-bo
     /--volume "\$data_dir:\/target"[\s\S]*find \/target -mindepth 1 -depth -delete/u,
   );
   assert.match(source, /--pull never --name "\$cleanup_container"/u);
+  assert.match(
+    source,
+    /handle_failure\(\)[\s\S]*?trap - ERR EXIT HUP INT TERM[\s\S]*?cleanup_transient_credentials[\s\S]*?cleanup_exact_target/u,
+  );
+  assert.match(
+    source,
+    /cleanup_authorized=0[\s\S]*?if \[\[ "\$cleanup_authorized" -ne 1 \]\]; then[\s\S]*?write_receipt_json not_proven initialization_prelock_failure false[\s\S]*?return 0/u,
+  );
+  assert.match(
+    source,
+    /on_signal\(\)[\s\S]*?handle_failure 130 initialization_interrupted[\s\S]*?exit 130/u,
+  );
+  assert.match(source, /trap on_signal HUP INT TERM/u);
+  assert.match(source, /trap on_exit EXIT/u);
+  assert.match(
+    source,
+    /on_exit\(\)[\s\S]*?"\$exit_code" -ne 0 && "\$failure_handled" -eq 0[\s\S]*?handle_failure/u,
+  );
+  assert.doesNotMatch(
+    source,
+    /trap (?:cleanup_transient_credentials|cleanup_exact_target) EXIT/u,
+  );
+  const trapIndex = source.indexOf("trap on_error ERR");
+  const actionGateIndex = source.indexOf('[[ "$action" == initialize ]]');
+  const identityGateIndex = source.indexOf('[[ "$(hostname)" == r640');
+  assert.ok(trapIndex >= 0 && trapIndex < actionGateIndex);
+  assert.ok(trapIndex < identityGateIndex);
+  const lockIndex = source.indexOf('flock -n 9 || fail "target operation lock is held"');
+  const cleanupAuthorizationIndex = source.indexOf("cleanup_authorized=1");
+  const logInitializationIndex = source.indexOf(': >"$log_file"');
+  assert.ok(lockIndex >= 0 && lockIndex < cleanupAuthorizationIndex);
+  assert.ok(cleanupAuthorizationIndex < logInitializationIndex);
+  const passed = source.slice(source.indexOf("stage=passed"));
+  assert.match(passed, /write_receipt_json passed none true/u);
+  assert.doesNotMatch(passed, /cleanup_exact_target|write_receipt_json (?:failed|not_proven)/u);
 });
 
 test("target initializer restores the container-readable database role script mode", () => {
@@ -111,4 +155,57 @@ test("target initializer validates immutable release and restored backup before 
   assert.doesNotMatch(source, /"method":"system\.version"/u);
   assert.match(source, /\.result\.data\.git_sha == \$sha/u);
   assert.match(source, /\.result\.data\.release_version == \$version/u);
+});
+
+test("target initializer acquires the exact release before package verification and cleans every control", () => {
+  assert.match(
+    source,
+    /schemaVersion "plush[.]remote-target-initialization-receipt\/v3"/u,
+  );
+  assert.match(source, /acquisitionDurationMs/u);
+  assert.match(source, /acquisition_started_epoch_ms/u);
+  assert.match(source, /credentialCleanupProven/u);
+  assert.match(source, /cleanup_transient_credentials/u);
+  const helperSource = source.indexOf('source "$incoming/remote-release-acquire.sh"');
+  const acquire = source.indexOf("acquire_target_release");
+  const packageVerification = source.indexOf("stage=package_verification");
+  assert.ok(helperSource >= 0 && helperSource < acquire);
+  assert.ok(acquire < packageVerification);
+  assert.deepEqual(shellArray("control_files"), [
+    "promotion-manifest.json",
+    "remote-promotion.sh",
+    "remote-release-acquire.sh",
+    "target-initialization.secret",
+    "target-release-fetch.json",
+    "transfer-checksums.sha256",
+  ]);
+  const tokenRead = source.indexOf("IFS= read -r target_fetch_token || true");
+  assert.ok(helperSource < tokenRead && tokenRead < acquire);
+  assert.doesNotMatch(source, /target-release-fetch[.]secret/u);
+  const requiredFiles = shellArray("required_files");
+  for (const payload of [
+    "checksums.sha256",
+    "sbom.cdx.json",
+    "server-image.tar",
+    "source.tar",
+    "web-image.tar",
+  ]) {
+    assert.equal(requiredFiles.includes(payload), true, payload);
+  }
+  assert.match(
+    source,
+    /cmp --silent "\$incoming\/remote-release-acquire[.]sh" "\$release_dir\/scripts\/deploy\/remote-release-acquire[.]sh"/u,
+  );
+  const successCleanup = source.slice(source.indexOf("stage=passed"));
+  for (const cleaned of [
+    "checksums.sha256",
+    "remote-release-acquire.sh",
+    "target-release-fetch.json",
+  ]) {
+    assert.match(successCleanup, new RegExp(cleaned.replaceAll(".", "[.]"), "u"));
+  }
+  assert.ok(
+    successCleanup.indexOf('rmdir "$incoming"') <
+      successCleanup.indexOf('rm -f -- "$owner_marker"'),
+  );
 });

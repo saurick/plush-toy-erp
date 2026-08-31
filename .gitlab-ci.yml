@@ -3,6 +3,7 @@ workflow:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: '$CI_PIPELINE_SOURCE =~ /^(api|trigger|web)$/ && $RELEASE_SHA && $RELEASE_VERSION && $RELEASE_VERSION_REFERENCE'
+    - if: '$CI_PIPELINE_SOURCE =~ /^(api|web)$/ && $BACKFILL_RELEASE_SOURCE_SHA'
     - if: '$CI_PIPELINE_SOURCE == "web"'
     - when: never
 
@@ -71,7 +72,7 @@ variables:
 
 .main_quality_rules: &main_quality_rules
   rules:
-    - if: '$RELEASE_SHA'
+    - if: '$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA'
       when: never
     - if: '$CI_PIPELINE_SOURCE =~ /^(push|web)$/ && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
     - when: never
@@ -79,7 +80,7 @@ variables:
 plan:
   stage: plan
   rules:
-    - if: '$RELEASE_SHA'
+    - if: '$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA'
       when: never
     - when: on_success
   script:
@@ -263,7 +264,7 @@ quality_resource_runtime:
     paths:
       - output/ci/resource-lanes/runtime.json
 
-quality_web:
+quality_web_checks:
   <<: [*quality_shard, *pnpm_cache_pull]
   needs:
     - job: plan
@@ -271,21 +272,89 @@ quality_web:
     - job: prepare
       artifacts: false
   script:
-    - node scripts/qa/ci-quality-shard.mjs --shard web
+    - node scripts/qa/ci-quality-stage-lane.mjs --shard web --lane checks
   artifacts:
     when: always
     expire_in: 90 days
     paths:
-      - output/ci/shards/web.json
+      - output/ci/web-lanes/checks.json
+
+quality_web_build:
+  <<: [*quality_shard, *pnpm_cache_pull]
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+  script:
+    - node scripts/qa/ci-quality-stage-lane.mjs --shard web --lane build
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/web-lanes/build.json
       - web/build/
 
-quality_server:
+quality_server_core:
   <<: [*quality_shard, *browser_cache_pull]
   needs:
     - job: plan
       artifacts: true
     - job: prepare
       artifacts: false
+  script:
+    - node scripts/qa/ci-quality-stage-lane.mjs --shard server --lane core
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/server-lanes/core.json
+
+quality_server_critical_postgres:
+  <<: *quality_shard
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+  script:
+    - node scripts/qa/ci-quality-stage-lane.mjs --shard server --lane critical_postgres
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/server-lanes/critical_postgres.json
+
+quality_web:
+  <<: *quality_shard
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+    - job: quality_web_checks
+      artifacts: true
+    - job: quality_web_build
+      artifacts: true
+  script:
+    - node scripts/qa/ci-quality-shard.mjs --shard web
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/shards/web.json
+
+quality_server:
+  <<: *quality_shard
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+    - job: quality_server_core
+      artifacts: true
+    - job: quality_server_critical_postgres
+      artifacts: true
   script:
     - node scripts/qa/ci-quality-shard.mjs --shard server
   artifacts:
@@ -339,7 +408,7 @@ quality_browser:
       artifacts: true
     - job: prepare
       artifacts: false
-    - job: quality_web
+    - job: quality_web_build
       artifacts: true
   script:
     - node scripts/qa/ci-quality-shard.mjs --shard browser
@@ -402,7 +471,7 @@ quality_affected:
     - job: plan
       artifacts: true
   rules:
-    - if: '$RELEASE_SHA'
+    - if: '$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA'
       when: never
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - when: never
@@ -510,7 +579,7 @@ quality_affected:
       artifacts: false
       optional: true
   rules:
-    - if: '$RELEASE_SHA'
+    - if: '$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA'
       when: never
     - when: on_success
   script:
@@ -523,15 +592,26 @@ quality_affected:
         for asset in terminal.json receipt.json evidence-manifest.json; do
           test -s "$evidence_dir/$asset"
         done
+        [[ "$CI_JOB_TOKEN" =~ ^[A-Za-z0-9_.-]{20,512}$ ]]
+        job_token_config=output/ci/ci-gate-job-token.curl
+        cleanup_evidence_credentials() {
+          rm -f -- "$job_token_config"
+        }
+        trap cleanup_evidence_credentials EXIT
+        printf 'header = "JOB-TOKEN: %s"\n' "$CI_JOB_TOKEN" > "$job_token_config"
+        chmod 0600 "$job_token_config"
         package_version="pipeline-$CI_PIPELINE_ID-job-$CI_JOB_ID-$CI_COMMIT_SHA"
         for asset in terminal.json receipt.json evidence-manifest.json; do
-          curl --fail --silent --show-error \
+          curl --config "$job_token_config" \
+            --fail --silent --show-error \
             --retry 3 --retry-delay 2 --retry-all-errors \
             --connect-timeout 10 --max-time 300 \
-            --header "JOB-TOKEN: $CI_JOB_TOKEN" \
             --upload-file "$evidence_dir/$asset" \
             "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/plush-ci-evidence/$package_version/$asset"
         done
+        cleanup_evidence_credentials
+        trap - EXIT
+        test ! -e "$job_token_config"
         echo "[gitlab-ci] evidence=published package=$package_version"
       fi
       echo "[gitlab-ci] status=complete sha=$CI_COMMIT_SHA source=$CI_PIPELINE_SOURCE"
@@ -560,6 +640,8 @@ publish_release:
       test -n "${GITHUB_PACKAGES_USER:-}"
       test -n "${GITHUB_PACKAGES_TOKEN:-}"
       test -n "${GITLAB_RELEASE_TOKEN:-}"
+      [[ "$CI_JOB_TOKEN" =~ ^[A-Za-z0-9_.-]{20,512}$ ]]
+      [[ "$GITLAB_RELEASE_TOKEN" =~ ^[A-Za-z0-9_.-]{20,512}$ ]]
       mkdir -p output/ci
       release_args=(
         --sha "$RELEASE_SHA"
@@ -578,6 +660,18 @@ publish_release:
         3) ;;
         *) exit "$published_status" ;;
       esac
+
+      job_token_config=output/ci/publish-release-job-token.curl
+      private_token_config=output/ci/publish-release-private-token.curl
+      docker_config=""
+      cleanup_publish_credentials() {
+        rm -f -- "$job_token_config" "$private_token_config"
+        if [[ -n "$docker_config" ]]; then rm -rf -- "$docker_config"; fi
+      }
+      trap cleanup_publish_credentials EXIT
+      printf 'header = "JOB-TOKEN: %s"\n' "$CI_JOB_TOKEN" > "$job_token_config"
+      printf 'header = "PRIVATE-TOKEN: %s"\n' "$GITLAB_RELEASE_TOKEN" > "$private_token_config"
+      chmod 0600 "$job_token_config" "$private_token_config"
 
       node scripts/deploy/gitlab-strict-terminal-reuse.mjs \
         --sha "$RELEASE_SHA" \
@@ -603,8 +697,7 @@ publish_release:
       case "$candidate_status" in
         0) ;;
         3)
-          curl --fail --silent --show-error \
-            --header "PRIVATE-TOKEN: $GITLAB_RELEASE_TOKEN" \
+          curl --config "$private_token_config" --fail --silent --show-error \
             "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases?per_page=100&order_by=released_at&sort=desc" \
             > output/ci/release-version-catalog.json
           node scripts/deploy/release-version-catalog.mjs verify \
@@ -622,10 +715,9 @@ publish_release:
             --out "$artifact_dir" \
             --json
           node scripts/deploy/gitlab-release-candidate.mjs prepare "${candidate_args[@]}" --json
-          if ! curl --fail --silent --show-error \
+          if ! curl --config "$job_token_config" --fail --silent --show-error \
             --retry 4 --retry-delay 3 --retry-all-errors \
             --connect-timeout 20 --max-time 7200 \
-            --header "JOB-TOKEN: $CI_JOB_TOKEN" \
             --upload-file "$candidate_archive" \
             "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/plush-release-candidate/artifact-$RELEASE_SHA/candidate.tar"; then
             echo "[gitlab-ci] candidate upload outcome is uncertain; verifying server digest"
@@ -654,10 +746,9 @@ publish_release:
             --receipt "$rehearsal_receipt" \
             --json
           node scripts/deploy/gitlab-release-candidate.mjs prepare-rehearsal "${rehearsal_args[@]}" --json
-          if ! curl --fail --silent --show-error \
+          if ! curl --config "$job_token_config" --fail --silent --show-error \
             --retry 4 --retry-delay 3 --retry-all-errors \
             --connect-timeout 20 --max-time 300 \
-            --header "JOB-TOKEN: $CI_JOB_TOKEN" \
             --upload-file "$rehearsal_receipt" \
             "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/plush-release-rehearsal/artifact-$RELEASE_SHA/receipt.json"; then
             echo "[gitlab-ci] rehearsal upload outcome is uncertain; verifying server digest"
@@ -673,9 +764,13 @@ publish_release:
         cp -- "$rehearsal_receipt" "$artifact_dir/release-rehearsal.json"
       fi
 
+      source_archive=output/ci/source.tar
+      git archive --format=tar --output="$source_archive" "$RELEASE_SHA"
+      source_sha="$(jq -er '.sourceArchive.sha256' "$artifact_dir/release-artifact.json")"
+      test "$(sha256sum "$source_archive" | awk '{print $1}')" = "$source_sha"
+
       docker_config="$(mktemp -d)"
       export DOCKER_CONFIG="$docker_config"
-      trap 'rm -rf "$docker_config"' EXIT
       printf '%s' "$GITHUB_PACKAGES_TOKEN" | docker login ghcr.io --username "$GITHUB_PACKAGES_USER" --password-stdin
       node scripts/deploy/github-release-publisher.mjs \
         --artifact-dir "$artifact_dir" \
@@ -696,8 +791,7 @@ publish_release:
       package_id_file=output/ci/release-package-id
       package_files=output/ci/release-package-files.json
       missing_assets=output/ci/release-missing-assets.txt
-      curl --fail --silent --show-error \
-        --header "PRIVATE-TOKEN: $GITLAB_RELEASE_TOKEN" \
+      curl --config "$private_token_config" --fail --silent --show-error \
         "$package_api?package_type=generic&package_name=plush-release&package_version=$package_version&per_page=100" \
         > "$package_catalog"
       node scripts/deploy/gitlab-release-publication.mjs select \
@@ -707,8 +801,7 @@ publish_release:
         --json
       package_id="$(tr -d '\n' < "$package_id_file")"
       if [[ -n "$package_id" ]]; then
-        curl --fail --silent --show-error \
-          --header "PRIVATE-TOKEN: $GITLAB_RELEASE_TOKEN" \
+        curl --config "$private_token_config" --fail --silent --show-error \
           "$package_api/$package_id/package_files?per_page=100" \
           > "$package_files"
       else
@@ -721,16 +814,14 @@ publish_release:
         --json
       while IFS= read -r asset; do
         test -n "$asset"
-        curl --fail --silent --show-error \
+        curl --config "$job_token_config" --fail --silent --show-error \
           --retry 4 --retry-delay 3 --retry-all-errors \
           --connect-timeout 20 --max-time 7200 \
-          --header "JOB-TOKEN: $CI_JOB_TOKEN" \
           --upload-file "$artifact_dir/$asset" \
           "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/plush-release/$package_version/$asset"
       done < "$missing_assets"
 
-      curl --fail --silent --show-error \
-        --header "PRIVATE-TOKEN: $GITLAB_RELEASE_TOKEN" \
+      curl --config "$private_token_config" --fail --silent --show-error \
         "$package_api?package_type=generic&package_name=plush-release&package_version=$package_version&per_page=100" \
         > "$package_catalog"
       node scripts/deploy/gitlab-release-publication.mjs select \
@@ -740,8 +831,7 @@ publish_release:
         --json
       package_id="$(tr -d '\n' < "$package_id_file")"
       test -n "$package_id"
-      curl --fail --silent --show-error \
-        --header "PRIVATE-TOKEN: $GITLAB_RELEASE_TOKEN" \
+      curl --config "$private_token_config" --fail --silent --show-error \
         "$package_api/$package_id/package_files?per_page=100" \
         > "$package_files"
       node scripts/deploy/gitlab-release-publication.mjs verify \
@@ -749,12 +839,68 @@ publish_release:
         --remote "$package_files" \
         --json
 
+      source_package_catalog=output/ci/release-source-package-catalog.json
+      source_package_id_file=output/ci/release-source-package-id
+      source_package_files=output/ci/release-source-package-files.json
+      source_missing_assets=output/ci/release-source-missing-assets.txt
+      curl --config "$private_token_config" --fail --silent --show-error \
+        "$package_api?package_type=generic&package_name=plush-release-source&package_version=$package_version&per_page=100" \
+        > "$source_package_catalog"
+      node scripts/deploy/gitlab-release-publication.mjs select \
+        --catalog "$source_package_catalog" \
+        --version "$package_version" \
+        --package-name plush-release-source \
+        --package-id-out "$source_package_id_file" \
+        --json
+      source_package_id="$(tr -d '\n' < "$source_package_id_file")"
+      if [[ -n "$source_package_id" ]]; then
+        curl --config "$private_token_config" --fail --silent --show-error \
+          "$package_api/$source_package_id/package_files?per_page=100" \
+          > "$source_package_files"
+      else
+        printf '[]\n' > "$source_package_files"
+      fi
+      node scripts/deploy/gitlab-release-publication.mjs plan-source \
+        --artifact "$artifact_dir/release-artifact.json" \
+        --source "$source_archive" \
+        --version "$package_version" \
+        --remote "$source_package_files" \
+        --missing-out "$source_missing_assets" \
+        --json
+      if [[ -s "$source_missing_assets" ]]; then
+        test "$(cat "$source_missing_assets")" = source.tar
+        curl --config "$job_token_config" --fail --silent --show-error \
+          --retry 4 --retry-delay 3 --retry-all-errors \
+          --connect-timeout 20 --max-time 7200 \
+          --upload-file "$source_archive" \
+          "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/plush-release-source/$package_version/source.tar"
+      fi
+      curl --config "$private_token_config" --fail --silent --show-error \
+        "$package_api?package_type=generic&package_name=plush-release-source&package_version=$package_version&per_page=100" \
+        > "$source_package_catalog"
+      node scripts/deploy/gitlab-release-publication.mjs select \
+        --catalog "$source_package_catalog" \
+        --version "$package_version" \
+        --package-name plush-release-source \
+        --package-id-out "$source_package_id_file" \
+        --json
+      source_package_id="$(tr -d '\n' < "$source_package_id_file")"
+      test -n "$source_package_id"
+      curl --config "$private_token_config" --fail --silent --show-error \
+        "$package_api/$source_package_id/package_files?per_page=100" \
+        > "$source_package_files"
+      node scripts/deploy/gitlab-release-publication.mjs verify-source \
+        --artifact "$artifact_dir/release-artifact.json" \
+        --source "$source_archive" \
+        --version "$package_version" \
+        --remote "$source_package_files" \
+        --json
+
       release_api="$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases/$package_version"
       release_existing_json=output/ci/release-existing.json
       release_create_json=output/ci/release-create.json
-      release_code="$(curl --silent --show-error --output "$release_existing_json" \
+      release_code="$(curl --config "$private_token_config" --silent --show-error --output "$release_existing_json" \
         --write-out '%{http_code}' \
-        --header "PRIVATE-TOKEN: $GITLAB_RELEASE_TOKEN" \
         "$release_api")"
       if [[ "$release_code" == "200" ]]; then
         test "$(jq -r .tag_name "$release_existing_json")" = "$package_version"
@@ -767,9 +913,8 @@ publish_release:
           --arg description 'Immutable exact-SHA v2 seven-asset release. The published rehearsal receipt is the same receipt bound into the manifest. Target promotion and customer UAT remain separate evidence.' \
           '{name:$name,tag_name:$tag,ref:$ref,description:$description}' \
           > "$release_create_json"
-        curl --fail --silent --show-error \
+        curl --config "$private_token_config" --fail --silent --show-error \
           --request POST \
-          --header "PRIVATE-TOKEN: $GITLAB_RELEASE_TOKEN" \
           --header 'Content-Type: application/json' \
           --data-binary @"$release_create_json" \
           "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases"
@@ -778,3 +923,153 @@ publish_release:
         exit 1
       fi
       node scripts/deploy/gitlab-release-candidate.mjs published "${release_args[@]}" --json
+      cleanup_publish_credentials
+      trap - EXIT
+      test ! -e "$job_token_config"
+      test ! -e "$private_token_config"
+      test ! -e "$docker_config"
+
+backfill_release_source:
+  stage: release
+  interruptible: false
+  rules:
+    - if: '$CI_PIPELINE_SOURCE =~ /^(api|web)$/ && $BACKFILL_RELEASE_SOURCE_SHA && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
+    - when: never
+  timeout: 1h
+  resource_group: immutable-release-catalog
+  script:
+    - |
+      set -euo pipefail
+      [[ "$BACKFILL_RELEASE_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+      test "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH"
+      test "$CI_COMMIT_REF_PROTECTED" = "true"
+      test "$CI_PIPELINE_SOURCE" = api -o "$CI_PIPELINE_SOURCE" = web
+      test "$BACKFILL_RELEASE_SOURCE_SHA" != "$CI_COMMIT_SHA"
+      git cat-file -e "$BACKFILL_RELEASE_SOURCE_SHA^{commit}"
+      git merge-base --is-ancestor "$BACKFILL_RELEASE_SOURCE_SHA" "$CI_COMMIT_SHA"
+      test -n "${GITLAB_RELEASE_TOKEN:-}"
+      [[ "$CI_JOB_TOKEN" =~ ^[A-Za-z0-9_.-]{20,512}$ ]]
+      [[ "$GITLAB_RELEASE_TOKEN" =~ ^[A-Za-z0-9_.-]{20,512}$ ]]
+
+      package_version="artifact-$BACKFILL_RELEASE_SOURCE_SHA"
+      package_api="$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages"
+      work=output/ci/release-source-backfill
+      controls="$work/controls"
+      source_archive="$work/source.tar"
+      formal_catalog="$work/formal-catalog.json"
+      formal_id_file="$work/formal-id"
+      formal_files="$work/formal-files.json"
+      source_catalog="$work/source-catalog.json"
+      source_id_file="$work/source-id"
+      source_files="$work/source-files.json"
+      source_missing="$work/source-missing.txt"
+      job_token_config="$work/job-token.curl"
+      private_token_config="$work/private-token.curl"
+      mkdir -p "$controls"
+      cleanup() {
+        rm -f -- "$job_token_config" "$private_token_config"
+      }
+      trap cleanup EXIT
+      printf 'header = "JOB-TOKEN: %s"\n' "$CI_JOB_TOKEN" > "$job_token_config"
+      printf 'header = "PRIVATE-TOKEN: %s"\n' "$GITLAB_RELEASE_TOKEN" > "$private_token_config"
+      chmod 0600 "$job_token_config" "$private_token_config"
+
+      curl --config "$private_token_config" \
+        --fail --silent --show-error \
+        "$package_api?package_type=generic&package_name=plush-release&package_version=$package_version&per_page=100" \
+        > "$formal_catalog"
+      node scripts/deploy/gitlab-release-publication.mjs select \
+        --catalog "$formal_catalog" \
+        --version "$package_version" \
+        --package-id-out "$formal_id_file" \
+        --json
+      formal_id="$(tr -d '\n' < "$formal_id_file")"
+      test -n "$formal_id"
+      curl --config "$private_token_config" \
+        --fail --silent --show-error \
+        "$package_api/$formal_id/package_files?per_page=100" \
+        > "$formal_files"
+      for control in \
+        checksums.sha256 \
+        release-artifact.json \
+        release-manifest.json \
+        release-rehearsal.json; do
+        curl --config "$job_token_config" \
+          --fail --silent --show-error \
+          --connect-timeout 10 --max-time 300 \
+          --output "$controls/$control" \
+          "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/plush-release/$package_version/$control"
+      done
+      git archive --format=tar --output="$source_archive" "$BACKFILL_RELEASE_SOURCE_SHA"
+      node scripts/deploy/gitlab-release-publication.mjs validate-source-backfill \
+        --controls "$controls" \
+        --source "$source_archive" \
+        --version "$package_version" \
+        --formal-remote "$formal_files" \
+        --json
+
+      curl --config "$private_token_config" \
+        --fail --silent --show-error \
+        "$package_api?package_type=generic&package_name=plush-release-source&package_version=$package_version&per_page=100" \
+        > "$source_catalog"
+      node scripts/deploy/gitlab-release-publication.mjs select \
+        --catalog "$source_catalog" \
+        --version "$package_version" \
+        --package-name plush-release-source \
+        --package-id-out "$source_id_file" \
+        --json
+      source_id="$(tr -d '\n' < "$source_id_file")"
+      if [[ -n "$source_id" ]]; then
+        curl --config "$private_token_config" \
+          --fail --silent --show-error \
+          "$package_api/$source_id/package_files?per_page=100" \
+          > "$source_files"
+      else
+        printf '[]\n' > "$source_files"
+      fi
+      node scripts/deploy/gitlab-release-publication.mjs plan-source \
+        --artifact "$controls/release-artifact.json" \
+        --source "$source_archive" \
+        --version "$package_version" \
+        --remote "$source_files" \
+        --missing-out "$source_missing" \
+        --json
+      if [[ -s "$source_missing" ]]; then
+        test "$(cat "$source_missing")" = source.tar
+        if ! curl --config "$job_token_config" \
+          --fail --silent --show-error \
+          --retry 4 --retry-delay 3 --retry-all-errors \
+          --connect-timeout 20 --max-time 1800 \
+          --upload-file "$source_archive" \
+          "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/plush-release-source/$package_version/source.tar"; then
+          echo "[gitlab-ci] source backfill upload outcome is uncertain; verifying server digest"
+        fi
+      fi
+
+      curl --config "$private_token_config" \
+        --fail --silent --show-error \
+        "$package_api?package_type=generic&package_name=plush-release-source&package_version=$package_version&per_page=100" \
+        > "$source_catalog"
+      node scripts/deploy/gitlab-release-publication.mjs select \
+        --catalog "$source_catalog" \
+        --version "$package_version" \
+        --package-name plush-release-source \
+        --package-id-out "$source_id_file" \
+        --json
+      source_id="$(tr -d '\n' < "$source_id_file")"
+      test -n "$source_id"
+      curl --config "$private_token_config" \
+        --fail --silent --show-error \
+        "$package_api/$source_id/package_files?per_page=100" \
+        > "$source_files"
+      node scripts/deploy/gitlab-release-publication.mjs verify-source \
+        --artifact "$controls/release-artifact.json" \
+        --source "$source_archive" \
+        --version "$package_version" \
+        --remote "$source_files" \
+        --json
+      cleanup
+      trap - EXIT
+      test ! -e "$job_token_config"
+      test ! -e "$private_token_config"
+      echo "[gitlab-ci] source-backfill=complete sha=$BACKFILL_RELEASE_SOURCE_SHA"

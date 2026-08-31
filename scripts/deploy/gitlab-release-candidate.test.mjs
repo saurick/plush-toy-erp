@@ -46,6 +46,14 @@ test("candidate manifest requires one build and exact five-file digest set", () 
     () => validateGitlabReleaseCandidateManifest({ ...manifest, files: manifest.files.slice(1) }),
     /contract/u,
   );
+  assert.throws(
+    () =>
+      validateGitlabReleaseCandidateManifest({
+        ...manifest,
+        files: [...manifest.files, manifest.files[0]],
+      }),
+    /contract/u,
+  );
 });
 
 test("rehearsal receipt requires migration, two runtime reads, backup restore, restart and cleanup", () => {

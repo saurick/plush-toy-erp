@@ -57,7 +57,11 @@ test("remote code rollback is fixed to the two registered targets and has no bui
 test("remote code rollback requires exact confirmation, lock and receipt", () => {
   assert.match(source, /ROLLBACK:\$target:\$from_sha:\$to_sha:\$operation_id/u);
   assert.match(source, /flock -n 9/u);
-  assert.match(source, /plush[.]remote-rollback-receipt\/v3/u);
+  assert.match(source, /plush[.]remote-rollback-receipt\/v5/u);
+  assert.match(source, /credentialCleanupProven/u);
+  assert.match(source, /trap on_signal HUP INT TERM/u);
+  assert.match(source, /trap cleanup_transient_materialization EXIT/u);
+  assert.match(source, /enter_stage artifact_fetch/u);
   assert.match(source, /enter_stage package_verification/u);
   assert.match(source, /durationMs: \$durationMs/u);
   assert.match(source, /timings: \$timings/u);
@@ -73,6 +77,19 @@ test("remote code rollback requires exact confirmation, lock and receipt", () =>
   );
 });
 
+test("remote rollback acquires the exact formal release on R640 before package verification", () => {
+  assert.match(source, /source "\$incoming\/remote-release-acquire[.]sh"/u);
+  assert.match(source, /acquire_target_release/u);
+  assert.match(source, /target-release-fetch[.]json/u);
+  assert.match(source, /acquisitionMode/u);
+  assert.match(source, /catalogAndChecksumsVerified/u);
+  const trapIndex = source.indexOf("trap on_error ERR");
+  const tokenRead = source.indexOf("IFS= read -r target_fetch_token || true");
+  const acquireIndex = source.indexOf("acquire_target_release", tokenRead);
+  assert.ok(trapIndex >= 0 && trapIndex < tokenRead && tokenRead < acquireIndex);
+  assert.doesNotMatch(source, /target-release-fetch[.]secret/u);
+});
+
 test("remote rollback normalizes the runtime identity proxy contract", () => {
   assert.match(
     source,
@@ -81,13 +98,37 @@ test("remote rollback normalizes the runtime identity proxy contract", () => {
   assert.match(source, /proxy_count != 1/u);
 });
 
+test("remote rollback reports failed only after proving previous runtime and public recovery", () => {
+  const recovery = source.match(/recover_previous\(\) \{[\s\S]+?\n\}/u)?.[0];
+  assert.ok(recovery);
+  assert.match(recovery, /up -d --no-build --pull never postgres jaeger app-server web-desktop/u);
+  assert.match(recovery, /\$server_endpoint\/healthz/u);
+  assert.match(recovery, /\$server_endpoint\/readyz/u);
+  assert.match(recovery, /\$web_endpoint\/healthz/u);
+  assert.match(recovery, /recovered_server_sha/u);
+  assert.match(recovery, /recovered_web_sha/u);
+  assert.match(recovery, /recovered_public_sha/u);
+  assert.match(recovery, /cutover-public-web[.]sh/u);
+  assert.match(
+    source,
+    /recovery_required" -eq 1 && "\$recovery_proven" -eq 1[\s\S]+?write_receipt failed rollback_failed_previous_release_restored/u,
+  );
+  assert.match(
+    source,
+    /recovery_required" -eq 1[\s\S]+?write_receipt not_proven rollback_previous_release_recovery_not_proven/u,
+  );
+  assert.match(source, /current_source_switch_started=1/u);
+});
+
 test("remote rollback reuses only checksum-bound retained content", () => {
-  assert.match(source, /plush[.]target-release-cache\/v1/u);
+  assert.match(source, /plush[.]target-release-cache\/v2/u);
+  assert.match(source, /cache_root=\$root\/release-cache-v2/u);
   assert.match(source, /target_manifest_sha256/u);
   assert.match(source, /cache_avoided_bytes/u);
   assert.match(source, /dockerLoadSkipped: \$cacheImageHit/u);
   assert.match(source, /if \[\[ "\$cache_image_hit" != true \]\]/u);
   assert.match(source, /formal rollback cache conflicts/u);
+  assert.match(source, /formal rollback cache inventory is invalid/u);
   assert.match(
     source,
     /stillExecuted: \["migration_status", "health", "ready", "public_entry"\]/u,
@@ -116,6 +157,31 @@ test("remote rollback cleans only materialization created by the current operati
   assert.match(source, /! -L "\$candidate"/u);
   assert.match(source, /stat -c '%u'/u);
   assert.match(source, /rm -rf -- "\$candidate"/u);
+  assert.match(source, /fetch_payloads_published=0/u);
+});
+
+test("remote rollback removes the complete incoming control and payload inventory on success", () => {
+  const cleanup = source.slice(source.lastIndexOf("enter_stage passed"));
+  for (const name of [
+    ".target-cache.json",
+    "checksums.sha256",
+    "current-release-manifest.json",
+    "release-artifact.json",
+    "release-manifest.json",
+    "release-rehearsal.json",
+    "remote-code-rollback.sh",
+    "remote-release-acquire.sh",
+    "rollback-manifest.json",
+    "sbom.cdx.json",
+    "server-image.tar",
+    "source.tar",
+    "target-release-fetch.json",
+    "transfer-checksums.sha256",
+    "web-image.tar",
+  ]) {
+    assert.match(cleanup, new RegExp(`\\$incoming/${name.replaceAll(".", "[.]")}`, "u"), name);
+  }
+  assert.match(cleanup, /rmdir "\$incoming"/u);
 });
 
 test("remote rollback restores only the trusted database role script mode after safe extraction", () => {

@@ -82,7 +82,7 @@ expected_user=__EXPECTED_USER__
 root=__ROOT__
 current=__CURRENT__
 releases=__RELEASES__
-cache_root=__ROOT__/release-cache
+cache_roots=(__ROOT__/release-cache __ROOT__/release-cache-v2)
 operations_root=__OPERATION_ROOT__
 incoming_root=__ROOT__/incoming
 runtime_env=__RUNTIME_ENV__
@@ -459,7 +459,10 @@ $container_sha"
   fi
 done <<<"$all_public_containers"
 
-if plain_directory "$cache_root"; then
+for cache_root in "\${cache_roots[@]}"; do
+  if ! plain_directory "$cache_root"; then
+    continue
+  fi
   shopt -s nullglob
   for cache_dir in "$cache_root"/*; do
     [[ -d "$cache_dir" && ! -L "$cache_dir" ]] || continue
@@ -478,7 +481,7 @@ $cache_sha"
       fi
     fi
   done
-fi
+done
 
 if plain_directory "$operations_root"; then
   operation_directory_count="$(find "$operations_root" -mindepth 1 -maxdepth 1 -type d ! -lname '*' -printf '.' 2>/dev/null | wc -c | tr -d ' ')"

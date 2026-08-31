@@ -7,6 +7,8 @@ import {
   buildObservedQualityPaths,
   hasCompleteCiNodeLaneEvidence,
   hasCompleteCiResourceLaneEvidence,
+  hasCompleteCiServerLaneEvidence,
+  hasCompleteCiWebLaneEvidence,
   matchesStrictSourceArchive,
   validateCiQualityShardSet,
 } from "./ci-quality-aggregate.mjs";
@@ -19,6 +21,10 @@ import {
   expectedCiNodeTestLaneFiles,
 } from "./ci-node-test-lane.mjs";
 import { CI_RESOURCE_TEST_LANES } from "./ci-resource-test-lane.mjs";
+import {
+  CI_SERVER_QUALITY_LANES,
+  CI_WEB_QUALITY_LANES,
+} from "./ci-quality-stage-lane.mjs";
 
 const sha = "a".repeat(40);
 const digest = "b".repeat(64);
@@ -220,7 +226,48 @@ test("aggregate keeps internal resource lanes behind one complete external invar
   assert.equal(hasCompleteCiResourceLaneEvidence(driftedTiming), false);
 });
 
-test("aggregate models Node/resource fan-in and Web-browser chains instead of calling the longest job a critical path", () => {
+test("aggregate keeps Web and Server lanes behind complete external invariants", () => {
+  for (const [definitions, validate] of [
+    [CI_WEB_QUALITY_LANES, hasCompleteCiWebLaneEvidence],
+    [CI_SERVER_QUALITY_LANES, hasCompleteCiServerLaneEvidence],
+  ]) {
+    const jobs = Object.entries(definitions).map(
+      ([lane, definition], index) => {
+        const durationMs = 100 + index;
+        const startedAt = new Date(
+          1_700_000_150_000 + index * 1_000,
+        ).toISOString();
+        return {
+          lane,
+          job: definition.job,
+          jobId: String(index + 40),
+          startedAt,
+          finishedAt: new Date(
+            Date.parse(startedAt) + durationMs,
+          ).toISOString(),
+          durationMs,
+        };
+      },
+    );
+    const value = {
+      status: "passed",
+      laneCount: jobs.length,
+      durationMs: 200,
+      jobs,
+      executed: 20,
+      passed: 20,
+      failed: 0,
+      skipped: 0,
+    };
+    assert.equal(validate(value), true);
+    assert.equal(validate({ ...value, skipped: 1, passed: 19 }), false);
+    const drifted = structuredClone(value);
+    drifted.jobs[0].job = "quality_other";
+    assert.equal(validate(drifted), false);
+  }
+});
+
+test("aggregate models every internal fan-in and lets Browser start from Web build", () => {
   const origin = 1_700_000_200_000;
   const stamp = (offset) => new Date(origin + offset).toISOString();
   const byShard = new Map(
@@ -252,6 +299,11 @@ test("aggregate models Node/resource fan-in and Web-browser chains instead of ca
     job: { name: "quality_resource" },
     startedAt: stamp(140),
     finishedAt: stamp(170),
+  });
+  byShard.set("server", {
+    job: { name: "quality_server" },
+    startedAt: stamp(160),
+    finishedAt: stamp(180),
   });
   const lanes = [
     {
@@ -285,14 +337,64 @@ test("aggregate models Node/resource fan-in and Web-browser chains instead of ca
       durationMs: 100,
     },
   ];
-  const paths = buildObservedQualityPaths(byShard, lanes, resourceLanes);
+  const webLanes = [
+    {
+      lane: "checks",
+      job: "quality_web_checks",
+      startedAt: stamp(0),
+      finishedAt: stamp(90),
+      durationMs: 90,
+    },
+    {
+      lane: "build",
+      job: "quality_web_build",
+      startedAt: stamp(5),
+      finishedAt: stamp(80),
+      durationMs: 75,
+    },
+  ];
+  const serverLanes = [
+    {
+      lane: "core",
+      job: "quality_server_core",
+      startedAt: stamp(0),
+      finishedAt: stamp(155),
+      durationMs: 155,
+    },
+    {
+      lane: "critical_postgres",
+      job: "quality_server_critical_postgres",
+      startedAt: stamp(10),
+      finishedAt: stamp(145),
+      durationMs: 135,
+    },
+  ];
+  const paths = buildObservedQualityPaths(
+    byShard,
+    lanes,
+    resourceLanes,
+    webLanes,
+    serverLanes,
+  );
   const nodePath = paths.find((path) => path.id === "node");
+  const webPath = paths.find((path) => path.id === "web");
   const webBrowserPath = paths.find((path) => path.id === "web_browser");
+  const serverPath = paths.find((path) => path.id === "server");
   const resourcePath = paths.find((path) => path.id === "resource");
   assert.deepEqual(nodePath.jobs, ["quality_node_release", "quality_node"]);
   assert.equal(nodePath.durationMs, 200);
-  assert.deepEqual(webBrowserPath.jobs, ["quality_web", "quality_browser"]);
-  assert.equal(webBrowserPath.durationMs, 200);
+  assert.deepEqual(webPath.jobs, ["quality_web_checks", "quality_web"]);
+  assert.equal(webPath.durationMs, 100);
+  assert.deepEqual(webBrowserPath.jobs, [
+    "quality_web_build",
+    "quality_browser",
+  ]);
+  assert.equal(webBrowserPath.durationMs, 195);
+  assert.deepEqual(serverPath.jobs, [
+    "quality_server_core",
+    "quality_server",
+  ]);
+  assert.equal(serverPath.durationMs, 180);
   assert.deepEqual(resourcePath.jobs, [
     "quality_resource_runtime",
     "quality_resource",

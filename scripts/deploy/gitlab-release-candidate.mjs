@@ -31,6 +31,7 @@ export { validateReleaseRehearsalReceipt };
 export const GITLAB_RELEASE_CANDIDATE_SCHEMA = "plush.gitlab-release-candidate/v1";
 export const GITLAB_RELEASE_CANDIDATE_PACKAGE = "plush-release-candidate";
 export const GITLAB_RELEASE_REHEARSAL_PACKAGE = "plush-release-rehearsal";
+export const GITLAB_RELEASE_SOURCE_PACKAGE = "plush-release-source";
 const RELEASE_PACKAGE = "plush-release";
 const CANDIDATE_FILE = "candidate.tar";
 const REHEARSAL_FILE = "receipt.json";
@@ -306,6 +307,8 @@ export function validateGitlabReleaseCandidateManifest(manifest) {
     !["serverContentId", "webContentId"].every(
       (key) => /^sha256:[0-9a-f]{64}$/u.test(String(manifest?.artifact?.[key] || "")),
     ) ||
+    !Array.isArray(manifest?.files) ||
+    manifest.files.length !== CANDIDATE_PAYLOADS.length ||
     files.size !== CANDIDATE_PAYLOADS.length ||
     CANDIDATE_PAYLOADS.some((name) => {
       const file = files.get(name);
@@ -404,7 +407,10 @@ export async function prepareCandidate(options, runtime = {}) {
   });
   const manifestFile = path.resolve(options.manifestOut);
   mkdirSync(path.dirname(manifestFile), { recursive: true, mode: 0o700 });
-  writeFileSync(manifestFile, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600, flag: "wx" });
+  writeFileSync(manifestFile, `${JSON.stringify(manifest, null, 2)}\n`, {
+    mode: 0o600,
+    flag: "wx",
+  });
   const archive = createCandidateArchive({
     artifactDir: options.artifactDir,
     manifestFile,
@@ -631,11 +637,28 @@ export async function inspectPublishedRelease(options, runtime = {}) {
       throw new Error(`formal release server checksum mismatch: ${name}`);
     }
   }
+  const sourcePackage = await onePackage(
+    context,
+    request,
+    GITLAB_RELEASE_SOURCE_PACKAGE,
+    releaseIdentity.packageVersion,
+  );
+  const sourceFiles = await packageFiles(context, request, sourcePackage);
+  if (sourceFiles.length !== 1) {
+    throw new Error("release source package must contain exactly one file");
+  }
+  const source = exactRemoteFile(sourceFiles, "source.tar", {
+    maximum: 8 * 1024 * 1024 * 1024,
+  });
+  if (source.file_sha256 !== artifact.sourceArchive.sha256) {
+    throw new Error("release source package digest does not match the formal artifact");
+  }
   return {
     status: "published",
     packageId: packageValue.id,
     releaseTag: releaseIdentity.packageVersion,
     releaseManifestSha256: byName.get("release-manifest.json").file_sha256,
+    releaseSourceSha256: source.file_sha256,
   };
 }
 

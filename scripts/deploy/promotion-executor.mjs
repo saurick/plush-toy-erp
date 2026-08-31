@@ -34,7 +34,6 @@ import {
   validatePromotionManifest,
 } from "./promotion-manifest.mjs";
 import { assertReleaseArtifactManifest } from "./release-artifact-bundle.mjs";
-import { verifyReleaseArtifact } from "./release-artifact-verify.mjs";
 import {
   sha256File,
   validateReleaseArtifactBinding,
@@ -56,11 +55,16 @@ import {
   prepareTargetReleaseIncoming,
   probeTargetReleaseCache,
 } from "./target-release-cache.mjs";
+import {
+  TARGET_RELEASE_FETCH_FILE,
+  requireTargetReleaseFetchCredential,
+  validateTargetReleaseFetch,
+} from "./target-release-fetch.mjs";
 
 export const REMOTE_PROMOTION_RECEIPT_CONTRACT =
-  "plush.remote-promotion-receipt/v3";
+  "plush.remote-promotion-receipt/v5";
 export const REMOTE_TARGET_INITIALIZATION_RECEIPT_CONTRACT =
-  "plush.remote-target-initialization-receipt/v1";
+  "plush.remote-target-initialization-receipt/v3";
 export const TARGET_INITIALIZATION_RECEIPT_FILE_SUFFIX =
   ".target-initialization.json";
 
@@ -71,7 +75,15 @@ const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 const IMAGE_ID_PATTERN = /^sha256:[0-9a-f]{64}$/u;
 const ISSUE_PATTERN = /^(?:none|[a-z][a-z0-9_]{2,63})$/u;
 const MAX_RECEIPT_BYTES = 256 * 1024;
+
+export function consumeTargetReleaseFetchCredential(env = process.env) {
+  const token = env.PLUSH_GITLAB_TARGET_FETCH_TOKEN;
+  delete env.PLUSH_GITLAB_TARGET_FETCH_TOKEN;
+  return token;
+}
+
 const PROMOTION_STAGE_IDS = Object.freeze([
+  "artifact_fetch",
   "package_verification",
   "capacity_recheck",
   "release_materialization",
@@ -87,16 +99,44 @@ const PROMOTION_STAGE_IDS = Object.freeze([
   "public_entry_switch",
   "current_source_switch",
 ]);
+const TARGET_INITIALIZATION_STAGE_IDS = Object.freeze([
+  "artifact_fetch",
+  "package_verification",
+  "release_materialization",
+  "image_load_and_readback",
+  "runtime_secret_materialization",
+  "static_preflight",
+  "database_start",
+  "migration_apply_started",
+  "administrator_bootstrap",
+  "compose_start",
+  "runtime_verified",
+  "basic_smoke",
+  "public_entry_switch",
+  "backup_restore_check",
+  "current_source_switch",
+  "passed",
+]);
 const TRANSFER_FILES = Object.freeze([
+  "checksums.sha256",
   "promotion-manifest.json",
   "release-artifact.json",
   "release-manifest.json",
   "release-rehearsal.json",
   "remote-promotion.sh",
+  "remote-release-acquire.sh",
   "sbom.cdx.json",
   "server-image.tar",
   "source.tar",
+  TARGET_RELEASE_FETCH_FILE,
   "web-image.tar",
+]);
+const CONTROL_TRANSFER_FILES = Object.freeze([
+  "promotion-manifest.json",
+  "remote-promotion.sh",
+  "remote-release-acquire.sh",
+  TARGET_RELEASE_FETCH_FILE,
+  "transfer-checksums.sha256",
 ]);
 
 function hasExactKeys(value, expected) {
@@ -122,6 +162,33 @@ function runChecked(runCommand, command, args, options, label) {
     throw new Error(`${label} failed with exit ${String(result.status)}`);
   }
   return result;
+}
+
+function targetAcquisitionMetrics(receipt) {
+  if (
+    receipt?.acquisition?.mode !== "gitlab_internal" ||
+    !Number.isSafeInteger(receipt.acquisition.downloadedBytes) ||
+    receipt.acquisition.downloadedBytes <= 0
+  ) {
+    return {};
+  }
+  const stageDuration = Array.isArray(receipt.timings)
+    ? receipt.timings.find(
+        (item) => item?.id === "artifact_fetch" && item?.status === "passed",
+      )?.durationMs
+    : undefined;
+  const durationMs = Number.isSafeInteger(receipt.acquisition.durationMs)
+    ? receipt.acquisition.durationMs
+    : stageDuration;
+  if (!Number.isSafeInteger(durationMs) || durationMs <= 0) {
+    return {};
+  }
+  return {
+    targetAcquisitionDurationMs: durationMs,
+    targetAcquisitionBytesPerSecond: Math.round(
+      (receipt.acquisition.downloadedBytes * 1000) / durationMs,
+    ),
+  };
 }
 
 function safeBundleFile(bundleDir, relativeFile) {
@@ -195,7 +262,6 @@ export function preparePromotionTransfer(
   if (artifact?.git?.commit !== releaseManifest.gitSha) {
     throw new Error("release artifact does not match the immutable release");
   }
-  verifyReleaseArtifact(artifactFile);
   const rehearsalFile = safeBundleFile(bundle, "release-rehearsal.json");
   const rehearsalReceipt = validateReleaseRehearsalReceipt(
     JSON.parse(readFileSync(rehearsalFile, "utf8")),
@@ -217,15 +283,24 @@ export function preparePromotionTransfer(
       "release rehearsal receipt does not match the promotion plan",
     );
   }
-  const sbomSource = safeBundleFile(bundle, artifact.sbom.file);
-  const imageByKind = new Map(
-    artifact.images.map((image) => [
-      image.kind,
-      safeBundleFile(bundle, image.archive.file),
-    ]),
+  const checksumsFile = safeBundleFile(bundle, "checksums.sha256");
+  const fetchFile = safeBundleFile(bundle, TARGET_RELEASE_FETCH_FILE);
+  const fetch = validateTargetReleaseFetch(
+    JSON.parse(readFileSync(fetchFile, "utf8")),
   );
-  if (!imageByKind.has("server") || !imageByKind.has("web")) {
-    throw new Error("release image archives are incomplete");
+  if (
+    fetch.gitSha !== releaseManifest.gitSha ||
+    fetch.version !== releaseManifest.version ||
+    fetch.formal.files.find((file) => file.name === "release-artifact.json")
+      ?.sha256 !== sha256File(artifactFile) ||
+    fetch.formal.files.find((file) => file.name === "release-manifest.json")
+      ?.sha256 !== sha256File(releaseManifestFile) ||
+    fetch.formal.files.find((file) => file.name === "release-rehearsal.json")
+      ?.sha256 !== sha256File(rehearsalFile) ||
+    fetch.formal.files.find((file) => file.name === "checksums.sha256")
+      ?.sha256 !== sha256File(checksumsFile)
+  ) {
+    throw new Error("target-direct release descriptor does not match the plan");
   }
 
   runChecked(
@@ -249,35 +324,10 @@ export function preparePromotionTransfer(
   mkdirSync(destination, { recursive: true, mode: 0o700 });
   try {
     copyBoundedFile(
-      rehearsalFile,
-      path.join(destination, "release-rehearsal.json"),
-      4 * 1024 * 1024,
+      fetchFile,
+      path.join(destination, TARGET_RELEASE_FETCH_FILE),
+      512 * 1024,
     );
-    if (!cachedPackage) {
-      copyBoundedFile(
-        releaseManifestFile,
-        path.join(destination, "release-manifest.json"),
-        512 * 1024,
-      );
-      copyBoundedFile(
-        artifactFile,
-        path.join(destination, "release-artifact.json"),
-        512 * 1024,
-      );
-      copyBoundedFile(
-        sbomSource,
-        path.join(destination, "sbom.cdx.json"),
-        32 * 1024 * 1024,
-      );
-      copyBoundedFile(
-        imageByKind.get("server"),
-        path.join(destination, "server-image.tar"),
-      );
-      copyBoundedFile(
-        imageByKind.get("web"),
-        path.join(destination, "web-image.tar"),
-      );
-    }
     writeFileSync(
       path.join(destination, "promotion-manifest.json"),
       `${JSON.stringify(plan, null, 2)}\n`,
@@ -296,29 +346,18 @@ export function preparePromotionTransfer(
       ),
       { mode: 0o600 },
     );
-    if (!cachedPackage) {
-      runChecked(
+    writeFileSync(
+      path.join(destination, "remote-release-acquire.sh"),
+      sourceFileAtCommit(
+        root,
+        releaseManifest.gitSha,
+        "scripts/deploy/remote-release-acquire.sh",
         runCommand,
-        "git",
-        [
-          "archive",
-          "--format=tar",
-          `--output=${path.join(destination, "source.tar")}`,
-          releaseManifest.gitSha,
-        ],
-        { cwd: root },
-        "create committed source archive",
-      );
-      if (
-        sha256File(path.join(destination, "source.tar")) !==
-        releaseManifest.artifact.sourceArchiveSha256
-      ) {
-        throw new Error(
-          "committed source archive checksum does not match release",
-        );
-      }
-    }
+      ),
+      { mode: 0o600 },
+    );
     const immutableChecksums = {
+      "checksums.sha256": sha256File(checksumsFile),
       "release-manifest.json": sha256File(releaseManifestFile),
       "release-rehearsal.json": sha256File(rehearsalFile),
       "release-artifact.json": sha256File(artifactFile),
@@ -327,6 +366,7 @@ export function preparePromotionTransfer(
         (image) => image.kind === "server",
       ).archive.sha256,
       "source.tar": releaseManifest.artifact.sourceArchiveSha256,
+      [TARGET_RELEASE_FETCH_FILE]: sha256File(fetchFile),
       "web-image.tar": artifact.images.find((image) => image.kind === "web")
         .archive.sha256,
     };
@@ -340,14 +380,7 @@ export function preparePromotionTransfer(
       `${checksumLines.join("\n")}\n`,
       { mode: 0o600 },
     );
-    const files = cachedPackage
-      ? [
-          "promotion-manifest.json",
-          "release-rehearsal.json",
-          "remote-promotion.sh",
-          "transfer-checksums.sha256",
-        ]
-      : [...TRANSFER_FILES, "transfer-checksums.sha256"];
+    const files = [...CONTROL_TRANSFER_FILES];
     return {
       schemaVersion: "plush.promotion-transfer/v1",
       gitSha: releaseManifest.gitSha,
@@ -361,6 +394,10 @@ export function preparePromotionTransfer(
       ),
       buildPerformance: artifact?.performance?.build || null,
       cachedPackage,
+      acquisitionExpectedBytes: cachedPackage
+        ? 0
+        : fetch.formal.files.reduce((total, file) => total + file.size, 0) +
+          fetch.source.file.size,
       files,
       totalBytes: files.reduce(
         (total, file) => total + statSync(path.join(destination, file)).size,
@@ -522,10 +559,26 @@ export function validateRemoteTargetInitializationReceipt(receipt, expected) {
     SHA256_PATTERN.test(backupSha256) &&
     Number.isSafeInteger(backupSizeBytes) &&
     backupSizeBytes > 0 &&
-    receipt?.rollbackPoint?.restoreChecked === true;
+      receipt?.rollbackPoint?.restoreChecked === true;
+  const acquisitionCompleted =
+    receipt?.acquisition?.mode === "gitlab_internal" &&
+    receipt?.acquisition?.expectedBytes === expected.acquisitionExpectedBytes &&
+    receipt?.acquisition?.downloadedBytes === expected.acquisitionExpectedBytes &&
+    Number.isSafeInteger(receipt?.acquisition?.durationMs) &&
+    receipt.acquisition.durationMs > 0 &&
+    receipt?.acquisition?.catalogAndChecksumsVerified === true;
+  const acquisitionFailedAtFetch =
+    receipt?.stage === "artifact_fetch" &&
+    receipt?.acquisition?.mode === "none" &&
+    receipt?.acquisition?.downloadedBytes === 0 &&
+    [0, expected.acquisitionExpectedBytes].includes(
+      receipt?.acquisition?.expectedBytes,
+    ) &&
+    receipt?.acquisition?.catalogAndChecksumsVerified === false;
   if (
     !hasExactKeys(receipt, [
       "before",
+      "acquisition",
       "bootstrap",
       "checks",
       "finishedAt",
@@ -548,6 +601,14 @@ export function validateRemoteTargetInitializationReceipt(receipt, expected) {
       "version",
     ]) ||
     !hasExactKeys(receipt?.before, ["targetState"]) ||
+    !hasExactKeys(receipt?.acquisition, [
+      "catalogAndChecksumsVerified",
+      "credentialCleanupProven",
+      "downloadedBytes",
+      "durationMs",
+      "expectedBytes",
+      "mode",
+    ]) ||
     !hasExactKeys(receipt?.images, ["serverContentId", "webContentId"]) ||
     !hasExactKeys(receipt?.migration, [
       "applyStarted",
@@ -597,13 +658,23 @@ export function validateRemoteTargetInitializationReceipt(receipt, expected) {
     receipt?.releaseRehearsalSha256 !== expected.releaseRehearsalSha256 ||
     receipt?.initializationFingerprint !== expected.initializationFingerprint ||
     receipt?.before?.targetState !== "absent" ||
+    !["none", "gitlab_internal"].includes(receipt?.acquisition?.mode) ||
+    !Number.isSafeInteger(receipt?.acquisition?.downloadedBytes) ||
+    receipt.acquisition.downloadedBytes < 0 ||
+    !Number.isSafeInteger(receipt?.acquisition?.expectedBytes) ||
+    receipt.acquisition.expectedBytes < 0 ||
+    !Number.isSafeInteger(receipt?.acquisition?.durationMs) ||
+    receipt.acquisition.durationMs < 0 ||
+    typeof receipt?.acquisition?.catalogAndChecksumsVerified !== "boolean" ||
+    typeof receipt?.acquisition?.credentialCleanupProven !== "boolean" ||
+    (!acquisitionCompleted && !acquisitionFailedAtFetch) ||
     receipt?.rollbackPoint?.backupAlias !==
       `initial-${expected.gitSha.slice(0, 12)}-${expected.operationId}` ||
     receipt?.migration?.automaticDownMigration !== false ||
-    receipt?.bootstrap?.secretPersistedOnTarget !== false ||
+    typeof receipt?.bootstrap?.secretPersistedOnTarget !== "boolean" ||
     receipt?.rollback?.preservesOtherTargets !== true ||
     !ISSUE_PATTERN.test(String(receipt?.issueCode || "")) ||
-    !/^[a-z][a-z0-9_]{2,63}$/u.test(String(receipt?.stage || "")) ||
+    !TARGET_INITIALIZATION_STAGE_IDS.includes(receipt?.stage) ||
     typeof receipt?.migration?.applyStarted !== "boolean" ||
     typeof receipt?.bootstrap?.started !== "boolean" ||
     typeof receipt?.bootstrap?.completed !== "boolean" ||
@@ -624,6 +695,16 @@ export function validateRemoteTargetInitializationReceipt(receipt, expected) {
     throw new Error("remote target initialization receipt contract is invalid");
   }
   const passed = receipt.status === "passed";
+  const failedAtFetch = receipt.stage === "artifact_fetch";
+  const fetchHasNoSideEffects =
+    serverContentId === "unknown" &&
+    webContentId === "unknown" &&
+    receipt.migration.applyStarted === false &&
+    receipt.migration.readback === "unknown" &&
+    receipt.bootstrap.started === false &&
+    receipt.bootstrap.completed === false &&
+    Object.values(receipt.checks).every((value) => value === false) &&
+    failedBackup;
   if (
     (passed &&
       (receipt.issueCode !== "none" ||
@@ -634,13 +715,20 @@ export function validateRemoteTargetInitializationReceipt(receipt, expected) {
         !receipt.migration.applyStarted ||
         !receipt.bootstrap.started ||
         !receipt.bootstrap.completed ||
+        receipt.bootstrap.secretPersistedOnTarget ||
+        !receipt.acquisition.credentialCleanupProven ||
+        !acquisitionCompleted ||
         !receipt.rollback.complete ||
         !receipt.rollback.retainedTarget ||
         Object.values(receipt.checks).some((value) => value !== true))) ||
     (!passed &&
       (receipt.issueCode === "none" ||
         receipt.rollback.retainedTarget ||
-        (receipt.status === "failed" && !receipt.rollback.complete)))
+        (receipt.status === "failed" &&
+          (!receipt.rollback.complete ||
+            !receipt.acquisition.credentialCleanupProven ||
+            receipt.bootstrap.secretPersistedOnTarget)) ||
+        (failedAtFetch && !fetchHasNoSideEffects)))
   ) {
     throw new Error(
       "remote target initialization receipt status is inconsistent",
@@ -676,7 +764,13 @@ function executeTargetInitialization(
     releaseManifestPath,
     confirmation,
   },
-  { runCommand, runInitializationPreflight, now, createInitializationSecrets },
+  {
+    runCommand,
+    runInitializationPreflight,
+    now,
+    createInitializationSecrets,
+    fetchToken,
+  },
 ) {
   const immediate = runInitializationPreflight(plan.target.key);
   if (
@@ -720,6 +814,9 @@ function executeTargetInitialization(
   let remoteRootPrepared = false;
   let remoteExecutionInvoked = false;
   let validatedReceipt = null;
+  let controlTransferDurationMs = 0;
+  let controlTransferBytesPerSecond = 0;
+  const targetFetchToken = requireTargetReleaseFetchCredential(fetchToken);
   try {
     const transfer = preparePromotionTransfer(
       {
@@ -756,7 +853,8 @@ function executeTargetInitialization(
       metadata: {
         ...operation.metadata,
         promotionMode: "initialize",
-        transferBytes: transfer.totalBytes,
+        controlTransferBytes: transfer.totalBytes,
+        targetAcquisitionExpectedBytes: transfer.acquisitionExpectedBytes,
         bootstrapAccessStored: true,
       },
       now: now(),
@@ -769,13 +867,24 @@ function executeTargetInitialization(
       "prepare pristine target initialization root",
     );
     remoteRootPrepared = true;
-    runChecked(
-      runCommand,
-      rsyncTransfer.command,
-      rsyncTransfer.args,
-      { timeout: 10 * 60_000 },
-      "transfer immutable target initialization package",
-    );
+    const controlTransferStartedAt = Date.now();
+    try {
+      runChecked(
+        runCommand,
+        rsyncTransfer.command,
+        rsyncTransfer.args,
+        { timeout: 10 * 60_000 },
+        "transfer target initialization control package",
+      );
+    } finally {
+      controlTransferDurationMs = Math.max(
+        1,
+        Date.now() - controlTransferStartedAt,
+      );
+      controlTransferBytesPerSecond = Math.round(
+        (transfer.totalBytes * 1000) / controlTransferDurationMs,
+      );
+    }
     const remoteScript = `${target.filesystem.root}/incoming/${operation.id}/remote-promotion.sh`;
     remoteExecutionInvoked = true;
     const result = runCommand(
@@ -796,6 +905,7 @@ function executeTargetInitialization(
       ],
       {
         encoding: "utf8",
+        input: `${targetFetchToken}\n`,
         maxBuffer: 1024 * 1024,
         timeout: 60 * 60_000,
       },
@@ -812,6 +922,7 @@ function executeTargetInitialization(
           releaseManifestSha256: plan.release.manifestSha256,
           releaseRehearsalSha256: plan.release.rehearsalReceiptSha256,
           initializationFingerprint: plan.fingerprint,
+          acquisitionExpectedBytes: transfer.acquisitionExpectedBytes,
         },
       );
     } catch (error) {
@@ -837,7 +948,8 @@ function executeTargetInitialization(
       validatedReceipt,
     );
     if (
-      validatedReceipt.status !== "passed" &&
+      validatedReceipt.status === "failed" &&
+      validatedReceipt.rollback.complete &&
       accessFile &&
       existsSync(accessFile)
     ) {
@@ -858,10 +970,21 @@ function executeTargetInitialization(
         backupSha256: validatedReceipt.rollbackPoint.backupSha256,
         backupSizeBytes: validatedReceipt.rollbackPoint.backupSizeBytes,
         migrationReadback: validatedReceipt.migration.readback,
+        targetAcquisitionMode: validatedReceipt.acquisition.mode,
+        targetAcquisitionBytes:
+          validatedReceipt.acquisition.downloadedBytes,
+        targetAcquisitionExpectedBytes:
+          validatedReceipt.acquisition.expectedBytes,
+        targetAcquisitionVerified:
+          validatedReceipt.acquisition.catalogAndChecksumsVerified,
+        ...targetAcquisitionMetrics(validatedReceipt),
         serverContentId: validatedReceipt.images.serverContentId,
         webContentId: validatedReceipt.images.webContentId,
         initializationReceiptFile: path.relative(store, receiptFile),
         initializationReceiptSha256: sha256File(receiptFile),
+        controlTransferDurationMs,
+        controlTransferBytesPerSecond,
+        bootstrapAccessStored: Boolean(accessFile && existsSync(accessFile)),
       },
       now: now(),
     });
@@ -909,6 +1032,16 @@ function executeTargetInitialization(
         issues: initializationTerminalIssue(
           outcomeUnknown || !effectiveCleanupProven ? "not_proven" : "failed",
         ),
+        metadata: {
+          ...operation.metadata,
+          ...(controlTransferDurationMs > 0
+            ? {
+                controlTransferDurationMs,
+                controlTransferBytesPerSecond,
+              }
+            : {}),
+          bootstrapAccessStored: Boolean(accessFile && existsSync(accessFile)),
+        },
         now: now(),
       });
     }
@@ -952,6 +1085,7 @@ export function validateRemotePromotionReceipt(receipt, expected) {
   if (
     !hasExactKeys(receipt, [
       "before",
+      "acquisition",
       "cache",
       "checks",
       "durationMs",
@@ -976,6 +1110,13 @@ export function validateRemotePromotionReceipt(receipt, expected) {
       "version",
     ]) ||
     !hasExactKeys(receipt?.before, ["runtimeSha"]) ||
+    !hasExactKeys(receipt?.acquisition, [
+      "catalogAndChecksumsVerified",
+      "credentialCleanupProven",
+      "downloadedBytes",
+      "expectedBytes",
+      "mode",
+    ]) ||
     !hasExactKeys(receipt?.cache, [
       "avoidedBytes",
       "basis",
@@ -1038,6 +1179,15 @@ export function validateRemotePromotionReceipt(receipt, expected) {
     !optionalImageId(serverContentId) ||
     !optionalImageId(webContentId) ||
     !optionalBackup ||
+    !["none", "target_cache", "gitlab_internal"].includes(
+      receipt?.acquisition?.mode,
+    ) ||
+    !Number.isSafeInteger(receipt?.acquisition?.downloadedBytes) ||
+    receipt.acquisition.downloadedBytes < 0 ||
+    !Number.isSafeInteger(receipt?.acquisition?.expectedBytes) ||
+    receipt.acquisition.expectedBytes < 0 ||
+    typeof receipt?.acquisition?.catalogAndChecksumsVerified !== "boolean" ||
+    typeof receipt?.acquisition?.credentialCleanupProven !== "boolean" ||
     typeof receipt?.cache?.packageHit !== "boolean" ||
     typeof receipt?.cache?.imageHit !== "boolean" ||
     typeof receipt?.cache?.dockerLoadSkipped !== "boolean" ||
@@ -1071,6 +1221,8 @@ export function validateRemotePromotionReceipt(receipt, expected) {
     throw new Error("remote promotion receipt contract is invalid");
   }
   if (
+    (receipt.status !== "not_proven" &&
+      receipt.acquisition.credentialCleanupProven !== true) ||
     (receipt.status === "passed" &&
       (receipt.issueCode !== "none" ||
         !SHA_PATTERN.test(beforeSha) ||
@@ -1083,7 +1235,18 @@ export function validateRemotePromotionReceipt(receipt, expected) {
         receipt.checks?.health !== true ||
         receipt.checks?.ready !== true ||
         receipt.checks?.basicSmoke !== true ||
-        receipt.checks?.publicEntry !== true)) ||
+        receipt.checks?.publicEntry !== true ||
+        receipt.acquisition.catalogAndChecksumsVerified !== true ||
+        receipt.acquisition.mode === "none" ||
+        receipt.acquisition.expectedBytes !==
+          expected.acquisitionExpectedBytes ||
+        (receipt.acquisition.mode === "gitlab_internal" &&
+          (receipt.acquisition.expectedBytes <= 0 ||
+            receipt.acquisition.downloadedBytes !==
+              receipt.acquisition.expectedBytes)) ||
+        (receipt.acquisition.mode === "target_cache" &&
+          (receipt.acquisition.downloadedBytes !== 0 ||
+            receipt.acquisition.expectedBytes !== 0)))) ||
     (receipt.status !== "passed" && receipt.issueCode === "none")
   ) {
     throw new Error("remote promotion receipt status is inconsistent");
@@ -1162,6 +1325,7 @@ export function executePromotion(
     probeCache = probeTargetReleaseCache,
     prepareCache = prepareTargetReleaseIncoming,
     createInitializationSecrets = generateTargetInitializationSecrets,
+    fetchToken = consumeTargetReleaseFetchCredential(),
     now = () => new Date().toISOString(),
   } = {},
 ) {
@@ -1208,6 +1372,7 @@ export function executePromotion(
         runInitializationPreflight,
         now,
         createInitializationSecrets,
+        fetchToken,
       },
     );
   }
@@ -1275,65 +1440,74 @@ export function executePromotion(
     cacheProbe.avoidedBytes,
     listDeliveryOperations(store, { limit: 200 }),
   );
-  const transfer = preparePromotionTransfer(
-    {
-      repoRoot: root,
-      bundleDir,
-      releaseManifestPath,
-      promotionPlan: plan,
-      destination: transferRoot,
-    },
-    { runCommand, cachedPackage: cacheProbe.packageHit },
-  );
+  const targetFetchToken = cacheProbe.packageHit
+    ? null
+    : requireTargetReleaseFetchCredential(fetchToken);
   const target = getDeploymentTarget(targetKey);
   const sshArgs = fixedSshArgs(target);
-  assertLocalRsync(runCommand);
-  const rsyncTransfer = buildFixedTargetRsyncTransfer({
-    target,
-    operationId: operation.id,
-    sourceFiles: transfer.files.map((file) => path.join(transferRoot, file)),
-  });
-  operation = transitionDeliveryOperation(store, operation.id, {
-    status: "running",
-    message: "target write started with the fixed promotion contract",
-    metadata: {
-      ...operation.metadata,
-      transferBytes: transfer.totalBytes,
-      targetCacheHit: cacheProbe.packageHit,
-      targetImageCacheHit: cacheProbe.imageHit,
-      targetCacheSource: cacheProbe.cacheSource,
-      avoidedTransferBytes: cacheProbe.avoidedBytes,
-      avoidedTransferDurationMs: avoidedTransfer.durationMs,
-      avoidedTransferBaselineOperationId: avoidedTransfer.baselineOperationId,
-      dockerLoadSkipped: cacheProbe.imageHit,
-      cacheBasis: cacheProbe.basis,
-      stillExecutedChecks: ["migration", "health", "ready", "public_entry"],
-    },
-    now: now(),
-  });
+  let transfer;
+  let rsyncTransfer;
   let remoteStarted = false;
   let targetPrepared = false;
-  let transferDurationMs = 0;
-  let transferBytesPerSecond = 0;
+  let controlTransferDurationMs = 0;
+  let controlTransferBytesPerSecond = 0;
   try {
+    transfer = preparePromotionTransfer(
+      {
+        repoRoot: root,
+        bundleDir,
+        releaseManifestPath,
+        promotionPlan: plan,
+        destination: transferRoot,
+      },
+      { runCommand, cachedPackage: cacheProbe.packageHit },
+    );
+    assertLocalRsync(runCommand);
+    rsyncTransfer = buildFixedTargetRsyncTransfer({
+      target,
+      operationId: operation.id,
+      sourceFiles: transfer.files.map((file) => path.join(transferRoot, file)),
+    });
+    operation = transitionDeliveryOperation(store, operation.id, {
+      status: "running",
+      message: "target write started with the fixed promotion contract",
+      metadata: {
+        ...operation.metadata,
+        controlTransferBytes: transfer.totalBytes,
+        targetAcquisitionExpectedBytes: transfer.acquisitionExpectedBytes,
+        targetCacheHit: cacheProbe.packageHit,
+        targetImageCacheHit: cacheProbe.imageHit,
+        targetCacheSource: cacheProbe.cacheSource,
+        avoidedTransferBytes: cacheProbe.avoidedBytes,
+        avoidedTransferDurationMs: avoidedTransfer.durationMs,
+        avoidedTransferBaselineOperationId: avoidedTransfer.baselineOperationId,
+        dockerLoadSkipped: cacheProbe.imageHit,
+        cacheBasis: cacheProbe.basis,
+        stillExecutedChecks: ["migration", "health", "ready", "public_entry"],
+      },
+      now: now(),
+    });
+    targetPrepared = true;
     prepareCache(
       { operationId: operation.id, identity: cacheIdentity, probe: cacheProbe },
       { runCommand, targetKey },
     );
-    targetPrepared = true;
-    const transferStartedAt = Date.now();
+    const controlTransferStartedAt = Date.now();
     try {
       runChecked(
         runCommand,
         rsyncTransfer.command,
         rsyncTransfer.args,
         { timeout: 10 * 60_000 },
-        "transfer immutable promotion package",
+        "transfer promotion control package",
       );
     } finally {
-      transferDurationMs = Math.max(1, Date.now() - transferStartedAt);
-      transferBytesPerSecond = Math.round(
-        (transfer.totalBytes * 1000) / transferDurationMs,
+      controlTransferDurationMs = Math.max(
+        1,
+        Date.now() - controlTransferStartedAt,
+      );
+      controlTransferBytesPerSecond = Math.round(
+        (transfer.totalBytes * 1000) / controlTransferDurationMs,
       );
     }
     remoteStarted = true;
@@ -1356,6 +1530,7 @@ export function executePromotion(
       ],
       {
         encoding: "utf8",
+        input: targetFetchToken ? `${targetFetchToken}\n` : "",
         maxBuffer: 1024 * 1024,
         timeout: 60 * 60_000,
       },
@@ -1371,6 +1546,7 @@ export function executePromotion(
         releaseManifestSha256: plan.release.manifestSha256,
         releaseRehearsalSha256: plan.release.rehearsalReceiptSha256,
         promotionFingerprint: plan.fingerprint,
+        acquisitionExpectedBytes: transfer.acquisitionExpectedBytes,
       });
     } catch (error) {
       throw new Error(
@@ -1404,8 +1580,14 @@ export function executePromotion(
         serverContentId: receipt.images.serverContentId,
         webContentId: receipt.images.webContentId,
         remoteStageTimings: receipt.timings,
-        transferDurationMs,
-        transferBytesPerSecond,
+        controlTransferDurationMs,
+        controlTransferBytesPerSecond,
+        targetAcquisitionMode: receipt.acquisition.mode,
+        targetAcquisitionBytes: receipt.acquisition.downloadedBytes,
+        targetAcquisitionExpectedBytes: receipt.acquisition.expectedBytes,
+        targetAcquisitionVerified:
+          receipt.acquisition.catalogAndChecksumsVerified,
+        ...targetAcquisitionMetrics(receipt),
         serverArchiveBytes: transfer.imageArchiveBytes.server,
         webArchiveBytes: transfer.imageArchiveBytes.web,
         serverDigest: transfer.imageDigests.server,
@@ -1429,10 +1611,12 @@ export function executePromotion(
     };
   } catch (error) {
     let executionError = error;
+    let targetCleanupProven = true;
     if (!remoteStarted && targetPrepared) {
       try {
         cleanupCache(operation.id, { runCommand, targetKey });
       } catch (cleanupError) {
+        targetCleanupProven = false;
         executionError = new Error(
           `${error.message}; target incoming cleanup failed: ${cleanupError.message}`,
           { cause: error },
@@ -1440,17 +1624,23 @@ export function executePromotion(
       }
     }
     const current = readDeliveryOperation(store, operation.id);
-    if (current.status === "running") {
+    if (["ready", "launching", "running"].includes(current.status)) {
+      const outcomeUnknown = remoteStarted || !targetCleanupProven;
       operation = transitionDeliveryOperation(store, operation.id, {
-        status: remoteStarted ? "not_proven" : "failed",
+        status: outcomeUnknown ? "not_proven" : "failed",
         message: remoteStarted
           ? "remote promotion result could not be proven; automatic retry is disabled"
-          : "promotion package transfer failed before remote execution",
-        issues: terminalIssue(remoteStarted ? "not_proven" : "failed"),
+          : !targetCleanupProven
+            ? "promotion control transfer cleanup could not be proven; automatic retry is disabled"
+          : "promotion package preparation or control transfer failed before remote execution",
+        issues: terminalIssue(outcomeUnknown ? "not_proven" : "failed"),
         metadata: {
           ...current.metadata,
-          ...(transferDurationMs > 0
-            ? { transferDurationMs, transferBytesPerSecond }
+          ...(controlTransferDurationMs > 0
+            ? {
+                controlTransferDurationMs,
+                controlTransferBytesPerSecond,
+              }
             : {}),
         },
         now: now(),

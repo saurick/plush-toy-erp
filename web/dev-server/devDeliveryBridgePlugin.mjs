@@ -54,6 +54,7 @@ const DELIVERY_TARGET_KEYS = Object.freeze([
   ...SUPPORTED_DEPLOYMENT_TARGET_KEYS,
 ])
 const REMOTE_STAGE_LABELS = Object.freeze({
+  artifact_fetch: 'GitLab 内部取件',
   package_verification: '制品包校验',
   capacity_recheck: '容量复核',
   release_materialization: '版本目录落盘',
@@ -305,13 +306,43 @@ function publicOperation(
           durationMs: item.durationMs,
         }))
     : []
-  const transferStage =
+  const controlTransferStage =
+    Number.isSafeInteger(metadata.controlTransferDurationMs) &&
+    metadata.controlTransferDurationMs >= 0
+      ? [
+          {
+            id: 'control_transfer',
+            label: '控制包传输',
+            status:
+              remoteStages.length > 0 ||
+              ['passed', 'not_proven'].includes(operation.status)
+                ? 'passed'
+                : operation.status,
+            durationMs: metadata.controlTransferDurationMs,
+          },
+        ]
+      : []
+  const targetAcquisitionStage =
+    remoteStages.some((stage) => stage.id === 'artifact_fetch') ||
+    !Number.isSafeInteger(metadata.targetAcquisitionDurationMs) ||
+    metadata.targetAcquisitionDurationMs < 0
+      ? []
+      : [
+          {
+            id: 'artifact_fetch',
+            label: REMOTE_STAGE_LABELS.artifact_fetch,
+            status: operation.status === 'passed' ? 'passed' : 'failed',
+            durationMs: metadata.targetAcquisitionDurationMs,
+          },
+        ]
+  const historicalTransferStage =
+    controlTransferStage.length === 0 &&
     Number.isSafeInteger(metadata.transferDurationMs) &&
     metadata.transferDurationMs >= 0
       ? [
           {
             id: 'artifact_transfer',
-            label: '制品传输',
+            label: '历史制品中转',
             status:
               remoteStages.length > 0 ||
               ['passed', 'not_proven'].includes(operation.status)
@@ -330,7 +361,12 @@ function publicOperation(
       durationMs: Math.max(0, Date.parse(next.at) - Date.parse(event.at)),
     }
   })
-  const measuredStages = [...transferStage, ...remoteStages]
+  const measuredStages = [
+    ...controlTransferStage,
+    ...historicalTransferStage,
+    ...targetAcquisitionStage,
+    ...remoteStages,
+  ]
   const metricInteger = (key) =>
     Number.isSafeInteger(metadata[key]) && metadata[key] >= 0
       ? metadata[key]
@@ -401,6 +437,28 @@ function publicOperation(
       ? [...metadata.stillExecutedChecks]
       : null
     : []
+  const targetAcquisitionBytes = metricInteger('targetAcquisitionBytes')
+  const targetAcquisitionDurationMs =
+    metricInteger('targetAcquisitionDurationMs') ??
+    remoteStages.find((stage) => stage.id === 'artifact_fetch')?.durationMs
+  const controlTransferBytes = metricInteger('controlTransferBytes')
+  const controlTransferDurationMs = metricInteger('controlTransferDurationMs')
+  const publicTransferBytes =
+    targetAcquisitionBytes ?? controlTransferBytes ?? metricInteger('transferBytes')
+  const publicTransferDurationMs =
+    (targetAcquisitionBytes !== null &&
+    Number.isSafeInteger(targetAcquisitionDurationMs)
+      ? targetAcquisitionDurationMs
+      : null) ??
+    controlTransferDurationMs ??
+    metricInteger('transferDurationMs')
+  const publicTransferBytesPerSecond =
+    publicTransferBytes !== null && publicTransferDurationMs > 0
+      ? Math.round((publicTransferBytes * 1000) / publicTransferDurationMs)
+      : publicTransferBytes === 0 && publicTransferDurationMs !== null
+        ? 0
+        : metricInteger('controlTransferBytesPerSecond') ??
+          metricInteger('transferBytesPerSecond')
   return {
     id: operation.id,
     action: operation.action,
@@ -415,9 +473,9 @@ function publicOperation(
     durationMs,
     stages: measuredStages.length > 0 ? measuredStages : lifecycleStages,
     metrics: {
-      transferBytes: metricInteger('transferBytes'),
-      transferDurationMs: metricInteger('transferDurationMs'),
-      transferBytesPerSecond: metricInteger('transferBytesPerSecond'),
+      transferBytes: publicTransferBytes,
+      transferDurationMs: publicTransferDurationMs,
+      transferBytesPerSecond: publicTransferBytesPerSecond,
       serverArchiveBytes: metricInteger('serverArchiveBytes'),
       webArchiveBytes: metricInteger('webArchiveBytes'),
       backupSizeBytes: metricInteger('backupSizeBytes'),
@@ -468,11 +526,11 @@ function publicOperation(
   }
 }
 
-function releaseDirectory(root, gitSha) {
+function releaseControlDirectory(root, gitSha) {
   if (!SHA_PATTERN.test(String(gitSha || ''))) {
     throw new Error('release SHA is invalid')
   }
-  return path.join(root, 'output', 'dev-workbench', 'releases', gitSha)
+  return path.join(root, 'output', 'dev-workbench', 'release-controls', gitSha)
 }
 
 function providerIssue(message, provider = 'gitlab') {
@@ -896,9 +954,17 @@ export function createDevDeliveryService({
     ) {
       throw new Error('published v2 seven-asset release is not ready')
     }
-    const destination = releaseDirectory(root, payload.gitSha)
+    if (
+      deliveryProvider.provider !== 'gitlab' ||
+      typeof deliveryProvider.downloadReleaseControl !== 'function'
+    ) {
+      throw new Error(
+        'promotion requires the GitLab target-direct release transport'
+      )
+    }
+    const destination = releaseControlDirectory(root, payload.gitSha)
     const downloaded = await Promise.resolve(
-      deliveryProvider.downloadRelease(payload.gitSha, destination)
+      deliveryProvider.downloadReleaseControl(payload.gitSha, destination)
     )
     const result = await Promise.resolve(
       preparePromotionAction(
@@ -916,9 +982,88 @@ export function createDevDeliveryService({
         { runPreflight, runInitializationPreflight, now }
       )
     )
+    let preparedOperation = result.operation
+    if (
+      preparedOperation.status === 'ready' &&
+      preparedOperation.metadata?.promotionMode === 'upgrade'
+    ) {
+      const currentGitSha = result.plan?.ancestry?.currentGitSha
+      if (!SHA_PATTERN.test(String(currentGitSha || ''))) {
+        preparedOperation = transitionDeliveryOperation(
+          store,
+          preparedOperation.id,
+          {
+            status: 'blocked',
+            message:
+              'promotion is blocked because the current release transport identity is unavailable',
+            issues: [
+              {
+                code: 'promotion_current_release_transport_unavailable',
+                level: 'error',
+                message:
+                  '当前运行版本缺少可验证的目标直取回滚身份；未启动目标写操作',
+              },
+            ],
+            now: now(),
+          }
+        )
+      } else {
+        preparedOperation = transitionDeliveryOperation(
+          store,
+          preparedOperation.id,
+          {
+            status: 'running',
+            message: 'verifying the current release rollback transport',
+            now: now(),
+          }
+        )
+        try {
+          await Promise.resolve(
+            deliveryProvider.downloadReleaseControl(
+              currentGitSha,
+              releaseControlDirectory(root, currentGitSha)
+            )
+          )
+          preparedOperation = transitionDeliveryOperation(
+            store,
+            preparedOperation.id,
+            {
+              status: 'ready',
+              message:
+                'promotion and current-release rollback transports are verified; explicit confirmation is required',
+              metadata: {
+                ...preparedOperation.metadata,
+                currentGitSha,
+                currentReleaseTransportVerified: true,
+              },
+              now: now(),
+            }
+          )
+        } catch {
+          preparedOperation = transitionDeliveryOperation(
+            store,
+            preparedOperation.id,
+            {
+              status: 'blocked',
+              message:
+                'promotion is blocked because the current release cannot be fetched for rollback',
+              issues: [
+                {
+                  code: 'promotion_current_release_transport_unavailable',
+                  level: 'error',
+                  message:
+                    '当前运行版本缺少完整的目标直取回滚制品；未启动目标写操作',
+                },
+              ],
+              now: now(),
+            }
+          )
+        }
+      }
+    }
     preflightCache.delete(payload.target)
     return {
-      operation: presentOperation(result.operation),
+      operation: presentOperation(preparedOperation),
       plan: result.plan,
       reused: result.reused,
     }
@@ -949,14 +1094,28 @@ export function createDevDeliveryService({
     ) {
       throw new Error('both immutable rollback releases must be complete')
     }
-    const currentDirectory = releaseDirectory(root, payload.fromGitSha)
-    const targetDirectory = releaseDirectory(root, payload.toGitSha)
+    const currentDirectory = releaseControlDirectory(root, payload.fromGitSha)
+    const targetDirectory = releaseControlDirectory(root, payload.toGitSha)
+    if (
+      deliveryProvider.provider !== 'gitlab' ||
+      typeof deliveryProvider.downloadReleaseControl !== 'function'
+    ) {
+      throw new Error(
+        'rollback requires the GitLab target-direct release transport'
+      )
+    }
     const [currentDownload, targetDownload] = await Promise.all([
       Promise.resolve(
-        deliveryProvider.downloadRelease(payload.fromGitSha, currentDirectory)
+        deliveryProvider.downloadReleaseControl(
+          payload.fromGitSha,
+          currentDirectory
+        )
       ),
       Promise.resolve(
-        deliveryProvider.downloadRelease(payload.toGitSha, targetDirectory)
+        deliveryProvider.downloadReleaseControl(
+          payload.toGitSha,
+          targetDirectory
+        )
       ),
     ])
     const result = await Promise.resolve(
@@ -1074,7 +1233,7 @@ export function createDevDeliveryService({
     }
   }
 
-  function executeFixedPromotion(payload) {
+  async function executeFixedPromotion(payload) {
     if (children.size > 0) {
       throw new Error('another delivery target action is already running')
     }
@@ -1090,12 +1249,57 @@ export function createDevDeliveryService({
     if (payload.confirmation !== expected) {
       throw new Error('explicit promotion confirmation does not match')
     }
+    if (operation.metadata?.promotionMode === 'upgrade') {
+      const currentGitSha = operation.metadata?.currentGitSha
+      if (
+        operation.metadata?.currentReleaseTransportVerified !== true ||
+        !SHA_PATTERN.test(String(currentGitSha || ''))
+      ) {
+        transitionDeliveryOperation(store, operation.id, {
+          status: 'blocked',
+          message:
+            'promotion is blocked because the current release rollback transport was not proven',
+          issues: [
+            {
+              code: 'promotion_current_release_transport_unavailable',
+              level: 'error',
+              message: '当前运行版本的目标直取回滚资格未证明；未启动目标写操作',
+            },
+          ],
+          now: now(),
+        })
+        throw new Error('current release rollback transport is unavailable')
+      }
+      try {
+        await Promise.resolve(
+          deliveryProvider.downloadReleaseControl(
+            currentGitSha,
+            releaseControlDirectory(root, currentGitSha)
+          )
+        )
+      } catch {
+        transitionDeliveryOperation(store, operation.id, {
+          status: 'blocked',
+          message:
+            'promotion is blocked because the current release rollback transport changed',
+          issues: [
+            {
+              code: 'promotion_current_release_transport_unavailable',
+              level: 'error',
+              message: '当前运行版本的目标直取回滚制品已变化；未启动目标写操作',
+            },
+          ],
+          now: now(),
+        })
+        throw new Error('current release rollback transport is unavailable')
+      }
+    }
     operation = transitionDeliveryOperation(store, operation.id, {
       status: 'launching',
       message: 'promotion executor child is launching',
       now: now(),
     })
-    const bundleDir = releaseDirectory(root, operation.gitSha)
+    const bundleDir = releaseControlDirectory(root, operation.gitSha)
     let child
     try {
       child = spawnProcess(
@@ -1166,11 +1370,11 @@ export function createDevDeliveryService({
       message: 'rollback executor child is launching',
       now: now(),
     })
-    const currentBundleDir = releaseDirectory(
+    const currentBundleDir = releaseControlDirectory(
       root,
       operation.metadata.currentGitSha
     )
-    const targetBundleDir = releaseDirectory(root, operation.gitSha)
+    const targetBundleDir = releaseControlDirectory(root, operation.gitSha)
     let child
     try {
       child = spawnProcess(
@@ -1268,7 +1472,7 @@ export function createDevDeliveryService({
       return {
         schemaVersion: 'plush.dev-delivery-action-result/v1',
         action: validated.action,
-        ...executeFixedPromotion(validated.payload),
+        ...(await executeFixedPromotion(validated.payload)),
       }
     },
   }

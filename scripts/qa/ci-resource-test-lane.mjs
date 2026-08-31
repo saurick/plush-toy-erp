@@ -37,7 +37,7 @@ export const CI_RESOURCE_TEST_LANES = Object.freeze({
 });
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
-const RANGE_PATTERN = /^(?:[0-9a-f]{40}|HEAD\^)\.\.?HEAD$/u;
+const RANGE_PATTERN = /^(?:[0-9a-f]{40}|HEAD\^)\.\.\.?HEAD$/u;
 const FIXTURE_PREFIX = "bootstrap-production-admin-";
 
 function stableValue(value) {

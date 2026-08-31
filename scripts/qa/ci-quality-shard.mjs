@@ -28,6 +28,10 @@ import {
 } from "./ci-playwright-runtime.mjs";
 import { loadCiNodeTestLaneSet } from "./ci-node-test-lane.mjs";
 import { loadCiResourceTestLaneSet } from "./ci-resource-test-lane.mjs";
+import {
+  loadCiQualityStageLaneSet,
+  readCiQualityStageLaneReceipt,
+} from "./ci-quality-stage-lane.mjs";
 
 export const CI_QUALITY_SHARD_SCHEMA = "plush.ci-quality-shard/v1";
 export const CI_QUALITY_SHARDS = Object.freeze({
@@ -269,34 +273,6 @@ function atomicJson(file, value) {
   }
 }
 
-function mappedPostgresPort(root, name) {
-  const result = spawnSync("docker", ["port", name, "5432/tcp"], {
-    cwd: root,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  const match = /^127\.0\.0\.1:(\d+)$/u.exec(String(result.stdout || "").trim());
-  if (result.error || result.status !== 0 || !match) {
-    throw new Error("quality shard PostgreSQL port mapping is invalid");
-  }
-  return Number(match[1]);
-}
-
-async function waitForPostgres(root, name, env) {
-  for (let attempt = 0; attempt < 45; attempt += 1) {
-    const result = spawnSync(
-      "docker",
-      ["inspect", "--format", "{{.State.Health.Status}}", name],
-      { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
-    );
-    const health = String(result.stdout || "").trim();
-    if (result.status === 0 && health === "healthy") return;
-    if (health === "unhealthy") throw new Error("quality shard PostgreSQL is unhealthy");
-    await new Promise((resolve) => setTimeout(resolve, 2_000));
-  }
-  throw new Error(`quality shard PostgreSQL did not become healthy for pipeline ${env.CI_PIPELINE_ID}`);
-}
-
 async function materializeChromium(root, childEnv) {
   await runProcess("pnpm", ["--dir", "web", "install", "--frozen-lockfile", "--offline"], {
     cwd: root,
@@ -347,13 +323,14 @@ export async function runCiQualityShard({
   };
   if (shard === "node") childEnv.QA_CI_NODE_LANES = "verified";
   if (shard === "resource") childEnv.QA_CI_RESOURCE_LANES = "verified";
+  if (shard === "web") childEnv.QA_CI_WEB_LANES = "verified";
+  if (shard === "server") childEnv.QA_CI_SERVER_LANES = "verified";
   if (shard === "browser") {
     childEnv.QA_BROWSER_SCENARIOS =
       "root-redirect-desktop,root-redirect-mobile,print-center-engineering-preview-tablet";
   }
   let gateOutput = "";
   let failure = null;
-  let postgresName = "";
   let sandboxPath = "";
   let runtimeMaterialized = false;
   const invariants = {
@@ -369,16 +346,18 @@ export async function runCiQualityShard({
       : "not-applicable",
     nodeLanes: shard === "node" ? null : "not-applicable",
     resourceLanes: shard === "resource" ? null : "not-applicable",
+    webLanes: shard === "web" ? null : "not-applicable",
+    serverLanes: shard === "server" ? null : "not-applicable",
     webBuildSha256: null,
   };
   try {
-    if (["node", "web"].includes(shard)) {
+    if (shard === "node") {
       await runProcess("pnpm", ["--dir", "web", "install", "--frozen-lockfile", "--offline"], {
         cwd: root,
         env: childEnv,
       });
     }
-    if (["server", "browser"].includes(shard)) {
+    if (shard === "browser") {
       const chromium = await materializeChromium(root, childEnv);
       runtimeMaterialized = true;
       sandboxPath = `/usr/local/sbin/chrome-devel-sandbox-${env.CI_JOB_ID}`;
@@ -391,49 +370,6 @@ export async function runCiQualityShard({
       childEnv.CHROME_DEVEL_SANDBOX = sandboxPath;
       childEnv.ERP_PDF_CHROME_PATH = chromium.chromePath;
     }
-    if (shard === "server") {
-      postgresName = `plush-ci-postgres-${env.CI_PIPELINE_ID}-${env.CI_JOB_ID}`;
-      await runProcess(
-        "docker",
-        [
-          "run",
-          "--detach",
-          "--rm",
-          "--name",
-          postgresName,
-          "--label",
-          `com.plush.ci.pipeline=${env.CI_PIPELINE_ID}`,
-          "--label",
-          `com.plush.ci.job=${env.CI_JOB_ID}`,
-          "--env",
-          "POSTGRES_PASSWORD=ci-local-password",
-          "--publish",
-          "127.0.0.1::5432",
-          "--health-cmd",
-          "pg_isready -U postgres",
-          "--health-interval",
-          "2s",
-          "--health-timeout",
-          "5s",
-          "--health-retries",
-          "45",
-          "postgres:18.1",
-        ],
-        { cwd: root, env: childEnv },
-      );
-      await waitForPostgres(root, postgresName, env);
-      const port = mappedPostgresPort(root, postgresName);
-      childEnv.DISPOSABLE_DATABASE_BASE_URL =
-        `postgres://postgres:ci-local-password@127.0.0.1:${port}/postgres?sslmode=disable`;
-      await runProcess("make", ["data"], {
-        cwd: path.join(root, "server"),
-        env: childEnv,
-      });
-      if (runGit(root, ["status", "--porcelain=v1", "--untracked-files=all"])) {
-        throw new Error("make data changed the exact-SHA checkout");
-      }
-      invariants.makeData = "passed";
-    }
     if (shard === "security") {
       await runProcess(
         "pnpm",
@@ -444,15 +380,25 @@ export async function runCiQualityShard({
     }
     if (shard === "browser") {
       const webBuild = path.join(root, "web", "build");
-      const webReceipt = JSON.parse(
-        readFileSync(path.join(root, "output", "ci", "shards", "web.json"), "utf8"),
-      );
+      const webReceipt = readCiQualityStageLaneReceipt({
+        root,
+        file: "output/ci/web-lanes/build.json",
+        shard: "web",
+        lane: "build",
+        expected: {
+          repository: env.CI_PROJECT_PATH,
+          gitSha: env.CI_COMMIT_SHA,
+          pipelineId: String(env.CI_PIPELINE_ID),
+          pipelineIid: String(env.CI_PIPELINE_IID),
+          pipelineSource: env.CI_PIPELINE_SOURCE,
+          planSha256: plan.planSha256,
+          rangeSha256: plan.rangeSha256,
+          range: plan.range,
+        },
+      });
       const webBuildSha256 = hashDirectory(webBuild);
       if (
-        webReceipt?.schemaVersion !== CI_QUALITY_SHARD_SCHEMA ||
-        webReceipt?.shard !== "web" ||
-        webReceipt?.status !== "passed" ||
-        webReceipt?.invariants?.webBuildSha256 !== webBuildSha256
+        webReceipt.webBuildSha256 !== webBuildSha256
       ) {
         throw new Error("browser shard Web build artifact identity mismatch");
       }
@@ -518,8 +464,42 @@ export async function runCiQualityShard({
       env: childEnv,
     });
     gateOutput = main.output;
-    if (shard === "web") {
-      invariants.webBuildSha256 = hashDirectory(path.join(root, "web", "build"));
+    if (["web", "server"].includes(shard)) {
+      const lanes = loadCiQualityStageLaneSet({
+        root,
+        shard,
+        directory: `output/ci/${shard}-lanes`,
+        expected: {
+          repository: env.CI_PROJECT_PATH,
+          gitSha: env.CI_COMMIT_SHA,
+          pipelineId: String(env.CI_PIPELINE_ID),
+          pipelineIid: String(env.CI_PIPELINE_IID),
+          pipelineSource: env.CI_PIPELINE_SOURCE,
+          planSha256: plan.planSha256,
+          rangeSha256: plan.rangeSha256,
+          range: plan.range,
+        },
+      });
+      const laneEvidence = {
+        status: "passed",
+        laneCount: lanes.laneCount,
+        durationMs: lanes.durationMs,
+        jobs: lanes.jobs,
+        executed: lanes.summary.executed,
+        passed: lanes.summary.passed,
+        failed: lanes.summary.failed,
+        skipped: lanes.summary.skipped,
+      };
+      if (shard === "web") {
+        invariants.webLanes = laneEvidence;
+        invariants.webBuildSha256 = lanes.webBuildSha256;
+      } else {
+        invariants.serverLanes = laneEvidence;
+        invariants.makeData = lanes.cleanup.makeData;
+        invariants.databaseCleanup = lanes.cleanup.database;
+        invariants.chromiumSandboxCleanup = lanes.cleanup.chromiumSandbox;
+        invariants.playwrightRuntimeCleanup = lanes.cleanup.playwrightRuntime;
+      }
     }
     if (shard === "node") {
       const source = await runProcess(
@@ -554,25 +534,6 @@ export async function runCiQualityShard({
     failure = error;
     if (error?.result?.output) gateOutput += error.result.output;
   } finally {
-    if (postgresName) {
-      const exists = spawnSync("docker", ["inspect", postgresName], {
-        cwd: root,
-        stdio: "ignore",
-      }).status === 0;
-      if (exists) {
-        const removed = spawnSync("docker", ["rm", "--force", postgresName], {
-          cwd: root,
-          stdio: "ignore",
-        });
-        if (removed.status !== 0 && !failure) failure = new Error("PostgreSQL cleanup failed");
-      }
-      const residual = spawnSync("docker", ["inspect", postgresName], {
-        cwd: root,
-        stdio: "ignore",
-      }).status === 0;
-      invariants.databaseCleanup = residual ? "failed" : "passed";
-      if (residual && !failure) failure = new Error("PostgreSQL cleanup readback failed");
-    }
     if (sandboxPath) {
       const removed = spawnSync(
         "sudo",

@@ -28,7 +28,6 @@ import {
   buildFixedTargetRsyncTransfer,
 } from "./fixed-target-rsync.mjs";
 import { assertReleaseArtifactManifest } from "./release-artifact-bundle.mjs";
-import { verifyReleaseArtifact } from "./release-artifact-verify.mjs";
 import { readRollbackPlan } from "./rollback-controller.mjs";
 import { validateRollbackManifest } from "./rollback-manifest.mjs";
 import {
@@ -46,9 +45,14 @@ import {
   prepareTargetReleaseIncoming,
   probeTargetReleaseCache,
 } from "./target-release-cache.mjs";
+import {
+  TARGET_RELEASE_FETCH_FILE,
+  requireTargetReleaseFetchCredential,
+  validateTargetReleaseFetch,
+} from "./target-release-fetch.mjs";
 
 export const REMOTE_ROLLBACK_RECEIPT_CONTRACT =
-  "plush.remote-rollback-receipt/v3";
+  "plush.remote-rollback-receipt/v5";
 
 const UUID_V4_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
@@ -57,7 +61,15 @@ const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 const IMAGE_ID_PATTERN = /^sha256:[0-9a-f]{64}$/u;
 const ISSUE_PATTERN = /^(?:none|[a-z][a-z0-9_]{2,63})$/u;
 const MAX_RECEIPT_BYTES = 256 * 1024;
+
+export function consumeTargetReleaseFetchCredential(env = process.env) {
+  const token = env.PLUSH_GITLAB_TARGET_FETCH_TOKEN;
+  delete env.PLUSH_GITLAB_TARGET_FETCH_TOKEN;
+  return token;
+}
+
 const ROLLBACK_STAGE_IDS = Object.freeze([
+  "artifact_fetch",
   "package_verification",
   "target_identity_recheck",
   "release_materialization",
@@ -69,15 +81,27 @@ const ROLLBACK_STAGE_IDS = Object.freeze([
   "current_source_switch",
 ]);
 const TRANSFER_FILES = Object.freeze([
+  "checksums.sha256",
   "current-release-manifest.json",
   "release-artifact.json",
   "release-manifest.json",
+  "release-rehearsal.json",
   "remote-code-rollback.sh",
+  "remote-release-acquire.sh",
   "rollback-manifest.json",
   "sbom.cdx.json",
   "server-image.tar",
   "source.tar",
+  TARGET_RELEASE_FETCH_FILE,
   "web-image.tar",
+]);
+const CONTROL_TRANSFER_FILES = Object.freeze([
+  "current-release-manifest.json",
+  "remote-code-rollback.sh",
+  "remote-release-acquire.sh",
+  "rollback-manifest.json",
+  TARGET_RELEASE_FETCH_FILE,
+  "transfer-checksums.sha256",
 ]);
 
 function hasExactKeys(value, expected) {
@@ -103,6 +127,29 @@ function runChecked(runCommand, command, args, options, label) {
     throw new Error(`${label} failed with exit ${String(result.status)}`);
   }
   return result;
+}
+
+function targetAcquisitionMetrics(receipt) {
+  if (
+    receipt?.acquisition?.mode !== "gitlab_internal" ||
+    !Number.isSafeInteger(receipt.acquisition.downloadedBytes) ||
+    receipt.acquisition.downloadedBytes <= 0 ||
+    !Array.isArray(receipt.timings)
+  ) {
+    return {};
+  }
+  const timing = receipt.timings.find(
+    (item) => item?.id === "artifact_fetch" && item?.status === "passed",
+  );
+  if (!Number.isSafeInteger(timing?.durationMs) || timing.durationMs <= 0) {
+    return {};
+  }
+  return {
+    targetAcquisitionDurationMs: timing.durationMs,
+    targetAcquisitionBytesPerSecond: Math.round(
+      (receipt.acquisition.downloadedBytes * 1000) / timing.durationMs,
+    ),
+  };
 }
 
 function safeBundleFile(bundleDir, relativeFile) {
@@ -181,16 +228,25 @@ export function prepareRollbackTransfer(
     artifact,
     sha256File(artifactFile),
   );
-  verifyReleaseArtifact(artifactFile);
-  const sbomSource = safeBundleFile(bundle, artifact.sbom.file);
-  const imageByKind = new Map(
-    artifact.images.map((image) => [
-      image.kind,
-      safeBundleFile(bundle, image.archive.file),
-    ]),
+  const checksumsFile = safeBundleFile(bundle, "checksums.sha256");
+  const rehearsalFile = safeBundleFile(bundle, "release-rehearsal.json");
+  const fetchFile = safeBundleFile(bundle, TARGET_RELEASE_FETCH_FILE);
+  const fetch = validateTargetReleaseFetch(
+    JSON.parse(readFileSync(fetchFile, "utf8")),
   );
-  if (!imageByKind.has("server") || !imageByKind.has("web")) {
-    throw new Error("rollback image archives are incomplete");
+  if (
+    fetch.gitSha !== target.manifest.gitSha ||
+    fetch.version !== target.manifest.version ||
+    fetch.formal.files.find((file) => file.name === "release-artifact.json")
+      ?.sha256 !== sha256File(artifactFile) ||
+    fetch.formal.files.find((file) => file.name === "release-manifest.json")
+      ?.sha256 !== sha256File(target.absolute) ||
+    fetch.formal.files.find((file) => file.name === "release-rehearsal.json")
+      ?.sha256 !== sha256File(rehearsalFile) ||
+    fetch.formal.files.find((file) => file.name === "checksums.sha256")
+      ?.sha256 !== sha256File(checksumsFile)
+  ) {
+    throw new Error("target-direct rollback descriptor does not match the plan");
   }
   for (const gitSha of [current.manifest.gitSha, target.manifest.gitSha]) {
     runChecked(
@@ -218,31 +274,11 @@ export function prepareRollbackTransfer(
       path.join(destination, "current-release-manifest.json"),
       512 * 1024,
     );
-    if (!cachedPackage) {
-      copyBoundedFile(
-        target.absolute,
-        path.join(destination, "release-manifest.json"),
-        512 * 1024,
-      );
-      copyBoundedFile(
-        artifactFile,
-        path.join(destination, "release-artifact.json"),
-        512 * 1024,
-      );
-      copyBoundedFile(
-        sbomSource,
-        path.join(destination, "sbom.cdx.json"),
-        32 * 1024 * 1024,
-      );
-      copyBoundedFile(
-        imageByKind.get("server"),
-        path.join(destination, "server-image.tar"),
-      );
-      copyBoundedFile(
-        imageByKind.get("web"),
-        path.join(destination, "web-image.tar"),
-      );
-    }
+    copyBoundedFile(
+      fetchFile,
+      path.join(destination, TARGET_RELEASE_FETCH_FILE),
+      512 * 1024,
+    );
     writeFileSync(
       path.join(destination, "rollback-manifest.json"),
       `${JSON.stringify(plan, null, 2)}\n`,
@@ -266,34 +302,32 @@ export function prepareRollbackTransfer(
       String(remoteScript.stdout || ""),
       { mode: 0o600 },
     );
-    if (!cachedPackage) {
-      runChecked(
-        runCommand,
-        "git",
-        [
-          "archive",
-          "--format=tar",
-          `--output=${path.join(destination, "source.tar")}`,
-          target.manifest.gitSha,
-        ],
-        { cwd: root },
-        "create rollback target source archive",
-      );
-      if (
-        sha256File(path.join(destination, "source.tar")) !==
-        target.manifest.artifact.sourceArchiveSha256
-      ) {
-        throw new Error("rollback source archive checksum does not match");
-      }
-    }
+    const acquireScript = runChecked(
+      runCommand,
+      "git",
+      [
+        "show",
+        `${current.manifest.gitSha}:scripts/deploy/remote-release-acquire.sh`,
+      ],
+      { cwd: root },
+      "read committed release acquisition helper",
+    );
+    writeFileSync(
+      path.join(destination, "remote-release-acquire.sh"),
+      String(acquireScript.stdout || ""),
+      { mode: 0o600 },
+    );
     const immutableChecksums = {
+      "checksums.sha256": sha256File(checksumsFile),
       "release-manifest.json": sha256File(target.absolute),
+      "release-rehearsal.json": sha256File(rehearsalFile),
       "release-artifact.json": sha256File(artifactFile),
       "sbom.cdx.json": artifact.sbom.sha256,
       "server-image.tar": artifact.images.find(
         (image) => image.kind === "server",
       ).archive.sha256,
       "source.tar": target.manifest.artifact.sourceArchiveSha256,
+      [TARGET_RELEASE_FETCH_FILE]: sha256File(fetchFile),
       "web-image.tar": artifact.images.find((image) => image.kind === "web")
         .archive.sha256,
     };
@@ -307,14 +341,7 @@ export function prepareRollbackTransfer(
       `${checksumLines.join("\n")}\n`,
       { mode: 0o600 },
     );
-    const files = cachedPackage
-      ? [
-          "current-release-manifest.json",
-          "remote-code-rollback.sh",
-          "rollback-manifest.json",
-          "transfer-checksums.sha256",
-        ]
-      : [...TRANSFER_FILES, "transfer-checksums.sha256"];
+    const files = [...CONTROL_TRANSFER_FILES];
     return {
       schemaVersion: "plush.rollback-transfer/v1",
       operationId: plan.operationId,
@@ -322,6 +349,10 @@ export function prepareRollbackTransfer(
       toGitSha: plan.to.gitSha,
       toVersion: plan.to.version,
       cachedPackage,
+      acquisitionExpectedBytes: cachedPackage
+        ? 0
+        : fetch.formal.files.reduce((total, file) => total + file.size, 0) +
+          fetch.source.file.size,
       files,
       totalBytes: files.reduce(
         (total, file) => total + statSync(path.join(destination, file)).size,
@@ -355,6 +386,7 @@ export function validateRemoteRollbackReceipt(receipt, expected) {
   });
   if (
     !hasExactKeys(receipt, [
+      "acquisition",
       "cache",
       "checks",
       "currentManifestSha256",
@@ -378,6 +410,13 @@ export function validateRemoteRollbackReceipt(receipt, expected) {
       "timings",
       "toGitSha",
       "toVersion",
+    ]) ||
+    !hasExactKeys(receipt?.acquisition, [
+      "catalogAndChecksumsVerified",
+      "credentialCleanupProven",
+      "downloadedBytes",
+      "expectedBytes",
+      "mode",
     ]) ||
     !hasExactKeys(receipt?.cache, [
       "avoidedBytes",
@@ -432,6 +471,15 @@ export function validateRemoteRollbackReceipt(receipt, expected) {
     receipt.notProven.length !== 2 ||
     !optionalImageId(serverContentId) ||
     !optionalImageId(webContentId) ||
+    !["none", "target_cache", "gitlab_internal"].includes(
+      receipt?.acquisition?.mode,
+    ) ||
+    !Number.isSafeInteger(receipt?.acquisition?.downloadedBytes) ||
+    receipt.acquisition.downloadedBytes < 0 ||
+    !Number.isSafeInteger(receipt?.acquisition?.expectedBytes) ||
+    receipt.acquisition.expectedBytes < 0 ||
+    typeof receipt?.acquisition?.catalogAndChecksumsVerified !== "boolean" ||
+    typeof receipt?.acquisition?.credentialCleanupProven !== "boolean" ||
     typeof receipt?.cache?.packageHit !== "boolean" ||
     typeof receipt?.cache?.imageHit !== "boolean" ||
     receipt?.cache?.dockerLoadSkipped !== receipt?.cache?.imageHit ||
@@ -466,10 +514,23 @@ export function validateRemoteRollbackReceipt(receipt, expected) {
     throw new Error("remote rollback receipt contract is invalid");
   }
   if (
+    (receipt.status !== "not_proven" &&
+      receipt.acquisition.credentialCleanupProven !== true) ||
     (receipt.status === "passed" &&
       (receipt.issueCode !== "none" ||
         !IMAGE_ID_PATTERN.test(serverContentId) ||
         !IMAGE_ID_PATTERN.test(webContentId) ||
+        receipt.acquisition.catalogAndChecksumsVerified !== true ||
+        receipt.acquisition.mode === "none" ||
+        receipt.acquisition.expectedBytes !==
+          expected.acquisitionExpectedBytes ||
+        (receipt.acquisition.mode === "gitlab_internal" &&
+          (receipt.acquisition.expectedBytes <= 0 ||
+            receipt.acquisition.downloadedBytes !==
+              receipt.acquisition.expectedBytes)) ||
+        (receipt.acquisition.mode === "target_cache" &&
+          (receipt.acquisition.downloadedBytes !== 0 ||
+            receipt.acquisition.expectedBytes !== 0)) ||
         Object.values(receipt.checks).some((value) => value !== true))) ||
     (receipt.status !== "passed" && receipt.issueCode === "none")
   ) {
@@ -527,6 +588,7 @@ export function executeRollback(
     cleanupCache = cleanupPreparedTargetReleaseIncoming,
     probeCache = probeTargetReleaseCache,
     prepareCache = prepareTargetReleaseIncoming,
+    fetchToken = consumeTargetReleaseFetchCredential(),
     now = () => new Date().toISOString(),
   } = {},
 ) {
@@ -617,7 +679,17 @@ export function executeRollback(
     cacheProbe.avoidedBytes,
     listDeliveryOperations(store, { limit: 200 }),
   );
+  const targetFetchToken = cacheProbe.packageHit
+    ? null
+    : requireTargetReleaseFetchCredential(fetchToken);
+  const target = getDeploymentTarget(targetKey);
+  const sshArgs = fixedSshArgs(target);
   let transfer;
+  let rsyncTransfer;
+  let remoteStarted = false;
+  let targetPrepared = false;
+  let controlTransferDurationMs = 0;
+  let controlTransferBytesPerSecond = 0;
   try {
     transfer = prepareRollbackTransfer(
       {
@@ -630,76 +702,57 @@ export function executeRollback(
       },
       { runCommand, cachedPackage: cacheProbe.packageHit },
     );
-  } catch (error) {
-    transitionDeliveryOperation(store, operation.id, {
-      status: "failed",
-      message: "rollback package preparation failed before target write",
-      issues: [
-        {
-          code: "rollback_package_preparation_failed",
-          level: "error",
-          message: "回滚包准备失败；未写入目标",
-        },
-      ],
+    assertLocalRsync(runCommand);
+    rsyncTransfer = buildFixedTargetRsyncTransfer({
+      target,
+      operationId: operation.id,
+      sourceFiles: transfer.files.map((file) => path.join(transferRoot, file)),
+    });
+    operation = transitionDeliveryOperation(store, operation.id, {
+      status: "running",
+      message: "code-only target rollback started with the fixed contract",
+      metadata: {
+        ...operation.metadata,
+        controlTransferBytes: transfer.totalBytes,
+        targetAcquisitionExpectedBytes: transfer.acquisitionExpectedBytes,
+        targetCacheHit: cacheProbe.packageHit,
+        targetImageCacheHit: cacheProbe.imageHit,
+        targetCacheSource: cacheProbe.cacheSource,
+        avoidedTransferBytes: cacheProbe.avoidedBytes,
+        avoidedTransferDurationMs: avoidedTransfer.durationMs,
+        avoidedTransferBaselineOperationId: avoidedTransfer.baselineOperationId,
+        dockerLoadSkipped: cacheProbe.imageHit,
+        cacheBasis: cacheProbe.basis,
+        stillExecutedChecks: [
+          "migration_status",
+          "health",
+          "ready",
+          "public_entry",
+        ],
+      },
       now: now(),
     });
-    throw error;
-  }
-
-  const target = getDeploymentTarget(targetKey);
-  const sshArgs = fixedSshArgs(target);
-  assertLocalRsync(runCommand);
-  const rsyncTransfer = buildFixedTargetRsyncTransfer({
-    target,
-    operationId: operation.id,
-    sourceFiles: transfer.files.map((file) => path.join(transferRoot, file)),
-  });
-  operation = transitionDeliveryOperation(store, operation.id, {
-    status: "running",
-    message: "code-only target rollback started with the fixed contract",
-    metadata: {
-      ...operation.metadata,
-      transferBytes: transfer.totalBytes,
-      targetCacheHit: cacheProbe.packageHit,
-      targetImageCacheHit: cacheProbe.imageHit,
-      targetCacheSource: cacheProbe.cacheSource,
-      avoidedTransferBytes: cacheProbe.avoidedBytes,
-      avoidedTransferDurationMs: avoidedTransfer.durationMs,
-      avoidedTransferBaselineOperationId: avoidedTransfer.baselineOperationId,
-      dockerLoadSkipped: cacheProbe.imageHit,
-      cacheBasis: cacheProbe.basis,
-      stillExecutedChecks: [
-        "migration_status",
-        "health",
-        "ready",
-        "public_entry",
-      ],
-    },
-    now: now(),
-  });
-  let remoteStarted = false;
-  let targetPrepared = false;
-  let transferDurationMs = 0;
-  let transferBytesPerSecond = 0;
-  try {
+    targetPrepared = true;
     prepareCache(
       { operationId: operation.id, identity: cacheIdentity, probe: cacheProbe },
       { runCommand, targetKey },
     );
-    targetPrepared = true;
-    const transferStartedAt = Date.now();
+    const controlTransferStartedAt = Date.now();
     try {
       runChecked(
         runCommand,
         rsyncTransfer.command,
         rsyncTransfer.args,
         { timeout: 10 * 60_000 },
-        "transfer immutable rollback package",
+        "transfer rollback control package",
       );
     } finally {
-      transferDurationMs = Math.max(1, Date.now() - transferStartedAt);
-      transferBytesPerSecond = Math.round(
-        (transfer.totalBytes * 1000) / transferDurationMs,
+      controlTransferDurationMs = Math.max(
+        1,
+        Date.now() - controlTransferStartedAt,
+      );
+      controlTransferBytesPerSecond = Math.round(
+        (transfer.totalBytes * 1000) / controlTransferDurationMs,
       );
     }
     remoteStarted = true;
@@ -723,8 +776,9 @@ export function executeRollback(
       ],
       {
         encoding: "utf8",
+        input: targetFetchToken ? `${targetFetchToken}\n` : "",
         maxBuffer: 1024 * 1024,
-        timeout: 30 * 60_000,
+        timeout: 60 * 60_000,
       },
     );
     const rawReceipt = String(result.stdout || "").trim();
@@ -737,6 +791,7 @@ export function executeRollback(
       currentManifestSha256: plan.from.manifestSha256,
       targetManifestSha256: plan.to.manifestSha256,
       rollbackFingerprint: plan.fingerprint,
+      acquisitionExpectedBytes: transfer.acquisitionExpectedBytes,
     });
     if (result.error) {
       throw new Error(`remote rollback SSH failed: ${result.error.message}`);
@@ -763,8 +818,14 @@ export function executeRollback(
         webContentId: receipt.images.webContentId,
         databaseChangedByExecutor: false,
         remoteStageTimings: receipt.timings,
-        transferDurationMs,
-        transferBytesPerSecond,
+        controlTransferDurationMs,
+        controlTransferBytesPerSecond,
+        targetAcquisitionMode: receipt.acquisition.mode,
+        targetAcquisitionBytes: receipt.acquisition.downloadedBytes,
+        targetAcquisitionExpectedBytes: receipt.acquisition.expectedBytes,
+        targetAcquisitionVerified:
+          receipt.acquisition.catalogAndChecksumsVerified,
+        ...targetAcquisitionMetrics(receipt),
         targetCacheHit: receipt.cache.packageHit,
         targetImageCacheHit: receipt.cache.imageHit,
         targetCacheSource: receipt.cache.cacheSource,
@@ -783,10 +844,12 @@ export function executeRollback(
     };
   } catch (error) {
     let executionError = error;
+    let targetCleanupProven = true;
     if (!remoteStarted && targetPrepared) {
       try {
         cleanupCache(operation.id, { runCommand, targetKey });
       } catch (cleanupError) {
+        targetCleanupProven = false;
         executionError = new Error(
           `${error.message}; target incoming cleanup failed: ${cleanupError.message}`,
           { cause: error },
@@ -794,17 +857,23 @@ export function executeRollback(
       }
     }
     const current = readDeliveryOperation(store, operation.id);
-    if (current.status === "running") {
+    if (["ready", "launching", "running"].includes(current.status)) {
+      const outcomeUnknown = remoteStarted || !targetCleanupProven;
       operation = transitionDeliveryOperation(store, operation.id, {
-        status: remoteStarted ? "not_proven" : "failed",
+        status: outcomeUnknown ? "not_proven" : "failed",
         message: remoteStarted
           ? "remote rollback result could not be proven; automatic retry is disabled"
-          : "rollback transfer failed before remote execution",
-        issues: terminalIssues(remoteStarted ? "not_proven" : "failed"),
+          : !targetCleanupProven
+            ? "rollback control transfer cleanup could not be proven; automatic retry is disabled"
+          : "rollback package preparation or control transfer failed before remote execution",
+        issues: terminalIssues(outcomeUnknown ? "not_proven" : "failed"),
         metadata: {
           ...current.metadata,
-          ...(transferDurationMs > 0
-            ? { transferDurationMs, transferBytesPerSecond }
+          ...(controlTransferDurationMs > 0
+            ? {
+                controlTransferDurationMs,
+                controlTransferBytesPerSecond,
+              }
             : {}),
         },
         now: now(),

@@ -44,9 +44,12 @@ release pipeline 只复用同一 protected main push pipeline 的完整终态，
 2. 用候选包内同一 bytes 完成隔离 release rehearsal。
 3. 推送同一镜像并取得 registry digest。
 4. 登记 v2 七资产：checksums、artifact manifest、release manifest、SBOM、两个 image tar 与同一 `release-rehearsal.json`。
-5. 由使用者显式发起 promotion；main push 不自动部署 demo 或 test。
+5. 在独立 `plush-release-source` Package 登记同 SHA 的唯一 `source.tar`，并在创建 Release 前读回 digest。
+6. 由使用者显式发起 promotion；main push 不自动部署 demo 或 test。
 
 旧 v1 六资产只读、展示和既有回滚兼容，`promotionEligible=false`。同版本异 SHA、digest、rehearsal 或资产内容一律失败关闭。
+
+历史运行 SHA 只有在已有完整 v2 七资产时，才可通过 protected main 的 `backfill_release_source` job 补齐唯一 `source.tar`。该 job 在 Runner 内证明目标 SHA 是当前 main 的 ancestor，下载并校验四个小控制文件与服务端七资产目录，再由 `git archive` 生成并核对 source digest；它只写 `plush-release-source`，不改写七资产、GitLab Release、镜像或 public asset。旧 v1 不允许借 backfill 升格为 promotion 输入。
 
 ## Operation 真源
 
@@ -60,9 +63,11 @@ GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，
 
 ## Promotion 与传输
 
-两个 target 的 promotion / rollback / database rebuild 使用固定 SSH 和 `rsync 3.x`，只向 operation 专属 `incoming` 目录传输 manifest 白名单。允许按 manifest SHA、checksum、registry digest、Docker content ID 和镜像内完整 `GIT_SHA` 命中 release cache；缓存不完整或身份不一致时失败关闭。
+两个 target 的 promotion、rollback 和首次初始化使用固定 SSH 与 `rsync 3.x`，但 Mac 只向 operation 专属 `incoming` 目录传输 operation manifest、固定执行脚本、`target-release-fetch.json` 和控制校验表。`checksums.sha256`、artifact/release/rehearsal、SBOM、两个 image tar 与 `source.tar` 不经过 Mac；R640 目标固定把 `gitlab.saurick.me` 解析到同机内网地址，经系统信任 TLS 直接从 `plush-release` 与 `plush-release-source` Package 取得，并在物化前逐项核对名称、大小、SHA-256、v2 manifest、rehearsal、source binding 和 image content ID。专用 `read_package_registry` deploy token 只通过唯一 SSH 进程的标准输入进入已加锁的远端执行器，不进入参数、控制包或目标 secret 文件；下载期间只允许存在 `0600` curl 配置，结束或失败清理后必须证明不存在。不存在静默回退到 Mac 大文件中转的路径。
 
-即使命中缓存，migration、Compose、health、ready、业务 smoke 与对应公网 exact-SHA 仍完整执行。传输不使用 `--delete`，不全局 prune，不删除数据库、volume、env、证书、当前版本或规定回滚版本。
+正式 target cache v2 精确包含七资产与 `source.tar` 八项，legacy cache 只保留、不迁移或命中；operation 私有 incoming 可以包含控制文件，但只有逐项复核过的八个 payload 才能被物化或提升为正式 cache。允许按 manifest SHA、checksum、registry digest、Docker content ID 和镜像内完整 `GIT_SHA` 命中 package/image cache；正式 cache 不完整、存在额外项或符号链接，或任一 payload 身份不一致时失败关闭。首次升级还要在 target write 前证明当前运行 SHA 的 direct-fetch 回滚输入可用，避免新版本成功后才发现旧版本不可回取。
+
+即使命中缓存，migration、Compose、health、ready、业务 smoke 与对应公网 exact-SHA 仍完整执行。operation 分别记录 Mac 控制包字节/耗时、R640 内部取件期望与实际字节/耗时、校验与缓存命中，不把控制面等待伪装成制品传输。传输不使用 `--delete`，不全局 prune，不删除数据库、volume、env、证书、当前版本或规定回滚版本。
 
 ## 数据库重建
 
@@ -138,6 +143,9 @@ node --test scripts/deploy/deployment-targets.test.mjs \
   scripts/deploy/production-preflight.test.mjs \
   scripts/deploy/promotion-controller.test.mjs \
   scripts/deploy/promotion-executor.test.mjs \
+  scripts/deploy/target-release-fetch.test.mjs \
+  scripts/deploy/remote-release-acquire.test.mjs \
+  scripts/deploy/target-release-cache.test.mjs \
   scripts/deploy/rollback-controller.test.mjs \
   scripts/deploy/rollback-executor.test.mjs \
   scripts/deploy/database-rebuild-controller.test.mjs \

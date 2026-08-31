@@ -6,6 +6,7 @@ print_help() {
 用法:
   bash scripts/qa/full.sh
   bash scripts/qa/full.sh --ci-shard node|web|server|resource|browser|security
+  bash scripts/qa/full.sh --ci-lane web-checks|web-build|server-core|server-postgres
 
 作用:
   执行一次完整本地质量检查。high-risk 或发布候选由 prepare-push.sh --full 在建立远端连接前调用。
@@ -41,8 +42,12 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
 fi
 
 ci_shard=""
+ci_lane=""
 if [[ $# -eq 2 && "${1:-}" == "--ci-shard" ]]; then
   ci_shard="$2"
+  shift 2
+elif [[ $# -eq 2 && "${1:-}" == "--ci-lane" ]]; then
+  ci_lane="$2"
   shift 2
 fi
 
@@ -60,6 +65,19 @@ case "$ci_shard" in
   ;;
 esac
 
+case "$ci_lane" in
+"" | web-checks | web-build | server-core | server-postgres) ;;
+*)
+  echo "[qa:full] status=incomplete reason=invalid_ci_lane lane=$ci_lane"
+  exit 2
+  ;;
+esac
+
+if [[ -n "$ci_shard" && -n "$ci_lane" ]]; then
+  echo "[qa:full] status=incomplete reason=ambiguous_ci_partition"
+  exit 2
+fi
+
 full_profile="${QA_FULL_PROFILE:-full}"
 case "$full_profile" in
 full | strict) ;;
@@ -70,7 +88,7 @@ full | strict) ;;
 esac
 
 test_gate_output_args=()
-if [[ -n "$ci_shard" ]]; then
+if [[ -n "$ci_shard" || -n "$ci_lane" ]]; then
   test_gate_output_args=(--output-mode summary)
 fi
 
@@ -106,7 +124,7 @@ fi
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
 
-if [[ -n "$ci_shard" ]]; then
+if [[ -n "$ci_shard" || -n "$ci_lane" ]]; then
   if [[ "${GITLAB_CI:-}" != "true" ||
     "${CI_PROJECT_PATH:-}" != "saurick/plush-toy-erp" ||
     "${CI_DEFAULT_BRANCH:-}" != "main" ||
@@ -115,11 +133,19 @@ if [[ -n "$ci_shard" ]]; then
     ! "${CI_COMMIT_SHA:-}" =~ ^[0-9a-f]{40}$ ||
     "$(git rev-parse HEAD)" != "${CI_COMMIT_SHA:-}" ||
     "$full_profile" != "strict" ]]; then
-    echo "[qa:full] status=incomplete reason=untrusted_ci_shard_context shard=$ci_shard"
+    if [[ -n "$ci_shard" ]]; then
+      echo "[qa:full] status=incomplete reason=untrusted_ci_shard_context shard=$ci_shard"
+    else
+      echo "[qa:full] status=incomplete reason=untrusted_ci_lane_context lane=$ci_lane"
+    fi
     exit 2
   fi
   if [[ -n "$(git status --porcelain=v1 --untracked-files=all)" ]]; then
-    echo "[qa:full] status=incomplete reason=dirty_ci_shard shard=$ci_shard"
+    if [[ -n "$ci_shard" ]]; then
+      echo "[qa:full] status=incomplete reason=dirty_ci_shard shard=$ci_shard"
+    else
+      echo "[qa:full] status=incomplete reason=dirty_ci_lane lane=$ci_lane"
+    fi
     exit 2
   fi
 fi
@@ -188,8 +214,8 @@ qa_full_secrets() {
   SECRETS_STRICT=1 bash "$ROOT_DIR/scripts/qa/secrets.sh"
 }
 
-qa_full_web() {
-  echo "[qa:full] 运行 web 测试与构建"
+qa_full_web_checks() {
+  echo "[qa:full] 运行 web 静态检查与测试"
   cd "$ROOT_DIR/web"
   node -e "const fs=require('fs');const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));if(typeof pkg?.scripts?.test!=='string'||!pkg.scripts.test.trim()){console.error('[qa:full] web/package.json 缺少 scripts.test');process.exit(1)}"
   if [[ "$full_profile" == "strict" ]]; then
@@ -205,11 +231,21 @@ qa_full_web() {
     node "$ROOT_DIR/scripts/qa/run-test-gate.mjs" \
     --kind node --label web-all "${test_gate_output_args[@]}" -- \
     "$PNPM_BIN" test --test-reporter=tap
+}
+
+qa_full_web_build() {
+  echo "[qa:full] 运行 web 生产构建与边界检查"
+  cd "$ROOT_DIR/web"
   qa_run_substep "$full_profile" web production_build \
     env NODE_ENV=production "$PNPM_BIN" build
   qa_run_substep "$full_profile" web production_boundary \
     node "$ROOT_DIR/scripts/qa/dev-workbench-production-boundary.mjs" \
     --build-dir "$ROOT_DIR/web/build"
+}
+
+qa_full_web() {
+  qa_full_web_checks
+  qa_full_web_build
 }
 
 qa_full_browser() {
@@ -276,18 +312,46 @@ qa_full_govulncheck() {
   GOVULNCHECK_STRICT=1 bash "$ROOT_DIR/scripts/qa/govulncheck.sh"
 }
 
+if [[ -n "$ci_lane" ]]; then
+  case "$ci_lane" in
+  web-checks)
+    qa_run_stage strict web qa_full_web_checks
+    ;;
+  web-build)
+    qa_run_stage strict web qa_full_web_build
+    ;;
+  server-core)
+    qa_run_stage strict environment_profile qa_full_environment_profile
+    qa_run_stage strict server qa_full_server
+    ;;
+  server-postgres)
+    qa_run_stage strict critical_postgres qa_full_critical_postgres
+    ;;
+  esac
+  echo "[qa:full] profile=$full_profile lane=$ci_lane status=complete 全部门禁通过"
+  exit 0
+fi
+
 case "$ci_shard" in
 node)
   qa_run_stage strict secrets qa_full_secrets
   qa_run_stage strict shared qa_full_shared
   ;;
 web)
-  qa_run_stage strict web qa_full_web
+  if [[ "${QA_CI_WEB_LANES:-}" == "verified" ]]; then
+    node "$ROOT_DIR/scripts/qa/ci-quality-stage-lane.mjs" --aggregate --shard web
+  else
+    qa_run_stage strict web qa_full_web
+  fi
   ;;
 server)
-  qa_run_stage strict environment_profile qa_full_environment_profile
-  qa_run_stage strict server qa_full_server
-  qa_run_stage strict critical_postgres qa_full_critical_postgres
+  if [[ "${QA_CI_SERVER_LANES:-}" == "verified" ]]; then
+    node "$ROOT_DIR/scripts/qa/ci-quality-stage-lane.mjs" --aggregate --shard server
+  else
+    qa_run_stage strict environment_profile qa_full_environment_profile
+    qa_run_stage strict server qa_full_server
+    qa_run_stage strict critical_postgres qa_full_critical_postgres
+  fi
   ;;
 resource)
   qa_run_stage strict resource_sensitive_node qa_full_resource_sensitive_node

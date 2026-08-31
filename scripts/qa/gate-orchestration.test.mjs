@@ -426,7 +426,27 @@ test("fixed full and strict gates cannot disappear behind file or package probes
   );
   assert.match(
     full,
-    /if \[\[ -n "\$ci_shard" \]\]; then\s+test_gate_output_args=\(--output-mode summary\)/u,
+    /if \[\[ -n "\$ci_shard" \|\| -n "\$ci_lane" \]\]; then\s+test_gate_output_args=\(--output-mode summary\)/u,
+  );
+  assert.match(
+    full,
+    /--ci-lane web-checks\|web-build\|server-core\|server-postgres/u,
+  );
+  assert.match(
+    full,
+    /web-checks\)\s+qa_run_stage strict web qa_full_web_checks/u,
+  );
+  assert.match(
+    full,
+    /web-build\)\s+qa_run_stage strict web qa_full_web_build/u,
+  );
+  assert.match(
+    full,
+    /server-core\)\s+qa_run_stage strict environment_profile qa_full_environment_profile\s+qa_run_stage strict server qa_full_server/u,
+  );
+  assert.match(
+    full,
+    /server-postgres\)\s+qa_run_stage strict critical_postgres qa_full_critical_postgres/u,
   );
   assert.match(
     full,

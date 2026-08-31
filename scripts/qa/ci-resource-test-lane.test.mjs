@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -19,6 +20,10 @@ import {
 import { validateBootstrapProductionAdminTestRegistry } from "../deploy/bootstrap-production-admin.test-support.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "../..");
+const resourceLaneSource = readFileSync(
+  new URL("./ci-resource-test-lane.mjs", import.meta.url),
+  "utf8",
+);
 const sha = "a".repeat(40);
 const digest = "b".repeat(64);
 const expected = Object.freeze({
@@ -133,6 +138,21 @@ test("resource lane registry covers 39 cases and 86 scenarios exactly once", () 
   );
   assert.equal(bootstrapProductionAdminTestLaneCases("contract").length, 21);
   assert.equal(bootstrapProductionAdminTestLaneCases("runtime").length, 18);
+});
+
+test("resource lane plan range accepts only canonical two-dot or three-dot history", () => {
+  assert.equal(
+    resourceLaneSource.includes(
+      "const RANGE_PATTERN = /^(?:[0-9a-f]{40}|HEAD\\^)\\.\\.\\.?HEAD$/u;",
+    ),
+    true,
+  );
+  assert.equal(
+    resourceLaneSource.includes(
+      "const RANGE_PATTERN = /^(?:[0-9a-f]{40}|HEAD\\^)\\.\\.?HEAD$/u;",
+    ),
+    false,
+  );
 });
 
 test("resource fan-in rejects missing, duplicate, skipped, drifted, dirty and extra lane evidence", async (t) => {

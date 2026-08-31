@@ -7,6 +7,18 @@ fail() {
   return 1
 }
 
+epoch_millis() {
+  local seconds
+  local nanoseconds
+  read -r seconds nanoseconds <<<"$(date '+%s %N' 2>/dev/null || date '+%s')"
+  [[ "$seconds" =~ ^[0-9]+$ ]] || fail "millisecond clock is unavailable"
+  if [[ "$nanoseconds" =~ ^[0-9]{9}$ ]]; then
+    printf '%s%s\n' "$seconds" "${nanoseconds:0:3}"
+  else
+    printf '%s000\n' "$seconds"
+  fi
+}
+
 action="${1:-}"
 target="${2:-}"
 operation_id="${3:-}"
@@ -66,16 +78,6 @@ sha_pattern='^[0-9a-f]{40}$'
 sha256_pattern='^[0-9a-f]{64}$'
 version_pattern='^[0-9A-Za-z]([0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$'
 
-[[ "$action" == initialize ]] || fail "unsupported action"
-[[ "$operation_id" =~ $uuid_v4_pattern ]] || fail "invalid operation id"
-[[ "$release_sha" =~ $sha_pattern ]] || fail "invalid release SHA"
-[[ "$release_version" =~ $version_pattern ]] || fail "invalid release version"
-[[ "$release_manifest_sha256" =~ $sha256_pattern ]] || fail "invalid release manifest checksum"
-[[ "$release_rehearsal_sha256" =~ $sha256_pattern ]] || fail "invalid rehearsal checksum"
-[[ "$initialization_fingerprint" =~ $sha256_pattern ]] || fail "invalid initialization fingerprint"
-[[ "$confirmation" == "PROMOTE:$target:$release_sha:$operation_id" ]] || fail "confirmation does not match"
-[[ "$(hostname)" == r640 && "$(id -un)" == simon ]] || fail "remote identity does not match"
-
 incoming=$root/incoming/$operation_id
 owner_marker=$root/.initialization-owner.json
 target_identity=$root/.plush-target-identity.json
@@ -100,7 +102,7 @@ public_container=${public_container_prefix}${release_sha:0:8}
 public_candidate=${public_container_prefix}candidate-${release_sha:0:8}
 restore_database="plush_init_restore_${operation_id//-/}"
 restore_database="${restore_database:0:50}"
-stage=package_verification
+stage=artifact_fetch
 migration_apply_started=0
 bootstrap_started=0
 bootstrap_completed=0
@@ -112,6 +114,20 @@ web_content_id=unknown
 server_ref=unknown
 web_ref=unknown
 failure_handled=0
+cleanup_authorized=0
+acquisition_mode=none
+acquisition_downloaded_bytes=0
+acquisition_expected_bytes=0
+acquisition_duration_ms=0
+acquisition_started_epoch_ms=0
+acquisition_verified=false
+credential_cleanup_proven=false
+# The sourced release-acquisition helper owns and clears this temporary state.
+# shellcheck disable=SC2034
+fetch_materializing=""
+# shellcheck disable=SC2034
+fetch_materializing_created=0
+fetch_payloads_published=0
 
 plain_owned_directory() {
   [[ -d "$1" && ! -L "$1" && "$(stat -c '%u' "$1" 2>/dev/null || true)" == "$(id -u)" ]]
@@ -169,8 +185,12 @@ write_receipt_json() {
   local status="$1"
   local issue_code="$2"
   local rollback_complete_json="$3"
+  local bootstrap_secret_persisted=false
+  if [[ -e "$secret_file" || -L "$secret_file" ]]; then
+    bootstrap_secret_persisted=true
+  fi
   jq -cn \
-    --arg schemaVersion "plush.remote-target-initialization-receipt/v1" \
+    --arg schemaVersion "plush.remote-target-initialization-receipt/v3" \
     --arg status "$status" \
     --arg operationId "$operation_id" \
     --arg target "$target" \
@@ -190,6 +210,13 @@ write_receipt_json() {
     --argjson bootstrapStarted "$bootstrap_started" \
     --argjson bootstrapCompleted "$bootstrap_completed" \
     --argjson rollbackComplete "$rollback_complete_json" \
+    --arg acquisitionMode "$acquisition_mode" \
+    --argjson acquisitionDownloadedBytes "$acquisition_downloaded_bytes" \
+    --argjson acquisitionExpectedBytes "$acquisition_expected_bytes" \
+    --argjson acquisitionDurationMs "$acquisition_duration_ms" \
+    --argjson acquisitionVerified "$acquisition_verified" \
+    --argjson acquisitionCredentialCleanupProven "$credential_cleanup_proven" \
+    --argjson bootstrapSecretPersisted "$bootstrap_secret_persisted" \
     --arg finishedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     '{
       schemaVersion: $schemaVersion,
@@ -204,6 +231,14 @@ write_receipt_json() {
       stage: $stage,
       issueCode: $issueCode,
       before: {targetState: "absent"},
+      acquisition: {
+        mode: $acquisitionMode,
+        downloadedBytes: $acquisitionDownloadedBytes,
+        expectedBytes: $acquisitionExpectedBytes,
+        durationMs: $acquisitionDurationMs,
+        catalogAndChecksumsVerified: $acquisitionVerified,
+        credentialCleanupProven: $acquisitionCredentialCleanupProven
+      },
       images: {serverContentId: $serverContentId, webContentId: $webContentId},
       migration: {
         applyStarted: ($migrationApplyStarted == 1),
@@ -213,7 +248,7 @@ write_receipt_json() {
       bootstrap: {
         started: ($bootstrapStarted == 1),
         completed: ($bootstrapCompleted == 1),
-        secretPersistedOnTarget: false
+        secretPersistedOnTarget: $bootstrapSecretPersisted
       },
       rollbackPoint: {
         backupAlias: ("initial-" + ($gitSha[0:12]) + "-" + $operationId),
@@ -251,9 +286,51 @@ write_receipt_json() {
     }'
 }
 
+cleanup_transient_credentials() {
+  trap - ERR
+  unset target_fetch_token secret_values APP_ADMIN_PASSWORD
+  if [[ ! -e "$root" && ! -L "$root" ]]; then
+    return 0
+  fi
+  plain_owned_directory "$root" || return 1
+  plain_owned_file "$owner_marker" || return 1
+  jq -e --arg operationId "$operation_id" --arg target "$target" \
+    '.schemaVersion == "plush.target-initialization-owner/v1" and .operationId == $operationId and .target == $target' \
+    "$owner_marker" >/dev/null 2>&1 || return 1
+  if [[ -d "$incoming" && ! -L "$incoming" ]]; then
+    [[ "$(stat -c '%u' "$incoming" 2>/dev/null || true)" == "$(id -u)" ]] || return 1
+    rm -f -- "$secret_file"
+    if [[ "$fetch_payloads_published" -eq 1 ]]; then
+      rm -f -- \
+        "$incoming/checksums.sha256" "$incoming/release-artifact.json" \
+        "$incoming/release-manifest.json" "$incoming/release-rehearsal.json" \
+        "$incoming/sbom.cdx.json" "$incoming/server-image.tar" \
+        "$incoming/source.tar" "$incoming/web-image.tar"
+      fetch_payloads_published=0
+    fi
+    if [[ -e "$incoming/.acquire-$operation_id" || -L "$incoming/.acquire-$operation_id" ]]; then
+      [[ -d "$incoming/.acquire-$operation_id" && ! -L "$incoming/.acquire-$operation_id" &&
+        "$(stat -c '%u' "$incoming/.acquire-$operation_id" 2>/dev/null || true)" == "$(id -u)" ]] || return 1
+      rm -rf -- "$incoming/.acquire-$operation_id"
+    fi
+  fi
+  [[ ! -e "$secret_file" && ! -L "$secret_file" &&
+    -z "${target_fetch_token+x}" &&
+    ! -e "$incoming/sbom.cdx.json" && ! -L "$incoming/sbom.cdx.json" &&
+    ! -e "$incoming/server-image.tar" && ! -L "$incoming/server-image.tar" &&
+    ! -e "$incoming/source.tar" && ! -L "$incoming/source.tar" &&
+    ! -e "$incoming/web-image.tar" && ! -L "$incoming/web-image.tar" &&
+    ! -e "$incoming/.acquire-$operation_id" && ! -L "$incoming/.acquire-$operation_id" ]]
+}
+
 cleanup_exact_target() {
   trap - ERR
   local cleanup_container="${project}-initialization-cleanup"
+  plain_owned_directory "$root" || return 1
+  plain_owned_file "$owner_marker" || return 1
+  jq -e --arg operationId "$operation_id" --arg target "$target" \
+    '.schemaVersion == "plush.target-initialization-owner/v1" and .operationId == $operationId and .target == $target' \
+    "$owner_marker" >/dev/null 2>&1 || return 1
   docker rm -f "$public_candidate" "$public_container" >/dev/null 2>&1 || true
   if plain_owned_file "$runtime_env" && plain_owned_directory "$release_dir"; then
     env -i \
@@ -268,21 +345,16 @@ cleanup_exact_target() {
   fi
   docker rm -f "$postgres_container" "$jaeger_container" "$server_container" "$web_container" >/dev/null 2>&1 || true
   docker network rm "$public_network" >/dev/null 2>&1 || true
-  if plain_owned_directory "$root" && plain_owned_file "$owner_marker" &&
-    jq -e --arg operationId "$operation_id" --arg target "$target" \
-      '.schemaVersion == "plush.target-initialization-owner/v1" and .operationId == $operationId and .target == $target' \
-      "$owner_marker" >/dev/null 2>&1; then
-    if [[ -d "$data_dir" && ! -L "$data_dir" ]]; then
-      [[ "$(docker ps -aq --filter "name=^/${cleanup_container}$" | sed '/^$/d' | wc -l | tr -d ' ')" == 0 ]] || return 1
-      docker run --rm --pull never --name "$cleanup_container" \
-        --network none --read-only --pids-limit 64 --memory 64m \
-        --cap-drop ALL --cap-add DAC_OVERRIDE --cap-add FOWNER \
-        --security-opt no-new-privileges --user 0:0 \
-        --volume "$data_dir:/target" --entrypoint sh postgres:18.1 \
-        -ceu 'find /target -mindepth 1 -depth -delete' >/dev/null 2>&1 || return 1
-    fi
-    rm -rf -- "$root"
+  if [[ -d "$data_dir" && ! -L "$data_dir" ]]; then
+    [[ "$(docker ps -aq --filter "name=^/${cleanup_container}$" | sed '/^$/d' | wc -l | tr -d ' ')" == 0 ]] || return 1
+    docker run --rm --pull never --name "$cleanup_container" \
+      --network none --read-only --pids-limit 64 --memory 64m \
+      --cap-drop ALL --cap-add DAC_OVERRIDE --cap-add FOWNER \
+      --security-opt no-new-privileges --user 0:0 \
+      --volume "$data_dir:/target" --entrypoint sh postgres:18.1 \
+      -ceu 'find /target -mindepth 1 -depth -delete' >/dev/null 2>&1 || return 1
   fi
+  rm -rf -- "$root"
   if [[ ! -e "$root" && ! -L "$root" ]] &&
     [[ "$(docker ps -aq --filter "label=com.docker.compose.project=$project" | sed '/^$/d' | wc -l | tr -d ' ')" == 0 ]] &&
     [[ "$({ docker ps -aq --format '{{.Names}}' | grep -E "^${public_container_prefix}" || true; } | wc -l | tr -d ' ')" == 0 ]] &&
@@ -292,18 +364,66 @@ cleanup_exact_target() {
   return 1
 }
 
-on_error() {
-  local exit_code=$?
-  [[ "$failure_handled" -eq 0 ]] || exit "$exit_code"
+handle_failure() {
+  local exit_code="$1"
+  local failure_issue="$2"
+  local acquisition_finished_epoch_ms
+  [[ "$failure_handled" -eq 0 ]] || return 0
   failure_handled=1
+  trap - ERR EXIT HUP INT TERM
+  if [[ "$cleanup_authorized" -ne 1 ]]; then
+    credential_cleanup_proven=false
+    write_receipt_json not_proven initialization_prelock_failure false
+    return 0
+  fi
+  if [[ "$acquisition_started_epoch_ms" -gt 0 && "$acquisition_duration_ms" -eq 0 ]]; then
+    acquisition_finished_epoch_ms="$(epoch_millis)"
+    acquisition_duration_ms=$((acquisition_finished_epoch_ms - acquisition_started_epoch_ms))
+    [[ "$acquisition_duration_ms" -gt 0 ]] || acquisition_duration_ms=1
+  fi
+  if cleanup_transient_credentials; then
+    credential_cleanup_proven=true
+  else
+    credential_cleanup_proven=false
+  fi
   if cleanup_exact_target; then
-    write_receipt_json failed initialization_rolled_back true
+    credential_cleanup_proven=true
+    write_receipt_json failed "$failure_issue" true
   else
     write_receipt_json not_proven rollback_incomplete false
   fi
+}
+
+on_error() {
+  local exit_code=$?
+  handle_failure "$exit_code" initialization_rolled_back
   exit "$exit_code"
 }
+on_signal() {
+  trap - ERR EXIT HUP INT TERM
+  handle_failure 130 initialization_interrupted
+  exit 130
+}
+on_exit() {
+  local exit_code=$?
+  trap - ERR HUP INT TERM EXIT
+  if [[ "$exit_code" -ne 0 && "$failure_handled" -eq 0 ]]; then
+    handle_failure "$exit_code" initialization_rolled_back
+  fi
+}
 trap on_error ERR
+trap on_signal HUP INT TERM
+trap on_exit EXIT
+
+[[ "$action" == initialize ]] || fail "unsupported action"
+[[ "$operation_id" =~ $uuid_v4_pattern ]] || fail "invalid operation id"
+[[ "$release_sha" =~ $sha_pattern ]] || fail "invalid release SHA"
+[[ "$release_version" =~ $version_pattern ]] || fail "invalid release version"
+[[ "$release_manifest_sha256" =~ $sha256_pattern ]] || fail "invalid release manifest checksum"
+[[ "$release_rehearsal_sha256" =~ $sha256_pattern ]] || fail "invalid rehearsal checksum"
+[[ "$initialization_fingerprint" =~ $sha256_pattern ]] || fail "invalid initialization fingerprint"
+[[ "$confirmation" == "PROMOTE:$target:$release_sha:$operation_id" ]] || fail "confirmation does not match"
+[[ "$(hostname)" == r640 && "$(id -un)" == simon ]] || fail "remote identity does not match"
 
 plain_owned_directory "$root" || fail "target root is invalid"
 plain_owned_file "$owner_marker" || fail "initialization owner marker is invalid"
@@ -313,23 +433,53 @@ jq -e --arg operationId "$operation_id" --arg target "$target" \
 plain_owned_directory "$incoming" || fail "incoming directory is invalid"
 mkdir -p "$operation_dir" "$run_root"
 chmod 700 "$operations_root" "$operation_dir" "$run_root"
-: >"$log_file"
-chmod 600 "$log_file"
 
 exec 9>>"$run_root/promotion.lock"
 chmod 600 "$run_root/promotion.lock"
 flock -n 9 || fail "target operation lock is held"
+cleanup_authorized=1
+: >"$log_file"
+chmod 600 "$log_file"
+
+control_files=(
+  promotion-manifest.json
+  remote-promotion.sh
+  remote-release-acquire.sh
+  target-initialization.secret
+  target-release-fetch.json
+  transfer-checksums.sha256
+)
+for file in "${control_files[@]}"; do
+  plain_owned_file "$incoming/$file" || fail "incoming control package is incomplete"
+  [[ "$(stat -c '%a' "$incoming/$file")" == 600 ]] || fail "incoming control file mode is invalid"
+done
+# The helper is a control-plane script bound to the exact release commit by the
+# transfer checksum. It materializes large payloads on R640 before the complete
+# immutable transfer checksum is evaluated.
+# shellcheck source=/dev/null
+source "$incoming/remote-release-acquire.sh"
+target_fetch_token=""
+IFS= read -r target_fetch_token || true
+acquisition_started_epoch_ms="$(epoch_millis)"
+acquire_target_release
+acquisition_finished_epoch_ms="$(epoch_millis)"
+acquisition_duration_ms=$((acquisition_finished_epoch_ms - acquisition_started_epoch_ms))
+[[ "$acquisition_duration_ms" -gt 0 ]] || acquisition_duration_ms=1
+stage=package_verification
 
 required_files=(
+  checksums.sha256
   promotion-manifest.json
   release-artifact.json
   release-manifest.json
   release-rehearsal.json
   remote-promotion.sh
+  remote-release-acquire.sh
   sbom.cdx.json
   server-image.tar
   source.tar
   target-initialization.secret
+  target-release-fetch.json
   transfer-checksums.sha256
   web-image.tar
 )
@@ -419,6 +569,7 @@ jq -n \
   >"$release_dir/.plush-release-identity.json"
 chmod 600 "$release_dir/.plush-release-identity.json"
 cmp --silent "$incoming/remote-promotion.sh" "$release_dir/scripts/deploy/remote-target-initialization.sh" || fail "initializer is not part of the exact release"
+cmp --silent "$incoming/remote-release-acquire.sh" "$release_dir/scripts/deploy/remote-release-acquire.sh" || fail "release acquisition helper is not part of the exact release"
 
 stage=image_load_and_readback
 server_ref="$(jq -r '.images[] | select(.kind == "server") | .ref' "$incoming/release-artifact.json")"
@@ -654,13 +805,20 @@ chmod 600 "$target_identity.next"
 mv "$target_identity.next" "$target_identity"
 
 stage=passed
+[[ ! -e "$secret_file" && ! -L "$secret_file" &&
+  -z "${target_fetch_token+x}" &&
+  ! -e "$incoming/.acquire-$operation_id" && ! -L "$incoming/.acquire-$operation_id" ]] ||
+  fail "transient credential cleanup is unproven"
+credential_cleanup_proven=true
 write_receipt_json passed none true >"$receipt.next"
 chmod 600 "$receipt.next"
 mv "$receipt.next" "$receipt"
 rm -f -- \
-  "$incoming/promotion-manifest.json" "$incoming/release-artifact.json" \
+  "$incoming/checksums.sha256" "$incoming/promotion-manifest.json" \
+  "$incoming/release-artifact.json" \
   "$incoming/release-manifest.json" "$incoming/release-rehearsal.json" \
-  "$incoming/remote-promotion.sh" "$incoming/sbom.cdx.json" \
+  "$incoming/remote-promotion.sh" "$incoming/remote-release-acquire.sh" \
+  "$incoming/sbom.cdx.json" "$incoming/target-release-fetch.json" \
   "$incoming/server-image.tar" "$incoming/source.tar" \
   "$incoming/transfer-checksums.sha256" "$incoming/web-image.tar"
 rmdir "$incoming"

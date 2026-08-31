@@ -65,7 +65,7 @@ customer-test-133)
   ;;
 esac
 incoming_root=$root/incoming
-cache_root=$root/release-cache
+cache_root=$root/release-cache-v2
 releases_root=$root/releases
 operations_root=$root/operations
 run_root=$root/run
@@ -169,6 +169,7 @@ release_identity=$release_dir/.plush-release-identity.json
 stage=initial
 env_changed=0
 service_switch_started=0
+current_source_switch_started=0
 env_backup=""
 server_content_id=unknown
 web_content_id=unknown
@@ -183,6 +184,14 @@ cache_materializing=""
 cache_materializing_created=0
 release_materializing=""
 release_materializing_created=0
+acquisition_mode=none
+acquisition_downloaded_bytes=0
+acquisition_expected_bytes=0
+acquisition_verified=false
+credential_cleanup_proven=false
+fetch_materializing=""
+fetch_materializing_created=0
+fetch_payloads_published=0
 operation_started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 operation_started_epoch_ms="$(epoch_millis)"
 stage_started_epoch_ms="$operation_started_epoch_ms"
@@ -278,7 +287,7 @@ write_receipt() {
   finished_epoch_ms="$(epoch_millis)"
   duration_ms=$((finished_epoch_ms - operation_started_epoch_ms))
   jq -n \
-    --arg schemaVersion "plush.remote-rollback-receipt/v3" \
+    --arg schemaVersion "plush.remote-rollback-receipt/v5" \
     --arg status "$status" \
     --arg operationId "$operation_id" \
     --arg target "$target" \
@@ -302,6 +311,11 @@ write_receipt() {
     --arg cacheSource "$cache_source" \
     --argjson cacheAvoidedBytes "$cache_avoided_bytes" \
     --argjson cacheBasis "$cache_basis" \
+    --arg acquisitionMode "$acquisition_mode" \
+    --argjson acquisitionDownloadedBytes "$acquisition_downloaded_bytes" \
+    --argjson acquisitionExpectedBytes "$acquisition_expected_bytes" \
+    --argjson acquisitionVerified "$acquisition_verified" \
+    --argjson credentialCleanupProven "$credential_cleanup_proven" \
     '{
       schemaVersion: $schemaVersion,
       status: $status,
@@ -321,6 +335,13 @@ write_receipt() {
         dockerLoadSkipped: $cacheImageHit,
         basis: $cacheBasis,
         stillExecuted: ["migration_status", "health", "ready", "public_entry"]
+      },
+      acquisition: {
+        mode: $acquisitionMode,
+        downloadedBytes: $acquisitionDownloadedBytes,
+        expectedBytes: $acquisitionExpectedBytes,
+        catalogAndChecksumsVerified: $acquisitionVerified,
+        credentialCleanupProven: $credentialCleanupProven
       },
       stage: $stage,
       issueCode: $issueCode,
@@ -373,7 +394,16 @@ clean_env=(
 )
 
 recover_previous() {
+  local recovered_public_containers
+  local recovered_public_count
+  local recovered_public_sha
+  local recovered_server_sha
+  local recovered_web_image
+  local recovered_web_sha
+  local recovery_cutover_script
   [[ "$env_changed" -eq 1 && -n "$env_backup" && -f "$env_backup" ]] || return 1
+  [[ "$current_source_switch_started" -eq 0 && -d "$current" && ! -L "$current" ]] ||
+    return 1
   cp "$env_backup" "$runtime_env.recovering"
   chmod 600 "$runtime_env.recovering"
   mv -f "$runtime_env.recovering" "$runtime_env"
@@ -383,17 +413,78 @@ recover_previous() {
     --env-file "$runtime_env" \
     -f "$current/server/deploy/compose/prod/compose.yml" \
     -f "$current/server/deploy/compose/prod/$compose_override_name" \
-    up -d --no-build --pull never app-server web-desktop \
+    up -d --no-build --pull never postgres jaeger app-server web-desktop \
     >>"$log_file" 2>&1 || return 1
   curl --fail --silent --show-error --max-time 10 \
+    "$server_endpoint/healthz" >/dev/null 2>&1 || return 1
+  curl --fail --silent --show-error --max-time 10 \
     "$server_endpoint/readyz" >/dev/null 2>&1 || return 1
-  recovered_sha="$(docker inspect "$server_container" --format '{{range .Config.Env}}{{println .}}{{end}}' |
+  curl --fail --silent --show-error --max-time 10 \
+    "$web_endpoint/healthz" >/dev/null 2>&1 || return 1
+  recovered_server_sha="$(docker inspect "$server_container" --format '{{range .Config.Env}}{{println .}}{{end}}' |
     sed -n 's/^GIT_SHA=//p' | head -n1)"
-  [[ "$recovered_sha" == "$from_sha" ]]
+  recovered_web_sha="$(docker inspect "$web_container" --format '{{range .Config.Env}}{{println .}}{{end}}' |
+    sed -n 's/^GIT_SHA=//p' | head -n1)"
+  recovered_web_image="$(docker inspect "$web_container" --format '{{.Config.Image}}')"
+  [[ "$recovered_server_sha" == "$from_sha" &&
+    "$recovered_web_sha" == "$from_sha" &&
+    -n "$recovered_web_image" ]] || return 1
+  recovered_public_containers="$(
+    docker ps --format '{{.Names}}' |
+      grep -E "^${public_container_prefix}[0-9a-f]{8}$" || true
+  )"
+  recovered_public_count="$(printf '%s\n' "$recovered_public_containers" | sed '/^$/d' | wc -l | tr -d ' ')"
+  [[ "$recovered_public_count" == 1 ]] || return 1
+  recovery_cutover_script=$current/deployments/yoyoosun/scripts/cutover-public-web.sh
+  [[ -f "$recovery_cutover_script" && ! -L "$recovery_cutover_script" ]] ||
+    return 1
+  bash "$recovery_cutover_script" \
+    --image "$recovered_web_image" \
+    --release "$from_sha" \
+    --current-container "$recovered_public_containers" \
+    --endpoint "$public_endpoint" \
+    --api-origin http://app-server:8300 \
+    --network "$public_network" \
+    --container-prefix "$public_container_prefix" \
+    --host-port "$public_host_port" \
+    --candidate-port "$public_candidate_port" \
+    --execute \
+    --confirm "PUBLIC_WEB_CUTOVER:$recovered_public_containers:$from_sha" \
+    >>"$log_file" 2>&1 || return 1
+  recovered_public_sha="$(docker inspect "${public_container_prefix}${from_sha:0:8}" \
+    --format '{{range .Config.Env}}{{println .}}{{end}}' |
+    sed -n 's/^GIT_SHA=//p' | head -n1)"
+  [[ "$recovered_public_sha" == "$from_sha" ]] || return 1
+  service_switch_started=0
 }
 
 cleanup_transient_materialization() {
   local candidate
+  credential_cleanup_proven=false
+  unset target_fetch_token
+  if [[ "$fetch_payloads_published" -eq 1 ]]; then
+    rm -f -- \
+      "$incoming/checksums.sha256" "$incoming/release-artifact.json" \
+      "$incoming/release-manifest.json" "$incoming/release-rehearsal.json" \
+      "$incoming/sbom.cdx.json" "$incoming/server-image.tar" \
+      "$incoming/source.tar" "$incoming/web-image.tar" 2>/dev/null || true
+    fetch_payloads_published=0
+  fi
+  if [[ "$fetch_materializing_created" -eq 1 ]]; then
+    candidate="$fetch_materializing"
+    if [[ "$candidate" == "$incoming/.acquire-$operation_id" &&
+      -d "$candidate" && ! -L "$candidate" &&
+      "$(stat -c '%u' "$candidate" 2>/dev/null || true)" == "$(id -u)" ]]; then
+      rm -rf -- "$candidate" ||
+        printf '[remote-code-rollback] failed to clean acquisition materialization\n' >&2
+    fi
+    fetch_materializing_created=0
+  fi
+  if [[ -z "${target_fetch_token+x}" &&
+    (-z "$fetch_materializing" ||
+    (! -e "$fetch_materializing/curl.conf" && ! -L "$fetch_materializing/curl.conf")) ]]; then
+    credential_cleanup_proven=true
+  fi
   if [[ "$cache_materializing_created" -eq 1 ]]; then
     candidate="$cache_materializing"
     if [[ "$candidate" == "$cache_root/.materializing-$operation_id" &&
@@ -418,10 +509,20 @@ cleanup_transient_materialization() {
 
 on_error() {
   local exit_code=$?
+  local recovery_required=0
+  local recovery_proven=1
   trap - ERR
   cleanup_transient_materialization
-  if [[ "$env_changed" -eq 1 ]] && recover_previous; then
+  if [[ "$env_changed" -eq 1 ]]; then
+    recovery_required=1
+    recover_previous || recovery_proven=0
+  fi
+  if [[ "$credential_cleanup_proven" != true ]]; then
+    write_receipt not_proven rollback_credential_cleanup_not_proven
+  elif [[ "$recovery_required" -eq 1 && "$recovery_proven" -eq 1 ]]; then
     write_receipt failed rollback_failed_previous_release_restored
+  elif [[ "$recovery_required" -eq 1 ]]; then
+    write_receipt not_proven rollback_previous_release_recovery_not_proven
   elif [[ "$service_switch_started" -eq 0 ]]; then
     write_receipt failed rollback_failed_before_service_switch
   else
@@ -432,11 +533,36 @@ on_error() {
     "$stage" "$exit_code" >&2
   exit "$exit_code"
 }
+on_signal() {
+  trap - ERR HUP INT TERM
+  cleanup_transient_materialization
+  if [[ "$env_changed" -eq 1 ]]; then
+    recover_previous || true
+  fi
+  write_receipt not_proven rollback_interrupted
+  cat "$receipt"
+  exit 130
+}
 trap on_error ERR
+trap on_signal HUP INT TERM
+trap cleanup_transient_materialization EXIT
 
 : >"$log_file"
 chmod 600 "$log_file"
 write_state running
+
+[[ -f "$incoming/remote-release-acquire.sh" &&
+  ! -L "$incoming/remote-release-acquire.sh" ]] ||
+  fail "target release acquisition helper is invalid"
+# shellcheck source=scripts/deploy/remote-release-acquire.sh
+source "$incoming/remote-release-acquire.sh"
+release_sha=$to_sha
+release_version=$to_version
+target_fetch_token=""
+IFS= read -r target_fetch_token || true
+
+enter_stage artifact_fetch
+acquire_target_release
 
 enter_stage package_verification
 [[ -d "$incoming" && ! -L "$incoming" &&
@@ -444,15 +570,19 @@ enter_stage package_verification
   fail "incoming rollback package is invalid"
 required_files=(
   .target-cache.json
+  checksums.sha256
   current-release-manifest.json
   release-manifest.json
   release-artifact.json
+  release-rehearsal.json
   rollback-manifest.json
   sbom.cdx.json
   source.tar
   server-image.tar
   web-image.tar
   remote-code-rollback.sh
+  remote-release-acquire.sh
+  target-release-fetch.json
   transfer-checksums.sha256
 )
 for required_file in "${required_files[@]}"; do
@@ -463,7 +593,7 @@ jq -e \
   --arg operationId "$operation_id" \
   --arg target "$target" \
   --arg manifest "$target_manifest_sha256" \
-  '.schemaVersion == "plush.target-release-cache/v1" and
+  '.schemaVersion == "plush.target-release-cache/v2" and
    .operationId == $operationId and
    .releaseManifestSha256 == $manifest and
    (.packageHit | type == "boolean") and
@@ -607,8 +737,10 @@ mkdir -p "$cache_root"
 chmod 700 "$cache_root"
 formal_cache=$cache_root/$target_manifest_sha256
 immutable_cache_files=(
+  checksums.sha256
   release-manifest.json
   release-artifact.json
+  release-rehearsal.json
   sbom.cdx.json
   source.tar
   server-image.tar
@@ -618,6 +750,8 @@ if [[ -e "$formal_cache" ]]; then
   [[ -d "$formal_cache" && ! -L "$formal_cache" &&
     "$(stat -c '%u' "$formal_cache")" == "$(id -u)" ]] ||
     fail "formal rollback cache is invalid"
+  [[ "$(find "$formal_cache" -mindepth 1 -maxdepth 1 -printf '.' | wc -c | tr -d ' ')" == "${#immutable_cache_files[@]}" ]] ||
+    fail "formal rollback cache inventory is invalid"
   for cache_file in "${immutable_cache_files[@]}"; do
     [[ -f "$formal_cache/$cache_file" && ! -L "$formal_cache/$cache_file" &&
       "$(stat -c '%u' "$formal_cache/$cache_file")" == "$(id -u)" ]] ||
@@ -685,6 +819,10 @@ cmp --silent \
   "$incoming/remote-code-rollback.sh" \
   "$current/scripts/deploy/remote-code-rollback.sh" ||
   fail "remote rollback script is not part of the live exact source"
+cmp --silent \
+  "$incoming/remote-release-acquire.sh" \
+  "$current/scripts/deploy/remote-release-acquire.sh" ||
+  fail "release acquisition helper is not part of the live exact source"
 
 enter_stage image_load_and_readback
 if [[ "$cache_image_hit" != true ]]; then
@@ -821,6 +959,7 @@ public_runtime_sha="$(
   fail "public entry rollback identity does not match"
 
 enter_stage current_source_switch
+current_source_switch_started=1
 next_current=$root/.current-next-rollback-$operation_id
 [[ ! -e "$next_current" ]] || fail "next current directory already exists"
 cp -a --reflink=auto "$release_dir" "$next_current"
@@ -835,15 +974,19 @@ env_changed=0
 write_receipt passed none
 rm -f \
   "$incoming/.target-cache.json" \
+  "$incoming/checksums.sha256" \
   "$incoming/current-release-manifest.json" \
   "$incoming/release-artifact.json" \
   "$incoming/release-manifest.json" \
+  "$incoming/release-rehearsal.json" \
   "$incoming/remote-code-rollback.sh" \
+  "$incoming/remote-release-acquire.sh" \
   "$incoming/rollback-manifest.json" \
   "$incoming/sbom.cdx.json" \
   "$incoming/server-image.tar" \
   "$incoming/source.tar" \
   "$incoming/transfer-checksums.sha256" \
+  "$incoming/target-release-fetch.json" \
   "$incoming/web-image.tar"
 rmdir "$incoming"
 cat "$receipt"

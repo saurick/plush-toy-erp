@@ -39,6 +39,10 @@ import {
   expectedCiNodeTestLaneFiles,
 } from "./ci-node-test-lane.mjs";
 import { CI_RESOURCE_TEST_LANES } from "./ci-resource-test-lane.mjs";
+import {
+  CI_SERVER_QUALITY_LANES,
+  CI_WEB_QUALITY_LANES,
+} from "./ci-quality-stage-lane.mjs";
 import { BOOTSTRAP_PRODUCTION_ADMIN_TEST_CASES } from "../deploy/bootstrap-production-admin.test-cases.mjs";
 
 export const CI_QUALITY_AGGREGATE_SCHEMA = "plush.gitlab-strict-aggregate/v1";
@@ -119,6 +123,45 @@ export function hasCompleteCiResourceLaneEvidence(value) {
   );
 }
 
+function hasCompleteCiStageLaneEvidence(value, definitions) {
+  const expectedJobs = Object.entries(definitions);
+  return (
+    value?.status === "passed" &&
+    value.laneCount === expectedJobs.length &&
+    Number.isSafeInteger(value.durationMs) &&
+    value.durationMs >= 0 &&
+    Number.isSafeInteger(value.executed) &&
+    value.executed > 0 &&
+    value.passed === value.executed &&
+    value.failed === 0 &&
+    value.skipped === 0 &&
+    Array.isArray(value.jobs) &&
+    value.jobs.length === expectedJobs.length &&
+    value.jobs.every((job, index) => {
+      const [lane, definition] = expectedJobs[index];
+      return (
+        job?.lane === lane &&
+        job.job === definition.job &&
+        /^\d+$/u.test(String(job.jobId || "")) &&
+        Number.isFinite(Date.parse(job.startedAt)) &&
+        Number.isFinite(Date.parse(job.finishedAt)) &&
+        Number.isSafeInteger(job.durationMs) &&
+        job.durationMs >= 0 &&
+        Date.parse(job.finishedAt) - Date.parse(job.startedAt) ===
+          job.durationMs
+      );
+    })
+  );
+}
+
+export function hasCompleteCiWebLaneEvidence(value) {
+  return hasCompleteCiStageLaneEvidence(value, CI_WEB_QUALITY_LANES);
+}
+
+export function hasCompleteCiServerLaneEvidence(value) {
+  return hasCompleteCiStageLaneEvidence(value, CI_SERVER_QUALITY_LANES);
+}
+
 function latestLanePredecessor(lanes) {
   return [...lanes].sort(
     (left, right) =>
@@ -131,8 +174,10 @@ export function buildObservedQualityPaths(
   byShard,
   nodeLaneDurations,
   resourceLaneDurations,
+  webLaneDurations,
+  serverLaneDurations,
 ) {
-  const standalone = ["static", "server", "security"].map(
+  const standalone = ["static", "security"].map(
     (shard) => {
       const receipt = byShard.get(shard);
       return Object.freeze({
@@ -152,15 +197,40 @@ export function buildObservedQualityPaths(
   const resource = byShard.get("resource");
   const nodePredecessor = latestLanePredecessor(nodeLaneDurations);
   const resourcePredecessor = latestLanePredecessor(resourceLaneDurations);
+  const webPredecessor = latestLanePredecessor(webLaneDurations);
+  const webBuild = webLaneDurations.find(({ lane }) => lane === "build");
+  const server = byShard.get("server");
+  const serverPredecessor = latestLanePredecessor(serverLaneDurations);
+  if (!webBuild) throw new Error("Web build lane timing is missing");
   const paths = [
     ...standalone,
     Object.freeze({
+      id: "web",
+      shard: "web",
+      jobs: Object.freeze([webPredecessor.job, web.job.name]),
+      startedAt: webPredecessor.startedAt,
+      finishedAt: web.finishedAt,
+      durationMs:
+        Date.parse(web.finishedAt) - Date.parse(webPredecessor.startedAt),
+    }),
+    Object.freeze({
       id: "web_browser",
       shard: "browser",
-      jobs: Object.freeze([web.job.name, browser.job.name]),
-      startedAt: web.startedAt,
+      jobs: Object.freeze([webBuild.job, browser.job.name]),
+      startedAt: webBuild.startedAt,
       finishedAt: browser.finishedAt,
-      durationMs: Date.parse(browser.finishedAt) - Date.parse(web.startedAt),
+      durationMs:
+        Date.parse(browser.finishedAt) - Date.parse(webBuild.startedAt),
+    }),
+    Object.freeze({
+      id: "server",
+      shard: "server",
+      jobs: Object.freeze([serverPredecessor.job, server.job.name]),
+      startedAt: serverPredecessor.startedAt,
+      finishedAt: server.finishedAt,
+      durationMs:
+        Date.parse(server.finishedAt) -
+        Date.parse(serverPredecessor.startedAt),
     }),
     Object.freeze({
       id: "node",
@@ -427,6 +497,12 @@ export async function aggregateCiQuality({
     !hasCompleteCiResourceLaneEvidence(
       byShard.get("resource").invariants.resourceLanes,
     ) ||
+    !hasCompleteCiWebLaneEvidence(
+      byShard.get("web").invariants.webLanes,
+    ) ||
+    !hasCompleteCiServerLaneEvidence(
+      byShard.get("server").invariants.serverLanes,
+    ) ||
     byShard.get("security").invariants.dependencyAudit !== "passed" ||
     byShard.get("server").invariants.makeData !== "passed" ||
     byShard.get("server").invariants.databaseCleanup !== "passed" ||
@@ -470,6 +546,26 @@ export async function aggregateCiQuality({
       finishedAt: job.finishedAt,
       durationMs: job.durationMs,
     }));
+  const webLaneDurations = byShard.get("web").invariants.webLanes.jobs.map(
+    (job) => ({
+      lane: job.lane,
+      job: job.job,
+      jobId: job.jobId,
+      startedAt: job.startedAt,
+      finishedAt: job.finishedAt,
+      durationMs: job.durationMs,
+    }),
+  );
+  const serverLaneDurations = byShard
+    .get("server")
+    .invariants.serverLanes.jobs.map((job) => ({
+      lane: job.lane,
+      job: job.job,
+      jobId: job.jobId,
+      startedAt: job.startedAt,
+      finishedAt: job.finishedAt,
+      durationMs: job.durationMs,
+    }));
   const executionDurations = [
     ...shardDurations.map((entry) => ({ ...entry, kind: "shard" })),
     ...nodeLaneDurations.map((entry) => ({ ...entry, kind: "node_lane", shard: "node" })),
@@ -478,16 +574,30 @@ export async function aggregateCiQuality({
       kind: "resource_lane",
       shard: "resource",
     })),
+    ...webLaneDurations.map((entry) => ({
+      ...entry,
+      kind: "web_lane",
+      shard: "web",
+    })),
+    ...serverLaneDurations.map((entry) => ({
+      ...entry,
+      kind: "server_lane",
+      shard: "server",
+    })),
   ];
   const shardWallStarted = Math.min(
     ...receipts.map((receipt) => Date.parse(receipt.startedAt)),
     ...nodeLaneDurations.map((job) => Date.parse(job.startedAt)),
     ...resourceLaneDurations.map((job) => Date.parse(job.startedAt)),
+    ...webLaneDurations.map((job) => Date.parse(job.startedAt)),
+    ...serverLaneDurations.map((job) => Date.parse(job.startedAt)),
   );
   const shardWallFinished = Math.max(
     ...receipts.map((receipt) => Date.parse(receipt.finishedAt)),
     ...nodeLaneDurations.map((job) => Date.parse(job.finishedAt)),
     ...resourceLaneDurations.map((job) => Date.parse(job.finishedAt)),
+    ...webLaneDurations.map((job) => Date.parse(job.finishedAt)),
+    ...serverLaneDurations.map((job) => Date.parse(job.finishedAt)),
   );
   const bottleneckExecution = [...executionDurations].sort(
     (left, right) => right.durationMs - left.durationMs,
@@ -496,6 +606,8 @@ export async function aggregateCiQuality({
     byShard,
     nodeLaneDurations,
     resourceLaneDurations,
+    webLaneDurations,
+    serverLaneDurations,
   );
   const criticalPath = [...observedPaths].sort(
     (left, right) => right.durationMs - left.durationMs,
@@ -542,6 +654,8 @@ export async function aggregateCiQuality({
     shards: shardDurations,
     nodeLanes: nodeLaneDurations,
     resourceLanes: resourceLaneDurations,
+    webLanes: webLaneDurations,
+    serverLanes: serverLaneDurations,
     dag: {
       wallDurationMs: shardWallFinished - shardWallStarted,
       criticalShard: criticalPath.shard,
@@ -615,7 +729,7 @@ export async function aggregateCiQuality({
     invariants: [
       "protected main trust bootstrap and real push range passed",
       "all seven fixed GitLab quality shards passed for one exact SHA",
-      "internal Node and resource lanes covered each registered test exactly once",
+      "internal Node, resource, Web and Server lanes covered each registered contract exactly once",
       "source archive, dependency audit and make data integrity passed",
       "PostgreSQL, Chromium sandbox and browser cleanup readbacks passed",
     ],

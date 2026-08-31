@@ -874,6 +874,34 @@ test('delivery summary exposes cached canonical CI timings and readable operatio
     },
     now: '2026-08-08T01:01:10.000Z',
   })
+  const directOperationId = '123e4567-e89b-42d3-a456-426614174003'
+  createOrReuseDeliveryOperation(store, {
+    action: 'promote',
+    target: 'demo-133',
+    gitSha: SHA,
+    version: '2026.07.29-1',
+    idempotencyKey: 'version-center:promote:fixed-0003',
+    operationId: directOperationId,
+    now: '2026-08-08T02:00:00.000Z',
+  })
+  transitionDeliveryOperation(store, directOperationId, {
+    status: 'running',
+    message: 'promotion started',
+    now: '2026-08-08T02:00:01.000Z',
+  })
+  transitionDeliveryOperation(store, directOperationId, {
+    status: 'waiting',
+    message: 'target acquisition completed',
+    metadata: {
+      controlTransferBytes: 2_048,
+      controlTransferDurationMs: 200,
+      controlTransferBytesPerSecond: 10_240,
+      targetAcquisitionBytes: 1_000_000,
+      targetAcquisitionDurationMs: 4_000,
+      targetAcquisitionBytesPerSecond: 250_000,
+    },
+    now: '2026-08-08T02:00:10.000Z',
+  })
   let timingReads = 0
   const timingPayload = {
     schemaVersion: 'plush.delivery-pipeline-timings/v1',
@@ -913,13 +941,19 @@ test('delivery summary exposes cached canonical CI timings and readable operatio
   assert.strictEqual(first.timings, timingPayload)
   assert.strictEqual(second.timings, timingPayload)
   assert.equal(timingReads, 1)
-  assert.equal(first.operations[0].durationMs, 70_000)
+  const historicalOperation = first.operations.find(
+    (operation) => operation.id === OPERATION_ID
+  )
+  const directOperation = first.operations.find(
+    (operation) => operation.id === directOperationId
+  )
+  assert.equal(historicalOperation.durationMs, 70_000)
   assert.deepEqual(
-    first.operations[0].stages.map((item) => item.durationMs),
+    historicalOperation.stages.map((item) => item.durationMs),
     [65_000]
   )
-  assert.equal(first.operations[0].stages[0].label, '制品传输')
-  assert.deepEqual(first.operations[0].metrics, {
+  assert.equal(historicalOperation.stages[0].label, '历史制品中转')
+  assert.deepEqual(historicalOperation.metrics, {
     transferBytes: 1_265_345_566,
     transferDurationMs: 65_000,
     transferBytesPerSecond: 19_466_855,
@@ -947,6 +981,16 @@ test('delivery summary exposes cached canonical CI timings and readable operatio
     cacheBasis: [],
     stillExecutedChecks: [],
   })
+  assert.deepEqual(
+    directOperation.stages.map((stage) => [stage.id, stage.label, stage.durationMs]),
+    [
+      ['control_transfer', '控制包传输', 200],
+      ['artifact_fetch', 'GitLab 内部取件', 4_000],
+    ]
+  )
+  assert.equal(directOperation.metrics.transferBytes, 1_000_000)
+  assert.equal(directOperation.metrics.transferDurationMs, 4_000)
+  assert.equal(directOperation.metrics.transferBytesPerSecond, 250_000)
 })
 
 test('promotion executor is launched once and an unstarted child fails closed', async (t) => {
@@ -1038,6 +1082,160 @@ test('promotion executor is launched once and an unstarted child fails closed', 
   child.emit('close', 1)
   assert.equal(spawnCount, 1)
   assert.equal(readDeliveryOperation(store, OPERATION_ID).status, 'failed')
+})
+
+test('upgrade promotion proves the current direct-fetch rollback transport before prepare and launch', async (t) => {
+  const { root, store } = createProject(t)
+  const currentSha = 'b'.repeat(40)
+  const downloads = []
+  const child = new EventEmitter()
+  let spawnCount = 0
+  const preparePromotionAction = ({ idempotencyKey, targetKey }) => {
+    let operation = createOrReuseDeliveryOperation(store, {
+      action: 'promote',
+      target: targetKey,
+      gitSha: SHA,
+      version: '2026.07.29-1',
+      idempotencyKey,
+      operationId: OPERATION_ID,
+      metadata: { source: 'version-center' },
+    }).operation
+    operation = transitionDeliveryOperation(store, operation.id, {
+      status: 'running',
+      message: 'fixed preflight',
+    })
+    operation = transitionDeliveryOperation(store, operation.id, {
+      status: 'ready',
+      message: 'promotion ready',
+      metadata: { ...operation.metadata, promotionMode: 'upgrade' },
+    })
+    return {
+      operation,
+      plan: { ancestry: { currentGitSha: currentSha } },
+      reused: false,
+    }
+  }
+  const service = createDevDeliveryService({
+    projectRoot: root,
+    operationStore: store,
+    provider: {
+      provider: 'gitlab',
+      listVersions: () => [
+        {
+          gitSha: SHA,
+          version: '2026.07.29-1',
+          status: 'published',
+          completeAssets: true,
+          promotionEligible: true,
+        },
+      ],
+      getReleaseStatus: () => ({ status: 'missing' }),
+      dispatchRelease: () => {},
+      downloadReleaseControl(gitSha, destination) {
+        downloads.push(gitSha)
+        return { directory: destination }
+      },
+    },
+    preparePromotionAction,
+    spawnProcess() {
+      spawnCount += 1
+      return child
+    },
+  })
+  const prepared = await service.act({
+    action: 'prepare-promotion',
+    payload: {
+      gitSha: SHA,
+      version: '2026.07.29-1',
+      target: 'demo-133',
+      idempotencyKey: IDEMPOTENCY_KEY,
+    },
+  })
+  assert.equal(prepared.operation.status, 'ready')
+  const preparedRaw = readDeliveryOperation(store, OPERATION_ID)
+  assert.equal(preparedRaw.metadata.currentGitSha, currentSha)
+  assert.equal(
+    preparedRaw.metadata.currentReleaseTransportVerified,
+    true
+  )
+  const confirmation = `PROMOTE:demo-133:${SHA}:${OPERATION_ID}`
+  const accepted = await service.act({
+    action: 'execute-promotion',
+    payload: { operationId: OPERATION_ID, confirmation },
+  })
+  assert.equal(accepted.operation.status, 'launching')
+  assert.deepEqual(downloads, [SHA, currentSha, currentSha])
+  assert.equal(spawnCount, 1)
+  child.emit('close', 1)
+})
+
+test('upgrade promotion is blocked before target write when current rollback transport is missing', async (t) => {
+  const { root, store } = createProject(t)
+  const currentSha = 'b'.repeat(40)
+  let spawnCount = 0
+  const service = createDevDeliveryService({
+    projectRoot: root,
+    operationStore: store,
+    provider: {
+      provider: 'gitlab',
+      listVersions: () => [
+        {
+          gitSha: SHA,
+          version: '2026.07.29-1',
+          status: 'published',
+          completeAssets: true,
+          promotionEligible: true,
+        },
+      ],
+      downloadReleaseControl(gitSha, destination) {
+        if (gitSha === currentSha) throw new Error('missing source package')
+        return { directory: destination }
+      },
+    },
+    preparePromotionAction({ idempotencyKey, targetKey }) {
+      let operation = createOrReuseDeliveryOperation(store, {
+        action: 'promote',
+        target: targetKey,
+        gitSha: SHA,
+        version: '2026.07.29-1',
+        idempotencyKey,
+        operationId: OPERATION_ID,
+      }).operation
+      operation = transitionDeliveryOperation(store, operation.id, {
+        status: 'running',
+        message: 'fixed preflight',
+      })
+      operation = transitionDeliveryOperation(store, operation.id, {
+        status: 'ready',
+        message: 'promotion ready',
+        metadata: { ...operation.metadata, promotionMode: 'upgrade' },
+      })
+      return {
+        operation,
+        plan: { ancestry: { currentGitSha: currentSha } },
+        reused: false,
+      }
+    },
+    spawnProcess() {
+      spawnCount += 1
+      return new EventEmitter()
+    },
+  })
+  const prepared = await service.act({
+    action: 'prepare-promotion',
+    payload: {
+      gitSha: SHA,
+      version: '2026.07.29-1',
+      target: 'demo-133',
+      idempotencyKey: IDEMPOTENCY_KEY,
+    },
+  })
+  assert.equal(prepared.operation.status, 'blocked')
+  assert.equal(
+    prepared.operation.issues[0].code,
+    'promotion_current_release_transport_unavailable'
+  )
+  assert.equal(spawnCount, 0)
 })
 
 test('a synchronous executor start failure is terminal and is not retried', async (t) => {

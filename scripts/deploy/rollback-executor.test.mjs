@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 import {
+  consumeTargetReleaseFetchCredential,
   REMOTE_ROLLBACK_RECEIPT_CONTRACT,
   validateRemoteRollbackReceipt,
 } from "./rollback-executor.mjs";
@@ -13,6 +14,7 @@ const FROM_SHA = "a".repeat(40);
 const TO_SHA = "b".repeat(40);
 const HASH = "c".repeat(64);
 const ROLLBACK_STAGES = [
+  "artifact_fetch",
   "package_verification",
   "target_identity_recheck",
   "release_materialization",
@@ -24,6 +26,19 @@ const ROLLBACK_STAGES = [
   "current_source_switch",
 ];
 
+test("rollback executor consumes the inherited target fetch credential once", () => {
+  const env = {
+    KEEP_ME: "safe",
+    PLUSH_GITLAB_TARGET_FETCH_TOKEN: "target-fetch-token",
+  };
+  assert.equal(
+    consumeTargetReleaseFetchCredential(env),
+    "target-fetch-token",
+  );
+  assert.deepEqual(env, { KEEP_ME: "safe" });
+  assert.equal(consumeTargetReleaseFetchCredential(env), undefined);
+});
+
 function expected() {
   return {
     operationId: OPERATION_ID,
@@ -34,6 +49,7 @@ function expected() {
     currentManifestSha256: "d".repeat(64),
     targetManifestSha256: "e".repeat(64),
     rollbackFingerprint: HASH,
+    acquisitionExpectedBytes: 0,
     cache: {
       packageHit: true,
       imageHit: true,
@@ -73,6 +89,13 @@ function receipt(status = "passed") {
     images: {
       serverContentId: passed ? `sha256:${"1".repeat(64)}` : "unknown",
       webContentId: passed ? `sha256:${"2".repeat(64)}` : "unknown",
+    },
+    acquisition: {
+      mode: "target_cache",
+      downloadedBytes: 0,
+      expectedBytes: 0,
+      catalogAndChecksumsVerified: true,
+      credentialCleanupProven: true,
     },
     database: {
       downMigrationAutomatic: false,
@@ -121,6 +144,16 @@ test("rollback executor accepts only identity-bound redacted receipts", () => {
   assert.equal(
     validateRemoteRollbackReceipt(receipt("failed"), expected()).status,
     "failed",
+  );
+  const failedWithoutCredentialCleanup = receipt("failed");
+  failedWithoutCredentialCleanup.acquisition.credentialCleanupProven = false;
+  assert.throws(
+    () =>
+      validateRemoteRollbackReceipt(
+        failedWithoutCredentialCleanup,
+        expected(),
+      ),
+    /inconsistent/u,
   );
   assert.throws(
     () =>
@@ -202,6 +235,63 @@ test("rollback executor has explicit confirmation and no automatic retry path", 
   assert.match(source, /automatic retry is disabled/u);
   assert.match(source, /databaseChangedByExecutor: false/u);
   assert.match(source, /buildFixedTargetRsyncTransfer/u);
+  assert.match(source, /PLUSH_GITLAB_TARGET_FETCH_TOKEN/u);
+  assert.doesNotMatch(source, /process[.]env[.]PLUSH_GITLAB_TOKEN/u);
+  assert.match(source, /input: targetFetchToken \? `\$\{targetFetchToken\}\\n` : ""/u);
+  assert.doesNotMatch(source, /target-release-fetch[.]secret/u);
+  const controlTransfer = source.match(
+    /const CONTROL_TRANSFER_FILES = Object[.]freeze\(\[[\s\S]+?\]\);/u,
+  )?.[0];
+  assert.ok(controlTransfer);
+  for (const file of [
+    "checksums.sha256",
+    "release-artifact.json",
+    "release-manifest.json",
+    "release-rehearsal.json",
+    "sbom.cdx.json",
+    "server-image.tar",
+    "source.tar",
+    "web-image.tar",
+  ]) {
+    assert.doesNotMatch(
+      controlTransfer,
+      new RegExp(`"${file.replaceAll(".", "[.]")}"`, "u"),
+    );
+  }
+  for (const file of [
+    "current-release-manifest.json",
+    "remote-code-rollback.sh",
+    "remote-release-acquire.sh",
+    "rollback-manifest.json",
+    "transfer-checksums.sha256",
+  ]) {
+    assert.match(
+      controlTransfer,
+      new RegExp(`"${file.replaceAll(".", "[.]")}"`, "u"),
+    );
+  }
+  const rollbackRoot = source.indexOf("const transferRoot = path.join(");
+  const cleanupBoundary = source.indexOf(
+    "rmSync(transferRoot, { recursive: true, force: true })",
+    rollbackRoot,
+  );
+  const cleanupTry = source.indexOf("try {", rollbackRoot);
+  for (const guardedStep of [
+    "transfer = prepareRollbackTransfer(",
+    "assertLocalRsync(runCommand)",
+    'status: "running"',
+  ]) {
+    const step = source.indexOf(guardedStep, rollbackRoot);
+    assert.ok(
+      cleanupTry >= 0 && cleanupTry < step && step < cleanupBoundary,
+      `${guardedStep} must stay inside the exact local transfer cleanup boundary`,
+    );
+  }
+  assert.match(source, /targetPrepared = true;\s+prepareCache\(/u);
+  assert.match(
+    source,
+    /const outcomeUnknown = remoteStarted \|\| !targetCleanupProven/u,
+  );
   assert.doesNotMatch(source, /["']scp["']/u);
   assert.doesNotMatch(source, /docker build|compose build|git clone/u);
 });
