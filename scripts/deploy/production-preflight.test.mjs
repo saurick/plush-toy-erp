@@ -134,6 +134,11 @@ function writeFixture({
     path.join(repoRoot, "server/deploy/compose/prod/chromium-seccomp.json"),
     path.join(composeDir, "chromium-seccomp.json"),
   );
+  fs.copyFileSync(
+    path.join(repoRoot, "server/deploy/compose/prod/database_roles.sh"),
+    path.join(composeDir, "database_roles.sh"),
+  );
+  fs.chmodSync(path.join(composeDir, "database_roles.sh"), 0o755);
 
   const migrateScript = path.join(composeDir, "migrate_online.sh");
   fs.writeFileSync(
@@ -718,6 +723,15 @@ test("production preflight rejects Compose that bypasses the web bind variable",
     result.stderr,
     /Compose web desktop 端口必须显式消费 WEB_DESKTOP_BIND_ADDR/u,
   );
+});
+
+test("production preflight rejects a database role script unreadable by PostgreSQL", () => {
+  const fixture = writeFixture();
+  fs.chmodSync(path.join(fixture.composeDir, "database_roles.sh"), 0o700);
+
+  const result = runPreflight(fixture);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /数据库角色初始化脚本权限必须为 0755/u);
 });
 
 test("production preflight snapshots a private env and passes only the snapshot to Compose", () => {

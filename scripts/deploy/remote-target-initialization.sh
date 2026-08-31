@@ -253,6 +253,7 @@ write_receipt_json() {
 
 cleanup_exact_target() {
   trap - ERR
+  local cleanup_container="${project}-initialization-cleanup"
   docker rm -f "$public_candidate" "$public_container" >/dev/null 2>&1 || true
   if plain_owned_file "$runtime_env" && plain_owned_directory "$release_dir"; then
     env -i \
@@ -271,6 +272,15 @@ cleanup_exact_target() {
     jq -e --arg operationId "$operation_id" --arg target "$target" \
       '.schemaVersion == "plush.target-initialization-owner/v1" and .operationId == $operationId and .target == $target' \
       "$owner_marker" >/dev/null 2>&1; then
+    if [[ -d "$data_dir" && ! -L "$data_dir" ]]; then
+      [[ "$(docker ps -aq --filter "name=^/${cleanup_container}$" | sed '/^$/d' | wc -l | tr -d ' ')" == 0 ]] || return 1
+      docker run --rm --pull never --name "$cleanup_container" \
+        --network none --read-only --pids-limit 64 --memory 64m \
+        --cap-drop ALL --cap-add DAC_OVERRIDE --cap-add FOWNER \
+        --security-opt no-new-privileges --user 0:0 \
+        --volume "$data_dir:/target" --entrypoint sh postgres:18.1 \
+        -ceu 'find /target -mindepth 1 -depth -delete' >/dev/null 2>&1 || return 1
+    fi
     rm -rf -- "$root"
   fi
   if [[ ! -e "$root" && ! -L "$root" ]] &&
@@ -397,6 +407,9 @@ if ! tar -tf "$incoming/source.tar" | awk '/^\// {exit 1} /(^|\/)\.\.?(\/|$)/ {e
   fail "source archive contains an unsafe path"
 fi
 tar --extract --file "$incoming/source.tar" --directory "$release_dir" --no-same-owner --no-same-permissions
+database_roles_script=$release_dir/server/deploy/compose/prod/database_roles.sh
+plain_owned_file "$database_roles_script" || fail "database role initializer is invalid"
+chmod 755 "$database_roles_script"
 jq -n \
   --arg schemaVersion "plush.target-release-identity/v1" \
   --arg gitSha "$release_sha" \

@@ -52,6 +52,23 @@ test("target initializer keeps bootstrap secrets transient and rollback owner-bo
   );
   assert.match(source, /rollback_incomplete/u);
   assert.match(source, /automaticDownMigration: false/u);
+  assert.match(
+    source,
+    /--volume "\$data_dir:\/target"[\s\S]*find \/target -mindepth 1 -depth -delete/u,
+  );
+  assert.match(source, /--pull never --name "\$cleanup_container"/u);
+});
+
+test("target initializer restores the container-readable database role script mode", () => {
+  const extractIndex = source.indexOf("tar --extract");
+  const chmodIndex = source.indexOf('chmod 755 "$database_roles_script"');
+  const composeStartIndex = source.indexOf("stage=database_start");
+  assert.ok(extractIndex >= 0 && extractIndex < chmodIndex);
+  assert.ok(chmodIndex < composeStartIndex);
+  assert.match(
+    source,
+    /plain_owned_file "\$database_roles_script" \|\| fail "database role initializer is invalid"/u,
+  );
 });
 
 test("target initializer validates immutable release and restored backup before retention", () => {

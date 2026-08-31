@@ -232,6 +232,7 @@ fi
 compose_file="$compose_dir/compose.yml"
 migrate_script="$compose_dir/migrate_online.sh"
 chromium_seccomp_profile="$compose_dir/chromium-seccomp.json"
+database_roles_script="$compose_dir/database_roles.sh"
 
 case "$deployment_target" in
 "") ;;
@@ -619,6 +620,8 @@ grep -q 'APP_HTTP_BIND_ADDR:-127.0.0.1' "$compose_file" || fail "Compose app HTT
 grep -q 'WEB_DESKTOP_BIND_ADDR:-0.0.0.0' "$compose_file" || fail "Compose web desktop 端口必须显式消费 WEB_DESKTOP_BIND_ADDR，并默认绑定 0.0.0.0"
 grep -q 'database_roles.sh:/docker-entrypoint-initdb.d/20-database-roles.sh:ro' "$compose_file" || fail "Compose 必须为 fresh database 挂载角色初始化脚本"
 grep -q 'database_roles.sh:/usr/local/bin/plush-database-roles:ro' "$compose_file" || fail "Compose 必须挂载可重复执行的数据库权限对账脚本"
+[[ -f "$database_roles_script" && ! -L "$database_roles_script" ]] || fail "数据库角色初始化脚本必须是普通文件"
+[[ "$(path_mode "$database_roles_script")" == "755" ]] || fail "数据库角色初始化脚本权限必须为 0755"
 grep -q 'POSTGRES_DSN: "postgres://erp_app:' "$compose_file" || fail "Compose app-server 必须固定使用 erp_app"
 for role_password_key in POSTGRES_APP_PASSWORD POSTGRES_MIGRATOR_PASSWORD POSTGRES_BACKUP_PASSWORD; do
   grep -q "${role_password_key}:" "$compose_file" || fail "Compose PostgreSQL 缺少 $role_password_key"
