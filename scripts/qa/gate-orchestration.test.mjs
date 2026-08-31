@@ -620,10 +620,10 @@ test("full overlaps only independent shared, Web and Server stages", () => {
   const full = read("scripts/qa/full.sh");
   assert.match(
     full,
-    /qa_run_stage "\$full_profile" environment_profile qa_full_environment_profile\s+qa_run_stage "\$full_profile" secrets qa_full_secrets\s+qa_run_parallel_stages \\\s+"\$full_profile" \\\s+shared qa_full_shared \\\s+web qa_full_web \\\s+server qa_full_server_core\s+qa_run_stage \\\s+"\$full_profile" \\\s+resource_sensitive_node \\\s+qa_full_resource_sensitive_node\s+qa_run_stage "\$full_profile" critical_postgres qa_full_critical_postgres\s+qa_run_stage "\$full_profile" browser qa_full_browser\s+qa_run_stage "\$full_profile" govulncheck qa_full_govulncheck/u,
+    /qa_run_stage "\$full_profile" environment_profile qa_full_environment_profile\s+qa_run_stage "\$full_profile" secrets qa_full_secrets\s+qa_run_parallel_stages \\\s+"\$full_profile" \\\s+shared qa_full_shared \\\s+web qa_full_web \\\s+server qa_full_server\s+qa_run_stage \\\s+"\$full_profile" \\\s+resource_sensitive_node \\\s+qa_full_resource_sensitive_node\s+qa_run_stage "\$full_profile" critical_postgres qa_full_critical_postgres\s+qa_run_stage "\$full_profile" browser qa_full_browser\s+qa_run_stage "\$full_profile" govulncheck qa_full_govulncheck/u,
   );
   const serverBody =
-    full.match(/qa_full_server_core\(\) \{([\s\S]*?)\n\}/u)?.[1] || "";
+    full.match(/qa_full_server\(\) \{([\s\S]*?)\n\}/u)?.[1] || "";
   const criticalBody =
     full.match(/qa_full_critical_postgres\(\) \{([\s\S]*?)\n\}/u)?.[1] || "";
   assert.doesNotMatch(serverBody, /--workflow critical-postgres/u);
@@ -646,6 +646,8 @@ test("GitLab quality shards are fixed, trusted and preserve every strict stage",
   assert.match(full, /dirty_ci_shard/u);
   for (const contract of [
     ["node", "secrets", "shared"],
+    ["web", "web"],
+    ["server", "environment_profile", "server", "critical_postgres"],
     ["resource", "resource_sensitive_node"],
     ["browser", "browser"],
     ["security", "govulncheck"],
@@ -659,24 +661,6 @@ test("GitLab quality shards are fixed, trusted and preserve every strict stage",
       assert.match(body, new RegExp(`qa_run_stage strict ${stage}`, "u"));
     }
   }
-  assert.match(
-    full,
-    /QA_CI_WEB_LANES[\s\S]+ci-quality-workload-lane[.]mjs" --aggregate web/u,
-  );
-  assert.match(
-    full,
-    /QA_CI_SERVER_LANES[\s\S]+ci-quality-workload-lane[.]mjs" --aggregate server/u,
-  );
-  assert.match(
-    full,
-    /qa_run_stage strict web_validation qa_full_web_validation/u,
-  );
-  assert.match(full, /qa_run_stage strict web_build qa_full_web_build/u);
-  assert.match(full, /qa_run_stage strict server qa_full_server_core/u);
-  assert.match(
-    full,
-    /qa_run_stage strict critical_postgres qa_full_critical_postgres/u,
-  );
   assert.match(strict, /--ci-shard static/u);
   assert.match(strict, /untrusted_ci_shard_context/u);
   assert.match(strict, /qa_run_stage strict strict_profile/u);

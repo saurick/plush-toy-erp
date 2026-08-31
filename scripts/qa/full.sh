@@ -6,8 +6,6 @@ print_help() {
 用法:
   bash scripts/qa/full.sh
   bash scripts/qa/full.sh --ci-shard node|web|server|resource|browser|security
-  bash scripts/qa/full.sh --ci-shard web --ci-lane validation|build
-  bash scripts/qa/full.sh --ci-shard server --ci-lane core|critical
 
 作用:
   执行一次完整本地质量检查。high-risk 或发布候选由 prepare-push.sh --full 在建立远端连接前调用。
@@ -43,14 +41,9 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
 fi
 
 ci_shard=""
-ci_lane=""
 if [[ $# -eq 2 && "${1:-}" == "--ci-shard" ]]; then
   ci_shard="$2"
   shift 2
-elif [[ $# -eq 4 && "${1:-}" == "--ci-shard" && "${3:-}" == "--ci-lane" ]]; then
-  ci_shard="$2"
-  ci_lane="$4"
-  shift 4
 fi
 
 if [[ $# -gt 0 ]]; then
@@ -63,14 +56,6 @@ case "$ci_shard" in
 "" | node | web | server | resource | browser | security) ;;
 *)
   echo "[qa:full] status=incomplete reason=invalid_ci_shard shard=$ci_shard"
-  exit 2
-  ;;
-esac
-
-case "$ci_shard:$ci_lane" in
-*: | web:validation | web:build | server:core | server:critical) ;;
-*)
-  echo "[qa:full] status=incomplete reason=invalid_ci_lane shard=$ci_shard lane=$ci_lane"
   exit 2
   ;;
 esac
@@ -203,8 +188,8 @@ qa_full_secrets() {
   SECRETS_STRICT=1 bash "$ROOT_DIR/scripts/qa/secrets.sh"
 }
 
-qa_full_web_validation() {
-  echo "[qa:full] 运行 Web 静态检查与自动化测试"
+qa_full_web() {
+  echo "[qa:full] 运行 web 测试与构建"
   cd "$ROOT_DIR/web"
   node -e "const fs=require('fs');const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));if(typeof pkg?.scripts?.test!=='string'||!pkg.scripts.test.trim()){console.error('[qa:full] web/package.json 缺少 scripts.test');process.exit(1)}"
   if [[ "$full_profile" == "strict" ]]; then
@@ -220,21 +205,11 @@ qa_full_web_validation() {
     node "$ROOT_DIR/scripts/qa/run-test-gate.mjs" \
     --kind node --label web-all "${test_gate_output_args[@]}" -- \
     "$PNPM_BIN" test --test-reporter=tap
-}
-
-qa_full_web_build() {
-  echo "[qa:full] 构建 Web 生产产物并验证 DEV 边界"
-  cd "$ROOT_DIR/web"
   qa_run_substep "$full_profile" web production_build \
     env NODE_ENV=production "$PNPM_BIN" build
   qa_run_substep "$full_profile" web production_boundary \
     node "$ROOT_DIR/scripts/qa/dev-workbench-production-boundary.mjs" \
     --build-dir "$ROOT_DIR/web/build"
-}
-
-qa_full_web() {
-  qa_full_web_validation
-  qa_full_web_build
 }
 
 qa_full_browser() {
@@ -273,7 +248,7 @@ qa_full_browser() {
   trap - EXIT
 }
 
-qa_full_server_core() {
+qa_full_server() {
   echo "[qa:full] 运行 server 全量检查"
   cd "$ROOT_DIR/server"
   PURCHASE_RECEIPT_PG_DB_URL="$DISPOSABLE_DATABASE_BASE_URL" \
@@ -307,29 +282,12 @@ node)
   qa_run_stage strict shared qa_full_shared
   ;;
 web)
-  if [[ "${QA_CI_WEB_LANES:-}" == "verified" && -z "$ci_lane" ]]; then
-    node "$ROOT_DIR/scripts/qa/ci-quality-workload-lane.mjs" --aggregate web
-  elif [[ "$ci_lane" == "validation" ]]; then
-    qa_run_stage strict web_validation qa_full_web_validation
-  elif [[ "$ci_lane" == "build" ]]; then
-    qa_run_stage strict web_build qa_full_web_build
-  else
-    qa_run_stage strict web qa_full_web
-  fi
+  qa_run_stage strict web qa_full_web
   ;;
 server)
-  if [[ "${QA_CI_SERVER_LANES:-}" == "verified" && -z "$ci_lane" ]]; then
-    node "$ROOT_DIR/scripts/qa/ci-quality-workload-lane.mjs" --aggregate server
-  elif [[ "$ci_lane" == "core" ]]; then
-    qa_run_stage strict environment_profile qa_full_environment_profile
-    qa_run_stage strict server qa_full_server_core
-  elif [[ "$ci_lane" == "critical" ]]; then
-    qa_run_stage strict critical_postgres qa_full_critical_postgres
-  else
-    qa_run_stage strict environment_profile qa_full_environment_profile
-    qa_run_stage strict server qa_full_server_core
-    qa_run_stage strict critical_postgres qa_full_critical_postgres
-  fi
+  qa_run_stage strict environment_profile qa_full_environment_profile
+  qa_run_stage strict server qa_full_server
+  qa_run_stage strict critical_postgres qa_full_critical_postgres
   ;;
 resource)
   qa_run_stage strict resource_sensitive_node qa_full_resource_sensitive_node
@@ -347,7 +305,7 @@ security)
     "$full_profile" \
     shared qa_full_shared \
     web qa_full_web \
-    server qa_full_server_core
+    server qa_full_server
   qa_run_stage \
     "$full_profile" \
     resource_sensitive_node \

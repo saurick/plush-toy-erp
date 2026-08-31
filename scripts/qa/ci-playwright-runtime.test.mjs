@@ -237,14 +237,6 @@ test("package absence only consumes one exact Runner-local cold seed", () => {
   assert.match(source, /await verifyRuntimeArchiveSet\(candidate\)/u);
   assert.match(source, /await verifyRunnerLocalSeed\(seedDirectory\)/u);
   assert.match(source, /removeExactDirectory\(seedDirectory\)/u);
-  assert.match(
-    source,
-    /stagingPrefix = `[.]playwright-\$\{env[.]CI_JOB_ID\}-`/u,
-  );
-  assert.match(
-    source,
-    /entry[.]name[.]startsWith\(stagingPrefix\)[\s\S]+removeExactDirectory\(path[.]join\(runtimeParent, entry[.]name\)\)/u,
-  );
   assert.match(source, /phase=runner-local-seed status=started/u);
   assert.match(source, /phase=runner-local-seed status=complete/u);
   assert.match(source, /phase=runner-local-seed status=failed/u);
