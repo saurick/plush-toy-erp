@@ -473,8 +473,11 @@ for value in "$sms_access_key_id" "$sms_access_key_secret" "$sms_sign_name" "$sm
 done
 unset provider_env
 
-mkdir -p "$runtime_dir" "$root/data" "$data_dir" "$backups_root" "$run_root" "$tools_root"
-chmod 700 "$runtime_dir" "$root/data" "$data_dir" "$backups_root" "$run_root" "$root/tools" "$root/tools/atlas" "$tools_root"
+[[ ! -e "$data_dir" && ! -L "$data_dir" ]] || fail "database data directory must be absent before initialization"
+# Keep the same ownership contract as the green release rehearsal: Docker creates
+# the bind source, then the PostgreSQL 18 entrypoint establishes its runtime owner.
+mkdir -p "$runtime_dir" "$root/data" "$backups_root" "$run_root" "$tools_root"
+chmod 700 "$runtime_dir" "$root/data" "$backups_root" "$run_root" "$root/tools" "$root/tools/atlas" "$tools_root"
 cp /usr/local/bin/atlas "$tools_root/atlas"
 chmod 700 "$tools_root/atlas"
 

@@ -71,6 +71,20 @@ test("target initializer restores the container-readable database role script mo
   );
 });
 
+test("target initializer lets Docker establish the fresh PostgreSQL data-root owner", () => {
+  const ownershipGate = source.indexOf(
+    '[[ ! -e "$data_dir" && ! -L "$data_dir" ]] || fail "database data directory must be absent before initialization"',
+  );
+  const directoryMaterialization = source.indexOf(
+    'mkdir -p "$runtime_dir" "$root/data" "$backups_root" "$run_root" "$tools_root"',
+  );
+  const composeStartIndex = source.indexOf("stage=database_start");
+  assert.ok(ownershipGate >= 0 && ownershipGate < directoryMaterialization);
+  assert.ok(directoryMaterialization < composeStartIndex);
+  assert.doesNotMatch(source, /mkdir -p[^\n]*"\$data_dir"/u);
+  assert.doesNotMatch(source, /chmod 700[^\n]*"\$data_dir"/u);
+});
+
 test("target initializer validates immutable release and restored backup before retention", () => {
   assert.match(
     source,
