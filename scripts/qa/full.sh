@@ -164,15 +164,24 @@ qa_full_environment_profile() {
 
 qa_full_shared() {
   echo "[qa:full] 运行共享基础检查，不重复 Web/Go 全量稍后覆盖的 fast 子集"
+  local node_test_profile=parallel_safe
+  if [[ "$ci_shard" == "node" && "${QA_CI_NODE_LANES:-}" == "verified" ]]; then
+    node_test_profile=ci_lanes
+  fi
   QA_BASE_RANGE="${QA_DB_GUARD_RANGE:-${QA_BASE_RANGE:-}}" \
-    QA_FAST_SCOPE=base QA_NODE_TEST_PROFILE=parallel_safe \
+    QA_FAST_SCOPE=base QA_NODE_TEST_PROFILE="$node_test_profile" \
     QA_FAST_GATE_PROFILE="$full_profile" \
     bash "$ROOT_DIR/scripts/qa/fast.sh"
 }
 
 qa_full_resource_sensitive_node() {
-  echo "[qa:full] 串行运行资源敏感的发布合同测试"
-  node "$ROOT_DIR/scripts/qa/run-node-tests.mjs" --profile resource_sensitive
+  if [[ "$ci_shard" == "resource" && "${QA_CI_RESOURCE_LANES:-}" == "verified" ]]; then
+    echo "[qa:full] 校验两个串行资源 lane 的 exact-once 回执"
+    node "$ROOT_DIR/scripts/qa/ci-resource-test-lane.mjs" --aggregate
+  else
+    echo "[qa:full] 串行运行资源敏感的发布合同测试"
+    node "$ROOT_DIR/scripts/qa/run-node-tests.mjs" --profile resource_sensitive
+  fi
 }
 
 qa_full_secrets() {

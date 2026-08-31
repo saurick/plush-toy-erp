@@ -5,6 +5,11 @@ import { spawn, spawnSync } from "node:child_process";
 import test from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
 
+import {
+  BOOTSTRAP_PRODUCTION_ADMIN_TEST_CASES,
+  bootstrapProductionAdminTestCase,
+} from "./bootstrap-production-admin.test-cases.mjs";
+
 const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
 const scriptPath = path.join(
   repoRoot,
@@ -30,11 +35,60 @@ const adminPassword = "FreshAdmin9!";
 const postgresAppPassword = "test-app-password-12345";
 const postgresDSN = `postgres://erp_app:${postgresAppPassword}@postgres:5432/${expectedDatabase}?sslmode=disable`;
 const fixtureScratchRoot = path.join(repoRoot, "output", "qa-tmp");
-// Aggregate Node tests run files concurrently; this only gives fixture scheduling headroom.
+// This test owns a background fixture process, so keep bounded scheduling headroom for startup and cleanup.
 const fixtureProcessTimeoutMs = 30_000;
 const fixtureReadyTimeoutMs = 15_000;
 
-test("bootstrap resolves its release root independently of the caller cwd", () => {
+const registeredBootstrapTests = new Map();
+
+function defineBootstrapTest(id, fn) {
+  const definition = bootstrapProductionAdminTestCase(id);
+  if (registeredBootstrapTests.has(id)) {
+    throw new Error(`duplicate bootstrap production admin test id: ${id}`);
+  }
+  registeredBootstrapTests.set(id, Object.freeze({ ...definition, fn }));
+}
+
+export function validateBootstrapProductionAdminTestRegistry() {
+  const expectedIds = BOOTSTRAP_PRODUCTION_ADMIN_TEST_CASES.map(({ id }) => id);
+  const actualIds = [...registeredBootstrapTests.keys()];
+  if (JSON.stringify(actualIds) !== JSON.stringify(expectedIds)) {
+    throw new Error("bootstrap production admin test registry is incomplete");
+  }
+  return Object.freeze({
+    caseCount: actualIds.length,
+    scenarioCount: BOOTSTRAP_PRODUCTION_ADMIN_TEST_CASES.reduce(
+      (total, definition) => total + definition.scenarioCount,
+      0,
+    ),
+  });
+}
+
+export function registerBootstrapProductionAdminTests(lane) {
+  const registry = validateBootstrapProductionAdminTestRegistry();
+  const selected = [...registeredBootstrapTests.values()].filter(
+    (definition) => definition.lane === lane,
+  );
+  if (selected.length === 0) {
+    throw new Error(
+      `unknown or empty bootstrap production admin test lane: ${lane}`,
+    );
+  }
+  for (const definition of selected) {
+    test(definition.name, definition.fn);
+  }
+  return Object.freeze({
+    ...registry,
+    lane,
+    laneCaseCount: selected.length,
+    laneScenarioCount: selected.reduce(
+      (total, definition) => total + definition.scenarioCount,
+      0,
+    ),
+  });
+}
+
+defineBootstrapTest("release-root", () => {
   assert.match(
     scriptSource,
     /script_dir="\$\(cd "\$\(dirname "\$\{BASH_SOURCE\[0\]\}"\)" && pwd -P\)"/u,
@@ -171,10 +225,7 @@ function writeFixture(t) {
   }
   fs.chmodSync(path.join(composeDir, "database_roles.sh"), 0o755);
   fs.chmodSync(path.join(composeDir, "migrate_online.sh"), 0o755);
-  const composeOverride = path.join(
-    composeDir,
-    "compose.demo-133.yml",
-  );
+  const composeOverride = path.join(composeDir, "compose.demo-133.yml");
   fs.writeFileSync(composeOverride, `name: ${trialProject}\n`, "utf8");
   const customerTestComposeOverride = path.join(
     composeDir,
@@ -879,7 +930,7 @@ function assertSecretSafe(result, fixture, secret = adminPassword) {
   }
 }
 
-test("bootstrap production admin uses one secret-safe one-shot and reads back all evidence", (t) => {
+defineBootstrapTest("success-receipt", (t) => {
   const fixture = writeFixture(t);
   const result = runHelper(fixture);
 
@@ -910,7 +961,7 @@ test("bootstrap production admin uses one secret-safe one-shot and reads back al
   assertSecretSafe(result, fixture);
 });
 
-test("bootstrap production admin reads scalar mode and owner with GNU stat semantics", (t) => {
+defineBootstrapTest("gnu-stat", (t) => {
   const fixture = writeFixture(t);
   installGnuStatShim(fixture);
 
@@ -925,7 +976,7 @@ test("bootstrap production admin reads scalar mode and owner with GNU stat seman
   assertSecretSafe(result, fixture);
 });
 
-test("bootstrap production admin falls back to scalar BSD stat semantics", (t) => {
+defineBootstrapTest("bsd-stat", (t) => {
   const fixture = writeFixture(t);
   installBsdStatShim(fixture);
 
@@ -939,7 +990,7 @@ test("bootstrap production admin falls back to scalar BSD stat semantics", (t) =
   assertSecretSafe(result, fixture);
 });
 
-test("bootstrap production admin binds the demo-133 override, lock and all Compose calls", async (t) => {
+defineBootstrapTest("demo-target-contract", async (t) => {
   const fixture = writeFixture(t);
   configureTrialFixture(fixture);
   const releasePath = path.join(fixture.stateDir, "release-compose-version");
@@ -982,7 +1033,7 @@ test("bootstrap production admin binds the demo-133 override, lock and all Compo
   assertSecretSafe(result, fixture);
 });
 
-test("bootstrap production admin binds the isolated customer-test-133 contract", (t) => {
+defineBootstrapTest("customer-test-contract", (t) => {
   const fixture = writeFixture(t);
   configureCustomerTestFixture(fixture);
   const result = runHelper(fixture, {
@@ -1012,7 +1063,7 @@ test("bootstrap production admin binds the isolated customer-test-133 contract",
   assertSecretSafe(result, fixture);
 });
 
-test("bootstrap production admin rejects every drift from the exact demo-133 data, lock and Jaeger contract", (t) => {
+defineBootstrapTest("demo-target-drift", (t) => {
   const cases = [
     ["POSTGRES_DATA_DIR", "/home/simon/plush-toy-erp-demo-v1/data/other"],
     ["MIGRATION_LOCK_FILE", path.join("__alternate__", "atlas-migrate.lock")],
@@ -1069,7 +1120,7 @@ test("bootstrap production admin rejects every drift from the exact demo-133 dat
   }
 });
 
-test("bootstrap production admin rejects missing or out-of-scope Compose overrides before docker", (t) => {
+defineBootstrapTest("compose-override-scope", (t) => {
   {
     const fixture = writeFixture(t);
     const result = runHelper(fixture, {
@@ -1098,7 +1149,7 @@ test("bootstrap production admin rejects missing or out-of-scope Compose overrid
   }
 });
 
-test("bootstrap production admin serializes the same Compose project and database before docker", async (t) => {
+defineBootstrapTest("compose-database-serialization", async (t) => {
   const fixture = writeFixture(t);
   const releasePath = path.join(fixture.stateDir, "release-compose-version");
   const first = startHelper(fixture, {
@@ -1142,7 +1193,7 @@ test("bootstrap production admin serializes the same Compose project and databas
   assertSecretSafe(firstResult, fixture);
 });
 
-test("bootstrap production admin rejects an alternate registered-target lock root before Docker", (t) => {
+defineBootstrapTest("alternate-target-lock-root", (t) => {
   const fixture = writeFixture(t);
   const secondLockDir = path.join(fixture.root, "alternate-lock-root");
   fs.mkdirSync(secondLockDir, { mode: 0o700 });
@@ -1155,12 +1206,15 @@ test("bootstrap production admin rejects an alternate registered-target lock roo
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /MIGRATION_LOCK_FILE 不符合登记合同/u);
   assert.equal(fs.existsSync(path.join(fixture.stateDir, "started")), false);
-  assert.equal(fs.existsSync(path.join(fixture.stateDir, "advisory-ready")), false);
+  assert.equal(
+    fs.existsSync(path.join(fixture.stateDir, "advisory-ready")),
+    false,
+  );
   assert.equal(fs.existsSync(fixture.secretEnvLog), false);
   assertSecretSafe(result, fixture);
 });
 
-test("bootstrap production admin rejects busy or abnormal PostgreSQL advisory locks before one-shot", (t) => {
+defineBootstrapTest("advisory-lock-busy", (t) => {
   const cases = [
     [{ FAKE_ADVISORY_BUSY: "1" }, /advisory lock 已被占用/u],
     [{ FAKE_ADVISORY_ERROR: "1" }, /advisory lock session 异常退出/u],
@@ -1177,7 +1231,7 @@ test("bootstrap production admin rejects busy or abnormal PostgreSQL advisory lo
   }
 });
 
-test("bootstrap production admin preserves an existing lock as stale evidence", (t) => {
+defineBootstrapTest("stale-file-lock", (t) => {
   const fixture = writeFixture(t);
   const lockPath = bootstrapLockPath(fixture);
   fs.mkdirSync(lockPath, { mode: 0o700 });
@@ -1197,7 +1251,7 @@ test("bootstrap production admin preserves an existing lock as stale evidence", 
   assertSecretSafe(result, fixture);
 });
 
-test("bootstrap production admin releases its lock after a post-lock failure", (t) => {
+defineBootstrapTest("post-lock-failure-release", (t) => {
   const fixture = writeFixture(t);
   const result = runHelper(fixture, {
     env: { FAKE_POSTGRES_HEALTH: "unhealthy" },
@@ -1209,7 +1263,7 @@ test("bootstrap production admin releases its lock after a post-lock failure", (
   assertSecretSafe(result, fixture);
 });
 
-test("bootstrap production admin only releases the lock token it acquired", async (t) => {
+defineBootstrapTest("acquired-lock-token", async (t) => {
   const fixture = writeFixture(t);
   const releasePath = path.join(fixture.stateDir, "release-compose-version");
   const first = startHelper(fixture, {
@@ -1240,7 +1294,7 @@ test("bootstrap production admin only releases the lock token it acquired", asyn
   assertSecretSafe(result, fixture);
 });
 
-test("bootstrap production admin rejects a non-private lock parent before docker", (t) => {
+defineBootstrapTest("private-lock-parent", (t) => {
   const fixture = writeFixture(t);
   fs.chmodSync(fixture.lockDir, 0o755);
 
@@ -1251,7 +1305,7 @@ test("bootstrap production admin rejects a non-private lock parent before docker
   assertSecretSafe(result, fixture);
 });
 
-test("bootstrap production admin rejects shared temporary lock roots before docker", (t) => {
+defineBootstrapTest("shared-temp-lock-root", (t) => {
   for (const migrationLockFile of [
     "/tmp/plush-bootstrap/atlas-migrate.lock",
     "/var/tmp/plush-bootstrap/atlas-migrate.lock",
@@ -1271,7 +1325,7 @@ test("bootstrap production admin rejects shared temporary lock roots before dock
   }
 });
 
-test("bootstrap production admin rejects missing, local-default and weak secrets before docker", (t) => {
+defineBootstrapTest("secret-validation", (t) => {
   for (const [password, expected] of [
     ["", /必须通过环境变量 APP_ADMIN_PASSWORD/u],
     ["adminadmin", /不得使用本地开发默认密码/u],
@@ -1285,7 +1339,7 @@ test("bootstrap production admin rejects missing, local-default and weak secrets
   }
 });
 
-test("bootstrap production admin accepts only one exact internal PostgreSQL DSN before docker", (t) => {
+defineBootstrapTest("postgres-dsn", (t) => {
   const invalidCases = [
     `${postgresDSN}&application_name=bootstrap`,
     `postgres://postgres:test-production-password@postgres,postgres-backup:5432/${expectedDatabase}?sslmode=disable`,
@@ -1317,7 +1371,7 @@ test("bootstrap production admin accepts only one exact internal PostgreSQL DSN 
   assertSecretSafe(userResult, userFixture);
 });
 
-test("bootstrap production admin rejects password persistence and an open once window in steady env", (t) => {
+defineBootstrapTest("steady-password-window", (t) => {
   for (const mutate of [
     (value) => `${value}APP_ADMIN_PASSWORD=\n`,
     (value) =>
@@ -1339,7 +1393,7 @@ test("bootstrap production admin rejects password persistence and an open once w
   }
 });
 
-test("bootstrap production admin binds confirmation, database, migration and image release", (t) => {
+defineBootstrapTest("confirmation-release-binding", (t) => {
   const cases = [
     {
       options: { confirmation: "wrong-confirmation" },
@@ -1368,7 +1422,7 @@ test("bootstrap production admin binds confirmation, database, migration and ima
   }
 });
 
-test("bootstrap production admin rejects the wrong PostgreSQL Compose label or container name before DB writes", (t) => {
+defineBootstrapTest("postgres-container-identity", (t) => {
   const cases = [
     [
       { FAKE_POSTGRES_COMPOSE_PROJECT: "wrong-project" },
@@ -1391,7 +1445,7 @@ test("bootstrap production admin rejects the wrong PostgreSQL Compose label or c
   }
 });
 
-test("bootstrap production admin never accepts or cleans a one-shot with mismatched CID, name, labels, image or operation", (t) => {
+defineBootstrapTest("one-shot-identity-cleanup", (t) => {
   const cases = [
     { FAKE_ONE_SHOT_ID: "c".repeat(64) },
     { FAKE_ONE_SHOT_NAME: "foreign-admin-bootstrap" },
@@ -1428,7 +1482,7 @@ test("bootstrap production admin never accepts or cleans a one-shot with mismatc
   }
 });
 
-test("bootstrap production admin fails before writes on infrastructure and schema blockers", (t) => {
+defineBootstrapTest("infrastructure-schema-blockers", (t) => {
   const cases = [
     [{ FAKE_POSTGRES_HEALTH: "unhealthy" }, /running\/healthy/u],
     [{ FAKE_APP_RUNNING: "1" }, /必须停止常驻 app-server/u],
@@ -1445,7 +1499,7 @@ test("bootstrap production admin fails before writes on infrastructure and schem
   }
 });
 
-test("bootstrap production admin refuses a preexisting marker or username without starting a container", (t) => {
+defineBootstrapTest("existing-marker-username", (t) => {
   for (const [env, expected] of [
     [{ FAKE_PREEXISTING_MARKER: "1" }, /marker 已存在/u],
     [{ FAKE_PREEXISTING_ADMIN: "1" }, /用户名已存在/u],
@@ -1459,7 +1513,7 @@ test("bootstrap production admin refuses a preexisting marker or username withou
   }
 });
 
-test("bootstrap production admin treats committed evidence mismatches as non-retryable", (t) => {
+defineBootstrapTest("committed-evidence-mismatch", (t) => {
   const cases = [
     [{ FAKE_EXACT_MARKER_COUNT: "0" }, /marker payload 读回失败/u],
     [{ FAKE_ELIGIBLE_ADMIN_COUNT: "0" }, /管理员状态读回失败/u],
@@ -1479,7 +1533,7 @@ test("bootstrap production admin treats committed evidence mismatches as non-ret
   }
 });
 
-test("bootstrap production admin cleans an early-exit container and never reports committed", (t) => {
+defineBootstrapTest("early-exit-cleanup", (t) => {
   const fixture = writeFixture(t);
   const result = runHelper(fixture, {
     env: {
@@ -1495,7 +1549,7 @@ test("bootstrap production admin cleans an early-exit container and never report
   assertSecretSafe(result, fixture);
 });
 
-test("bootstrap production admin times out fail-closed and removes the one-shot", (t) => {
+defineBootstrapTest("timeout-cleanup", (t) => {
   const fixture = writeFixture(t);
   const result = runHelper(fixture, {
     timeoutSeconds: "1",
@@ -1509,7 +1563,7 @@ test("bootstrap production admin times out fail-closed and removes the one-shot"
   assertSecretSafe(result, fixture);
 });
 
-test("bootstrap production admin recovers an invalid cid only through the unique random operation label", (t) => {
+defineBootstrapTest("invalid-cid-recovery", (t) => {
   const fixture = writeFixture(t);
   const result = runHelper(fixture, { env: { FAKE_INVALID_CID: "1" } });
 
@@ -1520,7 +1574,7 @@ test("bootstrap production admin recovers an invalid cid only through the unique
   assertSecretSafe(result, fixture);
 });
 
-test("bootstrap production admin retains locks when random-operation discovery fails or is non-unique", (t) => {
+defineBootstrapTest("random-operation-discovery", (t) => {
   for (const env of [
     { FAKE_INVALID_CID: "1", FAKE_DISCOVERY_FAIL: "1" },
     { FAKE_INVALID_CID: "1", FAKE_DISCOVERY_MULTIPLE: "1" },
@@ -1544,7 +1598,7 @@ test("bootstrap production admin retains locks when random-operation discovery f
   }
 });
 
-test("bootstrap production admin retains locks when a failed compose run has no verified container", (t) => {
+defineBootstrapTest("compose-failure-unverified-container", (t) => {
   const fixture = writeFixture(t);
   const result = runHelper(fixture, {
     env: {
@@ -1567,7 +1621,7 @@ test("bootstrap production admin retains locks when a failed compose run has no 
   assertSecretSafe(result, fixture);
 });
 
-test("bootstrap production admin reports committed but not ready when container cleanup fails", (t) => {
+defineBootstrapTest("cleanup-failure-receipt", (t) => {
   const fixture = writeFixture(t);
   const result = runHelper(fixture, { env: { FAKE_CLEANUP_FAIL: "1" } });
 
@@ -1581,7 +1635,7 @@ test("bootstrap production admin reports committed but not ready when container 
   assertSecretSafe(result, fixture);
 });
 
-test("bootstrap production admin accepts an already verified --rm container disappearing during cleanup", (t) => {
+defineBootstrapTest("disappeared-rm-container", (t) => {
   const fixture = writeFixture(t);
   const result = runHelper(fixture, {
     env: { FAKE_AUTO_REMOVE_AFTER_VERIFIED: "1" },
@@ -1599,7 +1653,7 @@ test("bootstrap production admin accepts an already verified --rm container disa
   assertSecretSafe(result, fixture);
 });
 
-test("bootstrap production admin does not confuse Docker inspect failure with verified absence", (t) => {
+defineBootstrapTest("inspect-failure", (t) => {
   const fixture = writeFixture(t);
   const result = runHelper(fixture, {
     env: { FAKE_INSPECT_FAILURE_AFTER_COMMIT: "1" },
@@ -1618,7 +1672,7 @@ test("bootstrap production admin does not confuse Docker inspect failure with ve
   assertSecretSafe(result, fixture);
 });
 
-test("bootstrap production admin retains the file lock when PostgreSQL cannot prove advisory release", (t) => {
+defineBootstrapTest("advisory-release-failure", (t) => {
   const fixture = writeFixture(t);
   const result = runHelper(fixture, {
     env: { FAKE_ADVISORY_TERMINATE_FAIL: "1" },
@@ -1636,7 +1690,7 @@ test("bootstrap production admin retains the file lock when PostgreSQL cannot pr
   assertSecretSafe(result, fixture);
 });
 
-test("bootstrap production admin pins a private env snapshot and detects steady env drift", (t) => {
+defineBootstrapTest("env-snapshot-drift", (t) => {
   const fixture = writeFixture(t);
   const result = runHelper(fixture, {
     env: { FAKE_MUTATE_ENV_FILE: fixture.envFile },
@@ -1649,7 +1703,7 @@ test("bootstrap production admin pins a private env snapshot and detects steady 
   assertSecretSafe(result, fixture);
 });
 
-test("bootstrap production admin rejects a steady Compose password mapping", (t) => {
+defineBootstrapTest("compose-password-mapping", (t) => {
   const fixture = writeFixture(t);
   const composePath = path.join(fixture.composeDir, "compose.yml");
   fs.writeFileSync(
@@ -1672,7 +1726,7 @@ test("bootstrap production admin rejects a steady Compose password mapping", (t)
   assertSecretSafe(result, fixture);
 });
 
-test("bootstrap production admin rejects permissive or symlinked env files", (t) => {
+defineBootstrapTest("env-file-permissions", (t) => {
   {
     const fixture = writeFixture(t);
     fs.chmodSync(fixture.envFile, 0o644);
@@ -1693,7 +1747,7 @@ test("bootstrap production admin rejects permissive or symlinked env files", (t)
   }
 });
 
-test("bootstrap production admin rejects host target overrides", (t) => {
+defineBootstrapTest("host-target-overrides", (t) => {
   const fixture = writeFixture(t);
   const result = runHelper(fixture, {
     env: { COMPOSE_PROJECT_NAME: "wrong-project" },
@@ -1705,7 +1759,7 @@ test("bootstrap production admin rejects host target overrides", (t) => {
   assertSecretSafe(result, fixture);
 });
 
-test("bootstrap production admin script keeps the compose one-shot fail-closed", () => {
+defineBootstrapTest("one-shot-source-contract", () => {
   const source = fs.readFileSync(scriptPath, "utf8");
   const preflightSource = fs.readFileSync(
     path.join(repoRoot, "scripts/deploy/production-preflight.sh"),

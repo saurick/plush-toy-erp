@@ -26,6 +26,8 @@ import {
   cleanupPlaywrightRuntime,
   materializePlaywrightRuntime,
 } from "./ci-playwright-runtime.mjs";
+import { loadCiNodeTestLaneSet } from "./ci-node-test-lane.mjs";
+import { loadCiResourceTestLaneSet } from "./ci-resource-test-lane.mjs";
 
 export const CI_QUALITY_SHARD_SCHEMA = "plush.ci-quality-shard/v1";
 export const CI_QUALITY_SHARDS = Object.freeze({
@@ -343,6 +345,8 @@ export async function runCiQualityShard({
     QA_DB_GUARD_RANGE: plan.range,
     QA_FULL_PROFILE: "strict",
   };
+  if (shard === "node") childEnv.QA_CI_NODE_LANES = "verified";
+  if (shard === "resource") childEnv.QA_CI_RESOURCE_LANES = "verified";
   if (shard === "browser") {
     childEnv.QA_BROWSER_SCENARIOS =
       "root-redirect-desktop,root-redirect-mobile,print-center-engineering-preview-tablet";
@@ -363,6 +367,8 @@ export async function runCiQualityShard({
     playwrightRuntimeCleanup: ["server", "browser"].includes(shard)
       ? "pending"
       : "not-applicable",
+    nodeLanes: shard === "node" ? null : "not-applicable",
+    resourceLanes: shard === "resource" ? null : "not-applicable",
     webBuildSha256: null,
   };
   try {
@@ -451,6 +457,61 @@ export async function runCiQualityShard({
         throw new Error("browser shard Web build artifact identity mismatch");
       }
       invariants.webBuildSha256 = webBuildSha256;
+    }
+    if (shard === "node") {
+      const lanes = loadCiNodeTestLaneSet({
+        root,
+        directory: "output/ci/node-lanes",
+        expected: {
+          repository: env.CI_PROJECT_PATH,
+          gitSha: env.CI_COMMIT_SHA,
+          pipelineId: String(env.CI_PIPELINE_ID),
+          pipelineIid: String(env.CI_PIPELINE_IID),
+          pipelineSource: env.CI_PIPELINE_SOURCE,
+          planSha256: plan.planSha256,
+          rangeSha256: plan.rangeSha256,
+          range: plan.range,
+        },
+      });
+      invariants.nodeLanes = {
+        status: "passed",
+        laneCount: lanes.laneCount,
+        testFileCount: lanes.testFileCount,
+        durationMs: lanes.durationMs,
+        jobs: lanes.jobs,
+        executed: lanes.summary.tests,
+        passed: lanes.summary.pass,
+        failed: lanes.summary.fail,
+        skipped: lanes.summary.skipped,
+      };
+    }
+    if (shard === "resource") {
+      const lanes = loadCiResourceTestLaneSet({
+        root,
+        directory: "output/ci/resource-lanes",
+        expected: {
+          repository: env.CI_PROJECT_PATH,
+          gitSha: env.CI_COMMIT_SHA,
+          pipelineId: String(env.CI_PIPELINE_ID),
+          pipelineIid: String(env.CI_PIPELINE_IID),
+          pipelineSource: env.CI_PIPELINE_SOURCE,
+          planSha256: plan.planSha256,
+          rangeSha256: plan.rangeSha256,
+          range: plan.range,
+        },
+      });
+      invariants.resourceLanes = {
+        status: "passed",
+        laneCount: lanes.laneCount,
+        caseCount: lanes.caseCount,
+        scenarioCount: lanes.scenarioCount,
+        durationMs: lanes.durationMs,
+        jobs: lanes.jobs,
+        executed: lanes.summary.tests,
+        passed: lanes.summary.pass,
+        failed: lanes.summary.fail,
+        skipped: lanes.summary.skipped,
+      };
     }
     const main = await runProcess(definition.command[0], definition.command.slice(1), {
       cwd: root,

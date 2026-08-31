@@ -52,26 +52,22 @@ test("all scripts Node tests in the current tree are assigned to one explicit gr
     ),
   );
   assert.deepEqual(NODE_TEST_GROUPS.resource_sensitive, [
-    "scripts/deploy/bootstrap-production-admin.test.mjs",
+    "scripts/deploy/bootstrap-production-admin.contract.test.mjs",
+    "scripts/deploy/bootstrap-production-admin.runtime.test.mjs",
   ]);
-  assert.equal(
-    NODE_TEST_GROUPS.release.includes(
-      "scripts/deploy/bootstrap-production-admin.test.mjs",
-    ),
-    false,
-  );
+  for (const file of NODE_TEST_GROUPS.resource_sensitive) {
+    assert.equal(NODE_TEST_GROUPS.release.includes(file), false);
+  }
 
   const parallelSafe = catalogNodeTests("parallel_safe");
-  assert.equal(
-    parallelSafe.includes("scripts/deploy/bootstrap-production-admin.test.mjs"),
-    false,
-  );
-  assert.equal(
-    catalogNodeTests("full").filter(
-      (file) => file === "scripts/deploy/bootstrap-production-admin.test.mjs",
-    ).length,
-    1,
-  );
+  for (const file of NODE_TEST_GROUPS.resource_sensitive) {
+    assert.equal(parallelSafe.includes(file), false);
+    assert.equal(
+      catalogNodeTests("full").filter((candidate) => candidate === file)
+        .length,
+      1,
+    );
+  }
   assert.deepEqual(
     [...parallelSafe, ...NODE_TEST_GROUPS.resource_sensitive].sort(),
     validation.tests,
@@ -283,8 +279,15 @@ test("QA gates compose explicit Node groups without repeating full-only work", a
   assert.match(fast, /scripts\/qa\/run-node-tests\.mjs/u);
   assert.match(fast, /--profile "\$node_test_profile"/u);
   assert.match(full, /QA_FAST_SCOPE=base/u);
-  assert.match(full, /QA_NODE_TEST_PROFILE=parallel_safe/u);
+  assert.match(full, /local node_test_profile=parallel_safe/u);
+  assert.match(full, /node_test_profile=ci_lanes/u);
+  assert.match(full, /QA_NODE_TEST_PROFILE="\$node_test_profile"/u);
   assert.match(full, /run-node-tests\.mjs" --profile resource_sensitive/u);
+  assert.match(full, /QA_CI_RESOURCE_LANES/u);
+  assert.match(full, /ci-resource-test-lane\.mjs" --aggregate/u);
+  assert.match(fast, /base:ci_lanes/u);
+  assert.match(fast, /ci-node-test-lane\.mjs/u);
+  assert.match(fast, /QA_CI_NODE_LANES/u);
   assert.match(full, /bash "\$ROOT_DIR\/scripts\/qa\/fast\.sh"/u);
   assert.match(strict, /bash "\$ROOT_DIR\/scripts\/qa\/full\.sh"/u);
   assert.match(strict, /QA_BROWSER_SCENARIOS=/u);

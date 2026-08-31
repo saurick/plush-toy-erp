@@ -36,12 +36,26 @@ fi
 fast_scope="${QA_FAST_SCOPE:-complete}"
 node_test_profile="${QA_NODE_TEST_PROFILE:-fast}"
 case "$fast_scope:$node_test_profile" in
-complete:fast | base:parallel_safe) ;;
+complete:fast | base:parallel_safe | base:ci_lanes) ;;
 *)
   echo "[qa:fast] status=incomplete reason=invalid_composition scope=$fast_scope node_profile=$node_test_profile"
   exit 2
   ;;
 esac
+
+if [[ "$node_test_profile" == "ci_lanes" ]]; then
+  if [[ "${GITLAB_CI:-}" != "true" ||
+    "${CI_PROJECT_PATH:-}" != "saurick/plush-toy-erp" ||
+    "${CI_DEFAULT_BRANCH:-}" != "main" ||
+    "${CI_COMMIT_BRANCH:-}" != "main" ||
+    "${CI_COMMIT_REF_PROTECTED:-}" != "true" ||
+    "${CI_JOB_NAME:-}" != "quality_node" ||
+    "${QA_CI_NODE_LANES:-}" != "verified" ||
+    ! "${CI_COMMIT_SHA:-}" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "[qa:fast] status=incomplete reason=untrusted_ci_node_lanes"
+    exit 2
+  fi
+fi
 
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
@@ -106,8 +120,15 @@ qa_fast_repository_guards() {
 }
 
 qa_fast_node_tests() {
-  echo "[qa:fast] 运行 scripts Node 显式测试组 profile=$node_test_profile"
-  node "$ROOT_DIR/scripts/qa/run-node-tests.mjs" --profile "$node_test_profile"
+  if [[ "$node_test_profile" == "ci_lanes" ]]; then
+    echo "[qa:fast] 核对 scripts Node 内部分片回执"
+    node "$ROOT_DIR/scripts/qa/ci-node-test-lane.mjs" \
+      --aggregate \
+      --dir output/ci/node-lanes
+  else
+    echo "[qa:fast] 运行 scripts Node 显式测试组 profile=$node_test_profile"
+    node "$ROOT_DIR/scripts/qa/run-node-tests.mjs" --profile "$node_test_profile"
+  fi
 }
 
 qa_fast_script_boundaries() {

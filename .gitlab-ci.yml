@@ -203,7 +203,7 @@ quality_static:
     paths:
       - output/ci/shards/static.json
 
-quality_node:
+quality_node_release:
   <<: [*quality_shard, *pnpm_cache_pull]
   needs:
     - job: plan
@@ -211,12 +211,57 @@ quality_node:
     - job: prepare
       artifacts: false
   script:
-    - node scripts/qa/ci-quality-shard.mjs --shard node
+    - node scripts/qa/ci-node-test-lane.mjs --lane release
   artifacts:
     when: always
     expire_in: 90 days
     paths:
-      - output/ci/shards/node.json
+      - output/ci/node-lanes/release.json
+
+quality_node_core:
+  <<: [*quality_shard, *pnpm_cache_pull]
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+  script:
+    - node scripts/qa/ci-node-test-lane.mjs --lane core
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/node-lanes/core.json
+
+quality_resource_contract:
+  <<: *quality_shard
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+  script:
+    - node scripts/qa/ci-resource-test-lane.mjs --lane contract
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/resource-lanes/contract.json
+
+quality_resource_runtime:
+  <<: *quality_shard
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+  script:
+    - node scripts/qa/ci-resource-test-lane.mjs --lane runtime
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/resource-lanes/runtime.json
 
 quality_web:
   <<: [*quality_shard, *pnpm_cache_pull]
@@ -256,6 +301,10 @@ quality_resource:
       artifacts: true
     - job: prepare
       artifacts: false
+    - job: quality_resource_contract
+      artifacts: true
+    - job: quality_resource_runtime
+      artifacts: true
   script:
     - node scripts/qa/ci-quality-shard.mjs --shard resource
   artifacts:
@@ -263,6 +312,25 @@ quality_resource:
     expire_in: 90 days
     paths:
       - output/ci/shards/resource.json
+
+quality_node:
+  <<: [*quality_shard, *pnpm_cache_pull]
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+    - job: quality_node_release
+      artifacts: true
+    - job: quality_node_core
+      artifacts: true
+  script:
+    - node scripts/qa/ci-quality-shard.mjs --shard node
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/shards/node.json
 
 quality_browser:
   <<: [*quality_shard, *browser_cache_pull]

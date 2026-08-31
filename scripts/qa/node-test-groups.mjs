@@ -28,10 +28,12 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/qa/affected.test.mjs",
     "scripts/qa/candidate-sha-freeze.test.mjs",
     "scripts/qa/canonical-runtime-audit-contract.test.mjs",
+    "scripts/qa/ci-node-test-lane.test.mjs",
     "scripts/qa/ci-plan.test.mjs",
     "scripts/qa/ci-playwright-runtime.test.mjs",
     "scripts/qa/ci-quality-aggregate.test.mjs",
     "scripts/qa/ci-quality-shard.test.mjs",
+    "scripts/qa/ci-resource-test-lane.test.mjs",
     "scripts/qa/core-boundary.test.mjs",
     "scripts/qa/customer-config-effective-session-probe.test.mjs",
     "scripts/qa/customer-config-runtime-manifest.test.mjs",
@@ -209,6 +211,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/qa/yoyoosun-release-readiness.test.mjs",
   ]),
   resource_sensitive: Object.freeze([
-    "scripts/deploy/bootstrap-production-admin.test.mjs",
+    "scripts/deploy/bootstrap-production-admin.contract.test.mjs",
+    "scripts/deploy/bootstrap-production-admin.runtime.test.mjs",
   ]),
 });

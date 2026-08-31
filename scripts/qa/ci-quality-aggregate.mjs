@@ -34,6 +34,12 @@ import {
   CI_QUALITY_SHARDS,
   CI_QUALITY_SHARD_SCHEMA,
 } from "./ci-quality-shard.mjs";
+import {
+  CI_NODE_TEST_LANES,
+  expectedCiNodeTestLaneFiles,
+} from "./ci-node-test-lane.mjs";
+import { CI_RESOURCE_TEST_LANES } from "./ci-resource-test-lane.mjs";
+import { BOOTSTRAP_PRODUCTION_ADMIN_TEST_CASES } from "../deploy/bootstrap-production-admin.test-cases.mjs";
 
 export const CI_QUALITY_AGGREGATE_SCHEMA = "plush.gitlab-strict-aggregate/v1";
 export const CI_EVIDENCE_MANIFEST_SCHEMA = "plush.gitlab-ci-evidence/v1";
@@ -44,6 +50,147 @@ export function matchesStrictSourceArchive(sourceIntegrity, strictIdentity) {
     sourceIntegrity.archiveSha256 ===
       `sha256:${strictIdentity.sourceArchiveSha256}`
   );
+}
+
+export function hasCompleteCiNodeLaneEvidence(value) {
+  const expectedFiles = Object.keys(CI_NODE_TEST_LANES).flatMap((lane) =>
+    expectedCiNodeTestLaneFiles(lane),
+  );
+  const expectedJobs = Object.entries(CI_NODE_TEST_LANES);
+  return (
+    value?.status === "passed" &&
+    value.laneCount === Object.keys(CI_NODE_TEST_LANES).length &&
+    value.testFileCount === expectedFiles.length &&
+    Number.isSafeInteger(value.durationMs) &&
+    value.durationMs >= 0 &&
+    Number.isSafeInteger(value.executed) &&
+    value.executed > 0 &&
+    value.passed === value.executed &&
+    value.failed === 0 &&
+    value.skipped === 0 &&
+    Array.isArray(value.jobs) &&
+    value.jobs.length === expectedJobs.length &&
+    value.jobs.every((job, index) => {
+      const [lane, definition] = expectedJobs[index];
+      return (
+        job?.lane === lane &&
+        job.job === definition.job &&
+        /^\d+$/u.test(String(job.jobId || "")) &&
+        Number.isFinite(Date.parse(job.startedAt)) &&
+        Number.isFinite(Date.parse(job.finishedAt)) &&
+        Number.isSafeInteger(job.durationMs) &&
+        job.durationMs >= 0 &&
+        Date.parse(job.finishedAt) - Date.parse(job.startedAt) ===
+          job.durationMs
+      );
+    })
+  );
+}
+
+export function hasCompleteCiResourceLaneEvidence(value) {
+  const expectedJobs = Object.entries(CI_RESOURCE_TEST_LANES);
+  return (
+    value?.status === "passed" &&
+    value.laneCount === expectedJobs.length &&
+    value.caseCount === BOOTSTRAP_PRODUCTION_ADMIN_TEST_CASES.length &&
+    value.scenarioCount === 86 &&
+    Number.isSafeInteger(value.durationMs) &&
+    value.durationMs >= 0 &&
+    value.executed === BOOTSTRAP_PRODUCTION_ADMIN_TEST_CASES.length &&
+    value.passed === value.executed &&
+    value.failed === 0 &&
+    value.skipped === 0 &&
+    Array.isArray(value.jobs) &&
+    value.jobs.length === expectedJobs.length &&
+    value.jobs.every((job, index) => {
+      const [lane, definition] = expectedJobs[index];
+      return (
+        job?.lane === lane &&
+        job.job === definition.job &&
+        /^\d+$/u.test(String(job.jobId || "")) &&
+        Number.isFinite(Date.parse(job.startedAt)) &&
+        Number.isFinite(Date.parse(job.finishedAt)) &&
+        Number.isSafeInteger(job.durationMs) &&
+        job.durationMs >= 0 &&
+        Date.parse(job.finishedAt) - Date.parse(job.startedAt) ===
+          job.durationMs
+      );
+    })
+  );
+}
+
+function latestLanePredecessor(lanes) {
+  return [...lanes].sort(
+    (left, right) =>
+      Date.parse(right.finishedAt) - Date.parse(left.finishedAt) ||
+      right.durationMs - left.durationMs,
+  )[0];
+}
+
+export function buildObservedQualityPaths(
+  byShard,
+  nodeLaneDurations,
+  resourceLaneDurations,
+) {
+  const standalone = ["static", "server", "security"].map(
+    (shard) => {
+      const receipt = byShard.get(shard);
+      return Object.freeze({
+        id: shard,
+        shard,
+        jobs: Object.freeze([receipt.job.name]),
+        startedAt: receipt.startedAt,
+        finishedAt: receipt.finishedAt,
+        durationMs:
+          Date.parse(receipt.finishedAt) - Date.parse(receipt.startedAt),
+      });
+    },
+  );
+  const web = byShard.get("web");
+  const browser = byShard.get("browser");
+  const node = byShard.get("node");
+  const resource = byShard.get("resource");
+  const nodePredecessor = latestLanePredecessor(nodeLaneDurations);
+  const resourcePredecessor = latestLanePredecessor(resourceLaneDurations);
+  const paths = [
+    ...standalone,
+    Object.freeze({
+      id: "web_browser",
+      shard: "browser",
+      jobs: Object.freeze([web.job.name, browser.job.name]),
+      startedAt: web.startedAt,
+      finishedAt: browser.finishedAt,
+      durationMs: Date.parse(browser.finishedAt) - Date.parse(web.startedAt),
+    }),
+    Object.freeze({
+      id: "node",
+      shard: "node",
+      jobs: Object.freeze([nodePredecessor.job, node.job.name]),
+      startedAt: nodePredecessor.startedAt,
+      finishedAt: node.finishedAt,
+      durationMs:
+        Date.parse(node.finishedAt) - Date.parse(nodePredecessor.startedAt),
+    }),
+    Object.freeze({
+      id: "resource",
+      shard: "resource",
+      jobs: Object.freeze([resourcePredecessor.job, resource.job.name]),
+      startedAt: resourcePredecessor.startedAt,
+      finishedAt: resource.finishedAt,
+      durationMs:
+        Date.parse(resource.finishedAt) -
+        Date.parse(resourcePredecessor.startedAt),
+    }),
+  ];
+  if (
+    paths.some(
+      (entry) =>
+        !Number.isSafeInteger(entry.durationMs) || entry.durationMs < 0,
+    )
+  ) {
+    throw new Error("quality aggregate observed DAG timing is invalid");
+  }
+  return Object.freeze(paths);
 }
 const TRUST_SCHEMA = "plush.gitlab-ci-trust/v1";
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
@@ -155,6 +302,12 @@ export function validateCiQualityShardSet(receipts, expected) {
       receipt.pipeline?.source !== expected.pipelineSource ||
       receipt.job?.name !== definition.job ||
       !/^\d+$/u.test(String(receipt.job?.id || "")) ||
+      !Number.isFinite(Date.parse(receipt.startedAt)) ||
+      !Number.isFinite(Date.parse(receipt.finishedAt)) ||
+      !Number.isSafeInteger(receipt.durationMs) ||
+      receipt.durationMs < 0 ||
+      Date.parse(receipt.finishedAt) - Date.parse(receipt.startedAt) !==
+        receipt.durationMs ||
       receipt.cleanupPassed !== true ||
       receipt.redaction?.containsSecrets !== false ||
       receipt.redaction?.containsCredentials !== false ||
@@ -268,6 +421,12 @@ export async function aggregateCiQuality({
     !matchesStrictSourceArchive(sourceIntegrity, strictIdentity) ||
     sourceIntegrity.repositoryBoundary !== "passed" ||
     sourceIntegrity.overlayCustomer !== "yoyoosun" ||
+    !hasCompleteCiNodeLaneEvidence(
+      byShard.get("node").invariants.nodeLanes,
+    ) ||
+    !hasCompleteCiResourceLaneEvidence(
+      byShard.get("resource").invariants.resourceLanes,
+    ) ||
     byShard.get("security").invariants.dependencyAudit !== "passed" ||
     byShard.get("server").invariants.makeData !== "passed" ||
     byShard.get("server").invariants.databaseCleanup !== "passed" ||
@@ -288,14 +447,57 @@ export async function aggregateCiQuality({
   const parallelDurationMs = Math.max(
     ...RECEIPT_GATE_PARALLEL_STAGE_IDS.map((id) => stageById.get(id)?.durationMs || 0),
   );
-  const shardWallStarted = Math.min(...receipts.map((receipt) => Date.parse(receipt.startedAt)));
-  const shardWallFinished = Math.max(...receipts.map((receipt) => Date.parse(receipt.finishedAt)));
   const shardDurations = receipts.map((receipt) => ({
     shard: receipt.shard,
     job: receipt.job.name,
     durationMs: receipt.durationMs,
   }));
-  const bottleneckShard = [...shardDurations].sort(
+  const nodeLaneDurations = byShard.get("node").invariants.nodeLanes.jobs.map((job) => ({
+    lane: job.lane,
+    job: job.job,
+    jobId: job.jobId,
+    startedAt: job.startedAt,
+    finishedAt: job.finishedAt,
+    durationMs: job.durationMs,
+  }));
+  const resourceLaneDurations = byShard
+    .get("resource")
+    .invariants.resourceLanes.jobs.map((job) => ({
+      lane: job.lane,
+      job: job.job,
+      jobId: job.jobId,
+      startedAt: job.startedAt,
+      finishedAt: job.finishedAt,
+      durationMs: job.durationMs,
+    }));
+  const executionDurations = [
+    ...shardDurations.map((entry) => ({ ...entry, kind: "shard" })),
+    ...nodeLaneDurations.map((entry) => ({ ...entry, kind: "node_lane", shard: "node" })),
+    ...resourceLaneDurations.map((entry) => ({
+      ...entry,
+      kind: "resource_lane",
+      shard: "resource",
+    })),
+  ];
+  const shardWallStarted = Math.min(
+    ...receipts.map((receipt) => Date.parse(receipt.startedAt)),
+    ...nodeLaneDurations.map((job) => Date.parse(job.startedAt)),
+    ...resourceLaneDurations.map((job) => Date.parse(job.startedAt)),
+  );
+  const shardWallFinished = Math.max(
+    ...receipts.map((receipt) => Date.parse(receipt.finishedAt)),
+    ...nodeLaneDurations.map((job) => Date.parse(job.finishedAt)),
+    ...resourceLaneDurations.map((job) => Date.parse(job.finishedAt)),
+  );
+  const bottleneckExecution = [...executionDurations].sort(
+    (left, right) => right.durationMs - left.durationMs,
+  )[0];
+  const observedPaths = buildObservedQualityPaths(
+    byShard,
+    nodeLaneDurations,
+    resourceLaneDurations,
+  );
+  const criticalPath = [...observedPaths].sort(
     (left, right) => right.durationMs - left.durationMs,
   )[0];
   const categoryKeys = ["web", "server", "database", "browser", "security"];
@@ -338,10 +540,18 @@ export async function aggregateCiQuality({
     },
     strictIdentity,
     shards: shardDurations,
+    nodeLanes: nodeLaneDurations,
+    resourceLanes: resourceLaneDurations,
     dag: {
       wallDurationMs: shardWallFinished - shardWallStarted,
-      criticalShard: bottleneckShard.shard,
-      criticalShardDurationMs: bottleneckShard.durationMs,
+      criticalShard: criticalPath.shard,
+      criticalJob: criticalPath.jobs.at(-1),
+      criticalShardDurationMs: criticalPath.durationMs,
+      criticalPathId: criticalPath.id,
+      criticalPathJobs: criticalPath.jobs,
+      criticalPathDurationMs: criticalPath.durationMs,
+      longestExecutionJob: bottleneckExecution.job,
+      longestExecutionDurationMs: bottleneckExecution.durationMs,
       runnerConcurrencyRequired: 4,
     },
     sourceIntegrity,
@@ -405,6 +615,7 @@ export async function aggregateCiQuality({
     invariants: [
       "protected main trust bootstrap and real push range passed",
       "all seven fixed GitLab quality shards passed for one exact SHA",
+      "internal Node and resource lanes covered each registered test exactly once",
       "source archive, dependency audit and make data integrity passed",
       "PostgreSQL, Chromium sandbox and browser cleanup readbacks passed",
     ],

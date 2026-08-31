@@ -59,6 +59,62 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
       new RegExp(`ci-quality-shard[.]mjs --shard ${shard}`, "u"),
     );
   }
+  assert.equal(
+    workflow.match(/ci-quality-shard[.]mjs --shard /gu)?.length ?? 0,
+    7,
+  );
+  for (const lane of ["release", "core"]) {
+    assert.match(workflow, new RegExp(`^quality_node_${lane}:`, "mu"));
+    assert.match(
+      workflow,
+      new RegExp(`ci-node-test-lane[.]mjs --lane ${lane}`, "u"),
+    );
+    assert.match(
+      workflow,
+      new RegExp(`output/ci/node-lanes/${lane}[.]json`, "u"),
+    );
+  }
+  for (const lane of ["contract", "runtime"]) {
+    assert.match(workflow, new RegExp(`^quality_resource_${lane}:`, "mu"));
+    assert.match(
+      workflow,
+      new RegExp(`ci-resource-test-lane[.]mjs --lane ${lane}`, "u"),
+    );
+    assert.match(
+      workflow,
+      new RegExp(`output/ci/resource-lanes/${lane}[.]json`, "u"),
+    );
+  }
+  assert.doesNotMatch(workflow, /^quality_node_runtime:/mu);
+  assert.match(
+    workflow,
+    /quality_node:[\s\S]+?job: quality_node_release\n      artifacts: true[\s\S]+?job: quality_node_core\n      artifacts: true[\s\S]+?ci-quality-shard[.]mjs --shard node/u,
+  );
+  assert.match(
+    workflow,
+    /quality_resource:[\s\S]+?job: quality_resource_contract\n      artifacts: true[\s\S]+?job: quality_resource_runtime\n      artifacts: true[\s\S]+?ci-quality-shard[.]mjs --shard resource/u,
+  );
+  assert.ok(
+    workflow.indexOf("quality_node_release:") <
+      workflow.indexOf("quality_web:"),
+  );
+  assert.ok(
+    workflow.indexOf("quality_node_core:") <
+      workflow.indexOf("quality_web:"),
+  );
+  const aggregateBlock = workflow.match(
+    /^quality_aggregate:[\s\S]+?^quality_affected:/mu,
+  )?.[0];
+  assert.ok(aggregateBlock);
+  assert.match(
+    aggregateBlock,
+    /job: quality_node\n      artifacts: true/u,
+  );
+  assert.doesNotMatch(aggregateBlock, /quality_node_(?:core|release)/u);
+  assert.doesNotMatch(
+    aggregateBlock,
+    /quality_resource_(?:contract|runtime)/u,
+  );
   assert.match(workflow, /^quality_aggregate:\n  stage: aggregate/mu);
   assert.match(workflow, /ci-quality-aggregate[.]mjs/u);
   assert.match(workflow, /plush-ci-evidence/u);
@@ -112,7 +168,7 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   );
   assert.match(workflow, /policy: pull-push/u);
   assert.match(workflow, /policy: pull/u);
-  for (const shard of ["node", "web"]) {
+  for (const shard of ["node_release", "node_core", "node", "web"]) {
     assert.match(
       workflow,
       new RegExp(
@@ -134,7 +190,13 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
     workflow,
     /^quality_affected:\n  stage: quality\n  <<: \*browser_cache_pull/mu,
   );
-  for (const shard of ["static", "resource", "security"]) {
+  for (const shard of [
+    "static",
+    "resource_contract",
+    "resource_runtime",
+    "resource",
+    "security",
+  ]) {
     assert.match(
       workflow,
       new RegExp(`^quality_${shard}:\\n  <<: \\*quality_shard`, "mu"),

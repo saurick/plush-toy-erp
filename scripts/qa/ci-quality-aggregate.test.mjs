@@ -4,6 +4,9 @@ import test from "node:test";
 import {
   CI_QUALITY_AGGREGATE_SCHEMA,
   CI_EVIDENCE_MANIFEST_SCHEMA,
+  buildObservedQualityPaths,
+  hasCompleteCiNodeLaneEvidence,
+  hasCompleteCiResourceLaneEvidence,
   matchesStrictSourceArchive,
   validateCiQualityShardSet,
 } from "./ci-quality-aggregate.mjs";
@@ -11,6 +14,11 @@ import {
   CI_QUALITY_SHARDS,
   CI_QUALITY_SHARD_SCHEMA,
 } from "./ci-quality-shard.mjs";
+import {
+  CI_NODE_TEST_LANES,
+  expectedCiNodeTestLaneFiles,
+} from "./ci-node-test-lane.mjs";
+import { CI_RESOURCE_TEST_LANES } from "./ci-resource-test-lane.mjs";
 
 const sha = "a".repeat(40);
 const digest = "b".repeat(64);
@@ -47,6 +55,10 @@ function fingerprint(shard, definition) {
 async function receipts() {
   const values = [];
   for (const [shard, definition] of Object.entries(CI_QUALITY_SHARDS)) {
+    const durationMs = values.length + 10;
+    const startedAt = new Date(
+      1_700_000_000_000 + values.length * 1_000,
+    ).toISOString();
     values.push({
       schemaVersion: CI_QUALITY_SHARD_SCHEMA,
       shard,
@@ -57,6 +69,9 @@ async function receipts() {
       protectedDefaultBranch: true,
       pipeline: { id: "12", iid: "7", source: "push" },
       job: { id: String(values.length + 20), name: definition.job },
+      startedAt,
+      finishedAt: new Date(Date.parse(startedAt) + durationMs).toISOString(),
+      durationMs,
       commandFingerprint: await fingerprint(shard, definition),
       plan: {
         planSha256: expected.planSha256,
@@ -108,9 +123,192 @@ test("aggregate matches the tagged shard archive digest to strict plain SHA-256"
   );
 });
 
+test("aggregate keeps internal Node lanes behind one complete external invariant", () => {
+  const jobs = Object.entries(CI_NODE_TEST_LANES).map(
+    ([lane, definition], index) => {
+      const durationMs = index + 100;
+      const startedAt = new Date(
+        1_700_000_100_000 + index * 1_000,
+      ).toISOString();
+      return {
+        lane,
+        job: definition.job,
+        jobId: String(index + 30),
+        startedAt,
+        finishedAt: new Date(
+          Date.parse(startedAt) + durationMs,
+        ).toISOString(),
+        durationMs,
+      };
+    },
+  );
+  const value = {
+    status: "passed",
+    laneCount: Object.keys(CI_NODE_TEST_LANES).length,
+    testFileCount: Object.keys(CI_NODE_TEST_LANES).flatMap((lane) =>
+      expectedCiNodeTestLaneFiles(lane),
+    ).length,
+    durationMs: Math.max(...jobs.map((job) => job.durationMs)),
+    jobs,
+    executed: 400,
+    passed: 400,
+    failed: 0,
+    skipped: 0,
+  };
+  assert.equal(hasCompleteCiNodeLaneEvidence(value), true);
+  assert.equal(
+    hasCompleteCiNodeLaneEvidence({
+      ...value,
+      laneCount: value.laneCount + 1,
+    }),
+    false,
+  );
+  assert.equal(
+    hasCompleteCiNodeLaneEvidence({ ...value, skipped: 1, passed: 399 }),
+    false,
+  );
+  const driftedJob = structuredClone(value);
+  driftedJob.jobs[0].job = "quality_node_other";
+  assert.equal(hasCompleteCiNodeLaneEvidence(driftedJob), false);
+  const driftedTiming = structuredClone(value);
+  driftedTiming.jobs[0].finishedAt = new Date(
+    Date.parse(driftedTiming.jobs[0].finishedAt) + 1,
+  ).toISOString();
+  assert.equal(hasCompleteCiNodeLaneEvidence(driftedTiming), false);
+});
+
+test("aggregate keeps internal resource lanes behind one complete external invariant", () => {
+  const jobs = Object.entries(CI_RESOURCE_TEST_LANES).map(
+    ([lane, definition], index) => {
+      const durationMs = index + 100;
+      const startedAt = new Date(
+        1_700_000_100_000 + index * 1_000,
+      ).toISOString();
+      return {
+        lane,
+        job: definition.job,
+        jobId: String(index + 30),
+        startedAt,
+        finishedAt: new Date(
+          Date.parse(startedAt) + durationMs,
+        ).toISOString(),
+        durationMs,
+      };
+    },
+  );
+  const value = {
+    status: "passed",
+    laneCount: 2,
+    caseCount: 39,
+    scenarioCount: 86,
+    durationMs: Math.max(...jobs.map((job) => job.durationMs)),
+    jobs,
+    executed: 39,
+    passed: 39,
+    failed: 0,
+    skipped: 0,
+  };
+  assert.equal(hasCompleteCiResourceLaneEvidence(value), true);
+  assert.equal(
+    hasCompleteCiResourceLaneEvidence({ ...value, scenarioCount: 85 }),
+    false,
+  );
+  const driftedTiming = structuredClone(value);
+  driftedTiming.jobs[1].finishedAt = new Date(
+    Date.parse(driftedTiming.jobs[1].finishedAt) + 1,
+  ).toISOString();
+  assert.equal(hasCompleteCiResourceLaneEvidence(driftedTiming), false);
+});
+
+test("aggregate models Node/resource fan-in and Web-browser chains instead of calling the longest job a critical path", () => {
+  const origin = 1_700_000_200_000;
+  const stamp = (offset) => new Date(origin + offset).toISOString();
+  const byShard = new Map(
+    ["static", "server", "resource", "security"].map((shard, index) => [
+      shard,
+      {
+        job: { name: `quality_${shard}` },
+        startedAt: stamp(index * 10),
+        finishedAt: stamp(index * 10 + 50),
+      },
+    ]),
+  );
+  byShard.set("web", {
+    job: { name: "quality_web" },
+    startedAt: stamp(0),
+    finishedAt: stamp(100),
+  });
+  byShard.set("browser", {
+    job: { name: "quality_browser" },
+    startedAt: stamp(110),
+    finishedAt: stamp(200),
+  });
+  byShard.set("node", {
+    job: { name: "quality_node" },
+    startedAt: stamp(170),
+    finishedAt: stamp(210),
+  });
+  byShard.set("resource", {
+    job: { name: "quality_resource" },
+    startedAt: stamp(140),
+    finishedAt: stamp(170),
+  });
+  const lanes = [
+    {
+      lane: "core",
+      job: "quality_node_core",
+      startedAt: stamp(0),
+      finishedAt: stamp(150),
+      durationMs: 150,
+    },
+    {
+      lane: "release",
+      job: "quality_node_release",
+      startedAt: stamp(10),
+      finishedAt: stamp(160),
+      durationMs: 150,
+    },
+  ];
+  const resourceLanes = [
+    {
+      lane: "contract",
+      job: "quality_resource_contract",
+      startedAt: stamp(20),
+      finishedAt: stamp(120),
+      durationMs: 100,
+    },
+    {
+      lane: "runtime",
+      job: "quality_resource_runtime",
+      startedAt: stamp(30),
+      finishedAt: stamp(130),
+      durationMs: 100,
+    },
+  ];
+  const paths = buildObservedQualityPaths(byShard, lanes, resourceLanes);
+  const nodePath = paths.find((path) => path.id === "node");
+  const webBrowserPath = paths.find((path) => path.id === "web_browser");
+  const resourcePath = paths.find((path) => path.id === "resource");
+  assert.deepEqual(nodePath.jobs, ["quality_node_release", "quality_node"]);
+  assert.equal(nodePath.durationMs, 200);
+  assert.deepEqual(webBrowserPath.jobs, ["quality_web", "quality_browser"]);
+  assert.equal(webBrowserPath.durationMs, 200);
+  assert.deepEqual(resourcePath.jobs, [
+    "quality_resource_runtime",
+    "quality_resource",
+  ]);
+  assert.equal(resourcePath.durationMs, 140);
+});
+
 test("aggregate rejects missing, duplicate and failed shards", async () => {
   const values = await receipts();
   assert.equal(validateCiQualityShardSet(values, expected).size, 7);
+  const invalidTiming = structuredClone(values);
+  invalidTiming[0].durationMs += 1;
+  assert.throws(
+    () => validateCiQualityShardSet(invalidTiming, expected),
+    /invalid/u,
+  );
   assert.throws(() => validateCiQualityShardSet(values.slice(1), expected), /every shard/u);
   const failed = structuredClone(values);
   failed[0].status = "failed";

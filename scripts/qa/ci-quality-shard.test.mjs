@@ -72,6 +72,30 @@ test("Node and Web shards install the cached Web dependencies offline", () => {
   );
 });
 
+test("Node shard fans in internal lanes while preserving one external shard", () => {
+  assert.match(source, /loadCiNodeTestLaneSet/u);
+  assert.match(source, /QA_CI_NODE_LANES = "verified"/u);
+  assert.match(source, /directory: "output\/ci\/node-lanes"/u);
+  assert.match(source, /nodeLanes: shard === "node"/u);
+  assert.match(source, /laneCount: lanes\.laneCount/u);
+  assert.match(source, /testFileCount: lanes\.testFileCount/u);
+  assert.match(source, /jobs: lanes\.jobs/u);
+  assert.equal(Object.hasOwn(CI_QUALITY_SHARDS, "node_core"), false);
+  assert.equal(Object.hasOwn(CI_QUALITY_SHARDS, "node_release"), false);
+});
+
+test("resource shard fans in two serial lanes while preserving one external shard", () => {
+  assert.match(source, /loadCiResourceTestLaneSet/u);
+  assert.match(source, /QA_CI_RESOURCE_LANES = "verified"/u);
+  assert.match(source, /directory: "output\/ci\/resource-lanes"/u);
+  assert.match(source, /resourceLanes: shard === "resource"/u);
+  assert.match(source, /caseCount: lanes\.caseCount/u);
+  assert.match(source, /scenarioCount: lanes\.scenarioCount/u);
+  assert.match(source, /jobs: lanes\.jobs/u);
+  assert.equal(Object.hasOwn(CI_QUALITY_SHARDS, "resource_contract"), false);
+  assert.equal(Object.hasOwn(CI_QUALITY_SHARDS, "resource_runtime"), false);
+});
+
 test("Node shard accepts only the tagged source-archive SHA-256 contract", () => {
   const gitSha = "a".repeat(40);
   const evidence = {

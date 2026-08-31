@@ -628,7 +628,9 @@ test("full overlaps only independent shared, Web and Server stages", () => {
     full.match(/qa_full_critical_postgres\(\) \{([\s\S]*?)\n\}/u)?.[1] || "";
   assert.doesNotMatch(serverBody, /--workflow critical-postgres/u);
   assert.match(criticalBody, /--workflow critical-postgres/u);
-  assert.match(full, /QA_NODE_TEST_PROFILE=parallel_safe/u);
+  assert.match(full, /local node_test_profile=parallel_safe/u);
+  assert.match(full, /node_test_profile=ci_lanes/u);
+  assert.match(full, /QA_NODE_TEST_PROFILE="\$node_test_profile"/u);
   assert.match(full, /run-node-tests\.mjs" --profile resource_sensitive/u);
   assert.match(full, /QA_FAST_GATE_PROFILE="\$full_profile"/u);
 });
