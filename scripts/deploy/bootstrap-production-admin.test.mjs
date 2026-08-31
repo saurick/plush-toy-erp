@@ -161,6 +161,7 @@ function writeFixture(t) {
   for (const filename of [
     "compose.yml",
     "chromium-seccomp.json",
+    "database_roles.sh",
     "migrate_online.sh",
   ]) {
     fs.copyFileSync(
@@ -168,6 +169,7 @@ function writeFixture(t) {
       path.join(composeDir, filename),
     );
   }
+  fs.chmodSync(path.join(composeDir, "database_roles.sh"), 0o755);
   fs.chmodSync(path.join(composeDir, "migrate_online.sh"), 0o755);
   const composeOverride = path.join(
     composeDir,
