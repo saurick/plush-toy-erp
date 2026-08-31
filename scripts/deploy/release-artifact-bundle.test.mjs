@@ -373,6 +373,19 @@ test("release image builders consume the committed generated projection without 
     serverDockerfile,
     /^COPY --chown=app:app --chmod=0444 --from=go-builder \/src\/configs\/prod\/config[.]yaml \/app\/configs\/config[.]yaml$/mu,
   );
+  assert.match(
+    serverDockerfile,
+    /^RUN install -d -o node -g node -m 0555 \/app\/build \/app\/scripts$/mu,
+  );
+  assert.match(
+    serverDockerfile,
+    /^COPY --chown=node:node --from=web-builder \/web\/build [.][\/]build$/mu,
+  );
+  assert.match(
+    serverDockerfile,
+    /^COPY --chown=node:node --chmod=0444 web\/scripts\/serveStaticApp[.]mjs [.][\/]scripts\/serveStaticApp[.]mjs$/mu,
+  );
+  assert.match(serverDockerfile, /^RUN chmod -R u=rX,go=rX \/app\/build$/mu);
   for (const dockerfile of [webDockerfile, serverDockerfile]) {
     assert.doesNotMatch(
       dockerfile,

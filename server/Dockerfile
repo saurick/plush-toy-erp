@@ -74,8 +74,10 @@ ENV PROXY_TIMEOUT_MS=30000
 
 WORKDIR /app
 
-COPY --from=web-builder /web/build ./build
-COPY web/scripts/serveStaticApp.mjs ./scripts/serveStaticApp.mjs
+RUN install -d -o node -g node -m 0555 /app/build /app/scripts
+COPY --chown=node:node --from=web-builder /web/build ./build
+COPY --chown=node:node --chmod=0444 web/scripts/serveStaticApp.mjs ./scripts/serveStaticApp.mjs
+RUN chmod -R u=rX,go=rX /app/build
 
 USER node
 

@@ -1797,6 +1797,19 @@ test("production artifacts pin the verified Chromium build and async warmup", ()
   );
   assert.match(
     dockerfile,
+    /^RUN install -d -o node -g node -m 0555 \/app\/build \/app\/scripts$/mu,
+  );
+  assert.match(
+    dockerfile,
+    /^COPY --chown=node:node --from=web-builder \/web\/build [.][\/]build$/mu,
+  );
+  assert.match(
+    dockerfile,
+    /^COPY --chown=node:node --chmod=0444 web\/scripts\/serveStaticApp[.]mjs [.][\/]scripts\/serveStaticApp[.]mjs$/mu,
+  );
+  assert.match(dockerfile, /^RUN chmod -R u=rX,go=rX \/app\/build$/mu);
+  assert.match(
+    dockerfile,
     /useradd --system --uid 10001 --gid app --create-home --home-dir \/home\/app/u,
   );
   assert.match(dockerfile, /^ENV HOME=\/home\/app$/mu);
