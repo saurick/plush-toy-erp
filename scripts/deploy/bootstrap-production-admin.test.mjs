@@ -226,6 +226,7 @@ exec /usr/bin/mktemp "$template"
       "TRACE_ENDPOINT=jaeger:4318",
       "TRACE_RATIO=0.1",
       "WEB_API_ORIGIN=http://app-server:8300",
+      "WEB_PROXY_PREFIXES=/rpc,/templates,/readyz/runtime-identity",
       "APP_HTTP_BIND_ADDR=127.0.0.1",
       "APP_HTTP_PORT=8325",
       "WEB_DESKTOP_BIND_ADDR=127.0.0.1",
