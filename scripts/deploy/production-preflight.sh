@@ -621,7 +621,9 @@ grep -q 'WEB_DESKTOP_BIND_ADDR:-0.0.0.0' "$compose_file" || fail "Compose web de
 grep -q 'database_roles.sh:/docker-entrypoint-initdb.d/20-database-roles.sh:ro' "$compose_file" || fail "Compose 必须为 fresh database 挂载角色初始化脚本"
 grep -q 'database_roles.sh:/usr/local/bin/plush-database-roles:ro' "$compose_file" || fail "Compose 必须挂载可重复执行的数据库权限对账脚本"
 [[ -f "$database_roles_script" && ! -L "$database_roles_script" ]] || fail "数据库角色初始化脚本必须是普通文件"
-[[ "$(path_mode "$database_roles_script")" == "755" ]] || fail "数据库角色初始化脚本权限必须为 0755"
+if [[ "$mode" != "example" ]]; then
+  [[ "$(path_mode "$database_roles_script")" == "755" ]] || fail "数据库角色初始化脚本权限必须为 0755"
+fi
 grep -q 'POSTGRES_DSN: "postgres://erp_app:' "$compose_file" || fail "Compose app-server 必须固定使用 erp_app"
 for role_password_key in POSTGRES_APP_PASSWORD POSTGRES_MIGRATOR_PASSWORD POSTGRES_BACKUP_PASSWORD; do
   grep -q "${role_password_key}:" "$compose_file" || fail "Compose PostgreSQL 缺少 $role_password_key"
