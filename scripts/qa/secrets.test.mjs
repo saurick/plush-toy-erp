@@ -101,8 +101,13 @@ if [[ "\${1:-}" == "git" ]]; then
     if [[ "$1" == "--log-opts" ]]; then log_opts="$2"; shift 2; continue; fi
     shift
   done
-  history_output="$(git log -p "$log_opts")" || exit 2
-  if grep -Fq 'GATE_HISTORY_SECRET_MARKER' <<<"$history_output"; then exit 1; fi
+  set +e
+  git log -p "$log_opts" | grep -F 'GATE_HISTORY_SECRET_MARKER' >/dev/null
+  pipeline_statuses=("\${PIPESTATUS[@]}")
+  set -e
+  if [[ "\${pipeline_statuses[0]}" -ne 0 ]]; then exit 2; fi
+  if [[ "\${pipeline_statuses[1]}" -eq 0 ]]; then exit 1; fi
+  if [[ "\${pipeline_statuses[1]}" -ne 1 ]]; then exit 2; fi
   exit 0
 fi
 exit 0
