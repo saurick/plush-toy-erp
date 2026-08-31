@@ -662,10 +662,10 @@ function validateCustomerConfigReleaseOverlay() {
     "server/Dockerfile must not let Web test and style scripts invalidate the production Web build",
   );
   assert(
-    /^\s*COPY\s+web\/scripts\/serveStaticApp\.mjs\s+\.\/scripts\/serveStaticApp\.mjs\s*$/mu.test(
+    /^\s*COPY\s+--chown=node:node\s+--chmod=0444\s+web\/scripts\/serveStaticApp\.mjs\s+\.\/scripts\/serveStaticApp\.mjs\s*$/mu.test(
       serverDockerfile,
     ),
-    "server/Dockerfile must copy only the production static-server entry into the Web runtime",
+    "server/Dockerfile must copy only the production static-server entry into the Web runtime with fixed read-only ownership",
   );
   assert(
     !/^\s*COPY\s+scripts\s+\/scripts\s*$/mu.test(serverDockerfile),
