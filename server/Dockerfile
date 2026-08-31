@@ -175,7 +175,8 @@ WORKDIR /app
 COPY --from=go-builder /src/bin/server /app/server
 COPY --from=go-builder /src/bin/bootstrap-manual-acceptance-core /app/bootstrap-manual-acceptance-core
 COPY --from=go-builder /src/bin/rotate-manual-acceptance-passwords /app/rotate-manual-acceptance-passwords
-COPY --from=go-builder /src/configs/prod /app/configs
+RUN install -d -o app -g app -m 0555 /app/configs
+COPY --chown=app:app --chmod=0444 --from=go-builder /src/configs/prod/config.yaml /app/configs/config.yaml
 COPY --from=web-builder /web/build /app/public
 
 EXPOSE 8300

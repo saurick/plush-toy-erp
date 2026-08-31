@@ -1789,6 +1789,14 @@ test("production artifacts pin the verified Chromium build and async warmup", ()
   assert.match(dockerfile, /^USER app$/m);
   assert.match(
     dockerfile,
+    /^RUN install -d -o app -g app -m 0555 \/app\/configs$/mu,
+  );
+  assert.match(
+    dockerfile,
+    /^COPY --chown=app:app --chmod=0444 --from=go-builder \/src\/configs\/prod\/config[.]yaml \/app\/configs\/config[.]yaml$/mu,
+  );
+  assert.match(
+    dockerfile,
     /useradd --system --uid 10001 --gid app --create-home --home-dir \/home\/app/u,
   );
   assert.match(dockerfile, /^ENV HOME=\/home\/app$/mu);
