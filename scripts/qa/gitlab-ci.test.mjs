@@ -387,6 +387,7 @@ test("historical source backfill is one protected internal job and cannot rewrit
   );
   const backfill = workflow.match(/^backfill_release_source:[\s\S]+$/mu)?.[0];
   assert.ok(backfill);
+  assert.match(backfill, /environment:\n    name: release/u);
   assert.match(backfill, /resource_group: immutable-release-catalog/u);
   assert.match(backfill, /CI_COMMIT_REF_PROTECTED/u);
   assert.match(backfill, /git merge-base --is-ancestor/u);

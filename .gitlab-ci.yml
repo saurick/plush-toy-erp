@@ -932,6 +932,8 @@ publish_release:
 backfill_release_source:
   stage: release
   interruptible: false
+  environment:
+    name: release
   rules:
     - if: '$CI_PIPELINE_SOURCE =~ /^(api|web)$/ && $BACKFILL_RELEASE_SOURCE_SHA && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
     - when: never
