@@ -18,60 +18,23 @@ if [ -z "$PURCHASE_RECEIPT_PG_DB_URL" ]; then
   exit 2
 fi
 
-parse_output="$(
-  python3 - "$PURCHASE_RECEIPT_PG_DB_URL" "$cmd" <<'PY'
-import re
-import shlex
-import sys
-import urllib.parse
-
-raw, command = sys.argv[1:]
-u = urllib.parse.urlparse(raw)
-if u.scheme not in {"postgres", "postgresql"}:
-    raise SystemExit("ERROR: PURCHASE_RECEIPT_PG_DB_URL must use postgres/postgresql scheme")
-host = u.hostname or ""
-dbname = (u.path or "").lstrip("/")
-allowed_hosts = {
-    "localhost",
-    "127.0.0.1",
-    "::1",
-    "postgres",
-    "purchase-receipt-postgres",
-    "plush-toy-erp-purchase-receipt-postgres",
-            "host.docker.internal",
-}
-if host not in allowed_hosts:
-    raise SystemExit(f"ERROR: refuse non-local PURCHASE_RECEIPT_PG_DB_URL host: {host}")
-if not dbname:
-    raise SystemExit("ERROR: PURCHASE_RECEIPT_PG_DB_URL missing database name")
-owns_disposable_lifecycle = command in {
-    "test-critical-disposable",
-    "test-populated-upgrade",
-}
-if not re.fullmatch(r"plush_erp_ci_[a-z0-9_]+", dbname) and not (
-    owns_disposable_lifecycle and dbname == "postgres"
-):
-    raise SystemExit(f"ERROR: database name must match plush_erp_ci_<run-id>: {dbname}")
-if not re.fullmatch(r"[A-Za-z0-9_]+", dbname):
-    raise SystemExit(f"ERROR: database name must be alphanumeric/underscore only: {dbname}")
-
-port = u.port or 5432
-user = urllib.parse.unquote(u.username or "")
-hostport = f"[{host}]:{port}" if ":" in host and not host.startswith("[") else f"{host}:{port}"
-safe_netloc = f"{user}@{hostport}" if user else hostport
-safe_url = urllib.parse.urlunparse((u.scheme, safe_netloc, "/" + dbname, "", u.query, ""))
-admin_url = urllib.parse.urlunparse(u._replace(path="/postgres"))
-
-def emit(name, value):
-    print(f"{name}={shlex.quote(value)}")
-
-emit("PURCHASE_RECEIPT_PG_DB_HOST", host)
-emit("PURCHASE_RECEIPT_PG_DB_NAME", dbname)
-emit("PURCHASE_RECEIPT_PG_DB_SAFE_URL", safe_url)
-emit("PURCHASE_RECEIPT_PG_ADMIN_DB_URL", admin_url)
-PY
-)" || exit 1
-eval "$parse_output"
+postgres_target_helper="$script_dir/qa/postgres-target-contract.py"
+base_target_fields=()
+while IFS= read -r -d '' target_field; do
+  base_target_fields+=("$target_field")
+done < <(
+  python3 "$postgres_target_helper" base purchase-receipt "$PURCHASE_RECEIPT_PG_DB_URL" "$cmd"
+)
+unset target_field
+if [[ "${#base_target_fields[@]}" -ne 5 || "${base_target_fields[4]}" != 'ok' ]]; then
+  echo "ERROR: PostgreSQL target contract validation failed" >&2
+  exit 1
+fi
+PURCHASE_RECEIPT_PG_DB_HOST="${base_target_fields[0]}"
+PURCHASE_RECEIPT_PG_DB_NAME="${base_target_fields[1]}"
+PURCHASE_RECEIPT_PG_DB_SAFE_URL="${base_target_fields[2]}"
+PURCHASE_RECEIPT_PG_ADMIN_DB_URL="${base_target_fields[3]}"
+unset base_target_fields
 
 echo "purchase receipt target host=${PURCHASE_RECEIPT_PG_DB_HOST} db=${PURCHASE_RECEIPT_PG_DB_NAME}"
 echo "purchase receipt target dsn=${PURCHASE_RECEIPT_PG_DB_SAFE_URL}"
@@ -91,28 +54,19 @@ run_verified_go_test() {
 }
 
 run_disposable_critical_gate() {
-  local critical_target
-  critical_target="$(
-    python3 - "$PURCHASE_RECEIPT_PG_DB_URL" "$$" <<'PY'
-import re
-import secrets
-import shlex
-import sys
-import urllib.parse
-
-raw, process_id = sys.argv[1:]
-url = urllib.parse.urlparse(raw)
-base_name = (url.path or "").lstrip("/")
-suffix = f"_critical_{process_id}_{secrets.token_hex(4)}"
-database_name = base_name[: 63 - len(suffix)] + suffix
-if not re.fullmatch(r"[A-Za-z0-9_]+", database_name):
-    raise SystemExit(f"ERROR: unsafe disposable critical database name: {database_name}")
-database_url = urllib.parse.urlunparse(url._replace(path="/" + database_name))
-print(f"CRITICAL_DATABASE_NAME={shlex.quote(database_name)}")
-print(f"CRITICAL_DATABASE_URL={shlex.quote(database_url)}")
-PY
-  )" || exit 1
-  eval "$critical_target"
+  local critical_target_fields=()
+  local target_field
+  while IFS= read -r -d '' target_field; do
+    critical_target_fields+=("$target_field")
+  done < <(
+    python3 "$postgres_target_helper" critical "$PURCHASE_RECEIPT_PG_DB_URL" "$$"
+  )
+  if [[ "${#critical_target_fields[@]}" -ne 3 || "${critical_target_fields[2]}" != 'ok' ]]; then
+    echo "ERROR: disposable critical PostgreSQL target validation failed" >&2
+    exit 1
+  fi
+  CRITICAL_DATABASE_NAME="${critical_target_fields[0]}"
+  CRITICAL_DATABASE_URL="${critical_target_fields[1]}"
 
   CRITICAL_DATABASE_CREATED=0
   cleanup_disposable_critical_gate() {
@@ -198,6 +152,7 @@ test-populated-upgrade)
   migration_dir="$root_dir/server/internal/data/model/migrate"
   fixture_file="$root_dir/scripts/qa/fixtures/populated-upgrade-20260710150001.sql"
   net_weight_fixture_file="$root_dir/scripts/qa/fixtures/net-weight-kg-to-g-20260714165115.sql"
+  populated_contract_file="$root_dir/scripts/qa/fixtures/populated-upgrade-contract.sql"
   preflight_script="$root_dir/scripts/qa/populated-upgrade-preflight.sh"
   cutover_preflight_sql="$root_dir/scripts/qa/customer-config-cutover-20260714055825.sql"
   populated_report_file=""
@@ -213,36 +168,33 @@ test-populated-upgrade)
       exit 1
     fi
   done
-  for required_file in "$fixture_file" "$net_weight_fixture_file" "$preflight_script" "$cutover_preflight_sql"; do
+  for required_file in \
+    "$postgres_target_helper" \
+    "$fixture_file" \
+    "$net_weight_fixture_file" \
+    "$populated_contract_file" \
+    "$preflight_script" \
+    "$cutover_preflight_sql"; do
     if [[ ! -f "$required_file" ]]; then
       echo "ERROR: test-populated-upgrade required file is missing: $required_file" >&2
       exit 1
     fi
   done
 
-  populated_target="$({
-    python3 - "$PURCHASE_RECEIPT_PG_DB_URL" "$PURCHASE_RECEIPT_PG_DB_NAME" "$$" "$RANDOM" <<'PY'
-import re
-import shlex
-import sys
-import urllib.parse
-
-raw, base_name, process_id, random_value = sys.argv[1:]
-if base_name == "postgres":
-    base_name = "plush_erp_ci"
-suffix = f"_populated_{process_id}_{random_value}"
-prefix = base_name[: 63 - len(suffix)]
-database_name = prefix + suffix
-if not re.fullmatch(r"[A-Za-z0-9_]+", database_name):
-    raise SystemExit(f"ERROR: unsafe populated-upgrade database name: {database_name}")
-
-url = urllib.parse.urlparse(raw)
-database_url = urllib.parse.urlunparse(url._replace(path="/" + database_name))
-print(f"POPULATED_UPGRADE_DB_NAME={shlex.quote(database_name)}")
-print(f"POPULATED_UPGRADE_DB_URL={shlex.quote(database_url)}")
-PY
-  })" || exit 1
-  eval "$populated_target"
+  populated_target_fields=()
+  while IFS= read -r -d '' target_field; do
+    populated_target_fields+=("$target_field")
+  done < <(
+    python3 "$postgres_target_helper" populated \
+      "$PURCHASE_RECEIPT_PG_DB_URL" "$PURCHASE_RECEIPT_PG_DB_NAME" "$$" "$RANDOM"
+  )
+  unset target_field
+  if [[ "${#populated_target_fields[@]}" -ne 3 || "${populated_target_fields[2]}" != 'ok' ]]; then
+    echo "ERROR: populated-upgrade PostgreSQL target validation failed" >&2
+    exit 1
+  fi
+  POPULATED_UPGRADE_DB_NAME="${populated_target_fields[0]}"
+  POPULATED_UPGRADE_DB_URL="${populated_target_fields[1]}"
 
   cleanup_populated_upgrade() {
     local cleanup_status=$?
@@ -270,49 +222,9 @@ PY
 
   populated_hash() {
     local snapshot_hash
-    snapshot_hash="$({
-      populated_psql -Atq <<'SQL'
-WITH synthetic_rows AS (
-  SELECT 'unit:' || id::text AS row_key, to_jsonb(row_data) AS payload
-    FROM units AS row_data
-   WHERE id = 910001
-  UNION ALL
-  SELECT 'product:' || id::text, to_jsonb(row_data)
-    FROM products AS row_data
-   WHERE id = 910001
-  UNION ALL
-  SELECT 'bom:' || id::text, to_jsonb(row_data)
-    FROM bom_headers AS row_data
-   WHERE id = 910001
-  UNION ALL
-  SELECT 'finance:' || id::text, to_jsonb(row_data)
-    FROM finance_facts AS row_data
-   WHERE id = 910001
-  UNION ALL
-  SELECT 'role:' || id::text, to_jsonb(row_data)
-    FROM roles AS row_data
-   WHERE id IN (910001, 910002, 910003)
-  UNION ALL
-  SELECT 'process:' || id::text, to_jsonb(row_data)
-    FROM process_instances AS row_data
-   WHERE id IN (910001, 910002)
-  UNION ALL
-  SELECT 'node:' || id::text, to_jsonb(row_data)
-    FROM process_node_instances AS row_data
-   WHERE id IN (910001, 910002)
-  UNION ALL
-  SELECT 'workflow-state:' || id::text, to_jsonb(row_data)
-    FROM workflow_business_states AS row_data
-   WHERE id = 910001
-  UNION ALL
-  SELECT 'workflow-task:' || id::text, to_jsonb(row_data)
-    FROM workflow_tasks AS row_data
-   WHERE id = 910001
-)
-SELECT count(*)::text || ':' || md5(string_agg(row_key || ':' || payload::text, E'\n' ORDER BY row_key))
-  FROM synthetic_rows;
-SQL
-    })"
+    snapshot_hash="$(
+      populated_psql -Atq -v plush_snapshot=1 -f "$populated_contract_file"
+    )"
     if [[ "$snapshot_hash" != "${POPULATED_EXPECTED_ROW_COUNT}:"* ]]; then
       echo "ERROR: populated-upgrade fixture row set is incomplete: ${snapshot_hash:-empty}" >&2
       return 1
@@ -447,36 +359,7 @@ SQL
   assert_net_weight_kg_fixture() {
     local readback
     readback="$(
-      populated_psql -Atq <<'SQL'
-SELECT weighted_product.unit_net_weight_kg::text
-       || '|' || weighted_sku.unit_net_weight_kg::text
-       || '|' || weighted_shipment.total_net_weight_kg::text
-       || '|' || weighted_shipment.requested_total_net_weight_kg::text
-       || '|' || weighted_item.unit_net_weight_kg_snapshot::text
-       || '|' || (
-         (null_product.unit_net_weight_kg IS NULL)::int
-         + (null_sku.unit_net_weight_kg IS NULL)::int
-         + (null_shipment.total_net_weight_kg IS NULL)::int
-         + (null_shipment.requested_total_net_weight_kg IS NULL)::int
-         + (null_item.unit_net_weight_kg_snapshot IS NULL)::int
-       )::text
-  FROM products AS weighted_product,
-       products AS null_product,
-       product_skus AS weighted_sku,
-       product_skus AS null_sku,
-       shipments AS weighted_shipment,
-       shipments AS null_shipment,
-       shipment_items AS weighted_item,
-       shipment_items AS null_item
- WHERE weighted_product.id = 910001
-   AND null_product.id = 910002
-   AND weighted_sku.id = 910001
-   AND null_sku.id = 910002
-   AND weighted_shipment.id = 910001
-   AND null_shipment.id = 910002
-   AND weighted_item.id = 910001
-   AND null_item.id = 910002;
-SQL
+      populated_psql -Atq -v plush_net_weight_kg=1 -f "$populated_contract_file"
     )"
     if [[ "$readback" != '0.425000|0.123456|12.345600|11.111111|0.425000|5' ]]; then
       echo "ERROR: populated-upgrade kg fixture mismatch: ${readback:-empty}" >&2
@@ -487,36 +370,7 @@ SQL
   assert_net_weight_gram_upgrade() {
     local readback column_readback constraint_readback
     readback="$(
-      populated_psql -Atq <<'SQL'
-SELECT weighted_product.unit_net_weight_g::text
-       || '|' || weighted_sku.unit_net_weight_g::text
-       || '|' || weighted_shipment.total_net_weight_g::text
-       || '|' || weighted_shipment.requested_total_net_weight_g::text
-       || '|' || weighted_item.unit_net_weight_g_snapshot::text
-       || '|' || (
-         (null_product.unit_net_weight_g IS NULL)::int
-         + (null_sku.unit_net_weight_g IS NULL)::int
-         + (null_shipment.total_net_weight_g IS NULL)::int
-         + (null_shipment.requested_total_net_weight_g IS NULL)::int
-         + (null_item.unit_net_weight_g_snapshot IS NULL)::int
-       )::text
-  FROM products AS weighted_product,
-       products AS null_product,
-       product_skus AS weighted_sku,
-       product_skus AS null_sku,
-       shipments AS weighted_shipment,
-       shipments AS null_shipment,
-       shipment_items AS weighted_item,
-       shipment_items AS null_item
- WHERE weighted_product.id = 910001
-   AND null_product.id = 910002
-   AND weighted_sku.id = 910001
-   AND null_sku.id = 910002
-   AND weighted_shipment.id = 910001
-   AND null_shipment.id = 910002
-   AND weighted_item.id = 910001
-   AND null_item.id = 910002;
-SQL
+      populated_psql -Atq -v plush_net_weight_g=1 -f "$populated_contract_file"
     )"
     if [[ "$readback" != '425.000000|123.456000|12345.600000|11111.111000|425.000000|5' ]]; then
       echo "ERROR: populated-upgrade g conversion mismatch: ${readback:-empty}" >&2
@@ -524,43 +378,7 @@ SQL
     fi
 
     column_readback="$(
-      populated_psql -Atq <<'SQL'
-WITH expected(table_name, column_name) AS (
-  VALUES
-    ('products', 'unit_net_weight_g'),
-    ('product_skus', 'unit_net_weight_g'),
-    ('shipments', 'total_net_weight_g'),
-    ('shipments', 'requested_total_net_weight_g'),
-    ('shipment_items', 'unit_net_weight_g_snapshot')
-), old_columns(table_name, column_name) AS (
-  VALUES
-    ('products', 'unit_net_weight_kg'),
-    ('product_skus', 'unit_net_weight_kg'),
-    ('shipments', 'total_net_weight_kg'),
-    ('shipments', 'requested_total_net_weight_kg'),
-    ('shipment_items', 'unit_net_weight_kg_snapshot')
-)
-SELECT count(actual.column_name)::text
-       || '|' || count(*) FILTER (
-         WHERE actual.data_type = 'numeric'
-           AND actual.numeric_precision = 20
-           AND actual.numeric_scale = 6
-           AND actual.is_nullable = 'YES'
-       )::text
-       || '|' || (
-         SELECT count(*)
-           FROM information_schema.columns AS actual_old
-           JOIN old_columns
-             ON old_columns.table_name = actual_old.table_name
-            AND old_columns.column_name = actual_old.column_name
-          WHERE actual_old.table_schema = 'public'
-       )::text
-  FROM expected
-  LEFT JOIN information_schema.columns AS actual
-    ON actual.table_schema = 'public'
-   AND actual.table_name = expected.table_name
-   AND actual.column_name = expected.column_name;
-SQL
+      populated_psql -Atq -v plush_net_weight_g_columns=1 -f "$populated_contract_file"
     )"
     if [[ "$column_readback" != '5|5|0' ]]; then
       echo "ERROR: populated-upgrade g column shape mismatch: ${column_readback:-empty}" >&2
@@ -568,74 +386,14 @@ SQL
     fi
 
     constraint_readback="$(
-      populated_psql -Atq <<'SQL'
-WITH expected(name) AS (
-  VALUES
-    ('products_unit_net_weight_g_positive'),
-    ('product_skus_unit_net_weight_g_positive'),
-    ('product_skus_unit_net_weight_g_requires_default_unit'),
-    ('shipments_total_net_weight_g_positive'),
-    ('shipments_requested_total_net_weight_g_positive'),
-    ('shipment_items_unit_net_weight_g_snapshot_positive')
-), old(name) AS (
-  VALUES
-    ('products_unit_net_weight_kg_positive'),
-    ('product_skus_unit_net_weight_kg_positive'),
-    ('product_skus_unit_net_weight_kg_requires_default_unit'),
-    ('shipments_total_net_weight_kg_positive'),
-    ('shipments_requested_total_net_weight_kg_positive'),
-    ('shipment_items_unit_net_weight_kg_snapshot_positive')
-)
-SELECT (SELECT count(*) FROM pg_constraint JOIN expected ON expected.name = pg_constraint.conname)::text
-       || '|' || (SELECT count(*) FROM pg_constraint JOIN old ON old.name = pg_constraint.conname)::text;
-SQL
+      populated_psql -Atq -v plush_net_weight_g_constraints=1 -f "$populated_contract_file"
     )"
     if [[ "$constraint_readback" != '6|0' ]]; then
       echo "ERROR: populated-upgrade g constraint set mismatch: ${constraint_readback:-empty}" >&2
       return 1
     fi
 
-    populated_psql -q <<'SQL'
-DO $$
-DECLARE
-  rejection_count integer := 0;
-BEGIN
-  BEGIN
-    UPDATE products SET unit_net_weight_g = 0 WHERE id = 910001;
-  EXCEPTION WHEN check_violation THEN
-    rejection_count := rejection_count + 1;
-  END;
-  BEGIN
-    UPDATE product_skus SET unit_net_weight_g = 0 WHERE id = 910001;
-  EXCEPTION WHEN check_violation THEN
-    rejection_count := rejection_count + 1;
-  END;
-  BEGIN
-    UPDATE product_skus SET unit_net_weight_g = 1 WHERE id = 910002;
-  EXCEPTION WHEN check_violation THEN
-    rejection_count := rejection_count + 1;
-  END;
-  BEGIN
-    UPDATE shipments SET total_net_weight_g = 0 WHERE id = 910001;
-  EXCEPTION WHEN check_violation THEN
-    rejection_count := rejection_count + 1;
-  END;
-  BEGIN
-    UPDATE shipments SET requested_total_net_weight_g = 0 WHERE id = 910001;
-  EXCEPTION WHEN check_violation THEN
-    rejection_count := rejection_count + 1;
-  END;
-  BEGIN
-    UPDATE shipment_items SET unit_net_weight_g_snapshot = 0 WHERE id = 910001;
-  EXCEPTION WHEN check_violation THEN
-    rejection_count := rejection_count + 1;
-  END;
-  IF rejection_count <> 6 THEN
-    RAISE EXCEPTION 'expected 6 net-weight constraint rejections, got %', rejection_count;
-  END IF;
-END
-$$;
-SQL
+    populated_psql -q -v plush_net_weight_g_rejections=1 -f "$populated_contract_file"
   }
 
   echo "[qa:populated-upgrade] create isolated db=${POPULATED_UPGRADE_DB_NAME}"
@@ -737,16 +495,9 @@ SQL
     'process_instances has 2 rows that must be explicitly governed before customer config hash cutover'
 
   cutover_before_hash="$(populated_hash)"
-  populated_psql -q <<'SQL'
-BEGIN;
-UPDATE workflow_tasks
-   SET process_instance_id = NULL,
-       process_node_instance_id = NULL
- WHERE id = 910001;
-DELETE FROM process_node_instances WHERE id IN (910001, 910002);
-DELETE FROM process_instances WHERE id IN (910001, 910002);
-COMMIT;
-SQL
+  populated_psql -q \
+    -v plush_customer_config_cutover_cleanup=1 \
+    -f "$populated_contract_file"
   POPULATED_EXPECTED_ROW_COUNT=9
   cutover_after_hash="$(populated_hash)"
   if [[ "$cutover_before_hash" == "$cutover_after_hash" ]]; then
@@ -795,29 +546,7 @@ SQL
   assert_populated_preflight_green checkpoint-20260714165115-with-kg
   assert_customer_config_cutover_preflight_green checkpoint-20260714165115-with-kg
 
-  populated_psql -q <<'SQL'
-INSERT INTO roles (id, role_key, name, description, builtin, role_type, version, created_at, updated_at)
-VALUES
-  (910004, 'boss', 'QA legacy dashboard boss', '', true, 'business_default', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-  (910005, 'pmc', 'QA legacy dashboard PMC', '', true, 'business_default', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-  (910006, 'warehouse', 'QA legacy warehouse', '', true, 'business_default', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-INSERT INTO permissions (id, permission_key, name, description, module, action, resource, builtin, created_at, updated_at)
-VALUES
-  (910001, 'erp.dashboard.read', 'QA legacy shared dashboard', '', 'erp', 'read', 'dashboard', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-  (910002, 'process_runtime.recover', 'QA legacy process recovery', '', 'process_runtime', 'recover', 'domain_command', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-  (910003, 'production.fact.read', 'QA production fact read', '', 'production', 'read', 'fact', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-  (910004, 'production.wip.read', 'QA production WIP read', '', 'production', 'read', 'wip', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-INSERT INTO role_permissions (role_id, permission_id, created_at)
-VALUES
-  (910003, 910001, CURRENT_TIMESTAMP),
-  (910004, 910001, CURRENT_TIMESTAMP),
-  (910005, 910001, CURRENT_TIMESTAMP),
-  (910001, 910002, CURRENT_TIMESTAMP),
-  (910002, 910002, CURRENT_TIMESTAMP),
-  (910003, 910002, CURRENT_TIMESTAMP),
-  (910004, 910002, CURRENT_TIMESTAMP),
-  (910005, 910002, CURRENT_TIMESTAMP);
-SQL
+  populated_psql -q -v plush_legacy_dashboard_seed=1 -f "$populated_contract_file"
 
   atlas migrate apply \
     --dir "file://${migration_dir}" \

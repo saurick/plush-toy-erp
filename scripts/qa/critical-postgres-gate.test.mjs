@@ -73,6 +73,7 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
   const strict = read('scripts/qa/strict.sh')
   const makefile = read('server/Makefile')
   const pgScript = read('scripts/purchase-receipt-pg.sh')
+  const targetContract = read('scripts/qa/postgres-target-contract.py')
   const disposableRunner = read('scripts/qa/disposable-database-runner.mjs')
   const criticalTestConfig = read('scripts/qa/critical-postgres-tests.sh')
   const workflowConcurrency = read(
@@ -131,6 +132,12 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
   assert.match(full, /GOVULNCHECK_STRICT=1/u, 'the shared full execution must include one blocking vulnerability scan')
   assert.doesNotMatch(strict, /scripts\/qa\/govulncheck\.sh/u, 'strict must not repeat the full vulnerability scan')
 
+  assert.match(
+    targetContract,
+    /re\.fullmatch\(r"plush_erp_ci_\[a-z0-9_\]\+"/u,
+    'the shared target contract must reject fixed or non-CI database names',
+  )
+
   for (const name of [
     'INVENTORY',
     'BOM_LOT',
@@ -156,11 +163,7 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
       ),
       `${helper} must require an explicit generated database DSN`,
     )
-    assert.match(
-      read(helper),
-      /re\.fullmatch\(r"plush_erp_ci_\[a-z0-9_\]\+"/u,
-      `${helper} must reject fixed or non-CI database names`,
-    )
+    assert.match(read(helper), /postgres-target-contract\.py/u)
   }
   const returnHelper = read('scripts/purchase-return-pg.sh')
   assert.match(returnHelper, /file:\/\/internal\/data\/model\/migrate/u)
@@ -172,7 +175,7 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
   assert.match(disposableRunner, /buildDisposableDatabaseTarget/u)
   assert.match(disposableRunner, /DROP DATABASE "\$\{databaseName\}" WITH \(FORCE\)/u)
   assert.match(disposableRunner, /cleanup-readback/u)
-  assert.match(pgScript, /_critical_\{process_id\}_\{secrets\.token_hex\(4\)\}/u)
+  assert.match(targetContract, /_critical_\{process_id\}_\{secrets\.token_hex\(4\)\}/u)
   assert.match(pgScript, /CREATE DATABASE \\"\$\{CRITICAL_DATABASE_NAME\}\\"/u)
   assert.match(pgScript, /DROP DATABASE IF EXISTS \\"\$\{CRITICAL_DATABASE_NAME\}\\" WITH \(FORCE\)/u)
   assert.match(pgScript, /trap cleanup_disposable_critical_gate EXIT/u)
@@ -329,6 +332,8 @@ test('full and strict require the fail-closed populated upgrade PostgreSQL gate'
   const strict = read('scripts/qa/strict.sh')
   const makefile = read('server/Makefile')
   const pgScript = read('scripts/purchase-receipt-pg.sh')
+  const targetContract = read('scripts/qa/postgres-target-contract.py')
+  const populatedContract = read('scripts/qa/fixtures/populated-upgrade-contract.sql')
   const fixture = read('scripts/qa/fixtures/populated-upgrade-20260710150001.sql')
   const netWeightFixture = read('scripts/qa/fixtures/net-weight-kg-to-g-20260714165115.sql')
   const cutoverPreflight = read('scripts/qa/customer-config-cutover-20260714055825.sql')
@@ -362,7 +367,7 @@ test('full and strict require the fail-closed populated upgrade PostgreSQL gate'
   assert.match(makefile, /^populated_upgrade_pg_test:/mu)
   assert.match(makefile, /purchase-receipt-pg\.sh test-populated-upgrade/u)
   assert.match(pgScript, /test-populated-upgrade\)/u)
-  assert.match(pgScript, /_populated_\{process_id\}_\{random_value\}/u)
+  assert.match(targetContract, /_populated_\{process_id\}_\{random_value\}/u)
   assert(pgScript.includes('CREATE DATABASE'))
   assert(pgScript.includes('DROP DATABASE IF EXISTS'))
   assert(pgScript.includes('WITH (FORCE)'))
@@ -399,7 +404,7 @@ test('full and strict require the fail-closed populated upgrade PostgreSQL gate'
   assert.match(pgScript, /425\.000000\|123\.456000\|12345\.600000\|11111\.111000\|425\.000000\|5/u)
   assert.match(pgScript, /column_readback" != '5\|5\|0'/u)
   assert.match(pgScript, /constraint_readback" != '6\|0'/u)
-  assert.match(pgScript, /rejection_count <> 6/u)
+  assert.match(populatedContract, /rejection_count <> 6/u)
 
   for (const blocker of [
     'bom',
@@ -464,9 +469,9 @@ test('full and strict require the fail-closed populated upgrade PostgreSQL gate'
   assert.match(netWeightFixture, /NULL/u)
   assert.match(pgScript, /POPULATED_EXPECTED_ROW_COUNT=13/u)
   assert.match(pgScript, /POPULATED_EXPECTED_ROW_COUNT=9/u)
-  assert.match(pgScript, /UPDATE workflow_tasks\s+SET process_instance_id = NULL,/u)
-  assert.match(pgScript, /DELETE FROM process_node_instances WHERE id IN \(910001, 910002\)/u)
-  assert.match(pgScript, /DELETE FROM process_instances WHERE id IN \(910001, 910002\)/u)
+  assert.match(populatedContract, /UPDATE workflow_tasks\s+SET process_instance_id = NULL,/u)
+  assert.match(populatedContract, /DELETE FROM process_node_instances WHERE id IN \(910001, 910002\)/u)
+  assert.match(populatedContract, /DELETE FROM process_instances WHERE id IN \(910001, 910002\)/u)
   assert.match(pgScript, /cutover_readback" != '1\|0\|0\|0'/u)
   assert.match(
     pgScript,
@@ -522,7 +527,53 @@ test('full and strict require the fail-closed populated upgrade PostgreSQL gate'
   assert.match(fullGates, /populated-upgrade-postgres/u)
   assert.match(fullRequiredFiles, /fixtures\/populated-upgrade-20260710150001\.sql/u)
   assert.match(fullRequiredFiles, /fixtures\/net-weight-kg-to-g-20260714165115\.sql/u)
+  assert.match(fullRequiredFiles, /fixtures\/populated-upgrade-contract\.sql/u)
+  assert.match(fullRequiredFiles, /postgres-target-contract\.py/u)
   assert.match(profiles, /customer-config-cutover-20260714055825\.sql/u)
+})
+
+test('PostgreSQL entrypoints avoid Bash heredoc preprocessing deadlocks', () => {
+  const pgScript = read('scripts/purchase-receipt-pg.sh')
+  const targetContract = read('scripts/qa/postgres-target-contract.py')
+  const sqlContract = read('scripts/qa/fixtures/populated-upgrade-contract.sql')
+
+  for (const entrypoint of [
+    'scripts/purchase-receipt-pg.sh',
+    'scripts/purchase-return-pg.sh',
+    'scripts/inventory-pg.sh',
+    'scripts/bom-lot-pg.sh',
+  ]) {
+    const source = read(entrypoint)
+    assert.doesNotMatch(
+      source,
+      /<</u,
+      `${entrypoint} must not preprocess heredocs before its selected command`,
+    )
+    assert.match(source, /postgres-target-contract\.py/u)
+    assert.doesNotMatch(
+      source,
+      /mapfile\s+-[^\n]*\bd\b/u,
+      `${entrypoint} must remain compatible with the declared Bash 4 minimum`,
+    )
+    assert.match(source, /read -r -d '' target_field/u)
+  }
+  assert.match(pgScript, /populated-upgrade-contract\.sql/u)
+  for (const mode of ['base', 'critical', 'populated']) {
+    assert.match(targetContract, new RegExp(`mode == "${mode}"`, 'u'))
+  }
+  for (const action of [
+    'plush_snapshot',
+    'plush_net_weight_kg',
+    'plush_net_weight_g',
+    'plush_net_weight_g_columns',
+    'plush_net_weight_g_constraints',
+    'plush_net_weight_g_rejections',
+    'plush_customer_config_cutover_cleanup',
+    'plush_legacy_dashboard_seed',
+  ]) {
+    assert.match(sqlContract, new RegExp(`\\\\if :\\{\\?${action}\\}`, 'u'))
+    assert.match(pgScript, new RegExp(`-v ${action}=1`, 'u'))
+  }
 })
 
 test('populated upgrade entrypoint cleans only a database it created', () => {
@@ -561,6 +612,7 @@ exit 42
       {
         cwd: path.join(repoRoot, 'server'),
         encoding: 'utf8',
+        timeout: 5_000,
         env: {
           ...process.env,
           FAKE_CREATE_FAIL: createFails ? '1' : '0',
@@ -570,6 +622,11 @@ exit 42
             'postgres://postgres:local-test-password@127.0.0.1:55432/plush_erp_ci_purchase_receipt_fixture?sslmode=disable',
         },
       },
+    )
+    assert.notEqual(
+      result.error?.code,
+      'ETIMEDOUT',
+      'populated-upgrade wrapper must not hang before its disposable database lifecycle',
     )
     return { result, log: readFileSync(logFile, 'utf8') }
   }

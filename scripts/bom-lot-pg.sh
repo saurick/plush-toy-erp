@@ -13,54 +13,24 @@ if [ -z "$BOM_LOT_PG_DB_URL" ]; then
   exit 2
 fi
 
-parse_output="$(
-  python3 - "$BOM_LOT_PG_DB_URL" <<'PY'
-import re
-import shlex
-import sys
-import urllib.parse
-
-raw = sys.argv[1]
-u = urllib.parse.urlparse(raw)
-if u.scheme not in {"postgres", "postgresql"}:
-    raise SystemExit("ERROR: BOM_LOT_PG_DB_URL must use postgres/postgresql scheme")
-host = u.hostname or ""
-dbname = (u.path or "").lstrip("/")
-allowed_hosts = {
-    "localhost",
-    "127.0.0.1",
-    "::1",
-    "postgres",
-    "bom-lot-postgres",
-    "plush-toy-erp-bom-lot-postgres",
-        "host.docker.internal",
-}
-if host not in allowed_hosts:
-    raise SystemExit(f"ERROR: refuse non-local BOM_LOT_PG_DB_URL host: {host}")
-if not dbname:
-    raise SystemExit("ERROR: BOM_LOT_PG_DB_URL missing database name")
-if not re.fullmatch(r"plush_erp_ci_[a-z0-9_]+", dbname):
-    raise SystemExit(f"ERROR: database name must match plush_erp_ci_<run-id>: {dbname}")
-if not re.fullmatch(r"[A-Za-z0-9_]+", dbname):
-    raise SystemExit(f"ERROR: database name must be alphanumeric/underscore only: {dbname}")
-
-port = u.port or 5432
-user = urllib.parse.unquote(u.username or "")
-hostport = f"[{host}]:{port}" if ":" in host and not host.startswith("[") else f"{host}:{port}"
-safe_netloc = f"{user}@{hostport}" if user else hostport
-safe_url = urllib.parse.urlunparse((u.scheme, safe_netloc, "/" + dbname, "", u.query, ""))
-admin_url = urllib.parse.urlunparse(u._replace(path="/postgres"))
-
-def emit(name, value):
-    print(f"{name}={shlex.quote(value)}")
-
-emit("BOM_LOT_PG_DB_HOST", host)
-emit("BOM_LOT_PG_DB_NAME", dbname)
-emit("BOM_LOT_PG_DB_SAFE_URL", safe_url)
-emit("BOM_LOT_PG_ADMIN_DB_URL", admin_url)
-PY
-)" || exit 1
-eval "$parse_output"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+postgres_target_helper="$script_dir/qa/postgres-target-contract.py"
+base_target_fields=()
+while IFS= read -r -d '' target_field; do
+  base_target_fields+=("$target_field")
+done < <(
+  python3 "$postgres_target_helper" base bom-lot "$BOM_LOT_PG_DB_URL" "$cmd"
+)
+unset target_field
+if [[ "${#base_target_fields[@]}" -ne 5 || "${base_target_fields[4]}" != 'ok' ]]; then
+  echo "ERROR: PostgreSQL target contract validation failed" >&2
+  exit 1
+fi
+BOM_LOT_PG_DB_HOST="${base_target_fields[0]}"
+BOM_LOT_PG_DB_NAME="${base_target_fields[1]}"
+BOM_LOT_PG_DB_SAFE_URL="${base_target_fields[2]}"
+BOM_LOT_PG_ADMIN_DB_URL="${base_target_fields[3]}"
+unset base_target_fields
 
 echo "bom-lot target host=${BOM_LOT_PG_DB_HOST} db=${BOM_LOT_PG_DB_NAME}"
 echo "bom-lot target dsn=${BOM_LOT_PG_DB_SAFE_URL}"

@@ -277,6 +277,8 @@ const FULL_REQUIRED_FILES = Object.freeze([
   "scripts/purchase-receipt-pg.sh",
   "scripts/qa/fixtures/populated-upgrade-20260710150001.sql",
   "scripts/qa/fixtures/net-weight-kg-to-g-20260714165115.sql",
+  "scripts/qa/fixtures/populated-upgrade-contract.sql",
+  "scripts/qa/postgres-target-contract.py",
   "scripts/purchase-return-pg.sh",
   "scripts/qa/govulncheck.sh",
   "web/scripts/styleL1.mjs",
