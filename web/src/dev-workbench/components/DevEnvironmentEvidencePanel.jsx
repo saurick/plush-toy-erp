@@ -194,11 +194,18 @@ function DeliveryOperationOverview({ summary, error, loading }) {
             <RouterLink
               to={`${DEV_VERSION_CENTER_ROUTE}?view=${DEV_VERSION_CENTER_VIEW_HISTORY}`}
             >
-              查看完整工作台操作记录
+              查看工作台操作记录
             </RouterLink>
           </article>
         </div>
       )}
+      {overview.state === 'loading' ? (
+        <RouterLink
+          to={`${DEV_VERSION_CENTER_ROUTE}?view=${DEV_VERSION_CENTER_VIEW_HISTORY}`}
+        >
+          查看工作台操作记录
+        </RouterLink>
+      ) : null}
       <Text type="secondary">
         GitLab Pipeline、Package 与 Release 只在“远端 CI/CD 活动”中展示，不会伪装成工作台操作记录。
       </Text>
@@ -326,7 +333,7 @@ export default function DevEnvironmentEvidencePanel() {
       <div
         className="erp-dev-environment-evidence__grid"
         role="region"
-        aria-label="本地开发、demo 项目演练造数、test 甲方测试验收与隔离完整验收目标事实"
+        aria-label="本地开发、demo 项目演练造数、test 甲方测试验收与隔离完整验收的环境与验收事实"
         // 横向事实对比区需要键盘焦点，才能在窄屏使用方向键滚动。
         // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
         tabIndex={0}

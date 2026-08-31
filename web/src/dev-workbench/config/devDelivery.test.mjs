@@ -33,6 +33,7 @@ import {
   formatDeliveryPercent,
   formatDeliveryRate,
   formatDeliveryTimestamp,
+  resolveDevOperationHistoryState,
   resolveDevVersionCenterView,
   shortGitSha,
   summarizePipelineTimings,
@@ -314,6 +315,20 @@ test('target cache metrics require exact identity evidence and use Chinese prese
 
 test('delivery summary requires both target contracts and no-shell boundaries', () => {
   assert.equal(validateDevDeliverySummary(summaryFixture()).status, 'success')
+  for (const generatedAt of [
+    'not-a-time',
+    '2026-08-31',
+    '2026-08-31T12:00:00',
+  ]) {
+    assert.throws(
+      () =>
+        validateDevDeliverySummary({
+          ...summaryFixture(),
+          generatedAt,
+        }),
+      /generation/u
+    )
+  }
   assert.throws(
     () =>
       validateDevDeliverySummary({
@@ -1115,6 +1130,39 @@ test('version center keeps critical state visible and uses stable tab pagination
   )
   assert.equal(DEV_VERSION_CENTER_VERSION_PAGE_SIZE, 6)
   assert.equal(DEV_VERSION_CENTER_HISTORY_PAGE_SIZE, 10)
+  assert.equal(
+    resolveDevOperationHistoryState({ initialLoading: true }),
+    'loading'
+  )
+  assert.equal(
+    resolveDevOperationHistoryState({ loadError: 'unreadable' }),
+    'failure'
+  )
+  assert.equal(
+    resolveDevOperationHistoryState({
+      loadError: 'latest read failed',
+      hasSummary: true,
+      summaryFresh: false,
+      operationCount: 2,
+    }),
+    'stale'
+  )
+  assert.equal(
+    resolveDevOperationHistoryState({
+      hasSummary: true,
+      summaryFresh: true,
+      operationCount: 0,
+    }),
+    'empty'
+  )
+  assert.equal(
+    resolveDevOperationHistoryState({
+      hasSummary: true,
+      summaryFresh: true,
+      operationCount: 2,
+    }),
+    'normal'
+  )
 
   assert.match(versionCenterPageSource, /useSearchParams/u)
   assert.match(versionCenterPageSource, /label: '版本与部署'/u)
@@ -1127,6 +1175,10 @@ test('version center keeps critical state visible and uses stable tab pagination
   assert.doesNotMatch(versionCenterPageSource, /label: '幂等/u)
   assert.match(versionCenterPageSource, /openOperations[.]map/u)
   assert.match(versionCenterPageSource, /dataSource=\{historyOperations\}/u)
+  assert.match(
+    versionCenterPageSource,
+    /operationHistoryState === 'failure' \? null : \([\s\S]*?<Table/u
+  )
   assert.match(versionCenterPageSource, /DevPipelineStatusStrip/u)
   assert.match(versionCenterPageSource, /erp-dev-version-published-at/u)
   assert.match(versionCenterPageSource, /发布于/u)

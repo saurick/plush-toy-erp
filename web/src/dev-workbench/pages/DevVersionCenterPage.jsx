@@ -59,6 +59,7 @@ import {
   formatDeliveryBytes,
   formatDeliveryDuration,
   formatDeliveryRate,
+  resolveDevOperationHistoryState,
   resolveDevVersionCenterView,
   shortGitSha,
 } from '../config/devDelivery.mjs'
@@ -639,15 +640,13 @@ export default function DevVersionCenterPage() {
   const historyOperations = operations.filter(
     (operation) => !OPEN_OPERATION_STATUSES.has(operation.status)
   )
-  const operationHistoryState = initialLoading
-    ? 'loading'
-    : loadError && !summary
-      ? 'failure'
-      : summary && !summaryFresh
-        ? 'stale'
-        : historyOperations.length === 0
-          ? 'empty'
-          : 'normal'
+  const operationHistoryState = resolveDevOperationHistoryState({
+    initialLoading,
+    loadError,
+    hasSummary: Boolean(summary),
+    summaryFresh,
+    operationCount: historyOperations.length,
+  })
   const operationHistoryPresentation = operationHistoryStatePresentation(
     operationHistoryState
   )
@@ -1312,28 +1311,30 @@ export default function DevVersionCenterPage() {
                 description="未使用 GitLab Pipeline、Package、Release、Codex 对话或普通 SSH 动作补造操作记录。"
               />
             ) : null}
-            <Table
-              rowKey="id"
-              columns={operationColumns}
-              dataSource={historyOperations}
-              loading={initialLoading}
-              pagination={{
-                current: historyPage,
-                pageSize: DEV_VERSION_CENTER_HISTORY_PAGE_SIZE,
-                hideOnSinglePage: true,
-                showSizeChanger: false,
-                showTotal: (total, range) =>
-                  `${String(range[0])}-${String(range[1])} / 共 ${String(total)} 条记录`,
-                onChange: (nextPage) =>
-                  changeTablePage(setHistoryPage, historyTableRef, nextPage),
-              }}
-              locale={{
-                emptyText: (
-                  <Empty description="尚无工作台发起并已结束的 release、promotion、rebuild 或 rollback" />
-                ),
-              }}
-              scroll={{ x: 980 }}
-            />
+            {operationHistoryState === 'failure' ? null : (
+              <Table
+                rowKey="id"
+                columns={operationColumns}
+                dataSource={historyOperations}
+                loading={initialLoading}
+                pagination={{
+                  current: historyPage,
+                  pageSize: DEV_VERSION_CENTER_HISTORY_PAGE_SIZE,
+                  hideOnSinglePage: true,
+                  showSizeChanger: false,
+                  showTotal: (total, range) =>
+                    `${String(range[0])}-${String(range[1])} / 共 ${String(total)} 条记录`,
+                  onChange: (nextPage) =>
+                    changeTablePage(setHistoryPage, historyTableRef, nextPage),
+                }}
+                locale={{
+                  emptyText: (
+                    <Empty description="尚无工作台发起并已结束的 release、promotion、rebuild 或 rollback" />
+                  ),
+                }}
+                scroll={{ x: 980 }}
+              />
+            )}
           </Card>
         </section>
       ),

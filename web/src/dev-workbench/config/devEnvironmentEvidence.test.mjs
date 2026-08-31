@@ -177,7 +177,7 @@ function deliverySummaryFixture() {
   }
 }
 
-test('environment evidence keeps one controller and four explicit targets', () => {
+test('environment evidence keeps one controller and four evidence cards', () => {
   const evidence = buildDevEnvironmentEvidence({
     dataSummary: dataSummaryFixture(),
     deliverySummary: deliverySummaryFixture(),
@@ -222,7 +222,10 @@ test('demo becomes green only after its current target-bound persistent readback
   })
 
   assert.equal(evidence.cards[1].status, 'success')
-  assert.equal(evidence.cards[1].datasetEvidence, 'demo UAT 造数已独立持久读回')
+  assert.equal(
+    evidence.cards[1].datasetEvidence,
+    'demo 项目演练造数已独立持久读回'
+  )
   assert.match(evidence.cards[1].rollbackBoundary, /新回滚点/u)
   assert.equal(evidence.cards[0].status, 'success')
 })
@@ -274,6 +277,51 @@ test('delivery operation overview separates normal, empty, stale and failure sta
       now: currentTime,
     }).strongestBlocker,
     /demo-133 · failed/u
+  )
+  assert.equal(
+    buildDevDeliveryOperationOverview({
+      summary: {
+        ...operationSummary,
+        issues: [
+          {
+            code: 'gitlab_provider_unavailable',
+            level: 'error',
+            message: 'GitLab 版本列表不可用',
+          },
+        ],
+        operations: [
+          {
+            ...operationSummary.operations[0],
+            issues: [
+              {
+                code: 'target_operation_failed',
+                level: 'error',
+                message: 'demo 目标初始化失败',
+              },
+            ],
+          },
+        ],
+      },
+      now: currentTime,
+    }).strongestBlocker,
+    'demo 目标初始化失败'
+  )
+  assert.equal(
+    buildDevDeliveryOperationOverview({
+      summary: {
+        ...operationSummary,
+        issues: [
+          {
+            code: 'gitlab_provider_unavailable',
+            level: 'error',
+            message: '远端 CI/CD 证据暂不可读',
+          },
+        ],
+        operations: [],
+      },
+      now: currentTime,
+    }).strongestBlocker,
+    '远端 CI/CD 证据暂不可读'
   )
   assert.equal(
     buildDevDeliveryOperationOverview({

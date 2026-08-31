@@ -770,7 +770,7 @@ export function createDevDeliveryService({
         timingsResult.status === 'fulfilled' ? timingsResult.value : null,
       operations: (() => {
         const requestCounts = deliveryOperationRequestCounts(store)
-        return listDeliveryOperations(store, { limit: 50 }).map((operation) =>
+        return listDeliveryOperations(store, { limit: 200 }).map((operation) =>
           publicOperation(operation, {
             requestCount: requestCounts.get(operation.id) || 1,
           })

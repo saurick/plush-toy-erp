@@ -390,6 +390,47 @@ test('delivery summary binds a recovery receipt to registered target identity', 
   ])
 })
 
+test('delivery summary exposes the complete current operation-store window', async (t) => {
+  const { root, store } = createProject(t)
+  for (let index = 1; index <= 83; index += 1) {
+    createOrReuseDeliveryOperation(store, {
+      action: 'release',
+      target: 'gitlab-release',
+      gitSha: SHA,
+      version: `2026.07.29-${String(index)}`,
+      idempotencyKey: `version-center:history:${String(index).padStart(4, '0')}`,
+      metadata: { source: 'version-center' },
+    })
+  }
+  const service = createDevDeliveryService({
+    projectRoot: root,
+    operationStore: store,
+    provider: {
+      listVersions: () => [],
+      getReleaseStatus: () => ({ status: 'missing' }),
+      dispatchRelease: () => {},
+      downloadRelease: () => {},
+    },
+    readRepositoryState: () => ({
+      commit: SHA,
+      dirty: false,
+      fingerprint: 'd'.repeat(64),
+    }),
+    runPreflight: (targetKey) => ({
+      status: 'passed',
+      target: targetKey,
+      purpose:
+        targetKey === 'customer-test-133'
+          ? 'customer-clean-acceptance'
+          : 'project-demo-simulated',
+    }),
+    readRecoveryEvidence: () => null,
+  })
+
+  const result = await service.summary()
+  assert.equal(result.operations.length, 83)
+})
+
 test('delivery summary binds version actions to Git ancestry instead of timestamps', async (t) => {
   const { root, store } = createProject(t)
   const currentSha = 'b'.repeat(40)

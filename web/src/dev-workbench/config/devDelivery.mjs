@@ -230,6 +230,19 @@ export function resolveDevVersionCenterView(value) {
     : DEV_VERSION_CENTER_VIEW_VERSIONS
 }
 
+export function resolveDevOperationHistoryState({
+  initialLoading = false,
+  loadError = '',
+  hasSummary = false,
+  summaryFresh = false,
+  operationCount = 0,
+} = {}) {
+  if (initialLoading) return 'loading'
+  if (loadError && !hasSummary) return 'failure'
+  if (hasSummary && !summaryFresh) return 'stale'
+  return operationCount === 0 ? 'empty' : 'normal'
+}
+
 const OPERATION_MESSAGE_LABELS = Object.freeze({
   'operation accepted': '操作已受理',
   'controlled retry operation accepted': '受控的新尝试已受理',
@@ -636,7 +649,11 @@ function validateDuration(value, field, { optional = false } = {}) {
 
 function validatePipelineTimestamp(value, field, { optional = false } = {}) {
   if (value === null && optional) return value
-  if (typeof value !== 'string' || Number.isNaN(Date.parse(value))) {
+  if (
+    typeof value !== 'string' ||
+    !TIMESTAMP_WITH_TIME_ZONE_PATTERN.test(value) ||
+    Number.isNaN(Date.parse(value))
+  ) {
     throw new Error(`${field} timestamp is invalid`)
   }
   return value
@@ -812,6 +829,7 @@ function validateReleaseVersionPolicy(value) {
 
 export function validateDevDeliverySummary(summary) {
   assertObject(summary, 'delivery summary')
+  validatePipelineTimestamp(summary.generatedAt, 'delivery summary generation')
   if (
     summary.schemaVersion !== 'plush.dev-delivery-summary/v1' ||
     !['success', 'partial'].includes(summary.status) ||

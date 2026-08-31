@@ -207,7 +207,7 @@ function customerTestCard(dataSummary, deliverySummary, error) {
   }
 }
 
-function demoUatCard(dataSummary, deliverySummary, error) {
+function demoProjectCard(dataSummary, deliverySummary, error) {
   const contract = dataSummary?.datasetContract
   const expected = contract?.customerTrial133
   const target = deliveryTarget(deliverySummary, 'demo-133')
@@ -281,7 +281,7 @@ function demoUatCard(dataSummary, deliverySummary, error) {
 
   return {
     key: 'demo-133',
-    label: 'demo UAT 造数',
+    label: 'demo 项目演练造数',
     scope: '保留 seed / fixture / 模拟业务数据',
     accent: 'demo',
     status,
@@ -298,8 +298,8 @@ function demoUatCard(dataSummary, deliverySummary, error) {
       ? contract.semanticDigest
       : '未证明',
     datasetEvidence: datasetReadBack
-      ? 'demo UAT 造数已独立持久读回'
-      : 'demo UAT 造数与附件回执未证明',
+      ? 'demo 项目演练造数已独立持久读回'
+      : 'demo 项目演练造数与附件回执未证明',
     health: healthReady
       ? 'health / ready / 公网入口已读回'
       : 'health / ready / 公网入口未齐',
@@ -394,7 +394,7 @@ export function buildDevEnvironmentEvidence({
     cards: Object.freeze([
       Object.freeze(localEnvironmentCard(dataSummary, dataError)),
       Object.freeze(
-        demoUatCard(dataSummary, deliverySummary, deliveryError)
+        demoProjectCard(dataSummary, deliverySummary, deliveryError)
       ),
       Object.freeze(
         customerTestCard(dataSummary, deliverySummary, deliveryError)
@@ -462,7 +462,12 @@ export function buildDevDeliveryOperationOverview({
           OPERATION_BLOCKER_PRIORITY[left.status] ||
         Date.parse(right.updatedAt || 0) - Date.parse(left.updatedAt || 0)
     )[0]
-  const issue = summary?.issues?.find((candidate) => candidate.level === 'error')
+  const blockingIssue = blocking?.issues?.find(
+    (candidate) => candidate.level === 'error'
+  )
+  const summaryIssue = summary?.issues?.find(
+    (candidate) => candidate.level === 'error'
+  )
   const generatedAt = validTimestamp(summary?.generatedAt)
     ? summary.generatedAt
     : ''
@@ -485,7 +490,8 @@ export function buildDevDeliveryOperationOverview({
     recentOperationAt: recent?.updatedAt || '',
     strongestBlocker: error
       ? '最新读回失败，当前仅保留上次记录'
-      : issue?.message ||
+      : blockingIssue?.message ||
+        summaryIssue?.message ||
         (blocking
           ? `${deliveryOperationLabel(blocking)} · ${safeText(blocking.status)}`
           : '当前无未结束或失败的工作台操作'),

@@ -27,12 +27,12 @@ test('environment evidence keeps all target facts and workbench history in one m
   )
   assert.match(
     panel,
-    /role="region"[\s\S]*aria-label="本地开发、demo 项目演练造数、test 甲方测试验收与隔离完整验收目标事实"[\s\S]*tabIndex=\{0\}/u
+    /role="region"[\s\S]*aria-label="本地开发、demo 项目演练造数、test 甲方测试验收与隔离完整验收的环境与验收事实"[\s\S]*tabIndex=\{0\}/u
   )
   assert.match(panel, /最近工作台操作/u)
   assert.match(panel, /最严重阻断/u)
   assert.match(panel, /最后核对/u)
-  assert.match(panel, /查看完整工作台操作记录/u)
+  assert.match(panel, /查看工作台操作记录/u)
   assert.match(panel, /远端 CI\/CD 活动/u)
   assert.match(panel, /Release \/ SHA/u)
   assert.match(panel, /客户配置 revision/u)
