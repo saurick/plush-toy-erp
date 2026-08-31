@@ -47,14 +47,15 @@ function stableStringify(value) {
 function manifestFingerprint(manifest) {
   const copy = structuredClone(manifest);
   delete copy.fingerprint;
-  return createHash("sha256")
-    .update(stableStringify(copy))
-    .digest("hex");
+  return createHash("sha256").update(stableStringify(copy)).digest("hex");
 }
 
 export function validatePromotionManifest(manifest) {
   const ancestry = validateGitAncestryRelation(manifest?.ancestry);
   const target = getDeploymentTarget(manifest?.target?.key);
+  const customerConfigState = manifest?.before?.customerConfigState;
+  const customerConfigActivationRequiredAfterPromotion =
+    manifest?.before?.customerConfigActivationRequiredAfterPromotion;
   if (
     manifest?.schemaVersion !== PROMOTION_MANIFEST_CONTRACT ||
     !["eligible", "blocked", "already_current"].includes(manifest?.status) ||
@@ -64,7 +65,9 @@ export function validatePromotionManifest(manifest) {
     manifest?.target?.trialTarget !== target.trialTarget ||
     !SHA_PATTERN.test(String(manifest?.release?.gitSha || "")) ||
     !SHA256_PATTERN.test(String(manifest?.release?.manifestSha256 || "")) ||
-    !SHA256_PATTERN.test(String(manifest?.release?.artifactManifestSha256 || "")) ||
+    !SHA256_PATTERN.test(
+      String(manifest?.release?.artifactManifestSha256 || ""),
+    ) ||
     manifest?.release?.strictStatus !== "passed" ||
     manifest?.release?.rehearsalStatus !== "passed" ||
     manifest?.release?.rehearsalReceiptFile !== "release-rehearsal.json" ||
@@ -97,7 +100,19 @@ export function validatePromotionManifest(manifest) {
     imageKinds.add(image.kind);
   }
   if (
-    manifest.status === "blocked" !== (manifest.blockers.length > 0) ||
+    (customerConfigState !== undefined &&
+      !["active", "absent", "invalid", "unknown"].includes(
+        customerConfigState,
+      )) ||
+    (customerConfigActivationRequiredAfterPromotion !== undefined &&
+      typeof customerConfigActivationRequiredAfterPromotion !== "boolean") ||
+    (customerConfigActivationRequiredAfterPromotion === true &&
+      (customerConfigState !== "absent" ||
+        ancestry.actionClass !== "promote" ||
+        manifest.blockers.includes(
+          "target_customer_config_readback_failed",
+        ))) ||
+    (manifest.status === "blocked") !== manifest.blockers.length > 0 ||
     (manifest.status === "already_current" &&
       (manifest.before?.runtimeSha !== manifest.release.gitSha ||
         ancestry.actionClass !== "current")) ||
@@ -113,6 +128,28 @@ export function validatePromotionManifest(manifest) {
     throw new Error("promotion manifest status/rollback/redaction is invalid");
   }
   return manifest;
+}
+
+function isInitialCustomerConfigActivationTransition(
+  targetPreflight,
+  gitRelation,
+) {
+  const runtime = targetPreflight?.remote?.runtime;
+  const activeConfig = runtime?.activeCustomerConfig;
+  return (
+    targetPreflight?.status === "blocked" &&
+    gitRelation.actionClass === "promote" &&
+    targetPreflight.blockers.includes(
+      "target_customer_config_readback_failed",
+    ) &&
+    runtime?.customerConfigState === "absent" &&
+    runtime?.database === "blocked" &&
+    SHA_PATTERN.test(String(runtime?.serverSha || "")) &&
+    runtime.serverSha === runtime.webSha &&
+    activeConfig?.revision === "unknown" &&
+    activeConfig?.productVersion === "unknown" &&
+    activeConfig?.datasetVersion === "unknown"
+  );
 }
 
 export function buildPromotionManifest({
@@ -141,7 +178,11 @@ export function buildPromotionManifest({
     targetPreflight?.schemaVersion !== "plush.target-preflight/v1" ||
     !targetPreflight?.target ||
     targetPreflight?.customer !== "yoyoosun" ||
-    !["passed", "blocked"].includes(targetPreflight?.status)
+    !["passed", "blocked"].includes(targetPreflight?.status) ||
+    !Array.isArray(targetPreflight?.blockers) ||
+    targetPreflight.blockers.some(
+      (blocker) => !BLOCKER_PATTERN.test(String(blocker || "")),
+    )
   ) {
     throw new Error("fixed target preflight is required");
   }
@@ -155,6 +196,11 @@ export function buildPromotionManifest({
     throw new Error("promotion ancestry does not match the target and release");
   }
   const blockerSet = new Set(targetPreflight.blockers || []);
+  const customerConfigActivationRequiredAfterPromotion =
+    isInitialCustomerConfigActivationTransition(targetPreflight, gitRelation);
+  if (customerConfigActivationRequiredAfterPromotion) {
+    blockerSet.delete("target_customer_config_readback_failed");
+  }
   if (!["promote", "current"].includes(gitRelation.actionClass)) {
     blockerSet.add("promotion_git_relation_not_ahead");
   }
@@ -208,6 +254,9 @@ export function buildPromotionManifest({
       latestBackupSha256: targetPreflight.remote.backup.latestSha256,
       latestBackupSizeBytes: targetPreflight.remote.backup.latestSizeBytes,
       latestBackupIsRollbackPointForThisOperation: false,
+      customerConfigState:
+        targetPreflight.remote.runtime.customerConfigState || "unknown",
+      customerConfigActivationRequiredAfterPromotion,
     },
     blockers,
     steps: [
@@ -236,6 +285,9 @@ export function buildPromotionManifest({
             "fresh pre-migration backup and restore check",
             "target migration plan/apply/readback",
             "target release identity and smoke",
+            ...(customerConfigActivationRequiredAfterPromotion
+              ? ["release-bound customer configuration activation and readback"]
+              : []),
             "rollback rehearsal",
             "customer UAT and sign-off",
           ],
@@ -268,7 +320,9 @@ export function writePromotionManifest(file, manifest) {
       JSON.parse(readFileSync(file, "utf8")),
     );
     if (stableStringify(existing) !== stableStringify(manifest)) {
-      throw new Error("promotion manifest already exists with different content");
+      throw new Error(
+        "promotion manifest already exists with different content",
+      );
     }
     return { path: file, reused: true };
   }

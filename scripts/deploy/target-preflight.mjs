@@ -28,6 +28,7 @@ const REPORT_KEYS = Object.freeze([
   "DATABASE_STATUS",
   "DATABASE_NAME",
   "MIGRATION_VERSION",
+  "ACTIVE_CONFIG_STATE",
   "ACTIVE_CONFIG_REVISION",
   "ACTIVE_CONFIG_PRODUCT_VERSION",
   "ACTIVE_DATASET_VERSION",
@@ -130,6 +131,7 @@ resource_identity_status=passed
 compose_status=passed
 database_status=passed
 migration_version=unknown
+active_config_state=unknown
 active_config_revision=unknown
 active_config_product_version=unknown
 active_dataset_version=unknown
@@ -559,14 +561,25 @@ else
     database_status=blocked
     block target_migration_readback_failed
   fi
-  if active_config_revision="$(read_database_scalar "SELECT revision FROM customer_config_revisions WHERE customer_key = 'yoyoosun' AND status = 'active' ORDER BY id DESC LIMIT 1")" &&
-    active_config_product_version="$(read_database_scalar "SELECT product_version FROM customer_config_revisions WHERE customer_key = 'yoyoosun' AND status = 'active' ORDER BY id DESC LIMIT 1")" &&
-    active_dataset_version="$(read_database_scalar "SELECT COALESCE(jsonb_extract_path_text(compiled_snapshot, 'datasetVersion'), '') FROM customer_config_revisions WHERE customer_key = 'yoyoosun' AND status = 'active' ORDER BY id DESC LIMIT 1")" &&
-    [[ "$active_config_revision" =~ ^[A-Za-z0-9._-]+$ ]] &&
-    [[ "$active_config_product_version" =~ ^[A-Za-z0-9._-]+$ ]] &&
-    [[ "$active_dataset_version" =~ ^[A-Za-z0-9._-]+$ ]]; then
-    :
+  if active_config_count="$(read_database_scalar "SELECT COUNT(*) FROM customer_config_revisions WHERE customer_key = 'yoyoosun' AND status = 'active'")" &&
+    [[ "$active_config_count" =~ ^[0-9]+$ ]]; then
+    if [[ "$active_config_count" == 0 ]]; then
+      active_config_state=absent
+    elif [[ "$active_config_count" == 1 ]] &&
+      active_config_revision="$(read_database_scalar "SELECT revision FROM customer_config_revisions WHERE customer_key = 'yoyoosun' AND status = 'active' ORDER BY id DESC LIMIT 1")" &&
+      active_config_product_version="$(read_database_scalar "SELECT product_version FROM customer_config_revisions WHERE customer_key = 'yoyoosun' AND status = 'active' ORDER BY id DESC LIMIT 1")" &&
+      active_dataset_version="$(read_database_scalar "SELECT COALESCE(jsonb_extract_path_text(compiled_snapshot, 'datasetVersion'), '') FROM customer_config_revisions WHERE customer_key = 'yoyoosun' AND status = 'active' ORDER BY id DESC LIMIT 1")" &&
+      [[ "$active_config_revision" =~ ^[A-Za-z0-9._-]+$ ]] &&
+      [[ "$active_config_product_version" =~ ^[A-Za-z0-9._-]+$ ]] &&
+      [[ "$active_dataset_version" =~ ^[A-Za-z0-9._-]+$ ]]; then
+      active_config_state=active
+    else
+      active_config_state=invalid
+    fi
   else
+    active_config_state=invalid
+  fi
+  if [[ "$active_config_state" != active ]]; then
     active_config_revision=unknown
     active_config_product_version=unknown
     active_dataset_version=unknown
@@ -603,6 +616,7 @@ printf '%s\n' \
   "DATABASE_STATUS=$database_status" \
   "DATABASE_NAME=$database" \
   "MIGRATION_VERSION=$migration_version" \
+  "ACTIVE_CONFIG_STATE=$active_config_state" \
   "ACTIVE_CONFIG_REVISION=$active_config_revision" \
   "ACTIVE_CONFIG_PRODUCT_VERSION=$active_config_product_version" \
   "ACTIVE_DATASET_VERSION=$active_dataset_version" \
@@ -841,6 +855,11 @@ export function parseRemoteTargetPreflight(
   ) {
     throw new Error("migration version is invalid");
   }
+  const customerConfigState = assertEnum(
+    values.ACTIVE_CONFIG_STATE,
+    ["active", "absent", "invalid", "unknown"],
+    "active customer config state",
+  );
   const blockers =
     values.BLOCKERS === "none"
       ? []
@@ -905,6 +924,7 @@ export function parseRemoteTargetPreflight(
       database: checkStatus("DATABASE_STATUS"),
       databaseName: values.DATABASE_NAME,
       migrationVersion,
+      customerConfigState,
       activeCustomerConfig: {
         revision: safeIdentity(
           values.ACTIVE_CONFIG_REVISION,
@@ -1014,6 +1034,17 @@ export function parseRemoteTargetPreflight(
   };
   if (
     report.capacity.minimumAvailableBytes !== 30 * 1024 ** 3 ||
+    (report.runtime.customerConfigState === "active" &&
+      Object.values(report.runtime.activeCustomerConfig).includes("unknown")) ||
+    (report.runtime.customerConfigState !== "active" &&
+      Object.values(report.runtime.activeCustomerConfig).some(
+        (value) => value !== "unknown",
+      )) ||
+    (["absent", "invalid"].includes(report.runtime.customerConfigState) &&
+      (report.runtime.database !== "blocked" ||
+        !report.blockers.includes("target_customer_config_readback_failed"))) ||
+    (report.runtime.customerConfigState === "unknown" &&
+      report.runtime.database === "passed") ||
     report.retention.identifiedReleaseCount >
       report.retention.releaseDirectoryCount ||
     report.retention.protectedReleaseCount >
@@ -1032,9 +1063,7 @@ export function parseRemoteTargetPreflight(
       (!SHA_PATTERN.test(report.runtime.serverSha) ||
         report.runtime.serverSha !== report.runtime.webSha ||
         report.runtime.migrationVersion === "unknown" ||
-        Object.values(report.runtime.activeCustomerConfig).includes(
-          "unknown",
-        ) ||
+        report.runtime.customerConfigState !== "active" ||
         report.publicEntry.status !== "passed" ||
         report.publicEntry.gitSha !== report.runtime.serverSha))
   ) {

@@ -315,11 +315,18 @@ function targetPreflight(blocked = false) {
         minimumAvailableBytes: 30 * 1024 ** 3,
       },
       runtime: {
+        database: "passed",
         serverSha: CURRENT_SHA,
         webSha: CURRENT_SHA,
         serverHealth: "passed",
         serverReady: "passed",
         webHealth: "passed",
+        customerConfigState: "active",
+        activeCustomerConfig: {
+          revision: "revision-1",
+          productVersion: "product-1",
+          datasetVersion: "dataset-1",
+        },
       },
       backup: {
         latestSha256: "6".repeat(64),
@@ -434,6 +441,58 @@ test("promotion preparation awaits one read-only preflight and becomes ready", a
     readPromotionPlan(data.store, first.operation.id).status,
     "eligible",
   );
+});
+
+test("an initialized target without active customer config remains an upgrade and becomes ready", async (t) => {
+  const data = fixture(t);
+  const base = targetPreflight(false);
+  const absentConfig = {
+    ...base,
+    status: "blocked",
+    blockers: ["target_customer_config_readback_failed"],
+    remote: {
+      ...base.remote,
+      runtime: {
+        ...base.remote.runtime,
+        database: "blocked",
+        customerConfigState: "absent",
+        activeCustomerConfig: {
+          revision: "unknown",
+          productVersion: "unknown",
+          datasetVersion: "unknown",
+        },
+      },
+    },
+  };
+  let initializationCalls = 0;
+
+  const report = await preparePromotion(
+    {
+      repoRoot: data.root,
+      releaseManifestPath: data.releaseManifestPath,
+      targetKey: "demo-133",
+      idempotencyKey: `${IDEMPOTENCY_KEY}:config-bootstrap`,
+      operationStore: data.store,
+    },
+    {
+      classifyRelation,
+      runPreflight: () => absentConfig,
+      runInitializationPreflight: () => {
+        initializationCalls += 1;
+        return targetInitializationPreflight();
+      },
+    },
+  );
+
+  assert.equal(report.operation.status, "ready");
+  assert.equal(report.operation.metadata.promotionMode, "upgrade");
+  assert.equal(report.plan.status, "eligible");
+  assert.equal(report.plan.before.customerConfigState, "absent");
+  assert.equal(
+    report.plan.before.customerConfigActivationRequiredAfterPromotion,
+    true,
+  );
+  assert.equal(initializationCalls, 0);
 });
 
 test("a pristine registered target becomes one explicit initialization promotion", async (t) => {

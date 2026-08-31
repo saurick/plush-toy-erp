@@ -43,6 +43,7 @@ function remoteReport(overrides = {}) {
     DATABASE_STATUS: "passed",
     DATABASE_NAME: "plush_erp_demo_v1",
     MIGRATION_VERSION: "20260728100514",
+    ACTIVE_CONFIG_STATE: "active",
     ACTIVE_CONFIG_REVISION:
       "yoyoosun-customer-trial-133-package-v7.runtime-manifest-v1",
     ACTIVE_CONFIG_PRODUCT_VERSION: "customer-trial-133-test-2026.07.16-v5",
@@ -95,6 +96,7 @@ test("target preflight parser returns bounded redacted evidence", () => {
   assert.equal(report.runtime.resourceIdentity, "passed");
   assert.equal(report.runtime.serverSha, SHA);
   assert.equal(report.runtime.migrationVersion, "20260728100514");
+  assert.equal(report.runtime.customerConfigState, "active");
   assert.deepEqual(report.runtime.activeCustomerConfig, {
     revision: "yoyoosun-customer-trial-133-package-v7.runtime-manifest-v1",
     productVersion: "customer-trial-133-test-2026.07.16-v5",
@@ -134,6 +136,45 @@ test("target preflight parser returns bounded redacted evidence", () => {
   });
   assert.equal("ssh" in report, false);
   assert.doesNotMatch(JSON.stringify(report), /192\.168|\/home\/simon/u);
+});
+
+test("target preflight distinguishes a pristine active-config absence from an invalid readback", () => {
+  const report = parseRemoteTargetPreflight(
+    remoteReport({
+      STATUS: "blocked",
+      DATABASE_STATUS: "blocked",
+      ACTIVE_CONFIG_STATE: "absent",
+      ACTIVE_CONFIG_REVISION: "unknown",
+      ACTIVE_CONFIG_PRODUCT_VERSION: "unknown",
+      ACTIVE_DATASET_VERSION: "unknown",
+      BLOCKERS: "target_customer_config_readback_failed",
+    }),
+  );
+
+  assert.equal(report.status, "blocked");
+  assert.equal(report.runtime.customerConfigState, "absent");
+  assert.deepEqual(report.runtime.activeCustomerConfig, {
+    revision: "unknown",
+    productVersion: "unknown",
+    datasetVersion: "unknown",
+  });
+  assert.deepEqual(report.blockers, ["target_customer_config_readback_failed"]);
+
+  assert.throws(
+    () =>
+      parseRemoteTargetPreflight(
+        remoteReport({
+          STATUS: "blocked",
+          DATABASE_STATUS: "blocked",
+          ACTIVE_CONFIG_STATE: "invalid",
+          ACTIVE_CONFIG_REVISION: "unknown",
+          ACTIVE_CONFIG_PRODUCT_VERSION: "unknown",
+          ACTIVE_DATASET_VERSION: "unknown",
+          BLOCKERS: "target_migration_readback_failed",
+        }),
+      ),
+    /contradicts the fixed contract/u,
+  );
 });
 
 test("target preflight parser fails closed on identity and blocker drift", () => {
@@ -217,6 +258,7 @@ test("target preflight preserves a safe blocked report before runtime env exists
       COMPOSE_STATUS: "blocked",
       DATABASE_STATUS: "blocked",
       MIGRATION_VERSION: "unknown",
+      ACTIVE_CONFIG_STATE: "unknown",
       ACTIVE_CONFIG_REVISION: "unknown",
       ACTIVE_CONFIG_PRODUCT_VERSION: "unknown",
       ACTIVE_DATASET_VERSION: "unknown",
@@ -450,6 +492,10 @@ test("remote target preflight script is read-only and contains no build command"
   assert.match(
     REMOTE_TARGET_PREFLIGHT_SCRIPT,
     /SELECT version FROM atlas_schema_revisions[.]atlas_schema_revisions/u,
+  );
+  assert.match(
+    REMOTE_TARGET_PREFLIGHT_SCRIPT,
+    /SELECT COUNT\(\*\) FROM customer_config_revisions/u,
   );
   assert.match(
     REMOTE_TARGET_PREFLIGHT_SCRIPT,

@@ -1,9 +1,5 @@
 import assert from "node:assert/strict";
-import {
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-} from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -81,8 +77,7 @@ function releaseManifest() {
       provenance: {
         source: "gitlab-ci",
         repository: "saurick/plush-toy-erp",
-        workflowRef:
-          "saurick/plush-toy-erp/.gitlab-ci.yml@refs/heads/main",
+        workflowRef: "saurick/plush-toy-erp/.gitlab-ci.yml@refs/heads/main",
         runId: "123",
         runAttempt: "1",
         job: "quality_aggregate",
@@ -203,11 +198,18 @@ function preflight(overrides = {}) {
         minimumAvailableBytes: 30 * 1024 ** 3,
       },
       runtime: {
+        database: "passed",
         serverSha: CURRENT_SHA,
         webSha: CURRENT_SHA,
         serverHealth: "passed",
         serverReady: "passed",
         webHealth: "passed",
+        customerConfigState: "active",
+        activeCustomerConfig: {
+          revision: "revision-1",
+          productVersion: "product-1",
+          datasetVersion: "dataset-1",
+        },
       },
       backup: {
         latestSha256: "6".repeat(64),
@@ -270,6 +272,117 @@ test("promotion manifest preserves capacity blocker and detects already-current"
     ancestry: ancestry(SHA, SHA),
   });
   assert.equal(current.status, "already_current");
+});
+
+test("promotion manifest defers only the proven first customer-config activation blocker", () => {
+  const base = preflight();
+  const absentConfig = {
+    ...base,
+    status: "blocked",
+    blockers: ["target_customer_config_readback_failed"],
+    remote: {
+      ...base.remote,
+      runtime: {
+        ...base.remote.runtime,
+        database: "blocked",
+        customerConfigState: "absent",
+        activeCustomerConfig: {
+          revision: "unknown",
+          productVersion: "unknown",
+          datasetVersion: "unknown",
+        },
+      },
+    },
+  };
+  const eligible = buildPromotionManifest({
+    operationId: OPERATION_ID,
+    releaseManifest: releaseManifest(),
+    releaseManifestSha256: HASH,
+    targetPreflight: absentConfig,
+    ancestry: ancestry(),
+  });
+
+  assert.equal(eligible.status, "eligible");
+  assert.deepEqual(eligible.blockers, []);
+  assert.equal(eligible.before.customerConfigState, "absent");
+  assert.equal(
+    eligible.before.customerConfigActivationRequiredAfterPromotion,
+    true,
+  );
+  assert.equal(
+    eligible.notProven.includes(
+      "release-bound customer configuration activation and readback",
+    ),
+    true,
+  );
+  assert.doesNotMatch(eligible.steps.join("\n"), /customer configuration/u);
+
+  const invalidReadback = buildPromotionManifest({
+    operationId: OPERATION_ID,
+    releaseManifest: releaseManifest(),
+    releaseManifestSha256: HASH,
+    targetPreflight: {
+      ...absentConfig,
+      remote: {
+        ...absentConfig.remote,
+        runtime: {
+          ...absentConfig.remote.runtime,
+          customerConfigState: "invalid",
+        },
+      },
+    },
+    ancestry: ancestry(),
+  });
+  assert.equal(invalidReadback.status, "blocked");
+  assert.deepEqual(invalidReadback.blockers, [
+    "target_customer_config_readback_failed",
+  ]);
+  assert.equal(
+    invalidReadback.before.customerConfigActivationRequiredAfterPromotion,
+    false,
+  );
+
+  const otherBlocker = buildPromotionManifest({
+    operationId: OPERATION_ID,
+    releaseManifest: releaseManifest(),
+    releaseManifestSha256: HASH,
+    targetPreflight: {
+      ...absentConfig,
+      blockers: [
+        "target_customer_config_readback_failed",
+        "target_disk_capacity_low",
+      ],
+    },
+    ancestry: ancestry(),
+  });
+  assert.equal(otherBlocker.status, "blocked");
+  assert.deepEqual(otherBlocker.blockers, ["target_disk_capacity_low"]);
+
+  const alreadyCurrent = buildPromotionManifest({
+    operationId: OPERATION_ID,
+    releaseManifest: releaseManifest(),
+    releaseManifestSha256: HASH,
+    targetPreflight: {
+      ...absentConfig,
+      remote: {
+        ...absentConfig.remote,
+        runtime: {
+          ...absentConfig.remote.runtime,
+          serverSha: SHA,
+          webSha: SHA,
+        },
+      },
+    },
+    ancestry: ancestry(SHA, SHA),
+  });
+  assert.equal(alreadyCurrent.status, "blocked");
+  assert.deepEqual(alreadyCurrent.blockers, [
+    "target_customer_config_readback_failed",
+  ]);
+  assert.equal(
+    alreadyCurrent.before.customerConfigActivationRequiredAfterPromotion,
+    false,
+  );
 });
 
 test("promotion manifest is private idempotent and immutable", () => {
