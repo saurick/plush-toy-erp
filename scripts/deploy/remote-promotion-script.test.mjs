@@ -124,6 +124,24 @@ test("remote promotion cleans only materialization created by the current operat
   assert.match(source, /rm -rf -- "\$candidate"/u);
 });
 
+test("remote promotion restores only the trusted database role script mode after safe extraction", () => {
+  const extractIndex = source.indexOf("tar --extract");
+  const ownershipGateIndex = source.indexOf('"$owner_uid" == "$(id -u)"');
+  const chmodIndex = source.indexOf('chmod 755 "$database_roles_script"');
+  const retainIndex = source.indexOf(
+    'mv "$release_materializing" "$release_dir"',
+  );
+  assert.ok(extractIndex >= 0 && extractIndex < ownershipGateIndex);
+  assert.ok(ownershipGateIndex < chmodIndex && chmodIndex < retainIndex);
+  assert.match(source, /--no-same-owner --no-same-permissions/u);
+  assert.match(
+    source,
+    /-f "\$database_roles_script" && ! -L "\$database_roles_script"/u,
+  );
+  assert.match(source, /"\$owner_uid" == "\$\(id -u\)"/u);
+  assert.doesNotMatch(source, /chmod -R|chmod 755 "\$release_materializing"/u);
+});
+
 test("remote promotion normalizes full nanoseconds to portable milliseconds", () => {
   assert.doesNotMatch(source, /date \+%s%3N/u);
   assert.equal(runEpochMillis("1786145037 839556629"), "1786145037839");
