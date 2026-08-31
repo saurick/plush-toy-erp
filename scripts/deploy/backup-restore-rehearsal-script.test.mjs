@@ -14,6 +14,7 @@ function runScript(args = [], env = {}) {
   return spawnSync("bash", [scriptPath, ...args], {
     cwd: repoRoot,
     encoding: "utf8",
+    timeout: 5_000,
     env: {
       ...process.env,
       ...env,
@@ -24,6 +25,7 @@ function runScript(args = [], env = {}) {
 test("backup restore rehearsal script help is runnable", () => {
   const result = runScript(["--help"]);
 
+  assert.equal(result.error?.code, undefined, "help must not time out");
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /SOURCE_POSTGRES_DSN/);
   assert.match(result.stdout, /backup-restore-report\.json/);
@@ -186,6 +188,12 @@ test("backup restore rehearsal keeps credentials private and uses the full migra
     /PGHOST="\$source_pg_host" PGPORT="\$source_pg_port"[\s\S]*PGDATABASE="\$source_pg_database" PGUSER="\$source_pg_user"[\s\S]*PGPASSWORD="\$source_pg_password" PGSSLMODE="\$source_pg_sslmode"[\s\S]*"\$pg_dump_bin"[\s\S]*--format=custom/,
   );
   assert.match(source, /BACKUP_SOURCE_POSTGRES_DSN="\$source_dsn" python3/);
+  assert.doesNotMatch(
+    source,
+    /source_pg_settings="\$\([\s\S]*?python3\s+-\s+<<['"]?PY/u,
+  );
+  assert.match(source, /mapfile -d '' -t source_pg_settings/u);
+  assert.doesNotMatch(source, /eval "\$source_pg_settings"/u);
   assert.match(source, /source_dsn=""[\s\S]*unset "\$source_env"/);
   assert.doesNotMatch(source, /PGDATABASE="\$source_dsn"/);
   assert.doesNotMatch(source, /"\$pg_dump_bin"\s+"\$source_dsn"/);

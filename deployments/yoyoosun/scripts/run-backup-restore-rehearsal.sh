@@ -3,38 +3,37 @@ set -euo pipefail
 umask 077
 
 print_help() {
-  cat <<'USAGE'
-用法:
-  SOURCE_POSTGRES_DSN='<postgres://erp_backup:...@host:port/database?sslmode=...>' \
-  bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh \
-    --release-version local-dev-20260616 \
-    --environment local-dev \
-    --backup-purpose pre-migration \
-    --source-policy dedicated-backup \
-    --out output/customers/yoyoosun/backup-restore-rehearsal \
-    --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \
-    --backend-url http://127.0.0.1:8300 \
-    --web-url http://127.0.0.1:5175/erp
-
-作用:
-  对 SOURCE_POSTGRES_DSN 指向的库执行一次真实备份恢复演练：
-  1. 用经过权限对账的 erp_backup 和本机 PostgreSQL 18.1 pg_dump 生成 custom dump 到 output/。
-  2. 启动临时隔离 PostgreSQL 容器。
-  3. 将 dump 恢复到临时库。
-  4. 对恢复库先读取 migrationBefore，依次运行存量升级与客户配置切换只读审计，再执行 Atlas migration apply 和 migration status。
-  5. 可选执行 backend healthz/readyz 和 web 主路径 HTTP smoke。
-  6. 生成脱敏 backup-evidence.md、migration-status.txt、command-summary.txt 和 backup-restore-report.json。
-  7. 如提供 --evidence-dir，只复制上述脱敏 artifact 到 release evidence 目录；dump 仍留在 output/。
-
-边界:
-  - 不读取、不提交真实 .env。
-  - 不把 dump、secret、完整 DSN 或客户 raw rows 写入 git。
-  - 默认 SOURCE_POSTGRES_DSN 必须使用只读 erp_backup；恢复和 migration 由隔离库管理员 / erp_migrator 完成。
-  - shared-dev-session-read-only 只供本项目本地迁移入口备份已登记的 106 开发库，并强制当前源连接只读；不能用于目标或发布环境。
-  - --environment 会写入正式恢复报告；目标演练必须显式填写实际环境（例如 customer-trial-133），不能沿用默认 local-dev。
-  - 默认拒绝把 192.168.0.133 测试 / 目标库当成本地 source，除非显式设置
-    ERP_ALLOW_TEST_DB_AS_DEV=1 或 ALLOW_TARGET_DB_BACKUP_REHEARSAL=1。
-USAGE
+  printf '%s\n' \
+    '用法:' \
+    "  SOURCE_POSTGRES_DSN='<postgres://erp_backup:...@host:port/database?sslmode=...>' \\" \
+    "  bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh \\" \
+    "    --release-version local-dev-20260616 \\" \
+    "    --environment local-dev \\" \
+    "    --backup-purpose pre-migration \\" \
+    "    --source-policy dedicated-backup \\" \
+    "    --out output/customers/yoyoosun/backup-restore-rehearsal \\" \
+    "    --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \\" \
+    "    --backend-url http://127.0.0.1:8300 \\" \
+    '    --web-url http://127.0.0.1:5175/erp' \
+    '' \
+    '作用:' \
+    '  对 SOURCE_POSTGRES_DSN 指向的库执行一次真实备份恢复演练：' \
+    '  1. 用经过权限对账的 erp_backup 和本机 PostgreSQL 18.1 pg_dump 生成 custom dump 到 output/。' \
+    '  2. 启动临时隔离 PostgreSQL 容器。' \
+    '  3. 将 dump 恢复到临时库。' \
+    '  4. 对恢复库先读取 migrationBefore，依次运行存量升级与客户配置切换只读审计，再执行 Atlas migration apply 和 migration status。' \
+    '  5. 可选执行 backend healthz/readyz 和 web 主路径 HTTP smoke。' \
+    '  6. 生成脱敏 backup-evidence.md、migration-status.txt、command-summary.txt 和 backup-restore-report.json。' \
+    '  7. 如提供 --evidence-dir，只复制上述脱敏 artifact 到 release evidence 目录；dump 仍留在 output/。' \
+    '' \
+    '边界:' \
+    '  - 不读取、不提交真实 .env。' \
+    '  - 不把 dump、secret、完整 DSN 或客户 raw rows 写入 git。' \
+    '  - 默认 SOURCE_POSTGRES_DSN 必须使用只读 erp_backup；恢复和 migration 由隔离库管理员 / erp_migrator 完成。' \
+    '  - shared-dev-session-read-only 只供本项目本地迁移入口备份已登记的 106 开发库，并强制当前源连接只读；不能用于目标或发布环境。' \
+    '  - --environment 会写入正式恢复报告；目标演练必须显式填写实际环境（例如 customer-trial-133），不能沿用默认 local-dev。' \
+    '  - 默认拒绝把 192.168.0.133 测试 / 目标库当成本地 source，除非显式设置' \
+    '    ERP_ALLOW_TEST_DB_AS_DEV=1 或 ALLOW_TARGET_DB_BACKUP_REHEARSAL=1。'
 }
 
 repo_root="$(git rev-parse --show-toplevel)"
@@ -222,10 +221,10 @@ source_pg_password=""
 source_pg_sslmode=""
 source_pg_options=""
 source_role_alias="erp_backup"
-source_pg_settings="$(
-  BACKUP_SOURCE_POSTGRES_DSN="$source_dsn" python3 - <<'PY'
+mapfile -d '' -t source_pg_settings < <(
+  BACKUP_SOURCE_POSTGRES_DSN="$source_dsn" python3 -c '
 import os
-import shlex
+import sys
 import urllib.parse
 
 raw = os.environ.get("BACKUP_SOURCE_POSTGRES_DSN", "").strip()
@@ -250,19 +249,21 @@ if sslmode not in {"disable", "allow", "prefer", "require", "verify-ca", "verify
 if not host or not database or not user or not password:
     raise SystemExit("[backup-restore-rehearsal] SOURCE_POSTGRES_DSN 目标或凭据不完整")
 
-for name, value in {
-    "source_pg_host": host,
-    "source_pg_port": str(port),
-    "source_pg_database": database,
-    "source_pg_user": user,
-    "source_pg_password": password,
-    "source_pg_sslmode": sslmode,
-}.items():
-    print(f"{name}={shlex.quote(value)}")
-PY
-)"
-eval "$source_pg_settings"
-unset source_pg_settings
+values = (host, str(port), database, user, password, sslmode)
+sys.stdout.buffer.write(b"\0".join(value.encode() for value in values) + b"\0")
+'
+)
+[[ "${#source_pg_settings[@]}" -eq 6 ]] || {
+  echo "[backup-restore-rehearsal] SOURCE_POSTGRES_DSN 解析失败" >&2
+  exit 1
+}
+source_pg_host="${source_pg_settings[0]}"
+source_pg_port="${source_pg_settings[1]}"
+source_pg_database="${source_pg_settings[2]}"
+source_pg_user="${source_pg_settings[3]}"
+source_pg_password="${source_pg_settings[4]}"
+source_pg_sslmode="${source_pg_settings[5]}"
+unset 'source_pg_settings'
 source_dsn=""
 unset "$source_env"
 
