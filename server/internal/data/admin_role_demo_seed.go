@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -31,25 +32,47 @@ type ManualAcceptancePasswordRotationAccount struct {
 }
 
 type ManualAcceptancePasswordRotationReceipt struct {
-	OperationID      string                                    `json:"operationId,omitempty"`
-	Target           string                                    `json:"target,omitempty"`
-	DatasetVersion   string                                    `json:"datasetVersion,omitempty"`
-	Release          string                                    `json:"release,omitempty"`
-	MigrationVersion string                                    `json:"migrationVersion,omitempty"`
-	CustomerRevision string                                    `json:"customerRevision,omitempty"`
-	RotatedAt        time.Time                                 `json:"rotatedAt"`
-	Accounts         []ManualAcceptancePasswordRotationAccount `json:"accounts"`
-	Replayed         bool                                      `json:"replayed"`
+	OperationID      string                                         `json:"operationId,omitempty"`
+	Target           string                                         `json:"target,omitempty"`
+	DatasetVersion   string                                         `json:"datasetVersion,omitempty"`
+	Release          string                                         `json:"release,omitempty"`
+	MigrationVersion string                                         `json:"migrationVersion,omitempty"`
+	CustomerRevision string                                         `json:"customerRevision,omitempty"`
+	RotatedAt        time.Time                                      `json:"rotatedAt"`
+	Accounts         []ManualAcceptancePasswordRotationAccount      `json:"accounts"`
+	Unselected       *ManualAcceptanceUnselectedAccountReceipt      `json:"unselectedAccounts,omitempty"`
+	RollbackPoint    *ManualAcceptancePasswordRotationRollbackPoint `json:"rollbackPoint,omitempty"`
+	Replayed         bool                                           `json:"replayed"`
+}
+
+type ManualAcceptancePasswordRotationRollbackPoint struct {
+	BackupAlias    string `json:"backupAlias"`
+	BackupSHA256   string `json:"backupSha256"`
+	BackupSize     int64  `json:"backupSizeBytes"`
+	RestoreChecked bool   `json:"restoreChecked"`
+}
+
+type ManualAcceptanceUnselectedAccountReceipt struct {
+	AccountCount        int    `json:"accountCount"`
+	IdentityFingerprint string `json:"identityFingerprint"`
+	Preserved           bool   `json:"preserved"`
 }
 
 type ManualAcceptancePasswordRotationOperation struct {
-	MarkerKey        string
-	OperationID      string
-	Target           string
-	DatasetVersion   string
-	Release          string
-	MigrationVersion string
-	CustomerRevision string
+	MarkerKey                  string
+	OperationID                string
+	Target                     string
+	DatasetVersion             string
+	Release                    string
+	MigrationVersion           string
+	CustomerRevision           string
+	PreserveUnselectedAccounts bool
+	RollbackPoint              *ManualAcceptancePasswordRotationRollbackPoint
+}
+
+type manualAcceptanceUnselectedAccountIdentitySnapshot struct {
+	accountCount        int
+	identityFingerprint string
 }
 
 func RejectPublicRoleDemoPassword(password string) error {
@@ -71,12 +94,120 @@ func validateManualAcceptanceRotationOperation(operation ManualAcceptancePasswor
 		}
 	}
 	if nonEmpty == 0 {
+		if operation.PreserveUnselectedAccounts || operation.RollbackPoint != nil {
+			return errors.New("rotation evidence requires a durable rotation operation identity")
+		}
 		return nil
 	}
 	if nonEmpty != len(values) || len(operation.MarkerKey) > 128 {
 		return errors.New("manual acceptance password rotation operation identity is incomplete")
 	}
+	if operation.RollbackPoint != nil {
+		point := operation.RollbackPoint
+		if strings.TrimSpace(point.BackupAlias) == "" ||
+			!validManualAcceptanceIdentityFingerprint(point.BackupSHA256) ||
+			point.BackupSize <= 0 || !point.RestoreChecked {
+			return errors.New("manual acceptance password rotation rollback point is incomplete")
+		}
+	} else if operation.Target == "customer-trial-133" || operation.Target == "customer-test-133" {
+		return errors.New("registered 133 password rotation requires a durable rollback point")
+	}
 	return nil
+}
+
+func validateManualAcceptanceRotationScope(
+	operation ManualAcceptancePasswordRotationOperation,
+	adminUsernames []string,
+	demoUsernames []string,
+	demoPassword string,
+	phoneUsername string,
+	phone string,
+) error {
+	if operation.Target != "customer-test-133" {
+		return nil
+	}
+	if len(adminUsernames) != 1 || strings.TrimSpace(adminUsernames[0]) != "admin" {
+		return errors.New("customer-test-133 password rotation must select only the stable admin")
+	}
+	if len(demoUsernames) != 0 || strings.TrimSpace(demoPassword) != "" {
+		return errors.New("customer-test-133 password rotation must preserve every non-admin credential")
+	}
+	if strings.TrimSpace(phoneUsername) != "" || strings.TrimSpace(phone) != "" {
+		return errors.New("customer-test-133 password rotation must not change phone identities")
+	}
+	if !operation.PreserveUnselectedAccounts {
+		return errors.New("customer-test-133 password rotation must prove unselected account preservation")
+	}
+	return nil
+}
+
+func manualAcceptanceRollbackPointMatches(
+	expected *ManualAcceptancePasswordRotationRollbackPoint,
+	actual *ManualAcceptancePasswordRotationRollbackPoint,
+) bool {
+	if expected == nil || actual == nil {
+		return expected == nil && actual == nil
+	}
+	return expected.BackupAlias == actual.BackupAlias &&
+		expected.BackupSHA256 == actual.BackupSHA256 &&
+		expected.BackupSize == actual.BackupSize &&
+		expected.RestoreChecked == actual.RestoreChecked
+}
+
+func validManualAcceptanceIdentityFingerprint(value string) bool {
+	if len(value) != sha256.Size*2 {
+		return false
+	}
+	for _, character := range value {
+		if (character < '0' || character > '9') && (character < 'a' || character > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
+func readManualAcceptanceUnselectedAccountIdentitySnapshot(
+	ctx context.Context,
+	tx *sql.Tx,
+	selected map[string]struct{},
+) (manualAcceptanceUnselectedAccountIdentitySnapshot, error) {
+	rows, err := tx.QueryContext(ctx, `
+SELECT id, username
+FROM admin_users
+ORDER BY username`)
+	if err != nil {
+		return manualAcceptanceUnselectedAccountIdentitySnapshot{}, err
+	}
+	defer func() { _ = rows.Close() }()
+	hash := sha256.New()
+	accountCount := 0
+	for rows.Next() {
+		var id int64
+		var username string
+		if err := rows.Scan(&id, &username); err != nil {
+			return manualAcceptanceUnselectedAccountIdentitySnapshot{}, err
+		}
+		if _, exists := selected[username]; exists {
+			continue
+		}
+		encoded, err := json.Marshal([]any{id, username})
+		if err != nil {
+			return manualAcceptanceUnselectedAccountIdentitySnapshot{}, err
+		}
+		_, _ = hash.Write(encoded)
+		_, _ = hash.Write([]byte{'\n'})
+		for index := range encoded {
+			encoded[index] = 0
+		}
+		accountCount++
+	}
+	if err := rows.Err(); err != nil {
+		return manualAcceptanceUnselectedAccountIdentitySnapshot{}, err
+	}
+	return manualAcceptanceUnselectedAccountIdentitySnapshot{
+		accountCount:        accountCount,
+		identityFingerprint: fmt.Sprintf("%x", hash.Sum(nil)),
+	}, nil
 }
 
 func readManualAcceptanceRotationReceipt(
@@ -86,6 +217,7 @@ func readManualAcceptanceRotationReceipt(
 	adminUsernames []string,
 	demoUsernames []string,
 	expectPhoneBound bool,
+	expectUnselectedPreservation bool,
 ) (*ManualAcceptancePasswordRotationReceipt, error) {
 	var raw string
 	if err := tx.QueryRowContext(ctx,
@@ -104,7 +236,8 @@ func readManualAcceptanceRotationReceipt(
 		receipt.Release != operation.Release ||
 		receipt.MigrationVersion != operation.MigrationVersion ||
 		receipt.CustomerRevision != operation.CustomerRevision ||
-		receipt.RotatedAt.IsZero() {
+		receipt.RotatedAt.IsZero() ||
+		!manualAcceptanceRollbackPointMatches(operation.RollbackPoint, receipt.RollbackPoint) {
 		return nil, errors.New("manual acceptance password rotation marker identity mismatch")
 	}
 	expectedUsernames := append(append([]string(nil), adminUsernames...), demoUsernames...)
@@ -123,6 +256,16 @@ func readManualAcceptanceRotationReceipt(
 	if (expectPhoneBound && (phoneBoundCount != 1 || receipt.Accounts[0].Username != "admin" || !receipt.Accounts[0].PhoneBound)) ||
 		(!expectPhoneBound && phoneBoundCount != 0) {
 		return nil, errors.New("manual acceptance password rotation marker phone binding mismatch")
+	}
+	if expectUnselectedPreservation {
+		if receipt.Unselected == nil ||
+			receipt.Unselected.AccountCount < 0 ||
+			!receipt.Unselected.Preserved ||
+			!validManualAcceptanceIdentityFingerprint(receipt.Unselected.IdentityFingerprint) {
+			return nil, errors.New("manual acceptance password rotation marker preservation receipt is invalid")
+		}
+	} else if receipt.Unselected != nil {
+		return nil, errors.New("manual acceptance password rotation marker has unexpected preservation receipt")
 	}
 	receipt.Replayed = false
 	return &receipt, nil
@@ -244,6 +387,16 @@ func RotateManualAcceptancePasswordsWithOperation(
 	}
 	phoneUsername = strings.TrimSpace(phoneUsername)
 	phone = strings.TrimSpace(phone)
+	if err := validateManualAcceptanceRotationScope(
+		operation,
+		adminUsernames,
+		demoUsernames,
+		demoPassword,
+		phoneUsername,
+		phone,
+	); err != nil {
+		return nil, err
+	}
 	if (phoneUsername == "") != (phone == "") {
 		return nil, errors.New("manual acceptance phone username and phone must be provided together")
 	}
@@ -293,9 +446,32 @@ func RotateManualAcceptancePasswordsWithOperation(
 		return nil, err
 	}
 	defer func() { _ = tx.Rollback() }()
+	var unselectedBefore manualAcceptanceUnselectedAccountIdentitySnapshot
+	if operation.PreserveUnselectedAccounts {
+		if _, err := tx.ExecContext(ctx, "LOCK TABLE admin_users IN SHARE ROW EXCLUSIVE MODE"); err != nil {
+			return nil, err
+		}
+		unselectedBefore, err = readManualAcceptanceUnselectedAccountIdentitySnapshot(ctx, tx, seen)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if operation.MarkerKey != "" {
-		replayed, err := readManualAcceptanceRotationReceipt(ctx, tx, operation, adminUsernames, demoUsernames, phoneUsername != "")
+		replayed, err := readManualAcceptanceRotationReceipt(
+			ctx,
+			tx,
+			operation,
+			adminUsernames,
+			demoUsernames,
+			phoneUsername != "",
+			operation.PreserveUnselectedAccounts,
+		)
 		if err == nil {
+			if operation.PreserveUnselectedAccounts &&
+				(replayed.Unselected.AccountCount != unselectedBefore.accountCount ||
+					replayed.Unselected.IdentityFingerprint != unselectedBefore.identityFingerprint) {
+				return nil, errors.New("manual acceptance unselected account identity set changed after the durable rotation receipt")
+			}
 			if commitErr := tx.Commit(); commitErr != nil {
 				return nil, commitErr
 			}
@@ -324,6 +500,10 @@ func RotateManualAcceptancePasswordsWithOperation(
 		DatasetVersion: operation.DatasetVersion, Release: operation.Release,
 		MigrationVersion: operation.MigrationVersion, CustomerRevision: operation.CustomerRevision,
 		RotatedAt: now, Accounts: make([]ManualAcceptancePasswordRotationAccount, 0, len(adminUsernames)+len(demoUsernames)),
+	}
+	if operation.RollbackPoint != nil {
+		point := *operation.RollbackPoint
+		receipt.RollbackPoint = &point
 	}
 	phoneAlreadyBound := false
 	if phone != "" {
@@ -422,6 +602,20 @@ WHERE admin_user_id = $1
 			receipt.Accounts = append(receipt.Accounts, ManualAcceptancePasswordRotationAccount{
 				Username: username, AuthVersion: authVersion, RevokedSessions: revokedSessions, PhoneBound: phoneBound,
 			})
+		}
+	}
+	if operation.PreserveUnselectedAccounts {
+		unselectedAfter, err := readManualAcceptanceUnselectedAccountIdentitySnapshot(ctx, tx, seen)
+		if err != nil {
+			return nil, err
+		}
+		if unselectedBefore != unselectedAfter {
+			return nil, errors.New("manual acceptance unselected account identity set changed during password rotation")
+		}
+		receipt.Unselected = &ManualAcceptanceUnselectedAccountReceipt{
+			AccountCount:        unselectedAfter.accountCount,
+			IdentityFingerprint: unselectedAfter.identityFingerprint,
+			Preserved:           true,
 		}
 	}
 	if operation.MarkerKey != "" {

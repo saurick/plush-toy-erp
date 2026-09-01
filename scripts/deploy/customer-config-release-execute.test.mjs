@@ -13,8 +13,43 @@ import { writeCredentialEvidenceTestFixture } from "./credential-evidence-test-f
 import {
   buildInputTemplate,
   parseCliArgs,
-  runCustomerConfigRelease,
+  runCustomerConfigRelease as runCustomerConfigReleaseImpl,
 } from "./customer-config-release-execute.mjs";
+
+function matchedRuntimeIdentityResponse() {
+  return {
+    ok: true,
+    status: 200,
+    headers: {
+      get(name) {
+        return String(name).toLowerCase() ===
+          "x-erp-runtime-identity-proof"
+          ? "matched-v1"
+          : null;
+      },
+    },
+  };
+}
+
+function runCustomerConfigRelease(options, runtime = {}) {
+  return runCustomerConfigReleaseImpl(
+    { deploymentTarget: "demo-133", ...options },
+    {
+      ...runtime,
+      fetchImpl:
+        runtime.fetchImpl ||
+        (async (url, init) => {
+          if (
+            new URL(String(url)).pathname ===
+            "/readyz/runtime-identity"
+          ) {
+            return matchedRuntimeIdentityResponse();
+          }
+          return globalThis.fetch(url, init);
+        }),
+    },
+  );
+}
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const releaseCli = path.join(testDir, "customer-config-release-execute.mjs");
@@ -843,6 +878,16 @@ test("execute activate 通过 JSON-RPC 调用 validate、publish、transition ch
     );
     assert.equal(calls[3].params.expected_active_revision, "");
     assert.equal(report.backendEndpointAlias, "http://127.0.0.1:8300");
+    assert.deepEqual(report.runtimeIdentityVerification, {
+      status: "verified",
+      deploymentTargetBound: true,
+      scope: "release-v1",
+      database: "plush_erp_demo_v1",
+      releaseVersion: "abc1234000000000000000000000000000000000",
+      migrationVersion: "20260628123354",
+      proof: "matched-v1",
+      responseBodyStored: false,
+    });
     assert.equal(report.transitionCheck.allowed, true);
     assert.equal(report.transitionCheck.attempts, 1);
     assert.equal(
@@ -859,6 +904,83 @@ test("execute activate 通过 JSON-RPC 调用 validate、publish、transition ch
     assert.equal(
       report.effectiveSessionVerification.configRevision,
       "yoyoosun-customer-package-v7.runtime-manifest-v1",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalConfirm === undefined) {
+      delete process.env.CUSTOMER_CONFIG_CONFIRM;
+    } else {
+      process.env.CUSTOMER_CONFIG_CONFIRM = originalConfirm;
+    }
+    if (originalToken === undefined) {
+      delete process.env.CUSTOMER_CONFIG_ADMIN_TOKEN;
+    } else {
+      process.env.CUSTOMER_CONFIG_ADMIN_TOKEN = originalToken;
+    }
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("activate 在首次 JSON-RPC 前拒绝不匹配的目标运行身份", async () => {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "customer-config-release-"),
+  );
+  const manifest = writeRuntimeManifest(root);
+  const evidenceDir = "deployments/yoyoosun/evidence/releases/2026-06-28";
+  writeReleaseEvidence(path.join(root, evidenceDir));
+  writeManifestEvidence(root, evidenceDir, manifest);
+  const identityCalls = [];
+  const originalFetch = globalThis.fetch;
+  const originalConfirm = process.env.CUSTOMER_CONFIG_CONFIRM;
+  const originalToken = process.env.CUSTOMER_CONFIG_ADMIN_TOKEN;
+  process.env.CUSTOMER_CONFIG_CONFIRM = "ACTIVATE_YOYOOSUN_CONFIG";
+  process.env.CUSTOMER_CONFIG_ADMIN_TOKEN = "test-token";
+  globalThis.fetch = async () => {
+    throw new Error("JSON-RPC must not run after runtime identity mismatch");
+  };
+
+  try {
+    await assert.rejects(
+      () =>
+        runCustomerConfigRelease(
+          {
+            manifest,
+            evidenceDir,
+            out: path.join(root, "out"),
+            backendURL: "http://127.0.0.1:8300",
+            execute: true,
+            activate: true,
+            activateOnly: true,
+          },
+          {
+            repoRoot: root,
+            fetchImpl: async (url, init) => {
+              identityCalls.push({ url: String(url), init });
+              return {
+                ok: false,
+                status: 409,
+                headers: { get: () => null },
+              };
+            },
+          },
+        ),
+      /target runtime identity preflight did not match/,
+    );
+    assert.equal(identityCalls.length, 1);
+    assert.equal(
+      new URL(identityCalls[0].url).pathname,
+      "/readyz/runtime-identity",
+    );
+    assert.equal(identityCalls[0].init.method, "GET");
+    assert.equal(
+      identityCalls[0].init.headers["X-ERP-Runtime-Identity-Scope"],
+      "release-v1",
+    );
+    assert.match(
+      identityCalls[0].init.headers[
+        "X-ERP-Expected-Runtime-Identity-SHA256"
+      ],
+      /^[a-f0-9]{64}$/u,
     );
   } finally {
     globalThis.fetch = originalFetch;

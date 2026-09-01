@@ -364,6 +364,7 @@ test("生成 manifest evidence 后 activation gate 可通过", async () => {
   assert.equal(evidence.redaction.containsSecrets, false);
 
   const gate = validateCustomerConfigActivationGate({
+    deploymentTarget: "demo-133",
     repoRoot: root,
     manifest,
     evidenceDir,
@@ -398,6 +399,7 @@ test("未显式 approved 时生成 draft，不自动通过 activation gate", asy
   assert.throws(
     () =>
       validateCustomerConfigActivationGate({
+        deploymentTarget: "demo-133",
         repoRoot: root,
         manifest,
         evidenceDir,

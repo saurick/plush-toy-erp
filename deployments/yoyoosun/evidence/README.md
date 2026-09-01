@@ -9,6 +9,7 @@
 - migration before / after version。
 - env、客户配置和菜单配置 fingerprint。
 - backup id、大小、hash、存储位置 alias。
+- `credential-rotation-report.json` 使用 `plush.manual-acceptance-credential-rotation-receipt/v1`，其 `rollbackPoint` 只记录 operation-bound 备份 alias、SHA-256、正数 size 与 `restoreChecked=true`；不记录真实路径。该备份独立于 release / migration 的 `backupId`，不能互相冒充。
 - 备份恢复演练状态、恢复目标 alias、命令摘要 alias、备份大小 / hash、migration status、pending files 和 smoke query 状态。
 - smoke 项目、状态、时间、公网 endpoint alias、后端 endpoint alias、可复核 target、URL / path 检查的 HTTP status 和脱敏失败原因；如本次发布激活客户配置 revision，smoke report 还应包含 `jsonrpc:customer_config.get_effective_session` 检查，记录期望 revision、token 来源 env 名和 `responseBodyStored=false`，不保存 token 或响应正文；真实 smoke report 必须有非空 checks，且每条 check 都通过。
 - rollback / forward-fix 演练步骤、post-check smoke report 路径、post-check smoke 数量、目标 release alias 和脱敏结论；若本次演练覆盖客户配置激活或回滚，还应记录 post-check `customer-config-effective-session` 读回验证。
@@ -38,6 +39,7 @@
 
 ```bash
 bash deployments/yoyoosun/scripts/collect-evidence.sh \
+  --deployment-target <demo-133|customer-test-133> \
   --release-version <release-version> \
   --output deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
@@ -46,12 +48,13 @@ bash deployments/yoyoosun/scripts/collect-evidence.sh \
 
 ```bash
 node scripts/deploy/release-evidence-status.mjs \
+  --deployment-target <demo-133|customer-test-133> \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
 
 status 不执行发布、不读取真实 `.env`、不恢复备份、不跑 migration、不调用后端、不做 smoke，也不执行 rollback / forward-fix；JSON 输出会带 `scope.evidenceOnly=true`、`readyMeaning` 和 `notProvenByThisHelper`，明确 `ready` 只表示该 evidence 目录通过 release evidence gate，不证明 status 脚本执行过真实目标环境发布、migration、smoke、恢复演练或回滚 / 前向修复演练。最终是否可进入客户试用或交付仍以 `release-evidence-gate.mjs` 通过为准。
 
-客户试用或交付前必须先用真实运行时 `.env` 跑 production preflight，并完成一次真实恢复演练和 rollback / forward-fix 演练，再运行 release evidence gate，确认 release、production preflight、pre-migration backup、backup restore、migration、smoke、rollback / forward-fix plan、rollback rehearsal 和 sign-off 字段都不是模板占位，release evidence 的 `gitCommit` 是 7-40 位 Git hash，`serverImageDigest` / `webImageDigest` 是 `sha256:<64-hex>`，同目录 `image-digests.txt` 必须记录同一组 server / web digest 且与 release evidence 一致，backup evidence 本体绑定本次 releaseVersion、environment 和 backupId，且 `migrationVersion` 等于 release 的 `migrationBefore`、`backupTime` 是 ISO 时间、`databaseBackupSize` 是正数、`restoreTestStatus` / `smokeQueryStatus` 是通过态，`migration-status-before-apply.txt` 的 `Current Version` 等于 release 的 `migrationBefore`，migration status 的 `Current Version` 等于 release 的 `migrationAfter` 且 `Pending Files=0`，backup restore 带 `verifiedAt`、`sourceAlias`、`restoreTarget`、当前 evidence 目录内真实存在且不含完整 DSN / secret 的 `artifacts.backupEvidence` / `artifacts.preMigrationStatus` / `artifacts.migrationStatus` / `artifacts.commandSummary` 相对路径、备份大小 / hash、`backup.migrationVersion=migrationBefore`、`restore.migrationBeforeApply=migrationBefore`、`restore.pendingFiles=0`、`restore.restoreMigrationVersion=migrationAfter` 和 smoke 表数量，并且 gate 会解析 backup restore 的 pre / post migration artifact 内容与 release migrationBefore / migrationAfter 一致，也会解析 `artifacts.commandSummary` 的 `backupId / releaseVersion / sourceAlias / restoreTarget / steps`，确认命令摘要绑定同一批次、同一来源、同一恢复目标，并包含 pg_dump、restore、atlas、smoke 脱敏步骤；rollback rehearsal 带非空且全通过的 steps、post-check smoke report 路径和正数 `smokeCheckCount`，其中 `postCheck.smokeReport` 必须指向同一 release evidence 目录内的 `smoke-test-report.json`，且数量必须与该文件 checks 数量一致；如果本次演练覆盖客户配置激活或回滚，rollback rehearsal 还要带 `postCheck.customerConfigEffectiveSession`，证明 post-smoke 已用目标环境 `get_effective_session` 读回同一 revision；smoke checks 非空且全部通过，`endpointAlias` 必须非空，`backendEndpointAlias` 可选但如存在也必须脱敏，二者和每项 URL target 都不能包含 URL 账号密码；如果本次发布激活客户配置 revision，smoke 还要用目标环境 `get_effective_session` 证明 active revision 投影可读回；sign-off 绑定本次 releaseVersion、environment 和 backupId，并且 release / backup / backup restore / smoke / rollback rehearsal / sign-off 使用同一 `releaseVersion` 和 environment，release / backup / backup restore / sign-off 使用同一 `backupId`，backup / backup restore 使用同一 databaseBackupHash：
+客户试用或交付前必须先用真实运行时 `.env` 跑 production preflight，并完成一次真实恢复演练和 rollback / forward-fix 演练，再运行 release evidence gate，确认 release、production preflight、pre-migration backup、backup restore、migration、smoke、credential rotation、rollback / forward-fix plan、rollback rehearsal 和 sign-off 字段都不是模板占位。credential rotation 必须绑定 exact target、release、migration、operationId 与 restore-checked operation backup；其回执禁止额外字段、绝对路径或敏感材料。release evidence 的 `gitCommit` 是 7-40 位 Git hash，`serverImageDigest` / `webImageDigest` 是 `sha256:<64-hex>`，同目录 `image-digests.txt` 必须记录同一组 server / web digest 且与 release evidence 一致，backup evidence 本体绑定本次 releaseVersion、environment 和 backupId，且 `migrationVersion` 等于 release 的 `migrationBefore`、`backupTime` 是 ISO 时间、`databaseBackupSize` 是正数、`restoreTestStatus` / `smokeQueryStatus` 是通过态，`migration-status-before-apply.txt` 的 `Current Version` 等于 release 的 `migrationBefore`，migration status 的 `Current Version` 等于 release 的 `migrationAfter` 且 `Pending Files=0`，backup restore 带 `verifiedAt`、`sourceAlias`、`restoreTarget`、当前 evidence 目录内真实存在且不含完整 DSN / secret 的 `artifacts.backupEvidence` / `artifacts.preMigrationStatus` / `artifacts.migrationStatus` / `artifacts.commandSummary` 相对路径、备份大小 / hash、`backup.migrationVersion=migrationBefore`、`restore.migrationBeforeApply=migrationBefore`、`restore.pendingFiles=0`、`restore.restoreMigrationVersion=migrationAfter` 和 smoke 表数量，并且 gate 会解析 backup restore 的 pre / post migration artifact 内容与 release migrationBefore / migrationAfter 一致，也会解析 `artifacts.commandSummary` 的 `backupId / releaseVersion / sourceAlias / restoreTarget / steps`，确认命令摘要绑定同一批次、同一来源、同一恢复目标，并包含 pg_dump、restore、atlas、smoke 脱敏步骤；rollback rehearsal 带非空且全通过的 steps、post-check smoke report 路径和正数 `smokeCheckCount`，其中 `postCheck.smokeReport` 必须指向同一 release evidence 目录内的 `smoke-test-report.json`，且数量必须与该文件 checks 数量一致；如果本次演练覆盖客户配置激活或回滚，rollback rehearsal 还要带 `postCheck.customerConfigEffectiveSession`，证明 post-smoke 已用目标环境 `get_effective_session` 读回同一 revision；smoke checks 非空且全部通过，`endpointAlias` 必须非空，`backendEndpointAlias` 可选但如存在也必须脱敏，二者和每项 URL target 都不能包含 URL 账号密码；如果本次发布激活客户配置 revision，smoke 还要用目标环境 `get_effective_session` 证明 active revision 投影可读回；sign-off 绑定本次 releaseVersion、environment 和 backupId，并且 release / backup / backup restore / smoke / rollback rehearsal / sign-off 使用同一 `releaseVersion` 和 environment，release / backup / backup restore / sign-off 使用同一 `backupId`，backup / backup restore 使用同一 databaseBackupHash：
 
 恢复链跨越 `20260714055504` 时，还必须先在 restored DB 完成 populated upgrade read-only audit；`backup-evidence.md`、backup restore 的 restore / summary 和 `command-summary.txt` 必须同时记录 `populatedUpgradeAuditStatus=passed`，步骤必须包含 read-only audit。release gate 会交叉核对这些字段，不能只靠迁移最终版本或人工备注补证。
 
@@ -59,6 +62,7 @@ status 不执行发布、不读取真实 `.env`、不恢复备份、不跑 migra
 
 ```bash
 bash scripts/deploy/production-preflight.sh \
+  --deployment-target <demo-133|customer-test-133> \
   --env-file server/deploy/compose/prod/.env \
   --out deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/production-preflight-report.txt
 ```
@@ -74,6 +78,7 @@ SOURCE_POSTGRES_DSN="$(cd server && make print_db_url)" \
 ```bash
 node scripts/deploy/release-evidence-gate.mjs \
   --customer yoyoosun \
+  --deployment-target <demo-133|customer-test-133> \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
 
@@ -83,6 +88,7 @@ node scripts/deploy/release-evidence-gate.mjs \
 
 ```bash
 node scripts/deploy/customer-config-activation-gate.mjs \
+  --deployment-target <demo-133|customer-test-133> \
   --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
@@ -108,6 +114,7 @@ node scripts/deploy/customer-config-manifest-evidence.mjs \
 
 ```bash
 node scripts/deploy/customer-config-release-readiness.mjs \
+  --deployment-target <demo-133|customer-test-133> \
   --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
@@ -116,6 +123,7 @@ node scripts/deploy/customer-config-release-readiness.mjs \
 
 ```bash
 node scripts/deploy/customer-config-release-readiness.mjs \
+  --deployment-target <demo-133|customer-test-133> \
   --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \
   --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json \
@@ -128,6 +136,7 @@ readiness gate 只聚合脱敏证据和 report，不访问后端、不执行 mig
 
 ```bash
 node scripts/deploy/customer-config-release-execute.mjs \
+  --deployment-target <demo-133|customer-test-133> \
   --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \
   --out output/customers/yoyoosun/customer-config-release

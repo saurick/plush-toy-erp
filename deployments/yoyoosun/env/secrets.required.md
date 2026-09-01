@@ -25,7 +25,7 @@
 - 禁止在 runbook 中记录真实 token、真实数据库连接串或真实下载链接。
 - 禁止在 evidence 中粘贴带 secret 的终端输出。
 - 禁止在截图中展示 token、密码、手机号、地址、价格或客户敏感订单明细。
-- `customer-trial-133` 是明确登记的隔离测试目标，固定使用 `admin/adminadmin` 与全部 `uat_*/12345678`；两者是写入 `credential.contract.json` 的公开测试凭据，不属于 Secret。其他 staging / UAT / 生产目标不得复用这两组公开值。
+- `credential.contract.json` 只登记两个 133 deployment target 的公开测试凭据：`demo-133` 固定使用 `admin/adminadmin` 与全部 `uat_*/12345678`；`customer-test-133` 只固定 admin 为 `adminadmin`，不得读取、推断、认证或改写其非管理员密码。这些登记值不属于 Secret，但仍不得进入 steady `.env`；未登记的 staging / UAT / 生产目标不得复用。
 
 ## 验证
 

@@ -1,25 +1,38 @@
 import assert from "node:assert/strict";
-import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 import {
-  buildReleaseEvidenceStatus,
+  buildReleaseEvidenceStatus as buildReleaseEvidenceStatusImpl,
   parseCliArgs,
 } from "./release-evidence-status.mjs";
+import { writeCredentialEvidenceTestFixture } from "./credential-evidence-test-fixture.mjs";
+import {
+  loadYoyoosunCredentialContract,
+  selectYoyoosunCredentialTarget,
+} from "../../deployments/yoyoosun/scripts/credential-contract.mjs";
+import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from "../qa/manual-acceptance-core-contract.mjs";
+
+function buildReleaseEvidenceStatus(options) {
+  return buildReleaseEvidenceStatusImpl({
+    deploymentTarget: "demo-133",
+    ...options,
+  });
+}
 
 const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
-const credentialContractRaw = fs.readFileSync(
-  path.join(repoRoot, "deployments/yoyoosun/env/credential.contract.json"),
+const credentialContractLoaded = loadYoyoosunCredentialContract();
+const credentialContract = credentialContractLoaded.contract;
+const credentialContractSha256 = credentialContractLoaded.sha256;
+const credentialTarget = selectYoyoosunCredentialTarget(
+  credentialContractLoaded,
+  "demo-133",
 );
-const credentialContract = JSON.parse(credentialContractRaw.toString("utf8"));
-const credentialContractSha256 = crypto
-  .createHash("sha256")
-  .update(credentialContractRaw)
-  .digest("hex");
 const releaseGitCommit = "abc1234000000000000000000000000000000000";
+const currentDemoCustomerRevision =
+  MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision;
 const scriptPath = path.join(
   repoRoot,
   "scripts/deploy/release-evidence-status.mjs",
@@ -30,19 +43,24 @@ const collectEvidencePath = path.join(
 );
 
 function runStatus(args = [], options = {}) {
-  return spawnSync("node", [scriptPath, ...args], {
+  const targetArgs = args.includes("--help")
+    ? args
+    : ["--deployment-target", "demo-133", ...args];
+  return spawnSync("node", [scriptPath, ...targetArgs], {
     cwd: options.cwd || repoRoot,
     encoding: "utf8",
   });
 }
 
-function writeDraftEvidence(root) {
+function writeDraftEvidence(root, deploymentTarget = "demo-133") {
   const evidenceDir = "deployments/yoyoosun/evidence/releases/2026-06-29";
   const absoluteDir = path.join(root, evidenceDir);
   const result = spawnSync(
     "bash",
     [
       collectEvidencePath,
+      "--deployment-target",
+      deploymentTarget,
       "--release-version",
       "20260629T1200-draft",
       "--output",
@@ -263,9 +281,9 @@ steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status 
             uniqueTokensObserved: true,
             credentialContractSchema: credentialContract.schemaVersion,
             credentialContractSha256,
-            credentialTarget: credentialContract.target.key,
-            credentialDatabase: credentialContract.target.database,
-            credentialDatasetVersion: credentialContract.target.datasetVersion,
+            credentialTarget: credentialTarget.commandTarget,
+            credentialDatabase: credentialTarget.database,
+            credentialDatasetVersion: credentialTarget.datasetVersion,
             adminPasswordSource:
               credentialContract.credentials.admin.credentialSource,
             uatPasswordSource:
@@ -292,53 +310,12 @@ steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status 
             name: "customer-config-effective-session",
             status: "pass",
             target: "jsonrpc:customer_config.get_effective_session",
-            expectedRevision:
-              "yoyoosun-customer-package-v7.runtime-manifest-v1",
+            expectedRevision: currentDemoCustomerRevision,
             tokenSourceEnv: "CUSTOMER_CONFIG_ADMIN_TOKEN",
             responseBodyStored: false,
           },
         ],
         redaction: { containsSecrets: false, containsRawCustomerRows: false },
-      },
-      null,
-      2,
-    ),
-  );
-  fs.writeFileSync(
-    path.join(absoluteDir, "credential-rotation-report.json"),
-    JSON.stringify(
-      {
-        generatedAt: "2026-06-16T04:30:00Z",
-        operationId: "123e4567-e89b-42d3-a456-426614174000",
-        target: credentialContract.target.key,
-        datasetVersion: credentialContract.target.datasetVersion,
-        migrationVersion: "20260616000000",
-        customerRevision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
-        release: releaseGitCommit,
-        adminAccounts: 1,
-        accountKind: "customer-uat",
-        roleAccounts: 10,
-        revokedSessions: 1,
-        authVersionIncremented: true,
-        auditSource: "manual_acceptance_password_rotation",
-        phoneBound: false,
-        accounts: [
-          {
-            username: credentialContract.credentials.admin.username,
-            authVersion: 2,
-            revokedSessions: 1,
-            phoneBound: false,
-          },
-          ...credentialContract.credentials.uat.usernames.map(
-            (username, index) => ({
-              username,
-              authVersion: index + 2,
-              revokedSessions: 0,
-              phoneBound: false,
-            }),
-          ),
-        ],
-        replayed: false,
       },
       null,
       2,
@@ -387,8 +364,7 @@ steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status 
           customerConfigEffectiveSession: {
             status: "verified",
             target: "jsonrpc:customer_config.get_effective_session",
-            expectedRevision:
-              "yoyoosun-customer-package-v7.runtime-manifest-v1",
+            expectedRevision: currentDemoCustomerRevision,
             tokenSourceEnv: "CUSTOMER_CONFIG_ADMIN_TOKEN",
             responseBodyStored: false,
           },
@@ -425,6 +401,7 @@ steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status 
 - [x] known limitations reviewed
 `,
   );
+  writeCredentialEvidenceTestFixture(absoluteDir);
   return { evidenceDir, absoluteDir };
 }
 
@@ -434,7 +411,7 @@ function writeCustomerConfigManifestEvidence(absoluteDir) {
     JSON.stringify(
       {
         customerKey: "yoyoosun",
-        revision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
+        revision: currentDemoCustomerRevision,
         manifestSha256:
           "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         reviewStatus: "approved",
@@ -738,6 +715,10 @@ test("release evidence status reports draft evidence gate errors", () => {
   );
   assert.match(productionPreflight.commands.join("\n"), /--runtime/);
   assert.match(
+    productionPreflight.commands.join("\n"),
+    /--deployment-target demo-133 .*--compose-override server\/deploy\/compose\/prod\/compose\.demo-133\.yml .*--expected-release <git-commit>/,
+  );
+  assert.match(
     productionPreflight.manualChecks.join("\n"),
     /real runtime \.env/,
   );
@@ -754,7 +735,7 @@ test("release evidence status reports draft evidence gate errors", () => {
   );
   assert.match(
     backupRestore.commands.join("\n"),
-    /--environment <environment>/,
+    /--environment demo-133/,
   );
   const targetSmoke = status.closeoutNextActions.find(
     (item) => item.id === "target-smoke",
@@ -792,6 +773,42 @@ test("release evidence status reports incomplete evidence artifacts", () => {
     /--report deployments\/yoyoosun\/evidence\/releases\/2026-06-29\/smoke-test-report\.json/,
   );
   assert.doesNotMatch(nextCommands, /run-smoke\.sh[^\n]+--out/);
+});
+
+test("customer-test status keeps credential closeout admin-only and smoke omits UAT/SMS", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-status-customer-test-"),
+  );
+  const { evidenceDir, absoluteDir } = writeDraftEvidence(
+    root,
+    "customer-test-133",
+  );
+  fs.unlinkSync(path.join(absoluteDir, "smoke-test-report.json"));
+
+  const status = buildReleaseEvidenceStatus({
+    repoRoot: root,
+    evidenceDir,
+    deploymentTarget: "customer-test-133",
+  });
+  const credential = status.closeoutChecklist.find(
+    (item) => item.id === "credential-rotation",
+  );
+  assert.match(credential.reason, /admin 已轮换并真实登录/u);
+  assert.match(credential.reason, /非 admin 身份集合原子保留/u);
+  assert.doesNotMatch(credential.reason, /十个 UAT|11\/11/u);
+  const credentialAction = status.closeoutNextActions.find(
+    (item) => item.id === "credential-rotation",
+  );
+  assert.match(credentialAction.manualChecks.join("\n"), /only the customer-test admin/u);
+  assert.match(credentialAction.manualChecks.join("\n"), /preserve every non-admin identity/u);
+
+  const smokeCommand = status.nextCommands.find((command) =>
+    command.includes("run-smoke.sh"),
+  );
+  assert.match(smokeCommand, /--deployment-target customer-test-133/u);
+  assert.match(smokeCommand, /--admin-username admin/u);
+  assert.match(smokeCommand, /--credential-operation-id/u);
+  assert.doesNotMatch(smokeCommand, /UAT|SMS|--uat-password-env|--sms-phone-env/u);
 });
 
 test("release evidence status suggests customer config smoke when manifest evidence exists", () => {
@@ -1042,7 +1059,7 @@ test("release evidence status cross-checks customer config smoke and manifest ev
   );
 });
 
-test("release evidence status is not ready when gate passes with warnings", () => {
+test("release evidence status is not ready when demo effective-session evidence is invalid", () => {
   const root = fs.mkdtempSync(
     path.join(os.tmpdir(), "release-evidence-status-attention-"),
   );
@@ -1070,9 +1087,9 @@ test("release evidence status is not ready when gate passes with warnings", () =
 
   const status = buildReleaseEvidenceStatus({ repoRoot: root, evidenceDir });
 
-  assert.equal(status.gate.passed, true);
-  assert.equal(status.gateReady, true);
-  assert.equal(status.status, "attention");
+  assert.equal(status.gate.passed, false);
+  assert.equal(status.gateReady, false);
+  assert.equal(status.status, "draft");
   assert.equal(status.ready, false);
   assert.match(
     status.warnings.join("\n"),
@@ -1086,7 +1103,7 @@ test("release evidence status is not ready when gate passes with warnings", () =
     },
   );
   assert.equal(failResult.status, 1);
-  assert.match(failResult.stdout, /release evidence status: attention/);
+  assert.match(failResult.stdout, /release evidence status: draft/);
   assert.match(failResult.stdout, /warnings:/);
 });
 
@@ -1109,7 +1126,7 @@ test("release evidence status suggests restore rehearsal for missing supporting 
   const nextCommands = status.nextCommands.join("\n");
   assert.match(nextCommands, /run-backup-restore-rehearsal\.sh/);
   assert.match(nextCommands, /--backup-purpose pre-migration/);
-  assert.match(nextCommands, /--environment <environment>/);
+  assert.match(nextCommands, /--environment demo-133/);
   assert.match(
     nextCommands,
     /--evidence-dir deployments\/yoyoosun\/evidence\/releases\/2026-06-29/,

@@ -7,6 +7,8 @@ import { buildReleaseEvidenceStatus } from "./release-evidence-status.mjs";
 
 const DEFAULT_CUSTOMER = "yoyoosun";
 const DEFAULT_ENV_FILE = "server/deploy/compose/prod/.env";
+const EVIDENCE_DIR_ALIAS = "<release-evidence-dir>";
+const RUNTIME_ENV_FILE_ALIAS = "<runtime-env-file>";
 const DIGEST_RE = /^sha256:[a-f0-9]{64}$/i;
 const RELEASE_EVIDENCE_FILE = "release-evidence.md";
 const IMMUTABLE_VERSION_INPUTS = [
@@ -95,6 +97,13 @@ const OPERATOR_INPUT_GUIDE = {
     sourceHint: "Atlas migration version expected after this release is applied",
     evidenceTarget: "release-evidence.md field migrationAfter",
     validation: "14 digit Atlas migration version",
+    secret: false,
+  },
+  CREDENTIAL_ROTATION_OPERATION_ID: {
+    sourceHint: "credential rotation receipt operation id for this target",
+    evidenceTarget:
+      "smoke-test-report.json credentialOperationId and credential-rotation-report.json operationId",
+    validation: "lowercase UUID v4 shared by rotation and smoke receipts",
     secret: false,
   },
   BACKUP_ID: {
@@ -209,6 +218,9 @@ export function parseCliArgs(argv) {
       case "evidence-dir":
         options.evidenceDir = value;
         break;
+      case "deployment-target":
+        options.deploymentTarget = value;
+        break;
       case "env-file":
       case "runtime-env-file":
       case "preflight-env-file":
@@ -226,6 +238,7 @@ function printHelp() {
 
 Usage:
   node scripts/deploy/release-evidence-closeout-plan.mjs \\
+    --deployment-target <demo-133|customer-test-133> \\
     --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \\
     [--runtime-env-file server/deploy/compose/prod/.env] \\
     [--json] [--fail-on-blocked]
@@ -365,18 +378,39 @@ function checkRuntimeUrl({ env, key, label = key }) {
 
 function checkFile({ repoRoot, filePath, id, label = filePath }) {
   const absolutePath = path.resolve(repoRoot, filePath);
+  const exists = fs.existsSync(absolutePath);
   return {
     id,
-    ok: fs.existsSync(absolutePath),
+    ok: exists,
     kind: "file",
-    path: absolutePath,
-    message: fs.existsSync(absolutePath)
-      ? `${label} exists`
-      : `${label} is missing`,
+    message: exists ? `${label} exists` : `${label} is missing`,
   };
 }
 
-function buildChecksForAction({ action, repoRoot, env, envFile, evidenceDir }) {
+function redactLocalPath(value, pathValue, alias) {
+  const text = String(value ?? "");
+  const rawPath = String(pathValue ?? "");
+  return rawPath ? text.replaceAll(rawPath, alias) : text;
+}
+
+function sanitizeActionCommands(commands, { evidenceDir, envFile }) {
+  return commands.map((command) =>
+    redactLocalPath(
+      redactLocalPath(command, evidenceDir, EVIDENCE_DIR_ALIAS),
+      envFile,
+      RUNTIME_ENV_FILE_ALIAS,
+    ),
+  );
+}
+
+function buildChecksForAction({
+  action,
+  deploymentTarget,
+  repoRoot,
+  env,
+  envFile,
+  evidenceDir,
+}) {
   const checks = [
     checkFile({
       repoRoot,
@@ -395,7 +429,12 @@ function buildChecksForAction({ action, repoRoot, env, envFile, evidenceDir }) {
     case "immutable-version":
       checks.push(
         checkEnvOrEvidence({ env, evidenceInputs, key: "RELEASE_VERSION" }),
-        checkEnvOrEvidence({ env, evidenceInputs, key: "RELEASE_ENVIRONMENT" }),
+        checkEnvOrEvidence({
+          env,
+          evidenceInputs,
+          key: "RELEASE_ENVIRONMENT",
+          validate: (value) => value === deploymentTarget,
+        }),
         checkEnvOrEvidence({ env, evidenceInputs, key: "OPERATOR_ROLE" }),
         checkEnvOrEvidence({
           env,
@@ -434,6 +473,12 @@ function buildChecksForAction({ action, repoRoot, env, envFile, evidenceDir }) {
       break;
     case "production-preflight":
       checks.push(
+        checkEnvOrEvidence({
+          env,
+          evidenceInputs,
+          key: "GIT_COMMIT",
+          validate: (value) => /^[0-9a-f]{40}$/u.test(value),
+        }),
         checkFile({
           repoRoot,
           filePath: envFile,
@@ -464,8 +509,32 @@ function buildChecksForAction({ action, repoRoot, env, envFile, evidenceDir }) {
       break;
     case "target-smoke":
       checks.push(
-        checkEnvOrEvidence({ env, evidenceInputs, key: "RELEASE_VERSION" }),
-        checkEnvOrEvidence({ env, evidenceInputs, key: "RELEASE_ENVIRONMENT" }),
+        checkEnvOrEvidence({
+          env,
+          evidenceInputs,
+          key: "GIT_COMMIT",
+          validate: (value) => /^[0-9a-f]{40}$/u.test(value),
+        }),
+        checkEnvOrEvidence({
+          env,
+          evidenceInputs,
+          key: "MIGRATION_AFTER",
+          validate: (value) => /^\d{14}$/u.test(value),
+        }),
+        checkEnv({
+          env,
+          key: "CREDENTIAL_ROTATION_OPERATION_ID",
+          validate: (value) =>
+            /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u.test(
+              value,
+            ),
+        }),
+        checkEnvOrEvidence({
+          env,
+          evidenceInputs,
+          key: "RELEASE_ENVIRONMENT",
+          validate: (value) => value === deploymentTarget,
+        }),
         checkRuntimeUrl({ env, key: "SMOKE_ENDPOINT" }),
         checkRuntimeUrl({ env, key: "SMOKE_BACKEND_URL" }),
         checkFile({
@@ -485,7 +554,12 @@ function buildChecksForAction({ action, repoRoot, env, envFile, evidenceDir }) {
     case "rollback-forward-fix":
       checks.push(
         checkEnvOrEvidence({ env, evidenceInputs, key: "RELEASE_VERSION" }),
-        checkEnvOrEvidence({ env, evidenceInputs, key: "RELEASE_ENVIRONMENT" }),
+        checkEnvOrEvidence({
+          env,
+          evidenceInputs,
+          key: "RELEASE_ENVIRONMENT",
+          validate: (value) => value === deploymentTarget,
+        }),
         checkEnv({ env, key: "ROLLBACK_TARGET_RELEASE" }),
         checkEnv({ env, key: "ROLLBACK_TRIGGER_SCENARIO" }),
         checkFile({
@@ -511,8 +585,32 @@ function buildChecksForAction({ action, repoRoot, env, envFile, evidenceDir }) {
       }
       if (commandText.includes("run-smoke.sh")) {
         checks.push(
-          checkEnvOrEvidence({ env, evidenceInputs, key: "RELEASE_VERSION" }),
-          checkEnvOrEvidence({ env, evidenceInputs, key: "RELEASE_ENVIRONMENT" }),
+          checkEnvOrEvidence({
+            env,
+            evidenceInputs,
+            key: "GIT_COMMIT",
+            validate: (value) => /^[0-9a-f]{40}$/u.test(value),
+          }),
+          checkEnvOrEvidence({
+            env,
+            evidenceInputs,
+            key: "MIGRATION_AFTER",
+            validate: (value) => /^\d{14}$/u.test(value),
+          }),
+          checkEnv({
+            env,
+            key: "CREDENTIAL_ROTATION_OPERATION_ID",
+            validate: (value) =>
+              /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u.test(
+                value,
+              ),
+          }),
+          checkEnvOrEvidence({
+            env,
+            evidenceInputs,
+            key: "RELEASE_ENVIRONMENT",
+            validate: (value) => value === deploymentTarget,
+          }),
           checkRuntimeUrl({ env, key: "SMOKE_ENDPOINT" }),
           checkRuntimeUrl({ env, key: "SMOKE_BACKEND_URL" }),
           checkEnv({ env, key: "CUSTOMER_CONFIG_ADMIN_TOKEN" }),
@@ -521,7 +619,12 @@ function buildChecksForAction({ action, repoRoot, env, envFile, evidenceDir }) {
       if (commandText.includes("rollback-rehearsal-report.mjs")) {
         checks.push(
           checkEnvOrEvidence({ env, evidenceInputs, key: "RELEASE_VERSION" }),
-          checkEnvOrEvidence({ env, evidenceInputs, key: "RELEASE_ENVIRONMENT" }),
+          checkEnvOrEvidence({
+            env,
+            evidenceInputs,
+            key: "RELEASE_ENVIRONMENT",
+            validate: (value) => value === deploymentTarget,
+          }),
           checkEnv({ env, key: "ROLLBACK_TARGET_RELEASE" }),
           checkEnv({ env, key: "ROLLBACK_TRIGGER_SCENARIO" }),
           checkFile({
@@ -601,13 +704,13 @@ function shellToken(value) {
   return `'${text.replaceAll("'", "'\\''")}'`;
 }
 
-function buildInputTemplateCommand({ actionId, evidenceDir }) {
+function buildInputTemplateCommand({ actionId }) {
   if (actionId !== "immutable-version") return "";
   return [
     "node",
     "scripts/deploy/immutable-version-evidence.mjs",
     "--evidence-dir",
-    evidenceDir,
+    EVIDENCE_DIR_ALIAS,
     "--print-input-template",
   ].map(shellToken).join(" ");
 }
@@ -673,6 +776,7 @@ function buildOperatorChecklist({ resolvedInputs, missingPrerequisites }) {
 
 export function buildReleaseEvidenceCloseoutPlan({
   customer = DEFAULT_CUSTOMER,
+  deploymentTarget,
   evidenceDir,
   envFile = DEFAULT_ENV_FILE,
   repoRoot = process.cwd(),
@@ -681,8 +785,15 @@ export function buildReleaseEvidenceCloseoutPlan({
   if (!evidenceDir) {
     throw new CliError("--evidence-dir is required", 2);
   }
+  if (!["demo-133", "customer-test-133"].includes(deploymentTarget)) {
+    throw new CliError(
+      "--deployment-target must be demo-133 or customer-test-133",
+      2,
+    );
+  }
   const status = buildReleaseEvidenceStatus({
     customer,
+    deploymentTarget,
     evidenceDir,
     repoRoot,
   });
@@ -692,6 +803,7 @@ export function buildReleaseEvidenceCloseoutPlan({
   const actions = status.closeoutNextActions.map((action, index) => {
     const prerequisiteChecks = buildChecksForAction({
       action,
+      deploymentTarget,
       repoRoot,
       env,
       envFile,
@@ -707,10 +819,13 @@ export function buildReleaseEvidenceCloseoutPlan({
     return {
       order: index + 1,
       ...action,
+      commands: sanitizeActionCommands(action.commands, {
+        evidenceDir,
+        envFile,
+      }),
       gateSummary: getActionGateSummary(gateSummaryById, action),
       inputTemplateCommand: buildInputTemplateCommand({
         actionId: action.id,
-        evidenceDir,
       }),
       canRun: !manualOnly && missingPrerequisites.length === 0,
       manualOnly,
@@ -726,8 +841,9 @@ export function buildReleaseEvidenceCloseoutPlan({
 
   return {
     customer,
-    evidenceDir,
-    envFile,
+    deploymentTarget,
+    evidenceDir: EVIDENCE_DIR_ALIAS,
+    envFile: RUNTIME_ENV_FILE_ALIAS,
     status: {
       status: status.status,
       ready: status.ready,

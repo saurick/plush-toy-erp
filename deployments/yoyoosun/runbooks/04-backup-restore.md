@@ -54,8 +54,8 @@ SOURCE_POSTGRES_DSN='<postgres://erp_backup:...@host:port/database?sslmode=...>'
 7. 执行 customer config cutover read-only audit；发现遗留流程实例或任务配置 revision 锚点时停止，由人工治理，不执行自动 DML。
 8. 两项审计通过后执行 migration apply，再执行 migration status，确认 migrationAfter 和 pending files。
 9. 完成 customer config active revision 读回，保持客户入口关闭。
-10. 按凭据合同强制恢复固定 `admin/adminadmin` 与全部 `uat_*/12345678`，并撤销备份中恢复出的所有旧会话；禁止 Keychain、环境变量或发布输入覆盖固定密码。
-11. 启动 steady 后端并运行真实登录矩阵；只有 11 个账号全部取得新 token，且人工录入 SMS 手机号时指定身份绑定读回通过，才允许恢复 Web 入口。未录入手机号不阻断密码登录验收。
+10. 按目标凭据合同恢复并撤销备份中恢复出的旧会话：两个 target 的 `admin` 都恢复为 `adminadmin`；只有 `demo-133` 恢复十个 `uat_*` 为 `12345678`；`customer-test-133` 不读取、猜测或改写非管理员密码，只证明其 `id/username` 身份集合保持不变。轮换闭包必须先在目标锁内创建并 restore-check 独立的 operation-bound 备份，脱敏回执绑定其 alias/hash/size，调用者不得提供备份路径。禁止 Keychain、环境变量或发布输入覆盖公开测试凭据。
+11. 启动 steady 后端并运行适用的真实登录矩阵：demo 必须由 11 个合同账号全部取得新 token；test 只登录 admin 并证明非管理员身份集合未变化。人工录入 SMS 手机号时仅对 demo 指定身份执行绑定读回。全部适用门禁通过后才允许恢复 Web 入口；未录入手机号不阻断 demo 密码登录验收。
 12. 执行 smoke query、健康检查和关键页面 smoke。
 13. 写入恢复演练报告。
 

@@ -35,6 +35,9 @@ function parseArgs(argv) {
     } else if (arg === "--evidence-dir") {
       options.evidenceDir = argv[index + 1];
       index += 1;
+    } else if (arg === "--deployment-target") {
+      options.deploymentTarget = argv[index + 1];
+      index += 1;
     } else if (arg === "--json") {
       options.json = true;
     } else if (arg === "-h" || arg === "--help") {
@@ -50,6 +53,7 @@ function printHelp() {
   console.log(`Usage:
   node scripts/deploy/customer-config-activation-gate.mjs \\
     --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \\
+    --deployment-target <demo-133|customer-test-133> \\
     --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \\
     [--customer yoyoosun] \\
     [--json]
@@ -141,6 +145,7 @@ function validateManifestEvidence({
 
 export function validateCustomerConfigActivationGate({
   customer = DEFAULT_CUSTOMER,
+  deploymentTarget,
   manifest,
   evidenceDir,
   repoRoot = process.cwd(),
@@ -149,6 +154,12 @@ export function validateCustomerConfigActivationGate({
   assert(customer === DEFAULT_CUSTOMER, `Only ${DEFAULT_CUSTOMER} is supported by this gate today`, errors);
   assert(Boolean(manifest), "--manifest is required", errors);
   assert(Boolean(evidenceDir), "--evidence-dir is required", errors);
+  assert(
+    deploymentTarget === "demo-133" ||
+      deploymentTarget === "customer-test-133",
+    "--deployment-target must be demo-133 or customer-test-133",
+    errors,
+  );
 
   const absoluteManifest = manifest ? path.resolve(repoRoot, manifest) : "";
   assert(Boolean(absoluteManifest) && fs.existsSync(absoluteManifest), `manifest not found: ${manifest}`, errors);
@@ -186,8 +197,13 @@ export function validateCustomerConfigActivationGate({
     try {
       releaseGateResult = validateReleaseEvidenceGate({
         customer,
+        deploymentTarget,
         evidenceDir,
         repoRoot,
+        // This gate runs before activation, so the target cannot yet prove the
+        // candidate revision through get_effective_session. Final release
+        // closeout still uses the strict release-evidence gate directly.
+        allowMissingCustomerConfigEffectiveSession: true,
       });
     } catch (error) {
       if (Array.isArray(error.errors)) {
@@ -216,6 +232,7 @@ export function validateCustomerConfigActivationGate({
       try {
         error.releaseEvidenceStatus = buildReleaseEvidenceStatus({
           customer,
+          deploymentTarget,
           evidenceDir,
           repoRoot,
         });
@@ -232,11 +249,13 @@ export function validateCustomerConfigActivationGate({
 
   return {
     customer,
+    deploymentTarget,
     manifest: absoluteManifest,
     manifestSha256: `sha256:${manifestSha256}`,
     manifestEvidence,
     revision: manifestPayload.revision,
     evidenceDir: releaseGateResult.evidenceDir,
+    runtimeIdentity: releaseGateResult.runtimeIdentity,
     scope: ACTIVATION_GATE_SCOPE,
   };
 }

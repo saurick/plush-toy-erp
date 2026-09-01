@@ -35,6 +35,8 @@ test("collect evidence draft includes backup restore artifact placeholders compa
   );
 
   const result = runScript([
+    "--deployment-target",
+    "demo-133",
     "--release-version",
     "20260629T1200-draft",
     "--output",
@@ -81,6 +83,16 @@ test("collect evidence draft includes backup restore artifact placeholders compa
   assert.equal(credentialRotation.target, "customer-trial-133");
   assert.equal(credentialRotation.datasetVersion, "2026.08.15-v6");
   assert.equal(
+    credentialRotation.schemaVersion,
+    "plush.manual-acceptance-credential-rotation-receipt/v1",
+  );
+  assert.deepEqual(credentialRotation.rollbackPoint, {
+    backupAlias: "待填写",
+    backupSha256: "待填写",
+    backupSizeBytes: 0,
+    restoreChecked: false,
+  });
+  assert.equal(
     report.backup.migrationVersion,
     "待填写，必须等于 release-evidence.md migrationBefore",
   );
@@ -123,12 +135,19 @@ test("collect evidence draft includes backup restore artifact placeholders compa
     ),
   );
   assert.match(preflightReport, /--runtime/);
+  assert.match(preflightReport, /--deployment-target demo-133/u);
+  assert.match(
+    preflightReport,
+    /--compose-override server\/deploy\/compose\/prod\/compose\.demo-133\.yml/u,
+  );
+  assert.match(preflightReport, /--expected-release [0-9a-f]{40}/u);
   assert.doesNotMatch(preflightReport, /"\$output_dir/);
 
   assert.throws(
     () =>
       validateReleaseEvidenceGate({
         repoRoot: root,
+        deploymentTarget: "demo-133",
         evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-29",
       }),
     (error) => {

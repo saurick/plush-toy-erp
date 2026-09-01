@@ -126,6 +126,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
   release: Object.freeze([
     "scripts/deploy/backup-restore-rehearsal-script.test.mjs",
     "scripts/deploy/collect-evidence-script.test.mjs",
+    "scripts/deploy/credential-contract.test.mjs",
     "scripts/deploy/customer-config-activation-gate.test.mjs",
     "scripts/deploy/customer-config-manifest-evidence.test.mjs",
     "scripts/deploy/customer-config-release-execute.test.mjs",

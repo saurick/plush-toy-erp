@@ -6,9 +6,16 @@ import path from "node:path";
 import test from "node:test";
 
 import {
-  buildReleaseEvidenceCloseoutPlan,
+  buildReleaseEvidenceCloseoutPlan as buildReleaseEvidenceCloseoutPlanImpl,
   parseCliArgs,
 } from "./release-evidence-closeout-plan.mjs";
+
+function buildReleaseEvidenceCloseoutPlan(options) {
+  return buildReleaseEvidenceCloseoutPlanImpl({
+    deploymentTarget: "demo-133",
+    ...options,
+  });
+}
 
 const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
 const scriptPath = path.join(
@@ -22,9 +29,9 @@ const collectEvidencePath = path.join(
 
 const VALID_ENV = {
   RELEASE_VERSION: "20260629T1200-draft",
-  RELEASE_ENVIRONMENT: "customer-trial",
+  RELEASE_ENVIRONMENT: "demo-133",
   OPERATOR_ROLE: "release-operator",
-  GIT_COMMIT: "6da29ddcde7b",
+  GIT_COMMIT: "6da29ddcde7b0000000000000000000000000000",
   SERVER_IMAGE: "registry.example.invalid/plush/server:20260629T1200",
   SERVER_IMAGE_DIGEST:
     "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -33,6 +40,8 @@ const VALID_ENV = {
     "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   MIGRATION_BEFORE: "20260601000000",
   MIGRATION_AFTER: "20260628123354",
+  CREDENTIAL_ROTATION_OPERATION_ID:
+    "123e4567-e89b-42d3-a456-426614174000",
   BACKUP_ID: "backup-20260629T1200",
   SOURCE_POSTGRES_DSN: "postgres://release-source.example.invalid/plush",
   SMOKE_ENDPOINT: "https://erp.example.invalid",
@@ -51,6 +60,8 @@ function writeDraftEvidence(root) {
     "bash",
     [
       collectEvidencePath,
+      "--deployment-target",
+      "demo-133",
       "--release-version",
       "20260629T1200-draft",
       "--output",
@@ -89,7 +100,10 @@ function writeToolScripts(root) {
 }
 
 function runPlan({ cwd, args = [], env = {} }) {
-  return spawnSync(process.execPath, [scriptPath, ...args], {
+  const targetArgs = args.includes("--help")
+    ? args
+    : ["--deployment-target", "demo-133", ...args];
+  return spawnSync(process.execPath, [scriptPath, ...targetArgs], {
     cwd,
     env: {
       PATH: process.env.PATH,
@@ -102,6 +116,8 @@ function runPlan({ cwd, args = [], env = {} }) {
 test("parseCliArgs supports closeout plan options", () => {
   assert.deepEqual(
     parseCliArgs([
+      "--deployment-target",
+      "demo-133",
       "--evidence-dir",
       "deployments/yoyoosun/evidence/releases/2026-06-29",
       "--runtime-env-file",
@@ -111,6 +127,7 @@ test("parseCliArgs supports closeout plan options", () => {
     ]),
     {
       customer: "yoyoosun",
+      deploymentTarget: "demo-133",
       evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-29",
       envFile: "server/deploy/compose/prod/.env",
       json: true,
@@ -128,9 +145,13 @@ test("closeout plan reports missing local prerequisites for draft evidence", () 
   const plan = buildReleaseEvidenceCloseoutPlan({
     repoRoot: root,
     evidenceDir,
+    envFile: path.join(root, "private", "runtime.env"),
     env: {},
   });
 
+  assert.equal(JSON.stringify(plan).includes(root), false);
+  assert.equal(plan.evidenceDir, "<release-evidence-dir>");
+  assert.equal(plan.envFile, "<runtime-env-file>");
   assert.equal(plan.status.status, "draft");
   assert.equal(plan.status.ready, false);
   assert.equal(plan.scope.readOnly, true);
@@ -199,6 +220,10 @@ test("closeout plan reports missing local prerequisites for draft evidence", () 
   assert.match(
     preflight.commands.join("\n"),
     /production-preflight\.sh .*--runtime/,
+  );
+  assert.match(
+    preflight.commands.join("\n"),
+    /--deployment-target demo-133 .*--compose-override server\/deploy\/compose\/prod\/compose\.demo-133\.yml .*--expected-release <git-commit>/,
   );
   assert.match(
     preflight.missingPrerequisites.map((item) => item.message).join("\n"),
@@ -346,7 +371,7 @@ test("closeout plan deduplicates missing prerequisites for composite actions", (
   assert.equal(missingIds.filter((id) => id === "RELEASE_VERSION").length, 0);
   assert.equal(
     missingIds.filter((id) => id === "RELEASE_ENVIRONMENT").length,
-    1,
+    0,
   );
   assert.equal(
     action.resolvedInputs.RELEASE_VERSION.value,
@@ -359,7 +384,7 @@ test("closeout plan reuses release batch fields from evidence across machine act
     path.join(os.tmpdir(), "release-closeout-plan-evidence-inputs-"),
   );
   const { evidenceDir, absoluteDir } = writeDraftEvidence(root);
-  updateReleaseEvidenceField(absoluteDir, "environment", "customer-trial");
+  updateReleaseEvidenceField(absoluteDir, "environment", "demo-133");
   writeToolScripts(root);
 
   const plan = buildReleaseEvidenceCloseoutPlan({
@@ -372,6 +397,10 @@ test("closeout plan reuses release batch fields from evidence across machine act
       MANUAL_ACCEPTANCE_ADMIN_PASSWORD: "admin-secret-distinct",
       MANUAL_ACCEPTANCE_UAT_PASSWORD: "uat-secret-distinct",
       MANUAL_ACCEPTANCE_SMS_PHONE: "13800138000",
+      GIT_COMMIT: VALID_ENV.GIT_COMMIT,
+      MIGRATION_AFTER: VALID_ENV.MIGRATION_AFTER,
+      CREDENTIAL_ROTATION_OPERATION_ID:
+        VALID_ENV.CREDENTIAL_ROTATION_OPERATION_ID,
       CUSTOMER_CONFIG_ADMIN_TOKEN: "redacted-token",
       ROLLBACK_TARGET_RELEASE: "20260628T1200-previous",
       ROLLBACK_TRIGGER_SCENARIO: "smoke failed after activation",
@@ -390,12 +419,22 @@ test("closeout plan reuses release batch fields from evidence across machine act
   const smoke = plan.actions.find((action) => action.id === "target-smoke");
   assert.equal(smoke.canRun, true);
   assert.equal(
-    smoke.resolvedInputs.RELEASE_VERSION.source,
-    "release-evidence.md",
+    smoke.resolvedInputs.GIT_COMMIT.value,
+    VALID_ENV.GIT_COMMIT,
+  );
+  assert.equal(
+    smoke.resolvedInputs.MIGRATION_AFTER.value,
+    VALID_ENV.MIGRATION_AFTER,
+  );
+  assert.equal(
+    smoke.prerequisiteChecks.find(
+      (check) => check.id === "CREDENTIAL_ROTATION_OPERATION_ID",
+    ).ok,
+    true,
   );
   assert.equal(
     smoke.resolvedInputs.RELEASE_ENVIRONMENT.value,
-    "customer-trial",
+    "demo-133",
   );
 
   const rollback = plan.actions.find(
@@ -481,6 +520,6 @@ test("closeout plan text output includes gate summary for present unverified act
   );
   assert.match(
     result.stdout,
-    /operator input: RELEASE_ENVIRONMENT -> approved target environment name/,
+    /--environment demo-133/,
   );
 });

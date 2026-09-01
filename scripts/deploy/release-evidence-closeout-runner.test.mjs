@@ -6,10 +6,24 @@ import path from "node:path";
 import test from "node:test";
 
 import {
-  buildCloseoutRunPlan,
+  buildCloseoutRunPlan as buildCloseoutRunPlanImpl,
   parseCliArgs,
-  runCloseoutActions,
+  runCloseoutActions as runCloseoutActionsImpl,
 } from "./release-evidence-closeout-runner.mjs";
+
+function buildCloseoutRunPlan(options) {
+  return buildCloseoutRunPlanImpl({
+    deploymentTarget: "demo-133",
+    ...options,
+  });
+}
+
+function runCloseoutActions(options) {
+  return runCloseoutActionsImpl({
+    deploymentTarget: "demo-133",
+    ...options,
+  });
+}
 
 const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
 const scriptPath = path.join(
@@ -24,9 +38,9 @@ const collectEvidencePath = path.join(
 const VALID_ENV = {
   RELEASE_CLOSEOUT_CONFIRM: "RUN_YOOSUN_RELEASE_CLOSEOUT_INVALID",
   RELEASE_VERSION: "20260629T1200-draft",
-  RELEASE_ENVIRONMENT: "customer-trial",
+  RELEASE_ENVIRONMENT: "demo-133",
   OPERATOR_ROLE: "release-operator",
-  GIT_COMMIT: "6da29ddcde7b",
+  GIT_COMMIT: "6da29ddcde7b0000000000000000000000000000",
   SERVER_IMAGE: "registry.example.invalid/plush/server:20260629T1200",
   SERVER_IMAGE_DIGEST:
     "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -35,6 +49,8 @@ const VALID_ENV = {
     "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   MIGRATION_BEFORE: "20260601000000",
   MIGRATION_AFTER: "20260628123354",
+  CREDENTIAL_ROTATION_OPERATION_ID:
+    "123e4567-e89b-42d3-a456-426614174000",
   BACKUP_ID: "backup-20260629T1200",
   SOURCE_POSTGRES_DSN: "postgres://release-source.example.invalid/plush",
   SMOKE_ENDPOINT: "https://erp.example.invalid",
@@ -58,6 +74,8 @@ function writeDraftEvidence() {
     "bash",
     [
       collectEvidencePath,
+      "--deployment-target",
+      "demo-133",
       "--release-version",
       "20260629T1200-draft",
       "--output",
@@ -104,7 +122,10 @@ function writeCustomerConfigManifestEvidence(evidenceDir) {
 }
 
 function runCli(args = [], env = {}) {
-  return spawnSync(process.execPath, [scriptPath, ...args], {
+  const targetArgs = args.includes("--help")
+    ? args
+    : ["--deployment-target", "demo-133", ...args];
+  return spawnSync(process.execPath, [scriptPath, ...targetArgs], {
     cwd: repoRoot,
     env: {
       PATH: process.env.PATH,
@@ -117,6 +138,8 @@ function runCli(args = [], env = {}) {
 test("parseCliArgs supports runner options", () => {
   assert.deepEqual(
     parseCliArgs([
+      "--deployment-target",
+      "demo-133",
       "--evidence-dir",
       "deployments/yoyoosun/evidence/releases/2026-06-29",
       "--runtime-env-file",
@@ -128,6 +151,7 @@ test("parseCliArgs supports runner options", () => {
     ]),
     {
       customer: "yoyoosun",
+      deploymentTarget: "demo-133",
       envFile: "server/deploy/compose/prod/.env",
       evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-29",
       execute: true,
@@ -140,14 +164,23 @@ test("parseCliArgs supports runner options", () => {
 
 test("closeout runner report-only materializes commands without writing evidence", () => {
   const { evidenceDir } = writeDraftEvidence();
+  const privateEnvFile = path.join(
+    path.dirname(evidenceDir),
+    "private-runtime.env",
+  );
   const report = runCloseoutActions({
     repoRoot,
     evidenceDir,
+    envFile: privateEnvFile,
     only: ["immutable-version"],
     env: VALID_ENV,
     execute: false,
   });
 
+  assert.equal(JSON.stringify(report).includes(evidenceDir), false);
+  assert.equal(JSON.stringify(report).includes(privateEnvFile), false);
+  assert.equal(report.plan.evidenceDir, "<release-evidence-dir>");
+  assert.equal(report.plan.envFile, "<runtime-env-file>");
   assert.equal(report.ok, true);
   assert.equal(report.executed, false);
   assert.equal(report.plan.executeReady, true);
@@ -204,7 +237,7 @@ test("closeout runner materializes production preflight with runtime checks", ()
   assert.equal(plan.actions[0].canRun, true);
   assert.match(
     plan.actions[0].commands[0].displayCommand,
-    /production-preflight\.sh .*--env-file .* --runtime --out /,
+    /production-preflight\.sh --deployment-target demo-133 .*--compose-override server\/deploy\/compose\/prod\/compose\.demo-133\.yml --runtime --expected-release [0-9a-f]{40} --out /,
   );
 });
 
@@ -463,7 +496,7 @@ test("closeout runner CLI execute requires explicit confirmation phrase", () => 
 
 test("closeout runner reuses evidence-backed release fields for later actions", () => {
   const { evidenceDir } = writeDraftEvidence();
-  updateReleaseEvidenceField(evidenceDir, "environment", "customer-trial");
+  updateReleaseEvidenceField(evidenceDir, "environment", "demo-133");
   const { RELEASE_VERSION, RELEASE_ENVIRONMENT, ...envWithoutReleaseBatch } =
     VALID_ENV;
 
@@ -477,8 +510,8 @@ test("closeout runner reuses evidence-backed release fields for later actions", 
   assert.equal(plan.executeReady, true);
   assert.equal(plan.actions[0].canRun, true);
   assert.equal(
-    plan.actions[0].resolvedInputs.RELEASE_VERSION.source,
-    "release-evidence.md",
+    plan.actions[0].resolvedInputs.GIT_COMMIT.value,
+    VALID_ENV.GIT_COMMIT,
   );
   assert.equal(
     plan.actions[0].resolvedInputs.RELEASE_ENVIRONMENT.source,
@@ -486,7 +519,9 @@ test("closeout runner reuses evidence-backed release fields for later actions", 
   );
   assert.match(
     plan.actions[0].commands[0].displayCommand,
-    /--release-version 20260629T1200-draft --environment customer-trial/,
+    new RegExp(
+      `--release-version ${VALID_ENV.GIT_COMMIT} --migration-version ${VALID_ENV.MIGRATION_AFTER} --credential-operation-id ${VALID_ENV.CREDENTIAL_ROTATION_OPERATION_ID} --deployment-target demo-133 --environment demo-133`,
+    ),
   );
   assert.equal(
     plan.actions[0].commands[0].envKeys.includes("RELEASE_VERSION"),
@@ -536,7 +571,7 @@ test("closeout runner executes only selected runnable action", () => {
     "utf8",
   );
   assert.match(releaseEvidence, /\| releaseVersion \| 20260629T1200-draft \|/);
-  assert.match(releaseEvidence, /\| environment \| customer-trial \|/);
+  assert.match(releaseEvidence, /\| environment \| demo-133 \|/);
   assert.match(releaseEvidence, /\| migrationBefore \| 20260601000000 \|/);
   assert.match(releaseEvidence, /\| backupId \| backup-20260629T1200 \|/);
 });
@@ -986,7 +1021,7 @@ test("closeout runner text output includes input template for immutable version"
   );
   assert.match(
     result.stdout,
-    /operator input: RELEASE_ENVIRONMENT -> approved target environment name/,
+    /input template: node scripts\/deploy\/immutable-version-evidence\.mjs/,
   );
 });
 

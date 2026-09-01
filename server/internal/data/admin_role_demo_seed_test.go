@@ -2,9 +2,11 @@ package data
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"regexp"
 	"strings"
@@ -42,6 +44,15 @@ type markerReceiptMatcher struct {
 	secrets   []string
 }
 
+func testUnselectedAccountIdentityFingerprint(id int64, username string) string {
+	encoded, err := json.Marshal([]any{id, username})
+	if err != nil {
+		panic(err)
+	}
+	encoded = append(encoded, '\n')
+	return fmt.Sprintf("%x", sha256.Sum256(encoded))
+}
+
 func (expected markerReceiptMatcher) Match(value driver.Value) bool {
 	raw, ok := value.(string)
 	if !ok {
@@ -56,12 +67,21 @@ func (expected markerReceiptMatcher) Match(value driver.Value) bool {
 	if json.Unmarshal([]byte(raw), &receipt) != nil {
 		return false
 	}
+	preservationValid := receipt.Unselected == nil
+	if expected.operation.PreserveUnselectedAccounts {
+		preservationValid = receipt.Unselected != nil &&
+			receipt.Unselected.AccountCount >= 0 &&
+			receipt.Unselected.Preserved &&
+			validManualAcceptanceIdentityFingerprint(receipt.Unselected.IdentityFingerprint)
+	}
 	return receipt.OperationID == expected.operation.OperationID &&
 		receipt.Target == expected.operation.Target &&
+		receipt.DatasetVersion == expected.operation.DatasetVersion &&
 		receipt.Release == expected.operation.Release &&
 		receipt.MigrationVersion == expected.operation.MigrationVersion &&
 		receipt.CustomerRevision == expected.operation.CustomerRevision &&
-		len(receipt.Accounts) == 1 && receipt.Accounts[0].Username == expected.username &&
+		manualAcceptanceRollbackPointMatches(expected.operation.RollbackPoint, receipt.RollbackPoint) &&
+		preservationValid && len(receipt.Accounts) == 1 && receipt.Accounts[0].Username == expected.username &&
 		receipt.Accounts[0].AuthVersion > 0 && !receipt.Replayed
 }
 
@@ -641,6 +661,316 @@ func testRotationOperation() ManualAcceptancePasswordRotationOperation {
 		Release:          strings.Repeat("a", 40),
 		MigrationVersion: "20260722000505",
 		CustomerRevision: "yoyoosun-customer-trial-133-package-v7.runtime-manifest-v1",
+		RollbackPoint: &ManualAcceptancePasswordRotationRollbackPoint{
+			BackupAlias:    "pre-credential-rotation-aaaaaaaaaaaa-00000000-0000-4000-8000-000000000001",
+			BackupSHA256:   strings.Repeat("b", 64),
+			BackupSize:     42,
+			RestoreChecked: true,
+		},
+	}
+}
+
+func TestRotateManualAcceptancePasswordsRejectsCustomerTestScopeBeforeDatabaseMutation(t *testing.T) {
+	tests := []struct {
+		name           string
+		adminUsernames []string
+		demoUsernames  []string
+		demoPassword   string
+		phoneUsername  string
+		phone          string
+		preserve       bool
+	}{
+		{
+			name:           "extra admin selection",
+			adminUsernames: []string{"admin", "customer_user"},
+			preserve:       true,
+		},
+		{
+			name:           "non-admin selection",
+			adminUsernames: []string{"admin"},
+			demoUsernames:  []string{"customer_user"},
+			demoPassword:   "customer-test-pass",
+			preserve:       true,
+		},
+		{
+			name:           "unused non-admin password",
+			adminUsernames: []string{"admin"},
+			demoPassword:   "customer-test-pass",
+			preserve:       true,
+		},
+		{
+			name:           "phone binding",
+			adminUsernames: []string{"admin"},
+			phoneUsername:  "admin",
+			phone:          "13800138000",
+			preserve:       true,
+		},
+		{
+			name:           "missing preservation proof",
+			adminUsernames: []string{"admin"},
+			preserve:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db, mock, err := sqlmock.New()
+			if err != nil {
+				t.Fatalf("sqlmock.New() error = %v", err)
+			}
+			operation := testRotationOperation()
+			operation.Target = "customer-test-133"
+			operation.PreserveUnselectedAccounts = tt.preserve
+			_, err = RotateManualAcceptancePasswordsWithOperation(
+				context.Background(),
+				db,
+				tt.adminUsernames,
+				"admin-test-pass",
+				tt.demoUsernames,
+				tt.demoPassword,
+				tt.phoneUsername,
+				tt.phone,
+				operation,
+			)
+			if err == nil {
+				t.Fatal("invalid customer-test-133 rotation scope was accepted")
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Fatalf("invalid scope reached database mutation: %v", err)
+			}
+			mock.ExpectClose()
+			if err := db.Close(); err != nil {
+				t.Fatalf("db.Close() error = %v", err)
+			}
+		})
+	}
+}
+
+func expectUnselectedAccountIdentitySnapshot(
+	mock sqlmock.Sqlmock,
+	unselectedID int64,
+	unselectedUsername string,
+) {
+	mock.ExpectQuery(regexp.QuoteMeta(`
+SELECT id, username
+FROM admin_users
+ORDER BY username`)).WillReturnRows(
+		sqlmock.NewRows([]string{"id", "username"}).
+			AddRow(1, "admin").
+			AddRow(unselectedID, unselectedUsername),
+	)
+}
+
+func TestRotateManualAcceptancePasswordsPreservesUnselectedAccountsInSameTransaction(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	operation := testRotationOperation()
+	operation.Target = "customer-test-133"
+	operation.PreserveUnselectedAccounts = true
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta("LOCK TABLE admin_users IN SHARE ROW EXCLUSIVE MODE")).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	expectUnselectedAccountIdentitySnapshot(mock, 2, "customer_user")
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT marker_value FROM runtime_markers WHERE marker_key = $1 LIMIT 1")).
+		WithArgs(operation.MarkerKey).
+		WillReturnRows(sqlmock.NewRows([]string{"marker_value"}))
+	mock.ExpectQuery(regexp.QuoteMeta(`
+UPDATE admin_users
+SET password_hash = $2, auth_version = auth_version + 1, updated_at = $3
+WHERE username = $1
+RETURNING id, auth_version`)).
+		WithArgs("admin", bcryptHashMatcher("admin-test-pass"), sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "auth_version"}).AddRow(1, 8))
+	mock.ExpectExec(regexp.QuoteMeta(`
+UPDATE admin_sessions
+SET revoked_at = $2, revoke_reason = $3, updated_at = $2
+WHERE admin_user_id = $1
+  AND revoked_at IS NULL
+  AND expires_at > $2`)).
+		WithArgs(1, sqlmock.AnyArg(), adminSessionRevokeReasonPasswordReset).
+		WillReturnResult(sqlmock.NewResult(0, 2))
+	expectRotationAudit(mock, "admin", "admin-test-pass")
+	expectUnselectedAccountIdentitySnapshot(mock, 2, "customer_user")
+	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO runtime_markers (marker_key, marker_value, created_at, updated_at) VALUES ($1, $2, $3, $4)")).
+		WithArgs(operation.MarkerKey, markerReceiptMatcher{operation: operation, username: "admin", secrets: []string{"admin-test-pass"}}, sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+	mock.ExpectClose()
+
+	receipt, err := RotateManualAcceptancePasswordsWithOperation(
+		context.Background(), db,
+		[]string{"admin"}, "admin-test-pass",
+		nil, "", "", "", operation,
+	)
+	if err != nil {
+		t.Fatalf("RotateManualAcceptancePasswordsWithOperation() error = %v", err)
+	}
+	if receipt.Unselected == nil || receipt.Unselected.AccountCount != 1 || !receipt.Unselected.Preserved || !validManualAcceptanceIdentityFingerprint(receipt.Unselected.IdentityFingerprint) {
+		t.Fatalf("unexpected atomic preservation receipt: %#v", receipt.Unselected)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
+func TestRotateManualAcceptancePasswordsRollsBackWhenUnselectedAccountChanges(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	operation := testRotationOperation()
+	operation.Target = "customer-test-133"
+	operation.PreserveUnselectedAccounts = true
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta("LOCK TABLE admin_users IN SHARE ROW EXCLUSIVE MODE")).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	expectUnselectedAccountIdentitySnapshot(mock, 2, "customer_user")
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT marker_value FROM runtime_markers WHERE marker_key = $1 LIMIT 1")).
+		WithArgs(operation.MarkerKey).
+		WillReturnRows(sqlmock.NewRows([]string{"marker_value"}))
+	mock.ExpectQuery(regexp.QuoteMeta(`
+UPDATE admin_users
+SET password_hash = $2, auth_version = auth_version + 1, updated_at = $3
+WHERE username = $1
+RETURNING id, auth_version`)).
+		WithArgs("admin", bcryptHashMatcher("admin-test-pass"), sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "auth_version"}).AddRow(1, 8))
+	mock.ExpectExec(regexp.QuoteMeta(`
+UPDATE admin_sessions
+SET revoked_at = $2, revoke_reason = $3, updated_at = $2
+WHERE admin_user_id = $1
+  AND revoked_at IS NULL
+  AND expires_at > $2`)).
+		WithArgs(1, sqlmock.AnyArg(), adminSessionRevokeReasonPasswordReset).
+		WillReturnResult(sqlmock.NewResult(0, 2))
+	expectRotationAudit(mock, "admin", "admin-test-pass")
+	expectUnselectedAccountIdentitySnapshot(mock, 3, "customer_user_replaced")
+	mock.ExpectRollback()
+	mock.ExpectClose()
+
+	_, err = RotateManualAcceptancePasswordsWithOperation(
+		context.Background(), db,
+		[]string{"admin"}, "admin-test-pass",
+		nil, "", "", "", operation,
+	)
+	if err == nil || !strings.Contains(err.Error(), "unselected account identity set changed") {
+		t.Fatalf("error = %v, want atomic preservation failure", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
+func TestRotateManualAcceptancePasswordsReplaysOnlyWhenPreservedIdentityStillMatches(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	operation := testRotationOperation()
+	operation.Target = "customer-test-133"
+	operation.PreserveUnselectedAccounts = true
+	persisted := ManualAcceptancePasswordRotationReceipt{
+		OperationID: operation.OperationID, Target: operation.Target,
+		DatasetVersion: operation.DatasetVersion, Release: operation.Release,
+		MigrationVersion: operation.MigrationVersion, CustomerRevision: operation.CustomerRevision,
+		RotatedAt:     time.Date(2026, 7, 22, 3, 4, 5, 0, time.UTC),
+		Accounts:      []ManualAcceptancePasswordRotationAccount{{Username: "admin", AuthVersion: 7, RevokedSessions: 2}},
+		RollbackPoint: operation.RollbackPoint,
+		Unselected: &ManualAcceptanceUnselectedAccountReceipt{
+			AccountCount:        1,
+			IdentityFingerprint: testUnselectedAccountIdentityFingerprint(2, "customer_user"),
+			Preserved:           true,
+		},
+	}
+	raw, err := json.Marshal(persisted)
+	if err != nil {
+		t.Fatalf("json.Marshal(): %v", err)
+	}
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta("LOCK TABLE admin_users IN SHARE ROW EXCLUSIVE MODE")).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	expectUnselectedAccountIdentitySnapshot(mock, 2, "customer_user")
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT marker_value FROM runtime_markers WHERE marker_key = $1 LIMIT 1")).
+		WithArgs(operation.MarkerKey).
+		WillReturnRows(sqlmock.NewRows([]string{"marker_value"}).AddRow(string(raw)))
+	mock.ExpectCommit()
+	mock.ExpectClose()
+
+	receipt, err := RotateManualAcceptancePasswordsWithOperation(
+		context.Background(), db,
+		[]string{"admin"}, "admin-test-pass",
+		nil, "", "", "", operation,
+	)
+	if err != nil {
+		t.Fatalf("RotateManualAcceptancePasswordsWithOperation() replay error = %v", err)
+	}
+	if !receipt.Replayed || receipt.Unselected == nil || !receipt.Unselected.Preserved {
+		t.Fatalf("unexpected replay receipt: %#v", receipt)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("replay executed an unexpected mutation: %v", err)
+	}
+}
+
+func TestRotateManualAcceptancePasswordsRejectsReplayWhenPreservedIdentityChanged(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	operation := testRotationOperation()
+	operation.Target = "customer-test-133"
+	operation.PreserveUnselectedAccounts = true
+	persisted := ManualAcceptancePasswordRotationReceipt{
+		OperationID: operation.OperationID, Target: operation.Target,
+		DatasetVersion: operation.DatasetVersion, Release: operation.Release,
+		MigrationVersion: operation.MigrationVersion, CustomerRevision: operation.CustomerRevision,
+		RotatedAt:     time.Date(2026, 7, 22, 3, 4, 5, 0, time.UTC),
+		Accounts:      []ManualAcceptancePasswordRotationAccount{{Username: "admin", AuthVersion: 7, RevokedSessions: 2}},
+		RollbackPoint: operation.RollbackPoint,
+		Unselected: &ManualAcceptanceUnselectedAccountReceipt{
+			AccountCount:        1,
+			IdentityFingerprint: strings.Repeat("a", sha256.Size*2),
+			Preserved:           true,
+		},
+	}
+	raw, err := json.Marshal(persisted)
+	if err != nil {
+		t.Fatalf("json.Marshal(): %v", err)
+	}
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta("LOCK TABLE admin_users IN SHARE ROW EXCLUSIVE MODE")).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	expectUnselectedAccountIdentitySnapshot(mock, 2, "customer_user")
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT marker_value FROM runtime_markers WHERE marker_key = $1 LIMIT 1")).
+		WithArgs(operation.MarkerKey).
+		WillReturnRows(sqlmock.NewRows([]string{"marker_value"}).AddRow(string(raw)))
+	mock.ExpectRollback()
+	mock.ExpectClose()
+
+	_, err = RotateManualAcceptancePasswordsWithOperation(
+		context.Background(), db,
+		[]string{"admin"}, "admin-test-pass",
+		nil, "", "", "", operation,
+	)
+	if err == nil || !strings.Contains(err.Error(), "changed after the durable rotation receipt") {
+		t.Fatalf("error = %v, want replay preservation mismatch", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("replay mismatch executed an unexpected mutation: %v", err)
 	}
 }
 
@@ -659,6 +989,7 @@ func TestRotateManualAcceptancePasswordsReplaysDurableReceiptWithoutMutations(t 
 			{Username: "admin", AuthVersion: 7, RevokedSessions: 2, PhoneBound: true},
 			{Username: "demo_sales", AuthVersion: 3, RevokedSessions: 1},
 		},
+		RollbackPoint: operation.RollbackPoint,
 	}
 	raw, err := json.Marshal(persisted)
 	if err != nil {
@@ -688,6 +1019,85 @@ func TestRotateManualAcceptancePasswordsReplaysDurableReceiptWithoutMutations(t 
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("replay executed an unexpected mutation/audit: %v", err)
+	}
+}
+
+func TestRotateManualAcceptancePasswordsRejectsDurableRollbackPointDrift(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	operation := testRotationOperation()
+	driftedPoint := *operation.RollbackPoint
+	driftedPoint.BackupSHA256 = strings.Repeat("c", 64)
+	persisted := ManualAcceptancePasswordRotationReceipt{
+		OperationID: operation.OperationID, Target: operation.Target,
+		DatasetVersion: operation.DatasetVersion, Release: operation.Release,
+		MigrationVersion: operation.MigrationVersion, CustomerRevision: operation.CustomerRevision,
+		RotatedAt: time.Date(2026, 7, 22, 3, 4, 5, 0, time.UTC),
+		Accounts: []ManualAcceptancePasswordRotationAccount{
+			{Username: "admin", AuthVersion: 7, RevokedSessions: 2, PhoneBound: true},
+			{Username: "demo_sales", AuthVersion: 3, RevokedSessions: 1},
+		},
+		RollbackPoint: &driftedPoint,
+	}
+	raw, err := json.Marshal(persisted)
+	if err != nil {
+		t.Fatalf("json.Marshal(): %v", err)
+	}
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT marker_value FROM runtime_markers WHERE marker_key = $1 LIMIT 1")).
+		WithArgs(operation.MarkerKey).
+		WillReturnRows(sqlmock.NewRows([]string{"marker_value"}).AddRow(string(raw)))
+	mock.ExpectRollback()
+	mock.ExpectClose()
+
+	_, err = RotateManualAcceptancePasswordsWithOperation(
+		context.Background(), db,
+		[]string{"admin"}, "admin-test-pass",
+		[]string{"demo_sales"}, "demo-test-pass",
+		"admin", "13800138000", operation,
+	)
+	if err == nil || !strings.Contains(err.Error(), "marker identity mismatch") {
+		t.Fatalf("error = %v, want rollback point identity mismatch", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("rollback-point drift executed an unexpected mutation: %v", err)
+	}
+}
+
+func TestValidateManualAcceptanceRotationOperationRejectsIncompleteRollbackPoint(t *testing.T) {
+	valid := testRotationOperation()
+	mutations := []func(*ManualAcceptancePasswordRotationRollbackPoint){
+		func(point *ManualAcceptancePasswordRotationRollbackPoint) { point.BackupAlias = "" },
+		func(point *ManualAcceptancePasswordRotationRollbackPoint) {
+			point.BackupSHA256 = strings.Repeat("B", 64)
+		},
+		func(point *ManualAcceptancePasswordRotationRollbackPoint) { point.BackupSize = 0 },
+		func(point *ManualAcceptancePasswordRotationRollbackPoint) { point.RestoreChecked = false },
+	}
+	for index, mutate := range mutations {
+		candidate := valid
+		point := *valid.RollbackPoint
+		mutate(&point)
+		candidate.RollbackPoint = &point
+		if err := validateManualAcceptanceRotationOperation(candidate); err == nil {
+			t.Fatalf("invalid rollback point mutation %d accepted", index)
+		}
+	}
+	rollbackOnly := ManualAcceptancePasswordRotationOperation{
+		RollbackPoint: valid.RollbackPoint,
+	}
+	if err := validateManualAcceptanceRotationOperation(rollbackOnly); err == nil {
+		t.Fatal("rollback point without durable operation identity was accepted")
+	}
+	remoteWithoutRollback := valid
+	remoteWithoutRollback.RollbackPoint = nil
+	if err := validateManualAcceptanceRotationOperation(remoteWithoutRollback); err == nil {
+		t.Fatal("registered remote operation without rollback point was accepted")
 	}
 }
 

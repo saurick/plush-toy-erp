@@ -64,7 +64,7 @@ server/deploy/compose/prod
 
 ```bash
 node scripts/deploy/deployment-package-lint.mjs --customer yoyoosun
-node scripts/deploy/release-evidence-gate.mjs --customer yoyoosun --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
+node scripts/deploy/release-evidence-gate.mjs --customer yoyoosun --deployment-target <demo-133|customer-test-133> --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 bash deployments/yoyoosun/scripts/verify-env.sh --example
 ```
 

@@ -7,6 +7,7 @@ import {
   REQUIRED_FILES,
   validateReleaseEvidenceGate,
 } from "./release-evidence-gate.mjs";
+import { getDeploymentTarget } from "./deployment-targets.mjs";
 
 const DEFAULT_CUSTOMER = "yoyoosun";
 const CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE =
@@ -16,6 +17,7 @@ const USAGE = `Release evidence status
 
 Usage:
   node scripts/deploy/release-evidence-status.mjs \\
+    --deployment-target <demo-133|customer-test-133> \\
     --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 
 Options:
@@ -156,6 +158,9 @@ export function parseCliArgs(argv) {
       case "evidence-dir":
         options.evidenceDir = value;
         break;
+      case "deployment-target":
+        options.deploymentTarget = value;
+        break;
       case "customer":
         options.customer = value;
         break;
@@ -258,33 +263,48 @@ function readCustomerConfigSmokeEvidence(absoluteDir) {
   }
 }
 
-function buildSmokeCommand({ evidenceDir, customerConfigRevision = "" }) {
+function buildSmokeCommand({
+  deploymentTarget,
+  evidenceDir,
+  customerConfigRevision = "",
+}) {
   const customerConfigSmokeArgs = customerConfigRevision
     ? ` --customer-config-revision ${customerConfigRevision} --admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN`
     : "";
-  return `bash deployments/yoyoosun/scripts/run-smoke.sh --release-version <release-version> --environment <environment> --endpoint <public-endpoint> --backend-url <backend-endpoint> --admin-username admin --admin-password-env MANUAL_ACCEPTANCE_ADMIN_PASSWORD --uat-password-env MANUAL_ACCEPTANCE_UAT_PASSWORD --sms-phone-env MANUAL_ACCEPTANCE_SMS_PHONE${customerConfigSmokeArgs} --report ${evidenceDir}/smoke-test-report.json`;
+  const demoCredentialArgs =
+    deploymentTarget === "demo-133"
+      ? " --uat-password-env MANUAL_ACCEPTANCE_UAT_PASSWORD --sms-phone-env MANUAL_ACCEPTANCE_SMS_PHONE"
+      : "";
+  return `bash deployments/yoyoosun/scripts/run-smoke.sh --release-version <40-character-git-commit> --migration-version <migration-after> --credential-operation-id <credential-rotation-operation-id> --deployment-target ${deploymentTarget} --environment ${deploymentTarget} --endpoint <public-endpoint> --backend-url <backend-endpoint> --admin-username admin --admin-password-env MANUAL_ACCEPTANCE_ADMIN_PASSWORD${demoCredentialArgs}${customerConfigSmokeArgs} --report ${evidenceDir}/smoke-test-report.json`;
 }
 
 function buildRollbackRehearsalCommand({
+  deploymentTarget,
   evidenceDir,
   customerConfigRevision = "",
 }) {
   const customerConfigArg = customerConfigRevision
     ? ` --customer-config-revision ${customerConfigRevision}`
     : "";
-  return `node scripts/deploy/rollback-rehearsal-report.mjs --environment <environment> --release-version <release-version> --rehearsal-type rollback-forward-fix --trigger-scenario "<trigger>" --rollback-target-release <previous-release> --step "identify rollback target=pass" --post-smoke-report smoke-test-report.json${customerConfigArg} --evidence-dir ${evidenceDir}`;
+  return `node scripts/deploy/rollback-rehearsal-report.mjs --environment ${deploymentTarget} --release-version <release-version> --rehearsal-type rollback-forward-fix --trigger-scenario "<trigger>" --rollback-target-release <previous-release> --step "identify rollback target=pass" --post-smoke-report smoke-test-report.json${customerConfigArg} --evidence-dir ${evidenceDir}`;
 }
 
 function buildNextCommands({
+  deploymentTarget,
   evidenceDir,
   missingFiles,
   status,
   customerConfigManifestEvidence,
   customerConfigSmokeEvidence,
 }) {
+  const target = getDeploymentTarget(deploymentTarget);
+  const composeOverride = path.join(
+    target.compose.directory,
+    target.compose.overrideFile,
+  );
   if (status === "missing") {
     return [
-      `bash deployments/yoyoosun/scripts/collect-evidence.sh --release-version <release-version> --output ${evidenceDir || "deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>"}`,
+      `bash deployments/yoyoosun/scripts/collect-evidence.sh --deployment-target ${deploymentTarget} --release-version <release-version> --output ${evidenceDir || "deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>"}`,
     ];
   }
 
@@ -305,12 +325,12 @@ function buildNextCommands({
   }
   if (missing.has(REQUIRED_FILES.preflight)) {
     commands.push(
-      `bash scripts/deploy/production-preflight.sh --env-file server/deploy/compose/prod/.env --runtime --out ${evidenceDir}/production-preflight-report.txt`,
+      `bash scripts/deploy/production-preflight.sh --deployment-target ${deploymentTarget} --env-file ${target.filesystem.runtimeEnv} --compose-dir ${target.compose.directory} --compose-override ${composeOverride} --runtime --expected-release <git-commit> --out ${evidenceDir}/production-preflight-report.txt`,
     );
   }
   if (missing.has(REQUIRED_FILES.imageDigests)) {
     commands.push(
-      `node scripts/deploy/immutable-version-evidence.mjs --evidence-dir ${evidenceDir} --release-version <release-version> --environment <environment> --operator-role <operator-role> --git-commit <git-commit> --server-image <server-image-ref> --server-digest sha256:<64-hex> --web-image <web-image-ref> --web-digest sha256:<64-hex> --migration-before <migration-before> --migration-after <migration-after> --backup-id <backup-id>`,
+      `node scripts/deploy/immutable-version-evidence.mjs --evidence-dir ${evidenceDir} --release-version <release-version> --environment ${deploymentTarget} --operator-role <operator-role> --git-commit <git-commit> --server-image <server-image-ref> --server-digest sha256:<64-hex> --web-image <web-image-ref> --web-digest sha256:<64-hex> --migration-before <migration-before> --migration-after <migration-after> --backup-id <backup-id>`,
     );
   }
   if (
@@ -321,12 +341,13 @@ function buildNextCommands({
     missing.has(REQUIRED_FILES.migration)
   ) {
     commands.push(
-      `SOURCE_POSTGRES_DSN="<source-dsn>" bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh --release-version <release-version> --environment <environment> --backup-purpose pre-migration --out output/customers/yoyoosun/backup-restore-rehearsal --evidence-dir ${evidenceDir}`,
+      `SOURCE_POSTGRES_DSN="<source-dsn>" bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh --release-version <release-version> --environment ${deploymentTarget} --backup-purpose pre-migration --out output/customers/yoyoosun/backup-restore-rehearsal --evidence-dir ${evidenceDir}`,
     );
   }
   if (missing.has(REQUIRED_FILES.smoke)) {
     commands.push(
       buildSmokeCommand({
+        deploymentTarget,
         evidenceDir,
         customerConfigRevision: customerConfigManifestEvidence?.revision,
       }),
@@ -339,6 +360,7 @@ function buildNextCommands({
   ) {
     commands.push(
       buildSmokeCommand({
+        deploymentTarget,
         evidenceDir,
         customerConfigRevision: customerConfigManifestEvidence.revision,
       }),
@@ -351,22 +373,28 @@ function buildNextCommands({
   }
   if (missing.has(REQUIRED_FILES.rollbackRehearsal)) {
     commands.push(
-      `node scripts/deploy/rollback-rehearsal-report.mjs --environment <environment> --release-version <release-version> --rehearsal-type rollback-forward-fix --trigger-scenario "<trigger>" --rollback-target-release <previous-release> --step "identify rollback target=pass" --post-smoke-report smoke-test-report.json --evidence-dir ${evidenceDir}`,
+      `node scripts/deploy/rollback-rehearsal-report.mjs --environment ${deploymentTarget} --release-version <release-version> --rehearsal-type rollback-forward-fix --trigger-scenario "<trigger>" --rollback-target-release <previous-release> --step "identify rollback target=pass" --post-smoke-report smoke-test-report.json --evidence-dir ${evidenceDir}`,
     );
   }
   commands.push(
-    `node scripts/deploy/release-evidence-gate.mjs --evidence-dir ${evidenceDir}`,
+    `node scripts/deploy/release-evidence-gate.mjs --deployment-target ${deploymentTarget} --evidence-dir ${evidenceDir}`,
   );
   return commands;
 }
 
 function buildCloseoutNextActions({
+  deploymentTarget,
   evidenceDir,
   closeoutChecklist,
   customerConfigManifestEvidence,
   customerConfigSmokeEvidence,
 }) {
   const customerConfigRevision = customerConfigManifestEvidence?.revision || "";
+  const target = getDeploymentTarget(deploymentTarget);
+  const composeOverride = path.join(
+    target.compose.directory,
+    target.compose.overrideFile,
+  );
   return closeoutChecklist
     .filter((item) => item.status !== "gate-verified")
     .map((item) => {
@@ -383,7 +411,7 @@ function buildCloseoutNextActions({
       switch (item.id) {
         case "immutable-version":
           action.commands.push(
-            `node scripts/deploy/immutable-version-evidence.mjs --evidence-dir ${evidenceDir} --release-version <release-version> --environment <environment> --operator-role <operator-role> --git-commit <git-commit> --server-image <server-image-ref> --server-digest sha256:<64-hex> --web-image <web-image-ref> --web-digest sha256:<64-hex> --migration-before <migration-before> --migration-after <migration-after> --backup-id <backup-id>`,
+            `node scripts/deploy/immutable-version-evidence.mjs --evidence-dir ${evidenceDir} --release-version <release-version> --environment ${deploymentTarget} --operator-role <operator-role> --git-commit <git-commit> --server-image <server-image-ref> --server-digest sha256:<64-hex> --web-image <web-image-ref> --web-digest sha256:<64-hex> --migration-before <migration-before> --migration-after <migration-after> --backup-id <backup-id>`,
           );
           action.manualChecks.push(
             "Use releaseVersion, environment, gitCommit, image digests, migrationBefore, migrationAfter, and backupId from the same release batch; do not invent image digests or migration versions.",
@@ -391,7 +419,7 @@ function buildCloseoutNextActions({
           break;
         case "production-preflight":
           action.commands.push(
-            `bash scripts/deploy/production-preflight.sh --env-file server/deploy/compose/prod/.env --runtime --out ${evidenceDir}/production-preflight-report.txt`,
+            `bash scripts/deploy/production-preflight.sh --deployment-target ${deploymentTarget} --env-file ${target.filesystem.runtimeEnv} --compose-dir ${target.compose.directory} --compose-override ${composeOverride} --runtime --expected-release <git-commit> --out ${evidenceDir}/production-preflight-report.txt`,
           );
           action.manualChecks.push(
             "Run after the target Compose services start, using the real runtime .env; do not use .env.example, example-mode output, or an env-only preflight report.",
@@ -399,15 +427,23 @@ function buildCloseoutNextActions({
           break;
         case "backup-restore-rehearsal":
           action.commands.push(
-            `SOURCE_POSTGRES_DSN="<source-dsn>" bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh --release-version <release-version> --environment <environment> --backup-purpose pre-migration --out output/customers/yoyoosun/backup-restore-rehearsal --evidence-dir ${evidenceDir}`,
+            `SOURCE_POSTGRES_DSN="<source-dsn>" bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh --release-version <release-version> --environment ${deploymentTarget} --backup-purpose pre-migration --out output/customers/yoyoosun/backup-restore-rehearsal --evidence-dir ${evidenceDir}`,
           );
           action.manualChecks.push(
             "Bind backupId, migrationBefore, migrationAfter, backup hash, restore target, command summary, and smoke query evidence to the same release batch.",
           );
           break;
+        case "credential-rotation":
+          action.manualChecks.push(
+            deploymentTarget === "demo-133"
+              ? "Rotate the target admin and the exact ten UAT identities, revoke prior sessions, then bind the rotation operation id and positive admin auth version into target smoke."
+              : "Rotate and verify only the customer-test admin; preserve every non-admin identity atomically and do not read or pass UAT/SMS credential inputs.",
+          );
+          break;
         case "target-smoke":
           action.commands.push(
             buildSmokeCommand({
+              deploymentTarget,
               evidenceDir,
               customerConfigRevision,
             }),
@@ -419,6 +455,7 @@ function buildCloseoutNextActions({
         case "rollback-forward-fix":
           action.commands.push(
             buildRollbackRehearsalCommand({
+              deploymentTarget,
               evidenceDir,
               customerConfigRevision,
             }),
@@ -450,12 +487,14 @@ function buildCloseoutNextActions({
           ) {
             action.commands.push(
               buildSmokeCommand({
+                deploymentTarget,
                 evidenceDir,
                 customerConfigRevision: customerConfigManifestEvidence.revision,
               }),
             );
             action.commands.push(
               buildRollbackRehearsalCommand({
+                deploymentTarget,
                 evidenceDir,
                 customerConfigRevision: customerConfigManifestEvidence.revision,
               }),
@@ -477,6 +516,7 @@ function buildCloseoutNextActions({
 }
 
 function buildCloseoutChecklist({
+  deploymentTarget,
   files,
   gate,
   warnings,
@@ -514,7 +554,12 @@ function buildCloseoutChecklist({
     id: group.id,
     label: group.label,
     files: group.files,
-    reason: group.reason,
+    reason:
+      group.id === "credential-rotation"
+        ? deploymentTarget === "demo-133"
+          ? "证明 admin 与十个 UAT 岗位账号已轮换、旧会话已撤销且目标环境 11/11 真实登录通过"
+          : "证明 customer-test admin 已轮换并真实登录，且非 admin 身份集合原子保留、未读取或改动 UAT/SMS 凭据"
+        : group.reason,
     ...baseStatus(group.files),
   }));
 
@@ -616,6 +661,7 @@ function buildCloseoutGateSummary({ closeoutChecklist, gate, warnings }) {
 
 export function buildReleaseEvidenceStatus({
   evidenceDir,
+  deploymentTarget,
   customer = DEFAULT_CUSTOMER,
   repoRoot = process.cwd(),
 } = {}) {
@@ -623,6 +669,12 @@ export function buildReleaseEvidenceStatus({
   const warnings = [];
   if (!evidenceDir) {
     throw new CliError("Missing required --evidence-dir", 2);
+  }
+  if (!["demo-133", "customer-test-133"].includes(deploymentTarget)) {
+    throw new CliError(
+      "Missing or invalid --deployment-target (demo-133|customer-test-133)",
+      2,
+    );
   }
   const absoluteDir = path.resolve(repoRoot, evidenceDir);
   const directoryExists =
@@ -695,7 +747,12 @@ export function buildReleaseEvidenceStatus({
   };
   if (directoryExists) {
     try {
-      validateReleaseEvidenceGate({ evidenceDir, customer, repoRoot });
+      validateReleaseEvidenceGate({
+        evidenceDir,
+        deploymentTarget,
+        customer,
+        repoRoot,
+      });
       gate = {
         passed: true,
         errorCount: 0,
@@ -728,6 +785,7 @@ export function buildReleaseEvidenceStatus({
     : "missing";
 
   const closeoutChecklist = buildCloseoutChecklist({
+    deploymentTarget,
     files,
     gate,
     warnings,
@@ -741,6 +799,7 @@ export function buildReleaseEvidenceStatus({
     warnings,
   });
   const closeoutNextActions = buildCloseoutNextActions({
+    deploymentTarget,
     evidenceDir,
     closeoutChecklist,
     customerConfigManifestEvidence,
@@ -749,6 +808,7 @@ export function buildReleaseEvidenceStatus({
 
   return {
     customer,
+    deploymentTarget,
     evidenceDir,
     absoluteDir,
     status,
@@ -763,6 +823,7 @@ export function buildReleaseEvidenceStatus({
     errors,
     warnings,
     nextCommands: buildNextCommands({
+      deploymentTarget,
       evidenceDir,
       missingFiles,
       status,
@@ -784,6 +845,7 @@ function formatText(status) {
   const lines = [
     `release evidence status: ${status.status}`,
     `customer: ${status.customer}`,
+    `deploymentTarget: ${status.deploymentTarget}`,
     `evidenceDir: ${status.evidenceDir}`,
     `files: ${status.presentFileCount}/${status.requiredFileCount}`,
     `gate: ${status.gate.passed ? "passed" : `failed (${status.gate.errorCount})`}`,

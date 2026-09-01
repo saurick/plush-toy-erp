@@ -14,8 +14,15 @@ import {
   buildCustomerConfigReadbackPreflightReport,
   buildInputTemplate,
   parseCliArgs,
-  validateCustomerConfigReleaseReadiness,
+  validateCustomerConfigReleaseReadiness as validateCustomerConfigReleaseReadinessImpl,
 } from "./customer-config-release-readiness.mjs";
+
+function validateCustomerConfigReleaseReadiness(options, runtime) {
+  return validateCustomerConfigReleaseReadinessImpl(
+    { deploymentTarget: "customer-test-133", ...options },
+    runtime,
+  );
+}
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const readinessCli = path.join(
@@ -415,7 +422,11 @@ Pending Files: 0
 - [x] known limitations reviewed
 `,
   );
-  writeCredentialEvidenceTestFixture(dir);
+  writeCredentialEvidenceTestFixture(
+    dir,
+    undefined,
+    "customer-test-133",
+  );
 }
 
 function buildReleaseReport({ root, manifest, evidenceDir, overrides = {} }) {
@@ -498,7 +509,10 @@ async function writeReleaseReport(root, report) {
     "output/customers/yoyoosun/customer-config-release/customer-config-release-report.json";
   const absoluteReportPath = path.join(root, reportPath);
   fs.mkdirSync(path.dirname(absoluteReportPath), { recursive: true });
-  await writeFile(absoluteReportPath, `${JSON.stringify(report, null, 2)}\n`);
+  await writeFile(
+    absoluteReportPath,
+    `${JSON.stringify({ deploymentTarget: "customer-test-133", ...report }, null, 2)}\n`,
+  );
   return reportPath;
 }
 
@@ -820,6 +834,8 @@ test("CLI 输出 JSON 和文本范围声明", async () => {
       process.execPath,
       [
         readinessCli,
+        "--deployment-target",
+        "customer-test-133",
         "--manifest",
         manifest,
         "--evidence-dir",
@@ -847,7 +863,15 @@ test("CLI 输出 JSON 和文本范围声明", async () => {
 
     const textResult = spawnSync(
       process.execPath,
-      [readinessCli, "--manifest", manifest, "--evidence-dir", evidenceDir],
+      [
+        readinessCli,
+        "--deployment-target",
+        "customer-test-133",
+        "--manifest",
+        manifest,
+        "--evidence-dir",
+        evidenceDir,
+      ],
       { cwd: root, encoding: "utf8" },
     );
     assert.equal(
@@ -873,6 +897,8 @@ test("CLI JSON 失败时输出 release evidence closeout next actions", async ()
       process.execPath,
       [
         readinessCli,
+        "--deployment-target",
+        "customer-test-133",
         "--manifest",
         manifest,
         "--evidence-dir",

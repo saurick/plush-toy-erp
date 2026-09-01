@@ -162,6 +162,7 @@ runner 不替代 release evidence gate；每组 evidence 写入后仍要回到 `
 ```bash
 node scripts/deploy/release-evidence-gate.mjs \
   --customer yoyoosun \
+  --deployment-target <demo-133|customer-test-133> \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
 
@@ -177,6 +178,7 @@ node scripts/deploy/release-evidence-gate.mjs \
 
 ```bash
 node scripts/deploy/customer-config-activation-gate.mjs \
+  --deployment-target <demo-133|customer-test-133> \
   --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
@@ -187,6 +189,7 @@ release evidence 中只记录 manifest revision、哈希或人工 review 结论�
 
 ```bash
 node scripts/deploy/customer-config-release-readiness.mjs \
+  --deployment-target <demo-133|customer-test-133> \
   --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
@@ -195,6 +198,7 @@ node scripts/deploy/customer-config-release-readiness.mjs \
 
 ```bash
 node scripts/deploy/customer-config-release-readiness.mjs \
+  --deployment-target <demo-133|customer-test-133> \
   --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \
   --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json \
@@ -207,6 +211,7 @@ readiness gate 复用 activation gate，并额外校验执行报告的客户 key
 
 ```bash
 node scripts/deploy/customer-config-release-execute.mjs \
+  --deployment-target <demo-133|customer-test-133> \
   --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \
   --out output/customers/yoyoosun/customer-config-release

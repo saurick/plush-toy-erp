@@ -6,27 +6,42 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { buildRuntimeManifest } from "../qa/customer-config-runtime-manifest.mjs";
-import { validateCustomerConfigActivationGate } from "./customer-config-activation-gate.mjs";
+import { validateCustomerConfigActivationGate as validateCustomerConfigActivationGateImpl } from "./customer-config-activation-gate.mjs";
+import { writeCredentialEvidenceTestFixture } from "./credential-evidence-test-fixture.mjs";
+import {
+  loadYoyoosunCredentialContract,
+  selectYoyoosunCredentialTarget,
+} from "../../deployments/yoyoosun/scripts/credential-contract.mjs";
 import { releaseReadyYoyoosunCustomerPackage } from "./customer-config-test-fixtures.mjs";
 
 const scriptPath = path.resolve(
   new URL("customer-config-activation-gate.mjs", import.meta.url).pathname,
 );
 const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
-const credentialContractRaw = fs.readFileSync(
-  path.join(repoRoot, "deployments/yoyoosun/env/credential.contract.json"),
+const credentialContractLoaded = loadYoyoosunCredentialContract();
+const credentialContract = credentialContractLoaded.contract;
+const credentialContractSha256 = credentialContractLoaded.sha256;
+const credentialTarget = selectYoyoosunCredentialTarget(
+  credentialContractLoaded,
+  "demo-133",
 );
-const credentialContract = JSON.parse(credentialContractRaw.toString("utf8"));
-const credentialContractSha256 = crypto
-  .createHash("sha256")
-  .update(credentialContractRaw)
-  .digest("hex");
 const releaseGitCommit = "abc1234000000000000000000000000000000000";
 
 function runActivationGate(root, args) {
-  return spawnSync(process.execPath, [scriptPath, ...args], {
+  return spawnSync(
+    process.execPath,
+    [scriptPath, "--deployment-target", "demo-133", ...args],
+    {
     cwd: root,
     encoding: "utf8",
+    },
+  );
+}
+
+function validateCustomerConfigActivationGate(options) {
+  return validateCustomerConfigActivationGateImpl({
+    deploymentTarget: "demo-133",
+    ...options,
   });
 }
 
@@ -269,9 +284,9 @@ Pending Files: 0
             target: "jsonrpc:auth.admin_login",
             credentialContractSchema: credentialContract.schemaVersion,
             credentialContractSha256,
-            credentialTarget: credentialContract.target.key,
-            credentialDatabase: credentialContract.target.database,
-            credentialDatasetVersion: credentialContract.target.datasetVersion,
+            credentialTarget: credentialTarget.commandTarget,
+            credentialDatabase: credentialTarget.database,
+            credentialDatasetVersion: credentialTarget.datasetVersion,
             adminUsername: credentialContract.credentials.admin.username,
             adminAuthenticated: true,
             adminSuperAdmin: true,
@@ -308,46 +323,6 @@ Pending Files: 0
           },
         ],
         redaction: { containsSecrets: false, containsRawCustomerRows: false },
-      },
-      null,
-      2,
-    ),
-  );
-  fs.writeFileSync(
-    path.join(dir, "credential-rotation-report.json"),
-    JSON.stringify(
-      {
-        generatedAt: "2026-06-28T13:20:00Z",
-        operationId: "123e4567-e89b-42d3-a456-426614174000",
-        target: credentialContract.target.key,
-        datasetVersion: credentialContract.target.datasetVersion,
-        migrationVersion: "20260628123354",
-        customerRevision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
-        release: releaseGitCommit,
-        adminAccounts: 1,
-        accountKind: "customer-uat",
-        roleAccounts: 10,
-        revokedSessions: 1,
-        authVersionIncremented: true,
-        auditSource: "manual_acceptance_password_rotation",
-        phoneBound: false,
-        accounts: [
-          {
-            username: credentialContract.credentials.admin.username,
-            authVersion: 2,
-            revokedSessions: 1,
-            phoneBound: false,
-          },
-          ...credentialContract.credentials.uat.usernames.map(
-            (username, index) => ({
-              username,
-              authVersion: index + 2,
-              revokedSessions: 0,
-              phoneBound: false,
-            }),
-          ),
-        ],
-        replayed: false,
       },
       null,
       2,
@@ -424,6 +399,7 @@ Pending Files: 0
 - [x] known limitations reviewed
 `,
   );
+  writeCredentialEvidenceTestFixture(dir);
 }
 
 test("customer config activation gate accepts manifest with filled release evidence", () => {
@@ -446,6 +422,23 @@ test("customer config activation gate accepts manifest with filled release evide
     result.revision,
     "yoyoosun-customer-package-v7.runtime-manifest-v1",
   );
+  assert.deepEqual(result.runtimeIdentity, {
+    scope: "release-v1",
+    database: "plush_erp_demo_v1",
+    releaseVersion: "abc1234000000000000000000000000000000000",
+    migrationVersion: "20260628123354",
+    expectedDigestSha256: crypto
+      .createHash("sha256")
+      .update(
+        [
+          "release-v1",
+          "plush_erp_demo_v1",
+          "abc1234000000000000000000000000000000000",
+          "20260628123354",
+        ].join("\n"),
+      )
+      .digest("hex"),
+  });
   assert.equal(result.scope.evidenceOnly, true);
 });
 

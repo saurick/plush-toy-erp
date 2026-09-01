@@ -39,7 +39,7 @@ docker compose -f compose.yml --env-file /secure/path/yoyoosun/.env ps
 - 恢复后 migration version。
 - 恢复后 smoke 结果。
 
-恢复期间保持 `app-server` 和 Web 停止。恢复完成后先核对 migration version 与旧镜像合同，再按 `credential.contract.json` 恢复固定 `admin/adminadmin` 与全部 `uat_*/12345678`、递增认证版本并撤销恢复出的旧会话；禁止 Keychain、环境变量或发布输入覆盖固定密码。随后启动 steady 后端，运行真实登录矩阵；SMS 手机号仅在人工录入后执行绑定读回。全部适用检查通过后才启动 / 开放 Web。不得把新 schema 与旧镜像混用，也不得使用备份中恢复出的旧 token 或旧密码签收。
+恢复期间保持 `app-server` 和 Web 停止。恢复完成后先核对 migration version 与旧镜像合同，再按 `credential.contract.json` 执行目标特定凭据合同：两个 target 的 `admin` 都恢复为 `adminadmin`；只有 `demo-133` 恢复十个 `uat_*` 为 `12345678`；`customer-test-133` 不读取、猜测或改写非管理员密码，只证明其 `id/username` 身份集合保持不变。对应轮换必须先在目标锁内生成并 restore-check 独立的 operation-bound 备份，再递增认证版本并撤销恢复出的旧会话；禁止调用者选择备份路径，也禁止 Keychain、环境变量或发布输入覆盖公开测试凭据。随后启动 steady 后端，运行适用的真实登录矩阵；SMS 手机号只属于 demo，且仅在人工录入后执行绑定读回。全部适用检查通过后才启动 / 开放 Web。不得把新 schema 与旧镜像混用，也不得使用备份中恢复出的旧 token 或旧密码签收。
 
 ## 禁止
 

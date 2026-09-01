@@ -64,7 +64,7 @@
 | `scripts/deploy/rollback-rehearsal-report.mjs`                                                                                                                                                                     | 从真实 rollback / forward-fix 演练步骤和非空全通过 post-smoke report 生成脱敏 `rollback-rehearsal-report.json`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | 发布回滚 / 前向修复演练后                                                                                 |
 | `scripts/deploy/customer-config-manifest-evidence.mjs`                                                                                                                                                             | 生成客户配置 runtime manifest fingerprint evidence，写入已有 release evidence 目录                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | 客户配置 revision 激活前                                                                                  |
 | `scripts/deploy/customer-config-activation-gate.mjs`                                                                                                                                                               | 客户配置激活前门禁，组合检查 runtime manifest 与 release evidence；支持 `--json` 输出 evidence-only scope，失败时会带 release evidence status / closeout next actions；不执行后端激活、migration 或导入                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | 客户配置 revision 准备激活前                                                                              |
-| `scripts/deploy/customer-config-release-execute.mjs`                                                                                                                                                               | 客户配置发布执行器，默认只出报告；支持 `--print-input-template` 输出 validate / publish / transition check / activate 或 rollback / effective-session 读回输入模板；显式确认后才执行，切换 mutation 复用后端校验 hash、产品版本和观测 active revision 的 CAS identity                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | 客户配置 revision 发布 / 激活 / 受控回滚执行前                                                            |
+| `scripts/deploy/customer-config-release-execute.mjs`                                                                                                                                                               | 客户配置发布执行器，默认只出报告；支持 `--print-input-template` 输出 validate / publish / transition check / activate 或 rollback / effective-session 读回输入模板；显式确认后才执行；activate / rollback 在管理员凭据与首次 JSON-RPC 前先用 release evidence 的目标数据库、完整 SHA 和 migration 校验同一后端 `/readyz/runtime-identity`，切换 mutation 再复用后端校验 hash、产品版本和观测 active revision 的 CAS identity                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | 客户配置 revision 发布 / 激活 / 受控回滚执行前                                                            |
 | `scripts/deploy/customer-config-release-readiness.mjs`                                                                                                                                                             | 客户配置发布就绪聚合门禁，复核 manifest、manifest evidence、release evidence、activation gate 和可选执行报告；支持 `--print-input-template` 输出 active revision 读回证据前置清单，支持 `--readback-preflight-report` 写 no-write 读回缺口报告，支持 `--json` 输出 evidence-only scope，失败时会带 release evidence status / closeout next actions，明确 readiness 只聚合证据、不执行发布或后端写入                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | 客户配置 revision 发布前或执行后声明 ready 前                                                             |
 | `scripts/deploy/production-preflight.sh`                                                                                                                                                                           | 产品级生产发布前门禁，检查运行时 env、一次性 admin bootstrap、固定镜像 tag、SMS mock、debug 写入开关、PDF async warmup / 固定 Chromium、Compose、migration 脚本、PostgreSQL / 后端 / Jaeger loopback 和低配部署边界；对应测试已接入 fast / strict                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | 每次生产发布 / 部署后运行态复核前                                                                         |
 | `scripts/qa/populated-upgrade-preflight.sh`                                                                                                                                                                        | 以固定 `--audit` allowlist 选择 `20260714055504` populated upgrade 或 `20260714055825` customer config cutover read-only 审计；不执行 migration、不自动 DML、不输出 DSN                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | 现存数据库升级或 restored DB 演练 apply 前                                                                |
@@ -701,6 +701,7 @@ node /Users/simon/projects/plush-toy-erp/scripts/deploy/customer-config-manifest
 
 ```bash
 node /Users/simon/projects/plush-toy-erp/scripts/deploy/customer-config-activation-gate.mjs \
+  --deployment-target <demo-133|customer-test-133> \
   --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \
   --json
@@ -725,6 +726,7 @@ node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-config-runtime-mani
   --out output/customers/yoyoosun/customer-config-runtime-manifest.json
 
 node /Users/simon/projects/plush-toy-erp/scripts/deploy/customer-config-release-readiness.mjs \
+  --deployment-target <demo-133|customer-test-133> \
   --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \
   --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json \
@@ -733,6 +735,7 @@ node /Users/simon/projects/plush-toy-erp/scripts/deploy/customer-config-release-
 
 ```bash
 node /Users/simon/projects/plush-toy-erp/scripts/deploy/customer-config-release-readiness.mjs \
+  --deployment-target <demo-133|customer-test-133> \
   --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
@@ -741,6 +744,7 @@ node /Users/simon/projects/plush-toy-erp/scripts/deploy/customer-config-release-
 
 ```bash
 node /Users/simon/projects/plush-toy-erp/scripts/deploy/customer-config-release-readiness.mjs \
+  --deployment-target <demo-133|customer-test-133> \
   --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \
   --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json
@@ -758,6 +762,7 @@ node /Users/simon/projects/plush-toy-erp/scripts/deploy/customer-config-release-
 
 ```bash
 node /Users/simon/projects/plush-toy-erp/scripts/deploy/customer-config-release-execute.mjs \
+  --deployment-target <demo-133|customer-test-133> \
   --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \
   --out output/customers/yoyoosun/customer-config-release
 ```
@@ -768,6 +773,7 @@ node /Users/simon/projects/plush-toy-erp/scripts/deploy/customer-config-release-
 CUSTOMER_CONFIG_CONFIRM=PUBLISH_YOYOOSUN_CONFIG \
 CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' \
   node /Users/simon/projects/plush-toy-erp/scripts/deploy/customer-config-release-execute.mjs \
+    --deployment-target <demo-133|customer-test-133> \
     --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \
     --out output/customers/yoyoosun/customer-config-release \
     --backend-url http://127.0.0.1:8300 \
@@ -780,6 +786,7 @@ CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' \
 CUSTOMER_CONFIG_CONFIRM=ACTIVATE_YOYOOSUN_CONFIG \
 CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' \
   node /Users/simon/projects/plush-toy-erp/scripts/deploy/customer-config-release-execute.mjs \
+    --deployment-target <demo-133|customer-test-133> \
     --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \
     --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \
     --out output/customers/yoyoosun/customer-config-release \
@@ -794,6 +801,7 @@ CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' \
 CUSTOMER_CONFIG_CONFIRM=ACTIVATE_YOYOOSUN_CONFIG \
 CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' \
   node /Users/simon/projects/plush-toy-erp/scripts/deploy/customer-config-release-execute.mjs \
+    --deployment-target <demo-133|customer-test-133> \
     --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \
     --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \
     --out output/customers/yoyoosun/customer-config-release \
@@ -808,6 +816,7 @@ CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' \
 CUSTOMER_CONFIG_CONFIRM=ROLLBACK_YOYOOSUN_CONFIG \
 CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' \
   node /Users/simon/projects/plush-toy-erp/scripts/deploy/customer-config-release-execute.mjs \
+    --deployment-target <demo-133|customer-test-133> \
     --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \
     --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \
     --out output/customers/yoyoosun/customer-config-release \
@@ -816,7 +825,7 @@ CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' \
     --rollback
 ```
 
-该执行器只调用已有 `customer_config` JSON-RPC usecase，不上传 raw 客户文件、不直写数据库、不生成 migration、不导入业务数据、不写 Workflow / Fact runtime；没有 `--execute` 时不会访问后端。执行器会拒绝带账号密码的 `--backend-url`，并在 `customer-config-release-report.json` 写入脱敏 `backendEndpointAlias`、`validatedConfigIdentity` 与 `transitionCheck`；validate、publish、transition、mutation 响应身份不一致，blocker 结构异常，二次 active revision 漂移或 mutation CAS 冲突都会立即停止，不循环重试或 fallback。`--execute --activate`、`--execute --activate-only` 或 `--execute --rollback` 成功后会继续调用 `get_effective_session`，只接受正式 `{session}` 响应，并按 customer、revision、hash、hash version 与来源写入 `effectiveSessionVerification`，用于后续 readiness gate 判断“active revision 已能被正式前端投影消费”。
+该执行器只调用已有 `customer_config` JSON-RPC usecase，不上传 raw 客户文件、不直写数据库、不生成 migration、不导入业务数据、不写 Workflow / Fact runtime；没有 `--execute` 时不会访问后端。执行器会拒绝带账号密码的 `--backend-url`；activate / rollback 还会在读取管理员凭据和首次 JSON-RPC 前，用 release evidence 已校验的目标数据库、完整 SHA 与 migration 调用同一后端 `/readyz/runtime-identity`，只有 `matched-v1` 才继续，并在报告写入不含响应正文的 `runtimeIdentityVerification`。`customer-config-release-report.json` 还会写入脱敏 `backendEndpointAlias`、`validatedConfigIdentity` 与 `transitionCheck`；validate、publish、transition、mutation 响应身份不一致，blocker 结构异常，二次 active revision 漂移或 mutation CAS 冲突都会立即停止，不循环重试或 fallback。`--execute --activate`、`--execute --activate-only` 或 `--execute --rollback` 成功后会继续调用 `get_effective_session`，只接受正式 `{session}` 响应，并按 customer、revision、hash、hash version 与来源写入 `effectiveSessionVerification`，用于后续 readiness gate 判断“active revision 已能被正式前端投影消费”。
 
 ### 2C. Core 产品规则层边界检查
 
@@ -1051,6 +1060,7 @@ ready。migration / schema / guard / 备份编排真源或目标状态变化后�
 
 ```bash
 bash /Users/simon/projects/plush-toy-erp/scripts/deploy/production-preflight.sh \
+  --deployment-target <demo-133|customer-test-133> \
   --env-file /Users/simon/projects/plush-toy-erp/server/deploy/compose/prod/.env
 ```
 
@@ -1058,6 +1068,7 @@ bash /Users/simon/projects/plush-toy-erp/scripts/deploy/production-preflight.sh 
 
 ```bash
 bash /Users/simon/projects/plush-toy-erp/scripts/deploy/production-preflight.sh \
+  --deployment-target <demo-133|customer-test-133> \
   --env-file /Users/simon/projects/plush-toy-erp/server/deploy/compose/prod/.env \
   --runtime \
   --out /Users/simon/projects/plush-toy-erp/deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/production-preflight-report.txt

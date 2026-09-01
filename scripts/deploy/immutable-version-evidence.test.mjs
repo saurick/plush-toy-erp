@@ -39,6 +39,8 @@ function writeDraftEvidence(root) {
     "bash",
     [
       collectEvidencePath,
+      "--deployment-target",
+      "demo-133",
       "--release-version",
       "20260629T0802-draft",
       "--output",

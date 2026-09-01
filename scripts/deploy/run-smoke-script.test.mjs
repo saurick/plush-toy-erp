@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -34,9 +35,29 @@ const credentialEnv = {
   [credentialContract.smsLoginIdentity.environmentVariable]: "13800138000",
 };
 const releaseSha = "a".repeat(40);
+const migrationVersion = "20260831120000";
+const credentialOperationId = "00000000-0000-4000-8000-000000000001";
+
+function withDemoTarget(args) {
+  const normalized = [...args];
+  if (!normalized.includes("--migration-version")) {
+    normalized.push("--migration-version", migrationVersion);
+  }
+  if (!normalized.includes("--credential-operation-id")) {
+    normalized.push("--credential-operation-id", credentialOperationId);
+  }
+  if (!normalized.includes("--deployment-target")) {
+    const environmentIndex = normalized.indexOf("--environment");
+    if (environmentIndex !== -1) {
+      normalized[environmentIndex + 1] = "demo-133";
+    }
+    normalized.push("--deployment-target", "demo-133");
+  }
+  return normalized;
+}
 
 function runScript(args = []) {
-  return spawnSync("bash", [scriptPath, ...args], {
+  return spawnSync("bash", [scriptPath, ...withDemoTarget(args)], {
     cwd: repoRoot,
     encoding: "utf8",
   });
@@ -44,7 +65,7 @@ function runScript(args = []) {
 
 function runScriptAsync(args = [], { env = {} } = {}) {
   return new Promise((resolve) => {
-    const child = spawn("bash", [scriptPath, ...args], {
+    const child = spawn("bash", [scriptPath, ...withDemoTarget(args)], {
       cwd: repoRoot,
       env: { ...process.env, ...env },
       stdio: ["ignore", "pipe", "pipe"],
@@ -75,6 +96,7 @@ function createFakeCurlBin(root) {
 set -euo pipefail
 url="\${@: -1}"
 output_file=""
+headers_file=""
 write_out=""
 request_data=""
 if [[ -n "\${FAKE_CURL_ARGV_OUT:-}" ]]; then
@@ -87,6 +109,10 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     -o)
       output_file="\${2:-}"
+      shift 2
+      ;;
+    -D|--dump-header)
+      headers_file="\${2:-}"
       shift 2
       ;;
     -w)
@@ -110,6 +136,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 case "$url" in
+  */readyz/runtime-identity)
+    proof="\${FAKE_RUNTIME_IDENTITY_PROOF:-matched-v1}"
+    if [[ -n "$headers_file" ]]; then
+      printf 'HTTP/1.1 200 OK\r\nX-ERP-Runtime-Identity-Proof: %s\r\n\r\n' "$proof" >"$headers_file"
+    fi
+    [[ -z "$write_out" ]] || printf '200'
+    ;;
   */healthz|*/readyz|*/admin-login|*/m/warehouse/tasks)
     [[ -z "$write_out" ]] || printf '200'
     ;;
@@ -129,7 +162,8 @@ case "$url" in
         [[ "$username" != "admin" ]] || phone="\${FAKE_ADMIN_PHONE:-13800138000}"
         response_id="\${FAKE_LOGIN_RESPONSE_ID:-credential-login-smoke}"
         token_key="\${FAKE_LOGIN_TOKEN_KEY:-access_token}"
-        response="$(printf '{\"jsonrpc\":\"2.0\",\"id\":\"%s\",\"result\":{\"code\":0,\"data\":{\"username\":\"%s\",\"phone\":\"%s\",\"is_super_admin\":%s,\"%s\":\"unique-token-%s\"}}}' "$response_id" "$username" "$phone" "$is_super_admin" "$token_key" "$username")"
+        auth_version_json="\${FAKE_LOGIN_AUTH_VERSION_JSON:-2}"
+        response="$(printf '{\"jsonrpc\":\"2.0\",\"id\":\"%s\",\"result\":{\"code\":0,\"data\":{\"username\":\"%s\",\"phone\":\"%s\",\"is_super_admin\":%s,\"auth_version\":%s,\"%s\":\"unique-token-%s\"}}}' "$response_id" "$username" "$phone" "$is_super_admin" "$auth_version_json" "$token_key" "$username")"
       fi
       [[ -z "$output_file" ]] && printf '%s\n' "$response" || printf '%s\n' "$response" >"$output_file"
     else
@@ -166,8 +200,11 @@ test("run smoke help is runnable", () => {
 
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /--release-version/);
+  assert.match(result.stdout, /--migration-version/);
   assert.match(result.stdout, /--environment/);
+  assert.match(result.stdout, /--deployment-target/);
   assert.match(result.stdout, /--admin-password-env/);
+  assert.match(result.stdout, /--credential-operation-id/);
   assert.match(result.stdout, /--uat-password-env/);
   assert.match(result.stdout, /--print-input-template/);
 });
@@ -197,15 +234,18 @@ test("run smoke input template is no-write and does not require endpoint", () =>
   );
   assert(
     template.checks.includes(
-      "template-pdf-render when --customer-config-revision and an admin token are provided",
+      "template-pdf-render when --admin-token-env supplies an admin token",
     ),
   );
   assert(
     template.checks.some((item) => item.startsWith("credential-login-matrix")),
   );
   assert(
+    template.checks.includes("runtime-identity release-v1 before authentication"),
+  );
+  assert(
     template.requiredReadbackEvidence.some((item) =>
-      item.includes("totalAuthenticated=11"),
+      item.includes("demo totalAuthenticated=11"),
     ),
   );
   assert(
@@ -236,6 +276,7 @@ test("run smoke writes release-gate compatible report", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "run-smoke-report-"));
   const reportPath = path.join(root, "smoke-test-report.json");
   const fakeCurlBin = createFakeCurlBin(root);
+  const curlArgvPath = path.join(root, "curl-argv.txt");
   const tempDir = path.join(root, "tmp");
   fs.mkdirSync(tempDir);
   const endpoint = "http://127.0.0.1:19090";
@@ -276,14 +317,41 @@ test("run smoke writes release-gate compatible report", async () => {
   const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
   assert.equal(report.customerCode, "yoyoosun");
   assert.equal(report.releaseVersion, releaseSha);
-  assert.equal(report.environment, "customer-trial");
+  assert.equal(report.deploymentTarget, "demo-133");
+  assert.equal(report.environment, "demo-133");
   assert.equal(report.operatorRole, "deployment-operator");
   assert.equal(report.endpointAlias, endpoint);
   assert.equal(report.backendEndpointAlias, backendUrl);
   assert.equal(report.summary.total, report.checks.length);
   assert.equal(report.summary.passed, report.checks.length);
   assert.equal(report.summary.failed, 0);
-  assert.equal(report.checks.length, 10);
+  assert.equal(report.checks.length, 11);
+  const runtimeIdentityCheck = report.checks.find(
+    (check) => check.name === "runtime-identity",
+  );
+  assert.deepEqual(runtimeIdentityCheck, {
+    name: "runtime-identity",
+    status: "pass",
+    target: "/readyz/runtime-identity",
+    httpCode: "200",
+    scope: "release-v1",
+    database: "plush_erp_demo_v1",
+    releaseVersion: releaseSha,
+    migrationVersion,
+    expectedDigestSha256: crypto
+      .createHash("sha256")
+      .update(
+        [
+          "release-v1",
+          "plush_erp_demo_v1",
+          releaseSha,
+          migrationVersion,
+        ].join("\n"),
+      )
+      .digest("hex"),
+    proof: "matched-v1",
+    responseBodyStored: false,
+  });
   assert.ok(report.checks.some((check) => check.name === "web-readyz"));
   assert.ok(report.checks.some((check) => check.name === "server-healthz"));
   assert.ok(report.checks.some((check) => check.name === "server-readyz"));
@@ -306,8 +374,12 @@ test("run smoke writes release-gate compatible report", async () => {
   assert.equal(credentialCheck.adminSuperAdmin, true);
   assert.equal(credentialCheck.phoneConfigured, true);
   assert.equal(credentialCheck.phoneBound, true);
-  assert.equal(credentialCheck.uatExpected, 10);
-  assert.equal(credentialCheck.uatAuthenticated, 10);
+  assert.equal(credentialCheck.deploymentTarget, "demo-133");
+  assert.equal(credentialCheck.commandTarget, "customer-trial-133");
+  assert.equal(credentialCheck.targetIdentity, "customer-trial-133:2026.08.15-v6");
+  assert.equal(credentialCheck.database, "plush_erp_demo_v1");
+  assert.equal(credentialCheck.nonAdminExpected, 10);
+  assert.equal(credentialCheck.nonAdminAuthenticated, 10);
   assert.equal(credentialCheck.totalExpected, 11);
   assert.equal(credentialCheck.totalAuthenticated, 11);
   assert.equal(credentialCheck.uniqueTokensObserved, true);
@@ -329,7 +401,11 @@ test("run smoke writes release-gate compatible report", async () => {
     credentialCheck.smsPhoneSourceEnv,
     credentialContract.smsLoginIdentity.environmentVariable,
   );
-  assert.equal(credentialCheck.adminAuthVersion, null);
+  assert.equal(credentialCheck.adminAuthVersion, 2);
+  assert.equal(
+    credentialCheck.credentialOperationId,
+    credentialOperationId,
+  );
   for (const check of report.checks) {
     assert.match(check.status, /^pass$/);
     if (check.target.startsWith("http://")) {
@@ -375,6 +451,65 @@ test("run smoke writes release-gate compatible report", async () => {
   assert.deepEqual(fs.readdirSync(tempDir), []);
   assert.equal(report.redaction.containsSecrets, false);
   assert.equal(report.redaction.containsRawCustomerRows, false);
+});
+
+test("run smoke proves PDF before activation without claiming candidate effective session", async () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "run-smoke-pre-activation-pdf-"),
+  );
+  const reportPath = path.join(root, "smoke-test-report.json");
+  const tempDir = path.join(root, "tmp");
+  fs.mkdirSync(tempDir);
+  const fakeCurlBin = createFakeCurlBin(root);
+
+  const result = await runScriptAsync(
+    [
+      "--endpoint",
+      "http://127.0.0.1:19096",
+      "--backend-url",
+      "http://127.0.0.1:18306",
+      "--release-version",
+      releaseSha,
+      "--environment",
+      "demo-133",
+      "--report",
+      reportPath,
+      "--admin-token-env",
+      "SMOKE_ADMIN_TOKEN",
+      ...credentialArgs,
+    ],
+    {
+      env: {
+        PATH: `${fakeCurlBin}:${process.env.PATH ?? ""}`,
+        SMOKE_ADMIN_TOKEN: "test-token",
+        ...credentialEnv,
+        TMPDIR: tempDir,
+      },
+    },
+  );
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  assert.equal(
+    report.checks.some(
+      (check) => check.name === "customer-config-effective-session",
+    ),
+    false,
+  );
+  const pdfCheck = report.checks.find(
+    (check) => check.name === "template-pdf-render",
+  );
+  assert.equal(pdfCheck.status, "pass");
+  assert.equal(pdfCheck.httpCode, "200");
+  assert.equal(pdfCheck.contentType, "application/pdf");
+  assert.equal(pdfCheck.tokenSourceEnv, "SMOKE_ADMIN_TOKEN");
+  assert.equal(pdfCheck.responseBodyStored, false);
+  assert.equal(report.summary.failed, 0);
+  assert.doesNotMatch(
+    JSON.stringify(report),
+    /test-token|active_customer_config_revision|access_token|%PDF/u,
+  );
+  assert.deepEqual(fs.readdirSync(tempDir), []);
 });
 
 test("run smoke fails authenticated release smoke for a non-PDF response", async () => {
@@ -465,7 +600,7 @@ test("run smoke fails when one contracted UAT credential cannot log in", async (
   assert.equal(credentialCheck.status, "fail");
   assert.equal(credentialCheck.adminAuthenticated, true);
   assert.equal(credentialCheck.phoneBound, true);
-  assert.equal(credentialCheck.uatAuthenticated, 9);
+  assert.equal(credentialCheck.nonAdminAuthenticated, 9);
   assert.equal(credentialCheck.totalAuthenticated, 10);
   assert.equal(credentialCheck.uniqueTokensObserved, false);
   assert.equal(credentialCheck.responseBodyStored, false);
@@ -596,10 +731,11 @@ test("run smoke keeps backend checks optional", async () => {
   const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
   assert.equal(report.endpointAlias, endpoint);
   assert.equal(report.backendEndpointAlias, undefined);
-  assert.equal(report.checks.length, 5);
+  assert.equal(report.checks.length, 6);
   assert.deepEqual(
     report.checks.map((check) => check.name),
     [
+      "runtime-identity",
       "web-healthz",
       "web-readyz",
       "login-page",
@@ -607,9 +743,213 @@ test("run smoke keeps backend checks optional", async () => {
       "auth-sms-capabilities",
     ],
   );
-  assert.equal(report.summary.total, 5);
-  assert.equal(report.summary.passed, 5);
+  assert.equal(report.summary.total, 6);
+  assert.equal(report.summary.passed, 6);
   assert.equal(report.summary.failed, 0);
+});
+
+test("customer-test smoke authenticates only admin and omits non-admin receipt fields", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "run-smoke-test-target-"));
+  const reportPath = path.join(root, "smoke-test-report.json");
+  const fakeCurlBin = createFakeCurlBin(root);
+  const curlArgvPath = path.join(root, "curl-argv.txt");
+  const result = await runScriptAsync(
+    [
+      "--endpoint",
+      "http://127.0.0.1:19101",
+      "--backend-url",
+      "http://127.0.0.1:18311",
+      "--release-version",
+      releaseSha,
+      "--deployment-target",
+      "customer-test-133",
+      "--environment",
+      "customer-test-133",
+      "--report",
+      reportPath,
+      "--admin-username",
+      "admin",
+      "--admin-password-env",
+      "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
+    ],
+    {
+      env: {
+        PATH: `${fakeCurlBin}:${process.env.PATH ?? ""}`,
+        FAKE_CURL_ARGV_OUT: curlArgvPath,
+        MANUAL_ACCEPTANCE_UAT_PASSWORD: "must-be-cleared-before-curl",
+        MANUAL_ACCEPTANCE_SMS_PHONE: "13800138000",
+      },
+    },
+  );
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  const check = report.checks.find(
+    (candidate) => candidate.name === "credential-login-matrix",
+  );
+  assert.equal(report.deploymentTarget, "customer-test-133");
+  assert.equal(check.loginScope, "admin-only");
+  assert.equal(check.commandTarget, "customer-test-133");
+  assert.equal(check.database, "plush_erp_customer_test_v1");
+  assert.equal(check.nonAdminPolicy, "preserve");
+  assert.equal(check.totalAuthenticated, 1);
+  assert.equal(check.adminAuthVersion, 2);
+  assert.equal(check.credentialOperationId, credentialOperationId);
+  assert.deepEqual(check.usernames, ["admin"]);
+  assert.equal(
+    Object.keys(check).some((key) => /(dataset|uat|sms|phone)/iu.test(key)),
+    false,
+  );
+  assert.doesNotMatch(
+    fs.readFileSync(curlArgvPath, "utf8"),
+    /secret-env-leak|must-be-cleared-before-curl|13800138000/u,
+  );
+});
+
+test("customer-test smoke rejects UAT or SMS credential arguments", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "run-smoke-test-reject-"));
+  const result = runScript([
+    "--endpoint",
+    "http://127.0.0.1:19102",
+    "--backend-url",
+    "http://127.0.0.1:18312",
+    "--release-version",
+    releaseSha,
+    "--deployment-target",
+    "customer-test-133",
+    "--environment",
+    "customer-test-133",
+    "--report",
+    path.join(root, "smoke.json"),
+    ...credentialArgs,
+  ]);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout + result.stderr, /forbids UAT and SMS/u);
+});
+
+test("run smoke stops before authentication when runtime identity proof mismatches", async () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "run-smoke-runtime-identity-fail-"),
+  );
+  const reportPath = path.join(root, "smoke-test-report.json");
+  const curlArgvPath = path.join(root, "curl-argv.txt");
+  const fakeCurlBin = createFakeCurlBin(root);
+  const result = await runScriptAsync(
+    [
+      "--endpoint",
+      "http://127.0.0.1:19103",
+      "--backend-url",
+      "http://127.0.0.1:18313",
+      "--release-version",
+      releaseSha,
+      "--environment",
+      "demo-133",
+      "--report",
+      reportPath,
+      ...credentialArgs,
+    ],
+    {
+      env: {
+        PATH: `${fakeCurlBin}:${process.env.PATH ?? ""}`,
+        FAKE_CURL_ARGV_OUT: curlArgvPath,
+        FAKE_RUNTIME_IDENTITY_PROOF: "wrong-proof",
+        ...credentialEnv,
+      },
+    },
+  );
+
+  assert.notEqual(result.status, 0);
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  assert.deepEqual(report.checks.map((check) => check.name), [
+    "runtime-identity",
+  ]);
+  assert.equal(report.checks[0].status, "fail");
+  assert.equal(report.checks[0].proof, "unmatched");
+  assert.equal(report.checks[0].responseBodyStored, false);
+  assert.equal(report.summary.failed, 1);
+  assert.doesNotMatch(
+    fs.readFileSync(curlArgvPath, "utf8"),
+    /\/rpc\/auth|\/templates\/render-pdf/u,
+  );
+});
+
+test("credential smoke rejects a missing positive admin auth version", async () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "run-smoke-admin-auth-version-"),
+  );
+  const reportPath = path.join(root, "smoke-test-report.json");
+  const fakeCurlBin = createFakeCurlBin(root);
+  const result = await runScriptAsync(
+    [
+      "--endpoint",
+      "http://127.0.0.1:19104",
+      "--backend-url",
+      "http://127.0.0.1:18314",
+      "--release-version",
+      releaseSha,
+      "--environment",
+      "demo-133",
+      "--report",
+      reportPath,
+      ...credentialArgs,
+    ],
+    {
+      env: {
+        PATH: `${fakeCurlBin}:${process.env.PATH ?? ""}`,
+        FAKE_LOGIN_AUTH_VERSION_JSON: "null",
+        ...credentialEnv,
+      },
+    },
+  );
+
+  assert.notEqual(result.status, 0);
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  const check = report.checks.find(
+    (candidate) => candidate.name === "credential-login-matrix",
+  );
+  assert.equal(check.status, "fail");
+  assert.equal(check.adminAuthenticated, false);
+  assert.equal(check.adminAuthVersion, null);
+  assert.equal(check.credentialOperationId, credentialOperationId);
+});
+
+test("run smoke requires migration and credential operation identity", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "run-smoke-identity-input-"));
+  const baseArgs = [
+    "--endpoint",
+    "http://127.0.0.1:19105",
+    "--release-version",
+    releaseSha,
+    "--deployment-target",
+    "demo-133",
+    "--environment",
+    "demo-133",
+    "--report",
+    path.join(root, "smoke.json"),
+  ];
+  const missingMigration = spawnSync("bash", [scriptPath, ...baseArgs], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  assert.notEqual(missingMigration.status, 0);
+
+  const missingOperation = spawnSync(
+    "bash",
+    [
+      scriptPath,
+      ...baseArgs,
+      "--migration-version",
+      migrationVersion,
+      "--backend-url",
+      "http://127.0.0.1:18315",
+    ],
+    { cwd: repoRoot, encoding: "utf8" },
+  );
+  assert.notEqual(missingOperation.status, 0);
+  assert.match(
+    missingOperation.stdout + missingOperation.stderr,
+    /--credential-operation-id must be a lowercase UUID v4/u,
+  );
 });
 
 test("run smoke rejects credentialed endpoint URL before writing report", () => {

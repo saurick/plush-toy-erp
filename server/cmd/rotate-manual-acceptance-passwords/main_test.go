@@ -1,28 +1,76 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"server/internal/data"
+
 	"github.com/DATA-DOG/go-sqlmock"
 )
 
+func TestRotationReceiptPublishesDatabaseIdentity(t *testing.T) {
+	encoded, err := json.Marshal(rotationReceipt{
+		SchemaVersion: credentialRotationReceiptContract,
+		Database:      customerTest133DB,
+		RollbackPoint: &rotationRollbackPoint{
+			BackupAlias:    "pre-credential-rotation-aaaaaaaaaaaa-123e4567-e89b-42d3-a456-426614174000",
+			BackupSHA256:   strings.Repeat("b", 64),
+			BackupSize:     42,
+			RestoreChecked: true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("json.Marshal(rotationReceipt): %v", err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatalf("json.Unmarshal(rotationReceipt): %v", err)
+	}
+	if decoded["database"] != customerTest133DB {
+		t.Fatalf("rotation receipt database = %v, want %q", decoded["database"], customerTest133DB)
+	}
+	if decoded["schemaVersion"] != credentialRotationReceiptContract {
+		t.Fatalf("rotation receipt schemaVersion = %v", decoded["schemaVersion"])
+	}
+	rollbackPoint, ok := decoded["rollbackPoint"].(map[string]any)
+	if !ok || len(rollbackPoint) != 4 ||
+		rollbackPoint["backupAlias"] != "pre-credential-rotation-aaaaaaaaaaaa-123e4567-e89b-42d3-a456-426614174000" ||
+		rollbackPoint["backupSha256"] != strings.Repeat("b", 64) ||
+		rollbackPoint["backupSizeBytes"] != float64(42) ||
+		rollbackPoint["restoreChecked"] != true {
+		t.Fatalf("rotation receipt rollback point = %#v", decoded["rollbackPoint"])
+	}
+}
+
 func validOptions(target string) options {
-	return options{
+	opts := options{
 		target:                   target,
 		datasetVersion:           "2026.08.15-v6",
 		expectedMigrationVersion: "20260710150001",
 		expectedRelease:          strings.Repeat("a", 40),
 		operationID:              "123e4567-e89b-42d3-a456-426614174000",
-		confirm:                  expectedConfirmation(target, "2026.08.15-v6"),
 		timeout:                  30 * time.Second,
 	}
+	if target == targetCustomerTest133 {
+		opts.datasetVersion = ""
+		opts.targetIdentity = customerTest133Identity
+	}
+	if isRemote133Target(target) {
+		opts.backupAlias = "pre-credential-rotation-" + opts.expectedRelease[:12] + "-" + opts.operationID
+		opts.backupSHA256 = strings.Repeat("b", 64)
+		opts.backupSizeBytes = 42
+		opts.backupRestoreChecked = true
+	}
+	opts.confirm = expectedConfirmation(target, optionIdentity(opts))
+	return opts
 }
 
 func TestValidateOptionsBindsConfirmationToTargetAndVersion(t *testing.T) {
-	for _, target := range []string{targetLocalDev, targetCustomerTrial133} {
+	for _, target := range []string{targetLocalDev, targetCustomerTrial133, targetCustomerTest133} {
 		if err := validateOptions(validOptions(target)); err != nil {
 			t.Fatalf("validateOptions(%s): %v", target, err)
 		}
@@ -40,32 +88,79 @@ func TestValidateOptionsBindsConfirmationToTargetAndVersion(t *testing.T) {
 	if len(rotationMarkerKey(validOptions(targetCustomerTrial133).operationID)) > 128 {
 		t.Fatal("valid operation marker key exceeds runtime marker capacity")
 	}
+	opts = validOptions(targetCustomerTest133)
+	opts.targetIdentity = "customer-trial-133:2026.08.15-v6"
+	opts.confirm = expectedConfirmation(opts.target, opts.targetIdentity)
+	if err := validateOptions(opts); err == nil {
+		t.Fatal("customer-test-133 accepted a misleading target identity")
+	}
+	opts = validOptions(targetCustomerTest133)
+	opts.datasetVersion = currentDatasetVersion
+	if err := validateOptions(opts); err == nil {
+		t.Fatal("customer-test-133 accepted a simulated dataset version")
+	}
 }
 
-func TestAcceptanceAccountUsernamesSeparatesLocalDemoAndCustomerUAT(t *testing.T) {
-	for _, target := range []string{targetLocalDev, targetCustomerTrial133} {
+func TestValidateOptionsRequiresOperationBoundRestoreCheckedBackupFor133(t *testing.T) {
+	for _, target := range []string{targetCustomerTrial133, targetCustomerTest133} {
+		valid := validOptions(target)
+		mutations := []func(*options){
+			func(opts *options) { opts.backupAlias = "pre-credential-wrong" },
+			func(opts *options) { opts.backupSHA256 = strings.Repeat("b", 63) },
+			func(opts *options) { opts.backupSizeBytes = 0 },
+			func(opts *options) { opts.backupRestoreChecked = false },
+		}
+		for index, mutate := range mutations {
+			candidate := valid
+			mutate(&candidate)
+			if err := validateOptions(candidate); err == nil {
+				t.Fatalf("%s invalid backup mutation %d accepted", target, index)
+			}
+		}
+	}
+	local := validOptions(targetLocalDev)
+	local.backupAlias = "pre-credential-local"
+	if err := validateOptions(local); err == nil {
+		t.Fatal("local target accepted a remote rollback point")
+	}
+}
+
+func TestAcceptanceAccountUsernamesSeparatesLocalDemoCustomerUATAndCustomerTest(t *testing.T) {
+	for _, target := range []string{targetLocalDev, targetCustomerTrial133, targetCustomerTest133} {
 		opts := validOptions(target)
-		adminUsernames, roleUsernames, accountKind, err := acceptanceAccountUsernames(opts)
+		adminUsernames, roleUsernames, accountKind, nonAdminPolicy, err := acceptanceAccountUsernames(opts)
 		if err != nil {
 			t.Fatalf("acceptanceAccountUsernames(%s): %v", target, err)
 		}
 		if target == targetLocalDev && len(adminUsernames) != 0 {
 			t.Fatalf("local admin usernames = %v, want none", adminUsernames)
 		}
-		if target == targetCustomerTrial133 && (len(adminUsernames) != 1 || adminUsernames[0] != "admin") {
+		if isRemote133Target(target) && (len(adminUsernames) != 1 || adminUsernames[0] != "admin") {
 			t.Fatalf("133 admin usernames = %v, want stable admin", adminUsernames)
 		}
 		wantKind := "local-demo"
 		wantPrefix := "demo_"
+		wantPolicy := nonAdminPolicyRotate
 		if target == targetCustomerTrial133 {
 			wantKind = "customer-uat"
 			wantPrefix = "uat_"
 		}
+		if target == targetCustomerTest133 {
+			wantKind = "customer-test-admin-only"
+			wantPrefix = ""
+			wantPolicy = nonAdminPolicyPreserve
+		}
 		if accountKind != wantKind {
 			t.Fatalf("%s account kind = %q, want %q", target, accountKind, wantKind)
 		}
-		if len(roleUsernames) == 0 {
+		if nonAdminPolicy != wantPolicy {
+			t.Fatalf("%s non-admin policy = %q, want %q", target, nonAdminPolicy, wantPolicy)
+		}
+		if target != targetCustomerTest133 && len(roleUsernames) == 0 {
 			t.Fatalf("%s role usernames must not be empty", target)
+		}
+		if target == targetCustomerTest133 && len(roleUsernames) != 0 {
+			t.Fatalf("customer-test-133 role usernames = %v, want none", roleUsernames)
 		}
 		for _, username := range roleUsernames {
 			if strings.EqualFold(strings.TrimSpace(username), "admin") {
@@ -101,10 +196,18 @@ func TestValidateTargetDSNSeparatesLocalAnd133(t *testing.T) {
 		{name: "133 rejects live db", target: targetCustomerTrial133, dsn: "postgres://user:secret@127.0.0.1:55436/plush_erp?sslmode=disable", wantErr: "isolated database"},
 		{name: "133 wrong db", target: targetCustomerTrial133, dsn: "postgres://user:secret@127.0.0.1:55436/other?sslmode=disable", wantErr: "isolated database"},
 		{name: "133 rejects retired stack port", target: targetCustomerTrial133, dsn: "postgres://user:secret@127.0.0.1:5435/plush_erp_demo_v1?sslmode=disable", wantErr: "55436"},
+		{name: "customer test host loopback", target: targetCustomerTest133, dsn: "postgres://user:secret@127.0.0.1:55437/plush_erp_customer_test_v1?sslmode=disable"},
+		{name: "customer test compose endpoint", target: targetCustomerTest133, dsn: "postgres://user:secret@postgres:5432/plush_erp_customer_test_v1?sslmode=disable"},
+		{name: "customer test rejects demo database", target: targetCustomerTest133, dsn: "postgres://user:secret@127.0.0.1:55437/plush_erp_demo_v1?sslmode=disable", wantErr: "isolated database"},
+		{name: "customer test rejects demo port", target: targetCustomerTest133, dsn: "postgres://user:secret@127.0.0.1:55436/plush_erp_customer_test_v1?sslmode=disable", wantErr: "55437"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := validateTargetDSN(test.target, currentDatasetVersion, test.dsn)
+			datasetVersion := currentDatasetVersion
+			if test.target == targetCustomerTest133 {
+				datasetVersion = ""
+			}
+			err := validateTargetDSN(test.target, datasetVersion, test.dsn)
 			if test.wantErr == "" && err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -136,16 +239,28 @@ func TestValidateRotationPasswordsRequiresRegistered133TestCredentials(t *testin
 	if err := validateRotationPasswords(targetLocalDev, "", "remote-uat-secret"); err == nil {
 		t.Fatal("local target accepted a non-registered role password")
 	}
+	if err := validateRotationPasswords(targetCustomerTest133, "adminadmin", ""); err != nil {
+		t.Fatalf("customer-test-133 admin-only credential rejected: %v", err)
+	}
+	if err := validateRotationPasswords(targetCustomerTest133, "adminadmin", "12345678"); err == nil || !strings.Contains(err.Error(), "does not accept") {
+		t.Fatalf("customer-test-133 accepted a non-admin password: %v", err)
+	}
+	if err := validateRotationPasswords(targetCustomerTest133, "", ""); err == nil || !strings.Contains(err.Error(), adminPasswordEnv) {
+		t.Fatalf("customer-test-133 accepted a missing admin password: %v", err)
+	}
 }
 
 func TestValidateReleaseBindingRequiresExactImmutable133Version(t *testing.T) {
+	for _, target := range []string{targetCustomerTrial133, targetCustomerTest133} {
+		opts := validOptions(target)
+		if err := validateReleaseBinding(opts, opts.expectedRelease); err != nil {
+			t.Fatalf("%s matching release rejected: %v", target, err)
+		}
+		if err := validateReleaseBinding(opts, strings.Repeat("b", 40)); err == nil {
+			t.Fatalf("%s mismatched rotate binary version accepted", target)
+		}
+	}
 	opts := validOptions(targetCustomerTrial133)
-	if err := validateReleaseBinding(opts, opts.expectedRelease); err != nil {
-		t.Fatalf("matching release rejected: %v", err)
-	}
-	if err := validateReleaseBinding(opts, strings.Repeat("b", 40)); err == nil {
-		t.Fatal("mismatched rotate binary version accepted")
-	}
 	opts.expectedRelease = "DEV"
 	if err := validateOptions(opts); err == nil {
 		t.Fatal("non-immutable 133 release accepted")
@@ -165,6 +280,9 @@ func TestNormalizeRotationSMSPhoneRequires133IdentityBinding(t *testing.T) {
 	}
 	if _, err := normalizeRotationSMSPhone(targetLocalDev, "13800138000"); err == nil {
 		t.Fatal("local target accepted remote SMS identity binding")
+	}
+	if _, err := normalizeRotationSMSPhone(targetCustomerTest133, "13800138000"); err == nil {
+		t.Fatal("customer-test-133 accepted demo SMS identity binding")
 	}
 }
 
@@ -228,6 +346,47 @@ func TestAssertAcceptanceAccountsRequiresUATAndRejectsDemoOn133(t *testing.T) {
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("ExpectationsWereMet(): %v", err)
+	}
+}
+
+func TestAssertAcceptanceAccountsCustomerTestReadsOnlyStableAdmin(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New(): %v", err)
+	}
+	defer func() { _ = db.Close() }()
+	mock.ExpectQuery(`SELECT username FROM admin_users WHERE username = \$1`).WithArgs("admin").WillReturnRows(
+		sqlmock.NewRows([]string{"username"}).AddRow("admin"),
+	)
+	if err := assertAcceptanceAccounts(t.Context(), db, targetCustomerTest133, []string{"admin"}, nil); err != nil {
+		t.Fatalf("assertAcceptanceAccounts(customer-test-133): %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet(): %v", err)
+	}
+}
+
+func TestNonAdminReceiptFieldsRequiresAtomicDataReceiptForPreservePolicy(t *testing.T) {
+	preservedReceipt := &data.ManualAcceptancePasswordRotationReceipt{
+		Unselected: &data.ManualAcceptanceUnselectedAccountReceipt{
+			AccountCount:        4,
+			IdentityFingerprint: strings.Repeat("a", 64),
+			Preserved:           true,
+		},
+	}
+	count, preserved, err := nonAdminReceiptFields(nonAdminPolicyPreserve, 0, preservedReceipt)
+	if err != nil || count != 4 || preserved == nil || !*preserved {
+		t.Fatalf("preserve receipt fields = (%d, %v, %v)", count, preserved, err)
+	}
+	if _, _, err := nonAdminReceiptFields(nonAdminPolicyPreserve, 0, &data.ManualAcceptancePasswordRotationReceipt{}); err == nil {
+		t.Fatal("preserve policy accepted a missing atomic receipt")
+	}
+	if _, _, err := nonAdminReceiptFields(nonAdminPolicyRotate, 10, preservedReceipt); err == nil {
+		t.Fatal("rotate policy accepted an unexpected preservation receipt")
+	}
+	count, preserved, err = nonAdminReceiptFields(nonAdminPolicyRotate, 10, &data.ManualAcceptancePasswordRotationReceipt{})
+	if err != nil || count != 10 || preserved != nil {
+		t.Fatalf("rotate receipt fields = (%d, %v, %v)", count, preserved, err)
 	}
 }
 

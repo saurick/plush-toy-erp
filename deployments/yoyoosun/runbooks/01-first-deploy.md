@@ -15,6 +15,7 @@
 
 ```bash
 bash deployments/yoyoosun/scripts/collect-evidence.sh \
+  --deployment-target <demo-133|customer-test-133> \
   --release-version <release-version> \
   --output deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
@@ -48,21 +49,22 @@ sh migrate_online.sh --status-only
 MIGRATION_MAINTENANCE_CONFIRMED=1 sh migrate_online.sh --apply
 ```
 
-10. 全新库先使用一次性 bootstrap 创建稳定 `admin`；随后以 steady env 启动后端，保持 Web / 客户入口关闭，完成客户配置与模拟验收数据。
-11. 按 `credential.contract.json` 精确恢复固定 `admin/adminadmin` 与全部 `uat_*/12345678`。轮换必须覆盖全部 11 个账号、递增 `auth_version`、撤销旧会话并生成脱敏回执；这两组公开测试凭据不得由 Keychain、环境变量或临时发布输入覆盖，也不得进入服务器 steady `.env`。
+10. 全新库先使用一次性 bootstrap 创建稳定 `admin`；随后以 steady env 启动后端并保持 Web / 客户入口关闭。`demo-133` 才生成登记的模拟验收数据；`customer-test-133` 必须保持甲方干净测试基线，禁止写入 demo seed / fixture。
+11. 按 `credential.contract.json` 执行目标特定凭据合同：两个 target 的 `admin` 都恢复为固定测试凭据 `adminadmin`；只有 `demo-133` 轮换合同精确列出的十个 `uat_*` 为 `12345678`。demo 必须覆盖全部 11 个账号；test 只轮换 admin，并在同一事务内证明非管理员 `id/username` 身份集合保持不变，不读取、猜测或改写其密码。正式轮换闭包必须先持有目标 mutation lock，自行生成并隔离恢复校验 operation-bound 备份，原子保留后才递增对应账号的 `auth_version`、撤销旧会话并生成脱敏回执；调用者不得传入备份路径或 hash。公开测试凭据不得由 Keychain、环境变量或临时发布输入覆盖，也不得进入服务器 steady `.env`。
 12. 确认轮换完成后启动全部业务服务：
 
 ```bash
 docker compose -f compose.yml --env-file /secure/path/yoyoosun/.env up -d --remove-orphans
 ```
 
-13. 执行 health / ready 后，使用合同固定测试凭据运行正式 smoke。`credential-login-matrix` 必须真实登录稳定 `admin` 与十个 `uat_*`，逐一核对返回身份和新 token；SMS 手机号仅在人工录入后校验指定账号绑定。任何密码账号失败，或已配置手机号不一致，都保持入口关闭。
+13. 执行 health / ready 后，使用合同固定测试凭据运行正式 smoke。`demo-133` 的 `credential-login-matrix` 必须真实登录稳定 `admin` 与十个 `uat_*`；`customer-test-133` 只真实登录 admin，并核对非管理员身份集合未变化，禁止尝试非管理员密码。SMS 手机号仅属于 demo，且只在人工录入后校验指定账号绑定。任何适用账号失败、身份集合漂移，或已配置手机号不一致，都保持入口关闭。
 14. 收集 image digest、migration status、config fingerprint、smoke report、known limitations 和 release sign-off checklist。
 15. 客户试用或交付前执行 release evidence gate：
 
 ```bash
 node scripts/deploy/release-evidence-gate.mjs \
   --customer yoyoosun \
+  --deployment-target <demo-133|customer-test-133> \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
 
