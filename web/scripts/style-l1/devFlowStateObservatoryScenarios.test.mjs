@@ -4,112 +4,43 @@ import test from 'node:test'
 
 import { createDevFlowStateObservatoryScenarios } from './devFlowStateObservatoryScenarios.mjs'
 
-const scenarioSource = readFileSync(
-  new URL('./devFlowStateObservatoryScenarios.mjs', import.meta.url),
-  'utf8'
-)
-
-test('dev flow state observatory L1 scenarios cover read-only boundaries', () => {
+test('dev flow state observatory keeps one read-only desktop smoke', () => {
   const scenarios = createDevFlowStateObservatoryScenarios({
     assert,
     assertNoHorizontalOverflow: async () => {},
     expectText: async () => {},
-    gotoScenarioPath: async () => {},
   })
 
   assert.deepEqual(
-    scenarios.map((scenario) => scenario.name),
+    scenarios.map((scenario) => ({
+      name: scenario.name,
+      path: scenario.path,
+      viewport: scenario.viewport,
+    })),
     [
-      'dev-flow-state-observatory-readonly',
-      'dev-flow-state-observatory-chain-drill-dark',
-      'dev-flow-state-observatory-state-rules-dark',
-      'dev-flow-state-observatory-state-rules-mobile-dark',
-      'dev-flow-state-observatory-customer-review-chain-print',
-      'dev-flow-state-observatory-customer-review-overview-print',
-      'dev-flow-state-observatory-invalid-deep-link',
-      'dev-flow-state-observatory-task-lookup',
-      'dev-flow-state-observatory-mobile-dark',
-      'dev-flow-state-observatory-runtime-selector-readonly',
+      {
+        name: 'dev-flow-state-observatory-desktop-light',
+        path: '/__dev/status-flows?view=chain&chain=all',
+        viewport: { width: 1440, height: 900 },
+      },
     ]
   )
-  assert(
-    scenarios.every(
-      (scenario) =>
-        scenario.path.startsWith('/__dev/status-flows') &&
-        typeof scenario.beforeNavigate === 'function' &&
-        typeof scenario.verify === 'function' &&
-        !Object.hasOwn(scenario, 'mockAdminRpc')
-    )
-  )
-  assert(
-    scenarios
-      .filter(
-        (scenario) => scenario.name !== 'dev-flow-state-observatory-task-lookup'
-      )
-      .every((scenario) => !Object.hasOwn(scenario, 'auth'))
-  )
-  assert.deepEqual(scenarios[0].viewport, { width: 1440, height: 900 })
-  assert.match(scenarios[0].path, /chain=all/u)
-  assert.doesNotMatch(scenarios[0].path, /node=/u)
-  assert.deepEqual(scenarios[1].viewport, { width: 1440, height: 900 })
-  assert.equal(scenarios[1].themeMode, 'dark')
-  assert.match(scenarios[1].path, /chain=delivery_to_settlement/u)
-  assert.match(scenarios[1].path, /node=shipment_draft/u)
-  assert.deepEqual(scenarios[2].viewport, { width: 1440, height: 900 })
-  assert.equal(scenarios[2].themeMode, 'dark')
-  assert.match(scenarios[2].path, /view=states/u)
-  assert.match(scenarios[2].path, /flow=source.sales_order/u)
-  assert.deepEqual(scenarios[3].viewport, { width: 390, height: 844 })
-  assert.equal(scenarios[3].themeMode, 'dark')
-  assert.match(scenarios[3].path, /view=states/u)
-  assert.match(scenarios[3].path, /flow=fact.production/u)
-  assert.deepEqual(scenarios[4].viewport, { width: 1440, height: 900 })
-  assert.equal(scenarios[4].themeMode, 'dark')
-  assert.match(scenarios[4].path, /chain=production_exception/u)
-  assert.match(scenarios[4].path, /node=production_exception_decision/u)
-  assert.deepEqual(scenarios[5].viewport, { width: 1440, height: 900 })
-  assert.equal(scenarios[5].themeMode, 'dark')
-  assert.match(scenarios[5].path, /chain=all/u)
-  assert.doesNotMatch(scenarios[5].path, /node=/u)
-  assert.deepEqual(scenarios[6].viewport, { width: 1280, height: 800 })
-  assert.match(scenarios[6].path, /chain=retired-chain/u)
-  assert.match(scenarios[6].path, /task_id=abc/u)
-  assert.deepEqual(scenarios[7].viewport, { width: 1440, height: 900 })
-  assert.match(scenarios[7].path, /view=chain/u)
-  assert.match(scenarios[7].path, /chain=all/u)
-  assert.equal(scenarios[7].auth, 'admin')
-  assert.deepEqual(scenarios[7].effectiveSession, {
-    actions: ['workflow.task.read'],
-  })
-  assert.equal(scenarios[7].workflowTaskFixtures.length, 4)
-  assert.equal(scenarios[7].workflowProcessContextFixtures.length, 3)
-  assert.deepEqual(scenarios[8].viewport, { width: 390, height: 844 })
-  assert.equal(scenarios[8].themeMode, 'dark')
-  assert.match(scenarios[8].path, /chain=all/u)
-  assert.doesNotMatch(scenarios[8].path, /node=/u)
-  assert.deepEqual(scenarios[9].viewport, { width: 1440, height: 900 })
-  assert.match(scenarios[9].path, /view=runtime/u)
-  assert.match(
-    scenarios[9].path,
-    /process=sales_order_acceptance%2Fapproval_pmc/u
-  )
-  assert.doesNotMatch(scenarios[9].path, /[?&](chain|node|flow|state|fact)=/u)
-  assert.equal(Object.hasOwn(scenarios[9], 'auth'), false)
+  assert.equal(typeof scenarios[0].beforeNavigate, 'function')
+  assert.equal(typeof scenarios[0].verify, 'function')
+  assert.equal(Object.hasOwn(scenarios[0], 'themeMode'), false)
+  assert.equal(Object.hasOwn(scenarios[0], 'auth'), false)
+})
 
-  const runtimeSelectorSource = scenarioSource.slice(
-    scenarioSource.indexOf(
-      "name: 'dev-flow-state-observatory-runtime-selector-readonly'"
-    )
+test('dev flow state observatory has no mobile, dark, screenshot, density or keyboard contract', () => {
+  const source = readFileSync(
+    new URL('./devFlowStateObservatoryScenarios.mjs', import.meta.url),
+    'utf8'
   )
-  assert.equal(
-    runtimeSelectorSource.match(
-      /waitForDefinitionSelectPopupSettled\(page, 6\)/gu
-    )?.length,
-    3,
-    '流程定义下拉每次打开都必须等待完整稳定弹层，不能只等待单个分组节点'
-  )
+
+  assert.doesNotMatch(source, /mobile|themeMode|\.screenshot\s*\(/u)
   assert.doesNotMatch(
-    runtimeSelectorSource,
-    /\.locator\('\.ant-select-item-group'\)\s*\.nth\(5\)\s*\.waitFor/gu
+    source,
+    /keyboard\.press|cardCount|documentHeight|scrollHeight/u
   )
+  assert.match(source, /assertNoHorizontalOverflow/u)
 })

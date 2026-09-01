@@ -207,7 +207,8 @@ function DeliveryOperationOverview({ summary, error, loading }) {
         </RouterLink>
       ) : null}
       <Text type="secondary">
-        GitLab Pipeline、Package 与 Release 只在“远端 CI/CD 活动”中展示，不会伪装成工作台操作记录。
+        GitLab Pipeline、Package 与 Release
+        只在“远端流水线耗时”中展示，不会伪装成工作台操作记录。
       </Text>
     </section>
   )

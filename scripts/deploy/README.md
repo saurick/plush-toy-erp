@@ -9,9 +9,9 @@
 | target | 用途 | 公网入口 | 数据规则 |
 | --- | --- | --- | --- |
 | `demo-133` | 项目方造数、演练、培训与回归 | `demo.yoyoosun.net` | 可经受控 rebuild 恢复 seed / fixture / 模拟数据 |
-| `customer-test-133` | 甲方测试与验收 | `test.yoyoosun.net` | 交付前经备份和回滚验证恢复干净业务基线，甲方自行录入真实测试数据 |
+| `customer-test-133` | 甲方测试与验收 | `test.yoyoosun.net` | 普通部署默认保留现有数据；新一轮测试前可显式清空并重建干净基线 |
 
-`erp` 是未来生产环境，尚未登记为可执行 target。`admin.yoyoosun.net` 不是部署环境，不能进入 target registry、环境变量映射、数据清理、preflight、健康检查、release、promotion、smoke 或 rollback。`customer-trial-133` 只是 `demo-133` 内部模拟数据合同，不是第三个部署 target。
+`erp` 是未来生产环境，尚未登记为可执行 target；`yoyoosun.net` 临时 `302` 跳转到 `https://erp.yoyoosun.net` 也不改变这一点。`admin.yoyoosun.net` 退役后仍不能进入 target registry、环境变量映射、数据清理、preflight、健康检查、release、promotion、smoke 或 rollback。`customer-trial-133` 只是 `demo-133` 内部模拟数据合同，不是第三个部署 target。
 
 ## 常用入口
 
@@ -71,7 +71,9 @@ GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，
 
 ## 数据库重建
 
-数据库重建不是通用清库工具。执行前必须：
+数据库重建不是通用清库工具，也不是 promotion 的隐藏阶段。普通 promotion 默认保留数据库、附件、账号/RBAC、客户配置与审计；需要清空时必须另建 `rebuild-database` operation。没有新版本时可绑定目标当前 exact release 独立执行；同次既要新版本又要清空时，先完成保留数据的 promotion，再对同一已读回 release 独立重建。
+
+执行前必须：
 
 1. 目标已运行同一不可变 release。
 2. controller 即时 preflight 为 `ready`。
@@ -79,7 +81,7 @@ GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，
 4. 旧物理数据目录、dump 与 rollback identity 可读回。
 5. 只停止目标自身的 app/web/PostgreSQL，不影响另一个环境。
 
-`demo-133` 的受控重建可以随后重放 `customer-trial-133` 模拟数据。`customer-test-133` 的受控重建只建立甲方干净业务基线，不重放 demo seed/fixture。没有数据分类和恢复证明时不得执行重建；本轮 target 登记不代表已授权或已完成清理。
+`demo-133` 的受控重建可以随后重放 `customer-trial-133` 模拟数据。`customer-test-133` 的受控重建只建立甲方最小可登录的干净业务基线，不重放 demo seed/fixture。没有数据分类和恢复证明时不得执行重建；target 登记、普通 Goal 或一次 promotion 都不代表已授权或已完成清理。
 
 ```bash
 node scripts/deploy/database-rebuild-controller.mjs \

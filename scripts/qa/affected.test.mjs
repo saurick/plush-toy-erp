@@ -71,7 +71,11 @@ test("affected: docs-only changes stay at T1", () => {
     root: ROOT,
   });
 
-  assert.deepEqual(ids(plan), ["diff-check", "docs-inventory"]);
+  assert.deepEqual(ids(plan), [
+    "diff-check",
+    "phase-labels:affected",
+    "docs-inventory",
+  ]);
   const docsCommand = plan.commands.find(
     (item) => item.id === "docs-inventory",
   );
@@ -91,13 +95,39 @@ test("affected: docs-only changes stay at T1", () => {
   assert.equal(plan.localGate, "focused");
 });
 
+test("affected: phase-label gate scans only this change set", () => {
+  const plan = buildAffectedPlan(
+    ["docs/product/自动化测试策略.md", "web/src/App.jsx"],
+    { root: ROOT },
+  );
+  const phaseLabels = plan.commands.find(
+    (item) => item.id === "phase-labels:affected",
+  );
+
+  assert.deepEqual(phaseLabels?.args, [
+    "scripts/qa/phase-label-boundaries.mjs",
+    "docs/product/自动化测试策略.md",
+    "web/src/App.jsx",
+  ]);
+  assert.equal(
+    phaseLabels?.args.includes("."),
+    false,
+    "affected 命名门禁不得退化为全仓扫描",
+  );
+});
+
 test("affected: project skill changes run the repository skill health gate", () => {
   const plan = buildAffectedPlan(
     [".agents/skills/plush-test-governance/SKILL.md"],
     { root: ROOT },
   );
 
-  assert.deepEqual(ids(plan), ["diff-check", "docs-inventory", "skill-health"]);
+  assert.deepEqual(ids(plan), [
+    "diff-check",
+    "phase-labels:affected",
+    "docs-inventory",
+    "skill-health",
+  ]);
   assert.equal(plan.followUps.length, 0);
   assert.equal(plan.maxAffectedScope, "T1");
 });
@@ -199,6 +229,7 @@ test("affected: broad canonical audit is non-blocking and explicit", () => {
   assert.deepEqual(ids(auditPlan), [
     "diff-check",
     "node-check:scripts/qa/experimental/canonical-runtime-audit.mjs",
+    "phase-labels:affected",
   ]);
   assert(
     auditPlan.followUps.some(
@@ -247,12 +278,28 @@ test("affected: a page without a sibling test expands to web tests and browser f
   assert(plan.followUps.some((item) => item.id === "browser-regression"));
 });
 
-test("affected: DEV 菜单与页面改动强制选择页面治理合同", () => {
-  for (const file of [
-    "web/src/dev-workbench/config/devRoutes.mjs",
-    "web/src/dev-workbench/pages/DevDrillRecoveryPage.jsx",
-    "web/src/dev-workbench/styles/dev-drill-recovery.css",
-    "web/scripts/style-l1/devDrillRecoveryScenarios.mjs",
+test("affected: DEV 页面改动只选择聚焦合同与受影响桌面 smoke", () => {
+  for (const [file, expectedScenario] of [
+    [
+      "web/src/dev-workbench/pages/DevDrillRecoveryPage.jsx",
+      "dev-drill-recovery-desktop-light",
+    ],
+    [
+      "web/scripts/style-l1/devFlowStateObservatoryScenarios.mjs",
+      "dev-flow-state-observatory-desktop-light",
+    ],
+    [
+      "web/src/dev-workbench/config/devQualityGates.mjs",
+      "dev-quality-gates-desktop-light",
+    ],
+    [
+      "web/src/dev-workbench/pages/DevVersionCenterPage.jsx",
+      "dev-version-center-tabs-pagination-desktop",
+    ],
+    [
+      "web/src/dev-workbench/pages/DevProductCorePage.jsx",
+      "dev-page-product-core-desktop-light",
+    ],
   ]) {
     const plan = buildAffectedPlan([file], { root: ROOT });
     const governanceCommand = plan.commands.find((item) =>
@@ -262,8 +309,78 @@ test("affected: DEV 菜单与页面改动强制选择页面治理合同", () => 
       governanceCommand,
       `${file} 必须直接执行 DEV 页面治理合同，不能只留下浏览器 follow-up`,
     );
-    assert(plan.followUps.some((item) => item.id === "browser-regression"));
+    assert.equal(ids(plan).includes("web-test"), false, file);
+    assert.equal(ids(plan).includes("full"), false, file);
+    const browser = plan.followUps.find(
+      (item) => item.id === "browser-regression",
+    );
+    assert(browser, file);
+    assert.match(browser.text, /桌面/u, file);
+    assert.match(browser.text, /不要求.*移动端/u, file);
+    assert.match(browser.text, new RegExp(expectedScenario, "u"), file);
   }
+});
+
+test("affected: shared DEV navigation expands only to the canonical desktop scenario set", () => {
+  const plan = buildAffectedPlan(
+    ["web/src/dev-workbench/config/devRoutes.mjs"],
+    { root: ROOT },
+  );
+  const browser = plan.followUps.find(
+    (item) => item.id === "browser-regression",
+  );
+
+  assert(browser);
+  assert.match(browser.text, /dev-page-overview-desktop-light/u);
+  assert.match(browser.text, /dev-quality-gates-desktop-light/u);
+  assert.match(browser.text, /dev-version-center-tabs-pagination-desktop/u);
+  assert.doesNotMatch(browser.text, /mobile|dark/u);
+});
+
+test("affected: DEV server ordinary plugins stay focused while privileged bridges retain stronger follow-up", () => {
+  const ordinary = buildAffectedPlan(
+    ["web/dev-server/devCustomerConfigPlugin.mjs"],
+    { root: ROOT },
+  );
+  assert(
+    ordinary.commands.some((item) =>
+      item.args.includes("web/dev-server/devCustomerConfigPlugin.test.mjs"),
+    ),
+  );
+  assert(ids(ordinary).includes("node-check:web/dev-server/devCustomerConfigPlugin.mjs"));
+  assert.equal(ids(ordinary).includes("full"), false);
+  assert.equal(ordinary.followUps.length, 0);
+
+  const privileged = buildAffectedPlan(
+    ["web/dev-server/devDeliveryBridgePlugin.mjs"],
+    { root: ROOT },
+  );
+  assert(
+    privileged.commands.some((item) =>
+      item.args.includes("web/dev-server/devDeliveryBridgePlugin.test.mjs"),
+    ),
+  );
+  assert(
+    privileged.commands.some((item) =>
+      item.args.includes("web/dev-server/devServerSecurity.test.mjs"),
+    ),
+  );
+  assert(
+    privileged.followUps.some((item) => item.id === "dev-operation-boundary"),
+  );
+  assert.equal(ids(privileged).includes("full"), false);
+
+  const quality = buildAffectedPlan(
+    ["web/dev-server/devQualityGatePlugin.mjs"],
+    { root: ROOT },
+  );
+  assert(
+    quality.commands.some((item) =>
+      item.args.includes(
+        "scripts/qa/dev-quality-gate-provider-boundary.test.mjs",
+      ),
+    ),
+  );
 });
 
 test("affected: combined direct-test command keeps a bounded stable id", () => {
@@ -275,10 +392,12 @@ test("affected: combined direct-test command keeps a bounded stable id", () => {
     ],
     { root: ROOT },
   );
-  const command = plan.commands.find((item) =>
-    item.args.includes(
-      "web/scripts/style-l1/mobileTaskRecoveryScenarios.test.mjs",
-    ),
+  const command = plan.commands.find(
+    (item) =>
+      item.id.startsWith("node-tests:") &&
+      item.args.includes(
+        "web/scripts/style-l1/mobileTaskRecoveryScenarios.test.mjs",
+      ),
   );
 
   assert(command);
@@ -501,7 +620,11 @@ test("affected: deleted tests do not execute stale paths", () => {
     ids(webPlan).some((id) => id.includes("deleted.test.mjs")),
     false,
   );
-  assert.deepEqual(ids(qaPlan), ["diff-check", "full"]);
+  assert.deepEqual(ids(qaPlan), [
+    "diff-check",
+    "phase-labels:affected",
+    "full",
+  ]);
 });
 
 test("affected: QA shell scripts keep syntax proof and escalate without a sibling test", () => {
@@ -511,6 +634,7 @@ test("affected: QA shell scripts keep syntax proof and escalate without a siblin
   assert.deepEqual(ids(noSibling), [
     "bash-n:scripts/qa/go-vet.sh",
     "diff-check",
+    "phase-labels:affected",
     "full",
   ]);
   assert.equal(noSibling.localGate, "full");
@@ -599,7 +723,11 @@ test("affected: deployment changes conservatively select full plus release follo
     root: ROOT,
   });
 
-  assert.deepEqual(ids(plan), ["diff-check", "full"]);
+  assert.deepEqual(ids(plan), [
+    "diff-check",
+    "phase-labels:affected",
+    "full",
+  ]);
   assert.equal(plan.localGate, "full");
   assert.equal(plan.maxAffectedScope, "T8");
   assert(plan.affectedScopes.includes("T8"));
@@ -623,7 +751,11 @@ test("affected: full subsumes focused commands but keeps browser follow-up visib
     { root: ROOT },
   );
 
-  assert.deepEqual(ids(plan), ["diff-check", "full"]);
+  assert.deepEqual(ids(plan), [
+    "diff-check",
+    "phase-labels:affected",
+    "full",
+  ]);
   assert(plan.followUps.some((item) => item.id === "browser-regression"));
 });
 

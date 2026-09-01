@@ -8,7 +8,7 @@
 - `.env.example`：运行环境变量示例，不保存真实凭据。
 - `migrate_online.sh`：按登记目标执行受控 Atlas migration。
 
-当前可执行环境只有 `demo-133` 与 `customer-test-133`。`erp` 是未来生产环境，尚未启用；`admin.yoyoosun.net` 仅可作为应用自身的管理入口，不是部署环境，不能进入 target、Compose、migration、清理、健康检查、发布或回滚矩阵。
+当前可执行环境只有 `demo-133` 与 `customer-test-133`。`erp` 是未来生产环境，尚未启用；根域临时跳转到 `erp.yoyoosun.net` 不会把它变成可执行 target。`admin.yoyoosun.net` 退役后仍不能进入 target、Compose、migration、清理、健康检查、发布或回滚矩阵。
 
 ## 目标矩阵
 
@@ -17,9 +17,9 @@
 | target | 业务用途 | 公网入口 | Compose project | 数据库 | PostgreSQL / API / Web |
 | --- | --- | --- | --- | --- | --- |
 | `demo-133` | 项目方造数、演练、培训与回归；允许受控重建 | `demo.yoyoosun.net` | `plush-toy-erp-demo-v1` | `plush_erp_demo_v1` | `55436 / 8325 / 5195` |
-| `customer-test-133` | 甲方测试与验收；交付前恢复干净业务基线 | `test.yoyoosun.net` | `plush-toy-erp-test-v1` | `plush_erp_customer_test_v1` | `55437 / 8335 / 5205` |
+| `customer-test-133` | 甲方测试与验收；普通部署保留数据，需要时独立重建 | `test.yoyoosun.net` | `plush-toy-erp-test-v1` | `plush_erp_customer_test_v1` | `55437 / 8335 / 5205` |
 
-两个环境部署同一不可变 release digest，但数据库、上传、Compose project、端口、runtime env、数据目录、migration 锁、备份、回滚点、operation 与 smoke 必须完全独立。demo 造数不能进入 test；test 的重建或清理不能影响 demo。
+两个环境部署同一不可变 release digest，但数据库、上传、Compose project、端口、runtime env、数据目录、migration 锁、备份、回滚点、operation 与 smoke 必须完全独立。demo 造数不能进入 test；test 的普通 promotion 保留数据，显式重建或清理不能影响 demo。
 
 `customer-trial-133` 仍是 demo 内部模拟数据合同的 target key，不是第三个部署环境。它只能在 `demo-133` 的受控数据准备链中使用。
 

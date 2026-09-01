@@ -27,16 +27,16 @@
 
 ## 个人开发方式与工作区
 
-- 本项目个人主导，部署逐次授权。普通改动默认单任务、单 writer、最小充分验证和按需文档，不建分支或 PR，PR 审批不作门禁；PR CI 保留为按需验证入口，不引入团队审批、并行 Agent、Worktree 或阶段汇报。
+- 本项目个人主导。普通改动默认单任务、单 writer、最小充分验证和按需文档，不建分支或 PR；PR CI 仅作按需验证入口，不引入团队审批、并行 Agent、Worktree 或阶段汇报。
 - 甲方可在其他聊天软件提出需求或反复校对；只有项目负责人带回本任务并标注“甲方提出 / 要求 / 反馈 / 确认”的摘要、截图或资料才算甲方输入。外部聊天不是项目真源；未标注内容归项目负责人和 Codex 判断。裸“甲方”现指 `yoyoosun`。
 - 甲方只确认业务目标、关键岗位责任、高风险选择和实际使用结果，不必阅读代码或逐级确认架构层、产品状态、验证内部键和测试形态。对外只沟通业务范围、固定版本、是否发布、已知边界和反馈结果。
 - 项目负责人和 Codex 只实现当前目标所需最小闭环，不把模型自行推断当作需求；真源、状态、权限、异常恢复、测试和基础易用性仅补必要项，任务外发现只报告。优先复用和简单方案；只有当前目标或正确性、安全、数据完整性、可运维性确实需要时才增加复杂度，并说明理由。
-- 默认循环是“甲方目标或痛点 → Codex 实现与验证 → 经明确授权发布固定版本 → 甲方使用反馈 → 缺陷、细化或新需求”。按一个可验证业务切片完成，不建需求编号或多阶段计划；正式代码和文档不用历史 Phase/P 编号，`P0/P1/P2` 只表示风险优先级。
+- 默认循环是“甲方目标或痛点 → Codex 实现与验证 → 固定版本发布 → 甲方使用反馈 → 缺陷、细化或新需求”。每次完成一个可验证切片，不建需求编号或多阶段计划；正式代码和文档不用历史 Phase/P 编号，`P0/P1/P2` 只表示风险优先级。
 - 开始和收口检查 worktree，保留其他任务或用户已有改动，不回退、格式化、删除、stage 或宣称为本轮成果。
-- 所有项目任务（Goal、普通实现、文档、测试、诊断、运行与发布准备）各自完成业务切片、验证和必要回滚；Goal 只是一种普通任务来源。任务结束时若产生仓库改动，最终回复只留一份被动 `Git handoff record`，不在仓库或任务系统登记、聚合或调度记录。
+- Goal 只是普通任务来源；启动/恢复后，其写明闭环按全局 `$prompt-governance` 默认授权，明确包含交付时可直接 stage/commit/push/发布，不逐步确认。所有任务仍各自完成业务切片、验证和回滚，最终仅留被动 `Git handoff record`，不登记或广播跨会话调度状态。
 - `Git handoff record` 仅包含：精确文件或 hunk、建议 commit 分组、简体中文提交意图、已完成验证、未完成验证、需排除的外部脏文件，以及 commit / push 是否已获授权。它只是当次交接证据，不是 Git 授权，也不保存跨会话 owner、lease、等待、唤醒或状态广播。
 - Local 任务首次写入前和任务收口时，用 `GIT_OPTIONAL_LOCKS=0` 读取实时 HEAD、index、`index.lock`、status 和 scoped diff；共享 Local 不运行普通 `git status`。普通个人单 writer 按精确范围继续并保留外部脏现场；只有真实并发 writer、混合 hunk 或 index / `index.lock` 冲突时，才临时串行当前重叠路径或 Git 动作并重新读回，同一时点只能有一个 Git index 操作者。无法证明安全时停止相关写入或 Git 动作并报告，不建立任务调度、资源租约、registry、daemon、轮询、定时唤醒或消息广播。
-- stage、commit 和 push 是独立动作，均先询问用户；完成实现或验证不自动取得 Git 授权。
+- 非 Goal 或 Goal 未写明的 stage、commit、push 仍分别询问；执行前实时核对 index 和 upstream。
 - 本仓库不恢复单独执行规格目录、短任务模板或本地审查报告目录。
 
 ## 过程记录
@@ -50,8 +50,8 @@
 - 项目 skills 位于 `.agents/skills/` 并随仓库管理；只承载 plush 专项 SOP。
 - 当前入口见 `.agents/skills/README.md`。默认只选一个主 skill，真实跨领域/页面/打印/测试/operations 时再组合。
 - 运行诊断、可观测/错误、安全隐私、发布和回滚统一使用 `$plush-operations-governance`。
-- 提示词整理仅在明确需要时显式使用全局 `$prompt-governance`。
-- Git 改动按上节生成被动记录；只有用户明确要求 commit 或 push 且实时现场确属复杂收口时，才使用全局 `$git-closeout-coordination`，不保留项目级 Git 收口 Skill。
+- 提示词和 Goal 使用全局 `$prompt-governance`。
+- Git 改动按上节生成被动记录；常规任务明确要求或 Goal 写明 commit/push，且实时现场确属复杂收口时，才使用全局 `$git-closeout-coordination`，不保留项目级 Git 收口 Skill。
 - 修改 skill 时同步 README/metadata/引用，运行 validator、YAML/metadata 扫描和 `git diff --check`。
 
 ## Product Core 与客户差异
@@ -146,7 +146,7 @@
 - 镜像清理先保留当前及项目要求的回滚版本，再按 `$plush-operations-governance` 和发布文档执行。
 - 修改 `server/internal/data/model/schema/**` 后，本轮收口前必须在 `server/` 执行 `make data`，审查并纳入由此产生的 Ent 生成物、新 Atlas migration 与 `atlas.sum`，再运行 `bash scripts/qa/db-guard.sh`；结构变更缺 migration 或生成零漂移证据时只能报告 `incomplete`。Git hook 只做 check-only，不自动生成或改写 migration。
 - 登记共享开发库的日常升级只走高层入口：交互终端使用 `make migrate`，非交互环境使用 `make migrate_prepare` 后按同一次 ready 输出执行 `make migrate_execute`；`migrate_status` 只读。为避免旧习惯落入缺 token 的死路，裸 `make migrate_plan` 安全路由到 prepare，裸 TTY `make migrate_apply` 恢复唯一 ready operation 或重新准备后确认；只有携带完整内部确认的调用才进入底层 plan / apply 守卫。隔离库继续使用对应 lifecycle；测试、生产或归属不明数据库必须走正式目标流程，未 execute / apply 必须明确报告。
-- 命中“过程记录”的条件时才更新 `progress.md`；stage、commit 和 push 继续分别先询问用户，获准后只处理本轮精确范围，push 前 fetch 并确认 upstream。
+- 命中“过程记录”时才更新 `progress.md`；Git 收口按“个人开发方式与工作区”执行。
 
 ## 前端、原型与错误
 

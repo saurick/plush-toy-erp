@@ -57,6 +57,8 @@ Windows / WSL 下的 `pnpm start`、`pnpm start:frontend-only` 和 `pnpm start:y
 
 `pnpm start` 默认先执行共享本地 runtime preflight：本机 `API_ORIGIN` 会先检查工作区 schema / versioned migration、开发库 Atlas status，再要求后端 `/healthz` 与 `/readyz` 同时通过；预检和 Vite 的 `/rpc`、`/templates` 代理共用同一 `API_ORIGIN`。预检只读，不会 apply migration。仅做不登录、不调 RPC 的前端布局调试时，可显式使用 `pnpm start:frontend-only`；该模式会标记为降级、非绿色证据，不能用来验证登录或业务页。如果 `API_ORIGIN` 指向外部环境，本地不会读取其数据库，但仍要求该环境 health / ready 通过，migration 由目标环境发布证据负责。
 
+开发工作台读取 GitLab R640 CI、不可变版本目录与流水线耗时证据时，使用独立的 `PLUSH_GITLAB_READ_TOKEN`；macOS 未显式提供时，`pnpm start` 会自动读取钥匙串 service `plush-toy-erp.gitlab-read-api`、account `simon`。该凭据只允许当前项目的最小读取权限，只保存在本机钥匙串和 DEV 服务私有内存；版本中心将它收口到不含发布方法的只读 Provider，不进入浏览器、仓库、日志、质量门禁子进程或部署执行子进程，也不替代创建新发布使用的短期 `PLUSH_GITLAB_TOKEN`。钥匙串未登记时业务开发仍可启动，但 GitLab 服务端证据保持失败关闭，不以本机结果补证。
+
 桌面构建提供单端口岗位任务端主路径：
 
 ```text
@@ -361,6 +363,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 | `/__dev/business-usability`       | 页面任务、完成标准和页内解释覆盖只读检查           | `web/src/erp/config/businessUsabilityCatalog.mjs`            |
 | `/__dev/docs`                     | 当前工作区 Markdown 查看器                         | 仓库 Markdown 文件本身                                       |
 | `/__dev/testing`                  | 本轮验证、专项检查、Git 收口和证据覆盖             | `docs/product/自动化测试策略.md`                             |
+| `/__dev/quality`                  | 稳定入口；规范化进入服务器门禁视图                 | `/__dev/quality-gates?view=server`                           |
 | `/__dev/quality-gates`            | full / strict 运行、结果、耗时、治理与覆盖缺口     | 正式 QA runner、门禁回执、affected 与本地 operation          |
 | `/__dev/data-preparation`         | 固定数据范围检查、计划确认、执行与回执             | 既有 Core seed、统一本地验收 lifecycle 与 operation store    |
 | `/__dev/database-migration`       | 共享开发库迁移准备、执行、读回与重启               | 高层 CLI、迁移 operation service、备份恢复与 operation store |
@@ -396,7 +399,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 
 #### 产品工程入口 `/__dev/product-engineering`
 
-该页不再把内核、权限、治理、业务链、易用性、文档和原型作为同权技术资产卡平铺，而是按“查看当前产品能力、核对权限结果、判断规则、查看业务链、检查员工能否看懂并独立完成、搜索文档、评审原型”七类用户问题组织连续任务列表。每项只在主路径展示用途、适用范围和下一步；工具名称、页面路径、维护来源和开发边界默认折叠。
+该页把内核、权限、治理、业务链、易用性、文档和原型入口组织为“按问题找入口 / 项目图视角”两个同级、互斥且 URL-backed 的 Tab。默认 `view=questions` 按“查看当前产品能力、核对权限结果、判断规则、查看业务链、检查员工能否看懂并独立完成、搜索文档、评审原型”七类用户问题组织连续任务列表；`view=relationships` 把业务对象、状态、岗位、依赖和证据看作节点，按业务与事实、状态与流程、权限与责任、产品结构与治理、质量与 CI、交付与证据六类图模型提供分类说明、证据边界和现有入口。两个视角复用当前页面、菜单和正式真源；未知、重复或无关参数统一恢复到规范化查看方式。
 
 #### 产品内核 `/__dev/product-core`
 
@@ -455,8 +458,9 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 
 #### 质量门禁 `/__dev/quality-gates`
 
-- 页面首屏优先读取当前 committed SHA 的 R640 普通 push CI，展示流水线、十一个固定 job、耗时与 `CI Gate` 状态；该服务器证据只覆盖对应提交，不覆盖 Local dirty。未登记只读 token、API 不可达或当前 SHA 尚无 push 记录时保持不可读 / 缺失，不使用本机回执补造绿色结果。
-- 页面内部只保留 `run / governance / gaps` 三个 URL-backed 视图，其中 `run` 对外命名为“本机诊断”。三视图复用 `DevTaskNav` 的 roving tabIndex、方向键、Home / End、焦点与主题合同。每个视图只接受固定 query；未知、重复、过期或跨视图参数 fail closed。切换视图会清理无关 query，不启动、不取消或清空 operation；公共仓库身份与当前 operation 摘要由页面级唯一状态源读取，只有活动 operation 启用一个 polling，治理与缺口请求在切换时取消并以请求序号防止旧结果覆盖。
+- 一级“质量验证”入口 `/__dev/quality` 会使用 replace 导航规范化到 `/__dev/quality-gates?view=server`，直接展示正式服务器门禁轨道；不保留另一张只做分流的质量首页，也不复制第二套服务器证据。
+- 页面首屏优先读取当前 committed SHA 的 R640 普通 push CI，始终按正式合同展示 `plan → prepare → 质量检查 → aggregate → CI Gate` 执行轨道；质量检查最终汇入七个固定分片，其中 Node 核心 / 发布测试先行汇合，浏览器分片等待 Web 构建。服务器门禁在轨道前使用一张七行对照表，集中展示本机 strict 步骤、检查名称与对应 CI Job；本机诊断不重复显示 CI 标签。阶段编号按当前 runner 顺序动态计算，映射由 CI shard 合同测试守住。取得当前流水线证据后，再把真实状态与耗时填入十一个主路径节点，并展示墙钟时间、排队耗时、最长主路径 job 和相对耗时条。耗时条以最长主路径 job 为基准，不把可重叠的并行 job 相加成墙钟时间。该服务器证据只覆盖对应提交，不覆盖 Local dirty。未登记只读 token 或 API 不可达时明确标记“GitLab 读取失败”；凭据与 API 已读通但当前 SHA 尚无普通 push CI 时，分别显示“GitLab 读取正常”和“当前提交未产生 CI 记录”；流水线已形成但对应 job 尚未启动时标记“等待运行”。三者均保留完整轨道，且不使用本机回执或静态结构补造绿色结果与耗时。当前证据之后只读列出同一次 GitLab 查询中最近取得的最多 8 条 `main` 普通 push CI，展示结果、short SHA、真实事件时间、墙钟耗时、失败环节和 GitLab 详情链接；历史行不写本地缓存、不触发或重跑 CI，也不升级为当前 SHA 的通过证据。
+- 页面内部只保留 `server / run / governance / gaps` 四个 URL-backed 一级视图，对外分别命名为“服务器门禁 / 本机诊断 / 门禁治理 / 覆盖缺口”；默认进入服务器门禁，服务器证据和本机操作不再同时铺开，也不叠加第二组 Tab。四视图复用 `DevTaskNav` 的 roving tabIndex、方向键、Home / End、焦点与主题合同。每个视图只接受固定 query；未知、重复、过期或跨视图参数 fail closed。切换视图会清理无关 query，不启动、不取消或清空 operation；公共仓库身份与当前 operation 摘要由页面级唯一状态源读取，只有活动 operation 启用一个 polling，治理与缺口请求在切换时取消并以请求序号防止旧结果覆盖。
 - “本机诊断”只在定位工作区问题时，通过固定 `full / strict + idempotencyKey` 动作异步调用正式 runner，不替代 R640 exact-SHA CI。显式 loopback database base 仍受支持，没有显式 base 时自动使用本机已有的固定 `postgres:18.1` 创建本次专用容器、随机凭据和动态 loopback 端口，正式回执、内部临时数据库、容器与进程组清理全部读回后才可通过。浏览器不能提交 DSN、凭据、镜像、命令或路径，也不会清理外部容器。本机历史与 GitLab 流水线分开记录；页面支持刷新恢复、精确取消、有界超时、中文阶段、正式回执、可比环境耗时和最近 20 次脱敏本机记录。当前版本回执优先于旧本机历史，dirty 结果不会升级成发布证明，样本不足时不估算剩余时间，终态不再显示“预计剩余”。诊断执行轨道直接消费服务端 `profiles` 阶段序列与 operation `stageTimings`，自动分出 strict 附加检查和 full 共用主路径；运行前、运行中和终态原位展示阶段状态、第一失败、最长阶段、正式回执与清理读回，回执和清理不计入 runner 阶段。共享基础检查与 Web 阶段的固定子步骤也只从 runner 登记表投影，不在页面复制命令或推测子步骤实时状态；已记录阶段耗时按阶段耗时之和归一化，并明确标注可并行阶段不能相加推算墙钟时间。只有至少 3 个 profile、环境指纹和 dirty / clean 状态相同的正式通过回执才绘制零基线耗时趋势，精确历史表始终保留。技术 ID、完整 SHA、指纹和原始 stage key 默认折叠。
 - 本机托管数据库只提供一张默认折叠、展开后才加载的静态 Mermaid 生命周期图，并同步提供有序文字说明；它解释“登记环境或创建本次专用环境—运行正式门禁—精确清理—回执与清理读回”的固定边界，不承担实时运行状态。实时状态仍只读取当前 environment、operation 和正式回执，页面不为每种门禁重复绘制 Mermaid。
 - “门禁治理”只读登记风险、触发条件、正式来源引用、唯一证据与退出条件；不复制命令或测试列表，不提供新增、编辑、跳过、禁用或删除。“覆盖缺口”复用 affected 与七类风险边界，按当前或 staged 改动展示应运行门禁、当前结果和仍缺证据，并以语义化“风险 × 门禁”矩阵支持横向比较；原有逐类风险、原因和证据详情继续保留。本地门禁通过不证明目标发布、回滚、客户 UAT 或签收。
@@ -498,14 +502,14 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 
 #### 版本发布与部署中心 `/__dev/version-center`
 
-- 页面只在 development serve 中存在，展示当前 HEAD/dirty、GitLab 不可变版本、`demo-133` 与 `customer-test-133` 的当前 SHA、容量 blocker 和 operation 状态。它不把本地、CI、制品、目标 smoke 或验收合并成一个绿色结论；`admin.yoyoosun.net` 不是部署 target。
-- 页面顶部常驻四项关键状态、未结束 operation 与交付速览；下方以 URL 可恢复的 `版本与部署 / CI/CD 效能 / 操作记录` 三个视图分流阅读。最近最多 20 个不可变版本固定每页 6 条，已结束操作每页 10 条；切换视图不重新请求摘要，也不会停止未结束 operation 的轮询。
-- 顶部“人工接管说明”只解释 AI 不可用或用户亲自操作时如何沿用同一正式链路：Codex / 本地终端负责验证和中文提交，GitLab 负责代码真源、CI 与不可变 Release，GitHub 只接收 GPT Review 镜像，当前页面负责发布制品、部署、回滚和查看回执。说明会先区分可继续与必须停止的证据，再给出固定顺序和禁止捷径；它不创建 commit、push、tag、凭据输入、后台调度或第二套发布动作。
-- “CI/CD 效能”直接读取固定 GitLab 项目最近 pipeline、job 与时间；GitLab Jobs API 不提供 GitHub 式 step 时间时，界面保持 job 级证据，不伪造步骤。页面分别显示统计读取时间及最近动作、完整发布、制品和真实部署的事件时间，并默认展示观测关键路径、最长可见环节和建议复核点；全部 job 按需展开，不自动并发、重跑或复制 GitLab 状态。
-- 发布只允许当前 clean exact SHA；GitLab adapter 固定 `gitlab.saurick.me/saurick/plush-toy-erp`、受保护 main、Generic Package 和 `yoyoosun`。显式 `PLUSH_DELIVERY_PROVIDER=github` 才启用 GitHub 应急 adapter；两条发布链不得同时运行。
+- 页面只在 development serve 中存在，展示当前 HEAD/dirty、GitLab 不可变版本、`demo-133` 与 `customer-test-133` 的当前 SHA、容量 blocker 和 operation 状态。它不把本地、CI、制品、目标 smoke 或验收合并成一个绿色结论；根域临时跳转不启用 `erp` target，退役的 `admin.yoyoosun.net` 也不是部署 target。
+- 页面顶部先用一张主卡展示所选目标、当前结论与唯一下一步；本地候选、不可变版本、目标运行和公网入口收口为两列事实区，目标切换只显示当前目标的数据边界，不再同时平铺 demo / test 两张重复说明卡。严格门禁、发布动作和发布说明放在同一下一步区域；未结束 operation 与“最近发布与部署”继续常驻。下方以 URL 可恢复的 `版本与部署 / 流水线耗时 / 操作记录` 三个视图分流阅读。最近最多 20 个不可变版本固定每页 6 条，已结束操作每页 10 条；切换视图不重新请求摘要，也不会停止未结束 operation 的轮询。
+- 顶部“手动操作指引”只解释 AI 不可用或用户亲自操作时如何沿用同一正式链路：Codex / 本地终端负责验证和中文提交，GitLab 负责代码真源、CI 与不可变 Release，GitHub 只接收 GPT Review 镜像，当前页面负责发布制品、部署、回滚和查看回执。说明会先区分可继续与必须停止的证据，再给出固定顺序和禁止捷径；它不创建 commit、push、tag、凭据输入、后台调度或第二套发布动作。
+- “流水线耗时”直接读取固定 GitLab 项目最近 pipeline、job 与时间；GitLab Jobs API 不提供 GitHub 式 step 时间时，界面保持 job 级证据，不伪造步骤。页面分别显示统计读取时间及最近一次流水线、最近一次制品发布和构建制品的事件时间，并默认展示可见关键路径、最长可见环节和建议复核点；全部任务与步骤按需展开，不自动并发、重跑或复制 GitLab 状态。目标部署仍以工作台 operation 独立计时和读回。
+- 发布只允许当前 clean exact SHA；GitLab adapter 固定 `gitlab.saurick.me/saurick/plush-toy-erp`、受保护 main、Generic Package 和 `yoyoosun`。版本目录、流水线耗时、发布状态与控制制品下载使用只读 Provider；只有创建新发布调用写 Provider，未加载短期 `PLUSH_GITLAB_TOKEN` 时页面保持可读并停用该动作。显式 `PLUSH_DELIVERY_PROVIDER=github` 才启用 GitHub 应急 adapter；两条发布链不得同时运行。
 - 版本列表不改写不可变版本号；GitLab adapter 提供带时区的 `publishedAt`，每行在版本号和 short SHA 下显示本地完整日期时间，并用 HTML `time/dateTime` 保留原始值。Provider 拒绝缺失或非法发布时间，前端摘要合同进一步拒绝无时区值；比 133 当前 manifest 新的版本只允许准备部署，旧版本只允许检查回滚，当前 manifest、migration 序列或客户配置源指纹不能证明时按钮禁用并说明原因。顶部严格门禁与最新不可变版本、当前 operation、历史记录、详情头部和事件流统一显示各自真源提供的完成、发布、开始或更新时间；没有对应真源时显示“时间未证明”，不拿制品发布时间推算目标部署或公网核验时间。
-- 发布、部署与回滚先按动作、固定目标、Exact-SHA、版本和发布输入创建或复用 operation；不同窗口的相同意图会合并为一个 operation。同一目标只允许一个执行器；页面刷新从原子 operation store 恢复。`failed / blocked` 可由用户显式创建带父 operation 和尝试次数的新 operation，旧终态不变；`not_proven` 必须先读回目标且不提供重试。幂等证据仍以现有“操作记录”和详情为唯一运行真源，不新增幂等写动作或第二套 operation 状态，也不显示原始幂等键或指纹；演练页只读引用其完成状态。
-- Operation 列表同时展示开始时间、终态完成时间和总耗时；未结束 operation 显示开始与最近更新时间。详情通过独立 GET 按需读取最近 100 条脱敏事件，在头部保留 operation 起止时间，每条事件使用完整本地时间并在 `time/dateTime` 中保留原始带时区值，同时把 promotion / rollback v2 回执的固定阶段耗时或本地生命周期耗时显示为可读比例条。浏览器不接收本机路径、repo/workflow/target/SSH/shell/SQL/Docker 输入，也不持有 GitLab、GitHub 或 SSH 凭据。
+- 发布、部署与回滚先按动作、固定目标、Exact-SHA、版本和发布输入创建或复用 operation；不同窗口的相同意图会合并为一个 operation。同一目标只允许一个执行器；页面刷新从原子 operation store 恢复。test 普通部署保留现有数据，清空并重建测试数据使用独立的两阶段 operation，并固定到 test 当前运行的 exact SHA。`failed / blocked` 可由用户显式创建带父 operation 和尝试次数的新 operation，旧终态不变；`not_proven` 必须先读回目标且不提供重试。幂等证据仍以现有“操作记录”和详情为唯一运行真源，不新增幂等写动作或第二套 operation 状态，也不显示原始幂等键或指纹；演练页只读引用其完成状态。
+- Operation 列表同时展示开始时间、终态完成时间和工作台操作历时；未结束 operation 显示开始与最近更新时间。已结束记录只提供结果、动作、目标和版本 / SHA / 操作 ID 四类高价值筛选，筛选写入 URL 并在刷新、前进和后退后恢复；不增加低价值日期区间或技术字段筛选。详情按动作分型：制品发布只显示构建、制品和工作台发布操作历时，不把未执行的目标传输、备份或镜像加载写成“未证明”；部署、回滚和重建只显示真实读回的目标指标。技术 ID、重复请求识别依据、digest 和最近 100 条脱敏事件默认折叠；事件仍使用完整本地时间并在 `time/dateTime` 中保留原始带时区值。浏览器不接收本机路径、repo/workflow/target/SSH/shell/SQL/Docker 输入，也不持有 GitLab、GitHub 或 SSH 凭据。
 - 效能工作台的质量门禁、测试、数据准备、数据库迁移和客户配置执行证据统一展示真源提供的统计读取、开始、完成、阶段、事件、计划、备份验证、发布或激活时间；ISO 值必须自带时区，后端 Unix 时间只在字段合同明确为秒时转换。缺失或非法值显示“时间未证明”，静态目录和没有权威快照时间的页面不使用页面加载时间冒充更新时间。
 - 远端基础回执当前只证明制品、备份恢复检查、migration、Compose、health、ready、Web health 与运行 SHA；带凭据岗位矩阵、PDF、客户 UAT 和签收仍需独立完成。
 
@@ -517,7 +521,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 每项同时展示建议频率、变化触发条件、完成证据和安全边界。稳定期不要求每次发布都跑完整演练：目标预检仍是每次发布门禁，幂等与隔离恢复建议每月或相关脚本变化后执行，回滚 / 前滚建议每季度及 migration 合同变化后执行。
 - 服务器迁移或增加正式环境时，必须先在受控 deployment target registry 登记新的环境身份、路径、Compose、数据库、公网入口和容量合同，再为该目标建立独立 preflight 与 operation。页面使用“环境语义 + 技术 key”展示，不按 IP、机器名或菜单复制一套实现；当前未登记的第二目标保持不可执行。
 - 故障注入默认关闭。只有存在独立隔离环境、固定故障目录、明确恢复步骤和残留读回后才可扩展；页面不接受临时主机、路径、凭据、命令、SQL 或 Docker 输入，也禁止对当前试用或正式环境临时制造故障。
-- AI 不可用时仍回到版本中心的“人工接管说明”，沿用 clean exact SHA、GitLab CI、不可变 Release、固定 operation 和结果读回；演练页不复制易漂移的命令清单，也不提供绕过门禁的应急按钮。
+- AI 不可用时仍回到版本中心的“手动操作指引”，沿用 clean exact SHA、GitLab CI、不可变 Release、固定 operation 和结果读回；演练页不复制易漂移的命令清单，也不提供绕过门禁的应急按钮。
 
 ## 当前前端边界
 

@@ -1,17 +1,29 @@
-import React from 'react'
+import React, { useCallback, useEffect, useMemo } from 'react'
 import {
   BuildOutlined,
   CheckCircleOutlined,
   DeploymentUnitOutlined,
   RightOutlined,
 } from '@ant-design/icons'
-import { Link } from 'react-router-dom'
+import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { Tag, Typography } from 'antd'
 import DevEntrySourceDetails from '../components/DevEntrySourceDetails.jsx'
 import DevEnvironmentEvidencePanel from '../components/DevEnvironmentEvidencePanel.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
+import DevTaskNav from '../components/DevTaskNav.jsx'
 import { DEV_HUB_ITEMS } from '../config/devHub.mjs'
-import { DEV_WORKBENCH_AREA_KEYS } from '../config/devRoutes.mjs'
+import {
+  DEV_PRODUCT_ENGINEERING_GRAPH_VIEW_COPY,
+  DEV_PRODUCT_ENGINEERING_VIEW,
+  DEV_PRODUCT_ENGINEERING_VIEW_ITEMS,
+  DEV_RELATIONSHIP_PERSPECTIVES,
+  buildDevProductEngineeringSearch,
+  parseDevProductEngineeringSearch,
+} from '../config/devRelationshipPerspectives.mjs'
+import {
+  DEV_QUALITY_GATES_ROUTE,
+  DEV_WORKBENCH_AREA_KEYS,
+} from '../config/devRoutes.mjs'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -170,6 +182,164 @@ function ProductEngineeringTaskEntry({ item, index }) {
   )
 }
 
+function RelationshipPerspectiveEntry({ perspective }) {
+  return (
+    <li className="erp-dev-relationship-item">
+      <span className="erp-dev-relationship-item__shape">
+        {perspective.shape}
+      </span>
+      <div className="erp-dev-relationship-item__copy">
+        <Title level={3}>{perspective.title}</Title>
+        <Text strong className="erp-dev-relationship-item__question">
+          {perspective.question}
+        </Text>
+        <Paragraph>{perspective.relationship}</Paragraph>
+        <Text type="secondary" className="erp-dev-relationship-item__boundary">
+          边界：{perspective.boundary}
+        </Text>
+      </div>
+      <div
+        className="erp-dev-relationship-item__links"
+        aria-label={`${perspective.title}相关入口`}
+      >
+        {perspective.destinations.map((destination) => (
+          <Link
+            key={destination.route}
+            to={destination.route}
+            className="erp-dev-relationship-item__link"
+          >
+            <span>{destination.label}</span>
+            <RightOutlined aria-hidden="true" />
+          </Link>
+        ))}
+      </div>
+    </li>
+  )
+}
+
+function ProductEngineeringWorkspace({ items }) {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const parsedView = useMemo(
+    () => parseDevProductEngineeringSearch(searchParams),
+    [searchParams]
+  )
+
+  useEffect(() => {
+    if (parsedView.canonical) return
+    const nextSearch = buildDevProductEngineeringSearch(parsedView.view)
+    setSearchParams(new URLSearchParams(nextSearch.slice(1)), {
+      replace: true,
+    })
+  }, [parsedView.canonical, parsedView.view, setSearchParams])
+
+  const selectView = useCallback(
+    (nextView) => {
+      if (nextView === parsedView.view && parsedView.canonical) return
+      const nextSearch = buildDevProductEngineeringSearch(nextView)
+      setSearchParams(new URLSearchParams(nextSearch.slice(1)))
+    },
+    [parsedView.canonical, parsedView.view, setSearchParams]
+  )
+
+  const panelId = `dev-product-engineering-view-panel-${parsedView.view}`
+  const tabId = `dev-product-engineering-view-tab-${parsedView.view}`
+
+  return (
+    <section
+      className="erp-dev-product-workspace"
+      aria-labelledby="dev-product-view-switcher-title"
+    >
+      <div className="erp-dev-product-view-switcher">
+        <DevTaskNav
+          compact
+          level="primary"
+          idPrefix="dev-product-engineering-view"
+          ariaLabel="产品工程查看方式"
+          items={DEV_PRODUCT_ENGINEERING_VIEW_ITEMS}
+          value={parsedView.view}
+          onChange={selectView}
+          className="erp-dev-product-view-tabs"
+        />
+        <div className="erp-dev-product-view-switcher__copy">
+          <Text strong id="dev-product-view-switcher-title">
+            选择查看方式
+          </Text>
+          <Text type="secondary">
+            两种方式指向同一组已有工具，只改变入口的组织方式。
+          </Text>
+        </div>
+      </div>
+
+      {parsedView.view === DEV_PRODUCT_ENGINEERING_VIEW.QUESTIONS ? (
+        <section
+          id={panelId}
+          role="tabpanel"
+          aria-labelledby={tabId}
+          tabIndex={0}
+          className="erp-dev-product-start"
+        >
+          <div className="erp-dev-product-start__head">
+            <div>
+              <Text className="erp-dev-product-start__eyebrow">
+                当前要解决的问题
+              </Text>
+              <Title level={2}>先选你想弄清楚的事情</Title>
+            </div>
+            <Text type="secondary">
+              每个入口先给答案或可读内容；工具名称、路径和维护来源需要时再展开。
+            </Text>
+          </div>
+          <ol className="erp-dev-product-task-list">
+            {items.map((item, index) => (
+              <ProductEngineeringTaskEntry
+                key={item.key}
+                item={item}
+                index={index}
+              />
+            ))}
+          </ol>
+        </section>
+      ) : (
+        <section
+          id={panelId}
+          role="tabpanel"
+          aria-labelledby={tabId}
+          tabIndex={0}
+          className="erp-dev-relationship-guide"
+        >
+          <div className="erp-dev-relationship-guide__head">
+            <div>
+              <Text className="erp-dev-product-start__eyebrow">
+                {DEV_PRODUCT_ENGINEERING_GRAPH_VIEW_COPY.eyebrow}
+              </Text>
+              <Title level={2}>
+                {DEV_PRODUCT_ENGINEERING_GRAPH_VIEW_COPY.title}
+              </Title>
+            </div>
+            <Text type="secondary">
+              {DEV_PRODUCT_ENGINEERING_GRAPH_VIEW_COPY.description}
+            </Text>
+          </div>
+          <ul className="erp-dev-relationship-list">
+            {DEV_RELATIONSHIP_PERSPECTIVES.map((perspective) => (
+              <RelationshipPerspectiveEntry
+                key={perspective.key}
+                perspective={perspective}
+              />
+            ))}
+          </ul>
+          <Text
+            type="secondary"
+            className="erp-dev-relationship-guide__boundary"
+          >
+            {DEV_PRODUCT_ENGINEERING_GRAPH_VIEW_COPY.boundary}
+          </Text>
+        </section>
+      )}
+    </section>
+  )
+}
+
 function QualityTaskEntry({ item }) {
   const copy = QUALITY_ENTRY_PRESENTATION[item.key]
 
@@ -263,6 +433,10 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
     throw new Error(`unknown dev workbench area: ${String(areaKey || '')}`)
   }
 
+  if (isQualityArea) {
+    return <Navigate to={`${DEV_QUALITY_GATES_ROUTE}?view=server`} replace />
+  }
+
   return (
     <div
       className={`erp-dev-hub-page erp-dev-hub-page--area erp-dev-workspace-page${
@@ -285,33 +459,7 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
       <main className="erp-dev-hub-shell">
         {isDeliveryArea ? <DevEnvironmentEvidencePanel /> : null}
         {isProductEngineeringArea ? (
-          <section
-            className="erp-dev-product-start"
-            aria-labelledby="dev-product-start-title"
-          >
-            <div className="erp-dev-product-start__head">
-              <div>
-                <Text className="erp-dev-product-start__eyebrow">
-                  当前要解决的问题
-                </Text>
-                <Title level={2} id="dev-product-start-title">
-                  先选你想弄清楚的事情
-                </Title>
-              </div>
-              <Text type="secondary">
-                每个入口先给答案或可读内容；工具名称、路径和维护来源需要时再展开。
-              </Text>
-            </div>
-            <ol className="erp-dev-product-task-list">
-              {items.map((item, index) => (
-                <ProductEngineeringTaskEntry
-                  key={item.key}
-                  item={item}
-                  index={index}
-                />
-              ))}
-            </ol>
-          </section>
+          <ProductEngineeringWorkspace items={items} />
         ) : isQualityArea ? (
           <section
             className="erp-dev-quality-start"

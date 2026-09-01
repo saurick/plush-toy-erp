@@ -5,8 +5,6 @@ import path from "node:path";
 
 const ROOT = process.cwd();
 
-const SCAN_ROOTS = ["."];
-
 const SKIP_PARTS = new Set([
   ".git",
   "node_modules",
@@ -63,6 +61,15 @@ function hasForbiddenStageLabel(value) {
   return NUMBERED_PHASE.test(value) || ABBREVIATED_STAGE.test(value);
 }
 
+function normalizeScanRoot(value) {
+  const absolute = path.resolve(ROOT, String(value || "."));
+  const relative = path.relative(ROOT, absolute);
+  if (relative === ".." || relative.startsWith(`..${path.sep}`)) {
+    throw new Error(`scan path must stay inside the repository: ${value}`);
+  }
+  return relative || ".";
+}
+
 function shouldSkip(relativePath) {
   const normalizedPath = relativePath.replace(/^\.\//u, "");
   if (SKIP_FILES.has(normalizedPath)) {
@@ -83,19 +90,20 @@ function shouldSkip(relativePath) {
 
 function walk(relativeRoot) {
   const absoluteRoot = path.join(ROOT, relativeRoot);
-  if (!fs.existsSync(absoluteRoot)) {
+  if (!fs.existsSync(absoluteRoot) || shouldSkip(relativeRoot)) {
     return [];
   }
   const stat = fs.statSync(absoluteRoot);
   if (stat.isFile()) {
-    return shouldSkip(relativeRoot) ||
-      !TEXT_EXTENSIONS.has(path.extname(relativeRoot))
-      ? []
-      : [relativeRoot];
+    return TEXT_EXTENSIONS.has(path.extname(relativeRoot))
+      ? [relativeRoot]
+      : [];
   }
-  const entries = fs.readdirSync(absoluteRoot, { withFileTypes: true });
+  if (!stat.isDirectory()) {
+    return [];
+  }
   const files = [];
-  for (const entry of entries) {
+  for (const entry of fs.readdirSync(absoluteRoot, { withFileTypes: true })) {
     const relativePath = path.join(relativeRoot, entry.name);
     if (shouldSkip(relativePath)) {
       continue;
@@ -111,8 +119,19 @@ function walk(relativeRoot) {
   return files;
 }
 
+let scanRoots;
+try {
+  scanRoots =
+    process.argv.length > 2
+      ? process.argv.slice(2).map(normalizeScanRoot)
+      : ["."];
+} catch (error) {
+  console.error(`[phase-label-boundaries] ${error.message}`);
+  process.exit(2);
+}
+
 const hits = [];
-const scanFiles = [...new Set(SCAN_ROOTS.flatMap(walk))];
+const scanFiles = [...new Set(scanRoots.flatMap(walk))];
 for (const relativeFile of scanFiles) {
   if (hasForbiddenStageLabel(relativeFile)) {
     hits.push(`${relativeFile}:1: forbidden phase label in file path`);
@@ -121,11 +140,14 @@ for (const relativeFile of scanFiles) {
   if (content.includes(0)) {
     continue;
   }
-  content.toString("utf8").split(/\r?\n/u).forEach((line, index) => {
-    if (hasForbiddenStageLabel(line)) {
-      hits.push(`${relativeFile}:${index + 1}: ${line.trim()}`);
-    }
-  });
+  content
+    .toString("utf8")
+    .split(/\r?\n/u)
+    .forEach((line, index) => {
+      if (hasForbiddenStageLabel(line)) {
+        hits.push(`${relativeFile}:${index + 1}: ${line.trim()}`);
+      }
+    });
 }
 
 if (hits.length > 0) {
@@ -142,4 +164,6 @@ if (hits.length > 0) {
   process.exit(1);
 }
 
-console.log("[phase-label-boundaries] ok");
+console.log(
+  `[phase-label-boundaries] ok mode=${process.argv.length > 2 ? "affected" : "repository"} files=${scanFiles.length}`,
+);

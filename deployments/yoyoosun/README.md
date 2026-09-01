@@ -20,6 +20,7 @@ server/deploy/compose/prod
 | backend | HTTP `8300` |
 | migration | host Atlas at `/usr/local/bin/atlas` through `server/deploy/compose/prod/migrate_online.sh`; private lock defaults to `/run/lock/plush-toy-erp/atlas-migrate.lock` |
 | build boundary | build images locally or in CI; target server only runs `docker load`, Compose, migration and smoke |
+| public navigation | `yoyoosun.net` 临时 `302` 跳转到 `https://erp.yoyoosun.net`；`admin.yoyoosun.net` 退役 |
 
 ## 目录说明 / Package Contents
 
@@ -34,6 +35,8 @@ server/deploy/compose/prod
 | `scripts/` | 针对本资料包的薄脚本，只做 env 校验、smoke、evidence 收集和备份恢复检查 |
 
 `env/runtime.contract.json` 是不含密钥的 yoyoosun 运行能力合同。当前固定要求短信登录为 `provider / enabled / not-mock`；生产 preflight、运行态容器检查、公开 `auth.capabilities` smoke 和 release evidence gate 必须同时满足，不能以页面截图或历史报告替代。
+
+根域跳转只属于公网导航配置，不会把 `erp.yoyoosun.net` 自动登记为生产 deployment target。正式启用生产仍必须另行补齐 target registry、运行资源、数据保留、备份恢复、权限、smoke 与回滚合同。Nginx 参考配置见 `compose/nginx.example.conf`，受控环境应用前必须先证明 `erp` 的 TLS 与目标页面可用，再切根域；失败时恢复原配置。
 
 ## 敏感信息规则 / Sensitive Data Rules
 

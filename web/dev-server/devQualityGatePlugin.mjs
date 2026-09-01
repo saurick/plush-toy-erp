@@ -211,6 +211,9 @@ export function buildDevQualityGateCommand({
   if (environmentMode === 'managed') {
     delete childEnvironment.DISPOSABLE_DATABASE_BASE_URL
   }
+  delete childEnvironment.PLUSH_GITLAB_TOKEN
+  delete childEnvironment.PLUSH_GITLAB_READ_TOKEN
+  delete childEnvironment.PLUSH_GITLAB_TARGET_FETCH_TOKEN
   return {
     command: nodeRuntime,
     args,
@@ -600,10 +603,16 @@ function statusProjection({
     return {
       tone: 'error',
       title: '当前版本本地严格门禁未通过',
-      description: '最近本地失败结果属于当前干净版本，且没有可复用的 R640 通过证据。',
+      description:
+        '最近本地失败结果属于当前干净版本，且没有可复用的 R640 通过证据。',
       releaseEligible: false,
       recommendation: '先修复第一失败阶段，再重新运行严格门禁。',
-      notProven: ['当前版本本地严格门禁', '当前版本 R640 严格门禁', '目标环境发布', '客户 UAT'],
+      notProven: [
+        '当前版本本地严格门禁',
+        '当前版本 R640 严格门禁',
+        '目标环境发布',
+        '客户 UAT',
+      ],
     }
   }
   if (!environment.disposableDatabaseReady) {
@@ -638,20 +647,15 @@ function statusProjection({
 }
 
 export const DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA =
-  'plush.dev-quality-gate-server-evidence/v1'
-const SERVER_CI_JOB_NAMES = Object.freeze([
-  'plan',
-  'prepare',
-  'quality_static',
-  'quality_node',
-  'quality_web',
-  'quality_server',
-  'quality_resource',
-  'quality_browser',
-  'quality_security',
-  'quality_aggregate',
-  'CI Gate',
-])
+  'plush.dev-quality-gate-server-evidence/v2'
+
+export function captureDevQualityGateServerEnvironment(env = process.env) {
+  return Object.freeze({
+    PLUSH_GITLAB_TOKEN: String(
+      env.PLUSH_GITLAB_READ_TOKEN || env.PLUSH_GITLAB_TOKEN || ''
+    ),
+  })
+}
 
 function unavailableServerEvidence(message) {
   return {
@@ -662,6 +666,7 @@ function unavailableServerEvidence(message) {
     gitSha: '',
     pipeline: null,
     jobs: [],
+    history: [],
     message,
     notProven: ['当前 exact SHA 的 R640 普通 CI'],
   }
@@ -676,11 +681,60 @@ export function projectDevQualityGateServerEvidence(timings, repository) {
   ) {
     throw new Error('server CI timing evidence is invalid')
   }
-  const exactRuns = timings.runs.filter(
-    (run) =>
-      run?.workflow === 'ci' &&
-      run?.event === 'push' &&
-      run?.gitSha === repository.commit
+  const projectRun = (run) => {
+    const latestJobs = new Map()
+    for (const job of run.jobs || []) {
+      if (!latestJobs.has(job.name) || job.id > latestJobs.get(job.name).id) {
+        latestJobs.set(job.name, job)
+      }
+    }
+    const jobs = [...latestJobs.values()].sort(
+      (left, right) => left.id - right.id
+    )
+    const passed =
+      run.status === 'completed' &&
+      run.conclusion === 'success' &&
+      jobs.length > 0 &&
+      jobs.every(
+        (job) => job.status === 'completed' && job.conclusion === 'success'
+      )
+    return { run, jobs, passed }
+  }
+  const candidates = timings.runs
+    .filter(
+      (run) =>
+        run?.workflow === 'ci' &&
+        run?.event === 'push' &&
+        /^[0-9a-f]{40}$/u.test(String(run?.gitSha || ''))
+    )
+    .map(projectRun)
+    .sort((left, right) => right.run.id - left.run.id)
+  const history = candidates.slice(0, 8).map(({ run, jobs, passed }) => {
+    const active = run.status !== 'completed'
+    const result = passed
+      ? 'passed'
+      : active
+        ? run.status === 'in_progress'
+          ? 'running'
+          : 'queued'
+        : run.conclusion === 'cancelled'
+          ? 'cancelled'
+          : run.conclusion === 'skipped'
+            ? 'skipped'
+            : 'failed'
+    return {
+      id: run.id,
+      result,
+      gitSha: run.gitSha,
+      url: run.url,
+      createdAt: run.createdAt,
+      finishedAt: run.finishedAt,
+      durationMs: run.durationMs,
+      failureJob: jobs.find((job) => job.conclusion === 'failure')?.name || '',
+    }
+  })
+  const exactRuns = candidates.filter(
+    (candidate) => candidate.run.gitSha === repository.commit
   )
   if (exactRuns.length === 0) {
     return {
@@ -691,32 +745,14 @@ export function projectDevQualityGateServerEvidence(timings, repository) {
       gitSha: repository.commit,
       pipeline: null,
       jobs: [],
-      message: 'R640 尚无绑定当前已提交 SHA 的普通 push CI 记录。',
+      history,
+      message:
+        'GitLab 凭据与 API 读取正常；R640 尚无绑定当前已提交 SHA 的普通 push CI 记录。',
       notProven: ['当前 exact SHA 的 R640 普通 CI'],
     }
   }
-  const projectRun = (run) => {
-    const latestJobs = new Map()
-    for (const job of run.jobs || []) {
-      if (!latestJobs.has(job.name) || job.id > latestJobs.get(job.name).id) {
-        latestJobs.set(job.name, job)
-      }
-    }
-    const jobs = SERVER_CI_JOB_NAMES.map((name) => latestJobs.get(name)).filter(
-      Boolean
-    )
-    const passed =
-      run.status === 'completed' &&
-      run.conclusion === 'success' &&
-      jobs.length === SERVER_CI_JOB_NAMES.length &&
-      jobs.every(
-        (job) => job.status === 'completed' && job.conclusion === 'success'
-      )
-    return { run, jobs, passed }
-  }
-  const candidates = exactRuns.map(projectRun)
   const selected =
-    candidates.find((candidate) => candidate.passed) || candidates[0]
+    exactRuns.find((candidate) => candidate.passed) || exactRuns[0]
   const active = selected.run.status !== 'completed'
   const status = selected.passed ? 'passed' : active ? 'running' : 'failed'
   return {
@@ -738,9 +774,11 @@ export function projectDevQualityGateServerEvidence(timings, repository) {
     jobs: selected.jobs.map((job) => ({
       id: job.id,
       name: job.name,
+      status: job.status,
       conclusion: job.conclusion,
       durationMs: job.durationMs,
     })),
+    history,
     message: selected.passed
       ? repository.dirty
         ? 'R640 已证明当前提交 SHA；该证据不覆盖本机未提交改动。'
@@ -808,6 +846,7 @@ export function createDevQualityGateService({
   timeoutMs = QUALITY_GATE_TIMEOUT_MS,
 } = {}) {
   const root = path.resolve(projectRoot || process.cwd())
+  const serverEvidenceEnvironment = captureDevQualityGateServerEnvironment(env)
   const store = operationStore || resolveDevQualityGateOperationStore(root)
   const active = new Map()
   const orphanStopTimers = new Map()
@@ -856,7 +895,7 @@ export function createDevQualityGateService({
     try {
       if (loadServerEvidence) {
         value = await loadServerEvidence({ repository, root })
-      } else if (!String(env.PLUSH_GITLAB_TOKEN || '')) {
+      } else if (!serverEvidenceEnvironment.PLUSH_GITLAB_TOKEN) {
         value = unavailableServerEvidence(
           '未登记只读 GitLab 凭据，当前仅显示本机回执。'
         )
@@ -865,16 +904,14 @@ export function createDevQualityGateService({
           await loadQaRuntimeModule('gitlabDelivery')
         const provider = createGitlabDeliveryProvider({
           projectRoot: root,
-          env,
+          env: serverEvidenceEnvironment,
         })
         value = projectDevQualityGateServerEvidence(
           await provider.listPipelineTimings({ limit: 8 }),
           repository
         )
       }
-      if (
-        value?.schemaVersion !== DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA
-      ) {
+      if (value?.schemaVersion !== DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA) {
         throw new Error('server CI evidence projection is invalid')
       }
     } catch {

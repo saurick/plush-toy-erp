@@ -55,6 +55,7 @@ export function DevTimingBars({
   totalDurationMs = 0,
   limit = 8,
   showTimeRange = false,
+  presentStage = deliveryPipelinePresentation,
 }) {
   const visibleStages = stages.slice(0, limit)
   if (visibleStages.length === 0) {
@@ -70,12 +71,8 @@ export function DevTimingBars({
   return (
     <ol className="erp-dev-timing-bars">
       {visibleStages.map((stage) => {
-        const stagePresentation = deliveryPipelinePresentation(
-          stage.name || stage.label
-        )
-        const groupPresentation = stage.group
-          ? deliveryPipelinePresentation(stage.group)
-          : null
+        const stagePresentation = presentStage(stage.name || stage.label)
+        const groupPresentation = stage.group ? presentStage(stage.group) : null
         const percentage = Math.min(
           100,
           Math.max(2, Math.round((stage.durationMs / denominator) * 100))
@@ -150,22 +147,22 @@ export function DevPipelineStatusStrip({
   )
 
   return (
-    <section aria-label="交付状态速览">
+    <section aria-label="最近发布与部署">
       <Card
         size="small"
         className="erp-dev-pipeline-status-strip"
-        title="交付状态速览"
+        title="最近发布与部署"
         extra={
           typeof onOpenDetails === 'function' ? (
             <Button type="link" onClick={onOpenDetails}>
-              查看完整效能
+              查看耗时详情
             </Button>
           ) : null
         }
       >
         <div className="erp-dev-pipeline-status-strip__metrics">
           <div>
-            <Text type="secondary">最近远端 CI/CD</Text>
+            <Text type="secondary">最近一次流水线</Text>
             <Space size={8} wrap>
               <Tag
                 color={
@@ -196,7 +193,7 @@ export function DevPipelineStatusStrip({
             <DevDeliveryTimestamp value={latestRun?.finishedAt} />
           </div>
           <div>
-            <Text type="secondary">最近完整发布</Text>
+            <Text type="secondary">最近一次制品发布</Text>
             <Text strong>
               {latestFullRelease
                 ? formatDeliveryDuration(latestFullRelease.durationMs)
@@ -226,16 +223,16 @@ export function DevPipelineStatusStrip({
             />
           </div>
           <div>
-            <Text type="secondary">最近工作台部署回执</Text>
+            <Text type="secondary">最近一次目标部署</Text>
             <Text strong>
               {deploymentOperation
                 ? formatDeliveryDuration(deploymentOperation.durationMs)
-                : '尚无真实部署'}
+                : '暂无已证明的目标部署'}
             </Text>
             <Text type="secondary">
               {deploymentOperation
                 ? `${targetCache.status} · 实传 ${formatDeliveryBytes(deploymentOperation.metrics.transferBytes)}`
-                : '等待包含制品传输的部署回执'}
+                : '等待目标部署读回'}
             </Text>
             <DevDeliveryTimestamp value={deploymentOperation?.updatedAt} />
           </div>
@@ -284,11 +281,10 @@ export default function DevPipelineTimingPanel({ timings, versions = [] }) {
       <div className="erp-dev-pipeline-timing__head">
         <div>
           <Title level={2} id="dev-pipeline-timing-title">
-            远端 CI/CD 活动
+            远端流水线耗时
           </Title>
           <Text type="secondary">
-            这里只展示当前 CI Provider 的 Pipeline、Package 与 Release；工作台
-            operation 只进入“当前操作”和“操作记录”。
+            展示远端流水线、制品发布和构建耗时；目标部署仍以“操作记录”中的独立回执为准。
           </Text>
         </div>
         <Text type="secondary">
@@ -299,13 +295,13 @@ export default function DevPipelineTimingPanel({ timings, versions = [] }) {
       {!latestRun ? (
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="尚无可计算的 CI/CD 运行"
+          description="尚无可计算的远端流水线"
         />
       ) : (
         <section aria-labelledby="dev-pipeline-timing-title">
           <div className="erp-dev-pipeline-timing__summary">
             <div>
-              <Text type="secondary">最近动作</Text>
+              <Text type="secondary">最近一次流水线</Text>
               <strong>{formatDeliveryDuration(latestRun.durationMs)}</strong>
               <Text>
                 {deliveryPipelineRunModePresentation(summary.latestMode)} ·{' '}
@@ -318,7 +314,7 @@ export default function DevPipelineTimingPanel({ timings, versions = [] }) {
               <DevDeliveryTimestamp value={latestRun.finishedAt} />
             </div>
             <div>
-              <Text type="secondary">最近完整发布</Text>
+              <Text type="secondary">最近一次制品发布</Text>
               <strong>
                 {formatDeliveryDuration(summary.latestFullRelease?.durationMs)}
               </strong>
@@ -369,8 +365,8 @@ export default function DevPipelineTimingPanel({ timings, versions = [] }) {
               color={latestRun.conclusion === 'success' ? 'success' : 'error'}
             >
               {latestRun.conclusion === 'success'
-                ? '最近动作通过'
-                : '最近动作未通过'}
+                ? '最近流水线通过'
+                : '最近流水线未通过'}
             </Tag>
             <Text>{summary.optimizationHint}</Text>
             <Text
@@ -383,7 +379,7 @@ export default function DevPipelineTimingPanel({ timings, versions = [] }) {
             >
               {summary.failureReason
                 ? `失败原因：${deliveryPipelinePresentation(summary.failureReason.job).label} / ${deliveryPipelinePresentation(summary.failureReason.step).label}`
-                : '最近动作没有失败步骤'}
+                : '最近流水线没有失败步骤'}
             </Text>
             <Link href={latestRun.url} target="_blank" rel="noreferrer">
               {latestRun.url.includes('github.com')
@@ -394,7 +390,7 @@ export default function DevPipelineTimingPanel({ timings, versions = [] }) {
 
           <div className="erp-dev-pipeline-timing__analysis">
             <div className="erp-dev-pipeline-timing__critical-path">
-              <Text strong>观测关键路径</Text>
+              <Text strong>流水线关键路径（可见部分）</Text>
               <Text>
                 {formatDeliveryDuration(summary.criticalPath?.durationMs)} ·
                 可见环节{' '}
@@ -423,11 +419,11 @@ export default function DevPipelineTimingPanel({ timings, versions = [] }) {
           {analysisJobs.length > 0 ? (
             <details className="erp-dev-pipeline-timing__details">
               <summary>
-                查看全部 job / step（{String(analysisJobs.length)} 个 job）
+                查看全部任务与步骤（{String(analysisJobs.length)} 个任务）
               </summary>
               <div className="erp-dev-pipeline-timing__jobs-toolbar">
                 <Text type="secondary">
-                  各 job 默认收起；可逐项查看步骤时间，或统一展开。
+                  各任务默认收起；可逐项查看步骤时间，或统一展开。
                 </Text>
                 <Space wrap>
                   <Button
@@ -494,7 +490,7 @@ export default function DevPipelineTimingPanel({ timings, versions = [] }) {
           ) : (
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="该次运行未返回 job / step 时间"
+              description="该次流水线未返回任务或步骤时间"
             />
           )}
         </section>

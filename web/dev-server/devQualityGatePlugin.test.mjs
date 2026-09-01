@@ -11,6 +11,7 @@ import {
   DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA,
   QUALITY_GATE_TIMEOUT_MS,
   buildDevQualityGateCommand,
+  captureDevQualityGateServerEnvironment,
   createDevQualityGateMiddleware,
   createDevQualityGatePlugin,
   createDevQualityGateService,
@@ -155,6 +156,7 @@ test('quality gate projects R640 exact-SHA CI separately from local dirty state'
           status: 'completed',
           conclusion: 'success',
           gitSha: REPOSITORY.commit,
+          createdAt: '2026-08-29T01:00:00.000Z',
           queueMs: 3000,
           durationMs: 420000,
           finishedAt: '2026-08-29T01:07:00.000Z',
@@ -171,15 +173,59 @@ test('quality gate projects R640 exact-SHA CI separately from local dirty state'
     },
     REPOSITORY
   )
-  assert.equal(
-    evidence.schemaVersion,
-    DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA
-  )
+  assert.equal(evidence.schemaVersion, DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA)
   assert.equal(evidence.status, 'passed')
   assert.equal(evidence.current, true)
   assert.equal(evidence.coversWorkingTree, false)
   assert.equal(evidence.jobs.length, names.length)
+  assert.equal(evidence.jobs[0].status, 'completed')
+  assert.equal(evidence.history.length, 1)
+  assert.equal(evidence.history[0].result, 'passed')
+  assert.equal(evidence.history[0].gitSha, REPOSITORY.commit)
   assert.match(evidence.message, /不覆盖本机未提交改动/u)
+})
+
+test('quality gate distinguishes a readable GitLab response from a missing exact-SHA pipeline', () => {
+  const evidence = projectDevQualityGateServerEvidence(
+    {
+      schemaVersion: 'plush.delivery-pipeline-timings/v1',
+      runs: [
+        {
+          id: 90,
+          attempt: 16,
+          workflow: 'ci',
+          event: 'push',
+          status: 'completed',
+          conclusion: 'failure',
+          gitSha: 'c'.repeat(40),
+          createdAt: '2026-08-28T01:00:00.000Z',
+          finishedAt: '2026-08-28T01:06:00.000Z',
+          durationMs: 360_000,
+          url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/90',
+          jobs: [
+            {
+              id: 900,
+              name: 'quality_web',
+              status: 'completed',
+              conclusion: 'failure',
+              durationMs: 120_000,
+            },
+          ],
+        },
+      ],
+    },
+    REPOSITORY
+  )
+
+  assert.equal(evidence.status, 'missing')
+  assert.equal(evidence.gitSha, REPOSITORY.commit)
+  assert.equal(evidence.pipeline, null)
+  assert.deepEqual(evidence.jobs, [])
+  assert.equal(evidence.history.length, 1)
+  assert.equal(evidence.history[0].result, 'failed')
+  assert.equal(evidence.history[0].failureJob, 'quality_web')
+  assert.match(evidence.message, /GitLab 凭据与 API 读取正常/u)
+  assert.match(evidence.message, /尚无绑定当前已提交 SHA/u)
 })
 
 test('quality gate command uses only fixed formal runners', () => {
@@ -196,6 +242,9 @@ test('quality gate command uses only fixed formal runners', () => {
     environment: {
       ...DATABASE_ENV,
       DISPOSABLE_DATABASE_BASE_URL: 'must-not-leak',
+      PLUSH_GITLAB_READ_TOKEN: 'must-not-reach-quality-child',
+      PLUSH_GITLAB_TARGET_FETCH_TOKEN: 'must-not-reach-quality-child',
+      PLUSH_GITLAB_TOKEN: 'must-not-reach-quality-child',
     },
     environmentMode: 'managed',
     nodeRuntime: '/pinned/node',
@@ -214,8 +263,27 @@ test('quality gate command uses only fixed formal runners', () => {
     Object.hasOwn(managed.env, 'DISPOSABLE_DATABASE_BASE_URL'),
     false
   )
+  assert.equal(Object.hasOwn(managed.env, 'PLUSH_GITLAB_TOKEN'), false)
+  assert.equal(Object.hasOwn(managed.env, 'PLUSH_GITLAB_READ_TOKEN'), false)
+  assert.equal(
+    Object.hasOwn(managed.env, 'PLUSH_GITLAB_TARGET_FETCH_TOKEN'),
+    false
+  )
   assert.equal(QUALITY_GATE_TIMEOUT_MS.full, 90 * 60 * 1000)
   assert.equal(QUALITY_GATE_TIMEOUT_MS.strict, 180 * 60 * 1000)
+})
+
+test('quality gate keeps a private server evidence credential snapshot', () => {
+  const sharedEnvironment = {
+    PLUSH_GITLAB_READ_TOKEN: 'fixture-read-api-token',
+    PLUSH_GITLAB_TOKEN: 'fixture-delivery-token',
+  }
+  const serverEnvironment =
+    captureDevQualityGateServerEnvironment(sharedEnvironment)
+  delete sharedEnvironment.PLUSH_GITLAB_READ_TOKEN
+
+  assert.equal(serverEnvironment.PLUSH_GITLAB_TOKEN, 'fixture-read-api-token')
+  assert.equal(Object.isFrozen(serverEnvironment), true)
 })
 
 test('quality gate environment prefers an explicit loopback base and otherwise probes managed Docker', async () => {
@@ -814,6 +882,7 @@ test('quality gate summary reuses only a passed receipt for the current clean SH
       gitSha: cleanRepository.commit,
       pipeline: null,
       jobs: [],
+      history: [],
       message: 'R640 exact-SHA CI 已通过',
       notProven: ['不可变 Release'],
     }),
@@ -850,6 +919,7 @@ test('quality gate never promotes a local receipt without R640 exact-SHA evidenc
       gitSha: cleanRepository.commit,
       pipeline: null,
       jobs: [],
+      history: [],
       message: '当前 SHA 无服务器证据',
       notProven: ['当前 exact SHA 的 R640 普通 CI'],
     }),
@@ -890,6 +960,7 @@ test('quality gate summary keeps current proof authoritative when rerun environm
       gitSha: cleanRepository.commit,
       pipeline: null,
       jobs: [],
+      history: [],
       message: 'R640 exact-SHA CI 已通过',
       notProven: ['不可变 Release'],
     }),

@@ -15,6 +15,7 @@ import {
   transitionDeliveryOperation,
 } from '../../scripts/deploy/delivery-operation-store.mjs'
 import {
+  captureDevDeliveryProviderEnvironments,
   DEV_DELIVERY_ACTION_API_PATH,
   DEV_DELIVERY_SESSION_API_PATH,
   createConfiguredDeliveryProvider,
@@ -70,6 +71,110 @@ test('delivery bridge defaults to GitLab and requires an explicit GitHub fallbac
       }),
     /gitlab or github/u
   )
+})
+
+test('delivery bridge keeps read and write provider credentials isolated', () => {
+  const environments = captureDevDeliveryProviderEnvironments({
+    PLUSH_GITLAB_READ_TOKEN: 'read-only-token',
+    PLUSH_GITLAB_TOKEN: 'write-token',
+    PLUSH_GITLAB_TARGET_FETCH_TOKEN: 'target-fetch-token',
+    [DELIVERY_OPERATION_STORE_REPO_ROOT_ENV]: '/tmp/operation-store',
+    KEEP_ME: 'visible',
+  })
+
+  assert.equal(
+    environments.readEnvironment.PLUSH_GITLAB_TOKEN,
+    'read-only-token'
+  )
+  assert.equal(environments.writeEnvironment.PLUSH_GITLAB_TOKEN, 'write-token')
+  assert.equal(environments.releaseDispatchAllowed, true)
+  for (const environment of [
+    environments.readEnvironment,
+    environments.writeEnvironment,
+  ]) {
+    assert.equal(environment.KEEP_ME, 'visible')
+    assert.equal(Object.hasOwn(environment, 'PLUSH_GITLAB_READ_TOKEN'), false)
+    assert.equal(
+      Object.hasOwn(environment, 'PLUSH_GITLAB_TARGET_FETCH_TOKEN'),
+      false
+    )
+    assert.equal(
+      Object.hasOwn(environment, DELIVERY_OPERATION_STORE_REPO_ROOT_ENV),
+      false
+    )
+  }
+
+  const readOnly = captureDevDeliveryProviderEnvironments({
+    PLUSH_GITLAB_READ_TOKEN: 'read-only-token',
+  })
+  assert.equal(readOnly.readEnvironment.PLUSH_GITLAB_TOKEN, 'read-only-token')
+  assert.equal(
+    Object.hasOwn(readOnly.writeEnvironment, 'PLUSH_GITLAB_TOKEN'),
+    false
+  )
+  assert.equal(readOnly.releaseDispatchAllowed, false)
+})
+
+test('read-only GitLab evidence does not authorize release dispatch', async (t) => {
+  const { root, store } = createProject(t)
+  const environment = { PLUSH_GITLAB_READ_TOKEN: 'read-only-token' }
+  let versionReads = 0
+  let timingReads = 0
+  const service = createDevDeliveryService({
+    projectRoot: root,
+    operationStore: store,
+    env: environment,
+    readProvider: {
+      provider: 'gitlab',
+      listVersions() {
+        versionReads += 1
+        return []
+      },
+      listPipelineTimings() {
+        timingReads += 1
+        return null
+      },
+      getReleaseStatus: () => ({ status: 'missing', release: null }),
+    },
+    readRepositoryState: () => ({
+      commit: SHA,
+      dirty: false,
+      fingerprint: 'd'.repeat(64),
+    }),
+    runPreflight: (target) => ({
+      status: 'passed',
+      target,
+      purpose:
+        target === 'customer-test-133'
+          ? 'customer-clean-acceptance'
+          : 'project-demo-simulated',
+    }),
+    readRecoveryEvidence: () => null,
+  })
+
+  const summary = await service.summary()
+  assert.equal(versionReads, 1)
+  assert.equal(timingReads, 1)
+  assert.equal(summary.boundaries.releaseDispatchAllowed, false)
+  assert.equal(
+    summary.issues.some(
+      (issue) => issue.code === 'release_dispatch_credential_unavailable'
+    ),
+    true
+  )
+  assert.equal(Object.hasOwn(environment, 'PLUSH_GITLAB_READ_TOKEN'), false)
+  await assert.rejects(
+    service.act({
+      action: 'dispatch-release',
+      payload: {
+        gitSha: SHA,
+        version: '2026.09.01-1',
+        idempotencyKey: IDEMPOTENCY_KEY,
+      },
+    }),
+    /credential is unavailable/u
+  )
+  assert.equal(listDeliveryOperations(store, { limit: 10 }).length, 0)
 })
 
 function createProject(t) {
@@ -231,6 +336,28 @@ test('delivery action contract accepts fixed actions and bounded explicit retry'
     }).payload.target,
     'demo-133'
   )
+  assert.equal(
+    validateDevDeliveryAction({
+      action: 'prepare-database-rebuild',
+      payload: {
+        gitSha: SHA,
+        version: '2026.07.29-1',
+        target: 'customer-test-133',
+        idempotencyKey: IDEMPOTENCY_KEY,
+      },
+    }).action,
+    'prepare-database-rebuild'
+  )
+  assert.equal(
+    validateDevDeliveryAction({
+      action: 'execute-database-rebuild',
+      payload: {
+        operationId: OPERATION_ID,
+        confirmation: `REBUILD_DATABASE:customer-test-133:${SHA}:${OPERATION_ID}`,
+      },
+    }).action,
+    'execute-database-rebuild'
+  )
   assert.throws(
     () =>
       validateDevDeliveryAction({
@@ -301,6 +428,100 @@ test('delivery action contract accepts fixed actions and bounded explicit retry'
       }),
     /unsupported fields/u
   )
+})
+
+test('version center keeps test data rebuild on its dedicated two-step executor', async (t) => {
+  const { root, store } = createProject(t)
+  const child = new EventEmitter()
+  const downloads = []
+  let preparedRequest
+  let spawned
+  const service = createDevDeliveryService({
+    projectRoot: root,
+    operationStore: store,
+    provider: {
+      provider: 'gitlab',
+      listVersions: () => [
+        {
+          gitSha: SHA,
+          version: '2026.07.29-1',
+          status: 'published',
+          completeAssets: true,
+        },
+      ],
+      downloadReleaseControl(gitSha, destination) {
+        downloads.push(gitSha)
+        return directControlDownload(destination)
+      },
+    },
+    prepareDatabaseRebuildAction(request) {
+      preparedRequest = request
+      let { operation } = createOrReuseDeliveryOperation(store, {
+        action: 'rebuild-database',
+        target: request.targetKey,
+        gitSha: SHA,
+        version: '2026.07.29-1',
+        idempotencyKey: request.idempotencyKey,
+        operationId: OPERATION_ID,
+      })
+      operation = transitionDeliveryOperation(store, operation.id, {
+        status: 'running',
+        message: 'fixed rebuild qualification started',
+      })
+      operation = transitionDeliveryOperation(store, operation.id, {
+        status: 'ready',
+        message: 'database rebuild is ready',
+      })
+      return {
+        operation,
+        plan: { status: 'eligible' },
+        reused: false,
+      }
+    },
+    spawnProcess(command, args, options) {
+      spawned = { command, args, options }
+      return child
+    },
+  })
+
+  const prepared = await service.act({
+    action: 'prepare-database-rebuild',
+    payload: {
+      gitSha: SHA,
+      version: '2026.07.29-1',
+      target: 'customer-test-133',
+      idempotencyKey: IDEMPOTENCY_KEY,
+    },
+  })
+  assert.equal(prepared.operation.action, 'rebuild-database')
+  assert.equal(prepared.operation.status, 'ready')
+  assert.equal(
+    prepared.operation.confirmationRequired,
+    `REBUILD_DATABASE:customer-test-133:${SHA}:${OPERATION_ID}`
+  )
+  assert.equal(preparedRequest.targetKey, 'customer-test-133')
+  assert.match(preparedRequest.releaseManifestPath, /release-manifest[.]json$/u)
+  assert.deepEqual(downloads, [SHA])
+
+  const accepted = await service.act({
+    action: 'execute-database-rebuild',
+    payload: {
+      operationId: OPERATION_ID,
+      confirmation: prepared.operation.confirmationRequired,
+    },
+  })
+  assert.equal(accepted.accepted, true)
+  assert.equal(accepted.operation.status, 'launching')
+  assert.equal(spawned.command, process.execPath)
+  assert.match(spawned.args[0], /database-rebuild-executor[.]mjs$/u)
+  assert.doesNotMatch(spawned.args.join(' '), /promotion-executor/u)
+  assert.equal(spawned.options.cwd, root)
+
+  child.emit('close', 1)
+  const failed = service.readOperation(OPERATION_ID)
+  assert.equal(failed.status, 'failed')
+  assert.equal(failed.issues[0].code, 'database_rebuild_executor_start_failed')
+  assert.equal(failed.retry.allowed, false)
 })
 
 test('recovery evidence reader exposes only the newest strict passed receipt', (t) => {
@@ -1114,7 +1335,7 @@ test('upgrade promotion proves the current direct-fetch rollback transport befor
   const child = new EventEmitter()
   let spawnCount = 0
   const preparePromotionAction = ({ idempotencyKey, targetKey }) => {
-    let operation = createOrReuseDeliveryOperation(store, {
+    let { operation } = createOrReuseDeliveryOperation(store, {
       action: 'promote',
       target: targetKey,
       gitSha: SHA,
@@ -1122,7 +1343,7 @@ test('upgrade promotion proves the current direct-fetch rollback transport befor
       idempotencyKey,
       operationId: OPERATION_ID,
       metadata: { source: 'version-center' },
-    }).operation
+    })
     operation = transitionDeliveryOperation(store, operation.id, {
       status: 'running',
       message: 'fixed preflight',
@@ -1213,14 +1434,14 @@ test('upgrade promotion is blocked before target write when current rollback tra
       },
     },
     preparePromotionAction({ idempotencyKey, targetKey }) {
-      let operation = createOrReuseDeliveryOperation(store, {
+      let { operation } = createOrReuseDeliveryOperation(store, {
         action: 'promote',
         target: targetKey,
         gitSha: SHA,
         version: '2026.07.29-1',
         idempotencyKey,
         operationId: OPERATION_ID,
-      }).operation
+      })
       operation = transitionDeliveryOperation(store, operation.id, {
         status: 'running',
         message: 'fixed preflight',
@@ -1262,8 +1483,10 @@ test('a synchronous executor start failure is terminal and is not retried', asyn
   const { root, store } = createProject(t)
   const originalFetchToken = process.env.PLUSH_GITLAB_TARGET_FETCH_TOKEN
   const originalProviderToken = process.env.PLUSH_GITLAB_TOKEN
+  const originalReadToken = process.env.PLUSH_GITLAB_READ_TOKEN
   process.env.PLUSH_GITLAB_TARGET_FETCH_TOKEN = 'promotion-target-fetch-token'
   process.env.PLUSH_GITLAB_TOKEN = 'must-not-reach-promotion-child'
+  process.env.PLUSH_GITLAB_READ_TOKEN = 'must-not-reach-promotion-child'
   t.after(() => {
     if (originalFetchToken === undefined) {
       delete process.env.PLUSH_GITLAB_TARGET_FETCH_TOKEN
@@ -1274,6 +1497,11 @@ test('a synchronous executor start failure is terminal and is not retried', asyn
       delete process.env.PLUSH_GITLAB_TOKEN
     } else {
       process.env.PLUSH_GITLAB_TOKEN = originalProviderToken
+    }
+    if (originalReadToken === undefined) {
+      delete process.env.PLUSH_GITLAB_READ_TOKEN
+    } else {
+      process.env.PLUSH_GITLAB_READ_TOKEN = originalReadToken
     }
   })
   createOrReuseDeliveryOperation(store, {
@@ -1323,6 +1551,10 @@ test('a synchronous executor start failure is terminal and is not retried', asyn
     'promotion-target-fetch-token'
   )
   assert.equal(Object.hasOwn(spawnedOptions.env, 'PLUSH_GITLAB_TOKEN'), false)
+  assert.equal(
+    Object.hasOwn(spawnedOptions.env, 'PLUSH_GITLAB_READ_TOKEN'),
+    false
+  )
   assert.equal(readDeliveryOperation(store, OPERATION_ID).status, 'failed')
   await assert.rejects(
     service.act({
@@ -1728,8 +1960,7 @@ test('legacy rollback blocks before spawn when its qualified cache disappears', 
       return new EventEmitter()
     },
   })
-  const confirmation =
-    `ROLLBACK:customer-test-133:${currentSha}:${SHA}:` + ROLLBACK_OPERATION_ID
+  const confirmation = `ROLLBACK:customer-test-133:${currentSha}:${SHA}:${ROLLBACK_OPERATION_ID}`
   await assert.rejects(
     service.act({
       action: 'execute-rollback',

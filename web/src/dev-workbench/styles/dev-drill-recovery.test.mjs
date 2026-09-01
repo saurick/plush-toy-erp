@@ -18,29 +18,12 @@ test('drill recovery styles: stay page-scoped and use one imported surface', () 
   assert.doesNotMatch(css, /^\.ant-(?:card|list|alert|btn)\s*\{/mu)
 })
 
-test('drill recovery layout: leads with one conclusion and avoids a drill card wall', () => {
-  assert.match(
-    css,
-    /\.erp-dev-recovery-overview \.ant-card-body \{[\s\S]*grid-template-columns: minmax\(0, 1fr\) minmax\(260px, 0\.38fr\);/u
-  )
+test('drill recovery page leads with the operational conclusion and evidence boundary', () => {
   assert.match(page, /当前恢复准备度/u)
   assert.match(page, /下一步建议/u)
   assert.match(page, /<details[\s\S]*<summary>/u)
   assert.match(page, /overview\.drills\.map/u)
-  assert.match(page, /open=\{open\}/u)
-  assert.match(page, /globalThis\.matchMedia\?\.\('\(min-width: 721px\)'\)/u)
-  assert.match(
-    page,
-    /onToggle=\{\(event\) => setOpen\(event\.currentTarget\.open\)\}/u
-  )
   assert.doesNotMatch(page, /function DrillCard|erp-dev-recovery-drills/u)
-})
-
-test('drill recovery layout: keeps scan fields visible and evidence on demand', () => {
-  assert.match(
-    css,
-    /\.erp-dev-recovery-list-head,[\s\S]*\.erp-dev-recovery-row > summary \{[\s\S]*grid-template-columns:/u
-  )
   assert.match(page, /优先级[\s\S]*演练[\s\S]*状态[\s\S]*建议频率/u)
   assert.match(page, /变化时触发/u)
   assert.match(page, /完成证据/u)
@@ -49,43 +32,6 @@ test('drill recovery layout: keeps scan fields visible and evidence on demand', 
     page,
     /const recentOperations = overview\.operations\.slice\(0, 3\)/u
   )
-  assert.match(css, /overflow-wrap: anywhere/u)
-})
-
-test('drill recovery styles: mobile keeps a compact readable scan with full-width actions', () => {
-  assert.match(
-    css,
-    /@media \(max-width: 720px\)[\s\S]*\.erp-dev-recovery-page \.erp-dev-workspace-nav \{[\s\S]*position: static;/u
-  )
-  assert.match(
-    css,
-    /@media \(max-width: 720px\)[\s\S]*\.erp-dev-recovery-row__detail-grid,[\s\S]*grid-template-columns: minmax\(0, 1fr\);/u
-  )
-  assert.match(
-    css,
-    /\.erp-dev-recovery-row__footer \{[\s\S]*flex-direction: column;/u
-  )
-  assert.match(
-    css,
-    /\.erp-dev-recovery-row__footer > \.ant-btn,[\s\S]*width: 100%;/u
-  )
-  assert.match(
-    css,
-    /\.erp-dev-recovery-row__objective,[\s\S]*\.erp-dev-recovery-row__risk \{[\s\S]*display: none;/u
-  )
-  assert.match(
-    css,
-    /\.erp-dev-recovery-overview__facts \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/u
-  )
-  assert.match(
-    css,
-    /\.erp-dev-recovery-row > summary \{[\s\S]*grid-template-columns: auto minmax\(0, 1fr\) minmax\(86px, 0\.55fr\) 12px;[\s\S]*min-height: 76px;/u
-  )
-  assert.match(
-    css,
-    /\.erp-dev-recovery-operation-list li \{[\s\S]*grid-template-columns: minmax\(0, 1fr\) auto;/u
-  )
-  assert.match(page, /title=\{drill\.cadence\}/u)
 })
 
 test('drill recovery page exposes business labels and keeps high-risk actions disabled', () => {

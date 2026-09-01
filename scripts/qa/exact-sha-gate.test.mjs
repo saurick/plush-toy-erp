@@ -81,6 +81,8 @@ function createFixture() {
   const files = new Set([
     ...PROFILE_REQUIRED_FILES.strict,
     ".gitlab-ci.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/release.yml",
     ".n-node-version",
     "server/go.mod",
     "server/go.sum",
@@ -354,8 +356,7 @@ test("exact-SHA terminal records truthful GitLab pipeline provenance", () => {
   assert.deepEqual(buildExactShaProvenance(gitlabEnv), {
     source: "gitlab-ci",
     repository: "saurick/plush-toy-erp",
-    workflowRef:
-      "saurick/plush-toy-erp/.gitlab-ci.yml@refs/heads/main",
+    workflowRef: "saurick/plush-toy-erp/.gitlab-ci.yml@refs/heads/main",
     runId: "9001",
     runAttempt: "27",
     job: "strict",

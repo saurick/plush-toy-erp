@@ -31,6 +31,33 @@ const MANAGED_DATABASE_COMMAND_IDS = new Set([
 const CUSTOMER_SOURCE_BOUNDARY_TEST =
   "scripts/qa/customer-source-repository-boundary.test.mjs";
 const DEV_PAGE_GOVERNANCE_TEST = "scripts/qa/dev-page-governance.test.mjs";
+const DEV_ENTRY_BOUNDARY_TEST = "scripts/qa/dev-entry-boundary.test.mjs";
+const DEV_SERVER_SECURITY_TEST =
+  "web/dev-server/devServerSecurity.test.mjs";
+const DEV_WORKBENCH_PLUGINS_TEST =
+  "web/dev-server/devWorkbenchPlugins.test.mjs";
+const DEV_QUALITY_GATE_PROVIDER_BOUNDARY_TEST =
+  "scripts/qa/dev-quality-gate-provider-boundary.test.mjs";
+const DEV_DESKTOP_SCENARIOS = Object.freeze([
+  "dev-business-usability-desktop-light",
+  "dev-drill-recovery-desktop-light",
+  "dev-flow-state-observatory-desktop-light",
+  "dev-quality-gates-desktop-light",
+  "dev-version-center-tabs-pagination-desktop",
+  "dev-page-overview-desktop-light",
+  "dev-page-product-engineering-desktop-light",
+  "dev-page-quality-desktop-light",
+  "dev-page-delivery-desktop-light",
+  "dev-page-product-core-desktop-light",
+  "dev-page-permission-relationships-desktop-light",
+  "dev-page-governance-desktop-light",
+  "dev-page-docs-desktop-light",
+  "dev-page-prototypes-desktop-light",
+  "dev-page-testing-desktop-light",
+  "dev-page-data-preparation-desktop-light",
+  "dev-page-customer-config-desktop-light",
+  "dev-page-database-migration-desktop-light",
+]);
 const SCHEMA_DOCS_TEST = "scripts/qa/schema-docs.test.mjs";
 const PRIVATE_SOURCE_EXTENSIONS = new Set([
   ".doc",
@@ -41,6 +68,21 @@ const PRIVATE_SOURCE_EXTENSIONS = new Set([
   ".png",
   ".xls",
   ".xlsx",
+]);
+const PHASE_LABEL_TEXT_EXTENSIONS = new Set([
+  "",
+  ".css",
+  ".go",
+  ".js",
+  ".json",
+  ".jsx",
+  ".md",
+  ".mjs",
+  ".sh",
+  ".ts",
+  ".tsx",
+  ".yaml",
+  ".yml",
 ]);
 
 const FIXED_COMMANDS = {
@@ -301,11 +343,34 @@ function addShellCheck(state, file) {
   addReason(state, id, file);
 }
 
+function addAffectedPhaseLabelCheck(state, files) {
+  if (files.length === 0) return;
+  const id = "phase-labels:affected";
+  state.commands.set(
+    id,
+    command(
+      id,
+      "T0",
+      "检查本次变更文件的阶段编号命名边界",
+      "node",
+      ["scripts/qa/phase-label-boundaries.mjs", ...files],
+    ),
+  );
+  for (const file of files) addReason(state, id, file);
+}
+
 function addFollowUp(state, id, scope, text, reason) {
   if (!state.followUps.has(id)) {
-    state.followUps.set(id, { id, scope, text, reasons: new Set() });
+    state.followUps.set(id, {
+      id,
+      scope,
+      texts: new Set(),
+      reasons: new Set(),
+    });
   }
-  state.followUps.get(id).reasons.add(reason);
+  const followUp = state.followUps.get(id);
+  followUp.texts.add(text);
+  followUp.reasons.add(reason);
   state.affectedScopes.add(scope);
 }
 
@@ -318,16 +383,118 @@ function isDocumentation(file) {
   );
 }
 
+function isPhaseLabelGovernedPath(file) {
+  if (
+    file === ".gitleaksignore" ||
+    file === "progress.md" ||
+    file === "docs/文档清单.md" ||
+    file === "scripts/qa/phase-label-boundaries.mjs" ||
+    file.startsWith("docs/archive/") ||
+    file.startsWith("docs/customers/yoyoosun/raw-source-files/") ||
+    file.startsWith("output/") ||
+    file.startsWith("server/internal/data/model/ent/")
+  ) {
+    return false;
+  }
+  return PHASE_LABEL_TEXT_EXTENSIONS.has(path.posix.extname(file));
+}
+
 function isDevPageGovernancePath(file) {
   return (
     /^web\/src\/dev-workbench\/(?:DevWorkbenchRoutes\.jsx|pages\/|styles\/)/u.test(
       file,
     ) ||
-    /^web\/src\/dev-workbench\/(?:components\/DevPageNav\.jsx|config\/(?:devHub|devRoutes)\.mjs)$/u.test(
+    /^web\/src\/dev-workbench\/(?:components\/Dev(?:EnvironmentEvidencePanel|PageNav|PipelineTimingPanel|TaskNav)\.jsx|config\/dev(?:BusinessUsability|CustomerConfig|DataPreparation|Delivery|Docs|FactLedgerCatalog|FlowState|Governance|Hub|ProductCore|Prototypes|QualityGates|Routes|Testing|VersionCenter)[^/]*\.mjs)$/u.test(
       file,
     ) ||
     /^web\/scripts\/style-l1\/(?:scenarios|dev[A-Z][^/]*)\.mjs$/u.test(file)
   );
+}
+
+function isPrivilegedDevServerPath(file) {
+  return /^web\/dev-server\/dev(?:CustomerImportDryRun|DataPreparation|DatabaseMigration|DeliveryBridge|QualityGate|ServerSecurity)/u.test(
+    file,
+  );
+}
+
+function isDevQualityGateProviderBoundaryPath(file) {
+  return [
+    "web/dev-server/devQualityGatePlugin.mjs",
+    "web/src/dev-workbench/config/devQualityGates.mjs",
+    "web/src/dev-workbench/pages/DevQualityGatesPage.jsx",
+  ].includes(file);
+}
+
+function devBrowserScenarioNames(file) {
+  const mappings = [
+    [/BusinessUsability|business-usability/u, ["dev-business-usability-desktop-light"]],
+    [/DrillRecovery|drill-recovery/u, ["dev-drill-recovery-desktop-light"]],
+    [
+      /FlowState|BusinessChain|FactLedger|status-flows|flow-state-observatory/u,
+      ["dev-flow-state-observatory-desktop-light"],
+    ],
+    [/QualityGate|quality-gates/u, ["dev-quality-gates-desktop-light"]],
+    [
+      /VersionCenter|version-center/u,
+      ["dev-version-center-tabs-pagination-desktop"],
+    ],
+    [/ProductCore|product-core/u, ["dev-page-product-core-desktop-light"]],
+    [
+      /PermissionRelationship|permission-relationships/u,
+      ["dev-page-permission-relationships-desktop-light"],
+    ],
+    [/Governance|governance/u, ["dev-page-governance-desktop-light"]],
+    [/DevDocs|devDocs|dev-docs/u, ["dev-page-docs-desktop-light"]],
+    [/Prototype|prototypes/u, ["dev-page-prototypes-desktop-light"]],
+    [
+      /DevTesting|devTesting/u,
+      ["dev-page-testing-desktop-light"],
+    ],
+    [
+      /DataPreparation|data-preparation/u,
+      ["dev-page-data-preparation-desktop-light"],
+    ],
+    [
+      /CustomerConfig|customer-config/u,
+      ["dev-page-customer-config-desktop-light"],
+    ],
+    [
+      /DatabaseMigration|database-migration/u,
+      ["dev-page-database-migration-desktop-light"],
+    ],
+    [/DevHub|devHub|dev-overview/u, ["dev-page-overview-desktop-light"]],
+    [
+      /DevWorkbenchArea|dev-product-engineering-workflow/u,
+      [
+        "dev-page-product-engineering-desktop-light",
+        "dev-page-quality-desktop-light",
+        "dev-page-delivery-desktop-light",
+      ],
+    ],
+    [
+      /dev-quality-workflow/u,
+      ["dev-page-quality-desktop-light", "dev-page-testing-desktop-light"],
+    ],
+    [/dev-delivery-workflow/u, ["dev-page-delivery-desktop-light"]],
+  ];
+  const match = mappings.find(([pattern]) => pattern.test(file));
+  if (match) return match[1];
+  if (
+    /(?:DevWorkbenchRoutes|DevPageNav|DevTaskNav|devRoutes|dev-navigation|dev-workbench-density|styles\/index\.css|style-l1\/scenarios\.mjs)/u.test(
+      file,
+    )
+  ) {
+    return DEV_DESKTOP_SCENARIOS;
+  }
+  return [];
+}
+
+function devBrowserFollowUpText(file) {
+  const scenarios = devBrowserScenarioNames(file);
+  if (scenarios.length > 0) {
+    return `运行 STYLE_L1_SCENARIOS=${scenarios.join(",")} pnpm --dir web style:l1，核对受影响 DEV 桌面页面可打开及 document-level 横向溢出；不要求 DEV 移动端、暗色、截图、固定密度或通用键盘合同。`;
+  }
+  return "选择受影响的 DEV 桌面 STYLE_L1_SCENARIOS 运行浏览器 smoke；共享布局或无法可靠映射场景时扩大到 DEV 桌面场景，不要求 DEV 移动端、暗色、截图、固定密度或通用键盘合同。";
 }
 
 function isCustomerPrivateSourcePath(file) {
@@ -386,10 +553,17 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
   const directTests = new Set();
 
   addFixed(state, "diff", "所有改动");
+  addAffectedPhaseLabelCheck(
+    state,
+    changedFiles.filter(isPhaseLabelGovernedPath),
+  );
 
   for (const file of changedFiles) {
     if (isDevPageGovernancePath(file)) {
       directTests.add(DEV_PAGE_GOVERNANCE_TEST);
+    }
+    if (isDevQualityGateProviderBoundaryPath(file)) {
+      directTests.add(DEV_QUALITY_GATE_PROVIDER_BOUNDARY_TEST);
     }
     if (isCustomerPrivateSourcePath(file)) {
       addNodeTests(state, [CUSTOMER_SOURCE_BOUNDARY_TEST], file, "T6");
@@ -569,9 +743,15 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
     }
 
     if (file.startsWith("web/src/")) {
+      const isDevWorkbenchSource = file.startsWith(
+        "web/src/dev-workbench/",
+      );
       if (file.endsWith(".test.mjs")) {
         if (fs.existsSync(path.join(root, file))) {
           directTests.add(file);
+        } else if (isDevWorkbenchSource) {
+          directTests.add(DEV_ENTRY_BOUNDARY_TEST);
+          directTests.add(DEV_PAGE_GOVERNANCE_TEST);
         } else {
           addFixed(state, "webTest", file);
           state.webNeedsAllTests = true;
@@ -582,8 +762,13 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
         );
         siblingTests.forEach((candidate) => directTests.add(candidate));
         if (siblingTests.length === 0 && /\.(?:js|jsx|mjs|css)$/u.test(file)) {
-          addFixed(state, "webTest", file);
-          state.webNeedsAllTests = true;
+          if (isDevWorkbenchSource) {
+            directTests.add(DEV_ENTRY_BOUNDARY_TEST);
+            directTests.add(DEV_PAGE_GOVERNANCE_TEST);
+          } else {
+            addFixed(state, "webTest", file);
+            state.webNeedsAllTests = true;
+          }
         }
       }
       if (/\.(?:js|jsx|mjs)$/u.test(file)) {
@@ -602,7 +787,41 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
           state,
           "browser-regression",
           "T5",
-          "选择受影响的 STYLE_L1_SCENARIOS 运行浏览器回归；共享布局、全局样式或无法可靠映射场景时扩大到完整 style:l1。",
+          isDevWorkbenchSource
+            ? devBrowserFollowUpText(file)
+            : "选择受影响的 STYLE_L1_SCENARIOS 运行浏览器回归；共享布局、全局样式或无法可靠映射场景时扩大到完整 style:l1。",
+          file,
+        );
+      }
+      continue;
+    }
+
+    if (file.startsWith("web/dev-server/")) {
+      if (file.endsWith(".test.mjs")) {
+        if (fs.existsSync(path.join(root, file))) {
+          directTests.add(file);
+        } else {
+          directTests.add(DEV_SERVER_SECURITY_TEST);
+          directTests.add(DEV_WORKBENCH_PLUGINS_TEST);
+        }
+      } else if (file.endsWith(".mjs")) {
+        const siblingTests = siblingTestCandidates(file).filter((candidate) =>
+          fs.existsSync(path.join(root, candidate)),
+        );
+        siblingTests.forEach((candidate) => directTests.add(candidate));
+        if (siblingTests.length === 0) {
+          directTests.add(DEV_SERVER_SECURITY_TEST);
+          directTests.add(DEV_WORKBENCH_PLUGINS_TEST);
+        }
+        addSyntaxCheck(state, file);
+      }
+      if (isPrivilegedDevServerPath(file)) {
+        directTests.add(DEV_SERVER_SECURITY_TEST);
+        addFollowUp(
+          state,
+          "dev-operation-boundary",
+          "T8",
+          "复核 loopback、same-origin、CSRF、幂等、命令 allowlist、exact-SHA 与脱敏边界；若真实执行 migration、发布或部署，再运行对应正式目标流程。",
           file,
         );
       }
@@ -631,7 +850,9 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
           state,
           "browser-regression",
           "T5",
-          "选择受影响的 STYLE_L1_SCENARIOS 运行浏览器回归；共享布局、全局样式或无法可靠映射场景时扩大到完整 style:l1。",
+          isDevPageGovernancePath(file)
+            ? devBrowserFollowUpText(file)
+            : "选择受影响的 STYLE_L1_SCENARIOS 运行浏览器回归；共享布局、全局样式或无法可靠映射场景时扩大到完整 style:l1。",
           file,
         );
       }
@@ -758,7 +979,11 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
       return scopeDifference || left.id.localeCompare(right.id);
     });
   const followUps = [...state.followUps.values()]
-    .map((item) => ({ ...item, reasons: [...item.reasons].sort() }))
+    .map(({ texts, ...item }) => ({
+      ...item,
+      text: [...texts].sort().join("\n"),
+      reasons: [...item.reasons].sort(),
+    }))
     .sort(
       (left, right) =>
         AFFECTED_SCOPE_ORDER.indexOf(left.scope) -

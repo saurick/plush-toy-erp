@@ -19,6 +19,7 @@ import {
   Modal,
   Popover,
   Segmented,
+  Select,
   Space,
   Table,
   Tag,
@@ -41,7 +42,11 @@ import {
   DEV_DELIVERY_SOURCE_PATH,
   DEV_DELIVERY_SUMMARY_SNAPSHOT_KEY,
   DEV_DELIVERY_TARGETS,
+  DEV_VERSION_CENTER_HISTORY_FILTER_ALL,
+  DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS,
   DEV_VERSION_CENTER_HISTORY_PAGE_SIZE,
+  DEV_VERSION_CENTER_HISTORY_RESULT_ATTENTION,
+  DEV_VERSION_CENTER_HISTORY_RESULT_PASSED,
   DEV_VERSION_CENTER_VERSION_PAGE_SIZE,
   DEV_VERSION_CENTER_VIEW_HISTORY,
   DEV_VERSION_CENTER_VIEW_PIPELINE,
@@ -50,16 +55,20 @@ import {
   createDeliveryIdempotencyKey,
   createDevDeliveryClient,
   deliveryIdempotencyPresentation,
+  deliveryOperationDetailPresentation,
   deliveryOperationMessagePresentation,
   deliveryRetryPresentation,
   deliveryStatusPresentation,
   deliveryTargetCachePresentation,
   deliveryVersionActionKind,
   deliveryVersionForTarget,
+  filterDevOperationHistory,
   formatDeliveryBytes,
   formatDeliveryDuration,
+  formatDeliveryPercent,
   formatDeliveryRate,
   isDevInitialCustomerConfigActivationReady,
+  resolveDevOperationHistoryFilters,
   resolveDevOperationHistoryState,
   resolveDevVersionCenterView,
   shortGitSha,
@@ -90,6 +99,27 @@ const OPEN_OPERATION_STATUSES = new Set([
   ...POLLING_OPERATION_STATUSES,
   'ready',
 ])
+const OPERATION_HISTORY_RESULT_OPTIONS = [
+  { label: '全部', value: DEV_VERSION_CENTER_HISTORY_FILTER_ALL },
+  { label: '需处理', value: DEV_VERSION_CENTER_HISTORY_RESULT_ATTENTION },
+  { label: '已通过', value: DEV_VERSION_CENTER_HISTORY_RESULT_PASSED },
+]
+const OPERATION_HISTORY_ACTION_OPTIONS = [
+  { label: '全部动作', value: DEV_VERSION_CENTER_HISTORY_FILTER_ALL },
+  { label: '发布制品', value: 'release' },
+  { label: '部署版本', value: 'promote' },
+  { label: '回滚版本', value: 'rollback' },
+  { label: '清空并重建数据', value: 'rebuild-database' },
+]
+const OPERATION_HISTORY_TARGET_OPTIONS = [
+  { label: '全部目标', value: DEV_VERSION_CENTER_HISTORY_FILTER_ALL },
+  { label: 'GitLab Release', value: 'gitlab-release' },
+  { label: 'GitHub 应急 Release', value: 'github-release' },
+  ...DEV_DELIVERY_TARGETS.map((target) => ({
+    label: target.shortLabel,
+    value: target.key,
+  })),
+]
 
 function upsertOperation(operations, operation) {
   const currentOperations = Array.isArray(operations) ? operations : []
@@ -110,22 +140,37 @@ function OperationIdempotencyText({ operation }) {
   return <Text type="secondary">{presentation.label}</Text>
 }
 
+function OperationMetricItem({ label, value }) {
+  return (
+    <div>
+      <Text type="secondary">{label}</Text>
+      <Text strong>{value}</Text>
+    </div>
+  )
+}
+
 function issueDescription(issues = []) {
   if (!Array.isArray(issues) || issues.length === 0) return ''
   return issues.map((issue) => issue.message).join('；')
 }
 
-function operationActionLabel(action, promotionMode = null) {
+function operationActionLabel(action, promotionMode = null, target = '') {
   if (action === 'release') return '发布制品'
   if (action === 'promote' && promotionMode === 'initialize') {
-    return '首次部署（Explicit Promotion）'
+    return '首次部署'
   }
-  if (action === 'promote') return '显式版本提升（Explicit Promotion）'
-  if (action === 'rebuild-database') return '重建目标数据库'
-  return '回滚'
+  if (action === 'promote') return '部署指定版本'
+  if (action === 'rebuild-database') {
+    return target === 'customer-test-133'
+      ? '清空并重建测试数据'
+      : '重建目标数据'
+  }
+  return '回滚版本'
 }
 
 function deliveryTargetLabel(targetKey) {
+  if (targetKey === 'gitlab-release') return 'GitLab Release'
+  if (targetKey === 'github-release') return 'GitHub 应急 Release'
   return (
     DEV_DELIVERY_TARGETS.find((target) => target.key === targetKey)?.label ||
     targetKey ||
@@ -165,19 +210,27 @@ const MANUAL_TAKEOVER_STEPS = [
   {
     title: '生成不可变 Release',
     description:
-      '优先回到本页使用“发布当前 SHA”；页面不可用时，才在 GitLab 手动运行受保护的 release pipeline，并填写同一 exact SHA 和新版本号。GitHub workflow 仅作显式应急回退。',
+      '优先回到本页使用“发布当前版本制品”；页面不可用时，才在 GitLab 手动运行受保护的 release pipeline，并填写同一 exact SHA 和新版本号。GitHub workflow 仅作显式应急回退。',
     boundary: '不要手工创建、移动或覆盖 tag，也不要上传自行拼装的制品。',
   },
   {
-    title: '在本页发起显式版本提升（Explicit Promotion）',
+    title: '在本页部署已发布版本',
     description:
-      '先选择 demo 项目演练造数环境或 test 甲方测试验收环境，再选择已发布版本，依次执行“准备版本提升”和“确认版本提升”；系统沿用既有 checksum、备份、migration、Compose、health/ready 与公网读回。',
-    boundary: '两个固定目标都只加载已构建制品，不在目标服务器构建镜像。',
+      '先选择 demo 项目演练造数环境或 test 甲方测试验收环境，再选择已发布版本，依次执行“准备部署”和“确认部署”；系统沿用既有制品校验、备份、数据库迁移、服务启动和公网读回。',
+    boundary:
+      '两个固定目标都只加载已构建制品，不在目标服务器构建镜像；普通部署默认保留现有业务数据。',
+  },
+  {
+    title: '需要时独立清空并重建 test 数据',
+    description:
+      '切换到 test 目标，使用“清空并重建测试数据”；该动作固定当前运行的 exact SHA，先独立检查资格，再要求输入完整破坏性确认文本。它不要求先发布新版本。',
+    boundary:
+      '该动作不嵌入普通部署，也不自动重试；必须保留可恢复备份、恢复校验、旧物理数据代和精确回滚身份。',
   },
   {
     title: '核对结果，必要时走正式回滚',
     description:
-      '在操作记录中核对 operation、版本、digest、migration、health/ready、公网 SHA 和浏览器资源；需要恢复时只使用版本行的“检查回滚”和“确认回滚”。',
+      '在操作记录中核对操作 ID、版本、镜像摘要、数据库迁移、服务健康状态、公网 SHA 和浏览器资源；需要恢复时只使用版本行的“检查回滚”和“确认回滚”。',
     boundary:
       'failed、blocked 或 not_proven 先查明回执，不直接重复执行同一写操作。',
   },
@@ -189,7 +242,7 @@ function ManualTakeoverGuide() {
       <Alert
         type="info"
         showIcon
-        message="人工接管仍走同一套 exact-SHA 正式流程"
+        message="手动操作仍走同一套固定版本流程"
         description="适用于 AI 暂时不可用或你选择亲自操作；它只解释现有入口，不新增绕过门禁的一键发布、第二套流水线或后台任务。"
       />
 
@@ -228,7 +281,7 @@ function ManualTakeoverGuide() {
             <Tag color="success">可以继续</Tag>
             <ul>
               <li>工作区干净，本地与 origin/main 的完整 SHA 一致</li>
-              <li>页面刚刷新且状态真源可读，没有其他未结束 operation</li>
+              <li>页面刚刷新且状态真源可读，没有其他未结束操作</li>
               <li>当前 SHA 的 CI、Release 或目标预检已明确通过</li>
             </ul>
           </article>
@@ -245,7 +298,7 @@ function ManualTakeoverGuide() {
 
       <section aria-labelledby="dev-version-takeover-steps-title">
         <Title level={5} id="dev-version-takeover-steps-title">
-          人工接管顺序
+          手动操作顺序
         </Title>
         <ol className="erp-dev-version-takeover-steps">
           {MANUAL_TAKEOVER_STEPS.map((step, index) => (
@@ -268,9 +321,8 @@ function ManualTakeoverGuide() {
         description="禁止 force push、跳过质量门禁、手工覆盖 tag 或目标页面文件、在目标服务器构建镜像、直接执行结构性 SQL、删除数据库或 volume、全局 prune，以及在结果未证明时盲目重试。"
       />
       <Text type="secondary">
-        AI 恢复后，把最终 exact SHA、GitLab pipeline、Release version 和
-        operation ID 交给
-        Codex，即可从现有回执继续核验，无需重做已被可信证明的步骤。
+        AI 恢复后，把最终 exact SHA、GitLab pipeline、Release version 和操作 ID
+        交给 Codex，即可从现有回执继续核验，无需重做已被可信证明的步骤。
       </Text>
     </div>
   )
@@ -292,6 +344,20 @@ export default function DevVersionCenterPage() {
   const requestedView =
     searchParams.get(DEV_VERSION_CENTER_VIEW_QUERY_KEY) || ''
   const activeView = resolveDevVersionCenterView(requestedView)
+  const requestedHistoryAction =
+    searchParams.get(DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.action) || ''
+  const requestedHistoryResult =
+    searchParams.get(DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.result) || ''
+  const requestedHistoryTarget =
+    searchParams.get(DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.target) || ''
+  const requestedHistoryKeyword =
+    searchParams.get(DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.keyword) || ''
+  const operationHistoryFilters = resolveDevOperationHistoryFilters({
+    action: requestedHistoryAction,
+    result: requestedHistoryResult,
+    target: requestedHistoryTarget,
+    keyword: requestedHistoryKeyword,
+  })
   const client = useMemo(() => createDevDeliveryClient(), [])
   const qualityGateClient = useMemo(() => createDevQualityGateClient(), [])
   const initialSnapshot = useMemo(
@@ -393,11 +459,55 @@ export default function DevVersionCenterPage() {
   )
 
   useEffect(() => {
-    if (requestedView === activeView) return
     const nextParams = new URLSearchParams(searchParams)
-    nextParams.set(DEV_VERSION_CENTER_VIEW_QUERY_KEY, activeView)
-    setSearchParams(nextParams, { replace: true })
-  }, [activeView, requestedView, searchParams, setSearchParams])
+    let changed = false
+    if (requestedView !== activeView) {
+      nextParams.set(DEV_VERSION_CENTER_VIEW_QUERY_KEY, activeView)
+      changed = true
+    }
+    for (const [key, value, defaultValue] of [
+      [
+        DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.action,
+        operationHistoryFilters.action,
+        DEV_VERSION_CENTER_HISTORY_FILTER_ALL,
+      ],
+      [
+        DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.result,
+        operationHistoryFilters.result,
+        DEV_VERSION_CENTER_HISTORY_FILTER_ALL,
+      ],
+      [
+        DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.target,
+        operationHistoryFilters.target,
+        DEV_VERSION_CENTER_HISTORY_FILTER_ALL,
+      ],
+      [
+        DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.keyword,
+        operationHistoryFilters.keyword,
+        '',
+      ],
+    ]) {
+      if (value === defaultValue) {
+        if (nextParams.has(key)) {
+          nextParams.delete(key)
+          changed = true
+        }
+      } else if (nextParams.get(key) !== value) {
+        nextParams.set(key, value)
+        changed = true
+      }
+    }
+    if (changed) setSearchParams(nextParams, { replace: true })
+  }, [
+    activeView,
+    operationHistoryFilters.action,
+    operationHistoryFilters.keyword,
+    operationHistoryFilters.result,
+    operationHistoryFilters.target,
+    requestedView,
+    searchParams,
+    setSearchParams,
+  ])
 
   const selectView = useCallback(
     (nextView) => {
@@ -410,6 +520,40 @@ export default function DevVersionCenterPage() {
     },
     [searchParams, setSearchParams]
   )
+
+  const updateOperationHistoryFilter = useCallback(
+    (key, value, { replace = false } = {}) => {
+      const nextParams = new URLSearchParams(searchParams)
+      const normalized = String(value || '').trim()
+      if (!normalized || normalized === DEV_VERSION_CENTER_HISTORY_FILTER_ALL) {
+        nextParams.delete(key)
+      } else {
+        nextParams.set(key, normalized)
+      }
+      nextParams.set(
+        DEV_VERSION_CENTER_VIEW_QUERY_KEY,
+        DEV_VERSION_CENTER_VIEW_HISTORY
+      )
+      setHistoryPage(1)
+      setSearchParams(nextParams, { replace })
+    },
+    [searchParams, setSearchParams]
+  )
+
+  const clearOperationHistoryFilters = useCallback(() => {
+    const nextParams = new URLSearchParams(searchParams)
+    for (const key of Object.values(
+      DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS
+    )) {
+      nextParams.delete(key)
+    }
+    nextParams.set(
+      DEV_VERSION_CENTER_VIEW_QUERY_KEY,
+      DEV_VERSION_CENTER_VIEW_HISTORY
+    )
+    setHistoryPage(1)
+    setSearchParams(nextParams)
+  }, [searchParams, setSearchParams])
 
   const openPipelineDetails = useCallback(() => {
     selectView(DEV_VERSION_CENTER_VIEW_PIPELINE)
@@ -592,9 +736,13 @@ export default function DevVersionCenterPage() {
               ? '已创建关联的新尝试'
               : action === 'prepare-promotion'
                 ? '部署准备结果已登记'
-                : action === 'prepare-rollback'
-                  ? '回滚资格结果已登记'
-                  : '部署执行器已启动，请按 operation 跟踪'
+                : action === 'prepare-database-rebuild'
+                  ? '测试数据清空重建资格结果已登记'
+                  : action === 'prepare-rollback'
+                    ? '回滚资格结果已登记'
+                    : action === 'execute-database-rebuild'
+                      ? '测试数据清空重建执行器已启动，请按操作记录跟踪'
+                      : '部署执行器已启动，请按操作记录跟踪'
         )
         await refresh()
         return true
@@ -641,6 +789,18 @@ export default function DevVersionCenterPage() {
   const historyOperations = operations.filter(
     (operation) => !OPEN_OPERATION_STATUSES.has(operation.status)
   )
+  const filteredHistoryOperations = filterDevOperationHistory(
+    historyOperations,
+    operationHistoryFilters
+  )
+  const hasOperationHistoryFilters = Boolean(
+    operationHistoryFilters.action !== DEV_VERSION_CENTER_HISTORY_FILTER_ALL ||
+      operationHistoryFilters.result !==
+        DEV_VERSION_CENTER_HISTORY_FILTER_ALL ||
+      operationHistoryFilters.target !==
+        DEV_VERSION_CENTER_HISTORY_FILTER_ALL ||
+      operationHistoryFilters.keyword
+  )
   const operationHistoryState = resolveDevOperationHistoryState({
     initialLoading,
     loadError,
@@ -668,6 +828,28 @@ export default function DevVersionCenterPage() {
   )
   const publicEntry = target?.remote?.publicEntry
   const targetPassed = target?.status === 'passed'
+  const customerTestRebuildEligible = Boolean(
+    summaryFresh &&
+      selectedTargetKey === 'customer-test-133' &&
+      targetPassed &&
+      currentTargetRelease?.status === 'published' &&
+      currentTargetRelease.completeAssets === true &&
+      !hasOpenOperation &&
+      !isMutationRunning
+  )
+  const customerTestRebuildExplanation = isMutationRunning
+    ? '已有写操作正在提交'
+    : !summaryFresh
+      ? '正在核对最新状态；上次结果只供查看'
+      : hasOpenOperation
+        ? '已有未结束的操作'
+        : !targetPassed
+          ? 'test 运行态只读预检未通过'
+          : !currentTargetRelease
+            ? '当前运行 SHA 没有可验证的不可变 Release'
+            : currentTargetRelease.completeAssets !== true
+              ? '当前运行 Release 制品不完整'
+              : ''
   const initializationReady = Boolean(
     initializationPreflight?.status === 'eligible' &&
       initializationPreflight?.remote?.rootState === 'absent' &&
@@ -677,8 +859,11 @@ export default function DevVersionCenterPage() {
     currentHeadRelease?.status === 'published' &&
       currentHeadRelease?.completeAssets === true
   )
+  const releaseDispatchAllowed =
+    summary?.boundaries?.releaseDispatchAllowed === true
   const canDispatch = Boolean(
     summaryFresh &&
+      releaseDispatchAllowed &&
       repository &&
       !repository.dirty &&
       Boolean(releaseVersion) &&
@@ -692,15 +877,17 @@ export default function DevVersionCenterPage() {
       ? '正在核对最新状态；上次结果只供查看'
       : hasOpenOperation
         ? '已有未结束的操作'
-        : repository?.dirty
-          ? '当前工作树有改动，不能创建 exact-SHA 发布'
-          : !releaseVersion
-            ? '正式版本目录不可用，不能创建新发布'
-            : headAlreadyPublished
-              ? repository?.commit === currentTargetSha
-                ? '当前 SHA 已发布并部署，无需重复发布'
-                : '当前 SHA 已有完整不可变制品，请在版本列表准备版本提升'
-              : '当前仓库身份不可用，不能创建 exact-SHA 发布'
+        : !releaseDispatchAllowed
+          ? '当前只加载 GitLab 只读凭据；查看不受影响，创建新发布需要短期发布凭据'
+          : repository?.dirty
+            ? '当前工作树有改动，不能创建 exact-SHA 发布'
+            : !releaseVersion
+              ? '正式版本目录不可用，不能创建新发布'
+              : headAlreadyPublished
+                ? repository?.commit === currentTargetSha
+                  ? '当前 SHA 已发布并部署，无需重复发布'
+                  : '当前 SHA 已有完整不可变制品，请在版本列表准备部署'
+                : '当前仓库身份不可用，不能创建 exact-SHA 发布'
   const strictProof = qualityGateSummary?.proofs?.strict
   const qualityGateIdentityCurrent = Boolean(
     repository &&
@@ -720,9 +907,272 @@ export default function DevVersionCenterPage() {
           : strictProof?.receipt
             ? '最近结果属于旧版本'
             : '尚未取得严格门禁结果'
+  const currentHeadRunningOnTarget = Boolean(
+    repository?.commit && repository.commit === currentTargetSha
+  )
+  const selectedTargetFullyProven = Boolean(
+    targetPassed && publicEntry?.status === 'passed'
+  )
+  const releaseDecision = !customerReady
+    ? {
+        color: 'warning',
+        label: '未选择甲方',
+        title: '先选择已登记甲方',
+        description:
+          '未确认甲方范围前，不读取目标状态，也不启用发布与部署操作。',
+      }
+    : initialLoading && !summary
+      ? {
+          color: 'processing',
+          label: '正在核对',
+          title: '正在读取发布与目标状态',
+          description: '核对完成前只显示页面结构，不启用任何写操作。',
+        }
+      : !summaryFresh
+        ? {
+            color: 'warning',
+            label: '等待最新状态',
+            title: '先完成最新状态核对',
+            description:
+              initialLoading || refreshing
+                ? '正在读取最新证据，完成前不会启用发布与部署操作。'
+                : '当前只保留上次核对结果，请刷新状态后再继续。',
+          }
+        : hasOpenOperation
+          ? {
+              color: 'processing',
+              label: '操作进行中',
+              title: '先完成当前发布或部署操作',
+              description:
+                '未结束操作会持续显示在下方；完成前不会再创建新的发布请求。',
+            }
+          : canDispatch
+            ? {
+                color: 'success',
+                label: '可以发布',
+                title: '当前提交可发布为不可变制品',
+                description:
+                  '本次只生成制品，不会直接部署；制品完成后再从版本列表准备并确认目标部署。',
+              }
+            : headAlreadyPublished && currentHeadRunningOnTarget
+              ? {
+                  color: selectedTargetFullyProven ? 'success' : 'warning',
+                  label: selectedTargetFullyProven ? '目标已就绪' : '仍需补证',
+                  title: selectedTargetFullyProven
+                    ? `当前提交已在${selectedTargetDefinition.shortLabel}运行`
+                    : `当前提交已在${selectedTargetDefinition.shortLabel}运行，仍需补齐目标证据`,
+                  description: selectedTargetFullyProven
+                    ? '运行版本、公网入口与基础健康已完成同一 SHA 核对。'
+                    : '运行 SHA 已识别，但目标预检或公网入口尚未形成完整证明。',
+                }
+              : headAlreadyPublished
+                ? {
+                    color: 'blue',
+                    label: '制品已就绪',
+                    title: '当前提交已有不可变制品',
+                    description: `无需重复发布，请在下方版本列表核对并准备部署到${selectedTargetDefinition.shortLabel}。`,
+                  }
+                : !releaseDispatchAllowed
+                  ? {
+                      color: 'blue',
+                      label: '只读模式',
+                      title: '版本与流水线可查看，当前不能创建新发布',
+                      description:
+                        '未加载短期 GitLab 发布凭据；部署已有不可变版本不受影响。',
+                    }
+                  : {
+                      color: 'warning',
+                      label: '暂不可发布',
+                      title: '先解除当前发布阻断',
+                      description: dispatchExplanation,
+                    }
   const operationCachePresentation = deliveryTargetCachePresentation(
     operationDetail?.metrics
   )
+  const operationDetailView =
+    deliveryOperationDetailPresentation(operationDetail)
+  const operationDetailIdempotency = operationDetail
+    ? deliveryIdempotencyPresentation(operationDetail.idempotency)
+    : null
+  const operationDetailRelease =
+    operationDetail?.action === 'release'
+      ? versions.find(
+          (version) =>
+            version.gitSha === operationDetail.gitSha &&
+            version.version === operationDetail.version
+        ) || null
+      : null
+  const operationReleaseServerBytes =
+    operationDetailRelease?.artifactSummary?.serverImageBytes ??
+    operationDetail?.metrics?.serverArchiveBytes ??
+    null
+  const operationReleaseWebBytes =
+    operationDetailRelease?.artifactSummary?.webImageBytes ??
+    operationDetail?.metrics?.webArchiveBytes ??
+    null
+  const operationReleaseTotalBytes =
+    operationDetailRelease?.artifactSummary?.totalBytes ??
+    (Number.isSafeInteger(operationReleaseServerBytes) &&
+    Number.isSafeInteger(operationReleaseWebBytes)
+      ? operationReleaseServerBytes + operationReleaseWebBytes
+      : null)
+  const operationReleaseBuildPerformance =
+    operationDetail?.metrics?.buildPerformance ??
+    operationDetailRelease?.buildPerformance ??
+    null
+  const operationReleaseMetricItems = [
+    {
+      key: 'total',
+      label: '制品总量',
+      value: Number.isSafeInteger(operationReleaseTotalBytes)
+        ? formatDeliveryBytes(operationReleaseTotalBytes)
+        : null,
+    },
+    {
+      key: 'server',
+      label: 'Server 镜像',
+      value: Number.isSafeInteger(operationReleaseServerBytes)
+        ? formatDeliveryBytes(operationReleaseServerBytes)
+        : null,
+    },
+    {
+      key: 'web',
+      label: 'Web 镜像',
+      value: Number.isSafeInteger(operationReleaseWebBytes)
+        ? formatDeliveryBytes(operationReleaseWebBytes)
+        : null,
+    },
+    {
+      key: 'cache',
+      label: '构建缓存命中率',
+      value: operationReleaseBuildPerformance
+        ? formatDeliveryPercent(
+            operationReleaseBuildPerformance.cacheHitRateBasisPoints
+          )
+        : null,
+    },
+    {
+      key: 'integrity',
+      label: '制品完整性',
+      value: operationDetailRelease
+        ? operationDetailRelease.completeAssets
+          ? `${String(operationDetailRelease.assets.length)} 项制品齐全`
+          : '完整性未证明'
+        : null,
+    },
+  ].filter((item) => item.value !== null)
+  const operationTargetMetricItems =
+    operationDetailView.metricsKind === 'target' && operationDetail
+      ? [
+          {
+            key: 'transferBytes',
+            label: '实际传输量',
+            value:
+              operationDetail.metrics.transferBytes == null
+                ? null
+                : formatDeliveryBytes(operationDetail.metrics.transferBytes),
+          },
+          {
+            key: 'transferDuration',
+            label: '实际传输耗时',
+            value:
+              operationDetail.metrics.transferDurationMs == null
+                ? null
+                : formatDeliveryDuration(
+                    operationDetail.metrics.transferDurationMs
+                  ),
+          },
+          {
+            key: 'transferRate',
+            label: '有效传输速率',
+            value:
+              operationDetail.metrics.transferBytesPerSecond == null
+                ? null
+                : formatDeliveryRate(
+                    operationDetail.metrics.transferBytesPerSecond
+                  ),
+          },
+          {
+            key: 'serverArchive',
+            label: 'Server 制品',
+            value:
+              operationDetail.metrics.serverArchiveBytes == null
+                ? null
+                : formatDeliveryBytes(
+                    operationDetail.metrics.serverArchiveBytes
+                  ),
+          },
+          {
+            key: 'webArchive',
+            label: 'Web 制品',
+            value:
+              operationDetail.metrics.webArchiveBytes == null
+                ? null
+                : formatDeliveryBytes(operationDetail.metrics.webArchiveBytes),
+          },
+          {
+            key: 'backup',
+            label: '回滚备份',
+            value:
+              operationDetail.metrics.backupSizeBytes == null
+                ? null
+                : formatDeliveryBytes(operationDetail.metrics.backupSizeBytes),
+          },
+          {
+            key: 'targetCache',
+            label: '目标内容缓存',
+            value:
+              operationDetail.metrics.targetCacheHit == null
+                ? null
+                : operationCachePresentation.status,
+          },
+          {
+            key: 'avoidedTransfer',
+            label: '减少重复传输',
+            value:
+              operationDetail.metrics.avoidedTransferBytes == null
+                ? null
+                : formatDeliveryBytes(
+                    operationDetail.metrics.avoidedTransferBytes
+                  ),
+          },
+          {
+            key: 'avoidedDuration',
+            label: '预计减少传输时间',
+            value:
+              operationDetail.metrics.avoidedTransferDurationMs == null
+                ? null
+                : formatDeliveryDuration(
+                    operationDetail.metrics.avoidedTransferDurationMs
+                  ),
+          },
+          {
+            key: 'dockerLoad',
+            label: '目标镜像加载',
+            value:
+              operationDetail.metrics.dockerLoadSkipped == null
+                ? null
+                : operationDetail.metrics.dockerLoadSkipped
+                  ? '复用已有镜像，未重复加载'
+                  : '已加载目标镜像',
+          },
+        ].filter((item) => item.value !== null)
+      : []
+  const operationDetailNeedsRetryCard = Boolean(
+    operationDetail &&
+      (operationDetail.status !== 'passed' ||
+        operationDetail.idempotency.attempt > 1 ||
+        operationDetail.idempotency.reuseCount > 0 ||
+        operationDetail.retry.allowed)
+  )
+  const operationServerDigest =
+    operationDetail?.metrics?.serverDigest ??
+    operationDetailRelease?.imageDigests?.server ??
+    null
+  const operationWebDigest =
+    operationDetail?.metrics?.webDigest ??
+    operationDetailRelease?.imageDigests?.web ??
+    null
   const refreshBusy = initialLoading || refreshing
   const refreshStatusText = initialLoading
     ? '正在读取最新状态'
@@ -745,10 +1195,12 @@ export default function DevVersionCenterPage() {
   useEffect(() => {
     const pageCount = Math.max(
       1,
-      Math.ceil(historyOperations.length / DEV_VERSION_CENTER_HISTORY_PAGE_SIZE)
+      Math.ceil(
+        filteredHistoryOperations.length / DEV_VERSION_CENTER_HISTORY_PAGE_SIZE
+      )
     )
     setHistoryPage((current) => Math.min(current, pageCount))
-  }, [historyOperations.length])
+  }, [filteredHistoryOperations.length])
 
   const changeTablePage = useCallback((setPage, tableRef, nextPage) => {
     setPage(nextPage)
@@ -787,7 +1239,7 @@ export default function DevVersionCenterPage() {
         }
       } catch (error) {
         if (cancelled) return
-        setOperationPollError(error?.message || 'Operation 状态读取暂时失败')
+        setOperationPollError(error?.message || '操作状态读取暂时失败')
       }
       if (!cancelled) {
         timer = window.setTimeout(poll, OPERATION_POLL_INTERVAL_MS)
@@ -845,7 +1297,7 @@ export default function DevVersionCenterPage() {
       ) {
         return
       }
-      message.error(error?.message || 'Operation 详情读取失败')
+      message.error(error?.message || '操作详情读取失败')
     } finally {
       if (
         operationDetailRequestRef.current === requestId &&
@@ -962,7 +1414,7 @@ export default function DevVersionCenterPage() {
           : !summaryFresh
             ? '正在核对最新状态；上次结果只供查看，暂不能执行'
             : hasOpenOperation
-              ? '已有未结束的 operation，请先完成或核对该操作'
+              ? '已有未结束操作，请先完成或核对该操作'
               : !targetActionReady
                 ? actionKind === 'initialize'
                   ? `${selectedTargetDefinition.shortLabel}首次部署预检未通过，先处理容量、基础镜像或资源冲突`
@@ -1004,7 +1456,7 @@ export default function DevVersionCenterPage() {
                   )
                 }
               >
-                {actionKind === 'initialize' ? '准备首次部署' : '准备版本提升'}
+                {actionKind === 'initialize' ? '准备首次部署' : '准备部署'}
               </Button>
             </Tooltip>
             <Tooltip
@@ -1013,7 +1465,7 @@ export default function DevVersionCenterPage() {
                   ? '只准备资格检查；migration 或客户配置指纹不一致会阻断'
                   : currentTargetRelease
                     ? actionKind === 'promote'
-                      ? `该版本不早于${selectedTargetDefinition.shortLabel}当前版本，应走显式版本提升`
+                      ? `该版本不早于${selectedTargetDefinition.shortLabel}当前版本，应走部署流程`
                       : promotionExplanation
                     : `${selectedTargetDefinition.shortLabel}当前 SHA 没有完整不可变 manifest，不能普通回滚`
               }
@@ -1049,7 +1501,7 @@ export default function DevVersionCenterPage() {
   const renderOperationActions = (record) => {
     const readyToExecute =
       record.status === 'ready' &&
-      ['promote', 'rollback'].includes(record.action)
+      ['promote', 'rollback', 'rebuild-database'].includes(record.action)
     const executable = summaryFresh && readyToExecute
     const retryable = record.retry?.allowed === true
     const retryEligible =
@@ -1064,11 +1516,13 @@ export default function DevVersionCenterPage() {
         {executable ? (
           <Button
             type="primary"
-            danger={record.action === 'rollback'}
+            danger={['rollback', 'rebuild-database'].includes(record.action)}
             disabled={isMutationRunning}
             icon={
               record.action === 'rollback' ? (
                 <RollbackOutlined />
+              ) : record.action === 'rebuild-database' ? (
+                <ToolOutlined />
               ) : (
                 <DeploymentUnitOutlined />
               )
@@ -1080,9 +1534,11 @@ export default function DevVersionCenterPage() {
           >
             {record.action === 'rollback'
               ? '确认回滚'
-              : record.promotionMode === 'initialize'
-                ? '确认首次部署'
-                : '确认版本提升'}
+              : record.action === 'rebuild-database'
+                ? '确认清空重建'
+                : record.promotionMode === 'initialize'
+                  ? '确认首次部署'
+                  : '确认部署'}
           </Button>
         ) : retryable ? (
           <Tooltip
@@ -1128,7 +1584,11 @@ export default function DevVersionCenterPage() {
       render: (_value, record) => (
         <Space direction="vertical" size={2}>
           <Text strong>
-            {operationActionLabel(record.action, record.promotionMode)}
+            {operationActionLabel(
+              record.action,
+              record.promotionMode,
+              record.target
+            )}
           </Text>
           <Text type="secondary" code>
             {record.id.slice(0, 8)}
@@ -1269,11 +1729,11 @@ export default function DevVersionCenterPage() {
     },
     {
       key: DEV_VERSION_CENTER_VIEW_PIPELINE,
-      label: 'CI/CD 效能',
+      label: '流水线耗时',
       children: (
         <section
           className="erp-dev-version-tab erp-dev-version-tab--pipeline"
-          aria-label="CI/CD 效能"
+          aria-label="流水线耗时"
         >
           <DevPipelineTimingPanel
             timings={summary?.timings}
@@ -1292,7 +1752,7 @@ export default function DevVersionCenterPage() {
           aria-label="操作记录"
         >
           <Card
-            title="工作台操作记录（已结束）"
+            title="发布与部署记录（已结束）"
             className="erp-dev-version-table-card"
             extra={
               <Tag color={operationHistoryPresentation.color}>
@@ -1305,40 +1765,137 @@ export default function DevVersionCenterPage() {
                 type="warning"
                 showIcon
                 message="当前显示上次成功读回的操作记录"
-                description="最新 operation store 不可读或仍在重新核对；记录可查看，但所有写操作保持停用。"
+                description="最新操作记录不可读或仍在重新核对；记录可查看，但所有写操作保持停用。"
               />
             ) : null}
             {operationHistoryState === 'failure' ? (
               <Alert
                 type="error"
                 showIcon
-                message="工作台 operation store 当前不可读"
+                message="工作台操作记录当前不可读"
                 description="未使用 GitLab Pipeline、Package、Release、Codex 对话或普通 SSH 动作补造操作记录。"
               />
             ) : null}
             {operationHistoryState === 'failure' ? null : (
-              <Table
-                rowKey="id"
-                columns={operationColumns}
-                dataSource={historyOperations}
-                loading={initialLoading}
-                pagination={{
-                  current: historyPage,
-                  pageSize: DEV_VERSION_CENTER_HISTORY_PAGE_SIZE,
-                  hideOnSinglePage: true,
-                  showSizeChanger: false,
-                  showTotal: (total, range) =>
-                    `${String(range[0])}-${String(range[1])} / 共 ${String(total)} 条记录`,
-                  onChange: (nextPage) =>
-                    changeTablePage(setHistoryPage, historyTableRef, nextPage),
-                }}
-                locale={{
-                  emptyText: (
-                    <Empty description="尚无工作台发起并已结束的 release、promotion、rebuild 或 rollback" />
-                  ),
-                }}
-                scroll={{ x: 980 }}
-              />
+              <>
+                <div
+                  className="erp-dev-operation-history-filters"
+                  role="search"
+                  aria-label="筛选发布与部署记录"
+                >
+                  <div className="erp-dev-operation-history-filters__controls">
+                    <div className="erp-dev-operation-history-filter-field erp-dev-operation-history-filter-field--result">
+                      <Text type="secondary">结果</Text>
+                      <Segmented
+                        aria-label="筛选结果"
+                        value={operationHistoryFilters.result}
+                        options={OPERATION_HISTORY_RESULT_OPTIONS}
+                        onChange={(value) =>
+                          updateOperationHistoryFilter(
+                            DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.result,
+                            value
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="erp-dev-operation-history-filter-field erp-dev-operation-history-filter-field--action">
+                      <Text type="secondary">动作</Text>
+                      <Select
+                        aria-label="筛选动作"
+                        value={operationHistoryFilters.action}
+                        options={OPERATION_HISTORY_ACTION_OPTIONS}
+                        onChange={(value) =>
+                          updateOperationHistoryFilter(
+                            DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.action,
+                            value
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="erp-dev-operation-history-filter-field erp-dev-operation-history-filter-field--target">
+                      <Text type="secondary">目标</Text>
+                      <Select
+                        aria-label="筛选目标"
+                        value={operationHistoryFilters.target}
+                        options={OPERATION_HISTORY_TARGET_OPTIONS}
+                        onChange={(value) =>
+                          updateOperationHistoryFilter(
+                            DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.target,
+                            value
+                          )
+                        }
+                      />
+                    </div>
+                    <label
+                      className="erp-dev-operation-history-filter-field erp-dev-operation-history-filter-field--keyword"
+                      htmlFor="dev-version-history-keyword"
+                    >
+                      <Text type="secondary">版本 / SHA / 操作 ID</Text>
+                      <Input
+                        id="dev-version-history-keyword"
+                        aria-label="搜索版本、SHA 或操作 ID"
+                        placeholder="输入完整内容或前几位"
+                        value={operationHistoryFilters.keyword}
+                        maxLength={128}
+                        allowClear
+                        onChange={(event) =>
+                          updateOperationHistoryFilter(
+                            DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.keyword,
+                            event.target.value,
+                            { replace: true }
+                          )
+                        }
+                      />
+                    </label>
+                  </div>
+                  <div className="erp-dev-operation-history-filters__meta">
+                    <Text type="secondary" aria-live="polite">
+                      {hasOperationHistoryFilters
+                        ? `显示 ${String(filteredHistoryOperations.length)} / 共 ${String(historyOperations.length)} 条记录`
+                        : `共 ${String(historyOperations.length)} 条记录`}
+                    </Text>
+                    <Button
+                      type="link"
+                      disabled={!hasOperationHistoryFilters}
+                      onClick={clearOperationHistoryFilters}
+                    >
+                      清空筛选
+                    </Button>
+                  </div>
+                </div>
+                <Table
+                  rowKey="id"
+                  columns={operationColumns}
+                  dataSource={filteredHistoryOperations}
+                  loading={initialLoading}
+                  pagination={{
+                    current: historyPage,
+                    pageSize: DEV_VERSION_CENTER_HISTORY_PAGE_SIZE,
+                    hideOnSinglePage: true,
+                    showSizeChanger: false,
+                    showTotal: (total, range) =>
+                      `${String(range[0])}-${String(range[1])} / 共 ${String(total)} 条记录`,
+                    onChange: (nextPage) =>
+                      changeTablePage(
+                        setHistoryPage,
+                        historyTableRef,
+                        nextPage
+                      ),
+                  }}
+                  locale={{
+                    emptyText: (
+                      <Empty
+                        description={
+                          hasOperationHistoryFilters
+                            ? '没有符合筛选条件的记录，请调整或清空上方条件'
+                            : '尚无已结束的制品发布、目标部署、数据清空重建或回滚记录'
+                        }
+                      />
+                    ),
+                  }}
+                  scroll={{ x: 980 }}
+                />
+              </>
             )}
           </Card>
         </section>
@@ -1358,12 +1915,10 @@ export default function DevVersionCenterPage() {
             版本发布与部署中心
           </Title>
           <Paragraph className="erp-dev-hub-summary">
-            以 exact SHA 选择同一不可变版本，分别显式提升到 demo
-            项目演练造数环境或 test 甲方测试验收环境。每个目标、每次动作都有独立
-            operation；代码推送不会自动部署，失败、阻断或结果未证明后不会自动重试。
+            从固定版本完成制品发布、目标部署与回滚；代码推送不会自动部署，任何未证明状态都会停用写操作。
           </Paragraph>
         </div>
-        <Space direction="vertical" size={4}>
+        <div className="erp-dev-version-header-actions">
           <Space wrap>
             <Button
               icon={<ReloadOutlined />}
@@ -1378,9 +1933,206 @@ export default function DevVersionCenterPage() {
               icon={<ToolOutlined />}
               onClick={() => setManualTakeoverOpen(true)}
             >
-              人工接管说明
+              手动操作指引
             </Button>
-            <Space size={8}>
+          </Space>
+          <Text type="secondary" role="status" aria-live="polite">
+            {refreshStatusText}
+          </Text>
+        </div>
+      </header>
+
+      <DevCustomerScopeSelector
+        scope={customerScope}
+        onChange={customerScope.selectCustomer}
+        disabled={isMutationRunning}
+        note="版本、部署与回滚仅作用于永绅登记的 demo / test 固定目标；admin 不是部署环境。"
+        invalidDescription="当前甲方没有登记发布目标；版本、部署、回滚与目标状态读取均已停止。"
+      />
+
+      <main className="erp-dev-hub-shell erp-dev-version-shell">
+        {loadError ? (
+          <Alert
+            className="erp-dev-version-evidence-alert"
+            type={summary ? 'warning' : 'error'}
+            showIcon
+            message={summary ? '最新状态核对失败' : '版本中心不可用'}
+            description={
+              summary
+                ? `${loadError}；当前保留上次结果，写操作已停用。`
+                : loadError
+            }
+          />
+        ) : null}
+        {summary?.issues?.length > 0 ? (
+          <Alert
+            className="erp-dev-version-evidence-alert"
+            type="warning"
+            showIcon
+            message="状态核对不完整，相关写操作按已证明范围停用"
+            description={issueDescription(summary.issues)}
+          />
+        ) : null}
+        {operationPollError ? (
+          <Alert
+            className="erp-dev-version-evidence-alert"
+            type="warning"
+            showIcon
+            message="操作状态刷新暂时中断"
+            description={`${operationPollError}；页面会继续有界重试，也可手动刷新状态。`}
+          />
+        ) : null}
+        <Card className="erp-dev-version-overview">
+          <div className="erp-dev-version-overview__main">
+            <div className="erp-dev-version-overview__scope">
+              <div className="erp-dev-version-overview__scope-copy">
+                <Text className="erp-dev-version-overview__eyebrow">
+                  当前操作目标
+                </Text>
+                <Space wrap size={8}>
+                  <Title level={2}>{selectedTargetDefinition.label}</Title>
+                  <Text code>{selectedTargetKey}</Text>
+                </Space>
+                <Text type="secondary">
+                  {selectedTargetDefinition.dataBoundary}
+                </Text>
+              </div>
+              <Segmented
+                aria-label="切换当前操作目标"
+                value={selectedTargetKey}
+                options={DEV_DELIVERY_TARGETS.map((item) => ({
+                  label: item.label,
+                  value: item.key,
+                }))}
+                onChange={setSelectedTargetKey}
+              />
+            </div>
+
+            <dl className="erp-dev-version-facts" aria-label="发布状态摘要">
+              <div className="erp-dev-version-fact" data-kind="local">
+                <dt>本地候选</dt>
+                <dd>
+                  <div className="erp-dev-version-fact__primary">
+                    <Text code>{shortGitSha(repository?.commit)}</Text>
+                    {repository ? (
+                      <Tag color={repository.dirty ? 'warning' : 'success'}>
+                        {repository.dirty ? '工作树有改动' : '工作树干净'}
+                      </Tag>
+                    ) : (
+                      <Tag color="error">身份未证明</Tag>
+                    )}
+                  </div>
+                  <Text type="secondary">
+                    只有 clean HEAD 才能触发 exact-SHA 发布。
+                  </Text>
+                </dd>
+              </div>
+              <div className="erp-dev-version-fact" data-kind="release">
+                <dt>{deliveryProviderName}不可变版本</dt>
+                <dd>
+                  <div className="erp-dev-version-fact__primary">
+                    <Text strong>{versions[0]?.version || '尚无可用版本'}</Text>
+                    <Text code>{shortGitSha(versions[0]?.gitSha)}</Text>
+                  </div>
+                  <DevDeliveryTimestamp
+                    value={versions[0]?.publishedAt}
+                    action="发布于"
+                    missing="发布时间未证明"
+                    className="erp-dev-latest-version-published-at"
+                  />
+                  <Text type="secondary">
+                    {versions[0]?.completeAssets
+                      ? versions[0]?.promotionEligible
+                        ? 'v2 七资产齐全，演练回执已绑定'
+                        : versions[0]?.assets.includes('release-rehearsal.json')
+                          ? 'v2 七资产存在，但演练证据未闭合'
+                          : 'v1 六资产齐全，仅保留读取与旧版回滚'
+                      : '等待完整 release assets'}
+                  </Text>
+                </dd>
+              </div>
+              <div className="erp-dev-version-fact" data-kind="target">
+                <dt>{selectedTargetDefinition.shortLabel}运行状态</dt>
+                <dd>
+                  <div className="erp-dev-version-fact__primary">
+                    <Text code>{shortGitSha(currentTargetSha)}</Text>
+                    <Tag
+                      color={
+                        targetPassed
+                          ? 'success'
+                          : initializationReady
+                            ? 'processing'
+                            : 'warning'
+                      }
+                    >
+                      {targetPassed
+                        ? '运行态只读预检通过'
+                        : initializationReady
+                          ? '首次部署预检通过'
+                          : '目标预检阻断'}
+                    </Tag>
+                  </div>
+                  <Text type="secondary">
+                    可用空间{' '}
+                    {formatDeliveryBytes(
+                      target?.remote?.capacity?.availableBytes ??
+                        initializationPreflight?.remote?.capacity
+                          ?.availableBytes
+                    )}
+                    {' / '}最低要求{' '}
+                    {formatDeliveryBytes(
+                      target?.remote?.capacity?.minimumAvailableBytes ??
+                        initializationPreflight?.remote?.capacity
+                          ?.minimumAvailableBytes
+                    )}
+                  </Text>
+                </dd>
+              </div>
+              <div className="erp-dev-version-fact" data-kind="public-entry">
+                <dt>公网入口</dt>
+                <dd>
+                  <div className="erp-dev-version-fact__primary">
+                    <Text code>{shortGitSha(publicEntry?.gitSha)}</Text>
+                    <Tag
+                      color={
+                        publicEntry?.status === 'passed' ? 'success' : 'warning'
+                      }
+                    >
+                      {publicEntry?.status === 'passed'
+                        ? `入口与${selectedTargetDefinition.shortLabel}版本一致`
+                        : '入口未完成证明'}
+                    </Tag>
+                  </div>
+                  <Text type="secondary">
+                    页面健康{' '}
+                    {publicEntry?.health === 'passed' ? '通过' : '未通过'}
+                    {' · '}短信 Provider{' '}
+                    {publicEntry?.provider === 'passed' ? '通过' : '未通过'}
+                  </Text>
+                  <Link
+                    href={
+                      publicEntry?.endpoint || selectedTargetDefinition.endpoint
+                    }
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    打开公网页面
+                  </Link>
+                </dd>
+              </div>
+            </dl>
+          </div>
+
+          <aside
+            className="erp-dev-version-next"
+            data-decision={releaseDecision.color}
+            aria-label="当前发布结论与下一步"
+          >
+            <Tag color={releaseDecision.color}>{releaseDecision.label}</Tag>
+            <Text type="secondary">当前结论 / 下一步</Text>
+            <Title level={3}>{releaseDecision.title}</Title>
+            <Paragraph>{releaseDecision.description}</Paragraph>
+            <div className="erp-dev-version-next__actions">
               <Tooltip title={canDispatch ? '' : dispatchExplanation}>
                 <Button
                   type="primary"
@@ -1388,7 +2140,7 @@ export default function DevVersionCenterPage() {
                   disabled={!canDispatch}
                   onClick={() => setReleaseModalOpen(true)}
                 >
-                  发布当前 SHA
+                  发布当前版本制品
                 </Button>
               </Tooltip>
               <Popover
@@ -1408,247 +2160,109 @@ export default function DevVersionCenterPage() {
                       manifest、checksum 和 SBOM。
                     </Text>
                     <Text type="secondary">
-                      发布完成后，仍需在版本列表中依次执行“准备版本提升”和“确认版本提升”。
+                      制品发布完成后，仍需在版本列表中依次执行“准备部署”和“确认部署”。
                     </Text>
                   </Space>
                 }
               >
                 <Button
-                  type="text"
-                  shape="circle"
-                  size="small"
+                  type="link"
                   icon={<QuestionCircleOutlined />}
-                  aria-label="查看发布当前 SHA 说明"
-                />
+                  aria-label="查看发布当前版本制品说明"
+                >
+                  发布说明
+                </Button>
               </Popover>
-            </Space>
-          </Space>
-          <Text type="secondary" role="status" aria-live="polite">
-            {refreshStatusText}
-          </Text>
-        </Space>
-      </header>
-
-      <DevCustomerScopeSelector
-        scope={customerScope}
-        onChange={customerScope.selectCustomer}
-        disabled={isMutationRunning}
-        note="版本、部署与回滚只读取永绅登记的 demo 与 test 两个固定目标；admin 仅是应用管理入口，不属于部署环境。"
-        invalidDescription="当前甲方没有登记发布目标；版本、部署、回滚与目标状态读取均已停止。"
-      />
-
-      <main className="erp-dev-hub-shell erp-dev-version-shell">
-        {loadError ? (
-          <Alert
-            type={summary ? 'warning' : 'error'}
-            showIcon
-            message={summary ? '最新状态核对失败' : '版本中心不可用'}
-            description={
-              summary
-                ? `${loadError}；当前保留上次结果，写操作已停用。`
-                : loadError
-            }
-          />
-        ) : null}
-        {summary?.issues?.length > 0 ? (
-          <Alert
-            type="warning"
-            showIcon
-            message="部分状态未能证明"
-            description={issueDescription(summary.issues)}
-          />
-        ) : null}
-        {operationPollError ? (
-          <Alert
-            type="warning"
-            showIcon
-            message="Operation 状态刷新暂时中断"
-            description={`${operationPollError}；页面会继续有界重试，也可手动刷新状态。`}
-          />
-        ) : null}
-        <DevStaticGuidance title="固定边界" hint="发布职责与安全限制">
-          GitLab 负责代码真源、CI 与不可变制品；GitHub 仅接收单向审查镜像；本地
-          Bridge 只接受固定动作；demo 与 test
-          均不构建、不接受浏览器传入的命令、目录、仓库或 SSH
-          目标。两个目标共享不可变版本，但数据库、附件、运行资源、备份与回滚点相互隔离。
-        </DevStaticGuidance>
-
-        <section
-          className="erp-dev-version-target-selector"
-          aria-label="部署目标选择"
-        >
-          <div className="erp-dev-version-target-selector__heading">
-            <div>
-              <Text strong>当前操作目标</Text>
-              <Text type="secondary">
-                先选目标，再查看该目标的版本方向、预检、promotion 与回滚资格。
-              </Text>
             </div>
-            <Segmented
-              value={selectedTargetKey}
-              options={DEV_DELIVERY_TARGETS.map((item) => ({
-                label: item.label,
-                value: item.key,
-              }))}
-              onChange={setSelectedTargetKey}
-            />
-          </div>
-          <div className="erp-dev-version-target-selector__boundaries">
-            {DEV_DELIVERY_TARGETS.map((item) => (
-              <article
-                key={item.key}
-                data-selected={
-                  item.key === selectedTargetKey ? 'true' : 'false'
-                }
-              >
-                <Space wrap size={6}>
-                  <Text strong>{item.label}</Text>
-                  <Tag
-                    color={item.key === selectedTargetKey ? 'blue' : 'default'}
-                  >
-                    {item.key}
-                  </Tag>
-                </Space>
-                <Text type="secondary">{item.dataBoundary}</Text>
-              </article>
-            ))}
-          </div>
-        </section>
 
-        <section
-          className="erp-dev-version-quality-gate-summary"
-          aria-label="当前发布 SHA 严格门禁摘要"
-        >
-          <div>
-            <Space wrap size={8}>
-              <Text strong>当前发布 SHA 严格门禁</Text>
-              <Tag
-                color={
-                  strictProof?.releaseEligible && qualityGateIdentityCurrent
-                    ? 'success'
-                    : 'warning'
-                }
-              >
-                {strictSummaryLabel}
-              </Tag>
-            </Space>
-            <Text type="secondary">
-              实际耗时{' '}
-              {formatQualityGateDuration(strictProof?.receipt?.durationMs)}
-              {' · '}
-              {strictProof?.reused ? '可信复用' : '本地新执行或尚未执行'}
-            </Text>
-            <DevDeliveryTimestamp
-              value={strictProof?.receipt?.finishedAt}
-              action="完成于"
-              missing="完成时间未证明"
-              className="erp-dev-quality-gate-finished-at"
-            />
-          </div>
-          <RouterLink to={`${DEV_QUALITY_GATES_ROUTE}?view=run&profile=strict`}>
-            查看质量门禁详情
-          </RouterLink>
-        </section>
-
-        <section className="erp-dev-version-summary" aria-label="发布状态摘要">
-          <Card title="本地候选">
-            <Space direction="vertical" size={8}>
-              <Text code>{shortGitSha(repository?.commit)}</Text>
-              {repository ? (
-                <Tag color={repository.dirty ? 'warning' : 'success'}>
-                  {repository.dirty ? '工作树有改动' : '工作树干净'}
-                </Tag>
-              ) : (
-                <Tag color="error">身份未证明</Tag>
-              )}
-              <Text type="secondary">
-                只有 clean HEAD 才能触发 exact-SHA 发布。
-              </Text>
-            </Space>
-          </Card>
-          <Card title={`${deliveryProviderName}不可变版本`}>
-            <Space direction="vertical" size={8}>
-              <Text strong>{versions[0]?.version || '尚无可用版本'}</Text>
-              <Text code>{shortGitSha(versions[0]?.gitSha)}</Text>
-              <DevDeliveryTimestamp
-                value={versions[0]?.publishedAt}
-                action="发布于"
-                missing="发布时间未证明"
-                className="erp-dev-latest-version-published-at"
-              />
-              <Text type="secondary">
-                {versions[0]?.completeAssets
-                  ? versions[0]?.promotionEligible
-                    ? 'v2 七资产齐全，演练回执已绑定'
-                    : versions[0]?.assets.includes('release-rehearsal.json')
-                      ? 'v2 七资产存在，但演练证据未闭合'
-                      : 'v1 六资产齐全，仅保留读取与旧版回滚'
-                  : '等待完整 release assets'}
-              </Text>
-            </Space>
-          </Card>
-          <Card
-            title={`${selectedTargetDefinition.label} · ${selectedTargetKey}`}
-          >
-            <Space direction="vertical" size={8}>
-              <Text code>{shortGitSha(currentTargetSha)}</Text>
-              <Tag
-                color={
-                  targetPassed
-                    ? 'success'
-                    : initializationReady
-                      ? 'processing'
+            <section
+              className="erp-dev-version-quality-gate-summary"
+              aria-label="当前发布 SHA 严格门禁摘要"
+            >
+              <Space wrap size={6}>
+                <Text strong>当前发布 SHA 严格门禁</Text>
+                <Tag
+                  color={
+                    strictProof?.releaseEligible && qualityGateIdentityCurrent
+                      ? 'success'
                       : 'warning'
-                }
-              >
-                {targetPassed
-                  ? '运行态只读预检通过'
-                  : initializationReady
-                    ? '首次部署预检通过'
-                    : '目标预检阻断'}
-              </Tag>
+                  }
+                >
+                  {strictSummaryLabel}
+                </Tag>
+              </Space>
               <Text type="secondary">
-                可用空间{' '}
-                {formatDeliveryBytes(
-                  target?.remote?.capacity?.availableBytes ??
-                    initializationPreflight?.remote?.capacity?.availableBytes
-                )}
-                {' / '}最低要求{' '}
-                {formatDeliveryBytes(
-                  target?.remote?.capacity?.minimumAvailableBytes ??
-                    initializationPreflight?.remote?.capacity
-                      ?.minimumAvailableBytes
-                )}
+                实际耗时{' '}
+                {formatQualityGateDuration(strictProof?.receipt?.durationMs)}
+                {' · '}
+                {strictProof?.reused ? '可信复用' : '本地新执行或尚未执行'}
               </Text>
+              <DevDeliveryTimestamp
+                value={strictProof?.receipt?.finishedAt}
+                action="完成于"
+                missing="完成时间未证明"
+                className="erp-dev-quality-gate-finished-at"
+              />
+              <RouterLink
+                to={`${DEV_QUALITY_GATES_ROUTE}?view=run&profile=strict`}
+              >
+                查看质量门禁详情
+              </RouterLink>
+            </section>
+          </aside>
+        </Card>
+
+        {selectedTargetKey === 'customer-test-133' ? (
+          <Card
+            className="erp-dev-version-table-card"
+            title="test 数据方式"
+            extra={<Tag color="blue">与版本部署分开</Tag>}
+          >
+            <Space direction="vertical" size={12} style={{ width: '100%' }}>
+              <Alert
+                type="info"
+                showIcon
+                message="普通部署默认保留现有数据"
+                description="发布和部署新版本只做备份、向前迁移、版本切换与运行核验，不会自动清空 test。没有新版本时，也可以单独清空并重建当前 exact SHA 的测试数据。"
+              />
+              <Space wrap>
+                <Tooltip
+                  title={
+                    customerTestRebuildEligible
+                      ? '先做只读资格检查，不会立即清空数据'
+                      : customerTestRebuildExplanation
+                  }
+                >
+                  <Button
+                    danger
+                    icon={<ToolOutlined />}
+                    disabled={!customerTestRebuildEligible}
+                    loading={actionKey === 'prepare:customer-test-rebuild'}
+                    onClick={() =>
+                      performAction(
+                        'prepare:customer-test-rebuild',
+                        'prepare-database-rebuild',
+                        {
+                          gitSha: currentTargetRelease.gitSha,
+                          version: currentTargetRelease.version,
+                          target: 'customer-test-133',
+                          idempotencyKey:
+                            createDeliveryIdempotencyKey('rebuild-database'),
+                        }
+                      )
+                    }
+                  >
+                    清空并重建测试数据
+                  </Button>
+                </Tooltip>
+                <Text type="secondary">
+                  固定当前运行版本 {shortGitSha(currentTargetSha)}
+                  ；资格通过后仍需二次确认。
+                </Text>
+              </Space>
             </Space>
           </Card>
-          <Card title="公网入口">
-            <Space direction="vertical" size={8}>
-              <Text code>{shortGitSha(publicEntry?.gitSha)}</Text>
-              <Tag
-                color={publicEntry?.status === 'passed' ? 'success' : 'warning'}
-              >
-                {publicEntry?.status === 'passed'
-                  ? `入口与${selectedTargetDefinition.shortLabel}版本一致`
-                  : '入口未完成证明'}
-              </Tag>
-              <Text type="secondary">
-                页面健康 {publicEntry?.health === 'passed' ? '通过' : '未通过'}
-                {' · '}短信 Provider{' '}
-                {publicEntry?.provider === 'passed' ? '通过' : '未通过'}
-              </Text>
-              <Link
-                href={
-                  publicEntry?.endpoint || selectedTargetDefinition.endpoint
-                }
-                target="_blank"
-                rel="noreferrer"
-              >
-                打开公网页面
-              </Link>
-            </Space>
-          </Card>
-        </section>
+        ) : null}
 
         {openOperations.length > 0 ? (
           <Card
@@ -1671,7 +2285,8 @@ export default function DevVersionCenterPage() {
                       <Text strong>
                         {operationActionLabel(
                           operation.action,
-                          operation.promotionMode
+                          operation.promotionMode,
+                          operation.target
                         )}
                       </Text>
                       <Text type="secondary" code>
@@ -1724,6 +2339,13 @@ export default function DevVersionCenterPage() {
           onOpenDetails={openPipelineDetails}
         />
 
+        <DevStaticGuidance title="固定边界" hint="发布职责与安全限制">
+          GitLab 负责代码真源、CI 与不可变制品；GitHub 仅接收单向审查镜像；本地
+          Bridge 只接受固定动作；demo 与 test
+          均不构建、不接受浏览器传入的命令、目录、仓库或 SSH
+          目标。两个目标共享不可变版本，但数据库、附件、运行资源、备份与回滚点相互隔离。
+        </DevStaticGuidance>
+
         <section
           ref={workspaceRef}
           className="erp-dev-version-workspace"
@@ -1738,7 +2360,7 @@ export default function DevVersionCenterPage() {
       </main>
 
       <Modal
-        title="人工接管与应急发布说明"
+        title="手动与应急发布指引"
         open={manualTakeoverOpen}
         width={760}
         className="erp-dev-version-takeover-modal"
@@ -1757,7 +2379,7 @@ export default function DevVersionCenterPage() {
       </Modal>
 
       <Modal
-        title="发布当前 exact SHA"
+        title="发布当前版本制品"
         open={releaseModalOpen}
         okText={`触发${deliveryProviderName}发布`}
         cancelText="取消"
@@ -1804,7 +2426,7 @@ export default function DevVersionCenterPage() {
       </Modal>
 
       <Drawer
-        title="操作详情"
+        title={operationDetailView.title}
         open={Boolean(operationDetail)}
         width={640}
         onClose={closeOperationDetail}
@@ -1824,12 +2446,17 @@ export default function DevVersionCenterPage() {
           <Space direction="vertical" size={16} style={{ width: '100%' }}>
             <Space wrap>
               <StatusTag status={operationDetail.status} />
-              <Text strong>{operationDetail.version}</Text>
+              <Text strong>
+                {operationActionLabel(
+                  operationDetail.action,
+                  operationDetail.promotionMode,
+                  operationDetail.target
+                )}{' '}
+                · {operationDetail.version}
+              </Text>
+              <Tag>{deliveryTargetLabel(operationDetail.target)}</Tag>
               <Text code>{shortGitSha(operationDetail.gitSha)}</Text>
             </Space>
-            <Text type="secondary" copyable>
-              {operationDetail.id}
-            </Text>
             <Space wrap size={[12, 4]}>
               <DevDeliveryTimestamp
                 value={operationDetail.createdAt}
@@ -1844,152 +2471,93 @@ export default function DevVersionCenterPage() {
                 className="erp-dev-operation-detail-time"
               />
             </Space>
-            <Card size="small" title="幂等与受控重试">
-              <Space direction="vertical" size={4} style={{ width: '100%' }}>
-                <Text strong>
-                  {
-                    deliveryIdempotencyPresentation(operationDetail.idempotency)
-                      .label
-                  }
-                </Text>
-                <Text type="secondary">
-                  识别依据：
-                  {deliveryIdempotencyPresentation(
-                    operationDetail.idempotency
-                  ).basis.join('、')}
-                </Text>
-                <Text type="secondary">
-                  {deliveryRetryPresentation(operationDetail.retry)}
-                </Text>
-                {operationDetail.idempotency.retryOfOperationId ? (
+            {operationDetailNeedsRetryCard ? (
+              <Card size="small" title="执行与重试">
+                <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                  <Text strong>{operationDetailIdempotency.label}</Text>
                   <Text type="secondary">
-                    关联上一次操作：
-                    {operationDetail.idempotency.retryOfOperationId.slice(0, 8)}
+                    {deliveryRetryPresentation(operationDetail.retry)}
                   </Text>
-                ) : null}
-              </Space>
-            </Card>
-            <Card size="small" title="操作环节耗时">
+                  {operationDetail.idempotency.retryOfOperationId ? (
+                    <Text type="secondary">
+                      关联上一次操作：
+                      {operationDetail.idempotency.retryOfOperationId.slice(
+                        0,
+                        8
+                      )}
+                    </Text>
+                  ) : null}
+                </Space>
+              </Card>
+            ) : null}
+            <Card size="small" title="操作耗时">
               <Space direction="vertical" size={8} style={{ width: '100%' }}>
                 <Text strong>
-                  总耗时 {formatDeliveryDuration(operationDetail.durationMs)}
+                  {operationDetailView.timingLabel}{' '}
+                  {formatDeliveryDuration(operationDetail.durationMs)}
                 </Text>
                 <DevTimingBars
                   stages={operationDetail.stages}
                   totalDurationMs={operationDetail.durationMs}
                   limit={100}
+                  presentStage={deliveryOperationMessagePresentation}
                 />
               </Space>
             </Card>
-            <Card size="small" title="制品与传输效能">
-              <div className="erp-dev-operation-metrics">
-                <div>
-                  <Text type="secondary">传输制品</Text>
-                  <Text strong>
-                    {formatDeliveryBytes(operationDetail.metrics.transferBytes)}
-                  </Text>
+            {operationDetailView.metricsKind === 'release' ? (
+              <Card size="small" title={operationDetailView.metricsTitle}>
+                <Text type="secondary" className="erp-dev-operation-scope-note">
+                  {operationDetailView.scopeNote}
+                </Text>
+                {operationReleaseMetricItems.length > 0 ? (
+                  <div className="erp-dev-operation-metrics">
+                    {operationReleaseMetricItems.map((item) => (
+                      <OperationMetricItem
+                        key={item.key}
+                        label={item.label}
+                        value={item.value}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <Text type="secondary">制品清单尚未读回</Text>
+                )}
+              </Card>
+            ) : null}
+            {operationTargetMetricItems.length > 0 ? (
+              <Card size="small" title={operationDetailView.metricsTitle}>
+                <div className="erp-dev-operation-metrics">
+                  {operationTargetMetricItems.map((item) => (
+                    <OperationMetricItem
+                      key={item.key}
+                      label={item.label}
+                      value={item.value}
+                    />
+                  ))}
                 </div>
-                <div>
-                  <Text type="secondary">实际传输耗时</Text>
-                  <Text strong>
-                    {formatDeliveryDuration(
-                      operationDetail.metrics.transferDurationMs
-                    )}
-                  </Text>
-                </div>
-                <div>
-                  <Text type="secondary">有效传输速率</Text>
-                  <Text strong>
-                    {formatDeliveryRate(
-                      operationDetail.metrics.transferBytesPerSecond
-                    )}
-                  </Text>
-                </div>
-                <div>
-                  <Text type="secondary">Server 制品</Text>
-                  <Text strong>
-                    {formatDeliveryBytes(
-                      operationDetail.metrics.serverArchiveBytes
-                    )}
-                  </Text>
-                </div>
-                <div>
-                  <Text type="secondary">Web 制品</Text>
-                  <Text strong>
-                    {formatDeliveryBytes(
-                      operationDetail.metrics.webArchiveBytes
-                    )}
-                  </Text>
-                </div>
-                <div>
-                  <Text type="secondary">回滚备份</Text>
-                  <Text strong>
-                    {formatDeliveryBytes(
-                      operationDetail.metrics.backupSizeBytes
-                    )}
-                  </Text>
-                </div>
-                <div>
-                  <Text type="secondary">目标内容缓存</Text>
-                  <Text strong>{operationCachePresentation.status}</Text>
-                </div>
-                <div>
-                  <Text type="secondary">避免重复传输</Text>
-                  <Text strong>
-                    {formatDeliveryBytes(
-                      operationDetail.metrics.avoidedTransferBytes
-                    )}
-                  </Text>
-                </div>
-                <div>
-                  <Text type="secondary">估算节省时间</Text>
-                  <Text strong>
-                    {formatDeliveryDuration(
-                      operationDetail.metrics.avoidedTransferDurationMs
-                    )}
-                  </Text>
-                </div>
-                <div>
-                  <Text type="secondary">镜像加载</Text>
-                  <Text strong>
-                    {operationDetail.metrics.dockerLoadSkipped === null
-                      ? '未证明'
-                      : operationDetail.metrics.dockerLoadSkipped
-                        ? '已安全跳过 Docker load'
-                        : '已执行 Docker load'}
-                  </Text>
-                </div>
-              </div>
-              {operationDetail.metrics.targetCacheHit != null ? (
-                <Space direction="vertical" size={4} style={{ width: '100%' }}>
-                  <Text type="secondary">
-                    命中来源：{operationCachePresentation.source}
-                  </Text>
-                  <Text type="secondary">
-                    命中依据：
-                    {operationCachePresentation.basis.length > 0
-                      ? operationCachePresentation.basis.join('、')
-                      : '无（已执行冷路径）'}
-                  </Text>
-                  <Text type="secondary">
-                    缓存命中后仍执行：
-                    {operationCachePresentation.stillExecuted.join('、')}
-                  </Text>
-                </Space>
-              ) : null}
-              {operationDetail.metrics.serverDigest ? (
-                <Space direction="vertical" size={4} style={{ width: '100%' }}>
-                  <Text type="secondary" code copyable>
-                    Server {operationDetail.metrics.serverDigest}
-                  </Text>
-                  <Text type="secondary" code copyable>
-                    Web {operationDetail.metrics.webDigest}
-                  </Text>
-                </Space>
-              ) : (
-                <Text type="secondary">镜像 digest 等待新版部署回执</Text>
-              )}
-            </Card>
+                {operationDetail.metrics.targetCacheHit != null ? (
+                  <Space
+                    direction="vertical"
+                    size={4}
+                    style={{ width: '100%' }}
+                  >
+                    <Text type="secondary">
+                      命中来源：{operationCachePresentation.source}
+                    </Text>
+                    <Text type="secondary">
+                      命中依据：
+                      {operationCachePresentation.basis.length > 0
+                        ? operationCachePresentation.basis.join('、')
+                        : '无（已执行冷路径）'}
+                    </Text>
+                    <Text type="secondary">
+                      缓存命中后仍执行：
+                      {operationCachePresentation.stillExecuted.join('、')}
+                    </Text>
+                  </Space>
+                ) : null}
+              </Card>
+            ) : null}
             {operationDetail.issues.length > 0 ? (
               <Alert
                 type="error"
@@ -1998,38 +2566,76 @@ export default function DevVersionCenterPage() {
                 description={issueDescription(operationDetail.issues)}
               />
             ) : null}
-            <List
-              loading={operationDetailLoading}
-              header="最近 100 条状态事件（按需读取）"
-              dataSource={operationDetail.events}
-              locale={{ emptyText: '暂无状态事件' }}
-              renderItem={(event) => (
-                <List.Item>
-                  <Space direction="vertical" size={4}>
-                    <Space wrap>
-                      <StatusTag status={event.status} />
-                      <DevDeliveryTimestamp
-                        value={event.at}
-                        action=""
-                        missing="事件时间未证明"
-                        className="erp-dev-operation-event-time"
-                      />
-                    </Space>
-                    <Text
-                      title={
-                        deliveryOperationMessagePresentation(event.message)
-                          .title
-                      }
-                    >
-                      {
-                        deliveryOperationMessagePresentation(event.message)
-                          .label
-                      }
-                    </Text>
-                  </Space>
-                </List.Item>
-              )}
-            />
+            <details className="erp-dev-operation-technical-details">
+              <summary>技术详情与状态事件</summary>
+              <div className="erp-dev-operation-technical-details__content">
+                <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                  <Text
+                    type="secondary"
+                    copyable={{ text: operationDetail.id }}
+                  >
+                    操作 ID：{operationDetail.id}
+                  </Text>
+                  <Text type="secondary">
+                    重复请求识别依据：
+                    {operationDetailIdempotency.basis.join('、')}
+                  </Text>
+                  <Text type="secondary">
+                    重试状态：{deliveryRetryPresentation(operationDetail.retry)}
+                  </Text>
+                  {operationServerDigest && operationWebDigest ? (
+                    <>
+                      <Text
+                        type="secondary"
+                        code
+                        copyable={{ text: operationServerDigest }}
+                      >
+                        Server {operationServerDigest}
+                      </Text>
+                      <Text
+                        type="secondary"
+                        code
+                        copyable={{ text: operationWebDigest }}
+                      >
+                        Web {operationWebDigest}
+                      </Text>
+                    </>
+                  ) : null}
+                </Space>
+                <List
+                  loading={operationDetailLoading}
+                  header="状态事件（最多 100 条，按需读取）"
+                  dataSource={operationDetail.events}
+                  locale={{ emptyText: '暂无状态事件' }}
+                  renderItem={(event) => (
+                    <List.Item>
+                      <Space direction="vertical" size={4}>
+                        <Space wrap>
+                          <StatusTag status={event.status} />
+                          <DevDeliveryTimestamp
+                            value={event.at}
+                            action=""
+                            missing="事件时间未证明"
+                            className="erp-dev-operation-event-time"
+                          />
+                        </Space>
+                        <Text
+                          title={
+                            deliveryOperationMessagePresentation(event.message)
+                              .title
+                          }
+                        >
+                          {
+                            deliveryOperationMessagePresentation(event.message)
+                              .label
+                          }
+                        </Text>
+                      </Space>
+                    </List.Item>
+                  )}
+                />
+              </div>
+            </details>
           </Space>
         ) : null}
       </Drawer>
@@ -2038,17 +2644,21 @@ export default function DevVersionCenterPage() {
         title={
           confirmOperation?.action === 'rollback'
             ? `确认代码回滚到 ${deliveryTargetLabel(confirmOperation?.target)}`
-            : confirmOperation?.promotionMode === 'initialize'
-              ? `确认首次部署（Explicit Promotion）至 ${deliveryTargetLabel(confirmOperation?.target)}`
-              : `确认显式版本提升（Explicit Promotion）至 ${deliveryTargetLabel(confirmOperation?.target)}`
+            : confirmOperation?.action === 'rebuild-database'
+              ? '确认清空并重建 test 测试数据'
+              : confirmOperation?.promotionMode === 'initialize'
+                ? `确认首次部署到 ${deliveryTargetLabel(confirmOperation?.target)}`
+                : `确认部署到 ${deliveryTargetLabel(confirmOperation?.target)}`
         }
         open={Boolean(confirmOperation)}
         okText={
           confirmOperation?.action === 'rollback'
             ? '开始回滚'
-            : confirmOperation?.promotionMode === 'initialize'
-              ? '开始首次部署'
-              : '开始版本提升'
+            : confirmOperation?.action === 'rebuild-database'
+              ? '开始清空重建'
+              : confirmOperation?.promotionMode === 'initialize'
+                ? '开始首次部署'
+                : '开始部署'
         }
         cancelText="取消"
         confirmLoading={actionKey === `execute:${confirmOperation?.id || ''}`}
@@ -2059,7 +2669,9 @@ export default function DevVersionCenterPage() {
         maskClosable={actionKey !== `execute:${confirmOperation?.id || ''}`}
         keyboard={actionKey !== `execute:${confirmOperation?.id || ''}`}
         okButtonProps={{
-          danger: confirmOperation?.action === 'rollback',
+          danger: ['rollback', 'rebuild-database'].includes(
+            confirmOperation?.action
+          ),
           disabled:
             !summaryFresh ||
             !confirmOperation ||
@@ -2071,7 +2683,9 @@ export default function DevVersionCenterPage() {
             `execute:${confirmOperation.id}`,
             confirmOperation.action === 'rollback'
               ? 'execute-rollback'
-              : 'execute-promotion',
+              : confirmOperation.action === 'rebuild-database'
+                ? 'execute-database-rebuild'
+                : 'execute-promotion',
             {
               operationId: confirmOperation.id,
               confirmation: confirmationText,
@@ -2098,12 +2712,16 @@ export default function DevVersionCenterPage() {
             message={
               confirmOperation?.action === 'rollback'
                 ? '该动作只回滚代码和镜像'
-                : `该动作会写入 ${deliveryTargetLabel(confirmOperation?.target)}`
+                : confirmOperation?.action === 'rebuild-database'
+                  ? '该动作会清空并重建 test 测试数据'
+                  : `该动作会写入 ${deliveryTargetLabel(confirmOperation?.target)}`
             }
             description={
               confirmOperation?.action === 'rollback'
                 ? '仅在 migration 序列和客户配置源指纹完全相同时允许；不自动 down migration 或恢复数据库。若结果未知，不会自动重试。'
-                : '执行器会重新做即时预检、创建并恢复检查新备份、校验制品、串行迁移、启动和 smoke。若结果未知，不会自动重试。'
+                : confirmOperation?.action === 'rebuild-database'
+                  ? '执行器会先复核当前 exact SHA，创建并恢复检查新备份，保留旧物理数据代，再迁移并核对空业务基线。该动作不属于普通部署，结果未知时不会自动重试。'
+                  : '执行器会重新做即时预检、创建并恢复检查新备份、校验制品、串行迁移、启动和 smoke。若结果未知，不会自动重试。'
             }
           />
           <Text>请完整输入以下确认文本：</Text>
@@ -2115,7 +2733,9 @@ export default function DevVersionCenterPage() {
             aria-label={
               confirmOperation?.action === 'rollback'
                 ? '回滚确认文本'
-                : '部署确认文本'
+                : confirmOperation?.action === 'rebuild-database'
+                  ? '清空并重建测试数据确认文本'
+                  : '部署确认文本'
             }
             value={confirmationText}
             placeholder="粘贴完整确认文本"

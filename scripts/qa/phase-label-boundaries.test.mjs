@@ -12,7 +12,7 @@ const SCRIPT_PATH = fileURLToPath(
   new URL("./phase-label-boundaries.mjs", import.meta.url),
 );
 
-function runFixture(files) {
+function runFixture(files, scanPaths = []) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "plush-phase-labels-"));
   try {
     for (const [relativePath, content] of Object.entries(files)) {
@@ -20,7 +20,7 @@ function runFixture(files) {
       fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
       fs.writeFileSync(absolutePath, content);
     }
-    return spawnSync(process.execPath, [SCRIPT_PATH], {
+    return spawnSync(process.execPath, [SCRIPT_PATH, ...scanPaths], {
       cwd: root,
       encoding: "utf8",
     });
@@ -83,4 +83,31 @@ test("ignores extensionless binary artifacts", () => {
   });
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /\[phase-label-boundaries\] ok/u);
+});
+
+test("affected mode scans only the explicitly changed files", () => {
+  const result = runFixture(
+    {
+      "changed.md": "capability-led delivery",
+      "unrelated.md": "Phase" + " 8 historical planning residue",
+    },
+    ["changed.md"],
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /mode=affected files=1/u);
+
+  const rejected = runFixture(
+    {
+      "changed.md": "Phase" + " 8 active label",
+      "unrelated.md": "capability-led delivery",
+    },
+    ["changed.md"],
+  );
+  assert.equal(rejected.status, 1);
+});
+
+test("affected mode rejects paths outside the repository", () => {
+  const result = runFixture({ "changed.md": "safe" }, ["../outside.md"]);
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /must stay inside the repository/u);
 });

@@ -9,7 +9,11 @@ import {
   DEV_DELIVERY_SOURCE_PATH,
   DEV_DELIVERY_SUMMARY_API_PATH,
   DEV_DELIVERY_TARGETS,
+  DEV_VERSION_CENTER_HISTORY_FILTER_ALL,
+  DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS,
   DEV_VERSION_CENTER_HISTORY_PAGE_SIZE,
+  DEV_VERSION_CENTER_HISTORY_RESULT_ATTENTION,
+  DEV_VERSION_CENTER_HISTORY_RESULT_PASSED,
   DEV_VERSION_CENTER_ROUTE,
   DEV_VERSION_CENTER_VERSION_PAGE_SIZE,
   DEV_VERSION_CENTER_VIEW_HISTORY,
@@ -18,6 +22,7 @@ import {
   createDeliveryIdempotencyKey,
   createDevDeliveryClient,
   deliveryOperationMessagePresentation,
+  deliveryOperationDetailPresentation,
   deliveryIdempotencyPresentation,
   deliveryPipelinePresentation,
   deliveryPipelineRunMode,
@@ -27,6 +32,7 @@ import {
   deliveryTargetCachePresentation,
   deliveryVersionActionKind,
   deliveryVersionForTarget,
+  filterDevOperationHistory,
   findLatestTransferredPromotion,
   formatDeliveryBytes,
   formatDeliveryDuration,
@@ -34,6 +40,7 @@ import {
   formatDeliveryRate,
   formatDeliveryTimestamp,
   isDevInitialCustomerConfigActivationReady,
+  resolveDevOperationHistoryFilters,
   resolveDevOperationHistoryState,
   resolveDevVersionCenterView,
   shortGitSha,
@@ -211,6 +218,7 @@ function summaryFixture() {
     issues: [],
     boundaries: {
       provider: 'gitlab',
+      releaseDispatchAllowed: true,
       target: 'demo-133',
       targets: ['demo-133', 'customer-test-133'],
       browserShellAccess: false,
@@ -337,6 +345,17 @@ test('delivery summary requires both target contracts and no-shell boundaries', 
         boundaries: {
           ...summaryFixture().boundaries,
           browserShellAccess: true,
+        },
+      }),
+    /contract/u
+  )
+  assert.throws(
+    () =>
+      validateDevDeliverySummary({
+        ...summaryFixture(),
+        boundaries: {
+          ...summaryFixture().boundaries,
+          releaseDispatchAllowed: 'yes',
         },
       }),
     /contract/u
@@ -802,7 +821,7 @@ test('delivery presentation helpers are deterministic and bounded', () => {
     deliveryOperationMessagePresentation(
       'fresh database generation and basic runtime verification passed'
     ).label,
-    '全新数据库代与基础运行核验已通过'
+    '全新数据代与基础运行核验已通过'
   )
   assert.match(
     deliveryOperationMessagePresentation('Future executor event').title,
@@ -812,6 +831,104 @@ test('delivery presentation helpers are deterministic and bounded', () => {
     deliveryPipelineRunModePresentation('exact_sha_reuse'),
     '相同 SHA 幂等复用'
   )
+  assert.deepEqual(deliveryOperationDetailPresentation({ action: 'release' }), {
+    title: '制品发布详情',
+    timingLabel: '工作台发布操作历时',
+    metricsKind: 'release',
+    metricsTitle: '构建与制品',
+    scopeNote: '本次仅发布不可变制品，未向 demo 或 test 执行部署。',
+  })
+  assert.equal(
+    deliveryOperationDetailPresentation({
+      action: 'promote',
+      promotionMode: 'initialize',
+    }).title,
+    '首次部署详情'
+  )
+  assert.equal(
+    deliveryOperationDetailPresentation({ action: 'promote' }).title,
+    '版本部署详情'
+  )
+  assert.equal(
+    deliveryOperationDetailPresentation({ action: 'rollback' }).metricsTitle,
+    '目标回滚与传输'
+  )
+  assert.equal(
+    deliveryOperationDetailPresentation({ action: 'rebuild-database' })
+      .timingLabel,
+    '工作台数据重建操作历时'
+  )
+})
+
+test('operation history filters normalize invalid input and compose useful dimensions', () => {
+  const operations = [
+    {
+      id: '11111111-1111-4111-8111-111111111111',
+      action: 'release',
+      target: 'gitlab-release',
+      version: '2026.08.31-10',
+      gitSha: 'a'.repeat(40),
+      status: 'passed',
+    },
+    {
+      id: '22222222-2222-4222-8222-222222222222',
+      action: 'promote',
+      target: 'demo-133',
+      version: '2026.08.31-9',
+      gitSha: 'b'.repeat(40),
+      status: 'failed',
+    },
+    {
+      id: '33333333-3333-4333-8333-333333333333',
+      action: 'rollback',
+      target: 'customer-test-133',
+      version: '2026.08.31-8',
+      gitSha: 'c'.repeat(40),
+      status: 'not_proven',
+    },
+  ]
+
+  assert.deepEqual(
+    resolveDevOperationHistoryFilters({
+      action: 'unknown',
+      result: 'unknown',
+      target: 'unknown',
+      keyword: '  2026.08.31  ',
+    }),
+    {
+      action: DEV_VERSION_CENTER_HISTORY_FILTER_ALL,
+      result: DEV_VERSION_CENTER_HISTORY_FILTER_ALL,
+      target: DEV_VERSION_CENTER_HISTORY_FILTER_ALL,
+      keyword: '2026.08.31',
+    }
+  )
+  assert.deepEqual(
+    filterDevOperationHistory(operations, {
+      result: DEV_VERSION_CENTER_HISTORY_RESULT_ATTENTION,
+    }).map((operation) => operation.id),
+    [operations[1].id, operations[2].id]
+  )
+  assert.deepEqual(
+    filterDevOperationHistory(operations, {
+      result: DEV_VERSION_CENTER_HISTORY_RESULT_PASSED,
+      action: 'release',
+      target: 'gitlab-release',
+      keyword: '11111111',
+    }).map((operation) => operation.id),
+    [operations[0].id]
+  )
+  assert.deepEqual(
+    filterDevOperationHistory(operations, { keyword: 'BBBBBBBBBBBB' }).map(
+      (operation) => operation.id
+    ),
+    [operations[1].id]
+  )
+  assert.deepEqual(DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS, {
+    action: 'history_action',
+    result: 'history_result',
+    target: 'history_target',
+    keyword: 'history_q',
+  })
 })
 
 test('pipeline jobs and timing stages use Chinese-first presentation labels', () => {
@@ -1127,18 +1244,20 @@ test('version center page does not expose shell, SSH or arbitrary target inputs'
   assert.match(source, /headAlreadyPublished/u)
   assert.match(source, /当前 SHA 已发布并部署，无需重复发布/u)
   assert.match(source, /deliveryOperationMessagePresentation/u)
-  assert.match(source, /重建目标数据库/u)
-  assert.match(source, /查看发布当前 SHA 说明/u)
+  assert.match(source, /清空并重建测试数据/u)
+  assert.match(source, /prepare-database-rebuild/u)
+  assert.match(source, /execute-database-rebuild/u)
+  assert.match(source, /查看发布当前版本制品说明/u)
   assert.match(source, /先发布制品，不会直接部署到任一目标/u)
-  assert.match(source, /“准备版本提升”和“确认版本提升”/u)
+  assert.match(source, /“准备部署”和“确认部署”/u)
   assert.match(source, /trigger=\{\['hover', 'click'\]\}/u)
-  assert.match(source, /人工接管说明/u)
-  assert.match(source, /人工接管与应急发布说明/u)
+  assert.match(source, /手动操作指引/u)
+  assert.match(source, /手动与应急发布指引/u)
   assert.match(source, /四处操作各管什么/u)
   assert.match(source, /Codex \/ 本地终端/u)
   assert.match(source, /先判断能不能继续/u)
   assert.match(source, /本页不创建 commit、不 push/u)
-  assert.match(source, /显式版本提升（Explicit Promotion）/u)
+  assert.match(source, /在本页部署已发布版本/u)
   assert.match(source, /代码推送不会自动部署/u)
   assert.match(source, /应急不等于绕过/u)
   assert.match(source, /禁止 force push、跳过质量门禁/u)
@@ -1146,8 +1265,19 @@ test('version center page does not expose shell, SSH or arbitrary target inputs'
   assert.match(source, /afterClose=\{\(\) =>/u)
   assert.match(
     source,
-    /人工接管说明[\s\S]*?发布当前 SHA[\s\S]*?查看发布当前 SHA 说明[\s\S]*?<\/header>/u
+    /手动操作指引[\s\S]*?<\/header>[\s\S]*?erp-dev-version-overview[\s\S]*?发布当前版本制品[\s\S]*?查看发布当前版本制品说明/u
   )
+  assert.doesNotMatch(
+    source,
+    /<header[\s\S]*?发布当前版本制品[\s\S]*?<\/header>/u
+  )
+  assert.match(source, /当前结论 \/ 下一步/u)
+  assert.match(source, /summary[?][.]boundaries[?][.]releaseDispatchAllowed/u)
+  assert.match(source, /版本与流水线可查看，当前不能创建新发布/u)
+  assert.match(source, /当前只加载 GitLab 只读凭据/u)
+  assert.match(source, /aria-label="切换当前操作目标"/u)
+  assert.match(source, /selectedTargetDefinition[.]dataBoundary/u)
+  assert.doesNotMatch(source, /erp-dev-version-target-selector__boundaries/u)
   assert.doesNotMatch(
     source,
     /(?:spawn|child_process|192[.]168|\/home\/simon)/iu
@@ -1214,15 +1344,21 @@ test('version center keeps critical state visible and uses stable tab pagination
 
   assert.match(versionCenterPageSource, /useSearchParams/u)
   assert.match(versionCenterPageSource, /label: '版本与部署'/u)
-  assert.match(versionCenterPageSource, /label: 'CI\/CD 效能'/u)
+  assert.match(versionCenterPageSource, /label: '流水线耗时'/u)
   assert.match(versionCenterPageSource, /label: '操作记录'/u)
-  assert.match(versionCenterPageSource, /幂等与受控重试/u)
+  assert.match(versionCenterPageSource, /筛选发布与部署记录/u)
+  assert.match(versionCenterPageSource, /搜索版本、SHA 或操作 ID/u)
+  assert.match(
+    versionCenterPageSource,
+    /dataSource=\{filteredHistoryOperations\}/u
+  )
+  assert.match(versionCenterPageSource, /没有符合筛选条件的记录/u)
+  assert.match(versionCenterPageSource, /执行与重试/u)
   assert.match(versionCenterPageSource, /OperationIdempotencyText/u)
   assert.match(versionCenterPageSource, /retry-operation/u)
   assert.match(versionCenterPageSource, /再次尝试/u)
   assert.doesNotMatch(versionCenterPageSource, /label: '幂等/u)
   assert.match(versionCenterPageSource, /openOperations[.]map/u)
-  assert.match(versionCenterPageSource, /dataSource=\{historyOperations\}/u)
   assert.match(
     versionCenterPageSource,
     /operationHistoryState === 'failure' \? null : \([\s\S]*?<Table/u
@@ -1291,7 +1427,7 @@ test('delivery pages expose one canonical dangerous action and lock concurrent m
   assert.match(versionCenterPageSource, /setOperationPollError/u)
   assert.match(
     versionCenterPageSource,
-    /danger: confirmOperation\?\.action === 'rollback'/u
+    /danger: \['rollback', 'rebuild-database'\][.]includes\([\s\S]*?confirmOperation\?\.action/u
   )
   assert.doesNotMatch(
     versionCenterPageSource,

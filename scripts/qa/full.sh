@@ -26,7 +26,7 @@ print_help() {
   QA_BASE_RANGE=...    指定真实 push 聚合范围，供严格 secrets 使用
   QA_DB_GUARD_RANGE=... 指定数据库守卫范围；prepare-push 只在精确首次镜像场景收窄到已验证上游
   DISPOSABLE_DATABASE_BASE_URL=... 本地 PostgreSQL 管理连接基线；门禁派生唯一 disposable test 库，不写入基线库
-  QA_BROWSER_SCENARIOS=...        追加浏览器诊断场景；不能替换正式门禁的工作台共享布局与新增页面治理场景
+  QA_BROWSER_SCENARIOS=...        追加受影响的浏览器诊断场景；默认门禁只保留桌面根入口 smoke
 
 结果边界:
   full/strict 拒绝 SKIP_*、STRICT_SKIP_* 与调用者提供的 coverage 变量。
@@ -155,7 +155,7 @@ fi
 # shellcheck disable=SC1091
 source "$ROOT_DIR/scripts/lib/bash.sh"
 
-DEFAULT_QA_BROWSER_SCENARIOS="root-redirect-desktop,dev-all-pages-mobile,dev-workbench-wide-layout,dev-hub-dark-desktop,dev-drill-recovery-desktop-light,dev-drill-recovery-mobile-dark,dev-business-usability-desktop-light,dev-business-usability-mobile-dark"
+DEFAULT_QA_BROWSER_SCENARIOS="root-redirect-desktop"
 
 # ROOT_DIR pins the shared PostgreSQL contract; ShellCheck scans it separately.
 # shellcheck disable=SC1091

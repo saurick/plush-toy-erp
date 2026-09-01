@@ -116,33 +116,33 @@ function addTrialReadback(summary) {
 
 function deliverySummaryFixture() {
   const target = (key, purpose, databaseName, endpoint) => ({
-      target: key,
-      purpose,
-      generatedAt: GENERATED_AT,
-      status: 'passed',
-      remote: {
-        runtime: {
-          serverSha: COMMIT,
-          webSha: COMMIT,
-          databaseName,
-          migrationVersion: '20260728100514',
-          activeCustomerConfig: {
-            revision:
-              'yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1',
-            productVersion: 'customer-trial-133-test-2026.08.15-v6',
-            datasetVersion: '2026.08.15-v6',
-          },
-          serverHealth: 'passed',
-          serverReady: 'passed',
-          webHealth: 'passed',
+    target: key,
+    purpose,
+    generatedAt: GENERATED_AT,
+    status: 'passed',
+    remote: {
+      runtime: {
+        serverSha: COMMIT,
+        webSha: COMMIT,
+        databaseName,
+        migrationVersion: '20260728100514',
+        activeCustomerConfig: {
+          revision:
+            'yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1',
+          productVersion: 'customer-trial-133-test-2026.08.15-v6',
+          datasetVersion: '2026.08.15-v6',
         },
-        publicEntry: { status: 'passed', endpoint },
-        backup: {
-          tooling: 'passed',
-          latestSha256: '1'.repeat(64),
-          latestSizeBytes: 1024,
-        },
+        serverHealth: 'passed',
+        serverReady: 'passed',
+        webHealth: 'passed',
       },
+      publicEntry: { status: 'passed', endpoint },
+      backup: {
+        tooling: 'passed',
+        latestSha256: '1'.repeat(64),
+        latestSizeBytes: 1024,
+      },
+    },
   })
   const demo = target(
     'demo-133',
@@ -186,14 +186,42 @@ test('environment evidence keeps one controller and four evidence cards', () => 
   assert.equal(evidence.controller, '本地 DEV-only')
   assert.deepEqual(
     evidence.cards.map(({ key }) => key),
-    ['local-development', 'demo-133', 'customer-test-133', 'isolated-acceptance']
+    [
+      'local-development',
+      'demo-133',
+      'customer-test-133',
+      'isolated-acceptance',
+    ]
   )
   assert.equal(evidence.cards[0].status, 'success')
   assert.equal(evidence.cards[1].status, 'not_proven')
   assert.match(evidence.cards[1].nextAction, /demo 目标卡/u)
-  assert.equal(evidence.cards[2].status, 'not_proven')
-  assert.match(evidence.cards[2].nextAction, /备份/u)
+  assert.equal(evidence.cards[2].status, 'success')
+  assert.equal(evidence.cards[2].datasetVersion, '保留现有数据')
+  assert.match(evidence.cards[2].nextAction, /独立清空并重建/u)
   assert.equal(evidence.cards[3].status, 'success')
+})
+
+test('customer test data rebuild is independent from normal deployment readiness', () => {
+  const deliverySummary = deliverySummaryFixture()
+  deliverySummary.operations.push({
+    id: '11111111-1111-4111-8111-111111111111',
+    action: 'rebuild-database',
+    target: 'customer-test-133',
+    status: 'passed',
+    updatedAt: '2026-08-15T03:00:00.000Z',
+  })
+  const evidence = buildDevEnvironmentEvidence({
+    dataSummary: dataSummaryFixture(),
+    deliverySummary,
+  })
+  const customerTest = evidence.cards[2]
+
+  assert.equal(customerTest.status, 'success')
+  assert.equal(customerTest.datasetVersion, 'clean-baseline')
+  assert.equal(customerTest.datasetRunId, '11111111')
+  assert.match(customerTest.datasetEvidence, /受控重建/u)
+  assert.match(customerTest.rollbackBoundary, /绑定回滚点/u)
 })
 
 test('local and remote target failures remain independent', () => {

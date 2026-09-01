@@ -73,7 +73,7 @@ Runner 和 shell job 始终使用 canonical 身份 `https://gitlab.saurick.me`�
 - `qemu-guest-agent` 随 VM 安装并启动，QEMU channel、服务存活和持久化状态进入 bootstrap 门禁；它只提供宿主机管理和只读身份证明，不成为 CI 凭据通道。
 - 注册前必须以系统信任链分别通过 curl 与 Node 的无认证 canonical GET；注册后还要读回 Runner service 配置环境和实际主进程环境。任一环节不绿，不消费注册 token，也不启动 Runner。
 
-R640 侧必须先有只监听 bridge/LAN 443 的 canonical TLS proxy，并保留已有 Tailscale 监听。UFW 只允许 `192.168.124.0/24` 经 KVM bridge 接口访问目标 `192.168.124.1/tcp/443`；不得改成 wildcard 443、LAN 全网放行或公网 FRP 绕行。主机防火墙、proxy listener、Runner 自然解析、系统信任链 curl 和 Node fetch 必须一起读回，单独的 `/etc/hosts` 或端口监听不算可达性证明。
+R640 侧必须先有只监听 bridge/LAN 443 的 canonical TLS proxy。Tailscale 节点域名只表示主机身份，不作为 GitLab 服务地址，也不得把 GitLab 挂到节点 `tailscale serve` 根路径。Runner 的 UFW 规则只允许 `192.168.124.0/24` 经 KVM bridge 接口访问目标 `192.168.124.1/tcp/443`；Mac、Windows 等 LAN 客户端若需 canonical 内网直连，只按实际客户端 `/32` 向 `192.168.0.133/tcp/443` 添加精确规则。不得改成 wildcard 443、LAN 整段放行或公网 FRP 绕行。主机防火墙、proxy listener、客户端自然解析、系统信任链 curl 和 Node fetch 必须一起读回，单独的 `/etc/hosts` 或端口监听不算可达性证明。
 
 ## 公网入口（独立可选）
 

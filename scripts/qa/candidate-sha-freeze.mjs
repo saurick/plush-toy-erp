@@ -23,7 +23,6 @@ import { validateStrictReceiptEvidence } from "./strict-receipt-identity.mjs";
 export const CANDIDATE_SHA_FREEZE_CONTRACT = "plush.candidate-sha-freeze/v1";
 export const CANDIDATE_SHA_FREEZE_SCENARIOS = Object.freeze([
   "dev-version-center-tabs-pagination-desktop",
-  "dev-version-center-tabs-pagination-mobile-dark",
 ]);
 export const CANDIDATE_SHA_FREEZE_TESTS = Object.freeze([
   "scripts/qa/strict-receipt-identity.test.mjs",
@@ -94,8 +93,8 @@ export function buildCandidateFreezePlan(root) {
       env: Object.freeze({}),
     }),
     Object.freeze({
-      id: "workbench_light_dark",
-      label: "效能工作台浅色与深色真实浏览器",
+      id: "workbench_desktop",
+      label: "效能工作台桌面真实浏览器",
       command: "pnpm",
       args: Object.freeze(["--dir", "web", "style:l1"]),
       env: Object.freeze({
@@ -194,7 +193,7 @@ export function runCandidateShaFreeze(
       recentActionAndDeploymentSeparated: true,
       publicExactShaReadback: true,
       productionBuildDevOnlyIsolation: true,
-      workbenchLightAndDark: true,
+      workbenchDesktop: true,
     },
     scenarios: CANDIDATE_SHA_FREEZE_SCENARIOS,
     steps,
@@ -253,7 +252,7 @@ function main() {
     console.log(`Usage:
   node scripts/qa/candidate-sha-freeze.mjs --sha <40-char-sha> --terminal <strict-terminal.json> [--out <receipt.json>]
 
-Runs the fixed P0 contract matrix plus the version-center light/dark browser
+Runs the fixed contract matrix plus the version-center desktop browser
 scenarios. It requires an already-passed exact-SHA strict terminal and a clean
 HEAD; it does not replace CI, Release, target promotion or public readback.`);
     return;

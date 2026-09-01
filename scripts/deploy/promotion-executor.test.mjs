@@ -48,10 +48,7 @@ test("promotion executor consumes the inherited target fetch credential once", (
     PLUSH_GITLAB_TOKEN: "provider-token",
     PLUSH_GITLAB_TARGET_FETCH_TOKEN: "target-fetch-token",
   };
-  assert.equal(
-    consumeTargetReleaseFetchCredential(env),
-    "target-fetch-token",
-  );
+  assert.equal(consumeTargetReleaseFetchCredential(env), "target-fetch-token");
   assert.deepEqual(env, { KEEP_ME: "safe" });
   assert.equal(consumeTargetReleaseFetchCredential(env), undefined);
 });
@@ -511,7 +508,10 @@ test("target initialization receipt binds pristine state, backup and rollback", 
           restoreChecked: false,
         },
         checks: Object.fromEntries(
-          Object.keys(initializationReceipt().checks).map((key) => [key, false]),
+          Object.keys(initializationReceipt().checks).map((key) => [
+            key,
+            false,
+          ]),
         ),
         rollback: {
           complete: true,
@@ -556,7 +556,10 @@ test("target initialization receipt binds pristine state, backup and rollback", 
             restoreChecked: false,
           },
           checks: Object.fromEntries(
-            Object.keys(initializationReceipt().checks).map((key) => [key, false]),
+            Object.keys(initializationReceipt().checks).map((key) => [
+              key,
+              false,
+            ]),
           ),
           rollback: {
             complete: true,
@@ -767,7 +770,10 @@ test("promotion executor contains no target build or automatic retry path", () =
   assert.match(source, /release-rehearsal[.]json/u);
   assert.match(source, /PLUSH_GITLAB_TARGET_FETCH_TOKEN/u);
   assert.doesNotMatch(source, /process[.]env[.]PLUSH_GITLAB_TOKEN/u);
-  assert.match(source, /input: targetFetchToken \? `\$\{targetFetchToken\}\\n` : ""/u);
+  assert.match(
+    source,
+    /input: targetFetchToken \? `\$\{targetFetchToken\}\\n` : ""/u,
+  );
   assert.match(source, /input: `\$\{targetFetchToken\}\\n`/u);
   assert.doesNotMatch(source, /target-release-fetch[.]secret/u);
   const controlTransfer = source.match(
@@ -847,8 +853,25 @@ test("promotion executor contains no target build or automatic retry path", () =
     assert.match(source, new RegExp(`\\b${metric}\\b`, "u"));
   }
   assert.equal(
-    source.match(/bootstrapAccessStored: Boolean\(accessFile && existsSync\(accessFile\)\)/gu)?.length,
+    source.match(
+      /bootstrapAccessStored: Boolean\(accessFile && existsSync\(accessFile\)\)/gu,
+    )?.length,
     2,
     "both terminal initialization paths must report the actual access-file state",
   );
+});
+
+test("ordinary promotion cannot invoke the independent database rebuild path", () => {
+  for (const file of [
+    "promotion-controller.mjs",
+    "promotion-executor.mjs",
+    "remote-promotion.sh",
+  ]) {
+    const source = readFileSync(path.join(import.meta.dirname, file), "utf8");
+    assert.doesNotMatch(
+      source,
+      /database-rebuild|rebuild-database|REBUILD_DATABASE/u,
+      `${file} must preserve target data and remain separate from rebuild`,
+    );
+  }
 });

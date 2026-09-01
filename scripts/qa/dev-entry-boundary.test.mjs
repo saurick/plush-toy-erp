@@ -832,7 +832,7 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
   );
   assertIncludes(
     buildDevTestingCopyPresetSource(customerConfigPreset),
-    "dev-customer-config-dark-desktop",
+    "dev-page-customer-config-desktop-light",
     "customer config dev console preset",
   );
   const devPrototypePreset = DEV_TESTING_COPY_PRESETS.find(
@@ -850,7 +850,7 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
   );
   assertIncludes(
     buildDevTestingCopyPresetSource(devPrototypePreset),
-    "dev-prototypes-dark-desktop",
+    "dev-page-prototypes-desktop-light",
     "dev prototype registry preset",
   );
   assertIncludes(
@@ -878,12 +878,17 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
   );
   assertIncludes(
     buildDevTestingCopyPresetSource(devDocGovernancePreset),
-    "dev-docs-dark-desktop",
+    "dev-page-overview-desktop-light",
     "dev docs governance preset",
   );
   assertIncludes(
     buildDevTestingCopyPresetSource(devDocGovernancePreset),
-    "dev-governance-dark-desktop",
+    "dev-page-docs-desktop-light",
+    "dev docs governance preset",
+  );
+  assertIncludes(
+    buildDevTestingCopyPresetSource(devDocGovernancePreset),
+    "dev-page-governance-desktop-light",
     "dev docs governance preset",
   );
   assertIncludes(

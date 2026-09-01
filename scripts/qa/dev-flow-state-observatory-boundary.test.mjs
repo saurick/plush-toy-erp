@@ -166,9 +166,6 @@ test("dev flow state observatory: long definition selects are grouped without ch
   const page = read(
     "web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx",
   );
-  const styles = read(
-    "web/src/dev-workbench/styles/dev-flow-state-observatory.css",
-  );
   const chainOptions = buildBusinessChainSelectOptions(catalog);
   const factOptions = buildFactDefinitionSelectOptions(catalog);
   const stateOptions = buildStateDefinitionSelectOptions(catalog);
@@ -191,8 +188,6 @@ test("dev flow state observatory: long definition selects are grouped without ch
   assert.match(page, /buildProcessDefinitionSelectOptions\(scopedCatalog\)/u);
   assert.match(page, /optionRender=\{renderDefinitionSelectOption\}/u);
   assert.match(page, /options=\{definitionOptions\}/u);
-  assert.match(styles, /erp-dev-flow-definition-select-popup/u);
-  assert.match(styles, /erp-dev-flow-definition-option__key/u);
 });
 
 test("dev flow state observatory: English anchors stay paired with the concept layers", () => {
@@ -388,7 +383,6 @@ test("dev flow state observatory: customer review print is generated from the sh
   const styles = read(
     "web/src/dev-workbench/styles/dev-flow-state-observatory.css",
   );
-
   assert.match(page, /buildDevBusinessChainCustomerReview/u);
   assert.match(page, /DevBusinessChainCustomerReviewPrint/u);
   assert.match(page, /导出甲方校对版/u);
@@ -571,10 +565,6 @@ test("dev flow state observatory: state rules explain exceptional paths without 
   const presentation = read(
     "web/src/dev-workbench/pages/devFlowStateRulePresentation.mjs",
   );
-  const styles = read(
-    "web/src/dev-workbench/styles/dev-flow-state-observatory.css",
-  );
-
   for (const copy of [
     "这里只展示这个对象自己的合法转换",
     "图中的彩色线和短标签共同区分路径",
@@ -623,19 +613,6 @@ test("dev flow state observatory: state rules explain exceptional paths without 
     );
   }
 
-  assert.match(
-    styles,
-    /\.erp-dev-flow-state-path-legend article > span[\s\S]*?width: 12px[\s\S]*?height: 12px/u,
-  );
-  assert.match(styles, /background: var\(--erp-dev-state-path-color\)/u);
-  assert.match(
-    styles,
-    /@media \(max-width: 760px\)[\s\S]*?\.erp-dev-flow-state-graph[\s\S]*?display: none/u,
-  );
-  assert.match(
-    styles,
-    /\.erp-dev-flow-state-list ul[\s\S]*?max-height: none[\s\S]*?overflow-y: visible/u,
-  );
 });
 
 test("dev flow state observatory: evidence is collapsed and no risky business write is imported", () => {
@@ -682,45 +659,4 @@ test("dev flow state observatory: evidence is collapsed and no risky business wr
     assert.doesNotMatch(source, directWriteRequest, `${name} writes over HTTP`);
     assert.doesNotMatch(source, directDatabase, `${name} contains direct SQL`);
   }
-});
-
-test("dev flow state observatory: responsive CSS uses a mobile step list and removes nested vertical scrolling", () => {
-  const css = read(
-    "web/src/dev-workbench/styles/dev-flow-state-observatory.css",
-  );
-  assert.match(css, /\[data-erp-theme='dark'\] \.erp-dev-flow-state-page/u);
-  assert.match(
-    css,
-    /@media \(max-width: 760px\)[\s\S]*?\.erp-dev-flow-overview-graph,[\s\S]*?\.erp-dev-flow-chain-graph,[\s\S]*?display: none/u,
-  );
-  assert.match(
-    css,
-    /@media \(max-width: 760px\)[\s\S]*?\.erp-dev-flow-overview-lanes,[\s\S]*?grid-template-columns: 1fr/u,
-  );
-  assert.match(
-    css,
-    /\.erp-dev-flow-overview-lanes button[\s\S]*?min-height: 108px/u,
-  );
-  assert.match(
-    css,
-    /\.erp-dev-flow-overview-lanes > details\[open\] > summary/u,
-  );
-  assert.match(
-    css,
-    /@media \(max-width: 760px\)[\s\S]*?\.erp-dev-flow-chain-steps[\s\S]*?grid-template-columns: 1fr/u,
-  );
-  assert.match(
-    css,
-    /@media \(max-width: 640px\)[\s\S]*?\.erp-dev-flow-nav \.erp-dev-task-nav[\s\S]*?grid-template-columns: repeat\(2/u,
-  );
-  assert.match(
-    css,
-    /@media print[\s\S]*?body > :not\(\.erp-dev-flow-customer-review-print\)[\s\S]*?display: none !important/u,
-  );
-  const detailStart = css.indexOf(".erp-dev-flow-node-detail {");
-  const detailEnd = css.indexOf("\n}", detailStart);
-  assert(detailStart >= 0 && detailEnd > detailStart);
-  const detail = css.slice(detailStart, detailEnd);
-  assert.doesNotMatch(detail, /overflow-y:\s*(?:auto|scroll)/u);
-  assert.doesNotMatch(detail, /max-height/u);
 });

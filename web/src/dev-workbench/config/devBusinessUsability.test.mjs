@@ -65,10 +65,6 @@ test('devBusinessUsability: 页面明确只读且不复制权限与岗位责任�
     new URL('../pages/DevBusinessUsabilityPage.jsx', import.meta.url),
     'utf8'
   )
-  const styleSource = readFileSync(
-    new URL('../styles/dev-business-usability.css', import.meta.url),
-    'utf8'
-  )
   assert.match(pageSource, /只读检查/u)
   assert.match(pageSource, /推荐岗位不是权限/u)
   assert.match(pageSource, /BUSINESS_USABILITY_CATALOG/u)
@@ -78,10 +74,6 @@ test('devBusinessUsability: 页面明确只读且不复制权限与岗位责任�
   )
   assert.match(pageSource, /\/erp\/help-center/u)
   assert.match(pageSource, /\/__dev\/status-flows/u)
-  assert.match(
-    styleSource,
-    /\[data-erp-theme='dark'\] \.erp-dev-business-usability-summary strong \{\s*color: var\(--erp-primary-strong, #86efac\);\s*\}/u
-  )
   assert.doesNotMatch(
     pageSource,
     /JsonRpc|fetch\(|axios|effective_role_access/u

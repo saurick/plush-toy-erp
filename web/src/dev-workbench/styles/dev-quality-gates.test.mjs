@@ -14,17 +14,12 @@ test('quality gates styles: stay page-scoped and imported after shared navigatio
   assert.doesNotMatch(css, /^\.erp-dev-task-nav\s*\{/mu)
 })
 
-test('quality gates styles: keep three compact tabs and table-local overflow on mobile', () => {
-  assert.match(css, /grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/u)
-  assert.match(
-    css,
-    /@media \(max-width: 600px\)[\s\S]*?\.erp-dev-quality-tabs/u
-  )
+test('quality gates styles: keep compact tabs and table-local overflow', () => {
+  assert.match(css, /grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/u)
   assert.match(
     css,
     /\.erp-dev-quality-governance-view \.ant-table-wrapper[\s\S]*?overflow-x:\s*auto/u
   )
-  assert.match(css, /@media \(max-width: 340px\)/u)
 })
 
 test('quality gates styles: reduced motion and long-content recovery remain explicit', () => {
@@ -42,16 +37,42 @@ test('quality gates styles: environment readiness stays page-owned and compact',
   assert.doesNotMatch(css, /^\.ant-alert\s*\{/mu)
 })
 
-test('quality gates styles: R640 evidence stays compact and responsive', () => {
+test('quality gates styles: R640 evidence stays compact and source-backed', () => {
   assert.match(css, /\.erp-dev-quality-server-evidence/u)
   assert.match(
     css,
     /\.erp-dev-quality-server-evidence[\s\S]*?border-inline-start:\s*4px solid var\(--erp-primary/u
   )
   assert.match(css, /\.erp-dev-quality-server-evidence__facts/u)
+  assert.match(css, /\.erp-dev-quality-server-evidence__job-list/u)
+  assert.match(css, /--quality-server-job-width/u)
+  assert.match(css, /\.erp-dev-quality-server-pipeline__track/u)
+  assert.match(css, /\.erp-dev-quality-server-pipeline__relationship/u)
+  assert.match(css, /\.erp-dev-quality-server-pipeline__mapping-table/u)
+  assert.match(css, /\.erp-dev-quality-server-pipeline__mapping-job/u)
+  assert.match(css, /\.erp-dev-quality-server-pipeline__node-note/u)
+  assert.match(css, /\.erp-dev-quality-server-history__table/u)
   assert.match(
     css,
-    /@media \(max-width: 600px\)[\s\S]*?\.erp-dev-quality-server-evidence__facts[\s\S]*?grid-template-columns:\s*1fr/u
+    /\.erp-dev-quality-server-history__table-wrap[\s\S]*?overflow-x:\s*auto/u
+  )
+  assert.match(
+    css,
+    /\.erp-dev-quality-server-pipeline__mapping-table-wrap[\s\S]*?overflow-x:\s*auto/u
+  )
+  assert.match(
+    css,
+    /\.erp-dev-quality-server-pipeline__phase\[data-phase='shards'\]/u
+  )
+  assert.match(css, /\.erp-dev-quality-server-pipeline__status--passed/u)
+  assert.match(css, /\.erp-dev-quality-server-pipeline__status-indicator/u)
+  assert.match(
+    css,
+    /\.erp-dev-quality-server-pipeline__mapping-table td::before[\s\S]*?content:\s*attr\(data-label\)/u
+  )
+  assert.match(
+    css,
+    /\.erp-dev-quality-server-history__table td::before[\s\S]*?content:\s*attr\(data-label\)/u
   )
 })
 
@@ -80,24 +101,20 @@ test('quality gates styles: use project theme tokens instead of missing Ant CSS 
   }
 })
 
-test('quality gates styles: execution track is stateful and becomes vertical on mobile', () => {
+test('quality gates styles: execution track keeps state semantics', () => {
   assert.match(css, /\.erp-dev-quality-flow__track/u)
   assert.match(
     css,
-    /grid-template-columns:\s*repeat\([\s\S]*?--quality-flow-columns/u
+    /grid-template-columns:\s*repeat\([\s\S]*?auto-fit[\s\S]*?minmax\(min\(170px, 100%\), 1fr\)/u
   )
   assert.match(css, /\[data-status='running'\]/u)
   assert.match(css, /\[data-status='failed'\]/u)
   assert.match(css, /\[data-emphasis='current'\]/u)
   assert.match(css, /\[data-emphasis='failed'\]/u)
   assert.match(css, /\[data-emphasis='longest'\]/u)
-  assert.match(
-    css,
-    /@media \(max-width: 600px\)[\s\S]*?\.erp-dev-quality-flow__track,[\s\S]*?grid-template-columns:\s*1fr/u
-  )
 })
 
-test('quality gates styles: visual evidence stays semantic, scoped and responsive', () => {
+test('quality gates styles: visual evidence stays semantic and scoped', () => {
   for (const selector of [
     '.erp-dev-quality-duration__bar',
     '.erp-dev-quality-history-trend__list',
@@ -111,10 +128,6 @@ test('quality gates styles: visual evidence stays semantic, scoped and responsiv
   assert.match(
     css,
     /\.erp-dev-quality-coverage__table-wrap[\s\S]*?overflow-x:\s*auto/u
-  )
-  assert.match(
-    css,
-    /@media \(max-width: 600px\)[\s\S]*?\.erp-dev-quality-history-trend__list > li/u
   )
   assert.doesNotMatch(css, /^\.erp-markdown-mermaid\s*\{/mu)
 })

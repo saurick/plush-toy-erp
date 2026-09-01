@@ -16,6 +16,7 @@ import {
 } from '../../scripts/deploy/delivery-operation-store.mjs'
 import { createGithubDeliveryProvider } from '../../scripts/deploy/github-delivery-provider.mjs'
 import { createGitlabDeliveryProvider } from '../../scripts/deploy/gitlab-delivery-provider.mjs'
+import { prepareDatabaseRebuild } from '../../scripts/deploy/database-rebuild-controller.mjs'
 import { preparePromotion } from '../../scripts/deploy/promotion-controller.mjs'
 import { prepareRollback } from '../../scripts/deploy/rollback-controller.mjs'
 import {
@@ -214,6 +215,33 @@ export function validateDevDeliveryAction(value) {
     ) {
       throw new Error('promotion execution payload is invalid')
     }
+  } else if (action === 'prepare-database-rebuild') {
+    assertExactKeys(
+      value.payload,
+      ['gitSha', 'idempotencyKey', 'target', 'version'],
+      'database rebuild preparation payload'
+    )
+    if (
+      !SHA_PATTERN.test(String(value.payload.gitSha || '')) ||
+      !VERSION_PATTERN.test(String(value.payload.version || '')) ||
+      !isDeliveryTarget(value.payload.target) ||
+      !IDEMPOTENCY_PATTERN.test(String(value.payload.idempotencyKey || ''))
+    ) {
+      throw new Error('database rebuild preparation payload is invalid')
+    }
+  } else if (action === 'execute-database-rebuild') {
+    assertExactKeys(
+      value.payload,
+      ['confirmation', 'operationId'],
+      'database rebuild execution payload'
+    )
+    if (
+      !UUID_V4_PATTERN.test(String(value.payload.operationId || '')) ||
+      typeof value.payload.confirmation !== 'string' ||
+      value.payload.confirmation.length > 240
+    ) {
+      throw new Error('database rebuild execution payload is invalid')
+    }
   } else if (action === 'prepare-rollback') {
     assertExactKeys(
       value.payload,
@@ -285,7 +313,9 @@ function publicOperation(
         ? `PROMOTE:${operation.target}:${operation.gitSha}:${operation.id}`
         : operation.action === 'rollback'
           ? `ROLLBACK:${operation.target}:${operation.metadata.currentGitSha}:${operation.gitSha}:${operation.id}`
-          : ''
+          : operation.action === 'rebuild-database'
+            ? `REBUILD_DATABASE:${operation.target}:${operation.gitSha}:${operation.id}`
+            : ''
   const durationMs = Math.max(
     0,
     Date.parse(operation.updatedAt) - Date.parse(operation.createdAt)
@@ -564,9 +594,53 @@ export function createConfiguredDeliveryProvider({
   throw new Error('delivery provider must be gitlab or github')
 }
 
+function normalizePrivateProviderToken(value) {
+  const token = String(value || '')
+  return token && token.length <= 512 && !/[\r\n]/u.test(token) ? token : ''
+}
+
+export function captureDevDeliveryProviderEnvironments(env = process.env) {
+  const selected = String(env.PLUSH_DELIVERY_PROVIDER || 'gitlab')
+  const writeToken = normalizePrivateProviderToken(env.PLUSH_GITLAB_TOKEN)
+  const readToken =
+    normalizePrivateProviderToken(env.PLUSH_GITLAB_READ_TOKEN) || writeToken
+  const baseEnvironment = { ...env }
+  delete baseEnvironment.PLUSH_GITLAB_TOKEN
+  delete baseEnvironment.PLUSH_GITLAB_READ_TOKEN
+  delete baseEnvironment.PLUSH_GITLAB_TARGET_FETCH_TOKEN
+  delete baseEnvironment[DELIVERY_OPERATION_STORE_REPO_ROOT_ENV]
+
+  const readEnvironment = { ...baseEnvironment }
+  if (readToken) readEnvironment.PLUSH_GITLAB_TOKEN = readToken
+  const writeEnvironment = { ...baseEnvironment }
+  if (writeToken) writeEnvironment.PLUSH_GITLAB_TOKEN = writeToken
+
+  return Object.freeze({
+    readEnvironment: Object.freeze(readEnvironment),
+    writeEnvironment: Object.freeze(writeEnvironment),
+    releaseDispatchAllowed: selected !== 'gitlab' || Boolean(writeToken),
+  })
+}
+
+function createReadOnlyDeliveryProvider(provider) {
+  const readOnlyProvider = { provider: provider.provider }
+  for (const method of [
+    'listVersions',
+    'listPipelineTimings',
+    'getReleaseStatus',
+    'downloadReleaseControl',
+  ]) {
+    if (typeof provider[method] === 'function') {
+      readOnlyProvider[method] = provider[method].bind(provider)
+    }
+  }
+  return Object.freeze(readOnlyProvider)
+}
+
 export function createDevDeliveryService({
   projectRoot,
   provider,
+  readProvider,
   operationStore,
   operationStoreRepoRoot,
   readRepositoryState = readRepositoryIdentity,
@@ -574,6 +648,7 @@ export function createDevDeliveryService({
   runInitializationPreflight = runTargetInitializationPreflightAsync,
   classifyRelation = classifyGitAncestryRelation,
   preparePromotionAction = preparePromotion,
+  prepareDatabaseRebuildAction = prepareDatabaseRebuild,
   prepareRollbackAction = prepareRollback,
   buildCacheIdentity = buildTargetReleaseCacheIdentity,
   probeCache = probeTargetReleaseCache,
@@ -609,17 +684,33 @@ export function createDevDeliveryService({
   delete env.PLUSH_GITLAB_TARGET_FETCH_TOKEN
   delete process.env.PLUSH_GITLAB_TARGET_FETCH_TOKEN
   delete process.env[DELIVERY_OPERATION_STORE_REPO_ROOT_ENV]
-  const providerEnvironment = { ...env }
-  delete providerEnvironment.PLUSH_GITLAB_TARGET_FETCH_TOKEN
-  delete providerEnvironment[DELIVERY_OPERATION_STORE_REPO_ROOT_ENV]
+  const providerEnvironments = captureDevDeliveryProviderEnvironments(env)
   const deliveryProvider =
     provider ||
     createConfiguredDeliveryProvider({
       projectRoot: root,
-      env: providerEnvironment,
+      env: providerEnvironments.writeEnvironment,
     })
+  const readDeliveryProviderSource =
+    readProvider ||
+    provider ||
+    createConfiguredDeliveryProvider({
+      projectRoot: root,
+      env: providerEnvironments.readEnvironment,
+    })
+  if (readDeliveryProviderSource.provider !== deliveryProvider.provider) {
+    throw new Error('delivery read and write providers must match')
+  }
+  const readDeliveryProvider = createReadOnlyDeliveryProvider(
+    readDeliveryProviderSource
+  )
+  const releaseDispatchAllowed = provider
+    ? typeof provider.dispatchRelease === 'function'
+    : providerEnvironments.releaseDispatchAllowed
   delete env.PLUSH_GITLAB_TOKEN
+  delete env.PLUSH_GITLAB_READ_TOKEN
   delete process.env.PLUSH_GITLAB_TOKEN
+  delete process.env.PLUSH_GITLAB_READ_TOKEN
   const providerKey =
     deliveryProvider.provider === 'github' ? 'github' : 'gitlab'
   const providerName = providerKey === 'gitlab' ? 'GitLab' : 'GitHub'
@@ -631,6 +722,7 @@ export function createDevDeliveryService({
   function executorEnvironment({ targetFetch = false } = {}) {
     const childEnv = { ...process.env }
     delete childEnv.PLUSH_GITLAB_TOKEN
+    delete childEnv.PLUSH_GITLAB_READ_TOKEN
     delete childEnv.PLUSH_GITLAB_TARGET_FETCH_TOKEN
     delete childEnv[DELIVERY_OPERATION_STORE_REPO_ROOT_ENV]
     if (resolvedStoreRepoRoot !== resolvedProjectRepoRoot) {
@@ -713,7 +805,7 @@ export function createDevDeliveryService({
       }
       try {
         const status = await Promise.resolve(
-          deliveryProvider.getReleaseStatus(operation.gitSha)
+          readDeliveryProvider.getReleaseStatus(operation.gitSha)
         )
         if (
           status.status === 'published' &&
@@ -763,7 +855,9 @@ export function createDevDeliveryService({
   }
 
   async function readPipelineTimings({ force = false } = {}) {
-    if (typeof deliveryProvider.listPipelineTimings !== 'function') return null
+    if (typeof readDeliveryProvider.listPipelineTimings !== 'function') {
+      return null
+    }
     const currentTime = Date.now()
     if (
       !force &&
@@ -773,7 +867,7 @@ export function createDevDeliveryService({
       return pipelineTimingCache.value
     }
     const value = await Promise.resolve(
-      deliveryProvider.listPipelineTimings({ limit: 8 })
+      readDeliveryProvider.listPipelineTimings({ limit: 8 })
     )
     pipelineTimingCache = { readAt: currentTime, value }
     return value
@@ -809,7 +903,7 @@ export function createDevDeliveryService({
     const [repositoryResult, versionsResult, timingsResult, ...targetResults] =
       await Promise.allSettled([
         readRepositoryState(root),
-        Promise.resolve(deliveryProvider.listVersions({ limit: 100 })),
+        Promise.resolve(readDeliveryProvider.listVersions({ limit: 100 })),
         readPipelineTimings(),
         ...DELIVERY_TARGET_KEYS.map((targetKey) =>
           readTargetPreflight(targetKey, { force: forcePreflight })
@@ -899,6 +993,14 @@ export function createDevDeliveryService({
         message: `${providerName} 流水线耗时暂不可用；发布与部署状态仍可独立核对`,
       })
     }
+    if (!releaseDispatchAllowed) {
+      issues.push({
+        code: 'release_dispatch_credential_unavailable',
+        level: 'warning',
+        message:
+          'GitLab 只读证据可继续查看；未加载短期发布凭据，发布当前版本制品已停用',
+      })
+    }
     let backupRestoreEvidence = null
     const customerTestPreflight =
       targetEvidence.get('customer-test-133')?.preflight
@@ -955,6 +1057,7 @@ export function createDevDeliveryService({
       issues,
       boundaries: {
         provider: providerKey,
+        releaseDispatchAllowed,
         target: 'demo-133',
         targets: DELIVERY_TARGET_KEYS,
         browserShellAccess: false,
@@ -966,6 +1069,9 @@ export function createDevDeliveryService({
   }
 
   async function dispatchRelease(payload, { retryOfOperationId = null } = {}) {
+    if (!releaseDispatchAllowed) {
+      throw new Error('release dispatch credential is unavailable')
+    }
     const repository = await readRepositoryState(root)
     if (repository.dirty || repository.commit !== payload.gitSha) {
       throw new Error(
@@ -992,7 +1098,7 @@ export function createDevDeliveryService({
     try {
       const versionReference = now()
       const existing = await Promise.resolve(
-        deliveryProvider.getReleaseStatus(operation.gitSha)
+        readDeliveryProvider.getReleaseStatus(operation.gitSha)
       )
       if (existing.status === 'published') {
         if (
@@ -1012,7 +1118,7 @@ export function createDevDeliveryService({
       if (retryOfOperationId === null) {
         const policy = assertOfficialReleaseVersion({
           versions: await Promise.resolve(
-            deliveryProvider.listVersions({ limit: 100 })
+            readDeliveryProvider.listVersions({ limit: 100 })
           ),
           reference: versionReference,
           requested: operation.version,
@@ -1056,7 +1162,7 @@ export function createDevDeliveryService({
     { retryOfOperationId = null } = {}
   ) {
     const versions = await Promise.resolve(
-      deliveryProvider.listVersions({ limit: 50 })
+      readDeliveryProvider.listVersions({ limit: 50 })
     )
     const release = versions.find((item) => item.gitSha === payload.gitSha)
     if (
@@ -1069,8 +1175,8 @@ export function createDevDeliveryService({
       throw new Error('published v2 seven-asset release is not ready')
     }
     if (
-      deliveryProvider.provider !== 'gitlab' ||
-      typeof deliveryProvider.downloadReleaseControl !== 'function'
+      readDeliveryProvider.provider !== 'gitlab' ||
+      typeof readDeliveryProvider.downloadReleaseControl !== 'function'
     ) {
       throw new Error(
         'promotion requires the GitLab target-direct release transport'
@@ -1078,7 +1184,7 @@ export function createDevDeliveryService({
     }
     const destination = releaseControlDirectory(root, payload.gitSha)
     const downloaded = await Promise.resolve(
-      deliveryProvider.downloadReleaseControl(payload.gitSha, destination)
+      readDeliveryProvider.downloadReleaseControl(payload.gitSha, destination)
     )
     const candidateTransport = await qualifyReleaseTransport(
       downloaded,
@@ -1140,7 +1246,7 @@ export function createDevDeliveryService({
         )
         try {
           const currentDownload = await Promise.resolve(
-            deliveryProvider.downloadReleaseControl(
+            readDeliveryProvider.downloadReleaseControl(
               currentGitSha,
               releaseControlDirectory(root, currentGitSha)
             )
@@ -1203,7 +1309,7 @@ export function createDevDeliveryService({
     { retryOfOperationId = null } = {}
   ) {
     const versions = await Promise.resolve(
-      deliveryProvider.listVersions({ limit: 50 })
+      readDeliveryProvider.listVersions({ limit: 50 })
     )
     const currentRelease = versions.find(
       (item) => item.gitSha === payload.fromGitSha
@@ -1226,8 +1332,8 @@ export function createDevDeliveryService({
     const currentDirectory = releaseControlDirectory(root, payload.fromGitSha)
     const targetDirectory = releaseControlDirectory(root, payload.toGitSha)
     if (
-      deliveryProvider.provider !== 'gitlab' ||
-      typeof deliveryProvider.downloadReleaseControl !== 'function'
+      readDeliveryProvider.provider !== 'gitlab' ||
+      typeof readDeliveryProvider.downloadReleaseControl !== 'function'
     ) {
       throw new Error(
         'rollback requires the GitLab target-direct release transport'
@@ -1235,13 +1341,13 @@ export function createDevDeliveryService({
     }
     const [currentDownload, targetDownload] = await Promise.all([
       Promise.resolve(
-        deliveryProvider.downloadReleaseControl(
+        readDeliveryProvider.downloadReleaseControl(
           payload.fromGitSha,
           currentDirectory
         )
       ),
       Promise.resolve(
-        deliveryProvider.downloadReleaseControl(
+        readDeliveryProvider.downloadReleaseControl(
           payload.toGitSha,
           targetDirectory
         )
@@ -1276,6 +1382,55 @@ export function createDevDeliveryService({
     if (result.plan?.transport?.mode !== expectedTargetTransport) {
       throw new Error('rollback release transport does not match its plan')
     }
+    preflightCache.delete(payload.target)
+    return {
+      operation: presentOperation(result.operation),
+      plan: result.plan,
+      reused: result.reused,
+    }
+  }
+
+  async function prepareFixedDatabaseRebuild(payload) {
+    const versions = await Promise.resolve(
+      readDeliveryProvider.listVersions({ limit: 50 })
+    )
+    const release = versions.find((item) => item.gitSha === payload.gitSha)
+    if (
+      !release ||
+      release.version !== payload.version ||
+      release.status !== 'published' ||
+      release.completeAssets !== true
+    ) {
+      throw new Error('current immutable release is not ready for data rebuild')
+    }
+    if (
+      readDeliveryProvider.provider !== 'gitlab' ||
+      typeof readDeliveryProvider.downloadReleaseControl !== 'function'
+    ) {
+      throw new Error(
+        'database rebuild requires the GitLab target-direct release transport'
+      )
+    }
+    const destination = releaseControlDirectory(root, payload.gitSha)
+    const downloaded = await Promise.resolve(
+      readDeliveryProvider.downloadReleaseControl(payload.gitSha, destination)
+    )
+    await qualifyReleaseTransport(downloaded, payload.target)
+    const result = await Promise.resolve(
+      prepareDatabaseRebuildAction(
+        {
+          repoRoot: root,
+          releaseManifestPath: path.join(
+            downloaded.directory,
+            'release-manifest.json'
+          ),
+          targetKey: payload.target,
+          idempotencyKey: payload.idempotencyKey,
+          operationStore: store,
+        },
+        { runPreflight, classifyRelation, now }
+      )
+    )
     preflightCache.delete(payload.target)
     return {
       operation: presentOperation(result.operation),
@@ -1336,15 +1491,46 @@ export function createDevDeliveryService({
     children.delete(operationId)
     const current = readDeliveryOperation(store, operationId)
     if (TERMINAL_STATUSES.has(current.status)) return
+    const executionFailure =
+      current.action === 'rollback'
+        ? {
+            startMessage: 'rollback executor did not start a target write',
+            startCode: 'rollback_executor_start_failed',
+            startIssue: '回滚执行器未启动；未自动重试',
+            unknownMessage:
+              'rollback executor ended while target outcome was unknown',
+            unknownCode: 'rollback_executor_outcome_unknown',
+            unknownIssue: '回滚结果未知，必须先读回，禁止自动重试',
+          }
+        : current.action === 'rebuild-database'
+          ? {
+              startMessage:
+                'database rebuild executor did not start a target write',
+              startCode: 'database_rebuild_executor_start_failed',
+              startIssue: '测试数据重建执行器未启动；未自动重试',
+              unknownMessage:
+                'database rebuild executor ended while target outcome was unknown',
+              unknownCode: 'database_rebuild_executor_outcome_unknown',
+              unknownIssue: '测试数据重建结果未知，必须先读回，禁止自动重试',
+            }
+          : {
+              startMessage: 'promotion executor did not start a target write',
+              startCode: 'promotion_executor_start_failed',
+              startIssue: '发布执行器未启动；未自动重试',
+              unknownMessage:
+                'promotion executor ended while target outcome was unknown',
+              unknownCode: 'promotion_executor_outcome_unknown',
+              unknownIssue: '目标结果未知，必须先读回，禁止自动重试',
+            }
     if (current.status === 'launching') {
       transitionDeliveryOperation(store, operationId, {
         status: 'failed',
-        message: 'promotion executor did not start a target write',
+        message: executionFailure.startMessage,
         issues: [
           {
-            code: 'promotion_executor_start_failed',
+            code: executionFailure.startCode,
             level: 'error',
-            message: '发布执行器未启动；未自动重试',
+            message: executionFailure.startIssue,
           },
         ],
         now: now(),
@@ -1354,12 +1540,12 @@ export function createDevDeliveryService({
     if (current.status === 'running') {
       transitionDeliveryOperation(store, operationId, {
         status: 'not_proven',
-        message: 'promotion executor ended while target outcome was unknown',
+        message: executionFailure.unknownMessage,
         issues: [
           {
-            code: 'promotion_executor_outcome_unknown',
+            code: executionFailure.unknownCode,
             level: 'error',
-            message: '目标结果未知，必须先读回，禁止自动重试',
+            message: executionFailure.unknownIssue,
           },
         ],
         now: now(),
@@ -1410,7 +1596,7 @@ export function createDevDeliveryService({
       }
       try {
         const currentDownload = await Promise.resolve(
-          deliveryProvider.downloadReleaseControl(
+          readDeliveryProvider.downloadReleaseControl(
             currentGitSha,
             releaseControlDirectory(root, currentGitSha)
           )
@@ -1519,20 +1705,20 @@ export function createDevDeliveryService({
     }
     try {
       if (
-        deliveryProvider.provider !== 'gitlab' ||
-        typeof deliveryProvider.downloadReleaseControl !== 'function'
+        readDeliveryProvider.provider !== 'gitlab' ||
+        typeof readDeliveryProvider.downloadReleaseControl !== 'function'
       ) {
         throw new Error('rollback release transport is unavailable')
       }
       const [currentDownload, targetDownload] = await Promise.all([
         Promise.resolve(
-          deliveryProvider.downloadReleaseControl(
+          readDeliveryProvider.downloadReleaseControl(
             operation.metadata.currentGitSha,
             releaseControlDirectory(root, operation.metadata.currentGitSha)
           )
         ),
         Promise.resolve(
-          deliveryProvider.downloadReleaseControl(
+          readDeliveryProvider.downloadReleaseControl(
             operation.gitSha,
             releaseControlDirectory(root, operation.gitSha)
           )
@@ -1633,6 +1819,72 @@ export function createDevDeliveryService({
     }
   }
 
+  async function executeFixedDatabaseRebuild(payload) {
+    if (children.size > 0) {
+      throw new Error('another delivery target action is already running')
+    }
+    let operation = readDeliveryOperation(store, payload.operationId)
+    if (
+      operation.action !== 'rebuild-database' ||
+      !isDeliveryTarget(operation.target) ||
+      operation.status !== 'ready'
+    ) {
+      throw new Error('database rebuild operation is not ready')
+    }
+    const expected = `REBUILD_DATABASE:${operation.target}:${operation.gitSha}:${operation.id}`
+    if (payload.confirmation !== expected) {
+      throw new Error('explicit database rebuild confirmation does not match')
+    }
+    operation = transitionDeliveryOperation(store, operation.id, {
+      status: 'launching',
+      message: 'database rebuild executor child is launching',
+      now: now(),
+    })
+    const bundleDir = releaseControlDirectory(root, operation.gitSha)
+    let child
+    try {
+      child = spawnProcess(
+        process.execPath,
+        [
+          path.join(root, 'scripts', 'deploy', 'database-rebuild-executor.mjs'),
+          '--operation-id',
+          operation.id,
+          '--release-manifest',
+          path.join(bundleDir, 'release-manifest.json'),
+          '--confirmation',
+          payload.confirmation,
+          '--json',
+        ],
+        {
+          cwd: root,
+          env: executorEnvironment(),
+          detached: false,
+          stdio: 'ignore',
+        }
+      )
+    } catch (error) {
+      finishSpawnedTargetAction(operation.id, error)
+      throw error
+    }
+    children.set(operation.id, child)
+    let finished = false
+    const finish = (error) => {
+      if (finished) return
+      finished = true
+      try {
+        finishSpawnedTargetAction(operation.id, error)
+      } catch {
+        // The operation store remains the only user-visible outcome source.
+      }
+    }
+    child.once('error', finish)
+    child.once('close', () => finish())
+    return {
+      accepted: true,
+      operation: presentOperation(operation),
+    }
+  }
+
   return {
     async summary(options) {
       return getSummary(options)
@@ -1665,6 +1917,13 @@ export function createDevDeliveryService({
           ...(await prepareFixedRollback(validated.payload)),
         }
       }
+      if (validated.action === 'prepare-database-rebuild') {
+        return {
+          schemaVersion: 'plush.dev-delivery-action-result/v1',
+          action: validated.action,
+          ...(await prepareFixedDatabaseRebuild(validated.payload)),
+        }
+      }
       if (validated.action === 'retry-operation') {
         return {
           schemaVersion: 'plush.dev-delivery-action-result/v1',
@@ -1677,6 +1936,13 @@ export function createDevDeliveryService({
           schemaVersion: 'plush.dev-delivery-action-result/v1',
           action: validated.action,
           ...(await executeFixedRollback(validated.payload)),
+        }
+      }
+      if (validated.action === 'execute-database-rebuild') {
+        return {
+          schemaVersion: 'plush.dev-delivery-action-result/v1',
+          action: validated.action,
+          ...(await executeFixedDatabaseRebuild(validated.payload)),
         }
       }
       return {

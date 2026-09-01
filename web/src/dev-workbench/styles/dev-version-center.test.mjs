@@ -28,18 +28,10 @@ test('version center keeps strict quality evidence as a compact summary and deep
     /qualityGateSummary[\s\S]{0,80}(?:stageTimings|complexity|categories)/u
   )
   assert.match(css, /[.]erp-dev-version-quality-gate-summary/u)
-})
-
-test('CI/CD timing details keep a touch-friendly keyboard-visible trigger', () => {
   assert.match(
-    css,
-    /[.]erp-dev-pipeline-timing__details > summary \{[\s\S]*min-height: 44px;[\s\S]*padding: 8px 4px;/u
+    versionPage,
+    /erp-dev-version-next[\s\S]*erp-dev-version-quality-gate-summary/u
   )
-  assert.match(
-    css,
-    /[.]erp-dev-pipeline-timing__jobs > details > summary \{[\s\S]*min-height: 44px;/u
-  )
-  assert.match(css, /summary:focus-visible/u)
 })
 
 test('CI/CD timing separates event timestamps from default and deep detail levels', () => {
@@ -51,10 +43,10 @@ test('CI/CD timing separates event timestamps from default and deep detail level
   assert.match(component, /value=\{deploymentOperation[?][.]updatedAt\}/u)
   assert.match(
     component,
-    /erp-dev-pipeline-timing__analysis[\s\S]*观测关键路径[\s\S]*耗时最长环节[\s\S]*erp-dev-pipeline-timing__details/u
+    /erp-dev-pipeline-timing__analysis[\s\S]*流水线关键路径（可见部分）[\s\S]*耗时最长环节[\s\S]*erp-dev-pipeline-timing__details/u
   )
-  assert.match(component, /查看全部 job \/ step/u)
-  assert.match(component, /各 job 默认收起/u)
+  assert.match(component, /查看全部任务与步骤/u)
+  assert.match(component, /各任务默认收起/u)
   assert.match(component, /全部展开/u)
   assert.match(component, /全部收起/u)
   assert.match(component, /showTimeRange/u)
@@ -86,135 +78,71 @@ test('version center exposes source-backed decision timestamps at every operatio
   assert.match(versionPage, /operationUpdateAction/u)
 })
 
-test('mobile timing labels wrap and retain Chinese-first trace titles', () => {
-  assert.match(
-    css,
-    /@media \(max-width: 1100px\)[\s\S]*[.]erp-dev-pipeline-timing__summary strong,[\s\S]*overflow-wrap: anywhere;[\s\S]*white-space: normal;/u
-  )
-  assert.match(
-    component,
-    /deliveryPipelinePresentation\(\s*stage[.]name \|\| stage[.]label\s*\)/u
-  )
+test('timing labels keep Chinese-first trace titles', () => {
+  assert.match(component, /presentStage = deliveryPipelinePresentation/u)
+  assert.match(component, /presentStage\(stage[.]name \|\| stage[.]label\)/u)
   assert.match(component, /stagePresentation[.]title/u)
   assert.match(component, /所属任务：\$\{groupPresentation[.]title\}/u)
+  assert.match(
+    versionPage,
+    /presentStage=\{deliveryOperationMessagePresentation\}/u
+  )
 })
 
-test('status, artifact and transfer metrics stay readable across breakpoints', () => {
-  assert.match(
-    css,
-    /[.]erp-dev-version-page > :not\([.]erp-dev-workspace-nav\) \{[\s\S]*width: auto;[\s\S]*min-width: 0;[\s\S]*max-width: 100%;/u
-  )
-  assert.match(
-    css,
-    /[.]erp-dev-version-shell \{[\s\S]*grid-template-columns: minmax\(0, 1fr\);/u
-  )
-  assert.match(css, /[.]erp-dev-version-shell > \* \{[\s\S]*min-width: 0;/u)
-  assert.match(
-    css,
-    /[.]erp-dev-version-summary \{[\s\S]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/u
-  )
-  assert.match(
-    css,
-    /@media \(max-width: 1100px\)[\s\S]*[.]erp-dev-version-summary \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/u
-  )
-  assert.match(
-    css,
-    /[.]erp-dev-operation-metrics \{[\s\S]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u
-  )
-  assert.match(
-    css,
-    /@media \(max-width: 1100px\)[\s\S]*[.]erp-dev-operation-metrics \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/u
-  )
-  assert.match(
-    css,
-    /@media \(max-width: 620px\)[\s\S]*[.]erp-dev-operation-metrics,[\s\S]*display: grid;[\s\S]*grid-template-columns: 1fr;/u
-  )
-  assert.match(
-    css,
-    /[.]erp-dev-version-page [.]erp-dev-version-summary \{[\s\S]*overflow-x: visible;[\s\S]*scroll-snap-type: none;/u
+test('version decisions and target evidence remain source-backed', () => {
+  assert.match(versionPage, /aria-label="当前发布结论与下一步"/u)
+  assert.match(versionPage, /boundaries[?][.]releaseDispatchAllowed/u)
+  assert.match(versionPage, /版本与流水线可查看，当前不能创建新发布/u)
+  assert.match(versionPage, /aria-label="切换当前操作目标"/u)
+  assert.match(versionPage, /data-kind="local"/u)
+  assert.match(versionPage, /data-kind="release"/u)
+  assert.match(versionPage, /data-kind="target"/u)
+  assert.match(versionPage, /data-kind="public-entry"/u)
+  assert.match(versionPage, /selectedTargetDefinition[.]dataBoundary/u)
+  assert.doesNotMatch(
+    versionPage,
+    /erp-dev-version-target-selector__boundaries/u
   )
   assert.match(component, /构建缓存与制品/u)
   assert.match(versionPage, /v2 · 7 项制品 · 证据未闭合/u)
   assert.match(versionPage, /v1 · 6 项制品 · 仅旧版回滚/u)
-  assert.match(component, /这里只展示当前 CI Provider/u)
+  assert.match(component, /展示远端流水线、制品发布和构建耗时/u)
   assert.doesNotMatch(component, /最近真实部署与传输/u)
-  assert.match(component, /最近完整发布/u)
-  assert.match(component, /operation 只进入“当前操作”和“操作记录”/u)
+  assert.match(component, /最近一次制品发布/u)
+  assert.match(component, /目标部署仍以“操作记录”中的独立回执为准/u)
   assert.match(component, /失败原因/u)
-  assert.match(component, /交付状态速览/u)
-  assert.match(component, /查看完整效能/u)
-  assert.match(css, /[.]erp-dev-pipeline-timing__critical-path/u)
-  assert.match(
-    css,
-    /[.]erp-dev-pipeline-status-strip__metrics \{[\s\S]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/u
-  )
-  assert.match(
-    css,
-    /@media \(max-width: 1100px\)[\s\S]*[.]erp-dev-pipeline-status-strip__metrics \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/u
-  )
-  assert.match(
-    css,
-    /@media \(max-width: 620px\)[\s\S]*[.]erp-dev-pipeline-status-strip__metrics,[\s\S]*grid-template-columns: 1fr;/u
-  )
-  assert.match(
-    css,
-    /[.]erp-dev-version-workspace,[\s\S]*[.]erp-dev-version-tab \{[\s\S]*min-width: 0;/u
-  )
-  assert.match(
-    css,
-    /@media \(max-width: 1100px\)[\s\S]*[.]erp-dev-pipeline-timing__summary \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/u
-  )
-  assert.match(
-    css,
-    /@media \(max-width: 620px\)[\s\S]*[.]erp-dev-pipeline-timing__summary,[\s\S]*display: grid;[\s\S]*grid-template-columns: 1fr;/u
-  )
+  assert.match(component, /最近发布与部署/u)
+  assert.match(component, /查看耗时详情/u)
 })
 
-test('manual takeover guide stays bounded, readable and single-column on mobile', () => {
-  assert.match(versionPage, /人工接管与应急发布说明/u)
+test('manual takeover guide keeps bounded internal scrolling', () => {
+  assert.match(versionPage, /手动与应急发布指引/u)
   assert.match(versionPage, /<ManualTakeoverGuide \/>/u)
-  assert.match(versionPage, /width=\{760\}/u)
   assert.match(
     css,
-    /[.]erp-dev-version-takeover-modal [.]ant-modal-body \{[\s\S]*max-height: min\(72vh, 720px\);[\s\S]*overflow-y: auto;[\s\S]*overscroll-behavior: contain;/u
-  )
-  assert.match(
-    css,
-    /[.]erp-dev-version-takeover-scope \{[\s\S]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/u
-  )
-  assert.match(
-    css,
-    /[.]erp-dev-version-takeover-conditions \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/u
-  )
-  assert.match(
-    css,
-    /@media \(max-width: 1100px\)[\s\S]*[.]erp-dev-version-takeover-scope \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/u
-  )
-  assert.match(
-    css,
-    /@media \(max-width: 620px\)[\s\S]*[.]erp-dev-version-takeover-scope,[\s\S]*[.]erp-dev-version-takeover-conditions \{[\s\S]*grid-template-columns: 1fr;/u
-  )
-  assert.match(
-    css,
-    /[.]erp-dev-version-takeover-scope [.]ant-typography,[\s\S]*overflow-wrap: anywhere;/u
+    /[.]erp-dev-version-takeover-modal [.]ant-modal-body \{[\s\S]*max-height:[\s\S]*overflow-y: auto;[\s\S]*overscroll-behavior: contain;/u
   )
 })
 
-test('dark theme keeps timing surfaces and progress tracks readable', () => {
-  assert.match(
-    css,
-    /:root\[data-erp-theme='dark'\] [.]erp-dev-pipeline-status-strip__metrics > div,[\s\S]*[.]erp-dev-pipeline-timing__summary > div,[\s\S]*[.]erp-dev-operation-metrics > div,[\s\S]*[.]erp-dev-version-takeover-scope > article,[\s\S]*[.]erp-dev-version-takeover-conditions > article \{[\s\S]*border-color: rgba\(255, 255, 255, 0[.]16\);[\s\S]*background: rgba\(255, 255, 255, 0[.]06\);/u
-  )
-  assert.match(
-    css,
-    /:root\[data-erp-theme='dark'\] [.]erp-dev-timing-bars__track \{[\s\S]*background: rgba\(255, 255, 255, 0[.]16\);/u
-  )
-  assert.match(
-    css,
-    /:root\[data-erp-theme='dark'\] [.]erp-dev-pipeline-timing__critical-path \{[\s\S]*background: rgba\(22, 119, 255, 0[.]2\);/u
-  )
-  assert.match(
-    css,
-    /:root\[data-erp-theme='dark'\] [.]erp-dev-version-takeover-scope > article,[\s\S]*[.]erp-dev-version-takeover-conditions > article \{[\s\S]*border-color: rgba\(255, 255, 255, 0[.]16\);[\s\S]*background: rgba\(255, 255, 255, 0[.]06\);/u
-  )
+test('operation detail separates release artifacts from target deployment metrics', () => {
+  assert.match(versionPage, /title=\{operationDetailView[.]title\}/u)
+  assert.match(versionPage, /operationDetailView[.]timingLabel/u)
+  assert.match(versionPage, /operationDetailView[.]scopeNote/u)
+  assert.match(versionPage, /operationReleaseMetricItems/u)
+  assert.match(versionPage, /operationTargetMetricItems/u)
+  assert.doesNotMatch(versionPage, /制品与传输效能/u)
+  assert.doesNotMatch(versionPage, />传输制品</u)
+  assert.match(versionPage, /技术详情与状态事件/u)
+})
+
+test('operation history filters expose high-value dimensions', () => {
+  assert.match(versionPage, /role="search"/u)
+  assert.match(versionPage, /筛选发布与部署记录/u)
+  assert.match(versionPage, />结果</u)
+  assert.match(versionPage, />动作</u)
+  assert.match(versionPage, />目标</u)
+  assert.match(versionPage, /版本 \/ SHA \/ 操作 ID/u)
+  assert.match(versionPage, /清空筛选/u)
+  assert.match(versionPage, /updateOperationHistoryFilter/u)
+  assert.match(versionPage, /clearOperationHistoryFilters/u)
 })

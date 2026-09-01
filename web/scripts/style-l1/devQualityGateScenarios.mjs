@@ -11,6 +11,51 @@ const repository = Object.freeze({
   dirty: true,
   fingerprint: 'b'.repeat(64),
 })
+const SERVER_JOB_TIMINGS = Object.freeze([
+  ['plan', 6_000],
+  ['prepare', 18_000],
+  ['quality_static', 31_000],
+  ['quality_node', 92_000],
+  ['quality_web', 126_000],
+  ['quality_server', 158_000],
+  ['quality_resource', 46_000],
+  ['quality_browser', 74_000],
+  ['quality_security', 38_000],
+  ['quality_aggregate', 9_000],
+  ['CI Gate', 2_000],
+])
+const SERVER_CI_HISTORY = Object.freeze([
+  Object.freeze({
+    id: 41,
+    result: 'passed',
+    gitSha: repository.commit,
+    url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/41',
+    createdAt: '2026-08-09T07:53:15.000Z',
+    finishedAt: NOW,
+    durationMs: 405_000,
+    failureJob: '',
+  }),
+  Object.freeze({
+    id: 40,
+    result: 'failed',
+    gitSha: '1'.repeat(40),
+    url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/40',
+    createdAt: '2026-08-09T06:48:00.000Z',
+    finishedAt: '2026-08-09T06:55:00.000Z',
+    durationMs: 420_000,
+    failureJob: 'quality_web',
+  }),
+  Object.freeze({
+    id: 39,
+    result: 'running',
+    gitSha: '2'.repeat(40),
+    url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/39',
+    createdAt: '2026-08-09T05:50:00.000Z',
+    finishedAt: null,
+    durationMs: null,
+    failureJob: '',
+  }),
+])
 const historicalRepository = Object.freeze({
   commit: 'f'.repeat(40),
   dirty: false,
@@ -88,18 +133,32 @@ const PASSED_WEB_STAGE_TIMING = passedStage(
 )
 const POST_WEB_STAGE_TIMINGS = Object.freeze([
   passedStage(
-    'browser',
-    '浏览器回归',
-    '2026-08-09T07:58:00.000Z',
-    '2026-08-09T07:58:30.000Z',
-    30_000
-  ),
-  passedStage(
     'server',
     '隔离数据库、迁移与 Server 测试',
-    '2026-08-09T07:58:30.000Z',
+    '2026-08-09T07:58:00.000Z',
+    '2026-08-09T07:59:00.000Z',
+    60_000
+  ),
+  passedStage(
+    'resource_sensitive_node',
+    '资源敏感发布合同',
+    '2026-08-09T07:59:00.000Z',
+    '2026-08-09T07:59:15.000Z',
+    15_000
+  ),
+  passedStage(
+    'critical_postgres',
+    '关键 PostgreSQL 合同',
+    '2026-08-09T07:59:15.000Z',
+    '2026-08-09T07:59:35.000Z',
+    20_000
+  ),
+  passedStage(
+    'browser',
+    '浏览器回归',
+    '2026-08-09T07:59:35.000Z',
     '2026-08-09T07:59:50.000Z',
-    80_000
+    15_000
   ),
   passedStage(
     'govulncheck',
@@ -152,8 +211,8 @@ function qualityOperation(
           treeState: operationRepository.dirty ? 'dirty' : 'clean',
           durationMs: 300_000,
           finishedAt: NOW,
-          executed: status === 'passed' ? 11 : 8,
-          passed: status === 'passed' ? 11 : 7,
+          executed: status === 'passed' ? 13 : 8,
+          passed: status === 'passed' ? 13 : 7,
           failed: status === 'failed' ? 1 : 0,
           skipped: 0,
           environmentFingerprint: 'e'.repeat(64),
@@ -195,7 +254,69 @@ function historicalQualityOperation(id, durationMs, createdAt, finishedAt) {
   }
 }
 
-export function createQualityGateStyleSummary(mode = 'idle') {
+function createServerEvidence(status = 'passed') {
+  if (status === 'unavailable') {
+    return {
+      schemaVersion: 'plush.dev-quality-gate-server-evidence/v2',
+      status: 'unavailable',
+      current: false,
+      coversWorkingTree: false,
+      gitSha: '',
+      pipeline: null,
+      jobs: [],
+      history: [],
+      message: '未登记只读 GitLab 凭据，当前仅显示本机回执。',
+      notProven: ['当前 exact SHA 的 R640 普通 CI'],
+    }
+  }
+  if (status === 'missing') {
+    return {
+      schemaVersion: 'plush.dev-quality-gate-server-evidence/v2',
+      status: 'missing',
+      current: false,
+      coversWorkingTree: false,
+      gitSha: repository.commit,
+      pipeline: null,
+      jobs: [],
+      history: SERVER_CI_HISTORY.slice(1),
+      message:
+        'GitLab 凭据与 API 读取正常；R640 尚无绑定当前已提交 SHA 的普通 push CI 记录。',
+      notProven: ['当前 exact SHA 的 R640 普通 CI'],
+    }
+  }
+  return {
+    schemaVersion: 'plush.dev-quality-gate-server-evidence/v2',
+    status: 'passed',
+    current: true,
+    coversWorkingTree: false,
+    gitSha: repository.commit,
+    pipeline: {
+      id: 41,
+      attempt: 41,
+      url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/41',
+      status: 'completed',
+      conclusion: 'success',
+      queueMs: 12_000,
+      durationMs: 405_000,
+      finishedAt: NOW,
+    },
+    jobs: SERVER_JOB_TIMINGS.map(([name, durationMs], index) => ({
+      id: 4_100 + index,
+      name,
+      status: 'completed',
+      conclusion: 'success',
+      durationMs,
+    })),
+    history: SERVER_CI_HISTORY,
+    message: 'R640 已证明当前提交 SHA；该证据不覆盖本机未提交改动。',
+    notProven: ['本机未提交改动', '不可变 Release', '目标部署', '客户 UAT'],
+  }
+}
+
+export function createQualityGateStyleSummary(
+  mode = 'idle',
+  { serverStatus = 'passed' } = {}
+) {
   const historicalOperations = [
     historicalQualityOperation(
       HISTORY_OPERATION_IDS[0],
@@ -247,12 +368,22 @@ export function createQualityGateStyleSummary(mode = 'idle') {
           { id: 'shared', label: '共享基础检查', parallel: true },
           { id: 'secrets', label: '敏感信息扫描', parallel: false },
           { id: 'web', label: 'Web 测试与生产构建', parallel: true },
-          { id: 'browser', label: '浏览器回归', parallel: false },
           {
             id: 'server',
             label: '隔离数据库、迁移与 Server 测试',
             parallel: true,
           },
+          {
+            id: 'resource_sensitive_node',
+            label: '资源敏感发布合同',
+            parallel: false,
+          },
+          {
+            id: 'critical_postgres',
+            label: '关键 PostgreSQL 合同',
+            parallel: false,
+          },
+          { id: 'browser', label: '浏览器回归', parallel: false },
           { id: 'govulncheck', label: 'Go 可达漏洞检查', parallel: false },
         ],
         substeps: {
@@ -286,12 +417,22 @@ export function createQualityGateStyleSummary(mode = 'idle') {
           { id: 'shared', label: '共享基础检查', parallel: true },
           { id: 'secrets', label: '敏感信息扫描', parallel: false },
           { id: 'web', label: 'Web 测试与生产构建', parallel: true },
-          { id: 'browser', label: '浏览器回归', parallel: false },
           {
             id: 'server',
             label: '隔离数据库、迁移与 Server 测试',
             parallel: true,
           },
+          {
+            id: 'resource_sensitive_node',
+            label: '资源敏感发布合同',
+            parallel: false,
+          },
+          {
+            id: 'critical_postgres',
+            label: '关键 PostgreSQL 合同',
+            parallel: false,
+          },
+          { id: 'browser', label: '浏览器回归', parallel: false },
           { id: 'govulncheck', label: 'Go 可达漏洞检查', parallel: false },
         ],
         substeps: {
@@ -331,6 +472,7 @@ export function createQualityGateStyleSummary(mode = 'idle') {
         receipt: null,
       },
     },
+    serverEvidence: createServerEvidence(serverStatus),
     status: {
       tone: active ? 'info' : mode === 'failed' ? 'warning' : 'warning',
       title: active
@@ -345,7 +487,7 @@ export function createQualityGateStyleSummary(mode = 'idle') {
           : '可以验证当前改动，但结果不能作为固定版本发布证明。',
       recommendation: active
         ? '等待当前运行结束；如确需停止，请使用取消运行。'
-        : '运行严格门禁，先确认当前改动没有质量阻断。',
+        : '运行本机严格诊断，先确认当前改动没有质量阻断。',
       releaseEligible: false,
       notProven: ['干净 exact SHA', '目标环境发布', '客户 UAT'],
     },
@@ -496,7 +638,7 @@ function gaps() {
   }
 }
 
-async function installQualityRoutes(page, mode, counters) {
+async function installQualityRoutes(page, mode, counters, options = {}) {
   await page.route('**/__dev/api/qa/quality-gates**', async (route) => {
     const url = new URL(route.request().url())
     let payload
@@ -508,7 +650,12 @@ async function installQualityRoutes(page, mode, counters) {
       payload = gaps()
     } else {
       counters.summary += 1
-      payload = createQualityGateStyleSummary(mode)
+      payload = createQualityGateStyleSummary(mode, options)
+      if (options.summaryDelayMs) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, options.summaryDelayMs)
+        )
+      }
     }
     await route.fulfill({
       status: 200,
@@ -518,681 +665,16 @@ async function installQualityRoutes(page, mode, counters) {
   })
 }
 
-async function qualityGeometry(page) {
-  return page.evaluate(() => {
-    const tabList = document.querySelector('.erp-dev-quality-tabs')
-    const table = document.querySelector('.ant-table-container')
-    const flowSteps = [
-      ...document.querySelectorAll('.erp-dev-quality-flow__step'),
-    ]
-    const firstFlowStyle = flowSteps[0] ? getComputedStyle(flowSteps[0]) : null
-    const flowLefts = new Set(
-      flowSteps.map((step) => Math.round(step.getBoundingClientRect().left))
-    )
-    return {
-      viewportWidth: document.documentElement.clientWidth,
-      documentWidth: document.documentElement.scrollWidth,
-      bodyWidth: document.body.scrollWidth,
-      tabClientWidth: tabList?.clientWidth || 0,
-      tabScrollWidth: tabList?.scrollWidth || 0,
-      tabHeight: tabList?.getBoundingClientRect().height || 0,
-      tableClientWidth: table?.clientWidth || 0,
-      tableScrollWidth: table?.scrollWidth || 0,
-      flowStepCount: flowSteps.length,
-      flowColumnCount: flowLefts.size,
-      flowStepBackground: firstFlowStyle?.backgroundColor || '',
-      flowStepColor: firstFlowStyle?.color || '',
-      currentFlowStepCount: document.querySelectorAll(
-        '.erp-dev-quality-flow__step[aria-current="step"]'
-      ).length,
-      flowPassedCount: document.querySelectorAll(
-        '.erp-dev-quality-flow__step[data-status="passed"]'
-      ).length,
-      flowRunningCount: document.querySelectorAll(
-        '.erp-dev-quality-flow__step[data-status="running"]'
-      ).length,
-      flowFailedCount: document.querySelectorAll(
-        '.erp-dev-quality-flow__step[data-status="failed"]'
-      ).length,
-      flowPendingCount: document.querySelectorAll(
-        '.erp-dev-quality-flow__step[data-status="pending"]'
-      ).length,
-      flowNotRunCount: document.querySelectorAll(
-        '.erp-dev-quality-flow__step[data-status="not_run"]'
-      ).length,
-      terminalPassedCount: document.querySelectorAll(
-        '.erp-dev-quality-flow__terminal-item[data-status="passed"]'
-      ).length,
-      terminalFailedCount: document.querySelectorAll(
-        '.erp-dev-quality-flow__terminal-item[data-status="failed"]'
-      ).length,
-      terminalPendingCount: document.querySelectorAll(
-        '.erp-dev-quality-flow__terminal-item[data-status="pending"]'
-      ).length,
-      durationSegmentCount: document.querySelectorAll(
-        '.erp-dev-quality-duration__segment'
-      ).length,
-      fixedSubstepDisclosureCount: document.querySelectorAll(
-        '.erp-dev-quality-flow__substeps'
-      ).length,
-      historyTrendBarCount: document.querySelectorAll(
-        '.erp-dev-quality-history-trend__bar'
-      ).length,
-      coverageMatrixCount: document.querySelectorAll(
-        '.erp-dev-quality-coverage table'
-      ).length,
-      coverageMissingCount: document.querySelectorAll(
-        '.erp-dev-quality-coverage__status[data-tone="missing"]'
-      ).length,
-      coverageNeutralCount: document.querySelectorAll(
-        '.erp-dev-quality-coverage__status[data-tone="neutral"]'
-      ).length,
-      managedDiagramCount: document.querySelectorAll(
-        '.erp-dev-quality-managed-database .erp-markdown-mermaid'
-      ).length,
-    }
-  })
-}
-
 export function createDevQualityGateScenarios({
   assert,
   assertNoHorizontalOverflow,
   expectHeading,
-  outputDir,
-  path,
 }) {
   return [
     {
-      name: 'dev-quality-gates-run-light-desktop',
-      path: '/__dev/quality-gates?view=run',
+      name: 'dev-quality-gates-desktop-light',
+      path: '/__dev/quality-gates?view=server',
       viewport: { width: 1440, height: 900 },
-      beforeNavigate: async (page) => {
-        const counters = { summary: 0, governance: 0, gaps: 0 }
-        page.__qualityCounters = counters
-        await installQualityRoutes(page, 'idle', counters)
-      },
-      verify: async (page) => {
-        await expectHeading(page, '质量门禁')
-        const runStrictButton = page.getByRole('button', {
-          name: '运行严格门禁',
-        })
-        await runStrictButton.waitFor()
-        await runStrictButton.click({ trial: true })
-        const strictHelpButton = page.getByRole('button', {
-          name: '为什么优先推荐严格门禁',
-        })
-        await strictHelpButton.waitFor()
-        assert.equal(
-          await page.getByText('为什么推荐这个门禁', { exact: true }).count(),
-          0
-        )
-        const [strictButtonBox, strictHelpBox] = await Promise.all([
-          runStrictButton.boundingBox(),
-          strictHelpButton.boundingBox(),
-        ])
-        assert(strictButtonBox, '严格门禁按钮应有可见布局')
-        assert(strictHelpBox, '严格门禁问号应有可见布局')
-        assert(
-          strictHelpBox.x >= strictButtonBox.x + strictButtonBox.width - 1,
-          JSON.stringify({ strictButtonBox, strictHelpBox })
-        )
-        assert(
-          Math.abs(
-            strictHelpBox.y +
-              strictHelpBox.height / 2 -
-              (strictButtonBox.y + strictButtonBox.height / 2)
-          ) <= 1,
-          JSON.stringify({ strictButtonBox, strictHelpBox })
-        )
-        const helpTooltip = page.getByRole('tooltip')
-        await strictHelpButton.hover()
-        await helpTooltip.getByText(/严格门禁比完整门禁多检查工具链/u).waitFor()
-        await page.screenshot({
-          path: path.join(
-            outputDir,
-            'dev-quality-gates-strict-help-tooltip-desktop.png'
-          ),
-        })
-        await page.mouse.move(0, 0)
-        await helpTooltip.waitFor({ state: 'hidden' })
-        await strictHelpButton.focus()
-        await helpTooltip.getByText(/严格门禁比完整门禁多检查工具链/u).waitFor()
-        assert.equal(
-          await strictHelpButton.evaluate(
-            (element) => document.activeElement === element
-          ),
-          true
-        )
-        await runStrictButton.focus()
-        await helpTooltip.waitFor({ state: 'hidden' })
-        const tabs = page.getByRole('tab')
-        assert.equal(await tabs.count(), 3)
-        assert.equal(
-          await page
-            .getByRole('tab', { name: '运行与结果' })
-            .getAttribute('aria-selected'),
-          'true'
-        )
-        const initialTabViewport = await page.evaluate(() => ({
-          panelTop: document
-            .querySelector('[role="tabpanel"]')
-            ?.getBoundingClientRect().top,
-          scrollY: window.scrollY,
-          tabTop: document
-            .querySelector('.erp-dev-quality-tabs')
-            ?.getBoundingClientRect().top,
-        }))
-        const assertTabViewportStable = async (transition) => {
-          const current = await page.evaluate(() => ({
-            panelTop: document
-              .querySelector('[role="tabpanel"]')
-              ?.getBoundingClientRect().top,
-            scrollY: window.scrollY,
-            tabTop: document
-              .querySelector('.erp-dev-quality-tabs')
-              ?.getBoundingClientRect().top,
-          }))
-          assert.equal(
-            current.scrollY,
-            initialTabViewport.scrollY,
-            `${transition}: ${JSON.stringify({ initialTabViewport, current })}`
-          )
-          assert(
-            Math.abs(current.tabTop - initialTabViewport.tabTop) <= 1,
-            `${transition}: ${JSON.stringify({ initialTabViewport, current })}`
-          )
-          assert(
-            Math.abs(current.panelTop - initialTabViewport.panelTop) <= 1,
-            `${transition}: ${JSON.stringify({ initialTabViewport, current })}`
-          )
-        }
-        await page.getByRole('tab', { name: '门禁治理' }).click()
-        await page.waitForURL(
-          '**/quality-gates?view=governance&filter=relevant'
-        )
-        await page.getByRole('tabpanel', { name: '门禁治理' }).waitFor()
-        await assertTabViewportStable('click run-to-governance')
-        await page.screenshot({
-          path: path.join(
-            outputDir,
-            'dev-quality-gates-tab-stable-desktop.png'
-          ),
-        })
-        await page
-          .getByRole('tab', { name: '门禁治理', selected: true })
-          .press('ArrowLeft')
-        await page.waitForURL('**/quality-gates?view=run')
-        await page.getByRole('tabpanel', { name: '运行与结果' }).waitFor()
-        await assertTabViewportStable('keyboard governance-to-run')
-        await page
-          .getByRole('tab', { name: '运行与结果', selected: true })
-          .press('End')
-        await page.waitForURL(
-          '**/quality-gates?view=gaps&range=current&risk=all'
-        )
-        await page
-          .getByRole('tab', { name: '覆盖缺口', selected: true })
-          .press('Home')
-        await page.waitForURL('**/quality-gates?view=run')
-        await page
-          .getByRole('tab', { name: '运行与结果', selected: true })
-          .press('ArrowRight')
-        await page.waitForURL(
-          '**/quality-gates?view=governance&filter=relevant'
-        )
-        await page.goBack()
-        await page.waitForURL('**/quality-gates?view=run')
-        await page.goForward()
-        await page.waitForURL(
-          '**/quality-gates?view=governance&filter=relevant'
-        )
-        await page.reload({ waitUntil: 'domcontentloaded' })
-        await page.getByRole('tab', { name: '门禁治理' }).waitFor()
-        assert.equal(
-          await page
-            .getByRole('tab', { name: '门禁治理' })
-            .getAttribute('aria-selected'),
-          'true'
-        )
-        await page.goBack()
-        await page.waitForURL('**/quality-gates?view=run')
-        await page.getByRole('button', { name: '运行严格门禁' }).waitFor()
-        await page.getByText('严格门禁附加检查', { exact: true }).waitFor()
-        await page.getByText('完整门禁共用主路径', { exact: true }).waitFor()
-        await page.getByText('正式回执', { exact: true }).first().waitFor()
-        await page.getByText('资源清理', { exact: true }).first().waitFor()
-        let metrics = await qualityGeometry(page)
-        assert.equal(metrics.flowStepCount, 11, JSON.stringify(metrics))
-        assert.equal(metrics.durationSegmentCount, 0, JSON.stringify(metrics))
-        assert.equal(metrics.managedDiagramCount, 0, JSON.stringify(metrics))
-        const managedGuide = page.locator('.erp-dev-quality-managed-database')
-        await managedGuide
-          .getByText('查看本机托管数据库的静态运行与清理流程', {
-            exact: true,
-          })
-          .click()
-        await page
-          .getByText('静态工作原理，不代表当前运行状态', { exact: true })
-          .waitFor()
-        await managedGuide
-          .locator('.erp-markdown-mermaid[data-mermaid-status="rendered"]')
-          .waitFor()
-        metrics = await qualityGeometry(page)
-        assert.equal(metrics.managedDiagramCount, 1, JSON.stringify(metrics))
-        const managedViewer = managedGuide.locator('.erp-markdown-mermaid')
-        const managedToolbar = managedViewer.locator(
-          '.erp-markdown-mermaid__toolbar'
-        )
-        const managedInitial = await managedViewer.evaluate((shell) => {
-          const toolbar = shell.querySelector('.erp-markdown-mermaid__toolbar')
-          const viewport = shell.querySelector(
-            '.erp-markdown-mermaid__viewport'
-          )
-          const canvas = shell.querySelector('.erp-markdown-mermaid__canvas')
-          const buttons = [
-            ...shell.querySelectorAll('.erp-markdown-mermaid__tool'),
-          ]
-          const readAction = (button) =>
-            button.getAttribute('data-mermaid-zoom-action') ||
-            button.getAttribute('data-mermaid-fullscreen-action') ||
-            ''
-          return {
-            actions: buttons.map(readAction),
-            centerHits: buttons.map((button) => {
-              const rect = button.getBoundingClientRect()
-              const hit = document.elementFromPoint(
-                rect.left + rect.width / 2,
-                rect.top + rect.height / 2
-              )
-              return hit === button || button.contains(hit)
-            }),
-            toolBoxes: buttons.map((button) => {
-              const rect = button.getBoundingClientRect()
-              return { width: rect.width, height: rect.height }
-            }),
-            toolbarDisplay: toolbar
-              ? window.getComputedStyle(toolbar).display
-              : '',
-            toolbarWrap: toolbar
-              ? window.getComputedStyle(toolbar).flexWrap
-              : '',
-            viewportOverflowX: viewport
-              ? window.getComputedStyle(viewport).overflowX
-              : '',
-            canvasWidth: canvas?.getBoundingClientRect().width || 0,
-            zoom: canvas?.getAttribute('data-mermaid-zoom') || '',
-          }
-        })
-        assert.deepEqual(
-          managedInitial.actions,
-          ['fit', 'fit-height', 'zoom-out', 'zoom-in', 'reset', 'open'],
-          JSON.stringify(managedInitial)
-        )
-        assert(
-          managedInitial.centerHits.every(Boolean),
-          `托管数据库图工具按钮中心必须分别命中自身：${JSON.stringify(
-            managedInitial
-          )}`
-        )
-        assert(
-          managedInitial.toolBoxes.every(
-            ({ width, height }) => width >= 31 && height >= 31
-          ),
-          `托管数据库图工具按钮必须保留可点击尺寸：${JSON.stringify(
-            managedInitial
-          )}`
-        )
-        assert.equal(managedInitial.toolbarDisplay, 'flex')
-        assert.equal(managedInitial.toolbarWrap, 'wrap')
-        assert.equal(managedInitial.viewportOverflowX, 'auto')
-        assert.equal(managedInitial.zoom, '100')
-        await managedToolbar
-          .locator('[data-mermaid-zoom-action="zoom-in"]')
-          .click()
-        await page.waitForFunction(
-          () =>
-            document
-              .querySelector(
-                '.erp-dev-quality-managed-database .erp-markdown-mermaid__canvas'
-              )
-              ?.getAttribute('data-mermaid-zoom') === '120'
-        )
-        const managedZoomed = await managedViewer.evaluate((shell) => {
-          const canvas = shell.querySelector('.erp-markdown-mermaid__canvas')
-          return {
-            canvasWidth: canvas?.getBoundingClientRect().width || 0,
-            zoom: canvas?.getAttribute('data-mermaid-zoom') || '',
-          }
-        })
-        assert.equal(managedZoomed.zoom, '120')
-        assert(
-          managedZoomed.canvasWidth > managedInitial.canvasWidth,
-          `托管数据库图放大后画布宽度必须增加：${JSON.stringify({
-            managedInitial,
-            managedZoomed,
-          })}`
-        )
-        await managedViewer.screenshot({
-          path: path.join(
-            outputDir,
-            'dev-quality-gates-managed-database-zoom-120-desktop.png'
-          ),
-          animations: 'disabled',
-        })
-        await managedToolbar
-          .locator('[data-mermaid-zoom-action="reset"]')
-          .click()
-        const fullscreenOpenButton = managedToolbar.locator(
-          '[data-mermaid-fullscreen-action="open"]'
-        )
-        await fullscreenOpenButton.click()
-        await page.waitForFunction(
-          () =>
-            document
-              .querySelector(
-                '.erp-dev-quality-managed-database .erp-markdown-mermaid'
-              )
-              ?.getAttribute('data-mermaid-fullscreen') === 'true'
-        )
-        await page.waitForFunction(
-          () =>
-            document.activeElement?.getAttribute(
-              'data-mermaid-fullscreen-action'
-            ) === 'close'
-        )
-        const managedFullscreen = await managedViewer.evaluate((shell) => {
-          const rect = shell.getBoundingClientRect()
-          const toolbar = shell.querySelector('.erp-markdown-mermaid__toolbar')
-          const style = window.getComputedStyle(shell)
-          return {
-            position: style.position,
-            left: rect.left,
-            top: rect.top,
-            right: rect.right,
-            bottom: rect.bottom,
-            viewportWidth: window.innerWidth,
-            viewportHeight: window.innerHeight,
-            toolbarClientWidth: toolbar?.clientWidth || 0,
-            toolbarScrollWidth: toolbar?.scrollWidth || 0,
-            bodyOverflow: document.body.style.overflow,
-            focusedAction:
-              document.activeElement?.getAttribute(
-                'data-mermaid-fullscreen-action'
-              ) || '',
-          }
-        })
-        assert.equal(managedFullscreen.position, 'fixed')
-        assert(
-          Math.abs(managedFullscreen.left) <= 1 &&
-            Math.abs(managedFullscreen.top) <= 1 &&
-            Math.abs(
-              managedFullscreen.right - managedFullscreen.viewportWidth
-            ) <= 1 &&
-            Math.abs(
-              managedFullscreen.bottom - managedFullscreen.viewportHeight
-            ) <= 1,
-          `托管数据库图全屏必须覆盖视口：${JSON.stringify(managedFullscreen)}`
-        )
-        assert(
-          managedFullscreen.toolbarScrollWidth <=
-            managedFullscreen.toolbarClientWidth + 1,
-          `托管数据库图全屏工具条不得溢出：${JSON.stringify(managedFullscreen)}`
-        )
-        assert.equal(managedFullscreen.bodyOverflow, 'hidden')
-        assert.equal(managedFullscreen.focusedAction, 'close')
-        await managedViewer.screenshot({
-          path: path.join(
-            outputDir,
-            'dev-quality-gates-managed-database-fullscreen-desktop.png'
-          ),
-          animations: 'disabled',
-        })
-        await page.keyboard.press('Escape')
-        await page.waitForFunction(
-          () =>
-            document
-              .querySelector(
-                '.erp-dev-quality-managed-database .erp-markdown-mermaid'
-              )
-              ?.getAttribute('data-mermaid-fullscreen') === 'false'
-        )
-        await page.waitForFunction(
-          () =>
-            document.activeElement?.getAttribute(
-              'data-mermaid-fullscreen-action'
-            ) === 'open'
-        )
-        assert.equal(
-          await fullscreenOpenButton.evaluate(
-            (button) => document.activeElement === button
-          ),
-          true,
-          '托管数据库图退出全屏后必须把焦点还给全屏入口'
-        )
-        await managedGuide.screenshot({
-          path: path.join(
-            outputDir,
-            'dev-quality-gates-managed-database-guide-desktop.png'
-          ),
-        })
-        await managedGuide
-          .getByText('查看本机托管数据库的静态运行与清理流程', {
-            exact: true,
-          })
-          .click()
-        await page.screenshot({
-          path: path.join(outputDir, 'dev-quality-gates-run-light-desktop.png'),
-          fullPage: true,
-        })
-        await assertNoHorizontalOverflow(
-          page,
-          'dev-quality-gates-run-light-desktop'
-        )
-      },
-    },
-    {
-      name: 'dev-quality-gates-governance-dark-running',
-      path: '/__dev/quality-gates?view=governance',
-      themeMode: 'dark',
-      viewport: { width: 1440, height: 900 },
-      beforeNavigate: async (page) => {
-        const counters = { summary: 0, governance: 0, gaps: 0 }
-        page.__qualityCounters = counters
-        await installQualityRoutes(page, 'running', counters)
-      },
-      verify: async (page) => {
-        await expectHeading(page, '质量门禁')
-        await page.getByRole('button', { name: '返回运行' }).waitFor()
-        await page.getByRole('table').waitFor()
-        assert.equal(await page.getByText('Stable key').count(), 0)
-        await page.getByText('暂无足够样本', { exact: true }).last().waitFor()
-        assert.equal(page.__qualityCounters.gaps, 0)
-        await page.screenshot({
-          path: path.join(
-            outputDir,
-            'dev-quality-gates-governance-dark-running.png'
-          ),
-          fullPage: true,
-        })
-        await assertNoHorizontalOverflow(
-          page,
-          'dev-quality-gates-governance-dark-running'
-        )
-        await page.getByRole('button', { name: '返回运行' }).click()
-        await page.waitForURL('**/quality-gates?view=run')
-        const currentStep = page.locator(
-          '.erp-dev-quality-flow__step[aria-current="step"]'
-        )
-        await currentStep.waitFor()
-        assert.equal(await currentStep.count(), 1)
-        await currentStep.getByText('Web 测试与生产构建').waitFor()
-        const metrics = await qualityGeometry(page)
-        assert.equal(metrics.flowPassedCount, 7, JSON.stringify(metrics))
-        assert.equal(metrics.flowRunningCount, 1, JSON.stringify(metrics))
-        assert.equal(metrics.flowPendingCount, 3, JSON.stringify(metrics))
-        assert.equal(metrics.flowFailedCount, 0, JSON.stringify(metrics))
-        assert.equal(metrics.terminalPendingCount, 2, JSON.stringify(metrics))
-        assert.equal(metrics.durationSegmentCount, 7, JSON.stringify(metrics))
-        assert.equal(
-          metrics.fixedSubstepDisclosureCount,
-          2,
-          JSON.stringify(metrics)
-        )
-        await page.screenshot({
-          path: path.join(outputDir, 'dev-quality-gates-run-dark-running.png'),
-          fullPage: true,
-        })
-        await assertNoHorizontalOverflow(
-          page,
-          'dev-quality-gates-run-dark-running'
-        )
-      },
-    },
-    {
-      name: 'dev-quality-gates-run-mobile-390',
-      path: '/__dev/quality-gates?view=run&profile=strict',
-      themeMode: 'dark',
-      viewport: { width: 390, height: 844 },
-      beforeNavigate: async (page) => {
-        await installQualityRoutes(page, 'failed', {
-          summary: 0,
-          governance: 0,
-          gaps: 0,
-        })
-      },
-      verify: async (page) => {
-        await expectHeading(page, '质量门禁')
-        const strictHelpButton = page.getByRole('button', {
-          name: '为什么优先推荐严格门禁',
-        })
-        await strictHelpButton.waitFor()
-        const strictHelpBox = await strictHelpButton.boundingBox()
-        assert(strictHelpBox, '移动端严格门禁问号应保持可见')
-        assert(
-          strictHelpBox.x + strictHelpBox.width <= 391,
-          JSON.stringify(strictHelpBox)
-        )
-        await page.getByText('第一失败：Web 测试与生产构建未通过').waitFor()
-        const metrics = await qualityGeometry(page)
-        assert(
-          metrics.tabScrollWidth <= metrics.tabClientWidth + 1,
-          JSON.stringify(metrics)
-        )
-        assert(metrics.tabHeight <= 55, JSON.stringify(metrics))
-        assert(
-          metrics.documentWidth <= metrics.viewportWidth + 1,
-          JSON.stringify(metrics)
-        )
-        assert(
-          metrics.bodyWidth <= metrics.viewportWidth + 1,
-          JSON.stringify(metrics)
-        )
-        assert(
-          metrics.tableScrollWidth >= metrics.tableClientWidth,
-          JSON.stringify(metrics)
-        )
-        assert.equal(metrics.flowStepCount, 11, JSON.stringify(metrics))
-        assert.equal(metrics.flowColumnCount, 1, JSON.stringify(metrics))
-        assert.equal(metrics.currentFlowStepCount, 0, JSON.stringify(metrics))
-        assert.equal(metrics.flowPassedCount, 7, JSON.stringify(metrics))
-        assert.equal(metrics.flowFailedCount, 1, JSON.stringify(metrics))
-        assert.equal(metrics.flowNotRunCount, 3, JSON.stringify(metrics))
-        assert.equal(metrics.flowPendingCount, 0, JSON.stringify(metrics))
-        assert.equal(metrics.terminalPassedCount, 1, JSON.stringify(metrics))
-        assert.equal(metrics.terminalFailedCount, 1, JSON.stringify(metrics))
-        assert.equal(metrics.durationSegmentCount, 8, JSON.stringify(metrics))
-        assert.equal(
-          metrics.fixedSubstepDisclosureCount,
-          2,
-          JSON.stringify(metrics)
-        )
-        assert.notEqual(
-          metrics.flowStepBackground,
-          'rgb(255, 255, 255)',
-          JSON.stringify(metrics)
-        )
-        assert.notEqual(
-          metrics.flowStepBackground,
-          metrics.flowStepColor,
-          JSON.stringify(metrics)
-        )
-        await page.getByText('未执行', { exact: true }).first().waitFor()
-        await page.getByText('最长阶段', { exact: true }).waitFor()
-        await page.getByText('终态证明', { exact: true }).waitFor()
-        const managedGuide = page.locator('.erp-dev-quality-managed-database')
-        await managedGuide
-          .getByText('查看本机托管数据库的静态运行与清理流程', {
-            exact: true,
-          })
-          .click()
-        const managedViewer = managedGuide.locator(
-          '.erp-markdown-mermaid[data-mermaid-status="rendered"]'
-        )
-        await managedViewer.waitFor()
-        const mobileViewer = await managedViewer.evaluate((shell) => {
-          const shellRect = shell.getBoundingClientRect()
-          const toolbar = shell.querySelector('.erp-markdown-mermaid__toolbar')
-          const buttons = [
-            ...shell.querySelectorAll('.erp-markdown-mermaid__tool'),
-          ]
-          const toolBackground = buttons[0]
-            ? window.getComputedStyle(buttons[0]).backgroundColor
-            : ''
-          return {
-            shellRight: shellRect.right,
-            viewportWidth: window.innerWidth,
-            toolbarClientWidth: toolbar?.clientWidth || 0,
-            toolbarScrollWidth: toolbar?.scrollWidth || 0,
-            actionCount: buttons.length,
-            toolBackground,
-            toolBoxes: buttons.map((button) => {
-              const rect = button.getBoundingClientRect()
-              return { width: rect.width, height: rect.height }
-            }),
-          }
-        })
-        assert.equal(mobileViewer.actionCount, 6, JSON.stringify(mobileViewer))
-        assert(
-          mobileViewer.toolBoxes.every(
-            ({ width, height }) => width >= 31 && height >= 31
-          ),
-          `移动端托管数据库图工具按钮必须保持可点击尺寸：${JSON.stringify(
-            mobileViewer
-          )}`
-        )
-        assert(
-          mobileViewer.toolbarScrollWidth <=
-            mobileViewer.toolbarClientWidth + 1,
-          `移动端托管数据库图工具条不得横向溢出：${JSON.stringify(
-            mobileViewer
-          )}`
-        )
-        assert(
-          mobileViewer.shellRight <= mobileViewer.viewportWidth + 1,
-          JSON.stringify(mobileViewer)
-        )
-        assert.notEqual(mobileViewer.toolBackground, 'rgba(0, 0, 0, 0)')
-        await managedGuide.screenshot({
-          path: path.join(
-            outputDir,
-            'dev-quality-gates-managed-database-guide-mobile-390.png'
-          ),
-          animations: 'disabled',
-        })
-        await page.screenshot({
-          path: path.join(outputDir, 'dev-quality-gates-run-mobile-390.png'),
-          fullPage: true,
-        })
-        await assertNoHorizontalOverflow(
-          page,
-          'dev-quality-gates-run-mobile-390'
-        )
-      },
-    },
-    {
-      name: 'dev-quality-gates-gaps-mobile-320',
-      path: '/__dev/quality-gates?view=gaps',
-      viewport: { width: 320, height: 800 },
       beforeNavigate: async (page) => {
         await installQualityRoutes(page, 'idle', {
           summary: 0,
@@ -1202,95 +684,91 @@ export function createDevQualityGateScenarios({
       },
       verify: async (page) => {
         await expectHeading(page, '质量门禁')
-        await page.getByText('当前改动', { exact: true }).first().waitFor()
-        await page.getByText('仍缺必需门禁').first().waitFor()
-        const metrics = await qualityGeometry(page)
-        assert(
-          metrics.tabScrollWidth <= metrics.tabClientWidth + 1,
-          JSON.stringify(metrics)
-        )
-        assert(metrics.tabHeight <= 55, JSON.stringify(metrics))
-        assert(
-          metrics.documentWidth <= metrics.viewportWidth + 1,
-          JSON.stringify(metrics)
-        )
-        assert(
-          metrics.bodyWidth <= metrics.viewportWidth + 1,
-          JSON.stringify(metrics)
-        )
-        assert.equal(metrics.coverageMatrixCount, 1, JSON.stringify(metrics))
-        assert.equal(metrics.coverageMissingCount, 4, JSON.stringify(metrics))
-        assert.equal(metrics.coverageNeutralCount, 2, JSON.stringify(metrics))
-        await page.getByText('— 未运行', { exact: true }).first().waitFor()
-        await page.getByText('· 不适用', { exact: true }).first().waitFor()
-        await page.screenshot({
-          path: path.join(outputDir, 'dev-quality-gates-gaps-mobile-320.png'),
-          fullPage: true,
+        await page.getByText('R640 普通 CI 已通过', { exact: true }).waitFor()
+
+        const serverPanel = page.getByRole('region', {
+          name: 'R640 服务器质量证据',
         })
-        await assertNoHorizontalOverflow(
-          page,
-          'dev-quality-gates-gaps-mobile-320'
-        )
-      },
-    },
-    {
-      name: 'dev-quality-gates-run-history-light',
-      path: '/__dev/quality-gates?view=run&profile=strict',
-      viewport: { width: 1440, height: 900 },
-      beforeNavigate: async (page) => {
-        await installQualityRoutes(page, 'history', {
-          summary: 0,
-          governance: 0,
-          gaps: 0,
-        })
-      },
-      verify: async (page) => {
-        await expectHeading(page, '质量门禁')
-        await page.getByText('历史运行', { exact: true }).waitFor()
-        await page
+        await serverPanel.waitFor()
+        await serverPanel
+          .getByText('Job 名称、状态与耗时直接来自当前 GitLab 流水线。', {
+            exact: true,
+          })
+          .waitFor()
+        await serverPanel
           .getByText(
-            '这是旧版本的历史运行记录，不代表当前版本；请以当前仓库身份的正式回执为准。',
+            '工作台不复制 CI DAG，新增或调整 Job 时以服务端读回为准。',
             { exact: true }
           )
           .waitFor()
-        const metrics = await qualityGeometry(page)
-        assert.equal(metrics.flowStepCount, 11, JSON.stringify(metrics))
-        assert.equal(metrics.flowPassedCount, 11, JSON.stringify(metrics))
-        assert.equal(metrics.flowNotRunCount, 0, JSON.stringify(metrics))
-        assert.equal(metrics.currentFlowStepCount, 0, JSON.stringify(metrics))
-        assert.equal(metrics.terminalPassedCount, 2, JSON.stringify(metrics))
-        assert.equal(metrics.durationSegmentCount, 11, JSON.stringify(metrics))
-        assert.equal(metrics.historyTrendBarCount, 3, JSON.stringify(metrics))
-        await page.getByText('3 个可比样本', { exact: true }).waitFor()
-        await page.screenshot({
-          path: path.join(outputDir, 'dev-quality-gates-run-history-light.png'),
-          fullPage: true,
-        })
+        assert.equal(
+          await serverPanel
+            .getByRole('table', {
+              name: '本机阶段与 R640 CI Job 对照',
+            })
+            .count(),
+          0
+        )
+
+        const pipelineNodes = serverPanel.locator(
+          '.erp-dev-quality-server-pipeline__node'
+        )
+        assert.deepEqual(
+          await pipelineNodes.locator('code').allTextContents(),
+          SERVER_JOB_TIMINGS.map(([jobName]) => jobName)
+        )
+        const pipelineGeometry = await serverPanel
+          .locator('.erp-dev-quality-server-pipeline__track')
+          .evaluate((track) => {
+            const phase = track.querySelector(
+              '.erp-dev-quality-server-pipeline__phase'
+            )
+            const nodes = phase?.querySelector(
+              '.erp-dev-quality-server-pipeline__nodes'
+            )
+            const nodeRects = Array.from(
+              nodes?.querySelectorAll(
+                '.erp-dev-quality-server-pipeline__node'
+              ) || []
+            ).map((node) => node.getBoundingClientRect())
+            const trackRect = track.getBoundingClientRect()
+            const phaseRect = phase?.getBoundingClientRect()
+            const nodesRect = nodes?.getBoundingClientRect()
+            return {
+              trackWidth: trackRect.width,
+              phaseWidth: phaseRect?.width || 0,
+              nodesClientWidth: nodes?.clientWidth || 0,
+              nodesScrollWidth: nodes?.scrollWidth || 0,
+              columnCount: new Set(nodeRects.map((rect) => Math.round(rect.x)))
+                .size,
+              maxNodeRight: nodeRects.reduce(
+                (right, rect) => Math.max(right, rect.right),
+                0
+              ),
+              nodesRight: nodesRect?.right || 0,
+            }
+          })
+        assert(
+          pipelineGeometry.phaseWidth >= pipelineGeometry.trackWidth - 1,
+          JSON.stringify(pipelineGeometry)
+        )
+        assert(
+          pipelineGeometry.columnCount > 1,
+          JSON.stringify(pipelineGeometry)
+        )
+        assert(
+          pipelineGeometry.nodesScrollWidth <=
+            pipelineGeometry.nodesClientWidth + 1,
+          JSON.stringify(pipelineGeometry)
+        )
+        assert(
+          pipelineGeometry.maxNodeRight <= pipelineGeometry.nodesRight + 1,
+          JSON.stringify(pipelineGeometry)
+        )
         await assertNoHorizontalOverflow(
           page,
-          'dev-quality-gates-run-history-light'
+          'dev-quality-gates-desktop-light'
         )
-      },
-    },
-    {
-      name: 'dev-quality-gates-invalid-query-fail-closed',
-      path: '/__dev/quality-gates?view=run&command=unsafe',
-      viewport: { width: 390, height: 844 },
-      beforeNavigate: async (page) => {
-        await installQualityRoutes(page, 'idle', {
-          summary: 0,
-          governance: 0,
-          gaps: 0,
-        })
-      },
-      verify: async (page) => {
-        await page.getByText('当前质量门禁链接无效或已经过期').waitFor()
-        assert.equal(
-          await page.getByRole('button', { name: '运行严格门禁' }).isDisabled(),
-          true
-        )
-        await page.getByRole('button', { name: '安全返回默认视图' }).click()
-        await page.waitForURL('**/quality-gates?view=run')
       },
     },
   ]

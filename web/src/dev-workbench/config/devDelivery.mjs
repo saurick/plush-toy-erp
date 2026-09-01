@@ -14,6 +14,15 @@ export const DEV_VERSION_CENTER_VIEW_QUERY_KEY = 'view'
 export const DEV_VERSION_CENTER_VIEW_VERSIONS = 'versions'
 export const DEV_VERSION_CENTER_VIEW_PIPELINE = 'pipeline'
 export const DEV_VERSION_CENTER_VIEW_HISTORY = 'history'
+export const DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS = Object.freeze({
+  action: 'history_action',
+  result: 'history_result',
+  target: 'history_target',
+  keyword: 'history_q',
+})
+export const DEV_VERSION_CENTER_HISTORY_FILTER_ALL = 'all'
+export const DEV_VERSION_CENTER_HISTORY_RESULT_ATTENTION = 'attention'
+export const DEV_VERSION_CENTER_HISTORY_RESULT_PASSED = 'passed'
 export const DEV_VERSION_CENTER_VERSION_PAGE_SIZE = 6
 export const DEV_VERSION_CENTER_HISTORY_PAGE_SIZE = 10
 export const DEV_DELIVERY_TARGETS = Object.freeze([
@@ -31,7 +40,7 @@ export const DEV_DELIVERY_TARGETS = Object.freeze([
     shortLabel: 'test 环境',
     purpose: 'customer-clean-acceptance',
     endpoint: 'https://test.yoyoosun.net',
-    dataBoundary: '每轮交付前恢复干净基线；由甲方录入真实测试数据',
+    dataBoundary: '普通部署默认保留现有数据；需要时独立清空并重建测试数据',
   }),
 ])
 const DEV_DELIVERY_TARGET_KEYS = Object.freeze(
@@ -42,6 +51,21 @@ const DEV_VERSION_CENTER_VIEW_VALUES = new Set([
   DEV_VERSION_CENTER_VIEW_VERSIONS,
   DEV_VERSION_CENTER_VIEW_PIPELINE,
   DEV_VERSION_CENTER_VIEW_HISTORY,
+])
+const DEV_VERSION_CENTER_HISTORY_RESULT_VALUES = new Set([
+  DEV_VERSION_CENTER_HISTORY_FILTER_ALL,
+  DEV_VERSION_CENTER_HISTORY_RESULT_ATTENTION,
+  DEV_VERSION_CENTER_HISTORY_RESULT_PASSED,
+])
+const DEV_VERSION_CENTER_HISTORY_TARGET_VALUES = new Set([
+  ...DEV_DELIVERY_TARGET_KEYS,
+  'gitlab-release',
+  'github-release',
+])
+const DEV_VERSION_CENTER_HISTORY_ATTENTION_STATUSES = new Set([
+  'failed',
+  'blocked',
+  'not_proven',
 ])
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/u
@@ -230,6 +254,64 @@ export function resolveDevVersionCenterView(value) {
     : DEV_VERSION_CENTER_VIEW_VERSIONS
 }
 
+export function resolveDevOperationHistoryFilters(value = {}) {
+  const action = String(value.action || '').trim()
+  const result = String(value.result || '').trim()
+  const target = String(value.target || '').trim()
+  const keyword = String(value.keyword || '')
+    .trim()
+    .slice(0, 128)
+  return {
+    action: DELIVERY_OPERATION_ACTIONS.has(action)
+      ? action
+      : DEV_VERSION_CENTER_HISTORY_FILTER_ALL,
+    result: DEV_VERSION_CENTER_HISTORY_RESULT_VALUES.has(result)
+      ? result
+      : DEV_VERSION_CENTER_HISTORY_FILTER_ALL,
+    target: DEV_VERSION_CENTER_HISTORY_TARGET_VALUES.has(target)
+      ? target
+      : DEV_VERSION_CENTER_HISTORY_FILTER_ALL,
+    keyword,
+  }
+}
+
+export function filterDevOperationHistory(operations, filters = {}) {
+  const resolved = resolveDevOperationHistoryFilters(filters)
+  const keyword = resolved.keyword.toLocaleLowerCase('zh-CN')
+  return (Array.isArray(operations) ? operations : []).filter((operation) => {
+    if (
+      resolved.action !== DEV_VERSION_CENTER_HISTORY_FILTER_ALL &&
+      operation.action !== resolved.action
+    ) {
+      return false
+    }
+    if (
+      resolved.target !== DEV_VERSION_CENTER_HISTORY_FILTER_ALL &&
+      operation.target !== resolved.target
+    ) {
+      return false
+    }
+    if (
+      resolved.result === DEV_VERSION_CENTER_HISTORY_RESULT_PASSED &&
+      operation.status !== 'passed'
+    ) {
+      return false
+    }
+    if (
+      resolved.result === DEV_VERSION_CENTER_HISTORY_RESULT_ATTENTION &&
+      !DEV_VERSION_CENTER_HISTORY_ATTENTION_STATUSES.has(operation.status)
+    ) {
+      return false
+    }
+    if (!keyword) return true
+    return [operation.version, operation.gitSha, operation.id].some((value) =>
+      String(value || '')
+        .toLocaleLowerCase('zh-CN')
+        .includes(keyword)
+    )
+  })
+}
+
 export function resolveDevOperationHistoryState({
   initialLoading = false,
   loadError = '',
@@ -249,7 +331,7 @@ const OPERATION_MESSAGE_LABELS = Object.freeze({
   'read-only fixed-target preflight started': '已开始固定目标只读预检',
   'read-only rollback qualification started': '已开始只读回滚资格检查',
   'read-only fixed-target database rebuild qualification started':
-    '已开始固定 133 数据库重建资格检查',
+    '已开始固定目标的数据清空重建资格检查',
   'promotion plan is eligible and requires explicit confirmation':
     '显式版本提升资格已通过，等待明确确认',
   'promotion plan is eligible; explicit confirmation is required':
@@ -259,19 +341,19 @@ const OPERATION_MESSAGE_LABELS = Object.freeze({
   'code-only rollback is eligible; explicit confirmation is required':
     '仅代码回滚资格已通过，等待明确确认',
   'database rebuild is eligible; exact destructive-scope confirmation is required':
-    '数据库重建资格已通过，等待精确破坏范围确认',
+    '数据清空重建资格已通过，等待精确破坏范围确认',
   'target write started with the fixed promotion contract':
     '已按固定版本提升合同开始写入目标',
   'code-only target rollback started with the fixed contract':
     '已按固定合同开始仅代码回滚',
   'target write started with the fixed database rebuild contract':
-    '已按固定合同开始重建 133 数据库',
+    '已按固定合同开始清空并重建目标数据',
   'target promotion and basic runtime verification passed':
     '133 显式版本提升与基础运行核验已通过',
   'code-only rollback and basic runtime verification passed':
     '代码回滚与基础运行核验已通过',
   'fresh database generation and basic runtime verification passed':
-    '全新数据库代与基础运行核验已通过',
+    '全新数据代与基础运行核验已通过',
   'immutable GitHub release and complete assets are published':
     'GitHub 不可变版本及完整制品已发布',
   'immutable GitLab release and complete assets are published':
@@ -295,19 +377,27 @@ const OPERATION_MESSAGE_LABELS = Object.freeze({
   'code-only rollback is blocked by fixed qualification':
     '仅代码回滚被固定资格检查阻断',
   'database rebuild is blocked by fixed-target qualification':
-    '数据库重建被固定目标资格检查阻断',
+    '数据清空重建被固定目标资格检查阻断',
   'promotion preparation failed without starting a target write':
     '版本提升准备失败，未开始写入目标',
   'rollback qualification failed without starting a target write':
     '回滚资格检查失败，未开始写入目标',
   'database rebuild qualification failed without starting a target write':
-    '数据库重建资格检查失败，未开始目标写入',
+    '数据清空重建资格检查失败，未开始目标写入',
   'promotion executor child is launching': '版本提升执行器正在启动',
   'rollback executor child is launching': '回滚执行器正在启动',
+  'database rebuild executor child is launching': '数据清空重建执行器正在启动',
   'promotion executor did not start a target write':
     '版本提升执行器未开始写入目标',
   'promotion executor ended while target outcome was unknown':
     '版本提升执行器已结束，但目标结果尚未证明',
+  'rollback executor did not start a target write': '回滚执行器未开始写入目标',
+  'rollback executor ended while target outcome was unknown':
+    '回滚执行器已结束，但目标结果尚未证明',
+  'database rebuild executor did not start a target write':
+    '数据清空重建执行器未开始写入目标',
+  'database rebuild executor ended while target outcome was unknown':
+    '数据清空重建执行器已结束，但目标结果尚未证明',
   'GitHub release workflow reached a failed terminal state':
     'GitHub 发布流水线已失败结束',
   'GitHub release pipeline reached a failed terminal state':
@@ -325,15 +415,15 @@ const OPERATION_MESSAGE_LABELS = Object.freeze({
   'rollback package preparation failed before target write':
     '回滚包准备失败，未开始写入目标',
   'database rebuild was blocked by the immediate target preflight':
-    '数据库重建被目标即时预检阻断',
+    '数据清空重建被目标即时预检阻断',
   'database rebuild failed within a recovered boundary':
-    '数据库重建在可恢复边界内失败',
+    '数据清空重建在可恢复边界内失败',
   'database rebuild outcome requires target readback':
-    '数据库重建结果需要重新读回确认',
+    '数据清空重建结果需要重新读回确认',
   'remote database rebuild result is unproven; automatic retry is disabled':
-    '远端数据库重建结果未证明，已禁止自动重试',
+    '远端数据清空重建结果未证明，已禁止自动重试',
   'database rebuild transfer failed before remote execution':
-    '数据库重建包在远端执行前传输失败',
+    '数据清空重建包在远端执行前传输失败',
   'target promotion failed before migration apply':
     '目标版本提升在数据库迁移前失败',
   'target promotion outcome requires readback':
@@ -841,6 +931,7 @@ export function validateDevDeliverySummary(summary) {
     !Object.hasOwn(summary, 'timings') ||
     !Object.hasOwn(summary, 'releaseVersionPolicy') ||
     !['gitlab', 'github'].includes(summary.boundaries?.provider) ||
+    typeof summary.boundaries?.releaseDispatchAllowed !== 'boolean' ||
     summary.boundaries?.target !== 'demo-133' ||
     !Array.isArray(summary.boundaries?.targets) ||
     summary.boundaries.targets.join(',') !==
@@ -1132,6 +1223,56 @@ export function deliveryRetryPresentation(value) {
     operation_in_progress: '操作进行中',
   }
   return labels[value?.reason] || '重试状态未证明'
+}
+
+export function deliveryOperationDetailPresentation(operation) {
+  if (operation?.action === 'release') {
+    return {
+      title: '制品发布详情',
+      timingLabel: '工作台发布操作历时',
+      metricsKind: 'release',
+      metricsTitle: '构建与制品',
+      scopeNote: '本次仅发布不可变制品，未向 demo 或 test 执行部署。',
+    }
+  }
+  if (operation?.action === 'promote') {
+    return {
+      title:
+        operation.promotionMode === 'initialize'
+          ? '首次部署详情'
+          : '版本部署详情',
+      timingLabel: '工作台部署操作历时',
+      metricsKind: 'target',
+      metricsTitle: '目标部署与传输',
+      scopeNote: '',
+    }
+  }
+  if (operation?.action === 'rollback') {
+    return {
+      title: '版本回滚详情',
+      timingLabel: '工作台回滚操作历时',
+      metricsKind: 'target',
+      metricsTitle: '目标回滚与传输',
+      scopeNote: '',
+    }
+  }
+  if (operation?.action === 'rebuild-database') {
+    const customerTest = operation.target === 'customer-test-133'
+    return {
+      title: customerTest ? '清空并重建测试数据详情' : '数据重建详情',
+      timingLabel: '工作台数据重建操作历时',
+      metricsKind: 'target',
+      metricsTitle: '备份、重建与恢复',
+      scopeNote: '该操作独立于版本部署；普通部署不会自动清空或重建数据。',
+    }
+  }
+  return {
+    title: '操作详情',
+    timingLabel: '工作台操作历时',
+    metricsKind: 'target',
+    metricsTitle: '执行指标',
+    scopeNote: '',
+  }
 }
 
 export function shortGitSha(value) {

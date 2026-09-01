@@ -19,7 +19,10 @@ import {
   PROFILE_REQUIRED_FILES,
 } from "../qa/gate-profiles.mjs";
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../..",
+);
 
 function git(root, args) {
   return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
@@ -67,7 +70,11 @@ function installHookFixture(root) {
   chmodSync(path.join(root, "scripts/git-hooks/pre-commit.sh"), 0o755);
   for (const name of ["error-code-sync.sh", "error-codes.sh"]) {
     const target = path.join(root, "scripts/qa", name);
-    writeFileSync(target, "#!/usr/bin/env bash\nset -euo pipefail\nexit 0\n", "utf8");
+    writeFileSync(
+      target,
+      "#!/usr/bin/env bash\nset -euo pipefail\nexit 0\n",
+      "utf8",
+    );
     chmodSync(target, 0o755);
   }
   const secrets = path.join(root, "scripts/qa/secrets.sh");
@@ -77,15 +84,24 @@ function installHookFixture(root) {
     "utf8",
   );
   chmodSync(secrets, 0o755);
-  for (const name of ["shfmt.sh", "go-vet.sh", "golangci-lint.sh", "yamllint.sh"]) {
+  for (const name of [
+    "shfmt.sh",
+    "go-vet.sh",
+    "golangci-lint.sh",
+    "yamllint.sh",
+  ]) {
     const target = path.join(root, "scripts/qa", name);
-    writeFileSync(target, "#!/usr/bin/env bash\nset -euo pipefail\nexit 0\n", "utf8");
+    writeFileSync(
+      target,
+      "#!/usr/bin/env bash\nset -euo pipefail\nexit 0\n",
+      "utf8",
+    );
     chmodSync(target, 0o755);
   }
   const shellcheck = path.join(root, "scripts/qa/shellcheck.sh");
   writeFileSync(
     shellcheck,
-    "#!/usr/bin/env bash\nset -euo pipefail\nfor file in \"$@\"; do bash -n \"$file\"; done\n",
+    '#!/usr/bin/env bash\nset -euo pipefail\nfor file in "$@"; do bash -n "$file"; done\n',
     "utf8",
   );
   chmodSync(shellcheck, 0o755);
@@ -118,7 +134,9 @@ function installDbGuardFixture(root) {
     "scripts/qa/db-guard.mjs",
     "scripts/qa/lib/git-range.mjs",
   ]) {
-    copyFileSync(path.join(ROOT, file), path.join(root, file));
+    const target = path.join(root, file);
+    mkdirSync(path.dirname(target), { recursive: true });
+    copyFileSync(path.join(ROOT, file), target);
   }
   chmodSync(path.join(root, "scripts/qa/db-guard.sh"), 0o755);
   installDbModelFixture(root);
@@ -143,7 +161,10 @@ test("pre-commit is check-only and preserves partial staging", () => {
     });
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.equal(git(root, ["show", ":partial.txt"]), indexBefore);
-    assert.equal(readFileSync(path.join(root, "partial.txt"), "utf8"), "staged\nunstaged\n");
+    assert.equal(
+      readFileSync(path.join(root, "partial.txt"), "utf8"),
+      "staged\nunstaged\n",
+    );
     assert.match(git(root, ["diff", "--name-only"]), /partial\.txt/u);
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -151,7 +172,9 @@ test("pre-commit is check-only and preserves partial staging", () => {
 });
 
 test("pre-commit keeps a relative commit index bound after entering its snapshot", () => {
-  const root = mkdtempSync(path.join(os.tmpdir(), "plush-pre-commit-index-env-"));
+  const root = mkdtempSync(
+    path.join(os.tmpdir(), "plush-pre-commit-index-env-"),
+  );
   try {
     git(root, ["init", "-q"]);
     installHookFixture(root);
@@ -173,7 +196,9 @@ test("pre-commit keeps a relative commit index bound after entering its snapshot
 });
 
 test("pre-commit skips fully deleted Go packages but still checks surviving packages", () => {
-  const root = mkdtempSync(path.join(os.tmpdir(), "plush-pre-commit-go-delete-"));
+  const root = mkdtempSync(
+    path.join(os.tmpdir(), "plush-pre-commit-go-delete-"),
+  );
   const capture = path.join(root, "go-vet-targets.txt");
   try {
     git(root, ["init", "-q"]);
@@ -316,7 +341,10 @@ test("pre-commit checks staged script content instead of an unstaged fixup", () 
     });
     assert.notEqual(result.status, 0, result.stderr || result.stdout);
     assert.doesNotMatch(result.stdout, /同时含暂存与未暂存改动/u);
-    assert.equal(git(root, ["show", ":scripts/example.sh"]), "#!/usr/bin/env bash\nif then");
+    assert.equal(
+      git(root, ["show", ":scripts/example.sh"]),
+      "#!/usr/bin/env bash\nif then",
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -372,7 +400,9 @@ test("pre-commit blocks DEV page changes when the indexed governance contract fa
 });
 
 test("pre-commit rejects a required hook deleted only from the index", () => {
-  const root = mkdtempSync(path.join(os.tmpdir(), "plush-pre-commit-required-"));
+  const root = mkdtempSync(
+    path.join(os.tmpdir(), "plush-pre-commit-required-"),
+  );
   try {
     git(root, ["init", "-q"]);
     installHookFixture(root);
@@ -393,7 +423,11 @@ test("pre-commit rejects a required hook deleted only from the index", () => {
       ],
       { cwd: root, encoding: "utf8" },
     );
-    assert.equal(profileResult.status, 1, profileResult.stderr || profileResult.stdout);
+    assert.equal(
+      profileResult.status,
+      1,
+      profileResult.stderr || profileResult.stdout,
+    );
     assert.match(profileResult.stderr, /缺少 required 文件/u);
     const result = spawnSync("bash", ["scripts/git-hooks/pre-commit.sh"], {
       cwd: root,
@@ -414,7 +448,11 @@ test("pre-commit uses the indexed checker when its worktree copy is weakened", (
     writeFileSync(path.join(root, "base.txt"), "base\n", "utf8");
     commit(root, "base");
 
-    writeFileSync(path.join(root, "payload.txt"), "FORBIDDEN_TEST_SECRET\n", "utf8");
+    writeFileSync(
+      path.join(root, "payload.txt"),
+      "FORBIDDEN_TEST_SECRET\n",
+      "utf8",
+    );
     git(root, ["add", "payload.txt"]);
     writeFileSync(
       path.join(root, "scripts/qa/secrets.sh"),
@@ -428,7 +466,10 @@ test("pre-commit uses the indexed checker when its worktree copy is weakened", (
     });
     assert.equal(result.status, 1, result.stderr || result.stdout);
     assert.match(result.stdout, /staged secret detected/u);
-    assert.match(git(root, ["diff", "--name-only"]), /scripts\/qa\/secrets\.sh/u);
+    assert.match(
+      git(root, ["diff", "--name-only"]),
+      /scripts\/qa\/secrets\.sh/u,
+    );
     assert.equal(git(root, ["show", ":payload.txt"]), "FORBIDDEN_TEST_SECRET");
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -436,7 +477,10 @@ test("pre-commit uses the indexed checker when its worktree copy is weakened", (
 });
 
 test("pre-commit source contains no mutating formatter or git add", () => {
-  const source = readFileSync(path.join(ROOT, "scripts/git-hooks/pre-commit.sh"), "utf8");
+  const source = readFileSync(
+    path.join(ROOT, "scripts/git-hooks/pre-commit.sh"),
+    "utf8",
+  );
   assert.doesNotMatch(source, /\bgit add\b/u);
   assert.doesNotMatch(source, /--write|--fix|shfmt -w/u);
   assert.doesNotMatch(

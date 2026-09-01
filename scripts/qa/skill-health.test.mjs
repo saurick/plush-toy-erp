@@ -94,7 +94,7 @@ test("skill health: every task leaves one passive Git handoff record", async () 
 
   assert.match(
     agents,
-    /所有项目任务（Goal、普通实现、文档、测试、诊断、运行与发布准备）[\s\S]*最终回复只留一份被动 `Git handoff record`/u,
+    /Goal 只是普通任务来源[\s\S]*其写明闭环按全局 `\$prompt-governance` 默认授权[\s\S]*所有任务仍各自完成业务切片、验证和回滚[\s\S]*最终仅留被动 `Git handoff record`/u,
   );
   assert.match(
     agents,
@@ -110,7 +110,10 @@ test("skill health: every task leaves one passive Git handoff record", async () 
     agents,
     /无法证明安全时停止相关写入或 Git 动作并报告[\s\S]*不建立任务调度、资源租约、registry、daemon、轮询、定时唤醒或消息广播/u,
   );
-  assert.match(agents, /stage、commit 和 push 是独立动作，均先询问用户/u);
+  assert.match(
+    agents,
+    /非 Goal 或 Goal 未写明的 stage、commit、push 仍分别询问/u,
+  );
   assert.match(skillsReadme, /当前 10 个 Skill/u);
   assert.match(
     skillsReadme,

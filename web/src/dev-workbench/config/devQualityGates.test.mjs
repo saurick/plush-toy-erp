@@ -14,6 +14,7 @@ import {
   VIEW_QUERY_KEYS,
   buildQualityGateCoverageMatrix,
   buildQualityGateHistoryTrend,
+  buildQualityGateServerTiming,
   buildQualityGateStageDurationComposition,
   buildQualityGateViewSearch,
   createDevQualityGateClient,
@@ -115,7 +116,7 @@ function summary(overrides = {}) {
       },
     },
     serverEvidence: {
-      schemaVersion: 'plush.dev-quality-gate-server-evidence/v1',
+      schemaVersion: 'plush.dev-quality-gate-server-evidence/v2',
       status: 'passed',
       current: true,
       coversWorkingTree: true,
@@ -134,8 +135,31 @@ function summary(overrides = {}) {
         {
           id: 390,
           name: 'CI Gate',
+          status: 'completed',
           conclusion: 'success',
           durationMs: 2_000,
+        },
+      ],
+      history: [
+        {
+          id: 39,
+          result: 'passed',
+          gitSha: 'a'.repeat(40),
+          url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/39',
+          createdAt: '2026-08-09T07:50:00.000Z',
+          finishedAt: NOW,
+          durationMs: 395_000,
+          failureJob: '',
+        },
+        {
+          id: 38,
+          result: 'failed',
+          gitSha: 'c'.repeat(40),
+          url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/38',
+          createdAt: '2026-08-09T06:50:00.000Z',
+          finishedAt: '2026-08-09T06:56:00.000Z',
+          durationMs: 360_000,
+          failureJob: 'quality_web',
         },
       ],
       message: 'R640 已通过当前 exact SHA 的完整分片、聚合与 CI Gate。',
@@ -206,13 +230,13 @@ function receipt(overrides = {}) {
   }
 }
 
-test('quality gates config: route, three views and per-view query contracts stay stable', () => {
+test('quality gates config: route, four views and per-view query contracts stay stable', () => {
   assert.equal(DEV_QUALITY_GATES_ROUTE, '/__dev/quality-gates')
-  assert.equal(DEFAULT_VIEW, 'run')
-  assert.deepEqual(VIEW_KEYS, ['run', 'governance', 'gaps'])
+  assert.equal(DEFAULT_VIEW, 'server')
+  assert.deepEqual(VIEW_KEYS, ['server', 'run', 'governance', 'gaps'])
   assert.deepEqual(
     VIEW_ITEMS.map((item) => item.label),
-    ['本机诊断', '门禁治理', '覆盖缺口']
+    ['服务器门禁', '本机诊断', '门禁治理', '覆盖缺口']
   )
   assert.deepEqual(QUERY_KEYS, {
     view: 'view',
@@ -224,6 +248,7 @@ test('quality gates config: route, three views and per-view query contracts stay
     risk: 'risk',
   })
   assert.deepEqual(VIEW_QUERY_KEYS, {
+    server: ['view'],
     run: ['view', 'profile', 'operation'],
     governance: ['view', 'q', 'filter'],
     gaps: ['view', 'range', 'risk'],
@@ -235,9 +260,16 @@ test('quality gates config: deep links restore each view and switching drops for
     valid: true,
     canonicalMissingView: true,
     issues: [],
-    view: 'run',
-    values: { view: 'run', profile: '', operation: '' },
+    view: 'server',
+    values: { view: 'server' },
   })
+  assert.equal(
+    buildQualityGateViewSearch('server', {
+      profile: 'strict',
+      q: 'must not leak',
+    }),
+    '?view=server'
+  )
   assert.equal(
     buildQualityGateViewSearch('run', {
       profile: 'strict',
@@ -270,6 +302,7 @@ test('quality gates config: unknown, repeated, stale and cross-view query fail c
     '?view=run&view=gaps',
     '?view=run&command=rm',
     '?view=run&q=wrong-view',
+    '?view=server&profile=strict',
     `?view=governance&operation=${OPERATION_ID}`,
     '?view=gaps&risk=critical',
   ]) {
@@ -491,6 +524,8 @@ test('quality gates config: summary preserves one shared operation truth', () =>
   assert.deepEqual(normalized.profiles.strict.substeps, {})
   assert.equal(normalized.serverEvidence.pipeline.id, 39)
   assert.equal(normalized.serverEvidence.jobs[0].name, 'CI Gate')
+  assert.equal(normalized.serverEvidence.history.length, 2)
+  assert.equal(normalized.serverEvidence.history[1].failureJob, 'quality_web')
   assert.throws(
     () =>
       normalizeDevQualityGateSummary(
@@ -513,6 +548,128 @@ test('quality gates config: summary preserves one shared operation truth', () =>
       ),
     /pipeline is invalid/u
   )
+  assert.throws(
+    () =>
+      normalizeDevQualityGateSummary(
+        summary({
+          serverEvidence: {
+            ...summary().serverEvidence,
+            history: [...summary().serverEvidence.history].reverse(),
+          },
+        })
+      ),
+    /history order is invalid/u
+  )
+})
+
+test('quality gates config: R640 timing ranks bottlenecks without summing parallel jobs', () => {
+  const timing = buildQualityGateServerTiming({
+    status: 'running',
+    pipeline: { durationMs: 120_000, queueMs: 5_000 },
+    jobs: [
+      {
+        id: 1,
+        name: 'quality_web',
+        status: 'completed',
+        conclusion: 'success',
+        durationMs: 60_000,
+      },
+      {
+        id: 2,
+        name: 'quality_server',
+        status: 'completed',
+        conclusion: 'success',
+        durationMs: 90_000,
+      },
+      {
+        id: 3,
+        name: 'CI Gate',
+        status: 'queued',
+        conclusion: '',
+        durationMs: null,
+      },
+    ],
+  })
+
+  assert.equal(timing.wallClockMs, 120_000)
+  assert.equal(timing.queueMs, 5_000)
+  assert.equal(timing.longestJob.name, 'quality_server')
+  assert.equal(timing.flowJobs.length, 3)
+  assert.equal(
+    timing.flowJobs.find((job) => job.name === 'quality_server').status,
+    'passed'
+  )
+  assert.equal(
+    timing.flowJobs.find((job) => job.name === 'CI Gate').status,
+    'pending'
+  )
+  assert.deepEqual(
+    timing.jobs.map(({ name, relativePercent }) => ({
+      name,
+      relativePercent,
+    })),
+    [
+      { name: 'quality_server', relativePercent: 100 },
+      { name: 'quality_web', relativePercent: 66.7 },
+      { name: 'CI Gate', relativePercent: null },
+    ]
+  )
+  assert.equal('totalDurationMs' in timing, false)
+})
+
+test('quality gates config: R640 timing does not invent jobs without evidence', () => {
+  const timing = buildQualityGateServerTiming({
+    status: 'unavailable',
+    pipeline: null,
+    jobs: [],
+  })
+
+  assert.deepEqual(timing.flowJobs, [])
+  assert.equal(timing.jobs.length, 0)
+  assert.equal(timing.longestJob, null)
+})
+
+test('quality gates config: R640 missing evidence is distinct from unreadable evidence', () => {
+  const timing = buildQualityGateServerTiming({
+    status: 'missing',
+    pipeline: null,
+    jobs: [],
+  })
+
+  assert.deepEqual(timing.flowJobs, [])
+})
+
+test('quality gates config: R640 queued and in-progress jobs keep distinct states', () => {
+  const timing = buildQualityGateServerTiming({
+    status: 'running',
+    pipeline: { durationMs: null, queueMs: 2_000 },
+    jobs: [
+      {
+        id: 1,
+        name: 'plan',
+        status: 'queued',
+        conclusion: '',
+        durationMs: null,
+      },
+      {
+        id: 2,
+        name: 'prepare',
+        status: 'in_progress',
+        conclusion: '',
+        durationMs: null,
+      },
+    ],
+  })
+
+  assert.equal(
+    timing.flowJobs.find((job) => job.name === 'plan').status,
+    'pending'
+  )
+  assert.equal(
+    timing.flowJobs.find((job) => job.name === 'prepare').status,
+    'running'
+  )
+  assert.equal(timing.flowJobs.length, 2)
 })
 
 test('quality gates config: current formal proof wins over unrelated history', () => {
@@ -667,6 +824,23 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
   assert.match(pageSource, /当前正式回执/u)
   assert.match(pageSource, /R640 服务器门禁/u)
   assert.match(pageSource, /正式主路径/u)
+  assert.match(pageSource, /Job 名称、状态与耗时直接来自当前 GitLab 流水线/u)
+  assert.match(pageSource, /工作台不复制 CI DAG/u)
+  assert.doesNotMatch(pageSource, /serverJobLocalStageLabels/u)
+  assert.doesNotMatch(pageSource, /本机阶段与 R640 CI Job 对照/u)
+  assert.doesNotMatch(pageSource, /CI：\{ciJob\.label\}/u)
+  assert.match(pageSource, /pending: '等待运行'/u)
+  assert.match(pageSource, /missing: '未产生 CI 记录'/u)
+  assert.match(pageSource, /unavailable: '读取失败'/u)
+  assert.match(pageSource, /连接正常 · 当前提交无 CI/u)
+  assert.match(pageSource, /GitLab 读取正常/u)
+  assert.match(pageSource, /R640 正在读取服务器证据/u)
+  assert.match(pageSource, /最近 CI/u)
+  assert.match(pageSource, /历史结果不代表当前提交已通过/u)
+  assert.match(pageSource, /最近普通 push CI 历史/u)
+  assert.match(pageSource, /serverHistoryFailureLabel/u)
+  assert.doesNotMatch(pageSource, /missing: '暂无当前 CI'/u)
+  assert.doesNotMatch(pageSource, /unavailable: '待读取'/u)
   assert.match(pageSource, /本机诊断（按需）/u)
   assert.match(pageSource, /本机最近诊断/u)
   assert.doesNotMatch(pageSource, /严格门禁：发版前验证/u)

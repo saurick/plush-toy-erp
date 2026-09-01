@@ -10,6 +10,51 @@
   overflow: hidden;
 }
 
+.erp-dev-product-workspace {
+  min-width: 0;
+}
+
+.erp-dev-product-view-switcher {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 22px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fbfdfb;
+}
+
+.erp-dev-product-view-switcher__copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.erp-dev-product-view-switcher__copy > .ant-typography:first-child {
+  color: #24412c;
+  font-size: 14px;
+}
+
+.erp-dev-product-view-switcher__copy > .ant-typography:last-child {
+  line-height: 1.5;
+}
+
+.erp-dev-product-view-tabs.erp-dev-task-nav,
+.erp-dev-product-view-tabs.erp-dev-task-nav--compact {
+  flex: 0 1 590px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.erp-dev-product-view-tabs .erp-dev-task-nav__item {
+  min-width: 0;
+}
+
+.erp-dev-product-start:focus-visible,
+.erp-dev-relationship-guide:focus-visible {
+  outline: 2px solid #2b8a3e;
+  outline-offset: -2px;
+}
+
 .erp-dev-product-start {
   min-width: 0;
 }
@@ -230,6 +275,148 @@
   outline-offset: 2px;
 }
 
+.erp-dev-relationship-guide {
+  min-width: 0;
+}
+
+.erp-dev-relationship-guide__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fbf8;
+}
+
+.erp-dev-relationship-guide__head > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.erp-dev-relationship-guide__head h2.ant-typography {
+  margin: 0;
+  color: #172b1e;
+  font-size: 24px;
+  line-height: 1.25;
+}
+
+.erp-dev-relationship-guide__head > .ant-typography {
+  max-width: 600px;
+  line-height: 1.6;
+  text-align: right;
+}
+
+.erp-dev-relationship-list {
+  margin: 0;
+  padding: 0 22px;
+  list-style: none;
+}
+
+.erp-dev-relationship-item {
+  display: grid;
+  grid-template-columns: 176px minmax(0, 1fr) minmax(150px, auto);
+  gap: 18px;
+  align-items: start;
+  min-width: 0;
+  padding: 18px 0;
+  border-top: 1px solid #e7ece8;
+}
+
+.erp-dev-relationship-item:first-child {
+  border-top: 0;
+}
+
+.erp-dev-relationship-item__shape {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  align-self: start;
+  border: 1px solid #c7d9ca;
+  border-radius: 999px;
+  background: #f3f8f4;
+  padding: 5px 10px;
+  color: #326440;
+  font-size: 12px;
+  font-weight: 720;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.erp-dev-relationship-item__copy {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.erp-dev-relationship-item__copy h3.ant-typography {
+  margin: 0;
+  color: #1f2937;
+  font-size: 17px;
+  line-height: 1.35;
+}
+
+.erp-dev-relationship-item__question {
+  color: #334155;
+  line-height: 1.55;
+}
+
+.erp-dev-relationship-item__copy p.ant-typography {
+  margin: 0;
+  color: #475569;
+  line-height: 1.65;
+}
+
+.erp-dev-relationship-item__boundary {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.erp-dev-relationship-item__links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+  align-self: center;
+  max-width: 300px;
+}
+
+.erp-dev-relationship-item__link {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid #c7d9ca;
+  border-radius: 999px;
+  background: #fff;
+  padding: 6px 11px;
+  color: #246936;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.erp-dev-relationship-item__link:hover,
+.erp-dev-relationship-item__link:focus-visible {
+  border-color: #2b8a3e;
+  background: #edf7ef;
+  color: #17562a;
+  outline: 3px solid rgb(43 138 62 / 16%);
+  outline-offset: 2px;
+}
+
+.erp-dev-relationship-guide__boundary {
+  display: block;
+  padding: 13px 22px 16px;
+  border-top: 1px solid #e7ece8;
+  background: #fbfdfb;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .erp-dev-flow-concepts,
 .erp-dev-flow-definition-tools {
   width: 100%;
@@ -397,7 +584,26 @@
   border-bottom-color: var(--erp-border, #334155);
 }
 
+[data-erp-theme='dark'] .erp-dev-product-view-switcher {
+  border-bottom-color: var(--erp-border, #334155);
+  background: var(--erp-surface-bg-soft, #111827);
+}
+
+[data-erp-theme='dark']
+  .erp-dev-product-view-switcher__copy
+  > .ant-typography:first-child {
+  color: var(--erp-text, #e5edf5);
+}
+
+[data-erp-theme='dark'] .erp-dev-relationship-guide__head,
+[data-erp-theme='dark'] .erp-dev-relationship-guide__boundary {
+  border-color: var(--erp-border, #334155);
+  background: var(--erp-surface-bg-soft, #111827);
+}
+
 [data-erp-theme='dark'] .erp-dev-product-start__head h2.ant-typography,
+[data-erp-theme='dark'] .erp-dev-relationship-guide__head h2.ant-typography,
+[data-erp-theme='dark'] .erp-dev-relationship-item__copy h3.ant-typography,
 [data-erp-theme='dark'] .erp-dev-product-task__copy h3.ant-typography,
 [data-erp-theme='dark'] .erp-dev-flow-concepts > summary,
 [data-erp-theme='dark'] .erp-dev-flow-definition-tools > summary,
@@ -410,6 +616,16 @@
   border-top-color: var(--erp-border, #334155);
 }
 
+[data-erp-theme='dark'] .erp-dev-relationship-item {
+  border-top-color: var(--erp-border, #334155);
+}
+
+[data-erp-theme='dark'] .erp-dev-relationship-item__shape {
+  border-color: #4f7a5a;
+  background: #183320;
+  color: #bbf7d0;
+}
+
 [data-erp-theme='dark'] .erp-dev-product-task__index,
 [data-erp-theme='dark'] .erp-dev-product-task__details dl,
 [data-erp-theme='dark'] .erp-dev-docs-pinned-disclosure {
@@ -419,6 +635,8 @@
 }
 
 [data-erp-theme='dark'] .erp-dev-product-task__details > summary,
+[data-erp-theme='dark'] .erp-dev-relationship-item__question,
+[data-erp-theme='dark'] .erp-dev-relationship-item__copy p.ant-typography,
 [data-erp-theme='dark'] .erp-dev-prototypes-boundary-details > summary,
 [data-erp-theme='dark'] .erp-dev-prototypes-filter-details > summary,
 [data-erp-theme='dark'] .erp-dev-prototypes-reader__source-details > summary,
@@ -426,6 +644,19 @@
 [data-erp-theme='dark'] .erp-dev-product-task__details dd,
 [data-erp-theme='dark'] .erp-dev-prototypes-boundary-details > div {
   color: var(--erp-text-muted, #aebbb2);
+}
+
+[data-erp-theme='dark'] .erp-dev-relationship-item__link {
+  border-color: #4f7a5a;
+  background: #17271c;
+  color: #bbf7d0;
+}
+
+[data-erp-theme='dark'] .erp-dev-relationship-item__link:hover,
+[data-erp-theme='dark'] .erp-dev-relationship-item__link:focus-visible {
+  border-color: #73d13d;
+  background: #1f4529;
+  color: #dcfce7;
 }
 
 [data-erp-theme='dark'] .erp-dev-product-task__action {
@@ -473,7 +704,27 @@
 }
 
 @media (max-width: 960px) {
+  .erp-dev-product-view-switcher {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .erp-dev-product-view-tabs.erp-dev-task-nav,
+  .erp-dev-product-view-tabs.erp-dev-task-nav--compact {
+    display: grid;
+    flex-basis: auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: visible;
+  }
+
+  .erp-dev-product-view-tabs .erp-dev-task-nav__item,
+  .erp-dev-product-view-tabs.erp-dev-task-nav--compact .erp-dev-task-nav__item {
+    min-width: 0;
+    flex: 1 1 0;
+  }
+
   .erp-dev-product-start__head,
+  .erp-dev-relationship-guide__head,
   .erp-dev-flow-concepts > summary,
   .erp-dev-flow-definition-tools > summary {
     align-items: flex-start;
@@ -481,19 +732,37 @@
   }
 
   .erp-dev-product-start__head > .ant-typography,
+  .erp-dev-relationship-guide__head > .ant-typography,
   .erp-dev-flow-concepts > summary small,
   .erp-dev-flow-definition-tools > summary small {
     max-width: none;
     text-align: left;
   }
+
+  .erp-dev-relationship-item {
+    grid-template-columns: 150px minmax(0, 1fr);
+  }
+
+  .erp-dev-relationship-item__links {
+    grid-column: 2;
+    justify-content: flex-start;
+    max-width: none;
+  }
 }
 
 @media (max-width: 640px) {
-  .erp-dev-product-start__head {
+  .erp-dev-product-view-switcher {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .erp-dev-product-start__head,
+  .erp-dev-relationship-guide__head {
     padding: 16px;
   }
 
-  .erp-dev-product-start__head h2.ant-typography {
+  .erp-dev-product-start__head h2.ant-typography,
+  .erp-dev-relationship-guide__head h2.ant-typography {
     font-size: 21px;
   }
 
@@ -521,6 +790,33 @@
     width: 100%;
     min-height: 44px;
     margin-top: 2px;
+  }
+
+  .erp-dev-relationship-list {
+    padding: 0 16px;
+  }
+
+  .erp-dev-relationship-item {
+    grid-template-columns: 1fr;
+    gap: 9px;
+    padding: 17px 0;
+  }
+
+  .erp-dev-relationship-item__shape {
+    justify-self: start;
+  }
+
+  .erp-dev-relationship-item__links {
+    grid-column: 1;
+    width: 100%;
+  }
+
+  .erp-dev-relationship-item__link {
+    min-height: 42px;
+  }
+
+  .erp-dev-relationship-guide__boundary {
+    padding: 13px 16px 16px;
   }
 
   .erp-dev-flow-concepts > summary,

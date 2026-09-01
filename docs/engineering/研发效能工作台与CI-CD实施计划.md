@@ -4,12 +4,12 @@
 
 仓库与运行主链已从“GitHub 托管主链”切换为“R640 GitLab canonical + KVM Runner + GitHub Review mirror”。本计划只记录稳定合同和完成标准；当前 SHA、pipeline、Release、Runner 资源、backup/restore 和目标环境必须从对应真源实时读回，不从勾选或历史结论推导。
 
-| 状态 | 当前结论 | 证据 |
-| --- | --- | --- |
-| 仓库定义 | R640 分片 DAG、普通 CI evidence 复用、单次制品构建、冻结演练和 v2 Release 合同由正式代码/测试/文档守住 | `.gitlab-ci.yml`、CI/release 脚本、R640 cloud-init、工作台与合同测试 |
-| Git/远端 | GitLab `origin/main` 是 canonical，GitHub 是 protected-main 单向 mirror 和应急路径 | 当前结论以 exact remote SHA、protected branch 与 pipeline API 读回为准 |
+| 状态            | 当前结论                                                                                                        | 证据                                                                                                                                                                                       |
+| --------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 仓库定义        | R640 分片 DAG、普通 CI evidence 复用、单次制品构建、冻结演练和 v2 Release 合同由正式代码/测试/文档守住          | `.gitlab-ci.yml`、CI/release 脚本、R640 cloud-init、工作台与合同测试                                                                                                                       |
+| Git/远端        | GitLab `origin/main` 是 canonical，GitHub 是 protected-main 单向 mirror 和应急路径                              | 当前结论以 exact remote SHA、protected branch 与 pipeline API 读回为准                                                                                                                     |
 | R640/公网运行态 | GitLab、公网入口和独立 KVM Runner 已是实际主链；VM 资源由唯一 provisioning 入口参数化，槽位是独立的受控容量策略 | 每次 Pipeline 通过 root-owned helper 的窄只读 evidence 投影验证 live `concurrent=limit` 与服务状态，并读回 guest vCPU、内存、swap、磁盘；本次 exact-SHA aggregate 绿后才成为已验证容量证据 |
-| 业务目标 | `demo-133` 是项目方模拟数据环境，`customer-test-133` 是甲方干净测试/验收环境；二者均非生产 | 两目标同 digest、运行与数据完全隔离；未来 `erp` 需另行正式启用 |
+| 业务目标        | `demo-133` 是项目方模拟数据环境，`customer-test-133` 是甲方测试/验收环境；二者均非生产                          | 两目标同 digest、运行与数据完全隔离；test 普通部署保留数据，未来 `erp` 需另行正式启用                                                                                                      |
 
 任何本地绿色都不能改写远端、不可变制品、发布演练、目标部署或客户 UAT 层的状态。
 
@@ -43,14 +43,14 @@
 
 在取得部署授权后，重新只读检查并记录：
 
-| 事项 | 必须证明 | 停止条件 |
-| --- | --- | --- |
-| R640 存储 | `/srv` SSD 与 `/srv/raid5` 实际 mount、余量、inode、SMART/RAID 状态 | mount 不符、降级或余量不足 |
-| 现有容器 | 名称、端口、数据目录和 restart 状态 | 8929/2224 冲突或路径重叠 |
-| KVM | `/dev/kvm`、libvirt network、VM 磁盘与资源预算 | 需要复用 GitLab 宿主 Docker socket |
-| 公网 | DNS、阿里云现有 vhost、FRP remote 18226、证书与回滚配置 | 同名站点来源不明或切换不可回滚 |
-| GitLab 镜像 | digest 与目标 CE 版本、升级路径和备份兼容 | 浮动 tag 或不支持的跳版本 |
-| Secrets | root 初始化、MFA、Runner token、project token、GHCR token、mirror key 的最小权限 | token 需要进入仓库/浏览器/日志 |
+| 事项        | 必须证明                                                                         | 停止条件                           |
+| ----------- | -------------------------------------------------------------------------------- | ---------------------------------- |
+| R640 存储   | `/srv` SSD 与 `/srv/raid5` 实际 mount、余量、inode、SMART/RAID 状态              | mount 不符、降级或余量不足         |
+| 现有容器    | 名称、端口、数据目录和 restart 状态                                              | 8929/2224 冲突或路径重叠           |
+| KVM         | `/dev/kvm`、libvirt network、VM 磁盘与资源预算                                   | 需要复用 GitLab 宿主 Docker socket |
+| 公网        | DNS、阿里云现有 vhost、FRP remote 18226、证书与回滚配置                          | 同名站点来源不明或切换不可回滚     |
+| GitLab 镜像 | digest 与目标 CE 版本、升级路径和备份兼容                                        | 浮动 tag 或不支持的跳版本          |
+| Secrets     | root 初始化、MFA、Runner token、project token、GHCR token、mirror key 的最小权限 | token 需要进入仓库/浏览器/日志     |
 
 ## 目标搭建顺序
 
@@ -78,7 +78,7 @@
 
 ## 工作台验收
 
-- 默认 Provider 为 GitLab；无 `PLUSH_GITLAB_TOKEN` 时只显示服务端 Provider 不可用，不向浏览器暴露 token、原始 header 或内部栈。
+- 默认 Provider 为 GitLab；无 `PLUSH_GITLAB_READ_TOKEN` 时版本目录与流水线证据保持不可用，无短期 `PLUSH_GITLAB_TOKEN` 时仍可只读查看但不能创建新发布。两类 token 均不向浏览器暴露原始值、header 或内部栈。
 - 版本列表只接受固定 GitLab project 的 `artifact-<40sha>` Release；只有 v2 七资产与同一演练回执完整时才可 promotion，v1 六资产只读/回滚且 `promotionEligible=false`。
 - 质量工程只把当前 committed SHA 的普通 push CI 投影为服务器证据，必须包含 plan、prepare、七分片、aggregate 和 `CI Gate`；Local dirty 和本地回执单独展示。
 - 版本中心 pipeline 只接受固定 GitLab URL、合法状态、时间和 job；无 step 数据显示空列表，不估算。版本与部署只展示真实不可变 Release/Package 和 target operation。
@@ -100,23 +100,23 @@
 当前可执行 target 是 `demo-133` 与 `customer-test-133`：
 
 - `demo.yoyoosun.net`：项目方造数、演练、培训和回归，允许经受控流程重建 seed / fixture / 模拟数据。
-- `test.yoyoosun.net`：甲方测试与验收；每轮交付前按正式 rebuild 合同恢复干净业务基线，由甲方自行录入真实测试数据。
+- `test.yoyoosun.net`：甲方测试与验收；普通部署默认保留现有数据，开始新一轮测试时可通过独立 rebuild operation 恢复干净业务基线。
 - `erp.yoyoosun.net`：未来生产，尚未启用，不能提前进入工作台或流水线可执行目标。
 
 demo 与 test 共享同一 Product Core 与不可变 release digest，不复制代码或字段真源；数据库、上传、Compose project、端口、runtime env、备份、rollback point、operation 与 smoke 全部独立。demo 造数不得污染 test，test 重建不得影响 demo。
 
-`admin.yoyoosun.net` 不属于部署环境，只能按应用自身管理入口语义存在；它不进入 CI/CD 环境矩阵、target registry、数据清理、健康检查、发布验证或回滚。当前目标登记也不代表已执行 test 数据清理；写入前仍要实时绑定数据类别、保留项、备份和恢复证明。
+根域 `yoyoosun.net` 临时使用 `302` 跳转到 `https://erp.yoyoosun.net`；这不启用未来生产 target。`admin.yoyoosun.net` 退役后不进入 CI/CD 环境矩阵、target registry、数据清理、健康检查、发布验证或回滚。当前目标登记与普通 promotion 都不代表已执行 test 数据清理；只有独立 rebuild operation 才携带清理意图。
 
 ## 回滚与停止条件
 
-| 故障层 | 回滚/处置 | 禁止动作 |
-| --- | --- | --- |
+| 故障层                  | 回滚/处置                                                  | 禁止动作                            |
+| ----------------------- | ---------------------------------------------------------- | ----------------------------------- |
 | GitLab 容器首次启动失败 | 保留 `/srv/gitlab` 和日志，修正单一配置或回到已固定 digest | 删除 data/config、全局 Docker prune |
-| 公网入口失败 | 恢复备份的阿里云 vhost/FRP upstream，GitLab LAN 入口保持 | 临时开放 8929 公网 |
-| Runner 不可信 | pause/delete Runner token，保留 GitLab；重建一次性 VM | 改挂宿主 Docker socket |
-| mirror 异常 | pause push mirror，GitLab main 继续作为真源 | 从 GitHub 强推覆盖 GitLab |
-| release 身份不一致 | 终止 job，保留 package/release 证据，使用新版本修复 | 覆盖同名 asset/tag 或猜 digest |
-| backup/restore 未通过 | 阻断 GitLab 升级和正式依赖切换 | 把 RAID 健康当恢复证据 |
+| 公网入口失败            | 恢复备份的阿里云 vhost/FRP upstream，GitLab LAN 入口保持   | 临时开放 8929 公网                  |
+| Runner 不可信           | pause/delete Runner token，保留 GitLab；重建一次性 VM      | 改挂宿主 Docker socket              |
+| mirror 异常             | pause push mirror，GitLab main 继续作为真源                | 从 GitHub 强推覆盖 GitLab           |
+| release 身份不一致      | 终止 job，保留 package/release 证据，使用新版本修复        | 覆盖同名 asset/tag 或猜 digest      |
+| backup/restore 未通过   | 阻断 GitLab 升级和正式依赖切换                             | 把 RAID 健康当恢复证据              |
 
 遇到以下任一条件立即停止：目标身份/挂载漂移、活动 writer/部署、端口重叠、备份不可验证、secret 可能落盘/输出、Runner 需要越过 VM、GitLab/GitHub 同时发布、release SHA 与 main 不一致、目标结果 `not_proven`、或需要数据库/域名破坏性动作但没有独立授权。
 

@@ -233,7 +233,7 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     commands: [
       'cd /Users/simon/projects/plush-toy-erp',
       'PATH=/usr/local/bin:$PATH node --test web/src/dev-workbench/config/devCustomerConfig.test.mjs web/src/erp/config/printTemplates.test.mjs scripts/qa/dev-entry-boundary.test.mjs',
-      'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=dev-customer-config-dark-desktop pnpm --dir web style:l1',
+      'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=dev-page-customer-config-desktop-light pnpm --dir web style:l1',
     ],
   },
   {
@@ -244,7 +244,7 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     commands: [
       'cd /Users/simon/projects/plush-toy-erp',
       'PATH=/usr/local/bin:$PATH node --test web/src/dev-workbench/config/devPrototypes.test.mjs web/src/dev-workbench/config/devHub.test.mjs',
-      'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=dev-prototypes-dark-desktop pnpm --dir web style:l1',
+      'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=dev-page-prototypes-desktop-light pnpm --dir web style:l1',
     ],
   },
   {
@@ -255,7 +255,7 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     commands: [
       'cd /Users/simon/projects/plush-toy-erp',
       'PATH=/usr/local/bin:$PATH node --test web/src/dev-workbench/config/devDocs.test.mjs web/src/dev-workbench/config/devGovernance.test.mjs web/src/dev-workbench/config/devHub.test.mjs',
-      'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=dev-hub-dark-desktop,dev-docs-dark-desktop,dev-governance-dark-desktop pnpm --dir web style:l1',
+      'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=dev-page-overview-desktop-light,dev-page-docs-desktop-light,dev-page-governance-desktop-light pnpm --dir web style:l1',
     ],
   },
   {

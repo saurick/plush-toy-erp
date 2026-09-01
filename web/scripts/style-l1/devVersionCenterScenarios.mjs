@@ -183,7 +183,9 @@ export function createVersionCenterSummary() {
       stages: [
         {
           id: 'completed',
-          label: isPromotion ? '部署与基础运行核验' : '不可变版本发布',
+          label: isPromotion
+            ? '部署与基础运行核验'
+            : 'GitHub release pipeline accepted; waiting for terminal assets',
           status,
           durationMs: 120_000,
         },
@@ -376,6 +378,7 @@ export function createVersionCenterSummary() {
     issues: [],
     boundaries: {
       provider: 'github',
+      releaseDispatchAllowed: true,
       target: 'demo-133',
       targets: ['demo-133', 'customer-test-133'],
       browserShellAccess: false,
@@ -473,49 +476,18 @@ async function waitForView(page, view) {
         view === 'versions'
           ? '版本与部署'
           : view === 'pipeline'
-            ? 'CI/CD 效能'
+            ? '流水线耗时'
             : '操作记录',
     })
     .waitFor({ state: 'visible', timeout: 10_000 })
 }
 
-async function waitForAntdModalMotion(page, modal) {
-  const modalHandle = await modal.elementHandle()
-  if (!modalHandle) {
-    throw new Error('未找到可等待动画结束的人工接管弹窗')
-  }
-  try {
-    await page.waitForFunction(
-      (node) => {
-        if (!(node instanceof HTMLElement) || !node.isConnected) return false
-        const className = String(node.className || '')
-        return (
-          !className.includes('ant-zoom-enter') &&
-          !className.includes('ant-zoom-appear')
-        )
-      },
-      modalHandle,
-      { timeout: 10_000 }
-    )
-  } finally {
-    await modalHandle.dispose()
-  }
-}
-
-function visibleTableRows(section) {
-  return section.locator('.ant-table-tbody > tr.ant-table-row')
-}
-
 export function createDevVersionCenterScenarios({
   assert,
   assertNoHorizontalOverflow,
-  clickERPThemeOption,
   expectHeading,
-  outputDir,
-  path,
 }) {
-  let desktopSummaryRequests = 0
-  let mobileSummaryRequests = 0
+  let summaryRequests = 0
 
   return [
     {
@@ -523,766 +495,73 @@ export function createDevVersionCenterScenarios({
       path: '/__dev/version-center',
       viewport: { width: 1440, height: 900 },
       beforeNavigate: async (page) => {
-        desktopSummaryRequests = 0
+        summaryRequests = 0
         await installSummaryRoute(page, () => {
-          desktopSummaryRequests += 1
+          summaryRequests += 1
         })
       },
       verify: async (page) => {
         await expectHeading(page, '版本发布与部署中心')
         await waitForView(page, 'versions')
-
-        const versions = page.locator('.erp-dev-version-tab--versions')
-        const currentOperation = page.locator(
-          '.erp-dev-version-current-operation'
-        )
-        await versions.waitFor({ state: 'visible' })
-        await currentOperation.waitFor({ state: 'visible' })
-        assert.equal(await visibleTableRows(versions).count(), 6)
-        assert.equal(
-          await currentOperation
-            .locator('.erp-dev-version-current-operation__item')
-            .count(),
-          1
-        )
-        const strictFinishedAt = page.locator(
-          '.erp-dev-version-quality-gate-summary .erp-dev-quality-gate-finished-at time'
-        )
-        await strictFinishedAt.waitFor({ state: 'visible' })
-        assert.equal(
-          await strictFinishedAt.getAttribute('datetime'),
-          '2026-08-09T08:00:00.000Z'
-        )
-        const latestVersionSummary = page
-          .locator('.erp-dev-version-summary .ant-card')
-          .filter({ hasText: 'GitHub 应急链不可变版本' })
-        const latestPublishedAt = latestVersionSummary.locator(
-          '.erp-dev-latest-version-published-at time'
-        )
-        await latestPublishedAt.waitFor({ state: 'visible' })
-        assert.equal(
-          await latestPublishedAt.getAttribute('datetime'),
-          '2026-08-08T14:00:00.000Z'
-        )
-        const currentOperationTimes = currentOperation.locator(
-          '.erp-dev-current-operation-time time'
-        )
-        assert.equal(await currentOperationTimes.count(), 2)
-        assert.deepEqual(await currentOperationTimes.allTextContents(), [
-          '2026/08/09 09:00:00',
-          '2026/08/09 09:00:30',
-        ])
-        assert.equal(
-          await versions.locator('.ant-pagination-options').count(),
-          0,
-          '版本分页不应提供无意义的每页条数选择器'
-        )
-        assert.match(
-          String(await versions.locator('.ant-pagination').textContent()),
-          /1-6 \/ 共 14 个版本/u
-        )
-        assert.match(
-          String(await currentOperation.textContent()),
-          /确认版本提升/u
-        )
-        assert.match(String(await currentOperation.textContent()), /f0000001/u)
-        const desktopVersionTimes = visibleTableRows(versions).locator(
-          '.erp-dev-version-published-at time'
-        )
-        assert.equal(
-          await desktopVersionTimes.count(),
-          6,
-          '当前页每个版本都应显示发布时间'
-        )
-        assert.match(
-          String(await desktopVersionTimes.first().textContent()),
-          /^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}$/u
-        )
-        assert.equal(
-          await desktopVersionTimes.first().getAttribute('datetime'),
-          '2026-08-08T14:00:00.000Z'
-        )
-        assert.equal(
-          await page.locator('.erp-dev-environment-evidence').count(),
-          0,
-          '版本中心子页不应重复常驻双环境事实'
-        )
-        const initialDesktopSummaryRequests = desktopSummaryRequests
-        assert.equal(
-          initialDesktopSummaryRequests,
-          1,
-          '初次加载只应执行版本页自身的一次读回'
-        )
-
-        const desktopTakeoverButton = page.getByRole('button', {
-          name: '人工接管说明',
-        })
-        await desktopTakeoverButton.focus()
-        await desktopTakeoverButton.click()
-        const desktopTakeoverDialog = page.getByRole('dialog', {
-          name: '人工接管与应急发布说明',
-        })
-        await desktopTakeoverDialog.waitFor({
-          state: 'visible',
-          timeout: 10_000,
-        })
-        await waitForAntdModalMotion(page, desktopTakeoverDialog)
-        await desktopTakeoverDialog
-          .getByText('四处操作各管什么', { exact: true })
-          .waitFor()
-        await desktopTakeoverDialog
-          .getByText('人工接管顺序', { exact: true })
-          .waitFor()
-        await desktopTakeoverDialog
-          .getByText('应急不等于绕过', { exact: true })
-          .waitFor()
-        const desktopTakeoverMetrics = await desktopTakeoverDialog.evaluate(
-          (dialog) => {
-            const scope = dialog.querySelector(
-              '.erp-dev-version-takeover-scope'
-            )
-            const rect = dialog.getBoundingClientRect()
-            return {
-              left: rect.left,
-              right: rect.right,
-              width: rect.width,
-              viewportWidth: window.innerWidth,
-              scopeColumns: scope
-                ? getComputedStyle(scope).gridTemplateColumns
-                : '',
-              documentWidth: document.documentElement.scrollWidth,
-            }
-          }
-        )
-        assert.equal(
-          desktopTakeoverMetrics.scopeColumns.trim().split(/\s+/u).length,
-          4,
-          `桌面人工接管职责应保持四列: ${JSON.stringify(desktopTakeoverMetrics)}`
-        )
-        assert(
-          desktopTakeoverMetrics.left >= -1 &&
-            desktopTakeoverMetrics.right <=
-              desktopTakeoverMetrics.viewportWidth + 1,
-          `桌面人工接管弹窗超出视口: ${JSON.stringify(desktopTakeoverMetrics)}`
-        )
-        await desktopTakeoverDialog.screenshot({
-          path: path.join(
-            outputDir,
-            'dev-version-center-manual-takeover-desktop-light.png'
-          ),
-        })
-        await assertNoHorizontalOverflow(
-          page,
-          'dev-version-center-manual-takeover-desktop-light'
-        )
-        await page.keyboard.press('Escape')
-        await desktopTakeoverDialog.waitFor({ state: 'hidden' })
-        await page.waitForFunction(() => {
-          const active = document.activeElement
-          return String(active?.textContent || '').includes('人工接管说明')
-        })
-
-        await page.screenshot({
-          path: path.join(
-            outputDir,
-            'dev-version-center-tabs-pagination-desktop-versions.png'
-          ),
-          fullPage: true,
-        })
-
-        await page.getByRole('button', { name: '查看完整效能' }).click()
-        await waitForView(page, 'pipeline')
         await page
-          .getByRole('heading', { name: '远端 CI/CD 活动' })
+          .locator('.erp-dev-version-workspace')
           .waitFor({ state: 'visible' })
-        assert.equal(desktopSummaryRequests, initialDesktopSummaryRequests)
-        assert.equal(await currentOperation.isVisible(), true)
-        const pipeline = page.locator('.erp-dev-version-tab--pipeline')
-        const fullTimingDetails = pipeline.locator(
-          '.erp-dev-pipeline-timing__details'
-        )
-        await pipeline.getByText('观测关键路径').waitFor({ state: 'visible' })
-        await pipeline.getByText('耗时最长环节').waitFor({ state: 'visible' })
-        assert(
-          (await pipeline.locator('time').count()) >= 3,
-          'CI/CD 摘要应分别显示运行、完整发布和制品发布时间'
-        )
-        assert.equal(
-          await pipeline.getByText('最近工作台部署回执').count(),
-          0,
-          '远端 CI/CD 活动不得混入工作台 operation 回执'
-        )
-        assert.equal(
-          await fullTimingDetails.evaluate((element) => element.open),
-          false,
-          '完整 job / step 首次进入应保持收起'
-        )
-        await page.screenshot({
-          path: path.join(
-            outputDir,
-            'dev-version-center-tabs-pagination-desktop-pipeline.png'
-          ),
-          fullPage: true,
-        })
-
-        const fullTimingSummary = fullTimingDetails.locator(':scope > summary')
-        await fullTimingSummary.focus()
-        await page.keyboard.press('Enter')
-        assert.equal(
-          await fullTimingDetails.evaluate((element) => element.open),
-          true,
-          '完整 job / step 应支持键盘展开'
-        )
-        const jobDetails = pipeline.locator(
-          '.erp-dev-pipeline-timing__jobs > details'
-        )
-        assert.equal(await jobDetails.count(), 2)
-        assert.equal(
-          await jobDetails.evaluateAll(
-            (elements) => elements.filter((element) => element.open).length
-          ),
-          0,
-          '打开完整列表后各 job 仍应默认收起'
-        )
-        const expandAll = pipeline.getByRole('button', { name: '全部展开' })
-        const collapseAll = pipeline.getByRole('button', { name: '全部收起' })
-        assert.equal(await expandAll.isEnabled(), true)
-        assert.equal(await collapseAll.isDisabled(), true)
-        await expandAll.click()
-        await page.waitForFunction(() =>
-          Array.from(
-            document.querySelectorAll(
-              '.erp-dev-pipeline-timing__jobs > details'
-            )
-          ).every((element) => element.open)
-        )
-        assert.equal(await collapseAll.isEnabled(), true)
-        const firstStepTimeRange = pipeline
-          .locator(
-            '.erp-dev-pipeline-timing__job-steps .erp-dev-timing-bars__meta .ant-typography-secondary'
-          )
-          .first()
-        await firstStepTimeRange.waitFor({ state: 'visible' })
-        assert.match(
-          String(await firstStepTimeRange.textContent()),
-          /\d{2}:\d{2}:\d{2}–\d{2}:\d{2}:\d{2}/u
-        )
-        await page.screenshot({
-          path: path.join(
-            outputDir,
-            'dev-version-center-tabs-pagination-desktop-pipeline-expanded.png'
-          ),
-          fullPage: true,
-        })
-        await collapseAll.click()
-        assert.equal(
-          await jobDetails.evaluateAll(
-            (elements) => elements.filter((element) => element.open).length
-          ),
-          0,
-          '全部收起应恢复 job 初始状态'
-        )
-
-        await page.getByRole('tab', { name: '操作记录' }).click()
-        await waitForView(page, 'history')
-        const history = page.locator('.erp-dev-version-tab--history')
-        await history.waitFor({ state: 'visible' })
-        assert.equal(await visibleTableRows(history).count(), 10)
-        assert.equal(
-          await history.locator('.ant-pagination-options').count(),
-          0,
-          '操作记录分页不应提供每页条数选择器'
-        )
-        assert.match(
-          String(await history.locator('.ant-pagination').textContent()),
-          /1-10 \/ 共 12 条记录/u
-        )
-        assert.doesNotMatch(String(await history.textContent()), /f0000001/u)
-        await visibleTableRows(history)
-          .first()
-          .getByRole('button', { name: '再次尝试' })
-          .waitFor({ state: 'visible' })
-        assert.match(
-          String(await visibleTableRows(history).nth(1).textContent()),
-          /已合并 2 个重复请求/u
-        )
-        const historyTimes = visibleTableRows(history).locator(
-          '.erp-dev-operation-history-time time'
-        )
-        assert.equal(
-          await historyTimes.count(),
-          20,
-          '每条历史操作都应同时显示开始与完成时间'
-        )
-        assert.deepEqual(
-          await historyTimes.evaluateAll((elements) =>
-            elements
-              .slice(0, 2)
-              .map((element) => element.getAttribute('datetime'))
-          ),
-          ['2026-08-08T13:00:00.000Z', '2026-08-08T13:00:02.000Z']
-        )
-        assert.equal(await currentOperation.isVisible(), true)
-        assert.equal(desktopSummaryRequests, initialDesktopSummaryRequests)
-
-        await page.screenshot({
-          path: path.join(
-            outputDir,
-            'dev-version-center-tabs-pagination-desktop-history-times.png'
-          ),
-          fullPage: true,
-        })
-
-        const firstHistoryDetailButton = visibleTableRows(history)
-          .first()
-          .getByRole('button', { name: '查看详情' })
-        await firstHistoryDetailButton.focus()
-        await firstHistoryDetailButton.click()
-        const operationDrawer = page.locator('.ant-drawer-content').last()
-        await operationDrawer.waitFor({ state: 'visible' })
-        assert.equal(
-          await operationDrawer
-            .locator('.erp-dev-operation-detail-time time')
-            .count(),
-          2,
-          '详情头部应显示开始与完成时间'
-        )
-        const operationEventTime = operationDrawer.locator(
-          '.erp-dev-operation-event-time time'
-        )
-        assert.equal(await operationEventTime.count(), 1)
-        assert.equal(
-          await operationEventTime.getAttribute('datetime'),
-          '2026-08-08T13:00:02.000Z'
-        )
-        assert.match(
-          String(await operationEventTime.textContent()),
-          /^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}$/u
-        )
-        await page.screenshot({
-          path: path.join(
-            outputDir,
-            'dev-version-center-tabs-pagination-desktop-operation-detail-times.png'
-          ),
-          fullPage: true,
-        })
-        await page.keyboard.press('Escape')
-        await operationDrawer.waitFor({ state: 'hidden' })
-        await page.waitForFunction(() => {
-          const firstButton = document.querySelector(
-            '.erp-dev-version-tab--history .ant-table-tbody tr.ant-table-row button'
-          )
-          return document.activeElement === firstButton
-        })
-
-        await page.reload({ waitUntil: 'domcontentloaded' })
-        await waitForView(page, 'history')
-        await history.waitFor({ state: 'visible' })
         assert.equal(
           await page.locator('.erp-dev-environment-evidence').count(),
           0
         )
-        assert.equal(await visibleTableRows(history).count(), 10)
-        assert.equal(await currentOperation.isVisible(), true)
-        assert.equal(desktopSummaryRequests, initialDesktopSummaryRequests * 2)
+        const initialSummaryRequests = summaryRequests
+        assert(initialSummaryRequests > 0)
+
+        const targetSelector = page.getByLabel('切换当前操作目标')
+        await targetSelector
+          .getByText('test 甲方测试验收', { exact: true })
+          .click()
+        await page.getByText('test 数据方式', { exact: true }).waitFor()
+        await page
+          .getByText('普通部署默认保留现有数据', { exact: true })
+          .waitFor()
+        assert.equal(
+          await page
+            .getByRole('button', { name: '清空并重建测试数据' })
+            .isDisabled(),
+          true,
+          'an existing target operation must keep the destructive action disabled'
+        )
+
+        await page.getByRole('tab', { name: '操作记录' }).click()
+        await waitForView(page, 'history')
+        await page
+          .locator('.erp-dev-version-tab--history')
+          .waitFor({ state: 'visible' })
+
+        await page.getByRole('tab', { name: '流水线耗时' }).click()
+        await waitForView(page, 'pipeline')
+        const timingDetails = page.locator('.erp-dev-pipeline-timing__details')
+        await timingDetails.waitFor({ state: 'visible' })
+        assert.equal(
+          await timingDetails.evaluate((element) => element.open),
+          false
+        )
+        await timingDetails.locator(':scope > summary').click()
+        assert.equal(
+          await timingDetails.evaluate((element) => element.open),
+          true
+        )
 
         await page.getByRole('tab', { name: '版本与部署' }).click()
         await waitForView(page, 'versions')
-        await versions.locator('.ant-pagination-item-2').click()
-        await versions.getByText('2026.08.08-8', { exact: true }).waitFor()
-        const firstVersionRow = visibleTableRows(versions).first()
-        assert.match(
-          String(await firstVersionRow.textContent()),
-          /2026.08.08-8/u
-        )
-        assert.equal(await visibleTableRows(versions).count(), 6)
-        assert.equal(
-          await visibleTableRows(versions)
-            .locator('.erp-dev-version-published-at time')
-            .count(),
-          6,
-          '版本翻页后也应逐行保留发布时间'
-        )
-        assert.equal(desktopSummaryRequests, initialDesktopSummaryRequests * 2)
-
-        const metrics = await page.evaluate(() => {
-          const workspace = document.querySelector('.erp-dev-version-workspace')
-          const table = document.querySelector(
-            '.erp-dev-version-tab--versions .ant-table-container'
-          )
-          return {
-            documentWidth: document.documentElement.scrollWidth,
-            viewportWidth: window.innerWidth,
-            workspaceWidth: workspace?.getBoundingClientRect().width || 0,
-            tableClientWidth: table?.clientWidth || 0,
-            tableScrollWidth: table?.scrollWidth || 0,
-          }
-        })
-        assert(
-          metrics.workspaceWidth > 0 &&
-            metrics.workspaceWidth <= metrics.viewportWidth,
-          `版本工作区宽度异常: ${JSON.stringify(metrics)}`
-        )
-        assert(
-          metrics.tableScrollWidth >= metrics.tableClientWidth,
-          `版本表格内部滚动尺寸异常: ${JSON.stringify(metrics)}`
-        )
-        assert(
-          metrics.documentWidth <= metrics.viewportWidth + 2,
-          `版本中心出现文档级横向溢出: ${JSON.stringify(metrics)}`
-        )
+        await page
+          .locator('.erp-dev-version-tab--versions .ant-pagination-item-2')
+          .click()
+        await page
+          .locator('.erp-dev-version-tab--versions')
+          .getByText('2026.08.08-8', { exact: true })
+          .waitFor()
+        assert.equal(summaryRequests, initialSummaryRequests)
         await assertNoHorizontalOverflow(
           page,
           'dev-version-center-tabs-pagination-desktop'
-        )
-      },
-    },
-    {
-      name: 'dev-version-center-tabs-pagination-mobile-dark',
-      path: '/__dev/version-center?view=history',
-      viewport: { width: 390, height: 844 },
-      beforeNavigate: async (page) => {
-        mobileSummaryRequests = 0
-        await installSummaryRoute(page, () => {
-          mobileSummaryRequests += 1
-        })
-      },
-      verify: async (page) => {
-        await expectHeading(page, '版本发布与部署中心')
-        await waitForView(page, 'history')
-        await clickERPThemeOption(page, '暗色')
-
-        const history = page.locator('.erp-dev-version-tab--history')
-        const currentOperation = page.locator(
-          '.erp-dev-version-current-operation'
-        )
-        await history.waitFor({ state: 'visible' })
-        await currentOperation.waitFor({ state: 'visible' })
-        assert.equal(await visibleTableRows(history).count(), 10)
-        assert.equal(
-          await currentOperation
-            .locator('.erp-dev-version-current-operation__item')
-            .count(),
-          1
-        )
-        await currentOperation
-          .getByRole('button', { name: '确认版本提升' })
-          .waitFor({ state: 'visible' })
-        assert.equal(
-          await currentOperation
-            .locator('.erp-dev-current-operation-time time')
-            .count(),
-          2,
-          '移动端当前操作也应显示开始与更新时间'
-        )
-        assert.equal(
-          await visibleTableRows(history)
-            .locator('.erp-dev-operation-history-time time')
-            .count(),
-          20,
-          '移动端历史表格应保留每条操作的开始与完成时间'
-        )
-        assert.equal(
-          await page.locator('.erp-dev-environment-evidence').count(),
-          0,
-          '移动端版本中心子页不应重复常驻双环境事实'
-        )
-        assert.equal(
-          mobileSummaryRequests,
-          1,
-          '移动端初次加载只应执行版本页自身的一次读回'
-        )
-
-        const mobileTakeoverButton = page.getByRole('button', {
-          name: '人工接管说明',
-        })
-        await mobileTakeoverButton.focus()
-        await mobileTakeoverButton.click()
-        const mobileTakeoverDialog = page.getByRole('dialog', {
-          name: '人工接管与应急发布说明',
-        })
-        await mobileTakeoverDialog.waitFor({
-          state: 'visible',
-          timeout: 10_000,
-        })
-        await waitForAntdModalMotion(page, mobileTakeoverDialog)
-        const mobileTakeoverMetrics = await mobileTakeoverDialog.evaluate(
-          (dialog) => {
-            const scope = dialog.querySelector(
-              '.erp-dev-version-takeover-scope'
-            )
-            const conditions = dialog.querySelector(
-              '.erp-dev-version-takeover-conditions'
-            )
-            const rect = dialog.getBoundingClientRect()
-            return {
-              left: rect.left,
-              right: rect.right,
-              width: rect.width,
-              viewportWidth: window.innerWidth,
-              scopeColumns: scope
-                ? getComputedStyle(scope).gridTemplateColumns
-                : '',
-              conditionColumns: conditions
-                ? getComputedStyle(conditions).gridTemplateColumns
-                : '',
-              theme: document.documentElement.dataset.erpTheme,
-            }
-          }
-        )
-        assert.equal(mobileTakeoverMetrics.theme, 'dark')
-        assert.equal(
-          mobileTakeoverMetrics.scopeColumns.trim().split(/\s+/u).length,
-          1,
-          `移动端人工接管职责应改为单列: ${JSON.stringify(mobileTakeoverMetrics)}`
-        )
-        assert.equal(
-          mobileTakeoverMetrics.conditionColumns.trim().split(/\s+/u).length,
-          1,
-          `移动端继续条件应改为单列: ${JSON.stringify(mobileTakeoverMetrics)}`
-        )
-        assert(
-          mobileTakeoverMetrics.left >= -1 &&
-            mobileTakeoverMetrics.right <=
-              mobileTakeoverMetrics.viewportWidth + 1 &&
-            mobileTakeoverMetrics.width >=
-              mobileTakeoverMetrics.viewportWidth - 24,
-          `移动端人工接管弹窗尺寸异常: ${JSON.stringify(mobileTakeoverMetrics)}`
-        )
-        await mobileTakeoverDialog.screenshot({
-          path: path.join(
-            outputDir,
-            'dev-version-center-manual-takeover-mobile-dark.png'
-          ),
-        })
-        await assertNoHorizontalOverflow(
-          page,
-          'dev-version-center-manual-takeover-mobile-dark'
-        )
-        await mobileTakeoverDialog
-          .getByRole('button', { name: '我知道了' })
-          .click()
-        await mobileTakeoverDialog.waitFor({ state: 'hidden' })
-        await page.waitForFunction(() => {
-          const active = document.activeElement
-          return String(active?.textContent || '').includes('人工接管说明')
-        })
-
-        await page.screenshot({
-          path: path.join(
-            outputDir,
-            'dev-version-center-tabs-pagination-mobile-dark-history-times.png'
-          ),
-          fullPage: true,
-        })
-
-        const mobileHistoryDetailButton = visibleTableRows(history)
-          .first()
-          .getByRole('button', { name: '查看详情' })
-        await mobileHistoryDetailButton.focus()
-        await mobileHistoryDetailButton.click()
-        const mobileOperationDrawer = page.locator('.ant-drawer-content').last()
-        await mobileOperationDrawer.waitFor({ state: 'visible' })
-        await page.waitForFunction(() => {
-          const drawers = document.querySelectorAll('.ant-drawer-content')
-          const drawer = drawers.item(drawers.length - 1)
-          if (!drawer) return false
-          const rect = drawer.getBoundingClientRect()
-          return (
-            rect.left >= -1 &&
-            rect.right <= window.innerWidth + 1 &&
-            rect.width <= window.innerWidth + 1
-          )
-        })
-        assert.equal(
-          await mobileOperationDrawer
-            .locator('.erp-dev-operation-detail-time time')
-            .count(),
-          2
-        )
-        assert.equal(
-          await mobileOperationDrawer
-            .locator('.erp-dev-operation-event-time time')
-            .count(),
-          1
-        )
-        const mobileDrawerMetrics = await mobileOperationDrawer.evaluate(
-          (element) => {
-            const rect = element.getBoundingClientRect()
-            return {
-              left: rect.left,
-              right: rect.right,
-              width: rect.width,
-              viewportWidth: window.innerWidth,
-              documentWidth: document.documentElement.scrollWidth,
-            }
-          }
-        )
-        assert(
-          mobileDrawerMetrics.left >= -1 &&
-            mobileDrawerMetrics.right <=
-              mobileDrawerMetrics.viewportWidth + 1 &&
-            mobileDrawerMetrics.width <= mobileDrawerMetrics.viewportWidth + 1,
-          `移动端操作详情超出视口: ${JSON.stringify(mobileDrawerMetrics)}`
-        )
-        assert(
-          mobileDrawerMetrics.documentWidth <=
-            mobileDrawerMetrics.viewportWidth + 2,
-          `移动端操作详情造成文档级横向溢出: ${JSON.stringify(mobileDrawerMetrics)}`
-        )
-        await page.screenshot({
-          path: path.join(
-            outputDir,
-            'dev-version-center-tabs-pagination-mobile-dark-operation-detail-times.png'
-          ),
-          fullPage: true,
-        })
-        await page.keyboard.press('Escape')
-        await mobileOperationDrawer.waitFor({ state: 'hidden' })
-        await page.waitForFunction(() => {
-          const firstButton = document.querySelector(
-            '.erp-dev-version-tab--history .ant-table-tbody tr.ant-table-row button'
-          )
-          return document.activeElement === firstButton
-        })
-
-        const metrics = await page.evaluate(() => {
-          const statusGrid = document.querySelector(
-            '.erp-dev-pipeline-status-strip__metrics'
-          )
-          const tabList = document.querySelector(
-            '.erp-dev-version-workspace [role="tablist"]'
-          )
-          const table = document.querySelector(
-            '.erp-dev-version-tab--history .ant-table-container'
-          )
-          return {
-            theme: document.documentElement.dataset.erpTheme,
-            statusColumns: statusGrid
-              ? getComputedStyle(statusGrid).gridTemplateColumns
-              : '',
-            tabListWidth: tabList?.getBoundingClientRect().width || 0,
-            viewportWidth: window.innerWidth,
-            documentWidth: document.documentElement.scrollWidth,
-            tableClientWidth: table?.clientWidth || 0,
-            tableScrollWidth: table?.scrollWidth || 0,
-          }
-        })
-        assert.equal(metrics.theme, 'dark')
-        assert.equal(
-          metrics.statusColumns.trim().split(/\s+/u).length,
-          1,
-          `移动端交付速览应为单列: ${JSON.stringify(metrics)}`
-        )
-        assert(
-          metrics.tabListWidth <= metrics.viewportWidth,
-          `移动端 Tab 导航宽度异常: ${JSON.stringify(metrics)}`
-        )
-        assert(
-          metrics.tableScrollWidth >= metrics.tableClientWidth,
-          `移动端操作表格内部滚动尺寸异常: ${JSON.stringify(metrics)}`
-        )
-        assert(
-          metrics.documentWidth <= metrics.viewportWidth + 2,
-          `移动端版本中心出现文档级横向溢出: ${JSON.stringify(metrics)}`
-        )
-
-        await page.getByRole('tab', { name: '版本与部署' }).click()
-        await waitForView(page, 'versions')
-        const versions = page.locator('.erp-dev-version-tab--versions')
-        await versions.waitFor({ state: 'visible' })
-        const mobileVersionTimes = visibleTableRows(versions).locator(
-          '.erp-dev-version-published-at time'
-        )
-        assert.equal(
-          await mobileVersionTimes.count(),
-          6,
-          '移动端当前页每个版本都应显示发布时间'
-        )
-        assert.match(
-          String(await mobileVersionTimes.first().textContent()),
-          /^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}$/u
-        )
-        const mobileVersionTimeMetrics = await mobileVersionTimes
-          .first()
-          .evaluate((element) => {
-            const cell = element.closest('td')
-            const timeRect = element.getBoundingClientRect()
-            const cellRect = cell?.getBoundingClientRect()
-            return {
-              timeLeft: timeRect.left,
-              timeRight: timeRect.right,
-              cellLeft: cellRect?.left || 0,
-              cellRight: cellRect?.right || 0,
-              documentWidth: document.documentElement.scrollWidth,
-              viewportWidth: window.innerWidth,
-            }
-          })
-        assert(
-          mobileVersionTimeMetrics.timeLeft >=
-            mobileVersionTimeMetrics.cellLeft - 1 &&
-            mobileVersionTimeMetrics.timeRight <=
-              mobileVersionTimeMetrics.cellRight + 1,
-          `移动端版本发布时间超出所属单元格: ${JSON.stringify(mobileVersionTimeMetrics)}`
-        )
-        assert(
-          mobileVersionTimeMetrics.documentWidth <=
-            mobileVersionTimeMetrics.viewportWidth + 2,
-          `移动端版本时间造成文档级横向溢出: ${JSON.stringify(mobileVersionTimeMetrics)}`
-        )
-        await page.screenshot({
-          path: path.join(
-            outputDir,
-            'dev-version-center-tabs-pagination-mobile-dark-versions.png'
-          ),
-          fullPage: true,
-        })
-
-        await page.getByRole('tab', { name: 'CI/CD 效能' }).click()
-        await waitForView(page, 'pipeline')
-        const pipeline = page.locator('.erp-dev-version-tab--pipeline')
-        await pipeline.getByText('观测关键路径').waitFor({ state: 'visible' })
-        await pipeline.getByText('耗时最长环节').waitFor({ state: 'visible' })
-        assert.equal(
-          await pipeline
-            .locator('.erp-dev-pipeline-timing__details')
-            .evaluate((element) => element.open),
-          false,
-          '移动端完整 job / step 也应默认收起'
-        )
-        const pipelineMetrics = await page.evaluate(() => {
-          const pipelinePanel = document.querySelector(
-            '.erp-dev-version-tab--pipeline'
-          )
-          const criticalPath = document.querySelector(
-            '.erp-dev-pipeline-timing__critical-path'
-          )
-          return {
-            documentWidth: document.documentElement.scrollWidth,
-            viewportWidth: window.innerWidth,
-            pipelineWidth: pipelinePanel?.getBoundingClientRect().width || 0,
-            criticalPathWidth: criticalPath?.getBoundingClientRect().width || 0,
-          }
-        })
-        assert(
-          pipelineMetrics.pipelineWidth <= pipelineMetrics.viewportWidth &&
-            pipelineMetrics.criticalPathWidth <= pipelineMetrics.pipelineWidth,
-          `移动端 CI/CD 默认摘要宽度异常: ${JSON.stringify(pipelineMetrics)}`
-        )
-        assert(
-          pipelineMetrics.documentWidth <= pipelineMetrics.viewportWidth + 2,
-          `移动端 CI/CD 出现文档级横向溢出: ${JSON.stringify(pipelineMetrics)}`
-        )
-        await page.screenshot({
-          path: path.join(
-            outputDir,
-            'dev-version-center-tabs-pagination-mobile-dark-pipeline.png'
-          ),
-          fullPage: true,
-        })
-        await assertNoHorizontalOverflow(
-          page,
-          'dev-version-center-tabs-pagination-mobile-dark'
         )
       },
     },

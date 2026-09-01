@@ -68,16 +68,19 @@ test("candidate freeze binds a passed strict terminal to the exact SHA", () => {
   );
 });
 
-test("candidate freeze runs one fixed contract matrix and both workbench themes", () => {
+test("candidate freeze runs one fixed contract matrix and one desktop workbench smoke", () => {
   const plan = buildCandidateFreezePlan("/repo");
   assert.deepEqual(
     plan.map((step) => step.id),
-    ["contract_matrix", "workbench_light_dark"],
+    ["contract_matrix", "workbench_desktop"],
   );
   assert.deepEqual(
     plan[1].env.STYLE_L1_SCENARIOS.split(","),
     CANDIDATE_SHA_FREEZE_SCENARIOS,
   );
+  assert.deepEqual(CANDIDATE_SHA_FREEZE_SCENARIOS, [
+    "dev-version-center-tabs-pagination-desktop",
+  ]);
   assert.equal(
     CANDIDATE_SHA_FREEZE_TESTS.includes(
       "scripts/deploy/github-strict-terminal-reuse.test.mjs",

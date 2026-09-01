@@ -57,6 +57,18 @@ test("gate profiles prove coverage hierarchy without duplicate executions", () =
   assert(
     PROFILE_REQUIRED_EXECUTABLES.full.includes("scripts/purchase-return-pg.sh"),
   );
+  assert(
+    PROFILE_REQUIRED_FILES.fast.length <= 20,
+    "fast required inventory must stay limited to direct gate entrypoints",
+  );
+  assert(
+    PROFILE_REQUIRED_FILES.full.length <= 30,
+    "full required inventory must not copy its transitive test topology",
+  );
+  assert(
+    PROFILE_REQUIRED_FILES.strict.length <= 35,
+    "strict required inventory must remain a bounded entrypoint inventory",
+  );
 });
 
 test("all current required files exist for every profile", () => {
@@ -91,15 +103,13 @@ test("full and strict require a real web test script", () => {
   }
 });
 
-test("a deleted required test fails closed", () => {
+test("a deleted direct gate entrypoint fails closed", () => {
   const emptyRoot = mkdtempSync(path.join(os.tmpdir(), "plush-gate-required-"));
   try {
     const result = validateProfileFiles("fast", emptyRoot);
     assert.equal(result.ok, false);
-    assert(
-      result.missing.includes("scripts/qa/critical-postgres-gate.test.mjs"),
-    );
-    assert(result.missing.includes("scripts/qa/secrets.test.mjs"));
+    assert(result.missing.includes("scripts/qa/fast.sh"));
+    assert(result.missing.includes("scripts/qa/node-test-groups.mjs"));
   } finally {
     rmSync(emptyRoot, { recursive: true, force: true });
   }
@@ -171,9 +181,7 @@ test("commit tree validation does not trust a restored worktree file", () => {
     });
     assert.equal(result.ok, false);
     assert(!result.missing.includes(".githooks/pre-push"));
-    assert(
-      result.missing.includes("scripts/qa/critical-postgres-gate.test.mjs"),
-    );
+    assert(result.missing.includes("scripts/qa/fast.sh"));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -209,13 +217,16 @@ test("index transition rejects required deletion, mode loss, and symlink typecha
     result = validateProfileIndexTransition("fast", root);
     assert(result.nonExecutable.includes(".githooks/pre-push"));
 
-    assert(result.missing.includes(".github/workflows/ci.yml"));
-    const workflow = path.join(root, ".github/workflows/ci.yml");
-    mkdirSync(path.dirname(workflow), { recursive: true });
-    writeFileSync(workflow, "name: fixture\n", "utf8");
-    git(root, ["add", ".github/workflows/ci.yml"]);
+    assert(result.missing.includes("scripts/qa/node-test-groups.mjs"));
+    const nodeGroups = path.join(root, "scripts/qa/node-test-groups.mjs");
+    mkdirSync(path.dirname(nodeGroups), { recursive: true });
+    writeFileSync(nodeGroups, "export const NODE_TEST_GROUPS = {};\n", "utf8");
+    git(root, ["add", "scripts/qa/node-test-groups.mjs"]);
     result = validateProfileIndexTransition("fast", root);
-    assert.equal(result.missing.includes(".github/workflows/ci.yml"), false);
+    assert.equal(
+      result.missing.includes("scripts/qa/node-test-groups.mjs"),
+      false,
+    );
 
     rmSync(hook);
     symlinkSync("pre-push-target", hook);

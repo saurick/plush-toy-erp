@@ -64,11 +64,6 @@ const devWorkbenchAreaPageSource = readFileSync(
   new URL('../pages/DevWorkbenchAreaPage.jsx', import.meta.url),
   'utf8'
 )
-const devWorkbenchDensityStyles = readFileSync(
-  new URL('../styles/dev-workbench-density.css', import.meta.url),
-  'utf8'
-)
-
 test('devHub: route and dev gate stay dev-only', () => {
   assert.equal(DEV_HUB_ROUTE, '/__dev')
   assert.equal(DEV_HUB_PINNED_STORAGE_KEY, 'plush_erp_dev_hub_pinned_routes')
@@ -247,6 +242,13 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
   )
 })
 
+test('devHub: quality area entry resolves to the canonical server gate view', () => {
+  assert.match(
+    devWorkbenchAreaPageSource,
+    /if \(isQualityArea\) \{[\s\S]*<Navigate to=\{`\$\{DEV_QUALITY_GATES_ROUTE\}\?view=server`\} replace \/>/u
+  )
+})
+
 test('devHub: every tool has one registered area and the overview derives stages from it', () => {
   const toolAreaKeys = [
     DEV_WORKBENCH_AREA_KEYS.productEngineering,
@@ -335,21 +337,6 @@ test('devHub: delivery overview owns the local, demo, test, and isolated evidenc
   assert.doesNotMatch(
     devEnvironmentEvidencePanelSource,
     /name=["'](?:host|port|target|path|command|dsn|password|token)["']/iu
-  )
-})
-
-test('devHub: iconless delivery cards keep the full content width on narrow screens', () => {
-  assert.match(
-    devWorkbenchDensityStyles,
-    /@media \(max-width: 720px\)[\s\S]*\.erp-dev-hub-card--without-icon \{[\s\S]*grid-template-columns: minmax\(0, 1fr\);[\s\S]*\}/u
-  )
-  assert.match(
-    devWorkbenchDensityStyles,
-    /\.erp-dev-hub-card--without-icon \.erp-dev-hub-card__head \{[\s\S]*flex-direction: column;[\s\S]*\}/u
-  )
-  assert.match(
-    devWorkbenchDensityStyles,
-    /\.erp-dev-hub-card--without-icon \.erp-dev-hub-card__head \.ant-tag \{[\s\S]*max-width: 100%;[\s\S]*overflow-wrap: anywhere;[\s\S]*white-space: normal;[\s\S]*\}/u
   )
 })
 

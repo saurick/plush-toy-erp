@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-import { spawn } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import path from 'node:path'
 import process from 'node:process'
+import { promisify } from 'node:util'
 import { pathToFileURL } from 'node:url'
 
 import { loadDevPorts } from '../../scripts/dev-ports.mjs'
@@ -10,6 +11,56 @@ import { resolveDevBrowserLaunchEnv } from './openDevBrowser.js'
 
 const repoRoot = path.resolve(import.meta.dirname, '..', '..')
 const devPorts = loadDevPorts(repoRoot)
+const execFileAsync = promisify(execFile)
+
+export const DEV_GITLAB_KEYCHAIN = Object.freeze({
+  account: 'simon',
+  service: 'plush-toy-erp.gitlab-read-api',
+})
+
+function normalizeGitlabToken(value) {
+  const token = String(value || '').trim()
+  if (!token) return ''
+  if (token.length > 512 || /[\r\n]/u.test(token)) {
+    throw new Error('GitLab 只读凭据格式无效')
+  }
+  return token
+}
+
+async function readGitlabTokenFromKeychain() {
+  const { stdout } = await execFileAsync(
+    'security',
+    [
+      'find-generic-password',
+      '-w',
+      '-s',
+      DEV_GITLAB_KEYCHAIN.service,
+      '-a',
+      DEV_GITLAB_KEYCHAIN.account,
+    ],
+    { encoding: 'utf8', maxBuffer: 1024 }
+  )
+  return stdout
+}
+
+export async function resolveDevGitlabCredential({
+  env = process.env,
+  platform = process.platform,
+  readKeychain = readGitlabTokenFromKeychain,
+} = {}) {
+  const inherited = normalizeGitlabToken(env.PLUSH_GITLAB_READ_TOKEN)
+  if (inherited) return { source: 'environment', token: inherited }
+  if (platform !== 'darwin') return { source: 'missing', token: '' }
+  try {
+    const token = normalizeGitlabToken(await readKeychain())
+    return token
+      ? { source: 'keychain', token }
+      : { source: 'missing', token: '' }
+  } catch (error) {
+    if (error?.message === 'GitLab 只读凭据格式无效') throw error
+    return { source: 'missing', token: '' }
+  }
+}
 
 export function parseStartWebDevArgs(argv, env = process.env) {
   const viteArgs = []
@@ -28,16 +79,20 @@ export function parseStartWebDevArgs(argv, env = process.env) {
   }
 }
 
-function runVite(viteArgs, apiOrigin) {
+function runVite(viteArgs, apiOrigin, gitlabCredential) {
+  const childEnvironment = {
+    ...process.env,
+    ...resolveDevBrowserLaunchEnv(process.env),
+    API_ORIGIN: apiOrigin,
+  }
+  if (gitlabCredential.token) {
+    childEnvironment.PLUSH_GITLAB_READ_TOKEN = gitlabCredential.token
+  }
   const child = spawn(
     'pnpm',
     ['exec', 'vite', '--config', 'vite.config.mjs', ...viteArgs],
     {
-      env: {
-        ...process.env,
-        ...resolveDevBrowserLaunchEnv(process.env),
-        API_ORIGIN: apiOrigin,
-      },
+      env: childEnvironment,
       stdio: 'inherit',
     }
   )
@@ -57,7 +112,11 @@ function runVite(viteArgs, apiOrigin) {
 async function main() {
   const options = parseStartWebDevArgs(process.argv.slice(2))
   const result = await runWebRuntimePreflight(options)
-  runVite(options.viteArgs, result.apiOrigin)
+  const gitlabCredential = await resolveDevGitlabCredential()
+  if (gitlabCredential.source === 'keychain') {
+    process.stderr.write('[start-web] GitLab 只读凭据已从 macOS 钥匙串加载\n')
+  }
+  runVite(options.viteArgs, result.apiOrigin, gitlabCredential)
 }
 
 const isDirectRun =

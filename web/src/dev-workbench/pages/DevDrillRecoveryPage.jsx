@@ -554,7 +554,7 @@ export default function DevDrillRecoveryPage() {
                     navigateWithinCustomerScope(DEV_VERSION_CENTER_ROUTE)
                   }
                 >
-                  查看版本中心的人工接管说明
+                  查看版本中心的手动操作指引
                 </Button>
               </div>
             </div>

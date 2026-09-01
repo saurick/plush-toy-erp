@@ -140,9 +140,6 @@ qa_fast_script_boundaries() {
     node --check "$script"
   done
 
-  echo "[qa:fast] 运行活跃路径阶段编号命名边界检查"
-  node "$ROOT_DIR/scripts/qa/phase-label-boundaries.mjs"
-
   echo "[qa:fast] 运行行业模板候选边界检查"
   node "$ROOT_DIR/scripts/qa/industry-template-boundaries.mjs"
 

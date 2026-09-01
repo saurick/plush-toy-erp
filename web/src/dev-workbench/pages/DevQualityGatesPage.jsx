@@ -39,6 +39,7 @@ import {
   VIEW_ITEMS,
   buildQualityGateCoverageMatrix,
   buildQualityGateHistoryTrend,
+  buildQualityGateServerTiming,
   buildQualityGateStageDurationComposition,
   buildQualityGateViewSearch,
   createDevQualityGateClient,
@@ -55,6 +56,7 @@ const { Link, Paragraph, Text, Title } = Typography
 const POLL_INTERVAL_MS = 1500
 const SOURCE_PATH = 'scripts/qa/README.md'
 const EMPTY_VIEW_STATE = Object.freeze({
+  server: Object.freeze({}),
   run: Object.freeze({ profile: '', operation: '' }),
   governance: Object.freeze({ q: '', filter: 'relevant' }),
   gaps: Object.freeze({ range: 'current', risk: 'all' }),
@@ -339,9 +341,7 @@ function renderGovernanceEvidence(row) {
         {
           key: 'median',
           label: '中位数',
-          children: formatQualityGateDuration(
-            row.statistics?.medianDurationMs
-          ),
+          children: formatQualityGateDuration(row.statistics?.medianDurationMs),
         },
         {
           key: 'slower',
@@ -398,11 +398,14 @@ function operationUpdateAction(operation) {
   return operation?.finishedAt ? '完成于' : '更新于'
 }
 
-function ContextStrip({ summary, view, onReturnRun }) {
+function ContextStrip({ summary, view, summaryError, onReturnLocal }) {
   const serverEvidence = summary?.serverEvidence
-  const serverStatus =
-    SERVER_EVIDENCE_STATUS[serverEvidence?.status] ||
-    SERVER_EVIDENCE_STATUS.unavailable
+  const serverStatus = serverEvidence
+    ? SERVER_EVIDENCE_STATUS[serverEvidence.status] ||
+      SERVER_EVIDENCE_STATUS.unavailable
+    : summaryError
+      ? SERVER_EVIDENCE_STATUS.pageUnavailable
+      : SERVER_EVIDENCE_STATUS.loading
   const serverLabel = serverEvidence?.pipeline?.id
     ? `${serverStatus.label} · #${serverEvidence.pipeline.id}`
     : serverStatus.label
@@ -454,8 +457,8 @@ function ContextStrip({ summary, view, onReturnRun }) {
         </div>
       </dl>
       {view !== 'run' && summary?.currentOperation?.profile === 'strict' ? (
-        <Button type="link" onClick={onReturnRun}>
-          返回运行
+        <Button type="link" onClick={onReturnLocal}>
+          查看本机运行
         </Button>
       ) : null}
     </section>
@@ -463,12 +466,322 @@ function ContextStrip({ summary, view, onReturnRun }) {
 }
 
 const SERVER_EVIDENCE_STATUS = Object.freeze({
-  passed: Object.freeze({ label: '普通 CI 已通过', color: 'success' }),
-  running: Object.freeze({ label: '普通 CI 运行中', color: 'processing' }),
-  failed: Object.freeze({ label: '普通 CI 未通过', color: 'error' }),
-  missing: Object.freeze({ label: '当前 SHA 无记录', color: 'default' }),
-  unavailable: Object.freeze({ label: '服务器证据不可读', color: 'default' }),
+  loading: Object.freeze({
+    label: '正在读取',
+    color: 'processing',
+    alert: 'info',
+  }),
+  passed: Object.freeze({
+    label: '普通 CI 已通过',
+    color: 'success',
+    alert: 'success',
+  }),
+  running: Object.freeze({
+    label: '普通 CI 运行中',
+    color: 'processing',
+    alert: 'info',
+  }),
+  failed: Object.freeze({
+    label: '普通 CI 未通过',
+    color: 'error',
+    alert: 'error',
+  }),
+  missing: Object.freeze({
+    label: '连接正常 · 当前提交无 CI',
+    color: 'warning',
+    alert: 'info',
+  }),
+  unavailable: Object.freeze({
+    label: 'GitLab 读取失败',
+    color: 'error',
+    alert: 'warning',
+  }),
+  pageUnavailable: Object.freeze({
+    label: '页面状态读取失败',
+    color: 'error',
+    alert: 'error',
+  }),
 })
+const SERVER_JOB_STATUS = Object.freeze({
+  success: '通过',
+  failure: '失败',
+  cancelled: '取消',
+  skipped: '跳过',
+})
+const SERVER_PIPELINE_JOB_STATUS = Object.freeze({
+  passed: '已通过',
+  failed: '未通过',
+  running: '运行中',
+  pending: '等待运行',
+  cancelled: '已取消',
+  skipped: '已跳过',
+  not_run: '未形成记录',
+  missing: '未产生 CI 记录',
+  unavailable: '读取失败',
+})
+const SERVER_PIPELINE_JOB_LEGEND = Object.freeze([
+  'passed',
+  'running',
+  'pending',
+  'failed',
+  'cancelled',
+  'skipped',
+  'not_run',
+  'missing',
+  'unavailable',
+])
+const SERVER_HISTORY_STATUS = Object.freeze({
+  queued: Object.freeze({ label: '等待运行', color: 'processing' }),
+  running: Object.freeze({ label: '运行中', color: 'processing' }),
+  passed: Object.freeze({ label: '已通过', color: 'success' }),
+  failed: Object.freeze({ label: '未通过', color: 'error' }),
+  cancelled: Object.freeze({ label: '已取消', color: 'default' }),
+  skipped: Object.freeze({ label: '已跳过', color: 'default' }),
+})
+
+function qualityGateViewStatus(summary, view, summaryError) {
+  if (view !== 'server') return summary?.status
+  const evidence = summary?.serverEvidence
+  if (!evidence) {
+    return summaryError
+      ? {
+          tone: 'error',
+          title: 'R640 页面状态读取失败',
+          description: summaryError,
+          recommendation: '确认本机开发服务可用后刷新状态。',
+          notProven: [],
+        }
+      : {
+          tone: 'info',
+          title: 'R640 正在读取服务器证据',
+          description: '正在读取当前提交的 GitLab CI 证据。',
+          recommendation: '',
+          notProven: [],
+        }
+  }
+  const status =
+    SERVER_EVIDENCE_STATUS[evidence.status] ||
+    SERVER_EVIDENCE_STATUS.unavailable
+  return {
+    tone: status.alert,
+    title: `R640 ${status.label}`,
+    description: evidence?.message || '正在读取当前提交的服务器门禁证据。',
+    recommendation:
+      evidence?.status === 'passed'
+        ? '优先查看排队耗时与最长主路径 Job；未提交改动请切换到“本机诊断”定位。'
+        : evidence?.status === 'running'
+          ? '等待当前服务器流水线结束；页面不会用本机回执替代服务器结果。'
+          : evidence?.status === 'missing'
+            ? '读取链路无需修复；该提交产生普通 push CI 后，页面才会出现服务器运行结果。'
+            : '先恢复 GitLab 读取链路，再核对当前 SHA 的服务器证据。',
+    notProven: evidence?.notProven || [],
+  }
+}
+
+function ServerJobTimingRows({ jobs }) {
+  return (
+    <ol className="erp-dev-quality-server-evidence__job-list">
+      {jobs.map((job) => (
+        <li key={job.id} className="erp-dev-quality-server-evidence__job-row">
+          <Text
+            className="erp-dev-quality-server-evidence__job-name"
+            type={job.conclusion === 'failure' ? 'danger' : undefined}
+          >
+            {job.name} ·{' '}
+            {SERVER_JOB_STATUS[job.conclusion] ||
+              SERVER_PIPELINE_JOB_STATUS[job.flowStatus] ||
+              '状态未证明'}
+          </Text>
+          <div
+            className="erp-dev-quality-server-evidence__job-track"
+            aria-hidden="true"
+          >
+            <span
+              style={{
+                '--quality-server-job-width': `${job.relativePercent || 0}%`,
+              }}
+            />
+          </div>
+          <Text type="secondary">
+            {job.durationMs === null
+              ? '尚未完成'
+              : formatQualityGateDuration(job.durationMs)}
+          </Text>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+function serverHistoryFailureLabel(jobName) {
+  return jobName || '—'
+}
+
+function ServerCiHistory({ evidence, currentCommit }) {
+  const history = Array.isArray(evidence?.history) ? evidence.history : []
+  return (
+    <section
+      className="erp-dev-quality-server-history"
+      aria-labelledby="r640-ci-history-title"
+    >
+      <div className="erp-dev-quality-server-history__heading">
+        <div>
+          <Title level={3} id="r640-ci-history-title">
+            最近 CI
+          </Title>
+          <Text type="secondary">
+            GitLab 最近读取到的普通 push CI；历史结果不代表当前提交已通过。
+          </Text>
+        </div>
+        <Tag>{history.length} 条</Tag>
+      </div>
+      {history.length ? (
+        <div className="erp-dev-quality-server-history__table-wrap">
+          <table
+            className="erp-dev-quality-server-history__table"
+            aria-label="最近普通 push CI 历史"
+          >
+            <thead>
+              <tr>
+                <th scope="col">结果</th>
+                <th scope="col">提交</th>
+                <th scope="col">时间</th>
+                <th scope="col">总耗时</th>
+                <th scope="col">失败环节</th>
+                <th scope="col">详情</th>
+              </tr>
+            </thead>
+            <tbody>
+              {history.map((run) => {
+                const presentation =
+                  SERVER_HISTORY_STATUS[run.result] ||
+                  SERVER_HISTORY_STATUS.failed
+                const current = run.gitSha === currentCommit
+                return (
+                  <tr key={run.id} data-current={current ? 'true' : undefined}>
+                    <td data-label="结果">
+                      <Tag color={presentation.color}>{presentation.label}</Tag>
+                    </td>
+                    <td data-label="提交">
+                      <Space size={6} wrap>
+                        <Text code>{shortCommit(run.gitSha)}</Text>
+                        {current ? <Tag color="blue">当前提交</Tag> : null}
+                      </Space>
+                    </td>
+                    <td data-label="时间">
+                      <DevTimestamp
+                        value={run.finishedAt || run.createdAt}
+                        action={run.finishedAt ? '完成于' : '创建于'}
+                      />
+                    </td>
+                    <td data-label="总耗时">
+                      <Text>{formatQualityGateDuration(run.durationMs)}</Text>
+                    </td>
+                    <td data-label="失败环节">
+                      <Text type={run.failureJob ? 'danger' : 'secondary'}>
+                        {serverHistoryFailureLabel(run.failureJob)}
+                      </Text>
+                    </td>
+                    <td data-label="详情">
+                      <Link href={run.url} target="_blank" rel="noreferrer">
+                        查看 #{run.id}
+                      </Link>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description={
+            evidence?.status === 'unavailable'
+              ? 'GitLab 读取失败，历史 CI 暂不可用'
+              : '尚无可展示的普通 push CI 历史'
+          }
+        />
+      )}
+    </section>
+  )
+}
+
+function ServerCiPipelineFlow({ timing }) {
+  const visibleStatuses = new Set(timing.flowJobs.map((job) => job.status))
+  return (
+    <section
+      className="erp-dev-quality-server-pipeline"
+      aria-labelledby="r640-pipeline-flow-title"
+    >
+      <div className="erp-dev-quality-server-pipeline__heading">
+        <div>
+          <Text id="r640-pipeline-flow-title" strong>
+            本次 GitLab Pipeline Jobs
+          </Text>
+          <Text type="secondary">
+            Job 名称、状态与耗时直接来自当前 GitLab 流水线。
+          </Text>
+        </div>
+        <Text type="secondary">
+          工作台不复制 CI DAG，新增或调整 Job 时以服务端读回为准。
+        </Text>
+      </div>
+      <div className="erp-dev-quality-server-pipeline__track">
+        <section className="erp-dev-quality-server-pipeline__phase">
+          <div className="erp-dev-quality-server-pipeline__nodes">
+            {timing.flowJobs.map((job) => (
+              <article
+                key={job.id}
+                className={`erp-dev-quality-server-pipeline__node erp-dev-quality-server-pipeline__status--${job.status}`}
+                data-status={job.status}
+              >
+                <div className="erp-dev-quality-server-pipeline__node-heading">
+                  <span
+                    className="erp-dev-quality-server-pipeline__status-indicator"
+                    aria-hidden="true"
+                  />
+                  <Text
+                    className="erp-dev-quality-server-pipeline__node-text"
+                    code
+                    strong
+                  >
+                    {job.name}
+                  </Text>
+                </div>
+                <Text
+                  className="erp-dev-quality-server-pipeline__node-text"
+                  type="secondary"
+                >
+                  {job.durationMs === null
+                    ? SERVER_PIPELINE_JOB_STATUS[job.status] || '状态未证明'
+                    : `${SERVER_PIPELINE_JOB_STATUS[job.status] || '状态未证明'} · ${formatQualityGateDuration(job.durationMs)}`}
+                </Text>
+              </article>
+            ))}
+          </div>
+        </section>
+      </div>
+      <div className="erp-dev-quality-server-pipeline__legend">
+        {SERVER_PIPELINE_JOB_LEGEND.filter((status) =>
+          visibleStatuses.has(status)
+        ).map((status) => (
+          <span
+            key={status}
+            className={`erp-dev-quality-server-pipeline__legend-item erp-dev-quality-server-pipeline__status--${status}`}
+            data-status={status}
+          >
+            <i
+              className="erp-dev-quality-server-pipeline__status-indicator"
+              aria-hidden="true"
+            />
+            {SERVER_PIPELINE_JOB_STATUS[status]}
+          </span>
+        ))}
+      </div>
+    </section>
+  )
+}
 
 function ServerCiEvidencePanel({ summary }) {
   const evidence = summary?.serverEvidence
@@ -476,6 +789,9 @@ function ServerCiEvidencePanel({ summary }) {
   const status =
     SERVER_EVIDENCE_STATUS[evidence.status] ||
     SERVER_EVIDENCE_STATUS.unavailable
+  const timing = buildQualityGateServerTiming(evidence)
+  const highlightedJobs = timing.jobs.slice(0, 3)
+  const remainingJobs = timing.jobs.slice(3)
   return (
     <section
       className="erp-dev-quality-server-evidence"
@@ -485,15 +801,32 @@ function ServerCiEvidencePanel({ summary }) {
         <div className="erp-dev-quality-server-evidence__heading-copy">
           <Title level={2}>R640 服务器门禁</Title>
           <Text type="secondary">
-            正式主路径 · 当前提交的普通 push CI、七个固定分片、聚合回执与 CI Gate
+            正式主路径 · 当前提交的普通 push CI、实际 Job、聚合回执与 CI Gate
           </Text>
         </div>
         <Space wrap size={6}>
           <Tag color="blue">正式主路径</Tag>
+          <Tag color={evidence.status === 'unavailable' ? 'error' : 'success'}>
+            {evidence.status === 'unavailable'
+              ? 'GitLab 读取失败'
+              : 'GitLab 读取正常'}
+          </Tag>
           <Tag color={status.color}>{status.label}</Tag>
         </Space>
       </div>
+      <ServerCiPipelineFlow timing={timing} />
       <div className="erp-dev-quality-server-evidence__facts">
+        <div>
+          <Text type="secondary">证据读取</Text>
+          <Text
+            strong
+            type={evidence.status === 'unavailable' ? 'danger' : undefined}
+          >
+            {evidence.status === 'unavailable'
+              ? 'GitLab API 失败'
+              : 'GitLab API 正常'}
+          </Text>
+        </div>
         <div>
           <Text type="secondary">绑定提交</Text>
           <Text code>{shortCommit(evidence.gitSha)}</Text>
@@ -501,21 +834,35 @@ function ServerCiEvidencePanel({ summary }) {
         <div>
           <Text type="secondary">流水线</Text>
           {evidence.pipeline?.url ? (
-            <Link
-              href={evidence.pipeline.url}
-              target="_blank"
-              rel="noreferrer"
-            >
+            <Link href={evidence.pipeline.url} target="_blank" rel="noreferrer">
               #{evidence.pipeline.id}
             </Link>
           ) : (
-            <Text>尚未证明</Text>
+            <Text>
+              {evidence.status === 'missing'
+                ? '当前提交未触发 CI'
+                : evidence.status === 'unavailable'
+                  ? '读取失败'
+                  : '尚未证明'}
+            </Text>
           )}
         </div>
         <div>
           <Text type="secondary">服务器总耗时</Text>
+          <Text strong>{formatQualityGateDuration(timing.wallClockMs)}</Text>
+        </div>
+        <div>
+          <Text type="secondary">排队耗时</Text>
+          <Text strong>{formatQualityGateDuration(timing.queueMs)}</Text>
+        </div>
+        <div>
+          <Text type="secondary">最长主路径 Job</Text>
           <Text strong>
-            {formatQualityGateDuration(evidence.pipeline?.durationMs)}
+            {timing.longestJob
+              ? `${timing.longestJob.name} · ${formatQualityGateDuration(
+                  timing.longestJob.durationMs
+                )}`
+              : '尚未形成'}
           </Text>
         </div>
         <div>
@@ -527,20 +874,30 @@ function ServerCiEvidencePanel({ summary }) {
         </div>
       </div>
       <Text>{evidence.message}</Text>
-      {evidence.jobs.length ? (
-        <details className="erp-dev-quality-server-evidence__jobs">
-          <summary>查看服务器 job 耗时</summary>
-          <Space wrap size={[6, 6]}>
-            {evidence.jobs.map((job) => (
-              <Tag
-                key={job.id}
-                color={job.conclusion === 'success' ? 'success' : 'error'}
-              >
-                {job.name} · {formatQualityGateDuration(job.durationMs)}
-              </Tag>
-            ))}
-          </Space>
-        </details>
+      {timing.jobs.length ? (
+        <section
+          className="erp-dev-quality-server-evidence__timing"
+          aria-labelledby="r640-job-timing-title"
+        >
+          <div className="erp-dev-quality-server-evidence__timing-heading">
+            <Text id="r640-job-timing-title" strong>
+              最慢主路径 Job
+            </Text>
+            <Text type="secondary">条长相对最长主路径 Job，不是总耗时占比</Text>
+          </div>
+          <ServerJobTimingRows jobs={highlightedJobs} />
+          {remainingJobs.length ? (
+            <details className="erp-dev-quality-server-evidence__jobs">
+              <summary>展开其余 {remainingJobs.length} 个 Job</summary>
+              <ServerJobTimingRows jobs={remainingJobs} />
+            </details>
+          ) : null}
+          <Text type="secondary">
+            并行 Job
+            可能互相重叠，不能累加推算服务器墙钟时间；优化时优先检查最长主路径
+            Job 与排队耗时。
+          </Text>
+        </section>
       ) : null}
       <Text type="secondary">
         证据分层：服务器只证明已提交 SHA；本机 dirty 状态与本地回执不会被覆盖。
@@ -548,6 +905,10 @@ function ServerCiEvidencePanel({ summary }) {
           ? ` 尚未证明：${evidence.notProven.join('、')}。`
           : ''}
       </Text>
+      <ServerCiHistory
+        evidence={evidence}
+        currentCommit={summary?.repository?.commit || ''}
+      />
     </section>
   )
 }
@@ -1015,10 +1376,7 @@ function GateExecutionFlow({ summary, operation, profile }) {
               <Text strong>{group.label}</Text>
               <Tag>{group.scopeLabel}</Tag>
             </div>
-            <ol
-              className="erp-dev-quality-flow__track"
-              style={{ '--quality-flow-columns': group.stages.length }}
-            >
+            <ol className="erp-dev-quality-flow__track">
               {group.stages.map((stage) => {
                 const displayStatus = flowStageStatus(stage, operation)
                 const status =
@@ -1078,6 +1436,93 @@ function GateExecutionFlow({ summary, operation, profile }) {
       </div>
       <StageDurationComposition stages={stages} />
       <TerminalEvidence operation={operation} />
+    </section>
+  )
+}
+
+function LocalDiagnosticsActions({
+  summary,
+  initialLoading,
+  canRun,
+  actionProfile,
+  onStart,
+}) {
+  return (
+    <section className="erp-dev-quality-actions" aria-label="本机质量诊断操作">
+      <div className="erp-dev-quality-actions__heading">
+        <div>
+          <Text strong>本机诊断（按需）</Text>
+          <Text type="secondary">
+            用于定位当前工作区问题；正式 main 门禁由推送后的 R640 CI 执行。
+          </Text>
+        </div>
+        <Tag>不替代服务器 CI</Tag>
+      </div>
+      <div className="erp-dev-quality-actions__buttons">
+        <div className="erp-dev-quality-actions__primary">
+          <Button
+            size="large"
+            disabled={!canRun}
+            loading={actionProfile === 'strict'}
+            onClick={() => onStart('strict')}
+          >
+            运行本机严格诊断
+          </Button>
+          <Tooltip
+            title="严格门禁比完整门禁多检查工具链、Shell 与 YAML，并生成绑定当前仓库身份的正式回执；若工作区有未提交改动，结果只证明当前工作区，不能作为干净 exact SHA 的发布证明。"
+            placement="bottom"
+            trigger={['hover', 'focus']}
+          >
+            <Button
+              type="text"
+              shape="circle"
+              size="small"
+              className="erp-dev-quality-actions__help"
+              icon={<QuestionCircleOutlined />}
+              aria-label="什么时候运行本机严格诊断"
+            />
+          </Tooltip>
+        </div>
+        <Button
+          size="large"
+          disabled={!canRun}
+          loading={actionProfile === 'full'}
+          onClick={() => onStart('full')}
+        >
+          运行本机完整诊断
+        </Button>
+      </div>
+      <div className="erp-dev-quality-actions__durations">
+        <Text>
+          本机严格诊断：按需定位严格门禁问题 · 最近实际耗时{' '}
+          {formatQualityGateDuration(profileDuration(summary, 'strict'))}
+        </Text>
+        <Text>
+          本机完整诊断：按需定位完整门禁问题 · 最近实际耗时{' '}
+          {formatQualityGateDuration(profileDuration(summary, 'full'))}
+        </Text>
+      </div>
+      {!initialLoading && summary?.environment ? (
+        <div className="erp-dev-quality-actions__environment">
+          <Tag
+            color={
+              summary.environment.disposableDatabaseReady
+                ? 'success'
+                : 'warning'
+            }
+          >
+            {summary.environment.disposableDatabaseReady
+              ? '运行环境已就绪'
+              : '运行环境未就绪'}
+          </Tag>
+          <Text type="secondary">
+            {summary.environment.disposableDatabaseReady
+              ? summary.environment.message
+              : '请按上方建议完成本机运行环境准备。'}
+          </Text>
+        </div>
+      ) : null}
+      <ManagedDatabaseLifecycleGuide />
     </section>
   )
 }
@@ -1539,6 +1984,7 @@ export default function DevQualityGatesPage() {
   const titleRef = useRef(null)
   const cancelButtonRef = useRef(null)
   const viewValuesRef = useRef({
+    server: { ...EMPTY_VIEW_STATE.server },
     run: { ...EMPTY_VIEW_STATE.run },
     governance: { ...EMPTY_VIEW_STATE.governance },
     gaps: { ...EMPTY_VIEW_STATE.gaps },
@@ -1653,7 +2099,7 @@ export default function DevQualityGatesPage() {
   }, [loadSummary, polling])
 
   useEffect(() => {
-    if (!parsed.valid || activeView === 'run') {
+    if (!parsed.valid || ['server', 'run'].includes(activeView)) {
       viewRequestRef.current += 1
       setViewState({
         view: activeView,
@@ -1746,7 +2192,9 @@ export default function DevQualityGatesPage() {
 
   const refresh = useCallback(async () => {
     await loadSummary()
-    if (activeView !== 'run') setViewRefresh((value) => value + 1)
+    if (['governance', 'gaps'].includes(activeView)) {
+      setViewRefresh((value) => value + 1)
+    }
   }, [activeView, loadSummary])
 
   const start = useCallback(
@@ -1833,6 +2281,11 @@ export default function DevQualityGatesPage() {
       !busy &&
       !initialLoading
   )
+  const displayedStatus = qualityGateViewStatus(
+    summary,
+    activeView,
+    summaryError
+  )
 
   return (
     <div className="erp-dev-quality-gates-page erp-dev-workspace-page">
@@ -1894,117 +2347,35 @@ export default function DevQualityGatesPage() {
 
         <Alert
           className="erp-dev-quality-status-banner"
-          type={summary?.status?.tone || 'info'}
+          type={displayedStatus?.tone || 'info'}
           showIcon
           icon={
-            summary?.status?.tone === 'success' ? (
+            displayedStatus?.tone === 'success' ? (
               <CheckCircleOutlined />
-            ) : summary?.status?.tone === 'error' ? (
+            ) : displayedStatus?.tone === 'error' ? (
               <CloseCircleOutlined />
             ) : (
               <InfoCircleOutlined />
             )
           }
-          message={summary?.status?.title || '正在读取当前质量状态'}
+          message={displayedStatus?.title || '正在读取当前质量状态'}
           description={
             <Space direction="vertical" size={4}>
               <Text>
-                {summary?.status?.description ||
+                {displayedStatus?.description ||
                   '请稍候，页面不会自动执行任何门禁。'}
               </Text>
-              {summary?.status?.recommendation ? (
-                <Text strong>建议：{summary.status.recommendation}</Text>
+              {displayedStatus?.recommendation ? (
+                <Text strong>建议：{displayedStatus.recommendation}</Text>
               ) : null}
-              {summary?.status?.notProven?.length ? (
+              {displayedStatus?.notProven?.length ? (
                 <Text type="secondary">
-                  尚未证明：{summary.status.notProven.join('、')}
+                  尚未证明：{displayedStatus.notProven.join('、')}
                 </Text>
               ) : null}
             </Space>
           }
         />
-
-        <ServerCiEvidencePanel summary={summary} />
-
-        <section
-          className="erp-dev-quality-actions"
-          aria-label="本机质量诊断操作"
-        >
-          <div className="erp-dev-quality-actions__heading">
-            <div>
-              <Text strong>本机诊断（按需）</Text>
-              <Text type="secondary">
-                用于定位当前工作区问题；正式 main 门禁由推送后的 R640 CI 执行。
-              </Text>
-            </div>
-            <Tag>不替代服务器 CI</Tag>
-          </div>
-          <div className="erp-dev-quality-actions__buttons">
-            <div className="erp-dev-quality-actions__primary">
-              <Button
-                size="large"
-                disabled={!canRun}
-                loading={actionProfile === 'strict'}
-                onClick={() => start('strict')}
-              >
-                运行本机严格诊断
-              </Button>
-              <Tooltip
-                title="严格门禁比完整门禁多检查工具链、Shell 与 YAML，并生成绑定当前仓库身份的正式回执；若工作区有未提交改动，结果只证明当前工作区，不能作为干净 exact SHA 的发布证明。"
-                placement="bottom"
-                trigger={['hover', 'focus']}
-              >
-                <Button
-                  type="text"
-                  shape="circle"
-                  size="small"
-                  className="erp-dev-quality-actions__help"
-                  icon={<QuestionCircleOutlined />}
-                  aria-label="什么时候运行本机严格诊断"
-                />
-              </Tooltip>
-            </div>
-            <Button
-              size="large"
-              disabled={!canRun}
-              loading={actionProfile === 'full'}
-              onClick={() => start('full')}
-            >
-              运行本机完整诊断
-            </Button>
-          </div>
-          <div className="erp-dev-quality-actions__durations">
-            <Text>
-              本机严格诊断：按需定位严格门禁问题 · 最近实际耗时{' '}
-              {formatQualityGateDuration(profileDuration(summary, 'strict'))}
-            </Text>
-            <Text>
-              本机完整诊断：按需定位完整门禁问题 · 最近实际耗时{' '}
-              {formatQualityGateDuration(profileDuration(summary, 'full'))}
-            </Text>
-          </div>
-          {!initialLoading && summary?.environment ? (
-            <div className="erp-dev-quality-actions__environment">
-              <Tag
-                color={
-                  summary.environment.disposableDatabaseReady
-                    ? 'success'
-                    : 'warning'
-                }
-              >
-                {summary.environment.disposableDatabaseReady
-                  ? '运行环境已就绪'
-                  : '运行环境未就绪'}
-              </Tag>
-              <Text type="secondary">
-                {summary.environment.disposableDatabaseReady
-                  ? summary.environment.message
-                  : '请按上方建议完成本机运行环境准备。'}
-              </Text>
-            </div>
-          ) : null}
-          <ManagedDatabaseLifecycleGuide />
-        </section>
 
         <DevTaskNav
           idPrefix="quality-gates"
@@ -2022,7 +2393,8 @@ export default function DevQualityGatesPage() {
         <ContextStrip
           summary={summary}
           view={activeView}
-          onReturnRun={() => selectView('run')}
+          summaryError={summaryError}
+          onReturnLocal={() => selectView('run')}
         />
 
         <section className="erp-dev-quality-content">
@@ -2032,15 +2404,27 @@ export default function DevQualityGatesPage() {
             aria-labelledby={`quality-gates-tab-${activeView}`}
             tabIndex={0}
           >
+            {parsed.valid && activeView === 'server' ? (
+              <ServerCiEvidencePanel summary={summary} />
+            ) : null}
             {parsed.valid && activeView === 'run' ? (
-              <RunView
-                summary={summary}
-                operation={displayedOperation}
-                previewProfile={parsed.values.profile || 'strict'}
-                actionProfile={actionProfile}
-                onCancel={cancel}
-                cancelButtonRef={cancelButtonRef}
-              />
+              <>
+                <LocalDiagnosticsActions
+                  summary={summary}
+                  initialLoading={initialLoading}
+                  canRun={canRun}
+                  actionProfile={actionProfile}
+                  onStart={start}
+                />
+                <RunView
+                  summary={summary}
+                  operation={displayedOperation}
+                  previewProfile={parsed.values.profile || 'strict'}
+                  actionProfile={actionProfile}
+                  onCancel={cancel}
+                  cancelButtonRef={cancelButtonRef}
+                />
+              </>
             ) : null}
             {parsed.valid && activeView === 'governance' ? (
               <GovernanceView

@@ -272,7 +272,11 @@ test("full browser evidence is current-worktree self-hosted on an isolated port"
   assert.match(full, /STYLE_L1_PORT="\$browser_port"/u);
   assert.match(
     full,
-    /DEFAULT_QA_BROWSER_SCENARIOS="root-redirect-desktop,dev-all-pages-mobile,dev-workbench-wide-layout,dev-hub-dark-desktop,dev-drill-recovery-desktop-light,dev-drill-recovery-mobile-dark,dev-business-usability-desktop-light,dev-business-usability-mobile-dark"/u,
+    /DEFAULT_QA_BROWSER_SCENARIOS="root-redirect-desktop"/u,
+  );
+  assert.doesNotMatch(
+    full,
+    /DEFAULT_QA_BROWSER_SCENARIOS="[^"]*dev-/u,
   );
   assert.match(
     full,

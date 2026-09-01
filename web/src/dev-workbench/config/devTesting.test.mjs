@@ -523,7 +523,7 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
   )
   assert.match(
     getPresetCopyText('customer-config-dev-console'),
-    /dev-customer-config-dark-desktop/
+    /dev-page-customer-config-desktop-light/
   )
   assert.match(
     getPreset('customer-config-dev-console').description,
@@ -536,7 +536,7 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
   assert.match(getPresetCopyText('dev-prototype-registry'), /devHub\.test\.mjs/)
   assert.match(
     getPresetCopyText('dev-prototype-registry'),
-    /dev-prototypes-dark-desktop/
+    /dev-page-prototypes-desktop-light/
   )
   assert.match(
     getPreset('dev-prototype-registry').description,
@@ -548,10 +548,17 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
     getPresetCopyText('dev-doc-governance'),
     /devGovernance\.test\.mjs/
   )
-  assert.match(getPresetCopyText('dev-doc-governance'), /dev-docs-dark-desktop/)
   assert.match(
     getPresetCopyText('dev-doc-governance'),
-    /dev-governance-dark-desktop/
+    /dev-page-overview-desktop-light/
+  )
+  assert.match(
+    getPresetCopyText('dev-doc-governance'),
+    /dev-page-docs-desktop-light/
+  )
+  assert.match(
+    getPresetCopyText('dev-doc-governance'),
+    /dev-page-governance-desktop-light/
   )
   assert.match(getPreset('dev-doc-governance').description, /不改正式文档真源/)
   assert.match(getPreset('dev-doc-governance').description, /不进入正式菜单/)

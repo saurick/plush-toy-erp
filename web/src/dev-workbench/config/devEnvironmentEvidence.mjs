@@ -112,7 +112,8 @@ function localEnvironmentCard(dataSummary, error) {
 function deliveryTarget(summary, targetKey) {
   return (
     summary?.targets?.find((descriptor) => descriptor.key === targetKey)
-      ?.preflight || (summary?.target?.target === targetKey ? summary.target : null)
+      ?.preflight ||
+    (summary?.target?.target === targetKey ? summary.target : null)
   )
 }
 
@@ -147,7 +148,8 @@ function customerTestCard(dataSummary, deliverySummary, error) {
   const cleanBaseline = Boolean(
     rebuild &&
       (!latestGeneratedDataWrite ||
-        Date.parse(rebuild.updatedAt) > Date.parse(latestGeneratedDataWrite.updatedAt))
+        Date.parse(rebuild.updatedAt) >
+          Date.parse(latestGeneratedDataWrite.updatedAt))
   )
   const runtimeReady = Boolean(
     target?.status === 'passed' &&
@@ -160,16 +162,14 @@ function customerTestCard(dataSummary, deliverySummary, error) {
     ? 'failed'
     : !target || target.status === 'blocked'
       ? 'blocked'
-      : runtimeReady && cleanBaseline
+      : runtimeReady
         ? 'success'
-        : runtimeReady
-          ? 'not_proven'
-          : 'warning'
+        : 'warning'
 
   return {
     key: 'customer-test-133',
     label: 'test 甲方测试验收',
-    scope: '每轮交付前恢复干净基线；由甲方录入真实测试数据',
+    scope: '普通部署保留现有数据；需要时独立清空并重建测试数据',
     accent: 'test',
     status,
     releaseSha: safeText(runtime?.serverSha),
@@ -179,18 +179,20 @@ function customerTestCard(dataSummary, deliverySummary, error) {
     customerConfigProductVersion: safeText(
       runtime?.activeCustomerConfig?.productVersion
     ),
-    datasetVersion: cleanBaseline ? 'clean-baseline' : '未证明',
-    datasetRunId: rebuild?.id ? rebuild.id.slice(0, 8) : '未证明',
+    datasetVersion: cleanBaseline ? 'clean-baseline' : '保留现有数据',
+    datasetRunId: rebuild?.id ? rebuild.id.slice(0, 8) : '不适用',
     semanticDigest: '不适用',
     datasetEvidence: cleanBaseline
       ? '受控重建晚于该库最近一次模拟数据写入'
-      : '干净业务数据基线与精确回滚点尚未共同证明',
+      : rebuild
+        ? '受控重建后已有数据写入；普通部署继续保留现状'
+        : '尚未执行独立清空重建；普通部署继续保留现状',
     health: runtimeReady
       ? 'health / ready / 公网入口已读回'
       : 'health / ready / 公网入口未齐',
     rollbackBoundary: rebuild
-      ? '数据库重建 operation 已通过；回滚只使用其绑定恢复点'
-      : '清理前必须取得可恢复备份、恢复校验与精确回滚点',
+      ? '数据清空重建 operation 已通过；恢复只使用其绑定回滚点'
+      : '普通部署保留数据；清空重建时另行取得可恢复备份与精确回滚点',
     readbackAt: latestTimestamp([
       rebuild?.updatedAt,
       target?.generatedAt,
@@ -201,8 +203,8 @@ function customerTestCard(dataSummary, deliverySummary, error) {
       : !runtimeReady
         ? '先完成 test 运行态与公网读回'
         : cleanBaseline
-          ? '保留干净基线，等待甲方录入真实测试数据'
-          : '先备份并恢复校验，再走受控数据库重建',
+          ? '可在当前干净基线上继续录入测试数据'
+          : '保留现有数据继续测试；需要时独立清空并重建',
     error: safeText(error, ''),
   }
 }
@@ -250,10 +252,7 @@ function demoProjectCard(dataSummary, deliverySummary, error) {
   const datasetReadBack = Boolean(trialOperation)
   const dataBackup = trialOperation?.readback?.backupReceipt
   const runtimeAligned =
-    releaseAligned &&
-    migrationAligned &&
-    configAligned &&
-    healthReady
+    releaseAligned && migrationAligned && configAligned && healthReady
   const status = error
     ? 'failed'
     : !target || target.status === 'blocked'
@@ -427,7 +426,7 @@ function deliveryOperationLabel(operation) {
     release: '不可变版本发布',
     promote: '显式版本提升',
     rollback: '目标回滚',
-    'rebuild-database': '受控数据库重建',
+    'rebuild-database': '独立数据清空重建',
   }[operation?.action]
   return action ? `${action} · ${safeText(operation.target)}` : '未知工作台操作'
 }

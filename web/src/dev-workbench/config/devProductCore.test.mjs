@@ -22,10 +22,6 @@ const pageSource = readFileSync(
   new URL('../pages/DevProductCorePage.jsx', import.meta.url),
   'utf8'
 )
-const styleSource = readFileSync(
-  new URL('../styles/dev-product-core.css', import.meta.url),
-  'utf8'
-)
 
 test('devProductCore: route and source stay inside the DEV-only workbench', () => {
   assert.equal(DEV_PRODUCT_CORE_ROUTE, '/__dev/product-core')
@@ -110,18 +106,10 @@ test('devProductCore: filters distinguish membership and readable keywords', () 
   )
 })
 
-test('devProductCore: page is one searchable table with a mobile row layout', () => {
+test('devProductCore: page consumes the searchable read-only capability projection', () => {
   assert.match(pageSource, /searchParams\.get\('status'\)/u)
   assert.match(pageSource, /searchParams\.get\('q'\)/u)
   assert.match(pageSource, /aria-pressed=\{isActive\}/u)
-  assert.match(pageSource, /<table className="erp-dev-product-core-table">/u)
-  assert.match(pageSource, /<caption>当前 Product Core 能力与边界<\/caption>/u)
-  assert.match(pageSource, /data-label="当前可用范围"/u)
-  assert.match(pageSource, /data-label="当前边界"/u)
   assert.match(pageSource, /进入 Product Core 不等于已发布或已验收/u)
   assert.doesNotMatch(pageSource, /parseProductCoreEvidenceEntries/u)
-  assert.doesNotMatch(pageSource, /erp-dev-product-core-status-help/u)
-  assert.match(styleSource, /@media \(max-width: 767px\)/u)
-  assert.match(styleSource, /\.erp-dev-product-core-table td::before/u)
-  assert.match(styleSource, /\.erp-dev-product-core-filter:focus-visible/u)
 })

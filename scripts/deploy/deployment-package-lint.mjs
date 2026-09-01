@@ -148,7 +148,9 @@ export function findForbiddenFiles(packageDir) {
       if (relativePath === "env/.env.example") {
         return false;
       }
-      return FORBIDDEN_PATH_PATTERNS.some((pattern) => pattern.test(relativePath));
+      return FORBIDDEN_PATH_PATTERNS.some((pattern) =>
+        pattern.test(relativePath),
+      );
     });
 }
 
@@ -173,9 +175,17 @@ function validateEnvExample(packageDir, errors) {
   }
   const content = readText(envPath);
   for (const key of REQUIRED_ENV_KEYS) {
-    assert(new RegExp(`^${key}=`, "m").test(content), `env/.env.example missing ${key}`, errors);
+    assert(
+      new RegExp(`^${key}=`, "m").test(content),
+      `env/.env.example missing ${key}`,
+      errors,
+    );
   }
-  assert(/ERP_DEBUG_ENV=prod/m.test(content), "env/.env.example must set ERP_DEBUG_ENV=prod", errors);
+  assert(
+    /ERP_DEBUG_ENV=prod/m.test(content),
+    "env/.env.example must set ERP_DEBUG_ENV=prod",
+    errors,
+  );
   assert(
     /ERP_DEBUG_SEED_ENABLED=false/m.test(content),
     "env/.env.example must disable ERP_DEBUG_SEED_ENABLED",
@@ -194,31 +204,93 @@ function validateEnvExample(packageDir, errors) {
 }
 
 function validateCompose(packageDir, errors) {
-  const composePath = path.join(packageDir, "compose/docker-compose.example.yml");
+  const composePath = path.join(
+    packageDir,
+    "compose/docker-compose.example.yml",
+  );
   if (!fs.existsSync(composePath)) {
     return;
   }
   const content = readText(composePath);
-  assert(/healthcheck:/m.test(content), "compose example must include healthcheck", errors);
-  assert(/restart:\s+always/m.test(content), "compose example must include restart policy", errors);
-  assert(/web-desktop:/m.test(content), "compose example must use single web-desktop entry", errors);
-  assert(!/web-mobile-/m.test(content), "compose example must not restore old web-mobile services", errors);
+  assert(
+    /healthcheck:/m.test(content),
+    "compose example must include healthcheck",
+    errors,
+  );
+  assert(
+    /restart:\s+always/m.test(content),
+    "compose example must include restart policy",
+    errors,
+  );
+  assert(
+    /web-desktop:/m.test(content),
+    "compose example must use single web-desktop entry",
+    errors,
+  );
+  assert(
+    !/web-mobile-/m.test(content),
+    "compose example must not restore old web-mobile services",
+    errors,
+  );
+}
+
+function validateNginxRouting(packageDir, errors) {
+  const configPath = path.join(packageDir, "compose/nginx.example.conf");
+  if (!fs.existsSync(configPath)) {
+    return;
+  }
+  const content = readText(configPath);
+  assert(
+    (content.match(/server_name yoyoosun[.]net;/g) || []).length === 2,
+    "nginx example must declare HTTP and HTTPS root-domain servers",
+    errors,
+  );
+  assert(
+    (
+      content.match(
+        /return 302 https:\/\/erp[.]yoyoosun[.]net\$request_uri;/g,
+      ) || []
+    ).length === 2,
+    "nginx example root domain must temporarily redirect to erp with 302",
+    errors,
+  );
+  assert(
+    (content.match(/server_name erp[.]yoyoosun[.]net;/g) || []).length === 2,
+    "nginx example must declare HTTP and HTTPS erp servers",
+    errors,
+  );
+  assert(
+    !/server_name[^;]*admin[.]yoyoosun[.]net/u.test(content),
+    "nginx example must not restore the retired admin route",
+    errors,
+  );
 }
 
 function validateContent(packageDir, errors) {
   for (const file of walkFiles(packageDir)) {
     const relativePath = normalizeRelative(packageDir, file);
-    if (/\.(json|md|mjs|sh|ya?ml|conf|example)$|\.env\.example$/.test(relativePath)) {
+    if (
+      /\.(json|md|mjs|sh|ya?ml|conf|example)$|\.env\.example$/.test(
+        relativePath,
+      )
+    ) {
       const content = readText(file);
       for (const pattern of SECRET_CONTENT_PATTERNS) {
-        assert(!pattern.test(content), `${relativePath} contains a forbidden secret-like pattern`, errors);
+        assert(
+          !pattern.test(content),
+          `${relativePath} contains a forbidden secret-like pattern`,
+          errors,
+        );
       }
     }
   }
 }
 
 function validateReleaseEvidenceTemplate(packageDir, errors) {
-  const templatePath = path.join(packageDir, "evidence/releases/release-evidence-template.md");
+  const templatePath = path.join(
+    packageDir,
+    "evidence/releases/release-evidence-template.md",
+  );
   if (!fs.existsSync(templatePath)) {
     return;
   }
@@ -252,7 +324,11 @@ function validateReleaseEvidenceTemplate(packageDir, errors) {
     "rollback-rehearsal-report.json",
     "command-summary.txt",
   ]) {
-    assert(content.includes(evidenceFile), `release evidence template missing ${evidenceFile}`, errors);
+    assert(
+      content.includes(evidenceFile),
+      `release evidence template missing ${evidenceFile}`,
+      errors,
+    );
   }
   for (const artifactField of [
     "artifacts.backupEvidence",
@@ -260,12 +336,19 @@ function validateReleaseEvidenceTemplate(packageDir, errors) {
     "artifacts.migrationStatus",
     "artifacts.commandSummary",
   ]) {
-    assert(content.includes(artifactField), `release evidence template missing ${artifactField}`, errors);
+    assert(
+      content.includes(artifactField),
+      `release evidence template missing ${artifactField}`,
+      errors,
+    );
   }
 }
 
 function validateBackupEvidenceTemplate(packageDir, errors) {
-  const templatePath = path.join(packageDir, "evidence/backups/backup-evidence-template.md");
+  const templatePath = path.join(
+    packageDir,
+    "evidence/backups/backup-evidence-template.md",
+  );
   if (!fs.existsSync(templatePath)) {
     return;
   }
@@ -299,7 +382,10 @@ function validateBackupEvidenceTemplate(packageDir, errors) {
 }
 
 function validateMigrationEvidenceTemplate(packageDir, errors) {
-  const templatePath = path.join(packageDir, "evidence/migrations/migration-evidence-template.md");
+  const templatePath = path.join(
+    packageDir,
+    "evidence/migrations/migration-evidence-template.md",
+  );
   if (!fs.existsSync(templatePath)) {
     return;
   }
@@ -324,17 +410,26 @@ function validateMigrationEvidenceTemplate(packageDir, errors) {
     );
   }
   for (const gateLine of ["Current Version:", "Pending Files:"]) {
-    assert(content.includes(gateLine), `migration evidence template missing ${gateLine}`, errors);
+    assert(
+      content.includes(gateLine),
+      `migration evidence template missing ${gateLine}`,
+      errors,
+    );
   }
   assert(
-    /不要记录完整 DSN、密码、migration SQL 全文、客户业务数据明细或 raw rows/.test(content),
+    /不要记录完整 DSN、密码、migration SQL 全文、客户业务数据明细或 raw rows/.test(
+      content,
+    ),
     "migration evidence template must state DSN, SQL, secret and raw rows redaction boundary",
     errors,
   );
 }
 
 function validateReleaseSignoffTemplate(packageDir, errors) {
-  const templatePath = path.join(packageDir, "evidence/releases/release-signoff-checklist-template.md");
+  const templatePath = path.join(
+    packageDir,
+    "evidence/releases/release-signoff-checklist-template.md",
+  );
   if (!fs.existsSync(templatePath)) {
     return;
   }
@@ -354,8 +449,16 @@ function validateReleaseSignoffTemplate(packageDir, errors) {
       errors,
     );
   }
-  for (const value of ["customer-trial-approved", "internal-only", "rollback-or-forward-fix"]) {
-    assert(content.includes(value), `release signoff template missing ${value}`, errors);
+  for (const value of [
+    "customer-trial-approved",
+    "internal-only",
+    "rollback-or-forward-fix",
+  ]) {
+    assert(
+      content.includes(value),
+      `release signoff template missing ${value}`,
+      errors,
+    );
   }
   for (const checklistItem of [
     "pre-migration backup evidence verified",
@@ -364,17 +467,26 @@ function validateReleaseSignoffTemplate(packageDir, errors) {
     "smoke report reviewed",
     "customer-visible scope reviewed",
   ]) {
-    assert(content.includes(checklistItem), `release signoff template missing ${checklistItem}`, errors);
+    assert(
+      content.includes(checklistItem),
+      `release signoff template missing ${checklistItem}`,
+      errors,
+    );
   }
   assert(
-    /不保存真实密码、token、备份文件、完整 DSN、客户 raw rows 或未脱敏截图/.test(content),
+    /不保存真实密码、token、备份文件、完整 DSN、客户 raw rows 或未脱敏截图/.test(
+      content,
+    ),
     "release signoff template must state secret, backup, DSN, raw rows and screenshot redaction boundary",
     errors,
   );
 }
 
 function validateRollbackForwardFixPlanTemplate(packageDir, errors) {
-  const templatePath = path.join(packageDir, "evidence/releases/rollback-forward-fix-plan-template.md");
+  const templatePath = path.join(
+    packageDir,
+    "evidence/releases/rollback-forward-fix-plan-template.md",
+  );
   if (!fs.existsSync(templatePath)) {
     return;
   }
@@ -393,15 +505,27 @@ function validateRollbackForwardFixPlanTemplate(packageDir, errors) {
       errors,
     );
   }
-  for (const value of ["rollback-ready", "forward-fix-ready", "rollback-or-forward-fix-ready"]) {
-    assert(content.includes(value), `rollback forward-fix template missing ${value}`, errors);
+  for (const value of [
+    "rollback-ready",
+    "forward-fix-ready",
+    "rollback-or-forward-fix-ready",
+  ]) {
+    assert(
+      content.includes(value),
+      `rollback forward-fix template missing ${value}`,
+      errors,
+    );
   }
   for (const checklistItem of [
     "rollback target identified",
     "forward-fix owner assigned",
     "post-action smoke scope defined",
   ]) {
-    assert(content.includes(checklistItem), `rollback forward-fix template missing ${checklistItem}`, errors);
+    assert(
+      content.includes(checklistItem),
+      `rollback forward-fix template missing ${checklistItem}`,
+      errors,
+    );
   }
   assert(
     /deployments\/yoyoosun\/runbooks\/03-rollback\.md/.test(content),
@@ -409,14 +533,19 @@ function validateRollbackForwardFixPlanTemplate(packageDir, errors) {
     errors,
   );
   assert(
-    /不保存真实密码、token、备份文件、完整 DSN、客户 raw rows 或未脱敏截图/.test(content),
+    /不保存真实密码、token、备份文件、完整 DSN、客户 raw rows 或未脱敏截图/.test(
+      content,
+    ),
     "rollback forward-fix template must state secret, backup, DSN, raw rows and screenshot redaction boundary",
     errors,
   );
 }
 
 function validateSmokeReportExample(packageDir, errors) {
-  const examplePath = path.join(packageDir, "evidence/smoke/smoke-test-report.example.json");
+  const examplePath = path.join(
+    packageDir,
+    "evidence/smoke/smoke-test-report.example.json",
+  );
   if (!fs.existsSync(examplePath)) {
     return;
   }
@@ -424,12 +553,28 @@ function validateSmokeReportExample(packageDir, errors) {
   try {
     report = JSON.parse(readText(examplePath));
   } catch (error) {
-    errors.push(`smoke test report example must be valid JSON: ${error.message}`);
+    errors.push(
+      `smoke test report example must be valid JSON: ${error.message}`,
+    );
     return;
   }
-  assert(report.customerCode === DEFAULT_CUSTOMER, `smoke test report example customerCode must be ${DEFAULT_CUSTOMER}`, errors);
-  for (const field of ["environment", "releaseVersion", "generatedAt", "operatorRole", "endpointAlias"]) {
-    assert(Boolean(String(report[field] ?? "").trim()), `smoke test report example missing ${field}`, errors);
+  assert(
+    report.customerCode === DEFAULT_CUSTOMER,
+    `smoke test report example customerCode must be ${DEFAULT_CUSTOMER}`,
+    errors,
+  );
+  for (const field of [
+    "environment",
+    "releaseVersion",
+    "generatedAt",
+    "operatorRole",
+    "endpointAlias",
+  ]) {
+    assert(
+      Boolean(String(report[field] ?? "").trim()),
+      `smoke test report example missing ${field}`,
+      errors,
+    );
   }
   assert(
     !hasCredentialedUrl(report.endpointAlias),
@@ -447,18 +592,42 @@ function validateSmokeReportExample(packageDir, errors) {
   const total = Number(report.summary?.total ?? 0);
   const passed = Number(report.summary?.passed ?? 0);
   const failed = Number(report.summary?.failed ?? 0);
-  assert(checks.length > 0, "smoke test report example checks must not be empty", errors);
-  assert(total === checks.length, "smoke test report example summary.total must match checks length", errors);
-  assert(passed === checks.length, "smoke test report example summary.passed must match checks length", errors);
-  assert(failed === 0, "smoke test report example summary.failed must be 0", errors);
+  assert(
+    checks.length > 0,
+    "smoke test report example checks must not be empty",
+    errors,
+  );
+  assert(
+    total === checks.length,
+    "smoke test report example summary.total must match checks length",
+    errors,
+  );
+  assert(
+    passed === checks.length,
+    "smoke test report example summary.passed must match checks length",
+    errors,
+  );
+  assert(
+    failed === 0,
+    "smoke test report example summary.failed must be 0",
+    errors,
+  );
   for (const [index, check] of checks.entries()) {
-    assert(Boolean(String(check?.name ?? "").trim()), `smoke test report example checks[${index}].name is missing`, errors);
+    assert(
+      Boolean(String(check?.name ?? "").trim()),
+      `smoke test report example checks[${index}].name is missing`,
+      errors,
+    );
     assert(
       /^(pass|passed|ok)$/i.test(String(check?.status ?? "").trim()),
       `smoke test report example checks[${index}].status must be pass`,
       errors,
     );
-    assert(Boolean(String(check?.target ?? "").trim()), `smoke test report example checks[${index}].target is missing`, errors);
+    assert(
+      Boolean(String(check?.target ?? "").trim()),
+      `smoke test report example checks[${index}].target is missing`,
+      errors,
+    );
     assert(
       !hasCredentialedUrl(check?.target),
       `smoke test report example checks[${index}].target must not contain URL credentials`,
@@ -472,7 +641,11 @@ function validateSmokeReportExample(packageDir, errors) {
       );
     }
   }
-  assert(report.redaction?.containsSecrets === false, "smoke test report example must declare containsSecrets=false", errors);
+  assert(
+    report.redaction?.containsSecrets === false,
+    "smoke test report example must declare containsSecrets=false",
+    errors,
+  );
   assert(
     report.redaction?.containsRawCustomerRows === false,
     "smoke test report example must declare containsRawCustomerRows=false",
@@ -480,14 +653,25 @@ function validateSmokeReportExample(packageDir, errors) {
   );
 }
 
-export function validateDeploymentPackage({ repoRoot = process.cwd(), customer = DEFAULT_CUSTOMER } = {}) {
+export function validateDeploymentPackage({
+  repoRoot = process.cwd(),
+  customer = DEFAULT_CUSTOMER,
+} = {}) {
   const packageDir = path.join(repoRoot, "deployments", customer);
   const errors = [];
 
-  assert(fs.existsSync(packageDir), `deployments/${customer} must exist`, errors);
+  assert(
+    fs.existsSync(packageDir),
+    `deployments/${customer} must exist`,
+    errors,
+  );
 
   for (const relativePath of REQUIRED_FILES) {
-    assert(fs.existsSync(path.join(packageDir, relativePath)), `Missing deployments/${customer}/${relativePath}`, errors);
+    assert(
+      fs.existsSync(path.join(packageDir, relativePath)),
+      `Missing deployments/${customer}/${relativePath}`,
+      errors,
+    );
   }
 
   for (const relativePath of findForbiddenFiles(packageDir)) {
@@ -496,6 +680,7 @@ export function validateDeploymentPackage({ repoRoot = process.cwd(), customer =
 
   validateEnvExample(packageDir, errors);
   validateCompose(packageDir, errors);
+  validateNginxRouting(packageDir, errors);
   validateContent(packageDir, errors);
   validateReleaseEvidenceTemplate(packageDir, errors);
   validateBackupEvidenceTemplate(packageDir, errors);
@@ -505,7 +690,9 @@ export function validateDeploymentPackage({ repoRoot = process.cwd(), customer =
   validateSmokeReportExample(packageDir, errors);
 
   if (errors.length > 0) {
-    const error = new Error(`deployment package lint failed:\n- ${errors.join("\n- ")}`);
+    const error = new Error(
+      `deployment package lint failed:\n- ${errors.join("\n- ")}`,
+    );
     error.errors = errors;
     throw error;
   }

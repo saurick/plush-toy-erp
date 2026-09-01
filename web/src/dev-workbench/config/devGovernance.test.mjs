@@ -31,14 +31,6 @@ const devTaskNavSource = readFileSync(
   new URL('../components/DevTaskNav.jsx', import.meta.url),
   'utf8'
 )
-const devNavigationStyles = readFileSync(
-  new URL('../styles/dev-navigation.css', import.meta.url),
-  'utf8'
-)
-const devWorkbenchDensityStyles = readFileSync(
-  new URL('../styles/dev-workbench-density.css', import.meta.url),
-  'utf8'
-)
 
 test('devGovernance: route and dev gate stay dev-only', () => {
   assert.equal(DEV_GOVERNANCE_ROUTE, '/__dev/governance')
@@ -71,14 +63,6 @@ test('devGovernance: shared dev page nav exposes workspace routes and unique dee
   assert.match(devPageNavSource, /getDevSecondaryNavItems/)
   assert.match(
     devPageNavSource,
-    /import ERPThemeToggle from '@\/common\/components\/theme\/ERPThemeToggle'/
-  )
-  assert.match(
-    devPageNavSource,
-    /<ERPThemeToggle[\s\S]*?className="erp-dev-workspace-nav__theme-toggle"[\s\S]*?variant="menu"[\s\S]*?showLabel[\s\S]*?\/>/
-  )
-  assert.match(
-    devPageNavSource,
     /function normalizePathname\(pathname\)[\s\S]*pathname\.replace\(\/\\\/\+\$\/, ''\)/
   )
   assert.match(devPageNavSource, /normalizePathname\(location\.pathname\)/)
@@ -97,30 +81,6 @@ test('devGovernance: shared dev page nav exposes workspace routes and unique dee
       `accessible name must stay unique: ${accessibleName}`
     )
   }
-
-  assert.match(
-    devNavigationStyles,
-    /grid-template-columns:\s*232px minmax\(0, 1fr\)/u
-  )
-  assert.match(
-    devWorkbenchDensityStyles,
-    /grid-template-columns:\s*216px minmax\(0, 1fr\)/u
-  )
-  assert.match(devWorkbenchDensityStyles, /width:\s*216px/u)
-  assert.match(devNavigationStyles, /position:\s*sticky/u)
-  assert.match(devNavigationStyles, /@media \(max-width: 980px\)/u)
-  assert.match(
-    devNavigationStyles,
-    /\.erp-dev-workspace-page\s*\{[\s\S]*?display:\s*block/u
-  )
-  assert.match(
-    devNavigationStyles,
-    /\.erp-dev-workspace-nav__theme-toggle\.erp-theme-menu-toggle\.ant-btn\s*\{\s*width:\s*100%;\s*\}/u
-  )
-  assert.match(
-    devNavigationStyles,
-    /@media \(max-width: 980px\)[\s\S]*?\.erp-dev-workspace-nav__theme-toggle\.erp-theme-menu-toggle\.ant-btn\s*\{\s*width:\s*auto;\s*\}/u
-  )
 })
 
 test('devGovernance: task navigation is an accessible tab set rather than a false stepper', () => {

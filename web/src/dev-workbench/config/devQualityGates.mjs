@@ -11,7 +11,7 @@ export const DEV_QUALITY_GATE_OPERATION_API_PREFIX = `${DEV_QUALITY_GATE_API_PAT
 export const DEV_QUALITY_GATE_OPERATION_SCHEMA =
   'plush.dev-quality-gate-operation-public/v1'
 export const DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA =
-  'plush.dev-quality-gate-server-evidence/v1'
+  'plush.dev-quality-gate-server-evidence/v2'
 
 export const QUERY_KEYS = Object.freeze({
   view: 'view',
@@ -23,6 +23,12 @@ export const QUERY_KEYS = Object.freeze({
   risk: 'risk',
 })
 export const VIEW_ITEMS = Object.freeze([
+  Object.freeze({
+    value: 'server',
+    label: '服务器门禁',
+    description:
+      '查看当前 committed SHA 的 R640 CI、排队耗时与最慢主路径 Job；不混入本机诊断记录。',
+  }),
   Object.freeze({
     value: 'run',
     label: '本机诊断',
@@ -42,11 +48,12 @@ export const VIEW_ITEMS = Object.freeze([
 ])
 export const VIEW_KEYS = Object.freeze(VIEW_ITEMS.map((item) => item.value))
 export const VIEW_QUERY_KEYS = Object.freeze({
+  server: Object.freeze(['view']),
   run: Object.freeze(['view', 'profile', 'operation']),
   governance: Object.freeze(['view', 'q', 'filter']),
   gaps: Object.freeze(['view', 'range', 'risk']),
 })
-export const DEFAULT_VIEW = 'run'
+export const DEFAULT_VIEW = 'server'
 export const DEV_QUALITY_GATE_PROFILES = Object.freeze(['full', 'strict'])
 export const DEV_QUALITY_GATE_GOVERNANCE_FILTERS = Object.freeze([
   'relevant',
@@ -101,6 +108,14 @@ const PIPELINE_CONCLUSIONS = Object.freeze([
   '',
   'success',
   'failure',
+  'cancelled',
+  'skipped',
+])
+const SERVER_HISTORY_RESULTS = Object.freeze([
+  'queued',
+  'running',
+  'passed',
+  'failed',
   'cancelled',
   'skipped',
 ])
@@ -450,12 +465,13 @@ function normalizeServerEvidenceDuration(value, field) {
 function normalizeServerEvidenceJob(job) {
   assertExactKeys(
     job,
-    ['conclusion', 'durationMs', 'id', 'name'],
+    ['conclusion', 'durationMs', 'id', 'name', 'status'],
     'quality server evidence job'
   )
   if (
     !Number.isSafeInteger(job.id) ||
     job.id < 1 ||
+    !PIPELINE_STATUSES.includes(job.status) ||
     !PIPELINE_CONCLUSIONS.includes(job.conclusion)
   ) {
     throw new Error('quality server evidence job is invalid')
@@ -512,6 +528,62 @@ function normalizeServerEvidencePipeline(pipeline) {
   }
 }
 
+function normalizeServerEvidenceHistory(history) {
+  if (!Array.isArray(history) || history.length > 8) {
+    throw new Error('quality server evidence history is invalid')
+  }
+  const normalized = history.map((run) => {
+    assertExactKeys(
+      run,
+      [
+        'createdAt',
+        'durationMs',
+        'failureJob',
+        'finishedAt',
+        'gitSha',
+        'id',
+        'result',
+        'url',
+      ],
+      'quality server evidence history run'
+    )
+    if (
+      !Number.isSafeInteger(run.id) ||
+      run.id < 1 ||
+      !SERVER_HISTORY_RESULTS.includes(run.result) ||
+      !COMMIT_PATTERN.test(run.gitSha) ||
+      !isIsoDate(run.createdAt) ||
+      (run.finishedAt !== null && !isIsoDate(run.finishedAt)) ||
+      run.url !==
+        `https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/${String(run.id)}` ||
+      (run.result !== 'failed' && run.failureJob !== '')
+    ) {
+      throw new Error('quality server evidence history run is invalid')
+    }
+    return {
+      ...run,
+      durationMs: normalizeServerEvidenceDuration(
+        run.durationMs,
+        'quality server evidence history duration'
+      ),
+      failureJob: safeText(
+        run.failureJob,
+        'quality server evidence history failure job',
+        { allowEmpty: true, max: 120 }
+      ),
+    }
+  })
+  if (
+    new Set(normalized.map((run) => run.id)).size !== normalized.length ||
+    normalized.some(
+      (run, index) => index > 0 && run.id >= normalized[index - 1].id
+    )
+  ) {
+    throw new Error('quality server evidence history order is invalid')
+  }
+  return normalized
+}
+
 function normalizeServerEvidence(evidence) {
   assertExactKeys(
     evidence,
@@ -519,6 +591,7 @@ function normalizeServerEvidence(evidence) {
       'coversWorkingTree',
       'current',
       'gitSha',
+      'history',
       'jobs',
       'message',
       'notProven',
@@ -542,6 +615,7 @@ function normalizeServerEvidence(evidence) {
     throw new Error('quality server evidence is invalid')
   }
   const pipeline = normalizeServerEvidencePipeline(evidence.pipeline)
+  const history = normalizeServerEvidenceHistory(evidence.history)
   if (
     (['passed', 'running', 'failed'].includes(evidence.status) && !pipeline) ||
     (['missing', 'unavailable'].includes(evidence.status) && pipeline) ||
@@ -552,6 +626,7 @@ function normalizeServerEvidence(evidence) {
   return {
     ...evidence,
     pipeline,
+    history,
     jobs: evidence.jobs.map(normalizeServerEvidenceJob),
     message: safeText(evidence.message, 'quality server evidence message'),
     notProven: evidence.notProven.map((item) =>
@@ -806,7 +881,9 @@ export function parseQualityGateSearch(search, { operationIds = null } = {}) {
     }
   }
   const values = { view }
-  if (view === 'run') {
+  if (view === 'server') {
+    // 服务器视图只绑定当前 summary，不接受额外筛选或运行参数。
+  } else if (view === 'run') {
     const profile = params.get(QUERY_KEYS.profile) || ''
     const operation = params.get(QUERY_KEYS.operation) || ''
     if (profile && !DEV_QUALITY_GATE_PROFILES.includes(profile)) {
@@ -834,7 +911,7 @@ export function parseQualityGateSearch(search, { operationIds = null } = {}) {
     }
     values.q = q
     values.filter = filter
-  } else {
+  } else if (view === 'gaps') {
     const range = params.get(QUERY_KEYS.range) || 'current'
     const risk = params.get(QUERY_KEYS.risk) || 'all'
     if (!DEV_QUALITY_GATE_GAP_RANGES.includes(range)) {
@@ -988,6 +1065,78 @@ export function buildQualityGateStageDurationComposition(stages) {
       ),
       parallel: stage.parallel === true,
       longest: stage.durationMs === longestDurationMs,
+    })),
+  }
+}
+
+const PENDING_SERVER_JOB_STATUSES = Object.freeze([
+  'queued',
+  'waiting',
+  'requested',
+  'pending',
+])
+
+function projectServerPipelineJobStatus(job, evidenceStatus) {
+  if (!job) {
+    if (evidenceStatus === 'running') return 'pending'
+    if (evidenceStatus === 'missing') return 'missing'
+    if (evidenceStatus === 'failed') return 'not_run'
+    return 'unavailable'
+  }
+  if (job.conclusion === 'success') return 'passed'
+  if (job.conclusion === 'failure') return 'failed'
+  if (job.conclusion === 'cancelled') return 'cancelled'
+  if (job.conclusion === 'skipped') return 'skipped'
+  if (PENDING_SERVER_JOB_STATUSES.includes(job.status)) return 'pending'
+  if (job.status === 'in_progress') return 'running'
+  return 'unavailable'
+}
+
+export function buildQualityGateServerTiming(evidence) {
+  const observedJobs = (Array.isArray(evidence?.jobs) ? evidence.jobs : []).map(
+    (job) => ({
+      ...job,
+      durationMs:
+        Number.isFinite(job?.durationMs) && job.durationMs >= 0
+          ? job.durationMs
+          : null,
+      flowStatus: projectServerPipelineJobStatus(job, evidence?.status),
+    })
+  )
+  const flowJobs = observedJobs.map((job) => ({
+    ...job,
+    label: job.name,
+    observed: true,
+    status: job.flowStatus,
+  }))
+  const jobs = [...flowJobs]
+    .sort((left, right) => {
+      const durationDifference =
+        (right.durationMs ?? -1) - (left.durationMs ?? -1)
+      return durationDifference || left.name.localeCompare(right.name, 'zh-CN')
+    })
+  const longestJob = jobs.find((job) => job.durationMs !== null) || null
+  const longestDurationMs = longestJob?.durationMs || 0
+
+  return {
+    wallClockMs:
+      Number.isFinite(evidence?.pipeline?.durationMs) &&
+      evidence.pipeline.durationMs >= 0
+        ? evidence.pipeline.durationMs
+        : null,
+    queueMs:
+      Number.isFinite(evidence?.pipeline?.queueMs) &&
+      evidence.pipeline.queueMs >= 0
+        ? evidence.pipeline.queueMs
+        : null,
+    longestJob,
+    flowJobs,
+    jobs: jobs.map((job) => ({
+      ...job,
+      relativePercent:
+        job.durationMs !== null && longestDurationMs > 0
+          ? Number(((job.durationMs / longestDurationMs) * 100).toFixed(1))
+          : null,
     })),
   }
 }
