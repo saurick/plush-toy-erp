@@ -14,6 +14,13 @@ import { spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
+
+import {
+  createOrReuseDeliveryOperation,
+  DELIVERY_OPERATION_STORE_REPO_ROOT_ENV,
+  resolveDeliveryOperationStore,
+} from "./delivery-operation-store.mjs";
 
 import {
   consumeTargetReleaseFetchCredential,
@@ -51,6 +58,63 @@ test("rollback executor consumes the inherited target fetch credential once", ()
   );
   assert.deepEqual(env, { KEEP_ME: "safe" });
   assert.equal(consumeTargetReleaseFetchCredential(env), undefined);
+});
+
+test("rollback CLI reads the canonical operation store selected by its parent service", (t) => {
+  const canonicalRoot = mkdtempSync(
+    path.join(os.tmpdir(), "rollback-operation-canonical-"),
+  );
+  const executionRoot = mkdtempSync(
+    path.join(os.tmpdir(), "rollback-operation-execution-"),
+  );
+  t.after(() => {
+    rmSync(canonicalRoot, { recursive: true, force: true });
+    rmSync(executionRoot, { recursive: true, force: true });
+  });
+  const store = resolveDeliveryOperationStore(canonicalRoot);
+  createOrReuseDeliveryOperation(store, {
+    action: "rollback",
+    target: "demo-133",
+    gitSha: TO_SHA,
+    version: "2026.07.29-1",
+    idempotencyKey: "version-center:rollback:canonical-store",
+    operationId: OPERATION_ID,
+    metadata: {
+      currentGitSha: FROM_SHA,
+      currentVersion: "2026.07.29-2",
+    },
+  });
+  const script = fileURLToPath(
+    new URL("./rollback-executor.mjs", import.meta.url),
+  );
+  const result = spawnSync(
+    process.execPath,
+    [
+      script,
+      "--operation-id",
+      OPERATION_ID,
+      "--current-manifest",
+      path.join(executionRoot, "current-release-manifest.json"),
+      "--target-bundle-dir",
+      path.join(executionRoot, "bundle"),
+      "--target-manifest",
+      path.join(executionRoot, "release-manifest.json"),
+      "--confirmation",
+      `ROLLBACK:demo-133:${FROM_SHA}:${TO_SHA}:${OPERATION_ID}`,
+      "--json",
+    ],
+    {
+      cwd: executionRoot,
+      env: {
+        ...process.env,
+        [DELIVERY_OPERATION_STORE_REPO_ROOT_ENV]: canonicalRoot,
+      },
+      encoding: "utf8",
+    },
+  );
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /not in the eligible ready state/u);
+  assert.equal(result.stderr.includes(canonicalRoot), false);
 });
 
 function expected() {

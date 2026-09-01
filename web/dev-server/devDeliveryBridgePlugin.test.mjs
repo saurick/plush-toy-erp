@@ -8,6 +8,7 @@ import test from 'node:test'
 
 import {
   createOrReuseDeliveryOperation,
+  DELIVERY_OPERATION_STORE_REPO_ROOT_ENV,
   listDeliveryOperations,
   readDeliveryOperation,
   resolveDeliveryOperationStore,
@@ -1331,6 +1332,82 @@ test('a synchronous executor start failure is terminal and is not retried', asyn
     /not ready/u
   )
   assert.equal(spawnCount, 1)
+})
+
+test('delivery executor child receives only the declared canonical operation store root', async (t) => {
+  const execution = createProject(t)
+  const canonical = createProject(t)
+  createOrReuseDeliveryOperation(canonical.store, {
+    action: 'promote',
+    target: 'customer-test-133',
+    gitSha: SHA,
+    version: '2026.07.29-1',
+    idempotencyKey: IDEMPOTENCY_KEY,
+    operationId: OPERATION_ID,
+  })
+  transitionDeliveryOperation(canonical.store, OPERATION_ID, {
+    status: 'running',
+    message: 'preflight started',
+  })
+  transitionDeliveryOperation(canonical.store, OPERATION_ID, {
+    status: 'ready',
+    message: 'promotion ready',
+  })
+  const child = new EventEmitter()
+  let spawnedOptions
+  const env = {
+    [DELIVERY_OPERATION_STORE_REPO_ROOT_ENV]: canonical.root,
+  }
+  const service = createDevDeliveryService({
+    projectRoot: execution.root,
+    env,
+    provider: {
+      provider: 'gitlab',
+      listVersions: () => [],
+      getReleaseStatus: () => ({ status: 'missing' }),
+      dispatchRelease: () => {},
+      downloadReleaseControl: (_gitSha, destination) =>
+        directControlDownload(destination),
+    },
+    spawnProcess(_command, _args, options) {
+      spawnedOptions = options
+      return child
+    },
+  })
+  const confirmation = `PROMOTE:customer-test-133:${SHA}:${OPERATION_ID}`
+  const accepted = await service.act({
+    action: 'execute-promotion',
+    payload: { operationId: OPERATION_ID, confirmation },
+  })
+  assert.equal(accepted.accepted, true)
+  assert.equal(
+    spawnedOptions.env[DELIVERY_OPERATION_STORE_REPO_ROOT_ENV],
+    path.resolve(canonical.store, '../../..')
+  )
+  assert.equal(
+    Object.hasOwn(process.env, DELIVERY_OPERATION_STORE_REPO_ROOT_ENV),
+    false
+  )
+  assert.deepEqual(env, {})
+  child.emit('close', 1)
+  assert.equal(
+    readDeliveryOperation(canonical.store, OPERATION_ID).status,
+    'failed'
+  )
+
+  assert.throws(
+    () =>
+      createDevDeliveryService({
+        projectRoot: execution.root,
+        operationStore: canonical.store,
+        operationStoreRepoRoot: execution.root,
+        provider: {
+          provider: 'gitlab',
+          listVersions: () => [],
+        },
+      }),
+    /does not match its declared repository root/u
+  )
 })
 
 test('rollback executor uses the operation-bound current and target versions', async (t) => {

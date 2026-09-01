@@ -20,6 +20,8 @@ import path from "node:path";
 import process from "node:process";
 
 export const DELIVERY_OPERATION_CONTRACT = "plush.delivery-operation/v1";
+export const DELIVERY_OPERATION_STORE_REPO_ROOT_ENV =
+  "PLUSH_DELIVERY_OPERATION_STORE_REPO_ROOT";
 export const DELIVERY_OPERATION_ACTIONS = Object.freeze([
   "verify-affected",
   "verify-full",
@@ -303,6 +305,22 @@ export function resolveDeliveryOperationStore(
     throw new Error("operation store must remain inside repository output/");
   }
   return candidate;
+}
+
+export function consumeDeliveryOperationStore(repoRoot, env = process.env) {
+  const requestedRepoRoot = env[DELIVERY_OPERATION_STORE_REPO_ROOT_ENV];
+  delete env[DELIVERY_OPERATION_STORE_REPO_ROOT_ENV];
+  if (requestedRepoRoot === undefined) {
+    return resolveDeliveryOperationStore(repoRoot);
+  }
+  if (
+    typeof requestedRepoRoot !== "string" ||
+    requestedRepoRoot.trim() !== requestedRepoRoot ||
+    !path.isAbsolute(requestedRepoRoot)
+  ) {
+    throw new Error("delivery operation store repo root is invalid");
+  }
+  return resolveDeliveryOperationStore(requestedRepoRoot);
 }
 
 function operationFile(store, operationId) {

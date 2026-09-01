@@ -4,7 +4,9 @@ import path from 'node:path'
 import process from 'node:process'
 
 import {
+  consumeDeliveryOperationStore,
   createOrReuseDeliveryOperation,
+  DELIVERY_OPERATION_STORE_REPO_ROOT_ENV,
   deliveryOperationRequestCounts,
   listDeliveryOperations,
   readDeliveryOperation,
@@ -566,6 +568,7 @@ export function createDevDeliveryService({
   projectRoot,
   provider,
   operationStore,
+  operationStoreRepoRoot,
   readRepositoryState = readRepositoryIdentity,
   runPreflight = runTargetPreflightAsync,
   runInitializationPreflight = runTargetInitializationPreflightAsync,
@@ -582,7 +585,22 @@ export function createDevDeliveryService({
   env = process.env,
 } = {}) {
   const root = path.resolve(projectRoot || process.cwd())
-  const store = operationStore || resolveDeliveryOperationStore(root)
+  const defaultStore = resolveDeliveryOperationStore(root)
+  const inheritedStore = consumeDeliveryOperationStore(root, env)
+  if (operationStoreRepoRoot && inheritedStore !== defaultStore) {
+    throw new Error('delivery operation store repository root is ambiguous')
+  }
+  const expectedStore = operationStoreRepoRoot
+    ? resolveDeliveryOperationStore(operationStoreRepoRoot)
+    : inheritedStore
+  const store = operationStore ? path.resolve(operationStore) : expectedStore
+  if (store !== expectedStore) {
+    throw new Error(
+      'delivery operation store does not match its declared repository root'
+    )
+  }
+  const resolvedProjectRepoRoot = path.resolve(defaultStore, '../../..')
+  const resolvedStoreRepoRoot = path.resolve(expectedStore, '../../..')
   const targetFetchToken =
     env.PLUSH_GITLAB_TARGET_FETCH_TOKEN ||
     (env === process.env
@@ -590,8 +608,10 @@ export function createDevDeliveryService({
       : process.env.PLUSH_GITLAB_TARGET_FETCH_TOKEN)
   delete env.PLUSH_GITLAB_TARGET_FETCH_TOKEN
   delete process.env.PLUSH_GITLAB_TARGET_FETCH_TOKEN
+  delete process.env[DELIVERY_OPERATION_STORE_REPO_ROOT_ENV]
   const providerEnvironment = { ...env }
   delete providerEnvironment.PLUSH_GITLAB_TARGET_FETCH_TOKEN
+  delete providerEnvironment[DELIVERY_OPERATION_STORE_REPO_ROOT_ENV]
   const deliveryProvider =
     provider ||
     createConfiguredDeliveryProvider({
@@ -612,6 +632,10 @@ export function createDevDeliveryService({
     const childEnv = { ...process.env }
     delete childEnv.PLUSH_GITLAB_TOKEN
     delete childEnv.PLUSH_GITLAB_TARGET_FETCH_TOKEN
+    delete childEnv[DELIVERY_OPERATION_STORE_REPO_ROOT_ENV]
+    if (resolvedStoreRepoRoot !== resolvedProjectRepoRoot) {
+      childEnv[DELIVERY_OPERATION_STORE_REPO_ROOT_ENV] = resolvedStoreRepoRoot
+    }
     if (targetFetch && targetFetchToken) {
       childEnv.PLUSH_GITLAB_TARGET_FETCH_TOKEN = targetFetchToken
     }

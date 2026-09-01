@@ -18,6 +18,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import {
+  consumeDeliveryOperationStore,
   listDeliveryOperations,
   readDeliveryOperation,
   resolveDeliveryOperationStore,
@@ -1735,6 +1736,7 @@ automatically retried. The browser-facing Bridge chooses all local paths.`);
     }
     const report = executePromotion({
       repoRoot: process.cwd(),
+      operationStore: consumeDeliveryOperationStore(process.cwd()),
       operationId: options.operationId,
       bundleDir: options.bundleDir,
       releaseManifestPath: options.releaseManifest,

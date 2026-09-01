@@ -1,8 +1,16 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
+
+import {
+  createOrReuseDeliveryOperation,
+  DELIVERY_OPERATION_STORE_REPO_ROOT_ENV,
+  resolveDeliveryOperationStore,
+} from "./delivery-operation-store.mjs";
 
 import {
   classifyImmediatePromotionPreflight,
@@ -46,6 +54,57 @@ test("promotion executor consumes the inherited target fetch credential once", (
   );
   assert.deepEqual(env, { KEEP_ME: "safe" });
   assert.equal(consumeTargetReleaseFetchCredential(env), undefined);
+});
+
+test("promotion CLI reads the canonical operation store selected by its parent service", (t) => {
+  const canonicalRoot = mkdtempSync(
+    path.join(os.tmpdir(), "promotion-operation-canonical-"),
+  );
+  const executionRoot = mkdtempSync(
+    path.join(os.tmpdir(), "promotion-operation-execution-"),
+  );
+  t.after(() => {
+    rmSync(canonicalRoot, { recursive: true, force: true });
+    rmSync(executionRoot, { recursive: true, force: true });
+  });
+  const store = resolveDeliveryOperationStore(canonicalRoot);
+  createOrReuseDeliveryOperation(store, {
+    action: "promote",
+    target: "customer-test-133",
+    gitSha: SHA,
+    version: "2026.07.29-1",
+    idempotencyKey: "version-center:promotion:canonical-store",
+    operationId: OPERATION_ID,
+  });
+  const script = fileURLToPath(
+    new URL("./promotion-executor.mjs", import.meta.url),
+  );
+  const result = spawnSync(
+    process.execPath,
+    [
+      script,
+      "--operation-id",
+      OPERATION_ID,
+      "--bundle-dir",
+      path.join(executionRoot, "bundle"),
+      "--release-manifest",
+      path.join(executionRoot, "release-manifest.json"),
+      "--confirmation",
+      `PROMOTE:customer-test-133:${SHA}:${OPERATION_ID}`,
+      "--json",
+    ],
+    {
+      cwd: executionRoot,
+      env: {
+        ...process.env,
+        [DELIVERY_OPERATION_STORE_REPO_ROOT_ENV]: canonicalRoot,
+      },
+      encoding: "utf8",
+    },
+  );
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /not in the eligible ready state/u);
+  assert.equal(result.stderr.includes(canonicalRoot), false);
 });
 
 function blockedAbsentCustomerConfigPreflight(overrides = {}) {

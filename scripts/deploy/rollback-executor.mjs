@@ -16,6 +16,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import {
+  consumeDeliveryOperationStore,
   listDeliveryOperations,
   readDeliveryOperation,
   resolveDeliveryOperationStore,
@@ -1201,6 +1202,7 @@ or automatically retries a terminal or unknown operation.`);
     }
     const report = executeRollback({
       repoRoot: process.cwd(),
+      operationStore: consumeDeliveryOperationStore(process.cwd()),
       operationId: options.operationId,
       currentReleaseManifestPath: options.currentManifest,
       targetBundleDir: options.targetBundleDir,

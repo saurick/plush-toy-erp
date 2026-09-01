@@ -7,8 +7,10 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
+  consumeDeliveryOperationStore,
   createOrReuseDeliveryOperation,
   DELIVERY_OPERATION_ACTIONS,
+  DELIVERY_OPERATION_STORE_REPO_ROOT_ENV,
   deliveryOperationRequestCounts,
   listDeliveryOperations,
   readDeliveryOperation,
@@ -62,6 +64,27 @@ function runChild(moduleUrl, store, key) {
 
 test("delivery operation registry includes the fixed database rebuild action", () => {
   assert.equal(DELIVERY_OPERATION_ACTIONS.includes("rebuild-database"), true);
+});
+
+test("delivery operation store consumes one explicit canonical repo root", (t) => {
+  const local = createStore(t);
+  const canonical = createStore(t);
+  const env = {
+    KEEP_ME: "safe",
+    [DELIVERY_OPERATION_STORE_REPO_ROOT_ENV]: canonical.root,
+  };
+  assert.equal(consumeDeliveryOperationStore(local.root, env), canonical.store);
+  assert.deepEqual(env, { KEEP_ME: "safe" });
+  assert.equal(consumeDeliveryOperationStore(local.root, env), local.store);
+
+  const invalid = {
+    [DELIVERY_OPERATION_STORE_REPO_ROOT_ENV]: "relative/repository",
+  };
+  assert.throws(
+    () => consumeDeliveryOperationStore(local.root, invalid),
+    /repo root is invalid/u,
+  );
+  assert.deepEqual(invalid, {});
 });
 
 function createStore(t) {
