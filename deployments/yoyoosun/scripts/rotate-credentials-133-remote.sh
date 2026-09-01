@@ -110,7 +110,7 @@ cleanup_restore_database() {
     'dropdb --if-exists --force -U "$POSTGRES_USER" "$1"' \
     sh "$restore_database" >/dev/null 2>&1 || return 1
   docker exec "$postgres_cid" sh -ceu \
-    '[ "$(psql -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -v candidate="$1" -c "SELECT COUNT(*) FROM pg_database WHERE datname = :'\''candidate'\''")" = 0 ]' \
+    '[ "$(printf "%s\n" "SELECT COUNT(*) FROM pg_database WHERE datname = :'\''candidate'\'';" | psql -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -v candidate="$1")" = 0 ]' \
     sh "$restore_database" >/dev/null 2>&1 || return 1
   restore_database_cleanup_required=0
 }
@@ -199,7 +199,7 @@ fi
 docker exec -i "$postgres_cid" sh -ceu 'pg_restore --list >/dev/null' <"$backup_candidate"
 
 docker exec "$postgres_cid" sh -ceu \
-  '[ "$(psql -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -v candidate="$1" -c "SELECT COUNT(*) FROM pg_database WHERE datname = :'\''candidate'\''")" = 0 ]' \
+  '[ "$(printf "%s\n" "SELECT COUNT(*) FROM pg_database WHERE datname = :'\''candidate'\'';" | psql -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -v candidate="$1")" = 0 ]' \
   sh "$restore_database" || {
   echo "credential restore database identity is not preabsent" >&2
   exit 1

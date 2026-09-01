@@ -383,6 +383,22 @@ test("remote closure creates one operation-bound restore-checked backup before r
     remoteSource,
     /psql[^\n]+-c "SELECT COUNT\(\*\) FROM runtime_markers WHERE marker_key/u,
   );
+  assert.equal(
+    remoteSource.match(
+      /printf "%s\\n" "SELECT COUNT\(\*\) FROM pg_database WHERE datname = :/gu,
+    )?.length,
+    2,
+  );
+  assert.equal(
+    remoteSource.match(
+      /\| psql -At -U "\$POSTGRES_USER" -d "\$POSTGRES_DB" -v ON_ERROR_STOP=1 -v candidate="\$1"/gu,
+    )?.length,
+    2,
+  );
+  assert.doesNotMatch(
+    remoteSource,
+    /psql[^\n]+-c "SELECT COUNT\(\*\) FROM pg_database WHERE datname/u,
+  );
   assert.match(
     remoteSource,
     /existing credential backup has no durable receipt/u,
