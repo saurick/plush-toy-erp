@@ -442,13 +442,25 @@ func (uc *ProcessRuntimeUsecase) CompleteLinkedWorkflowTask(ctx context.Context,
 			err,
 		)
 	}
+	var routeErr error
 	if taskStatusKey == "rejected" {
-		if err := uc.settleRejectedProcessAfterNodeCompletion(ctx, completedNode, reason, actorID, commandPayload); err != nil {
-			return nil, err
-		}
+		routeErr = uc.settleRejectedProcessAfterNodeCompletion(ctx, completedNode, reason, actorID, commandPayload)
 	} else {
-		if err := uc.advanceAfterNodeCompletionWithPayload(ctx, completedNode, actorID, commandPayload); err != nil {
-			return nil, err
+		routeErr = uc.advanceAfterNodeCompletionWithPayload(ctx, completedNode, actorID, commandPayload)
+	}
+	if routeErr != nil {
+		if !errors.Is(routeErr, ErrProcessNodeInstanceConflict) {
+			return nil, routeErr
+		}
+		if reconcileErr := uc.reconcileLinkedWorkflowTaskCompletion(
+			ctx,
+			completedNode,
+			taskStatusKey,
+			reason,
+			actorID,
+			commandPayload,
+		); reconcileErr != nil {
+			return nil, reconcileErr
 		}
 	}
 	return completedNode, nil

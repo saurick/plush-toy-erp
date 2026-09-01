@@ -2245,6 +2245,146 @@ func TestProcessRuntimeUsecaseCompleteLinkedWorkflowTaskReconcilesConcurrentNode
 	}
 }
 
+func TestProcessRuntimeUsecaseCompleteLinkedWorkflowTaskReconcilesConcurrentDownstreamActivation(t *testing.T) {
+	const (
+		processID = 10
+		nodeID    = 20
+		nextID    = 21
+	)
+	ownerPoolKey := "order_review"
+	requiredCapabilityKey := PermissionWorkflowTaskComplete
+	baseRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{
+			ID: processID, Status: ProcessStatusActive, ConfigRevision: "yoyoosun-rev-1",
+			BusinessRefType: "sales_order", BusinessRefID: 1001,
+		},
+		nodes: []*ProcessNodeInstance{
+			{
+				ID: nodeID, ProcessInstanceID: processID, NodeKey: "order_approval",
+				NodeType: ProcessNodeTypeApproval, Attempt: 1, Status: ProcessNodeStatusActive, Version: 3,
+			},
+			{
+				ID: nextID, ProcessInstanceID: processID, NodeKey: "order_review",
+				NodeType: ProcessNodeTypeHumanTask, Attempt: 1, Status: ProcessNodeStatusWaiting, Version: 1,
+				OwnerPoolKey: &ownerPoolKey, RequiredCapabilityKey: &requiredCapabilityKey,
+			},
+		},
+	}
+	processRepo := &concurrentActivationProcessRuntimeRepo{
+		memProcessRuntimeRepo: baseRepo,
+		conflictOnce:          true,
+	}
+	workflowRepo := &retryWorkflowRepo{stubWorkflowRepo: stubWorkflowRepo{
+		currentTask: &WorkflowTask{
+			ID: 99, TaskStatusKey: "done", ProcessInstanceID: processTestIntPtr(processID),
+			ProcessNodeInstanceID: processTestIntPtr(nodeID), Payload: map[string]any{"outcome": "approved"},
+		},
+	}}
+	uc := NewProcessRuntimeUsecase(processRepo, workflowRepo, &stubProcessOwnerRoleResolver{
+		explanation: &WorkflowTaskCandidateExplanation{
+			ConfigRevision: "yoyoosun-rev-1", OwnerPoolKey: ownerPoolKey,
+			RequiredCapabilities: []string{requiredCapabilityKey}, CandidateOwnerRoleKeys: []string{PMCRoleKey},
+			Source: "customer_config_revision",
+		},
+	})
+
+	completed, err := uc.CompleteLinkedWorkflowTask(context.Background(), &ProcessLinkedWorkflowTaskCompletion{
+		WorkflowTaskID: 99,
+	}, 7)
+	if err != nil {
+		t.Fatalf("concurrent downstream activation must reconcile: %v", err)
+	}
+	if processRepo.conflictOnce || completed == nil || completed.Status != ProcessNodeStatusCompleted ||
+		completed.Version != 4 || completed.Outcome == nil || *completed.Outcome != "approved" {
+		t.Fatalf("unexpected reconciled downstream activation conflict=%v node=%#v", processRepo.conflictOnce, completed)
+	}
+	if baseRepo.nodes[0].RoutingCompletedAt == nil {
+		t.Fatal("concurrently routed workflow node must retain durable routing evidence")
+	}
+	if baseRepo.nodes[1].Status != ProcessNodeStatusActive || baseRepo.nodes[1].Version != 2 {
+		t.Fatalf("concurrent downstream activation must converge on one active target, got %#v", baseRepo.nodes[1])
+	}
+	if len(workflowRepo.createdByCode) != 1 || workflowRepo.createdByCode["PROC-10-NODE-21-A1"] == nil {
+		t.Fatalf("concurrent downstream activation must create one task, got %#v", workflowRepo.createdByCode)
+	}
+}
+
+func TestProcessRuntimeUsecaseCompleteLinkedWorkflowTaskRejectedReconcilesConcurrentDownstreamActivation(t *testing.T) {
+	const (
+		processID = 10
+		nodeID    = 20
+		nextID    = 21
+	)
+	reason := "客户交期依据不足"
+	branchPolicyKey := "order_approval.decision"
+	ownerPoolKey := "order_review"
+	requiredCapabilityKey := PermissionWorkflowTaskComplete
+	baseRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{
+			ID: processID, Status: ProcessStatusActive, ConfigRevision: "yoyoosun-rev-1",
+			BusinessRefType: "sales_order", BusinessRefID: 1001,
+		},
+		nodes: []*ProcessNodeInstance{
+			{
+				ID: nodeID, ProcessInstanceID: processID, NodeKey: "order_approval",
+				NodeType: ProcessNodeTypeApproval, Attempt: 1, Status: ProcessNodeStatusActive, Version: 3,
+				PolicySnapshot: map[string]any{"branch_policy_key": branchPolicyKey},
+			},
+			{
+				ID: nextID, ProcessInstanceID: processID, NodeKey: "order_revision",
+				NodeType: ProcessNodeTypeHumanTask, Attempt: 1, Status: ProcessNodeStatusWaiting, Version: 1,
+				OwnerPoolKey: &ownerPoolKey, RequiredCapabilityKey: &requiredCapabilityKey,
+			},
+		},
+	}
+	processRepo := &concurrentActivationProcessRuntimeRepo{
+		memProcessRuntimeRepo: baseRepo,
+		conflictOnce:          true,
+	}
+	workflowRepo := &retryWorkflowRepo{stubWorkflowRepo: stubWorkflowRepo{
+		currentTask: &WorkflowTask{
+			ID: 99, TaskStatusKey: "rejected", BlockedReason: &reason,
+			ProcessInstanceID: processTestIntPtr(processID), ProcessNodeInstanceID: processTestIntPtr(nodeID),
+		},
+	}}
+	branchHandler := &stubProcessBranchPolicyHandler{
+		result: &ProcessBranchPolicyResult{NextNodeKey: "order_revision"},
+	}
+	uc := NewProcessRuntimeUsecase(processRepo, workflowRepo, &stubProcessOwnerRoleResolver{
+		explanation: &WorkflowTaskCandidateExplanation{
+			ConfigRevision: "yoyoosun-rev-1", OwnerPoolKey: ownerPoolKey,
+			RequiredCapabilities: []string{requiredCapabilityKey}, CandidateOwnerRoleKeys: []string{SalesRoleKey},
+			Source: "customer_config_revision",
+		},
+	})
+	if err := uc.RegisterBranchPolicyHandler(branchPolicyKey, branchHandler); err != nil {
+		t.Fatalf("register branch policy failed: %v", err)
+	}
+
+	completed, err := uc.CompleteLinkedWorkflowTask(context.Background(), &ProcessLinkedWorkflowTaskCompletion{
+		WorkflowTaskID: 99,
+	}, 7)
+	if err != nil {
+		t.Fatalf("concurrent rejected downstream activation must reconcile: %v", err)
+	}
+	if processRepo.conflictOnce || completed == nil || completed.Status != ProcessNodeStatusCompleted ||
+		completed.Version != 4 || completed.Outcome == nil || *completed.Outcome != "rejected" {
+		t.Fatalf("unexpected rejected downstream activation conflict=%v node=%#v", processRepo.conflictOnce, completed)
+	}
+	if baseRepo.nodes[0].RoutingCompletedAt == nil {
+		t.Fatal("concurrently routed rejected node must retain durable routing evidence")
+	}
+	if baseRepo.nodes[1].Status != ProcessNodeStatusActive || baseRepo.nodes[1].Version != 2 {
+		t.Fatalf("rejected downstream activation must converge on one active target, got %#v", baseRepo.nodes[1])
+	}
+	if len(workflowRepo.createdByCode) != 1 || workflowRepo.createdByCode["PROC-10-NODE-21-A1"] == nil {
+		t.Fatalf("rejected downstream activation must create one task, got %#v", workflowRepo.createdByCode)
+	}
+	if branchHandler.input == nil || branchHandler.input.Reason != reason || branchHandler.input.Outcome != "rejected" {
+		t.Fatalf("rejected reconciliation must retain route evidence, got %#v", branchHandler.input)
+	}
+}
+
 func TestProcessRuntimeUsecaseCompleteLinkedWorkflowTaskRejectsNonMatchingConcurrentCompletion(t *testing.T) {
 	const (
 		processID = 10
