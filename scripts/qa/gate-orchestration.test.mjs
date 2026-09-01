@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { once } from "node:events";
+import { EventEmitter, once } from "node:events";
 import { readFileSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
@@ -8,6 +8,7 @@ import test from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
 
 import {
+  installStyleL1TerminationHandlers,
   isOwnedProcessGroupAlive,
   terminateOwnedProcessGroup,
 } from "../../web/scripts/styleL1.mjs";
@@ -293,6 +294,12 @@ test("full browser evidence is current-worktree self-hosted on an isolated port"
 
   assert.match(style, /target=self-host worktree=/u);
   assert.match(style, /target=external base_url=/u);
+  assert.match(style, /STYLE_L1_OUTPUT_DIR/u);
+  assert.match(style, /STYLE_L1_SCENARIO_MAX_ATTEMPTS/u);
+  assert.match(
+    style,
+    /\[style:l1:scenario\] id=\$\{scenario[.]name\} status=passed/u,
+  );
   assert.match(style, /detached:\s*true/u);
   assert.match(style, /assertPortAvailable\(devServerPort\)/u);
   assert.match(
@@ -314,6 +321,34 @@ test("full production build cannot inherit the DEV server environment", () => {
   );
   assert.equal(full.match(/NODE_ENV=production/gu)?.length, 1);
 });
+
+for (const [signal, exitCode] of [
+  ["SIGTERM", 143],
+  ["SIGINT", 130],
+]) {
+  test(`style cleanup handles ${signal} once before exiting`, async () => {
+    const processRef = new EventEmitter();
+    const exits = [];
+    let cleanupCalls = 0;
+    const termination = installStyleL1TerminationHandlers({
+      processRef,
+      cleanup: async () => {
+        cleanupCalls += 1;
+      },
+      exit: (code) => exits.push(code),
+    });
+    processRef.emit(signal);
+    processRef.emit(signal);
+    processRef.emit(signal === "SIGTERM" ? "SIGINT" : "SIGTERM");
+    await termination.shutdownPromise;
+    assert.equal(termination.signal, signal);
+    assert.equal(cleanupCalls, 1);
+    assert.deepEqual(exits, [exitCode]);
+    termination.dispose();
+    assert.equal(processRef.listenerCount("SIGTERM"), 0);
+    assert.equal(processRef.listenerCount("SIGINT"), 0);
+  });
+}
 
 test("style cleanup SIGKILLs a surviving owned group without touching an unrelated listener", async () => {
   const [ownedPort, unrelatedPort] = await reserveDistinctPorts(2);

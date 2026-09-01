@@ -1025,6 +1025,31 @@ test("a wrapped Git exec-path prefix is normalized through the base PATH", (t) =
   );
 });
 
+test("environment fingerprint reads tool versions from the supplied PATH", (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "plush-receipt-tool-env-"));
+  const bin = path.join(root, "bin");
+  const executable = path.join(bin, "gitleaks");
+  mkdirSync(bin, { recursive: true });
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  writeFileSync(
+    executable,
+    "#!/bin/sh\nprintf '%s\\n' 'gitleaks supplied-path-v1'\n",
+    "utf8",
+  );
+  chmodSync(executable, 0o755);
+  const environment = cleanEnvironment({
+    PATH: `${bin}${path.delimiter}${STABLE_RECEIPT_TOOLS.env.PATH}`,
+  });
+  const first = environmentFingerprint(root, environment);
+  writeFileSync(
+    executable,
+    "#!/bin/sh\nprintf '%s\\n' 'gitleaks supplied-path-v2'\n",
+    "utf8",
+  );
+  const second = environmentFingerprint(root, environment);
+  assert.notEqual(second, first);
+});
+
 test(
   "an unchanged govulncheck version survives one slow version probe",
   { timeout: 30_000 },

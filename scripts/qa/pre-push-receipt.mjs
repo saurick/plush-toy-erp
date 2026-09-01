@@ -972,8 +972,14 @@ function hashFileIfPresent(root, relativePath) {
   };
 }
 
-function toolFingerprint(command, args = ["--version"], timeout = 5_000) {
-  const result = commandResult(command, args, { timeout });
+function toolFingerprint(
+  root,
+  env,
+  command,
+  args = ["--version"],
+  timeout = 5_000,
+) {
+  const result = commandResult(command, args, { cwd: root, env, timeout });
   const version = `${result.stdout}\n${result.stderr}`
     .trim()
     .split("\n")[0];
@@ -1032,13 +1038,13 @@ export function environmentFingerprint(root, env = process.env) {
       version: process.version,
     },
     tools: [
-      toolFingerprint("git"),
-      toolFingerprint("go", ["version"]),
-      toolFingerprint("pnpm"),
-      toolFingerprint("gitleaks", ["version"]),
-      toolFingerprint("govulncheck", ["-version"], 15_000),
-      toolFingerprint("psql"),
-      toolFingerprint("atlas", ["version"]),
+      toolFingerprint(root, env, "git"),
+      toolFingerprint(root, env, "go", ["version"]),
+      toolFingerprint(root, env, "pnpm"),
+      toolFingerprint(root, env, "gitleaks", ["version"]),
+      toolFingerprint(root, env, "govulncheck", ["-version"], 15_000),
+      toolFingerprint(root, env, "psql"),
+      toolFingerprint(root, env, "atlas", ["version"]),
     ],
     dependencies: DEPENDENCY_METADATA_FILES.map((file) =>
       hashFileIfPresent(root, file),

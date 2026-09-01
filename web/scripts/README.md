@@ -38,13 +38,13 @@ pnpm preview:yoyoosun --print-plan
 pnpm preview:yoyoosun
 ```
 
-`STYLE_L1_SCENARIOS` 支持逗号分隔的场景名，适合局部页面回归。默认读取 `config/dev-ports.env` 的专属 style 端口 `6175`；如需显式设置 `STYLE_L1_PORT=<port>`，只能使用该 style 端口或本项目 `15200-15299` 辅助区间，脚本会把实际端口同步给 Vite 和 HMR。
+`STYLE_L1_SCENARIOS` 支持逗号分隔的场景名，适合局部页面回归；`STYLE_L1_SCENARIO_MAX_ATTEMPTS` 只接受 `1` 或 `2`，CI 固定为一次；`STYLE_L1_OUTPUT_DIR` 只接受仓库 `output/` 下的受管目录。默认读取 `config/dev-ports.env` 的专属 style 端口 `6175`；如需显式设置 `STYLE_L1_PORT=<port>`，只能使用该 style 端口或本项目 `15200-15299` 辅助区间，脚本会把实际端口同步给 Vite 和 HMR。
 
-受管前端脚本的默认辅助端口按用途分开：共享真实登录 `15210`、采购合同 `15211`、委外合同 `15212`、采购入库 E2E `15213`、移动认证 `15220`、试用浏览器 `15230`、移动 Workflow `15240`。`start:yoyoosun` / `preview:yoyoosun` 从 `15200` 起探测，但不会越过 `15299`；所有 Vite 入口的统一配置会拒绝主前端 `5175`、样式 `6175` 和本项目辅助块之外的受管监听端口。
+受管前端脚本的默认辅助端口按用途分开：共享真实登录 `15210`、采购合同 `15211`、委外合同 `15212`、采购入库 E2E `15213`、移动认证 `15220`、试用浏览器 `15230`、移动 Workflow `15240`，CI Browser 三条隔离 lane 使用 `15250`、`15251`、`15252`。`start:yoyoosun` / `preview:yoyoosun` 从 `15200` 起探测，但不会越过 `15299`；所有 Vite 入口的统一配置会拒绝主前端 `5175`、样式 `6175` 和本项目辅助块之外的受管监听端口。
 
 ## 写入和输出边界
 
-- `style:l1` 输出浏览器截图、日志和报告到 `web/output/playwright/style-l1/`，不纳入 git。
+- `style:l1` 默认输出浏览器截图、日志和报告到 `web/output/playwright/style-l1/`，不纳入 git；CI 三条 Browser lane 分别写入仓库 `output/` 下按 pipeline/job/lane 隔离的受管目录，取消、超时、成功或失败都按已验证进程组清理浏览器、Vite、端口、lock 与临时目录。
 - `realLoginSmokeShared.mjs --print-input-template` 只打印真实登录 smoke 所需输入和命令模板，不读取本地配置、不校验账号、不调用后端、不启动浏览器、不登录、不写数据库。
 - `realLoginSmokeShared.mjs --preflight-report <path>` 只写本地前置报告，探测后端 health 和管理员凭据来源候选是否存在；不读取 config 内容、不读取密码值、不校验账号、不调用 auth JSON-RPC、不启动 Vite / Playwright、不登录、不写数据库，报告不保存密码、token 或 Authorization header。
 - `mobileAuthLoginRouteSmoke.mjs --print-input-template` 只打印移动端认证回跳 smoke 所需输入、岗位任务端角色和命令模板，不启动 Vite、不启动浏览器、不调用真实后端、不登录、不写数据库。
