@@ -159,7 +159,7 @@ docker exec "$postgres_cid" sh -ceu '[ "$POSTGRES_DB" = "$1" ]' sh "$database" |
   exit 1
 }
 if ! marker_count="$(docker exec "$postgres_cid" sh -ceu \
-  'psql -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -v marker_key="$1" -c "SELECT COUNT(*) FROM runtime_markers WHERE marker_key = :'\''marker_key'\''"' \
+  'printf "%s\n" "SELECT COUNT(*) FROM runtime_markers WHERE marker_key = :'\''marker_key'\'';" | psql -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -v marker_key="$1"' \
   sh "$rotation_marker_key" 2>/dev/null)"; then
   echo "credential rotation marker state is unreadable" >&2
   exit 1
