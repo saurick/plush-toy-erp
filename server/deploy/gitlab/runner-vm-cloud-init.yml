@@ -74,6 +74,11 @@ write_files:
     owner: root:root
     encoding: b64
     content: __PLUSH_RUNNER_CAPACITY_SCRIPT_BASE64__
+  - path: /usr/local/sbin/plush-chromium-sandbox
+    permissions: '0755'
+    owner: root:root
+    encoding: b64
+    content: __PLUSH_RUNNER_CHROMIUM_SANDBOX_SCRIPT_BASE64__
   - path: /etc/plush-runner/capacity-policy.env
     permissions: '0600'
     owner: root:root
@@ -92,20 +97,7 @@ write_files:
   - path: /etc/sudoers.d/90-plush-runner-ci
     permissions: '0440'
     content: |
-      gitlab-runner ALL=(root) NOPASSWD: /usr/bin/install, /usr/local/sbin/plush-remove-chromium-sandbox *
-  - path: /usr/local/sbin/plush-remove-chromium-sandbox
-    permissions: '0755'
-    owner: root:root
-    content: |
-      #!/usr/bin/env bash
-      set -euo pipefail
-      [[ $# -eq 1 && "$1" =~ ^[0-9]+$ ]]
-      sandbox="/usr/local/sbin/chrome-devel-sandbox-$1"
-      if [[ -e "$sandbox" ]]; then
-        [[ -f "$sandbox" && ! -L "$sandbox" ]]
-        rm -f -- "$sandbox"
-      fi
-      test ! -e "$sandbox"
+      gitlab-runner ALL=(root) NOPASSWD: /usr/local/sbin/plush-chromium-sandbox *
   - path: /etc/profile.d/plush-go-module-network.sh
     permissions: '0644'
     content: |
@@ -456,7 +448,16 @@ write_files:
       test "$(stat -c '%U:%G:%a' /var/lib/plush-runner)" = root:root:755
       test ! -e /etc/plush-runner/capacity.env
       test ! -e /var/lib/plush-runner/capacity.json
-      test "$(stat -c '%U:%G:%a' /usr/local/sbin/plush-remove-chromium-sandbox)" = root:root:755
+      test "$(stat -c '%U:%G:%a' /usr/local/sbin/plush-chromium-sandbox)" = root:root:755
+      test "$(stat -c '%U:%G:%a:%h' /etc/sudoers.d/90-plush-runner-ci)" = root:root:440:1
+      visudo -cf /etc/sudoers.d/90-plush-runner-ci >/dev/null
+      runuser -u gitlab-runner -- sudo -n /usr/local/sbin/plush-chromium-sandbox preflight 1 >/dev/null
+      if runuser -u gitlab-runner -- sudo -n /usr/bin/install --version >/dev/null 2>&1; then
+        exit 43
+      fi
+      if runuser -u gitlab-runner -- sudo -n /usr/local/sbin/plush-chromium-sandbox invalid 1 >/dev/null 2>&1; then
+        exit 43
+      fi
       test ! -e /etc/plush-runner/registration.env
   - path: /usr/local/sbin/plush-bootstrap-gitlab-runner
     permissions: '0755'
@@ -484,6 +485,64 @@ write_files:
       test -f "$env_file"
       test ! -L "$env_file"
       test "$(stat -c '%U:%G:%a:%h' "$env_file")" = root:root:600:1
+      registration_env_identity="$(stat -c '%d:%i:%U:%G:%a:%h' "$env_file")"
+      test "$registration_env_identity" = "$(stat -c '%d:%i:%U:%G:%a:%h' "$env_file")"
+
+      config=/etc/gitlab-runner/config.toml
+      registration_started=false
+      registration_committed=false
+      registration_token_cleaned=false
+
+      cleanup_registration_token() {
+        local current_identity cleanup_green=true
+        if [[ "$registration_token_cleaned" == true ]]; then
+          unset GITLAB_RUNNER_TOKEN
+          test ! -e "$env_file"
+          return
+        fi
+        current_identity="$(stat -c '%d:%i:%U:%G:%a:%h' "$env_file" 2>/dev/null || true)"
+        if [[ "$current_identity" != "$registration_env_identity" ]]; then
+          cleanup_green=false
+        elif ! shred -u -- "$env_file"; then
+          cleanup_green=false
+        elif [[ -e "$env_file" ]]; then
+          cleanup_green=false
+        else
+          registration_token_cleaned=true
+        fi
+        unset GITLAB_RUNNER_TOKEN
+        [[ "$cleanup_green" == true ]]
+      }
+
+      rollback_registration() {
+        status=$?
+        trap - EXIT
+        rollback_green=true
+        cleanup_registration_token || rollback_green=false
+        if [[ "$registration_started" == true && "$registration_committed" != true ]]; then
+          systemctl disable --now gitlab-runner >/dev/null 2>&1 || rollback_green=false
+          if [[ -f "$config" && ! -L "$config" ]]; then
+            if gitlab-runner unregister --name r640-kvm-isolated-shell >/dev/null 2>&1; then
+              rm -f -- "$config" || rollback_green=false
+            else
+              rollback_green=false
+            fi
+          elif [[ -e "$config" ]]; then
+            rollback_green=false
+          fi
+          if [[ "$rollback_green" == true ]]; then
+            rm -f -- /etc/plush-runner/capacity.env /var/lib/plush-runner/capacity.json || rollback_green=false
+          fi
+        fi
+        if [[ "$rollback_green" != true ]]; then
+          echo "[runner-registration] status=rollback_incomplete" >&2
+          exit 70
+        fi
+        exit "$status"
+      }
+      trap rollback_registration EXIT
+      trap 'exit 130' HUP INT TERM
+
       test "$(awk 'END {print NR}' "$env_file")" = 1
       GITLAB_RUNNER_TOKEN="$(sed -n 's/^GITLAB_RUNNER_TOKEN=//p' "$env_file")"
       [[ "$GITLAB_RUNNER_TOKEN" =~ ^[A-Za-z0-9_.-]{20,512}$ ]]
@@ -511,41 +570,12 @@ write_files:
 
       /usr/local/sbin/plush-configure-gitlab-route
       verify_canonical_gitlab
-      config=/etc/gitlab-runner/config.toml
       test ! -e "$config"
       test ! -e /etc/plush-runner/capacity.env
       test ! -e /var/lib/plush-runner/capacity.json
       test "$(systemctl is-active gitlab-runner 2>/dev/null || true)" != active
 
-      registration_committed=false
-      rollback_registration() {
-        status=$?
-        trap - EXIT
-        if [[ "$registration_committed" != true ]]; then
-          rollback_green=true
-          systemctl disable --now gitlab-runner >/dev/null 2>&1 || rollback_green=false
-          if [[ -f "$config" && ! -L "$config" ]]; then
-            if gitlab-runner unregister --name r640-kvm-isolated-shell >/dev/null 2>&1; then
-              rm -f -- "$config" || rollback_green=false
-            else
-              rollback_green=false
-            fi
-          elif [[ -e "$config" ]]; then
-            rollback_green=false
-          fi
-          if [[ "$rollback_green" == true ]]; then
-            rm -f -- /etc/plush-runner/capacity.env /var/lib/plush-runner/capacity.json || rollback_green=false
-          fi
-          if [[ "$rollback_green" != true ]]; then
-            echo "[runner-registration] status=rollback_incomplete" >&2
-            exit 70
-          fi
-        fi
-        exit "$status"
-      }
-      trap rollback_registration EXIT
-      trap 'exit 130' HUP INT TERM
-
+      registration_started=true
       gitlab-runner register --non-interactive \
         --url https://gitlab.saurick.me \
         --token "$GITLAB_RUNNER_TOKEN" \
@@ -560,7 +590,9 @@ write_files:
       /usr/local/sbin/plush-runner-capacity \
         --initialize \
         --slots "$RUNNER_CONCURRENT_SLOTS"
-      shred -u "$env_file"
+      cleanup_registration_token
+      test "$registration_token_cleaned" = true
+      test ! -e "$env_file"
       systemctl enable --now gitlab-runner
       test "$(systemctl is-active gitlab-runner)" = active
       test "$(systemctl is-enabled gitlab-runner)" = enabled

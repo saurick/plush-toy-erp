@@ -31,6 +31,18 @@ const expected = Object.freeze({
   range: `${sha}..HEAD`,
 });
 
+test("Server Chromium lane uses only the digest-pinned sandbox helper", () => {
+  assert.match(
+    laneSource,
+    /"\/usr\/local\/sbin\/plush-chromium-sandbox",\n {10}"install"/u,
+  );
+  assert.match(
+    laneSource,
+    /"\/usr\/local\/sbin\/plush-chromium-sandbox",\n {10}"remove"/u,
+  );
+  assert.doesNotMatch(laneSource, /"install",\n {10}"-o",\n {10}"root"/u);
+});
+
 function registry(shard) {
   return shard === "web" ? CI_WEB_QUALITY_LANES : CI_SERVER_QUALITY_LANES;
 }

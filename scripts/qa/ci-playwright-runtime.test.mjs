@@ -7,6 +7,7 @@ import {
   assertPinnedPlaywrightMetadata,
   assertRuntimeAssetObservation,
   canBootstrapRuntimePackage,
+  CI_PLAYWRIGHT_CHROMIUM_SANDBOX_SHA256,
   CI_PLAYWRIGHT_RUNTIME,
   CI_PLAYWRIGHT_RUNTIME_ASSETS,
   CI_PLAYWRIGHT_RUNTIME_LOCAL_SEED_DIRECTORY,
@@ -60,6 +61,14 @@ test("Playwright runtime pins one exact Linux archive set", () => {
     },
   );
   assert.match(CI_PLAYWRIGHT_RUNTIME.archiveSetSha256, /^[0-9a-f]{64}$/u);
+  assert.equal(
+    CI_PLAYWRIGHT_CHROMIUM_SANDBOX_SHA256,
+    "206aa30eeb399b1d10fdf345106b315be01deded548243eb7263c8af2773ab88",
+  );
+  assert.equal(
+    CI_PLAYWRIGHT_RUNTIME_ASSETS[0].sandboxSha256,
+    CI_PLAYWRIGHT_CHROMIUM_SANDBOX_SHA256,
+  );
   assert.deepEqual(
     CI_PLAYWRIGHT_RUNTIME_ASSETS.map(({ name, size, sha256, url }) => ({
       name,

@@ -683,15 +683,11 @@ export async function runCiQualityStageLane({
       await runProcess(
         "sudo",
         [
+          "-n",
+          "/usr/local/sbin/plush-chromium-sandbox",
           "install",
-          "-o",
-          "root",
-          "-g",
-          "root",
-          "-m",
-          "4755",
+          String(env.CI_JOB_ID),
           chromium.sandboxSource,
-          sandboxPath,
         ],
         { cwd: root, env: childEnv },
       );
@@ -779,7 +775,12 @@ export async function runCiQualityStageLane({
     if (sandboxPath) {
       const removed = spawnSync(
         "sudo",
-        ["/usr/local/sbin/plush-remove-chromium-sandbox", String(env.CI_JOB_ID)],
+        [
+          "-n",
+          "/usr/local/sbin/plush-chromium-sandbox",
+          "remove",
+          String(env.CI_JOB_ID),
+        ],
         { cwd: root, stdio: "ignore" },
       );
       const residual = existsSync(sandboxPath);

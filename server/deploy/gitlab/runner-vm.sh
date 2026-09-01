@@ -6,6 +6,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 TEMPLATE_FILE="$SCRIPT_DIR/runner-vm-cloud-init.yml"
 CAPACITY_HELPER="$SCRIPT_DIR/runner-capacity.sh"
+CHROMIUM_SANDBOX_HELPER="$SCRIPT_DIR/runner-chromium-sandbox.sh"
 SOURCE_CAPACITY_FILE="$SCRIPT_DIR/runner-capacity.env"
 DOMAIN=plush-gitlab-runner
 POOL=runner-vm
@@ -69,13 +70,16 @@ for command in awk base64 cloud-localds flock grep install mktemp rm rmdir sha25
 done
 [[ -f "$TEMPLATE_FILE" && ! -L "$TEMPLATE_FILE" ]]
 [[ -f "$CAPACITY_HELPER" && ! -L "$CAPACITY_HELPER" ]]
+[[ -f "$CHROMIUM_SANDBOX_HELPER" && ! -L "$CHROMIUM_SANDBOX_HELPER" ]]
 [[ -f "$SOURCE_CAPACITY_FILE" && ! -L "$SOURCE_CAPACITY_FILE" ]]
 [[ -f "$SSH_PUBLIC_KEY_FILE" && ! -L "$SSH_PUBLIC_KEY_FILE" ]]
 [[ "$(stat -c '%h' "$TEMPLATE_FILE")" == 1 ]]
 [[ "$(stat -c '%h' "$CAPACITY_HELPER")" == 1 ]]
+[[ "$(stat -c '%h' "$CHROMIUM_SANDBOX_HELPER")" == 1 ]]
 [[ "$(stat -c '%h' "$SOURCE_CAPACITY_FILE")" == 1 ]]
 [[ "$(stat -c '%h' "$SSH_PUBLIC_KEY_FILE")" == 1 ]]
 bash -n "$CAPACITY_HELPER"
+bash -n "$CHROMIUM_SANDBOX_HELPER"
 [[ "$(awk 'END {print NR}' "$SOURCE_CAPACITY_FILE")" -eq 1 ]]
 RUNNER_CONCURRENT_SLOTS="$(sed -n 's/^RUNNER_CONCURRENT_SLOTS=//p' "$SOURCE_CAPACITY_FILE")"
 [[ "$RUNNER_CONCURRENT_SLOTS" =~ ^[1-9][0-9]*$ ]]
@@ -99,6 +103,7 @@ SSH_PUBLIC_KEY="$(awk 'NF == 2 && $1 == "ssh-ed25519" && $2 ~ /^[A-Za-z0-9+\/=]+
 for placeholder in \
   __PLUSH_RUNNER_SSH_AUTHORIZED_KEY__ \
   __PLUSH_RUNNER_CAPACITY_SCRIPT_BASE64__ \
+  __PLUSH_RUNNER_CHROMIUM_SANDBOX_SCRIPT_BASE64__ \
   __PLUSH_RUNNER_SLOT_SAFETY_MAX__ \
   __RUNNER_CONCURRENT_SLOTS__; do
   [[ "$(grep -Foc "$placeholder" "$TEMPLATE_FILE")" == 1 ]]
@@ -117,9 +122,10 @@ BASE_VOLUME_KEY="$(virsh -c qemu:///system vol-key --pool "$POOL" "$BASE_VOLUME"
 BASE_VOLUME_SHA256="$(timeout 600 sha256sum -- "$BASE_VOLUME_KEY" | awk '{print $1}')"
 TEMPLATE_SHA256="$(sha256sum "$TEMPLATE_FILE" | awk '{print $1}')"
 HELPER_SHA256="$(sha256sum "$CAPACITY_HELPER" | awk '{print $1}')"
+CHROMIUM_SANDBOX_HELPER_SHA256="$(sha256sum "$CHROMIUM_SANDBOX_HELPER" | awk '{print $1}')"
 SSH_PUBLIC_KEY_SHA256="$(printf '%s' "$SSH_PUBLIC_KEY" | sha256sum | awk '{print $1}')"
 SOURCE_CAPACITY_SHA256="$(sha256sum "$SOURCE_CAPACITY_FILE" | awk '{print $1}')"
-for digest in "$BASE_VOLUME_SHA256" "$TEMPLATE_SHA256" "$HELPER_SHA256" "$SSH_PUBLIC_KEY_SHA256" "$SOURCE_CAPACITY_SHA256"; do
+for digest in "$BASE_VOLUME_SHA256" "$TEMPLATE_SHA256" "$HELPER_SHA256" "$CHROMIUM_SANDBOX_HELPER_SHA256" "$SSH_PUBLIC_KEY_SHA256" "$SOURCE_CAPACITY_SHA256"; do
   [[ "$digest" =~ ^[0-9a-f]{64}$ ]]
 done
 if virsh -c qemu:///system dominfo "$DOMAIN" >/dev/null 2>&1; then
@@ -133,21 +139,16 @@ for volume in "$DISK_VOLUME" "$SEED_VOLUME"; do
   fi
 done
 
-EXPECTED_CONFIRMATION="PROVISION_PLUSH_RUNNER:R640:$DOMAIN:$POOL:$NETWORK:$VCPUS:$MEMORY_MIB:$DISK_GIB:$RUNNER_CONCURRENT_SLOTS:$BASE_VOLUME_SHA256:$TEMPLATE_SHA256:$HELPER_SHA256:$SOURCE_CAPACITY_SHA256:$SSH_PUBLIC_KEY_SHA256"
-echo "[runner-vm] status=preview domain=$DOMAIN pool=$POOL network=$NETWORK vcpus=$VCPUS memoryMiB=$MEMORY_MIB diskGiB=$DISK_GIB runnerConcurrentSlots=$RUNNER_CONCURRENT_SLOTS safetyMax=$SLOT_SAFETY_MAX"
-echo "[runner-vm] confirmation=$EXPECTED_CONFIRMATION"
-if [[ "$MODE" == preview ]]; then
-  exit 0
-fi
+EXPECTED_CONFIRMATION="PROVISION_PLUSH_RUNNER:R640:$DOMAIN:$POOL:$NETWORK:$VCPUS:$MEMORY_MIB:$DISK_GIB:$RUNNER_CONCURRENT_SLOTS:$BASE_VOLUME_SHA256:$TEMPLATE_SHA256:$HELPER_SHA256:$CHROMIUM_SANDBOX_HELPER_SHA256:$SOURCE_CAPACITY_SHA256:$SSH_PUBLIC_KEY_SHA256"
 [[ "$EUID" -eq 0 ]]
-[[ "$CONFIRMATION" == "$EXPECTED_CONFIRMATION" ]]
+if [[ "$MODE" == execute ]]; then
+  [[ "$CONFIRMATION" == "$EXPECTED_CONFIRMATION" ]]
+fi
 
 OPERATION_ROOT="$(mktemp -d /var/tmp/.plush-runner-provision.XXXXXX)"
-chmod 0700 "$OPERATION_ROOT"
 USER_DATA="$OPERATION_ROOT/user-data"
 META_DATA="$OPERATION_ROOT/meta-data"
 SEED_IMAGE="$OPERATION_ROOT/seed.iso"
-HELPER_BASE64="$(base64 -w0 "$CAPACITY_HELPER")"
 
 cleanup_operation_root() {
   rm -f -- "$USER_DATA" "$META_DATA" "$SEED_IMAGE"
@@ -165,14 +166,20 @@ cleanup_uncommitted_render() {
 }
 trap cleanup_uncommitted_render EXIT
 
+chmod 0700 "$OPERATION_ROOT"
+HELPER_BASE64="$(base64 -w0 "$CAPACITY_HELPER")"
+CHROMIUM_SANDBOX_HELPER_BASE64="$(base64 -w0 "$CHROMIUM_SANDBOX_HELPER")"
+
 awk \
   -v ssh_key="$SSH_PUBLIC_KEY" \
   -v helper="$HELPER_BASE64" \
+  -v chromium_sandbox_helper="$CHROMIUM_SANDBOX_HELPER_BASE64" \
   -v runner_concurrent_slots="$RUNNER_CONCURRENT_SLOTS" \
   -v safety_max="$SLOT_SAFETY_MAX" '
   {
     gsub(/__PLUSH_RUNNER_SSH_AUTHORIZED_KEY__/, ssh_key)
     gsub(/__PLUSH_RUNNER_CAPACITY_SCRIPT_BASE64__/, helper)
+    gsub(/__PLUSH_RUNNER_CHROMIUM_SANDBOX_SCRIPT_BASE64__/, chromium_sandbox_helper)
     gsub(/__PLUSH_RUNNER_SLOT_SAFETY_MAX__/, safety_max)
     gsub(/__RUNNER_CONCURRENT_SLOTS__/, runner_concurrent_slots)
     print
@@ -186,6 +193,17 @@ printf 'instance-id: plush-gitlab-runner\nlocal-hostname: plush-gitlab-runner\n'
 chmod 0600 "$USER_DATA" "$META_DATA"
 cloud-localds "$SEED_IMAGE" "$USER_DATA" "$META_DATA"
 chmod 0600 "$SEED_IMAGE"
+
+if [[ "$MODE" == preview ]]; then
+  cleanup_operation_root
+  trap - EXIT
+  [[ ! -e "$OPERATION_ROOT" ]]
+  echo "[runner-vm] status=preview domain=$DOMAIN pool=$POOL network=$NETWORK vcpus=$VCPUS memoryMiB=$MEMORY_MIB diskGiB=$DISK_GIB runnerConcurrentSlots=$RUNNER_CONCURRENT_SLOTS safetyMax=$SLOT_SAFETY_MAX renderValidated=true cleanup=complete"
+  echo "[runner-vm] confirmation=$EXPECTED_CONFIRMATION"
+  exit 0
+fi
+echo "[runner-vm] status=preview domain=$DOMAIN pool=$POOL network=$NETWORK vcpus=$VCPUS memoryMiB=$MEMORY_MIB diskGiB=$DISK_GIB runnerConcurrentSlots=$RUNNER_CONCURRENT_SLOTS safetyMax=$SLOT_SAFETY_MAX renderValidated=true cleanup=pending"
+echo "[runner-vm] confirmation=$EXPECTED_CONFIRMATION"
 
 COMMITTED=false
 DOMAIN_CREATED=false

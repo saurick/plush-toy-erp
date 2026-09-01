@@ -30,6 +30,8 @@ const PLAYWRIGHT_VERSION = "1.58.2";
 const CHROMIUM_VERSION = "145.0.7632.6";
 const CHROMIUM_REVISION = "1208";
 const FFMPEG_REVISION = "1011";
+export const CI_PLAYWRIGHT_CHROMIUM_SANDBOX_SHA256 =
+  "206aa30eeb399b1d10fdf345106b315be01deded548243eb7263c8af2773ab88";
 const PACKAGE_NAME = "plush-ci-playwright-runtime";
 const PACKAGE_VERSION = "playwright-1.58.2-linux-x64-r1208-v1";
 const PACKAGE_FILE = "runtime.tar";
@@ -48,6 +50,7 @@ export const CI_PLAYWRIGHT_RUNTIME_ASSETS = Object.freeze([
     directory: "chromium-1208",
     executable: path.join("chrome-linux64", "chrome"),
     sandbox: path.join("chrome-linux64", "chrome_sandbox"),
+    sandboxSha256: CI_PLAYWRIGHT_CHROMIUM_SANDBOX_SHA256,
   }),
   Object.freeze({
     name: "chrome-headless-shell-linux64.zip",
@@ -653,7 +656,16 @@ function verifyMaterializedRuntime(browserDirectory) {
     assertPrivateDirectory(directory);
     assertRegularFile(path.join(directory, "INSTALLATION_COMPLETE"));
     assertExecutable(path.join(directory, asset.executable));
-    if (asset.sandbox) assertRegularFile(path.join(directory, asset.sandbox));
+    if (asset.sandbox) {
+      const sandbox = path.join(directory, asset.sandbox);
+      assertRegularFile(sandbox);
+      const sandboxSha256 = createHash("sha256")
+        .update(readFileSync(sandbox))
+        .digest("hex");
+      if (sandboxSha256 !== asset.sandboxSha256) {
+        throw new Error("Playwright Chromium sandbox checksum mismatch");
+      }
+    }
   }
   const chromium = CI_PLAYWRIGHT_RUNTIME_ASSETS[0];
   return Object.freeze({

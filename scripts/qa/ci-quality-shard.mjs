@@ -289,9 +289,18 @@ async function installChromiumSandbox(
 ) {
   await runProcess(
     "sudo",
-    ["install", "-o", "root", "-g", "root", "-m", "4755", sandboxSource, sandboxPath],
+    [
+      "-n",
+      "/usr/local/sbin/plush-chromium-sandbox",
+      "install",
+      String(childEnv.CI_JOB_ID),
+      sandboxSource,
+    ],
     { cwd: root, env: childEnv },
   );
+  if (sandboxPath !== `/usr/local/sbin/chrome-devel-sandbox-${childEnv.CI_JOB_ID}`) {
+    throw new Error("Chromium sandbox destination identity mismatch");
+  }
 }
 
 function balancedCounts(value = {}) {
@@ -537,7 +546,12 @@ export async function runCiQualityShard({
     if (sandboxPath) {
       const removed = spawnSync(
         "sudo",
-        ["/usr/local/sbin/plush-remove-chromium-sandbox", String(env.CI_JOB_ID)],
+        [
+          "-n",
+          "/usr/local/sbin/plush-chromium-sandbox",
+          "remove",
+          String(env.CI_JOB_ID),
+        ],
         {
           cwd: root,
           stdio: "ignore",

@@ -62,6 +62,15 @@ test("only the Browser canonical shard materializes and cleans its verified runt
     source,
     /if \(shard === "browser"\)/u,
   );
+  assert.match(
+    source,
+    /"\/usr\/local\/sbin\/plush-chromium-sandbox",\n {6}"install"/u,
+  );
+  assert.match(
+    source,
+    /"\/usr\/local\/sbin\/plush-chromium-sandbox",\n {10}"remove"/u,
+  );
+  assert.doesNotMatch(source, /\["install", "-o", "root"/u);
 });
 
 test("only the Node canonical shard installs cached Web dependencies", () => {

@@ -1,6 +1,21 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+
+import {
+  CI_PLAYWRIGHT_CHROMIUM_SANDBOX_SHA256,
+  CI_PLAYWRIGHT_RUNTIME_ASSETS,
+} from "./ci-playwright-runtime.mjs";
+
+const repositoryRoot = new URL("../../", import.meta.url);
+const trackedFiles = execFileSync("git", ["ls-files", "-z"], {
+  cwd: repositoryRoot,
+  encoding: "utf8",
+  env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
+})
+  .split("\0")
+  .filter(Boolean);
 
 const workflow = readFileSync(
   new URL("../../.gitlab-ci.yml", import.meta.url),
@@ -39,6 +54,13 @@ const runnerCapacity = readFileSync(
 );
 const runnerCapacityPolicy = readFileSync(
   new URL("../../server/deploy/gitlab/runner-capacity.env", import.meta.url),
+  "utf8",
+);
+const runnerChromiumSandbox = readFileSync(
+  new URL(
+    "../../server/deploy/gitlab/runner-chromium-sandbox.sh",
+    import.meta.url,
+  ),
   "utf8",
 );
 const runnerVm = readFileSync(
@@ -223,8 +245,17 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   assert.match(workflow, /ci-playwright-runtime[.]mjs cleanup/u);
   assert.match(
     workflow,
-    /test "\$\(stat -c '%U:%G:%a' \/usr\/local\/sbin\/plush-remove-chromium-sandbox\)" = root:root:755\n {6}sudo -n -l \/usr\/local\/sbin\/plush-remove-chromium-sandbox "\$CI_JOB_ID" >\/dev\/null/u,
+    /test "\$\(stat -c '%U:%G:%a' \/usr\/local\/sbin\/plush-chromium-sandbox\)" = root:root:755\n {6}sudo -n \/usr\/local\/sbin\/plush-chromium-sandbox preflight "\$CI_JOB_ID" >\/dev\/null/u,
   );
+  assert.match(
+    workflow,
+    /sudo -n \/usr\/local\/sbin\/plush-chromium-sandbox install "\$CI_JOB_ID" "\$sandbox_source"/u,
+  );
+  assert.match(
+    workflow,
+    /sudo -n \/usr\/local\/sbin\/plush-chromium-sandbox remove "\$CI_JOB_ID"/u,
+  );
+  assert.doesNotMatch(workflow, /sudo (?:-n )?install /u);
   assert.match(
     workflow,
     new RegExp(
@@ -517,6 +548,52 @@ test("R640 GitLab definitions pin identity, separate SSD data and require exact 
   assert.match(runnerRegistration, /--token "\$GITLAB_RUNNER_TOKEN"/u);
   assert.doesNotMatch(runnerRegistration, /source "\$env_file"/u);
   assert.match(runnerRegistration, /GITLAB_RUNNER_TOKEN=.*sed -n/u);
+  assert.match(runnerRegistration, /registration_env_identity=.*stat -c/u);
+  assert.match(runnerRegistration, /registration_started=false/u);
+  assert.match(
+    runnerRegistration,
+    /registration_started=true\n      gitlab-runner register/u,
+  );
+  assert.match(
+    runnerRegistration,
+    /registration_started" == true && "\$registration_committed" != true/u,
+  );
+  assert.match(runnerRegistration, /cleanup_registration_token/u);
+  const tokenCleanupTrapIndex = runnerRegistration.indexOf(
+    "trap rollback_registration EXIT",
+  );
+  assert.ok(tokenCleanupTrapIndex >= 0);
+  for (const tokenConsumer of [
+    `test "$(awk 'END {print NR}' "$env_file")" = 1`,
+    `GITLAB_RUNNER_TOKEN="$(sed -n`,
+    "/usr/local/sbin/plush-configure-gitlab-route",
+  ]) {
+    assert.ok(
+      tokenCleanupTrapIndex < runnerRegistration.indexOf(tokenConsumer),
+      `the exact token cleanup trap must precede ${tokenConsumer}`,
+    );
+  }
+  assert.match(runnerRegistration, /shred -u -- "\$env_file"/u);
+  assert.match(runnerRegistration, /test ! -e "\$env_file"/u);
+  const registrationExecution = runnerRegistration.slice(
+    runnerRegistration.indexOf("/usr/local/sbin/plush-configure-gitlab-route"),
+  );
+  const initializeIndex = registrationExecution.indexOf("--initialize");
+  const successCleanupIndex = registrationExecution.indexOf(
+    "cleanup_registration_token",
+  );
+  const serviceEnableIndex = registrationExecution.indexOf(
+    "systemctl enable --now gitlab-runner",
+  );
+  const commitIndex = registrationExecution.indexOf(
+    "registration_committed=true",
+  );
+  assert.ok(
+    initializeIndex >= 0 &&
+      initializeIndex < successCleanupIndex &&
+      successCleanupIndex < serviceEnableIndex &&
+      serviceEnableIndex < commitIndex,
+  );
   assert.match(runnerRegistration, /rollback_registration/u);
   assert.match(runnerRegistration, /gitlab-runner unregister --name r640-kvm-isolated-shell/u);
   assert.match(runnerRegistration, /--name r640-kvm-isolated-shell/u);
@@ -535,8 +612,12 @@ test("R640 GitLab definitions pin identity, separate SSD data and require exact 
   );
   assert.match(runnerCloudInit, /libnss3/u);
   assert.equal(runnerCloudInit.match(/^  - curl$/gmu)?.length ?? 0, 1);
-  assert.match(runnerCloudInit, /plush-remove-chromium-sandbox/u);
-  assert.match(runnerCloudInit, /chrome-devel-sandbox-\$1/u);
+  assert.match(runnerCloudInit, /plush-chromium-sandbox/u);
+  assert.match(
+    runnerCloudInit,
+    /NOPASSWD: \/usr\/local\/sbin\/plush-chromium-sandbox \*/u,
+  );
+  assert.doesNotMatch(runnerCloudInit, /NOPASSWD: \/usr\/bin\/install/u);
   assert.doesNotMatch(runnerCloudInit, /NOPASSWD: \/usr\/bin\/apt-get/u);
   assert.match(runnerCloudInit, /ssh_pwauth: false/u);
   assert.match(runnerCloudInit, /disable_root: true/u);
@@ -548,6 +629,7 @@ test("Runner provisioning and capacity stay parameterized and fail closed", () =
   for (const placeholder of [
     "__PLUSH_RUNNER_SSH_AUTHORIZED_KEY__",
     "__PLUSH_RUNNER_CAPACITY_SCRIPT_BASE64__",
+    "__PLUSH_RUNNER_CHROMIUM_SANDBOX_SCRIPT_BASE64__",
     "__PLUSH_RUNNER_SLOT_SAFETY_MAX__",
     "__RUNNER_CONCURRENT_SLOTS__",
   ]) {
@@ -565,10 +647,41 @@ test("Runner provisioning and capacity stay parameterized and fail closed", () =
   assert.match(runnerVm, /timeout 600 sha256sum/u);
   assert.match(runnerVm, /TEMPLATE_SHA256/u);
   assert.match(runnerVm, /HELPER_SHA256/u);
+  assert.match(runnerVm, /CHROMIUM_SANDBOX_HELPER_SHA256/u);
   assert.match(runnerVm, /SSH_PUBLIC_KEY_SHA256/u);
   assert.match(runnerVm, /domain_exists/u);
   assert.match(runnerVm, /volume_exists/u);
   assert.match(runnerVm, /status=rollback_incomplete/u);
+  assert.match(runnerVm, /renderValidated=true cleanup=complete/u);
+  const renderRootIndex = runnerVm.indexOf('OPERATION_ROOT="$(mktemp -d');
+  const renderTrapIndex = runnerVm.indexOf("trap cleanup_uncommitted_render EXIT");
+  for (const renderConsumer of [
+    'chmod 0700 "$OPERATION_ROOT"',
+    'HELPER_BASE64="$(base64 -w0',
+    "CHROMIUM_SANDBOX_HELPER_BASE64=",
+    "awk \\",
+    'cloud-localds "$SEED_IMAGE"',
+  ]) {
+    assert.ok(
+      renderRootIndex >= 0 &&
+        renderRootIndex < renderTrapIndex &&
+        renderTrapIndex < runnerVm.indexOf(renderConsumer),
+      `render cleanup trap must precede ${renderConsumer}`,
+    );
+  }
+  assert.ok(
+    runnerVm.indexOf("trap rollback EXIT") <
+      runnerVm.indexOf("virsh -c qemu:///system vol-clone"),
+  );
+  assert.ok(
+    runnerVm.indexOf('cloud-localds "$SEED_IMAGE"') <
+      runnerVm.indexOf('if [[ "$MODE" == preview ]]'),
+    "preview must use the production renderer before returning",
+  );
+  assert.match(
+    runnerVm,
+    /if \[\[ "\$MODE" == preview \]\]; then\n  cleanup_operation_root\n  trap - EXIT\n  \[\[ ! -e "\$OPERATION_ROOT" \]\][\s\S]+?renderValidated=true cleanup=complete/u,
+  );
   assert.match(runnerVm, /flock -n 9/u);
   assert.match(runnerVm, /LOCK_DIR=\/run\/plush-runner-vm/u);
   assert.match(runnerVm, /domain_state.*shut off/u);
@@ -612,6 +725,77 @@ test("Runner provisioning and capacity stay parameterized and fail closed", () =
   assert.match(runnerCapacityEvidence, /"--evidence"/u);
   assert.doesNotMatch(runnerCapacity, /SLOTS="?\$\([^\n]*nproc/u);
   assert.doesNotMatch(runnerCloudInit, /concurrent = (?:4|12|48)|limit = (?:4|12|48)/u);
+});
+
+test("Runner Chromium sandbox uses one digest-pinned minimal sudo helper", () => {
+  assert.match(runnerChromiumSandbox, /\$\{SUDO_USER:-\}" == gitlab-runner/u);
+  assert.match(
+    runnerChromiumSandbox,
+    new RegExp(`EXPECTED_SANDBOX_SHA256=${CI_PLAYWRIGHT_CHROMIUM_SANDBOX_SHA256}`, "u"),
+  );
+  assert.match(runnerChromiumSandbox, /case "\$ACTION" in/u);
+  for (const action of ["preflight", "install", "remove"]) {
+    assert.match(runnerChromiumSandbox, new RegExp(`^${action}\\)`, "mu"));
+  }
+  assert.match(
+    runnerChromiumSandbox,
+    new RegExp(
+      `playwright-"\\$JOB_ID"/${CI_PLAYWRIGHT_RUNTIME_ASSETS[0].directory}/${CI_PLAYWRIGHT_RUNTIME_ASSETS[0].sandbox}`,
+      "u",
+    ),
+  );
+  assert.match(
+    runnerChromiumSandbox,
+    /LOCK_FILE="\$LOCK_DIR\/operation[.]lock"/u,
+  );
+  assert.match(runnerChromiumSandbox, /flock -w 30 9/u);
+  assert.doesNotMatch(runnerChromiumSandbox, /flock -n 9/u);
+  assert.match(
+    runnerChromiumSandbox,
+    /\$candidate_identity" =~ \^\$TEMPORARY_IDENTITY:root:root:\[12\]\$/u,
+  );
+  const installBranch = runnerChromiumSandbox.slice(
+    runnerChromiumSandbox.indexOf("install)"),
+    runnerChromiumSandbox.indexOf("remove)"),
+  );
+  const orderedInstallSteps = [
+    "trap rollback_install EXIT",
+    'TEMPORARY="$(mktemp',
+    'install -o root -g root -m 0700 "$SOURCE" "$TEMPORARY"',
+    'sha256sum "$TEMPORARY"',
+    'chmod 4755 "$TEMPORARY"',
+    'ln -- "$TEMPORARY" "$DESTINATION"',
+    'unlink -- "$TEMPORARY"',
+    "validate_published_sandbox",
+    "COMMITTED=true",
+    "trap - EXIT",
+  ];
+  let previousIndex = -1;
+  for (const step of orderedInstallSteps) {
+    const stepIndex = installBranch.indexOf(step, previousIndex + 1);
+    assert.ok(stepIndex > previousIndex, `sandbox helper step order: ${step}`);
+    previousIndex = stepIndex;
+  }
+  assert.match(runnerChromiumSandbox, /status=rollback_incomplete/u);
+  assert.doesNotMatch(runnerChromiumSandbox, /rm -rf|eval|source /u);
+});
+
+test("Runner live secret state and duplicate TOML truth cannot enter the tracked tree", () => {
+  const forbiddenRunnerState = trackedFiles.filter(
+    (file) =>
+      /(?:^|\/)registration[.]env$/u.test(file) ||
+      /(?:^|\/)runner-config(?:[.][^/]*)?[.]toml$/u.test(file) ||
+      /(?:^|\/)gitlab-runner\/config[.]toml$/u.test(file) ||
+      /^server\/deploy\/gitlab\/.*[.]toml$/u.test(file),
+  );
+
+  assert.deepEqual(forbiddenRunnerState, []);
+  assert.doesNotMatch(
+    runnerCloudInit,
+    /path: \/etc\/gitlab-runner\/config[.]toml/u,
+  );
+  assert.match(runnerCloudInit, /gitlab-runner register --non-interactive/u);
+  assert.match(runnerCapacity, /CONFIG_FILE=\/etc\/gitlab-runner\/config[.]toml/u);
 });
 
 test("Runner capacity observation reuses the seven-shard exact-SHA evidence", () => {

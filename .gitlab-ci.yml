@@ -176,8 +176,8 @@ prepare:
     - |
       set -euo pipefail
       node scripts/qa/ci-runner-capacity-evidence.mjs
-      test "$(stat -c '%U:%G:%a' /usr/local/sbin/plush-remove-chromium-sandbox)" = root:root:755
-      sudo -n -l /usr/local/sbin/plush-remove-chromium-sandbox "$CI_JOB_ID" >/dev/null
+      test "$(stat -c '%U:%G:%a' /usr/local/sbin/plush-chromium-sandbox)" = root:root:755
+      sudo -n /usr/local/sbin/plush-chromium-sandbox preflight "$CI_JOB_ID" >/dev/null
       pnpm --dir web install --frozen-lockfile
       node scripts/qa/ci-playwright-runtime.mjs seed
       (cd server && go mod download)
@@ -510,7 +510,7 @@ quality_affected:
           docker rm --force "$postgres_name" >/dev/null || cleanup_status=1
         fi
         if [[ -n "$sandbox_path" ]]; then
-          sudo /usr/local/sbin/plush-remove-chromium-sandbox "$CI_JOB_ID" || cleanup_status=1
+          sudo -n /usr/local/sbin/plush-chromium-sandbox remove "$CI_JOB_ID" || cleanup_status=1
         fi
         if [[ "$runtime_materialized" == "true" ]]; then
           node scripts/qa/ci-playwright-runtime.mjs cleanup || cleanup_status=1
@@ -553,7 +553,7 @@ quality_affected:
         sandbox_path="/usr/local/sbin/chrome-devel-sandbox-$CI_JOB_ID"
         test -x "$chrome_path"
         test -f "$sandbox_source"
-        sudo install -o root -g root -m 4755 "$sandbox_source" "$sandbox_path"
+        sudo -n /usr/local/sbin/plush-chromium-sandbox install "$CI_JOB_ID" "$sandbox_source"
         export CHROME_DEVEL_SANDBOX="$sandbox_path"
         export ERP_PDF_CHROME_PATH="$chrome_path"
       fi
