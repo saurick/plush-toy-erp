@@ -95,7 +95,29 @@ test("rollback qualification permits only equal migration and config identity", 
   assert.equal(validateRollbackManifest(manifest).status, "eligible");
   assert.equal(manifest.rollback.mode, "code_and_images_only");
   assert.equal(manifest.rollback.automaticDatabaseDownMigration, false);
+  assert.deepEqual(manifest.transport, {
+    mode: "legacy_target_cache",
+    targetManifestSha256: "6".repeat(64),
+  });
   assert.deepEqual(manifest.blockers, []);
+  const drifted = structuredClone(manifest);
+  drifted.transport.targetManifestSha256 = "7".repeat(64);
+  assert.throws(
+    () => validateRollbackManifest(drifted),
+    /transport identity/u,
+  );
+  const withoutTransport = structuredClone(manifest);
+  delete withoutTransport.transport;
+  assert.throws(
+    () => validateRollbackManifest(withoutTransport),
+    /transport identity/u,
+  );
+  const withoutReleaseSchema = structuredClone(manifest);
+  delete withoutReleaseSchema.to.schemaVersion;
+  assert.throws(
+    () => validateRollbackManifest(withoutReleaseSchema),
+    /image identity/u,
+  );
 });
 
 test("rollback qualification blocks schema, config and runtime mismatch", () => {

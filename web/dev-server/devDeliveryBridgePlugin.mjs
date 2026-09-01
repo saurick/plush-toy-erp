@@ -17,6 +17,11 @@ import { createGitlabDeliveryProvider } from '../../scripts/deploy/gitlab-delive
 import { preparePromotion } from '../../scripts/deploy/promotion-controller.mjs'
 import { prepareRollback } from '../../scripts/deploy/rollback-controller.mjs'
 import {
+  buildTargetReleaseCacheIdentity,
+  probeTargetReleaseCache,
+  targetReleaseCacheEvidenceFingerprint,
+} from '../../scripts/deploy/target-release-cache.mjs'
+import {
   assertOfficialReleaseVersion,
   buildReleaseVersionCatalog,
 } from '../../scripts/deploy/release-version-catalog.mjs'
@@ -444,7 +449,9 @@ function publicOperation(
   const controlTransferBytes = metricInteger('controlTransferBytes')
   const controlTransferDurationMs = metricInteger('controlTransferDurationMs')
   const publicTransferBytes =
-    targetAcquisitionBytes ?? controlTransferBytes ?? metricInteger('transferBytes')
+    targetAcquisitionBytes ??
+    controlTransferBytes ??
+    metricInteger('transferBytes')
   const publicTransferDurationMs =
     (targetAcquisitionBytes !== null &&
     Number.isSafeInteger(targetAcquisitionDurationMs)
@@ -457,8 +464,8 @@ function publicOperation(
       ? Math.round((publicTransferBytes * 1000) / publicTransferDurationMs)
       : publicTransferBytes === 0 && publicTransferDurationMs !== null
         ? 0
-        : metricInteger('controlTransferBytesPerSecond') ??
-          metricInteger('transferBytesPerSecond')
+        : (metricInteger('controlTransferBytesPerSecond') ??
+          metricInteger('transferBytesPerSecond'))
   return {
     id: operation.id,
     action: operation.action,
@@ -565,6 +572,8 @@ export function createDevDeliveryService({
   classifyRelation = classifyGitAncestryRelation,
   preparePromotionAction = preparePromotion,
   prepareRollbackAction = prepareRollback,
+  buildCacheIdentity = buildTargetReleaseCacheIdentity,
+  probeCache = probeTargetReleaseCache,
   readRecoveryEvidence = readLatestBackupRestoreEvidence,
   spawnProcess = spawn,
   now = () => new Date().toISOString(),
@@ -574,8 +583,23 @@ export function createDevDeliveryService({
 } = {}) {
   const root = path.resolve(projectRoot || process.cwd())
   const store = operationStore || resolveDeliveryOperationStore(root)
+  const targetFetchToken =
+    env.PLUSH_GITLAB_TARGET_FETCH_TOKEN ||
+    (env === process.env
+      ? undefined
+      : process.env.PLUSH_GITLAB_TARGET_FETCH_TOKEN)
+  delete env.PLUSH_GITLAB_TARGET_FETCH_TOKEN
+  delete process.env.PLUSH_GITLAB_TARGET_FETCH_TOKEN
+  const providerEnvironment = { ...env }
+  delete providerEnvironment.PLUSH_GITLAB_TARGET_FETCH_TOKEN
   const deliveryProvider =
-    provider || createConfiguredDeliveryProvider({ projectRoot: root, env })
+    provider ||
+    createConfiguredDeliveryProvider({
+      projectRoot: root,
+      env: providerEnvironment,
+    })
+  delete env.PLUSH_GITLAB_TOKEN
+  delete process.env.PLUSH_GITLAB_TOKEN
   const providerKey =
     deliveryProvider.provider === 'github' ? 'github' : 'gitlab'
   const providerName = providerKey === 'gitlab' ? 'GitLab' : 'GitHub'
@@ -584,6 +608,16 @@ export function createDevDeliveryService({
   const initializationPreflightCache = new Map()
   let pipelineTimingCache = null
 
+  function executorEnvironment({ targetFetch = false } = {}) {
+    const childEnv = { ...process.env }
+    delete childEnv.PLUSH_GITLAB_TOKEN
+    delete childEnv.PLUSH_GITLAB_TARGET_FETCH_TOKEN
+    if (targetFetch && targetFetchToken) {
+      childEnv.PLUSH_GITLAB_TARGET_FETCH_TOKEN = targetFetchToken
+    }
+    return childEnv
+  }
+
   function presentOperation(operation, options = {}) {
     const requestCount =
       deliveryOperationRequestCounts(store).get(operation.id) || 1
@@ -591,6 +625,62 @@ export function createDevDeliveryService({
   }
 
   recoverInterruptedDeliveryOperations(store, now())
+
+  function releaseControlIdentity(download) {
+    if (download?.transportMode === 'v2_direct') {
+      const manifest = download.fetch?.formal?.files?.find(
+        (file) => file.name === 'release-manifest.json'
+      )
+      if (!/^[0-9a-f]{64}$/u.test(String(manifest?.sha256 || ''))) {
+        throw new Error('v2 target-direct release transport is invalid')
+      }
+      return Object.freeze({
+        mode: 'gitlab_internal_or_target_cache',
+        manifestSha256: manifest.sha256,
+        identity: null,
+      })
+    }
+    if (download?.transportMode !== 'legacy_v1_cache_only') {
+      throw new Error('release transport mode is unsupported')
+    }
+    const identity = buildCacheIdentity({
+      bundleDir: download.directory,
+      releaseManifestPath: path.join(
+        download.directory,
+        'release-manifest.json'
+      ),
+    })
+    return Object.freeze({
+      mode: 'legacy_target_cache',
+      manifestSha256: identity.releaseManifestSha256,
+      identity,
+    })
+  }
+
+  async function qualifyReleaseTransport(download, targetKey) {
+    const control = releaseControlIdentity(download)
+    if (control.mode === 'gitlab_internal_or_target_cache') {
+      return Object.freeze({ ...control, cacheFingerprint: null })
+    }
+    const probe = await Promise.resolve(
+      probeCache(control.identity, { targetKey })
+    )
+    if (
+      control.identity.cacheMode !== 'legacy_v1_existing_only' ||
+      probe.packageHit !== true ||
+      probe.cacheSource !== 'formal'
+    ) {
+      throw new Error('legacy target rollback cache is unavailable')
+    }
+    return Object.freeze({
+      ...control,
+      cacheFingerprint: targetReleaseCacheEvidenceFingerprint({
+        targetKey,
+        identity: control.identity,
+        probe,
+      }),
+    })
+  }
 
   async function reconcileWaitingOperations() {
     for (const operation of listDeliveryOperations(store, { limit: 100 })) {
@@ -966,6 +1056,13 @@ export function createDevDeliveryService({
     const downloaded = await Promise.resolve(
       deliveryProvider.downloadReleaseControl(payload.gitSha, destination)
     )
+    const candidateTransport = await qualifyReleaseTransport(
+      downloaded,
+      payload.target
+    )
+    if (candidateTransport.mode !== 'gitlab_internal_or_target_cache') {
+      throw new Error('promotion candidate requires the v2 target transport')
+    }
     const result = await Promise.resolve(
       preparePromotionAction(
         {
@@ -1018,11 +1115,15 @@ export function createDevDeliveryService({
           }
         )
         try {
-          await Promise.resolve(
+          const currentDownload = await Promise.resolve(
             deliveryProvider.downloadReleaseControl(
               currentGitSha,
               releaseControlDirectory(root, currentGitSha)
             )
+          )
+          const currentTransport = await qualifyReleaseTransport(
+            currentDownload,
+            payload.target
           )
           preparedOperation = transitionDeliveryOperation(
             store,
@@ -1035,6 +1136,10 @@ export function createDevDeliveryService({
                 ...preparedOperation.metadata,
                 currentGitSha,
                 currentReleaseTransportVerified: true,
+                currentReleaseTransportMode: currentTransport.mode,
+                currentReleaseManifestSha256: currentTransport.manifestSha256,
+                currentReleaseCacheFingerprint:
+                  currentTransport.cacheFingerprint,
               },
               now: now(),
             }
@@ -1135,9 +1240,18 @@ export function createDevDeliveryService({
           operationStore: store,
           retryOfOperationId,
         },
-        { runPreflight, now }
+        { runPreflight, buildCacheIdentity, probeCache, now }
       )
     )
+    const expectedTargetTransport =
+      targetDownload.transportMode === 'legacy_v1_cache_only'
+        ? 'legacy_target_cache'
+        : targetDownload.transportMode === 'v2_direct'
+          ? 'gitlab_internal_or_target_cache'
+          : 'unsupported'
+    if (result.plan?.transport?.mode !== expectedTargetTransport) {
+      throw new Error('rollback release transport does not match its plan')
+    }
     preflightCache.delete(payload.target)
     return {
       operation: presentOperation(result.operation),
@@ -1271,12 +1385,26 @@ export function createDevDeliveryService({
         throw new Error('current release rollback transport is unavailable')
       }
       try {
-        await Promise.resolve(
+        const currentDownload = await Promise.resolve(
           deliveryProvider.downloadReleaseControl(
             currentGitSha,
             releaseControlDirectory(root, currentGitSha)
           )
         )
+        const currentTransport = await qualifyReleaseTransport(
+          currentDownload,
+          operation.target
+        )
+        if (
+          currentTransport.mode !==
+            operation.metadata.currentReleaseTransportMode ||
+          currentTransport.manifestSha256 !==
+            operation.metadata.currentReleaseManifestSha256 ||
+          currentTransport.cacheFingerprint !==
+            operation.metadata.currentReleaseCacheFingerprint
+        ) {
+          throw new Error('current release rollback transport changed')
+        }
       } catch {
         transitionDeliveryOperation(store, operation.id, {
           status: 'blocked',
@@ -1318,7 +1446,7 @@ export function createDevDeliveryService({
         ],
         {
           cwd: root,
-          env: process.env,
+          env: executorEnvironment({ targetFetch: true }),
           detached: false,
           stdio: 'ignore',
         }
@@ -1346,7 +1474,7 @@ export function createDevDeliveryService({
     }
   }
 
-  function executeFixedRollback(payload) {
+  async function executeFixedRollback(payload) {
     if (children.size > 0) {
       throw new Error('another delivery target action is already running')
     }
@@ -1365,6 +1493,59 @@ export function createDevDeliveryService({
     if (payload.confirmation !== expected) {
       throw new Error('explicit rollback confirmation does not match')
     }
+    try {
+      if (
+        deliveryProvider.provider !== 'gitlab' ||
+        typeof deliveryProvider.downloadReleaseControl !== 'function'
+      ) {
+        throw new Error('rollback release transport is unavailable')
+      }
+      const [currentDownload, targetDownload] = await Promise.all([
+        Promise.resolve(
+          deliveryProvider.downloadReleaseControl(
+            operation.metadata.currentGitSha,
+            releaseControlDirectory(root, operation.metadata.currentGitSha)
+          )
+        ),
+        Promise.resolve(
+          deliveryProvider.downloadReleaseControl(
+            operation.gitSha,
+            releaseControlDirectory(root, operation.gitSha)
+          )
+        ),
+      ])
+      const currentControl = releaseControlIdentity(currentDownload)
+      const targetTransport = await qualifyReleaseTransport(
+        targetDownload,
+        operation.target
+      )
+      if (
+        currentControl.manifestSha256 !==
+          operation.metadata.currentManifestSha256 ||
+        targetTransport.manifestSha256 !==
+          operation.metadata.targetManifestSha256 ||
+        targetTransport.mode !== operation.metadata.rollbackTransportMode ||
+        (targetTransport.mode === 'legacy_target_cache' &&
+          targetTransport.cacheFingerprint !==
+            operation.metadata.rollbackTargetCacheFingerprint)
+      ) {
+        throw new Error('rollback release transport changed')
+      }
+    } catch {
+      transitionDeliveryOperation(store, operation.id, {
+        status: 'blocked',
+        message: 'rollback is blocked because its release transport changed',
+        issues: [
+          {
+            code: 'rollback_target_transport_unavailable',
+            level: 'error',
+            message: '目标回滚制品或既有缓存资格不可用；未启动目标写操作',
+          },
+        ],
+        now: now(),
+      })
+      throw new Error('rollback release transport is unavailable')
+    }
     operation = transitionDeliveryOperation(store, operation.id, {
       status: 'launching',
       message: 'rollback executor child is launching',
@@ -1375,6 +1556,11 @@ export function createDevDeliveryService({
       operation.metadata.currentGitSha
     )
     const targetBundleDir = releaseControlDirectory(root, operation.gitSha)
+    const rollbackChildEnv = executorEnvironment({
+      targetFetch:
+        operation.metadata.rollbackTransportMode ===
+        'gitlab_internal_or_target_cache',
+    })
     let child
     try {
       child = spawnProcess(
@@ -1395,7 +1581,7 @@ export function createDevDeliveryService({
         ],
         {
           cwd: root,
-          env: process.env,
+          env: rollbackChildEnv,
           detached: false,
           stdio: 'ignore',
         }
@@ -1466,7 +1652,7 @@ export function createDevDeliveryService({
         return {
           schemaVersion: 'plush.dev-delivery-action-result/v1',
           action: validated.action,
-          ...executeFixedRollback(validated.payload),
+          ...(await executeFixedRollback(validated.payload)),
         }
       }
       return {

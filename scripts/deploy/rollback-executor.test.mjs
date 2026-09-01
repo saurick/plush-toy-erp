@@ -1,10 +1,23 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { spawnSync } from "node:child_process";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 
 import {
   consumeTargetReleaseFetchCredential,
+  REMOTE_ROLLBACK_BOOTSTRAP,
   REMOTE_ROLLBACK_RECEIPT_CONTRACT,
   validateRemoteRollbackReceipt,
 } from "./rollback-executor.mjs";
@@ -29,6 +42,7 @@ const ROLLBACK_STAGES = [
 test("rollback executor consumes the inherited target fetch credential once", () => {
   const env = {
     KEEP_ME: "safe",
+    PLUSH_GITLAB_TOKEN: "provider-token",
     PLUSH_GITLAB_TARGET_FETCH_TOKEN: "target-fetch-token",
   };
   assert.equal(
@@ -193,6 +207,25 @@ test("rollback executor accepts only identity-bound redacted receipts", () => {
       ),
     /timing contract/u,
   );
+  for (const mutate of [
+    (value) => {
+      value.cache.avoidedBytes += 1;
+    },
+    (value) => {
+      value.cache.cacheSource = "retained_operation";
+    },
+    (value) => {
+      value.cache.imageHit = false;
+      value.cache.dockerLoadSkipped = false;
+    },
+  ]) {
+    const changed = structuredClone(receipt());
+    mutate(changed);
+    assert.throws(
+      () => validateRemoteRollbackReceipt(changed, expected()),
+      /inconsistent/u,
+    );
+  }
 });
 
 test("rollback uses the live release control script, not the historical target script", () => {
@@ -209,18 +242,96 @@ test("rollback uses the live release control script, not the historical target s
     /\$\{target[.]manifest[.]gitSha\}:scripts\/deploy\/remote-code-rollback[.]sh/u,
   );
   assert.match(source, /validateReleaseArtifactBinding/u);
+  const manifestReader = source.slice(
+    source.indexOf("function readReleaseManifest(file)"),
+    source.indexOf("export function prepareRollbackTransfer"),
+  );
+  assert.match(manifestReader, /readBoundedPlainFile/u);
+  assert.match(manifestReader, /sha256: snapshot[.]sha256/u);
+  assert.doesNotMatch(manifestReader, /sha256File/u);
+  assert.match(source, /rollback target manifest is outside its bundle/u);
   const remoteSource = readFileSync(
     new URL("./remote-code-rollback.sh", import.meta.url),
     "utf8",
   );
   assert.match(
     remoteSource,
-    /cmp --silent[\s\S]*?"\$incoming\/remote-code-rollback[.]sh"[\s\S]*?"\$current\/scripts\/deploy\/remote-code-rollback[.]sh"/u,
+    /cmp --silent "\$incoming\/remote-code-rollback[.]sh" "\$live_rollback_script"/u,
+  );
+  assert.match(source, /const REMOTE_ROLLBACK_BOOTSTRAP = String[.]raw/u);
+  assert.match(source, /owned_private_directory "\$current\/scripts\/deploy"/u);
+  assert.match(source, /cmp --silent "\$incoming_script" "\$live_script"/u);
+  assert.match(source, /exec \/bin\/bash "\$live_script" "\$@"/u);
+  assert.doesNotMatch(
+    source,
+    /const remoteScript = `\$\{target[.]filesystem[.]root\}\/incoming\//u,
   );
   assert.match(
     remoteSource,
     /public_cutover_script=\$current\/deployments\/yoyoosun\/scripts\/cutover-public-web[.]sh/u,
   );
+});
+
+test("rollback bootstrap executes only an identical script below the physical current tree", (t) => {
+  function fixture(name) {
+    const root = realpathSync(
+      mkdtempSync(path.join(os.tmpdir(), `plush-rollback-bootstrap-${name}-`)),
+    );
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    const currentDeploy = path.join(root, "current", "scripts", "deploy");
+    const incoming = path.join(root, "incoming");
+    mkdirSync(currentDeploy, { recursive: true, mode: 0o700 });
+    mkdirSync(incoming, { mode: 0o700 });
+    const script = Buffer.from(
+      "set -euo pipefail\nprintf 'bootstrap-ok:%s\\n' \"$1\"\n",
+    );
+    writeFileSync(path.join(currentDeploy, "remote-code-rollback.sh"), script, {
+      mode: 0o600,
+    });
+    writeFileSync(path.join(incoming, "remote-code-rollback.sh"), script, {
+      mode: 0o600,
+    });
+    return { root, currentDeploy, incoming };
+  }
+
+  function run({ root, incoming }) {
+    return spawnSync(
+      "/bin/bash",
+      [
+        "-c",
+        REMOTE_ROLLBACK_BOOTSTRAP,
+        "plush-rollback-bootstrap",
+        root,
+        incoming,
+        "sentinel",
+      ],
+      { encoding: "utf8" },
+    );
+  }
+
+  const valid = fixture("valid");
+  const accepted = run(valid);
+  assert.equal(accepted.status, 0, accepted.stderr);
+  assert.equal(accepted.stdout, "bootstrap-ok:sentinel\n");
+
+  const mismatch = fixture("mismatch");
+  writeFileSync(
+    path.join(mismatch.incoming, "remote-code-rollback.sh"),
+    "set -euo pipefail\nexit 0\n",
+    { mode: 0o600 },
+  );
+  assert.notEqual(run(mismatch).status, 0);
+
+  const permissive = fixture("permissive");
+  chmodSync(permissive.currentDeploy, 0o722);
+  assert.notEqual(run(permissive).status, 0);
+
+  const linked = fixture("linked");
+  const physicalCurrent = path.join(linked.root, "current-physical");
+  const current = path.join(linked.root, "current");
+  renameSync(current, physicalCurrent);
+  symlinkSync(physicalCurrent, current);
+  assert.notEqual(run(linked).status, 0);
 });
 
 test("rollback executor has explicit confirmation and no automatic retry path", () => {
@@ -236,13 +347,25 @@ test("rollback executor has explicit confirmation and no automatic retry path", 
   assert.match(source, /databaseChangedByExecutor: false/u);
   assert.match(source, /buildFixedTargetRsyncTransfer/u);
   assert.match(source, /PLUSH_GITLAB_TARGET_FETCH_TOKEN/u);
+  const executeSource = source.slice(
+    source.indexOf("export function executeRollback("),
+    source.indexOf("function parseArgs("),
+  );
+  assert.ok(
+    executeSource.indexOf("consumeTargetReleaseFetchCredential()") <
+      executeSource.indexOf("runPreflight(targetKey)"),
+  );
   assert.doesNotMatch(source, /process[.]env[.]PLUSH_GITLAB_TOKEN/u);
   assert.match(source, /input: targetFetchToken \? `\$\{targetFetchToken\}\\n` : ""/u);
   assert.doesNotMatch(source, /target-release-fetch[.]secret/u);
-  const controlTransfer = source.match(
-    /const CONTROL_TRANSFER_FILES = Object[.]freeze\(\[[\s\S]+?\]\);/u,
+  const v2ControlTransfer = source.match(
+    /const V2_CONTROL_TRANSFER_FILES = Object[.]freeze\(\[[\s\S]+?\]\);/u,
   )?.[0];
-  assert.ok(controlTransfer);
+  const legacyControlTransfer = source.match(
+    /const LEGACY_CONTROL_TRANSFER_FILES = Object[.]freeze\(\[[\s\S]+?\]\);/u,
+  )?.[0];
+  assert.ok(v2ControlTransfer);
+  assert.ok(legacyControlTransfer);
   for (const file of [
     "checksums.sha256",
     "release-artifact.json",
@@ -254,7 +377,7 @@ test("rollback executor has explicit confirmation and no automatic retry path", 
     "web-image.tar",
   ]) {
     assert.doesNotMatch(
-      controlTransfer,
+      v2ControlTransfer,
       new RegExp(`"${file.replaceAll(".", "[.]")}"`, "u"),
     );
   }
@@ -266,10 +389,29 @@ test("rollback executor has explicit confirmation and no automatic retry path", 
     "transfer-checksums.sha256",
   ]) {
     assert.match(
-      controlTransfer,
+      v2ControlTransfer,
       new RegExp(`"${file.replaceAll(".", "[.]")}"`, "u"),
     );
   }
+  assert.doesNotMatch(legacyControlTransfer, /remote-release-acquire[.]sh/u);
+  for (const file of [
+    "release-artifact.json",
+    "release-manifest.json",
+    "release-rehearsal.json",
+    "sbom.cdx.json",
+    "server-image.tar",
+    "source.tar",
+    "web-image.tar",
+  ]) {
+    assert.doesNotMatch(
+      legacyControlTransfer,
+      new RegExp(`"${file.replaceAll(".", "[.]")}"`, "u"),
+    );
+  }
+  assert.match(
+    source,
+    /const inheritedFetchToken = consumeTargetReleaseFetchCredential\(\)/u,
+  );
   const rollbackRoot = source.indexOf("const transferRoot = path.join(");
   const cleanupBoundary = source.indexOf(
     "rmSync(transferRoot, { recursive: true, force: true })",

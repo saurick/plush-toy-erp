@@ -78,6 +78,7 @@ const MAX_RECEIPT_BYTES = 256 * 1024;
 
 export function consumeTargetReleaseFetchCredential(env = process.env) {
   const token = env.PLUSH_GITLAB_TARGET_FETCH_TOKEN;
+  delete env.PLUSH_GITLAB_TOKEN;
   delete env.PLUSH_GITLAB_TARGET_FETCH_TOKEN;
   return token;
 }

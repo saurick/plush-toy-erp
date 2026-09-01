@@ -1,11 +1,13 @@
 import { spawnSync } from "node:child_process";
-import { lstatSync, readFileSync, realpathSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
+import process from "node:process";
 
 import { getDeploymentTarget } from "./deployment-targets.mjs";
+import { parseReleaseChecksums } from "./github-release-asset-set.mjs";
 import { assertReleaseArtifactManifest } from "./release-artifact-bundle.mjs";
 import {
-  sha256File,
   validateReleaseArtifactBinding,
   validateReleaseManifest,
 } from "./release-catalog.mjs";
@@ -13,8 +15,13 @@ import {
   TARGET_RELEASE_FETCH_FILE,
   validateTargetReleaseFetch,
 } from "./target-release-fetch.mjs";
+import { readBoundedPlainFile } from "../lib/file-digest.mjs";
 
 export const TARGET_RELEASE_CACHE_CONTRACT = "plush.target-release-cache/v2";
+export const TARGET_RELEASE_CACHE_MODES = Object.freeze({
+  direct: "v2_direct",
+  legacy: "legacy_v1_existing_only",
+});
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 const DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/u;
@@ -80,6 +87,7 @@ export function buildTargetReleaseCacheIdentityFromEvidence({
   }
   return Object.freeze({
     contract: TARGET_RELEASE_CACHE_CONTRACT,
+    cacheMode: TARGET_RELEASE_CACHE_MODES.direct,
     gitSha: manifest.gitSha,
     version: manifest.version,
     ...controlDigests,
@@ -96,17 +104,95 @@ export function buildTargetReleaseCacheIdentityFromEvidence({
   });
 }
 
-function plainFile(file, maximumBytes = 2 * 1024 ** 3) {
-  const stat = lstatSync(file);
-  if (
-    !stat.isFile() ||
-    stat.isSymbolicLink() ||
-    stat.size <= 0 ||
-    stat.size > maximumBytes
-  ) {
-    throw new Error("target cache identity input is invalid");
+function buildLegacyTargetReleaseCacheIdentity({
+  manifest,
+  artifact,
+  manifestSnapshot,
+  artifactSnapshot,
+  checksumsSnapshot,
+}) {
+  if (manifest.schemaVersion !== "plush.release-manifest/v1") {
+    throw new Error("legacy target cache requires a v1 release manifest");
   }
-  return file;
+  const manifestSha256 = manifestSnapshot.sha256;
+  const artifactSha256 = artifactSnapshot.sha256;
+  const checksumsSha256 = checksumsSnapshot.sha256;
+  const checksums = parseReleaseChecksums(
+    checksumsSnapshot.content.toString("utf8"),
+  );
+  const imageArtifacts = new Map(
+    artifact.images.map((image) => [image.kind, image]),
+  );
+  const imageManifests = new Map(
+    manifest.images.map((image) => [image.kind, image]),
+  );
+  const server = imageArtifacts.get("server");
+  const web = imageArtifacts.get("web");
+  const serverManifest = imageManifests.get("server");
+  const webManifest = imageManifests.get("web");
+  const expectedChecksums = new Map([
+    ["release-artifact.json", artifactSha256],
+    ["release-manifest.json", manifestSha256],
+    ["sbom.cdx.json", artifact.sbom?.sha256],
+    ["server-image.tar", server?.archive?.sha256],
+    ["web-image.tar", web?.archive?.sha256],
+  ]);
+  if (
+    !server ||
+    !web ||
+    !serverManifest ||
+    !webManifest ||
+    [...expectedChecksums].some(
+      ([name, sha256]) => checksums.get(name) !== sha256,
+    )
+  ) {
+    throw new Error("legacy target cache control evidence is inconsistent");
+  }
+  return Object.freeze({
+    contract: TARGET_RELEASE_CACHE_CONTRACT,
+    cacheMode: TARGET_RELEASE_CACHE_MODES.legacy,
+    gitSha: manifest.gitSha,
+    version: manifest.version,
+    releaseManifestSha256: manifestSha256,
+    releaseArtifactSha256: artifactSha256,
+    checksumsSha256,
+    releaseRehearsalSha256: null,
+    sourceArchiveSha256: artifact.sourceArchive.sha256,
+    sbomSha256: artifact.sbom.sha256,
+    serverArchiveSha256: server.archive.sha256,
+    webArchiveSha256: web.archive.sha256,
+    serverContentId: server.contentId,
+    webContentId: web.contentId,
+    serverDigest: serverManifest.digest,
+    webDigest: webManifest.digest,
+    serverRef: server.ref,
+    webRef: web.ref,
+  });
+}
+
+function plainFile(file, maximumBytes = 2 * 1024 ** 3) {
+  const input = path.resolve(file);
+  const absolute = path.join(
+    realpathSync(path.dirname(input)),
+    path.basename(input),
+  );
+  try {
+    return {
+      absolute,
+      ...readBoundedPlainFile(absolute, { maximumBytes }),
+    };
+  } catch (error) {
+    throw new Error("target cache identity input is invalid", { cause: error });
+  }
+}
+
+function plainDirectory(directory) {
+  const absolute = path.resolve(directory);
+  const stat = lstatSync(absolute);
+  if (!stat.isDirectory() || stat.isSymbolicLink()) {
+    throw new Error("target cache bundle is invalid");
+  }
+  return realpathSync(absolute);
 }
 
 function fixedSshArgs(target) {
@@ -124,10 +210,15 @@ function fixedSshArgs(target) {
 }
 
 function runChecked(runCommand, command, args, options, label) {
+  const { env = process.env, ...commandOptions } = options || {};
+  const childEnv = { ...env };
+  delete childEnv.PLUSH_GITLAB_TOKEN;
+  delete childEnv.PLUSH_GITLAB_TARGET_FETCH_TOKEN;
   const result = runCommand(command, args, {
     encoding: "utf8",
     maxBuffer: 4 * 1024 * 1024,
-    ...options,
+    ...commandOptions,
+    env: childEnv,
   });
   if (result.error || result.status !== 0) {
     throw new Error(
@@ -141,32 +232,47 @@ export function buildTargetReleaseCacheIdentity({
   bundleDir,
   releaseManifestPath,
 }) {
-  const bundle = realpathSync(bundleDir);
-  const manifestFile = plainFile(realpathSync(releaseManifestPath), 512 * 1024);
+  const bundle = plainDirectory(bundleDir);
+  const manifestSnapshot = plainFile(releaseManifestPath, 512 * 1024);
+  if (manifestSnapshot.absolute !== path.join(bundle, "release-manifest.json")) {
+    throw new Error("target cache release manifest is outside its bundle");
+  }
   const manifest = validateReleaseManifest(
-    JSON.parse(readFileSync(manifestFile, "utf8")),
+    JSON.parse(manifestSnapshot.content.toString("utf8")),
   );
-  const artifactFile = plainFile(
+  const artifactSnapshot = plainFile(
     path.join(bundle, "release-artifact.json"),
     512 * 1024,
   );
   const artifact = assertReleaseArtifactManifest(
-    JSON.parse(readFileSync(artifactFile, "utf8")),
+    JSON.parse(artifactSnapshot.content.toString("utf8")),
   );
-  validateReleaseArtifactBinding(manifest, artifact, sha256File(artifactFile));
-  const checksumsFile = plainFile(path.join(bundle, "checksums.sha256"), 4 * 1024 * 1024);
-  const rehearsalFile = plainFile(
+  validateReleaseArtifactBinding(manifest, artifact, artifactSnapshot.sha256);
+  const checksumsSnapshot = plainFile(
+    path.join(bundle, "checksums.sha256"),
+    4 * 1024 * 1024,
+  );
+  if (manifest.schemaVersion === "plush.release-manifest/v1") {
+    return buildLegacyTargetReleaseCacheIdentity({
+      manifest,
+      artifact,
+      manifestSnapshot,
+      artifactSnapshot,
+      checksumsSnapshot,
+    });
+  }
+  const rehearsalSnapshot = plainFile(
     path.join(bundle, "release-rehearsal.json"),
     4 * 1024 * 1024,
   );
-  const fetchFile = plainFile(
+  const fetchSnapshot = plainFile(
     path.join(bundle, TARGET_RELEASE_FETCH_FILE),
     512 * 1024,
   );
   const fetch = validateTargetReleaseFetch(
-    JSON.parse(readFileSync(fetchFile, "utf8")),
+    JSON.parse(fetchSnapshot.content.toString("utf8")),
   );
-  if (sha256File(rehearsalFile) !== manifest.rehearsal?.receiptSha256) {
+  if (rehearsalSnapshot.sha256 !== manifest.rehearsal?.receiptSha256) {
     throw new Error("target cache rehearsal identity is invalid");
   }
   return buildTargetReleaseCacheIdentityFromEvidence({
@@ -174,30 +280,34 @@ export function buildTargetReleaseCacheIdentity({
     artifact,
     fetch,
     controlDigests: {
-      releaseManifestSha256: sha256File(manifestFile),
-      releaseArtifactSha256: sha256File(artifactFile),
-      checksumsSha256: sha256File(checksumsFile),
-      releaseRehearsalSha256: sha256File(rehearsalFile),
+      releaseManifestSha256: manifestSnapshot.sha256,
+      releaseArtifactSha256: artifactSnapshot.sha256,
+      checksumsSha256: checksumsSnapshot.sha256,
+      releaseRehearsalSha256: rehearsalSnapshot.sha256,
     },
   });
 }
 
 function identityArgs(identity) {
-  for (const field of [
+  const requiredDigestFields = [
     "releaseManifestSha256",
     "releaseArtifactSha256",
     "checksumsSha256",
-    "releaseRehearsalSha256",
     "sourceArchiveSha256",
     "sbomSha256",
     "serverArchiveSha256",
     "webArchiveSha256",
-  ]) {
+  ];
+  if (identity.cacheMode === TARGET_RELEASE_CACHE_MODES.direct) {
+    requiredDigestFields.push("releaseRehearsalSha256");
+  }
+  for (const field of requiredDigestFields) {
     if (!SHA256_PATTERN.test(String(identity[field] || ""))) {
       throw new Error(`target cache ${field} is invalid`);
     }
   }
   if (
+    !Object.values(TARGET_RELEASE_CACHE_MODES).includes(identity.cacheMode) ||
     !SHA_PATTERN.test(identity.gitSha) ||
     !DIGEST_PATTERN.test(identity.serverContentId) ||
     !DIGEST_PATTERN.test(identity.webContentId) ||
@@ -209,12 +319,13 @@ function identityArgs(identity) {
     throw new Error("target cache release/image identity is invalid");
   }
   return [
+    identity.cacheMode,
     identity.gitSha,
     identity.version,
     identity.releaseManifestSha256,
     identity.releaseArtifactSha256,
     identity.checksumsSha256,
-    identity.releaseRehearsalSha256,
+    identity.releaseRehearsalSha256 || "none",
     identity.sourceArchiveSha256,
     identity.sbomSha256,
     identity.serverArchiveSha256,
@@ -230,8 +341,36 @@ function identityArgs(identity) {
 
 const CACHE_PROBE_SCRIPT_TEMPLATE = String.raw`set -euo pipefail
 root=__ROOT__
-cache_root=$root/release-cache-v2
+cache_mode="$1"; shift
+case "$cache_mode" in
+  v2_direct) cache_root=$root/release-cache-v2 ;;
+  legacy_v1_existing_only) cache_root=$root/release-cache ;;
+  *) exit 20 ;;
+esac
 incoming_root=$root/incoming
+owned_directory() {
+  local candidate="$1" canonical mode
+  [[ -d "$candidate" && ! -L "$candidate" ]] || return 1
+  canonical="$(readlink -f -- "$candidate")" || return 1
+  [[ "$canonical" == "$candidate" && "$(stat -c '%u' "$candidate")" == "$(id -u)" ]] || return 1
+  mode="$(stat -c '%a' "$candidate")"
+  [[ "$mode" =~ ^[0-7]{3,4}$ ]] || return 1
+  (( (8#$mode & 8#022) == 0 ))
+}
+owned_plain_file() {
+  local candidate="$1" mode
+  [[ -f "$candidate" && ! -L "$candidate" && "$(stat -c '%u' "$candidate")" == "$(id -u)" ]] || return 1
+  mode="$(stat -c '%a' "$candidate")"
+  [[ "$mode" =~ ^[0-7]{3,4}$ ]] || return 1
+  (( (8#$mode & 8#022) == 0 ))
+}
+owned_directory "$root"
+if [[ -e "$cache_root" ]]; then
+  owned_directory "$cache_root"
+fi
+if [[ -e "$incoming_root" ]]; then
+  owned_directory "$incoming_root"
+fi
 git_sha="$1"; shift; version="$1"; shift; manifest_sha="$1"; shift; artifact_sha="$1"; shift
 checksums_sha="$1"; shift; rehearsal_sha="$1"; shift; source_sha="$1"; shift; sbom_sha="$1"; shift
 server_archive_sha="$1"; shift; web_archive_sha="$1"; shift
@@ -252,21 +391,29 @@ portable_manifest_digest() {
   printf '%s\n' "$manifest_digest"
 }
 validate_candidate() {
-  local candidate="$1" required actual_server_manifest actual_web_manifest
-  [[ -d "$candidate" && ! -L "$candidate" && "$(stat -c '%u' "$candidate")" == "$(id -u)" ]]
-  for required in checksums.sha256 release-manifest.json release-artifact.json release-rehearsal.json sbom.cdx.json source.tar server-image.tar web-image.tar; do
-    [[ -f "$candidate/$required" && ! -L "$candidate/$required" && "$(stat -c '%u' "$candidate/$required")" == "$(id -u)" ]]
+  local candidate="$1" required actual_server_manifest actual_web_manifest expected_manifest_schema
+  owned_directory "$candidate"
+  local required_files=(release-manifest.json release-artifact.json sbom.cdx.json source.tar server-image.tar web-image.tar)
+  if [[ "$cache_mode" == v2_direct ]]; then
+    required_files=(checksums.sha256 release-manifest.json release-artifact.json release-rehearsal.json sbom.cdx.json source.tar server-image.tar web-image.tar)
+  fi
+  for required in "${"$"}{required_files[@]}"; do
+    owned_plain_file "$candidate/$required"
   done
   [[ "$(sha256sum "$candidate/release-manifest.json" | awk '{print $1}')" == "$manifest_sha" ]]
   [[ "$(sha256sum "$candidate/release-artifact.json" | awk '{print $1}')" == "$artifact_sha" ]]
-  [[ "$(sha256sum "$candidate/checksums.sha256" | awk '{print $1}')" == "$checksums_sha" ]]
-  [[ "$(sha256sum "$candidate/release-rehearsal.json" | awk '{print $1}')" == "$rehearsal_sha" ]]
+  if [[ "$cache_mode" == v2_direct ]]; then
+    [[ "$(sha256sum "$candidate/checksums.sha256" | awk '{print $1}')" == "$checksums_sha" ]]
+    [[ "$(sha256sum "$candidate/release-rehearsal.json" | awk '{print $1}')" == "$rehearsal_sha" ]]
+  fi
   [[ "$(sha256sum "$candidate/source.tar" | awk '{print $1}')" == "$source_sha" ]]
   [[ "$(sha256sum "$candidate/sbom.cdx.json" | awk '{print $1}')" == "$sbom_sha" ]]
   [[ "$(sha256sum "$candidate/server-image.tar" | awk '{print $1}')" == "$server_archive_sha" ]]
   [[ "$(sha256sum "$candidate/web-image.tar" | awk '{print $1}')" == "$web_archive_sha" ]]
-  jq -e --arg sha "$git_sha" --arg version "$version" --arg serverDigest "$server_digest" --arg webDigest "$web_digest" \
-    '((.schemaVersion == "plush.release-manifest/v1") or (.schemaVersion == "plush.release-manifest/v2")) and
+  expected_manifest_schema=plush.release-manifest/v2
+  [[ "$cache_mode" == legacy_v1_existing_only ]] && expected_manifest_schema=plush.release-manifest/v1
+  jq -e --arg schema "$expected_manifest_schema" --arg sha "$git_sha" --arg version "$version" --arg serverDigest "$server_digest" --arg webDigest "$web_digest" \
+    '.schemaVersion == $schema and
      .gitSha == $sha and .version == $version and
      ([.images[] | select(.kind == "server") | .digest] == [$serverDigest]) and
      ([.images[] | select(.kind == "web") | .digest] == [$webDigest])' "$candidate/release-manifest.json" >/dev/null
@@ -280,9 +427,25 @@ validate_candidate() {
 }
 has_exact_formal_inventory() {
   local candidate="$1" actual expected
-  expected="$(printf '%s\n' checksums.sha256 release-artifact.json release-manifest.json release-rehearsal.json sbom.cdx.json server-image.tar source.tar web-image.tar | LC_ALL=C sort)"
+  if [[ "$cache_mode" == v2_direct ]]; then
+    expected="$(printf '%s\n' checksums.sha256 release-artifact.json release-manifest.json release-rehearsal.json sbom.cdx.json server-image.tar source.tar web-image.tar | LC_ALL=C sort)"
+  else
+    expected="$(printf '%s\n' release-artifact.json release-manifest.json sbom.cdx.json server-image.tar source.tar web-image.tar | LC_ALL=C sort)"
+  fi
   actual="$(find "$candidate" -mindepth 1 -maxdepth 1 -printf '%f\n' | LC_ALL=C sort)"
   [[ "$actual" == "$expected" ]]
+}
+has_safe_retained_inventory() {
+  local candidate="$1" entry name
+  while IFS= read -r entry; do
+    name="$(basename -- "$entry")"
+    case "$name" in
+      .target-cache.json|checksums.sha256|release-artifact.json|release-manifest.json|release-rehearsal.json|sbom.cdx.json|server-image.tar|source.tar|web-image.tar|promotion-manifest.json|rollback-manifest.json|current-release-manifest.json|remote-promotion.sh|remote-code-rollback.sh|remote-release-acquire.sh|target-release-fetch.json|transfer-checksums.sha256)
+        owned_plain_file "$entry" || return 1
+        ;;
+      *) return 1 ;;
+    esac
+  done < <(find "$candidate" -mindepth 1 -maxdepth 1 -print)
 }
 candidate=""; source_kind=none; source_token=none; manifests=""
 formal="$cache_root/$manifest_sha"
@@ -291,15 +454,25 @@ if [[ -e "$formal" ]]; then
   manifests="$(validate_candidate "$formal")" || { echo '[target-cache] invalid formal cache' >&2; exit 21; }
   candidate="$formal"; source_kind=formal; source_token=formal
 else
-  shopt -s nullglob
-  for retained in "$incoming_root"/*; do
-    [[ -d "$retained" && ! -L "$retained" && -f "$retained/release-manifest.json" && ! -L "$retained/release-manifest.json" ]] || continue
-    [[ -f "$retained/.target-cache.json" && ! -L "$retained/.target-cache.json" ]] || continue
-    jq -e --arg manifest "$manifest_sha" '.schemaVersion == "plush.target-release-cache/v2" and .releaseManifestSha256 == $manifest' "$retained/.target-cache.json" >/dev/null 2>&1 || continue
-    [[ "$(sha256sum "$retained/release-manifest.json" | awk '{print $1}')" == "$manifest_sha" ]] || continue
-    manifests="$(validate_candidate "$retained")" || { echo '[target-cache] invalid retained cache' >&2; exit 22; }
-    candidate="$retained"; source_kind=retained_operation; source_token="$(basename "$retained")"; break
-  done
+  if [[ "$cache_mode" == v2_direct ]]; then
+    shopt -s nullglob
+    for retained in "$incoming_root"/*; do
+      owned_directory "$retained" || continue
+      has_safe_retained_inventory "$retained" || continue
+      owned_plain_file "$retained/release-manifest.json" || continue
+      owned_plain_file "$retained/.target-cache.json" || continue
+      retained_operation="$(basename -- "$retained")"
+      [[ "$retained_operation" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]] || continue
+      jq -e --arg operationId "$retained_operation" --arg manifest "$manifest_sha" \
+        '.schemaVersion == "plush.target-release-cache/v2" and
+         .operationId == $operationId and .cacheMode == "v2_direct" and
+         .releaseManifestSha256 == $manifest' \
+        "$retained/.target-cache.json" >/dev/null 2>&1 || continue
+      [[ "$(sha256sum "$retained/release-manifest.json" | awk '{print $1}')" == "$manifest_sha" ]] || continue
+      manifests="$(validate_candidate "$retained")" || { echo '[target-cache] invalid retained cache' >&2; exit 22; }
+      candidate="$retained"; source_kind=retained_operation; source_token="$retained_operation"; break
+    done
+  fi
 fi
 if [[ -z "$candidate" ]]; then
   jq -n --arg schemaVersion "plush.target-release-cache/v2" --arg manifest "$manifest_sha" \
@@ -318,7 +491,11 @@ if actual_server_id="$(docker image inspect --format '{{.Id}}' "$server_ref" 2>/
    [[ "$(docker image inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$web_ref" | sed -n 's/^GIT_SHA=//p' | head -n1)" == "$git_sha" ]]; then
   image_hit=true
 fi
-avoided_bytes="$(stat -c '%s' "$candidate/checksums.sha256" "$candidate/release-manifest.json" "$candidate/release-artifact.json" "$candidate/release-rehearsal.json" "$candidate/sbom.cdx.json" "$candidate/source.tar" "$candidate/server-image.tar" "$candidate/web-image.tar" | awk '{total += $1} END {print total + 0}')"
+if [[ "$cache_mode" == v2_direct ]]; then
+  avoided_bytes="$(stat -c '%s' "$candidate/checksums.sha256" "$candidate/release-manifest.json" "$candidate/release-artifact.json" "$candidate/release-rehearsal.json" "$candidate/sbom.cdx.json" "$candidate/source.tar" "$candidate/server-image.tar" "$candidate/web-image.tar" | awk '{total += $1} END {print total + 0}')"
+else
+  avoided_bytes="$(stat -c '%s' "$candidate/release-manifest.json" "$candidate/release-artifact.json" "$candidate/sbom.cdx.json" "$candidate/source.tar" "$candidate/server-image.tar" "$candidate/web-image.tar" | awk '{total += $1} END {print total + 0}')"
+fi
 jq -n --arg schemaVersion "plush.target-release-cache/v2" --arg manifest "$manifest_sha" --arg source "$source_kind" --arg token "$source_token" \
   --argjson imageHit "$image_hit" --argjson avoidedBytes "$avoided_bytes" \
   '{schemaVersion:$schemaVersion,releaseManifestSha256:$manifest,packageHit:true,imageHit:$imageHit,cacheSource:$source,sourceToken:$token,avoidedBytes:$avoidedBytes,basis:["release_manifest_sha256","archive_sha256","registry_digest","docker_content_id","embedded_git_sha"]}'
@@ -356,6 +533,31 @@ export function validateTargetCacheProbe(value, expectedManifestSha256) {
     throw new Error("target release cache probe contract is invalid");
   }
   return Object.freeze(value);
+}
+
+export function targetReleaseCacheEvidenceFingerprint({
+  targetKey,
+  identity,
+  probe,
+}) {
+  getDeploymentTarget(targetKey);
+  identityArgs(identity);
+  validateTargetCacheProbe(probe, identity.releaseManifestSha256);
+  return createHash("sha256")
+    .update(
+      JSON.stringify([
+        targetKey,
+        identity.cacheMode,
+        identity.gitSha,
+        identity.version,
+        identity.releaseManifestSha256,
+        probe.packageHit,
+        probe.cacheSource,
+        probe.avoidedBytes,
+        probe.basis,
+      ]),
+    )
+    .digest("hex");
 }
 
 export function estimateAvoidedTransferDuration(avoidedBytes, operations) {
@@ -414,30 +616,92 @@ export function probeTargetReleaseCache(
 const PREPARE_CACHE_SCRIPT_TEMPLATE = String.raw`set -euo pipefail
 umask 077
 root=__ROOT__
-operation_id="$1"; shift; manifest_sha="$1"; shift; package_hit="$1"; shift; image_hit="$1"; shift
+operation_id="$1"; shift; cache_mode="$1"; shift; manifest_sha="$1"; shift; package_hit="$1"; shift; image_hit="$1"; shift
 source_kind="$1"; shift; source_token="$1"; shift; avoided_bytes="$1"; shift; artifact_sha="$1"; shift
 checksums_sha="$1"; shift; rehearsal_sha="$1"; shift; source_sha="$1"; shift; sbom_sha="$1"; shift
 server_archive_sha="$1"; shift; web_archive_sha="$1"
 [[ "$operation_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]
 incoming_root=$root/incoming; incoming=$incoming_root/$operation_id
-mkdir -p "$incoming_root"; chmod 700 "$incoming_root"
+owned_directory() {
+  local candidate="$1" canonical mode
+  [[ -d "$candidate" && ! -L "$candidate" ]] || return 1
+  canonical="$(readlink -f -- "$candidate")" || return 1
+  [[ "$canonical" == "$candidate" && "$(stat -c '%u' "$candidate")" == "$(id -u)" ]] || return 1
+  mode="$(stat -c '%a' "$candidate")"
+  [[ "$mode" =~ ^[0-7]{3,4}$ ]] || return 1
+  (( (8#$mode & 8#022) == 0 ))
+}
+owned_plain_file() {
+  local candidate="$1" mode
+  [[ -f "$candidate" && ! -L "$candidate" && "$(stat -c '%u' "$candidate")" == "$(id -u)" ]] || return 1
+  mode="$(stat -c '%a' "$candidate")"
+  [[ "$mode" =~ ^[0-7]{3,4}$ ]] || return 1
+  (( (8#$mode & 8#022) == 0 ))
+}
+safe_retained_inventory() {
+  local candidate="$1" entry name
+  while IFS= read -r entry; do
+    name="$(basename -- "$entry")"
+    case "$name" in
+      .target-cache.json|checksums.sha256|release-artifact.json|release-manifest.json|release-rehearsal.json|sbom.cdx.json|server-image.tar|source.tar|web-image.tar|promotion-manifest.json|rollback-manifest.json|current-release-manifest.json|remote-promotion.sh|remote-code-rollback.sh|remote-release-acquire.sh|target-release-fetch.json|transfer-checksums.sha256)
+        owned_plain_file "$entry" || return 1
+        ;;
+      *) return 1 ;;
+    esac
+  done < <(find "$candidate" -mindepth 1 -maxdepth 1 -print)
+}
+owned_directory "$root"
+if [[ -e "$incoming_root" ]]; then
+  owned_directory "$incoming_root"
+else
+  mkdir "$incoming_root"
+fi
+chmod 700 "$incoming_root"
+owned_directory "$incoming_root"
 if [[ -e "$incoming" ]]; then
-  [[ -d "$incoming" && ! -L "$incoming" && -z "$(find "$incoming" -mindepth 1 -maxdepth 1 -print -quit)" ]]
+  owned_directory "$incoming"
+  [[ -z "$(find "$incoming" -mindepth 1 -maxdepth 1 -print -quit)" ]]
 else
   mkdir "$incoming"
 fi
 chmod 700 "$incoming"
+owned_directory "$incoming"
 if [[ "$package_hit" == true ]]; then
-  if [[ "$source_kind" == formal && "$source_token" == formal ]]; then
-    source_dir=$root/release-cache-v2/$manifest_sha
-  elif [[ "$source_kind" == retained_operation && "$source_token" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]; then
-    source_dir=$incoming_root/$source_token
+  if [[ "$cache_mode" == legacy_v1_existing_only ]]; then
+    [[ "$source_kind" == formal && "$source_token" == formal ]] || exit 31
+    source_root=$root/release-cache
+    source_dir=$source_root/$manifest_sha
+    cache_files=(release-manifest.json release-artifact.json source.tar sbom.cdx.json server-image.tar web-image.tar)
+  elif [[ "$cache_mode" == v2_direct ]]; then
+    if [[ "$source_kind" == formal && "$source_token" == formal ]]; then
+      source_root=$root/release-cache-v2
+      source_dir=$source_root/$manifest_sha
+    elif [[ "$source_kind" == retained_operation && "$source_token" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]; then
+      [[ "$source_token" != "$operation_id" ]] || exit 31
+      source_root=$incoming_root
+      source_dir=$source_root/$source_token
+    else
+      exit 31
+    fi
+    cache_files=(checksums.sha256 release-manifest.json release-artifact.json release-rehearsal.json source.tar sbom.cdx.json server-image.tar web-image.tar)
   else
     exit 31
   fi
-  [[ -d "$source_dir" && ! -L "$source_dir" ]]
-  for file in checksums.sha256 release-manifest.json release-artifact.json release-rehearsal.json source.tar sbom.cdx.json server-image.tar web-image.tar; do
-    [[ -f "$source_dir/$file" && ! -L "$source_dir/$file" ]]
+  owned_directory "$source_root"
+  owned_directory "$source_dir"
+  if [[ "$source_kind" == formal ]]; then
+    [[ "$(find "$source_dir" -mindepth 1 -maxdepth 1 -printf '.' | wc -c | tr -d ' ')" == "${"$"}{#cache_files[@]}" ]]
+  else
+    safe_retained_inventory "$source_dir"
+    owned_plain_file "$source_dir/.target-cache.json"
+    jq -e --arg operationId "$source_token" --arg manifest "$manifest_sha" \
+      '.schemaVersion == "plush.target-release-cache/v2" and
+       .operationId == $operationId and .cacheMode == "v2_direct" and
+       .releaseManifestSha256 == $manifest' \
+      "$source_dir/.target-cache.json" >/dev/null
+  fi
+  for file in "${"$"}{cache_files[@]}"; do
+    owned_plain_file "$source_dir/$file"
     case "$file" in
       release-manifest.json) expected_value="$manifest_sha" ;;
       release-artifact.json) expected_value="$artifact_sha" ;;
@@ -453,10 +717,11 @@ if [[ "$package_hit" == true ]]; then
     ln "$source_dir/$file" "$incoming/$file"
   done
 fi
-jq -n --arg schemaVersion "plush.target-release-cache/v2" --arg operationId "$operation_id" --arg manifest "$manifest_sha" \
+jq -n --arg schemaVersion "plush.target-release-cache/v2" --arg operationId "$operation_id" --arg cacheMode "$cache_mode" --arg manifest "$manifest_sha" \
   --arg source "$source_kind" --argjson packageHit "$package_hit" --argjson imageHit "$image_hit" --argjson avoidedBytes "$avoided_bytes" \
-  '{schemaVersion:$schemaVersion,operationId:$operationId,releaseManifestSha256:$manifest,packageHit:$packageHit,imageHit:$imageHit,cacheSource:$source,avoidedBytes:$avoidedBytes,basis:(if $packageHit then ["release_manifest_sha256","archive_sha256","registry_digest","docker_content_id","embedded_git_sha"] else [] end)}' >"$incoming/.target-cache.json"
+  '{schemaVersion:$schemaVersion,operationId:$operationId,cacheMode:$cacheMode,releaseManifestSha256:$manifest,packageHit:$packageHit,imageHit:$imageHit,cacheSource:$source,avoidedBytes:$avoidedBytes,basis:(if $packageHit then ["release_manifest_sha256","archive_sha256","registry_digest","docker_content_id","embedded_git_sha"] else [] end)}' >"$incoming/.target-cache.json"
 chmod 600 "$incoming/.target-cache.json"
+owned_plain_file "$incoming/.target-cache.json"
 `;
 
 export function prepareTargetReleaseIncoming(
@@ -467,6 +732,12 @@ export function prepareTargetReleaseIncoming(
     throw new Error("target cache operation id is invalid");
   }
   validateTargetCacheProbe(probe, identity.releaseManifestSha256);
+  if (
+    identity.cacheMode === TARGET_RELEASE_CACHE_MODES.legacy &&
+    (!probe.packageHit || probe.cacheSource !== "formal")
+  ) {
+    throw new Error("legacy target release cache is unavailable");
+  }
   const target = getDeploymentTarget(targetKey);
   runChecked(
     runCommand,
@@ -477,6 +748,7 @@ export function prepareTargetReleaseIncoming(
       "-s",
       "--",
       operationId,
+      identity.cacheMode,
       identity.releaseManifestSha256,
       String(probe.packageHit),
       String(probe.imageHit),
@@ -485,7 +757,7 @@ export function prepareTargetReleaseIncoming(
       String(probe.avoidedBytes),
       identity.releaseArtifactSha256,
       identity.checksumsSha256,
-      identity.releaseRehearsalSha256,
+      identity.releaseRehearsalSha256 || "none",
       identity.sourceArchiveSha256,
       identity.sbomSha256,
       identity.serverArchiveSha256,
@@ -504,9 +776,22 @@ const CLEANUP_PREPARED_INCOMING_SCRIPT_TEMPLATE = String.raw`set -euo pipefail
 root=__ROOT__
 operation_id="$1"
 [[ "$operation_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]
-incoming=$root/incoming/$operation_id
+incoming_root=$root/incoming
+incoming=$incoming_root/$operation_id
+owned_directory() {
+  local candidate="$1" canonical mode
+  [[ -d "$candidate" && ! -L "$candidate" ]] || return 1
+  canonical="$(readlink -f -- "$candidate")" || return 1
+  [[ "$canonical" == "$candidate" && "$(stat -c '%u' "$candidate")" == "$(id -u)" ]] || return 1
+  mode="$(stat -c '%a' "$candidate")"
+  [[ "$mode" =~ ^[0-7]{3,4}$ ]] || return 1
+  (( (8#$mode & 8#022) == 0 ))
+}
+owned_directory "$root"
+[[ -e "$incoming_root" ]] || exit 0
+owned_directory "$incoming_root"
 [[ -e "$incoming" ]] || exit 0
-[[ -d "$incoming" && ! -L "$incoming" && "$(stat -c '%u' "$incoming")" == "$(id -u)" ]]
+owned_directory "$incoming"
 rm -rf -- "$incoming"
 `;
 

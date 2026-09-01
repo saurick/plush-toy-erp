@@ -13,6 +13,7 @@ import test from "node:test";
 import {
   GITLAB_DELIVERY_BASE_URL,
   GITLAB_DELIVERY_PACKAGE,
+  GITLAB_LEGACY_RELEASE_ASSETS,
   GITLAB_DELIVERY_PROJECT,
   GITLAB_RELEASE_ASSETS,
   GITLAB_SOURCE_PACKAGE,
@@ -628,6 +629,7 @@ test("GitLab provider downloads only bounded control evidence for target-direct 
   try {
     const result = await provider.downloadReleaseControl(SHA, destination);
     assert.equal(result.reused, false);
+    assert.equal(result.transportMode, "v2_direct");
     assert.deepEqual(requestedAssets.sort(), Object.keys(bodies).sort());
     assert.equal(result.fetch.source.file.size, sourcePackage.size);
     assert.equal(JSON.stringify(result).includes(TOKEN), false);
@@ -658,6 +660,110 @@ test("GitLab provider downloads only bounded control evidence for target-direct 
     await assert.rejects(
       provider.downloadReleaseControl(SHA, destination),
       /stale or invalid/u,
+    );
+  } finally {
+    rmSync(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
+test("GitLab provider reads legacy release controls without source lookup or Mac payload transfer", async () => {
+  const detail = releaseDetailFixture();
+  const legacyManifest = structuredClone(detail.manifest);
+  legacyManifest.schemaVersion = "plush.release-manifest/v1";
+  delete legacyManifest.rehearsal;
+  const bodies = {
+    "release-artifact.json": JSON.stringify(detail.artifact),
+    "release-manifest.json": JSON.stringify(legacyManifest),
+  };
+  const digests = Object.fromEntries(
+    Object.entries(bodies).map(([name, body]) => [
+      name,
+      createHash("sha256").update(body).digest("hex"),
+    ]),
+  );
+  const payloadDigests = {
+    "sbom.cdx.json": detail.artifact.sbom.sha256,
+    "server-image.tar": detail.artifact.images[0].archive.sha256,
+    "web-image.tar": detail.artifact.images[1].archive.sha256,
+  };
+  bodies["checksums.sha256"] = `${Object.entries({
+    ...digests,
+    ...payloadDigests,
+  })
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, digest]) => `${digest}  ${name}`)
+    .join("\n")}\n`;
+  digests["checksums.sha256"] = createHash("sha256")
+    .update(bodies["checksums.sha256"])
+    .digest("hex");
+  const formalFiles = GITLAB_LEGACY_RELEASE_ASSETS.map((file_name) => ({
+    file_name,
+    size: bodies[file_name]
+      ? Buffer.byteLength(bodies[file_name])
+      : file_name === "server-image.tar"
+        ? detail.artifact.images[0].archive.sizeBytes
+        : file_name === "web-image.tar"
+          ? detail.artifact.images[1].archive.sizeBytes
+          : 101,
+    file_sha256: digests[file_name] || payloadDigests[file_name],
+  }));
+  const requestedAssets = [];
+  let sourceQueries = 0;
+  const provider = createGitlabDeliveryProvider({
+    projectRoot: process.cwd(),
+    env: { PLUSH_GITLAB_TOKEN: TOKEN },
+    request: async (url) => {
+      if (url.includes("package_name=plush-release-source")) {
+        sourceQueries += 1;
+        throw new Error("legacy release must not query the source package");
+      }
+      if (url.includes("/packages?")) {
+        return json([
+          {
+            id: 41,
+            package_type: "generic",
+            name: GITLAB_DELIVERY_PACKAGE,
+            version: `artifact-${SHA}`,
+          },
+        ]);
+      }
+      if (url.includes("/packages/41/package_files")) return json(formalFiles);
+      const asset = Object.keys(bodies).find((name) =>
+        url.endsWith(`/${name}`),
+      );
+      if (asset) {
+        requestedAssets.push(asset);
+        return new Response(bodies[asset], { status: 200 });
+      }
+      throw new Error(`unexpected URL: ${url}`);
+    },
+  });
+  const outputRoot = path.join(
+    process.cwd(),
+    "output",
+    "dev-workbench",
+    "release-controls",
+  );
+  mkdirSync(outputRoot, { recursive: true });
+  const temporaryRoot = mkdtempSync(path.join(outputRoot, "provider-legacy-"));
+  const destination = path.join(temporaryRoot, SHA);
+  try {
+    const result = await provider.downloadReleaseControl(SHA, destination);
+    assert.equal(result.transportMode, "legacy_v1_cache_only");
+    assert.equal(result.fetch, null);
+    assert.equal(sourceQueries, 0);
+    assert.deepEqual(requestedAssets.sort(), Object.keys(bodies).sort());
+    assert.deepEqual(result.assets, [
+      "checksums.sha256",
+      "release-artifact.json",
+      "release-manifest.json",
+    ]);
+    assert.equal(
+      buildTargetReleaseCacheIdentity({
+        bundleDir: destination,
+        releaseManifestPath: path.join(destination, "release-manifest.json"),
+      }).cacheMode,
+      "legacy_v1_existing_only",
     );
   } finally {
     rmSync(temporaryRoot, { recursive: true, force: true });

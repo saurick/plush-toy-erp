@@ -3,10 +3,8 @@ import {
   closeSync,
   existsSync,
   fsyncSync,
-  lstatSync,
   mkdirSync,
   openSync,
-  readFileSync,
   renameSync,
   unlinkSync,
   writeFileSync,
@@ -17,6 +15,7 @@ import process from "node:process";
 import { validateReleaseManifest } from "./release-catalog.mjs";
 import { validateGitAncestryRelation } from "./git-ancestry-relation.mjs";
 import { getDeploymentTarget } from "./deployment-targets.mjs";
+import { readBoundedPlainFile } from "../lib/file-digest.mjs";
 
 export const ROLLBACK_MANIFEST_CONTRACT = "plush.rollback-manifest/v1";
 
@@ -52,6 +51,7 @@ function releaseIdentity(manifest, manifestSha256) {
     throw new Error("rollback release manifest SHA-256 is invalid");
   }
   return {
+    schemaVersion: release.schemaVersion,
     gitSha: release.gitSha,
     version: release.version,
     manifestSha256,
@@ -106,6 +106,10 @@ export function validateRollbackManifest(manifest) {
   }
   for (const release of [manifest.from, manifest.to]) {
     if (
+      ![
+        "plush.release-manifest/v1",
+        "plush.release-manifest/v2",
+      ].includes(release.schemaVersion) ||
       !Array.isArray(release.images) ||
       release.images.length !== 2 ||
       new Set(release.images.map((image) => image.kind)).size !== 2 ||
@@ -119,6 +123,21 @@ export function validateRollbackManifest(manifest) {
     ) {
       throw new Error("rollback image identity is invalid");
     }
+  }
+  if (
+    !manifest.transport ||
+    Object.keys(manifest.transport).sort().join(",") !==
+      "mode,targetManifestSha256" ||
+    ![
+      "legacy_target_cache",
+      "gitlab_internal_or_target_cache",
+    ].includes(manifest.transport.mode) ||
+    manifest.transport.targetManifestSha256 !==
+      manifest.to.manifestSha256 ||
+    (manifest.transport.mode === "legacy_target_cache") !==
+      (manifest.to.schemaVersion === "plush.release-manifest/v1")
+  ) {
+    throw new Error("rollback transport identity is invalid");
   }
   if (
     (manifest.status === "blocked") !== (manifest.blockers.length > 0) ||
@@ -223,6 +242,13 @@ export function buildRollbackManifest({
     ancestry: gitRelation,
     from,
     to,
+    transport: {
+      mode:
+        to.schemaVersion === "plush.release-manifest/v1"
+          ? "legacy_target_cache"
+          : "gitlab_internal_or_target_cache",
+      targetManifestSha256: to.manifestSha256,
+    },
     before: {
       runtimeSha,
       serverHealth: targetPreflight.remote.runtime.serverHealth,
@@ -266,12 +292,18 @@ export function writeRollbackManifest(file, manifest) {
   validateRollbackManifest(manifest);
   const content = `${JSON.stringify(manifest, null, 2)}\n`;
   if (existsSync(file)) {
-    const stat = lstatSync(file);
-    if (!stat.isFile() || stat.isSymbolicLink()) {
-      throw new Error("rollback manifest output is not a plain file");
+    let snapshot;
+    try {
+      snapshot = readBoundedPlainFile(file, {
+        maximumBytes: 512 * 1024,
+      });
+    } catch (error) {
+      throw new Error("rollback manifest output is not a bounded plain file", {
+        cause: error,
+      });
     }
     const existing = validateRollbackManifest(
-      JSON.parse(readFileSync(file, "utf8")),
+      JSON.parse(snapshot.content.toString("utf8")),
     );
     if (
       JSON.stringify(stableValue(existing)) !==

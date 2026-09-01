@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import {
-  copyFileSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -23,6 +22,7 @@ import {
   transitionDeliveryOperation,
 } from "./delivery-operation-store.mjs";
 import { getDeploymentTarget } from "./deployment-targets.mjs";
+import { parseReleaseChecksums } from "./github-release-asset-set.mjs";
 import {
   assertLocalRsync,
   buildFixedTargetRsyncTransfer,
@@ -44,12 +44,14 @@ import {
   estimateAvoidedTransferDuration,
   prepareTargetReleaseIncoming,
   probeTargetReleaseCache,
+  targetReleaseCacheEvidenceFingerprint,
 } from "./target-release-cache.mjs";
 import {
   TARGET_RELEASE_FETCH_FILE,
   requireTargetReleaseFetchCredential,
   validateTargetReleaseFetch,
 } from "./target-release-fetch.mjs";
+import { readBoundedPlainFile } from "../lib/file-digest.mjs";
 
 export const REMOTE_ROLLBACK_RECEIPT_CONTRACT =
   "plush.remote-rollback-receipt/v5";
@@ -61,9 +63,43 @@ const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 const IMAGE_ID_PATTERN = /^sha256:[0-9a-f]{64}$/u;
 const ISSUE_PATTERN = /^(?:none|[a-z][a-z0-9_]{2,63})$/u;
 const MAX_RECEIPT_BYTES = 256 * 1024;
+export const REMOTE_ROLLBACK_BOOTSTRAP = String.raw`set -euo pipefail
+root=$1
+incoming=$2
+shift 2
+current=$root/current
+live_script=$current/scripts/deploy/remote-code-rollback.sh
+incoming_script=$incoming/remote-code-rollback.sh
+owned_private_directory() {
+  local candidate="$1" canonical mode
+  [[ -d "$candidate" && ! -L "$candidate" ]] || return 1
+  canonical="$(readlink -f -- "$candidate")" || return 1
+  [[ "$canonical" == "$candidate" && "$(stat -c '%u' "$candidate")" == "$(id -u)" ]] || return 1
+  mode="$(stat -c '%a' "$candidate")"
+  [[ "$mode" =~ ^[0-7]{3,4}$ ]] || return 1
+  (( (8#$mode & 8#022) == 0 ))
+}
+owned_private_plain_file() {
+  local candidate="$1" mode
+  [[ -f "$candidate" && ! -L "$candidate" && "$(stat -c '%u' "$candidate")" == "$(id -u)" ]] || return 1
+  mode="$(stat -c '%a' "$candidate")"
+  [[ "$mode" =~ ^[0-7]{3,4}$ ]] || return 1
+  (( (8#$mode & 8#022) == 0 ))
+}
+owned_private_directory "$root"
+owned_private_directory "$current"
+owned_private_directory "$current/scripts"
+owned_private_directory "$current/scripts/deploy"
+owned_private_directory "$incoming"
+owned_private_plain_file "$live_script"
+owned_private_plain_file "$incoming_script"
+[[ "$(readlink -f -- "$live_script")" == "$live_script" ]]
+cmp --silent "$incoming_script" "$live_script"
+exec /bin/bash "$live_script" "$@"`;
 
 export function consumeTargetReleaseFetchCredential(env = process.env) {
   const token = env.PLUSH_GITLAB_TARGET_FETCH_TOKEN;
+  delete env.PLUSH_GITLAB_TOKEN;
   delete env.PLUSH_GITLAB_TARGET_FETCH_TOKEN;
   return token;
 }
@@ -80,7 +116,7 @@ const ROLLBACK_STAGE_IDS = Object.freeze([
   "public_entry_switch",
   "current_source_switch",
 ]);
-const TRANSFER_FILES = Object.freeze([
+const V2_TRANSFER_FILES = Object.freeze([
   "checksums.sha256",
   "current-release-manifest.json",
   "release-artifact.json",
@@ -95,12 +131,31 @@ const TRANSFER_FILES = Object.freeze([
   TARGET_RELEASE_FETCH_FILE,
   "web-image.tar",
 ]);
-const CONTROL_TRANSFER_FILES = Object.freeze([
+const LEGACY_TRANSFER_FILES = Object.freeze([
+  "checksums.sha256",
+  "current-release-manifest.json",
+  "release-artifact.json",
+  "release-manifest.json",
+  "remote-code-rollback.sh",
+  "rollback-manifest.json",
+  "sbom.cdx.json",
+  "server-image.tar",
+  "source.tar",
+  "web-image.tar",
+]);
+const V2_CONTROL_TRANSFER_FILES = Object.freeze([
   "current-release-manifest.json",
   "remote-code-rollback.sh",
   "remote-release-acquire.sh",
   "rollback-manifest.json",
   TARGET_RELEASE_FETCH_FILE,
+  "transfer-checksums.sha256",
+]);
+const LEGACY_CONTROL_TRANSFER_FILES = Object.freeze([
+  "checksums.sha256",
+  "current-release-manifest.json",
+  "remote-code-rollback.sh",
+  "rollback-manifest.json",
   "transfer-checksums.sha256",
 ]);
 
@@ -127,6 +182,10 @@ function runChecked(runCommand, command, args, options, label) {
     throw new Error(`${label} failed with exit ${String(result.status)}`);
   }
   return result;
+}
+
+function shellQuote(value) {
+  return `'${String(value).replaceAll("'", `'"'"'`)}'`;
 }
 
 function targetAcquisitionMetrics(receipt) {
@@ -164,29 +223,35 @@ function safeBundleFile(bundleDir, relativeFile) {
   return candidate;
 }
 
-function copyBoundedFile(source, destination, maximumBytes = 2 * 1024 ** 3) {
-  const stat = lstatSync(source);
-  if (
-    !stat.isFile() ||
-    stat.isSymbolicLink() ||
-    stat.size <= 0 ||
-    stat.size > maximumBytes
-  ) {
-    throw new Error("rollback transfer input is invalid or too large");
+function plainDirectory(directory, label) {
+  const input = path.resolve(directory);
+  const stat = lstatSync(input);
+  if (!stat.isDirectory() || stat.isSymbolicLink()) {
+    throw new Error(`${label} is invalid`);
   }
-  copyFileSync(source, destination);
+  return realpathSync(input);
 }
 
 function readReleaseManifest(file) {
-  const absolute = realpathSync(file);
-  const stat = lstatSync(absolute);
-  if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 512 * 1024) {
-    throw new Error("rollback release manifest is invalid");
+  const input = path.resolve(file);
+  const absolute = path.join(
+    realpathSync(path.dirname(input)),
+    path.basename(input),
+  );
+  let snapshot;
+  try {
+    snapshot = readBoundedPlainFile(absolute, {
+      maximumBytes: 512 * 1024,
+    });
+  } catch (error) {
+    throw new Error("rollback release manifest is invalid", { cause: error });
   }
   return {
     absolute,
+    content: snapshot.content,
+    sha256: snapshot.sha256,
     manifest: validateReleaseManifest(
-      JSON.parse(readFileSync(absolute, "utf8")),
+      JSON.parse(snapshot.content.toString("utf8")),
     ),
   };
 }
@@ -202,51 +267,105 @@ export function prepareRollbackTransfer(
   },
   { runCommand = spawnSync, cachedPackage = false } = {},
 ) {
-  const root = realpathSync(repoRoot);
-  const bundle = realpathSync(bundleDir);
+  const root = plainDirectory(repoRoot, "rollback repository root");
+  const bundle = plainDirectory(bundleDir, "rollback release bundle");
   const plan = validateRollbackManifest(rollbackPlan);
   if (plan.status !== "eligible") {
     throw new Error("only an eligible rollback plan can be transferred");
   }
   const current = readReleaseManifest(currentReleaseManifestPath);
   const target = readReleaseManifest(targetReleaseManifestPath);
+  if (target.absolute !== path.join(bundle, "release-manifest.json")) {
+    throw new Error("rollback target manifest is outside its bundle");
+  }
+  const legacyTarget =
+    target.manifest.schemaVersion === "plush.release-manifest/v1";
   if (
     current.manifest.gitSha !== plan.from.gitSha ||
     target.manifest.gitSha !== plan.to.gitSha ||
     target.manifest.version !== plan.to.version ||
-    sha256File(current.absolute) !== plan.from.manifestSha256 ||
-    sha256File(target.absolute) !== plan.to.manifestSha256
+    current.sha256 !== plan.from.manifestSha256 ||
+    target.sha256 !== plan.to.manifestSha256
   ) {
     throw new Error("rollback release manifests do not match the plan");
   }
+  if (
+    !plan.transport ||
+    plan.transport.targetManifestSha256 !== plan.to.manifestSha256 ||
+    (legacyTarget
+      ? plan.transport.mode !== "legacy_target_cache"
+      : plan.transport.mode !== "gitlab_internal_or_target_cache") ||
+    (legacyTarget && !cachedPackage)
+  ) {
+    throw new Error("rollback transport does not match the release plan");
+  }
   const artifactFile = safeBundleFile(bundle, "release-artifact.json");
+  const artifactSnapshot = readBoundedPlainFile(artifactFile, {
+    maximumBytes: 512 * 1024,
+  });
   const artifact = assertReleaseArtifactManifest(
-    JSON.parse(readFileSync(artifactFile, "utf8")),
+    JSON.parse(artifactSnapshot.content.toString("utf8")),
   );
   validateReleaseArtifactBinding(
     target.manifest,
     artifact,
-    sha256File(artifactFile),
+    artifactSnapshot.sha256,
   );
   const checksumsFile = safeBundleFile(bundle, "checksums.sha256");
-  const rehearsalFile = safeBundleFile(bundle, "release-rehearsal.json");
-  const fetchFile = safeBundleFile(bundle, TARGET_RELEASE_FETCH_FILE);
-  const fetch = validateTargetReleaseFetch(
-    JSON.parse(readFileSync(fetchFile, "utf8")),
-  );
-  if (
-    fetch.gitSha !== target.manifest.gitSha ||
-    fetch.version !== target.manifest.version ||
-    fetch.formal.files.find((file) => file.name === "release-artifact.json")
-      ?.sha256 !== sha256File(artifactFile) ||
-    fetch.formal.files.find((file) => file.name === "release-manifest.json")
-      ?.sha256 !== sha256File(target.absolute) ||
-    fetch.formal.files.find((file) => file.name === "release-rehearsal.json")
-      ?.sha256 !== sha256File(rehearsalFile) ||
-    fetch.formal.files.find((file) => file.name === "checksums.sha256")
-      ?.sha256 !== sha256File(checksumsFile)
-  ) {
-    throw new Error("target-direct rollback descriptor does not match the plan");
+  const checksumsSnapshot = readBoundedPlainFile(checksumsFile, {
+    maximumBytes: 4 * 1024 * 1024,
+  });
+  let rehearsalFile = null;
+  let rehearsalSnapshot = null;
+  let fetchFile = null;
+  let fetchSnapshot = null;
+  let fetch = null;
+  if (legacyTarget) {
+    const checksums = parseReleaseChecksums(
+      checksumsSnapshot.content.toString("utf8"),
+    );
+    const expected = new Map([
+      ["release-artifact.json", artifactSnapshot.sha256],
+      ["release-manifest.json", target.sha256],
+      ["sbom.cdx.json", artifact.sbom.sha256],
+      [
+        "server-image.tar",
+        artifact.images.find((image) => image.kind === "server").archive.sha256,
+      ],
+      [
+        "web-image.tar",
+        artifact.images.find((image) => image.kind === "web").archive.sha256,
+      ],
+    ]);
+    if ([...expected].some(([name, digest]) => checksums.get(name) !== digest)) {
+      throw new Error("legacy rollback checksum catalog does not match the plan");
+    }
+  } else {
+    rehearsalFile = safeBundleFile(bundle, "release-rehearsal.json");
+    fetchFile = safeBundleFile(bundle, TARGET_RELEASE_FETCH_FILE);
+    rehearsalSnapshot = readBoundedPlainFile(rehearsalFile, {
+      maximumBytes: 4 * 1024 * 1024,
+    });
+    fetchSnapshot = readBoundedPlainFile(fetchFile, {
+      maximumBytes: 512 * 1024,
+    });
+    fetch = validateTargetReleaseFetch(
+      JSON.parse(fetchSnapshot.content.toString("utf8")),
+    );
+    if (
+      fetch.gitSha !== target.manifest.gitSha ||
+      fetch.version !== target.manifest.version ||
+      fetch.formal.files.find((file) => file.name === "release-artifact.json")
+        ?.sha256 !== artifactSnapshot.sha256 ||
+      fetch.formal.files.find((file) => file.name === "release-manifest.json")
+        ?.sha256 !== target.sha256 ||
+      fetch.formal.files.find((file) => file.name === "release-rehearsal.json")
+        ?.sha256 !== rehearsalSnapshot.sha256 ||
+      fetch.formal.files.find((file) => file.name === "checksums.sha256")
+        ?.sha256 !== checksumsSnapshot.sha256
+    ) {
+      throw new Error("target-direct rollback descriptor does not match the plan");
+    }
   }
   for (const gitSha of [current.manifest.gitSha, target.manifest.gitSha]) {
     runChecked(
@@ -269,20 +388,28 @@ export function prepareRollbackTransfer(
   }
   mkdirSync(destination, { recursive: true, mode: 0o700 });
   try {
-    copyBoundedFile(
-      current.absolute,
+    writeFileSync(
       path.join(destination, "current-release-manifest.json"),
-      512 * 1024,
+      current.content,
+      { flag: "wx", mode: 0o600 },
     );
-    copyBoundedFile(
-      fetchFile,
-      path.join(destination, TARGET_RELEASE_FETCH_FILE),
-      512 * 1024,
-    );
+    if (legacyTarget) {
+      writeFileSync(
+        path.join(destination, "checksums.sha256"),
+        checksumsSnapshot.content,
+        { flag: "wx", mode: 0o600 },
+      );
+    } else {
+      writeFileSync(
+        path.join(destination, TARGET_RELEASE_FETCH_FILE),
+        fetchSnapshot.content,
+        { flag: "wx", mode: 0o600 },
+      );
+    }
     writeFileSync(
       path.join(destination, "rollback-manifest.json"),
       `${JSON.stringify(plan, null, 2)}\n`,
-      { mode: 0o600 },
+      { flag: "wx", mode: 0o600 },
     );
     // The control script belongs to the live release. The target release only
     // supplies the source and images; importing its historical orchestrator can
@@ -300,38 +427,45 @@ export function prepareRollbackTransfer(
     writeFileSync(
       path.join(destination, "remote-code-rollback.sh"),
       String(remoteScript.stdout || ""),
-      { mode: 0o600 },
+      { flag: "wx", mode: 0o600 },
     );
-    const acquireScript = runChecked(
-      runCommand,
-      "git",
-      [
-        "show",
-        `${current.manifest.gitSha}:scripts/deploy/remote-release-acquire.sh`,
-      ],
-      { cwd: root },
-      "read committed release acquisition helper",
-    );
-    writeFileSync(
-      path.join(destination, "remote-release-acquire.sh"),
-      String(acquireScript.stdout || ""),
-      { mode: 0o600 },
-    );
+    if (!legacyTarget) {
+      const acquireScript = runChecked(
+        runCommand,
+        "git",
+        [
+          "show",
+          `${current.manifest.gitSha}:scripts/deploy/remote-release-acquire.sh`,
+        ],
+        { cwd: root },
+        "read committed release acquisition helper",
+      );
+      writeFileSync(
+        path.join(destination, "remote-release-acquire.sh"),
+        String(acquireScript.stdout || ""),
+        { flag: "wx", mode: 0o600 },
+      );
+    }
     const immutableChecksums = {
-      "checksums.sha256": sha256File(checksumsFile),
-      "release-manifest.json": sha256File(target.absolute),
-      "release-rehearsal.json": sha256File(rehearsalFile),
-      "release-artifact.json": sha256File(artifactFile),
+      "checksums.sha256": checksumsSnapshot.sha256,
+      "release-manifest.json": target.sha256,
+      "release-artifact.json": artifactSnapshot.sha256,
       "sbom.cdx.json": artifact.sbom.sha256,
       "server-image.tar": artifact.images.find(
         (image) => image.kind === "server",
       ).archive.sha256,
       "source.tar": target.manifest.artifact.sourceArchiveSha256,
-      [TARGET_RELEASE_FETCH_FILE]: sha256File(fetchFile),
       "web-image.tar": artifact.images.find((image) => image.kind === "web")
         .archive.sha256,
     };
-    const checksumLines = TRANSFER_FILES.map((file) => {
+    if (!legacyTarget) {
+      immutableChecksums["release-rehearsal.json"] = rehearsalSnapshot.sha256;
+      immutableChecksums[TARGET_RELEASE_FETCH_FILE] = fetchSnapshot.sha256;
+    }
+    const transferFiles = legacyTarget
+      ? LEGACY_TRANSFER_FILES
+      : V2_TRANSFER_FILES;
+    const checksumLines = transferFiles.map((file) => {
       const digest =
         immutableChecksums[file] || sha256File(path.join(destination, file));
       return `${digest}  ${file}`;
@@ -339,17 +473,22 @@ export function prepareRollbackTransfer(
     writeFileSync(
       path.join(destination, "transfer-checksums.sha256"),
       `${checksumLines.join("\n")}\n`,
-      { mode: 0o600 },
+      { flag: "wx", mode: 0o600 },
     );
-    const files = [...CONTROL_TRANSFER_FILES];
+    const files = [
+      ...(legacyTarget
+        ? LEGACY_CONTROL_TRANSFER_FILES
+        : V2_CONTROL_TRANSFER_FILES),
+    ];
     return {
       schemaVersion: "plush.rollback-transfer/v1",
       operationId: plan.operationId,
       fromGitSha: plan.from.gitSha,
       toGitSha: plan.to.gitSha,
       toVersion: plan.to.version,
+      transportMode: plan.transport.mode,
       cachedPackage,
-      acquisitionExpectedBytes: cachedPackage
+      acquisitionExpectedBytes: cachedPackage || legacyTarget
         ? 0
         : fetch.formal.files.reduce((total, file) => total + file.size, 0) +
           fetch.source.file.size,
@@ -513,6 +652,18 @@ export function validateRemoteRollbackReceipt(receipt, expected) {
   ) {
     throw new Error("remote rollback receipt contract is invalid");
   }
+  const expectedCache = expected.cache;
+  const cacheMatchesExpected =
+    expectedCache &&
+    receipt.cache.packageHit === expectedCache.packageHit &&
+    receipt.cache.imageHit === expectedCache.imageHit &&
+    receipt.cache.cacheSource === expectedCache.cacheSource &&
+    receipt.cache.avoidedBytes === expectedCache.avoidedBytes &&
+    receipt.cache.dockerLoadSkipped === expectedCache.dockerLoadSkipped &&
+    JSON.stringify(receipt.cache.basis) ===
+      JSON.stringify(expectedCache.basis) &&
+    JSON.stringify(receipt.cache.stillExecuted) ===
+      JSON.stringify(expectedCache.stillExecuted);
   if (
     (receipt.status !== "not_proven" &&
       receipt.acquisition.credentialCleanupProven !== true) ||
@@ -531,7 +682,8 @@ export function validateRemoteRollbackReceipt(receipt, expected) {
         (receipt.acquisition.mode === "target_cache" &&
           (receipt.acquisition.downloadedBytes !== 0 ||
             receipt.acquisition.expectedBytes !== 0)) ||
-        Object.values(receipt.checks).some((value) => value !== true))) ||
+        Object.values(receipt.checks).some((value) => value !== true) ||
+        !cacheMatchesExpected)) ||
     (receipt.status !== "passed" && receipt.issueCode === "none")
   ) {
     throw new Error("remote rollback receipt status is inconsistent");
@@ -588,10 +740,11 @@ export function executeRollback(
     cleanupCache = cleanupPreparedTargetReleaseIncoming,
     probeCache = probeTargetReleaseCache,
     prepareCache = prepareTargetReleaseIncoming,
-    fetchToken = consumeTargetReleaseFetchCredential(),
+    fetchToken,
     now = () => new Date().toISOString(),
   } = {},
 ) {
+  const inheritedFetchToken = consumeTargetReleaseFetchCredential();
   if (!UUID_V4_PATTERN.test(String(operationId || ""))) {
     throw new Error("rollback operation id is invalid");
   }
@@ -607,7 +760,15 @@ export function executeRollback(
     !plan ||
     plan.status !== "eligible" ||
     operation.gitSha !== plan.to.gitSha ||
-    operation.version !== plan.to.version
+    operation.version !== plan.to.version ||
+    operation.metadata?.rollbackFingerprint !== plan.fingerprint ||
+    operation.metadata?.currentManifestSha256 !== plan.from.manifestSha256 ||
+    operation.metadata?.targetManifestSha256 !== plan.to.manifestSha256 ||
+    operation.metadata?.rollbackTransportMode !== plan.transport?.mode ||
+    (plan.transport?.mode === "legacy_target_cache" &&
+      !SHA256_PATTERN.test(
+        String(operation.metadata?.rollbackTargetCacheFingerprint || ""),
+      ))
   ) {
     throw new Error("rollback operation is not in the eligible ready state");
   }
@@ -670,18 +831,60 @@ export function executeRollback(
     "transfers",
     `${operation.id}-rollback-${operation.requestFingerprint.slice(0, 12)}`,
   );
-  const cacheIdentity = buildCacheIdentity({
-    bundleDir: targetBundleDir,
-    releaseManifestPath: targetReleaseManifestPath,
-  });
-  const cacheProbe = probeCache(cacheIdentity, { runCommand, targetKey });
-  const avoidedTransfer = estimateAvoidedTransferDuration(
-    cacheProbe.avoidedBytes,
-    listDeliveryOperations(store, { limit: 200 }),
-  );
-  const targetFetchToken = cacheProbe.packageHit
-    ? null
-    : requireTargetReleaseFetchCredential(fetchToken);
+  const legacyTarget = plan.transport.mode === "legacy_target_cache";
+  let cacheIdentity;
+  let cacheProbe;
+  let avoidedTransfer;
+  try {
+    cacheIdentity = buildCacheIdentity({
+      bundleDir: targetBundleDir,
+      releaseManifestPath: targetReleaseManifestPath,
+    });
+    cacheProbe = probeCache(cacheIdentity, { runCommand, targetKey });
+    if (
+      (legacyTarget &&
+        (cacheIdentity.cacheMode !== "legacy_v1_existing_only" ||
+          !cacheProbe.packageHit ||
+          cacheProbe.cacheSource !== "formal" ||
+          targetReleaseCacheEvidenceFingerprint({
+            targetKey,
+            identity: cacheIdentity,
+            probe: cacheProbe,
+          }) !== operation.metadata.rollbackTargetCacheFingerprint)) ||
+      (!legacyTarget && cacheIdentity.cacheMode !== "v2_direct")
+    ) {
+      throw new Error("rollback target cache does not match the bound transport");
+    }
+    avoidedTransfer = estimateAvoidedTransferDuration(
+      cacheProbe.avoidedBytes,
+      listDeliveryOperations(store, { limit: 200 }),
+    );
+  } catch {
+    operation = transitionDeliveryOperation(store, operation.id, {
+      status: "blocked",
+      message: "rollback is blocked because its target transport is unavailable",
+      issues: [
+        {
+          code: "rollback_target_transport_unavailable",
+          level: "error",
+          message: "目标回滚制品或既有缓存资格不可用；未启动目标写操作",
+        },
+      ],
+      now: now(),
+    });
+    return {
+      schemaVersion: "plush.rollback-execution/v1",
+      operation,
+      targetWriteStarted: false,
+      receipt: null,
+    };
+  }
+  const consumedFetchToken =
+    fetchToken === undefined ? inheritedFetchToken : fetchToken;
+  const targetFetchToken =
+    legacyTarget || cacheProbe.packageHit
+      ? null
+      : requireTargetReleaseFetchCredential(consumedFetchToken);
   const target = getDeploymentTarget(targetKey);
   const sshArgs = fixedSshArgs(target);
   let transfer;
@@ -756,13 +959,16 @@ export function executeRollback(
       );
     }
     remoteStarted = true;
-    const remoteScript = `${target.filesystem.root}/incoming/${operation.id}/remote-code-rollback.sh`;
-    const result = runCommand(
-      "ssh",
-      [
-        ...sshArgs,
-        "bash",
-        remoteScript,
+    const remoteRoot = target.filesystem.root;
+    const remoteIncoming = `${remoteRoot}/incoming/${operation.id}`;
+    const remoteCommand = [
+      "/bin/bash",
+      "-c",
+      shellQuote(REMOTE_ROLLBACK_BOOTSTRAP),
+      shellQuote("plush-rollback-bootstrap"),
+      shellQuote(remoteRoot),
+      shellQuote(remoteIncoming),
+      ...[
         "rollback",
         targetKey,
         operation.id,
@@ -773,7 +979,11 @@ export function executeRollback(
         plan.to.manifestSha256,
         plan.fingerprint,
         confirmation,
-      ],
+      ].map(shellQuote),
+    ].join(" ");
+    const result = runCommand(
+      "ssh",
+      [...sshArgs, remoteCommand],
       {
         encoding: "utf8",
         input: targetFetchToken ? `${targetFetchToken}\n` : "",
@@ -792,6 +1002,20 @@ export function executeRollback(
       targetManifestSha256: plan.to.manifestSha256,
       rollbackFingerprint: plan.fingerprint,
       acquisitionExpectedBytes: transfer.acquisitionExpectedBytes,
+      cache: {
+        packageHit: cacheProbe.packageHit,
+        imageHit: cacheProbe.imageHit,
+        cacheSource: cacheProbe.cacheSource,
+        avoidedBytes: cacheProbe.avoidedBytes,
+        dockerLoadSkipped: cacheProbe.imageHit,
+        basis: cacheProbe.basis,
+        stillExecuted: [
+          "migration_status",
+          "health",
+          "ready",
+          "public_entry",
+        ],
+      },
     });
     if (result.error) {
       throw new Error(`remote rollback SSH failed: ${result.error.message}`);
@@ -826,13 +1050,18 @@ export function executeRollback(
         targetAcquisitionVerified:
           receipt.acquisition.catalogAndChecksumsVerified,
         ...targetAcquisitionMetrics(receipt),
-        targetCacheHit: receipt.cache.packageHit,
-        targetImageCacheHit: receipt.cache.imageHit,
-        targetCacheSource: receipt.cache.cacheSource,
-        avoidedTransferBytes: receipt.cache.avoidedBytes,
-        dockerLoadSkipped: receipt.cache.dockerLoadSkipped,
-        cacheBasis: receipt.cache.basis,
-        stillExecutedChecks: receipt.cache.stillExecuted,
+        targetCacheHit: cacheProbe.packageHit,
+        targetImageCacheHit: cacheProbe.imageHit,
+        targetCacheSource: cacheProbe.cacheSource,
+        avoidedTransferBytes: cacheProbe.avoidedBytes,
+        dockerLoadSkipped: cacheProbe.imageHit,
+        cacheBasis: cacheProbe.basis,
+        stillExecutedChecks: [
+          "migration_status",
+          "health",
+          "ready",
+          "public_entry",
+        ],
       },
       now: now(),
     });

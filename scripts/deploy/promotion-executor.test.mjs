@@ -37,6 +37,7 @@ const PROMOTION_STAGES = [
 test("promotion executor consumes the inherited target fetch credential once", () => {
   const env = {
     KEEP_ME: "safe",
+    PLUSH_GITLAB_TOKEN: "provider-token",
     PLUSH_GITLAB_TARGET_FETCH_TOKEN: "target-fetch-token",
   };
   assert.equal(

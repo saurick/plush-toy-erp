@@ -78,7 +78,7 @@ test("remote code rollback requires exact confirmation, lock and receipt", () =>
 });
 
 test("remote rollback acquires the exact formal release on R640 before package verification", () => {
-  assert.match(source, /source "\$incoming\/remote-release-acquire[.]sh"/u);
+  assert.match(source, /source "\$live_acquire_script"/u);
   assert.match(source, /acquire_target_release/u);
   assert.match(source, /target-release-fetch[.]json/u);
   assert.match(source, /acquisitionMode/u);
@@ -86,8 +86,51 @@ test("remote rollback acquires the exact formal release on R640 before package v
   const trapIndex = source.indexOf("trap on_error ERR");
   const tokenRead = source.indexOf("IFS= read -r target_fetch_token || true");
   const acquireIndex = source.indexOf("acquire_target_release", tokenRead);
-  assert.ok(trapIndex >= 0 && trapIndex < tokenRead && tokenRead < acquireIndex);
+  const artifactStage = source.indexOf("enter_stage artifact_fetch");
+  const planCheck = source.indexOf("\nvalidate_bound_rollback_plan\n", artifactStage);
+  const incomingOwnerGate = source.indexOf(
+    'owned_private_directory "$incoming"',
+    artifactStage,
+  );
+  const liveScriptCheck = source.indexOf(
+    'cmp --silent "$incoming/remote-code-rollback.sh" "$live_rollback_script"',
+    artifactStage,
+  );
+  assert.ok(
+    trapIndex >= 0 &&
+      trapIndex < artifactStage &&
+      artifactStage < incomingOwnerGate &&
+      incomingOwnerGate < liveScriptCheck &&
+      liveScriptCheck < planCheck &&
+      planCheck < tokenRead &&
+      tokenRead < acquireIndex,
+  );
   assert.doesNotMatch(source, /target-release-fetch[.]secret/u);
+  assert.match(
+    source,
+    /live_rollback_script" == "\$current\/scripts\/deploy\/remote-code-rollback[.]sh/u,
+  );
+  assert.match(
+    source,
+    /live_acquire_script" == "\$current\/scripts\/deploy\/remote-release-acquire[.]sh/u,
+  );
+  assert.doesNotMatch(
+    source,
+    /\$releases_root"\/\*\/scripts\/deploy\/remote-(?:code-rollback|release-acquire)[.]sh/u,
+  );
+  const acquisitionSwitch = source.slice(
+    source.indexOf('case "$cache_contract_mode" in'),
+    source.indexOf("enter_stage package_verification"),
+  );
+  const legacyArm = acquisitionSwitch.slice(
+    acquisitionSwitch.indexOf("legacy_v1_existing_only)"),
+    acquisitionSwitch.indexOf("v2_direct)"),
+  );
+  assert.doesNotMatch(legacyArm, /target_fetch_token|live_acquire_script|source /u);
+  assert.match(
+    source,
+    /"\$rollback_transport_mode" != legacy_target_cache[\s\S]+?fail "legacy rollback cache is unavailable"/u,
+  );
 });
 
 test("remote rollback normalizes the runtime identity proxy contract", () => {
@@ -96,6 +139,22 @@ test("remote rollback normalizes the runtime identity proxy contract", () => {
     /WEB_PROXY_PREFIXES=\/rpc,\/templates,\/readyz\/runtime-identity/u,
   );
   assert.match(source, /proxy_count != 1/u);
+});
+
+test("remote rollback arms runtime env recovery before the atomic replacement", () => {
+  const backupGate = source.indexOf(
+    'owned_private_plain_file "$env_backup"',
+  );
+  const recoveryArmed = source.indexOf("env_changed=1", backupGate);
+  const replaceEnv = source.indexOf(
+    'mv -f "$env_next" "$runtime_env"',
+    recoveryArmed,
+  );
+  assert.ok(
+    backupGate >= 0 &&
+      backupGate < recoveryArmed &&
+      recoveryArmed < replaceEnv,
+  );
 });
 
 test("remote rollback reports failed only after proving previous runtime and public recovery", () => {
@@ -122,13 +181,27 @@ test("remote rollback reports failed only after proving previous runtime and pub
 
 test("remote rollback reuses only checksum-bound retained content", () => {
   assert.match(source, /plush[.]target-release-cache\/v2/u);
-  assert.match(source, /cache_root=\$root\/release-cache-v2/u);
+  assert.match(source, /cache_root_v2=\$root\/release-cache-v2/u);
+  assert.match(
+    source,
+    /legacy_cache_root=\$root\/release-cache/u,
+  );
+  assert.match(
+    source,
+    /legacy_v1_existing_only\)[\s\S]+?cache_root=\$legacy_cache_root/u,
+  );
+  assert.match(source, /v2_direct\)[\s\S]+?cache_root=\$cache_root_v2/u);
   assert.match(source, /target_manifest_sha256/u);
   assert.match(source, /cache_avoided_bytes/u);
   assert.match(source, /dockerLoadSkipped: \$cacheImageHit/u);
   assert.match(source, /if \[\[ "\$cache_image_hit" != true \]\]/u);
   assert.match(source, /formal rollback cache conflicts/u);
   assert.match(source, /formal rollback cache inventory is invalid/u);
+  assert.match(source, /owned_private_directory\(\)/u);
+  assert.match(source, /readlink -f -- "\$candidate"/u);
+  assert.match(source, /8#022/u);
+  assert.match(source, /ensure_owned_private_child "\$root" "\$cache_root"/u);
+  assert.match(source, /owned_private_plain_file "\$formal_cache\/\$cache_file"/u);
   assert.match(
     source,
     /stillExecuted: \["migration_status", "health", "ready", "public_entry"\]/u,
@@ -141,7 +214,10 @@ test("remote rollback rechecks frozen Git ancestry and runtime before cache writ
   const runtimeCheck = source.indexOf(
     'fail "current runtime SHA or Git ancestry changed after rollback qualification"',
   );
-  const cacheWrite = source.indexOf('mkdir -p "$cache_root"', runtimeCheck);
+  const cacheWrite = source.indexOf(
+    'ensure_owned_private_child "$root" "$cache_root"',
+    runtimeCheck,
+  );
   assert.ok(runtimeCheck >= 0 && runtimeCheck < cacheWrite);
 });
 
@@ -158,6 +234,35 @@ test("remote rollback cleans only materialization created by the current operati
   assert.match(source, /stat -c '%u'/u);
   assert.match(source, /rm -rf -- "\$candidate"/u);
   assert.match(source, /fetch_payloads_published=0/u);
+});
+
+test("remote rollback preserves current before atomically installing the verified next tree", () => {
+  const stage = source.indexOf("enter_stage current_source_switch");
+  const armed = source.indexOf("current_source_switch_started=1", stage);
+  const nextPath = source.indexOf(
+    "next_current=$root/.current-next-rollback-$operation_id",
+    armed,
+  );
+  const copyNext = source.indexOf(
+    'cp -a --reflink=auto "$release_dir" "$next_current"',
+    nextPath,
+  );
+  const oldPath = source.indexOf("old_current=$root/current.before-rollback-", copyNext);
+  const preserveCurrent = source.indexOf('mv "$current" "$old_current"', oldPath);
+  const installNext = source.indexOf('mv "$next_current" "$current"', preserveCurrent);
+  assert.ok(
+    stage >= 0 &&
+      stage < armed &&
+      armed < nextPath &&
+      nextPath < copyNext &&
+      copyNext < oldPath &&
+      oldPath < preserveCurrent &&
+      preserveCurrent < installNext,
+  );
+  assert.match(
+    source.slice(nextPath, preserveCurrent),
+    /! -e "\$next_current"[\s\S]+?! -e "\$old_current"/u,
+  );
 });
 
 test("remote rollback removes the complete incoming control and payload inventory on success", () => {
@@ -187,19 +292,33 @@ test("remote rollback removes the complete incoming control and payload inventor
 test("remote rollback restores only the trusted database role script mode after safe extraction", () => {
   const extractIndex = source.indexOf("tar --extract");
   const ownershipGateIndex = source.indexOf('"$owner_uid" == "$(id -u)"');
-  const chmodIndex = source.indexOf('chmod 755 "$database_roles_script"');
+  const chmodIndex = source.indexOf('chmod 755 "$roles_script"');
   const retainIndex = source.indexOf(
     'mv "$release_materializing" "$release_dir"',
   );
   assert.ok(extractIndex >= 0 && extractIndex < ownershipGateIndex);
   assert.ok(ownershipGateIndex < chmodIndex && chmodIndex < retainIndex);
   assert.match(source, /--no-same-owner --no-same-permissions/u);
+  assert.match(source, /tar --list --verbose --absolute-names/u);
   assert.match(
     source,
-    /-f "\$database_roles_script" && ! -L "\$database_roles_script"/u,
+    /substr\(\$0, 1, 1\) != "-" && substr\(\$0, 1, 1\) != "d"/u,
+  );
+  assert.match(source, /source archive contains a non-regular member/u);
+  assert.match(
+    source,
+    /-f "\$roles_script" && ! -L "\$roles_script"/u,
   );
   assert.match(source, /"\$owner_uid" == "\$\(id -u\)"/u);
   assert.doesNotMatch(source, /chmod -R|chmod 755 "\$release_materializing"/u);
+  assert.match(source, /release_tree_digest "\$release_dir"/u);
+  assert.match(source, /release_tree_digest "\$release_verifying"/u);
+  assert.match(source, /existing target release tree differs from the verified source archive/u);
+  assert.match(source, /-type f ! -links 1/u);
+  assert.match(source, /owned_private_directory "\$runtime_root"/u);
+  assert.match(source, /owned_private_plain_file "\$compose_base"/u);
+  assert.match(source, /owned_private_plain_file "\$compose_override"/u);
+  assert.match(source, /owned_private_plain_file "\$preflight_script"/u);
 });
 
 test("remote code rollback normalizes full nanoseconds to portable milliseconds", () => {

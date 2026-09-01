@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
+import { realpathSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -14,27 +14,41 @@ import {
   validateRollbackManifest,
   writeRollbackManifest,
 } from "./rollback-manifest.mjs";
-import { sha256File, validateReleaseManifest } from "./release-catalog.mjs";
+import { validateReleaseManifest } from "./release-catalog.mjs";
 import { runTargetPreflight } from "./target-preflight.mjs";
 import { classifyGitAncestryRelation } from "./git-ancestry-relation.mjs";
 import { getDeploymentTarget } from "./deployment-targets.mjs";
+import {
+  buildTargetReleaseCacheIdentity,
+  probeTargetReleaseCache,
+  targetReleaseCacheEvidenceFingerprint,
+} from "./target-release-cache.mjs";
+import { readBoundedPlainFile } from "../lib/file-digest.mjs";
 
 const MAX_MANIFEST_BYTES = 512 * 1024;
 
 function readReleaseManifest(file) {
-  const absolute = realpathSync(file);
-  const stat = lstatSync(absolute);
-  if (
-    !stat.isFile() ||
-    stat.isSymbolicLink() ||
-    stat.size > MAX_MANIFEST_BYTES
-  ) {
-    throw new Error("rollback release manifest is not a bounded plain file");
+  const input = path.resolve(file);
+  const absolute = path.join(
+    realpathSync(path.dirname(input)),
+    path.basename(input),
+  );
+  let snapshot;
+  try {
+    snapshot = readBoundedPlainFile(absolute, {
+      maximumBytes: MAX_MANIFEST_BYTES,
+    });
+  } catch (error) {
+    throw new Error(
+      "rollback release manifest is not a bounded plain file",
+      { cause: error },
+    );
   }
   return {
     absolute,
+    sha256: snapshot.sha256,
     manifest: validateReleaseManifest(
-      JSON.parse(readFileSync(absolute, "utf8")),
+      JSON.parse(snapshot.content.toString("utf8")),
     ),
   };
 }
@@ -53,6 +67,8 @@ function issueForBlocker(code) {
       "目标版本客户配置源指纹不同，禁止普通代码回滚",
     rollback_git_relation_not_behind:
       "目标 SHA 不是 133 当前 SHA 的祖先，禁止按发布时间猜测回滚方向",
+    rollback_target_transport_unavailable:
+      "目标旧版本没有精确命中的既有回滚缓存，禁止从控制机中转或补造制品",
   };
   return {
     code,
@@ -63,16 +79,18 @@ function issueForBlocker(code) {
 
 export function readRollbackPlan(store, operationId) {
   const file = rollbackPlanFile(store, operationId);
-  if (!existsSync(file)) return null;
-  const stat = lstatSync(file);
-  if (
-    !stat.isFile() ||
-    stat.isSymbolicLink() ||
-    stat.size > MAX_MANIFEST_BYTES
-  ) {
-    throw new Error("rollback plan is invalid");
+  let snapshot;
+  try {
+    snapshot = readBoundedPlainFile(file, {
+      maximumBytes: MAX_MANIFEST_BYTES,
+    });
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
   }
-  return validateRollbackManifest(JSON.parse(readFileSync(file, "utf8")));
+  return validateRollbackManifest(
+    JSON.parse(snapshot.content.toString("utf8")),
+  );
 }
 
 export async function prepareRollback(
@@ -88,6 +106,8 @@ export async function prepareRollback(
   {
     runPreflight = runTargetPreflight,
     classifyRelation = classifyGitAncestryRelation,
+    buildCacheIdentity = buildTargetReleaseCacheIdentity,
+    probeCache = probeTargetReleaseCache,
     now = () => new Date().toISOString(),
   } = {},
 ) {
@@ -96,8 +116,8 @@ export async function prepareRollback(
   getDeploymentTarget(targetKey);
   const current = readReleaseManifest(currentReleaseManifestPath);
   const target = readReleaseManifest(targetReleaseManifestPath);
-  const currentManifestSha256 = sha256File(current.absolute);
-  const targetManifestSha256 = sha256File(target.absolute);
+  const currentManifestSha256 = current.sha256;
+  const targetManifestSha256 = target.sha256;
   const created = createOrReuseDeliveryOperation(store, {
     action: "rollback",
     target: targetKey,
@@ -129,7 +149,42 @@ export async function prepareRollback(
     now: now(),
   });
   try {
-    const targetPreflight = await runPreflight(targetKey);
+    let targetPreflight = await runPreflight(targetKey);
+    let rollbackTargetCacheFingerprint = null;
+    if (target.manifest.schemaVersion === "plush.release-manifest/v1") {
+      try {
+        const identity = buildCacheIdentity({
+          bundleDir: path.dirname(target.absolute),
+          releaseManifestPath: target.absolute,
+        });
+        const probe = await Promise.resolve(
+          probeCache(identity, { targetKey }),
+        );
+        if (
+          identity.cacheMode !== "legacy_v1_existing_only" ||
+          probe.packageHit !== true ||
+          probe.cacheSource !== "formal"
+        ) {
+          throw new Error("legacy rollback target cache is unavailable");
+        }
+        rollbackTargetCacheFingerprint =
+          targetReleaseCacheEvidenceFingerprint({
+            targetKey,
+            identity,
+            probe,
+          });
+      } catch {
+        targetPreflight = {
+          ...targetPreflight,
+          blockers: [
+            ...new Set([
+              ...(targetPreflight.blockers || []),
+              "rollback_target_transport_unavailable",
+            ]),
+          ].sort(),
+        };
+      }
+    }
     const ancestry = classifyRelation({
       repoRoot: root,
       currentGitSha: current.manifest.gitSha,
@@ -154,6 +209,8 @@ export async function prepareRollback(
         metadata: {
           ...operation.metadata,
           rollbackFingerprint: plan.fingerprint,
+          rollbackTransportMode: plan.transport.mode,
+          rollbackTargetCacheFingerprint,
         },
         now: now(),
       });
@@ -164,6 +221,8 @@ export async function prepareRollback(
         metadata: {
           ...operation.metadata,
           rollbackFingerprint: plan.fingerprint,
+          rollbackTransportMode: plan.transport.mode,
+          rollbackTargetCacheFingerprint,
           noTargetWriteRequired: true,
         },
         now: now(),
@@ -176,6 +235,8 @@ export async function prepareRollback(
         metadata: {
           ...operation.metadata,
           rollbackFingerprint: plan.fingerprint,
+          rollbackTransportMode: plan.transport.mode,
+          rollbackTargetCacheFingerprint,
         },
         now: now(),
       });

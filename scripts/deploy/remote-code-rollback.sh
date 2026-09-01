@@ -65,7 +65,10 @@ customer-test-133)
   ;;
 esac
 incoming_root=$root/incoming
-cache_root=$root/release-cache-v2
+runtime_root=$root/runtime
+cache_root_v2=$root/release-cache-v2
+legacy_cache_root=$root/release-cache
+cache_root=$cache_root_v2
 releases_root=$root/releases
 operations_root=$root/operations
 run_root=$root/run
@@ -83,6 +86,44 @@ version_pattern='^[0-9A-Za-z]([0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$'
 fail() {
   printf '[remote-code-rollback] %s\n' "$1" >&2
   return 1
+}
+
+owned_private_directory() {
+  local candidate="$1"
+  local canonical
+  local mode
+  [[ -d "$candidate" && ! -L "$candidate" ]] || return 1
+  canonical="$(readlink -f -- "$candidate")" || return 1
+  [[ "$canonical" == "$candidate" &&
+    "$(stat -c '%u' "$candidate")" == "$(id -u)" ]] || return 1
+  mode="$(stat -c '%a' "$candidate")"
+  [[ "$mode" =~ ^[0-7]{3,4}$ ]] || return 1
+  (((8#$mode & 8#022) == 0))
+}
+
+owned_private_plain_file() {
+  local candidate="$1"
+  local mode
+  [[ -f "$candidate" && ! -L "$candidate" &&
+    "$(stat -c '%u' "$candidate")" == "$(id -u)" ]] || return 1
+  mode="$(stat -c '%a' "$candidate")"
+  [[ "$mode" =~ ^[0-7]{3,4}$ ]] || return 1
+  (((8#$mode & 8#022) == 0))
+}
+
+ensure_owned_private_child() {
+  local parent="$1"
+  local candidate="$2"
+  owned_private_directory "$parent" || return 1
+  [[ "$candidate" == "$parent"/* &&
+    "${candidate#"$parent"/}" != */* ]] || return 1
+  if [[ -e "$candidate" || -L "$candidate" ]]; then
+    owned_private_directory "$candidate"
+    return
+  fi
+  mkdir -- "$candidate"
+  chmod 700 "$candidate"
+  owned_private_directory "$candidate"
 }
 
 epoch_millis() {
@@ -144,6 +185,59 @@ portable_archive_manifest_digest() {
   printf '%s\n' "$manifest_digest"
 }
 
+validate_source_archive() {
+  local archive="$1"
+  if tar --list --absolute-names --file "$archive" |
+    awk '
+      /^\// { exit 1 }
+      /(^|\/)\.\.?($|\/)/ { exit 1 }
+      { next }
+    '; then
+    :
+  else
+    fail "source archive contains an unsafe path"
+  fi
+  if tar --list --verbose --absolute-names --file "$archive" |
+    awk 'substr($0, 1, 1) != "-" && substr($0, 1, 1) != "d" { exit 1 }'; then
+    :
+  else
+    fail "source archive contains a non-regular member"
+  fi
+}
+
+materialize_release_source() {
+  local archive="$1"
+  local destination="$2"
+  local roles_script
+  local owner_uid
+  tar --extract --file "$archive" \
+    --directory "$destination" --no-same-owner --no-same-permissions
+  roles_script=$destination/server/deploy/compose/prod/database_roles.sh
+  owner_uid="$(stat -c '%u' "$roles_script" 2>/dev/null || true)"
+  [[ -f "$roles_script" && ! -L "$roles_script" &&
+    "$owner_uid" == "$(id -u)" ]] ||
+    fail "database role initializer is invalid"
+  chmod 755 "$roles_script"
+}
+
+release_tree_digest() {
+  local candidate="$1"
+  local owner_gid
+  local owner_uid
+  owner_gid="$(id -g)"
+  owner_uid="$(id -u)"
+  owned_private_directory "$candidate" || return 1
+  if find "$candidate" -mindepth 1 \
+    \( \( ! -type f ! -type d \) -o ! -uid "$owner_uid" -o ! -gid "$owner_gid" \
+    -o \( -type f ! -links 1 \) -o -perm /022 \) \
+    -print -quit | grep -q .; then
+    return 1
+  fi
+  tar --create --format=gnu --sort=name --mtime=@0 \
+    --owner=0 --group=0 --numeric-owner --file=- --directory="$candidate" . |
+    sha256sum | awk '{print $1}'
+}
+
 [[ "$action" == rollback ]] || fail "unsupported action"
 [[ "$operation_id" =~ $uuid_v4_pattern ]] || fail "invalid operation id"
 [[ "$from_sha" =~ $sha_pattern && "$to_sha" =~ $sha_pattern ]] ||
@@ -171,6 +265,8 @@ env_changed=0
 service_switch_started=0
 current_source_switch_started=0
 env_backup=""
+env_next=""
+env_recovering=""
 server_content_id=unknown
 web_content_id=unknown
 server_ref=unknown
@@ -184,11 +280,16 @@ cache_materializing=""
 cache_materializing_created=0
 release_materializing=""
 release_materializing_created=0
+release_verifying=""
+release_verifying_created=0
 acquisition_mode=none
 acquisition_downloaded_bytes=0
 acquisition_expected_bytes=0
 acquisition_verified=false
 credential_cleanup_proven=false
+rollback_transport_mode=""
+target_manifest_schema=""
+cache_contract_mode=""
 fetch_materializing=""
 fetch_materializing_created=0
 fetch_payloads_published=0
@@ -198,15 +299,43 @@ stage_started_epoch_ms="$operation_started_epoch_ms"
 stage_finalized=0
 stage_timings='[]'
 
-mkdir -p "$operations_root" "$run_root"
-chmod 700 "$operations_root" "$run_root"
-mkdir "$operation_dir" 2>/dev/null || true
-[[ -d "$operation_dir" && ! -L "$operation_dir" ]] ||
-  fail "operation directory is invalid"
+owned_private_directory "$root" || fail "target root is invalid"
+[[ "$runtime_env" == "$runtime_root/.env.$target" ]] ||
+  fail "runtime env identity is invalid"
+owned_private_directory "$incoming_root" || fail "incoming root is invalid"
+owned_private_directory "$runtime_root" || fail "runtime root is invalid"
+owned_private_directory "$releases_root" || fail "releases root is invalid"
+owned_private_directory "$current" || fail "current release root is invalid"
+ensure_owned_private_child "$root" "$operations_root" ||
+  fail "operations root is invalid"
+ensure_owned_private_child "$root" "$run_root" ||
+  fail "run root is invalid"
+if [[ -e "$operation_dir" || -L "$operation_dir" ]]; then
+  owned_private_directory "$operation_dir" ||
+    fail "operation directory is invalid"
+else
+  mkdir -- "$operation_dir"
+fi
 chmod 700 "$operation_dir"
+owned_private_directory "$operation_dir" || fail "operation directory is invalid"
+for operation_file in "$receipt" "$state_file" "$log_file"; do
+  if [[ -e "$operation_file" || -L "$operation_file" ]]; then
+    owned_private_plain_file "$operation_file" ||
+      fail "operation evidence file is invalid"
+  fi
+done
+for transient_file in "$receipt.tmp" "$state_file.tmp"; do
+  [[ ! -e "$transient_file" && ! -L "$transient_file" ]] ||
+    fail "stale operation evidence temporary exists"
+done
 
+if [[ -e "$promotion_lock" || -L "$promotion_lock" ]]; then
+  owned_private_plain_file "$promotion_lock" ||
+    fail "promotion lock is invalid"
+fi
 exec 9>>"$promotion_lock"
 chmod 600 "$promotion_lock"
+owned_private_plain_file "$promotion_lock" || fail "promotion lock is invalid"
 if ! flock -n 9; then
   fail "another promotion or rollback holds the fixed target lock"
 fi
@@ -394,6 +523,9 @@ clean_env=(
 )
 
 recover_previous() {
+  local recovery_compose_base
+  local recovery_compose_dir
+  local recovery_compose_override
   local recovered_public_containers
   local recovered_public_count
   local recovered_public_sha
@@ -401,18 +533,32 @@ recover_previous() {
   local recovered_web_image
   local recovered_web_sha
   local recovery_cutover_script
-  [[ "$env_changed" -eq 1 && -n "$env_backup" && -f "$env_backup" ]] || return 1
-  [[ "$current_source_switch_started" -eq 0 && -d "$current" && ! -L "$current" ]] ||
+  [[ "$env_changed" -eq 1 &&
+    "$env_backup" == "$runtime_env.bak-before-rollback-${from_sha:0:8}-${operation_id:0:8}" ]] ||
     return 1
-  cp "$env_backup" "$runtime_env.recovering"
-  chmod 600 "$runtime_env.recovering"
-  mv -f "$runtime_env.recovering" "$runtime_env"
+  owned_private_directory "$runtime_root" || return 1
+  owned_private_plain_file "$env_backup" || return 1
+  [[ "$current_source_switch_started" -eq 0 ]] || return 1
+  owned_private_directory "$current" || return 1
+  recovery_compose_dir=$current/server/deploy/compose/prod
+  recovery_compose_base=$recovery_compose_dir/compose.yml
+  recovery_compose_override=$recovery_compose_dir/$compose_override_name
+  owned_private_directory "$recovery_compose_dir" || return 1
+  owned_private_plain_file "$recovery_compose_base" || return 1
+  owned_private_plain_file "$recovery_compose_override" || return 1
+  env_recovering="$runtime_env.recovering-$operation_id"
+  [[ ! -e "$env_recovering" && ! -L "$env_recovering" ]] || return 1
+  cp "$env_backup" "$env_recovering"
+  chmod 600 "$env_recovering"
+  owned_private_plain_file "$env_recovering" || return 1
+  mv -f "$env_recovering" "$runtime_env"
+  env_recovering=""
   env_changed=0
   "${clean_env[@]}" docker compose \
     -p "$project" \
     --env-file "$runtime_env" \
-    -f "$current/server/deploy/compose/prod/compose.yml" \
-    -f "$current/server/deploy/compose/prod/$compose_override_name" \
+    -f "$recovery_compose_base" \
+    -f "$recovery_compose_override" \
     up -d --no-build --pull never postgres jaeger app-server web-desktop \
     >>"$log_file" 2>&1 || return 1
   curl --fail --silent --show-error --max-time 10 \
@@ -436,8 +582,8 @@ recover_previous() {
   recovered_public_count="$(printf '%s\n' "$recovered_public_containers" | sed '/^$/d' | wc -l | tr -d ' ')"
   [[ "$recovered_public_count" == 1 ]] || return 1
   recovery_cutover_script=$current/deployments/yoyoosun/scripts/cutover-public-web.sh
-  [[ -f "$recovery_cutover_script" && ! -L "$recovery_cutover_script" ]] ||
-    return 1
+  owned_private_plain_file "$recovery_cutover_script" || return 1
+  [[ -x "$recovery_cutover_script" ]] || return 1
   bash "$recovery_cutover_script" \
     --image "$recovered_web_image" \
     --release "$from_sha" \
@@ -462,6 +608,19 @@ cleanup_transient_materialization() {
   local candidate
   credential_cleanup_proven=false
   unset target_fetch_token
+  for candidate in "$env_next" "$env_recovering"; do
+    if [[ -n "$candidate" && "$candidate" == "$runtime_root"/* &&
+      "${candidate#"$runtime_root"/}" != */* &&
+      (-e "$candidate" || -L "$candidate") ]]; then
+      if owned_private_directory "$runtime_root" &&
+        owned_private_plain_file "$candidate"; then
+        rm -f -- "$candidate" ||
+          printf '[remote-code-rollback] failed to clean runtime temporary\n' >&2
+      fi
+    fi
+  done
+  env_next=""
+  env_recovering=""
   if [[ "$fetch_payloads_published" -eq 1 ]]; then
     rm -f -- \
       "$incoming/checksums.sha256" "$incoming/release-artifact.json" \
@@ -472,9 +631,9 @@ cleanup_transient_materialization() {
   fi
   if [[ "$fetch_materializing_created" -eq 1 ]]; then
     candidate="$fetch_materializing"
-    if [[ "$candidate" == "$incoming/.acquire-$operation_id" &&
-      -d "$candidate" && ! -L "$candidate" &&
-      "$(stat -c '%u' "$candidate" 2>/dev/null || true)" == "$(id -u)" ]]; then
+    if [[ "$candidate" == "$incoming/.acquire-$operation_id" ]] &&
+      owned_private_directory "$incoming" &&
+      owned_private_directory "$candidate"; then
       rm -rf -- "$candidate" ||
         printf '[remote-code-rollback] failed to clean acquisition materialization\n' >&2
     fi
@@ -487,9 +646,9 @@ cleanup_transient_materialization() {
   fi
   if [[ "$cache_materializing_created" -eq 1 ]]; then
     candidate="$cache_materializing"
-    if [[ "$candidate" == "$cache_root/.materializing-$operation_id" &&
-      -d "$candidate" && ! -L "$candidate" &&
-      "$(stat -c '%u' "$candidate" 2>/dev/null || true)" == "$(id -u)" ]]; then
+    if [[ "$candidate" == "$cache_root/.materializing-$operation_id" ]] &&
+      owned_private_directory "$cache_root" &&
+      owned_private_directory "$candidate"; then
       rm -rf -- "$candidate" ||
         printf '[remote-code-rollback] failed to clean cache materialization\n' >&2
     fi
@@ -497,13 +656,23 @@ cleanup_transient_materialization() {
   fi
   if [[ "$release_materializing_created" -eq 1 ]]; then
     candidate="$release_materializing"
-    if [[ "$candidate" == "$releases_root/.materializing-rollback-$operation_id" &&
-      -d "$candidate" && ! -L "$candidate" &&
-      "$(stat -c '%u' "$candidate" 2>/dev/null || true)" == "$(id -u)" ]]; then
+    if [[ "$candidate" == "$releases_root/.materializing-rollback-$operation_id" ]] &&
+      owned_private_directory "$releases_root" &&
+      owned_private_directory "$candidate"; then
       rm -rf -- "$candidate" ||
         printf '[remote-code-rollback] failed to clean release materialization\n' >&2
     fi
     release_materializing_created=0
+  fi
+  if [[ "$release_verifying_created" -eq 1 ]]; then
+    candidate="$release_verifying"
+    if [[ "$candidate" == "$releases_root/.verifying-rollback-$operation_id" ]] &&
+      owned_private_directory "$releases_root" &&
+      owned_private_directory "$candidate"; then
+      rm -rf -- "$candidate" ||
+        printf '[remote-code-rollback] failed to clean release verification\n' >&2
+    fi
+    release_verifying_created=0
   fi
 }
 
@@ -547,66 +716,205 @@ trap on_error ERR
 trap on_signal HUP INT TERM
 trap cleanup_transient_materialization EXIT
 
+validate_bound_rollback_plan() {
+  local actual_rollback_fingerprint
+  actual_rollback_fingerprint="$(
+    jq -jSc 'del(.fingerprint)' "$incoming/rollback-manifest.json" |
+      sha256sum | awk '{print $1}'
+  )"
+  [[ "$actual_rollback_fingerprint" == "$rollback_fingerprint" ]] ||
+    fail "rollback manifest fingerprint does not match its content"
+  jq -e \
+    --arg operationId "$operation_id" \
+    --arg target "$target" \
+    --arg fromSha "$from_sha" \
+    --arg toSha "$to_sha" \
+    --arg fingerprint "$rollback_fingerprint" \
+    --arg transportMode "$rollback_transport_mode" \
+    --arg targetManifestSha256 "$target_manifest_sha256" \
+    '.schemaVersion == "plush.rollback-manifest/v1" and
+     .status == "eligible" and
+     .operationId == $operationId and
+     .target.key == $target and
+     .from.gitSha == $fromSha and
+     .to.gitSha == $toSha and
+     .ancestry.schemaVersion == "plush.git-ancestry-relation/v1" and
+     .ancestry.currentGitSha == $fromSha and
+     .ancestry.candidateGitSha == $toSha and
+     .ancestry.relation == "behind" and
+     .ancestry.actionClass == "rollback" and
+     .ancestry.actionReason == "candidate_is_ancestor_of_current" and
+     .fingerprint == $fingerprint and
+     .transport.mode == $transportMode and
+     .transport.targetManifestSha256 == $targetManifestSha256 and
+     .rollback.mode == "code_and_images_only" and
+     .rollback.automaticDatabaseDownMigration == false and
+     .rollback.databaseRestoreAutomatic == false' \
+    "$incoming/rollback-manifest.json" >/dev/null
+}
+
 : >"$log_file"
 chmod 600 "$log_file"
 write_state running
 
-[[ -f "$incoming/remote-release-acquire.sh" &&
-  ! -L "$incoming/remote-release-acquire.sh" ]] ||
-  fail "target release acquisition helper is invalid"
-# shellcheck source=scripts/deploy/remote-release-acquire.sh
-source "$incoming/remote-release-acquire.sh"
-release_sha=$to_sha
-release_version=$to_version
-target_fetch_token=""
-IFS= read -r target_fetch_token || true
-
 enter_stage artifact_fetch
-acquire_target_release
+owned_private_directory "$incoming" ||
+  fail "incoming rollback package is invalid"
+for control_file in \
+  .target-cache.json current-release-manifest.json \
+  rollback-manifest.json remote-code-rollback.sh; do
+  owned_private_plain_file "$incoming/$control_file" ||
+    fail "incoming rollback control is invalid"
+done
+live_rollback_script="$(
+  readlink -f -- "$current/scripts/deploy/remote-code-rollback.sh"
+)" || fail "live rollback script is unavailable"
+[[ "$live_rollback_script" == "$current/scripts/deploy/remote-code-rollback.sh" ]] ||
+  fail "live rollback script is outside the current release root"
+owned_private_plain_file "$live_rollback_script" ||
+  fail "live rollback script is invalid"
+cmp --silent "$incoming/remote-code-rollback.sh" "$live_rollback_script" ||
+  fail "remote rollback script is not part of the live exact source"
+[[ "$(sha256sum "$incoming/current-release-manifest.json" | awk '{print $1}')" == "$current_manifest_sha256" ]] ||
+  fail "current release manifest checksum does not match the rollback operation"
+owned_private_plain_file "$incoming/.target-cache.json" ||
+  fail "target cache transport marker is invalid"
+jq -e \
+  --arg operationId "$operation_id" \
+  --arg manifest "$target_manifest_sha256" \
+  '.schemaVersion == "plush.target-release-cache/v2" and
+   .operationId == $operationId and
+   .releaseManifestSha256 == $manifest and
+   (.cacheMode == "v2_direct" or
+    .cacheMode == "legacy_v1_existing_only")' \
+  "$incoming/.target-cache.json" >/dev/null
+cache_contract_mode="$(jq -er '.cacheMode' "$incoming/.target-cache.json")"
+case "$cache_contract_mode" in
+legacy_v1_existing_only)
+  rollback_transport_mode=legacy_target_cache
+  cache_root=$legacy_cache_root
+  ;;
+v2_direct)
+  rollback_transport_mode=gitlab_internal_or_target_cache
+  cache_root=$cache_root_v2
+  ;;
+*)
+  fail "target cache transport mode is unsupported"
+  ;;
+esac
+validate_bound_rollback_plan
+
+case "$cache_contract_mode" in
+legacy_v1_existing_only)
+  [[ -f "$incoming/release-manifest.json" &&
+    ! -L "$incoming/release-manifest.json" ]] ||
+    fail "legacy target release manifest is unavailable"
+  target_manifest_schema="$(jq -er '.schemaVersion' "$incoming/release-manifest.json")"
+  [[ "$target_manifest_schema" == plush.release-manifest/v1 ]] ||
+    fail "legacy target release manifest version is invalid"
+  acquisition_mode=target_cache
+  acquisition_expected_bytes=0
+  acquisition_downloaded_bytes=0
+  credential_cleanup_proven=true
+  ;;
+v2_direct)
+  owned_private_plain_file "$incoming/remote-release-acquire.sh" ||
+    fail "target release acquisition helper is invalid"
+  live_acquire_script="$(
+    readlink -f -- "$current/scripts/deploy/remote-release-acquire.sh"
+  )" || fail "live release acquisition helper is unavailable"
+  [[ "$live_acquire_script" == "$current/scripts/deploy/remote-release-acquire.sh" ]] ||
+    fail "live release acquisition helper is outside the current release root"
+  owned_private_plain_file "$live_acquire_script" ||
+    fail "live release acquisition helper is invalid"
+  cmp --silent \
+    "$incoming/remote-release-acquire.sh" \
+    "$live_acquire_script" ||
+    fail "release acquisition helper is not part of the live exact source"
+  # The dynamic path was resolved beneath the registered live release and
+  # byte-compared with the incoming control copy immediately above.
+  # shellcheck disable=SC1090
+  source "$live_acquire_script"
+  # These globals are consumed by acquire_target_release from the sourced file.
+  # shellcheck disable=SC2034
+  release_sha=$to_sha
+  # shellcheck disable=SC2034
+  release_version=$to_version
+  target_fetch_token=""
+  IFS= read -r target_fetch_token || true
+  acquire_target_release
+  target_manifest_schema="$(jq -er '.schemaVersion' "$incoming/release-manifest.json")"
+  [[ "$target_manifest_schema" == plush.release-manifest/v2 ]] ||
+    fail "target release manifest version is invalid"
+  ;;
+esac
 
 enter_stage package_verification
-[[ -d "$incoming" && ! -L "$incoming" &&
-  "$(stat -c '%u' "$incoming")" == "$(id -u)" ]] ||
+owned_private_directory "$incoming" ||
   fail "incoming rollback package is invalid"
-required_files=(
-  .target-cache.json
-  checksums.sha256
-  current-release-manifest.json
-  release-manifest.json
-  release-artifact.json
-  release-rehearsal.json
-  rollback-manifest.json
-  sbom.cdx.json
-  source.tar
-  server-image.tar
-  web-image.tar
-  remote-code-rollback.sh
-  remote-release-acquire.sh
-  target-release-fetch.json
-  transfer-checksums.sha256
-)
+if [[ "$rollback_transport_mode" == legacy_target_cache ]]; then
+  required_files=(
+    .target-cache.json
+    checksums.sha256
+    current-release-manifest.json
+    release-manifest.json
+    release-artifact.json
+    rollback-manifest.json
+    sbom.cdx.json
+    source.tar
+    server-image.tar
+    web-image.tar
+    remote-code-rollback.sh
+    transfer-checksums.sha256
+  )
+else
+  required_files=(
+    .target-cache.json
+    checksums.sha256
+    current-release-manifest.json
+    release-manifest.json
+    release-artifact.json
+    release-rehearsal.json
+    rollback-manifest.json
+    sbom.cdx.json
+    source.tar
+    server-image.tar
+    web-image.tar
+    remote-code-rollback.sh
+    remote-release-acquire.sh
+    target-release-fetch.json
+    transfer-checksums.sha256
+  )
+fi
 for required_file in "${required_files[@]}"; do
-  [[ -f "$incoming/$required_file" && ! -L "$incoming/$required_file" ]] ||
+  owned_private_plain_file "$incoming/$required_file" ||
     fail "incoming rollback package is incomplete"
 done
 jq -e \
   --arg operationId "$operation_id" \
-  --arg target "$target" \
+  --arg cacheMode "$cache_contract_mode" \
   --arg manifest "$target_manifest_sha256" \
   '.schemaVersion == "plush.target-release-cache/v2" and
    .operationId == $operationId and
+   .cacheMode == $cacheMode and
    .releaseManifestSha256 == $manifest and
    (.packageHit | type == "boolean") and
    (.imageHit | type == "boolean") and
    (.avoidedBytes | type == "number") and .avoidedBytes >= 0 and
    (.cacheSource == "none" or .cacheSource == "formal" or .cacheSource == "retained_operation") and
    (.basis | type == "array") and
-   (if .packageHit then (
-      .avoidedBytes > 0 and
-      (.cacheSource == "formal" or .cacheSource == "retained_operation") and
+   (if $cacheMode == "legacy_v1_existing_only" then (
+      .packageHit == true and .avoidedBytes > 0 and
+      .cacheSource == "formal" and
       .basis == ["release_manifest_sha256","archive_sha256","registry_digest","docker_content_id","embedded_git_sha"]
-    )
-    else (.imageHit == false and .avoidedBytes == 0 and .cacheSource == "none" and (.basis | length) == 0) end)' \
+    ) else (
+      if .packageHit then (
+        .avoidedBytes > 0 and
+        (.cacheSource == "formal" or .cacheSource == "retained_operation") and
+        .basis == ["release_manifest_sha256","archive_sha256","registry_digest","docker_content_id","embedded_git_sha"]
+      )
+      else (.imageHit == false and .avoidedBytes == 0 and .cacheSource == "none" and (.basis | length) == 0) end
+    ) end)' \
   "$incoming/.target-cache.json" >/dev/null
 cache_package_hit="$(jq -r '.packageHit' "$incoming/.target-cache.json")"
 cache_image_hit="$(jq -r '.imageHit' "$incoming/.target-cache.json")"
@@ -617,32 +925,28 @@ cache_basis="$(jq -c '.basis' "$incoming/.target-cache.json")"
   cd "$incoming"
   sha256sum --check --strict transfer-checksums.sha256
 ) >>"$log_file" 2>&1
+if [[ "$rollback_transport_mode" == legacy_target_cache ]]; then
+  legacy_checksum_names="$(
+    awk 'NF == 2 { print $2 }' "$incoming/checksums.sha256" | LC_ALL=C sort
+  )"
+  expected_legacy_checksum_names="$(
+    printf '%s\n' \
+      release-artifact.json release-manifest.json sbom.cdx.json \
+      server-image.tar web-image.tar | LC_ALL=C sort
+  )"
+  [[ "$legacy_checksum_names" == "$expected_legacy_checksum_names" ]] ||
+    fail "legacy rollback checksum catalog is not exact"
+  (
+    cd "$incoming"
+    sha256sum --check --strict checksums.sha256
+  ) >>"$log_file" 2>&1
+  acquisition_verified=true
+fi
 [[ "$(sha256sum "$incoming/current-release-manifest.json" | awk '{print $1}')" == "$current_manifest_sha256" &&
 "$(sha256sum "$incoming/release-manifest.json" | awk '{print $1}')" == "$target_manifest_sha256" ]] ||
   fail "release manifest checksums do not match the rollback operation"
 
-jq -e \
-  --arg operationId "$operation_id" \
-  --arg fromSha "$from_sha" \
-  --arg toSha "$to_sha" \
-  --arg fingerprint "$rollback_fingerprint" \
-  '.schemaVersion == "plush.rollback-manifest/v1" and
-   .status == "eligible" and
-   .operationId == $operationId and
-   .target.key == $target and
-   .from.gitSha == $fromSha and
-   .to.gitSha == $toSha and
-   .ancestry.schemaVersion == "plush.git-ancestry-relation/v1" and
-   .ancestry.currentGitSha == $fromSha and
-   .ancestry.candidateGitSha == $toSha and
-   .ancestry.relation == "behind" and
-   .ancestry.actionClass == "rollback" and
-   .ancestry.actionReason == "candidate_is_ancestor_of_current" and
-   .fingerprint == $fingerprint and
-   .rollback.mode == "code_and_images_only" and
-   .rollback.automaticDatabaseDownMigration == false and
-   .rollback.databaseRestoreAutomatic == false' \
-  "$incoming/rollback-manifest.json" >/dev/null
+validate_bound_rollback_plan
 jq -e -s \
   --arg fromSha "$from_sha" \
   --arg toSha "$to_sha" \
@@ -733,38 +1037,53 @@ curl --fail --silent --show-error --max-time 10 \
 curl --fail --silent --show-error --max-time 10 \
   "$web_endpoint/healthz" >/dev/null
 
-mkdir -p "$cache_root"
-chmod 700 "$cache_root"
 formal_cache=$cache_root/$target_manifest_sha256
-immutable_cache_files=(
-  checksums.sha256
-  release-manifest.json
-  release-artifact.json
-  release-rehearsal.json
-  sbom.cdx.json
-  source.tar
-  server-image.tar
-  web-image.tar
-)
+if [[ "$rollback_transport_mode" == legacy_target_cache ]]; then
+  owned_private_directory "$cache_root" ||
+    fail "legacy rollback cache root is unavailable"
+  immutable_cache_files=(
+    release-manifest.json
+    release-artifact.json
+    sbom.cdx.json
+    source.tar
+    server-image.tar
+    web-image.tar
+  )
+else
+  ensure_owned_private_child "$root" "$cache_root" ||
+    fail "rollback cache root is invalid"
+  immutable_cache_files=(
+    checksums.sha256
+    release-manifest.json
+    release-artifact.json
+    release-rehearsal.json
+    sbom.cdx.json
+    source.tar
+    server-image.tar
+    web-image.tar
+  )
+fi
 if [[ -e "$formal_cache" ]]; then
-  [[ -d "$formal_cache" && ! -L "$formal_cache" &&
-    "$(stat -c '%u' "$formal_cache")" == "$(id -u)" ]] ||
+  owned_private_directory "$formal_cache" ||
     fail "formal rollback cache is invalid"
   [[ "$(find "$formal_cache" -mindepth 1 -maxdepth 1 -printf '.' | wc -c | tr -d ' ')" == "${#immutable_cache_files[@]}" ]] ||
     fail "formal rollback cache inventory is invalid"
   for cache_file in "${immutable_cache_files[@]}"; do
-    [[ -f "$formal_cache/$cache_file" && ! -L "$formal_cache/$cache_file" &&
-      "$(stat -c '%u' "$formal_cache/$cache_file")" == "$(id -u)" ]] ||
+    owned_private_plain_file "$formal_cache/$cache_file" ||
       fail "formal rollback cache is incomplete"
     cmp --silent "$incoming/$cache_file" "$formal_cache/$cache_file" ||
       fail "formal rollback cache conflicts with verified package"
   done
 else
+  [[ "$rollback_transport_mode" != legacy_target_cache ]] ||
+    fail "legacy rollback cache is unavailable"
   cache_materializing=$cache_root/.materializing-$operation_id
   [[ ! -e "$cache_materializing" ]] || fail "stale rollback cache materialization exists"
   mkdir "$cache_materializing"
   cache_materializing_created=1
   chmod 700 "$cache_materializing"
+  owned_private_directory "$cache_materializing" ||
+    fail "rollback cache materialization is invalid"
   for cache_file in "${immutable_cache_files[@]}"; do
     ln "$incoming/$cache_file" "$cache_materializing/$cache_file"
   done
@@ -773,33 +1092,55 @@ else
 fi
 
 enter_stage release_materialization
+validate_source_archive "$incoming/source.tar"
 if [[ -e "$release_dir" ]]; then
-  [[ -d "$release_dir" && ! -L "$release_dir" &&
-    -f "$release_identity" && ! -L "$release_identity" ]] ||
+  if ! owned_private_directory "$release_dir" ||
+    ! owned_private_plain_file "$release_identity"; then
     fail "existing target release directory has no trusted identity"
+  fi
   jq -e \
     --arg sha "$to_sha" \
     --arg sourceSha256 "$source_sha256" \
+    --arg releaseManifestSha256 "$target_manifest_sha256" \
     '.schemaVersion == "plush.target-release-identity/v1" and
-     .gitSha == $sha and .sourceArchiveSha256 == $sourceSha256' \
+     .gitSha == $sha and
+     .sourceArchiveSha256 == $sourceSha256 and
+     .releaseManifestSha256 == $releaseManifestSha256' \
     "$release_identity" >/dev/null
+  release_verifying=$releases_root/.verifying-rollback-$operation_id
+  [[ ! -e "$release_verifying" && ! -L "$release_verifying" ]] ||
+    fail "stale release verification directory exists"
+  mkdir "$release_verifying"
+  release_verifying_created=1
+  chmod 700 "$release_verifying"
+  owned_private_directory "$release_verifying" ||
+    fail "release verification directory is invalid"
+  materialize_release_source "$incoming/source.tar" "$release_verifying"
+  [[ ! -e "$release_verifying/.plush-release-identity.json" &&
+    ! -L "$release_verifying/.plush-release-identity.json" ]] ||
+    fail "source archive contains a reserved release identity"
+  cp "$release_identity" "$release_verifying/.plush-release-identity.json"
+  chmod 600 "$release_verifying/.plush-release-identity.json"
+  existing_tree_digest="$(release_tree_digest "$release_dir")" ||
+    fail "existing target release tree is invalid"
+  verified_tree_digest="$(release_tree_digest "$release_verifying")" ||
+    fail "verified target release tree is invalid"
+  [[ "$existing_tree_digest" == "$verified_tree_digest" ]] ||
+    fail "existing target release tree differs from the verified source archive"
+  rm -rf -- "$release_verifying"
+  release_verifying_created=0
 else
   release_materializing="$releases_root/.materializing-rollback-$operation_id"
   [[ ! -e "$release_materializing" ]] || fail "stale materialization directory exists"
   mkdir "$release_materializing"
   release_materializing_created=1
   chmod 700 "$release_materializing"
-  tar -tf "$incoming/source.tar" |
-    awk '/^\\// { exit 1 } /(^|\\/)\\.\\.?($|\\/)/ { exit 1 } { next }' ||
-    fail "source archive contains an unsafe path"
-  tar --extract --file "$incoming/source.tar" \
-    --directory "$release_materializing" --no-same-owner --no-same-permissions
-  database_roles_script=$release_materializing/server/deploy/compose/prod/database_roles.sh
-  owner_uid="$(stat -c '%u' "$database_roles_script" 2>/dev/null || true)"
-  [[ -f "$database_roles_script" && ! -L "$database_roles_script" &&
-    "$owner_uid" == "$(id -u)" ]] ||
-    fail "database role initializer is invalid"
-  chmod 755 "$database_roles_script"
+  owned_private_directory "$release_materializing" ||
+    fail "rollback release materialization is invalid"
+  materialize_release_source "$incoming/source.tar" "$release_materializing"
+  [[ ! -e "$release_materializing/.plush-release-identity.json" &&
+    ! -L "$release_materializing/.plush-release-identity.json" ]] ||
+    fail "source archive contains a reserved release identity"
   jq -n \
     --arg schemaVersion "plush.target-release-identity/v1" \
     --arg gitSha "$to_sha" \
@@ -817,12 +1158,14 @@ else
 fi
 cmp --silent \
   "$incoming/remote-code-rollback.sh" \
-  "$current/scripts/deploy/remote-code-rollback.sh" ||
+  "$live_rollback_script" ||
   fail "remote rollback script is not part of the live exact source"
-cmp --silent \
-  "$incoming/remote-release-acquire.sh" \
-  "$current/scripts/deploy/remote-release-acquire.sh" ||
-  fail "release acquisition helper is not part of the live exact source"
+if [[ "$rollback_transport_mode" != legacy_target_cache ]]; then
+  cmp --silent \
+    "$incoming/remote-release-acquire.sh" \
+    "$live_acquire_script" ||
+    fail "release acquisition helper is not part of the live exact source"
+fi
 
 enter_stage image_load_and_readback
 if [[ "$cache_image_hit" != true ]]; then
@@ -864,24 +1207,41 @@ update_env_image_refs() {
 }
 
 enter_stage static_preflight
+owned_private_directory "$runtime_root" || fail "runtime root is invalid"
 [[ -f "$runtime_env" && ! -L "$runtime_env" &&
   "$(stat -c '%u' "$runtime_env")" == "$(id -u)" &&
   "$(stat -c '%a' "$runtime_env")" == 600 ]] ||
   fail "target runtime env is invalid"
 env_backup="$runtime_env.bak-before-rollback-${from_sha:0:8}-${operation_id:0:8}"
-[[ ! -e "$env_backup" ]] || fail "rollback env backup already exists"
+[[ ! -e "$env_backup" && ! -L "$env_backup" ]] ||
+  fail "rollback env backup already exists"
 cp "$runtime_env" "$env_backup"
 chmod 600 "$env_backup"
-update_env_image_refs "$runtime_env" "$runtime_env.next"
-chmod 600 "$runtime_env.next"
-mv -f "$runtime_env.next" "$runtime_env"
+owned_private_plain_file "$env_backup" || fail "rollback env backup is invalid"
+env_next="$runtime_env.next-$operation_id"
+[[ ! -e "$env_next" && ! -L "$env_next" ]] ||
+  fail "rollback env temporary already exists"
+update_env_image_refs "$runtime_env" "$env_next"
+chmod 600 "$env_next"
+owned_private_plain_file "$env_next" ||
+  fail "rollback env temporary is invalid"
 env_changed=1
+mv -f "$env_next" "$runtime_env"
+env_next=""
 
 compose_dir=$release_dir/server/deploy/compose/prod
 compose_base=$compose_dir/compose.yml
 compose_override=$compose_dir/$compose_override_name
 preflight_script=$release_dir/scripts/deploy/production-preflight.sh
-[[ -f "$compose_base" && -f "$compose_override" && -x "$preflight_script" ]] ||
+owned_private_directory "$compose_dir" ||
+  fail "target rollback compose directory is invalid"
+owned_private_plain_file "$compose_base" ||
+  fail "target rollback compose base is invalid"
+owned_private_plain_file "$compose_override" ||
+  fail "target rollback compose override is invalid"
+owned_private_plain_file "$preflight_script" ||
+  fail "target rollback preflight is invalid"
+[[ -x "$preflight_script" ]] ||
   fail "target rollback release entrypoints are incomplete"
 compose=(
   docker compose
@@ -929,7 +1289,9 @@ runtime_web_sha="$(docker inspect "$web_container" --format '{{range .Config.Env
 
 enter_stage public_entry_switch
 public_cutover_script=$current/deployments/yoyoosun/scripts/cutover-public-web.sh
-[[ -f "$public_cutover_script" && ! -L "$public_cutover_script" ]] ||
+owned_private_plain_file "$public_cutover_script" ||
+  fail "public entry cutover script is unavailable"
+[[ -x "$public_cutover_script" ]] ||
   fail "public entry cutover script is unavailable"
 public_containers="$(
   docker ps --format '{{.Names}}' |
@@ -961,11 +1323,15 @@ public_runtime_sha="$(
 enter_stage current_source_switch
 current_source_switch_started=1
 next_current=$root/.current-next-rollback-$operation_id
-[[ ! -e "$next_current" ]] || fail "next current directory already exists"
+[[ ! -e "$next_current" && ! -L "$next_current" ]] ||
+  fail "next current directory already exists"
 cp -a --reflink=auto "$release_dir" "$next_current"
 chmod 700 "$next_current"
+owned_private_directory "$next_current" || fail "next current directory is invalid"
 old_current=$root/current.before-rollback-${from_sha:0:8}-to-${to_sha:0:8}-${operation_id:0:8}
-[[ ! -e "$old_current" ]] || fail "rollback source preservation path exists"
+[[ ! -e "$old_current" && ! -L "$old_current" ]] ||
+  fail "rollback source preservation path exists"
+owned_private_directory "$current" || fail "current release root is invalid"
 mv "$current" "$old_current"
 mv "$next_current" "$current"
 
