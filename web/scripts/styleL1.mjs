@@ -43,7 +43,11 @@ import { loadDevPorts } from '../../scripts/dev-ports.mjs'
 const webDir = path.resolve(import.meta.dirname, '..')
 const repoRoot = path.resolve(webDir, '..')
 const devPorts = loadDevPorts(repoRoot)
-const outputDir = path.resolve(webDir, 'output', 'playwright', 'style-l1')
+const outputDir = resolveStyleL1OutputDirectory(
+  repoRoot,
+  webDir,
+  process.env.STYLE_L1_OUTPUT_DIR
+)
 const devServerPort = Number(process.env.STYLE_L1_PORT || devPorts.style)
 const externalBaseURL = String(process.env.STYLE_L1_BASE_URL || '').trim()
 const baseURL = externalBaseURL || `http://127.0.0.1:${devServerPort}`
@@ -55,11 +59,95 @@ const scenarioFilter = new Set(
     .filter(Boolean)
 )
 const scenarioStartAt = String(process.env.STYLE_L1_START_AT || '').trim()
-const scenarioMaxAttempts = 2
+const scenarioMaxAttempts = resolveStyleL1ScenarioMaxAttempts(
+  process.env.STYLE_L1_SCENARIO_MAX_ATTEMPTS
+)
+
+export function resolveStyleL1ScenarioMaxAttempts(value) {
+  const normalized = String(value || '').trim()
+  if (!normalized) return 2
+  assert.match(
+    normalized,
+    /^[12]$/u,
+    '[style:l1] STYLE_L1_SCENARIO_MAX_ATTEMPTS 只能是 1 或 2'
+  )
+  return Number(normalized)
+}
+
+export function resolveStyleL1OutputDirectory(
+  projectRoot,
+  projectWebDir,
+  value
+) {
+  const normalized = String(value || '').trim()
+  if (!normalized) {
+    return path.resolve(projectWebDir, 'output', 'playwright', 'style-l1')
+  }
+  const resolved = path.resolve(normalized)
+  const managedOutputRoot = path.resolve(projectRoot, 'output')
+  const relative = path.relative(managedOutputRoot, resolved)
+  assert(
+    relative &&
+      !relative.startsWith(`..${path.sep}`) &&
+      !path.isAbsolute(relative),
+    '[style:l1] STYLE_L1_OUTPUT_DIR 必须位于项目 managed output 根内'
+  )
+  return resolved
+}
 
 let devServerProcess = null
 let devServerProcessGroupID = null
 let devServerLogs = ''
+let activeBrowser = null
+let runtimeCleanupPromise = null
+
+async function cleanupStyleL1Runtime() {
+  runtimeCleanupPromise ||= (async () => {
+    const browser = activeBrowser
+    activeBrowser = null
+    try {
+      await browser?.close()
+    } finally {
+      await stopDevServer()
+    }
+  })()
+  return runtimeCleanupPromise
+}
+
+export function installStyleL1TerminationHandlers({
+  processRef = process,
+  cleanup = cleanupStyleL1Runtime,
+  exit = (code) => processRef.exit(code),
+} = {}) {
+  let interruptedSignal = ''
+  let shutdownPromise = null
+  const interrupt = (signal) => {
+    if (interruptedSignal) return
+    interruptedSignal = signal
+    shutdownPromise ||= Promise.resolve()
+      .then(() => cleanup())
+      .then(
+        () => exit(interruptedSignal === 'SIGINT' ? 130 : 143),
+        () => exit(1)
+      )
+  }
+  const onSigterm = () => interrupt('SIGTERM')
+  const onSigint = () => interrupt('SIGINT')
+  processRef.on('SIGTERM', onSigterm)
+  processRef.on('SIGINT', onSigint)
+  return Object.freeze({
+    dispose() {
+      processRef.removeListener('SIGTERM', onSigterm)
+      processRef.removeListener('SIGINT', onSigint)
+    },
+    get shutdownPromise() {
+      return shutdownPromise
+    },
+    get signal() {
+      return interruptedSignal
+    },
+  })
+}
 
 const assertAntdModalCentered = (...args) =>
   assertAntdModalCenteredImpl(...args)
@@ -240,21 +328,17 @@ async function main() {
       console.log(`[style:l1] target=external base_url=${externalBaseURL}`)
     }
 
-    const browser = await chromium.launch({
+    activeBrowser = await chromium.launch({
       headless,
       args: ['--no-proxy-server', '--proxy-bypass-list=<-loopback>'],
     })
-    try {
-      for (const scenario of selectedScenarios) {
-        await runScenario(browser, scenario)
-      }
-    } finally {
-      await browser.close()
+    for (const scenario of selectedScenarios) {
+      await runScenario(activeBrowser, scenario)
     }
 
     console.log(`[style:l1] 通过，共验证 ${selectedScenarios.length} 个场景`)
   } finally {
-    await stopDevServer()
+    await cleanupStyleL1Runtime()
   }
 }
 
@@ -578,10 +662,17 @@ function canConnectToLocalServer(url) {
 
 async function runScenario(browser, scenario) {
   let lastError = null
+  const startedAt = Date.now()
 
   for (let attempt = 1; attempt <= scenarioMaxAttempts; attempt += 1) {
     try {
       await runScenarioOnce(browser, scenario)
+      console.log(
+        `[style:l1:scenario] id=${scenario.name} status=passed durationMs=${Math.max(
+          0,
+          Date.now() - startedAt
+        )} attempts=${attempt}`
+      )
       return
     } catch (error) {
       lastError = error
@@ -8722,5 +8813,10 @@ function tailLogs(text) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
-  await main()
+  const termination = installStyleL1TerminationHandlers()
+  try {
+    await main()
+  } finally {
+    termination.dispose()
+  }
 }

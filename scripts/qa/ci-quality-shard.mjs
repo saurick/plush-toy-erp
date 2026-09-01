@@ -3,11 +3,8 @@
 import { createHash } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import {
-  existsSync,
-  lstatSync,
   mkdirSync,
   readFileSync,
-  readdirSync,
   renameSync,
   rmSync,
   writeFileSync,
@@ -22,27 +19,38 @@ import {
   summarizeGateCategories,
 } from "./run-gate-with-receipt.mjs";
 import { summarizeGateOutput } from "./dev-workbench-receipt.mjs";
-import {
-  cleanupPlaywrightRuntime,
-  materializePlaywrightRuntime,
-} from "./ci-playwright-runtime.mjs";
 import { loadCiNodeTestLaneSet } from "./ci-node-test-lane.mjs";
 import { loadCiResourceTestLaneSet } from "./ci-resource-test-lane.mjs";
 import {
+  formatCiQualityStageLaneAggregate,
   loadCiQualityStageLaneSet,
-  readCiQualityStageLaneReceipt,
 } from "./ci-quality-stage-lane.mjs";
 
 export const CI_QUALITY_SHARD_SCHEMA = "plush.ci-quality-shard/v1";
 export const CI_QUALITY_SHARDS = Object.freeze({
   static: Object.freeze({
     job: "quality_static",
-    command: Object.freeze(["bash", "scripts/qa/strict.sh", "--ci-shard", "static"]),
-    stages: Object.freeze(["strict_profile", "shellcheck", "shfmt", "yamllint"]),
+    command: Object.freeze([
+      "bash",
+      "scripts/qa/strict.sh",
+      "--ci-shard",
+      "static",
+    ]),
+    stages: Object.freeze([
+      "strict_profile",
+      "shellcheck",
+      "shfmt",
+      "yamllint",
+    ]),
   }),
   node: Object.freeze({
     job: "quality_node",
-    command: Object.freeze(["bash", "scripts/qa/full.sh", "--ci-shard", "node"]),
+    command: Object.freeze([
+      "bash",
+      "scripts/qa/full.sh",
+      "--ci-shard",
+      "node",
+    ]),
     stages: Object.freeze(["secrets", "shared"]),
   }),
   web: Object.freeze({
@@ -52,22 +60,41 @@ export const CI_QUALITY_SHARDS = Object.freeze({
   }),
   server: Object.freeze({
     job: "quality_server",
-    command: Object.freeze(["bash", "scripts/qa/full.sh", "--ci-shard", "server"]),
-    stages: Object.freeze(["environment_profile", "server", "critical_postgres"]),
+    command: Object.freeze([
+      "bash",
+      "scripts/qa/full.sh",
+      "--ci-shard",
+      "server",
+    ]),
+    stages: Object.freeze([
+      "environment_profile",
+      "server",
+      "critical_postgres",
+    ]),
   }),
   resource: Object.freeze({
     job: "quality_resource",
-    command: Object.freeze(["bash", "scripts/qa/full.sh", "--ci-shard", "resource"]),
+    command: Object.freeze([
+      "bash",
+      "scripts/qa/full.sh",
+      "--ci-shard",
+      "resource",
+    ]),
     stages: Object.freeze(["resource_sensitive_node"]),
   }),
   browser: Object.freeze({
     job: "quality_browser",
-    command: Object.freeze(["bash", "scripts/qa/full.sh", "--ci-shard", "browser"]),
+    command: Object.freeze(["internal", "browser-fan-in"]),
     stages: Object.freeze(["browser"]),
   }),
   security: Object.freeze({
     job: "quality_security",
-    command: Object.freeze(["bash", "scripts/qa/full.sh", "--ci-shard", "security"]),
+    command: Object.freeze([
+      "bash",
+      "scripts/qa/full.sh",
+      "--ci-shard",
+      "security",
+    ]),
     stages: Object.freeze(["govulncheck"]),
   }),
 });
@@ -229,34 +256,13 @@ async function runProcess(command, args, { cwd, env, stream = true } = {}) {
     throw error;
   }
   if (result.error || result.status !== 0) {
-    const error = result.error || new Error(`${command} exited with status ${String(result.status)}`);
+    const error =
+      result.error ||
+      new Error(`${command} exited with status ${String(result.status)}`);
     error.result = value;
     throw error;
   }
   return value;
-}
-
-function hashDirectory(root) {
-  const entries = [];
-  const walk = (directory) => {
-    for (const entry of readdirSync(directory, { withFileTypes: true })) {
-      const absolute = path.join(directory, entry.name);
-      const relative = path.relative(root, absolute).split(path.sep).join("/");
-      const stat = lstatSync(absolute);
-      if (stat.isSymbolicLink()) throw new Error("Web build contains a symbolic link");
-      if (stat.isDirectory()) {
-        walk(absolute);
-      } else if (stat.isFile()) {
-        entries.push({ relative, mode: stat.mode & 0o777, sha256: sha256File(absolute) });
-      } else {
-        throw new Error("Web build contains an unsupported entry");
-      }
-    }
-  };
-  walk(root);
-  if (entries.length === 0) throw new Error("Web build is empty");
-  entries.sort((left, right) => left.relative.localeCompare(right.relative));
-  return stableSha256(entries);
 }
 
 function atomicJson(file, value) {
@@ -270,36 +276,6 @@ function atomicJson(file, value) {
     renameSync(temporary, file);
   } finally {
     rmSync(temporary, { force: true });
-  }
-}
-
-async function materializeChromium(root, childEnv) {
-  await runProcess("pnpm", ["--dir", "web", "install", "--frozen-lockfile", "--offline"], {
-    cwd: root,
-    env: childEnv,
-  });
-  return materializePlaywrightRuntime({ root, env: childEnv });
-}
-
-async function installChromiumSandbox(
-  root,
-  childEnv,
-  sandboxSource,
-  sandboxPath,
-) {
-  await runProcess(
-    "sudo",
-    [
-      "-n",
-      "/usr/local/sbin/plush-chromium-sandbox",
-      "install",
-      String(childEnv.CI_JOB_ID),
-      sandboxSource,
-    ],
-    { cwd: root, env: childEnv },
-  );
-  if (sandboxPath !== `/usr/local/sbin/chrome-devel-sandbox-${childEnv.CI_JOB_ID}`) {
-    throw new Error("Chromium sandbox destination identity mismatch");
   }
 }
 
@@ -334,14 +310,8 @@ export async function runCiQualityShard({
   if (shard === "resource") childEnv.QA_CI_RESOURCE_LANES = "verified";
   if (shard === "web") childEnv.QA_CI_WEB_LANES = "verified";
   if (shard === "server") childEnv.QA_CI_SERVER_LANES = "verified";
-  if (shard === "browser") {
-    childEnv.QA_BROWSER_SCENARIOS =
-      "root-redirect-desktop,root-redirect-mobile,print-center-engineering-preview-tablet";
-  }
   let gateOutput = "";
   let failure = null;
-  let sandboxPath = "";
-  let runtimeMaterialized = false;
   const invariants = {
     dependencyAudit: shard === "security" ? "pending" : "not-applicable",
     makeData: shard === "server" ? "pending" : "not-applicable",
@@ -357,61 +327,39 @@ export async function runCiQualityShard({
     resourceLanes: shard === "resource" ? null : "not-applicable",
     webLanes: shard === "web" ? null : "not-applicable",
     serverLanes: shard === "server" ? null : "not-applicable",
+    browserLanes: shard === "browser" ? null : "not-applicable",
+    browserRuntimeCleanup: shard === "browser" ? "pending" : "not-applicable",
+    browserLaneLockCleanup: shard === "browser" ? "pending" : "not-applicable",
+    browserPortCleanup: shard === "browser" ? "pending" : "not-applicable",
+    browserWebBuildReadOnly: shard === "browser" ? "pending" : "not-applicable",
     webBuildSha256: null,
   };
   try {
     if (shard === "node") {
-      await runProcess("pnpm", ["--dir", "web", "install", "--frozen-lockfile", "--offline"], {
-        cwd: root,
-        env: childEnv,
-      });
-    }
-    if (shard === "browser") {
-      const chromium = await materializeChromium(root, childEnv);
-      runtimeMaterialized = true;
-      sandboxPath = `/usr/local/sbin/chrome-devel-sandbox-${env.CI_JOB_ID}`;
-      await installChromiumSandbox(
-        root,
-        childEnv,
-        chromium.sandboxSource,
-        sandboxPath,
+      await runProcess(
+        "pnpm",
+        ["--dir", "web", "install", "--frozen-lockfile", "--offline"],
+        {
+          cwd: root,
+          env: childEnv,
+        },
       );
-      childEnv.CHROME_DEVEL_SANDBOX = sandboxPath;
-      childEnv.ERP_PDF_CHROME_PATH = chromium.chromePath;
     }
     if (shard === "security") {
       await runProcess(
         "pnpm",
-        ["--dir", "web", "audit", "--prod", "--audit-level", "high", "--registry=https://registry.npmjs.org"],
+        [
+          "--dir",
+          "web",
+          "audit",
+          "--prod",
+          "--audit-level",
+          "high",
+          "--registry=https://registry.npmjs.org",
+        ],
         { cwd: root, env: childEnv },
       );
       invariants.dependencyAudit = "passed";
-    }
-    if (shard === "browser") {
-      const webBuild = path.join(root, "web", "build");
-      const webReceipt = readCiQualityStageLaneReceipt({
-        root,
-        file: "output/ci/web-lanes/build.json",
-        shard: "web",
-        lane: "build",
-        expected: {
-          repository: env.CI_PROJECT_PATH,
-          gitSha: env.CI_COMMIT_SHA,
-          pipelineId: String(env.CI_PIPELINE_ID),
-          pipelineIid: String(env.CI_PIPELINE_IID),
-          pipelineSource: env.CI_PIPELINE_SOURCE,
-          planSha256: plan.planSha256,
-          rangeSha256: plan.rangeSha256,
-          range: plan.range,
-        },
-      });
-      const webBuildSha256 = hashDirectory(webBuild);
-      if (
-        webReceipt.webBuildSha256 !== webBuildSha256
-      ) {
-        throw new Error("browser shard Web build artifact identity mismatch");
-      }
-      invariants.webBuildSha256 = webBuildSha256;
     }
     if (shard === "node") {
       const lanes = loadCiNodeTestLaneSet({
@@ -468,13 +416,9 @@ export async function runCiQualityShard({
         skipped: lanes.summary.skipped,
       };
     }
-    const main = await runProcess(definition.command[0], definition.command.slice(1), {
-      cwd: root,
-      env: childEnv,
-    });
-    gateOutput = main.output;
-    if (["web", "server"].includes(shard)) {
-      const lanes = loadCiQualityStageLaneSet({
+    let stageLanes = null;
+    if (["web", "server", "browser"].includes(shard)) {
+      stageLanes = loadCiQualityStageLaneSet({
         root,
         shard,
         directory: `output/ci/${shard}-lanes`,
@@ -489,6 +433,19 @@ export async function runCiQualityShard({
           range: plan.range,
         },
       });
+    }
+    if (shard === "browser") {
+      gateOutput = formatCiQualityStageLaneAggregate(shard, stageLanes);
+    } else {
+      const main = await runProcess(
+        definition.command[0],
+        definition.command.slice(1),
+        { cwd: root, env: childEnv },
+      );
+      gateOutput = main.output;
+    }
+    if (stageLanes) {
+      const lanes = stageLanes;
       const laneEvidence = {
         status: "passed",
         laneCount: lanes.laneCount,
@@ -502,12 +459,26 @@ export async function runCiQualityShard({
       if (shard === "web") {
         invariants.webLanes = laneEvidence;
         invariants.webBuildSha256 = lanes.webBuildSha256;
-      } else {
+      } else if (shard === "server") {
         invariants.serverLanes = laneEvidence;
         invariants.makeData = lanes.cleanup.makeData;
         invariants.databaseCleanup = lanes.cleanup.database;
         invariants.chromiumSandboxCleanup = lanes.cleanup.chromiumSandbox;
         invariants.playwrightRuntimeCleanup = lanes.cleanup.playwrightRuntime;
+      } else {
+        invariants.browserLanes = {
+          ...laneEvidence,
+          scenarioCount: lanes.browser.scenarioCount,
+          productionBoundaryCount: lanes.browser.productionBoundaryCount,
+          retries: lanes.browser.retries,
+        };
+        invariants.chromiumSandboxCleanup = lanes.cleanup.chromiumSandbox;
+        invariants.playwrightRuntimeCleanup = lanes.cleanup.playwrightRuntime;
+        invariants.browserRuntimeCleanup = lanes.cleanup.browserRuntime;
+        invariants.browserLaneLockCleanup = lanes.cleanup.browserLaneLock;
+        invariants.browserPortCleanup = lanes.cleanup.browserPort;
+        invariants.browserWebBuildReadOnly = "passed";
+        invariants.webBuildSha256 = lanes.webBuildSha256;
       }
     }
     if (shard === "node") {
@@ -525,10 +496,12 @@ export async function runCiQualityShard({
         { cwd: root, env: childEnv, stream: false },
       );
       const report = JSON.parse(source.stdout);
-      if (!hasCompleteSourceArchiveLightEvidence(report, {
-        gitSha: env.CI_COMMIT_SHA,
-        customer: "yoyoosun",
-      })) {
+      if (
+        !hasCompleteSourceArchiveLightEvidence(report, {
+          gitSha: env.CI_COMMIT_SHA,
+          customer: "yoyoosun",
+        })
+      ) {
         throw new Error("source archive light evidence is incomplete");
       }
       invariants.sourceIntegrity = {
@@ -542,39 +515,6 @@ export async function runCiQualityShard({
   } catch (error) {
     failure = error;
     if (error?.result?.output) gateOutput += error.result.output;
-  } finally {
-    if (sandboxPath) {
-      const removed = spawnSync(
-        "sudo",
-        [
-          "-n",
-          "/usr/local/sbin/plush-chromium-sandbox",
-          "remove",
-          String(env.CI_JOB_ID),
-        ],
-        {
-          cwd: root,
-          stdio: "ignore",
-        },
-      );
-      const residual = existsSync(sandboxPath);
-      invariants.chromiumSandboxCleanup =
-        removed.status === 0 && !residual ? "passed" : "failed";
-      if ((removed.status !== 0 || residual) && !failure) {
-        failure = new Error("Chromium sandbox cleanup readback failed");
-      }
-    }
-    if (runtimeMaterialized) {
-      try {
-        cleanupPlaywrightRuntime({ root, env: childEnv });
-        invariants.playwrightRuntimeCleanup = "passed";
-      } catch {
-        invariants.playwrightRuntimeCleanup = "failed";
-        if (!failure) {
-          failure = new Error("Playwright runtime cleanup readback failed");
-        }
-      }
-    }
   }
 
   const timing = parseGateStageTimings(gateOutput, "strict");
@@ -620,7 +560,10 @@ export async function runCiQualityShard({
     substepTimings: timing.substepTimings,
     summary: {
       executed: testSummary.executed + stageCount,
-      passed: status === "passed" ? testSummary.passed + stageCount : testSummary.passed,
+      passed:
+        status === "passed"
+          ? testSummary.passed + stageCount
+          : testSummary.passed,
       failed: status === "failed" ? Math.max(1, testSummary.failed) : 0,
       skipped: testSummary.skipped,
     },
@@ -629,9 +572,17 @@ export async function runCiQualityShard({
     cleanupPassed:
       !["failed", "pending"].includes(invariants.databaseCleanup) &&
       !["failed", "pending"].includes(invariants.chromiumSandboxCleanup) &&
-      !["failed", "pending"].includes(invariants.playwrightRuntimeCleanup),
+      !["failed", "pending"].includes(invariants.playwrightRuntimeCleanup) &&
+      !["failed", "pending"].includes(invariants.browserRuntimeCleanup) &&
+      !["failed", "pending"].includes(invariants.browserLaneLockCleanup) &&
+      !["failed", "pending"].includes(invariants.browserPortCleanup) &&
+      !["failed", "pending"].includes(invariants.browserWebBuildReadOnly),
     failure: failure ? safeFailure(failure) : null,
-    runtime: { node: process.version, platform: process.platform, arch: process.arch },
+    runtime: {
+      node: process.version,
+      platform: process.platform,
+      arch: process.arch,
+    },
     redaction: {
       containsSecrets: false,
       containsCredentials: false,
@@ -648,33 +599,48 @@ export async function runCiQualityShard({
 }
 
 function parseArgs(argv) {
-  const options = { shard: "", planFile: "output/ci/plan.json", rangeFile: "output/ci/range.txt", out: "" };
+  const options = {
+    shard: "",
+    planFile: "output/ci/plan.json",
+    rangeFile: "output/ci/range.txt",
+    out: "",
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (["--shard", "--plan", "--range", "--out"].includes(arg)) {
       const value = argv[index + 1];
-      if (!value || value.startsWith("--")) throw new Error(`${arg} requires a value`);
-      const key = { "--shard": "shard", "--plan": "planFile", "--range": "rangeFile", "--out": "out" }[arg];
+      if (!value || value.startsWith("--"))
+        throw new Error(`${arg} requires a value`);
+      const key = {
+        "--shard": "shard",
+        "--plan": "planFile",
+        "--range": "rangeFile",
+        "--out": "out",
+      }[arg];
       options[key] = value;
       index += 1;
       continue;
     }
     throw new Error(`unknown argument: ${arg}`);
   }
-  if (!Object.hasOwn(CI_QUALITY_SHARDS, options.shard)) throw new Error("--shard is invalid");
+  if (!Object.hasOwn(CI_QUALITY_SHARDS, options.shard))
+    throw new Error("--shard is invalid");
   options.out ||= `output/ci/shards/${options.shard}.json`;
   return options;
 }
 
 const isDirectRun =
-  process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
+  process.argv[1] &&
+  pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
 
 if (isDirectRun) {
   try {
     const receipt = await runCiQualityShard(parseArgs(process.argv.slice(2)));
     process.exitCode = receipt.status === "passed" ? 0 : 1;
   } catch (error) {
-    process.stderr.write(`[ci-quality-shard] status=blocked reason=${safeFailure(error)}\n`);
+    process.stderr.write(
+      `[ci-quality-shard] status=blocked reason=${safeFailure(error)}\n`,
+    );
     process.exitCode = 2;
   }
 }

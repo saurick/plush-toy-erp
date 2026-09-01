@@ -5,6 +5,8 @@ import {
   CI_QUALITY_AGGREGATE_SCHEMA,
   CI_EVIDENCE_MANIFEST_SCHEMA,
   buildObservedQualityPaths,
+  hasCompleteCiBrowserCrossShardEvidence,
+  hasCompleteCiBrowserLaneEvidence,
   hasCompleteCiNodeLaneEvidence,
   hasCompleteCiResourceLaneEvidence,
   hasCompleteCiServerLaneEvidence,
@@ -22,6 +24,8 @@ import {
 } from "./ci-node-test-lane.mjs";
 import { CI_RESOURCE_TEST_LANES } from "./ci-resource-test-lane.mjs";
 import {
+  CI_BROWSER_QUALITY_LANES,
+  CI_BROWSER_QUALITY_SCENARIOS,
   CI_SERVER_QUALITY_LANES,
   CI_WEB_QUALITY_LANES,
 } from "./ci-quality-stage-lane.mjs";
@@ -85,13 +89,22 @@ async function receipts() {
         range: expected.range,
       },
       expectedStages: [...definition.stages],
-      stageTimings: definition.stages.map((id) => ({ id, status: "passed", durationMs: 1 })),
+      stageTimings: definition.stages.map((id) => ({
+        id,
+        status: "passed",
+        durationMs: 1,
+      })),
       substepTimings: [],
       summary: { executed: 1, passed: 1, failed: 0, skipped: 0 },
       categoryCounts: Object.fromEntries(
         ["web", "server", "database", "browser", "security"].map((key) => [
           key,
-          { executed: key === "web" && shard === "web" ? 1 : 0, passed: key === "web" && shard === "web" ? 1 : 0, failed: 0, skipped: 0 },
+          {
+            executed: key === "web" && shard === "web" ? 1 : 0,
+            passed: key === "web" && shard === "web" ? 1 : 0,
+            failed: 0,
+            skipped: 0,
+          },
         ]),
       ),
       cleanupPassed: true,
@@ -141,9 +154,7 @@ test("aggregate keeps internal Node lanes behind one complete external invariant
         job: definition.job,
         jobId: String(index + 30),
         startedAt,
-        finishedAt: new Date(
-          Date.parse(startedAt) + durationMs,
-        ).toISOString(),
+        finishedAt: new Date(Date.parse(startedAt) + durationMs).toISOString(),
         durationMs,
       };
     },
@@ -195,9 +206,7 @@ test("aggregate keeps internal resource lanes behind one complete external invar
         job: definition.job,
         jobId: String(index + 30),
         startedAt,
-        finishedAt: new Date(
-          Date.parse(startedAt) + durationMs,
-        ).toISOString(),
+        finishedAt: new Date(Date.parse(startedAt) + durationMs).toISOString(),
         durationMs,
       };
     },
@@ -265,6 +274,147 @@ test("aggregate keeps Web and Server lanes behind complete external invariants",
     drifted.jobs[0].job = "quality_other";
     assert.equal(validate(drifted), false);
   }
+});
+
+test("aggregate keeps Browser scenarios and cleanup behind one external invariant", () => {
+  const jobs = Object.entries(CI_BROWSER_QUALITY_LANES).map(
+    ([lane, definition], index) => {
+      const durationMs = 100 + index;
+      const startedAt = new Date(
+        1_700_000_160_000 + index * 1_000,
+      ).toISOString();
+      return {
+        lane,
+        job: definition.job,
+        jobId: String(index + 50),
+        startedAt,
+        finishedAt: new Date(Date.parse(startedAt) + durationMs).toISOString(),
+        durationMs,
+      };
+    },
+  );
+  const value = {
+    status: "passed",
+    laneCount: jobs.length,
+    scenarioCount: CI_BROWSER_QUALITY_SCENARIOS.length,
+    productionBoundaryCount: 1,
+    retries: 0,
+    durationMs: 200,
+    jobs,
+    executed: CI_BROWSER_QUALITY_SCENARIOS.length + 1,
+    passed: CI_BROWSER_QUALITY_SCENARIOS.length + 1,
+    failed: 0,
+    skipped: 0,
+  };
+  assert.equal(hasCompleteCiBrowserLaneEvidence(value), true);
+  assert.equal(
+    hasCompleteCiBrowserLaneEvidence({ ...value, scenarioCount: 9 }),
+    false,
+  );
+  assert.equal(
+    hasCompleteCiBrowserLaneEvidence({ ...value, retries: 1 }),
+    false,
+  );
+  assert.equal(
+    hasCompleteCiBrowserLaneEvidence({
+      ...value,
+      executed: value.executed + 1,
+      passed: value.passed + 1,
+    }),
+    false,
+  );
+  const drifted = structuredClone(value);
+  drifted.jobs[1].job = "quality_browser_other";
+  assert.equal(hasCompleteCiBrowserLaneEvidence(drifted), false);
+});
+
+test("aggregate rejects every Browser cleanup, execution and Web-build identity drift", () => {
+  const jobs = Object.entries(CI_BROWSER_QUALITY_LANES).map(
+    ([lane, definition], index) => {
+      const startedAt = new Date(
+        1_700_000_170_000 + index * 1_000,
+      ).toISOString();
+      const durationMs = 100 + index;
+      return {
+        lane,
+        job: definition.job,
+        jobId: String(index + 60),
+        startedAt,
+        finishedAt: new Date(Date.parse(startedAt) + durationMs).toISOString(),
+        durationMs,
+      };
+    },
+  );
+  const webBuildSha256 = "d".repeat(64);
+  const browser = {
+    invariants: {
+      browserLanes: {
+        status: "passed",
+        laneCount: jobs.length,
+        scenarioCount: CI_BROWSER_QUALITY_SCENARIOS.length,
+        productionBoundaryCount: 1,
+        retries: 0,
+        durationMs: 200,
+        jobs,
+        executed: CI_BROWSER_QUALITY_SCENARIOS.length + 1,
+        passed: CI_BROWSER_QUALITY_SCENARIOS.length + 1,
+        failed: 0,
+        skipped: 0,
+      },
+      chromiumSandboxCleanup: "passed",
+      playwrightRuntimeCleanup: "passed",
+      browserRuntimeCleanup: "passed",
+      browserLaneLockCleanup: "passed",
+      browserPortCleanup: "passed",
+      browserWebBuildReadOnly: "passed",
+      webBuildSha256,
+    },
+  };
+  const web = { invariants: { webBuildSha256 } };
+  assert.equal(hasCompleteCiBrowserCrossShardEvidence(browser, web), true);
+  for (const key of [
+    "chromiumSandboxCleanup",
+    "playwrightRuntimeCleanup",
+    "browserRuntimeCleanup",
+    "browserLaneLockCleanup",
+    "browserPortCleanup",
+    "browserWebBuildReadOnly",
+  ]) {
+    const drifted = structuredClone(browser);
+    drifted.invariants[key] = "failed";
+    assert.equal(
+      hasCompleteCiBrowserCrossShardEvidence(drifted, web),
+      false,
+      key,
+    );
+  }
+  for (const [key, value] of [
+    ["executed", CI_BROWSER_QUALITY_SCENARIOS.length],
+    ["passed", CI_BROWSER_QUALITY_SCENARIOS.length],
+    ["scenarioCount", CI_BROWSER_QUALITY_SCENARIOS.length - 1],
+    ["productionBoundaryCount", 0],
+    ["retries", 1],
+  ]) {
+    const drifted = structuredClone(browser);
+    drifted.invariants.browserLanes[key] = value;
+    assert.equal(
+      hasCompleteCiBrowserCrossShardEvidence(drifted, web),
+      false,
+      key,
+    );
+  }
+  assert.equal(
+    hasCompleteCiBrowserCrossShardEvidence(browser, {
+      invariants: { webBuildSha256: "e".repeat(64) },
+    }),
+    false,
+  );
+  assert.equal(
+    hasCompleteCiBrowserCrossShardEvidence(browser, {
+      invariants: { webBuildSha256: "not-a-digest" },
+    }),
+    false,
+  );
 });
 
 test("aggregate models every internal fan-in and lets Browser start from Web build", () => {
@@ -369,12 +519,36 @@ test("aggregate models every internal fan-in and lets Browser start from Web bui
       durationMs: 135,
     },
   ];
+  const browserLanes = [
+    {
+      lane: "boundary_entry_print",
+      job: "quality_browser_boundary_entry_print",
+      startedAt: stamp(82),
+      finishedAt: stamp(135),
+      durationMs: 53,
+    },
+    {
+      lane: "dev_overview_mobile",
+      job: "quality_browser_dev_overview_mobile",
+      startedAt: stamp(83),
+      finishedAt: stamp(140),
+      durationMs: 57,
+    },
+    {
+      lane: "dev_detail",
+      job: "quality_browser_dev_detail",
+      startedAt: stamp(81),
+      finishedAt: stamp(145),
+      durationMs: 64,
+    },
+  ];
   const paths = buildObservedQualityPaths(
     byShard,
     lanes,
     resourceLanes,
     webLanes,
     serverLanes,
+    browserLanes,
   );
   const nodePath = paths.find((path) => path.id === "node");
   const webPath = paths.find((path) => path.id === "web");
@@ -387,13 +561,11 @@ test("aggregate models every internal fan-in and lets Browser start from Web bui
   assert.equal(webPath.durationMs, 100);
   assert.deepEqual(webBrowserPath.jobs, [
     "quality_web_build",
+    "quality_browser_dev_detail",
     "quality_browser",
   ]);
   assert.equal(webBrowserPath.durationMs, 195);
-  assert.deepEqual(serverPath.jobs, [
-    "quality_server_core",
-    "quality_server",
-  ]);
+  assert.deepEqual(serverPath.jobs, ["quality_server_core", "quality_server"]);
   assert.equal(serverPath.durationMs, 180);
   assert.deepEqual(resourcePath.jobs, [
     "quality_resource_runtime",
@@ -411,11 +583,17 @@ test("aggregate rejects missing, duplicate and failed shards", async () => {
     () => validateCiQualityShardSet(invalidTiming, expected),
     /invalid/u,
   );
-  assert.throws(() => validateCiQualityShardSet(values.slice(1), expected), /every shard/u);
+  assert.throws(
+    () => validateCiQualityShardSet(values.slice(1), expected),
+    /every shard/u,
+  );
   const failed = structuredClone(values);
   failed[0].status = "failed";
   assert.throws(() => validateCiQualityShardSet(failed, expected), /invalid/u);
   const duplicate = structuredClone(values);
   duplicate[1] = structuredClone(duplicate[0]);
-  assert.throws(() => validateCiQualityShardSet(duplicate, expected), /invalid/u);
+  assert.throws(
+    () => validateCiQualityShardSet(duplicate, expected),
+    /invalid/u,
+  );
 });

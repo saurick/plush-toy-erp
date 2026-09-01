@@ -7,6 +7,7 @@ import {
   CI_PLAYWRIGHT_CHROMIUM_SANDBOX_SHA256,
   CI_PLAYWRIGHT_RUNTIME_ASSETS,
 } from "./ci-playwright-runtime.mjs";
+import { CI_BROWSER_QUALITY_LANES } from "./ci-quality-stage-lane.mjs";
 
 const repositoryRoot = new URL("../../", import.meta.url);
 const trackedFiles = execFileSync("git", ["ls-files", "-z"], {
@@ -45,7 +46,10 @@ const backupVerify = readFileSync(
   "utf8",
 );
 const runnerCloudInit = readFileSync(
-  new URL("../../server/deploy/gitlab/runner-vm-cloud-init.yml", import.meta.url),
+  new URL(
+    "../../server/deploy/gitlab/runner-vm-cloud-init.yml",
+    import.meta.url,
+  ),
   "utf8",
 );
 const runnerCapacity = readFileSync(
@@ -151,10 +155,7 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
     server: ["core", "critical_postgres"],
   })) {
     for (const lane of lanes) {
-      assert.match(
-        workflow,
-        new RegExp(`^quality_${shard}_${lane}:`, "mu"),
-      );
+      assert.match(workflow, new RegExp(`^quality_${shard}_${lane}:`, "mu"));
       assert.match(
         workflow,
         new RegExp(
@@ -167,6 +168,47 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
         new RegExp(`output/ci/${shard}-lanes/${lane}[.]json`, "u"),
       );
     }
+  }
+  for (const lane of Object.keys(CI_BROWSER_QUALITY_LANES)) {
+    assert.match(workflow, new RegExp(`^quality_browser_${lane}:`, "mu"));
+    assert.match(
+      workflow,
+      new RegExp(
+        `ci-quality-stage-lane[.]mjs --shard browser --lane ${lane}`,
+        "u",
+      ),
+    );
+    assert.match(
+      workflow,
+      new RegExp(`output/ci/browser-lanes/${lane}[.]json`, "u"),
+    );
+    assert.match(
+      workflow,
+      new RegExp(
+        `^quality_browser_${lane}:[\\s\\S]+?resource_group: quality-browser-${lane.replaceAll("_", "-")}[\\s\\S]+?job: quality_web_build\\n      artifacts: true[\\s\\S]+?ci-quality-stage-lane[.]mjs --shard browser --lane ${lane}`,
+        "mu",
+      ),
+    );
+  }
+  assert.equal(
+    new Set(
+      [
+        ...workflow.matchAll(
+          /^  resource_group: (quality-browser-[a-z-]+)$/gmu,
+        ),
+      ].map(([, resourceGroup]) => resourceGroup),
+    ).size,
+    Object.keys(CI_BROWSER_QUALITY_LANES).length,
+  );
+  for (const lane of Object.keys(CI_BROWSER_QUALITY_LANES)) {
+    const job = workflow.match(
+      new RegExp(
+        `^quality_browser_${lane}:[\\s\\S]+?(?=^quality_[a-z_]+:|(?![\\s\\S]))`,
+        "mu",
+      ),
+    )?.[0];
+    assert.ok(job);
+    assert.doesNotMatch(job, /interruptible: false/u);
   }
   assert.doesNotMatch(workflow, /^quality_node_runtime:/mu);
   assert.match(
@@ -190,43 +232,42 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
       workflow.indexOf("quality_web:"),
   );
   assert.ok(
-    workflow.indexOf("quality_node_core:") <
-      workflow.indexOf("quality_web:"),
+    workflow.indexOf("quality_node_core:") < workflow.indexOf("quality_web:"),
   );
   const aggregateBlock = workflow.match(
     /^quality_aggregate:[\s\S]+?^quality_affected:/mu,
   )?.[0];
   assert.ok(aggregateBlock);
-  assert.match(
-    aggregateBlock,
-    /job: quality_node\n      artifacts: true/u,
-  );
+  assert.match(aggregateBlock, /job: quality_node\n      artifacts: true/u);
   assert.doesNotMatch(aggregateBlock, /quality_node_(?:core|release)/u);
-  assert.doesNotMatch(
-    aggregateBlock,
-    /quality_resource_(?:contract|runtime)/u,
-  );
+  assert.doesNotMatch(aggregateBlock, /quality_resource_(?:contract|runtime)/u);
   assert.doesNotMatch(
     aggregateBlock,
     /quality_(?:web_(?:checks|build)|server_(?:core|critical_postgres))/u,
   );
+  assert.doesNotMatch(aggregateBlock, /quality_browser_(?:boundary|dev)/u);
   assert.match(workflow, /^quality_aggregate:\n  stage: aggregate/mu);
   assert.match(workflow, /ci-quality-aggregate[.]mjs/u);
   assert.match(workflow, /plush-ci-evidence/u);
-  assert.match(workflow, /quality_browser:[\s\S]+?job: quality_web_build\n      artifacts: true/u);
+  for (const lane of Object.keys(CI_BROWSER_QUALITY_LANES)) {
+    assert.match(
+      workflow,
+      new RegExp(
+        `quality_browser:[\\s\\S]+?job: quality_browser_${lane}\\n      artifacts: true`,
+        "u",
+      ),
+    );
+  }
   assert.doesNotMatch(
     workflow.match(/^quality_browser:[\s\S]+?^quality_security:/mu)?.[0] || "",
-    /job: quality_web\n/u,
+    /job: quality_web(?:_build)?\n/u,
   );
   assert.match(workflow, /history_range=HEAD/u);
   assert.match(
     workflow,
     /trusted_config_sha="\$CI_MERGE_REQUEST_DIFF_BASE_SHA"/u,
   );
-  assert.match(
-    workflow,
-    /git show "\$trusted_config_sha:[.]gitleaks[.]toml"/u,
-  );
+  assert.match(workflow, /git show "\$trusted_config_sha:[.]gitleaks[.]toml"/u);
   assert.match(workflow, /output\/ci\/plan[.]json/u);
   assert.match(workflow, /output\/ci\/range[.]txt/u);
   assert.match(workflow, /output\/cache\/gitlab\/pnpm-store/u);
@@ -291,7 +332,10 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
       ),
     );
   }
-  for (const shard of ["server_core", "browser"]) {
+  for (const shard of [
+    "server_core",
+    ...Object.keys(CI_BROWSER_QUALITY_LANES).map((lane) => `browser_${lane}`),
+  ]) {
     assert.match(
       workflow,
       new RegExp(
@@ -312,6 +356,7 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
     "web",
     "server_critical_postgres",
     "server",
+    "browser",
     "security",
   ]) {
     assert.match(
@@ -378,16 +423,10 @@ test("GitLab release reuses push CI, builds one candidate and freezes rehearsal 
     /chmod 0600 "\$job_token_config" "\$private_token_config"/u,
   );
   assert.match(publish, /cleanup_publish_credentials/u);
-  assert.doesNotMatch(
-    publish,
-    /--header\s+"(?:PRIVATE|JOB)-TOKEN:/u,
-  );
+  assert.doesNotMatch(publish, /--header\s+"(?:PRIVATE|JOB)-TOKEN:/u);
   assert.match(workflow, /github-release-asset-set[.]mjs finalize/u);
   assert.match(workflow, /output\/ci\/release-assets[.]json/u);
-  assert.match(
-    workflow,
-    /gitlab-release-publication[.]mjs plan/u,
-  );
+  assert.match(workflow, /gitlab-release-publication[.]mjs plan/u);
   assert.match(workflow, /--missing-out "\$missing_assets"/u);
   assert.match(workflow, /done < "\$missing_assets"/u);
   assert.match(workflow, /gitlab-release-publication[.]mjs verify/u);
@@ -424,9 +463,7 @@ test("GitLab CI gate keeps its evidence token out of curl argv", () => {
   assert.match(gate, /cleanup_evidence_credentials/u);
   assert.match(gate, /test ! -e "\$job_token_config"/u);
   assert.equal(
-    gate.includes(
-      '[[ "$CI_JOB_TOKEN" =~ ^[A-Za-z0-9_.-]{20,4096}$ ]]',
-    ),
+    gate.includes('[[ "$CI_JOB_TOKEN" =~ ^[A-Za-z0-9_.-]{20,4096}$ ]]'),
     true,
   );
   assert.doesNotMatch(gate, /--header\s+"JOB-TOKEN:/u);
@@ -501,10 +538,7 @@ test("historical source backfill is one protected internal job and cannot rewrit
     backfill,
     /curl[^\n]*(?:PRIVATE-TOKEN|GITLAB_RELEASE_TOKEN)/u,
   );
-  assert.doesNotMatch(
-    backfill,
-    /--header\s+"(?:PRIVATE|DEPLOY)-TOKEN:/u,
-  );
+  assert.doesNotMatch(backfill, /--header\s+"(?:PRIVATE|DEPLOY)-TOKEN:/u);
 });
 
 test("GitLab jobs stay on the isolated runner and never receive the R640 host socket", () => {
@@ -595,17 +629,17 @@ test("R640 GitLab definitions pin identity, separate SSD data and require exact 
       serviceEnableIndex < commitIndex,
   );
   assert.match(runnerRegistration, /rollback_registration/u);
-  assert.match(runnerRegistration, /gitlab-runner unregister --name r640-kvm-isolated-shell/u);
+  assert.match(
+    runnerRegistration,
+    /gitlab-runner unregister --name r640-kvm-isolated-shell/u,
+  );
   assert.match(runnerRegistration, /--name r640-kvm-isolated-shell/u);
   assert.match(runnerRegistration, /--executor shell/u);
   assert.match(
     runnerRegistration,
     /\/usr\/local\/sbin\/plush-runner-capacity \\\n        --initialize \\\n        --slots "\$RUNNER_CONCURRENT_SLOTS"/u,
   );
-  assert.doesNotMatch(
-    runnerRegistration,
-    /concurrent\s*=|limit\s*=/u,
-  );
+  assert.doesNotMatch(runnerRegistration, /concurrent\s*=|limit\s*=/u);
   assert.doesNotMatch(
     runnerRegistration,
     /--(?:access-level|locked|maintenance-note|maximum-timeout|paused|run-untagged|tag-list)(?:[=\s]|$)/u,
@@ -621,7 +655,10 @@ test("R640 GitLab definitions pin identity, separate SSD data and require exact 
   assert.doesNotMatch(runnerCloudInit, /NOPASSWD: \/usr\/bin\/apt-get/u);
   assert.match(runnerCloudInit, /ssh_pwauth: false/u);
   assert.match(runnerCloudInit, /disable_root: true/u);
-  assert.match(runnerCloudInit, /chmod 0600 \/etc\/gitlab-runner\/config[.]toml/u);
+  assert.match(
+    runnerCloudInit,
+    /chmod 0600 \/etc\/gitlab-runner\/config[.]toml/u,
+  );
   assert.doesNotMatch(runnerCloudInit, /curl[^\n]*[|]\s*(?:ba)?sh/u);
 });
 
@@ -633,7 +670,10 @@ test("Runner provisioning and capacity stay parameterized and fail closed", () =
     "__PLUSH_RUNNER_SLOT_SAFETY_MAX__",
     "__RUNNER_CONCURRENT_SLOTS__",
   ]) {
-    assert.equal(runnerCloudInit.match(new RegExp(placeholder, "gu"))?.length, 1);
+    assert.equal(
+      runnerCloudInit.match(new RegExp(placeholder, "gu"))?.length,
+      1,
+    );
   }
   assert.match(runnerVm, /--vcpus/u);
   assert.match(runnerVm, /--memory-mib/u);
@@ -654,7 +694,9 @@ test("Runner provisioning and capacity stay parameterized and fail closed", () =
   assert.match(runnerVm, /status=rollback_incomplete/u);
   assert.match(runnerVm, /renderValidated=true cleanup=complete/u);
   const renderRootIndex = runnerVm.indexOf('OPERATION_ROOT="$(mktemp -d');
-  const renderTrapIndex = runnerVm.indexOf("trap cleanup_uncommitted_render EXIT");
+  const renderTrapIndex = runnerVm.indexOf(
+    "trap cleanup_uncommitted_render EXIT",
+  );
   for (const renderConsumer of [
     'chmod 0700 "$OPERATION_ROOT"',
     'HELPER_BASE64="$(base64 -w0',
@@ -711,27 +753,39 @@ test("Runner provisioning and capacity stay parameterized and fail closed", () =
   assert.match(runnerCapacity, /LIMIT_VALUES\[0\].*== 0/u);
   assert.match(runnerCapacity, /RUNNER_CONCURRENT_SLOTS=/u);
   assert.match(runnerCapacity, /EXPECTED_RUNNER_NAME=r640-kvm-isolated-shell/u);
-  assert.match(runnerCapacity, /EXPECTED_RUNNER_URL=https:\/\/gitlab[.]saurick[.]me/u);
+  assert.match(
+    runnerCapacity,
+    /EXPECTED_RUNNER_URL=https:\/\/gitlab[.]saurick[.]me/u,
+  );
   assert.match(runnerCapacity, /EXPECTED_RUNNER_EXECUTOR=shell/u);
   assert.match(runnerCapacity, /kill -STOP "\$RUNNER_MAIN_PID"/u);
   assert.match(runnerCapacity, /systemctl stop --no-block gitlab-runner/u);
   assert.match(runnerCapacity, /kill -CONT "\$RUNNER_MAIN_PID"/u);
   assert.doesNotMatch(runnerCapacity, /PLUSH_RUNNER_(?:INITIAL_)?SLOTS=/u);
-  assert.match(runnerCloudInit, /RUNNER_CONCURRENT_SLOTS=__RUNNER_CONCURRENT_SLOTS__/u);
+  assert.match(
+    runnerCloudInit,
+    /RUNNER_CONCURRENT_SLOTS=__RUNNER_CONCURRENT_SLOTS__/u,
+  );
   assert.match(
     runnerCloudInit,
     /gitlab-runner ALL=\(root\) NOPASSWD: \/usr\/local\/sbin\/plush-runner-capacity --evidence/u,
   );
   assert.match(runnerCapacityEvidence, /"--evidence"/u);
   assert.doesNotMatch(runnerCapacity, /SLOTS="?\$\([^\n]*nproc/u);
-  assert.doesNotMatch(runnerCloudInit, /concurrent = (?:4|12|48)|limit = (?:4|12|48)/u);
+  assert.doesNotMatch(
+    runnerCloudInit,
+    /concurrent = (?:4|12|48)|limit = (?:4|12|48)/u,
+  );
 });
 
 test("Runner Chromium sandbox uses one digest-pinned minimal sudo helper", () => {
   assert.match(runnerChromiumSandbox, /\$\{SUDO_USER:-\}" == gitlab-runner/u);
   assert.match(
     runnerChromiumSandbox,
-    new RegExp(`EXPECTED_SANDBOX_SHA256=${CI_PLAYWRIGHT_CHROMIUM_SANDBOX_SHA256}`, "u"),
+    new RegExp(
+      `EXPECTED_SANDBOX_SHA256=${CI_PLAYWRIGHT_CHROMIUM_SANDBOX_SHA256}`,
+      "u",
+    ),
   );
   assert.match(runnerChromiumSandbox, /case "\$ACTION" in/u);
   for (const action of ["preflight", "install", "remove"]) {
@@ -795,7 +849,10 @@ test("Runner live secret state and duplicate TOML truth cannot enter the tracked
     /path: \/etc\/gitlab-runner\/config[.]toml/u,
   );
   assert.match(runnerCloudInit, /gitlab-runner register --non-interactive/u);
-  assert.match(runnerCapacity, /CONFIG_FILE=\/etc\/gitlab-runner\/config[.]toml/u);
+  assert.match(
+    runnerCapacity,
+    /CONFIG_FILE=\/etc\/gitlab-runner\/config[.]toml/u,
+  );
 });
 
 test("Runner capacity observation reuses the seven-shard exact-SHA evidence", () => {
@@ -853,10 +910,7 @@ test("Runner VM rebuild preserves QGA and the internal canonical GitLab route", 
     runnerCloudInit,
     /test -c \/dev\/virtio-ports\/org[.]qemu[.]guest_agent[.]0/u,
   );
-  assert.match(
-    runnerCloudInit,
-    /runuser -l "\$user" -s \/bin\/bash -c/u,
-  );
+  assert.match(runnerCloudInit, /runuser -l "\$user" -s \/bin\/bash -c/u);
   assert.match(runnerRegistration, /verify_canonical_gitlab/u);
   assert.match(
     runnerRegistration,
@@ -957,7 +1011,8 @@ test("Runner VM bootstrap retries pinned downloads and fails closed", () => {
   const resumableDownload = runnerCloudInit.match(
     /download_resumable_file\(\) \{[\s\S]+?\n      \}/u,
   )?.[0];
-  const runcmdEntries = runnerCloudInit.match(/^  - \[bash, -lc, .+\]$/gmu) ?? [];
+  const runcmdEntries =
+    runnerCloudInit.match(/^  - \[bash, -lc, .+\]$/gmu) ?? [];
 
   assert.equal(downloadCalls.length, 5);
   assert.equal(rawCurlCalls.length, 2);

@@ -24,23 +24,28 @@ test("quality shard catalog covers the strict stage set exactly once", () => {
     "browser",
     "security",
   ]);
-  const stages = Object.values(CI_QUALITY_SHARDS).flatMap((value) => value.stages);
+  const stages = Object.values(CI_QUALITY_SHARDS).flatMap(
+    (value) => value.stages,
+  );
   assert.equal(new Set(stages).size, stages.length);
-  assert.deepEqual(new Set(stages), new Set([
-    "strict_profile",
-    "shellcheck",
-    "shfmt",
-    "yamllint",
-    "environment_profile",
-    "shared",
-    "secrets",
-    "web",
-    "server",
-    "resource_sensitive_node",
-    "critical_postgres",
-    "browser",
-    "govulncheck",
-  ]));
+  assert.deepEqual(
+    new Set(stages),
+    new Set([
+      "strict_profile",
+      "shellcheck",
+      "shfmt",
+      "yamllint",
+      "environment_profile",
+      "shared",
+      "secrets",
+      "web",
+      "server",
+      "resource_sensitive_node",
+      "critical_postgres",
+      "browser",
+      "govulncheck",
+    ]),
+  );
   for (const [shard, value] of Object.entries(CI_QUALITY_SHARDS)) {
     assert.equal(value.job, `quality_${shard}`);
     assert.ok(Object.isFrozen(value));
@@ -49,28 +54,17 @@ test("quality shard catalog covers the strict stage set exactly once", () => {
   }
 });
 
-test("only the Browser canonical shard materializes and cleans its verified runtime", () => {
-  assert.match(source, /materializePlaywrightRuntime\(\{ root, env: childEnv \}\)/u);
-  assert.match(source, /cleanupPlaywrightRuntime\(\{ root, env: childEnv \}\)/u);
-  assert.match(source, /playwrightRuntimeCleanup/u);
-  assert.match(source, /runtimeMaterialized = true/u);
-  assert.doesNotMatch(
-    source,
-    /"playwright", "install", "chromium"/u,
-  );
-  assert.match(
-    source,
-    /if \(shard === "browser"\)/u,
-  );
-  assert.match(
-    source,
-    /"\/usr\/local\/sbin\/plush-chromium-sandbox",\n {6}"install"/u,
-  );
-  assert.match(
-    source,
-    /"\/usr\/local\/sbin\/plush-chromium-sandbox",\n {10}"remove"/u,
-  );
-  assert.doesNotMatch(source, /\["install", "-o", "root"/u);
+test("Browser canonical shard only fans in isolated lane receipts", () => {
+  assert.match(source, /formatCiQualityStageLaneAggregate/u);
+  assert.match(source, /browserLanes: shard === "browser"/u);
+  assert.match(source, /browserRuntimeCleanup/u);
+  assert.match(source, /browserLaneLockCleanup/u);
+  assert.match(source, /browserPortCleanup/u);
+  assert.match(source, /browserWebBuildReadOnly/u);
+  assert.doesNotMatch(source, /materializePlaywrightRuntime/u);
+  assert.doesNotMatch(source, /cleanupPlaywrightRuntime/u);
+  assert.doesNotMatch(source, /plush-chromium-sandbox/u);
+  assert.doesNotMatch(source, /"playwright", "install", "chromium"/u);
 });
 
 test("only the Node canonical shard installs cached Web dependencies", () => {
@@ -81,21 +75,20 @@ test("only the Node canonical shard installs cached Web dependencies", () => {
   );
 });
 
-test("Web and Server canonical shards fan in internal lanes without rerunning resources", () => {
+test("Web, Server and Browser canonical shards fan in internal lanes without rerunning resources", () => {
   assert.match(source, /loadCiQualityStageLaneSet/u);
   assert.match(source, /QA_CI_WEB_LANES = "verified"/u);
   assert.match(source, /QA_CI_SERVER_LANES = "verified"/u);
   assert.match(source, /directory: `output\/ci\/\$\{shard\}-lanes`/u);
   assert.match(source, /webLanes: shard === "web"/u);
   assert.match(source, /serverLanes: shard === "server"/u);
+  assert.match(source, /browserLanes: shard === "browser"/u);
   assert.doesNotMatch(source, /plush-ci-postgres-/u);
 });
 
-test("Browser trusts only the exact Web build lane artifact", () => {
-  assert.match(source, /readCiQualityStageLaneReceipt/u);
-  assert.match(source, /file: "output\/ci\/web-lanes\/build[.]json"/u);
-  assert.match(source, /lane: "build"/u);
-  assert.match(source, /webReceipt[.]webBuildSha256 !== webBuildSha256/u);
+test("Browser propagates only the verified shared Web build digest", () => {
+  assert.match(source, /invariants[.]webBuildSha256 = lanes[.]webBuildSha256/u);
+  assert.match(source, /invariants[.]browserWebBuildReadOnly = "passed"/u);
   assert.doesNotMatch(source, /output[\/]ci[\/]shards[\/]web[.]json/u);
 });
 

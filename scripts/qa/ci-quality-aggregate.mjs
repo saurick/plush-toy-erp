@@ -40,6 +40,8 @@ import {
 } from "./ci-node-test-lane.mjs";
 import { CI_RESOURCE_TEST_LANES } from "./ci-resource-test-lane.mjs";
 import {
+  CI_BROWSER_QUALITY_LANES,
+  CI_BROWSER_QUALITY_SCENARIOS,
   CI_SERVER_QUALITY_LANES,
   CI_WEB_QUALITY_LANES,
 } from "./ci-quality-stage-lane.mjs";
@@ -168,6 +170,32 @@ export function hasCompleteCiServerLaneEvidence(value) {
   return hasCompleteCiStageLaneEvidence(value, CI_SERVER_QUALITY_LANES);
 }
 
+export function hasCompleteCiBrowserLaneEvidence(value) {
+  return (
+    hasCompleteCiStageLaneEvidence(value, CI_BROWSER_QUALITY_LANES) &&
+    value.scenarioCount === CI_BROWSER_QUALITY_SCENARIOS.length &&
+    value.productionBoundaryCount === 1 &&
+    value.executed === CI_BROWSER_QUALITY_SCENARIOS.length + 1 &&
+    value.retries === 0
+  );
+}
+
+export function hasCompleteCiBrowserCrossShardEvidence(browser, web) {
+  const browserInvariants = browser?.invariants || {};
+  const webInvariants = web?.invariants || {};
+  return (
+    hasCompleteCiBrowserLaneEvidence(browserInvariants.browserLanes) &&
+    browserInvariants.chromiumSandboxCleanup === "passed" &&
+    browserInvariants.playwrightRuntimeCleanup === "passed" &&
+    browserInvariants.browserRuntimeCleanup === "passed" &&
+    browserInvariants.browserLaneLockCleanup === "passed" &&
+    browserInvariants.browserPortCleanup === "passed" &&
+    browserInvariants.browserWebBuildReadOnly === "passed" &&
+    SHA256_PATTERN.test(String(webInvariants.webBuildSha256 || "")) &&
+    webInvariants.webBuildSha256 === browserInvariants.webBuildSha256
+  );
+}
+
 function latestLanePredecessor(lanes) {
   return [...lanes].sort(
     (left, right) =>
@@ -182,21 +210,20 @@ export function buildObservedQualityPaths(
   resourceLaneDurations,
   webLaneDurations,
   serverLaneDurations,
+  browserLaneDurations,
 ) {
-  const standalone = ["static", "security"].map(
-    (shard) => {
-      const receipt = byShard.get(shard);
-      return Object.freeze({
-        id: shard,
-        shard,
-        jobs: Object.freeze([receipt.job.name]),
-        startedAt: receipt.startedAt,
-        finishedAt: receipt.finishedAt,
-        durationMs:
-          Date.parse(receipt.finishedAt) - Date.parse(receipt.startedAt),
-      });
-    },
-  );
+  const standalone = ["static", "security"].map((shard) => {
+    const receipt = byShard.get(shard);
+    return Object.freeze({
+      id: shard,
+      shard,
+      jobs: Object.freeze([receipt.job.name]),
+      startedAt: receipt.startedAt,
+      finishedAt: receipt.finishedAt,
+      durationMs:
+        Date.parse(receipt.finishedAt) - Date.parse(receipt.startedAt),
+    });
+  });
   const web = byShard.get("web");
   const browser = byShard.get("browser");
   const node = byShard.get("node");
@@ -205,6 +232,7 @@ export function buildObservedQualityPaths(
   const resourcePredecessor = latestLanePredecessor(resourceLaneDurations);
   const webPredecessor = latestLanePredecessor(webLaneDurations);
   const webBuild = webLaneDurations.find(({ lane }) => lane === "build");
+  const browserPredecessor = latestLanePredecessor(browserLaneDurations);
   const server = byShard.get("server");
   const serverPredecessor = latestLanePredecessor(serverLaneDurations);
   if (!webBuild) throw new Error("Web build lane timing is missing");
@@ -222,7 +250,11 @@ export function buildObservedQualityPaths(
     Object.freeze({
       id: "web_browser",
       shard: "browser",
-      jobs: Object.freeze([webBuild.job, browser.job.name]),
+      jobs: Object.freeze([
+        webBuild.job,
+        browserPredecessor.job,
+        browser.job.name,
+      ]),
       startedAt: webBuild.startedAt,
       finishedAt: browser.finishedAt,
       durationMs:
@@ -235,8 +267,7 @@ export function buildObservedQualityPaths(
       startedAt: serverPredecessor.startedAt,
       finishedAt: server.finishedAt,
       durationMs:
-        Date.parse(server.finishedAt) -
-        Date.parse(serverPredecessor.startedAt),
+        Date.parse(server.finishedAt) - Date.parse(serverPredecessor.startedAt),
     }),
     Object.freeze({
       id: "node",
@@ -306,7 +337,12 @@ function atomicJson(file, value) {
 
 function plainJson(file, label) {
   const stat = lstatSync(file);
-  if (!stat.isFile() || stat.isSymbolicLink() || stat.size < 2 || stat.size > 4 * 1024 * 1024) {
+  if (
+    !stat.isFile() ||
+    stat.isSymbolicLink() ||
+    stat.size < 2 ||
+    stat.size > 4 * 1024 * 1024
+  ) {
     throw new Error(`${label} is not a bounded plain file`);
   }
   return JSON.parse(readFileSync(file, "utf8"));
@@ -341,7 +377,12 @@ function addCounts(left, right) {
   });
 }
 
-const ZERO_COUNTS = Object.freeze({ executed: 0, passed: 0, failed: 0, skipped: 0 });
+const ZERO_COUNTS = Object.freeze({
+  executed: 0,
+  passed: 0,
+  failed: 0,
+  skipped: 0,
+});
 
 function validateCounts(value, label, { allowZero = true } = {}) {
   if (
@@ -394,27 +435,38 @@ export function validateCiQualityShardSet(receipts, expected) {
       receipt.plan?.planSha256 !== expected.planSha256 ||
       receipt.plan?.rangeSha256 !== expected.rangeSha256 ||
       receipt.plan?.range !== expected.range ||
-      receipt.commandFingerprint !== stableSha256({ shard: receipt.shard, definition }) ||
-      JSON.stringify(receipt.expectedStages) !== JSON.stringify(definition.stages) ||
+      receipt.commandFingerprint !==
+        stableSha256({ shard: receipt.shard, definition }) ||
+      JSON.stringify(receipt.expectedStages) !==
+        JSON.stringify(definition.stages) ||
       !Array.isArray(receipt.stageTimings) ||
       receipt.stageTimings.length !== definition.stages.length ||
       receipt.stageTimings.some(
-        (stage) => !definition.stages.includes(stage.id) || stage.status !== "passed",
+        (stage) =>
+          !definition.stages.includes(stage.id) || stage.status !== "passed",
       )
     ) {
-      throw new Error(`quality shard receipt is invalid: ${receipt?.shard || "unknown"}`);
+      throw new Error(
+        `quality shard receipt is invalid: ${receipt?.shard || "unknown"}`,
+      );
     }
-    validateCounts(receipt.summary, `quality shard ${receipt.shard}`, { allowZero: false });
+    validateCounts(receipt.summary, `quality shard ${receipt.shard}`, {
+      allowZero: false,
+    });
     if (
       receipt.summary.failed !== 0 ||
       receipt.summary.skipped !== 0 ||
       receipt.summary.passed !== receipt.summary.executed
     ) {
-      throw new Error(`quality shard did not prove all-passed execution: ${receipt.shard}`);
+      throw new Error(
+        `quality shard did not prove all-passed execution: ${receipt.shard}`,
+      );
     }
     byShard.set(receipt.shard, receipt);
   }
-  const actualStages = receipts.flatMap((receipt) => receipt.stageTimings.map((stage) => stage.id));
+  const actualStages = receipts.flatMap((receipt) =>
+    receipt.stageTimings.map((stage) => stage.id),
+  );
   const expectedStages = RECEIPT_GATE_STAGE_IDS.strict;
   if (
     actualStages.length !== expectedStages.length ||
@@ -485,14 +537,21 @@ export async function aggregateCiQuality({
     range,
     runnerId: String(env.CI_RUNNER_ID),
   });
-  const trust = validateTrust(plainJson(path.resolve(root, trustFile), "CI trust receipt"), expected);
+  const trust = validateTrust(
+    plainJson(path.resolve(root, trustFile), "CI trust receipt"),
+    expected,
+  );
   const directory = path.resolve(root, shardsDir);
   const names = readdirSync(directory).sort();
-  const expectedNames = Object.keys(CI_QUALITY_SHARDS).map((name) => `${name}.json`).sort();
+  const expectedNames = Object.keys(CI_QUALITY_SHARDS)
+    .map((name) => `${name}.json`)
+    .sort();
   if (JSON.stringify(names) !== JSON.stringify(expectedNames)) {
     throw new Error("quality aggregate shard artifact directory is ambiguous");
   }
-  const receipts = names.map((name) => plainJson(path.join(directory, name), `quality shard ${name}`));
+  const receipts = names.map((name) =>
+    plainJson(path.join(directory, name), `quality shard ${name}`),
+  );
   const byShard = validateCiQualityShardSet(receipts, expected);
   const runnerCapacityPolicy = readRunnerCapacityPolicy({
     policyFile: path.resolve(root, RUNNER_CAPACITY_SOURCE_PATH),
@@ -511,57 +570,67 @@ export async function aggregateCiQuality({
       helperSha256: runnerCapacityPolicy.helperSha256,
     },
   );
-  const strictIdentity = buildStrictReceiptIdentity(root, env.CI_COMMIT_SHA, env);
+  const strictIdentity = buildStrictReceiptIdentity(
+    root,
+    env.CI_COMMIT_SHA,
+    env,
+  );
   const sourceIntegrity = byShard.get("node").invariants.sourceIntegrity;
   if (
     !matchesStrictSourceArchive(sourceIntegrity, strictIdentity) ||
     sourceIntegrity.repositoryBoundary !== "passed" ||
     sourceIntegrity.overlayCustomer !== "yoyoosun" ||
-    !hasCompleteCiNodeLaneEvidence(
-      byShard.get("node").invariants.nodeLanes,
-    ) ||
+    !hasCompleteCiNodeLaneEvidence(byShard.get("node").invariants.nodeLanes) ||
     !hasCompleteCiResourceLaneEvidence(
       byShard.get("resource").invariants.resourceLanes,
     ) ||
-    !hasCompleteCiWebLaneEvidence(
-      byShard.get("web").invariants.webLanes,
-    ) ||
+    !hasCompleteCiWebLaneEvidence(byShard.get("web").invariants.webLanes) ||
     !hasCompleteCiServerLaneEvidence(
       byShard.get("server").invariants.serverLanes,
+    ) ||
+    !hasCompleteCiBrowserCrossShardEvidence(
+      byShard.get("browser"),
+      byShard.get("web"),
     ) ||
     byShard.get("security").invariants.dependencyAudit !== "passed" ||
     byShard.get("server").invariants.makeData !== "passed" ||
     byShard.get("server").invariants.databaseCleanup !== "passed" ||
-    byShard.get("server").invariants.chromiumSandboxCleanup !== "passed" ||
-    byShard.get("browser").invariants.chromiumSandboxCleanup !== "passed" ||
-    !SHA256_PATTERN.test(String(byShard.get("web").invariants.webBuildSha256 || "")) ||
-    byShard.get("web").invariants.webBuildSha256 !==
-      byShard.get("browser").invariants.webBuildSha256
+    byShard.get("server").invariants.chromiumSandboxCleanup !== "passed"
   ) {
     throw new Error("quality aggregate cross-shard invariant is incomplete");
   }
 
   const stageById = new Map(
-    receipts.flatMap((receipt) => receipt.stageTimings).map((stage) => [stage.id, stage]),
+    receipts
+      .flatMap((receipt) => receipt.stageTimings)
+      .map((stage) => [stage.id, stage]),
   );
-  const stageTimings = RECEIPT_GATE_STAGE_IDS.strict.map((id) => stageById.get(id));
-  const substepTimings = receipts.flatMap((receipt) => receipt.substepTimings || []);
+  const stageTimings = RECEIPT_GATE_STAGE_IDS.strict.map((id) =>
+    stageById.get(id),
+  );
+  const substepTimings = receipts.flatMap(
+    (receipt) => receipt.substepTimings || [],
+  );
   const parallelDurationMs = Math.max(
-    ...RECEIPT_GATE_PARALLEL_STAGE_IDS.map((id) => stageById.get(id)?.durationMs || 0),
+    ...RECEIPT_GATE_PARALLEL_STAGE_IDS.map(
+      (id) => stageById.get(id)?.durationMs || 0,
+    ),
   );
   const shardDurations = receipts.map((receipt) => ({
     shard: receipt.shard,
     job: receipt.job.name,
     durationMs: receipt.durationMs,
   }));
-  const nodeLaneDurations = byShard.get("node").invariants.nodeLanes.jobs.map((job) => ({
-    lane: job.lane,
-    job: job.job,
-    jobId: job.jobId,
-    startedAt: job.startedAt,
-    finishedAt: job.finishedAt,
-    durationMs: job.durationMs,
-  }));
+  const nodeLaneDurations = byShard
+    .get("node")
+    .invariants.nodeLanes.jobs.map((job) => ({
+      lane: job.lane,
+      job: job.job,
+      jobId: job.jobId,
+      startedAt: job.startedAt,
+      finishedAt: job.finishedAt,
+      durationMs: job.durationMs,
+    }));
   const resourceLaneDurations = byShard
     .get("resource")
     .invariants.resourceLanes.jobs.map((job) => ({
@@ -572,16 +641,16 @@ export async function aggregateCiQuality({
       finishedAt: job.finishedAt,
       durationMs: job.durationMs,
     }));
-  const webLaneDurations = byShard.get("web").invariants.webLanes.jobs.map(
-    (job) => ({
+  const webLaneDurations = byShard
+    .get("web")
+    .invariants.webLanes.jobs.map((job) => ({
       lane: job.lane,
       job: job.job,
       jobId: job.jobId,
       startedAt: job.startedAt,
       finishedAt: job.finishedAt,
       durationMs: job.durationMs,
-    }),
-  );
+    }));
   const serverLaneDurations = byShard
     .get("server")
     .invariants.serverLanes.jobs.map((job) => ({
@@ -592,9 +661,23 @@ export async function aggregateCiQuality({
       finishedAt: job.finishedAt,
       durationMs: job.durationMs,
     }));
+  const browserLaneDurations = byShard
+    .get("browser")
+    .invariants.browserLanes.jobs.map((job) => ({
+      lane: job.lane,
+      job: job.job,
+      jobId: job.jobId,
+      startedAt: job.startedAt,
+      finishedAt: job.finishedAt,
+      durationMs: job.durationMs,
+    }));
   const executionDurations = [
     ...shardDurations.map((entry) => ({ ...entry, kind: "shard" })),
-    ...nodeLaneDurations.map((entry) => ({ ...entry, kind: "node_lane", shard: "node" })),
+    ...nodeLaneDurations.map((entry) => ({
+      ...entry,
+      kind: "node_lane",
+      shard: "node",
+    })),
     ...resourceLaneDurations.map((entry) => ({
       ...entry,
       kind: "resource_lane",
@@ -610,6 +693,11 @@ export async function aggregateCiQuality({
       kind: "server_lane",
       shard: "server",
     })),
+    ...browserLaneDurations.map((entry) => ({
+      ...entry,
+      kind: "browser_lane",
+      shard: "browser",
+    })),
   ];
   const shardWallStarted = Math.min(
     ...receipts.map((receipt) => Date.parse(receipt.startedAt)),
@@ -617,6 +705,7 @@ export async function aggregateCiQuality({
     ...resourceLaneDurations.map((job) => Date.parse(job.startedAt)),
     ...webLaneDurations.map((job) => Date.parse(job.startedAt)),
     ...serverLaneDurations.map((job) => Date.parse(job.startedAt)),
+    ...browserLaneDurations.map((job) => Date.parse(job.startedAt)),
   );
   const shardWallFinished = Math.max(
     ...receipts.map((receipt) => Date.parse(receipt.finishedAt)),
@@ -624,6 +713,7 @@ export async function aggregateCiQuality({
     ...resourceLaneDurations.map((job) => Date.parse(job.finishedAt)),
     ...webLaneDurations.map((job) => Date.parse(job.finishedAt)),
     ...serverLaneDurations.map((job) => Date.parse(job.finishedAt)),
+    ...browserLaneDurations.map((job) => Date.parse(job.finishedAt)),
   );
   const bottleneckExecution = [...executionDurations].sort(
     (left, right) => right.durationMs - left.durationMs,
@@ -634,6 +724,7 @@ export async function aggregateCiQuality({
     resourceLaneDurations,
     webLaneDurations,
     serverLaneDurations,
+    browserLaneDurations,
   );
   const criticalPath = [...observedPaths].sort(
     (left, right) => right.durationMs - left.durationMs,
@@ -643,7 +734,14 @@ export async function aggregateCiQuality({
     categoryKeys.map((key) => [
       key,
       receipts.reduce(
-        (total, receipt) => addCounts(total, validateCounts(receipt.categoryCounts[key], `${receipt.shard}.${key}`)),
+        (total, receipt) =>
+          addCounts(
+            total,
+            validateCounts(
+              receipt.categoryCounts[key],
+              `${receipt.shard}.${key}`,
+            ),
+          ),
         ZERO_COUNTS,
       ),
     ]),
@@ -682,6 +780,7 @@ export async function aggregateCiQuality({
     resourceLanes: resourceLaneDurations,
     webLanes: webLaneDurations,
     serverLanes: serverLaneDurations,
+    browserLanes: browserLaneDurations,
     dag: {
       wallDurationMs: shardWallFinished - shardWallStarted,
       criticalShard: criticalPath.shard,
@@ -710,7 +809,9 @@ export async function aggregateCiQuality({
     cleanup: {
       postgres: "passed",
       chromiumSandboxes: "passed",
-      browserLock: "passed",
+      browserRuntimes: "passed",
+      browserLaneLocks: "passed",
+      browserPorts: "passed",
     },
     webBuildSha256: byShard.get("web").invariants.webBuildSha256,
     redaction: {
@@ -723,7 +824,10 @@ export async function aggregateCiQuality({
   };
   atomicJson(path.resolve(root, aggregateFile), aggregate);
   const gitContext = getDevWorkbenchGitContext(root);
-  if (gitContext.gitCommit !== expected.gitSha || gitContext.treeState !== "clean") {
+  if (
+    gitContext.gitCommit !== expected.gitSha ||
+    gitContext.treeState !== "clean"
+  ) {
     throw new Error("quality aggregate checkout identity changed");
   }
   const metrics = {
@@ -736,7 +840,10 @@ export async function aggregateCiQuality({
         durationMs: parallelDurationMs,
       },
     ],
-    measuredStageDurationMs: stageTimings.reduce((total, stage) => total + stage.durationMs, 0),
+    measuredStageDurationMs: stageTimings.reduce(
+      (total, stage) => total + stage.durationMs,
+      0,
+    ),
     observedCriticalPathDurationMs: aggregate.dag.wallDurationMs,
     bottleneckStageId: [...stageTimings].sort(
       (left, right) => right.durationMs - left.durationMs,
@@ -757,7 +864,11 @@ export async function aggregateCiQuality({
     gate: "strict",
     gitContext,
     metrics,
-    notProven: ["immutable release publication", "target deployment", "customer UAT"],
+    notProven: [
+      "immutable release publication",
+      "target deployment",
+      "customer UAT",
+    ],
     profile: "strict",
     repoRoot: root,
     startedAt: new Date(shardWallStarted).toISOString(),
@@ -766,7 +877,7 @@ export async function aggregateCiQuality({
     invariants: [
       "protected main trust bootstrap and real push range passed",
       "all seven fixed GitLab quality shards passed for one exact SHA",
-      "internal Node, resource, Web and Server lanes covered each registered contract exactly once",
+      "internal Node, resource, Web, Server and Browser lanes covered each registered contract exactly once",
       "source archive, dependency audit and make data integrity passed",
       "PostgreSQL, Chromium sandbox and browser cleanup readbacks passed",
       "Runner dynamic resources and configured slots were observed before this exact-SHA pipeline and validated by the green seven-shard aggregate",
@@ -780,8 +891,14 @@ export async function aggregateCiQuality({
   );
   const evidenceRoot = path.resolve(root, evidenceDir);
   mkdirSync(evidenceRoot, { recursive: true, mode: 0o700 });
-  copyFileSync(terminalResult.plan.terminalPath, path.join(evidenceRoot, "terminal.json"));
-  copyFileSync(terminalResult.plan.receiptPath, path.join(evidenceRoot, "receipt.json"));
+  copyFileSync(
+    terminalResult.plan.terminalPath,
+    path.join(evidenceRoot, "terminal.json"),
+  );
+  copyFileSync(
+    terminalResult.plan.receiptPath,
+    path.join(evidenceRoot, "receipt.json"),
+  );
   const manifest = {
     schemaVersion: CI_EVIDENCE_MANIFEST_SCHEMA,
     repository: expected.repository,
@@ -798,7 +915,11 @@ export async function aggregateCiQuality({
     aggregateSha256: sha256File(path.resolve(root, aggregateFile)),
     files: evidenceFiles(root, evidenceRoot),
     createdAt: now().toISOString(),
-    redaction: { containsSecrets: false, containsCredentials: false, containsRawLogs: false },
+    redaction: {
+      containsSecrets: false,
+      containsCredentials: false,
+      containsRawLogs: false,
+    },
   };
   atomicJson(path.join(evidenceRoot, "evidence-manifest.json"), manifest);
   return { aggregate, manifest, terminal: terminalResult.terminal };
@@ -819,7 +940,8 @@ function parseArgs(argv) {
     const arg = argv[index];
     const key = mapping[arg];
     const value = argv[index + 1];
-    if (!key || !value || value.startsWith("--")) throw new Error(`invalid argument: ${arg}`);
+    if (!key || !value || value.startsWith("--"))
+      throw new Error(`invalid argument: ${arg}`);
     options[key] = value;
     index += 1;
   }
@@ -827,7 +949,8 @@ function parseArgs(argv) {
 }
 
 const isDirectRun =
-  process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
+  process.argv[1] &&
+  pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
 
 if (isDirectRun) {
   try {
@@ -836,7 +959,9 @@ if (isDirectRun) {
       `[ci-quality-aggregate] status=passed sha=${result.aggregate.gitSha} criticalShard=${result.aggregate.dag.criticalShard} durationMs=${result.aggregate.dag.wallDurationMs}\n`,
     );
   } catch (error) {
-    process.stderr.write(`[ci-quality-aggregate] status=blocked reason=${error.message}\n`);
+    process.stderr.write(
+      `[ci-quality-aggregate] status=blocked reason=${error.message}\n`,
+    );
     process.exitCode = 2;
   }
 }
