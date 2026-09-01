@@ -3,6 +3,8 @@ package_update: true
 package_upgrade: false
 ssh_pwauth: false
 disable_root: true
+ssh_authorized_keys:
+  - __PLUSH_RUNNER_SSH_AUTHORIZED_KEY__
 packages:
   - ca-certificates
   - curl
@@ -67,6 +69,21 @@ users:
     lock_passwd: true
 
 write_files:
+  - path: /usr/local/sbin/plush-runner-capacity
+    permissions: '0755'
+    owner: root:root
+    encoding: b64
+    content: __PLUSH_RUNNER_CAPACITY_SCRIPT_BASE64__
+  - path: /etc/plush-runner/capacity-policy.env
+    permissions: '0600'
+    owner: root:root
+    content: |
+      PLUSH_RUNNER_SLOT_SAFETY_MAX=__PLUSH_RUNNER_SLOT_SAFETY_MAX__
+  - path: /etc/sudoers.d/95-plush-runner-capacity-evidence
+    permissions: '0440'
+    owner: root:root
+    content: |
+      gitlab-runner ALL=(root) NOPASSWD: /usr/local/sbin/plush-runner-capacity --evidence
   - path: /etc/sysctl.d/99-plush-runner.conf
     permissions: '0644'
     content: |
@@ -431,6 +448,14 @@ write_files:
       test "$(systemctl is-active gitlab-runner 2>/dev/null || true)" = inactive
       test "$(systemctl is-enabled gitlab-runner 2>/dev/null || true)" = disabled
       test -x /usr/local/sbin/plush-register-gitlab-runner
+      test "$(stat -c '%U:%G:%a' /usr/local/sbin/plush-runner-capacity)" = root:root:755
+      test "$(stat -c '%U:%G:%a:%h' /etc/plush-runner/capacity-policy.env)" = root:root:600:1
+      test "$(stat -c '%U:%G:%a:%h' /etc/sudoers.d/95-plush-runner-capacity-evidence)" = root:root:440:1
+      visudo -cf /etc/sudoers.d/95-plush-runner-capacity-evidence >/dev/null
+      runuser -u gitlab-runner -- sudo -n -l /usr/local/sbin/plush-runner-capacity --evidence >/dev/null
+      test "$(stat -c '%U:%G:%a' /var/lib/plush-runner)" = root:root:755
+      test ! -e /etc/plush-runner/capacity.env
+      test ! -e /var/lib/plush-runner/capacity.json
       test "$(stat -c '%U:%G:%a' /usr/local/sbin/plush-remove-chromium-sandbox)" = root:root:755
       test ! -e /etc/plush-runner/registration.env
   - path: /usr/local/sbin/plush-bootstrap-gitlab-runner
@@ -447,16 +472,21 @@ write_files:
       systemctl disable --now gitlab-runner
       /usr/local/sbin/plush-configure-gitlab-route
       install -d -o root -g root -m 0700 /etc/plush-runner
+      install -d -o root -g root -m 0755 /var/lib/plush-runner
       /usr/local/sbin/plush-verify-runner-bootstrap
       echo "Runner toolchain ready. Place a 0600 registration.env and run /usr/local/sbin/plush-register-gitlab-runner."
   - path: /usr/local/sbin/plush-register-gitlab-runner
     permissions: '0755'
     content: |
       #!/usr/bin/env bash
-      set -euo pipefail
+      set -Eeuo pipefail
       env_file=/etc/plush-runner/registration.env
       test -f "$env_file"
-      test "$(stat -c %a "$env_file")" = 600
+      test ! -L "$env_file"
+      test "$(stat -c '%U:%G:%a:%h' "$env_file")" = root:root:600:1
+      test "$(awk 'END {print NR}' "$env_file")" = 1
+      GITLAB_RUNNER_TOKEN="$(sed -n 's/^GITLAB_RUNNER_TOKEN=//p' "$env_file")"
+      [[ "$GITLAB_RUNNER_TOKEN" =~ ^[A-Za-z0-9_.-]{20,512}$ ]]
 
       verify_canonical_gitlab() {
         local http_status
@@ -481,35 +511,60 @@ write_files:
 
       /usr/local/sbin/plush-configure-gitlab-route
       verify_canonical_gitlab
-      # shellcheck disable=SC1090
-      source "$env_file"
-      : "${GITLAB_RUNNER_TOKEN:?missing GITLAB_RUNNER_TOKEN}"
+      config=/etc/gitlab-runner/config.toml
+      test ! -e "$config"
+      test ! -e /etc/plush-runner/capacity.env
+      test ! -e /var/lib/plush-runner/capacity.json
+      test "$(systemctl is-active gitlab-runner 2>/dev/null || true)" != active
+
+      registration_committed=false
+      rollback_registration() {
+        status=$?
+        trap - EXIT
+        if [[ "$registration_committed" != true ]]; then
+          rollback_green=true
+          systemctl disable --now gitlab-runner >/dev/null 2>&1 || rollback_green=false
+          if [[ -f "$config" && ! -L "$config" ]]; then
+            if gitlab-runner unregister --name r640-kvm-isolated-shell >/dev/null 2>&1; then
+              rm -f -- "$config" || rollback_green=false
+            else
+              rollback_green=false
+            fi
+          elif [[ -e "$config" ]]; then
+            rollback_green=false
+          fi
+          if [[ "$rollback_green" == true ]]; then
+            rm -f -- /etc/plush-runner/capacity.env /var/lib/plush-runner/capacity.json || rollback_green=false
+          fi
+          if [[ "$rollback_green" != true ]]; then
+            echo "[runner-registration] status=rollback_incomplete" >&2
+            exit 70
+          fi
+        fi
+        exit "$status"
+      }
+      trap rollback_registration EXIT
+      trap 'exit 130' HUP INT TERM
+
       gitlab-runner register --non-interactive \
         --url https://gitlab.saurick.me \
         --token "$GITLAB_RUNNER_TOKEN" \
         --name r640-kvm-isolated-shell \
         --executor shell
-      config=/etc/gitlab-runner/config.toml
-      temporary="$(mktemp /etc/gitlab-runner/config.toml.XXXXXX)"
-      trap 'rm -f "$temporary"' EXIT
-      awk '
-        /^concurrent = / { print "concurrent = 4"; concurrent += 1; next }
-        /^[[:space:]]*limit = / { next }
-        /^\[\[runners\]\]$/ { print; print "  limit = 4"; runners += 1; next }
-        { print }
-        END { if (concurrent != 1 || runners != 1) exit 42 }
-      ' "$config" > "$temporary"
-      install -o root -g root -m 0600 "$temporary" "$config"
-      rm -f "$temporary"
-      trap - EXIT
-      test "$(awk '$1 == "concurrent" { print $3 }' "$config")" = 4
-      test "$(awk '$1 == "limit" { print $3 }' "$config")" = 4
+      test -f "$config"
+      test ! -L "$config"
       chown root:root /etc/gitlab-runner/config.toml
       chmod 0600 /etc/gitlab-runner/config.toml
+      RUNNER_CONCURRENT_SLOTS=__RUNNER_CONCURRENT_SLOTS__
+      [[ "$RUNNER_CONCURRENT_SLOTS" =~ ^[1-9][0-9]*$ ]]
+      /usr/local/sbin/plush-runner-capacity \
+        --initialize \
+        --slots "$RUNNER_CONCURRENT_SLOTS"
       shred -u "$env_file"
       systemctl enable --now gitlab-runner
       test "$(systemctl is-active gitlab-runner)" = active
       test "$(systemctl is-enabled gitlab-runner)" = enabled
+      runuser -u gitlab-runner -- sudo -n /usr/local/sbin/plush-runner-capacity --evidence >/dev/null
       service_environment="$(systemctl show --property=Environment --value gitlab-runner.service | tr ' ' '\n')"
       grep -Fqx 'NO_PROXY=gitlab.saurick.me' <<<"$service_environment"
       grep -Fqx 'no_proxy=gitlab.saurick.me' <<<"$service_environment"
@@ -519,6 +574,8 @@ write_files:
       grep -Fqx 'NO_PROXY=gitlab.saurick.me' <<<"$process_environment"
       grep -Fqx 'no_proxy=gitlab.saurick.me' <<<"$process_environment"
       test "$(runuser -l gitlab-runner -s /bin/bash -c 'printf "%s\n%s" "$NO_PROXY" "$no_proxy"')" = $'gitlab.saurick.me\ngitlab.saurick.me'
+      registration_committed=true
+      trap - EXIT
 
 runcmd:
   - [bash, -lc, '/usr/local/sbin/plush-bootstrap-gitlab-runner']

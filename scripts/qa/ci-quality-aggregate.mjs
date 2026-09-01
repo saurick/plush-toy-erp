@@ -44,8 +44,14 @@ import {
   CI_WEB_QUALITY_LANES,
 } from "./ci-quality-stage-lane.mjs";
 import { BOOTSTRAP_PRODUCTION_ADMIN_TEST_CASES } from "../deploy/bootstrap-production-admin.test-cases.mjs";
+import {
+  RUNNER_CAPACITY_HELPER_SOURCE_PATH,
+  RUNNER_CAPACITY_SOURCE_PATH,
+  readRunnerCapacityPolicy,
+  validateRunnerCapacityObservation,
+} from "./ci-runner-capacity-evidence.mjs";
 
-export const CI_QUALITY_AGGREGATE_SCHEMA = "plush.gitlab-strict-aggregate/v1";
+export const CI_QUALITY_AGGREGATE_SCHEMA = "plush.gitlab-strict-aggregate/v2";
 export const CI_EVIDENCE_MANIFEST_SCHEMA = "plush.gitlab-ci-evidence/v1";
 
 export function matchesStrictSourceArchive(sourceIntegrity, strictIdentity) {
@@ -313,12 +319,13 @@ function assertAggregateEnvironment(env) {
     env.CI_DEFAULT_BRANCH !== "main" ||
     env.CI_COMMIT_BRANCH !== "main" ||
     env.CI_COMMIT_REF_PROTECTED !== "true" ||
-    !["push", "web"].includes(env.CI_PIPELINE_SOURCE) ||
+    env.CI_PIPELINE_SOURCE !== "push" ||
     env.CI_JOB_NAME !== "quality_aggregate" ||
     !SHA_PATTERN.test(String(env.CI_COMMIT_SHA || "")) ||
     !/^\d+$/u.test(String(env.CI_PIPELINE_ID || "")) ||
     !/^\d+$/u.test(String(env.CI_PIPELINE_IID || "")) ||
     !/^\d+$/u.test(String(env.CI_JOB_ID || "")) ||
+    !/^\d+$/u.test(String(env.CI_RUNNER_ID || "")) ||
     env.RELEASE_SHA
   ) {
     throw new Error("quality aggregate GitLab identity is untrusted");
@@ -457,6 +464,7 @@ export async function aggregateCiQuality({
   planFile = "output/ci/plan.json",
   rangeFile = "output/ci/range.txt",
   trustFile = "output/ci/trust.json",
+  capacityFile = "output/ci/runner-capacity-observation.json",
   aggregateFile = "output/ci/quality-aggregate.json",
   evidenceDir = "output/ci/evidence",
   env = process.env,
@@ -475,6 +483,7 @@ export async function aggregateCiQuality({
     planSha256: sha256File(planPath),
     rangeSha256: sha256File(rangePath),
     range,
+    runnerId: String(env.CI_RUNNER_ID),
   });
   const trust = validateTrust(plainJson(path.resolve(root, trustFile), "CI trust receipt"), expected);
   const directory = path.resolve(root, shardsDir);
@@ -485,6 +494,23 @@ export async function aggregateCiQuality({
   }
   const receipts = names.map((name) => plainJson(path.join(directory, name), `quality shard ${name}`));
   const byShard = validateCiQualityShardSet(receipts, expected);
+  const runnerCapacityPolicy = readRunnerCapacityPolicy({
+    policyFile: path.resolve(root, RUNNER_CAPACITY_SOURCE_PATH),
+    helperFile: path.resolve(root, RUNNER_CAPACITY_HELPER_SOURCE_PATH),
+  });
+  const capacityObservation = validateRunnerCapacityObservation(
+    plainJson(path.resolve(root, capacityFile), "Runner capacity observation"),
+    {
+      repository: expected.repository,
+      gitSha: expected.gitSha,
+      pipelineId: expected.pipelineId,
+      pipelineIid: expected.pipelineIid,
+      pipelineSource: expected.pipelineSource,
+      runnerId: expected.runnerId,
+      slots: runnerCapacityPolicy.slots,
+      helperSha256: runnerCapacityPolicy.helperSha256,
+    },
+  );
   const strictIdentity = buildStrictReceiptIdentity(root, env.CI_COMMIT_SHA, env);
   const sourceIntegrity = byShard.get("node").invariants.sourceIntegrity;
   if (
@@ -666,7 +692,17 @@ export async function aggregateCiQuality({
       criticalPathDurationMs: criticalPath.durationMs,
       longestExecutionJob: bottleneckExecution.job,
       longestExecutionDurationMs: bottleneckExecution.durationMs,
-      runnerConcurrencyRequired: 4,
+    },
+    runnerCapacity: {
+      observation: capacityObservation,
+      validation: {
+        status: "passed",
+        gitSha: expected.gitSha,
+        pipelineId: expected.pipelineId,
+        allSevenShardsPassed: true,
+        zeroSkip: true,
+        cleanupPassed: true,
+      },
     },
     sourceIntegrity,
     dependencyAudit: "passed",
@@ -707,6 +743,7 @@ export async function aggregateCiQuality({
     )[0].id,
     categoryCounts,
     gitlabDag: aggregate.dag,
+    runnerCapacity: aggregate.runnerCapacity,
   };
   const receiptPlan = buildExactShaPlan(root, {
     sha: expected.gitSha,
@@ -732,6 +769,7 @@ export async function aggregateCiQuality({
       "internal Node, resource, Web and Server lanes covered each registered contract exactly once",
       "source archive, dependency audit and make data integrity passed",
       "PostgreSQL, Chromium sandbox and browser cleanup readbacks passed",
+      "Runner dynamic resources and configured slots were observed before this exact-SHA pipeline and validated by the green seven-shard aggregate",
     ],
   });
   writeDevWorkbenchReceipt(receiptPlan.receiptPath, standardReceipt);
@@ -773,6 +811,7 @@ function parseArgs(argv) {
     "--plan": "planFile",
     "--range": "rangeFile",
     "--trust": "trustFile",
+    "--runner-capacity": "capacityFile",
     "--aggregate": "aggregateFile",
     "--evidence-dir": "evidenceDir",
   };

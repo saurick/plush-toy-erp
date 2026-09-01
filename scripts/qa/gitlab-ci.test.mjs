@@ -33,8 +33,30 @@ const runnerCloudInit = readFileSync(
   new URL("../../server/deploy/gitlab/runner-vm-cloud-init.yml", import.meta.url),
   "utf8",
 );
+const runnerCapacity = readFileSync(
+  new URL("../../server/deploy/gitlab/runner-capacity.sh", import.meta.url),
+  "utf8",
+);
+const runnerCapacityPolicy = readFileSync(
+  new URL("../../server/deploy/gitlab/runner-capacity.env", import.meta.url),
+  "utf8",
+);
+const runnerVm = readFileSync(
+  new URL("../../server/deploy/gitlab/runner-vm.sh", import.meta.url),
+  "utf8",
+);
+const runnerCapacityEvidence = readFileSync(
+  new URL("./ci-runner-capacity-evidence.mjs", import.meta.url),
+  "utf8",
+);
+const qualityAggregate = readFileSync(
+  new URL("./ci-quality-aggregate.mjs", import.meta.url),
+  "utf8",
+);
 
 test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", () => {
+  assert.match(workflow, /auto_cancel:\n    on_new_commit: interruptible/u);
+  assert.doesNotMatch(workflow, /CI_PIPELINE_SOURCE == "web"/u);
   assert.match(workflow, /CI_PIPELINE_SOURCE == "merge_request_event"/u);
   assert.match(
     workflow,
@@ -62,6 +84,23 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   assert.equal(
     workflow.match(/ci-quality-shard[.]mjs --shard /gu)?.length ?? 0,
     7,
+  );
+  assert.doesNotMatch(workflow, /^quality_capacity:/mu);
+  assert.match(
+    workflow,
+    /prepare:[\s\S]+?node scripts\/qa\/ci-runner-capacity-evidence[.]mjs[\s\S]+?output\/ci\/runner-capacity-observation[.]json/u,
+  );
+  assert.match(
+    workflow,
+    /quality_aggregate:[\s\S]+?- job: prepare\n      artifacts: true/u,
+  );
+  const staticBlock = workflow.match(
+    /^quality_static:[\s\S]+?^quality_node_release:/mu,
+  )?.[0];
+  assert.ok(staticBlock);
+  assert.equal(
+    staticBlock.match(/- job: prepare\n      artifacts: false/gu)?.length ?? 0,
+    1,
   );
   for (const lane of ["release", "core"]) {
     assert.match(workflow, new RegExp(`^quality_node_${lane}:`, "mu"));
@@ -476,10 +515,20 @@ test("R640 GitLab definitions pin identity, separate SSD data and require exact 
   assert.match(runnerRegistration, /gitlab-runner register --non-interactive/u);
   assert.match(runnerRegistration, /--url https:\/\/gitlab[.]saurick[.]me/u);
   assert.match(runnerRegistration, /--token "\$GITLAB_RUNNER_TOKEN"/u);
+  assert.doesNotMatch(runnerRegistration, /source "\$env_file"/u);
+  assert.match(runnerRegistration, /GITLAB_RUNNER_TOKEN=.*sed -n/u);
+  assert.match(runnerRegistration, /rollback_registration/u);
+  assert.match(runnerRegistration, /gitlab-runner unregister --name r640-kvm-isolated-shell/u);
   assert.match(runnerRegistration, /--name r640-kvm-isolated-shell/u);
   assert.match(runnerRegistration, /--executor shell/u);
-  assert.match(runnerRegistration, /concurrent = 4/u);
-  assert.match(runnerRegistration, /limit = 4/u);
+  assert.match(
+    runnerRegistration,
+    /\/usr\/local\/sbin\/plush-runner-capacity \\\n        --initialize \\\n        --slots "\$RUNNER_CONCURRENT_SLOTS"/u,
+  );
+  assert.doesNotMatch(
+    runnerRegistration,
+    /concurrent\s*=|limit\s*=/u,
+  );
   assert.doesNotMatch(
     runnerRegistration,
     /--(?:access-level|locked|maintenance-note|maximum-timeout|paused|run-untagged|tag-list)(?:[=\s]|$)/u,
@@ -493,6 +542,88 @@ test("R640 GitLab definitions pin identity, separate SSD data and require exact 
   assert.match(runnerCloudInit, /disable_root: true/u);
   assert.match(runnerCloudInit, /chmod 0600 \/etc\/gitlab-runner\/config[.]toml/u);
   assert.doesNotMatch(runnerCloudInit, /curl[^\n]*[|]\s*(?:ba)?sh/u);
+});
+
+test("Runner provisioning and capacity stay parameterized and fail closed", () => {
+  for (const placeholder of [
+    "__PLUSH_RUNNER_SSH_AUTHORIZED_KEY__",
+    "__PLUSH_RUNNER_CAPACITY_SCRIPT_BASE64__",
+    "__PLUSH_RUNNER_SLOT_SAFETY_MAX__",
+    "__RUNNER_CONCURRENT_SLOTS__",
+  ]) {
+    assert.equal(runnerCloudInit.match(new RegExp(placeholder, "gu"))?.length, 1);
+  }
+  assert.match(runnerVm, /--vcpus/u);
+  assert.match(runnerVm, /--memory-mib/u);
+  assert.match(runnerVm, /--disk-gib/u);
+  assert.doesNotMatch(runnerVm, /--runner-concurrent-slots/u);
+  assert.doesNotMatch(runnerVm, /--slot-safety-max/u);
+  assert.match(runnerVm, /SOURCE_CAPACITY_FILE/u);
+  assert.equal(runnerCapacityPolicy, "RUNNER_CONCURRENT_SLOTS=19\n");
+  assert.match(runnerVm, /PROVISION_PLUSH_RUNNER:R640:/u);
+  assert.match(runnerVm, /BASE_VOLUME_SHA256/u);
+  assert.match(runnerVm, /timeout 600 sha256sum/u);
+  assert.match(runnerVm, /TEMPLATE_SHA256/u);
+  assert.match(runnerVm, /HELPER_SHA256/u);
+  assert.match(runnerVm, /SSH_PUBLIC_KEY_SHA256/u);
+  assert.match(runnerVm, /domain_exists/u);
+  assert.match(runnerVm, /volume_exists/u);
+  assert.match(runnerVm, /status=rollback_incomplete/u);
+  assert.match(runnerVm, /flock -n 9/u);
+  assert.match(runnerVm, /LOCK_DIR=\/run\/plush-runner-vm/u);
+  assert.match(runnerVm, /domain_state.*shut off/u);
+  assert.match(runnerVm, /dominfo "\$DOMAIN"[\s\S]+?rollback_green=false/u);
+  assert.match(runnerVm, /DOMAIN_UUID/u);
+  assert.match(runnerVm, /DISK_VOLUME_KEY/u);
+  assert.match(runnerVm, /SEED_VOLUME_KEY/u);
+  assert.match(runnerVm, /status=vm_created_registration_pending/u);
+  assert.doesNotMatch(
+    runnerVm,
+    /VCPUS=(?:4|12|48)$|MEMORY_MIB=(?:12288|24576|49152)$|SLOTS=(?:4|12|48)$/mu,
+  );
+  assert.match(runnerCapacity, /flock -n/u);
+  assert.match(runnerCapacity, /--expect-slots/u);
+  assert.match(runnerCapacity, /SET_RUNNER_CAPACITY:R640:/u);
+  assert.match(runnerCapacity, /CURRENT_SLOTS.*EXPECTED_SLOTS/u);
+  assert.match(runnerCapacity, /LIMIT_VALUES\[0\].*SLOTS/u);
+  assert.match(runnerCapacity, /status=rollback_incomplete/u);
+  assert.match(runnerCapacity, /mode=idempotent/u);
+  assert.match(runnerCapacity, /status=evidence/u);
+  assert.match(runnerCapacity, /LOCK_DIR=\/run\/plush-runner/u);
+  assert.ok(
+    runnerCapacity.indexOf("flock -n 9") <
+      runnerCapacity.indexOf('require_private_file "$CONFIG_FILE"'),
+  );
+  assert.match(runnerCapacity, /if \[\[ "\$MODE" == initialize \]\]/u);
+  assert.match(runnerCapacity, /LIMIT_VALUES\[0\].*== 0/u);
+  assert.match(runnerCapacity, /RUNNER_CONCURRENT_SLOTS=/u);
+  assert.match(runnerCapacity, /EXPECTED_RUNNER_NAME=r640-kvm-isolated-shell/u);
+  assert.match(runnerCapacity, /EXPECTED_RUNNER_URL=https:\/\/gitlab[.]saurick[.]me/u);
+  assert.match(runnerCapacity, /EXPECTED_RUNNER_EXECUTOR=shell/u);
+  assert.match(runnerCapacity, /kill -STOP "\$RUNNER_MAIN_PID"/u);
+  assert.match(runnerCapacity, /systemctl stop --no-block gitlab-runner/u);
+  assert.match(runnerCapacity, /kill -CONT "\$RUNNER_MAIN_PID"/u);
+  assert.doesNotMatch(runnerCapacity, /PLUSH_RUNNER_(?:INITIAL_)?SLOTS=/u);
+  assert.match(runnerCloudInit, /RUNNER_CONCURRENT_SLOTS=__RUNNER_CONCURRENT_SLOTS__/u);
+  assert.match(
+    runnerCloudInit,
+    /gitlab-runner ALL=\(root\) NOPASSWD: \/usr\/local\/sbin\/plush-runner-capacity --evidence/u,
+  );
+  assert.match(runnerCapacityEvidence, /"--evidence"/u);
+  assert.doesNotMatch(runnerCapacity, /SLOTS="?\$\([^\n]*nproc/u);
+  assert.doesNotMatch(runnerCloudInit, /concurrent = (?:4|12|48)|limit = (?:4|12|48)/u);
+});
+
+test("Runner capacity observation reuses the seven-shard exact-SHA evidence", () => {
+  assert.match(
+    runnerCapacityEvidence,
+    /plush[.]gitlab-runner-capacity-observation\/v1/u,
+  );
+  assert.match(runnerCapacityEvidence, /CI_RUNNER_ID/u);
+  assert.match(runnerCapacityEvidence, /containsRawLogs: false/u);
+  assert.match(qualityAggregate, /runnerCapacity: aggregate[.]runnerCapacity/u);
+  assert.match(qualityAggregate, /allSevenShardsPassed: true/u);
+  assert.doesNotMatch(qualityAggregate, /runnerConcurrencyRequired/u);
 });
 
 test("Runner verifier enters a neutral cwd before cross-user checks", () => {

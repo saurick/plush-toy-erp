@@ -13,7 +13,9 @@
 
 GitLab 不与业务 PostgreSQL、测试数据库或现有 Docker 容器共享数据目录。Runner 运行在独立 KVM VM 内，只获得 VM 内的 Docker socket；不得挂载 R640 宿主机 `/var/run/docker.sock`。
 
-Runner VM 当前资源合同为 12 vCPU、24 GiB 内存和 SSD 系统盘，全局 `concurrent=4`且唯一 project runner `limit=4`。该并发度只服务于七个固定质量分片；PostgreSQL 容器名和 loopback 端口、Chromium sandbox、浏览器锁与输出目录都按 pipeline/job 隔离。若资源实测出现 OOM、长时间 iowait、数据库或浏览器交叉污染，先降低该两个数值并重跑完整证据，不通过跳过测试保速。
+Runner VM 的 vCPU、内存和系统盘不是仓库常量，而是 `runner-vm.sh` 创建/重建时彼此独立的必填参数；每次容量判断都必须从 guest 实时读取在线 vCPU、MemTotal、swap 与根文件系统，并写入 exact-SHA CI 回执。Runner slot 的唯一显式参数名是 `RUNNER_CONCURRENT_SLOTS`，不能由 `nproc` 自动派生；注册、重建与后续 live 调整都复用 `runner-capacity.sh`，它只在 Runner 空闲、配置身份和旧值精确匹配时原子更新全局 `concurrent` 与唯一 project runner `limit`，失败恢复旧配置并读回。
+
+当前 canonical 质量 Pipeline 的全局稳定安全并发上限只在 `runner-capacity.env` 保存，DAG 只调度已经就绪的 Job，空槽不预留 CPU 或内存。`concurrent=limit` 把多 Pipeline 即使短暂重叠时的总资源使用也限制在同一个全局上限内；普通完整质量只接受 protected main 的自然 push，新的 commit 自动取消可中断的旧 Pipeline。Job 内 Node 并发仍为 1，PostgreSQL、Docker、Chromium、浏览器锁和 resource-sensitive lane 继续按既有资源边界串行或隔离。只有 VM 资源规格变化，或出现 OOM、swap、持续 iowait、资源残留或清理污染证据时，才重新评估安全上限；不得通过跳过测试保速。
 
 性能调优必须分别观测 R640 宿主机和 Runner guest：记录冷/热缓存的 job 时长、DAG 关键路径、CPU / 内存 / IO 峰值、p50、波动和近似 p95，再决定 Runner slot、分片和语言测试并行度。普通 CI 7–9 分钟、热缓存提交到部署 10–15 分钟只是稳健阶段目标；资源仍有余量且未出现排队、IO 争用、OOM、flaky 或波动扩大时，继续冲刺 6–8 分钟和 8–12 分钟，稳定更快也接受。只有资源饱和或进一步提速需要明显不成比例的复杂度时才停止；不得减少测试、放宽 fail-closed / exact-SHA、隔离或清理门禁，也不得用伪缓存命中换取数字。
 
@@ -43,6 +45,9 @@ CI 冷启动因此不再承担公网下载。运行包合同固定 `playwright 1
 - `.env.example`：非敏感路径与端口模板；实际 `.env` 不进入 Git。
 - `install-r640.sh`：默认只读预检；只有精确 `--execute --confirm` 才创建目录并启动单个 GitLab 服务。
 - `runner-vm-cloud-init.yml`：专用 Ubuntu Runner VM 的工具链、QEMU Guest Agent、canonical 内网路由与 fail-closed 注册入口。
+- `runner-vm.sh`：唯一 VM provisioning 入口；显式验证 vCPU、内存、磁盘，并从唯一容量参数读取初始槽位和安全上限；默认只读预览，失败只回滚本操作创建的 domain/volume。
+- `runner-capacity.env`：唯一受版本控制的当前槽位参数；VM 创建、live helper 和 CI evidence 只从该参数建立一致性证明。
+- `runner-capacity.sh`：VM 内唯一槽位更新 helper；锁定旧值和 idle 状态，原子更新、服务读回并生成脱敏容量回执。
 - `gitlab-backup.sh`：生成 GitLab 应用备份、config archive 和 RAID5 checksum；默认只预览。
 - `gitlab-backup-verify.sh`：只校验归档、checksum 与当前 GitLab 自检，不会覆盖在线实例。
 
@@ -111,7 +116,7 @@ gitlab.saurick.me
    | `GITHUB_PACKAGES_TOKEN` | GitHub Packages write/read，不授 repo 管理 |
    | `GITLAB_RELEASE_TOKEN` | 当前项目 API 与 Release 管理，不授管理员权限 |
 
-6. 用 Ubuntu 24.04 cloud image 创建独立 KVM VM，应用 `runner-vm-cloud-init.yml`；cloud-init 固定安装 GNU Make、GCC、QEMU Guest Agent、Docker Buildx v0.30.1、Docker Compose v2.40.3 与当前 Playwright 1.58.2 Chromium 所需系统包，并要求 `ubuntu`、`root`、`gitlab-runner` 的 Go 环境都读回 `CGO_ENABLED=1`，job 不能自行取得 apt 权限。先在 R640 完成上一节的 proxy listener 与精确 UFW bridge 规则并读回，再在 GitLab 创建 project runner，把 token 只写入 VM 的 `/etc/plush-runner/registration.env`，权限 `0600`，运行 `/usr/local/sbin/plush-register-gitlab-runner`。脚本会先证明 canonical curl/Node 路径，注册成功后销毁 token 文件并验证 Runner 进程环境。
+6. 用 `runner-vm.sh` 显式传入 Ubuntu 24.04 base volume、vCPU、内存、磁盘和受信 SSH 公钥；槽位与安全上限只从 `runner-capacity.env` 读取。preview 给出绑定全部参数和源文件身份的精确确认值，execute 才渲染并应用 `runner-vm-cloud-init.yml`。cloud-init 固定安装 GNU Make、GCC、QEMU Guest Agent、Docker Buildx v0.30.1、Docker Compose v2.40.3 与当前 Playwright 1.58.2 Chromium 所需系统包，并要求 `ubuntu`、`root`、`gitlab-runner` 的 Go 环境都读回 `CGO_ENABLED=1`，job 不能自行取得 apt 权限。先在 R640 完成上一节的 proxy listener 与精确 UFW bridge 规则并读回，再在 GitLab 创建 project runner，把 token 只写入 VM 的 `/etc/plush-runner/registration.env`，权限 `0600`，运行 `/usr/local/sbin/plush-register-gitlab-runner`。注册脚本只把同一个显式参数交给共享 capacity helper 初始化槽位，不再维护第二份 TOML 改写；成功后销毁 token 文件并验证 Runner 进程环境。
 7. Runner 必须显示 tags `plush,isolated,amd64`、locked、run untagged=false；运行一次非发布 pipeline，核对 VM 内临时 PostgreSQL 被清理且 R640 宿主容器列表未变化。
 
 ## GitHub 单向镜像与 GPT Review
@@ -147,4 +152,4 @@ sudo bash server/deploy/gitlab/gitlab-backup-verify.sh
 
 R640 GitLab、独立 KVM Runner、公网入口、protected main、GitHub 单向 mirror 和 main pipeline 已进入实际运行主链。本文档只固定重建和安全合同，不把某次历史绿灯写成当前运行证明；当前 SHA、Runner 配置、pipeline/job 终态、Package/Release、backup/restore 仍必须从 GitLab API、Runner VM 和对应脱敏回执实时读回。
 
-`runner-vm-cloud-init.yml` 是新建或重建 Runner VM 的正式定义，不会被普通 CI job 自动应用。线上参数与该定义漂移时，只在无活动 job 的有界窗口内备份精确 config、修正、重启 Runner 并读回；不回显 token，不把 live 手工改动作为唯一真源。R640 的 UFW bridge 规则和 canonical TLS proxy 属于宿主机前置状态，Runner VM 重建不会替它们补写；每次重建都必须重新完成宿主 listener/firewall 与 guest curl/Node 的双边读回。
+`runner-vm.sh` 与其消费的 `runner-vm-cloud-init.yml` 共同构成新建或重建 Runner VM 的唯一正式入口，不会被普通 CI job 自动应用。VM 资源不保存一次性的固定数字；每次 preview/execute 都必须显式提供并读回。当前槽位由 VM 内 root-owned capacity policy、live config 和 validation receipt 共同绑定；普通 Pipeline 的 prepare job 只能通过精确的只读 `sudo ... --evidence` 投影验证 live `concurrent=limit`、service 与 safety ceiling，再记录实时资源，七类 aggregate 全绿后才把该槽位标记为当前 exact SHA 已验证。线上参数漂移时，只在无活动 job 的有界窗口内用共享 capacity helper 修正、重启 Runner 并读回；不回显 token，不把 live 手工改动作为唯一真源。R640 的 UFW bridge 规则和 canonical TLS proxy 属于宿主机前置状态，Runner VM 重建不会替它们补写；每次重建都必须重新完成宿主 listener/firewall 与 guest curl/Node 的双边读回。

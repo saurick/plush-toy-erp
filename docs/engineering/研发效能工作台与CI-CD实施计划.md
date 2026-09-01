@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | 仓库定义 | R640 分片 DAG、普通 CI evidence 复用、单次制品构建、冻结演练和 v2 Release 合同由正式代码/测试/文档守住 | `.gitlab-ci.yml`、CI/release 脚本、R640 cloud-init、工作台与合同测试 |
 | Git/远端 | GitLab `origin/main` 是 canonical，GitHub 是 protected-main 单向 mirror 和应急路径 | 当前结论以 exact remote SHA、protected branch 与 pipeline API 读回为准 |
-| R640/公网运行态 | GitLab、公网入口和独立 KVM Runner 已是实际主链；Runner 重建合同为 12 vCPU / 24 GiB / `concurrent=4` | 当前配置、资源、job 和 backup/restore 仍必须从 R640 实时读回 |
+| R640/公网运行态 | GitLab、公网入口和独立 KVM Runner 已是实际主链；VM 资源由唯一 provisioning 入口参数化，槽位是独立的受控容量策略 | 每次 Pipeline 通过 root-owned helper 的窄只读 evidence 投影验证 live `concurrent=limit` 与服务状态，并读回 guest vCPU、内存、swap、磁盘；本次 exact-SHA aggregate 绿后才成为已验证容量证据 |
 | 业务目标 | `demo-133` 是项目方模拟数据环境，`customer-test-133` 是甲方干净测试/验收环境；二者均非生产 | 两目标同 digest、运行与数据完全隔离；未来 `erp` 需另行正式启用 |
 
 任何本地绿色都不能改写远端、不可变制品、发布演练、目标部署或客户 UAT 层的状态。
@@ -24,6 +24,7 @@
 - [x] GitHub CI 取消 main push，只保留 PR、`review/gpt/**` 和手工审查；GitHub emergency release 在完整接入 canonical v2 七资产与同一演练回执前，于任何 checkout、登录、构建或上传前失败关闭。
 - [x] 质量工程页面分开展示当前 committed SHA 的 R640 普通 CI 与 Local dirty/本地回执；只有服务器 exact-SHA 证据可提升发布资格，版本中心只从 GitLab 的真实 pipeline、Release/Package 和 target operation 展示效能与交付状态。
 - [x] 性能证据区分 R640 宿主与 Runner guest，按冷/热缓存保存 job、关键路径、CPU/内存/IO 峰值、p50、波动和近似 p95；阶段目标不是停止线，资源仍有余量时继续提速且不降低覆盖、隔离、清理或 fail-closed。
+- [x] Runner VM vCPU、内存和磁盘由 `runner-vm.sh` 显式参数化；唯一槽位参数 `RUNNER_CONCURRENT_SLOTS` 只在 `runner-capacity.env` 保存，并由同一个 `runner-capacity.sh` 管理旧值、idle、锁、服务读回和回滚。DAG 按实际就绪状态使用该全局安全上限；protected main 自然 push 自动取消旧的可中断 Pipeline，重资源 lane 与 Job 内串行合同不变。
 - [x] R640 GitLab Compose、精确安装、备份/校验和 Runner VM cloud-init 定义。
 - [x] affected mapping、quality gate catalog、Node 分组、fast web 合同和 GitLab CI 静态门禁。
 - [x] 正式部署、QA、Web 与工程文档同步。
@@ -58,7 +59,7 @@
 3. 只在 R640 本机处理初始密码，立即修改、启用 MFA，创建非 root 管理员。
 4. 创建私有项目 `saurick/plush-toy-erp`，保护 main、禁止 force push，要求 merge pipeline 成功并以 `CI Gate` 作为稳定汇总 job。
 5. 创建 protected `release` environment 和三项最小权限 protected variables。
-6. 创建独立 KVM Runner VM，完成 cloud-init 后通过 `0600` 一次性 token 文件注册 locked project runner；读回 tags 与 untagged=false。
+6. 用唯一 `runner-vm.sh` 显式传入 VM 资源与独立槽位参数并渲染 cloud-init；完成后通过 `0600` 一次性 token 文件注册 locked project runner，读回动态资源、`concurrent=limit`、tags 与 untagged=false。
 7. 配置 GitLab push mirror 到 GitHub，只同步 protected main；GitHub main 禁止直接更新。另验证经过独立授权的 `review/gpt` 快照使用单独 GitHub remote，不成为第二条 main 写入链。
 8. 在阿里云备份旧 vhost，切换 `gitlab.saurick.me -> 18226`，完成 Nginx config test、TLS、health 和登录读回。
 9. 运行非发布 MR/main pipeline，核对 `CI Gate`、缓存、一次性 PostgreSQL 清理、Runner VM 与 R640 宿主隔离。

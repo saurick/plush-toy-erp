@@ -107,8 +107,8 @@ async function receipts() {
   return values;
 }
 
-test("aggregate contracts keep v3 strict evidence external shape", () => {
-  assert.equal(CI_QUALITY_AGGREGATE_SCHEMA, "plush.gitlab-strict-aggregate/v1");
+test("aggregate contracts keep dynamic Runner evidence in the strict external shape", () => {
+  assert.equal(CI_QUALITY_AGGREGATE_SCHEMA, "plush.gitlab-strict-aggregate/v2");
   assert.equal(CI_EVIDENCE_MANIFEST_SCHEMA, "plush.gitlab-ci-evidence/v1");
 });
 

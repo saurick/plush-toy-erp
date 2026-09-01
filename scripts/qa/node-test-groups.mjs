@@ -35,6 +35,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/qa/ci-quality-shard.test.mjs",
     "scripts/qa/ci-quality-stage-lane.test.mjs",
     "scripts/qa/ci-resource-test-lane.test.mjs",
+    "scripts/qa/ci-runner-capacity-evidence.test.mjs",
     "scripts/qa/core-boundary.test.mjs",
     "scripts/qa/customer-config-effective-session-probe.test.mjs",
     "scripts/qa/customer-config-runtime-manifest.test.mjs",

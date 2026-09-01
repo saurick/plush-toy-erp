@@ -1,10 +1,11 @@
 workflow:
+  auto_cancel:
+    on_new_commit: interruptible
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: '$CI_PIPELINE_SOURCE =~ /^(api|trigger|web)$/ && $RELEASE_SHA && $RELEASE_VERSION && $RELEASE_VERSION_REFERENCE'
     - if: '$CI_PIPELINE_SOURCE =~ /^(api|web)$/ && $BACKFILL_RELEASE_SOURCE_SHA'
-    - if: '$CI_PIPELINE_SOURCE == "web"'
     - when: never
 
 stages:
@@ -74,7 +75,7 @@ variables:
   rules:
     - if: '$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA'
       when: never
-    - if: '$CI_PIPELINE_SOURCE =~ /^(push|web)$/ && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
     - when: never
 
 plan:
@@ -174,6 +175,7 @@ prepare:
   script:
     - |
       set -euo pipefail
+      node scripts/qa/ci-runner-capacity-evidence.mjs
       test "$(stat -c '%U:%G:%a' /usr/local/sbin/plush-remove-chromium-sandbox)" = root:root:755
       sudo -n -l /usr/local/sbin/plush-remove-chromium-sandbox "$CI_JOB_ID" >/dev/null
       pnpm --dir web install --frozen-lockfile
@@ -183,6 +185,10 @@ prepare:
       test -d "$PLAYWRIGHT_RUNTIME_ARCHIVE_DIR"
       test ! -e "$PLAYWRIGHT_BROWSERS_PATH"
       echo "[gitlab-ci] cache=prepared sha=$CI_COMMIT_SHA"
+  artifacts:
+    expire_in: 30 days
+    paths:
+      - output/ci/runner-capacity-observation.json
 
 .quality_shard: &quality_shard
   stage: quality
@@ -438,6 +444,8 @@ quality_aggregate:
   <<: *main_quality_rules
   needs:
     - job: plan
+      artifacts: true
+    - job: prepare
       artifacts: true
     - job: quality_static
       artifacts: true
