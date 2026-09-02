@@ -22,6 +22,7 @@ import {
   DownloadOutlined,
   EyeOutlined,
   PaperClipOutlined,
+  RedoOutlined,
   StopOutlined,
   UploadOutlined,
 } from '@ant-design/icons'
@@ -40,8 +41,10 @@ import {
   resolveBusinessAttachmentAuditMeta,
   resolveBusinessAttachmentWithdrawalMeta,
 } from '../../utils/businessAttachmentPresentation.mjs'
+import { settleBusinessAttachmentBatchUpload } from '../../utils/businessAttachmentBatchUpload.mjs'
 import { resolveBusinessAttachmentPanelState } from '../../utils/businessAttachmentPanelState.mjs'
 import { PRINT_APPENDIX_ATTACHMENT_TYPE } from '../../utils/businessAttachmentPrintAppendix.mjs'
+import { isMutationResultUnknown } from '../../utils/sourceDocumentMutation.mjs'
 
 const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024
 const MAX_ATTACHMENT_SIZE_LABEL = '5MB'
@@ -143,10 +146,16 @@ const PRINT_APPENDIX_MIME_TYPES = new Set([
 const PRINT_APPENDIX_ACCEPT = [...PRINT_APPENDIX_MIME_TYPES].join(',')
 
 let pendingAttachmentID = 0
+let attachmentPanelMessageID = 0
 
 function createPendingAttachmentID() {
   pendingAttachmentID += 1
   return `pending-${Date.now()}-${pendingAttachmentID}`
+}
+
+function createAttachmentPanelMessageKey() {
+  attachmentPanelMessageID += 1
+  return `business-attachment-panel-${attachmentPanelMessageID}`
 }
 
 function readFileAsBase64(file) {
@@ -219,6 +228,39 @@ function isPreviewableAttachment(item) {
   return PREVIEWABLE_ATTACHMENT_MIME_TYPES.has(mimeType)
 }
 
+function createUploadIssueItems(failed, targetOwnerId) {
+  return failed.map(({ item, error }) => {
+    const resultUnconfirmed = isMutationResultUnknown(error)
+    return {
+      ...item,
+      upload_status: resultUnconfirmed ? 'unconfirmed' : 'failed',
+      upload_error: resultUnconfirmed
+        ? '上传结果尚未确认，请刷新附件列表核对，不要直接重试'
+        : getActionErrorMessage(error, '上传该附件'),
+      retry_owner_id: targetOwnerId,
+    }
+  })
+}
+
+function createBatchRetryState({
+  targetOwnerId,
+  totalCount,
+  succeededCount,
+  issueItems,
+}) {
+  return {
+    targetOwnerId,
+    totalCount,
+    succeededCount,
+    retryableItems: issueItems.filter(
+      (item) => item.upload_status === 'failed'
+    ),
+    unconfirmedItems: issueItems.filter(
+      (item) => item.upload_status === 'unconfirmed'
+    ),
+  }
+}
+
 function SavedAttachmentAuditMeta({ item }) {
   const { uploaderLabel, uploadedAtLabel } =
     resolveBusinessAttachmentAuditMeta(item)
@@ -284,8 +326,11 @@ const BusinessAttachmentPanel = forwardRef(
     const printAppendixInputRef = useRef(null)
     const withdrawalReasonRef = useRef(null)
     const pendingAttachmentsRef = useRef([])
+    const batchRetryResolveRef = useRef(null)
     const [attachments, setAttachments] = useState([])
     const [pendingAttachments, setPendingAttachments] = useState([])
+    const [batchRetryState, setBatchRetryState] = useState(null)
+    const [uploadMessageKey] = useState(createAttachmentPanelMessageKey)
     const [loading, setLoading] = useState(false)
     const [uploading, setUploading] = useState(false)
     const [previewing, setPreviewing] = useState(false)
@@ -331,6 +376,18 @@ const BusinessAttachmentPanel = forwardRef(
       ],
       [attachments, pendingAttachments]
     )
+    const retryablePendingAttachments = useMemo(
+      () =>
+        pendingAttachments.filter((item) => item.upload_status === 'failed'),
+      [pendingAttachments]
+    )
+    const batchIssueItems = useMemo(
+      () => [
+        ...(batchRetryState?.retryableItems || []),
+        ...(batchRetryState?.unconfirmedItems || []),
+      ],
+      [batchRetryState]
+    )
 
     useEffect(() => {
       pendingAttachmentsRef.current = pendingAttachments
@@ -343,6 +400,15 @@ const BusinessAttachmentPanel = forwardRef(
         }
       },
       [previewAttachment]
+    )
+
+    useEffect(
+      () => () => {
+        const resolve = batchRetryResolveRef.current
+        batchRetryResolveRef.current = null
+        resolve?.(false)
+      },
+      []
     )
 
     const reload = useCallback(
@@ -374,7 +440,7 @@ const BusinessAttachmentPanel = forwardRef(
 
     const uploadPreparedAttachment = useCallback(
       async (item, targetOwnerId) => {
-        await uploadBusinessAttachment({
+        return uploadBusinessAttachment({
           owner_type: ownerType,
           owner_id: targetOwnerId,
           attachment_type: item.attachment_type || attachmentType,
@@ -391,9 +457,55 @@ const BusinessAttachmentPanel = forwardRef(
       [attachmentType, ownerType, ownerVersion, slotKey]
     )
 
-    function clearPendingAttachments() {
+    const settlePreparedAttachments = useCallback(
+      (items, targetOwnerId) =>
+        settleBusinessAttachmentBatchUpload(items, (item) =>
+          uploadPreparedAttachment(item, targetOwnerId)
+        ),
+      [uploadPreparedAttachment]
+    )
+
+    const replacePendingUploadItems = useCallback(
+      (attemptedItems, issueItems) => {
+        const attemptedUIDs = new Set(
+          attemptedItems.map((item) => String(item.uid || ''))
+        )
+        setPendingAttachments((current) => {
+          const next = [
+            ...current.filter(
+              (item) => !attemptedUIDs.has(String(item.uid || ''))
+            ),
+            ...issueItems,
+          ]
+          pendingAttachmentsRef.current = next
+          return next
+        })
+      },
+      []
+    )
+
+    const resolveBatchRetryDecision = useCallback((value) => {
+      const resolve = batchRetryResolveRef.current
+      batchRetryResolveRef.current = null
+      setBatchRetryState(null)
+      resolve?.(value)
+    }, [])
+
+    const clearPendingAttachments = useCallback(() => {
+      pendingAttachmentsRef.current = []
       setPendingAttachments([])
-    }
+      resolveBatchRetryDecision(false)
+    }, [resolveBatchRetryDecision])
+
+    const waitForBatchRetryDecision = useCallback((nextState) => {
+      const previousResolve = batchRetryResolveRef.current
+      batchRetryResolveRef.current = null
+      previousResolve?.(false)
+      setBatchRetryState(nextState)
+      return new Promise((resolve) => {
+        batchRetryResolveRef.current = resolve
+      })
+    }, [])
 
     useImperativeHandle(
       ref,
@@ -408,32 +520,48 @@ const BusinessAttachmentPanel = forwardRef(
             message.warning('业务记录保存后才能绑定附件')
             return false
           }
+          message.destroy(uploadMessageKey)
           setUploading(true)
-          let uploadedCount = 0
+          let result
+          let issueItems = []
           try {
-            for (const item of items) {
-              await uploadPreparedAttachment(item, targetOwnerId)
-              uploadedCount += 1
-              setPendingAttachments((current) =>
-                current.filter((entry) => entry.uid !== item.uid)
-              )
+            result = await settlePreparedAttachments(items, targetOwnerId)
+            issueItems = createUploadIssueItems(result.failed, targetOwnerId)
+            replacePendingUploadItems(items, issueItems)
+            if (
+              result.succeeded.length > 0 ||
+              issueItems.some((item) => item.upload_status === 'unconfirmed')
+            ) {
+              await reload(targetOwnerId)
             }
-            message.success(
-              uploadedCount > 1
-                ? `${uploadedCount} 个附件已随记录保存`
-                : '附件已随记录保存'
-            )
-            await reload(targetOwnerId)
-            return true
-          } catch (error) {
-            message.error(getActionErrorMessage(error, '上传待保存附件'))
-            return false
           } finally {
             setUploading(false)
           }
+
+          if (result.failed.length <= 0) {
+            return true
+          }
+
+          return waitForBatchRetryDecision(
+            createBatchRetryState({
+              targetOwnerId,
+              totalCount: items.length,
+              succeededCount: result.succeeded.length,
+              issueItems,
+            })
+          )
         },
       }),
-      [normalizedOwnerId, ownerType, reload, uploadPreparedAttachment]
+      [
+        clearPendingAttachments,
+        normalizedOwnerId,
+        ownerType,
+        reload,
+        replacePendingUploadItems,
+        settlePreparedAttachments,
+        uploadMessageKey,
+        waitForBatchRetryDecision,
+      ]
     )
 
     async function handleFileChange(
@@ -468,6 +596,7 @@ const BusinessAttachmentPanel = forwardRef(
         return
       }
 
+      message.destroy(uploadMessageKey)
       setUploading(true)
       try {
         const preparedItems = []
@@ -483,12 +612,18 @@ const BusinessAttachmentPanel = forwardRef(
         }
 
         if (missingOwner && canQueuePending) {
-          setPendingAttachments((current) => [...current, ...preparedItems])
-          message.success(
-            preparedItems.length > 1
-              ? `${preparedItems.length} 个附件将在保存后上传`
-              : '附件将在保存后上传'
-          )
+          setPendingAttachments((current) => {
+            const next = [...current, ...preparedItems]
+            pendingAttachmentsRef.current = next
+            return next
+          })
+          message.success({
+            key: uploadMessageKey,
+            content:
+              preparedItems.length > 1
+                ? `${preparedItems.length} 个附件将在保存后上传`
+                : '附件将在保存后上传',
+          })
           return
         }
         if (missingOwner) {
@@ -496,20 +631,182 @@ const BusinessAttachmentPanel = forwardRef(
           return
         }
 
-        for (const item of preparedItems) {
-          await uploadPreparedAttachment(item, normalizedOwnerId)
-        }
-        message.success(
-          preparedItems.length > 1
-            ? `${preparedItems.length} 个附件已上传`
-            : '附件已上传'
+        const result = await settlePreparedAttachments(
+          preparedItems,
+          normalizedOwnerId
         )
+        const issueItems = createUploadIssueItems(
+          result.failed,
+          normalizedOwnerId
+        )
+        replacePendingUploadItems(preparedItems, issueItems)
+        if (result.failed.length > 0) {
+          if (
+            result.succeeded.length > 0 ||
+            issueItems.some((item) => item.upload_status === 'unconfirmed')
+          ) {
+            await reload(normalizedOwnerId)
+          }
+          setBatchRetryState(
+            createBatchRetryState({
+              targetOwnerId: normalizedOwnerId,
+              totalCount: preparedItems.length,
+              succeededCount: result.succeeded.length,
+              issueItems,
+            })
+          )
+          return
+        }
+        message.success({
+          key: uploadMessageKey,
+          content:
+            preparedItems.length > 1
+              ? `${preparedItems.length} 个附件已上传`
+              : '附件已上传',
+        })
         await reload(normalizedOwnerId)
       } catch (error) {
         message.error(getActionErrorMessage(error, '上传业务附件'))
       } finally {
         setUploading(false)
       }
+    }
+
+    const handleBatchRetry = useCallback(async () => {
+      const current = batchRetryState
+      if (!current || current.retryableItems.length <= 0) return
+
+      setUploading(true)
+      let result
+      let issueItems = []
+      try {
+        result = await settlePreparedAttachments(
+          current.retryableItems,
+          current.targetOwnerId
+        )
+        issueItems = createUploadIssueItems(
+          result.failed,
+          current.targetOwnerId
+        )
+        replacePendingUploadItems(current.retryableItems, issueItems)
+        if (
+          result.succeeded.length > 0 ||
+          issueItems.some((item) => item.upload_status === 'unconfirmed')
+        ) {
+          await reload(current.targetOwnerId)
+        }
+      } finally {
+        setUploading(false)
+      }
+
+      const nextIssueItems = [...current.unconfirmedItems, ...issueItems]
+      const nextSucceededCount =
+        current.succeededCount + result.succeeded.length
+      if (nextIssueItems.length <= 0) {
+        if (!batchRetryResolveRef.current) {
+          message.success({
+            key: uploadMessageKey,
+            content:
+              current.totalCount > 1
+                ? `${current.totalCount} 个附件均已上传`
+                : '附件已上传',
+          })
+        }
+        resolveBatchRetryDecision(true)
+        return
+      }
+
+      setBatchRetryState(
+        createBatchRetryState({
+          targetOwnerId: current.targetOwnerId,
+          totalCount: current.totalCount,
+          succeededCount: nextSucceededCount,
+          issueItems: nextIssueItems,
+        })
+      )
+    }, [
+      batchRetryState,
+      reload,
+      replacePendingUploadItems,
+      resolveBatchRetryDecision,
+      settlePreparedAttachments,
+      uploadMessageKey,
+    ])
+
+    const handleDeferBatchRetry = useCallback(() => {
+      const waitingForSavedRecord = Boolean(batchRetryResolveRef.current)
+      if ((batchRetryState?.unconfirmedItems || []).length > 0) {
+        message.warning({
+          key: uploadMessageKey,
+          content: '请刷新附件列表核对结果，确认未上传后再重新选择',
+        })
+      } else if (waitingForSavedRecord) {
+        message.info({
+          key: uploadMessageKey,
+          content: '业务记录已保存，失败附件尚未绑定，请稍后重新处理',
+        })
+      } else {
+        message.info({
+          key: uploadMessageKey,
+          content: '失败附件已保留在当前列表，可稍后重试',
+        })
+      }
+      resolveBatchRetryDecision(false)
+    }, [batchRetryState, resolveBatchRetryDecision, uploadMessageKey])
+
+    async function handleRetryPendingAttachments(items) {
+      const retryItems = items.filter((item) => item.upload_status === 'failed')
+      if (retryItems.length <= 0) return
+      const targetOwnerId = Number(
+        retryItems[0]?.retry_owner_id || normalizedOwnerId || 0
+      )
+      const hasMixedOwner = retryItems.some(
+        (item) => Number(item.retry_owner_id || targetOwnerId) !== targetOwnerId
+      )
+      if (
+        !ownerType ||
+        targetOwnerId <= 0 ||
+        hasMixedOwner ||
+        targetOwnerId !== normalizedOwnerId
+      ) {
+        message.warning('当前业务记录已切换，请重新选择需要上传的附件')
+        return
+      }
+
+      setUploading(true)
+      let result
+      let issueItems = []
+      try {
+        result = await settlePreparedAttachments(retryItems, targetOwnerId)
+        issueItems = createUploadIssueItems(result.failed, targetOwnerId)
+        replacePendingUploadItems(retryItems, issueItems)
+        if (
+          result.succeeded.length > 0 ||
+          issueItems.some((item) => item.upload_status === 'unconfirmed')
+        ) {
+          await reload(targetOwnerId)
+        }
+      } finally {
+        setUploading(false)
+      }
+
+      if (result.failed.length <= 0) {
+        message.success({
+          key: uploadMessageKey,
+          content:
+            result.succeeded.length > 1
+              ? `${result.succeeded.length} 个失败附件已重新上传`
+              : '附件已重新上传',
+        })
+        return
+      }
+      message.warning({
+        key: uploadMessageKey,
+        content:
+          result.succeeded.length > 0
+            ? `本次成功 ${result.succeeded.length} 个，仍有 ${result.failed.length} 个未完成`
+            : `${result.failed.length} 个附件仍未完成，请查看逐项结果`,
+      })
     }
 
     async function handleDownload(item) {
@@ -560,9 +857,11 @@ const BusinessAttachmentPanel = forwardRef(
     }
 
     function handleRemovePending(item) {
-      setPendingAttachments((current) =>
-        current.filter((entry) => entry.uid !== item.uid)
-      )
+      setPendingAttachments((current) => {
+        const next = current.filter((entry) => entry.uid !== item.uid)
+        pendingAttachmentsRef.current = next
+        return next
+      })
     }
 
     function openWithdrawal(item) {
@@ -680,6 +979,19 @@ const BusinessAttachmentPanel = forwardRef(
       if (item.__kind === 'pending') {
         return [
           renderPreviewAction(item),
+          item.upload_status === 'failed' ? (
+            <Button
+              key="retry-pending"
+              type="link"
+              size="small"
+              aria-label={`重试附件 ${item.file_name}`}
+              icon={<RedoOutlined />}
+              disabled={uploading}
+              onClick={() => handleRetryPendingAttachments([item])}
+            >
+              重试
+            </Button>
+          ) : null,
           <Button
             key="remove-pending"
             danger
@@ -724,6 +1036,18 @@ const BusinessAttachmentPanel = forwardRef(
           {canUpload ? (
             <>
               <Space wrap>
+                {retryablePendingAttachments.length > 1 ? (
+                  <Button
+                    icon={<RedoOutlined />}
+                    loading={uploading}
+                    disabled={uploading}
+                    onClick={() =>
+                      handleRetryPendingAttachments(retryablePendingAttachments)
+                    }
+                  >
+                    重试失败项（{retryablePendingAttachments.length}）
+                  </Button>
+                ) : null}
                 {enablePrintAppendixUpload ? (
                   <Button
                     icon={<UploadOutlined />}
@@ -793,7 +1117,31 @@ const BusinessAttachmentPanel = forwardRef(
                       <Tag color="purple">合同附图</Tag>
                     ) : null}
                     {item.__kind === 'pending' ? (
-                      <Tag color="blue">保存后上传</Tag>
+                      <>
+                        <Tag
+                          color={
+                            item.upload_status === 'failed' ||
+                            item.upload_status === 'unconfirmed'
+                              ? 'error'
+                              : 'blue'
+                          }
+                        >
+                          {item.upload_status === 'failed'
+                            ? '上传失败'
+                            : item.upload_status === 'unconfirmed'
+                              ? '结果待确认'
+                              : '保存后上传'}
+                        </Tag>
+                        {item.upload_error ? (
+                          <Typography.Text
+                            type="danger"
+                            title={item.upload_error}
+                            style={{ overflowWrap: 'anywhere' }}
+                          >
+                            {item.upload_error}
+                          </Typography.Text>
+                        ) : null}
+                      </>
                     ) : (
                       <SavedAttachmentAuditMeta item={item} />
                     )}
@@ -803,6 +1151,74 @@ const BusinessAttachmentPanel = forwardRef(
             </List.Item>
           )}
         />
+        <Modal
+          centered
+          destroyOnHidden
+          open={Boolean(batchRetryState)}
+          title="部分附件上传失败"
+          okText={`重试失败项（${batchRetryState?.retryableItems.length || 0}）`}
+          cancelText={
+            (batchRetryState?.unconfirmedItems.length || 0) > 0
+              ? '稍后核对'
+              : '稍后处理'
+          }
+          confirmLoading={uploading}
+          okButtonProps={{
+            icon: <RedoOutlined />,
+            disabled:
+              uploading || (batchRetryState?.retryableItems.length || 0) <= 0,
+          }}
+          maskClosable={false}
+          keyboard={!uploading}
+          closable={!uploading}
+          onCancel={handleDeferBatchRetry}
+          onOk={handleBatchRetry}
+        >
+          <Space direction="vertical" size={12} style={{ width: '100%' }}>
+            <Typography.Paragraph type="secondary">
+              本轮共 {batchRetryState?.totalCount || 0} 个附件，已成功{' '}
+              {batchRetryState?.succeededCount || 0} 个，未完成{' '}
+              {batchIssueItems.length} 个。成功项已经保留，重试时不会重复上传。
+            </Typography.Paragraph>
+            {(batchRetryState?.unconfirmedItems.length || 0) > 0 ? (
+              <Typography.Paragraph type="warning">
+                “结果待确认”表示服务端可能已经收到文件。请先刷新附件列表核对，避免直接重试产生重复附件。
+              </Typography.Paragraph>
+            ) : null}
+            <List
+              size="small"
+              dataSource={batchIssueItems}
+              renderItem={(item) => (
+                <List.Item>
+                  <List.Item.Meta
+                    title={item.file_name}
+                    description={
+                      <Space size={6} wrap>
+                        <Tag
+                          color={
+                            item.upload_status === 'unconfirmed'
+                              ? 'warning'
+                              : 'error'
+                          }
+                        >
+                          {item.upload_status === 'unconfirmed'
+                            ? '结果待确认'
+                            : '上传失败'}
+                        </Tag>
+                        <Typography.Text
+                          type="secondary"
+                          style={{ overflowWrap: 'anywhere' }}
+                        >
+                          {item.upload_error}
+                        </Typography.Text>
+                      </Space>
+                    }
+                  />
+                </List.Item>
+              )}
+            />
+          </Space>
+        </Modal>
         <Modal
           centered
           destroyOnHidden

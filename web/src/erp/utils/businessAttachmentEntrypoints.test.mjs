@@ -65,6 +65,25 @@ test('read-only attachment panels do not expose a fake upload control', () => {
   )
 })
 
+test('attachment panel reports batch results and retries only explicit failures', () => {
+  const source = readFileSync(
+    new URL(
+      '../components/business-list/BusinessAttachmentPanel.jsx',
+      import.meta.url
+    ),
+    'utf8'
+  )
+
+  assert.match(source, /settleBusinessAttachmentBatchUpload/u)
+  assert.match(source, /title="部分附件上传失败"/u)
+  assert.match(source, /重试失败项/u)
+  assert.match(source, /成功项已经保留，重试时不会重复上传/u)
+  assert.match(source, /item\.upload_status === 'failed'/u)
+  assert.match(source, /item\.upload_status === 'unconfirmed'/u)
+  assert.match(source, /结果待确认/u)
+  assert.match(source, /isMutationResultUnknown/u)
+})
+
 test('outsourcing attachment panel exposes a typed contract-image upload without changing normal evidence uploads', () => {
   const panelSource = readFileSync(
     new URL(
