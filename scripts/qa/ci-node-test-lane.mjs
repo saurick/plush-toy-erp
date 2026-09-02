@@ -16,18 +16,65 @@ import process from "node:process";
 import { pathToFileURL } from "node:url";
 
 import { sha256File } from "../lib/file-digest.mjs";
-import { catalogNodeTests } from "./run-node-tests.mjs";
+import { buildNodeTestArgs, catalogNodeTests } from "./run-node-tests.mjs";
 import { verifyNodeTestSummary } from "./verify-node-test-summary.mjs";
 
 export const CI_NODE_TEST_LANE_SCHEMA = "plush.ci-node-test-lane/v1";
+
+const RELEASE_LANE_ANCHORS = Object.freeze({
+  preflight: Object.freeze(["scripts/deploy/production-preflight.test.mjs"]),
+  a: Object.freeze(["scripts/qa/pre-push-receipt.test.mjs"]),
+  b: Object.freeze([
+    "scripts/deploy/migrate-online.test.mjs",
+    "scripts/deploy/run-smoke-script.test.mjs",
+  ]),
+});
+
+function releaseLaneTestFiles() {
+  const release = [...catalogNodeTests("release")].sort();
+  const anchors = Object.values(RELEASE_LANE_ANCHORS).flat();
+  const anchorSet = new Set(anchors);
+  if (
+    anchorSet.size !== anchors.length ||
+    anchors.some((file) => !release.includes(file))
+  ) {
+    throw new Error("Node release lane anchors are invalid");
+  }
+  const residual = release.filter((file) => !anchorSet.has(file));
+  return Object.freeze({
+    preflight: RELEASE_LANE_ANCHORS.preflight,
+    a: Object.freeze([
+      ...RELEASE_LANE_ANCHORS.a,
+      ...residual.filter((_, index) => index % 2 === 0),
+    ]),
+    b: Object.freeze([
+      ...RELEASE_LANE_ANCHORS.b,
+      ...residual.filter((_, index) => index % 2 === 1),
+    ]),
+  });
+}
+
+const RELEASE_LANE_TEST_FILES = releaseLaneTestFiles();
+
 export const CI_NODE_TEST_LANES = Object.freeze({
   core: Object.freeze({
     job: "quality_node_core",
     profiles: Object.freeze(["fast", "database", "browser"]),
   }),
-  release: Object.freeze({
-    job: "quality_node_release",
+  release_preflight: Object.freeze({
+    job: "quality_node_release_preflight",
     profiles: Object.freeze(["release"]),
+    testFiles: RELEASE_LANE_TEST_FILES.preflight,
+  }),
+  release_a: Object.freeze({
+    job: "quality_node_release_a",
+    profiles: Object.freeze(["release"]),
+    testFiles: RELEASE_LANE_TEST_FILES.a,
+  }),
+  release_b: Object.freeze({
+    job: "quality_node_release_b",
+    profiles: Object.freeze(["release"]),
+    testFiles: RELEASE_LANE_TEST_FILES.b,
   }),
 });
 
@@ -146,6 +193,7 @@ function plainJson(file, label) {
 function laneTestFiles(lane) {
   const definition = CI_NODE_TEST_LANES[lane];
   if (!definition) throw new Error(`unknown Node test lane: ${lane}`);
+  if (definition.testFiles) return definition.testFiles;
   return definition.profiles.flatMap((profile) => catalogNodeTests(profile));
 }
 
@@ -403,19 +451,26 @@ export function runCiNodeTestLane({
   }
 
   if (!failure) {
-    for (const profile of definition.profiles) {
+    const runs = definition.testFiles
+      ? [
+          {
+            profile: definition.profiles[0],
+            args: buildNodeTestArgs(laneTestFiles(lane)),
+          },
+        ]
+      : definition.profiles.map((profile) => ({
+          profile,
+          args: ["scripts/qa/run-node-tests.mjs", "--profile", profile],
+        }));
+    for (const { profile, args } of runs) {
       const profileStarted = Date.now();
-      const result = spawnSync(
-        process.execPath,
-        ["scripts/qa/run-node-tests.mjs", "--profile", profile],
-        {
-          cwd: root,
-          env: childEnv,
-          encoding: "utf8",
-          maxBuffer: 256 * 1024 * 1024,
-          stdio: ["ignore", "pipe", "pipe"],
-        },
-      );
+      const result = spawnSync(process.execPath, args, {
+        cwd: root,
+        env: childEnv,
+        encoding: "utf8",
+        maxBuffer: 256 * 1024 * 1024,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
       process.stdout.write(result.stdout || "");
       process.stderr.write(result.stderr || "");
       if (result.error) {

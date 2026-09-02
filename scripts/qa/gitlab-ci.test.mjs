@@ -121,14 +121,14 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
     /quality_aggregate:[\s\S]+?- job: prepare\n      artifacts: true/u,
   );
   const staticBlock = workflow.match(
-    /^quality_static:[\s\S]+?^quality_node_release:/mu,
+    /^quality_static:[\s\S]+?^quality_node_release_preflight:/mu,
   )?.[0];
   assert.ok(staticBlock);
   assert.equal(
     staticBlock.match(/- job: prepare\n      artifacts: false/gu)?.length ?? 0,
     1,
   );
-  for (const lane of ["release", "core"]) {
+  for (const lane of ["release_preflight", "release_a", "release_b", "core"]) {
     assert.match(workflow, new RegExp(`^quality_node_${lane}:`, "mu"));
     assert.match(
       workflow,
@@ -213,7 +213,7 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   assert.doesNotMatch(workflow, /^quality_node_runtime:/mu);
   assert.match(
     workflow,
-    /quality_node:[\s\S]+?job: quality_node_release\n      artifacts: true[\s\S]+?job: quality_node_core\n      artifacts: true[\s\S]+?ci-quality-shard[.]mjs --shard node/u,
+    /quality_node:[\s\S]+?job: quality_node_release_preflight\n      artifacts: true[\s\S]+?job: quality_node_release_a\n      artifacts: true[\s\S]+?job: quality_node_release_b\n      artifacts: true[\s\S]+?job: quality_node_core\n      artifacts: true[\s\S]+?ci-quality-shard[.]mjs --shard node/u,
   );
   assert.match(
     workflow,
@@ -228,7 +228,7 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
     /quality_server:[\s\S]+?job: quality_server_core\n      artifacts: true[\s\S]+?job: quality_server_critical_postgres\n      artifacts: true[\s\S]+?ci-quality-shard[.]mjs --shard server/u,
   );
   assert.ok(
-    workflow.indexOf("quality_node_release:") <
+    workflow.indexOf("quality_node_release_preflight:") <
       workflow.indexOf("quality_web:"),
   );
   assert.ok(
@@ -239,7 +239,10 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   )?.[0];
   assert.ok(aggregateBlock);
   assert.match(aggregateBlock, /job: quality_node\n      artifacts: true/u);
-  assert.doesNotMatch(aggregateBlock, /quality_node_(?:core|release)/u);
+  assert.doesNotMatch(
+    aggregateBlock,
+    /quality_node_(?:core|release_(?:preflight|a|b))/u,
+  );
   assert.doesNotMatch(aggregateBlock, /quality_resource_(?:contract|runtime)/u);
   assert.doesNotMatch(
     aggregateBlock,
@@ -318,7 +321,9 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   assert.match(workflow, /policy: pull-push/u);
   assert.match(workflow, /policy: pull/u);
   for (const shard of [
-    "node_release",
+    "node_release_preflight",
+    "node_release_a",
+    "node_release_b",
     "node_core",
     "node",
     "web_checks",

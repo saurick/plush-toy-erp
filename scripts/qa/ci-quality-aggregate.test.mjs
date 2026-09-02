@@ -464,11 +464,25 @@ test("aggregate models every internal fan-in and lets Browser start from Web bui
       durationMs: 150,
     },
     {
-      lane: "release",
-      job: "quality_node_release",
+      lane: "release_preflight",
+      job: "quality_node_release_preflight",
       startedAt: stamp(10),
-      finishedAt: stamp(160),
-      durationMs: 150,
+      finishedAt: stamp(130),
+      durationMs: 120,
+    },
+    {
+      lane: "release_a",
+      job: "quality_node_release_a",
+      startedAt: stamp(8),
+      finishedAt: stamp(165),
+      durationMs: 157,
+    },
+    {
+      lane: "release_b",
+      job: "quality_node_release_b",
+      startedAt: stamp(12),
+      finishedAt: stamp(155),
+      durationMs: 143,
     },
   ];
   const resourceLanes = [
@@ -541,8 +555,8 @@ test("aggregate models every internal fan-in and lets Browser start from Web bui
   const webBrowserPath = paths.find((path) => path.id === "web_browser");
   const serverPath = paths.find((path) => path.id === "server");
   const resourcePath = paths.find((path) => path.id === "resource");
-  assert.deepEqual(nodePath.jobs, ["quality_node_release", "quality_node"]);
-  assert.equal(nodePath.durationMs, 200);
+  assert.deepEqual(nodePath.jobs, ["quality_node_release_a", "quality_node"]);
+  assert.equal(nodePath.durationMs, 202);
   assert.deepEqual(webPath.jobs, ["quality_web_checks", "quality_web"]);
   assert.equal(webPath.durationMs, 100);
   assert.deepEqual(webBrowserPath.jobs, [

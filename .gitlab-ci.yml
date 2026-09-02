@@ -210,7 +210,7 @@ quality_static:
     paths:
       - output/ci/shards/static.json
 
-quality_node_release:
+quality_node_release_preflight:
   <<: [*quality_shard, *pnpm_cache_pull]
   needs:
     - job: plan
@@ -218,12 +218,42 @@ quality_node_release:
     - job: prepare
       artifacts: false
   script:
-    - node scripts/qa/ci-node-test-lane.mjs --lane release
+    - node scripts/qa/ci-node-test-lane.mjs --lane release_preflight
   artifacts:
     when: always
     expire_in: 90 days
     paths:
-      - output/ci/node-lanes/release.json
+      - output/ci/node-lanes/release_preflight.json
+
+quality_node_release_a:
+  <<: [*quality_shard, *pnpm_cache_pull]
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+  script:
+    - node scripts/qa/ci-node-test-lane.mjs --lane release_a
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/node-lanes/release_a.json
+
+quality_node_release_b:
+  <<: [*quality_shard, *pnpm_cache_pull]
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+  script:
+    - node scripts/qa/ci-node-test-lane.mjs --lane release_b
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/node-lanes/release_b.json
 
 quality_node_core:
   <<: [*quality_shard, *pnpm_cache_pull]
@@ -395,7 +425,11 @@ quality_node:
       artifacts: true
     - job: prepare
       artifacts: false
-    - job: quality_node_release
+    - job: quality_node_release_preflight
+      artifacts: true
+    - job: quality_node_release_a
+      artifacts: true
+    - job: quality_node_release_b
       artifacts: true
     - job: quality_node_core
       artifacts: true
