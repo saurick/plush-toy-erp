@@ -243,6 +243,19 @@ test("manual acceptance source plan reaches every agreed pagination threshold", 
     DEFAULT_SOURCE_DATA_SCALE.salesOrders,
   );
   assert.equal(
+    plan.records.salesOrders.every(
+      (order) =>
+        order.currency === "CNY" &&
+        order.tax_mode === "INCLUSIVE" &&
+        order.tax_rate === "13" &&
+        ["INCLUDED", "EXCLUDED"].includes(order.freight_terms) &&
+        (order.freight_terms === "INCLUDED") ===
+          (order.price_condition_note === "含税含运费"),
+    ),
+    true,
+    "sales orders need complete, internally consistent commercial terms",
+  );
+  assert.equal(
     plan.records.purchaseOrders.length,
     DEFAULT_SOURCE_DATA_SCALE.purchaseOrders,
   );
