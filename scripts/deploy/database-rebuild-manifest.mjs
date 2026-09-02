@@ -146,7 +146,21 @@ export function buildDatabaseRebuildManifest({
   const databaseName =
     targetPreflight.remote?.runtime?.databaseName || "unknown";
   const blockers = new Set(targetPreflight.blockers || []);
-  if (targetPreflight.status !== "passed" && blockers.size === 0) {
+  // A fresh physical generation intentionally establishes customer config after
+  // migration and the one-use administrator bootstrap. Only an explicitly
+  // observed absence is safe to defer; invalid or unreadable state remains a
+  // blocker, as do all other fixed-target preflight failures.
+  const deferredAbsentCustomerConfig =
+    targetPreflight.remote?.runtime?.customerConfigState === "absent" &&
+    blockers.has("target_customer_config_readback_failed");
+  if (deferredAbsentCustomerConfig) {
+    blockers.delete("target_customer_config_readback_failed");
+  }
+  if (
+    targetPreflight.status !== "passed" &&
+    blockers.size === 0 &&
+    !deferredAbsentCustomerConfig
+  ) {
     blockers.add("database_rebuild_target_preflight_blocked");
   }
   if (runtimeSha !== release.gitSha || webSha !== release.gitSha) {

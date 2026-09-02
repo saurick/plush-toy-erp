@@ -98,6 +98,7 @@ function targetPreflight({ runtimeSha = SHA, blocked = false } = {}) {
       },
       runtime: {
         databaseName: "plush_erp_customer_test_v1",
+        customerConfigState: "active",
         serverSha: runtimeSha,
         webSha: runtimeSha,
         serverHealth: "passed",
@@ -166,6 +167,36 @@ test("database rebuild plan blocks runtime drift and target preflight failures",
   assert.equal(blockerWithoutDetail.status, "blocked");
   assert.deepEqual(blockerWithoutDetail.blockers, [
     "database_rebuild_target_preflight_blocked",
+  ]);
+});
+
+test("database rebuild defers only an explicitly absent customer config", () => {
+  const absentConfig = targetPreflight();
+  absentConfig.status = "blocked";
+  absentConfig.blockers = ["target_customer_config_readback_failed"];
+  absentConfig.remote.runtime.customerConfigState = "absent";
+  const eligible = buildDatabaseRebuildManifest({
+    operationId: "423e4567-e89b-42d3-a456-426614174000",
+    releaseManifest: releaseManifest(),
+    releaseManifestSha256: HASH,
+    targetPreflight: absentConfig,
+    ancestry: ancestry(),
+  });
+  assert.equal(eligible.status, "eligible");
+  assert.deepEqual(eligible.blockers, []);
+
+  const invalidConfig = structuredClone(absentConfig);
+  invalidConfig.remote.runtime.customerConfigState = "invalid";
+  const blocked = buildDatabaseRebuildManifest({
+    operationId: "523e4567-e89b-42d3-a456-426614174000",
+    releaseManifest: releaseManifest(),
+    releaseManifestSha256: HASH,
+    targetPreflight: invalidConfig,
+    ancestry: ancestry(),
+  });
+  assert.equal(blocked.status, "blocked");
+  assert.deepEqual(blocked.blockers, [
+    "target_customer_config_readback_failed",
   ]);
 });
 
