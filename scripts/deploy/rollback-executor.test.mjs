@@ -28,6 +28,10 @@ import {
   REMOTE_ROLLBACK_RECEIPT_CONTRACT,
   validateRemoteRollbackReceipt,
 } from "./rollback-executor.mjs";
+import {
+  envWithLinuxStat,
+  installLinuxStatShim,
+} from "./remote-linux-script.test-support.mjs";
 
 const OPERATION_ID = "11111111-1111-4111-8111-111111111111";
 const FROM_SHA = "a".repeat(40);
@@ -355,10 +359,15 @@ test("rollback bootstrap executes only an identical script below the physical cu
     writeFileSync(path.join(incoming, "remote-code-rollback.sh"), script, {
       mode: 0o600,
     });
-    return { root, currentDeploy, incoming };
+    return {
+      root,
+      currentDeploy,
+      incoming,
+      statBin: installLinuxStatShim(root),
+    };
   }
 
-  function run({ root, incoming }) {
+  function run({ root, incoming, statBin }) {
     return spawnSync(
       "/bin/bash",
       [
@@ -369,7 +378,7 @@ test("rollback bootstrap executes only an identical script below the physical cu
         incoming,
         "sentinel",
       ],
-      { encoding: "utf8" },
+      { encoding: "utf8", env: envWithLinuxStat(statBin) },
     );
   }
 

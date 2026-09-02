@@ -27,6 +27,10 @@ import {
   targetReleaseCacheEvidenceFingerprint,
   validateTargetCacheProbe,
 } from "./target-release-cache.mjs";
+import {
+  envWithLinuxStat,
+  installLinuxStatShim,
+} from "./remote-linux-script.test-support.mjs";
 
 const SHA = "a".repeat(40);
 const HASH = "b".repeat(64);
@@ -207,7 +211,7 @@ function createExecutableCacheFixture(
   };
 }
 
-function executableCacheRunCommand(root) {
+function executableCacheRunCommand(root, statBin = installLinuxStatShim(root)) {
   return (_command, args, options) => {
     const separator = args.lastIndexOf("--");
     assert.notEqual(separator, -1);
@@ -218,6 +222,7 @@ function executableCacheRunCommand(root) {
     );
     return spawnSync("bash", ["-s", "--", ...args.slice(separator + 1)], {
       encoding: "utf8",
+      env: envWithLinuxStat(statBin),
       input: source,
     });
   };
