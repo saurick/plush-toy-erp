@@ -525,11 +525,13 @@ test('full and strict require the fail-closed populated upgrade PostgreSQL gate'
   )
   assert.doesNotMatch(fastGates, /populated-upgrade-postgres/u)
   assert.match(fullGates, /populated-upgrade-postgres/u)
-  assert.match(fullRequiredFiles, /fixtures\/populated-upgrade-20260710150001\.sql/u)
-  assert.match(fullRequiredFiles, /fixtures\/net-weight-kg-to-g-20260714165115\.sql/u)
-  assert.match(fullRequiredFiles, /fixtures\/populated-upgrade-contract\.sql/u)
-  assert.match(fullRequiredFiles, /postgres-target-contract\.py/u)
-  assert.match(profiles, /customer-config-cutover-20260714055825\.sql/u)
+  assert.match(fullRequiredFiles, /scripts\/qa\/full\.sh/u)
+  assert.match(fullRequiredFiles, /scripts\/purchase-receipt-pg\.sh/u)
+  assert.doesNotMatch(
+    fullRequiredFiles,
+    /fixtures\/|customer-config-cutover|postgres-target-contract/u,
+    'gate profiles only list direct entrypoints; the executable gate above proves its transitive inputs',
+  )
 })
 
 test('PostgreSQL entrypoints avoid Bash heredoc preprocessing deadlocks', () => {

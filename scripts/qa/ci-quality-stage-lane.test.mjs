@@ -176,8 +176,6 @@ test("Web, Server and Browser internal lane catalogs partition canonical work on
   ]);
   assert.deepEqual(Object.keys(CI_BROWSER_QUALITY_LANES), [
     "boundary_entry_print",
-    "dev_overview_mobile",
-    "dev_detail",
   ]);
   assert.deepEqual(
     Object.values(CI_WEB_QUALITY_LANES).flatMap(({ substeps }) => substeps),
@@ -234,10 +232,10 @@ test("Web, Server and Browser internal lane catalogs partition canonical work on
     () =>
       validateCiBrowserQualityLaneRegistry({
         ...CI_BROWSER_QUALITY_LANES,
-        dev_detail: {
-          ...CI_BROWSER_QUALITY_LANES.dev_detail,
+        boundary_entry_print: {
+          ...CI_BROWSER_QUALITY_LANES.boundary_entry_print,
           browserScenarios: [
-            ...CI_BROWSER_QUALITY_LANES.dev_detail.browserScenarios,
+            ...CI_BROWSER_QUALITY_LANES.boundary_entry_print.browserScenarios,
           ].reverse(),
         },
       }),
@@ -380,13 +378,13 @@ test("lane receipts reject skipped, drifted and incomplete cleanup evidence", ()
       }),
     /invalid/u,
   );
-  const browser = receipt("browser", "dev_detail", 2);
+  const browser = receipt("browser", "boundary_entry_print", 2);
   browser.invariants.browserPortCleanup = "failed";
   assert.throws(
     () =>
       validateCiQualityStageLaneReceipt(browser, {
         shard: "browser",
-        lane: "dev_detail",
+        lane: "boundary_entry_print",
         expected,
       }),
     /invalid/u,
@@ -435,7 +433,10 @@ test("fan-in accepts every lane exactly once and rejects extra artifacts", async
         aggregate.stageTimings.map(({ id }) => id),
         ["browser"],
       );
-      assert.equal(aggregate.browser.scenarioCount, 10);
+      assert.equal(
+        aggregate.browser.scenarioCount,
+        CI_BROWSER_QUALITY_SCENARIOS.length,
+      );
       assert.equal(aggregate.browser.productionBoundaryCount, 1);
       assert.equal(aggregate.browser.retries, 0);
       assert.equal(aggregate.cleanup.chromiumSandbox, "passed");

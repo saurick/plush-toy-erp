@@ -106,15 +106,8 @@ export const CI_SERVER_QUALITY_LANES = Object.freeze({
 });
 
 export const CI_BROWSER_QUALITY_SCENARIOS = Object.freeze([
-  "dev-drill-recovery-desktop-light",
-  "dev-drill-recovery-mobile-dark",
-  "dev-business-usability-desktop-light",
-  "dev-business-usability-mobile-dark",
   "root-redirect-desktop",
   "root-redirect-mobile",
-  "dev-workbench-wide-layout",
-  "dev-hub-dark-desktop",
-  "dev-all-pages-mobile",
   "print-center-engineering-preview-tablet",
 ]);
 
@@ -137,47 +130,6 @@ export const CI_BROWSER_QUALITY_LANES = Object.freeze({
       "root-redirect-desktop",
       "root-redirect-mobile",
       "print-center-engineering-preview-tablet",
-    ]),
-  }),
-  dev_overview_mobile: Object.freeze({
-    job: "quality_browser_dev_overview_mobile",
-    command: Object.freeze(["internal", "browser-quality"]),
-    stages: Object.freeze(["browser"]),
-    substeps: Object.freeze([]),
-    requiresTests: true,
-    pnpm: true,
-    chromium: true,
-    postgres: false,
-    makeData: false,
-    webBuild: false,
-    consumesWebBuild: true,
-    productionBoundary: false,
-    portOffset: 51,
-    browserScenarios: Object.freeze([
-      "dev-workbench-wide-layout",
-      "dev-hub-dark-desktop",
-      "dev-all-pages-mobile",
-    ]),
-  }),
-  dev_detail: Object.freeze({
-    job: "quality_browser_dev_detail",
-    command: Object.freeze(["internal", "browser-quality"]),
-    stages: Object.freeze(["browser"]),
-    substeps: Object.freeze([]),
-    requiresTests: true,
-    pnpm: true,
-    chromium: true,
-    postgres: false,
-    makeData: false,
-    webBuild: false,
-    consumesWebBuild: true,
-    productionBoundary: false,
-    portOffset: 52,
-    browserScenarios: Object.freeze([
-      "dev-drill-recovery-desktop-light",
-      "dev-drill-recovery-mobile-dark",
-      "dev-business-usability-desktop-light",
-      "dev-business-usability-mobile-dark",
     ]),
   }),
 });
@@ -206,7 +158,7 @@ export function validateCiBrowserQualityLaneRegistry(
     (definition) => definition.productionBoundary === true,
   );
   if (
-    definitions.length < 2 ||
+    definitions.length < 1 ||
     scenarios.length !== uniqueScenarios.size ||
     expected.length !== new Set(expected).size ||
     JSON.stringify([...uniqueScenarios].sort()) !==

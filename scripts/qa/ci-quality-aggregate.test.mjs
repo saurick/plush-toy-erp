@@ -324,7 +324,7 @@ test("aggregate keeps Browser scenarios and cleanup behind one external invarian
     false,
   );
   const drifted = structuredClone(value);
-  drifted.jobs[1].job = "quality_browser_other";
+  drifted.jobs[0].job = "quality_browser_other";
   assert.equal(hasCompleteCiBrowserLaneEvidence(drifted), false);
 });
 
@@ -527,20 +527,6 @@ test("aggregate models every internal fan-in and lets Browser start from Web bui
       finishedAt: stamp(135),
       durationMs: 53,
     },
-    {
-      lane: "dev_overview_mobile",
-      job: "quality_browser_dev_overview_mobile",
-      startedAt: stamp(83),
-      finishedAt: stamp(140),
-      durationMs: 57,
-    },
-    {
-      lane: "dev_detail",
-      job: "quality_browser_dev_detail",
-      startedAt: stamp(81),
-      finishedAt: stamp(145),
-      durationMs: 64,
-    },
   ];
   const paths = buildObservedQualityPaths(
     byShard,
@@ -561,7 +547,7 @@ test("aggregate models every internal fan-in and lets Browser start from Web bui
   assert.equal(webPath.durationMs, 100);
   assert.deepEqual(webBrowserPath.jobs, [
     "quality_web_build",
-    "quality_browser_dev_detail",
+    "quality_browser_boundary_entry_print",
     "quality_browser",
   ]);
   assert.equal(webBrowserPath.durationMs, 195);
