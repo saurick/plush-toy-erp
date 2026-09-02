@@ -144,8 +144,48 @@ function allocateUdpPort() {
   });
 }
 
-export async function allocateRehearsalPorts() {
+export async function allocateDistinctRehearsalPort(
+  allocator,
+  reserved,
+  maximumAttempts = 32,
+) {
+  if (
+    typeof allocator !== "function" ||
+    !(reserved instanceof Set) ||
+    !Number.isSafeInteger(maximumAttempts) ||
+    maximumAttempts < 1
+  ) {
+    throw new RehearsalError(
+      "preflight",
+      "release rehearsal port allocator is invalid",
+    );
+  }
+  for (let attempt = 0; attempt < maximumAttempts; attempt += 1) {
+    const port = await allocator();
+    if (!Number.isSafeInteger(port) || port < 1 || port > 65535) {
+      throw new RehearsalError(
+        "preflight",
+        "release rehearsal allocated an invalid port",
+      );
+    }
+    if (!reserved.has(port)) {
+      reserved.add(port);
+      return port;
+    }
+  }
+  throw new RehearsalError(
+    "preflight",
+    "release rehearsal could not allocate unique ports",
+  );
+}
+
+export async function allocateRehearsalPorts({
+  allocateTcp = allocateTcpPort,
+  allocateUdp = allocateUdpPort,
+  maximumAttempts = 32,
+} = {}) {
   const ports = {};
+  const reserved = new Set();
   for (const key of [
     "postgres",
     "appHttp",
@@ -158,15 +198,17 @@ export async function allocateRehearsalPorts() {
     "jaegerOtlpGrpc",
     "jaegerOtlpHttp",
   ]) {
-    ports[key] = await allocateTcpPort();
+    ports[key] = await allocateDistinctRehearsalPort(
+      allocateTcp,
+      reserved,
+      maximumAttempts,
+    );
   }
   for (const key of ["jaeger5775", "jaeger6831", "jaeger6832"]) {
-    ports[key] = await allocateUdpPort();
-  }
-  if (new Set(Object.values(ports)).size !== Object.keys(ports).length) {
-    throw new RehearsalError(
-      "preflight",
-      "release rehearsal ports are not unique",
+    ports[key] = await allocateDistinctRehearsalPort(
+      allocateUdp,
+      reserved,
+      maximumAttempts,
     );
   }
   return ports;

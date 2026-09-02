@@ -13,6 +13,8 @@ import test from "node:test";
 
 import {
   activateRehearsalCustomerConfig,
+  allocateDistinctRehearsalPort,
+  allocateRehearsalPorts,
   bootstrapRehearsalAdmin,
   bootstrapRehearsalApprovalEligibility,
   buildRehearsalAdminPassword,
@@ -81,6 +83,28 @@ const ports = {
   jaegerOtlpGrpc: 51013,
   jaegerOtlpHttp: 51014,
 };
+
+test("release rehearsal retries bounded TCP and UDP port collisions", async () => {
+  const tcpValues = [
+    51001, 51001, 51002, 51003, 51004, 51005, 51006, 51007, 51008, 51009, 51010,
+  ];
+  const udpValues = [51010, 51011, 51011, 51012, 51013];
+  const allocated = await allocateRehearsalPorts({
+    allocateTcp: async () => tcpValues.shift(),
+    allocateUdp: async () => udpValues.shift(),
+    maximumAttempts: 4,
+  });
+  assert.equal(Object.keys(allocated).length, 13);
+  assert.equal(new Set(Object.values(allocated)).size, 13);
+  assert.deepEqual(
+    [allocated.jaeger5775, allocated.jaeger6831, allocated.jaeger6832],
+    [51011, 51012, 51013],
+  );
+  await assert.rejects(
+    allocateDistinctRehearsalPort(async () => 51001, new Set([51001]), 2),
+    /could not allocate unique ports/u,
+  );
+});
 
 test("local release rehearsal CLI requires explicit manifest inputs", () => {
   assert.deepEqual(
@@ -160,10 +184,7 @@ test("local release rehearsal removes container-owned PostgreSQL state through o
     "--cpus=0.25",
     "--mount",
   ]);
-  assert.equal(
-    calls[0].args.includes("postgres:18.1"),
-    true,
-  );
+  assert.equal(calls[0].args.includes("postgres:18.1"), true);
   assert.equal(
     calls[0].args.some((value) => value.includes("chown 0:0 /cleanup")),
     true,
