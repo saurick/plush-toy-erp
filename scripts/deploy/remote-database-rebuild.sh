@@ -402,6 +402,7 @@ jq -e \
   "$incoming/release-manifest.json" >/dev/null
 jq -e \
   --arg operationId "$operation_id" \
+  --arg target "$target" \
   --arg sha "$release_sha" \
   --arg fingerprint "$rebuild_fingerprint" \
   --arg database "$database" \

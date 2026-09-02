@@ -54,6 +54,10 @@ test("remote database rebuild binds the frozen current Git relation before lifec
   assert.match(source, /plush[.]git-ancestry-relation\/v1/u);
   assert.match(source, /ancestry[.]relation == "current"/u);
   assert.match(source, /ancestry[.]actionClass == "current"/u);
+  assert.match(
+    source,
+    /--arg target "\$target"[\s\S]*[.]target[.]key == \$target/u,
+  );
   const runtimeCheck = source.indexOf(
     'fail "target runtime or Git ancestry changed after database rebuild qualification"',
   );
