@@ -1367,6 +1367,7 @@ function validateSmokeReport(
   absoluteDir,
   credentialTarget,
   allowMissingCustomerConfigEffectiveSession,
+  allowMissingTemplatePdfRender,
 ) {
   let report;
   try {
@@ -1509,8 +1510,12 @@ function validateSmokeReport(
     (check) => check?.name === "template-pdf-render",
   );
   assert(
-    pdfChecks.length === 1,
-    `${REQUIRED_FILES.smoke} must include exactly one template-pdf-render check`,
+    allowMissingTemplatePdfRender
+      ? pdfChecks.length <= 1
+      : pdfChecks.length === 1,
+    allowMissingTemplatePdfRender
+      ? `${REQUIRED_FILES.smoke} must not contain duplicate template-pdf-render checks`
+      : `${REQUIRED_FILES.smoke} must include exactly one template-pdf-render check`,
     errors,
   );
   const pdfCheck = pdfChecks[0];
@@ -2115,6 +2120,7 @@ export function validateReleaseEvidenceGate({
   customer = DEFAULT_CUSTOMER,
   repoRoot = process.cwd(),
   allowMissingCustomerConfigEffectiveSession = false,
+  allowMissingTemplatePdfRender = false,
 } = {}) {
   const errors = [];
   let credentialTarget;
@@ -2249,6 +2255,7 @@ export function validateReleaseEvidenceGate({
       absoluteDir,
       credentialTarget,
       allowMissingCustomerConfigEffectiveSession,
+      allowMissingTemplatePdfRender,
     );
     validateCredentialRotationReport(
       credentialRotationContent,

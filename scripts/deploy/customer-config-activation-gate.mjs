@@ -201,9 +201,12 @@ export function validateCustomerConfigActivationGate({
         evidenceDir,
         repoRoot,
         // This gate runs before activation, so the target cannot yet prove the
-        // candidate revision through get_effective_session. Final release
-        // closeout still uses the strict release-evidence gate directly.
+        // candidate revision through get_effective_session or render a
+        // module-gated PDF when no active revision exists. Final release
+        // closeout still uses the strict release-evidence gate directly and
+        // requires both checks after activation.
         allowMissingCustomerConfigEffectiveSession: true,
+        allowMissingTemplatePdfRender: true,
       });
     } catch (error) {
       if (Array.isArray(error.errors)) {

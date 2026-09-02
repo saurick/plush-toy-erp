@@ -442,6 +442,45 @@ test("customer config activation gate accepts manifest with filled release evide
   assert.equal(result.scope.evidenceOnly, true);
 });
 
+test("customer config activation gate defers module-gated PDF proof until activation", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "customer-config-activation-gate-pre-activation-"),
+  );
+  const manifest = writeRuntimeManifest(root);
+  const evidenceDir = "deployments/yoyoosun/evidence/releases/2026-06-28";
+  const absoluteEvidenceDir = path.join(root, evidenceDir);
+  writeReleaseEvidence(absoluteEvidenceDir);
+  writeManifestEvidence(root, evidenceDir, manifest);
+
+  const smokePath = path.join(absoluteEvidenceDir, "smoke-test-report.json");
+  const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+  smoke.checks = smoke.checks.filter(
+    (check) => check.name !== "template-pdf-render",
+  );
+  smoke.summary.total = smoke.checks.length;
+  smoke.summary.passed = smoke.checks.length;
+  fs.writeFileSync(smokePath, JSON.stringify(smoke, null, 2));
+
+  const rollbackPath = path.join(
+    absoluteEvidenceDir,
+    "rollback-rehearsal-report.json",
+  );
+  const rollback = JSON.parse(fs.readFileSync(rollbackPath, "utf8"));
+  rollback.postCheck.smokeCheckCount = smoke.checks.length;
+  fs.writeFileSync(rollbackPath, JSON.stringify(rollback, null, 2));
+
+  const result = validateCustomerConfigActivationGate({
+    repoRoot: root,
+    manifest,
+    evidenceDir,
+  });
+
+  assert.equal(
+    result.revision,
+    "yoyoosun-customer-package-v7.runtime-manifest-v1",
+  );
+});
+
 test("customer config activation gate CLI JSON reports ok success scope", () => {
   const root = fs.mkdtempSync(
     path.join(os.tmpdir(), "customer-config-activation-gate-json-ok-"),
