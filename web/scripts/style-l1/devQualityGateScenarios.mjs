@@ -12,18 +12,129 @@ const repository = Object.freeze({
   fingerprint: 'b'.repeat(64),
 })
 const SERVER_JOB_TIMINGS = Object.freeze([
-  ['plan', 6_000],
-  ['prepare', 18_000],
-  ['quality_static', 31_000],
-  ['quality_node', 92_000],
-  ['quality_web', 126_000],
-  ['quality_server', 158_000],
-  ['quality_resource', 46_000],
-  ['quality_browser', 74_000],
-  ['quality_security', 38_000],
-  ['quality_aggregate', 9_000],
-  ['CI Gate', 2_000],
+  ['plan', 6_000, 900, 'orchestration', 'pipeline', 1],
+  ['prepare', 18_000, 1_200, 'orchestration', 'pipeline', 1],
+  ['quality_static', 31_000, 1_400, 'execution', 'static', 1],
+  ['quality_node_release_preflight', 129_000, 2_100, 'execution', 'node', 1],
+  ['quality_node_release_a', 107_000, 1_900, 'execution', 'node', 1],
+  ['quality_node_release_b', 85_000, 1_700, 'execution', 'node', 1],
+  ['quality_node_core', 102_000, 1_600, 'execution', 'node', 2],
+  ['quality_resource_contract', 48_000, 1_300, 'execution', 'resource', 1],
+  ['quality_resource_runtime', 76_000, 1_500, 'execution', 'resource', 1],
+  ['quality_web_checks', 64_000, 1_400, 'execution', 'web', 1],
+  ['quality_web_build', 71_000, 1_500, 'execution', 'web', 1],
+  ['quality_server_schema', 38_000, 1_300, 'execution', 'server', 1],
+  ['quality_server_upgrade', 82_000, 1_800, 'execution', 'server', 1],
+  ['quality_server_test_build', 96_000, 2_000, 'execution', 'server', 1],
+  ['quality_server_critical_postgres', 70_000, 1_800, 'execution', 'server', 1],
+  [
+    'quality_browser_boundary_entry_print',
+    81_000,
+    2_400,
+    'execution',
+    'browser',
+    1,
+  ],
+  ['quality_node', 28_000, 900, 'aggregate', 'node', 1],
+  ['quality_resource', 8_000, 700, 'aggregate', 'resource', 1],
+  ['quality_web', 7_000, 700, 'aggregate', 'web', 1],
+  ['quality_server', 5_000, 600, 'aggregate', 'server', 1],
+  ['quality_browser', 6_000, 600, 'aggregate', 'browser', 1],
+  ['quality_security', 38_000, 1_300, 'execution', 'security', 1],
+  ['quality_aggregate', 9_000, 500, 'aggregate', 'pipeline', 1],
+  ['CI Gate', 2_000, 300, 'terminal', 'pipeline', 1],
 ])
+const SERVER_CI_AGGREGATE_NEEDS = Object.freeze({
+  quality_node: [
+    'plan',
+    'prepare',
+    'quality_node_release_preflight',
+    'quality_node_release_a',
+    'quality_node_release_b',
+    'quality_node_core',
+  ],
+  quality_resource: [
+    'plan',
+    'prepare',
+    'quality_resource_contract',
+    'quality_resource_runtime',
+  ],
+  quality_web: ['plan', 'prepare', 'quality_web_checks', 'quality_web_build'],
+  quality_server: [
+    'plan',
+    'prepare',
+    'quality_server_schema',
+    'quality_server_upgrade',
+    'quality_server_test_build',
+    'quality_server_critical_postgres',
+  ],
+  quality_browser: ['plan', 'prepare', 'quality_browser_boundary_entry_print'],
+})
+
+function serverCiTopologyJob(name) {
+  if (name === 'plan') return { name, stage: 'plan', needs: [] }
+  if (name === 'prepare') {
+    return { name, stage: 'prepare', needs: ['plan'] }
+  }
+  if (name === 'quality_aggregate') {
+    return {
+      name,
+      stage: 'aggregate',
+      needs: [
+        'plan',
+        'prepare',
+        'quality_static',
+        'quality_node',
+        'quality_web',
+        'quality_server',
+        'quality_resource',
+        'quality_browser',
+        'quality_security',
+      ],
+    }
+  }
+  if (name === 'CI Gate') {
+    return { name, stage: 'gate', needs: ['quality_aggregate'] }
+  }
+  if (Object.hasOwn(SERVER_CI_AGGREGATE_NEEDS, name)) {
+    return {
+      name,
+      stage: 'quality',
+      needs: SERVER_CI_AGGREGATE_NEEDS[name],
+    }
+  }
+  if (name === 'quality_browser_boundary_entry_print') {
+    return {
+      name,
+      stage: 'quality',
+      needs: ['plan', 'prepare', 'quality_web_build'],
+    }
+  }
+  return { name, stage: 'quality', needs: ['plan', 'prepare'] }
+}
+
+const SERVER_CI_TOPOLOGY = Object.freeze(
+  SERVER_JOB_TIMINGS.map(([name]) => Object.freeze(serverCiTopologyJob(name)))
+)
+
+function serverHistoryJobs(pipelineId, durationOffset = 0, failureJob = '') {
+  return SERVER_JOB_TIMINGS.map(
+    ([name, durationMs, queueMs, role, group, attemptCount], index) => ({
+      id: pipelineId * 100 + index,
+      name,
+      status: 'completed',
+      conclusion: name === failureJob ? 'failure' : 'success',
+      durationMs: Math.max(1_000, durationMs + durationOffset),
+      queueMs,
+      attemptCount,
+      role,
+      group,
+      url: `https://gitlab.saurick.me/saurick/plush-toy-erp/-/jobs/${String(
+        pipelineId * 100 + index
+      )}`,
+    })
+  )
+}
 const SERVER_CI_HISTORY = Object.freeze([
   Object.freeze({
     id: 41,
@@ -33,7 +144,9 @@ const SERVER_CI_HISTORY = Object.freeze([
     createdAt: '2026-08-09T07:53:15.000Z',
     finishedAt: NOW,
     durationMs: 405_000,
+    queueMs: 12_000,
     failureJob: '',
+    jobs: serverHistoryJobs(41),
   }),
   Object.freeze({
     id: 40,
@@ -43,7 +156,9 @@ const SERVER_CI_HISTORY = Object.freeze([
     createdAt: '2026-08-09T06:48:00.000Z',
     finishedAt: '2026-08-09T06:55:00.000Z',
     durationMs: 420_000,
+    queueMs: 18_000,
     failureJob: 'quality_web',
+    jobs: serverHistoryJobs(40, 8_000, 'quality_web'),
   }),
   Object.freeze({
     id: 39,
@@ -53,7 +168,9 @@ const SERVER_CI_HISTORY = Object.freeze([
     createdAt: '2026-08-09T05:50:00.000Z',
     finishedAt: null,
     durationMs: null,
+    queueMs: 35_000,
     failureJob: '',
+    jobs: serverHistoryJobs(39, -5_000),
   }),
 ])
 const historicalRepository = Object.freeze({
@@ -257,13 +374,19 @@ function historicalQualityOperation(id, durationMs, createdAt, finishedAt) {
 function createServerEvidence(status = 'passed') {
   if (status === 'unavailable') {
     return {
-      schemaVersion: 'plush.dev-quality-gate-server-evidence/v2',
+      schemaVersion: 'plush.dev-quality-gate-server-evidence/v4',
       status: 'unavailable',
       current: false,
       coversWorkingTree: false,
       gitSha: '',
       pipeline: null,
       jobs: [],
+      topology: {
+        status: 'unavailable',
+        gitSha: '',
+        jobs: [],
+        message: '当前 exact SHA 的 GitLab CI 依赖暂不可读。',
+      },
       history: [],
       message: '未登记只读 GitLab 凭据，当前仅显示本机回执。',
       notProven: ['当前 exact SHA 的 R640 普通 CI'],
@@ -271,13 +394,19 @@ function createServerEvidence(status = 'passed') {
   }
   if (status === 'missing') {
     return {
-      schemaVersion: 'plush.dev-quality-gate-server-evidence/v2',
+      schemaVersion: 'plush.dev-quality-gate-server-evidence/v4',
       status: 'missing',
       current: false,
       coversWorkingTree: false,
       gitSha: repository.commit,
       pipeline: null,
       jobs: [],
+      topology: {
+        status: 'missing',
+        gitSha: repository.commit,
+        jobs: [],
+        message: '当前提交尚未形成实际 Pipeline Job。',
+      },
       history: SERVER_CI_HISTORY.slice(1),
       message:
         'GitLab 凭据与 API 读取正常；R640 尚无绑定当前已提交 SHA 的普通 push CI 记录。',
@@ -285,7 +414,7 @@ function createServerEvidence(status = 'passed') {
     }
   }
   return {
-    schemaVersion: 'plush.dev-quality-gate-server-evidence/v2',
+    schemaVersion: 'plush.dev-quality-gate-server-evidence/v4',
     status: 'passed',
     current: true,
     coversWorkingTree: false,
@@ -300,13 +429,29 @@ function createServerEvidence(status = 'passed') {
       durationMs: 405_000,
       finishedAt: NOW,
     },
-    jobs: SERVER_JOB_TIMINGS.map(([name, durationMs], index) => ({
-      id: 4_100 + index,
-      name,
-      status: 'completed',
-      conclusion: 'success',
-      durationMs,
-    })),
+    jobs: SERVER_JOB_TIMINGS.map(
+      ([name, durationMs, queueMs, role, group, attemptCount], index) => ({
+        id: 4_100 + index,
+        name,
+        status: 'completed',
+        conclusion: 'success',
+        durationMs,
+        queueMs,
+        attemptCount,
+        role,
+        group,
+        url: `https://gitlab.saurick.me/saurick/plush-toy-erp/-/jobs/${String(
+          4_100 + index
+        )}`,
+      })
+    ),
+    topology: {
+      status: 'available',
+      gitSha: repository.commit,
+      jobs: SERVER_CI_TOPOLOGY,
+      message:
+        '依赖来自当前 exact SHA 的 GitLab CI Lint，状态来自本次实际 Pipeline。',
+    },
     history: SERVER_CI_HISTORY,
     message: 'R640 已证明当前提交 SHA；该证据不覆盖本机未提交改动。',
     notProven: ['本机未提交改动', '不可变 Release', '目标部署', '客户 UAT'],
@@ -691,13 +836,16 @@ export function createDevQualityGateScenarios({
         })
         await serverPanel.waitFor()
         await serverPanel
-          .getByText('Job 名称、状态与耗时直接来自当前 GitLab 流水线。', {
-            exact: true,
-          })
+          .getByText(
+            '全部 Job 的状态、运行与等待直接来自当前 GitLab 流水线。',
+            {
+              exact: true,
+            }
+          )
           .waitFor()
         await serverPanel
           .getByText(
-            '工作台不复制 CI DAG，新增或调整 Job 时以服务端读回为准。',
+            '工作台不复制 CI DAG；依赖不可读时失败关闭，不画推测连线。',
             { exact: true }
           )
           .waitFor()
@@ -709,14 +857,102 @@ export function createDevQualityGateScenarios({
             .count(),
           0
         )
+        const pipelineDag = serverPanel.locator(
+          '.erp-dev-quality-server-pipeline__dag .erp-markdown-mermaid'
+        )
+        await pipelineDag
+          .locator('.erp-markdown-mermaid__canvas > svg')
+          .waitFor()
+        assert.equal(
+          await pipelineDag.getAttribute('data-mermaid-status'),
+          'rendered'
+        )
+        assert.equal(
+          await pipelineDag.getAttribute('data-mermaid-html-labels'),
+          'false'
+        )
+        assert.deepEqual(
+          await serverPanel
+            .locator('.erp-dev-quality-server-pipeline__relationship .ant-tag')
+            .allTextContents(),
+          ['22 个 Job', '59 条依赖']
+        )
 
         const pipelineNodes = serverPanel.locator(
           '.erp-dev-quality-server-pipeline__node'
         )
+        await pipelineNodes.first().waitFor()
         assert.deepEqual(
-          await pipelineNodes.locator('code').allTextContents(),
-          SERVER_JOB_TIMINGS.map(([jobName]) => jobName)
+          (await pipelineNodes.locator('code').allTextContents()).sort(),
+          SERVER_JOB_TIMINGS.map(([jobName]) => jobName).sort()
         )
+        assert.deepEqual(
+          await serverPanel
+            .locator('.erp-dev-quality-server-pipeline__phase-heading')
+            .locator('strong')
+            .allTextContents(),
+          [
+            '准备',
+            '静态检查',
+            'Node 合同',
+            '资源敏感',
+            'Web',
+            'Server / PostgreSQL',
+            '浏览器',
+            '安全',
+            '聚合与终态',
+          ]
+        )
+        const viewSwitch = serverPanel.locator('[aria-label="服务器门禁详情"]')
+        await viewSwitch.getByText('Job 性能', { exact: true }).click()
+        await page.waitForFunction(
+          () =>
+            new URL(window.location.href).searchParams.get('serverView') ===
+            'performance'
+        )
+        const performance = serverPanel.getByRole('region', {
+          name: '历史 Job 性能',
+        })
+        await performance.waitFor()
+        await performance.getByText('超过 120 秒', { exact: true }).waitFor()
+        await performance
+          .getByText('超过 90 秒', { exact: true })
+          .first()
+          .waitFor()
+        const remainingPerformance = performance.locator(
+          '.erp-dev-quality-server-performance__remaining'
+        )
+        await remainingPerformance.locator('summary').click()
+        await remainingPerformance
+          .getByText('quality_node', { exact: true })
+          .waitFor()
+        await remainingPerformance.locator('summary').click()
+
+        await viewSwitch.getByText('CI 历史', { exact: true }).click()
+        await page.waitForFunction(
+          () =>
+            new URL(window.location.href).searchParams.get('serverView') ===
+            'history'
+        )
+        await page.reload()
+        await expectHeading(page, '质量门禁')
+        await serverPanel.locator('[data-server-view="history"]').waitFor()
+        const firstHistoryDetails = serverPanel
+          .locator('.erp-dev-quality-server-history__jobs')
+          .first()
+        await firstHistoryDetails.locator('summary').click()
+        await firstHistoryDetails
+          .getByText('quality_node_release_preflight', { exact: true })
+          .waitFor()
+        await firstHistoryDetails.locator('summary').click()
+
+        await viewSwitch.getByText('本次流水线', { exact: true }).click()
+        await page.waitForFunction(
+          () =>
+            new URL(window.location.href).searchParams.get('serverView') ===
+            'pipeline'
+        )
+        await serverPanel.locator('[data-server-view="pipeline"]').waitFor()
         const pipelineGeometry = await serverPanel
           .locator('.erp-dev-quality-server-pipeline__track')
           .evaluate((track) => {

@@ -15,6 +15,7 @@ import {
   GITLAB_DELIVERY_PACKAGE,
   GITLAB_LEGACY_RELEASE_ASSETS,
   GITLAB_DELIVERY_PROJECT,
+  GITLAB_PIPELINE_TOPOLOGY_CONTRACT,
   GITLAB_RELEASE_ASSETS,
   GITLAB_SOURCE_PACKAGE,
   createGitlabDeliveryProvider,
@@ -361,13 +362,18 @@ test("GitLab provider enriches the newest release with build and digest evidence
     env: { PLUSH_GITLAB_TOKEN: TOKEN },
     request: async (url) => {
       if (url.includes("/releases?")) return json([releaseFixture()]);
-      if (url.includes("/packages?") && url.includes("package_name=plush-release-source")) {
-        return json([{
-          id: 42,
-          package_type: "generic",
-          name: GITLAB_SOURCE_PACKAGE,
-          version: `artifact-${SHA}`,
-        }]);
+      if (
+        url.includes("/packages?") &&
+        url.includes("package_name=plush-release-source")
+      ) {
+        return json([
+          {
+            id: 42,
+            package_type: "generic",
+            name: GITLAB_SOURCE_PACKAGE,
+            version: `artifact-${SHA}`,
+          },
+        ]);
       }
       if (url.includes("/packages?")) {
         return json([
@@ -381,13 +387,17 @@ test("GitLab provider enriches the newest release with build and digest evidence
       }
       if (url.includes("/packages/41/package_files")) return json(files);
       if (url.includes("/packages/42/package_files")) {
-        return json([{
-          file_name: "source.tar",
-          size: 101,
-          file_sha256: detail.artifact.sourceArchive.sha256,
-        }]);
+        return json([
+          {
+            file_name: "source.tar",
+            size: 101,
+            file_sha256: detail.artifact.sourceArchive.sha256,
+          },
+        ]);
       }
-      const asset = Object.keys(bodies).find((name) => url.endsWith(`/${name}`));
+      const asset = Object.keys(bodies).find((name) =>
+        url.endsWith(`/${name}`),
+      );
       if (asset) return new Response(bodies[asset], { status: 200 });
       throw new Error(`unexpected URL: ${url}`);
     },
@@ -402,6 +412,7 @@ test("GitLab provider enriches the newest release with build and digest evidence
 });
 
 test("GitLab provider normalizes pipeline and job timings", async () => {
+  const pipelineQueries = [];
   const pipeline = {
     id: 91,
     iid: 17,
@@ -420,7 +431,8 @@ test("GitLab provider normalizes pipeline and job timings", async () => {
     projectRoot: process.cwd(),
     env: { PLUSH_GITLAB_TOKEN: TOKEN },
     request: async (url) => {
-      if (url.endsWith("/pipelines?ref=main&order_by=id&sort=desc&per_page=8")) {
+      if (url.includes("/pipelines?")) {
+        pipelineQueries.push(url);
         return json([{ id: 91 }]);
       }
       if (url.endsWith("/pipelines/91")) return json(pipeline);
@@ -430,9 +442,11 @@ test("GitLab provider normalizes pipeline and job timings", async () => {
             id: 301,
             name: "quality",
             status: "success",
+            created_at: "2026-08-27T01:00:01Z",
             started_at: "2026-08-27T01:00:03Z",
             finished_at: "2026-08-27T01:01:03Z",
             duration: 60,
+            queued_duration: 2,
           },
           {
             id: 302,
@@ -447,12 +461,92 @@ test("GitLab provider normalizes pipeline and job timings", async () => {
       throw new Error(`unexpected URL: ${url}`);
     },
   });
-  const timings = await provider.listPipelineTimings();
+  const timings = await provider.listPipelineTimings({ source: "push" });
   assert.equal(timings.runs[0].workflow, "ci");
   assert.equal(timings.runs[0].status, "completed");
   assert.equal(timings.runs[0].queueMs, 3_000);
+  assert.equal(timings.runs[0].jobs[0].queueMs, 2_000);
+  assert.equal(
+    timings.runs[0].jobs[0].url,
+    `${GITLAB_DELIVERY_BASE_URL}/${GITLAB_DELIVERY_PROJECT}/-/jobs/301`,
+  );
   assert.equal(timings.runs[0].jobs[0].steps.length, 0);
   assert.equal(timings.runs[0].jobs[1].status, "queued");
+  await provider.listPipelineTimings();
+  await provider.listPipelineTimings({ limit: 1, sha: SHA, source: "push" });
+  assert.equal(pipelineQueries[0].endsWith("&source=push"), true);
+  assert.equal(pipelineQueries[1].endsWith("&per_page=8"), true);
+  assert.equal(
+    pipelineQueries[2].endsWith(`&per_page=1&sha=${SHA}&source=push`),
+    true,
+  );
+  await assert.rejects(
+    provider.listPipelineTimings({ source: "web" }),
+    /timing query is invalid/u,
+  );
+  await assert.rejects(
+    provider.listPipelineTimings({ sha: "not-a-sha" }),
+    /timing query is invalid/u,
+  );
+});
+
+test("GitLab provider reads exact-SHA CI needs without copying the DAG", async () => {
+  let topologyUrl;
+  const provider = createGitlabDeliveryProvider({
+    projectRoot: process.cwd(),
+    env: { PLUSH_GITLAB_TOKEN: TOKEN },
+    request: async (url) => {
+      topologyUrl = new URL(url);
+      return json({
+        valid: true,
+        jobs: [
+          { name: "plan", stage: "plan", needs: null },
+          {
+            name: "prepare",
+            stage: "prepare",
+            needs: [{ name: "plan", optional: false, artifacts: true }],
+          },
+          {
+            name: "quality_node_core",
+            stage: "quality",
+            needs: ["plan", { name: "prepare" }],
+          },
+          {
+            name: "CI Gate",
+            stage: "gate",
+            needs: [
+              { name: "quality_node_core" },
+              { name: "quality_affected", optional: true },
+            ],
+          },
+        ],
+      });
+    },
+  });
+
+  const topology = await provider.readPipelineTopology({ sha: SHA });
+
+  assert.equal(topology.schemaVersion, GITLAB_PIPELINE_TOPOLOGY_CONTRACT);
+  assert.equal(topology.gitSha, SHA);
+  assert.deepEqual(topology.jobs, [
+    { name: "plan", stage: "plan", needs: [] },
+    { name: "prepare", stage: "prepare", needs: ["plan"] },
+    {
+      name: "quality_node_core",
+      stage: "quality",
+      needs: ["plan", "prepare"],
+    },
+    { name: "CI Gate", stage: "gate", needs: ["quality_node_core"] },
+  ]);
+  assert.equal(topologyUrl.pathname.endsWith("/ci/lint"), true);
+  assert.equal(topologyUrl.searchParams.get("content_ref"), SHA);
+  assert.equal(topologyUrl.searchParams.get("dry_run"), "true");
+  assert.equal(topologyUrl.searchParams.get("dry_run_ref"), "main");
+  assert.equal(topologyUrl.searchParams.get("include_jobs"), "true");
+  await assert.rejects(
+    provider.readPipelineTopology({ sha: "not-a-sha" }),
+    /topology query is invalid/u,
+  );
 });
 
 test("GitLab provider dispatches only the exact current main SHA", async () => {
@@ -515,12 +609,14 @@ test("GitLab provider rejects duplicate formal package identities", async () => 
     env: { PLUSH_GITLAB_TOKEN: TOKEN },
     request: async (url) => {
       if (url.includes("/packages?")) {
-        return json([41, 42].map((id) => ({
-          id,
-          package_type: "generic",
-          name: GITLAB_DELIVERY_PACKAGE,
-          version: `artifact-${SHA}`,
-        })));
+        return json(
+          [41, 42].map((id) => ({
+            id,
+            package_type: "generic",
+            name: GITLAB_DELIVERY_PACKAGE,
+            version: `artifact-${SHA}`,
+          })),
+        );
       }
       throw new Error(`unexpected URL: ${url}`);
     },
@@ -587,7 +683,10 @@ test("GitLab provider downloads only bounded control evidence for target-direct 
     projectRoot: process.cwd(),
     env: { PLUSH_GITLAB_TOKEN: TOKEN },
     request: async (url) => {
-      if (url.includes("/packages?") && url.includes("package_name=plush-release-source")) {
+      if (
+        url.includes("/packages?") &&
+        url.includes("package_name=plush-release-source")
+      ) {
         return json([
           {
             id: 42,
@@ -608,8 +707,11 @@ test("GitLab provider downloads only bounded control evidence for target-direct 
         ]);
       }
       if (url.includes("/packages/41/package_files")) return json(formalFiles);
-      if (url.includes("/packages/42/package_files")) return json([sourcePackage]);
-      const asset = Object.keys(bodies).find((name) => url.endsWith(`/${name}`));
+      if (url.includes("/packages/42/package_files"))
+        return json([sourcePackage]);
+      const asset = Object.keys(bodies).find((name) =>
+        url.endsWith(`/${name}`),
+      );
       if (asset) {
         requestedAssets.push(asset);
         return new Response(bodies[asset], { status: 200 });

@@ -30,15 +30,19 @@ import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevTimestamp from '../components/DevTimestamp.jsx'
 import {
+  DEFAULT_SERVER_VIEW,
   DEFAULT_VIEW,
   DEV_QUALITY_GATE_ACTIVE_STATUSES,
   DEV_QUALITY_GATE_GOVERNANCE_FILTERS,
   DEV_QUALITY_GATE_GAP_RANGES,
   DEV_QUALITY_GATE_GAP_RISKS,
   DEV_QUALITY_GATE_PROFILES,
+  DEV_QUALITY_GATE_SERVER_VIEWS,
   VIEW_ITEMS,
   buildQualityGateCoverageMatrix,
   buildQualityGateHistoryTrend,
+  buildQualityGateServerPerformance,
+  buildQualityGateServerDag,
   buildQualityGateServerTiming,
   buildQualityGateStageDurationComposition,
   buildQualityGateViewSearch,
@@ -56,7 +60,7 @@ const { Link, Paragraph, Text, Title } = Typography
 const POLL_INTERVAL_MS = 1500
 const SOURCE_PATH = 'scripts/qa/README.md'
 const EMPTY_VIEW_STATE = Object.freeze({
-  server: Object.freeze({}),
+  server: Object.freeze({ serverView: DEFAULT_SERVER_VIEW }),
   run: Object.freeze({ profile: '', operation: '' }),
   governance: Object.freeze({ q: '', filter: 'relevant' }),
   gaps: Object.freeze({ range: 'current', risk: 'all' }),
@@ -538,6 +542,43 @@ const SERVER_HISTORY_STATUS = Object.freeze({
   cancelled: Object.freeze({ label: '已取消', color: 'default' }),
   skipped: Object.freeze({ label: '已跳过', color: 'default' }),
 })
+const SERVER_JOB_ROLE = Object.freeze({
+  orchestration: Object.freeze({ label: '准备', color: 'default' }),
+  execution: Object.freeze({ label: '执行', color: 'blue' }),
+  aggregate: Object.freeze({ label: '汇总', color: 'purple' }),
+  terminal: Object.freeze({ label: '终态', color: 'success' }),
+})
+const SERVER_JOB_GROUP = Object.freeze({
+  preparation: '准备',
+  static: '静态检查',
+  node: 'Node 合同',
+  resource: '资源敏感',
+  web: 'Web',
+  server: 'Server / PostgreSQL',
+  browser: '浏览器',
+  security: '安全',
+  other: '其他执行',
+  closeout: '聚合与终态',
+})
+const SERVER_JOB_ATTENTION = Object.freeze({
+  critical: Object.freeze({ label: '超过 120 秒', color: 'error' }),
+  review: Object.freeze({ label: '超过 90 秒', color: 'warning' }),
+  regressed: Object.freeze({ label: '较中位数变慢', color: 'warning' }),
+  queued: Object.freeze({ label: '等待偏长', color: 'processing' }),
+  aggregate_slow: Object.freeze({ label: '汇总偏慢', color: 'warning' }),
+  unstable: Object.freeze({ label: '有失败或重试', color: 'warning' }),
+  healthy: Object.freeze({ label: '正常', color: 'success' }),
+})
+const SERVER_VIEW_OPTIONS = Object.freeze([
+  Object.freeze({ label: '本次流水线', value: 'pipeline' }),
+  Object.freeze({ label: 'Job 性能', value: 'performance' }),
+  Object.freeze({ label: 'CI 历史', value: 'history' }),
+])
+const SERVER_VIEW_HELP = Object.freeze({
+  pipeline: '核对本次提交的真实 needs、并行关系、Job 状态与耗时。',
+  performance: '比较近 20 次同名 Job 的中位数、P95、等待与重试。',
+  history: '按流水线回看近 20 次普通 push CI 的结果与失败环节。',
+})
 
 function qualityGateViewStatus(summary, view, summaryError) {
   if (view !== 'server') return summary?.status
@@ -568,7 +609,7 @@ function qualityGateViewStatus(summary, view, summaryError) {
     description: evidence?.message || '正在读取当前提交的服务器门禁证据。',
     recommendation:
       evidence?.status === 'passed'
-        ? '优先查看排队耗时与最长主路径 Job；未提交改动请切换到“本机诊断”定位。'
+        ? '优先查看排队耗时、最长执行 Job 与历史退化；未提交改动请切换到“本机诊断”定位。'
         : evidence?.status === 'running'
           ? '等待当前服务器流水线结束；页面不会用本机回执替代服务器结果。'
           : evidence?.status === 'missing'
@@ -583,15 +624,30 @@ function ServerJobTimingRows({ jobs }) {
     <ol className="erp-dev-quality-server-evidence__job-list">
       {jobs.map((job) => (
         <li key={job.id} className="erp-dev-quality-server-evidence__job-row">
-          <Text
-            className="erp-dev-quality-server-evidence__job-name"
-            type={job.conclusion === 'failure' ? 'danger' : undefined}
-          >
-            {job.name} ·{' '}
-            {SERVER_JOB_STATUS[job.conclusion] ||
-              SERVER_PIPELINE_JOB_STATUS[job.flowStatus] ||
-              '状态未证明'}
-          </Text>
+          <div className="erp-dev-quality-server-evidence__job-identity">
+            <Space size={6} wrap>
+              <Link href={job.url} target="_blank" rel="noreferrer">
+                <Text
+                  code
+                  className="erp-dev-quality-server-evidence__job-name"
+                  type={job.conclusion === 'failure' ? 'danger' : undefined}
+                >
+                  {job.name}
+                </Text>
+              </Link>
+              <Tag color={SERVER_JOB_ROLE[job.role]?.color || 'default'}>
+                {SERVER_JOB_ROLE[job.role]?.label || '执行'}
+              </Tag>
+              {job.attemptCount > 1 ? (
+                <Tag color="warning">重试 {job.attemptCount - 1} 次</Tag>
+              ) : null}
+            </Space>
+            <Text type="secondary">
+              {SERVER_JOB_STATUS[job.conclusion] ||
+                SERVER_PIPELINE_JOB_STATUS[job.flowStatus] ||
+                '状态未证明'}
+            </Text>
+          </div>
           <div
             className="erp-dev-quality-server-evidence__job-track"
             aria-hidden="true"
@@ -602,11 +658,17 @@ function ServerJobTimingRows({ jobs }) {
               }}
             />
           </div>
-          <Text type="secondary">
-            {job.durationMs === null
-              ? '尚未完成'
-              : formatQualityGateDuration(job.durationMs)}
-          </Text>
+          <div className="erp-dev-quality-server-evidence__job-times">
+            <Text type="secondary">
+              运行{' '}
+              {job.durationMs === null
+                ? '尚未完成'
+                : formatQualityGateDuration(job.durationMs)}
+            </Text>
+            <Text type="secondary">
+              等待 {formatQualityGateDuration(job.queueMs)}
+            </Text>
+          </div>
         </li>
       ))}
     </ol>
@@ -615,6 +677,207 @@ function ServerJobTimingRows({ jobs }) {
 
 function serverHistoryFailureLabel(jobName) {
   return jobName || '—'
+}
+
+function serverHistoryJobStatusLabel(job) {
+  if (SERVER_JOB_STATUS[job.conclusion]) {
+    return SERVER_JOB_STATUS[job.conclusion]
+  }
+  if (job.status === 'in_progress') return '运行中'
+  if (['queued', 'waiting', 'requested', 'pending'].includes(job.status)) {
+    return '等待运行'
+  }
+  if (job.status === 'completed') return '已结束'
+  return '状态未证明'
+}
+
+function ServerHistoryJobList({ jobs }) {
+  return (
+    <ol className="erp-dev-quality-server-history__jobs-list">
+      {jobs.map((job) => (
+        <li key={job.id}>
+          <Space size={6} wrap>
+            <Link href={job.url} target="_blank" rel="noreferrer">
+              <Text code>{job.name}</Text>
+            </Link>
+            <Tag color={SERVER_JOB_ROLE[job.role]?.color || 'default'}>
+              {SERVER_JOB_ROLE[job.role]?.label || '执行'}
+            </Tag>
+            {job.attemptCount > 1 ? (
+              <Tag color="warning">重试 {job.attemptCount - 1} 次</Tag>
+            ) : null}
+          </Space>
+          <Text type={job.conclusion === 'failure' ? 'danger' : 'secondary'}>
+            {serverHistoryJobStatusLabel(job)} · 运行{' '}
+            {formatQualityGateDuration(job.durationMs)} · 等待{' '}
+            {formatQualityGateDuration(job.queueMs)}
+          </Text>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+function ServerJobPerformanceTable({ rows, label }) {
+  return (
+    <div className="erp-dev-quality-server-performance__table-wrap">
+      <table
+        className="erp-dev-quality-server-performance__table"
+        aria-label={label}
+      >
+        <thead>
+          <tr>
+            <th scope="col">Job</th>
+            <th scope="col">最新运行</th>
+            <th scope="col">中位 / 近似 P95</th>
+            <th scope="col">中位 / 近似 P95 等待</th>
+            <th scope="col">样本</th>
+            <th scope="col">判断</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const attention =
+              SERVER_JOB_ATTENTION[row.attention] ||
+              SERVER_JOB_ATTENTION.healthy
+            return (
+              <tr key={row.name} data-attention={row.attention}>
+                <td data-label="Job">
+                  <Space size={6} wrap>
+                    <Link
+                      href={row.latestJobUrl || row.latestPipelineUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <Text code>{row.name}</Text>
+                    </Link>
+                    <Tag color={SERVER_JOB_ROLE[row.role]?.color || 'default'}>
+                      {SERVER_JOB_ROLE[row.role]?.label || '执行'}
+                    </Tag>
+                  </Space>
+                </td>
+                <td data-label="最新运行">
+                  <Text
+                    type={
+                      row.latestConclusion === 'failure' ? 'danger' : undefined
+                    }
+                  >
+                    {serverHistoryJobStatusLabel({
+                      conclusion: row.latestConclusion,
+                      status: row.latestStatus,
+                    })}{' '}
+                    · {formatQualityGateDuration(row.latestDurationMs)}
+                  </Text>
+                </td>
+                <td data-label="中位 / 近似 P95">
+                  <Text>
+                    {formatQualityGateDuration(row.medianDurationMs)} /{' '}
+                    {row.p95DurationMs === null
+                      ? '样本不足'
+                      : formatQualityGateDuration(row.p95DurationMs)}
+                  </Text>
+                </td>
+                <td data-label="中位 / 近似 P95 等待">
+                  <Text>
+                    {formatQualityGateDuration(row.medianQueueMs)} /{' '}
+                    {row.p95QueueMs === null
+                      ? '样本不足'
+                      : formatQualityGateDuration(row.p95QueueMs)}
+                  </Text>
+                </td>
+                <td data-label="样本">
+                  <Space size={4} wrap>
+                    <Tag>{row.sampleCount} 次</Tag>
+                    {row.retryCount ? (
+                      <Tag color="warning">重试 {row.retryCount}</Tag>
+                    ) : null}
+                    {row.failureCount ? (
+                      <Tag color="error">失败 {row.failureCount}</Tag>
+                    ) : null}
+                  </Space>
+                </td>
+                <td data-label="判断">
+                  <Tag color={attention.color}>{attention.label}</Tag>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function ServerJobPerformance({ evidence }) {
+  const performance = buildQualityGateServerPerformance(evidence)
+  if (!performance.rows.length) {
+    return <Empty description="最近普通 push CI 尚无可比较的 Job 数据" />
+  }
+  const highlightedNames = new Set(
+    performance.rows
+      .filter((row) => row.attention !== 'healthy')
+      .map((row) => row.name)
+  )
+  for (const row of performance.rows
+    .filter((candidate) => candidate.role === 'execution')
+    .slice(0, 3)) {
+    highlightedNames.add(row.name)
+  }
+  const highlighted = performance.rows.filter((row) =>
+    highlightedNames.has(row.name)
+  )
+  const remaining = performance.rows.filter(
+    (row) => !highlightedNames.has(row.name)
+  )
+  return (
+    <section
+      className="erp-dev-quality-server-performance"
+      aria-labelledby="r640-job-performance-title"
+    >
+      <div className="erp-dev-quality-server-performance__heading">
+        <div>
+          <Title level={3} id="r640-job-performance-title">
+            历史 Job 性能
+          </Title>
+          <Text type="secondary">
+            最近普通 push CI 的逐 Job 运行、等待与重试；执行 Job 使用 90 / 120
+            秒复核线，是否拆分仍看多次样本与边界，汇总 Job 单独判断。
+          </Text>
+        </div>
+        <Space size={6} wrap>
+          <Tag>{performance.historyCount} 次 CI</Tag>
+          <Tag>{performance.executionCount} 个执行 Job</Tag>
+          {performance.criticalCount ? (
+            <Tag color="error">红线 {performance.criticalCount}</Tag>
+          ) : null}
+          {performance.reviewCount ? (
+            <Tag color="warning">黄线 {performance.reviewCount}</Tag>
+          ) : null}
+          {performance.queueAttentionCount ? (
+            <Tag color="processing">
+              等待偏长 {performance.queueAttentionCount}
+            </Tag>
+          ) : null}
+          {performance.unstableCount ? (
+            <Tag color="warning">失败/重试 {performance.unstableCount}</Tag>
+          ) : null}
+        </Space>
+      </div>
+      <ServerJobPerformanceTable
+        rows={highlighted}
+        label="需要关注的历史 Job 性能"
+      />
+      {remaining.length ? (
+        <details className="erp-dev-quality-server-performance__remaining">
+          <summary>展开其余 {remaining.length} 个 Job</summary>
+          <ServerJobPerformanceTable
+            rows={remaining}
+            label="其余历史 Job 性能"
+          />
+        </details>
+      ) : null}
+    </section>
+  )
 }
 
 function ServerCiHistory({ evidence, currentCommit }) {
@@ -647,6 +910,7 @@ function ServerCiHistory({ evidence, currentCommit }) {
                 <th scope="col">提交</th>
                 <th scope="col">时间</th>
                 <th scope="col">总耗时</th>
+                <th scope="col">排队</th>
                 <th scope="col">失败环节</th>
                 <th scope="col">详情</th>
               </tr>
@@ -677,15 +941,22 @@ function ServerCiHistory({ evidence, currentCommit }) {
                     <td data-label="总耗时">
                       <Text>{formatQualityGateDuration(run.durationMs)}</Text>
                     </td>
+                    <td data-label="排队">
+                      <Text>{formatQualityGateDuration(run.queueMs)}</Text>
+                    </td>
                     <td data-label="失败环节">
                       <Text type={run.failureJob ? 'danger' : 'secondary'}>
                         {serverHistoryFailureLabel(run.failureJob)}
                       </Text>
                     </td>
                     <td data-label="详情">
-                      <Link href={run.url} target="_blank" rel="noreferrer">
-                        查看 #{run.id}
-                      </Link>
+                      <details className="erp-dev-quality-server-history__jobs">
+                        <summary>展开 {run.jobs.length} 个 Job</summary>
+                        <Link href={run.url} target="_blank" rel="noreferrer">
+                          在 GitLab 查看 #{run.id}
+                        </Link>
+                        <ServerHistoryJobList jobs={run.jobs} />
+                      </details>
                     </td>
                   </tr>
                 )
@@ -707,7 +978,8 @@ function ServerCiHistory({ evidence, currentCommit }) {
   )
 }
 
-function ServerCiPipelineFlow({ timing }) {
+function ServerCiPipelineFlow({ evidence, timing }) {
+  const dag = buildQualityGateServerDag(evidence)
   const visibleStatuses = new Set(timing.flowJobs.map((job) => job.status))
   return (
     <section
@@ -717,81 +989,200 @@ function ServerCiPipelineFlow({ timing }) {
       <div className="erp-dev-quality-server-pipeline__heading">
         <div>
           <Text id="r640-pipeline-flow-title" strong>
-            本次 GitLab Pipeline Jobs
+            本次 GitLab Pipeline DAG
           </Text>
           <Text type="secondary">
-            Job 名称、状态与耗时直接来自当前 GitLab 流水线。
+            依赖关系来自同一 exact SHA 的 GitLab CI 配置，状态与耗时来自本次实际
+            Pipeline。
           </Text>
         </div>
         <Text type="secondary">
-          工作台不复制 CI DAG，新增或调整 Job 时以服务端读回为准。
+          工作台不复制 CI DAG；依赖不可读时失败关闭，不画推测连线。
         </Text>
       </div>
-      <div className="erp-dev-quality-server-pipeline__track">
-        <section className="erp-dev-quality-server-pipeline__phase">
-          <div className="erp-dev-quality-server-pipeline__nodes">
-            {timing.flowJobs.map((job) => (
-              <article
-                key={job.id}
-                className={`erp-dev-quality-server-pipeline__node erp-dev-quality-server-pipeline__status--${job.status}`}
-                data-status={job.status}
+      <div className="erp-dev-quality-server-pipeline__relationship">
+        <div>
+          <Text strong>
+            {dag.status === 'available' ? '实际依赖已读取' : '依赖图尚未形成'}
+          </Text>
+          <Text type="secondary">{dag.message}</Text>
+        </div>
+        {dag.status === 'available' ? (
+          <Space size={6} wrap>
+            <Tag color="blue">{dag.nodeCount} 个 Job</Tag>
+            <Tag color="purple">{dag.edgeCount} 条依赖</Tag>
+          </Space>
+        ) : (
+          <Tag>未证明</Tag>
+        )}
+      </div>
+      {dag.chart ? (
+        <div className="erp-dev-quality-server-pipeline__dag">
+          <MermaidDiagram
+            chart={dag.chart}
+            label="当前 GitLab Pipeline Job 依赖图"
+            showSourceOnError={false}
+            flowchartHtmlLabels={false}
+          />
+        </div>
+      ) : (
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description={
+            evidence?.topology?.status === 'missing'
+              ? '当前提交尚未触发实际 Pipeline，依赖图等待服务器运行'
+              : '当前 Pipeline 的依赖关系暂不可读；下方 Job 明细仍可核对'
+          }
+        />
+      )}
+      <div className="erp-dev-quality-server-pipeline__mapping">
+        <div className="erp-dev-quality-server-pipeline__mapping-heading">
+          <div>
+            <Text strong>当前 Job 明细</Text>
+            <Text type="secondary">
+              全部 Job 的状态、运行与等待直接来自当前 GitLab 流水线。
+            </Text>
+          </div>
+          <Tag>{timing.flowJobs.length} 个</Tag>
+        </div>
+        {timing.flowGroups.length ? (
+          <div className="erp-dev-quality-server-pipeline__track">
+            {timing.flowGroups.map((group) => (
+              <section
+                key={group.key}
+                className="erp-dev-quality-server-pipeline__phase"
+                data-phase={group.key}
               >
-                <div className="erp-dev-quality-server-pipeline__node-heading">
-                  <span
-                    className="erp-dev-quality-server-pipeline__status-indicator"
-                    aria-hidden="true"
-                  />
-                  <Text
-                    className="erp-dev-quality-server-pipeline__node-text"
-                    code
-                    strong
-                  >
-                    {job.name}
-                  </Text>
+                <div className="erp-dev-quality-server-pipeline__phase-heading">
+                  <Text strong>{SERVER_JOB_GROUP[group.key] || group.key}</Text>
+                  <Tag>{group.jobs.length} 个</Tag>
                 </div>
-                <Text
-                  className="erp-dev-quality-server-pipeline__node-text"
-                  type="secondary"
-                >
-                  {job.durationMs === null
-                    ? SERVER_PIPELINE_JOB_STATUS[job.status] || '状态未证明'
-                    : `${SERVER_PIPELINE_JOB_STATUS[job.status] || '状态未证明'} · ${formatQualityGateDuration(job.durationMs)}`}
-                </Text>
-              </article>
+                <div className="erp-dev-quality-server-pipeline__nodes">
+                  {group.jobs.map((job) => (
+                    <article
+                      key={job.id}
+                      className={`erp-dev-quality-server-pipeline__node erp-dev-quality-server-pipeline__status--${job.status}`}
+                      data-status={job.status}
+                    >
+                      <div className="erp-dev-quality-server-pipeline__node-heading">
+                        <span
+                          className="erp-dev-quality-server-pipeline__status-indicator"
+                          aria-hidden="true"
+                        />
+                        <Link href={job.url} target="_blank" rel="noreferrer">
+                          <Text
+                            className="erp-dev-quality-server-pipeline__node-text"
+                            code
+                            strong
+                          >
+                            {job.name}
+                          </Text>
+                        </Link>
+                      </div>
+                      <Space size={4} wrap>
+                        <Tag
+                          color={SERVER_JOB_ROLE[job.role]?.color || 'default'}
+                        >
+                          {SERVER_JOB_ROLE[job.role]?.label || '执行'}
+                        </Tag>
+                        {job.attemptCount > 1 ? (
+                          <Tag color="warning">重试 {job.attemptCount - 1}</Tag>
+                        ) : null}
+                      </Space>
+                      <Text
+                        className="erp-dev-quality-server-pipeline__node-text"
+                        type="secondary"
+                      >
+                        {SERVER_PIPELINE_JOB_STATUS[job.status] || '状态未证明'}{' '}
+                        · 运行 {formatQualityGateDuration(job.durationMs)} ·
+                        等待 {formatQualityGateDuration(job.queueMs)}
+                      </Text>
+                    </article>
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
-        </section>
+        ) : (
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description="当前提交尚无实际 Job"
+          />
+        )}
       </div>
-      <div className="erp-dev-quality-server-pipeline__legend">
-        {SERVER_PIPELINE_JOB_LEGEND.filter((status) =>
-          visibleStatuses.has(status)
-        ).map((status) => (
-          <span
-            key={status}
-            className={`erp-dev-quality-server-pipeline__legend-item erp-dev-quality-server-pipeline__status--${status}`}
-            data-status={status}
-          >
-            <i
-              className="erp-dev-quality-server-pipeline__status-indicator"
-              aria-hidden="true"
-            />
-            {SERVER_PIPELINE_JOB_STATUS[status]}
-          </span>
-        ))}
-      </div>
+      {visibleStatuses.size ? (
+        <div className="erp-dev-quality-server-pipeline__legend">
+          {SERVER_PIPELINE_JOB_LEGEND.filter((status) =>
+            visibleStatuses.has(status)
+          ).map((status) => (
+            <span
+              key={status}
+              className={`erp-dev-quality-server-pipeline__legend-item erp-dev-quality-server-pipeline__status--${status}`}
+              data-status={status}
+            >
+              <i
+                className="erp-dev-quality-server-pipeline__status-indicator"
+                aria-hidden="true"
+              />
+              {SERVER_PIPELINE_JOB_STATUS[status]}
+            </span>
+          ))}
+        </div>
+      ) : null}
     </section>
   )
 }
 
-function ServerCiEvidencePanel({ summary }) {
+function ServerCurrentPipelineView({ evidence, timing }) {
+  const highlightedJobs = timing.jobs.slice(0, 3)
+  const remainingJobs = timing.jobs.slice(3)
+  return (
+    <div className="erp-dev-quality-server-view" data-server-view="pipeline">
+      <ServerCiPipelineFlow evidence={evidence} timing={timing} />
+      {timing.jobs.length ? (
+        <section
+          className="erp-dev-quality-server-evidence__timing"
+          aria-labelledby="r640-job-timing-title"
+        >
+          <div className="erp-dev-quality-server-evidence__timing-heading">
+            <Text id="r640-job-timing-title" strong>
+              当前最慢 Job
+            </Text>
+            <Text type="secondary">条长相对本次最长 Job，不是总耗时占比</Text>
+          </div>
+          <ServerJobTimingRows jobs={highlightedJobs} />
+          {remainingJobs.length ? (
+            <details className="erp-dev-quality-server-evidence__jobs">
+              <summary>展开其余 {remainingJobs.length} 个 Job</summary>
+              <ServerJobTimingRows jobs={remainingJobs} />
+            </details>
+          ) : null}
+          <Text type="secondary">
+            并行 Job 可能互相重叠，不能累加推算服务器墙钟时间；执行、汇总和终态
+            Job 分开判断，优化时优先检查最长执行 Job 与排队耗时。
+          </Text>
+        </section>
+      ) : null}
+      <Text type="secondary">
+        证据分层：服务器只证明已提交 SHA；本机 dirty 状态与本地回执不会被覆盖。
+        {evidence.notProven?.length
+          ? ` 尚未证明：${evidence.notProven.join('、')}。`
+          : ''}
+      </Text>
+    </div>
+  )
+}
+
+function ServerCiEvidencePanel({ summary, serverView, onServerViewChange }) {
   const evidence = summary?.serverEvidence
   if (!evidence) return null
   const status =
     SERVER_EVIDENCE_STATUS[evidence.status] ||
     SERVER_EVIDENCE_STATUS.unavailable
   const timing = buildQualityGateServerTiming(evidence)
-  const highlightedJobs = timing.jobs.slice(0, 3)
-  const remainingJobs = timing.jobs.slice(3)
+  const selectedServerView = DEV_QUALITY_GATE_SERVER_VIEWS.includes(serverView)
+    ? serverView
+    : DEFAULT_SERVER_VIEW
   return (
     <section
       className="erp-dev-quality-server-evidence"
@@ -814,7 +1205,6 @@ function ServerCiEvidencePanel({ summary }) {
           <Tag color={status.color}>{status.label}</Tag>
         </Space>
       </div>
-      <ServerCiPipelineFlow timing={timing} />
       <div className="erp-dev-quality-server-evidence__facts">
         <div>
           <Text type="secondary">证据读取</Text>
@@ -856,11 +1246,11 @@ function ServerCiEvidencePanel({ summary }) {
           <Text strong>{formatQualityGateDuration(timing.queueMs)}</Text>
         </div>
         <div>
-          <Text type="secondary">最长主路径 Job</Text>
+          <Text type="secondary">最长执行 Job</Text>
           <Text strong>
-            {timing.longestJob
-              ? `${timing.longestJob.name} · ${formatQualityGateDuration(
-                  timing.longestJob.durationMs
+            {timing.longestExecutionJob
+              ? `${timing.longestExecutionJob.name} · ${formatQualityGateDuration(
+                  timing.longestExecutionJob.durationMs
                 )}`
               : '尚未形成'}
           </Text>
@@ -874,41 +1264,38 @@ function ServerCiEvidencePanel({ summary }) {
         </div>
       </div>
       <Text>{evidence.message}</Text>
-      {timing.jobs.length ? (
-        <section
-          className="erp-dev-quality-server-evidence__timing"
-          aria-labelledby="r640-job-timing-title"
-        >
-          <div className="erp-dev-quality-server-evidence__timing-heading">
-            <Text id="r640-job-timing-title" strong>
-              最慢主路径 Job
-            </Text>
-            <Text type="secondary">条长相对最长主路径 Job，不是总耗时占比</Text>
-          </div>
-          <ServerJobTimingRows jobs={highlightedJobs} />
-          {remainingJobs.length ? (
-            <details className="erp-dev-quality-server-evidence__jobs">
-              <summary>展开其余 {remainingJobs.length} 个 Job</summary>
-              <ServerJobTimingRows jobs={remainingJobs} />
-            </details>
-          ) : null}
-          <Text type="secondary">
-            并行 Job
-            可能互相重叠，不能累加推算服务器墙钟时间；优化时优先检查最长主路径
-            Job 与排队耗时。
-          </Text>
-        </section>
+      <div className="erp-dev-quality-server-evidence__view-switch">
+        <Segmented
+          aria-label="服务器门禁详情"
+          options={SERVER_VIEW_OPTIONS}
+          value={selectedServerView}
+          onChange={(nextView) => {
+            if (DEV_QUALITY_GATE_SERVER_VIEWS.includes(nextView)) {
+              onServerViewChange(nextView)
+            }
+          }}
+        />
+        <Text type="secondary">{SERVER_VIEW_HELP[selectedServerView]}</Text>
+      </div>
+      {selectedServerView === 'pipeline' ? (
+        <ServerCurrentPipelineView evidence={evidence} timing={timing} />
       ) : null}
-      <Text type="secondary">
-        证据分层：服务器只证明已提交 SHA；本机 dirty 状态与本地回执不会被覆盖。
-        {evidence.notProven?.length
-          ? ` 尚未证明：${evidence.notProven.join('、')}。`
-          : ''}
-      </Text>
-      <ServerCiHistory
-        evidence={evidence}
-        currentCommit={summary?.repository?.commit || ''}
-      />
+      {selectedServerView === 'performance' ? (
+        <div
+          className="erp-dev-quality-server-view"
+          data-server-view="performance"
+        >
+          <ServerJobPerformance evidence={evidence} />
+        </div>
+      ) : null}
+      {selectedServerView === 'history' ? (
+        <div className="erp-dev-quality-server-view" data-server-view="history">
+          <ServerCiHistory
+            evidence={evidence}
+            currentCommit={summary?.repository?.commit || ''}
+          />
+        </div>
+      ) : null}
     </section>
   )
 }
@@ -2405,7 +2792,13 @@ export default function DevQualityGatesPage() {
             tabIndex={0}
           >
             {parsed.valid && activeView === 'server' ? (
-              <ServerCiEvidencePanel summary={summary} />
+              <ServerCiEvidencePanel
+                summary={summary}
+                serverView={parsed.values.serverView}
+                onServerViewChange={(serverView) =>
+                  updateViewValues({ serverView })
+                }
+              />
             ) : null}
             {parsed.valid && activeView === 'run' ? (
               <>

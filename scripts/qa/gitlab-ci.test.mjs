@@ -7,7 +7,10 @@ import {
   CI_PLAYWRIGHT_CHROMIUM_SANDBOX_SHA256,
   CI_PLAYWRIGHT_RUNTIME_ASSETS,
 } from "./ci-playwright-runtime.mjs";
-import { CI_BROWSER_QUALITY_LANES } from "./ci-quality-stage-lane.mjs";
+import {
+  CI_BROWSER_QUALITY_LANES,
+  CI_SERVER_QUALITY_LANES,
+} from "./ci-quality-stage-lane.mjs";
 
 const repositoryRoot = new URL("../../", import.meta.url);
 const trackedFiles = execFileSync("git", ["ls-files", "-z"], {
@@ -152,7 +155,7 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   }
   for (const [shard, lanes] of Object.entries({
     web: ["checks", "build"],
-    server: ["core", "critical_postgres"],
+    server: Object.keys(CI_SERVER_QUALITY_LANES),
   })) {
     for (const lane of lanes) {
       assert.match(workflow, new RegExp(`^quality_${shard}_${lane}:`, "mu"));
@@ -225,7 +228,7 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   );
   assert.match(
     workflow,
-    /quality_server:[\s\S]+?job: quality_server_core\n      artifacts: true[\s\S]+?job: quality_server_critical_postgres\n      artifacts: true[\s\S]+?ci-quality-shard[.]mjs --shard server/u,
+    /quality_server:[\s\S]+?job: quality_server_schema\n      artifacts: true[\s\S]+?job: quality_server_upgrade\n      artifacts: true[\s\S]+?job: quality_server_test_build\n      artifacts: true[\s\S]+?job: quality_server_critical_postgres\n      artifacts: true[\s\S]+?ci-quality-shard[.]mjs --shard server/u,
   );
   assert.ok(
     workflow.indexOf("quality_node_release_preflight:") <
@@ -246,7 +249,7 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   assert.doesNotMatch(aggregateBlock, /quality_resource_(?:contract|runtime)/u);
   assert.doesNotMatch(
     aggregateBlock,
-    /quality_(?:web_(?:checks|build)|server_(?:core|critical_postgres))/u,
+    /quality_(?:web_(?:checks|build)|server_(?:schema|upgrade|test_build|critical_postgres))/u,
   );
   assert.doesNotMatch(aggregateBlock, /quality_browser_(?:boundary|dev)/u);
   assert.match(workflow, /^quality_aggregate:\n  stage: aggregate/mu);
@@ -338,7 +341,7 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
     );
   }
   for (const shard of [
-    "server_core",
+    "server_test_build",
     ...Object.keys(CI_BROWSER_QUALITY_LANES).map((lane) => `browser_${lane}`),
   ]) {
     assert.match(
@@ -359,6 +362,8 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
     "resource_runtime",
     "resource",
     "web",
+    "server_schema",
+    "server_upgrade",
     "server_critical_postgres",
     "server",
     "browser",

@@ -271,14 +271,8 @@ test("full browser evidence is current-worktree self-hosted on an isolated port"
   assert.match(full, /browser_gate_lock_release/u);
   assert.match(full, /STYLE_L1_BASE_URL=""/u);
   assert.match(full, /STYLE_L1_PORT="\$browser_port"/u);
-  assert.match(
-    full,
-    /DEFAULT_QA_BROWSER_SCENARIOS="root-redirect-desktop"/u,
-  );
-  assert.doesNotMatch(
-    full,
-    /DEFAULT_QA_BROWSER_SCENARIOS="[^"]*dev-/u,
-  );
+  assert.match(full, /DEFAULT_QA_BROWSER_SCENARIOS="root-redirect-desktop"/u);
+  assert.doesNotMatch(full, /DEFAULT_QA_BROWSER_SCENARIOS="[^"]*dev-/u);
   assert.match(
     full,
     /local browser_scenarios="\$DEFAULT_QA_BROWSER_SCENARIOS"/u,
@@ -469,7 +463,7 @@ test("fixed full and strict gates cannot disappear behind file or package probes
   );
   assert.match(
     full,
-    /--ci-lane web-checks\|web-build\|server-core\|server-postgres/u,
+    /--ci-lane web-checks\|web-build\|server-schema\|server-upgrade\|server-test-build\|server-postgres/u,
   );
   assert.match(
     full,
@@ -481,7 +475,15 @@ test("fixed full and strict gates cannot disappear behind file or package probes
   );
   assert.match(
     full,
-    /server-core\)\s+qa_run_stage strict environment_profile qa_full_environment_profile\s+qa_run_stage strict server qa_full_server/u,
+    /server-schema\)\s+qa_run_stage strict server qa_full_server_schema/u,
+  );
+  assert.match(
+    full,
+    /server-upgrade\)\s+qa_run_stage strict environment_profile qa_full_environment_profile\s+qa_run_stage strict server qa_full_server_upgrade/u,
+  );
+  assert.match(
+    full,
+    /server-test-build\)\s+qa_run_stage strict server qa_full_server_test_build/u,
   );
   assert.match(
     full,

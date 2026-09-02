@@ -4,8 +4,8 @@ workflow:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-    - if: '$CI_PIPELINE_SOURCE =~ /^(api|trigger|web)$/ && $RELEASE_SHA && $RELEASE_VERSION && $RELEASE_VERSION_REFERENCE'
-    - if: '$CI_PIPELINE_SOURCE =~ /^(api|web)$/ && $BACKFILL_RELEASE_SOURCE_SHA'
+    - if: "$CI_PIPELINE_SOURCE =~ /^(api|trigger|web)$/ && $RELEASE_SHA && $RELEASE_VERSION && $RELEASE_VERSION_REFERENCE"
+    - if: "$CI_PIPELINE_SOURCE =~ /^(api|web)$/ && $BACKFILL_RELEASE_SOURCE_SHA"
     - when: never
 
 stages:
@@ -73,7 +73,7 @@ variables:
 
 .main_quality_rules: &main_quality_rules
   rules:
-    - if: '$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA'
+    - if: "$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA"
       when: never
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
     - when: never
@@ -81,7 +81,7 @@ variables:
 plan:
   stage: plan
   rules:
-    - if: '$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA'
+    - if: "$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA"
       when: never
     - when: on_success
   script:
@@ -331,7 +331,37 @@ quality_web_build:
       - output/ci/web-lanes/build.json
       - web/build/
 
-quality_server_core:
+quality_server_schema:
+  <<: *quality_shard
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+  script:
+    - node scripts/qa/ci-quality-stage-lane.mjs --shard server --lane schema
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/server-lanes/schema.json
+
+quality_server_upgrade:
+  <<: *quality_shard
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+  script:
+    - node scripts/qa/ci-quality-stage-lane.mjs --shard server --lane upgrade
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/server-lanes/upgrade.json
+
+quality_server_test_build:
   <<: [*quality_shard, *browser_cache_pull]
   needs:
     - job: plan
@@ -339,12 +369,12 @@ quality_server_core:
     - job: prepare
       artifacts: false
   script:
-    - node scripts/qa/ci-quality-stage-lane.mjs --shard server --lane core
+    - node scripts/qa/ci-quality-stage-lane.mjs --shard server --lane test_build
   artifacts:
     when: always
     expire_in: 90 days
     paths:
-      - output/ci/server-lanes/core.json
+      - output/ci/server-lanes/test_build.json
 
 quality_server_critical_postgres:
   <<: *quality_shard
@@ -387,7 +417,11 @@ quality_server:
       artifacts: true
     - job: prepare
       artifacts: false
-    - job: quality_server_core
+    - job: quality_server_schema
+      artifacts: true
+    - job: quality_server_upgrade
+      artifacts: true
+    - job: quality_server_test_build
       artifacts: true
     - job: quality_server_critical_postgres
       artifacts: true
@@ -531,7 +565,7 @@ quality_affected:
     - job: plan
       artifacts: true
   rules:
-    - if: '$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA'
+    - if: "$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA"
       when: never
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - when: never
@@ -639,7 +673,7 @@ quality_affected:
       artifacts: false
       optional: true
   rules:
-    - if: '$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA'
+    - if: "$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA"
       when: never
     - when: on_success
   script:

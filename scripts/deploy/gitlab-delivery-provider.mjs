@@ -42,6 +42,8 @@ export const GITLAB_LEGACY_RELEASE_ASSETS = LEGACY_DELIVERY_RELEASE_ASSETS;
 export const GITLAB_RELEASE_ASSETS = DELIVERY_RELEASE_ASSETS;
 export const GITLAB_PIPELINE_TIMINGS_CONTRACT =
   "plush.delivery-pipeline-timings/v1";
+export const GITLAB_PIPELINE_TOPOLOGY_CONTRACT =
+  "plush.delivery-pipeline-topology/v1";
 
 const PROJECT_ID = encodeURIComponent(GITLAB_DELIVERY_PROJECT);
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
@@ -50,6 +52,7 @@ const SHA256_DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/u;
 const MAX_JSON_BYTES = 8 * 1024 * 1024;
 const MAX_RELEASE_DETAIL_BYTES = 512 * 1024;
 const MAX_ASSET_BYTES = 32 * 1024 * 1024 * 1024;
+const PIPELINE_READ_CONCURRENCY = 4;
 const CONTROL_RELEASE_ASSETS = Object.freeze([
   "checksums.sha256",
   "release-artifact.json",
@@ -65,12 +68,7 @@ const ALLOWED_CONTROL_RELEASE_ASSETS = new Set([
   ...CONTROL_RELEASE_ASSETS,
   ...LEGACY_CONTROL_RELEASE_ASSETS,
 ]);
-const TERMINAL_STATUSES = new Set([
-  "success",
-  "failed",
-  "canceled",
-  "skipped",
-]);
+const TERMINAL_STATUSES = new Set(["success", "failed", "canceled", "skipped"]);
 
 function exactAssetSet(assets, expected) {
   const sorted = [...expected].sort();
@@ -261,27 +259,25 @@ function normalizePackageFiles(files) {
   }
   if (
     files.some(
-      (file) =>
-        !GITLAB_RELEASE_ASSETS.includes(String(file?.file_name || "")),
+      (file) => !GITLAB_RELEASE_ASSETS.includes(String(file?.file_name || "")),
     )
   ) {
     throw new Error("GitLab package contains an unknown release asset");
   }
-  const selected = files
-    .map((file) => {
-      const name = String(file.file_name);
-      const size = Number(file.size);
-      const sha256 = String(file.file_sha256 || "");
-      if (
-        !Number.isSafeInteger(size) ||
-        size < 1 ||
-        size > MAX_ASSET_BYTES ||
-        !SHA256_PATTERN.test(sha256)
-      ) {
-        throw new Error("GitLab package file identity is invalid");
-      }
-      return { name, size, sha256 };
-    });
+  const selected = files.map((file) => {
+    const name = String(file.file_name);
+    const size = Number(file.size);
+    const sha256 = String(file.file_sha256 || "");
+    if (
+      !Number.isSafeInteger(size) ||
+      size < 1 ||
+      size > MAX_ASSET_BYTES ||
+      !SHA256_PATTERN.test(sha256)
+    ) {
+      throw new Error("GitLab package file identity is invalid");
+    }
+    return { name, size, sha256 };
+  });
   if (new Set(selected.map((file) => file.name)).size !== selected.length) {
     throw new Error("GitLab package contains duplicate release assets");
   }
@@ -340,6 +336,9 @@ function normalizeJob(job) {
   const finishedAt = normalizeTimestamp(job.finished_at, "job finish", {
     optional: true,
   });
+  const createdAt = normalizeTimestamp(job.created_at, "job creation", {
+    optional: true,
+  });
   return {
     id: job.id,
     name: normalizeLabel(job.name, "job"),
@@ -351,8 +350,81 @@ function normalizeJob(job) {
       Number.isFinite(job.duration) && job.duration >= 0
         ? Math.round(job.duration * 1000)
         : elapsedMs(startedAt, finishedAt),
+    queueMs:
+      Number.isFinite(job.queued_duration) && job.queued_duration >= 0
+        ? Math.round(job.queued_duration * 1000)
+        : elapsedMs(createdAt, startedAt),
+    url: `${GITLAB_DELIVERY_BASE_URL}/${GITLAB_DELIVERY_PROJECT}/-/jobs/${String(job.id)}`,
     steps: [],
   };
+}
+
+function normalizeTopologyNeed(need) {
+  const name =
+    typeof need === "string" ? need : String(need?.name || need?.job || "");
+  return {
+    name: normalizeLabel(name, "CI job dependency"),
+    optional: typeof need === "object" && need?.optional === true,
+  };
+}
+
+function normalizePipelineTopology(value, gitSha) {
+  if (
+    value?.valid !== true ||
+    !Array.isArray(value.jobs) ||
+    value.jobs.length < 1 ||
+    value.jobs.length > 100
+  ) {
+    throw new Error("GitLab pipeline topology response is invalid");
+  }
+  const jobs = value.jobs.map((job) => {
+    const rawNeeds = job?.needs === null ? [] : job?.needs;
+    if (!Array.isArray(rawNeeds) || rawNeeds.length > 100) {
+      throw new Error("GitLab CI job dependencies are invalid");
+    }
+    const needs = rawNeeds.map(normalizeTopologyNeed);
+    if (new Set(needs.map((need) => need.name)).size !== needs.length) {
+      throw new Error("GitLab CI job dependencies are not unique");
+    }
+    return {
+      name: normalizeLabel(job?.name, "CI job"),
+      stage: normalizeLabel(job?.stage, "CI job stage"),
+      needs,
+    };
+  });
+  const names = new Set(jobs.map((job) => job.name));
+  if (
+    names.size !== jobs.length ||
+    jobs.some(
+      (job) =>
+        job.needs.some((need) => need.name === job.name) ||
+        job.needs.some((need) => !need.optional && !names.has(need.name)),
+    )
+  ) {
+    throw new Error("GitLab pipeline topology graph is invalid");
+  }
+  return {
+    schemaVersion: GITLAB_PIPELINE_TOPOLOGY_CONTRACT,
+    gitSha,
+    jobs: jobs.map((job) => ({
+      ...job,
+      needs: job.needs
+        .filter((need) => names.has(need.name))
+        .map((need) => need.name),
+    })),
+  };
+}
+
+async function mapWithConcurrency(values, concurrency, mapper) {
+  const output = [];
+  for (let index = 0; index < values.length; index += concurrency) {
+    output.push(
+      ...(await Promise.all(
+        values.slice(index, index + concurrency).map((value) => mapper(value)),
+      )),
+    );
+  }
+  return output;
 }
 
 function normalizePipeline(pipelineValue, jobs) {
@@ -426,7 +498,9 @@ function assertDownloadDirectory(projectRoot, destination, kind = "release") {
     !["release", "control"].includes(kind) ||
     !candidate.startsWith(`${fixedRoot}${path.sep}`)
   ) {
-    throw new Error("GitLab release download must remain in the fixed output root");
+    throw new Error(
+      "GitLab release download must remain in the fixed output root",
+    );
   }
   let cursor = candidate;
   while (cursor !== outputRoot) {
@@ -599,14 +673,18 @@ export function createGitlabDeliveryProvider({
     }
     const controls = new Map(
       transport.controlAssets.map((name) => {
-        const buffer = Buffer.from(readBoundedManifest(path.join(target, name)));
+        const buffer = Buffer.from(
+          readBoundedManifest(path.join(target, name)),
+        );
         const metadata = formalFiles.find((file) => file.name === name);
         if (
           !metadata ||
           buffer.length !== metadata.size ||
           sha256Buffer(buffer) !== metadata.sha256
         ) {
-          throw new Error(`GitLab release control asset identity mismatch: ${name}`);
+          throw new Error(
+            `GitLab release control asset identity mismatch: ${name}`,
+          );
         }
         return [name, buffer];
       }),
@@ -682,7 +760,9 @@ export function createGitlabDeliveryProvider({
       manifest.schemaVersion !== "plush.release-manifest/v2" ||
       manifest.rehearsal?.receiptSha256 !== sha256Buffer(rehearsalBuffer)
     ) {
-      throw new Error("GitLab release control evidence is not promotion eligible");
+      throw new Error(
+        "GitLab release control evidence is not promotion eligible",
+      );
     }
     const expectedFetch = buildTargetReleaseFetch({
       gitSha,
@@ -691,13 +771,17 @@ export function createGitlabDeliveryProvider({
       sourceFile,
     });
     const fetch = validateTargetReleaseFetch(
-      JSON.parse(readBoundedManifest(path.join(target, TARGET_RELEASE_FETCH_FILE))),
+      JSON.parse(
+        readBoundedManifest(path.join(target, TARGET_RELEASE_FETCH_FILE)),
+      ),
     );
     if (
       JSON.stringify(fetch) !== JSON.stringify(expectedFetch) ||
       fetch.source.file.sha256 !== artifact.sourceArchive.sha256
     ) {
-      throw new Error("cached GitLab target release descriptor is stale or invalid");
+      throw new Error(
+        "cached GitLab target release descriptor is stale or invalid",
+      );
     }
     return {
       transportMode: transport.transportMode,
@@ -717,9 +801,7 @@ export function createGitlabDeliveryProvider({
       packageValue,
       "release-manifest.json",
     );
-    const manifest = validateReleaseManifest(
-      manifestAsset.value,
-    );
+    const manifest = validateReleaseManifest(manifestAsset.value);
     validateReleaseArtifactBinding(manifest, artifact, artifactAsset.sha256);
     if (
       artifact?.schemaVersion !== "plush-release-artifact/v1" ||
@@ -773,7 +855,7 @@ export function createGitlabDeliveryProvider({
     return detail;
   }
 
-  async function listPipelines({ limit, sha } = {}) {
+  async function listPipelines({ limit, sha, source } = {}) {
     const query = new URLSearchParams({
       ref: "main",
       order_by: "id",
@@ -781,6 +863,7 @@ export function createGitlabDeliveryProvider({
       per_page: String(limit),
     });
     if (sha) query.set("sha", sha);
+    if (source) query.set("source", source);
     const pipelines = await requestJson(
       request,
       env,
@@ -850,9 +933,7 @@ export function createGitlabDeliveryProvider({
         const packageItem = packageByVersion.get(tag);
         const files = packageItem ? await readPackageFiles(packageItem) : [];
         versions.push({
-          packageValue: packageItem
-            ? { item: packageItem, tag, files }
-            : null,
+          packageValue: packageItem ? { item: packageItem, tag, files } : null,
           version: normalizeRelease(release, files),
         });
       }
@@ -883,19 +964,46 @@ export function createGitlabDeliveryProvider({
       return versions.map((item) => item.version);
     },
 
-    async listPipelineTimings({ limit = 8 } = {}) {
-      if (!Number.isSafeInteger(limit) || limit < 1 || limit > 20) {
-        throw new Error("GitLab pipeline timing limit is invalid");
+    async listPipelineTimings({ limit = 8, sha = "", source = "" } = {}) {
+      if (
+        !Number.isSafeInteger(limit) ||
+        limit < 1 ||
+        limit > 20 ||
+        (sha !== "" && !SHA_PATTERN.test(sha)) ||
+        !["", "push"].includes(source)
+      ) {
+        throw new Error("GitLab pipeline timing query is invalid");
       }
-      const runs = [];
-      for (const raw of await listPipelines({ limit })) {
-        runs.push(await readPipeline(raw));
-      }
+      const runs = await mapWithConcurrency(
+        await listPipelines({ limit, sha, source }),
+        PIPELINE_READ_CONCURRENCY,
+        readPipeline,
+      );
       return {
         schemaVersion: GITLAB_PIPELINE_TIMINGS_CONTRACT,
         generatedAt: normalizeTimestamp(now(), "timing generation"),
         runs,
       };
+    },
+
+    async readPipelineTopology({ sha } = {}) {
+      if (!SHA_PATTERN.test(String(sha || ""))) {
+        throw new Error("GitLab pipeline topology query is invalid");
+      }
+      const query = new URLSearchParams({
+        content_ref: sha,
+        dry_run: "true",
+        dry_run_ref: "main",
+        include_jobs: "true",
+      });
+      return normalizePipelineTopology(
+        await requestJson(
+          request,
+          env,
+          `/projects/${PROJECT_ID}/ci/lint?${query.toString()}`,
+        ),
+        sha,
+      );
     },
 
     async getReleaseStatus(gitSha) {

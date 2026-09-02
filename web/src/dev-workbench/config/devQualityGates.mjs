@@ -11,10 +11,11 @@ export const DEV_QUALITY_GATE_OPERATION_API_PREFIX = `${DEV_QUALITY_GATE_API_PAT
 export const DEV_QUALITY_GATE_OPERATION_SCHEMA =
   'plush.dev-quality-gate-operation-public/v1'
 export const DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA =
-  'plush.dev-quality-gate-server-evidence/v2'
+  'plush.dev-quality-gate-server-evidence/v4'
 
 export const QUERY_KEYS = Object.freeze({
   view: 'view',
+  serverView: 'serverView',
   profile: 'profile',
   operation: 'operation',
   q: 'q',
@@ -27,7 +28,7 @@ export const VIEW_ITEMS = Object.freeze([
     value: 'server',
     label: '服务器门禁',
     description:
-      '查看当前 committed SHA 的 R640 CI、排队耗时与最慢主路径 Job；不混入本机诊断记录。',
+      '查看当前 committed SHA 的 R640 CI、逐 Job 运行等待与历史退化；不混入本机诊断记录。',
   }),
   Object.freeze({
     value: 'run',
@@ -48,12 +49,18 @@ export const VIEW_ITEMS = Object.freeze([
 ])
 export const VIEW_KEYS = Object.freeze(VIEW_ITEMS.map((item) => item.value))
 export const VIEW_QUERY_KEYS = Object.freeze({
-  server: Object.freeze(['view']),
+  server: Object.freeze(['view', 'serverView']),
   run: Object.freeze(['view', 'profile', 'operation']),
   governance: Object.freeze(['view', 'q', 'filter']),
   gaps: Object.freeze(['view', 'range', 'risk']),
 })
 export const DEFAULT_VIEW = 'server'
+export const DEFAULT_SERVER_VIEW = 'pipeline'
+export const DEV_QUALITY_GATE_SERVER_VIEWS = Object.freeze([
+  'pipeline',
+  'performance',
+  'history',
+])
 export const DEV_QUALITY_GATE_PROFILES = Object.freeze(['full', 'strict'])
 export const DEV_QUALITY_GATE_GOVERNANCE_FILTERS = Object.freeze([
   'relevant',
@@ -118,6 +125,23 @@ const SERVER_HISTORY_RESULTS = Object.freeze([
   'failed',
   'cancelled',
   'skipped',
+])
+const SERVER_JOB_ROLES = Object.freeze([
+  'orchestration',
+  'execution',
+  'aggregate',
+  'terminal',
+])
+const SERVER_JOB_GROUPS = Object.freeze([
+  'pipeline',
+  'static',
+  'node',
+  'resource',
+  'web',
+  'server',
+  'browser',
+  'security',
+  'other',
 ])
 const STATUS_META = Object.freeze({
   queued: Object.freeze({ label: '等待启动', tone: 'processing' }),
@@ -465,14 +489,31 @@ function normalizeServerEvidenceDuration(value, field) {
 function normalizeServerEvidenceJob(job) {
   assertExactKeys(
     job,
-    ['conclusion', 'durationMs', 'id', 'name', 'status'],
+    [
+      'attemptCount',
+      'conclusion',
+      'durationMs',
+      'group',
+      'id',
+      'name',
+      'queueMs',
+      'role',
+      'status',
+      'url',
+    ],
     'quality server evidence job'
   )
   if (
     !Number.isSafeInteger(job.id) ||
     job.id < 1 ||
+    !Number.isSafeInteger(job.attemptCount) ||
+    job.attemptCount < 1 ||
     !PIPELINE_STATUSES.includes(job.status) ||
-    !PIPELINE_CONCLUSIONS.includes(job.conclusion)
+    !PIPELINE_CONCLUSIONS.includes(job.conclusion) ||
+    !SERVER_JOB_ROLES.includes(job.role) ||
+    !SERVER_JOB_GROUPS.includes(job.group) ||
+    job.url !==
+      `https://gitlab.saurick.me/saurick/plush-toy-erp/-/jobs/${String(job.id)}`
   ) {
     throw new Error('quality server evidence job is invalid')
   }
@@ -482,6 +523,10 @@ function normalizeServerEvidenceJob(job) {
     durationMs: normalizeServerEvidenceDuration(
       job.durationMs,
       'quality server evidence job duration'
+    ),
+    queueMs: normalizeServerEvidenceDuration(
+      job.queueMs,
+      'quality server evidence job queue duration'
     ),
   }
 }
@@ -528,8 +573,88 @@ function normalizeServerEvidencePipeline(pipeline) {
   }
 }
 
+function serverTopologyIsAcyclic(jobs) {
+  const remainingNeeds = new Map(
+    jobs.map((job) => [job.name, new Set(job.needs)])
+  )
+  const ready = jobs
+    .filter((job) => job.needs.length === 0)
+    .map((job) => job.name)
+  let visited = 0
+  while (ready.length > 0) {
+    const name = ready.shift()
+    visited += 1
+    for (const [candidate, needs] of remainingNeeds) {
+      if (!needs.delete(name) || needs.size !== 0) continue
+      if (candidate !== name) ready.push(candidate)
+    }
+  }
+  return visited === jobs.length
+}
+
+function normalizeServerEvidenceTopology(topology) {
+  assertExactKeys(
+    topology,
+    ['gitSha', 'jobs', 'message', 'status'],
+    'quality server evidence topology'
+  )
+  if (
+    !['available', 'missing', 'unavailable'].includes(topology.status) ||
+    (topology.gitSha !== '' && !COMMIT_PATTERN.test(topology.gitSha)) ||
+    !Array.isArray(topology.jobs) ||
+    topology.jobs.length > 100
+  ) {
+    throw new Error('quality server evidence topology is invalid')
+  }
+  const jobs = topology.jobs.map((job) => {
+    assertExactKeys(
+      job,
+      ['name', 'needs', 'stage'],
+      'quality server evidence topology job'
+    )
+    if (!Array.isArray(job.needs) || job.needs.length > 100) {
+      throw new Error('quality server evidence topology job is invalid')
+    }
+    const name = safeText(job.name, 'quality server topology job name', {
+      max: 120,
+    })
+    const needs = job.needs.map((dependency) =>
+      safeText(dependency, 'quality server topology dependency', { max: 120 })
+    )
+    if (new Set(needs).size !== needs.length || needs.includes(name)) {
+      throw new Error(
+        'quality server evidence topology dependencies are invalid'
+      )
+    }
+    return {
+      name,
+      stage: safeText(job.stage, 'quality server topology job stage', {
+        max: 120,
+      }),
+      needs,
+    }
+  })
+  const names = new Set(jobs.map((job) => job.name))
+  if (
+    names.size !== jobs.length ||
+    jobs.some((job) =>
+      job.needs.some((dependency) => !names.has(dependency))
+    ) ||
+    !serverTopologyIsAcyclic(jobs) ||
+    (topology.status === 'available' && jobs.length === 0) ||
+    (topology.status !== 'available' && jobs.length !== 0)
+  ) {
+    throw new Error('quality server evidence topology graph is invalid')
+  }
+  return {
+    ...topology,
+    message: safeText(topology.message, 'quality server topology message'),
+    jobs,
+  }
+}
+
 function normalizeServerEvidenceHistory(history) {
-  if (!Array.isArray(history) || history.length > 8) {
+  if (!Array.isArray(history) || history.length > 20) {
     throw new Error('quality server evidence history is invalid')
   }
   const normalized = history.map((run) => {
@@ -542,6 +667,8 @@ function normalizeServerEvidenceHistory(history) {
         'finishedAt',
         'gitSha',
         'id',
+        'jobs',
+        'queueMs',
         'result',
         'url',
       ],
@@ -552,6 +679,8 @@ function normalizeServerEvidenceHistory(history) {
       run.id < 1 ||
       !SERVER_HISTORY_RESULTS.includes(run.result) ||
       !COMMIT_PATTERN.test(run.gitSha) ||
+      !Array.isArray(run.jobs) ||
+      run.jobs.length > 100 ||
       !isIsoDate(run.createdAt) ||
       (run.finishedAt !== null && !isIsoDate(run.finishedAt)) ||
       run.url !==
@@ -560,17 +689,29 @@ function normalizeServerEvidenceHistory(history) {
     ) {
       throw new Error('quality server evidence history run is invalid')
     }
+    const jobs = run.jobs.map(normalizeServerEvidenceJob)
+    if (
+      new Set(jobs.map((job) => job.id)).size !== jobs.length ||
+      new Set(jobs.map((job) => job.name)).size !== jobs.length
+    ) {
+      throw new Error('quality server evidence history jobs are invalid')
+    }
     return {
       ...run,
       durationMs: normalizeServerEvidenceDuration(
         run.durationMs,
         'quality server evidence history duration'
       ),
+      queueMs: normalizeServerEvidenceDuration(
+        run.queueMs,
+        'quality server evidence history queue duration'
+      ),
       failureJob: safeText(
         run.failureJob,
         'quality server evidence history failure job',
         { allowEmpty: true, max: 120 }
       ),
+      jobs,
     }
   })
   if (
@@ -598,6 +739,7 @@ function normalizeServerEvidence(evidence) {
       'pipeline',
       'schemaVersion',
       'status',
+      'topology',
     ],
     'quality server evidence'
   )
@@ -607,7 +749,7 @@ function normalizeServerEvidence(evidence) {
     typeof evidence.current !== 'boolean' ||
     typeof evidence.coversWorkingTree !== 'boolean' ||
     !Array.isArray(evidence.jobs) ||
-    evidence.jobs.length > 20 ||
+    evidence.jobs.length > 100 ||
     !Array.isArray(evidence.notProven) ||
     evidence.notProven.length > 20 ||
     (evidence.gitSha !== '' && !COMMIT_PATTERN.test(evidence.gitSha))
@@ -615,19 +757,32 @@ function normalizeServerEvidence(evidence) {
     throw new Error('quality server evidence is invalid')
   }
   const pipeline = normalizeServerEvidencePipeline(evidence.pipeline)
+  const topology = normalizeServerEvidenceTopology(evidence.topology)
   const history = normalizeServerEvidenceHistory(evidence.history)
+  const jobs = evidence.jobs.map(normalizeServerEvidenceJob)
   if (
     (['passed', 'running', 'failed'].includes(evidence.status) && !pipeline) ||
     (['missing', 'unavailable'].includes(evidence.status) && pipeline) ||
-    (evidence.coversWorkingTree && evidence.status !== 'passed')
+    (evidence.coversWorkingTree && evidence.status !== 'passed') ||
+    (topology.status === 'available' &&
+      (!pipeline || topology.gitSha !== evidence.gitSha)) ||
+    (topology.status === 'missing' && pipeline) ||
+    (topology.status === 'available' &&
+      (topology.jobs.length !== jobs.length ||
+        topology.jobs.some(
+          (topologyJob) => !jobs.some((job) => job.name === topologyJob.name)
+        ))) ||
+    new Set(jobs.map((job) => job.id)).size !== jobs.length ||
+    new Set(jobs.map((job) => job.name)).size !== jobs.length
   ) {
     throw new Error('quality server evidence state is inconsistent')
   }
   return {
     ...evidence,
     pipeline,
+    topology,
     history,
-    jobs: evidence.jobs.map(normalizeServerEvidenceJob),
+    jobs,
     message: safeText(evidence.message, 'quality server evidence message'),
     notProven: evidence.notProven.map((item) =>
       safeText(item, 'quality server evidence missing item', { max: 200 })
@@ -882,7 +1037,11 @@ export function parseQualityGateSearch(search, { operationIds = null } = {}) {
   }
   const values = { view }
   if (view === 'server') {
-    // 服务器视图只绑定当前 summary，不接受额外筛选或运行参数。
+    const serverView = params.get(QUERY_KEYS.serverView) || DEFAULT_SERVER_VIEW
+    if (!DEV_QUALITY_GATE_SERVER_VIEWS.includes(serverView)) {
+      issues.push('服务器门禁视图不存在或已经过期')
+    }
+    values.serverView = serverView
   } else if (view === 'run') {
     const profile = params.get(QUERY_KEYS.profile) || ''
     const operation = params.get(QUERY_KEYS.operation) || ''
@@ -1092,6 +1251,117 @@ function projectServerPipelineJobStatus(job, evidenceStatus) {
   return 'unavailable'
 }
 
+const SERVER_DAG_STAGE_LABELS = Object.freeze({
+  plan: '计划',
+  prepare: '准备',
+  quality: '并行门禁',
+  aggregate: '聚合',
+  gate: '终态',
+})
+
+const SERVER_DAG_STATUS_LABELS = Object.freeze({
+  passed: '通过',
+  running: '运行中',
+  pending: '等待',
+  failed: '失败',
+  cancelled: '取消',
+  skipped: '跳过',
+  not_run: '未运行',
+  missing: '无记录',
+  unavailable: '不可读',
+})
+
+function escapeServerDagText(value) {
+  return String(value)
+    .replaceAll('&', '＆')
+    .replaceAll('"', "'")
+    .replaceAll('<', '‹')
+    .replaceAll('>', '›')
+    .replaceAll('|', '｜')
+    .replaceAll('[', '(')
+    .replaceAll(']', ')')
+    .replaceAll('{', '(')
+    .replaceAll('}', ')')
+}
+
+export function buildQualityGateServerDag(evidence) {
+  const topology = evidence?.topology
+  if (topology?.status !== 'available' || !Array.isArray(topology.jobs)) {
+    return {
+      status: topology?.status || 'unavailable',
+      chart: '',
+      nodeCount: 0,
+      edgeCount: 0,
+      message: topology?.message || '当前 GitLab CI 依赖暂不可读。',
+    }
+  }
+  const actualByName = new Map(
+    (Array.isArray(evidence?.jobs) ? evidence.jobs : []).map((job) => [
+      job.name,
+      job,
+    ])
+  )
+  const nodeIds = new Map(
+    topology.jobs.map((job, index) => [job.name, `J${String(index)}`])
+  )
+  const stages = []
+  for (const job of topology.jobs) {
+    if (!stages.includes(job.stage)) stages.push(job.stage)
+  }
+  const lines = ['flowchart LR']
+  const statusIds = new Map()
+  for (const [stageIndex, stage] of stages.entries()) {
+    const stageLabel = SERVER_DAG_STAGE_LABELS[stage] || stage
+    lines.push(
+      `  subgraph S${String(stageIndex)}["${escapeServerDagText(stageLabel)}"]`
+    )
+    lines.push('    direction TB')
+    for (const job of topology.jobs.filter(
+      (candidate) => candidate.stage === stage
+    )) {
+      const actual = actualByName.get(job.name)
+      const status = projectServerPipelineJobStatus(actual, evidence?.status)
+      const duration =
+        actual?.durationMs === null || actual?.durationMs === undefined
+          ? SERVER_DAG_STATUS_LABELS[status] || '状态未证明'
+          : `${SERVER_DAG_STATUS_LABELS[status] || '状态未证明'} · ${formatQualityGateDuration(actual.durationMs)}`
+      lines.push(
+        `    ${nodeIds.get(job.name)}["${escapeServerDagText(`${job.name} · ${duration}`)}"]`
+      )
+      const ids = statusIds.get(status) || []
+      ids.push(nodeIds.get(job.name))
+      statusIds.set(status, ids)
+    }
+    lines.push('  end')
+  }
+  let edgeCount = 0
+  for (const job of topology.jobs) {
+    for (const dependency of job.needs) {
+      lines.push(`  ${nodeIds.get(dependency)} --> ${nodeIds.get(job.name)}`)
+      edgeCount += 1
+    }
+  }
+  for (const [status, ids] of statusIds) {
+    lines.push(`  class ${ids.join(',')} ${status}`)
+  }
+  lines.push('  classDef passed stroke:#2b8a3e,stroke-width:2px')
+  lines.push('  classDef running stroke:#1677ff,stroke-width:3px')
+  lines.push('  classDef pending stroke:#d89614,stroke-width:2px')
+  lines.push('  classDef failed stroke:#cf1322,stroke-width:3px')
+  lines.push('  classDef cancelled stroke:#8c8c8c,stroke-width:2px')
+  lines.push('  classDef skipped stroke:#8c8c8c,stroke-dasharray:4 3')
+  lines.push('  classDef not_run stroke:#8c8c8c,stroke-dasharray:4 3')
+  lines.push('  classDef missing stroke:#8c8c8c,stroke-dasharray:4 3')
+  lines.push('  classDef unavailable stroke:#8c8c8c,stroke-dasharray:4 3')
+  return {
+    status: 'available',
+    chart: lines.join('\n'),
+    nodeCount: topology.jobs.length,
+    edgeCount,
+    message: topology.message,
+  }
+}
+
 export function buildQualityGateServerTiming(evidence) {
   const observedJobs = (Array.isArray(evidence?.jobs) ? evidence.jobs : []).map(
     (job) => ({
@@ -1100,6 +1370,8 @@ export function buildQualityGateServerTiming(evidence) {
         Number.isFinite(job?.durationMs) && job.durationMs >= 0
           ? job.durationMs
           : null,
+      queueMs:
+        Number.isFinite(job?.queueMs) && job.queueMs >= 0 ? job.queueMs : null,
       flowStatus: projectServerPipelineJobStatus(job, evidence?.status),
     })
   )
@@ -1109,14 +1381,40 @@ export function buildQualityGateServerTiming(evidence) {
     observed: true,
     status: job.flowStatus,
   }))
-  const jobs = [...flowJobs]
-    .sort((left, right) => {
-      const durationDifference =
-        (right.durationMs ?? -1) - (left.durationMs ?? -1)
-      return durationDifference || left.name.localeCompare(right.name, 'zh-CN')
-    })
+  const jobs = [...flowJobs].sort((left, right) => {
+    const durationDifference =
+      (right.durationMs ?? -1) - (left.durationMs ?? -1)
+    return durationDifference || left.name.localeCompare(right.name, 'zh-CN')
+  })
   const longestJob = jobs.find((job) => job.durationMs !== null) || null
+  const longestExecutionJob =
+    jobs.find((job) => job.role === 'execution' && job.durationMs !== null) ||
+    null
   const longestDurationMs = longestJob?.durationMs || 0
+  const flowGroupOrder = [
+    'preparation',
+    'static',
+    'node',
+    'resource',
+    'web',
+    'server',
+    'browser',
+    'security',
+    'other',
+    'closeout',
+  ]
+  const flowGroups = flowGroupOrder
+    .map((key) => ({
+      key,
+      jobs: flowJobs.filter((job) => {
+        if (key === 'preparation') return job.role === 'orchestration'
+        if (key === 'closeout') {
+          return job.group === 'pipeline' && job.role !== 'orchestration'
+        }
+        return job.group === key
+      }),
+    }))
+    .filter((group) => group.jobs.length > 0)
 
   return {
     wallClockMs:
@@ -1130,7 +1428,9 @@ export function buildQualityGateServerTiming(evidence) {
         ? evidence.pipeline.queueMs
         : null,
     longestJob,
+    longestExecutionJob,
     flowJobs,
+    flowGroups,
     jobs: jobs.map((job) => ({
       ...job,
       relativePercent:
@@ -1138,6 +1438,155 @@ export function buildQualityGateServerTiming(evidence) {
           ? Number(((job.durationMs / longestDurationMs) * 100).toFixed(1))
           : null,
     })),
+  }
+}
+
+function percentileDuration(values, percentile) {
+  if (!values.length) return null
+  const ordered = [...values].sort((left, right) => left - right)
+  const index = Math.max(
+    0,
+    Math.min(ordered.length - 1, Math.ceil(ordered.length * percentile) - 1)
+  )
+  return ordered[index]
+}
+
+function serverJobPerformanceStatus(row) {
+  if (row.role === 'execution') {
+    if (row.latestDurationMs !== null && row.latestDurationMs > 120_000) {
+      return 'critical'
+    }
+    if (row.latestDurationMs !== null && row.latestDurationMs > 90_000) {
+      return 'review'
+    }
+    if (
+      row.sampleCount >= 3 &&
+      row.latestDurationMs !== null &&
+      row.medianDurationMs !== null &&
+      row.latestDurationMs - row.medianDurationMs >= 15_000 &&
+      row.latestDurationMs >= row.medianDurationMs * 1.25
+    ) {
+      return 'regressed'
+    }
+  }
+  if (row.latestQueueMs !== null && row.latestQueueMs > 30_000) {
+    return 'queued'
+  }
+  if (
+    row.role === 'aggregate' &&
+    row.latestDurationMs !== null &&
+    row.latestDurationMs > 30_000
+  ) {
+    return 'aggregate_slow'
+  }
+  if (row.retryCount > 0 || row.failureCount > 0) return 'unstable'
+  return 'healthy'
+}
+
+export function buildQualityGateServerPerformance(evidence) {
+  const byName = new Map()
+  const history = Array.isArray(evidence?.history) ? evidence.history : []
+  for (const run of history) {
+    for (const job of Array.isArray(run.jobs) ? run.jobs : []) {
+      const row = byName.get(job.name) || {
+        name: job.name,
+        role: job.role,
+        group: job.group,
+        latestDurationMs: null,
+        latestQueueMs: null,
+        latestConclusion: '',
+        latestStatus: '',
+        latestPipelineId: null,
+        latestPipelineUrl: '',
+        latestJobUrl: '',
+        durations: [],
+        queues: [],
+        retryCount: 0,
+        failureCount: 0,
+      }
+      if (row.latestPipelineId === null) {
+        row.latestDurationMs = job.durationMs
+        row.latestQueueMs = job.queueMs
+        row.latestConclusion = job.conclusion
+        row.latestStatus = job.status
+        row.latestPipelineId = run.id
+        row.latestPipelineUrl = run.url
+        row.latestJobUrl = job.url
+      }
+      row.retryCount += Math.max(0, job.attemptCount - 1)
+      if (job.conclusion === 'failure') row.failureCount += 1
+      if (job.status === 'completed' && Number.isFinite(job.queueMs)) {
+        row.queues.push(job.queueMs)
+      }
+      if (
+        job.status === 'completed' &&
+        job.conclusion === 'success' &&
+        Number.isFinite(job.durationMs)
+      ) {
+        row.durations.push(job.durationMs)
+      }
+      byName.set(job.name, row)
+    }
+  }
+
+  const roleOrder = {
+    execution: 0,
+    aggregate: 1,
+    orchestration: 2,
+    terminal: 3,
+  }
+  const statusOrder = {
+    critical: 0,
+    review: 1,
+    regressed: 2,
+    queued: 3,
+    aggregate_slow: 4,
+    unstable: 5,
+    healthy: 6,
+  }
+  const rows = [...byName.values()]
+    .map((row) => {
+      const projected = {
+        ...row,
+        sampleCount: row.durations.length,
+        medianDurationMs: percentileDuration(row.durations, 0.5),
+        p95DurationMs:
+          row.durations.length >= 3
+            ? percentileDuration(row.durations, 0.95)
+            : null,
+        medianQueueMs: percentileDuration(row.queues, 0.5),
+        p95QueueMs:
+          row.queues.length >= 3 ? percentileDuration(row.queues, 0.95) : null,
+      }
+      delete projected.durations
+      delete projected.queues
+      return {
+        ...projected,
+        attention: serverJobPerformanceStatus(projected),
+      }
+    })
+    .sort((left, right) => {
+      const roleDifference = roleOrder[left.role] - roleOrder[right.role]
+      if (roleDifference) return roleDifference
+      const statusDifference =
+        statusOrder[left.attention] - statusOrder[right.attention]
+      if (statusDifference) return statusDifference
+      const durationDifference =
+        (right.latestDurationMs ?? -1) - (left.latestDurationMs ?? -1)
+      return durationDifference || left.name.localeCompare(right.name, 'zh-CN')
+    })
+
+  return {
+    historyCount: history.length,
+    executionCount: rows.filter((row) => row.role === 'execution').length,
+    criticalCount: rows.filter((row) => row.attention === 'critical').length,
+    reviewCount: rows.filter((row) => row.attention === 'review').length,
+    queueAttentionCount: rows.filter((row) => row.attention === 'queued')
+      .length,
+    unstableCount: rows.filter(
+      (row) => row.retryCount > 0 || row.failureCount > 0
+    ).length,
+    rows,
   }
 }
 

@@ -92,6 +92,28 @@
   background: var(--erp-surface-bg, #fff);
 }
 
+.erp-dev-quality-server-evidence__view-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--erp-border, #dce8dd);
+  border-radius: 8px;
+  background: var(--erp-surface-bg, #fff);
+}
+
+.erp-dev-quality-server-evidence__view-switch > .ant-typography {
+  flex: 1 1 260px;
+}
+
+.erp-dev-quality-server-view {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
 .erp-dev-quality-server-pipeline {
   display: grid;
   gap: 10px;
@@ -142,6 +164,19 @@
   margin: 0;
 }
 
+.erp-dev-quality-server-pipeline__dag {
+  min-width: 0;
+}
+
+.erp-dev-quality-server-pipeline__dag .erp-markdown-mermaid {
+  min-width: 0;
+  margin: 0;
+}
+
+.erp-dev-quality-server-pipeline__dag .erp-markdown-mermaid__canvas {
+  min-width: 880px;
+}
+
 .erp-dev-quality-server-pipeline__mapping {
   display: grid;
   gap: 8px;
@@ -170,59 +205,6 @@
   margin: 0;
 }
 
-.erp-dev-quality-server-pipeline__mapping-table-wrap {
-  max-width: 100%;
-  min-width: 0;
-  overflow-x: auto;
-  border: 1px solid var(--erp-border, #dce8dd);
-  border-radius: 7px;
-  background: var(--erp-surface-bg, #fff);
-}
-
-.erp-dev-quality-server-pipeline__mapping-table {
-  width: 100%;
-  min-width: 720px;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
-
-.erp-dev-quality-server-pipeline__mapping-table th,
-.erp-dev-quality-server-pipeline__mapping-table td {
-  padding: 7px 9px;
-  text-align: left;
-  vertical-align: top;
-}
-
-.erp-dev-quality-server-pipeline__mapping-table th {
-  color: var(--erp-text-muted, #637266);
-  font-size: 12px;
-  font-weight: 600;
-  background: var(--erp-surface-bg-soft, #f7faf7);
-}
-
-.erp-dev-quality-server-pipeline__mapping-table :where(th:first-child) {
-  width: 138px;
-}
-
-.erp-dev-quality-server-pipeline__mapping-table :where(th:last-child) {
-  width: 270px;
-}
-
-.erp-dev-quality-server-pipeline__mapping-table tbody tr {
-  border-top: 1px solid var(--erp-border, #dce8dd);
-}
-
-.erp-dev-quality-server-pipeline__mapping-table .ant-typography {
-  overflow-wrap: anywhere;
-}
-
-.erp-dev-quality-server-pipeline__mapping-job {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px 8px;
-  align-items: center;
-}
-
 .erp-dev-quality-server-pipeline__track {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -243,11 +225,12 @@
 
 .erp-dev-quality-server-pipeline__phase-heading {
   gap: 6px;
+  justify-content: space-between;
 }
 
-.erp-dev-quality-server-pipeline__phase-order {
-  color: var(--erp-primary, #2b8a3e);
-  font-variant-numeric: tabular-nums;
+.erp-dev-quality-server-pipeline__phase-heading .ant-tag,
+.erp-dev-quality-server-pipeline__node .ant-tag {
+  margin: 0;
 }
 
 .erp-dev-quality-server-pipeline__nodes {
@@ -278,12 +261,8 @@
   min-width: 0;
 }
 
-.erp-dev-quality-server-pipeline__status-indicator {
-  flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--erp-dev-quality-server-pipeline-status);
+.erp-dev-quality-server-pipeline__node-heading > a {
+  min-width: 0;
 }
 
 .erp-dev-quality-server-pipeline__node-text {
@@ -293,11 +272,21 @@
   white-space: nowrap;
 }
 
-.erp-dev-quality-server-pipeline__node-note {
-  min-width: 0;
-  font-size: 12px;
-  line-height: 1.35;
+.erp-dev-quality-server-pipeline__node-heading
+  .erp-dev-quality-server-pipeline__node-text {
+  display: block;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
   overflow-wrap: anywhere;
+}
+
+.erp-dev-quality-server-pipeline__status-indicator {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--erp-dev-quality-server-pipeline-status);
 }
 
 .erp-dev-quality-server-pipeline__status--passed {
@@ -320,33 +309,6 @@
 .erp-dev-quality-server-pipeline__status--skipped,
 .erp-dev-quality-server-pipeline__status--not_run {
   opacity: 0.72;
-}
-
-.erp-dev-quality-server-pipeline__connector {
-  position: relative;
-  display: block;
-  height: 12px;
-}
-
-.erp-dev-quality-server-pipeline__connector::before {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  left: 0;
-  border-top: 2px solid var(--erp-border-strong, #c5d7c8);
-  content: '';
-}
-
-.erp-dev-quality-server-pipeline__connector::after {
-  position: absolute;
-  top: 1px;
-  right: 0;
-  width: 0;
-  height: 0;
-  border-top: 5px solid transparent;
-  border-bottom: 5px solid transparent;
-  border-left: 7px solid var(--erp-border-strong, #c5d7c8);
-  content: '';
 }
 
 .erp-dev-quality-server-pipeline__legend {
@@ -405,10 +367,21 @@
 
 .erp-dev-quality-server-evidence__job-row {
   display: grid;
-  grid-template-columns: minmax(130px, 0.8fr) minmax(180px, 2fr) auto;
+  grid-template-columns: minmax(210px, 1.2fr) minmax(180px, 2fr) auto;
   gap: 10px;
   align-items: center;
   min-width: 0;
+}
+
+.erp-dev-quality-server-evidence__job-identity,
+.erp-dev-quality-server-evidence__job-times {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.erp-dev-quality-server-evidence__job-identity .ant-tag {
+  margin: 0;
 }
 
 .erp-dev-quality-server-evidence__job-name {
@@ -431,6 +404,93 @@
   height: 100%;
   border-radius: inherit;
   background: var(--erp-primary, #2b8a3e);
+}
+
+.erp-dev-quality-server-performance {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--erp-border, #dce8dd);
+}
+
+.erp-dev-quality-server-performance__heading {
+  display: flex;
+  gap: 8px 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.erp-dev-quality-server-performance__heading > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.erp-dev-quality-server-performance__heading .ant-typography,
+.erp-dev-quality-server-performance__heading .ant-tag {
+  margin: 0;
+}
+
+.erp-dev-quality-server-performance__table-wrap {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  border: 1px solid var(--erp-border, #dce8dd);
+  border-radius: 8px;
+  background: var(--erp-surface-bg, #fff);
+}
+
+.erp-dev-quality-server-performance__table {
+  width: 100%;
+  min-width: 880px;
+  border-collapse: collapse;
+}
+
+.erp-dev-quality-server-performance__table th,
+.erp-dev-quality-server-performance__table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--erp-border, #dce8dd);
+  text-align: start;
+  vertical-align: middle;
+}
+
+.erp-dev-quality-server-performance__table th {
+  color: var(--erp-text-muted, #637266);
+  background: var(--erp-surface-bg-soft, #f7faf7);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.erp-dev-quality-server-performance__table tbody tr[data-attention='critical'] {
+  background: color-mix(in srgb, #ff4d4f 8%, transparent);
+}
+
+.erp-dev-quality-server-performance__table tbody tr[data-attention='review'],
+.erp-dev-quality-server-performance__table tbody tr[data-attention='regressed'],
+.erp-dev-quality-server-performance__table
+  tbody
+  tr[data-attention='aggregate_slow'],
+.erp-dev-quality-server-performance__table tbody tr[data-attention='unstable'] {
+  background: color-mix(in srgb, #d89614 7%, transparent);
+}
+
+.erp-dev-quality-server-performance__table tbody tr[data-attention='queued'] {
+  background: color-mix(in srgb, #1677ff 7%, transparent);
+}
+
+.erp-dev-quality-server-performance__remaining > summary,
+.erp-dev-quality-server-history__jobs > summary {
+  width: fit-content;
+  color: var(--erp-primary, #2b8a3e);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.erp-dev-quality-server-performance__remaining[open],
+.erp-dev-quality-server-history__jobs[open] {
+  display: grid;
+  gap: 8px;
 }
 
 .erp-dev-quality-server-history {
@@ -468,7 +528,7 @@
 
 .erp-dev-quality-server-history__table {
   width: 100%;
-  min-width: 820px;
+  min-width: 980px;
   border-collapse: collapse;
 }
 
@@ -489,6 +549,28 @@
 
 .erp-dev-quality-server-history__table tbody tr[data-current='true'] {
   background: var(--erp-primary-soft, #edf7ef);
+}
+
+.erp-dev-quality-server-history__jobs-list {
+  display: grid;
+  gap: 6px;
+  max-height: 360px;
+  margin: 0;
+  padding: 6px 0 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.erp-dev-quality-server-history__jobs-list > li {
+  display: grid;
+  gap: 2px;
+  min-width: 240px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--erp-border, #dce8dd);
+}
+
+.erp-dev-quality-server-history__jobs-list .ant-tag {
+  margin: 0;
 }
 
 .erp-dev-quality-actions {
@@ -1198,32 +1280,6 @@
     grid-template-columns: 1fr;
   }
 
-  .erp-dev-quality-server-pipeline__connector {
-    width: 12px;
-    height: 22px;
-    justify-self: center;
-  }
-
-  .erp-dev-quality-server-pipeline__connector::before {
-    top: 0;
-    right: auto;
-    bottom: 5px;
-    left: 5px;
-    border-top: 0;
-    border-left: 2px solid var(--erp-border-strong, #c5d7c8);
-  }
-
-  .erp-dev-quality-server-pipeline__connector::after {
-    top: auto;
-    right: auto;
-    bottom: 0;
-    left: 1px;
-    border-top: 7px solid var(--erp-border-strong, #c5d7c8);
-    border-right: 5px solid transparent;
-    border-bottom: 0;
-    border-left: 5px solid transparent;
-  }
-
   .erp-dev-quality-server-evidence__facts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1348,45 +1404,13 @@
     align-self: flex-start;
   }
 
-  .erp-dev-quality-server-pipeline__mapping-table-wrap {
-    overflow-x: hidden;
+  .erp-dev-quality-server-evidence__view-switch {
+    align-items: stretch;
+    flex-direction: column;
   }
 
-  .erp-dev-quality-server-pipeline__mapping-table {
-    min-width: 0;
-    table-layout: auto;
-  }
-
-  .erp-dev-quality-server-pipeline__mapping-table thead {
-    display: none;
-  }
-
-  .erp-dev-quality-server-pipeline__mapping-table tbody {
-    display: grid;
-    gap: 6px;
-    padding: 6px;
-  }
-
-  .erp-dev-quality-server-pipeline__mapping-table tbody tr {
-    display: grid;
-    gap: 5px;
-    padding: 8px;
-    border: 1px solid var(--erp-border, #dce8dd);
-    border-radius: 6px;
-  }
-
-  .erp-dev-quality-server-pipeline__mapping-table td {
-    display: grid;
-    grid-template-columns: 76px minmax(0, 1fr);
-    gap: 8px;
-    padding: 0;
-  }
-
-  .erp-dev-quality-server-pipeline__mapping-table td::before {
-    color: var(--erp-text-muted, #637266);
-    font-size: 12px;
-    font-weight: 600;
-    content: attr(data-label);
+  .erp-dev-quality-server-evidence__view-switch > .ant-segmented {
+    width: 100%;
   }
 
   .erp-dev-quality-server-pipeline__phase[data-phase='shards']
@@ -1402,6 +1426,58 @@
   .erp-dev-quality-server-evidence__job-track {
     grid-column: 1 / -1;
     grid-row: 2;
+  }
+
+  .erp-dev-quality-server-evidence__job-times {
+    text-align: end;
+  }
+
+  .erp-dev-quality-server-performance__heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .erp-dev-quality-server-performance__table-wrap {
+    overflow-x: hidden;
+    border: 0;
+    background: transparent;
+  }
+
+  .erp-dev-quality-server-performance__table {
+    min-width: 0;
+  }
+
+  .erp-dev-quality-server-performance__table thead {
+    display: none;
+  }
+
+  .erp-dev-quality-server-performance__table tbody {
+    display: grid;
+    gap: 8px;
+  }
+
+  .erp-dev-quality-server-performance__table tbody tr {
+    display: grid;
+    gap: 6px;
+    padding: 10px;
+    border: 1px solid var(--erp-border, #dce8dd);
+    border-radius: 8px;
+    background: var(--erp-surface-bg, #fff);
+  }
+
+  .erp-dev-quality-server-performance__table td {
+    display: grid;
+    grid-template-columns: 84px minmax(0, 1fr);
+    gap: 8px;
+    padding: 0;
+    border: 0;
+  }
+
+  .erp-dev-quality-server-performance__table td::before {
+    color: var(--erp-text-muted, #637266);
+    font-size: 12px;
+    font-weight: 600;
+    content: attr(data-label);
   }
 
   .erp-dev-quality-server-history__heading {
@@ -1459,6 +1535,10 @@
     font-size: 12px;
     font-weight: 600;
     content: attr(data-label);
+  }
+
+  .erp-dev-quality-server-history__jobs-list > li {
+    min-width: 0;
   }
 
   .erp-dev-quality-flow {

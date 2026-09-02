@@ -647,7 +647,69 @@ function statusProjection({
 }
 
 export const DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA =
-  'plush.dev-quality-gate-server-evidence/v2'
+  'plush.dev-quality-gate-server-evidence/v4'
+
+const SERVER_CI_HISTORY_LIMIT = 20
+const SERVER_JOB_FAN_IN_GROUPS = Object.freeze({
+  quality_browser: 'browser',
+  quality_node: 'node',
+  quality_resource: 'resource',
+  quality_server: 'server',
+  quality_web: 'web',
+})
+const SERVER_JOB_GROUP_PREFIXES = Object.freeze([
+  Object.freeze(['quality_browser_', 'browser']),
+  Object.freeze(['quality_node_', 'node']),
+  Object.freeze(['quality_resource_', 'resource']),
+  Object.freeze(['quality_security_', 'security']),
+  Object.freeze(['quality_server_', 'server']),
+  Object.freeze(['quality_static_', 'static']),
+  Object.freeze(['quality_web_', 'web']),
+])
+
+function serverJobClassification(name) {
+  if (['plan', 'prepare'].includes(name)) {
+    return { role: 'orchestration', group: 'pipeline' }
+  }
+  if (name === 'CI Gate') {
+    return { role: 'terminal', group: 'pipeline' }
+  }
+  if (name === 'quality_aggregate') {
+    return { role: 'aggregate', group: 'pipeline' }
+  }
+  if (Object.hasOwn(SERVER_JOB_FAN_IN_GROUPS, name)) {
+    return { role: 'aggregate', group: SERVER_JOB_FAN_IN_GROUPS[name] }
+  }
+  if (name === 'quality_static') {
+    return { role: 'execution', group: 'static' }
+  }
+  if (name === 'quality_security') {
+    return { role: 'execution', group: 'security' }
+  }
+  const matched = SERVER_JOB_GROUP_PREFIXES.find(([prefix]) =>
+    name.startsWith(prefix)
+  )
+  if (matched) return { role: 'execution', group: matched[1] }
+  return { role: 'execution', group: 'other' }
+}
+
+function projectServerJob(job, attemptCount) {
+  const { role, group } = serverJobClassification(String(job.name || ''))
+  return {
+    id: job.id,
+    name: job.name,
+    status: job.status,
+    conclusion: job.conclusion,
+    durationMs: Number.isSafeInteger(job.durationMs) ? job.durationMs : null,
+    queueMs: Number.isSafeInteger(job.queueMs) ? job.queueMs : null,
+    attemptCount,
+    role,
+    group,
+    url:
+      job.url ||
+      `https://gitlab.saurick.me/saurick/plush-toy-erp/-/jobs/${String(job.id)}`,
+  }
+}
 
 export function captureDevQualityGateServerEnvironment(env = process.env) {
   return Object.freeze({
@@ -666,13 +728,72 @@ function unavailableServerEvidence(message) {
     gitSha: '',
     pipeline: null,
     jobs: [],
+    topology: {
+      status: 'unavailable',
+      gitSha: '',
+      jobs: [],
+      message: '当前 exact SHA 的 GitLab CI 依赖暂不可读。',
+    },
     history: [],
     message,
     notProven: ['当前 exact SHA 的 R640 普通 CI'],
   }
 }
 
-export function projectDevQualityGateServerEvidence(timings, repository) {
+function projectServerTopology(topology, repository, jobs) {
+  if (jobs.length === 0) {
+    return {
+      status: 'missing',
+      gitSha: repository.commit,
+      jobs: [],
+      message: '当前提交尚未形成实际 Pipeline Job，配置依赖不冒充运行证据。',
+    }
+  }
+  if (
+    topology?.schemaVersion !== 'plush.delivery-pipeline-topology/v1' ||
+    topology.gitSha !== repository.commit ||
+    !Array.isArray(topology.jobs)
+  ) {
+    return {
+      status: 'unavailable',
+      gitSha: repository.commit,
+      jobs: [],
+      message: '当前 Pipeline 可读，但同一 SHA 的 GitLab CI 依赖暂不可读。',
+    }
+  }
+  const actualNames = new Set(jobs.map((job) => job.name))
+  const definitions = new Map(topology.jobs.map((job) => [job.name, job]))
+  if (
+    definitions.size !== topology.jobs.length ||
+    jobs.some((job) => !definitions.has(job.name))
+  ) {
+    return {
+      status: 'unavailable',
+      gitSha: repository.commit,
+      jobs: [],
+      message: 'GitLab CI 配置与本次实际 Job 不一致，依赖图已失败关闭。',
+    }
+  }
+  return {
+    status: 'available',
+    gitSha: repository.commit,
+    jobs: topology.jobs
+      .filter((job) => actualNames.has(job.name))
+      .map((job) => ({
+        name: job.name,
+        stage: job.stage,
+        needs: job.needs.filter((name) => actualNames.has(name)),
+      })),
+    message:
+      '依赖来自当前 exact SHA 的 GitLab CI Lint，状态来自本次实际 Pipeline。',
+  }
+}
+
+export function projectDevQualityGateServerEvidence(
+  timings,
+  repository,
+  topology = null
+) {
   if (
     timings?.schemaVersion !== 'plush.delivery-pipeline-timings/v1' ||
     !Array.isArray(timings?.runs) ||
@@ -682,15 +803,18 @@ export function projectDevQualityGateServerEvidence(timings, repository) {
     throw new Error('server CI timing evidence is invalid')
   }
   const projectRun = (run) => {
-    const latestJobs = new Map()
+    const jobAttempts = new Map()
     for (const job of run.jobs || []) {
-      if (!latestJobs.has(job.name) || job.id > latestJobs.get(job.name).id) {
-        latestJobs.set(job.name, job)
-      }
+      const attempts = jobAttempts.get(job.name) || []
+      attempts.push(job)
+      jobAttempts.set(job.name, attempts)
     }
-    const jobs = [...latestJobs.values()].sort(
-      (left, right) => left.id - right.id
-    )
+    const jobs = [...jobAttempts.values()]
+      .map((attempts) => {
+        const sorted = [...attempts].sort((left, right) => left.id - right.id)
+        return projectServerJob(sorted.at(-1), sorted.length)
+      })
+      .sort((left, right) => left.id - right.id)
     const passed =
       run.status === 'completed' &&
       run.conclusion === 'success' &&
@@ -709,30 +833,35 @@ export function projectDevQualityGateServerEvidence(timings, repository) {
     )
     .map(projectRun)
     .sort((left, right) => right.run.id - left.run.id)
-  const history = candidates.slice(0, 8).map(({ run, jobs, passed }) => {
-    const active = run.status !== 'completed'
-    const result = passed
-      ? 'passed'
-      : active
-        ? run.status === 'in_progress'
-          ? 'running'
-          : 'queued'
-        : run.conclusion === 'cancelled'
-          ? 'cancelled'
-          : run.conclusion === 'skipped'
-            ? 'skipped'
-            : 'failed'
-    return {
-      id: run.id,
-      result,
-      gitSha: run.gitSha,
-      url: run.url,
-      createdAt: run.createdAt,
-      finishedAt: run.finishedAt,
-      durationMs: run.durationMs,
-      failureJob: jobs.find((job) => job.conclusion === 'failure')?.name || '',
-    }
-  })
+  const history = candidates
+    .slice(0, SERVER_CI_HISTORY_LIMIT)
+    .map(({ run, jobs, passed }) => {
+      const active = run.status !== 'completed'
+      const result = passed
+        ? 'passed'
+        : active
+          ? run.status === 'in_progress'
+            ? 'running'
+            : 'queued'
+          : run.conclusion === 'cancelled'
+            ? 'cancelled'
+            : run.conclusion === 'skipped'
+              ? 'skipped'
+              : 'failed'
+      return {
+        id: run.id,
+        result,
+        gitSha: run.gitSha,
+        url: run.url,
+        createdAt: run.createdAt,
+        finishedAt: run.finishedAt,
+        durationMs: run.durationMs,
+        queueMs: run.queueMs,
+        failureJob:
+          jobs.find((job) => job.conclusion === 'failure')?.name || '',
+        jobs,
+      }
+    })
   const exactRuns = candidates.filter(
     (candidate) => candidate.run.gitSha === repository.commit
   )
@@ -745,6 +874,7 @@ export function projectDevQualityGateServerEvidence(timings, repository) {
       gitSha: repository.commit,
       pipeline: null,
       jobs: [],
+      topology: projectServerTopology(topology, repository, []),
       history,
       message:
         'GitLab 凭据与 API 读取正常；R640 尚无绑定当前已提交 SHA 的普通 push CI 记录。',
@@ -771,13 +901,8 @@ export function projectDevQualityGateServerEvidence(timings, repository) {
       durationMs: selected.run.durationMs,
       finishedAt: selected.run.finishedAt,
     },
-    jobs: selected.jobs.map((job) => ({
-      id: job.id,
-      name: job.name,
-      status: job.status,
-      conclusion: job.conclusion,
-      durationMs: job.durationMs,
-    })),
+    jobs: selected.jobs,
+    topology: projectServerTopology(topology, repository, selected.jobs),
     history,
     message: selected.passed
       ? repository.dirty
@@ -906,9 +1031,37 @@ export function createDevQualityGateService({
           projectRoot: root,
           env: serverEvidenceEnvironment,
         })
+        let timings = await provider.listPipelineTimings({
+          limit: SERVER_CI_HISTORY_LIMIT,
+          source: 'push',
+        })
+        if (!timings.runs.some((run) => run.gitSha === repository.commit)) {
+          const exactTimings = await provider.listPipelineTimings({
+            limit: SERVER_CI_HISTORY_LIMIT,
+            sha: repository.commit,
+            source: 'push',
+          })
+          const knownRunIds = new Set(timings.runs.map((run) => run.id))
+          timings = {
+            ...timings,
+            runs: [
+              ...timings.runs,
+              ...exactTimings.runs.filter((run) => !knownRunIds.has(run.id)),
+            ],
+          }
+        }
+        let topology = null
+        try {
+          topology = await provider.readPipelineTopology({
+            sha: repository.commit,
+          })
+        } catch {
+          // Job timing remains useful when GitLab cannot expose the exact-SHA needs graph.
+        }
         value = projectDevQualityGateServerEvidence(
-          await provider.listPipelineTimings({ limit: 8 }),
-          repository
+          timings,
+          repository,
+          topology
         )
       }
       if (value?.schemaVersion !== DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA) {

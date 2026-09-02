@@ -6,7 +6,7 @@ print_help() {
 用法:
   bash scripts/qa/full.sh
   bash scripts/qa/full.sh --ci-shard node|web|server|resource|browser|security
-  bash scripts/qa/full.sh --ci-lane web-checks|web-build|server-core|server-postgres
+  bash scripts/qa/full.sh --ci-lane web-checks|web-build|server-schema|server-upgrade|server-test-build|server-postgres
 
 作用:
   执行一次完整本地质量检查。high-risk 或发布候选由 prepare-push.sh --full 在建立远端连接前调用。
@@ -66,7 +66,7 @@ case "$ci_shard" in
 esac
 
 case "$ci_lane" in
-"" | web-checks | web-build | server-core | server-postgres) ;;
+"" | web-checks | web-build | server-schema | server-upgrade | server-test-build | server-postgres) ;;
 *)
   echo "[qa:full] status=incomplete reason=invalid_ci_lane lane=$ci_lane"
   exit 2
@@ -284,11 +284,22 @@ qa_full_browser() {
   trap - EXIT
 }
 
-qa_full_server() {
-  echo "[qa:full] 运行 server 全量检查"
+qa_full_server_schema() {
+  echo "[qa:full] 运行 server schema 与生成零漂移检查"
+  cd "$ROOT_DIR/server"
+  make data
+}
+
+qa_full_server_upgrade() {
+  echo "[qa:full] 运行 server 存量升级检查"
   cd "$ROOT_DIR/server"
   PURCHASE_RECEIPT_PG_DB_URL="$DISPOSABLE_DATABASE_BASE_URL" \
     make populated_upgrade_pg_test
+}
+
+qa_full_server_test_build() {
+  echo "[qa:full] 运行 server 测试与构建"
+  cd "$ROOT_DIR/server"
   ERP_PDF_CHROMIUM_INTEGRATION=1 \
     node "$ROOT_DIR/scripts/qa/run-test-gate.mjs" \
     --kind go --label server-all \
@@ -296,6 +307,11 @@ qa_full_server() {
     "${test_gate_output_args[@]}" -- \
     go test -count=1 -json -skip "$CRITICAL_POSTGRES_TEST_PATTERN" ./...
   make build
+}
+
+qa_full_server() {
+  qa_full_server_upgrade
+  qa_full_server_test_build
 }
 
 qa_full_critical_postgres() {
@@ -320,9 +336,15 @@ if [[ -n "$ci_lane" ]]; then
   web-build)
     qa_run_stage strict web qa_full_web_build
     ;;
-  server-core)
+  server-schema)
+    qa_run_stage strict server qa_full_server_schema
+    ;;
+  server-upgrade)
     qa_run_stage strict environment_profile qa_full_environment_profile
-    qa_run_stage strict server qa_full_server
+    qa_run_stage strict server qa_full_server_upgrade
+    ;;
+  server-test-build)
+    qa_run_stage strict server qa_full_server_test_build
     ;;
   server-postgres)
     qa_run_stage strict critical_postgres qa_full_critical_postgres

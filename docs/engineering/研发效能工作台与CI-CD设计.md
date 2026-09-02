@@ -52,7 +52,7 @@ GitLab HTTP 只绑定 R640 `127.0.0.1:8929`，由 FRP 到阿里云 `18226`，再
 `.gitlab-ci.yml` 是唯一 canonical 编排：
 
 1. `plan` 根据 MR base、push before SHA 或手工范围建立可信 diff，先做 diff/log 检查和可信基线 gitleaks，再生成带 digest 的 `ci-plan` / range / trust。
-2. MR 保留 plan-driven affected/full 单 job。main push 先由唯一 `prepare` cache writer 预热 locked pnpm/Playwright/Go 依赖，然后用最多四个 Runner slot 运行 static、Node contracts、Web、Server/PostgreSQL、resource-sensitive、browser 和 security 七个固定分片。browser 只等待同 SHA Web build，其他分片不建人工依赖。
+2. MR 保留 plan-driven affected/full 单 job。main push 先由唯一 `prepare` cache writer 预热 locked pnpm/Playwright/Go 依赖，再由 Runner 已登记容量调度 static、Node contracts、Web、Server/PostgreSQL、resource-sensitive、browser 和 security 七个固定外部分片。Server 内部把 schema 零漂移、存量升级、普通测试/构建和关键 PostgreSQL 合同拆为四条独立 lane；只有升级与关键合同持有受管 PostgreSQL，只有普通测试/构建消费 Chromium。browser 只等待同 SHA Web build，其他分片不建人工依赖。
 3. `quality_aggregate` 要求七个回执、阶段并集、分类执行数、source archive、依赖审计、`make data`、Web build digest、PostgreSQL/Chromium/browser 清理全部同 SHA 且通过，再签发标准 v3 strict terminal。
 4. `CI Gate` 只在对应 main aggregate 或 MR quality 成功时通过；main push 还会把 terminal、receipt 和 manifest 固化到 exact pipeline/job/SHA 的 `plush-ci-evidence` Package，作为 protected main 的稳定 required job 和后续 release 唯一可复用证据。
 
@@ -60,7 +60,7 @@ GitLab HTTP 只绑定 R640 `127.0.0.1:8929`，由 FRP 到阿里云 `18226`，再
 
 缓存只缩短依赖和浏览器准备时间，不能跳过 checksum、locked/offline install、门禁、source archive 或 clean-tree 读回。分片只 pull cache，不并发回写同一 key。pipeline artifacts 是本次运行内证据；只有 `CI Gate` 上传且经 release 服务器端重新校验的 exact Package 才能跨 pipeline 复用，仍不等于不可变 Release。
 
-性能结论必须把 R640 宿主与 Runner guest 分开，并同时报告冷/热缓存、各 job 时长、关键路径、CPU / 内存 / IO 峰值、p50、波动和近似 p95。7–9 分钟普通 CI 与 10–15 分钟热缓存提交到部署只是阶段目标；若 guest 和宿主仍有实测余量且没有排队、IO 争用、OOM、flaky 或波动扩大，就继续调整 Runner 并发、DAG shard 和各语言测试并行度，冲刺 6–8 分钟与 8–12 分钟，稳定更快也接受。停止条件是资源饱和或复杂度收益明显失衡，不是达到某个时间；完整覆盖、fail-closed、exact-SHA、数据库/浏览器/端口隔离和清理始终不降级。
+性能结论必须把 R640 宿主与 Runner guest 分开，并同时报告冷/热缓存、各 job 时长、关键路径、CPU / 内存 / IO 峰值、p50、波动和近似 p95。执行 Job 以 90 秒为目标线、120 秒为红线：90–120 秒进入优化复核，超过 120 秒进入拆分候选；但单次慢不自动拆分，必须结合近 20 次有效样本的中位数、近似 P95、覆盖边界与重复成本判断。`plan` / `prepare`、领域 fan-in、`quality_aggregate` 和 `CI Gate` 不套执行 Job 的 90 / 120 秒拆分线；排队超过 30 秒先查 Runner 容量和资源争用，不用拆 Job 掩盖等待。7–9 分钟普通 CI 与 10–15 分钟热缓存提交到部署只是阶段目标；若 guest 和宿主仍有实测余量且没有排队、IO 争用、OOM、flaky 或波动扩大，就继续调整 Runner 并发、DAG shard 和各语言测试并行度，冲刺 6–8 分钟与 8–12 分钟，稳定更快也接受。停止条件是资源饱和或复杂度收益明显失衡，不是达到某个时间；完整覆盖、fail-closed、exact-SHA、数据库/浏览器/端口隔离和清理始终不降级。
 
 ### exact-SHA release
 
@@ -94,7 +94,7 @@ Generic Package version 与 Release tag 固定为 `artifact-<40sha>`。重试时
 
 `scripts/deploy/github-delivery-provider.mjs` 继续读取 GitHub 历史/应急 Release，并把 v1 六资产投影为只读、可回滚但不可用于显式版本提升（Explicit Promotion）。当前 GitHub emergency workflow 在 checkout、registry 登录、构建和上传前固定失败关闭；只有未来完整支持 canonical v2 七资产与同一演练回执后，才能另行恢复写入。浏览器不知道 token，也不能选择 Provider。
 
-GitLab Jobs API 当前只提供 job 级时间时，工作台展示真实 job 窗口和空 steps，不推算或伪造 GitHub 式 step timing。GitHub 历史/应急运行仍可按原合同展示。
+GitLab Jobs API 的 job `duration` 和 `queued_duration` 是运行与等待真源。工作台读取当前流水线与最近 20 次普通 push CI 的全部 job，同名重试保留最新 attempt 并单列重试次数；页面只派生中位数、近似 P95、失败与排队趋势，不另存一份 CI 历史库。GitLab 未提供 step timing 时继续返回空 steps，不推算或伪造 GitHub 式 step timing。GitHub 历史/应急运行仍可按原合同展示。
 
 ## GitHub 单向镜像与 GPT Review
 
@@ -116,17 +116,17 @@ GPT Review 的 finding 是审查输入，不是仓库事实。修复仍回到 Gi
 
 工作台不把本地绿色、GitLab pipeline、GitLab Release、目标 smoke、备份恢复、岗位矩阵或客户 UAT 合成一个“全部完成”。每层单独显示来源与时间；缺失或非法时间显示“未证明”。
 
-`/__dev/quality-gates` 另外读取当前 committed SHA 的 R640 普通 push CI，明确展示 pipeline 与十一个固定 job 耗时。该服务器证据不覆盖 Local dirty 状态或本地 full/strict 回执；只有当前干净 SHA 的 R640 普通 CI 完整通过，质量工程与版本中心才把 `releaseEligible` 提升为真。本地 strict 即使通过也只保留为 Local 回执，不能替代 protected main 证据；未登记只读 token、API 不可达或 SHA 无 push 记录时只显示不可读/缺失，不制造绿色证据。
+`/__dev/quality-gates` 另外读取当前 committed SHA 的 R640 普通 push CI，动态展示 GitLab 实际返回的全部 Job，不在前端复制 Job 目录或 DAG。“本次流水线”用同一 exact SHA 的 GitLab CI Lint `needs` 生成有向图，再与实际 Pipeline Job 取交集；依赖不可读或两者不一致时只保留可靠耗时并让 DAG 失败关闭，不画推测连线。服务器门禁内部只保留“本次流水线、Job 性能、CI 历史”三个轻量切换视图，顶部同 SHA 证据摘要始终可见。Job 只按“编排、执行、汇总、终态”和领域分组投影；默认突出异常与最慢执行 Job，其余以可展开明细保留。同一 development-only API 同时返回最近 20 次普通 push CI 的 pipeline 与逐 Job 数据，便于页面和 Codex 直接读取后定位慢 Job、排队、重试和回归；GitLab 仍是唯一历史真源。该服务器证据不覆盖 Local dirty 状态或本地 full/strict 回执；只有当前干净 SHA 的 R640 普通 CI 完整通过，质量工程与版本中心才把 `releaseEligible` 提升为真。本地 strict 即使通过也只保留为 Local 回执，不能替代 protected main 证据；未登记只读 token、API 不可达或 SHA 无 push 记录时只显示不可读/缺失，不制造绿色证据。
 
 ## 目标环境与真实数据
 
 当前可执行 target 只有 `demo-133` 与 `customer-test-133`。显式版本提升（Explicit Promotion）只 load/pull 已发布 digest，随后执行固定 preflight、backup、migration、Compose、health/ready、公网 SHA 和资源读回；它必须由使用者明确发起，`main` push 不会自动部署。失败、blocked 或 `not_proven` 不自动重试。
 
-| 环境                       | 公网入口            | 数据与用途                                                        | 重建边界                                                     |
-| -------------------------- | ------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------ |
-| demo / `demo-133`          | `demo.yoyoosun.net` | 项目方造数、演练、培训和回归；允许 seed/fixture/模拟业务事实      | 只走受控重建，必须保留自己的备份与回滚点                     |
-| test / `customer-test-133` | `test.yoyoosun.net` | 甲方测试/验收；普通部署保留数据，新一轮测试前可显式重建 | 清理与 promotion 分开；重建前必须有可恢复备份、恢复验证和精确回滚点 |
-| erp                        | `erp.yoyoosun.net`  | 未来正式生产                                                      | 当前未登记、未启用，不能从工作台执行                         |
+| 环境                       | 公网入口            | 数据与用途                                                   | 重建边界                                                            |
+| -------------------------- | ------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------- |
+| demo / `demo-133`          | `demo.yoyoosun.net` | 项目方造数、演练、培训和回归；允许 seed/fixture/模拟业务事实 | 只走受控重建，必须保留自己的备份与回滚点                            |
+| test / `customer-test-133` | `test.yoyoosun.net` | 甲方测试/验收；普通部署保留数据，新一轮测试前可显式重建      | 清理与 promotion 分开；重建前必须有可恢复备份、恢复验证和精确回滚点 |
+| erp                        | `erp.yoyoosun.net`  | 未来正式生产                                                 | 当前未登记、未启用，不能从工作台执行                                |
 
 demo 与 test 必须使用同一 release digest，但数据库、上传目录、Compose project、宿主端口、运行 env、备份、回滚点、target registry、preflight、operation 和 smoke 全部独立。demo 造数不得进入 test；test 普通 promotion 保留现有数据，显式重建不得影响 demo。根域 `yoyoosun.net` 临时 `302` 跳转到 `erp.yoyoosun.net` 只是导航行为，不把未来生产域名加入 target registry。`admin.yoyoosun.net` 退役后绝不进入 CI/CD 环境矩阵、数据清理、健康检查、发布验证或回滚流程。真实资料进入客户 Private 仓或经确认的受控存储，不进入 Product Core、CI artifacts 或公开 GitHub 镜像。
 

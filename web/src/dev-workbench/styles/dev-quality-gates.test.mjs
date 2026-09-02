@@ -48,9 +48,9 @@ test('quality gates styles: R640 evidence stays compact and source-backed', () =
   assert.match(css, /--quality-server-job-width/u)
   assert.match(css, /\.erp-dev-quality-server-pipeline__track/u)
   assert.match(css, /\.erp-dev-quality-server-pipeline__relationship/u)
-  assert.match(css, /\.erp-dev-quality-server-pipeline__mapping-table/u)
-  assert.match(css, /\.erp-dev-quality-server-pipeline__mapping-job/u)
-  assert.match(css, /\.erp-dev-quality-server-pipeline__node-note/u)
+  assert.match(css, /\.erp-dev-quality-server-pipeline__dag/u)
+  assert.match(css, /\.erp-dev-quality-server-evidence__view-switch/u)
+  assert.match(css, /\.erp-dev-quality-server-view/u)
   assert.match(css, /\.erp-dev-quality-server-history__table/u)
   assert.match(
     css,
@@ -58,7 +58,7 @@ test('quality gates styles: R640 evidence stays compact and source-backed', () =
   )
   assert.match(
     css,
-    /\.erp-dev-quality-server-pipeline__mapping-table-wrap[\s\S]*?overflow-x:\s*auto/u
+    /\.erp-dev-quality-server-pipeline__dag \.erp-markdown-mermaid__canvas[\s\S]*?min-width:\s*880px/u
   )
   assert.match(
     css,
@@ -68,12 +68,9 @@ test('quality gates styles: R640 evidence stays compact and source-backed', () =
   assert.match(css, /\.erp-dev-quality-server-pipeline__status-indicator/u)
   assert.match(
     css,
-    /\.erp-dev-quality-server-pipeline__mapping-table td::before[\s\S]*?content:\s*attr\(data-label\)/u
-  )
-  assert.match(
-    css,
     /\.erp-dev-quality-server-history__table td::before[\s\S]*?content:\s*attr\(data-label\)/u
   )
+  assert.doesNotMatch(css, /\.erp-dev-quality-server-pipeline__connector/u)
 })
 
 test('quality gates styles: local diagnostics remain visibly secondary', () => {

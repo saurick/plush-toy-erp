@@ -135,6 +135,19 @@ test('quality gate projects R640 exact-SHA CI separately from local dirty state'
     'plan',
     'prepare',
     'quality_static',
+    'quality_node_release_preflight',
+    'quality_node_release_a',
+    'quality_node_release_b',
+    'quality_node_core',
+    'quality_resource_contract',
+    'quality_resource_runtime',
+    'quality_web_checks',
+    'quality_web_build',
+    'quality_server_schema',
+    'quality_server_upgrade',
+    'quality_server_test_build',
+    'quality_server_critical_postgres',
+    'quality_browser_boundary_entry_print',
     'quality_node',
     'quality_web',
     'quality_server',
@@ -161,17 +174,51 @@ test('quality gate projects R640 exact-SHA CI separately from local dirty state'
           durationMs: 420000,
           finishedAt: '2026-08-29T01:07:00.000Z',
           url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/91',
-          jobs: names.map((name, index) => ({
-            id: index + 1,
-            name,
-            status: 'completed',
-            conclusion: 'success',
-            durationMs: (index + 1) * 1000,
-          })),
+          jobs: [
+            {
+              id: 50,
+              name: 'quality_node_release_preflight',
+              status: 'completed',
+              conclusion: 'failure',
+              durationMs: 90_000,
+              queueMs: 800,
+            },
+            ...names.map((name, index) => ({
+              id: index + 100,
+              name,
+              status: 'completed',
+              conclusion: 'success',
+              durationMs: (index + 1) * 1000,
+              queueMs: (index + 1) * 100,
+            })),
+          ],
         },
       ],
     },
-    REPOSITORY
+    REPOSITORY,
+    {
+      schemaVersion: 'plush.delivery-pipeline-topology/v1',
+      gitSha: REPOSITORY.commit,
+      jobs: names.map((name) => ({
+        name,
+        stage:
+          name === 'plan'
+            ? 'plan'
+            : name === 'prepare'
+              ? 'prepare'
+              : name === 'quality_aggregate'
+                ? 'aggregate'
+                : name === 'CI Gate'
+                  ? 'gate'
+                  : 'quality',
+        needs:
+          name === 'prepare'
+            ? ['plan']
+            : name === 'CI Gate'
+              ? ['quality_aggregate']
+              : [],
+      })),
+    }
   )
   assert.equal(evidence.schemaVersion, DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA)
   assert.equal(evidence.status, 'passed')
@@ -179,9 +226,27 @@ test('quality gate projects R640 exact-SHA CI separately from local dirty state'
   assert.equal(evidence.coversWorkingTree, false)
   assert.equal(evidence.jobs.length, names.length)
   assert.equal(evidence.jobs[0].status, 'completed')
+  const releasePreflight = evidence.jobs.find(
+    (job) => job.name === 'quality_node_release_preflight'
+  )
+  assert.equal(releasePreflight.attemptCount, 2)
+  assert.equal(releasePreflight.role, 'execution')
+  assert.equal(releasePreflight.group, 'node')
+  assert.equal(releasePreflight.queueMs, 400)
+  assert.equal(
+    evidence.jobs.find((job) => job.name === 'quality_node').role,
+    'aggregate'
+  )
   assert.equal(evidence.history.length, 1)
   assert.equal(evidence.history[0].result, 'passed')
   assert.equal(evidence.history[0].gitSha, REPOSITORY.commit)
+  assert.equal(evidence.history[0].jobs.length, names.length)
+  assert.equal(evidence.history[0].queueMs, 3000)
+  assert.equal(evidence.topology.status, 'available')
+  assert.deepEqual(
+    evidence.topology.jobs.find((job) => job.name === 'CI Gate').needs,
+    ['quality_aggregate']
+  )
   assert.match(evidence.message, /不覆盖本机未提交改动/u)
 })
 
@@ -221,6 +286,7 @@ test('quality gate distinguishes a readable GitLab response from a missing exact
   assert.equal(evidence.gitSha, REPOSITORY.commit)
   assert.equal(evidence.pipeline, null)
   assert.deepEqual(evidence.jobs, [])
+  assert.equal(evidence.topology.status, 'missing')
   assert.equal(evidence.history.length, 1)
   assert.equal(evidence.history[0].result, 'failed')
   assert.equal(evidence.history[0].failureJob, 'quality_web')

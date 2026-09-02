@@ -3,17 +3,21 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 import {
+  DEFAULT_SERVER_VIEW,
   DEFAULT_VIEW,
   DEV_QUALITY_GATE_ACTION_API_PATH,
   DEV_QUALITY_GATE_API_PATH,
   DEV_QUALITY_GATE_SESSION_API_PATH,
   DEV_QUALITY_GATES_ROUTE,
+  DEV_QUALITY_GATE_SERVER_VIEWS,
   QUERY_KEYS,
   VIEW_ITEMS,
   VIEW_KEYS,
   VIEW_QUERY_KEYS,
   buildQualityGateCoverageMatrix,
   buildQualityGateHistoryTrend,
+  buildQualityGateServerPerformance,
+  buildQualityGateServerDag,
   buildQualityGateServerTiming,
   buildQualityGateStageDurationComposition,
   buildQualityGateViewSearch,
@@ -116,7 +120,7 @@ function summary(overrides = {}) {
       },
     },
     serverEvidence: {
-      schemaVersion: 'plush.dev-quality-gate-server-evidence/v2',
+      schemaVersion: 'plush.dev-quality-gate-server-evidence/v4',
       status: 'passed',
       current: true,
       coversWorkingTree: true,
@@ -138,8 +142,19 @@ function summary(overrides = {}) {
           status: 'completed',
           conclusion: 'success',
           durationMs: 2_000,
+          queueMs: 500,
+          attemptCount: 1,
+          role: 'terminal',
+          group: 'pipeline',
+          url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/jobs/390',
         },
       ],
+      topology: {
+        status: 'available',
+        gitSha: 'a'.repeat(40),
+        jobs: [{ name: 'CI Gate', stage: 'gate', needs: [] }],
+        message: '依赖来自当前 exact SHA 的 GitLab CI Lint。',
+      },
       history: [
         {
           id: 39,
@@ -149,7 +164,22 @@ function summary(overrides = {}) {
           createdAt: '2026-08-09T07:50:00.000Z',
           finishedAt: NOW,
           durationMs: 395_000,
+          queueMs: 3_500,
           failureJob: '',
+          jobs: [
+            {
+              id: 390,
+              name: 'CI Gate',
+              status: 'completed',
+              conclusion: 'success',
+              durationMs: 2_000,
+              queueMs: 500,
+              attemptCount: 1,
+              role: 'terminal',
+              group: 'pipeline',
+              url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/jobs/390',
+            },
+          ],
         },
         {
           id: 38,
@@ -159,7 +189,22 @@ function summary(overrides = {}) {
           createdAt: '2026-08-09T06:50:00.000Z',
           finishedAt: '2026-08-09T06:56:00.000Z',
           durationMs: 360_000,
+          queueMs: 6_000,
           failureJob: 'quality_web',
+          jobs: [
+            {
+              id: 380,
+              name: 'quality_web',
+              status: 'completed',
+              conclusion: 'failure',
+              durationMs: 120_000,
+              queueMs: 2_000,
+              attemptCount: 1,
+              role: 'aggregate',
+              group: 'web',
+              url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/jobs/380',
+            },
+          ],
         },
       ],
       message: 'R640 已通过当前 exact SHA 的完整分片、聚合与 CI Gate。',
@@ -233,6 +278,12 @@ function receipt(overrides = {}) {
 test('quality gates config: route, four views and per-view query contracts stay stable', () => {
   assert.equal(DEV_QUALITY_GATES_ROUTE, '/__dev/quality-gates')
   assert.equal(DEFAULT_VIEW, 'server')
+  assert.equal(DEFAULT_SERVER_VIEW, 'pipeline')
+  assert.deepEqual(DEV_QUALITY_GATE_SERVER_VIEWS, [
+    'pipeline',
+    'performance',
+    'history',
+  ])
   assert.deepEqual(VIEW_KEYS, ['server', 'run', 'governance', 'gaps'])
   assert.deepEqual(
     VIEW_ITEMS.map((item) => item.label),
@@ -240,6 +291,7 @@ test('quality gates config: route, four views and per-view query contracts stay 
   )
   assert.deepEqual(QUERY_KEYS, {
     view: 'view',
+    serverView: 'serverView',
     profile: 'profile',
     operation: 'operation',
     q: 'q',
@@ -248,7 +300,7 @@ test('quality gates config: route, four views and per-view query contracts stay 
     risk: 'risk',
   })
   assert.deepEqual(VIEW_QUERY_KEYS, {
-    server: ['view'],
+    server: ['view', 'serverView'],
     run: ['view', 'profile', 'operation'],
     governance: ['view', 'q', 'filter'],
     gaps: ['view', 'range', 'risk'],
@@ -261,7 +313,7 @@ test('quality gates config: deep links restore each view and switching drops for
     canonicalMissingView: true,
     issues: [],
     view: 'server',
-    values: { view: 'server' },
+    values: { view: 'server', serverView: 'pipeline' },
   })
   assert.equal(
     buildQualityGateViewSearch('server', {
@@ -269,6 +321,14 @@ test('quality gates config: deep links restore each view and switching drops for
       q: 'must not leak',
     }),
     '?view=server'
+  )
+  assert.equal(
+    buildQualityGateViewSearch('server', { serverView: 'performance' }),
+    '?view=server&serverView=performance'
+  )
+  assert.equal(
+    parseQualityGateSearch('?view=server&serverView=history').values.serverView,
+    'history'
   )
   assert.equal(
     buildQualityGateViewSearch('run', {
@@ -303,6 +363,7 @@ test('quality gates config: unknown, repeated, stale and cross-view query fail c
     '?view=run&command=rm',
     '?view=run&q=wrong-view',
     '?view=server&profile=strict',
+    '?view=server&serverView=unknown',
     `?view=governance&operation=${OPERATION_ID}`,
     '?view=gaps&risk=critical',
   ]) {
@@ -524,6 +585,7 @@ test('quality gates config: summary preserves one shared operation truth', () =>
   assert.deepEqual(normalized.profiles.strict.substeps, {})
   assert.equal(normalized.serverEvidence.pipeline.id, 39)
   assert.equal(normalized.serverEvidence.jobs[0].name, 'CI Gate')
+  assert.equal(normalized.serverEvidence.topology.status, 'available')
   assert.equal(normalized.serverEvidence.history.length, 2)
   assert.equal(normalized.serverEvidence.history[1].failureJob, 'quality_web')
   assert.throws(
@@ -560,6 +622,119 @@ test('quality gates config: summary preserves one shared operation truth', () =>
       ),
     /history order is invalid/u
   )
+  assert.throws(
+    () =>
+      normalizeDevQualityGateSummary(
+        summary({
+          serverEvidence: {
+            ...summary().serverEvidence,
+            jobs: [
+              summary().serverEvidence.jobs[0],
+              summary().serverEvidence.jobs[0],
+            ],
+          },
+        })
+      ),
+    /state is inconsistent/u
+  )
+  assert.throws(
+    () =>
+      normalizeDevQualityGateSummary(
+        summary({
+          serverEvidence: {
+            ...summary().serverEvidence,
+            topology: {
+              ...summary().serverEvidence.topology,
+              jobs: [{ name: 'CI Gate', stage: 'gate', needs: ['unknown'] }],
+            },
+          },
+        })
+      ),
+    /topology graph is invalid/u
+  )
+})
+
+test('quality gates config: R640 DAG is derived from exact needs and actual Job states', () => {
+  const dag = buildQualityGateServerDag({
+    status: 'running',
+    topology: {
+      status: 'available',
+      gitSha: 'a'.repeat(40),
+      message: '同 SHA 依赖已读取。',
+      jobs: [
+        { name: 'plan', stage: 'plan', needs: [] },
+        { name: 'prepare', stage: 'prepare', needs: ['plan'] },
+        {
+          name: 'quality_node_core',
+          stage: 'quality',
+          needs: ['prepare'],
+        },
+        {
+          name: 'quality_aggregate',
+          stage: 'aggregate',
+          needs: ['quality_node_core'],
+        },
+        { name: 'CI Gate', stage: 'gate', needs: ['quality_aggregate'] },
+      ],
+    },
+    jobs: [
+      {
+        name: 'plan',
+        status: 'completed',
+        conclusion: 'success',
+        durationMs: 1_000,
+      },
+      {
+        name: 'prepare',
+        status: 'completed',
+        conclusion: 'success',
+        durationMs: 2_000,
+      },
+      {
+        name: 'quality_node_core',
+        status: 'in_progress',
+        conclusion: '',
+        durationMs: 28_000,
+      },
+      {
+        name: 'quality_aggregate',
+        status: 'queued',
+        conclusion: '',
+        durationMs: null,
+      },
+      {
+        name: 'CI Gate',
+        status: 'queued',
+        conclusion: '',
+        durationMs: null,
+      },
+    ],
+  })
+
+  assert.equal(dag.status, 'available')
+  assert.equal(dag.nodeCount, 5)
+  assert.equal(dag.edgeCount, 4)
+  assert.match(dag.chart, /^flowchart LR/mu)
+  assert.match(dag.chart, /J0 --> J1/u)
+  assert.match(dag.chart, /J3 --> J4/u)
+  assert.match(dag.chart, /quality_node_core · 运行中 · 28 秒/u)
+  assert.deepEqual(
+    buildQualityGateServerDag({
+      topology: {
+        status: 'unavailable',
+        gitSha: 'a'.repeat(40),
+        jobs: [],
+        message: '依赖暂不可读。',
+      },
+    }),
+    {
+      status: 'unavailable',
+      chart: '',
+      nodeCount: 0,
+      edgeCount: 0,
+      message: '依赖暂不可读。',
+    }
+  )
 })
 
 test('quality gates config: R640 timing ranks bottlenecks without summing parallel jobs', () => {
@@ -569,17 +744,23 @@ test('quality gates config: R640 timing ranks bottlenecks without summing parall
     jobs: [
       {
         id: 1,
-        name: 'quality_web',
+        name: 'quality_web_build',
         status: 'completed',
         conclusion: 'success',
         durationMs: 60_000,
+        queueMs: 1_000,
+        role: 'execution',
+        group: 'web',
       },
       {
         id: 2,
-        name: 'quality_server',
+        name: 'quality_server_test_build',
         status: 'completed',
         conclusion: 'success',
         durationMs: 90_000,
+        queueMs: 2_000,
+        role: 'execution',
+        group: 'server',
       },
       {
         id: 3,
@@ -587,16 +768,21 @@ test('quality gates config: R640 timing ranks bottlenecks without summing parall
         status: 'queued',
         conclusion: '',
         durationMs: null,
+        queueMs: 3_000,
+        role: 'terminal',
+        group: 'pipeline',
       },
     ],
   })
 
   assert.equal(timing.wallClockMs, 120_000)
   assert.equal(timing.queueMs, 5_000)
-  assert.equal(timing.longestJob.name, 'quality_server')
+  assert.equal(timing.longestJob.name, 'quality_server_test_build')
+  assert.equal(timing.longestExecutionJob.name, 'quality_server_test_build')
   assert.equal(timing.flowJobs.length, 3)
   assert.equal(
-    timing.flowJobs.find((job) => job.name === 'quality_server').status,
+    timing.flowJobs.find((job) => job.name === 'quality_server_test_build')
+      .status,
     'passed'
   )
   assert.equal(
@@ -609,12 +795,153 @@ test('quality gates config: R640 timing ranks bottlenecks without summing parall
       relativePercent,
     })),
     [
-      { name: 'quality_server', relativePercent: 100 },
-      { name: 'quality_web', relativePercent: 66.7 },
+      { name: 'quality_server_test_build', relativePercent: 100 },
+      { name: 'quality_web_build', relativePercent: 66.7 },
       { name: 'CI Gate', relativePercent: null },
     ]
   )
+  assert.deepEqual(
+    timing.flowGroups.map(({ key, jobs }) => [
+      key,
+      jobs.map((job) => job.name),
+    ]),
+    [
+      ['web', ['quality_web_build']],
+      ['server', ['quality_server_test_build']],
+      ['closeout', ['CI Gate']],
+    ]
+  )
   assert.equal('totalDurationMs' in timing, false)
+})
+
+test('quality gates config: R640 history separates execution limits from fan-in and queue delay', () => {
+  function historyJob(
+    pipelineId,
+    index,
+    {
+      name,
+      role,
+      group,
+      durationMs,
+      queueMs,
+      conclusion = 'success',
+      attemptCount = 1,
+    }
+  ) {
+    return {
+      id: pipelineId * 100 + index,
+      name,
+      role,
+      group,
+      status: 'completed',
+      conclusion,
+      durationMs,
+      queueMs,
+      attemptCount,
+      url: `https://gitlab.saurick.me/saurick/plush-toy-erp/-/jobs/${String(
+        pipelineId * 100 + index
+      )}`,
+    }
+  }
+
+  const runs = [
+    {
+      id: 44,
+      url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/44',
+      executionMs: 125_000,
+      aggregateMs: 35_000,
+      prepareQueueMs: 40_000,
+      attemptCount: 2,
+    },
+    {
+      id: 43,
+      url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/43',
+      executionMs: 88_000,
+      aggregateMs: 22_000,
+      prepareQueueMs: 4_000,
+      attemptCount: 1,
+    },
+    {
+      id: 42,
+      url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/42',
+      executionMs: 92_000,
+      aggregateMs: 20_000,
+      prepareQueueMs: 3_000,
+      attemptCount: 1,
+    },
+    {
+      id: 41,
+      url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/41',
+      executionMs: 95_000,
+      aggregateMs: 18_000,
+      prepareQueueMs: 2_000,
+      attemptCount: 1,
+      failed: true,
+    },
+  ].map((run) => ({
+    id: run.id,
+    url: run.url,
+    jobs: [
+      historyJob(run.id, 1, {
+        name: 'quality_node_release_preflight',
+        role: 'execution',
+        group: 'node',
+        durationMs: run.executionMs,
+        queueMs: 5_000,
+        conclusion: run.failed ? 'failure' : 'success',
+        attemptCount: run.attemptCount,
+      }),
+      historyJob(run.id, 2, {
+        name: 'quality_node',
+        role: 'aggregate',
+        group: 'node',
+        durationMs: run.aggregateMs,
+        queueMs: 1_000,
+      }),
+      historyJob(run.id, 3, {
+        name: 'prepare',
+        role: 'orchestration',
+        group: 'pipeline',
+        durationMs: 10_000,
+        queueMs: run.prepareQueueMs,
+      }),
+      historyJob(run.id, 4, {
+        name: 'quality_web_checks',
+        role: 'execution',
+        group: 'web',
+        durationMs: 20_000,
+        queueMs: 1_000,
+        attemptCount: run.id === 44 ? 2 : 1,
+      }),
+    ],
+  }))
+
+  const performance = buildQualityGateServerPerformance({ history: runs })
+  const execution = performance.rows.find(
+    (row) => row.name === 'quality_node_release_preflight'
+  )
+  const aggregate = performance.rows.find((row) => row.name === 'quality_node')
+  const prepare = performance.rows.find((row) => row.name === 'prepare')
+  const retried = performance.rows.find(
+    (row) => row.name === 'quality_web_checks'
+  )
+
+  assert.equal(performance.historyCount, 4)
+  assert.equal(performance.executionCount, 2)
+  assert.equal(performance.criticalCount, 1)
+  assert.equal(performance.unstableCount, 2)
+  assert.equal(execution.attention, 'critical')
+  assert.equal(execution.sampleCount, 3)
+  assert.equal(execution.medianDurationMs, 92_000)
+  assert.equal(execution.p95DurationMs, 125_000)
+  assert.equal(execution.medianQueueMs, 5_000)
+  assert.equal(execution.p95QueueMs, 5_000)
+  assert.equal(execution.retryCount, 1)
+  assert.equal(execution.failureCount, 1)
+  assert.match(execution.latestJobUrl, /\/jobs\/4401$/u)
+  assert.equal(aggregate.attention, 'aggregate_slow')
+  assert.equal(prepare.attention, 'queued')
+  assert.equal(retried.attention, 'unstable')
 })
 
 test('quality gates config: R640 timing does not invent jobs without evidence', () => {
@@ -816,7 +1143,7 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
   assert.match(pageSource, /getQualityGateFlowSegments/u)
   assert.match(pageSource, /<ol/u)
   assert.match(pageSource, /aria-current=/u)
-  assert.equal((pageSource.match(/<MermaidDiagram/gu) || []).length, 1)
+  assert.equal((pageSource.match(/<MermaidDiagram/gu) || []).length, 2)
   assert.match(pageSource, /静态工作原理，不代表当前运行状态/u)
   assert.match(pageSource, /buildQualityGateStageDurationComposition/u)
   assert.match(pageSource, /buildQualityGateHistoryTrend/u)
@@ -824,8 +1151,14 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
   assert.match(pageSource, /当前正式回执/u)
   assert.match(pageSource, /R640 服务器门禁/u)
   assert.match(pageSource, /正式主路径/u)
-  assert.match(pageSource, /Job 名称、状态与耗时直接来自当前 GitLab 流水线/u)
+  assert.match(
+    pageSource,
+    /全部 Job 的状态、运行与等待直接来自当前 GitLab 流水线/u
+  )
   assert.match(pageSource, /工作台不复制 CI DAG/u)
+  assert.match(pageSource, /aria-label="服务器门禁详情"/u)
+  assert.match(pageSource, /data-server-view="performance"/u)
+  assert.match(pageSource, /data-server-view="history"/u)
   assert.doesNotMatch(pageSource, /serverJobLocalStageLabels/u)
   assert.doesNotMatch(pageSource, /本机阶段与 R640 CI Job 对照/u)
   assert.doesNotMatch(pageSource, /CI：\{ciJob\.label\}/u)

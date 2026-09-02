@@ -171,7 +171,9 @@ function receipt(shard, lane, index) {
 test("Web, Server and Browser internal lane catalogs partition canonical work once", () => {
   assert.deepEqual(Object.keys(CI_WEB_QUALITY_LANES), ["checks", "build"]);
   assert.deepEqual(Object.keys(CI_SERVER_QUALITY_LANES), [
-    "core",
+    "schema",
+    "upgrade",
+    "test_build",
     "critical_postgres",
   ]);
   assert.deepEqual(Object.keys(CI_BROWSER_QUALITY_LANES), [
@@ -189,13 +191,19 @@ test("Web, Server and Browser internal lane catalogs partition canonical work on
   );
   assert.deepEqual(
     Object.values(CI_SERVER_QUALITY_LANES).flatMap(({ stages }) => stages),
-    ["environment_profile", "server", "critical_postgres"],
+    ["server", "environment_profile", "server", "server", "critical_postgres"],
   );
   assert.equal(CI_WEB_QUALITY_LANES.checks.requiresTests, true);
   assert.equal(CI_WEB_QUALITY_LANES.build.requiresTests, false);
-  assert.equal(CI_SERVER_QUALITY_LANES.core.postgres, true);
-  assert.equal(CI_SERVER_QUALITY_LANES.core.makeData, true);
-  assert.equal(CI_SERVER_QUALITY_LANES.core.chromium, true);
+  assert.equal(CI_SERVER_QUALITY_LANES.schema.postgres, false);
+  assert.equal(CI_SERVER_QUALITY_LANES.schema.makeData, true);
+  assert.equal(CI_SERVER_QUALITY_LANES.schema.chromium, false);
+  assert.equal(CI_SERVER_QUALITY_LANES.upgrade.postgres, true);
+  assert.equal(CI_SERVER_QUALITY_LANES.upgrade.makeData, false);
+  assert.equal(CI_SERVER_QUALITY_LANES.upgrade.chromium, false);
+  assert.equal(CI_SERVER_QUALITY_LANES.test_build.postgres, false);
+  assert.equal(CI_SERVER_QUALITY_LANES.test_build.makeData, false);
+  assert.equal(CI_SERVER_QUALITY_LANES.test_build.chromium, true);
   assert.equal(CI_SERVER_QUALITY_LANES.critical_postgres.postgres, true);
   assert.equal(CI_SERVER_QUALITY_LANES.critical_postgres.makeData, false);
   assert.equal(CI_SERVER_QUALITY_LANES.critical_postgres.chromium, false);
@@ -335,11 +343,11 @@ test("lane plan range accepts only canonical two-dot or three-dot history", () =
 });
 
 test("lane receipts reject skipped, drifted and incomplete cleanup evidence", () => {
-  const value = receipt("server", "core", 1);
+  const value = receipt("server", "upgrade", 1);
   assert.equal(
     validateCiQualityStageLaneReceipt(value, {
       shard: "server",
-      lane: "core",
+      lane: "upgrade",
       expected,
     }),
     value,
@@ -351,7 +359,7 @@ test("lane receipts reject skipped, drifted and incomplete cleanup evidence", ()
     () =>
       validateCiQualityStageLaneReceipt(skipped, {
         shard: "server",
-        lane: "core",
+        lane: "upgrade",
         expected,
       }),
     /invalid/u,
@@ -362,7 +370,7 @@ test("lane receipts reject skipped, drifted and incomplete cleanup evidence", ()
     () =>
       validateCiQualityStageLaneReceipt(drifted, {
         shard: "server",
-        lane: "core",
+        lane: "upgrade",
         expected,
       }),
     /invalid/u,
@@ -373,7 +381,7 @@ test("lane receipts reject skipped, drifted and incomplete cleanup evidence", ()
     () =>
       validateCiQualityStageLaneReceipt(dirty, {
         shard: "server",
-        lane: "core",
+        lane: "upgrade",
         expected,
       }),
     /invalid/u,
@@ -427,6 +435,11 @@ test("fan-in accepts every lane exactly once and rejects extra artifacts", async
         aggregate.stageTimings.map(({ id }) => id),
         ["environment_profile", "server", "critical_postgres"],
       );
+      assert.equal(
+        aggregate.stageTimings.find(({ id }) => id === "server").durationMs,
+        22,
+      );
+      assert.equal(aggregate.cleanup.makeData, "passed");
       assert.equal(aggregate.cleanup.database, "passed");
     } else {
       assert.deepEqual(

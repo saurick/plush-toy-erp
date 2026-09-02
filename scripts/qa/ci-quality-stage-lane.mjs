@@ -69,21 +69,55 @@ export const CI_WEB_QUALITY_LANES = Object.freeze({
 });
 
 export const CI_SERVER_QUALITY_LANES = Object.freeze({
-  core: Object.freeze({
-    job: "quality_server_core",
+  schema: Object.freeze({
+    job: "quality_server_schema",
     command: Object.freeze([
       "bash",
       "scripts/qa/full.sh",
       "--ci-lane",
-      "server-core",
+      "server-schema",
+    ]),
+    stages: Object.freeze(["server"]),
+    substeps: Object.freeze([]),
+    requiresTests: false,
+    pnpm: false,
+    chromium: false,
+    postgres: false,
+    makeData: true,
+    webBuild: false,
+  }),
+  upgrade: Object.freeze({
+    job: "quality_server_upgrade",
+    command: Object.freeze([
+      "bash",
+      "scripts/qa/full.sh",
+      "--ci-lane",
+      "server-upgrade",
     ]),
     stages: Object.freeze(["environment_profile", "server"]),
+    substeps: Object.freeze([]),
+    requiresTests: false,
+    pnpm: false,
+    chromium: false,
+    postgres: true,
+    makeData: false,
+    webBuild: false,
+  }),
+  test_build: Object.freeze({
+    job: "quality_server_test_build",
+    command: Object.freeze([
+      "bash",
+      "scripts/qa/full.sh",
+      "--ci-lane",
+      "server-test-build",
+    ]),
+    stages: Object.freeze(["server"]),
     substeps: Object.freeze([]),
     requiresTests: true,
     pnpm: false,
     chromium: true,
-    postgres: true,
-    makeData: true,
+    postgres: false,
+    makeData: false,
     webBuild: false,
   }),
   critical_postgres: Object.freeze({
@@ -916,11 +950,19 @@ export function loadCiQualityStageLaneSet({
         }),
       ]
     : Object.freeze(
-        ["environment_profile", "server", "critical_postgres"].map((id) =>
-          receipts
-            .flatMap((receipt) => receipt.stageTimings)
-            .find((stage) => stage.id === id),
-        ),
+        ["environment_profile", "server", "critical_postgres"].map((id) => {
+          const matching = receipts.flatMap((receipt) =>
+            receipt.stageTimings.filter((stage) => stage.id === id),
+          );
+          if (matching.length === 0) {
+            throw new Error(`server quality stage is missing: ${id}`);
+          }
+          return Object.freeze({
+            id,
+            status: "passed",
+            durationMs: Math.max(...matching.map((stage) => stage.durationMs)),
+          });
+        }),
       );
   const categoryKeys = ["web", "server", "database", "browser", "security"];
   const browserScenarios =
@@ -987,7 +1029,7 @@ export function loadCiQualityStageLaneSet({
     cleanup: Object.freeze({
       makeData:
         shard === "server"
-          ? byLane.get("core").invariants.makeData
+          ? byLane.get("schema").invariants.makeData
           : "not-applicable",
       database:
         shard === "server" &&
@@ -1227,19 +1269,6 @@ export async function runCiQualityStageLane({
       await waitForPostgres(root, postgresName);
       const port = mappedPostgresPort(root, postgresName);
       childEnv.DISPOSABLE_DATABASE_BASE_URL = `postgres://postgres:ci-local-password@127.0.0.1:${port}/postgres?sslmode=disable`;
-      if (definition.makeData) {
-        await runProcess("make", ["data"], {
-          cwd: path.join(root, "server"),
-          env: childEnv,
-          termination,
-        });
-        if (
-          runGit(root, ["status", "--porcelain=v1", "--untracked-files=all"])
-        ) {
-          throw new Error("make data changed the exact-SHA checkout");
-        }
-        invariants.makeData = "passed";
-      }
     }
     if (shard === "browser") {
       const result = await runBrowserQualityLane({
@@ -1266,6 +1295,12 @@ export async function runCiQualityStageLane({
         { cwd: root, env: childEnv, termination },
       );
       gateOutput = result.output;
+    }
+    if (definition.makeData) {
+      if (runGit(root, ["status", "--porcelain=v1", "--untracked-files=all"])) {
+        throw new Error("make data changed the exact-SHA checkout");
+      }
+      invariants.makeData = "passed";
     }
   } catch (error) {
     failure = error;

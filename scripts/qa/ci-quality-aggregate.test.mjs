@@ -519,8 +519,22 @@ test("aggregate models every internal fan-in and lets Browser start from Web bui
   ];
   const serverLanes = [
     {
-      lane: "core",
-      job: "quality_server_core",
+      lane: "schema",
+      job: "quality_server_schema",
+      startedAt: stamp(5),
+      finishedAt: stamp(60),
+      durationMs: 55,
+    },
+    {
+      lane: "upgrade",
+      job: "quality_server_upgrade",
+      startedAt: stamp(3),
+      finishedAt: stamp(120),
+      durationMs: 117,
+    },
+    {
+      lane: "test_build",
+      job: "quality_server_test_build",
       startedAt: stamp(0),
       finishedAt: stamp(155),
       durationMs: 155,
@@ -565,7 +579,10 @@ test("aggregate models every internal fan-in and lets Browser start from Web bui
     "quality_browser",
   ]);
   assert.equal(webBrowserPath.durationMs, 195);
-  assert.deepEqual(serverPath.jobs, ["quality_server_core", "quality_server"]);
+  assert.deepEqual(serverPath.jobs, [
+    "quality_server_test_build",
+    "quality_server",
+  ]);
   assert.equal(serverPath.durationMs, 180);
   assert.deepEqual(resourcePath.jobs, [
     "quality_resource_runtime",
