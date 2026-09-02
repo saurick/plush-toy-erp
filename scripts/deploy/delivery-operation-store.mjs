@@ -60,6 +60,7 @@ const STATUS_TRANSITIONS = Object.freeze({
 const UUID_V4_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
+const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 const VERSION_PATTERN = /^[0-9A-Za-z](?:[0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$/u;
 const TARGET_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const IDEMPOTENCY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$/u;
@@ -888,6 +889,60 @@ export function transitionDeliveryOperation(
     updatedAt: now,
     metadata: nextMetadata,
     issues: nextIssues,
+    events: [...current.events, { at: now, status, message }],
+  });
+  writePrivateJson(operationFile(store, operationId), next, {
+    overwrite: true,
+  });
+  return next;
+}
+
+export function reconcileDeliveryOperationFromTerminalReceipt(
+  store,
+  operationId,
+  {
+    status,
+    message,
+    issues,
+    metadata,
+    receiptIdentity,
+    now = new Date().toISOString(),
+  },
+) {
+  const current = readDeliveryOperation(store, operationId);
+  const identityKeys = Object.keys(receiptIdentity || {}).sort();
+  if (
+    current.status !== "not_proven" ||
+    !["passed", "failed"].includes(status) ||
+    identityKeys.length !== 7 ||
+    identityKeys.join(",") !==
+      "action,gitSha,operationId,receiptSha256,status,target,version" ||
+    receiptIdentity.operationId !== current.id ||
+    receiptIdentity.action !== current.action ||
+    receiptIdentity.target !== current.target ||
+    receiptIdentity.gitSha !== current.gitSha ||
+    receiptIdentity.version !== current.version ||
+    receiptIdentity.status !== status ||
+    !SHA256_PATTERN.test(String(receiptIdentity.receiptSha256 || ""))
+  ) {
+    throw new Error("terminal receipt reconciliation identity is invalid");
+  }
+  if (
+    typeof message !== "string" ||
+    message.length === 0 ||
+    message.length > 500
+  ) {
+    throw new Error("operation reconciliation message is invalid");
+  }
+  assertPublicMetadata(message, "operation reconciliation message");
+  validateOperationTimestamp(now);
+  const next = validateDeliveryOperation({
+    ...current,
+    status,
+    revision: current.revision + 1,
+    updatedAt: now,
+    metadata: assertPublicMetadata(metadata),
+    issues: issues.map(validateIssue),
     events: [...current.events, { at: now, status, message }],
   });
   writePrivateJson(operationFile(store, operationId), next, {

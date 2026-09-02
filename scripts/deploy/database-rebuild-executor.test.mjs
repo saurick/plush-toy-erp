@@ -23,6 +23,7 @@ import { prepareDatabaseRebuild } from "./database-rebuild-controller.mjs";
 import { buildDatabaseRebuildManifest } from "./database-rebuild-manifest.mjs";
 import {
   readDeliveryOperation,
+  recoverInterruptedDeliveryOperation,
   resolveDeliveryOperationStore,
 } from "./delivery-operation-store.mjs";
 import { sha256File } from "./release-catalog.mjs";
@@ -438,6 +439,81 @@ test("database rebuild executor persists the validated redacted receipt for down
         operationStore: store,
       }),
     /canonical delivery operation path/u,
+  );
+});
+
+test("database rebuild reconciles a restart freeze only from its validated terminal receipt", (t) => {
+  const { root, releasePath, store, prepared } = executableFixture(
+    t,
+    "executor-terminal-reconciliation",
+  );
+  const remoteReceipt = receipt({
+    operationId: prepared.operation.id,
+    releaseManifestSha256: sha256File(releasePath),
+    databaseRebuildFingerprint: prepared.plan.fingerprint,
+    database: {
+      ...receipt().database,
+      previousDataAlias: `rollback-${SHA.slice(0, 12)}-${prepared.operation.id.slice(0, 8)}`,
+    },
+  });
+  const runCommand = (command, args, options = {}) => {
+    if (command === "git" && args[0] === "show") {
+      return {
+        status: 0,
+        stdout: "#!/usr/bin/env bash\nexit 0\n",
+        stderr: "",
+      };
+    }
+    if (command === "git") return { status: 0, stdout: "", stderr: "" };
+    if (command === "rsync" && args[0] === "--version") {
+      return {
+        status: 0,
+        stdout: "rsync  version 3.4.4  protocol version 32\n",
+        stderr: "",
+      };
+    }
+    if (command === "rsync") return { status: 0, stdout: "", stderr: "" };
+    if (command === "ssh" && options.input) {
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    if (command === "ssh") {
+      recoverInterruptedDeliveryOperation(
+        store,
+        prepared.operation.id,
+        "2026-08-03T12:29:59Z",
+      );
+      return {
+        status: 0,
+        stdout: `${JSON.stringify(remoteReceipt)}\n`,
+        stderr: "",
+      };
+    }
+    throw new Error(`unexpected command: ${command}`);
+  };
+  const report = executeDatabaseRebuild(
+    {
+      repoRoot: root,
+      operationId: prepared.operation.id,
+      releaseManifestPath: releasePath,
+      confirmation: `REBUILD_DATABASE:customer-test-133:${SHA}:${prepared.operation.id}`,
+      operationStore: store,
+    },
+    {
+      runPreflight: () => preflight(),
+      classifyRelation,
+      runCommand,
+      createSecret: () => "FreshAdmin9!abcd",
+      now: () => "2026-08-03T12:30:01Z",
+    },
+  );
+  assert.equal(report.operation.status, "passed");
+  assert.deepEqual(
+    report.operation.events.slice(-2).map(({ status }) => status),
+    ["not_proven", "passed"],
+  );
+  assert.equal(
+    readFileSync(path.join(root, report.bootstrapSecretFile), "utf8"),
+    "FreshAdmin9!abcd",
   );
 });
 

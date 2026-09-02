@@ -57,7 +57,7 @@ release pipeline 只复用同一 protected main push pipeline 的完整终态，
 
 GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，由 GitLab Provider 单独读取；它们不会被伪造成 operation。Codex 聊天、普通 SSH、手工排障和没有正式回执的动作也不会进入 operation store。
 
-同一动作、target、Exact-SHA、版本和发布输入只认领一个 operation；不同窗口的同一意图会合并。`failed / blocked` 只能显式建立父子重试链；`launching / running` 在 Bridge 重启后冻结为 `not_proven`，必须先读回目标，不能自动重试。
+同一动作、target、Exact-SHA、版本和发布输入只认领一个 operation；不同窗口的同一意图会合并。`failed / blocked` 只能显式建立父子重试链；`launching / running` 在 Bridge 重启后冻结为 `not_proven`，必须先读回目标，不能自动重试。数据库重建执行器只允许同一 operation、target、Exact-SHA、版本均匹配且通过合同校验的远端终态回执收敛这次冻结；该收敛不是重试，也不会再次写目标。
 
 `/__dev/delivery` 首屏显示最近 operation、最严重阻断、最后核对时间和完整记录入口；`/__dev/version-center?view=history` 读取同一持久化 store，并明确显示加载、正常、空、失败和过期状态。
 

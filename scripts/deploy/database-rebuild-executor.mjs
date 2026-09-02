@@ -24,6 +24,7 @@ import {
 } from "./database-rebuild-manifest.mjs";
 import {
   readDeliveryOperation,
+  reconcileDeliveryOperationFromTerminalReceipt,
   resolveDeliveryOperationStore,
   transitionDeliveryOperation,
 } from "./delivery-operation-store.mjs";
@@ -483,7 +484,8 @@ export function executeDatabaseRebuild(
   }
   const immediatePreflight = runPreflight(plan.target.key);
   const immediateRuntime = immediatePreflight.remote?.runtime;
-  const immediateBlockers = databaseRebuildPreflightBlockers(immediatePreflight);
+  const immediateBlockers =
+    databaseRebuildPreflightBlockers(immediatePreflight);
   if (
     immediateRuntime?.serverSha !== operation.gitSha ||
     immediateRuntime?.webSha !== operation.gitSha
@@ -636,7 +638,7 @@ export function executeDatabaseRebuild(
     if (receipt.status !== "passed" && existsSync(transfer.secretFile)) {
       rmSync(transfer.secretFile);
     }
-    operation = transitionDeliveryOperation(store, operation.id, {
+    const terminalTransition = {
       status: receipt.status,
       message:
         receipt.status === "passed"
@@ -656,7 +658,40 @@ export function executeDatabaseRebuild(
         databaseRebuildReceiptSha256: receiptSha256,
       },
       now: now(),
-    });
+    };
+    const currentOperation = readDeliveryOperation(store, operation.id);
+    if (
+      currentOperation.status === "not_proven" &&
+      ["passed", "failed"].includes(receipt.status)
+    ) {
+      operation = reconcileDeliveryOperationFromTerminalReceipt(
+        store,
+        operation.id,
+        {
+          ...terminalTransition,
+          receiptIdentity: {
+            operationId: receipt.operationId,
+            action: operation.action,
+            target: receipt.target,
+            gitSha: receipt.gitSha,
+            version: receipt.version,
+            status: receipt.status,
+            receiptSha256,
+          },
+        },
+      );
+    } else if (
+      currentOperation.status === "not_proven" &&
+      receipt.status === "not_proven"
+    ) {
+      operation = currentOperation;
+    } else {
+      operation = transitionDeliveryOperation(
+        store,
+        operation.id,
+        terminalTransition,
+      );
+    }
     return {
       schemaVersion: "plush.database-rebuild-execution/v1",
       operation,
