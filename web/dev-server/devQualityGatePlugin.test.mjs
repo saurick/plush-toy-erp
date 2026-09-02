@@ -135,12 +135,16 @@ test('quality gate projects R640 exact-SHA CI separately from local dirty state'
     'plan',
     'prepare',
     'quality_static',
-    'quality_node_release_preflight',
+    'quality_node_release_preflight_a',
+    'quality_node_release_preflight_b',
     'quality_node_release_a',
     'quality_node_release_b',
+    'quality_node_release_c',
     'quality_node_core',
-    'quality_resource_contract',
-    'quality_resource_runtime',
+    'quality_resource_contract_a',
+    'quality_resource_contract_b',
+    'quality_resource_runtime_a',
+    'quality_resource_runtime_b',
     'quality_web_checks',
     'quality_web_build',
     'quality_server_schema',
@@ -177,7 +181,7 @@ test('quality gate projects R640 exact-SHA CI separately from local dirty state'
           jobs: [
             {
               id: 50,
-              name: 'quality_node_release_preflight',
+              name: 'quality_node_release_preflight_a',
               status: 'completed',
               conclusion: 'failure',
               durationMs: 90_000,
@@ -233,7 +237,7 @@ test('quality gate projects R640 exact-SHA CI separately from local dirty state'
   assert(evidence.jobGuides.every((guide) => guide.registered === true))
   assert.equal(evidence.jobs[0].status, 'completed')
   const releasePreflight = evidence.jobs.find(
-    (job) => job.name === 'quality_node_release_preflight'
+    (job) => job.name === 'quality_node_release_preflight_a'
   )
   assert.equal(releasePreflight.attemptCount, 2)
   assert.equal(releasePreflight.role, 'execution')

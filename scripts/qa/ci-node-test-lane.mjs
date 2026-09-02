@@ -28,6 +28,7 @@ const RELEASE_LANE_ANCHORS = Object.freeze({
     "scripts/deploy/migrate-online.test.mjs",
     "scripts/deploy/run-smoke-script.test.mjs",
   ]),
+  c: Object.freeze([]),
 });
 
 function releaseLaneTestFiles() {
@@ -45,11 +46,15 @@ function releaseLaneTestFiles() {
     preflight: RELEASE_LANE_ANCHORS.preflight,
     a: Object.freeze([
       ...RELEASE_LANE_ANCHORS.a,
-      ...residual.filter((_, index) => index % 2 === 0),
+      ...residual.filter((_, index) => index % 3 === 0),
     ]),
     b: Object.freeze([
       ...RELEASE_LANE_ANCHORS.b,
-      ...residual.filter((_, index) => index % 2 === 1),
+      ...residual.filter((_, index) => index % 3 === 1),
+    ]),
+    c: Object.freeze([
+      ...RELEASE_LANE_ANCHORS.c,
+      ...residual.filter((_, index) => index % 3 === 2),
     ]),
   });
 }
@@ -61,10 +66,17 @@ export const CI_NODE_TEST_LANES = Object.freeze({
     job: "quality_node_core",
     profiles: Object.freeze(["fast", "database", "browser"]),
   }),
-  release_preflight: Object.freeze({
-    job: "quality_node_release_preflight",
+  release_preflight_a: Object.freeze({
+    job: "quality_node_release_preflight_a",
     profiles: Object.freeze(["release"]),
     testFiles: RELEASE_LANE_TEST_FILES.preflight,
+    testPartition: "a",
+  }),
+  release_preflight_b: Object.freeze({
+    job: "quality_node_release_preflight_b",
+    profiles: Object.freeze(["release"]),
+    testFiles: RELEASE_LANE_TEST_FILES.preflight,
+    testPartition: "b",
   }),
   release_a: Object.freeze({
     job: "quality_node_release_a",
@@ -75,6 +87,11 @@ export const CI_NODE_TEST_LANES = Object.freeze({
     job: "quality_node_release_b",
     profiles: Object.freeze(["release"]),
     testFiles: RELEASE_LANE_TEST_FILES.b,
+  }),
+  release_c: Object.freeze({
+    job: "quality_node_release_c",
+    profiles: Object.freeze(["release"]),
+    testFiles: RELEASE_LANE_TEST_FILES.c,
   }),
 });
 
@@ -227,23 +244,37 @@ export function expectedCiNodeTestLaneFiles(lane) {
 }
 
 export function validateCiNodeTestLaneCatalog(lanes = CI_NODE_TEST_LANES) {
-  const actual = [];
-  const duplicates = [];
-  const seen = new Set();
-  for (const lane of Object.keys(lanes)) {
+  const occurrences = new Map();
+  for (const [lane, definition] of Object.entries(lanes)) {
     for (const file of laneTestFiles(lane)) {
-      if (seen.has(file)) duplicates.push(file);
-      seen.add(file);
-      actual.push(file);
+      const entries = occurrences.get(file) || [];
+      entries.push({ lane, testPartition: definition.testPartition || "" });
+      occurrences.set(file, entries);
     }
   }
   const expected = [...catalogNodeTests("parallel_safe")].sort();
-  const sortedActual = [...actual].sort();
+  const sortedActual = [...occurrences.keys()].sort();
+  const duplicates = [];
+  const partitioned = [];
+  for (const [file, entries] of occurrences) {
+    if (entries.length === 1) continue;
+    const partitions = entries.map(({ testPartition }) => testPartition).sort();
+    if (
+      file === "scripts/deploy/production-preflight.test.mjs" &&
+      entries.length === 2 &&
+      JSON.stringify(partitions) === JSON.stringify(["a", "b"])
+    ) {
+      partitioned.push(file);
+    } else {
+      duplicates.push(file);
+    }
+  }
   return Object.freeze({
     ok:
       duplicates.length === 0 &&
       JSON.stringify(sortedActual) === JSON.stringify(expected),
     duplicates: Object.freeze([...new Set(duplicates)].sort()),
+    partitioned: Object.freeze(partitioned.sort()),
     actual: Object.freeze(sortedActual),
     expected: Object.freeze(expected),
   });
@@ -285,6 +316,7 @@ export function validateCiNodeTestLaneSet(receipts, expected) {
         JSON.stringify(definition.profiles) ||
       JSON.stringify(receipt.testFiles) !== JSON.stringify(testFiles) ||
       receipt.testFileCount !== testFiles.length ||
+      receipt.testPartition !== (definition.testPartition || null) ||
       !Number.isFinite(Date.parse(receipt.startedAt)) ||
       !Number.isFinite(Date.parse(receipt.finishedAt)) ||
       !Number.isSafeInteger(receipt.durationMs) ||
@@ -431,6 +463,9 @@ export function runCiNodeTestLane({
     QA_DB_GUARD_RANGE: plan.range,
     QA_FULL_PROFILE: "strict",
   };
+  if (definition.testPartition) {
+    childEnv.PRODUCTION_PREFLIGHT_TEST_LANE = definition.testPartition;
+  }
 
   const install = spawnSync(
     "pnpm",
@@ -519,6 +554,7 @@ export function runCiNodeTestLane({
     profiles: [...definition.profiles],
     testFiles: [...expectedCiNodeTestLaneFiles(lane)],
     testFileCount: expectedCiNodeTestLaneFiles(lane).length,
+    testPartition: definition.testPartition || null,
     startedAt,
     finishedAt,
     durationMs: Math.max(0, Date.parse(finishedAt) - startedEpoch),

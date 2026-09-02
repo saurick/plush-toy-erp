@@ -26,13 +26,21 @@ import { verifyNodeTestSummary } from "./verify-node-test-summary.mjs";
 
 export const CI_RESOURCE_TEST_LANE_SCHEMA = "plush.ci-resource-test-lane/v1";
 export const CI_RESOURCE_TEST_LANES = Object.freeze({
-  contract: Object.freeze({
-    job: "quality_resource_contract",
+  contract_a: Object.freeze({
+    job: "quality_resource_contract_a",
     testFile: "scripts/deploy/bootstrap-production-admin.contract.test.mjs",
   }),
-  runtime: Object.freeze({
-    job: "quality_resource_runtime",
+  contract_b: Object.freeze({
+    job: "quality_resource_contract_b",
+    testFile: "scripts/deploy/bootstrap-production-admin.contract-b.test.mjs",
+  }),
+  runtime_a: Object.freeze({
+    job: "quality_resource_runtime_a",
     testFile: "scripts/deploy/bootstrap-production-admin.runtime.test.mjs",
+  }),
+  runtime_b: Object.freeze({
+    job: "quality_resource_runtime_b",
+    testFile: "scripts/deploy/bootstrap-production-admin.runtime-b.test.mjs",
   }),
 });
 

@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import test from "node:test";
+import { productionPreflightTest as test } from "./production-preflight-test-lane.mjs";
 
 const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
 const scriptPath = path.join(
@@ -1035,6 +1035,7 @@ test("production preflight verifies the runtime Chromium package exact pin", () 
   });
 
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stdout, /Compose 运行服务存在/u);
   assert.match(
     result.stdout,
     new RegExp(

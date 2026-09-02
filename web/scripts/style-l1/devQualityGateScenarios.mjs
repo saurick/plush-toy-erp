@@ -17,12 +17,16 @@ const SERVER_JOB_TIMINGS = Object.freeze([
   ['plan', 6_000, 900, 'orchestration', 'pipeline', 1],
   ['prepare', 18_000, 1_200, 'orchestration', 'pipeline', 1],
   ['quality_static', 31_000, 1_400, 'execution', 'static', 1],
-  ['quality_node_release_preflight', 129_000, 2_100, 'execution', 'node', 1],
-  ['quality_node_release_a', 107_000, 1_900, 'execution', 'node', 1],
-  ['quality_node_release_b', 85_000, 1_700, 'execution', 'node', 1],
+  ['quality_node_release_preflight_a', 78_000, 2_100, 'execution', 'node', 1],
+  ['quality_node_release_preflight_b', 76_000, 2_000, 'execution', 'node', 1],
+  ['quality_node_release_a', 82_000, 1_900, 'execution', 'node', 1],
+  ['quality_node_release_b', 79_000, 1_700, 'execution', 'node', 1],
+  ['quality_node_release_c', 74_000, 1_600, 'execution', 'node', 1],
   ['quality_node_core', 102_000, 1_600, 'execution', 'node', 2],
-  ['quality_resource_contract', 48_000, 1_300, 'execution', 'resource', 1],
-  ['quality_resource_runtime', 76_000, 1_500, 'execution', 'resource', 1],
+  ['quality_resource_contract_a', 79_000, 1_300, 'execution', 'resource', 1],
+  ['quality_resource_contract_b', 77_000, 1_400, 'execution', 'resource', 1],
+  ['quality_resource_runtime_a', 81_000, 1_500, 'execution', 'resource', 1],
+  ['quality_resource_runtime_b', 80_000, 1_500, 'execution', 'resource', 1],
   ['quality_web_checks', 64_000, 1_400, 'execution', 'web', 1],
   ['quality_web_build', 71_000, 1_500, 'execution', 'web', 1],
   ['quality_server_schema', 38_000, 1_300, 'execution', 'server', 1],
@@ -50,16 +54,20 @@ const SERVER_CI_AGGREGATE_NEEDS = Object.freeze({
   quality_node: [
     'plan',
     'prepare',
-    'quality_node_release_preflight',
+    'quality_node_release_preflight_a',
+    'quality_node_release_preflight_b',
     'quality_node_release_a',
     'quality_node_release_b',
+    'quality_node_release_c',
     'quality_node_core',
   ],
   quality_resource: [
     'plan',
     'prepare',
-    'quality_resource_contract',
-    'quality_resource_runtime',
+    'quality_resource_contract_a',
+    'quality_resource_contract_b',
+    'quality_resource_runtime_a',
+    'quality_resource_runtime_b',
   ],
   quality_web: ['plan', 'prepare', 'quality_web_checks', 'quality_web_build'],
   quality_server: [
@@ -954,7 +962,7 @@ export function createDevQualityGateScenarios({
           .first()
         await firstHistoryDetails.locator('summary').click()
         await firstHistoryDetails
-          .getByText('quality_node_release_preflight', { exact: true })
+          .getByText('quality_node_release_preflight_a', { exact: true })
           .waitFor()
         await firstHistoryDetails.locator('summary').click()
 

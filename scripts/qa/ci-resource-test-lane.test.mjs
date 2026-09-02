@@ -117,8 +117,10 @@ async function receipts() {
 
 test("resource lane registry covers 39 cases and 86 scenarios exactly once", () => {
   assert.deepEqual(Object.keys(CI_RESOURCE_TEST_LANES), [
-    "contract",
-    "runtime",
+    "contract_a",
+    "contract_b",
+    "runtime_a",
+    "runtime_b",
   ]);
   assert.deepEqual(validateBootstrapProductionAdminTestRegistry(), {
     caseCount: 39,
@@ -131,13 +133,15 @@ test("resource lane registry covers 39 cases and 86 scenarios exactly once", () 
   assert.deepEqual(catalog.duplicateIds, []);
   assert.equal(BOOTSTRAP_PRODUCTION_ADMIN_TEST_CASES.length, 39);
   assert.deepEqual(
-    bootstrapProductionAdminTestLaneCases("contract").map(({ id }) => id),
+    bootstrapProductionAdminTestLaneCases("contract_a").map(({ id }) => id),
     BOOTSTRAP_PRODUCTION_ADMIN_TEST_CASES.filter(
-      ({ lane }) => lane === "contract",
+      ({ lane }) => lane === "contract_a",
     ).map(({ id }) => id),
   );
-  assert.equal(bootstrapProductionAdminTestLaneCases("contract").length, 21);
-  assert.equal(bootstrapProductionAdminTestLaneCases("runtime").length, 18);
+  assert.equal(bootstrapProductionAdminTestLaneCases("contract_a").length, 4);
+  assert.equal(bootstrapProductionAdminTestLaneCases("contract_b").length, 17);
+  assert.equal(bootstrapProductionAdminTestLaneCases("runtime_a").length, 4);
+  assert.equal(bootstrapProductionAdminTestLaneCases("runtime_b").length, 14);
 });
 
 test("resource lane plan range accepts only canonical two-dot or three-dot history", () => {
@@ -159,7 +163,7 @@ test("resource fan-in rejects missing, duplicate, skipped, drifted, dirty and ex
   const values = await receipts();
   assert.equal(
     validateCiResourceTestLaneSet(values, expected, { root: repoRoot }).size,
-    2,
+    Object.keys(CI_RESOURCE_TEST_LANES).length,
   );
   assert.throws(
     () =>
@@ -215,7 +219,7 @@ test("resource fan-in rejects missing, duplicate, skipped, drifted, dirty and ex
     directory: root,
     expected,
   });
-  assert.equal(loaded.laneCount, 2);
+  assert.equal(loaded.laneCount, Object.keys(CI_RESOURCE_TEST_LANES).length);
   assert.equal(loaded.caseCount, 39);
   assert.equal(loaded.scenarioCount, 86);
   assert.equal(loaded.summary.pass, 39);

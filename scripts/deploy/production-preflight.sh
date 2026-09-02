@@ -768,6 +768,7 @@ if [[ "$runtime_check" -eq 1 ]]; then
   done
   app_cid="${runtime_cids[app_server]}"
   postgres_cid="${runtime_cids[postgres]}"
+  ok "Compose 运行服务存在"
   ok "Compose 四服务容器唯一，镜像引用 / content id 与 release=$expected_release 一致"
 
   runtime_cid_for_service() {

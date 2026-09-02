@@ -1,3 +1,3 @@
 import { registerBootstrapProductionAdminTests } from "./bootstrap-production-admin.test-support.mjs";
 
-registerBootstrapProductionAdminTests("contract_a");
+registerBootstrapProductionAdminTests("runtime_b");

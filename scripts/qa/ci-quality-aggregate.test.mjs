@@ -213,7 +213,7 @@ test("aggregate keeps internal resource lanes behind one complete external invar
   );
   const value = {
     status: "passed",
-    laneCount: 2,
+    laneCount: Object.keys(CI_RESOURCE_TEST_LANES).length,
     caseCount: 39,
     scenarioCount: 86,
     durationMs: Math.max(...jobs.map((job) => job.durationMs)),
@@ -464,11 +464,18 @@ test("aggregate models every internal fan-in and lets Browser start from Web bui
       durationMs: 150,
     },
     {
-      lane: "release_preflight",
-      job: "quality_node_release_preflight",
+      lane: "release_preflight_a",
+      job: "quality_node_release_preflight_a",
       startedAt: stamp(10),
       finishedAt: stamp(130),
       durationMs: 120,
+    },
+    {
+      lane: "release_preflight_b",
+      job: "quality_node_release_preflight_b",
+      startedAt: stamp(11),
+      finishedAt: stamp(128),
+      durationMs: 117,
     },
     {
       lane: "release_a",
@@ -484,21 +491,42 @@ test("aggregate models every internal fan-in and lets Browser start from Web bui
       finishedAt: stamp(155),
       durationMs: 143,
     },
+    {
+      lane: "release_c",
+      job: "quality_node_release_c",
+      startedAt: stamp(13),
+      finishedAt: stamp(145),
+      durationMs: 132,
+    },
   ];
   const resourceLanes = [
     {
-      lane: "contract",
-      job: "quality_resource_contract",
+      lane: "contract_a",
+      job: "quality_resource_contract_a",
       startedAt: stamp(20),
       finishedAt: stamp(120),
       durationMs: 100,
     },
     {
-      lane: "runtime",
-      job: "quality_resource_runtime",
+      lane: "contract_b",
+      job: "quality_resource_contract_b",
+      startedAt: stamp(25),
+      finishedAt: stamp(118),
+      durationMs: 93,
+    },
+    {
+      lane: "runtime_a",
+      job: "quality_resource_runtime_a",
       startedAt: stamp(30),
       finishedAt: stamp(130),
       durationMs: 100,
+    },
+    {
+      lane: "runtime_b",
+      job: "quality_resource_runtime_b",
+      startedAt: stamp(32),
+      finishedAt: stamp(128),
+      durationMs: 96,
     },
   ];
   const webLanes = [
@@ -585,7 +613,7 @@ test("aggregate models every internal fan-in and lets Browser start from Web bui
   ]);
   assert.equal(serverPath.durationMs, 180);
   assert.deepEqual(resourcePath.jobs, [
-    "quality_resource_runtime",
+    "quality_resource_runtime_a",
     "quality_resource",
   ]);
   assert.equal(resourcePath.durationMs, 140);

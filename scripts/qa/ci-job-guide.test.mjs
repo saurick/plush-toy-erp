@@ -34,7 +34,7 @@ test("CI Job guide covers every registered push-CI Job exactly once", () => {
   ];
 
   assert.equal(CI_JOB_GUIDE_SCHEMA, "plush.ci-job-guide/v1");
-  assert.equal(expected.length, 24);
+  assert.equal(expected.length, 28);
   assert.equal(new Set(expected).size, expected.length);
   assert.deepEqual(
     CI_JOB_GUIDES.map(({ name }) => name).sort(),

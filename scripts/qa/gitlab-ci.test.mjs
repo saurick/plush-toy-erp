@@ -11,6 +11,8 @@ import {
   CI_BROWSER_QUALITY_LANES,
   CI_SERVER_QUALITY_LANES,
 } from "./ci-quality-stage-lane.mjs";
+import { CI_NODE_TEST_LANES } from "./ci-node-test-lane.mjs";
+import { CI_RESOURCE_TEST_LANES } from "./ci-resource-test-lane.mjs";
 
 const repositoryRoot = new URL("../../", import.meta.url);
 const trackedFiles = execFileSync("git", ["ls-files", "-z"], {
@@ -124,14 +126,14 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
     /quality_aggregate:[\s\S]+?- job: prepare\n      artifacts: true/u,
   );
   const staticBlock = workflow.match(
-    /^quality_static:[\s\S]+?^quality_node_release_preflight:/mu,
+    /^quality_static:[\s\S]+?^quality_node_release_preflight_a:/mu,
   )?.[0];
   assert.ok(staticBlock);
   assert.equal(
     staticBlock.match(/- job: prepare\n      artifacts: false/gu)?.length ?? 0,
     1,
   );
-  for (const lane of ["release_preflight", "release_a", "release_b", "core"]) {
+  for (const lane of Object.keys(CI_NODE_TEST_LANES)) {
     assert.match(workflow, new RegExp(`^quality_node_${lane}:`, "mu"));
     assert.match(
       workflow,
@@ -142,7 +144,7 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
       new RegExp(`output/ci/node-lanes/${lane}[.]json`, "u"),
     );
   }
-  for (const lane of ["contract", "runtime"]) {
+  for (const lane of Object.keys(CI_RESOURCE_TEST_LANES)) {
     assert.match(workflow, new RegExp(`^quality_resource_${lane}:`, "mu"));
     assert.match(
       workflow,
@@ -214,14 +216,25 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
     assert.doesNotMatch(job, /interruptible: false/u);
   }
   assert.doesNotMatch(workflow, /^quality_node_runtime:/mu);
-  assert.match(
-    workflow,
-    /quality_node:[\s\S]+?job: quality_node_release_preflight\n      artifacts: true[\s\S]+?job: quality_node_release_a\n      artifacts: true[\s\S]+?job: quality_node_release_b\n      artifacts: true[\s\S]+?job: quality_node_core\n      artifacts: true[\s\S]+?ci-quality-shard[.]mjs --shard node/u,
-  );
-  assert.match(
-    workflow,
-    /quality_resource:[\s\S]+?job: quality_resource_contract\n      artifacts: true[\s\S]+?job: quality_resource_runtime\n      artifacts: true[\s\S]+?ci-quality-shard[.]mjs --shard resource/u,
-  );
+  const nodeAggregate = workflow.match(
+    /^quality_node:[\s\S]+?(?=^quality_[a-z_]+:|(?![\s\S]))/mu,
+  )?.[0];
+  assert.ok(nodeAggregate);
+  for (const { job } of Object.values(CI_NODE_TEST_LANES)) {
+    assert.match(nodeAggregate, new RegExp(`job: ${job}\\n      artifacts: true`, "u"));
+  }
+  assert.match(nodeAggregate, /ci-quality-shard[.]mjs --shard node/u);
+  const resourceAggregate = workflow.match(
+    /^quality_resource:[\s\S]+?(?=^quality_[a-z_]+:|(?![\s\S]))/mu,
+  )?.[0];
+  assert.ok(resourceAggregate);
+  for (const { job } of Object.values(CI_RESOURCE_TEST_LANES)) {
+    assert.match(
+      resourceAggregate,
+      new RegExp(`job: ${job}\\n      artifacts: true`, "u"),
+    );
+  }
+  assert.match(resourceAggregate, /ci-quality-shard[.]mjs --shard resource/u);
   assert.match(
     workflow,
     /quality_web:[\s\S]+?job: quality_web_checks\n      artifacts: true[\s\S]+?job: quality_web_build\n      artifacts: true[\s\S]+?ci-quality-shard[.]mjs --shard web/u,
@@ -231,7 +244,7 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
     /quality_server:[\s\S]+?job: quality_server_schema\n      artifacts: true[\s\S]+?job: quality_server_upgrade\n      artifacts: true[\s\S]+?job: quality_server_test_build\n      artifacts: true[\s\S]+?job: quality_server_critical_postgres\n      artifacts: true[\s\S]+?ci-quality-shard[.]mjs --shard server/u,
   );
   assert.ok(
-    workflow.indexOf("quality_node_release_preflight:") <
+    workflow.indexOf("quality_node_release_preflight_a:") <
       workflow.indexOf("quality_web:"),
   );
   assert.ok(
@@ -244,9 +257,12 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   assert.match(aggregateBlock, /job: quality_node\n      artifacts: true/u);
   assert.doesNotMatch(
     aggregateBlock,
-    /quality_node_(?:core|release_(?:preflight|a|b))/u,
+    /quality_node_(?:core|release_(?:preflight_[ab]|[abc]))/u,
   );
-  assert.doesNotMatch(aggregateBlock, /quality_resource_(?:contract|runtime)/u);
+  assert.doesNotMatch(
+    aggregateBlock,
+    /quality_resource_(?:contract|runtime)_[ab]/u,
+  );
   assert.doesNotMatch(
     aggregateBlock,
     /quality_(?:web_(?:checks|build)|server_(?:schema|upgrade|test_build|critical_postgres))/u,
@@ -324,9 +340,11 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   assert.match(workflow, /policy: pull-push/u);
   assert.match(workflow, /policy: pull/u);
   for (const shard of [
-    "node_release_preflight",
+    "node_release_preflight_a",
+    "node_release_preflight_b",
     "node_release_a",
     "node_release_b",
+    "node_release_c",
     "node_core",
     "node",
     "web_checks",
@@ -358,8 +376,10 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   );
   for (const shard of [
     "static",
-    "resource_contract",
-    "resource_runtime",
+    "resource_contract_a",
+    "resource_contract_b",
+    "resource_runtime_a",
+    "resource_runtime_b",
     "resource",
     "web",
     "server_schema",

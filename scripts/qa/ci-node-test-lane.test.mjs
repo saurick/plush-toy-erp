@@ -15,6 +15,10 @@ import {
 } from "./ci-node-test-lane.mjs";
 import { catalogNodeTests } from "./run-node-tests.mjs";
 import { EXPLICIT_ONLY_NODE_TESTS } from "./node-test-groups.mjs";
+import {
+  PRODUCTION_PREFLIGHT_TEST_LANES,
+  productionPreflightLaneForIndex,
+} from "../deploy/production-preflight-test-lane.mjs";
 
 const sha = "a".repeat(40);
 const digest = "b".repeat(64);
@@ -62,6 +66,7 @@ function receipt(lane, index) {
     profiles: [...definition.profiles],
     testFiles: [...expectedCiNodeTestLaneFiles(lane)],
     testFileCount: expectedCiNodeTestLaneFiles(lane).length,
+    testPartition: definition.testPartition || null,
     startedAt,
     finishedAt,
     durationMs,
@@ -86,26 +91,37 @@ function receipts() {
   return Object.keys(CI_NODE_TEST_LANES).map(receipt);
 }
 
-test("Node lane catalog covers parallel_safe exactly once and excludes resource-sensitive", () => {
+test("Node lane catalog covers parallel_safe with one controlled preflight partition", () => {
   assert.deepEqual(Object.keys(CI_NODE_TEST_LANES), [
     "core",
-    "release_preflight",
+    "release_preflight_a",
+    "release_preflight_b",
     "release_a",
     "release_b",
+    "release_c",
   ]);
   assert.deepEqual(CI_NODE_TEST_LANES.core.profiles, [
     "fast",
     "database",
     "browser",
   ]);
-  for (const lane of ["release_preflight", "release_a", "release_b"]) {
+  for (const lane of [
+    "release_preflight_a",
+    "release_preflight_b",
+    "release_a",
+    "release_b",
+    "release_c",
+  ]) {
     assert.deepEqual(CI_NODE_TEST_LANES[lane].profiles, ["release"]);
   }
-  assert.deepEqual(expectedCiNodeTestLaneFiles("release_preflight"), [
-    "scripts/deploy/production-preflight.test.mjs",
-  ]);
-  assert.equal(expectedCiNodeTestLaneFiles("release_a").length, 44);
-  assert.equal(expectedCiNodeTestLaneFiles("release_b").length, 44);
+  for (const lane of ["release_preflight_a", "release_preflight_b"]) {
+    assert.deepEqual(expectedCiNodeTestLaneFiles(lane), [
+      "scripts/deploy/production-preflight.test.mjs",
+    ]);
+  }
+  assert.equal(expectedCiNodeTestLaneFiles("release_a").length, 30);
+  assert.equal(expectedCiNodeTestLaneFiles("release_b").length, 30);
+  assert.equal(expectedCiNodeTestLaneFiles("release_c").length, 28);
   assert.ok(
     expectedCiNodeTestLaneFiles("release_a").includes(
       "scripts/qa/pre-push-receipt.test.mjs",
@@ -123,9 +139,10 @@ test("Node lane catalog covers parallel_safe exactly once and excludes resource-
   );
   assert.deepEqual(
     [
-      ...expectedCiNodeTestLaneFiles("release_preflight"),
+      ...expectedCiNodeTestLaneFiles("release_preflight_a"),
       ...expectedCiNodeTestLaneFiles("release_a"),
       ...expectedCiNodeTestLaneFiles("release_b"),
+      ...expectedCiNodeTestLaneFiles("release_c"),
     ].sort(),
     [...catalogNodeTests("release")].sort(),
   );
@@ -133,6 +150,9 @@ test("Node lane catalog covers parallel_safe exactly once and excludes resource-
   const catalog = validateCiNodeTestLaneCatalog();
   assert.equal(catalog.ok, true);
   assert.deepEqual(catalog.duplicates, []);
+  assert.deepEqual(catalog.partitioned, [
+    "scripts/deploy/production-preflight.test.mjs",
+  ]);
   assert.deepEqual(
     catalog.actual,
     [...catalogNodeTests("parallel_safe")].sort(),
@@ -149,9 +169,23 @@ test("Node lane catalog covers parallel_safe exactly once and excludes resource-
   );
 });
 
+test("production preflight partitions alternate every top-level test deterministically", () => {
+  assert.deepEqual(PRODUCTION_PREFLIGHT_TEST_LANES, ["a", "b"]);
+  assert.deepEqual(
+    Array.from({ length: 8 }, (_, index) =>
+      productionPreflightLaneForIndex(index),
+    ),
+    ["a", "b", "a", "b", "a", "b", "a", "b"],
+  );
+  assert.throws(() => productionPreflightLaneForIndex(-1), /non-negative/u);
+});
+
 test("Node fan-in rejects missing, duplicate, skipped, drifted and extra lane evidence", async (t) => {
   const values = receipts();
-  assert.equal(validateCiNodeTestLaneSet(values, expected).size, 4);
+  assert.equal(
+    validateCiNodeTestLaneSet(values, expected).size,
+    Object.keys(CI_NODE_TEST_LANES).length,
+  );
   assert.throws(
     () => validateCiNodeTestLaneSet(values.slice(1), expected),
     /every lane/u,
@@ -195,8 +229,11 @@ test("Node fan-in rejects missing, duplicate, skipped, drifted and extra lane ev
     directory: path.basename(root),
     expected,
   });
-  assert.equal(loaded.laneCount, 4);
-  assert.equal(loaded.testFileCount, catalogNodeTests("parallel_safe").length);
+  assert.equal(loaded.laneCount, Object.keys(CI_NODE_TEST_LANES).length);
+  assert.equal(
+    loaded.testFileCount,
+    catalogNodeTests("parallel_safe").length + 1,
+  );
   assert.equal(loaded.summary.fail, 0);
   assert.equal(loaded.summary.skipped, 0);
 
