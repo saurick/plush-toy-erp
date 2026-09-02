@@ -18,7 +18,10 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { readDatabaseRebuildPlan } from "./database-rebuild-controller.mjs";
-import { validateDatabaseRebuildManifest } from "./database-rebuild-manifest.mjs";
+import {
+  databaseRebuildPreflightBlockers,
+  validateDatabaseRebuildManifest,
+} from "./database-rebuild-manifest.mjs";
 import {
   readDeliveryOperation,
   resolveDeliveryOperationStore,
@@ -480,7 +483,7 @@ export function executeDatabaseRebuild(
   }
   const immediatePreflight = runPreflight(plan.target.key);
   const immediateRuntime = immediatePreflight.remote?.runtime;
-  const immediateBlockers = [...(immediatePreflight.blockers || [])];
+  const immediateBlockers = databaseRebuildPreflightBlockers(immediatePreflight);
   if (
     immediateRuntime?.serverSha !== operation.gitSha ||
     immediateRuntime?.webSha !== operation.gitSha
@@ -505,13 +508,7 @@ export function executeDatabaseRebuild(
   } catch {
     immediateBlockers.push("database_rebuild_git_relation_not_current");
   }
-  if (
-    immediatePreflight.status !== "passed" &&
-    immediateBlockers.length === 0
-  ) {
-    immediateBlockers.push("database_rebuild_target_preflight_blocked");
-  }
-  if (immediatePreflight.status !== "passed" || immediateBlockers.length > 0) {
+  if (immediateBlockers.length > 0) {
     operation = transitionDeliveryOperation(store, operation.id, {
       status: "blocked",
       message: "database rebuild was blocked by the immediate target preflight",

@@ -11,6 +11,7 @@ import test from "node:test";
 
 import {
   buildDatabaseRebuildManifest,
+  databaseRebuildPreflightBlockers,
   validateDatabaseRebuildManifest,
   writeDatabaseRebuildManifest,
 } from "./database-rebuild-manifest.mjs";
@@ -184,6 +185,7 @@ test("database rebuild defers only an explicitly absent customer config", () => 
   });
   assert.equal(eligible.status, "eligible");
   assert.deepEqual(eligible.blockers, []);
+  assert.deepEqual(databaseRebuildPreflightBlockers(absentConfig), []);
 
   const invalidConfig = structuredClone(absentConfig);
   invalidConfig.remote.runtime.customerConfigState = "invalid";
@@ -195,6 +197,9 @@ test("database rebuild defers only an explicitly absent customer config", () => 
     ancestry: ancestry(),
   });
   assert.equal(blocked.status, "blocked");
+  assert.deepEqual(databaseRebuildPreflightBlockers(invalidConfig), [
+    "target_customer_config_readback_failed",
+  ]);
   assert.deepEqual(blocked.blockers, [
     "target_customer_config_readback_failed",
   ]);
