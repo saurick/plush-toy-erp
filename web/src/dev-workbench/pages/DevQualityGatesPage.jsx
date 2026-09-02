@@ -12,6 +12,7 @@ import {
   Alert,
   Button,
   Descriptions,
+  Drawer,
   Empty,
   List,
   Progress,
@@ -560,6 +561,24 @@ const SERVER_JOB_GROUP = Object.freeze({
   other: '其他执行',
   closeout: '聚合与终态',
 })
+const SERVER_JOB_ROLE_HELP = Object.freeze({
+  orchestration: '确定范围或准备环境，本身不代表测试覆盖耗时。',
+  execution: '实际运行检查、测试或构建，是性能优化的主要对象。',
+  aggregate: '核对子 Job 回执并形成领域结论，不代表前序测试只耗时这么久。',
+  terminal: '核对最终证据并决定整条 CI 是否可信通过。',
+})
+const SERVER_JOB_GROUP_HELP = Object.freeze({
+  preparation: '先确定本次验证范围并准备统一运行环境。',
+  static: '尽早检查脚本和配置中的静态问题。',
+  node: '验证 Node 工具、发布合同以及共享检查。',
+  resource: '验证会占用进程、端口或临时数据库的敏感场景及清理。',
+  web: '分别完成前端代码检查与生产构建。',
+  server: '验证 Schema、存量升级、Go 测试构建和关键 PostgreSQL 合同。',
+  browser: '复用同一提交的前端构建，验证浏览器主路径。',
+  security: '检查 Go 依赖中的可达漏洞。',
+  other: '当前流水线已运行，但尚未归入既有业务阶段。',
+  closeout: '只核对前序回执并形成聚合或最终结论。',
+})
 const SERVER_JOB_ATTENTION = Object.freeze({
   critical: Object.freeze({ label: '超过 120 秒', color: 'error' }),
   review: Object.freeze({ label: '超过 90 秒', color: 'warning' }),
@@ -978,9 +997,228 @@ function ServerCiHistory({ evidence, currentCommit }) {
   )
 }
 
-function ServerCiPipelineFlow({ evidence, timing }) {
+function serverJobFlowGroup(job) {
+  if (job?.role === 'orchestration') return 'preparation'
+  if (job?.group === 'pipeline') return 'closeout'
+  return job?.group || 'other'
+}
+
+function ServerJobGuideDrawer({
+  evidence,
+  timing,
+  open,
+  selectedJobName,
+  onSelect,
+  onShowAll,
+  onClose,
+  onAfterOpenChange,
+}) {
+  const guideByName = new Map(
+    (evidence.jobGuides || []).map((guide) => [guide.name, guide])
+  )
+  const selectedJob = timing.flowJobs.find(
+    (job) => job.name === selectedJobName
+  )
+  const selectedGuide = selectedJob ? guideByName.get(selectedJob.name) : null
+  const topologyJob =
+    evidence.topology?.status === 'available' && selectedJob
+      ? evidence.topology.jobs.find((job) => job.name === selectedJob.name)
+      : null
+  const selectedGroup = selectedJob ? serverJobFlowGroup(selectedJob) : ''
+  const selectedRole = selectedJob
+    ? SERVER_JOB_ROLE[selectedJob.role] || SERVER_JOB_ROLE.execution
+    : null
+
+  const dependencyContent = (() => {
+    if (evidence.topology?.status !== 'available') {
+      return (
+        <Text type="secondary">
+          当前依赖暂不可读；以 GitLab Pipeline 为准。
+        </Text>
+      )
+    }
+    if (!topologyJob?.needs.length) return <Text>无前置依赖</Text>
+    return (
+      <Space size={[4, 4]} wrap>
+        {topologyJob.needs.map((name) => (
+          <Text key={name} code>
+            {name}
+          </Text>
+        ))}
+      </Space>
+    )
+  })()
+
+  return (
+    <Drawer
+      title={selectedGuide?.label || 'Job 说明'}
+      open={open}
+      width="min(560px, calc(100vw - 16px))"
+      rootClassName="erp-dev-quality-job-guide-drawer"
+      onClose={onClose}
+      afterOpenChange={onAfterOpenChange}
+      destroyOnHidden
+    >
+      {selectedJob && selectedGuide ? (
+        <div className="erp-dev-quality-job-guide-drawer__detail">
+          <Space size={6} wrap>
+            <Tag color={selectedRole.color}>{selectedRole.label}</Tag>
+            <Tag>{SERVER_JOB_GROUP[selectedGroup] || selectedGroup}</Tag>
+            {!selectedGuide.registered ? (
+              <Tag color="warning">说明待登记</Tag>
+            ) : null}
+          </Space>
+          <Paragraph>{selectedGuide.summary}</Paragraph>
+          <Descriptions
+            size="small"
+            column={1}
+            bordered
+            items={[
+              {
+                key: 'job',
+                label: 'Job',
+                children: <Text code>{selectedJob.name}</Text>,
+              },
+              {
+                key: 'role',
+                label: '类型',
+                children: (
+                  <div className="erp-dev-quality-job-guide-drawer__stack">
+                    <Text strong>{selectedRole.label}</Text>
+                    <Text type="secondary">
+                      {SERVER_JOB_ROLE_HELP[selectedJob.role]}
+                    </Text>
+                  </div>
+                ),
+              },
+              {
+                key: 'group',
+                label: '所属阶段',
+                children: (
+                  <div className="erp-dev-quality-job-guide-drawer__stack">
+                    <Text strong>
+                      {SERVER_JOB_GROUP[selectedGroup] || selectedGroup}
+                    </Text>
+                    <Text type="secondary">
+                      {SERVER_JOB_GROUP_HELP[selectedGroup]}
+                    </Text>
+                  </div>
+                ),
+              },
+              {
+                key: 'current',
+                label: '本次结果',
+                children: (
+                  <Space size={[8, 4]} wrap>
+                    <Tag>{SERVER_PIPELINE_JOB_STATUS[selectedJob.status]}</Tag>
+                    <Text>
+                      运行 {formatQualityGateDuration(selectedJob.durationMs)}
+                    </Text>
+                    <Text>
+                      等待 {formatQualityGateDuration(selectedJob.queueMs)}
+                    </Text>
+                    {selectedJob.attemptCount > 1 ? (
+                      <Text>重试 {selectedJob.attemptCount - 1} 次</Text>
+                    ) : null}
+                  </Space>
+                ),
+              },
+              {
+                key: 'checks',
+                label: '包含检查',
+                children: (
+                  <ul className="erp-dev-quality-job-guide-drawer__checks">
+                    {selectedGuide.checks.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                ),
+              },
+              {
+                key: 'needs',
+                label: '前置依赖',
+                children: dependencyContent,
+              },
+              {
+                key: 'outcome',
+                label: '结果用途',
+                children: selectedGuide.outcome,
+              },
+            ]}
+          />
+          <Space size={8} wrap>
+            <Button href={selectedJob.url} target="_blank">
+              在 GitLab 查看日志
+            </Button>
+            <Button type="link" onClick={onShowAll}>
+              查看全部 Job 说明
+            </Button>
+          </Space>
+        </div>
+      ) : (
+        <div className="erp-dev-quality-job-guide-drawer__catalog">
+          <Text type="secondary">
+            先看阶段，再按需查看单个 Job；依赖、状态与耗时仍以当前 GitLab
+            流水线为准。
+          </Text>
+          {timing.flowGroups.map((group) => (
+            <section
+              key={group.key}
+              className="erp-dev-quality-job-guide-drawer__group"
+            >
+              <div className="erp-dev-quality-job-guide-drawer__group-heading">
+                <Text strong>{SERVER_JOB_GROUP[group.key] || group.key}</Text>
+                <Text type="secondary">{SERVER_JOB_GROUP_HELP[group.key]}</Text>
+              </div>
+              <List
+                size="small"
+                dataSource={group.jobs}
+                renderItem={(job) => {
+                  const guide = guideByName.get(job.name)
+                  if (!guide) return null
+                  return (
+                    <List.Item
+                      actions={[
+                        <Button
+                          key="open"
+                          type="link"
+                          aria-label={`查看 ${job.name} 说明`}
+                          onClick={() => onSelect(job.name)}
+                        >
+                          查看
+                        </Button>,
+                      ]}
+                    >
+                      <List.Item.Meta
+                        title={
+                          <Space size={6} wrap>
+                            <Text strong>{guide.label}</Text>
+                            <Text code>{job.name}</Text>
+                            {!guide.registered ? (
+                              <Tag color="warning">说明待登记</Tag>
+                            ) : null}
+                          </Space>
+                        }
+                        description={guide.summary}
+                      />
+                    </List.Item>
+                  )
+                }}
+              />
+            </section>
+          ))}
+        </div>
+      )}
+    </Drawer>
+  )
+}
+
+function ServerCiPipelineFlow({ evidence, timing, onOpenJobGuide }) {
   const dag = buildQualityGateServerDag(evidence)
   const visibleStatuses = new Set(timing.flowJobs.map((job) => job.status))
+  const guideByName = new Map(
+    (evidence.jobGuides || []).map((guide) => [guide.name, guide])
+  )
   return (
     <section
       className="erp-dev-quality-server-pipeline"
@@ -1078,6 +1316,21 @@ function ServerCiPipelineFlow({ evidence, timing }) {
                             {job.name}
                           </Text>
                         </Link>
+                        <Tooltip
+                          trigger={['hover', 'focus']}
+                          title={`查看 ${guideByName.get(job.name)?.label || job.name} 说明`}
+                        >
+                          <Button
+                            type="text"
+                            size="small"
+                            className="erp-dev-quality-server-pipeline__node-guide-button"
+                            icon={<QuestionCircleOutlined />}
+                            aria-label={`查看 ${job.name} 说明`}
+                            onClick={(event) =>
+                              onOpenJobGuide(job.name, event.currentTarget)
+                            }
+                          />
+                        </Tooltip>
                       </div>
                       <Space size={4} wrap>
                         <Tag
@@ -1133,12 +1386,16 @@ function ServerCiPipelineFlow({ evidence, timing }) {
   )
 }
 
-function ServerCurrentPipelineView({ evidence, timing }) {
+function ServerCurrentPipelineView({ evidence, timing, onOpenJobGuide }) {
   const highlightedJobs = timing.jobs.slice(0, 3)
   const remainingJobs = timing.jobs.slice(3)
   return (
     <div className="erp-dev-quality-server-view" data-server-view="pipeline">
-      <ServerCiPipelineFlow evidence={evidence} timing={timing} />
+      <ServerCiPipelineFlow
+        evidence={evidence}
+        timing={timing}
+        onOpenJobGuide={onOpenJobGuide}
+      />
       {timing.jobs.length ? (
         <section
           className="erp-dev-quality-server-evidence__timing"
@@ -1175,6 +1432,24 @@ function ServerCurrentPipelineView({ evidence, timing }) {
 
 function ServerCiEvidencePanel({ summary, serverView, onServerViewChange }) {
   const evidence = summary?.serverEvidence
+  const [jobGuideOpen, setJobGuideOpen] = useState(false)
+  const [selectedJobName, setSelectedJobName] = useState('')
+  const jobGuideTriggerRef = useRef(null)
+  const openJobGuide = useCallback((jobName, trigger) => {
+    jobGuideTriggerRef.current = trigger
+    setSelectedJobName(jobName)
+    setJobGuideOpen(true)
+  }, [])
+  const restoreJobGuideFocus = useCallback((open) => {
+    if (open) return
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        const trigger = jobGuideTriggerRef.current
+        if (trigger?.isConnected) trigger.focus({ preventScroll: true })
+        jobGuideTriggerRef.current = null
+      })
+    })
+  }, [])
   if (!evidence) return null
   const status =
     SERVER_EVIDENCE_STATUS[evidence.status] ||
@@ -1276,9 +1551,23 @@ function ServerCiEvidencePanel({ summary, serverView, onServerViewChange }) {
           }}
         />
         <Text type="secondary">{SERVER_VIEW_HELP[selectedServerView]}</Text>
+        {evidence.jobGuides.length ? (
+          <Button
+            size="small"
+            className="erp-dev-quality-server-evidence__view-switch-guide"
+            icon={<QuestionCircleOutlined />}
+            onClick={(event) => openJobGuide('', event.currentTarget)}
+          >
+            Job 说明
+          </Button>
+        ) : null}
       </div>
       {selectedServerView === 'pipeline' ? (
-        <ServerCurrentPipelineView evidence={evidence} timing={timing} />
+        <ServerCurrentPipelineView
+          evidence={evidence}
+          timing={timing}
+          onOpenJobGuide={openJobGuide}
+        />
       ) : null}
       {selectedServerView === 'performance' ? (
         <div
@@ -1296,6 +1585,16 @@ function ServerCiEvidencePanel({ summary, serverView, onServerViewChange }) {
           />
         </div>
       ) : null}
+      <ServerJobGuideDrawer
+        evidence={evidence}
+        timing={timing}
+        open={jobGuideOpen}
+        selectedJobName={selectedJobName}
+        onSelect={setSelectedJobName}
+        onShowAll={() => setSelectedJobName('')}
+        onClose={() => setJobGuideOpen(false)}
+        onAfterOpenChange={restoreJobGuideFocus}
+      />
     </section>
   )
 }

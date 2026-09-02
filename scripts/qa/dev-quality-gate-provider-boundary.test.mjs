@@ -78,6 +78,17 @@ test("DEV quality gate projects provider jobs without a synchronized frontend ca
     jobNames,
   );
   assert.deepEqual(
+    evidence.jobGuides.map((guide) => ({
+      name: guide.name,
+      registered: guide.registered,
+    })),
+    [
+      { name: "setup-renamed", registered: false },
+      { name: "quality_new_lane", registered: false },
+      { name: "CI Gate", registered: true },
+    ],
+  );
+  assert.deepEqual(
     timing.flowJobs.map((job) => job.name),
     jobNames,
   );
@@ -116,6 +127,7 @@ test("DEV quality gate has no second CI job topology source", () => {
   const provider = read("scripts/deploy/gitlab-delivery-provider.mjs");
   const config = read("web/src/dev-workbench/config/devQualityGates.mjs");
   const page = read("web/src/dev-workbench/pages/DevQualityGatesPage.jsx");
+  const guide = read("scripts/qa/ci-job-guide.mjs");
 
   assert.doesNotMatch(
     plugin,
@@ -141,4 +153,6 @@ test("DEV quality gate has no second CI job topology source", () => {
     page,
     /SERVER_CI_JOB_CATALOG|localStageIds|CI 7 分片|七个固定分片/u,
   );
+  assert.match(guide, /projectCiJobGuides/u);
+  assert.doesNotMatch(guide, /needs|durationMs|queueMs|history/u);
 });

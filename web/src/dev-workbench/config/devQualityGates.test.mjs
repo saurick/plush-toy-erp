@@ -120,7 +120,7 @@ function summary(overrides = {}) {
       },
     },
     serverEvidence: {
-      schemaVersion: 'plush.dev-quality-gate-server-evidence/v4',
+      schemaVersion: 'plush.dev-quality-gate-server-evidence/v5',
       status: 'passed',
       current: true,
       coversWorkingTree: true,
@@ -147,6 +147,16 @@ function summary(overrides = {}) {
           role: 'terminal',
           group: 'pipeline',
           url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/jobs/390',
+        },
+      ],
+      jobGuides: [
+        {
+          name: 'CI Gate',
+          label: 'CI 最终门禁',
+          summary: '核对最终证据并固定到当前 Pipeline。',
+          checks: ['最终证据完整性'],
+          outcome: '形成 exact-SHA CI Gate 证据。',
+          registered: true,
         },
       ],
       topology: {
@@ -585,6 +595,7 @@ test('quality gates config: summary preserves one shared operation truth', () =>
   assert.deepEqual(normalized.profiles.strict.substeps, {})
   assert.equal(normalized.serverEvidence.pipeline.id, 39)
   assert.equal(normalized.serverEvidence.jobs[0].name, 'CI Gate')
+  assert.equal(normalized.serverEvidence.jobGuides[0].label, 'CI 最终门禁')
   assert.equal(normalized.serverEvidence.topology.status, 'available')
   assert.equal(normalized.serverEvidence.history.length, 2)
   assert.equal(normalized.serverEvidence.history[1].failureJob, 'quality_web')
@@ -651,6 +662,33 @@ test('quality gates config: summary preserves one shared operation truth', () =>
         })
       ),
     /topology graph is invalid/u
+  )
+  assert.throws(
+    () =>
+      normalizeDevQualityGateSummary(
+        summary({
+          serverEvidence: {
+            ...summary().serverEvidence,
+            jobGuides: [],
+          },
+        })
+      ),
+    /state is inconsistent/u
+  )
+  assert.throws(
+    () =>
+      normalizeDevQualityGateSummary(
+        summary({
+          serverEvidence: {
+            ...summary().serverEvidence,
+            jobGuides: [
+              summary().serverEvidence.jobGuides[0],
+              summary().serverEvidence.jobGuides[0],
+            ],
+          },
+        })
+      ),
+    /state is inconsistent/u
   )
 })
 
@@ -1157,11 +1195,19 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
   )
   assert.match(pageSource, /工作台不复制 CI DAG/u)
   assert.match(pageSource, /aria-label="服务器门禁详情"/u)
+  assert.match(pageSource, /<Drawer/u)
+  assert.match(pageSource, />\s*Job 说明\s*</u)
+  assert.match(pageSource, /aria-label=\{`查看 \$\{job\.name\} 说明`\}/u)
+  assert.match(pageSource, /先看阶段，再按需查看单个 Job/u)
+  assert.match(pageSource, /核对子 Job 回执并形成领域结论/u)
   assert.match(pageSource, /data-server-view="performance"/u)
   assert.match(pageSource, /data-server-view="history"/u)
   assert.doesNotMatch(pageSource, /serverJobLocalStageLabels/u)
   assert.doesNotMatch(pageSource, /本机阶段与 R640 CI Job 对照/u)
   assert.doesNotMatch(pageSource, /CI：\{ciJob\.label\}/u)
+  assert.equal((pageSource.match(/label: '本次流水线'/gu) || []).length, 1)
+  assert.equal((pageSource.match(/label: 'Job 性能'/gu) || []).length, 1)
+  assert.equal((pageSource.match(/label: 'CI 历史'/gu) || []).length, 1)
   assert.match(pageSource, /pending: '等待运行'/u)
   assert.match(pageSource, /missing: '未产生 CI 记录'/u)
   assert.match(pageSource, /unavailable: '读取失败'/u)

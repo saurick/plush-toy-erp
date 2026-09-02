@@ -21,6 +21,7 @@ import {
   readDevQaExecutionLock,
   releaseDevQaExecutionLock,
 } from '../../scripts/qa/dev-qa-execution-lock.mjs'
+import { projectCiJobGuides } from '../../scripts/qa/ci-job-guide.mjs'
 import { validateDevWorkbenchReceipt } from '../../scripts/qa/dev-workbench-receipt.mjs'
 import {
   readRepositoryIdentity,
@@ -647,7 +648,7 @@ function statusProjection({
 }
 
 export const DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA =
-  'plush.dev-quality-gate-server-evidence/v4'
+  'plush.dev-quality-gate-server-evidence/v5'
 
 const SERVER_CI_HISTORY_LIMIT = 20
 const SERVER_JOB_FAN_IN_GROUPS = Object.freeze({
@@ -728,6 +729,7 @@ function unavailableServerEvidence(message) {
     gitSha: '',
     pipeline: null,
     jobs: [],
+    jobGuides: [],
     topology: {
       status: 'unavailable',
       gitSha: '',
@@ -874,6 +876,7 @@ export function projectDevQualityGateServerEvidence(
       gitSha: repository.commit,
       pipeline: null,
       jobs: [],
+      jobGuides: [],
       topology: projectServerTopology(topology, repository, []),
       history,
       message:
@@ -902,6 +905,7 @@ export function projectDevQualityGateServerEvidence(
       finishedAt: selected.run.finishedAt,
     },
     jobs: selected.jobs,
+    jobGuides: projectCiJobGuides(selected.jobs.map((job) => job.name)),
     topology: projectServerTopology(topology, repository, selected.jobs),
     history,
     message: selected.passed

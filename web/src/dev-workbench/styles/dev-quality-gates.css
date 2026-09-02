@@ -108,6 +108,10 @@
   flex: 1 1 260px;
 }
 
+.erp-dev-quality-server-evidence__view-switch-guide {
+  flex: 0 0 auto;
+}
+
 .erp-dev-quality-server-view {
   display: grid;
   gap: 10px;
@@ -262,7 +266,15 @@
 }
 
 .erp-dev-quality-server-pipeline__node-heading > a {
+  flex: 1 1 auto;
   min-width: 0;
+}
+
+.erp-dev-quality-server-pipeline__node-guide-button.ant-btn {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  color: var(--erp-text-muted, #667085);
 }
 
 .erp-dev-quality-server-pipeline__node-text {
@@ -571,6 +583,73 @@
 
 .erp-dev-quality-server-history__jobs-list .ant-tag {
   margin: 0;
+}
+
+.erp-dev-quality-job-guide-drawer .ant-drawer-body {
+  padding: 16px;
+}
+
+.erp-dev-quality-job-guide-drawer__detail,
+.erp-dev-quality-job-guide-drawer__catalog,
+.erp-dev-quality-job-guide-drawer__group,
+.erp-dev-quality-job-guide-drawer__stack {
+  display: grid;
+  min-width: 0;
+}
+
+.erp-dev-quality-job-guide-drawer__detail,
+.erp-dev-quality-job-guide-drawer__catalog {
+  gap: 16px;
+}
+
+.erp-dev-quality-job-guide-drawer__group {
+  gap: 4px;
+}
+
+.erp-dev-quality-job-guide-drawer__stack,
+.erp-dev-quality-job-guide-drawer__group-heading {
+  gap: 2px;
+}
+
+.erp-dev-quality-job-guide-drawer__group-heading {
+  display: grid;
+  min-width: 0;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--erp-border, #dce8dd);
+}
+
+.erp-dev-quality-job-guide-drawer__detail > .ant-typography,
+.erp-dev-quality-job-guide-drawer__catalog > .ant-typography,
+.erp-dev-quality-job-guide-drawer__group .ant-list-item-meta-title,
+.erp-dev-quality-job-guide-drawer__group .ant-list-item-meta-description {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-quality-job-guide-drawer__group .ant-list-item {
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.erp-dev-quality-job-guide-drawer__group .ant-list-item-meta {
+  min-width: 0;
+}
+
+.erp-dev-quality-job-guide-drawer__group .ant-list-item-action {
+  margin-inline-start: 4px;
+}
+
+.erp-dev-quality-job-guide-drawer__checks {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding-inline-start: 18px;
+}
+
+.erp-dev-quality-job-guide-drawer .ant-descriptions-item-content,
+.erp-dev-quality-job-guide-drawer .ant-typography code {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .erp-dev-quality-actions {

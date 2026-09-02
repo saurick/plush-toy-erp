@@ -1,3 +1,5 @@
+import { projectCiJobGuides } from '../../../scripts/qa/ci-job-guide.mjs'
+
 const NOW = '2026-08-09T08:00:00.000Z'
 const OPERATION_ID = '11111111-1111-4111-8111-111111111111'
 const HISTORY_OPERATION_IDS = Object.freeze([
@@ -378,13 +380,14 @@ function historicalQualityOperation(id, durationMs, createdAt, finishedAt) {
 function createServerEvidence(status = 'passed') {
   if (status === 'unavailable') {
     return {
-      schemaVersion: 'plush.dev-quality-gate-server-evidence/v4',
+      schemaVersion: 'plush.dev-quality-gate-server-evidence/v5',
       status: 'unavailable',
       current: false,
       coversWorkingTree: false,
       gitSha: '',
       pipeline: null,
       jobs: [],
+      jobGuides: [],
       topology: {
         status: 'unavailable',
         gitSha: '',
@@ -398,13 +401,14 @@ function createServerEvidence(status = 'passed') {
   }
   if (status === 'missing') {
     return {
-      schemaVersion: 'plush.dev-quality-gate-server-evidence/v4',
+      schemaVersion: 'plush.dev-quality-gate-server-evidence/v5',
       status: 'missing',
       current: false,
       coversWorkingTree: false,
       gitSha: repository.commit,
       pipeline: null,
       jobs: [],
+      jobGuides: [],
       topology: {
         status: 'missing',
         gitSha: repository.commit,
@@ -418,7 +422,7 @@ function createServerEvidence(status = 'passed') {
     }
   }
   return {
-    schemaVersion: 'plush.dev-quality-gate-server-evidence/v4',
+    schemaVersion: 'plush.dev-quality-gate-server-evidence/v5',
     status: 'passed',
     current: true,
     coversWorkingTree: false,
@@ -449,6 +453,7 @@ function createServerEvidence(status = 'passed') {
         )}`,
       })
     ),
+    jobGuides: projectCiJobGuides(SERVER_JOB_TIMINGS.map(([name]) => name)),
     topology: {
       status: 'available',
       gitSha: repository.commit,
@@ -1014,6 +1019,100 @@ export function createDevQualityGateScenarios({
         assert(
           pipelineGeometry.maxNodeRight <= pipelineGeometry.nodesRight + 1,
           JSON.stringify(pipelineGeometry)
+        )
+
+        const jobGuideButton = serverPanel.getByRole('button', {
+          name: 'Job 说明',
+        })
+        await jobGuideButton.click()
+        const jobGuideDrawer = page.locator('.erp-dev-quality-job-guide-drawer')
+        await jobGuideDrawer.locator('.ant-drawer-content').waitFor()
+        await jobGuideDrawer
+          .getByText('先看阶段，再按需查看单个 Job', { exact: false })
+          .waitFor()
+        assert.deepEqual(
+          await jobGuideDrawer
+            .locator('.erp-dev-quality-job-guide-drawer__group-heading strong')
+            .allTextContents(),
+          [
+            '准备',
+            '静态检查',
+            'Node 合同',
+            '资源敏感',
+            'Web',
+            'Server / PostgreSQL',
+            '浏览器',
+            '安全',
+            '聚合与终态',
+          ]
+        )
+        assert.deepEqual(
+          (
+            await jobGuideDrawer
+              .locator('.ant-list-item-meta-title code')
+              .allTextContents()
+          ).sort(),
+          SERVER_JOB_TIMINGS.map(([jobName]) => jobName).sort()
+        )
+
+        await jobGuideDrawer
+          .getByRole('button', { name: '查看 quality_node 说明' })
+          .click()
+        await jobGuideDrawer
+          .getByText('Node 汇总', { exact: true })
+          .first()
+          .waitFor()
+        await jobGuideDrawer
+          .getByText('不会重跑分片测试', { exact: false })
+          .waitFor()
+        await jobGuideDrawer
+          .getByText(
+            '核对子 Job 回执并形成领域结论，不代表前序测试只耗时这么久。',
+            { exact: true }
+          )
+          .waitFor()
+        await jobGuideDrawer.getByText('运行 28 秒', { exact: true }).waitFor()
+        await jobGuideDrawer
+          .getByText('quality_node_core', { exact: true })
+          .waitFor()
+        await jobGuideDrawer.locator('.ant-drawer-close').click()
+        await jobGuideDrawer.waitFor({ state: 'hidden' })
+        await page.waitForFunction(() =>
+          document.activeElement?.textContent?.includes('Job 说明')
+        )
+
+        const coreGuideButton = serverPanel.getByRole('button', {
+          name: '查看 quality_node_core 说明',
+        })
+        await coreGuideButton.click()
+        await jobGuideDrawer
+          .getByText('Node 核心测试', { exact: true })
+          .first()
+          .waitFor()
+        await jobGuideDrawer.getByText('fast 测试组', { exact: true }).waitFor()
+        await jobGuideDrawer.getByText('运行 1 分 42 秒').waitFor()
+        await jobGuideDrawer.locator('.ant-drawer-close').click()
+        await jobGuideDrawer.waitFor({ state: 'hidden' })
+        await page.waitForFunction(
+          () =>
+            document.activeElement?.getAttribute('aria-label') ===
+            '查看 quality_node_core 说明'
+        )
+
+        await coreGuideButton.click()
+        await jobGuideDrawer.locator('.ant-drawer-content').waitFor()
+        const drawerGeometry = await jobGuideDrawer.evaluate((drawer) => {
+          const rect = drawer.getBoundingClientRect()
+          return {
+            left: rect.left,
+            right: rect.right,
+            viewportWidth: window.innerWidth,
+          }
+        })
+        assert(drawerGeometry.left >= 0, JSON.stringify(drawerGeometry))
+        assert(
+          drawerGeometry.right <= drawerGeometry.viewportWidth + 1,
+          JSON.stringify(drawerGeometry)
         )
         await assertNoHorizontalOverflow(
           page,

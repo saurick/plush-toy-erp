@@ -225,6 +225,12 @@ test('quality gate projects R640 exact-SHA CI separately from local dirty state'
   assert.equal(evidence.current, true)
   assert.equal(evidence.coversWorkingTree, false)
   assert.equal(evidence.jobs.length, names.length)
+  assert.equal(evidence.jobGuides.length, names.length)
+  assert.equal(
+    evidence.jobGuides.find((guide) => guide.name === 'quality_node').label,
+    'Node 汇总'
+  )
+  assert(evidence.jobGuides.every((guide) => guide.registered === true))
   assert.equal(evidence.jobs[0].status, 'completed')
   const releasePreflight = evidence.jobs.find(
     (job) => job.name === 'quality_node_release_preflight'
@@ -286,6 +292,7 @@ test('quality gate distinguishes a readable GitLab response from a missing exact
   assert.equal(evidence.gitSha, REPOSITORY.commit)
   assert.equal(evidence.pipeline, null)
   assert.deepEqual(evidence.jobs, [])
+  assert.deepEqual(evidence.jobGuides, [])
   assert.equal(evidence.topology.status, 'missing')
   assert.equal(evidence.history.length, 1)
   assert.equal(evidence.history[0].result, 'failed')

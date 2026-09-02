@@ -11,7 +11,7 @@ export const DEV_QUALITY_GATE_OPERATION_API_PREFIX = `${DEV_QUALITY_GATE_API_PAT
 export const DEV_QUALITY_GATE_OPERATION_SCHEMA =
   'plush.dev-quality-gate-operation-public/v1'
 export const DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA =
-  'plush.dev-quality-gate-server-evidence/v4'
+  'plush.dev-quality-gate-server-evidence/v5'
 
 export const QUERY_KEYS = Object.freeze({
   view: 'view',
@@ -531,6 +531,44 @@ function normalizeServerEvidenceJob(job) {
   }
 }
 
+function normalizeServerEvidenceJobGuide(guide) {
+  assertExactKeys(
+    guide,
+    ['checks', 'label', 'name', 'outcome', 'registered', 'summary'],
+    'quality server evidence job guide'
+  )
+  if (
+    typeof guide.registered !== 'boolean' ||
+    !Array.isArray(guide.checks) ||
+    guide.checks.length < 1 ||
+    guide.checks.length > 8
+  ) {
+    throw new Error('quality server evidence job guide is invalid')
+  }
+  return {
+    name: safeText(guide.name, 'quality server evidence job guide name', {
+      max: 120,
+    }),
+    label: safeText(guide.label, 'quality server evidence job guide label', {
+      max: 80,
+    }),
+    summary: safeText(
+      guide.summary,
+      'quality server evidence job guide summary',
+      { max: 240 }
+    ),
+    checks: guide.checks.map((item) =>
+      safeText(item, 'quality server evidence job guide check', { max: 120 })
+    ),
+    outcome: safeText(
+      guide.outcome,
+      'quality server evidence job guide outcome',
+      { max: 240 }
+    ),
+    registered: guide.registered,
+  }
+}
+
 function normalizeServerEvidencePipeline(pipeline) {
   if (pipeline === null) return null
   assertExactKeys(
@@ -733,6 +771,7 @@ function normalizeServerEvidence(evidence) {
       'current',
       'gitSha',
       'history',
+      'jobGuides',
       'jobs',
       'message',
       'notProven',
@@ -750,6 +789,8 @@ function normalizeServerEvidence(evidence) {
     typeof evidence.coversWorkingTree !== 'boolean' ||
     !Array.isArray(evidence.jobs) ||
     evidence.jobs.length > 100 ||
+    !Array.isArray(evidence.jobGuides) ||
+    evidence.jobGuides.length > 100 ||
     !Array.isArray(evidence.notProven) ||
     evidence.notProven.length > 20 ||
     (evidence.gitSha !== '' && !COMMIT_PATTERN.test(evidence.gitSha))
@@ -760,6 +801,7 @@ function normalizeServerEvidence(evidence) {
   const topology = normalizeServerEvidenceTopology(evidence.topology)
   const history = normalizeServerEvidenceHistory(evidence.history)
   const jobs = evidence.jobs.map(normalizeServerEvidenceJob)
+  const jobGuides = evidence.jobGuides.map(normalizeServerEvidenceJobGuide)
   if (
     (['passed', 'running', 'failed'].includes(evidence.status) && !pipeline) ||
     (['missing', 'unavailable'].includes(evidence.status) && pipeline) ||
@@ -773,7 +815,10 @@ function normalizeServerEvidence(evidence) {
           (topologyJob) => !jobs.some((job) => job.name === topologyJob.name)
         ))) ||
     new Set(jobs.map((job) => job.id)).size !== jobs.length ||
-    new Set(jobs.map((job) => job.name)).size !== jobs.length
+    new Set(jobs.map((job) => job.name)).size !== jobs.length ||
+    new Set(jobGuides.map((guide) => guide.name)).size !== jobGuides.length ||
+    jobGuides.length !== jobs.length ||
+    jobGuides.some((guide) => !jobs.some((job) => job.name === guide.name))
   ) {
     throw new Error('quality server evidence state is inconsistent')
   }
@@ -783,6 +828,7 @@ function normalizeServerEvidence(evidence) {
     topology,
     history,
     jobs,
+    jobGuides,
     message: safeText(evidence.message, 'quality server evidence message'),
     notProven: evidence.notProven.map((item) =>
       safeText(item, 'quality server evidence missing item', { max: 200 })
