@@ -247,8 +247,8 @@ export function validateCiResourceTestLaneCatalog() {
     duplicateIds.length === 0 &&
     JSON.stringify([...ids].sort()) ===
       JSON.stringify([...expectedIds].sort()) &&
-    JSON.stringify(actualFiles) ===
-      JSON.stringify(NODE_TEST_GROUPS.resource_sensitive) &&
+    JSON.stringify([...actualFiles].sort()) ===
+      JSON.stringify([...NODE_TEST_GROUPS.resource_sensitive].sort()) &&
     actualCases.reduce(
       (total, definition) => total + definition.scenarioCount,
       0,

@@ -56,6 +56,7 @@ export const CUSTOMER_WEB_OVERLAY_ARCHIVE_INPUTS = Object.freeze([
   "config/customers/demo/customerPackage.mjs",
   "config/customers/reference-customer/customerPackage.mjs",
   "config/customers/yoyoosun/customerPackage.mjs",
+  "config/customers/yoyoosun/releasePackage.mjs",
   "config/customers/yoyoosun/roleFlowMatrix.mjs",
 ]);
 

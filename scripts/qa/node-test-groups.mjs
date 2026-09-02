@@ -218,9 +218,9 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/qa/yoyoosun-release-readiness.test.mjs",
   ]),
   resource_sensitive: Object.freeze([
-    "scripts/deploy/bootstrap-production-admin.contract.test.mjs",
     "scripts/deploy/bootstrap-production-admin.contract-b.test.mjs",
-    "scripts/deploy/bootstrap-production-admin.runtime.test.mjs",
+    "scripts/deploy/bootstrap-production-admin.contract.test.mjs",
     "scripts/deploy/bootstrap-production-admin.runtime-b.test.mjs",
+    "scripts/deploy/bootstrap-production-admin.runtime.test.mjs",
   ]),
 });

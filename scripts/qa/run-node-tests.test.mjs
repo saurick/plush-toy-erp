@@ -52,7 +52,9 @@ test("all scripts Node tests in the current tree are assigned to one explicit gr
     ),
   );
   assert.deepEqual(NODE_TEST_GROUPS.resource_sensitive, [
+    "scripts/deploy/bootstrap-production-admin.contract-b.test.mjs",
     "scripts/deploy/bootstrap-production-admin.contract.test.mjs",
+    "scripts/deploy/bootstrap-production-admin.runtime-b.test.mjs",
     "scripts/deploy/bootstrap-production-admin.runtime.test.mjs",
   ]);
   for (const file of NODE_TEST_GROUPS.resource_sensitive) {
