@@ -5,6 +5,7 @@ import test from "node:test";
 
 import {
   getCustomerPackage,
+  getCustomerReleasePackage,
   listCustomerPackageKeys,
 } from "./index.mjs";
 
@@ -45,4 +46,23 @@ test("customer package index: registered keys match package identity", () => {
   }
   assert.equal(getCustomerPackage("unknown-customer"), null);
   assert.equal(getCustomerPackage("../yoyoosun"), null);
+});
+
+test("customer package index: only explicitly reviewed packages enter formal release", () => {
+  assert.equal(getCustomerReleasePackage("demo"), null);
+  assert.equal(getCustomerReleasePackage("reference-customer"), null);
+  assert.equal(getCustomerReleasePackage("unknown-customer"), null);
+
+  const draftPackage = getCustomerPackage("yoyoosun");
+  const releasePackage = getCustomerReleasePackage("yoyoosun");
+  assert(releasePackage);
+  assert.equal(releasePackage.customerKey, draftPackage.customerKey);
+  assert.equal(releasePackage.packageKey, draftPackage.packageKey);
+  assert.equal(releasePackage.status, "release_ready");
+  assert.equal(releasePackage.runtimeEnabled, true);
+  assert.equal(releasePackage.sourcePolicy.previewOnly, false);
+  assert.equal(releasePackage.sourcePolicy.publishEnabled, true);
+  assert.equal(releasePackage.sourcePolicy.localTestApplyEnabled, false);
+  assert.equal(draftPackage.status, "draft");
+  assert.equal(draftPackage.runtimeEnabled, false);
 });

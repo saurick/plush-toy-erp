@@ -8,6 +8,7 @@ import { customerPackageCatalog } from "../../config/catalog/customerPackageCata
 import { demoCustomerPackage } from "../../config/customers/demo/customerPackage.mjs";
 import { referenceCustomerPackage } from "../../config/customers/reference-customer/customerPackage.mjs";
 import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
+import { yoyoosunReleasePackage } from "../../config/customers/yoyoosun/releasePackage.mjs";
 import { yoyoosunMenuConfig } from "../../config/customers/yoyoosun/menuConfig.mjs";
 import { getNavigationSections } from "../../web/src/erp/config/seedData.mjs";
 import {
@@ -39,8 +40,10 @@ function releaseReadyPackage(config) {
   };
 }
 
-function buildRuntimeManifest(config = yoyoosunCustomerPackage) {
-  return compileRuntimeManifest(releaseReadyPackage(config));
+function buildRuntimeManifest(config = yoyoosunReleasePackage) {
+  return compileRuntimeManifest(
+    config.status === "release_ready" ? config : releaseReadyPackage(config),
+  );
 }
 
 function navigationPageKeys() {
@@ -91,6 +94,26 @@ test("customer-config-runtime-manifest: formal compile rejects every tracked dra
       /formal runtime compile requires a release-ready package with runtime and publish enabled/,
     );
   }
+});
+
+test("customer-config-runtime-manifest: formal CLI uses only the registered yoyoosun release input", () => {
+  const result = runCustomerConfigRuntimeManifest({
+    customer: "yoyoosun",
+    mode: "validate",
+    out: "",
+  });
+  assert.equal(result.manifest.publishable, true);
+  assert.equal(result.manifest.revision, "yoyoosun-customer-package-v7.runtime-manifest-v1");
+
+  assert.throws(
+    () =>
+      runCustomerConfigRuntimeManifest({
+        customer: "demo",
+        mode: "validate",
+        out: "",
+      }),
+    /no explicitly registered release-ready input/u,
+  );
 });
 
 test("customer-config-runtime-manifest: preview stays explicitly non-publishable", () => {
@@ -790,16 +813,22 @@ test("customer-config-runtime-manifest: preview output is bounded to output dire
   );
 });
 
-test("customer-config-runtime-manifest: --out cannot be combined with formal compile", () => {
-  assert.throws(
-    () =>
-      runCustomerConfigRuntimeManifest({
-        customer: "yoyoosun",
-        mode: "compile",
-        out: "output/customers/yoyoosun/customer-config-runtime-manifest.json",
-      }),
-    /--out requires --mode preview/,
-  );
+test("customer-config-runtime-manifest: formal compile writes the registered release input", async () => {
+  const outPath =
+    "output/customers/yoyoosun/customer-config-runtime-manifest.release.test.json";
+  rmSync(path.resolve(outPath), { force: true });
+
+  const result = runCustomerConfigRuntimeManifest({
+    customer: "yoyoosun",
+    mode: "compile",
+    out: outPath,
+  });
+  const payload = JSON.parse(await readFile(path.resolve(outPath), "utf8"));
+  assert.equal(result.manifest.revision, payload.revision);
+  assert.equal(payload.customer_key, "yoyoosun");
+  assert.equal(payload.publishable, true);
+  assert.equal(payload.compiled_snapshot.package.status, "release_ready");
+  rmSync(path.resolve(outPath), { force: true });
 });
 
 test("customer-config-runtime-manifest: multi-customer preview output is rejected", () => {

@@ -1,6 +1,7 @@
 import { demoCustomerPackage } from "./demo/customerPackage.mjs";
 import { referenceCustomerPackage } from "./reference-customer/customerPackage.mjs";
 import { yoyoosunCustomerPackage } from "./yoyoosun/customerPackage.mjs";
+import { yoyoosunReleasePackage } from "./yoyoosun/releasePackage.mjs";
 
 const CUSTOMER_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const PACKAGE_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*-package-v[1-9][0-9]*$/u;
@@ -44,9 +45,30 @@ const customerPackages = Object.freeze(
   ),
 );
 
+const customerReleasePackages = Object.freeze({
+  yoyoosun: yoyoosunReleasePackage,
+});
+
 export function getCustomerPackage(customerKey) {
   const normalizedCustomerKey = String(customerKey || "").trim();
   return customerPackages[normalizedCustomerKey] || null;
+}
+
+export function getCustomerReleasePackage(customerKey) {
+  const normalizedCustomerKey = String(customerKey || "").trim();
+  const releasePackage = customerReleasePackages[normalizedCustomerKey] || null;
+  if (!releasePackage) {
+    return null;
+  }
+  if (
+    releasePackage.customerKey !== normalizedCustomerKey ||
+    releasePackage.packageKey !== customerPackages[normalizedCustomerKey]?.packageKey
+  ) {
+    throw new Error(
+      `registered customer release package identity mismatch: ${normalizedCustomerKey}`,
+    );
+  }
+  return releasePackage;
 }
 
 export function listCustomerPackageKeys() {

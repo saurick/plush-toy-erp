@@ -35,6 +35,8 @@
   - 打印默认值只覆盖采购合同、加工合同的买方 / 委托方抬头，供应商 / 加工方和明细继续来自业务快照。
   - Dry Run 不写数据库；本地测试应用只写共享开发库的客户配置控制面，并要求管理员显式确认。正式发布仍需 release readiness，rollback 只回滚配置 revision，不回滚业务数据或数据库备份。
 
+- `releasePackage.mjs`：显式评审后的正式 manifest 输入，只把同一受控包切换为 `release_ready / runtimeEnabled / publishEnabled`，并关闭本地测试应用标记。raw 包仍保持草案，正式编译只从该独立登记入口读取；修改可发布内容后必须先递增 `packageKey`，避免复用已发布 revision。
+
 未来可继续放：
 
 - logo / 主题色。
@@ -49,13 +51,14 @@ cd /Users/simon/projects/plush-toy-erp
 node scripts/qa/customer-config-boundaries.mjs
 node scripts/qa/customer-package-lint.mjs --customer yoyoosun
 node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode preview
+node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode compile
 ```
 
 如需生成本地预览报告：
 
 ```bash
 node scripts/qa/customer-package-lint.mjs --customer yoyoosun --out output/customers/yoyoosun/customer-package-preview.json
-node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode preview --out output/customers/yoyoosun/customer-config-runtime-manifest.json
+node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode compile --out output/customers/yoyoosun/customer-config-runtime-manifest.json
 ```
 
-这些报告只写入 `output/`，用于人工 review，不纳入 git。`customer-package-preview.json` 不是 runtime manifest；`customer-config-runtime-manifest.json` 是可提交给后端 validate / publish 的受控 payload 形状，但脚本本身不调用后端、不激活、不导入业务数据。
+这些报告只写入 `output/`，不纳入 git。`customer-package-preview.json` 不是 runtime manifest；只有 `--mode compile` 从 `releasePackage.mjs` 生成的 `customer-config-runtime-manifest.json` 才是可提交给后端 validate / publish 的正式 payload。脚本本身不调用后端、不激活、不导入业务数据。

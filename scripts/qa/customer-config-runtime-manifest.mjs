@@ -8,6 +8,7 @@ import { customerPackageCatalog } from "../../config/catalog/customerPackageCata
 import { customerPackageSchema } from "../../config/schemas/customerPackageSchema.mjs";
 import {
   getCustomerPackage,
+  getCustomerReleasePackage,
   listCustomerPackageKeys,
 } from "../../config/customers/index.mjs";
 import {
@@ -482,15 +483,15 @@ function printHelp() {
   node scripts/qa/customer-config-runtime-manifest.mjs --customer demo --mode preview
   node scripts/qa/customer-config-runtime-manifest.mjs --customer demo --customer yoyoosun --mode preview
   node scripts/qa/customer-config-runtime-manifest.mjs --all --mode preview
-  node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode preview --out output/customers/yoyoosun/customer-config-runtime-manifest.json
+  node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode compile --out output/customers/yoyoosun/customer-config-runtime-manifest.json
 
 Modes:
   validate  validate the compiled runtime manifest without writing files
-  compile   validate and return the manifest in-process for tests
+  compile   validate and optionally write a formal release manifest under output/
   preview   validate and optionally write JSON under output/
 
-Tracked draft packages must use preview mode. Formal validate / compile only
-accepts an explicitly reviewed release-ready input. This tool does not upload
+Tracked draft packages must use preview mode. Formal validate / compile reads
+only an explicitly registered release-ready input. This tool does not upload
 files, call the backend, activate a revision, import business data, or write
 Workflow / Fact runtime state.`);
 }
@@ -1567,15 +1568,26 @@ function writeManifest(outPath, manifest) {
 function runCustomerConfigRuntimeManifest(args) {
   const mode = args.mode || (args.out ? "preview" : "validate");
   assert(ALLOWED_MODES.includes(mode), `unsupported mode: ${mode}`);
-  assert(!args.out || mode === "preview", "--out requires --mode preview");
-  const config = getCustomerPackage(args.customer);
-  assert(config, `unknown customer package: ${args.customer}`);
+  assert(
+    !args.out || mode === "preview" || mode === "compile",
+    "--out requires --mode preview or --mode compile",
+  );
+  const config =
+    mode === "preview"
+      ? getCustomerPackage(args.customer)
+      : getCustomerReleasePackage(args.customer);
+  assert(
+    config,
+    mode === "preview"
+      ? `unknown customer package: ${args.customer}`
+      : `customer package has no explicitly registered release-ready input: ${args.customer}`,
+  );
   assert(existsSync(path.join(repoRoot, "server/internal/biz/customer_config.go")), "customer_config usecase must exist");
   const manifest =
     mode === "preview"
       ? buildRuntimePreviewManifest(config)
       : buildRuntimeManifest(config);
-  if (mode === "preview" && args.out) {
+  if (args.out) {
     writeManifest(args.out, manifest);
   }
   return {
@@ -1614,7 +1626,7 @@ function runCustomerConfigRuntimeManifestMany(args) {
   const customerKeys = normalizeCustomerKeys(args);
   assert(
     !args.out || customerKeys.length === 1,
-    "--out only supports one customer runtime manifest; run preview once per customer",
+    "--out only supports one customer runtime manifest; run once per customer",
   );
   return customerKeys.map((customerKey) =>
     runCustomerConfigRuntimeManifest({
