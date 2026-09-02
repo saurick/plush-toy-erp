@@ -163,7 +163,13 @@ case "$url" in
         response_id="\${FAKE_LOGIN_RESPONSE_ID:-credential-login-smoke}"
         token_key="\${FAKE_LOGIN_TOKEN_KEY:-access_token}"
         auth_version_json="\${FAKE_LOGIN_AUTH_VERSION_JSON:-2}"
-        response="$(printf '{\"jsonrpc\":\"2.0\",\"id\":\"%s\",\"result\":{\"code\":0,\"data\":{\"username\":\"%s\",\"phone\":\"%s\",\"is_super_admin\":%s,\"auth_version\":%s,\"%s\":\"unique-token-%s\"}}}' "$response_id" "$username" "$phone" "$is_super_admin" "$auth_version_json" "$token_key" "$username")"
+        token="$(node -e '
+const username = process.argv[1];
+const authVersion = JSON.parse(process.argv[2]);
+const encode = (value) => Buffer.from(JSON.stringify(value)).toString("base64url");
+process.stdout.write([encode({ alg: "HS256", typ: "JWT" }), encode({ uid: username, auth_version: authVersion }), encode({ username })].join("."));
+' "$username" "$auth_version_json")"
+        response="$(printf '{\"jsonrpc\":\"2.0\",\"id\":\"%s\",\"result\":{\"code\":0,\"data\":{\"username\":\"%s\",\"phone\":\"%s\",\"is_super_admin\":%s,\"%s\":\"%s\"}}}' "$response_id" "$username" "$phone" "$is_super_admin" "$token_key" "$token")"
       fi
       [[ -z "$output_file" ]] && printf '%s\n' "$response" || printf '%s\n' "$response" >"$output_file"
     else
@@ -372,6 +378,7 @@ test("run smoke writes release-gate compatible report", async () => {
   assert.equal(credentialCheck.adminUsername, "admin");
   assert.equal(credentialCheck.adminAuthenticated, true);
   assert.equal(credentialCheck.adminSuperAdmin, true);
+  assert.equal(credentialCheck.adminAuthVersion, 2);
   assert.equal(credentialCheck.phoneConfigured, true);
   assert.equal(credentialCheck.phoneBound, true);
   assert.equal(credentialCheck.deploymentTarget, "demo-133");
@@ -873,7 +880,7 @@ test("run smoke stops before authentication when runtime identity proof mismatch
   );
 });
 
-test("credential smoke rejects a missing positive admin auth version", async () => {
+test("credential smoke rejects a missing positive JWT auth version", async () => {
   const root = fs.mkdtempSync(
     path.join(os.tmpdir(), "run-smoke-admin-auth-version-"),
   );

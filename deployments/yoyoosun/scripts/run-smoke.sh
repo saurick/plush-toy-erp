@@ -446,6 +446,14 @@ try {
   const parsed = JSON.parse(fs.readFileSync(0, "utf8"));
   const data = parsed?.result?.data;
   const token = String(data?.access_token || "").trim();
+  const tokenParts = token.split(".");
+  let tokenAuthVersion = null;
+  if (tokenParts.length === 3) {
+    const claims = JSON.parse(Buffer.from(tokenParts[1], "base64url").toString("utf8"));
+    if (Number.isSafeInteger(claims?.auth_version) && claims.auth_version > 0) {
+      tokenAuthVersion = claims.auth_version;
+    }
+  }
   const expected = process.argv[1];
   const requireSuperAdmin = process.argv[2] === "true";
   const expectedPhone = fs.readFileSync(process.argv[3], "utf8");
@@ -461,7 +469,7 @@ try {
   process.stdout.write([
     crypto.createHash("sha256").update(token).digest("hex"),
     requireSuperAdmin && expectedPhone !== "" && String(data?.phone || "") === expectedPhone ? "true" : "false",
-    Number.isSafeInteger(data?.auth_version) && data.auth_version > 0 ? String(data.auth_version) : "",
+    tokenAuthVersion === null ? "" : String(tokenAuthVersion),
   ].join("\t"));
 } catch {
   process.exit(1);
