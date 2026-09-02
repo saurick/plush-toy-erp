@@ -984,12 +984,13 @@ async function waitForScenarioDocumentReady(page, errors = []) {
   }
 }
 
-function isRetryableScenarioFailure(error) {
+export function isRetryableScenarioFailure(error) {
   const message = String(error?.message || '')
   return (
     message.includes('Timeout') ||
     message.includes('未找到可见文案') ||
     message.includes('Execution context was destroyed') ||
+    message.includes('net::ERR_NETWORK_CHANGED') ||
     message.includes('net::ERR_ADDRESS_INVALID') ||
     message.includes('net::ERR_CONNECTION_REFUSED')
   )

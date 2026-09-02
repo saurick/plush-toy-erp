@@ -19,6 +19,7 @@ import {
   validateCiBrowserQualityLaneRegistry,
   validateCiQualityStageLaneReceipt,
 } from "./ci-quality-stage-lane.mjs";
+import { isRetryableScenarioFailure } from "../../web/scripts/styleL1.mjs";
 
 const sha = "a".repeat(40);
 const digest = "b".repeat(64);
@@ -251,7 +252,7 @@ test("Web, Server and Browser internal lane catalogs partition canonical work on
   );
 });
 
-test("Browser scenario evidence is exact, single-attempt and duplicate closed", () => {
+test("Browser scenario evidence is exact, bounded-retry and duplicate closed", () => {
   const output = [
     "[style:l1:scenario] id=root-redirect-desktop status=passed durationMs=12 attempts=1",
     "[style:l1:scenario] id=root-redirect-mobile status=passed durationMs=9 attempts=1",
@@ -277,10 +278,30 @@ test("Browser scenario evidence is exact, single-attempt and duplicate closed", 
   assert.throws(
     () =>
       parseCiBrowserScenarioTimings(
-        "[style:l1:scenario] id=root-redirect-desktop status=passed durationMs=12 attempts=2",
+        "[style:l1:scenario] id=root-redirect-desktop status=passed durationMs=12 attempts=3",
         ["root-redirect-desktop"],
       ),
     /ambiguous/u,
+  );
+  assert.deepEqual(
+    parseCiBrowserScenarioTimings(
+      "[style:l1:scenario] id=root-redirect-desktop status=passed durationMs=12 attempts=2",
+      ["root-redirect-desktop"],
+    ).map(({ id, attempts }) => ({ id, attempts })),
+    [{ id: "root-redirect-desktop", attempts: 2 }],
+  );
+});
+
+test("Browser scenario retry includes Chromium network-change transients", () => {
+  assert.equal(
+    isRetryableScenarioFailure(
+      new Error("Failed to load resource: net::ERR_NETWORK_CHANGED"),
+    ),
+    true,
+  );
+  assert.equal(
+    isRetryableScenarioFailure(new Error("business assertion failed")),
+    false,
   );
 });
 
@@ -387,6 +408,27 @@ test("lane receipts reject skipped, drifted and incomplete cleanup evidence", ()
     /invalid/u,
   );
   const browser = receipt("browser", "boundary_entry_print", 2);
+  browser.browser.scenarioTimings[0].attempts = 2;
+  browser.browser.retries = 1;
+  assert.equal(
+    validateCiQualityStageLaneReceipt(browser, {
+      shard: "browser",
+      lane: "boundary_entry_print",
+      expected,
+    }),
+    browser,
+  );
+  browser.browser.retries = 0;
+  assert.throws(
+    () =>
+      validateCiQualityStageLaneReceipt(browser, {
+        shard: "browser",
+        lane: "boundary_entry_print",
+        expected,
+      }),
+    /invalid/u,
+  );
+  browser.browser.retries = 1;
   browser.invariants.browserPortCleanup = "failed";
   assert.throws(
     () =>

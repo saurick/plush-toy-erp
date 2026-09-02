@@ -618,7 +618,9 @@ export function parseCiBrowserScenarioTimings(output, expectedScenarios) {
       seen.has(id) ||
       !Number.isSafeInteger(durationMs) ||
       durationMs < 0 ||
-      attempts !== 1
+      !Number.isSafeInteger(attempts) ||
+      attempts < 1 ||
+      attempts > 2
     ) {
       throw new Error("browser quality scenario timing is ambiguous");
     }
@@ -664,7 +666,7 @@ async function runBrowserQualityLane({
     STYLE_L1_OUTPUT_DIR: runtimePaths.outputDirectory,
     STYLE_L1_PORT: String(port),
     STYLE_L1_SCENARIOS: definition.browserScenarios.join(","),
-    STYLE_L1_SCENARIO_MAX_ATTEMPTS: "1",
+    STYLE_L1_SCENARIO_MAX_ATTEMPTS: "2",
     TMP: runtimePaths.temporaryDirectory,
     TEMP: runtimePaths.temporaryDirectory,
     TMPDIR: runtimePaths.temporaryDirectory,
@@ -715,7 +717,10 @@ async function runBrowserQualityLane({
       productionBoundary: definition.productionBoundary,
       boundaryDurationMs,
       portOffset: definition.portOffset,
-      retries: 0,
+      retries: scenarioTimings.reduce(
+        (total, timing) => total + timing.attempts - 1,
+        0,
+      ),
     }),
   });
 }
@@ -874,13 +879,19 @@ export function validateCiQualityStageLaneReceipt(
         receipt.browser.scenarioTimings.some(
           (timing) =>
             timing.status !== "passed" ||
-            timing.attempts !== 1 ||
+            !Number.isSafeInteger(timing.attempts) ||
+            timing.attempts < 1 ||
+            timing.attempts > 2 ||
             !Number.isSafeInteger(timing.durationMs) ||
             timing.durationMs < 0,
         ) ||
         receipt.browser?.productionBoundary !== definition.productionBoundary ||
         receipt.browser?.portOffset !== definition.portOffset ||
-        receipt.browser?.retries !== 0 ||
+        receipt.browser?.retries !==
+          receipt.browser.scenarioTimings.reduce(
+            (total, timing) => total + timing.attempts - 1,
+            0,
+          ) ||
         (definition.productionBoundary
           ? !Number.isSafeInteger(receipt.browser?.boundaryDurationMs) ||
             receipt.browser.boundaryDurationMs < 0
