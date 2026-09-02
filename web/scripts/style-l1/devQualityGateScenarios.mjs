@@ -116,6 +116,10 @@ function serverCiTopologyJob(name) {
 const SERVER_CI_TOPOLOGY = Object.freeze(
   SERVER_JOB_TIMINGS.map(([name]) => Object.freeze(serverCiTopologyJob(name)))
 )
+const SERVER_CI_TOPOLOGY_EDGE_COUNT = SERVER_CI_TOPOLOGY.reduce(
+  (total, job) => total + job.needs.length,
+  0
+)
 
 function serverHistoryJobs(pipelineId, durationOffset = 0, failureJob = '') {
   return SERVER_JOB_TIMINGS.map(
@@ -875,7 +879,10 @@ export function createDevQualityGateScenarios({
           await serverPanel
             .locator('.erp-dev-quality-server-pipeline__relationship .ant-tag')
             .allTextContents(),
-          ['22 个 Job', '59 条依赖']
+          [
+            `${SERVER_JOB_TIMINGS.length} 个 Job`,
+            `${SERVER_CI_TOPOLOGY_EDGE_COUNT} 条依赖`,
+          ]
         )
 
         const pipelineNodes = serverPanel.locator(
@@ -953,6 +960,13 @@ export function createDevQualityGateScenarios({
             'pipeline'
         )
         await serverPanel.locator('[data-server-view="pipeline"]').waitFor()
+        await pipelineDag
+          .locator('.erp-markdown-mermaid__canvas > svg')
+          .waitFor()
+        assert.equal(
+          await pipelineDag.getAttribute('data-mermaid-status'),
+          'rendered'
+        )
         const pipelineGeometry = await serverPanel
           .locator('.erp-dev-quality-server-pipeline__track')
           .evaluate((track) => {
