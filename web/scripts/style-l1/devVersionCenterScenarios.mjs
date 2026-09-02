@@ -506,6 +506,23 @@ export function createDevVersionCenterScenarios({
         await page
           .locator('.erp-dev-version-workspace')
           .waitFor({ state: 'visible' })
+        const evidenceNote = page.locator(
+          '.erp-dev-version-workspace__evidence-note'
+        )
+        await evidenceNote.waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          (await evidenceNote.textContent())?.replace(/\s+/gu, ' ').trim(),
+          'CI/CD 证据分两处查看：流水线耗时看 GitLab 的 CI 检查、构建和制品发布耗时；操作记录看工作台发起的发布、目标部署、回滚和数据重建结果。'
+        )
+        const evidenceNoteBox = await evidenceNote.boundingBox()
+        const tabNavigationBox = await page
+          .locator('.erp-dev-version-workspace .ant-tabs-nav')
+          .boundingBox()
+        assert(evidenceNoteBox && tabNavigationBox)
+        assert(
+          evidenceNoteBox.y + evidenceNoteBox.height <= tabNavigationBox.y + 1,
+          'CI/CD 说明不得覆盖页签'
+        )
         assert.equal(
           await page.locator('.erp-dev-environment-evidence').count(),
           0
@@ -534,9 +551,11 @@ export function createDevVersionCenterScenarios({
         await page
           .locator('.erp-dev-version-tab--history')
           .waitFor({ state: 'visible' })
+        assert.equal(await evidenceNote.isVisible(), true)
 
         await page.getByRole('tab', { name: '流水线耗时' }).click()
         await waitForView(page, 'pipeline')
+        assert.equal(await evidenceNote.isVisible(), true)
         const timingDetails = page.locator('.erp-dev-pipeline-timing__details')
         await timingDetails.waitFor({ state: 'visible' })
         assert.equal(
@@ -562,6 +581,16 @@ export function createDevVersionCenterScenarios({
         await assertNoHorizontalOverflow(
           page,
           'dev-version-center-tabs-pagination-desktop'
+        )
+        await page.getByRole('tab', { name: '流水线耗时' }).click()
+        await waitForView(page, 'pipeline')
+        await page
+          .locator('.erp-dev-pipeline-timing')
+          .waitFor({ state: 'visible' })
+        assert.equal(await evidenceNote.isVisible(), true)
+        await assertNoHorizontalOverflow(
+          page,
+          'dev-version-center-tabs-pagination-desktop-pipeline'
         )
       },
     },

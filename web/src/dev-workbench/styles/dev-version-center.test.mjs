@@ -106,10 +106,23 @@ test('version decisions and target evidence remain source-backed', () => {
   assert.match(component, /构建缓存与制品/u)
   assert.match(versionPage, /v2 · 7 项制品 · 证据未闭合/u)
   assert.match(versionPage, /v1 · 6 项制品 · 仅旧版回滚/u)
-  assert.match(component, /展示远端流水线、制品发布和构建耗时/u)
+  assert.match(versionPage, /CI\/CD 证据分两处查看/u)
+  assert.match(
+    versionPage,
+    /流水线耗时看 GitLab 的 CI[\s\S]*检查、构建和制品发布耗时/u
+  )
+  assert.match(
+    versionPage,
+    /操作记录看工作台发起的发布、目标部署、回滚和数据重建结果/u
+  )
+  assert.match(css, /[.]erp-dev-version-workspace__evidence-note/u)
+  assert.doesNotMatch(component, /展示远端流水线、制品发布和构建耗时/u)
   assert.doesNotMatch(component, /最近真实部署与传输/u)
   assert.match(component, /最近一次制品发布/u)
-  assert.match(component, /目标部署仍以“操作记录”中的独立回执为准/u)
+  assert.doesNotMatch(
+    component,
+    /目标部署仍以“操作记录”中的独立回执为准/u
+  )
   assert.match(component, /失败原因/u)
   assert.match(component, /最近发布与部署/u)
   assert.match(component, /查看耗时详情/u)

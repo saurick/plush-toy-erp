@@ -279,14 +279,9 @@ export default function DevPipelineTimingPanel({ timings, versions = [] }) {
   return (
     <Card className="erp-dev-pipeline-timing" variant="borderless">
       <div className="erp-dev-pipeline-timing__head">
-        <div>
-          <Title level={2} id="dev-pipeline-timing-title">
-            远端流水线耗时
-          </Title>
-          <Text type="secondary">
-            展示远端流水线、制品发布和构建耗时；目标部署仍以“操作记录”中的独立回执为准。
-          </Text>
-        </div>
+        <Title level={2} id="dev-pipeline-timing-title">
+          远端流水线耗时
+        </Title>
         <Text type="secondary">
           统计读取：{formatDeliveryTimestamp(timings?.generatedAt)}
         </Text>

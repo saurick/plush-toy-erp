@@ -2351,6 +2351,11 @@ export default function DevVersionCenterPage() {
           className="erp-dev-version-workspace"
           aria-label="版本发布工作区"
         >
+          <p className="erp-dev-version-workspace__evidence-note">
+            <strong>CI/CD 证据分两处查看：</strong>
+            流水线耗时看 GitLab 的 CI
+            检查、构建和制品发布耗时；操作记录看工作台发起的发布、目标部署、回滚和数据重建结果。
+          </p>
           <Tabs
             activeKey={activeView}
             items={workspaceItems}
