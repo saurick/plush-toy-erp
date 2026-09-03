@@ -8,6 +8,7 @@ import { getDeploymentTarget } from "./deployment-targets.mjs";
 export const TARGET_PREFLIGHT_CONTRACT = "plush.target-preflight/v1";
 export const REMOTE_TARGET_PREFLIGHT_CONTRACT =
   "plush.remote-target-preflight/v1";
+export const ACTIVE_DATASET_VERSION_NOT_APPLICABLE = "not_applicable";
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
@@ -573,9 +574,14 @@ else
       active_config_product_version="$(read_database_scalar "SELECT product_version FROM customer_config_revisions WHERE customer_key = 'yoyoosun' AND status = 'active' ORDER BY id DESC LIMIT 1")" &&
       active_dataset_version="$(read_database_scalar "SELECT COALESCE(jsonb_extract_path_text(compiled_snapshot, 'datasetVersion'), '') FROM customer_config_revisions WHERE customer_key = 'yoyoosun' AND status = 'active' ORDER BY id DESC LIMIT 1")" &&
       [[ "$active_config_revision" =~ ^[A-Za-z0-9._-]+$ ]] &&
-      [[ "$active_config_product_version" =~ ^[A-Za-z0-9._-]+$ ]] &&
-      [[ "$active_dataset_version" =~ ^[A-Za-z0-9._-]+$ ]]; then
-      active_config_state=active
+      [[ "$active_config_product_version" =~ ^[A-Za-z0-9._-]+$ ]]; then
+      active_config_state=invalid
+      if [[ "$trial_target" == none && -z "$active_dataset_version" ]]; then
+        active_dataset_version=__ACTIVE_DATASET_VERSION_NOT_APPLICABLE__
+        active_config_state=active
+      elif [[ "$trial_target" != none && "$active_dataset_version" =~ ^[A-Za-z0-9._-]+$ ]]; then
+        active_config_state=active
+      fi
     else
       active_config_state=invalid
     fi
@@ -682,6 +688,8 @@ export function buildRemoteTargetPreflightScript(target) {
     __PROJECT__: target.compose.projectName,
     __DATABASE__: target.database.name,
     __TRIAL_TARGET__: target.trialTarget,
+    __ACTIVE_DATASET_VERSION_NOT_APPLICABLE__:
+      ACTIVE_DATASET_VERSION_NOT_APPLICABLE,
     __MIGRATION_LOCK__: target.database.migrationLock,
     __POSTGRES_BIND__: target.runtime.postgres.bindAddress,
     __POSTGRES_PORT__: target.runtime.postgres.hostPort,
@@ -1035,14 +1043,23 @@ export function parseRemoteTargetPreflight(
       containsRawEnvironmentValues: false,
     },
   };
+  const activeCustomerConfig = report.runtime.activeCustomerConfig;
+  const activeCustomerConfigMatchesTarget =
+    report.runtime.customerConfigState === "active"
+      ? activeCustomerConfig.revision !== "unknown" &&
+        activeCustomerConfig.productVersion !== "unknown" &&
+        (target.trialTarget === "none"
+          ? activeCustomerConfig.datasetVersion ===
+            ACTIVE_DATASET_VERSION_NOT_APPLICABLE
+          : activeCustomerConfig.datasetVersion !== "unknown" &&
+            activeCustomerConfig.datasetVersion !==
+              ACTIVE_DATASET_VERSION_NOT_APPLICABLE)
+      : Object.values(activeCustomerConfig).every(
+          (value) => value === "unknown",
+        );
   if (
     report.capacity.minimumAvailableBytes !== 30 * 1024 ** 3 ||
-    (report.runtime.customerConfigState === "active" &&
-      Object.values(report.runtime.activeCustomerConfig).includes("unknown")) ||
-    (report.runtime.customerConfigState !== "active" &&
-      Object.values(report.runtime.activeCustomerConfig).some(
-        (value) => value !== "unknown",
-      )) ||
+    !activeCustomerConfigMatchesTarget ||
     (["absent", "invalid"].includes(report.runtime.customerConfigState) &&
       (report.runtime.database !== "blocked" ||
         !report.blockers.includes("target_customer_config_readback_failed"))) ||

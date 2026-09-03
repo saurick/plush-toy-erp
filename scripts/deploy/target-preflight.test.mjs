@@ -14,12 +14,15 @@ import { PassThrough } from "node:stream";
 import test from "node:test";
 
 import {
+  ACTIVE_DATASET_VERSION_NOT_APPLICABLE,
   REMOTE_TARGET_PREFLIGHT_CONTRACT,
   REMOTE_TARGET_PREFLIGHT_SCRIPT,
+  buildRemoteTargetPreflightScript,
   parseRemoteTargetPreflight,
   runTargetPreflight,
   runTargetPreflightAsync,
 } from "./target-preflight.mjs";
+import { getDeploymentTarget } from "./deployment-targets.mjs";
 
 const SHA = "a".repeat(40);
 const BACKUP_HASH = "b".repeat(64);
@@ -90,6 +93,18 @@ function remoteReport(overrides = {}) {
     .join("\n")}\n`;
 }
 
+function customerTestRemoteReport(overrides = {}) {
+  return remoteReport({
+    TARGET: "customer-test-133",
+    DATABASE_NAME: "plush_erp_customer_test_v1",
+    ACTIVE_CONFIG_REVISION: "yoyoosun-customer-package-v7.runtime-manifest-v1",
+    ACTIVE_CONFIG_PRODUCT_VERSION: "local-customer-package",
+    ACTIVE_DATASET_VERSION: ACTIVE_DATASET_VERSION_NOT_APPLICABLE,
+    PUBLIC_CONTAINER: `plush-toy-erp-test-web-public-${SHA.slice(0, 8)}`,
+    ...overrides,
+  });
+}
+
 test("target preflight parser returns bounded redacted evidence", () => {
   const report = parseRemoteTargetPreflight(remoteReport());
   assert.equal(report.status, "passed");
@@ -136,6 +151,44 @@ test("target preflight parser returns bounded redacted evidence", () => {
   });
   assert.equal("ssh" in report, false);
   assert.doesNotMatch(JSON.stringify(report), /192\.168|\/home\/simon/u);
+});
+
+test("customer test preflight treats the trial dataset identity as not applicable", () => {
+  const target = getDeploymentTarget("customer-test-133");
+  const report = parseRemoteTargetPreflight(customerTestRemoteReport(), target);
+
+  assert.equal(report.status, "passed");
+  assert.equal(
+    report.runtime.activeCustomerConfig.datasetVersion,
+    ACTIVE_DATASET_VERSION_NOT_APPLICABLE,
+  );
+
+  const script = buildRemoteTargetPreflightScript(target);
+  assert.match(script, /trial_target=none/u);
+  assert.match(script, /active_dataset_version=not_applicable/u);
+  assert.doesNotMatch(script, /__[A-Z0-9_]+__/u);
+});
+
+test("target preflight rejects dataset identity drift between demo and customer test", () => {
+  assert.throws(
+    () =>
+      parseRemoteTargetPreflight(
+        remoteReport({
+          ACTIVE_DATASET_VERSION: ACTIVE_DATASET_VERSION_NOT_APPLICABLE,
+        }),
+      ),
+    /contradicts the fixed contract/u,
+  );
+  assert.throws(
+    () =>
+      parseRemoteTargetPreflight(
+        customerTestRemoteReport({
+          ACTIVE_DATASET_VERSION: "2026.07.16-v5",
+        }),
+        getDeploymentTarget("customer-test-133"),
+      ),
+    /contradicts the fixed contract/u,
+  );
 });
 
 test("target preflight distinguishes a pristine active-config absence from an invalid readback", () => {
