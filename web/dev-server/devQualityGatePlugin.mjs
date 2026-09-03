@@ -652,14 +652,14 @@ export const DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA =
 
 const SERVER_CI_HISTORY_LIMIT = 20
 const SERVER_JOB_FAN_IN_GROUPS = Object.freeze({
-  quality_browser: 'browser',
+  'quality_browser 2/2': 'browser',
   quality_node: 'node',
   quality_resource: 'resource',
   quality_server: 'server',
   quality_web: 'web',
 })
 const SERVER_JOB_GROUP_PREFIXES = Object.freeze([
-  Object.freeze(['quality_browser_', 'browser']),
+  Object.freeze(['quality_browser 1/', 'browser']),
   Object.freeze(['quality_node_', 'node']),
   Object.freeze(['quality_resource_', 'resource']),
   Object.freeze(['quality_security_', 'security']),

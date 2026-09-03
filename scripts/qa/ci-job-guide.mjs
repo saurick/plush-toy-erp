@@ -135,7 +135,7 @@ const RAW_CI_JOB_GUIDES = [
     outcome: "生成 Server critical-postgres 分片回执。",
   },
   {
-    name: "quality_browser_boundary_entry_print",
+    name: "quality_browser 1/2",
     label: "浏览器主路径检查",
     summary: "复用同一 SHA 的 Web 构建，验证入口、响应式边界和打印中心主路径。",
     checks: ["桌面与移动入口", "打印中心预览", "浏览器与端口清理"],
@@ -170,7 +170,7 @@ const RAW_CI_JOB_GUIDES = [
     outcome: "形成唯一 Server 领域回执。",
   },
   {
-    name: "quality_browser",
+    name: "quality_browser 2/2",
     label: "浏览器汇总",
     summary: "核对浏览器场景、Web 构建身份以及端口和运行时清理结果。",
     checks: ["浏览器场景回执", "Web build digest", "端口与运行时清理"],

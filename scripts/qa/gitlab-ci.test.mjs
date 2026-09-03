@@ -85,6 +85,24 @@ const qualityAggregate = readFileSync(
   "utf8",
 );
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
+
+function yamlJobName(name) {
+  return name.includes(" ") ? JSON.stringify(name) : name;
+}
+
+function yamlJobBlock(name) {
+  const heading = escapeRegExp(`${yamlJobName(name)}:`);
+  return workflow.match(
+    new RegExp(
+      `^${heading}\\n[\\s\\S]+?(?=^(?:"[^"]+"|[A-Za-z_.][^:\\n]*):\\n|(?![\\s\\S]))`,
+      "mu",
+    ),
+  )?.[0];
+}
+
 test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", () => {
   assert.match(workflow, /auto_cancel:\n    on_new_commit: interruptible/u);
   assert.doesNotMatch(workflow, /CI_PIPELINE_SOURCE == "web"/u);
@@ -106,7 +124,9 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
     "browser",
     "security",
   ]) {
-    assert.match(workflow, new RegExp(`^quality_${shard}:`, "mu"));
+    const jobName =
+      shard === "browser" ? "quality_browser 2/2" : `quality_${shard}`;
+    assert.ok(yamlJobBlock(jobName));
     assert.match(
       workflow,
       new RegExp(`ci-quality-shard[.]mjs --shard ${shard}`, "u"),
@@ -174,26 +194,42 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
       );
     }
   }
-  for (const lane of Object.keys(CI_BROWSER_QUALITY_LANES)) {
-    assert.match(workflow, new RegExp(`^quality_browser_${lane}:`, "mu"));
+  const groupedBrowserJobs = [
+    ...workflow.matchAll(/^"(quality_browser ([12])\/2)":/gmu),
+  ].map(([, name, index]) => ({ name, index }));
+  assert.deepEqual(groupedBrowserJobs, [
+    { name: "quality_browser 1/2", index: "1" },
+    { name: "quality_browser 2/2", index: "2" },
+  ]);
+  assert.equal(
+    new Set(
+      groupedBrowserJobs.map(({ name }) => name.replace(/ [12]\/2$/u, "")),
+    ).size,
+    1,
+  );
+  for (const [lane, definition] of Object.entries(CI_BROWSER_QUALITY_LANES)) {
+    const job = yamlJobBlock(definition.job);
+    assert.ok(job);
     assert.match(
-      workflow,
+      job,
+      new RegExp(
+        `resource_group: quality-browser-${lane.replaceAll("_", "-")}`,
+        "u",
+      ),
+    );
+    assert.match(job, /job: quality_web_build\n      artifacts: true/u);
+    assert.match(
+      job,
       new RegExp(
         `ci-quality-stage-lane[.]mjs --shard browser --lane ${lane}`,
         "u",
       ),
     );
     assert.match(
-      workflow,
+      job,
       new RegExp(`output/ci/browser-lanes/${lane}[.]json`, "u"),
     );
-    assert.match(
-      workflow,
-      new RegExp(
-        `^quality_browser_${lane}:[\\s\\S]+?resource_group: quality-browser-${lane.replaceAll("_", "-")}[\\s\\S]+?job: quality_web_build\\n      artifacts: true[\\s\\S]+?ci-quality-stage-lane[.]mjs --shard browser --lane ${lane}`,
-        "mu",
-      ),
-    );
+    assert.doesNotMatch(job, /interruptible: false/u);
   }
   assert.equal(
     new Set(
@@ -205,16 +241,6 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
     ).size,
     Object.keys(CI_BROWSER_QUALITY_LANES).length,
   );
-  for (const lane of Object.keys(CI_BROWSER_QUALITY_LANES)) {
-    const job = workflow.match(
-      new RegExp(
-        `^quality_browser_${lane}:[\\s\\S]+?(?=^quality_[a-z_]+:|(?![\\s\\S]))`,
-        "mu",
-      ),
-    )?.[0];
-    assert.ok(job);
-    assert.doesNotMatch(job, /interruptible: false/u);
-  }
   assert.doesNotMatch(workflow, /^quality_node_runtime:/mu);
   const nodeAggregate = workflow.match(
     /^quality_node:[\s\S]+?(?=^quality_[a-z_]+:|(?![\s\S]))/mu,
@@ -271,18 +297,21 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   assert.match(workflow, /^quality_aggregate:\n  stage: aggregate/mu);
   assert.match(workflow, /ci-quality-aggregate[.]mjs/u);
   assert.match(workflow, /plush-ci-evidence/u);
-  for (const lane of Object.keys(CI_BROWSER_QUALITY_LANES)) {
+  const browserAggregate = yamlJobBlock("quality_browser 2/2");
+  assert.ok(browserAggregate);
+  for (const { job } of Object.values(CI_BROWSER_QUALITY_LANES)) {
     assert.match(
-      workflow,
+      browserAggregate,
       new RegExp(
-        `quality_browser:[\\s\\S]+?job: quality_browser_${lane}\\n      artifacts: true`,
+        `job: ${escapeRegExp(yamlJobName(job))}\\n      artifacts: true`,
         "u",
       ),
     );
   }
-  assert.doesNotMatch(
-    workflow.match(/^quality_browser:[\s\S]+?^quality_security:/mu)?.[0] || "",
-    /job: quality_web(?:_build)?\n/u,
+  assert.doesNotMatch(browserAggregate, /job: quality_web(?:_build)?\n/u);
+  assert.match(
+    aggregateBlock,
+    /job: "quality_browser 2\/2"\n      artifacts: true/u,
   );
   assert.match(workflow, /history_range=HEAD/u);
   assert.match(
@@ -358,16 +387,14 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
       ),
     );
   }
-  for (const shard of [
-    "server_test_build",
-    ...Object.keys(CI_BROWSER_QUALITY_LANES).map((lane) => `browser_${lane}`),
-  ]) {
+  assert.match(
+    workflow,
+    /^quality_server_test_build:\n  <<: \[\*quality_shard, \*browser_cache_pull\]/mu,
+  );
+  for (const { job } of Object.values(CI_BROWSER_QUALITY_LANES)) {
     assert.match(
-      workflow,
-      new RegExp(
-        `^quality_${shard}:\\n  <<: \\[\\*quality_shard, \\*browser_cache_pull\\]`,
-        "mu",
-      ),
+      yamlJobBlock(job),
+      /<<: \[\*quality_shard, \*browser_cache_pull\]/u,
     );
   }
   assert.match(
@@ -386,7 +413,6 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
     "server_upgrade",
     "server_critical_postgres",
     "server",
-    "browser",
     "security",
   ]) {
     assert.match(
@@ -394,6 +420,10 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
       new RegExp(`^quality_${shard}:\\n  <<: \\*quality_shard`, "mu"),
     );
   }
+  assert.match(
+    browserAggregate,
+    /^"quality_browser 2\/2":\n  <<: \*quality_shard/mu,
+  );
   assert.match(
     workflow,
     /^quality_aggregate:\n  stage: aggregate\n  <<: \*main_quality_rules/mu,

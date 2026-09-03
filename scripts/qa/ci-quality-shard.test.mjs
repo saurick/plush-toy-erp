@@ -47,7 +47,10 @@ test("quality shard catalog covers the strict stage set exactly once", () => {
     ]),
   );
   for (const [shard, value] of Object.entries(CI_QUALITY_SHARDS)) {
-    assert.equal(value.job, `quality_${shard}`);
+    assert.equal(
+      value.job,
+      shard === "browser" ? "quality_browser 2/2" : `quality_${shard}`,
+    );
     assert.ok(Object.isFrozen(value));
     assert.ok(Object.isFrozen(value.command));
     assert.ok(Object.isFrozen(value.stages));

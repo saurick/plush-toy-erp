@@ -33,19 +33,12 @@ const SERVER_JOB_TIMINGS = Object.freeze([
   ['quality_server_upgrade', 82_000, 1_800, 'execution', 'server', 1],
   ['quality_server_test_build', 96_000, 2_000, 'execution', 'server', 1],
   ['quality_server_critical_postgres', 70_000, 1_800, 'execution', 'server', 1],
-  [
-    'quality_browser_boundary_entry_print',
-    81_000,
-    2_400,
-    'execution',
-    'browser',
-    1,
-  ],
+  ['quality_browser 1/2', 81_000, 2_400, 'execution', 'browser', 1],
   ['quality_node', 28_000, 900, 'aggregate', 'node', 1],
   ['quality_resource', 8_000, 700, 'aggregate', 'resource', 1],
   ['quality_web', 7_000, 700, 'aggregate', 'web', 1],
   ['quality_server', 5_000, 600, 'aggregate', 'server', 1],
-  ['quality_browser', 6_000, 600, 'aggregate', 'browser', 1],
+  ['quality_browser 2/2', 6_000, 600, 'aggregate', 'browser', 1],
   ['quality_security', 38_000, 1_300, 'execution', 'security', 1],
   ['quality_aggregate', 9_000, 500, 'aggregate', 'pipeline', 1],
   ['CI Gate', 2_000, 300, 'terminal', 'pipeline', 1],
@@ -78,7 +71,7 @@ const SERVER_CI_AGGREGATE_NEEDS = Object.freeze({
     'quality_server_test_build',
     'quality_server_critical_postgres',
   ],
-  quality_browser: ['plan', 'prepare', 'quality_browser_boundary_entry_print'],
+  'quality_browser 2/2': ['plan', 'prepare', 'quality_browser 1/2'],
 })
 
 function serverCiTopologyJob(name) {
@@ -98,7 +91,7 @@ function serverCiTopologyJob(name) {
         'quality_web',
         'quality_server',
         'quality_resource',
-        'quality_browser',
+        'quality_browser 2/2',
         'quality_security',
       ],
     }
@@ -113,7 +106,7 @@ function serverCiTopologyJob(name) {
       needs: SERVER_CI_AGGREGATE_NEEDS[name],
     }
   }
-  if (name === 'quality_browser_boundary_entry_print') {
+  if (name === 'quality_browser 1/2') {
     return {
       name,
       stage: 'quality',

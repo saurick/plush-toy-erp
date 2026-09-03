@@ -543,7 +543,9 @@ quality_node:
     paths:
       - output/ci/shards/node.json
 
-quality_browser_boundary_entry_print:
+# Keep the Browser execution and fan-in as separate jobs, but use GitLab's
+# numbered-name convention so the pipeline graph can collapse them as one group.
+"quality_browser 1/2":
   <<: [*quality_shard, *browser_cache_pull]
   resource_group: quality-browser-boundary-entry-print
   needs:
@@ -561,14 +563,14 @@ quality_browser_boundary_entry_print:
     paths:
       - output/ci/browser-lanes/boundary_entry_print.json
 
-quality_browser:
+"quality_browser 2/2":
   <<: *quality_shard
   needs:
     - job: plan
       artifacts: true
     - job: prepare
       artifacts: false
-    - job: quality_browser_boundary_entry_print
+    - job: "quality_browser 1/2"
       artifacts: true
   script:
     - node scripts/qa/ci-quality-shard.mjs --shard browser
@@ -611,7 +613,7 @@ quality_aggregate:
       artifacts: true
     - job: quality_resource
       artifacts: true
-    - job: quality_browser
+    - job: "quality_browser 2/2"
       artifacts: true
     - job: quality_security
       artifacts: true

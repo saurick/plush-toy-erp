@@ -147,7 +147,7 @@ export const CI_BROWSER_QUALITY_SCENARIOS = Object.freeze([
 
 export const CI_BROWSER_QUALITY_LANES = Object.freeze({
   boundary_entry_print: Object.freeze({
-    job: "quality_browser_boundary_entry_print",
+    job: "quality_browser 1/2",
     command: Object.freeze(["internal", "browser-quality"]),
     stages: Object.freeze(["browser"]),
     substeps: Object.freeze([]),

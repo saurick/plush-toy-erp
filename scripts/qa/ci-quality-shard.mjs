@@ -83,7 +83,7 @@ export const CI_QUALITY_SHARDS = Object.freeze({
     stages: Object.freeze(["resource_sensitive_node"]),
   }),
   browser: Object.freeze({
-    job: "quality_browser",
+    job: "quality_browser 2/2",
     command: Object.freeze(["internal", "browser-fan-in"]),
     stages: Object.freeze(["browser"]),
   }),

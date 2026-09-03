@@ -163,7 +163,7 @@ test("only the protected main push prepare job may seed an absent package", () =
     ["CI_PIPELINE_SOURCE", "web"],
     ["CI_COMMIT_BRANCH", "feature"],
     ["CI_COMMIT_REF_PROTECTED", "false"],
-    ["CI_JOB_NAME", "quality_browser"],
+    ["CI_JOB_NAME", "quality_browser 1/2"],
     ["RELEASE_SHA", "a".repeat(40)],
   ]) {
     assert.equal(

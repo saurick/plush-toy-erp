@@ -436,7 +436,7 @@ test("aggregate models every internal fan-in and lets Browser start from Web bui
     finishedAt: stamp(100),
   });
   byShard.set("browser", {
-    job: { name: "quality_browser" },
+    job: { name: "quality_browser 2/2" },
     startedAt: stamp(110),
     finishedAt: stamp(200),
   });
@@ -578,7 +578,7 @@ test("aggregate models every internal fan-in and lets Browser start from Web bui
   const browserLanes = [
     {
       lane: "boundary_entry_print",
-      job: "quality_browser_boundary_entry_print",
+      job: "quality_browser 1/2",
       startedAt: stamp(82),
       finishedAt: stamp(135),
       durationMs: 53,
@@ -603,8 +603,8 @@ test("aggregate models every internal fan-in and lets Browser start from Web bui
   assert.equal(webPath.durationMs, 100);
   assert.deepEqual(webBrowserPath.jobs, [
     "quality_web_build",
-    "quality_browser_boundary_entry_print",
-    "quality_browser",
+    "quality_browser 1/2",
+    "quality_browser 2/2",
   ]);
   assert.equal(webBrowserPath.durationMs, 195);
   assert.deepEqual(serverPath.jobs, [
