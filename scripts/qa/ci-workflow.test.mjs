@@ -102,6 +102,34 @@ test("CI scans the trusted history before executing candidate repository scripts
   assert.match(planRuns, /git log --check --format= "\$history_range"/u);
 });
 
+test("first review push compares only default-branch candidate history", () => {
+  const rangeStep = plan.steps.find((step) => step.id === "range");
+  assert.equal(
+    rangeStep.env.DEFAULT_BRANCH,
+    "${{ github.event.repository.default_branch }}",
+  );
+  const pushBlock = rangeStep.run.match(
+    /elif \[\[ "\$EVENT_NAME" == "push" \]\]; then([\s\S]*?)elif \[\[ "\$EVENT_NAME" == "workflow_dispatch" \]\]; then/u,
+  );
+  assert.ok(pushBlock);
+  assert.match(
+    pushBlock[1],
+    /default_branch_ref="refs\/remotes\/origin\/\$DEFAULT_BRANCH"/u,
+  );
+  assert.match(
+    pushBlock[1],
+    /git rev-parse --verify "\$default_branch_ref\^\{commit\}"/u,
+  );
+  assert.match(
+    pushBlock[1],
+    /git merge-base --is-ancestor "\$default_branch_sha" HEAD/u,
+  );
+  assert.match(pushBlock[1], /range="\$default_branch_sha\.\.HEAD"/u);
+  assert.match(pushBlock[1], /history_range="\$range"/u);
+  assert.match(pushBlock[1], /trusted_config_sha="\$default_branch_sha"/u);
+  assert.doesNotMatch(pushBlock[1], /empty_tree|history_range=HEAD/u);
+});
+
 test("GitHub review CI uses affected/full without claiming canonical main evidence", () => {
   assert.match(
     planRuns,
