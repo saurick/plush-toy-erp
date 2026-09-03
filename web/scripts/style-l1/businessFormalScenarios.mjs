@@ -786,6 +786,31 @@ export function createBusinessFormalScenarios(deps) {
     await failedPicker.waitFor({ state: 'hidden', timeout: 10_000 })
     await expectText(page, '已导入销售订单来源行和剩余可出货数量')
     await modal.waitFor({ state: 'visible', timeout: 10_000 })
+    assert.equal(
+      await modal.getByLabel('币种（跟随销售订单）').inputValue(),
+      'USD',
+      '出货单币种应由销售订单带出并保持只读'
+    )
+    assert.equal(
+      await modal.getByRole('combobox', { name: '实际运费币种' }).count(),
+      0,
+      '实际运费不应提供独立币种选择'
+    )
+    await modal.getByLabel('实际运费金额').fill('12.5')
+    assert.equal(
+      await modal.getByLabel('实际运费币种（自动）').inputValue(),
+      'USD',
+      '实际运费应展示销售订单币种'
+    )
+    assert.equal(
+      await modal.getByLabel('实际运费币种（自动）').isEditable(),
+      false,
+      '自动带出的实际运费币种不可编辑'
+    )
+    await expectText(page, '币种：USD')
+    await modal.screenshot({
+      path: path.join(outputDir, 'shipment-source-one-currency-modal.png'),
+    })
     await expectText(page, '销售订单行追溯')
     assert.equal(
       await modal.getByText('销售订单行追溯', { exact: true }).count(),
@@ -3789,7 +3814,13 @@ export function createBusinessFormalScenarios(deps) {
         })
         await assertBusinessMainTableSortableColumns(page, {
           scenarioName: 'business-v1-shipments',
-          unsortableHeaders: ['实际 / 最终总净重（克）', '备注'],
+          unsortableHeaders: [
+            '实际 / 最终总净重（克）',
+            '包装 / 毛重 / 体积',
+            '实际运费',
+            '唛头',
+            '备注',
+          ],
         })
         await assertNoHorizontalOverflow(page, 'business-v1-shipments')
 

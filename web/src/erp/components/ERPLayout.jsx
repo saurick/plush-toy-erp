@@ -80,6 +80,7 @@ import { getEffectiveSession } from '../api/customerConfigApi.mjs'
 import {
   DEFAULT_DESKTOP_ENTRY,
   resolveCurrentNavigationEntry,
+  resolveDesktopHomeEntry,
 } from '../utils/currentNavigationEntry.mjs'
 import { formatAdminIdentity } from '../utils/adminIdentity.mjs'
 import {
@@ -714,6 +715,13 @@ export default function ERPLayout() {
         .filter((section) => section.items.length > 0),
     [visibleSections]
   )
+  const desktopHomeEntry = useMemo(
+    () =>
+      resolveDesktopHomeEntry({
+        navigationSections: visibleSections,
+      }),
+    [visibleSections]
+  )
   const visibleMenuPaths = useMemo(
     () =>
       permissionGovernedVisibleSections.flatMap((section) =>
@@ -1075,19 +1083,28 @@ export default function ERPLayout() {
   const sideNav = (
     <div className="erp-admin-sider__body">
       <div className="erp-admin-brand">
-        <div className="erp-admin-brand__logo">
-          <span className="erp-admin-brand__logo-mark">
-            {activeBrand.brandMark}
-          </span>
-          <div className="erp-admin-brand__logo-copy">
-            <div className="erp-admin-brand__logo-title">
-              {activeBrand.companyName}
-            </div>
-            <div className="erp-admin-brand__logo-subtitle">
-              {activeBrand.systemName}
+        <button
+          type="button"
+          className="erp-admin-brand__home"
+          aria-label={`返回首页：${desktopHomeEntry.label || DEFAULT_DESKTOP_ENTRY.label}`}
+          title={`返回${desktopHomeEntry.label || DEFAULT_DESKTOP_ENTRY.label}`}
+          data-testid="desktop-home-entry"
+          onClick={() => handleNavigate(desktopHomeEntry.path)}
+        >
+          <div className="erp-admin-brand__logo">
+            <span className="erp-admin-brand__logo-mark">
+              {activeBrand.brandMark}
+            </span>
+            <div className="erp-admin-brand__logo-copy">
+              <div className="erp-admin-brand__logo-title">
+                {activeBrand.companyName}
+              </div>
+              <div className="erp-admin-brand__logo-subtitle">
+                {activeBrand.systemName}
+              </div>
             </div>
           </div>
-        </div>
+        </button>
       </div>
 
       <Menu

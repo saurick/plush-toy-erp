@@ -1,4 +1,8 @@
 import { effectiveSessionAllowsAction } from './adminProfileSync.mjs'
+import {
+  BUSINESS_CURRENCY_OPTIONS,
+  isBusinessCurrency,
+} from './businessCurrency.mjs'
 import { unixSecondsToBusinessDate } from './businessDate.mjs'
 import { normalizeMaterialPurchaseUnitText } from './materialPurchaseContractEditor.mjs'
 import {
@@ -52,11 +56,7 @@ export const SALES_ORDER_ITEM_STATUS_LABELS = Object.freeze({
   canceled: '已取消',
 })
 
-export const BUSINESS_CURRENCY_OPTIONS = Object.freeze([
-  Object.freeze({ value: 'CNY', label: '人民币（CNY）' }),
-  Object.freeze({ value: 'USD', label: '美元（USD）' }),
-  Object.freeze({ value: 'HKD', label: '港币（HKD）' }),
-])
+export { BUSINESS_CURRENCY_OPTIONS }
 
 export const SALES_ORDER_TAX_MODE_OPTIONS = Object.freeze([
   Object.freeze({ value: 'INCLUSIVE', label: '含税价' }),
@@ -275,10 +275,7 @@ function normalizeSourceOrderCurrency(value, extra = {}) {
   if (!currency && !isEdit) {
     return 'CNY'
   }
-  if (
-    !currency ||
-    !BUSINESS_CURRENCY_OPTIONS.some((option) => option.value === currency)
-  ) {
+  if (!currency || !isBusinessCurrency(currency)) {
     throw new Error('币种必须明确选择人民币、美元或港币')
   }
   return currency

@@ -153,6 +153,16 @@ test('shipment source import uses server candidates with remote search and pagin
   assert.match(source, /newSourceItems/u)
 })
 
+test('shipment freight currency is derived from the selected sales order', () => {
+  assert.match(source, /sourceCurrency = ''/u)
+  assert.match(
+    source,
+    /freight_currency:\s*freightAmount\s*\?\s*trimOptional\(sourceCurrency\)\?\.toUpperCase\(\)\s*:\s*undefined/u
+  )
+  assert.match(source, /sourceCurrency:\s*selectedSalesOrder\?\.currency/u)
+  assert.doesNotMatch(source, /trimOptional\(values\.freight_currency\)/u)
+})
+
 test('new shipment drafts clear prior source selection and cached candidate state', () => {
   const resetState = source.match(
     /const resetShipmentSourceSelectionState = \(\) => \{([\s\S]*?)\n {2}\}/u

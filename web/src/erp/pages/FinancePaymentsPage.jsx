@@ -1025,7 +1025,12 @@ export default function FinancePaymentsPage() {
     }
 
     return [
-      { title: '收付款单号', dataIndex: 'payment_no', width: 200 },
+      {
+        title: '收付款单号',
+        dataIndex: 'payment_no',
+        copyable: { label: '收付款单号' },
+        width: 200,
+      },
       {
         title: '方向',
         dataIndex: 'direction',
@@ -1039,6 +1044,10 @@ export default function FinancePaymentsPage() {
       {
         title: '往来方',
         key: 'counterparty',
+        copyable: {
+          label: '往来方',
+          resolveValue: (_value, record) => counterpartyLabel(record),
+        },
         width: 200,
         detailValue: counterpartyLabel,
         render: (_, record) => counterpartyLabel(record),
@@ -1058,8 +1067,18 @@ export default function FinancePaymentsPage() {
         render: (items) => `${Array.isArray(items) ? items.length : 0} 笔`,
         exportValue: paymentAllocationExportValue,
       },
-      { title: '账户摘要', dataIndex: 'account_ref', width: 200 },
-      { title: '业务凭据', dataIndex: 'evidence_ref', width: 200 },
+      {
+        title: '账户摘要',
+        dataIndex: 'account_ref',
+        copyable: { label: '账户摘要' },
+        width: 200,
+      },
+      {
+        title: '业务凭据',
+        dataIndex: 'evidence_ref',
+        copyable: { label: '业务凭据' },
+        width: 200,
+      },
       {
         title: '发生时间',
         dataIndex: 'occurred_at',
@@ -1071,10 +1090,16 @@ export default function FinancePaymentsPage() {
   }, [customers, suppliers])
   const creditColumns = useMemo(
     () => [
-      { title: '红冲单号', dataIndex: 'credit_note_no', width: 200 },
+      {
+        title: '红冲单号',
+        dataIndex: 'credit_note_no',
+        copyable: { label: '红冲单号' },
+        width: 200,
+      },
       {
         title: '来源财务记录',
         dataIndex: 'finance_fact_no',
+        copyable: { label: '来源财务记录' },
         width: 190,
         render: (value) => value || '已关联财务记录',
         exportValue: (record) => record?.finance_fact_no || '已关联财务记录',

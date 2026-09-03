@@ -35,10 +35,10 @@ function displaySalesOrderItemAmount(record, fallback = '-') {
   return displayOptionalValue(deriveSalesOrderItemAmount(record), fallback)
 }
 
-function contactText(snapshot = {}) {
+function contactText(snapshot = {}, fallback = '-') {
   const name = snapshot?.name || ''
   const phone = snapshot?.mobile || snapshot?.phone || ''
-  return [name, phone].filter(Boolean).join(' / ') || '-'
+  return [name, phone].filter(Boolean).join(' / ') || fallback
 }
 
 function moneyText(value, currency, fallback = '-') {
@@ -85,6 +85,7 @@ export function buildSalesOrderColumns() {
       title: '订单号',
       exportTitle: '订单号',
       dataIndex: 'order_no',
+      copyable: true,
       width: 160,
       sorter: (a, b) => compareText(a?.order_no, b?.order_no),
     },
@@ -92,6 +93,9 @@ export function buildSalesOrderColumns() {
       title: '客户',
       exportTitle: '客户',
       dataIndex: 'customer_snapshot',
+      copyable: {
+        resolveValue: (value) => value?.name || '',
+      },
       width: 180,
       sorter: (a, b) =>
         compareText(a?.customer_snapshot?.name, b?.customer_snapshot?.name),
@@ -105,6 +109,7 @@ export function buildSalesOrderColumns() {
       title: '客户订单号',
       exportTitle: '客户订单号',
       dataIndex: 'customer_order_no',
+      copyable: true,
       effectiveFieldKey: 'source_no',
       width: 150,
       sorter: (a, b) => compareText(a?.customer_order_no, b?.customer_order_no),
@@ -114,6 +119,7 @@ export function buildSalesOrderColumns() {
       title: '业务员 / 跟单人',
       exportTitle: '业务员 / 跟单人',
       dataIndex: 'sales_owner',
+      copyable: true,
       width: 140,
       sorter: (a, b) => compareText(a?.sales_owner, b?.sales_owner),
       render: (value) => value || '-',
@@ -122,13 +128,16 @@ export function buildSalesOrderColumns() {
       title: '联系人',
       exportTitle: '联系人',
       dataIndex: 'contact_snapshot',
+      copyable: {
+        resolveValue: (value) => contactText(value, ''),
+      },
       width: 170,
       sorter: (a, b) =>
         compareText(
           contactText(a?.contact_snapshot),
           contactText(b?.contact_snapshot)
         ),
-      render: contactText,
+      render: (value) => contactText(value),
       exportValue: (record) => contactText(record?.contact_snapshot),
     },
     {

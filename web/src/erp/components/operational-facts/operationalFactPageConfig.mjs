@@ -370,6 +370,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
           : activeKey === 'reservations'
             ? 'reservation_no'
             : 'fact_no',
+      copyable: { label: '单号' },
       width: 260,
       sortType: 'text',
     },

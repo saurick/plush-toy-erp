@@ -176,8 +176,18 @@ export default function HistoryRecordsPage() {
         width: 120,
         render: (value) => <Tag>{value}</Tag>,
       },
-      { title: '编号 / 名称', dataIndex: 'primary', width: 180 },
-      { title: '名称 / 往来方', dataIndex: 'secondary', width: 180 },
+      {
+        title: '编号 / 名称',
+        dataIndex: 'primary',
+        copyable: { label: '编号或名称' },
+        width: 180,
+      },
+      {
+        title: '名称 / 往来方',
+        dataIndex: 'secondary',
+        copyable: { label: '名称或往来方' },
+        width: 180,
+      },
       {
         title: '历史状态',
         dataIndex: 'status',

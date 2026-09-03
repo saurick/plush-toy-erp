@@ -115,6 +115,7 @@ func TestOperationalFactRepoListShipmentSourceCandidatesUsesShippedTruth(t *test
 	ctx := context.Background()
 	f := newShipmentSourceCandidateFixture(t, "shipment_source_truth")
 	order := f.createOrder(t, "SO-SOURCE-001", biz.SalesOrderStatusActive)
+	order = f.client.SalesOrder.UpdateOneID(order.ID).SetCurrency("USD").SaveX(ctx)
 	otherOrder := f.createOrder(t, "SO-SOURCE-002", biz.SalesOrderStatusActive)
 	closedOrder := f.createOrder(t, "SO-SOURCE-CLOSED", biz.SalesOrderStatusClosed)
 
@@ -147,7 +148,7 @@ func TestOperationalFactRepoListShipmentSourceCandidatesUsesShippedTruth(t *test
 	byLine := make(map[int]*biz.ShipmentSourceCandidate, len(items))
 	for _, item := range items {
 		byLine[item.LineNo] = item
-		if item.SalesOrderID != order.ID || item.OrderStatus != biz.SalesOrderStatusActive || item.OrderVersion <= 0 {
+		if item.SalesOrderID != order.ID || item.OrderStatus != biz.SalesOrderStatusActive || item.OrderVersion <= 0 || item.Currency != "USD" {
 			t.Fatalf("invalid order projection: %#v", item)
 		}
 		if item.CustomerSnapshot["name"] != "订单客户快照-SO-SOURCE-001" || item.CustomerName == "" || item.SKUCode == nil || item.UnitName != "只" {

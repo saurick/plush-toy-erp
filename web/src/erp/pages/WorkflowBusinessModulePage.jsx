@@ -73,6 +73,7 @@ import {
   getWorkflowTaskReason,
   getWorkflowTaskStatusMeta,
 } from '../utils/workflowTaskBoard.mjs'
+import { resolveReadableWorkflowSourceNo } from '../utils/workflowDocumentRefs.mjs'
 import { isWorkflowProcessDecisionTask } from '../utils/workflowTaskActionContract.mjs'
 import {
   buildWorkflowProcessDecision,
@@ -1001,6 +1002,9 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           exportTitle: '任务编号',
           dataIndex: 'task_code',
           key: 'task_code',
+          copyable: {
+            resolveValue: (_value, record) => getWorkflowTaskCodeLabel(record),
+          },
           width: 190,
           fixed: 'left',
           render: (value, record) => (
@@ -1016,6 +1020,10 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           exportTitle: '来源',
           dataIndex: 'source_no',
           key: 'source_no',
+          copyable: {
+            resolveValue: (_value, record) =>
+              resolveReadableWorkflowSourceNo(record, ['source_no']),
+          },
           width: 170,
           render: (_, record) => formatWorkflowTaskSource(record),
           exportValue: formatWorkflowTaskSource,

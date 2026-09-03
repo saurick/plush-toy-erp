@@ -1512,7 +1512,12 @@ export default function V1ProductionOrdersPage() {
 
   const columns = useMemo(
     () => [
-      { title: '生产单号', dataIndex: 'order_no', width: 180 },
+      {
+        title: '生产单号',
+        dataIndex: 'order_no',
+        copyable: { label: '生产单号' },
+        width: 180,
+      },
       {
         title: '状态',
         dataIndex: 'status',

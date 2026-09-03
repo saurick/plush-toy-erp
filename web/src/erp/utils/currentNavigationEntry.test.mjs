@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   DEFAULT_DESKTOP_ENTRY,
   resolveCurrentNavigationEntry,
+  resolveDesktopHomeEntry,
 } from './currentNavigationEntry.mjs'
 
 const navigationSections = [
@@ -66,4 +67,33 @@ test('currentNavigationEntry: unregistered URLs use display fallback without gra
   assert.equal(result.menuPath, '')
   assert.equal(result.entry.key, 'global-dashboard')
   assert.equal(result.entry.path, DEFAULT_DESKTOP_ENTRY.path)
+})
+
+test('currentNavigationEntry: desktop home prefers workbench and falls back to the first visible page', () => {
+  const reorderedSections = [
+    {
+      title: '系统管理',
+      items: [
+        navigationSections[0].items[1],
+        navigationSections[0].items[0],
+      ],
+    },
+  ]
+  assert.equal(
+    resolveDesktopHomeEntry({ navigationSections: reorderedSections }).path,
+    DEFAULT_DESKTOP_ENTRY.path
+  )
+
+  const permissionCenter = {
+    key: 'permission-center',
+    path: '/erp/system/permissions',
+    label: '权限管理',
+  }
+  assert.equal(
+    resolveDesktopHomeEntry({
+      navigationSections: [{ title: '系统管理', items: [permissionCenter] }],
+    }),
+    permissionCenter
+  )
+  assert.equal(resolveDesktopHomeEntry(), DEFAULT_DESKTOP_ENTRY)
 })

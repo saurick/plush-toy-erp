@@ -2,6 +2,7 @@ import React from 'react'
 
 import {
   CalendarOutlined,
+  CopyOutlined,
   DownOutlined,
   MoreOutlined,
   RollbackOutlined,
@@ -24,6 +25,8 @@ import {
   Typography,
 } from 'antd'
 import SharedSearchInput from '@/common/components/SearchInput'
+import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
+import { message } from '@/common/utils/antdApp'
 import { BusinessPageHelpTrigger } from '../help/BusinessContextHelp.jsx'
 import {
   DATE_INPUT_DISPLAY_FORMAT,
@@ -35,6 +38,11 @@ import {
 } from '../../utils/dateRange.mjs'
 import { selectStableBusinessActionIndexes } from '../../utils/businessActionAvailability.mjs'
 import { normalizeBusinessPageHeaderStats } from '../../utils/businessPageHeader.mjs'
+import {
+  businessTableCopyColumnKey,
+  resolveBusinessTableCopyLabel,
+  resolveBusinessTableCopyText,
+} from '../../utils/businessTableCopy.mjs'
 
 const { Text } = Typography
 
@@ -319,6 +327,57 @@ function resolveBusinessTableColumnWidth(column = {}) {
   return BUSINESS_TABLE_DEFAULT_COLUMN_WIDTH
 }
 
+function CopyableBusinessTableCell({ column, value, record, children }) {
+  const copyConfig =
+    typeof column?.copyable === 'object' && column.copyable !== null
+      ? column.copyable
+      : {}
+  const copyText = resolveBusinessTableCopyText(column, value, record)
+  const copyLabel = resolveBusinessTableCopyLabel(column)
+
+  if (!copyText) return children
+
+  const handleCopy = async (event) => {
+    const trigger = event.currentTarget
+    const shouldReleasePointerFocus = event.detail > 0
+    event.stopPropagation()
+    try {
+      await copyTextToClipboard(copyText)
+      message.success(copyConfig.successText || `${copyLabel}已复制`)
+    } catch {
+      message.error(copyConfig.errorText || '复制失败，请手动复制')
+    } finally {
+      if (shouldReleasePointerFocus && document.activeElement === trigger) {
+        trigger.blur()
+      }
+    }
+  }
+
+  return (
+    <div
+      className="erp-business-table-copyable-cell"
+      data-copyable-column={businessTableCopyColumnKey(column) || undefined}
+    >
+      <div
+        className="erp-business-table-copyable-cell__content"
+        title={copyText}
+      >
+        {children}
+      </div>
+      <Button
+        type="text"
+        size="small"
+        className="erp-business-table-copyable-cell__button"
+        icon={<CopyOutlined />}
+        aria-label={`复制${copyLabel}`}
+        title={`复制${copyLabel}`}
+        onClick={handleCopy}
+        onDoubleClick={(event) => event.stopPropagation()}
+      />
+    </div>
+  )
+}
+
 function normalizeBusinessTableColumn(column) {
   if (!column || typeof column !== 'object') {
     return column
@@ -329,11 +388,29 @@ function normalizeBusinessTableColumn(column) {
   if (Array.isArray(nextColumn.children)) {
     nextColumn.children = nextColumn.children.map(normalizeBusinessTableColumn)
   }
+  if (nextColumn.copyable) {
+    const renderCell = nextColumn.render
+    nextColumn.render = (value, record, index) => {
+      const renderedValue =
+        typeof renderCell === 'function'
+          ? renderCell(value, record, index)
+          : value
+      return (
+        <CopyableBusinessTableCell
+          column={nextColumn}
+          value={value}
+          record={record}
+        >
+          {renderedValue}
+        </CopyableBusinessTableCell>
+      )
+    }
+  }
 
   return nextColumn
 }
 
-function normalizeBusinessTableColumns(columns = []) {
+export function normalizeBusinessTableColumns(columns = []) {
   return (Array.isArray(columns) ? columns : []).map(
     normalizeBusinessTableColumn
   )

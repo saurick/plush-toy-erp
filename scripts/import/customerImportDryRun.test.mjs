@@ -7,6 +7,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import { OUTPUT_FILES } from './customerImportDryRun.mjs'
+import { normalizeFields } from './customerImportDryRunNormalize.mjs'
 
 const testDir = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(testDir, '../..')
@@ -19,6 +20,15 @@ test('help 输出可运行', () => {
   assert.equal(result.status, 0)
   assert.match(result.stdout, /Customer import dry-run tooling/)
   assert.match(result.stdout, /--fail-on-blockers/)
+})
+
+test('金额前缀统一按 CNY 解析', () => {
+  const warnings = []
+
+  assert.deepEqual(normalizeFields({ amount: 'CNY 1,234.50' }, warnings), {
+    amount: '1234.5',
+  })
+  assert.deepEqual(warnings, [])
 })
 
 test('缺少 --source 返回非 0', async () => {

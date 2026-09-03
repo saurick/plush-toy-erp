@@ -34,6 +34,7 @@ export function buildPurchaseOrderColumns({ resolveSupplierName }) {
       title: '采购单号',
       exportTitle: '采购单号',
       dataIndex: 'purchase_order_no',
+      copyable: true,
       width: 180,
       fixed: 'left',
       sorter: (a, b) => compareText(a?.purchase_order_no, b?.purchase_order_no),
@@ -42,6 +43,12 @@ export function buildPurchaseOrderColumns({ resolveSupplierName }) {
       title: '供应商',
       exportTitle: '供应商',
       dataIndex: 'supplier_id',
+      copyable: {
+        resolveValue: (_value, record) => {
+          const supplierName = resolveSupplierName(record)
+          return supplierName === '未指定供应商' ? '' : supplierName
+        },
+      },
       width: 160,
       sortValue: resolveSupplierName,
       render: (_value, record) => resolveSupplierName(record),

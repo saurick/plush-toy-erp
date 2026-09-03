@@ -360,24 +360,15 @@ test('shipmentWeight: SKU, shipment modal, list column, export and stale-clear U
   assert.doesNotMatch(shipmentWeightSource, /\bBigInt\b|\b\d+n\b/u)
 
   assert.match(masterFormSource, /label="SKU 单重（净重）"/u)
-  assert.match(
-    masterFormSource,
-    /requiredWhenWeightField="unit_net_weight_g"/u
-  )
+  assert.match(masterFormSource, /requiredWhenWeightField="unit_net_weight_g"/u)
   assert.match(
     masterPageSource,
     /所属产品或 SKU 默认单位已变更，SKU 单重已清空/u
   )
   assert.match(masterColumnsSource, /title: 'SKU 单重（净重）'/u)
   assert.match(masterColumnsSource, /compareNumeric20Scale6Values\(/u)
-  assert.doesNotMatch(
-    masterColumnsSource,
-    /Number\(a\?\.unit_net_weight_g/u
-  )
-  assert.match(
-    masterColumnsSource,
-    /exportTitle: 'SKU 单重（克）'/u
-  )
+  assert.doesNotMatch(masterColumnsSource, /Number\(a\?\.unit_net_weight_g/u)
+  assert.match(masterColumnsSource, /exportTitle: 'SKU 单重（克）'/u)
 
   assert.match(
     shipmentModalSource,
@@ -413,7 +404,7 @@ test('shipmentWeight: SKU, shipment modal, list column, export and stale-clear U
   )
   assert.match(
     shipmentsPageSource,
-    /buildShipmentWithItemsParams\(\s*values,\s*\{\s*products,\s*productSKUs,?\s*\}\s*\)/u
+    /buildShipmentWithItemsParams\(\s*values,\s*\{\s*products,\s*productSKUs,\s*sourceCurrency:\s*selectedSalesOrder\?\.currency,?\s*\}\s*\)/u
   )
   assert.match(
     shipmentsPageSource,

@@ -59,6 +59,7 @@ export function buildBOMVersionColumns({ productOptions = [] }) {
       title: 'BOM 版本',
       exportTitle: 'BOM 版本',
       dataIndex: 'version',
+      copyable: true,
       width: 180,
       sorter: (a, b) =>
         String(a?.version || '').localeCompare(String(b?.version || '')),
@@ -76,6 +77,7 @@ export function buildBOMVersionColumns({ productOptions = [] }) {
       title: '来源订单号',
       exportTitle: '来源订单号',
       dataIndex: 'source_order_no',
+      copyable: true,
       width: 150,
       sorter: (a, b) =>
         String(a?.source_order_no || '').localeCompare(
@@ -87,6 +89,7 @@ export function buildBOMVersionColumns({ productOptions = [] }) {
       title: '设计师',
       exportTitle: '设计师',
       dataIndex: 'designer',
+      copyable: true,
       width: 110,
       sorter: (a, b) =>
         String(a?.designer || '').localeCompare(String(b?.designer || '')),

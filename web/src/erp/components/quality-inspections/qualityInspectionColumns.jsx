@@ -419,6 +419,7 @@ export function buildQualityInspectionDataColumns({
       title: '质检单号',
       exportTitle: '质检单号',
       dataIndex: 'inspection_no',
+      copyable: true,
       width: 170,
     },
     {

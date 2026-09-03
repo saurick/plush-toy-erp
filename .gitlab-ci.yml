@@ -582,6 +582,11 @@ quality_node:
 
 quality_security:
   <<: *quality_shard
+  variables:
+    # Preserve symbol-level coverage while bounding this whole-program
+    # analysis job's transient heap and parallel GC work.
+    GOMAXPROCS: "10"
+    GOGC: "25"
   needs:
     - job: plan
       artifacts: true

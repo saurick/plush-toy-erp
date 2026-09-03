@@ -58,6 +58,7 @@ import {
   SelectFilter,
   SelectionActionBar,
   SelectionClearAction,
+  normalizeBusinessTableColumns,
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
   BusinessListToolbarActions,
@@ -1415,6 +1416,7 @@ export default function V1InventoryLedgerPage() {
         {
           title: '批次号',
           dataIndex: 'lot_no',
+          copyable: { label: '批次号' },
           width: 180,
           render: (value, record) => value || (record.id ? '已登记批次' : '-'),
         },
@@ -1429,6 +1431,11 @@ export default function V1InventoryLedgerPage() {
         {
           title: '材料 / 产品',
           dataIndex: 'subject_id',
+          copyable: {
+            label: '材料或产品',
+            resolveValue: (_value, record) =>
+              renderSubjectReference(record?.subject_id, record),
+          },
           width: 220,
           render: renderSubjectReference,
           exportValue: (record) =>
@@ -1437,6 +1444,11 @@ export default function V1InventoryLedgerPage() {
         {
           title: '产品规格',
           dataIndex: 'product_sku_id',
+          copyable: {
+            label: '产品规格',
+            resolveValue: (_value, record) =>
+              renderProductSKUReference(record?.product_sku_id, record),
+          },
           width: 220,
           render: renderProductSKUReference,
           exportValue: (record) =>
@@ -1445,14 +1457,28 @@ export default function V1InventoryLedgerPage() {
         {
           title: '供应商批次',
           dataIndex: 'supplier_lot_no',
+          copyable: { label: '供应商批次' },
           width: 150,
           render: dash,
         },
-        { title: '色号', dataIndex: 'color_no', width: 110, render: dash },
-        { title: '缸号', dataIndex: 'dye_lot_no', width: 110, render: dash },
+        {
+          title: '色号',
+          dataIndex: 'color_no',
+          copyable: { label: '色号' },
+          width: 110,
+          render: dash,
+        },
+        {
+          title: '缸号',
+          dataIndex: 'dye_lot_no',
+          copyable: { label: '缸号' },
+          width: 110,
+          render: dash,
+        },
         {
           title: '生产批次',
           dataIndex: 'production_lot_no',
+          copyable: { label: '生产批次' },
           width: 140,
           render: dash,
         },
@@ -1511,6 +1537,11 @@ export default function V1InventoryLedgerPage() {
         {
           title: '材料 / 产品',
           dataIndex: 'subject_id',
+          copyable: {
+            label: '材料或产品',
+            resolveValue: (_value, record) =>
+              renderSubjectReference(record?.subject_id, record),
+          },
           width: 220,
           render: renderSubjectReference,
           exportValue: (record) =>
@@ -1519,6 +1550,11 @@ export default function V1InventoryLedgerPage() {
         {
           title: '产品规格',
           dataIndex: 'product_sku_id',
+          copyable: {
+            label: '产品规格',
+            resolveValue: (_value, record) =>
+              renderProductSKUReference(record?.product_sku_id, record),
+          },
           width: 220,
           render: renderProductSKUReference,
           exportValue: (record) =>
@@ -1527,6 +1563,11 @@ export default function V1InventoryLedgerPage() {
         {
           title: '仓库',
           dataIndex: 'warehouse_id',
+          copyable: {
+            label: '仓库',
+            resolveValue: (_value, record) =>
+              renderWarehouseReference(record?.warehouse_id),
+          },
           width: 180,
           render: renderWarehouseReference,
           exportValue: (record) =>
@@ -1535,6 +1576,11 @@ export default function V1InventoryLedgerPage() {
         {
           title: '批次',
           dataIndex: 'lot_id',
+          copyable: {
+            label: '批次',
+            resolveValue: (_value, record) =>
+              renderLotReference(record?.lot_id),
+          },
           width: 180,
           render: renderLotReference,
           exportValue: (record) => renderLotReference(record?.lot_id),
@@ -1565,6 +1611,14 @@ export default function V1InventoryLedgerPage() {
         {
           title: '来源单据',
           key: 'source_document',
+          copyable: {
+            label: '来源单据',
+            resolveValue: (_value, record) =>
+              record?.source_no ||
+              record?.source_document_no ||
+              record?.document_no ||
+              '',
+          },
           width: 120,
           render: (_, record) => formatSourceDocumentRef(record),
           exportValue: formatSourceDocumentRef,
@@ -1616,6 +1670,11 @@ export default function V1InventoryLedgerPage() {
       {
         title: '材料 / 产品',
         dataIndex: 'subject_id',
+        copyable: {
+          label: '材料或产品',
+          resolveValue: (_value, record) =>
+            renderSubjectReference(record?.subject_id, record),
+        },
         width: 220,
         render: renderSubjectReference,
         exportValue: (record) =>
@@ -1624,6 +1683,11 @@ export default function V1InventoryLedgerPage() {
       {
         title: '产品规格',
         dataIndex: 'product_sku_id',
+        copyable: {
+          label: '产品规格',
+          resolveValue: (_value, record) =>
+            renderProductSKUReference(record?.product_sku_id, record),
+        },
         width: 220,
         render: renderProductSKUReference,
         exportValue: (record) =>
@@ -1632,6 +1696,11 @@ export default function V1InventoryLedgerPage() {
       {
         title: '仓库',
         dataIndex: 'warehouse_id',
+        copyable: {
+          label: '仓库',
+          resolveValue: (_value, record) =>
+            renderWarehouseReference(record?.warehouse_id),
+        },
         width: 180,
         render: renderWarehouseReference,
         exportValue: (record) => renderWarehouseReference(record?.warehouse_id),
@@ -1639,6 +1708,10 @@ export default function V1InventoryLedgerPage() {
       {
         title: '批次',
         dataIndex: 'lot_id',
+        copyable: {
+          label: '批次',
+          resolveValue: (_value, record) => renderLotReference(record?.lot_id),
+        },
         width: 180,
         render: renderLotReference,
         exportValue: (record) => renderLotReference(record?.lot_id),
@@ -1702,6 +1775,10 @@ export default function V1InventoryLedgerPage() {
     moduleTitle: `库存台账 / ${activeLabel}`,
     columns,
   })
+  const copyableTableColumns = useMemo(
+    () => normalizeBusinessTableColumns(tableColumns),
+    [tableColumns]
+  )
   const loadExportRows = useCallback(
     async ({ signal }) => {
       if (!canReadInventory) return []
@@ -2267,7 +2344,7 @@ export default function V1InventoryLedgerPage() {
           rowKey={(record) => `${activeView}-${record.id}`}
           loading={loading}
           dataSource={rows}
-          columns={tableColumns}
+          columns={copyableTableColumns}
           pagination={createBusinessTablePagination({
             pagination,
             total,

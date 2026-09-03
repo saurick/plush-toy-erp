@@ -172,9 +172,10 @@ function idempotencyKey(prefix) {
 
 function buildShipmentParams(
   values = {},
-  { products = [], productSKUs = [] } = {}
+  { products = [], productSKUs = [], sourceCurrency = '' } = {}
 ) {
   const items = Array.isArray(values.items) ? values.items : []
+  const freightAmount = trimOptional(values.freight_amount)
   const weightPreview = resolveShipmentWeightPreview({
     items,
     products,
@@ -195,8 +196,10 @@ function buildShipmentParams(
     gross_weight_kg: trimOptional(values.gross_weight_kg),
     volume_m3: trimOptional(values.volume_m3),
     shipping_mark: trimOptional(values.shipping_mark),
-    freight_amount: trimOptional(values.freight_amount),
-    freight_currency: trimOptional(values.freight_currency),
+    freight_amount: freightAmount,
+    freight_currency: freightAmount
+      ? trimOptional(sourceCurrency)?.toUpperCase()
+      : undefined,
     total_net_weight_g: resolveShipmentSubmittedTotalNetWeight({
       preview: weightPreview,
       manualValue: values.total_net_weight_g,
@@ -237,7 +240,6 @@ function shipmentFormValues(shipment = {}) {
     volume_m3: shipment.volume_m3,
     shipping_mark: shipment.shipping_mark || '',
     freight_amount: shipment.freight_amount,
-    freight_currency: shipment.freight_currency,
     note: shipment.note || '',
   }
 }
@@ -1084,7 +1086,6 @@ export default function ShipmentsPage() {
       volume_m3: undefined,
       shipping_mark: '',
       freight_amount: undefined,
-      freight_currency: undefined,
       items: [createBlankShipmentItem()],
     })
     setShipmentModal({ mode: 'create', shipment: null })
@@ -1164,6 +1165,7 @@ export default function ShipmentsPage() {
       const params = buildShipmentWithItemsParams(values, {
         products,
         productSKUs,
+        sourceCurrency: selectedSalesOrder?.currency,
       })
       const editingShipment =
         shipmentModal?.mode === 'edit' ? shipmentModal.shipment : null

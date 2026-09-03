@@ -313,6 +313,22 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
     aggregateBlock,
     /job: "quality_browser 2\/2"\n      artifacts: true/u,
   );
+  const securityBlock = workflow.match(
+    /^quality_security:[\s\S]+?^quality_aggregate:/mu,
+  )?.[0];
+  assert.ok(securityBlock);
+  assert.match(
+    securityBlock,
+    /variables:\n(?:    #[^\n]*\n)+    GOMAXPROCS: "10"\n    GOGC: "25"/u,
+  );
+  assert.match(
+    securityBlock,
+    /ci-quality-shard[.]mjs --shard security/u,
+  );
+  assert.doesNotMatch(
+    securityBlock,
+    /SKIP_GOVULNCHECK|-scan (?:module|package)/u,
+  );
   assert.match(workflow, /history_range=HEAD/u);
   assert.match(
     workflow,

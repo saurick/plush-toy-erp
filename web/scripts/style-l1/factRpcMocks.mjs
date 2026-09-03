@@ -391,6 +391,7 @@ export async function installFactRpcMocks(page, context) {
         order_no: 'SO-STYLE-L1',
         order_status: 'active',
         order_version: 1,
+        currency: 'USD',
         customer_id: 1,
         customer_snapshot: {
           id: 1,

@@ -1155,6 +1155,14 @@ export function createStyleL1Scenarios(deps) {
       hiddenItemKeys: Object.freeze([]),
     }),
   })
+  const yoyoosunBrandHomeCustomerConfig = Object.freeze({
+    ...roleGuidedCustomerConfig,
+    brand: Object.freeze({
+      brandMark: '永',
+      companyName: '东莞市永绅玩具有限公司',
+      systemName: '业务管理',
+    }),
+  })
   const multiMobileRoleAdminProfile = Object.freeze({
     username: 'style-l1-sales-quality',
     is_super_admin: false,
@@ -2463,6 +2471,156 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '销售订单 功能预览')
         await page.goBack({ waitUntil: 'domcontentloaded' })
         await expectHeading(page, '系统功能总览')
+      },
+    },
+    {
+      name: 'yoyoosun-brand-home-desktop',
+      path: '/erp/task-board',
+      auth: 'admin',
+      customerConfig: yoyoosunBrandHomeCustomerConfig,
+      adminProfile: customerRoleAdminProfile('sales', 'brand_home_sales'),
+      effectiveSession: customerRoleRuntimeSession(
+        ['sales'],
+        'style-l1-brand-home-desktop'
+      ),
+      viewport: { width: 1280, height: 720 },
+      verify: async (page) => {
+        await waitForPath(page, '/erp/task-board')
+        const homeEntry = page.locator(
+          '.erp-admin-sider .erp-admin-brand__home'
+        )
+        await homeEntry.waitFor({ state: 'visible', timeout: 10_000 })
+        await homeEntry.focus()
+        const homeMetrics = await homeEntry.evaluate((node) => {
+          const buttonRect = node.getBoundingClientRect()
+          const logoRect = node
+            .querySelector('.erp-admin-brand__logo')
+            ?.getBoundingClientRect()
+          const style = window.getComputedStyle(node)
+          return {
+            ariaLabel: node.getAttribute('aria-label') || '',
+            boxShadow: style.boxShadow,
+            buttonHeight: buttonRect.height,
+            buttonWidth: buttonRect.width,
+            cursor: style.cursor,
+            focused: document.activeElement === node,
+            logoHeight: logoRect?.height || 0,
+            logoWidth: logoRect?.width || 0,
+            overflow: node.scrollWidth - node.clientWidth,
+            tagName: node.tagName,
+            title: node.getAttribute('title') || '',
+          }
+        })
+        assert(
+          homeMetrics.ariaLabel === '返回首页：工作台' &&
+            homeMetrics.title === '返回工作台' &&
+            homeMetrics.tagName === 'BUTTON' &&
+            homeMetrics.cursor === 'pointer' &&
+            homeMetrics.focused &&
+            homeMetrics.boxShadow !== 'none' &&
+            homeMetrics.buttonWidth >= homeMetrics.logoWidth &&
+            homeMetrics.buttonHeight >= homeMetrics.logoHeight &&
+            homeMetrics.overflow <= 1,
+          `品牌首页入口的语义、焦点或点击范围异常: ${JSON.stringify(homeMetrics)}`
+        )
+        await page.screenshot({
+          path: path.resolve(outputDir, 'yoyoosun-brand-home-desktop-focus.png'),
+          fullPage: true,
+        })
+        await page.keyboard.press('Enter')
+        await waitForPath(page, '/erp/dashboard')
+        await page.waitForLoadState('networkidle').catch(() => {})
+
+        const sameRouteRPCMethods = []
+        const trackSameRouteRequest = (request) => {
+          if (request.method() !== 'POST') return
+          try {
+            const method = request.postDataJSON()?.method
+            if (method) sameRouteRPCMethods.push(method)
+          } catch {
+            // 非 JSON 请求不参与同路由重复读取断言。
+          }
+        }
+        page.on('request', trackSameRouteRequest)
+        try {
+          await homeEntry.click()
+          await page.waitForTimeout(250)
+        } finally {
+          page.off('request', trackSameRouteRequest)
+        }
+        await waitForPath(page, '/erp/dashboard')
+        assert.deepEqual(
+          sameRouteRPCMethods,
+          [],
+          `已在工作台时点击品牌区不应重复读取页面: ${JSON.stringify(sameRouteRPCMethods)}`
+        )
+        await assertNoHorizontalOverflow(page, 'yoyoosun-brand-home-desktop')
+      },
+    },
+    {
+      name: 'yoyoosun-brand-home-mobile-dark',
+      path: '/erp/master/products',
+      auth: 'admin',
+      themeMode: 'dark',
+      customerConfig: yoyoosunBrandHomeCustomerConfig,
+      adminProfile: customerRoleAdminProfile('sales', 'brand_home_sales'),
+      effectiveSession: customerRoleRuntimeSession(
+        ['sales'],
+        'style-l1-brand-home-mobile-dark'
+      ),
+      viewport: { width: 390, height: 844 },
+      verify: async (page) => {
+        await waitForPath(page, '/erp/master/products')
+        const openNavigation = page.getByRole('button', {
+          name: '打开导航菜单',
+        })
+        await openNavigation.focus()
+        await page.keyboard.press('Enter')
+        const drawer = page.locator('.erp-admin-drawer:visible')
+        await drawer.waitFor({ state: 'visible', timeout: 10_000 })
+        const homeEntry = drawer.locator('.erp-admin-brand__home')
+        await homeEntry.focus()
+        await homeEntry.hover()
+        await page.waitForTimeout(200)
+        const homeMetrics = await homeEntry.evaluate((node) => {
+          const rect = node.getBoundingClientRect()
+          const brandRect = node.parentElement?.getBoundingClientRect()
+          const style = window.getComputedStyle(node)
+          return {
+            ariaLabel: node.getAttribute('aria-label') || '',
+            backgroundColor: style.backgroundColor,
+            boxShadow: style.boxShadow,
+            contained:
+              Boolean(brandRect) &&
+              rect.left >= brandRect.left - 1 &&
+              rect.right <= brandRect.right + 1,
+            focused: document.activeElement === node,
+            overflow: node.scrollWidth - node.clientWidth,
+          }
+        })
+        assert(
+          homeMetrics.ariaLabel === '返回首页：工作台' &&
+            homeMetrics.backgroundColor !== 'rgba(0, 0, 0, 0)' &&
+            homeMetrics.boxShadow !== 'none' &&
+            homeMetrics.contained &&
+            homeMetrics.focused &&
+            homeMetrics.overflow <= 1,
+          `移动暗色品牌首页入口的焦点、悬停或边界异常: ${JSON.stringify(homeMetrics)}`
+        )
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'yoyoosun-brand-home-mobile-dark-focus.png'
+          ),
+          fullPage: false,
+        })
+        await page.keyboard.press('Enter')
+        await waitForPath(page, '/erp/dashboard')
+        await drawer.waitFor({ state: 'hidden', timeout: 10_000 })
+        await assertNoHorizontalOverflow(
+          page,
+          'yoyoosun-brand-home-mobile-dark'
+        )
       },
     },
     {

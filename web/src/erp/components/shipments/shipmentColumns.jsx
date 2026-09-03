@@ -88,6 +88,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       title: '出货单号',
       exportTitle: '出货单号',
       dataIndex: 'shipment_no',
+      copyable: true,
       width: 280,
       sortType: 'text',
     },
@@ -104,6 +105,12 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       title: '来源单据',
       exportTitle: '来源单据',
       dataIndex: 'sales_order_id',
+      copyable: {
+        resolveValue: (value) => {
+          const order = salesOrdersByID.get(Number(value || 0))
+          return order?.order_no || order?.customer_order_no || ''
+        },
+      },
       width: 120,
       sortType: 'number',
       render: (value) => {
@@ -126,6 +133,10 @@ export function buildShipmentColumns({ salesOrdersByID }) {
     {
       title: '客户',
       exportTitle: '客户',
+      copyable: {
+        label: '客户',
+        resolveValue: (_value, record) => record?.customer_snapshot || '',
+      },
       width: 260,
       sortValue: (record) =>
         record.customer_snapshot || (record.customer_id ? '客户已关联' : ''),
@@ -175,6 +186,10 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       title: '运输 / 承运 / 单号',
       exportTitle: '运输 / 承运 / 单号',
       key: 'transport',
+      copyable: {
+        label: '物流单号',
+        resolveValue: (_value, record) => record?.tracking_no || '',
+      },
       width: 300,
       sortValue: transportText,
       render: (_, record) => transportText(record),

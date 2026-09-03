@@ -10,6 +10,7 @@ import (
 	"server/internal/biz"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/shipment"
+	"server/internal/data/model/ent/shipmentitem"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/shopspring/decimal"
@@ -171,6 +172,54 @@ func TestOperationalFactRepoCreateSourceShipmentOwnsCustomerSnapshotAndReplay(t 
 	}
 	if _, err := f.repo.CreateShipmentDraftWithItems(ctx, retry); !errors.Is(err, biz.ErrIdempotencyConflict) {
 		t.Fatalf("stored snapshot drift replay error = %v, want ErrIdempotencyConflict", err)
+	}
+}
+
+func TestOperationalFactRepoCreateSourceShipmentKeepsOneCurrencyThroughShippingValidation(t *testing.T) {
+	ctx := context.Background()
+	f := newShipmentSourceSnapshotFixture(t, "source_currency")
+	order := f.createOrder(t, "SO-SOURCE-CURRENCY", biz.SalesOrderStatusActive)
+	order = f.client.SalesOrder.UpdateOneID(order.ID).SetCurrency("USD").SaveX(ctx)
+	line := f.createOrderItem(t, order.ID, 1, biz.SalesOrderItemStatusOpen, 3)
+	clientSnapshot := "客户端快照"
+	freightAmount := decimal.RequireFromString("12.5")
+	usd := "USD"
+
+	input := shipmentSourceSnapshotInput(f, order.ID, line.ID, "SHP-SOURCE-CURRENCY-USD", &f.customerID, &clientSnapshot)
+	input.Shipment.FreightAmount = &freightAmount
+	input.Shipment.FreightCurrency = &usd
+	created, err := f.repo.CreateShipmentDraftWithItems(ctx, input)
+	if err != nil {
+		t.Fatalf("create source-bound shipment with matching currency: %v", err)
+	}
+	if created.FreightCurrency == nil || *created.FreightCurrency != usd || len(created.Items) != 1 ||
+		created.Items[0].CurrencySnapshot == nil || *created.Items[0].CurrencySnapshot != usd {
+		t.Fatalf("created shipment currency snapshots = %#v, want one USD currency", created)
+	}
+
+	cny := "CNY"
+	mismatched := shipmentSourceSnapshotInput(f, order.ID, line.ID, "SHP-SOURCE-CURRENCY-CNY", &f.customerID, &clientSnapshot)
+	mismatched.Shipment.FreightAmount = &freightAmount
+	mismatched.Shipment.FreightCurrency = &cny
+	if _, err := f.repo.CreateShipmentDraftWithItems(ctx, mismatched); !errors.Is(err, biz.ErrShipmentSourceMismatch) {
+		t.Fatalf("mismatched freight currency error = %v, want ErrShipmentSourceMismatch", err)
+	}
+	if count := f.client.Shipment.Query().Where(shipment.ShipmentNo("SHP-SOURCE-CURRENCY-CNY")).CountX(ctx); count != 0 {
+		t.Fatalf("mismatched freight currency wrote %d shipment rows", count)
+	}
+
+	if _, err := f.repo.data.sqldb.ExecContext(ctx, "UPDATE shipments SET freight_currency = ? WHERE id = ?", cny, created.ID); err != nil {
+		t.Fatalf("tamper stored shipment currency: %v", err)
+	}
+	tampered := f.client.Shipment.GetX(ctx, created.ID)
+	tx, err := f.repo.inv.beginInventoryDBTx(ctx)
+	if err != nil {
+		t.Fatalf("begin shipment validation transaction: %v", err)
+	}
+	defer rollbackInventoryDBTx(ctx, tx, f.repo.log)
+	items := tx.client.ShipmentItem.Query().Where(shipmentitem.ShipmentID(created.ID)).AllX(ctx)
+	if _, err := validateShipmentSourceAndQuantity(ctx, tx, tampered, items); !errors.Is(err, biz.ErrShipmentSourceMismatch) {
+		t.Fatalf("shipping validation after stored currency drift error = %v, want ErrShipmentSourceMismatch", err)
 	}
 }
 

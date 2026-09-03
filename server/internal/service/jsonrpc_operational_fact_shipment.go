@@ -629,6 +629,7 @@ func shipmentSourceCandidateToAny(item *biz.ShipmentSourceCandidate) map[string]
 		"order_no":              item.OrderNo,
 		"order_status":          item.OrderStatus,
 		"order_version":         item.OrderVersion,
+		"currency":              item.Currency,
 		"customer_id":           item.CustomerID,
 		"customer_snapshot":     item.CustomerSnapshot,
 		"delivery_snapshot":     item.DeliverySnapshot,

@@ -62,7 +62,7 @@ test('shipment source labels prefer immutable snapshots and use current display 
   assert.doesNotMatch(source, /selectedSourceRows\.reduce|剩余可出货合计/u)
 })
 
-test('shipment logistics fields are grouped, paired, and remain before attachments and details', () => {
+test('shipment logistics fields keep freight on the sales-order currency and remain before attachments and details', () => {
   for (const copy of [
     '计划与收货',
     '国家 / 地区',
@@ -79,7 +79,7 @@ test('shipment logistics fields are grouped, paired, and remain before attachmen
     '唛头',
     '实际运费',
     '实际运费金额',
-    '实际运费币种',
+    '币种（跟随销售订单）',
     '包装说明',
     '箱号',
   ]) {
@@ -87,13 +87,16 @@ test('shipment logistics fields are grouped, paired, and remain before attachmen
   }
   assert.match(
     source,
-    /只记录本次出货的实际物流金额，不自动生成应付或付款记录/u
+    /只记录本次出货的实际物流金额，并沿用销售订单币种；不自动生成应付或付款记录/u
   )
-  assert.match(
-    source,
-    /if \(freightCurrency\) throw new Error\('请填写实际运费金额'\)/u
-  )
-  assert.match(source, /throw new Error\('请选择实际运费币种'\)/u)
+  assert.match(source, /<FieldWithUnitSuffix/u)
+  assert.match(source, /suffixAriaLabel="实际运费币种（自动）"/u)
+  assert.match(source, /sourceCurrency=\{/u)
+  assert.match(source, /throw new Error\('请先导入销售订单以确定单据币种'\)/u)
+  assert.doesNotMatch(source, /label="实际运费币种"/u)
+  assert.doesNotMatch(source, /BUSINESS_CURRENCY_OPTIONS/u)
+  assert.doesNotMatch(source, /addonAfter=/u)
+  assert.doesNotMatch(source, /name="freight_currency"/u)
 
   const fieldsIndex = source.indexOf('<ShipmentFormFields')
   const attachmentsIndex = source.indexOf('<BusinessAttachmentPanel')

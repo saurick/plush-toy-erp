@@ -25,6 +25,10 @@ test('shipment source L1 keeps selection across the 20-row server page boundary'
   )
   assert.match(pickerContract, /sourceTable[\s\S]*SO-STYLE-L1/u)
   assert.match(pickerContract, /sourceTable[\s\S]*PROD-STYLE-L1-01/u)
+  assert.match(pickerContract, /币种（跟随销售订单）/u)
+  assert.match(pickerContract, /实际运费币种（自动）/u)
+  assert.match(pickerContract, /币种：USD/u)
+  assert.match(pickerContract, /shipment-source-one-currency-modal\.png/u)
   assert.doesNotMatch(pickerContract, /expectText\(page, expectedText\)/u)
 })
 
@@ -76,10 +80,7 @@ test('inventory header summary keeps view text in tabs and numeric values in car
   const interaction = source.slice(startIndex, startIndex + 2_600)
 
   assert.ok(startIndex >= 0)
-  assert.match(
-    interaction,
-    /expectedLabels:\s*\['筛选结果', '本页显示'\]/u
-  )
+  assert.match(interaction, /expectedLabels:\s*\['筛选结果', '本页显示'\]/u)
   assert.match(interaction, /name: '库存批次'/u)
   assert.match(interaction, /name: '库存变动记录'/u)
   assert.match(interaction, /assertTextAbsent\(page, '查看内容'\)/u)
@@ -132,10 +133,7 @@ test('production exception workflow scenario follows the current approval empty 
     source,
     /business-production-exceptions-decisions-tab-mobile\.png/u
   )
-  assert.match(
-    source,
-    /business-production-exceptions-tasks-tab-mobile\.png/u
-  )
+  assert.match(source, /business-production-exceptions-tasks-tab-mobile\.png/u)
   assert.match(source, /taskWorkspaceRowGap/u)
   assert.match(source, /taskWorkspaceRenderedGap/u)
 })
@@ -225,7 +223,7 @@ test('shipment table assertions lock the combined visible headers', () => {
   assert.match(source, /getByText\(headerText, \{ exact: true \}\)/u)
   assert.match(
     source,
-    /unsortableHeaders: \['实际 \/ 最终总净重（克）', '备注'\]/u
+    /unsortableHeaders:\s*\[\s*'实际 \/ 最终总净重（克）',\s*'包装 \/ 毛重 \/ 体积',\s*'实际运费',\s*'唛头',\s*'备注',?\s*\]/u
   )
   assert.match(source, /unsortableHeaders: \['SKU 单重（净重）'\]/u)
   assert.doesNotMatch(source, /expectText\(page, '总净重（克）'\)/u)

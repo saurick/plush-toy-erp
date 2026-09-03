@@ -26,6 +26,7 @@ type ShipmentSourceCandidate struct {
 	OrderNo          string
 	OrderStatus      string
 	OrderVersion     int
+	Currency         string
 	CustomerID       int
 	CustomerSnapshot map[string]any
 	DeliverySnapshot map[string]any

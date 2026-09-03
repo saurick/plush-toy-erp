@@ -3261,7 +3261,14 @@ async function verifyBusinessRowDoubleClickModal(
     .filter({ hasText: rowText })
     .first()
   await row.waitFor({ timeout: 10_000 })
-  await row.dblclick()
+  const copyableCellContent = row
+    .locator('.erp-business-table-copyable-cell__content')
+    .first()
+  if ((await copyableCellContent.count()) > 0) {
+    await copyableCellContent.dblclick()
+  } else {
+    await row.dblclick()
+  }
 
   const modal = page
     .locator('.erp-business-action-modal--form.ant-modal:visible')

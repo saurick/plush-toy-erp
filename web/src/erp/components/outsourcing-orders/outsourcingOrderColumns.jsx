@@ -24,6 +24,7 @@ export function buildOutsourcingOrderColumns({ resolveSupplierName }) {
       title: '加工合同号',
       exportTitle: '加工合同号',
       dataIndex: 'outsourcing_order_no',
+      copyable: true,
       width: 180,
       fixed: 'left',
       sortType: 'text',
@@ -32,6 +33,12 @@ export function buildOutsourcingOrderColumns({ resolveSupplierName }) {
       title: '加工厂',
       exportTitle: '加工厂',
       dataIndex: 'supplier_id',
+      copyable: {
+        resolveValue: (_value, record) => {
+          const supplierName = resolveSupplierName(record)
+          return supplierName === '未指定加工厂' ? '' : supplierName
+        },
+      },
       width: 180,
       sortValue: resolveSupplierName,
       render: (_, record) => resolveSupplierName(record),
@@ -52,6 +59,7 @@ export function buildOutsourcingOrderColumns({ resolveSupplierName }) {
       title: '来源订单',
       exportTitle: '来源订单',
       dataIndex: 'source_order_no',
+      copyable: true,
       width: 160,
       sortType: 'text',
       render: (value) => value || '-',

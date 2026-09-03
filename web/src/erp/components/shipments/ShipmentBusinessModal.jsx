@@ -19,6 +19,7 @@ import BusinessAttachmentPanel from '../business-list/BusinessAttachmentPanel.js
 import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
 import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.jsx'
+import FieldWithUnitSuffix from '../business-list/FieldWithUnitSuffix.jsx'
 import SourceImportPickerModal from '../business-list/SourceImportPickerModal.jsx'
 import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import {
@@ -31,7 +32,6 @@ import {
   formatQuantity,
 } from '../../utils/businessLineItems.mjs'
 import { optionalContactPhoneRule } from '../../utils/contactValidation.mjs'
-import { BUSINESS_CURRENCY_OPTIONS } from '../../utils/masterDataOrderView.mjs'
 import { numeric20Scale6Units } from '../../utils/numeric20Scale6.mjs'
 import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
 import {
@@ -99,15 +99,24 @@ export function sourceLineProductText(
 }
 
 function ShipmentFormFields({
-  form,
   disabled = false,
   customerOptions = [],
   salesOrderOptions = [],
+  sourceCurrency = '',
+  storedFreightCurrency = '',
   sourceSelectionOnly = false,
   sourceLocked = false,
 }) {
-  const freightAmount = Form.useWatch('freight_amount', form)
-  const freightCurrency = Form.useWatch('freight_currency', form)
+  const normalizedSourceCurrency = String(sourceCurrency || '')
+    .trim()
+    .toUpperCase()
+  const normalizedStoredFreightCurrency = String(storedFreightCurrency || '')
+    .trim()
+    .toUpperCase()
+  const displayedFreightCurrency =
+    (disabled ? normalizedStoredFreightCurrency : normalizedSourceCurrency) ||
+    ''
+
   return (
     <>
       <BusinessFormSectionTitle>单据与客户</BusinessFormSectionTitle>
@@ -161,6 +170,17 @@ function ShipmentFormFields({
           allowClear
           autoComplete="off"
           disabled={disabled || sourceLocked}
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="币种（跟随销售订单）"
+      >
+        <Input
+          aria-label="币种（跟随销售订单）"
+          disabled
+          placeholder="导入销售订单后自动带出"
+          value={normalizedSourceCurrency}
         />
       </Form.Item>
       <Form.Item name="idempotency_key" hidden rules={[{ required: true }]}>
@@ -346,16 +366,17 @@ function ShipmentFormFields({
       <BusinessFormSectionTitle>实际运费</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field"
-        dependencies={['freight_currency']}
-        extra="只记录本次出货的实际物流金额，不自动生成应付或付款记录。"
+        extra="只记录本次出货的实际物流金额，并沿用销售订单币种；不自动生成应付或付款记录。"
         label="实际运费金额"
         name="freight_amount"
         rules={[
           {
             validator: async (_, value) => {
               if (value === undefined || value === null || value === '') {
-                if (freightCurrency) throw new Error('请填写实际运费金额')
                 return
+              }
+              if (!normalizedSourceCurrency) {
+                throw new Error('请先导入销售订单以确定单据币种')
               }
               if (numeric20Scale6Units(value) === null) {
                 throw new Error('实际运费必须为非负数，且最多保留 6 位小数')
@@ -364,40 +385,19 @@ function ShipmentFormFields({
           },
         ]}
       >
-        <InputNumber
+        <FieldWithUnitSuffix
+          control={
+            <InputNumber
+              aria-label="实际运费金额"
+              max="99999999999999.999999"
+              min="0"
+              precision={6}
+              stringMode
+            />
+          }
           disabled={disabled}
-          max="99999999999999.999999"
-          min="0"
-          precision={6}
-          stringMode
-          style={{ width: '100%' }}
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        dependencies={['freight_amount']}
-        label="实际运费币种"
-        name="freight_currency"
-        rules={[
-          {
-            validator: async (_, value) => {
-              if (
-                freightAmount !== undefined &&
-                freightAmount !== null &&
-                freightAmount !== '' &&
-                !value
-              ) {
-                throw new Error('请选择实际运费币种')
-              }
-            },
-          },
-        ]}
-      >
-        <Select
-          allowClear
-          disabled={disabled}
-          options={BUSINESS_CURRENCY_OPTIONS}
-          placeholder="请选择币种"
+          suffixAriaLabel="实际运费币种（自动）"
+          unitText={displayedFreightCurrency}
         />
       </Form.Item>
       <BusinessFormSectionTitle>其他说明</BusinessFormSectionTitle>
@@ -456,7 +456,8 @@ function ShipmentSelectedSourceAlert({
             </Text>
             <Text type="secondary">
               客户：{salesOrderCustomerText(selectedSalesOrder) || '-'}；已导入{' '}
-              {selectedSourceRows.length} 行
+              {selectedSourceRows.length} 行；币种：
+              {selectedSalesOrder.currency || '未记录'}
             </Text>
           </div>
         )
@@ -993,12 +994,18 @@ export default function ShipmentBusinessModal({
     >
       <Form layout="vertical" form={form} className="erp-business-action-form">
         <ShipmentFormFields
-          form={form}
           customerOptions={customerOptions}
           disabled={!isWritableModal}
           salesOrderOptions={salesOrderOptions}
+          sourceCurrency={
+            selectedSalesOrder?.currency ||
+            modalSelectedShipment?.items?.find(
+              (item) => item?.currency_snapshot
+            )?.currency_snapshot
+          }
           sourceSelectionOnly={isWritableModal}
           sourceLocked={Boolean(selectedSalesOrder)}
+          storedFreightCurrency={modalSelectedShipment?.freight_currency}
         />
         <BusinessAttachmentPanel
           ref={shipmentAttachmentRef}

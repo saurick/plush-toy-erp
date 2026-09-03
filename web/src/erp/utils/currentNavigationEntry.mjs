@@ -10,6 +10,20 @@ function flattenNavigationItems(navigationSections = []) {
   )
 }
 
+export function resolveDesktopHomeEntry({
+  navigationSections = [],
+  fallbackEntry = DEFAULT_DESKTOP_ENTRY,
+} = {}) {
+  const items = flattenNavigationItems(navigationSections).filter(
+    (item) => typeof item?.path === 'string' && item.path.trim()
+  )
+  return (
+    items.find((item) => item.path === fallbackEntry.path) ||
+    items[0] ||
+    fallbackEntry
+  )
+}
+
 export function resolveCurrentNavigationEntry({
   navigationSections = [],
   locationPath = '',

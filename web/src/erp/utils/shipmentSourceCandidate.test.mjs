@@ -14,6 +14,7 @@ function candidate(overrides = {}) {
     order_no: 'SO-007',
     order_status: 'active',
     order_version: 3,
+    currency: 'USD',
     customer_id: 8,
     customer_snapshot: { code: 'C-008', name: '示例客户' },
     delivery_snapshot: {
@@ -282,6 +283,18 @@ test('shipment source candidate page fails closed on truncated totals and invali
       offset: 0,
     },
     {
+      shipment_source_candidates: [candidate({ currency: 'EUR' })],
+      total: 1,
+      limit: 20,
+      offset: 0,
+    },
+    {
+      shipment_source_candidates: [candidate({ currency: ' usd ' })],
+      total: 1,
+      limit: 20,
+      offset: 0,
+    },
+    {
       shipment_source_candidates: [
         candidate({ ordered_quantity: '-1', remaining_quantity: '0' }),
       ],
@@ -359,6 +372,7 @@ test('shipment source candidate normalization keeps backend quantity truth and s
     order_no: 'SO-007',
     lifecycle_status: 'active',
     version: 3,
+    currency: 'USD',
     customer_id: 8,
     customer_snapshot: { code: 'C-008', name: '示例客户' },
     customer_name: '当前客户名称',

@@ -7,6 +7,11 @@ const source = readFileSync(
   'utf8'
 )
 
+test('finance source summary never fabricates CNY when source currency is missing', () => {
+  assert.match(source, /currency \|\| '币种未记录'/u)
+  assert.doesNotMatch(source, /record\.currency \|\| 'CNY'/u)
+})
+
 test('finance source modal exposes only operator-owned business fields', () => {
   for (const fieldName of ['fact_no', 'occurred_at', 'note']) {
     assert.match(source, new RegExp(`name="${fieldName}"`, 'u'))

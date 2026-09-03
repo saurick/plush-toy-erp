@@ -169,12 +169,17 @@ func shipmentSourceCandidateFromEnt(
 	if deliverySnapshot == nil {
 		deliverySnapshot = map[string]any{}
 	}
+	currency, ok := biz.NormalizeFinanceCurrency(order.Currency)
+	if !ok || currency != order.Currency {
+		return nil, biz.ErrShipmentSourceMismatch
+	}
 
 	candidate := &biz.ShipmentSourceCandidate{
 		SalesOrderID:        order.ID,
 		OrderNo:             order.OrderNo,
 		OrderStatus:         order.LifecycleStatus,
 		OrderVersion:        order.Version,
+		Currency:            currency,
 		CustomerID:          order.CustomerID,
 		CustomerSnapshot:    customerSnapshot,
 		DeliverySnapshot:    deliverySnapshot,

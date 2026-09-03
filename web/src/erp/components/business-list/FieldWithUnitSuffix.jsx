@@ -79,6 +79,7 @@ export default function FieldWithUnitSuffix({
   onBlur,
   disabled,
   readOnly,
+  suffixAriaLabel,
   ...controlProps
 }) {
   const suffixText = normalizeText(unitText)
@@ -111,7 +112,7 @@ export default function FieldWithUnitSuffix({
         value={suffixText}
         readOnly
         tabIndex={-1}
-        aria-label={`单位 ${suffixText}`}
+        aria-label={suffixAriaLabel || `单位 ${suffixText}`}
         title={suffixText}
         style={{
           '--erp-unit-suffix-width': `${unitSuffixWidthPx(suffixText)}px`,

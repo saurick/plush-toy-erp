@@ -1,4 +1,5 @@
 import { positiveInt } from './businessLineItems.mjs'
+import { isBusinessCurrency } from './businessCurrency.mjs'
 import {
   compareNumeric20Scale6Units,
   numeric20Scale6Units,
@@ -117,6 +118,7 @@ export function validateShipmentSourceCandidatePage(
     const productSkuID = row?.product_sku_id
     const customerSnapshot = row?.customer_snapshot
     const deliverySnapshot = row?.delivery_snapshot
+    const currency = String(row?.currency ?? '').trim()
     if (
       !isPositiveSafeInteger(salesOrderID) ||
       !isPositiveSafeInteger(salesOrderItemID) ||
@@ -135,6 +137,9 @@ export function validateShipmentSourceCandidatePage(
         .toLowerCase() !== 'active' ||
       String(row?.line_status || '').trim() === '' ||
       String(row?.order_no || '').trim() === '' ||
+      typeof row?.currency !== 'string' ||
+      row.currency !== currency ||
+      !isBusinessCurrency(currency) ||
       String(row?.customer_name || '').trim() === '' ||
       String(row?.product_code || '').trim() === '' ||
       String(row?.product_name || '').trim() === '' ||
@@ -204,6 +209,7 @@ export function shipmentSourceOrderFromCandidate(row = {}) {
     order_no: row.order_no || '',
     lifecycle_status: row.order_status || '',
     version: row.order_version,
+    currency: row.currency || '',
     customer_id: positiveInt(row.customer_id),
     customer_snapshot: row.customer_snapshot,
     customer_name: row.customer_name || '',

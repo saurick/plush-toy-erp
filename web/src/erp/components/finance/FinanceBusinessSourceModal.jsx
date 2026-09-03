@@ -38,6 +38,7 @@ function sourcePartner(action, source = {}) {
 
 function sourceSummaryItems(action, source = {}) {
   const record = source && typeof source === 'object' ? source : {}
+  const currency = String(record.currency || '').trim()
   const items = [
     {
       key: 'source',
@@ -70,7 +71,7 @@ function sourceSummaryItems(action, source = {}) {
       {
         key: 'amount',
         label: '账面金额',
-        children: `${record.amount || '0'} ${record.currency || 'CNY'}`,
+        children: `${record.amount || '0'} ${currency || '币种未记录'}`,
       }
     )
   } else if (

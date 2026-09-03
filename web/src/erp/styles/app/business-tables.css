@@ -410,6 +410,54 @@
   padding: 10px 12px;
 }
 
+.erp-business-table-copyable-cell {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 4px;
+}
+
+.erp-business-table-copyable-cell__content {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.erp-business-table-copyable-cell__button.ant-btn {
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0;
+  color: var(--erp-primary-strong, #237234);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s ease;
+}
+
+.erp-business-table-copyable-cell:hover
+  .erp-business-table-copyable-cell__button.ant-btn,
+.erp-business-table-copyable-cell:focus-within
+  .erp-business-table-copyable-cell__button.ant-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (hover: none) {
+  .erp-business-table-copyable-cell__button.ant-btn {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .erp-business-table-copyable-cell__button.ant-btn {
+    transition: none;
+  }
+}
+
 .erp-business-page-header-card__grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, auto);

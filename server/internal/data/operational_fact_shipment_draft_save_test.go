@@ -38,6 +38,7 @@ func createEditableShipmentSourceFixture(
 	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
 		OrderNo:          "SO-SHIP-EDIT",
 		CustomerID:       customer.ID,
+		Currency:         biz.FinanceCurrencyUSD,
 		CustomerSnapshot: map[string]any{"code": "C-SHIP-EDIT", "name": "出货编辑测试客户"},
 		OrderDate:        time.Date(2026, 8, 9, 0, 0, 0, 0, time.UTC),
 		TaxMode:          stringPtr(biz.SalesOrderTaxModeNone),
@@ -219,6 +220,18 @@ func TestOperationalFactRepoSaveShipmentDraftReplacesAggregateWithCASAndServerSn
 	rows, total, err := repo.ListShipments(ctx, biz.OperationalFactFilter{Keyword: "TRACK-EDIT-001", Limit: 20})
 	if err != nil || total != 1 || len(rows) != 1 || rows[0].ID != updated.ID {
 		t.Fatalf("tracking keyword search total=%d rows=%#v err=%v", total, rows, err)
+	}
+
+	mismatchedCurrency := *in
+	mismatchedCurrency.ExpectedVersion = updated.Version
+	cny := biz.FinanceCurrencyCNY
+	mismatchedCurrency.FreightCurrency = &cny
+	if _, err := uc.SaveShipmentDraftWithItems(ctx, &mismatchedCurrency); !errors.Is(err, biz.ErrShipmentSourceMismatch) {
+		t.Fatalf("mismatched freight currency save error=%v, want ErrShipmentSourceMismatch", err)
+	}
+	unchanged := client.Shipment.GetX(ctx, created.ID)
+	if unchanged.Version != updated.Version || unchanged.FreightCurrency == nil || *unchanged.FreightCurrency != biz.FinanceCurrencyUSD {
+		t.Fatalf("mismatched freight currency changed shipment = %#v", unchanged)
 	}
 
 	stale := *in

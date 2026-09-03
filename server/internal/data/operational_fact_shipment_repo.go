@@ -324,6 +324,9 @@ func lockAndResolveShipmentSalesOrderSource(
 	if in.CustomerID == nil || *in.CustomerID != order.CustomerID {
 		return nil, biz.ErrShipmentSourceMismatch
 	}
+	if _, err := validatedShipmentSourceCurrency(order.Currency, in.FreightAmount, in.FreightCurrency); err != nil {
+		return nil, err
+	}
 
 	quantityBySourceLine := make(map[int]decimal.Decimal, len(items))
 	inputsBySourceLine := make(map[int][]*biz.ShipmentItemCreate, len(items))
@@ -525,11 +528,26 @@ func shipmentSourceOrderCurrency(ctx context.Context, client *ent.Client, salesO
 		}
 		return nil, err
 	}
-	currency, ok := biz.NormalizeFinanceCurrency(order.Currency)
-	if !ok || currency != order.Currency {
-		return nil, biz.ErrShipmentSourceMismatch
+	currency, err := validatedShipmentSourceCurrency(order.Currency, nil, nil)
+	if err != nil {
+		return nil, err
 	}
 	return &currency, nil
+}
+
+func validatedShipmentSourceCurrency(orderCurrency string, freightAmount *decimal.Decimal, freightCurrency *string) (string, error) {
+	currency, ok := biz.NormalizeFinanceCurrency(orderCurrency)
+	if !ok || currency != orderCurrency || (freightAmount == nil) != (freightCurrency == nil) {
+		return "", biz.ErrShipmentSourceMismatch
+	}
+	if freightCurrency == nil {
+		return currency, nil
+	}
+	normalizedFreightCurrency, ok := biz.NormalizeFinanceCurrency(*freightCurrency)
+	if !ok || normalizedFreightCurrency != *freightCurrency || normalizedFreightCurrency != currency {
+		return "", biz.ErrShipmentSourceMismatch
+	}
+	return currency, nil
 }
 
 func createShipmentItem(ctx context.Context, client *ent.Client, shipmentID int, salesOrderID *int, sourceCurrency *string, in *biz.ShipmentItemCreate) (*ent.ShipmentItem, error) {
@@ -1497,9 +1515,9 @@ func validateShipmentSourceAndQuantity(ctx context.Context, tx *inventoryDBTx, p
 	if parent.CustomerID == nil || *parent.CustomerID != order.CustomerID {
 		return nil, biz.ErrShipmentSourceMismatch
 	}
-	sourceCurrency, ok := biz.NormalizeFinanceCurrency(order.Currency)
-	if !ok || sourceCurrency != order.Currency {
-		return nil, biz.ErrShipmentSourceMismatch
+	sourceCurrency, err := validatedShipmentSourceCurrency(order.Currency, parent.FreightAmount, parent.FreightCurrency)
+	if err != nil {
+		return nil, err
 	}
 	state.sourceCurrency = sourceCurrency
 
