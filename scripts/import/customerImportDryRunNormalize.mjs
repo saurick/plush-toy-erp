@@ -129,7 +129,7 @@ function normalizeDecimal(text) {
 function normalizeMoney(text) {
   const cleaned = String(text)
     .replace(/[¥￥$,\s]/g, '')
-    .replace(/^CNY/i, '')
+    .replace(/^(?:CNY|RMB)/i, '')
   return normalizeDecimal(cleaned)
 }
 

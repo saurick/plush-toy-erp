@@ -22,10 +22,13 @@ test('help 输出可运行', () => {
   assert.match(result.stdout, /--fail-on-blockers/)
 })
 
-test('金额前缀统一按 CNY 解析', () => {
+test('金额前缀统一按 CNY 或 RMB 解析', () => {
   const warnings = []
 
   assert.deepEqual(normalizeFields({ amount: 'CNY 1,234.50' }, warnings), {
+    amount: '1234.5',
+  })
+  assert.deepEqual(normalizeFields({ amount: 'RMB 1,234.50' }, warnings), {
     amount: '1234.5',
   })
   assert.deepEqual(warnings, [])
