@@ -13,11 +13,11 @@
 
 GitLab 不与业务 PostgreSQL、测试数据库或现有 Docker 容器共享数据目录。Runner 运行在独立 KVM VM 内，只获得 VM 内的 Docker socket；不得挂载 R640 宿主机 `/var/run/docker.sock`。
 
-Runner VM 的 vCPU、内存和系统盘不是仓库常量，而是 `runner-vm.sh` 创建/重建时彼此独立的必填参数；每次容量判断都必须从 guest 实时读取在线 vCPU、MemTotal、swap 与根文件系统，并写入 exact-SHA CI 回执。Runner slot 的唯一显式参数名是 `RUNNER_CONCURRENT_SLOTS`，不能由 `nproc` 自动派生；注册、重建与后续 live 调整都复用 `runner-capacity.sh`，它只在 Runner 空闲、配置身份和旧值精确匹配时原子更新全局 `concurrent` 与唯一 project runner `limit`，失败恢复旧配置并读回。
+Runner VM 的 vCPU、内存和系统盘不是仓库常量，而是 `runner-vm.sh` 创建/重建时彼此独立的必填参数；脚本不设置与工作负载脱节的固定内存下限。`runner-capacity.sh --evidence` 只读回在线 vCPU、MemTotal、swap、根文件系统和槽位配置，证明当前配置身份一致，不把开机快照冒充负载容量结论。Runner slot 的唯一显式参数名是 `RUNNER_CONCURRENT_SLOTS`，不能由 `nproc` 自动派生；注册、重建与后续 live 调整都复用 `runner-capacity.sh`，它只在 Runner 空闲、配置身份和旧值精确匹配时原子更新全局 `concurrent` 与唯一 project runner `limit`，失败恢复旧配置并读回。
 
 当前 canonical 质量 Pipeline 的全局稳定安全并发上限只在 `runner-capacity.env` 保存，DAG 只调度已经就绪的 Job，空槽不预留 CPU 或内存。`concurrent=limit` 把多 Pipeline 即使短暂重叠时的总资源使用也限制在同一个全局上限内；普通完整质量只接受 protected main 的自然 push，新的 commit 自动取消可中断的旧 Pipeline。Job 内 Node 并发仍为 1，PostgreSQL、Docker、Chromium、浏览器锁和 resource-sensitive lane 继续按既有资源边界串行或隔离。只有 VM 资源规格变化，或出现 OOM、swap、持续 iowait、资源残留或清理污染证据时，才重新评估安全上限；不得通过跳过测试保速。
 
-性能调优必须分别观测 R640 宿主机和 Runner guest：记录冷/热缓存的 job 时长、DAG 关键路径、CPU / 内存 / IO 峰值、p50、波动和近似 p95，再决定 Runner slot、分片和语言测试并行度。普通 CI 7–9 分钟、热缓存提交到部署 10–15 分钟只是稳健阶段目标；资源仍有余量且未出现排队、IO 争用、OOM、flaky 或波动扩大时，继续冲刺 6–8 分钟和 8–12 分钟，稳定更快也接受。只有资源饱和或进一步提速需要明显不成比例的复杂度时才停止；不得减少测试、放宽 fail-closed / exact-SHA、隔离或清理门禁，也不得用伪缓存命中换取数字。
+性能调优必须分别观测 R640 宿主机和 Runner guest：在候选内存下运行 protected main 的完整自然 push Pipeline，记录冷/热缓存的 job 时长、DAG 关键路径、峰值工作集、最低 MemAvailable、swap、memory PSI、OOM、IO 峰值、p50、波动和近似 p95，再决定 Runner 内存、slot、分片和语言测试并行度。内存候选以完整 Pipeline 的实测峰值加明确余量为依据；一次绿色只证明该次候选可运行，不直接证明长期稳定，缩容后至少保留可立即恢复的上一档规格。普通 CI 7–9 分钟、热缓存提交到部署 10–15 分钟只是稳健阶段目标；资源仍有余量且未出现排队、IO 争用、OOM、flaky 或波动扩大时，继续冲刺 6–8 分钟和 8–12 分钟，稳定更快也接受。只有资源饱和或进一步提速需要明显不成比例的复杂度时才停止；不得减少测试、放宽 fail-closed / exact-SHA、隔离或清理门禁，也不得用伪缓存命中换取数字。
 
 ## Playwright 冷启动与本地运行包
 
@@ -45,7 +45,7 @@ CI 冷启动因此不再承担公网下载。运行包合同固定 `playwright 1
 - `.env.example`：非敏感路径与端口模板；实际 `.env` 不进入 Git。
 - `install-r640.sh`：默认只读预检；只有精确 `--execute --confirm` 才创建目录并启动单个 GitLab 服务。
 - `runner-vm-cloud-init.yml`：专用 Ubuntu Runner VM 的工具链、QEMU Guest Agent、canonical 内网路由与 fail-closed 注册入口。
-- `runner-vm.sh`：唯一 VM provisioning 入口；显式验证 vCPU、内存、磁盘，并从唯一容量参数读取初始槽位和安全上限；默认只读预览，失败只回滚本操作创建的 domain/volume。
+- `runner-vm.sh`：唯一 VM provisioning 入口；显式验证 vCPU、内存、磁盘参数形状，不替工作负载猜测固定内存下限，并从唯一容量参数读取初始槽位和安全上限；默认只读预览，失败只回滚本操作创建的 domain/volume。
 - `runner-capacity.env`：唯一受版本控制的当前槽位参数；VM 创建、live helper 和 CI evidence 只从该参数建立一致性证明。
 - `runner-capacity.sh`：VM 内唯一槽位更新 helper；锁定旧值和 idle 状态，原子更新、服务读回并生成脱敏容量回执。
 - `gitlab-backup.sh`：生成 GitLab 应用备份、config archive 和 RAID5 checksum；默认只预览。
@@ -152,4 +152,4 @@ sudo bash server/deploy/gitlab/gitlab-backup-verify.sh
 
 R640 GitLab、独立 KVM Runner、公网入口、protected main、GitHub 单向 mirror 和 main pipeline 已进入实际运行主链。本文档只固定重建和安全合同，不把某次历史绿灯写成当前运行证明；当前 SHA、Runner 配置、pipeline/job 终态、Package/Release、backup/restore 仍必须从 GitLab API、Runner VM 和对应脱敏回执实时读回。
 
-`runner-vm.sh` 与其消费的 `runner-vm-cloud-init.yml` 共同构成新建或重建 Runner VM 的唯一正式入口，不会被普通 CI job 自动应用。VM 资源不保存一次性的固定数字；每次 preview/execute 都必须显式提供并读回。当前槽位由 VM 内 root-owned capacity policy、live config 和 validation receipt 共同绑定；普通 Pipeline 的 prepare job 只能通过精确的只读 `sudo ... --evidence` 投影验证 live `concurrent=limit`、service 与 safety ceiling，再记录实时资源，七类 aggregate 全绿后才把该槽位标记为当前 exact SHA 已验证。线上参数漂移时，只在无活动 job 的有界窗口内用共享 capacity helper 修正、重启 Runner 并读回；不回显 token，不把 live 手工改动作为唯一真源。R640 的 UFW bridge 规则和 canonical TLS proxy 属于宿主机前置状态，Runner VM 重建不会替它们补写；每次重建都必须重新完成宿主 listener/firewall 与 guest curl/Node 的双边读回。
+`runner-vm.sh` 与其消费的 `runner-vm-cloud-init.yml` 共同构成新建或重建 Runner VM 的唯一正式入口，不会被普通 CI job 自动应用。VM 资源不保存一次性的固定数字；每次 preview/execute 都必须显式提供并读回。当前槽位由 VM 内 root-owned capacity policy、live config 和 configuration receipt 共同绑定；普通 Pipeline 的 prepare job 只能通过精确的只读 `sudo ... --evidence` 投影验证 live `concurrent=limit`、service 与 safety ceiling，并记录本次候选资源。七类 aggregate 全绿只证明该 exact SHA 在该候选资源下完成一次；内存是否适合作为稳定规格仍以完整 Pipeline 窗口内的峰值、余量、PSI、swap、OOM 和多次波动证据判断，不能从 prepare 的空载快照推导。线上参数漂移时，只在无活动 job 的有界窗口内用共享 capacity helper 修正、重启 Runner 并读回；不回显 token，不把 live 手工改动作为唯一真源。R640 的 UFW bridge 规则和 canonical TLS proxy 属于宿主机前置状态，Runner VM 重建不会替它们补写；每次重建都必须重新完成宿主 listener/firewall 与 guest curl/Node 的双边读回。

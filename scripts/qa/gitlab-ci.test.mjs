@@ -692,7 +692,7 @@ test("R640 GitLab definitions pin identity, separate SSD data and require exact 
   assert.doesNotMatch(runnerCloudInit, /curl[^\n]*[|]\s*(?:ba)?sh/u);
 });
 
-test("Runner provisioning and capacity stay parameterized and fail closed", () => {
+test("Runner provisioning and capacity stay explicit and fail closed", () => {
   for (const placeholder of [
     "__PLUSH_RUNNER_SSH_AUTHORIZED_KEY__",
     "__PLUSH_RUNNER_CAPACITY_SCRIPT_BASE64__",
@@ -708,6 +708,7 @@ test("Runner provisioning and capacity stay parameterized and fail closed", () =
   assert.match(runnerVm, /--vcpus/u);
   assert.match(runnerVm, /--memory-mib/u);
   assert.match(runnerVm, /--disk-gib/u);
+  assert.doesNotMatch(runnerVm, /MEMORY_MIB\s*>=/u);
   assert.doesNotMatch(runnerVm, /--runner-concurrent-slots/u);
   assert.doesNotMatch(runnerVm, /--slot-safety-max/u);
   assert.match(runnerVm, /SOURCE_CAPACITY_FILE/u);
@@ -774,6 +775,7 @@ test("Runner provisioning and capacity stay parameterized and fail closed", () =
   assert.match(runnerCapacity, /status=rollback_incomplete/u);
   assert.match(runnerCapacity, /mode=idempotent/u);
   assert.match(runnerCapacity, /status=evidence/u);
+  assert.doesNotMatch(runnerCapacity, /MIN_MEMORY_MIB|MEMORY_MIB\s*>=/u);
   assert.match(runnerCapacity, /LOCK_DIR=\/run\/plush-runner/u);
   assert.ok(
     runnerCapacity.indexOf("flock -n 9") <

@@ -10,7 +10,6 @@ RECEIPT_DIR=/var/lib/plush-runner
 RECEIPT_FILE=/var/lib/plush-runner/capacity.json
 LOCK_DIR=/run/plush-runner
 LOCK_FILE=/run/plush-runner/capacity.lock
-MIN_MEMORY_MIB=16384
 MIN_ROOT_AVAILABLE_GIB=50
 EXPECTED_RUNNER_NAME=r640-kvm-isolated-shell
 EXPECTED_RUNNER_URL=https://gitlab.saurick.me
@@ -41,42 +40,42 @@ USAGE
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --slots)
-      SLOTS="${2:-}"
-      shift 2
-      ;;
-    --expect-slots)
-      EXPECTED_SLOTS="${2:-}"
-      shift 2
-      ;;
-    --execute)
-      [[ "$MODE" == preview ]]
-      MODE=execute
-      shift
-      ;;
-    --initialize)
-      [[ "$MODE" == preview ]]
-      MODE=initialize
-      shift
-      ;;
-    --evidence)
-      [[ "$MODE" == preview ]]
-      MODE=evidence
-      shift
-      ;;
-    --confirm)
-      CONFIRMATION="${2:-}"
-      shift 2
-      ;;
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    *)
-      echo "[runner-capacity] status=incomplete reason=unsupported_argument" >&2
-      usage >&2
-      exit 2
-      ;;
+  --slots)
+    SLOTS="${2:-}"
+    shift 2
+    ;;
+  --expect-slots)
+    EXPECTED_SLOTS="${2:-}"
+    shift 2
+    ;;
+  --execute)
+    [[ "$MODE" == preview ]]
+    MODE=execute
+    shift
+    ;;
+  --initialize)
+    [[ "$MODE" == preview ]]
+    MODE=initialize
+    shift
+    ;;
+  --evidence)
+    [[ "$MODE" == preview ]]
+    MODE=evidence
+    shift
+    ;;
+  --confirm)
+    CONFIRMATION="${2:-}"
+    shift 2
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    echo "[runner-capacity] status=incomplete reason=unsupported_argument" >&2
+    usage >&2
+    exit 2
+    ;;
   esac
 done
 
@@ -182,12 +181,11 @@ if [[ "$MODE" == evidence ]]; then
   SLOTS="$CURRENT_SLOTS"
 fi
 [[ "$SLOTS" =~ ^[1-9][0-9]*$ ]]
-(( SLOTS <= SLOT_SAFETY_MAX ))
-(( SLOT_SAFETY_MAX <= VCPUS ))
-if [[ "$MODE" == evidence || "$MODE" == initialize ]] || (( SLOTS > CURRENT_SLOTS )); then
-  (( MEMORY_MIB >= MIN_MEMORY_MIB ))
-  (( ROOT_AVAILABLE_GIB >= MIN_ROOT_AVAILABLE_GIB ))
-  (( SWAP_TOTAL_KIB - SWAP_FREE_KIB == 0 ))
+((SLOTS <= SLOT_SAFETY_MAX))
+((SLOT_SAFETY_MAX <= VCPUS))
+if [[ "$MODE" == evidence || "$MODE" == initialize ]] || ((SLOTS > CURRENT_SLOTS)); then
+  ((ROOT_AVAILABLE_GIB >= MIN_ROOT_AVAILABLE_GIB))
+  ((SWAP_TOTAL_KIB - SWAP_FREE_KIB == 0))
 fi
 PREVIOUS_SLOTS="$CURRENT_SLOTS"
 RECEIPT_READY=false

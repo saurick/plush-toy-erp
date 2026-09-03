@@ -41,19 +41,44 @@ USAGE
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --vcpus) VCPUS="${2:-}"; shift 2 ;;
-    --memory-mib) MEMORY_MIB="${2:-}"; shift 2 ;;
-    --disk-gib) DISK_GIB="${2:-}"; shift 2 ;;
-    --base-volume) BASE_VOLUME="${2:-}"; shift 2 ;;
-    --ssh-public-key-file) SSH_PUBLIC_KEY_FILE="${2:-}"; shift 2 ;;
-    --execute) [[ "$MODE" == preview ]]; MODE=execute; shift ;;
-    --confirm) CONFIRMATION="${2:-}"; shift 2 ;;
-    -h|--help) usage; exit 0 ;;
-    *)
-      echo "[runner-vm] status=incomplete reason=unsupported_argument" >&2
-      usage >&2
-      exit 2
-      ;;
+  --vcpus)
+    VCPUS="${2:-}"
+    shift 2
+    ;;
+  --memory-mib)
+    MEMORY_MIB="${2:-}"
+    shift 2
+    ;;
+  --disk-gib)
+    DISK_GIB="${2:-}"
+    shift 2
+    ;;
+  --base-volume)
+    BASE_VOLUME="${2:-}"
+    shift 2
+    ;;
+  --ssh-public-key-file)
+    SSH_PUBLIC_KEY_FILE="${2:-}"
+    shift 2
+    ;;
+  --execute)
+    [[ "$MODE" == preview ]]
+    MODE=execute
+    shift
+    ;;
+  --confirm)
+    CONFIRMATION="${2:-}"
+    shift 2
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    echo "[runner-vm] status=incomplete reason=unsupported_argument" >&2
+    usage >&2
+    exit 2
+    ;;
   esac
 done
 
@@ -62,8 +87,7 @@ for value in "$VCPUS" "$MEMORY_MIB" "$DISK_GIB"; do
 done
 [[ "$BASE_VOLUME" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]
 [[ -n "$SSH_PUBLIC_KEY_FILE" ]]
-(( MEMORY_MIB >= 16384 ))
-(( DISK_GIB >= 50 ))
+((DISK_GIB >= 50))
 
 for command in awk base64 cloud-localds flock grep install mktemp rm rmdir sha256sum stat timeout virsh virt-install; do
   command -v "$command" >/dev/null
@@ -84,7 +108,7 @@ bash -n "$CHROMIUM_SANDBOX_HELPER"
 RUNNER_CONCURRENT_SLOTS="$(sed -n 's/^RUNNER_CONCURRENT_SLOTS=//p' "$SOURCE_CAPACITY_FILE")"
 [[ "$RUNNER_CONCURRENT_SLOTS" =~ ^[1-9][0-9]*$ ]]
 SLOT_SAFETY_MAX="$RUNNER_CONCURRENT_SLOTS"
-(( SLOT_SAFETY_MAX <= VCPUS ))
+((SLOT_SAFETY_MAX <= VCPUS))
 
 install -d -o root -g root -m 0700 "$LOCK_DIR"
 [[ -d "$LOCK_DIR" && ! -L "$LOCK_DIR" ]]
