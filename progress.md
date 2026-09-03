@@ -4,6 +4,13 @@
 
 ## 当前活跃事项
 
+### Runner VM 内存实测收敛（2026-09-03）
+
+- 根因与修正：Runner 创建脚本和容量 evidence 曾把 `16 GiB` 当作脱离工作负载的固定下限，导致空载约 `1.5–2.0 GiB`、完整 CI 峰值未知时仍不能按实测缩容。`60a5f1d41ef5fa36be2259b22de4077037a84fc2` 已移除两个固定下限，只保留参数形状、磁盘、slot、swap、服务身份和 exact helper 等失败关闭门禁；内存容量改由完整负载窗口决定。
+- 失败下界：VM 在保留 `24 GiB` 最大可恢复上限和 `18 GiB` 持久恢复值时，先热缩到 `8 GiB` 运行 protected main 自然 push pipeline `119`，质量并发后内核 OOM-kill `MainThread` 与 `govulncheck`。随后 pipeline `121` 从头固定使用 `12 GiB`，19 槽质量并发的秒级采样达到峰值工作集 `11224 MiB`、最低 `MemAvailable 503 MiB`、最大匿名页 `10023 MiB` 与最大 `Committed_AS 16737 MiB`，memory PSI full 增量约 `4.19s`，再次 OOM-kill `govulncheck`。因此 `8 GiB` 和 `12 GiB` 都已被真实完整负载否决。
+- 当前候选：pipeline `121` 触发 OOM 后，运行态在线回升到 `16 GiB`，其余分片继续完成；失败的 `quality_security` 在 `16 GiB` 下正式重试并通过，随后 `quality_aggregate` 与 `CI Gate` 全绿，pipeline 最终为 success。VM live `currentMemory` 当前为 `16 GiB`，持久值在候选验证期间恢复为上一档 `18 GiB`，最大内存仍保留 `24 GiB`；只有完整自然 push 全绿且 OOM、swap、memory PSI 与最低余量读回健康后，才把持久值收敛到 `16 GiB`。
+- 证据边界：pipeline `119` 与 `121` 都在失败后扩容，能证明两个下界不可用以及 `16 GiB` 可完成被杀重任务和末端门禁，但不能冒充“整条 pipeline 从起点都运行在 `16 GiB`”。本修正记录提交后的 protected main 自然 push 必须在 `16 GiB` 下重新覆盖 plan、prepare、全部质量分片、aggregate 与 `CI Gate`；最终状态和资源峰值只从 GitLab、Runner guest 与 R640 宿主实时读回，本过程记录不作为当前运行真源。
+
 ### R640 GitLab 性能与不可变交付闭环（2026-08-29）
 
 - 已提交 / 推送：`cddd39ff87e3e2ae9cd8c0282431309bb7cb043f` 已把普通 main CI 拆为 plan、prepare、七个固定质量分片、aggregate 与 `CI Gate`，并把普通 exact-SHA terminal 接到 release 复用；同 SHA 候选只构建一次。新 publication 固定 `plush.release-manifest/v2` 七资产并绑定同一 `release-rehearsal.json`；legacy v1 六资产只读、展示、校验及既有回滚，不能补传、重封装或 promotion。通用 / GitLab / GitHub delivery provider、catalog / publisher、promotion、target cache / remote load、回滚读取和研发效能工作台已同步该边界。
