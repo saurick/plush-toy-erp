@@ -28,8 +28,8 @@ import {
   validateTargetCacheProbe,
 } from "./target-release-cache.mjs";
 import {
-  envWithLinuxStat,
-  installLinuxStatShim,
+  envWithLinuxCommandShims,
+  installTargetReleaseCacheCommandShims,
 } from "./remote-linux-script.test-support.mjs";
 
 const SHA = "a".repeat(40);
@@ -211,7 +211,10 @@ function createExecutableCacheFixture(
   };
 }
 
-function executableCacheRunCommand(root, statBin = installLinuxStatShim(root)) {
+function executableCacheRunCommand(
+  root,
+  commandBin = installTargetReleaseCacheCommandShims(root),
+) {
   return (_command, args, options) => {
     const separator = args.lastIndexOf("--");
     assert.notEqual(separator, -1);
@@ -222,7 +225,7 @@ function executableCacheRunCommand(root, statBin = installLinuxStatShim(root)) {
     );
     return spawnSync("bash", ["-s", "--", ...args.slice(separator + 1)], {
       encoding: "utf8",
-      env: envWithLinuxStat(statBin),
+      env: envWithLinuxCommandShims(commandBin),
       input: source,
     });
   };
@@ -699,6 +702,7 @@ test("formal v1 and v2 caches execute probe and prepare with exact payloads", (t
       targetKey: "demo-133",
     });
     assert.equal(probe.packageHit, true);
+    assert.equal(probe.imageHit, false);
     assert.equal(probe.cacheSource, "formal");
     prepareTargetReleaseIncoming(
       { operationId: item.operationId, identity: fixture.identity, probe },

@@ -100,7 +100,7 @@ test('start:yoyoosun print-plan describes dev injection without publishing custo
   assert.match(result.stdout, /mode=vite dev server with HMR/u)
   assert.match(
     result.stdout,
-    /preflight=database migration \+ backend health\/ready \+ customer config\/assets/u
+    /preflight=database migration \+ backend health\/ready; recoverable local blockers open the restricted migration page/u
   )
   assert.match(result.stdout, /ERP_DEV_CUSTOMER_KEY=yoyoosun/u)
   assert.match(
@@ -153,7 +153,7 @@ test('start:yoyoosun ignores ambient frontend-only environment state', () => {
   assert.equal(result.status, 0, result.stderr)
   assert.match(
     result.stdout,
-    /preflight=database migration \+ backend health\/ready \+ customer config\/assets/u
+    /preflight=database migration \+ backend health\/ready; recoverable local blockers open the restricted migration page/u
   )
   assert.doesNotMatch(result.stdout, /frontend-only/u)
 })
