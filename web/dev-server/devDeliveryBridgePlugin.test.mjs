@@ -1278,6 +1278,7 @@ test('promotion executor is launched once and an unstarted child fails closed', 
     message: 'rollback ready',
   })
   const child = new EventEmitter()
+  child.stderr = new EventEmitter()
   let spawnCount = 0
   const service = createDevDeliveryService({
     projectRoot: root,
@@ -1292,7 +1293,7 @@ test('promotion executor is launched once and an unstarted child fails closed', 
       spawnCount += 1
       assert.equal(command, process.execPath)
       assert.equal(options.shell, undefined)
-      assert.equal(options.stdio, 'ignore')
+      assert.deepEqual(options.stdio, ['ignore', 'ignore', 'pipe'])
       assert(
         args.some((item) => String(item).endsWith('/promotion-executor.mjs'))
       )
@@ -1323,9 +1324,21 @@ test('promotion executor is launched once and an unstarted child fails closed', 
     }),
     /already running/u
   )
+  child.stderr.emit(
+    'data',
+    Buffer.from(
+      'startup failed token=child-secret https://user:pass@example.test/private'
+    )
+  )
   child.emit('close', 1)
   assert.equal(spawnCount, 1)
-  assert.equal(readDeliveryOperation(store, OPERATION_ID).status, 'failed')
+  const failed = readDeliveryOperation(store, OPERATION_ID)
+  assert.equal(failed.status, 'failed')
+  assert.match(failed.issues[0].message, /executor_exit=1/u)
+  assert.doesNotMatch(
+    failed.issues[0].message,
+    /child-secret|user:pass|example[.]test/u
+  )
 })
 
 test('upgrade promotion proves the current direct-fetch rollback transport before prepare and launch', async (t) => {
@@ -1334,7 +1347,10 @@ test('upgrade promotion proves the current direct-fetch rollback transport befor
   const downloads = []
   const child = new EventEmitter()
   let spawnCount = 0
-  const preparePromotionAction = ({ idempotencyKey, targetKey }) => {
+  const preparePromotionAction = async (
+    { idempotencyKey, targetKey },
+    { qualifyEligiblePlan }
+  ) => {
     let { operation } = createOrReuseDeliveryOperation(store, {
       action: 'promote',
       target: targetKey,
@@ -1348,14 +1364,28 @@ test('upgrade promotion proves the current direct-fetch rollback transport befor
       status: 'running',
       message: 'fixed preflight',
     })
+    const plan = {
+      status: 'eligible',
+      ancestry: { currentGitSha: currentSha },
+    }
+    const qualification = await qualifyEligiblePlan({
+      operation,
+      plan,
+      promotionMode: 'upgrade',
+    })
     operation = transitionDeliveryOperation(store, operation.id, {
-      status: 'ready',
-      message: 'promotion ready',
-      metadata: { ...operation.metadata, promotionMode: 'upgrade' },
+      status: qualification.status,
+      message: qualification.message,
+      issues: qualification.issues,
+      metadata: {
+        ...operation.metadata,
+        ...(qualification.metadata || {}),
+        promotionMode: 'upgrade',
+      },
     })
     return {
       operation,
-      plan: { ancestry: { currentGitSha: currentSha } },
+      plan,
       reused: false,
     }
   }
@@ -1399,6 +1429,10 @@ test('upgrade promotion proves the current direct-fetch rollback transport befor
   const preparedRaw = readDeliveryOperation(store, OPERATION_ID)
   assert.equal(preparedRaw.metadata.currentGitSha, currentSha)
   assert.equal(preparedRaw.metadata.currentReleaseTransportVerified, true)
+  assert.deepEqual(
+    preparedRaw.events.map((event) => event.status),
+    ['queued', 'running', 'ready']
+  )
   const confirmation = `PROMOTE:demo-133:${SHA}:${OPERATION_ID}`
   const accepted = await service.act({
     action: 'execute-promotion',
@@ -1433,7 +1467,10 @@ test('upgrade promotion is blocked before target write when current rollback tra
         return directControlDownload(destination)
       },
     },
-    preparePromotionAction({ idempotencyKey, targetKey }) {
+    async preparePromotionAction(
+      { idempotencyKey, targetKey },
+      { qualifyEligiblePlan }
+    ) {
       let { operation } = createOrReuseDeliveryOperation(store, {
         action: 'promote',
         target: targetKey,
@@ -1446,14 +1483,28 @@ test('upgrade promotion is blocked before target write when current rollback tra
         status: 'running',
         message: 'fixed preflight',
       })
+      const plan = {
+        status: 'eligible',
+        ancestry: { currentGitSha: currentSha },
+      }
+      const qualification = await qualifyEligiblePlan({
+        operation,
+        plan,
+        promotionMode: 'upgrade',
+      })
       operation = transitionDeliveryOperation(store, operation.id, {
-        status: 'ready',
-        message: 'promotion ready',
-        metadata: { ...operation.metadata, promotionMode: 'upgrade' },
+        status: qualification.status,
+        message: qualification.message,
+        issues: qualification.issues,
+        metadata: {
+          ...operation.metadata,
+          ...(qualification.metadata || {}),
+          promotionMode: 'upgrade',
+        },
       })
       return {
         operation,
-        plan: { ancestry: { currentGitSha: currentSha } },
+        plan,
         reused: false,
       }
     },
@@ -1475,6 +1526,12 @@ test('upgrade promotion is blocked before target write when current rollback tra
   assert.equal(
     prepared.operation.issues[0].code,
     'promotion_current_release_transport_unavailable'
+  )
+  assert.deepEqual(
+    readDeliveryOperation(store, OPERATION_ID).events.map(
+      (event) => event.status
+    ),
+    ['queued', 'running', 'blocked']
   )
   assert.equal(spawnCount, 0)
 })
@@ -1534,7 +1591,9 @@ test('a synchronous executor start failure is terminal and is not retried', asyn
     spawnProcess(_command, _args, options) {
       spawnCount += 1
       spawnedOptions = options
-      throw new Error('executor unavailable')
+      throw new Error(
+        'executor unavailable token=start-secret /Users/simon/private/runner'
+      )
     },
   })
   const confirmation = `PROMOTE:customer-test-133:${SHA}:${OPERATION_ID}`
@@ -1555,7 +1614,13 @@ test('a synchronous executor start failure is terminal and is not retried', asyn
     Object.hasOwn(spawnedOptions.env, 'PLUSH_GITLAB_READ_TOKEN'),
     false
   )
-  assert.equal(readDeliveryOperation(store, OPERATION_ID).status, 'failed')
+  const failed = readDeliveryOperation(store, OPERATION_ID)
+  assert.equal(failed.status, 'failed')
+  assert.match(failed.issues[0].message, /executor unavailable/u)
+  assert.doesNotMatch(
+    failed.issues[0].message,
+    /start-secret|\/Users\/simon|private\/runner/u
+  )
   await assert.rejects(
     service.act({
       action: 'execute-promotion',

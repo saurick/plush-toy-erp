@@ -78,6 +78,11 @@ test("only the Node canonical shard installs cached Web dependencies", () => {
   );
 });
 
+test("Security uses the bounded audit-only retry wrapper", () => {
+  assert.match(source, /"node",\s*\["scripts\/qa\/pnpm-audit-retry[.]mjs"\]/u);
+  assert.doesNotMatch(source, /\[\s*"--dir",\s*"web",\s*"audit",\s*"--prod"/u);
+});
+
 test("Web, Server and Browser canonical shards fan in internal lanes without rerunning resources", () => {
   assert.match(source, /loadCiQualityStageLaneSet/u);
   assert.match(source, /QA_CI_WEB_LANES = "verified"/u);

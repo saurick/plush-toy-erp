@@ -6,31 +6,31 @@
 
 部署 target 的唯一真源是 `deployment-targets.json`：
 
-| target | 用途 | 公网入口 | 数据规则 |
-| --- | --- | --- | --- |
-| `demo-133` | 项目方造数、演练、培训与回归 | `demo.yoyoosun.net` | 可经受控 rebuild 恢复 seed / fixture / 模拟数据 |
-| `customer-test-133` | 甲方测试与验收 | `test.yoyoosun.net` | 普通部署默认保留现有数据；新一轮测试前可显式清空并重建干净基线 |
+| target              | 用途                         | 公网入口            | 数据规则                                                       |
+| ------------------- | ---------------------------- | ------------------- | -------------------------------------------------------------- |
+| `demo-133`          | 项目方造数、演练、培训与回归 | `demo.yoyoosun.net` | 可经受控 rebuild 恢复 seed / fixture / 模拟数据                |
+| `customer-test-133` | 甲方测试与验收               | `test.yoyoosun.net` | 普通部署默认保留现有数据；新一轮测试前可显式清空并重建干净基线 |
 
 `erp` 是未来生产环境，尚未登记为可执行 target；`yoyoosun.net` 临时 `302` 跳转到 `https://erp.yoyoosun.net` 也不改变这一点。`admin.yoyoosun.net` 退役后仍不能进入 target registry、环境变量映射、数据清理、preflight、健康检查、release、promotion、smoke 或 rollback。`customer-trial-133` 只是 `demo-133` 内部模拟数据合同，不是第三个部署 target。
 
 ## 常用入口
 
-| 入口 | 职责 | 写入边界 |
-| --- | --- | --- |
-| `deployment-targets.mjs` | 读取两个固定 target 的脱敏投影 | 只读 |
-| `target-preflight.mjs` | 读回容量、Compose、端口、数据库、当前 SHA、锁、rollback point 与对应公网入口 | 只读，不创建备份或切换版本 |
-| `production-preflight.sh` | 校验 runtime env、固定镜像、Compose、migration、PDF、健康与目标身份 | 默认只读；`--runtime` 仍只核对 |
-| `release-artifact-bundle.mjs` | 从 clean committed archive 构建一次 `linux/amd64` Server/Web 制品、SBOM 与 manifest | `--execute` 才构建本机制品 |
-| `release-artifact-verify.mjs` | 校验 manifest、SBOM、image tar 与内置 release identity | 默认只读；`--load` 会加载本地镜像 |
-| `local-release-rehearsal.mjs` | 用同一不可变 bytes 在一次性环境完成 migration、health/ready、登录、PDF、备份恢复与零残留 | `--execute` 才启动隔离环境 |
-| `promotion-controller.mjs` | 校验 v2 七资产、rehearsal、即时 target preflight，创建 ready operation | 不写目标 |
-| `promotion-executor.mjs` | 执行已确认的固定 target promotion 并读回公网 exact SHA | 写单一目标；失败按 operation 回滚 |
-| `rollback-controller.mjs` | 校验旧 manifest、migration 与客户配置兼容性 | 不写目标 |
-| `rollback-executor.mjs` | 回滚 Compose / 公网入口到兼容旧版本 | 不 down migration，不自动恢复数据库 |
-| `database-rebuild-controller.mjs` | 为指定 target 生成备份、物理数据代和空基线资格计划 | 不停服务、不备份、不迁移 |
-| `database-rebuild-executor.mjs` | 执行 ready rebuild operation | 会停单一 target、备份并切换其 PostgreSQL 数据目录 |
-| `bootstrap-production-admin.sh` | 在已迁移 fresh 数据库创建首个管理员并读回 marker/audit/RBAC | 只允许 fresh target 的一次性确认窗口 |
-| `release-evidence-status.mjs` / `release-evidence-gate.mjs` | 汇总并校验 release evidence | 只读 |
+| 入口                                                        | 职责                                                                                               | 写入边界                                          |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `deployment-targets.mjs`                                    | 读取两个固定 target 的脱敏投影                                                                     | 只读                                              |
+| `target-preflight.mjs`                                      | 读回容量、Compose、端口、数据库、当前 SHA、锁、rollback point 与对应公网入口                       | 只读，不创建备份或切换版本                        |
+| `production-preflight.sh`                                   | 校验 runtime env、固定镜像、Compose、migration、PDF、健康与目标身份                                | 默认只读；`--runtime` 仍只核对                    |
+| `release-artifact-bundle.mjs`                               | 从 clean committed archive 构建一次 `linux/amd64` Server/Web 制品、SBOM 与 manifest                | `--execute` 才构建本机制品                        |
+| `release-artifact-verify.mjs`                               | 校验 manifest、SBOM、image tar 与内置 release identity                                             | 默认只读；`--load` 会加载本地镜像                 |
+| `local-release-rehearsal.mjs`                               | 用同一不可变 bytes 在一次性环境完成 migration、health/ready、登录、PDF、备份恢复与零残留           | `--execute` 才启动隔离环境                        |
+| `promotion-controller.mjs`                                  | 校验 v2 七资产、rehearsal、即时 target preflight；工作台在最终传输资格核对后才创建 ready operation | 不写目标                                          |
+| `promotion-executor.mjs`                                    | 执行已确认的固定 target promotion 并读回公网 exact SHA                                             | 写单一目标；失败按 operation 回滚                 |
+| `rollback-controller.mjs`                                   | 校验旧 manifest、migration 与客户配置兼容性                                                        | 不写目标                                          |
+| `rollback-executor.mjs`                                     | 回滚 Compose / 公网入口到兼容旧版本                                                                | 不 down migration，不自动恢复数据库               |
+| `database-rebuild-controller.mjs`                           | 为指定 target 生成备份、物理数据代和空基线资格计划                                                 | 不停服务、不备份、不迁移                          |
+| `database-rebuild-executor.mjs`                             | 执行 ready rebuild operation                                                                       | 会停单一 target、备份并切换其 PostgreSQL 数据目录 |
+| `bootstrap-production-admin.sh`                             | 在已迁移 fresh 数据库创建首个管理员并读回 marker/audit/RBAC                                        | 只允许 fresh target 的一次性确认窗口              |
+| `release-evidence-status.mjs` / `release-evidence-gate.mjs` | 汇总并校验 release evidence                                                                        | 只读                                              |
 
 所有浏览器动作只传 operation intent、固定 target、版本和确认串；浏览器不能传 repo、路径、SSH、env、shell、SQL、Docker 命令或凭据。
 
@@ -57,7 +57,7 @@ release pipeline 只复用同一 protected main push pipeline 的完整终态，
 
 GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，由 GitLab Provider 单独读取；它们不会被伪造成 operation。Codex 聊天、普通 SSH、手工排障和没有正式回执的动作也不会进入 operation store。
 
-同一动作、target、Exact-SHA、版本和发布输入只认领一个 operation；不同窗口的同一意图会合并。`failed / blocked` 只能显式建立父子重试链；`launching / running` 在 Bridge 重启后冻结为 `not_proven`，必须先读回目标，不能自动重试。数据库重建执行器只允许同一 operation、target、Exact-SHA、版本均匹配且通过合同校验的远端终态回执收敛这次冻结；该收敛不是重试，也不会再次写目标。
+同一动作、target、Exact-SHA、版本和发布输入只认领一个 operation；不同窗口的同一意图会合并。`failed / blocked` 只能显式建立父子重试链；`launching / running` 在 Bridge 重启后冻结为 `not_proven`，必须先读回目标，不能自动重试。执行器子进程启动或过早退出时只把 4 KiB 以内的 stderr 转成 240 字符以内的脱敏诊断写入 operation，命令、参数、PID、凭据和真实路径仍不入库。数据库重建执行器只允许同一 operation、target、Exact-SHA、版本均匹配且通过合同校验的远端终态回执收敛这次冻结；该收敛不是重试，也不会再次写目标。
 
 `/__dev/delivery` 首屏显示最近 operation、最严重阻断、最后核对时间和完整记录入口；`/__dev/version-center?view=history` 读取同一持久化 store，并明确显示加载、正常、空、失败和过期状态。
 
@@ -65,7 +65,7 @@ GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，
 
 两个 target 的 promotion、rollback 和首次初始化使用固定 SSH 与 `rsync 3.x`，但 Mac 只向 operation 专属 `incoming` 目录传输 operation manifest、固定执行脚本、`target-release-fetch.json` 和控制校验表；legacy v1 代码回滚额外传输小型 `checksums.sha256` 作为既有目标缓存的校验目录。Mac 可以下载并校验有大小上限的 `checksums.sha256`、artifact/release/rehearsal JSON 与 fetch descriptor 控制证据，但 SBOM、两个 image tar 与 `source.tar` 大型 payload 不经过 Mac；R640 目标固定把 `gitlab.saurick.me` 解析到同机内网地址，经系统信任 TLS 直接从 `plush-release` 与 `plush-release-source` Package 取得，并在物化前逐项核对名称、大小、SHA-256、v2 manifest、rehearsal、source binding 和 image content ID。专用 `read_package_registry` deploy token 只保存在工作台进程内存，并且只注入确实可能冷取件的唯一 executor 子进程；子进程在任何预检前立即从环境移除，再仅通过唯一 SSH 标准输入进入已加锁的远端执行器。它不进入其他子进程、参数、控制包或目标 secret 文件；下载期间只允许存在 `0600` curl 配置，结束或失败清理后必须证明不存在。不存在静默回退到 Mac 大文件中转的路径。
 
-正式 target cache v2 精确包含七资产与 `source.tar` 八项；legacy cache 只允许既有 v1 代码回滚按目标精确命中，缺失即阻断，禁止用于 promotion、远端补取、迁入 v2 或新建 legacy cache。operation 私有 incoming 可以包含控制文件，但只有逐项复核过的 payload 才能被物化或提升为对应正式 cache。允许按 manifest SHA、checksum、registry digest、Docker content ID 和镜像内完整 `GIT_SHA` 命中 package/image cache；正式 cache 不完整、存在额外项或符号链接，或任一 payload 身份不一致时失败关闭。首次升级还要在 target write 前证明当前运行 SHA 的 direct-fetch 或同目标 legacy 回滚输入可用，避免新版本成功后才发现旧版本不可回取。
+正式 target cache v2 精确包含七资产与 `source.tar` 八项；legacy cache 只允许既有 v1 代码回滚按目标精确命中，缺失即阻断，禁止用于 promotion、远端补取、迁入 v2 或新建 legacy cache。operation 私有 incoming 可以包含控制文件，但只有逐项复核过的 payload 才能被物化或提升为对应正式 cache。允许按 manifest SHA、checksum、registry digest、Docker content ID 和镜像内完整 `GIT_SHA` 命中 package/image cache；正式 cache 不完整、存在额外项或符号链接，或任一 payload 身份不一致时失败关闭。工作台首次升级还要在 target write 前证明当前运行 SHA 的 direct-fetch 或同目标 legacy 回滚输入可用；这一核对完成前 operation 保持 `running`，只能从 `running` 直接进入最终 `ready / blocked`，避免新版本成功后才发现旧版本不可回取，也不暴露可误确认的中间 ready。
 
 即使命中缓存，migration、Compose、health、ready、业务 smoke 与对应公网 exact-SHA 仍完整执行。operation 分别记录 Mac 控制包字节/耗时、R640 内部取件期望与实际字节/耗时、校验与缓存命中，不把控制面等待伪装成制品传输。传输不使用 `--delete`，不全局 prune，不删除数据库、volume、env、证书、当前版本或规定回滚版本。
 

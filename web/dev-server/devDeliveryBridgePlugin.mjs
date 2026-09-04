@@ -53,6 +53,7 @@ const VERSION_PATTERN = /^[0-9A-Za-z](?:[0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$/u
 const IDEMPOTENCY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$/u
 const UUID_V4_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
+const MAX_EXECUTOR_STDERR_BYTES = 4 * 1024
 const OPERATION_PATH_PATTERN = new RegExp(
   `^${DEV_DELIVERY_API_PREFIX}/operations/([0-9a-f-]{36})$`,
   'u'
@@ -578,6 +579,27 @@ function providerIssue(message, provider = 'gitlab') {
     level: 'error',
     message,
   }
+}
+
+function safeExecutorDiagnostic(error) {
+  const raw = [error?.code, error?.message, error?.stderr]
+    .filter(Boolean)
+    .join(' ')
+  const sanitized = String(raw || 'executor ended without diagnostics')
+    .replace(/\b(?:Bearer|Basic)\s+\S+/giu, '<redacted-credential>')
+    .replace(
+      /\b(?:authorization|cookie|password|secret|token|api[_-]?key|private[_-]?key|dsn)\b(?:\s*[:=]\s*\S+)?/giu,
+      '<redacted-credential>'
+    )
+    .replace(/[a-z][a-z0-9+.-]*:\/\/[^\s]+/giu, '<redacted-url>')
+    .replace(
+      /\/(?:Users|home|builds|private|var|tmp)\/[^\s]+/gu,
+      '<redacted-path>'
+    )
+    .replace(/\s+/gu, ' ')
+    .trim()
+    .slice(0, 240)
+  return sanitized || 'executor ended without diagnostics'
 }
 
 export function createConfiguredDeliveryProvider({
@@ -1193,6 +1215,69 @@ export function createDevDeliveryService({
     if (candidateTransport.mode !== 'gitlab_internal_or_target_cache') {
       throw new Error('promotion candidate requires the v2 target transport')
     }
+    const qualifyEligiblePlan = async ({ plan, promotionMode }) => {
+      if (promotionMode !== 'upgrade') {
+        return {
+          status: 'ready',
+          message:
+            'promotion candidate transport is verified; explicit confirmation is required',
+        }
+      }
+      const currentGitSha = plan?.ancestry?.currentGitSha
+      if (!SHA_PATTERN.test(String(currentGitSha || ''))) {
+        return {
+          status: 'blocked',
+          message:
+            'promotion is blocked because the current release transport identity is unavailable',
+          issues: [
+            {
+              code: 'promotion_current_release_transport_unavailable',
+              level: 'error',
+              message:
+                '当前运行版本缺少可验证的目标直取回滚身份；未启动目标写操作',
+            },
+          ],
+        }
+      }
+      try {
+        const currentDownload = await Promise.resolve(
+          readDeliveryProvider.downloadReleaseControl(
+            currentGitSha,
+            releaseControlDirectory(root, currentGitSha)
+          )
+        )
+        const currentTransport = await qualifyReleaseTransport(
+          currentDownload,
+          payload.target
+        )
+        return {
+          status: 'ready',
+          message:
+            'promotion and current-release rollback transports are verified; explicit confirmation is required',
+          metadata: {
+            currentGitSha,
+            currentReleaseTransportVerified: true,
+            currentReleaseTransportMode: currentTransport.mode,
+            currentReleaseManifestSha256: currentTransport.manifestSha256,
+            currentReleaseCacheFingerprint: currentTransport.cacheFingerprint,
+          },
+        }
+      } catch {
+        return {
+          status: 'blocked',
+          message:
+            'promotion is blocked because the current release cannot be fetched for rollback',
+          issues: [
+            {
+              code: 'promotion_current_release_transport_unavailable',
+              level: 'error',
+              message:
+                '当前运行版本缺少完整的目标直取回滚制品；未启动目标写操作',
+            },
+          ],
+        }
+      }
+    }
     const result = await Promise.resolve(
       preparePromotionAction(
         {
@@ -1206,95 +1291,47 @@ export function createDevDeliveryService({
           operationStore: store,
           retryOfOperationId,
         },
-        { runPreflight, runInitializationPreflight, now }
+        {
+          runPreflight,
+          runInitializationPreflight,
+          qualifyEligiblePlan,
+          now,
+        }
       )
     )
     let preparedOperation = result.operation
     if (
       preparedOperation.status === 'ready' &&
-      preparedOperation.metadata?.promotionMode === 'upgrade'
+      preparedOperation.metadata?.promotionMode === 'upgrade' &&
+      preparedOperation.metadata?.currentReleaseTransportVerified !== true
     ) {
-      const currentGitSha = result.plan?.ancestry?.currentGitSha
-      if (!SHA_PATTERN.test(String(currentGitSha || ''))) {
-        preparedOperation = transitionDeliveryOperation(
-          store,
-          preparedOperation.id,
-          {
-            status: 'blocked',
-            message:
-              'promotion is blocked because the current release transport identity is unavailable',
-            issues: [
-              {
-                code: 'promotion_current_release_transport_unavailable',
-                level: 'error',
-                message:
-                  '当前运行版本缺少可验证的目标直取回滚身份；未启动目标写操作',
-              },
-            ],
-            now: now(),
-          }
-        )
-      } else {
-        preparedOperation = transitionDeliveryOperation(
-          store,
-          preparedOperation.id,
-          {
-            status: 'running',
-            message: 'verifying the current release rollback transport',
-            now: now(),
-          }
-        )
-        try {
-          const currentDownload = await Promise.resolve(
-            readDeliveryProvider.downloadReleaseControl(
-              currentGitSha,
-              releaseControlDirectory(root, currentGitSha)
-            )
-          )
-          const currentTransport = await qualifyReleaseTransport(
-            currentDownload,
-            payload.target
-          )
-          preparedOperation = transitionDeliveryOperation(
-            store,
-            preparedOperation.id,
-            {
-              status: 'ready',
-              message:
-                'promotion and current-release rollback transports are verified; explicit confirmation is required',
-              metadata: {
-                ...preparedOperation.metadata,
-                currentGitSha,
-                currentReleaseTransportVerified: true,
-                currentReleaseTransportMode: currentTransport.mode,
-                currentReleaseManifestSha256: currentTransport.manifestSha256,
-                currentReleaseCacheFingerprint:
-                  currentTransport.cacheFingerprint,
-              },
-              now: now(),
-            }
-          )
-        } catch {
-          preparedOperation = transitionDeliveryOperation(
-            store,
-            preparedOperation.id,
-            {
-              status: 'blocked',
-              message:
-                'promotion is blocked because the current release cannot be fetched for rollback',
-              issues: [
-                {
-                  code: 'promotion_current_release_transport_unavailable',
-                  level: 'error',
-                  message:
-                    '当前运行版本缺少完整的目标直取回滚制品；未启动目标写操作',
-                },
-              ],
-              now: now(),
-            }
-          )
+      preparedOperation = transitionDeliveryOperation(
+        store,
+        preparedOperation.id,
+        {
+          status: 'running',
+          message: 'verifying the current release rollback transport',
+          now: now(),
         }
-      }
+      )
+      const qualification = await qualifyEligiblePlan({
+        plan: result.plan,
+        promotionMode: 'upgrade',
+      })
+      preparedOperation = transitionDeliveryOperation(
+        store,
+        preparedOperation.id,
+        {
+          status: qualification.status,
+          message: qualification.message,
+          issues: qualification.issues,
+          metadata: {
+            ...preparedOperation.metadata,
+            ...(qualification.metadata || {}),
+          },
+          now: now(),
+        }
+      )
     }
     preflightCache.delete(payload.target)
     return {
@@ -1530,7 +1567,7 @@ export function createDevDeliveryService({
           {
             code: executionFailure.startCode,
             level: 'error',
-            message: executionFailure.startIssue,
+            message: `${executionFailure.startIssue}；诊断：${safeExecutorDiagnostic(error)}`,
           },
         ],
         now: now(),
@@ -1545,7 +1582,7 @@ export function createDevDeliveryService({
           {
             code: executionFailure.unknownCode,
             level: 'error',
-            message: executionFailure.unknownIssue,
+            message: `${executionFailure.unknownIssue}；诊断：${safeExecutorDiagnostic(error)}`,
           },
         ],
         now: now(),
@@ -1555,6 +1592,45 @@ export function createDevDeliveryService({
     if (error) {
       throw error
     }
+  }
+
+  function watchSpawnedTargetAction(operationId, child) {
+    children.set(operationId, child)
+    let capturedStderr = Buffer.alloc(0)
+    let stderrTruncated = false
+    child.stderr?.on('data', (value) => {
+      const chunk = Buffer.isBuffer(value) ? value : Buffer.from(String(value))
+      const remaining = MAX_EXECUTOR_STDERR_BYTES - capturedStderr.length
+      if (remaining <= 0) {
+        stderrTruncated = true
+        return
+      }
+      capturedStderr = Buffer.concat([
+        capturedStderr,
+        chunk.subarray(0, remaining),
+      ])
+      if (chunk.length > remaining) stderrTruncated = true
+    })
+    let finished = false
+    const finish = (error) => {
+      if (finished) return
+      finished = true
+      try {
+        finishSpawnedTargetAction(operationId, error)
+      } catch {
+        // The operation store remains the only user-visible outcome source.
+      }
+    }
+    child.once('error', finish)
+    child.once('close', (status, signal) => {
+      const stderr = capturedStderr.toString('utf8')
+      const suffix = stderrTruncated ? ' [truncated]' : ''
+      finish(
+        new Error(
+          `executor_exit=${Number.isInteger(status) ? status : 'unknown'} signal=${signal || 'none'}${stderr ? ` stderr=${stderr}${suffix}` : ''}`
+        )
+      )
+    })
   }
 
   async function executeFixedPromotion(payload) {
@@ -1658,26 +1734,14 @@ export function createDevDeliveryService({
           cwd: root,
           env: executorEnvironment({ targetFetch: true }),
           detached: false,
-          stdio: 'ignore',
+          stdio: ['ignore', 'ignore', 'pipe'],
         }
       )
     } catch (error) {
       finishSpawnedTargetAction(operation.id, error)
       throw error
     }
-    children.set(operation.id, child)
-    let finished = false
-    const finish = (error) => {
-      if (finished) return
-      finished = true
-      try {
-        finishSpawnedTargetAction(operation.id, error)
-      } catch {
-        // The operation store remains the only user-visible outcome source.
-      }
-    }
-    child.once('error', finish)
-    child.once('close', () => finish())
+    watchSpawnedTargetAction(operation.id, child)
     return {
       accepted: true,
       operation: presentOperation(operation),
@@ -1793,26 +1857,14 @@ export function createDevDeliveryService({
           cwd: root,
           env: rollbackChildEnv,
           detached: false,
-          stdio: 'ignore',
+          stdio: ['ignore', 'ignore', 'pipe'],
         }
       )
     } catch (error) {
       finishSpawnedTargetAction(operation.id, error)
       throw error
     }
-    children.set(operation.id, child)
-    let finished = false
-    const finish = (error) => {
-      if (finished) return
-      finished = true
-      try {
-        finishSpawnedTargetAction(operation.id, error)
-      } catch {
-        // The operation store remains the only user-visible outcome source.
-      }
-    }
-    child.once('error', finish)
-    child.once('close', () => finish())
+    watchSpawnedTargetAction(operation.id, child)
     return {
       accepted: true,
       operation: presentOperation(operation),
@@ -1859,26 +1911,14 @@ export function createDevDeliveryService({
           cwd: root,
           env: executorEnvironment(),
           detached: false,
-          stdio: 'ignore',
+          stdio: ['ignore', 'ignore', 'pipe'],
         }
       )
     } catch (error) {
       finishSpawnedTargetAction(operation.id, error)
       throw error
     }
-    children.set(operation.id, child)
-    let finished = false
-    const finish = (error) => {
-      if (finished) return
-      finished = true
-      try {
-        finishSpawnedTargetAction(operation.id, error)
-      } catch {
-        // The operation store remains the only user-visible outcome source.
-      }
-    }
-    child.once('error', finish)
-    child.once('close', () => finish())
+    watchSpawnedTargetAction(operation.id, child)
     return {
       accepted: true,
       operation: presentOperation(operation),

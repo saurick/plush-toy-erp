@@ -94,6 +94,7 @@ export async function preparePromotion(
     runPreflight = runTargetPreflight,
     runInitializationPreflight = runTargetInitializationPreflight,
     classifyRelation = classifyGitAncestryRelation,
+    qualifyEligiblePlan = null,
     now = () => new Date().toISOString(),
   } = {},
 ) {
@@ -224,17 +225,56 @@ export async function preparePromotion(
         now: now(),
       });
     } else {
-      operation = transitionDeliveryOperation(store, operation.id, {
-        status: "ready",
-        message:
-          "promotion plan is eligible; explicit confirmation is required",
-        metadata: {
-          ...operation.metadata,
-          promotionFingerprint: plan.fingerprint,
-          promotionMode,
-        },
-        now: now(),
-      });
+      if (
+        qualifyEligiblePlan !== null &&
+        typeof qualifyEligiblePlan !== "function"
+      ) {
+        throw new Error("promotion readiness qualifier is invalid");
+      }
+      const qualification = qualifyEligiblePlan
+        ? await qualifyEligiblePlan({
+            operation,
+            plan,
+            promotionMode,
+            releaseManifest,
+          })
+        : { status: "ready" };
+      if (qualification?.status === "ready") {
+        operation = transitionDeliveryOperation(store, operation.id, {
+          status: "ready",
+          message:
+            qualification?.message ||
+            "promotion plan is eligible; explicit confirmation is required",
+          metadata: {
+            ...operation.metadata,
+            ...(qualification?.metadata || {}),
+            promotionFingerprint: plan.fingerprint,
+            promotionMode,
+          },
+          now: now(),
+        });
+      } else if (
+        qualification.status === "blocked" &&
+        Array.isArray(qualification.issues) &&
+        qualification.issues.length > 0
+      ) {
+        operation = transitionDeliveryOperation(store, operation.id, {
+          status: "blocked",
+          message:
+            qualification.message ||
+            "promotion is blocked by final readiness qualification",
+          issues: qualification.issues,
+          metadata: {
+            ...operation.metadata,
+            ...(qualification.metadata || {}),
+            promotionFingerprint: plan.fingerprint,
+            promotionMode,
+          },
+          now: now(),
+        });
+      } else {
+        throw new Error("promotion readiness qualification is invalid");
+      }
     }
     return {
       schemaVersion: "plush.promotion-controller/v1",

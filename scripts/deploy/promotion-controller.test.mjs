@@ -16,7 +16,10 @@ import {
   preparePromotion,
   readPromotionPlan,
 } from "./promotion-controller.mjs";
-import { resolveDeliveryOperationStore } from "./delivery-operation-store.mjs";
+import {
+  readDeliveryOperation,
+  resolveDeliveryOperationStore,
+} from "./delivery-operation-store.mjs";
 import { releaseManifestV2Fixture } from "./release-catalog-test-fixtures.mjs";
 
 const SHA = "a".repeat(40);
@@ -294,6 +297,51 @@ test("promotion preparation awaits one read-only preflight and becomes ready", a
   assert.equal(
     readPromotionPlan(data.store, first.operation.id).status,
     "eligible",
+  );
+});
+
+test("final eligibility qualification completes before ready is persisted", async (t) => {
+  const data = fixture(t);
+  let observedStatus = "";
+  const report = await preparePromotion(
+    {
+      repoRoot: data.root,
+      releaseManifestPath: data.releaseManifestPath,
+      targetKey: "demo-133",
+      idempotencyKey: `${IDEMPOTENCY_KEY}:final-qualification`,
+      operationStore: data.store,
+    },
+    {
+      classifyRelation,
+      runPreflight: () => targetPreflight(false),
+      qualifyEligiblePlan: async ({ operation, plan, promotionMode }) => {
+        const current = readDeliveryOperation(data.store, operation.id);
+        observedStatus = current.status;
+        assert.equal(promotionMode, "upgrade");
+        assert.equal(plan.status, "eligible");
+        assert.deepEqual(
+          current.events.map((event) => event.status),
+          ["queued", "running"],
+        );
+        return {
+          status: "ready",
+          message:
+            "promotion and current-release rollback transports are verified; explicit confirmation is required",
+          metadata: {
+            currentGitSha: plan.ancestry.currentGitSha,
+            currentReleaseTransportVerified: true,
+          },
+        };
+      },
+    },
+  );
+
+  assert.equal(observedStatus, "running");
+  assert.equal(report.operation.status, "ready");
+  assert.equal(report.operation.metadata.currentReleaseTransportVerified, true);
+  assert.deepEqual(
+    report.operation.events.map((event) => event.status),
+    ["queued", "running", "ready"],
   );
 });
 

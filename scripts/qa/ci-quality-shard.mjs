@@ -346,19 +346,10 @@ export async function runCiQualityShard({
       );
     }
     if (shard === "security") {
-      await runProcess(
-        "pnpm",
-        [
-          "--dir",
-          "web",
-          "audit",
-          "--prod",
-          "--audit-level",
-          "high",
-          "--registry=https://registry.npmjs.org",
-        ],
-        { cwd: root, env: childEnv },
-      );
+      await runProcess("node", ["scripts/qa/pnpm-audit-retry.mjs"], {
+        cwd: root,
+        env: childEnv,
+      });
       invariants.dependencyAudit = "passed";
     }
     if (shard === "node") {
