@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
@@ -44,6 +44,12 @@ const publish = workflow.jobs.publish;
 const validateRuns = validate.steps.map((step) => step.run || "").join("\n");
 const strictRuns = strict.steps.map((step) => step.run || "").join("\n");
 const publishRuns = publish.steps.map((step) => step.run || "").join("\n");
+
+test("GitHub keeps no automatic repository CI workflow", () => {
+  const workflowsDirectory = path.join(ROOT, ".github/workflows");
+  assert.equal(existsSync(path.join(workflowsDirectory, "ci.yml")), false);
+  assert.deepEqual(readdirSync(workflowsDirectory).sort(), ["release.yml"]);
+});
 
 test("release is manual, globally serialized and split by permission boundary", () => {
   assert.equal(workflow.name, "Emergency Immutable Release (GitHub)");

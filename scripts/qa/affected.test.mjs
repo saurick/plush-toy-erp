@@ -170,12 +170,12 @@ test("affected: non-public customer config binary selects the privacy boundary",
   assert.equal(plan.maxAffectedScope, "T6");
 });
 
-test("affected: CI workflow changes run the repository CI contract", () => {
+test("affected: removed GitHub CI workflow runs the remaining workflow contract", () => {
   const plan = buildAffectedPlan([".github/workflows/ci.yml"], { root: ROOT });
 
   assert(
     plan.commands.some((item) =>
-      item.args.includes("scripts/qa/ci-workflow.test.mjs"),
+      item.args.includes("scripts/qa/release-workflow.test.mjs"),
     ),
   );
   assert(plan.followUps.some((item) => item.id === "remote-ci-enforcement"));
@@ -205,12 +205,6 @@ test("affected: release workflow changes run the immutable release contract", ()
     plan.commands.some((item) =>
       item.args.includes("scripts/qa/release-workflow.test.mjs"),
     ),
-  );
-  assert.equal(
-    plan.commands.some((item) =>
-      item.args.includes("scripts/qa/ci-workflow.test.mjs"),
-    ),
-    false,
   );
   assert(plan.followUps.some((item) => item.id === "remote-ci-enforcement"));
   assert.equal(plan.localGate, "focused");
@@ -687,14 +681,14 @@ test("affected: populated upgrade fixture runs the static PostgreSQL gate contra
   }
 });
 
-test("affected: CI YAML parser changes rerun the structural workflow contract", () => {
+test("affected: workflow YAML parser changes rerun the emergency release contract", () => {
   const plan = buildAffectedPlan(["scripts/qa/ci-workflow-yaml-check.go"], {
     root: ROOT,
   });
 
   assert(
     plan.commands.some((item) =>
-      item.args.includes("scripts/qa/ci-workflow.test.mjs"),
+      item.args.includes("scripts/qa/release-workflow.test.mjs"),
     ),
   );
   assert.equal(ids(plan).includes("full"), false);

@@ -622,16 +622,12 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
     }
 
     if (file.startsWith(".github/workflows/")) {
-      directTests.add(
-        file === ".github/workflows/release.yml"
-          ? "scripts/qa/release-workflow.test.mjs"
-          : "scripts/qa/ci-workflow.test.mjs",
-      );
+      directTests.add("scripts/qa/release-workflow.test.mjs");
       addFollowUp(
         state,
         "remote-ci-enforcement",
         "T8",
-        "确认 GitHub workflow 仅用于镜像审查或显式应急回退，且未与 GitLab 主链重复执行发布。仓库 workflow 不能替代远端镜像规则证据。",
+        "确认 GitHub 只保留显式应急发布 workflow，main 镜像不会重复运行 CI，且未与 GitLab 主链并行发布。仓库 workflow 不能替代远端镜像规则证据。",
         file,
       );
       continue;
@@ -872,7 +868,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
     }
 
     if (file === "scripts/qa/ci-workflow-yaml-check.go") {
-      directTests.add("scripts/qa/ci-workflow.test.mjs");
+      directTests.add("scripts/qa/release-workflow.test.mjs");
       continue;
     }
 

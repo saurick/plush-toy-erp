@@ -6,7 +6,7 @@
 
 **R640 GitLab 代码真源与 CI/CD + 独立 KVM Runner VM + GitHub 单向 GPT Review 镜像 + GHCR digest 镜像 + GitLab Release 可移植制品 + 本地 loopback Bridge + 固定目标 operation。**
 
-GitLab 和 GitHub 不并列承担 main CI。GitLab 负责 protected main、merge request、七分片 exact-SHA aggregate、`CI Gate`、Generic Package 与 Release；GitHub main 只接收 push mirror，另保留经过独立授权的 `review/gpt/**` 审查快照、审查 CI 和明确应急 release。工作台读取 GitLab 证据，不复制一套 CI 状态机。
+GitLab 独立承担 main CI。GitLab 负责 protected main、merge request、七分片 exact-SHA aggregate、`CI Gate`、Generic Package 与 Release；GitHub main 只接收 protected-main push mirror，供 GPT 审查和外部只读浏览，并保留明确应急 release，不运行仓库 CI。工作台读取 GitLab 证据，不复制一套 CI 状态机。
 
 R640 GitLab、KVM Runner、公网入口、protected main 和 mirror 已是实际主链，但仓库定义和历史绿灯都不能代替当前读回。每次结论仍分别绑定当前 pipeline/job、CI evidence Package、Release Package、Runner 配置、backup/restore、目标 operation 与 UAT。
 
@@ -94,13 +94,13 @@ Generic Package version 与 Release tag 固定为 `artifact-<40sha>`。重试时
 
 `scripts/deploy/github-delivery-provider.mjs` 继续读取 GitHub 历史/应急 Release，并把 v1 六资产投影为只读、可回滚但不可用于显式版本提升（Explicit Promotion）。当前 GitHub emergency workflow 在 checkout、registry 登录、构建和上传前固定失败关闭；只有未来完整支持 canonical v2 七资产与同一演练回执后，才能另行恢复写入。浏览器不知道 token，也不能选择 Provider。
 
-GitLab Jobs API 的 job `duration` 和 `queued_duration` 是运行与等待真源。工作台读取当前流水线与最近 20 次普通 push CI 的全部 job，同名重试保留最新 attempt 并单列重试次数；页面只派生中位数、近似 P95、失败与排队趋势，不另存一份 CI 历史库。GitLab 未提供 step timing 时继续返回空 steps，不推算或伪造 GitHub 式 step timing。GitHub 历史/应急运行仍可按原合同展示。
+GitLab Jobs API 的 job `duration` 和 `queued_duration` 是运行与等待真源。工作台读取当前流水线与最近 20 次普通 push CI 的全部 job，同名重试保留最新 attempt 并单列重试次数；页面只派生中位数、近似 P95、失败与排队趋势，不另存一份 CI 历史库。GitLab 未提供 step timing 时继续返回空 steps，不推算或伪造 GitHub 式 step timing。显式选择 fallback Provider 时只展示 GitHub 应急 release 运行，不再把历史审查 CI 当作当前流水线证据。
 
 ## GitHub 单向镜像与 GPT Review
 
-GitLab 项目使用 push mirror 将 protected main 同步到 `github.com/saurick/plush-toy-erp`。GitHub main 禁止人工直接更新；镜像凭据使用专用最小权限 deploy key/token。GitLab CE 不用受保护审查分支换取额外镜像：需要 GPT 行级审查时，由 clean main 经过既有 review receipt 和单独 push 授权，显式推到 GitHub `review/gpt`，审查完成后关闭 Draft PR 而不从 GitHub 合并 main。
+GitLab 项目使用 push mirror 将 protected main 同步到 `github.com/saurick/plush-toy-erp`。GitHub main 禁止人工直接更新；镜像凭据使用专用最小权限 deploy key/token。仓库不维护 GitHub 审查分支或审查 CI。需要 GPT 审查时，先让 GitLab `main` 的 exact SHA 通过正式 `CI Gate` 并镜像，再按该次推送前后的 base/head SHA 审查 GitHub `main` 提交差异。
 
-`.github/workflows/ci.yml` 只响应 pull request、`review/gpt/**` 和手工运行，不响应 main mirror push，也不签发 canonical main exact-SHA terminal。`.github/workflows/release.yml` 是手工应急 release；只有 GitLab 主链不可用、操作人明确切换 Provider 且确认没有并行发布时才可运行。
+GitHub 不保留仓库 CI workflow；历史 Actions 运行只作审计，不能证明当前候选。`.github/workflows/release.yml` 是手工应急 release；只有 GitLab 主链不可用、操作人明确切换 Provider 且确认没有并行发布时才可运行。
 
 GPT Review 的 finding 是审查输入，不是仓库事实。修复仍回到 GitLab main 主链，经正式测试、commit/push 授权和 pipeline 证明。
 
@@ -165,7 +165,7 @@ GitLab 升级固定镜像 digest，遵循官方逐版本路径。升级前固定
 
 - 不让 R640 GitLab 容器兼任 Runner。
 - 不给 Runner VM 挂 R640 宿主 Docker socket。
-- 不同时运行 GitLab 与 GitHub main CI/release。
+- 不同时运行 GitLab release 与 GitHub emergency release。
 - 不在 133 或客户 UAT 目标构建源码。
 - 不把 GitLab 改造成业务多租户、license、计费或客户工单系统。
 - 不因双环境复制 Product Core 或字段/流程真源。

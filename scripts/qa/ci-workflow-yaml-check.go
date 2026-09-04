@@ -12,7 +12,7 @@ import (
 
 func main() {
 	if len(os.Args) != 2 {
-		fmt.Fprintln(os.Stderr, "usage: go run ../scripts/qa/ci-workflow-yaml-check.go ../.github/workflows/ci.yml")
+		fmt.Fprintln(os.Stderr, "usage: go run ../scripts/qa/ci-workflow-yaml-check.go ../.github/workflows/release.yml")
 		os.Exit(2)
 	}
 

@@ -575,7 +575,6 @@ test("local receipt has one repository-owned issuer while full and CI stay real"
   const prePush = read("scripts/git-hooks/pre-push.sh");
   const preparePush = read("scripts/qa/prepare-push.sh");
   const receipt = read("scripts/qa/pre-push-receipt.mjs");
-  const ci = read(".github/workflows/ci.yml");
 
   assert.match(full, /SECRETS_STRICT=1 bash/u);
   assert.match(full, /GOVULNCHECK_STRICT=1 bash/u);
@@ -592,7 +591,7 @@ test("local receipt has one repository-owned issuer while full and CI stay real"
   assert.doesNotMatch(strict, /scripts\/qa\/govulncheck\.sh/u);
   assert.match(strict, /status=complete/u);
   assert.doesNotMatch(
-    `${full}\n${strict}\n${ci}`,
+    `${full}\n${strict}`,
     /pre-push-receipt|PRE_PUSH_RECEIPT/u,
   );
 
@@ -609,10 +608,7 @@ test("local receipt has one repository-owned issuer while full and CI stay real"
   assert.match(receipt, /SERVER_CI_REQUIRED_CONTRACT/u);
   assert.match(receipt, /profile: "server-ci"/u);
   assert.match(receipt, /serverCiRequired: gateDecision\.serverCiRequired/u);
-  assert.match(
-    receipt,
-    /reviewOnly \|\| initialGateDecision\.profile === "server-ci"/u,
-  );
+  assert.match(receipt, /initialGateDecision\.profile === "server-ci"/u);
   assert.match(
     receipt,
     /allowServerCi: receipt\?\.gate\?\.profile === "server-ci"/u,
@@ -632,11 +628,7 @@ test("local receipt has one repository-owned issuer while full and CI stay real"
   assert.match(receipt, /liveChecks: gateDecision\.liveChecks/u);
   assert.match(receipt, /stableStringify\(receipt\?\.gate\?\.liveChecks\)/u);
   assert.match(receipt, /SECRETS_STRICT: "1"/u);
-  assert.match(receipt, /REVIEW_PUSH_REMOTE_REF = "refs\/heads\/review\/gpt"/u);
-  assert.match(receipt, /reviewReceiptPath/u);
-  assert.match(receipt, /purpose: "review-only"/u);
-  assert.match(receipt, /deliveryEligible: false/u);
-  assert.match(receipt, /--review/u);
+  assert.doesNotMatch(receipt, /review\/gpt|review-only|--review/u);
   assert.doesNotMatch(receipt, /process\.env\.PRE_PUSH_RECEIPT_/u);
   assert.doesNotMatch(strict, /SKIP_GOVULNCHECK=1/u);
 });

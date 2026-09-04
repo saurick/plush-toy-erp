@@ -21,7 +21,7 @@
 - [x] exact-SHA terminal 与 release catalog 支持真实 `gitlab-ci` provenance，同时保留明确的 `github-actions` 应急 provenance。
 - [x] GitLab Provider：固定 URL/project/package/release/pipeline、受限下载根、token 服务端边界和 pipeline/job timing。
 - [x] Delivery Bridge 默认 GitLab，只有 `PLUSH_DELIVERY_PROVIDER=github` 才选择 GitHub fallback。
-- [x] GitHub CI 取消 main push，只保留 PR、`review/gpt/**` 和手工审查；GitHub emergency release 在完整接入 canonical v2 七资产与同一演练回执前，于任何 checkout、登录、构建或上传前失败关闭。
+- [x] GitHub 仓库 CI 与专用审查分支已移除；protected main 只接收 GitLab 单向镜像，GPT 审查读取目标提交范围。GitHub emergency release 在完整接入 canonical v2 七资产与同一演练回执前，于任何 checkout、登录、构建或上传前失败关闭。
 - [x] 质量工程页面分开展示当前 committed SHA 的 R640 普通 CI 与 Local dirty/本地回执；只有服务器 exact-SHA 证据可提升发布资格，版本中心只从 GitLab 的真实 pipeline、Release/Package 和 target operation 展示效能与交付状态。
 - [x] 性能证据区分 R640 宿主与 Runner guest，按冷/热缓存保存 job、关键路径、CPU/内存/IO 峰值、p50、波动和近似 p95；阶段目标不是停止线，资源仍有余量时继续提速且不降低覆盖、隔离、清理或 fail-closed。
 - [x] Runner VM vCPU、内存和磁盘由 `runner-vm.sh` 显式参数化；唯一槽位参数 `RUNNER_CONCURRENT_SLOTS` 只在 `runner-capacity.env` 保存，并由同一个 `runner-capacity.sh` 管理旧值、idle、锁、服务读回和回滚。DAG 按实际就绪状态使用该全局安全上限；protected main 自然 push 自动取消旧的可中断 Pipeline，重资源 lane 与 Job 内串行合同不变。
@@ -37,7 +37,7 @@
 2. 对 `.gitlab-ci.yml`、Compose、cloud-init 和 Shell 脚本做 YAML/Shell 静态检查；不执行安装、备份或远端命令。
 3. 运行 `git diff --check` 和精确变更审查，确认没有触碰外部脏路径、generated path、schema/migration 或生产配置。
 4. 根据 affected plan 判断是否需要更高成本验证。full、strict、完整 Style L1 或真实浏览器门禁仍需按测试治理另行点名授权。
-5. commit、GitLab/GitHub push、发布和目标部署继续按当前用户授权范围分层执行；一层完成不自动推定后一层。
+5. commit、GitLab push、GitHub mirror、发布和目标部署继续按各自合同与当前授权边界分层执行；一层完成不自动推定后一层。
 
 ## GitLab 部署前置证据
 
@@ -60,7 +60,7 @@
 4. 创建私有项目 `saurick/plush-toy-erp`，保护 main、禁止 force push，要求 merge pipeline 成功并以 `CI Gate` 作为稳定汇总 job。
 5. 创建 protected `release` environment 和三项最小权限 protected variables。
 6. 用唯一 `runner-vm.sh` 显式传入 VM 资源与独立槽位参数并渲染 cloud-init；完成后通过 `0600` 一次性 token 文件注册 locked project runner，读回动态资源、`concurrent=limit`、tags 与 untagged=false。
-7. 配置 GitLab push mirror 到 GitHub，只同步 protected main；GitHub main 禁止直接更新。另验证经过独立授权的 `review/gpt` 快照使用单独 GitHub remote，不成为第二条 main 写入链。
+7. 配置 GitLab push mirror 到 GitHub，只同步 protected main；GitHub main 禁止直接更新，仓库不配置 GitHub CI 或专用审查分支。
 8. 在阿里云备份旧 vhost，切换 `gitlab.saurick.me -> 18226`，完成 Nginx config test、TLS、health 和登录读回。
 9. 运行非发布 MR/main pipeline，核对 `CI Gate`、缓存、一次性 PostgreSQL 清理、Runner VM 与 R640 宿主隔离。
 10. 用合法正式版本运行 release pipeline，核对普通 push CI terminal 复用、单次 candidate build、同 bytes rehearsal、v2 manifest、GHCR digest、含同一 `release-rehearsal.json` 的七资产 package、GitLab Release 和工作台读取。
@@ -71,9 +71,8 @@
 ## GitHub 与 GPT Review 验收
 
 - GitHub main SHA 与 GitLab main 一致，mirror 方向只有 GitLab → GitHub。
-- GitHub main push 不启动 `GitHub Review Mirror CI`。
-- 经过 `prepare-push.sh --review --remote github` 和单独 push 授权的 `review/gpt/**` 或 Draft PR 可以启动审查 CI，但结果不冒充 GitLab `CI Gate`，也不从 GitHub 合并 main。
-- GPT Review 能读取目标 SHA；finding 返回仓库处理，不在 GitHub 直接形成第二条 main 写入链。
+- GitHub 仓库没有自动 CI workflow，main 镜像不重复执行 GitLab 已完成的质量门禁。
+- GPT Review 能按本次 GitLab push 前后的 base/head SHA 读取 GitHub main 提交差异；finding 返回仓库处理，不在 GitHub 直接形成第二条 main 写入链。
 - GitHub emergency release 当前固定在任何副作用前失败关闭；只有未来完整支持 canonical v2 七资产和同一演练回执后，fallback 演练才可另行评审。
 
 ## 工作台验收

@@ -1,4 +1,4 @@
 interface:
   display_name: "Plush Test Governance"
   short_description: "按改动影响面选择最小充分测试并准确说明验证与证据边界"
-  default_prompt: "Use $plush-test-governance 按用户目标和影响面选择最小充分验证；普通定向检查直接执行，高成本验证按名称一次确认；prepare-push 默认 affected，高风险或发布候选显式使用 --full，网页 GPT 审查快照使用不能进入 main/发布的 --review，并报告执行数、skip、未跑项与盲区。"
+  default_prompt: "Use $plush-test-governance 按用户目标和影响面选择最小充分验证；普通定向检查直接执行，高成本验证按名称确认；正式推送只走 GitLab origin/main，GitHub main 仅接收镜像且不运行仓库 CI，并准确报告执行数、skip、未跑项与盲区。"

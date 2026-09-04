@@ -42,7 +42,6 @@ const SHA256_DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/u;
 const MAX_GITHUB_OUTPUT_BYTES = 8 * 1024 * 1024;
 const MAX_RELEASE_DETAIL_BYTES = 512 * 1024;
 const TRACKED_WORKFLOWS = Object.freeze({
-  ".github/workflows/ci.yml": "ci",
   ".github/workflows/release.yml": "release",
 });
 const RUN_STATUSES = new Set([

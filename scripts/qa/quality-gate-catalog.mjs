@@ -121,7 +121,6 @@ export const QUALITY_GATE_CATALOG = Object.freeze([
     profiles: Object.freeze(["strict"]),
     sources: Object.freeze([
       ".gitlab-ci.yml",
-      ".github/workflows/ci.yml",
       ".github/workflows/release.yml",
       "scripts/deploy/source-archive-release-check.mjs",
     ]),

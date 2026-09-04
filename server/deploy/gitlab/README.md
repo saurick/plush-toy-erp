@@ -127,11 +127,11 @@ gitlab.saurick.me
 - 只镜像 protected branches，因此自动镜像只承载 protected main；
 - 使用 GitHub 专用 deploy key/token，不复用个人高权限凭据；
 - GitHub 禁止直接写 `main`，主分支变化只来自 GitLab push mirror；
-- 本地 remote 固定为 `origin=GitLab`、`github=GitHub`；需要 GPT Review 时，取得单独 push 授权后使用既有 `prepare-push.sh --review --remote github` 将同一 clean main SHA 推到 GitHub `review/gpt`，不把该审查 ref 设为 protected，也不从 GitHub 合并 main；
-- GitHub `GitHub Review Mirror CI` 只响应 PR、`review/gpt/**` 和手动运行，不响应镜像 main；
+- 本地 remote 固定为 `origin=GitLab`、`github=GitHub`；正式代码只推 GitLab `origin/main`，不从本地直接写 GitHub main，也不创建专用审查分支；
+- GitHub 不配置仓库 CI workflow，main 镜像不重复执行 GitLab 门禁；
 - GitHub `Emergency Immutable Release (GitHub)` 当前在 checkout、登录、构建或上传前固定失败关闭；只有未来完整支持 canonical v2 七资产与同一演练回执后才可另行恢复，且不得与 GitLab release pipeline 同时执行。
 
-GPT Review 读取 GitHub main 镜像或显式 `review/gpt` 快照即可；审查意见回到当前任务处理，GitHub 不成为字段、发布或部署真源。
+GPT Review 按本次 GitLab push 前后的 base/head SHA 读取 GitHub main 提交差异；审查意见回到当前任务处理，GitHub 不成为字段、发布或部署真源。
 
 ## 备份、恢复和升级
 

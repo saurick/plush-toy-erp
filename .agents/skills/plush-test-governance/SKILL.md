@@ -1,6 +1,6 @@
 ---
 name: plush-test-governance
-description: 项目测试治理（plush-toy-erp）。Use when choosing, running, reviewing, or explaining validation scope, T0-T8 levels, test shapes, browser checks, migrations, release evidence, or a review-only GPT/GitHub push snapshot.
+description: 项目测试治理（plush-toy-erp）。Use when choosing, running, reviewing, or explaining validation scope, T0-T8 levels, test shapes, browser checks, migrations, GitLab exact-SHA CI, release evidence, or mirrored GitHub review evidence.
 ---
 
 # Plush Test Governance
@@ -21,8 +21,7 @@ description: 项目测试治理（plush-toy-erp）。Use when choosing, running,
 2. 以用户目标和实际改动为边界选择最小充分验证；普通静态检查、同名测试和受影响模块验证直接执行。只有高成本门禁、真实数据写入、部署或其他外部动作需要在执行前明确范围、未跑项、停止条件和授权边界。
 3. 按实际风险选择验证：文档/Skill 做链接与合同检查；schema/migration 做生成、迁移和数据测试；领域/API/RBAC 做正常、边界、异常和权限；页面做 Web 与真实浏览器；发布做目标环境证据。
 4. 开发期先运行 `bash scripts/qa/affected.sh --plan`，确认计划和 required follow-up 后再使用 `--run`；优先同名测试、受影响模块和单链浏览器，不为普通改动机械运行全站。
-5. `full.sh`、`strict.sh`、Full Acceptance、全量 Style L1、全页面或全 PDF 回归必须在执行前按名称明确授权；同一候选可一次合并确认，不逐项往返，范围或候选变化后重新确认。“覆盖所有业务链场景”“一次做完”“提交并推送”等未点名高成本验证的宽泛表述不构成授权。`prepare-push.sh` 默认复算 clean HEAD 与真实 push range 的 affected 计划：计划能由自动命令闭合时签发 affected 回执；命中 full local gate、仍有 required follow-up 或作为发布候选时停止并要求显式 `--full`，不得静默升级。用户未指定分支而说“推送代码”时，目标默认为两阶段：先更新固定 `review/gpt`，网页 GPT 审查与 Codex 核对无有效阻断后，再把同一最终 HEAD 正式推到 `main`；不得把它解释为连续双推。用户明确指定 `main`、`review/gpt` 或“让 GPT 分析”时，只执行指定目标。候选因审查意见变化后必须先重新更新 `review/gpt`，最终 `main` 成功后不再重复推 review ref。用户明确说“提交推送代码让 GPT 分析”时，该句同时授权暂存并提交本轮可证明归属的相关改动，以及把形成的 clean `main` 只推到固定 `review/gpt`，不再逐步重复确认，也不得吸收无关脏路径。先 fetch；工作区干净且本地只落后时可用 fast-forward-only 同步 `origin/main`，不得生成 merge commit。随后使用固定 `main -> review/gpt` 的 `prepare-push.sh --review`；该授权不包含正式 `main`、发布、部署、merge commit、rebase 或 force，分叉、范围不清、活动 writer、GPT 结果无法读回或检查失败时停止，且不得把 review 回执用于其他 ref。
-   GitHub 审查快照的远端固定为 `github`，准备命令必须显式使用 `prepare-push.sh --review --remote github`，推送固定为 `git push github refs/heads/main:refs/heads/review/gpt`。审查通过后才对最终 HEAD 独立准备并推送 GitLab `origin/main`；同一收口流程覆盖两个远端，但不是未经审查的并行双推。
+5. `full.sh`、`strict.sh`、Full Acceptance、全量 Style L1、全页面或全 PDF 回归必须在执行前按名称明确授权；同一候选可一次合并确认，不逐项往返，范围或候选变化后重新确认。“覆盖所有业务链场景”“一次做完”“提交并推送”等未点名高成本验证的宽泛表述不构成授权。`prepare-push.sh` 默认复算 clean HEAD 与真实 push range 的 affected 计划：计划能由自动命令闭合时签发 affected 回执；命中 full local gate、仍有 required follow-up 或作为发布候选时停止并要求显式 `--full`，不得静默升级。用户明确授权推送但未指定远端时，只准备并推送 GitLab `origin/main`；GitHub `main` 只接受 GitLab protected-main 的同 SHA push mirror，不直接从本地更新，也不重复运行仓库 CI。先 fetch；工作区干净且本地只落后时可用 fast-forward-only 同步 `origin/main`，不得生成 merge commit。随后对最终 clean HEAD 使用普通 `prepare-push.sh`，推送后等待 R640 exact-SHA `CI Gate`。用户明确说“提交推送代码让 GPT 分析”时，该句同时授权本轮精确相关改动的 commit 与 GitLab `origin/main` push；GitLab CI 成功并镜像后，GPT 按 GitHub `main` 的目标提交范围做事后审查。只说“让 GPT 分析”不隐含 commit 或 push；可先审查当前本地 diff，或等已授权的正式推送完成后审查镜像。GPT finding 仍须回到当前仓库核对，必要修复形成新候选并重新走 GitLab main 门禁。
 6. 产品范围与 clean exact SHA 冻结后，同一候选只运行一轮匹配的 `prepare-push`；不要先手动重复同一 affected/full。高成本门禁失败即停止，不自动扩圈或重跑；只有影响生产正确性、安全、数据完整性、权限或可恢复发布的修复形成新候选后，才重新确认。fixture、mock、选择器、测试文案、开发工作台或证据展示问题若不使生产结论失效，列为后续事项。
 7. 对 `affected` 无法选择的生成命令、真实数据库、浏览器、migration 或发布检查，按计划显式补充；环境不具备时报告 `blocked` 或 `missing`，不要用另一类测试绿色代替。
 8. 记录实际命令、执行数、pass/fail/skip、证据环境和未覆盖项。缺 summary、`0 tests executed` 或意外 skip 一律不能写成通过。
@@ -39,7 +38,7 @@ description: 项目测试治理（plush-toy-erp）。Use when choosing, running,
 | 页面与样式 | 默认态、交互态、恢复态、相邻区域、长文本/异常数据和真实浏览器 |
 | Seed / Import / Config | 模拟与真实数据、dry-run、批次身份、readback、cleanup 和失败关闭 |
 
-`prepare-push.sh` 的 affected/full 分流、review-only 审查通道、`full.sh` 和 `strict.sh` 的当前编排以脚本为准。三类 push 回执都绑定 clean HEAD、真实 remote/ref range、gate/environment/TTL，并由 hook 实时复核逐 range secrets；review 回执额外标记 `deliveryEligible=false`，只允许固定 ref 且不执行 affected/full。本地绿色不等于已提交、已发布、恢复可用或客户验收。
+`prepare-push.sh` 的 affected/full/server-ci 分流、`full.sh` 和 `strict.sh` 的当前编排以脚本为准。push 回执绑定 clean HEAD、真实 remote/ref range、gate/environment/TTL，并由 hook 实时复核逐 range secrets。GitHub 镜像不运行仓库 CI，也不签发发布证据；本地绿色和 GitHub 可见提交都不等于 GitLab `CI Gate` 已成功、已发布、恢复可用或客户验收。
 
 ## 输出
 

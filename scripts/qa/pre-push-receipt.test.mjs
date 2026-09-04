@@ -26,8 +26,6 @@ import {
 import {
   PRE_PUSH_RECEIPT_TTL_MS,
   REMOTE_REF_QUERY_TIMEOUT_MS,
-  REVIEW_PUSH_LOCAL_REF,
-  REVIEW_PUSH_REMOTE_REF,
   environmentFingerprint,
   resolveReceiptState,
   runRemoteRefQueryWithRetry,
@@ -355,29 +353,6 @@ function runRealGitPush(fixture, { env = cleanEnvironment() } = {}) {
   });
 }
 
-function runRealGitReviewPush(fixture, { env = cleanEnvironment() } = {}) {
-  git(fixture.root, [
-    "config",
-    "core.hooksPath",
-    path.join(fixture.root, ".githooks"),
-  ]);
-  return spawnSync(
-    "git",
-    [
-      "push",
-      "--porcelain",
-      "origin",
-      `${REVIEW_PUSH_LOCAL_REF}:${REVIEW_PUSH_REMOTE_REF}`,
-    ],
-    {
-      cwd: fixture.root,
-      env,
-      encoding: "utf8",
-      maxBuffer: 32 * 1024 * 1024,
-    },
-  );
-}
-
 function gitStateFile(root, name) {
   return path.join(root, ".git", name);
 }
@@ -479,11 +454,27 @@ test("prepare wrapper exposes help without running full or creating receipt stat
     assert.match(result.stdout, /R640 exact-SHA GitLab CI/u);
     assert.match(result.stdout, /回执只授权普通非强制 push/u);
     assert.match(result.stdout, /terminal-success CI Gate/u);
+    assert.doesNotMatch(result.stdout, /--review|review\/gpt/u);
     assert.doesNotMatch(result.stdout, /计划可自动闭合时执行 affected/u);
     assert.equal(
       existsSync(gitStateFile(fixture.root, "full-ranges.txt")),
       false,
     );
+    assert.equal(
+      existsSync(path.join(fixture.root, ".git", "plush-qa")),
+      false,
+    );
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("removed review-only option fails closed", () => {
+  const fixture = createFixture();
+  try {
+    const result = runPrepare(fixture.root, ["--review"]);
+    assert.equal(result.status, 2, result.stderr || result.stdout);
+    assert.match(result.stderr, /reason=unknown_option --review/u);
     assert.equal(
       existsSync(path.join(fixture.root, ".git", "plush-qa")),
       false,
@@ -617,240 +608,6 @@ test("server-CI metadata is signed and recomputed by the hook", () => {
     );
   } finally {
     fixture.cleanup();
-  }
-});
-
-test("review-only preparation scans the main delta without opening delivery gates", () => {
-  const fixture = createFixture();
-  try {
-    const env = cleanEnvironment({ DISPOSABLE_DATABASE_BASE_URL: "" });
-    const prepared = runPrepare(fixture.root, ["--review"], env);
-    assert.equal(prepared.status, 0, prepared.stderr || prepared.stdout);
-    assert.match(
-      prepared.stdout,
-      /status=complete profile=review recommended_delivery_profile=full review_only=true/u,
-    );
-
-    const state = resolveReceiptState(fixture.root);
-    const receipt = JSON.parse(
-      readFileSync(state.reviewReceiptPath, "utf8"),
-    );
-    const expectedRange = `${fixture.remoteSha}..${fixture.localSha}`;
-    assert.equal(receipt.purpose, "review-only");
-    assert.equal(receipt.gate.profile, "review");
-    assert.equal(receipt.gate.recommendedProfile, "full");
-    assert.equal(receipt.gate.deliveryEligible, false);
-    assert.equal(receipt.push.review.baseSha, fixture.remoteSha);
-    assert.equal(receipt.push.review.deliveryEligible, false);
-    assert.equal(receipt.push.refs[0].remoteSha, ZERO_SHA);
-    assert.equal(receipt.push.refs[0].range, expectedRange);
-    assert.equal(receipt.push.aggregateRange, expectedRange);
-    assert.equal(existsSync(state.receiptPath), false);
-    assert.equal(existsSync(gitStateFile(fixture.root, "full-ranges.txt")), false);
-    assert.equal(
-      existsSync(gitStateFile(fixture.root, "affected-ranges.txt")),
-      false,
-    );
-    assert.deepEqual(
-      readLines(gitStateFile(fixture.root, "secret-ranges.txt")),
-      [expectedRange],
-    );
-
-    const mainPush = runHook(fixture, { env });
-    assert.equal(mainPush.status, 2, mainPush.stderr || mainPush.stdout);
-    assert.match(mainPush.stderr, /reason=receipt_missing/u);
-    assert.match(mainPush.stderr, /run=bash scripts\/qa\/prepare-push\.sh/u);
-
-    const reviewPush = runHook(fixture, {
-      env,
-      input: `${REVIEW_PUSH_LOCAL_REF} ${fixture.localSha} ${REVIEW_PUSH_REMOTE_REF} ${ZERO_SHA}\n`,
-    });
-    assert.equal(reviewPush.status, 0, reviewPush.stderr || reviewPush.stdout);
-    assert.match(reviewPush.stdout, /review_only=true/u);
-    assert.deepEqual(
-      readLines(gitStateFile(fixture.root, "secret-ranges.txt")),
-      [expectedRange, expectedRange],
-    );
-
-    const actualPush = runRealGitReviewPush(fixture, { env });
-    assert.equal(actualPush.status, 0, actualPush.stderr || actualPush.stdout);
-    assert.equal(
-      git(fixture.remote, ["rev-parse", REVIEW_PUSH_REMOTE_REF]),
-      fixture.localSha,
-    );
-    assert.deepEqual(
-      readLines(gitStateFile(fixture.root, "secret-ranges.txt")),
-      [expectedRange, expectedRange, expectedRange],
-    );
-  } finally {
-    fixture.cleanup();
-  }
-});
-
-test("an existing review ref advances only by fast-forward delta", () => {
-  const fixture = createFixture();
-  try {
-    git(fixture.root, [
-      "-c",
-      "core.hooksPath=/dev/null",
-      "push",
-      "--quiet",
-      "origin",
-      `${fixture.localSha}:${REVIEW_PUSH_REMOTE_REF}`,
-    ]);
-    const previousReviewSha = fixture.localSha;
-    writeFileSync(path.join(fixture.root, "tracked.txt"), "next review\n", "utf8");
-    fixture.localSha = commit(fixture.root, "next review snapshot");
-
-    const prepared = runPrepare(
-      fixture.root,
-      ["--review"],
-      cleanEnvironment({ DISPOSABLE_DATABASE_BASE_URL: "" }),
-    );
-    assert.equal(prepared.status, 0, prepared.stderr || prepared.stdout);
-    const state = resolveReceiptState(fixture.root);
-    const receipt = JSON.parse(
-      readFileSync(state.reviewReceiptPath, "utf8"),
-    );
-    assert.equal(receipt.push.refs[0].remoteSha, previousReviewSha);
-    assert.equal(
-      receipt.push.aggregateRange,
-      `${previousReviewSha}..${fixture.localSha}`,
-    );
-  } finally {
-    fixture.cleanup();
-  }
-});
-
-test("review mode rejects custom refs, delivery mixing, stale main, and divergence", () => {
-  {
-    const fixture = createFixture();
-    try {
-      for (const [args, reason] of [
-        [["--review", "--full"], "mutually_exclusive_options"],
-        [
-          [
-            "--review",
-            "--ref",
-            `${REVIEW_PUSH_LOCAL_REF}:${REVIEW_PUSH_REMOTE_REF}`,
-          ],
-          "review_ref_is_fixed",
-        ],
-        [
-          [
-            "--full",
-            "--ref",
-            `${REVIEW_PUSH_LOCAL_REF}:${REVIEW_PUSH_REMOTE_REF}`,
-          ],
-          "review_ref_requires_review_mode",
-        ],
-      ]) {
-        const result = runPrepare(fixture.root, args);
-        assert.equal(result.status, 2, result.stderr || result.stdout);
-        assert.match(result.stderr, new RegExp(`reason=${reason}`, "u"));
-      }
-      const invalidHook = runHook(fixture, {
-        input: `refs/heads/topic ${fixture.localSha} ${REVIEW_PUSH_REMOTE_REF} ${ZERO_SHA}\n`,
-      });
-      assert.equal(
-        invalidHook.status,
-        2,
-        invalidHook.stderr || invalidHook.stdout,
-      );
-      assert.match(invalidHook.stderr, /reason=invalid_review_push_shape/u);
-    } finally {
-      fixture.cleanup();
-    }
-  }
-
-  {
-    const fixture = createFixture();
-    try {
-      git(fixture.root, ["checkout", "-qb", "remote-main-ahead"]);
-      const remoteMainSha = commit(fixture.root, "remote main ahead", {
-        allowEmpty: true,
-      });
-      git(fixture.root, [
-        "-c",
-        "core.hooksPath=/dev/null",
-        "push",
-        "--quiet",
-        "origin",
-        `${remoteMainSha}:refs/heads/main`,
-      ]);
-      git(fixture.root, ["checkout", "-q", "main"]);
-      const prepared = runPrepare(fixture.root, ["--review"]);
-      assert.equal(prepared.status, 2, prepared.stderr || prepared.stdout);
-      assert.match(prepared.stderr, /reason=review_base_not_ancestor/u);
-    } finally {
-      fixture.cleanup();
-    }
-  }
-
-  {
-    const fixture = createFixture();
-    try {
-      git(fixture.root, [
-        "checkout",
-        "-qb",
-        "divergent-review",
-        fixture.remoteSha,
-      ]);
-      writeFileSync(
-        path.join(fixture.root, "divergent.txt"),
-        "divergent\n",
-        "utf8",
-      );
-      const divergentSha = commit(fixture.root, "divergent review");
-      git(fixture.root, [
-        "-c",
-        "core.hooksPath=/dev/null",
-        "push",
-        "--quiet",
-        "origin",
-        `${divergentSha}:${REVIEW_PUSH_REMOTE_REF}`,
-      ]);
-      git(fixture.root, ["checkout", "-q", "main"]);
-      const prepared = runPrepare(fixture.root, ["--review"]);
-      assert.equal(prepared.status, 2, prepared.stderr || prepared.stdout);
-      assert.match(prepared.stderr, /reason=review_non_fast_forward/u);
-    } finally {
-      fixture.cleanup();
-    }
-  }
-});
-
-test("review preparation fails closed on log or strict secret findings", () => {
-  for (const scenario of ["log", "secrets"]) {
-    const fixture = createFixture();
-    try {
-      if (scenario === "log") {
-        writeFileSync(
-          path.join(fixture.root, "bad-review.txt"),
-          "trailing whitespace  \n",
-        );
-        fixture.localSha = commit(fixture.root, "bad review whitespace");
-      }
-      const exactRange = `${fixture.remoteSha}..${fixture.localSha}`;
-      const env = cleanEnvironment(
-        scenario === "secrets" ? { FAIL_RANGE: exactRange } : {},
-      );
-      const prepared = runPrepare(fixture.root, ["--review"], env);
-      assert.notEqual(prepared.status, 0, scenario);
-      assert.match(
-        prepared.stderr,
-        new RegExp(
-          `reason=${scenario === "log" ? "git_log_check_failed" : "push_range_secrets_failed"}`,
-          "u",
-        ),
-      );
-      assert.equal(
-        existsSync(resolveReceiptState(fixture.root).reviewReceiptPath),
-        false,
-      );
-    } finally {
-      fixture.cleanup();
-    }
   }
 });
 

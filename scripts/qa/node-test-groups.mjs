@@ -187,7 +187,6 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/deploy/target-release-fetch.test.mjs",
     "scripts/qa/capacity-customer-config.test.mjs",
     "scripts/qa/capacity-dataset.test.mjs",
-    "scripts/qa/ci-workflow.test.mjs",
     "scripts/qa/customer-trial-133-data.test.mjs",
     "scripts/qa/gitlab-ci.test.mjs",
     "scripts/qa/local-acceptance-lifecycle.test.mjs",

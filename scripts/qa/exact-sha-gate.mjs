@@ -58,7 +58,6 @@ const EXTRA_FINGERPRINT_FILES = Object.freeze([
 ]);
 const WORKFLOW_FINGERPRINT_FILES = Object.freeze([
   ".gitlab-ci.yml",
-  ".github/workflows/ci.yml",
   ".github/workflows/release.yml",
 ]);
 const TOOLCHAIN_FINGERPRINT_FILES = Object.freeze([

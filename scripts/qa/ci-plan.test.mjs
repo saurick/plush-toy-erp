@@ -58,9 +58,9 @@ test("CI plan treats main full as the complete environment", () => {
   assert(Object.values(plan.flags).every(Boolean));
 });
 
-test("CI workflow contract parsing selects Go without forcing full", () => {
+test("emergency release workflow contract parsing selects Go without forcing full", () => {
   const plan = buildCIPlan({
-    files: [".github/workflows/ci.yml"],
+    files: [".github/workflows/release.yml"],
     mode: "affected",
     root: ROOT,
   });

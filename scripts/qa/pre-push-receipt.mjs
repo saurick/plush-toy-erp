@@ -45,12 +45,8 @@ export const PRE_PUSH_ENVIRONMENT_CONTRACT = "plush.pre-push-environment/v2";
 export const PRE_PUSH_GATE_CONTRACT = "plush.pre-push-gate-tree/v5";
 export const PRE_PUSH_SIGNATURE_CONTRACT = "hmac-sha256/v1";
 export const REMOTE_REF_QUERY_TIMEOUT_MS = 20_000;
-export const REVIEW_PUSH_BASE_REF = "refs/heads/main";
-export const REVIEW_PUSH_LOCAL_REF = "refs/heads/main";
-export const REVIEW_PUSH_REMOTE_REF = "refs/heads/review/gpt";
 
 const ZERO_SHA = "0000000000000000000000000000000000000000";
-const REVIEW_PUSH_CONTRACT = "plush.review-push/v1";
 const LIVE_PUSH_CHECKS_CONTRACT = "plush.live-push-checks/v1";
 const SERVER_CI_REQUIRED_CONTRACT = "plush.server-ci-required/v1";
 const CANONICAL_GITLAB_REMOTE = "origin";
@@ -623,16 +619,6 @@ function resolvePreparationPlan(root, options) {
       ? resolveDefaultPreparation(root, options.remoteName)
       : { remoteName: options.remoteName || "origin", refspecs: options.refspecs };
   const remoteName = options.remoteName || defaults.remoteName;
-  if (
-    defaults.refspecs.some(
-      ({ remoteRef }) => remoteRef === REVIEW_PUSH_REMOTE_REF,
-    )
-  ) {
-    throw new ReceiptError(
-      "review_ref_requires_review_mode",
-      "rerun=bash scripts/qa/prepare-push.sh --review",
-    );
-  }
   resolveRemoteLocation(root, remoteName);
   const remoteRefs = readRemoteRefs(
     root,
@@ -644,131 +630,6 @@ function resolvePreparationPlan(root, options) {
     remoteName,
     refspecs: defaults.refspecs,
     remoteRefs,
-  });
-}
-
-function assertReviewAncestor(root, ancestor, head, reason, remoteName) {
-  const available = commandResult(
-    "git",
-    ["cat-file", "-e", `${ancestor}^{commit}`],
-    { cwd: root },
-  );
-  if (available.error || available.status !== 0) {
-    throw new ReceiptError(
-      reason,
-      `sha=${ancestor} run=git fetch ${remoteName}`,
-    );
-  }
-  const ancestorResult = commandResult(
-    "git",
-    ["merge-base", "--is-ancestor", ancestor, head],
-    { cwd: root },
-  );
-  if (ancestorResult.error || ancestorResult.status !== 0) {
-    throw new ReceiptError(
-      reason,
-      `sha=${ancestor} head=${head} run=git fetch ${remoteName}`,
-    );
-  }
-}
-
-function buildReviewPushPlan({
-  root,
-  remoteName,
-  remoteLocation = "",
-  remoteBaseSha,
-  remoteReviewSha = ZERO_SHA,
-}) {
-  const snapshot = readRepositorySnapshot(root);
-  const currentRef = optionalGit(root, [
-    "symbolic-ref",
-    "--quiet",
-    "HEAD",
-  ]);
-  if (currentRef !== REVIEW_PUSH_LOCAL_REF) {
-    throw new ReceiptError(
-      "review_push_requires_main",
-      `current_ref=${currentRef || "detached"}`,
-    );
-  }
-  const localSha = runGit(root, [
-    "rev-parse",
-    "--verify",
-    `${REVIEW_PUSH_LOCAL_REF}^{commit}`,
-  ]).trim();
-  assertCommitSha(localSha, "review_local_sha");
-  if (localSha !== snapshot.head) {
-    throw new ReceiptError(
-      "non_head_ref",
-      `local_ref=${REVIEW_PUSH_LOCAL_REF} local_sha=${localSha} head_sha=${snapshot.head}`,
-    );
-  }
-  if (!remoteBaseSha) {
-    throw new ReceiptError(
-      "review_base_missing",
-      `remote_ref=${REVIEW_PUSH_BASE_REF}`,
-    );
-  }
-  assertCommitSha(remoteBaseSha, "review_base_sha");
-  assertCommitSha(remoteReviewSha, "review_remote_sha", { allowZero: true });
-  assertReviewAncestor(
-    root,
-    remoteBaseSha,
-    snapshot.head,
-    "review_base_not_ancestor",
-    remoteName,
-  );
-  if (remoteReviewSha !== ZERO_SHA) {
-    assertReviewAncestor(
-      root,
-      remoteReviewSha,
-      snapshot.head,
-      "review_non_fast_forward",
-      remoteName,
-    );
-  }
-
-  const rangeBaseSha =
-    remoteReviewSha === ZERO_SHA ? remoteBaseSha : remoteReviewSha;
-  const range = `${rangeBaseSha}..${localSha}`;
-  const remote = resolveRemoteLocation(root, remoteName, remoteLocation);
-  return {
-    remoteName,
-    remoteUrlSha256: remote.sha256,
-    purpose: "review-only",
-    review: {
-      contract: REVIEW_PUSH_CONTRACT,
-      baseRef: REVIEW_PUSH_BASE_REF,
-      baseSha: remoteBaseSha,
-      localRef: REVIEW_PUSH_LOCAL_REF,
-      remoteRef: REVIEW_PUSH_REMOTE_REF,
-      deliveryEligible: false,
-    },
-    refs: [
-      {
-        localRef: REVIEW_PUSH_LOCAL_REF,
-        localSha,
-        remoteRef: REVIEW_PUSH_REMOTE_REF,
-        remoteSha: remoteReviewSha,
-        range,
-      },
-    ],
-    aggregateRange: range,
-  };
-}
-
-function resolveReviewPreparationPlan(root, options) {
-  const remoteName = options.remoteName || "origin";
-  resolveRemoteLocation(root, remoteName);
-  const remoteRefs = readRemoteRefs(root, remoteName, [
-    REVIEW_PUSH_BASE_REF,
-    REVIEW_PUSH_REMOTE_REF,
-  ]);
-  return buildReviewPushPlan({
-    root,
-    remoteName,
-    remoteBaseSha: remoteRefs.get(REVIEW_PUSH_BASE_REF) || "",
-    remoteReviewSha: remoteRefs.get(REVIEW_PUSH_REMOTE_REF) || ZERO_SHA,
   });
 }
 
@@ -867,19 +728,6 @@ export function resolvePrePushGateDecision(
   });
 }
 
-export function resolveReviewGateDecision(root, pushPlan) {
-  const deliveryDecision = resolvePrePushGateDecision(root, pushPlan);
-  return Object.freeze({
-    ...deliveryDecision,
-    profile: "review",
-    requiresFullConfirmation: false,
-    requiresManagedDatabase: false,
-    deliveryRequiresFullConfirmation:
-      deliveryDecision.requiresFullConfirmation,
-    deliveryRequiresManagedDatabase: deliveryDecision.requiresManagedDatabase,
-  });
-}
-
 function parsePushInput(root, input) {
   const records = [];
   for (const rawLine of input.split("\n")) {
@@ -926,37 +774,6 @@ function resolveHookPlan(root, remoteName, remoteLocation, records) {
     refs: sortedRefs,
     aggregateRange: computeAggregateRange(root, snapshot.head, sortedRefs),
   };
-}
-
-function isExactReviewPush(records) {
-  return (
-    records.length === 1 &&
-    records[0].localSha !== ZERO_SHA &&
-    records[0].localRef === REVIEW_PUSH_LOCAL_REF &&
-    records[0].remoteRef === REVIEW_PUSH_REMOTE_REF
-  );
-}
-
-function resolveReviewHookPlan(
-  root,
-  remoteName,
-  remoteLocation,
-  records,
-) {
-  if (!isExactReviewPush(records)) {
-    throw new ReceiptError(
-      "invalid_review_push_shape",
-      `expected=${REVIEW_PUSH_LOCAL_REF}:${REVIEW_PUSH_REMOTE_REF}`,
-    );
-  }
-  const remoteRefs = readRemoteRefs(root, remoteName, [REVIEW_PUSH_BASE_REF]);
-  return buildReviewPushPlan({
-    root,
-    remoteName,
-    remoteLocation,
-    remoteBaseSha: remoteRefs.get(REVIEW_PUSH_BASE_REF) || "",
-    remoteReviewSha: records[0].remoteSha,
-  });
 }
 
 function hashFileIfPresent(root, relativePath) {
@@ -1077,7 +894,7 @@ function readTreeEntries(root, head) {
 export function gateContractFingerprint(root, head, gateDecision) {
   if (
     !gateDecision ||
-    !["affected", "full", "review", "server-ci"].includes(gateDecision.profile)
+    !["affected", "full", "server-ci"].includes(gateDecision.profile)
   ) {
     throw new ReceiptError("invalid_gate_decision");
   }
@@ -1125,17 +942,15 @@ export function gateContractFingerprint(root, head, gateDecision) {
     gates:
       gateDecision.profile === "full"
         ? GATE_PROFILES.full
-        : gateDecision.profile === "review"
-          ? ["review-only-plan", "git-log-check", "live-range-secrets"]
-          : gateDecision.profile === "server-ci"
-            ? [
-                "server-ci-required",
-                "exact-sha-ci-gate",
-                "source-integrity",
-                "git-log-check",
-                "live-range-secrets",
-              ]
-            : ["affected-plan", "live-range-secrets"],
+        : gateDecision.profile === "server-ci"
+          ? [
+              "server-ci-required",
+              "exact-sha-ci-gate",
+              "source-integrity",
+              "git-log-check",
+              "live-range-secrets",
+            ]
+          : ["affected-plan", "live-range-secrets"],
     requiredFiles: requiredFiles
       .map((file) => entries.get(file))
       .sort((left, right) => left.file.localeCompare(right.file)),
@@ -1185,7 +1000,6 @@ export function resolveReceiptState(root) {
     stateDir,
     worktreeKey,
     receiptPath: path.join(stateDir, `${worktreeKey}.json`),
-    reviewReceiptPath: path.join(stateDir, `${worktreeKey}.review.json`),
     keyPath: path.join(stateDir, `${worktreeKey}.key`),
     lockPath: path.join(stateDir, `${worktreeKey}.lock`),
   };
@@ -1402,9 +1216,7 @@ function validateReceipt({
   if (receipt?.contract !== PRE_PUSH_RECEIPT_CONTRACT) {
     throw new ReceiptError("receipt_contract_mismatch");
   }
-  const expectedPurpose =
-    gateDecision?.profile === "review" ? "review-only" : "delivery";
-  if (receipt?.purpose !== expectedPurpose) {
+  if (receipt?.purpose !== "delivery") {
     throw new ReceiptError("receipt_purpose_mismatch");
   }
   if (
@@ -1418,7 +1230,7 @@ function validateReceipt({
       stableStringify(gateDecision.liveChecks) ||
     stableStringify(receipt?.gate?.serverCiRequired) !==
       stableStringify(gateDecision.serverCiRequired) ||
-    receipt?.gate?.deliveryEligible !== (gateDecision.profile !== "review")
+    receipt?.gate?.deliveryEligible !== true
   ) {
     throw new ReceiptError("receipt_profile_mismatch");
   }
@@ -1478,7 +1290,7 @@ function makeReceipt({
     expiresAtMs: issuedAtMs + PRE_PUSH_RECEIPT_TTL_MS,
     repository: expectedRepositoryIdentity(root, snapshot, state),
     push: pushPlan,
-    purpose: gateDecision.profile === "review" ? "review-only" : "delivery",
+    purpose: "delivery",
     gate: {
       profile: gateDecision.profile,
       recommendedProfile: gateDecision.recommendedProfile,
@@ -1486,7 +1298,7 @@ function makeReceipt({
       databaseGuard: gateDecision.databaseGuard,
       liveChecks: gateDecision.liveChecks,
       serverCiRequired: gateDecision.serverCiRequired,
-      deliveryEligible: gateDecision.profile !== "review",
+      deliveryEligible: true,
       contract: PRE_PUSH_GATE_CONTRACT,
       sha256:
         gateSha256 ||
@@ -1503,7 +1315,6 @@ function makeReceipt({
 function parsePrepareOptions(root, args) {
   const options = {
     forceFull: false,
-    reviewOnly: false,
     remoteName: "",
     refspecs: [],
   };
@@ -1513,11 +1324,6 @@ function parsePrepareOptions(root, args) {
     if (arg === "--full") {
       if (options.forceFull) throw new ReceiptError("duplicate_option", arg);
       options.forceFull = true;
-      continue;
-    }
-    if (arg === "--review") {
-      if (options.reviewOnly) throw new ReceiptError("duplicate_option", arg);
-      options.reviewOnly = true;
       continue;
     }
     if (arg === "--remote") {
@@ -1533,18 +1339,6 @@ function parsePrepareOptions(root, args) {
       continue;
     }
     throw new ReceiptError("unknown_option", arg);
-  }
-  if (options.reviewOnly && options.forceFull) {
-    throw new ReceiptError(
-      "mutually_exclusive_options",
-      "options=--review,--full",
-    );
-  }
-  if (options.reviewOnly && options.refspecs.length > 0) {
-    throw new ReceiptError(
-      "review_ref_is_fixed",
-      `refspec=${REVIEW_PUSH_LOCAL_REF}:${REVIEW_PUSH_REMOTE_REF}`,
-    );
   }
   return options;
 }
@@ -1576,7 +1370,6 @@ function parseHookOptions(args) {
 
 function usesDefaultServerCiProfile(options) {
   return (
-    options.reviewOnly !== true &&
     options.forceFull !== true &&
     !options.remoteName &&
     options.refspecs.length === 0
@@ -1587,15 +1380,11 @@ export function resolvePrepareMode(root, options, { env = process.env } = {}) {
   assertNoForbiddenEnvironment(env);
   const snapshot = readRepositorySnapshot(root);
   assertCleanSnapshot(snapshot);
-  const pushPlan = options.reviewOnly
-    ? resolveReviewPreparationPlan(root, options)
-    : resolvePreparationPlan(root, options);
-  const gateDecision = options.reviewOnly
-    ? resolveReviewGateDecision(root, pushPlan)
-    : resolvePrePushGateDecision(root, pushPlan, {
-        forceFull: options.forceFull,
-        allowServerCi: usesDefaultServerCiProfile(options),
-      });
+  const pushPlan = resolvePreparationPlan(root, options);
+  const gateDecision = resolvePrePushGateDecision(root, pushPlan, {
+    forceFull: options.forceFull,
+    allowServerCi: usesDefaultServerCiProfile(options),
+  });
   if (gateDecision.requiresFullConfirmation) {
     throw new ReceiptError(
       "full_confirmation_required",
@@ -1607,26 +1396,15 @@ export function resolvePrepareMode(root, options, { env = process.env } = {}) {
 
 export function preparePush(root, options, { env = process.env } = {}) {
   const state = resolveReceiptState(root);
-  const reviewOnly = options.reviewOnly === true;
-  const label = reviewOnly ? "qa:prepare-review-push" : "qa:prepare-push";
-  const receiptPath = reviewOnly
-    ? state.reviewReceiptPath
-    : state.receiptPath;
-  const resolvePlan = () =>
-    reviewOnly
-      ? resolveReviewPreparationPlan(root, options)
-      : resolvePreparationPlan(root, options);
+  const label = "qa:prepare-push";
+  const receiptPath = state.receiptPath;
+  const resolvePlan = () => resolvePreparationPlan(root, options);
   const resolveGateDecision = (pushPlan) =>
-    reviewOnly
-      ? resolveReviewGateDecision(root, pushPlan)
-      : resolvePrePushGateDecision(root, pushPlan, {
-          forceFull: options.forceFull,
-          allowServerCi: usesDefaultServerCiProfile(options),
-        });
-  const releaseLock = acquireReceiptLock(
-    state,
-    reviewOnly ? "prepare-review" : "prepare",
-  );
+    resolvePrePushGateDecision(root, pushPlan, {
+      forceFull: options.forceFull,
+      allowServerCi: usesDefaultServerCiProfile(options),
+    });
+  const releaseLock = acquireReceiptLock(state, "prepare");
   let receiptCandidate = "";
   try {
     assertNoForbiddenEnvironment(env);
@@ -1688,7 +1466,7 @@ export function preparePush(root, options, { env = process.env } = {}) {
     console.log(
       `[${label}] 运行 ${initialGateDecision.profile}（HEAD=${before.head.slice(0, 12)} aggregate_range=${initialPlan.aggregateRange} db_guard_range=${initialGateDecision.databaseGuard.range} files=${initialGateDecision.changedFileCount} recommended_delivery_profile=${initialGateDecision.recommendedProfile}）`,
     );
-    if (reviewOnly || initialGateDecision.profile === "server-ci") {
+    if (initialGateDecision.profile === "server-ci") {
       runLivePushChecks(root, initialPlan, env, {
         label,
         gateDecision: initialGateDecision,
@@ -1779,7 +1557,7 @@ export function preparePush(root, options, { env = process.env } = {}) {
     publishPrivateFile(receiptCandidate, receiptPath);
     receiptCandidate = "";
     console.log(
-      `[${label}] status=complete profile=${finalGateDecision.profile} recommended_delivery_profile=${finalGateDecision.recommendedProfile} review_only=${reviewOnly} head=${after.head} aggregate_range=${finalPlan.aggregateRange} db_guard_range=${finalGateDecision.databaseGuard.range} ttl_seconds=${PRE_PUSH_RECEIPT_TTL_MS / 1000}`,
+      `[${label}] status=complete profile=${finalGateDecision.profile} recommended_delivery_profile=${finalGateDecision.recommendedProfile} head=${after.head} aggregate_range=${finalPlan.aggregateRange} db_guard_range=${finalGateDecision.databaseGuard.range} ttl_seconds=${PRE_PUSH_RECEIPT_TTL_MS / 1000}`,
     );
     return { receipt, state, reused: false };
   } catch (error) {
@@ -1859,50 +1637,27 @@ export function verifyPushHook(
   if (nonDeletion.length !== records.length) {
     throw new ReceiptError("mixed_delete_update_unsupported");
   }
-  const targetsReviewRef = records.some(
-    ({ remoteRef }) => remoteRef === REVIEW_PUSH_REMOTE_REF,
-  );
-  const reviewOnly = isExactReviewPush(records);
-  if (targetsReviewRef && !reviewOnly) {
-    throw new ReceiptError(
-      "invalid_review_push_shape",
-      `expected=${REVIEW_PUSH_LOCAL_REF}:${REVIEW_PUSH_REMOTE_REF}`,
-    );
-  }
 
   const state = resolveReceiptState(root);
   const releaseLock = acquireReceiptLock(state, "verify");
   try {
     const before = readRepositorySnapshot(root);
     assertCleanSnapshot(before);
-    const pushPlan = reviewOnly
-      ? resolveReviewHookPlan(
-          root,
-          options.remoteName,
-          options.remoteLocation,
-          records,
-        )
-      : resolveHookPlan(
-          root,
-          options.remoteName,
-          options.remoteLocation,
-          records,
-        );
-    const receiptPath = reviewOnly
-      ? state.reviewReceiptPath
-      : state.receiptPath;
+    const pushPlan = resolveHookPlan(
+      root,
+      options.remoteName,
+      options.remoteLocation,
+      records,
+    );
+    const receiptPath = state.receiptPath;
     const receipt = readReceipt(
       receiptPath,
-      reviewOnly
-        ? "bash scripts/qa/prepare-push.sh --review"
-        : "bash scripts/qa/prepare-push.sh",
+      "bash scripts/qa/prepare-push.sh",
     );
-    const gateDecision = reviewOnly
-      ? resolveReviewGateDecision(root, pushPlan)
-      : resolvePrePushGateDecision(root, pushPlan, {
-          forceFull: receipt?.gate?.profile === "full",
-          allowServerCi: receipt?.gate?.profile === "server-ci",
-        });
+    const gateDecision = resolvePrePushGateDecision(root, pushPlan, {
+      forceFull: receipt?.gate?.profile === "full",
+      allowServerCi: receipt?.gate?.profile === "server-ci",
+    });
     const gateSha256 = gateContractFingerprint(
       root,
       before.head,
@@ -1939,7 +1694,7 @@ export function verifyPushHook(
       environmentSha256: environmentFingerprint(root, env),
     });
     console.log(
-      `[pre-push] status=complete coverage=receipt+live-range-secrets review_only=${reviewOnly} ranges=${pushPlan.refs.length} aggregate_range=${pushPlan.aggregateRange}`,
+      `[pre-push] status=complete coverage=receipt+live-range-secrets ranges=${pushPlan.refs.length} aggregate_range=${pushPlan.aggregateRange}`,
     );
     return { status: "complete", pushPlan, receipt };
   } finally {
@@ -1951,19 +1706,15 @@ function printHelp() {
   console.log(`用法:
   bash scripts/qa/prepare-push.sh [--remote <name>] [--ref <local-ref>:<remote-ref>]...
   bash scripts/qa/prepare-push.sh --full [--remote <name>] [--ref <local-ref>:<remote-ref>]...
-  bash scripts/qa/prepare-push.sh --review [--remote <name>]
 
 说明:
   默认 origin refs/heads/main -> refs/heads/main 普通推送会在连接前校验 clean HEAD/tree、
   真实 remote/ref/range、git log、strict secrets 与 source-integrity，并签发 server-ci
   回执；高成本门禁交由 R640 exact-SHA GitLab CI。回执只授权普通非强制 push；
   release、package promotion 或 protected deploy 必须等待同一 exact SHA 的
-  terminal-success CI Gate。显式 --full、--review 与任何非规范目标仍保守处理。
+  terminal-success CI Gate。显式 --full 与任何非规范目标仍保守处理。
   普通当前分支可不传 remote/ref；多 ref 或非默认目标逐项传 --ref。
-  --review 只允许 clean main 以 fast-forward 方式更新远端 review/gpt；它只运行提交
-  格式与严格 secrets 检查并记录后续正式推送建议，不运行 affected/full，也不能用于
-  main、tag、发布或其他 ref。pre-push hook 只读取固定回执位置，不接受调用者提供
-  回执路径、token 或跳过环境变量。`);
+  pre-push hook 只读取固定回执位置，不接受调用者提供回执路径、token 或跳过环境变量。`);
 }
 
 function main() {

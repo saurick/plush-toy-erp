@@ -27,7 +27,6 @@ export const CANDIDATE_SHA_FREEZE_SCENARIOS = Object.freeze([
 export const CANDIDATE_SHA_FREEZE_TESTS = Object.freeze([
   "scripts/qa/strict-receipt-identity.test.mjs",
   "scripts/qa/exact-sha-gate.test.mjs",
-  "scripts/qa/ci-workflow.test.mjs",
   "scripts/qa/release-workflow.test.mjs",
   "scripts/qa/dev-workbench-production-boundary.test.mjs",
   "scripts/deploy/github-strict-terminal-reuse.test.mjs",
