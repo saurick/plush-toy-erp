@@ -2491,6 +2491,136 @@ export function createBusinessFormalScenarios(deps) {
       },
     },
     {
+      name: 'business-table-headers-single-line-desktop',
+      path: '/erp/master/products',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      themeMode: 'dark',
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '产品档案')
+        await expectText(page, 'PROD-STYLE-L1')
+        await expectText(page, '海关编码（HS Code）')
+        await assertERPThemeMode(page, {
+          scenarioName: 'business-table-headers-single-line-desktop',
+          expectedMode: 'dark',
+          expectedEffectiveTheme: 'dark',
+        })
+        await assertBusinessMainTableSortableColumns(page, {
+          scenarioName: 'business-table-headers-single-line-desktop',
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'business-table-headers-single-line-desktop'
+        )
+        await page.locator('.erp-business-data-table-card').screenshot({
+          path: path.join(
+            outputDir,
+            'business-table-headers-single-line-dark-desktop.png'
+          ),
+        })
+
+        const firstHeaderTrigger = page
+          .locator(
+            '.erp-business-data-table-card .ant-table-thead th .erp-module-column-header-trigger'
+          )
+          .first()
+        const triggerBox = await firstHeaderTrigger.boundingBox()
+        assert(
+          triggerBox && triggerBox.width >= 23.5 && triggerBox.height >= 23.5,
+          `产品档案列设置按钮应保留 24px 点击范围: ${JSON.stringify(triggerBox)}`
+        )
+        const readFirstHeaderSortState = () =>
+          firstHeaderTrigger.evaluate((node) => {
+            const headerCell = node.closest('th')
+            return {
+              ariaSort: headerCell?.getAttribute('aria-sort') || '',
+              ascending: Boolean(
+                headerCell?.querySelector(
+                  '.ant-table-column-sorter-up.active, .ant-table-column-sorter-up.ant-table-column-sorter-active'
+                )
+              ),
+              descending: Boolean(
+                headerCell?.querySelector(
+                  '.ant-table-column-sorter-down.active, .ant-table-column-sorter-down.ant-table-column-sorter-active'
+                )
+              ),
+            }
+          })
+        const sortStateBeforeColumnMenu = await readFirstHeaderSortState()
+        await firstHeaderTrigger.click({
+          position: {
+            x: triggerBox.width - 2,
+            y: triggerBox.height / 2,
+          },
+        })
+        const columnMenu = page
+          .locator('.ant-dropdown:not(.ant-dropdown-hidden)')
+          .last()
+        await columnMenu
+          .getByText('右移一列')
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        await page.waitForTimeout(180)
+        assert.deepEqual(
+          await readFirstHeaderSortState(),
+          sortStateBeforeColumnMenu,
+          '点击列设置按钮靠排序侧边缘不应触发表格排序'
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'business-table-headers-column-menu-hit-area-dark.png'
+          ),
+        })
+        await page.keyboard.press('Escape')
+        await columnMenu.waitFor({ state: 'hidden', timeout: 10_000 })
+        await page.mouse.move(0, 0)
+        await page.waitForTimeout(120)
+
+        await page
+          .locator(
+            '.erp-business-data-table-card .ant-table-content, .erp-business-data-table-card .ant-table-body'
+          )
+          .first()
+          .evaluate((node) => {
+            node.scrollLeft = node.scrollWidth - node.clientWidth
+          })
+        await page.waitForTimeout(120)
+        await page.locator('.erp-business-data-table-card').screenshot({
+          path: path.join(
+            outputDir,
+            'business-table-headers-single-line-dark-right-edge.png'
+          ),
+        })
+
+        await page.setViewportSize({ width: 760, height: 900 })
+        await page.waitForTimeout(180)
+        await assertBusinessMainTableSortableColumns(page, {
+          scenarioName: 'business-table-headers-single-line-narrow',
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'business-table-headers-single-line-narrow'
+        )
+        const tableScrollableWidth = await page
+          .locator(
+            '.erp-business-data-table-card .ant-table-content, .erp-business-data-table-card .ant-table-body'
+          )
+          .first()
+          .evaluate((node) => node.scrollWidth - node.clientWidth)
+        assert(
+          tableScrollableWidth > 1,
+          `产品档案窄屏态应保留表格内横向滚动: ${tableScrollableWidth}`
+        )
+        await page.locator('.erp-business-data-table-card').screenshot({
+          path: path.join(
+            outputDir,
+            'business-table-headers-single-line-dark-narrow.png'
+          ),
+        })
+      },
+    },
+    {
       name: 'business-core-pages-desktop',
       path: '/erp/master/partners/suppliers',
       auth: 'admin',

@@ -7479,7 +7479,9 @@ async function assertBusinessMainTableSortableColumns(
       : []
     const columnHeaderTriggers = tableCard
       ? Array.from(
-          tableCard.querySelectorAll('.erp-module-column-header-trigger')
+          tableCard.querySelectorAll(
+            '.ant-table-thead th .erp-module-column-header-trigger'
+          )
         ).map((node) => ({
           label: node.getAttribute('aria-label') || '',
           opacity: Number(window.getComputedStyle(node).opacity || 1),
@@ -7491,9 +7493,23 @@ async function assertBusinessMainTableSortableColumns(
       : []
     const columnHeaderTexts = tableCard
       ? Array.from(
-          tableCard.querySelectorAll('.erp-module-column-header-text')
+          tableCard.querySelectorAll(
+            '.ant-table-thead th .erp-module-column-header-text'
+          )
         ).map((node) => {
           const style = window.getComputedStyle(node)
+          const textRect = node.getBoundingClientRect()
+          const triggerRect = node
+            .closest('.erp-module-column-header')
+            ?.querySelector('.erp-module-column-header-trigger')
+            ?.getBoundingClientRect()
+          const titleRect = node
+            .closest('.ant-table-column-title')
+            ?.getBoundingClientRect()
+          const sorterRect = node
+            .closest('.ant-table-column-sorters')
+            ?.querySelector('.ant-table-column-sorter')
+            ?.getBoundingClientRect()
           return {
             text: String(node.textContent || '')
               .replace(/\s+/g, ' ')
@@ -7503,6 +7519,17 @@ async function assertBusinessMainTableSortableColumns(
             textOverflow: style.textOverflow,
             overflow: style.overflow,
             whiteSpace: style.whiteSpace,
+            triggerOverlap: triggerRect
+              ? textRect.right > triggerRect.left + 1
+              : false,
+            triggerRightGap:
+              triggerRect && titleRect
+                ? titleRect.right - triggerRect.right
+                : null,
+            triggerSorterGap:
+              triggerRect && sorterRect
+                ? sorterRect.left - triggerRect.right
+                : null,
           }
         })
       : []
@@ -7556,12 +7583,33 @@ async function assertBusinessMainTableSortableColumns(
   const oversizedColumnHeaderTriggers = metrics.columnHeaderTriggers.filter(
     (node) => node.width > 24 || node.height > 24
   )
+  const undersizedColumnHeaderTriggers = metrics.columnHeaderTriggers.filter(
+    (node) => node.width < 23.5 || node.height < 23.5
+  )
   const ellipsisHeaderTexts = metrics.columnHeaderTexts.filter(
     (node) =>
       node.text &&
       (node.textOverflow === 'ellipsis' ||
         node.overflow === 'hidden' ||
         node.scrollWidth > node.clientWidth + 1)
+  )
+  const wrappedHeaderTexts = metrics.columnHeaderTexts.filter(
+    (node) => node.text && node.whiteSpace !== 'nowrap'
+  )
+  const overlappingHeaderTexts = metrics.columnHeaderTexts.filter(
+    (node) => node.text && node.triggerOverlap
+  )
+  const misplacedHeaderTriggers = metrics.columnHeaderTexts.filter(
+    (node) =>
+      node.text &&
+      Number.isFinite(node.triggerRightGap) &&
+      Math.abs(node.triggerRightGap) > 1
+  )
+  const crowdedHeaderControls = metrics.columnHeaderTexts.filter(
+    (node) =>
+      node.text &&
+      Number.isFinite(node.triggerSorterGap) &&
+      node.triggerSorterGap < 7
   )
 
   assert(
@@ -7607,6 +7655,31 @@ async function assertBusinessMainTableSortableColumns(
     oversizedColumnHeaderTriggers,
     [],
     `${scenarioName} 业务主表列设置快捷入口应保持紧凑尺寸: ${JSON.stringify(metrics)}`
+  )
+  assert.deepEqual(
+    undersizedColumnHeaderTriggers,
+    [],
+    `${scenarioName} 业务主表列设置快捷入口应保留 24px 点击范围: ${JSON.stringify(metrics)}`
+  )
+  assert.deepEqual(
+    wrappedHeaderTexts,
+    [],
+    `${scenarioName} 业务主表列标题文字应保持单行: ${JSON.stringify(metrics)}`
+  )
+  assert.deepEqual(
+    overlappingHeaderTexts,
+    [],
+    `${scenarioName} 业务主表列标题不应与列设置按钮重叠: ${JSON.stringify(metrics)}`
+  )
+  assert.deepEqual(
+    misplacedHeaderTriggers,
+    [],
+    `${scenarioName} 业务主表列设置按钮应贴住标题区右侧: ${JSON.stringify(metrics)}`
+  )
+  assert.deepEqual(
+    crowdedHeaderControls,
+    [],
+    `${scenarioName} 业务主表列设置与排序入口之间应保留 8px 间距: ${JSON.stringify(metrics)}`
   )
   assert.deepEqual(
     ellipsisHeaderTexts,

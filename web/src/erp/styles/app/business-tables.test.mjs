@@ -43,3 +43,61 @@ test('copyable table content keeps the project full-text wrapping contract', () 
   assert.match(rule[1], /overflow-wrap:\s*anywhere\s*;/u)
   assert.doesNotMatch(rule[1], /text-overflow:\s*ellipsis\s*;/u)
 })
+
+test('screen table header labels stay on one line without clipping', () => {
+  const genericTitleRule = stylesheet.match(
+    /\.ant-table-wrapper \.ant-table-thead > tr > th \.ant-table-column-title\s*\{([^}]*)\}/u
+  )
+  assert.ok(genericTitleRule, 'expected the shared Ant table title rule')
+  assert.match(genericTitleRule[1], /min-width:\s*max-content\s*;/u)
+  assert.match(genericTitleRule[1], /overflow:\s*visible\s*;/u)
+  assert.match(genericTitleRule[1], /white-space:\s*nowrap\s*;/u)
+  assert.doesNotMatch(genericTitleRule[1], /overflow-wrap:\s*anywhere\s*;/u)
+
+  const businessHeaderContainerRule = stylesheet.match(
+    /\.erp-module-column-header\s*\{([^}]*)\}/u
+  )
+  assert.ok(
+    businessHeaderContainerRule,
+    'expected the business table header rule'
+  )
+  assert.match(businessHeaderContainerRule[1], /width:\s*100%\s*;/u)
+  assert.match(businessHeaderContainerRule[1], /min-width:\s*0\s*;/u)
+  assert.match(businessHeaderContainerRule[1], /max-width:\s*100%\s*;/u)
+  assert.match(businessHeaderContainerRule[1], /gap:\s*6px\s*;/u)
+  assert.match(businessHeaderContainerRule[1], /white-space:\s*nowrap\s*;/u)
+
+  const businessHeaderControlsRule = stylesheet.match(
+    /\.erp-business-module-table-card\s+\.ant-table-wrapper\s+\.ant-table-thead\s+> tr\s+> th\s+\.ant-table-column-sorters:has\(\.erp-module-column-header\)\s*\{([^}]*)\}/u
+  )
+  assert.ok(
+    businessHeaderControlsRule,
+    'expected separate spacing between column settings and sorting'
+  )
+  assert.match(businessHeaderControlsRule[1], /gap:\s*8px\s*;/u)
+
+  const businessHeaderRule = stylesheet.match(
+    /\.erp-module-column-header-text\s*\{([^}]*)\}/u
+  )
+  assert.ok(businessHeaderRule, 'expected the business table header text rule')
+  assert.match(businessHeaderRule[1], /min-width:\s*max-content\s*;/u)
+  assert.match(businessHeaderRule[1], /max-width:\s*none\s*;/u)
+  assert.match(businessHeaderRule[1], /overflow:\s*visible\s*;/u)
+  assert.match(businessHeaderRule[1], /text-overflow:\s*clip\s*;/u)
+  assert.match(businessHeaderRule[1], /white-space:\s*nowrap\s*;/u)
+
+  const businessHeaderTriggerRule = stylesheet.match(
+    /\.erp-module-column-header-trigger\.ant-btn\s*\{([^}]*)\}/u
+  )
+  assert.ok(
+    businessHeaderTriggerRule,
+    'expected the business table header trigger rule'
+  )
+  assert.match(businessHeaderTriggerRule[1], /position:\s*static\s*;/u)
+  assert.match(businessHeaderTriggerRule[1], /flex:\s*0 0 auto\s*;/u)
+  assert.match(businessHeaderTriggerRule[1], /width:\s*24px\s*;/u)
+  assert.match(businessHeaderTriggerRule[1], /min-width:\s*24px\s*;/u)
+  assert.match(businessHeaderTriggerRule[1], /height:\s*24px\s*;/u)
+  assert.match(businessHeaderTriggerRule[1], /margin-left:\s*auto\s*;/u)
+  assert.doesNotMatch(businessHeaderTriggerRule[1], /position:\s*absolute\s*;/u)
+})

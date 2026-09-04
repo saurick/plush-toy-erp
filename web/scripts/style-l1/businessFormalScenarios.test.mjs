@@ -90,6 +90,34 @@ test('inventory header summary keeps view text in tabs and numeric values in car
   assert.match(source, /inventory-numeric-summary-dark-mobile-header\.png/u)
 })
 
+test('product table headers keep the shared single-line browser regression', () => {
+  const startIndex = source.indexOf(
+    "name: 'business-table-headers-single-line-desktop'"
+  )
+  const scenario = source.slice(startIndex, startIndex + 6_000)
+
+  assert.ok(startIndex >= 0)
+  assert.match(scenario, /海关编码（HS Code）/u)
+  assert.match(scenario, /assertBusinessMainTableSortableColumns/u)
+  assert.match(scenario, /assertNoHorizontalOverflow/u)
+  assert.match(scenario, /tableScrollableWidth > 1/u)
+  assert.match(
+    scenario,
+    /business-table-headers-single-line-dark-desktop\.png/u
+  )
+  assert.match(
+    scenario,
+    /business-table-headers-single-line-dark-right-edge\.png/u
+  )
+  assert.match(
+    scenario,
+    /business-table-headers-column-menu-hit-area-dark\.png/u
+  )
+  assert.match(scenario, /triggerBox\.width >= 23\.5/u)
+  assert.match(scenario, /sortStateBeforeColumnMenu/u)
+  assert.match(scenario, /business-table-headers-single-line-dark-narrow\.png/u)
+})
+
 test('quality page assertion preserves the visible incoming-inspection boundary', () => {
   assert.match(source, /首次到货检验不合格可按来源行和部分数量办理退厂或补换/u)
   assert.match(source, /已入库后的不合格仍生成采购退货/u)
