@@ -27,6 +27,10 @@ const workflow = readFileSync(
   new URL("../../.gitlab-ci.yml", import.meta.url),
   "utf8",
 );
+const npmrc = readFileSync(
+  new URL("../../web/.npmrc", import.meta.url),
+  "utf8",
+);
 const nodeVersion = readFileSync(
   new URL("../../.n-node-version", import.meta.url),
   "utf8",
@@ -247,7 +251,10 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   )?.[0];
   assert.ok(nodeAggregate);
   for (const { job } of Object.values(CI_NODE_TEST_LANES)) {
-    assert.match(nodeAggregate, new RegExp(`job: ${job}\\n      artifacts: true`, "u"));
+    assert.match(
+      nodeAggregate,
+      new RegExp(`job: ${job}\\n      artifacts: true`, "u"),
+    );
   }
   assert.match(nodeAggregate, /ci-quality-shard[.]mjs --shard node/u);
   const resourceAggregate = workflow.match(
@@ -321,10 +328,7 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
     securityBlock,
     /variables:\n(?:    #[^\n]*\n)+    GOMAXPROCS: "10"\n    GOGC: "25"/u,
   );
-  assert.match(
-    securityBlock,
-    /ci-quality-shard[.]mjs --shard security/u,
-  );
+  assert.match(securityBlock, /ci-quality-shard[.]mjs --shard security/u);
   assert.doesNotMatch(
     securityBlock,
     /SKIP_GOVULNCHECK|-scan (?:module|package)/u,
@@ -339,6 +343,25 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   assert.match(workflow, /output\/ci\/range[.]txt/u);
   assert.match(workflow, /output\/cache\/gitlab\/pnpm-store/u);
   assert.match(workflow, /export npm_config_store_dir="\$PNPM_STORE_PATH"/u);
+  assert.match(
+    workflow,
+    /PNPM_INSTALL_REGISTRY: "https:\/\/registry[.]npmmirror[.]com"/u,
+  );
+  assert.match(npmrc, /^registry=https:\/\/registry[.]npmmirror[.]com$/mu);
+  assert.equal(
+    workflow.match(
+      /pnpm --dir web install --frozen-lockfile --prefer-offline --registry="\$PNPM_INSTALL_REGISTRY"/gu,
+    )?.length ?? 0,
+    2,
+  );
+  assert.equal(
+    workflow.match(/-u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY/gu)?.length ?? 0,
+    2,
+  );
+  assert.equal(
+    workflow.match(/npm_config_proxy= npm_config_https_proxy=/gu)?.length ?? 0,
+    2,
+  );
   assert.match(
     workflow,
     /export PLAYWRIGHT_RUNTIME_ARCHIVE_DIR="\$CI_PROJECT_DIR\/output\/cache\/gitlab\/playwright-runtime"/u,

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildPnpmAuditEnvironment,
   classifyPnpmAuditResult,
   evaluatePnpmAuditThreshold,
   PNPM_AUDIT_RETRY_POLICY,
@@ -99,10 +100,15 @@ test("a transient network error retries once and returns the next report", async
   ];
   const retries = [];
   const sleeps = [];
+  const networkModes = [];
 
   await assert.doesNotReject(async () => {
     const result = await runPnpmAudit({
-      execute: async () => results.shift(),
+      environment: { HTTPS_PROXY: "http://configured-proxy.invalid:7890" },
+      execute: async ({ networkMode }) => {
+        networkModes.push(networkMode);
+        return results.shift();
+      },
       onRetry: (value) => retries.push(value),
       sleep: async (delay) => sleeps.push(delay),
     });
@@ -112,11 +118,37 @@ test("a transient network error retries once and returns the next report", async
     {
       attempt: 1,
       maxAttempts: 2,
+      nextNetworkMode: "configured_proxy",
       reason: "ERR_SOCKET_TIMEOUT",
       retryDelayMs: 5_000,
     },
   ]);
   assert.deepEqual(sleeps, [5_000]);
+  assert.deepEqual(networkModes, ["direct", "configured_proxy"]);
+});
+
+test("direct audit mode removes proxy settings without exposing them", () => {
+  const directEnvironment = buildPnpmAuditEnvironment({
+    environment: {
+      PATH: "/usr/bin",
+      HTTPS_PROXY: "http://configured-proxy.invalid:7890",
+      npm_config_https_proxy: "http://npm-proxy.invalid:7890",
+    },
+    networkMode: "direct",
+  });
+  assert.equal(directEnvironment.PATH, "/usr/bin");
+  assert.equal(directEnvironment.HTTPS_PROXY, undefined);
+  assert.equal(directEnvironment.npm_config_proxy, "");
+  assert.equal(directEnvironment.npm_config_https_proxy, "");
+
+  const proxyEnvironment = buildPnpmAuditEnvironment({
+    environment: { HTTPS_PROXY: "http://configured-proxy.invalid:7890" },
+    networkMode: "configured_proxy",
+  });
+  assert.equal(
+    proxyEnvironment.HTTPS_PROXY,
+    "http://configured-proxy.invalid:7890",
+  );
 });
 
 test("HTTP 503 is transient while malformed output fails closed", () => {

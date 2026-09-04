@@ -43,6 +43,56 @@ const TRANSIENT_AUDIT_FAILURE_PATTERNS = Object.freeze([
   ],
 ]);
 
+const AUDIT_PROXY_ENV_KEYS = Object.freeze([
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "ALL_PROXY",
+  "http_proxy",
+  "https_proxy",
+  "all_proxy",
+  "npm_config_proxy",
+  "npm_config_https_proxy",
+  "NPM_CONFIG_PROXY",
+  "NPM_CONFIG_HTTPS_PROXY",
+]);
+
+function hasConfiguredAuditProxy(environment) {
+  return AUDIT_PROXY_ENV_KEYS.some(
+    (key) => String(environment[key] || "").trim() !== "",
+  );
+}
+
+function auditNetworkModeForAttempt(attempt, environment) {
+  return attempt > 1 && hasConfiguredAuditProxy(environment)
+    ? "configured_proxy"
+    : "direct";
+}
+
+export function buildPnpmAuditEnvironment({
+  environment = process.env,
+  networkMode = "direct",
+} = {}) {
+  if (!["direct", "configured_proxy"].includes(networkMode)) {
+    throw new Error(`unsupported pnpm audit network mode: ${networkMode}`);
+  }
+
+  const auditEnvironment = { ...environment };
+  if (networkMode === "direct") {
+    for (const key of AUDIT_PROXY_ENV_KEYS) delete auditEnvironment[key];
+    // Empty npm config values also override proxy entries from user-level npmrc.
+    auditEnvironment.npm_config_proxy = "";
+    auditEnvironment.npm_config_https_proxy = "";
+  }
+
+  return {
+    ...auditEnvironment,
+    npm_config_fetch_retries: "1",
+    npm_config_fetch_retry_mintimeout: "2000",
+    npm_config_fetch_retry_maxtimeout: "10000",
+    npm_config_fetch_timeout: "45000",
+  };
+}
+
 function isRecord(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -158,17 +208,11 @@ export function evaluatePnpmAuditThreshold(report) {
   };
 }
 
-async function executePnpmAudit({ timeoutMs }) {
+async function executePnpmAudit({ environment, networkMode, timeoutMs }) {
   const options = {
     cwd: REPO_ROOT,
     encoding: "utf8",
-    env: {
-      ...process.env,
-      npm_config_fetch_retries: "1",
-      npm_config_fetch_retry_mintimeout: "2000",
-      npm_config_fetch_retry_maxtimeout: "10000",
-      npm_config_fetch_timeout: "45000",
-    },
+    env: buildPnpmAuditEnvironment({ environment, networkMode }),
     killSignal: "SIGTERM",
     maxBuffer: 64 * 1024 * 1024,
     timeout: timeoutMs,
@@ -212,11 +256,18 @@ function auditCommandError(result, classification, attempts) {
 }
 
 export async function runPnpmAudit({
+  environment = process.env,
   execute = executePnpmAudit,
   now = Date.now,
-  onRetry = ({ attempt, maxAttempts, reason, retryDelayMs }) => {
+  onRetry = ({
+    attempt,
+    maxAttempts,
+    nextNetworkMode,
+    reason,
+    retryDelayMs,
+  }) => {
     process.stderr.write(
-      `[qa:dependency-audit] transient_registry_failure=${reason} attempt=${attempt}/${maxAttempts} retry_in_ms=${retryDelayMs}\n`,
+      `[qa:dependency-audit] transient_registry_failure=${reason} attempt=${attempt}/${maxAttempts} retry_in_ms=${retryDelayMs} next_network_mode=${nextNetworkMode}\n`,
     );
   },
   policy = PNPM_AUDIT_RETRY_POLICY,
@@ -239,7 +290,10 @@ export async function runPnpmAudit({
       );
     }
 
+    const networkMode = auditNetworkModeForAttempt(attempt, environment);
     lastResult = await execute({
+      environment,
+      networkMode,
       timeoutMs: Math.min(policy.attemptTimeoutMs, remainingMs),
     });
     lastClassification = classifyPnpmAuditResult(lastResult);
@@ -259,6 +313,7 @@ export async function runPnpmAudit({
     onRetry({
       attempt,
       maxAttempts: policy.maxAttempts,
+      nextNetworkMode: auditNetworkModeForAttempt(attempt + 1, environment),
       reason: lastClassification.reason,
       retryDelayMs: policy.retryDelayMs,
     });

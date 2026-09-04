@@ -24,6 +24,7 @@ WORKDIR /web
 COPY web/package.json web/pnpm-lock.yaml ./
 RUN --mount=type=cache,id=plush-npm,target=/root/.npm,sharing=locked \
     --mount=type=cache,id=plush-pnpm,target=/web/.pnpm-store,sharing=locked \
+    npm config set registry https://registry.npmmirror.com && \
     npm install -g pnpm@10.13.1 && \
     pnpm config set store-dir /web/.pnpm-store && \
     pnpm config set registry https://registry.npmmirror.com && \

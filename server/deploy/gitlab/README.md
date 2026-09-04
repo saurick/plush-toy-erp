@@ -55,6 +55,8 @@ CI 冷启动因此不再承担公网下载。运行包合同固定 `playwright 1
 
 Runner VM 的 Go 模块下载统一由 `/etc/profile.d/plush-go-module-network.sh` 提供登录环境：`GOPROXY=https://goproxy.cn,direct`，`GOSUMDB=sum.golang.google.cn`。`goproxy.cn` 只负责在大陆网络中提供可达的模块代理；模块内容仍必须通过 Go checksum database 校验，不得设置 `GOSUMDB=off` 或改为跳过校验。
 
+Node 公共依赖安装固定优先使用 pnpm store，并直连 `https://registry.npmmirror.com`；CI 安装命令清除通用代理环境，避免大包流量被低速代理接管。`pnpm audit` 仍固定请求 npm 官方审计接口，第一次强制直连；只有连接、DNS、429 或 5xx 瞬时失败且 Runner 环境已配置代理时，最后一次重试才使用该代理。合法漏洞报告和非瞬时错误继续立即失败关闭。
+
 `govulncheck` 固定安装 `v1.6.0`，`shfmt` 固定安装 `v3.13.1`；两者的安装命令都使用上述代理和 checksum database，并保留有界重试与超时。Runner bootstrap 不依赖 GitHub Release CDN，避免可达性间歇变化绕过统一模块校验路径。最终门禁必须分别用 `ubuntu`、`root`、`gitlab-runner` 的登录 shell 读回相同的 `GOPROXY` 与 `GOSUMDB`，防止 bootstrap 成功但 CI job 回到不可达或未校验的下载路径。
 
 恢复执行 Runner bootstrap 时，只有 Node、pnpm、Go 的固定安装路径、符号链接目标和精确版本同时匹配，才跳过对应的基础工具下载。任一条件缺失或不匹配时，仍走原有的 checksum 校验下载与原子替换；不得仅凭 `command -v` 或文件存在就判定可复用。

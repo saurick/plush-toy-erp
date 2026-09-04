@@ -1195,7 +1195,8 @@ node /Users/simon/projects/plush-toy-erp/scripts/deploy/rollback-rehearsal-repor
 
 ### npm registry token 边界
 
-- 入库的 `web/.npmrc` 只保留无密钥的 pnpm 行为配置，不写 `_authToken`、`npmAuthToken`、`NPM_TOKEN` 或 `NODE_AUTH_TOKEN`。
+- 入库的 `web/.npmrc` 只保留无密钥的 pnpm 行为配置，并将公共依赖安装固定到 `https://registry.npmmirror.com`；CI 安装还会清除通用代理环境，优先直连该镜像。依赖审计不走镜像，固定直连 npm 官方接口，只有瞬时失败且环境已经配置代理时才在最后一次重试使用代理。
+- `web/.npmrc` 不写 `_authToken`、`npmAuthToken`、`NPM_TOKEN` 或 `NODE_AUTH_TOKEN`。
 - 本机私有 registry token 放在被 `.gitignore` 忽略的 `.npmrc.local`、`web/.npmrc.local`，或通过 shell 环境变量注入。
 - `scripts/qa/secrets.sh` 在 git 仓库内扫描 diff / staged 候选文件，并始终检查候选 `.npmrc` / `.npmrc.local` / `.yarnrc.yml` 中的 npm token 明文；安装 `gitleaks` 后会继续执行通用密钥扫描。
 - 源码包没有 `.git` 时，`scripts/qa/secrets.sh` 会按脚本所在目录推导项目根目录并扫描包内文件；该模式不支持 `SECRETS_STAGED_ONLY=1` 或 git diff range。

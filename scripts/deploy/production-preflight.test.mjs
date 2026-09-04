@@ -285,10 +285,7 @@ const deploymentTargetFixtures = Object.freeze({
 
 function configureExactDeploymentTargetFixture(
   fixture,
-  {
-    targetKey = "demo-133",
-    dsn,
-  } = {},
+  { targetKey = "demo-133", dsn } = {},
 ) {
   const target = deploymentTargetFixtures[targetKey];
   assert.ok(target, `unknown fixture deployment target: ${targetKey}`);
@@ -337,7 +334,8 @@ function configureExactDeploymentTargetFixture(
 }
 
 function deploymentTargetArgs(fixture) {
-  const target = fixture.deploymentTarget ?? deploymentTargetFixtures["demo-133"];
+  const target =
+    fixture.deploymentTarget ?? deploymentTargetFixtures["demo-133"];
   return [
     "--deployment-target",
     target.key,
@@ -351,7 +349,8 @@ function runDeploymentTargetPreflight(
   extraArgs = [],
   { env = {}, includeExpectedRelease = true } = {},
 ) {
-  const target = fixture.deploymentTarget ?? deploymentTargetFixtures["demo-133"];
+  const target =
+    fixture.deploymentTarget ?? deploymentTargetFixtures["demo-133"];
   const fakeBin = createFakeRuntimeBin(fixture.root);
   return runPreflight(fixture, extraArgs, {
     skipComposeConfig: false,
@@ -377,7 +376,8 @@ function runDeploymentTargetPreflight(
   });
 }
 
-const configureExactCustomerTrialFixture = configureExactDeploymentTargetFixture;
+const configureExactCustomerTrialFixture =
+  configureExactDeploymentTargetFixture;
 const trialOverrideArgs = deploymentTargetArgs;
 const runTrialPreflight = runDeploymentTargetPreflight;
 
@@ -1184,7 +1184,10 @@ test("production preflight rejects a registered target service from the canonica
   );
 
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /demo-133 运行态服务 postgres 不属于登记 Compose project/u);
+  assert.match(
+    result.stderr,
+    /demo-133 运行态服务 postgres 不属于登记 Compose project/u,
+  );
 });
 
 test("production preflight rejects registered runtime container name drift", () => {
@@ -1288,10 +1291,7 @@ test("production preflight rejects registered runtime app DSN drift without leak
   );
 
   assert.notEqual(result.status, 0);
-  assert.match(
-    result.stderr,
-    /POSTGRES_DSN 不符合登记数据库合同/u,
-  );
+  assert.match(result.stderr, /POSTGRES_DSN 不符合登记数据库合同/u);
   assert.doesNotMatch(result.stdout, new RegExp(runtimeSecret));
   assert.doesNotMatch(result.stderr, new RegExp(runtimeSecret));
 });
@@ -1543,10 +1543,7 @@ test("production preflight requires a loopback web bind for registered targets",
 
   const result = runTrialPreflight(fixture, trialOverrideArgs(fixture));
   assert.notEqual(result.status, 0);
-  assert.match(
-    result.stderr,
-    /demo-133 前端宿主机端口必须绑定 127\.0\.0\.1/u,
-  );
+  assert.match(result.stderr, /demo-133 前端宿主机端口必须绑定 127\.0\.0\.1/u);
 });
 
 test("production preflight invokes registered Compose with an explicit project and both files", () => {
@@ -1580,10 +1577,7 @@ test("production preflight rejects a resolved registered Compose project drift",
   });
 
   assert.notEqual(result.status, 0);
-  assert.match(
-    result.stderr,
-    /解析后的 Compose project 不符合登记合同/u,
-  );
+  assert.match(result.stderr, /解析后的 Compose project 不符合登记合同/u);
 });
 
 test("production preflight forbids skipping resolved Compose config for registered targets", () => {
@@ -1661,16 +1655,10 @@ test("production preflight excludes admin and undeclared environment names", asy
   for (const targetKey of ["admin", "admin-133", "erp", "test-133"]) {
     await t.test(targetKey, () => {
       const fixture = writeFixture();
-      const result = runPreflight(fixture, [
-        "--deployment-target",
-        targetKey,
-      ]);
+      const result = runPreflight(fixture, ["--deployment-target", targetKey]);
 
       assert.notEqual(result.status, 0);
-      assert.match(
-        result.stderr,
-        /只允许 demo-133 或 customer-test-133/u,
-      );
+      assert.match(result.stderr, /只允许 demo-133 或 customer-test-133/u);
     });
   }
 });
@@ -1810,6 +1798,16 @@ test("production artifacts pin the verified Chromium build and async warmup", ()
     dockerfile,
     /RUN --mount=type=cache,id=plush-npm,target=\/root\/.npm,sharing=locked \\\n\s+--mount=type=cache,id=plush-pnpm,target=\/web\/.pnpm-store,sharing=locked/u,
   );
+  for (const builderDockerfile of [dockerfile, webDockerfile]) {
+    const registryIndex = builderDockerfile.indexOf(
+      "npm config set registry https://registry.npmmirror.com",
+    );
+    const pnpmInstallIndex = builderDockerfile.indexOf(
+      "npm install -g pnpm@10.13.1",
+    );
+    assert.ok(registryIndex >= 0);
+    assert.ok(pnpmInstallIndex > registryIndex);
+  }
   assert.match(
     dockerfile,
     /RUN --mount=type=cache,id=plush-apt-lists,target=\/var\/lib\/apt\/lists,sharing=locked \\\n\s+--mount=type=cache,id=plush-apt-cache,target=\/var\/cache\/apt,sharing=locked/u,

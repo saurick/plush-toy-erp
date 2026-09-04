@@ -44,6 +44,7 @@ variables:
   CI: "true"
   DISPOSABLE_DATABASE_BASE_URL: "postgres://postgres:ci-local-password@127.0.0.1:55432/postgres?sslmode=disable"
   RELEASE_CUSTOMER: "yoyoosun"
+  PNPM_INSTALL_REGISTRY: "https://registry.npmmirror.com"
   GIT_STRATEGY: fetch
   GIT_DEPTH: "0"
 
@@ -178,7 +179,13 @@ prepare:
       node scripts/qa/ci-runner-capacity-evidence.mjs
       test "$(stat -c '%U:%G:%a' /usr/local/sbin/plush-chromium-sandbox)" = root:root:755
       sudo -n /usr/local/sbin/plush-chromium-sandbox preflight "$CI_JOB_ID" >/dev/null
-      pnpm --dir web install --frozen-lockfile
+      env \
+        -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
+        -u http_proxy -u https_proxy -u all_proxy \
+        -u npm_config_proxy -u npm_config_https_proxy \
+        -u NPM_CONFIG_PROXY -u NPM_CONFIG_HTTPS_PROXY \
+        npm_config_proxy= npm_config_https_proxy= \
+        pnpm --dir web install --frozen-lockfile --prefer-offline --registry="$PNPM_INSTALL_REGISTRY"
       node scripts/qa/ci-playwright-runtime.mjs seed
       (cd server && go mod download)
       test -d "$PNPM_STORE_PATH"
@@ -701,7 +708,13 @@ quality_affected:
         export DISPOSABLE_DATABASE_BASE_URL="postgres://postgres:ci-local-password@127.0.0.1:$postgres_port/postgres?sslmode=disable"
       fi
       if [[ "$needs_web" == "true" || "$needs_chromium" == "true" ]]; then
-        pnpm --dir web install --frozen-lockfile
+        env \
+          -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
+          -u http_proxy -u https_proxy -u all_proxy \
+          -u npm_config_proxy -u npm_config_https_proxy \
+          -u NPM_CONFIG_PROXY -u NPM_CONFIG_HTTPS_PROXY \
+          npm_config_proxy= npm_config_https_proxy= \
+          pnpm --dir web install --frozen-lockfile --prefer-offline --registry="$PNPM_INSTALL_REGISTRY"
       fi
       if [[ "$needs_web" == "true" ]]; then
         pnpm --dir web audit --prod --audit-level high --registry=https://registry.npmjs.org

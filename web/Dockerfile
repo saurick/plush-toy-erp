@@ -12,7 +12,8 @@ WORKDIR /app
 
 COPY web/package.json web/pnpm-lock.yaml ./web/
 
-RUN npm install -g pnpm@10.13.1 && \
+RUN npm config set registry https://registry.npmmirror.com && \
+    npm install -g pnpm@10.13.1 && \
     pnpm config set store-dir /app/.pnpm-store && \
     pnpm config set registry https://registry.npmmirror.com && \
     cd web && \
