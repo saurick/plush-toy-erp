@@ -120,7 +120,6 @@ import {
 import { createDuplicatedDraftLineItem } from '../utils/businessLineItems.mjs'
 import { currentBusinessDate } from '../utils/businessDate.mjs'
 import {
-  BOMXlsxImportError,
   MAX_BOM_XLSX_FILE_BYTES,
   buildBOMImportDraft,
   getBOMImportDraftIssues,
@@ -1113,9 +1112,10 @@ export default function BOMVersionsPage() {
       )
     } catch (error) {
       message.error(
-        error instanceof BOMXlsxImportError
-          ? error.message
-          : 'Excel 解析失败，请确认文件未损坏且使用现有 BOM 明细格式'
+        getActionErrorMessage(
+          error,
+          'Excel 解析失败，请确认文件未损坏且使用现有 BOM 明细格式'
+        )
       )
     } finally {
       setImporting(false)
