@@ -4,6 +4,7 @@ import process from 'node:process'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 
 import { createBusinessAttachmentAssertions } from './businessAttachmentAssertions.mjs'
+import { createBOMImportWorkbookFixture } from './bomImportWorkbookFixture.mjs'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
 import { createOutsourcingSourceFactScenarios } from './outsourcingSourceFactScenarios.mjs'
 import { createProductionSourceInboundLotScenarios } from './productionSourceInboundLotScenarios.mjs'
@@ -1502,6 +1503,220 @@ export function createBusinessFormalScenarios(deps) {
           path: path.join(outputDir, 'bom-person-field-labels-boundary.png'),
         })
         await closeBusinessFormModal(page, modal)
+      },
+    },
+    {
+      name: 'bom-xlsx-import-draft-desktop',
+      path: '/erp/purchase/material-bom',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        const rpcMutations = []
+        page.on('request', (request) => {
+          if (!request.url().includes('/rpc/')) return
+          try {
+            const body = request.postDataJSON() || {}
+            if (
+              /^(?:activate_|create_|save_|update_)/u.test(
+                String(body.method || '')
+              )
+            ) {
+              rpcMutations.push(body)
+            }
+          } catch {
+            // Non-JSON requests are outside the RPC mutation contract.
+          }
+        })
+
+        await expectHeading(page, '物料清单（BOM）')
+        const importButton = page.locator(
+          'button[data-business-action-key="import-bom-xlsx"]'
+        )
+        await importButton.waitFor({ state: 'visible' })
+        await page.waitForFunction(() => {
+          const button = document.querySelector(
+            'button[data-business-action-key="import-bom-xlsx"]'
+          )
+          return button instanceof HTMLButtonElement && !button.disabled
+        })
+        await page.getByLabel('选择 BOM Excel 文件').setInputFiles({
+          name: 'BOM-IMPORT-STYLE-L1.xlsx',
+          mimeType:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          buffer: createBOMImportWorkbookFixture(),
+        })
+
+        const modal = page
+          .locator('.erp-business-action-modal--form.ant-modal:visible')
+          .last()
+        await modal.waitFor({ state: 'visible' })
+        await expectText(page, '检查并保存导入草稿')
+        await expectText(page, '已读取 2 条 BOM 明细')
+        await expectText(page, '待补全 1 项')
+        assert.equal(
+          await modal.getByLabel('来源订单号', { exact: true }).inputValue(),
+          'ORDER-IMPORT-L1',
+          'BOM 导入应带入原表订单号'
+        )
+        assert.equal(
+          await modal.getByLabel('订单数量', { exact: true }).inputValue(),
+          '100',
+          'BOM 导入应保留用于损耗核对的原表订单数量'
+        )
+        assert.equal(
+          (
+            await modal.getByLabel('制表日期', { exact: true }).inputValue()
+          ).replaceAll('/', '-'),
+          '2026-01-19',
+          'BOM 导入应把 Excel 日期序列转换为本地化显示的业务日期'
+        )
+
+        const importMetrics = await modal.evaluate((node) => {
+          const alert = node.querySelector('.erp-bom-import-review')
+          const modalBody = node.querySelector('.ant-modal-body')
+          const rows = Array.from(
+            node.querySelectorAll(
+              '.erp-bom-modal-items .erp-sales-order-lines-form__row'
+            )
+          )
+          const statuses = rows.map((row) =>
+            row
+              .querySelector('.erp-bom-import-line-status')
+              ?.getAttribute('data-bom-import-row-status')
+          )
+          const alertRect = alert?.getBoundingClientRect()
+          const bodyRect = modalBody?.getBoundingClientRect()
+          return {
+            issueCount: alert?.getAttribute('data-bom-import-issue-count'),
+            statuses,
+            rowCount: rows.length,
+            alertContained:
+              Boolean(alertRect && bodyRect) &&
+              alertRect.left >= bodyRect.left - 1 &&
+              alertRect.right <= bodyRect.right + 1,
+            documentOverflowX:
+              document.documentElement.scrollWidth -
+              document.documentElement.clientWidth,
+          }
+        })
+        assert.deepEqual(
+          importMetrics,
+          {
+            issueCount: '1',
+            statuses: ['matched', 'unresolved'],
+            rowCount: 2,
+            alertContained: true,
+            documentOverflowX: 0,
+          },
+          `BOM 导入校对态应清楚区分已匹配与待补全行，且不撑破页面: ${JSON.stringify(
+            importMetrics
+          )}`
+        )
+        await modal.screenshot({
+          path: path.join(outputDir, 'bom-xlsx-import-unresolved.png'),
+        })
+
+        await modal.getByLabel('BOM 版本', { exact: true }).fill('V-IMPORT-L1')
+        await modal.getByRole('button', { name: '保存为草稿' }).click()
+        await expectText(page, '还有 1 项导入内容需要补全，暂未保存')
+        assert.equal(
+          rpcMutations.filter((item) => item.method === 'save_bom_with_items')
+            .length,
+          0,
+          '待补全的 BOM 导入不得提前写入草稿'
+        )
+
+        const rows = modal.locator(
+          '.erp-bom-modal-items .erp-sales-order-lines-form__row'
+        )
+        const unresolvedRow = rows.nth(1)
+        await unresolvedRow.scrollIntoViewIfNeeded()
+        const materialSelect = unresolvedRow.locator(
+          '.erp-line-item-field--source .ant-select'
+        )
+        await materialSelect.click()
+        await materialSelect.locator('input').fill('MAT-STYLE-L1')
+        await page.keyboard.press('Enter')
+        await materialSelect
+          .locator('.ant-select-selection-item')
+          .filter({ hasText: 'MAT-STYLE-L1' })
+          .waitFor({ state: 'visible' })
+        await modal
+          .locator('.erp-bom-import-review[data-bom-import-issue-count="0"]')
+          .waitFor({ state: 'visible' })
+        assert.deepEqual(
+          await modal
+            .locator('.erp-bom-import-line-status')
+            .evaluateAll((nodes) =>
+              nodes.map((node) =>
+                node.getAttribute('data-bom-import-row-status')
+              )
+            ),
+          ['matched', 'matched'],
+          '人工选择现有材料后，待补全行应即时变为已匹配'
+        )
+        await unresolvedRow.scrollIntoViewIfNeeded()
+        await modal.screenshot({
+          path: path.join(outputDir, 'bom-xlsx-import-resolved.png'),
+        })
+
+        const saveRequestPromise = page.waitForRequest((request) => {
+          if (!request.url().includes('/rpc/bom')) return false
+          try {
+            return request.postDataJSON()?.method === 'save_bom_with_items'
+          } catch {
+            return false
+          }
+        })
+        await modal.getByRole('button', { name: '保存为草稿' }).click()
+        const saveRequest = await saveRequestPromise
+        const saveBody = saveRequest.postDataJSON()
+        assert.equal(saveBody.method, 'save_bom_with_items')
+        assert.equal(saveBody.params.product_id, 1)
+        assert.equal(saveBody.params.version, 'V-IMPORT-L1')
+        assert.equal(saveBody.params.source_order_no, 'ORDER-IMPORT-L1')
+        assert.equal(saveBody.params.print_date, '2026-01-19')
+        assert.equal(saveBody.params.items.length, 2)
+        assert.deepEqual(
+          saveBody.params.items.map((item) => ({
+            materialID: item.material_id,
+            unitID: item.unit_id,
+            quantity: item.quantity,
+            lossRate: item.loss_rate,
+            totalUsage: item.total_usage_snapshot,
+          })),
+          [
+            {
+              materialID: 1,
+              unitID: 1,
+              quantity: '0.5',
+              lossRate: '0.1',
+              totalUsage: '55',
+            },
+            {
+              materialID: 1,
+              unitID: 1,
+              quantity: '1',
+              lossRate: '0',
+              totalUsage: '100',
+            },
+          ],
+          '导入保存必须使用现有主数据 ID、单位用量和逐行核对后的损耗率'
+        )
+        assert.equal(
+          JSON.stringify(saveBody.params).includes('_import_source'),
+          false,
+          '页面校对元数据不得进入正式 BOM 写入合同'
+        )
+        await modal.waitFor({ state: 'hidden' })
+        await expectText(page, 'BOM 导入草稿已创建')
+        assert.deepEqual(
+          rpcMutations.map((item) => item.method),
+          ['save_bom_with_items'],
+          'BOM Excel 导入只能保存草稿，不得自动创建主数据或激活版本'
+        )
+        await assertNoHorizontalOverflow(page, 'bom-xlsx-import-draft-desktop')
       },
     },
     {

@@ -939,8 +939,17 @@
             <div class="fields">
               <div class="field"><label for="paymentMethod">付款方式</label><input id="paymentMethod" value="月结" /></div>
               <div class="field"><label for="paymentTermDays">付款周期（天）</label><input id="paymentTermDays" value="30" inputmode="numeric" /></div>
-              <div class="field"><label for="taxMode">计税方式</label><select id="taxMode"><option>含税</option><option>未税</option></select></div>
-              <div class="field"><label for="freightTerms">运费条件</label><select id="freightTerms"><option>含运费</option><option>不含运费</option></select></div>
+            </div>
+          </section>
+
+          <section class="group">
+            <h3>税费与运费条件</h3>
+            <div class="fields">
+              <div class="field"><label for="taxMode">计税方式</label><select id="taxMode"><option value="INCLUSIVE">价内税</option><option value="EXCLUSIVE" selected>价外税</option><option value="NONE">不计税</option></select></div>
+              <div class="field"><label for="taxRate">税率</label><input id="taxRate" value="13" inputmode="decimal" /></div>
+              <div class="field"><label for="freightTerms">报价是否含运费</label><select id="freightTerms"><option value="INCLUDED">报价含运费</option><option value="EXCLUDED" selected>报价不含运费（另计）</option></select></div>
+              <div class="field"><label for="quotedFreightAmount">报价运费（CNY）</label><input id="quotedFreightAmount" value="180.00" inputmode="decimal" /><small id="quotedFreightHint">另行向客户收取，计入本单计税基础和订单总额。</small></div>
+              <div class="field full"><label for="priceConditionNote">报价备注</label><textarea id="priceConditionNote">报价运费沿用本单币种；出货实际运费另行记录。</textarea></div>
             </div>
           </section>
 
@@ -1053,7 +1062,16 @@
                   >数量合计 <strong id="quantityTotal">3000</strong></span
                 >
                 <span class="stat"
-                  >金额合计 <strong id="amountTotal">4500.00</strong></span
+                  >货款金额 <strong id="amountTotal">4500.00</strong></span
+                >
+                <span class="stat"
+                  >报价运费 <strong id="quotedFreightTotal">180.00</strong></span
+                >
+                <span class="stat"
+                  >税额 <strong id="taxAmountTotal">608.40</strong></span
+                >
+                <span class="stat"
+                  >订单总额 <strong id="orderTotal">5288.40</strong></span
                 >
               </div>
             </div>
@@ -1064,6 +1082,7 @@
             <ul>
               <li>切换客户或 SKU 后，不保留上一项不适用的业务信息。</li>
               <li>客户、产品、数量和交期缺失时，必须补齐后再保存。</li>
+              <li>报价含运费时清空另计金额；报价不含运费时，提交订单前必须明确填写报价运费。</li>
               <li>只读或无权限状态不得继续提交保存动作。</li>
             </ul>
           </div>
@@ -1108,6 +1127,11 @@
       const itemList = document.querySelector("#itemList");
       const modeNote = document.querySelector("#modeNote");
       const footerState = document.querySelector("#footerState");
+      const freightTerms = document.querySelector("#freightTerms");
+      const quotedFreightAmount = document.querySelector("#quotedFreightAmount");
+      const quotedFreightHint = document.querySelector("#quotedFreightHint");
+      const taxMode = document.querySelector("#taxMode");
+      const taxRate = document.querySelector("#taxRate");
       const focusableSelector = [
         "button:not([disabled])",
         "a[href]",
@@ -1170,6 +1194,22 @@
               readonly || control.dataset.modeInitiallyDisabled === "true";
           });
         syncItemControls(readonly);
+        syncQuotedFreightField(readonly);
+      }
+
+      function syncQuotedFreightField(
+        readonly = formMode.value === "readonly",
+      ) {
+        const excluded = freightTerms.value === "EXCLUDED";
+        quotedFreightAmount.disabled = readonly || !excluded;
+        if (!excluded) {
+          quotedFreightAmount.value = "";
+          quotedFreightHint.textContent =
+            "已包含在产品单价中，不重复计入订单总额。";
+        } else {
+          quotedFreightHint.textContent =
+            "另行向客户收取，计入本单计税基础和订单总额；提交前需填写。";
+        }
       }
 
       function applyMode(name) {
@@ -1302,12 +1342,38 @@
           },
           0,
         );
+        const quotedFreight =
+          freightTerms.value === "EXCLUDED"
+            ? Number(quotedFreightAmount.value || 0)
+            : 0;
+        const commercialBase = amountTotal + quotedFreight;
+        const rate = Number(taxRate.value || 0);
+        const taxAmount =
+          taxMode.value === "INCLUSIVE"
+            ? (commercialBase * rate) / (100 + rate)
+            : taxMode.value === "EXCLUSIVE"
+              ? (commercialBase * rate) / 100
+              : 0;
+        const total =
+          taxMode.value === "EXCLUSIVE"
+            ? commercialBase + taxAmount
+            : commercialBase;
         document.querySelector("#itemCount").textContent = String(cards.length);
         document.querySelector("#quantityTotal").textContent = String(
           quantityTotal || 0,
         );
         document.querySelector("#amountTotal").textContent = (
           amountTotal || 0
+        ).toFixed(2);
+        document.querySelector("#quotedFreightTotal").textContent =
+          freightTerms.value === "INCLUDED"
+            ? "已含在单价"
+            : (quotedFreight || 0).toFixed(2);
+        document.querySelector("#taxAmountTotal").textContent = (
+          taxAmount || 0
+        ).toFixed(2);
+        document.querySelector("#orderTotal").textContent = (
+          total || 0
         ).toFixed(2);
         syncItemControls();
       }
@@ -1357,6 +1423,13 @@
       }
 
       formMode.addEventListener("change", () => applyMode(formMode.value));
+      freightTerms.addEventListener("change", () => {
+        syncQuotedFreightField();
+        updateStats();
+      });
+      quotedFreightAmount.addEventListener("input", updateStats);
+      taxMode.addEventListener("change", updateStats);
+      taxRate.addEventListener("input", updateStats);
       openFormModal.addEventListener("click", openBusinessForm);
       closeFormModal.addEventListener("click", closeBusinessForm);
       cancelFormModal.addEventListener("click", closeBusinessForm);

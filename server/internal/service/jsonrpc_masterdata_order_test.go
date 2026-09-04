@@ -307,12 +307,12 @@ type stubSalesOrderJSONRPCRepo struct {
 
 func (s *stubSalesOrderJSONRPCRepo) CreateSalesOrder(_ context.Context, in *biz.SalesOrderMutation) (*biz.SalesOrder, error) {
 	s.savedOrder = in
-	return &biz.SalesOrder{ID: 1, OrderNo: in.OrderNo, CustomerID: in.CustomerID, Currency: in.Currency, SalesOwner: in.SalesOwner, ContactSnapshot: in.ContactSnapshot, PaymentMethod: in.PaymentMethod, PaymentTermDays: in.PaymentTermDays, PriceConditionNote: in.PriceConditionNote, OrderDate: in.OrderDate, LifecycleStatus: biz.SalesOrderStatusDraft}, nil
+	return &biz.SalesOrder{ID: 1, OrderNo: in.OrderNo, CustomerID: in.CustomerID, Currency: in.Currency, SalesOwner: in.SalesOwner, ContactSnapshot: in.ContactSnapshot, PaymentMethod: in.PaymentMethod, PaymentTermDays: in.PaymentTermDays, PriceConditionNote: in.PriceConditionNote, TaxMode: in.TaxMode, TaxRate: in.TaxRate, FreightTerms: in.FreightTerms, QuotedFreightAmount: in.QuotedFreightAmount, GoodsAmount: in.GoodsAmount, TaxAmount: in.TaxAmount, OrderTotal: in.OrderTotal, OrderDate: in.OrderDate, LifecycleStatus: biz.SalesOrderStatusDraft}, nil
 }
 
 func (s *stubSalesOrderJSONRPCRepo) UpdateSalesOrder(_ context.Context, id int, in *biz.SalesOrderMutation) (*biz.SalesOrder, error) {
 	s.savedOrder = in
-	return &biz.SalesOrder{ID: id, OrderNo: in.OrderNo, CustomerID: in.CustomerID, Currency: in.Currency, SalesOwner: in.SalesOwner, ContactSnapshot: in.ContactSnapshot, PaymentMethod: in.PaymentMethod, PaymentTermDays: in.PaymentTermDays, PriceConditionNote: in.PriceConditionNote, OrderDate: in.OrderDate, LifecycleStatus: biz.SalesOrderStatusDraft}, nil
+	return &biz.SalesOrder{ID: id, OrderNo: in.OrderNo, CustomerID: in.CustomerID, Currency: in.Currency, SalesOwner: in.SalesOwner, ContactSnapshot: in.ContactSnapshot, PaymentMethod: in.PaymentMethod, PaymentTermDays: in.PaymentTermDays, PriceConditionNote: in.PriceConditionNote, TaxMode: in.TaxMode, TaxRate: in.TaxRate, FreightTerms: in.FreightTerms, QuotedFreightAmount: in.QuotedFreightAmount, GoodsAmount: in.GoodsAmount, TaxAmount: in.TaxAmount, OrderTotal: in.OrderTotal, OrderDate: in.OrderDate, LifecycleStatus: biz.SalesOrderStatusDraft}, nil
 }
 
 func (s *stubSalesOrderJSONRPCRepo) GetSalesOrder(_ context.Context, id int) (*biz.SalesOrder, error) {
@@ -399,7 +399,7 @@ func (s *stubSalesOrderJSONRPCRepo) SaveSalesOrderWithItems(_ context.Context, i
 		version = in.ExpectedVersion + 1
 	}
 	out := &biz.SalesOrderWithItems{
-		Order: &biz.SalesOrder{ID: orderID, OrderNo: in.OrderNo, CustomerID: in.CustomerID, Currency: in.Currency, SalesOwner: in.SalesOwner, ContactSnapshot: in.ContactSnapshot, PaymentMethod: in.PaymentMethod, PaymentTermDays: in.PaymentTermDays, PriceConditionNote: in.PriceConditionNote, OrderDate: in.OrderDate, LifecycleStatus: biz.SalesOrderStatusDraft, Version: version},
+		Order: &biz.SalesOrder{ID: orderID, OrderNo: in.OrderNo, CustomerID: in.CustomerID, Currency: in.Currency, SalesOwner: in.SalesOwner, ContactSnapshot: in.ContactSnapshot, PaymentMethod: in.PaymentMethod, PaymentTermDays: in.PaymentTermDays, PriceConditionNote: in.PriceConditionNote, TaxMode: in.TaxMode, TaxRate: in.TaxRate, FreightTerms: in.FreightTerms, QuotedFreightAmount: in.QuotedFreightAmount, GoodsAmount: in.GoodsAmount, TaxAmount: in.TaxAmount, OrderTotal: in.OrderTotal, OrderDate: in.OrderDate, LifecycleStatus: biz.SalesOrderStatusDraft, Version: version},
 		Items: make([]*biz.SalesOrderItem, 0, len(items)),
 	}
 	for idx, item := range items {
@@ -1486,7 +1486,7 @@ func TestJsonrpcDispatcher_SalesOrderAPIRequiresPermissionAndRejectsShipmentVerb
 	}
 }
 
-func TestJsonrpcDispatcher_SalesOrderAggregateRejectsUnknownFieldAndMalformedPaymentTerm(t *testing.T) {
+func TestJsonrpcDispatcher_SalesOrderAggregateRejectsUnknownOrMalformedFields(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		key   string
@@ -1494,6 +1494,9 @@ func TestJsonrpcDispatcher_SalesOrderAggregateRejectsUnknownFieldAndMalformedPay
 	}{
 		{name: "unknown top-level field", key: "unexpected_field", value: true},
 		{name: "malformed payment term", key: "payment_term_days", value: "30"},
+		{name: "quoted freight as JSON number", key: "quoted_freight_amount", value: float64(10)},
+		{name: "quoted freight over precision", key: "quoted_freight_amount", value: "0.0000001"},
+		{name: "negative quoted freight", key: "quoted_freight_amount", value: "-1"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			repo := &stubSalesOrderJSONRPCRepo{customerActive: true, productActive: true, unitActive: true}
@@ -1733,15 +1736,18 @@ func TestJsonrpcDispatcher_SaveSalesOrderWithItemsUsesSingleUsecase(t *testing.T
 		biz.PermissionSalesOrderCreate,
 	))
 	params := mustJSONRPCStruct(t, map[string]any{
-		"order_no":             "SO-TX-JSONRPC",
-		"customer_id":          float64(1),
-		"currency":             "HKD",
-		"sales_owner":          "张三",
-		"contact_snapshot":     map[string]any{"name": "李四", "email": "buyer@example.com"},
-		"payment_method":       "60天月结",
-		"payment_term_days":    float64(60),
-		"price_condition_note": "本单价格按60天账期",
-		"order_date":           "2026-06-15",
+		"order_no":              "SO-TX-JSONRPC",
+		"customer_id":           float64(1),
+		"currency":              "HKD",
+		"sales_owner":           "张三",
+		"contact_snapshot":      map[string]any{"name": "李四", "email": "buyer@example.com"},
+		"payment_method":        "60天月结",
+		"payment_term_days":     float64(60),
+		"price_condition_note":  "本单价格按60天账期",
+		"tax_mode":              biz.SalesOrderTaxModeNone,
+		"freight_terms":         biz.SalesOrderFreightTermsExcluded,
+		"quoted_freight_amount": "88.5",
+		"order_date":            "2026-06-15",
 		"items": []any{
 			map[string]any{
 				"line_no":          float64(1),
@@ -1772,6 +1778,9 @@ func TestJsonrpcDispatcher_SaveSalesOrderWithItemsUsesSingleUsecase(t *testing.T
 	if repo.savedOrder.SalesOwner == nil || *repo.savedOrder.SalesOwner != "张三" || repo.savedOrder.ContactSnapshot["email"] != "buyer@example.com" {
 		t.Fatalf("expected owner and contact snapshot forwarded, got %#v", repo.savedOrder)
 	}
+	if repo.savedOrder.QuotedFreightAmount == nil || repo.savedOrder.QuotedFreightAmount.String() != "88.5" {
+		t.Fatalf("expected exact quoted freight forwarded, got %#v", repo.savedOrder)
+	}
 	data := res.Data.AsMap()
 	items := data["sales_order_items"].([]any)
 	if data["sales_order"] == nil || len(items) != 1 {
@@ -1783,6 +1792,9 @@ func TestJsonrpcDispatcher_SaveSalesOrderWithItemsUsesSingleUsecase(t *testing.T
 	}
 	if order["sales_owner"] != "张三" || order["contact_snapshot"] == nil {
 		t.Fatalf("expected owner and contact snapshot in save response, got %#v", order)
+	}
+	if order["quoted_freight_amount"] != "88.5" {
+		t.Fatalf("expected quoted freight in save response, got %#v", order)
 	}
 	item := items[0].(map[string]any)
 	if fmt.Sprint(item["product_sku_id"]) != "10" {

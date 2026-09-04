@@ -3866,6 +3866,7 @@ var (
 		{Name: "tax_mode", Type: field.TypeString, Nullable: true, Size: 32},
 		{Name: "tax_rate", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "freight_terms", Type: field.TypeString, Nullable: true, Size: 32},
+		{Name: "quoted_freight_amount", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "goods_amount", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "tax_amount", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "order_total", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
@@ -3891,7 +3892,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "sales_orders_customers_sales_orders",
-				Columns:    []*schema.Column{SalesOrdersColumns[29]},
+				Columns:    []*schema.Column{SalesOrdersColumns[30]},
 				RefColumns: []*schema.Column{CustomersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -3905,7 +3906,7 @@ var (
 			{
 				Name:    "salesorder_customer_id",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[29]},
+				Columns: []*schema.Column{SalesOrdersColumns[30]},
 			},
 			{
 				Name:    "salesorder_customer_order_no",
@@ -3925,17 +3926,17 @@ var (
 			{
 				Name:    "salesorder_lifecycle_status",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[19]},
+				Columns: []*schema.Column{SalesOrdersColumns[20]},
 			},
 			{
 				Name:    "salesorder_order_date",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[17]},
+				Columns: []*schema.Column{SalesOrdersColumns[18]},
 			},
 			{
 				Name:    "salesorder_planned_delivery_date",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[18]},
+				Columns: []*schema.Column{SalesOrdersColumns[19]},
 			},
 		},
 	}
@@ -5351,16 +5352,18 @@ func init() {
 	SalesOrdersTable.ForeignKeys[0].RefTable = CustomersTable
 	SalesOrdersTable.Annotation = &entsql.Annotation{}
 	SalesOrdersTable.Annotation.Checks = map[string]string{
-		"sales_orders_currency_allowed":         "currency IN ('USD', 'CNY', 'HKD')",
-		"sales_orders_freight_terms_allowed":    "freight_terms IS NULL OR freight_terms IN ('INCLUDED', 'EXCLUDED')",
-		"sales_orders_goods_amount_nonnegative": "goods_amount IS NULL OR goods_amount >= 0",
-		"sales_orders_lifecycle_status_allowed": "lifecycle_status IN ('draft', 'submitted', 'active', 'closed', 'canceled')",
-		"sales_orders_order_total_nonnegative":  "order_total IS NULL OR order_total >= 0",
-		"sales_orders_tax_amount_nonnegative":   "tax_amount IS NULL OR tax_amount >= 0",
-		"sales_orders_tax_mode_allowed":         "tax_mode IS NULL OR tax_mode IN ('INCLUSIVE', 'EXCLUSIVE', 'NONE')",
-		"sales_orders_tax_pair_valid":           "((tax_mode IS NULL AND tax_rate IS NULL) OR (tax_mode = 'NONE' AND tax_rate IS NULL) OR (tax_mode IN ('INCLUSIVE', 'EXCLUSIVE') AND tax_rate IS NOT NULL))",
-		"sales_orders_tax_rate_valid":           "tax_rate IS NULL OR (tax_rate > 0 AND tax_rate <= 100)",
-		"sales_orders_version_positive":         "version > 0",
+		"sales_orders_currency_allowed":           "currency IN ('USD', 'CNY', 'HKD')",
+		"sales_orders_freight_terms_allowed":      "freight_terms IS NULL OR freight_terms IN ('INCLUDED', 'EXCLUDED')",
+		"sales_orders_goods_amount_nonnegative":   "goods_amount IS NULL OR goods_amount >= 0",
+		"sales_orders_lifecycle_status_allowed":   "lifecycle_status IN ('draft', 'submitted', 'active', 'closed', 'canceled')",
+		"sales_orders_order_total_nonnegative":    "order_total IS NULL OR order_total >= 0",
+		"sales_orders_quoted_freight_nonnegative": "quoted_freight_amount IS NULL OR quoted_freight_amount >= 0",
+		"sales_orders_quoted_freight_terms_valid": "quoted_freight_amount IS NULL OR freight_terms = 'EXCLUDED'",
+		"sales_orders_tax_amount_nonnegative":     "tax_amount IS NULL OR tax_amount >= 0",
+		"sales_orders_tax_mode_allowed":           "tax_mode IS NULL OR tax_mode IN ('INCLUSIVE', 'EXCLUSIVE', 'NONE')",
+		"sales_orders_tax_pair_valid":             "((tax_mode IS NULL AND tax_rate IS NULL) OR (tax_mode = 'NONE' AND tax_rate IS NULL) OR (tax_mode IN ('INCLUSIVE', 'EXCLUSIVE') AND tax_rate IS NOT NULL))",
+		"sales_orders_tax_rate_valid":             "tax_rate IS NULL OR (tax_rate > 0 AND tax_rate <= 100)",
+		"sales_orders_version_positive":           "version > 0",
 	}
 	SalesOrderItemsTable.ForeignKeys[0].RefTable = ProductSkusTable
 	SalesOrderItemsTable.ForeignKeys[1].RefTable = SalesOrdersTable

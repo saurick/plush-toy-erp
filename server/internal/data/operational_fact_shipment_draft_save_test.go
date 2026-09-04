@@ -36,13 +36,14 @@ func createEditableShipmentSourceFixture(
 	customer := createSalesOrderTestCustomer(t, ctx, client, "C-SHIP-EDIT", true)
 	salesUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, log.NewStdLogger(io.Discard)))
 	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
-		OrderNo:          "SO-SHIP-EDIT",
-		CustomerID:       customer.ID,
-		Currency:         biz.FinanceCurrencyUSD,
-		CustomerSnapshot: map[string]any{"code": "C-SHIP-EDIT", "name": "出货编辑测试客户"},
-		OrderDate:        time.Date(2026, 8, 9, 0, 0, 0, 0, time.UTC),
-		TaxMode:          stringPtr(biz.SalesOrderTaxModeNone),
-		FreightTerms:     stringPtr(biz.SalesOrderFreightTermsExcluded),
+		OrderNo:             "SO-SHIP-EDIT",
+		CustomerID:          customer.ID,
+		Currency:            biz.FinanceCurrencyUSD,
+		CustomerSnapshot:    map[string]any{"code": "C-SHIP-EDIT", "name": "出货编辑测试客户"},
+		OrderDate:           time.Date(2026, 8, 9, 0, 0, 0, 0, time.UTC),
+		TaxMode:             stringPtr(biz.SalesOrderTaxModeNone),
+		FreightTerms:        stringPtr(biz.SalesOrderFreightTermsExcluded),
+		QuotedFreightAmount: &decimal.Zero,
 	})
 	if err != nil {
 		t.Fatalf("create source sales order: %v", err)

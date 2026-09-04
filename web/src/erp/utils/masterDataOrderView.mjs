@@ -66,7 +66,7 @@ export const SALES_ORDER_TAX_MODE_OPTIONS = Object.freeze([
 
 export const SALES_ORDER_FREIGHT_TERMS_OPTIONS = Object.freeze([
   Object.freeze({ value: 'INCLUDED', label: '报价含运费' }),
-  Object.freeze({ value: 'EXCLUDED', label: '报价不含运费' }),
+  Object.freeze({ value: 'EXCLUDED', label: '报价不含运费（另计）' }),
 ])
 
 export const PURCHASE_INVOICE_REQUIRED_OPTIONS = Object.freeze([
@@ -405,6 +405,8 @@ export function calculateSalesOrderAmounts({
   items = [],
   taxMode,
   taxRate,
+  freightTerms,
+  quotedFreightAmount,
 } = {}) {
   const normalizedItems = Array.isArray(items) ? items : []
   if (normalizedItems.length === 0) {
@@ -421,6 +423,19 @@ export function calculateSalesOrderAmounts({
     BigInt(0)
   )
   const goodsAmount = numeric20Scale6TextFromUnits(goodsUnits.toString())
+  const normalizedFreightTerms = String(freightTerms || '')
+    .trim()
+    .toUpperCase()
+  let commercialBaseUnits = goodsUnits
+  if (normalizedFreightTerms === 'EXCLUDED') {
+    const quotedFreightUnits = numeric20Scale6Units(quotedFreightAmount)
+    if (quotedFreightUnits === null) {
+      return { complete: false, goodsAmount, taxAmount: '', orderTotal: '' }
+    }
+    commercialBaseUnits += BigInt(quotedFreightUnits)
+  } else if (normalizedFreightTerms !== 'INCLUDED') {
+    return { complete: false, goodsAmount, taxAmount: '', orderTotal: '' }
+  }
   const mode = String(taxMode || '')
     .trim()
     .toUpperCase()
@@ -429,7 +444,7 @@ export function calculateSalesOrderAmounts({
       complete: true,
       goodsAmount,
       taxAmount: '0',
-      orderTotal: goodsAmount,
+      orderTotal: numeric20Scale6TextFromUnits(commercialBaseUnits.toString()),
     }
   }
   if (mode !== 'INCLUSIVE' && mode !== 'EXCLUSIVE') {
@@ -449,14 +464,14 @@ export function calculateSalesOrderAmounts({
       ? percentageBaseUnits + BigInt(rateUnits)
       : percentageBaseUnits
   const taxUnits = divideAndRoundNonNegative(
-    goodsUnits * BigInt(rateUnits),
+    commercialBaseUnits * BigInt(rateUnits),
     denominator
   )
   if (taxUnits === null) {
     return { complete: false, goodsAmount, taxAmount: '', orderTotal: '' }
   }
   const orderTotalUnits =
-    mode === 'EXCLUSIVE' ? goodsUnits + taxUnits : goodsUnits
+    mode === 'EXCLUSIVE' ? commercialBaseUnits + taxUnits : commercialBaseUnits
   return {
     complete: true,
     goodsAmount,
@@ -1283,6 +1298,9 @@ export function buildSalesOrderParams(values = {}, extra = {}) {
   const taxMode = String(values.tax_mode || '')
     .trim()
     .toUpperCase()
+  const freightTerms = String(values.freight_terms || '')
+    .trim()
+    .toUpperCase()
   return compactParams({
     ...extra,
     order_no: trimOptional(values.order_no),
@@ -1316,6 +1334,10 @@ export function buildSalesOrderParams(values = {}, extra = {}) {
         ? undefined
         : normalizeOptionalDecimalString(values.tax_rate),
     freight_terms: trimOptional(values.freight_terms),
+    quoted_freight_amount:
+      freightTerms === 'EXCLUDED'
+        ? normalizeOptionalDecimalString(values.quoted_freight_amount)
+        : undefined,
     order_date: trimOptional(values.order_date),
     planned_delivery_date: trimOptional(values.planned_delivery_date),
     note: trimOptional(values.note),

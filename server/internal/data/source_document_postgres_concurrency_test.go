@@ -83,13 +83,15 @@ func TestSourceDocumentPostgresSaveSubmitConcurrency(t *testing.T) {
 		unitPrice := decimal.NewFromInt(1)
 		taxMode := biz.SalesOrderTaxModeNone
 		freightTerms := biz.SalesOrderFreightTermsExcluded
+		quotedFreightAmount := decimal.Zero
 
 		created, err := realUC.SaveSalesOrderWithItems(ctx, 0, &biz.SalesOrderMutation{
-			OrderNo:      "SO-PG-CONCURRENT-" + suffix,
-			CustomerID:   customer.ID,
-			OrderDate:    orderDate,
-			TaxMode:      &taxMode,
-			FreightTerms: &freightTerms,
+			OrderNo:             "SO-PG-CONCURRENT-" + suffix,
+			CustomerID:          customer.ID,
+			OrderDate:           orderDate,
+			TaxMode:             &taxMode,
+			FreightTerms:        &freightTerms,
+			QuotedFreightAmount: &quotedFreightAmount,
 		}, []*biz.SalesOrderItemSaveMutation{{
 			SalesOrderItemMutation: biz.SalesOrderItemMutation{
 				LineNo:          1,
@@ -110,13 +112,14 @@ func TestSourceDocumentPostgresSaveSubmitConcurrency(t *testing.T) {
 		saveErr := make(chan error, 1)
 		go func() {
 			_, err := pausedUC.SaveSalesOrderWithItems(ctx, created.Order.ID, &biz.SalesOrderMutation{
-				OrderNo:         "SO-PG-MUTATED-" + suffix,
-				CustomerID:      customer.ID,
-				OrderDate:       orderDate,
-				Currency:        created.Order.Currency,
-				TaxMode:         &taxMode,
-				FreightTerms:    &freightTerms,
-				ExpectedVersion: created.Order.Version,
+				OrderNo:             "SO-PG-MUTATED-" + suffix,
+				CustomerID:          customer.ID,
+				OrderDate:           orderDate,
+				Currency:            created.Order.Currency,
+				TaxMode:             &taxMode,
+				FreightTerms:        &freightTerms,
+				QuotedFreightAmount: &quotedFreightAmount,
+				ExpectedVersion:     created.Order.Version,
 			}, []*biz.SalesOrderItemSaveMutation{{
 				ID: created.Items[0].ID,
 				SalesOrderItemMutation: biz.SalesOrderItemMutation{

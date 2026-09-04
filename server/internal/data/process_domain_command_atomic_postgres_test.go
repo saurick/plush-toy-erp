@@ -192,7 +192,8 @@ func TestSalesProcessCommandPostgresRollsBackOnResultConflictAndFailsClosedForLe
 			OrderNo: "SO-ATOMIC-" + label + "-" + suffix, CustomerID: customer.ID,
 			CustomerSnapshot: map[string]any{"name": customer.Name}, ContactSnapshot: map[string]any{}, OrderDate: time.Now(),
 			Currency: biz.FinanceCurrencyCNY, TaxMode: stringPtr(biz.SalesOrderTaxModeNone),
-			FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
+			FreightTerms:        stringPtr(biz.SalesOrderFreightTermsExcluded),
+			QuotedFreightAmount: &decimal.Zero,
 		})
 		if createErr != nil {
 			t.Fatalf("create sales order %s: %v", label, createErr)
@@ -316,7 +317,7 @@ func TestInventoryPostgresShipmentProcessCommandRollsBackSKUInventoryOnResultCon
 	unitPrice := decimal.NewFromInt(1)
 	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
 		OrderNo: "SO-ATOMIC-SHIP-" + fixtures.suffix, CustomerID: customer.ID, OrderDate: time.Now(),
-		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
+		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded), QuotedFreightAmount: &decimal.Zero,
 	})
 	if err != nil {
 		t.Fatalf("create shipment source sales order: %v", err)

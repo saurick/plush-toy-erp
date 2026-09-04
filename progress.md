@@ -284,3 +284,10 @@
 - 工作台与边界：质量工程页面单独展示当前 committed SHA 的 R640 普通 push CI 和 job 耗时，Local dirty/本地回执仍分层；版本中心仍只读取真实 GitLab pipeline、不可变 Release/Package 和 target operation。`test-133` 仍只是 customer-trial，不能冒充正式生产；当前 pipeline 耗时、版本、制品 digest、演练、目标部署和 UAT 必须从各自回执读取，不由本过程记录宣称。
 - 当前目标边界：固定只读 `target-preflight --target test-133` 的最近证据是远端目标身份与合同不匹配，因此在重新读回并定位 config、数据库、版本或目标身份漂移前，不对 133 seed、reset 或 promotion。该阻断不把 133 升格为生产，也不替代继续从正式 registry 识别独立生产 target。
 - 安全处置：运行态诊断期间对 Runner 认证信息可能进入工具输出的情形按泄露处理，旧 token 已失效并完成无回显轮换。后续诊断只读取脱敏身份和状态，不输出 token 值。
+
+### 销售订单报价运费独立金额（2026-09-04）
+
+- 业务闭环：销售订单新增整单“报价运费”，沿用订单币种；“报价不含运费（另计）”时纳入同一计税基础和订单总额，允许草稿暂缺但提交 / 生效前必须明确填写，`0` 表示明确免收；“报价含运费”时自动清空该金额并禁止重复计入。出货单实际运费仍是独立物流事实，不复制、不回写，也不自动形成应付或付款。
+- 真源 / 历史：后端 usecase 唯一计算货款、税额和总额，API、列表、详情、导出、帮助与试用模拟数据同步读取同一字段；数据库只新增可空 `quoted_freight_amount` 及非负、运费条件一致性约束。历史记录不猜测回填，既有已生效单仍可读取，后续需要商业条件完备的状态转换按新规则失败关闭。
+- Schema / 迁移：完成 Ent 生成、Atlas migration、风险元数据、`atlas.sum` 和数据字典同步；`make data` 读回 migration 目录与目标 schema 一致，`scripts/qa/db-guard.sh` 通过。本批未连接或 apply 开发库、测试库或目标库，未发布或部署。
+- 验证：Go `internal/biz`、`internal/service`、`internal/data` 全包通过；报价运费字段链、计算、页面、帮助、模拟数据、原型和 Schema 文档定向 Node `156 / 156` 通过；Vite production build（`3396` modules）、阶段编号边界与 `git diff --check` 通过。隔离浏览器的销售订单竞态场景通过；可见原型交互确认含运费会清空并禁用另计金额，不含运费填 `250.00` 后税额和总额分别更新为 `617.50`、`5367.50`。全业务页面场景在销售订单检查之后被无关的出货附件审计断言阻断，不能算本批绿色；客户 UAT、目标 migration smoke、full / strict、提交和推送均未执行。

@@ -478,11 +478,12 @@ func TestOperationalFactUsecase_SourceLinkedShipmentAndReservationAllowInactiveO
 		t.Fatalf("create source product SKU failed: %v", err)
 	}
 	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
-		OrderNo:      "SO-SOURCE-INACTIVE",
-		CustomerID:   customer.ID,
-		OrderDate:    time.Date(2026, 6, 18, 0, 0, 0, 0, time.UTC),
-		TaxMode:      stringPtr(biz.SalesOrderTaxModeNone),
-		FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
+		OrderNo:             "SO-SOURCE-INACTIVE",
+		CustomerID:          customer.ID,
+		OrderDate:           time.Date(2026, 6, 18, 0, 0, 0, 0, time.UTC),
+		TaxMode:             stringPtr(biz.SalesOrderTaxModeNone),
+		FreightTerms:        stringPtr(biz.SalesOrderFreightTermsExcluded),
+		QuotedFreightAmount: &decimal.Zero,
 	})
 	if err != nil {
 		t.Fatalf("create sales order failed: %v", err)
@@ -1318,11 +1319,12 @@ func TestOperationalFactRepo_ShipmentSourceIntegrityAndCumulativeQuantity(t *tes
 	customer := createSalesOrderTestCustomer(t, ctx, client, "C-SHIP-SOURCE", true)
 	otherCustomer := createSalesOrderTestCustomer(t, ctx, client, "C-SHIP-SOURCE-OTHER", true)
 	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
-		OrderNo:      "SO-SHIP-SOURCE",
-		CustomerID:   customer.ID,
-		OrderDate:    time.Date(2026, 7, 10, 0, 0, 0, 0, time.UTC),
-		TaxMode:      stringPtr(biz.SalesOrderTaxModeNone),
-		FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
+		OrderNo:             "SO-SHIP-SOURCE",
+		CustomerID:          customer.ID,
+		OrderDate:           time.Date(2026, 7, 10, 0, 0, 0, 0, time.UTC),
+		TaxMode:             stringPtr(biz.SalesOrderTaxModeNone),
+		FreightTerms:        stringPtr(biz.SalesOrderFreightTermsExcluded),
+		QuotedFreightAmount: &decimal.Zero,
 	})
 	if err != nil {
 		t.Fatalf("create sales order failed: %v", err)
@@ -1447,11 +1449,12 @@ func TestOperationalFactRepo_ShipmentConsumesOwnReservationWithoutStealingAnothe
 		t.Helper()
 		customer := createSalesOrderTestCustomer(t, ctx, client, "C-RESERVE-"+suffix, true)
 		order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
-			OrderNo:      "SO-RESERVE-" + suffix,
-			CustomerID:   customer.ID,
-			OrderDate:    time.Date(2026, 7, 10, 0, 0, 0, 0, time.UTC),
-			TaxMode:      stringPtr(biz.SalesOrderTaxModeNone),
-			FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
+			OrderNo:             "SO-RESERVE-" + suffix,
+			CustomerID:          customer.ID,
+			OrderDate:           time.Date(2026, 7, 10, 0, 0, 0, 0, time.UTC),
+			TaxMode:             stringPtr(biz.SalesOrderTaxModeNone),
+			FreightTerms:        stringPtr(biz.SalesOrderFreightTermsExcluded),
+			QuotedFreightAmount: &decimal.Zero,
 		})
 		if err != nil {
 			t.Fatalf("create order %s failed: %v", suffix, err)
@@ -1547,7 +1550,7 @@ func TestOperationalFactRepo_ShipmentRejectsPartialAtomicReservationConsumption(
 		t.Fatalf("seed product inventory failed: %v", err)
 	}
 	customer := createSalesOrderTestCustomer(t, ctx, client, "C-PARTIAL-RESERVE", true)
-	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{OrderNo: "SO-PARTIAL-RESERVE", CustomerID: customer.ID, OrderDate: time.Now(), TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded)})
+	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{OrderNo: "SO-PARTIAL-RESERVE", CustomerID: customer.ID, OrderDate: time.Now(), TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded), QuotedFreightAmount: &decimal.Zero})
 	if err != nil {
 		t.Fatalf("create order failed: %v", err)
 	}
@@ -1608,7 +1611,7 @@ func TestOperationalFactRepo_ShipmentRejectsRemainingReservationAcrossInventoryG
 		}
 	}
 	customer := createSalesOrderTestCustomer(t, ctx, client, "C-CROSS-GRAIN", true)
-	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{OrderNo: "SO-CROSS-GRAIN", CustomerID: customer.ID, OrderDate: time.Now(), TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded)})
+	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{OrderNo: "SO-CROSS-GRAIN", CustomerID: customer.ID, OrderDate: time.Now(), TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded), QuotedFreightAmount: &decimal.Zero})
 	if err != nil {
 		t.Fatalf("create sales order failed: %v", err)
 	}

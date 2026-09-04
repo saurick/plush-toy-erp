@@ -9,8 +9,18 @@ import {
   PlusOutlined,
   PrinterOutlined,
   SettingOutlined,
+  UploadOutlined,
 } from '@ant-design/icons'
-import { Button, Form, Input, Popconfirm, Select, Space } from 'antd'
+import {
+  Alert,
+  Button,
+  Form,
+  Input,
+  Popconfirm,
+  Select,
+  Space,
+  Tag,
+} from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -109,6 +119,14 @@ import {
 } from '../utils/referenceSelectOptions.mjs'
 import { createDuplicatedDraftLineItem } from '../utils/businessLineItems.mjs'
 import { currentBusinessDate } from '../utils/businessDate.mjs'
+import {
+  BOMXlsxImportError,
+  MAX_BOM_XLSX_FILE_BYTES,
+  buildBOMImportDraft,
+  getBOMImportDraftIssues,
+  getBOMImportLineIssues,
+  parseBOMXlsx,
+} from '../utils/bomXlsxImport.mjs'
 import {
   BOM_PRODUCTION_OPERATION_OPTIONS,
   bomProductionOperationLabel,
@@ -209,6 +227,93 @@ function normalizeBOMLinesForForm(headerID, items = []) {
   )
 }
 
+function BOMImportLineStatus({ fieldName, form }) {
+  const materialID = Form.useWatch(['items', fieldName, 'material_id'], form)
+  const unitID = Form.useWatch(['items', fieldName, 'unit_id'], form)
+  const quantity = Form.useWatch(['items', fieldName, 'quantity'], form)
+  const lossRate = Form.useWatch(['items', fieldName, 'loss_rate'], form)
+  const source = form.getFieldValue(['items', fieldName, '_import_source'])
+  if (!source) return null
+  const issues = getBOMImportLineIssues({
+    material_id: materialID,
+    unit_id: unitID,
+    quantity,
+    loss_rate: lossRate,
+    _import_source: source,
+  })
+  const sourceParts = [
+    source.materialName || '未识别材料',
+    source.materialSpec,
+    source.color,
+    source.unit,
+  ].filter(Boolean)
+  return (
+    <div
+      className="erp-bom-import-line-status"
+      data-bom-import-row-status={issues.length > 0 ? 'unresolved' : 'matched'}
+    >
+      <span
+        className="erp-bom-import-line-status__source"
+        title={sourceParts.join(' / ')}
+      >
+        Excel 第 {source.rowNumber} 行 · {sourceParts.join(' / ')}
+      </span>
+      <Tag
+        color={issues.length > 0 ? 'warning' : 'success'}
+        title={issues.map((issue) => issue.message).join('；') || undefined}
+      >
+        {issues.length > 0 ? `待补全 ${issues.length} 项` : '已匹配'}
+      </Tag>
+    </div>
+  )
+}
+
+function BOMImportReviewSummary({ issues, review }) {
+  if (!review) return null
+  const affectedRows = new Set(
+    issues
+      .filter((issue) => issue.scope === 'item')
+      .map((issue) => issue.itemIndex)
+  ).size
+  const lossEvidence = review.lossEvidence || {}
+  const issueText =
+    issues.length > 0
+      ? `待补全 ${issues.length} 项${
+          affectedRows > 0 ? `，涉及 ${affectedRows} 行` : ''
+        }`
+      : '明细已全部关联，可继续核对并保存'
+
+  return (
+    <Alert
+      className="erp-business-source-summary erp-bom-import-review"
+      data-bom-import-issue-count={issues.length}
+      description={
+        <div className="erp-bom-import-review__details">
+          <span>
+            来源：{review.fileName} / {review.sheetName}
+          </span>
+          <span>
+            产品：{review.productCode || review.productName || '原表未填写'}，
+            {review.productMatchLabel}
+          </span>
+          <span>
+            损耗核对：原表明确 {Number(lossEvidence.explicit || 0)}{' '}
+            行，按单位用量、 订单数量和总用量反算{' '}
+            {Number(lossEvidence.calculated || 0)} 行
+          </span>
+          <span>
+            文件仅在当前浏览器解析；保存时只创建 BOM
+            草稿，并把来源文件名写入备注， 不会自动上传原文件或创建主数据。
+          </span>
+        </div>
+      }
+      message={`已读取 ${review.rowCount} 条 BOM 明细；${issueText}`}
+      showIcon
+      type={issues.length > 0 ? 'warning' : 'success'}
+    />
+  )
+}
+
 const BOMLineItemsForm = React.memo(
   ({
     canEdit,
@@ -262,7 +367,10 @@ const BOMLineItemsForm = React.memo(
               ref={(node) => registerLineItemRow(index, node)}
             >
               <div className="erp-sales-order-lines-form__row-head">
-                <strong>第 {index + 1} 行</strong>
+                <div className="erp-bom-line-row-title">
+                  <strong>第 {index + 1} 行</strong>
+                  <BOMImportLineStatus fieldName={field.name} form={form} />
+                </div>
                 {canEdit ? (
                   <Space
                     className="erp-sales-order-lines-form__row-actions"
@@ -277,10 +385,10 @@ const BOMLineItemsForm = React.memo(
                         const currentLines = form.getFieldValue('items') || []
                         const sourceLine =
                           currentLines[field.name] || currentLines[index] || {}
-                        add(
-                          createDuplicatedDraftLineItem(sourceLine),
-                          index + 1
-                        )
+                        const duplicatedLine =
+                          createDuplicatedDraftLineItem(sourceLine)
+                        delete duplicatedLine._import_source
+                        add(duplicatedLine, index + 1)
                         requestLineItemScroll(index + 1)
                       }}
                     >
@@ -319,14 +427,13 @@ const BOMLineItemsForm = React.memo(
                       const material = materialByID.get(materialID)
                       const sourceValues =
                         buildBOMItemSourceValuesFromMaterial(material)
-                      form.setFieldValue(
-                        ['items', field.name, 'material_id'],
-                        sourceValues.material_id
-                      )
-                      form.setFieldValue(
-                        ['items', field.name, 'unit_id'],
-                        sourceValues.unit_id
-                      )
+                      const currentItems = form.getFieldValue('items') || []
+                      const nextItems = [...currentItems]
+                      nextItems[field.name] = {
+                        ...(currentItems[field.name] || {}),
+                        ...sourceValues,
+                      }
+                      form.setFieldsValue({ items: nextItems })
                     }}
                     optionFilterProp="label"
                     options={materialOptions}
@@ -505,14 +612,22 @@ export default function BOMVersionsPage() {
   const selectedRowKeysRef = useRef([])
   const itemsPreviewGenerationRef = useRef(0)
   const headerAttachmentRef = useRef(null)
+  const importFileInputRef = useRef(null)
   const [columnOrder, setColumnOrder] = useState(null)
   const [columnOrderOpen, setColumnOrderOpen] = useState(false)
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
   const [headerModalOpen, setHeaderModalOpen] = useState(false)
   const [headerMode, setHeaderMode] = useState('create')
+  const [importing, setImporting] = useState(false)
+  const [importReview, setImportReview] = useState(null)
+  const [, setImportFormRevision] = useState(0)
   const [products, setProducts] = useState([])
   const [materials, setMaterials] = useState([])
   const [units, setUnits] = useState([])
+  const [referenceOptionsState, setReferenceOptionsState] = useState({
+    loading: true,
+    loaded: false,
+  })
   const [headerForm] = Form.useForm()
   const { registerLineItemRow, requestLineItemScroll } =
     useLineItemAppendScroll()
@@ -558,6 +673,9 @@ export default function BOMVersionsPage() {
     () => uniqueReferenceOptions(units, unitOption),
     [units]
   )
+  const importIssues = importReview
+    ? getBOMImportDraftIssues(headerForm.getFieldsValue(true))
+    : []
   const bomItemsPreview = useBusinessRowItemsPreview({
     records: versions,
     getItemTotal: (record) => record?.item_count,
@@ -762,6 +880,7 @@ export default function BOMVersionsPage() {
   ])
 
   const loadReferenceOptions = useCallback(async () => {
+    setReferenceOptionsState({ loading: true, loaded: false })
     try {
       const [productResult, materialResult, unitResult] = await Promise.all([
         listAllProducts({ active_only: true }),
@@ -775,11 +894,13 @@ export default function BOMVersionsPage() {
         Array.isArray(materialResult?.materials) ? materialResult.materials : []
       )
       setUnits(Array.isArray(unitResult?.units) ? unitResult.units : [])
+      setReferenceOptionsState({ loading: false, loaded: true })
     } catch (error) {
       message.error(getActionErrorMessage(error, '加载物料清单相关资料'))
       setProducts([])
       setMaterials([])
       setUnits([])
+      setReferenceOptionsState({ loading: false, loaded: false })
     }
   }, [])
 
@@ -795,7 +916,7 @@ export default function BOMVersionsPage() {
     const nextProductID = Number(headerProductIDForSuggestion || 0)
     const shouldLoadSuggestions =
       headerModalOpen &&
-      (headerMode === 'create' || headerMode === 'copy') &&
+      ['copy', 'create', 'import'].includes(headerMode) &&
       Number.isFinite(nextProductID) &&
       nextProductID > 0
 
@@ -952,8 +1073,64 @@ export default function BOMVersionsPage() {
     [applySelectedRowKeys, loadDetail]
   )
 
+  const openImportedDraft = async (file) => {
+    if (!file) return
+    if (!referenceOptionsState.loaded) {
+      message.warning('产品、材料和单位尚未加载完成，请稍后重试')
+      return
+    }
+    if (!/\.xlsx$/iu.test(String(file.name || ''))) {
+      message.warning('仅支持 .xlsx 格式的 BOM Excel 文件')
+      return
+    }
+    if (Number(file.size || 0) > MAX_BOM_XLSX_FILE_BYTES) {
+      message.warning('Excel 文件超过 20MB，请精简图片或拆分后再导入')
+      return
+    }
+
+    setImporting(true)
+    try {
+      const parsed = await parseBOMXlsx(await file.arrayBuffer(), {
+        fileName: file.name,
+      })
+      const draft = buildBOMImportDraft(parsed, {
+        products,
+        materials,
+        units,
+      })
+      headerAttachmentRef.current?.clearPendingAttachments()
+      setHeaderMode('import')
+      headerForm.resetFields()
+      headerForm.setFieldsValue(draft.values)
+      setHeaderProductIDForSuggestion(draft.values.product_id)
+      setImportReview(draft.review)
+      setHeaderModalOpen(true)
+      const issues = getBOMImportDraftIssues(draft.values)
+      message.success(
+        issues.length > 0
+          ? `已读取 ${draft.review.rowCount} 条明细，请先补全 ${issues.length} 项`
+          : `已读取 ${draft.review.rowCount} 条明细，请核对后保存草稿`
+      )
+    } catch (error) {
+      message.error(
+        error instanceof BOMXlsxImportError
+          ? error.message
+          : 'Excel 解析失败，请确认文件未损坏且使用现有 BOM 明细格式'
+      )
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  const handleImportFileChange = (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (file) openImportedDraft(file)
+  }
+
   const openCreate = () => {
     headerAttachmentRef.current?.clearPendingAttachments()
+    setImportReview(null)
     setHeaderMode('create')
     headerForm.resetFields()
     headerForm.setFieldsValue({
@@ -996,6 +1173,7 @@ export default function BOMVersionsPage() {
   const openView = async (record = selectedVersion) => {
     if (!record?.id) return
     headerAttachmentRef.current?.clearPendingAttachments()
+    setImportReview(null)
     applySelectedRowKeys([record.id])
     const detail = (await loadDetail(record.id)) || record
     setHeaderMode('view')
@@ -1007,6 +1185,7 @@ export default function BOMVersionsPage() {
   const openEdit = async (record = selectedVersion) => {
     if (!record?.id || !canEditBOM(record)) return
     headerAttachmentRef.current?.clearPendingAttachments()
+    setImportReview(null)
     applySelectedRowKeys([record.id])
     const detail = await loadDetail(record.id)
     if (!detail?.id || !Array.isArray(detail.items)) {
@@ -1021,6 +1200,7 @@ export default function BOMVersionsPage() {
   const openCopy = (record = selectedVersion) => {
     if (!record?.id || !canCopyBOM(record)) return
     headerAttachmentRef.current?.clearPendingAttachments()
+    setImportReview(null)
     applySelectedRowKeys([record.id])
     const nextVersionSuggestion = suggestNextBOMVersion(
       versions,
@@ -1049,7 +1229,29 @@ export default function BOMVersionsPage() {
   }
 
   const saveHeader = async () => {
-    const values = await headerForm.validateFields()
+    if (headerMode === 'import') {
+      const issues = getBOMImportDraftIssues(headerForm.getFieldsValue(true))
+      if (issues.length > 0) {
+        const firstLineIssue = issues.find((issue) => issue.scope === 'item')
+        if (firstLineIssue) {
+          requestLineItemScroll(firstLineIssue.itemIndex)
+        } else {
+          headerForm.scrollToField([issues[0].field], {
+            block: 'center',
+          })
+        }
+        message.warning(`还有 ${issues.length} 项导入内容需要补全，暂未保存`)
+        return
+      }
+    }
+
+    let values
+    try {
+      values = await headerForm.validateFields()
+    } catch {
+      message.warning('请先补全表单中的必填项')
+      return
+    }
     const isCreatingVersion = headerMode !== 'edit'
     setSaving(true)
     try {
@@ -1090,10 +1292,13 @@ export default function BOMVersionsPage() {
             ? 'BOM 新版本已复制为草稿'
             : headerMode === 'edit'
               ? 'BOM 草稿已更新'
-              : 'BOM 草稿已创建'
+              : headerMode === 'import'
+                ? 'BOM 导入草稿已创建'
+                : 'BOM 草稿已创建'
           : 'BOM 草稿已保存，未上传的附件请重新选择'
       )
       headerAttachmentRef.current?.clearPendingAttachments()
+      setImportReview(null)
       setHeaderModalOpen(false)
       if (isCreatingVersion) {
         resetBusinessPaginationCurrent(setPagination)
@@ -1353,6 +1558,36 @@ export default function BOMVersionsPage() {
         }
         actions={
           <Space wrap>
+            {canCreate ? (
+              <>
+                <ToolbarButton
+                  data-business-action-key="import-bom-xlsx"
+                  icon={<UploadOutlined />}
+                  loading={importing}
+                  disabled={
+                    importing ||
+                    referenceOptionsState.loading ||
+                    !referenceOptionsState.loaded
+                  }
+                  title={
+                    referenceOptionsState.loaded
+                      ? '按现有材料分析明细表导入并生成待核对草稿'
+                      : '产品、材料和单位加载完成后可导入'
+                  }
+                  onClick={() => importFileInputRef.current?.click()}
+                >
+                  导入 Excel
+                </ToolbarButton>
+                <input
+                  ref={importFileInputRef}
+                  aria-label="选择 BOM Excel 文件"
+                  hidden
+                  type="file"
+                  accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  onChange={handleImportFileChange}
+                />
+              </>
+            ) : null}
             <ToolbarButton
               icon={<DownloadOutlined />}
               loading={exporting}
@@ -1669,15 +1904,18 @@ export default function BOMVersionsPage() {
               ? '编辑 BOM 草稿'
               : headerMode === 'view'
                 ? '查看 BOM 版本'
-                : '新建 BOM 草稿'
+                : headerMode === 'import'
+                  ? '检查并保存导入草稿'
+                  : '新建 BOM 草稿'
         }
         description="BOM 只维护产品结构和材料用量，库存、采购或成本变动请到对应业务页面处理。"
-        okText="保存"
+        okText={headerMode === 'import' ? '保存为草稿' : '保存'}
         cancelText="取消"
         confirmLoading={saving || detailLoading}
         onOk={saveHeader}
         onCancel={() => {
           headerAttachmentRef.current?.clearPendingAttachments()
+          setImportReview(null)
           setHeaderModalOpen(false)
         }}
         footer={
@@ -1697,6 +1935,9 @@ export default function BOMVersionsPage() {
           layout="vertical"
           className="erp-business-action-form"
           onValuesChange={(changedValues) => {
+            if (headerMode === 'import') {
+              setImportFormRevision((current) => current + 1)
+            }
             if (
               Object.prototype.hasOwnProperty.call(changedValues, 'product_id')
             ) {
@@ -1714,6 +1955,12 @@ export default function BOMVersionsPage() {
             versionSuggestionLoading={headerVersionCandidates.loading}
             onUseVersionSuggestion={useHeaderVersionSuggestion}
           />
+          {headerMode === 'import' ? (
+            <BOMImportReviewSummary
+              issues={importIssues}
+              review={importReview}
+            />
+          ) : null}
           <BusinessAttachmentPanel
             ref={headerAttachmentRef}
             ownerType="bom_header"
@@ -1740,11 +1987,17 @@ export default function BOMVersionsPage() {
             </p>
           ) : (
             <BOMLineItemsForm
-              canEdit={headerMode === 'create' ? canCreate : modalActionCanEdit}
+              canEdit={
+                headerMode === 'create' || headerMode === 'import'
+                  ? canCreate
+                  : modalActionCanEdit
+              }
               description={
-                headerMode === 'create'
-                  ? '新建草稿时可先录入材料明细，保存后一起写入当前 BOM 草稿。'
-                  : '在当前弹窗内维护材料、用量、损耗率和备注。'
+                headerMode === 'import'
+                  ? '逐行核对材料、单位、单位用量和损耗率；待补全项修正后才能保存。'
+                  : headerMode === 'create'
+                    ? '新建草稿时可先录入材料明细，保存后一起写入当前 BOM 草稿。'
+                    : '在当前弹窗内维护材料、用量、损耗率和备注。'
               }
               form={headerForm}
               materialByID={materialByID}
@@ -1752,7 +2005,9 @@ export default function BOMVersionsPage() {
               registerLineItemRow={registerLineItemRow}
               requestLineItemScroll={requestLineItemScroll}
               selectedVersionID={
-                headerMode === 'create' ? undefined : modalActionVersion?.id
+                headerMode === 'create' || headerMode === 'import'
+                  ? undefined
+                  : modalActionVersion?.id
               }
               unitOptions={unitOptions}
             />

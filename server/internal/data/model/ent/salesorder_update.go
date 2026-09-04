@@ -278,6 +278,26 @@ func (_u *SalesOrderUpdate) ClearFreightTerms() *SalesOrderUpdate {
 	return _u
 }
 
+// SetQuotedFreightAmount sets the "quoted_freight_amount" field.
+func (_u *SalesOrderUpdate) SetQuotedFreightAmount(v decimal.Decimal) *SalesOrderUpdate {
+	_u.mutation.SetQuotedFreightAmount(v)
+	return _u
+}
+
+// SetNillableQuotedFreightAmount sets the "quoted_freight_amount" field if the given value is not nil.
+func (_u *SalesOrderUpdate) SetNillableQuotedFreightAmount(v *decimal.Decimal) *SalesOrderUpdate {
+	if v != nil {
+		_u.SetQuotedFreightAmount(*v)
+	}
+	return _u
+}
+
+// ClearQuotedFreightAmount clears the value of the "quoted_freight_amount" field.
+func (_u *SalesOrderUpdate) ClearQuotedFreightAmount() *SalesOrderUpdate {
+	_u.mutation.ClearQuotedFreightAmount()
+	return _u
+}
+
 // SetGoodsAmount sets the "goods_amount" field.
 func (_u *SalesOrderUpdate) SetGoodsAmount(v decimal.Decimal) *SalesOrderUpdate {
 	_u.mutation.SetGoodsAmount(v)
@@ -880,6 +900,12 @@ func (_u *SalesOrderUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	if _u.mutation.FreightTermsCleared() {
 		_spec.ClearField(salesorder.FieldFreightTerms, field.TypeString)
 	}
+	if value, ok := _u.mutation.QuotedFreightAmount(); ok {
+		_spec.SetField(salesorder.FieldQuotedFreightAmount, field.TypeOther, value)
+	}
+	if _u.mutation.QuotedFreightAmountCleared() {
+		_spec.ClearField(salesorder.FieldQuotedFreightAmount, field.TypeOther)
+	}
 	if value, ok := _u.mutation.GoodsAmount(); ok {
 		_spec.SetField(salesorder.FieldGoodsAmount, field.TypeOther, value)
 	}
@@ -1384,6 +1410,26 @@ func (_u *SalesOrderUpdateOne) SetNillableFreightTerms(v *string) *SalesOrderUpd
 // ClearFreightTerms clears the value of the "freight_terms" field.
 func (_u *SalesOrderUpdateOne) ClearFreightTerms() *SalesOrderUpdateOne {
 	_u.mutation.ClearFreightTerms()
+	return _u
+}
+
+// SetQuotedFreightAmount sets the "quoted_freight_amount" field.
+func (_u *SalesOrderUpdateOne) SetQuotedFreightAmount(v decimal.Decimal) *SalesOrderUpdateOne {
+	_u.mutation.SetQuotedFreightAmount(v)
+	return _u
+}
+
+// SetNillableQuotedFreightAmount sets the "quoted_freight_amount" field if the given value is not nil.
+func (_u *SalesOrderUpdateOne) SetNillableQuotedFreightAmount(v *decimal.Decimal) *SalesOrderUpdateOne {
+	if v != nil {
+		_u.SetQuotedFreightAmount(*v)
+	}
+	return _u
+}
+
+// ClearQuotedFreightAmount clears the value of the "quoted_freight_amount" field.
+func (_u *SalesOrderUpdateOne) ClearQuotedFreightAmount() *SalesOrderUpdateOne {
+	_u.mutation.ClearQuotedFreightAmount()
 	return _u
 }
 
@@ -2018,6 +2064,12 @@ func (_u *SalesOrderUpdateOne) sqlSave(ctx context.Context) (_node *SalesOrder, 
 	}
 	if _u.mutation.FreightTermsCleared() {
 		_spec.ClearField(salesorder.FieldFreightTerms, field.TypeString)
+	}
+	if value, ok := _u.mutation.QuotedFreightAmount(); ok {
+		_spec.SetField(salesorder.FieldQuotedFreightAmount, field.TypeOther, value)
+	}
+	if _u.mutation.QuotedFreightAmountCleared() {
+		_spec.ClearField(salesorder.FieldQuotedFreightAmount, field.TypeOther)
 	}
 	if value, ok := _u.mutation.GoodsAmount(); ok {
 		_spec.SetField(salesorder.FieldGoodsAmount, field.TypeOther, value)

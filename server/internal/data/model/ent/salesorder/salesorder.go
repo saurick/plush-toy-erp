@@ -42,6 +42,8 @@ const (
 	FieldTaxRate = "tax_rate"
 	// FieldFreightTerms holds the string denoting the freight_terms field in the database.
 	FieldFreightTerms = "freight_terms"
+	// FieldQuotedFreightAmount holds the string denoting the quoted_freight_amount field in the database.
+	FieldQuotedFreightAmount = "quoted_freight_amount"
 	// FieldGoodsAmount holds the string denoting the goods_amount field in the database.
 	FieldGoodsAmount = "goods_amount"
 	// FieldTaxAmount holds the string denoting the tax_amount field in the database.
@@ -129,6 +131,7 @@ var Columns = []string{
 	FieldTaxMode,
 	FieldTaxRate,
 	FieldFreightTerms,
+	FieldQuotedFreightAmount,
 	FieldGoodsAmount,
 	FieldTaxAmount,
 	FieldOrderTotal,
@@ -266,6 +269,11 @@ func ByTaxRate(opts ...sql.OrderTermOption) OrderOption {
 // ByFreightTerms orders the results by the freight_terms field.
 func ByFreightTerms(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldFreightTerms, opts...).ToFunc()
+}
+
+// ByQuotedFreightAmount orders the results by the quoted_freight_amount field.
+func ByQuotedFreightAmount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldQuotedFreightAmount, opts...).ToFunc()
 }
 
 // ByGoodsAmount orders the results by the goods_amount field.

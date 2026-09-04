@@ -977,6 +977,43 @@
   margin-top: 16px;
 }
 
+.erp-bom-import-review {
+  grid-column: 1 / -1;
+}
+
+.erp-bom-import-review__details {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-bom-line-row-title,
+.erp-bom-import-line-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.erp-bom-import-line-status {
+  color: var(--erp-text-muted, #64748b);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.erp-bom-import-line-status__source {
+  max-width: 520px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.erp-bom-import-line-status .ant-tag {
+  margin-inline-end: 0;
+}
+
 .erp-bom-modal-items
   .erp-sales-order-lines-form__grid
   .erp-line-item-field--source.ant-form-item {

@@ -236,6 +236,8 @@ export function SalesOrderFormFields({
   const orderDate = Form.useWatch('order_date', form)
   const plannedDeliveryDate = Form.useWatch('planned_delivery_date', form)
   const taxMode = Form.useWatch('tax_mode', form)
+  const freightTerms = Form.useWatch('freight_terms', form)
+  const currency = Form.useWatch('currency', form)
   const disableOrderDateAfterPlannedDelivery = useCallback(
     (current) => isDateInputAfter(current, plannedDeliveryDate),
     [plannedDeliveryDate]
@@ -493,6 +495,38 @@ export function SalesOrderFormFields({
           allowClear
           options={SALES_ORDER_FREIGHT_TERMS_OPTIONS}
           placeholder="请选择运费条件"
+          onChange={(value) => {
+            if (value !== 'EXCLUDED') {
+              form.setFieldValue('quoted_freight_amount', undefined)
+            }
+          }}
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        dependencies={['freight_terms', 'currency']}
+        extra={
+          freightTerms === 'INCLUDED'
+            ? '已包含在产品单价中，不重复计入订单总额'
+            : '报价不含运费时填写另行向客户收取的金额；提交前需补齐'
+        }
+        label="报价运费"
+        name="quoted_freight_amount"
+        rules={[optionalMoneyRule('报价运费')]}
+      >
+        <FieldWithUnitSuffix
+          control={
+            <InputNumber
+              disabled={freightTerms !== 'EXCLUDED'}
+              min="0"
+              precision={6}
+              stringMode
+              placeholder={
+                freightTerms === 'EXCLUDED' ? '填写另计运费' : '已含在单价'
+              }
+            />
+          }
+          unitText={currency || '币种'}
         />
       </Form.Item>
       <Form.Item
@@ -614,6 +648,8 @@ export function SalesOrderItemsFormSection({
   const watchedItems = Form.useWatch('items', form)
   const taxMode = Form.useWatch('tax_mode', form)
   const taxRate = Form.useWatch('tax_rate', form)
+  const freightTerms = Form.useWatch('freight_terms', form)
+  const quotedFreightAmount = Form.useWatch('quoted_freight_amount', form)
   const currency = Form.useWatch('currency', form)
   const commercialAmounts = useMemo(
     () =>
@@ -621,8 +657,10 @@ export function SalesOrderItemsFormSection({
         items: watchedItems || [],
         taxMode,
         taxRate,
+        freightTerms,
+        quotedFreightAmount,
       }),
-    [watchedItems, taxMode, taxRate]
+    [watchedItems, taxMode, taxRate, freightTerms, quotedFreightAmount]
   )
   const { registerLineItemRow, requestLineItemScroll } =
     useLineItemAppendScroll()
@@ -1182,6 +1220,20 @@ export function SalesOrderItemsFormSection({
                     commercialAmounts.goodsAmount,
                     2
                   )}`.trim(),
+                },
+                {
+                  key: 'quoted-freight-amount',
+                  label: '报价运费',
+                  value:
+                    freightTerms === 'INCLUDED'
+                      ? '已含在单价'
+                      : freightTerms === 'EXCLUDED' &&
+                          numeric20Scale6Units(quotedFreightAmount) !== null
+                        ? `${currency || ''} ${formatNumeric20Scale6Summary(
+                            quotedFreightAmount,
+                            2
+                          )}`.trim()
+                        : '待补齐',
                 },
                 {
                   key: 'tax-amount',

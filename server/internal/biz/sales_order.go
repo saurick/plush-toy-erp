@@ -64,6 +64,7 @@ type SalesOrder struct {
 	TaxMode             *string
 	TaxRate             *decimal.Decimal
 	FreightTerms        *string
+	QuotedFreightAmount *decimal.Decimal
 	GoodsAmount         *decimal.Decimal
 	TaxAmount           *decimal.Decimal
 	OrderTotal          *decimal.Decimal
@@ -120,6 +121,7 @@ type SalesOrderMutation struct {
 	TaxMode             *string
 	TaxRate             *decimal.Decimal
 	FreightTerms        *string
+	QuotedFreightAmount *decimal.Decimal
 	GoodsAmount         *decimal.Decimal
 	TaxAmount           *decimal.Decimal
 	OrderTotal          *decimal.Decimal
@@ -480,6 +482,8 @@ func (uc *SalesOrderUsecase) SaveSalesOrderWithItems(ctx context.Context, id int
 	normalizedOrder.GoodsAmount, normalizedOrder.TaxAmount, normalizedOrder.OrderTotal, err = CalculateSalesOrderAmounts(
 		normalizedOrder.TaxMode,
 		normalizedOrder.TaxRate,
+		normalizedOrder.FreightTerms,
+		normalizedOrder.QuotedFreightAmount,
 		amounts,
 	)
 	if err != nil {
@@ -616,6 +620,10 @@ func normalizeSalesOrderMutation(in SalesOrderMutation, create bool) (SalesOrder
 	in.PaymentMethod = normalizeOptionalString(in.PaymentMethod)
 	in.PriceConditionNote = normalizeOptionalString(in.PriceConditionNote)
 	in.TaxMode, in.TaxRate, in.FreightTerms, err = normalizeSalesOrderCommercialTerms(in.TaxMode, in.TaxRate, in.FreightTerms)
+	if err != nil {
+		return SalesOrderMutation{}, err
+	}
+	in.QuotedFreightAmount, err = normalizeSalesOrderQuotedFreightAmount(in.FreightTerms, in.QuotedFreightAmount)
 	if err != nil {
 		return SalesOrderMutation{}, err
 	}

@@ -111,6 +111,11 @@ func FreightTerms(v string) predicate.SalesOrder {
 	return predicate.SalesOrder(sql.FieldEQ(FieldFreightTerms, v))
 }
 
+// QuotedFreightAmount applies equality check predicate on the "quoted_freight_amount" field. It's identical to QuotedFreightAmountEQ.
+func QuotedFreightAmount(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldQuotedFreightAmount, v))
+}
+
 // GoodsAmount applies equality check predicate on the "goods_amount" field. It's identical to GoodsAmountEQ.
 func GoodsAmount(v decimal.Decimal) predicate.SalesOrder {
 	return predicate.SalesOrder(sql.FieldEQ(FieldGoodsAmount, v))
@@ -914,6 +919,56 @@ func FreightTermsEqualFold(v string) predicate.SalesOrder {
 // FreightTermsContainsFold applies the ContainsFold predicate on the "freight_terms" field.
 func FreightTermsContainsFold(v string) predicate.SalesOrder {
 	return predicate.SalesOrder(sql.FieldContainsFold(FieldFreightTerms, v))
+}
+
+// QuotedFreightAmountEQ applies the EQ predicate on the "quoted_freight_amount" field.
+func QuotedFreightAmountEQ(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldQuotedFreightAmount, v))
+}
+
+// QuotedFreightAmountNEQ applies the NEQ predicate on the "quoted_freight_amount" field.
+func QuotedFreightAmountNEQ(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNEQ(FieldQuotedFreightAmount, v))
+}
+
+// QuotedFreightAmountIn applies the In predicate on the "quoted_freight_amount" field.
+func QuotedFreightAmountIn(vs ...decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIn(FieldQuotedFreightAmount, vs...))
+}
+
+// QuotedFreightAmountNotIn applies the NotIn predicate on the "quoted_freight_amount" field.
+func QuotedFreightAmountNotIn(vs ...decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotIn(FieldQuotedFreightAmount, vs...))
+}
+
+// QuotedFreightAmountGT applies the GT predicate on the "quoted_freight_amount" field.
+func QuotedFreightAmountGT(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGT(FieldQuotedFreightAmount, v))
+}
+
+// QuotedFreightAmountGTE applies the GTE predicate on the "quoted_freight_amount" field.
+func QuotedFreightAmountGTE(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGTE(FieldQuotedFreightAmount, v))
+}
+
+// QuotedFreightAmountLT applies the LT predicate on the "quoted_freight_amount" field.
+func QuotedFreightAmountLT(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLT(FieldQuotedFreightAmount, v))
+}
+
+// QuotedFreightAmountLTE applies the LTE predicate on the "quoted_freight_amount" field.
+func QuotedFreightAmountLTE(v decimal.Decimal) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLTE(FieldQuotedFreightAmount, v))
+}
+
+// QuotedFreightAmountIsNil applies the IsNil predicate on the "quoted_freight_amount" field.
+func QuotedFreightAmountIsNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIsNull(FieldQuotedFreightAmount))
+}
+
+// QuotedFreightAmountNotNil applies the NotNil predicate on the "quoted_freight_amount" field.
+func QuotedFreightAmountNotNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotNull(FieldQuotedFreightAmount))
 }
 
 // GoodsAmountEQ applies the EQ predicate on the "goods_amount" field.

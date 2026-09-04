@@ -56,6 +56,14 @@ function taxTermsText(record = {}) {
   return rate ? `${mode} / ${rate}%` : mode
 }
 
+function quotedFreightText(record = {}, fallback = '-') {
+  const terms = String(record.freight_terms || '')
+    .trim()
+    .toUpperCase()
+  if (terms === 'INCLUDED') return '已含在单价'
+  return moneyText(record.quoted_freight_amount, record.currency, fallback)
+}
+
 function deliveryText(snapshot = {}) {
   const source = snapshot && typeof snapshot === 'object' ? snapshot : {}
   return (
@@ -199,6 +207,19 @@ export function buildSalesOrderColumns() {
       render: salesOrderFreightTermsText,
       exportValue: (record) =>
         salesOrderFreightTermsText(record?.freight_terms),
+    },
+    {
+      title: '报价运费',
+      exportTitle: '报价运费',
+      dataIndex: 'quoted_freight_amount',
+      width: 140,
+      sorter: (a, b) =>
+        compareNumeric20Scale6Values(
+          a?.quoted_freight_amount,
+          b?.quoted_freight_amount
+        ),
+      render: (_, record) => quotedFreightText(record),
+      exportValue: (record) => quotedFreightText(record, ''),
     },
     {
       title: '付款条件',

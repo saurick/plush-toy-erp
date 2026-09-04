@@ -1,6 +1,6 @@
 # 导入准备脚本 / Import Preparation
 
-本目录只负责通用客户来源 manifest 校验、只读提取、快照冻结和 dry-run。Product Core 不保存真实客户原件或私密 manifest；永绅原件与 manifest 已进入客户专属 Private 仓库，当前工作树已移除旧副本。仓库没有真实客户数据导入执行器。
+本目录只负责通用客户来源 manifest 校验、只读提取、快照冻结和 dry-run。Product Core 不保存真实客户原件或私密 manifest；永绅原件与 manifest 已进入客户专属 Private 仓库，当前工作树已移除旧副本。本目录没有真实客户数据写入执行器；BOM 版本页的 `.xlsx` 辅助录入是独立的窄范围业务入口，不由这里的脚本执行。
 
 ## 主路径
 
@@ -50,7 +50,13 @@ node "$PRODUCT_ROOT/scripts/import/customerSourceExtract.mjs" \
 - 客户私有仓的 `product.lock.json` 是可变产品版本锁定真源。每次 Product Core `HEAD` 推进后，必须在两边已提交且工作树清洁时更新该锁，再以 `FORMAL_PRODUCT_PIN=1` 运行私有仓 `scripts/validate.sh`；没有这组证据时不能宣称最新 Product Core 版本已固定。
 - Product Core 既有 Git 历史仍含旧副本，历史清理不属于普通功能提交；真实导入批准和客户签收也仍是独立未完成项。
 
-## 真实导入边界
+## 写入边界
+
+BOM 版本页可以把结构匹配的材料分析 `.xlsx` 在浏览器本地解析为待复核表单，只唯一匹配已有产品、材料和单位，全部必填项解决后再通过既有 `save_bom_with_items` 新建 `DRAFT`。它不自动创建主数据或 SKU，不覆盖 / 激活已有 BOM，不写采购、库存、生产、成本或财务事实，也不把原文件自动上传到业务附件；文件名和 sheet 仅作为来源说明写入 BOM 备注。
+
+这个页面入口不改变本目录的无写入合同，`canExecuteRealImport=false` 仍只描述这里的 freeze / dry-run 工具。
+
+## 通用批量导入边界
 
 以后拿到经客户确认的真实数据时，应单独评审通用导入批次能力：通过正式 usecase/API 写入，具备 RBAC、事务、幂等批次、逐行结果、失败恢复、审计和导入后对账。它不能在本目录以某个客户名硬编码，也不能由 dry-run 参数偷偷开启。
 

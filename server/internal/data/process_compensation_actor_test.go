@@ -30,7 +30,7 @@ func TestCancellationCompensationKeepsAuthenticatedActor(t *testing.T) {
 		product := createSalesOrderTestProduct(t, ctx, client, unit.ID, "P-COMP-ACTOR", true)
 		order, err := uc.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
 			OrderNo: "SO-COMP-ACTOR", CustomerID: customer.ID, OrderDate: time.Now(),
-			TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
+			TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded), QuotedFreightAmount: &decimal.Zero,
 		})
 		if err != nil {
 			t.Fatalf("create sales order: %v", err)

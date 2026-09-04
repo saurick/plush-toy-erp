@@ -181,6 +181,20 @@ func (_c *SalesOrderCreate) SetNillableFreightTerms(v *string) *SalesOrderCreate
 	return _c
 }
 
+// SetQuotedFreightAmount sets the "quoted_freight_amount" field.
+func (_c *SalesOrderCreate) SetQuotedFreightAmount(v decimal.Decimal) *SalesOrderCreate {
+	_c.mutation.SetQuotedFreightAmount(v)
+	return _c
+}
+
+// SetNillableQuotedFreightAmount sets the "quoted_freight_amount" field if the given value is not nil.
+func (_c *SalesOrderCreate) SetNillableQuotedFreightAmount(v *decimal.Decimal) *SalesOrderCreate {
+	if v != nil {
+		_c.SetQuotedFreightAmount(*v)
+	}
+	return _c
+}
+
 // SetGoodsAmount sets the "goods_amount" field.
 func (_c *SalesOrderCreate) SetGoodsAmount(v decimal.Decimal) *SalesOrderCreate {
 	_c.mutation.SetGoodsAmount(v)
@@ -681,6 +695,10 @@ func (_c *SalesOrderCreate) createSpec() (*SalesOrder, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.FreightTerms(); ok {
 		_spec.SetField(salesorder.FieldFreightTerms, field.TypeString, value)
 		_node.FreightTerms = &value
+	}
+	if value, ok := _c.mutation.QuotedFreightAmount(); ok {
+		_spec.SetField(salesorder.FieldQuotedFreightAmount, field.TypeOther, value)
+		_node.QuotedFreightAmount = &value
 	}
 	if value, ok := _c.mutation.GoodsAmount(); ok {
 		_spec.SetField(salesorder.FieldGoodsAmount, field.TypeOther, value)

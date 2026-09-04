@@ -249,6 +249,9 @@ test("manual acceptance source plan reaches every agreed pagination threshold", 
         order.tax_mode === "INCLUSIVE" &&
         order.tax_rate === "13" &&
         ["INCLUDED", "EXCLUDED"].includes(order.freight_terms) &&
+        (order.freight_terms === "INCLUDED"
+          ? order.quoted_freight_amount === null
+          : order.quoted_freight_amount === "0") &&
         (order.freight_terms === "INCLUDED") ===
           (order.price_condition_note === "含税含运费"),
     ),

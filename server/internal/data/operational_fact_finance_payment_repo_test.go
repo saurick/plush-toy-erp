@@ -38,12 +38,13 @@ func createShippedShipmentForFinanceFactFixture(
 	salesUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, log.NewStdLogger(io.Discard)))
 	paymentTermDays := 30
 	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
-		OrderNo:         "SO-" + suffix,
-		CustomerID:      customer.ID,
-		OrderDate:       time.Now().UTC(),
-		PaymentTermDays: &paymentTermDays,
-		TaxMode:         stringPtr(biz.SalesOrderTaxModeNone),
-		FreightTerms:    stringPtr(biz.SalesOrderFreightTermsExcluded),
+		OrderNo:             "SO-" + suffix,
+		CustomerID:          customer.ID,
+		OrderDate:           time.Now().UTC(),
+		PaymentTermDays:     &paymentTermDays,
+		TaxMode:             stringPtr(biz.SalesOrderTaxModeNone),
+		FreightTerms:        stringPtr(biz.SalesOrderFreightTermsExcluded),
+		QuotedFreightAmount: &decimal.Zero,
 	})
 	if err != nil {
 		t.Fatalf("create finance fixture sales order: %v", err)

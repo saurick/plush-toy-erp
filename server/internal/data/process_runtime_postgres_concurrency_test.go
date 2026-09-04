@@ -327,6 +327,7 @@ func TestProcessRuntimePostgresConcurrentSalesActivationReusesWinnerAndRoutesRev
 		SetOrderDate(time.Now().UTC()).
 		SetTaxMode(biz.SalesOrderTaxModeNone).
 		SetFreightTerms(biz.SalesOrderFreightTermsExcluded).
+		SetQuotedFreightAmount(decimal.Zero).
 		SetGoodsAmount(quantity).
 		SetTaxAmount(decimal.Zero).
 		SetOrderTotal(quantity).

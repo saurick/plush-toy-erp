@@ -379,15 +379,24 @@ test('devPrototypes: 岗位任务端 v1 将详情与处理唯一交给 v2', () =
     'utf8'
   )
   const readme = readFileSync(
-    path.join(repoRoot, 'docs/product/prototypes/mobile-role-tasks-v1/README.md'),
+    path.join(
+      repoRoot,
+      'docs/product/prototypes/mobile-role-tasks-v1/README.md'
+    ),
     'utf8'
   )
 
   assert.match(html, /data-continue/u)
   assert.match(html, />进入任务<\/button>/u)
   assert.equal([...html.matchAll(/<dialog\b/gu)].length, 0)
-  assert.doesNotMatch(html, /renderTaskDetail|detailScreen|reasonSheet|data-action=/u)
-  assert.match(readme, /详情、处理与结果回执的当前交互由 `mobile-role-tasks-v2\/index\.html` 唯一定义/u)
+  assert.doesNotMatch(
+    html,
+    /renderTaskDetail|detailScreen|reasonSheet|data-action=/u
+  )
+  assert.match(
+    readme,
+    /详情、处理与结果回执的当前交互由 `mobile-role-tasks-v2\/index\.html` 唯一定义/u
+  )
   assert.match(readme, /不再保留旧详情页、原因面板、动作栏或提交脚本/u)
 })
 
@@ -551,6 +560,14 @@ test('devPrototypes: 业务表单样板使用真实单弹窗与完整键盘边�
   assert.match(html, /<h3>订单与客户<\/h3>/u)
   assert.match(html, /<h3>联系人与负责人<\/h3>/u)
   assert.match(html, /<h3>结算条件<\/h3>/u)
+  assert.match(html, /<h3>税费与运费条件<\/h3>/u)
+  assert.match(html, /for="freightTerms">报价是否含运费<\/label>/u)
+  assert.match(html, /id="quotedFreightAmount"/u)
+  assert.match(html, /function syncQuotedFreightField\(/u)
+  assert.match(html, /quotedFreightAmount\.value = ""/u)
+  assert.match(html, /id="quotedFreightTotal"/u)
+  assert.match(html, /id="taxAmountTotal"/u)
+  assert.match(html, /id="orderTotal"/u)
   assert.match(html, /<h3>交付与收货<\/h3>/u)
   assert.match(html, /<h3>附件与其他说明<\/h3>/u)
   assert.match(html, /<label class="required" for="customer">客户<\/label>/u)
@@ -581,7 +598,8 @@ test('devPrototypes: 业务表单样板使用真实单弹窗与完整键盘边�
   assert.match(html, /"#attachment"/u)
   assert.match(html, /function syncItemControls\(/u)
   assert.doesNotMatch(
-    html.match(/const mutationControlSelector = \[([\s\S]*?)\]\.join/u)?.[1] || '',
+    html.match(/const mutationControlSelector = \[([\s\S]*?)\]\.join/u)?.[1] ||
+      '',
     /\.remove-item/u
   )
   assert.match(html, /"#addItem"/u)
@@ -662,14 +680,8 @@ test('devPrototypes: 任务中心只保留队列和共享处理流程入口', ()
     html,
     /drawer|data-step-panel|reasonInput|submitFailed|data-drawer-command/u
   )
-  assert.match(
-    readme,
-    /\| `index\.html` \|[^\n]*共享处理流程交接/u
-  )
-  assert.doesNotMatch(
-    readme,
-    /\| `index\.html` \|[^\n]*三步任务处理抽屉/u
-  )
+  assert.match(readme, /\| `index\.html` \|[^\n]*共享处理流程交接/u)
+  assert.doesNotMatch(readme, /\| `index\.html` \|[^\n]*三步任务处理抽屉/u)
 })
 
 test('devPrototypes: 审计空结果同步清除选中项、详情和指标', () => {
@@ -716,7 +728,10 @@ test('devPrototypes: 局部动作弹层使用原生 dialog 和 alertdialog 行�
   assert.match(html, /dialog\.querySelector\([\s\S]*?\[data-initial-focus\]/u)
   assert.match(html, /trigger\?\.focus\(\{ preventScroll: true \}\)/u)
   assert.match(html, /openDialog\("import", buttons\[0\]\)/u)
-  assert.doesNotMatch(html, /formDialog|data-target="form"|补录出货信息|保存补录/u)
+  assert.doesNotMatch(
+    html,
+    /formDialog|data-target="form"|补录出货信息|保存补录/u
+  )
   assert.match(
     html,
     /@media \(max-width: 980px\)[\s\S]*?\.modal\.columns \{[\s\S]*?max-height: calc\(100vh - 24px\)/u

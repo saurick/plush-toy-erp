@@ -91430,6 +91430,7 @@ type SalesOrderMutation struct {
 	tax_mode                  *string
 	tax_rate                  *decimal.Decimal
 	freight_terms             *string
+	quoted_freight_amount     *decimal.Decimal
 	goods_amount              *decimal.Decimal
 	tax_amount                *decimal.Decimal
 	order_total               *decimal.Decimal
@@ -92228,6 +92229,55 @@ func (m *SalesOrderMutation) FreightTermsCleared() bool {
 func (m *SalesOrderMutation) ResetFreightTerms() {
 	m.freight_terms = nil
 	delete(m.clearedFields, salesorder.FieldFreightTerms)
+}
+
+// SetQuotedFreightAmount sets the "quoted_freight_amount" field.
+func (m *SalesOrderMutation) SetQuotedFreightAmount(d decimal.Decimal) {
+	m.quoted_freight_amount = &d
+}
+
+// QuotedFreightAmount returns the value of the "quoted_freight_amount" field in the mutation.
+func (m *SalesOrderMutation) QuotedFreightAmount() (r decimal.Decimal, exists bool) {
+	v := m.quoted_freight_amount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldQuotedFreightAmount returns the old "quoted_freight_amount" field's value of the SalesOrder entity.
+// If the SalesOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SalesOrderMutation) OldQuotedFreightAmount(ctx context.Context) (v *decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldQuotedFreightAmount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldQuotedFreightAmount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldQuotedFreightAmount: %w", err)
+	}
+	return oldValue.QuotedFreightAmount, nil
+}
+
+// ClearQuotedFreightAmount clears the value of the "quoted_freight_amount" field.
+func (m *SalesOrderMutation) ClearQuotedFreightAmount() {
+	m.quoted_freight_amount = nil
+	m.clearedFields[salesorder.FieldQuotedFreightAmount] = struct{}{}
+}
+
+// QuotedFreightAmountCleared returns if the "quoted_freight_amount" field was cleared in this mutation.
+func (m *SalesOrderMutation) QuotedFreightAmountCleared() bool {
+	_, ok := m.clearedFields[salesorder.FieldQuotedFreightAmount]
+	return ok
+}
+
+// ResetQuotedFreightAmount resets all changes to the "quoted_freight_amount" field.
+func (m *SalesOrderMutation) ResetQuotedFreightAmount() {
+	m.quoted_freight_amount = nil
+	delete(m.clearedFields, salesorder.FieldQuotedFreightAmount)
 }
 
 // SetGoodsAmount sets the "goods_amount" field.
@@ -93164,7 +93214,7 @@ func (m *SalesOrderMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SalesOrderMutation) Fields() []string {
-	fields := make([]string, 0, 29)
+	fields := make([]string, 0, 30)
 	if m.order_no != nil {
 		fields = append(fields, salesorder.FieldOrderNo)
 	}
@@ -93206,6 +93256,9 @@ func (m *SalesOrderMutation) Fields() []string {
 	}
 	if m.freight_terms != nil {
 		fields = append(fields, salesorder.FieldFreightTerms)
+	}
+	if m.quoted_freight_amount != nil {
+		fields = append(fields, salesorder.FieldQuotedFreightAmount)
 	}
 	if m.goods_amount != nil {
 		fields = append(fields, salesorder.FieldGoodsAmount)
@@ -93288,6 +93341,8 @@ func (m *SalesOrderMutation) Field(name string) (ent.Value, bool) {
 		return m.TaxRate()
 	case salesorder.FieldFreightTerms:
 		return m.FreightTerms()
+	case salesorder.FieldQuotedFreightAmount:
+		return m.QuotedFreightAmount()
 	case salesorder.FieldGoodsAmount:
 		return m.GoodsAmount()
 	case salesorder.FieldTaxAmount:
@@ -93355,6 +93410,8 @@ func (m *SalesOrderMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldTaxRate(ctx)
 	case salesorder.FieldFreightTerms:
 		return m.OldFreightTerms(ctx)
+	case salesorder.FieldQuotedFreightAmount:
+		return m.OldQuotedFreightAmount(ctx)
 	case salesorder.FieldGoodsAmount:
 		return m.OldGoodsAmount(ctx)
 	case salesorder.FieldTaxAmount:
@@ -93491,6 +93548,13 @@ func (m *SalesOrderMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetFreightTerms(v)
+		return nil
+	case salesorder.FieldQuotedFreightAmount:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetQuotedFreightAmount(v)
 		return nil
 	case salesorder.FieldGoodsAmount:
 		v, ok := value.(decimal.Decimal)
@@ -93699,6 +93763,9 @@ func (m *SalesOrderMutation) ClearedFields() []string {
 	if m.FieldCleared(salesorder.FieldFreightTerms) {
 		fields = append(fields, salesorder.FieldFreightTerms)
 	}
+	if m.FieldCleared(salesorder.FieldQuotedFreightAmount) {
+		fields = append(fields, salesorder.FieldQuotedFreightAmount)
+	}
 	if m.FieldCleared(salesorder.FieldGoodsAmount) {
 		fields = append(fields, salesorder.FieldGoodsAmount)
 	}
@@ -93775,6 +93842,9 @@ func (m *SalesOrderMutation) ClearField(name string) error {
 		return nil
 	case salesorder.FieldFreightTerms:
 		m.ClearFreightTerms()
+		return nil
+	case salesorder.FieldQuotedFreightAmount:
+		m.ClearQuotedFreightAmount()
 		return nil
 	case salesorder.FieldGoodsAmount:
 		m.ClearGoodsAmount()
@@ -93855,6 +93925,9 @@ func (m *SalesOrderMutation) ResetField(name string) error {
 		return nil
 	case salesorder.FieldFreightTerms:
 		m.ResetFreightTerms()
+		return nil
+	case salesorder.FieldQuotedFreightAmount:
+		m.ResetQuotedFreightAmount()
 		return nil
 	case salesorder.FieldGoodsAmount:
 		m.ResetGoodsAmount()

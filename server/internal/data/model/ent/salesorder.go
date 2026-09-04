@@ -48,6 +48,8 @@ type SalesOrder struct {
 	TaxRate *decimal.Decimal `json:"tax_rate,omitempty"`
 	// FreightTerms holds the value of the "freight_terms" field.
 	FreightTerms *string `json:"freight_terms,omitempty"`
+	// QuotedFreightAmount holds the value of the "quoted_freight_amount" field.
+	QuotedFreightAmount *decimal.Decimal `json:"quoted_freight_amount,omitempty"`
 	// GoodsAmount holds the value of the "goods_amount" field.
 	GoodsAmount *decimal.Decimal `json:"goods_amount,omitempty"`
 	// TaxAmount holds the value of the "tax_amount" field.
@@ -142,7 +144,7 @@ func (*SalesOrder) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case salesorder.FieldTaxRate, salesorder.FieldGoodsAmount, salesorder.FieldTaxAmount, salesorder.FieldOrderTotal:
+		case salesorder.FieldTaxRate, salesorder.FieldQuotedFreightAmount, salesorder.FieldGoodsAmount, salesorder.FieldTaxAmount, salesorder.FieldOrderTotal:
 			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
 		case salesorder.FieldCustomerSnapshot, salesorder.FieldContactSnapshot, salesorder.FieldDeliverySnapshot:
 			values[i] = new([]byte)
@@ -270,6 +272,13 @@ func (_m *SalesOrder) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.FreightTerms = new(string)
 				*_m.FreightTerms = value.String
+			}
+		case salesorder.FieldQuotedFreightAmount:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field quoted_freight_amount", values[i])
+			} else if value.Valid {
+				_m.QuotedFreightAmount = new(decimal.Decimal)
+				*_m.QuotedFreightAmount = *value.S.(*decimal.Decimal)
 			}
 		case salesorder.FieldGoodsAmount:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -483,6 +492,11 @@ func (_m *SalesOrder) String() string {
 	if v := _m.FreightTerms; v != nil {
 		builder.WriteString("freight_terms=")
 		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.QuotedFreightAmount; v != nil {
+		builder.WriteString("quoted_freight_amount=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")
 	if v := _m.GoodsAmount; v != nil {

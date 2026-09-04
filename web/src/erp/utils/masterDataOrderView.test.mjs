@@ -368,6 +368,36 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
   )
 
   assert.deepEqual(
+    buildSalesOrderParams({
+      order_no: ' SO-FREIGHT ',
+      customer_id: '3',
+      freight_terms: ' EXCLUDED ',
+      quoted_freight_amount: ' 88.500000 ',
+      order_date: '2026-05-31',
+    }),
+    {
+      order_no: 'SO-FREIGHT',
+      currency: 'CNY',
+      customer_id: 3,
+      customer_snapshot: {},
+      contact_snapshot: {},
+      freight_terms: 'EXCLUDED',
+      quoted_freight_amount: '88.500000',
+      order_date: '2026-05-31',
+    }
+  )
+  assert.equal(
+    Object.hasOwn(
+      buildSalesOrderParams({
+        freight_terms: 'INCLUDED',
+        quoted_freight_amount: '88.5',
+      }),
+      'quoted_freight_amount'
+    ),
+    false
+  )
+
+  assert.deepEqual(
     buildSalesOrderItemParams({
       line_no: '2',
       product_id: '5',
@@ -1839,31 +1869,47 @@ test('FL_sales_order_item_amount__keeps_manual_snapshot_without_inputs masterDat
   )
 })
 
-test('masterDataOrderView: sales order totals preserve tax-mode semantics and incomplete drafts', () => {
+test('masterDataOrderView: sales order totals include separately quoted freight without double counting included freight', () => {
   const items = [{ ordered_quantity: '2', unit_price: '50' }]
-  assert.deepEqual(calculateSalesOrderAmounts({ items: [], taxMode: 'NONE' }), {
-    complete: false,
-    goodsAmount: '',
-    taxAmount: '',
-    orderTotal: '',
-  })
-  assert.deepEqual(calculateSalesOrderAmounts({ items, taxMode: 'NONE' }), {
-    complete: true,
-    goodsAmount: '100',
-    taxAmount: '0',
-    orderTotal: '100',
-  })
+  assert.deepEqual(
+    calculateSalesOrderAmounts({
+      items: [],
+      taxMode: 'NONE',
+      freightTerms: 'INCLUDED',
+    }),
+    {
+      complete: false,
+      goodsAmount: '',
+      taxAmount: '',
+      orderTotal: '',
+    }
+  )
+  assert.deepEqual(
+    calculateSalesOrderAmounts({
+      items,
+      taxMode: 'NONE',
+      freightTerms: 'INCLUDED',
+    }),
+    {
+      complete: true,
+      goodsAmount: '100',
+      taxAmount: '0',
+      orderTotal: '100',
+    }
+  )
   assert.deepEqual(
     calculateSalesOrderAmounts({
       items,
       taxMode: 'EXCLUSIVE',
       taxRate: '13',
+      freightTerms: 'EXCLUDED',
+      quotedFreightAmount: '10',
     }),
     {
       complete: true,
       goodsAmount: '100',
-      taxAmount: '13',
-      orderTotal: '113',
+      taxAmount: '14.3',
+      orderTotal: '124.3',
     }
   )
   assert.deepEqual(
@@ -1871,6 +1917,7 @@ test('masterDataOrderView: sales order totals preserve tax-mode semantics and in
       items: [{ ordered_quantity: '1', unit_price: '113' }],
       taxMode: 'INCLUSIVE',
       taxRate: '13',
+      freightTerms: 'INCLUDED',
     }),
     {
       complete: true,
@@ -1884,10 +1931,27 @@ test('masterDataOrderView: sales order totals preserve tax-mode semantics and in
       items: [{ ordered_quantity: '2', unit_price: '' }],
       taxMode: 'EXCLUSIVE',
       taxRate: '13',
+      freightTerms: 'EXCLUDED',
+      quotedFreightAmount: '10',
     }),
     {
       complete: false,
       goodsAmount: '',
+      taxAmount: '',
+      orderTotal: '',
+    }
+  )
+  assert.deepEqual(
+    calculateSalesOrderAmounts({
+      items,
+      taxMode: 'EXCLUSIVE',
+      taxRate: '13',
+      freightTerms: 'EXCLUDED',
+      quotedFreightAmount: '',
+    }),
+    {
+      complete: false,
+      goodsAmount: '100',
       taxAmount: '',
       orderTotal: '',
     }

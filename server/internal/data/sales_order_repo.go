@@ -47,7 +47,13 @@ var _ biz.SalesOrderLifecycleActionRepo = (*salesOrderRepo)(nil)
 var _ biz.SalesOrderCommercialReadinessRepo = (*salesOrderRepo)(nil)
 
 func (r *salesOrderRepo) CreateSalesOrder(ctx context.Context, in *biz.SalesOrderMutation) (*biz.SalesOrder, error) {
-	goodsAmount, taxAmount, orderTotal, err := biz.CalculateSalesOrderAmounts(in.TaxMode, in.TaxRate, nil)
+	goodsAmount, taxAmount, orderTotal, err := biz.CalculateSalesOrderAmounts(
+		in.TaxMode,
+		in.TaxRate,
+		in.FreightTerms,
+		in.QuotedFreightAmount,
+		nil,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -66,6 +72,7 @@ func (r *salesOrderRepo) CreateSalesOrder(ctx context.Context, in *biz.SalesOrde
 		SetNillableTaxMode(in.TaxMode).
 		SetNillableTaxRate(in.TaxRate).
 		SetNillableFreightTerms(in.FreightTerms).
+		SetNillableQuotedFreightAmount(in.QuotedFreightAmount).
 		SetNillableGoodsAmount(goodsAmount).
 		SetNillableTaxAmount(taxAmount).
 		SetNillableOrderTotal(orderTotal).
@@ -85,7 +92,13 @@ func (r *salesOrderRepo) UpdateSalesOrder(ctx context.Context, id int, in *biz.S
 	if err != nil {
 		return nil, err
 	}
-	in.GoodsAmount, in.TaxAmount, in.OrderTotal, err = biz.CalculateSalesOrderAmounts(in.TaxMode, in.TaxRate, amounts)
+	in.GoodsAmount, in.TaxAmount, in.OrderTotal, err = biz.CalculateSalesOrderAmounts(
+		in.TaxMode,
+		in.TaxRate,
+		in.FreightTerms,
+		in.QuotedFreightAmount,
+		amounts,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -1137,6 +1150,7 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 			SetNillableTaxMode(in.TaxMode).
 			SetNillableTaxRate(in.TaxRate).
 			SetNillableFreightTerms(in.FreightTerms).
+			SetNillableQuotedFreightAmount(in.QuotedFreightAmount).
 			SetNillableGoodsAmount(in.GoodsAmount).
 			SetNillableTaxAmount(in.TaxAmount).
 			SetNillableOrderTotal(in.OrderTotal).
@@ -1478,6 +1492,7 @@ func entSalesOrderToBiz(row *ent.SalesOrder) *biz.SalesOrder {
 		TaxMode:             row.TaxMode,
 		TaxRate:             row.TaxRate,
 		FreightTerms:        row.FreightTerms,
+		QuotedFreightAmount: row.QuotedFreightAmount,
 		GoodsAmount:         row.GoodsAmount,
 		TaxAmount:           row.TaxAmount,
 		OrderTotal:          row.OrderTotal,
@@ -1558,6 +1573,9 @@ func validateSalesOrderCommercialReadinessWithClient(ctx context.Context, client
 	if *order.TaxMode != biz.SalesOrderTaxModeNone && order.TaxRate == nil {
 		return biz.ErrSalesOrderCommercialTermsIncomplete
 	}
+	if *order.FreightTerms == biz.SalesOrderFreightTermsExcluded && order.QuotedFreightAmount == nil {
+		return biz.ErrSalesOrderCommercialTermsIncomplete
+	}
 	items, err := client.SalesOrderItem.Query().Where(
 		salesorderitem.SalesOrderID(id),
 		salesorderitem.LineStatus(biz.SalesOrderItemStatusOpen),
@@ -1606,7 +1624,13 @@ func recalculateSalesOrderAmountsWithClient(ctx context.Context, client *ent.Cli
 	if err != nil {
 		return err
 	}
-	goodsAmount, taxAmount, orderTotal, err := biz.CalculateSalesOrderAmounts(order.TaxMode, order.TaxRate, amounts)
+	goodsAmount, taxAmount, orderTotal, err := biz.CalculateSalesOrderAmounts(
+		order.TaxMode,
+		order.TaxRate,
+		order.FreightTerms,
+		order.QuotedFreightAmount,
+		amounts,
+	)
 	if err != nil {
 		return err
 	}
@@ -1646,6 +1670,11 @@ func setSalesOrderCommercialFieldsOnUpdateOne(update *ent.SalesOrderUpdateOne, i
 	} else {
 		update.SetFreightTerms(*in.FreightTerms)
 	}
+	if in.QuotedFreightAmount == nil {
+		update.ClearQuotedFreightAmount()
+	} else {
+		update.SetQuotedFreightAmount(*in.QuotedFreightAmount)
+	}
 	if in.GoodsAmount == nil {
 		update.ClearGoodsAmount()
 	} else {
@@ -1678,6 +1707,11 @@ func setSalesOrderCommercialFieldsOnUpdate(update *ent.SalesOrderUpdate, in *biz
 		update.ClearFreightTerms()
 	} else {
 		update.SetFreightTerms(*in.FreightTerms)
+	}
+	if in.QuotedFreightAmount == nil {
+		update.ClearQuotedFreightAmount()
+	} else {
+		update.SetQuotedFreightAmount(*in.QuotedFreightAmount)
 	}
 	if in.GoodsAmount == nil {
 		update.ClearGoodsAmount()

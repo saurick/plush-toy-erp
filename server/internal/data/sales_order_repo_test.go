@@ -40,6 +40,7 @@ func TestSalesOrderRepoOrderLifecycleAndList(t *testing.T) {
 	priceConditionNote := "原始报价"
 	taxMode := biz.SalesOrderTaxModeNone
 	freightTerms := biz.SalesOrderFreightTermsExcluded
+	quotedFreightAmount := decimal.Zero
 	note := "首单"
 	order, err := uc.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
 		OrderNo:             "SO-001",
@@ -52,6 +53,7 @@ func TestSalesOrderRepoOrderLifecycleAndList(t *testing.T) {
 		PriceConditionNote:  &priceConditionNote,
 		TaxMode:             &taxMode,
 		FreightTerms:        &freightTerms,
+		QuotedFreightAmount: &quotedFreightAmount,
 		OrderDate:           orderDate,
 		PlannedDeliveryDate: &plannedDate,
 		Note:                &note,
@@ -71,14 +73,15 @@ func TestSalesOrderRepoOrderLifecycleAndList(t *testing.T) {
 
 	updatedNote := "更新备注"
 	updated, err := uc.UpdateSalesOrder(ctx, order.ID, &biz.SalesOrderMutation{
-		OrderNo:          "SO-001-A",
-		CustomerID:       customer.ID,
-		Currency:         biz.FinanceCurrencyHKD,
-		CustomerSnapshot: map[string]any{"name": "updated"},
-		TaxMode:          &taxMode,
-		FreightTerms:     &freightTerms,
-		OrderDate:        orderDate,
-		Note:             &updatedNote,
+		OrderNo:             "SO-001-A",
+		CustomerID:          customer.ID,
+		Currency:            biz.FinanceCurrencyHKD,
+		CustomerSnapshot:    map[string]any{"name": "updated"},
+		TaxMode:             &taxMode,
+		FreightTerms:        &freightTerms,
+		QuotedFreightAmount: &quotedFreightAmount,
+		OrderDate:           orderDate,
+		Note:                &updatedNote,
 	})
 	if err != nil {
 		t.Fatalf("update sales order failed: %v", err)
@@ -106,6 +109,7 @@ func TestSalesOrderRepoOrderLifecycleAndList(t *testing.T) {
 		CustomerSnapshot:    map[string]any{"name": customer.Name},
 		TaxMode:             &taxMode,
 		FreightTerms:        &freightTerms,
+		QuotedFreightAmount: &quotedFreightAmount,
 		OrderDate:           nextOrderDate,
 		PlannedDeliveryDate: &nextPlannedDate,
 	})
@@ -545,9 +549,10 @@ func TestSalesOrderRepoSubmitRequiresCommercialClosure(t *testing.T) {
 		t.Fatalf("missing commercial terms error=%v, want ErrSalesOrderCommercialTermsIncomplete", err)
 	}
 
+	zeroQuotedFreight := decimal.Zero
 	missingPrice, err := uc.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
 		OrderNo: "SO-COMMERCIAL-MISSING-PRICE", CustomerID: customer.ID, OrderDate: orderDate,
-		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
+		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded), QuotedFreightAmount: &zeroQuotedFreight,
 	})
 	if err != nil {
 		t.Fatalf("create missing-price order: %v", err)
@@ -573,11 +578,29 @@ func TestSalesOrderRepoSubmitRequiresCommercialClosure(t *testing.T) {
 		t.Fatalf("missing lines error=%v, want ErrSalesOrderCommercialTermsIncomplete", err)
 	}
 
+	missingQuotedFreight, err := uc.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
+		OrderNo: "SO-COMMERCIAL-MISSING-QUOTED-FREIGHT", CustomerID: customer.ID, OrderDate: orderDate,
+		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
+	})
+	if err != nil {
+		t.Fatalf("create missing-quoted-freight order: %v", err)
+	}
+	if _, err := uc.AddSalesOrderItem(ctx, &biz.SalesOrderItemMutation{
+		SalesOrderID: missingQuotedFreight.ID, LineNo: 1, ProductID: product.ID, UnitID: unit.ID,
+		OrderedQuantity: decimal.NewFromInt(1), UnitPrice: &unitPrice,
+	}); err != nil {
+		t.Fatalf("add priced missing-quoted-freight line: %v", err)
+	}
+	if _, err := uc.SubmitSalesOrder(ctx, missingQuotedFreight.ID); !errors.Is(err, biz.ErrSalesOrderCommercialTermsIncomplete) {
+		t.Fatalf("missing quoted freight error=%v, want ErrSalesOrderCommercialTermsIncomplete", err)
+	}
+
 	taxMode := biz.SalesOrderTaxModeExclusive
 	taxRate := decimal.NewFromInt(13)
+	quotedFreight := decimal.NewFromInt(10)
 	complete, err := uc.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
 		OrderNo: "SO-COMMERCIAL-COMPLETE", CustomerID: customer.ID, OrderDate: orderDate,
-		TaxMode: &taxMode, TaxRate: &taxRate, FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
+		TaxMode: &taxMode, TaxRate: &taxRate, FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded), QuotedFreightAmount: &quotedFreight,
 	})
 	if err != nil {
 		t.Fatalf("create complete order: %v", err)
@@ -593,8 +616,9 @@ func TestSalesOrderRepoSubmitRequiresCommercialClosure(t *testing.T) {
 		t.Fatalf("submit complete order: %v", err)
 	}
 	if complete.GoodsAmount == nil || !complete.GoodsAmount.Equal(decimal.NewFromInt(100)) ||
-		complete.TaxAmount == nil || !complete.TaxAmount.Equal(decimal.NewFromInt(13)) ||
-		complete.OrderTotal == nil || !complete.OrderTotal.Equal(decimal.NewFromInt(113)) {
+		complete.QuotedFreightAmount == nil || !complete.QuotedFreightAmount.Equal(decimal.NewFromInt(10)) ||
+		complete.TaxAmount == nil || !complete.TaxAmount.Equal(decimal.RequireFromString("14.3")) ||
+		complete.OrderTotal == nil || !complete.OrderTotal.Equal(decimal.RequireFromString("124.3")) {
 		t.Fatalf("submitted commercial totals=%#v", complete)
 	}
 }

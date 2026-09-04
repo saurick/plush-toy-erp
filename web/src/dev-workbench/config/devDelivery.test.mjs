@@ -65,7 +65,7 @@ const databaseMigrationPageSource = readFileSync(
   new URL('../pages/DevDatabaseMigrationPage.jsx', import.meta.url),
   'utf8'
 )
-const workflowSources = ['ci.yml', 'release.yml'].map((name) =>
+const workflowSources = ['release.yml'].map((name) =>
   readFileSync(
     new URL(`../../../../.github/workflows/${name}`, import.meta.url),
     'utf8'

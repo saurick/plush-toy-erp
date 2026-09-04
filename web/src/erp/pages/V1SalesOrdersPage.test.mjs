@@ -35,6 +35,7 @@ test('sales order commercial and delivery fields stay grouped without changing t
     '计税方式',
     '税率',
     '报价是否含运费',
+    '报价运费',
     '交付与收货',
     '国家 / 地区',
     '收货人',
@@ -50,6 +51,12 @@ test('sales order commercial and delivery fields stay grouped without changing t
     assert.match(form, new RegExp(copy.replace('/', '\\/'), 'u'))
   }
   assert.match(form, /unitText="%"/u)
+  assert.match(form, /name="quoted_freight_amount"/u)
+  assert.match(form, /value !== 'EXCLUDED'/u)
+  assert.match(form, /setFieldValue\('quoted_freight_amount', undefined\)/u)
+  assert.match(form, /unitText=\{currency \|\| '币种'\}/u)
+  assert.match(columns, /title: '报价运费'/u)
+  assert.match(columns, /dataIndex: 'quoted_freight_amount'/u)
   assert.doesNotMatch(form, /addonAfter=/u)
   const headerIndex = businessModal.indexOf('<SalesOrderFormFields')
   const attachmentsIndex = businessModal.indexOf('<BusinessAttachmentPanel')

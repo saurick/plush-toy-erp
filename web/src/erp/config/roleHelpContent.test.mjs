@@ -185,8 +185,14 @@ test('roleHelpContent: 永绅岗位帮助只指导已开放且有权限的动作
     ]
   )
   assert.doesNotMatch(pmcCopy, /发布生产订单/u)
-  assert.match(salesCopy, /数量、单价、计税方式、报价是否含运费和交期/u)
-  assert.match(salesCopy, /收货信息、数量、单价、货款、税额、总额/u)
+  assert.match(
+    salesCopy,
+    /数量、单价、计税方式、报价是否含运费、另计报价运费和交期/u
+  )
+  assert.match(
+    salesCopy,
+    /收货信息、数量、单价、货款、报价运费、税额、总额/u
+  )
   assert.match(purchaseCopy, /付款方式、是否需要发票、收货地址和到货日期/u)
   assert.doesNotMatch(warehouseCopy, /盘点、调拨|人工调整/u)
   assert.match(warehouseCopy, /生产提交完工报告不等于成品已经入库/u)

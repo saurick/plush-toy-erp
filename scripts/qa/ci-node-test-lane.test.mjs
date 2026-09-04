@@ -119,7 +119,7 @@ test("Node lane catalog covers parallel_safe with one controlled preflight parti
       "scripts/deploy/production-preflight.test.mjs",
     ]);
   }
-  assert.equal(expectedCiNodeTestLaneFiles("release_a").length, 30);
+  assert.equal(expectedCiNodeTestLaneFiles("release_a").length, 29);
   assert.equal(expectedCiNodeTestLaneFiles("release_b").length, 30);
   assert.equal(expectedCiNodeTestLaneFiles("release_c").length, 28);
   assert.ok(

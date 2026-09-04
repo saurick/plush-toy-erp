@@ -46,9 +46,34 @@ func normalizeSalesOrderCommercialTerms(
 	return taxMode, taxRate, freightTerms, nil
 }
 
+func normalizeSalesOrderQuotedFreightAmount(
+	freightTerms *string,
+	amount *decimal.Decimal,
+) (*decimal.Decimal, error) {
+	if freightTerms == nil {
+		if amount != nil {
+			return nil, ErrBadParam
+		}
+		return nil, nil
+	}
+	if *freightTerms != SalesOrderFreightTermsExcluded {
+		return nil, nil
+	}
+	if amount == nil {
+		return nil, nil
+	}
+	normalized := amount.Truncate(lineAmountScale)
+	if !amount.Equal(normalized) || normalized.IsNegative() || normalized.GreaterThan(maxPositiveNumeric20Scale6) {
+		return nil, ErrBadParam
+	}
+	return &normalized, nil
+}
+
 func CalculateSalesOrderAmounts(
 	taxMode *string,
 	taxRate *decimal.Decimal,
+	freightTerms *string,
+	quotedFreightAmount *decimal.Decimal,
 	amounts []*decimal.Decimal,
 ) (goodsAmount, taxAmount, orderTotal *decimal.Decimal, err error) {
 	if len(amounts) == 0 {
@@ -66,6 +91,28 @@ func CalculateSalesOrderAmounts(
 	}
 	goods = goods.Round(lineAmountScale)
 	goodsAmount = &goods
+	if freightTerms == nil {
+		return goodsAmount, nil, nil, nil
+	}
+	terms := strings.ToUpper(strings.TrimSpace(*freightTerms))
+	commercialBase := goods
+	switch terms {
+	case SalesOrderFreightTermsIncluded:
+		if quotedFreightAmount != nil {
+			return nil, nil, nil, ErrBadParam
+		}
+	case SalesOrderFreightTermsExcluded:
+		if quotedFreightAmount == nil {
+			return goodsAmount, nil, nil, nil
+		}
+		normalizedFreight, normalizeErr := normalizeSalesOrderQuotedFreightAmount(&terms, quotedFreightAmount)
+		if normalizeErr != nil {
+			return nil, nil, nil, normalizeErr
+		}
+		commercialBase = commercialBase.Add(*normalizedFreight).Round(lineAmountScale)
+	default:
+		return nil, nil, nil, ErrBadParam
+	}
 	if taxMode == nil {
 		return goodsAmount, nil, nil, nil
 	}
@@ -73,7 +120,7 @@ func CalculateSalesOrderAmounts(
 	switch mode {
 	case SalesOrderTaxModeNone:
 		tax := decimal.Zero
-		total := goods
+		total := commercialBase
 		return goodsAmount, &tax, &total, nil
 	case SalesOrderTaxModeInclusive, SalesOrderTaxModeExclusive:
 		if taxRate == nil || !taxRate.IsPositive() || taxRate.GreaterThan(decimal.NewFromInt(100)) {
@@ -81,13 +128,13 @@ func CalculateSalesOrderAmounts(
 		}
 		var tax decimal.Decimal
 		if mode == SalesOrderTaxModeInclusive {
-			tax = goods.Mul(*taxRate).Div(decimal.NewFromInt(100).Add(*taxRate)).Round(lineAmountScale)
+			tax = commercialBase.Mul(*taxRate).Div(decimal.NewFromInt(100).Add(*taxRate)).Round(lineAmountScale)
 		} else {
-			tax = goods.Mul(*taxRate).Div(decimal.NewFromInt(100)).Round(lineAmountScale)
+			tax = commercialBase.Mul(*taxRate).Div(decimal.NewFromInt(100)).Round(lineAmountScale)
 		}
-		total := goods
+		total := commercialBase
 		if mode == SalesOrderTaxModeExclusive {
-			total = goods.Add(tax).Round(lineAmountScale)
+			total = commercialBase.Add(tax).Round(lineAmountScale)
 		}
 		return goodsAmount, &tax, &total, nil
 	default:

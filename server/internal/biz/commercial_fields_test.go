@@ -14,21 +14,23 @@ func TestCalculateSalesOrderAmounts(t *testing.T) {
 		return &parsed
 	}
 	tests := []struct {
-		name      string
-		mode      string
-		rate      *decimal.Decimal
-		amounts   []*decimal.Decimal
-		wantGoods string
-		wantTax   string
-		wantTotal string
+		name          string
+		mode          string
+		rate          *decimal.Decimal
+		freightTerms  string
+		quotedFreight *decimal.Decimal
+		amounts       []*decimal.Decimal
+		wantGoods     string
+		wantTax       string
+		wantTotal     string
 	}{
-		{name: "no tax", mode: SalesOrderTaxModeNone, amounts: []*decimal.Decimal{amount("10.5"), amount("2.5")}, wantGoods: "13", wantTax: "0", wantTotal: "13"},
-		{name: "exclusive tax", mode: SalesOrderTaxModeExclusive, rate: amount("13"), amounts: []*decimal.Decimal{amount("100")}, wantGoods: "100", wantTax: "13", wantTotal: "113"},
-		{name: "inclusive tax", mode: SalesOrderTaxModeInclusive, rate: amount("13"), amounts: []*decimal.Decimal{amount("113")}, wantGoods: "113", wantTax: "13", wantTotal: "113"},
+		{name: "no tax with freight included in prices", mode: SalesOrderTaxModeNone, freightTerms: SalesOrderFreightTermsIncluded, amounts: []*decimal.Decimal{amount("10.5"), amount("2.5")}, wantGoods: "13", wantTax: "0", wantTotal: "13"},
+		{name: "exclusive tax with separately quoted freight", mode: SalesOrderTaxModeExclusive, rate: amount("13"), freightTerms: SalesOrderFreightTermsExcluded, quotedFreight: amount("10"), amounts: []*decimal.Decimal{amount("100")}, wantGoods: "100", wantTax: "14.3", wantTotal: "124.3"},
+		{name: "inclusive tax with separately quoted freight", mode: SalesOrderTaxModeInclusive, rate: amount("13"), freightTerms: SalesOrderFreightTermsExcluded, quotedFreight: amount("113"), amounts: []*decimal.Decimal{amount("113")}, wantGoods: "113", wantTax: "26", wantTotal: "226"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			goods, tax, total, err := CalculateSalesOrderAmounts(&tt.mode, tt.rate, tt.amounts)
+			goods, tax, total, err := CalculateSalesOrderAmounts(&tt.mode, tt.rate, &tt.freightTerms, tt.quotedFreight, tt.amounts)
 			if err != nil || goods == nil || tax == nil || total == nil || goods.String() != tt.wantGoods || tax.String() != tt.wantTax || total.String() != tt.wantTotal {
 				t.Fatalf("amounts goods=%v tax=%v total=%v err=%v", goods, tax, total, err)
 			}
@@ -36,14 +38,22 @@ func TestCalculateSalesOrderAmounts(t *testing.T) {
 	}
 
 	mode := SalesOrderTaxModeExclusive
-	if goods, tax, total, err := CalculateSalesOrderAmounts(&mode, amount("13"), nil); err != nil || goods != nil || tax != nil || total != nil {
+	freightTerms := SalesOrderFreightTermsExcluded
+	if goods, tax, total, err := CalculateSalesOrderAmounts(&mode, amount("13"), &freightTerms, amount("10"), nil); err != nil || goods != nil || tax != nil || total != nil {
 		t.Fatalf("order without lines must keep totals incomplete: goods=%v tax=%v total=%v err=%v", goods, tax, total, err)
 	}
-	if goods, tax, total, err := CalculateSalesOrderAmounts(&mode, amount("13"), []*decimal.Decimal{nil}); err != nil || goods != nil || tax != nil || total != nil {
+	if goods, tax, total, err := CalculateSalesOrderAmounts(&mode, amount("13"), &freightTerms, amount("10"), []*decimal.Decimal{nil}); err != nil || goods != nil || tax != nil || total != nil {
 		t.Fatalf("incomplete line must keep totals incomplete: goods=%v tax=%v total=%v err=%v", goods, tax, total, err)
 	}
+	if goods, tax, total, err := CalculateSalesOrderAmounts(&mode, amount("13"), &freightTerms, nil, []*decimal.Decimal{amount("100")}); err != nil || goods == nil || goods.String() != "100" || tax != nil || total != nil {
+		t.Fatalf("excluded freight without a quote must keep tax and total incomplete: goods=%v tax=%v total=%v err=%v", goods, tax, total, err)
+	}
+	included := SalesOrderFreightTermsIncluded
+	if _, _, _, err := CalculateSalesOrderAmounts(&mode, amount("13"), &included, amount("10"), []*decimal.Decimal{amount("100")}); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("included freight with a separate quote error=%v, want ErrBadParam", err)
+	}
 	negative := decimal.NewFromInt(-1)
-	if _, _, _, err := CalculateSalesOrderAmounts(&mode, amount("13"), []*decimal.Decimal{&negative}); !errors.Is(err, ErrBadParam) {
+	if _, _, _, err := CalculateSalesOrderAmounts(&mode, amount("13"), &freightTerms, amount("10"), []*decimal.Decimal{&negative}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("negative line amount error=%v, want ErrBadParam", err)
 	}
 }
@@ -60,6 +70,21 @@ func TestNormalizeSalesOrderCommercialTerms(t *testing.T) {
 	invalidMode := "unknown"
 	if _, _, _, err := normalizeSalesOrderCommercialTerms(&invalidMode, nil, &freight); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("invalid tax mode error=%v, want ErrBadParam", err)
+	}
+
+	quotedFreight := decimal.RequireFromString("88.500000")
+	excluded := SalesOrderFreightTermsExcluded
+	normalizedQuotedFreight, err := normalizeSalesOrderQuotedFreightAmount(&excluded, &quotedFreight)
+	if err != nil || normalizedQuotedFreight == nil || normalizedQuotedFreight.String() != "88.5" {
+		t.Fatalf("normalized quoted freight=%v err=%v", normalizedQuotedFreight, err)
+	}
+	normalizedQuotedFreight, err = normalizeSalesOrderQuotedFreightAmount(normalizedFreight, &quotedFreight)
+	if err != nil || normalizedQuotedFreight != nil {
+		t.Fatalf("included freight must clear separate quote: amount=%v err=%v", normalizedQuotedFreight, err)
+	}
+	negativeQuotedFreight := decimal.NewFromInt(-1)
+	if _, err := normalizeSalesOrderQuotedFreightAmount(&excluded, &negativeQuotedFreight); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("negative quoted freight error=%v, want ErrBadParam", err)
 	}
 }
 

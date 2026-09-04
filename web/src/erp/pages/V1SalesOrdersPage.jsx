@@ -904,6 +904,7 @@ export default function V1SalesOrdersPage() {
       tax_mode: undefined,
       tax_rate: undefined,
       freight_terms: undefined,
+      quoted_freight_amount: undefined,
       order_date: currentBusinessDate(),
       items: [createBlankOrderLine(1, { unitID: defaultUnitID })],
     })
@@ -1804,7 +1805,7 @@ export default function V1SalesOrdersPage() {
         columns={orderColumns}
         dataSource={orders}
         expandable={salesOrderItemsPreview.expandable}
-        scroll={{ x: 2600 }}
+        scroll={{ x: 2740 }}
         pagination={createBusinessTablePagination({
           pagination,
           total,

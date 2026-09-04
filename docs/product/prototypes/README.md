@@ -193,7 +193,7 @@
 | `business-module-page-standard-v1/task-collab-entry-v2.html` | To Implement | Core | 业务页协同入口组件样板，仅用于有真实 Workflow 关联的业务页，展示当前选中业务记录的待办；未选中记录或当前记录无待办时不显示固定栏，跨记录任务回到任务中心。 |
 | `print-template-center-v1/index.html` | To Implement | Core | 模板打印中心样板，覆盖模板导航、纸面预览和打印窗口入口；字段编辑和明细确认回到独立打印窗口。 |
 | `business-detail-page-standard-v1/index.html` | To Implement | Core | 业务只读详情 Modal 样板，对齐共享详情组件的标题、字段描述表、完整明细分页和加载 / 空 / 失败状态；不再保留独立详情页外壳或业务动作区。 |
-| `business-form-page-standard-v1/index.html` | To Implement | Core | 销售订单宽业务 Modal 样板，对齐订单与客户、联系人与负责人、结算条件、交付与收货、附件，以及 SKU 来源、带出摘要、单位、复制行和产品顺序；保留保存 / 取消、来源清值和只读评审状态，不提供通用整表重置。 |
+| `business-form-page-standard-v1/index.html` | To Implement | Core | 销售订单宽业务 Modal 样板，对齐订单与客户、联系人与负责人、结算条件、税费与报价运费、交付与收货、附件，以及 SKU 来源、带出摘要、单位、复制行和产品顺序；保留保存 / 取消、来源清值和只读评审状态，不提供通用整表重置。 |
 | `action-modal-drawer-standard-v1/index.html` | To Implement | Core | 局部动作弹窗标准样板，只承接来源选择器、列顺序、状态规则说明和危险确认；不再复制完整业务表单或只读详情。目录名保留历史 `drawer` 字样仅为引用兼容。 |
 | `business-module-page-standard-v1/images/` | Reference | Exploration / Evidence | 早期三张协同入口方向图，用于追溯方案比较。 |
 | `mobile-role-tasks-v2/index.html` | Current | Core | 当前选中任务查看、处理、任务附件和可信回执流程；与 v1 当前列表基线共同组成移动任务主路径。 |

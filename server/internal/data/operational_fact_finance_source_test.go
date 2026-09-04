@@ -36,7 +36,7 @@ func TestOperationalFactRepoShipmentItemFinanceSnapshotsComeFromSalesOrderLine(t
 	salesUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, log.NewStdLogger(io.Discard)))
 	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
 		OrderNo: "SO-SNAPSHOT", CustomerID: customer.ID, OrderDate: time.Now().UTC(),
-		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
+		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded), QuotedFreightAmount: &decimal.Zero,
 	})
 	if err != nil {
 		t.Fatalf("create sales order: %v", err)
@@ -137,7 +137,7 @@ func TestOperationalFactRepoShipShipmentKeepsFinanceSnapshotsFromActiveSalesOrde
 	paymentTermDays := 60
 	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
 		OrderNo: "SO-SNAPSHOT-REFRESH", CustomerID: customer.ID, OrderDate: time.Now().UTC(), Currency: biz.FinanceCurrencyUSD, PaymentTermDays: &paymentTermDays,
-		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
+		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded), QuotedFreightAmount: &decimal.Zero,
 	})
 	if err != nil {
 		t.Fatalf("create sales order: %v", err)
@@ -266,7 +266,7 @@ func TestOperationalFactRepoFinalShipmentAbsorbsFinanceRoundingTail(t *testing.T
 	paymentTermDays := 30
 	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
 		OrderNo: "SO-ROUNDING-TAIL", CustomerID: customer.ID, OrderDate: time.Now().UTC(), PaymentTermDays: &paymentTermDays,
-		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
+		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded), QuotedFreightAmount: &decimal.Zero,
 	})
 	if err != nil {
 		t.Fatalf("create sales order: %v", err)
@@ -859,7 +859,7 @@ func prepareShipmentFinanceSource(
 	paymentTermDays := 30
 	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
 		OrderNo: "SO-" + suffix, CustomerID: customer.ID, OrderDate: time.Now().UTC(), PaymentTermDays: &paymentTermDays,
-		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
+		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded), QuotedFreightAmount: &decimal.Zero,
 	})
 	if err != nil {
 		t.Fatalf("create sales order: %v", err)

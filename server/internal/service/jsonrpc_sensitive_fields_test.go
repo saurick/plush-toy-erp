@@ -11,6 +11,7 @@ func TestRedactSensitiveFieldMapRemovesNestedPrivateAndCommercialFields(t *testi
 	data := map[string]any{
 		"customer": map[string]any{
 			"name": "客户甲", "phone": "13800138000", "tax_no": "TAX-1",
+			"quoted_freight_amount": "88.5",
 			"items": []any{map[string]any{
 				"product_name": "玩偶", "unit_price": "12.5", "amount": "25",
 			}},
@@ -18,7 +19,7 @@ func TestRedactSensitiveFieldMapRemovesNestedPrivateAndCommercialFields(t *testi
 	}
 	redactSensitiveFieldMap(data, "sales", sensitiveFieldReadPolicy{})
 	customer := data["customer"].(map[string]any)
-	if customer["name"] != "客户甲" || customer["phone"] != nil || customer["tax_no"] != nil {
+	if customer["name"] != "客户甲" || customer["phone"] != nil || customer["tax_no"] != nil || customer["quoted_freight_amount"] != nil {
 		t.Fatalf("party redaction mismatch: %#v", customer)
 	}
 	item := customer["items"].([]any)[0].(map[string]any)

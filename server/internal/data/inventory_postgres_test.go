@@ -804,7 +804,7 @@ func TestOperationalFactPostgresConcurrentShipmentsDoNotExceedSalesOrderLine(t *
 	unitPrice := decimal.NewFromInt(1)
 	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
 		OrderNo: "PG-SO-SHIP-" + fixtures.suffix, CustomerID: customer.ID, OrderDate: time.Now(),
-		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
+		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded), QuotedFreightAmount: &decimal.Zero,
 	})
 	if err != nil {
 		t.Fatalf("create postgres sales order failed: %v", err)
@@ -919,7 +919,7 @@ func TestOperationalFactPostgresCancelledShipmentRestoresSourceCandidateQuantity
 	unitPrice := decimal.NewFromInt(1)
 	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
 		OrderNo: "PG-SO-SHIP-CANCEL-" + fixtures.suffix, CustomerID: customer.ID, OrderDate: time.Now(),
-		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
+		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded), QuotedFreightAmount: &decimal.Zero,
 	})
 	if err != nil {
 		t.Fatalf("create postgres sales order failed: %v", err)
@@ -1138,7 +1138,7 @@ func TestOperationalFactPostgresConcurrentReservationReleaseAndShipmentPreserveR
 	unitPrice := decimal.NewFromInt(1)
 	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
 		OrderNo: "PG-SO-RELEASE-SHIP-" + fixtures.suffix, CustomerID: customer.ID, OrderDate: time.Now(),
-		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
+		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded), QuotedFreightAmount: &decimal.Zero,
 	})
 	if err != nil {
 		t.Fatalf("create postgres sales order failed: %v", err)
@@ -1237,7 +1237,7 @@ func TestOperationalFactPostgresShipmentRejectsRemainingReservationAcrossInvento
 	unitPrice := decimal.NewFromInt(1)
 	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
 		OrderNo: "PG-SO-CROSS-" + fixtures.suffix, CustomerID: customer.ID, OrderDate: time.Now(),
-		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
+		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded), QuotedFreightAmount: &decimal.Zero,
 	})
 	if err != nil {
 		t.Fatalf("create postgres sales order failed: %v", err)
