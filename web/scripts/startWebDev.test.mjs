@@ -4,9 +4,15 @@ import test from 'node:test'
 import { createERPViteConfig } from '../vite.shared.mjs'
 import {
   DEV_GITLAB_KEYCHAIN,
+  createViteChildEnvironment,
   parseStartWebDevArgs,
   resolveDevGitlabCredential,
+  resolveWebRuntimeStartup,
 } from './startWebDev.mjs'
+import {
+  LOCAL_RUNTIME_RECOVERY_MODE,
+  LocalRuntimePreflightError,
+} from '../../scripts/local-runtime-preflight.mjs'
 
 test('start web dev: 默认启用共享 runtime preflight', () => {
   assert.deepEqual(parseStartWebDevArgs([], {}), {
@@ -32,6 +38,71 @@ test('start web dev: frontend-only 必须显式启用且保留 Vite 参数', () 
     false,
     '遗留 shell 环境不能把普通 pnpm start 静默降级'
   )
+})
+
+test('start web dev: pending migration 启动受限恢复页而不是退出', async () => {
+  const output = []
+  const startup = await resolveWebRuntimeStartup(
+    {
+      apiOrigin: 'http://127.0.0.1:8300',
+      frontendOnly: false,
+      viteArgs: [],
+    },
+    {
+      preflight: async () => {
+        throw new LocalRuntimePreflightError(
+          'database_migration_pending',
+          'pending=1'
+        )
+      },
+      writeLine: (line) => output.push(line),
+    }
+  )
+
+  assert.equal(startup.complete, false)
+  assert.equal(startup.recoveryMode, LOCAL_RUNTIME_RECOVERY_MODE)
+  assert.equal(startup.recoveryReason, 'database_migration_pending')
+  assert.match(output.join('\n'), /恢复模式.*普通 ERP 页面与 RPC 暂停/u)
+})
+
+test('start web dev: 非恢复错误仍然失败关闭', async () => {
+  await assert.rejects(
+    resolveWebRuntimeStartup(
+      {
+        apiOrigin: 'http://127.0.0.1:8300',
+        frontendOnly: false,
+        viteArgs: [],
+      },
+      {
+        preflight: async () => {
+          throw new Error('db-guard failed')
+        },
+        writeLine: () => {},
+      }
+    ),
+    /db-guard failed/u
+  )
+})
+
+test('start web dev: recovery 环境显式覆盖且普通启动清除遗留值', () => {
+  const credential = { source: 'missing', token: '' }
+  const recovery = createViteChildEnvironment({
+    apiOrigin: 'http://127.0.0.1:8300',
+    gitlabCredential: credential,
+    recoveryMode: LOCAL_RUNTIME_RECOVERY_MODE,
+    recoveryReason: 'database_migration_pending',
+    env: { ERP_DEV_RECOVERY_MODE: 'stale', BROWSER: 'none' },
+  })
+  assert.equal(recovery.ERP_DEV_RECOVERY_MODE, LOCAL_RUNTIME_RECOVERY_MODE)
+  assert.equal(recovery.ERP_DEV_RECOVERY_REASON, 'database_migration_pending')
+
+  const normal = createViteChildEnvironment({
+    apiOrigin: 'http://127.0.0.1:8300',
+    gitlabCredential: credential,
+    env: { ERP_DEV_RECOVERY_MODE: 'stale', BROWSER: 'none' },
+  })
+  assert.equal(Object.hasOwn(normal, 'ERP_DEV_RECOVERY_MODE'), false)
+  assert.equal(Object.hasOwn(normal, 'ERP_DEV_RECOVERY_REASON'), false)
 })
 
 test('start web dev: 显式 GitLab 凭据优先且不读取钥匙串', async () => {

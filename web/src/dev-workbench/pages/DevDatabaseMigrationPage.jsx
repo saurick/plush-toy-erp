@@ -42,6 +42,7 @@ import {
   readDevSummarySnapshot,
   updateDevSummarySnapshot,
 } from '../config/devSummarySnapshot.mjs'
+import { isDevDatabaseMigrationRecoveryActive } from '../config/devRuntimeRecovery.mjs'
 
 const { Paragraph, Text, Title } = Typography
 const OPERATION_POLL_INTERVAL_MS = 1500
@@ -103,6 +104,12 @@ function runtimePresentation(runtime) {
   return { color: 'warning', label: '本地后端未就绪' }
 }
 
+function toolReadinessPresentation(tools) {
+  return tools?.status === 'ready'
+    ? { color: 'success', label: '迁移准备环境已就绪' }
+    : { color: 'error', label: '迁移准备环境未就绪' }
+}
+
 function operationStepStatus(operation, step) {
   if (!operation) return 'wait'
   const failed = ['failed', 'blocked', 'not_proven'].includes(operation.status)
@@ -130,6 +137,7 @@ function operationStepStatus(operation, step) {
 }
 
 export default function DevDatabaseMigrationPage() {
+  const recoveryActive = isDevDatabaseMigrationRecoveryActive()
   const client = useMemo(() => createDevDatabaseMigrationClient(), [])
   const initialSnapshot = useMemo(
     () => readDevSummarySnapshot(DATABASE_MIGRATION_SNAPSHOT_KEY),
@@ -273,7 +281,9 @@ export default function DevDatabaseMigrationPage() {
 
   const target = summary?.target
   const runtime = summary?.runtime
+  const tools = summary?.tools
   const runtimeState = runtimePresentation(runtime)
+  const toolState = toolReadinessPresentation(tools)
   const pendingFiles = target?.pendingFiles
   const isLatest = pendingFiles === 0
   const hasRunningOperation = operations.some((operation) =>
@@ -288,6 +298,7 @@ export default function DevDatabaseMigrationPage() {
     target?.key === 'shared-dev' &&
     Number.isSafeInteger(pendingFiles) &&
     pendingFiles > 0 &&
+    tools?.status === 'ready' &&
     !hasRunningOperation &&
     !readyOperation
   const canRestart =
@@ -397,13 +408,15 @@ export default function DevDatabaseMigrationPage() {
                   ? ''
                   : !summaryFresh
                     ? '正在核对最新状态；上次结果只供查看'
-                    : isLatest
-                      ? '数据库已是最新版本'
-                      : readyOperation
-                        ? '已有准备完成的不可变计划，请确认或刷新状态'
-                        : hasRunningOperation
-                          ? '已有操作正在执行'
-                          : '当前目标或 migration 状态未通过检查'
+                    : tools?.status !== 'ready'
+                      ? '迁移准备环境未就绪，请按下方检查项处理后刷新'
+                      : isLatest
+                        ? '数据库已是最新版本'
+                        : readyOperation
+                          ? '已有准备完成的不可变计划，请确认或刷新状态'
+                          : hasRunningOperation
+                            ? '已有操作正在执行'
+                            : '当前目标或 migration 状态未通过检查'
               }
             >
               <Button
@@ -430,6 +443,31 @@ export default function DevDatabaseMigrationPage() {
       </header>
 
       <main className="erp-dev-hub-shell erp-dev-database-migration-shell">
+        {recoveryActive ? (
+          isLatest && runtime?.available ? (
+            <Alert
+              type="success"
+              showIcon
+              message="数据库与本地后端已经恢复"
+              description="普通 ERP 页面和 RPC 已可重新开放；进入完整效能工作台会重新载入当前页面。"
+              action={
+                <Button
+                  type="primary"
+                  onClick={() => window.location.assign('/__dev')}
+                >
+                  进入完整效能工作台
+                </Button>
+              }
+            />
+          ) : (
+            <Alert
+              type="info"
+              showIcon
+              message="当前处于数据库迁移恢复模式"
+              description="pnpm start 已保留本页用于检查和恢复；完成 migration、同目标读回及后端 health / ready 前，普通 ERP 页面和 RPC 保持暂停。"
+            />
+          )
+        ) : null}
         {loadError ? (
           <Alert
             type={summary ? 'warning' : 'error'}
@@ -505,6 +543,35 @@ export default function DevDatabaseMigrationPage() {
               <Text type="secondary">
                 无关文档或页面变化不会让已准备计划反复重建。
               </Text>
+            </Space>
+          </Card>
+          <Card title="迁移准备环境">
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              <Tag color={toolState.color}>{toolState.label}</Tag>
+              <List
+                size="small"
+                dataSource={tools?.checks || []}
+                locale={{ emptyText: '工具状态未证明' }}
+                renderItem={(check) => (
+                  <List.Item>
+                    <Space direction="vertical" size={2}>
+                      <Space size={6}>
+                        <Text>{check.label}</Text>
+                        <Tag
+                          color={
+                            check.status === 'passed' ? 'success' : 'error'
+                          }
+                        >
+                          {check.status === 'passed' ? '已就绪' : '需处理'}
+                        </Tag>
+                      </Space>
+                      {check.status === 'blocked' ? (
+                        <Text type="secondary">{check.message}</Text>
+                      ) : null}
+                    </Space>
+                  </List.Item>
+                )}
+              />
             </Space>
           </Card>
         </section>

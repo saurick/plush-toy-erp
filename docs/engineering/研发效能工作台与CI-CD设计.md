@@ -122,6 +122,12 @@ GPT Review 的 finding 是审查输入，不是仓库事实。修复仍回到 Gi
 
 同一 development-only API 同时返回最近 20 次普通 push CI 的 pipeline 与逐 Job 数据，便于页面和 Codex 直接读取后定位慢 Job、排队、重试和回归；GitLab 仍是唯一历史真源。该服务器证据不覆盖 Local dirty 状态或本地 full/strict 回执；只有当前干净 SHA 的 R640 普通 CI 完整通过，质量工程与版本中心才把 `releaseEligible` 提升为真。本地 strict 即使通过也只保留为 Local 回执，不能替代 protected main 证据；未登记只读 token、API 不可达或 SHA 无 push 记录时只显示不可读/缺失，不制造绿色证据。
 
+### 本地数据库恢复启动
+
+普通 `pnpm start` 仍先执行只读 runtime preflight。工作区 db-guard、数据库配置和安全状态无法证明时直接阻断；只有已明确归类的本地 pending migration 或本地后端 health / ready 未就绪，才启动受限 Vite 并固定进入 `/__dev/database-migration`。该模式只放行迁移页和固定迁移 API，普通 ERP 页面、其它 DEV API、`/rpc` 与 `/templates` 均返回阻断；migration 到 head 且后端 health / ready 同目标读回后，恢复控制器才解除限制，重新载入后进入完整工作台。外部 `API_ORIGIN` 不降级到本机恢复模式。
+
+迁移页在停止后端之前检查完整工具能力：兼容 `docker` CLI/socket 的可用容器运行环境、Atlas v1.2.0、PostgreSQL 18 `pg_dump` / `psql` 和备份恢复基础命令。实现不绑定 macOS 或某一桌面产品；Docker Engine、Docker Desktop、Colima、Rancher Desktop、OrbStack，以及提供兼容入口的 Podman 都按同一能力合同判断。工具不完整只返回脱敏阻断和下一步，不自动启动本机应用、不自动 apply，也不把前端恢复页可达当成数据库已迁移。
+
 ## 目标环境与真实数据
 
 当前可执行 target 只有 `demo-133` 与 `customer-test-133`。显式版本提升（Explicit Promotion）只 load/pull 已发布 digest，随后执行固定 preflight、backup、migration、Compose、health/ready、公网 SHA 和资源读回；它必须由使用者明确发起，`main` push 不会自动部署。失败、blocked 或 `not_proven` 不自动重试。

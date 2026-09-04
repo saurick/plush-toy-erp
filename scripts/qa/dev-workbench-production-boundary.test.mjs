@@ -39,6 +39,8 @@ test("production artifact boundary: rejects DEV routes, styles and private paths
   for (const marker of [
     "/__dev",
     "/__dev/quality-gates",
+    "__PLUSH_DEV_DATABASE_MIGRATION_RECOVERY_ACTIVE__",
+    "dev_runtime_recovery_active",
     "erp-dev-workspace-nav",
     "erp-dev-quality-gates",
     "质量门禁",

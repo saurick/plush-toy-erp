@@ -1034,7 +1034,9 @@ lock 或状态不明的连接仍以 `database_clients_active` 阻断，并显示
 
 普通本地开发可从
 `http://127.0.0.1:5175/__dev/database-migration` 使用同一底层合同，不必手工
-复制 status / plan / apply 的临时确认值。页面只支持 application config 已
+复制 status / plan / apply 的临时确认值。普通 `pnpm start` 遇到 pending migration
+或本地后端未就绪时会自动保留该受限恢复页，不再因 Vite 未启动而形成死锁；
+恢复期间普通 ERP 页面、其它 DEV API 与 RPC 保持阻断。页面只支持 application config 已
 登记的 `192.168.0.106:5432/plush_erp`：先点“检查并准备”，Bridge 固定完成
 status、停止后端、plan、备份恢复演练与身份复核；再输入页面给出的完整确认串，
 execute 写入前还会重新核对备份文件身份，

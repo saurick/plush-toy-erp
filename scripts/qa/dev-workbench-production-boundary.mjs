@@ -17,6 +17,8 @@ const textExtensions = new Set([
 export const productionArtifactForbiddenMarkers = Object.freeze([
   "/__dev",
   "/__dev/quality-gates",
+  "__PLUSH_DEV_DATABASE_MIGRATION_RECOVERY_ACTIVE__",
+  "dev_runtime_recovery_active",
   "dev-workbench",
   "研发效能工作台",
   "Engineering Delivery Workbench",

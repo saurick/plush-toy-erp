@@ -3,6 +3,10 @@ import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 import { fileURLToPath } from 'url'
 import { getAppDefinition } from './src/erp/config/appRegistry.mjs'
+import {
+  DEV_DATABASE_MIGRATION_RECOVERY_ROUTE,
+  normalizeDevRuntimeRecoveryMode,
+} from './src/dev-workbench/config/devRuntimeRecovery.mjs'
 import { loadDevPorts } from '../scripts/dev-ports.mjs'
 import { normalizeAPIOrigin } from '../scripts/local-runtime-preflight-core.mjs'
 
@@ -137,6 +141,9 @@ export function createERPViteConfig(appId) {
   const apiOrigin = normalizeAPIOrigin(
     process.env.API_ORIGIN || `http://127.0.0.1:${devPorts.http}`
   )
+  const recoveryMode = normalizeDevRuntimeRecoveryMode(
+    process.env.ERP_DEV_RECOVERY_MODE
+  )
 
   return defineConfig(async ({ command, mode }) => {
     const env = loadEnv(mode, process.cwd(), '')
@@ -157,6 +164,7 @@ export function createERPViteConfig(appId) {
             devCustomerKey: process.env.ERP_DEV_CUSTOMER_KEY || '',
             mode,
             projectRoot: PROJECT_ROOT,
+            recoveryMode,
           })
         : []
 
@@ -215,7 +223,9 @@ export function createERPViteConfig(appId) {
         host: '0.0.0.0',
         port: serverPort,
         strictPort: true,
-        open: createDevOrigin(serverPort),
+        open: recoveryMode
+          ? `${createDevOrigin(serverPort)}${DEV_DATABASE_MIGRATION_RECOVERY_ROUTE}`
+          : createDevOrigin(serverPort),
         hmr: {
           host: DEV_HOST,
           clientPort: hmrClientPort,

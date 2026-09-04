@@ -166,6 +166,7 @@ test("dev workbench boundary: Node serve bridges are centralized outside browser
     "web/dev-server/devCustomerImportDryRunPlugin.mjs",
     "web/dev-server/devDataPreparationPlugin.mjs",
     "web/dev-server/devDatabaseMigrationPlugin.mjs",
+    "web/dev-server/devDatabaseMigrationRecoveryPlugin.mjs",
     "web/dev-server/devDatabaseMigrationRuntime.mjs",
     "web/dev-server/devDeliveryBridgePlugin.mjs",
     "web/dev-server/devQaCoveragePlugin.mjs",

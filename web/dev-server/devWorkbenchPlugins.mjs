@@ -1,6 +1,7 @@
 import { createDevCustomerConfigPlugin } from './devCustomerConfigPlugin.mjs'
 import { createDevCustomerImportDryRunPlugin } from './devCustomerImportDryRunPlugin.mjs'
 import { createDevDatabaseMigrationPlugin } from './devDatabaseMigrationPlugin.mjs'
+import { createDevDatabaseMigrationRecoveryController } from './devDatabaseMigrationRecoveryPlugin.mjs'
 import { createDevDataPreparationPlugin } from './devDataPreparationPlugin.mjs'
 import { createDevDeliveryBridgePlugin } from './devDeliveryBridgePlugin.mjs'
 import { createDevQaCoveragePlugin } from './devQaCoveragePlugin.mjs'
@@ -24,16 +25,25 @@ export function createDevWorkbenchServePlugins({
   devCustomerKey = '',
   mode,
   projectRoot,
+  recoveryMode = '',
 } = {}) {
   if (command !== 'serve' || mode !== 'development') return []
+  const recovery = createDevDatabaseMigrationRecoveryController({
+    mode: recoveryMode,
+  })
   return [
+    recovery.plugin,
     createDevCustomerImportDryRunPlugin({
       projectRoot,
       apiOrigin,
       devCustomerKey,
     }),
     createDevCustomerConfigPlugin({ projectRoot }),
-    createDevDatabaseMigrationPlugin({ projectRoot, apiOrigin }),
+    createDevDatabaseMigrationPlugin({
+      projectRoot,
+      apiOrigin,
+      onRuntimeReady: recovery.markRuntimeReady,
+    }),
     createDevDataPreparationPlugin({ projectRoot }),
     createDevQaTestingPlugin({ projectRoot }),
     createDevQualityGatePlugin({ projectRoot }),

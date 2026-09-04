@@ -203,6 +203,7 @@ web_tests=(
   "$ROOT_DIR/web/scripts/realLoginSmokeShared.test.mjs"
   "$ROOT_DIR/web/scripts/mobileAuthLoginRouteSmoke.test.mjs"
   "$ROOT_DIR/web/scripts/purchaseReceiptRealWriteBrowserE2E.test.mjs"
+  "$ROOT_DIR/web/scripts/startWebDev.test.mjs"
   "$ROOT_DIR/web/dev-server/devServerSecurity.test.mjs"
   "$ROOT_DIR/web/dev-server/devWorkbenchPlugins.test.mjs"
   "$ROOT_DIR/web/dev-server/devQaCoveragePlugin.test.mjs"

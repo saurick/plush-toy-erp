@@ -11,11 +11,11 @@ import {
   validateDevAuxPort,
 } from '../../scripts/dev-ports.mjs'
 import { resolveAvailablePort } from './localPort.mjs'
+import { normalizeAPIOrigin } from '../../scripts/local-runtime-preflight.mjs'
 import {
-  normalizeAPIOrigin,
-  runWebRuntimePreflight,
-} from '../../scripts/local-runtime-preflight.mjs'
-import { resolveDevBrowserLaunchEnv } from './openDevBrowser.js'
+  createViteChildEnvironment,
+  resolveWebRuntimeStartup,
+} from './startWebDev.mjs'
 
 const repoRoot = path.resolve(import.meta.dirname, '..', '..')
 const devPorts = loadDevPorts(repoRoot)
@@ -122,7 +122,7 @@ function printPlan(options) {
       `[${label}] preflight=${
         options.frontendOnly
           ? 'frontend-only (database/backend explicitly skipped; non-green)'
-          : 'database migration + backend health/ready + customer config/assets'
+          : 'database migration + backend health/ready; recoverable local blockers open the restricted migration page'
       }`,
       `[${label}] mode=vite dev server with HMR`,
       `[${label}] customer_config publish/activate is not executed`,
@@ -142,11 +142,13 @@ function printPlan(options) {
   )
 }
 
-function runVite(options) {
+function runVite(options, startup) {
   const child = spawn('pnpm', ['exec', 'vite', '--config', 'vite.config.mjs'], {
     env: {
-      ...process.env,
-      ...resolveDevBrowserLaunchEnv(process.env),
+      ...createViteChildEnvironment({
+        ...startup,
+        gitlabCredential: { source: 'missing', token: '' },
+      }),
       ERP_DEV_CUSTOMER_KEY: options.customer,
       ERP_VITE_PORT: options.port,
       ERP_VITE_HMR_CLIENT_PORT: options.port,
@@ -188,12 +190,12 @@ async function main() {
     return
   }
 
-  await runWebRuntimePreflight(options)
+  const startup = await resolveWebRuntimeStartup(options)
   checkDevCustomerPackage(options.customer)
   process.stdout.write(
     `[start-yoyoosun] 客户配置与公开资源预检通过：${options.customer}\n`
   )
-  runVite(options)
+  runVite(options, startup)
 }
 
 const isDirectRun =

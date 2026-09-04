@@ -31,6 +31,12 @@ const OPERATION_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u
+const TOOL_CHECK_KEYS = new Set([
+  'container_runtime',
+  'atlas',
+  'postgresql_client',
+  'supporting_commands',
+])
 
 function assertObject(value, field) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -143,6 +149,41 @@ function validateRuntime(runtime) {
   return runtime
 }
 
+function validateToolReadiness(tools) {
+  assertObject(tools, '迁移准备环境')
+  if (
+    tools.schemaVersion !== 'plush.dev-database-migration-tools/v1' ||
+    !['ready', 'blocked'].includes(tools.status) ||
+    !Array.isArray(tools.checks) ||
+    tools.checks.length < 1 ||
+    tools.checks.length > TOOL_CHECK_KEYS.size
+  ) {
+    throw new Error('迁移准备环境返回结构无效')
+  }
+  const seen = new Set()
+  tools.checks.forEach((check) => {
+    assertObject(check, '迁移准备环境检查')
+    if (
+      !TOOL_CHECK_KEYS.has(check.key) ||
+      seen.has(check.key) ||
+      !['passed', 'blocked'].includes(check.status)
+    ) {
+      throw new Error('迁移准备环境检查返回结构无效')
+    }
+    assertSafeText(check.label, '迁移准备环境名称', { max: 80 })
+    assertSafeText(check.message, '迁移准备环境说明', { max: 600 })
+    seen.add(check.key)
+  })
+  const allPassed = tools.checks.every((check) => check.status === 'passed')
+  if (
+    (tools.status === 'ready') !== allPassed ||
+    (tools.status === 'ready' && seen.size !== TOOL_CHECK_KEYS.size)
+  ) {
+    throw new Error('迁移准备环境状态不一致')
+  }
+  return tools
+}
+
 export function validateDatabaseMigrationSummary(summary) {
   assertObject(summary, '数据库迁移摘要')
   if (
@@ -156,6 +197,7 @@ export function validateDatabaseMigrationSummary(summary) {
   summary.issues.forEach(validateIssue)
   summary.operations.forEach(validateDatabaseMigrationOperation)
   validateRuntime(summary.runtime)
+  validateToolReadiness(summary.tools)
   if (summary.target !== null) {
     assertObject(summary.target, '数据库目标')
     if (

@@ -4,6 +4,13 @@
 
 ## 当前活跃事项
 
+### 本地 migration 恢复启动与门禁（2026-09-04）
+
+- 根因：CI 和本地预检先前只证明 pending migration 必须阻断普通业务运行，但 `pnpm start` 会同时退出 Vite，导致唯一受控迁移页也无法访问。现在只将已明确分类的本地 pending migration 或本地后端 health / ready 未就绪转为受限恢复模式；db-guard、数据库配置、Atlas 输出、可编程对象和外部 API 错误仍直接失败关闭。
+- 恢复边界：受限 Vite 只放行 `/__dev/database-migration` 与固定迁移 API，普通 ERP 导航回到恢复页，其它 DEV API、`/rpc` 和 `/templates` 返回明确阻断。只有同目标 `pending=0` 且本地后端 health / ready 读回通过才解除限制；页面可达不代表数据库已迁移，仍不自动 apply 或重试。
+- 工具能力：迁移准备在停止后端之前检查兼容 `docker` CLI/socket 的容器运行环境、固定 Atlas v1.2.0、PostgreSQL 18 客户端和备份恢复基础命令。实现不绑定 macOS 或 OrbStack，Docker Engine、Docker Desktop、Colima、Rancher Desktop、OrbStack 及配置兼容入口的 Podman 按同一能力合同判断。
+- 验证 / 边界：定向合同 `60 / 60`、正式 `fast` 门禁、Web ESLint / Stylelint、Vite production build 和生产 `/__dev` 边界浏览器 smoke 通过；最终代码的真实 `pnpm start` 读回恢复页 `200`、ERP 页 `302`、RPC `503`。共享开发库仍为 `127 / 128`、`pending=1`、`writes=0`，当前只有容器运行环境未就绪；未执行 migration、推送、部署或客户 UAT，本地提交状态以 Git 实时读回为准。
+
 ### Runner VM 内存实测收敛（2026-09-03）
 
 - 根因与修正：Runner 创建脚本和容量 evidence 曾把 `16 GiB` 当作脱离工作负载的固定下限，导致空载约 `1.5–2.0 GiB`、完整 CI 峰值未知时仍不能按实测缩容。`60a5f1d41ef5fa36be2259b22de4077037a84fc2` 已移除两个固定下限，只保留参数形状、磁盘、slot、swap、服务身份和 exact helper 等失败关闭门禁；内存容量改由完整负载窗口决定。

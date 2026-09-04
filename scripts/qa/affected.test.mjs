@@ -287,6 +287,10 @@ test("affected: DEV 页面改动只选择聚焦合同与受影响桌面 smoke", 
       "dev-quality-gates-desktop-light",
     ],
     [
+      "web/src/dev-workbench/config/devRuntimeRecovery.mjs",
+      "dev-page-database-migration-desktop-light",
+    ],
+    [
       "web/src/dev-workbench/pages/DevVersionCenterPage.jsx",
       "dev-version-center-tabs-pagination-desktop",
     ],

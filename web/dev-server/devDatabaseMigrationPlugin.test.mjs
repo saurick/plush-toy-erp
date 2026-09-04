@@ -59,6 +59,39 @@ function target({ pendingFiles = 1 } = {}) {
 function dependencies(calls) {
   let pendingFiles = 1
   return {
+    async toolReadiness() {
+      calls.push('tools')
+      return {
+        schemaVersion: 'plush.dev-database-migration-tools/v1',
+        status: 'ready',
+        checks: [
+          {
+            key: 'container_runtime',
+            label: '容器运行环境',
+            status: 'passed',
+            message: '已就绪',
+          },
+          {
+            key: 'atlas',
+            label: 'Atlas',
+            status: 'passed',
+            message: '已就绪',
+          },
+          {
+            key: 'postgresql_client',
+            label: 'PostgreSQL 客户端',
+            status: 'passed',
+            message: '已就绪',
+          },
+          {
+            key: 'supporting_commands',
+            label: '基础命令',
+            status: 'passed',
+            message: '已就绪',
+          },
+        ],
+      }
+    },
     async status() {
       calls.push('status')
       return target({ pendingFiles })
@@ -206,6 +239,74 @@ test('database migration service prepares once, applies once, reads back, and re
     }),
     /确认文本或操作状态/u
   )
+})
+
+test('database migration service reports runtime recovery only after migration and health readback', async (t) => {
+  const { root, store } = createProject(t)
+  const calls = []
+  let readyReports = 0
+  const service = createDevDatabaseMigrationService({
+    projectRoot: root,
+    apiOrigin: 'http://127.0.0.1:8300',
+    operationStore: store,
+    dependencies: dependencies(calls),
+    onRuntimeReady: () => {
+      readyReports += 1
+    },
+  })
+
+  await service.summary()
+  assert.equal(readyReports, 0)
+  const prepare = await service.act({
+    action: 'prepare',
+    idempotencyKey: PREPARE_KEY,
+  })
+  const ready = await waitForOperation(service, prepare.operation.id, ['ready'])
+  await service.act({
+    action: 'execute',
+    operationId: ready.id,
+    confirmation: ready.confirmationPrompt,
+  })
+  await waitForOperation(service, ready.id, ['passed'])
+  assert.equal(readyReports, 1)
+  await service.summary()
+  assert.equal(readyReports, 1)
+})
+
+test('database migration service checks tools before stopping the backend', async (t) => {
+  const { root, store } = createProject(t)
+  const calls = []
+  const runtime = dependencies(calls)
+  runtime.toolReadiness = async () => ({
+    schemaVersion: 'plush.dev-database-migration-tools/v1',
+    status: 'blocked',
+    checks: [
+      {
+        key: 'container_runtime',
+        label: '容器运行环境',
+        status: 'blocked',
+        message: 'Docker-compatible 容器守护进程未就绪',
+      },
+    ],
+  })
+  const service = createDevDatabaseMigrationService({
+    projectRoot: root,
+    apiOrigin: 'http://127.0.0.1:8300',
+    operationStore: store,
+    dependencies: runtime,
+  })
+
+  const result = await service.act({
+    action: 'prepare',
+    idempotencyKey: PREPARE_KEY,
+  })
+  const blocked = await waitForOperation(service, result.operation.id, [
+    'blocked',
+  ])
+  assert.equal(blocked.issues[0].code, 'migration_tool_unavailable')
+  assert.match(blocked.issues[0].message, /不限定操作系统或产品/u)
+  assert.equal(calls.includes('stop'), false)
+  assert.equal(calls.includes('status'), false)
 })
 
 test('database migration service does not misclassify passive client diagnostics', async (t) => {

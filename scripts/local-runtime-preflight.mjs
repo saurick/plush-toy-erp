@@ -26,6 +26,29 @@ const expectedHealthBodies = Object.freeze({
   readyz: "ready",
 });
 
+export const LOCAL_RUNTIME_RECOVERY_MODE = "database-migration";
+const RECOVERABLE_WEB_PREFLIGHT_CODES = new Set([
+  "database_migration_pending",
+  "local_backend_unavailable",
+]);
+
+export class LocalRuntimePreflightError extends Error {
+  constructor(code, message) {
+    super(message);
+    this.name = "LocalRuntimePreflightError";
+    this.code = code;
+    this.recoveryMode = LOCAL_RUNTIME_RECOVERY_MODE;
+  }
+}
+
+export function isRecoverableWebRuntimePreflightError(error) {
+  return (
+    error instanceof LocalRuntimePreflightError &&
+    error.recoveryMode === LOCAL_RUNTIME_RECOVERY_MODE &&
+    RECOVERABLE_WEB_PREFLIGHT_CODES.has(error.code)
+  );
+}
+
 function writeLine(runtime, message) {
   const writer =
     runtime.writeLine || ((line) => process.stdout.write(`${line}\n`));
@@ -119,7 +142,8 @@ export async function checkLocalDatabaseMigrations(runtime = {}) {
 
   const result = evaluateMigrationStatus(status);
   if (!result.ok) {
-    throw new Error(
+    throw new LocalRuntimePreflightError(
+      "database_migration_pending",
       `开发数据库 migration 未到最新版本（applied=${result.appliedFiles}/${result.availableFiles}, pending=${result.pendingFiles}）；请在 server 目录的交互终端运行 make migrate，非交互环境显式运行 migrate_prepare / migrate_execute。高层入口会先完成 plan 与备份恢复验证，再等待明确确认；启动预检本身不会自动 apply`,
     );
   }
@@ -229,7 +253,15 @@ export async function runWebRuntimePreflight(
       `[local-preflight] 使用外部后端 ${normalizedOrigin}；本地不读取其数据库，migration 由目标环境发布门禁证明`,
     );
   }
-  await checkBackend(normalizedOrigin, runtime);
+  try {
+    await checkBackend(normalizedOrigin, runtime);
+  } catch (error) {
+    if (!isLoopbackAPIOrigin(normalizedOrigin)) throw error;
+    throw new LocalRuntimePreflightError(
+      "local_backend_unavailable",
+      "本地后端 health / ready 未就绪；普通业务运行保持阻断，可进入数据库迁移恢复页检查 migration 或重启后端",
+    );
+  }
   return { complete: true, frontendOnly: false, apiOrigin: normalizedOrigin };
 }
 

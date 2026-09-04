@@ -46,6 +46,12 @@ const OPERATION_ID_PATTERN =
 const IDEMPOTENCY_PATTERN =
   /^database-migration:(?:prepare|restart):[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u
 const MAX_REQUEST_BYTES = 16 * 1024
+const TOOL_CHECK_KEYS = new Set([
+  'container_runtime',
+  'atlas',
+  'postgresql_client',
+  'supporting_commands',
+])
 
 class DatabaseMigrationActionError extends Error {
   constructor(
@@ -114,6 +120,64 @@ function normalizeTarget(status) {
   return publicTarget
 }
 
+function blockedToolReadiness() {
+  return {
+    schemaVersion: 'plush.dev-database-migration-tools/v1',
+    status: 'blocked',
+    checks: [
+      {
+        key: 'container_runtime',
+        label: '迁移准备工具',
+        status: 'blocked',
+        message: '迁移准备工具状态暂时无法读取，请刷新后重试',
+      },
+    ],
+  }
+}
+
+function normalizeToolReadiness(value) {
+  if (
+    value?.schemaVersion !== 'plush.dev-database-migration-tools/v1' ||
+    !['ready', 'blocked'].includes(value.status) ||
+    !Array.isArray(value.checks) ||
+    value.checks.length < 1 ||
+    value.checks.length > TOOL_CHECK_KEYS.size
+  ) {
+    throw new Error('migration tool readiness is invalid')
+  }
+  const seen = new Set()
+  for (const check of value.checks) {
+    if (
+      !check ||
+      typeof check !== 'object' ||
+      !TOOL_CHECK_KEYS.has(check.key) ||
+      seen.has(check.key) ||
+      typeof check.label !== 'string' ||
+      check.label.length < 1 ||
+      check.label.length > 80 ||
+      !['passed', 'blocked'].includes(check.status) ||
+      typeof check.message !== 'string' ||
+      check.message.length < 1 ||
+      check.message.length > 600
+    ) {
+      throw new Error('migration tool readiness check is invalid')
+    }
+    seen.add(check.key)
+  }
+  const allPassed = value.checks.every((check) => check.status === 'passed')
+  if (
+    (value.status === 'ready') !== allPassed ||
+    (value.status === 'ready' && seen.size !== TOOL_CHECK_KEYS.size)
+  ) {
+    throw new Error('migration tool readiness status is inconsistent')
+  }
+  return value
+}
+
+function migrationToolIssueMessage() {
+  return '迁移准备环境未就绪；请准备可用的 Docker-compatible 容器运行环境、Atlas v1.2.0、PostgreSQL 18 客户端及基础命令。容器运行环境不限定操作系统或产品，可使用 Docker Engine、Docker Desktop、Colima、Rancher Desktop、OrbStack，或提供兼容 docker CLI/socket 的 Podman 配置'
+}
+
 function databaseClientDiagnosticMessage(diagnostic) {
   const details = [
     ...String(diagnostic || '').matchAll(/^\[migration-client\] (.+)$/gmu),
@@ -155,8 +219,7 @@ function publicIssue(error, fallbackCode = 'operation_blocked') {
     return {
       code: 'migration_tool_unavailable',
       severity: 'blocked',
-      message:
-        '迁移或备份工具不可用；请检查 Docker、Atlas 与 PostgreSQL 18 客户端',
+      message: migrationToolIssueMessage(),
     }
   }
   if (
@@ -206,6 +269,7 @@ export function createDevDatabaseMigrationService({
   operationStore,
   dependencies,
   now = () => new Date(),
+  onRuntimeReady,
 } = {}) {
   if (!projectRoot) throw new Error('projectRoot is required')
   const root = path.resolve(projectRoot)
@@ -216,7 +280,23 @@ export function createDevDatabaseMigrationService({
   const store = operationStore || resolveDatabaseMigrationOperationStore(root)
   const runtime =
     dependencies || createDevDatabaseMigrationRuntime(root, normalizedApiOrigin)
+  const runtimeReadyCallback =
+    typeof onRuntimeReady === 'function' ? onRuntimeReady : () => {}
+  let runtimeReadyReported = false
   recoverInterruptedDatabaseMigrationOperations(store, now().toISOString())
+
+  const reportRuntimeReady = (target, runtimeReadback) => {
+    if (
+      runtimeReadyReported ||
+      target?.key !== 'shared-dev' ||
+      target?.pendingFiles !== 0 ||
+      runtimeReadback?.available !== true
+    ) {
+      return
+    }
+    runtimeReadyReported = true
+    runtimeReadyCallback()
+  }
 
   const transitionFailure = (
     operationId,
@@ -243,6 +323,12 @@ export function createDevDatabaseMigrationService({
 
   const runPrepare = async (operationId) => {
     try {
+      const tools = normalizeToolReadiness(await runtime.toolReadiness())
+      if (tools.status !== 'ready') {
+        throw new DatabaseMigrationActionError(migrationToolIssueMessage(), {
+          code: 'migration_tool_unavailable',
+        })
+      }
       const initialTarget = await runtime.status()
       if (
         initialTarget.key !== 'shared-dev' ||
@@ -254,6 +340,7 @@ export function createDevDatabaseMigrationService({
       }
       const source = await runtime.sourceIdentity()
       if (initialTarget.pendingFiles === 0) {
+        const runtimeReadback = await runtime.runtime()
         transitionDatabaseMigrationOperation(store, operationId, {
           status: 'passed',
           message: '共享开发库已是最新版本，无需迁移',
@@ -264,10 +351,11 @@ export function createDevDatabaseMigrationService({
             currentVersion: initialTarget.currentVersion,
             latestVersion: initialTarget.latestVersion,
             pendingFiles: 0,
-            runtime: await runtime.runtime(),
+            runtime: runtimeReadback,
           },
           now: now().toISOString(),
         })
+        reportRuntimeReady(initialTarget, runtimeReadback)
         return
       }
       await runtime.stopRuntime()
@@ -422,6 +510,7 @@ export function createDevDatabaseMigrationService({
         },
         now: now().toISOString(),
       })
+      reportRuntimeReady(after, runtimeReadback)
     } catch (error) {
       const current = readDatabaseMigrationOperation(store, operationId)
       transitionFailure(
@@ -456,6 +545,7 @@ export function createDevDatabaseMigrationService({
         },
         now: now().toISOString(),
       })
+      reportRuntimeReady(target, runtimeReadback)
     } catch (error) {
       transitionFailure(operationId, error, 'failed')
     } finally {
@@ -470,6 +560,7 @@ export function createDevDatabaseMigrationService({
       })
       let target = null
       let runtimeReadback = null
+      let tools = null
       const issues = []
       try {
         target = normalizeTarget(await runtime.status())
@@ -487,11 +578,19 @@ export function createDevDatabaseMigrationService({
           ready: { status: 'unavailable', httpCode: 0 },
         }
       }
+      try {
+        tools = normalizeToolReadiness(await runtime.toolReadiness())
+      } catch (error) {
+        logFailure('summary-tools', error)
+        tools = blockedToolReadiness()
+      }
+      reportRuntimeReady(target, runtimeReadback)
       return {
         schemaVersion: 'plush.dev-database-migration-summary/v1',
         status: issues.length > 0 ? 'blocked' : 'success',
         target,
         runtime: runtimeReadback,
+        tools,
         operations,
         issues,
         boundary: {
@@ -663,6 +762,7 @@ export function createDevDatabaseMigrationMiddleware({
   projectRoot,
   apiOrigin,
   service,
+  onRuntimeReady,
   csrfToken = randomBytes(32).toString('base64url'),
 } = {}) {
   const migrationService =
@@ -670,6 +770,7 @@ export function createDevDatabaseMigrationMiddleware({
     createDevDatabaseMigrationService({
       projectRoot,
       apiOrigin,
+      onRuntimeReady,
     })
   return async (request, response, next) => {
     let requestPath

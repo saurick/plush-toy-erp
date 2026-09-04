@@ -16,6 +16,7 @@ import {
   SHARED_DEV_BACKUP_SOURCE_POLICY,
   buildSharedDevBackupRehearsalArgs,
   createDevDatabaseMigrationRuntime,
+  readDatabaseMigrationToolReadiness,
   redactDatabaseMigrationDiagnostic,
 } from './devDatabaseMigrationRuntime.mjs'
 
@@ -141,4 +142,66 @@ test('database migration runtime redacts DSN, confirmations, and local paths', (
   assert.match(redacted, /postgres:\/\/<redacted>@/u)
   assert.match(redacted, /<confirmation-redacted>/u)
   assert.match(redacted, /<local-path>/u)
+})
+
+test('database migration runtime accepts platform-neutral compatible tooling', async () => {
+  const calls = []
+  const readiness = await readDatabaseMigrationToolReadiness({
+    env: {},
+    execFile: async (command, args) => {
+      calls.push([command, ...args])
+      if (command === 'docker') return { stdout: '28.0.0\n', stderr: '' }
+      if (command === 'atlas')
+        return { stdout: 'atlas version v1.2.0\n', stderr: '' }
+      if (
+        path.basename(command) === 'pg_dump' ||
+        path.basename(command) === 'psql'
+      ) {
+        return {
+          stdout: `${path.basename(command)} (PostgreSQL) 18.1\n`,
+          stderr: '',
+        }
+      }
+      assert.equal(command, 'bash')
+      return { stdout: '', stderr: '' }
+    },
+  })
+
+  assert.equal(readiness.status, 'ready')
+  assert.equal(
+    readiness.checks.every((check) => check.status === 'passed'),
+    true
+  )
+  assert.deepEqual(
+    calls.map(([command]) => path.basename(command)),
+    ['docker', 'atlas', 'pg_dump', 'psql', 'bash']
+  )
+})
+
+test('database migration runtime identifies an unavailable container daemon without naming one desktop product', async () => {
+  const readiness = await readDatabaseMigrationToolReadiness({
+    env: {},
+    execFile: async (command) => {
+      if (command === 'docker') throw new Error('daemon unavailable')
+      if (command === 'atlas') return { stdout: 'atlas version v1.2.0\n' }
+      if (
+        path.basename(command) === 'pg_dump' ||
+        path.basename(command) === 'psql'
+      ) {
+        return { stdout: `${path.basename(command)} (PostgreSQL) 18.1\n` }
+      }
+      return { stdout: '' }
+    },
+  })
+
+  assert.equal(readiness.status, 'blocked')
+  const container = readiness.checks.find(
+    (check) => check.key === 'container_runtime'
+  )
+  assert.equal(container.status, 'blocked')
+  assert.match(container.message, /Docker-compatible/u)
+  assert.match(
+    container.message,
+    /Docker Engine.*Docker Desktop.*Colima.*Rancher.*OrbStack.*Podman/u
+  )
 })

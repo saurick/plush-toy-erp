@@ -1354,12 +1354,12 @@ test("dev entry boundary: Product Core 与客户开发入口共用同一 web pre
     "node ./scripts/startYoyoosunDev.mjs",
   );
 
-  for (const script of [
-    "web/scripts/startWebDev.mjs",
-    "web/scripts/startYoyoosunDev.mjs",
-  ]) {
-    const source = read(script);
-    assert.match(source, /runWebRuntimePreflight/u, script);
-    assert.match(source, /resolveDevBrowserLaunchEnv/u, script);
-  }
+  const sharedStart = read("web/scripts/startWebDev.mjs");
+  assert.match(sharedStart, /runWebRuntimePreflight/u);
+  assert.match(sharedStart, /resolveDevBrowserLaunchEnv/u);
+  assert.match(sharedStart, /resolveWebRuntimeStartup/u);
+
+  const customerStart = read("web/scripts/startYoyoosunDev.mjs");
+  assert.match(customerStart, /resolveWebRuntimeStartup/u);
+  assert.match(customerStart, /createViteChildEnvironment/u);
 });

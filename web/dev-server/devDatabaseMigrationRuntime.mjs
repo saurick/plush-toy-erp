@@ -32,9 +32,112 @@ export const DEV_DATABASE_MIGRATION_SOURCE_FILES = Object.freeze([
   'deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh',
   'server/Makefile',
   'web/dev-server/devDatabaseMigrationPlugin.mjs',
+  'web/dev-server/devDatabaseMigrationRecoveryPlugin.mjs',
   'web/dev-server/devDatabaseMigrationRuntime.mjs',
   'web/dev-server/devServerSecurity.mjs',
 ])
+
+const MIGRATION_TOOL_CHECKS = Object.freeze([
+  {
+    key: 'container_runtime',
+    label: '容器运行环境',
+    blockedMessage:
+      '未检测到可用的 Docker-compatible 容器守护进程；可使用 Docker Engine、Docker Desktop、Colima、Rancher Desktop、OrbStack，或配置兼容 docker CLI/socket 的 Podman',
+  },
+  {
+    key: 'atlas',
+    label: 'Atlas',
+    blockedMessage: 'Atlas CLI 未安装或版本不是项目固定的 v1.2.0',
+  },
+  {
+    key: 'postgresql_client',
+    label: 'PostgreSQL 客户端',
+    blockedMessage: 'PostgreSQL 18 的 pg_dump / psql 客户端未就绪',
+  },
+  {
+    key: 'supporting_commands',
+    label: '基础命令',
+    blockedMessage:
+      '备份恢复所需基础命令未就绪（Bash 4+、curl、jq、Python 3、sha256sum 等）',
+  },
+])
+
+function resolvePostgresCommand(name, env) {
+  const override = name === 'pg_dump' ? env.PG_DUMP_BIN : env.PSQL_BIN
+  if (String(override || '').trim()) return String(override).trim()
+  const homebrew = `/opt/homebrew/opt/postgresql@18/bin/${name}`
+  return existsSync(homebrew) ? homebrew : name
+}
+
+async function probeTool(executor, command, args, env, accepts) {
+  try {
+    const result = await executor(command, args, {
+      env,
+      encoding: 'utf8',
+      timeout: 5000,
+      maxBuffer: 1024 * 1024,
+    })
+    return accepts(`${result.stdout || ''}\n${result.stderr || ''}`)
+  } catch {
+    return false
+  }
+}
+
+export async function readDatabaseMigrationToolReadiness({
+  execFile = execFileAsync,
+  env = process.env,
+} = {}) {
+  const pgDump = resolvePostgresCommand('pg_dump', env)
+  const psql = resolvePostgresCommand('psql', env)
+  const [containerReady, atlasReady, pgDumpReady, psqlReady, supportReady] =
+    await Promise.all([
+      probeTool(
+        execFile,
+        'docker',
+        ['info', '--format', '{{.ServerVersion}}'],
+        env,
+        (output) => output.trim().length > 0
+      ),
+      probeTool(execFile, 'atlas', ['version'], env, (output) =>
+        /(?:^|\s)v1\.2\.0(?:\s|$)/u.test(output)
+      ),
+      probeTool(execFile, pgDump, ['--version'], env, (output) =>
+        /PostgreSQL\) 18\./u.test(output)
+      ),
+      probeTool(execFile, psql, ['--version'], env, (output) =>
+        /PostgreSQL\) 18\./u.test(output)
+      ),
+      probeTool(
+        execFile,
+        'bash',
+        [
+          '-c',
+          'type mapfile >/dev/null 2>&1 && command -v curl sha256sum wc awk date jq python3 >/dev/null 2>&1',
+        ],
+        env,
+        () => true
+      ),
+    ])
+  const passed = [
+    containerReady,
+    atlasReady,
+    pgDumpReady && psqlReady,
+    supportReady,
+  ]
+  const checks = MIGRATION_TOOL_CHECKS.map((definition, index) => ({
+    key: definition.key,
+    label: definition.label,
+    status: passed[index] ? 'passed' : 'blocked',
+    message: passed[index] ? '已就绪' : definition.blockedMessage,
+  }))
+  return {
+    schemaVersion: 'plush.dev-database-migration-tools/v1',
+    status: checks.every((check) => check.status === 'passed')
+      ? 'ready'
+      : 'blocked',
+    checks,
+  }
+}
 
 export function redactDatabaseMigrationDiagnostic(value) {
   return String(value || '')
@@ -309,7 +412,17 @@ function operationLogFile(projectRoot, operationId) {
 export function createDevDatabaseMigrationRuntime(projectRoot, apiOrigin) {
   const root = path.resolve(projectRoot)
   const serverRoot = path.join(root, 'server')
+  let cachedToolReadiness = null
+  let cachedToolReadinessUntil = 0
   return {
+    async toolReadiness() {
+      if (cachedToolReadiness && Date.now() < cachedToolReadinessUntil) {
+        return cachedToolReadiness
+      }
+      cachedToolReadiness = await readDatabaseMigrationToolReadiness()
+      cachedToolReadinessUntil = Date.now() + 15_000
+      return cachedToolReadiness
+    },
     async status() {
       const result = await executeCommand('make', ['migrate_status'], {
         cwd: serverRoot,

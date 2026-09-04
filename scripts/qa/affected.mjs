@@ -404,7 +404,7 @@ function isDevPageGovernancePath(file) {
     /^web\/src\/dev-workbench\/(?:DevWorkbenchRoutes\.jsx|pages\/|styles\/)/u.test(
       file,
     ) ||
-    /^web\/src\/dev-workbench\/(?:components\/Dev(?:EnvironmentEvidencePanel|PageNav|PipelineTimingPanel|TaskNav)\.jsx|config\/dev(?:BusinessUsability|CustomerConfig|DataPreparation|Delivery|Docs|FactLedgerCatalog|FlowState|Governance|Hub|ProductCore|Prototypes|QualityGates|Routes|Testing|VersionCenter)[^/]*\.mjs)$/u.test(
+    /^web\/src\/dev-workbench\/(?:components\/Dev(?:EnvironmentEvidencePanel|PageNav|PipelineTimingPanel|TaskNav)\.jsx|config\/dev(?:BusinessUsability|CustomerConfig|DataPreparation|Delivery|Docs|FactLedgerCatalog|FlowState|Governance|Hub|ProductCore|Prototypes|QualityGates|Routes|RuntimeRecovery|Testing|VersionCenter)[^/]*\.mjs)$/u.test(
       file,
     ) ||
     /^web\/scripts\/style-l1\/(?:scenarios|dev[A-Z][^/]*)\.mjs$/u.test(file)
@@ -459,7 +459,7 @@ function devBrowserScenarioNames(file) {
       ["dev-page-customer-config-desktop-light"],
     ],
     [
-      /DatabaseMigration|database-migration/u,
+      /DatabaseMigration|RuntimeRecovery|database-migration|runtime-recovery/u,
       ["dev-page-database-migration-desktop-light"],
     ],
     [/DevHub|devHub|dev-overview/u, ["dev-page-overview-desktop-light"]],

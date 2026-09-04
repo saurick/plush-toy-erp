@@ -13,6 +13,7 @@
 | `devQualityGatePlugin.mjs`          | 复用正式 full / strict runner 与回执，自动选择显式 loopback base 或本机托管 PostgreSQL，提供异步运行、取消、超时、清理读回和只读治理 |
 | `devDataPreparationPlugin.mjs`      | 提供单一数据准备 operation 真源；同一 Scenario profile 显式绑定本地或 133，冻结 V6、release、数据库、migration、客户配置与回滚点，长期数据与隔离验收不互相替代 |
 | `devDatabaseMigrationPlugin.mjs`    | 提供本地共享开发库迁移的受控 operation service 和 HTTP 层，供页面与高层 CLI 复用                                                     |
+| `devDatabaseMigrationRecoveryPlugin.mjs` | 在普通启动被 pending migration 或本地后端阻断时，只开放迁移恢复页与固定 API，并临时阻断 ERP / RPC；通过同目标与 health / ready 读回后解除 |
 | `devDatabaseMigrationRuntime.mjs`   | 执行迁移 status、plan、备份恢复、apply、读回和重启                                                                                   |
 | `devDeliveryBridgePlugin.mjs`       | 提供不可变版本、固定目标 promotion 和受控 rollback Bridge                                                                            |
 | `devServerSecurity.mjs`             | 集中维护 loopback remote address 与 Host 校验                                                                                        |
@@ -30,5 +31,6 @@
 - 质量门禁没有显式 database base 时只允许本机 Docker 的固定 `postgres:18.1` 托管模式：每次随机凭据、仅绑定 `127.0.0.1` 动态端口、按 operation 与 repository label 精确清理；不得删除外部容器或占用者。
 - production build、production preview 和正式部署不包含本目录模块、`/__dev` 路由或本机私有路径。
 - `devDatabaseMigrationRuntime.mjs` 的 source identity 包含迁移 Bridge、高层 CLI 与安全真源；路径或内容变化后，既有迁移 plan 必须失效并重新准备，不保留旧路径兼容。execute 在 apply 前还必须重新验证 operation 绑定的备份文件身份。
+- 数据库迁移准备先检查能力而非绑定操作系统或桌面产品：固定需要兼容 `docker` CLI/socket 的容器运行环境、Atlas v1.2.0、PostgreSQL 18 客户端及备份恢复基础命令。Docker Engine、Docker Desktop、Colima、Rancher Desktop、OrbStack 或提供兼容入口的 Podman 均可；环境不完整时不得先停止后端。
 
 调整本目录后至少运行同目录 Node 测试、工作台源码边界测试、production build、制品零残留扫描和 production `/__dev` 浏览器 smoke。

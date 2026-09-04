@@ -157,7 +157,7 @@ export function createBusinessAttachmentAssertions({
         overflowX: node.scrollWidth - node.clientWidth,
       }))
       assert(
-        withdrawnMetrics.text.includes('撤销账号：demo_boss') &&
+        withdrawnMetrics.text.includes('撤销人：demo_boss') &&
           withdrawnMetrics.text.includes('撤销时间：') &&
           withdrawnMetrics.text.includes(
             '撤销原因：浏览器验收：上传了错误版本'

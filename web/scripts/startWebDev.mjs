@@ -6,7 +6,12 @@ import { promisify } from 'node:util'
 import { pathToFileURL } from 'node:url'
 
 import { loadDevPorts } from '../../scripts/dev-ports.mjs'
-import { runWebRuntimePreflight } from '../../scripts/local-runtime-preflight.mjs'
+import {
+  LOCAL_RUNTIME_RECOVERY_MODE,
+  isLoopbackAPIOrigin,
+  isRecoverableWebRuntimePreflightError,
+  runWebRuntimePreflight,
+} from '../../scripts/local-runtime-preflight.mjs'
 import { resolveDevBrowserLaunchEnv } from './openDevBrowser.js'
 
 const repoRoot = path.resolve(import.meta.dirname, '..', '..')
@@ -79,15 +84,69 @@ export function parseStartWebDevArgs(argv, env = process.env) {
   }
 }
 
-function runVite(viteArgs, apiOrigin, gitlabCredential) {
+export async function resolveWebRuntimeStartup(
+  options,
+  {
+    preflight = runWebRuntimePreflight,
+    writeLine = (line) => process.stderr.write(`${line}\n`),
+  } = {}
+) {
+  try {
+    return {
+      ...(await preflight(options)),
+      recoveryMode: '',
+      recoveryReason: '',
+    }
+  } catch (error) {
+    if (
+      options.frontendOnly ||
+      !isLoopbackAPIOrigin(options.apiOrigin) ||
+      !isRecoverableWebRuntimePreflightError(error)
+    ) {
+      throw error
+    }
+    writeLine(
+      `[start-web] ${error.message}\n[start-web] 已进入数据库迁移恢复模式；只开放恢复页，普通 ERP 页面与 RPC 暂停`
+    )
+    return {
+      complete: false,
+      frontendOnly: false,
+      apiOrigin: options.apiOrigin,
+      recoveryMode: LOCAL_RUNTIME_RECOVERY_MODE,
+      recoveryReason: error.code,
+    }
+  }
+}
+
+export function createViteChildEnvironment({
+  apiOrigin,
+  gitlabCredential,
+  recoveryMode = '',
+  recoveryReason = '',
+  env = process.env,
+} = {}) {
   const childEnvironment = {
-    ...process.env,
-    ...resolveDevBrowserLaunchEnv(process.env),
+    ...env,
+    ...resolveDevBrowserLaunchEnv(env),
     API_ORIGIN: apiOrigin,
+  }
+  delete childEnvironment.ERP_DEV_RECOVERY_MODE
+  delete childEnvironment.ERP_DEV_RECOVERY_REASON
+  if (recoveryMode) {
+    childEnvironment.ERP_DEV_RECOVERY_MODE = recoveryMode
+    childEnvironment.ERP_DEV_RECOVERY_REASON = recoveryReason
   }
   if (gitlabCredential.token) {
     childEnvironment.PLUSH_GITLAB_READ_TOKEN = gitlabCredential.token
   }
+  return childEnvironment
+}
+
+function runVite(viteArgs, startup, gitlabCredential) {
+  const childEnvironment = createViteChildEnvironment({
+    ...startup,
+    gitlabCredential,
+  })
   const child = spawn(
     'pnpm',
     ['exec', 'vite', '--config', 'vite.config.mjs', ...viteArgs],
@@ -111,12 +170,12 @@ function runVite(viteArgs, apiOrigin, gitlabCredential) {
 
 async function main() {
   const options = parseStartWebDevArgs(process.argv.slice(2))
-  const result = await runWebRuntimePreflight(options)
+  const startup = await resolveWebRuntimeStartup(options)
   const gitlabCredential = await resolveDevGitlabCredential()
   if (gitlabCredential.source === 'keychain') {
     process.stderr.write('[start-web] GitLab 只读凭据已从 macOS 钥匙串加载\n')
   }
-  runVite(options.viteArgs, result.apiOrigin, gitlabCredential)
+  runVite(options.viteArgs, startup, gitlabCredential)
 }
 
 const isDirectRun =

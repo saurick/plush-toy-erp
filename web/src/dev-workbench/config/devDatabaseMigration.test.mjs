@@ -69,6 +69,36 @@ function summary() {
       health: { status: 'passed', httpCode: 200 },
       ready: { status: 'passed', httpCode: 200 },
     },
+    tools: {
+      schemaVersion: 'plush.dev-database-migration-tools/v1',
+      status: 'ready',
+      checks: [
+        {
+          key: 'container_runtime',
+          label: '容器运行环境',
+          status: 'passed',
+          message: '已就绪',
+        },
+        {
+          key: 'atlas',
+          label: 'Atlas',
+          status: 'passed',
+          message: '已就绪',
+        },
+        {
+          key: 'postgresql_client',
+          label: 'PostgreSQL 客户端',
+          status: 'passed',
+          message: '已就绪',
+        },
+        {
+          key: 'supporting_commands',
+          label: '基础命令',
+          status: 'passed',
+          message: '已就绪',
+        },
+      ],
+    },
     operations: [operation()],
     issues: [],
     boundary: {
@@ -113,6 +143,21 @@ test('database migration client rejects hidden confirmations and arbitrary targe
   assert.throws(
     () => validateDatabaseMigrationSummary(unsafe),
     /数据库目标返回结构无效/u
+  )
+})
+
+test('database migration client rejects inconsistent tool readiness', () => {
+  const invalid = summary()
+  invalid.tools = {
+    ...invalid.tools,
+    status: 'ready',
+    checks: invalid.tools.checks.map((check, index) =>
+      index === 0 ? { ...check, status: 'blocked' } : check
+    ),
+  }
+  assert.throws(
+    () => validateDatabaseMigrationSummary(invalid),
+    /迁移准备环境状态不一致/u
   )
 })
 

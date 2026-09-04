@@ -2,10 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  LOCAL_RUNTIME_RECOVERY_MODE,
+  LocalRuntimePreflightError,
   checkBackendReadiness,
   checkLocalDatabaseMigrations,
   evaluateMigrationStatus,
   isLoopbackAPIOrigin,
+  isRecoverableWebRuntimePreflightError,
   normalizeAPIOrigin,
   runWebRuntimePreflight,
 } from "./local-runtime-preflight.mjs";
@@ -214,11 +217,61 @@ test("local runtime preflight: pending migration 指向高层迁移入口，不�
         return { stdout: JSON.stringify(pending), stderr: "" };
       },
     }),
-    /make migrate.*migrate_prepare \/ migrate_execute.*plan 与备份恢复验证.*不会自动 apply/u,
+    (error) => {
+      assert.equal(error.code, "database_migration_pending");
+      assert.equal(error.recoveryMode, LOCAL_RUNTIME_RECOVERY_MODE);
+      assert.equal(isRecoverableWebRuntimePreflightError(error), true);
+      assert.match(
+        error.message,
+        /make migrate.*migrate_prepare \/ migrate_execute.*plan 与备份恢复验证.*不会自动 apply/u,
+      );
+      return true;
+    },
   );
   assert.deepEqual(
     calls.map(([command]) => command),
     ["bash", "go", "atlas"],
+  );
+});
+
+test("local runtime preflight: 本地后端未就绪可进入受限恢复模式", async () => {
+  await assert.rejects(
+    runWebRuntimePreflight(
+      { apiOrigin: "http://127.0.0.1:8300" },
+      {
+        checkDatabase: async () => {},
+        checkBackend: async () => {
+          throw new Error("readyz unavailable");
+        },
+        writeLine: () => {},
+      },
+    ),
+    (error) => {
+      assert(error instanceof LocalRuntimePreflightError);
+      assert.equal(error.code, "local_backend_unavailable");
+      assert.equal(isRecoverableWebRuntimePreflightError(error), true);
+      assert.doesNotMatch(error.message, /readyz unavailable/u);
+      return true;
+    },
+  );
+});
+
+test("local runtime preflight: 外部后端失败不能降级成本机恢复模式", async () => {
+  await assert.rejects(
+    runWebRuntimePreflight(
+      { apiOrigin: "https://erp.example.com" },
+      {
+        checkBackend: async () => {
+          throw new Error("external backend unavailable");
+        },
+        writeLine: () => {},
+      },
+    ),
+    (error) => {
+      assert.equal(error.message, "external backend unavailable");
+      assert.equal(isRecoverableWebRuntimePreflightError(error), false);
+      return true;
+    },
   );
 });
 
