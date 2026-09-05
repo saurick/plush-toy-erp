@@ -1,4 +1,4 @@
 interface:
   display_name: "Plush Page Design Governance"
-  short_description: "页面设计治理 Page / 页面质量门禁 / 截图调试"
-  default_prompt: "Use $plush-page-design-governance 核对普通 ERP 页面的任务、字段动作状态、后端支撑与可访问性，并做浏览器回归；纸张/PDF 保真转交打印模板治理。"
+  short_description: "plush 页面语义、布局与浏览器验证按实际影响面选择流程"
+  default_prompt: "Use $plush-page-design-governance 在当前任务仓库按需核对页面语义或布局交互，复用已有能力完成授权改动并验证受影响场景。"

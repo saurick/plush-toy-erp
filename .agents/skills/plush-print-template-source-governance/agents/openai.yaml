@@ -1,4 +1,4 @@
 interface:
   display_name: "Plush Print Template Source Governance"
-  short_description: "plush 打印模板源文件意图、版式、交互、截图调试和验证流程治理"
-  default_prompt: "Use $plush-print-template-source-governance 按 plush 真源判断客户 Excel/PDF/截图中的模板本体、纸张版式、样例数据和编辑语义，再用 visual evidence、DOM/box metrics 与 PDF/print 证据实现或评审；普通页面壳层转交页面治理。"
+  short_description: "plush 打印源文件、纸面编辑与 PDF 验证按任务选择流程"
+  default_prompt: "Use $plush-print-template-source-governance 在当前任务仓库按需核对源文件或模板运行路径，完成改动并验证受影响的字段、编辑和 PDF 输出。"

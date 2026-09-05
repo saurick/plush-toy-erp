@@ -4,8 +4,7 @@
 
 ## AGENTS 体积治理
 
-- 本仓库所有 `AGENTS.md` 目标小于 16 KiB；达到 16 KiB 先去重，超过 24 KiB 必须按全局治理顺序精简，`bash scripts/qa/agents-size.sh` 负责预警和阻断。
-- 检查脚本不得自动截断、删除、拆分或重写规则；安全、权限、Workflow/Fact、客户资料和真源边界不得为过门禁被弱化。
+运行 `bash scripts/qa/agents-size.sh`；阈值、精简顺序及只检查不改写的边界沿用全局 AGENTS，项目安全和业务约束必须保留。
 
 ## 阅读顺序与当前真源
 
@@ -22,7 +21,6 @@
 
 - `docs/product/产品完成路线图.md` 管长期路线，不替代当前实现真源。
 - 仓库不保存其他项目或 GPT/ChatGPT 导出的参考原文；有价值结论必须先按本项目真源复核，再转化为正式 docs、代码或测试。`docs/archive/**` 和 `progress.md` 只保留本项目历史/过程证据。
-- 历史 changes、外部规划、截图和客户样本不能单独证明当前 schema/API/UI/RBAC/部署能力。
 - 当前客户稳定 key 为 `yoyoosun`；不要恢复 `current` 客户目录或旧工作区别名。
 
 ## 个人开发方式与工作区
@@ -33,10 +31,9 @@
 - 项目负责人和 Codex 只实现当前目标所需最小闭环，不把模型自行推断当作需求；真源、状态、权限、异常恢复、测试和基础易用性仅补必要项，任务外发现只报告。优先复用和简单方案；只有当前目标或正确性、安全、数据完整性、可运维性确实需要时才增加复杂度，并说明理由。
 - 默认循环是“甲方目标或痛点 → Codex 实现与验证 → 固定版本发布 → 甲方使用反馈 → 缺陷、细化或新需求”。每次完成一个可验证切片，不建需求编号或多阶段计划；正式代码和文档不用历史 Phase/P 编号，`P0/P1/P2` 只表示风险优先级。
 - 开始和收口检查 worktree，保留其他任务或用户已有改动，不回退、格式化、删除、stage 或宣称为本轮成果。
-- Goal 只是普通任务来源；启动/恢复后，其写明闭环按全局 `$prompt-governance` 默认授权，明确包含交付时可直接 stage/commit/push/发布，不逐步确认。所有任务仍各自完成业务切片、验证和回滚，最终仅留被动 `Git handoff record`，不登记或广播跨会话调度状态。
-- `Git handoff record` 仅包含：精确文件或 hunk、建议 commit 分组、简体中文提交意图、已完成验证、未完成验证、需排除的外部脏文件，以及 commit / push 是否已获授权。它只是当次交接证据，不是 Git 授权，也不保存跨会话 owner、lease、等待、唤醒或状态广播。
+- Goal 的启动、恢复和已写明闭环授权遵循全局 `$prompt-governance`；普通任务与 Goal 都完成当前业务切片、验证和必要回滚，不登记或广播跨会话调度状态。
+- 存在待提交或需交接改动时，在最终回复保留一份被动 `Git handoff record`：精确文件 / hunk、提交分组及中文意图、验证与盲区、外部脏文件、commit / push 授权。简单改动可融入交付摘要；该记录不产生授权或跨会话调度状态。
 - Local 任务首次写入前和任务收口时，用 `GIT_OPTIONAL_LOCKS=0` 读取实时 HEAD、index、`index.lock`、status 和 scoped diff；共享 Local 不运行普通 `git status`。普通个人单 writer 按精确范围继续并保留外部脏现场；只有真实并发 writer、混合 hunk 或 index / `index.lock` 冲突时，才临时串行当前重叠路径或 Git 动作并重新读回，同一时点只能有一个 Git index 操作者。无法证明安全时停止相关写入或 Git 动作并报告，不建立任务调度、资源租约、registry、daemon、轮询、定时唤醒或消息广播。
-- 非 Goal 或 Goal 未写明的 stage、commit、push 仍分别询问；执行前实时核对 index 和 upstream。
 - 本仓库不恢复单独执行规格目录、短任务模板或本地审查报告目录。
 
 ## 过程记录
@@ -48,11 +45,10 @@
 ## 项目 Skills
 
 - 项目 skills 位于 `.agents/skills/` 并随仓库管理；只承载 plush 专项 SOP。
-- 当前入口见 `.agents/skills/README.md`。默认只选一个主 skill，真实跨领域/页面/打印/测试/operations 时再组合。
+- `.agents/skills/README.md` 管项目路由；按全局规则选择当前目标需要的分支和验证，切换 skill 后继续已授权工作。
 - 运行诊断、可观测/错误、安全隐私、发布和回滚统一使用 `$plush-operations-governance`。
-- 提示词和 Goal 使用全局 `$prompt-governance`。
-- Git 改动按上节生成被动记录；常规任务明确要求或 Goal 写明 commit/push，且实时现场确属复杂收口时，才使用全局 `$git-closeout-coordination`，不保留项目级 Git 收口 Skill。
-- 修改 skill 时同步 README/metadata/引用，运行 validator、YAML/metadata 扫描和 `git diff --check`。
+- Git 复杂收口在普通任务或 Goal 已授权 commit / push 时使用全局 `$git-closeout-coordination`；不保留项目级重复 Skill。
+- 修改 skill 后运行 `node scripts/qa/skill-health.mjs`、validator 与 `git diff --check`；仅在适用范围、入口或元数据变化时同步 README / metadata / 引用。
 
 ## Product Core 与客户差异
 
@@ -117,7 +113,7 @@
 
 按 `docs/product/自动化测试策略.md` 和 `$plush-test-governance` 选择 T0-T8 与测试形态。
 
-- 高成本验证按 `$plush-test-governance` 在执行前点名授权；同一候选可一次合并确认，范围或候选变化后再确认。`prepare-push.sh` 默认 affected；高风险、待补验证或发布须显式 `--full`，禁止静默升级。
+- 高成本验证按 `$plush-test-governance` 在执行前点名授权；同一候选可一次合并确认，范围或候选变化后再确认。`prepare-push.sh` 默认单一 `origin/main` 使用 `server-ci` 短门禁，高成本验证由 R640 exact-SHA CI 执行；非标准目标和显式本地 `--full` 按 `scripts/qa/README.md` 的保守合同处理，禁止静默升级。
 
 - 各领域的正常、边界、异常、权限和证据边界由测试策略、对应代码与测试真源守住，不在本文件重复目录。
 
@@ -158,8 +154,7 @@
 
 ## 旧项目与外部规划
 
-- 旧项目只能作迁移背景，不是 plush 字段、流程、页面、测试或文案真源；运行时用户界面不出现旧项目名或“对齐旧项目”说明。
-- 旧项目、GPT/ChatGPT 会话和其他外部规划只作任务输入，不把原文或来源名称带入仓库。被采纳的结论必须改写为 plush 自有合同，并由本文件、README、正式 docs、代码、migration、测试和 worktree 复核。
+- 旧项目只作迁移背景；外部输入的核实与原文处理遵循“阅读顺序与当前真源”。不把外部来源名称带入仓库，运行时用户界面不出现旧项目名或“对齐旧项目”说明。
 - 本项目是新系统。以前 AI 草稿、本地实验、未发布的 schema、API、状态、字段、别名、mock 或 fixture 都不是兼容对象，不能因代码、常量或测试曾经存在就进入正式设计。
 - 未进入正式目标设计的旧路径必须从代码、目标 Schema、seed/fixture、API、UI、文档和测试全链删除；已落库的 schema 或数据残留通过新的正式 migration 一次性清理，不改写已执行 migration。禁止保留 alias、fallback、双写、兼容读取、退出路径或仅为旧测试继续通过的分支。
 - 一次性 migration 或数据清理、正式业务事实与审计记录留存、网络重试和幂等 receipt replay 是当前系统正确性要求，不属于历史兼容；不得借“禁止兼容”绕过数据完整性、事务、迁移可追溯性和审计边界。

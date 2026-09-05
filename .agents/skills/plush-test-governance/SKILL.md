@@ -17,12 +17,12 @@ description: 项目测试治理（plush-toy-erp）。Use when choosing, running,
 
 ## 工作流
 
-1. 先看 `git status --short`，确认本轮路径、其他 writer 和当前 repository identity。
+1. 先看 `GIT_OPTIONAL_LOCKS=0 git status --short`，确认本轮路径、其他 writer 和当前 repository identity。
 2. 以用户目标和实际改动为边界选择最小充分验证；普通静态检查、同名测试和受影响模块验证直接执行。只有高成本门禁、真实数据写入、部署或其他外部动作需要在执行前明确范围、未跑项、停止条件和授权边界。
 3. 按实际风险选择验证：文档/Skill 做链接与合同检查；schema/migration 做生成、迁移和数据测试；领域/API/RBAC 做正常、边界、异常和权限；页面做 Web 与真实浏览器；发布做目标环境证据。
 4. 开发期先运行 `bash scripts/qa/affected.sh --plan`，确认计划和 required follow-up 后再使用 `--run`；优先同名测试、受影响模块和单链浏览器，不为普通改动机械运行全站。
-5. `full.sh`、`strict.sh`、Full Acceptance、全量 Style L1、全页面或全 PDF 回归必须在执行前按名称明确授权；同一候选可一次合并确认，不逐项往返，范围或候选变化后重新确认。“覆盖所有业务链场景”“一次做完”“提交并推送”等未点名高成本验证的宽泛表述不构成授权。`prepare-push.sh` 默认复算 clean HEAD 与真实 push range 的 affected 计划：计划能由自动命令闭合时签发 affected 回执；命中 full local gate、仍有 required follow-up 或作为发布候选时停止并要求显式 `--full`，不得静默升级。用户明确授权推送但未指定远端时，只准备并推送 GitLab `origin/main`；GitHub `main` 只接受 GitLab protected-main 的同 SHA push mirror，不直接从本地更新，也不重复运行仓库 CI。先 fetch；工作区干净且本地只落后时可用 fast-forward-only 同步 `origin/main`，不得生成 merge commit。随后对最终 clean HEAD 使用普通 `prepare-push.sh`，推送后等待 R640 exact-SHA `CI Gate`。用户明确说“提交推送代码让 GPT 分析”时，该句同时授权本轮精确相关改动的 commit 与 GitLab `origin/main` push；GitLab CI 成功并镜像后，GPT 按 GitHub `main` 的目标提交范围做事后审查。只说“让 GPT 分析”不隐含 commit 或 push；可先审查当前本地 diff，或等已授权的正式推送完成后审查镜像。GPT finding 仍须回到当前仓库核对，必要修复形成新候选并重新走 GitLab main 门禁。
-6. 产品范围与 clean exact SHA 冻结后，同一候选只运行一轮匹配的 `prepare-push`；不要先手动重复同一 affected/full。高成本门禁失败即停止，不自动扩圈或重跑；只有影响生产正确性、安全、数据完整性、权限或可恢复发布的修复形成新候选后，才重新确认。fixture、mock、选择器、测试文案、开发工作台或证据展示问题若不使生产结论失效，列为后续事项。
+5. `full.sh`、`strict.sh`、Full Acceptance、全量 Style L1、全页面或全 PDF 回归必须在执行前按名称明确授权；同一候选可一次合并确认，不逐项往返，范围或候选变化后重新确认。“覆盖所有业务链场景”“一次做完”“提交并推送”等未点名高成本验证的宽泛表述不构成授权。`prepare-push.sh` 在 clean HEAD 与真实 push range 上复算 affected 风险；默认单一 `origin/main` 只执行并签名 remote/ref/range、git-log、严格 secrets 与源码完整性短门禁，签发 `server-ci` 回执，高成本检查由 R640 exact-SHA CI 执行。非标准 remote/ref、多 ref 或显式 `--full` 继续使用 affected/full 保守合同；需要本地 full 时仍须按名称明确授权，不得静默升级。用户明确授权推送但未指定远端时，只准备并推送 GitLab `origin/main`；GitHub `main` 只接受 GitLab protected-main 的同 SHA push mirror，不直接从本地更新，也不重复运行仓库 CI。先 fetch；工作区干净且本地只落后时可用 fast-forward-only 同步 `origin/main`，不得生成 merge commit。随后对最终 clean HEAD 使用普通 `prepare-push.sh`，推送后等待 R640 exact-SHA `CI Gate`。用户明确说“提交推送代码让 GPT 分析”时，该句同时授权本轮精确相关改动的 commit 与 GitLab `origin/main` push；GitLab CI 成功并镜像后，GPT 按 GitHub `main` 的目标提交范围做事后审查。只说“让 GPT 分析”不隐含 commit 或 push；可先审查当前本地 diff，或等已授权的正式推送完成后审查镜像。GPT finding 仍须回到当前仓库核对，必要修复形成新候选并重新走 GitLab main 门禁。
+6. 产品范围与 clean exact SHA 冻结后，同一候选只运行一轮匹配的 `prepare-push`；默认 `origin/main` 不在本地重复高成本门禁，非标准目标和显式 `--full` 也不先手动重复同一 affected/full。高成本门禁失败时停止该门禁的自动扩圈或重跑，保留失败证据并继续独立的已授权工作；只有影响生产正确性、安全、数据完整性、权限或可恢复发布的修复形成新候选后，才重新确认。fixture、mock、选择器、测试文案、开发工作台或证据展示问题若不使生产结论失效，列为后续事项。
 7. 对 `affected` 无法选择的生成命令、真实数据库、浏览器、migration 或发布检查，按计划显式补充；环境不具备时报告 `blocked` 或 `missing`，不要用另一类测试绿色代替。
 8. 记录实际命令、执行数、pass/fail/skip、证据环境和未覆盖项。缺 summary、`0 tests executed` 或意外 skip 一律不能写成通过。
 9. 只有命中项目过程记录条件时才更新 `progress.md`；普通且已闭环的小改动不重复留过程台账。

@@ -5,12 +5,14 @@ description: 项目代码审查治理（plush-toy-erp）。Use when reviewing pl
 
 # Plush 代码审查治理 Code Review Governance
 
-用这个 skill 审查 `/Users/simon/projects/plush-toy-erp` 的代码和正式文档改动。默认只审查，不改代码。
+从当前任务的 checkout / Worktree 内用 `git rev-parse --show-toplevel` 核对仓库根；下文命令以该根目录为工作目录，仓库内文件引用也相对它解析。
+
+用这个 skill 审查 `plush-toy-erp` 的代码和正式文档改动。默认只审查，不改代码。
 
 ## 范围解析 Scope
 
 1. 用户指定 commit、branch、文件、目录或 PR 时，只审指定范围。
-2. side chat 或新会话未指定范围时，审当前仓库 `git status`、staged diff、unstaged diff 和最近相关提交。
+2. side chat 或新会话未指定范围时，审当前仓库 `GIT_OPTIONAL_LOCKS=0 git status`、staged diff、unstaged diff 和最近相关提交。
 3. 当前主会话里“实现后 review”时，审本轮相关改动；若工作区有多组无关改动，先按最近用户请求收窄。
 4. 不依赖主会话说法。任何结论都要回到仓库代码、正式文档、测试和当前 diff。
 
@@ -19,8 +21,8 @@ description: 项目代码审查治理（plush-toy-erp）。Use when reviewing pl
 先运行：
 
 ```bash
-git -C /Users/simon/projects/plush-toy-erp status --short
-git -C /Users/simon/projects/plush-toy-erp diff --stat
+GIT_OPTIONAL_LOCKS=0 git status --short
+git diff --stat
 ```
 
 再按触达范围读：

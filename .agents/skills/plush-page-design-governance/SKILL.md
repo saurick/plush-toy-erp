@@ -1,22 +1,31 @@
 ---
 name: plush-page-design-governance
-description: 项目页面治理（plush-toy-erp）。Use when ordinary ERP pages, fields, actions, states, layouts, prototypes, accessibility, or browser regressions are primary; use print-template governance when customer source files or paper/PDF fidelity are primary.
+description: 项目页面治理（plush-toy-erp）。Use to assess or change ERP page tasks, fields, actions, layout, and browser regressions; customer print sources and PDF fidelity use print governance.
 ---
 
 # Plush Page Design Governance
 
-Use this skill to turn "简洁易用、美观、低心智负担" into concrete implementation checks for plush-toy-erp pages. Do not treat it as a generic visual taste guide. Its purpose is to protect page meaning, feature semantics, information hierarchy, ERP task focus, Workflow / Fact boundaries, RBAC/menu truth, and regression quality.
+从当前任务的 checkout / Worktree 内用 `git rev-parse --show-toplevel` 核对仓库根；下文命令以该根目录为工作目录，仓库内引用也相对它解析。
 
-边界说明：本 skill 只负责普通页面的可见能力、功能语义、信息层级、交互和页面回归治理；客户 Excel/PDF/图片源、纸张版式和 PDF/打印保真由 `plush-print-template-source-governance` 负责。涉及 API / RBAC / schema / migration / Workflow / Fact 时，只做真实性核对和升级判断，不直接把后端实现纳入页面治理范围。若页面改动需要新增或修改后端能力，应切换到 `plush-domain-boundary-governance`，并按对应 test / security / release skill 补足验证。
+让页面的岗位任务、字段、动作和反馈清楚可用，并保持后端能力、Workflow / Fact、RBAC 与菜单真源一致。评估默认只给结论；实现请求连续完成当前授权范围及必要验证。
 
-## 项目页面门禁 Project Page Gates
+## Project Page Gates
 
-- 功能先于视觉：每个元素都要说明支持哪个角色、哪个判断、哪个动作或哪个反馈；无决策价值、重复入口、假快捷方式和装饰性卡片应删除、合并或降级。
-- 真源先于局部修补：页面不能补造后端事实、隐藏 Workflow / Fact 缺口、显示裸技术字段，或用页面私有字段映射替代共享 helper / API / RBAC 合同。
-- 低密度但不失真：减少信息密度必须通过信息分组、任务优先级、可读标签和可验证交互完成，不能靠隐藏必要状态、吞掉错误或弱化关键约束。
-- 可回归：样式、布局、交互和原型同步必须覆盖默认态、交互态、恢复态、长文本/大数字/多标签、暗色/移动端和相邻区域；共享组件按影响面升级验证。
-- 截图调试门禁：触达用户可见页面、打印预览、布局、焦点、选择或插入/删除等交互态时，必须用真实浏览器截图 / visual evidence 结合 DOM / box metrics 验证，不能只靠代码、单测或默认态截图收口。
-- 截图够用标准 Screenshot sufficiency：不是多拍图，而是形成证据链；至少证明问题/目标状态、改后状态、一个相关边界状态，并用 DOM / box metrics 证明目标行/单元格/按钮/焦点、溢出和相邻区域正确。
+- 每个可见元素都应支持岗位判断、动作或反馈；重复入口和装饰信息按任务价值合并、降级或删除。
+- 页面不能补造业务事实、掩盖后端或权限缺口，也不能以局部字段映射替代共享真源。
+- 减少密度依靠任务分组、优先级、可读标签和交互，保留必要状态、错误及关键约束。
+- 复用设计系统和共享业务组件。布局或交互变化必须以真实浏览器证据和 DOM / box metrics 验证，覆盖受影响的默认、交互、恢复、边界与相邻区域；主题、移动端和共享组件按实际影响扩大范围。
+- 纸面模板及 PDF 保真使用 `$plush-print-template-source-governance`。需要改变 API / RBAC / schema / Workflow / Fact 时转入领域技能继续已授权工作，新增范围才询问。
+
+## Select the Relevant Detail
+
+| 当前任务 | 必要读取 |
+| --- | --- |
+| 页面任务、字段、动作、状态、密度、原型 | [Page Semantics](references/page-semantics.md) |
+| 布局、主题、弹窗、键盘、运行交互、浏览器验证 | [Page Implementation](references/page-implementation.md) |
+| 纯文档 / Skill 修改 | 文本、metadata、引用和 scoped diff 检查 |
+
+只加载命中的分支。原型未变化且仍准确时不机械同步；小改动不强制检查全部页面或固定截图数量，高成本验证遵循 `$plush-test-governance`。
 
 ## Workflow
 
@@ -25,84 +34,9 @@ Use this skill to turn "简洁易用、美观、低心智负担" into concrete i
    - Read the relevant current truth before editing: project `AGENTS.md`, `docs/当前真源与交接顺序.md`, `web/README.md`, and `docs/product/prototypes/README.md` when prototypes are involved.
    - Inspect the real runtime page and existing components when the task touches layout, density, spacing, styles, interactions, or visible page structure.
 
-2. Sync prototype design conditionally.
-   - If the page has a matching asset under `docs/product/prototypes/**`, read `docs/product/prototypes/README.md` and the prototype README before changing runtime UI. Confirm whether the prototype is Draft, To Implement, or Current.
-   - If no matching prototype exists, do not create one just to satisfy process. Create or update a prototype only when the user explicitly asks for prototype/design work, the task is a new reusable UI pattern, or missing prototype context would make implementation ambiguous.
-   - Absorb prototype intent, structure, interaction, information hierarchy, and meaningful business semantics. Do not copy static numbers, fake customers, mock tasks, dev-only shells, or visual-only decoration into runtime.
-   - If runtime implementation changes a prototype's promised structure, interaction, business meaning, absorbed scope, index entry, or status wording, update the prototype README, prototype index, registry, and related tests in the same round.
-   - If the change is a small style, copy, or feature-detail correction and the existing prototype remains accurate, leave prototype files untouched and say why in the final response.
-   - Do not promote To Implement assets to Current without explicit user confirmation, even if code and tests pass.
-
-3. Define the page's single primary job.
-   - State who uses the page and what they should finish there.
-   - Every visible module must answer at least one useful question: why the user needs it, what decision or action it supports, and what changes after the user acts.
-   - Classify each visible element as decision information, action entry, operational feedback/status, navigation/context, or auxiliary explanation.
-
-4. Evaluate feature and detail semantics before visual simplification.
-   - For each feature, button, field, filter, status, tab, card, table column, empty state, error state, and shortcut, state which role uses it and which business action, decision, or feedback it supports.
-   - Verify that the user action has a real outcome: data changes, task state changes, navigation changes, validation feedback, exported output, or a clear next step. If nothing meaningful changes, delete, rename, merge, or downgrade the control.
-   - Check whether the feature already exists elsewhere. Keep duplicates only when role, context, frequency, or selected-record workflow justifies the second entry.
-   - Check whether the visible UI implies a backend/API/RBAC/menu/Workflow/Fact capability that is not actually complete. If so, fix the wording or scope instead of letting the UI pretend the capability exists.
-   - Cover functional edge states before styling: no data, long text, many tags, large numbers, no permission, disabled user, loading, failed request, validation error, already done, posted/settled, cancelled/reversed, and stale selected records where relevant.
-   - Treat page navigation and tab switching as request-lifecycle events. When a current page issues list/dictionary/reference reads that can overlap with a later route, menu, tab, filter, or refresh action, the older request must be cancelled or guarded by a latest-request check; aborted or stale requests must not show user-facing network errors, overwrite current state, or re-enable loading indicators incorrectly.
-   - Re-clicking the already active desktop menu entry is not a refresh gesture. It may close mobile navigation, but it must not re-request page data; use the page-level refresh button for explicit reloads.
-   - Prefer selecting or deriving business fields from existing truth sources over manually inventing page-local values. Do not let frontend display logic become a hidden business fact source.
-   - Do not expose engineering fields to business users. Fields such as `idempotency_key`, 幂等键, 内部主键, 内部引用, trace / request IDs, raw database IDs, source IDs, or source line IDs must not be visible form labels, table columns, filter placeholders, modal fields, or export headers. Keep them hidden in form state or backend contracts when needed, and show readable business references such as 单号、来源单据、来源行、状态、余额、已关联 or 不可生成原因.
-   - Business object controls are allowed only when they read as business controls: labels, option text, selected summaries, empty states, and validation messages must use names, codes, order numbers, line numbers, status, quantity, or "已关联" feedback. Do not show raw `#123` fallbacks, `id` / `*_id` fields, source ID inputs, source line ID inputs, or "选择器" copy that asks non-technical users to understand implementation mechanics.
-   - For business fields, identify the source-of-truth field before changing labels, mappings, defaults, imports, table columns, details, printing, export, or search. Check both stale values and missing values across create defaults, edit overwrite, source switch, source clear/delete, list/detail/print/export/search display, and historical-data fallback.
-   - If the page repeats the same field mapping in form defaults, save transforms, table mapping, print/export mapping, or import logic, prefer a shared mapper/helper over adding another local conditional.
-
-5. Reduce density by meaning, not by hiding truth.
-   - Delete, merge, rename, or downgrade elements that are decorative, duplicated, vanity-only, or do not change a user's judgment or next action.
-   - Reserve prominent `Alert` cards and warning icons for states that require the user to stop, correct, retry, confirm risk, or resolve missing permission. Routine guidance, successful calculations, loading copy, DEV / QA / simulation labels, and evidence-boundary explanations must not become persistent employee-facing alerts; use one short inline note, field help, or an on-demand disclosure instead, and keep at most one passive note visible by default in a page or modal section.
-   - Prefer fewer stronger sections over many small cards.
-   - Avoid duplicate shortcuts to the same action unless the duplicate is role-specific and measurably shortens the main task.
-   - Keep ERP pages work-focused: compact filters, readable tables, clear primary actions, restrained status summaries, and obvious selected-row actions.
-   - Use helpful labels and microcopy only where they reduce ambiguity; do not add explanatory text that restates visible UI.
-
-6. Preserve project boundaries.
-   - Do not change schema, migration, RBAC permissions, menu truth, route truth, WorkflowUsecase, or Fact usecases as a side effect of visual cleanup.
-   - Do not hardcode the current customer into product-core UI.
-   - Do not turn prototype static numbers, fake records, or dev-only samples into runtime facts.
-   - Do not make workflow task done mean inventory, shipment, finance, invoice, receivable, or payment fact posted.
-   - If a simplification requires hiding, renaming, combining, or reordering official menu entries, stop and treat it as a menu/product-boundary review.
-
-7. Implement with the existing design system.
-   - Reuse current page shells, shared business-page components, theme tokens, CSS variables, and existing interaction patterns before adding new abstractions.
-   - Keep light and dark themes readable. Printing/PDF previews remain fixed light unless a separate design explicitly changes screen preview behavior.
-   - For desktop ERP business objects, use Modal as the unified create/edit/view surface. Do not introduce Drawer as the primary business-form interaction; keep Drawer for workflow task handling, navigation, or contextual side panels that do not save a complete business object.
-   - Size modals by task complexity: confirmation/delete/simple prompts around 420-520px, master-data create/edit around 640-880px, and business documents such as purchase orders, sales orders, shipments, quality inspections, BOM, and outsourcing orders around `min(1720px, calc(100vw - 96px))` with a fixed footer action area. Keep complex line items inside the same business modal through sections, tables, horizontal scroll, or a second-level source picker; do not split business editing into drawers.
-   - Preserve accessibility and keyboard behavior for interactive surfaces: opening focus, logical Tab order, Escape/close behavior, disabled/loading states, aria labels for icon-only controls, focus return after modal close, and keyboard access for draggable/resizable or overflow controls.
-   - Prefer scoped component styles. Do not add `!important` unless the source cannot be controlled and the reason is documented in the final response.
-   - Use real controls for real actions: buttons for commands, tabs for views, menus for option sets, checkboxes/toggles for binary settings, and tables for scan/compare workflows.
-
-8. Validate as regression, not just screenshot review.
-   - Cover default, interaction, recovery, and adjacent-area states.
-   - For visible layout or interaction changes, capture named screenshots or Playwright artifacts for the exact changed state and at least one boundary state; repeat screenshot debugging until target row/cell/focus/action result is visually and structurally correct.
-   - Minimum visual evidence is usually 2-4 targeted screenshots: default or baseline, exact changed / problem interaction, one relevant boundary, and adjacent area when overlap or layout push is possible. Print templates, PDF parity, mobile/dark, or multi-step editor flows can require 5-8 screenshots, but every screenshot must answer a concrete validation question.
-   - Check DOM/box metrics for layout-sensitive changes: bounding boxes, overflow, scrollWidth/clientWidth, offsetHeight/clientHeight/scrollHeight, wrapping, and neighboring overlap.
-   - Include long text, many tags, wide numbers, and mobile/dark cases when the changed area can receive variable data.
-   - Treat anti-aliasing, subpixel, font-rendering, or screenshot compression differences as rendering noise unless readability, geometry, interaction, or print output changes. Treat overlap, clipping, wrong focus, wrong row/cell selection, stale artifacts, missing text, or misleading business UI as product defects.
-   - For field chain changes, validate relevant stale/missing value paths: new value replaces old value, source switching clears or replaces old values, missing truth is not fabricated, snapshot gaps fall back only by documented rules, and historical records do not display incorrect values.
-   - For interactive controls, validate focus, keyboard, disabled/loading, and accessible-name behavior in the changed surface.
-   - For navigation-sensitive pages, validate fast route/menu/tab switching. Confirm that stale requests are cancelled or ignored, no stale request produces a toast on the next page, and repeated clicks on the active menu entry do not trigger duplicate reads.
-   - If prototype assets, prototype registry, or prototype tests changed, run the relevant prototype inventory and frontend regression checks named by the repo.
-   - Run the repo-appropriate frontend checks. For style/page work in plush-toy-erp, default to:
-     ```bash
-     cd /Users/simon/projects/plush-toy-erp/web && pnpm lint && pnpm css && pnpm test
-     cd /Users/simon/projects/plush-toy-erp/web && pnpm style:l1
-     ```
-   - For a narrow page change, targeted `STYLE_L1_SCENARIOS=... pnpm style:l1` is acceptable only when the final response clearly names the covered scenario and any remaining blind spots.
+2. 根据影响面读取上表的语义或实现分支，在现有组件、helper 和真实后端能力上修改。
+3. 按 `$plush-test-governance` 与 affected 计划完成相关检查。字段变化核对覆盖、清空和缺值；交互变化核对实际动作、请求生命周期、焦点和恢复；仅在新改动、失败或未解决风险需要时扩圈或重跑。
 
 ## Deliverable Standard
 
-When answering, lead with a verdict if the user asks whether the design direction is reasonable. If implementing, report:
-
-- What page meaning was kept, removed, merged, renamed, or downgraded.
-- Which prototype assets were checked, updated, intentionally skipped, or not found.
-- What feature or detail semantics were kept, removed, merged, renamed, downgraded, or left unimplemented.
-- Which stale/missing field-value paths and accessibility/keyboard states were verified or intentionally left out.
-- Which files changed.
-- Which runtime/browser and automated checks passed.
-- Which paths were intentionally not changed, especially RBAC, schema, menu truth, Workflow / Fact, customer-specific logic, and docs.
-- Any remaining blind spots or follow-up tasks.
+结论先行，说明页面行为或信息结构的变化、修改文件、实际验证和盲区。原型、字段链或权限边界仅在本次相关时展开；不逐项填报未触达内容。

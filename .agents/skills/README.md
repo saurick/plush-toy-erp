@@ -2,7 +2,7 @@
 
 本目录只保存 plush-toy-erp 的专项 SOP。长期规则在 `AGENTS.md`，项目事实在正式 docs、代码、migration 和测试；通用工作流使用 `~/.codex/skills`，不在项目版重复。
 
-当前 10 个 Skill 是按需加载的专项工具，不是 10 个开发阶段，也不要求逐个执行或由甲方确认。普通任务只选择一个最贴近目标的 Skill；只有真实跨领域时才组合。
+当前 10 个 Skill 按需选择分支，不要求逐个执行或由甲方确认。优先一个主 Skill，真实跨领域才组合；切换 Skill 后继续同一目标的已授权工作。
 
 | Skill                                     | 适用范围                                                                                                                               |
 | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
@@ -19,11 +19,17 @@
 
 ## 选择规则
 
+页面治理按需读取 [Page Semantics](plush-page-design-governance/references/page-semantics.md) 或 [Page Implementation](plush-page-design-governance/references/page-implementation.md)。
+
+打印治理在 [Source Analysis](plush-print-template-source-governance/references/source-analysis.md) 与 [Template Runtime](plush-print-template-source-governance/references/template-runtime.md) 中保存条件细节，由对应 SKILL 选择本次需要的引用。
+
+从当前任务的 checkout / Worktree 内用 `git rev-parse --show-toplevel` 核对仓库根；下文命令以该根目录为工作目录，仓库内文件引用也相对它解析。
+
 - 简单任务只选一个最贴近主目标的 skill；跨边界时再补相邻 skill。
 - schema / migration 的设计、生成和领域合同使用 Domain；目标库 apply、运行态迁移、发布与回滚使用 Operations。
 - 普通页面和原型使用 Page；客户源文件、纸张版式或 PDF/打印保真是主目标时使用 Print。
 - seed / fixture / dry-run / cleanup 的数据构造使用 Seed；验收目录、readiness、浏览器/PDF、人工结论和签收编排使用 Manual Acceptance。
 - Manual Acceptance 只编排验收与证据；目标访问、migration、release、rollback 的真实执行仍由 Operations 负责。
-- 提示词整理使用全局显式 `$prompt-governance`。所有任务按 `AGENTS.md` 只产出一份被动 `Git handoff record`；只有用户明确要求 commit / push 且实时现场复杂时，才使用全局 `$git-closeout-coordination`。
+- 提示词整理使用全局显式 `$prompt-governance`。存在待提交 / 需交接改动时按 `AGENTS.md` 留一份被动 `Git handoff record`；只有当前任务已授权 commit / push 且实时现场复杂时，才使用全局 `$git-closeout-coordination`。
 - 项目 skill 不重复高内聚、低耦合等通用常识，只保留项目真源、判断流程、命令和验收。
 - 修改 skill 后同步 `agents/openai.yaml`，运行 validator、YAML/metadata 扫描、引用扫描和 `git diff --check`；只有命中项目过程记录条件时才更新 `progress.md`。

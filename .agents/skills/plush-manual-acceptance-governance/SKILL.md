@@ -30,7 +30,7 @@ description: 项目人工验收治理（plush-toy-erp）。Use when planning acc
 
 ## Workflow / 工作流
 
-1. 冻结 scope：customer、target、profile、dataset key/data version/run id、允许写入、禁止路径、验收与停止条件。先运行 `git status --short`，保留其他会话改动。
+1. 冻结 scope：customer、target、profile、dataset key/data version/run id、允许写入、禁止路径、验收与停止条件。先运行 `GIT_OPTIONAL_LOCKS=0 git status --short`，保留其他会话改动。
 2. 生成当前目录与数据计划。先读 `scripts/qa/README.md`，运行 catalog 的 JSON 模式；不要复制旧清单数量或依赖历史报告。
 3. 检查环境门禁：URL/host、DB、migration、active customer config revision、账号/RBAC、凭据分离、报告目录和精确确认词。凭据只经环境变量传入，不写入命令记录、报告或仓库。
 4. 按当前脚本能力准备 source data、账号、任务、附件和 source-driven Fact。计划入口与 apply 入口分开；脚本声明 plan-only、retired 或 unsupported 的阶段立即停止，不用旧报告、generic RPC、直接 SQL 或局部事实代替。

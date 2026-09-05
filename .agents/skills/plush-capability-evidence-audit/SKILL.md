@@ -31,14 +31,14 @@ description: 项目能力证据审计（plush-toy-erp）。Use for read-only evi
 
 1. 把问题改写成可判定命题，例如“采购主路径已具备产品事实”或“固定版本已在目标环境可用”。
 2. 选择命题真正需要的证据类型和停止条件，不默认要求客户确认技术实现、架构或测试内部键。
-3. 检查 current revision 与 worktree，区分 committed truth、local WIP 和其他任务改动。所有 status、diff、ref 与 index 只读盘点都设置 `GIT_OPTIONAL_LOCKS=0`；共享 dirty Local 直接读取 HEAD、index、`index.lock`、`git status --short --untracked-files=all` 与 scoped diff，不用普通 `git status` 制造可避免的 index refresh / lock。
+3. 检查 current revision 与 worktree，区分 committed truth、local WIP 和其他任务改动。所有 status、diff、ref 与 index 只读盘点都设置 `GIT_OPTIONAL_LOCKS=0`；共享 dirty Local 直接读取 HEAD、index、`index.lock`、`GIT_OPTIONAL_LOCKS=0 git status --short --untracked-files=all` 与 scoped diff，不用会刷新 index 的普通 status 盘点制造可避免的锁。
 4. 从能力台账定位范围，再回到当前代码、migration、测试或目标证据核对；发生冲突时报告漂移。
 5. 状态题默认只读。不要为补证据自动迁移、写库、发布、清理、提交或推送。
 6. 给出结论、已核证据、缺口和最小下一步；不要用“继续开发”概括所有问题。
 
 ## 停止条件
 
-- 需要生产凭据、真实写入、migration apply、发布、恢复演练或签收时，先取得授权并切 `$plush-operations-governance`。
+- 需要生产凭据、真实写入、migration apply、发布、恢复演练或签收时，核对当前任务已有授权并切 `$plush-operations-governance`；缺少时只暂停对应动作，已授权范围不重复询问。
 - 需要修业务真源、schema/API/RBAC 时切 `$plush-domain-boundary-governance`；需要补测试时切 `$plush-test-governance`。
 - 无法取得目标或客户证据时准确写 `not checked`，不根据旧记忆或本地绿色补齐。
 

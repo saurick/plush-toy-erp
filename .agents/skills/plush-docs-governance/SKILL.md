@@ -1,119 +1,38 @@
 ---
 name: plush-docs-governance
-description: 项目文档治理（plush-toy-erp）。Use when creating, reviewing, renaming, reorganizing, or updating plush Markdown, README, docs indexes, AGENTS rules, or progress records.
+description: 项目文档治理（plush-toy-erp）。Use to review or maintain plush Markdown, README, docs indexes, AGENTS rules, and progress records.
 ---
 
 # Plush Docs Governance
 
-Use this skill to keep plush-toy-erp docs useful for humans and safe as project truth. It covers both governance and reading experience: current source of truth, inventory sync, Chinese filenames, low information density, reader paths, conclusion-first structure, clear section anchors, copyable commands, diagrams that reduce understanding cost, and links to exact relevant locations.
+维护 plush 文档的真源、读者路径和项目命名。按目标选择分支，不把普通文案修订扩展为业务或运行改造。
 
-## 项目文档门禁 Project Docs Gates
+## Scope and Truth
 
-- 先保护当前真源：新增、改写或合并文档前，确认它不会覆盖代码、migration、测试、README、`docs/当前真源与交接顺序.md` 或 `AGENTS.md` 的正式口径。
-- 降低心智负担：结论、适用范围、主路径、验收方式和风险边界前置；表格、Mermaid、链接和摘要只在减少查找成本时使用。
-- 避免文档漂移：行为、入口、菜单、配置、测试或部署口径变化时，同步相关索引、README、`docs/文档清单.md` 和 `progress.md`；只改措辞时不机械扩大同步面。
-- 控制复杂度：不要为普通说明引入重模板、重审批流、重复负面清单或并行 metadata；能由脚本、索引或现有文档承接的规则，不再造一套文档真源。
+- 读取项目 `AGENTS.md`、`docs/当前真源与交接顺序.md` 及相关目录 README；使用 `GIT_OPTIONAL_LOCKS=0` 核对当前 diff 并保护外部改动。已读且未变化的入口无需重复加载。
+- 正式 docs 描述合同；当前实现核对代码、Ent schema、Atlas migration 和测试；目标交付需运行证据。`progress.md`、`docs/archive/**`、外部规划和客户样本不能替代当前真源。
+- 外部 GPT / 其他项目原文不进入产品仓；采纳结论先核实，再写成项目自身合同。客户原件与私密 manifest 继续留受控私有存储。
+- 普通文档维护不编辑 AGENTS；用户明确要求治理长期规则时直接在授权范围内完成，保留 Workflow / Fact、RBAC、迁移、隐私、Git 与恢复门禁。
+- 本次目标确实需要行为修改时，切换对应领域、页面或 operations 分支并继续已授权工作；只对新增范围或缺少授权的动作暂停。
 
-## Workflow
+## Writing and Organization
 
-1. Snapshot scope and worktree.
-   - Run `git status --short` before editing.
-   - Classify the task as docs-only, docs-adjacent, or behavior-changing.
-   - If runtime, schema, API, RBAC, menu, deployment, or test behavior changes are required, stop treating it as docs-only and follow the relevant project workflow too.
+- 结论、读者、范围、当前状态和主路径前置。业务文档用岗位语言；T0-T8 是验证层级，L/内部状态键不作普通业务摘要。
+- README 管导航，专题管业务 / 操作，progress 管过程；同一规则集中一处，用稳定章节链接关联。对比 / 清单用表格，操作用编号，命令用代码块，复杂关系才用 Mermaid。
+- 不新增重模板、平行 metadata、过程目录或重复负面清单。frontmatter 仅在真实 viewer / generator / index 消费时使用；命令注明工作目录和有用的成功信号。
+- 长期文档默认中文文件名、中文主体及 English anchor；README / AGENTS / CHANGELOG、archive、生成和外部稳定路径例外，不机械改名。
+- AGENTS 留长期项目特例，业务事实进专题，机械门禁留现有 QA，按需 SOP 进 Skills。删改规则须有具体影响依据，授权语义变化单列说明；体积治理不删除有效保护。
 
-2. Read the docs truth chain.
-   - Always read project `AGENTS.md` for rules, but treat it as protected project-level governance.
-   - Read `docs/当前真源与交接顺序.md` before making current-state claims.
-   - Read `docs/文档清单.md` when adding, deleting, renaming, reclassifying, or changing the stated purpose/title of long-lived Markdown.
-   - Read the nearest directory `README.md` for the touched docs area when it exists.
-   - Do not store other-project or GPT/ChatGPT exported source documents in the repository. Review them outside the repo, then restate accepted conclusions as project-native formal docs, code, or tests.
-   - Treat `docs/archive/**` plus `progress.md` as project history/process evidence, not current runtime truth.
+## Conditional Sync
 
-3. Protect `AGENTS.md`.
-   - Ordinary docs cleanup should read `AGENTS.md`, not edit it.
-   - Edit `AGENTS.md` only when the user explicitly asks to change long-term rules, governance, prohibited actions, required workflows, or repository-wide doc policy.
-   - Keep `AGENTS.md` concise and rule-focused. Do not move ordinary product explanations, process notes, roadmap detail, or page-level prose into it.
-   - When editing `AGENTS.md`, verify the new rule belongs at project level instead of a product doc, architecture doc, deployment doc, test strategy, hook, or QA script.
-   - In the final response, explicitly say whether `AGENTS.md` was only read or actually changed.
+- 新增、删除、重命名、重分类长期 Markdown 或改变标题 / 职责时，同步 `docs/文档清单.md`、目录 README、入口、锚点与引用；仅改正文通常不动清单。
+- 一级目录 / 长期子系统变化才同步相关结构导航。行为、配置、接口、使用方式变化时同步对应专题；普通缺陷、样式或测试补强不更新能力台账。
+- 能力边界 / 产品状态 / 关键阻塞实质变化才更新能力台账；客户启用、发布或验收状态变化才更新客户矩阵；主路径入口变化才更新当前真源索引。
+- progress 严格按 AGENTS 的跨会话、阻塞 / 风险、schema / migration、发布 / 回滚、重大决策或用户要求条件更新；先检查 600 行 / 80 KiB，达到后显式归档并保留活跃事项和索引。
+- 文档被 DEV viewer、帮助页、原型索引或生成脚本消费时，同步实际消费者与必要测试，不建第二份真源。
 
-4. Decide metadata and frontmatter deliberately.
-   - Do not add Markdown frontmatter or metadata by default.
-   - Before adding or changing metadata, identify the real consumer: docs viewer, generator, search index, build script, publishing tool, or human-maintained inventory.
-   - If the project already has a registry, docs index, seed config, or viewer config as the source of truth, update that source instead of inventing parallel Markdown frontmatter.
-   - Keep human-readable H1, headings, and `docs/文档清单.md` aligned with any metadata that is truly required.
+## Validation and Output
 
-5. Design for human reading first.
-   - Start ordinary docs with purpose, scope, current truth, main path, and acceptance or verification.
-   - Give readers a path near the top: who should read this, where to start, and what they can do after reading.
-   - Put the current conclusion, status, main path, required commands, and risk boundary before history or detailed evidence.
-   - Keep high-risk restrictions in `AGENTS.md`, governance docs, hooks, or QA scripts instead of copying negative lists into every ordinary doc.
-   - Make headings scannable. A reader should know what each section does from the H2/H3 list.
-   - Prefer Chinese main headings with stable English anchors or technical terms where useful.
-   - Avoid front-loading history, internal IDs, stage labels, or capability anchors when the document is meant for human scanning.
-   - Write ordinary prose with the human-readable state first, for example `可作为试用候选` or `领域逻辑验证（T3）`. Product capability status does not use an internal L-level code; readers must not memorize an identifier table before understanding the sentence.
-   - Definition and traceability tables may keep separate identifier and name columns. Exact commands, paths, environment variables, JSON keys, test fixture IDs, stable anchors, and archive filenames keep their machine-facing spelling.
-   - Do not leave bare identifiers or compressed ranges such as `T3-T5` or `F02-F05` in human-facing summaries. Spell out validation scopes, formulas, or flows and keep identifiers only as secondary traceability.
-   - Use open-source and large-company documentation patterns as information architecture only: Quick start, Concepts, How-to, Reference, Troubleshooting, FAQ, Changelog. Keep the actual process lightweight for personal development.
-   - When docs involve classification matrices, separate architecture layers, validation levels, test shapes, and evidence environments. Do not call `T0-T8` project architecture layers; treat them as validation levels. Keep detailed test selection in `docs/product/自动化测试策略.md` or the `plush-test-governance` skill, and link there instead of duplicating the full testing policy.
+运行 `git diff --check` 和定向路径 / 锚点 / 旧术语扫描；改 Skills 运行 `node scripts/qa/skill-health.mjs` 和 validator，改文档清单或消费者时运行对应检查。Mermaid 变化检查语法与标签。纯治理不执行 migration 或无关全量 QA。
 
-6. Reduce documentation density by meaning.
-   - Delete or move repeated background, stale process notes, duplicated warnings, hidden task history, and explanations that do not change reader action.
-   - Split large docs when the main surface stops being quickly scannable. Keep the main doc as route/index/summary and move evidence or long detail to a linked detail doc.
-   - Choose the expression shape by the information type, not by decoration:
-     - Use tables for short comparable facts, status inventories, responsibility matrices, path lists, field/API/config comparisons, command catalogs, acceptance criteria, risk registers, and docs classification.
-     - Use numbered lists for ordered procedures, troubleshooting paths, migration sequences, release steps, and verification steps.
-     - Use code blocks for commands, config, SQL, API examples, and minimal reproducible snippets.
-     - Use short paragraphs under clear headings for principles, rationale, boundaries, and caveats.
-     - Use nearby links and section anchors when readers need to jump from a summary to an exact truth source, detailed design, command, acceptance section, risk boundary, prototype, or product/architecture doc.
-     - Use Mermaid or simple diagrams only when a visual structure makes Workflow / Fact boundaries, state transitions, module layers, data flow, deployment paths, doc truth chains, or decision trees easier to understand than prose.
-   - Make important commands copyable and result-oriented: include the working directory or command context, the expected success signal, and where to troubleshoot failures when that is useful.
-   - Do not force long prose, workflows, or FAQ content into tables just for visual neatness.
-   - Do not stack tables, diagrams, and links for visual polish alone. Each structure should answer a reader question or reduce lookup cost.
-   - Do not import heavy company process by default. Avoid mandatory RFC/ADR templates, approval checklists, or broad doc taxonomies unless the repo already uses them or the user explicitly asks.
-
-7. Add diagrams when they reduce understanding cost.
-   - Prefer Mermaid or a simple structure diagram for complex flows, state machines, system layers, module dependencies, user-to-backend sequences, deployment paths, document truth chains, and decision trees.
-   - Do not add diagrams mechanically. If a short list or table is clearer, use that instead.
-   - Diagrams are reading aids, not new truth. Keep the authoritative wording in the surrounding doc and make sure the diagram matches current code, formal docs, schema, migration, tests, and the project truth index.
-   - Give each non-trivial diagram a short lead-in or follow-up sentence explaining what question the diagram answers.
-   - Keep diagrams compact enough to scan. Split large diagrams by workflow, layer, or decision if one diagram becomes dense.
-   - Use stable, human-readable node labels. Avoid internal IDs as the first visible signal unless the diagram is specifically for maintainers.
-   - After adding or changing Mermaid, check fenced code blocks, Mermaid syntax shape, node labels, anchors, and surrounding text for consistency.
-
-8. Maintain jumpability and cross-links.
-   - For key truth, commands, acceptance, risks, next steps, and related docs, provide links to the most specific stable section practical.
-   - Keep section titles stable when other docs or tools link to them. If a title must change, search for old anchors and update incoming links.
-   - Use explicit nearby links instead of expecting readers to infer where details live.
-   - Prefer one routing/index section over repeated copies of the same explanation across multiple docs.
-
-9. Apply plush naming and inventory rules.
-   - Active long-lived Markdown defaults to Chinese filenames. Keep English anchors in H1, metadata, body, or `docs/文档清单.md`.
-   - Do not mechanically rename `README.md`, `AGENTS.md`, `CHANGELOG.md`, `docs/archive/**`, generated files, externally stable links, code package names, API paths, table names, config keys, or status keys.
-   - When adding, deleting, renaming, or reclassifying long-lived Markdown, update `docs/文档清单.md` and relevant directory README files in the same round.
-   - If only body wording changes and title/purpose/path/classification remain accurate, `docs/文档清单.md` usually does not need an update.
-
-10. Sync related surfaces.
-   - Search the repo for renamed paths, old titles, old customer keys, old anchors, and old terminology before calling the change complete.
-   - If docs are surfaced through dev-only viewers, prototypes, tests, scripts, or generated indexes, update those references together.
-   - When formal docs change after code/runtime behavior changes, update `progress.md` if the repo rule requires it and check whether `docs/当前真源与交接顺序.md`, product docs, architecture docs, web/server/scripts README, or test strategy need matching updates.
-   - Before updating `progress.md`, check its size. If it is at or above 600 lines or 80KB, archive older entries first according to project rules, preserving active items, unfinished items, risks, and a traceable archive index.
-
-11. Validate with scans.
-   - Use targeted `rg` checks for old paths, stale headings, stale anchors, English-only active titles where Chinese readability is expected, and broken internal references that can be detected by text search.
-   - For Mermaid changes, include a targeted scan or syntax-oriented check for Mermaid fenced blocks and any anchors or labels referenced by surrounding text.
-   - Run `git diff --check`.
-   - For docs-only changes, do not run migrations or unrelated heavy runtime tests unless the touched docs/scripts require them.
-   - For rename or viewer/test changes, run the relevant repo tests or scripts named by the project docs.
-
-## Deliverable Standard
-
-When answering, report:
-
-- Verdict if the user asked whether the docs direction is reasonable.
-- Whether `AGENTS.md` was read only or changed, and why.
-- What docs were created, renamed, deleted, simplified, split, or re-linked.
-- What diagrams were added, updated, or intentionally skipped, and why.
-- Whether metadata/frontmatter was intentionally added, changed, or skipped.
-- Whether `docs/文档清单.md`, nearby README files, anchors, references, and `progress.md` needed updates, including whether `progress.md` size/archiving was checked.
-- Which scans or validation commands passed.
-- What remains intentionally out of scope, especially runtime behavior, schema, RBAC, deployment, customer raw evidence, archive-history rewriting, and broad directory reorganization.
+报告关键修改、AGENTS 是否变化、必要同步、验证及盲区；未涉及的图表、metadata、目录或运行层不逐项填报。
