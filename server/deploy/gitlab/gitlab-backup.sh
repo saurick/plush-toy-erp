@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 ENV_FILE="$SCRIPT_DIR/.env"
@@ -8,13 +9,22 @@ CONFIRMATION=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --execute) EXECUTE=true; shift ;;
-    --confirm) CONFIRMATION="${2:-}"; shift 2 ;;
-    -h|--help)
-      echo "usage: sudo bash server/deploy/gitlab/gitlab-backup.sh --execute --confirm BACKUP_GITLAB:R640"
-      exit 0
-      ;;
-    *) echo "[gitlab-backup] unsupported argument: $1"; exit 2 ;;
+  --execute)
+    EXECUTE=true
+    shift
+    ;;
+  --confirm)
+    CONFIRMATION="${2:-}"
+    shift 2
+    ;;
+  -h | --help)
+    echo "usage: sudo bash server/deploy/gitlab/gitlab-backup.sh --execute --confirm BACKUP_GITLAB:R640"
+    exit 0
+    ;;
+  *)
+    echo "[gitlab-backup] unsupported argument: $1"
+    exit 2
+    ;;
   esac
 done
 
@@ -50,7 +60,15 @@ GITLAB_BACKUP_RETENTION_DAYS="$(read_env_value GITLAB_BACKUP_RETENTION_DAYS)"
 
 docker inspect plush-gitlab >/dev/null
 test "$(docker inspect --format '{{.State.Health.Status}}' plush-gitlab)" = healthy
-findmnt --target "$GITLAB_RAID_BACKUP_DIR" >/dev/null
+[[ ! -L /srv/raid5 && "$(findmnt -n -o TARGET --target /srv/raid5)" == "/srv/raid5" ]] || {
+  echo "[gitlab-backup] RAID5 must be mounted" >&2
+  exit 2
+}
+backup_source="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/var/opt/gitlab/backups"}}{{.Source}}{{end}}{{end}}' plush-gitlab)"
+[[ "$backup_source" == "$GITLAB_RAID_BACKUP_DIR/repository" ]] || {
+  echo "[gitlab-backup] backup mount mismatch; refusing an SSD backup" >&2
+  exit 2
+}
 echo "[gitlab-backup] target=$GITLAB_RAID_BACKUP_DIR retention_days=$GITLAB_BACKUP_RETENTION_DAYS"
 
 if [[ "$EXECUTE" != "true" ]]; then
@@ -63,19 +81,24 @@ if [[ "$EUID" -ne 0 || "$CONFIRMATION" != "BACKUP_GITLAB:R640" ]]; then
 fi
 
 install -d -m 0700 "$GITLAB_RAID_BACKUP_DIR/repository" "$GITLAB_RAID_BACKUP_DIR/config"
+exec 9>/run/lock/plush-gitlab-backup.lock
+flock -n 9 || {
+  echo "[gitlab-backup] another backup is active" >&2
+  exit 2
+}
 docker exec plush-gitlab gitlab-backup create STRATEGY=copy
-archive="$(find "$GITLAB_DATA_DIR/backups" -maxdepth 1 -type f -name '*_gitlab_backup.tar' -printf '%T@ %p\n' | sort -nr | head -n 1 | cut -d' ' -f2-)"
+archive="$(find "$GITLAB_RAID_BACKUP_DIR/repository" -maxdepth 1 -type f -name '*_gitlab_backup.tar' -printf '%T@ %p\n' | sort -nr | head -n 1 | cut -d' ' -f2-)"
 test -n "$archive"
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
-repository_copy="$GITLAB_RAID_BACKUP_DIR/repository/$(basename "$archive")"
+repository_copy="$archive"
 config_copy="$GITLAB_RAID_BACKUP_DIR/config/gitlab-config-$stamp.tar.gz"
-test ! -e "$repository_copy"
+test ! -L "$repository_copy"
 test ! -e "$config_copy"
 test ! -e "$GITLAB_RAID_BACKUP_DIR/backup-$stamp.sha256"
-install -m 0600 "$archive" "$repository_copy"
+chmod 0600 "$repository_copy"
 tar -C "$GITLAB_CONFIG_DIR" -czf "$config_copy" .
 chmod 0600 "$config_copy"
-sha256sum "$repository_copy" "$config_copy" > "$GITLAB_RAID_BACKUP_DIR/backup-$stamp.sha256"
+sha256sum "$repository_copy" "$config_copy" >"$GITLAB_RAID_BACKUP_DIR/backup-$stamp.sha256"
 chmod 0600 "$GITLAB_RAID_BACKUP_DIR/backup-$stamp.sha256"
 
 find "$GITLAB_RAID_BACKUP_DIR/repository" -maxdepth 1 -type f -name '*_gitlab_backup.tar' -mtime "+$GITLAB_BACKUP_RETENTION_DAYS" -delete

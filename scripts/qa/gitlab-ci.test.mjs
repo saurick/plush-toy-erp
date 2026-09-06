@@ -661,6 +661,16 @@ test("R640 GitLab definitions pin identity, separate SSD data and require exact 
   );
   assert.match(compose, /127[.]0[.]0[.]1:\$\{GITLAB_HTTP_PORT:-8929\}:8929/u);
   assert.match(compose, /\/srv\/gitlab\/data/u);
+  for (const directory of ["artifacts", "packages", "backups"]) {
+    assert.ok(compose.includes(`/srv/raid5/gitlab/${directory}`));
+  }
+  assert.equal(compose.match(/create_host_path: false/gu)?.length, 3);
+  assert.match(runnerVm, /cache=none,discard=unmap/u);
+  assert.match(
+    runnerCloudInit,
+    /"gc":\{"enabled":true,"defaultKeepStorage":"20GB"\}/u,
+  );
+  assert.match(runnerCloudInit, /\[systemctl, enable, --now, fstrim.timer\]/u);
   assert.match(installer, /preview_only=true/u);
   assert.match(installer, /INSTALL_GITLAB:R640:gitlab[.]saurick[.]me/u);
   assert.match(installer, /RUNTIME_ENV="\$\(mktemp\)"/u);
@@ -668,6 +678,13 @@ test("R640 GitLab definitions pin identity, separate SSD data and require exact 
   assert.doesNotMatch(installer, /docker\s+(?:rm|stop|system prune)|rm\s+-rf/u);
   assert.match(backup, /\/srv\/raid5\/gitlab\/backups/u);
   assert.match(backup, /BACKUP_GITLAB:R640/u);
+  assert.match(backup, /backup mount mismatch/u);
+  assert.match(backup, /flock -n 9/u);
+  assert.doesNotMatch(backup, /install -m 0600 "\$archive"/u);
+  assert.equal(
+    workflow.match(/gitlab-release-candidate[.]mjs retire-candidate/gu)?.length,
+    2,
+  );
   assert.doesNotMatch(backup, /volume prune|image prune|rm\s+-rf/u);
   assert.match(backupVerify, /NR != 2/u);
   assert.match(backupVerify, /test ! -L "\$CHECKSUM_FILE"/u);

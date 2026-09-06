@@ -69,6 +69,11 @@ users:
     lock_passwd: true
 
 write_files:
+  - path: /etc/docker/daemon.json
+    owner: root:root
+    permissions: '0644'
+    content: |
+      {"builder":{"gc":{"enabled":true,"defaultKeepStorage":"20GB"}}}
   - path: /usr/local/sbin/plush-runner-capacity
     permissions: '0755'
     owner: root:root
@@ -611,5 +616,6 @@ write_files:
 
 runcmd:
   - [bash, -lc, '/usr/local/sbin/plush-bootstrap-gitlab-runner']
+  - [systemctl, enable, --now, fstrim.timer]
 
 final_message: "Dedicated plush GitLab Runner VM bootstrap finished. Registration remains fail-closed until the protected token file is supplied."

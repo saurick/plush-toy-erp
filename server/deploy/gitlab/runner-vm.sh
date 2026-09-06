@@ -320,7 +320,7 @@ virt-install \
   --vcpus "$VCPUS" \
   --os-variant ubuntu24.04 \
   --import \
-  --disk "vol=$POOL/$DISK_VOLUME,bus=virtio" \
+  --disk "vol=$POOL/$DISK_VOLUME,bus=virtio,cache=none,discard=unmap" \
   --disk "vol=$POOL/$SEED_VOLUME,device=cdrom" \
   --network "network=$NETWORK,model=virtio" \
   --noautoconsole

@@ -14,17 +14,30 @@ usage() {
   sudo bash server/deploy/gitlab/install-r640.sh --execute \
     --confirm INSTALL_GITLAB:R640:gitlab.saurick.me
 
-默认只读预检。执行模式只创建 /srv/gitlab 精确目录并启动 plush-gitlab；
+默认只读预检。执行模式只创建 /srv/gitlab 与已挂载 RAID5 的精确目录并启动 plush-gitlab；
 不会停止、删除、重建其他容器，也不会配置公网 FRP、DNS 或 GitHub 镜像。
 USAGE
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --execute) EXECUTE=true; shift ;;
-    --confirm) CONFIRMATION="${2:-}"; shift 2 ;;
-    -h|--help) usage; exit 0 ;;
-    *) echo "[gitlab-install] unsupported argument: $1"; usage; exit 2 ;;
+  --execute)
+    EXECUTE=true
+    shift
+    ;;
+  --confirm)
+    CONFIRMATION="${2:-}"
+    shift 2
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    echo "[gitlab-install] unsupported argument: $1"
+    usage
+    exit 2
+    ;;
   esac
 done
 
@@ -60,6 +73,8 @@ GITLAB_SSH_PUBLIC_PORT="$(read_env_value GITLAB_SSH_PUBLIC_PORT)"
 GITLAB_CONFIG_DIR="$(read_env_value GITLAB_CONFIG_DIR)"
 GITLAB_LOG_DIR="$(read_env_value GITLAB_LOG_DIR)"
 GITLAB_DATA_DIR="$(read_env_value GITLAB_DATA_DIR)"
+GITLAB_ARTIFACT_DIR="$(read_env_value GITLAB_ARTIFACT_DIR)"
+GITLAB_PACKAGE_DIR="$(read_env_value GITLAB_PACKAGE_DIR)"
 GITLAB_RAID_BACKUP_DIR="$(read_env_value GITLAB_RAID_BACKUP_DIR)"
 GITLAB_BACKUP_KEEP_SECONDS="$(read_env_value GITLAB_BACKUP_KEEP_SECONDS)"
 GITLAB_BACKUP_RETENTION_DAYS="$(read_env_value GITLAB_BACKUP_RETENTION_DAYS)"
@@ -78,6 +93,8 @@ GITLAB_MEMORY_LIMIT="$(read_env_value GITLAB_MEMORY_LIMIT)"
 [[ "$GITLAB_CONFIG_DIR" == "/srv/gitlab/config" ]]
 [[ "$GITLAB_LOG_DIR" == "/srv/gitlab/logs" ]]
 [[ "$GITLAB_DATA_DIR" == "/srv/gitlab/data" ]]
+[[ "$GITLAB_ARTIFACT_DIR" == "/srv/raid5/gitlab/artifacts" ]]
+[[ "$GITLAB_PACKAGE_DIR" == "/srv/raid5/gitlab/packages" ]]
 [[ "$GITLAB_RAID_BACKUP_DIR" == "/srv/raid5/gitlab/backups" ]]
 [[ "$GITLAB_HTTP_PORT" == "8929" ]]
 [[ "$GITLAB_SSH_BIND_ADDRESS" == "192.168.0.133" ]]
@@ -97,17 +114,22 @@ printf '%s\n' \
   "GITLAB_CONFIG_DIR=$GITLAB_CONFIG_DIR" \
   "GITLAB_LOG_DIR=$GITLAB_LOG_DIR" \
   "GITLAB_DATA_DIR=$GITLAB_DATA_DIR" \
+  "GITLAB_ARTIFACT_DIR=$GITLAB_ARTIFACT_DIR" \
+  "GITLAB_PACKAGE_DIR=$GITLAB_PACKAGE_DIR" \
   "GITLAB_RAID_BACKUP_DIR=$GITLAB_RAID_BACKUP_DIR" \
   "GITLAB_BACKUP_KEEP_SECONDS=$GITLAB_BACKUP_KEEP_SECONDS" \
   "GITLAB_BACKUP_RETENTION_DAYS=$GITLAB_BACKUP_RETENTION_DAYS" \
   "GITLAB_MEMORY_LIMIT=$GITLAB_MEMORY_LIMIT" \
-  > "$RUNTIME_ENV"
+  >"$RUNTIME_ENV"
 
 command -v docker >/dev/null
 docker compose version >/dev/null
 docker info >/dev/null
 findmnt --target /srv >/dev/null
-findmnt --target /srv/raid5 >/dev/null
+[[ ! -L /srv/raid5 && "$(findmnt -n -o TARGET --target /srv/raid5)" == "/srv/raid5" ]] || {
+  echo "[gitlab-install] RAID5 must be mounted; refusing to create storage on the root filesystem" >&2
+  exit 2
+}
 
 if docker inspect plush-gitlab >/dev/null 2>&1; then
   echo "[gitlab-install] existing plush-gitlab container detected; use the documented upgrade flow"
@@ -139,6 +161,8 @@ if [[ "$CONFIRMATION" != "INSTALL_GITLAB:R640:gitlab.saurick.me" ]]; then
 fi
 
 install -d -m 0700 "$GITLAB_CONFIG_DIR" "$GITLAB_DATA_DIR" "$GITLAB_RAID_BACKUP_DIR"
+install -d -m 0700 "$GITLAB_RAID_BACKUP_DIR/repository" "$GITLAB_RAID_BACKUP_DIR/config"
+install -d -m 0750 "$GITLAB_ARTIFACT_DIR" "$GITLAB_PACKAGE_DIR"
 install -d -m 0750 "$GITLAB_LOG_DIR"
 docker compose --env-file "$RUNTIME_ENV" --file "$COMPOSE_FILE" pull gitlab
 docker compose --env-file "$RUNTIME_ENV" --file "$COMPOSE_FILE" up --detach --no-deps gitlab

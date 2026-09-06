@@ -25,13 +25,20 @@ read_env_value() {
 GITLAB_RAID_BACKUP_DIR="$(read_env_value GITLAB_RAID_BACKUP_DIR)"
 : "${GITLAB_RAID_BACKUP_DIR:?missing GITLAB_RAID_BACKUP_DIR}"
 [[ "$GITLAB_RAID_BACKUP_DIR" == "/srv/raid5/gitlab/backups" ]]
+[[ ! -L /srv/raid5 && "$(findmnt -n -o TARGET --target /srv/raid5)" == "/srv/raid5" ]] || {
+  echo "[gitlab-backup-verify] RAID5 must be mounted" >&2
+  exit 2
+}
 
 if [[ -z "$CHECKSUM_FILE" ]]; then
   CHECKSUM_FILE="$(find "$GITLAB_RAID_BACKUP_DIR" -maxdepth 1 -type f -name 'backup-*.sha256' -printf '%T@ %p\n' | sort -nr | head -n 1 | cut -d' ' -f2-)"
 fi
 case "$CHECKSUM_FILE" in
-  "$GITLAB_RAID_BACKUP_DIR"/backup-*.sha256) ;;
-  *) echo "[gitlab-backup-verify] checksum must be inside $GITLAB_RAID_BACKUP_DIR"; exit 2 ;;
+"$GITLAB_RAID_BACKUP_DIR"/backup-*.sha256) ;;
+*)
+  echo "[gitlab-backup-verify] checksum must be inside $GITLAB_RAID_BACKUP_DIR"
+  exit 2
+  ;;
 esac
 test -f "$CHECKSUM_FILE"
 test ! -L "$CHECKSUM_FILE"

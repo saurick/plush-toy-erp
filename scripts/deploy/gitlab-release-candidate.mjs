@@ -662,6 +662,64 @@ export async function inspectPublishedRelease(options, runtime = {}) {
   };
 }
 
+export async function retirePublishedCandidate(options, runtime = {}) {
+  const releaseIdentity = identity(options);
+  const request = runtime.request || globalThis.fetch;
+  const context = apiContext(runtime.env || process.env);
+  // The complete published release is the recovery input once publication succeeds.
+  // Incomplete publication must retain the frozen build for a subsequent retry.
+  const inspect = runtime.inspectPublishedRelease || inspectPublishedRelease;
+  const published = await inspect(options, runtime);
+  if (
+    published.status !== "published" ||
+    published.releaseTag !== releaseIdentity.packageVersion
+  ) {
+    throw new Error(
+      "candidate retirement requires a verified published release",
+    );
+  }
+  const packages = await listPackages(
+    context,
+    request,
+    GITLAB_RELEASE_CANDIDATE_PACKAGE,
+    releaseIdentity.packageVersion,
+  );
+  if (packages.length === 0) return { status: "already-retired" };
+  if (
+    packages.length !== 1 ||
+    !Number.isSafeInteger(packages[0].id) ||
+    packages[0].id < 1
+  ) {
+    throw new Error("candidate retirement package identity is not unique");
+  }
+  const candidate = packages[0];
+  const files = await packageFiles(context, request, candidate);
+  if (files.length !== 1)
+    throw new Error("candidate retirement requires one archive");
+  exactRemoteFile(files, CANDIDATE_FILE);
+  const result = await request(
+    `${context.baseUrl}/projects/${context.projectId}/packages/${candidate.id}`,
+    {
+      method: "DELETE",
+      headers: { "PRIVATE-TOKEN": context.token },
+    },
+  );
+  if (!result.ok && result.status !== 404) {
+    throw new Error(
+      `candidate retirement request failed with status ${String(result.status)}`,
+    );
+  }
+  const remaining = await listPackages(
+    context,
+    request,
+    GITLAB_RELEASE_CANDIDATE_PACKAGE,
+    releaseIdentity.packageVersion,
+  );
+  if (remaining.length !== 0)
+    throw new Error("candidate retirement readback still contains the package");
+  return { status: "retired", packageId: candidate.id, bytes: files[0].size };
+}
+
 function parseArgs(argv) {
   const [command, ...args] = argv;
   const options = {
@@ -703,6 +761,7 @@ function parseArgs(argv) {
     "verify-rehearsal",
     "recover-rehearsal",
     "published",
+    "retire-candidate",
   ].includes(command)) {
     throw new Error("release candidate command is invalid");
   }
@@ -724,6 +783,7 @@ if (isDirectRun) {
     if (options.command === "verify-rehearsal") result = await verifyRemoteRehearsal(options);
     if (options.command === "recover-rehearsal") result = await recoverRehearsal(options);
     if (options.command === "published") result = await inspectPublishedRelease(options);
+    if (options.command === "retire-candidate") result = await retirePublishedCandidate(options);
     process.stdout.write(
       options.json
         ? `${JSON.stringify({ status: result.status, sha: options.sha, version: options.version, sha256: result.sha256 || result.fileSha256 || result.releaseManifestSha256 || "" }, null, 2)}\n`

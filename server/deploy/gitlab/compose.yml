@@ -20,6 +20,7 @@ services:
         gitlab_rails['backup_archive_permissions'] = 0600
         prometheus_monitoring['enable'] = true
         alertmanager['enable'] = false
+        puma['worker_processes'] = ${GITLAB_PUMA_WORKERS:-4}
         letsencrypt['enable'] = false
     ports:
       - "127.0.0.1:${GITLAB_HTTP_PORT:-8929}:8929"
@@ -28,6 +29,21 @@ services:
       - ${GITLAB_CONFIG_DIR:-/srv/gitlab/config}:/etc/gitlab
       - ${GITLAB_LOG_DIR:-/srv/gitlab/logs}:/var/log/gitlab
       - ${GITLAB_DATA_DIR:-/srv/gitlab/data}:/var/opt/gitlab
+      - type: bind
+        source: ${GITLAB_ARTIFACT_DIR:-/srv/raid5/gitlab/artifacts}
+        target: /var/opt/gitlab/gitlab-rails/shared/artifacts
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${GITLAB_PACKAGE_DIR:-/srv/raid5/gitlab/packages}
+        target: /var/opt/gitlab/gitlab-rails/shared/packages
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${GITLAB_RAID_BACKUP_DIR:-/srv/raid5/gitlab/backups}/repository
+        target: /var/opt/gitlab/backups
+        bind:
+          create_host_path: false
     healthcheck:
       test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:8929/-/health >/dev/null"]
       interval: 30s
