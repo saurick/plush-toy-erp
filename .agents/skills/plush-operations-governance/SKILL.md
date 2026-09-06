@@ -1,6 +1,6 @@
 ---
 name: plush-operations-governance
-description: 项目运行与发布治理（plush-toy-erp）。Use when Codex diagnoses plush runtime failures, changes logs or error handling, handles secrets or production access, performs live target checks, or plans and executes releases, migrations, health checks, rollback, and release evidence. For a purely read-only "what is complete" audit, use plush-capability-evidence-audit instead.
+description: 实时环境与运行操作（plush-toy-erp），不用于仅核对已有证据。Use for runtime fixes, live target checks, observability, secrets/privacy, migration, release or rollback.
 ---
 
 # Plush 运行与发布治理 / Operations Governance

@@ -1,6 +1,6 @@
 ---
 name: plush-capability-evidence-audit
-description: 项目能力证据审计（plush-toy-erp）。Use for read-only evidence audits when users ask what is implemented, what remains, what local QA proves, or whether existing release, recovery, delivery, and acceptance evidence is complete. Do not use for live target checks or release, migration, rollback, or other operational execution.
+description: 已有证据的只读能力审计（plush-toy-erp），不执行实时目标核验或运维。Use to assess implementation, QA coverage, delivery/recovery evidence and acceptance gaps.
 ---
 
 # Plush Capability Evidence Audit

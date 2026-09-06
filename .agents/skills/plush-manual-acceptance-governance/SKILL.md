@@ -1,6 +1,6 @@
 ---
 name: plush-manual-acceptance-governance
-description: 项目人工验收治理（plush-toy-erp）。Use when planning acceptance catalogs and batches, coordinating datasets/accounts/tasks, collecting browser/PDF and human evidence, or recording signoff/retirement; use operations governance for target access, migration, release, and rollback execution.
+description: 验收编排与证据（plush-toy-erp），目标环境操作使用运行治理。Use for acceptance catalogs/batches, datasets/accounts, browser/PDF and human checks, signoff and retirement.
 ---
 
 # Plush Manual Acceptance Governance

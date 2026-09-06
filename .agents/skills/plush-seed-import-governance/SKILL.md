@@ -1,6 +1,6 @@
 ---
 name: plush-seed-import-governance
-description: 项目数据准备治理（plush-toy-erp）。Use when seed/fixture construction, trial simulation data, import dry-run, batch identity, cleanup, or customer-data boundaries are primary; use manual-acceptance governance for catalog/readiness/browser/PDF/signoff orchestration.
+description: 数据准备与导入（plush-toy-erp）；验收目录、检查与签收编排使用验收治理。Use for seed/fixtures, trial data, import dry-runs, batch identity, cleanup and customer-data boundaries.
 ---
 
 # Plush Seed / 导入治理 Seed Import Governance
