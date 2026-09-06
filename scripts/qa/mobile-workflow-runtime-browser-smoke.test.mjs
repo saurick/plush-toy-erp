@@ -1051,7 +1051,7 @@ test("mobile workflow runtime browser smoke report is redacted local evidence on
 
 test("mobile workflow runtime browser smoke docs keep no-write and report boundary", async () => {
   const scriptReadme = await readFile(
-    path.join(repoRoot, "scripts/README.md"),
+    path.join(repoRoot, "scripts/qa/README.md"),
     "utf8",
   );
   const webReadme = await readFile(
@@ -1063,7 +1063,7 @@ test("mobile workflow runtime browser smoke docs keep no-write and report bounda
     "utf8",
   );
   for (const [source, context] of [
-    [scriptReadme, "scripts README"],
+    [scriptReadme, "QA scripts README"],
     [webReadme, "web README"],
     [testStrategyDoc, "automation test strategy"],
   ]) {
@@ -1104,7 +1104,7 @@ test("mobile workflow runtime browser smoke docs keep no-write and report bounda
     );
     assert.match(
       source,
-      /不占用正式来源任务组|不会占用正式来源任务组/u,
+      /不(?:会)?占用(?:\s+`[^`\r\n]+`\s*等)?正式来源任务组/u,
       `${context} must keep formal source task namespaces protected`,
     );
     assert.match(
