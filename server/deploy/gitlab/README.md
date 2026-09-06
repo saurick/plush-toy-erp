@@ -18,7 +18,9 @@ GitLab 不与业务 PostgreSQL、测试数据库或现有 Docker 容器共享数
 
 备份保留 14 天，生成入口用非等待锁串行，先验证真实 RAID5 挂载及容器 backup bind；缺挂载时阻断，不退回 SSD。Compose 不自动创建缺失的冷数据目录。已有安装必须在无活动 CI/backup 的维护窗口先复制并逐文件校验 Package，再切换挂载；读回 GitLab 健康、项目 clone、Package 下载和备份恢复后才能移除旧副本。直接覆盖旧 Compose 前还须保留 live config 与回滚文件。
 
-正式发布和重复发布的入口都先校验七资产、Release、源码包与演练身份，再通过 GitLab API 退役对应 `candidate.tar` 并读回，最后通过 `gitlab-runner-images.mjs` 移除本次构建在专属 Runner 中的六个镜像别名。每个别名都核对完整 commit，任何现存容器引用或 tag 身份变化都阻止删除；不使用 force，构建层仍受 Docker GC 管理。缺少任何正式恢复输入、尚未发布或身份不唯一时保留候选；不按文件年龄直接删除 Package 底层目录。历史候选可使用同一个 `gitlab-release-candidate.mjs retire-candidate --sha <sha> --version <version> --customer yoyoosun --json` 入口逐份处理。
+正式发布和重复发布的入口都先校验七资产、Release、源码包与演练身份，再通过 GitLab API 退役对应 `candidate.tar` 并读回，最后通过 `gitlab-runner-images.mjs` 移除本次构建在专属 Runner 中的六个镜像别名。每个别名都核对完整 commit，任何现存容器引用或 tag 身份变化都阻止删除；不使用 force，构建层仍受 Docker GC 管理。缺少任何正式恢复输入、尚未发布或身份不唯一时保留候选；不按文件年龄直接删除 Package 底层目录。
+
+CI 的 Package 删除使用当前 `CI_JOB_TOKEN`，发布发起者须具有本项目 Package 删除权限（Maintainer / Owner）；验证和 Release 读写继续使用原有 Developer 发布账号，不提升其常驻权限。缺失 Job Token 或 API 拒绝删除时停止退役，不降级凭据。历史候选可使用同一个 `gitlab-release-candidate.mjs retire-candidate --sha <sha> --version <version> --customer yoyoosun --json` 入口逐份处理；非 CI 运维必须提供本来就有删除权限的 `GITLAB_RELEASE_TOKEN`。
 
 Runner 的工作区、Go/pnpm 缓存和 Docker 层继续在 SSD。Docker 默认 builder 启用 `20GB` GC 保留目标；VM disk 显式使用 `discard=unmap`，guest 启用每周 `fstrim.timer`。在线应用配置须先证明 Runner 空闲，在维护窗口重启并读回；不删除业务 volume，不把镜像大小与共享 build cache 相加。目标部署的旧镜像/中转包先按 live 容器、当前版本、回滚和 operation 引用盘点，必要历史归档放 RAID5，精确清理仍走项目发布边界。
 

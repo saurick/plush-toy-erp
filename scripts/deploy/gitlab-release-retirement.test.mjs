@@ -26,12 +26,13 @@ function fixture({
   remains = [],
   verifyError,
   deleteStatus = 204,
+  environment = env,
 } = {}) {
   const calls = [];
   let deleted = false;
   return {
     calls,
-    env,
+    env: environment,
     async inspectPublishedRelease(received) {
       calls.push("verify-published");
       assert.deepEqual(received, options);
@@ -39,9 +40,19 @@ function fixture({
       return { status: "published", releaseTag: packageVersion };
     },
     async request(url, init = {}) {
-      assert.equal(init.headers["PRIVATE-TOKEN"], env.GITLAB_RELEASE_TOKEN);
-      assert.ok(!url.includes(env.GITLAB_RELEASE_TOKEN));
       const method = init.method || "GET";
+      assert.deepEqual(
+        init.headers,
+        method === "DELETE" && environment.CI_JOB_TOKEN
+          ? { "JOB-TOKEN": environment.CI_JOB_TOKEN }
+          : method === "DELETE"
+            ? { "PRIVATE-TOKEN": environment.GITLAB_RELEASE_TOKEN }
+            : {
+                "PRIVATE-TOKEN": environment.GITLAB_RELEASE_TOKEN,
+                accept: "application/json",
+              },
+      );
+      assert.ok(!url.includes(environment.GITLAB_RELEASE_TOKEN));
       calls.push(`${method} ${url}`);
       if (method === "DELETE") {
         assert.equal(
@@ -94,6 +105,22 @@ test("incomplete recovery evidence retains the candidate without any deletion re
     /source package is missing/u,
   );
   assert.deepEqual(runtime.calls, ["verify-published"]);
+});
+
+test("CI deletion uses only the current job token and never falls back after a permission failure", async () => {
+  const environment = {
+    ...env,
+    GITLAB_CI: "true",
+    CI_JOB_TOKEN: "test-only-job-token",
+  };
+  const runtime = fixture({ environment });
+  assert.equal((await retirePublishedCandidate(options, runtime)).status, "retired");
+  const denied = fixture({ environment, deleteStatus: 403 });
+  await assert.rejects(retirePublishedCandidate(options, denied), /status 403/u);
+  assert.equal(denied.calls.filter((call) => call.startsWith("DELETE ")).length, 1);
+  const missing = fixture({ environment: { ...env, GITLAB_CI: "true" } });
+  await assert.rejects(retirePublishedCandidate(options, missing), /current CI job token/u);
+  assert.deepEqual(missing.calls, []);
 });
 
 test("the real published verifier rejects a missing release before retirement", async () => {

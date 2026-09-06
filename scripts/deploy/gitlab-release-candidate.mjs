@@ -665,7 +665,11 @@ export async function inspectPublishedRelease(options, runtime = {}) {
 export async function retirePublishedCandidate(options, runtime = {}) {
   const releaseIdentity = identity(options);
   const request = runtime.request || globalThis.fetch;
-  const context = apiContext(runtime.env || process.env);
+  const env = runtime.env || process.env;
+  const context = apiContext(env);
+  const jobToken = String(env.CI_JOB_TOKEN || "");
+  if (env.GITLAB_CI === "true" && !jobToken)
+    throw new Error("candidate retirement requires the current CI job token");
   // The complete published release is the recovery input once publication succeeds.
   // Incomplete publication must retain the frozen build for a subsequent retry.
   const inspect = runtime.inspectPublishedRelease || inspectPublishedRelease;
@@ -701,7 +705,11 @@ export async function retirePublishedCandidate(options, runtime = {}) {
     `${context.baseUrl}/projects/${context.projectId}/packages/${candidate.id}`,
     {
       method: "DELETE",
-      headers: { "PRIVATE-TOKEN": context.token },
+      // The publishing bot is Developer; deletion uses the triggering user's
+      // existing package permissions through the short-lived job token.
+      headers: jobToken
+        ? { "JOB-TOKEN": jobToken }
+        : { "PRIVATE-TOKEN": context.token },
     },
   );
   if (!result.ok && result.status !== 404) {
