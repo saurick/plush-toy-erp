@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs'
 
 import test from 'node:test'
 
+import * as flow from './outsourceReturnFlow.mjs'
+
 const mobileRoleTasksPageSource = readFileSync(
   new URL('../mobile/pages/MobileRoleTasksPage.jsx', import.meta.url),
   'utf8'
@@ -74,8 +76,6 @@ test('outsourceReturnFlow: 移动端回货检验状态动作不再本地创建�
     /loadTasks\(\{\s*canonicalTask: confirmedTask\s*\}\)\.catch/
   )
 })
-
-import * as flow from './outsourceReturnFlow.mjs'
 
 test('outsourceReturnFlow: recognizes server tasks without exposing client task builders', () => {
   assert.equal(

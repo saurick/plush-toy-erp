@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs'
 
 import test from 'node:test'
 
+import * as flow from './purchaseInboundFlow.mjs'
+
 const mobileRoleTasksPageSource = readFileSync(
   new URL('../mobile/pages/MobileRoleTasksPage.jsx', import.meta.url),
   'utf8'
@@ -76,8 +78,6 @@ test('purchaseInboundFlow: 移动端采购 warehouse_inbound 状态动作交给�
     /roleKey === 'warehouse' &&[\s\S]{0,120}isWarehouseInboundTask\(task\)/
   )
 })
-
-import * as flow from './purchaseInboundFlow.mjs'
 
 test('purchaseInboundFlow: recognizes server tasks without exposing client task builders', () => {
   assert.equal(

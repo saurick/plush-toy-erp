@@ -1,8 +1,8 @@
-import { getPrintWorkspaceDraftScope } from './printWorkspaceScope.mjs'
-import { createMockAdminSessionToken } from '../../../scripts/mockAdminSessionToken.mjs'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
+import { createMockAdminSessionToken } from '../../../scripts/mockAdminSessionToken.mjs'
+import { getPrintWorkspaceDraftScope } from './printWorkspaceScope.mjs'
 
 import {
   MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
@@ -925,8 +925,10 @@ test('printWorkspace: 独立窗口保留来源配置版本并只使用当前会�
     )
   } finally {
     globalThis.window = previousWindow
-    if (previousStorage)
+    if (previousStorage) {
       Object.defineProperty(globalThis, 'localStorage', previousStorage)
-    else delete globalThis.localStorage
+    } else {
+      delete globalThis.localStorage
+    }
   }
 })

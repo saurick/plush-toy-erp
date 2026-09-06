@@ -373,8 +373,8 @@ test("trial account RBAC static projection covers current seed, RBAC, mobile ent
 test("trial account RBAC docs keep preflight and real evidence boundary", () => {
   const docs = [
     [
-      "scripts README",
-      readFileSync(path.join(repoRoot, "scripts/README.md"), "utf8"),
+      "QA scripts README",
+      readFileSync(path.join(repoRoot, "scripts/qa/README.md"), "utf8"),
     ],
     [
       "automation test strategy",

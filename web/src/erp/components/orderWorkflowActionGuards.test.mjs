@@ -143,7 +143,6 @@ test('purchase and outsourcing hooks submit blocked-to-ready resume through the 
     {
       exportName: 'useSourceOrderWorkflowActions',
       relativePath: './workflow/useSourceOrderWorkflowActions.mjs',
-      surfaceKey: 'outsourcing_orders',
       surfaceKey: 'purchase_orders',
     },
     {

@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs'
 
 import test from 'node:test'
 
+import * as flow from './payableReconciliationFlow.mjs'
+
 test('payableReconciliationFlow: 移动端应付和对账完成不再本地派生任务或业务状态', () => {
   const hookSource = readFileSync(
     new URL('../mobile/hooks/useMobileRoleTaskActions.js', import.meta.url),
@@ -22,8 +24,6 @@ test('payableReconciliationFlow: 移动端应付和对账完成不再本地派�
     false
   )
 })
-
-import * as flow from './payableReconciliationFlow.mjs'
 
 test('payableReconciliationFlow: recognizes server tasks without exposing client task builders', () => {
   assert.equal(

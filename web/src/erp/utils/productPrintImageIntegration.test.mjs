@@ -15,13 +15,6 @@ const instructionPaperSource = readFileSync(
   new URL('../components/print/WorkInstructionPaper.jsx', import.meta.url),
   'utf8'
 )
-const printPrimitivesSource = readFileSync(
-  new URL(
-    '../components/print/EngineeringPrintPrimitives.jsx',
-    import.meta.url
-  ),
-  'utf8'
-)
 
 test('product print images: BOM material and work instruction drafts freeze product image snapshots before opening', () => {
   const actionSource = bomPageSource.slice(

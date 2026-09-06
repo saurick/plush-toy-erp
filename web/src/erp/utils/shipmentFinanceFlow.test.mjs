@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs'
 
 import test from 'node:test'
 
+import * as flow from './shipmentFinanceFlow.mjs'
+
 test('shipmentFinanceFlow: 移动端应收和开票完成不再本地派生任务或业务状态', () => {
   const hookSource = readFileSync(
     new URL('../mobile/hooks/useMobileRoleTaskActions.js', import.meta.url),
@@ -17,8 +19,6 @@ test('shipmentFinanceFlow: 移动端应收和开票完成不再本地派生任�
   assert.equal(hookSource.includes('upsertWorkflowBusinessState'), false)
   assert.equal(hookSource.includes('INVOICE_REGISTRATION_TASK_GROUP'), false)
 })
-
-import * as flow from './shipmentFinanceFlow.mjs'
 
 test('shipmentFinanceFlow: recognizes server tasks without exposing client task builders', () => {
   assert.equal(

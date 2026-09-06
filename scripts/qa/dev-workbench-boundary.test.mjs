@@ -216,67 +216,127 @@ test("dev workbench boundary: primary navigation is fixed to four areas", () => 
   );
 });
 
+const allowedERPImports = new Set([
+  "api/customerConfigApi.mjs",
+  "api/customerConfigTransition.mjs",
+  "api/workflowApi.mjs",
+  "utils/processRuntimePresentation.mjs",
+  "api/approvalSettingsApi.mjs",
+  "utils/approvalSettingsActivation.mjs",
+  "utils/permissionCenterAccess.mjs",
+  "utils/permissionCenterSearch.mjs",
+  "utils/permissionModuleLabels.mjs",
+  "utils/adminIdentity.mjs",
+  "config/printTemplates.mjs",
+  "config/workflowStatus.mjs",
+  "config/businessUsabilityCatalog.mjs",
+  "config/roleHelpContent.mjs",
+]);
+const allowedERPImportsByFile = new Map([
+  [
+    "web/src/dev-workbench/config/currentPageAtlasPrototype.test.mjs",
+    new Set(["config/businessModules.mjs", "config/seedData.mjs"]),
+  ],
+  [
+    "web/src/dev-workbench/pages/DevCustomerConfigPage.jsx",
+    new Set(["config/businessModules.mjs", "config/seedData.mjs"]),
+  ],
+  [
+    "web/src/dev-workbench/config/devPermissionNavigation.mjs",
+    new Set(["config/seedData.mjs", "config/roleGuidedNavigation.mjs"]),
+  ],
+  [
+    "web/src/dev-workbench/components/flow-state/WorkflowView.jsx",
+    new Set([
+      "utils/workflowTaskEventPresentation.mjs",
+      "utils/workflowTaskBoard.mjs",
+    ]),
+  ],
+  [
+    "web/src/dev-workbench/components/flow-state/FlowTaskContext.jsx",
+    new Set(["utils/workflowTaskBoard.mjs"]),
+  ],
+  [
+    "web/src/dev-workbench/components/flow-state/RuntimeView.jsx",
+    new Set(["utils/workflowTaskBoard.mjs"]),
+  ],
+]);
+
+function isAllowedERPImport(file, specifier) {
+  const resolved = specifier.startsWith("@/")
+    ? path.posix.join("web/src", specifier.slice(2))
+    : path.posix.join(path.posix.dirname(file), specifier);
+  const module = path.posix.relative("web/src/erp", resolved);
+  return (
+    allowedERPImports.has(module) ||
+    allowedERPImportsByFile.get(file)?.has(module) === true
+  );
+}
+
 test("dev workbench boundary: imports from ERP stay on explicit read/API adapters", () => {
   const workbenchSources = listFiles("web/src/dev-workbench")
     .filter((file) => /\.(?:js|jsx|mjs)$/u.test(file))
     .map((file) => ({ file, source: read(file) }));
-  const allowedERPImports = new Set([
-    "@/erp/api/customerConfigApi.mjs",
-    "@/erp/api/customerConfigTransition.mjs",
-    "@/erp/api/workflowApi.mjs",
-    "@/erp/utils/processRuntimePresentation.mjs",
-    "../../erp/api/approvalSettingsApi.mjs",
-    "../../erp/utils/approvalSettingsActivation.mjs",
-    "../../erp/utils/permissionCenterAccess.mjs",
-    "../../erp/utils/permissionCenterSearch.mjs",
-    "../../erp/utils/permissionModuleLabels.mjs",
-    "../../erp/utils/adminIdentity.mjs",
-    "../../erp/config/printTemplates.mjs",
-    "../../erp/config/workflowStatus.mjs",
-    "../../erp/config/businessUsabilityCatalog.mjs",
-    "../../erp/config/roleHelpContent.mjs",
-  ]);
-  const allowedERPImportsByFile = new Map([
-    [
-      "web/src/dev-workbench/config/currentPageAtlasPrototype.test.mjs",
-      new Set([
-        "../../erp/config/businessModules.mjs",
-        "../../erp/config/seedData.mjs",
-      ]),
-    ],
-    [
-      "web/src/dev-workbench/pages/DevCustomerConfigPage.jsx",
-      new Set([
-        "@/erp/config/businessModules.mjs",
-        "@/erp/config/seedData.mjs",
-      ]),
-    ],
-    [
-      "web/src/dev-workbench/config/devPermissionNavigation.mjs",
-      new Set([
-        "../../erp/config/seedData.mjs",
-        "../../erp/config/roleGuidedNavigation.mjs",
-      ]),
-    ],
-    [
-      "web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx",
-      new Set([
-        "@/erp/utils/workflowTaskEventPresentation.mjs",
-        "@/erp/utils/workflowTaskBoard.mjs",
-      ]),
-    ],
-  ]);
 
   for (const { file, source } of workbenchSources) {
-    const fileScopedERPImports = allowedERPImportsByFile.get(file);
     for (const match of source.matchAll(
       /(?:from\s+|import\()['"]([^'"]*erp\/[^'"]+)['"]/gu,
     )) {
       assert(
-        allowedERPImports.has(match[1]) || fileScopedERPImports?.has(match[1]),
+        isAllowedERPImport(file, match[1]),
         `${file} imports non-approved ERP internals: ${match[1]}`,
       );
     }
     assert.doesNotMatch(source, /@\/erp\/(?:pages|components|styles)\//u);
   }
+});
+
+test("dev workbench boundary: resolved imports preserve module and file scope", () => {
+  const workflowFile =
+    "web/src/dev-workbench/components/flow-state/WorkflowView.jsx";
+  for (const prefix of ["@/erp/", "../../../erp/"]) {
+    assert.equal(
+      isAllowedERPImport(
+        workflowFile,
+        `${prefix}utils/permissionCenterAccess.mjs`,
+      ),
+      true,
+    );
+    assert.equal(
+      isAllowedERPImport(workflowFile, `${prefix}utils/workflowTaskBoard.mjs`),
+      true,
+    );
+    assert.equal(
+      isAllowedERPImport(
+        workflowFile,
+        `${prefix}utils/workflowTaskMutation.mjs`,
+      ),
+      false,
+    );
+    assert.equal(
+      isAllowedERPImport(
+        workflowFile,
+        `${prefix}pages/PermissionCenterPage.jsx`,
+      ),
+      false,
+    );
+  }
+  assert.equal(
+    isAllowedERPImport(
+      "web/src/dev-workbench/components/flow-state/BusinessChainViews.jsx",
+      "@/erp/utils/workflowTaskBoard.mjs",
+    ),
+    false,
+  );
+  assert.equal(
+    isAllowedERPImport(workflowFile, "@/erp/config/seedData.mjs"),
+    false,
+  );
+  assert.equal(
+    isAllowedERPImport(
+      workflowFile,
+      "@/erp/../dev-workbench/utils/workflowTaskBoard.mjs",
+    ),
+    false,
+  );
 });

@@ -11,6 +11,8 @@ import {
   resolveFinishedGoodsTaskBusinessStatus,
 } from './finishedGoodsFlow.mjs'
 
+import * as flow from './finishedGoodsFlow.mjs'
+
 const mobileRoleTasksPageSource = readFileSync(
   new URL('../mobile/pages/MobileRoleTasksPage.jsx', import.meta.url),
   'utf8'
@@ -135,8 +137,6 @@ test('finishedGoodsFlow: canonical 出货放行来源任务保持只读识别', 
     false
   )
 })
-
-import * as flow from './finishedGoodsFlow.mjs'
 
 test('finishedGoodsFlow: recognizes server tasks without exposing client task builders', () => {
   assert.equal(

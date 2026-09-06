@@ -50,7 +50,7 @@ const staticProjectionSourcePaths = Object.freeze({
   appRegistry: "web/src/erp/config/appRegistry.mjs",
   mobileRolePermissions: "web/src/erp/utils/mobileRolePermissions.mjs",
   trialBrowserSmoke: "web/scripts/trialDemoAccountBrowserSmoke.mjs",
-  scriptsReadme: "scripts/README.md",
+  scriptsReadme: "scripts/qa/README.md",
   webReadme: "web/README.md",
   serverConfigDoc: "server/docs/config.md",
 });
