@@ -81,7 +81,7 @@ if [[ "$EUID" -ne 0 || "$CONFIRMATION" != "BACKUP_GITLAB:R640" ]]; then
 fi
 
 install -d -m 0700 "$GITLAB_RAID_BACKUP_DIR/repository" "$GITLAB_RAID_BACKUP_DIR/config"
-exec 9>/run/lock/plush-gitlab-backup.lock
+exec 9>"$GITLAB_RAID_BACKUP_DIR/.backup.lock"
 flock -n 9 || {
   echo "[gitlab-backup] another backup is active" >&2
   exit 2

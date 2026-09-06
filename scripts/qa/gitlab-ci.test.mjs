@@ -680,6 +680,7 @@ test("R640 GitLab definitions pin identity, separate SSD data and require exact 
   assert.match(backup, /BACKUP_GITLAB:R640/u);
   assert.match(backup, /backup mount mismatch/u);
   assert.match(backup, /flock -n 9/u);
+  assert.ok(backup.includes('exec 9>"$GITLAB_RAID_BACKUP_DIR/.backup.lock"'));
   assert.doesNotMatch(backup, /install -m 0600 "\$archive"/u);
   assert.equal(
     workflow.match(/gitlab-release-candidate[.]mjs retire-candidate/gu)?.length,
