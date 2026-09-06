@@ -18,9 +18,13 @@ GitLab 不与业务 PostgreSQL、测试数据库或现有 Docker 容器共享数
 
 备份保留 14 天，生成入口用非等待锁串行，先验证真实 RAID5 挂载及容器 backup bind；缺挂载时阻断，不退回 SSD。Compose 不自动创建缺失的冷数据目录。已有安装必须在无活动 CI/backup 的维护窗口先复制并逐文件校验 Package，再切换挂载；读回 GitLab 健康、项目 clone、Package 下载和备份恢复后才能移除旧副本。直接覆盖旧 Compose 前还须保留 live config 与回滚文件。
 
-正式发布和重复发布的入口都先校验七资产、Release、源码包与演练身份，再通过 GitLab API 退役对应 `candidate.tar` 并读回。缺少任何正式恢复输入、尚未发布或身份不唯一时保留候选；不按文件年龄直接删除 Package 底层目录。历史候选可使用同一个 `gitlab-release-candidate.mjs retire-candidate --sha <sha> --version <version> --customer yoyoosun --json` 入口逐份处理。
+正式发布和重复发布的入口都先校验七资产、Release、源码包与演练身份，再通过 GitLab API 退役对应 `candidate.tar` 并读回，最后通过 `gitlab-runner-images.mjs` 移除本次构建在专属 Runner 中的六个镜像别名。每个别名都核对完整 commit，任何现存容器引用或 tag 身份变化都阻止删除；不使用 force，构建层仍受 Docker GC 管理。缺少任何正式恢复输入、尚未发布或身份不唯一时保留候选；不按文件年龄直接删除 Package 底层目录。历史候选可使用同一个 `gitlab-release-candidate.mjs retire-candidate --sha <sha> --version <version> --customer yoyoosun --json` 入口逐份处理。
 
 Runner 的工作区、Go/pnpm 缓存和 Docker 层继续在 SSD。Docker 默认 builder 启用 `20GB` GC 保留目标；VM disk 显式使用 `discard=unmap`，guest 启用每周 `fstrim.timer`。在线应用配置须先证明 Runner 空闲，在维护窗口重启并读回；不删除业务 volume，不把镜像大小与共享 build cache 相加。目标部署的旧镜像/中转包先按 live 容器、当前版本、回滚和 operation 引用盘点，必要历史归档放 RAID5，精确清理仍走项目发布边界。
+
+升级前的 VM 内部快照会继续引用旧磁盘块，guest TRIM 成功不等于宿主机已经回收空间。快照归档使用 `/srv/raid5/runner-vm/upgrade-backups/<日期>/`：先停止空闲 VM，保存含快照的 qcow2、backing image、domain/snapshot XML；压缩档解压流的 SHA-256 必须与停机原盘一致，backing image 单独校验。只删除已归档的指定内部快照，再运行 `qemu-img check`、启动 guest、TRIM 和 Runner 验证，并以宿主机 `du` / `df` 读回实际回收量。恢复时先在独立目录解压并核对 backing image 与指定快照，不能直接覆盖运行盘。后续升级复用同一归档路径；正常升级确认后保留最近两次恢复点，额外历史按明确保留需求处理。
+
+旧部署的冷归档使用 `/srv/raid5/cicd-archives/<项目>/`。已完成且超过七天的中转操作可逐文件校验后仅迁走镜像和源码大文件，原 operation 回执与控制文件继续保留；状态不明、活动操作和容器挂载引用的文件不迁走。镜像清理保护所有现存容器引用的版本及其 Server/Web 配对，并额外保留各镜像最近三个版本；每次按精确 tag 列表执行，不扩到其他项目。
 
 Runner VM 的 vCPU、内存和系统盘不是仓库常量，而是 `runner-vm.sh` 创建/重建时彼此独立的必填参数；脚本不设置与工作负载脱节的固定内存下限。`runner-capacity.sh --evidence` 只读回在线 vCPU、MemTotal、swap、根文件系统和槽位配置，证明当前配置身份一致，不把开机快照冒充负载容量结论。Runner slot 的唯一显式参数名是 `RUNNER_CONCURRENT_SLOTS`，不能由 `nproc` 自动派生；注册、重建与后续 live 调整都复用 `runner-capacity.sh`，它只在 Runner 空闲、配置身份和旧值精确匹配时原子更新全局 `concurrent` 与唯一 project runner `limit`，失败恢复旧配置并读回。
 

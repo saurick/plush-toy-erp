@@ -838,6 +838,7 @@ publish_release:
         0)
           echo "[gitlab-ci] release=already-published sha=$RELEASE_SHA version=$RELEASE_VERSION"
           node scripts/deploy/gitlab-release-candidate.mjs retire-candidate "${release_args[@]}" --json
+          node scripts/deploy/gitlab-runner-images.mjs --sha "$RELEASE_SHA" --execute
           exit 0
           ;;
         3) ;;
@@ -1107,6 +1108,7 @@ publish_release:
       fi
       node scripts/deploy/gitlab-release-candidate.mjs published "${release_args[@]}" --json
       node scripts/deploy/gitlab-release-candidate.mjs retire-candidate "${release_args[@]}" --json
+      node scripts/deploy/gitlab-runner-images.mjs --sha "$RELEASE_SHA" --execute
       cleanup_publish_credentials
       trap - EXIT
       test ! -e "$job_token_config"

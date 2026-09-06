@@ -686,6 +686,10 @@ test("R640 GitLab definitions pin identity, separate SSD data and require exact 
     workflow.match(/gitlab-release-candidate[.]mjs retire-candidate/gu)?.length,
     2,
   );
+  assert.equal(
+    workflow.match(/gitlab-runner-images[.]mjs --sha "\$RELEASE_SHA" --execute/gu)?.length,
+    2,
+  );
   assert.doesNotMatch(backup, /volume prune|image prune|rm\s+-rf/u);
   assert.match(backupVerify, /NR != 2/u);
   assert.match(backupVerify, /test ! -L "\$CHECKSUM_FILE"/u);
