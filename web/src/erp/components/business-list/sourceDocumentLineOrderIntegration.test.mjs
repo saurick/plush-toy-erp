@@ -63,6 +63,10 @@ const toolbarSources = [
     button: '加工明细顺序',
     title: '调整加工明细顺序',
     apiFunction: 'reorderOutsourcingOrderItems',
+    mutation: new URL(
+      '../outsourcing-orders/useOutsourcingOrderLineOrder.mjs',
+      import.meta.url
+    ),
     documentType: 'outsourcing_order',
   },
 ]
@@ -93,18 +97,25 @@ for (const runtime of toolbarSources) {
   test(`${runtime.name} exposes a nonterminal toolbar reorder backed by the dedicated API`, () => {
     const pageSource = readFileSync(runtime.page, 'utf8')
     const actionSource = readFileSync(runtime.action, 'utf8')
+    const mutationSource = readFileSync(
+      runtime.mutation || runtime.page,
+      'utf8'
+    )
     assert.ok(actionSource.includes(runtime.button))
     assert.ok(pageSource.includes(runtime.title))
-    assert.ok(pageSource.includes(runtime.apiFunction))
+    assert.ok(mutationSource.includes(runtime.apiFunction))
     assert.ok(pageSource.includes('canReorderSourceDocumentItems'))
     assert.ok(pageSource.includes(`'${runtime.documentType}'`))
     assert.ok(actionSource.includes('selectedOrderCanReorder'))
-    assert.match(pageSource, /expected_version:\s*order\.version/u)
+    assert.match(mutationSource, /expected_version:\s*order\.version/u)
     assert.match(
-      pageSource,
+      mutationSource,
       /item_ids:\s*orderedItems\.map\(\(item\) => item\.id\)/u
     )
     assert.match(pageSource, /BusinessLineItemOrderModal/u)
-    assert.match(apiSource, new RegExp(`export async function ${runtime.apiFunction}\\b`, 'u'))
+    assert.match(
+      apiSource,
+      new RegExp(`export async function ${runtime.apiFunction}\\b`, 'u')
+    )
   })
 }

@@ -26,7 +26,6 @@ import {
   financeInvoiceCategoryText,
   financePaymentTermText,
 } from './financeFactDisplay.mjs'
-import { resolveFinishedGoodsSourceNo } from './finishedGoodsFlow.mjs'
 import {
   formatUnitDisplayName,
   salesOrderFreightTermsText,
@@ -38,7 +37,6 @@ import {
   getPermissionCenterRoleName,
   getRoleTypeLabel,
 } from './permissionCenterAccess.mjs'
-import { resolvePayableSourceNo } from './payableReconciliationFlow.mjs'
 import {
   customerOption,
   inventoryLotOption,
@@ -186,8 +184,6 @@ test('mobile and fact presentation preserve zero values without exposing raw key
       source_type: 'unknown_source_type',
       source_id: SENTINEL_ID,
     }),
-    resolveFinishedGoodsSourceNo({ id: SENTINEL_ID }),
-    resolvePayableSourceNo({ id: SENTINEL_ID }),
     ...rows.flat(),
   ]
 
@@ -195,12 +191,10 @@ test('mobile and fact presentation preserve zero values without exposing raw key
     ['数量', '0'],
     ['IQC 结果', '质检已记录'],
   ])
-  assert.deepEqual(labels.slice(0, 5), [
+  assert.deepEqual(labels.slice(0, 3), [
     '到期状态',
     '到期状态',
     '已关联业务来源',
-    '',
-    '',
   ])
   assertNoTechnicalLeak(labels, '移动任务和事实展示不得透出 raw key 或内部 ID')
 })

@@ -31,6 +31,8 @@ import {
   releaseDevQaExecutionLock,
 } from '../../scripts/qa/dev-qa-execution-lock.mjs'
 import {
+  isSameOriginRequest,
+  readJsonBody,
   isLoopbackHostHeader,
   isLoopbackRemoteAddress,
 } from './devServerSecurity.mjs'
@@ -38,12 +40,9 @@ import {
 export { buildRepositoryFingerprint }
 
 export const DEV_QA_COVERAGE_API_PATH = '/__dev/api/qa/coverage'
-export const DEV_QA_COVERAGE_SESSION_API_PATH =
-  `${DEV_QA_COVERAGE_API_PATH}/session`
-export const DEV_QA_COVERAGE_ACTION_API_PATH =
-  `${DEV_QA_COVERAGE_API_PATH}/actions`
-export const DEV_QA_COVERAGE_OPERATION_API_PREFIX =
-  `${DEV_QA_COVERAGE_API_PATH}/operations`
+export const DEV_QA_COVERAGE_SESSION_API_PATH = `${DEV_QA_COVERAGE_API_PATH}/session`
+export const DEV_QA_COVERAGE_ACTION_API_PATH = `${DEV_QA_COVERAGE_API_PATH}/actions`
+export const DEV_QA_COVERAGE_OPERATION_API_PREFIX = `${DEV_QA_COVERAGE_API_PATH}/operations`
 export const QA_COVERAGE_REPORT_SCHEMA = 'plush-test-coverage-report/v1'
 export const QA_COVERAGE_PUBLIC_OPERATION_SCHEMA =
   'plush.dev-qa-coverage-operation-public/v1'
@@ -286,50 +285,6 @@ export function validateDevQaCoverageAction(value) {
   return value
 }
 
-function isSameOriginRequest(request) {
-  const host = request.headers?.host
-  const origin = request.headers?.origin
-  if (
-    Array.isArray(host) ||
-    Array.isArray(origin) ||
-    !isLoopbackHostHeader(host) ||
-    typeof origin !== 'string'
-  ) {
-    return false
-  }
-  try {
-    const parsed = new URL(origin)
-    return (
-      ['http:', 'https:'].includes(parsed.protocol) &&
-      parsed.host.toLowerCase() === String(host).toLowerCase() &&
-      isLoopbackHostHeader(parsed.host) &&
-      !parsed.username &&
-      !parsed.password &&
-      parsed.pathname === '/' &&
-      !parsed.search &&
-      !parsed.hash &&
-      request.headers?.['sec-fetch-site'] === 'same-origin'
-    )
-  } catch {
-    return false
-  }
-}
-
-async function readJsonBody(request) {
-  let size = 0
-  const chunks = []
-  for await (const chunk of request) {
-    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
-    size += bytes.length
-    if (size > MAX_QA_COVERAGE_REQUEST_BYTES) {
-      throw new Error('coverage request body is too large')
-    }
-    chunks.push(bytes)
-  }
-  if (size === 0) throw new Error('coverage request body is required')
-  return JSON.parse(Buffer.concat(chunks).toString('utf8'))
-}
-
 function publicCoverageOperation(operation) {
   if (!operation) return null
   return {
@@ -379,10 +334,9 @@ function createStageLineReader(onStage) {
       }
     }
     if (flush && pending) {
-      const match =
-        /^\[qa:test-coverage-collect\] stage=([a-z0-9-]+)$/u.exec(
-          pending.trim()
-        )
+      const match = /^\[qa:test-coverage-collect\] stage=([a-z0-9-]+)$/u.exec(
+        pending.trim()
+      )
       if (match && COVERAGE_OPERATION_STAGES.includes(match[1])) {
         onStage(match[1])
       }
@@ -453,10 +407,7 @@ export function createDevQaCoverageService({
       if (sharedLock?.kind === 'coverage') {
         let sharedOperation = null
         try {
-          sharedOperation = readCoverageOperation(
-            store,
-            sharedLock.operationId
-          )
+          sharedOperation = readCoverageOperation(store, sharedLock.operationId)
         } catch {
           sharedOperation = null
         }
@@ -569,7 +520,10 @@ export function createDevQaCoverageService({
       const exitCode = Number.isSafeInteger(code) ? code : null
       let message = '覆盖采集未完成，上一份报告保持不变'
       try {
-        const report = await readReport(reportPath, MAX_QA_COVERAGE_REPORT_BYTES)
+        const report = await readReport(
+          reportPath,
+          MAX_QA_COVERAGE_REPORT_BYTES
+        )
         const identityMatches = repositoryIdentitiesEqual(
           operation.repository,
           report.repository
@@ -635,10 +589,7 @@ export function createDevQaCoverageService({
           cwd: root,
           env: {
             ...process.env,
-            PATH: [
-              path.dirname(nodeRuntime),
-              String(process.env.PATH || ''),
-            ]
+            PATH: [path.dirname(nodeRuntime), String(process.env.PATH || '')]
               .filter(Boolean)
               .join(path.delimiter),
           },
@@ -839,8 +790,7 @@ export function createDevQaCoverageMiddleware({
         return
       }
 
-      const operationMatch =
-        COVERAGE_OPERATION_PATH_PATTERN.exec(requestPath)
+      const operationMatch = COVERAGE_OPERATION_PATH_PATTERN.exec(requestPath)
       if (request.method === 'GET' && operationMatch) {
         sendJson(response, 200, {
           schemaVersion: 'plush.dev-qa-coverage-operation-result/v1',
@@ -870,7 +820,12 @@ export function createDevQaCoverageMiddleware({
           throw new Error('coverage action query is unsupported')
         }
         const result = await coverageService.act(
-          validateDevQaCoverageAction(await readJsonBody(request))
+          validateDevQaCoverageAction(
+            await readJsonBody(request, {
+              maxBytes: MAX_QA_COVERAGE_REQUEST_BYTES,
+              label: 'coverage request',
+            })
+          )
         )
         sendJson(response, 202, result)
         return

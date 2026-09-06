@@ -1,4 +1,4 @@
-import { compactParams, trimOptional } from './masterDataOrderView.mjs'
+import { compactParams, trimOptional } from './sourceDocumentValues.mjs'
 import {
   formatNumeric20Scale6,
   isPositiveNumeric20Scale6Units,

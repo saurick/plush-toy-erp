@@ -13,7 +13,8 @@ var _ biz.QualityInspectionSourceRepo = (*inventoryRepo)(nil)
 func (r *inventoryRepo) CreateQualityInspectionFromPurchaseReceipt(
 	ctx context.Context,
 	in *biz.QualityInspectionFromPurchaseReceiptCreate,
-) (*biz.QualityInspection, error) {
+) (_ *biz.QualityInspection, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	if in == nil || in.PurchaseReceiptID <= 0 || in.PurchaseReceiptItemID <= 0 {
 		return nil, biz.ErrBadParam
 	}
@@ -95,7 +96,8 @@ func (r *inventoryRepo) CreateQualityInspectionFromPurchaseReceipt(
 func (r *inventoryRepo) CreateQualityInspectionFromOutsourcingReturn(
 	ctx context.Context,
 	in *biz.QualityInspectionFromOutsourcingReturnCreate,
-) (*biz.QualityInspection, error) {
+) (_ *biz.QualityInspection, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrQualityInspectionRecordConflict) }()
 	if in == nil || in.OutsourcingFactID <= 0 {
 		return nil, biz.ErrBadParam
 	}

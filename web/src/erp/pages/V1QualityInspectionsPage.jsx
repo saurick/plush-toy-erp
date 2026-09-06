@@ -107,13 +107,12 @@ import { formatQuantity } from '../utils/businessLineItems.mjs'
 import { resolveContextualBusinessActionAvailability } from '../utils/businessActionAvailability.mjs'
 import { resolveRelatedRecordActionAvailability } from '../utils/operationalActionAvailability.mjs'
 import {
-  compactParams,
   buildSequentialDraftCode,
   hasActionPermission,
   statusText,
-  trimOptional,
   V1_ROUTE_PATHS,
 } from '../utils/masterDataOrderView.mjs'
+import { compactParams, trimOptional } from '../utils/sourceDocumentValues.mjs'
 import { currentBusinessDate } from '../utils/businessDate.mjs'
 import {
   createBusinessTablePagination,

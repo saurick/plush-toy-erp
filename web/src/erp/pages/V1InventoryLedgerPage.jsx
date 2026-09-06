@@ -70,12 +70,11 @@ import InventoryOperationModal from '../components/inventory/InventoryOperationM
 import InventoryOperationRecordsModal from '../components/inventory/InventoryOperationRecordsModal.jsx'
 import ExceptionProcessRecoveryButton from '../components/workflow/ExceptionProcessRecoveryButton.jsx'
 import {
-  compactParams,
   formatUnixDate,
   formatUnixDateTime,
   hasActionPermission,
-  trimOptional,
 } from '../utils/masterDataOrderView.mjs'
+import { compactParams, trimOptional } from '../utils/sourceDocumentValues.mjs'
 import { currentBusinessDate } from '../utils/businessDate.mjs'
 import {
   businessSourceRouteFor,

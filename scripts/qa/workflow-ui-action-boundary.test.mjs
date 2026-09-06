@@ -501,13 +501,7 @@ test("workflow business role filters use shared role display names", () => {
     source,
     /function workflowRoleOption\(value\) \{[\s\S]*getRoleDisplayName\(value, '责任岗位'\)/u,
   );
-  for (const roleKey of [
-    "pmc",
-    "production",
-    "warehouse",
-    "finance",
-    "boss",
-  ]) {
+  for (const roleKey of ["pmc", "production", "warehouse", "finance", "boss"]) {
     assert(
       source.includes(`workflowRoleOption('${roleKey}')`),
       `Workflow business owner-role filter must derive ${roleKey} label from shared role display names`,
@@ -722,8 +716,7 @@ test("desktop workflow task actions explain backend access before submitting act
         "urgeWorkflowTask",
       ],
       forbiddenLegacyIDPattern: /^\s*id:\s*selectedTask\.id,/mu,
-      payloadBuilderPath:
-        "web/src/erp/utils/desktopWorkflowTaskAction.mjs",
+      payloadBuilderPath: "web/src/erp/utils/desktopWorkflowTaskAction.mjs",
     },
     {
       relativePath: "web/src/erp/pages/WorkflowBusinessModulePage.jsx",
@@ -738,19 +731,7 @@ test("desktop workflow task actions explain backend access before submitting act
     },
     {
       relativePath:
-        "web/src/erp/components/purchase-orders/usePurchaseOrderWorkflowActions.mjs",
-      actionWrappers: [
-        "completeWorkflowTaskAction",
-        "blockWorkflowTaskAction",
-        "rejectWorkflowTaskAction",
-        "resumeWorkflowTaskAction",
-        "urgeWorkflowTask",
-      ],
-      forbiddenLegacyIDPattern: /^\s*id:\s*task\.id,/mu,
-    },
-    {
-      relativePath:
-        "web/src/erp/components/outsourcing-orders/useOutsourcingOrderWorkflowActions.mjs",
+        "web/src/erp/components/workflow/useSourceOrderWorkflowActions.mjs",
       actionWrappers: [
         "completeWorkflowTaskAction",
         "blockWorkflowTaskAction",
@@ -788,7 +769,10 @@ test("desktop workflow task actions explain backend access before submitting act
       relativePath: expectation.relativePath,
     });
     const payloadContractSource = expectation.payloadBuilderPath
-      ? readFileSync(path.join(repoRoot, expectation.payloadBuilderPath), "utf8")
+      ? readFileSync(
+          path.join(repoRoot, expectation.payloadBuilderPath),
+          "utf8",
+        )
       : source;
     if (expectation.payloadBuilderPath) {
       assert.match(
@@ -820,8 +804,7 @@ test("desktop workflow task actions explain backend access before submitting act
       `${expectation.relativePath} must not submit client-controlled business_status_key; backend action/usecase derives business status`,
     );
     if (
-      expectation.relativePath.includes("usePurchaseOrderWorkflowActions") ||
-      expectation.relativePath.includes("useOutsourcingOrderWorkflowActions") ||
+      expectation.relativePath.includes("useSourceOrderWorkflowActions") ||
       expectation.relativePath.includes("DashboardPage") ||
       expectation.relativePath.includes("WorkflowBusinessModulePage")
     ) {
@@ -855,13 +838,7 @@ test("workflow task post-success refresh failures stay separate from mutation re
     },
     {
       relativePath:
-        "web/src/erp/components/purchase-orders/usePurchaseOrderWorkflowActions.mjs",
-      refreshCall: "loadWorkflowTasks()",
-      expectedCount: 5,
-    },
-    {
-      relativePath:
-        "web/src/erp/components/outsourcing-orders/useOutsourcingOrderWorkflowActions.mjs",
+        "web/src/erp/components/workflow/useSourceOrderWorkflowActions.mjs",
       refreshCall: "loadWorkflowTasks()",
       expectedCount: 5,
     },
@@ -881,8 +858,7 @@ test("workflow urge payloads do not replay frontend task source fields", () => {
     "web/src/erp/mobile/hooks/useMobileRoleTaskActions.js",
     "web/src/erp/pages/DashboardPage.jsx",
     "web/src/erp/pages/WorkflowBusinessModulePage.jsx",
-    "web/src/erp/components/purchase-orders/usePurchaseOrderWorkflowActions.mjs",
-    "web/src/erp/components/outsourcing-orders/useOutsourcingOrderWorkflowActions.mjs",
+    "web/src/erp/components/workflow/useSourceOrderWorkflowActions.mjs",
   ];
 
   for (const relativePath of urgeActionFiles) {
@@ -960,8 +936,17 @@ test("business collaboration panel is limited to selected purchase and outsourci
   ];
   for (const relativePath of contextualPagePaths) {
     const source = readFileSync(path.join(repoRoot, relativePath), "utf8");
+    const taskSource = relativePath.endsWith("V1OutsourcingOrdersPage.jsx")
+      ? readFileSync(
+          path.join(
+            erpSourceRoot,
+            "components/outsourcing-orders/useOutsourcingOrderTasks.mjs",
+          ),
+          "utf8",
+        )
+      : source;
     assert.match(
-      source,
+      taskSource,
       /loadBusinessCollaborationTasksForSource\(\{[\s\S]*?canRead:\s*canReadWorkflowTasks,[\s\S]*?listTasks:\s*listWorkflowTasks,[\s\S]*?sourceID:\s*requestedSourceID,[\s\S]*?sourceType:/u,
       `${relativePath} must delegate a permission-gated current-record task request to the shared loader`,
     );
@@ -1158,12 +1143,19 @@ test("outsourcing order page keeps write buttons behind projected actions", () =
     "pages/V1OutsourcingOrdersPage.jsx",
   );
   const pageSource = readFileSync(pagePath, "utf8");
+  const editorSource = readFileSync(
+    path.join(
+      erpSourceRoot,
+      "components/outsourcing-orders/useOutsourcingOrderEditor.mjs",
+    ),
+    "utf8",
+  );
 
   assert(
     pageSource.includes(
       "const canCreate = hasActionPermission(\n    adminProfile,\n    'outsourcing.order.create'\n  )",
     ) &&
-      pageSource.includes(
+      editorSource.includes(
         "const canUpdate = hasActionPermission(\n    adminProfile,\n    'outsourcing.order.update'\n  )",
       ),
     "outsourcing order page must derive create/update through projected action helper",
@@ -1242,13 +1234,13 @@ test("fact pages keep write buttons behind projected actions and status guards",
         "canWithdraw={canCreate || canPost}",
         "页面不提供脱离采购来源的手工入库明细。",
         "{canCreateReturn ? (",
-        "data-business-action-key=\"create-return\"",
+        'data-business-action-key="create-return"',
         "{canCreateAdjustment ? (",
-        "data-business-action-key=\"create-adjustment\"",
+        'data-business-action-key="create-adjustment"',
         "{canPost ? (",
-        "data-business-action-key=\"post\"",
+        'data-business-action-key="post"',
         "!selectedRow || selectedRow.status !== 'DRAFT' || saving",
-        "data-business-action-key=\"cancel\"",
+        'data-business-action-key="cancel"',
         "!['DRAFT', 'POSTED'].includes(selectedRow.status)",
         "草稿作废不更新库存；已过账入库取消由系统按采购入库规则恢复库存",
       ],
@@ -1268,12 +1260,12 @@ test("fact pages keep write buttons behind projected actions and status guards",
         "primaryAction={\n          canCreate ? (",
         "disabled={referenceDataState !== 'ready'}",
         "{canUpdate ? (",
-        "data-business-action-key=\"submit\"",
+        'data-business-action-key="submit"',
         "selectedRow.status !== 'DRAFT'",
-        "data-business-action-key=\"pass\"",
-        "data-business-action-key=\"reject\"",
+        'data-business-action-key="pass"',
+        'data-business-action-key="reject"',
         "selectedRow.status !== 'SUBMITTED'",
-        "data-business-action-key=\"cancel\"",
+        'data-business-action-key="cancel"',
         "!['DRAFT', 'SUBMITTED'].includes(selectedRow.status)",
         "canUpload={canCreate || canUpdate}",
         "canWithdraw={canCreate || canUpdate}",

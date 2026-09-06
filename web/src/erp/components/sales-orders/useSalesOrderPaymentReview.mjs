@@ -4,9 +4,9 @@ import { modal } from '@/common/utils/antdApp'
 import {
   buildPaymentConditionOptions,
   mergePaymentConditionOptions,
-  normalizeOptionalNonNegativeInteger,
   resolvePaymentTermDays,
-} from '../../utils/masterDataOrderView.mjs'
+} from '../../utils/paymentConditions.mjs'
+import { normalizeOptionalNonNegativeInteger } from '../../utils/sourceDocumentValues.mjs'
 
 export function useSalesOrderPaymentReview({
   customers = [],

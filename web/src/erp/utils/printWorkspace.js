@@ -113,6 +113,10 @@ function buildDraftSearchParams(options = {}) {
   if (normalizedCustomerKey) {
     searchParams.set('customer_key', normalizedCustomerKey)
   }
+  const configRevision = resolvePrintWorkspaceDraftConfigRevision(options)
+  if (configRevision) {
+    searchParams.set('config_revision', configRevision)
+  }
   const normalizedStateID = normalizeStateID(options.stateID)
   if (normalizedStateID) {
     searchParams.set(PRINT_WORKSPACE_STATE_QUERY_KEY, normalizedStateID)

@@ -313,35 +313,10 @@ ORDER BY sort_order ASC, id ASC`)
 
 	out := []biz.AdminRole{}
 	for rows.Next() {
-		var item biz.AdminRole
-		var primaryMenuPathsJSON string
-		var secondaryMenuPathsJSON string
-		if err := rows.Scan(
-			&item.ID,
-			&item.Key,
-			&item.Name,
-			&item.Description,
-			&item.Builtin,
-			&item.Type,
-			&item.Disabled,
-			&item.SortOrder,
-			&item.Version,
-			&item.NavigationMode,
-			&primaryMenuPathsJSON,
-			&secondaryMenuPathsJSON,
-		); err != nil {
+		item, err := scanAdminRole(rows)
+		if err != nil {
 			return nil, err
 		}
-		item.Key = biz.NormalizeRoleKey(item.Key)
-		item.Type = biz.NormalizeRoleType(item.Type, item.Key, item.Builtin)
-		settings := biz.NormalizePersistedRoleNavigationSettings(
-			item.NavigationMode,
-			decodeRoleMenuPaths(primaryMenuPathsJSON),
-			decodeRoleMenuPaths(secondaryMenuPathsJSON),
-		)
-		item.NavigationMode = settings.Mode
-		item.PrimaryMenuPaths = settings.PrimaryMenuPaths
-		item.SecondaryMenuPaths = settings.SecondaryMenuPaths
 		item.Permissions, err = r.loadRolePermissionKeys(ctx, item.ID)
 		if err != nil {
 			return nil, err

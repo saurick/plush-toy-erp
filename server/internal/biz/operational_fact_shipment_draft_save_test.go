@@ -12,6 +12,7 @@ import (
 type shipmentDraftSaveRepoStub struct {
 	OperationalFactRepo
 	calls int
+	err   error
 	saved *ShipmentDraftSave
 }
 
@@ -22,15 +23,10 @@ func (r *shipmentDraftSaveRepoStub) WarehouseIsActive(context.Context, int) (boo
 func (r *shipmentDraftSaveRepoStub) SaveShipmentDraftWithItems(_ context.Context, in *ShipmentDraftSave) (*Shipment, error) {
 	r.calls++
 	r.saved = in
+	if r.err != nil {
+		return nil, r.err
+	}
 	return &Shipment{ID: in.ID, ShipmentNo: in.ShipmentNo, Status: ShipmentStatusDraft, Version: in.ExpectedVersion + 1}, nil
-}
-
-type shipmentDraftSaveUnsupportedRepo struct {
-	OperationalFactRepo
-}
-
-func (r *shipmentDraftSaveUnsupportedRepo) WarehouseIsActive(context.Context, int) (bool, error) {
-	return true, nil
 }
 
 func validShipmentDraftSaveInput() *ShipmentDraftSave {
@@ -87,7 +83,7 @@ func TestOperationalFactUsecaseSaveShipmentDraftNormalizesCompleteAggregate(t *t
 	}
 }
 
-func TestOperationalFactUsecaseSaveShipmentDraftRejectsIncompleteOrUnsupportedAggregate(t *testing.T) {
+func TestOperationalFactUsecaseSaveShipmentDraftRejectsIncompleteAggregateAndPreservesRepositoryFailure(t *testing.T) {
 	for name, mutate := range map[string]func(*ShipmentDraftSave){
 		"missing id":               func(in *ShipmentDraftSave) { in.ID = 0 },
 		"missing expected version": func(in *ShipmentDraftSave) { in.ExpectedVersion = 0 },
@@ -108,7 +104,10 @@ func TestOperationalFactUsecaseSaveShipmentDraftRejectsIncompleteOrUnsupportedAg
 		})
 	}
 
-	if _, err := NewOperationalFactUsecase(&shipmentDraftSaveUnsupportedRepo{}).SaveShipmentDraftWithItems(t.Context(), validShipmentDraftSaveInput()); !errors.Is(err, ErrBadParam) {
-		t.Fatalf("unsupported repository error=%v, want ErrBadParam", err)
+	rejected := errors.New("draft write rejected")
+	repo := &shipmentDraftSaveRepoStub{err: rejected}
+	if _, err := NewOperationalFactUsecase(repo).SaveShipmentDraftWithItems(t.Context(), validShipmentDraftSaveInput()); !errors.Is(err, rejected) || repo.calls != 1 {
+		t.Fatalf("repository error=%v calls=%d", err, repo.calls)
 	}
+
 }

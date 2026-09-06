@@ -74,14 +74,15 @@ import {
   SHIPMENTS_MODULE_KEY,
 } from '../components/shipments/shipmentColumns.jsx'
 import {
-  compactParams,
-  buildDeliverySnapshot,
   buildSequentialDraftCode,
-  deliverySnapshotFormValues,
   hasActionPermission,
-  trimOptional,
   V1_ROUTE_PATHS,
 } from '../utils/masterDataOrderView.mjs'
+import {
+  buildDeliverySnapshot,
+  deliverySnapshotFormValues,
+} from '../utils/sourcePartySnapshots.mjs'
+import { compactParams, trimOptional } from '../utils/sourceDocumentValues.mjs'
 import {
   buildShipmentItemParams,
   createBlankShipmentItem,

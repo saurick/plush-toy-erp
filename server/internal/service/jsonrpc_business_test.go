@@ -533,7 +533,7 @@ func (r *businessDashboardWorkflowRepo) ListWorkflowTasks(_ context.Context, fil
 	return nil, totals[filter.TaskGroup], nil
 }
 
-type stubBusinessDashboardOperationalFactRepo struct{}
+type stubBusinessDashboardOperationalFactRepo struct{ biz.OperationalFactRepo }
 
 func (s *stubBusinessDashboardOperationalFactRepo) CustomerIsActive(context.Context, int) (bool, error) {
 	return false, biz.ErrCustomerNotFound
@@ -657,4 +657,8 @@ func (s *stubBusinessDashboardOperationalFactRepo) CancelPostedFinanceFact(conte
 
 func (s *stubBusinessDashboardOperationalFactRepo) ListFinanceFacts(context.Context, biz.OperationalFactFilter) ([]*biz.FinanceFact, int, error) {
 	return nil, 6, nil
+}
+
+func (s *stubBusinessDashboardOperationalFactRepo) ListStockReservationsForAccess(ctx context.Context, filter biz.OperationalFactFilter, _ biz.StockReservationReadScope) ([]*biz.StockReservation, int, error) {
+	return s.ListStockReservations(ctx, filter)
 }

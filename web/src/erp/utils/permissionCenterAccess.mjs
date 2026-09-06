@@ -26,7 +26,7 @@ function normalizeString(value = '') {
   return String(value || '').trim()
 }
 
-function normalizeStringList(values = []) {
+export function normalizeStringList(values = []) {
   return Array.isArray(values)
     ? values.map(normalizeString).filter(Boolean)
     : []
@@ -290,4 +290,11 @@ export function normalizePermissionUsage(usage = {}) {
       ...pages.flatMap((page) => page.restrictions),
     ]),
   }
+}
+
+export function getPermissionLabel(permissionDetailMap, permissionKey) {
+  return (
+    permissionDetailMap.get(String(permissionKey || '').trim())?.label ||
+    '对应页面入口功能'
+  )
 }

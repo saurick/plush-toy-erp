@@ -446,8 +446,16 @@ test('businessCollaborationTasks: 抽屉随最新活动任务同步并在终态�
 
 test('businessCollaborationTasks: 局部入口只保留采购和加工合同当前记录', () => {
   const supportedPages = [
-    readERPSource('../pages/V1PurchaseOrdersPage.jsx'),
-    readERPSource('../pages/V1OutsourcingOrdersPage.jsx'),
+    {
+      page: readERPSource('../pages/V1PurchaseOrdersPage.jsx'),
+      tasks: readERPSource('../pages/V1PurchaseOrdersPage.jsx'),
+    },
+    {
+      page: readERPSource('../pages/V1OutsourcingOrdersPage.jsx'),
+      tasks: readERPSource(
+        '../components/outsourcing-orders/useOutsourcingOrderTasks.mjs'
+      ),
+    },
   ]
   const unsupportedPages = [
     readERPSource('../pages/V1MasterDataPage.jsx'),
@@ -456,12 +464,12 @@ test('businessCollaborationTasks: 局部入口只保留采购和加工合同当�
     readERPSource('../pages/WorkflowBusinessModulePage.jsx'),
   ]
 
-  for (const source of supportedPages) {
+  for (const { page: source, tasks } of supportedPages) {
     assert.match(source, /<CollaborationTaskPanel/u)
-    assert.match(source, /loadBusinessCollaborationTasksForSource\(\{/u)
-    assert.match(source, /canRead: canReadWorkflowTasks/u)
-    assert.match(source, /listTasks: listWorkflowTasks/u)
-    assert.match(source, /sourceID: requestedSourceID/u)
+    assert.match(tasks, /loadBusinessCollaborationTasksForSource\(\{/u)
+    assert.match(tasks, /canRead: canReadWorkflowTasks/u)
+    assert.match(tasks, /listTasks: listWorkflowTasks/u)
+    assert.match(tasks, /sourceID: requestedSourceID/u)
     assert.match(
       source,
       /canReadWorkflowTasks && workflowTaskLoadState === 'ready'/u

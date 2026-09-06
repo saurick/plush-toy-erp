@@ -49,35 +49,10 @@ ORDER BY r.sort_order ASC, r.id ASC`, adminID)
 
 	out := []biz.AdminRole{}
 	for rows.Next() {
-		var item biz.AdminRole
-		var primaryMenuPathsJSON string
-		var secondaryMenuPathsJSON string
-		if err := rows.Scan(
-			&item.ID,
-			&item.Key,
-			&item.Name,
-			&item.Description,
-			&item.Builtin,
-			&item.Type,
-			&item.Disabled,
-			&item.SortOrder,
-			&item.Version,
-			&item.NavigationMode,
-			&primaryMenuPathsJSON,
-			&secondaryMenuPathsJSON,
-		); err != nil {
+		item, err := scanAdminRole(rows)
+		if err != nil {
 			return nil, err
 		}
-		item.Key = biz.NormalizeRoleKey(item.Key)
-		item.Type = biz.NormalizeRoleType(item.Type, item.Key, item.Builtin)
-		settings := biz.NormalizePersistedRoleNavigationSettings(
-			item.NavigationMode,
-			decodeRoleMenuPaths(primaryMenuPathsJSON),
-			decodeRoleMenuPaths(secondaryMenuPathsJSON),
-		)
-		item.NavigationMode = settings.Mode
-		item.PrimaryMenuPaths = settings.PrimaryMenuPaths
-		item.SecondaryMenuPaths = settings.SecondaryMenuPaths
 		out = append(out, item)
 	}
 	return out, rows.Err()
@@ -114,4 +89,37 @@ ORDER BY p.permission_key ASC`, adminID)
 		return nil, err
 	}
 	return biz.NormalizePermissionKeys(raw), nil
+}
+
+func scanAdminRole(rows *sql.Rows) (biz.AdminRole, error) {
+	var item biz.AdminRole
+	var primaryMenuPathsJSON string
+	var secondaryMenuPathsJSON string
+	if err := rows.Scan(
+		&item.ID,
+		&item.Key,
+		&item.Name,
+		&item.Description,
+		&item.Builtin,
+		&item.Type,
+		&item.Disabled,
+		&item.SortOrder,
+		&item.Version,
+		&item.NavigationMode,
+		&primaryMenuPathsJSON,
+		&secondaryMenuPathsJSON,
+	); err != nil {
+		return biz.AdminRole{}, err
+	}
+	item.Key = biz.NormalizeRoleKey(item.Key)
+	item.Type = biz.NormalizeRoleType(item.Type, item.Key, item.Builtin)
+	settings := biz.NormalizePersistedRoleNavigationSettings(
+		item.NavigationMode,
+		decodeRoleMenuPaths(primaryMenuPathsJSON),
+		decodeRoleMenuPaths(secondaryMenuPathsJSON),
+	)
+	item.NavigationMode = settings.Mode
+	item.PrimaryMenuPaths = settings.PrimaryMenuPaths
+	item.SecondaryMenuPaths = settings.SecondaryMenuPaths
+	return item, nil
 }

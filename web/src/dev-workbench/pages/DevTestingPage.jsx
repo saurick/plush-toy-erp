@@ -100,6 +100,7 @@ const markdownModules = import.meta.glob(
     '../../../../server/deploy/README.md',
     '../../../../server/deploy/compose/prod/README.md',
     '../../../../scripts/README.md',
+    '../../../../scripts/qa/README.md',
     '../../../../web/README.md',
     '../../../../web/scripts/README.md',
   ],

@@ -493,3 +493,186 @@ bash scripts/qa/affected.sh --file web/src/erp/utils/dateRange.mjs --run
 `gate-profiles.mjs` 只保存 fast/full/strict 的语义层级、直接入口和可执行位合同，当前 required files 保持小而累积。下游脚本和测试是否存在由真实执行、`node-test-groups.mjs` 的唯一登记以及各领域测试发现证明，不再在 profile 中复制整条传递依赖清单。
 
 `affected` 是开发期快速反馈和非标准目标的保守执行入口；默认 `origin/main` 的 `prepare-push` 会在 clean HEAD 和真实 aggregate range 上独立重算风险，但只签发 `server-ci` 短门禁回执，不在 Mac 执行 affected/full。显式 `--full` 只作本地完整诊断；随后必须按准备时相同 remote/ref push，hook 复核短期回执、真实 stdin/range、clean HEAD、gate/environment/TTL，并实时运行 `git log --check` 与逐 range 严格 secrets。推送后必须由 R640 exact-SHA CI Gate 终态成功才能发布、提升制品或进入受保护部署；目标 migration、health/smoke、备份恢复及回滚 evidence 仍独立取得。
+
+## 角色演示账号与登录核验
+
+角色演示账号只服务开发 / 验收登录测试，不写入 `server/configs/*/config.yaml`，也不是客户配置包。脚本会先确保内置 RBAC 权限和角色已 seed，再创建或更新以下账号并绑定真实角色：
+
+| 账号               | 角色          |
+| ------------------ | ------------- |
+| `demo_boss`        | `boss`        |
+| `demo_sales`       | `sales`       |
+| `demo_purchase`    | `purchase`    |
+| `demo_production`  | `production`  |
+| `demo_warehouse`   | `warehouse`   |
+| `demo_quality`     | `quality`     |
+| `demo_finance`     | `finance`     |
+| `demo_pmc`         | `pmc`         |
+| `demo_engineering` | `engineering` |
+| `demo_admin`       | `admin`       |
+
+默认不生成 `debug_operator` 账号；如确需调试权限账号，必须显式加 `--include-debug`，此时会额外生成 `demo_debug`。
+
+`demo_admin` 是普通演示角色账号，不是稳定超级管理员 `admin`。角色演示账号的 seed / reset 只处理 `demo_*`，不得顺带重置稳定管理员。
+
+无显式密码时，脚本只允许连接登记的 `192.168.0.106:5432/plush_erp` 或 `plush_erp_*_dev` 本地开发库，并使用公开测试密码 `12345678` 生成十个角色演示账号（包括普通演示管理员 `demo_admin`）；不会生成 `demo_debug`，也不会重置稳定超级管理员或人工验收场景账号。本入口及其 `demo_*` 账号不得用于 133、其他共享 / 试用、staging 或生产目标；`customer-trial-133` 复用相同公开密码值时只能走其独立 `uat_*` 凭据合同与受控轮换器。独立命令行调试账号和其他人工验收账号操作仍必须通过 `--password` 或 `ERP_ROLE_DEMO_PASSWORD` 显式提供非默认密码；唯一例外是 DEV-only 测试数据中心的固定 `scenario-demo` 编排，它在精确证明本机 8300 与登记 106 开发库后，可复用本机公开测试账号约定实现页面生成，且没有 133、staging 或生产逃逸开关。管理员和演示账号的创建、重置密码仍统一要求 8～20 个 Unicode 字符，且 UTF-8 编码后不超过 bcrypt 的 72 字节边界。
+
+```bash
+bash /Users/simon/projects/plush-toy-erp/scripts/seed-role-demo-admins.sh
+```
+
+如需覆盖公开测试默认值，或在受控场景中生成 `demo_debug` / 重置人工验收账号，必须显式传入非默认密码：
+
+```bash
+ERP_ROLE_DEMO_PASSWORD='<explicit-demo-password>' \
+  bash /Users/simon/projects/plush-toy-erp/scripts/seed-role-demo-admins.sh
+```
+
+已有账号重跑时会恢复 `disabled=false`、`is_super_admin=false` 和对应单一角色绑定；默认不重置已有账号密码。如需统一重置演示账号密码：
+
+```bash
+bash /Users/simon/projects/plush-toy-erp/scripts/seed-role-demo-admins.sh --reset-password
+```
+
+无输入重置只处理登记的 `192.168.0.106:5432/plush_erp` / `plush_erp_*_dev` 本地开发库中的十个角色演示账号。重置 `demo_debug` 或人工验收场景账号时必须用 `--password` 或 `ERP_ROLE_DEMO_PASSWORD` 显式提供非默认密码。脚本默认拒绝 `configs/prod` 或 `APP_ENV / ERP_ENV / GO_ENV=prod|production`；公开测试值即使显式传入也不能离开登记的本地开发库族，`--allow-prod` 必须使用非默认密码。常规开发和验收不要对生产库执行该脚本。
+
+生成或重置演示账号后，可执行真实账号核对。该脚本不创建账号、不改密码，只通过真实 `/rpc/auth` 的 `admin_login + me` 校验角色、`mobile.<role>.access`、`debug.*` 权限、`is_super_admin` 和 `disabled` 边界。`admin_login` 会写入正常认证会话，但脚本不调用业务写入 RPC，不写 Source Document、Workflow 或 Fact：
+
+如果只想先核对输入和账号清单，可打印输入模板。该模式只输出所需环境变量、账号清单、可选脱敏报告路径、effective session 脱敏诊断读取计划和真实核对命令，不读密码、不登录、不调用后端、不启动浏览器、不启动 Vite、不读取客户配置脚本、不写报告、不写数据库：
+
+```bash
+node /Users/simon/projects/plush-toy-erp/scripts/qa/trial-account-rbac.mjs --print-input-template
+node /Users/simon/projects/plush-toy-erp/web/scripts/trialDemoAccountBrowserSmoke.mjs --print-input-template
+```
+
+试用账号 RBAC 也可先写前置检查报告。该模式只探测后端健康检查、演示账号密码环境变量是否存在，并静态核对 Go seed、后端 RBAC mobile 权限、前端移动角色入口、浏览器 smoke 账号和文档入口里的试用角色投影是否一致；报告内 `preflightOnly=true`，并会列出真实 RBAC 检查前置和本报告未证明项。不读密码、不登录、不调用 `admin_login / me`，不写数据库，也不保存 access token 或 Authorization header；也不证明真实 RBAC、customer config active revision、桌面菜单投影或岗位任务端真实可用：
+
+```bash
+node /Users/simon/projects/plush-toy-erp/scripts/qa/trial-account-rbac.mjs \
+  --preflight-report output/trial-account-rbac/preflight.json
+```
+
+浏览器 smoke 还可先写前置检查报告。该模式只探测后端健康检查、演示账号密码环境变量是否存在、是否需要脚本托管 Vite、yoyoosun customer config 脚本是否存在，并复用 `audit:yoyoosun-entry` 做只读端口审计；如果显式传入 `TRIAL_BROWSER_SMOKE_BASE_URL`，该端口必须命中 yoyoosun config 和 yoyoosun asset，否则报告会以 `external-base-url-not-yoyoosun-entry` 阻止进入真实 smoke，避免把 Product Core、HTML fallback 或其他项目端口误当试用前端。报告还会静态输出桌面账号菜单应见 / 禁见、客户隐藏菜单、旧入口清理、岗位任务端路径、`demo_admin` 移动端拒绝态和 effective session DEV-only 脱敏诊断读取计划；报告内 `preflightOnly=true`，并会列出真实 smoke 前置和本报告未证明项。不读密码、不登录、不调用 JSON-RPC、不启动浏览器、不启动 Vite、不读取客户配置脚本、不创建任务、不写数据库，也不保存 access token 或 Authorization header。真实浏览器 smoke 在脚本托管 Vite 时会在桌面账号登录后读取 `window.__PLUSH_ERP_EFFECTIVE_SESSION_DIAGNOSTIC__`，确认只包含脱敏摘要、投影模式、空阻塞项和可见菜单计数；同时检查法律告知弹窗的标题、链接和确认回执。真实登录会写入认证会话，未确认的账号会写入法律告知确认回执，但脚本不调用业务办理动作，不写 Source Document、Workflow 或 Fact。需要留下本地读回记录时，可在真实命令上追加 `--report output/trial-demo-account-browser-smoke/report.json`，报告只保存账号通过数、岗位任务端通过数、拒绝态结果、法律告知检查结果、source / projectionMode / configRevision / customerKey / 计数 / blockers 等脱敏摘要，不保存密码、token、Authorization header、raw customer package 或 action 列表，也不证明目标环境发布、真实客户导入或 release evidence 已完成。外部 base URL 默认不强制读取该 DEV-only 变量，如外部地址确认是 Vite DEV，可设置 `TRIAL_BROWSER_SMOKE_EXPECT_EFFECTIVE_SESSION_DIAGNOSTIC=1`：
+
+```bash
+node /Users/simon/projects/plush-toy-erp/web/scripts/trialDemoAccountBrowserSmoke.mjs \
+  --preflight-report output/trial-demo-account-browser-smoke/preflight.json
+```
+
+真实登录 smoke 共享前置也可先打印输入模板，或写 no-write shared preflight 报告。模板只输出后端健康检查 URL、前端 URL、管理员凭据来源和具体 smoke 命令，不读取配置、不校验凭据、不调用后端、不启动浏览器、不登录、不写数据库；shared preflight 只探测后端 health 和管理员凭据来源候选，不读取 config 内容、不读取密码值、不校验账号、不调用 auth JSON-RPC、不启动 Vite / Playwright、不登录、不写数据库，也不保存密码、token 或 Authorization header。采购入库真实写入浏览器 e2e 还可以打印自己的持久化测试数据输入模板：
+
+```bash
+node /Users/simon/projects/plush-toy-erp/web/scripts/realLoginSmokeShared.mjs --print-input-template
+node /Users/simon/projects/plush-toy-erp/web/scripts/realLoginSmokeShared.mjs \
+  --preflight-report output/real-login-smoke-shared/preflight.json
+node /Users/simon/projects/plush-toy-erp/web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs --print-input-template
+node /Users/simon/projects/plush-toy-erp/web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs \
+  --preflight-report output/purchase-receipt-real-write-browser-e2e/preflight.json
+```
+
+`purchaseReceiptRealWriteBrowserE2E.mjs --print-input-template` 只输出采购入库页面真实写入 e2e 所需输入、持久测试数据确认、`PR-BROWSER-*` 记录边界和后续真实命令，不读取本地配置、不校验凭据、不调用后端、不启动 Vite、不启动 Playwright、不登录、不写数据库；`--preflight-report` 只写本地前置报告，探测后端 health、显式管理员凭据 env、持久测试数据确认和页面目标安全性，不读取本地配置、不登录、不调用 JSON-RPC、不启动 Vite / Playwright、不写数据库。真正运行 `pnpm smoke:purchase-receipt-real-write` 会写本地 / 开发库模拟采购入库事实，只能按脚本显式参数和 README 边界执行。
+
+```bash
+TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' \
+  node /Users/simon/projects/plush-toy-erp/scripts/qa/trial-account-rbac.mjs
+```
+
+如需留下本地可审计证据，可写入脱敏报告。报告只包含后端 endpoint alias、账号名、角色、岗位权限、debug 权限数量、super admin / disabled 布尔结果和汇总，不保存密码、access token 或 Authorization header：
+
+```bash
+TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' \
+  node /Users/simon/projects/plush-toy-erp/scripts/qa/trial-account-rbac.mjs \
+    --report output/trial-account-rbac/report.json
+```
+
+如需核对其他后端地址：
+
+```bash
+TRIAL_ACCOUNT_BACKEND_URL='http://127.0.0.1:8300' \
+TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' \
+  node /Users/simon/projects/plush-toy-erp/scripts/qa/trial-account-rbac.mjs
+```
+
+需要用真实浏览器核对桌面菜单、岗位任务端和无岗位权限拒绝态时，先确认后端已启动，再执行：
+
+```bash
+TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' \
+  pnpm --dir /Users/simon/projects/plush-toy-erp/web smoke:trial-demo-browser
+```
+
+该浏览器回归会自动启动单端口桌面 Vite，并使用 yoyoosun 菜单配置；它会同时检查各角色应看见的桌面菜单和不应看见的菜单，例如非 admin 不应看到权限管理，`demo_admin` 不应看到业务主入口。如需核对已启动前端地址，可设置 `TRIAL_BROWSER_SMOKE_BASE_URL`。如需保存本地脱敏读回报告，直接运行脚本并追加报告路径：
+该浏览器回归会自动启动单端口桌面 Vite，并使用 yoyoosun 菜单配置；它会同时检查各角色应看见的桌面菜单和不应看见的菜单，例如非 admin 不应看到权限管理，`demo_admin` 不应看到业务主入口。每次菜单切换还会采集页面就绪耗时、RPC 数量、忽略 JSON-RPC 随机 `id` 后的语义重复、主动取消、失败和未收敛请求；语义重复、失败、未收敛非零或单页就绪超过 5 秒均阻断。Mock / Style L1 保留 React StrictMode 双挂载探针，连接真实后端的 Vite 不向后端发送演练性双请求。如需核对已启动前端地址，可设置 `TRIAL_BROWSER_SMOKE_BASE_URL`。如需保存本地脱敏读回报告，直接运行脚本并追加报告路径：
+
+```bash
+TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' \
+  node /Users/simon/projects/plush-toy-erp/web/scripts/trialDemoAccountBrowserSmoke.mjs \
+    --report output/trial-demo-account-browser-smoke/report.json
+```
+
+如只核对岗位任务端登录后回跳和生产单端口路由，执行：
+
+如果只想先核对该 smoke 的输入、岗位角色、phone / iPad 视口和执行边界，先打印输入模板。该模式不启动 Vite、不启动浏览器、不调用真实后端、不登录、不写数据库：
+
+```bash
+node /Users/simon/projects/plush-toy-erp/web/scripts/mobileAuthLoginRouteSmoke.mjs --print-input-template
+```
+
+如需在不启动 Vite / Playwright、不调用后端和不登录的情况下，先写一份本地前置报告核对岗位路由计划、phone / iPad 视口和 mock 覆盖口径：
+
+```bash
+node /Users/simon/projects/plush-toy-erp/web/scripts/mobileAuthLoginRouteSmoke.mjs --preflight-report output/mobile-auth-login-route-smoke/preflight.json
+```
+
+```bash
+pnpm --dir /Users/simon/projects/plush-toy-erp/web smoke:mobile-auth-login-route
+```
+
+该回归默认验证 `/m/<role>/tasks`，与当前生产 `web-desktop` 单容器主路径一致，使用 mock auth / admin / customer-config / workflow RPC 覆盖未登录拦截、`admin.me` 与 effective session 刷新、登录回跳、当前已加载任务分布 / 风险提醒 / 已办列表和 phone / iPad 布局；preflight 只写本地 JSON，不证明真实后端 RBAC、customer config active revision 或真实账号可用。旧的 `mobile-*` 多实例 `/tasks` 路径已退出，不再作为本地兼容调试入口。
+
+如需核对真实后端模拟任务在岗位任务端详情页可见，并可提交阻塞、退回、完成和跨角色催办动作，先确认本地后端和试用账号可用，再执行：
+
+触达移动端任务动作、内部提醒、完成反馈、跨角色催办、任务模型或任务看板动作 helper 时，先跑本地无写入边界和模型测试：
+
+```bash
+node --test \
+  /Users/simon/projects/plush-toy-erp/scripts/qa/mobile-workflow-runtime-browser-smoke.test.mjs \
+  /Users/simon/projects/plush-toy-erp/web/src/erp/mobile/utils/mobileRoleTaskModel.test.mjs \
+  /Users/simon/projects/plush-toy-erp/web/src/erp/utils/workflowTaskBoard.test.mjs
+```
+
+如果还没有本地演示账号密码或后端地址，先打印输入模板。该模式只输出所需环境变量、模拟任务计划和真实回归命令，不登录、不调用后端、不启动浏览器、不写数据库：
+
+```bash
+node /Users/simon/projects/plush-toy-erp/web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs --print-input-template
+```
+
+本地前置看起来齐全但还不确定能否跑真实浏览器 smoke 时，先写 no-write preflight 报告。该报告只探测 backend health、演示密码 env 是否存在、是否需要脚本托管 Vite、试用 customer-config 脚本是否存在，并复用 `audit:yoyoosun-entry` 做只读端口审计；若显式传入 `MOBILE_WORKFLOW_BROWSER_SMOKE_BASE_URL`，该端口必须命中 yoyoosun config 和 yoyoosun asset，否则报告会以 `external-base-url-not-yoyoosun-entry` 阻止真实 smoke，避免把 Product Core、HTML fallback 或其他项目端口误当移动端任务端运行入口。报告还会记录模拟任务动作计划 coverage：老板阻塞、老板完成、老板退回、品质模拟完成、仓库模拟完成、跨角色催办、reason 必填、完成反馈、阻塞 / 退回原因事件、动作页证据输入已移除、新动作 evidence refs 为空和内部 `notification_type` 线索；不读取密码值、不登录、不调用 JSON-RPC、不启动 Vite / Playwright、不创建 workflow 任务、不写数据库，也不保存 token 或 Authorization header：
+
+```bash
+node /Users/simon/projects/plush-toy-erp/web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs \
+  --preflight-report output/mobile-workflow-runtime-browser-smoke/preflight.json
+```
+
+```bash
+MOBILE_WORKFLOW_BROWSER_SMOKE_PASSWORD='replace-with-local-demo-password' \
+  pnpm --dir /Users/simon/projects/plush-toy-erp/web smoke:mobile-workflow-runtime-browser
+```
+
+如需留下本地真实浏览器读回记录，直接运行脚本并追加报告路径：
+
+```bash
+MOBILE_WORKFLOW_BROWSER_SMOKE_PASSWORD='replace-with-local-demo-password' \
+  node /Users/simon/projects/plush-toy-erp/web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs \
+    --report output/mobile-workflow-runtime-browser-smoke/report.json
+```
+
+该回归会通过 JSON-RPC 在 `trial_boss_work / trial_quality_work / trial_warehouse_work` 普通协同命名空间创建唯一的 `simulated_only` 老板、品质和仓库任务，并为任务 payload 保留内部提醒线索；创建幂等键由 `runId + 场景任务码` 稳定生成，同键改变意图时由服务端拒绝。老板完成场景按正式角色合同要求 `workflow.task.approve`，其他岗位完成场景要求 `workflow.task.complete`。随后真实浏览器登录 `demo_boss`，在 `/m/boss/tasks` 提交自有任务阻塞原因、退回原因和完成反馈，验证动作页没有自由文本证据框或文件上传入口、回执没有新增历史处理线索，以及 `owner_role_key=warehouse` 且不指定跨岗处理人的仓库任务由老板通过监督范围查看，只能催办、不能代办阻塞 / 完成；再登录 `demo_quality` 和 `demo_warehouse` 验证完成反馈和已办列表。脚本不会占用 `order_approval / finished_goods_qc / warehouse_inbound / shipment_release` 等正式来源任务组；它只写本地 / 试用模拟 Workflow 证据，不绑定正式领域命令，不导入真实客户数据，也不写库存、采购、质检或财务事实。`--report` 只保存任务码、状态、动作结果、模拟任务计划 coverage 摘要、未证明项和脱敏布尔值，不保存密码、token、Authorization header、raw customer package 或 action 列表，也不进入 release evidence。
+
+## Workflow 定向验证
+
+以下命令在 `server/` 执行，用于任务状态、原因、事件、催办、版本与幂等的定向核验：
+
+```bash
+go test ./internal/data -run 'TestWorkflowRepo_(TaskStatusReasonEventAndCompletionCleanup|CreateAndUpdateTaskStatus|UrgeWorkflowTaskWritesEventAndPayload|.*Idempotency.*)'
+go test ./internal/service -run 'TestJsonrpcDispatcher_WorkflowUrgeTask|TestJsonrpcDispatcher_Workflow(CompleteTaskAction|ControlledTaskActions|.*Idempotency.*)'
+```

@@ -96,10 +96,8 @@ import {
   buildItemParams,
   unixToDateInputValue,
 } from '../components/bom/BOMVersionForms.jsx'
-import {
-  buildBOMItemSourceValuesFromMaterial,
-  hasActionPermission,
-} from '../utils/masterDataOrderView.mjs'
+import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
+import { buildBOMItemSourceValuesFromMaterial } from '../utils/sourceOrderLineValues.mjs'
 import {
   applyModuleColumnOrder,
   sanitizeModuleColumnOrder,

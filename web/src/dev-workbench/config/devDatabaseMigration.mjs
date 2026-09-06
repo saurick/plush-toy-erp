@@ -263,14 +263,27 @@ export function createDatabaseMigrationIdempotencyKey(kind) {
 
 export function createDevDatabaseMigrationClient({
   fetchImpl = globalThis.fetch,
+  timeoutMs = 60_000,
 } = {}) {
   if (typeof fetchImpl !== 'function') {
     throw new Error('当前环境不支持数据库迁移接口')
   }
+  const request = async (url, options) => {
+    try {
+      return await fetchImpl(url, {
+        ...options,
+        signal: AbortSignal.timeout(timeoutMs),
+      })
+    } catch {
+      throw new Error(
+        '迁移接口暂时无法连接或响应超时；请刷新状态核对结果，系统没有自动重试'
+      )
+    }
+  }
   let sessionPromise
   const session = () => {
     if (!sessionPromise) {
-      sessionPromise = fetchImpl(DEV_DATABASE_MIGRATION_SESSION_API_PATH, {
+      sessionPromise = request(DEV_DATABASE_MIGRATION_SESSION_API_PATH, {
         credentials: 'same-origin',
         cache: 'no-store',
         headers: { accept: 'application/json' },
@@ -286,14 +299,11 @@ export function createDevDatabaseMigrationClient({
   }
   return {
     async summary() {
-      const response = await fetchImpl(
-        DEV_DATABASE_MIGRATION_SUMMARY_API_PATH,
-        {
-          credentials: 'same-origin',
-          cache: 'no-store',
-          headers: { accept: 'application/json' },
-        }
-      )
+      const response = await request(DEV_DATABASE_MIGRATION_SUMMARY_API_PATH, {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { accept: 'application/json' },
+      })
       return validateDatabaseMigrationSummary(
         await readJson(response, '数据库迁移状态读取失败')
       )
@@ -302,7 +312,7 @@ export function createDevDatabaseMigrationClient({
       if (!OPERATION_ID_PATTERN.test(String(operationId || ''))) {
         throw new Error('迁移操作标识无效')
       }
-      const response = await fetchImpl(
+      const response = await request(
         `${DEV_DATABASE_MIGRATION_OPERATION_API_PREFIX}/${operationId}`,
         {
           credentials: 'same-origin',
@@ -315,7 +325,7 @@ export function createDevDatabaseMigrationClient({
     },
     async act(action) {
       const currentSession = await session()
-      const response = await fetchImpl(DEV_DATABASE_MIGRATION_ACTION_API_PATH, {
+      const response = await request(DEV_DATABASE_MIGRATION_ACTION_API_PATH, {
         method: 'POST',
         credentials: 'same-origin',
         cache: 'no-store',
@@ -326,6 +336,12 @@ export function createDevDatabaseMigrationClient({
         },
         body: JSON.stringify(action),
       })
+      if (response.status === 403) {
+        sessionPromise = undefined
+        throw new Error(
+          '迁移会话已失效或访问来源不符；请刷新状态后重新操作，本次请求未执行'
+        )
+      }
       const result = await readJson(response, '数据库迁移操作提交失败')
       assertObject(result, '数据库迁移操作结果')
       return validateDatabaseMigrationOperation(result.operation)

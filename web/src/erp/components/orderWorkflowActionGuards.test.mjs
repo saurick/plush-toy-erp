@@ -79,13 +79,14 @@ function loadOrderWorkflowHook({
 test('purchase and outsourcing hooks synchronously block another action for the same task', async (t) => {
   for (const config of [
     {
-      exportName: 'usePurchaseOrderWorkflowActions',
-      relativePath: './purchase-orders/usePurchaseOrderWorkflowActions.mjs',
+      exportName: 'useSourceOrderWorkflowActions',
+      relativePath: './workflow/useSourceOrderWorkflowActions.mjs',
+      surfaceKey: 'purchase_orders',
     },
     {
-      exportName: 'useOutsourcingOrderWorkflowActions',
-      relativePath:
-        './outsourcing-orders/useOutsourcingOrderWorkflowActions.mjs',
+      exportName: 'useSourceOrderWorkflowActions',
+      relativePath: './workflow/useSourceOrderWorkflowActions.mjs',
+      surfaceKey: 'outsourcing_orders',
     },
   ]) {
     await t.test(config.exportName, async () => {
@@ -110,7 +111,10 @@ test('purchase and outsourcing hooks synchronously block another action for the 
           blockCalls += 1
         },
       })
-      const actions = hook({ loadWorkflowTasks: async () => {} })
+      const actions = hook({
+        loadWorkflowTasks: async () => {},
+        surfaceKey: config.surfaceKey,
+      })
       const task = { id: 42, version: 7 }
 
       const completeSubmit = actions.completeWorkflowTask(task)
@@ -128,6 +132,7 @@ test('purchase and outsourcing hooks synchronously block another action for the 
       assert.equal(completeCalls, 1)
       assert.equal(blockCalls, 0)
       assert.equal(completeParams.expected_version, 7)
+      assert.equal(completeParams.payload.surface_key, config.surfaceKey)
       assert.match(completeParams.idempotency_key, /^wf:42:complete:/u)
     })
   }
@@ -136,14 +141,14 @@ test('purchase and outsourcing hooks synchronously block another action for the 
 test('purchase and outsourcing hooks submit blocked-to-ready resume through the shared guard', async (t) => {
   for (const config of [
     {
-      exportName: 'usePurchaseOrderWorkflowActions',
-      relativePath: './purchase-orders/usePurchaseOrderWorkflowActions.mjs',
+      exportName: 'useSourceOrderWorkflowActions',
+      relativePath: './workflow/useSourceOrderWorkflowActions.mjs',
+      surfaceKey: 'outsourcing_orders',
       surfaceKey: 'purchase_orders',
     },
     {
-      exportName: 'useOutsourcingOrderWorkflowActions',
-      relativePath:
-        './outsourcing-orders/useOutsourcingOrderWorkflowActions.mjs',
+      exportName: 'useSourceOrderWorkflowActions',
+      relativePath: './workflow/useSourceOrderWorkflowActions.mjs',
       surfaceKey: 'outsourcing_orders',
     },
   ]) {
@@ -164,7 +169,10 @@ test('purchase and outsourcing hooks submit blocked-to-ready resume through the 
           return true
         },
       })
-      const actions = hook({ loadWorkflowTasks: async () => {} })
+      const actions = hook({
+        loadWorkflowTasks: async () => {},
+        surfaceKey: config.surfaceKey,
+      })
       const task = { id: 42, task_status_key: 'blocked', version: 7 }
 
       assert.equal(

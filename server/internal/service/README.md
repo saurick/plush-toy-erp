@@ -21,6 +21,8 @@ JSON-RPC dispatcher 继续按职责拆文件维护：
 - `jsonrpc_dispatch_admin.go`：后台管理员、角色、权限和控制面审计入口。
 - `jsonrpc_dispatch_helpers.go`：协议参数解析、敏感参数脱敏和 `structpb` 包装 helper。
 
+`jsonrpc_customer_config.go` 保留客户配置统一入口与 method 分发；销售受理、材料供应和成品流转分别在同名前缀的 `_sales_acceptance.go`、`_material_supply.go`、`_finished_goods.go` 中解析协议并调用业务入口。流程实例的固定 revision 与领域命令边界由既有 usecase 校验。
+
 如果后续新增 HTTP DTO 转换逻辑，也建议继续把协议细节留在 `service` 层，不要回灌到 `biz`。
 
 补充说明见：

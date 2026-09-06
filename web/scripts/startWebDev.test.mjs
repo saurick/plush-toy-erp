@@ -65,23 +65,25 @@ test('start web dev: pending migration 启动受限恢复页而不是退出', as
   assert.match(output.join('\n'), /恢复模式.*普通 ERP 页面与 RPC 暂停/u)
 })
 
-test('start web dev: 非恢复错误仍然失败关闭', async () => {
-  await assert.rejects(
-    resolveWebRuntimeStartup(
-      {
-        apiOrigin: 'http://127.0.0.1:8300',
-        frontendOnly: false,
-        viteArgs: [],
+test('start web dev: 未分类的本地预检错误仍可进入恢复页且不泄露原始错误', async () => {
+  const output = []
+  const startup = await resolveWebRuntimeStartup(
+    {
+      apiOrigin: 'http://127.0.0.1:8300',
+      frontendOnly: false,
+      viteArgs: [],
+    },
+    {
+      preflight: async () => {
+        throw new Error('postgres://user:private-secret@example.com/db')
       },
-      {
-        preflight: async () => {
-          throw new Error('db-guard failed')
-        },
-        writeLine: () => {},
-      }
-    ),
-    /db-guard failed/u
+      writeLine: (line) => output.push(line),
+    }
   )
+  assert.equal(startup.complete, false)
+  assert.equal(startup.recoveryMode, LOCAL_RUNTIME_RECOVERY_MODE)
+  assert.equal(startup.recoveryReason, 'local_runtime_preflight_failed')
+  assert.doesNotMatch(output.join('\n'), /private-secret|postgres:\/\//u)
 })
 
 test('start web dev: recovery 环境显式覆盖且普通启动清除遗留值', () => {
@@ -103,6 +105,66 @@ test('start web dev: recovery 环境显式覆盖且普通启动清除遗留值',
   })
   assert.equal(Object.hasOwn(normal, 'ERP_DEV_RECOVERY_MODE'), false)
   assert.equal(Object.hasOwn(normal, 'ERP_DEV_RECOVERY_REASON'), false)
+})
+
+test('start web dev: 所有本地数据库预检阻断保留恢复入口', async () => {
+  for (const code of [
+    'workspace_migration_invalid',
+    'database_config_unavailable',
+    'database_status_unavailable',
+    'database_programmability_blocked',
+    'local_backend_unavailable',
+  ]) {
+    const startup = await resolveWebRuntimeStartup(
+      { apiOrigin: 'http://127.0.0.1:8300' },
+      {
+        preflight: async () => {
+          throw new LocalRuntimePreflightError(code, '检查未通过')
+        },
+        writeLine: () => {},
+      }
+    )
+    assert.equal(startup.recoveryReason, code)
+    assert.equal(startup.recoveryMode, LOCAL_RUNTIME_RECOVERY_MODE)
+    assert.equal(startup.complete, false)
+  }
+})
+
+test('start web dev: 预检卡住时取消命令并按时开放恢复页', async () => {
+  let signal
+  const startup = await resolveWebRuntimeStartup(
+    { apiOrigin: 'http://127.0.0.1:8300' },
+    {
+      timeoutMs: 5,
+      preflight: async (_, runtime) => {
+        signal = runtime.signal
+        await new Promise(() => {})
+      },
+      writeLine: () => {},
+    }
+  )
+  assert.equal(signal.aborted, true)
+  assert.equal(startup.recoveryReason, 'local_runtime_preflight_timeout')
+  assert.equal(startup.recoveryMode, LOCAL_RUNTIME_RECOVERY_MODE)
+})
+
+test('start web dev: 远端错误与非法代理配置不获得本地迁移入口', async () => {
+  for (const apiOrigin of [
+    'http://example.com',
+    'http://user:secret@127.0.0.1:8300',
+  ]) {
+    await assert.rejects(
+      resolveWebRuntimeStartup(
+        { apiOrigin },
+        {
+          preflight: async () => {
+            throw new Error('remote unavailable')
+          },
+          writeLine: () => {},
+        }
+      )
+    )
+  }
 })
 
 test('start web dev: 显式 GitLab 凭据优先且不读取钥匙串', async () => {

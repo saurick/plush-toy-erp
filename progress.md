@@ -4,6 +4,18 @@
 
 ## 当前活跃事项
 
+### 可维护性重构（2026-09-06）
+
+- 完成：清理闲置流程构建器，收口源单动作、字段映射、DEV 请求校验与 BOM/RBAC 映射；页面按查询、编辑、岗位/账号和事实动作归属拆分，Style L1 runner/打印链按职责拆分，客户配置分发与 Fact 必需依赖显式化。修正打印窗口草稿作用域、任务回执步骤及验证码组合控件描边/行高。
+- 验证：766 项定向 Node 测试、Go biz/data/service 定向测试、20 个浏览器场景、Web 构建、ESLint、Stylelint、依赖图和文档检查通过；高成本全量 QA 未运行。保留原有未提交改动，未 stage、commit、push、部署或变更数据库。
+
+### 本地启动与手动迁移恢复加固（2026-09-05）
+
+- 修正：本地数据库预检失败或超过 15 秒时保留迁移恢复页；恢复业务前重新通过完整检查。补齐逐项工具检测、旧计划重新准备、会话失效处理、未知写入结果停止、后端失败后的单独重启，以及数据库断连提示。
+- 实测：`pnpm start` 在正常配置与故意断连配置下均启动成功；断连时业务入口转入恢复页、RPC 返回 503，正常环境的迁移页重启后端成功，health / ready 均为 200，工作台与 ERP 登录入口可达。共享开发库为 `128/128`、`pending=0`。
+- 恢复证据：通过页面所用 runtime 执行只读源备份并恢复到临时 PostgreSQL 18.1，权限、约束、schema 与 migration 读回通过；容器已清理。备份标识 `br-yoyoosun-20260905T140753+0800`；验证截图与测试记录位于 `output/migration-recovery-verification-20260905/`。
+- 验证 / 边界：启动与迁移定向测试、迁移页单场景 Style L1、精确 ESLint、文档链接与 AGENTS 大小检查通过。未新增 migration，未 apply 共享库，未运行 full / strict，未部署、stage、commit 或 push。原有外部 `progress.md` 15 行改动保留，不能随本轮整体提交。
+
 ### 本地 migration 恢复启动与门禁（2026-09-04）
 
 - 根因：CI 和本地预检先前只证明 pending migration 必须阻断普通业务运行，但 `pnpm start` 会同时退出 Vite，导致唯一受控迁移页也无法访问。现在只将已明确分类的本地 pending migration 或本地后端 health / ready 未就绪转为受限恢复模式；db-guard、数据库配置、Atlas 输出、可编程对象和外部 API 错误仍直接失败关闭。
@@ -298,3 +310,18 @@
 - 真源 / 历史：后端 usecase 唯一计算货款、税额和总额，API、列表、详情、导出、帮助与试用模拟数据同步读取同一字段；数据库只新增可空 `quoted_freight_amount` 及非负、运费条件一致性约束。历史记录不猜测回填，既有已生效单仍可读取，后续需要商业条件完备的状态转换按新规则失败关闭。
 - Schema / 迁移：完成 Ent 生成、Atlas migration、风险元数据、`atlas.sum` 和数据字典同步；`make data` 读回 migration 目录与目标 schema 一致，`scripts/qa/db-guard.sh` 通过。本批未连接或 apply 开发库、测试库或目标库，未发布或部署。
 - 验证：Go `internal/biz`、`internal/service`、`internal/data` 全包通过；报价运费字段链、计算、页面、帮助、模拟数据、原型和 Schema 文档定向 Node `156 / 156` 通过；Vite production build（`3396` modules）、阶段编号边界与 `git diff --check` 通过。隔离浏览器的销售订单竞态场景通过；可见原型交互确认含运费会清空并禁用另计金额，不含运费填 `250.00` 后税额和总额分别更新为 `617.50`、`5367.50`。全业务页面场景在销售订单检查之后被无关的出货附件审计断言阻断，不能算本批绿色；客户 UAT、目标 migration smoke、full / strict、提交和推送均未执行。
+
+### 不可变发布与双目标部署完成（2026-09-05）
+
+- 发布：固定提交 `01fc1476a11ab6ab2bdfe77934fa391c542e8919`，实时确认与远端 `main` 一致。[完整 CI #139](https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/139) 成功，执行耗时 `211` 秒；[Release #140](https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/140) 复用其 exact-SHA 门禁，约 `229` 秒完成构建、隔离演练和 `2026.09.05-1` 发布。v2 七资产、独立 `source.tar` 与 manifest 绑定的演练回执均已读回校验；演练的 migration、health/ready、登录、PDF、备份恢复、稳态重启通过，临时容器零残留。
+- 目标部署：正式 controller/executor 先完成 `demo-133`（operation `fe5f06b0-da91-460d-8976-c33007c67bca`，远端执行 `97.797` 秒），读回通过后再完成 `customer-test-133`（operation `51d1c917-d923-45cf-9c9a-d9f354b15c09`，`94.392` 秒）。两个 v5 回执均为 `passed`；最终 `target-preflight` 确认前端、后端与各自公网入口均运行同一 `01fc1476…` 制品，health/ready/Web health 通过、migration 为 `20260904030457`、客户配置保持 active、迁移锁空闲。普通升级保留两个环境的现有业务数据。
+- 恢复与传输：旧版 `af4cc02808ebffc919201748561f7027b97679f3` 回滚制品在目标写入前已校验可取得；两个目标各自新建备份并完成隔离恢复校验，备份分别为 `866560` 与 `476846` bytes，完整 digest 绑定在对应 operation 回执。此次两个目标均为冷缓存，各自通过内网 TLS 取得并校验 `580313796` bytes，未经过 Mac 大文件中转；未据此宣称跨环境缓存命中或重复加载已消除。
+- 专用凭据：经用户明确授权创建本项目 Deploy Token `plush-target-package-read`，GitLab 回读 `Expires=Never`，唯一 scope 为 `read_package_registry`；安全保存于本机 macOS Keychain 的 `plush-toy-erp.gitlab-target-fetch`，不记录令牌值。两个目标取件成功且回执均证明临时凭据文件已清理；长期令牌保留，不在部署后撤销。
+- 验证边界：本轮没有重建或清空数据，没有改业务代码或 AGENTS。CI 与隔离发布演练不重复运行；目标带凭据岗位矩阵、目标 PDF smoke、客户 UAT / 签收和真实代码回滚演练仍未执行，不能由基础部署 smoke 或备份恢复校验代替。
+
+### GitLab 永久凭据替换与旧凭据清理（2026-09-05）
+
+- 已替换：经用户授权，创建 `plush-ci-read-permanent-20260905`（ID `21`，Reporter / `read_api`）与 `plush-release-permanent-20260905`（ID `22`，Developer / `api`），均回读 `expires_at=null`。前者替换钥匙串 `plush-toy-erp.gitlab-read-api`，并通过正式启动入口重启 `5175` 前端，确认新凭据已加载、旧进程已退出；后者替换 `GITLAB_RELEASE_TOKEN`，保留 `release` 环境范围及 Protected / Masked / Hidden / raw 属性。只移除这两枚新令牌的到期字段，未改变 GitLab 全站策略或扩大权限。
+- 已撤销：切换并验证引用后，旧发布令牌 ID `5`、旧永久只读令牌 ID `17` 均回读 `revoked=true / active=false`；此前个人临时令牌 `codex-delivery-20260831`、项目临时令牌 ID `14` 及旧 Deploy Token 均已失效。当前本项目有效凭据只有项目令牌 `21 / 22` 与永久制品下载 Deploy Token `10`，个人 active token 为 `0`；失效审计记录保留，SSH 推送密钥不变。
+- 验证：旧只读令牌认证返回 `401`；两个新令牌自身状态、固定 SHA 的 CI / Release 和主分支读取成功，撤销后 Pipeline `140` 仍返回 `200 / success`。现有 Deploy Token 从目标内网取得固定 release manifest，SHA-256 与发布证据一致。未重新运行 CI/CD 或部署；本机后端未就绪的原有恢复模式仍阻断工作台，未因此修改数据库或启动后端。
+- 安全待办：此前读取 GitLab 个人令牌页时，RSS feed token 意外进入工具输出；未复述或写入仓库，需要用户通过正常入口重置，尚未完成。本轮不记录任何令牌值，不改业务代码、AGENTS 或密码；此记录未提交推送。

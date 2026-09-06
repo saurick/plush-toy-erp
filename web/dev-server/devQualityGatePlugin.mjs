@@ -28,6 +28,8 @@ import {
   repositoryIdentitiesEqual,
 } from '../../scripts/qa/lib/repository-identity.mjs'
 import {
+  isSameOriginRequest,
+  readJsonBody,
   isLoopbackHostHeader,
   isLoopbackRemoteAddress,
 } from './devServerSecurity.mjs'
@@ -1806,50 +1808,6 @@ export function createDevQualityGateService({
   }
 }
 
-function isSameOriginRequest(request) {
-  const host = request.headers?.host
-  const origin = request.headers?.origin
-  if (
-    Array.isArray(host) ||
-    Array.isArray(origin) ||
-    !isLoopbackHostHeader(host) ||
-    typeof origin !== 'string'
-  ) {
-    return false
-  }
-  try {
-    const parsed = new URL(origin)
-    return (
-      ['http:', 'https:'].includes(parsed.protocol) &&
-      parsed.host.toLowerCase() === String(host).toLowerCase() &&
-      isLoopbackHostHeader(parsed.host) &&
-      !parsed.username &&
-      !parsed.password &&
-      parsed.pathname === '/' &&
-      !parsed.search &&
-      !parsed.hash &&
-      request.headers?.['sec-fetch-site'] === 'same-origin'
-    )
-  } catch {
-    return false
-  }
-}
-
-async function readJsonBody(request) {
-  let size = 0
-  const chunks = []
-  for await (const chunk of request) {
-    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
-    size += bytes.length
-    if (size > MAX_QUALITY_GATE_REQUEST_BYTES) {
-      throw new Error('quality gate request body is too large')
-    }
-    chunks.push(bytes)
-  }
-  if (size === 0) throw new Error('quality gate request body is required')
-  return JSON.parse(Buffer.concat(chunks).toString('utf8'))
-}
-
 function sendJson(response, statusCode, payload, headers = {}) {
   response.statusCode = statusCode
   response.setHeader('Content-Type', 'application/json; charset=utf-8')
@@ -1993,7 +1951,12 @@ export function createDevQualityGateMiddleware({
           202,
           await qualityService.cancel(
             cancelMatch[1],
-            validateDevQualityGateCancel(await readJsonBody(request))
+            validateDevQualityGateCancel(
+              await readJsonBody(request, {
+                maxBytes: MAX_QUALITY_GATE_REQUEST_BYTES,
+                label: 'quality gate request',
+              })
+            )
           )
         )
         return
@@ -2020,7 +1983,12 @@ export function createDevQualityGateMiddleware({
           response,
           202,
           await qualityService.act(
-            validateDevQualityGateAction(await readJsonBody(request))
+            validateDevQualityGateAction(
+              await readJsonBody(request, {
+                maxBytes: MAX_QUALITY_GATE_REQUEST_BYTES,
+                label: 'quality gate request',
+              })
+            )
           )
         )
         return

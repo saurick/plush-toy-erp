@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
-import { buildMaterialPurchaseContractDraftFromPurchaseOrder } from '../../utils/masterDataOrderView.mjs'
+import { buildMaterialPurchaseContractDraftFromPurchaseOrder } from '../../utils/purchaseOrderPrintDraft.mjs'
 import {
   completeMaterialPurchaseContractDraft,
   mergeSnapshotMissingFields,

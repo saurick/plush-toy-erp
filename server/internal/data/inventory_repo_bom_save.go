@@ -16,7 +16,8 @@ import (
 	entsql "entgo.io/ent/dialect/sql"
 )
 
-func (r *inventoryRepo) SaveBOMWithItems(ctx context.Context, id int, in *biz.BOMVersionMutation, items []*biz.BOMItemSaveMutation) (*biz.BOMVersionDetail, error) {
+func (r *inventoryRepo) SaveBOMWithItems(ctx context.Context, id int, in *biz.BOMVersionMutation, items []*biz.BOMItemSaveMutation) (_ *biz.BOMVersionDetail, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrBOMRecordConflict) }()
 	if in == nil || id < 0 || in.ProductID <= 0 || (id == 0 && in.ExpectedVersion != 0) || (id > 0 && in.ExpectedVersion <= 0) {
 		return nil, biz.ErrBadParam
 	}
@@ -117,7 +118,7 @@ func (r *inventoryRepo) SaveBOMWithItems(ctx context.Context, id int, in *biz.BO
 			).
 			SetVersion(in.Version).
 			SetUpdatedAt(nextEditTime)
-		applyBOMHeaderOptionalUpdate(update, in)
+		applyBOMHeaderOptionalFields(update.Mutation(), &in.BOMHeaderUpdate)
 		affected, err := update.Save(ctx)
 		if err != nil {
 			return nil, err
@@ -301,64 +302,6 @@ func nextBOMEditTime(expectedVersion int64) time.Time {
 		next = 1
 	}
 	return time.UnixMicro(next).UTC()
-}
-
-func applyBOMHeaderOptionalUpdate(update *ent.BOMHeaderUpdate, in *biz.BOMVersionMutation) {
-	if in.EffectiveFrom == nil {
-		update.ClearEffectiveFrom()
-	} else {
-		update.SetEffectiveFrom(*in.EffectiveFrom)
-	}
-	if in.EffectiveTo == nil {
-		update.ClearEffectiveTo()
-	} else {
-		update.SetEffectiveTo(*in.EffectiveTo)
-	}
-	if in.SourceOrderNo == nil {
-		update.ClearSourceOrderNo()
-	} else {
-		update.SetSourceOrderNo(*in.SourceOrderNo)
-	}
-	if in.QuantityText == nil {
-		update.ClearQuantityText()
-	} else {
-		update.SetQuantityText(*in.QuantityText)
-	}
-	if in.SpareText == nil {
-		update.ClearSpareText()
-	} else {
-		update.SetSpareText(*in.SpareText)
-	}
-	if in.PrintDate == nil {
-		update.ClearPrintDate()
-	} else {
-		update.SetPrintDate(*in.PrintDate)
-	}
-	if in.Designer == nil {
-		update.ClearDesigner()
-	} else {
-		update.SetDesigner(*in.Designer)
-	}
-	if in.Maker == nil {
-		update.ClearMaker()
-	} else {
-		update.SetMaker(*in.Maker)
-	}
-	if in.Auditor == nil {
-		update.ClearAuditor()
-	} else {
-		update.SetAuditor(*in.Auditor)
-	}
-	if in.HairDirection == nil {
-		update.ClearHairDirection()
-	} else {
-		update.SetHairDirection(*in.HairDirection)
-	}
-	if in.Note == nil {
-		update.ClearNote()
-	} else {
-		update.SetNote(*in.Note)
-	}
 }
 
 func createBOMSaveItem(ctx context.Context, tx *ent.Tx, headerID int, item *biz.BOMItemSaveMutation) (*ent.BOMItem, error) {

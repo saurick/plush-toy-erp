@@ -14,19 +14,58 @@ const formSource = readFileSync(
   'utf8'
 )
 const orderViewSource = readFileSync(
-  new URL('../utils/masterDataOrderView.mjs', import.meta.url),
+  new URL('../utils/sourceOrderParams.mjs', import.meta.url),
+  'utf8'
+)
+
+const sourceFactActions = readFileSync(
+  new URL(
+    '../components/outsourcing-orders/useOutsourcingSourceFacts.jsx',
+    import.meta.url
+  ),
+  'utf8'
+)
+const payableAction = readFileSync(
+  new URL(
+    '../components/outsourcing-orders/useOutsourcingReturnPayable.mjs',
+    import.meta.url
+  ),
+  'utf8'
+)
+
+const editor = readFileSync(
+  new URL(
+    '../components/outsourcing-orders/useOutsourcingOrderEditor.mjs',
+    import.meta.url
+  ),
+  'utf8'
+)
+
+const query = readFileSync(
+  new URL(
+    '../components/outsourcing-orders/useOutsourcingOrderQuery.mjs',
+    import.meta.url
+  ),
+  'utf8'
+)
+
+const lifecycle = readFileSync(
+  new URL(
+    '../components/outsourcing-orders/useOutsourcingOrderLifecycle.jsx',
+    import.meta.url
+  ),
   'utf8'
 )
 
 test('outsourcing records reopen exact DRAFT facts in the shared source modal', () => {
   assert.match(source, /openOutsourcingFactDraftEditor/u)
-  assert.match(source, /keyword: String\(fact\.id\)/u)
-  assert.match(source, /fresh\.status !== 'DRAFT'/u)
-  assert.match(source, /mode: 'edit'/u)
-  assert.match(source, /buildOperationalFactDraftSavePayload/u)
-  assert.match(source, /saveOutsourcingMaterialIssueDraft/u)
-  assert.match(source, /saveOutsourcingReturnReceiptDraft/u)
-  assert.match(source, /findOperationalFactDraftSaveResult/u)
+  assert.match(sourceFactActions, /keyword: String\(fact\.id\)/u)
+  assert.match(sourceFactActions, /fresh\.status !== 'DRAFT'/u)
+  assert.match(sourceFactActions, /mode: 'edit'/u)
+  assert.match(sourceFactActions, /buildOperationalFactDraftSavePayload/u)
+  assert.match(sourceFactActions, /saveOutsourcingMaterialIssueDraft/u)
+  assert.match(sourceFactActions, /saveOutsourcingReturnReceiptDraft/u)
+  assert.match(sourceFactActions, /findOperationalFactDraftSaveResult/u)
 })
 
 test('outsourcing page has no retired sales-order foreign-key field', () => {
@@ -35,31 +74,31 @@ test('outsourcing page has no retired sales-order foreign-key field', () => {
 })
 
 test('outsourcing contract keeps editable party B snapshot and checks it before lifecycle or print', () => {
-  assert.match(source, /supplier_types: \['outsourcing', 'mixed'\]/u)
-  assert.match(source, /buildOutsourcingSupplierSnapshot/u)
-  assert.match(source, /loadSupplierContacts/u)
+  assert.match(editor, /supplier_types: \['outsourcing', 'mixed'\]/u)
+  assert.match(editor, /buildOutsourcingSupplierSnapshot/u)
+  assert.match(editor, /loadSupplierContacts/u)
   assert.match(formSource, /合同乙方信息/u)
   assert.match(formSource, /乙方联系人/u)
   assert.match(formSource, /乙方签约人/u)
   assert.match(source, /inspectOutsourcingContractReadiness/u)
-  assert.match(source, /buildOutsourcingContractConfirmationSummary/u)
+  assert.match(lifecycle, /buildOutsourcingContractConfirmationSummary/u)
   assert.match(source, /loadBusinessAttachmentPrintAppendixSnapshots/u)
   assert.doesNotMatch(source, /mergeSnapshotMissingFields/u)
 })
 
 test('outsourcing order source actions use exact capabilities and dedicated commands', () => {
   for (const permission of [
-    'outsourcing.fact.read',
     'outsourcing.material_issue.create',
     'outsourcing.return_receipt.create',
   ]) {
     assert.match(source, new RegExp(permission.replaceAll('.', '\\.'), 'u'))
   }
+  assert.match(query, /'outsourcing\.fact\.read'/u)
   for (const command of [
     'createOutsourcingMaterialIssueFromOrder',
     'createOutsourcingReturnReceiptFromOrder',
   ]) {
-    assert.match(source, new RegExp(command, 'u'))
+    assert.match(sourceFactActions, new RegExp(command, 'u'))
   }
   assert.doesNotMatch(source, /createOutsourcingFact/u)
   assert.doesNotMatch(
@@ -70,15 +109,15 @@ test('outsourcing order source actions use exact capabilities and dedicated comm
 
 test('outsourcing order source actions stay on the matching confirmed open line', () => {
   assert.match(
-    source,
+    sourceFactActions,
     /OUTSOURCING_ORDER_SUBJECT_TYPES\.MATERIAL[\s\S]*OUTSOURCING_SOURCE_ACTIONS\.MATERIAL_ISSUE/u
   )
-  assert.match(source, /OUTSOURCING_SOURCE_ACTIONS\.RETURN_RECEIPT/u)
-  assert.match(source, /label: '委外发料'/u)
-  assert.match(source, /label: '登记回货'/u)
-  assert.match(source, /isOutsourcingSourceActionEligible/u)
-  assert.match(source, /filterOutsourcingSourceActionLots/u)
-  assert.match(source, /sourceAction && view === 'details'/u)
+  assert.match(sourceFactActions, /OUTSOURCING_SOURCE_ACTIONS\.RETURN_RECEIPT/u)
+  assert.match(sourceFactActions, /label: '委外发料'/u)
+  assert.match(sourceFactActions, /label: '登记回货'/u)
+  assert.match(sourceFactActions, /isOutsourcingSourceActionEligible/u)
+  assert.match(sourceFactActions, /filterOutsourcingSourceActionLots/u)
+  assert.match(sourceFactActions, /sourceAction && view === 'details'/u)
   assert.doesNotMatch(source, /sourceAction && view !== 'preview'/u)
   assert.doesNotMatch(source, /sourceAction && view === 'modal'/u)
 })
@@ -93,27 +132,36 @@ test('outsourcing page explains follow-up work in business language', () => {
 })
 
 test('outsourcing order source modal uses retry-safe attempts and clears closed context', () => {
-  assert.match(source, /createSourceBusinessActionAttemptStore/u)
-  assert.match(source, /sourceBusinessActionNo/u)
-  assert.match(source, /sourceFactAttemptsRef\.current\.prepare/u)
-  assert.match(source, /sourceFactAttemptsRef\.current\.settle/u)
-  assert.match(source, /isSourceBusinessActionResultUnknown\(error\)/u)
-  assert.match(source, /findOutsourcingSourceFactResult/u)
-  assert.match(source, /保持内容不变后重试，避免重复记录/u)
-  assert.match(source, /已重新读取并确认委外回货草稿，可在委外记录中继续办理/u)
-  assert.match(source, /sourceFactRequestRef\.current \+= 1/u)
-  assert.match(source, /setSourceFactContext\(EMPTY_SOURCE_FACT_CONTEXT\)/u)
+  assert.match(sourceFactActions, /createSourceBusinessActionAttemptStore/u)
+  assert.match(sourceFactActions, /sourceBusinessActionNo/u)
+  assert.match(sourceFactActions, /sourceFactAttemptsRef\.current\.prepare/u)
+  assert.match(sourceFactActions, /sourceFactAttemptsRef\.current\.settle/u)
+  assert.match(
+    sourceFactActions,
+    /isSourceBusinessActionResultUnknown\(error\)/u
+  )
+  assert.match(sourceFactActions, /findOutsourcingSourceFactResult/u)
+  assert.match(sourceFactActions, /保持内容不变后重试，避免重复记录/u)
+  assert.match(
+    sourceFactActions,
+    /已重新读取并确认委外回货草稿，可在委外记录中继续办理/u
+  )
+  assert.match(sourceFactActions, /sourceFactRequestRef\.current \+= 1/u)
+  assert.match(
+    sourceFactActions,
+    /setSourceFactContext\(EMPTY_SOURCE_FACT_CONTEXT\)/u
+  )
   assert.match(source, /<OutsourcingOrderSourceFactModal/u)
-  assert.match(source, /listAllProductSKUs/u)
-  assert.doesNotMatch(source, /listProductSKUs\(\{ limit: 500 \}\)/u)
-  assert.match(source, /listAllOutsourcingFacts\(\{/u)
+  assert.match(editor, /listAllProductSKUs/u)
+  assert.doesNotMatch(editor, /listProductSKUs\(\{ limit: 500 \}\)/u)
+  assert.match(sourceFactActions, /listAllOutsourcingFacts\(\{/u)
   assert.doesNotMatch(
     source,
     /listOutsourcingFacts\([\s\S]{0,160}limit:\s*500/u
   )
   assert.match(source, /productSKUs=\{productSKUs\}/u)
   assert.match(source, /handleProductSKUChange/u)
-  assert.match(source, /sku_code_snapshot/u)
+  assert.match(editor, /sku_code_snapshot/u)
 })
 
 test('outsourcing page delegates complete paginated datasets to listAll contracts', () => {
@@ -126,12 +174,20 @@ test('outsourcing page delegates complete paginated datasets to listAll contract
     'listAllUnits',
     'listAllWarehouses',
     'listAllContactsByOwner',
+  ]) {
+    assert.match(editor, new RegExp(`\\b${functionName}\\s*\\(`, 'u'))
+  }
+
+  for (const functionName of [
     'listAllOutsourcingOrderItems',
     'listAllOutsourcingFacts',
     'listAllInventoryLots',
     'listAllOutsourcingReturnQualityInspections',
   ]) {
-    assert.match(source, new RegExp(`\\b${functionName}\\s*\\(`, 'u'))
+    assert.match(
+      sourceFactActions,
+      new RegExp(`\\b${functionName}\\s*\\(`, 'u')
+    )
   }
 
   for (const singlePageFunctionName of [
@@ -149,16 +205,20 @@ test('outsourcing page delegates complete paginated datasets to listAll contract
     'listOutsourcingReturnQualityInspections',
   ]) {
     assert.doesNotMatch(
-      source,
+      editor,
+      new RegExp(`\\b${singlePageFunctionName}\\s*\\(`, 'u')
+    )
+    assert.doesNotMatch(
+      sourceFactActions,
       new RegExp(`\\b${singlePageFunctionName}\\s*\\(`, 'u')
     )
   }
 })
 
 test('outsourcing order source actions submit only source-owned form values', () => {
-  const actionSource = source.slice(
-    source.indexOf('const submitOutsourcingSourceFact'),
-    source.indexOf('const processingPrintTemplateDefaults')
+  const actionSource = sourceFactActions.slice(
+    sourceFactActions.indexOf('const submitOutsourcingSourceFact'),
+    sourceFactActions.lastIndexOf('return {')
   )
   assert.match(actionSource, /buildOutsourcingSourceFactPayload/u)
   assert.match(actionSource, /customer_key: activeCustomerKey \|\| undefined/u)
@@ -182,15 +242,24 @@ test('outsourcing order source actions submit only source-owned form values', ()
 test('posted outsourcing returns expose source-bound payable through related records', () => {
   assert.match(source, />\s*委外记录\s*</u)
   assert.match(source, /finance\.payable\.confirm/u)
-  assert.match(source, /buildOutsourcingReturnPayablePayload\(values, fact\)/u)
-  assert.match(source, /createPayableFromOutsourcingReturn\(attempt\.params\)/u)
-  assert.match(source, /financeSourceAttemptsRef\.current\.prepare/u)
-  assert.match(source, /financeSourceAttemptsRef\.current\.settle/u)
-  assert.match(source, /source_type: 'OUTSOURCING_FACT'/u)
-  assert.match(source, /resolveOutsourcingReturnQualityGate/u)
-  assert.match(source, /OUTSOURCING_RETURN_QUALITY_GATE_STATES\.ACCEPTED/u)
-  assert.match(source, /尚未完成合格或让步接收判定/u)
-  assert.match(source, /质检不合格，请先完成返工、退回等质量处置/u)
+  assert.match(
+    payableAction,
+    /buildOutsourcingReturnPayablePayload\(values, fact\)/u
+  )
+  assert.match(
+    payableAction,
+    /createPayableFromOutsourcingReturn\(attempt\.params\)/u
+  )
+  assert.match(payableAction, /financeSourceAttemptsRef\.current\.prepare/u)
+  assert.match(payableAction, /financeSourceAttemptsRef\.current\.settle/u)
+  assert.match(payableAction, /source_type: 'OUTSOURCING_FACT'/u)
+  assert.match(payableAction, /resolveOutsourcingReturnQualityGate/u)
+  assert.match(
+    payableAction,
+    /OUTSOURCING_RETURN_QUALITY_GATE_STATES\.ACCEPTED/u
+  )
+  assert.match(payableAction, /尚未完成合格或让步接收判定/u)
+  assert.match(payableAction, /质检不合格，请先完成返工、退回等质量处置/u)
   assert.match(source, /<OutsourcingReturnRecordsModal/u)
   assert.match(source, /<FinanceBusinessSourceModal/u)
 })
@@ -202,29 +271,32 @@ test('outsourcing record lifecycle uses exact permissions, canonical commands, a
   ]) {
     assert.match(source, new RegExp(permission.replaceAll('.', '\\.'), 'u'))
   }
-  assert.match(source, /postOutsourcingFact/u)
-  assert.match(source, /cancelOutsourcingFact/u)
-  assert.match(source, /const mutateOutsourcingFact/u)
-  assert.match(source, /isSourceBusinessActionResultUnknown\(error\)/u)
+  assert.match(sourceFactActions, /postOutsourcingFact/u)
+  assert.match(sourceFactActions, /cancelOutsourcingFact/u)
+  assert.match(sourceFactActions, /const mutateOutsourcingFact/u)
   assert.match(
-    source,
+    sourceFactActions,
+    /isSourceBusinessActionResultUnknown\(error\)/u
+  )
+  assert.match(
+    sourceFactActions,
     /currentFacts = await loadRelatedOutsourcingFacts\([\s\S]*setRelatedReturnFacts\(currentFacts\)/u
   )
-  assert.match(source, /matchesOperationalFactLifecycleResult/u)
-  assert.match(source, /expected_version: fact\?\.version/u)
+  assert.match(sourceFactActions, /matchesOperationalFactLifecycleResult/u)
+  assert.match(sourceFactActions, /expected_version: fact\?\.version/u)
   assert.match(
-    source,
+    sourceFactActions,
     /\.\.\.\(!isPost \? \{ reason: String\(reason \|\| ''\)\.trim\(\) \} : \{\}\)/u
   )
-  assert.match(source, /写入后重新读取仍未确认目标状态/u)
-  assert.match(source, /作废不会产生任何库存变动/u)
-  assert.match(source, /库存已恢复至过账前状态/u)
+  assert.match(sourceFactActions, /写入后重新读取仍未确认目标状态/u)
+  assert.match(sourceFactActions, /作废不会产生任何库存变动/u)
+  assert.match(sourceFactActions, /库存已恢复至过账前状态/u)
   assert.match(source, /canPostFact=\{canPostOutsourcingFact\}/u)
   assert.match(source, /canCancelFact=\{canCancelOutsourcingFact\}/u)
   assert.match(source, /onPostFact=\{postSelectedOutsourcingFact\}/u)
   assert.match(source, /onCancelFact=\{cancelSelectedOutsourcingFact\}/u)
   assert.match(
-    source,
+    sourceFactActions,
     /onOk: \(_close\) => \{\s+const reason = cancelReason\.trim\(\)/u
   )
   assert.doesNotMatch(source, /return Promise\.reject\(\)/u)
@@ -233,29 +305,38 @@ test('outsourcing record lifecycle uses exact permissions, canonical commands, a
 test('posted outsourcing returns expose source-bound quality inspection', () => {
   assert.match(source, /quality\.inspection\.create/u)
   assert.match(source, /quality\.inspection\.read/u)
-  assert.match(source, /createQualityInspectionFromOutsourcingReturn/u)
-  assert.match(source, /listAllOutsourcingReturnQualityInspections/u)
+  assert.match(
+    sourceFactActions,
+    /createQualityInspectionFromOutsourcingReturn/u
+  )
+  assert.match(sourceFactActions, /listAllOutsourcingReturnQualityInspections/u)
   assert.doesNotMatch(source, /\blistOutsourcingReturnQualityInspections\s*\(/u)
-  assert.match(source, /fact_id: fact\.id/u)
-  assert.match(source, /buildOutsourcingReturnQualityInspectionPayload/u)
-  assert.match(source, /isMatchingOutsourcingReturnQualityInspection/u)
-  assert.match(source, /qualitySourceInFlightRef\.current/u)
-  assert.match(source, /质检生成结果仍无法确认/u)
-  assert.match(source, /setRelatedReturnFacts\(facts\)/u)
-  assert.match(source, /setQualityInspectionByFactID/u)
+  assert.match(sourceFactActions, /fact_id: fact\.id/u)
+  assert.match(
+    sourceFactActions,
+    /buildOutsourcingReturnQualityInspectionPayload/u
+  )
+  assert.match(
+    sourceFactActions,
+    /isMatchingOutsourcingReturnQualityInspection/u
+  )
+  assert.match(sourceFactActions, /qualitySourceInFlightRef\.current/u)
+  assert.match(sourceFactActions, /质检生成结果仍无法确认/u)
+  assert.match(sourceFactActions, /setRelatedReturnFacts\(facts\)/u)
+  assert.match(sourceFactActions, /setQualityInspectionByFactID/u)
   assert.match(source, /canCreateQualityInspection=/u)
   assert.match(source, /canViewQualityInspection=/u)
   assert.match(source, /qualityInspectionByFactID=/u)
   assert.match(source, /viewOutsourcingReturnQualityInspection/u)
-  assert.match(source, /quality_inspection_id: inspection\.id/u)
+  assert.match(sourceFactActions, /quality_inspection_id: inspection\.id/u)
   assert.match(source, /<OutsourcingReturnQualityInspectionModal/u)
   assert.doesNotMatch(source, /createQualityInspectionDraft/u)
 })
 
 test('outsourcing return quality request only accepts source-owned business fields', () => {
-  const actionSource = source.slice(
-    source.indexOf('const submitOutsourcingReturnQualityInspection'),
-    source.indexOf('const openOutsourcingReturnPayable')
+  const actionSource = sourceFactActions.slice(
+    sourceFactActions.indexOf('const submitOutsourcingReturnQualityInspection'),
+    sourceFactActions.indexOf('const viewOutsourcingReturnQualityInspection')
   )
   assert.match(actionSource, /buildOutsourcingReturnQualityInspectionPayload/u)
   for (const forbiddenFormValue of [
@@ -276,12 +357,12 @@ test('outsourcing return quality request only accepts source-owned business fiel
 
 test('resolved related contract number is isolated by the exact route key', () => {
   assert.match(
-    source,
+    query,
     /const linkedRouteKey = `\$\{routeOutsourcingOrderID\}:\$\{routeOutsourcingFactID\}`/u
   )
-  assert.match(source, /resolvedLinkedContext\.routeKey === linkedRouteKey/u)
+  assert.match(query, /resolvedLinkedContext\.routeKey === linkedRouteKey/u)
   assert.match(
-    source,
+    query,
     /setResolvedLinkedContext\(\{ routeKey: requestRouteKey, keyword: '' \}\)/u
   )
 })

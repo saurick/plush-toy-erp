@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
 
@@ -20,6 +20,27 @@ import {
 
 const ROOT = resolve(import.meta.dirname, "../..");
 const read = (path) => readFileSync(resolve(ROOT, path), "utf8");
+
+// Static guards cover the page and its owned views; browser scenarios verify their wiring.
+function readObservatorySource() {
+  const dir = "web/src/dev-workbench/components/flow-state";
+  return [
+    read("web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx"),
+    ...readdirSync(resolve(ROOT, dir))
+      .filter((name) => /\.(jsx|mjs)$/.test(name))
+      .sort()
+      .map((name) => read(`${dir}/${name}`)),
+  ].join("\n");
+}
+
+function readFunctionSource(file, name) {
+  const source = read(file);
+  const start = source.indexOf(`function ${name}(`);
+  assert(start >= 0, `missing function ${name} in ${file}`);
+  const rest = source.slice(start);
+  const end = rest.search(/\n(?:export|function|const) /u);
+  return end < 0 ? rest : rest.slice(0, end);
+}
 
 test("dev flow state observatory: route and all catalogs stay DEV-only and read-only", () => {
   const catalog = DEV_FLOW_STATE_CATALOG;
@@ -69,9 +90,7 @@ test("dev flow state observatory: route and all catalogs stay DEV-only and read-
 });
 
 test("dev flow state observatory: five-view information architecture explains people, path, ledger, rules, and chain", () => {
-  const page = read(
-    "web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx",
-  );
+  const page = readObservatorySource();
 
   assert.match(
     page,
@@ -163,9 +182,7 @@ test("dev flow state observatory: five-view information architecture explains pe
 
 test("dev flow state observatory: long definition selects are grouped without changing ProcessRuntime order", () => {
   const catalog = DEV_FLOW_STATE_CATALOG;
-  const page = read(
-    "web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx",
-  );
+  const page = readObservatorySource();
   const chainOptions = buildBusinessChainSelectOptions(catalog);
   const factOptions = buildFactDefinitionSelectOptions(catalog);
   const stateOptions = buildStateDefinitionSelectOptions(catalog);
@@ -191,9 +208,7 @@ test("dev flow state observatory: long definition selects are grouped without ch
 });
 
 test("dev flow state observatory: English anchors stay paired with the concept layers", () => {
-  const page = read(
-    "web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx",
-  );
+  const page = readObservatorySource();
   const taskNav = read("web/src/dev-workbench/components/DevTaskNav.jsx");
 
   for (const [label, englishLabel] of [
@@ -214,28 +229,27 @@ test("dev flow state observatory: English anchors stay paired with the concept l
 });
 
 test("dev flow state observatory: pasted business text search is local, grouped, and IME-safe", () => {
-  const page = read(
-    "web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx",
-  );
+  const page = readObservatorySource();
   const helper = read(
     "web/src/dev-workbench/pages/devFlowDefinitionSearch.mjs",
   );
-  const searchStart = page.indexOf("function DefinitionSearch");
-  const searchEnd = page.indexOf("\nfunction ContextStrip", searchStart);
-  const pageIndexStart = page.indexOf(
+  const rootPage = read(
+    "web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx",
+  );
+  const search = readFunctionSource(
+    "web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx",
+    "DefinitionSearch",
+  );
+  const pageIndexStart = rootPage.indexOf(
     '<details className="erp-dev-flow-definition-tools">',
-    searchEnd,
   );
-  const primaryNavStart = page.indexOf(
+  const primaryNavStart = rootPage.indexOf(
     '<section className="erp-dev-flow-nav">',
-    pageIndexStart,
   );
-  assert(searchStart >= 0 && searchEnd > searchStart);
   assert(
-    pageIndexStart > searchEnd && primaryNavStart > pageIndexStart,
-    "definition index must be page-level and render before the five primary tabs",
+    pageIndexStart >= 0 && primaryNavStart > pageIndexStart,
+    "definition index renders before the five primary tabs",
   );
-  const search = page.slice(searchStart, searchEnd);
 
   for (const group of [
     "label: '业务链'",
@@ -301,9 +315,7 @@ test("dev flow state observatory: pasted business text search is local, grouped,
 });
 
 test("dev flow state observatory: deep links clear stale selections, fail closed for invalid values, and keep chain return context", () => {
-  const page = read(
-    "web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx",
-  );
+  const page = readObservatorySource();
 
   assert.deepEqual(Object.values(DEV_FLOW_STATE_QUERY_KEYS), [
     "view",
@@ -371,9 +383,7 @@ test("dev flow state observatory: deep links clear stale selections, fail closed
 });
 
 test("dev flow state observatory: customer review print is generated from the shared catalog and contains no second flow catalog", () => {
-  const page = read(
-    "web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx",
-  );
+  const page = readObservatorySource();
   const model = read(
     "web/src/dev-workbench/config/devBusinessChainCustomerReview.mjs",
   );
@@ -416,30 +426,23 @@ test("dev flow state observatory: customer review print is generated from the sh
 });
 
 test("dev flow state observatory: task selection stays in the URL without leaking into the global context strip", () => {
-  const page = read(
-    "web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx",
+  const page = readObservatorySource();
+  const context = readFunctionSource(
+    "web/src/dev-workbench/components/flow-state/FlowStateShared.jsx",
+    "ContextStrip",
   );
-  const contextStart = page.indexOf("function ContextStrip");
-  const contextEnd = page.indexOf("\nfunction TaskLookupResults", contextStart);
+  const workflow = readFunctionSource(
+    "web/src/dev-workbench/components/flow-state/WorkflowView.jsx",
+    "WorkflowView",
+  );
+  const runtime = readFunctionSource(
+    "web/src/dev-workbench/components/flow-state/RuntimeView.jsx",
+    "RuntimeView",
+  );
   const selectionStart = page.indexOf("const specialistSelection =");
   const selectionEnd = page.indexOf("\n\n  const renderView", selectionStart);
-  const workflowStart = page.indexOf("function WorkflowView");
-  const workflowEnd = page.indexOf(
-    "\nfunction ProcessDefinitionCard",
-    workflowStart,
-  );
-  const runtimeStart = page.indexOf("function RuntimeView");
-  const runtimeEnd = page.indexOf("\nfunction FactsView", runtimeStart);
-
-  assert(contextStart >= 0 && contextEnd > contextStart);
   assert(selectionStart >= 0 && selectionEnd > selectionStart);
-  assert(workflowStart >= 0 && workflowEnd > workflowStart);
-  assert(runtimeStart >= 0 && runtimeEnd > runtimeStart);
-
-  const context = page.slice(contextStart, contextEnd);
   const specialistSelection = page.slice(selectionStart, selectionEnd);
-  const workflow = page.slice(workflowStart, workflowEnd);
-  const runtime = page.slice(runtimeStart, runtimeEnd);
 
   assert.doesNotMatch(context, /taskId|真实任务上下文|task_id/u);
   assert.doesNotMatch(specialistSelection, /workflow|taskId|任务 \$\{/u);
@@ -456,9 +459,7 @@ test("dev flow state observatory: task selection stays in the URL without leakin
 });
 
 test("dev flow state observatory: task-name lookup and unlinked runtime boundary remain exact", () => {
-  const page = read(
-    "web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx",
-  );
+  const page = readObservatorySource();
   const helper = read("web/src/dev-workbench/pages/devFlowStateTaskLookup.mjs");
 
   for (const copy of [
@@ -517,18 +518,15 @@ test("dev flow state observatory: task-name lookup and unlinked runtime boundary
 });
 
 test("dev flow state observatory: Runtime completion never promotes Workflow or Fact completion", () => {
-  const page = read(
-    "web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx",
+  const page = readObservatorySource();
+  const chain = readFunctionSource(
+    "web/src/dev-workbench/components/flow-state/BusinessChainViews.jsx",
+    "BusinessChainView",
   );
-  const chainStart = page.indexOf("function BusinessChainView");
-  const chainEnd = page.indexOf("\nfunction WorkflowView", chainStart);
-  const chain = page.slice(chainStart, chainEnd);
-  const overviewStart = page.indexOf("function BusinessChainOverviewView");
-  const overviewEnd = page.indexOf(
-    "\nfunction BusinessChainView",
-    overviewStart,
+  const overview = readFunctionSource(
+    "web/src/dev-workbench/components/flow-state/BusinessChainViews.jsx",
+    "BusinessChainOverviewView",
   );
-  const overview = page.slice(overviewStart, overviewEnd);
 
   assert.match(chain, /item\.processKeys\.includes\(runtimeProcessKey\)/u);
   assert.match(chain, /data-runtime-current/u);
@@ -559,9 +557,7 @@ test("dev flow state observatory: Runtime completion never promotes Workflow or 
 });
 
 test("dev flow state observatory: state rules explain exceptional paths without becoming a state writer", () => {
-  const page = read(
-    "web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx",
-  );
+  const page = readObservatorySource();
   const presentation = read(
     "web/src/dev-workbench/pages/devFlowStateRulePresentation.mjs",
   );
@@ -612,13 +608,10 @@ test("dev flow state observatory: state rules explain exceptional paths without 
       `missing diagram path color: ${color}`,
     );
   }
-
 });
 
 test("dev flow state observatory: evidence is collapsed and no risky business write is imported", () => {
-  const page = read(
-    "web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx",
-  );
+  const page = readObservatorySource();
   const helper = read("web/src/dev-workbench/pages/devFlowStateTaskLookup.mjs");
   const businessChains = read(
     "web/src/dev-workbench/config/devBusinessChainCatalog.mjs",
@@ -627,13 +620,10 @@ test("dev flow state observatory: evidence is collapsed and no risky business wr
 
   assert.match(page, /function EvidenceDisclosure/u);
   assert.match(page, /<details[^>]*data-evidence-disclosure/u);
-  const evidenceStart = page.indexOf("function EvidenceDisclosure");
-  const evidenceEnd = page.indexOf(
-    "\nfunction GuidanceDisclosure",
-    evidenceStart,
+  const evidenceDisclosure = readFunctionSource(
+    "web/src/dev-workbench/components/flow-state/FlowStateShared.jsx",
+    "EvidenceDisclosure",
   );
-  assert(evidenceStart >= 0 && evidenceEnd > evidenceStart);
-  const evidenceDisclosure = page.slice(evidenceStart, evidenceEnd);
   assert.doesNotMatch(evidenceDisclosure, /<details[^>]*\bopen(?:=|\s|>)/u);
 
   const forbiddenMutationBinding =

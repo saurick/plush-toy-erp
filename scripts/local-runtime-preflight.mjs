@@ -27,9 +27,16 @@ const expectedHealthBodies = Object.freeze({
 });
 
 export const LOCAL_RUNTIME_RECOVERY_MODE = "database-migration";
+export const LOCAL_RUNTIME_PREFLIGHT_TIMEOUT_MS = 15_000;
 const RECOVERABLE_WEB_PREFLIGHT_CODES = new Set([
   "database_migration_pending",
   "local_backend_unavailable",
+  "workspace_migration_invalid",
+  "database_config_unavailable",
+  "database_status_unavailable",
+  "database_programmability_blocked",
+  "local_runtime_preflight_timeout",
+  "local_runtime_preflight_failed",
 ]);
 
 export class LocalRuntimePreflightError extends Error {
@@ -70,14 +77,20 @@ async function runCommand(
   options,
   runtime,
   failureMessage,
-  { includeOutput = false } = {},
+  { includeOutput = false, code = "local_runtime_preflight_failed" } = {},
 ) {
   const execFile = runtime.execFile || execFileAsync;
   try {
-    return await execFile(command, args, options);
+    return await execFile(command, args, {
+      ...options,
+      timeout: LOCAL_RUNTIME_PREFLIGHT_TIMEOUT_MS,
+      signal: runtime.signal,
+    });
   } catch (error) {
     const details = includeOutput ? commandFailureDetails(error) : "";
-    throw new Error(details ? `${failureMessage}\n${details}` : failureMessage);
+    const failure = new LocalRuntimePreflightError(code, failureMessage);
+    failure.diagnostic = details;
+    throw failure;
   }
 }
 
@@ -92,7 +105,7 @@ export async function checkLocalDatabaseMigrations(runtime = {}) {
     },
     runtime,
     "工作区 schema 与 versioned migration 不一致；请先修复 db-guard 报告的问题",
-    { includeOutput: true },
+    { includeOutput: true, code: "workspace_migration_invalid" },
   );
   writeLine(runtime, "[local-preflight] 工作区 schema/migration 守卫通过");
 
@@ -106,10 +119,14 @@ export async function checkLocalDatabaseMigrations(runtime = {}) {
     },
     runtime,
     "无法解析本地开发数据库配置；请检查 config.local.yaml 或 POSTGRES_DSN",
+    { code: "database_config_unavailable" },
   );
   const databaseURL = String(dbURLResult.stdout || "").trim();
   if (!databaseURL) {
-    throw new Error("本地开发数据库地址为空");
+    throw new LocalRuntimePreflightError(
+      "database_config_unavailable",
+      "本地开发数据库地址为空；请检查本地数据库配置",
+    );
   }
 
   const atlasResult = await runCommand(
@@ -131,13 +148,17 @@ export async function checkLocalDatabaseMigrations(runtime = {}) {
     },
     runtime,
     "无法读取本地开发数据库 migration 状态；未执行任何 migration",
+    { code: "database_status_unavailable" },
   );
 
   let status;
   try {
     status = JSON.parse(String(atlasResult.stdout || ""));
   } catch {
-    throw new Error("Atlas migration 状态输出无法识别；未执行任何 migration");
+    throw new LocalRuntimePreflightError(
+      "database_status_unavailable",
+      "Atlas migration 状态输出无法识别；请检查 Atlas 与数据库连接，未执行任何 migration",
+    );
   }
 
   const result = evaluateMigrationStatus(status);
@@ -165,7 +186,7 @@ export async function checkLocalDatabaseMigrations(runtime = {}) {
     },
     runtime,
     "开发数据库仍含自定义 Function、Procedure 或非内部 Trigger；请先完成受控 migration 清理",
-    { includeOutput: true },
+    { includeOutput: true, code: "database_programmability_blocked" },
   );
 
   writeLine(
@@ -190,6 +211,7 @@ async function fetchEndpoint(url, expectedBody, runtime) {
   let lastStatus = "unreachable";
 
   while (Date.now() <= deadline) {
+    runtime.signal?.throwIfAborted();
     const controller = new AbortController();
     const timeout = setTimeout(
       () => controller.abort(),
@@ -197,7 +219,9 @@ async function fetchEndpoint(url, expectedBody, runtime) {
     );
     try {
       const response = await fetchImpl(url, {
-        signal: controller.signal,
+        signal: runtime.signal
+          ? AbortSignal.any([runtime.signal, controller.signal])
+          : controller.signal,
         redirect: "manual",
         headers: { Accept: "text/plain" },
       });
@@ -211,6 +235,8 @@ async function fetchEndpoint(url, expectedBody, runtime) {
     } finally {
       clearTimeout(timeout);
     }
+
+    runtime.signal?.throwIfAborted();
 
     if (Date.now() <= deadline) {
       await sleep(retryIntervalMs);
@@ -308,6 +334,7 @@ const isDirectRun =
 if (isDirectRun) {
   main().catch((error) => {
     process.stderr.write(`[local-preflight] ${error.message}\n`);
+    if (error.diagnostic) process.stderr.write(`${error.diagnostic}\n`);
     process.exit(1);
   });
 }

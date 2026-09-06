@@ -16,7 +16,10 @@ import {
   verifyNewWorkflowTaskMutationAttempt,
 } from '../../utils/workflowTaskMutation.mjs'
 
-export function usePurchaseOrderWorkflowActions({ loadWorkflowTasks }) {
+export function useSourceOrderWorkflowActions({
+  loadWorkflowTasks,
+  surfaceKey,
+}) {
   const mutationAttemptsRef = useRef(null)
   mutationAttemptsRef.current ||= createTaskMutationAttemptStore()
   const mutationInFlightRef = useRef(null)
@@ -40,7 +43,7 @@ export function usePurchaseOrderWorkflowActions({ loadWorkflowTasks }) {
         action_key: operation,
         reason: '',
         payload: {
-          surface_key: 'purchase_orders',
+          surface_key: surfaceKey,
         },
       }
       return runMutationInFlight(task.id, async () => {
@@ -77,7 +80,7 @@ export function usePurchaseOrderWorkflowActions({ loadWorkflowTasks }) {
         return updatedTask
       })
     },
-    [loadWorkflowTasks, runMutationInFlight]
+    [loadWorkflowTasks, runMutationInFlight, surfaceKey]
   )
 
   const blockWorkflowTask = useCallback(
@@ -90,7 +93,7 @@ export function usePurchaseOrderWorkflowActions({ loadWorkflowTasks }) {
         action_key: operation,
         reason,
         payload: {
-          surface_key: 'purchase_orders',
+          surface_key: surfaceKey,
         },
       }
       return runMutationInFlight(task.id, async () => {
@@ -128,7 +131,7 @@ export function usePurchaseOrderWorkflowActions({ loadWorkflowTasks }) {
         return updatedTask
       })
     },
-    [loadWorkflowTasks, runMutationInFlight]
+    [loadWorkflowTasks, runMutationInFlight, surfaceKey]
   )
 
   const rejectWorkflowTask = useCallback(
@@ -141,7 +144,7 @@ export function usePurchaseOrderWorkflowActions({ loadWorkflowTasks }) {
         action_key: operation,
         reason,
         payload: {
-          surface_key: 'purchase_orders',
+          surface_key: surfaceKey,
         },
       }
       return runMutationInFlight(task.id, async () => {
@@ -179,7 +182,7 @@ export function usePurchaseOrderWorkflowActions({ loadWorkflowTasks }) {
         return updatedTask
       })
     },
-    [loadWorkflowTasks, runMutationInFlight]
+    [loadWorkflowTasks, runMutationInFlight, surfaceKey]
   )
 
   const resumeWorkflowTask = useCallback(
@@ -192,7 +195,7 @@ export function usePurchaseOrderWorkflowActions({ loadWorkflowTasks }) {
         action_key: operation,
         reason,
         payload: {
-          surface_key: 'purchase_orders',
+          surface_key: surfaceKey,
         },
       }
       return runMutationInFlight(task.id, async () => {
@@ -230,10 +233,10 @@ export function usePurchaseOrderWorkflowActions({ loadWorkflowTasks }) {
         return updatedTask
       })
     },
-    [loadWorkflowTasks, runMutationInFlight]
+    [loadWorkflowTasks, runMutationInFlight, surfaceKey]
   )
 
-  const urgePurchaseWorkflowTask = useCallback(
+  const urgeSourceWorkflowTask = useCallback(
     async (task, { reason = '' } = {}) => {
       const scope = `${task.id}:urge`
       const operation = 'urge'
@@ -243,7 +246,7 @@ export function usePurchaseOrderWorkflowActions({ loadWorkflowTasks }) {
         action: 'urge_task',
         reason,
         payload: {
-          surface_key: 'purchase_orders',
+          surface_key: surfaceKey,
         },
       }
       return runMutationInFlight(task.id, async () => {
@@ -281,7 +284,7 @@ export function usePurchaseOrderWorkflowActions({ loadWorkflowTasks }) {
         return updatedTask
       })
     },
-    [loadWorkflowTasks, runMutationInFlight]
+    [loadWorkflowTasks, runMutationInFlight, surfaceKey]
   )
 
   return {
@@ -289,6 +292,6 @@ export function usePurchaseOrderWorkflowActions({ loadWorkflowTasks }) {
     completeWorkflowTask,
     rejectWorkflowTask,
     resumeWorkflowTask,
-    urgePurchaseWorkflowTask,
+    urgeSourceWorkflowTask,
   }
 }

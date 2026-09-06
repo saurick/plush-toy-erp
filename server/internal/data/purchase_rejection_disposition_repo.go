@@ -18,7 +18,8 @@ import (
 
 var _ biz.PurchaseRejectionDispositionRepo = (*inventoryRepo)(nil)
 
-func (r *inventoryRepo) CreatePurchaseRejectionDisposition(ctx context.Context, in *biz.PurchaseRejectionDispositionCreate, intentHash string) (*biz.PurchaseRejectionDisposition, error) {
+func (r *inventoryRepo) CreatePurchaseRejectionDisposition(ctx context.Context, in *biz.PurchaseRejectionDispositionCreate, intentHash string) (_ *biz.PurchaseRejectionDisposition, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	if in == nil || intentHash == "" {
 		return nil, biz.ErrBadParam
 	}
@@ -99,7 +100,8 @@ func (r *inventoryRepo) resolvePurchaseRejectionReplay(ctx context.Context, clie
 	return entPurchaseRejectionDispositionToBiz(row), true, nil
 }
 
-func (r *inventoryRepo) PostPurchaseRejectionDisposition(ctx context.Context, in *biz.PurchaseRejectionDispositionMutation) (*biz.PurchaseRejectionDisposition, error) {
+func (r *inventoryRepo) PostPurchaseRejectionDisposition(ctx context.Context, in *biz.PurchaseRejectionDispositionMutation) (_ *biz.PurchaseRejectionDisposition, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	preview, err := r.data.postgres.PurchaseRejectionDisposition.Get(ctx, in.ID)
 	if ent.IsNotFound(err) {
 		return nil, biz.ErrPurchaseRejectionDispositionNotFound
@@ -167,7 +169,8 @@ func (r *inventoryRepo) PostPurchaseRejectionDisposition(ctx context.Context, in
 	return commitPurchaseRejectionDisposition(ctx, tx, row.ID)
 }
 
-func (r *inventoryRepo) CancelPurchaseRejectionDisposition(ctx context.Context, in *biz.PurchaseRejectionDispositionMutation) (*biz.PurchaseRejectionDisposition, error) {
+func (r *inventoryRepo) CancelPurchaseRejectionDisposition(ctx context.Context, in *biz.PurchaseRejectionDispositionMutation) (_ *biz.PurchaseRejectionDisposition, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	tx, err := r.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
@@ -219,7 +222,8 @@ func (r *inventoryRepo) CancelPurchaseRejectionDisposition(ctx context.Context, 
 	return commitPurchaseRejectionDisposition(ctx, tx, row.ID)
 }
 
-func (r *inventoryRepo) GetPurchaseRejectionDisposition(ctx context.Context, id int) (*biz.PurchaseRejectionDisposition, error) {
+func (r *inventoryRepo) GetPurchaseRejectionDisposition(ctx context.Context, id int) (_ *biz.PurchaseRejectionDisposition, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	row, err := r.data.postgres.PurchaseRejectionDisposition.Get(ctx, id)
 	if ent.IsNotFound(err) {
 		return nil, biz.ErrPurchaseRejectionDispositionNotFound
@@ -229,7 +233,8 @@ func (r *inventoryRepo) GetPurchaseRejectionDisposition(ctx context.Context, id 
 	}
 	return entPurchaseRejectionDispositionToBiz(row), nil
 }
-func (r *inventoryRepo) ListPurchaseRejectionDispositions(ctx context.Context, filter biz.PurchaseRejectionDispositionFilter) ([]*biz.PurchaseRejectionDisposition, int, error) {
+func (r *inventoryRepo) ListPurchaseRejectionDispositions(ctx context.Context, filter biz.PurchaseRejectionDispositionFilter) (_ []*biz.PurchaseRejectionDisposition, _ int, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	query := r.data.postgres.PurchaseRejectionDisposition.Query()
 	if filter.QualityInspectionID > 0 {
 		query = query.Where(purchaserejectiondisposition.QualityInspectionID(filter.QualityInspectionID))

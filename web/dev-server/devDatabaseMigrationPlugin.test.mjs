@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { Readable } from 'node:stream'
 import test from 'node:test'
+import { LocalRuntimePreflightError } from '../../scripts/local-runtime-preflight.mjs'
 
 import {
   resolveDatabaseMigrationOperationStore,
@@ -59,6 +60,9 @@ function target({ pendingFiles = 1 } = {}) {
 function dependencies(calls) {
   let pendingFiles = 1
   return {
+    async verifyReadiness() {
+      calls.push('verify-readiness')
+    },
     async toolReadiness() {
       calls.push('tools')
       return {
@@ -306,7 +310,217 @@ test('database migration service checks tools before stopping the backend', asyn
   assert.equal(blocked.issues[0].code, 'migration_tool_unavailable')
   assert.match(blocked.issues[0].message, /不限定操作系统或产品/u)
   assert.equal(calls.includes('stop'), false)
-  assert.equal(calls.includes('status'), false)
+  assert.equal(calls.includes('status'), true)
+})
+
+test('database migration service keeps recovery blocked until the original startup checks pass', async (t) => {
+  const { root, store } = createProject(t)
+  const runtime = dependencies([])
+  runtime.status = async () => target({ pendingFiles: 0 })
+  runtime.verifyReadiness = async () => {
+    throw new LocalRuntimePreflightError(
+      'database_programmability_blocked',
+      '数据库安全检查未通过'
+    )
+  }
+  let opened = 0
+  const service = createDevDatabaseMigrationService({
+    projectRoot: root,
+    operationStore: store,
+    dependencies: runtime,
+    onRuntimeReady: () => {
+      opened += 1
+    },
+  })
+  const blocked = await service.summary()
+  assert.equal(blocked.status, 'blocked')
+  assert.equal(blocked.runtime.available, true)
+  assert.equal(blocked.issues[0].code, 'database_programmability_blocked')
+  assert.equal(opened, 0)
+  runtime.verifyReadiness = async () => {}
+  assert.equal((await service.summary()).status, 'success')
+  assert.equal(opened, 1)
+})
+
+test('database migration summary distinguishes connection and identity failures from successful workspace checks', async (t) => {
+  for (const [diagnostic, expectedCode] of [
+    [
+      '[migration] 工作区 schema/migration 守卫通过\n[migration-summary] error_code=target_identity_failed next_action=verify_database_identity\npsql: connection to server failed: Connection refused',
+      'database_status_unavailable',
+    ],
+    [
+      '[migration] 工作区 schema/migration 守卫通过\n[migration-summary] error_code=target_identity_failed next_action=verify_database_identity',
+      'database_target_unverified',
+    ],
+    [
+      '[migration-summary] error_code=workspace_guard_failed next_action=fix_workspace',
+      'migration_source_changed',
+    ],
+  ]) {
+    const { root, store } = createProject(t)
+    const calls = []
+    const runtime = dependencies(calls)
+    runtime.status = async () => {
+      throw Object.assign(new Error('make migrate_status failed'), {
+        diagnostic,
+      })
+    }
+    const service = createDevDatabaseMigrationService({
+      projectRoot: root,
+      operationStore: store,
+      dependencies: runtime,
+    })
+    const summary = await service.summary()
+    assert.equal(summary.status, 'blocked')
+    assert.equal(summary.target, null)
+    assert.equal(summary.issues[0].code, expectedCode)
+    assert.equal(calls.includes('verify-readiness'), false)
+  }
+})
+
+test('database migration service does not require backup tools for an up-to-date database', async (t) => {
+  const { root, store } = createProject(t)
+  const calls = []
+  const runtime = dependencies(calls)
+  runtime.status = async () => target({ pendingFiles: 0 })
+  runtime.toolReadiness = async () => {
+    throw new Error('must not require Docker')
+  }
+  const service = createDevDatabaseMigrationService({
+    projectRoot: root,
+    operationStore: store,
+    dependencies: runtime,
+  })
+  const result = await service.act({
+    action: 'prepare',
+    idempotencyKey: PREPARE_KEY,
+  })
+  const operation = await waitForOperation(service, result.operation.id, [
+    'passed',
+  ])
+  assert.equal(operation.readback.migrationVerified, true)
+  assert.equal(
+    calls.some((call) => /^(?:stop|plan|backup|apply|restart)/u.test(call)),
+    false
+  )
+})
+
+test('database migration service marks lost apply or readback evidence as not-proven without retry', async (t) => {
+  for (const failure of ['apply', 'readback']) {
+    const { root, store } = createProject(t)
+    const calls = []
+    const runtime = dependencies(calls)
+    const originalApply = runtime.apply
+    runtime.apply = async (internal) => {
+      await originalApply(internal)
+      if (failure === 'apply') throw new Error('connection lost')
+      runtime.status = async () => {
+        throw new Error('readback unavailable')
+      }
+    }
+    const service = createDevDatabaseMigrationService({
+      projectRoot: root,
+      operationStore: store,
+      dependencies: runtime,
+    })
+    const prepared = await service.act({
+      action: 'prepare',
+      idempotencyKey: PREPARE_KEY,
+    })
+    const ready = await waitForOperation(service, prepared.operation.id, [
+      'ready',
+    ])
+    await service.act({
+      action: 'execute',
+      operationId: ready.id,
+      confirmation: ready.confirmationPrompt,
+    })
+    const result = await waitForOperation(service, ready.id, ['not_proven'])
+    assert.equal(result.issues[0].code, 'migration_outcome_unknown')
+    assert.equal(calls.filter((call) => call.startsWith('apply:')).length, 1)
+    assert.equal(
+      calls.some((call) => call.startsWith('restart:')),
+      false
+    )
+    await assert.rejects(
+      service.act({
+        action: 'execute',
+        operationId: ready.id,
+        confirmation: ready.confirmationPrompt,
+      })
+    )
+  }
+})
+
+test('database migration service preserves proven migration after backend failure and restarts without reapplying', async (t) => {
+  const { root, store } = createProject(t)
+  const calls = []
+  const runtime = dependencies(calls)
+  const { restart } = runtime
+  runtime.restart = async () => {
+    throw new Error('backend failed')
+  }
+  const service = createDevDatabaseMigrationService({
+    projectRoot: root,
+    operationStore: store,
+    dependencies: runtime,
+  })
+  const prepared = await service.act({
+    action: 'prepare',
+    idempotencyKey: PREPARE_KEY,
+  })
+  const ready = await waitForOperation(service, prepared.operation.id, [
+    'ready',
+  ])
+  await service.act({
+    action: 'execute',
+    operationId: ready.id,
+    confirmation: ready.confirmationPrompt,
+  })
+  const failed = await waitForOperation(service, ready.id, ['failed'])
+  assert.equal(failed.readback.migrationVerified, true)
+  assert.match(failed.message, /只需重启后端/u)
+  runtime.restart = restart
+  const result = await service.act({
+    action: 'restart',
+    idempotencyKey: PREPARE_KEY.replace(':prepare:', ':restart:'),
+  })
+  await waitForOperation(service, result.operation.id, ['passed'])
+  assert.equal(calls.filter((call) => call.startsWith('apply:')).length, 1)
+})
+
+test('database migration service explicitly re-prepares and invalidates the old confirmation', async (t) => {
+  const { root, store } = createProject(t)
+  const calls = []
+  const service = createDevDatabaseMigrationService({
+    projectRoot: root,
+    operationStore: store,
+    dependencies: dependencies(calls),
+  })
+  const prepared = await service.act({
+    action: 'prepare',
+    idempotencyKey: PREPARE_KEY,
+  })
+  const ready = await waitForOperation(service, prepared.operation.id, [
+    'ready',
+  ])
+  const next = await service.act({
+    action: 'prepare',
+    idempotencyKey: PREPARE_KEY.replace('111111111111', '222222222222'),
+  })
+  await waitForOperation(service, next.operation.id, ['ready'])
+  assert.equal(service.readOperation(ready.id).status, 'blocked')
+  await assert.rejects(
+    service.act({
+      action: 'execute',
+      operationId: ready.id,
+      confirmation: ready.confirmationPrompt,
+    })
+  )
+  assert.equal(
+    calls.some((call) => call.startsWith('apply:')),
+    false
+  )
 })
 
 test('database migration service does not misclassify passive client diagnostics', async (t) => {

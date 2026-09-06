@@ -30,10 +30,10 @@ import {
   BUSINESS_CURRENCY_OPTIONS,
   PURCHASE_INVOICE_CATEGORY_OPTIONS,
   PURCHASE_INVOICE_REQUIRED_OPTIONS,
-  buildPurchaseOrderItemSourceValuesFromMaterial,
-  summarizePurchaseOrderLines,
   unixToDateInputValue,
 } from '../../utils/masterDataOrderView.mjs'
+import { buildPurchaseOrderItemSourceValuesFromMaterial } from '../../utils/sourceOrderLineValues.mjs'
+import { summarizePurchaseOrderLines } from '../../utils/sourceOrderAmounts.mjs'
 import { createDuplicatedDraftLineItem } from '../../utils/businessLineItems.mjs'
 import {
   CATALOG_FILL_DUPLICATE_POLICIES,

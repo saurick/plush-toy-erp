@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { Readable } from 'node:stream'
 
 import {
+  isSameOriginRequest,
+  readJsonBody,
   isLoopbackHostHeader,
   isLoopbackRemoteAddress,
 } from './devServerSecurity.mjs'
@@ -53,4 +56,64 @@ test('Host checks reject DNS rebinding and malformed loopback lookalikes', () =>
   ]) {
     assert.equal(isLoopbackHostHeader(host), false, host)
   }
+})
+
+test('same-origin checks reject malformed origins and cross-origin metadata', () => {
+  const headers = {
+    host: 'localhost:5175',
+    origin: 'http://localhost:5175',
+    'sec-fetch-site': 'same-origin',
+  }
+  assert.equal(isSameOriginRequest({ headers }), true)
+  for (const changed of [
+    { host: ['localhost:5175'] },
+    { origin: ['http://localhost:5175'] },
+    { origin: undefined },
+    { origin: 'null' },
+    { origin: 'https://evil.test' },
+    { origin: 'http://localhost:5176' },
+    { origin: 'http://user@localhost:5175' },
+    { origin: 'http://localhost:5175/path' },
+    { origin: 'http://localhost:5175?x=1' },
+    { origin: 'http://localhost:5175#x' },
+    { 'sec-fetch-site': 'same-site' },
+  ])
+    assert.equal(
+      isSameOriginRequest({ headers: { ...headers, ...changed } }),
+      false,
+      JSON.stringify(changed)
+    )
+})
+
+test('JSON request limits count streamed UTF-8 bytes and preserve parse failures', async () => {
+  const bytes = Buffer.from('{"名称":"棉"}')
+  assert.deepEqual(
+    await readJsonBody(
+      Readable.from([bytes.subarray(0, 5), bytes.subarray(5)]),
+      { maxBytes: bytes.length }
+    ),
+    { 名称: '棉' }
+  )
+  await assert.rejects(
+    readJsonBody(Readable.from([bytes]), { maxBytes: bytes.length - 1 }),
+    /body is too large/u
+  )
+  await assert.rejects(
+    readJsonBody(Readable.from([]), { maxBytes: 16, label: 'testing request' }),
+    /testing request body is required/u
+  )
+  await assert.rejects(
+    readJsonBody(Readable.from(['{']), { maxBytes: 16 }),
+    SyntaxError
+  )
+  const interrupted = Readable.from(
+    (async function* () {
+      yield '{'
+      throw new Error('interrupted')
+    })()
+  )
+  await assert.rejects(
+    readJsonBody(interrupted, { maxBytes: 16 }),
+    /interrupted/u
+  )
 })

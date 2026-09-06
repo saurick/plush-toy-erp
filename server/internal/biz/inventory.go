@@ -13,6 +13,9 @@ import (
 )
 
 var (
+	ErrBOMRecordConflict                     = errors.New("bom record constraint conflict")
+	ErrPurchaseRecordConflict                = errors.New("purchase record constraint conflict")
+	ErrQualityInspectionRecordConflict       = errors.New("quality inspection record constraint conflict")
 	ErrInventoryTxnNotFound                  = errors.New("inventory txn not found")
 	ErrInventoryBalanceNotFound              = errors.New("inventory balance not found")
 	ErrInventoryLotNotFound                  = errors.New("inventory lot not found")

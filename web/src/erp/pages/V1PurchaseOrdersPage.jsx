@@ -60,27 +60,31 @@ import {
 } from '../components/purchase-orders/purchaseOrderPageConfig.mjs'
 import { usePurchaseOrderContractPrint } from '../components/purchase-orders/usePurchaseOrderContractPrint.mjs'
 import { usePurchaseOrderInboundDraft } from '../components/purchase-orders/usePurchaseOrderInboundDraft.mjs'
-import { usePurchaseOrderWorkflowActions } from '../components/purchase-orders/usePurchaseOrderWorkflowActions.mjs'
+import { useSourceOrderWorkflowActions } from '../components/workflow/useSourceOrderWorkflowActions.mjs'
 import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import { listWorkflowTasks } from '../api/workflowApi.mjs'
 import {
   V1_ROUTE_PATHS,
-  buildPurchaseOrderItemSourceValuesFromMaterial,
-  buildPurchaseOrderItemParams,
-  buildPurchaseOrderParams,
-  buildPurchaseOrderSupplierDefaults,
   buildSequentialDraftCode,
-  contractPartySnapshotFromPrintTemplateDefaults,
-  buildSupplierSnapshot,
-  buildSupplierSnapshotWithContacts,
   canRunPurchaseOrderLifecycleAction,
   formatUnixDate,
   hasActionPermission,
   PURCHASE_ORDER_ITEM_STATUS_LABELS,
   statusText,
-  SUPPLIER_CONTACT_OWNER_TYPE,
   unixToDateInputValue,
 } from '../utils/masterDataOrderView.mjs'
+import {
+  buildPurchaseOrderItemParams,
+  buildPurchaseOrderParams,
+} from '../utils/sourceOrderParams.mjs'
+import { buildPurchaseOrderItemSourceValuesFromMaterial } from '../utils/sourceOrderLineValues.mjs'
+import {
+  buildPurchaseOrderSupplierDefaults,
+  contractPartySnapshotFromPrintTemplateDefaults,
+  buildSupplierSnapshot,
+  buildSupplierSnapshotWithContacts,
+  SUPPLIER_CONTACT_OWNER_TYPE,
+} from '../utils/sourcePartySnapshots.mjs'
 import {
   filterBusinessCollaborationTasksBySource,
   loadBusinessCollaborationTasksForSource,
@@ -525,8 +529,11 @@ export default function V1PurchaseOrdersPage() {
     completeWorkflowTask,
     rejectWorkflowTask,
     resumeWorkflowTask,
-    urgePurchaseWorkflowTask,
-  } = usePurchaseOrderWorkflowActions({ loadWorkflowTasks })
+    urgeSourceWorkflowTask: urgePurchaseWorkflowTask,
+  } = useSourceOrderWorkflowActions({
+    loadWorkflowTasks,
+    surfaceKey: 'purchase_orders',
+  })
 
   const loadOrderItems = useCallback(async (order, options = {}) => {
     if (!order?.id) {

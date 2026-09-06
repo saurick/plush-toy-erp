@@ -18,15 +18,18 @@ const sourceImportPicker = readFileSync(
   'utf8'
 )
 const styleL1 = readFileSync(
-  resolve(__dirname, '../../../scripts/styleL1.mjs'),
+  resolve(__dirname, '../../../scripts/style-l1/businessListAssertions.mjs'),
   'utf8'
 )
 const businessFormalScenarios = readFileSync(
   resolve(__dirname, '../../../scripts/style-l1/businessFormalScenarios.mjs'),
   'utf8'
 )
-const styleL1Scenarios = readFileSync(
-  resolve(__dirname, '../../../scripts/style-l1/scenarios.mjs'),
+const businessFormInteractionScenarios = readFileSync(
+  resolve(
+    __dirname,
+    '../../../scripts/style-l1/businessFormInteractionScenarios.mjs'
+  ),
   'utf8'
 )
 
@@ -47,5 +50,5 @@ test('来源选择器空态与浏览器验证使用具体档案名', () => {
   assert.match(sourceImportPicker, /未选择\{selectedNoun\}/u)
   assert.match(styleL1, /未选择\$\{selectedNoun\}/u)
   assert.match(businessFormalScenarios, /selectedNoun: 'SKU'/u)
-  assert.match(styleL1Scenarios, /selectedNoun: '材料'/u)
+  assert.match(businessFormInteractionScenarios, /selectedNoun: '材料'/u)
 })

@@ -42,3 +42,12 @@ git diff --check
 ```bash
 STYLE_L1_SCENARIOS=business-core-pages-desktop pnpm --dir web style:l1
 ```
+
+## 页面职责拆分
+
+- `permission-center/` 的 `usePermissionCenterData` 负责账号与岗位加载，`usePermissionRoleSettings` 负责岗位草稿和权限预览，`PermissionAdminAccounts` 自持账号表单与弹窗；页面只协调页签与未保存提醒。
+- `workflow/useSourceOrderWorkflowActions.mjs` 统一采购和委外源单的 Workflow 动作；页面提供场景标识。
+- `outsourcing-orders/` 的 `useOutsourcingOrder*` 按查询、编辑、协同任务、明细排序和生命周期动作管理状态；`useOutsourcingSourceFacts` 管理委外来源事实与回货质检，应付操作由专用 Hook 管理。
+- `operational-facts/useOperationalFactQuery` 负责来源筛选、分页、详情与导出查询，`useOperationalFactMutations` 负责过账、结清和取消；页面消费这些状态与动作。
+- `production-orders/useProductionFactActions.mjs` 与 `finance/useFinanceReconciliationAction.mjs` 管理事实工作台对应操作的表单状态、请求失效和重试。
+- 工程打印的基础编辑组件及三类纸面位于 `print/`；页面保留窗口草稿和工具栏编排，业务数据仍只读。

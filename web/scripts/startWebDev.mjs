@@ -8,6 +8,8 @@ import { pathToFileURL } from 'node:url'
 import { loadDevPorts } from '../../scripts/dev-ports.mjs'
 import {
   LOCAL_RUNTIME_RECOVERY_MODE,
+  LOCAL_RUNTIME_PREFLIGHT_TIMEOUT_MS,
+  LocalRuntimePreflightError,
   isLoopbackAPIOrigin,
   isRecoverableWebRuntimePreflightError,
   runWebRuntimePreflight,
@@ -43,7 +45,7 @@ async function readGitlabTokenFromKeychain() {
       '-a',
       DEV_GITLAB_KEYCHAIN.account,
     ],
-    { encoding: 'utf8', maxBuffer: 1024 }
+    { encoding: 'utf8', maxBuffer: 1024, timeout: 5000 }
   )
   return stdout
 }
@@ -88,33 +90,55 @@ export async function resolveWebRuntimeStartup(
   options,
   {
     preflight = runWebRuntimePreflight,
+    timeoutMs = LOCAL_RUNTIME_PREFLIGHT_TIMEOUT_MS,
     writeLine = (line) => process.stderr.write(`${line}\n`),
   } = {}
 ) {
+  const localBackend = isLoopbackAPIOrigin(options.apiOrigin)
+  const controller = new AbortController()
+  let timer
   try {
+    const checked = await Promise.race([
+      preflight(options, { signal: controller.signal }),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          reject(
+            new LocalRuntimePreflightError(
+              'local_runtime_preflight_timeout',
+              '本地运行预检超时；可在迁移恢复页重新检查数据库与后端状态'
+            )
+          )
+          controller.abort()
+        }, timeoutMs)
+      }),
+    ])
     return {
-      ...(await preflight(options)),
+      ...checked,
       recoveryMode: '',
       recoveryReason: '',
     }
   } catch (error) {
-    if (
-      options.frontendOnly ||
-      !isLoopbackAPIOrigin(options.apiOrigin) ||
-      !isRecoverableWebRuntimePreflightError(error)
-    ) {
+    if (options.frontendOnly || !localBackend) {
       throw error
     }
+    const recoveryError = isRecoverableWebRuntimePreflightError(error)
+      ? error
+      : new LocalRuntimePreflightError(
+          'local_runtime_preflight_failed',
+          '本地运行预检未完成；请在迁移恢复页检查数据库配置、迁移状态和后端'
+        )
     writeLine(
-      `[start-web] ${error.message}\n[start-web] 已进入数据库迁移恢复模式；只开放恢复页，普通 ERP 页面与 RPC 暂停`
+      `[start-web] ${recoveryError.message}\n[start-web] 已进入数据库迁移恢复模式；只开放恢复页，普通 ERP 页面与 RPC 暂停`
     )
     return {
       complete: false,
       frontendOnly: false,
       apiOrigin: options.apiOrigin,
       recoveryMode: LOCAL_RUNTIME_RECOVERY_MODE,
-      recoveryReason: error.code,
+      recoveryReason: recoveryError.code,
     }
+  } finally {
+    clearTimeout(timer)
   }
 }
 
@@ -132,6 +156,7 @@ export function createViteChildEnvironment({
   }
   delete childEnvironment.ERP_DEV_RECOVERY_MODE
   delete childEnvironment.ERP_DEV_RECOVERY_REASON
+  delete childEnvironment.PLUSH_GITLAB_READ_TOKEN
   if (recoveryMode) {
     childEnvironment.ERP_DEV_RECOVERY_MODE = recoveryMode
     childEnvironment.ERP_DEV_RECOVERY_REASON = recoveryReason
@@ -171,7 +196,9 @@ function runVite(viteArgs, startup, gitlabCredential) {
 async function main() {
   const options = parseStartWebDevArgs(process.argv.slice(2))
   const startup = await resolveWebRuntimeStartup(options)
-  const gitlabCredential = await resolveDevGitlabCredential()
+  const gitlabCredential = startup.recoveryMode
+    ? { source: 'missing', token: '' }
+    : await resolveDevGitlabCredential()
   if (gitlabCredential.source === 'keychain') {
     process.stderr.write('[start-web] GitLab 只读凭据已从 macOS 钥匙串加载\n')
   }

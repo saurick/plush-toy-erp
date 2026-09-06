@@ -30,7 +30,8 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-func (r *inventoryRepo) CreatePurchaseReceiptDraft(ctx context.Context, in *biz.PurchaseReceiptCreate) (*biz.PurchaseReceipt, error) {
+func (r *inventoryRepo) CreatePurchaseReceiptDraft(ctx context.Context, in *biz.PurchaseReceiptCreate) (_ *biz.PurchaseReceipt, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	row, err := r.data.postgres.PurchaseReceipt.Create().
 		SetReceiptNo(in.ReceiptNo).
 		SetNillableSupplierID(in.SupplierID).
@@ -45,7 +46,8 @@ func (r *inventoryRepo) CreatePurchaseReceiptDraft(ctx context.Context, in *biz.
 	return entPurchaseReceiptToBiz(row, nil), nil
 }
 
-func (r *inventoryRepo) CreatePurchaseReceiptWithItems(ctx context.Context, in *biz.PurchaseReceiptCreate, items []*biz.PurchaseReceiptItemCreate) (*biz.PurchaseReceipt, error) {
+func (r *inventoryRepo) CreatePurchaseReceiptWithItems(ctx context.Context, in *biz.PurchaseReceiptCreate, items []*biz.PurchaseReceiptItemCreate) (_ *biz.PurchaseReceipt, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	tx, err := r.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
@@ -85,14 +87,16 @@ func (r *inventoryRepo) CreatePurchaseReceiptWithItems(ctx context.Context, in *
 	return out, nil
 }
 
-func (r *inventoryRepo) ResolvePurchaseReceiptFromPurchaseOrderReplay(ctx context.Context, in *biz.PurchaseReceiptFromPurchaseOrderCreate) (*biz.PurchaseReceipt, bool, error) {
+func (r *inventoryRepo) ResolvePurchaseReceiptFromPurchaseOrderReplay(ctx context.Context, in *biz.PurchaseReceiptFromPurchaseOrderCreate) (_ *biz.PurchaseReceipt, _ bool, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	if r == nil || r.data == nil || r.data.postgres == nil || in == nil || in.IdempotencyKey == "" || in.IdempotencyPayloadHash == "" {
 		return nil, false, biz.ErrBadParam
 	}
 	return resolvePurchaseReceiptFromPurchaseOrderReplay(ctx, r.data.postgres, in)
 }
 
-func (r *inventoryRepo) ResolvePurchaseReceiptItemReplay(ctx context.Context, in *biz.PurchaseReceiptItemCreate) (*biz.PurchaseReceiptItem, bool, error) {
+func (r *inventoryRepo) ResolvePurchaseReceiptItemReplay(ctx context.Context, in *biz.PurchaseReceiptItemCreate) (_ *biz.PurchaseReceiptItem, _ bool, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	if r == nil || r.data == nil || r.data.postgres == nil || in == nil || in.ReceiptID <= 0 || in.IdempotencyKey == "" || in.IdempotencyPayloadHash == "" {
 		return nil, false, biz.ErrBadParam
 	}
@@ -102,7 +106,8 @@ func (r *inventoryRepo) ResolvePurchaseReceiptItemReplay(ctx context.Context, in
 // ValidatePurchaseReceiptFromPurchaseOrder is the read-only preflight used by
 // Process Runtime before it binds an immutable command fingerprint. The create
 // transaction repeats every check under locks and remains the final authority.
-func (r *inventoryRepo) ValidatePurchaseReceiptFromPurchaseOrder(ctx context.Context, in *biz.PurchaseReceiptFromPurchaseOrderCreate) error {
+func (r *inventoryRepo) ValidatePurchaseReceiptFromPurchaseOrder(ctx context.Context, in *biz.PurchaseReceiptFromPurchaseOrderCreate) (resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	if r == nil || r.data == nil || r.data.postgres == nil || in == nil {
 		return biz.ErrBadParam
 	}
@@ -151,7 +156,8 @@ func (r *inventoryRepo) ValidatePurchaseReceiptFromPurchaseOrder(ctx context.Con
 	return biz.ErrBadParam
 }
 
-func (r *inventoryRepo) CreatePurchaseReceiptFromPurchaseOrder(ctx context.Context, in *biz.PurchaseReceiptFromPurchaseOrderCreate) (*biz.PurchaseReceipt, error) {
+func (r *inventoryRepo) CreatePurchaseReceiptFromPurchaseOrder(ctx context.Context, in *biz.PurchaseReceiptFromPurchaseOrderCreate) (_ *biz.PurchaseReceipt, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	return r.createPurchaseReceiptFromPurchaseOrder(ctx, in, nil, 0)
 }
 
@@ -160,7 +166,8 @@ func (r *inventoryRepo) CreatePurchaseReceiptFromPurchaseOrderForProcessCommand(
 	in *biz.PurchaseReceiptFromPurchaseOrderCreate,
 	command *biz.ProcessDomainCommandInput,
 	actorID int,
-) (*biz.PurchaseReceipt, error) {
+) (_ *biz.PurchaseReceipt, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	if command == nil {
 		return nil, biz.ErrBadParam
 	}
@@ -417,7 +424,8 @@ func recordPurchaseReceiptProcessCommandResultInTx(
 	return err
 }
 
-func (r *inventoryRepo) AddPurchaseReceiptItem(ctx context.Context, in *biz.PurchaseReceiptItemCreate) (*biz.PurchaseReceiptItem, error) {
+func (r *inventoryRepo) AddPurchaseReceiptItem(ctx context.Context, in *biz.PurchaseReceiptItemCreate) (_ *biz.PurchaseReceiptItem, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	if r == nil || r.data == nil || r.data.postgres == nil || in == nil || in.ReceiptID <= 0 || in.IdempotencyKey == "" || in.IdempotencyPayloadHash == "" {
 		return nil, biz.ErrBadParam
 	}
@@ -495,7 +503,8 @@ func (r *inventoryRepo) AddPurchaseReceiptItem(ctx context.Context, in *biz.Purc
 	return entPurchaseReceiptItemToBiz(row), nil
 }
 
-func (r *inventoryRepo) PostPurchaseReceipt(ctx context.Context, receiptID int) (*biz.PurchaseReceipt, error) {
+func (r *inventoryRepo) PostPurchaseReceipt(ctx context.Context, receiptID int) (_ *biz.PurchaseReceipt, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	return r.postPurchaseReceipt(ctx, receiptID, nil, nil, 0)
 }
 
@@ -505,7 +514,8 @@ func (r *inventoryRepo) PostPurchaseReceiptForProcessCommand(
 	command *biz.ProcessDomainCommandInput,
 	result *biz.ProcessDomainCommandResult,
 	actorID int,
-) (*biz.PurchaseReceipt, error) {
+) (_ *biz.PurchaseReceipt, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	if command == nil || result == nil {
 		return nil, biz.ErrBadParam
 	}
@@ -698,11 +708,13 @@ func verifyPurchaseReceiptInboundEvidence(ctx context.Context, tx *inventoryDBTx
 	return nil
 }
 
-func (r *inventoryRepo) CancelPostedPurchaseReceipt(ctx context.Context, receiptID int) (*biz.PurchaseReceipt, error) {
+func (r *inventoryRepo) CancelPostedPurchaseReceipt(ctx context.Context, receiptID int) (_ *biz.PurchaseReceipt, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	return r.cancelPostedPurchaseReceipt(ctx, receiptID, 0)
 }
 
-func (r *inventoryRepo) CancelPostedPurchaseReceiptWithActor(ctx context.Context, receiptID int, actorID int) (*biz.PurchaseReceipt, error) {
+func (r *inventoryRepo) CancelPostedPurchaseReceiptWithActor(ctx context.Context, receiptID int, actorID int) (_ *biz.PurchaseReceipt, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	if actorID <= 0 {
 		return nil, biz.ErrBadParam
 	}
@@ -1082,7 +1094,8 @@ func validateDraftPurchaseReceiptCancellationInspection(
 	return nil
 }
 
-func (r *inventoryRepo) GetPurchaseReceipt(ctx context.Context, id int) (*biz.PurchaseReceipt, error) {
+func (r *inventoryRepo) GetPurchaseReceipt(ctx context.Context, id int) (_ *biz.PurchaseReceipt, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	receipt, err := r.data.postgres.PurchaseReceipt.Get(ctx, id)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -1093,7 +1106,8 @@ func (r *inventoryRepo) GetPurchaseReceipt(ctx context.Context, id int) (*biz.Pu
 	return purchaseReceiptWithItems(ctx, r.data.postgres, receipt)
 }
 
-func (r *inventoryRepo) ListPurchaseReceipts(ctx context.Context, filter biz.PurchaseReceiptFilter) ([]*biz.PurchaseReceipt, int, error) {
+func (r *inventoryRepo) ListPurchaseReceipts(ctx context.Context, filter biz.PurchaseReceiptFilter) (_ []*biz.PurchaseReceipt, _ int, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	query := r.data.postgres.PurchaseReceipt.Query()
 	if filter.Status != "" {
 		query = query.Where(purchasereceipt.Status(filter.Status))

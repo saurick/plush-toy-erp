@@ -8,7 +8,6 @@ import (
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
-	"server/internal/data/model/ent"
 	"server/internal/errcode"
 
 	"github.com/shopspring/decimal"
@@ -510,7 +509,7 @@ func (d *jsonrpcDispatcher) mapQualityError(ctx context.Context, err error) *v1.
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "库存批次不存在"}
 	case errors.Is(err, biz.ErrInventoryLotStatusBlocked):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前批次状态不允许提交质检"}
-	case ent.IsConstraintError(err):
+	case errors.Is(err, biz.ErrQualityInspectionRecordConflict):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "质检单号或待检批次已存在"}
 	default:
 		l.Errorf("[quality] internal err=%v", err)

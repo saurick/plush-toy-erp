@@ -110,6 +110,8 @@ func TestOperationalFactUsecaseProductionTransitionPolicyFailsClosed(t *testing.
 }
 
 type productionCompletionRepoStub struct {
+	OperationalFactRepo
+
 	source             *ProductionOrderItem
 	sourceErr          error
 	resolveCalls       int

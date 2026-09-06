@@ -593,6 +593,11 @@ type OperationalFactReferenceRepo interface {
 }
 
 type ProductionFactRepo interface {
+	ProductionCompletionSourceRepo
+	ProductionMaterialIssueFromOrderRepo
+	ProductionFactDraftSaveRepo
+	ProductionReworkFromCompletionRepo
+	ProductionFactTransitionPolicyRepo
 	CreateProductionFactDraft(ctx context.Context, in *OperationalFactMutation) (*ProductionFact, error)
 	PostProductionFact(ctx context.Context, in *OperationalFactStatusMutation) (*ProductionFact, error)
 	CancelPostedProductionFact(ctx context.Context, in *OperationalFactStatusMutation) (*ProductionFact, error)
@@ -600,6 +605,8 @@ type ProductionFactRepo interface {
 }
 
 type OutsourcingFactRepo interface {
+	OutsourcingFactFromOrderRepo
+	OutsourcingFactDraftSaveRepo
 	CreateOutsourcingFactDraft(ctx context.Context, in *OperationalFactMutation) (*OutsourcingFact, error)
 	PostOutsourcingFact(ctx context.Context, in *OperationalFactStatusMutation) (*OutsourcingFact, error)
 	CancelPostedOutsourcingFact(ctx context.Context, in *OperationalFactStatusMutation) (*OutsourcingFact, error)
@@ -607,6 +614,10 @@ type OutsourcingFactRepo interface {
 }
 
 type ShipmentRepo interface {
+	ShipmentDraftSaveRepo
+	ShipmentReleaseSourceRepo
+	OperationalFactShipmentActorRepo
+	OperationalFactCancellationActorRepo
 	CreateShipmentDraftWithItems(ctx context.Context, in *ShipmentCreateWithItems) (*Shipment, error)
 	ShipShipment(ctx context.Context, id int) (*Shipment, error)
 	CancelShippedShipment(ctx context.Context, id int) (*Shipment, error)
@@ -615,6 +626,7 @@ type ShipmentRepo interface {
 }
 
 type StockReservationRepo interface {
+	StockReservationReadRepo
 	CreateStockReservation(ctx context.Context, in *StockReservationCreate) (*StockReservation, error)
 	CreateStockReservationFromSalesOrder(ctx context.Context, in *StockReservationFromSalesOrderCreate) (*StockReservation, error)
 	ReleaseStockReservation(ctx context.Context, id int) (*StockReservation, error)
@@ -622,6 +634,9 @@ type StockReservationRepo interface {
 }
 
 type FinanceFactRepo interface {
+	GetFinanceFact(ctx context.Context, id int) (*FinanceFact, error)
+	FinanceFactFromShipmentRepo
+	FinanceFactShipmentPaymentTermRepo
 	CreateFinanceFactDraft(ctx context.Context, in *FinanceFactCreate) (*FinanceFact, error)
 	PostFinanceFact(ctx context.Context, in *OperationalFactStatusMutation) (*FinanceFact, error)
 	SettleFinanceFact(ctx context.Context, in *OperationalFactStatusMutation) (*FinanceFact, error)
@@ -629,8 +644,9 @@ type FinanceFactRepo interface {
 	ListFinanceFacts(ctx context.Context, filter OperationalFactFilter) ([]*FinanceFact, int, error)
 }
 
-// OperationalFactRepo remains the composition-root aggregate while each fact
-// family exposes a narrow contract for focused usecases, adapters and tests.
+// OperationalFactRepo requires every capability used by the operational-fact
+// usecase at construction. Fact families expose their own focused contracts.
+// Optional process-command adapters remain separate from this aggregate.
 type OperationalFactRepo interface {
 	OperationalFactReferenceRepo
 	ProductionFactRepo
@@ -640,15 +656,12 @@ type OperationalFactRepo interface {
 	FinanceFactRepo
 }
 
-// ShipmentDraftSaveRepo is kept separate from the broad operational-fact
-// reader/writer contract so read adapters and test doubles do not accidentally
-// claim aggregate DRAFT replacement support.
+// ShipmentDraftSaveRepo owns protected replacement of a complete shipment draft.
 type ShipmentDraftSaveRepo interface {
 	SaveShipmentDraftWithItems(ctx context.Context, in *ShipmentDraftSave) (*Shipment, error)
 }
 
-// ProductionFactDraftSaveRepo is separate from OperationalFactRepo so readers
-// and legacy test doubles do not accidentally claim protected DRAFT updates.
+// ProductionFactDraftSaveRepo owns protected replacement of production drafts.
 type ProductionFactDraftSaveRepo interface {
 	SaveProductionFactDraft(ctx context.Context, in *ProductionFactDraftSave) (*ProductionFact, error)
 }
@@ -667,8 +680,8 @@ type StockReservationReadScope struct {
 	IncludeInventoryReferences  bool
 }
 
-// StockReservationReadRepo is an optional projection contract. Adapters that
-// do not implement it keep the base list available without readable joins.
+// StockReservationReadRepo requires permission-scoped reference projections
+// for every reservation list exposed by the usecase.
 type StockReservationReadRepo interface {
 	ListStockReservationsForAccess(ctx context.Context, filter OperationalFactFilter, scope StockReservationReadScope) ([]*StockReservation, int, error)
 }
@@ -680,8 +693,7 @@ type OperationalFactCancellationActorRepo interface {
 }
 
 // OperationalFactShipmentActorRepo is the authenticated direct-shipping path.
-// It keeps the base repository contract stable for isolated adapters while the
-// service fails closed if an implementation cannot preserve the actor.
+// Shipment repositories must preserve the authenticated actor in their write.
 type OperationalFactShipmentActorRepo interface {
 	ShipShipmentWithActor(ctx context.Context, id int, actorID int) (*Shipment, error)
 }
@@ -772,10 +784,7 @@ func (uc *OperationalFactUsecase) CreateProductionCompletionFromOrder(ctx contex
 	if normalized.LotID != nil && normalized.NewLotNo != nil {
 		return nil, ErrBadParam
 	}
-	sourceRepo, ok := uc.repo.(ProductionCompletionSourceRepo)
-	if !ok {
-		return nil, ErrBadParam
-	}
+	sourceRepo := uc.repo
 	source, err := sourceRepo.ResolveProductionCompletionSource(ctx, normalized.ProductionOrderID, normalized.ProductionOrderItemID)
 	if err != nil {
 		return nil, err
@@ -828,10 +837,7 @@ func (uc *OperationalFactUsecase) CreateProductionMaterialIssueFromOrder(ctx con
 	if err != nil {
 		return nil, err
 	}
-	repo, ok := uc.repo.(ProductionMaterialIssueFromOrderRepo)
-	if !ok {
-		return nil, ErrBadParam
-	}
+	repo := uc.repo
 	return repo.CreateProductionMaterialIssueFromOrder(ctx, normalized)
 }
 
@@ -855,10 +861,7 @@ func (uc *OperationalFactUsecase) saveProductionFactDraft(ctx context.Context, i
 	if err != nil {
 		return nil, err
 	}
-	repo, ok := uc.repo.(ProductionFactDraftSaveRepo)
-	if !ok {
-		return nil, ErrBadParam
-	}
+	repo := uc.repo
 	return repo.SaveProductionFactDraft(ctx, normalized)
 }
 
@@ -870,10 +873,7 @@ func (uc *OperationalFactUsecase) CreateProductionReworkFromCompletion(ctx conte
 	if err != nil {
 		return nil, err
 	}
-	repo, ok := uc.repo.(ProductionReworkFromCompletionRepo)
-	if !ok {
-		return nil, ErrBadParam
-	}
+	repo := uc.repo
 	return repo.CreateProductionReworkFromCompletion(ctx, normalized)
 }
 
@@ -881,10 +881,7 @@ func (uc *OperationalFactUsecase) ListProductionOrderMaterialRequirements(ctx co
 	if uc == nil || uc.repo == nil || productionOrderID <= 0 {
 		return nil, ErrBadParam
 	}
-	repo, ok := uc.repo.(ProductionMaterialIssueFromOrderRepo)
-	if !ok {
-		return nil, ErrBadParam
-	}
+	repo := uc.repo
 	return repo.ListProductionOrderMaterialRequirements(ctx, productionOrderID)
 }
 
@@ -997,10 +994,7 @@ func (uc *OperationalFactUsecase) CreateOutsourcingMaterialIssueFromOrder(ctx co
 	if err := requireActiveReference(ctx, normalized.WarehouseID, uc.repo.WarehouseIsActive, ErrWarehouseInactive); err != nil {
 		return nil, err
 	}
-	repo, ok := uc.repo.(OutsourcingFactFromOrderRepo)
-	if !ok {
-		return nil, ErrBadParam
-	}
+	repo := uc.repo
 	return repo.CreateOutsourcingMaterialIssueFromOrder(ctx, normalized)
 }
 
@@ -1021,10 +1015,7 @@ func (uc *OperationalFactUsecase) CreateOutsourcingReturnReceiptFromOrder(ctx co
 	if err := requireActiveReference(ctx, normalized.WarehouseID, uc.repo.WarehouseIsActive, ErrWarehouseInactive); err != nil {
 		return nil, err
 	}
-	repo, ok := uc.repo.(OutsourcingFactFromOrderRepo)
-	if !ok {
-		return nil, ErrBadParam
-	}
+	repo := uc.repo
 	return repo.CreateOutsourcingReturnReceiptFromOrder(ctx, normalized)
 }
 
@@ -1044,10 +1035,7 @@ func (uc *OperationalFactUsecase) saveOutsourcingFactDraft(ctx context.Context, 
 	if err != nil {
 		return nil, err
 	}
-	repo, ok := uc.repo.(OutsourcingFactDraftSaveRepo)
-	if !ok {
-		return nil, ErrBadParam
-	}
+	repo := uc.repo
 	return repo.SaveOutsourcingFactDraft(ctx, normalized)
 }
 
@@ -1132,10 +1120,7 @@ func (uc *OperationalFactUsecase) SaveShipmentDraftWithItems(ctx context.Context
 			return nil, err
 		}
 	}
-	repo, ok := uc.repo.(ShipmentDraftSaveRepo)
-	if !ok {
-		return nil, ErrBadParam
-	}
+	repo := uc.repo
 	return repo.SaveShipmentDraftWithItems(ctx, normalized)
 }
 
@@ -1143,10 +1128,7 @@ func (uc *OperationalFactUsecase) SubmitShipmentRelease(ctx context.Context, id 
 	if uc == nil || uc.repo == nil || id <= 0 || actorID <= 0 {
 		return nil, false, ErrBadParam
 	}
-	repo, ok := uc.repo.(ShipmentReleaseSourceRepo)
-	if !ok {
-		return nil, false, ErrBadParam
-	}
+	repo := uc.repo
 	return repo.SubmitShipmentRelease(ctx, id, actorID)
 }
 
@@ -1154,10 +1136,7 @@ func (uc *OperationalFactUsecase) GetProductionFactTransitionPolicy(ctx context.
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
 	}
-	repo, ok := uc.repo.(ProductionFactTransitionPolicyRepo)
-	if !ok {
-		return nil, ErrBadParam
-	}
+	repo := uc.repo
 	policy, err := repo.GetProductionFactTransitionPolicy(ctx, id)
 	if err != nil {
 		return nil, err
@@ -1179,12 +1158,7 @@ func (uc *OperationalFactUsecase) ValidateShipmentReleaseForShipping(ctx context
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return ErrBadParam
 	}
-	repo, ok := uc.repo.(ShipmentReleaseSourceRepo)
-	if !ok {
-		// Test doubles and adapters predating the source-task contract do not own
-		// the production data transaction. The concrete repository always does.
-		return nil
-	}
+	repo := uc.repo
 	return repo.ValidateShipmentReleaseForShipping(ctx, id)
 }
 
@@ -1199,10 +1173,7 @@ func (uc *OperationalFactUsecase) ShipShipmentWithActor(ctx context.Context, id 
 	if uc == nil || uc.repo == nil || id <= 0 || actorID <= 0 {
 		return nil, ErrBadParam
 	}
-	repo, ok := uc.repo.(OperationalFactShipmentActorRepo)
-	if !ok {
-		return nil, ErrActorAwareShipmentUnavailable
-	}
+	repo := uc.repo
 	return repo.ShipShipmentWithActor(ctx, id, actorID)
 }
 
@@ -1224,10 +1195,7 @@ func (uc *OperationalFactUsecase) CancelShippedShipmentWithActor(ctx context.Con
 	if uc == nil || uc.repo == nil || id <= 0 || actorID <= 0 {
 		return nil, ErrBadParam
 	}
-	repo, ok := uc.repo.(OperationalFactCancellationActorRepo)
-	if !ok {
-		return nil, ErrActorAwareCancellationUnavailable
-	}
+	repo := uc.repo
 	return repo.CancelShippedShipmentWithActor(ctx, id, actorID)
 }
 
@@ -1292,10 +1260,7 @@ func (uc *OperationalFactUsecase) ListStockReservationsForAccess(ctx context.Con
 	if err != nil {
 		return nil, 0, err
 	}
-	if repo, ok := uc.repo.(StockReservationReadRepo); ok {
-		return repo.ListStockReservationsForAccess(ctx, normalized, scope)
-	}
-	return uc.repo.ListStockReservations(ctx, normalized)
+	return uc.repo.ListStockReservationsForAccess(ctx, normalized, scope)
 }
 
 func (uc *OperationalFactUsecase) CreateFinanceFactDraft(ctx context.Context, in *FinanceFactCreate) (*FinanceFact, error) {
@@ -1340,10 +1305,7 @@ func (uc *OperationalFactUsecase) createFinanceFactFromShipment(ctx context.Cont
 	if factType == FinanceFactInvoice && normalized.InvoiceCategory == nil {
 		return nil, ErrFinanceFactInvoiceCategoryMissing
 	}
-	repo, ok := uc.repo.(FinanceFactFromShipmentRepo)
-	if !ok {
-		return nil, ErrBadParam
-	}
+	repo := uc.repo
 	return repo.CreateFinanceFactDraftFromShipment(ctx, factType, normalized)
 }
 
@@ -1351,10 +1313,7 @@ func (uc *OperationalFactUsecase) shipmentFinancePaymentTermSnapshot(ctx context
 	if uc == nil || uc.repo == nil || shipmentID <= 0 {
 		return nil, nil, ErrBadParam
 	}
-	repo, ok := uc.repo.(FinanceFactShipmentPaymentTermRepo)
-	if !ok {
-		return nil, nil, ErrBadParam
-	}
+	repo := uc.repo
 	days, err := repo.GetShipmentPaymentTermDays(ctx, shipmentID)
 	if err != nil {
 		return nil, nil, err
@@ -1375,12 +1334,7 @@ func (uc *OperationalFactUsecase) SettleFinanceFact(ctx context.Context, in *Ope
 	if uc == nil || uc.repo == nil || err != nil {
 		return nil, ErrBadParam
 	}
-	reader, ok := uc.repo.(interface {
-		GetFinanceFact(context.Context, int) (*FinanceFact, error)
-	})
-	if !ok {
-		return nil, ErrBadParam
-	}
+	reader := uc.repo
 	fact, err := reader.GetFinanceFact(ctx, normalized.ID)
 	if err != nil {
 		return nil, err

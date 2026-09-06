@@ -37,12 +37,6 @@
   --erp-login-sms-border: #b6c5d3;
 }
 
-.erp-login-card .erp-login-sms-code-compact.ant-space-compact:focus-within {
-  --erp-login-sms-border: var(--erp-login-sms-focus);
-
-  box-shadow: 0 0 0 3px var(--erp-login-sms-focus-ring);
-}
-
 #root
   .erp-login-card
   .erp-login-sms-code-compact.ant-space-compact

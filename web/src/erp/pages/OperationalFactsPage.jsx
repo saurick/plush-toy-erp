@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useMemo } from 'react'
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
@@ -10,24 +10,24 @@ import {
   RollbackOutlined,
 } from '@ant-design/icons'
 import { Button, Dropdown, Input, Modal, Popconfirm, Tabs, Tag } from 'antd'
+import { useNavigate, useOutletContext } from 'react-router-dom'
+import { useOperationalFactQuery } from '../components/operational-facts/useOperationalFactQuery.mjs'
+import { useOperationalFactMutations } from '../components/operational-facts/useOperationalFactMutations.mjs'
 import {
-  useNavigate,
-  useOutletContext,
-  useSearchParams,
-} from 'react-router-dom'
+  useProductionFactActions,
+  productionDraftSaveActionFor,
+  productionDraftEditPermissions,
+} from '../components/production-orders/useProductionFactActions.mjs'
+import { useFinanceReconciliationAction } from '../components/finance/useFinanceReconciliationAction.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { currentBusinessDate } from '../utils/businessDate.mjs'
 import {
-  compactParams,
   hasActionPermission,
-  trimOptional,
   V1_ROUTE_PATHS,
 } from '../utils/masterDataOrderView.mjs'
-import {
-  createBusinessTablePagination,
-  getBusinessPaginationParams,
-} from '../utils/businessPagination.mjs'
+
+import { createBusinessTablePagination } from '../utils/businessPagination.mjs'
 import { applyBusinessColumnSorters } from '../utils/moduleTableColumns.mjs'
 import {
   BusinessActionTooltip,
@@ -52,16 +52,9 @@ import ProductionReworkModal from '../components/production-facts/ProductionRewo
 import ProductionCompletionModal from '../components/production-orders/ProductionCompletionModal.jsx'
 import ProductionMaterialIssueModal from '../components/production-orders/ProductionMaterialIssueModal.jsx'
 import ProductionReworkProgressModal from '../components/production-orders/ProductionReworkProgressModal.jsx'
-import {
-  routeWithQuery,
-  searchParamPositiveInt,
-  searchParamText,
-} from '../utils/routeQuery.mjs'
+import { routeWithQuery } from '../utils/routeQuery.mjs'
 import {
   canOpenRelatedDocumentPath,
-  clearLinkedDocumentParams,
-  linkedDocumentContext,
-  linkedDocumentRequestKeyword,
   relatedDocumentRoute,
 } from '../utils/relatedDocumentNavigation.mjs'
 import {
@@ -71,43 +64,18 @@ import {
 } from '../utils/printWorkspace.js'
 import { buildProcessingContractDraftFromOutsourcingFact } from '../data/processingContractTemplate.mjs'
 import { canConfirmFinanceFact } from '../utils/financeFactPermissions.mjs'
-import {
-  createProductionReworkFromCompletion,
-  createReconciliationFromFinanceFact,
-  listAllProductionFacts,
-  listProductionOrderMaterialRequirements,
-  saveProductionCompletionDraft,
-  saveProductionMaterialIssueDraft,
-  saveProductionReworkFromCompletionDraft,
-} from '../api/operationalFactApi.mjs'
-import { getProductionWip } from '../api/productionWipApi.mjs'
-import { getProductionOrder } from '../api/productionOrderApi.mjs'
-import { listAllWarehouses } from '../api/masterDataOrderApi.mjs'
-import { listAllInventoryLots } from '../api/inventoryApi.mjs'
+
 import {
   FINANCE_BUSINESS_SOURCE_ACTIONS,
-  buildFinanceBusinessSourcePayload,
-  financeBusinessSourceActionConfig,
-  financeBusinessSourceFormValuesFromRequest,
   hasValidFinanceTransitionSource,
   isOutsourcingReturnPayableSource,
   isSingleFactReconciliationSource,
 } from '../utils/financeBusinessSourceAction.mjs'
-import {
-  createSourceBusinessActionAttemptStore,
-  isSourceBusinessActionResultUnknown,
-} from '../utils/sourceBusinessAction.mjs'
-import { matchesOperationalFactLifecycleResult } from '../utils/operationalFactLifecycle.mjs'
+
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
 import { resolveContextualBusinessActionAvailability } from '../utils/businessActionAvailability.mjs'
 import { resolveRelatedRecordActionAvailability } from '../utils/operationalActionAvailability.mjs'
-import {
-  buildProductionReworkPayload,
-  findProductionReworkResult,
-  isPostedProductionCompletion,
-  isProductionReworkEligible,
-  productionReworkFormValuesFromRequest,
-} from '../utils/productionReworkAction.mjs'
+import { isProductionReworkEligible } from '../utils/productionReworkAction.mjs'
 import {
   hasAnyPermission,
   isFinishedGoodsReceipt,
@@ -116,17 +84,7 @@ import {
   selectedLabelForKey,
 } from '../components/operational-facts/OperationalFactForms.jsx'
 import { hasRequiredOperationalFactDraftSource } from '../utils/operationalFactDraftSource.mjs'
-import {
-  OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS,
-  buildOperationalFactDraftSavePayload,
-  findOperationalFactDraftSaveResult,
-  operationalFactDraftFormValues,
-} from '../utils/operationalFactDraftEdit.mjs'
-import { filterProductionMaterialIssueLots } from '../utils/productionMaterialIssueAction.mjs'
-import {
-  uniqueReferenceOptions,
-  warehouseOptionFromRecord,
-} from '../utils/referenceSelectOptions.mjs'
+
 import {
   businessSourceInventoryRouteFor,
   businessSourceRouteFor,
@@ -134,7 +92,6 @@ import {
 } from '../utils/businessSourceNavigation.mjs'
 import { resolveOperationalFactRouteRecord } from '../utils/operationalFactRelatedNavigation.mjs'
 import {
-  DEFAULT_OPERATIONAL_FACT_PAGINATION,
   DEFAULT_OPERATIONAL_FACT_SUMMARY,
   EMPTY_VIEW_OVERRIDES,
   OCCURRED_DATE_FILTER_OPTIONS,
@@ -142,41 +99,10 @@ import {
   buildOperationalFactColumns,
   buildOperationalFactRelatedMenuItems,
   buildOperationalFactStats,
-  buildOperationalFactViewConfigs,
   financeSettlementActionFor,
   getOperationalFactAttachmentOwnerType,
   sourceTypeLabel,
 } from '../components/operational-facts/operationalFactPageConfig.mjs'
-
-function productionDraftSaveActionFor(record = {}) {
-  const factType = String(record?.fact_type || '').toUpperCase()
-  const sourceType = String(record?.source_type || '').toUpperCase()
-  if (factType === 'MATERIAL_ISSUE' && sourceType === 'PRODUCTION_ORDER') {
-    return OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_MATERIAL_ISSUE
-  }
-  if (
-    factType === 'FINISHED_GOODS_RECEIPT' &&
-    sourceType === 'PRODUCTION_ORDER'
-  ) {
-    return OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_COMPLETION
-  }
-  if (factType === 'REWORK' && sourceType === 'PRODUCTION_FACT') {
-    return OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_REWORK_COMPLETION
-  }
-  return ''
-}
-
-function productionDraftEditPermissions(action) {
-  if (
-    action === OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_MATERIAL_ISSUE
-  ) {
-    return ['production.material_issue.create']
-  }
-  if (action === OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_COMPLETION) {
-    return ['production.completion.create', 'warehouse.inbound.confirm']
-  }
-  return ['production.rework.create']
-}
 
 export function OperationalFactWorkspace({
   pageTitle = '业务记录处理',
@@ -189,61 +115,52 @@ export function OperationalFactWorkspace({
 }) {
   const outletContext = useOutletContext()
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
+
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
   )
-  const activeCustomerKey = adminProfile?.effective_session?.customer?.key || ''
-  const [activeKey, setActiveKey] = useState(initialActiveKey)
-  const [keyword, setKeyword] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
-  const [dateFieldByKey, setDateFieldByKey] = useState({})
-  const [dateRangeByKey, setDateRangeByKey] = useState({})
-  const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [financeCancelOpen, setFinanceCancelOpen] = useState(false)
-  const [financeCancelReason, setFinanceCancelReason] = useState('')
-  const [financeSourceContext, setFinanceSourceContext] = useState(null)
-  const [financeSourceLoading, setFinanceSourceLoading] = useState(false)
-  const [productionReworkContext, setProductionReworkContext] = useState(null)
-  const [productionReworkLoading, setProductionReworkLoading] = useState(false)
-  const [productionReworkProgressContext, setProductionReworkProgressContext] =
-    useState(null)
-  const [productionReworkProgressLoading, setProductionReworkProgressLoading] =
-    useState(false)
-  const [productionDraftEditContext, setProductionDraftEditContext] =
-    useState(null)
-  const [productionDraftEditLoading, setProductionDraftEditLoading] =
-    useState(false)
-  const [rowsByKey, setRowsByKey] = useState({})
-  const [totalByKey, setTotalByKey] = useState({})
-  const [paginationByKey, setPaginationByKey] = useState({})
-  const [selectedByKey, setSelectedByKey] = useState({})
-  const [detailRecord, setDetailRecord] = useState(null)
-  const listRequestVersionRef = useRef(0)
-  const mountedRef = useRef(false)
-  const financeSourceAttemptsRef = useRef(
-    createSourceBusinessActionAttemptStore()
-  )
-  const financeSourceInFlightRef = useRef(false)
-  const productionReworkAttemptsRef = useRef(
-    createSourceBusinessActionAttemptStore()
-  )
-  const productionReworkInFlightRef = useRef(false)
-  const productionReworkRequestRef = useRef(0)
-  const productionReworkProgressRequestRef = useRef(0)
-  const productionDraftEditRequestRef = useRef(0)
-  const routeSalesOrderID = searchParamPositiveInt(
-    searchParams,
-    'sales_order_id'
-  )
-  const routeSourceID = searchParamPositiveInt(searchParams, 'source_id')
-  const routeSourceType = searchParamText(searchParams, 'source_type')
-  const routeFactID = searchParamPositiveInt(searchParams, 'fact_id')
-  const routeView = searchParamText(searchParams, 'view')
-  const linkedContext = linkedDocumentContext(searchParams)
-  const linkedKeyword = linkedContext.keyword
+  const {
+    setActiveKey,
+    keyword,
+    setKeyword,
+    statusFilter,
+    setStatusFilter,
+    setDateFieldByKey,
+    dateRangeByKey,
+    setDateRangeByKey,
+    loading,
+    rowsByKey,
+    setPaginationByKey,
+    selectedByKey,
+    setSelectedByKey,
+    detailRecord,
+    setDetailRecord,
+    routeSalesOrderID,
+    routeSourceID,
+    routeSourceType,
+    routeFactID,
+    linkedKeyword,
+    configs,
+    currentActiveKey,
+    activeConfig,
+    activeTotal,
+    openOperationalFactDetails,
+    activePagination,
+    activeDateField,
+    resetPaginationForKey,
+    loadRows,
+    loadExportRows,
+    clearRouteContext,
+    clearFilters,
+  } = useOperationalFactQuery({
+    initialActiveKey,
+    enabledViews,
+    viewOverrides,
+    adminProfile,
+    outletContext,
+  })
+
   const allowedMenuPaths = useMemo(
     () => outletContext?.allowedMenuPaths || [],
     [outletContext?.allowedMenuPaths]
@@ -258,67 +175,29 @@ export function OperationalFactWorkspace({
     [adminProfile, allowedMenuPaths]
   )
 
-  const baseConfigs = useMemo(() => buildOperationalFactViewConfigs(), [])
-
-  useEffect(() => {
-    mountedRef.current = true
-    return () => {
-      mountedRef.current = false
-      listRequestVersionRef.current += 1
-      productionReworkRequestRef.current += 1
-      productionReworkProgressRequestRef.current += 1
-      productionDraftEditRequestRef.current += 1
-    }
-  }, [])
-
-  const enabledViewKeys = useMemo(() => {
-    const requestedKeys =
-      Array.isArray(enabledViews) && enabledViews.length > 0
-        ? enabledViews
-        : Object.keys(baseConfigs)
-    const validKeys = requestedKeys.filter((key) => Boolean(baseConfigs[key]))
-    return validKeys.length > 0 ? validKeys : ['production']
-  }, [baseConfigs, enabledViews])
-
-  const configs = useMemo(() => {
-    const nextConfigs = {}
-    enabledViewKeys.forEach((key) => {
-      const baseConfig = baseConfigs[key]
-      const override = viewOverrides?.[key] || {}
-      nextConfigs[key] = {
-        ...baseConfig,
-        ...override,
-        listParams: {
-          ...(baseConfig.listParams || {}),
-          ...(override.listParams || {}),
-        },
-      }
-    })
-    return nextConfigs
-  }, [baseConfigs, enabledViewKeys, viewOverrides])
-
-  useEffect(() => {
-    if (!configs[activeKey]) {
-      setActiveKey(enabledViewKeys[0] || 'production')
-    }
-  }, [activeKey, configs, enabledViewKeys])
-
-  useEffect(() => {
-    if (routeView && configs[routeView] && routeView !== activeKey) {
-      setActiveKey(routeView)
-    }
-  }, [activeKey, configs, routeView])
-
-  const fallbackActiveKey =
-    enabledViewKeys.find((key) => configs[key]) || 'production'
-  const currentActiveKey = configs[activeKey] ? activeKey : fallbackActiveKey
-  const activeConfig = configs[currentActiveKey] || configs[fallbackActiveKey]
   const activeRows = useMemo(
     () => rowsByKey[currentActiveKey] || [],
     [currentActiveKey, rowsByKey]
   )
-  const activeTotal = totalByKey[currentActiveKey] || 0
+
   const activeSelectedRow = selectedByKey[currentActiveKey] || null
+  const {
+    activeCustomerKey,
+    saving,
+    financeCancelOpen,
+    setFinanceCancelOpen,
+    financeCancelReason,
+    setFinanceCancelReason,
+    runRowAction,
+    confirmFinanceCancellation,
+  } = useOperationalFactMutations({
+    adminProfile,
+    currentActiveKey,
+    loadRows,
+    activeSelectedRow,
+    activeConfig,
+  })
+
   const resolvedRouteRecord = useMemo(
     () =>
       resolveOperationalFactRouteRecord(activeRows, {
@@ -340,45 +219,7 @@ export function OperationalFactWorkspace({
   const resolvedRouteKeyword = String(
     resolvedRouteRecord?.fact_no || resolvedRouteRecord?.shipment_no || ''
   ).trim()
-  const openOperationalFactDetails = useCallback(
-    (record) => {
-      if (!record?.id) return
-      setSelectedByKey((prev) => ({
-        ...prev,
-        [currentActiveKey]: record,
-      }))
-      setDetailRecord(record)
-    },
-    [currentActiveKey]
-  )
-  const financeSourceScope = financeSourceContext?.source?.id
-    ? `${financeSourceContext.action}:${financeSourceContext.source.id}`
-    : ''
-  const financeSourceInitialValues = useMemo(() => {
-    if (!financeSourceScope) return undefined
-    const retained = financeSourceAttemptsRef.current.peek(financeSourceScope)
-    return retained
-      ? financeBusinessSourceFormValuesFromRequest(retained.params)
-      : undefined
-  }, [financeSourceScope])
-  const productionReworkScope = productionReworkContext?.source?.id
-    ? `production-rework:${productionReworkContext.source.id}`
-    : ''
-  const productionReworkInitialValues = useMemo(() => {
-    if (!productionReworkScope) return undefined
-    const retained = productionReworkAttemptsRef.current.peek(
-      productionReworkScope
-    )
-    return retained
-      ? productionReworkFormValuesFromRequest(retained.params)
-      : undefined
-  }, [productionReworkScope])
-  const activePagination =
-    paginationByKey[currentActiveKey] || DEFAULT_OPERATIONAL_FACT_PAGINATION
-  const activeDateField =
-    dateFieldByKey[currentActiveKey] ||
-    activeConfig.defaultDateField ||
-    'occurred_at'
+
   const activeDateRange = dateRangeByKey[currentActiveKey] || ['', '']
   const activeFinanceFactType = activeConfig.listParams?.fact_type
   const canWriteActive =
@@ -410,787 +251,45 @@ export function OperationalFactWorkspace({
       )
   )
 
-  const resetPaginationForKey = useCallback(
-    (key = currentActiveKey) => {
-      setPaginationByKey((prev) => ({
-        ...prev,
-        [key]: {
-          ...(prev[key] || DEFAULT_OPERATIONAL_FACT_PAGINATION),
-          current: 1,
-        },
-      }))
-    },
-    [currentActiveKey]
-  )
+  const {
+    productionReworkContext,
+    productionReworkLoading,
+    productionReworkProgressContext,
+    productionReworkProgressLoading,
+    productionDraftEditContext,
+    productionDraftEditLoading,
+    productionReworkInitialValues,
+    openProductionDraftEditor,
+    loadProductionDraftMaterialLots,
+    closeProductionDraftEditor,
+    submitProductionDraftEdit,
+    openProductionRework,
+    closeProductionRework,
+    openProductionReworkProgress,
+    closeProductionReworkProgress,
+    submitProductionRework,
+  } = useProductionFactActions({
+    adminProfile,
+    activeCustomerKey,
+    loadRows,
+    canCreateProductionRework,
+    canViewProductionReworkProgress,
+    resetPaginationForKey,
+  })
 
-  const routeListParamsForKey = useCallback(
-    (key) => {
-      if (['shipments', 'reservations'].includes(key) && routeSalesOrderID) {
-        return { source_id: routeSalesOrderID }
-      }
-      if (
-        ['production', 'outsourcing'].includes(key) &&
-        routeSourceType &&
-        routeSourceID
-      ) {
-        return {
-          source_type: routeSourceType,
-          source_id: routeSourceID,
-        }
-      }
-      if (key === 'finance' && routeSourceType && routeSourceID) {
-        return {
-          source_type: routeSourceType,
-          source_id: routeSourceID,
-        }
-      }
-      return {}
-    },
-    [routeSalesOrderID, routeSourceID, routeSourceType]
-  )
-
-  const loadRows = useCallback(
-    async (key = currentActiveKey) => {
-      const config = configs[key]
-      if (!config) {
-        return
-      }
-      if (
-        Array.isArray(config.readPermissions) &&
-        config.readPermissions.length > 0 &&
-        !hasAnyPermission(adminProfile, config.readPermissions)
-      ) {
-        setRowsByKey((prev) => ({ ...prev, [key]: [] }))
-        setSelectedByKey((prev) => ({ ...prev, [key]: null }))
-        setTotalByKey((prev) => ({ ...prev, [key]: 0 }))
-        setLoading(false)
-        return
-      }
-      const requestVersion = listRequestVersionRef.current + 1
-      listRequestVersionRef.current = requestVersion
-      const shouldApplyRequest = () =>
-        mountedRef.current && requestVersion === listRequestVersionRef.current
-      setLoading(true)
-      try {
-        const pagination = paginationByKey[key] || activePagination
-        const exactRouteContext = Boolean(
-          routeFactID || routeSalesOrderID || (routeSourceType && routeSourceID)
-        )
-        const exactProductionFactID =
-          key === 'production' ? Number(routeFactID || 0) : 0
-        const data =
-          exactProductionFactID > 0
-            ? await listAllProductionFacts({
-                keyword: String(exactProductionFactID),
-              })
-            : await config.list(
-                compactParams({
-                  status: statusFilter,
-                  keyword: trimOptional(
-                    linkedDocumentRequestKeyword({
-                      localKeyword: keyword,
-                      linkedKeyword,
-                      hasExactContext: exactRouteContext,
-                    })
-                  ),
-                  date_field: dateFieldByKey[key] || config.defaultDateField,
-                  date_from: dateRangeByKey[key]?.[0] || undefined,
-                  date_to: dateRangeByKey[key]?.[1] || undefined,
-                  ...(config.listParams || {}),
-                  ...routeListParamsForKey(key),
-                  ...getBusinessPaginationParams(pagination),
-                })
-              )
-        const listedRows = Array.isArray(data?.[config.listKey])
-          ? data[config.listKey]
-          : []
-        const nextRows =
-          exactProductionFactID > 0
-            ? listedRows.filter(
-                (item) => Number(item?.id || 0) === exactProductionFactID
-              )
-            : listedRows
-        if (!shouldApplyRequest()) {
-          return
-        }
-        setRowsByKey((prev) => ({
-          ...prev,
-          [key]: nextRows,
-        }))
-        setSelectedByKey((prev) => {
-          const routeRecord = resolveOperationalFactRouteRecord(nextRows, {
-            activeKey: key,
-            factID: routeFactID,
-            sourceType: routeSourceType,
-            sourceID: routeSourceID,
-            total:
-              exactProductionFactID > 0
-                ? nextRows.length
-                : Number(data?.total || 0),
-          })
-          const hasRouteSelection = Boolean(
-            (key === 'production' && routeFactID) ||
-              (key === 'finance' && routeSourceType && routeSourceID)
-          )
-          if (hasRouteSelection) {
-            return {
-              ...prev,
-              [key]: routeRecord,
-            }
-          }
-          const current = prev[key]
-          if (!current?.id) return prev
-          const refreshed = nextRows.find((item) => item.id === current.id)
-          return {
-            ...prev,
-            [key]: refreshed || null,
-          }
-        })
-        setTotalByKey((prev) => ({
-          ...prev,
-          [key]:
-            exactProductionFactID > 0
-              ? nextRows.length
-              : Number(data?.total || 0),
-        }))
-        return nextRows
-      } catch (error) {
-        if (shouldApplyRequest()) {
-          setSelectedByKey((prev) => ({ ...prev, [key]: null }))
-          setDetailRecord(null)
-          message.error(getActionErrorMessage(error, `加载${config.title}`))
-        }
-        return null
-      } finally {
-        if (shouldApplyRequest()) {
-          setLoading(false)
-        }
-      }
-    },
-    [
-      activePagination,
-      adminProfile,
-      configs,
-      currentActiveKey,
-      dateFieldByKey,
-      dateRangeByKey,
-      keyword,
-      linkedKeyword,
-      paginationByKey,
-      routeFactID,
-      routeListParamsForKey,
-      routeSalesOrderID,
-      routeSourceID,
-      routeSourceType,
-      statusFilter,
-    ]
-  )
-
-  useEffect(() => {
-    loadRows(currentActiveKey)
-  }, [currentActiveKey, loadRows])
-
-  useEffect(() => {
-    return outletContext?.registerPageRefresh?.(() =>
-      loadRows(currentActiveKey)
-    )
-  }, [currentActiveKey, loadRows, outletContext])
-
-  const runRowAction = async (
-    config,
-    row,
-    actionKey,
-    actionLabel,
-    extraParams = {}
-  ) => {
-    const action = config[actionKey]
-    if (!action || !row?.id) {
-      return false
-    }
-    const usesStrictFactLifecycle =
-      ['production', 'outsourcing', 'finance'].includes(currentActiveKey) &&
-      ['post', 'settle', 'cancel'].includes(actionKey)
-    const targetStatus = usesStrictFactLifecycle
-      ? {
-          post: 'POSTED',
-          settle: 'SETTLED',
-          cancel: 'CANCELLED',
-        }[actionKey]
-      : ''
-    const attempt = Object.freeze({
-      id: row.id,
-      ...(usesStrictFactLifecycle
-        ? {
-            expected_version: row.version,
-            ...(activeCustomerKey ? { customer_key: activeCustomerKey } : {}),
-          }
-        : currentActiveKey === 'outsourcing' && activeCustomerKey
-          ? { customer_key: activeCustomerKey }
-          : {}),
-      ...extraParams,
-    })
-    let resultUnknown = false
-    try {
-      setSaving(true)
-      await action(attempt)
-    } catch (error) {
-      if (
-        !usesStrictFactLifecycle ||
-        !isSourceBusinessActionResultUnknown(error) ||
-        !targetStatus
-      ) {
-        message.error(getActionErrorMessage(error, actionLabel))
-        setSaving(false)
-        return false
-      }
-      resultUnknown = true
-    }
-    const refreshedRows = await loadRows(currentActiveKey)
-    if (resultUnknown) {
-      const confirmed = refreshedRows?.find((record) =>
-        matchesOperationalFactLifecycleResult(record, attempt, targetStatus)
-      )
-      if (!confirmed) {
-        message.warning(
-          '暂时无法确认操作结果，已清除当前选择；请刷新核对后再决定是否重试'
-        )
-        setSaving(false)
-        return false
-      }
-    }
-    message.success(
-      currentActiveKey === 'production' &&
-        actionKey === 'post' &&
-        String(row.fact_type || '')
-          .trim()
-          .toUpperCase() === 'REWORK'
-        ? '返工记录已过账，返工补制批次和生产异常任务已生成'
-        : resultUnknown
-          ? `已重新读取并确认${actionLabel}完成`
-          : `${actionLabel}已完成`
-    )
-    if (!refreshedRows) {
-      message.warning(`${actionLabel}已完成，请稍后刷新查看最新结果`)
-    }
-    setSaving(false)
-    return true
-  }
-
-  const openProductionDraftEditor = async (record) => {
-    const action = productionDraftSaveActionFor(record)
-    if (
-      !action ||
-      record?.status !== 'DRAFT' ||
-      !hasAnyPermission(adminProfile, productionDraftEditPermissions(action))
-    ) {
-      message.warning('当前记录状态或权限已变化，请刷新后重试')
-      return
-    }
-    const requestID = productionDraftEditRequestRef.current + 1
-    productionDraftEditRequestRef.current = requestID
-    setProductionDraftEditLoading(true)
-    try {
-      const exactData = await listAllProductionFacts({
-        keyword: String(record.id),
-      })
-      if (productionDraftEditRequestRef.current !== requestID) return
-      const fresh = (exactData?.production_facts || []).find(
-        (item) => Number(item?.id || 0) === Number(record.id)
-      )
-      if (
-        !fresh ||
-        fresh.status !== 'DRAFT' ||
-        productionDraftSaveActionFor(fresh) !== action
-      ) {
-        message.warning('草稿状态或来源已变化，请刷新后重试')
-        return
-      }
-      const initialValues = operationalFactDraftFormValues(fresh)
-      if (
-        action ===
-        OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_REWORK_COMPLETION
-      ) {
-        setProductionDraftEditContext({
-          kind: 'rework',
-          action,
-          record: fresh,
-          initialValues,
-        })
-        return
-      }
-      const orderID = Number(fresh.source_id || 0)
-      if (!orderID) throw new Error('生产来源不完整')
-      const [aggregate, warehouseData, lotData, factData, requirements] =
-        await Promise.all([
-          getProductionOrder(orderID),
-          listAllWarehouses({ active_only: true }),
-          listAllInventoryLots(
-            action ===
-              OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_MATERIAL_ISSUE
-              ? {
-                  subject_type: 'MATERIAL',
-                  subject_id: fresh.subject_id,
-                  warehouse_id: fresh.warehouse_id,
-                  status: 'ACTIVE',
-                }
-              : { status: 'ACTIVE' }
-          ),
-          listAllProductionFacts({
-            source_type: 'PRODUCTION_ORDER',
-            source_id: orderID,
-          }),
-          action ===
-          OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_MATERIAL_ISSUE
-            ? listProductionOrderMaterialRequirements({
-                customer_key: activeCustomerKey || undefined,
-                production_order_id: orderID,
-              })
-            : Promise.resolve([]),
-        ])
-      if (productionDraftEditRequestRef.current !== requestID) return
-      const warehouseOptions = uniqueReferenceOptions(
-        warehouseData?.warehouses,
-        warehouseOptionFromRecord
-      )
-      const facts = Array.isArray(factData?.production_facts)
-        ? factData.production_facts
-        : []
-      const lots = Array.isArray(lotData?.inventory_lots)
-        ? lotData.inventory_lots
-        : []
-      if (
-        action === OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_MATERIAL_ISSUE
-      ) {
-        const requirement = (
-          Array.isArray(requirements) ? requirements : []
-        ).find((item) => Number(item?.id || 0) === Number(fresh.source_line_id))
-        const orderItem = (aggregate?.items || []).find(
-          (item) =>
-            Number(item?.id || 0) ===
-            Number(requirement?.production_order_item_id || 0)
-        )
-        if (!requirement || !orderItem) throw new Error('生产领料来源已变化')
-        setProductionDraftEditContext({
-          kind: 'material',
-          action,
-          record: fresh,
-          initialValues,
-          order: aggregate.order,
-          orderItem,
-          requirement,
-          warehouseOptions,
-          lots: filterProductionMaterialIssueLots(requirement, lots),
-        })
-        return
-      }
-      const wipAggregate = fresh.production_wip_batch_id
-        ? await getProductionWip(orderID)
-        : null
-      if (productionDraftEditRequestRef.current !== requestID) return
-      setProductionDraftEditContext({
-        kind: 'completion',
-        action,
-        record: fresh,
-        initialValues: {
-          ...initialValues,
-          production_order_item_id: fresh.source_line_id,
-          production_wip_batch_id: fresh.production_wip_batch_id,
-        },
-        order: aggregate.order,
-        items: aggregate.items || [],
-        facts,
-        wipAggregate,
-        warehouseOptions,
-        lots,
-      })
-    } catch (error) {
-      if (productionDraftEditRequestRef.current === requestID) {
-        message.error(getActionErrorMessage(error, '加载生产草稿'))
-      }
-    } finally {
-      if (productionDraftEditRequestRef.current === requestID) {
-        setProductionDraftEditLoading(false)
-      }
-    }
-  }
-
-  const loadProductionDraftMaterialLots = async (warehouseID) => {
-    const context = productionDraftEditContext
-    const requestID = productionDraftEditRequestRef.current
-    if (context?.kind !== 'material' || !Number(warehouseID || 0)) return
-    setProductionDraftEditLoading(true)
-    try {
-      const data = await listAllInventoryLots({
-        subject_type: 'MATERIAL',
-        subject_id: context.requirement.material_id,
-        warehouse_id: Number(warehouseID),
-        status: 'ACTIVE',
-      })
-      if (productionDraftEditRequestRef.current !== requestID) return
-      setProductionDraftEditContext((current) =>
-        current?.kind === 'material'
-          ? {
-              ...current,
-              lots: filterProductionMaterialIssueLots(
-                current.requirement,
-                data?.inventory_lots
-              ),
-            }
-          : current
-      )
-    } catch (error) {
-      if (productionDraftEditRequestRef.current === requestID) {
-        message.error(getActionErrorMessage(error, '加载材料批次'))
-      }
-    } finally {
-      if (productionDraftEditRequestRef.current === requestID) {
-        setProductionDraftEditLoading(false)
-      }
-    }
-  }
-
-  const closeProductionDraftEditor = () => {
-    productionDraftEditRequestRef.current += 1
-    setProductionDraftEditLoading(false)
-    setProductionDraftEditContext(null)
-  }
-
-  const submitProductionDraftEdit = async (values) => {
-    const context = productionDraftEditContext
-    if (!context?.record?.id || productionDraftEditLoading) return
-    let request
-    try {
-      request = {
-        ...buildOperationalFactDraftSavePayload(
-          context.action,
-          values,
-          context.record
-        ),
-        ...(activeCustomerKey ? { customer_key: activeCustomerKey } : {}),
-      }
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '准备草稿内容'))
-      return
-    }
-    const saveByAction = {
-      [OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_MATERIAL_ISSUE]:
-        saveProductionMaterialIssueDraft,
-      [OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_COMPLETION]:
-        saveProductionCompletionDraft,
-      [OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_REWORK_COMPLETION]:
-        saveProductionReworkFromCompletionDraft,
-    }
-    const save = saveByAction[context.action]
-    if (!save) return
-    setProductionDraftEditLoading(true)
-    try {
-      try {
-        await save(request, context.record)
-      } catch (error) {
-        if (!isSourceBusinessActionResultUnknown(error)) throw error
-        const data = await listAllProductionFacts({
-          keyword: String(context.record.id),
-        })
-        const confirmed = findOperationalFactDraftSaveResult(
-          data?.production_facts,
-          request,
-          context.record,
-          context.action
-        )
-        if (!confirmed) throw error
-      }
-      setProductionDraftEditContext(null)
-      message.success(
-        context.action ===
-          OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_COMPLETION
-          ? '待入库草稿已保存，请由仓库核对后确认成品入库'
-          : '生产草稿已保存，请核对后再过账'
-      )
-      await loadRows('production')
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '保存生产草稿'))
-    } finally {
-      setProductionDraftEditLoading(false)
-    }
-  }
-
-  const openProductionRework = async (source) => {
-    if (!canCreateProductionRework) {
-      message.warning('当前账号没有发起返工的权限')
-      return
-    }
-    if (!isPostedProductionCompletion(source)) {
-      message.warning('仅已过账且来源完整的成品入库记录可以发起返工')
-      return
-    }
-    const requestID = productionReworkRequestRef.current + 1
-    productionReworkRequestRef.current = requestID
-    setProductionReworkLoading(true)
-    try {
-      const data = await listAllProductionFacts({
-        source_type: 'PRODUCTION_FACT',
-        source_id: source.id,
-      })
-      if (productionReworkRequestRef.current !== requestID) return
-      const facts = Array.isArray(data?.production_facts)
-        ? data.production_facts
-        : []
-      if (!isProductionReworkEligible(source, facts)) {
-        message.warning('当前完工记录已没有可返工数量，请刷新后核对')
-        return
-      }
-      setProductionReworkContext({ source, facts })
-    } catch (error) {
-      if (productionReworkRequestRef.current === requestID) {
-        message.error(getActionErrorMessage(error, '加载返工来源'))
-      }
-    } finally {
-      if (productionReworkRequestRef.current === requestID) {
-        setProductionReworkLoading(false)
-      }
-    }
-  }
-
-  const closeProductionRework = () => {
-    if (productionReworkInFlightRef.current) return
-    productionReworkRequestRef.current += 1
-    setProductionReworkLoading(false)
-    setProductionReworkContext(null)
-  }
-
-  const openProductionReworkProgress = async (source) => {
-    const orderID = Number(source?.production_order_id || 0)
-    if (!canViewProductionReworkProgress) {
-      message.warning('当前账号不能同时查看生产工序和生产记录')
-      return
-    }
-    if (
-      String(source?.fact_type || '').toUpperCase() !== 'REWORK' ||
-      !['POSTED', 'CANCELLED'].includes(
-        String(source?.status || '').toUpperCase()
-      ) ||
-      !Number.isSafeInteger(orderID) ||
-      orderID <= 0
-    ) {
-      message.warning('请选择已过账或已撤销且来源完整的返工记录')
-      return
-    }
-    const requestID = productionReworkProgressRequestRef.current + 1
-    productionReworkProgressRequestRef.current = requestID
-    setProductionReworkProgressLoading(true)
-    try {
-      const [aggregate, factData] = await Promise.all([
-        getProductionWip(orderID),
-        listAllProductionFacts({
-          source_type: 'PRODUCTION_ORDER',
-          source_id: orderID,
-        }),
-      ])
-      if (productionReworkProgressRequestRef.current !== requestID) return
-      const hasExactRoot = aggregate.batches.some(
-        (batch) =>
-          Number(batch?.origin_rework_fact_id || 0) === Number(source.id) &&
-          !Number(batch?.source_batch_id)
-      )
-      if (!hasExactRoot) {
-        message.warning('该返工记录尚未关联可核对的成品返工补制批次')
-        return
-      }
-      const facts = Array.isArray(factData?.production_facts)
-        ? factData.production_facts
-        : []
-      setProductionReworkProgressContext({
-        order: aggregate.productionOrder,
-        aggregate,
-        facts: facts.some((fact) => Number(fact?.id) === Number(source.id))
-          ? facts
-          : [source, ...facts],
-        focusReworkFactID: source.id,
-      })
-    } catch (error) {
-      if (productionReworkProgressRequestRef.current === requestID) {
-        message.error(getActionErrorMessage(error, '加载成品返工进度'))
-      }
-    } finally {
-      if (productionReworkProgressRequestRef.current === requestID) {
-        setProductionReworkProgressLoading(false)
-      }
-    }
-  }
-
-  const closeProductionReworkProgress = () => {
-    productionReworkProgressRequestRef.current += 1
-    setProductionReworkProgressLoading(false)
-    setProductionReworkProgressContext(null)
-  }
-
-  const submitProductionRework = async (values) => {
-    const source = productionReworkContext?.source
-    const facts = productionReworkContext?.facts || []
-    if (productionReworkInFlightRef.current || !source?.id) return
-
-    const scope = `production-rework:${source.id}`
-    let attempt
-    try {
-      const payload = {
-        ...buildProductionReworkPayload(values, source, facts),
-        customer_key: activeCustomerKey || undefined,
-      }
-      attempt = productionReworkAttemptsRef.current.prepare(scope, payload)
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '准备返工记录'))
-      return
-    }
-
-    productionReworkInFlightRef.current = true
-    setProductionReworkLoading(true)
-    try {
-      let result
-      let confirmedByReread = false
-      try {
-        result = await createProductionReworkFromCompletion(attempt.params)
-      } catch (error) {
-        if (!isSourceBusinessActionResultUnknown(error)) {
-          productionReworkAttemptsRef.current.settle(scope, attempt, error)
-          message.error(getActionErrorMessage(error, '生成返工草稿'))
-          return
-        }
-        let currentFacts = []
-        try {
-          const data = await listAllProductionFacts({
-            source_type: 'PRODUCTION_FACT',
-            source_id: source.id,
-          })
-          currentFacts = Array.isArray(data?.production_facts)
-            ? data.production_facts
-            : []
-          result = findProductionReworkResult(currentFacts, attempt.params)
-        } catch {
-          result = null
-        }
-        if (!result) {
-          productionReworkAttemptsRef.current.settle(scope, attempt, error)
-          message.warning(
-            '暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录'
-          )
-          return
-        }
-        confirmedByReread = true
-      }
-
-      productionReworkAttemptsRef.current.settle(scope, attempt, null)
-      productionReworkRequestRef.current += 1
-      setProductionReworkContext(null)
-      message.success(
-        confirmedByReread
-          ? '已重新读取并确认返工草稿，请核对后过账'
-          : '返工草稿已生成，请核对后过账'
-      )
-      resetPaginationForKey('production')
-    } finally {
-      productionReworkInFlightRef.current = false
-      setProductionReworkLoading(false)
-    }
-  }
-
-  const confirmFinanceCancellation = async () => {
-    const reason = financeCancelReason.trim()
-    if (!reason) {
-      message.error('请填写取消原因')
-      return
-    }
-    if ([...reason].length > 255) {
-      message.error('取消原因不能超过 255 个字')
-      return
-    }
-    const actionLabel =
-      currentActiveKey === 'finance'
-        ? activeSelectedRow?.status === 'DRAFT'
-          ? '作废财务草稿'
-          : '取消财务记录'
-        : currentActiveKey === 'production' &&
-            isFinishedGoodsReceipt(activeSelectedRow)
-          ? activeSelectedRow?.status === 'DRAFT'
-            ? '作废生产完工报告'
-            : '撤销成品入库'
-          : activeSelectedRow?.status === 'DRAFT'
-            ? '作废业务草稿'
-            : '取消业务记录'
-    const succeeded = await runRowAction(
-      activeConfig,
-      activeSelectedRow,
-      'cancel',
-      actionLabel,
-      { reason }
-    )
-    if (succeeded) {
-      setFinanceCancelOpen(false)
-      setFinanceCancelReason('')
-    }
-  }
-
-  const openFinanceSourceAction = (action, source) => {
-    const canRun =
-      action === FINANCE_BUSINESS_SOURCE_ACTIONS.SINGLE_FACT_RECONCILIATION &&
-      hasActionPermission(adminProfile, 'finance.reconciliation.confirm') &&
-      isSingleFactReconciliationSource(source)
-    if (!canRun) {
-      message.warning('当前记录状态或权限已变化，请刷新后重试')
-      return
-    }
-    setFinanceSourceContext({ action, source })
-  }
-
-  const closeFinanceSourceAction = () => {
-    if (financeSourceInFlightRef.current) return
-    setFinanceSourceContext(null)
-  }
-
-  const submitFinanceSourceAction = async (values) => {
-    const action = financeSourceContext?.action
-    const source = financeSourceContext?.source
-    if (financeSourceInFlightRef.current || !action || !source?.id) return
-
-    const config = financeBusinessSourceActionConfig(action)
-    const scope = `${action}:${source.id}`
-    let attempt
-    try {
-      const payload = {
-        ...buildFinanceBusinessSourcePayload(action, values, source),
-        customer_key: activeCustomerKey || undefined,
-      }
-      attempt = financeSourceAttemptsRef.current.prepare(scope, payload)
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '准备财务记录'))
-      return
-    }
-
-    financeSourceInFlightRef.current = true
-    setFinanceSourceLoading(true)
-    try {
-      await createReconciliationFromFinanceFact(attempt.params)
-      financeSourceAttemptsRef.current.settle(scope, attempt, null)
-      setFinanceSourceContext(null)
-      message.success(config.successMessage)
-      resetPaginationForKey(currentActiveKey)
-    } catch (error) {
-      const retained = financeSourceAttemptsRef.current.settle(
-        scope,
-        attempt,
-        error
-      )
-      if (retained) {
-        message.warning(
-          '暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录'
-        )
-      } else {
-        message.error(getActionErrorMessage(error, config.title))
-      }
-    } finally {
-      financeSourceInFlightRef.current = false
-      setFinanceSourceLoading(false)
-    }
-  }
+  const {
+    financeSourceContext,
+    financeSourceLoading,
+    financeSourceInitialValues,
+    openFinanceSourceAction,
+    closeFinanceSourceAction,
+    submitFinanceSourceAction,
+  } = useFinanceReconciliationAction({
+    adminProfile,
+    activeCustomerKey,
+    resetPaginationForKey,
+    currentActiveKey,
+  })
 
   const viewOutsourcingPayable = (fact) => {
     if (!fact?.id || !canOpenRelatedPath(V1_ROUTE_PATHS.payables)) return
@@ -1246,67 +345,7 @@ export function OperationalFactWorkspace({
     moduleTitle: `${pageTitle} / ${activeConfig.title}`,
     columns,
   })
-  const loadExportRows = useCallback(
-    async ({ signal }) => {
-      if (
-        Array.isArray(activeConfig.readPermissions) &&
-        activeConfig.readPermissions.length > 0 &&
-        !hasAnyPermission(adminProfile, activeConfig.readPermissions)
-      ) {
-        return []
-      }
-      const exactProductionFactID =
-        currentActiveKey === 'production' ? Number(routeFactID || 0) : 0
-      const exactRouteContext = Boolean(
-        routeFactID || routeSalesOrderID || (routeSourceType && routeSourceID)
-      )
-      const data =
-        exactProductionFactID > 0
-          ? await listAllProductionFacts(
-              { keyword: String(exactProductionFactID) },
-              { signal }
-            )
-          : await activeConfig.listAll(
-              compactParams({
-                status: statusFilter,
-                keyword: trimOptional(
-                  linkedDocumentRequestKeyword({
-                    localKeyword: keyword,
-                    linkedKeyword,
-                    hasExactContext: exactRouteContext,
-                  })
-                ),
-                date_field: activeDateField,
-                date_from: dateRangeByKey[currentActiveKey]?.[0] || undefined,
-                date_to: dateRangeByKey[currentActiveKey]?.[1] || undefined,
-                ...(activeConfig.listParams || {}),
-                ...routeListParamsForKey(currentActiveKey),
-              }),
-              { signal }
-            )
-      const exportRows = data?.[activeConfig.listKey]
-      return exactProductionFactID > 0 && Array.isArray(exportRows)
-        ? exportRows.filter(
-            (item) => Number(item?.id || 0) === exactProductionFactID
-          )
-        : exportRows
-    },
-    [
-      activeConfig,
-      activeDateField,
-      adminProfile,
-      currentActiveKey,
-      dateRangeByKey,
-      keyword,
-      linkedKeyword,
-      routeFactID,
-      routeListParamsForKey,
-      routeSalesOrderID,
-      routeSourceID,
-      routeSourceType,
-      statusFilter,
-    ]
-  )
+
   const { exporting, exportRows } = useBusinessListExport({
     requestKey: `operational-facts-export:${currentActiveKey}`,
     loadRows: loadExportRows,
@@ -1587,19 +626,7 @@ export function OperationalFactWorkspace({
       navigate(targetPath)
     }
   }
-  const clearRouteContext = useCallback(
-    (keys) => {
-      const nextParams = clearLinkedDocumentParams(searchParams)
-      const keysToDelete =
-        Array.isArray(keys) && keys.length > 0
-          ? keys
-          : ['sales_order_id', 'source_type', 'source_id', 'fact_id']
-      keysToDelete.forEach((key) => nextParams.delete(key))
-      setSearchParams(nextParams, { replace: true })
-      resetPaginationForKey()
-    },
-    [resetPaginationForKey, searchParams, setSearchParams]
-  )
+
   const hasActiveFilters = Boolean(
     keyword.trim() ||
       statusFilter ||
@@ -1611,19 +638,7 @@ export function OperationalFactWorkspace({
       routeFactID ||
       linkedKeyword
   )
-  const clearFilters = useCallback(() => {
-    setKeyword('')
-    setStatusFilter('')
-    setDateFieldByKey((prev) => ({
-      ...prev,
-      [currentActiveKey]: activeConfig.defaultDateField || 'occurred_at',
-    }))
-    setDateRangeByKey((prev) => ({
-      ...prev,
-      [currentActiveKey]: ['', ''],
-    }))
-    clearRouteContext()
-  }, [activeConfig.defaultDateField, clearRouteContext, currentActiveKey])
+
   const pageStats = buildOperationalFactStats({
     activeRows,
     activeTotal,

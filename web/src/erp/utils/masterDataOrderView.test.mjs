@@ -5,66 +5,78 @@ import { fileURLToPath } from 'node:url'
 
 import {
   BUSINESS_CURRENCY_OPTIONS,
-  OUTSOURCING_ORDER_SUBJECT_TYPES,
   V1_ROUTE_PATHS,
-  buildPaymentConditionOptions,
-  buildBOMItemSourceValuesFromMaterial,
-  buildCustomerSnapshot,
-  buildMaterialPurchaseContractDraftFromPurchaseOrder,
-  buildMasterDataParams,
   buildMaterialDraftCode,
-  buildOrderContactSnapshot,
-  buildOutsourcingOrderItemParams,
-  buildOutsourcingOrderItemSourceValuesFromMaterial,
-  buildOutsourcingOrderItemSourceValuesFromProduct,
-  buildOutsourcingOrderItemSourceValuesFromProductSKU,
-  buildOutsourcingOrderParams,
-  buildOutsourcingSupplierSnapshot,
-  buildOutsourcingOrderSubjectSwitchValues,
-  buildPurchaseOrderItemSourceValuesFromMaterial,
-  contractPartySnapshotFromPrintTemplateDefaults,
-  buildProcessParams,
-  buildProductParams,
-  buildProductSKUParams,
   formatProductUnitNetWeight,
-  buildSalesOrderCustomerSourceValues,
-  buildSalesOrderItemSourceValuesFromSKU,
-  buildPurchaseOrderItemParams,
-  buildPurchaseOrderParams,
-  buildPurchaseOrderSupplierDefaults,
-  buildSalesOrderItemParams,
-  buildSalesOrderParams,
   buildSequentialDraftCode,
-  buildSupplierSnapshot,
-  buildSupplierSnapshotWithContacts,
-  buildContractPartySnapshot,
   buildTextSelectOptions,
   buildUnitSelectOptions,
   canRunPurchaseOrderLifecycleAction,
   canRunSalesOrderLifecycleAction,
   canRunOutsourcingOrderLifecycleAction,
-  calculateSalesOrderAmounts,
   createBlankOutsourcingLine,
-  deriveOutsourcingOrderItemAmount,
-  deriveSalesOrderItemAmount,
   formatUnitDisplayName,
   formatUnitShortDisplayName,
   formatUnixDate,
-  formatPaymentCondition,
   formatUnixDateTime,
   hasActionPermission,
   inferDefaultUnitID,
   inferProductDefaultUnitID,
   normalizeOutsourcingLineFormValue,
+  statusText,
+  unixToDateInputValue,
+} from './masterDataOrderView.mjs'
+import { buildMaterialPurchaseContractDraftFromPurchaseOrder } from './purchaseOrderPrintDraft.mjs'
+import {
+  buildOutsourcingOrderItemParams,
+  buildOutsourcingOrderParams,
+  buildPurchaseOrderItemParams,
+  buildPurchaseOrderParams,
+  buildSalesOrderItemParams,
+  buildSalesOrderParams,
+} from './sourceOrderParams.mjs'
+import {
+  OUTSOURCING_ORDER_SUBJECT_TYPES,
+  buildBOMItemSourceValuesFromMaterial,
+  buildOutsourcingOrderItemSourceValuesFromMaterial,
+  buildOutsourcingOrderItemSourceValuesFromProduct,
+  buildOutsourcingOrderItemSourceValuesFromProductSKU,
+  buildOutsourcingOrderSubjectSwitchValues,
+  buildPurchaseOrderItemSourceValuesFromMaterial,
+  buildSalesOrderItemSourceValuesFromSKU,
+} from './sourceOrderLineValues.mjs'
+import {
+  buildMasterDataParams,
+  buildProcessParams,
+  buildProductParams,
+  buildProductSKUParams,
+} from './masterDataParams.mjs'
+import {
+  buildCustomerSnapshot,
+  buildOrderContactSnapshot,
+  buildOutsourcingSupplierSnapshot,
+  contractPartySnapshotFromPrintTemplateDefaults,
+  buildSalesOrderCustomerSourceValues,
+  buildPurchaseOrderSupplierDefaults,
+  buildSupplierSnapshot,
+  buildSupplierSnapshotWithContacts,
+  buildContractPartySnapshot,
+  SUPPLIER_CONTACT_OWNER_TYPE,
+} from './sourcePartySnapshots.mjs'
+import {
+  buildPaymentConditionOptions,
+  formatPaymentCondition,
   paymentConditionCompleteness,
   resolvePaymentTermDays,
-  statusText,
-  SUPPLIER_CONTACT_OWNER_TYPE,
+} from './paymentConditions.mjs'
+import {
+  calculateSalesOrderAmounts,
+  deriveOutsourcingOrderItemAmount,
+  deriveSalesOrderItemAmount,
   summarizeOutsourcingOrderLines,
   summarizePurchaseOrderLines,
   summarizeSalesOrderLines,
-  unixToDateInputValue,
-} from './masterDataOrderView.mjs'
+} from './sourceOrderAmounts.mjs'
 import { completeMaterialPurchaseContractDraft } from './contractPrintDraftCompleteness.mjs'
 
 function readERPSource(relativePath) {
@@ -2408,7 +2420,7 @@ test('FL_outsourcing_contract_party_b_snapshot__preserves_contract_override mast
 test('FL_print_supplier_contact_snapshot__purchase_and_outsourcing_pages_preserve_supplier_contacts masterDataOrderView: purchase save and outsourcing contract editing preserve supplier contact snapshots', () => {
   const purchasePageSource = readERPSource('../pages/V1PurchaseOrdersPage.jsx')
   const outsourcingPageSource = readERPSource(
-    '../pages/V1OutsourcingOrdersPage.jsx'
+    '../components/outsourcing-orders/useOutsourcingOrderEditor.mjs'
   )
   const outsourcingFormSource = readERPSource(
     '../components/outsourcing-orders/OutsourcingOrderForm.jsx'
@@ -2455,6 +2467,9 @@ test('FL_outsourcing_subject_form__wires_product_and_material_sources masterData
     '../components/outsourcing-orders/OutsourcingOrderForm.jsx'
   )
 
+  const editorSource = readERPSource(
+    '../components/outsourcing-orders/useOutsourcingOrderEditor.mjs'
+  )
   for (const sourceText of [
     'listAllMaterials',
     'buildOutsourcingOrderSubjectSwitchValues',
@@ -2465,7 +2480,7 @@ test('FL_outsourcing_subject_form__wires_product_and_material_sources masterData
     'onMaterialChange={handleMaterialChange}',
   ]) {
     assert.match(
-      pageSource,
+      sourceText.includes('={') ? pageSource : editorSource,
       new RegExp(sourceText.replace(/[{}]/gu, '\\$&'), 'u')
     )
   }
@@ -2497,7 +2512,9 @@ test('FL_outsourcing_subject_form__wires_product_and_material_sources masterData
   assert.match(formSource, /<Input\s+readOnly/u)
   assert.doesNotMatch(formSource, /name=\{\[field\.name, 'amount'\]\}/u)
   assert.match(
-    pageSource,
+    readERPSource(
+      '../components/outsourcing-orders/useOutsourcingSourceFacts.jsx'
+    ),
     /label: '来源产品订单编号',\s*value: item\?\.product_order_no_snapshot,\s*\},\s*\.\.\.\(isMaterial/u
   )
 })

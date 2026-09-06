@@ -69,6 +69,11 @@ function customerDiagramSources(review) {
     .map((diagram) => diagram.mermaidSource)
 }
 
+const chainViewsSource = readFileSync(
+  new URL('../components/flow-state/BusinessChainViews.jsx', import.meta.url),
+  'utf8'
+)
+
 test('customer review exports only the selected business chain with complete business questions', () => {
   const review = buildDevBusinessChainCustomerReview({
     catalog: DEV_FLOW_STATE_CATALOG,
@@ -295,7 +300,7 @@ test('customer review does not hardcode a customer and fails closed for an unkno
   assert.match(pageSource, /DEV_CUSTOMER_QUERY_KEY/u)
   assert.match(pageSource, /normalize: view === 'chain'/u)
   assert.match(pageSource, /catalog\.overlays\.find/u)
-  assert.match(pageSource, /disabled=\{!customerReviewReady\}/u)
+  assert.match(chainViewsSource, /disabled=\{!customerReviewReady\}/u)
   assert.match(pageSource, /通用业务链与运行观察仍可使用/u)
   assert.match(pageSource, /customerOverlay/u)
   assert.match(pageSource, /customerReviewPrintSnapshot/u)

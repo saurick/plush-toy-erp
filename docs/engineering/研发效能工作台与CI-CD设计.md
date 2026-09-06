@@ -124,9 +124,11 @@ GPT Review 的 finding 是审查输入，不是仓库事实。修复仍回到 Gi
 
 ### 本地数据库恢复启动
 
-普通 `pnpm start` 仍先执行只读 runtime preflight。工作区 db-guard、数据库配置和安全状态无法证明时直接阻断；只有已明确归类的本地 pending migration 或本地后端 health / ready 未就绪，才启动受限 Vite 并固定进入 `/__dev/database-migration`。该模式只放行迁移页和固定迁移 API，普通 ERP 页面、其它 DEV API、`/rpc` 与 `/templates` 均返回阻断；migration 到 head 且后端 health / ready 同目标读回后，恢复控制器才解除限制，重新载入后进入完整工作台。外部 `API_ORIGIN` 不降级到本机恢复模式。
+普通 `pnpm start` 的只读 runtime preflight 最多等待 15 秒，超时会取消检查。本地 pending、数据库连接或配置、db-guard、Atlas、安全检查和后端异常均保留受限 Vite，固定进入 `/__dev/database-migration`；恢复启动不依赖 GitLab 钥匙串读取。恢复页只显示脱敏原因，普通 ERP 页面、其它 DEV API、`/rpc` 与 `/templates` 继续阻断。修正环境后刷新状态，必须重新通过同一完整启动检查及同目标 health / ready，才能解除限制并重新载入完整工作台。外部 `API_ORIGIN`、非法代理地址、前端依赖缺失和端口冲突不属于本机数据库恢复范围。
 
 迁移页在停止后端之前检查完整工具能力：兼容 `docker` CLI/socket 的可用容器运行环境、Atlas v1.2.0、PostgreSQL 18 `pg_dump` / `psql` 和备份恢复基础命令。实现不绑定 macOS 或某一桌面产品；Docker Engine、Docker Desktop、Colima、Rancher Desktop、OrbStack，以及提供兼容入口的 Podman 都按同一能力合同判断。工具不完整只返回脱敏阻断和下一步，不自动启动本机应用、不自动 apply，也不把前端恢复页可达当成数据库已迁移。
+
+数据库已到 head 时，准备入口只读返回无需迁移，不要求备份容器或再次 apply。存在旧 ready 计划时可显式重新检查并准备，旧确认随之失效；服务重启导致会话失效时，下一次显式操作重新取会话，不自动重放写请求。apply 或写后读回中断且缺少零写入证明时记录 `not_proven`；已证明数据库升级而后端启动失败时保留迁移读回，只需单独重启后端。后端重启先停止原进程，再检查新进程的 health / ready，启动命令缺失或超时不会退出迁移工作台。
 
 ## 目标环境与真实数据
 

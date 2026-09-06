@@ -5,13 +5,13 @@ import {
   SALES_ORDER_ITEM_STATUS_LABELS,
   SALES_ORDER_STATUS_COLORS,
   SALES_ORDER_STATUS_LABELS,
-  deriveSalesOrderItemAmount,
-  formatPaymentCondition,
   formatUnixDate,
   salesOrderFreightTermsText,
   salesOrderTaxModeText,
   statusText,
 } from '../../utils/masterDataOrderView.mjs'
+import { formatPaymentCondition } from '../../utils/paymentConditions.mjs'
+import { deriveSalesOrderItemAmount } from '../../utils/sourceOrderAmounts.mjs'
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
 import {
   compareNumeric20Scale6Values,

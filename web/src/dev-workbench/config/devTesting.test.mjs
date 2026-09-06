@@ -144,6 +144,7 @@ test('devTesting: 只通过开发态独立路径暴露', () => {
     'web/scripts/README.md',
     'server/README.md',
     'scripts/README.md',
+    'scripts/qa/README.md',
     'docs/部署约定.md',
     'server/deploy/README.md',
     'server/deploy/compose/prod/README.md',

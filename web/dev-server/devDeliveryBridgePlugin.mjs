@@ -37,6 +37,8 @@ import {
 } from '../../scripts/deploy/deployment-targets.mjs'
 import { readRepositoryIdentity } from '../../scripts/qa/lib/repository-identity.mjs'
 import {
+  isSameOriginRequest,
+  readJsonBody,
   isLoopbackHostHeader,
   isLoopbackRemoteAddress,
 } from './devServerSecurity.mjs'
@@ -2006,51 +2008,6 @@ function sendJson(response, statusCode, payload, extraHeaders = {}) {
   response.end(JSON.stringify(payload))
 }
 
-function isSameOriginRequest(request) {
-  const host = request.headers?.host
-  const origin = request.headers?.origin
-  if (
-    Array.isArray(host) ||
-    Array.isArray(origin) ||
-    !isLoopbackHostHeader(host) ||
-    typeof origin !== 'string'
-  ) {
-    return false
-  }
-  let parsed
-  try {
-    parsed = new URL(origin)
-  } catch {
-    return false
-  }
-  return (
-    ['http:', 'https:'].includes(parsed.protocol) &&
-    parsed.host.toLowerCase() === String(host).toLowerCase() &&
-    isLoopbackHostHeader(parsed.host) &&
-    parsed.username === '' &&
-    parsed.password === '' &&
-    parsed.pathname === '/' &&
-    parsed.search === '' &&
-    parsed.hash === '' &&
-    request.headers?.['sec-fetch-site'] === 'same-origin'
-  )
-}
-
-async function readJsonBody(request) {
-  let size = 0
-  const chunks = []
-  for await (const chunk of request) {
-    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
-    size += bytes.length
-    if (size > MAX_DEV_DELIVERY_REQUEST_BYTES) {
-      throw new Error('request body is too large')
-    }
-    chunks.push(bytes)
-  }
-  if (size === 0) throw new Error('request body is required')
-  return JSON.parse(Buffer.concat(chunks).toString('utf8'))
-}
-
 export function createDevDeliveryMiddleware({
   projectRoot,
   service,
@@ -2130,7 +2087,12 @@ export function createDevDeliveryMiddleware({
           return
         }
         const result = await deliveryService.act(
-          validateDevDeliveryAction(await readJsonBody(request))
+          validateDevDeliveryAction(
+            await readJsonBody(request, {
+              maxBytes: MAX_DEV_DELIVERY_REQUEST_BYTES,
+              label: 'request',
+            })
+          )
         )
         sendJson(response, result.accepted === true ? 202 : 200, result)
         return

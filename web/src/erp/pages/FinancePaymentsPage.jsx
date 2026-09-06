@@ -69,11 +69,10 @@ import {
 } from '../utils/businessPagination.mjs'
 import {
   BUSINESS_CURRENCY_OPTIONS,
-  compactParams,
   formatUnixDateTime,
   hasActionPermission,
-  trimOptional,
 } from '../utils/masterDataOrderView.mjs'
+import { compactParams, trimOptional } from '../utils/sourceDocumentValues.mjs'
 import {
   createSourceBusinessActionAttemptStore,
   isSourceBusinessActionResultUnknown,

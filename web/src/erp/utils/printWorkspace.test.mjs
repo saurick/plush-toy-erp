@@ -1,3 +1,5 @@
+import { getPrintWorkspaceDraftScope } from './printWorkspaceScope.mjs'
+import { createMockAdminSessionToken } from '../../../scripts/mockAdminSessionToken.mjs'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
@@ -606,7 +608,7 @@ test('printWorkspace: 业务页打开时会先写入当前窗口专属打印草�
 
     assert.equal(
       popup.openedURL,
-      'http://127.0.0.1:4173/erp/print-workspace/material-purchase-contract?source=business&customer_key=yoyoosun&state=business-window-1'
+      'http://127.0.0.1:4173/erp/print-workspace/material-purchase-contract?source=business&customer_key=yoyoosun&config_revision=revision-7&state=business-window-1'
     )
     const draftStorageKey = buildPrintWorkspaceDraftStorageKey(
       MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
@@ -627,7 +629,7 @@ test('printWorkspace: 业务页打开时会先写入当前窗口专属打印草�
     )
     assert.equal(
       readPrintWorkspaceWindowState('business-window-1')?.workspaceURL,
-      'http://127.0.0.1:4173/erp/print-workspace/material-purchase-contract?source=business&customer_key=yoyoosun&state=business-window-1'
+      'http://127.0.0.1:4173/erp/print-workspace/material-purchase-contract?source=business&customer_key=yoyoosun&config_revision=revision-7&state=business-window-1'
     )
   } finally {
     globalThis.window = originalWindow
@@ -843,5 +845,88 @@ test('printWorkspace: 业务页弹窗被拦截时会清理本次临时打印草�
     )
   } finally {
     globalThis.window = originalWindow
+  }
+})
+
+test('printWorkspace: 独立窗口保留来源配置版本并只使用当前会话账号恢复草稿', () => {
+  const previousWindow = globalThis.window
+  const previousStorage = Object.getOwnPropertyDescriptor(
+    globalThis,
+    'localStorage'
+  )
+  const store = new Map([
+    ['admin_access_token', createMockAdminSessionToken({ userID: 42 })],
+    ['admin_user_id', '999'],
+  ])
+  const storage = {
+    getItem: (key) => store.get(key) ?? null,
+    setItem: (key, value) => store.set(key, value),
+    removeItem: (key) => store.delete(key),
+  }
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: storage,
+  })
+  globalThis.window = {
+    location: { origin: 'http://127.0.0.1' },
+    localStorage: storage,
+  }
+  try {
+    const scope = {
+      customerKey: 'yoyoosun',
+      accountKey: '42',
+      configRevision: 'revision-7',
+    }
+    const templateKey = MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY
+    const stateID = 'scope-window'
+    const url = new URL(
+      buildRestorablePrintWorkspaceURL(templateKey, { ...scope, stateID })
+    )
+    const restored = getPrintWorkspaceDraftScope(url.searchParams)
+    assert.deepEqual(restored, scope)
+    const sourceKey = buildPrintWorkspaceDraftStorageKey(
+      templateKey,
+      stateID,
+      scope
+    )
+    const restoredKey = buildPrintWorkspaceDraftStorageKey(
+      templateKey,
+      stateID,
+      restored
+    )
+    assert.equal(sourceKey, restoredKey)
+    persistPrintWorkspaceDraftSnapshot(
+      sourceKey,
+      { contractNo: 'source-order' },
+      storage
+    )
+    assert.deepEqual(readPrintWorkspaceDraftSnapshot(restoredKey, storage), {
+      contractNo: 'source-order',
+    })
+
+    store.set('admin_access_token', createMockAdminSessionToken({ userID: 43 }))
+    const nextAccount = getPrintWorkspaceDraftScope(url.searchParams)
+    assert.equal(nextAccount.accountKey, '43')
+    assert.equal(
+      readPrintWorkspaceDraftSnapshot(
+        buildPrintWorkspaceDraftStorageKey(templateKey, stateID, nextAccount),
+        storage
+      ),
+      null
+    )
+
+    store.delete('admin_access_token')
+    url.searchParams.set('account_key', '42')
+    const anonymous = getPrintWorkspaceDraftScope(url.searchParams)
+    assert.equal(anonymous.accountKey, '')
+    assert.equal(
+      buildPrintWorkspaceDraftStorageKey(templateKey, stateID, anonymous),
+      ''
+    )
+  } finally {
+    globalThis.window = previousWindow
+    if (previousStorage)
+      Object.defineProperty(globalThis, 'localStorage', previousStorage)
+    else delete globalThis.localStorage
   }
 })

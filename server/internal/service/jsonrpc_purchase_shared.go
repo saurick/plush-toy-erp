@@ -8,7 +8,6 @@ import (
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
-	"server/internal/data/model/ent"
 	"server/internal/errcode"
 )
 
@@ -194,7 +193,7 @@ func (d *jsonrpcDispatcher) mapPurchaseError(ctx context.Context, err error) *v1
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "库存不足，无法完成本次采购库存操作"}
 	case errors.Is(err, biz.ErrInventoryLotStatusBlocked):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前批次状态不允许扣减库存"}
-	case ent.IsConstraintError(err):
+	case errors.Is(err, biz.ErrPurchaseRecordConflict):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库、退货或调整单号及行号已存在"}
 	default:
 		l.Errorf("[purchase] internal err=%v", err)

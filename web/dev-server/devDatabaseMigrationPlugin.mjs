@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import path from 'node:path'
+import { LocalRuntimePreflightError } from '../../scripts/local-runtime-preflight.mjs'
 
 import {
   isLoopbackAPIOrigin,
@@ -17,6 +18,8 @@ import {
   transitionDatabaseMigrationOperation,
 } from '../../scripts/qa/dev-database-migration-operation-store.mjs'
 import {
+  isSameOriginRequest,
+  readJsonBody,
   isLoopbackHostHeader,
   isLoopbackRemoteAddress,
 } from './devServerSecurity.mjs'
@@ -193,6 +196,39 @@ function databaseClientDiagnosticMessage(diagnostic) {
 
 function publicIssue(error, fallbackCode = 'operation_blocked') {
   const diagnostic = String(error?.diagnostic || error?.message || '')
+  if (error instanceof LocalRuntimePreflightError) {
+    return { code: error.code, severity: 'blocked', message: error.message }
+  }
+  if (
+    error?.outcome === 'not_proven' ||
+    /committed_unverified|result=not_proven/iu.test(diagnostic)
+  ) {
+    return {
+      code: 'migration_outcome_unknown',
+      severity: 'blocked',
+      message: '迁移写入或读回结果尚未证明；请刷新状态核对，系统不会自动重试',
+    }
+  }
+  if (
+    /数据库.*(?:配置|地址|连接)|(?:dial tcp|connection refused|context deadline|timed? ?out|aborted|password authentication failed|no such host|could not translate host name)|超时/iu.test(
+      diagnostic
+    )
+  ) {
+    return {
+      code: 'database_status_unavailable',
+      severity: 'blocked',
+      message:
+        '无法核对数据库状态；请检查本地数据库配置、网络连接和数据库服务，然后刷新状态',
+    }
+  }
+  if (/\berror_code=target_identity_failed\b/u.test(diagnostic)) {
+    return {
+      code: 'database_target_unverified',
+      severity: 'blocked',
+      message:
+        '当前数据库身份未通过登记核对；请检查本地配置是否指向共享开发库，然后刷新状态',
+    }
+  }
   if (
     /影响 migration 的 client session|\bblocks_migration=true\b|other_client_sessions(?:_final)?_blocking=[1-9]\d*/iu.test(
       diagnostic
@@ -223,7 +259,8 @@ function publicIssue(error, fallbackCode = 'operation_blocked') {
     }
   }
   if (
-    /workspace|schema\/migration|checksum|hash|migration source/iu.test(
+    error?.code === 'migration_source_changed' ||
+    /\berror_code=(?:workspace_guard_failed|migration_source_changed)\b|checksum.*(?:mismatch|error)|migration source.*(?:changed|missing|invalid)|schema\/migration.*(?:失败|不一致|未收口)/iu.test(
       diagnostic
     )
   ) {
@@ -233,15 +270,8 @@ function publicIssue(error, fallbackCode = 'operation_blocked') {
       message: 'migration 或 schema 真源未收口或在操作期间发生变化，请重新准备',
     }
   }
-  if (/committed_unverified/iu.test(diagnostic)) {
-    return {
-      code: 'migration_outcome_unknown',
-      severity: 'blocked',
-      message: '数据库提交结果无法证明；系统不会自动重试，请先刷新状态',
-    }
-  }
   return {
-    code: error?.code || fallbackCode,
+    code: typeof error?.code === 'string' ? error.code : fallbackCode,
     severity: 'blocked',
     message:
       error?.message && error instanceof DatabaseMigrationActionError
@@ -285,17 +315,20 @@ export function createDevDatabaseMigrationService({
   let runtimeReadyReported = false
   recoverInterruptedDatabaseMigrationOperations(store, now().toISOString())
 
-  const reportRuntimeReady = (target, runtimeReadback) => {
+  const reportRuntimeReady = async (target, runtimeReadback) => {
     if (
-      runtimeReadyReported ||
       target?.key !== 'shared-dev' ||
       target?.pendingFiles !== 0 ||
       runtimeReadback?.available !== true
     ) {
       return
     }
-    runtimeReadyReported = true
-    runtimeReadyCallback()
+    // Recovery must satisfy the same checks that blocked ordinary startup.
+    await runtime.verifyReadiness()
+    if (!runtimeReadyReported) {
+      runtimeReadyReported = true
+      runtimeReadyCallback()
+    }
   }
 
   const transitionFailure = (
@@ -315,7 +348,10 @@ export function createDevDatabaseMigrationService({
       message:
         status === 'not_proven'
           ? '操作结果尚未证明，已停止自动处理'
-          : '操作被安全停止',
+          : readDatabaseMigrationOperation(store, operationId).readback
+                ?.migrationVerified
+            ? '数据库升级已完成，后端恢复未完成；修正启动问题后只需重启后端'
+            : '操作被安全停止',
       issues: [issue],
       now: now().toISOString(),
     })
@@ -323,12 +359,6 @@ export function createDevDatabaseMigrationService({
 
   const runPrepare = async (operationId) => {
     try {
-      const tools = normalizeToolReadiness(await runtime.toolReadiness())
-      if (tools.status !== 'ready') {
-        throw new DatabaseMigrationActionError(migrationToolIssueMessage(), {
-          code: 'migration_tool_unavailable',
-        })
-      }
       const initialTarget = await runtime.status()
       if (
         initialTarget.key !== 'shared-dev' ||
@@ -341,6 +371,7 @@ export function createDevDatabaseMigrationService({
       const source = await runtime.sourceIdentity()
       if (initialTarget.pendingFiles === 0) {
         const runtimeReadback = await runtime.runtime()
+        await reportRuntimeReady(initialTarget, runtimeReadback)
         transitionDatabaseMigrationOperation(store, operationId, {
           status: 'passed',
           message: '共享开发库已是最新版本，无需迁移',
@@ -355,8 +386,13 @@ export function createDevDatabaseMigrationService({
           },
           now: now().toISOString(),
         })
-        reportRuntimeReady(initialTarget, runtimeReadback)
         return
+      }
+      const tools = normalizeToolReadiness(await runtime.toolReadiness())
+      if (tools.status !== 'ready') {
+        throw new DatabaseMigrationActionError(migrationToolIssueMessage(), {
+          code: 'migration_tool_unavailable',
+        })
       }
       await runtime.stopRuntime()
       const plan = await runtime.plan(initialTarget.targetConfirmation)
@@ -431,6 +467,8 @@ export function createDevDatabaseMigrationService({
   }
 
   const runExecute = async (operationId) => {
+    let applyStarted = false
+    let noWritesProven = false
     try {
       const operation = readDatabaseMigrationOperation(store, operationId)
       const source = await runtime.sourceIdentity()
@@ -466,11 +504,14 @@ export function createDevDatabaseMigrationService({
         )
       }
       try {
+        applyStarted = true
         await runtime.apply(operation.internal)
       } catch (error) {
-        if (/committed_unverified/iu.test(String(error?.diagnostic || ''))) {
-          error.outcome = 'not_proven'
-        }
+        const diagnostic = String(error?.diagnostic || '')
+        noWritesProven =
+          /^\[migration-summary\] result=(?:blocked|failed|action_required) writes=0 apply=(?:not_started|not_requested|attempted_once) auto_retry=false$/mu.test(
+            diagnostic
+          )
         throw error
       }
       const after = await runtime.status()
@@ -498,6 +539,7 @@ export function createDevDatabaseMigrationService({
         now: now().toISOString(),
       })
       const runtimeReadback = await runtime.restart(operationId)
+      await reportRuntimeReady(after, runtimeReadback)
       transitionDatabaseMigrationOperation(store, operationId, {
         status: 'passed',
         message: '数据库升级、读回和本地后端重启均已完成',
@@ -510,9 +552,15 @@ export function createDevDatabaseMigrationService({
         },
         now: now().toISOString(),
       })
-      reportRuntimeReady(after, runtimeReadback)
     } catch (error) {
       const current = readDatabaseMigrationOperation(store, operationId)
+      if (
+        applyStarted &&
+        !noWritesProven &&
+        !current.readback?.migrationVerified
+      ) {
+        error.outcome = 'not_proven'
+      }
       transitionFailure(
         operationId,
         error,
@@ -526,12 +574,17 @@ export function createDevDatabaseMigrationService({
   const runRestart = async (operationId) => {
     try {
       const target = await runtime.status()
-      if (target.pendingFiles !== 0) {
+      if (
+        target.key !== 'shared-dev' ||
+        !target.targetConfirmation ||
+        target.pendingFiles !== 0
+      ) {
         throw new DatabaseMigrationActionError(
           '数据库仍有待执行 migration，不能只重启后端'
         )
       }
       const runtimeReadback = await runtime.restart(operationId)
+      await reportRuntimeReady(target, runtimeReadback)
       transitionDatabaseMigrationOperation(store, operationId, {
         status: 'passed',
         message: '本地后端已重启并通过 health / ready',
@@ -545,7 +598,6 @@ export function createDevDatabaseMigrationService({
         },
         now: now().toISOString(),
       })
-      reportRuntimeReady(target, runtimeReadback)
     } catch (error) {
       transitionFailure(operationId, error, 'failed')
     } finally {
@@ -584,7 +636,12 @@ export function createDevDatabaseMigrationService({
         logFailure('summary-tools', error)
         tools = blockedToolReadiness()
       }
-      reportRuntimeReady(target, runtimeReadback)
+      try {
+        await reportRuntimeReady(target, runtimeReadback)
+      } catch (error) {
+        logFailure('summary-preflight', error)
+        issues.push(publicIssue(error, 'local_runtime_preflight_failed'))
+      }
       return {
         schemaVersion: 'plush.dev-database-migration-summary/v1',
         status: issues.length > 0 ? 'blocked' : 'success',
@@ -622,6 +679,20 @@ export function createDevDatabaseMigrationService({
             acquireDatabaseMigrationExecutionLock(store, created.operation.id, {
               now: now().toISOString(),
             })
+            for (const previous of listDatabaseMigrationOperations(store)) {
+              if (
+                previous.id !== created.operation.id &&
+                previous.status === 'ready'
+              ) {
+                transitionDatabaseMigrationOperation(store, previous.id, {
+                  status: 'blocked',
+                  message: '已重新检查并准备，旧计划不再执行',
+                  confirmationPrompt: null,
+                  internal: null,
+                  now: now().toISOString(),
+                })
+              }
+            }
             runPrepare(created.operation.id).catch((error) =>
               logFailure('prepare-background', error)
             )
@@ -714,50 +785,6 @@ function sendJson(response, statusCode, payload, extraHeaders = {}) {
   response.end(JSON.stringify(payload))
 }
 
-function isSameOriginRequest(request) {
-  const host = request.headers?.host
-  const origin = request.headers?.origin
-  if (
-    Array.isArray(host) ||
-    Array.isArray(origin) ||
-    !isLoopbackHostHeader(host) ||
-    typeof origin !== 'string'
-  ) {
-    return false
-  }
-  try {
-    const parsed = new URL(origin)
-    return (
-      ['http:', 'https:'].includes(parsed.protocol) &&
-      parsed.host.toLowerCase() === String(host).toLowerCase() &&
-      isLoopbackHostHeader(parsed.host) &&
-      parsed.username === '' &&
-      parsed.password === '' &&
-      parsed.pathname === '/' &&
-      parsed.search === '' &&
-      parsed.hash === '' &&
-      request.headers?.['sec-fetch-site'] === 'same-origin'
-    )
-  } catch {
-    return false
-  }
-}
-
-async function readJsonBody(request) {
-  let size = 0
-  const chunks = []
-  for await (const chunk of request) {
-    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
-    size += bytes.length
-    if (size > MAX_REQUEST_BYTES) {
-      throw new Error('request body is too large')
-    }
-    chunks.push(bytes)
-  }
-  if (size === 0) throw new Error('request body is required')
-  return JSON.parse(Buffer.concat(chunks).toString('utf8'))
-}
-
 export function createDevDatabaseMigrationMiddleware({
   projectRoot,
   apiOrigin,
@@ -842,7 +869,12 @@ export function createDevDatabaseMigrationMiddleware({
           return
         }
         const result = await migrationService.act(
-          validateDevDatabaseMigrationAction(await readJsonBody(request))
+          validateDevDatabaseMigrationAction(
+            await readJsonBody(request, {
+              maxBytes: MAX_REQUEST_BYTES,
+              label: 'request',
+            })
+          )
         )
         sendJson(response, result.accepted ? 202 : 200, result)
         return

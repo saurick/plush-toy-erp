@@ -8,16 +8,49 @@ const source = readFileSync(
   'utf8'
 )
 
+const productionActions = readFileSync(
+  new URL(
+    '../components/production-orders/useProductionFactActions.mjs',
+    import.meta.url
+  ),
+  'utf8'
+)
+const reconciliationAction = readFileSync(
+  new URL(
+    '../components/finance/useFinanceReconciliationAction.mjs',
+    import.meta.url
+  ),
+  'utf8'
+)
+
+const querySource = readFileSync(
+  new URL(
+    '../components/operational-facts/useOperationalFactQuery.mjs',
+    import.meta.url
+  ),
+  'utf8'
+)
+
+const mutations = readFileSync(
+  new URL(
+    '../components/operational-facts/useOperationalFactMutations.mjs',
+    import.meta.url
+  ),
+  'utf8'
+)
+
 test('production facts load the exact draft before opening the shared editor', () => {
   assert.match(source, /production-fact-edit-draft/u)
   assert.match(
-    source,
+    productionActions,
     /listAllProductionFacts\(\{[\s\S]*keyword: String\(record\.id\)/u
   )
-  assert.match(source, /fresh\.status !== 'DRAFT'/u)
-  assert.match(source, /buildOperationalFactDraftSavePayload/u)
-  assert.match(source, /expected_version/u)
-  assert.match(source, /findOperationalFactDraftSaveResult/u)
+  assert.match(productionActions, /fresh\.status !== 'DRAFT'/u)
+  assert.match(
+    productionActions,
+    /buildOperationalFactDraftSavePayload\(\s*context\.action,\s*values,\s*context\.record/u
+  )
+  assert.match(productionActions, /findOperationalFactDraftSaveResult/u)
   assert.match(source, /mode="edit"/u)
 })
 
@@ -27,7 +60,7 @@ test('finance cancellation requires a bounded business reason and sends it to th
   assert.match(source, /请填写客户、供应商或账款调整的业务原因/u)
   assert.match(source, /请填写作废或取消的业务原因/u)
   assert.match(source, /maxLength=\{255\}/)
-  assert.match(source, /\{ reason \}/)
+  assert.match(mutations, /\{ reason \}/)
   assert.match(source, /currentActiveKey === 'finance'/)
   assert.match(source, /\['production', 'outsourcing'\]\.includes/)
   assert.match(source, /canConfirmFinanceFact\(adminProfile/)
@@ -117,23 +150,23 @@ test('finance page derives projection, permission and settlement from the filter
 })
 
 test('post-success refresh failure is not reported as a failed cancellation', () => {
-  assert.match(source, /已完成，请稍后刷新查看最新结果/)
-  assert.match(source, /return false/)
-  assert.match(source, /return true/)
+  assert.match(mutations, /已完成，请稍后刷新查看最新结果/)
+  assert.match(mutations, /return false/)
+  assert.match(mutations, /return true/)
 })
 
 test('only posted rework feedback explains the atomic exception handoff', () => {
   assert.match(
-    source,
+    mutations,
     /currentActiveKey === 'production'[\s\S]{0,180}actionKey === 'post'[\s\S]{0,180}row\.fact_type[\s\S]{0,180}'REWORK'/u
   )
-  assert.match(source, /返工记录已过账，返工补制批次和生产异常任务已生成/u)
-  assert.doesNotMatch(source, /发起生产异常/u)
+  assert.match(mutations, /返工记录已过账，返工补制批次和生产异常任务已生成/u)
+  assert.doesNotMatch(mutations, /发起生产异常/u)
 })
 
 test('production and outsourcing source links constrain the destination list', () => {
   assert.match(
-    source,
+    querySource,
     /\['production', 'outsourcing'\]\.includes\(key\)[\s\S]*source_type: routeSourceType,[\s\S]*source_id: routeSourceID/u
   )
 })
@@ -152,8 +185,11 @@ test('unified fact page keeps outsourcing payable read-only without a quality pr
 test('single reconciliation uses exact permission and retains unknown attempts', () => {
   assert.match(source, /finance\.reconciliation\.confirm/u)
   assert.match(source, /isSingleFactReconciliationSource\(activeSelectedRow\)/u)
-  assert.match(source, /createReconciliationFromFinanceFact/u)
-  assert.match(source, /financeSourceAttemptsRef\.current\.settle/u)
+  assert.match(reconciliationAction, /createReconciliationFromFinanceFact/u)
+  assert.match(
+    reconciliationAction,
+    /financeSourceAttemptsRef\.current\.settle/u
+  )
   assert.match(source, /单笔核对/u)
   assert.doesNotMatch(source, /SINGLE_FACT_RECONCILIATION[\s\S]{0,240}PAYMENT/u)
 })
@@ -180,26 +216,32 @@ test('posted production completions expose an exact-permission rework action', (
 })
 
 test('production rework uses a source-bound retry-safe command and rereads unknown results', () => {
-  assert.match(source, /buildProductionReworkPayload\(values, source, facts\)/u)
   assert.match(
-    source,
+    productionActions,
+    /buildProductionReworkPayload\(values, source, facts\)/u
+  )
+  assert.match(
+    productionActions,
     /productionReworkAttemptsRef\.current\.prepare\(scope, payload\)/u
   )
   assert.match(
-    source,
+    productionActions,
     /createProductionReworkFromCompletion\(attempt\.params\)/u
   )
-  assert.match(source, /isSourceBusinessActionResultUnknown\(error\)/u)
   assert.match(
-    source,
+    productionActions,
+    /isSourceBusinessActionResultUnknown\(error\)/u
+  )
+  assert.match(
+    productionActions,
     /source_type: 'PRODUCTION_FACT',[\s\S]{0,100}source_id: source\.id/u
   )
   assert.match(
-    source,
+    productionActions,
     /findProductionReworkResult\(currentFacts, attempt\.params\)/u
   )
-  assert.match(source, /已重新读取并确认返工草稿，请核对后过账/u)
-  assert.match(source, /setProductionReworkContext\(null\)/u)
+  assert.match(productionActions, /已重新读取并确认返工草稿，请核对后过账/u)
+  assert.match(productionActions, /setProductionReworkContext\(null\)/u)
   assert.match(source, /<ProductionReworkModal/u)
 })
 
@@ -207,13 +249,13 @@ test('posted rework records open authoritative progress and link back to the pro
   assert.match(source, /ProductionReworkProgressModal/u)
   assert.match(source, /'production\.wip\.read'/u)
   assert.match(source, /selectedCanViewProductionReworkProgress/u)
-  assert.match(source, /getProductionWip\(orderID\)/u)
-  assert.match(source, /origin_rework_fact_id/u)
-  assert.match(source, /focusReworkFactID:\s*source\.id/u)
+  assert.match(productionActions, /getProductionWip\(orderID\)/u)
+  assert.match(productionActions, /origin_rework_fact_id/u)
+  assert.match(productionActions, /focusReworkFactID:\s*source\.id/u)
   assert.match(source, />\s*查看返工进度\s*</u)
   assert.match(source, /V1_ROUTE_PATHS\.productionOrders/u)
   assert.match(source, /production_order_id:\s*orderID/u)
-  assert.match(source, /该返工记录尚未关联可核对的成品返工补制批次/u)
+  assert.match(productionActions, /该返工记录尚未关联可核对的成品返工补制批次/u)
 })
 
 test('operational fact core actions stay stable and contextual views remain explicitly registered', () => {

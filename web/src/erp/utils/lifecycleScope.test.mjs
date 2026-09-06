@@ -72,7 +72,10 @@ test('六类正式业务页面都把记录范围传给原列表 API', () => {
       '../pages/V1PurchaseOrdersPage.jsx',
       '../components/purchase-orders/PurchaseOrderOperationPanel.jsx',
     ],
-    ['../pages/V1OutsourcingOrdersPage.jsx'],
+    [
+      '../components/outsourcing-orders/useOutsourcingOrderQuery.mjs',
+      '../pages/V1OutsourcingOrdersPage.jsx',
+    ],
     ['../pages/V1ProductionOrdersPage.jsx'],
     ['../pages/BOMVersionsPage.jsx'],
   ]

@@ -124,8 +124,7 @@ test('formal workflow action surfaces use a synchronous task-level in-flight gua
     '../pages/DashboardPage.jsx',
     '../pages/WorkflowBusinessModulePage.jsx',
     '../mobile/hooks/useMobileRoleTaskActions.js',
-    '../components/purchase-orders/usePurchaseOrderWorkflowActions.mjs',
-    '../components/outsourcing-orders/useOutsourcingOrderWorkflowActions.mjs',
+    '../components/workflow/useSourceOrderWorkflowActions.mjs',
   ]
 
   for (const path of surfaces) {
@@ -160,11 +159,8 @@ test('formal workflow action surfaces submit only canonical payload fields', () 
   const desktopTaskAction = read('./desktopWorkflowTaskAction.mjs')
   const workflowPage = read('../pages/WorkflowBusinessModulePage.jsx')
   const mobile = read('../mobile/hooks/useMobileRoleTaskActions.js')
-  const purchase = read(
-    '../components/purchase-orders/usePurchaseOrderWorkflowActions.mjs'
-  )
-  const outsourcing = read(
-    '../components/outsourcing-orders/useOutsourcingOrderWorkflowActions.mjs'
+  const sourceOrderActions = read(
+    '../components/workflow/useSourceOrderWorkflowActions.mjs'
   )
 
   assert.match(dashboard, /buildDesktopWorkflowTaskActionParams/u)
@@ -178,10 +174,10 @@ test('formal workflow action surfaces submit only canonical payload fields', () 
     mobile,
     /mobile_role_key|mobile_action_(?:key|recorded_at|role_key)|(?:approval|qc|shipment_release|receivable|invoice|payable|reconciliation)_result/u
   )
-  assert.match(purchase, /surface_key:\s*'purchase_orders'/u)
-  assert.doesNotMatch(purchase, /purchase_order_page_action/u)
-  assert.match(outsourcing, /surface_key:\s*'outsourcing_orders'/u)
-  assert.doesNotMatch(outsourcing, /outsourcing_order_page_action/u)
+  assert.doesNotMatch(
+    sourceOrderActions,
+    /purchase_order_page_action|outsourcing_order_page_action/u
+  )
 })
 
 test('workflow task mutation params require the exact versioned command contract', () => {

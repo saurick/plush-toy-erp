@@ -46,6 +46,8 @@ import {
 } from '../../scripts/qa/manual-acceptance-target-policy.mjs'
 import { runTargetPreflightAsync } from '../../scripts/deploy/target-preflight.mjs'
 import {
+  isSameOriginRequest,
+  readJsonBody,
   isLoopbackHostHeader,
   isLoopbackRemoteAddress,
 } from './devServerSecurity.mjs'
@@ -2047,50 +2049,6 @@ function sendJson(response, statusCode, payload, extraHeaders = {}) {
   response.end(JSON.stringify(payload))
 }
 
-function isSameOriginRequest(request) {
-  const host = request.headers?.host
-  const origin = request.headers?.origin
-  if (
-    Array.isArray(host) ||
-    Array.isArray(origin) ||
-    !isLoopbackHostHeader(host) ||
-    typeof origin !== 'string'
-  ) {
-    return false
-  }
-  try {
-    const parsed = new URL(origin)
-    return (
-      ['http:', 'https:'].includes(parsed.protocol) &&
-      parsed.host.toLowerCase() === String(host).toLowerCase() &&
-      isLoopbackHostHeader(parsed.host) &&
-      !parsed.username &&
-      !parsed.password &&
-      parsed.pathname === '/' &&
-      !parsed.search &&
-      !parsed.hash &&
-      request.headers?.['sec-fetch-site'] === 'same-origin'
-    )
-  } catch {
-    return false
-  }
-}
-
-async function readJsonBody(request) {
-  let size = 0
-  const chunks = []
-  for await (const chunk of request) {
-    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
-    size += bytes.length
-    if (size > MAX_DEV_DATA_PREPARATION_REQUEST_BYTES) {
-      throw new Error('request body is too large')
-    }
-    chunks.push(bytes)
-  }
-  if (size === 0) throw new Error('request body is required')
-  return JSON.parse(Buffer.concat(chunks).toString('utf8'))
-}
-
 export function createDevDataPreparationMiddleware({
   projectRoot,
   service,
@@ -2179,7 +2137,12 @@ export function createDevDataPreparationMiddleware({
           return
         }
         const result = await dataService.act(
-          validateDevDataPreparationAction(await readJsonBody(request))
+          validateDevDataPreparationAction(
+            await readJsonBody(request, {
+              maxBytes: MAX_DEV_DATA_PREPARATION_REQUEST_BYTES,
+              label: 'request',
+            })
+          )
         )
         sendJson(response, result.action === 'execute' ? 202 : 200, result)
         return

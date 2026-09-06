@@ -4,11 +4,11 @@ import { Tag } from 'antd'
 import {
   PURCHASE_ORDER_STATUS_COLORS,
   PURCHASE_ORDER_STATUS_LABELS,
-  formatPaymentCondition,
   formatUnixDate,
   purchaseInvoicePreferenceText,
   statusText,
 } from '../../utils/masterDataOrderView.mjs'
+import { formatPaymentCondition } from '../../utils/paymentConditions.mjs'
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
 
 function compareText(a, b) {

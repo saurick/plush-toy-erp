@@ -14,7 +14,8 @@ import (
 
 var _ biz.QualityInspectionCorrectionRepo = (*inventoryRepo)(nil)
 
-func (r *inventoryRepo) CreateQualityInspectionCorrection(ctx context.Context, in *biz.QualityInspectionCorrectionCreate, actorID int) (*biz.QualityInspection, error) {
+func (r *inventoryRepo) CreateQualityInspectionCorrection(ctx context.Context, in *biz.QualityInspectionCorrectionCreate, actorID int) (_ *biz.QualityInspection, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrQualityInspectionRecordConflict) }()
 	tx, err := r.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err

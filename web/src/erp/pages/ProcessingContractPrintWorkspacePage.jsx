@@ -1,10 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  Navigate,
-  useOutletContext,
-  useParams,
-  useSearchParams,
-} from 'react-router-dom'
+import { Navigate, useParams, useSearchParams } from 'react-router-dom'
+import { getPrintWorkspaceDraftScope } from '../utils/printWorkspaceScope.mjs'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import PrintAppendixImageManager from '../components/print/PrintAppendixImages.jsx'
@@ -43,7 +39,6 @@ import {
   resolvePrintWorkspaceEntrySource,
   resolvePrintWorkspaceStateID,
   resolvePrintWorkspaceDraftMode,
-  resolvePrintWorkspaceCustomerKey,
 } from '../utils/printWorkspace.js'
 import {
   findMergeAtCell,
@@ -122,18 +117,8 @@ function resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag) {
 export default function ProcessingContractPrintWorkspacePage() {
   const { templateKey } = useParams()
   const [searchParams] = useSearchParams()
-  const outletContext = useOutletContext()
-  const accountKey = String(outletContext?.adminProfile?.id || '').trim()
-  const profileCustomerKey = String(
-    outletContext?.adminProfile?.effective_session?.customer?.key || ''
-  ).trim()
-  const configRevision = String(
-    outletContext?.adminProfile?.effective_session?.config_revision || ''
-  ).trim()
-  const customerKey = useMemo(
-    () => profileCustomerKey || resolvePrintWorkspaceCustomerKey(searchParams),
-    [profileCustomerKey, searchParams]
-  )
+  const { accountKey, customerKey, configRevision } =
+    getPrintWorkspaceDraftScope(searchParams)
   const paperRef = useRef(null)
   const stageWrapRef = useRef(null)
   const workspaceStateID = resolvePrintWorkspaceStateID(searchParams)
@@ -164,9 +149,10 @@ export default function ProcessingContractPrintWorkspacePage() {
     return buildRestorablePrintWorkspaceURL(PROCESSING_CONTRACT_TEMPLATE_KEY, {
       entrySource,
       customerKey,
+      configRevision,
       stateID: workspaceStateID,
     })
-  }, [customerKey, entrySource, workspaceStateID])
+  }, [configRevision, customerKey, entrySource, workspaceStateID])
   const [contract, setContract, flushContractDraft, , persistenceStatus] =
     usePersistentPrintWorkspaceDraft(
       () =>

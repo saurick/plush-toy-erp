@@ -157,7 +157,8 @@ test("sales order form fields are saved through the shared mapper", () => {
   const salesOrderForm = read(
     "web/src/erp/components/sales-orders/SalesOrderForm.jsx",
   );
-  const orderView = read("web/src/erp/utils/masterDataOrderView.mjs");
+  const orderView = read("web/src/erp/utils/sourceOrderParams.mjs");
+  const partySource = read("web/src/erp/utils/sourcePartySnapshots.mjs");
   const salesOrderService = read(
     "server/internal/service/jsonrpc_sales_order_shared.go",
   );
@@ -206,12 +207,12 @@ test("sales order form fields are saved through the shared mapper", () => {
     "V1SalesOrdersPage order no draft",
   );
   assertIncludes(
-    orderView,
-    "export function buildSalesOrderCustomerSourceValues(customer = {})",
+    partySource,
+    "function buildSalesOrderCustomerSourceValues(customer = {})",
     "shared sales order customer source helper",
   );
   assertIncludes(
-    orderView,
+    partySource,
     "customer_snapshot: buildCustomerSnapshot(customer)",
     "shared sales order customer source helper",
   );
@@ -272,7 +273,8 @@ test("sales order line source switching clears stale SKU snapshots", () => {
   const salesOrderForm = read(
     "web/src/erp/components/sales-orders/SalesOrderForm.jsx",
   );
-  const orderView = read("web/src/erp/utils/masterDataOrderView.mjs");
+  const orderView = read("web/src/erp/utils/sourceOrderLineValues.mjs");
+  const orderParams = read("web/src/erp/utils/sourceOrderParams.mjs");
 
   assertIncludes(
     salesOrderForm,
@@ -286,7 +288,7 @@ test("sales order line source switching clears stale SKU snapshots", () => {
   );
   assertIncludes(
     orderView,
-    "export function buildSalesOrderItemSourceValuesFromSKU(sku = {})",
+    "function buildSalesOrderItemSourceValuesFromSKU(sku = {})",
     "shared sales order line source helper",
   );
   assertIncludes(
@@ -330,17 +332,17 @@ test("sales order line source switching clears stale SKU snapshots", () => {
     "sales order line source select",
   );
   assertIncludes(
-    orderView,
+    orderParams,
     "product_code_snapshot: trimOptional(values.product_code_snapshot)",
     "shared sales order line mapper",
   );
   assertIncludes(
-    orderView,
+    orderParams,
     "product_name_snapshot: trimOptional(values.product_name_snapshot)",
     "shared sales order line mapper",
   );
   assertIncludes(
-    orderView,
+    orderParams,
     "color_snapshot: trimOptional(values.color_snapshot)",
     "shared sales order line mapper",
   );

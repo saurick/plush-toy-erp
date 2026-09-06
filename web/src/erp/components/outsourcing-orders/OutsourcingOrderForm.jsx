@@ -34,11 +34,13 @@ import {
 } from '../../utils/dateRange.mjs'
 import {
   BUSINESS_CURRENCY_OPTIONS,
-  OUTSOURCING_ORDER_SUBJECT_TYPES,
   createBlankOutsourcingLine,
+} from '../../utils/masterDataOrderView.mjs'
+import { OUTSOURCING_ORDER_SUBJECT_TYPES } from '../../utils/sourceOrderLineValues.mjs'
+import {
   deriveOutsourcingOrderItemAmount,
   summarizeOutsourcingOrderLines,
-} from '../../utils/masterDataOrderView.mjs'
+} from '../../utils/sourceOrderAmounts.mjs'
 import { createDuplicatedDraftLineItem } from '../../utils/businessLineItems.mjs'
 import { formatNumeric20Scale6Summary } from '../../utils/numeric20Scale6.mjs'
 

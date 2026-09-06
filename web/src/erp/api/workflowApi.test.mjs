@@ -1199,8 +1199,7 @@ test('workflow task callers own a frozen user-intent attempt store', () => {
     '../pages/DashboardPage.jsx',
     '../pages/WorkflowBusinessModulePage.jsx',
     '../mobile/hooks/useMobileRoleTaskActions.js',
-    '../components/purchase-orders/usePurchaseOrderWorkflowActions.mjs',
-    '../components/outsourcing-orders/useOutsourcingOrderWorkflowActions.mjs',
+    '../components/workflow/useSourceOrderWorkflowActions.mjs',
   ]) {
     const source = read(path)
     const runPattern = path.includes('useMobileRoleTaskActions')
@@ -1248,7 +1247,9 @@ test('workflow task request IDs stay cryptographically strong on non-secure HTTP
 })
 
 test('workflow browser and simulated closure fixtures submit idempotency keys', () => {
-  const styleScenario = read('../../../scripts/style-l1/scenarios.mjs')
+  const styleScenario = read(
+    '../../../scripts/style-l1/dashboardTaskScenarios.mjs'
+  )
   const simulatedClosure = read(
     '../../../../scripts/qa/mobile-workflow-simulated-closure.mjs'
   )

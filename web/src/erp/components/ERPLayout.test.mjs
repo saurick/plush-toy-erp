@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict'
-import { register } from 'node:module'
+
 import test from 'node:test'
 
-import { Window } from 'happy-dom'
 import { act, createElement, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import {
+  registerJSXTestLoader,
+  installTestDOM,
+} from '../../../scripts/test/reactRuntime.mjs'
 
 import {
   ADMIN_TOKEN_AUDIENCE,
@@ -19,89 +22,9 @@ let businessProbeRPC
 let businessPageMounts = 0
 let businessPageRPCAttempts = 0
 
-function registerERPLayoutJSXLoader() {
-  const sourceRootURL = new URL('../../', import.meta.url).href
-  const viteURL = import.meta.resolve('vite')
-  const loaderSource = `
-import { readFile, stat } from 'node:fs/promises'
-import { transformWithEsbuild } from ${JSON.stringify(viteURL)}
-
-const sourceRootURL = ${JSON.stringify(sourceRootURL)}
-
-async function resolveSourceURL(baseURL) {
-  const candidates = [
-    baseURL,
-    baseURL + '.js',
-    baseURL + '.jsx',
-    baseURL + '.mjs',
-    baseURL + '/index.js',
-    baseURL + '/index.jsx',
-    baseURL + '/index.mjs',
-  ]
-  for (const candidate of candidates) {
-    try {
-      if ((await stat(new URL(candidate))).isFile()) return candidate
-    } catch {}
-  }
-  return baseURL
-}
-
-export async function resolve(specifier, context, nextResolve) {
-  if (specifier.startsWith('@/')) {
-    return {
-      url: await resolveSourceURL(
-        new URL(specifier.slice(2), sourceRootURL).href
-      ),
-      shortCircuit: true,
-    }
-  }
-  try {
-    return await nextResolve(specifier, context)
-  } catch (error) {
-    if (
-      (specifier.startsWith('./') || specifier.startsWith('../')) &&
-      context.parentURL?.startsWith('file:')
-    ) {
-      const baseURL = new URL(specifier, context.parentURL).href
-      const resolvedURL = await resolveSourceURL(baseURL)
-      if (resolvedURL !== baseURL) {
-        return { url: resolvedURL, shortCircuit: true }
-      }
-    }
-    throw error
-  }
-}
-
-export async function load(url, context, nextLoad) {
-  if (/\\.(?:css|less|scss|sass)$/u.test(url)) {
-    return { format: 'module', source: 'export default {}', shortCircuit: true }
-  }
-  if (url.endsWith('.jsx')) {
-    const source = await readFile(new URL(url), 'utf8')
-    const transformed = await transformWithEsbuild(source, url, {
-      loader: 'jsx',
-      jsx: 'automatic',
-      target: 'esnext',
-      define: { 'import.meta.env.DEV': 'false' },
-    })
-    return {
-      format: 'module',
-      source: transformed.code,
-      shortCircuit: true,
-    }
-  }
-  return nextLoad(url, context)
-}
-`
-  register(
-    `data:text/javascript,${encodeURIComponent(loaderSource)}`,
-    import.meta.url
-  )
-}
-
 function loadERPLayoutRuntime() {
   if (!layoutRuntimePromise) {
-    registerERPLayoutJSXLoader()
+    registerJSXTestLoader()
     layoutRuntimePromise = Promise.all([
       import('./ERPLayout.jsx'),
       import('../../common/utils/jsonRpc.js'),
@@ -111,58 +34,6 @@ function loadERPLayoutRuntime() {
     }))
   }
   return layoutRuntimePromise
-}
-
-function installTestDOM() {
-  const runtimeWindow = new Window({
-    url: 'http://127.0.0.1/erp/business-dashboard',
-  })
-  const globals = {
-    window: runtimeWindow,
-    document: runtimeWindow.document,
-    HTMLElement: runtimeWindow.HTMLElement,
-    Element: runtimeWindow.Element,
-    Node: runtimeWindow.Node,
-    Event: runtimeWindow.Event,
-    ShadowRoot: runtimeWindow.ShadowRoot,
-    SVGElement: runtimeWindow.SVGElement,
-    Document: runtimeWindow.Document,
-    DocumentFragment: runtimeWindow.DocumentFragment,
-    MutationObserver: runtimeWindow.MutationObserver,
-    ResizeObserver: runtimeWindow.ResizeObserver,
-    localStorage: runtimeWindow.localStorage,
-    sessionStorage: runtimeWindow.sessionStorage,
-    navigator: runtimeWindow.navigator,
-    AbortController: runtimeWindow.AbortController,
-    getComputedStyle: runtimeWindow.getComputedStyle.bind(runtimeWindow),
-    IS_REACT_ACT_ENVIRONMENT: true,
-  }
-  const previousDescriptors = new Map(
-    Object.keys(globals).map((key) => [
-      key,
-      Object.getOwnPropertyDescriptor(globalThis, key),
-    ])
-  )
-  Object.entries(globals).forEach(([key, value]) => {
-    Object.defineProperty(globalThis, key, {
-      configurable: true,
-      value,
-      writable: true,
-    })
-  })
-
-  return {
-    runtimeWindow,
-    restore() {
-      previousDescriptors.forEach((descriptor, key) => {
-        if (descriptor) {
-          Object.defineProperty(globalThis, key, descriptor)
-        } else {
-          delete globalThis[key]
-        }
-      })
-    },
-  }
 }
 
 function encodeTokenPart(value) {

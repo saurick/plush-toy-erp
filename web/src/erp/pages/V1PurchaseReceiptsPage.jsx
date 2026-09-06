@@ -56,13 +56,12 @@ import PurchaseReceiptExceptionModal from '../components/purchase-receipts/Purch
 import PurchaseReceiptExceptionRecordsModal from '../components/purchase-receipts/PurchaseReceiptExceptionRecordsModal.jsx'
 import FinanceBusinessSourceModal from '../components/finance/FinanceBusinessSourceModal.jsx'
 import {
-  compactParams,
   formatUnixDate,
   formatUnixDateTime,
   hasActionPermission,
-  trimOptional,
   V1_ROUTE_PATHS,
 } from '../utils/masterDataOrderView.mjs'
+import { compactParams, trimOptional } from '../utils/sourceDocumentValues.mjs'
 import { currentBusinessDate } from '../utils/businessDate.mjs'
 import { formatQuantity } from '../utils/businessLineItems.mjs'
 import {

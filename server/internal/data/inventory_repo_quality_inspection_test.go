@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"server/internal/biz"
-	"server/internal/data/model/ent"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/shopspring/decimal"
@@ -58,7 +57,7 @@ func TestInventoryRepo_QualityInspectionLifecycleAndLotStatus(t *testing.T) {
 		InventoryLotID:        *passItem.LotID,
 		MaterialID:            fixtures.materialID,
 		WarehouseID:           fixtures.warehouseID,
-	}); !ent.IsConstraintError(err) {
+	}); !errors.Is(err, biz.ErrQualityInspectionRecordConflict) {
 		t.Fatalf("expected inspection_no unique constraint, got %v", err)
 	}
 

@@ -7,7 +7,6 @@ import (
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
-	"server/internal/data/model/ent"
 	"server/internal/errcode"
 )
 
@@ -179,7 +178,7 @@ func (d *jsonrpcDispatcher) mapBOMError(ctx context.Context, err error) *v1.Json
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该材料已停用，不能新增引用；历史 BOM 仍保留原引用"}
 	case errors.Is(err, biz.ErrUnitNotFound), errors.Is(err, biz.ErrUnitInactive):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该单位已停用，不能新增引用；历史 BOM 仍保留原引用"}
-	case ent.IsConstraintError(err):
+	case errors.Is(err, biz.ErrBOMRecordConflict):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "同一产品的 BOM 版本不能重复，且最多只能有一个激活版本"}
 	default:
 		l.Errorf("[bom] internal err=%v", err)

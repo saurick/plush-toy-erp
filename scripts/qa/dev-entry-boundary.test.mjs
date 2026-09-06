@@ -99,9 +99,7 @@ function extractDevTestingPageGlobPaths(pageSource = "") {
 
 test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV", () => {
   const appSource = read("web/src/App.jsx");
-  const devRoutesSource = read(
-    "web/src/dev-workbench/DevWorkbenchRoutes.jsx",
-  );
+  const devRoutesSource = read("web/src/dev-workbench/DevWorkbenchRoutes.jsx");
   const devDocsPageSource = read("web/src/dev-workbench/pages/DevDocsPage.jsx");
   const devProductCorePageSource = read(
     "web/src/dev-workbench/pages/DevProductCorePage.jsx",
@@ -309,8 +307,12 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
 });
 
 test("dev entry boundary: dev testing indexes only current maintained docs", () => {
-  const devTestingPageSource = read("web/src/dev-workbench/pages/DevTestingPage.jsx");
-  const devTestingCssSource = read("web/src/dev-workbench/styles/dev-prototypes.css");
+  const devTestingPageSource = read(
+    "web/src/dev-workbench/pages/DevTestingPage.jsx",
+  );
+  const devTestingCssSource = read(
+    "web/src/dev-workbench/styles/dev-prototypes.css",
+  );
   assert.deepEqual(DEV_TESTING_CURRENT_DOC_PATHS, [
     "docs/product/自动化测试策略.md",
     "README.md",
@@ -318,6 +320,7 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
     "web/scripts/README.md",
     "server/README.md",
     "scripts/README.md",
+    "scripts/qa/README.md",
     "docs/部署约定.md",
     "server/deploy/README.md",
     "server/deploy/compose/prod/README.md",
@@ -354,6 +357,7 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
     "../../../../docs/product/自动化测试策略.md": "# 自动化测试策略\n",
     "../../../../web/scripts/README.md": read("web/scripts/README.md"),
     "../../../../scripts/README.md": read("scripts/README.md"),
+    "../../../../scripts/qa/README.md": read("scripts/qa/README.md"),
     "../../../../docs/reference/第四次20260627/旧测试计划.md":
       "```bash\nbash stale-reference-command.sh\n```",
     "../../../../docs/archive/progress.md":
@@ -366,6 +370,7 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
       "docs/product/自动化测试策略.md",
       "web/scripts/README.md",
       "scripts/README.md",
+      "scripts/qa/README.md",
     ],
   );
   const webScriptsDoc = docs.find(
@@ -387,6 +392,7 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
     "dev testing web scripts README source",
   );
   const scriptsDoc = docs.find((item) => item.path === "scripts/README.md");
+  const qaDoc = docs.find((item) => item.path === "scripts/qa/README.md");
   assertIncludes(
     scriptsDoc?.source || "",
     "trial-role-entry-docs",
@@ -398,14 +404,14 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
     "dev testing scripts README source",
   );
   assertIncludes(
-    scriptsDoc?.source || "",
+    qaDoc?.source || "",
     "TestWorkflowRepo_(TaskStatusReasonEventAndCompletionCleanup",
-    "dev testing scripts README source",
+    "dev testing QA README source",
   );
   assertIncludes(
-    scriptsDoc?.source || "",
+    qaDoc?.source || "",
     "TestJsonrpcDispatcher_WorkflowUrgeTask",
-    "dev testing scripts README source",
+    "dev testing QA README source",
   );
   assertIncludes(
     scriptsDoc?.source || "",
@@ -1138,7 +1144,9 @@ test("dev entry boundary: indexed testing doc command scripts exist", () => {
 });
 
 test("dev entry boundary: customer config console stays preview or gated apply only", () => {
-  const pageSource = read("web/src/dev-workbench/pages/DevCustomerConfigPage.jsx");
+  const pageSource = read(
+    "web/src/dev-workbench/pages/DevCustomerConfigPage.jsx",
+  );
   assertIncludes(
     pageSource,
     "客户配置包预检与发布控制台",
@@ -1298,7 +1306,6 @@ test("dev entry boundary: customer config console stays preview or gated apply o
     "release readiness result must not be published directly by the browser page",
   );
 });
-
 
 test("dev entry boundary: make dev_restart 先预检再停服并且不自动执行 migration", () => {
   const makefile = read("server/Makefile");

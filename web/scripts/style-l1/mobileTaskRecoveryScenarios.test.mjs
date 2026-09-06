@@ -2,7 +2,10 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
-const source = readFileSync(new URL('./scenarios.mjs', import.meta.url), 'utf8')
+const source = readFileSync(
+  new URL('./mobileTaskScenarios.mjs', import.meta.url),
+  'utf8'
+)
 const scenario = source.slice(
   source.indexOf("name: 'mobile-nine-role-request-recovery-matrix'"),
   source.indexOf("name: 'mobile-yoyo-boss-urge-only'")
@@ -67,9 +70,6 @@ test('boss urge-only Style L1 uses explicit cross-role supervision without task 
     bossUrgeOnlyScenario,
     /'workflow\.task\.read': \['engineering'\]/u
   )
-  assert.match(
-    bossUrgeOnlyScenario,
-    /'workflow\.task\.update': \['boss'\]/u
-  )
+  assert.match(bossUrgeOnlyScenario, /'workflow\.task\.update': \['boss'\]/u)
   assert.match(bossUrgeOnlyScenario, /\['urge'\]/u)
 })

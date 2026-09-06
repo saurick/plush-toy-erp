@@ -51,7 +51,9 @@ export function resolveWorkflowTaskActionStep({
   ) {
     return fallbackStep
   }
-  return 'context'
+  return (
+    WORKFLOW_TASK_ACTION_STEP_KEYS.find((key) => availability[key]) || 'context'
+  )
 }
 
 export function moveWorkflowTaskActionStep({

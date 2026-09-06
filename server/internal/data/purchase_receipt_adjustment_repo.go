@@ -24,7 +24,8 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-func (r *inventoryRepo) CreatePurchaseReceiptAdjustmentDraft(ctx context.Context, in *biz.PurchaseReceiptAdjustmentCreate) (*biz.PurchaseReceiptAdjustment, error) {
+func (r *inventoryRepo) CreatePurchaseReceiptAdjustmentDraft(ctx context.Context, in *biz.PurchaseReceiptAdjustmentCreate) (_ *biz.PurchaseReceiptAdjustment, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	receipt, err := r.data.postgres.PurchaseReceipt.Get(ctx, in.PurchaseReceiptID)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -49,14 +50,16 @@ func (r *inventoryRepo) CreatePurchaseReceiptAdjustmentDraft(ctx context.Context
 	return entPurchaseReceiptAdjustmentToBiz(row, nil), nil
 }
 
-func (r *inventoryRepo) ResolvePurchaseReceiptAdjustmentReplay(ctx context.Context, in *biz.PurchaseReceiptAdjustmentCreate) (*biz.PurchaseReceiptAdjustment, bool, error) {
+func (r *inventoryRepo) ResolvePurchaseReceiptAdjustmentReplay(ctx context.Context, in *biz.PurchaseReceiptAdjustmentCreate) (_ *biz.PurchaseReceiptAdjustment, _ bool, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	if r == nil || r.data == nil || r.data.postgres == nil || in == nil || in.IdempotencyKey == "" || in.IdempotencyPayloadHash == "" {
 		return nil, false, biz.ErrBadParam
 	}
 	return resolvePurchaseReceiptAdjustmentReplay(ctx, r.data.postgres, in)
 }
 
-func (r *inventoryRepo) CreatePurchaseReceiptAdjustmentWithItems(ctx context.Context, in *biz.PurchaseReceiptAdjustmentCreate, items []*biz.PurchaseReceiptAdjustmentItemCreate) (*biz.PurchaseReceiptAdjustment, error) {
+func (r *inventoryRepo) CreatePurchaseReceiptAdjustmentWithItems(ctx context.Context, in *biz.PurchaseReceiptAdjustmentCreate, items []*biz.PurchaseReceiptAdjustmentItemCreate) (_ *biz.PurchaseReceiptAdjustment, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	if in == nil || in.PurchaseReceiptID <= 0 || len(items) == 0 || in.IdempotencyKey == "" || in.IdempotencyPayloadHash == "" {
 		return nil, biz.ErrBadParam
 	}
@@ -151,7 +154,8 @@ func (r *inventoryRepo) CreatePurchaseReceiptAdjustmentWithItems(ctx context.Con
 	return out, nil
 }
 
-func (r *inventoryRepo) AddPurchaseReceiptAdjustmentItem(ctx context.Context, in *biz.PurchaseReceiptAdjustmentItemCreate) (*biz.PurchaseReceiptAdjustmentItem, error) {
+func (r *inventoryRepo) AddPurchaseReceiptAdjustmentItem(ctx context.Context, in *biz.PurchaseReceiptAdjustmentItemCreate) (_ *biz.PurchaseReceiptAdjustmentItem, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	tx, err := r.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
@@ -198,7 +202,8 @@ func (r *inventoryRepo) AddPurchaseReceiptAdjustmentItem(ctx context.Context, in
 	return out, nil
 }
 
-func (r *inventoryRepo) PostPurchaseReceiptAdjustment(ctx context.Context, adjustmentID int) (*biz.PurchaseReceiptAdjustment, error) {
+func (r *inventoryRepo) PostPurchaseReceiptAdjustment(ctx context.Context, adjustmentID int) (_ *biz.PurchaseReceiptAdjustment, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	tx, err := r.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
@@ -320,7 +325,8 @@ func (r *inventoryRepo) PostPurchaseReceiptAdjustment(ctx context.Context, adjus
 	return out, nil
 }
 
-func (r *inventoryRepo) CancelPostedPurchaseReceiptAdjustment(ctx context.Context, adjustmentID int) (*biz.PurchaseReceiptAdjustment, error) {
+func (r *inventoryRepo) CancelPostedPurchaseReceiptAdjustment(ctx context.Context, adjustmentID int) (_ *biz.PurchaseReceiptAdjustment, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	tx, err := r.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
@@ -447,7 +453,8 @@ func (r *inventoryRepo) CancelPostedPurchaseReceiptAdjustment(ctx context.Contex
 	return out, nil
 }
 
-func (r *inventoryRepo) GetPurchaseReceiptAdjustment(ctx context.Context, id int) (*biz.PurchaseReceiptAdjustment, error) {
+func (r *inventoryRepo) GetPurchaseReceiptAdjustment(ctx context.Context, id int) (_ *biz.PurchaseReceiptAdjustment, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	adjustment, err := r.data.postgres.PurchaseReceiptAdjustment.Get(ctx, id)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -458,7 +465,8 @@ func (r *inventoryRepo) GetPurchaseReceiptAdjustment(ctx context.Context, id int
 	return purchaseReceiptAdjustmentWithItems(ctx, r.data.postgres, adjustment)
 }
 
-func (r *inventoryRepo) ListPurchaseReceiptAdjustments(ctx context.Context, filter biz.PurchaseReceiptAdjustmentFilter) ([]*biz.PurchaseReceiptAdjustment, int, error) {
+func (r *inventoryRepo) ListPurchaseReceiptAdjustments(ctx context.Context, filter biz.PurchaseReceiptAdjustmentFilter) (_ []*biz.PurchaseReceiptAdjustment, _ int, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	query := r.data.postgres.PurchaseReceiptAdjustment.Query()
 	if filter.Status != "" {
 		query = query.Where(purchasereceiptadjustment.Status(filter.Status))

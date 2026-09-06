@@ -113,3 +113,10 @@ body
   border-color: var(--erp-control-focus-border);
   box-shadow: inset 0 0 0 2px var(--erp-control-focus-ring);
 }
+
+/* The compact control paints its outline above both the input and code button. */
+.erp-login-card
+  .erp-login-sms-code-compact.ant-space-compact:focus-within::after {
+  border-color: var(--erp-login-sms-focus);
+  box-shadow: inset 0 0 0 2px var(--erp-login-sms-focus-ring);
+}

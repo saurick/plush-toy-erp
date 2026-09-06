@@ -10,6 +10,14 @@ function source(relativePath) {
   return readFileSync(path.join(erpRoot, relativePath), 'utf8')
 }
 
+function previewSource(relativePath) {
+  return source(
+    relativePath === 'pages/V1OutsourcingOrdersPage.jsx'
+      ? 'components/outsourcing-orders/useOutsourcingSourceFacts.jsx'
+      : relativePath
+  )
+}
+
 const aggregatePages = [
   'pages/V1SalesOrdersPage.jsx',
   'pages/V1PurchaseOrdersPage.jsx',
@@ -24,7 +32,7 @@ test('seven document aggregate pages use the shared row item preview contract', 
   for (const relativePath of aggregatePages) {
     const pageSource = source(relativePath)
     assert.match(
-      pageSource,
+      previewSource(relativePath),
       /useBusinessRowItemsPreview/,
       `${relativePath} should use the shared preview hook`
     )
@@ -50,7 +58,7 @@ test('seven aggregate pages project exact item totals without preloading detail 
     'pages/BOMVersionsPage.jsx',
   ]) {
     assert.match(
-      source(relativePath),
+      previewSource(relativePath),
       /getItemTotal:\s*\(\w+\) => \w+\?\.item_count/u,
       `${relativePath} should use the list item_count projection`
     )
@@ -137,7 +145,7 @@ test('source-document previews stay permission-aware and separate first-page fro
       'listAllOutsourcingOrderItems',
     ],
   ]) {
-    const pageSource = source(relativePath)
+    const pageSource = previewSource(relativePath)
     assert.match(pageSource, new RegExp(previewFunction))
     assert.match(pageSource, new RegExp(fullFunction))
   }

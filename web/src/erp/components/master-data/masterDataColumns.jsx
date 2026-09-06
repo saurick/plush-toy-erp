@@ -3,10 +3,10 @@ import { Tag } from 'antd'
 
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
 import {
-  formatPaymentCondition,
   formatProductUnitNetWeight,
   purchaseInvoicePreferenceText,
 } from '../../utils/masterDataOrderView.mjs'
+import { formatPaymentCondition } from '../../utils/paymentConditions.mjs'
 import { compareNumeric20Scale6Values } from '../../utils/numeric20Scale6.mjs'
 import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
 

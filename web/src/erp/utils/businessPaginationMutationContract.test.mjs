@@ -53,15 +53,23 @@ function conditionalBranches(source, condition, fromIndex = 0) {
 const masterDataSource = readSource('../pages/V1MasterDataPage.jsx')
 const salesOrderSource = readSource('../pages/V1SalesOrdersPage.jsx')
 const purchaseOrderSource = readSource('../pages/V1PurchaseOrdersPage.jsx')
-const outsourcingOrderSource = readSource(
-  '../pages/V1OutsourcingOrdersPage.jsx'
+const outsourcingOrderQuery = readSource(
+  '../components/outsourcing-orders/useOutsourcingOrderQuery.mjs'
+)
+const outsourcingOrderEditor = readSource(
+  '../components/outsourcing-orders/useOutsourcingOrderEditor.mjs'
 )
 const bomSource = readSource('../pages/BOMVersionsPage.jsx')
 const shipmentSource = readSource('../pages/ShipmentsPage.jsx')
 const productionOrderSource = readSource('../pages/V1ProductionOrdersPage.jsx')
 const purchaseReceiptSource = readSource('../pages/V1PurchaseReceiptsPage.jsx')
 const qualitySource = readSource('../pages/V1QualityInspectionsPage.jsx')
-const operationalFactsSource = readSource('../pages/OperationalFactsPage.jsx')
+const productionActions = readSource(
+  '../components/production-orders/useProductionFactActions.mjs'
+)
+const reconciliationAction = readSource(
+  '../components/finance/useFinanceReconciliationAction.mjs'
+)
 const purchaseOperationPanelSource = readSource(
   '../components/purchase-orders/PurchaseOrderOperationPanel.jsx'
 )
@@ -139,9 +147,9 @@ for (const pageCase of [
 
 test('outsourcing create resets only the order page while edit refreshes the current page and workflow tasks', () => {
   const mutation = sourceSlice(
-    outsourcingOrderSource,
+    outsourcingOrderEditor,
     'const submitForm = async () => {',
-    'const runLifecycleAction'
+    '\n  return {'
   )
   assert.match(mutation, /const isCreatingOrder = !editingRow\?\.id/u)
 
@@ -251,9 +259,9 @@ test('shipment edits reload the current page while create-only flows return thei
   assert.doesNotMatch(qualityCreate, /loadRows\(\)/u)
 
   const productionReworkCreate = sourceSlice(
-    operationalFactsSource,
+    productionActions,
     'const submitProductionRework = async (values) => {',
-    'const confirmFinanceCancellation'
+    '\n  return {'
   )
   assert.match(
     productionReworkCreate,
@@ -263,9 +271,9 @@ test('shipment edits reload the current page while create-only flows return thei
   assert.doesNotMatch(productionReworkCreate, /loadRows\('production'\)/u)
 
   const financeReconciliationCreate = sourceSlice(
-    operationalFactsSource,
+    reconciliationAction,
     'const submitFinanceSourceAction = async (values) => {',
-    'const viewOutsourcingPayable'
+    '\n  return {'
   )
   assert.match(
     financeReconciliationCreate,
@@ -318,7 +326,7 @@ test('exact linked-record routes use a one-record page instead of injecting into
   for (const [title, source] of [
     ['销售订单', salesOrderSource],
     ['采购订单', purchaseOrderSource],
-    ['加工合同', outsourcingOrderSource],
+    ['加工合同', outsourcingOrderQuery],
     ['生产订单', productionOrderSource],
     ['出货单', shipmentSource],
     ['采购入库单', purchaseReceiptSource],

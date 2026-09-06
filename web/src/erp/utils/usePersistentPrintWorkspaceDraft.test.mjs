@@ -315,7 +315,8 @@ test('usePersistentPrintWorkspaceDraft: 三个正式工作台传入 scoped key �
   ].map((filePath) => readFileSync(filePath, 'utf8'))
 
   workspacePageSources.forEach((workspaceSource) => {
-    assert.match(workspaceSource, /adminProfile\?\.id/u)
+    assert.match(workspaceSource, /getPrintWorkspaceDraftScope\(searchParams\)/u)
+    assert.doesNotMatch(workspaceSource, /useOutletContext/u)
     assert.match(workspaceSource, /configRevision/u)
     assert.match(
       workspaceSource,

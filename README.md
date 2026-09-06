@@ -62,6 +62,8 @@ pnpm start
 
 默认地址：`http://localhost:5175`
 
+本地数据库或后端检查失败、超时时，启动器会保留[数据库迁移恢复页](http://127.0.0.1:5175/__dev/database-migration)，按页面提示处理并刷新后恢复业务入口。启动不会自动迁移；详细边界见 [Web 启动说明](web/README.md)。
+
 本地 `make dev` / `pnpm start` 的固定端口组以 [`config/dev-ports.env`](config/dev-ports.env) 为真源：主前端 `5175`、后端 HTTP `8300`，端口被占用时直接失败，不会静默顺延到其他项目。`start:yoyoosun`、`preview:yoyoosun` 等短生命周期入口从本项目独占辅助块 `15200-15299` 起探测，并始终输出实际 URL。确需本机整组覆盖时使用 ignored 的 `config/dev-ports.local.env`，必须同时填写完整端口组，避免前端、代理和后端漂移。
 
 在 Windows / WSL 的 Chrome、Edge 或 Brave 中，`pnpm start` 与 `pnpm start:yoyoosun` 会优先激活并刷新同一 loopback 端口的已有项目标签页；只有首次打开、未找到精确端口标签或浏览器拒绝自动化时才新开标签页。显式 `BROWSER=none` 或其他 `BROWSER` 设置仍优先，不会被启动脚本覆盖。

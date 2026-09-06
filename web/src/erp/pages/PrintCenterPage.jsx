@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react'
 import { Button, Card, Space, Typography } from 'antd'
 import { ArrowRightOutlined, PrinterOutlined } from '@ant-design/icons'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { printTemplateCatalog } from '../config/printTemplates.mjs'
@@ -25,6 +25,12 @@ function buildTemplateNavItems() {
 }
 
 export default function PrintCenterPage() {
+  const { adminProfile } = useOutletContext() || {}
+  const draftScope = {
+    accountKey: adminProfile?.id,
+    customerKey: adminProfile?.effective_session?.customer?.key || '',
+    configRevision: adminProfile?.effective_session?.config_revision || '',
+  }
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedTemplateKey = String(searchParams.get('template') || '').trim()
   const requestedEntrySource = resolvePrintWorkspaceEntrySource(searchParams)
@@ -77,6 +83,7 @@ export default function PrintCenterPage() {
     try {
       if (supportsWorkspace) {
         openPrintWorkspaceWindow(activeTemplate.key, {
+          ...draftScope,
           entrySource: requestedEntrySource,
           draftMode: requestedDraftMode,
         })

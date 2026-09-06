@@ -6,7 +6,7 @@ import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import {
   compactParams,
   trimOptional,
-} from '../../utils/masterDataOrderView.mjs'
+} from '../../utils/sourceDocumentValues.mjs'
 import {
   buildQualityDefectRateParams,
   normalizeQualityDefectPercent,

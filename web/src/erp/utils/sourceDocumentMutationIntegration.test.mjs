@@ -55,12 +55,19 @@ const pageSources = [
   },
   {
     name: 'outsourcing order',
+    editorSource: readFileSync(
+      new URL(
+        '../components/outsourcing-orders/useOutsourcingOrderEditor.mjs',
+        import.meta.url
+      ),
+      'utf8'
+    ),
     source: readFileSync(
       new URL('../pages/V1OutsourcingOrdersPage.jsx', import.meta.url),
       'utf8'
     ),
     start: 'const submitForm = async () => {',
-    end: 'const runLifecycleAction',
+    end: '\n  return {',
     saveCall: 'saveOutsourcingOrderWithItems',
     allItemsCall: 'listAllOutsourcingOrderItems',
     detailsItemsLoader: 'loadAllOutsourcingOrderItemsForPreview',
@@ -103,7 +110,11 @@ function functionSlice(source, start, end) {
 
 for (const page of pageSources) {
   test(`${page.name} opens editing only after the full item read succeeds`, () => {
-    const openEdit = functionSlice(page.source, page.openStart, page.openEnd)
+    const openEdit = functionSlice(
+      page.editorSource || page.source,
+      page.openStart,
+      page.openEnd
+    )
     assert.match(openEdit, /sourceDocumentOpenEditController\.open\(/u)
     assert.match(openEdit, /openSourceDocumentEditWithAccessGate\(/u)
     assert.match(openEdit, /canUpdate(?:\s*:|\s*,)/u)
@@ -113,7 +124,7 @@ for (const page of pageSources) {
     )
     assert.match(openEdit, /isEditable:/u)
     assert.match(openEdit, /loadItems:[\s\S]*?signal/u)
-    assert.match(page.source, /expected_version/u)
+    assert.match(page.editorSource || page.source, /expected_version/u)
     assert.match(openEdit, /enterEditing: \((?:nextItems|lines|items)\) =>/u)
     assert.match(openEdit, /selectOpenSourceDocumentItems\(/u)
     assert.match(openEdit, page.editBindCall)
@@ -127,17 +138,20 @@ for (const page of pageSources) {
     assert.doesNotMatch(beforeEnterEditing, page.editBindCall)
     assert.doesNotMatch(beforeEnterEditing, page.editModalCall)
 
-    assert.match(page.source, /createSourceDocumentOpenEditController\(/u)
+    assert.match(
+      page.editorSource || page.source,
+      /createSourceDocumentOpenEditController\(/u
+    )
     assert.match(page.source, page.recordOpenCall)
     const recordOpen = functionSlice(
-      page.source,
+      page.editorSource || page.source,
       page.recordOpenStart,
       page.openEnd
     )
     assert.match(recordOpen, page.recordOpenEditCall)
     assert.match(recordOpen, page.detailsOpenCall)
     const detailsOpen = functionSlice(
-      page.source,
+      page.editorSource || page.source,
       page.detailsOpenStart,
       page.detailsOpenEnd
     )
@@ -146,8 +160,9 @@ for (const page of pageSources) {
       /sourceDocumentOpenEditController\.invalidate\(\)/u
     )
     const invalidationCount = (
-      page.source.match(/sourceDocumentOpenEditController\.invalidate\(\)/gu) ||
-      []
+      (page.editorSource || page.source).match(
+        /sourceDocumentOpenEditController\.invalidate\(\)/gu
+      ) || []
     ).length
     assert(
       invalidationCount >= 2,
@@ -156,14 +171,21 @@ for (const page of pageSources) {
   })
 
   test(`${page.name} separates save failure from accepted post-save work`, () => {
-    const mutation = functionSlice(page.source, page.start, page.end)
+    const mutation = functionSlice(
+      page.editorSource || page.source,
+      page.start,
+      page.end
+    )
     assert.match(mutation, /validateFields\(\)/u)
     assert.match(
       mutation,
       /if \(!error\?\.errorFields\) \{[\s\S]*?getActionErrorMessage/u,
       `${page.name} must handle form validation rejection without an unhandled page error`
     )
-    assert.match(page.source, new RegExp(page.allItemsCall))
+    assert.match(
+      page.editorSource || page.source,
+      new RegExp(page.allItemsCall)
+    )
     assert.match(mutation, /expected_version/u)
     assert.match(mutation, new RegExp(`${page.saveCall}\\(`))
     assert.match(
@@ -255,7 +277,7 @@ test('source-document read-only modals load complete line items', () => {
 })
 
 test('outsourcing order excludes canceled rows from editing and save parameters', () => {
-  const { source } = pageSources.find(
+  const { editorSource: source } = pageSources.find(
     (page) => page.name === 'outsourcing order'
   )
   const openEdit = functionSlice(
@@ -266,7 +288,7 @@ test('outsourcing order excludes canceled rows from editing and save parameters'
   const submit = functionSlice(
     source,
     'const submitForm = async () => {',
-    'const runLifecycleAction'
+    '\n  return {'
   )
 
   assert.match(openEdit, /selectOpenSourceDocumentItems\(items\)/u)

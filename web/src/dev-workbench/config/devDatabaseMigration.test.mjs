@@ -235,3 +235,51 @@ test('database migration client sends only fixed action intent with CSRF', async
       'database-migration:prepare:11111111-1111-4111-8111-111111111111',
   })
 })
+
+test('database migration client refreshes an expired session on the next explicit action without replaying writes', async () => {
+  let sessions = 0
+  let actions = 0
+  const client = createDevDatabaseMigrationClient({
+    fetchImpl: async (url, options) => {
+      assert(options.signal instanceof AbortSignal)
+      if (url.endsWith('/session')) {
+        sessions += 1
+        return Response.json({
+          schemaVersion: 'plush.dev-database-migration-session/v1',
+          target: 'shared-dev',
+          csrfToken: String(sessions).repeat(32),
+        })
+      }
+      actions += 1
+      assert.equal(options.headers['x-csrf-token'], String(sessions).repeat(32))
+      return actions === 1
+        ? Response.json({ message: 'expired' }, { status: 403 })
+        : Response.json(
+            { accepted: true, operation: operation('preparing') },
+            { status: 202 }
+          )
+    },
+  })
+  const action = {
+    action: 'prepare',
+    idempotencyKey: operation().idempotencyKey,
+  }
+  await assert.rejects(client.act(action), /会话已失效.*本次请求未执行/u)
+  assert.equal(actions, 1)
+  await client.act(action)
+  assert.equal(sessions, 2)
+  assert.equal(actions, 2)
+})
+
+test('database migration client gives bounded actionable network errors without automatic retry', async () => {
+  let calls = 0
+  const client = createDevDatabaseMigrationClient({
+    fetchImpl: async (_, options) => {
+      assert(options.signal instanceof AbortSignal)
+      calls += 1
+      throw new Error('private raw network error')
+    },
+  })
+  await assert.rejects(client.summary(), /刷新状态核对结果.*没有自动重试/u)
+  assert.equal(calls, 1)
+})

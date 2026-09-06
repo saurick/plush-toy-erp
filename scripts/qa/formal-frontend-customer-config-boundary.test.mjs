@@ -20,7 +20,10 @@ const erpSourceRoot = path.join(repoRoot, "web/src/erp");
 const sourceExtensions = new Set([".js", ".jsx", ".mjs"]);
 const skippedSuffixes = [".test.js", ".test.jsx", ".test.mjs"];
 
-const devOnlyPrefixes = ["web/src/dev-workbench/config/dev", "web/src/dev-workbench/pages/Dev"];
+const devOnlyPrefixes = [
+  "web/src/dev-workbench/config/dev",
+  "web/src/dev-workbench/pages/Dev",
+];
 
 const allowedRawConfigPaths = new Set([
   "web/src/dev-workbench/config/devCustomerConfig.mjs",
@@ -185,10 +188,16 @@ test("formal frontend customer config boundary: page, action, and field projecti
   );
   assert(mobileLayoutSource.includes("getEffectiveSession"));
   assert(mobileLayoutSource.includes("attachEffectiveSessionToAdminProfile"));
-  assert(mobileLayoutSource.includes("attachUnavailableEffectiveSessionToAdminProfile"));
+  assert(
+    mobileLayoutSource.includes(
+      "attachUnavailableEffectiveSessionToAdminProfile",
+    ),
+  );
   assert(mobileLayoutSource.includes("canMountCustomerRuntime"));
   assert(mobileLayoutSource.includes("shouldBlockMissingCustomerRuntime"));
-  assert(mobileLayoutSource.includes('data-mobile-customer-runtime-guard="true"'));
+  assert(
+    mobileLayoutSource.includes('data-mobile-customer-runtime-guard="true"'),
+  );
   assert(mobileLayoutSource.includes("暂时无法进入手机待办"));
 
   const mobileTasksSource = readRelative(
@@ -247,7 +256,11 @@ test("formal frontend customer config boundary: page, action, and field projecti
     requestSeq: 1,
     response: { items: [{ id: "stale-task" }] },
   });
-  assert.equal(staleResult, originalScope, "a stale response must not refill a new scope");
+  assert.equal(
+    staleResult,
+    originalScope,
+    "a stale response must not refill a new scope",
+  );
 
   const refreshFailure = settleMobileRoleTaskRequest(originalScope, {
     currentScopeKey: originalScopeKey,
@@ -297,8 +310,11 @@ test("formal frontend customer config boundary: page, action, and field projecti
   const outsourcingOrderSource = readRelative(
     "web/src/erp/pages/V1OutsourcingOrdersPage.jsx",
   );
-  assert(outsourcingOrderSource.includes("getEffectivePrintTemplateDefaults"));
-  assert(outsourcingOrderSource.includes("PROCESSING_CONTRACT_TEMPLATE_KEY"));
+  const outsourcingEditor = readRelative(
+    "web/src/erp/components/outsourcing-orders/useOutsourcingOrderEditor.mjs",
+  );
+  assert(outsourcingEditor.includes("getEffectivePrintTemplateDefaults"));
+  assert(outsourcingEditor.includes("PROCESSING_CONTRACT_TEMPLATE_KEY"));
   assert(
     outsourcingOrderSource.includes(
       "printTemplateDefaults: processingPrintTemplateDefaults",
@@ -336,15 +352,20 @@ test("formal customer frontend copy uses the current account and business perspe
   assert(mobileLayoutSource.includes("正在准备手机待办"));
   assert(mobileLayoutSource.includes("暂时无法进入手机待办"));
 
-  const permissionSource = readRelative(
-    "web/src/erp/pages/PermissionCenterPage.jsx",
+  const accountSource = readRelative(
+    "web/src/erp/components/permission-center/PermissionAdminAccounts.jsx",
+  );
+  const roleSource = readRelative(
+    "web/src/erp/components/permission-center/usePermissionRoleSettings.jsx",
   );
   const permissionBackendSource = readRelative(
     "server/internal/service/jsonrpc_permissions.go",
   );
-  assert(permissionSource.includes("buildAssignableRoleOptions(roles"));
-  assert(permissionSource.includes("getRolePermissionReadOnlyReason("));
-  assert(permissionBackendSource.includes('mapped["assignable_by_current_admin"]'));
+  assert(accountSource.includes("buildAssignableRoleOptions(roles"));
+  assert(roleSource.includes("getRolePermissionReadOnlyReason("));
+  assert(
+    permissionBackendSource.includes('mapped["assignable_by_current_admin"]'),
+  );
   assert(
     permissionBackendSource.includes(
       'mapped["permissions_editable_by_current_admin"]',
@@ -393,10 +414,7 @@ test("formal customer frontend copy uses the current account and business perspe
     /系统统一维护/u,
   );
   assert.equal(getRolePermissionReadOnlyReason(roleFixtures[2]), "");
-  assert.match(
-    getRolePermissionReadOnlyReason(roleFixtures[3]),
-    /只能查看/u,
-  );
+  assert.match(getRolePermissionReadOnlyReason(roleFixtures[3]), /只能查看/u);
 
   const printCenterSource = readRelative(
     "web/src/erp/pages/PrintCenterPage.jsx",
@@ -414,7 +432,9 @@ test("formal customer frontend copy uses the current account and business perspe
   const formalSources = [
     layoutSource,
     mobileLayoutSource,
-    permissionSource,
+    readRelative("web/src/erp/pages/PermissionCenterPage.jsx"),
+    accountSource,
+    roleSource,
     printCenterSource,
     loginSource,
     routerSource,

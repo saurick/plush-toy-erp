@@ -1,7 +1,7 @@
 import React from 'react'
 import { Button, Card, Space, Typography } from 'antd'
 import { PrinterOutlined } from '@ant-design/icons'
-import { Link, Navigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useParams, useOutletContext } from 'react-router-dom'
 import PrintTemplateRenderer from '../components/print/PrintTemplateRenderer.jsx'
 import { printTemplateCatalog } from '../config/printTemplates.mjs'
 import {
@@ -12,6 +12,12 @@ import {
 const { Paragraph, Text, Title } = Typography
 
 export default function PrintTemplatePreviewPage() {
+  const { adminProfile } = useOutletContext() || {}
+  const draftScope = {
+    accountKey: adminProfile?.id,
+    customerKey: adminProfile?.effective_session?.customer?.key || '',
+    configRevision: adminProfile?.effective_session?.config_revision || '',
+  }
   const { templateKey } = useParams()
   const template = printTemplateCatalog.find((item) => item.key === templateKey)
 
@@ -51,7 +57,9 @@ export default function PrintTemplatePreviewPage() {
               <Button
                 type="primary"
                 icon={<PrinterOutlined />}
-                onClick={() => openPrintWorkspaceWindow(template.key)}
+                onClick={() =>
+                  openPrintWorkspaceWindow(template.key, draftScope)
+                }
               >
                 打开可编辑打印窗口
               </Button>

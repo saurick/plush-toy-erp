@@ -23,6 +23,46 @@ function currentMigrationStatus() {
   };
 }
 
+test("local runtime preflight: 每个外部命令有超时与取消信号，错误分层且不回显凭据", async () => {
+  for (const [failedCommand, expectedCode] of [
+    ["bash", "workspace_migration_invalid"],
+    ["go", "database_config_unavailable"],
+    ["atlas", "database_status_unavailable"],
+    ["node", "database_programmability_blocked"],
+  ]) {
+    const controller = new AbortController();
+    const calls = [];
+    await assert.rejects(
+      checkLocalDatabaseMigrations({
+        signal: controller.signal,
+        writeLine: () => {},
+        execFile: async (command, args, options) => {
+          calls.push(command);
+          assert.equal(options.signal, controller.signal);
+          assert(options.timeout > 0 && options.timeout <= 15_000);
+          if (command === failedCommand)
+            throw new Error("postgres://user:secret@host/db");
+          return {
+            stdout:
+              command === "go"
+                ? "postgres://user:secret@host/db"
+                : command === "atlas"
+                  ? JSON.stringify(currentMigrationStatus())
+                  : "",
+          };
+        },
+      }),
+      (error) => {
+        assert.equal(error.code, expectedCode);
+        assert.equal(isRecoverableWebRuntimePreflightError(error), true);
+        assert.doesNotMatch(error.message, /secret|postgres:\/\//u);
+        return true;
+      },
+    );
+    assert.equal(calls.at(-1), failedCommand);
+  }
+});
+
 test("local runtime preflight: migration 必须精确落到最新 version", () => {
   assert.deepEqual(evaluateMigrationStatus(currentMigrationStatus()), {
     ok: true,
@@ -167,7 +207,12 @@ test("local runtime preflight: db-guard 失败保留可操作诊断且不继续�
         throw error;
       },
     }),
-    /schema.*migration.*product_skus 缺少 versioned DDL proof/su,
+    (error) => {
+      assert.equal(error.code, "workspace_migration_invalid");
+      assert.equal(isRecoverableWebRuntimePreflightError(error), true);
+      assert.match(error.diagnostic, /product_skus 缺少 versioned DDL proof/u);
+      return true;
+    },
   );
   assert.deepEqual(calls, ["bash"]);
 });
@@ -336,10 +381,9 @@ test("local runtime preflight: 自定义数据库执行对象阻断启动且诊�
       },
     }),
     (error) => {
-      assert.match(
-        error.message,
-        /自定义 Function.*Procedure.*Trigger.*public\.items\.forbidden/su,
-      );
+      assert.match(error.message, /自定义 Function.*Procedure.*Trigger/su);
+      assert.equal(error.code, "database_programmability_blocked");
+      assert.match(error.diagnostic, /public\.items\.forbidden/u);
       assert.doesNotMatch(error.message, /private-secret|postgres:\/\//u);
       return true;
     },

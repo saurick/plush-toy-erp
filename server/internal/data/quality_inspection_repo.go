@@ -29,7 +29,8 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-func (r *inventoryRepo) CreateQualityInspectionDraft(ctx context.Context, in *biz.QualityInspectionCreate) (*biz.QualityInspection, error) {
+func (r *inventoryRepo) CreateQualityInspectionDraft(ctx context.Context, in *biz.QualityInspectionCreate) (_ *biz.QualityInspection, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrQualityInspectionRecordConflict) }()
 	if err := validateQualityInspectionReferences(ctx, r.data.postgres, in); err != nil {
 		return nil, err
 	}
@@ -57,7 +58,8 @@ func (r *inventoryRepo) CreateQualityInspectionDraft(ctx context.Context, in *bi
 	return entQualityInspectionToBiz(row), nil
 }
 
-func (r *inventoryRepo) CreateFinishedGoodsQualityInspectionDraft(ctx context.Context, in *biz.QualityInspectionCreate) (*biz.QualityInspection, error) {
+func (r *inventoryRepo) CreateFinishedGoodsQualityInspectionDraft(ctx context.Context, in *biz.QualityInspectionCreate) (_ *biz.QualityInspection, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrQualityInspectionRecordConflict) }()
 	tx, err := r.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
@@ -120,7 +122,8 @@ func (r *inventoryRepo) CreateFinishedGoodsQualityInspectionDraft(ctx context.Co
 	return entQualityInspectionToBiz(row), nil
 }
 
-func (r *inventoryRepo) SubmitQualityInspection(ctx context.Context, inspectionID int) (*biz.QualityInspection, error) {
+func (r *inventoryRepo) SubmitQualityInspection(ctx context.Context, inspectionID int) (_ *biz.QualityInspection, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrQualityInspectionRecordConflict) }()
 	preview, err := r.data.postgres.QualityInspection.Get(ctx, inspectionID)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -226,11 +229,13 @@ func (r *inventoryRepo) SubmitQualityInspection(ctx context.Context, inspectionI
 	return entQualityInspectionToBiz(row), nil
 }
 
-func (r *inventoryRepo) PassQualityInspection(ctx context.Context, in *biz.QualityInspectionDecision) (*biz.QualityInspection, error) {
+func (r *inventoryRepo) PassQualityInspection(ctx context.Context, in *biz.QualityInspectionDecision) (_ *biz.QualityInspection, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrQualityInspectionRecordConflict) }()
 	return r.decideSubmittedQualityInspection(ctx, in, biz.QualityInspectionStatusPassed, biz.InventoryLotActive, nil, nil, 0)
 }
 
-func (r *inventoryRepo) RejectQualityInspection(ctx context.Context, in *biz.QualityInspectionDecision) (*biz.QualityInspection, error) {
+func (r *inventoryRepo) RejectQualityInspection(ctx context.Context, in *biz.QualityInspectionDecision) (_ *biz.QualityInspection, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrQualityInspectionRecordConflict) }()
 	return r.decideSubmittedQualityInspection(ctx, in, biz.QualityInspectionStatusRejected, biz.InventoryLotRejected, nil, nil, 0)
 }
 
@@ -240,7 +245,8 @@ func (r *inventoryRepo) PassQualityInspectionForProcessCommand(
 	command *biz.ProcessDomainCommandInput,
 	result *biz.ProcessDomainCommandResult,
 	actorID int,
-) (*biz.QualityInspection, error) {
+) (_ *biz.QualityInspection, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrQualityInspectionRecordConflict) }()
 	return r.decideSubmittedQualityInspection(ctx, in, biz.QualityInspectionStatusPassed, biz.InventoryLotActive, command, result, actorID)
 }
 
@@ -250,11 +256,13 @@ func (r *inventoryRepo) RejectQualityInspectionForProcessCommand(
 	command *biz.ProcessDomainCommandInput,
 	result *biz.ProcessDomainCommandResult,
 	actorID int,
-) (*biz.QualityInspection, error) {
+) (_ *biz.QualityInspection, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrQualityInspectionRecordConflict) }()
 	return r.decideSubmittedQualityInspection(ctx, in, biz.QualityInspectionStatusRejected, biz.InventoryLotRejected, command, result, actorID)
 }
 
-func (r *inventoryRepo) CancelQualityInspection(ctx context.Context, inspectionID int, decisionNote *string) (*biz.QualityInspection, error) {
+func (r *inventoryRepo) CancelQualityInspection(ctx context.Context, inspectionID int, decisionNote *string) (_ *biz.QualityInspection, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrQualityInspectionRecordConflict) }()
 	preview, err := r.data.postgres.QualityInspection.Get(ctx, inspectionID)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -349,7 +357,8 @@ func (r *inventoryRepo) CancelQualityInspection(ctx context.Context, inspectionI
 	return entQualityInspectionToBiz(row), nil
 }
 
-func (r *inventoryRepo) GetQualityInspection(ctx context.Context, id int) (*biz.QualityInspection, error) {
+func (r *inventoryRepo) GetQualityInspection(ctx context.Context, id int) (_ *biz.QualityInspection, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrQualityInspectionRecordConflict) }()
 	row, err := withProductionWIPQualityContext(
 		r.data.postgres.QualityInspection.Query().Where(qualityinspection.ID(id)),
 	).Only(ctx)
@@ -372,7 +381,8 @@ func (r *inventoryRepo) GetQualityInspection(ctx context.Context, id int) (*biz.
 	return item, nil
 }
 
-func (r *inventoryRepo) ListQualityInspections(ctx context.Context, filter biz.QualityInspectionFilter) ([]*biz.QualityInspection, int, error) {
+func (r *inventoryRepo) ListQualityInspections(ctx context.Context, filter biz.QualityInspectionFilter) (_ []*biz.QualityInspection, _ int, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrQualityInspectionRecordConflict) }()
 	query := r.data.postgres.QualityInspection.Query()
 	if filter.Status != "" {
 		query = query.Where(qualityinspection.Status(filter.Status))
@@ -502,7 +512,8 @@ func (r *inventoryRepo) ListQualityInspections(ctx context.Context, filter biz.Q
 	return out, total, nil
 }
 
-func (r *inventoryRepo) EvaluatePurchaseReceiptQualityGate(ctx context.Context, receiptID int) (*biz.PurchaseReceiptQualityGate, error) {
+func (r *inventoryRepo) EvaluatePurchaseReceiptQualityGate(ctx context.Context, receiptID int) (_ *biz.PurchaseReceiptQualityGate, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	tx, err := r.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
@@ -537,7 +548,8 @@ func (r *inventoryRepo) EvaluatePurchaseReceiptQualityGateForProcessCommand(
 	receiptID int,
 	command *biz.ProcessDomainCommandInput,
 	actorID int,
-) (*biz.PurchaseReceiptQualityGate, error) {
+) (_ *biz.PurchaseReceiptQualityGate, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	if command == nil {
 		return nil, biz.ErrBadParam
 	}

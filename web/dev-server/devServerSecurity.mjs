@@ -53,3 +53,47 @@ export function isLoopbackHostHeader(value) {
   if (!match || !isValidPort(match[2])) return false
   return match[1] === 'localhost' || isLoopbackIPv4(match[1])
 }
+
+export function isSameOriginRequest(request) {
+  const host = request.headers?.host
+  const origin = request.headers?.origin
+  if (
+    Array.isArray(host) ||
+    Array.isArray(origin) ||
+    !isLoopbackHostHeader(host) ||
+    typeof origin !== 'string'
+  ) {
+    return false
+  }
+  try {
+    const parsed = new URL(origin)
+    return (
+      ['http:', 'https:'].includes(parsed.protocol) &&
+      parsed.host.toLowerCase() === String(host).toLowerCase() &&
+      isLoopbackHostHeader(parsed.host) &&
+      !parsed.username &&
+      !parsed.password &&
+      parsed.pathname === '/' &&
+      !parsed.search &&
+      !parsed.hash &&
+      request.headers?.['sec-fetch-site'] === 'same-origin'
+    )
+  } catch {
+    return false
+  }
+}
+
+export async function readJsonBody(request, { maxBytes, label = 'request' }) {
+  let size = 0
+  const chunks = []
+  for await (const chunk of request) {
+    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+    size += bytes.length
+    if (size > maxBytes) {
+      throw new Error(`${label} body is too large`)
+    }
+    chunks.push(bytes)
+  }
+  if (size === 0) throw new Error(`${label} body is required`)
+  return JSON.parse(Buffer.concat(chunks).toString('utf8'))
+}

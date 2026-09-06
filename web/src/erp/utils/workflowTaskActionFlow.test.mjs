@@ -96,3 +96,15 @@ test('step navigation exposes context and action immediately but gates confirmat
     'action'
   )
 })
+
+test('a confirmed receipt remains on its only available step when editing closes', () => {
+  for (const requestedStep of ['context', 'action', 'confirm']) {
+    assert.equal(
+      resolveWorkflowTaskActionStep({
+        requestedStep,
+        availability: { context: false, action: false, confirm: true },
+      }),
+      'confirm'
+    )
+  }
+})

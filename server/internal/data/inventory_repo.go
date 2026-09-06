@@ -1286,7 +1286,8 @@ WHERE subject_type = %s AND subject_id = %s AND warehouse_id = %s AND unit_id = 
 	return result.RowsAffected()
 }
 
-func (r *inventoryRepo) CreateBOMHeader(ctx context.Context, in *biz.BOMHeaderCreate) (*biz.BOMHeader, error) {
+func (r *inventoryRepo) CreateBOMHeader(ctx context.Context, in *biz.BOMHeaderCreate) (_ *biz.BOMHeader, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrBOMRecordConflict) }()
 	if in == nil || !biz.IsCreatableBOMStatus(in.Status) {
 		return nil, biz.ErrBadParam
 	}
@@ -1318,7 +1319,8 @@ func (r *inventoryRepo) CreateBOMHeader(ctx context.Context, in *biz.BOMHeaderCr
 	return entBOMHeaderToBiz(row), nil
 }
 
-func (r *inventoryRepo) CreateBOMItem(ctx context.Context, in *biz.BOMItemCreate) (*biz.BOMItem, error) {
+func (r *inventoryRepo) CreateBOMItem(ctx context.Context, in *biz.BOMItemCreate) (_ *biz.BOMItem, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrBOMRecordConflict) }()
 	header, err := r.data.postgres.BOMHeader.Get(ctx, in.BOMHeaderID)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -1361,7 +1363,8 @@ func (r *inventoryRepo) CreateBOMItem(ctx context.Context, in *biz.BOMItemCreate
 	return entBOMItemToBiz(row), nil
 }
 
-func (r *inventoryRepo) UpdateBOMDraftHeader(ctx context.Context, id int, in *biz.BOMHeaderUpdate) (*biz.BOMHeader, error) {
+func (r *inventoryRepo) UpdateBOMDraftHeader(ctx context.Context, id int, in *biz.BOMHeaderUpdate) (_ *biz.BOMHeader, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrBOMRecordConflict) }()
 	header, err := r.data.postgres.BOMHeader.Get(ctx, id)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -1374,61 +1377,7 @@ func (r *inventoryRepo) UpdateBOMDraftHeader(ctx context.Context, id int, in *bi
 	}
 	update := r.data.postgres.BOMHeader.UpdateOneID(id).
 		SetVersion(in.Version)
-	if in.EffectiveFrom == nil {
-		update.ClearEffectiveFrom()
-	} else {
-		update.SetEffectiveFrom(*in.EffectiveFrom)
-	}
-	if in.EffectiveTo == nil {
-		update.ClearEffectiveTo()
-	} else {
-		update.SetEffectiveTo(*in.EffectiveTo)
-	}
-	if in.SourceOrderNo == nil {
-		update.ClearSourceOrderNo()
-	} else {
-		update.SetSourceOrderNo(*in.SourceOrderNo)
-	}
-	if in.QuantityText == nil {
-		update.ClearQuantityText()
-	} else {
-		update.SetQuantityText(*in.QuantityText)
-	}
-	if in.SpareText == nil {
-		update.ClearSpareText()
-	} else {
-		update.SetSpareText(*in.SpareText)
-	}
-	if in.PrintDate == nil {
-		update.ClearPrintDate()
-	} else {
-		update.SetPrintDate(*in.PrintDate)
-	}
-	if in.Designer == nil {
-		update.ClearDesigner()
-	} else {
-		update.SetDesigner(*in.Designer)
-	}
-	if in.Maker == nil {
-		update.ClearMaker()
-	} else {
-		update.SetMaker(*in.Maker)
-	}
-	if in.Auditor == nil {
-		update.ClearAuditor()
-	} else {
-		update.SetAuditor(*in.Auditor)
-	}
-	if in.HairDirection == nil {
-		update.ClearHairDirection()
-	} else {
-		update.SetHairDirection(*in.HairDirection)
-	}
-	if in.Note == nil {
-		update.ClearNote()
-	} else {
-		update.SetNote(*in.Note)
-	}
+	applyBOMHeaderOptionalFields(update.Mutation(), in)
 	row, err := update.Save(ctx)
 	if err != nil {
 		return nil, err
@@ -1436,7 +1385,8 @@ func (r *inventoryRepo) UpdateBOMDraftHeader(ctx context.Context, id int, in *bi
 	return entBOMHeaderToBiz(row), nil
 }
 
-func (r *inventoryRepo) UpdateBOMDraftItem(ctx context.Context, id int, in *biz.BOMItemUpdate) (*biz.BOMItem, error) {
+func (r *inventoryRepo) UpdateBOMDraftItem(ctx context.Context, id int, in *biz.BOMItemUpdate) (_ *biz.BOMItem, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrBOMRecordConflict) }()
 	item, err := r.data.postgres.BOMItem.Get(ctx, id)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -1513,7 +1463,8 @@ func (r *inventoryRepo) UpdateBOMDraftItem(ctx context.Context, id int, in *biz.
 	return entBOMItemToBiz(row), nil
 }
 
-func (r *inventoryRepo) DeleteBOMDraftItem(ctx context.Context, id int) error {
+func (r *inventoryRepo) DeleteBOMDraftItem(ctx context.Context, id int) (resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrBOMRecordConflict) }()
 	item, err := r.data.postgres.BOMItem.Get(ctx, id)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -1540,7 +1491,8 @@ func (r *inventoryRepo) DeleteBOMDraftItem(ctx context.Context, id int) error {
 	return nil
 }
 
-func (r *inventoryRepo) ListBOMHeaders(ctx context.Context, filter biz.BOMHeaderFilter) ([]*biz.BOMHeader, int, error) {
+func (r *inventoryRepo) ListBOMHeaders(ctx context.Context, filter biz.BOMHeaderFilter) (_ []*biz.BOMHeader, _ int, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrBOMRecordConflict) }()
 	query := r.data.postgres.BOMHeader.Query()
 	if filter.ProductID > 0 {
 		query = query.Where(bomheader.ProductID(filter.ProductID))
@@ -1600,7 +1552,8 @@ func (r *inventoryRepo) ListBOMHeaders(ctx context.Context, filter biz.BOMHeader
 	return out, total, nil
 }
 
-func (r *inventoryRepo) GetBOMHeader(ctx context.Context, id int) (*biz.BOMHeader, error) {
+func (r *inventoryRepo) GetBOMHeader(ctx context.Context, id int) (_ *biz.BOMHeader, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrBOMRecordConflict) }()
 	row, err := r.data.postgres.BOMHeader.Get(ctx, id)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -1611,7 +1564,8 @@ func (r *inventoryRepo) GetBOMHeader(ctx context.Context, id int) (*biz.BOMHeade
 	return entBOMHeaderToBiz(row), nil
 }
 
-func (r *inventoryRepo) ListBOMItemsByHeader(ctx context.Context, bomHeaderID int) ([]*biz.BOMItem, error) {
+func (r *inventoryRepo) ListBOMItemsByHeader(ctx context.Context, bomHeaderID int) (_ []*biz.BOMItem, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrBOMRecordConflict) }()
 	rows, err := r.data.postgres.BOMItem.Query().
 		Where(bomitem.BomHeaderID(bomHeaderID)).
 		Order(ent.Asc(bomitem.FieldID)).
@@ -1626,7 +1580,8 @@ func (r *inventoryRepo) ListBOMItemsByHeader(ctx context.Context, bomHeaderID in
 	return out, nil
 }
 
-func (r *inventoryRepo) ListBOMItemsByProduct(ctx context.Context, productID int) ([]*biz.BOMItem, error) {
+func (r *inventoryRepo) ListBOMItemsByProduct(ctx context.Context, productID int) (_ []*biz.BOMItem, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrBOMRecordConflict) }()
 	header, err := r.GetActiveBOMByProduct(ctx, productID)
 	if err != nil {
 		return nil, err
@@ -1645,7 +1600,8 @@ func (r *inventoryRepo) ListBOMItemsByProduct(ctx context.Context, productID int
 	return out, nil
 }
 
-func (r *inventoryRepo) GetActiveBOMByProduct(ctx context.Context, productID int) (*biz.BOMHeader, error) {
+func (r *inventoryRepo) GetActiveBOMByProduct(ctx context.Context, productID int) (_ *biz.BOMHeader, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrBOMRecordConflict) }()
 	row, err := r.data.postgres.BOMHeader.Query().
 		Where(
 			bomheader.ProductID(productID),
@@ -1662,7 +1618,8 @@ func (r *inventoryRepo) GetActiveBOMByProduct(ctx context.Context, productID int
 	return entBOMHeaderToBiz(row), nil
 }
 
-func (r *inventoryRepo) CopyBOMVersion(ctx context.Context, sourceHeaderID int, in *biz.BOMHeaderCreate) (*biz.BOMVersionDetail, error) {
+func (r *inventoryRepo) CopyBOMVersion(ctx context.Context, sourceHeaderID int, in *biz.BOMHeaderCreate) (_ *biz.BOMVersionDetail, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrBOMRecordConflict) }()
 	tx, err := r.data.postgres.Tx(ctx)
 	if err != nil {
 		return nil, err
@@ -1771,7 +1728,8 @@ func (r *inventoryRepo) CopyBOMVersion(ctx context.Context, sourceHeaderID int, 
 	return &biz.BOMVersionDetail{Header: entBOMHeaderToBiz(target), Items: copiedItems}, nil
 }
 
-func (r *inventoryRepo) ActivateBOMVersion(ctx context.Context, id int) (*biz.BOMVersionDetail, error) {
+func (r *inventoryRepo) ActivateBOMVersion(ctx context.Context, id int) (_ *biz.BOMVersionDetail, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrBOMRecordConflict) }()
 	tx, err := r.data.postgres.Tx(ctx)
 	if err != nil {
 		return nil, err
@@ -1833,7 +1791,8 @@ func (r *inventoryRepo) ActivateBOMVersion(ctx context.Context, id int) (*biz.BO
 	return &biz.BOMVersionDetail{Header: entBOMHeaderToBiz(target), Items: outItems}, nil
 }
 
-func (r *inventoryRepo) ArchiveBOMVersion(ctx context.Context, id int) (*biz.BOMHeader, error) {
+func (r *inventoryRepo) ArchiveBOMVersion(ctx context.Context, id int) (_ *biz.BOMHeader, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrBOMRecordConflict) }()
 	row, err := r.data.postgres.BOMHeader.Get(ctx, id)
 	if err != nil {
 		if ent.IsNotFound(err) {

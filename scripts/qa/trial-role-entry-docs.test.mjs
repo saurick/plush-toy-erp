@@ -68,15 +68,11 @@ test("trial role docs cover all current role demo accounts and mobile task paths
     assertIncludes(rbacSource, permissionKey, "RBAC permission registry");
 
     assertIncludes(
-      scriptReadme,
+      qaReadme,
       username,
       "scripts README role demo account table",
     );
-    assertIncludes(
-      scriptReadme,
-      roleKey,
-      "scripts README role demo account table",
-    );
+    assertIncludes(qaReadme, roleKey, "scripts README role demo account table");
     assertIncludes(
       serverConfigDoc,
       username,
@@ -117,7 +113,7 @@ test("trial role docs cover all current role demo accounts and mobile task paths
   );
 
   assertIncludes(
-    scriptReadme,
+    qaReadme,
     "demo_admin",
     "scripts README role demo account table",
   );
@@ -139,12 +135,12 @@ test("trial role docs cover all current role demo accounts and mobile task paths
     "role demo seed explicit password override",
   );
   assertIncludes(
-    scriptReadme,
+    qaReadme,
     "本入口及其 `demo_*` 账号不得用于 133",
     "scripts README local demo credential boundary",
   );
   assertIncludes(
-    scriptReadme,
+    qaReadme,
     "`customer-trial-133` 复用相同公开密码值时只能走其独立 `uat_*` 凭据合同与受控轮换器",
     "scripts README customer-trial credential boundary",
   );
@@ -264,17 +260,17 @@ test("trial role docs cover all current role demo accounts and mobile task paths
     "scripts README trial account RBAC test entry",
   );
   assertIncludes(
-    scriptReadme,
+    qaReadme,
     "非 admin 不应看到权限管理，`demo_admin` 不应看到业务主入口",
     "scripts README trial browser forbidden menu scope",
   );
   assertIncludes(
-    scriptReadme,
+    qaReadme,
     "--report output/trial-account-rbac/report.json",
     "scripts README trial account RBAC sanitized report command",
   );
   assertIncludes(
-    scriptReadme,
+    qaReadme,
     "不保存密码、access token 或 Authorization header",
     "scripts README trial account RBAC report redaction boundary",
   );
@@ -344,22 +340,22 @@ test("trial role docs cover all current role demo accounts and mobile task paths
     "automation test strategy trial account browser report release boundary",
   );
   assertIncludes(
-    scriptReadme,
+    qaReadme,
     "如果只想先核对输入和账号清单，可打印输入模板",
     "scripts README trial account input template",
   );
   assertIncludes(
-    scriptReadme,
+    qaReadme,
     "trialDemoAccountBrowserSmoke.mjs --print-input-template",
     "scripts README trial browser input template",
   );
   assertIncludes(
-    scriptReadme,
+    qaReadme,
     "--report output/trial-demo-account-browser-smoke/report.json",
     "scripts README trial browser sanitized report command",
   );
   assertIncludes(
-    scriptReadme,
+    qaReadme,
     "不保存密码、token、Authorization header、raw customer package 或 action 列表，也不证明目标环境发布、真实客户导入或 release evidence 已完成",
     "scripts README trial browser report redaction boundary",
   );
@@ -377,7 +373,7 @@ test("trial role docs cover all current role demo accounts and mobile task paths
     assertIncludes(docSource, "verify customer asset", context);
   }
   for (const [docSource, context] of [
-    [scriptReadme, "scripts README effective session probe entry"],
+    [qaReadme, "QA README effective session probe entry"],
     [qaReadme, "scripts qa README effective session probe entry"],
     [webReadme, "web README effective session probe command"],
   ]) {

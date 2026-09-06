@@ -55,12 +55,14 @@ const formalBusinessListCases = [
   {
     title: '委外订单',
     path: '../pages/V1OutsourcingOrdersPage.jsx',
+    queryPath: '../components/outsourcing-orders/useOutsourcingOrderQuery.mjs',
     completeList:
       /listAllOutsourcingOrders\(outsourcingListParams,\s*\{\s*signal,\s*\}\)/u,
   },
   {
     title: '业务记录',
     path: '../pages/OperationalFactsPage.jsx',
+    queryPath: '../components/operational-facts/useOperationalFactQuery.mjs',
     completeList: /activeConfig\.listAll\(/u,
   },
   {
@@ -76,7 +78,10 @@ for (const pageCase of formalBusinessListCases) {
     const source = readSource(pageCase.path)
 
     assert.match(source, /useBusinessListExport\(\{/u)
-    assert.match(source, pageCase.completeList)
+    assert.match(
+      readSource(pageCase.queryPath || pageCase.path),
+      pageCase.completeList
+    )
     assert.match(source, /loading \|\| exporting/u)
     assert.ok(
       source.includes('BusinessListToolbarActions') ||

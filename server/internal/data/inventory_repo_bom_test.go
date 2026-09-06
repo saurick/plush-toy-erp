@@ -68,7 +68,7 @@ func TestInventoryRepo_BOMHeaderAndItems(t *testing.T) {
 		ProductID: fixtures.productID,
 		Version:   "V1",
 		Status:    biz.BOMStatusDraft,
-	}); !ent.IsConstraintError(err) {
+	}); !errors.Is(err, biz.ErrBOMRecordConflict) {
 		t.Fatalf("expected product/version unique constraint, got %v", err)
 	}
 	draftHeader, err := uc.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{

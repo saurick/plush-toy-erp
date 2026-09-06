@@ -118,12 +118,27 @@ test('direct source route keys are consumed by their target pages', () => {
     ],
   ]
   for (const [page, queryKey, loader] of contracts) {
-    const source = pageSource(page)
+    const source =
+      page === 'V1OutsourcingOrdersPage.jsx'
+        ? readFileSync(
+            new URL(
+              '../components/outsourcing-orders/useOutsourcingOrderQuery.mjs',
+              import.meta.url
+            ),
+            'utf8'
+          )
+        : pageSource(page)
     assert.match(source, new RegExp(`["']${queryKey}["']`, 'u'))
     assert.match(source, new RegExp(`\\b${loader}\\b`, 'u'))
   }
 
-  const productionFacts = pageSource('OperationalFactsPage.jsx')
+  const productionFacts = readFileSync(
+    new URL(
+      '../components/operational-facts/useOperationalFactQuery.mjs',
+      import.meta.url
+    ),
+    'utf8'
+  )
   assert.match(productionFacts, /'fact_id'/u)
   assert.match(productionFacts, /await listAllProductionFacts\(\{/u)
   assert.match(

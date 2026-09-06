@@ -299,8 +299,7 @@ export default function DevDatabaseMigrationPage() {
     Number.isSafeInteger(pendingFiles) &&
     pendingFiles > 0 &&
     tools?.status === 'ready' &&
-    !hasRunningOperation &&
-    !readyOperation
+    !hasRunningOperation
   const canRestart =
     summaryFresh &&
     !actionKey &&
@@ -412,11 +411,9 @@ export default function DevDatabaseMigrationPage() {
                       ? '迁移准备环境未就绪，请按下方检查项处理后刷新'
                       : isLatest
                         ? '数据库已是最新版本'
-                        : readyOperation
-                          ? '已有准备完成的不可变计划，请确认或刷新状态'
-                          : hasRunningOperation
-                            ? '已有操作正在执行'
-                            : '当前目标或 migration 状态未通过检查'
+                        : hasRunningOperation
+                          ? '已有操作正在执行'
+                          : '当前目标或 migration 状态未通过检查'
               }
             >
               <Button
@@ -432,7 +429,7 @@ export default function DevDatabaseMigrationPage() {
                   })
                 }
               >
-                检查并准备
+                {readyOperation ? '重新检查并准备' : '检查并准备'}
               </Button>
             </Tooltip>
           </Space>
@@ -444,7 +441,10 @@ export default function DevDatabaseMigrationPage() {
 
       <main className="erp-dev-hub-shell erp-dev-database-migration-shell">
         {recoveryActive ? (
-          isLatest && runtime?.available ? (
+          summaryFresh &&
+          summary?.status === 'success' &&
+          isLatest &&
+          runtime?.available ? (
             <Alert
               type="success"
               showIcon
@@ -464,7 +464,7 @@ export default function DevDatabaseMigrationPage() {
               type="info"
               showIcon
               message="当前处于数据库迁移恢复模式"
-              description="pnpm start 已保留本页用于检查和恢复；完成 migration、同目标读回及后端 health / ready 前，普通 ERP 页面和 RPC 保持暂停。"
+              description="启动检查未通过时仍保留本页。请按下方提示处理并刷新状态；数据库、启动检查及后端健康均通过后，才能进入完整工作台。"
             />
           )
         ) : null}

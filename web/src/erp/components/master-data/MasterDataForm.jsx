@@ -14,8 +14,8 @@ import {
 import {
   PURCHASE_INVOICE_CATEGORY_OPTIONS,
   PURCHASE_INVOICE_REQUIRED_OPTIONS,
-  paymentConditionCompleteness,
 } from '../../utils/masterDataOrderView.mjs'
+import { paymentConditionCompleteness } from '../../utils/paymentConditions.mjs'
 import { normalizeNetWeightG } from '../../utils/shipmentWeight.mjs'
 import {
   optionalContactEmailRule,

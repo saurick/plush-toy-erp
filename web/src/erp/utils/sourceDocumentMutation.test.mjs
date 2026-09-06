@@ -15,7 +15,7 @@ import {
   settleSourceDocumentPostSaveEffect,
 } from './sourceDocumentMutation.mjs'
 import { createLatestRequestCoordinator } from '../hooks/useLatestRequestCoordinator.js'
-import { buildOutsourcingOrderItemParams } from './masterDataOrderView.mjs'
+import { buildOutsourcingOrderItemParams } from './sourceOrderParams.mjs'
 
 function deferred() {
   let reject

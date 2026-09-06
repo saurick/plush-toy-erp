@@ -12,17 +12,21 @@ import {
 } from 'node:fs'
 import path from 'node:path'
 import { promisify } from 'node:util'
+import {
+  LOCAL_RUNTIME_PREFLIGHT_TIMEOUT_MS,
+  runWebRuntimePreflight,
+} from '../../scripts/local-runtime-preflight.mjs'
 
 const execFileAsync = promisify(execFileCallback)
 const HASH_PATTERN = /^[0-9a-f]{64}$/u
 const COMMAND_TIMEOUT_MS = 15 * 60 * 1000
 const RUNTIME_WAIT_TIMEOUT_MS = 90 * 1000
-export const SHARED_DEV_BACKUP_SOURCE_POLICY =
-  'shared-dev-session-read-only'
+export const SHARED_DEV_BACKUP_SOURCE_POLICY = 'shared-dev-session-read-only'
 export const DEV_DATABASE_MIGRATION_SOURCE_FILES = Object.freeze([
   'scripts/local-migration.mjs',
   'scripts/local-migration-workflow.mjs',
   'scripts/local-runtime-preflight-core.mjs',
+  'scripts/local-runtime-preflight.mjs',
   'scripts/qa/database-programmability.mjs',
   'scripts/qa/populated-upgrade-preflight.sh',
   'scripts/qa/populated-upgrade-20260714055504.sql',
@@ -58,7 +62,7 @@ const MIGRATION_TOOL_CHECKS = Object.freeze([
     key: 'supporting_commands',
     label: '基础命令',
     blockedMessage:
-      '备份恢复所需基础命令未就绪（Bash 4+、curl、jq、Python 3、sha256sum 等）',
+      '备份恢复所需基础命令未就绪（Go、lockf、Bash 4+、curl、jq、Python 3、sha256sum 等）',
   },
 ])
 
@@ -112,7 +116,7 @@ export async function readDatabaseMigrationToolReadiness({
         'bash',
         [
           '-c',
-          'type mapfile >/dev/null 2>&1 && command -v curl sha256sum wc awk date jq python3 >/dev/null 2>&1',
+          'type mapfile >/dev/null 2>&1 || exit 1; for tool in go lockf curl sha256sum wc awk date jq python3; do command -v "$tool" >/dev/null 2>&1 || exit 1; done',
         ],
         env,
         () => true
@@ -360,6 +364,7 @@ async function readRuntime(apiOrigin) {
     try {
       const response = await fetch(`${apiOrigin}/${name}z`, {
         signal: AbortSignal.timeout(2500),
+        redirect: 'manual',
         headers: { accept: 'text/plain' },
       })
       const body = response.ok ? (await response.text()).trim() : ''
@@ -385,17 +390,34 @@ async function readRuntime(apiOrigin) {
   }
 }
 
-async function waitForRuntime(apiOrigin, child, timeoutMs) {
+export async function waitForRuntime(
+  apiOrigin,
+  child,
+  timeoutMs,
+  { read = readRuntime, intervalMs = 1000 } = {}
+) {
   const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    const runtime = await readRuntime(apiOrigin)
-    if (runtime.available) return runtime
-    if (child.exitCode !== null) {
-      throw new Error('local backend exited before health and ready passed')
-    }
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+  let spawnError
+  const onError = (error) => {
+    spawnError = error
   }
-  throw new Error('local backend did not become ready before timeout')
+  child.once('error', onError)
+  try {
+    while (Date.now() < deadline) {
+      const runtime = await read(apiOrigin)
+      if (spawnError) {
+        throw new Error('本地后端启动命令不可用；请检查 make 与 Go 环境')
+      }
+      if (child.exitCode !== null || child.signalCode) {
+        throw new Error('本地后端启动进程已退出；请查看本次启动日志并重新检查')
+      }
+      if (runtime.available) return runtime
+      await new Promise((resolve) => setTimeout(resolve, intervalMs))
+    }
+    throw new Error('本地后端启动超时；请查看本次启动日志并重新检查')
+  } finally {
+    child.removeListener('error', onError)
+  }
 }
 
 function operationLogFile(projectRoot, operationId) {
@@ -426,6 +448,7 @@ export function createDevDatabaseMigrationRuntime(projectRoot, apiOrigin) {
     async status() {
       const result = await executeCommand('make', ['migrate_status'], {
         cwd: serverRoot,
+        timeout: 30_000,
       })
       return parseMigrationStatusOutput(result.stdout)
     },
@@ -531,12 +554,30 @@ export function createDevDatabaseMigrationRuntime(projectRoot, apiOrigin) {
     async runtime() {
       return readRuntime(apiOrigin)
     },
+    async verifyReadiness() {
+      await runWebRuntimePreflight(
+        { apiOrigin },
+        {
+          signal: AbortSignal.timeout(LOCAL_RUNTIME_PREFLIGHT_TIMEOUT_MS),
+          writeLine: () => {},
+        }
+      )
+    },
     async restart(operationId) {
+      // Stop the previous process before health checks can accept its response.
+      await executeCommand('make', ['dev_preflight'], {
+        cwd: serverRoot,
+        timeout: 30_000,
+      })
+      await executeCommand('make', ['dev_stop'], {
+        cwd: serverRoot,
+        timeout: 30_000,
+      })
       const logFile = operationLogFile(root, operationId)
       const descriptor = openSync(logFile, 'a', 0o600)
       let child
       try {
-        child = spawn('make', ['dev_restart'], {
+        child = spawn('make', ['dev'], {
           cwd: serverRoot,
           env: process.env,
           detached: true,
@@ -546,7 +587,16 @@ export function createDevDatabaseMigrationRuntime(projectRoot, apiOrigin) {
         closeSync(descriptor)
       }
       child.unref()
-      return waitForRuntime(apiOrigin, child, RUNTIME_WAIT_TIMEOUT_MS)
+      try {
+        return await waitForRuntime(apiOrigin, child, RUNTIME_WAIT_TIMEOUT_MS)
+      } catch (error) {
+        if (child.pid && child.exitCode === null && !child.signalCode) {
+          try {
+            process.kill(-child.pid, 'SIGTERM')
+          } catch {}
+        }
+        throw error
+      }
     },
   }
 }

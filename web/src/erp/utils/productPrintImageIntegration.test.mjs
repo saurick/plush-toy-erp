@@ -11,6 +11,18 @@ const workspaceSource = readSource('../pages/EngineeringPrintWorkspacePage.jsx')
 const templateSource = readSource('../data/engineeringPrintTemplates.mjs')
 const printStyleSource = readSource('../styles/app/engineering-print.css')
 
+const instructionPaperSource = readFileSync(
+  new URL('../components/print/WorkInstructionPaper.jsx', import.meta.url),
+  'utf8'
+)
+const printPrimitivesSource = readFileSync(
+  new URL(
+    '../components/print/EngineeringPrintPrimitives.jsx',
+    import.meta.url
+  ),
+  'utf8'
+)
+
 test('product print images: BOM material and work instruction drafts freeze product image snapshots before opening', () => {
   const actionSource = bomPageSource.slice(
     bomPageSource.indexOf('const openEngineeringPrint'),
@@ -112,11 +124,11 @@ test('product print images: work instruction keeps legacy header plus an indepen
   assert.match(workspaceSource, /uploadInstructionImage\(slot\.key, file\)/u)
   assert.match(workspaceSource, /clearInstructionImage\(slot\.key\)/u)
   assert.match(
-    workspaceSource,
+    instructionPaperSource,
     /<WorkInstructionHeaderImages images=\{draft\.images\} \/>/u
   )
   assert.match(
-    workspaceSource,
+    instructionPaperSource,
     /<WorkInstructionHeaderImages images=\{headerImages\} \/>/u
   )
   assert.match(

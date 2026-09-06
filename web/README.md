@@ -39,6 +39,8 @@ pnpm install
 | `scripts/`           | 前端本地服务、浏览器级回归和 smoke 脚本，详见 `scripts/README.md`                           |
 | `build/`             | 构建产物，不作为业务真源                                                                    |
 
+`src/erp/utils/` 中，`sourcePartySnapshots.mjs` 管理往来方快照，`sourceOrderLineValues.mjs` 管理明细来源带值和清空，`masterDataParams.mjs` / `sourceOrderParams.mjs` 管理提交映射，`purchaseOrderPrintDraft.mjs` 管理采购打印输入；`masterDataOrderView.mjs` 保留展示、生命周期和表单行基础规则。页面状态和动作的职责见 [ERP 组件入口](./src/erp/components/README.md)。
+
 ## 启动命令
 
 ### 桌面后台
@@ -55,7 +57,7 @@ pnpm start
 
 Windows / WSL 下的 `pnpm start`、`pnpm start:frontend-only` 和 `pnpm start:yoyoosun` 通过同一受管浏览器入口打开页面。它只在 Chrome、Edge 或 Brave 中检查标题属于本项目的候选标签，并在地址栏精确匹配 `127.0.0.1` / `localhost` 与实际端口后激活、刷新该标签；窗口保持原有最大化或普通状态，只有已最小化时才恢复。未命中或 Windows UI Automation 不可用时回退到系统默认的新标签页。它不会输出浏览地址、关闭历史重复标签或读取其他标题标签的地址栏；显式 `BROWSER=none` 或自定义 `BROWSER` 始终优先。macOS 与原生 Linux 保留 Vite 的平台默认打开行为。
 
-`pnpm start` 默认先执行共享本地 runtime preflight：本机 `API_ORIGIN` 会先检查工作区 schema / versioned migration、开发库 Atlas status，再要求后端 `/healthz` 与 `/readyz` 同时通过；预检和 Vite 的 `/rpc`、`/templates` 代理共用同一 `API_ORIGIN`。预检只读，不会 apply migration。开发库存在 pending migration 或本地后端尚未就绪时，启动器不会再让 Vite 一并退出，而是只开放 `/__dev/database-migration` 恢复页；恢复期间普通 ERP 页面、其它 DEV API 与 `/rpc`、`/templates` 失败关闭，直到页面完成 migration、同目标读回及 health / ready 后重新载入完整工作台。db-guard、数据库配置、Atlas 输出或可编程对象等无法安全归类的问题仍直接阻断。仅做不登录、不调 RPC 的前端布局调试时，可显式使用 `pnpm start:frontend-only`；该模式会标记为降级、非绿色证据，不能用来验证登录或业务页。如果 `API_ORIGIN` 指向外部环境，本地不会读取其数据库，也不进入本机恢复模式，仍要求该环境 health / ready 通过，migration 由目标环境发布证据负责。
+`pnpm start` 默认先执行共享本地 runtime preflight：本机 `API_ORIGIN` 会先检查工作区 schema / versioned migration、开发库 Atlas status，再要求后端 `/healthz` 与 `/readyz` 同时通过；预检和 Vite 的 `/rpc`、`/templates` 代理共用同一 `API_ORIGIN`。预检只读，不会 apply migration。本地预检最多等待 15 秒；pending、数据库配置或连接、db-guard、Atlas、安全检查及后端异常或超时时，启动器保留 Vite，只开放 `/__dev/database-migration` 恢复页；恢复期间普通 ERP 页面、其它 DEV API 与 `/rpc`、`/templates` 失败关闭，修正环境后刷新状态，重新通过同一完整启动检查和同目标 health / ready，才能进入完整工作台。仅做不登录、不调 RPC 的前端布局调试时，可显式使用 `pnpm start:frontend-only`；该模式会标记为降级、非绿色证据，不能用来验证登录或业务页。如果 `API_ORIGIN` 指向外部环境，本地不会读取其数据库，也不进入本机恢复模式，仍要求该环境 health / ready 通过，migration 由目标环境发布证据负责。
 
 开发工作台读取 GitLab R640 CI、不可变版本目录与流水线耗时证据时，使用独立的 `PLUSH_GITLAB_READ_TOKEN`；macOS 未显式提供时，`pnpm start` 会自动读取钥匙串 service `plush-toy-erp.gitlab-read-api`、account `simon`。该凭据只允许当前项目的最小读取权限，只保存在本机钥匙串和 DEV 服务私有内存；版本中心将它收口到不含发布方法的只读 Provider，不进入浏览器、仓库、日志、质量门禁子进程或部署执行子进程，也不替代创建新发布使用的短期 `PLUSH_GITLAB_TOKEN`。钥匙串未登记时业务开发仍可启动，但 GitLab 服务端证据保持失败关闭，不以本机结果补证。
 
@@ -417,6 +419,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 
 - 页面保留稳定 `view` 值，主导航使用“看业务链、查责任与任务、看运行路径、看已生效结果、查状态规则”五个用户问题，不新增权限或基础资料等平行 Tab。顶部概念解释默认折叠：五个视图继续用“人、路、账、规则、链”帮助记忆，同时明确基础资料（如客户、供应商、产品、材料和仓库）提供标准，来源单据（如销售订单、采购订单、生产订单和加工合同）记录准备做什么或承诺做什么，但不代表库存、出货或财务结果已经发生；受控业务动作真正执行，计算结果从正式来源和事实派生，权限、客户配置与审计贯穿全部视图而不单独构成业务链。全局定义搜索默认折叠；当前视图、业务链和专项定义上下文始终可见，已选择任务只在 Workflow 主内容以及实际使用该任务定位的业务链或 ProcessRuntime 局部结果中展示，不进入 Fact / Ledger 或状态规则的全局上下文。业务链 Tab 默认进入 `view=chain&chain=all`：用 11 个链级节点按主链、供给支撑、异常返工和纠正冲正分区展示明确衔接，不展开各链内部节点，也不把总图登记成伪造的第 12 条业务链。点击或选择具体链后，一次只展示一条详细业务链，并以编号步骤回答“做什么、谁处理、怎样算完成、异常怎么办”；业务单据、基础资料、流程运行、岗位协同、已生效业务记录和计算结果使用业务名称，稳定 key、内部分类、查询来源、实例 ID 与代码证据按需查看。桌面同时直接展示分组卡片、编号步骤及对应 Mermaid 关系图，不提供图表展开或收起动作；移动端隐藏复杂图并保留纵向入口。
 - `devFlowStateCatalog.mjs` 汇总状态机和流程 variant，`devBusinessChainCatalog.mjs` 是业务链目录，`devFactLedgerCatalog.mjs` 是 Fact / Ledger 定义目录。三者都是 dev-only 只读投影，不是新的业务真源；构建器校验唯一 key、引用、覆盖和图可达，未知引用或缺失覆盖 fail closed。生产异常决策属于来源单据，不进入 Fact / Ledger 定义；拒绝或取消、超领额度、报废或在制让步执行分别按正式流程合同展示。合同测试还会扫描 Ent schema 中持久化的状态所有者字段，并要求与状态目录的 canonical 引用及少量显式 schema 映射全等：业务侧或观察台任一侧先改，另一侧未同步时都会失败关闭；事件前后值和来源快照不算状态所有者。
+- 观察台页面保留路由与视图编排；`src/dev-workbench/components/flow-state/` 按业务链、任务、运行路径、事实和状态规则拆分视图，共用目录与任务上下文，继续只读消费同一真源。
 - 状态规则视图直接消费同一状态目录登记的转换与异常路径分类，把正常推进、暂停与恢复、不通过与终止、纠正与退回、返工与再处理分组说明；图内用同一分类的彩色线、线型和动作短标签辅助扫读，图例与清单再解释适用条件、转换结果、影响边界和内部证据，不只靠颜色判断。可按全部、异常与纠正或当前状态筛选，并跳转到目录已明确关联的业务链、任务、运行路径或事实定义；它不查询历史实例，不提供改状态动作，也不是跨对象的通用状态管理器。
 - 全局定义搜索按业务链、Workflow、ProcessRuntime、状态机和 Fact / Ledger 分组，搜索文字不写入 URL。`view / chain / node / flow / state / process / fact / task_id` 保存在 URL；每个视图只接受自己的对象参数，切换视图会清理无关对象参数并在返回业务链时恢复最近链和步骤。未知、重复、过期、当前视图无关的参数，或 `chain=all` 携带单链 `node` 时停止加载并提供恢复到业务总图的入口。
 - 业务总图和具体业务链均提供“导出甲方校对版”。该入口直接从同一份业务链目录及其已登记流程、状态和岗位责任来源生成独立浅色打印稿，并调用浏览器原生打印；可在系统打印预览中保存为 PDF。打印稿先用 Mermaid 关系图展示主路径、岗位办理点、异常或纠正分支和正式业务结果，再用紧凑表格补充编号步骤、进入条件、可证明的责任岗位、人员与系统分工、完成条件及下一步；完整合同仍留在开发观察台，对外异常校对点去重后只列一次。具体链只导出当前所选链，`chain=all` 使用横向一页展示十二条链及其分区和衔接，不展开各链内部步骤。缺失信息显示“当前正式合同未定义”；暗色页面发起导出时图和文字仍固定为浅色。打印稿不包含稳定 key、源码路径、实例 ID、RPC、测试命令或真实业务记录，固定声明“未绑定客户发布版本”，并明确流程或任务完成不等于库存、出货、生产或财务事实生效。它只用于业务需求校对，不证明已经实现、发布或经甲方验收；页面不保存导出历史，也不新增 PDF 服务、数据库、API、RBAC、审批或外部发送能力。
@@ -482,8 +485,8 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 
 - 页面只操作 application config 已登记的 `192.168.0.106:5432/plush_erp` 共享开发库，不接受浏览器传入的 DSN、目标、命令、SQL、脚本路径、凭据或环境变量，也不支持 133、测试或生产数据库。
 - 默认只读显示当前 / 最新 migration、pending 数和后端 health / ready。存在 pending 时先点“检查并准备”：Bridge 固定执行同目标 status、停止后端、plan、备份恢复演练和最终身份复核；其它数据库客户端仍占用目标时按既有 guard 阻断，不代替用户强制断开。
-- `pnpm start` 在 pending migration 或本地后端未就绪时自动把本页作为受限恢复入口，普通 ERP 页面与 RPC 暂停。页面先检查实际能力而非指定桌面产品：需要兼容 `docker` CLI/socket 的可用容器运行环境、固定 Atlas、PostgreSQL 18 客户端和基础命令；可使用 Docker Engine、Docker Desktop、Colima、Rancher Desktop、OrbStack，或配置了兼容入口的 Podman。工具不全时不会先停后端，也不会开始 plan / backup。
-- 准备成功后，页面要求输入当前 operation 给出的完整确认串；execute 会再次核对 migration / schema 指纹、目标 revision 和准备阶段备份文件身份，随后同一 operation 只执行一次 apply、`pending=0` 读回、后端重启和 health / ready。提交结果无法证明时标为 `not_proven`，先读回，不自动重试。
+- `pnpm start` 在本地预检失败或超时时把本页作为受限恢复入口，普通 ERP 页面与 RPC 暂停。页面先检查实际能力而非指定桌面产品：需要兼容 `docker` CLI/socket 的可用容器运行环境、固定 Atlas、PostgreSQL 18 客户端和基础命令；可使用 Docker Engine、Docker Desktop、Colima、Rancher Desktop、OrbStack，或配置了兼容入口的 Podman。工具不全时不会先停后端，也不会开始 plan / backup。
+- 准备成功后，页面要求输入当前 operation 给出的完整确认串；execute 会再次核对 migration / schema 指纹、目标 revision 和准备阶段备份文件身份，随后同一 operation 只执行一次 apply、`pending=0` 读回、后端重启和 health / ready。写入或后续读回结果无法证明时标为 `not_proven`，先读回，不自动重试。已证明迁移成功而后端恢复失败时，只需单独重启后端。旧 ready 计划可重新检查并准备，旧确认随之失效；会话失效后下一次显式操作重新获取会话。
 - operation 使用 `0600` 原子状态、幂等键和跨 Vite 进程排他锁。migration / schema / guard / 备份编排真源、目标状态或备份文件身份变化会使旧计划失效；未变化且文件大小与 SHA-256 均读回一致的备份恢复报告可以复用，避免同一计划因非写入阻断反复 dump / restore。命令行 `make migrate` 与该页面复用同一 service；非交互调用必须显式使用 prepare / execute 两阶段，prepare 成功不能冒充已迁移。
 - 此入口不运行 `fast`、`full`、`strict`、完整验收 lifecycle 或发布构建。后端只在确认 apply 后重启一次；数据库已到 head 时不为了“证明绿色”重新迁移或重建。正式发布迁移继续使用受控发布制品、目标备份、串行锁、readback、smoke 和 rollback point。
 

@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
+import { EventEmitter } from 'node:events'
 import {
   mkdirSync,
   mkdtempSync,
@@ -18,7 +20,48 @@ import {
   createDevDatabaseMigrationRuntime,
   readDatabaseMigrationToolReadiness,
   redactDatabaseMigrationDiagnostic,
+  waitForRuntime,
 } from './devDatabaseMigrationRuntime.mjs'
+
+test('database migration runtime handles spawn failure without crashing the workbench', async () => {
+  const child = new EventEmitter()
+  child.exitCode = null
+  await assert.rejects(
+    waitForRuntime('http://127.0.0.1:8300', child, 100, {
+      read: async () => {
+        child.emit('error', new Error('spawn make ENOENT'))
+        return { available: false }
+      },
+      intervalMs: 1,
+    }),
+    /启动命令不可用/u
+  )
+  assert.equal(child.listenerCount('error'), 0)
+})
+
+test('database migration runtime rejects old healthy responses when the new process has exited', async () => {
+  const child = new EventEmitter()
+  child.exitCode = 1
+  await assert.rejects(
+    waitForRuntime('http://127.0.0.1:8300', child, 100, {
+      read: async () => ({ available: true }),
+      intervalMs: 1,
+    }),
+    /启动进程已退出/u
+  )
+})
+
+test('database migration runtime stops waiting when backend health cannot be proved', async () => {
+  const child = new EventEmitter()
+  child.exitCode = null
+  await assert.rejects(
+    waitForRuntime('http://127.0.0.1:8300', child, 5, {
+      read: async () => ({ available: false }),
+      intervalMs: 1,
+    }),
+    /启动超时/u
+  )
+})
 
 const BACKUP_ID = 'br-yoyoosun-20260729T080000+0800'
 
@@ -151,8 +194,9 @@ test('database migration runtime accepts platform-neutral compatible tooling', a
     execFile: async (command, args) => {
       calls.push([command, ...args])
       if (command === 'docker') return { stdout: '28.0.0\n', stderr: '' }
-      if (command === 'atlas')
+      if (command === 'atlas') {
         return { stdout: 'atlas version v1.2.0\n', stderr: '' }
+      }
       if (
         path.basename(command) === 'pg_dump' ||
         path.basename(command) === 'psql'
@@ -176,6 +220,65 @@ test('database migration runtime accepts platform-neutral compatible tooling', a
     calls.map(([command]) => path.basename(command)),
     ['docker', 'atlas', 'pg_dump', 'psql', 'bash']
   )
+})
+
+test('database migration runtime requires every supporting command before preparation', async (t) => {
+  for (const missing of ['go', 'lockf', 'jq', null]) {
+    const root = createRoot(t)
+    const bin = path.join(root, 'bin')
+    mkdirSync(bin)
+    for (const command of [
+      'go',
+      'lockf',
+      'curl',
+      'sha256sum',
+      'wc',
+      'awk',
+      'date',
+      'jq',
+      'python3',
+    ]) {
+      if (command !== missing) {
+        symlinkSync(process.execPath, path.join(bin, command))
+      }
+    }
+    const readiness = await readDatabaseMigrationToolReadiness({
+      env: {},
+      execFile: async (command, args) => {
+        if (command === 'docker') return { stdout: '29.0.0', stderr: '' }
+        if (command === 'atlas') {
+          return { stdout: 'atlas version v1.2.0', stderr: '' }
+        }
+        if (
+          path.basename(command) === 'pg_dump' ||
+          path.basename(command) === 'psql'
+        ) {
+          return { stdout: 'PostgreSQL) 18.1', stderr: '' }
+        }
+        assert.equal(command, 'bash')
+        return {
+          stdout: execFileSync(
+            'bash',
+            ['-c', `PATH="$MIGRATION_TEST_PATH"\n${args[1]}`],
+            {
+              env: { ...process.env, MIGRATION_TEST_PATH: bin },
+              encoding: 'utf8',
+            }
+          ),
+          stderr: '',
+        }
+      },
+    })
+    const check = readiness.checks.find(
+      (item) => item.key === 'supporting_commands'
+    )
+    assert.equal(check.status, missing ? 'blocked' : 'passed', String(missing))
+    assert.equal(
+      readiness.status,
+      missing ? 'blocked' : 'ready',
+      String(missing)
+    )
+  }
 })
 
 test('database migration runtime identifies an unavailable container daemon without naming one desktop product', async () => {

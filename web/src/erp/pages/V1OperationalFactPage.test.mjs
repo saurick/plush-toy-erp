@@ -67,9 +67,23 @@ test('operational fact workspace enforces exact outsourcing read and mutation co
     ),
     'utf8'
   )
-  assert.match(workspace, /config\.readPermissions/u)
+  const query = readFileSync(
+    new URL(
+      '../components/operational-facts/useOperationalFactQuery.mjs',
+      import.meta.url
+    ),
+    'utf8'
+  )
+  const mutations = readFileSync(
+    new URL(
+      '../components/operational-facts/useOperationalFactMutations.mjs',
+      import.meta.url
+    ),
+    'utf8'
+  )
+  assert.match(query, /config\.readPermissions/u)
   assert.match(
-    workspace,
+    query,
     /hasAnyPermission\(adminProfile, config\.readPermissions\)/u
   )
   assert.match(forms, /productionRead:\s*\['production\.fact\.read'\]/u)
@@ -78,5 +92,5 @@ test('operational fact workspace enforces exact outsourcing read and mutation co
     /production:\s*\{[\s\S]*?readPermissions:\s*ACTION_PERMISSIONS\.productionRead/u
   )
   assert.match(workspace, /currentActiveKey === 'outsourcing'/u)
-  assert.match(workspace, /customer_key: activeCustomerKey/u)
+  assert.match(mutations, /customer_key: activeCustomerKey/u)
 })

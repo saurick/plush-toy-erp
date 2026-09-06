@@ -13,7 +13,7 @@
 | `devQualityGatePlugin.mjs`          | 复用正式 full / strict runner 与回执，自动选择显式 loopback base 或本机托管 PostgreSQL，提供异步运行、取消、超时、清理读回和只读治理 |
 | `devDataPreparationPlugin.mjs`      | 提供单一数据准备 operation 真源；同一 Scenario profile 显式绑定本地或 133，冻结 V6、release、数据库、migration、客户配置与回滚点，长期数据与隔离验收不互相替代 |
 | `devDatabaseMigrationPlugin.mjs`    | 提供本地共享开发库迁移的受控 operation service 和 HTTP 层，供页面与高层 CLI 复用                                                     |
-| `devDatabaseMigrationRecoveryPlugin.mjs` | 在普通启动被 pending migration 或本地后端阻断时，只开放迁移恢复页与固定 API，并临时阻断 ERP / RPC；通过同目标与 health / ready 读回后解除 |
+| `devDatabaseMigrationRecoveryPlugin.mjs` | 本地预检失败或超时时保留迁移恢复页与固定 API，阻断 ERP / RPC；同一完整启动检查和同目标 health / ready 通过后解除 |
 | `devDatabaseMigrationRuntime.mjs`   | 执行迁移 status、plan、备份恢复、apply、读回和重启                                                                                   |
 | `devDeliveryBridgePlugin.mjs`       | 提供不可变版本、固定目标 promotion 和受控 rollback Bridge                                                                            |
 | `devServerSecurity.mjs`             | 集中维护 loopback remote address 与 Host 校验                                                                                        |
@@ -34,3 +34,5 @@
 - 数据库迁移准备先检查能力而非绑定操作系统或桌面产品：固定需要兼容 `docker` CLI/socket 的容器运行环境、Atlas v1.2.0、PostgreSQL 18 客户端及备份恢复基础命令。Docker Engine、Docker Desktop、Colima、Rancher Desktop、OrbStack 或提供兼容入口的 Podman 均可；环境不完整时不得先停止后端。
 
 调整本目录后至少运行同目录 Node 测试、工作台源码边界测试、production build、制品零残留扫描和 production `/__dev` 浏览器 smoke。
+
+DEV 桥接共用 `devServerSecurity.mjs` 的 loopback / same-origin 校验和有界 JSON 请求解析。各插件显式提供请求大小上限，继续独立维护令牌、动作允许列表和状态机。

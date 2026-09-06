@@ -18,7 +18,7 @@ import {
   completeMaterialPurchaseContractDraft,
   completeProcessingContractDraft,
 } from "../../web/src/erp/utils/contractPrintDraftCompleteness.mjs";
-import { buildMaterialPurchaseContractDraftFromPurchaseOrder } from "../../web/src/erp/utils/masterDataOrderView.mjs";
+import { buildMaterialPurchaseContractDraftFromPurchaseOrder } from "../../web/src/erp/utils/purchaseOrderPrintDraft.mjs";
 
 const syntheticSourceId = "__synthetic_yoyoosun_trial__";
 const requiredSourceCategories = new Set([

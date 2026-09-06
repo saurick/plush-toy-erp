@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from 'react'
-import { Navigate, useOutletContext, useSearchParams } from 'react-router-dom'
+import { Navigate, useSearchParams } from 'react-router-dom'
+import { getPrintWorkspaceDraftScope } from '../utils/printWorkspaceScope.mjs'
 import MaterialPurchaseContractWorkbench from '../components/print/MaterialPurchaseContractWorkbench.jsx'
 import { getPrintTemplateByKey } from '../config/printTemplates.mjs'
 import {
@@ -10,23 +11,12 @@ import {
   resolvePrintWorkspaceEntrySource,
   resolvePrintWorkspaceStateID,
   resolvePrintWorkspaceDraftMode,
-  resolvePrintWorkspaceCustomerKey,
 } from '../utils/printWorkspace.js'
 
 export default function MaterialPurchaseContractPrintWorkspacePage() {
   const [searchParams] = useSearchParams()
-  const outletContext = useOutletContext()
-  const accountKey = String(outletContext?.adminProfile?.id || '').trim()
-  const profileCustomerKey = String(
-    outletContext?.adminProfile?.effective_session?.customer?.key || ''
-  ).trim()
-  const configRevision = String(
-    outletContext?.adminProfile?.effective_session?.config_revision || ''
-  ).trim()
-  const customerKey = useMemo(
-    () => profileCustomerKey || resolvePrintWorkspaceCustomerKey(searchParams),
-    [profileCustomerKey, searchParams]
-  )
+  const { accountKey, customerKey, configRevision } =
+    getPrintWorkspaceDraftScope(searchParams)
   const template = getPrintTemplateByKey('material-purchase-contract')
   const workspaceStateID = resolvePrintWorkspaceStateID(searchParams)
   const entrySource = resolvePrintWorkspaceEntrySource(searchParams)
@@ -52,9 +42,10 @@ export default function MaterialPurchaseContractPrintWorkspacePage() {
     return buildRestorablePrintWorkspaceURL('material-purchase-contract', {
       entrySource,
       customerKey,
+      configRevision,
       stateID: workspaceStateID,
     })
-  }, [customerKey, entrySource, workspaceStateID])
+  }, [configRevision, customerKey, entrySource, workspaceStateID])
 
   useEffect(() => {
     document.title = '采购合同打印窗口'

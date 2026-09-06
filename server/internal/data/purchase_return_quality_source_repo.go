@@ -16,7 +16,8 @@ var _ biz.PurchaseReturnFromQualityInspectionRepo = (*inventoryRepo)(nil)
 func (r *inventoryRepo) CreatePurchaseReturnFromQualityInspection(
 	ctx context.Context,
 	in *biz.PurchaseReturnFromQualityInspectionCreate,
-) (*biz.PurchaseReturn, error) {
+) (_ *biz.PurchaseReturn, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	if in == nil || in.QualityInspectionID <= 0 {
 		return nil, biz.ErrBadParam
 	}

@@ -21,7 +21,8 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-func (r *inventoryRepo) CreatePurchaseReturnDraft(ctx context.Context, in *biz.PurchaseReturnCreate) (*biz.PurchaseReturn, error) {
+func (r *inventoryRepo) CreatePurchaseReturnDraft(ctx context.Context, in *biz.PurchaseReturnCreate) (_ *biz.PurchaseReturn, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	if in.PurchaseReceiptID != nil {
 		receipt, err := r.data.postgres.PurchaseReceipt.Get(ctx, *in.PurchaseReceiptID)
 		if err != nil {
@@ -50,14 +51,16 @@ func (r *inventoryRepo) CreatePurchaseReturnDraft(ctx context.Context, in *biz.P
 	return entPurchaseReturnToBiz(row, nil), nil
 }
 
-func (r *inventoryRepo) ResolvePurchaseReturnReplay(ctx context.Context, in *biz.PurchaseReturnCreate) (*biz.PurchaseReturn, bool, error) {
+func (r *inventoryRepo) ResolvePurchaseReturnReplay(ctx context.Context, in *biz.PurchaseReturnCreate) (_ *biz.PurchaseReturn, _ bool, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	if r == nil || r.data == nil || r.data.postgres == nil || in == nil || in.IdempotencyKey == "" || in.IdempotencyPayloadHash == "" {
 		return nil, false, biz.ErrBadParam
 	}
 	return resolvePurchaseReturnReplay(ctx, r.data.postgres, in)
 }
 
-func (r *inventoryRepo) CreatePurchaseReturnWithItems(ctx context.Context, in *biz.PurchaseReturnCreate, items []*biz.PurchaseReturnItemCreate) (*biz.PurchaseReturn, error) {
+func (r *inventoryRepo) CreatePurchaseReturnWithItems(ctx context.Context, in *biz.PurchaseReturnCreate, items []*biz.PurchaseReturnItemCreate) (_ *biz.PurchaseReturn, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	if in == nil || in.PurchaseReceiptID == nil || *in.PurchaseReceiptID <= 0 || len(items) == 0 || in.IdempotencyKey == "" || in.IdempotencyPayloadHash == "" {
 		return nil, biz.ErrBadParam
 	}
@@ -154,7 +157,8 @@ func (r *inventoryRepo) CreatePurchaseReturnWithItems(ctx context.Context, in *b
 	return out, nil
 }
 
-func (r *inventoryRepo) AddPurchaseReturnItem(ctx context.Context, in *biz.PurchaseReturnItemCreate) (*biz.PurchaseReturnItem, error) {
+func (r *inventoryRepo) AddPurchaseReturnItem(ctx context.Context, in *biz.PurchaseReturnItemCreate) (_ *biz.PurchaseReturnItem, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	tx, err := r.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
@@ -201,7 +205,8 @@ func (r *inventoryRepo) AddPurchaseReturnItem(ctx context.Context, in *biz.Purch
 	return out, nil
 }
 
-func (r *inventoryRepo) PostPurchaseReturn(ctx context.Context, returnID int) (*biz.PurchaseReturn, error) {
+func (r *inventoryRepo) PostPurchaseReturn(ctx context.Context, returnID int) (_ *biz.PurchaseReturn, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	tx, err := r.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
@@ -320,7 +325,8 @@ func (r *inventoryRepo) PostPurchaseReturn(ctx context.Context, returnID int) (*
 	return out, nil
 }
 
-func (r *inventoryRepo) CancelPostedPurchaseReturn(ctx context.Context, returnID int) (*biz.PurchaseReturn, error) {
+func (r *inventoryRepo) CancelPostedPurchaseReturn(ctx context.Context, returnID int) (_ *biz.PurchaseReturn, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	tx, err := r.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
@@ -460,7 +466,8 @@ func (r *inventoryRepo) CancelPostedPurchaseReturn(ctx context.Context, returnID
 	return out, nil
 }
 
-func (r *inventoryRepo) GetPurchaseReturn(ctx context.Context, id int) (*biz.PurchaseReturn, error) {
+func (r *inventoryRepo) GetPurchaseReturn(ctx context.Context, id int) (_ *biz.PurchaseReturn, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	purchaseReturn, err := r.data.postgres.PurchaseReturn.Get(ctx, id)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -471,7 +478,8 @@ func (r *inventoryRepo) GetPurchaseReturn(ctx context.Context, id int) (*biz.Pur
 	return purchaseReturnWithItems(ctx, r.data.postgres, purchaseReturn)
 }
 
-func (r *inventoryRepo) ListPurchaseReturns(ctx context.Context, filter biz.PurchaseReturnFilter) ([]*biz.PurchaseReturn, int, error) {
+func (r *inventoryRepo) ListPurchaseReturns(ctx context.Context, filter biz.PurchaseReturnFilter) (_ []*biz.PurchaseReturn, _ int, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	query := r.data.postgres.PurchaseReturn.Query()
 	if filter.Status != "" {
 		query = query.Where(purchasereturn.Status(filter.Status))

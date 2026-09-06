@@ -1,7 +1,13 @@
+import { act, createElement } from 'react'
+import { createRoot } from 'react-dom/client'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
+import {
+  registerJSXTestLoader,
+  installTestDOM,
+} from '../../../../scripts/test/reactRuntime.mjs'
 
 const source = readFileSync(
   fileURLToPath(new URL('./WorkflowTaskActionDrawer.jsx', import.meta.url)),
@@ -21,110 +27,6 @@ const processingHintSource = readFileSync(
   ),
   'utf8'
 )
-
-test('task action drawer exposes real clickable steps without using actions as navigation', () => {
-  assert.match(source, /role="tablist"/u)
-  assert.match(source, /role="tab"/u)
-  assert.match(source, /aria-selected=\{active\}/u)
-  assert.match(
-    source,
-    /onClick=\{\(\) => interactive && selectStep\(step\.key\)\}/u
-  )
-  assert.match(source, /handleStepKeyDown/u)
-  for (const step of ['context', 'action', 'confirm']) {
-    assert.match(source, new RegExp(`id="erp-task-action-step-${step}"`, 'u'))
-  }
-  assert.match(source, /hidden=\{activeStepKey !== 'context'\}/u)
-  assert.match(source, /hidden=\{activeStepKey !== 'action'\}/u)
-  assert.match(source, /hidden=\{activeStepKey !== 'confirm'\}/u)
-  assert.match(
-    source,
-    /onClick=\{\(\) => selectStep\('action'\)\}[\s\S]{0,80}>\s*选择处理方式\s*<\/Button>/u
-  )
-  assert.match(
-    source,
-    /onClick=\{\(\) => selectStep\('confirm'\)\}[\s\S]{0,80}>\s*核对并确认\s*<\/Button>/u
-  )
-  assert.doesNotMatch(source, /下一步：选择处理方式|下一步：确认/u)
-})
-
-test('task actions are selectable options and confirmation is separately gated', () => {
-  assert.match(source, /role="radiogroup"/u)
-  assert.match(source, /role="radio"/u)
-  assert.match(source, /handleActionKeyDown/u)
-  assert.match(source, /actionOptionRefs/u)
-  assert.match(source, /hasVisibleActionSelection/u)
-  assert.match(source, /催办只是处理方式之一/u)
-  assert.match(source, /disabled=\{actionSaving \|\| !canConfirm\}/u)
-  assert.match(source, /activeStepKey === 'confirm'/u)
-  assert.match(source, /<strong>提交后会发生什么<\/strong>/u)
-  assert.match(source, /<span>\{actionOutcomeHint\}<\/span>/u)
-  assert.match(source, /className="erp-task-action-drawer__outcome-note"/u)
-  const outcomeCopyIndex = source.indexOf(
-    '<strong>提交后会发生什么</strong>'
-  )
-  const outcomeNoteStart = source.lastIndexOf(
-    'className="erp-task-action-drawer__outcome-note"',
-    outcomeCopyIndex
-  )
-  const outcomeNoteEnd = source.indexOf('</div>', outcomeCopyIndex)
-  assert.ok(outcomeCopyIndex >= 0)
-  assert.ok(outcomeNoteStart >= 0)
-  assert.ok(outcomeNoteEnd > outcomeNoteStart)
-  assert.doesNotMatch(
-    source.slice(outcomeNoteStart, outcomeNoteEnd),
-    /showIcon/u
-  )
-  assert.doesNotMatch(
-    source,
-    /onClick=\{\(\) => selectAction\('urge',[\s\S]{0,80}下一步/u
-  )
-})
-
-test('task action drawer keeps confirmed mutations on step three and renders an authoritative handoff receipt', () => {
-  assert.match(source, /title: '确认与结果'/u)
-  assert.match(source, /actionReceipt = null/u)
-  assert.match(source, /hasActionReceipt/u)
-  assert.match(source, /setActiveStepKey\('confirm'\)/u)
-  assert.match(source, /workflow-task-action-receipt/u)
-  assert.match(source, /办理结果已确认/u)
-  assert.match(source, /hasActionReceipt \? '本次责任岗位' : '负责人'/u)
-  assert.match(source, /!hasActionReceipt && currentAssigneeLabel \? \(/u)
-  assert.match(source, /<strong>流程交接结果<\/strong>/u)
-  assert.match(source, /正在读取流程交接结果/u)
-  assert.match(source, /WorkflowProcessStageTrack context=\{processContext\}/u)
-  assert.match(source, /本任务已结束，没有关联的后续业务流程/u)
-  assert.match(source, /本次操作不触发流程流转/u)
-  assert.match(source, />\s*完成并关闭\s*<\/Button>/u)
-  assert.doesNotMatch(
-    source.slice(
-      source.indexOf('data-testid="workflow-task-action-receipt"'),
-      source.indexOf(') : actionMeta ? (')
-    ),
-    /assignee|处理人/u
-  )
-})
-
-test('task action drawer explains loading and readonly access before action selection', () => {
-  assert.match(source, /actionAvailabilityLoading/u)
-  assert.match(source, /正在确认可用的处理方式/u)
-  assert.doesNotMatch(source, /确认完成后即可选择处理方式/u)
-  assert.doesNotMatch(source, /请稍候再进入下一步/u)
-  assert.match(source, /当前只能查看任务/u)
-  assert.match(source, /description=\{readonlyReason/u)
-})
-
-test('task action drawer only renders the explicitly authorized related document entry', () => {
-  assert.match(source, /canOpenEntry = false/u)
-  assert.match(
-    source,
-    /const canOpenRelatedEntry = Boolean\(task && canOpenEntry && onOpenEntry\)/u
-  )
-  assert.match(source, /\{canOpenRelatedEntry \? \(/u)
-  assert.match(source, />\s*查看相关单据\s*<\/Button>/u)
-  assert.doesNotMatch(source, /resolveWorkflowTaskEntryPath/u)
-  assert.doesNotMatch(source, />\s*去办理\s*<\/Button>/u)
-})
 
 test('task action drawer exposes the shared task attachment action as a secondary footer entry', () => {
   assert.match(source, /BusinessAttachmentModalButton/u)
@@ -266,4 +168,212 @@ test('task transfer is an explicit scoped action with person and pool destinatio
     /getWorkflowTaskActionOutcomeHint\(\{ task, actionMode \}\)/u
   )
   assert.match(processingHintSource, /确认后只改变处理人/u)
+})
+
+let drawerRuntime
+async function mountDrawer(t, overrides = {}) {
+  const dom = installTestDOM()
+  if (!drawerRuntime) {
+    registerJSXTestLoader()
+    drawerRuntime = Promise.all([
+      import('./WorkflowTaskActionDrawer.jsx'),
+      import('../../../common/utils/jsonRpc.js'),
+    ])
+  }
+  const [{ default: Drawer }, { JsonRpc }] = await drawerRuntime
+  const calls = []
+  const submissions = []
+  let closed = 0
+  let opened = 0
+  const original = JsonRpc.prototype.call
+  JsonRpc.prototype.call = async function call(method, params, options) {
+    calls.push({ method, params, options })
+    if (method === 'list_task_events') {
+      return { data: { items: [], truncated: false } }
+    }
+    throw new Error(`unexpected RPC ${method}`)
+  }
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  let props = {
+    task: {
+      id: 42,
+      version: 1,
+      task_name: '核对材料',
+      task_status_key: 'pending',
+      owner_role_key: 'purchase',
+      source_type: 'purchase_order',
+      source_no: 'PO-42',
+    },
+    allowedActionModes: ['complete', 'block'],
+    onSubmit: (value) => submissions.push(value),
+    onClose: () => closed++,
+    onOpenEntry: () => opened++,
+    ...overrides,
+  }
+  const render = () =>
+    root.render(
+      createElement(Drawer, {
+        ...props,
+        onActionModeChange: (actionMode) => {
+          props = { ...props, actionMode }
+          render()
+        },
+        onActionReasonChange: (actionReason) => {
+          props = { ...props, actionReason }
+          render()
+        },
+      })
+    )
+  const update = async (patch) => {
+    props = { ...props, ...patch }
+    await act(async () => render())
+  }
+  t.after(async () => {
+    await act(async () => {
+      root.unmount()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    container.remove()
+    JsonRpc.prototype.call = original
+    dom.restore()
+  })
+  await update({})
+  const tabs = () => [...document.querySelectorAll('[role="tab"]')]
+  const button = (text) =>
+    [...document.querySelectorAll('button')].find(
+      (node) => node.textContent.trim() === text
+    )
+  const click = async (node) => {
+    assert(node, 'expected interactive element')
+    await act(async () => node.click())
+  }
+  return {
+    update,
+    tabs,
+    button,
+    click,
+    calls,
+    submissions,
+    get closed() {
+      return closed
+    },
+    get opened() {
+      return opened
+    },
+    get task() {
+      return props.task
+    },
+    window: dom.runtimeWindow,
+  }
+}
+
+test('drawer step navigation and keyboard selection never submit an action', async (t) => {
+  const ui = await mountDrawer(t)
+  assert.equal(ui.tabs()[0].getAttribute('aria-selected'), 'true')
+  assert.equal(ui.tabs()[2].disabled, true)
+  await ui.click(ui.tabs()[1])
+  assert.equal(ui.tabs()[1].getAttribute('aria-selected'), 'true')
+  await act(async () =>
+    ui.tabs()[1].dispatchEvent(
+      new ui.window.KeyboardEvent('keydown', {
+        key: 'ArrowLeft',
+        bubbles: true,
+      })
+    )
+  )
+  assert.equal(ui.tabs()[0].getAttribute('aria-selected'), 'true')
+  await ui.click(ui.button('选择处理方式'))
+  const complete = [...document.querySelectorAll('[role="radio"]')].find(
+    (node) => node.textContent.includes('处理完成')
+  )
+  await ui.click(complete)
+  assert.equal(complete.getAttribute('aria-checked'), 'true')
+  assert.equal(ui.submissions.length, 0)
+  await ui.click(ui.button('核对并确认'))
+  assert.equal(ui.tabs()[2].getAttribute('aria-selected'), 'true')
+  assert.match(
+    document.querySelector('.erp-task-action-drawer__outcome-note').textContent,
+    /提交后会发生什么/
+  )
+  assert.equal(ui.submissions.length, 0)
+  await ui.click(ui.button('确认完成'))
+  assert.deepEqual(ui.submissions, [{ processDecision: null }])
+})
+
+test('drawer requires a reason and disables submission while saving or access is withdrawn', async (t) => {
+  const ui = await mountDrawer(t, { actionMode: 'block' })
+  assert.equal(ui.tabs()[2].disabled, true)
+  await ui.update({ actionReason: '等待补齐材料' })
+  assert.equal(ui.tabs()[2].disabled, false)
+  await ui.click(ui.tabs()[2])
+  await ui.update({ actionSaving: true })
+  assert.equal(ui.button('提交阻塞').disabled, true)
+  await ui.click(ui.button('提交阻塞'))
+  assert.equal(ui.submissions.length, 0)
+  await ui.update({
+    actionSaving: false,
+    allowedActionModes: [],
+    readonlyReason: '当前岗位只能查看',
+  })
+  assert.equal(ui.tabs()[1].disabled, true)
+  assert.match(document.body.textContent, /当前岗位只能查看/)
+  assert.equal(ui.button('提交阻塞'), undefined)
+})
+
+test('drawer keeps a confirmed receipt visible and finishes without resubmitting', async (t) => {
+  const ui = await mountDrawer(t, { actionMode: 'complete' })
+  await ui.update({
+    task: { ...ui.task, task_status_key: 'done', version: 2 },
+    actionReceipt: {
+      actionTitle: '处理完成',
+      successMessage: '任务已处理完成',
+    },
+  })
+  assert.equal(ui.tabs()[2].getAttribute('aria-selected'), 'true')
+  assert.equal(ui.tabs()[0].disabled, true)
+  assert.equal(ui.tabs()[1].disabled, true)
+  const receipt = document.querySelector(
+    '[data-testid="workflow-task-action-receipt"]'
+  )
+  assert.match(receipt.textContent, /办理结果已确认/)
+  assert.match(
+    document.body.textContent,
+    /本任务已结束，没有关联的后续业务流程/
+  )
+  assert.equal(ui.button('确认完成'), undefined)
+  await ui.click(ui.button('完成并关闭'))
+  assert.equal(ui.closed, 1)
+  assert.equal(ui.submissions.length, 0)
+})
+
+test('drawer renders authorized related-document entry and explains access loading', async (t) => {
+  const ui = await mountDrawer(t, {
+    allowedActionModes: [],
+    actionAvailabilityLoading: true,
+  })
+  assert.match(document.body.textContent, /正在确认可用的处理方式/)
+  assert.equal(ui.button('查看相关单据'), undefined)
+  await ui.update({ canOpenEntry: true })
+  await ui.click(ui.button('查看相关单据'))
+  assert.equal(ui.opened, 1)
+  await ui.update({
+    canOpenEntry: false,
+    actionAvailabilityLoading: false,
+    readonlyReason: '只能查看任务',
+  })
+  assert.equal(ui.button('查看相关单据'), undefined)
+  assert.match(document.body.textContent, /当前只能查看任务/)
+})
+
+test('drawer reads events for the selected task and cancels the previous request on task switch', async (t) => {
+  const ui = await mountDrawer(t)
+  assert.equal(ui.calls.length, 1)
+  assert.deepEqual(ui.calls[0].params, { task_id: 42, limit: 100 })
+  const previous = ui.calls[0]
+  await ui.update({ task: { ...ui.task, id: 43, version: 2 } })
+  assert.equal(previous.options.signal.aborted, true)
+  assert.deepEqual(ui.calls[1].params, { task_id: 43, limit: 100 })
+  assert.match(document.body.textContent, /本任务处理记录/)
 })

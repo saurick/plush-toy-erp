@@ -86,19 +86,23 @@ import { useSalesOrderPaymentReview } from '../components/sales-orders/useSalesO
 import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
   V1_ROUTE_PATHS,
-  buildOrderContactSnapshot,
-  buildSalesOrderCustomerSourceValues,
   buildSequentialDraftCode,
   canRunSalesOrderLifecycleAction,
-  buildSalesOrderItemParams,
-  buildSalesOrderParams,
-  deliverySnapshotFormValues,
   formatUnixDate,
   hasActionPermission,
   SALES_ORDER_ITEM_STATUS_LABELS,
   statusText,
   unixToDateInputValue,
 } from '../utils/masterDataOrderView.mjs'
+import {
+  buildSalesOrderItemParams,
+  buildSalesOrderParams,
+} from '../utils/sourceOrderParams.mjs'
+import {
+  buildOrderContactSnapshot,
+  buildSalesOrderCustomerSourceValues,
+  deliverySnapshotFormValues,
+} from '../utils/sourcePartySnapshots.mjs'
 import {
   applyModuleColumnOrder,
   sanitizeModuleColumnOrder,
