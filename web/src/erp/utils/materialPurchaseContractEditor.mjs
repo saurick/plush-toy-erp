@@ -250,13 +250,13 @@ const createEmptyMaterialPurchaseLine = () => ({
 
 const normalizeClauses = (rawClauses = {}) => ({
   delivery: Array.isArray(rawClauses.delivery)
-    ? rawClauses.delivery.map((item) => toText(item)).filter(Boolean)
+    ? rawClauses.delivery.map((item) => toText(item))
     : [...DEFAULT_CLAUSES.delivery],
   contract: Array.isArray(rawClauses.contract)
-    ? rawClauses.contract.map((item) => toText(item)).filter(Boolean)
+    ? rawClauses.contract.map((item) => toText(item))
     : [...DEFAULT_CLAUSES.contract],
   settlement: Array.isArray(rawClauses.settlement)
-    ? rawClauses.settlement.map((item) => toText(item)).filter(Boolean)
+    ? rawClauses.settlement.map((item) => toText(item))
     : [...DEFAULT_CLAUSES.settlement],
 })
 

@@ -328,7 +328,7 @@ export function normalizeProcessingContractClauses(clauses = {}) {
 
   return Object.keys(defaultClauses).reduce((state, groupKey) => {
     state[groupKey] = Array.isArray(source[groupKey])
-      ? source[groupKey].map((item) => normalizeText(item)).filter(Boolean)
+      ? source[groupKey].map((item) => normalizeText(item))
       : [...defaultClauses[groupKey]]
     return state
   }, {})

@@ -82,6 +82,22 @@ test('processingContractTemplate: 默认条款保留 B 类加工合同源表固�
   ])
 })
 
+test('processingContractTemplate: 草稿恢复保留空条款及后续条款位置', () => {
+  const clauses = {
+    delivery: ['第一条', '', '第三条'],
+    contract: ['', ''],
+    settlement: [],
+  }
+  const restored = normalizeProcessingContractDraft({ clauses })
+  assert.deepEqual(restored.clauses, clauses)
+  restored.clauses.delivery[1] = '重新填写'
+  assert.deepEqual(
+    normalizeProcessingContractDraft(restored).clauses.delivery,
+    ['第一条', '重新填写', '第三条']
+  )
+  assert.deepEqual(clauses.delivery, ['第一条', '', '第三条'])
+})
+
 test('processingContractTemplate: 空白模板清空字段明细和末尾附图但保留合同条款', () => {
   const blankDraft = createBlankProcessingContractDraft({
     ...createProcessingContractDraft(),

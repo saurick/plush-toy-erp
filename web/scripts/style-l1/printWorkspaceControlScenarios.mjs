@@ -1,5 +1,6 @@
 import { writeFile } from 'node:fs/promises'
 import { printTemplateCatalog } from '../../src/erp/config/printTemplates.mjs'
+import { measureEmptyEditorHints } from './printEmptyEditorAssertions.mjs'
 
 export function createPrintWorkspaceControlScenarios({
   assert,
@@ -8,6 +9,162 @@ export function createPrintWorkspaceControlScenarios({
   gotoScenarioPath,
 }) {
   return [
+    {
+      name: 'print-workspace-all-empty-fields',
+      path: '/erp/print-workspace/material-purchase-contract?draft=fresh',
+      auth: 'admin',
+      viewport: { width: 1600, height: 1100 },
+      verify: async (page) => {
+        const reports = []
+        for (const template of printTemplateCatalog.filter(
+          (item) => item.runtime?.workspace
+        )) {
+          await gotoScenarioPath(
+            page,
+            `/erp/print-workspace/${template.key}?draft=fresh&state=all-empty-fields`
+          )
+          await page.locator('.erp-print-shell--ready').waitFor()
+          await page.evaluate(() => document.fonts.ready)
+          const editors = page.locator(
+            '.erp-print-shell__stage [contenteditable="true"]:not(:has([contenteditable="true"]))'
+          )
+          const count = await editors.count()
+          assert(count > 0, `${template.key} 必须遍历实际编辑字段`)
+          const stepNumbers = await editors.evaluateAll((nodes) =>
+            nodes.map((node) =>
+              node.closest('.erp-work-instruction-paper__step-no')
+                ? node.textContent.replace(/\u200b/g, '').trim()
+                : null
+            )
+          )
+          const report = { key: template.key, fields: count, states: [] }
+          for (const scale of ['1', '0.75', '1.25', '1.5']) {
+            await page
+              .locator('.erp-print-shell__zoom-control select')
+              .selectOption(scale)
+            for (let index = 0; index < count; index += 1) {
+              const editor = editors.nth(index)
+              assert.equal(
+                await editors.count(),
+                count,
+                `${template.key} 清空不能删除字段或移动后续索引`
+              )
+              assert(
+                await editor.isVisible(),
+                `${template.key} 字段 ${index} 空值后仍须可见`
+              )
+              // 每个字段都实际清空，不能按 display / align 抽样漏掉收缩的日期等字段。
+              await editor.fill('')
+              await editor.press('Backspace')
+              report.states.push({
+                scale,
+                index,
+                state: 'focused',
+                ...(await measureEmptyEditorHints(editor))[0],
+              })
+              await page
+                .locator('.erp-print-shell__toolbar-copy > strong')
+                .click()
+              report.states.push({
+                scale,
+                index,
+                state: 'blurred',
+                ...(await measureEmptyEditorHints(editor))[0],
+              })
+              if (scale === '1') {
+                await editor.click()
+                await editor.fill('12')
+                assert.equal(
+                  await editor.textContent(),
+                  '12',
+                  `${template.key} 字段 ${index} 清空失焦后应能点击并重新填写`
+                )
+                await editor.fill('')
+                await page
+                  .locator('.erp-print-shell__toolbar-copy > strong')
+                  .click()
+              }
+            }
+            if (scale === '1') {
+              await page.locator('.erp-print-shell__stage-wrap').screenshot({
+                path: path.join(
+                  outputDir,
+                  `print-${template.key}-all-empty.png`
+                ),
+              })
+            }
+          }
+          assert.equal(
+            report.states.length,
+            count * 4 * 2,
+            `${template.key} 必须检查全部字段和状态，不能静默跳过`
+          )
+          assert(
+            report.states.every(
+              ({ empty, focused, state }) =>
+                empty && focused === (state === 'focused')
+            ),
+            `${template.key} 清空后必须保持空值和预期焦点，不能回填或退出编辑`
+          )
+          await page.emulateMedia({ media: 'print' })
+          const printHints = await editors.evaluateAll(
+            (nodes) =>
+              nodes.filter(
+                (node) => getComputedStyle(node, '::before').content !== 'none'
+              ).length
+          )
+          assert.equal(printHints, 0, `${template.key} 空值提示不能进入打印`)
+          await page.emulateMedia({ media: 'screen' })
+          await page.locator('[data-print-draft-save-status="saved"]').waitFor()
+          const readValues = () =>
+            editors.evaluateAll((nodes) =>
+              nodes.map((node) =>
+                node.textContent.replace(/\u200b/g, '').trim()
+              )
+            )
+          const savedValues = await readValues()
+          const restoreURL = new URL(page.url())
+          restoreURL.searchParams.delete('draft')
+          await page.goto(restoreURL.href, { waitUntil: 'networkidle' })
+          await page.locator('.erp-print-shell--ready').waitFor()
+          await page.evaluate(() => document.fonts.ready)
+          assert.equal(
+            await editors.count(),
+            count,
+            `${template.key} 恢复草稿不能丢失空字段`
+          )
+          assert.deepEqual(
+            await readValues(),
+            // 作业序号按行结构自动编号，恢复时沿用既有编号规则。
+            savedValues.map((value, index) => stepNumbers[index] ?? value),
+            `${template.key} 空值草稿恢复后不能错位或回填样例`
+          )
+          report.restored = await measureEmptyEditorHints(editors)
+          assert(
+            report.restored.every((state) => state.textFits),
+            `${template.key} 恢复后的空值提示必须完整显示`
+          )
+          reports.push(report)
+          console.log(
+            `[print-all-empty] ${template.key}: ${count} fields, ${report.states.filter((state) => !state.textFits).length} clipped states`
+          )
+        }
+        await writeFile(
+          path.join(outputDir, 'print-all-empty-fields.json'),
+          JSON.stringify(reports, null, 2)
+        )
+        const failures = reports.flatMap((report) =>
+          report.states
+            .filter((state) => !state.textFits)
+            .map((state) => ({ template: report.key, ...state }))
+        )
+        assert.equal(
+          failures.length,
+          0,
+          `空字段提示必须完整显示: ${JSON.stringify(failures.slice(0, 12))}`
+        )
+      },
+    },
     {
       name: 'print-workspace-controls-and-empty-hints',
       path: '/erp/print-workspace/material-purchase-contract?draft=fresh',
@@ -74,12 +231,13 @@ export function createPrintWorkspaceControlScenarios({
             const group = panel
               .getByRole('region', { name: title, exact: true })
               .locator(':scope > details')
-            if (await group.count())
+            if (await group.count()) {
               assert.equal(
                 await group.evaluate((node) => node.open),
                 false,
                 `${title} 默认收起`
               )
+            }
           }
           const zoom = page.getByLabel('显示比例')
           assert(

@@ -133,8 +133,8 @@ function MaterialDetailPaper({
               <th key={column.key}>
                 <EditableText
                   value={
-                    !draft.columnLabels?.[columnIndex] ||
-                    draft.columnLabels[columnIndex] === column.label
+                    (draft.columnLabels?.[columnIndex] ?? column.label) ===
+                    column.label
                       ? column.headerLabel || column.label
                       : draft.columnLabels[columnIndex]
                   }

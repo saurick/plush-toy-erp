@@ -1,5 +1,66 @@
 import assert from 'node:assert/strict'
 
+export async function measureEmptyEditorHints(editors) {
+  return editors.evaluateAll((nodes) =>
+    nodes.map((node) => {
+      const style = getComputedStyle(node)
+      const hint = getComputedStyle(node, '::before')
+      const probe = document.createElement('span')
+      Object.assign(probe.style, {
+        position: 'fixed',
+        left: '-10000px',
+        top: '0',
+        visibility: 'hidden',
+        display: 'block',
+        boxSizing: 'content-box',
+        width: hint.width,
+        fontFamily: hint.fontFamily,
+        fontSize: hint.fontSize,
+        fontWeight: hint.fontWeight,
+        letterSpacing: hint.letterSpacing,
+        lineHeight: hint.lineHeight,
+        whiteSpace: hint.whiteSpace,
+        overflowWrap: hint.overflowWrap,
+        wordBreak: hint.wordBreak,
+      })
+      probe.textContent = '点击填写'
+      document.body.append(probe)
+      const requiredHeight = probe.getBoundingClientRect().height
+      const range = document.createRange()
+      range.selectNodeContents(probe)
+      const textWidth = Math.max(
+        ...[...range.getClientRects()].map((r) => r.width)
+      )
+      probe.remove()
+      const width = Number.parseFloat(hint.width)
+      const height = Number.parseFloat(hint.height)
+      const empty = !node.textContent.replace(/\u200b/g, '').trim()
+      return {
+        className: node.className,
+        empty,
+        focused: document.activeElement === node,
+        display: style.display,
+        fieldWidth: node.clientWidth,
+        fieldHeight: node.clientHeight,
+        minWidth: style.minWidth,
+        flex: style.flex,
+        content: hint.content,
+        width,
+        height,
+        requiredHeight,
+        textWidth,
+        textFits:
+          !empty ||
+          (hint.content === '"点击填写"' &&
+            width > 0 &&
+            requiredHeight <= height + 0.1 &&
+            textWidth <= width + 0.1 &&
+            height <= node.clientHeight + 1),
+      }
+    })
+  )
+}
+
 export async function assertEmptyEditorCaret(page, editor, label) {
   const original = await editor.textContent()
   const read = () =>

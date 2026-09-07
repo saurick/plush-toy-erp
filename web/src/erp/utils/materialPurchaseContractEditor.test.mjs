@@ -12,6 +12,7 @@ import {
   insertMaterialPurchaseLine,
   normalizeMaterialPurchaseUnitText,
   splitDetailCellMerge,
+  updateMaterialPurchaseClause,
   updateMaterialPurchaseLineCell,
 } from './materialPurchaseContractEditor.mjs'
 
@@ -47,6 +48,43 @@ const sampleDraft = buildMaterialPurchaseContractDraft({
       remark: '',
     },
   ],
+})
+
+test('materialPurchaseContractEditor: 清空和恢复条款不删除值槽或移动其他条款', () => {
+  const original = {
+    delivery: ['第一条', '第二条', '第三条'],
+    contract: ['合同约定'],
+    settlement: [],
+  }
+  const cleared = updateMaterialPurchaseClause(original, 'delivery', 1, '')
+  const edited = updateMaterialPurchaseClause(
+    cleared,
+    'delivery',
+    2,
+    '末条更新'
+  )
+  assert.deepEqual(edited.delivery, ['第一条', '', '末条更新'])
+  const recovered = buildMaterialPurchaseContractDraft({ clauses: edited })
+  assert.deepEqual(recovered.clauses, edited)
+  const refilled = updateMaterialPurchaseClause(
+    recovered.clauses,
+    'delivery',
+    1,
+    '重新填写'
+  )
+  assert.deepEqual(refilled.delivery, ['第一条', '重新填写', '末条更新'])
+  assert.deepEqual(original.delivery, ['第一条', '第二条', '第三条'])
+})
+
+test('materialPurchaseContractEditor: 全空条款保留数量，显式空分组仍为空', () => {
+  const draft = buildMaterialPurchaseContractDraft({
+    clauses: { delivery: ['', ' ', ''], contract: [], settlement: [''] },
+  })
+  assert.deepEqual(draft.clauses, {
+    delivery: ['', '', ''],
+    contract: [],
+    settlement: [''],
+  })
 })
 
 test('materialPurchaseContractEditor: 默认条款保留 C 类辅料合同源表固定文本', () => {

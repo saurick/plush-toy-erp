@@ -170,6 +170,13 @@
   align-items: baseline;
 }
 
+@media screen {
+  .erp-processing-contract-signature__date {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+}
+
 .erp-processing-contract-upload-bar {
   display: grid;
   gap: 10px;

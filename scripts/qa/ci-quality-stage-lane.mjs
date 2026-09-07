@@ -142,6 +142,7 @@ export const CI_SERVER_QUALITY_LANES = Object.freeze({
 export const CI_BROWSER_QUALITY_SCENARIOS = Object.freeze([
   "root-redirect-desktop",
   "root-redirect-mobile",
+  "print-workspace-all-empty-fields",
   "print-center-engineering-preview-tablet",
 ]);
 
@@ -163,6 +164,7 @@ export const CI_BROWSER_QUALITY_LANES = Object.freeze({
     browserScenarios: Object.freeze([
       "root-redirect-desktop",
       "root-redirect-mobile",
+      "print-workspace-all-empty-fields",
       "print-center-engineering-preview-tablet",
     ]),
   }),

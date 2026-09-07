@@ -1,5 +1,5 @@
-import { assertPrintTemplateGuide } from './printTemplateGuideAssertions.mjs'
 import { Buffer } from 'node:buffer'
+import { assertPrintTemplateGuide } from './printTemplateGuideAssertions.mjs'
 import { createMaterialDetailInteractionScenario } from './materialDetailInteractionScenario.mjs'
 import { createColorCardInteractionScenario } from './colorCardInteractionScenario.mjs'
 import { createWorkInstructionInteractionScenario } from './workInstructionInteractionScenario.mjs'
@@ -7,6 +7,7 @@ import { printTemplateCatalog } from '../../src/erp/config/printTemplates.mjs'
 import { createPrintPolishScenarios } from './printPolishScenarios.mjs'
 import { createPrintWorkspaceControlScenarios } from './printWorkspaceControlScenarios.mjs'
 import { createPrintWorkspaceFeedbackScenarios } from './printWorkspaceFeedbackScenarios.mjs'
+import { expandPrintToolSection } from './printToolHelpers.mjs'
 import {
   assertEmptyEditorCaret,
   collectEmptyEditorSamples,
@@ -1342,6 +1343,7 @@ export function createPrintWorkspaceScenarios({
         await expectText(page, '选择明细行')
         await expectText(page, '加工明细行: 3/300')
         await expectText(page, '打印')
+        await expandPrintToolSection(page, '末尾附图')
         await expectButton(page, '添加末尾图片')
         await assertProcessingContractPaperRowCount(page)
         await assertProcessingContractSignatureLayout(page)

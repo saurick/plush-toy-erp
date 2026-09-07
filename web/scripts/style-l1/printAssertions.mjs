@@ -1,8 +1,8 @@
-import { expandPrintToolSection } from './printToolHelpers.mjs'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
+import { expandPrintToolSection } from './printToolHelpers.mjs'
 
 import {
   A4_PAGE_HEIGHT_PX,
@@ -1045,7 +1045,7 @@ export function createPrintAssertions({
         timeout: 10_000,
       })
       await page.locator('[data-print-appendix-manager]').waitFor({
-        state: 'visible',
+        state: 'attached',
         timeout: 10_000,
       })
     }
