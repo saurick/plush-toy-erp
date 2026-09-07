@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { DeleteOutlined } from '@ant-design/icons'
+import { DeleteOutlined, FolderOpenOutlined } from '@ant-design/icons'
 import {
   Alert,
   AutoComplete,
@@ -1070,7 +1070,8 @@ export default function ShipmentBusinessModal({
                     </span>
                   </div>
                   <Button
-                    className="erp-line-items-form__import-button"
+                    icon={<FolderOpenOutlined aria-hidden="true" />}
+                    className="erp-line-items-form__import-button erp-action-button"
                     disabled={!canImportSalesOrderSource}
                     onClick={onOpenSalesOrderImport}
                   >

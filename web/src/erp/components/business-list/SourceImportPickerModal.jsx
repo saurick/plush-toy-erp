@@ -1,3 +1,4 @@
+import { RollbackOutlined } from '@ant-design/icons'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Button,
@@ -360,7 +361,8 @@ export default function SourceImportPickerModal({
             title={searchAccessibleLabel}
           />
           <Button
-            className="erp-source-import-picker__clear-filter"
+            icon={<RollbackOutlined aria-hidden="true" />}
+            className="erp-source-import-picker__clear-filter erp-action-button"
             disabled={keyword.length === 0}
             onClick={clearFilters}
           >

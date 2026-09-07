@@ -1,3 +1,10 @@
+import {
+  AuditOutlined,
+  EditOutlined,
+  EyeOutlined,
+  RollbackOutlined,
+  StopOutlined,
+} from '@ant-design/icons'
 import React, { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Modal, Space, Table, Tag } from 'antd'
 
@@ -232,6 +239,8 @@ export default function OutsourcingReturnRecordsModal({
           ) : null}
           {selectedDraftEditable ? (
             <Button
+              icon={<EditOutlined aria-hidden="true" />}
+              className="erp-action-button"
               disabled={loading || actionBusy}
               onClick={() => onEditFact?.(selected)}
             >
@@ -240,6 +249,8 @@ export default function OutsourcingReturnRecordsModal({
           ) : null}
           {selectedDraft && canCancelFact ? (
             <Button
+              icon={<StopOutlined aria-hidden="true" />}
+              className="erp-action-button"
               danger
               loading={actionLoading === `cancel:${selected.id}`}
               disabled={loading || actionBusy}
@@ -250,6 +261,8 @@ export default function OutsourcingReturnRecordsModal({
           ) : null}
           {selectedPosted && canCancelFact ? (
             <Button
+              icon={<RollbackOutlined aria-hidden="true" />}
+              className="erp-action-button"
               danger
               loading={actionLoading === `cancel:${selected.id}`}
               disabled={loading || actionBusy}
@@ -275,6 +288,8 @@ export default function OutsourcingReturnRecordsModal({
           selectedPostedReturn &&
           selectedQualityInspection ? (
             <Button
+              icon={<AuditOutlined aria-hidden="true" />}
+              className="erp-action-button"
               onClick={() =>
                 onViewQualityInspection?.(selectedQualityInspection)
               }
@@ -293,6 +308,8 @@ export default function OutsourcingReturnRecordsModal({
           ) : null}
           {canViewPayable ? (
             <Button
+              icon={<EyeOutlined aria-hidden="true" />}
+              className="erp-action-button"
               disabled={!selectedPostedReturn || loading || actionBusy}
               onClick={() => onViewPayable?.(selected)}
             >

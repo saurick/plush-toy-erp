@@ -2,10 +2,14 @@ import React from 'react'
 
 import {
   CalendarOutlined,
+  CheckCircleOutlined,
+  CheckSquareOutlined,
   CopyOutlined,
   DownOutlined,
   MoreOutlined,
   RollbackOutlined,
+  SendOutlined,
+  StopOutlined,
 } from '@ant-design/icons'
 import {
   Button,
@@ -977,9 +981,7 @@ export function SelectionClearAction({
 }) {
   const actionDisabled = disabled || Number(selectedCount) <= 0
   const actionDisabledReason =
-    disabled && disabledReason
-      ? disabledReason
-      : `请先选择${selectionLabel}`
+    disabled && disabledReason ? disabledReason : `请先选择${selectionLabel}`
 
   return (
     <BusinessActionTooltip
@@ -1001,6 +1003,21 @@ export function SelectionClearAction({
 
 SelectionClearAction.selectionActionPriority = 0
 
+const LIFECYCLE_ACTION_ICONS = {
+  submit: SendOutlined,
+  confirm: CheckCircleOutlined,
+  normal_close: CheckSquareOutlined,
+  short_close: StopOutlined,
+  cancel: StopOutlined,
+}
+
+function getLifecycleActionIcon(action) {
+  const Icon = Object.hasOwn(LIFECYCLE_ACTION_ICONS, action?.key)
+    ? LIFECYCLE_ACTION_ICONS[action.key]
+    : null
+  return Icon ? <Icon aria-hidden="true" /> : undefined
+}
+
 export function BusinessLifecyclePrimaryAction({
   action = null,
   disabled = false,
@@ -1012,8 +1029,9 @@ export function BusinessLifecyclePrimaryAction({
   return (
     <BusinessActionTooltip disabled={disabled} disabledReason={disabledReason}>
       <Button
+        icon={getLifecycleActionIcon(action)}
         data-business-action-key="lifecycle-primary"
-        className="erp-business-module-status-action erp-business-lifecycle-slot"
+        className="erp-business-module-status-action erp-business-lifecycle-slot erp-action-button"
         size="small"
         type="primary"
         danger={action?.danger === true}
@@ -1055,6 +1073,7 @@ export function BusinessLifecycleMoreAction({
           : ''
         return {
           key: action.key,
+          icon: getLifecycleActionIcon(action),
           label: (
             <span
               title={actionDisabledReason || undefined}
@@ -1093,7 +1112,7 @@ export function BusinessLifecycleMoreAction({
     >
       <Button
         data-business-action-key="lifecycle-more"
-        className="erp-business-module-status-action erp-business-lifecycle-slot"
+        className="erp-business-module-status-action erp-business-lifecycle-slot erp-action-button"
         size="small"
         aria-label={label}
       >

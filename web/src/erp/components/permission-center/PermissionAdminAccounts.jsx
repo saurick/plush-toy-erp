@@ -1,3 +1,4 @@
+import { UserAddOutlined } from '@ant-design/icons'
 import {
   Typography,
   Alert,
@@ -899,6 +900,8 @@ export default function PermissionAdminAccounts({
             <Tag color="green">共 {admins.length} 个员工账号</Tag>
           ) : null}
           <Button
+            icon={<UserAddOutlined aria-hidden="true" />}
+            className="erp-action-button"
             type="primary"
             disabled={!canCreateUsers}
             onClick={openCreateModal}

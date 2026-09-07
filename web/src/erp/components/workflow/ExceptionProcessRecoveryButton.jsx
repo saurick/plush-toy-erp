@@ -1,3 +1,4 @@
+import { ReloadOutlined } from '@ant-design/icons'
 import React, { useCallback, useState } from 'react'
 import { Button, Modal } from 'antd'
 import { message } from '@/common/utils/antdApp'
@@ -123,6 +124,8 @@ export default function ExceptionProcessRecoveryButton({
         disabledReason={actionDisabledReason}
       >
         <Button
+          icon={<ReloadOutlined aria-hidden="true" />}
+          className="erp-action-button"
           danger
           size={size}
           data-business-action-key="exception-process-recovery"

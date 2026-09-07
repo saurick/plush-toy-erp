@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   CopyOutlined,
   DeleteOutlined,
+  FolderOpenOutlined,
   OrderedListOutlined,
 } from '@ant-design/icons'
 import {
@@ -741,7 +742,8 @@ export function SalesOrderItemsFormSection({
               </div>
               <Space className="erp-line-item-order-actions" wrap>
                 <Button
-                  className="erp-line-items-form__import-button"
+                  icon={<FolderOpenOutlined aria-hidden="true" />}
+                  className="erp-line-items-form__import-button erp-action-button"
                   disabled={!canCreateItem}
                   onClick={() => setSkuImportOpen(true)}
                 >

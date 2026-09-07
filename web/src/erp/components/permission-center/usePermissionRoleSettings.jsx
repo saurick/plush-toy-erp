@@ -10,7 +10,12 @@ import {
   Tag,
 } from 'antd'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { QuestionCircleOutlined, RightOutlined } from '@ant-design/icons'
+import {
+  QuestionCircleOutlined,
+  ReloadOutlined,
+  RightOutlined,
+  SaveOutlined,
+} from '@ant-design/icons'
 import {
   IS_PRODUCTION_BUILD,
   READ_USER_PERMISSION,
@@ -991,8 +996,9 @@ export function usePermissionRoleSettings({
                     {roleConfigurationDirty ? '有未保存调整' : '已保存'}
                   </Tag>
                   <Button
+                    icon={<SaveOutlined aria-hidden="true" />}
                     type="primary"
-                    className="erp-role-center-save"
+                    className="erp-role-center-save erp-action-button"
                     loading={saving}
                     disabled={
                       !canManageRolePermissions ||
@@ -1024,7 +1030,12 @@ export function usePermissionRoleSettings({
                       : '当前勾选已经保留。请先刷新最新岗位资料，再核对并重新保存，避免覆盖他人的调整。'
                   }
                   action={
-                    <Button size="small" onClick={refreshConflictedRole}>
+                    <Button
+                      icon={<ReloadOutlined aria-hidden="true" />}
+                      className="erp-action-button"
+                      size="small"
+                      onClick={refreshConflictedRole}
+                    >
                       刷新并保留当前勾选
                     </Button>
                   }

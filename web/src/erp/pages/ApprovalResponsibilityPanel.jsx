@@ -1,5 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CheckCircleOutlined, QuestionCircleOutlined } from '@ant-design/icons'
+import {
+  CheckCircleOutlined,
+  QuestionCircleOutlined,
+  ReloadOutlined,
+  SaveOutlined,
+} from '@ant-design/icons'
 import {
   Alert,
   Button,
@@ -856,7 +861,12 @@ export default function ApprovalResponsibilityPanel({
           message="审批责任加载失败"
           description={loadError}
           action={
-            <Button size="small" onClick={load}>
+            <Button
+              icon={<ReloadOutlined aria-hidden="true" />}
+              className="erp-action-button"
+              size="small"
+              onClick={load}
+            >
               重试
             </Button>
           }
@@ -962,7 +972,13 @@ export default function ApprovalResponsibilityPanel({
                     : '保存后立即用于新发起审批；在途审批继续按原责任。'}
                 </Text>
               </div>
-              <Button type="primary" loading={saving} onClick={saveAndActivate}>
+              <Button
+                icon={<SaveOutlined aria-hidden="true" />}
+                className="erp-action-button"
+                type="primary"
+                loading={saving}
+                onClick={saveAndActivate}
+              >
                 {appliedReceipt || pendingPayload ? '确认并生效' : '保存并生效'}
               </Button>
             </div>

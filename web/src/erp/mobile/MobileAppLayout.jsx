@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ReloadOutlined } from '@ant-design/icons'
 import { Outlet, useNavigate } from 'react-router-dom'
 import {
   AUTH_SCOPE,
@@ -471,11 +472,12 @@ export default function MobileAppLayout() {
                 <span>连接暂未刷新，当前显示上次已确认的工作范围。</span>
                 <button
                   type="button"
-                  className="min-h-11 shrink-0 rounded-lg border border-amber-300 bg-white px-3 py-2 font-semibold disabled:cursor-wait disabled:opacity-60"
+                  className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2 font-semibold disabled:cursor-wait disabled:opacity-60"
                   onClick={handleRetry}
                   disabled={profileSyncing}
                 >
-                  {profileSyncing ? '连接中' : '重试'}
+                  <ReloadOutlined aria-hidden="true" className="text-base" />
+                  <span>{profileSyncing ? '连接中' : '重试'}</span>
                 </button>
               </div>
             ) : null}

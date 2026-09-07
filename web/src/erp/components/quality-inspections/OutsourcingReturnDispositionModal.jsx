@@ -1,3 +1,4 @@
+import { RollbackOutlined } from '@ant-design/icons'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Alert,
@@ -218,6 +219,8 @@ export default function OutsourcingReturnDispositionModal({
           ) : null}
           {selected && selected.status !== 'CANCELLED' && canCancel ? (
             <Button
+              icon={<RollbackOutlined aria-hidden="true" />}
+              className="erp-action-button"
               danger
               onClick={() => transition('cancel')}
               disabled={loading}

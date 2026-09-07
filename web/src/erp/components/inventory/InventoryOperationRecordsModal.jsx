@@ -1,3 +1,4 @@
+import { EditOutlined, ReloadOutlined } from '@ant-design/icons'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Checkbox, Modal, Select, Space, Table, Tag } from 'antd'
 
@@ -214,6 +215,8 @@ export default function InventoryOperationRecordsModal({
               </Button>
               {canEdit ? (
                 <Button
+                  icon={<EditOutlined aria-hidden="true" />}
+                  className="erp-action-button"
                   type="primary"
                   size="small"
                   loading={actionKey === `edit:${record.id}`}
@@ -276,7 +279,12 @@ export default function InventoryOperationRecordsModal({
         >
           仅看我创建
         </Checkbox>
-        <Button disabled={loading} onClick={loadRecords}>
+        <Button
+          icon={<ReloadOutlined aria-hidden="true" />}
+          className="erp-action-button"
+          disabled={loading}
+          onClick={loadRecords}
+        >
           刷新
         </Button>
       </Space>

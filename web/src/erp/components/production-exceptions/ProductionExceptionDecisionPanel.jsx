@@ -1,3 +1,4 @@
+import { AuditOutlined, RollbackOutlined } from '@ant-design/icons'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Card, Input, Modal, Table, Tag } from 'antd'
 import { useSearchParams } from 'react-router-dom'
@@ -169,9 +170,7 @@ export default function ProductionExceptionDecisionPanel({
     try {
       const data = await listProductionExceptions(
         {
-          ...(decisionTypeFilter
-            ? { decision_type: decisionTypeFilter }
-            : {}),
+          ...(decisionTypeFilter ? { decision_type: decisionTypeFilter } : {}),
           ...(statusFilter ? { status: statusFilter } : {}),
           ...(executionStatusFilter
             ? { execution_status: executionStatusFilter }
@@ -461,11 +460,9 @@ export default function ProductionExceptionDecisionPanel({
 
   if (!canRead) return null
 
-  const selectedRecord =
-    rows.find((item) => item.id === selectedID) || null
+  const selectedRecord = rows.find((item) => item.id === selectedID) || null
   const selectedRequesterOwned = Boolean(
-    selectedRecord &&
-      Number(selectedRecord.requested_by) === adminID
+    selectedRecord && Number(selectedRecord.requested_by) === adminID
   )
   const actionAvailability = {
     approval: resolveProductionExceptionActionAvailability({
@@ -576,6 +573,8 @@ export default function ProductionExceptionDecisionPanel({
               disabledReason={actionAvailability.approval.disabledReason}
             >
               <Button
+                icon={<AuditOutlined aria-hidden="true" />}
+                className="erp-action-button"
                 size="small"
                 data-business-action-key="production-exception-approval"
                 disabled={actionAvailability.approval.disabled}
@@ -591,6 +590,8 @@ export default function ProductionExceptionDecisionPanel({
               disabledReason={actionAvailability.decide.disabledReason}
             >
               <Button
+                icon={<AuditOutlined aria-hidden="true" />}
+                className="erp-action-button"
                 size="small"
                 type="primary"
                 data-business-action-key="production-exception-decide"
@@ -607,6 +608,8 @@ export default function ProductionExceptionDecisionPanel({
               disabledReason={actionAvailability.withdraw.disabledReason}
             >
               <Button
+                icon={<RollbackOutlined aria-hidden="true" />}
+                className="erp-action-button"
                 size="small"
                 danger
                 data-business-action-key="production-exception-withdraw"
@@ -648,6 +651,8 @@ export default function ProductionExceptionDecisionPanel({
               disabledReason={actionAvailability.reverse.disabledReason}
             >
               <Button
+                icon={<RollbackOutlined aria-hidden="true" />}
+                className="erp-action-button"
                 size="small"
                 danger
                 data-business-action-key="production-exception-reverse"
@@ -673,6 +678,8 @@ export default function ProductionExceptionDecisionPanel({
               disabledReason={actionAvailability.revokeQuota.disabledReason}
             >
               <Button
+                icon={<RollbackOutlined aria-hidden="true" />}
+                className="erp-action-button"
                 size="small"
                 danger
                 data-business-action-key="production-exception-revoke-quota"

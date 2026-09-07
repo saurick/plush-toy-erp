@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
-  ArrowLeftOutlined,
   ArrowDownOutlined,
+  ArrowLeftOutlined,
   ArrowRightOutlined,
   ArrowUpOutlined,
   DoubleLeftOutlined,
   DoubleRightOutlined,
   MoreOutlined,
   SettingOutlined,
+  UndoOutlined,
   VerticalAlignBottomOutlined,
   VerticalAlignTopOutlined,
 } from '@ant-design/icons'
@@ -235,7 +236,12 @@ export function ColumnOrderModal({
       destroyOnHidden={false}
       footer={
         <Space wrap className="erp-business-column-order-modal__footer">
-          <Button disabled={saving} onClick={resetDraftOrder}>
+          <Button
+            icon={<UndoOutlined aria-hidden="true" />}
+            className="erp-action-button"
+            disabled={saving}
+            onClick={resetDraftOrder}
+          >
             恢复默认
           </Button>
           <Button type="primary" loading={saving} onClick={saveDraftOrder}>

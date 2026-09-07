@@ -1,5 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { DownOutlined, EyeOutlined, LinkOutlined } from '@ant-design/icons'
+import {
+  AuditOutlined,
+  DownOutlined,
+  EditOutlined,
+  EyeOutlined,
+  LinkOutlined,
+  ReconciliationOutlined,
+  SendOutlined,
+  SwapOutlined,
+} from '@ant-design/icons'
 import {
   Alert,
   Button,
@@ -1929,6 +1938,8 @@ export default function V1InventoryLedgerPage() {
                 canCreateInventoryOperation &&
                 Number(currentOperation.created_by || 0) === currentAdminID ? (
                   <Button
+                    icon={<EditOutlined aria-hidden="true" />}
+                    className="erp-action-button"
                     size="small"
                     disabled={operationLoading}
                     onClick={() => openInventoryOperationEdit(currentOperation)}
@@ -1947,6 +1958,8 @@ export default function V1InventoryLedgerPage() {
                       onConfirm={() => transitionInventoryOperation('submit')}
                     >
                       <Button
+                        icon={<SendOutlined aria-hidden="true" />}
+                        className="erp-action-button"
                         type="primary"
                         size="small"
                         loading={operationLoading}
@@ -1991,6 +2004,8 @@ export default function V1InventoryLedgerPage() {
                 {currentOperation.status === 'SUBMITTED' &&
                 canApproveInventoryOperation ? (
                   <Button
+                    icon={<AuditOutlined aria-hidden="true" />}
+                    className="erp-action-button"
                     size="small"
                     onClick={() => navigate('/erp/task-board')}
                   >
@@ -2304,10 +2319,10 @@ export default function V1InventoryLedgerPage() {
           {canCreateInventoryOperation && activeView === VIEW_BALANCES ? (
             <>
               {[
-                ['CYCLE_COUNT', '盘点', true],
-                ['TRANSFER', '调拨', false],
-                ['MANUAL_ADJUSTMENT', '人工调整', false],
-              ].map(([type, label, primary]) => (
+                ['CYCLE_COUNT', '盘点', true, ReconciliationOutlined],
+                ['TRANSFER', '调拨', false, SwapOutlined],
+                ['MANUAL_ADJUSTMENT', '人工调整', false, EditOutlined],
+              ].map(([type, label, primary, Icon]) => (
                 <BusinessActionTooltip
                   key={type}
                   disabled={!selectedRow || operationLoading}
@@ -2318,6 +2333,8 @@ export default function V1InventoryLedgerPage() {
                   }
                 >
                   <Button
+                    icon={<Icon aria-hidden="true" />}
+                    className="erp-action-button"
                     data-business-action-key={`inventory-${type.toLowerCase()}`}
                     size="small"
                     type={primary ? 'primary' : 'default'}

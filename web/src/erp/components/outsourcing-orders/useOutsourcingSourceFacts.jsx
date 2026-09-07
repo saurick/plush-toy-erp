@@ -1,3 +1,4 @@
+import { ExportOutlined, ImportOutlined } from '@ant-design/icons'
 import React, { useCallback, useRef, useState } from 'react'
 import { Button, Input, Space } from 'antd'
 import { useOutsourcingReturnPayable } from './useOutsourcingReturnPayable.mjs'
@@ -763,6 +764,14 @@ export function useOutsourcingSourceFacts({
       }
       return (
         <Button
+          icon={
+            action.type === OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE ? (
+              <ExportOutlined aria-hidden="true" />
+            ) : (
+              <ImportOutlined aria-hidden="true" />
+            )
+          }
+          className="erp-action-button"
           size="small"
           loading={sourceFactLoading}
           onClick={(event) => {

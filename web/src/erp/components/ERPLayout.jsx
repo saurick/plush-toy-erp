@@ -8,17 +8,17 @@ import {
   DownOutlined,
   FileSearchOutlined,
   FileTextOutlined,
-  HomeOutlined,
   HistoryOutlined,
-  InfoCircleOutlined,
+  HomeOutlined,
   InboxOutlined,
+  InfoCircleOutlined,
   LogoutOutlined,
   MenuOutlined,
   PrinterOutlined,
   QuestionCircleOutlined,
   ReloadOutlined,
-  ScheduleOutlined,
   SafetyCertificateOutlined,
+  ScheduleOutlined,
   SettingOutlined,
   ShoppingCartOutlined,
   SwapOutlined,
@@ -230,7 +230,13 @@ function CustomerRuntimeUnavailable({ loggingOut, onRetry, onLogout }) {
             description="尚未确认当前账号可访问的页面和业务内容。为避免显示错误内容，系统没有加载工作台；请重试或退出后重新登录。"
             action={
               <Space size={8} wrap>
-                <Button onClick={onRetry}>重试</Button>
+                <Button
+                  icon={<ReloadOutlined aria-hidden="true" />}
+                  className="erp-action-button"
+                  onClick={onRetry}
+                >
+                  重试
+                </Button>
                 <Button loading={loggingOut} onClick={onLogout}>
                   退出登录
                 </Button>

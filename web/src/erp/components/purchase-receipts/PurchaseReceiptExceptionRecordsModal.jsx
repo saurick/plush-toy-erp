@@ -1,3 +1,8 @@
+import {
+  ReloadOutlined,
+  RollbackOutlined,
+  StopOutlined,
+} from '@ant-design/icons'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Modal, Popconfirm, Space, Table, Tabs, Tag } from 'antd'
 
@@ -186,9 +191,9 @@ export default function PurchaseReceiptExceptionRecordsModal({
               ? kind === 'return'
                 ? '采购退货草稿已作废，未更新库存'
                 : '入库调整草稿已作废，未更新库存'
-            : kind === 'return'
-              ? '采购退货已取消，库存已恢复到退货前'
-              : '入库调整已取消，库存已恢复到调整前'
+              : kind === 'return'
+                ? '采购退货已取消，库存已恢复到退货前'
+                : '入库调整已取消，库存已恢复到调整前'
         )
         await loadRecords()
         await onChanged?.()
@@ -258,6 +263,8 @@ export default function PurchaseReceiptExceptionRecordsModal({
                   }
                 >
                   <Button
+                    icon={<StopOutlined aria-hidden="true" />}
+                    className="erp-action-button"
                     size="small"
                     danger
                     loading={savingKey === `${kind}:cancel:${record.id}`}
@@ -280,6 +287,8 @@ export default function PurchaseReceiptExceptionRecordsModal({
               onConfirm={() => runAction({ kind, action: 'cancel', record })}
             >
               <Button
+                icon={<RollbackOutlined aria-hidden="true" />}
+                className="erp-action-button"
                 size="small"
                 danger
                 loading={savingKey === `${kind}:cancel:${record.id}`}
@@ -394,6 +403,8 @@ export default function PurchaseReceiptExceptionRecordsModal({
       footer={
         <Space>
           <Button
+            icon={<ReloadOutlined aria-hidden="true" />}
+            className="erp-action-button"
             onClick={loadRecords}
             loading={loading}
             disabled={Boolean(savingKey)}

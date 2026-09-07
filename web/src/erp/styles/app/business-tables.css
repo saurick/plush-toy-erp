@@ -956,6 +956,28 @@
   font-size: 14px;
 }
 
+.erp-action-button.ant-btn {
+  gap: 8px;
+}
+
+.erp-action-button.ant-btn > .ant-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  font-size: 16px;
+}
+
+.erp-action-button.ant-btn > .ant-btn-icon > .anticon {
+  font-size: inherit;
+}
+
+.erp-action-button.ant-btn.ant-btn-sm {
+  gap: 6px;
+}
+
+.erp-action-button.ant-btn-sm > .ant-btn-icon {
+  font-size: 14px;
+}
+
 .erp-business-row-items-preview__footer {
   display: flex;
   min-width: 0;
