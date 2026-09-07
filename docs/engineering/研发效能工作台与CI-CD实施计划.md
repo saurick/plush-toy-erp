@@ -36,7 +36,7 @@
 1. 运行新增/受影响 Node 合同：GitLab Provider、exact-SHA、release catalog、GitLab/GitHub workflow、affected、quality catalog、Bridge、工作台配置和样式。
 2. 对 `.gitlab-ci.yml`、Compose、cloud-init 和 Shell 脚本做 YAML/Shell 静态检查；不执行安装、备份或远端命令。
 3. 运行 `git diff --check` 和精确变更审查，确认没有触碰外部脏路径、generated path、schema/migration 或生产配置。
-4. 根据 affected plan 判断是否需要更高成本验证。full、strict、完整 Style L1 或真实浏览器门禁仍需按测试治理另行点名授权。
+4. 根据 affected plan 按影响面补齐当前目标必要的验证；明显超出任务范围或资源预算时，按测试治理说明影响后确认。
 5. commit、GitLab push、GitHub mirror、发布和目标部署继续按各自合同与当前授权边界分层执行；一层完成不自动推定后一层。
 
 ## GitLab 部署前置证据

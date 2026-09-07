@@ -113,7 +113,7 @@
 
 按 `docs/product/自动化测试策略.md` 和 `$plush-test-governance` 选择 T0-T8 与测试形态。
 
-- 高成本验证按 `$plush-test-governance` 在执行前点名授权；同一候选可一次合并确认，范围或候选变化后再确认。`prepare-push.sh` 默认单一 `origin/main` 使用 `server-ci` 短门禁，高成本验证由 R640 exact-SHA CI 执行；非标准目标和显式本地 `--full` 按 `scripts/qa/README.md` 的保守合同处理，禁止静默升级。
+- 实现授权包含当前目标所需的最小充分验证；按影响面自主执行，明显超出任务范围或资源预算时按 `$plush-test-governance` 说明影响后确认。同一目标内修复后的必要复验沿用已有授权，证据绑定当前代码。共享环境配置、真实数据、Git 和发布仍遵守各自授权边界。`prepare-push.sh` 默认单一 `origin/main` 使用 `server-ci` 短门禁，高成本验证由 R640 exact-SHA CI 执行；非标准目标和显式本地 `--full` 按 `scripts/qa/README.md` 的保守合同处理，禁止静默升级。
 
 - 各领域的正常、边界、异常、权限和证据边界由测试策略、对应代码与测试真源守住，不在本文件重复目录。
 

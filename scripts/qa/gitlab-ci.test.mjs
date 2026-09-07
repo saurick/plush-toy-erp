@@ -668,7 +668,7 @@ test("R640 GitLab definitions pin identity, separate SSD data and require exact 
   assert.match(runnerVm, /cache=none,discard=unmap/u);
   assert.match(
     runnerCloudInit,
-    /"gc":\{"enabled":true,"defaultKeepStorage":"20GB"\}/u,
+    /"gc":\{"enabled":true,"defaultKeepStorage":"40GB"\}/u,
   );
   assert.match(runnerCloudInit, /\[systemctl, enable, --now, fstrim.timer\]/u);
   assert.match(installer, /preview_only=true/u);

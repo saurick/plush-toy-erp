@@ -74,7 +74,7 @@ write_files:
     owner: root:root
     permissions: '0644'
     content: |
-      {"builder":{"gc":{"enabled":true,"defaultKeepStorage":"20GB"}}}
+      {"builder":{"gc":{"enabled":true,"defaultKeepStorage":"40GB"}}}
   - path: /usr/local/sbin/plush-runner-capacity
     permissions: '0755'
     owner: root:root

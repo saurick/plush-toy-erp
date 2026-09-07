@@ -22,7 +22,7 @@ GitLab 不与业务 PostgreSQL、测试数据库或现有 Docker 容器共享数
 
 CI 的 Package 删除使用当前 `CI_JOB_TOKEN`，发布发起者须具有本项目 Package 删除权限（Maintainer / Owner）；验证和 Release 读写继续使用原有 Developer 发布账号，不提升其常驻权限。缺失 Job Token 或 API 拒绝删除时停止退役，不降级凭据。历史候选可使用同一个 `gitlab-release-candidate.mjs retire-candidate --sha <sha> --version <version> --customer yoyoosun --json` 入口逐份处理；非 CI 运维必须提供本来就有删除权限的 `GITLAB_RELEASE_TOKEN`。
 
-Runner 的工作区、Go/pnpm 缓存和 Docker 层继续在 SSD。Docker 默认 builder 启用 `20GB` GC 保留目标；VM disk 显式使用 `discard=unmap`，guest 启用每周 `fstrim.timer`。在线应用配置须先证明 Runner 空闲，在维护窗口重启并读回；不删除业务 volume，不把镜像大小与共享 build cache 相加。目标部署的旧镜像/中转包先按 live 容器、当前版本、回滚和 operation 引用盘点，必要历史归档放 RAID5，精确清理仍走项目发布边界。
+Runner 的工作区、Go/pnpm 缓存和 Docker 层继续在 SSD。每台 Runner 的 Docker 默认 builder 启用 `40GB` GC 保留目标，为重复构建保留余量；该目标仅作用于 Docker 构建缓存，Go/pnpm 缓存和发布镜像另行保留。VM disk 显式使用 `discard=unmap`，guest 启用每周 `fstrim.timer`。在线应用配置须先证明 Runner 空闲，在维护窗口重启并读回；不删除业务 volume，不把镜像大小与共享 build cache 相加。目标部署的旧镜像/中转包先按 live 容器、当前版本、回滚和 operation 引用盘点，必要历史归档放 RAID5，精确清理仍走项目发布边界。
 
 升级前的 VM 内部快照会继续引用旧磁盘块，guest TRIM 成功不等于宿主机已经回收空间。快照归档使用 `/srv/raid5/runner-vm/upgrade-backups/<日期>/`：先停止空闲 VM，保存含快照的 qcow2、backing image、domain/snapshot XML；压缩档解压流的 SHA-256 必须与停机原盘一致，backing image 单独校验。只删除已归档的指定内部快照，再运行 `qemu-img check`、启动 guest、TRIM 和 Runner 验证，并以宿主机 `du` / `df` 读回实际回收量。恢复时先在独立目录解压并核对 backing image 与指定快照，不能直接覆盖运行盘。后续升级复用同一归档路径；正常升级确认后保留最近两次恢复点，额外历史按明确保留需求处理。
 
