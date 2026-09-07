@@ -7,7 +7,8 @@ import React, {
   useState,
 } from 'react'
 import { Checkbox, Input, Modal } from 'antd'
-import { DeleteOutlined, DragOutlined, UndoOutlined } from '@ant-design/icons'
+import { DeleteOutlined, DragOutlined } from '@ant-design/icons'
+import { PrintToolButton } from './PrintWorkspaceTools.jsx'
 import {
   WORK_INSTRUCTION_IMAGE_ANNOTATION_LIMITS,
   WORK_INSTRUCTION_IMAGE_ANNOTATION_TYPES,
@@ -856,16 +857,20 @@ export default function WorkInstructionImageAnnotationEditor({
           <span aria-live="polite">{status}</span>
           <div>
             {undoRecord ? (
-              <button type="button" onClick={handleUndo}>
-                <UndoOutlined aria-hidden="true" /> 撤销删除
-              </button>
+              <PrintToolButton icon="back" onClick={handleUndo}>
+                撤销删除
+              </PrintToolButton>
             ) : null}
             <button type="button" onClick={onCancel}>
               取消
             </button>
-            <button type="button" className="is-primary" onClick={handleSave}>
+            <PrintToolButton
+              icon="save"
+              className="is-primary"
+              onClick={handleSave}
+            >
               保存标注
-            </button>
+            </PrintToolButton>
           </div>
         </div>
       }
@@ -946,7 +951,8 @@ export default function WorkInstructionImageAnnotationEditor({
 
         <aside className="erp-work-instruction-annotation-modal__panel">
           <div className="erp-work-instruction-annotation-modal__add-actions">
-            <button
+            <PrintToolButton
+              icon="note"
               type="button"
               data-add-callout
               disabled={
@@ -961,8 +967,9 @@ export default function WorkInstructionImageAnnotationEditor({
               }
             >
               添加说明框
-            </button>
-            <button
+            </PrintToolButton>
+            <PrintToolButton
+              icon="measure"
               type="button"
               data-add-measurement
               disabled={
@@ -977,7 +984,7 @@ export default function WorkInstructionImageAnnotationEditor({
               }
             >
               添加距离标注
-            </button>
+            </PrintToolButton>
           </div>
 
           {annotations.length ? (
@@ -1006,14 +1013,15 @@ export default function WorkInstructionImageAnnotationEditor({
                   {annotations.length}/
                   {WORK_INSTRUCTION_IMAGE_ANNOTATION_LIMITS.perImage}
                 </span>
-                <button
+                <PrintToolButton
+                  icon="remove"
                   type="button"
                   className="erp-work-instruction-annotation-modal__delete"
                   disabled={!checkedIDs.length}
                   onClick={() => handleDelete(checkedIDs)}
                 >
                   删除所选{checkedIDs.length ? ` (${checkedIDs.length})` : ''}
-                </button>
+                </PrintToolButton>
               </div>
               <div className="erp-work-instruction-annotation-modal__annotation-list">
                 {annotations.map((annotation, annotationIndex) => (
@@ -1177,9 +1185,11 @@ export default function WorkInstructionImageAnnotationEditor({
                     />
                   </label>
                   <div className="erp-work-instruction-annotation-modal__point-actions">
-                    <button
+                    <PrintToolButton
+                      icon={addingTarget ? 'clear' : 'target'}
                       type="button"
                       className={addingTarget ? 'is-active' : ''}
+                      aria-pressed={addingTarget}
                       data-add-target
                       disabled={
                         selectedAnnotation.targets.length >=
@@ -1188,8 +1198,9 @@ export default function WorkInstructionImageAnnotationEditor({
                       onClick={() => setAddingTarget((current) => !current)}
                     >
                       {addingTarget ? '停止添加指向点' : '添加指向点'}
-                    </button>
-                    <button
+                    </PrintToolButton>
+                    <PrintToolButton
+                      icon="minus"
                       type="button"
                       disabled={selectedAnnotation.targets.length <= 1}
                       onClick={() => {
@@ -1203,7 +1214,7 @@ export default function WorkInstructionImageAnnotationEditor({
                       }}
                     >
                       移除末个指向点
-                    </button>
+                    </PrintToolButton>
                   </div>
                   <small>
                     当前 {selectedAnnotation.targets.length}/

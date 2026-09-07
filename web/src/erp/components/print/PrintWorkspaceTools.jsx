@@ -5,6 +5,13 @@ const TOOL_ICON_PATHS = {
     'M2 12a11 11 0 0 1 20 0 11 11 0 0 1-20 0Zm13 0a3 3 0 1 1-6 0 3 3 0 0 1 6 0',
   download: 'M12 3v12m-5-5 5 5 5-5M4 15v6h16v-6',
   print: 'M6 9V3h12v6M6 18H3V9h18v9h-3M6 14h12v7H6ZM17 12h1',
+  upload: 'M12 15V3m-5 5 5-5 5 5M4 15v6h16v-6',
+  replace: 'M3 7h17m-4-4 4 4-4 4M21 17H4m4-4-4 4 4 4',
+  clear: 'm6 6 12 12M6 18 18 6',
+  measure: 'M4 6v12m16-12v12M4 12h16m-4-4 4 4-4 4M8 8l-4 4 4 4',
+  save: 'M3 3h14l4 4v14H3ZM7 3v6h9V3M7 21v-8h10v8',
+  target: 'M12 3v4m0 10v4M3 12h4m10 0h4M17 12a5 5 0 1 1-10 0 5 5 0 0 1 10 0',
+  minus: 'M5 12h14',
   select: 'M5 3v17l5-5 4 6 3-2-4-6 7-1Z',
   cells: 'M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5M3 11v2m18-2v2M11 3h2m-2 18h2',
   up: 'm5 10 7-7 7 7M12 3v18',
@@ -108,7 +115,8 @@ export function PrintImageSlotTool({
             aria-label={`${image?.dataURL ? '更换' : '上传'}${label}`}
             onClick={() => inputRef.current?.click()}
           >
-            {image?.dataURL ? '更换' : '上传'}
+            <PrintToolIcon name={image?.dataURL ? 'replace' : 'upload'} />
+            <span>{image?.dataURL ? '更换' : '上传'}</span>
           </button>
           <button
             type="button"
@@ -116,7 +124,8 @@ export function PrintImageSlotTool({
             disabled={!image?.dataURL}
             onClick={onClear}
           >
-            清空
+            <PrintToolIcon name="clear" />
+            <span>清空</span>
           </button>
         </div>
       </div>

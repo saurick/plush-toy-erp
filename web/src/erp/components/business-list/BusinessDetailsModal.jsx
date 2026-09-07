@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { RedoOutlined } from '@ant-design/icons'
 import {
   Alert,
   Button,
@@ -23,9 +24,7 @@ function readDataIndex(record, dataIndex) {
     return dataIndex.reduce((current, key) => current?.[key], record)
   }
   if (typeof dataIndex === 'string' && dataIndex.includes('.')) {
-    return dataIndex
-      .split('.')
-      .reduce((current, key) => current?.[key], record)
+    return dataIndex.split('.').reduce((current, key) => current?.[key], record)
   }
   return dataIndex ? record?.[dataIndex] : undefined
 }
@@ -48,7 +47,9 @@ function visibleDetailValue(value) {
   if (React.isValidElement(value)) return value
   if (value === undefined || value === null || value === '') return '-'
   if (typeof value === 'boolean') return value ? '是' : '否'
-  if (['string', 'number', 'bigint'].includes(typeof value)) return String(value)
+  if (['string', 'number', 'bigint'].includes(typeof value)) {
+    return String(value)
+  }
   return '-'
 }
 
@@ -129,7 +130,12 @@ function BusinessLineItems({ config, open, record }) {
       {loadState.status === 'error' ? (
         <Alert
           action={
-            <Button size="small" onClick={() => setRetryKey((value) => value + 1)}>
+            <Button
+              size="small"
+              className="erp-business-retry-button"
+              icon={<RedoOutlined aria-hidden="true" />}
+              onClick={() => setRetryKey((value) => value + 1)}
+            >
               重试
             </Button>
           }
@@ -262,11 +268,7 @@ export default function BusinessDetailsModal({
         })}
       />
       {lineItems ? (
-        <BusinessLineItems
-          config={lineItems}
-          open={open}
-          record={record}
-        />
+        <BusinessLineItems config={lineItems} open={open} record={record} />
       ) : null}
       {children}
     </BusinessFormModal>

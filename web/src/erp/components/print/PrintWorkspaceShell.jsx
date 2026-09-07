@@ -9,6 +9,7 @@ import React, {
 import '@fontsource-variable/noto-sans-sc'
 import '@fontsource-variable/noto-serif-sc'
 import { inspectPrintImageBudget } from '../../utils/printOutputPreflight.mjs'
+import { PrintToolButton } from './PrintWorkspaceTools.jsx'
 
 const PRINT_WORKSPACE_PREPARING_MIN_MS = 280
 const DRAFT_PERSISTENCE_STATUS_TEXT = Object.freeze({
@@ -339,13 +340,14 @@ export default function PrintWorkspaceShell({
               </span>
             ) : null}
             {persistenceStatus === 'error' && onRetrySave ? (
-              <button
+              <PrintToolButton
+                icon="reset"
                 type="button"
-                className="erp-print-shell__button erp-print-shell__button--ghost"
+                className="erp-print-shell__button--ghost"
                 onClick={onRetrySave}
               >
                 重试保存
-              </button>
+              </PrintToolButton>
             ) : null}
           </div>
           <div className="erp-print-shell__toolbar-actions">

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { DownOutlined, RightOutlined } from '@ant-design/icons'
+import { DownOutlined, RedoOutlined, RightOutlined } from '@ant-design/icons'
 import { Alert, Button, Empty, Modal, Pagination, Spin } from 'antd'
 
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -108,7 +108,12 @@ function BusinessRowItemsLoadState({
     return (
       <Alert
         action={
-          <Button size="small" onClick={onRetry}>
+          <Button
+            size="small"
+            className="erp-business-retry-button"
+            icon={<RedoOutlined aria-hidden="true" />}
+            onClick={onRetry}
+          >
             重试
           </Button>
         }

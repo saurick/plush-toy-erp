@@ -948,6 +948,14 @@
   gap: 8px;
 }
 
+.erp-business-retry-button.ant-btn {
+  gap: 6px;
+}
+
+.erp-business-retry-button .anticon {
+  font-size: 14px;
+}
+
 .erp-business-row-items-preview__footer {
   display: flex;
   min-width: 0;

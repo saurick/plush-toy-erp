@@ -1014,12 +1014,12 @@
   color: #2c7b4e;
 }
 
-.erp-print-shell__toolbar-actions .erp-print-tool-button {
+.erp-print-shell__toolbar .erp-print-tool-button {
   justify-content: center;
   white-space: nowrap;
 }
 
-.erp-print-shell__toolbar-actions .erp-print-tool-icon {
+.erp-print-shell__toolbar .erp-print-tool-icon {
   color: inherit;
 }
 
@@ -1089,6 +1089,9 @@
 }
 
 .erp-print-image-tool__actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   min-height: 32px;
   padding: 0;
   border: 0;
@@ -1096,6 +1099,13 @@
   color: #2c7b4e;
   font: inherit;
   cursor: pointer;
+}
+
+.erp-print-image-tool__actions .erp-print-tool-icon {
+  flex-basis: 14px;
+  width: 14px;
+  height: 14px;
+  color: inherit;
 }
 
 .erp-print-image-tool__actions button:last-child {
