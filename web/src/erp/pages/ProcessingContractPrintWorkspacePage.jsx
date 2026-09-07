@@ -839,7 +839,8 @@ export default function ProcessingContractPrintWorkspacePage() {
       }
       toolbarActions={
         <div className="erp-print-shell__toolbar-group">
-          <button
+          <PrintToolButton
+            icon="preview"
             type="button"
             className={getToolbarButtonClassName()}
             onClick={handlePreviewPdf}
@@ -848,22 +849,24 @@ export default function ProcessingContractPrintWorkspacePage() {
             disabled={busyAction !== ''}
           >
             {busyAction === 'preview' ? '生成中…' : '在线预览 PDF'}
-          </button>
-          <button
+          </PrintToolButton>
+          <PrintToolButton
+            icon="download"
             type="button"
             className={getToolbarButtonClassName()}
             onClick={handleDownloadPdf}
             disabled={busyAction !== ''}
           >
             {busyAction === 'download' ? '生成中…' : '下载 PDF'}
-          </button>
-          <button
+          </PrintToolButton>
+          <PrintToolButton
+            icon="print"
             type="button"
             className={getToolbarButtonClassName({ primary: true })}
             onClick={handlePrint}
           >
             打印
-          </button>
+          </PrintToolButton>
         </div>
       }
     >

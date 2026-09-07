@@ -1014,6 +1014,15 @@
   color: #2c7b4e;
 }
 
+.erp-print-shell__toolbar-actions .erp-print-tool-button {
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.erp-print-shell__toolbar-actions .erp-print-tool-icon {
+  color: inherit;
+}
+
 .erp-print-shell__record-panel :is(button, summary, select):focus-visible {
   outline: 2px solid #2563eb;
   outline-offset: 2px;

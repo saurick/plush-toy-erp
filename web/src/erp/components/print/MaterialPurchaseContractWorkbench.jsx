@@ -784,7 +784,8 @@ export default function MaterialPurchaseContractWorkbench({
       }
       toolbarActions={
         <div className="erp-print-shell__toolbar-group">
-          <button
+          <PrintToolButton
+            icon="preview"
             type="button"
             className={getToolbarButtonClassName()}
             onClick={handlePreviewPDF}
@@ -793,22 +794,24 @@ export default function MaterialPurchaseContractWorkbench({
             disabled={pdfAction !== ''}
           >
             {pdfAction === 'preview' ? '生成中…' : '在线预览 PDF'}
-          </button>
-          <button
+          </PrintToolButton>
+          <PrintToolButton
+            icon="download"
             type="button"
             className={getToolbarButtonClassName()}
             onClick={handleDownloadPDF}
             disabled={pdfAction !== ''}
           >
             {pdfAction === 'download' ? '生成中…' : '下载 PDF'}
-          </button>
-          <button
+          </PrintToolButton>
+          <PrintToolButton
+            icon="print"
             type="button"
             className={getToolbarButtonClassName({ primary: true })}
             onClick={handlePrint}
           >
             打印
-          </button>
+          </PrintToolButton>
         </div>
       }
     >
