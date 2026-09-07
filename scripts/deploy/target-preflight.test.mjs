@@ -493,6 +493,50 @@ printf '%s' "$TARGET_PREFLIGHT_FAKE_SSH_REPORT"
   }
 });
 
+test("Atlas version check consumes delayed output and preserves CLI failures", () => {
+  const fixtureRoot = mkdtempSync(path.join(tmpdir(), "plush-atlas-version-"));
+  const atlasPath = path.join(fixtureRoot, "atlas");
+  const versionCheck = REMOTE_TARGET_PREFLIGHT_SCRIPT.match(
+    /if ! plain_file "\$trial_atlas_bin"[\s\S]*?\nfi\n/u,
+  )?.[0];
+  assert(versionCheck, "execute the version guard shipped to the target");
+  try {
+    writeFileSync(
+      atlasPath,
+      '#!/usr/bin/env bash\nprintf "atlas version %s\\n" "$TEST_ATLAS_VERSION"\nsleep 0.05\nprintf "update notice %050000d\\n" 0\nexit "$TEST_ATLAS_EXIT"\n',
+    );
+    chmodSync(atlasPath, 0o700);
+    for (const [version, exitCode, expectedBlocker] of [
+      ["v1.2.0", "0", ""],
+      ["v1.3.0", "0", "target_atlas_tooling_invalid"],
+      ["v1.2.0", "42", "target_atlas_tooling_invalid"],
+    ]) {
+      const result = spawnSync("bash", ["-s", "--", atlasPath], {
+        input: [
+          "set -euo pipefail",
+          'trial_atlas_bin="$1"',
+          "trial_atlas_required_version=v1.2.0",
+          'plain_file() { [[ -f "$1" && ! -L "$1" ]]; }',
+          "stat() { id -u; }",
+          'block() { printf "%s" "$1"; }',
+          versionCheck,
+        ].join("\n"),
+        env: {
+          ...process.env,
+          TEST_ATLAS_VERSION: version,
+          TEST_ATLAS_EXIT: exitCode,
+        },
+        encoding: "utf8",
+        timeout: 10_000,
+      });
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(result.stdout, expectedBlocker, `${version}, exit ${exitCode}`);
+    }
+  } finally {
+    rmSync(fixtureRoot, { force: true, recursive: true });
+  }
+});
+
 test("remote target preflight script is read-only and contains no build command", () => {
   assert.doesNotMatch(
     REMOTE_TARGET_PREFLIGHT_SCRIPT,

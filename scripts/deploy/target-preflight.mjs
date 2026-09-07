@@ -236,7 +236,7 @@ if ! plain_file "$trial_atlas_bin" ||
   [[ "$(stat -c '%u' "$trial_atlas_bin" 2>/dev/null || true)" != "$(id -u)" ]]; then
   block target_atlas_tooling_invalid
 elif ! "$trial_atlas_bin" version 2>&1 |
-  grep -Eq "(^|[[:space:]])$trial_atlas_required_version([[:space:]]|$)"; then
+  grep -E "(^|[[:space:]])$trial_atlas_required_version([[:space:]]|$)" >/dev/null; then
   block target_atlas_tooling_invalid
 fi
 
