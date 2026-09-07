@@ -9,6 +9,7 @@ import React, {
 import '@fontsource-variable/noto-sans-sc'
 import '@fontsource-variable/noto-serif-sc'
 import { inspectPrintImageBudget } from '../../utils/printOutputPreflight.mjs'
+import { bindPrintEditableCaret } from '../../utils/printEditableCaret.mjs'
 import { PrintToolButton } from './PrintWorkspaceTools.jsx'
 
 const PRINT_WORKSPACE_PREPARING_MIN_MS = 280
@@ -227,6 +228,8 @@ export default function PrintWorkspaceShell({
     measure()
     return () => observer.disconnect()
   }, [prepareSignature])
+  useEffect(() => bindPrintEditableCaret(stageRef.current), [])
+
   const scale = zoomMode === 'fit' ? fitScale : Number(zoomMode)
   const captureInput = (event) => {
     const editable = event.target.closest?.('[contenteditable="true"]')

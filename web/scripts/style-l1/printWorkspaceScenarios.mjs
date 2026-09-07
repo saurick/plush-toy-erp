@@ -7,6 +7,10 @@ import { printTemplateCatalog } from '../../src/erp/config/printTemplates.mjs'
 import { createPrintPolishScenarios } from './printPolishScenarios.mjs'
 import { createPrintWorkspaceControlScenarios } from './printWorkspaceControlScenarios.mjs'
 import { createPrintWorkspaceFeedbackScenarios } from './printWorkspaceFeedbackScenarios.mjs'
+import {
+  assertEmptyEditorCaret,
+  collectEmptyEditorSamples,
+} from './printEmptyEditorAssertions.mjs'
 
 export function createPrintWorkspaceScenarios({
   expectHeading,
@@ -1772,6 +1776,43 @@ export function createPrintWorkspaceScenarios({
               `print-workspace-${template.key}-appendix-nine-refreshed.png`
             ),
           })
+        }
+      },
+    },
+    {
+      name: 'print-workspace-empty-editor-delete',
+      path: '/erp/print-workspace/material-purchase-contract?draft=fresh',
+      auth: 'admin',
+      viewport: { width: 1600, height: 1100 },
+      verify: async (page) => {
+        for (const template of printTemplateCatalog.filter(
+          (entry) => entry.runtime?.workspace
+        )) {
+          await gotoScenarioPath(
+            page,
+            `/erp/print-workspace/${template.key}?draft=fresh&state=empty-editor-delete`
+          )
+          const editors = page.locator(
+            '.erp-print-shell__stage [contenteditable="true"]'
+          )
+          await editors.first().waitFor({ state: 'visible' })
+          await page.evaluate(() => document.fonts.ready)
+          const samples = await collectEmptyEditorSamples(editors)
+          for (const scale of ['1', '1.25']) {
+            await page
+              .locator('.erp-print-shell__zoom-control select')
+              .selectOption(scale)
+            for (const sample of samples) {
+              await assertEmptyEditorCaret(
+                page,
+                editors.nth(sample.index),
+                `${template.title} ${scale} ${sample.kind}`
+              )
+            }
+          }
+          console.log(
+            `[print-empty-editor] ${template.key}: ${samples.length * 2} delete / undo / retype checks passed`
+          )
         }
       },
     },
