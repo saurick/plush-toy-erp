@@ -59,6 +59,37 @@ test('作业指导书图片的标注布局经过草稿规范化与刷新仍保�
   )
 })
 
+test('物料明细数量的默认单位、定制单位和清空值经过草稿恢复后保持正确', () => {
+  assert.equal(
+    createEngineeringPrintDraft(MATERIAL_DETAIL_TEMPLATE_KEY).quantityText,
+    '(PCS) 200'
+  )
+  for (const [quantityText, expected] of [
+    ['200', '(PCS) 200'],
+    ['1,200.5', '(PCS) 1,200.5'],
+    [0, '(PCS) 0'],
+    ['(PCS) 200', '(PCS) 200'],
+    ['(SET) 120', '(SET) 120'],
+    ['200 件', '200 件'],
+    ['', ''],
+    [null, ''],
+  ]) {
+    const draft = createEngineeringPrintDraft(MATERIAL_DETAIL_TEMPLATE_KEY, {
+      quantityText,
+    })
+    assert.equal(draft.quantityText, expected)
+    const restored = createEngineeringPrintDraft(
+      MATERIAL_DETAIL_TEMPLATE_KEY,
+      JSON.parse(JSON.stringify(draft))
+    )
+    assert.equal(restored.quantityText, expected)
+  }
+  assert.equal(
+    buildMaterialDetailDraftFromBOMVersion({ quantity_text: '' }).quantityText,
+    ''
+  )
+})
+
 test('engineeringPrintTemplates: BOM 版本带值生成物料明细并保留产品核心字段', () => {
   const draft = buildMaterialDetailDraftFromBOMVersion(
     {
@@ -129,7 +160,7 @@ test('engineeringPrintTemplates: BOM 版本带值生成物料明细并保留产�
   assert.equal(draft.productNo, '26204#')
   assert.equal(draft.productName, '抱抱猴子 / 黑色 / 客户款 A')
   assert.equal(draft.orderNo, 'WL260102')
-  assert.equal(draft.quantityText, '3030')
+  assert.equal(draft.quantityText, '(PCS) 3030')
   assert.equal(draft.spareText, '备品 30')
   assert.equal(draft.dateText, '2026-01-19')
   assert.equal(draft.designer, '罗伟')

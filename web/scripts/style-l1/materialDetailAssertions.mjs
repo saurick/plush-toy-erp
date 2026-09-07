@@ -118,6 +118,11 @@ export function createMaterialDetailAssertions({
               ? Math.abs(labelRect.top - editorTextRect.top)
               : -1,
           editorBoxHeight: editorBoxRect?.height || 0,
+          editorBoxWidth: editorBoxRect?.width || 0,
+          editorTextHeight: editorTextRect?.height || 0,
+          label: label?.textContent || '',
+          value: editor?.textContent || '',
+          shortValue: /^(数量|备品|日期)[：:]/u.test(label?.textContent || ''),
           editorTextCenterDelta: editorTextRect
             ? Math.abs(editorCenter - editorBoxCenter)
             : -1,
@@ -125,6 +130,7 @@ export function createMaterialDetailAssertions({
       })
       return {
         checkedCount: states.length,
+        quantityField: states.find((state) => /^数量[：:]/u.test(state.label)),
         offTextAlignmentStates: states.filter(
           (state) => state.text && state.textTopDelta > 2
         ),
@@ -132,7 +138,17 @@ export function createMaterialDetailAssertions({
           (state) => state.text && state.editorTextCenterDelta > 4
         ),
         smallEditorBoxStates: states.filter(
-          (state) => state.text && state.editorBoxHeight < 20
+          (state) =>
+            state.text &&
+            (state.shortValue
+              ? state.editorBoxHeight < state.editorTextHeight ||
+                state.editorBoxWidth < state.editorTextHeight * 3
+              : state.editorBoxHeight < 20)
+        ),
+        wideShortValueStates: states.filter(
+          (state) =>
+            state.shortValue &&
+            state.editorBoxWidth > state.editorTextHeight * 6
         ),
         nonGridBaselineStates: states.filter(
           (state) =>
@@ -141,11 +157,18 @@ export function createMaterialDetailAssertions({
         ),
       }
     })
+    assert.equal(metrics.quantityField?.label, '数量：', '数量标签只包含字段名')
+    assert.equal(
+      metrics.quantityField?.value,
+      '(PCS) 200',
+      '数量单位和数字应位于同一个可编辑值槽中'
+    )
     assert(
       metrics.checkedCount === 9 &&
         metrics.offTextAlignmentStates.length === 0 &&
         metrics.offEditorTextCenterStates.length === 0 &&
         metrics.smallEditorBoxStates.length === 0 &&
+        metrics.wideShortValueStates.length === 0 &&
         metrics.nonGridBaselineStates.length === 0,
       `物料分析明细表顶部信息格字段名文字和值文字应对齐，值槽内部文字应上下居中: ${JSON.stringify(metrics)}`
     )
@@ -255,7 +278,8 @@ export function createMaterialDetailAssertions({
           (pair) =>
             pair.editorWidth <= 0 ||
             pair.editorHeight <= 0 ||
-            pair.rightGap > 2 ||
+            (!/^(数量|备品|日期)[：:]/u.test(pair.label) &&
+              pair.rightGap > 2) ||
             pair.labelEditorGap < 0 ||
             (!pair.isCompoundCell && pair.nextPairGap < 0)
         ),
@@ -270,7 +294,7 @@ export function createMaterialDetailAssertions({
         metrics.metaText.includes('毛向') &&
         metrics.narrowOrInlineStates.length === 0 &&
         metrics.nonFillingValueSlots.length === 0,
-      `物料分析明细表顶部信息格的编辑层应铺满标签右侧值槽，毛向应移入顶部信息区且不能留在源文件噪点位置: ${JSON.stringify(metrics)}`
+      `物料分析明细表顶部短字段使用紧凑值槽，长字段铺满标签右侧空间；毛向应位于顶部信息区: ${JSON.stringify(metrics)}`
     )
   }
 

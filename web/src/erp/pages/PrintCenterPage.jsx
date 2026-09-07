@@ -1,6 +1,14 @@
 import React from 'react'
 import { Button, Card, Typography } from 'antd'
-import { CheckCircleFilled, PrinterOutlined } from '@ant-design/icons'
+import {
+  BgColorsOutlined,
+  CheckCircleFilled,
+  FileTextOutlined,
+  PrinterOutlined,
+  ReadOutlined,
+  TableOutlined,
+  ToolOutlined,
+} from '@ant-design/icons'
 import { useSearchParams, useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -17,6 +25,14 @@ import {
 } from '../utils/printWorkspace.js'
 
 const { Paragraph, Title } = Typography
+
+const PRINT_TEMPLATE_ICONS = {
+  'material-purchase-contract': FileTextOutlined,
+  'processing-contract': ToolOutlined,
+  'engineering-material-detail': TableOutlined,
+  'engineering-color-card': BgColorsOutlined,
+  'engineering-work-instruction': ReadOutlined,
+}
 
 export default function PrintCenterPage() {
   const { adminProfile } = useOutletContext() || {}
@@ -39,26 +55,23 @@ export default function PrintCenterPage() {
   const activeTemplate = printTemplateCatalog.find(
     (item) => item.key === activeKey
   )
-  const supportsWorkspace = isSupportedPrintWorkspaceTemplate(
-    activeTemplate?.key
-  )
   const selectTemplate = (template) => {
     const nextSearchParams = new URLSearchParams(searchParams)
     nextSearchParams.set('template', template.key)
     setSearchParams(nextSearchParams, { replace: true })
   }
 
-  const handleOpenEditablePrint = async () => {
+  const handleOpenEditablePrint = (templateKey) => {
     try {
-      if (supportsWorkspace) {
-        openPrintWorkspaceWindow(activeTemplate.key, {
+      if (isSupportedPrintWorkspaceTemplate(templateKey)) {
+        openPrintWorkspaceWindow(templateKey, {
           ...draftScope,
           entrySource: requestedEntrySource,
           draftMode: requestedDraftMode,
         })
         return
       }
-      window.location.assign(`/erp/print-center/${activeTemplate.key}`)
+      window.location.assign(`/erp/print-center/${templateKey}`)
     } catch (error) {
       message.error(getActionErrorMessage(error, '打开模板'))
     }
@@ -76,13 +89,13 @@ export default function PrintCenterPage() {
               模板打印中心
             </Title>
             <Paragraph className="erp-print-center-nav-description">
-              选择模板，查看说明并打开编辑。
+              选择模板查看说明，双击模板打开编辑。
             </Paragraph>
           </div>
           <Button
             type="primary"
-            icon={<PrinterOutlined />}
-            onClick={handleOpenEditablePrint}
+            icon={<PrinterOutlined aria-hidden="true" />}
+            onClick={() => handleOpenEditablePrint(activeKey)}
           >
             打开编辑与打印
           </Button>
@@ -93,6 +106,8 @@ export default function PrintCenterPage() {
             <div className="erp-print-center-template-list">
               {printTemplateCatalog.map((template) => {
                 const isActive = template.key === activeTemplate.key
+                const TemplateIcon =
+                  PRINT_TEMPLATE_ICONS[template.key] || FileTextOutlined
                 return (
                   <button
                     type="button"
@@ -102,9 +117,14 @@ export default function PrintCenterPage() {
                     }`}
                     aria-pressed={isActive}
                     onClick={() => selectTemplate(template)}
+                    onDoubleClick={() => handleOpenEditablePrint(template.key)}
                   >
                     <span className="erp-print-center-template-title">
-                      {template.title}
+                      <TemplateIcon
+                        className="erp-print-center-template-icon"
+                        aria-hidden="true"
+                      />
+                      <span>{template.title}</span>
                     </span>
                     {isActive ? <CheckCircleFilled aria-hidden="true" /> : null}
                   </button>

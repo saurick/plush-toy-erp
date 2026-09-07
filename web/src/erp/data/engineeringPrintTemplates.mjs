@@ -607,7 +607,7 @@ export const DEFAULT_MATERIAL_DETAIL_SAMPLE = {
   productNo: 'SIM-PROD-002',
   orderNo: 'SIM-SO-002',
   productName: '合成玩偶乙-黑色',
-  quantityText: '200',
+  quantityText: '(PCS) 200',
   spareText: '含备品 10',
   dateText: '2026-01-02',
   designer: '设计师',
@@ -789,6 +789,12 @@ export const DEFAULT_WORK_INSTRUCTION_SAMPLE = {
   continuationPages: [],
 }
 
+function normalizeMaterialDetailQuantityText(value) {
+  const text = toText(value)
+  // 纯数字数量沿用模板的 PCS 单位；已有单位或说明按原文保存。
+  return /^[+-]?\d+(?:,\d{3})*(?:\.\d+)?$/u.test(text) ? `(PCS) ${text}` : text
+}
+
 export function createMaterialDetailDraft(input = {}) {
   const sourceLines = hasOwn(input, 'lines')
     ? Array.isArray(input.lines)
@@ -818,10 +824,12 @@ export function createMaterialDetailDraft(input = {}) {
       'productName',
       DEFAULT_MATERIAL_DETAIL_SAMPLE.productName
     ),
-    quantityText: textWithDefault(
-      input,
-      'quantityText',
-      DEFAULT_MATERIAL_DETAIL_SAMPLE.quantityText
+    quantityText: normalizeMaterialDetailQuantityText(
+      textWithDefault(
+        input,
+        'quantityText',
+        DEFAULT_MATERIAL_DETAIL_SAMPLE.quantityText
+      )
     ),
     spareText: textWithDefault(
       input,

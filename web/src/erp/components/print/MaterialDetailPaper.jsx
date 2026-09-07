@@ -17,6 +17,8 @@ import {
   isMergeTopLeftCell,
 } from '../../utils/detailCellMerge.mjs'
 
+const SHORT_META_FIELDS = new Set(['quantityText', 'spareText', 'dateText'])
+
 function MaterialDetailPaper({
   draft,
   selectedLineIndex,
@@ -66,7 +68,7 @@ function MaterialDetailPaper({
         {[
           ['产品编号：', 'productNo'],
           ['订单编号：', 'orderNo'],
-          ['数量：(PCS)', 'quantityText'],
+          ['数量：', 'quantityText'],
           ['备品：', 'spareText'],
           ['产品名称：', 'productName'],
           ['日期：', 'dateText'],
@@ -105,6 +107,11 @@ function MaterialDetailPaper({
               <EditableText
                 value={draft[key]}
                 onCommit={(value) => onFieldChange(key, value)}
+                className={
+                  SHORT_META_FIELDS.has(key)
+                    ? 'erp-engineering-print-meta-grid__short-value'
+                    : ''
+                }
               />
             </div>
           )

@@ -1250,6 +1250,19 @@
   min-height: 7mm;
 }
 
+@media screen {
+  .erp-material-detail-paper
+    .erp-engineering-print-meta-grid
+    .erp-engineering-print-meta-grid__short-value {
+    width: fit-content;
+    min-width: min(100%, 10ch);
+    max-width: 100%;
+    min-height: 1.6em;
+    /* 缩小值槽，保留原占位高度和文字基线；打印继续使用原有版式。 */
+    margin-block: max(0px, calc((7mm - 1.6em) / 2));
+  }
+}
+
 .erp-engineering-print-row-actions {
   display: flex;
   justify-content: center;

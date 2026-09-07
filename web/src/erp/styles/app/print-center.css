@@ -325,8 +325,16 @@
 }
 
 .erp-print-center-template-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-weight: 700;
   line-height: 1.35;
+}
+
+.erp-print-center-template-icon {
+  flex: none;
+  font-size: 16px;
 }
 
 .erp-print-center-template-meta {
