@@ -240,7 +240,7 @@ pnpm start:yoyoosun --print-plan
 pnpm start:yoyoosun
 ```
 
-本地后端的 `make run`、`make dev` 和 `make dev_restart` 默认使用 `ERP_CUSTOMER_KEY=yoyoosun`，避免未显式携带 customer key 的业务 RPC 回落到 demo；这些本地入口同时显式开放后端 local-test gate，gate 按 pgx 最终连接配置只接受 `192.168.0.106:5432` 的 `plush_erp` / `plush_erp_*_dev` 开发库，production 配置会拒绝该开关。确需 demo 时使用 `ERP_CUSTOMER_KEY=demo make dev_restart` 显式覆盖。
+本地后端的 `make run`、`make dev` 和 `make dev_restart` 默认使用 `ERP_CUSTOMER_KEY=yoyoosun`，避免未显式携带 customer key 的业务 RPC 回落到 demo；这些本地入口同时显式开放后端 local-test gate，gate 按 pgx 最终连接配置只接受 `192.168.0.133:5432` 的 `plush_erp` / `plush_erp_*_dev` 开发库，production 配置会拒绝该开关。确需 demo 时使用 `ERP_CUSTOMER_KEY=demo make dev_restart` 显式覆盖。
 
 `start:yoyoosun` 同样从 `15200` 起在 `15200-15299` 辅助块内自动顺延端口，保留 HMR，并复用 `pnpm start` 的 schema / migration / health / ready 预检，再检查 yoyoosun 静态配置和公开资源存在。启动命令只注入前端静态客户配置，不自动写库或切换后端 revision。登录后可在 `/__dev/customer-config?customer=yoyoosun` 由管理员显式确认应用；dev-only middleware 只接受匹配的 `start:yoyoosun` 客户上下文和 loopback `API_ORIGIN`，生成内容寻址、长度不超过 64 的 `local_test_apply` revision，再由已开放本地 gate 的后端执行 validate / publish / transition check / activate or rollback / active readback。该操作写入共享开发 PostgreSQL 客户配置控制面，active 切换对其他共享库使用者也可见；默认后端与正式 validator / executor 均拒绝 local-test marker，因此不等于正式 publish / activate、目标环境部署或客户签收。
 
@@ -473,17 +473,17 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 
 - 页面默认按“确认完整回归能否开始 → 核对最新业务链与数据范围 → 准备并确认新批次 → 查看回执与耗时”组织为一条连续工作流。主路径直接读取业务链与造数的同一合同，显示当前 11 条业务链、67 个步骤、66 个合法场景、9 个现有造数阶段和 51 个页面目标；选择业务链只展开责任岗位、前置状态、允许动作、结果状态、Fact 与该步骤已登记场景，不创建局部造数入口。安全结论、阻断和主动作保持可见；SHA、目标指纹、plan hash、run id、固定步骤及历史事件按需展开。
 - 页面只通过 development serve 的 loopback Bridge 使用三个固定 profile，不接受 shell、SQL、脚本路径、DSN、后端地址、密码或自定义环境变量。写入口的信任边界是本机开发进程、Host / Origin / `Sec-Fetch-Site`、CSRF 和 operation 确认，不冒充 ERP RBAC。
-- `本地长期基础数据 / core-demo` 只允许登记的 `192.168.0.106:5432/plush_erp` 或 `plush_erp_*_dev`，先确认 migration 已到 head，再顺序准备十个演示账号、当前 V6 的 11 个单位与 4 个仓库。它不生成材料、产品、工艺、BOM、客户、订单、Workflow 或 Fact；这些版本化业务数据由 `scenario-demo` 接续准备，避免两套基础资料和生产工序语义并存。稳定 upsert 不等于跨入口事务，也不提供按 operation 删除。
-- `业务场景演示数据 / scenario-demo` 固定使用 `yoyoosun-manual-acceptance / 2026.08.15-v6 / 20260815-V6`，只允许 `127.0.0.1:8300` 对应的登记 106 长期开发库。用户确认后先稳定准备本地岗位账号与至少 30 条由真实控制面操作产生的审计样例，再通过正式 `validate / publish / transition check / activate or rollback / effective-session readback` 对齐当前跟踪的 yoyoosun 本地测试配置，之后才准备 Source Document、已登记的 ProcessRuntime、模拟岗位任务和来源驱动 Fact。同批只允许精确创建或读回；半批、字段或身份漂移直接阻断，不提供清理或重置。收付款覆盖已批准、两笔已过账和已冲销，红冲覆盖一条有效红冲与一组原红冲 / 反向红冲。岗位到期时间是固定 V6 快照，不保证长期维持“今天 / 本周”相对语义；数据前置不替代浏览器验证和岗位人工验收。
+- `本地长期基础数据 / core-demo` 只允许登记的 `192.168.0.133:5432/plush_erp` 或 `plush_erp_*_dev`，先确认 migration 已到 head，再顺序准备十个演示账号、当前 V6 的 11 个单位与 4 个仓库。它不生成材料、产品、工艺、BOM、客户、订单、Workflow 或 Fact；这些版本化业务数据由 `scenario-demo` 接续准备，避免两套基础资料和生产工序语义并存。稳定 upsert 不等于跨入口事务，也不提供按 operation 删除。
+- `业务场景演示数据 / scenario-demo` 固定使用 `yoyoosun-manual-acceptance / 2026.08.15-v6 / 20260815-V6`，只允许 `127.0.0.1:8300` 对应的登记 133 长期开发库。用户确认后先稳定准备本地岗位账号与至少 30 条由真实控制面操作产生的审计样例，再通过正式 `validate / publish / transition check / activate or rollback / effective-session readback` 对齐当前跟踪的 yoyoosun 本地测试配置，之后才准备 Source Document、已登记的 ProcessRuntime、模拟岗位任务和来源驱动 Fact。同批只允许精确创建或读回；半批、字段或身份漂移直接阻断，不提供清理或重置。收付款覆盖已批准、两笔已过账和已冲销，红冲覆盖一条有效红冲与一组原红冲 / 反向红冲。岗位到期时间是固定 V6 快照，不保证长期维持“今天 / 本周”相对语义；数据前置不替代浏览器验证和岗位人工验收。
 - `按最新业务链完整回归 / full-acceptance` 是默认推荐入口，只接受 clean exact commit 和服务端已有的 `LOCAL_ACCEPTANCE_DATABASE_BASE_URL`。每次执行都复用统一 lifecycle 建立新的同批专用库，按当前合同运行全部已登记合法场景、migration、正式 Source / ProcessRuntime / Fact 数据、51 项只读页面验收和收付款、库存人工调整、生产超领三条真实写流程；成功或失败都必须停服、删库并读回零残留。页面记录 operation 实际墙钟时间，并从同一 dataset 回执展示 9 个现有造数阶段的开始、结束和耗时。旧回执只证明对应旧计划，不会被当作最新代码已经回归。
 - `scenario-demo` 的页面操作固定为“读取预检 → 点击生成 → 自动准备并冻结 `planHash`、`runId`、仓库和目标摘要 → 核对固定目标 / V6 基线 / 数据范围 / 长期保留边界 → 确认生成 → 异步执行 → 读取回执”，不要求手输长确认串。其他 profile 继续使用完整确认串。执行前身份变化会使原计划失效；页面刷新可恢复最近 operation。进程中断或结果不明确时显示 `not_proven`，不会自动重试；用户可重新准备更晚的同目标 scenario plan 并再次确认，以同一固定批次显式补齐，其他 profile、不同目标或仍在运行的 operation 继续阻断。
-- `scenario-demo` 只在固定本机 8300、登记 106 长期开发库、migration 和 runtime identity 已证明后，由后台使用项目登记的本机开发账号约定；显式 Vite 进程环境覆盖值仍优先，但凭据不进入浏览器、命令参数或回执。日常直接在本页点击即可，不需要 `make dev_restart`；只有修改 Vite 凭据覆盖环境时才重启一次 `pnpm start`。后端代码、配置或 migration 变化时才按正式后端流程重启。
+- `scenario-demo` 只在固定本机 8300、登记 133 长期开发库、migration 和 runtime identity 已证明后，由后台使用项目登记的本机开发账号约定；显式 Vite 进程环境覆盖值仍优先，但凭据不进入浏览器、命令参数或回执。日常直接在本页点击即可，不需要 `make dev_restart`；只有修改 Vite 凭据覆盖环境时才重启一次 `pnpm start`。后端代码、配置或 migration 变化时才按正式后端流程重启。
 - 页面不提供普通“重置全部数据”或 debug cleanup。共享基线按正式账号 / 主数据生命周期退出，已生效业务事实按取消、冲正或调整退出；只有专用验收库允许数据库级自动清理。Workflow task 完成不等于 Fact 已生成。
 - `dataVersion` 是一轮可重复、可验收的冻结业务数据基线，不是 Git commit、operation 或每次造数的版本。业务链数据摘要和验证摘要都相同时，长期同批数据仍可用；只有验证摘要变化时，以新 operation / batch 绑定 exact commit 重新核验但继续当前 V6。数据摘要变化时先在隔离批次修正和验证，只有单位含义、记录结构、生命周期 / 状态、业务链映射、稳定编码或数量合同不兼容，或者准备冻结下一轮甲方测试基线时，才集中升级 `dataVersion`。已持久冻结的旧基线不得静默改写；纯样式、重构、性能或不改变数据结果的修复不升级 V6。完整回归仍默认每次使用新隔离批次，长期保留规则只服务 `core-demo / scenario-demo` 的日常联调边界。
 
 #### 数据库迁移 `/__dev/database-migration`
 
-- 页面只操作 application config 已登记的 `192.168.0.106:5432/plush_erp` 共享开发库，不接受浏览器传入的 DSN、目标、命令、SQL、脚本路径、凭据或环境变量，也不支持 133、测试或生产数据库。
+- 页面只操作 application config 已登记的 `192.168.0.133:5432/plush_erp` 共享开发库，不接受浏览器传入的 DSN、目标、命令、SQL、脚本路径、凭据或环境变量，也不支持 133 上其他实例、测试或生产数据库。
 - 默认只读显示当前 / 最新 migration、pending 数和后端 health / ready。存在 pending 时先点“检查并准备”：Bridge 固定执行同目标 status、停止后端、plan、备份恢复演练和最终身份复核；其它数据库客户端仍占用目标时按既有 guard 阻断，不代替用户强制断开。
 - `pnpm start` 在本地预检失败或超时时把本页作为受限恢复入口，普通 ERP 页面与 RPC 暂停。页面先检查实际能力而非指定桌面产品：需要兼容 `docker` CLI/socket 的可用容器运行环境、固定 Atlas、PostgreSQL 18 客户端和基础命令；可使用 Docker Engine、Docker Desktop、Colima、Rancher Desktop、OrbStack，或配置了兼容入口的 Podman。工具不全时不会先停后端，也不会开始 plan / backup。
 - 准备成功后，页面要求输入当前 operation 给出的完整确认串；execute 会再次核对 migration / schema 指纹、目标 revision 和准备阶段备份文件身份，随后同一 operation 只执行一次 apply、`pending=0` 读回、后端重启和 health / ready。写入或后续读回结果无法证明时标为 `not_proven`，先读回，不自动重试。已证明迁移成功而后端恢复失败时，只需单独重启后端。旧 ready 计划可重新检查并准备，旧确认随之失效；会话失效后下一次显式操作重新获取会话。

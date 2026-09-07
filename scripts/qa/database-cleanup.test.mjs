@@ -170,7 +170,7 @@ test("cleanup requires an explicit flag for the registered development cluster",
     ...base.manifest,
     source: {
       ...base.manifest.source,
-      safeTarget: `host=192.168.0.106 port=5432 database=${databaseName}`,
+      safeTarget: `host=192.168.0.133 port=5432 database=${databaseName}`,
     },
   };
   const confirmation = databaseCleanupConfirmation({
@@ -180,7 +180,7 @@ test("cleanup requires an explicit flag for the registered development cluster",
   });
   const request = {
     adminURL:
-      "postgres://postgres:secret@192.168.0.106:5432/postgres?sslmode=disable",
+      "postgres://postgres:secret@192.168.0.133:5432/postgres?sslmode=disable",
     confirmation,
     databaseName,
     inventory: base.inventory,

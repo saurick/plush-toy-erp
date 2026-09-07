@@ -92,7 +92,7 @@ func TestParseOptionsHasNoProductionEscapeFlag(t *testing.T) {
 func TestRequireLocalDevelopmentTargetFailsClosed(t *testing.T) {
 	t.Parallel()
 
-	localDSN := "postgres://test_user:secret@192.168.0.106:5432/plush_erp_simon_dev?sslmode=disable"
+	localDSN := "postgres://test_user:secret@192.168.0.133:5432/plush_erp_simon_dev?sslmode=disable"
 	if err := requireLocalDevelopmentTarget("./configs/dev/config.yaml", localDSN, func(string) string { return "" }); err != nil {
 		t.Fatalf("registered local development target rejected: %v", err)
 	}
@@ -134,7 +134,7 @@ func TestRequireLocalDevelopmentTargetFailsClosed(t *testing.T) {
 		{
 			name:     "generic database",
 			confPath: "./configs/dev/config.yaml",
-			dsn:      "postgres://postgres:secret@192.168.0.106:5432/postgres?sslmode=disable",
+			dsn:      "postgres://postgres:secret@192.168.0.133:5432/postgres?sslmode=disable",
 			getenv:   func(string) string { return "" },
 		},
 		{
@@ -163,9 +163,9 @@ func TestResolvePostgresDSNMergesLocalConfigAndEnvironment(t *testing.T) {
 	}
 	confPath := filepath.Join(confDir, "config.yaml")
 	localPath := filepath.Join(confDir, "config.local.yaml")
-	baseDSN := "postgres://base:secret@192.168.0.106:5432/plush_erp?sslmode=disable"
-	localDSN := "postgres://local:secret@192.168.0.106:5432/plush_erp_local_dev?sslmode=disable"
-	envDSN := "postgres://env:secret@192.168.0.106:5432/plush_erp_env_dev?sslmode=disable"
+	baseDSN := "postgres://base:secret@192.168.0.133:5432/plush_erp?sslmode=disable"
+	localDSN := "postgres://local:secret@192.168.0.133:5432/plush_erp_local_dev?sslmode=disable"
+	envDSN := "postgres://env:secret@192.168.0.133:5432/plush_erp_env_dev?sslmode=disable"
 	writeConfigForTest(t, confPath, baseDSN)
 	writeConfigForTest(t, localPath, localDSN)
 

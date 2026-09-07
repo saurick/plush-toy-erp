@@ -103,10 +103,10 @@ test("database target binds URL, profile, declared name and run identity", () =>
 
 test("report-only inventory may read only the registered development cluster", () => {
   const target = parseDatabaseURL(
-    "postgres://u:p@192.168.0.106:5432/plush_erp?sslmode=disable",
+    "postgres://u:p@192.168.0.133:5432/plush_erp?sslmode=disable",
     { allowRegisteredDevelopment: true },
   );
-  assert.equal(target.host, "192.168.0.106");
+  assert.equal(target.host, "192.168.0.133");
   assert.throws(() =>
     parseDatabaseURL(
       "postgres://u:p@192.168.0.133:5435/plush_erp?sslmode=disable",
@@ -115,11 +115,11 @@ test("report-only inventory may read only the registered development cluster", (
   );
   assert.throws(() =>
     parseLoopbackDatabaseURL(
-      "postgres://u:p@192.168.0.106:5432/plush_erp?sslmode=disable",
+      "postgres://u:p@192.168.0.133:5432/plush_erp?sslmode=disable",
     ),
   );
   const disposableURL =
-    "postgres://u:p@192.168.0.106:5432/plush_erp_ci_registered_fixture?sslmode=disable";
+    "postgres://u:p@192.168.0.133:5432/plush_erp_ci_registered_fixture?sslmode=disable";
   assert.throws(() =>
     assertDisposableDatabaseTarget({
       databaseURL: disposableURL,
@@ -132,6 +132,17 @@ test("report-only inventory may read only the registered development cluster", (
       databaseURL: disposableURL,
       profile: "ci",
     }).host,
-    "192.168.0.106",
+    "192.168.0.133",
   );
+});
+
+// The previous shared source must remain rejected after cutover.
+test("registered development rejects the retired source and other 133 instances", () => {
+ for (const dsn of [
+  "postgres://u:p@192.168.0.106:5432/plush_erp?sslmode=disable",
+  "postgres://u:p@192.168.0.133:5434/trade_erp?sslmode=disable",
+  "postgres://u:p@192.168.0.133:55437/plush_erp_customer_test_v1?sslmode=disable",
+ ]) {
+  assert.throws(() => parseDatabaseURL(dsn, { allowRegisteredDevelopment: true }));
+ }
 });

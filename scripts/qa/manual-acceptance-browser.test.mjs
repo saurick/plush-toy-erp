@@ -619,7 +619,7 @@ test("manual acceptance browser boundary isolates legal acknowledgement from bus
 test("browser and backend URLs fail closed outside localhost", () => {
   for (const value of [
     "https://example.com",
-    "http://192.168.0.106:15200",
+    "http://192.168.0.133:15200",
     "http://user:secret@127.0.0.1:15200",
     "file:///tmp/index.html",
     "http://127.0.0.1:15200/erp",

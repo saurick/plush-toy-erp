@@ -30,7 +30,7 @@ print_help() {
     '  - 不读取、不提交真实 .env。' \
     '  - 不把 dump、secret、完整 DSN 或客户 raw rows 写入 git。' \
     '  - 默认 SOURCE_POSTGRES_DSN 必须使用只读 erp_backup；恢复和 migration 由隔离库管理员 / erp_migrator 完成。' \
-    '  - shared-dev-session-read-only 只供本项目本地迁移入口备份已登记的 106 开发库，并强制当前源连接只读；不能用于目标或发布环境。' \
+    '  - shared-dev-session-read-only 只供本项目本地迁移入口备份已登记的 133 开发库，并强制当前源连接只读；不能用于目标或发布环境。' \
     '  - --environment 会写入正式恢复报告；目标演练必须显式填写实际环境（例如 customer-trial-133），不能沿用默认 local-dev。' \
     '  - 默认拒绝把 192.168.0.133 测试 / 目标库当成本地 source，除非显式设置' \
     '    ERP_ALLOW_TEST_DB_AS_DEV=1 或 ALLOW_TARGET_DB_BACKUP_REHEARSAL=1。'
@@ -153,7 +153,7 @@ dedicated-backup | shared-dev-session-read-only) ;;
   ;;
 esac
 
-if [[ "$source_dsn" == *"192.168.0.133"* && "${ERP_ALLOW_TEST_DB_AS_DEV:-}" != "1" && "${ALLOW_TARGET_DB_BACKUP_REHEARSAL:-}" != "1" ]]; then
+if [[ "$source_dsn" == *"192.168.0.133"* && "$source_policy" != "shared-dev-session-read-only" && "${ERP_ALLOW_TEST_DB_AS_DEV:-}" != "1" && "${ALLOW_TARGET_DB_BACKUP_REHEARSAL:-}" != "1" ]]; then
   echo "[backup-restore-rehearsal] 拒绝默认使用 192.168.0.133 测试 / 目标库作为 source" >&2
   echo "[backup-restore-rehearsal] 如确需对目标库演练，显式设置 ALLOW_TARGET_DB_BACKUP_REHEARSAL=1" >&2
   exit 1
@@ -269,10 +269,10 @@ unset "$source_env"
 
 if [[ "$source_policy" == "shared-dev-session-read-only" ]]; then
   [[ "$environment" == "shared-dev" &&
-    "$source_pg_host" == "192.168.0.106" &&
+    "$source_pg_host" == "192.168.0.133" &&
     "$source_pg_port" == "5432" &&
     "$source_pg_database" == "plush_erp" ]] || {
-    echo "[backup-restore-rehearsal] shared-dev-session-read-only 只允许已登记的 192.168.0.106:5432/plush_erp shared-dev" >&2
+    echo "[backup-restore-rehearsal] shared-dev-session-read-only 只允许已登记的 192.168.0.133:5432/plush_erp shared-dev" >&2
     exit 1
   }
   source_pg_options="-c default_transaction_read_only=on"

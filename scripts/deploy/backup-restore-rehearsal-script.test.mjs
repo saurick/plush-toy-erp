@@ -242,7 +242,7 @@ test("backup restore rehearsal scopes the shared development source exception", 
 
   assert.match(
     sharedPolicyBlock,
-    /source_policy" == "shared-dev-session-read-only"[\s\S]*environment" == "shared-dev"[\s\S]*source_pg_host" == "192\.168\.0\.106"[\s\S]*source_pg_port" == "5432"[\s\S]*source_pg_database" == "plush_erp"/,
+    /source_policy" == "shared-dev-session-read-only"[\s\S]*environment" == "shared-dev"[\s\S]*source_pg_host" == "192\.168\.0\.133"[\s\S]*source_pg_port" == "5432"[\s\S]*source_pg_database" == "plush_erp"/,
   );
   assert.match(
     sharedPolicyBlock,

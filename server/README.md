@@ -221,7 +221,7 @@ make run
 
 Linux 本地终端确实以 root 运行时，`make run` / `make dev_restart` 会把 `ERP_PDF_ALLOW_LOCAL_NO_SANDBOX=1` 只传给本地后端，供 Playwright Chromium 完成 PDF warmup；服务端还会同时核对 Linux 与 effective UID 0。非 root 本地进程继续启用 Chromium sandbox，生产镜像也不设置该开关，并由运行预检拒绝 root app-server。
 
-登记的本地开发库未显式设置管理员账号或密码时，分别使用 `admin` / `adminadmin`。配置或 `APP_ADMIN_*` 显式值优先；启动只创建缺失账号，不会覆盖已有账号密码。管理员账号创建、初始化和重置密码统一要求 8～20 位，并继续受 bcrypt 72-byte 安全边界保护。若本地验收工具曾改动稳定管理员，使用以下专用命令恢复当前开发库；它会递增认证版本并撤销旧会话，且没有生产或 133 逃逸开关：
+登记的本地开发库未显式设置管理员账号或密码时，分别使用 `admin` / `adminadmin`。配置或 `APP_ADMIN_*` 显式值优先；启动只创建缺失账号，不会覆盖已有账号密码。管理员账号创建、初始化和重置密码统一要求 8～20 位，并继续受 bcrypt 72-byte 安全边界保护。若本地验收工具曾改动稳定管理员，使用以下专用命令恢复当前开发库；它会递增认证版本并撤销旧会话，且没有通往演示、验收或生产实例的逃逸开关：
 
 ```bash
 make reset_local_admin_password
@@ -234,7 +234,7 @@ make run_yoyoosun
 make dev_restart_yoyoosun
 ```
 
-确需启动 demo 时必须显式覆盖，例如 `ERP_CUSTOMER_KEY=demo make dev_restart`。永绅本地测试配置仍需登录后在 Vite 开发控制台显式应用；上述目标不会自动发布或激活配置。未通过本地 Make 入口启动的后端默认拒绝 local-test manifest 及其切换操作；本地 gate 开启时，启动预检和 JSON-RPC dispatcher 会基于同一份启动时配置，按 pgx 最终连接结果把 DSN 固定到 `192.168.0.106:5432` 上的 `plush_erp` 或 `plush_erp_*_dev` 开发库，不会因运行中修改环境变量、query override、multi-host fallback 或 `ERP_ALLOW_TEST_DB_AS_DEV=1` 放行 133 / loopback tunnel。人工验收数据 runner 另行把 `local-dev` 精确绑定到当前版本的隔离验收库，不会写共享开发库；production 配置发现该环境开关时也会直接失败。
+确需启动 demo 时必须显式覆盖，例如 `ERP_CUSTOMER_KEY=demo make dev_restart`。永绅本地测试配置仍需登录后在 Vite 开发控制台显式应用；上述目标不会自动发布或激活配置。未通过本地 Make 入口启动的后端默认拒绝 local-test manifest 及其切换操作；本地 gate 开启时，启动预检和 JSON-RPC dispatcher 会基于同一份启动时配置，按 pgx 最终连接结果把 DSN 固定到 `192.168.0.133:5432` 上的 `plush_erp` 或 `plush_erp_*_dev` 开发库，不会因运行中修改环境变量、query override、multi-host fallback 或 `ERP_ALLOW_TEST_DB_AS_DEV=1` 放行 133 其他实例或 loopback tunnel。人工验收数据 runner 另行把 `local-dev` 精确绑定到当前版本的隔离验收库，不会写共享开发库；production 配置发现该环境开关时也会直接失败。
 
 ## 常用命令
 
@@ -266,7 +266,7 @@ go run ./cmd/backfill-workflow-source-tasks \
 
 该命令只扫描当前仍为 `RELEASED` 的生产订单和当前仍为 `POSTED REWORK` 的返工事实，补齐缺失的 task / `created` event / business state 包；确定性编号被占用、已有包不完整或来源不合法时整批失败。新建任务保持 `ready`，由真实责任岗位处理，不推断历史 `done / rejected`。它不扫描 `DRAFT` 出货单，也不猜测历史上是否点过提交；出货放行仍必须从出货页显式提交。命令可执行不表示任何共享库、目标环境或客户数据库已经 dry-run / apply。
 
-本地开发默认只使用 `192.168.0.106:5432/plush_erp`。`192.168.0.133:5435/plush_erp` 是测试 / 目标环境库，不应通过 `config.local.yaml` 静默混入本地 `make run`、seed 或 migration；确需对测试库执行一次性操作时，必须显式设置 `ERP_ALLOW_TEST_DB_AS_DEV=1` 并在命令里写清目标。
+本地开发默认只使用 `192.168.0.133:5432/plush_erp`，物理实例标识为 `7682605996671565865`，默认后端启动和共享库 migration 均验证此身份。133 上演示、甲方测试和运行数据库按各自端口独立；`5435/55435` 旧实例已退役。既有显式测试操作开关不扩展 local-test、管理员恢复或共享 migration 白名单。
 
 库存事实 PostgreSQL 本地验收使用专用防呆 target，默认库名为 `plush_erp_inventory_test`：
 
@@ -315,7 +315,7 @@ make purchase_return_pg_test
 
 - `make migrate`、`make migrate_prepare` 和 `make migrate_execute` 默认读取 `server/configs/dev/config.yaml`，且只接受登记共享开发库
 - 若存在 `config.local.yaml`，会覆盖本地私有 DSN
-- dev 配置解析到 `192.168.0.133` 或 `5435` 会被防呆拦截，避免把测试 / 目标环境当成本地开发库迁移
+- dev 默认使用登记的 `192.168.0.133:5432` 开发库族；防呆会拒绝旧源地址，以及 133 上其他端口或其他项目库，独立 loopback 测试入口保持各自原有边界
 - 只有显式设置 `USE_ENV_DB_URL=1` 时才使用环境变量 `DB_URL`
 - 高层入口在 apply 前自动运行 populated-upgrade、customer-config-cutover 与 operational fact lifecycle 审计；裸 `migrate_plan / migrate_apply` 是高层兼容入口，携带完整内部确认时才进入低层诊断和服务实现合同
 - 生产 / 低配部署只走 `server/deploy/compose/prod/migrate_online.sh`，由同一锁串行执行 status、055504 审计、055825 审计、dry-run 和 apply

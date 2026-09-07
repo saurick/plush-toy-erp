@@ -255,7 +255,7 @@ test("local runtime preflight: pending migration 指向高层迁移入口，不�
         if (command === "go") {
           return {
             stdout:
-              "postgres://test_user:private-secret@192.168.0.106:5432/plush_erp_simon_dev",
+              "postgres://test_user:private-secret@192.168.0.133:5432/plush_erp_simon_dev",
             stderr: "",
           };
         }
@@ -331,7 +331,7 @@ test("local runtime preflight: migration 最新后仍强制数据库可编程对
       if (command === "go") {
         return {
           stdout:
-            "postgres://test_user:private-secret@192.168.0.106:5432/plush_erp",
+            "postgres://test_user:private-secret@192.168.0.133:5432/plush_erp",
           stderr: "",
         };
       }
@@ -341,7 +341,7 @@ test("local runtime preflight: migration 最新后仍强制数据库可编程对
       assert.equal(command, "node");
       assert.equal(
         options.env.PLUSH_DATABASE_PROGRAMMABILITY_URL,
-        "postgres://test_user:private-secret@192.168.0.106:5432/plush_erp",
+        "postgres://test_user:private-secret@192.168.0.133:5432/plush_erp",
       );
       return { stdout: "[db-programmability] clean\n", stderr: "" };
     },
@@ -364,7 +364,7 @@ test("local runtime preflight: 自定义数据库执行对象阻断启动且诊�
         if (command === "go") {
           return {
             stdout:
-              "postgres://test_user:private-secret@192.168.0.106:5432/plush_erp",
+              "postgres://test_user:private-secret@192.168.0.133:5432/plush_erp",
             stderr: "",
           };
         }

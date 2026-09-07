@@ -14,10 +14,10 @@ import (
 )
 
 // 默认参数：本机开发默认走共享 PG。
-// - 日常联调默认连 192.168.0.106:5432/plush_erp
+// - 日常联调默认连 192.168.0.133:5432/plush_erp
 // - 在 compose 容器里跑的话，把 host 改成 postgres
 const (
-	defaultHost = "192.168.0.106"
+	defaultHost = "192.168.0.133"
 	defaultPort = "5432"
 	defaultDB   = "plush_erp"
 	defaultUser = "test_user"

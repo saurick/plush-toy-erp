@@ -724,6 +724,11 @@ func main() {
 	if err := devdbguard.RequireLocalDevDSN(confPath, dataCfg.Postgres.Dsn, os.Getenv); err != nil {
 		panic(err)
 	}
+	if devdbguard.IsDevConfigPath(confPath) {
+		if err := devdbguard.VerifyRegisteredDevelopmentRuntime(dataCfg.Postgres.Dsn); err != nil {
+			panic(err)
+		}
+	}
 	if err := validateProductionBootstrapConfig(confPath, dataCfg, os.Getenv); err != nil {
 		panic(err)
 	}

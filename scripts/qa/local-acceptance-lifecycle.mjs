@@ -127,7 +127,7 @@ async function inspectLocalAcceptanceBackendLogFile(logPath) {
 }
 
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/u;
-const REGISTERED_DATABASE_HOST = "192.168.0.106";
+const REGISTERED_DATABASE_HOST = "192.168.0.133";
 const REGISTERED_DATABASE_PORT = 5432;
 const HTTP_TIMEOUT_MS = 15_000;
 const SERVICE_READY_TIMEOUT_MS = 180_000;

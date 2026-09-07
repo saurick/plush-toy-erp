@@ -51,11 +51,11 @@ const REPOSITORY = Object.freeze({
   fingerprint: 'b'.repeat(64),
 })
 const CORE_DSN =
-  'postgres://dev_user:do-not-return@192.168.0.106:5432/plush_erp?sslmode=disable'
+  'postgres://dev_user:do-not-return@192.168.0.133:5432/plush_erp?sslmode=disable'
 const FULL_DSN =
-  'postgres://dev_user:do-not-return@192.168.0.106:5432/postgres?sslmode=disable'
+  'postgres://dev_user:do-not-return@192.168.0.133:5432/postgres?sslmode=disable'
 const SCENARIO_TARGET_FINGERPRINT = createHash('sha256')
-  .update('postgres://192.168.0.106:5432/plush_erp')
+  .update('postgres://192.168.0.133:5432/plush_erp')
   .digest('hex')
 const SCENARIO_SEMANTIC_DIGEST = digestManualAcceptanceSemanticPlan(
   buildManualAcceptanceSemanticPlan()
@@ -813,7 +813,7 @@ test('concurrent services atomically claim one idempotency key and return one op
   assert.equal(calls.filter(({ args }) => args.includes('--mode')).length, 1)
 })
 
-test('core demo target is fixed to registered 106 development databases and never accepts 133', async (t) => {
+test('core demo target is fixed to registered 133 development databases and rejects other 133 instances', async (t) => {
   const fixture = createFixture(t)
   const service = createDevDataPreparationService({
     projectRoot: fixture.root,
@@ -1023,7 +1023,7 @@ test('core demo rejects malformed registered-family aliases', async (t) => {
     operationStore: fixture.store,
     commandRunner: async () => ({
       stdout:
-        'postgres://dev:credential@192.168.0.106:5432/plush_erp__dev?sslmode=disable',
+        'postgres://dev:credential@192.168.0.133:5432/plush_erp__dev?sslmode=disable',
     }),
     readRepositoryState: async () => REPOSITORY,
     environment: {},
@@ -1268,7 +1268,7 @@ test('execution lock is atomic across dev server processes', (t) => {
 test('operation persistence recovers interrupted execution as not_proven and blocks replay', async (t) => {
   const fixture = createFixture(t)
   const targetSummary = {
-    safeTarget: 'host=192.168.0.106 port=5432 database=plush_erp',
+    safeTarget: 'host=192.168.0.133 port=5432 database=plush_erp',
     targetFingerprint: 'c'.repeat(64),
     preflightFingerprint: 'd'.repeat(64),
     disposable: false,
@@ -1324,7 +1324,7 @@ test('operation persistence recovers interrupted execution as not_proven and blo
 test('fresh Vite config reload keeps an in-flight operation inside the recovery grace window', (t) => {
   const fixture = createFixture(t)
   const targetSummary = {
-    safeTarget: 'host=192.168.0.106 port=5432 database=plush_erp',
+    safeTarget: 'host=192.168.0.133 port=5432 database=plush_erp',
     targetFingerprint: 'c'.repeat(64),
     preflightFingerprint: 'd'.repeat(64),
     disposable: false,
@@ -1364,7 +1364,7 @@ test('fresh Vite config reload keeps an in-flight operation inside the recovery 
 
 test('scenario-demo allows only a newer explicit same-target replay after an unknown outcome', () => {
   const targetSummary = {
-    safeTarget: 'host=192.168.0.106 port=5432 database=plush_erp',
+    safeTarget: 'host=192.168.0.133 port=5432 database=plush_erp',
     targetFingerprint: 'c'.repeat(64),
     preflightFingerprint: 'd'.repeat(64),
     disposable: false,
@@ -1437,7 +1437,7 @@ test('scenario-demo allows only a newer explicit same-target replay after an unk
 test('a later authoritative scenario readback releases the resolved unknown outcome for core demo', () => {
   const targetSummary = {
     targetKey: 'local-development',
-    safeTarget: 'host=192.168.0.106 port=5432 database=plush_erp',
+    safeTarget: 'host=192.168.0.133 port=5432 database=plush_erp',
     targetFingerprint: 'c'.repeat(64),
     preflightFingerprint: 'd'.repeat(64),
     disposable: false,
@@ -1511,7 +1511,7 @@ test('failed command receipts redact credentials and full DSNs', async (t) => {
         preflightCount += 1
         if (preflightCount > 1) {
           throw new Error(
-            'Command failed:\npassword=hunter2\tdsn=postgres://admin:secret@192.168.0.106:5432/plush_erp\n/tmp/seed.log /home/dev/config /private/tmp/a /var/run/service'
+            'Command failed:\npassword=hunter2\tdsn=postgres://admin:secret@192.168.0.133:5432/plush_erp\n/tmp/seed.log /home/dev/config /private/tmp/a /var/run/service'
           )
         }
         return {

@@ -19,7 +19,7 @@
 - 文档入口：[docs/README.md](docs/README.md)；当前真源：[docs/当前真源与交接顺序.md](docs/当前真源与交接顺序.md)；链与运行轨迹边界：[docs/architecture/业务链与运行轨迹边界.md](docs/architecture/业务链与运行轨迹边界.md)；项目治理地图：[docs/项目治理地图.md](docs/项目治理地图.md)。
 - 当前唯一部署真源仍是 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`
 - 当前后端统一走 `8300`
-- 本地开发数据库默认命中 `192.168.0.106:5432/plush_erp`；`192.168.0.133:5435/plush_erp` 是测试 / 目标环境，不作为本地开发默认库
+- 本地开发数据库默认命中 `192.168.0.133:5432/plush_erp`；133 上演示、验收和运行实例与开发库独立；`5435/55435` 旧实例已退役
 - 当前管理员账号 / RBAC 表、工作流协同表、库存 / 采购 / 质检 / 生产 / 委外 / 出货 / 预留 / 财务事实表、`product_skus`、`purchase_orders`、`processes`、`outsourcing_orders` 和 V1 主数据 / 销售订单表已通过 Ent + Atlas 落地；旧普通 `users` 表和 `user` JSON-RPC 普通账号管理链路已退出，账号登录与岗位任务端统一使用 `admin_users`、角色和权限码；业务看板统计使用只读 `dashboard_stats`；采购订单、BOM、产品 / SKU、工序、采购入库、质量检验、库存、委外订单、生产进度、出货、应收、应付、发票、单笔核对、真实收付款、多来源核销和红冲均已有对应 JSON-RPC / RBAC / V1 页面或正式来源入口；余额视图按 ACTIVE `stock_reservations` 返回已预留和可用量，显式 SKU 贯通销售订单行、批次、库存、生产 / 委外、出货与预留，并以产品 + SKU + 仓库 + 单位 + 批次作为精确库存 grain。历史 `product_sku_id=NULL` 不自动回填或与任一 SKU 共池；BOM SKU 粒度、受控导入创建 SKU 和旧库存人工重分类仍待评审；具体目标库是否已 apply 以 `make migrate_status` 为准
 - `出货单` 当前已作为 Shipment Fact V1 正式入口接入 `/erp/warehouse/shipments`，复用 `operational_fact` JSON-RPC 和 `shipment.*` RBAC；品质岗位可在启动财务放行前，从 `DRAFT` 出货单按产品 / SKU、仓库、批次送检粒度生成出货前成品检验，一旦发起就必须合格或让步接收后才能启动。`finished_goods_delivery` 启动事务锁定出货单并重验检验集合，随后直接创建 Shipment 财务 approval；审批同意由绑定领域命令写版本化 `APPROVED` 门禁，审批拒绝由命名领域命令写 `REJECTED` 门禁，两条分支分别结束流程且都不生成仓库放行任务。确认出货仍在独立事务重新核对 `APPROVED` 门禁、质检、来源数量、预留和可用库存，之后才写 `SHIPPED` 与库存 `OUT`。该可选质检侧链不启动 Workflow，也不替代生产完工质检主链；`出库管理` 已作为收窄的出货出库 / 库存预留 V1 入口复用 `shipments / stock_reservations`
 - 采购订单当前只表达采购承诺，不写库存、批次、应付、发票或付款事实；采购需求、采购订单余额、在途统计、采购合同审批、生产、委外、品质和财务后续仍按真实样本逐步拆；BOM Version 当前只维护工程版本、明细、复制、激活和归档，不生成采购需求、生产任务、库存事实或成本；加工环节 / processes 工序主数据只维护工序编号、名称、类别和可委外 / 可内制 / 需质检标记，不生成委外源单、生产任务、质检事实、库存流水或财务事实
@@ -39,7 +39,7 @@
 | Node.js | `24.14.0` | `.n-node-version`、`.node-version`、`.nvmrc` |
 | pnpm | `10.13.1` | `web/package.json` 的 `packageManager` |
 | Go | `>= 1.26.6` | `server/go.mod` 的 `toolchain go1.26.6` |
-| PostgreSQL | 本地开发默认 `192.168.0.106:5432/plush_erp` | `server/configs/dev/config.yaml` / `config.local.yaml` 和 `make print_db_url` |
+| PostgreSQL | 本地开发默认 `192.168.0.133:5432/plush_erp` | `server/configs/dev/config.yaml` / `config.local.yaml` 和 `make print_db_url` |
 
 推荐初始化顺序：
 
@@ -117,8 +117,8 @@ make run
 默认端口：
 
 - HTTP：`8300`
-- 本地开发 PostgreSQL：`192.168.0.106:5432/plush_erp`
-- 测试 / 目标环境 PostgreSQL：`192.168.0.133:5435/plush_erp`，只在显式测试服发布、测试服回归或目标环境验收时使用
+- 本地开发 PostgreSQL：`192.168.0.133:5432/plush_erp`
+- 演示与甲方测试 PostgreSQL：133 上的独立 loopback 端口 `55436/55437`，远程访问使用 SSH tunnel；发布与验收仍走各自正式流程。`5435/55435` 是已退役旧实例。
 
 ## 当前不做
 
@@ -188,5 +188,5 @@ pnpm style:l1
   为只读检查；裸 `migrate_plan` 兼容路由到 prepare，裸 TTY `migrate_apply`
   恢复唯一 ready operation 或重新准备后确认，不会再直接因缺内部 token 失败。
   只有携带完整内部确认的调用才进入高层服务复用的底层 plan / apply 守卫。启动
-  命令仍不会自动 apply，133 / 生产继续走正式发布流程
+  命令仍不会自动 apply，演示、验收与生产环境继续走正式发布流程
 - 工作流协同与各领域事实分别使用自己的 Ent schema；后续新增或调整领域对象仍必须先稳定字段关系，再改 `/Users/simon/projects/plush-toy-erp/server/internal/data/model/schema/*.go`

@@ -47,7 +47,7 @@
 - `endpoint` 为空时，服务仍能启动，只是使用本地无 exporter 的 tracer provider。
 - `ratio` 会被夹到 `[0,1]`；生产默认低采样，排障时可临时调高，`1` 表示全量采样。
 - 当前通过 OTLP HTTP exporter 发 trace，仓库默认内置 Jaeger 作为 tracing 存储和查询入口。
-- 宿主机本地调试当前默认连 `192.168.0.106:4318`；若本机 Jaeger VM IP 变化，需同步改 dev 本地配置。
+- 宿主机本地调试当前默认连 `192.168.0.133:4318`；若本机 Jaeger VM IP 变化，需同步改 dev 本地配置。
 - 宿主机线上进程当前默认连 `127.0.0.1:4318`。
 - Compose 里的 `app-server` 容器仍通过 `TRACE_ENDPOINT=jaeger:4318` 走容器网络，不读宿主机的 `127.0.0.1`。
 - Compose 里的 `TRACE_RATIO` 可覆盖 `trace.jaeger.ratio`，默认 `0.1`。
@@ -73,7 +73,7 @@
 - `maxIdleConns` 不得大于 `maxOpenConns`；非法配置会在启动前直接失败，不会交给运行时隐式修正。
 - `debug=true` 时会输出更多 SQL 调试信息，更适合开发环境。
 - `data.postgres.debug` 只控制 Ent SQL debug 日志；SQL trace 独立接入 `otelsql`，当前不写入 SQL text、语句模板、bind args 或 SQL 参数值。
-- 本地开发默认 DSN 已收口到共享 PG `192.168.0.106:5432/plush_erp`。
+- 本地开发默认 DSN 已收口到共享 PG `192.168.0.133:5432/plush_erp`。
 - 若你在数据库客户端里使用的是 `zos_test_user` 等其他账号，应该通过 `server/configs/dev/config.local.yaml` 或环境变量覆盖用户名和密码，而不是改公共仓库默认值。
 
 ## `data.etcd`
@@ -123,7 +123,7 @@
 | `BOOTSTRAP_ADMIN_ONCE` | `false` | 仅在新库首次初始化 bootstrap 管理员时临时设为 `true`；成功后写 marker 并恢复为 `false` |
 | `APP_ADMIN_PASSWORD` | 本地开发为 `adminadmin`；其它环境为空 | 本地覆盖默认密码；生产仅在 `BOOTSTRAP_ADMIN_ONCE=true` 的首次初始化窗口临时注入；已有同名管理员不会被自动重置或提权 |
 
-生产启动会阻断 `POSTGRES_DSN`、`APP_JWT_SECRET`、阿里云 PNVS 必填配置或 bootstrap 管理员密码中的 `change-this` / placeholder，显式拒绝已知本地开发默认密码，并拒绝 SMS mock、未显式关闭的 debug seed / cleanup。Compose 默认不注入 `APP_ADMIN_PASSWORD`，避免环境变量长期覆盖配置文件里的管理员初始化口径。只有新库首次初始化需要创建 bootstrap 管理员时，才允许同时临时设置 `BOOTSTRAP_ADMIN_ONCE=true` 和 `APP_ADMIN_PASSWORD`；初始化成功后会写入 runtime marker 和 runtime audit event，后续重复 bootstrap 会被拒绝。如果 `admin` 或同名管理员已经存在，启动逻辑不会重置密码，也不会自动提权，应通过管理员改密或受控 SQL 更新密码哈希。本地专用重置命令无生产或 133 逃逸开关。当前产品不提供公开自助注册 API 或前端路由，协作账号来源回到受控初始化或后续账号管理流程。
+生产启动会阻断 `POSTGRES_DSN`、`APP_JWT_SECRET`、阿里云 PNVS 必填配置或 bootstrap 管理员密码中的 `change-this` / placeholder，显式拒绝已知本地开发默认密码，并拒绝 SMS mock、未显式关闭的 debug seed / cleanup。Compose 默认不注入 `APP_ADMIN_PASSWORD`，避免环境变量长期覆盖配置文件里的管理员初始化口径。只有新库首次初始化需要创建 bootstrap 管理员时，才允许同时临时设置 `BOOTSTRAP_ADMIN_ONCE=true` 和 `APP_ADMIN_PASSWORD`；初始化成功后会写入 runtime marker 和 runtime audit event，后续重复 bootstrap 会被拒绝。如果 `admin` 或同名管理员已经存在，启动逻辑不会重置密码，也不会自动提权，应通过管理员改密或受控 SQL 更新密码哈希。本地专用重置命令无通往演示、验收或生产实例的逃逸开关。当前产品不提供公开自助注册 API 或前端路由，协作账号来源回到受控初始化或后续账号管理流程。
 
 ## HTTP 安全响应头
 
@@ -147,12 +147,12 @@ bash /Users/simon/projects/plush-toy-erp/scripts/seed-role-demo-admins.sh
 
 该脚本可生成 `demo_boss`、`demo_sales`、`demo_purchase`、`demo_production`、`demo_warehouse`、`demo_quality`、`demo_finance`、`demo_pmc`、`demo_engineering` 和 `demo_admin`，每个账号只绑定对应内置角色，权限仍来自 `roles -> role_permissions` 真源。默认不生成 `debug_operator` 账号；如果确需调试权限账号，必须显式加 `--include-debug`。
 
-无显式密码时，脚本只允许连接登记的 `192.168.0.106:5432/plush_erp` 或 `plush_erp_*_dev` 本地开发库，并以公开测试密码 `12345678` 生成十个角色演示账号，包括普通演示管理员 `demo_admin`；不会生成 `demo_debug`，也不会重置稳定超级管理员或人工验收场景账号。调试账号、人工验收账号或包含调试角色的完整回归必须通过 `--password` 或 `ERP_ROLE_DEMO_PASSWORD` 显式提供非默认密码。已有账号仍需加 `--reset-password` 才会重置密码。公开测试值一旦 seed 就是可登录凭据，不得写入 133、其他共享 / 试用、staging 或生产目标。
+无显式密码时，脚本只允许连接登记的 `192.168.0.133:5432/plush_erp` 或 `plush_erp_*_dev` 本地开发库，并以公开测试密码 `12345678` 生成十个角色演示账号，包括普通演示管理员 `demo_admin`；不会生成 `demo_debug`，也不会重置稳定超级管理员或人工验收场景账号。调试账号、人工验收账号或包含调试角色的完整回归必须通过 `--password` 或 `ERP_ROLE_DEMO_PASSWORD` 显式提供非默认密码。已有账号仍需加 `--reset-password` 才会重置密码。公开测试值一旦 seed 就是可登录凭据，不得写入 133 上其他实例、其他共享 / 试用、staging 或生产目标。
 
 安全边界：
 
 - 生产默认不应生成角色演示账号；脚本默认拒绝 `configs/prod` 或 `APP_ENV / ERP_ENV / GO_ENV=prod|production`。
-- 显式传入的覆盖密码只通过 `ERP_ROLE_DEMO_PASSWORD` 或命令参数临时提供，脚本不会把覆盖值写入配置文件。公开测试值即使显式传入也只能用于登记的 `192.168.0.106:5432/plush_erp` / `plush_erp_*_dev` 本地开发库；使用 `--allow-prod` 时必须提供非默认密码。
+- 显式传入的覆盖密码只通过 `ERP_ROLE_DEMO_PASSWORD` 或命令参数临时提供，脚本不会把覆盖值写入配置文件。公开测试值即使显式传入也只能用于登记的 `192.168.0.133:5432/plush_erp` / `plush_erp_*_dev` 本地开发库；使用 `--allow-prod` 时必须提供非默认密码。
 - 已有演示账号重跑时默认不重置密码，只恢复 `disabled=false`、`is_super_admin=false` 和单一角色绑定；如需重置必须显式加 `--reset-password`。
 
 ## debug seed / cleanup 环境变量

@@ -278,7 +278,7 @@ func TestApplyLocalAdminCredentialDefaults(t *testing.T) {
 	t.Parallel()
 
 	cfg := &conf.Data{Postgres: &conf.Data_Postgres{
-		Dsn: "postgres://test_user:secret@192.168.0.106:5432/plush_erp_simon_dev?sslmode=disable",
+		Dsn: "postgres://test_user:secret@192.168.0.133:5432/plush_erp_simon_dev?sslmode=disable",
 	}}
 	applyLocalAdminCredentialDefaults("./configs/dev/config.yaml", cfg, func(string) string { return "" })
 	if cfg.Auth == nil || cfg.Auth.Admin == nil {
@@ -297,7 +297,7 @@ func TestApplyLocalAdminCredentialDefaultsPreservesExplicitValues(t *testing.T) 
 
 	cfg := &conf.Data{
 		Postgres: &conf.Data_Postgres{
-			Dsn: "postgres://test_user:secret@192.168.0.106:5432/plush_erp_simon_dev?sslmode=disable",
+			Dsn: "postgres://test_user:secret@192.168.0.133:5432/plush_erp_simon_dev?sslmode=disable",
 		},
 		Auth: &conf.Data_Auth{Admin: &conf.Data_Auth_Admin{
 			Username: "local-operator",
@@ -314,7 +314,7 @@ func TestApplyLocalAdminCredentialDefaultsSkipsProduction(t *testing.T) {
 	t.Parallel()
 
 	cfg := &conf.Data{Postgres: &conf.Data_Postgres{
-		Dsn: "postgres://test_user:secret@192.168.0.106:5432/plush_erp_simon_dev?sslmode=disable",
+		Dsn: "postgres://test_user:secret@192.168.0.133:5432/plush_erp_simon_dev?sslmode=disable",
 	}}
 	applyLocalAdminCredentialDefaults("./configs/prod/config.yaml", cfg, productionConfigTestEnv(nil))
 	if cfg.Auth != nil {
@@ -338,7 +338,7 @@ func TestApplyLocalAdminCredentialDefaultsSkipsProductionEnvironment(t *testing.
 	t.Parallel()
 
 	cfg := &conf.Data{Postgres: &conf.Data_Postgres{
-		Dsn: "postgres://test_user:secret@192.168.0.106:5432/plush_erp_simon_dev?sslmode=disable",
+		Dsn: "postgres://test_user:secret@192.168.0.133:5432/plush_erp_simon_dev?sslmode=disable",
 	}}
 	applyLocalAdminCredentialDefaults("./configs/dev/config.yaml", cfg, productionConfigTestEnv(nil))
 	if cfg.Auth != nil {
@@ -490,7 +490,7 @@ func TestValidateCustomerConfigLocalTestDatabaseBindsSharedDevelopmentDatabase(t
 		return ""
 	}
 	valid := &conf.Data{Postgres: &conf.Data_Postgres{
-		Dsn: "postgres://test_user:secret@192.168.0.106:5432/plush_erp_simon_dev?sslmode=disable",
+		Dsn: "postgres://test_user:secret@192.168.0.133:5432/plush_erp_simon_dev?sslmode=disable",
 	}}
 	if err := validateCustomerConfigLocalTestDatabase(valid, enabled); err != nil {
 		t.Fatalf("expected shared development database to pass, got %v", err)

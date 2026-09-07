@@ -234,7 +234,7 @@ export function parseDatabaseURL(
   const normalizedHost = url.hostname.replace(/^\[|\]$/gu, "");
   const registeredDevelopment =
     allowRegisteredDevelopment &&
-    normalizedHost === "192.168.0.106" &&
+    normalizedHost === "192.168.0.133" &&
     port === 5432;
   if (
     !isLoopbackDatabaseHost(normalizedHost) &&

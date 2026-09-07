@@ -147,7 +147,7 @@ func TestValidateActiveCustomerTrialConfigRejectsReservedVersionDrift(t *testing
 
 func TestValidateActiveCustomerTrialConfigRequiresRegisteredLocalTestRuntime(t *testing.T) {
 	const acceptanceDatabase = "plush_erp_acceptance_local_fixture_dev"
-	const localAcceptanceDSN = "postgres://test_user:secret@192.168.0.106:5432/" + acceptanceDatabase + "?sslmode=disable"
+	const localAcceptanceDSN = "postgres://test_user:secret@192.168.0.133:5432/" + acceptanceDatabase + "?sslmode=disable"
 	localMarkers := map[string]string{"applyPurpose": biz.CustomerConfigLocalTestApplyPurpose}
 	for _, tc := range []struct {
 		name          string
@@ -177,16 +177,16 @@ func TestValidateActiveCustomerTrialConfigRequiresRegisteredLocalTestRuntime(t *
 			wantError:     "exact registered runtime opt-in",
 		},
 		{
-			name:          "non-local configured server",
+			name:          "retired source server",
 			allow:         "1",
-			configuredDSN: "postgres://test_user:secret@192.168.0.133:5432/" + acceptanceDatabase + "?sslmode=disable",
+			configuredDSN: "postgres://test_user:secret@192.168.0.106:5432/" + acceptanceDatabase + "?sslmode=disable",
 			databaseName:  acceptanceDatabase,
 			wantError:     "registered local development database family",
 		},
 		{
 			name:          "wrong configured port",
 			allow:         "1",
-			configuredDSN: "postgres://test_user:secret@192.168.0.106:5435/" + acceptanceDatabase + "?sslmode=disable",
+			configuredDSN: "postgres://test_user:secret@192.168.0.133:5435/" + acceptanceDatabase + "?sslmode=disable",
 			databaseName:  acceptanceDatabase,
 			wantError:     "registered local development database family",
 		},
@@ -284,7 +284,7 @@ func TestValidateActiveCustomerTrialConfigRejectsIncompleteLocalTestMarker(t *te
 				context.Background(),
 				db,
 				false,
-				"postgres://test_user:secret@192.168.0.106:5432/plush_erp_acceptance_local_fixture_dev?sslmode=disable",
+				"postgres://test_user:secret@192.168.0.133:5432/plush_erp_acceptance_local_fixture_dev?sslmode=disable",
 			)
 			if err == nil || !strings.Contains(err.Error(), "local-test customer config marker is incomplete or invalid") {
 				t.Fatalf("validateActiveCustomerTrialConfig() error = %v", err)

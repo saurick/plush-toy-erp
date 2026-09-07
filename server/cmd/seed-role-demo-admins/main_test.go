@@ -96,8 +96,8 @@ func TestValidateRoleDemoPasswordRequiresExplicitValueWithAllowProd(t *testing.T
 }
 
 func TestValidateRoleDemoPasswordTargetRestrictsPublicDefault(t *testing.T) {
-	const isolatedDevDSN = "postgres://test_user:secret@192.168.0.106:5432/plush_erp_simon_dev?sslmode=disable"
-	const registeredDevDSN = "postgres://test_user:secret@192.168.0.106:5432/plush_erp?sslmode=disable"
+	const isolatedDevDSN = "postgres://test_user:secret@192.168.0.133:5432/plush_erp_simon_dev?sslmode=disable"
+	const registeredDevDSN = "postgres://test_user:secret@192.168.0.133:5432/plush_erp?sslmode=disable"
 	if err := validateRoleDemoPasswordTarget(defaultRoleDemoPassword, isolatedDevDSN, false, false); err != nil {
 		t.Fatalf("registered isolated development database must accept the public default: %v", err)
 	}

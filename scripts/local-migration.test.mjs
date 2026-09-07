@@ -21,7 +21,7 @@ import {
 const identity = Object.freeze({
   database: "plush_erp_simon_dev",
   user: "test_user",
-  systemIdentifier: "7572907083182862377",
+  systemIdentifier: "7682605996671565865",
 });
 const cliPath = fileURLToPath(
   new URL("./local-migration.mjs", import.meta.url),
@@ -37,23 +37,23 @@ function outputBuffer() {
 
 test("local migration: only the exact application-config 106 development family is shared-dev", () => {
   const registered = classifyDevelopmentTarget(
-    "postgres://user:secret@192.168.0.106:5432/plush_erp_simon_dev?sslmode=disable",
+    "postgres://user:secret@192.168.0.133:5432/plush_erp_simon_dev?sslmode=disable",
     "application-config",
   );
   assert.equal(registered.scope, "shared-dev");
   assert.equal(
     registered.safeTarget,
-    "host=192.168.0.106 port=5432 database=plush_erp_simon_dev",
+    "host=192.168.0.133 port=5432 database=plush_erp_simon_dev",
   );
   assert.doesNotMatch(registered.safeTarget, /user|secret/u);
 
   for (const [url, source] of [
     [
-      "postgres://user:secret@192.168.0.106:5432/plush_erp_simon_dev",
+      "postgres://user:secret@192.168.0.133:5432/plush_erp_simon_dev",
       "environment",
     ],
     [
-      "postgres://user:secret@192.168.0.106:5432/plush_erp_dev",
+      "postgres://user:secret@192.168.0.133:5432/plush_erp_dev",
       "application-config",
     ],
     [
@@ -61,7 +61,7 @@ test("local migration: only the exact application-config 106 development family 
       "application-config",
     ],
     [
-      "postgres://user:secret@192.168.0.106:5432/unrelated_dev",
+      "postgres://user:secret@192.168.0.133:5432/unrelated_dev",
       "application-config",
     ],
   ]) {
@@ -89,7 +89,7 @@ test("local migration: loopback isolated plush databases remain available", () =
 
 test("local migration: confirmations bind target, migration hash, revision and pending set", () => {
   const target = classifyDevelopmentTarget(
-    "postgres://user:secret@192.168.0.106:5432/plush_erp_simon_dev",
+    "postgres://user:secret@192.168.0.133:5432/plush_erp_simon_dev",
     "application-config",
   );
   const confirmation = targetConfirmation(target, identity);
@@ -175,7 +175,7 @@ test("local migration: terminal receipt always emits a complete safe outcome exa
     phase: "schema_readback",
     target: {
       scope: "shared-dev",
-      safeTarget: "host=192.168.0.106 port=5432 database=plush_erp",
+      safeTarget: "host=192.168.0.133 port=5432 database=plush_erp",
       currentVersion: "20260729043852",
       latestVersion: "20260731124000",
       appliedFiles: 105,
@@ -210,7 +210,7 @@ test("local migration: terminal receipt always emits a complete safe outcome exa
   );
   assert.match(
     output,
-    /target=shared-dev host=192\.168\.0\.106 port=5432 database=plush_erp/u,
+    /target=shared-dev host=192\.168\.0\.133 port=5432 database=plush_erp/u,
   );
   assert.match(
     output,
@@ -230,7 +230,7 @@ test("local migration: unsafe receipt target falls back to unavailable", () => {
     target: {
       key: "shared-dev",
       safeTarget:
-        "host=192.168.0.106 port=5432 database=plush_erp\npassword=sentinel",
+        "host=192.168.0.133 port=5432 database=plush_erp\npassword=sentinel",
     },
   });
   receipt.finish({
@@ -248,7 +248,7 @@ test("local migration: unsafe receipt target falls back to unavailable", () => {
 
 test("local migration: diagnostics redact database credentials and confirmation values", () => {
   const secrets = [
-    "postgres://admin:dsn-secret@192.168.0.106:5432/plush_erp",
+    "postgres://admin:dsn-secret@192.168.0.133:5432/plush_erp",
     "postgresql://admin:dsn-secret@localhost:5432/plush_erp",
     "DB_URL='postgres://admin:db-url-secret@localhost/plush_erp'",
     "POSTGRES_DSN=postgres://admin:postgres-dsn-secret@localhost/plush_erp",

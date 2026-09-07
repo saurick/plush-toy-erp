@@ -265,7 +265,7 @@ Atlas validate / `tx-mode=all` dry-run、全部 pending SQL 的同事务真实�
 唯一 ready operation，找不到时重新准备并等待完整确认。只有携带完整内部确认
 的调用才进入高层服务复用的低层 plan / apply 合同，因此旧命令不再因缺 token
 必然失败，也没有放宽目标、备份、停写或一次 apply 边界。环境变量覆盖的远程库、
-133、生产或归属不明目标仍使用正式发布流程。
+133 上其他实例、生产或归属不明目标仍使用正式发布流程。
 
 高层 `make migrate` 停止本项目后端后，会按数据库会话的实际状态判断风险，不按
 客户端名称判断。没有事务、没有快照或 advisory lock、状态为 `idle / ClientRead`
@@ -301,7 +301,7 @@ lock 或状态不明的连接仍以 `database_clients_active` 阻断，并显示
 复制 status / plan / apply 的临时确认值。普通 `pnpm start` 遇到 pending migration
 或其它本地数据库 / 后端预检失败时会保留该受限恢复页；预检最多等待 15 秒，超时取消检查后仍启动 Vite；
 恢复期间普通 ERP 页面、其它 DEV API 与 RPC 保持阻断。页面只支持 application config 已
-登记的 `192.168.0.106:5432/plush_erp`：先点“检查并准备”，Bridge 固定完成
+登记的 `192.168.0.133:5432/plush_erp`：先点“检查并准备”，Bridge 固定完成
 status、停止后端、plan、备份恢复演练与身份复核；再输入页面给出的完整确认串，
 execute 写入前还会重新核对备份文件身份，
 同一 operation 只执行一次 apply、`pending=0` 读回、后端重启和 health /
@@ -312,7 +312,7 @@ ready，并重新通过完整启动检查。旧 ready 计划可显式重新检�
 迁移真源与目标状态可以复用已通过且 dump 大小 / SHA-256 读回一致的备份恢复
 报告，避免非写入阻断后反复备份；它不会运行 `fast`、`full`、`strict`、完整
 验收 lifecycle 或发布构建。数据库已到 head 时不要求备份工具，只显示状态，不重新 apply 或
-重建。该入口不是任意数据库控制台，也不能替代 133 / 生产发布流程。
+重建。该入口不是任意数据库控制台，也不能替代演示、验收或生产发布流程。
 
 生产发布还必须使用准备好的运行时 `.env` 执行产品级 preflight；该命令不执行 migration，只确认发布前门禁是否满足，包括 secret 占位、固定镜像 tag、SMS mock、debug seed / cleanup、PostgreSQL / 后端 HTTP / Jaeger loopback 和低配部署边界：
 

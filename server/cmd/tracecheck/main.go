@@ -24,7 +24,7 @@ func getenv(k, def string) string {
 
 func main() {
 	// 宿主机本地调试默认走当前 Jaeger VM 的 192 地址；线上宿主机可改成 127.0.0.1:4318。
-	endpoint := getenv("OTLP_ENDPOINT", "192.168.0.106:4318")
+	endpoint := getenv("OTLP_ENDPOINT", "192.168.0.133:4318")
 	serviceName := getenv("TRACE_SERVICE_NAME", "plush-toy-erp-tracecheck")
 
 	ctx := context.Background()

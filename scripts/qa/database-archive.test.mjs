@@ -133,7 +133,7 @@ test("archive fails closed on restore fingerprint drift and still removes restor
 test("archive requires an explicit flag for the one registered development cluster", () => {
   const databaseName = "plush_erp_ci_registered_archive_fixture";
   const databaseURL =
-    `postgres://postgres:secret@192.168.0.106:5432/${databaseName}?sslmode=disable`;
+    `postgres://postgres:secret@192.168.0.133:5432/${databaseName}?sslmode=disable`;
   const base = {
     databaseName,
     databaseURL,
@@ -148,7 +148,7 @@ test("archive requires an explicit flag for the one registered development clust
     allowRegisteredDevelopment: true,
   });
   assert.equal(report.source.databaseName, databaseName);
-  assert.match(report.source.safeTarget, /host=192[.]168[.]0[.]106/u);
+  assert.match(report.source.safeTarget, /host=192[.]168[.]0[.]133/u);
 
   assert.throws(
     () =>
@@ -157,7 +157,7 @@ test("archive requires an explicit flag for the one registered development clust
         allowRegisteredDevelopment: true,
         databaseName: "plush_erp_unclassified_fixture",
         databaseURL:
-          "postgres://postgres:secret@192.168.0.106:5432/plush_erp_unclassified_fixture?sslmode=disable",
+          "postgres://postgres:secret@192.168.0.133:5432/plush_erp_unclassified_fixture?sslmode=disable",
       }),
     /non-long-lived/u,
   );

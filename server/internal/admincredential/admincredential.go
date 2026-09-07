@@ -233,7 +233,7 @@ func requireLocalDevelopmentTarget(confPath, dsn string, getenv func(string) str
 			return fmt.Errorf("refuse local admin credential reset: %s marks a production runtime", key)
 		}
 	}
-	// This strict guard accepts only the registered 192.168.0.106:5432
+	// This strict guard accepts only the registered 192.168.0.133:5432
 	// development database family. It intentionally has no production or 133
 	// escape hatch and ignores ERP_ALLOW_TEST_DB_AS_DEV.
 	if err := devdbguard.RequireLocalAdminResetDSN(dsn); err != nil {

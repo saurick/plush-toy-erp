@@ -27,7 +27,7 @@ go run ./cmd/server -conf ./configs/dev/config.yaml
 ## 默认端口
 
 - HTTP：`8300`
-- 本地开发数据库：`192.168.0.106:5432/plush_erp`
+- 本地开发数据库：`192.168.0.133:5432/plush_erp`
 - PostgreSQL Compose 宿主机映射：`5435`
 
 配置来源：
@@ -92,7 +92,7 @@ go test ./...
 
 `make migrate` 是登记共享开发库的人机交互入口。非交互执行必须先运行
 `make migrate_prepare`，再原样使用同一次 ready 输出运行 `make migrate_execute`；
-prepare 成功不表示数据库已经升级。133 与生产环境不使用这些本地目标。
+prepare 成功不表示数据库已经升级。133 上演示、验收和生产实例不使用这些本地目标。
 
 ## 后续扩展时建议确认
 

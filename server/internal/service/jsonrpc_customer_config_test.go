@@ -632,7 +632,7 @@ func TestResolveCustomerConfigLocalTestGateBindsFlagToRegisteredDevelopmentFamil
 	t.Parallel()
 
 	exact := &conf.Data{Postgres: &conf.Data_Postgres{
-		Dsn: "postgres://test_user:secret@192.168.0.106:5432/plush_erp_acceptance_local_fixture_dev?sslmode=disable",
+		Dsn: "postgres://test_user:secret@192.168.0.133:5432/plush_erp_acceptance_local_fixture_dev?sslmode=disable",
 	}}
 	enabled, err := resolveCustomerConfigLocalTestGate(exact, func(key string) string {
 		if key == biz.CustomerConfigLocalTestAllowEnv {
@@ -645,7 +645,7 @@ func TestResolveCustomerConfigLocalTestGateBindsFlagToRegisteredDevelopmentFamil
 	}
 
 	shared := &conf.Data{Postgres: &conf.Data_Postgres{
-		Dsn: "postgres://test_user:secret@192.168.0.106:5432/plush_erp_simon_dev?sslmode=disable",
+		Dsn: "postgres://test_user:secret@192.168.0.133:5432/plush_erp_simon_dev?sslmode=disable",
 	}}
 	if enabled, err := resolveCustomerConfigLocalTestGate(shared, func(string) string { return "1" }); err != nil || !enabled {
 		t.Fatalf("shared dev gate = %v, %v; want enabled", enabled, err)

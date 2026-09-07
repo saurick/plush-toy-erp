@@ -114,7 +114,7 @@ CHECK/UNIQUE/FK 约束。
       `writes=0 / apply=skipped`
 
     **注意：**
-    - 开发 plan/apply 只接受 loopback 的 `plush_erp*` 隔离库，以及 application config 精确命中的 `192.168.0.106:5432/plush_erp` / `plush_erp_*_dev`。环境变量覆盖同一共享地址也不会被当成登记目标。
+    - 开发 plan/apply 只接受 loopback 的 `plush_erp*` 隔离库，以及 application config 精确命中的 `192.168.0.133:5432/plush_erp` / `plush_erp_*_dev`。环境变量覆盖同一共享地址也不会被当成登记目标。
     - 如果当前 shell 里还带着旧的 `DB_URL`、`POSTGRES_DSN`、`USE_ENV_DB_URL=1` 或其他连接环境变量，必须先确认 `make migrate_status` 的脱敏目标。
     - 如果目标库可能是生产库、共享测试库，或当前无法明确判断数据库归属，必须先说明将命中的库和风险，再等待确认。
     - `result=not_proven`、`writes=unknown` 或

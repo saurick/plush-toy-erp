@@ -36,7 +36,7 @@
 | `node scripts/qa/output-retention-preview.mjs --protect-sha <40sha> --out output/dev-workbench/retention/previews/<name>.json`      | 对登记的 managed output 生成数量与 5GiB 容量预算预览，保护最新状态、operation 引用和显式 SHA；无 `--apply`，不删除文件                                                                                                                                                                                                                                                         | 定期检查本地证据膨胀                                |
 | `node scripts/qa/database-inventory.mjs --out <report.json>`                                                                        | 从环境中的固定数据库 URL 只读盘点同服务器项目库、连接数、migration、仓库引用和 disposable 分类；不授权删除                                                                                                                                                                                                                                                                     | 发布演练前后或发现临时库堆积时                      |
 | `node scripts/qa/database-archive.mjs --database-name <name> --out <dir>`                                                           | 只接受已登记 disposable 库且要求零连接；生成归档并在临时 restore 库核对 migration、schema 与逐表计数，最后删除 restore 库并读回零残留                                                                                                                                                                                                                                          | 清理候选库取得可恢复证据时                          |
-| `node scripts/qa/database-cleanup.mjs --database-name <name> --inventory <report> --manifest <manifest> --print-confirmation`       | 从同一 inventory 与 archive manifest 生成精确确认串；正式 cleanup 还需通过环境提供 admin URL、传入确认串和输出报告，成功后读回源库已不存在。登记 106 仅在三个命令均显式加 `--allow-registered-development` 时开放；长期或未分类库始终拒绝                                                                                                                                      | archive / restore 已通过后清理同一 disposable 库    |
+| `node scripts/qa/database-cleanup.mjs --database-name <name> --inventory <report> --manifest <manifest> --print-confirmation`       | 从同一 inventory 与 archive manifest 生成精确确认串；正式 cleanup 还需通过环境提供 admin URL、传入确认串和输出报告，成功后读回源库已不存在。登记 133 仅在三个命令均显式加 `--allow-registered-development` 时开放；长期或未分类库始终拒绝                                                                                                                                      | archive / restore 已通过后清理同一 disposable 库    |
 | `sh scripts/qa/populated-upgrade-preflight.sh --audit <populated-upgrade\|customer-config-cutover\|database-constraints> ...`       | 对指定数据库运行固定 allowlist 的 migration 只读审计；不执行 migration 或自动数据治理                                                                                                                                                                                                                                                                                          | 跨越存量升级、客户配置切换或关键约束收紧前          |
 | `.gitlab-ci.yml`                                                                                                                    | canonical `plan → prepare → 七类外部证据 DAG → aggregate → CI Gate`；Node 与 resource-sensitive 分别在内部按真实资源边界 fan-in，并保留每条 lane 的时间窗，对外仍只有七类规范回执；MR 保留 affected，main 普通 CI 签发可复用 exact-SHA 证据，受保护 release 不重跑 strict，同 SHA 只构建一次候选制品并冻结演练回执后登记 GitLab Package/Release                                | GitLab main、merge request、受保护 release          |
 | `.github/workflows/release.yml`                                                                                                     | GitHub 应急发布保护壳；在 canonical v2 七资产与同一演练回执完整接入前，于 checkout、登录、构建或上传前固定失败关闭，禁止六资产部分发布                                                                                                                                                                                                                                         | 应急发布合同回归                                    |
@@ -187,14 +187,14 @@ node scripts/qa/manual-acceptance-data-depth.mjs
 
 正常整批写入只使用顶层 runner。它按 `core → baseline → role → source → task → facts → purchase-quality → attachments → readiness` 串行执行；两端 handler 身份和 target-free 业务输入相同，目标适配层只提供 endpoint、数据库身份、凭据、确认、带外证明和报告目录。`core` 在登录前先调用只读 `/readyz/runtime-identity`，用摘要同时绑定实际数据库、完整 40 位 release commit 和 14 位 Atlas revision；探针只返回匹配 marker，不返回数据库名或连接信息。随后登录 admin 读取真实 `debug.capabilities`，再次核对数据库、运行环境和六个 debug=false，只读证明后续阶段依赖的 1 个稳定单位和 4 个仓库。`baseline` 再逐类读回客户、供应商、材料、产品、SKU、工序、BOM、来源单、Workflow 和全部 Fact 都为 0；任何已有业务记录都会阻断，不能用历史数据凑页面数量。`role` 在已注册的 local 与 133 验收目标中读取岗位当前完整设置，再统一通过带版本校验和审计的 `admin.set_role_settings` 整包回写原权限、原菜单布局和新的仓库范围，把 `warehouse / quality` 精确绑定到这 4 个核心仓库；不得分拆写入、丢失导航顺序或用脚本直写 RBAC 表。材料、产品、工序、BOM 与业务源单数量随后由 `source` 阶段独立写入并读回。密码创建与重置统一要求 8～20 位且 UTF-8 编码后不超过 72 字节；本地从环境变量读取，133 从固定测试凭据合同读取，报告均不保存密码。
 
-`local-acceptance-lifecycle.mjs` 是本地完整验收的统一入口：它只接受登记的 `192.168.0.106:5432` 开发 PostgreSQL、clean exact commit、按批生成的 `plush_erp_acceptance_<run-id>_dev` 与 `plush_erp_acceptance_<run-id>_browser_actions_dev`，并使用隔离端口完成建库、migration、后端、十个正式模拟岗位账号的受控预配置 bootstrap、客户配置、core、九岗位数据、51 项只读浏览器和三条真实写异常流。预配置 bootstrap 只在 runtime identity、精确数据库、环境、super admin、目标确认和账号确认均通过后走 `admin.create`，不直写账号表；它先满足客户配置审批责任岗位的“有可办理员工”发布门禁，dataset role 阶段仍会重新核对账号并补齐正式岗位权限和仓库范围。浏览器启动前会重新扫描规范辅助端口，并在健康检查后复核本轮 Vite 子进程仍存活，不能把并发任务占用端口上的外部页面误认成本轮服务。只读验收完成并停后端后才克隆 `browser_actions` 库；无论成功失败都会停服务、逐库强制删除和读回残留，清理失败返回非零并报告精确库名。默认只打印 plan；真实执行必须传入 exact commit、run id、由 plan 生成的确认串和 `LOCAL_ACCEPTANCE_DATABASE_BASE_URL`，回执不保存 DSN、密码或 token：
+`local-acceptance-lifecycle.mjs` 是本地完整验收的统一入口：它只接受登记的 `192.168.0.133:5432` 开发 PostgreSQL、clean exact commit、按批生成的 `plush_erp_acceptance_<run-id>_dev` 与 `plush_erp_acceptance_<run-id>_browser_actions_dev`，并使用隔离端口完成建库、migration、后端、十个正式模拟岗位账号的受控预配置 bootstrap、客户配置、core、九岗位数据、51 项只读浏览器和三条真实写异常流。预配置 bootstrap 只在 runtime identity、精确数据库、环境、super admin、目标确认和账号确认均通过后走 `admin.create`，不直写账号表；它先满足客户配置审批责任岗位的“有可办理员工”发布门禁，dataset role 阶段仍会重新核对账号并补齐正式岗位权限和仓库范围。浏览器启动前会重新扫描规范辅助端口，并在健康检查后复核本轮 Vite 子进程仍存活，不能把并发任务占用端口上的外部页面误认成本轮服务。只读验收完成并停后端后才克隆 `browser_actions` 库；无论成功失败都会停服务、逐库强制删除和读回残留，清理失败返回非零并报告精确库名。默认只打印 plan；真实执行必须传入 exact commit、run id、由 plan 生成的确认串和 `LOCAL_ACCEPTANCE_DATABASE_BASE_URL`，回执不保存 DSN、密码或 token：
 
 ```bash
 node scripts/qa/local-acceptance-lifecycle.mjs \
   --commit '<clean-40-character-commit>' \
   --run-id 20260728-delivery
 
-LOCAL_ACCEPTANCE_DATABASE_BASE_URL='postgres://<user>:<password>@192.168.0.106:5432/postgres?sslmode=disable' \
+LOCAL_ACCEPTANCE_DATABASE_BASE_URL='postgres://<user>:<password>@192.168.0.133:5432/postgres?sslmode=disable' \
   node scripts/qa/local-acceptance-lifecycle.mjs \
     --execute \
     --commit '<clean-40-character-commit>' \
@@ -232,7 +232,7 @@ MANUAL_ACCEPTANCE_PASSWORD='<different-demo-password>' \
 ```
 
 ```bash
-POSTGRES_DSN='postgres://<user>:<password>@192.168.0.106:5432/plush_erp_acceptance_20260728_delivery_dev?sslmode=disable' \
+POSTGRES_DSN='postgres://<user>:<password>@192.168.0.133:5432/plush_erp_acceptance_20260728_delivery_dev?sslmode=disable' \
   bash scripts/seed-core-demo-data.sh \
     --references-only \
     --expected-database plush_erp_acceptance_20260728_delivery_dev \
@@ -422,7 +422,7 @@ MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
 
 本地 Kratos BBR 若在逐页读取期间返回纯 HTTP 429，浏览器验收会按 10 / 20 / 30 秒递增等待，最多执行四次，并在报告保留每次失败事件与截图。只要混入其他运行时错误、最终页面数据不足，或第四次仍被限流，整轮验收仍失败；该重试不能把持续过载或业务错误改写成绿色。
 
-三条异常流真实写浏览器验收必须单独使用名称和归属明确、可回收的全新本地隔离库。数据库名必须由 `database-target.mjs` 的 `browser-actions` 生命周期生成并匹配 `plush_erp_acceptance_<run-id>_browser_actions_dev`，后端必须是 loopback 且不能使用共享端口 `8300`，显式确认串必须同时绑定数据库名与后端 origin；runner 启动后还会用 `/readyz/runtime-identity` 复核同一数据库身份。禁止指向共享开发库、133、客户试用或生产数据库。
+三条异常流真实写浏览器验收必须单独使用名称和归属明确、可回收的全新本地隔离库。数据库名必须由 `database-target.mjs` 的 `browser-actions` 生命周期生成并匹配 `plush_erp_acceptance_<run-id>_browser_actions_dev`，后端必须是 loopback 且不能使用共享端口 `8300`，显式确认串必须同时绑定数据库名与后端 origin；runner 启动后还会用 `/readyz/runtime-identity` 复核同一数据库身份。禁止指向日常共享开发库、133 上其他实例、客户试用或生产数据库。
 
 ```bash
 MANUAL_ACCEPTANCE_DEMO_PASSWORD='<local-demo-password>' \
@@ -515,7 +515,7 @@ bash scripts/qa/affected.sh --file web/src/erp/utils/dateRange.mjs --run
 
 `demo_admin` 是普通演示角色账号，不是稳定超级管理员 `admin`。角色演示账号的 seed / reset 只处理 `demo_*`，不得顺带重置稳定管理员。
 
-无显式密码时，脚本只允许连接登记的 `192.168.0.106:5432/plush_erp` 或 `plush_erp_*_dev` 本地开发库，并使用公开测试密码 `12345678` 生成十个角色演示账号（包括普通演示管理员 `demo_admin`）；不会生成 `demo_debug`，也不会重置稳定超级管理员或人工验收场景账号。本入口及其 `demo_*` 账号不得用于 133、其他共享 / 试用、staging 或生产目标；`customer-trial-133` 复用相同公开密码值时只能走其独立 `uat_*` 凭据合同与受控轮换器。独立命令行调试账号和其他人工验收账号操作仍必须通过 `--password` 或 `ERP_ROLE_DEMO_PASSWORD` 显式提供非默认密码；唯一例外是 DEV-only 测试数据中心的固定 `scenario-demo` 编排，它在精确证明本机 8300 与登记 106 开发库后，可复用本机公开测试账号约定实现页面生成，且没有 133、staging 或生产逃逸开关。管理员和演示账号的创建、重置密码仍统一要求 8～20 个 Unicode 字符，且 UTF-8 编码后不超过 bcrypt 的 72 字节边界。
+无显式密码时，脚本只允许连接登记的 `192.168.0.133:5432/plush_erp` 或 `plush_erp_*_dev` 本地开发库，并使用公开测试密码 `12345678` 生成十个角色演示账号（包括普通演示管理员 `demo_admin`）；不会生成 `demo_debug`，也不会重置稳定超级管理员或人工验收场景账号。本入口及其 `demo_*` 账号不得用于 133 上其他实例、其他共享 / 试用、staging 或生产目标；`customer-trial-133` 复用相同公开密码值时只能走其独立 `uat_*` 凭据合同与受控轮换器。独立命令行调试账号和其他人工验收账号操作仍必须通过 `--password` 或 `ERP_ROLE_DEMO_PASSWORD` 显式提供非默认密码；唯一例外是 DEV-only 测试数据中心的固定 `scenario-demo` 编排，它在精确证明本机 8300 与登记 133 开发库后，可复用本机公开测试账号约定实现页面生成，且没有通往演示、验收、staging 或生产实例的逃逸开关。管理员和演示账号的创建、重置密码仍统一要求 8～20 个 Unicode 字符，且 UTF-8 编码后不超过 bcrypt 的 72 字节边界。
 
 ```bash
 bash /Users/simon/projects/plush-toy-erp/scripts/seed-role-demo-admins.sh
@@ -534,7 +534,7 @@ ERP_ROLE_DEMO_PASSWORD='<explicit-demo-password>' \
 bash /Users/simon/projects/plush-toy-erp/scripts/seed-role-demo-admins.sh --reset-password
 ```
 
-无输入重置只处理登记的 `192.168.0.106:5432/plush_erp` / `plush_erp_*_dev` 本地开发库中的十个角色演示账号。重置 `demo_debug` 或人工验收场景账号时必须用 `--password` 或 `ERP_ROLE_DEMO_PASSWORD` 显式提供非默认密码。脚本默认拒绝 `configs/prod` 或 `APP_ENV / ERP_ENV / GO_ENV=prod|production`；公开测试值即使显式传入也不能离开登记的本地开发库族，`--allow-prod` 必须使用非默认密码。常规开发和验收不要对生产库执行该脚本。
+无输入重置只处理登记的 `192.168.0.133:5432/plush_erp` / `plush_erp_*_dev` 本地开发库中的十个角色演示账号。重置 `demo_debug` 或人工验收场景账号时必须用 `--password` 或 `ERP_ROLE_DEMO_PASSWORD` 显式提供非默认密码。脚本默认拒绝 `configs/prod` 或 `APP_ENV / ERP_ENV / GO_ENV=prod|production`；公开测试值即使显式传入也不能离开登记的本地开发库族，`--allow-prod` 必须使用非默认密码。常规开发和验收不要对生产库执行该脚本。
 
 生成或重置演示账号后，可执行真实账号核对。该脚本不创建账号、不改密码，只通过真实 `/rpc/auth` 的 `admin_login + me` 校验角色、`mobile.<role>.access`、`debug.*` 权限、`is_super_admin` 和 `disabled` 边界。`admin_login` 会写入正常认证会话，但脚本不调用业务写入 RPC，不写 Source Document、Workflow 或 Fact：
 

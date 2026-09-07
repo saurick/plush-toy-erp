@@ -37,7 +37,7 @@ const REPOSITORY = Object.freeze({
 });
 const LOCAL_DATABASE = Object.freeze({
   databaseName: "plush_erp",
-  host: "192.168.0.106",
+  host: "192.168.0.133",
   port: 5432,
   safeTarget: "registered-development:plush_erp",
   targetFingerprint: "a".repeat(64),
@@ -327,7 +327,7 @@ test("CLI accepts only registered persistent targets and binds apply to plan dig
     /requires --expected-plan-digest/u,
   );
   assert.throws(
-    () => parseScenarioDemoArgs(["--host", "192.168.0.106"]),
+    () => parseScenarioDemoArgs(["--host", "192.168.0.133"]),
     /unknown option/u,
   );
 });
@@ -339,7 +339,7 @@ test("local CLI plan proves database, migration, runtime, and repository", async
     if (command === "go") {
       return {
         stdout:
-          "postgres://user:redacted@192.168.0.106:5432/plush_erp?sslmode=disable\n",
+          "postgres://user:redacted@192.168.0.133:5432/plush_erp?sslmode=disable\n",
         stderr: "",
       };
     }

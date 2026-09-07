@@ -47,7 +47,7 @@ async function waitForOperation(service, operationId, statuses) {
 function target({ pendingFiles = 1 } = {}) {
   return {
     key: 'shared-dev',
-    safeTarget: 'host=192.168.0.106 port=5432 database=plush_erp',
+    safeTarget: 'host=192.168.0.133 port=5432 database=plush_erp',
     currentVersion: pendingFiles === 0 ? '20260729043852' : '20260728100514',
     latestVersion: '20260729043852',
     appliedFiles: pendingFiles === 0 ? 105 : 104,
@@ -172,7 +172,7 @@ function dependencies(calls) {
 
 test('database migration output parser keeps low-level confirmations server-side', () => {
   const status = parseMigrationStatusOutput(`
-[migration] target=shared-dev host=192.168.0.106 port=5432 database=plush_erp
+[migration] target=shared-dev host=192.168.0.133 port=5432 database=plush_erp
 [migration] current=20260728100514 latest=20260729043852 applied=104/105 pending=1
 [migration] MIGRATE_TARGET_CONFIRM=TRUST_SHARED_DEV_DATABASE:target-proof
 `)

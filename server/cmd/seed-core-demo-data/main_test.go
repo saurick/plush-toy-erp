@@ -38,7 +38,7 @@ func TestManualAcceptanceReferenceTargetIsBoundToTheExactFreshDatabase(t *testin
 	const database = "plush_erp_acceptance_20260728_delivery_dev"
 	const confirmation = "SEED_MANUAL_ACCEPTANCE_CORE_REFERENCES:local-dev:" + database + ":2026.08.15-v6:20260815-V6"
 	validLoopback := "postgres://acceptance:secret@127.0.0.1:55432/" + database + "?sslmode=disable"
-	validRegisteredDevelopment := "postgres://acceptance:secret@192.168.0.106:5432/" + database + "?sslmode=disable"
+	validRegisteredDevelopment := "postgres://acceptance:secret@192.168.0.133:5432/" + database + "?sslmode=disable"
 	for _, valid := range []string{validLoopback, validRegisteredDevelopment} {
 		if err := validateManualAcceptanceReferenceTarget(
 			valid,
@@ -95,7 +95,7 @@ func TestManualAcceptanceReferenceTargetIsBoundToTheExactFreshDatabase(t *testin
 func TestScenarioDemoReferenceTargetIsBoundToRegisteredLongLivedDevelopmentDatabase(t *testing.T) {
 	for _, database := range []string{"plush_erp", "plush_erp_simon_dev"} {
 		confirmation := "SEED_SCENARIO_DEMO_CORE_REFERENCES:scenario-demo:" + database + ":2026.08.15-v6:20260815-V6"
-		dsn := "postgres://acceptance:secret@192.168.0.106:5432/" + database + "?sslmode=disable"
+		dsn := "postgres://acceptance:secret@192.168.0.133:5432/" + database + "?sslmode=disable"
 		if err := validateScenarioDemoReferenceTarget(dsn, database, confirmation); err != nil {
 			t.Fatalf("valid scenario reference target rejected: %v", err)
 		}
@@ -113,12 +113,12 @@ func TestScenarioDemoReferenceTargetIsBoundToRegisteredLongLivedDevelopmentDatab
 			confirm:  confirmation,
 		},
 		"disposable database": {
-			dsn:      "postgres://acceptance:secret@192.168.0.106:5432/plush_erp_acceptance_run_dev?sslmode=disable",
+			dsn:      "postgres://acceptance:secret@192.168.0.133:5432/plush_erp_acceptance_run_dev?sslmode=disable",
 			database: "plush_erp_acceptance_run_dev",
 			confirm:  confirmation,
 		},
 		"unregistered family member": {
-			dsn:      "postgres://acceptance:secret@192.168.0.106:5432/plush_erp_other_dev?sslmode=disable",
+			dsn:      "postgres://acceptance:secret@192.168.0.133:5432/plush_erp_other_dev?sslmode=disable",
 			database: "plush_erp_other_dev",
 			confirm:  confirmation,
 		},
@@ -128,12 +128,12 @@ func TestScenarioDemoReferenceTargetIsBoundToRegisteredLongLivedDevelopmentDatab
 			confirm:  confirmation,
 		},
 		"query override": {
-			dsn:      "postgres://acceptance:secret@192.168.0.106:5432/" + database + "?sslmode=disable&host=192.168.0.133",
+			dsn:      "postgres://acceptance:secret@192.168.0.133:5432/" + database + "?sslmode=disable&host=192.168.0.133",
 			database: database,
 			confirm:  confirmation,
 		},
 		"wrong confirmation": {
-			dsn:      "postgres://acceptance:secret@192.168.0.106:5432/" + database + "?sslmode=disable",
+			dsn:      "postgres://acceptance:secret@192.168.0.133:5432/" + database + "?sslmode=disable",
 			database: database,
 			confirm:  "SEED_SCENARIO_DEMO_CORE_REFERENCES",
 		},

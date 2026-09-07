@@ -25,7 +25,7 @@ function operation(status = 'ready') {
     message: '升级计划、真实备份和隔离恢复验证已完成',
     target: {
       key: 'shared-dev',
-      safeTarget: 'host=192.168.0.106 port=5432 database=plush_erp',
+      safeTarget: 'host=192.168.0.133 port=5432 database=plush_erp',
       currentVersion: '20260728100514',
       latestVersion: '20260729043852',
       appliedFiles: 104,

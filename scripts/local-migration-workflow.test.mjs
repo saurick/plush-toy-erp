@@ -27,7 +27,7 @@ function outputBuffer() {
 function target(pendingFiles = 2) {
   return {
     key: "shared-dev",
-    safeTarget: "host=192.168.0.106 port=5432 database=plush_erp",
+    safeTarget: "host=192.168.0.133 port=5432 database=plush_erp",
     currentVersion: pendingFiles === 0 ? "20260731124000" : "20260729043852",
     latestVersion: "20260731124000",
     appliedFiles: pendingFiles === 0 ? 107 : 105,
@@ -257,7 +257,7 @@ test("local migration workflow: explicit non-interactive prepare exits ready wit
   assert.match(receipt, /command=migrate_prepare mode=prepare phase=ready/u);
   assert.match(
     receipt,
-    /target=shared-dev host=192\.168\.0\.106 port=5432 database=plush_erp/u,
+    /target=shared-dev host=192\.168\.0\.133 port=5432 database=plush_erp/u,
   );
   assert.match(
     receipt,

@@ -19,7 +19,7 @@ const migrationDir = path.join(serverRoot, "internal/data/model/migrate");
 const migrationScriptPath = fileURLToPath(import.meta.url);
 const stagedLifecycleVersion = "20260726173924";
 const lifecyclePreflightVersion = "20260726173943";
-const registeredSharedDevSystemIdentifier = "7572907083182862377";
+const registeredSharedDevSystemIdentifier = "7682605996671565865";
 const targetConfirmPrefixes = Object.freeze({
   local: "TRUST_LOCAL_DATABASE:",
   "shared-dev": "TRUST_SHARED_DEV_DATABASE:",
@@ -328,7 +328,7 @@ export function classifyDevelopmentTarget(databaseURL, source) {
     scope = "local";
   } else if (
     source === "application-config" &&
-    host === "192.168.0.106" &&
+    host === "192.168.0.133" &&
     port === "5432" &&
     isRegisteredDevelopmentDatabase(database)
   ) {
