@@ -13,7 +13,126 @@ import {
   deleteWorkInstructionImageAnnotations,
   restoreWorkInstructionImageAnnotations,
   resolveWorkInstructionAnnotationLayout,
+  getWorkInstructionMeasurementLabelPosition,
 } from './workInstructionImageAnnotations.mjs'
+
+test('距离文字的位置允许零值，异常和越界输入仍受约束', () => {
+  const normalized = (labelOffset) =>
+    normalizeWorkInstructionImageAnnotations([
+      { type: 'measurement', labelOffset },
+    ])[0].labelOffset
+  assert.equal(normalized(0), 0)
+  assert.equal(normalized(-9), -9)
+  assert.equal(normalized(undefined), -7)
+  assert.equal(normalized('invalid'), -7)
+  assert.equal(normalized(100), 24)
+})
+
+test('距离文字在横线、竖线、斜线及边缘保留间距，不被画布裁掉', () => {
+  const segments = [
+    [
+      { x: 20, y: 50 },
+      { x: 80, y: 50 },
+    ],
+    [
+      { x: 50, y: 20 },
+      { x: 50, y: 80 },
+    ],
+    [
+      { x: 10, y: 15 },
+      { x: 85, y: 80 },
+    ],
+    [
+      { x: 85, y: 15 },
+      { x: 10, y: 80 },
+    ],
+    [
+      { x: 10, y: 1 },
+      { x: 90, y: 1 },
+    ],
+    [
+      { x: 10, y: 99 },
+      { x: 90, y: 99 },
+    ],
+    [
+      { x: 1, y: 10 },
+      { x: 1, y: 90 },
+    ],
+    [
+      { x: 99, y: 10 },
+      { x: 99, y: 90 },
+    ],
+    [
+      { x: 0, y: 0 },
+      { x: 1, y: 1 },
+    ],
+    [
+      { x: 99, y: 99 },
+      { x: 100, y: 100 },
+    ],
+  ]
+  for (const canvas of [
+    { width: 752, height: 435 },
+    { width: 300, height: 255 },
+  ]) {
+    for (const label of [
+      { width: canvas.width * 0.08, height: canvas.width * 0.05 },
+      { width: canvas.width * 0.42, height: canvas.width * 0.12 },
+    ]) {
+      for (const [start, end] of segments) {
+        for (const labelOffset of [-24, -7, 0, 7, 24]) {
+          const position = getWorkInstructionMeasurementLabelPosition(
+            { start, end, labelOffset },
+            canvas,
+            label
+          )
+          const center = {
+            x: (position.x * canvas.width) / 100,
+            y: (position.y * canvas.height) / 100,
+          }
+          const dx = ((end.x - start.x) * canvas.width) / 100
+          const dy = ((end.y - start.y) * canvas.height) / 100
+          const length = Math.hypot(dx, dy)
+          const normal = { x: -dy / length, y: dx / length }
+          const centerDistance = Math.abs(
+            (center.x - (start.x * canvas.width) / 100) * normal.x +
+              (center.y - (start.y * canvas.height) / 100) * normal.y
+          )
+          const textExtent =
+            (Math.abs(normal.x) * label.width) / 2 +
+            (Math.abs(normal.y) * label.height) / 2
+          assert(
+            centerDistance - textExtent >= canvas.width * 0.008 - 0.01,
+            `文字必须完全离开线段：${JSON.stringify({ start, end, canvas, label, labelOffset, position })}`
+          )
+          assert(center.x - label.width / 2 >= -0.01)
+          assert(center.x + label.width / 2 <= canvas.width + 0.01)
+          assert(center.y - label.height / 2 >= -0.01)
+          assert(center.y + label.height / 2 <= canvas.height + 0.01)
+        }
+      }
+    }
+  }
+})
+
+test('距离的两端重合时，文字位置仍有限且可调整到上下两侧', () => {
+  const input = {
+    start: { x: 50, y: 50 },
+    end: { x: 50, y: 50 },
+    labelOffset: -7,
+  }
+  const canvas = { width: 600, height: 350 }
+  const label = { width: 60, height: 30 }
+  const above = getWorkInstructionMeasurementLabelPosition(input, canvas, label)
+  const below = getWorkInstructionMeasurementLabelPosition(
+    { ...input, labelOffset: 7 },
+    canvas,
+    label
+  )
+  assert.equal(above.x, 50)
+  assert(above.y < 50)
+  assert(below.y > 50)
+})
 
 test('说明框使用右侧空位，删除后新增可复用空位且不覆盖其他框', () => {
   let annotations = []

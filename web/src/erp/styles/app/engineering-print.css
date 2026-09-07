@@ -202,7 +202,7 @@
 .erp-work-instruction-image-annotations__measurement-label {
   width: max-content;
   max-width: 42%;
-  padding: 0.5mm 1mm;
+  padding: 0.5cqi 1cqi;
   border: 0;
   background: rgb(255 255 255 / 88%);
   font-weight: 700;
@@ -438,8 +438,10 @@
   white-space: nowrap;
 }
 
-.erp-work-instruction-annotation-modal__list-number {
+.erp-work-instruction-annotation-modal__list-type {
+  flex-shrink: 0;
   color: #64748b;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 

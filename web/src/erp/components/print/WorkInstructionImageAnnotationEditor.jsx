@@ -14,6 +14,8 @@ import {
   addWorkInstructionCalloutTarget,
   appendWorkInstructionImageAnnotation,
   clampAnnotationPercent,
+  getWorkInstructionMeasurementGeometry,
+  getWorkInstructionMeasurementLabelPosition,
   normalizeWorkInstructionImageAnnotations,
   removeLastWorkInstructionCalloutTarget,
   deleteWorkInstructionImageAnnotations,
@@ -63,6 +65,12 @@ function getAnnotationLabel(annotation, index) {
     : `说明框 ${index + 1}`
 }
 
+function getAnnotationTypeLabel(annotation) {
+  return annotation.type === WORK_INSTRUCTION_IMAGE_ANNOTATION_TYPES.measurement
+    ? '距离标注'
+    : '说明框'
+}
+
 export function WorkInstructionImageAnnotationLayer({
   annotations = [],
   editable = false,
@@ -73,7 +81,40 @@ export function WorkInstructionImageAnnotationLayer({
   onHandlePointerDown = null,
   onHandleKeyDown = null,
 }) {
-  const normalized = normalizeWorkInstructionImageAnnotations(annotations)
+  const layerRef = useRef(null)
+  const normalized = useMemo(
+    () => normalizeWorkInstructionImageAnnotations(annotations),
+    [annotations]
+  )
+  useLayoutEffect(() => {
+    const layer = layerRef.current
+    if (!layer) return undefined
+    const labels = Array.from(
+      layer.querySelectorAll('[data-work-instruction-measurement-label-id]')
+    )
+    if (!labels.length) return undefined
+    const positionLabels = () => {
+      const canvas = { width: layer.clientWidth, height: layer.clientHeight }
+      if (!canvas.width || !canvas.height) return
+      labels.forEach((label) => {
+        const annotation = normalized.find(
+          (item) => item.id === label.dataset.workInstructionMeasurementLabelId
+        )
+        const position = getWorkInstructionMeasurementLabelPosition(
+          annotation,
+          canvas,
+          { width: label.offsetWidth, height: label.offsetHeight }
+        )
+        label.style.left = `${position.x}%`
+        label.style.top = `${position.y}%`
+      })
+    }
+    positionLabels()
+    const observer = new ResizeObserver(positionLabels)
+    observer.observe(layer)
+    labels.forEach((label) => observer.observe(label))
+    return () => observer.disconnect()
+  }, [normalized, editable])
   const visible = editable
     ? normalized
     : normalized.filter(
@@ -86,6 +127,7 @@ export function WorkInstructionImageAnnotationLayer({
 
   return (
     <div
+      ref={layerRef}
       className={`erp-work-instruction-image-annotations${
         editable ? ' erp-work-instruction-image-annotations--editable' : ''
       }`}
@@ -163,12 +205,6 @@ export function WorkInstructionImageAnnotationLayer({
           annotation.type ===
           WORK_INSTRUCTION_IMAGE_ANNOTATION_TYPES.measurement
         ) {
-          const midpoint = {
-            x: (annotation.start.x + annotation.end.x) / 2,
-            y:
-              (annotation.start.y + annotation.end.y) / 2 +
-              annotation.labelOffset,
-          }
           const MeasurementLabel = editable ? 'button' : 'span'
           return (
             <React.Fragment key={annotation.id}>
@@ -179,14 +215,41 @@ export function WorkInstructionImageAnnotationLayer({
                     isSelected ? ' is-selected' : ''
                   }`}
                   style={{
-                    left: `${midpoint.x}%`,
-                    top: `${midpoint.y}%`,
                     color: annotation.color,
                   }}
                   data-annotation-control={editable ? 'true' : undefined}
                   data-work-instruction-annotation-kind="measurement"
+                  data-work-instruction-measurement-label-id={annotation.id}
+                  aria-label={
+                    editable ? `移动距离文字 ${annotationIndex + 1}` : undefined
+                  }
+                  title={
+                    editable ? '拖动调整与线段的距离；方向键微调' : undefined
+                  }
                   onClick={
                     editable ? () => onSelect?.(annotationIndex) : undefined
+                  }
+                  onPointerDown={
+                    editable
+                      ? (event) =>
+                          onHandlePointerDown?.(
+                            event,
+                            annotationIndex,
+                            'label',
+                            null
+                          )
+                      : undefined
+                  }
+                  onKeyDown={
+                    editable
+                      ? (event) =>
+                          onHandleKeyDown?.(
+                            event,
+                            annotationIndex,
+                            'label',
+                            null
+                          )
+                      : undefined
                   }
                 >
                   {annotation.text || '填写距离'}
@@ -577,6 +640,8 @@ export default function WorkInstructionImageAnnotationEditor({
         kind === 'box'
           ? { x: point.x - annotation.x, y: point.y - annotation.y }
           : null,
+      startPoint: point,
+      labelOffset: annotation.labelOffset,
     }
     setSelectedAnnotationIndex(annotationIndex)
     setAddingTarget(false)
@@ -592,6 +657,21 @@ export default function WorkInstructionImageAnnotationEditor({
         current,
         drag.annotationIndex,
         (annotation) => {
+          if (drag.kind === 'label') {
+            const canvas = surfaceRef.current
+            const { normal } = getWorkInstructionMeasurementGeometry(
+              annotation,
+              {
+                width: canvas.clientWidth,
+                height: canvas.clientHeight,
+              }
+            )
+            const delta =
+              ((point.x - drag.startPoint.x) * canvas.clientWidth * normal.x) /
+                canvas.clientHeight +
+              (point.y - drag.startPoint.y) * normal.y
+            return { ...annotation, labelOffset: drag.labelOffset + delta }
+          }
           if (drag.kind === 'box') {
             return {
               ...annotation,
@@ -673,6 +753,22 @@ export default function WorkInstructionImageAnnotationEditor({
         current,
         annotationIndex,
         (annotation) => {
+          if (kind === 'label') {
+            const canvas = surfaceRef.current
+            const { normal } = getWorkInstructionMeasurementGeometry(
+              annotation,
+              {
+                width: canvas.clientWidth,
+                height: canvas.clientHeight,
+              }
+            )
+            return {
+              ...annotation,
+              labelOffset:
+                annotation.labelOffset +
+                (offset.x * normal.x + offset.y * normal.y) * amount,
+            }
+          }
           if (kind === 'box') {
             return {
               ...annotation,
@@ -775,7 +871,7 @@ export default function WorkInstructionImageAnnotationEditor({
       }
     >
       <p className="erp-work-instruction-annotation-modal__help">
-        点击说明框直接填写；拖动移动手柄或指向点调整位置，也可用方向键微调。距离数值请按实测结果填写。
+        点击说明框直接填写；拖动移动手柄、指向点或距离文字调整位置，也可用方向键微调。距离数值请按实测结果填写。
       </p>
       <div className="erp-work-instruction-annotation-modal__layout">
         <section className="erp-work-instruction-annotation-modal__stage">
@@ -944,17 +1040,18 @@ export default function WorkInstructionImageAnnotationEditor({
                           ? 'is-active'
                           : ''
                       }
-                      title={getAnnotationLabel(annotation, annotationIndex)}
+                      title={`${getAnnotationTypeLabel(annotation)} ${annotationIndex + 1}：${annotation.text || '未填写'}`}
                       onClick={() => {
                         setSelectedAnnotationIndex(annotationIndex)
                         setAddingTarget(false)
                       }}
                     >
-                      <span className="erp-work-instruction-annotation-modal__list-number">
+                      <span className="erp-work-instruction-annotation-modal__list-type">
+                        {getAnnotationTypeLabel(annotation)}{' '}
                         {annotationIndex + 1}
                       </span>
                       <span className="erp-work-instruction-annotation-modal__list-text">
-                        {getAnnotationLabel(annotation, annotationIndex)}
+                        {annotation.text.trim() || '点击填写'}
                       </span>
                     </button>
                     <button
@@ -984,6 +1081,7 @@ export default function WorkInstructionImageAnnotationEditor({
                   距离文字
                   <Input.TextArea
                     ref={textInputRef}
+                    aria-label="距离文字"
                     value={selectedAnnotation.text}
                     maxLength={
                       WORK_INSTRUCTION_IMAGE_ANNOTATION_LIMITS.textLength
@@ -1114,21 +1212,24 @@ export default function WorkInstructionImageAnnotationEditor({
                   </small>
                 </>
               ) : (
-                <label>
-                  距离文字位置
-                  <input
-                    type="range"
-                    min="-24"
-                    max="24"
-                    value={selectedAnnotation.labelOffset}
-                    onChange={(event) =>
-                      updateSelectedAnnotation((annotation) => ({
-                        ...annotation,
-                        labelOffset: Number(event.target.value),
-                      }))
-                    }
-                  />
-                </label>
+                <>
+                  <label>
+                    距离文字位置
+                    <input
+                      type="range"
+                      min="-24"
+                      max="24"
+                      value={selectedAnnotation.labelOffset}
+                      onChange={(event) =>
+                        updateSelectedAnnotation((annotation) => ({
+                          ...annotation,
+                          labelOffset: Number(event.target.value),
+                        }))
+                      }
+                    />
+                  </label>
+                  <small>沿线段两侧调整，文字与线条自动留出间距。</small>
+                </>
               )}
             </div>
           ) : null}

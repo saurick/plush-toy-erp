@@ -1,5 +1,6 @@
 import { writeFile } from 'node:fs/promises'
 import { Buffer } from 'node:buffer'
+import { createWorkInstructionMeasurementScenario } from './workInstructionMeasurementScenario.mjs'
 
 export function createPrintPolishScenarios({
   assert,
@@ -24,6 +25,12 @@ export function createPrintPolishScenarios({
     return html
   }
   return [
+    createWorkInstructionMeasurementScenario({
+      assert,
+      path,
+      outputDir,
+      captureSnapshot,
+    }),
     {
       name: 'print-workspace-contract-edit-continuity',
       path: '/erp/print-workspace/material-purchase-contract?state=edit-start',

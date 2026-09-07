@@ -70,6 +70,7 @@ function normalizeCallout(annotation, index) {
 }
 
 function normalizeMeasurement(annotation, index) {
+  const labelOffset = Number(annotation.labelOffset ?? -7)
   return {
     id: normalizeAnnotationID(annotation.id, index),
     type: WORK_INSTRUCTION_IMAGE_ANNOTATION_TYPES.measurement,
@@ -79,8 +80,115 @@ function normalizeMeasurement(annotation, index) {
     end: normalizePoint(annotation.end, { x: 72, y: 62 }),
     labelOffset: Math.max(
       -24,
-      Math.min(24, Number(annotation.labelOffset) || -7)
+      Math.min(24, Number.isFinite(labelOffset) ? labelOffset : -7)
     ),
+  }
+}
+
+export function getWorkInstructionMeasurementGeometry(annotation, canvas) {
+  const dx = ((annotation.end.x - annotation.start.x) * canvas.width) / 100
+  const dy = ((annotation.end.y - annotation.start.y) * canvas.height) / 100
+  const length = Math.hypot(dx, dy)
+  return {
+    midpoint: {
+      x: ((annotation.start.x + annotation.end.x) * canvas.width) / 200,
+      y: ((annotation.start.y + annotation.end.y) * canvas.height) / 200,
+    },
+    normal: length ? { x: -dy / length, y: dx / length } : { x: 0, y: 1 },
+  }
+}
+
+export function getWorkInstructionMeasurementLabelPosition(
+  annotation,
+  canvas,
+  label
+) {
+  const { midpoint, normal } = getWorkInstructionMeasurementGeometry(
+    annotation,
+    canvas
+  )
+  const gap = canvas.width * 0.008
+  const halfWidth = label.width / 2
+  const halfHeight = label.height / 2
+  const bounds = {
+    left: halfWidth + gap,
+    right: canvas.width - halfWidth - gap,
+    top: halfHeight + gap,
+    bottom: canvas.height - halfHeight - gap,
+  }
+  const clearance =
+    Math.abs(normal.x) * halfWidth + Math.abs(normal.y) * halfHeight + gap
+  const distance =
+    clearance + (Math.abs(annotation.labelOffset) * canvas.height) / 100
+  const clamp = (point) => ({
+    x: Math.max(bounds.left, Math.min(bounds.right, point.x)),
+    y: Math.max(bounds.top, Math.min(bounds.bottom, point.y)),
+  })
+  const signedDistance = (point, side) =>
+    side *
+    ((point.x - midpoint.x) * normal.x + (point.y - midpoint.y) * normal.y)
+  const preferredSide = annotation.labelOffset > 0 ? 1 : -1
+  for (const side of [preferredSide, -preferredSide]) {
+    const desired = {
+      x: midpoint.x + normal.x * distance * side,
+      y: midpoint.y + normal.y * distance * side,
+    }
+    const constrained = clamp(desired)
+    let point = constrained
+    if (signedDistance(constrained, side) < clearance - 0.001) {
+      // 在画布内寻找同侧空位，不能把越界文字直接压回线段上。
+      const candidates = []
+      const missing = clearance - signedDistance(constrained, side)
+      candidates.push({
+        x: constrained.x + normal.x * missing * side,
+        y: constrained.y + normal.y * missing * side,
+      })
+      if (Math.abs(normal.y) > 0.000001) {
+        for (const x of [bounds.left, bounds.right]) {
+          candidates.push({
+            x,
+            y:
+              midpoint.y +
+              (clearance * side - (x - midpoint.x) * normal.x) / normal.y,
+          })
+        }
+      }
+      if (Math.abs(normal.x) > 0.000001) {
+        for (const y of [bounds.top, bounds.bottom]) {
+          candidates.push({
+            x:
+              midpoint.x +
+              (clearance * side - (y - midpoint.y) * normal.y) / normal.x,
+            y,
+          })
+        }
+      }
+      const [candidate] = candidates
+        .filter(
+          (item) =>
+            item.x >= bounds.left - 0.001 &&
+            item.x <= bounds.right + 0.001 &&
+            item.y >= bounds.top - 0.001 &&
+            item.y <= bounds.bottom + 0.001
+        )
+        .sort(
+          (a, b) =>
+            Math.hypot(a.x - desired.x, a.y - desired.y) -
+            Math.hypot(b.x - desired.x, b.y - desired.y)
+        )
+      point = candidate
+    }
+    if (point) {
+      return {
+        x: (point.x / canvas.width) * 100,
+        y: (point.y / canvas.height) * 100,
+      }
+    }
+  }
+  const point = clamp(midpoint)
+  return {
+    x: (point.x / canvas.width) * 100,
+    y: (point.y / canvas.height) * 100,
   }
 }
 
