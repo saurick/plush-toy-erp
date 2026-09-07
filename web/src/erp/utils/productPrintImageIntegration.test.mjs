@@ -105,17 +105,19 @@ test('product print images: outsourcing never borrows the first line image when 
   )
 })
 
-test('product print images: work instruction keeps legacy header plus an independently controlled second slot', () => {
+test('product print images: work instruction controls both header slots through shared image tools', () => {
   assert.match(
     templateSource,
     /workInstruction:\s*\[[\s\S]*key: 'header'[\s\S]*key: 'header_right'/u
   )
   assert.match(
     workspaceSource,
-    /workInstructionHeaderImageInputRefs\.current\[slot\.key\] = node/u
+    /templateKey === WORK_INSTRUCTION_TEMPLATE_KEY\s*\? engineeringImageSlots\.workInstruction/u
   )
-  assert.match(workspaceSource, /uploadInstructionImage\(slot\.key, file\)/u)
-  assert.match(workspaceSource, /clearInstructionImage\(slot\.key\)/u)
+  assert.match(
+    workspaceSource,
+    /productImageSlots\.map\(\(slot\) => \([\s\S]*<PrintImageSlotTool[\s\S]*key=\{slot\.key\}[\s\S]*image=\{draft\.images\?\.\[slot\.key\]\}[\s\S]*onUpload=\{\(file\) => uploadImage\(slot\.key, file\)\}[\s\S]*onClear=\{\(\) => clearImage\(slot\.key\)\}/u
+  )
   assert.match(
     instructionPaperSource,
     /<WorkInstructionHeaderImages images=\{draft\.images\} \/>/u

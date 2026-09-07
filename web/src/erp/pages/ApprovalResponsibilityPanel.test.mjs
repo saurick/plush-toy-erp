@@ -101,5 +101,8 @@ test('approval responsibility panel protects modal and page drafts', () => {
   assert.match(source, /\[active, discardVersion, load, refreshVersion\]/)
   assert.doesNotMatch(source, /const requestReload = \(\) =>/)
   assert.doesNotMatch(source, /刷新审批责任/)
-  assert.doesNotMatch(source, /ReloadOutlined/)
+  assert.match(
+    source,
+    /\{loadError \? \([\s\S]*message="审批责任加载失败"[\s\S]*icon=\{<ReloadOutlined aria-hidden="true" \/>\}[\s\S]*onClick=\{load\}[\s\S]*重试/
+  )
 })
