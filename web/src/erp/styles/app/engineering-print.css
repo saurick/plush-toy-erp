@@ -945,7 +945,12 @@
 .erp-work-instruction-paper__meta-value {
   font-size: 16px;
   text-align: center;
-  font-weight: 700;
+  font-weight: 400;
+}
+
+.erp-work-instruction-paper__meta-label > .erp-engineering-print-editable,
+.erp-work-instruction-paper__meta-value > .erp-engineering-print-editable {
+  justify-content: center;
 }
 
 .erp-work-instruction-paper__header-image-cell {
