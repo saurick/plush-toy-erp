@@ -466,7 +466,7 @@ export function createPrintAssertions({
     )
 
     await page.getByRole('button', { name: '手签留白' }).click()
-    await expectText(page, '已清空签字人，纸面保留日期和甲乙方手签位置。')
+    await expectText(page, '已清空签字人，保留日期和手签位置。')
 
     const afterClear = await page.evaluate(
       ({ selector }) =>

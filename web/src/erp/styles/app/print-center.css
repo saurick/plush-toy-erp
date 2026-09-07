@@ -833,6 +833,18 @@
   background: #f4f7f4;
 }
 
+.erp-print-shell__record-panel .erp-print-shell__tool-feedback {
+  margin: 8px 0 0;
+  color: #52605a;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.erp-print-shell [data-print-feedback][data-tone='error'] {
+  color: #b42318;
+}
+
 @media screen {
   .erp-print-shell .erp-material-contract-meta__row,
   .erp-print-shell .erp-processing-contract-meta__row {

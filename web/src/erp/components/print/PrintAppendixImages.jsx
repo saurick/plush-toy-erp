@@ -1,5 +1,4 @@
 import React, { useRef, useState } from 'react'
-import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   PRINT_APPENDIX_IMAGE_ACCEPT,
@@ -125,8 +124,7 @@ export default function PrintAppendixImageManager({
     if (result === false) {
       const warning =
         '图片已保留在当前窗口，但浏览器存储空间不足；请先完成打印，刷新前不要关闭窗口。'
-      onStatusChange?.(warning)
-      message.warning(warning)
+      onStatusChange?.(warning, 'error')
       return false
     }
     onStatusChange?.(statusText)
@@ -139,7 +137,7 @@ export default function PrintAppendixImageManager({
     if (!files.length) return
 
     setBusy(true)
-    onStatusChange?.(`正在处理 ${files.length} 张末尾图片...`)
+    onStatusChange?.(`正在处理 ${files.length} 张末尾图片...`, 'info')
     try {
       const snapshots = []
       for (const file of files) {
@@ -151,8 +149,7 @@ export default function PrintAppendixImageManager({
       )
     } catch (error) {
       const errorMessage = getActionErrorMessage(error, '添加末尾图片失败')
-      onStatusChange?.(errorMessage)
-      message.error(errorMessage)
+      onStatusChange?.(errorMessage, 'error')
     } finally {
       setBusy(false)
     }

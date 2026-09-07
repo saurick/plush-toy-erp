@@ -11,12 +11,47 @@ const DRAFT_PERSISTENCE_STATUS_TEXT = Object.freeze({
   unavailable: '本窗口内容不会自动保存',
 })
 
-export function PrintWorkspaceToolSection({ title, children }) {
+function PrintWorkspaceFeedback({ feedback, local = false }) {
+  const feedbackRef = useRef(null)
+  useEffect(() => {
+    if (!local || !feedback) return
+    const node = feedbackRef.current
+    const panel = node?.closest('.erp-print-shell__record-panel')
+    if (!panel || panel.scrollHeight <= panel.clientHeight) return
+    const bounds = panel.getBoundingClientRect()
+    const message = node.getBoundingClientRect()
+    // 只滚动工具区，让结果可见；纸面位置和输入焦点保持不变。
+    if (message.bottom > bounds.bottom) {
+      panel.scrollTop += message.bottom - bounds.bottom + 12
+    } else if (message.top < bounds.top) {
+      panel.scrollTop -= bounds.top - message.top + 12
+    }
+  }, [feedback, local])
+  if (!feedback?.text) return null
+  return (
+    <p
+      ref={feedbackRef}
+      className={
+        local ? 'erp-print-shell__tool-feedback' : 'erp-print-shell__feedback'
+      }
+      data-print-feedback={feedback.area}
+      data-tone={feedback.tone}
+      role={feedback.tone === 'error' ? 'alert' : 'status'}
+      aria-atomic="true"
+      data-print-editor-only
+    >
+      {feedback.text}
+    </p>
+  )
+}
+
+export function PrintWorkspaceToolSection({ title, children, feedback }) {
   if (!children) return null
   return (
     <section className="erp-print-shell__tool-section" aria-label={title}>
       <h3>{title}</h3>
       {children}
+      <PrintWorkspaceFeedback feedback={feedback} local />
     </section>
   )
 }
@@ -25,6 +60,8 @@ export default function PrintWorkspaceShell({
   title,
   sourceTag = '使用默认模板',
   statusText = '',
+  feedback = null,
+  onClearFeedback,
   persistenceStatus = '',
   tools = [],
   onRetrySave,
@@ -103,6 +140,7 @@ export default function PrintWorkspaceShell({
     const editable = event.target.closest?.('[contenteditable="true"]')
     if (editable) {
       editable.dataset.printEmpty = String(!editable.textContent.trim())
+      onClearFeedback?.()
     }
   }
 
@@ -205,12 +243,18 @@ export default function PrintWorkspaceShell({
               ? editorActions
               : null}
             {formatActions && tools.includes('text') ? (
-              <PrintWorkspaceToolSection title="文字格式">
+              <PrintWorkspaceToolSection
+                title="文字格式"
+                feedback={feedback?.area === 'text' ? feedback : null}
+              >
                 {formatActions}
               </PrintWorkspaceToolSection>
             ) : null}
             {panelActions && tools.includes('images') ? (
-              <PrintWorkspaceToolSection title="图片管理">
+              <PrintWorkspaceToolSection
+                title="图片管理"
+                feedback={feedback?.area === 'images' ? feedback : null}
+              >
                 {panelActions}
                 <p role="status" data-print-image-budget>
                   {imageBudget.problem ||
@@ -230,7 +274,10 @@ export default function PrintWorkspaceShell({
               </PrintWorkspaceToolSection>
             ) : null}
             {draftActions ? (
-              <PrintWorkspaceToolSection title="模板内容">
+              <PrintWorkspaceToolSection
+                title="模板内容"
+                feedback={feedback?.area === 'draft' ? feedback : null}
+              >
                 {draftActions}
               </PrintWorkspaceToolSection>
             ) : null}
@@ -287,11 +334,15 @@ export default function PrintWorkspaceShell({
               </span>
             </label>
           </div>
-          {statusText ? (
-            <p className="erp-print-shell__feedback" role="status">
-              {statusText}
-            </p>
-          ) : null}
+          <PrintWorkspaceFeedback
+            feedback={
+              statusText
+                ? { area: 'output', text: statusText, tone: 'info' }
+                : feedback?.area === 'output'
+                  ? feedback
+                  : null
+            }
+          />
           <div
             className="erp-print-shell__stage"
             ref={stageRef}

@@ -560,19 +560,22 @@ async function verifyColorCardPlaceholderInsertion({
   let toolbarGroups = await collectToolbarGroups()
 
   assert.equal(
-    toolbarGroups[1].buttons[0].disabled,
+    toolbarGroups[1].buttons.find((button) => button.text === '上插一行')
+      .disabled,
     false,
     '色卡选择空白占位行后，上插一行应可用'
   )
 
   assert.equal(
-    toolbarGroups[1].buttons[1].disabled,
+    toolbarGroups[1].buttons.find((button) => button.text === '下插一行')
+      .disabled,
     false,
     '色卡选择空白占位行后，下插一行应可用'
   )
 
   assert.equal(
-    toolbarGroups[1].buttons[2].disabled,
+    toolbarGroups[1].buttons.find((button) => button.text === '移除当前行')
+      .disabled,
     true,
     '色卡空白占位行不是已存在明细行，不应直接移除'
   )
@@ -858,24 +861,26 @@ export function createColorCardInteractionScenario({
 
       assertButtonTexts(
         toolbarGroups[0],
-        ['上插色卡块', '下插色卡块', '移除当前块', '选择色卡块'],
+        ['选择色卡块', '上插色卡块', '下插色卡块', '移除当前块'],
         '色卡块'
       )
 
       assertButtonTexts(
         toolbarGroups[1],
-        ['上插一行', '下插一行', '移除当前行', '选择色卡行'],
+        ['选择色卡行', '上插一行', '下插一行', '移除当前行'],
         '色卡行'
       )
 
       assert.equal(
-        toolbarGroups[0].buttons[0].disabled,
+        toolbarGroups[0].buttons.find((button) => button.text === '上插色卡块')
+          .disabled,
         true,
         '色卡未选择色卡块前，上插色卡块应禁用'
       )
 
       assert.equal(
-        toolbarGroups[1].buttons[0].disabled,
+        toolbarGroups[1].buttons.find((button) => button.text === '上插一行')
+          .disabled,
         true,
         '色卡未选择色卡行前，上插一行应禁用'
       )

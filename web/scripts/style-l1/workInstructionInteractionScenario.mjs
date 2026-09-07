@@ -645,31 +645,36 @@ async function verifyWorkInstructionRowImages({
   let toolbarGroups = await collectToolbarGroups()
 
   assert.equal(
-    toolbarGroups[0].buttons[6].disabled,
+    toolbarGroups[0].buttons.find((button) => button.text === '给当前行加图')
+      .disabled,
     false,
     '作业指导书选择编号行后，给当前行加图应可用'
   )
 
   assert.equal(
-    toolbarGroups[0].buttons[0].disabled,
+    toolbarGroups[0].buttons.find((button) => button.text === '上插一行')
+      .disabled,
     false,
     '作业指导书选择编号作业行后，上插一行应可用'
   )
 
   assert.equal(
-    toolbarGroups[0].buttons[1].disabled,
+    toolbarGroups[0].buttons.find((button) => button.text === '下插一行')
+      .disabled,
     false,
     '作业指导书选择编号作业行后，下插一行应可用'
   )
 
   assert.equal(
-    toolbarGroups[0].buttons[7].disabled,
+    toolbarGroups[0].buttons.find((button) => button.text === '清空当前行图片')
+      .disabled,
     true,
     '作业指导书选中无图片行时，清空当前行图片仍应禁用'
   )
 
   assert.equal(
-    toolbarGroups[0].buttons[8].disabled,
+    toolbarGroups[0].buttons.find((button) => button.text === '标注当前行图片')
+      .disabled,
     true,
     '作业指导书选中无图片行时，标注当前行图片仍应禁用'
   )
@@ -958,13 +963,15 @@ async function verifyWorkInstructionRowImages({
   toolbarGroups = await collectToolbarGroups()
 
   assert.equal(
-    toolbarGroups[0].buttons[7].disabled,
+    toolbarGroups[0].buttons.find((button) => button.text === '清空当前行图片')
+      .disabled,
     false,
     '作业指导书图片上传后，清空当前行图片应可用'
   )
 
   assert.equal(
-    toolbarGroups[0].buttons[8].disabled,
+    toolbarGroups[0].buttons.find((button) => button.text === '标注当前行图片')
+      .disabled,
     false,
     '作业指导书图片上传后，标注当前行图片应可用'
   )
@@ -1155,7 +1162,8 @@ async function verifyWorkInstructionLastRowImages({
   let toolbarGroups = await collectToolbarGroups()
 
   assert.equal(
-    toolbarGroups[0].buttons[6].disabled,
+    toolbarGroups[0].buttons.find((button) => button.text === '给当前行加图')
+      .disabled,
     false,
     '作业指导书最后一条作业行选中后，给当前行加图应可用'
   )
@@ -1514,7 +1522,8 @@ async function verifyWorkInstructionRowInsertion({
   let toolbarGroups = await collectToolbarGroups()
 
   assert.equal(
-    toolbarGroups[0].buttons[6].disabled,
+    toolbarGroups[0].buttons.find((button) => button.text === '给当前行加图')
+      .disabled,
     true,
     '作业指导书标题行选中后，给当前行加图仍应禁用'
   )
@@ -1704,6 +1713,7 @@ export function createWorkInstructionInteractionScenario({
       assertButtonTexts(
         toolbarGroups[0],
         [
+          '选择行',
           '上插一行',
           '下插一行',
           '移除当前行',
@@ -1713,7 +1723,6 @@ export function createWorkInstructionInteractionScenario({
           '给当前行加图',
           '清空当前行图片',
           '标注当前行图片',
-          '选择行',
         ],
         '作业指导书纸面行'
       )
@@ -1730,13 +1739,15 @@ export function createWorkInstructionInteractionScenario({
       )
 
       assert.equal(
-        toolbarGroups[0].buttons[0].disabled,
+        toolbarGroups[0].buttons.find((button) => button.text === '上插一行')
+          .disabled,
         true,
         '作业指导书未选择纸面行前，上插一行应禁用'
       )
 
       assert.equal(
-        toolbarGroups[0].buttons[1].disabled,
+        toolbarGroups[0].buttons.find((button) => button.text === '下插一行')
+          .disabled,
         true,
         '作业指导书未选择纸面行前，下插一行应禁用'
       )
@@ -1772,19 +1783,25 @@ export function createWorkInstructionInteractionScenario({
       )
 
       assert.equal(
-        toolbarGroups[0].buttons[6].disabled,
+        toolbarGroups[0].buttons.find(
+          (button) => button.text === '给当前行加图'
+        ).disabled,
         true,
         '作业指导书未选择纸面行前，给当前行加图应禁用'
       )
 
       assert.equal(
-        toolbarGroups[0].buttons[7].disabled,
+        toolbarGroups[0].buttons.find(
+          (button) => button.text === '清空当前行图片'
+        ).disabled,
         true,
         '作业指导书未选择纸面行前，清空当前行图片应禁用'
       )
 
       assert.equal(
-        toolbarGroups[0].buttons[8].disabled,
+        toolbarGroups[0].buttons.find(
+          (button) => button.text === '标注当前行图片'
+        ).disabled,
         true,
         '作业指导书未选择纸面行前，标注当前行图片应禁用'
       )

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useParams, useSearchParams } from 'react-router-dom'
+import usePrintWorkspaceFeedback from '../utils/usePrintWorkspaceFeedback.js'
 import { getPrintOutputProblem } from '../utils/printOutputPreflight.mjs'
 import { getPrintWorkspaceDraftScope } from '../utils/printWorkspaceScope.mjs'
 import {
@@ -17,7 +18,6 @@ import {
   ATTACHMENT_ACCEPT,
   EDITABLE_CLASS,
 } from '../components/print/EngineeringPrintPrimitives.jsx'
-import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import PrintAppendixImageManager from '../components/print/PrintAppendixImages.jsx'
 import PrintWorkspaceShell, {
@@ -374,7 +374,8 @@ export default function EngineeringPrintWorkspacePage() {
   const instructionRowImageInputRefs = useRef({})
   const [pdfAction, setPdfAction] = useState('')
   const [pdfActionStartedAt, setPdfActionStartedAt] = useState(0)
-  const [toolbarStatus, setToolbarStatus] = useState('')
+  const { feedback, reportFeedback, clearFeedback } =
+    usePrintWorkspaceFeedback()
   const [draft, setDraft, flushDraft, draftRef, persistenceStatus] =
     usePersistentPrintWorkspaceDraft(
       () =>
@@ -425,7 +426,7 @@ export default function EngineeringPrintWorkspacePage() {
         businessInput,
       })
     )
-    setToolbarStatus('')
+    clearFeedback()
     setSelectedMaterialLineIndex(null)
     setMaterialLineSelectionMode(false)
     setMaterialCellSelectionMode(false)
@@ -440,6 +441,7 @@ export default function EngineeringPrintWorkspacePage() {
     setInstructionRowSelectionMode(false)
     setInstructionAnnotationEditorTarget(null)
   }, [
+    clearFeedback,
     businessInput,
     draftStorageKey,
     resetDraftOnOpen,
@@ -474,12 +476,12 @@ export default function EngineeringPrintWorkspacePage() {
       () => {
         setPdfAction('')
         setPdfActionStartedAt(0)
-        setToolbarStatus('PDF 操作等待超时，请重新点击。')
+        reportFeedback('output', 'PDF 操作等待超时，请重新点击。', 'error')
       },
       Math.max(0, PDF_ACTION_UI_STALE_TIMEOUT_MS - elapsed)
     )
     return () => window.clearTimeout(timeoutID)
-  }, [pdfAction, pdfActionStartedAt])
+  }, [reportFeedback, pdfAction, pdfActionStartedAt])
 
   if (!engineeringPrintTemplateKeys.has(templateKey) || !template) {
     return <Navigate to="/erp/print-center" replace />
@@ -524,12 +526,12 @@ export default function EngineeringPrintWorkspacePage() {
     materialCellSelectionMode &&
     Boolean(materialActiveMerge)
 
-  const showEditorMessage = (result, fallback = '操作失败') => {
+  const showEditorMessage = (area, result, fallback = '操作失败') => {
     if (!result?.ok) {
-      message.warning(result?.message || fallback)
+      reportFeedback(area, result?.message || fallback, 'error')
       return false
     }
-    setToolbarStatus(result.message || '打印模板已更新。')
+    reportFeedback(area, result.message || '打印模板已更新。')
     return true
   }
 
@@ -567,7 +569,7 @@ export default function EngineeringPrintWorkspacePage() {
   }
 
   const resetSelectionForTemplate = () => {
-    setToolbarStatus('')
+    clearFeedback()
     setSelectedMaterialLineIndex(null)
     setMaterialLineSelectionMode(false)
     setMaterialCellSelectionMode(false)
@@ -586,15 +588,13 @@ export default function EngineeringPrintWorkspacePage() {
   const handleResetDraft = () => {
     setDraft(createEngineeringPrintDraft(templateKey))
     resetSelectionForTemplate()
-    setToolbarStatus('已恢复默认样例。')
-    message.success('已恢复默认样例')
+    reportFeedback('draft', '已恢复样例。')
   }
 
   const handleBlankDraft = () => {
     setDraft(createBlankEngineeringDraft(templateKey))
     resetSelectionForTemplate()
-    setToolbarStatus('已生成空白模板，版式和可编辑区域已保留。')
-    message.success('已生成空白模板')
+    reportFeedback('draft', '已生成空白模板，版式和可编辑区域已保留。')
   }
 
   const applyMaterialLineAction = (action, position = 'after') => {
@@ -607,7 +607,7 @@ export default function EngineeringPrintWorkspacePage() {
               selectedMaterialLineIndex,
               position
             )
-      if (!showEditorMessage(result, '物料行操作失败')) return current
+      if (!showEditorMessage('rows', result, '物料行操作失败')) return current
       setSelectedMaterialLineIndex(result.selectedIndex)
       setMaterialMergeSelectionAnchor(null)
       setMaterialMergeSelectionFocus(null)
@@ -617,7 +617,7 @@ export default function EngineeringPrintWorkspacePage() {
   }
 
   const toggleMaterialLineSelectionMode = () => {
-    setToolbarStatus('')
+    clearFeedback()
     setMaterialLineSelectionMode((current) => {
       const nextValue = !current
       if (nextValue) {
@@ -634,11 +634,11 @@ export default function EngineeringPrintWorkspacePage() {
 
   const selectMaterialLine = (rowIndex) => {
     setSelectedMaterialLineIndex(rowIndex)
-    setToolbarStatus('')
+    clearFeedback()
   }
 
   const toggleMaterialCellSelectionMode = () => {
-    setToolbarStatus('')
+    clearFeedback()
     setMaterialCellSelectionMode((current) => {
       const nextValue = !current
       if (nextValue) {
@@ -653,7 +653,7 @@ export default function EngineeringPrintWorkspacePage() {
   }
 
   const selectMaterialCell = (rowIndex, colIndex) => {
-    setToolbarStatus('')
+    clearFeedback()
     const nextCell = { rowIndex, colIndex }
     setMaterialActiveCell(nextCell)
     const currentSelection = normalizeCellSelection(
@@ -681,7 +681,9 @@ export default function EngineeringPrintWorkspacePage() {
         merges: current.merges,
         selection: materialMergeSelection,
       })
-      if (!showEditorMessage(result, '合并物料明细单元格失败')) return current
+      if (!showEditorMessage('cells', result, '合并物料明细单元格失败')) {
+        return current
+      }
       const mergedAnchor = materialMergeSelection
         ? {
             rowIndex: materialMergeSelection.rowStart,
@@ -706,7 +708,9 @@ export default function EngineeringPrintWorkspacePage() {
         rowIndex: materialActiveCell?.rowIndex,
         colIndex: materialActiveCell?.colIndex,
       })
-      if (!showEditorMessage(result, '拆分物料明细单元格失败')) return current
+      if (!showEditorMessage('cells', result, '拆分物料明细单元格失败')) {
+        return current
+      }
       return {
         ...current,
         merges: result.merges,
@@ -720,7 +724,7 @@ export default function EngineeringPrintWorkspacePage() {
         action === 'remove'
           ? removeColorCardBlock(current, selectedColorBlockIndex)
           : insertColorCardBlock(current, selectedColorBlockIndex, position)
-      if (!showEditorMessage(result, '色卡块操作失败')) return current
+      if (!showEditorMessage('blocks', result, '色卡块操作失败')) return current
       setSelectedColorBlockIndex(result.selectedIndex)
       setSelectedColorLine(null)
       return result.draft
@@ -728,7 +732,7 @@ export default function EngineeringPrintWorkspacePage() {
   }
 
   const toggleColorBlockSelectionMode = () => {
-    setToolbarStatus('')
+    clearFeedback()
     setColorBlockSelectionMode((current) => {
       const nextValue = !current
       if (nextValue) {
@@ -743,7 +747,7 @@ export default function EngineeringPrintWorkspacePage() {
   }
 
   const toggleColorLineSelectionMode = () => {
-    setToolbarStatus('')
+    clearFeedback()
     setColorLineSelectionMode((current) => {
       const nextValue = !current
       if (nextValue) {
@@ -760,20 +764,24 @@ export default function EngineeringPrintWorkspacePage() {
   const selectColorBlock = (blockIndex) => {
     setSelectedColorBlockIndex(blockIndex)
     setSelectedColorLine(null)
-    setToolbarStatus('')
+    clearFeedback()
   }
 
   const selectColorLine = (blockIndex, lineIndex, persisted = true) => {
     setSelectedColorBlockIndex(null)
     setSelectedColorLine({ blockIndex, lineIndex, persisted })
-    setToolbarStatus('')
+    clearFeedback()
   }
 
   const applyColorLineAction = (action, position = 'after') => {
     const blockIndex = selectedColorLine?.blockIndex ?? selectedColorBlockIndex
     const lineIndex = selectedColorLine?.lineIndex ?? null
     if (action === 'remove' && selectedColorLine?.persisted === false) {
-      setToolbarStatus('当前空白位还不是色卡行，请先上插或下插生成空白行。')
+      reportFeedback(
+        'rows',
+        '当前空白位还不是色卡行，请先上插或下插生成空白行。',
+        'error'
+      )
       return
     }
     setDraft((current) => {
@@ -781,7 +789,7 @@ export default function EngineeringPrintWorkspacePage() {
         action === 'remove'
           ? removeColorCardLine(current, blockIndex, lineIndex)
           : insertColorCardLine(current, blockIndex, lineIndex, position)
-      if (!showEditorMessage(result, '色卡行操作失败')) return current
+      if (!showEditorMessage('rows', result, '色卡行操作失败')) return current
       setSelectedColorBlockIndex(null)
       setSelectedColorLine({
         blockIndex: result.selectedBlockIndex,
@@ -793,7 +801,7 @@ export default function EngineeringPrintWorkspacePage() {
   }
 
   const toggleInstructionRowSelectionMode = () => {
-    setToolbarStatus('')
+    clearFeedback()
     setInstructionRowSelectionMode((current) => {
       const nextValue = !current
       if (!nextValue) {
@@ -807,7 +815,7 @@ export default function EngineeringPrintWorkspacePage() {
     const normalizedTarget = normalizeInstructionRowTarget(target)
     if (!normalizedTarget) return
     setSelectedInstructionRowTarget(normalizedTarget)
-    setToolbarStatus('')
+    clearFeedback()
   }
 
   const applyInstructionRowAction = (action, position = 'after') => {
@@ -831,7 +839,7 @@ export default function EngineeringPrintWorkspacePage() {
                 target.rowIndex,
                 position
               )
-      if (!showEditorMessage(result, '作业行操作失败')) return current
+      if (!showEditorMessage('rows', result, '作业行操作失败')) return current
       setSelectedInstructionRowTarget({
         pageIndex: target.pageIndex,
         rowIndex: result.selectedIndex,
@@ -860,7 +868,7 @@ export default function EngineeringPrintWorkspacePage() {
               target.rowIndex,
               type
             )
-      if (!showEditorMessage(result, '行类型调整失败')) return current
+      if (!showEditorMessage('rows', result, '行类型调整失败')) return current
       setSelectedInstructionRowTarget({
         pageIndex: target.pageIndex,
         rowIndex: result.selectedIndex,
@@ -913,15 +921,20 @@ export default function EngineeringPrintWorkspacePage() {
   }
 
   const uploadImage = async (slotKey, file) => {
+    clearFeedback()
     try {
       const snapshot = await createImageSnapshot(file)
       setDraft((current) => ({
         ...current,
         images: { ...current.images, [slotKey]: snapshot },
       }))
-      setToolbarStatus('图片已更新，打印和 PDF 会使用当前图片。')
+      reportFeedback('images', '图片已更新，打印和 PDF 会使用当前图片。')
     } catch (error) {
-      message.error(getActionErrorMessage(error, '上传图片失败'))
+      reportFeedback(
+        'images',
+        getActionErrorMessage(error, '上传图片失败'),
+        'error'
+      )
     }
   }
 
@@ -933,6 +946,7 @@ export default function EngineeringPrintWorkspacePage() {
         [slotKey]: createEmptyEngineeringImageSlot(),
       },
     }))
+    reportFeedback('images', '已移除图片。')
   }
 
   const handleMaterialImageUploadClick = (slotKey) => {
@@ -952,15 +966,17 @@ export default function EngineeringPrintWorkspacePage() {
       normalizedTarget.rowIndex
     ]
     if (!isWorkInstructionStepRow(row)) {
-      message.warning('图片只能添加到编号行。')
+      reportFeedback('rows', '图片只能添加到编号行。', 'error')
       return
     }
     const imageCount = Array.isArray(row.images)
       ? row.images.filter((image) => image?.dataURL).length
       : 0
     if (imageCount >= ENGINEERING_PRINT_LIMITS.instructionRowImages) {
-      setToolbarStatus(
-        `每个作业行最多支持 ${ENGINEERING_PRINT_LIMITS.instructionRowImages} 张图片。`
+      reportFeedback(
+        'rows',
+        `每个作业行最多支持 ${ENGINEERING_PRINT_LIMITS.instructionRowImages} 张图片。`,
+        'error'
       )
       return
     }
@@ -984,7 +1000,7 @@ export default function EngineeringPrintWorkspacePage() {
       normalizedTarget.rowIndex
     ]
     if (!isWorkInstructionStepRow(row)) {
-      message.warning('图片只能添加到编号行。')
+      reportFeedback('rows', '图片只能添加到编号行。', 'error')
       return
     }
     const existingImageCount = Array.isArray(row.images)
@@ -997,11 +1013,14 @@ export default function EngineeringPrintWorkspacePage() {
     const acceptedFiles = files.slice(0, remainingImageCount)
     const omittedFileCount = files.length - acceptedFiles.length
     if (!acceptedFiles.length) {
-      setToolbarStatus(
-        `每个作业行最多支持 ${ENGINEERING_PRINT_LIMITS.instructionRowImages} 张图片。`
+      reportFeedback(
+        'rows',
+        `每个作业行最多支持 ${ENGINEERING_PRINT_LIMITS.instructionRowImages} 张图片。`,
+        'error'
       )
       return
     }
+    clearFeedback()
     try {
       const snapshots = []
       for (const file of acceptedFiles) {
@@ -1023,7 +1042,8 @@ export default function EngineeringPrintWorkspacePage() {
           }
         })
       )
-      setToolbarStatus(
+      reportFeedback(
+        'rows',
         `图片已更新，${formatInstructionRowTargetLabel(
           normalizedTarget
         )}本次新增 ${snapshots.length} 张${
@@ -1033,7 +1053,11 @@ export default function EngineeringPrintWorkspacePage() {
         }。`
       )
     } catch (error) {
-      message.error(getActionErrorMessage(error, '上传工序图片失败'))
+      reportFeedback(
+        'rows',
+        getActionErrorMessage(error, '上传工序图片失败'),
+        'error'
+      )
     }
   }
 
@@ -1057,9 +1081,10 @@ export default function EngineeringPrintWorkspacePage() {
       normalizedTarget.rowIndex
     ]
     if (!isWorkInstructionStepRow(row)) {
-      message.warning('图片只能添加到编号行。')
+      reportFeedback('rows', '图片只能添加到编号行。', 'error')
       return
     }
+    clearFeedback()
     try {
       const snapshot = await createImageSnapshot(file)
       setDraft((current) =>
@@ -1079,9 +1104,13 @@ export default function EngineeringPrintWorkspacePage() {
           }
         })
       )
-      setToolbarStatus('图片已更新。')
+      reportFeedback('rows', '图片已更新。')
     } catch (error) {
-      message.error(getActionErrorMessage(error, '上传工序图片失败'))
+      reportFeedback(
+        'rows',
+        getActionErrorMessage(error, '上传工序图片失败'),
+        'error'
+      )
     }
   }
 
@@ -1108,6 +1137,7 @@ export default function EngineeringPrintWorkspacePage() {
         return { ...baseRow, images }
       })
     )
+    reportFeedback('rows', '已移除图片。')
   }
 
   const clearInstructionRowImages = (target) => {
@@ -1125,7 +1155,8 @@ export default function EngineeringPrintWorkspacePage() {
         }
       })
     )
-    setToolbarStatus(
+    reportFeedback(
+      'rows',
       `已清空作业指导书${formatInstructionRowTargetLabel(
         normalizedTarget
       )}图片。`
@@ -1141,6 +1172,7 @@ export default function EngineeringPrintWorkspacePage() {
   }
 
   const openInstructionAnnotationEditor = (target) => {
+    clearFeedback()
     const normalizedTarget = normalizeInstructionRowTarget(target)
     if (!normalizedTarget) return
     const row = getInstructionRowsForTarget(draft, normalizedTarget)[
@@ -1150,7 +1182,7 @@ export default function EngineeringPrintWorkspacePage() {
       ? row.images.findIndex((image) => image?.dataURL)
       : -1
     if (!isWorkInstructionStepRow(row) || firstImageIndex < 0) {
-      message.warning('请先给当前编号行上传图片。')
+      reportFeedback('rows', '请先给当前编号行上传图片。', 'error')
       return
     }
     setInstructionAnnotationEditorTarget({
@@ -1179,7 +1211,8 @@ export default function EngineeringPrintWorkspacePage() {
       }))
     )
     setInstructionAnnotationEditorTarget(null)
-    setToolbarStatus(
+    reportFeedback(
+      'rows',
       `已保存作业指导书${formatInstructionRowTargetLabel(target)}图片标注。`
     )
   }
@@ -1424,7 +1457,7 @@ export default function EngineeringPrintWorkspacePage() {
       <PrintAppendixImageManager
         images={draft.appendixImages}
         onImagesChange={handleAppendixImagesChange}
-        onStatusChange={setToolbarStatus}
+        onStatusChange={(text, tone) => reportFeedback('images', text, tone)}
       />
     </div>
   )
@@ -1453,12 +1486,12 @@ export default function EngineeringPrintWorkspacePage() {
       paperRef.current
     )
     if (!problem) return true
-    setToolbarStatus(problem)
-    message.warning(problem)
+    reportFeedback('output', problem, 'error')
     return false
   }
 
   const handlePreviewPDF = async () => {
+    clearFeedback()
     if (!paperRef.current) return
     try {
       setPdfAction('preview')
@@ -1481,9 +1514,13 @@ export default function EngineeringPrintWorkspacePage() {
         preloaded: pdfPreviewPreloadRef.current,
       })
       pdfPreviewPreloadRef.current = null
-      if (opened) setToolbarStatus('PDF 预览已打开。')
+      if (opened) reportFeedback('output', 'PDF 预览已打开。')
     } catch (error) {
-      message.error(getActionErrorMessage(error, '打开 PDF 预览失败'))
+      reportFeedback(
+        'output',
+        getActionErrorMessage(error, '打开 PDF 预览失败'),
+        'error'
+      )
     } finally {
       setPdfAction('')
       setPdfActionStartedAt(0)
@@ -1491,6 +1528,7 @@ export default function EngineeringPrintWorkspacePage() {
   }
 
   const handleDownloadPDF = async () => {
+    clearFeedback()
     if (!paperRef.current) return
     try {
       setPdfAction('download')
@@ -1506,9 +1544,13 @@ export default function EngineeringPrintWorkspacePage() {
         templateKey: template.key,
         customerKey,
       })
-      setToolbarStatus('PDF 已开始下载。')
+      reportFeedback('output', 'PDF 已开始下载。')
     } catch (error) {
-      message.error(getActionErrorMessage(error, '下载 PDF 失败'))
+      reportFeedback(
+        'output',
+        getActionErrorMessage(error, '下载 PDF 失败'),
+        'error'
+      )
     } finally {
       setPdfAction('')
       setPdfActionStartedAt(0)
@@ -1516,6 +1558,7 @@ export default function EngineeringPrintWorkspacePage() {
   }
 
   const handlePrint = async () => {
+    clearFeedback()
     try {
       await preparePrintWorkspaceSnapshot({
         windowLike: window,
@@ -1530,11 +1573,12 @@ export default function EngineeringPrintWorkspacePage() {
       }
       window.print()
     } catch (error) {
-      message.error(getActionErrorMessage(error, '打印'))
+      reportFeedback('output', getActionErrorMessage(error, '打印'), 'error')
     }
   }
 
   const applyRichTextCommand = (command) => {
+    clearFeedback()
     if (typeof document === 'undefined') return
     if (command === 'red') {
       const selection = window.getSelection?.()
@@ -1591,7 +1635,10 @@ export default function EngineeringPrintWorkspacePage() {
     if (templateKey === MATERIAL_DETAIL_TEMPLATE_KEY) {
       return (
         <>
-          <PrintWorkspaceToolSection title="明细行">
+          <PrintWorkspaceToolSection
+            title="明细行"
+            feedback={feedback?.area === 'rows' ? feedback : null}
+          >
             <div className="erp-print-shell__toolbar-group">
               <button
                 type="button"
@@ -1634,7 +1681,10 @@ export default function EngineeringPrintWorkspacePage() {
               </span>
             </div>
           </PrintWorkspaceToolSection>
-          <PrintWorkspaceToolSection title="单元格">
+          <PrintWorkspaceToolSection
+            title="单元格"
+            feedback={feedback?.area === 'cells' ? feedback : null}
+          >
             <div className="erp-print-shell__toolbar-group">
               <button
                 type="button"
@@ -1670,7 +1720,10 @@ export default function EngineeringPrintWorkspacePage() {
     if (templateKey === COLOR_CARD_TEMPLATE_KEY) {
       return (
         <>
-          <PrintWorkspaceToolSection title="色卡块">
+          <PrintWorkspaceToolSection
+            title="色卡块"
+            feedback={feedback?.area === 'blocks' ? feedback : null}
+          >
             <div className="erp-print-shell__toolbar-group">
               <button
                 type="button"
@@ -1713,7 +1766,10 @@ export default function EngineeringPrintWorkspacePage() {
               </span>
             </div>
           </PrintWorkspaceToolSection>
-          <PrintWorkspaceToolSection title="明细行">
+          <PrintWorkspaceToolSection
+            title="明细行"
+            feedback={feedback?.area === 'rows' ? feedback : null}
+          >
             <div className="erp-print-shell__toolbar-group">
               <button
                 type="button"
@@ -1757,7 +1813,10 @@ export default function EngineeringPrintWorkspacePage() {
     }
 
     return (
-      <PrintWorkspaceToolSection title="明细行">
+      <PrintWorkspaceToolSection
+        title="明细行"
+        feedback={feedback?.area === 'rows' ? feedback : null}
+      >
         <div className="erp-print-shell__toolbar-group">
           <button
             type="button"
@@ -2013,7 +2072,8 @@ export default function EngineeringPrintWorkspacePage() {
       <PrintWorkspaceShell
         title={template.title}
         sourceTag={businessInput ? '业务记录带值' : '使用默认模板'}
-        statusText={toolbarStatus}
+        feedback={feedback}
+        onClearFeedback={clearFeedback}
         tools={template.runtime.tools}
         persistenceStatus={persistenceStatus}
         onRetrySave={flushDraft}

@@ -5,6 +5,7 @@ import { createWorkInstructionInteractionScenario } from './workInstructionInter
 import { printTemplateCatalog } from '../../src/erp/config/printTemplates.mjs'
 import { createPrintPolishScenarios } from './printPolishScenarios.mjs'
 import { createPrintWorkspaceControlScenarios } from './printWorkspaceControlScenarios.mjs'
+import { createPrintWorkspaceFeedbackScenarios } from './printWorkspaceFeedbackScenarios.mjs'
 
 export function createPrintWorkspaceScenarios({
   expectHeading,
@@ -633,6 +634,12 @@ export function createPrintWorkspaceScenarios({
     )
   }
   return [
+    ...createPrintWorkspaceFeedbackScenarios({
+      assert,
+      path,
+      outputDir,
+      gotoScenarioPath,
+    }),
     ...createPrintWorkspaceControlScenarios({
       assert,
       path,

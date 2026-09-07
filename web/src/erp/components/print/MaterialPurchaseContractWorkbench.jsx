@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import usePrintWorkspaceFeedback from '../../utils/usePrintWorkspaceFeedback.js'
 import { getPrintOutputProblem } from '../../utils/printOutputPreflight.mjs'
-import { message, modal } from '@/common/utils/antdApp'
+import { modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   applyDetailCellMerge,
@@ -114,7 +115,8 @@ export default function MaterialPurchaseContractWorkbench({
   const [mergeSelectionAnchor, setMergeSelectionAnchor] = useState(null)
   const [mergeSelectionFocus, setMergeSelectionFocus] = useState(null)
   const [activeCell, setActiveCell] = useState(null)
-  const [toolbarStatus, setToolbarStatus] = useState('')
+  const { feedback, reportFeedback, clearFeedback } =
+    usePrintWorkspaceFeedback()
   const [pdfAction, setPdfAction] = useState('')
   const [pdfActionStartedAt, setPdfActionStartedAt] = useState(0)
   const pdfPreviewPreloadRef = useRef(null)
@@ -138,8 +140,9 @@ export default function MaterialPurchaseContractWorkbench({
     setActiveCell(null)
     setPdfAction('')
     setPdfActionStartedAt(0)
-    setToolbarStatus('')
+    clearFeedback()
   }, [
+    clearFeedback,
     businessInput,
     draftStorageKey,
     resetDraftOnOpen,
@@ -182,17 +185,19 @@ export default function MaterialPurchaseContractWorkbench({
     const timeoutID = window.setTimeout(() => {
       setPdfAction('')
       setPdfActionStartedAt(0)
-      setToolbarStatus(
+      reportFeedback(
+        'output',
         pdfAction === 'download'
           ? 'PDF 下载等待超时，请重新点击下载 PDF。'
-          : 'PDF 预览等待超时，请重新点击在线预览 PDF。'
+          : 'PDF 预览等待超时，请重新点击在线预览 PDF。',
+        'error'
       )
     }, remainingMs)
 
     return () => {
       window.clearTimeout(timeoutID)
     }
-  }, [pdfAction, pdfActionStartedAt])
+  }, [reportFeedback, pdfAction, pdfActionStartedAt])
 
   const totals = useMemo(
     () => computeMaterialPurchaseTotals(draft.lines, { merges: draft.merges }),
@@ -257,7 +262,7 @@ export default function MaterialPurchaseContractWorkbench({
   }
 
   const handleToggleRowSelectionMode = () => {
-    setToolbarStatus('')
+    clearFeedback()
     setRowSelectionMode((currentValue) => {
       const nextValue = !currentValue
       if (nextValue) {
@@ -271,7 +276,7 @@ export default function MaterialPurchaseContractWorkbench({
   }
 
   const handleToggleCellSelectionMode = () => {
-    setToolbarStatus('')
+    clearFeedback()
     setCellSelectionMode((currentValue) => {
       const nextValue = !currentValue
       if (nextValue) {
@@ -286,7 +291,7 @@ export default function MaterialPurchaseContractWorkbench({
   }
 
   const handleSelectCell = (rowIndex, colIndex) => {
-    setToolbarStatus('')
+    clearFeedback()
     const nextCell = { rowIndex, colIndex }
     setActiveCell(nextCell)
     const currentSelection = normalizeCellSelection(
@@ -314,8 +319,7 @@ export default function MaterialPurchaseContractWorkbench({
       selection: mergeSelection,
     })
     if (!result.ok) {
-      setToolbarStatus(result.message)
-      message.warning(result.message)
+      reportFeedback('cells', result.message, 'error')
       return
     }
 
@@ -333,7 +337,7 @@ export default function MaterialPurchaseContractWorkbench({
     setActiveCell(mergedAnchor)
     setMergeSelectionAnchor(mergedAnchor)
     setMergeSelectionFocus(mergedAnchor)
-    setToolbarStatus(result.message)
+    reportFeedback('cells', result.message)
   }
 
   const handleSplitMerge = () => {
@@ -343,8 +347,7 @@ export default function MaterialPurchaseContractWorkbench({
       colIndex: activeCell?.colIndex,
     })
     if (!result.ok) {
-      setToolbarStatus(result.message)
-      message.warning(result.message)
+      reportFeedback('cells', result.message, 'error')
       return
     }
 
@@ -352,7 +355,7 @@ export default function MaterialPurchaseContractWorkbench({
       ...currentDraft,
       merges: result.merges,
     }))
-    setToolbarStatus(result.message)
+    reportFeedback('cells', result.message)
   }
 
   const handleInsertRow = (position) => {
@@ -363,8 +366,7 @@ export default function MaterialPurchaseContractWorkbench({
       position,
     })
     if (!result.ok) {
-      setToolbarStatus(result.message)
-      message.warning(result.message)
+      reportFeedback('rows', result.message, 'error')
       return
     }
     setDraft((currentDraft) => ({
@@ -373,7 +375,7 @@ export default function MaterialPurchaseContractWorkbench({
       merges: result.merges,
     }))
     setSelectedRowIndex(result.selectedRowIndex)
-    setToolbarStatus(result.message)
+    reportFeedback('rows', result.message)
   }
 
   const handleDeleteRow = () => {
@@ -383,8 +385,7 @@ export default function MaterialPurchaseContractWorkbench({
       selectedRowIndex,
     })
     if (!result.ok) {
-      setToolbarStatus(result.message)
-      message.warning(result.message)
+      reportFeedback('rows', result.message, 'error')
       return
     }
     setDraft((currentDraft) => ({
@@ -393,7 +394,7 @@ export default function MaterialPurchaseContractWorkbench({
       merges: result.merges,
     }))
     setSelectedRowIndex(result.selectedRowIndex)
-    setToolbarStatus(result.message)
+    reportFeedback('rows', result.message)
   }
 
   const buildPdfFileName = useCallback(
@@ -465,12 +466,12 @@ export default function MaterialPurchaseContractWorkbench({
       paperRef.current
     )
     if (!problem) return true
-    setToolbarStatus(problem)
-    message.warning(problem)
+    reportFeedback('output', problem, 'error')
     return false
   }
 
   const handlePreviewPDF = async () => {
+    clearFeedback()
     if (!paperRef.current) {
       return
     }
@@ -489,11 +490,10 @@ export default function MaterialPurchaseContractWorkbench({
         templateKey: MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
         customerKey,
       })
-      setToolbarStatus('已生成在线 PDF 预览。')
+      reportFeedback('output', '已生成在线 PDF 预览。')
     } catch (error) {
       const errorMessage = getActionErrorMessage(error, '生成 PDF 预览')
-      setToolbarStatus(errorMessage)
-      message.error(errorMessage)
+      reportFeedback('output', errorMessage, 'error')
     } finally {
       setPdfAction('')
       setPdfActionStartedAt(0)
@@ -501,6 +501,7 @@ export default function MaterialPurchaseContractWorkbench({
   }
 
   const handleDownloadPDF = async () => {
+    clearFeedback()
     if (!paperRef.current) {
       return
     }
@@ -519,11 +520,10 @@ export default function MaterialPurchaseContractWorkbench({
         templateKey: MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
         customerKey,
       })
-      setToolbarStatus('已开始下载 PDF。')
+      reportFeedback('output', '已开始下载 PDF。')
     } catch (error) {
       const errorMessage = getActionErrorMessage(error, '下载 PDF')
-      setToolbarStatus(errorMessage)
-      message.error(errorMessage)
+      reportFeedback('output', errorMessage, 'error')
     } finally {
       setPdfAction('')
       setPdfActionStartedAt(0)
@@ -531,6 +531,7 @@ export default function MaterialPurchaseContractWorkbench({
   }
 
   const handlePrint = async () => {
+    clearFeedback()
     try {
       await preparePrintWorkspaceSnapshot({
         windowLike: window,
@@ -540,7 +541,7 @@ export default function MaterialPurchaseContractWorkbench({
       syncPrintRuntimeMargin()
       window.print()
     } catch (error) {
-      message.error(getActionErrorMessage(error, '打印'))
+      reportFeedback('output', getActionErrorMessage(error, '打印'), 'error')
     }
   }
 
@@ -551,10 +552,11 @@ export default function MaterialPurchaseContractWorkbench({
     resetRowSelection()
     setCellSelectionMode(false)
     resetCellSelection()
-    setToolbarStatus('已恢复为实拍对照样例。')
+    reportFeedback('draft', '已恢复样例。')
   }
 
   const handleBlankDraft = () => {
+    clearFeedback()
     modal.confirm({
       title: '生成空白采购合同',
       content:
@@ -570,8 +572,10 @@ export default function MaterialPurchaseContractWorkbench({
         resetRowSelection()
         setCellSelectionMode(false)
         resetCellSelection()
-        setToolbarStatus('已生成空白采购合同，模板结构和合同条款已保留。')
-        message.success('已生成空白采购合同')
+        reportFeedback(
+          'draft',
+          '已生成空白采购合同，模板结构和合同条款已保留。'
+        )
       },
     })
   }
@@ -580,8 +584,7 @@ export default function MaterialPurchaseContractWorkbench({
     setDraft((currentDraft) =>
       clearMaterialPurchaseContractSignatureDraft(currentDraft)
     )
-    setToolbarStatus('已清空签字人，纸面保留日期和甲乙方手签位置。')
-    message.success('已清空签字人')
+    reportFeedback('draft', '已清空签字人，保留日期和手签位置。')
   }
 
   const getToolbarButtonClassName = ({
@@ -612,7 +615,8 @@ export default function MaterialPurchaseContractWorkbench({
     <PrintWorkspaceShell
       title="采购合同"
       sourceTag={draft.printMode === 'blank' ? '空白模板' : sourceTag}
-      statusText={toolbarStatus}
+      feedback={feedback}
+      onClearFeedback={clearFeedback}
       tools={template.runtime.tools}
       persistenceStatus={persistenceStatus}
       onRetrySave={flushDraft}
@@ -628,7 +632,7 @@ export default function MaterialPurchaseContractWorkbench({
             : 1
       }
       onReturnToEdit={() => {
-        setToolbarStatus('')
+        clearFeedback()
         setRowSelectionMode(false)
         setCellSelectionMode(false)
         resetRowSelection()
@@ -645,7 +649,7 @@ export default function MaterialPurchaseContractWorkbench({
         <PrintAppendixImageManager
           images={draft.appendixImages}
           onImagesChange={handleAppendixImagesChange}
-          onStatusChange={setToolbarStatus}
+          onStatusChange={(text, tone) => reportFeedback('images', text, tone)}
         />
       }
       formulaActions={
@@ -670,7 +674,10 @@ export default function MaterialPurchaseContractWorkbench({
       }
       editorActions={
         <>
-          <PrintWorkspaceToolSection title="明细行">
+          <PrintWorkspaceToolSection
+            title="明细行"
+            feedback={feedback?.area === 'rows' ? feedback : null}
+          >
             <div className="erp-print-shell__toolbar-group">
               <button
                 type="button"
@@ -710,7 +717,10 @@ export default function MaterialPurchaseContractWorkbench({
               </span>
             </div>
           </PrintWorkspaceToolSection>
-          <PrintWorkspaceToolSection title="单元格">
+          <PrintWorkspaceToolSection
+            title="单元格"
+            feedback={feedback?.area === 'cells' ? feedback : null}
+          >
             <div className="erp-print-shell__toolbar-group">
               <button
                 type="button"
@@ -806,7 +816,10 @@ export default function MaterialPurchaseContractWorkbench({
           handleClauseCommit={handleClauseCommit}
           selectedRowIndex={selectedRowIndex}
           rowSelectionMode={rowSelectionMode}
-          setSelectedRowIndex={setSelectedRowIndex}
+          setSelectedRowIndex={(index) => {
+            clearFeedback()
+            setSelectedRowIndex(index)
+          }}
           activeCell={activeCell}
           mergeSelection={mergeSelection}
           cellSelectionMode={cellSelectionMode}

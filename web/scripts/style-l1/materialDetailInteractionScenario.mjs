@@ -223,20 +223,18 @@ export function createMaterialDetailInteractionScenario({
 
       assertButtonTexts(
         toolbarGroups[0],
-        [
-          '上插一行',
-          '下插一行',
-          '移除当前行',
-          '选择明细行',
-          '选择单元格',
-          '合并选区',
-          '拆分当前',
-        ],
-        '物料分析明细表'
+        ['选择明细行', '上插一行', '下插一行', '移除当前行'],
+        '物料分析明细表明细行'
+      )
+      assertButtonTexts(
+        toolbarGroups[1],
+        ['选择单元格', '合并选区', '拆分当前'],
+        '物料分析明细表单元格'
       )
 
       assert.equal(
-        toolbarGroups[0].buttons[0].disabled,
+        toolbarGroups[0].buttons.find((button) => button.text === '上插一行')
+          .disabled,
         true,
         '物料明细未选择明细行前，上插一行应禁用'
       )
@@ -253,7 +251,8 @@ export function createMaterialDetailInteractionScenario({
       toolbarGroups = await collectToolbarGroups()
 
       assert.equal(
-        toolbarGroups[0].buttons[0].disabled,
+        toolbarGroups[0].buttons.find((button) => button.text === '上插一行')
+          .disabled,
         false,
         '物料明细进入选择明细行模式并选中行后，上插一行应可用'
       )

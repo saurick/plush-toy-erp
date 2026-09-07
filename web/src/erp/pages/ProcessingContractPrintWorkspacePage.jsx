@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useParams, useSearchParams } from 'react-router-dom'
+import usePrintWorkspaceFeedback from '../utils/usePrintWorkspaceFeedback.js'
 import { getPrintTemplateByKey } from '../config/printTemplates.mjs'
 import { getPrintOutputProblem } from '../utils/printOutputPreflight.mjs'
 import { getPrintWorkspaceDraftScope } from '../utils/printWorkspaceScope.mjs'
-import { message, modal } from '@/common/utils/antdApp'
+import { modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import PrintAppendixImageManager from '../components/print/PrintAppendixImages.jsx'
 import ProcessingContractPaper from '../components/print/ProcessingContractPaper.jsx'
@@ -173,7 +174,8 @@ export default function ProcessingContractPrintWorkspacePage() {
   const [busyAction, setBusyAction] = useState('')
   const [busyActionStartedAt, setBusyActionStartedAt] = useState(0)
   const pdfPreviewPreloadRef = useRef(null)
-  const [toolbarStatus, setToolbarStatus] = useState('')
+  const { feedback, reportFeedback, clearFeedback } =
+    usePrintWorkspaceFeedback()
 
   useEffect(() => {
     document.title = '加工合同打印窗口'
@@ -197,8 +199,9 @@ export default function ProcessingContractPrintWorkspacePage() {
     setShowFormula(false)
     setBusyAction('')
     setBusyActionStartedAt(0)
-    setToolbarStatus('')
+    clearFeedback()
   }, [
+    clearFeedback,
     draftStorageKey,
     entrySource,
     resetDraftOnOpen,
@@ -241,17 +244,19 @@ export default function ProcessingContractPrintWorkspacePage() {
     const timeoutID = window.setTimeout(() => {
       setBusyAction('')
       setBusyActionStartedAt(0)
-      setToolbarStatus(
+      reportFeedback(
+        'output',
         busyAction === 'download'
           ? 'PDF 下载等待超时，请重新点击下载 PDF。'
-          : 'PDF 预览等待超时，请重新点击在线预览 PDF。'
+          : 'PDF 预览等待超时，请重新点击在线预览 PDF。',
+        'error'
       )
     }, remainingMs)
 
     return () => {
       window.clearTimeout(timeoutID)
     }
-  }, [busyAction, busyActionStartedAt])
+  }, [reportFeedback, busyAction, busyActionStartedAt])
 
   const mergeSelection = normalizeCellSelection(
     mergeSelectionAnchor,
@@ -324,7 +329,7 @@ export default function ProcessingContractPrintWorkspacePage() {
   }
 
   const handleToggleRowSelectionMode = () => {
-    setToolbarStatus('')
+    clearFeedback()
     setRowSelectionMode((current) => {
       const nextValue = !current
       if (nextValue) {
@@ -338,7 +343,7 @@ export default function ProcessingContractPrintWorkspacePage() {
   }
 
   const handleToggleCellSelectionMode = () => {
-    setToolbarStatus('')
+    clearFeedback()
     setCellSelectionMode((current) => {
       const nextValue = !current
       if (nextValue) {
@@ -353,7 +358,7 @@ export default function ProcessingContractPrintWorkspacePage() {
   }
 
   const handleSelectCell = (rowIndex, colIndex) => {
-    setToolbarStatus('')
+    clearFeedback()
     const nextCell = { rowIndex, colIndex }
     setActiveCell(nextCell)
     const currentSelection = normalizeCellSelection(
@@ -383,8 +388,7 @@ export default function ProcessingContractPrintWorkspacePage() {
       position,
     })
     if (!result.ok) {
-      setToolbarStatus(result.message)
-      message.warning(result.message)
+      reportFeedback('rows', result.message, 'error')
       return
     }
 
@@ -394,7 +398,7 @@ export default function ProcessingContractPrintWorkspacePage() {
       merges: result.merges,
     }))
     setSelectedLineIndex(result.selectedLineIndex)
-    setToolbarStatus(result.message)
+    reportFeedback('rows', result.message)
   }
 
   const handleRemoveLine = () => {
@@ -405,8 +409,7 @@ export default function ProcessingContractPrintWorkspacePage() {
       contractNo: contract.contractNo,
     })
     if (!result.ok) {
-      setToolbarStatus(result.message)
-      message.warning(result.message)
+      reportFeedback('rows', result.message, 'error')
       return
     }
 
@@ -416,7 +419,7 @@ export default function ProcessingContractPrintWorkspacePage() {
       merges: result.merges,
     }))
     setSelectedLineIndex(result.selectedLineIndex)
-    setToolbarStatus(result.message)
+    reportFeedback('rows', result.message)
   }
 
   const withPdfAction = async (actionKey, runner) => {
@@ -424,6 +427,7 @@ export default function ProcessingContractPrintWorkspacePage() {
       return
     }
 
+    clearFeedback()
     setBusyActionStartedAt(Date.now())
     setBusyAction(actionKey)
     try {
@@ -438,7 +442,11 @@ export default function ProcessingContractPrintWorkspacePage() {
       })
       await runner()
     } catch (error) {
-      message.error(getActionErrorMessage(error, '生成 PDF'))
+      reportFeedback(
+        'output',
+        getActionErrorMessage(error, '生成 PDF'),
+        'error'
+      )
     } finally {
       setBusyAction('')
       setBusyActionStartedAt(0)
@@ -501,8 +509,7 @@ export default function ProcessingContractPrintWorkspacePage() {
       paperRef.current
     )
     if (!problem) return true
-    setToolbarStatus(problem)
-    message.warning(problem)
+    reportFeedback('output', problem, 'error')
     return false
   }
 
@@ -527,6 +534,7 @@ export default function ProcessingContractPrintWorkspacePage() {
     })
 
   const handlePrint = async () => {
+    clearFeedback()
     try {
       await preparePrintWorkspaceSnapshot({
         windowLike: window,
@@ -539,7 +547,7 @@ export default function ProcessingContractPrintWorkspacePage() {
       })
       window.print()
     } catch (error) {
-      message.error(getActionErrorMessage(error, '打印'))
+      reportFeedback('output', getActionErrorMessage(error, '打印'), 'error')
     }
   }
 
@@ -550,8 +558,7 @@ export default function ProcessingContractPrintWorkspacePage() {
       selection: mergeSelection,
     })
     if (!result.ok) {
-      setToolbarStatus(result.message)
-      message.warning(result.message)
+      reportFeedback('cells', result.message, 'error')
       return
     }
 
@@ -569,7 +576,7 @@ export default function ProcessingContractPrintWorkspacePage() {
     setActiveCell(mergedAnchor)
     setMergeSelectionAnchor(mergedAnchor)
     setMergeSelectionFocus(mergedAnchor)
-    setToolbarStatus(result.message)
+    reportFeedback('cells', result.message)
   }
 
   const handleSplitMerge = () => {
@@ -579,8 +586,7 @@ export default function ProcessingContractPrintWorkspacePage() {
       colIndex: activeCell?.colIndex,
     })
     if (!result.ok) {
-      setToolbarStatus(result.message)
-      message.warning(result.message)
+      reportFeedback('cells', result.message, 'error')
       return
     }
 
@@ -588,7 +594,7 @@ export default function ProcessingContractPrintWorkspacePage() {
       ...current,
       merges: result.merges,
     }))
-    setToolbarStatus(result.message)
+    reportFeedback('cells', result.message)
   }
 
   const resetDraft = () => {
@@ -598,10 +604,11 @@ export default function ProcessingContractPrintWorkspacePage() {
     setCellSelectionMode(false)
     resetCellSelection()
     setShowFormula(false)
-    setToolbarStatus('已恢复默认加工合同样例。')
+    reportFeedback('draft', '已恢复样例。')
   }
 
   const handleBlankDraft = () => {
+    clearFeedback()
     modal.confirm({
       title: '生成空白加工合同',
       content:
@@ -619,15 +626,17 @@ export default function ProcessingContractPrintWorkspacePage() {
         resetCellSelection()
         setShowFormula(false)
         setBusyAction('')
-        setToolbarStatus('已生成空白加工合同，模板结构和合同条款已保留。')
+        reportFeedback(
+          'draft',
+          '已生成空白加工合同，模板结构和合同条款已保留。'
+        )
       },
     })
   }
 
   const handleClearSignature = () => {
     setContract((current) => clearProcessingContractSignatureDraft(current))
-    setToolbarStatus('已清空签字人，纸面保留日期和甲乙方手签位置。')
-    message.success('已清空签字人')
+    reportFeedback('draft', '已清空签字人，保留日期和手签位置。')
   }
 
   const getToolbarButtonClassName = ({
@@ -653,8 +662,10 @@ export default function ProcessingContractPrintWorkspacePage() {
           ? '正在生成在线 PDF...'
           : busyAction === 'download'
             ? '正在下载 PDF...'
-            : toolbarStatus
+            : ''
       }
+      feedback={feedback}
+      onClearFeedback={clearFeedback}
       tools={template.runtime.tools}
       persistenceStatus={persistenceStatus}
       onRetrySave={flushContractDraft}
@@ -670,7 +681,7 @@ export default function ProcessingContractPrintWorkspacePage() {
             : 1
       }
       onReturnToEdit={() => {
-        setToolbarStatus('')
+        clearFeedback()
         setRowSelectionMode(false)
         setCellSelectionMode(false)
         setSelectedLineIndex(null)
@@ -687,7 +698,7 @@ export default function ProcessingContractPrintWorkspacePage() {
         <PrintAppendixImageManager
           images={contract.appendixImages}
           onImagesChange={handleAppendixImagesChange}
-          onStatusChange={setToolbarStatus}
+          onStatusChange={(text, tone) => reportFeedback('images', text, tone)}
         />
       }
       formulaActions={
@@ -717,7 +728,10 @@ export default function ProcessingContractPrintWorkspacePage() {
       }
       editorActions={
         <>
-          <PrintWorkspaceToolSection title="明细行">
+          <PrintWorkspaceToolSection
+            title="明细行"
+            feedback={feedback?.area === 'rows' ? feedback : null}
+          >
             <div className="erp-print-shell__toolbar-group">
               <button
                 type="button"
@@ -758,7 +772,10 @@ export default function ProcessingContractPrintWorkspacePage() {
               </span>
             </div>
           </PrintWorkspaceToolSection>
-          <PrintWorkspaceToolSection title="单元格">
+          <PrintWorkspaceToolSection
+            title="单元格"
+            feedback={feedback?.area === 'cells' ? feedback : null}
+          >
             <div className="erp-print-shell__toolbar-group">
               <button
                 type="button"
@@ -853,7 +870,10 @@ export default function ProcessingContractPrintWorkspacePage() {
           cellSelectionMode={cellSelectionMode}
           mergeSelection={mergeSelection}
           activeCell={activeCell}
-          onSelectLine={setSelectedLineIndex}
+          onSelectLine={(index) => {
+            clearFeedback()
+            setSelectedLineIndex(index)
+          }}
           onSelectCell={handleSelectCell}
           onFieldChange={setField}
           onLineFieldChange={setLineField}
