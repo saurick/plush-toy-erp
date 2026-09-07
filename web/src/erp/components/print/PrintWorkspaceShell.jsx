@@ -32,8 +32,14 @@ function revealTool(node) {
   }
 }
 
-function PrintWorkspaceFeedback({ feedback, local = false }) {
+function PrintWorkspaceFeedback({ feedback, local = false, returnFocusRef }) {
   const feedbackRef = useRef(null)
+  const [dismissedFeedback, setDismissedFeedback] = useState(null)
+  useEffect(() => {
+    if (local || feedback?.tone !== 'success') return undefined
+    const timer = window.setTimeout(() => setDismissedFeedback(feedback), 4000)
+    return () => window.clearTimeout(timer)
+  }, [feedback, local])
   useEffect(() => {
     if (!local || !feedback) return
     const node = feedbackRef.current
@@ -49,9 +55,9 @@ function PrintWorkspaceFeedback({ feedback, local = false }) {
       panel.scrollTop -= bounds.top - message.top + 12
     }
   }, [feedback, local])
-  if (!feedback?.text) return null
+  if (!feedback?.text || feedback === dismissedFeedback) return null
   return (
-    <p
+    <div
       ref={feedbackRef}
       className={
         local ? 'erp-print-shell__tool-feedback' : 'erp-print-shell__feedback'
@@ -62,8 +68,30 @@ function PrintWorkspaceFeedback({ feedback, local = false }) {
       aria-atomic="true"
       data-print-editor-only
     >
-      {feedback.text}
-    </p>
+      <span>{feedback.text}</span>
+      {!local ? (
+        <button
+          type="button"
+          className="erp-print-shell__feedback-close"
+          aria-label="关闭提示"
+          onClick={(event) => {
+            if (document.activeElement === event.currentTarget) {
+              const trigger = returnFocusRef?.current
+              const target =
+                trigger?.isConnected && !trigger.disabled
+                  ? trigger
+                  : feedbackRef.current
+                      ?.closest('.erp-print-shell')
+                      ?.querySelector('.erp-print-shell__zoom-control select')
+              target?.focus({ preventScroll: true })
+            }
+            setDismissedFeedback(feedback)
+          }}
+        >
+          <span aria-hidden="true">×</span>
+        </button>
+      ) : null}
+    </div>
   )
 }
 
@@ -176,6 +204,7 @@ export default function PrintWorkspaceShell({
   children,
 }) {
   const stageRef = useRef(null)
+  const outputTriggerRef = useRef(null)
   const [zoomMode, setZoomMode] = useState('fit')
   const [fitScale, setFitScale] = useState(1)
   const [preparing, setPreparing] = useState(true)
@@ -231,6 +260,15 @@ export default function PrintWorkspaceShell({
   useEffect(() => bindPrintEditableCaret(stageRef.current), [])
 
   const scale = zoomMode === 'fit' ? fitScale : Number(zoomMode)
+  const outputFeedback = useMemo(
+    () =>
+      statusText
+        ? { area: 'output', text: statusText, tone: 'info' }
+        : feedback?.area === 'output'
+          ? feedback
+          : null,
+    [statusText, feedback]
+  )
   const captureInput = (event) => {
     const editable = event.target.closest?.('[contenteditable="true"]')
     if (editable) {
@@ -353,7 +391,13 @@ export default function PrintWorkspaceShell({
               </PrintToolButton>
             ) : null}
           </div>
-          <div className="erp-print-shell__toolbar-actions">
+          <div
+            className="erp-print-shell__toolbar-actions"
+            onClickCapture={(event) => {
+              const button = event.target.closest('button')
+              if (button) outputTriggerRef.current = button
+            }}
+          >
             <label className="erp-print-shell__zoom-control print-zoom-control">
               显示比例
               <span className="print-zoom-select">
@@ -373,6 +417,11 @@ export default function PrintWorkspaceShell({
             {toolbarActions}
           </div>
         </header>
+
+        <PrintWorkspaceFeedback
+          feedback={outputFeedback}
+          returnFocusRef={outputTriggerRef}
+        />
 
         <main className="erp-print-shell__content">
           <aside className="erp-print-shell__panel" aria-label="打印编辑工具">
@@ -448,15 +497,6 @@ export default function PrintWorkspaceShell({
           </aside>
 
           <section className="erp-print-shell__workspace">
-            <PrintWorkspaceFeedback
-              feedback={
-                statusText
-                  ? { area: 'output', text: statusText, tone: 'info' }
-                  : feedback?.area === 'output'
-                    ? feedback
-                    : null
-              }
-            />
             <div
               className="erp-print-shell__stage"
               ref={stageRef}

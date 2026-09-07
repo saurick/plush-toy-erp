@@ -272,9 +272,6 @@ export function createPrintWorkspaceScenarios({
       const stageRect = stage?.getBoundingClientRect()
       const paperRect = paper?.getBoundingClientRect()
       const stageStyle = stage ? window.getComputedStyle(stage) : null
-      const feedbackRect = document
-        .querySelector('.erp-print-shell__feedback')
-        ?.getBoundingClientRect()
 
       return {
         foundToolbar: Boolean(toolbar),
@@ -285,7 +282,7 @@ export function createPrintWorkspaceScenarios({
           toolbarRect && contentRect
             ? contentRect.top - toolbarRect.bottom
             : -1,
-        controlsBottom: feedbackRect?.bottom || toolbarRect?.bottom || 0,
+        controlsBottom: toolbarRect?.bottom || 0,
         stageTop: stageRect?.top || 0,
         contentToStage:
           contentRect && stageRect ? stageRect.top - contentRect.top : -1,

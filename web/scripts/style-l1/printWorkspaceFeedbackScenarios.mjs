@@ -50,6 +50,161 @@ export function createPrintWorkspaceFeedbackScenarios({
   }
   return [
     {
+      name: 'print-workspace-floating-output-feedback',
+      path: '/erp/print-workspace/engineering-color-card?draft=fresh',
+      auth: 'admin',
+      viewport: { width: 1440, height: 960 },
+      expectedConsoleErrorPatterns: [
+        /^console error \[path=\/erp\/print-workspace\/[^\]]+\]: Failed to load resource: the server responded with a status of 503 .*\/templates\/render-pdf:/u,
+      ],
+      verify: async (page) => {
+        let failOutput = false
+        let outputHTML = ''
+        let activeTemplate = ''
+        await page.route('**/templates/render-pdf', async (route) => {
+          outputHTML = route.request().postDataJSON().html
+          if (activeTemplate === 'processing-contract') {
+            await new Promise((resolve) => setTimeout(resolve, 500))
+          }
+          await route.fulfill(
+            failOutput
+              ? {
+                  status: 503,
+                  contentType: 'application/json',
+                  body: JSON.stringify({
+                    message: '暂时无法生成 PDF，请稍后重试。',
+                  }),
+                }
+              : { contentType: 'application/pdf', body: '%PDF-1.4\n%%EOF\n' }
+          )
+        })
+        const measure = () =>
+          page.evaluate(() => {
+            const stage = document
+              .querySelector('.erp-print-shell__stage')
+              .getBoundingClientRect()
+            const toolbar = document
+              .querySelector('.erp-print-shell__toolbar')
+              .getBoundingClientRect()
+            return {
+              stageTop: stage.top,
+              stageHeight: stage.height,
+              toolbarHeight: toolbar.height,
+            }
+          })
+        const assertFeedback = async (before) => {
+          const feedback = page.locator('[data-print-feedback="output"]')
+          await feedback.waitFor()
+          const geometry = await feedback.evaluate((node) => {
+            const box = node.getBoundingClientRect()
+            return {
+              position: getComputedStyle(node).position,
+              outsidePaper: !node.closest('.erp-print-shell__workspace'),
+              fits:
+                box.left >= 0 &&
+                box.right <= innerWidth &&
+                node.scrollWidth <= node.clientWidth + 1,
+            }
+          })
+          assert.equal(geometry.position, 'fixed')
+          assert(
+            geometry.outsidePaper && geometry.fits,
+            '提示在纸面外，长文案不横向溢出'
+          )
+          assert.deepEqual(
+            await measure(),
+            before,
+            '提示不能改变工具栏高度或纸面位置'
+          )
+          await page.emulateMedia({ media: 'print' })
+          assert.equal(await feedback.isVisible(), false, '悬浮提示不进入打印')
+          await page.emulateMedia({ media: 'screen' })
+          return feedback
+        }
+        for (const [index, [key]] of templates.entries()) {
+          activeTemplate = key
+          failOutput = false
+          await gotoScenarioPath(
+            page,
+            `/erp/print-workspace/${key}?draft=fresh&state=floating-output`
+          )
+          await page.locator('.erp-print-shell--ready').waitFor()
+          await page.evaluate(() => document.fonts.ready)
+          const before = await measure()
+          const download = page.waitForEvent('download')
+          await page
+            .getByRole('button', { name: '下载 PDF', exact: true })
+            .click()
+          if (key === 'processing-contract') await assertFeedback(before)
+          await download
+          const feedback = page.locator('[data-print-feedback="output"]')
+          if (key !== 'processing-contract') await assertFeedback(before)
+          assert(
+            !outputHTML.includes('data-print-feedback='),
+            '发送给 PDF 服务的快照不含提示'
+          )
+          if (index === 0) {
+            await feedback.waitFor({ state: 'hidden', timeout: 6000 })
+            assert.deepEqual(
+              await measure(),
+              before,
+              '成功提示消失后也不推移纸面'
+            )
+          } else if (key !== 'processing-contract') {
+            await page
+              .getByRole('button', { name: '关闭提示', exact: true })
+              .click()
+          } else {
+            await feedback.waitFor({ state: 'hidden' })
+            assert.deepEqual(
+              await measure(),
+              before,
+              '加工合同进度结束后不保留占位'
+            )
+          }
+
+          failOutput = true
+          await page
+            .locator('.erp-print-shell__stage [contenteditable="true"]')
+            .first()
+            .fill('输出反馈验证')
+          if (index === 0) {
+            await page.setViewportSize({ width: 760, height: 800 })
+            await page.waitForTimeout(150)
+          }
+          const beforeError = await measure()
+          await page
+            .getByRole('button', { name: '下载 PDF', exact: true })
+            .click()
+          await page
+            .locator('[data-print-feedback="output"][role="alert"]')
+            .waitFor()
+          await assertFeedback(beforeError)
+          if (index === 0) {
+            await page.waitForTimeout(4200)
+            assert(await feedback.isVisible(), '错误提示不能自动消失')
+          }
+          await page.screenshot({
+            path: path.join(outputDir, `print-output-feedback-${key}.png`),
+          })
+          await page
+            .getByRole('button', { name: '关闭提示', exact: true })
+            .focus()
+          await page.keyboard.press('Enter')
+          assert.equal(await feedback.count(), 0)
+          assert(
+            await page
+              .getByRole('button', { name: '下载 PDF', exact: true })
+              .evaluate((node) => node === document.activeElement),
+            '关闭提示后回到原输出按钮'
+          )
+          await page.reload({ waitUntil: 'networkidle' })
+          assert.equal(await feedback.count(), 0, '刷新不恢复已过时的提示')
+          await page.setViewportSize({ width: 1440, height: 960 })
+        }
+      },
+    },
+    {
       name: 'print-workspace-local-feedback',
       path: '/erp/print-workspace/material-purchase-contract?draft=fresh',
       auth: 'admin',
