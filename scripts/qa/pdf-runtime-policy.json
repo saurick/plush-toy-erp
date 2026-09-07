@@ -1,0 +1,9 @@
+{
+  "baselineImage": "sha256:6c3ec96a8b297935b4199b74b88041167ad7f91e65ec657e24181c87d6cb128c",
+  "baselineImageBytes": 491381479,
+  "maximumGrowthPercent": 10,
+  "maximumImageBytes": 550000000,
+  "sizeMetric": "Docker image inspect Size on the dedicated Runner containerd image store",
+  "trivyVersion": "0.74.0",
+  "trivyLinuxAMD64ArchiveSHA256": "2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a"
+}

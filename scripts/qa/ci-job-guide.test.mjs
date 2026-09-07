@@ -19,7 +19,7 @@ function jobNames(registry) {
   return Object.values(registry).map(({ job }) => job);
 }
 
-test("CI Job guide covers every registered push-CI Job exactly once", () => {
+test("CI Job guide covers registered quality and PDF monitor jobs exactly once", () => {
   const expected = [
     "plan",
     "prepare",
@@ -31,10 +31,11 @@ test("CI Job guide covers every registered push-CI Job exactly once", () => {
     ...jobNames(CI_QUALITY_SHARDS),
     "quality_aggregate",
     "CI Gate",
+    "pdf_runtime_monitor",
   ];
 
   assert.equal(CI_JOB_GUIDE_SCHEMA, "plush.ci-job-guide/v1");
-  assert.equal(expected.length, 28);
+  assert.equal(expected.length, 29);
   assert.equal(new Set(expected).size, expected.length);
   assert.deepEqual(
     CI_JOB_GUIDES.map(({ name }) => name).sort(),
@@ -82,9 +83,15 @@ test("CI Job guide projection follows actual Job order and fails open only for c
     () => projectCiJobGuides(["quality_node", "quality_node"]),
     /projection is invalid/u,
   );
-  assert.throws(() => projectCiJobGuides(["bad\njob"]), /projection is invalid/u);
   assert.throws(
-    () => projectCiJobGuides(Array.from({ length: 101 }, (_, index) => `job-${index}`)),
+    () => projectCiJobGuides(["bad\njob"]),
+    /projection is invalid/u,
+  );
+  assert.throws(
+    () =>
+      projectCiJobGuides(
+        Array.from({ length: 101 }, (_, index) => `job-${index}`),
+      ),
     /projection is invalid/u,
   );
 });

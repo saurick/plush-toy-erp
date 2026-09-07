@@ -4,13 +4,13 @@
 
 ## 存储与隔离结论
 
-| 资源 | 放置 | 原因 | 恢复边界 |
-| --- | --- | --- | --- |
-| GitLab config、PostgreSQL、repositories | R640 SSD：`/srv/gitlab` | 随机 I/O 和数据库延迟敏感 | 由 GitLab backup + config archive 恢复 |
-| CI artifacts、Package Registry | R640 RAID5：`/srv/raid5/gitlab/artifacts`、`/srv/raid5/gitlab/packages` | 大文件容量优先；正式制品通过原 GitLab URL 读取 | 保留正式 Release、源码、演练与门禁证据，纳入 GitLab backup |
-| GitLab 备份生成、临时文件与归档 | R640 RAID5：`/srv/raid5/gitlab/backups/repository` | 直接在 RAID5 生成，避免 SSD 再保留一套全量备份 | config archive 与 checksum 同属 `backups`；仍需异机/离线副本，RAID 不是备份 |
-| Runner VM 系统盘与 job cache | R640 SSD 上的独立 KVM qcow2 | 构建 I/O 与 GitLab 数据隔离 | Runner 可重建，不保存业务真源 |
-| 发布镜像 | GHCR digest | 复用现有目标机加载和 release manifest 合同 | 新 GitLab Release 保存 v2 七资产（含同一演练回执）；legacy v1 六资产只读/回滚 |
+| 资源                                    | 放置                                                                    | 原因                                           | 恢复边界                                                                      |
+| --------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------- |
+| GitLab config、PostgreSQL、repositories | R640 SSD：`/srv/gitlab`                                                 | 随机 I/O 和数据库延迟敏感                      | 由 GitLab backup + config archive 恢复                                        |
+| CI artifacts、Package Registry          | R640 RAID5：`/srv/raid5/gitlab/artifacts`、`/srv/raid5/gitlab/packages` | 大文件容量优先；正式制品通过原 GitLab URL 读取 | 保留正式 Release、源码、演练与门禁证据，纳入 GitLab backup                    |
+| GitLab 备份生成、临时文件与归档         | R640 RAID5：`/srv/raid5/gitlab/backups/repository`                      | 直接在 RAID5 生成，避免 SSD 再保留一套全量备份 | config archive 与 checksum 同属 `backups`；仍需异机/离线副本，RAID 不是备份   |
+| Runner VM 系统盘与 job cache            | R640 SSD 上的独立 KVM qcow2                                             | 构建 I/O 与 GitLab 数据隔离                    | Runner 可重建，不保存业务真源                                                 |
+| 发布镜像                                | GHCR digest                                                             | 复用现有目标机加载和 release manifest 合同     | 新 GitLab Release 保存 v2 七资产（含同一演练回执）；legacy v1 六资产只读/回滚 |
 
 GitLab 不与业务 PostgreSQL、测试数据库或现有 Docker 容器共享数据目录。Runner 运行在独立 KVM VM 内，只获得 VM 内的 Docker socket；不得挂载 R640 宿主机 `/var/run/docker.sock`。
 
@@ -44,11 +44,11 @@ exact SHA `3aba488752b04e3b930ea181aa04e11d5f143cb8` 的自然 push pipeline `16
 
 CI 冷启动因此不再承担公网下载。运行包合同固定 `playwright 1.58.2 / Chromium 145.0.7632.6 / revision 1208 / FFmpeg 1011`，并绑定下列原始 ZIP：
 
-| 文件 | 字节数 | SHA-256 |
-| --- | ---: | --- |
-| `chrome-linux64.zip` | `175440843` | `b5e3195041af345a668d110f5daf5581961fa3608626ea588c97dd0fe81c4e38` |
+| 文件                                |      字节数 | SHA-256                                                            |
+| ----------------------------------- | ----------: | ------------------------------------------------------------------ |
+| `chrome-linux64.zip`                | `175440843` | `b5e3195041af345a668d110f5daf5581961fa3608626ea588c97dd0fe81c4e38` |
 | `chrome-headless-shell-linux64.zip` | `116288461` | `2536e97d8f410df0394b3e7c4252e88ce9f239f04f3af4e247a26caf45baf49e` |
-| `ffmpeg-linux.zip` | `2376500` | `ebc74fc5b94830176a3c2914ae96bd8bc7f6a91f4f33890230f84a172ee61ccc` |
+| `ffmpeg-linux.zip`                  |   `2376500` | `ebc74fc5b94830176a3c2914ae96bd8bc7f6a91f4f33890230f84a172ee61ccc` |
 
 只有 protected main 的自然 push `prepare` job 在同项目 Generic Package 精确返回 404 时，才允许消费一次 Runner 本地冷种子。运维 owner 在 CI 外下载上述三个公开固定文件，逐项核对长度和 SHA-256，再通过受信 SSH 写入 `/home/gitlab-runner/.plush-ci-playwright-runtime-seed-playwright-1.58.2-linux-x64-r1208-v1`：目录必须为当前 `gitlab-runner` uid、真实目录、`0700`，且只含三个当前 uid、真实普通文件、`0600` 的精确 basename。`prepare` 会在任何 package 写入前再次检查身份、mode、inventory、长度和 SHA-256，只把校验后的副本打为 `runtime.tar`，用内存中的 job token 上传 GitLab Generic Package，再下载、解包并复核同一内层集合；成功或失败后仅删除已经完整接受的精确本地种子目录。种子缺失或任何身份/内容歧义立即失败，不回退到 Runner 公网下载。
 
@@ -127,13 +127,13 @@ gitlab.saurick.me
 4. 创建私有项目 `saurick/plush-toy-erp`，将 `main` 设为 protected，禁止 force push，并要求 merge pipeline 成功；最终汇总 job 固定为 `CI Gate`。
 5. 创建 protected environment `release`，只允许受保护 main 运行；以下变量设为 masked + protected，并把 environment scope 固定为 `release`：
 
-   | 变量 | 最小权限 |
-   | --- | --- |
-   | `GITHUB_PACKAGES_USER` | GHCR 发布账号名 |
-   | `GITHUB_PACKAGES_TOKEN` | GitHub Packages write/read，不授 repo 管理 |
-   | `GITLAB_RELEASE_TOKEN` | 当前项目 API 与 Release 管理，不授管理员权限 |
+   | 变量                    | 最小权限                                     |
+   | ----------------------- | -------------------------------------------- |
+   | `GITHUB_PACKAGES_USER`  | GHCR 发布账号名                              |
+   | `GITHUB_PACKAGES_TOKEN` | GitHub Packages write/read，不授 repo 管理   |
+   | `GITLAB_RELEASE_TOKEN`  | 当前项目 API 与 Release 管理，不授管理员权限 |
 
-6. 用 `runner-vm.sh` 显式传入 Ubuntu 24.04 base volume、vCPU、内存、磁盘和受信 SSH 公钥；槽位与安全上限只从 `runner-capacity.env` 读取。preview 给出绑定全部参数和源文件身份的精确确认值，execute 才渲染并应用 `runner-vm-cloud-init.yml`。cloud-init 固定安装 GNU Make、GCC、QEMU Guest Agent、Docker Buildx v0.30.1、Docker Compose v2.40.3 与当前 Playwright 1.58.2 Chromium 所需系统包，并要求 `ubuntu`、`root`、`gitlab-runner` 的 Go 环境都读回 `CGO_ENABLED=1`，job 不能自行取得 apt 权限。先在 R640 完成上一节的 proxy listener 与精确 UFW bridge 规则并读回，再在 GitLab 创建 project runner，把 token 只写入 VM 的 `/etc/plush-runner/registration.env`，权限 `0600`，运行 `/usr/local/sbin/plush-register-gitlab-runner`。注册脚本只把同一个显式参数交给共享 capacity helper 初始化槽位，不再维护第二份 TOML 改写；成功后销毁 token 文件并验证 Runner 进程环境。
+6. 用 `runner-vm.sh` 显式传入 Ubuntu 24.04 base volume、vCPU、内存、磁盘和受信 SSH 公钥；槽位与安全上限只从 `runner-capacity.env` 读取。preview 给出绑定全部参数和源文件身份的精确确认值，execute 才渲染并应用 `runner-vm-cloud-init.yml`。cloud-init 固定安装 GNU Make、GCC、用于 PDF 验证的 `poppler-utils`、QEMU Guest Agent、Docker Buildx v0.30.1、Docker Compose v2.40.3 与当前 Playwright 1.58.2 Chromium 所需系统包，并要求 `ubuntu`、`root`、`gitlab-runner` 的 Go 环境都读回 `CGO_ENABLED=1`，job 不能自行取得 apt 权限。先在 R640 完成上一节的 proxy listener 与精确 UFW bridge 规则并读回，再在 GitLab 创建 project runner，把 token 只写入 VM 的 `/etc/plush-runner/registration.env`，权限 `0600`，运行 `/usr/local/sbin/plush-register-gitlab-runner`。注册脚本只把同一个显式参数交给共享 capacity helper 初始化槽位，不再维护第二份 TOML 改写；成功后销毁 token 文件并验证 Runner 进程环境。
 7. Runner 必须显示 tags `plush,isolated,amd64`、locked、run untagged=false；运行一次非发布 pipeline，核对 VM 内临时 PostgreSQL 被清理且 R640 宿主容器列表未变化。
 
 ## GitHub 单向镜像与 GPT Review
@@ -172,3 +172,7 @@ R640 GitLab、独立 KVM Runner、公网入口、protected main、GitHub 单向 
 `runner-vm.sh` 与其消费的 `runner-vm-cloud-init.yml` 共同构成新建或重建 Runner VM 的唯一正式入口，不会被普通 CI job 自动应用。VM 资源不保存一次性的固定数字；每次 preview/execute 都必须显式提供并读回。当前槽位由 VM 内 root-owned capacity policy、live config 和 configuration receipt 共同绑定；普通 Pipeline 的 prepare job 只能通过精确的只读 `sudo ... --evidence` 投影验证 live `concurrent=limit`、service 与 safety ceiling，并记录本次候选资源。七类 aggregate 全绿只证明该 exact SHA 在该候选资源下完成一次；内存是否适合作为稳定规格仍以完整 Pipeline 窗口内的峰值、余量、PSI、swap、OOM 和多次波动证据判断，不能从 prepare 的空载快照推导。线上参数漂移时，只在无活动 job 的有界窗口内用共享 capacity helper 修正、重启 Runner 并读回；不回显 token，不把 live 手工改动作为唯一真源。R640 的 UFW bridge 规则和 canonical TLS proxy 属于宿主机前置状态，Runner VM 重建不会替它们补写；每次重建都必须重新完成宿主 listener/firewall 与 guest curl/Node 的双边读回。
 
 `quality_security` 只在自身 Job 内限制 `govulncheck` 可用的 Go 调度并行度并收紧 GC 目标；仍执行默认 symbol 级 `./...` 源码扫描，不改成 package/module 级，也不以资源优化跳过安全门禁。具体参数以 `.gitlab-ci.yml` 为唯一真源；Runner vCPU、Go / govulncheck 版本或服务端包图明显变化时，必须在同一 SHA、同一 Runner 的空闲窗口重新比较峰值 RSS、墙钟、CPU 与扫描结果，再决定是否调整。单独扫描的改进不能证明更小 VM 容量可用，容量仍需完整自然 Pipeline 的 OOM、swap、PSI 与最低余量证据。
+
+## 打印引擎 CI
+
+打印引擎的固定版本、最终镜像业务 PDF、真实系统包清单、漏洞和体积规则见 [`scripts/qa/README.md`](../../../scripts/qa/README.md#打印引擎验证--pdf-runtime)。正式制品构建会执行该门禁；已有 VM 需先由运维核对 Poppler 已安装，不由普通 Job 取得 apt 权限。上游版本检查使用独立的受保护定时入口及不可变镜像引用，不自动升级，也不改变普通 push 的质量 DAG。

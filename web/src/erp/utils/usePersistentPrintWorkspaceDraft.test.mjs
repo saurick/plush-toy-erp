@@ -1,3 +1,8 @@
+import { IDBFactory } from 'fake-indexeddb'
+import {
+  preparePrintDraftStorage,
+  createPrintDraftWriter,
+} from './printDraftStorage.mjs'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -14,21 +19,18 @@ import {
   buildPrintWorkspaceDraftStorageKey,
   readPrintWorkspaceDraftSnapshot,
 } from './printWorkspace.js'
-import { preparePrintWorkspaceSnapshot } from './usePrintWorkspaceWindowSnapshot.js'
+import { preparePrintWorkspaceSnapshot } from './printWorkspaceOutput.mjs'
 import {
   runSilentPrintWorkspaceDraftUpdate,
   useFlushPrintWorkspaceDraftOnPageExit,
   usePersistentPrintWorkspaceDraft,
 } from './usePersistentPrintWorkspaceDraft.js'
 
-const source = readFileSync(
-  new URL('./usePersistentPrintWorkspaceDraft.js', import.meta.url),
-  'utf8'
-)
 const erpRootDir = dirname(dirname(fileURLToPath(import.meta.url)))
 
 function installTestDOM() {
   const runtimeWindow = new Window({ url: 'http://127.0.0.1/' })
+  runtimeWindow.indexedDB = new IDBFactory()
   runtimeWindow.requestAnimationFrame = (callback) =>
     runtimeWindow.setTimeout(() => callback(Date.now()), 0)
   const globals = {
@@ -123,39 +125,26 @@ function DraftInteractionHarness({ storageKey, onPreparedAction }) {
   )
 }
 
-test('usePersistentPrintWorkspaceDraft: 持久化结果、保存状态和 setter 返回值使用同一写入结果', () => {
-  assert.match(
-    source,
-    /const saved = persistPrintWorkspaceDraftSnapshot\([\s\S]*?setPersistenceStatus\(saved \? 'saved' : 'error'\)[\s\S]*?return saved/u
-  )
-  assert.match(
-    source,
-    /const persisted = persistDraft\(resolvedDraft\)[\s\S]*?return persisted/u
-  )
-  assert.doesNotMatch(
-    source,
-    /persistPrintWorkspaceDraftSnapshot\(draftStorageKey, nextDraft\)[\s\S]*?return true/u,
-    'localStorage 满额时不得继续报告保存成功'
-  )
-})
-
-test('usePersistentPrintWorkspaceDraft: 普通输入只由 setter 持久化，不用 draft effect 重复写入', () => {
-  assert.doesNotMatch(
-    source,
-    /useEffect\(\(\) => \{[\s\S]*?persistDraft\(draftRef\.current\)[\s\S]*?\}, \[[^\]]*persistDraft[^\]]*\]\)/u
-  )
-  assert.doesNotMatch(source, /\[draft, persistDraft\]/u)
-})
-
-test('usePersistentPrintWorkspaceDraft: flush 会把静默编辑提交给 React 后再持久化', () => {
-  assert.match(
-    source,
-    /setDraftState\(\(currentDraft\) =>\s*currentDraft === draftRef\.current \? currentDraft : draftRef\.current\s*\)/u
-  )
-  assert.match(
-    source,
-    /return \[draft, setDraft, flushDraft, draftRef, persistenceStatus\]/u
-  )
+test('write result and pending state follow the actual asynchronous transaction', async () => {
+  const statuses = []
+  let finish
+  const writer = createPrintDraftWriter({
+    write: () =>
+      new Promise((resolve) => {
+        finish = resolve
+      }),
+    onStatus: (status) => statuses.push(status),
+  })
+  const result = writer.save({ value: 'last input' })
+  const flushed = writer.flush()
+  await Promise.resolve()
+  assert.equal(writer.unsaved, true)
+  assert.deepEqual(statuses, ['saving'])
+  finish(false)
+  assert.equal(await result, false)
+  assert.equal(await flushed, false)
+  assert.equal(writer.unsaved, true)
+  assert.equal(statuses.at(-1), 'error')
 })
 
 test('usePersistentPrintWorkspaceDraft: 不 blur 也能恢复最后输入，立即预览和打印读取重算后的金额', async () => {
@@ -185,6 +174,7 @@ test('usePersistentPrintWorkspaceDraft: 不 blur 也能恢复最后输入，立�
     actionResolved?.()
   }
   const mountHarness = async (storageKey) => {
+    await preparePrintDraftStorage(storageKey)
     const container = document.createElement('div')
     document.body.appendChild(container)
     const root = createRoot(container)
@@ -216,7 +206,9 @@ test('usePersistentPrintWorkspaceDraft: 不 blur 也能恢复最后输入，立�
         .find((button) => button.textContent === action)
         .click()
     })
-    await completed
+    await act(async () => {
+      await completed
+    })
     actionResolved = null
   }
 
@@ -226,10 +218,11 @@ test('usePersistentPrintWorkspaceDraft: 不 blur 也能恢复最后输入，立�
     window.localStorage.clear()
     mounted = await mountHarness(revisionOneKey)
     await editQuantity(mounted.container, '12')
-    assert.deepEqual(readPrintWorkspaceDraftSnapshot(revisionOneKey), {
-      quantity: '12',
-      unitPrice: '2.675',
-    })
+    assert.equal(
+      readPrintWorkspaceDraftSnapshot(revisionOneKey),
+      null,
+      '尚未提交的异步写入不能报告已保存'
+    )
     assert.equal(
       mounted.container.querySelector('[data-testid="draft-total"]')
         ?.textContent,
@@ -251,6 +244,7 @@ test('usePersistentPrintWorkspaceDraft: 不 blur 也能恢复最后输入，立�
     })
 
     await editQuantity(mounted.container, '14')
+    await runPreparedAction(mounted.container, 'print')
     await act(async () => mounted.root.unmount())
     mounted = null
 
@@ -315,7 +309,10 @@ test('usePersistentPrintWorkspaceDraft: 三个正式工作台传入 scoped key �
   ].map((filePath) => readFileSync(filePath, 'utf8'))
 
   workspacePageSources.forEach((workspaceSource) => {
-    assert.match(workspaceSource, /getPrintWorkspaceDraftScope\(searchParams\)/u)
+    assert.match(
+      workspaceSource,
+      /getPrintWorkspaceDraftScope\(searchParams\)/u
+    )
     assert.doesNotMatch(workspaceSource, /useOutletContext/u)
     assert.match(workspaceSource, /configRevision/u)
     assert.match(

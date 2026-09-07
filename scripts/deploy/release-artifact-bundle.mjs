@@ -22,6 +22,7 @@ import { fileURLToPath } from "node:url";
 
 import { sha256File } from "../lib/file-digest.mjs";
 import { runSourceArchiveReleaseCheck } from "./source-archive-release-check.mjs";
+import { printTemplateCatalog } from "../../web/src/erp/config/printTemplates.mjs";
 
 const SCHEMA_VERSION = "plush-release-artifact/v1";
 const CUSTOMER_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
@@ -636,6 +637,7 @@ export function buildDependencySbom({
   customer,
   migrationLatest,
   createdAt,
+  pdfRuntime,
   runCommand = runArtifactCommand,
 }) {
   const goSum = gitShow(repoRoot, commit, "server/go.sum", runCommand);
@@ -652,6 +654,14 @@ export function buildDependencySbom({
     // Formal Web and Server artifacts now share this one committed graph.
     // Do not report bases from the independent development Web Dockerfile.
     ...parseContainerComponents(serverDockerfile),
+    ...(pdfRuntime?.packages || []).map(({ name, version }) => ({
+      type: "library",
+      name,
+      version,
+      "bom-ref": `debian:${name}@${version}`,
+      purl: `pkg:deb/debian/${encodeURIComponent(name.split(":")[0])}@${encodeURIComponent(version)}?distro=bookworm`,
+      properties: [{ name: "runtime.imageId", value: pdfRuntime.imageId }],
+    })),
   ].sort((left, right) => left["bom-ref"].localeCompare(right["bom-ref"]));
   if (components.length === 0) {
     throw new ReleaseArtifactError("dependency SBOM is empty");
@@ -679,11 +689,41 @@ export function buildDependencySbom({
         properties: [
           { name: "customer", value: customer },
           { name: "migration.latest", value: migrationLatest },
+          ...(pdfRuntime
+            ? [{ name: "pdf.runtime", value: JSON.stringify(pdfRuntime) }]
+            : []),
         ],
       },
     },
     components,
   };
+}
+
+export function verifyReleasePdfRuntime({
+  repoRoot,
+  sourceImage,
+  commit,
+  runCommand = runArtifactCommand,
+}) {
+  const directory = path.join(
+    repoRoot,
+    "output/ci/pdf-runtime",
+    `${commit}-${process.pid}-${crypto.randomBytes(4).toString("hex")}`,
+  );
+  runCommand({
+    command: "bash",
+    args: ["scripts/qa/pdf-runtime.sh", "verify", sourceImage, directory],
+    cwd: repoRoot,
+    label: "verify final-image business PDF, security and size",
+    stdio: "inherit",
+  });
+  const report = JSON.parse(
+    readFileSync(path.join(directory, "report.json"), "utf8"),
+  );
+  const pdfChecks = JSON.parse(
+    readFileSync(path.join(directory, "pdfs/pdf-checks.json"), "utf8"),
+  );
+  return { ...report, businessPdfChecks: pdfChecks };
 }
 
 function inspectImage(imageRef, repoRoot, runCommand) {
@@ -999,18 +1039,6 @@ export async function buildReleaseArtifact(options = {}, runtime = {}) {
       customer,
       runCommand,
     });
-    const sbom = buildDependencySbom({
-      repoRoot,
-      commit,
-      customer,
-      migrationLatest: migration.latest,
-      createdAt,
-      runCommand,
-    });
-    const sbomFile = "sbom.cdx.json";
-    const sbomPath = path.join(temporaryDir, sbomFile);
-    writeJSON(sbomPath, sbom);
-
     const sourceWeb = sourceReport.dockerImages.find((item) =>
       item.startsWith("plush-source-archive-web:"),
     );
@@ -1022,6 +1050,47 @@ export async function buildReleaseArtifact(options = {}, runtime = {}) {
         "source archive release images are incomplete",
       );
     }
+    const pdfRuntime = await (
+      runtime.verifyPdfRuntime || verifyReleasePdfRuntime
+    )({
+      repoRoot,
+      sourceImage: sourceServer,
+      commit,
+      runCommand,
+    });
+    const expectedPdfFiles = printTemplateCatalog
+      .filter((template) => template.runtime?.workspace)
+      .map((template) => `print-snapshot-${template.key}.pdf`)
+      .sort();
+    const actualPdfFiles = (pdfRuntime?.businessPdfChecks?.results || [])
+      .map((result) => result.file)
+      .sort();
+    if (
+      pdfRuntime?.status !== "passed" ||
+      pdfRuntime.sourceCommit !== commit ||
+      pdfRuntime.imageId !==
+        inspectImage(sourceServer, repoRoot, runCommand).Id ||
+      !pdfRuntime.packages?.length ||
+      pdfRuntime.businessPdfChecks?.status !== "passed" ||
+      JSON.stringify(actualPdfFiles) !== JSON.stringify(expectedPdfFiles)
+    ) {
+      throw new ReleaseArtifactError(
+        "final-image PDF evidence must match the release image and registered templates",
+      );
+    }
+    const sbom = buildDependencySbom({
+      repoRoot,
+      commit,
+      customer,
+      migrationLatest: migration.latest,
+      createdAt,
+      pdfRuntime,
+      runCommand,
+    });
+    const sbomFile = "sbom.cdx.json";
+    const sbomPath = path.join(temporaryDir, sbomFile);
+    writeJSON(sbomPath, sbom);
+
     const fixedSuffix = `${customer}-${commit}`;
     const images = [
       await imageArtifact({

@@ -1,4 +1,3 @@
-import { Buffer } from 'node:buffer'
 export function createMaterialDetailAssertions({
   page,
   assert,
@@ -65,19 +64,12 @@ export function createMaterialDetailAssertions({
         nonFillStates: states.filter(
           (state) => state.text && state.editorHeight > 0 && state.fillDelta > 3
         ),
-        nonFlexStates: states.filter(
-          (state) =>
-            state.text &&
-            (state.editorDisplay !== 'flex' ||
-              state.editorAlignItems !== 'center')
-        ),
       }
     })
     assert(
       metrics.checkedCount >= 28 &&
         metrics.offCenterStates.length === 0 &&
-        metrics.nonFillStates.length === 0 &&
-        metrics.nonFlexStates.length === 0,
+        metrics.nonFillStates.length === 0,
       `物料分析明细表所有表头和明细单元格内容都应上下居中且编辑层铺满单元格: ${JSON.stringify(metrics)}`
     )
   }

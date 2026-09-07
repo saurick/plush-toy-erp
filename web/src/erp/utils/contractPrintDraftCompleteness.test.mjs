@@ -7,7 +7,7 @@ import {
   mergeSnapshotMissingFields,
 } from './contractPrintDraftCompleteness.mjs'
 
-test('contractPrintDraftCompleteness: purchase draft fills missing display fields without internal ids', () => {
+test('contractPrintDraftCompleteness: purchase draft keeps missing fields empty without inventing display data', () => {
   const draft = completeMaterialPurchaseContractDraft({
     contractNo: 'PO-001',
     buyerCompany: '永绅',
@@ -21,17 +21,17 @@ test('contractPrintDraftCompleteness: purchase draft fills missing display field
     ],
   })
 
-  assert.equal(draft.supplierContact, '未维护联系人')
+  assert.equal(draft.supplierContact, '')
   assert.equal(draft.buyerCompany, '永绅')
-  assert.equal(draft.buyerContact, '未配置订货人')
+  assert.equal(draft.buyerContact, '')
   assert.equal(draft.lines[0].contractNo, 'PO-001')
-  assert.equal(draft.lines[0].productOrderNo, '未关联产品订单')
-  assert.equal(draft.lines[0].productNo, '未关联产品编号')
-  assert.equal(draft.lines[0].productName, '未关联产品名称')
-  assert.equal(draft.lines[0].unit, '未维护单位')
+  assert.equal(draft.lines[0].productOrderNo, '')
+  assert.equal(draft.lines[0].productNo, '')
+  assert.equal(draft.lines[0].productName, '')
+  assert.equal(draft.lines[0].unit, '')
 })
 
-test('contractPrintDraftCompleteness: processing draft fills missing display fields', () => {
+test('contractPrintDraftCompleteness: processing draft keeps missing fields empty', () => {
   const draft = completeProcessingContractDraft({
     contractNo: 'OUT-001',
     supplierName: '加工厂 A',
@@ -49,12 +49,12 @@ test('contractPrintDraftCompleteness: processing draft fills missing display fie
   })
 
   assert.equal(draft.supplierName, '加工厂 A')
-  assert.equal(draft.supplierContact, '未维护联系人')
-  assert.equal(draft.buyerContact, '未配置委托人')
+  assert.equal(draft.supplierContact, '')
+  assert.equal(draft.buyerContact, '')
   assert.equal(draft.lines[0].supplierAlias, '加工厂 A')
-  assert.equal(draft.lines[0].productOrderNo, '未关联产品订单')
+  assert.equal(draft.lines[0].productOrderNo, '')
   assert.equal(draft.lines[0].processingItem, '本体')
-  assert.equal(draft.lines[0].processCategory, '未维护工序类别')
+  assert.equal(draft.lines[0].processCategory, '')
 })
 
 test('contractPrintDraftCompleteness: live master snapshot only fills blank snapshot fields', () => {

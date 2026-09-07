@@ -26,6 +26,7 @@ import (
 	"github.com/chromedp/cdproto/fetch"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/page"
+	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/chromedp"
 	"github.com/go-kratos/kratos/v2/log"
 	httpx "github.com/go-kratos/kratos/v2/transport/http"
@@ -883,6 +884,13 @@ func renderTemplateHTMLToPDF(ctx context.Context, htmlDoc string, printScale flo
 		chromedp.WaitReady("body", chromedp.ByQuery),
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			return emulation.SetEmulatedMedia().WithMedia("print").Do(ctx)
+		}),
+		chromedp.Evaluate(`document.fonts.ready.then(() => {
+          const faces = Array.from(document.fonts);
+          if (faces.some(face => face.status === 'error')) throw new Error('打印字体加载失败');
+          return true;
+        })`, nil, func(params *cdpruntime.EvaluateParams) *cdpruntime.EvaluateParams {
+			return params.WithAwaitPromise(true)
 		}),
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			buf, _, err := page.PrintToPDF().

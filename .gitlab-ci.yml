@@ -6,6 +6,7 @@ workflow:
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: "$CI_PIPELINE_SOURCE =~ /^(api|trigger|web)$/ && $RELEASE_SHA && $RELEASE_VERSION && $RELEASE_VERSION_REFERENCE"
     - if: "$CI_PIPELINE_SOURCE =~ /^(api|web)$/ && $BACKFILL_RELEASE_SOURCE_SHA"
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $PDF_RUNTIME_MONITOR == "1" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
     - when: never
 
 stages:
@@ -74,7 +75,7 @@ variables:
 
 .main_quality_rules: &main_quality_rules
   rules:
-    - if: "$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA"
+    - if: '$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA || $CI_PIPELINE_SOURCE == "schedule"'
       when: never
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
     - when: never
@@ -82,7 +83,7 @@ variables:
 plan:
   stage: plan
   rules:
-    - if: "$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA"
+    - if: '$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA || $CI_PIPELINE_SOURCE == "schedule"'
       when: never
     - when: on_success
   script:
@@ -647,7 +648,7 @@ quality_affected:
     - job: plan
       artifacts: true
   rules:
-    - if: "$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA"
+    - if: '$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA || $CI_PIPELINE_SOURCE == "schedule"'
       when: never
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - when: never
@@ -761,7 +762,7 @@ quality_affected:
       artifacts: false
       optional: true
   rules:
-    - if: "$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA"
+    - if: '$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA || $CI_PIPELINE_SOURCE == "schedule"'
       when: never
     - when: on_success
   script:
@@ -798,10 +799,38 @@ quality_affected:
       fi
       echo "[gitlab-ci] status=complete sha=$CI_COMMIT_SHA source=$CI_PIPELINE_SOURCE"
 
+pdf_runtime_monitor:
+  stage: quality
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $PDF_RUNTIME_MONITOR == "1" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
+    - when: never
+  timeout: 30m
+  script:
+    - |
+      set -euo pipefail
+      [[ "${PDF_RUNTIME_IMAGE:-}" =~ ^sha256:[a-f0-9]{64}$ || "${PDF_RUNTIME_IMAGE:-}" =~ @sha256:[a-f0-9]{64}$ ]]
+      bash scripts/qa/pdf-runtime.sh monitor "$PDF_RUNTIME_IMAGE" "output/ci/pdf-runtime/monitor-$CI_JOB_ID"
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/pdf-runtime/
+
 publish_release:
   stage: release
   interruptible: false
+  <<: *browser_cache_pull
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/pdf-runtime/**/report.json
+      - output/ci/pdf-runtime/**/vulnerabilities.json
+      - output/ci/pdf-runtime/**/pdf-runtime.log
+      - output/ci/pdf-runtime/**/pdfs/
   rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: never
     - if: '$RELEASE_SHA && $RELEASE_VERSION && $RELEASE_VERSION_REFERENCE && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true" && $RELEASE_CUSTOMER == "yoyoosun"'
     - when: never
   timeout: 4h
@@ -891,6 +920,13 @@ publish_release:
             --requested "$RELEASE_VERSION" \
             --json
           test ! -e "$artifact_dir"
+          env \
+            -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
+            -u http_proxy -u https_proxy -u all_proxy \
+            -u npm_config_proxy -u npm_config_https_proxy \
+            -u NPM_CONFIG_PROXY -u NPM_CONFIG_HTTPS_PROXY \
+            npm_config_proxy= npm_config_https_proxy= \
+            pnpm --dir web install --frozen-lockfile --prefer-offline --registry="$PNPM_INSTALL_REGISTRY"
           node scripts/deploy/release-artifact-bundle.mjs \
             --execute \
             --ref "$RELEASE_SHA" \
@@ -1121,6 +1157,8 @@ backfill_release_source:
   environment:
     name: release
   rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: never
     - if: '$CI_PIPELINE_SOURCE =~ /^(api|web)$/ && $BACKFILL_RELEASE_SOURCE_SHA && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
     - when: never
   timeout: 1h

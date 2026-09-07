@@ -1,9 +1,6 @@
+import { getPrintTemplateByKey } from '../config/printTemplates.mjs'
 import { PROCESSING_CONTRACT_TEMPLATE_KEY } from '../data/processingContractTemplate.mjs'
-import {
-  COLOR_CARD_TEMPLATE_KEY,
-  MATERIAL_DETAIL_TEMPLATE_KEY,
-  WORK_INSTRUCTION_TEMPLATE_KEY,
-} from '../data/engineeringPrintTemplates.mjs'
+import { readPreparedPrintDraft } from './printDraftStorage.mjs'
 
 export const MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY =
   'material-purchase-contract'
@@ -40,14 +37,6 @@ export const PRINT_WORKSPACE_ENTRY_SOURCE = Object.freeze({
 
 export const PROCESSING_CONTRACT_WORKSPACE_PATH = `/erp/print-workspace/${PROCESSING_CONTRACT_TEMPLATE_KEY}`
 export const MATERIAL_PURCHASE_CONTRACT_WORKSPACE_PATH = `/erp/print-workspace/${MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY}`
-
-const supportedPrintWorkspaceTemplateKeys = new Set([
-  PROCESSING_CONTRACT_TEMPLATE_KEY,
-  MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
-  MATERIAL_DETAIL_TEMPLATE_KEY,
-  COLOR_CARD_TEMPLATE_KEY,
-  WORK_INSTRUCTION_TEMPLATE_KEY,
-])
 
 function normalizeTemplateKey(templateKey = '') {
   return String(templateKey || '').trim()
@@ -232,7 +221,7 @@ export function readInitialPrintWorkspaceDraftFromWindowName(
   }
 }
 
-function clearInitialPrintWorkspaceDraftCache(storageKey, windowLike) {
+export function clearInitialPrintWorkspaceDraftCache(storageKey, windowLike) {
   const targetWindow =
     windowLike || (typeof window !== 'undefined' ? window : null)
   if (!targetWindow || !String(storageKey || '').trim()) {
@@ -242,8 +231,8 @@ function clearInitialPrintWorkspaceDraftCache(storageKey, windowLike) {
 }
 
 export function isSupportedPrintWorkspaceTemplate(templateKey) {
-  return supportedPrintWorkspaceTemplateKeys.has(
-    normalizeTemplateKey(templateKey)
+  return Boolean(
+    getPrintTemplateByKey(normalizeTemplateKey(templateKey))?.runtime
   )
 }
 
@@ -562,6 +551,10 @@ export function persistPrintWorkspaceDraftSnapshot(
 
 export function readPrintWorkspaceDraftSnapshot(storageKey, storageLike) {
   const normalizedStorageKey = String(storageKey || '').trim()
+  if (!storageLike) {
+    const prepared = readPreparedPrintDraft(normalizedStorageKey)
+    if (prepared !== undefined) return prepared
+  }
   const storage =
     storageLike || (typeof window !== 'undefined' ? window.localStorage : null)
   if (!normalizedStorageKey || !storage) {

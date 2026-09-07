@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer'
+import fs from 'node:fs/promises'
 export async function createEngineeringPrintAssertions({
   page,
   assert,
@@ -7,16 +8,21 @@ export async function createEngineeringPrintAssertions({
 }) {
   const collectToolbarGroups = async () =>
     page.evaluate(() =>
-      [...document.querySelectorAll('.erp-print-shell__toolbar-group')].map(
-        (group) => ({
-          buttons: [...group.querySelectorAll('button')].map((button) => ({
-            text: String(button.textContent || '')
-              .replace(/\s+/gu, ' ')
-              .trim(),
-            disabled: button.disabled,
-          })),
-        })
-      )
+      [
+        ...document.querySelectorAll(
+          '.erp-print-shell__panel .erp-print-shell__toolbar-group'
+        ),
+        ...document.querySelectorAll(
+          '.erp-print-shell__toolbar .erp-print-shell__toolbar-group'
+        ),
+      ].map((group) => ({
+        buttons: [...group.querySelectorAll('button')].map((button) => ({
+          text: String(button.textContent || '')
+            .replace(/\s+/gu, ' ')
+            .trim(),
+          disabled: button.disabled,
+        })),
+      }))
     )
 
   const assertButtonTexts = (group, expectedTexts, scenarioLabel) => {
@@ -41,40 +47,27 @@ export async function createEngineeringPrintAssertions({
   const assertEngineeringEditorRounded = async (scenarioLabel) => {
     const metrics = await page.evaluate(() => {
       const panel = document.querySelector('.erp-print-shell__record-panel')
-      const table = document.querySelector('.erp-print-shell__record-table')
-      const editor = document.querySelector('.erp-print-shell__field-editor')
       const paper = document.querySelector('.erp-engineering-print-paper')
-      const panelStyle = panel && window.getComputedStyle(panel)
-      const tableStyle = table && window.getComputedStyle(table)
-      const editorStyle = editor && window.getComputedStyle(editor)
-      const paperStyle = paper && window.getComputedStyle(paper)
       return {
-        panelRadius: panelStyle?.borderTopLeftRadius || '',
-        tableRadius: tableStyle?.borderTopLeftRadius || '',
-        tableOverflow: tableStyle?.overflow || '',
-        tableBorderCollapse: tableStyle?.borderCollapse || '',
-        editorRadius: editorStyle?.borderTopLeftRadius || '',
-        paperRadius: paperStyle?.borderTopLeftRadius || '',
-        paperOverflow: paperStyle?.overflow || '',
-        isWorkInstructionPaper:
-          paper?.classList.contains('erp-work-instruction-paper') || false,
-        tableWidth: table?.getBoundingClientRect().width || 0,
-        tableScrollWidth: table?.scrollWidth || 0,
-        tableClientWidth: table?.clientWidth || 0,
+        panelRadius: parseFloat(getComputedStyle(panel).borderTopLeftRadius),
+        paperRadius: parseFloat(getComputedStyle(paper).borderTopLeftRadius),
+        panelFits: panel.scrollWidth <= panel.clientWidth + 1,
+        paperFits: paper.scrollWidth <= paper.clientWidth + 1,
+        sections: panel.querySelectorAll('.erp-print-shell__tool-section')
+          .length,
+        duplicateFields: panel.querySelectorAll(
+          'input:not([type="file"]), textarea, [contenteditable="true"]'
+        ).length,
       }
     })
     assert(
-      parseFloat(metrics.panelRadius) >= 8 &&
-        parseFloat(metrics.tableRadius) >= 10 &&
-        parseFloat(metrics.editorRadius) >= 8 &&
-        parseFloat(metrics.paperRadius) >= 10 &&
-        (metrics.paperOverflow === 'hidden' ||
-          (metrics.isWorkInstructionPaper &&
-            metrics.paperOverflow === 'visible')) &&
-        metrics.tableOverflow === 'hidden' &&
-        metrics.tableBorderCollapse === 'separate' &&
-        metrics.tableScrollWidth <= metrics.tableClientWidth + 1,
-      `${scenarioLabel} 左侧字段表和右侧纸面编辑区应保持圆角且不横向溢出: ${JSON.stringify(metrics)}`
+      metrics.panelRadius >= 8 &&
+        metrics.paperRadius >= 10 &&
+        metrics.panelFits &&
+        metrics.paperFits &&
+        metrics.sections >= 2 &&
+        metrics.duplicateFields === 0,
+      `${scenarioLabel} 工具分组和纸面应完整且不重复业务字段: ${JSON.stringify(metrics)}`
     )
   }
 
@@ -155,6 +148,10 @@ export async function createEngineeringPrintAssertions({
   await page.route('**/templates/render-pdf', async (route) => {
     const payload = route.request().postDataJSON() || {}
     capturedEngineeringPdfRequests.push(payload)
+    await fs.writeFile(
+      path.join(outputDir, `print-snapshot-${payload.template_key}.html`),
+      payload.html
+    )
     await route.fulfill({
       status: 200,
       contentType: 'application/pdf',

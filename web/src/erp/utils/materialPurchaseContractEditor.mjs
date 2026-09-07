@@ -266,6 +266,7 @@ export const buildMaterialPurchaseContractDraft = (sample = {}) => {
     : []
 
   return {
+    printMode: sample.printMode === 'blank' ? 'blank' : 'document',
     contractNo: toText(sample.contractNo),
     orderDateText: toText(sample.orderDateText),
     returnDateText: toText(sample.returnDateText),
@@ -310,6 +311,7 @@ export const buildBlankMaterialPurchaseContractDraft = (draft = {}) => {
   const normalizedDraft = buildMaterialPurchaseContractDraft(draft)
   return {
     ...normalizedDraft,
+    printMode: 'blank',
     contractNo: '',
     orderDateText: '',
     returnDateText: '',

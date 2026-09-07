@@ -1,5 +1,13 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Input, Modal } from 'antd'
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
+import { Checkbox, Input, Modal } from 'antd'
+import { DeleteOutlined, DragOutlined, UndoOutlined } from '@ant-design/icons'
 import {
   WORK_INSTRUCTION_IMAGE_ANNOTATION_LIMITS,
   WORK_INSTRUCTION_IMAGE_ANNOTATION_TYPES,
@@ -8,7 +16,9 @@ import {
   clampAnnotationPercent,
   normalizeWorkInstructionImageAnnotations,
   removeLastWorkInstructionCalloutTarget,
-  removeWorkInstructionImageAnnotation,
+  deleteWorkInstructionImageAnnotations,
+  restoreWorkInstructionImageAnnotations,
+  resolveWorkInstructionAnnotationLayout,
   replaceWorkInstructionImageAnnotation,
 } from '../../utils/workInstructionImageAnnotations.mjs'
 
@@ -58,6 +68,7 @@ export function WorkInstructionImageAnnotationLayer({
   editable = false,
   selectedIndex = null,
   onSelect = null,
+  onTextChange = null,
   onBoxPointerDown = null,
   onHandlePointerDown = null,
   onHandleKeyDown = null,
@@ -220,11 +231,20 @@ export function WorkInstructionImageAnnotationLayer({
           )
         }
 
-        const CalloutBox = editable ? 'button' : 'span'
+        const CalloutBox = editable ? 'textarea' : 'span'
         return (
           <React.Fragment key={annotation.id}>
             <CalloutBox
-              type={editable ? 'button' : undefined}
+              aria-label={
+                editable ? `说明框 ${annotationIndex + 1} 文字` : undefined
+              }
+              value={editable ? annotation.text : undefined}
+              placeholder={editable ? '点击填写' : undefined}
+              maxLength={
+                editable
+                  ? WORK_INSTRUCTION_IMAGE_ANNOTATION_LIMITS.textLength
+                  : undefined
+              }
               className={`erp-work-instruction-image-annotations__callout erp-work-instruction-image-annotations__callout--${annotation.tone}${
                 isSelected ? ' is-selected' : ''
               }`}
@@ -232,28 +252,50 @@ export function WorkInstructionImageAnnotationLayer({
                 left: `${annotation.x}%`,
                 top: `${annotation.y}%`,
                 width: `${annotation.width}%`,
-                minHeight: `${annotation.height}%`,
+                height: `${annotation.height}%`,
                 '--annotation-color': annotation.color,
               }}
               data-annotation-control={editable ? 'true' : undefined}
               data-work-instruction-annotation-kind="callout"
-              onClick={editable ? () => onSelect?.(annotationIndex) : undefined}
-              onKeyDown={
+              data-annotation-id={annotation.id}
+              onFocus={editable ? () => onSelect?.(annotationIndex) : undefined}
+              onChange={
                 editable
                   ? (event) =>
-                      onHandleKeyDown?.(event, annotationIndex, 'box', null)
-                  : undefined
-              }
-              onPointerDown={
-                editable
-                  ? (event) => onBoxPointerDown?.(event, annotationIndex)
+                      onTextChange?.(annotationIndex, event.target.value)
                   : undefined
               }
             >
-              {annotation.text || '填写说明'}
+              {editable ? null : annotation.text}
             </CalloutBox>
-            {editable
-              ? annotation.targets.map((target, targetIndex) => (
+            {editable && isSelected ? (
+              <button
+                type="button"
+                aria-label={`移动说明框 ${annotationIndex + 1}`}
+                title="拖动移动；方向键微调"
+                className="erp-work-instruction-image-annotations__move-handle"
+                data-annotation-control="true"
+                data-work-instruction-annotation-handle="box"
+                style={{
+                  left: `${annotation.x >= 5 ? annotation.x : annotation.x + annotation.width}%`,
+                  top: `${annotation.y}%`,
+                  transform:
+                    annotation.x >= 5
+                      ? 'translateX(calc(-100% - 4px))'
+                      : 'translateX(4px)',
+                }}
+                onPointerDown={(event) =>
+                  onBoxPointerDown?.(event, annotationIndex)
+                }
+                onKeyDown={(event) =>
+                  onHandleKeyDown?.(event, annotationIndex, 'box', null)
+                }
+              >
+                <DragOutlined aria-hidden="true" />
+              </button>
+            ) : null}
+            {editable &&
+              annotation.targets.map((target, targetIndex) => (
                 <button
                   type="button"
                   aria-label={`${getAnnotationLabel(annotation, annotationIndex)}指向点 ${targetIndex + 1}`}
@@ -280,8 +322,7 @@ export function WorkInstructionImageAnnotationLayer({
                     )
                   }
                 />
-              ))
-              : null}
+              ))}
           </React.Fragment>
         )
       })}
@@ -298,13 +339,6 @@ function getCanvasPoint(event, element) {
   }
 }
 
-function hasCallout(annotations) {
-  return annotations.some(
-    (annotation) =>
-      annotation.type === WORK_INSTRUCTION_IMAGE_ANNOTATION_TYPES.callout
-  )
-}
-
 export default function WorkInstructionImageAnnotationEditor({
   open,
   images = [],
@@ -317,15 +351,30 @@ export default function WorkInstructionImageAnnotationEditor({
   const [selectedAnnotationIndex, setSelectedAnnotationIndex] = useState(null)
   const [addingTarget, setAddingTarget] = useState(false)
   const [status, setStatus] = useState('')
+  const [checkedIDs, setCheckedIDs] = useState([])
+  const [undoRecord, setUndoRecord] = useState(null)
+  const [overflowIDs, setOverflowIDs] = useState([])
   const surfaceRef = useRef(null)
   const dragRef = useRef(null)
   const textInputRef = useRef(null)
+  const focusTextIDRef = useRef(null)
+  const overflowByImageRef = useRef(new Map())
+  const focusAnnotationText = useCallback((annotation) => {
+    const field =
+      annotation?.type === WORK_INSTRUCTION_IMAGE_ANNOTATION_TYPES.callout
+        ? surfaceRef.current?.querySelector(
+            `[data-annotation-id="${annotation.id}"]`
+          )
+        : textInputRef.current
+    field?.focus?.({ preventScroll: true })
+  }, [])
 
   useEffect(() => {
     if (!open) return
     const nextImages = images.map((image) => ({
       ...image,
       annotations: normalizeWorkInstructionImageAnnotations(image?.annotations),
+      annotationLayout: resolveWorkInstructionAnnotationLayout(image),
     }))
     const firstVisibleIndex = nextImages.findIndex((image) => image?.dataURL)
     const requestedImage = nextImages[initialImageIndex]?.dataURL
@@ -335,7 +384,11 @@ export default function WorkInstructionImageAnnotationEditor({
     setActiveImageIndex(Math.max(0, requestedImage))
     setSelectedAnnotationIndex(null)
     setAddingTarget(false)
-    setStatus('先添加说明框或距离标注，再在大图上拖动位置。')
+    setCheckedIDs([])
+    setUndoRecord(null)
+    focusTextIDRef.current = null
+    overflowByImageRef.current.clear()
+    setStatus('添加说明框后可直接输入文字；用移动手柄调整位置。')
   }, [images, initialImageIndex, open])
 
   const imageEntries = useMemo(
@@ -356,11 +409,48 @@ export default function WorkInstructionImageAnnotationEditor({
       ? annotations[selectedAnnotationIndex]
       : null
   const selectedAnnotationId = selectedAnnotation?.id
+  const selectedAnnotationType = selectedAnnotation?.type
 
   useEffect(() => {
-    if (!selectedAnnotationId) return
-    textInputRef.current?.focus?.({ preventScroll: true })
-  }, [selectedAnnotationId])
+    if (
+      !selectedAnnotationId ||
+      focusTextIDRef.current !== selectedAnnotationId
+    ) {
+      return
+    }
+    focusAnnotationText({
+      id: selectedAnnotationId,
+      type: selectedAnnotationType,
+    })
+    focusTextIDRef.current = null
+  }, [
+    activeImageIndex,
+    focusAnnotationText,
+    selectedAnnotationId,
+    selectedAnnotationType,
+  ])
+
+  useLayoutEffect(() => {
+    const canvas = surfaceRef.current
+    if (!canvas) return undefined
+    const check = () => {
+      const ids = Array.from(canvas.querySelectorAll('[data-annotation-id]'))
+        .filter(
+          (box) =>
+            box.scrollHeight > box.clientHeight + 1 ||
+            box.scrollWidth > box.clientWidth + 1
+        )
+        .map((box) => box.dataset.annotationId)
+      overflowByImageRef.current.set(activeImageIndex, ids)
+      setOverflowIDs((current) =>
+        current.join() === ids.join() ? current : ids
+      )
+    }
+    check()
+    const observer = new ResizeObserver(check)
+    observer.observe(canvas)
+    return () => observer.disconnect()
+  }, [activeImage, activeImageIndex])
 
   const updateAnnotations = (nextAnnotations) => {
     setDraftImages((current) =>
@@ -399,6 +489,7 @@ export default function WorkInstructionImageAnnotationEditor({
     setStatus(result.message)
     if (!result.ok) return
     updateAnnotations(result.annotations)
+    focusTextIDRef.current = result.annotations[result.selectedIndex].id
     setSelectedAnnotationIndex(result.selectedIndex)
     setAddingTarget(false)
   }
@@ -407,9 +498,64 @@ export default function WorkInstructionImageAnnotationEditor({
     setActiveImageIndex(imageIndex)
     setSelectedAnnotationIndex(null)
     setAddingTarget(false)
+    setCheckedIDs([])
     setStatus(
       `正在标注第 ${imageEntries.findIndex((entry) => entry.imageIndex === imageIndex) + 1} 张图片。`
     )
+  }
+
+  const handleDelete = (ids) => {
+    const result = deleteWorkInstructionImageAnnotations(annotations, ids)
+    if (!result.removed.length) return
+    setUndoRecord({ imageIndex: activeImageIndex, removed: result.removed })
+    updateAnnotations(result.annotations)
+    const nextIndex = result.annotations.findIndex(
+      (item) => item.id === selectedAnnotationId
+    )
+    setSelectedAnnotationIndex(
+      nextIndex >= 0
+        ? nextIndex
+        : result.annotations.length
+          ? Math.min(
+              selectedAnnotationIndex ?? 0,
+              result.annotations.length - 1
+            )
+          : null
+    )
+    setCheckedIDs((current) => current.filter((id) => !ids.includes(id)))
+    setAddingTarget(false)
+    setStatus(`已删除 ${result.removed.length} 个标注，可以撤销。`)
+  }
+
+  const handleUndo = () => {
+    if (!undoRecord) return
+    const result = restoreWorkInstructionImageAnnotations(
+      draftImages[undoRecord.imageIndex]?.annotations,
+      undoRecord.removed
+    )
+    if (!result.ok) {
+      setStatus(
+        `撤销后会超过每图 ${WORK_INSTRUCTION_IMAGE_ANNOTATION_LIMITS.perImage} 个标注，请先移除新增标注。`
+      )
+      return
+    }
+    setDraftImages((current) =>
+      current.map((image, index) =>
+        index === undoRecord.imageIndex
+          ? { ...image, annotations: result.annotations }
+          : image
+      )
+    )
+    setActiveImageIndex(undoRecord.imageIndex)
+    setSelectedAnnotationIndex(
+      result.annotations.findIndex(
+        (item) => item.id === undoRecord.removed[0].annotation.id
+      )
+    )
+    setCheckedIDs([])
+    setAddingTarget(false)
+    setUndoRecord(null)
+    setStatus('已恢复删除的标注。')
   }
 
   const startDrag = (event, annotationIndex, kind, targetIndex = null) => {
@@ -419,6 +565,7 @@ export default function WorkInstructionImageAnnotationEditor({
     const annotation = annotations[annotationIndex]
     if (!annotation) return
     event.preventDefault()
+    event.currentTarget.focus({ preventScroll: true })
     event.stopPropagation()
     surfaceRef.current?.setPointerCapture?.(event.pointerId)
     dragRef.current = {
@@ -569,18 +716,28 @@ export default function WorkInstructionImageAnnotationEditor({
   }
 
   const handleSave = () => {
-    const invalid = draftImages.some((image) =>
-      normalizeWorkInstructionImageAnnotations(image?.annotations).some(
+    for (const [imageIndex, image] of draftImages.entries()) {
+      const items = normalizeWorkInstructionImageAnnotations(image?.annotations)
+      const invalidIndex = items.findIndex(
         (annotation) =>
-          !annotation.text ||
+          !annotation.text.trim() ||
           (annotation.type ===
             WORK_INSTRUCTION_IMAGE_ANNOTATION_TYPES.callout &&
-            annotation.targets.length === 0)
+            annotation.targets.length === 0) ||
+          overflowByImageRef.current.get(imageIndex)?.includes(annotation.id)
       )
-    )
-    if (invalid) {
-      setStatus('请填写每个标注的文字；说明框至少保留一个指向点。')
-      return
+      if (invalidIndex >= 0) {
+        setActiveImageIndex(imageIndex)
+        setSelectedAnnotationIndex(invalidIndex)
+        focusTextIDRef.current = items[invalidIndex].id
+        if (imageIndex === activeImageIndex) {
+          focusAnnotationText(items[invalidIndex])
+        }
+        setStatus(
+          `请检查图片 ${imageIndex + 1} 的标注 ${invalidIndex + 1}：填写文字、保留指向点；文字超框时请扩大说明框或拆分说明。`
+        )
+        return
+      }
     }
     onSave?.(draftImages)
   }
@@ -588,7 +745,7 @@ export default function WorkInstructionImageAnnotationEditor({
   return (
     <Modal
       open={open}
-      title="大图标注"
+      title="图片标注"
       width="min(1120px, calc(100vw - 32px))"
       className="erp-work-instruction-annotation-modal"
       rootClassName="erp-work-instruction-annotation-modal-root"
@@ -602,6 +759,11 @@ export default function WorkInstructionImageAnnotationEditor({
         <div className="erp-work-instruction-annotation-modal__footer">
           <span aria-live="polite">{status}</span>
           <div>
+            {undoRecord ? (
+              <button type="button" onClick={handleUndo}>
+                <UndoOutlined aria-hidden="true" /> 撤销删除
+              </button>
+            ) : null}
             <button type="button" onClick={onCancel}>
               取消
             </button>
@@ -613,7 +775,7 @@ export default function WorkInstructionImageAnnotationEditor({
       }
     >
       <p className="erp-work-instruction-annotation-modal__help">
-        说明框可指向同一图片的一个或多个部位；距离标注请拖动两个端点，并按尺子上的实际读数填写数值。
+        点击说明框直接填写；拖动移动手柄或指向点调整位置，也可用方向键微调。距离数值请按实测结果填写。
       </p>
       <div className="erp-work-instruction-annotation-modal__layout">
         <section className="erp-work-instruction-annotation-modal__stage">
@@ -641,9 +803,10 @@ export default function WorkInstructionImageAnnotationEditor({
             <div
               ref={surfaceRef}
               className={`erp-work-instruction-annotation-modal__canvas${
-                hasCallout(annotations) ? ' has-callout' : ''
+                activeImage.annotationLayout === 'sidebar' ? ' has-callout' : ''
               }${addingTarget ? ' is-adding-target' : ''}`}
               data-work-instruction-annotation-canvas="true"
+              aria-label="图片标注画布"
               onPointerDown={handleCanvasPointerDown}
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
@@ -657,6 +820,15 @@ export default function WorkInstructionImageAnnotationEditor({
                 editable
                 selectedIndex={selectedAnnotationIndex}
                 onSelect={setSelectedAnnotationIndex}
+                onTextChange={(annotationIndex, text) =>
+                  updateAnnotations((current) =>
+                    replaceWorkInstructionImageAnnotation(
+                      current,
+                      annotationIndex,
+                      (annotation) => ({ ...annotation, text })
+                    )
+                  )
+                }
                 onBoxPointerDown={(event, annotationIndex) =>
                   startDrag(event, annotationIndex, 'box')
                 }
@@ -681,7 +853,11 @@ export default function WorkInstructionImageAnnotationEditor({
             <button
               type="button"
               data-add-callout
-              disabled={!activeImage}
+              disabled={
+                !activeImage ||
+                annotations.length >=
+                  WORK_INSTRUCTION_IMAGE_ANNOTATION_LIMITS.perImage
+              }
               onClick={() =>
                 handleAddAnnotation(
                   WORK_INSTRUCTION_IMAGE_ANNOTATION_TYPES.callout
@@ -693,7 +869,11 @@ export default function WorkInstructionImageAnnotationEditor({
             <button
               type="button"
               data-add-measurement
-              disabled={!activeImage}
+              disabled={
+                !activeImage ||
+                annotations.length >=
+                  WORK_INSTRUCTION_IMAGE_ANNOTATION_LIMITS.perImage
+              }
               onClick={() =>
                 handleAddAnnotation(
                   WORK_INSTRUCTION_IMAGE_ANNOTATION_TYPES.measurement
@@ -705,25 +885,91 @@ export default function WorkInstructionImageAnnotationEditor({
           </div>
 
           {annotations.length ? (
-            <div className="erp-work-instruction-annotation-modal__annotation-list">
-              {annotations.map((annotation, annotationIndex) => (
+            <section
+              className="erp-work-instruction-annotation-modal__list-section"
+              aria-label="当前图片的标注"
+            >
+              <div className="erp-work-instruction-annotation-modal__list-toolbar">
+                <Checkbox
+                  checked={checkedIDs.length === annotations.length}
+                  indeterminate={
+                    checkedIDs.length > 0 &&
+                    checkedIDs.length < annotations.length
+                  }
+                  onChange={(event) =>
+                    setCheckedIDs(
+                      event.target.checked
+                        ? annotations.map((item) => item.id)
+                        : []
+                    )
+                  }
+                >
+                  全选
+                </Checkbox>
+                <span>
+                  {annotations.length}/
+                  {WORK_INSTRUCTION_IMAGE_ANNOTATION_LIMITS.perImage}
+                </span>
                 <button
                   type="button"
-                  className={
-                    selectedAnnotationIndex === annotationIndex
-                      ? 'is-active'
-                      : ''
-                  }
-                  key={annotation.id}
-                  onClick={() => {
-                    setSelectedAnnotationIndex(annotationIndex)
-                    setAddingTarget(false)
-                  }}
+                  className="erp-work-instruction-annotation-modal__delete"
+                  disabled={!checkedIDs.length}
+                  onClick={() => handleDelete(checkedIDs)}
                 >
-                  {getAnnotationLabel(annotation, annotationIndex)}
+                  删除所选{checkedIDs.length ? ` (${checkedIDs.length})` : ''}
                 </button>
-              ))}
-            </div>
+              </div>
+              <div className="erp-work-instruction-annotation-modal__annotation-list">
+                {annotations.map((annotation, annotationIndex) => (
+                  <div
+                    className="erp-work-instruction-annotation-modal__list-row"
+                    key={annotation.id}
+                  >
+                    <Checkbox
+                      aria-label={`选择标注 ${annotationIndex + 1}`}
+                      checked={checkedIDs.includes(annotation.id)}
+                      onChange={(event) =>
+                        setCheckedIDs((current) =>
+                          event.target.checked
+                            ? [...current, annotation.id]
+                            : current.filter((id) => id !== annotation.id)
+                        )
+                      }
+                    />
+                    <button
+                      type="button"
+                      aria-pressed={selectedAnnotationIndex === annotationIndex}
+                      className={
+                        selectedAnnotationIndex === annotationIndex
+                          ? 'is-active'
+                          : ''
+                      }
+                      title={getAnnotationLabel(annotation, annotationIndex)}
+                      onClick={() => {
+                        setSelectedAnnotationIndex(annotationIndex)
+                        setAddingTarget(false)
+                      }}
+                    >
+                      <span className="erp-work-instruction-annotation-modal__list-number">
+                        {annotationIndex + 1}
+                      </span>
+                      <span className="erp-work-instruction-annotation-modal__list-text">
+                        {getAnnotationLabel(annotation, annotationIndex)}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className="erp-work-instruction-annotation-modal__delete"
+                      aria-label={`删除标注 ${annotationIndex + 1}`}
+                      title="删除此标注"
+                      onClick={() => handleDelete([annotation.id])}
+                    >
+                      <DeleteOutlined />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
           ) : (
             <p className="erp-work-instruction-annotation-modal__empty-copy">
               还没有标注。
@@ -732,32 +978,40 @@ export default function WorkInstructionImageAnnotationEditor({
 
           {selectedAnnotation ? (
             <div className="erp-work-instruction-annotation-modal__form">
-              <label>
-                {selectedAnnotation.type ===
-                WORK_INSTRUCTION_IMAGE_ANNOTATION_TYPES.measurement
-                  ? '距离文字'
-                  : '说明文字'}
-                <Input.TextArea
-                  ref={textInputRef}
-                  value={selectedAnnotation.text}
-                  maxLength={
-                    WORK_INSTRUCTION_IMAGE_ANNOTATION_LIMITS.textLength
-                  }
-                  autoSize={{ minRows: 3, maxRows: 8 }}
-                  placeholder={
-                    selectedAnnotation.type ===
-                    WORK_INSTRUCTION_IMAGE_ANNOTATION_TYPES.measurement
-                      ? '例如：30 mm、45±2 mm'
-                      : '填写工艺说明或质量要求'
-                  }
-                  onChange={(event) =>
-                    updateSelectedAnnotation((annotation) => ({
-                      ...annotation,
-                      text: event.target.value,
-                    }))
-                  }
-                />
-              </label>
+              {selectedAnnotation.type ===
+              WORK_INSTRUCTION_IMAGE_ANNOTATION_TYPES.measurement ? (
+                <label>
+                  距离文字
+                  <Input.TextArea
+                    ref={textInputRef}
+                    value={selectedAnnotation.text}
+                    maxLength={
+                      WORK_INSTRUCTION_IMAGE_ANNOTATION_LIMITS.textLength
+                    }
+                    autoSize={{ minRows: 3, maxRows: 8 }}
+                    status={
+                      overflowIDs.includes(selectedAnnotation.id)
+                        ? 'error'
+                        : undefined
+                    }
+                    placeholder="例如：30 mm、45±2 mm"
+                    onChange={(event) =>
+                      updateSelectedAnnotation((annotation) => ({
+                        ...annotation,
+                        text: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+              ) : null}
+              {overflowIDs.includes(selectedAnnotation.id) ? (
+                <small
+                  role="status"
+                  className="erp-work-instruction-annotation-modal__overflow-warning"
+                >
+                  文字超出说明框，请扩大说明框或拆分说明。
+                </small>
+              ) : null}
 
               <label>
                 线条颜色
@@ -876,23 +1130,6 @@ export default function WorkInstructionImageAnnotationEditor({
                   />
                 </label>
               )}
-
-              <button
-                type="button"
-                className="erp-work-instruction-annotation-modal__delete"
-                onClick={() => {
-                  updateAnnotations((current) =>
-                    removeWorkInstructionImageAnnotation(
-                      current,
-                      selectedAnnotationIndex
-                    )
-                  )
-                  setSelectedAnnotationIndex(null)
-                  setAddingTarget(false)
-                }}
-              >
-                删除当前标注
-              </button>
             </div>
           ) : null}
         </aside>

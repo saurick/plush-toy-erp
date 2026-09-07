@@ -71,6 +71,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/qa/mobile-workflow-simulated-closure.test.mjs",
     "scripts/qa/operational-fact-simulated-closure.test.mjs",
     "scripts/qa/output-retention-preview.test.mjs",
+    "scripts/qa/pdf-runtime.test.mjs",
     "scripts/qa/phase-label-boundaries.test.mjs",
     "scripts/qa/pnpm-audit-retry.test.mjs",
     "scripts/qa/private-deployment-boundaries.test.mjs",

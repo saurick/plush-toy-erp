@@ -10,7 +10,101 @@ import {
   removeLastWorkInstructionCalloutTarget,
   removeWorkInstructionImageAnnotation,
   replaceWorkInstructionImageAnnotation,
+  deleteWorkInstructionImageAnnotations,
+  restoreWorkInstructionImageAnnotations,
+  resolveWorkInstructionAnnotationLayout,
 } from './workInstructionImageAnnotations.mjs'
+
+test('说明框使用右侧空位，删除后新增可复用空位且不覆盖其他框', () => {
+  let annotations = []
+  for (let index = 0; index < 3; index += 1) {
+    annotations = appendWorkInstructionImageAnnotation(
+      annotations,
+      'callout'
+    ).annotations
+  }
+  assert(annotations.every((item) => item.x === 64))
+  assert(annotations[1].y >= annotations[0].y + annotations[0].height)
+  assert(annotations[2].y >= annotations[1].y + annotations[1].height)
+  const free = annotations[1]
+  const removed = deleteWorkInstructionImageAnnotations(annotations, [free.id])
+  const replaced = appendWorkInstructionImageAnnotation(
+    removed.annotations,
+    'callout'
+  )
+  assert.equal(replaced.annotations.at(-1).y, free.y)
+})
+
+test('按ID批量删除和撤销保留顺序与期间编辑，不影响其余标注', () => {
+  const original = [0, 1, 2, 3].map((index) => ({
+    id: `n-${index}`,
+    type: 'callout',
+    text: `说明${index}`,
+    targets: [{ x: 20, y: 30 }],
+  }))
+  const deleted = deleteWorkInstructionImageAnnotations(original, [
+    'n-0',
+    'n-2',
+  ])
+  assert.deepEqual(
+    deleted.annotations.map((item) => item.id),
+    ['n-1', 'n-3']
+  )
+  const edited = replaceWorkInstructionImageAnnotation(
+    deleted.annotations,
+    0,
+    (item) => ({ ...item, text: '删除之后的编辑' })
+  )
+  const restored = restoreWorkInstructionImageAnnotations(
+    edited,
+    deleted.removed
+  )
+  assert.equal(restored.ok, true)
+  assert.deepEqual(
+    restored.annotations.map((item) => item.id),
+    ['n-0', 'n-1', 'n-2', 'n-3']
+  )
+  assert.equal(restored.annotations[1].text, '删除之后的编辑')
+  assert.deepEqual(
+    restoreWorkInstructionImageAnnotations(
+      restored.annotations,
+      deleted.removed
+    ).annotations,
+    restored.annotations
+  )
+  const full = Array.from({ length: 12 }, (_, index) => ({
+    ...original[0],
+    id: `full-${index}`,
+  }))
+  assert.equal(
+    restoreWorkInstructionImageAnnotations(full, deleted.removed).ok,
+    false
+  )
+})
+
+test('图片的标注布局独立于增删，已有覆盖式距离坐标不会迁移', () => {
+  assert.equal(resolveWorkInstructionAnnotationLayout({}), 'sidebar')
+  assert.equal(
+    resolveWorkInstructionAnnotationLayout({
+      annotations: [{ type: 'measurement' }],
+    }),
+    'overlay'
+  )
+  assert.equal(
+    resolveWorkInstructionAnnotationLayout({
+      annotationLayout: 'sidebar',
+      annotations: [{ type: 'measurement' }],
+    }),
+    'sidebar'
+  )
+  assert.equal(
+    resolveWorkInstructionAnnotationLayout({
+      annotationLayout: 'overlay',
+      annotations: [{ type: 'callout' }],
+    }),
+    'overlay'
+  )
+})
 
 test('workInstructionImageAnnotations: 说明框保留多个归一化指向点', () => {
   const created = appendWorkInstructionImageAnnotation(
@@ -67,6 +161,16 @@ test('workInstructionImageAnnotations: 距离标注保存两个端点和人工�
   assert.equal(updated[0].text, '30 mm')
   assert.deepEqual(updated[0].start, { x: 21, y: 44 })
   assert.deepEqual(updated[0].end, { x: 79, y: 44 })
+})
+
+test('标注逐字输入保留词间空格和换行，不在下一次按键前截掉空格', () => {
+  const created = appendWorkInstructionImageAnnotation([], 'callout')
+  const changed = replaceWorkInstructionImageAnnotation(
+    created.annotations,
+    0,
+    (item) => ({ ...item, text: 'Keep gap \n' })
+  )
+  assert.equal(changed[0].text, 'Keep gap \n')
 })
 
 test('workInstructionImageAnnotations: 每图标注和每框指向点都 fail closed', () => {

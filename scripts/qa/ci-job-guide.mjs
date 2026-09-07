@@ -12,7 +12,11 @@ const RAW_CI_JOB_GUIDES = [
     name: "prepare",
     label: "准备 Runner 环境",
     summary: "准备依赖、缓存和浏览器运行包，并核对 Runner 容量与沙箱。",
-    checks: ["Runner 容量与 Chromium 沙箱", "pnpm 锁定依赖", "Playwright 与 Go 依赖"],
+    checks: [
+      "Runner 容量与 Chromium 沙箱",
+      "pnpm 锁定依赖",
+      "Playwright 与 Go 依赖",
+    ],
     outcome: "只准备运行条件，不代表任何测试已经通过。",
   },
   {
@@ -144,7 +148,8 @@ const RAW_CI_JOB_GUIDES = [
   {
     name: "quality_node",
     label: "Node 汇总",
-    summary: "核对四条 Node 分片，并完成 secrets 与 shared 收口；不会重跑分片测试。",
+    summary:
+      "核对四条 Node 分片，并完成 secrets 与 shared 收口；不会重跑分片测试。",
     checks: ["四条 Node 分片回执", "严格敏感信息扫描", "共享基础检查"],
     outcome: "形成唯一 Node 领域回执，供总聚合读取。",
   },
@@ -196,6 +201,14 @@ const RAW_CI_JOB_GUIDES = [
     summary: "核对最终证据并固定到当前 Pipeline；它决定整条 CI 的可信终态。",
     checks: ["最终证据完整性", "Pipeline / Job / SHA 身份", "证据包上传"],
     outcome: "形成可被发布链读取的 exact-SHA CI Gate 证据。",
+  },
+  {
+    name: "pdf_runtime_monitor",
+    label: "打印引擎版本检查",
+    summary: "在受控定时流水线中核对固定打印镜像与上游稳定版本。",
+    checks: ["实际 Chromium 与系统包", "可修复高危漏洞", "镜像体积与上游版本"],
+    outcome:
+      "输出更新或漏洞报告，升级仍需固定版本并通过最终镜像的真实 PDF 验证。",
   },
 ];
 

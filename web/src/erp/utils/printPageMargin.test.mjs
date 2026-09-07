@@ -99,3 +99,23 @@ test('printPageMargin: 纸面高度跨页时会同步切换续页页边距', () 
   assert.equal(result.margin, CONTINUED_PRINT_PAGE_MARGIN)
   assert.match(styleNode?.textContent || '', /margin: 5mm 0 5mm;/)
 })
+
+test('screen zoom does not change whether the same paper needs another page', () => {
+  const doc = createFakeDocument()
+  for (const zoom of [0.5, 1, 1.5]) {
+    doc.defaultView = { getComputedStyle: () => ({ zoom: String(zoom) }) }
+    const paper = {
+      ownerDocument: doc,
+      closest: () => ({}),
+      scrollHeight: A4_PAGE_HEIGHT_PX,
+      offsetHeight: A4_PAGE_HEIGHT_PX,
+      getBoundingClientRect: () => ({ height: A4_PAGE_HEIGHT_PX * zoom }),
+    }
+    assert.equal(syncPrintPageMarginForPaper(paper).hasContinuation, false)
+    paper.scrollHeight += 12
+    paper.getBoundingClientRect = () => ({
+      height: (A4_PAGE_HEIGHT_PX + 12) * zoom,
+    })
+    assert.equal(syncPrintPageMarginForPaper(paper).hasContinuation, true)
+  }
+})

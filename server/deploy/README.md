@@ -6,7 +6,7 @@ R640 自建 GitLab、隔离 Runner、备份与 GitHub 单向镜像的仓库内�
 
 部署构建边界：目标服务器配置较低，只负责从受控 Package 直接取得并加载已构建镜像、启动 Compose、执行 migration 和部署后检查；服务端/前端镜像必须先在 CI 构建并登记为不可变制品，不能由 Mac 二次中转。不要在服务器上执行 `docker build`、`pnpm build`、`go build`、`make build_server` 等重构建步骤。
 
-发布制品入口是仓库根目录的 `scripts/deploy/release-artifact-bundle.mjs` 与 `release-artifact-verify.mjs`：只接受 clean current HEAD 的 committed archive，正式 Server / Web 镜像都从 `server/Dockerfile` 的共享缓存图构建，前端只编译一次并被两个 runtime target 复用。两个镜像固定为 `linux/amd64`，正式 `RELEASE_VERSION` 由服务端按上海日历日与 Release catalog 唯一推导，并与同一 40 位 `GIT_SHA` 内置到镜像；前端静态包在编译时写入同一组身份。后台和手机端通过公开只读 `system.version` 核对前后端是否来自同一次构建。本地开发明确显示为本地版本，不作为发布证据。Docker save 结果用 zstd level 3 预压缩但保持现有归档文件名，manifest 同时记录压缩方式、压缩前后字节数与耗时、OCI config content ID、归档 checksum、实际发布依赖 SBOM、migration 序列和客户配置源指纹。目标机只允许加载 / 拉取 manifest 中的固定制品；Docker `.Id` 因 classic / containerd image store 差异只允许读回为该 config digest 或同一归档的唯一 OCI manifest digest，不能放宽 tag、平台、版本身份或归档 checksum。目标 preflight 必须证明归档工具链可用，并以 `preview_only` 方式列出当前、缓存、容器和 operation 未引用的历史发布候选；preflight 不删除目录或容器，候选仍须人工复核后再单独清理。正式 promotion 前必须先用 `scripts/deploy/local-release-rehearsal.mjs` 在一次性数据库和本文件登记的唯一 Compose 上完成 migration、运行身份、登录、PDF、备份恢复与 steady-state restart；本地回执不能替代目标 preflight、active config、rollback 或 UAT。
+发布制品入口是仓库根目录的 `scripts/deploy/release-artifact-bundle.mjs` 与 `release-artifact-verify.mjs`：只接受 clean current HEAD 的 committed archive，正式 Server / Web 镜像都从 `server/Dockerfile` 的共享缓存图构建，前端只编译一次并被两个 runtime target 复用。两个镜像固定为 `linux/amd64`，正式 `RELEASE_VERSION` 由服务端按上海日历日与 Release catalog 唯一推导，并与同一 40 位 `GIT_SHA` 内置到镜像；前端静态包在编译时写入同一组身份。后台和手机端通过公开只读 `system.version` 核对前后端是否来自同一次构建。本地开发明确显示为本地版本，不作为发布证据。Docker save 结果用 zstd level 3 预压缩但保持现有归档文件名，manifest 同时记录压缩方式、压缩前后字节数与耗时、OCI config content ID、归档 checksum、实际发布依赖 SBOM（含最终镜像 Debian 系统包、PDF 验证、漏洞与体积结果）、migration 序列和客户配置源指纹。目标机只允许加载 / 拉取 manifest 中的固定制品；Docker `.Id` 因 classic / containerd image store 差异只允许读回为该 config digest 或同一归档的唯一 OCI manifest digest，不能放宽 tag、平台、版本身份或归档 checksum。目标 preflight 必须证明归档工具链可用，并以 `preview_only` 方式列出当前、缓存、容器和 operation 未引用的历史发布候选；preflight 不删除目录或容器，候选仍须人工复核后再单独清理。正式 promotion 前必须先用 `scripts/deploy/local-release-rehearsal.mjs` 在一次性数据库和本文件登记的唯一 Compose 上完成 migration、运行身份、登录、PDF、备份恢复与 steady-state restart；本地回执不能替代目标 preflight、active config、rollback 或 UAT。
 
 GitLab `.gitlab-ci.yml` 是 main / MR 的 canonical CI/CD；GitHub main 只接收单向镜像，不运行仓库 CI，`.github/workflows/release.yml` 仅保留显式应急发布。GitLab release pipeline 对 main 的 exact SHA 恢复并校验同一 protected push pipeline 的完整 `CI Gate` 证据，不重复 strict；随后只构建一次不可变候选，将镜像按 digest 发布到 GHCR，并把含同一演练回执的 v2 七资产登记到 GitLab Generic Package 与 Release，同时把同 SHA 的 `source.tar` 单独登记为目标内部物化输入。发布中断后只续传已校验远端子集所缺的资产，最后必须读回完整七资产和精确 source 包。
 
@@ -24,7 +24,7 @@ Atlas migration 在普通生产 / 低配服务器上使用宿主机 `/usr/local/
 
 - 单机或单宿主机部署入口
 - 默认包含 PostgreSQL、Jaeger、业务服务、前端单入口静态服务和基础 smoke 检查
-- 服务端镜像内置 Chromium / CJK 字体用于 `/templates/render-pdf`，Compose 默认使用 `ERP_PDF_RENDER_CONCURRENCY=4` 和 `ERP_PDF_QUEUE_CAPACITY=2` 限制 PDF 执行与等待请求；只有容量压测证明宿主机仍有稳定余量时，才在独立部署配置中成对调整并发与内存预算
+- 服务端镜像内置固定 Chromium 和前端 Noto 字体资源用于 `/templates/render-pdf`，Compose 默认使用 `ERP_PDF_RENDER_CONCURRENCY=4` 和 `ERP_PDF_QUEUE_CAPACITY=2` 限制 PDF 执行与等待请求；只有容量压测证明宿主机仍有稳定余量时，才在独立部署配置中成对调整并发与内存预算
 - 提供迁移脚本，不再保留远端增量发布脚本
 
 关键文件：

@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useParams, useSearchParams } from 'react-router-dom'
+import { getPrintTemplateByKey } from '../config/printTemplates.mjs'
+import { getPrintOutputProblem } from '../utils/printOutputPreflight.mjs'
 import { getPrintWorkspaceDraftScope } from '../utils/printWorkspaceScope.mjs'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -49,9 +51,8 @@ import {
   watchPrintPageMarginForPaper,
 } from '../utils/printPageMargin.mjs'
 import { normalizePrintAppendixImages } from '../utils/printAppendixImages.mjs'
-import usePrintWorkspaceWindowSnapshot, {
-  preparePrintWorkspaceSnapshot,
-} from '../utils/usePrintWorkspaceWindowSnapshot.js'
+import usePrintWorkspaceWindowState from '../utils/usePrintWorkspaceWindowState.js'
+import { preparePrintWorkspaceSnapshot } from '../utils/printWorkspaceOutput.mjs'
 import {
   useFlushPrintWorkspaceDraftOnPageExit,
   usePersistentPrintWorkspaceDraft,
@@ -115,6 +116,7 @@ function resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag) {
 }
 
 export default function ProcessingContractPrintWorkspacePage() {
+  const template = getPrintTemplateByKey(PROCESSING_CONTRACT_TEMPLATE_KEY)
   const { templateKey } = useParams()
   const [searchParams] = useSearchParams()
   const { accountKey, customerKey, configRevision } =
@@ -153,17 +155,22 @@ export default function ProcessingContractPrintWorkspacePage() {
       stateID: workspaceStateID,
     })
   }, [configRevision, customerKey, entrySource, workspaceStateID])
-  const [contract, setContract, flushContractDraft, , persistenceStatus] =
-    usePersistentPrintWorkspaceDraft(
-      () =>
-        loadDraft({
-          forceFresh: resetDraftOnOpen,
-          storageKey: draftStorageKey,
-          workspaceStateID,
-          businessInput: entrySource === PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
-        }),
-      draftStorageKey
-    )
+  const [
+    contract,
+    setContract,
+    flushContractDraft,
+    contractRef,
+    persistenceStatus,
+  ] = usePersistentPrintWorkspaceDraft(
+    () =>
+      loadDraft({
+        forceFresh: resetDraftOnOpen,
+        storageKey: draftStorageKey,
+        workspaceStateID,
+        businessInput: entrySource === PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
+      }),
+    draftStorageKey
+  )
   const [rowSelectionMode, setRowSelectionMode] = useState(false)
   const [selectedLineIndex, setSelectedLineIndex] = useState(null)
   const [cellSelectionMode, setCellSelectionMode] = useState(false)
@@ -224,13 +231,10 @@ export default function ProcessingContractPrintWorkspacePage() {
     })
   }, [])
 
-  usePrintWorkspaceWindowSnapshot({
+  usePrintWorkspaceWindowState({
     stateID: workspaceStateID,
     templateKey: PROCESSING_CONTRACT_TEMPLATE_KEY,
     workspaceURL,
-    observeNodeRef: paperRef,
-    suspended: busyAction !== '',
-    beforeSnapshot: flushContractDraft,
   })
 
   useEffect(() => {
@@ -318,8 +322,8 @@ export default function ProcessingContractPrintWorkspacePage() {
     }))
   }
 
-  const handleAppendixImagesChange = (images) => {
-    const persisted = setContract((current) => {
+  const handleAppendixImagesChange = async (images) => {
+    const persisted = await setContract((current) => {
       const nextContract = {
         ...current,
         appendixImages: normalizePrintAppendixImages(images),
@@ -449,6 +453,7 @@ export default function ProcessingContractPrintWorkspacePage() {
         windowLike: window,
         beforeSnapshot: flushContractDraft,
       })
+      if (!checkOutput()) return
       syncPrintPageMarginForPaper(paperRef.current, {
         stageWrapElement: stageWrapRef.current,
         paperContinuedClass: 'erp-processing-contract-paper--continued',
@@ -463,6 +468,11 @@ export default function ProcessingContractPrintWorkspacePage() {
   }
 
   const warmupPreviewPdf = useCallback(() => {
+    if (
+      getPrintOutputProblem(template, contractRef.current, paperRef.current)
+    ) {
+      return
+    }
     if (!paperRef.current || busyAction || pdfPreviewPreloadRef.current) {
       return
     }
@@ -484,7 +494,7 @@ export default function ProcessingContractPrintWorkspacePage() {
         }
       })
     pdfPreviewPreloadRef.current = preloadPromise
-  }, [busyAction, customerKey])
+  }, [busyAction, contractRef, customerKey, template])
 
   useEffect(() => {
     pdfPreviewPreloadRef.current = null
@@ -504,6 +514,18 @@ export default function ProcessingContractPrintWorkspacePage() {
 
   if (templateKey !== PROCESSING_CONTRACT_TEMPLATE_KEY) {
     return <Navigate to="/erp/print-center" replace />
+  }
+
+  const checkOutput = () => {
+    const problem = getPrintOutputProblem(
+      template,
+      contractRef.current,
+      paperRef.current
+    )
+    if (!problem) return true
+    setToolbarStatus(problem)
+    message.warning(problem)
+    return false
   }
 
   const handlePreviewPdf = () =>
@@ -527,15 +549,20 @@ export default function ProcessingContractPrintWorkspacePage() {
     })
 
   const handlePrint = async () => {
-    await preparePrintWorkspaceSnapshot({
-      windowLike: window,
-      beforeSnapshot: flushContractDraft,
-    })
-    syncPrintPageMarginForPaper(paperRef.current, {
-      stageWrapElement: stageWrapRef.current,
-      paperContinuedClass: 'erp-processing-contract-paper--continued',
-    })
-    window.print()
+    try {
+      await preparePrintWorkspaceSnapshot({
+        windowLike: window,
+        beforeSnapshot: flushContractDraft,
+      })
+      if (!checkOutput()) return
+      syncPrintPageMarginForPaper(paperRef.current, {
+        stageWrapElement: stageWrapRef.current,
+        paperContinuedClass: 'erp-processing-contract-paper--continued',
+      })
+      window.print()
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '打印'))
+    }
   }
 
   const handleApplyMerge = () => {
@@ -604,7 +631,10 @@ export default function ProcessingContractPrintWorkspacePage() {
       okText: '生成空白模板',
       cancelText: '取消',
       onOk: () => {
-        setContract((current) => createBlankProcessingContractDraft(current))
+        setContract((current) => ({
+          ...createBlankProcessingContractDraft(current),
+          printMode: 'blank',
+        }))
         setSelectedLineIndex(null)
         setRowSelectionMode(false)
         setCellSelectionMode(false)
@@ -636,207 +666,10 @@ export default function ProcessingContractPrintWorkspacePage() {
       .filter(Boolean)
       .join(' ')
 
-  const fieldRows = [
-    {
-      key: 'contractNo',
-      label: '合同编号',
-      value: contract.contractNo,
-      onChange: (value) => setField('contractNo', value),
-    },
-    {
-      key: 'orderDateText',
-      label: '下单日期',
-      value: contract.orderDateText,
-      onChange: (value) => setField('orderDateText', value),
-    },
-    {
-      key: 'returnDateText',
-      label: '回货日期',
-      value: contract.returnDateText,
-      onChange: (value) => setField('returnDateText', value),
-    },
-    {
-      key: 'supplierName',
-      label: '加工方名称',
-      value: contract.supplierName,
-      onChange: (value) => setField('supplierName', value),
-    },
-    {
-      key: 'supplierContact',
-      label: '联系人',
-      value: contract.supplierContact,
-      onChange: (value) => setField('supplierContact', value),
-    },
-    {
-      key: 'supplierPhone',
-      label: '联系电话',
-      value: contract.supplierPhone,
-      onChange: (value) => setField('supplierPhone', value),
-    },
-    {
-      key: 'supplierAddress',
-      label: '供应商地址',
-      value: contract.supplierAddress,
-      multiline: true,
-      rows: 3,
-      onChange: (value) => setField('supplierAddress', value),
-    },
-    {
-      key: 'buyerCompany',
-      label: '委托单位',
-      value: contract.buyerCompany,
-      onChange: (value) => setField('buyerCompany', value),
-    },
-    {
-      key: 'buyerContact',
-      label: '委托人',
-      value: contract.buyerContact,
-      onChange: (value) => setField('buyerContact', value),
-    },
-    {
-      key: 'buyerPhone',
-      label: '委托方电话',
-      value: contract.buyerPhone,
-      onChange: (value) => setField('buyerPhone', value),
-    },
-    {
-      key: 'buyerAddress',
-      label: '公司地址',
-      value: contract.buyerAddress,
-      multiline: true,
-      rows: 3,
-      onChange: (value) => setField('buyerAddress', value),
-    },
-    {
-      key: 'buyerSigner',
-      label: '甲方签名',
-      value: contract.buyerSigner,
-      onChange: (value) => setField('buyerSigner', value),
-    },
-    {
-      key: 'supplierSigner',
-      label: '乙方签名',
-      value: contract.supplierSigner,
-      onChange: (value) => setField('supplierSigner', value),
-    },
-    {
-      key: 'buyerSignDateText',
-      label: '甲方日期',
-      value: contract.buyerSignDateText,
-      onChange: (value) => setField('buyerSignDateText', value),
-    },
-    {
-      key: 'supplierSignDateText',
-      label: '乙方日期',
-      value: contract.supplierSignDateText,
-      onChange: (value) => setField('supplierSignDateText', value),
-    },
-    ...Object.entries(contract.clauses).flatMap(([groupKey, values]) =>
-      values.map((item, index) => ({
-        key: `${groupKey}-${index}`,
-        label:
-          groupKey === 'delivery'
-            ? `来货要求 ${index + 1}`
-            : groupKey === 'contract'
-              ? `合同约定 ${index + 1}`
-              : `结算方式 ${index + 1}`,
-        value: item,
-        multiline: true,
-        rows: 3,
-        onChange: (value) => setClause(groupKey, index, value),
-      }))
-    ),
-  ]
-
-  const detailEditor = (
-    <section className="erp-print-shell__detail-panel">
-      <h4>加工明细分行编辑</h4>
-      <table className="erp-print-shell__detail-table">
-        <thead>
-          <tr>
-            <th>序号</th>
-            <th>加工项目</th>
-            <th>数量</th>
-            <th>单价</th>
-            <th>金额</th>
-            <th>备注</th>
-          </tr>
-        </thead>
-        <tbody>
-          {contract.lines.map((line, index) => (
-            <tr key={`processing-panel-line-${index}`}>
-              <td className="erp-print-shell__detail-index-cell">
-                {index + 1}
-              </td>
-              <td>
-                <textarea
-                  className="erp-print-shell__detail-editor erp-print-shell__detail-editor--multiline"
-                  rows={2}
-                  value={line.processingItem}
-                  onChange={(event) =>
-                    setLineField(index, 'processingItem', event.target.value)
-                  }
-                />
-              </td>
-              <td>
-                <input
-                  className="erp-print-shell__detail-editor"
-                  type="text"
-                  value={line.quantity}
-                  onChange={(event) =>
-                    setLineField(index, 'quantity', event.target.value)
-                  }
-                />
-              </td>
-              <td>
-                <input
-                  className="erp-print-shell__detail-editor"
-                  type="text"
-                  value={line.unitPrice}
-                  onChange={(event) =>
-                    setLineField(index, 'unitPrice', event.target.value)
-                  }
-                />
-              </td>
-              <td>
-                <input
-                  className="erp-print-shell__detail-editor"
-                  type="text"
-                  inputMode="decimal"
-                  value={line.amount}
-                  onChange={(event) =>
-                    setLineField(index, 'amount', event.target.value, {
-                      amountInputPhase: 'input',
-                    })
-                  }
-                  onBlur={(event) =>
-                    setLineField(index, 'amount', event.target.value, {
-                      amountInputPhase: 'commit',
-                    })
-                  }
-                />
-              </td>
-              <td>
-                <textarea
-                  className="erp-print-shell__detail-editor erp-print-shell__detail-editor--multiline"
-                  rows={2}
-                  value={line.remark}
-                  onChange={(event) =>
-                    setLineField(index, 'remark', event.target.value)
-                  }
-                />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </section>
-  )
-
   return (
     <PrintWorkspaceShell
       title="加工合同"
-      sourceTag={sourceTag}
+      sourceTag={contract.printMode === 'blank' ? '空白模板' : sourceTag}
       statusText={
         busyAction === 'preview'
           ? '正在生成在线 PDF...'
@@ -844,8 +677,33 @@ export default function ProcessingContractPrintWorkspacePage() {
             ? '正在下载 PDF...'
             : toolbarStatus
       }
+      tools={template.runtime.tools}
       persistenceStatus={persistenceStatus}
-      panelTip="左侧修改会立即显示在右侧合同中；普通末尾图片自动两张一行，长图自动整行，每张可切换排版，打印时只输出右侧合同。"
+      onRetrySave={flushContractDraft}
+      selectionMode={
+        cellSelectionMode ? '选择单元格' : rowSelectionMode ? '选择明细行' : ''
+      }
+      selectionCount={
+        cellSelectionMode && mergeSelection
+          ? (mergeSelection.rowEnd - mergeSelection.rowStart + 1) *
+            (mergeSelection.colEnd - mergeSelection.colStart + 1)
+          : selectedLineIndex === null
+            ? 0
+            : 1
+      }
+      onReturnToEdit={() => {
+        setRowSelectionMode(false)
+        setCellSelectionMode(false)
+        setSelectedLineIndex(null)
+        resetCellSelection()
+      }}
+      selectionBounds={cellSelectionMode ? mergeSelection : null}
+      selectionSummary={
+        rowSelectionMode && selectedLineIndex !== null
+          ? `第 ${selectedLineIndex + 1} 行`
+          : ''
+      }
+      panelTip="直接点击纸面填写；选择行或单元格后，可在这里调整结构。"
       prepareSignature={`${draftStorageKey}:${resetDraftOnOpen ? 'fresh' : 'restore'}`}
       panelActions={
         <PrintAppendixImageManager
@@ -854,8 +712,6 @@ export default function ProcessingContractPrintWorkspacePage() {
           onStatusChange={setToolbarStatus}
         />
       }
-      detailEditor={detailEditor}
-      fieldRows={fieldRows}
       formulaPanel={
         showFormula ? (
           <>
@@ -872,131 +728,131 @@ export default function ProcessingContractPrintWorkspacePage() {
           </>
         ) : null
       }
+      editorActions={
+        <div className="erp-print-shell__toolbar-group">
+          <button
+            type="button"
+            className={getToolbarButtonClassName()}
+            onClick={() => handleInsertLine('before')}
+            disabled={selectedLineIndex === null}
+          >
+            上插一行
+          </button>
+          <button
+            type="button"
+            className={getToolbarButtonClassName()}
+            onClick={() => handleInsertLine('after')}
+            disabled={selectedLineIndex === null}
+          >
+            下插一行
+          </button>
+          <button
+            type="button"
+            className={getToolbarButtonClassName()}
+            onClick={handleRemoveLine}
+            disabled={selectedLineIndex === null}
+          >
+            移除当前行
+          </button>
+          <button
+            type="button"
+            className={getToolbarButtonClassName({
+              active: rowSelectionMode,
+            })}
+            onClick={handleToggleRowSelectionMode}
+          >
+            {rowSelectionMode ? '取消选择' : '选择明细行'}
+          </button>
+          <button
+            type="button"
+            className={getToolbarButtonClassName({
+              active: cellSelectionMode,
+            })}
+            onClick={handleToggleCellSelectionMode}
+          >
+            {cellSelectionMode ? '取消选区' : '选择单元格'}
+          </button>
+          <button
+            type="button"
+            className={getToolbarButtonClassName()}
+            onClick={handleApplyMerge}
+            disabled={!canApplyMerge}
+          >
+            合并选区
+          </button>
+          <button
+            type="button"
+            className={getToolbarButtonClassName()}
+            onClick={handleSplitMerge}
+            disabled={!canSplitMerge}
+          >
+            拆分当前
+          </button>
+          <button
+            type="button"
+            className={getToolbarButtonClassName({ active: showFormula })}
+            onClick={() => setShowFormula((current) => !current)}
+          >
+            计算规则
+          </button>
+          <span className="erp-print-shell__counter">
+            加工明细行: {contract.lines.length}/{PROCESSING_CONTRACT_MAX_ROWS}
+          </span>
+        </div>
+      }
+      draftActions={
+        <div className="erp-print-shell__toolbar-group">
+          <button
+            type="button"
+            className={getToolbarButtonClassName()}
+            onClick={resetDraft}
+          >
+            恢复样例
+          </button>
+          <button
+            type="button"
+            className={getToolbarButtonClassName()}
+            onClick={handleClearSignature}
+          >
+            手签留白
+          </button>
+          <button
+            type="button"
+            className={getToolbarButtonClassName()}
+            onClick={handleBlankDraft}
+          >
+            空白模板
+          </button>
+        </div>
+      }
       toolbarActions={
-        <>
-          <div className="erp-print-shell__toolbar-group">
-            <button
-              type="button"
-              className={getToolbarButtonClassName()}
-              onClick={() => handleInsertLine('before')}
-              disabled={selectedLineIndex === null}
-            >
-              上插一行
-            </button>
-            <button
-              type="button"
-              className={getToolbarButtonClassName()}
-              onClick={() => handleInsertLine('after')}
-              disabled={selectedLineIndex === null}
-            >
-              下插一行
-            </button>
-            <button
-              type="button"
-              className={getToolbarButtonClassName()}
-              onClick={handleRemoveLine}
-              disabled={selectedLineIndex === null}
-            >
-              移除当前行
-            </button>
-            <button
-              type="button"
-              className={getToolbarButtonClassName({
-                active: rowSelectionMode,
-              })}
-              onClick={handleToggleRowSelectionMode}
-            >
-              {rowSelectionMode ? '取消选择' : '选择明细行'}
-            </button>
-            <button
-              type="button"
-              className={getToolbarButtonClassName({
-                active: cellSelectionMode,
-              })}
-              onClick={handleToggleCellSelectionMode}
-            >
-              {cellSelectionMode ? '取消选区' : '选择单元格'}
-            </button>
-            <button
-              type="button"
-              className={getToolbarButtonClassName()}
-              onClick={handleApplyMerge}
-              disabled={!canApplyMerge}
-            >
-              合并选区
-            </button>
-            <button
-              type="button"
-              className={getToolbarButtonClassName()}
-              onClick={handleSplitMerge}
-              disabled={!canSplitMerge}
-            >
-              拆分当前
-            </button>
-            <button
-              type="button"
-              className={getToolbarButtonClassName({ active: showFormula })}
-              onClick={() => setShowFormula((current) => !current)}
-            >
-              计算规则
-            </button>
-            <span className="erp-print-shell__counter">
-              加工明细行: {contract.lines.length}/{PROCESSING_CONTRACT_MAX_ROWS}
-            </span>
-          </div>
-
-          <div className="erp-print-shell__toolbar-group">
-            <button
-              type="button"
-              className={getToolbarButtonClassName()}
-              onClick={resetDraft}
-            >
-              恢复样例
-            </button>
-            <button
-              type="button"
-              className={getToolbarButtonClassName()}
-              onClick={handleClearSignature}
-            >
-              手签留白
-            </button>
-            <button
-              type="button"
-              className={getToolbarButtonClassName()}
-              onClick={handleBlankDraft}
-            >
-              空白模板
-            </button>
-          </div>
-
-          <div className="erp-print-shell__toolbar-group">
-            <button
-              type="button"
-              className={getToolbarButtonClassName()}
-              onClick={handlePreviewPdf}
-              onFocus={warmupPreviewPdf}
-              onMouseEnter={warmupPreviewPdf}
-              disabled={busyAction !== ''}
-            >
-              {busyAction === 'preview' ? '生成中…' : '在线预览 PDF'}
-            </button>
-            <button
-              type="button"
-              className={getToolbarButtonClassName()}
-              onClick={handleDownloadPdf}
-              disabled={busyAction !== ''}
-            >
-              {busyAction === 'download' ? '生成中…' : '下载 PDF'}
-            </button>
-            <button
-              type="button"
-              className={getToolbarButtonClassName({ primary: true })}
-              onClick={handlePrint}
-            >
-              打印
-            </button>
-          </div>
-        </>
+        <div className="erp-print-shell__toolbar-group">
+          <button
+            type="button"
+            className={getToolbarButtonClassName()}
+            onClick={handlePreviewPdf}
+            onFocus={warmupPreviewPdf}
+            onMouseEnter={warmupPreviewPdf}
+            disabled={busyAction !== ''}
+          >
+            {busyAction === 'preview' ? '生成中…' : '在线预览 PDF'}
+          </button>
+          <button
+            type="button"
+            className={getToolbarButtonClassName()}
+            onClick={handleDownloadPdf}
+            disabled={busyAction !== ''}
+          >
+            {busyAction === 'download' ? '生成中…' : '下载 PDF'}
+          </button>
+          <button
+            type="button"
+            className={getToolbarButtonClassName({ primary: true })}
+            onClick={handlePrint}
+          >
+            打印
+          </button>
+        </div>
       }
     >
       <div className="erp-print-shell__stage-wrap" ref={stageWrapRef}>

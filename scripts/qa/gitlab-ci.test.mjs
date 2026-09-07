@@ -352,15 +352,15 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
     workflow.match(
       /pnpm --dir web install --frozen-lockfile --prefer-offline --registry="\$PNPM_INSTALL_REGISTRY"/gu,
     )?.length ?? 0,
-    2,
+    3,
   );
   assert.equal(
     workflow.match(/-u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY/gu)?.length ?? 0,
-    2,
+    3,
   );
   assert.equal(
     workflow.match(/npm_config_proxy= npm_config_https_proxy=/gu)?.length ?? 0,
-    2,
+    3,
   );
   assert.match(
     workflow,
@@ -687,7 +687,9 @@ test("R640 GitLab definitions pin identity, separate SSD data and require exact 
     2,
   );
   assert.equal(
-    workflow.match(/gitlab-runner-images[.]mjs --sha "\$RELEASE_SHA" --execute/gu)?.length,
+    workflow.match(
+      /gitlab-runner-images[.]mjs --sha "\$RELEASE_SHA" --execute/gu,
+    )?.length,
     2,
   );
   assert.doesNotMatch(backup, /volume prune|image prune|rm\s+-rf/u);

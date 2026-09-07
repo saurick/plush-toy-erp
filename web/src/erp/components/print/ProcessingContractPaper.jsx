@@ -95,6 +95,12 @@ function EditableText({
     <Component
       ref={editableRef}
       className={`${className}${disabled ? ' erp-processing-contract-editable--disabled' : ''}`}
+      data-print-empty={
+        !String(value ?? '')
+          .replace(/<[^>]*>/g, '')
+          .replace(/&nbsp;/g, '')
+          .trim()
+      }
       contentEditable={!disabled}
       suppressContentEditableWarning
       spellCheck={false}

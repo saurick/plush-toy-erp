@@ -33,6 +33,32 @@ import {
   splitMaterialDetailCellMerge,
 } from './engineeringPrintEditor.mjs'
 
+test('作业指导书图片的标注布局经过草稿规范化与刷新仍保留', () => {
+  const draft = createEngineeringPrintDraft(WORK_INSTRUCTION_TEMPLATE_KEY, {
+    instructionRows: [
+      {
+        no: '1',
+        text: '检查',
+        images: [
+          {
+            dataURL: 'data:image/png;base64,dGVzdA==',
+            annotationLayout: 'sidebar',
+            annotations: [
+              { id: 'measurement-1', type: 'measurement', text: '30 mm' },
+            ],
+          },
+        ],
+      },
+    ],
+  })
+  assert.equal(draft.instructionRows[0].images[0].annotationLayout, 'sidebar')
+  assert.equal(
+    createEngineeringPrintDraft(WORK_INSTRUCTION_TEMPLATE_KEY, draft)
+      .instructionRows[0].images[0].annotationLayout,
+    'sidebar'
+  )
+})
+
 test('engineeringPrintTemplates: BOM 版本带值生成物料明细并保留产品核心字段', () => {
   const draft = buildMaterialDetailDraftFromBOMVersion(
     {

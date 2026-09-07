@@ -618,6 +618,28 @@ test("release artifact builder normalizes the source hash and writes complete ch
         runCommand,
         streamImageArchive: streamArchive,
         inspectPortableImageArchiveIdentity: inspectArchiveIdentity,
+        verifyPdfRuntime: async ({ sourceImage, commit: checkedCommit }) => {
+          assert.equal(sourceImage, sourceImages.server);
+          assert.equal(checkedCommit, commit);
+          return {
+            status: "passed",
+            sourceCommit: commit,
+            imageId: `sha256:${"2".repeat(64)}`,
+            packages: [
+              { name: "chromium", version: "152.0.7977.82-1~deb12u1" },
+            ],
+            businessPdfChecks: {
+              status: "passed",
+              results: [
+                "material-purchase-contract",
+                "processing-contract",
+                "engineering-material-detail",
+                "engineering-color-card",
+                "engineering-work-instruction",
+              ].map((key) => ({ file: `print-snapshot-${key}.pdf`, pages: 1 })),
+            },
+          };
+        },
       },
     );
     const output = path.join(root, report.outputDirectory);
@@ -629,6 +651,22 @@ test("release artifact builder normalizes the source hash and writes complete ch
       "utf8",
     );
 
+    const sbom = JSON.parse(
+      readFileSync(path.join(output, "sbom.cdx.json"), "utf8"),
+    );
+    assert(
+      sbom.components.some(
+        (item) =>
+          item.name === "chromium" && item.purl.startsWith("pkg:deb/debian/"),
+      ),
+    );
+    assert(
+      sbom.metadata.component.properties.some(
+        (item) =>
+          item.name === "pdf.runtime" &&
+          JSON.parse(item.value).status === "passed",
+      ),
+    );
     assert.equal(manifest.sourceArchive.sha256, "9".repeat(64));
     assert.equal(manifest.releaseVersion, releaseVersion);
     assert(

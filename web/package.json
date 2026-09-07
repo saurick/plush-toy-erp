@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@ant-design/icons": "^5.6.1",
+    "@fontsource-variable/noto-sans-sc": "5.3.0",
+    "@fontsource-variable/noto-serif-sc": "5.3.0",
     "antd": "^5.29.3",
     "jwt-decode": "^4.0.0",
     "mermaid": "^11.15.0",
@@ -43,6 +45,7 @@
     "eslint-plugin-react": "^7.36.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-tailwindcss": "^3.18.2",
+    "fake-indexeddb": "6.2.5",
     "happy-dom": "10.8.0",
     "lodash": "^4.17.21",
     "playwright": "^1.58.2",

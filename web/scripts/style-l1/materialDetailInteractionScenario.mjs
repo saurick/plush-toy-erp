@@ -263,7 +263,7 @@ export function createMaterialDetailInteractionScenario({
         .count()
 
       await page
-        .locator('.erp-print-shell__toolbar-group')
+        .locator('.erp-print-shell__panel .erp-print-shell__toolbar-group')
         .first()
         .getByRole('button', { name: '下插一行' })
         .click()

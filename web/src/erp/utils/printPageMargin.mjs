@@ -51,7 +51,13 @@ export function resolvePaperRenderedHeight(paperElement) {
     return 0
   }
 
-  const rectHeight = Number(paperElement.getBoundingClientRect?.().height || 0)
+  const rectHeight =
+    Number(paperElement.getBoundingClientRect?.().height || 0) /
+    (Number(
+      paperElement.ownerDocument?.defaultView?.getComputedStyle(
+        paperElement.closest?.('.erp-print-shell__stage-wrap') || paperElement
+      ).zoom
+    ) || 1)
   const scrollHeight = Number(paperElement.scrollHeight || 0)
   const offsetHeight = Number(paperElement.offsetHeight || 0)
 

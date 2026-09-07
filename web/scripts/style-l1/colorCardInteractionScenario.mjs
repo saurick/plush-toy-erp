@@ -430,7 +430,7 @@ async function verifyColorCardExistingLineInsertion({
   )
 
   await page
-    .locator('.erp-print-shell__toolbar-group')
+    .locator('.erp-print-shell__panel .erp-print-shell__toolbar-group')
     .nth(1)
     .getByRole('button', { name: '移除当前行' })
     .click()
@@ -453,7 +453,7 @@ async function verifyColorCardExistingLineInsertion({
     .dispatchEvent('mousedown', { bubbles: true, cancelable: true })
 
   await page
-    .locator('.erp-print-shell__toolbar-group')
+    .locator('.erp-print-shell__panel .erp-print-shell__toolbar-group')
     .nth(1)
     .getByRole('button', { name: '上插一行' })
     .click()
@@ -491,7 +491,7 @@ async function verifyColorCardExistingLineInsertion({
   )
 
   await page
-    .locator('.erp-print-shell__toolbar-group')
+    .locator('.erp-print-shell__panel .erp-print-shell__toolbar-group')
     .nth(1)
     .getByRole('button', { name: '移除当前行' })
     .click()
@@ -596,7 +596,7 @@ async function verifyColorCardPlaceholderInsertion({
   )
 
   await page
-    .locator('.erp-print-shell__toolbar-group')
+    .locator('.erp-print-shell__panel .erp-print-shell__toolbar-group')
     .nth(1)
     .getByRole('button', { name: '上插一行' })
     .click()
@@ -620,7 +620,7 @@ async function verifyColorCardPlaceholderInsertion({
   )
 
   await page
-    .locator('.erp-print-shell__toolbar-group')
+    .locator('.erp-print-shell__panel .erp-print-shell__toolbar-group')
     .nth(1)
     .getByRole('button', { name: '移除当前行' })
     .click()
@@ -652,7 +652,7 @@ async function verifyColorCardPlaceholderInsertion({
     placeholderDownSelectionState.visibleRows
 
   await page
-    .locator('.erp-print-shell__toolbar-group')
+    .locator('.erp-print-shell__panel .erp-print-shell__toolbar-group')
     .nth(1)
     .getByRole('button', { name: '下插一行' })
     .click()
@@ -679,7 +679,7 @@ async function verifyColorCardPlaceholderInsertion({
   )
 
   await page
-    .locator('.erp-print-shell__toolbar-group')
+    .locator('.erp-print-shell__panel .erp-print-shell__toolbar-group')
     .nth(1)
     .getByRole('button', { name: '移除当前行' })
     .click()
@@ -704,7 +704,7 @@ async function verifyColorCardPlaceholderInsertion({
       .last()
       .dispatchEvent('mousedown', { bubbles: true, cancelable: true })
     await page
-      .locator('.erp-print-shell__toolbar-group')
+      .locator('.erp-print-shell__panel .erp-print-shell__toolbar-group')
       .nth(1)
       .getByRole('button', { name: '下插一行' })
       .click()

@@ -8,6 +8,7 @@ import {
 import { PrintAppendixImages } from './PrintAppendixImages.jsx'
 import {
   MATERIAL_DETAIL_COLUMNS,
+  MATERIAL_DETAIL_COLUMN_WIDTHS,
   engineeringImageSlots,
 } from '../../data/engineeringPrintTemplates.mjs'
 import {
@@ -37,7 +38,10 @@ function MaterialDetailPaper({
       ref={paperRef}
     >
       <header className="erp-material-detail-paper__header">
-        <div className="erp-material-detail-paper__title-block">
+        <div
+          className="erp-material-detail-paper__title-block"
+          data-print-focus-group=""
+        >
           <EditableText
             value={draft.companyName}
             onCommit={(value) => onFieldChange('companyName', value)}
@@ -109,30 +113,27 @@ function MaterialDetailPaper({
 
       <table className="erp-engineering-print-table erp-material-detail-table">
         <colgroup>
-          <col style={{ width: '5.4%' }} />
-          <col style={{ width: '12.8%' }} />
-          <col style={{ width: '7.2%' }} />
-          <col style={{ width: '6.2%' }} />
-          <col style={{ width: '2.6%' }} />
-          <col style={{ width: '3.6%' }} />
-          <col style={{ width: '10%' }} />
-          <col style={{ width: '2.8%' }} />
-          <col style={{ width: '5.2%' }} />
-          <col style={{ width: '3.6%' }} />
-          <col style={{ width: '7.9%' }} />
-          <col style={{ width: '10.4%' }} />
-          <col style={{ width: '7.3%' }} />
-          <col style={{ width: '15%' }} />
+          {MATERIAL_DETAIL_COLUMNS.map((column, index) => (
+            <col
+              key={column.key}
+              style={{ width: MATERIAL_DETAIL_COLUMN_WIDTHS[index] }}
+            />
+          ))}
         </colgroup>
         <thead>
           <tr>
             {MATERIAL_DETAIL_COLUMNS.map((column, columnIndex) => (
               <th key={column.key}>
                 <EditableText
-                  value={draft.columnLabels?.[columnIndex] || column.label}
+                  value={
+                    !draft.columnLabels?.[columnIndex] ||
+                    draft.columnLabels[columnIndex] === column.label
+                      ? column.headerLabel || column.label
+                      : draft.columnLabels[columnIndex]
+                  }
                   multiline
                   rich
-                  className="erp-material-detail-table__editable"
+                  className="erp-material-detail-table__editable erp-material-detail-table__header"
                   onCommit={(value) => onColumnLabelChange(columnIndex, value)}
                 />
               </th>

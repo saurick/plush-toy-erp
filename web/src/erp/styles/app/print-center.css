@@ -527,7 +527,7 @@
 
 .erp-print-shell__toolbar-actions {
   display: flex;
-  flex: 999 1 720px;
+  flex: 0 1 auto;
   min-width: 0;
   align-items: flex-start;
   align-content: flex-start;
@@ -620,7 +620,7 @@
 
 .erp-print-shell__content {
   display: grid;
-  grid-template-columns: 384px minmax(0, 1fr);
+  grid-template-columns: 248px minmax(0, 1fr);
   gap: 12px;
   margin-top: 12px;
   align-items: start;
@@ -675,164 +675,184 @@
   color: #595959;
 }
 
-.erp-print-shell__search {
-  margin-bottom: 10px;
+.erp-print-shell__tool-section {
+  padding: 14px 0;
+  border-top: 1px solid #edf0ed;
 }
 
-.erp-print-shell__search-input {
-  width: 100%;
-  height: 32px;
-  padding: 4px 8px;
-  border: 1px solid #d9d9d9;
-  border-radius: 12px;
+.erp-print-shell__tool-section h4 {
+  margin: 0 0 9px;
+  color: #36433a;
   font-size: 12px;
 }
 
-.erp-print-shell__search-input:focus {
-  outline: 1px solid #1f7a3f;
-  border-color: #1f7a3f;
+.erp-print-shell__tool-section .erp-print-shell__toolbar-group {
+  justify-content: flex-start;
+  gap: 6px;
 }
 
-.erp-print-shell__detail-panel {
-  margin-bottom: 10px;
-}
-
-.erp-print-shell__panel-actions {
-  margin-bottom: 10px;
-}
-
-.erp-print-shell__detail-panel h4 {
-  margin: 0 0 6px;
+.erp-print-shell__tool-section .erp-print-shell__button {
+  padding: 0 9px;
   font-size: 12px;
-  color: #434343;
 }
 
-.erp-print-shell__detail-table,
-.erp-print-shell__record-table {
+.erp-print-shell__tool-section .erp-print-shell__counter {
   width: 100%;
-  border: 1px solid #d9d9d9;
-  border-collapse: separate;
-  border-spacing: 0;
-  border-radius: 10px;
-  overflow: hidden;
-  table-layout: fixed;
-}
-
-.erp-print-shell__detail-table th,
-.erp-print-shell__detail-table td,
-.erp-print-shell__record-table th,
-.erp-print-shell__record-table td {
+  justify-content: flex-start;
   border: 0;
-  border-right: 1px solid #d9d9d9;
-  border-bottom: 1px solid #d9d9d9;
-  padding: 4px 6px;
-  vertical-align: top;
-  font-size: 12px;
+  border-radius: 4px;
 }
 
-.erp-print-shell__detail-table :where(th, td):last-child,
-.erp-print-shell__record-table :where(th, td):last-child {
-  border-right: 0;
+.erp-print-shell__workspace {
+  min-width: 0;
 }
 
-.erp-print-shell__detail-table tbody tr:last-child td,
-.erp-print-shell__record-table tbody tr:last-child td {
-  border-bottom: 0;
-}
-
-.erp-print-shell__detail-table th,
-.erp-print-shell__record-table th {
-  background: #fafafa;
-  color: #595959;
-}
-
-.erp-print-shell__detail-index-cell,
-.erp-print-shell__field-label {
-  background: #fcfcfc;
-  color: #434343;
-}
-
-.erp-print-shell__detail-index-cell {
-  width: 48px;
-  text-align: center;
-  vertical-align: middle;
-}
-
-.erp-print-shell__field-label {
-  width: 36%;
-  max-width: 36%;
-  white-space: pre-wrap;
-  overflow-wrap: break-word;
-}
-
-.erp-print-shell__field-value {
-  width: 64%;
-  max-width: 64%;
-}
-
-.erp-print-shell__field-editor,
-.erp-print-shell__detail-editor {
-  width: 100%;
-  min-height: 28px;
-  padding: 4px 6px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
-  font-size: 12px;
-  line-height: 1.45;
-  color: #262626;
-}
-
-.erp-print-shell__currency-input {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+.erp-print-shell__view-bar {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
-  width: 100%;
-}
-
-.erp-print-shell__currency-prefix {
-  color: #476454;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #fff;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px 8px 0 0;
   font-size: 12px;
-  font-variant-numeric: tabular-nums;
+  color: #47564b;
 }
 
-.erp-print-shell__detail-editor--currency {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
+.erp-print-shell__zoom-control {
+  --erp-control-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #334155;
+  font-size: 13px;
+  line-height: 20px;
+  white-space: nowrap;
 }
 
-.erp-print-shell__field-editor--multiline,
-.erp-print-shell__detail-editor--multiline {
-  min-height: 48px;
-  resize: vertical;
-  white-space: pre-wrap;
+.erp-print-shell__zoom-control select {
+  box-sizing: border-box;
+  height: 32px;
+  min-width: 120px;
+  padding: 4px 28px 4px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #334155;
+  font: inherit;
+  cursor: pointer;
 }
 
-.erp-print-shell__field-editor:focus,
-.erp-print-shell__detail-editor:focus {
-  outline: none;
-  border-color: #1f7a3f;
-  background: #f6ffed;
+.erp-print-shell__zoom-control select:hover {
+  border-color: #94a3b8;
 }
 
-.erp-print-shell__detail-static,
-.erp-print-shell__field-static {
-  min-height: 28px;
-  padding: 4px 6px;
-  line-height: 1.45;
-  color: #262626;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+.erp-print-shell__zoom-control select:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
 }
 
-.erp-print-shell__empty-row {
-  text-align: center;
-  color: #8c8c8c;
+.erp-print-shell__view-bar button {
+  margin-left: 8px;
+}
+.erp-print-shell__view-bar
+  [data-print-edit-mode]:not([data-print-edit-mode='edit']) {
+  color: #1d4ed8;
+}
+.erp-print-shell__feedback {
+  margin: 0;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: #52605a;
+  background: #f4f7f4;
+}
+
+@media screen {
+  .erp-print-shell .erp-material-contract-meta__row,
+  .erp-print-shell .erp-processing-contract-meta__row {
+    column-gap: 8px;
+  }
+
+  .erp-print-shell .erp-material-contract-meta__row--top-item {
+    --erp-material-contract-label-width: 20mm;
+  }
+
+  .erp-print-shell__stage-wrap {
+    width: max-content;
+    zoom: var(--print-view-scale, 1);
+  }
+  .erp-print-shell__stage-wrap > * {
+    flex-shrink: 0;
+  }
+
+  .erp-print-shell__stage {
+    --erp-print-focus-color: rgb(47 143 75 / 82%);
+    --erp-print-focus-background: rgb(47 143 75 / 8%);
+    --erp-print-focus-outset: 5px;
+  }
+
+  /* The focus frame includes the font's caret bounds without changing paper layout. */
+  .erp-print-shell__stage [contenteditable='true']:focus,
+  .erp-print-shell__stage
+    [data-print-focus-group]:has([contenteditable='true']:focus) {
+    outline: 1px dashed var(--erp-print-focus-color);
+    outline-offset: var(--erp-print-focus-outset);
+    background: var(--erp-print-focus-background);
+    box-shadow: 0 0 0 var(--erp-print-focus-outset)
+      var(--erp-print-focus-background);
+  }
+
+  .erp-print-shell__stage :is(td, th):has(> [contenteditable='true']:focus) {
+    outline: 1px dashed var(--erp-print-focus-color);
+    outline-offset: 0;
+    background: var(--erp-print-focus-background);
+    box-shadow: none;
+  }
+
+  .erp-print-shell__stage :is(td, th) > [contenteditable='true']:focus {
+    outline: none;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .erp-print-shell__stage
+    [data-print-focus-group]
+    [contenteditable='true']:focus {
+    outline: none;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .erp-print-shell [contenteditable][data-print-empty='true'] {
+    position: relative;
+  }
+  .erp-print-shell
+    [contenteditable='true'][data-print-empty='true']:not(
+      :focus
+    ):hover::before {
+    content: '点击填写';
+    position: absolute;
+    inset-inline-start: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #8b9890;
+    font: 11px/1.2 sans-serif;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+}
+
+@media print {
+  .erp-print-shell__view-bar,
+  .erp-print-shell__feedback {
+    display: none;
+  }
 }
 
 .erp-print-shell__stage {
-  max-height: calc(100vh - 96px);
+  max-height: calc(100vh - 160px);
   padding: 24px;
   overflow: auto;
   border: 1px solid #d9d9d9;
@@ -848,4 +868,12 @@
 
 .erp-print-shell__stage-wrap--continued {
   align-items: flex-start;
+}
+
+.erp-print-shell__selection-impact {
+  display: block;
+  margin-top: 4px;
+  color: #66736b;
+  font-size: 12px;
+  font-weight: 400;
 }

@@ -8,10 +8,10 @@ ARG GO_TARGETARCH=amd64
 ARG NODE_BUILDER_IMAGE=node:24.14.0
 ARG GO_BUILDER_IMAGE=golang:1.26.6
 ARG WEB_RUNTIME_BASE_IMAGE=node:24.14.0-slim
-ARG RUNTIME_BASE_IMAGE=debian:bookworm-slim
-# Debian 12 的 Chromium 150.0.7871.46 在部分宿主运行时会 SIGTRAP。
-# 版本升级必须显式修改本参数，并重新通过容器启动与真实 PDF 发布烟测。
-ARG CHROMIUM_VERSION=150.0.7871.100-1~deb12u1
+ARG RUNTIME_BASE_IMAGE=debian:bookworm-slim@sha256:88200866dfff7ea7f5cbcb6ec7c8a701889efe6fe859fe64d6990e4b07ea4171
+# 同时固定 Debian 包源与浏览器版本；升级由最终镜像的真实 PDF 检查验证。
+ARG DEBIAN_SNAPSHOT=20260906T000000Z
+ARG CHROMIUM_VERSION=152.0.7977.82-1~deb12u1
 
 # ======================
 # 1) 构建前端静态文件
@@ -53,7 +53,9 @@ RUN pnpm run build:committed && \
     node /scripts/build/apply-customer-web-config.mjs \
       --customer "${ERP_CUSTOMER_PACKAGE}" \
       --config-root /config \
-      --web-build-dir /web/build
+      --web-build-dir /web/build && \
+    find /web/build -type d -exec chmod 0755 {} + && \
+    find /web/build -type f -exec chmod 0644 {} +
 
 # ======================
 # 2) 独立 Web runtime；正式发布与 Server 共用上面的唯一前端构建
@@ -134,21 +136,33 @@ RUN --mount=type=cache,id=plush-gomod,target=/go/pkg/mod \
 FROM --platform=$RUNTIMEPLATFORM ${RUNTIME_BASE_IMAGE} AS server-runtime
 
 ARG CHROMIUM_VERSION
+ARG DEBIAN_SNAPSHOT
+ARG RUNTIME_BASE_IMAGE
 
 ENV TZ=Asia/Shanghai
 ENV ERP_PDF_CHROME_PATH=/usr/bin/chromium
+ENV CHROMIUM_DEBIAN_SNAPSHOT=${DEBIAN_SNAPSHOT}
+ENV PDF_RUNTIME_BASE_IMAGE=${RUNTIME_BASE_IMAGE}
+
+# 引导 HTTPS 包源，随后由固定快照中的 ca-certificates 接管证书文件。
+COPY --from=go-builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 
 RUN --mount=type=cache,id=plush-apt-lists,target=/var/lib/apt/lists,sharing=locked \
     --mount=type=cache,id=plush-apt-cache,target=/var/cache/apt,sharing=locked \
     rm -f /etc/apt/apt.conf.d/docker-clean && \
-    apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    rm -f /etc/apt/sources.list.d/debian.sources && \
+    printf '%s\n' \
+      "deb [check-valid-until=no] https://snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT} bookworm main" \
+      "deb [check-valid-until=no] https://snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT} bookworm-updates main" \
+      "deb [check-valid-until=no] https://snapshot.debian.org/archive/debian-security/${DEBIAN_SNAPSHOT} bookworm-security main" \
+      > /etc/apt/sources.list && \
+    apt-get -o Acquire::Retries=3 -o Acquire::https::Timeout=30 update && \
+    DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 -o Acquire::https::Timeout=30 install -y --no-install-recommends \
       tzdata \
       ca-certificates \
       curl \
       "chromium=${CHROMIUM_VERSION}" \
-      "chromium-common=${CHROMIUM_VERSION}" \
-      fonts-noto-cjk && \
+      "chromium-common=${CHROMIUM_VERSION}" && \
     installed_chromium_version="$(dpkg-query -W -f='${Version}' chromium)" && \
     installed_chromium_common_version="$(dpkg-query -W -f='${Version}' chromium-common)" && \
     test "$installed_chromium_version" = "$CHROMIUM_VERSION" && \

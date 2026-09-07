@@ -1,7 +1,9 @@
+import { Buffer } from 'node:buffer'
 import { createMaterialDetailInteractionScenario } from './materialDetailInteractionScenario.mjs'
 import { createColorCardInteractionScenario } from './colorCardInteractionScenario.mjs'
 import { createWorkInstructionInteractionScenario } from './workInstructionInteractionScenario.mjs'
-import { Buffer } from 'node:buffer'
+import { printTemplateCatalog } from '../../src/erp/config/printTemplates.mjs'
+import { createPrintPolishScenarios } from './printPolishScenarios.mjs'
 
 export function createPrintWorkspaceScenarios({
   expectHeading,
@@ -36,47 +38,120 @@ export function createPrintWorkspaceScenarios({
 }) {
   const assertPrintEditableFocusBorderStyle = async (
     page,
-    { selector, scenarioLabel }
+    { selector, index = 0, scenarioLabel }
   ) => {
-    await page.locator(selector).first().waitFor({
+    await page.evaluate(() => document.fonts.ready)
+    await page.locator(selector).nth(index).waitFor({
       state: 'visible',
       timeout: 10_000,
     })
     const metrics = await page
       .locator(selector)
-      .first()
+      .nth(index)
       .evaluate((element) => {
+        const before = element.getBoundingClientRect()
         element.focus()
-        const editableStyle = window.getComputedStyle(element)
-        const cell = element.closest('td')
-        const cellStyle = cell ? window.getComputedStyle(cell) : null
+        const cell = element.parentElement?.matches('td, th')
+          ? element.parentElement
+          : null
+        const group = element.closest('[data-print-focus-group]')
+        const frame = group || cell || element
+        const frameStyle = getComputedStyle(frame)
+        const box = frame.getBoundingClientRect()
+        const after = element.getBoundingClientRect()
+        const scale = box.width / frame.offsetWidth
+        const outset = Number.parseFloat(frameStyle.outlineOffset) * scale
+        const range = document.createRange()
+        range.selectNodeContents(element)
+        const text = range.getBoundingClientRect()
+        const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
+        const firstText = walker.nextNode()
+        let caret = null
+        if (firstText) {
+          range.setStart(firstText, 0)
+          range.collapse(true)
+          caret = range.getBoundingClientRect()
+        }
+        const clearance = (rect) =>
+          rect && rect.height > 0
+            ? {
+                top: (rect.top - box.top + outset) / scale,
+                bottom: (box.bottom + outset - rect.bottom) / scale,
+                left: (rect.left - box.left + outset) / scale,
+                right: (box.right + outset - rect.right) / scale,
+              }
+            : null
+        const neighboringText = []
+        const neighbors = document.createTreeWalker(
+          element.closest('.erp-print-shell__stage-wrap'),
+          NodeFilter.SHOW_TEXT
+        )
+        for (
+          let node = neighbors.nextNode();
+          node;
+          node = neighbors.nextNode()
+        ) {
+          if (
+            !node.textContent.trim() ||
+            frame.contains(node) ||
+            ['STYLE', 'SCRIPT'].includes(node.parentElement.tagName) ||
+            getComputedStyle(node.parentElement).visibility === 'hidden'
+          ) {
+            continue
+          }
+          const neighborRange = document.createRange()
+          neighborRange.selectNodeContents(node)
+          for (const rect of neighborRange.getClientRects()) {
+            const overlapX =
+              Math.min(box.right + outset, rect.right) -
+              Math.max(box.left - outset, rect.left)
+            const overlapY =
+              Math.min(box.bottom + outset, rect.bottom) -
+              Math.max(box.top - outset, rect.top)
+            if (overlapX > 0.5 * scale && overlapY > 0.5 * scale) {
+              neighboringText.push(node.textContent.trim().slice(0, 40))
+            }
+          }
+        }
         return {
-          activeElementMatches:
-            document.activeElement === element ||
-            document.activeElement?.contains(element) ||
-            false,
-          editableOutlineStyle: editableStyle.outlineStyle,
-          editableOutlineWidth: editableStyle.outlineWidth,
-          editableBoxShadow: editableStyle.boxShadow,
-          editableBackground: editableStyle.backgroundColor,
-          cellOutlineStyle: cellStyle?.outlineStyle || '',
-          cellOutlineWidth: cellStyle?.outlineWidth || '',
-          cellBoxShadow: cellStyle?.boxShadow || '',
-          cellBackground: cellStyle?.backgroundColor || '',
+          activeElementMatches: document.activeElement === element,
+          outlineStyle: frameStyle.outlineStyle,
+          outlineColor: frameStyle.outlineColor,
+          background: frameStyle.backgroundColor,
+          wholeCell: Boolean(cell),
+          grouped: Boolean(group),
+          innerOutlineStyle: getComputedStyle(element).outlineStyle,
+          widthChange: after.width - before.width,
+          heightChange: after.height - before.height,
+          textClearance: clearance(text),
+          caretClearance: clearance(caret),
+          neighboringText,
         }
       })
-    const borderEvidence = `${metrics.editableBoxShadow} ${metrics.cellBoxShadow}`
-    const backgroundEvidence = `${metrics.editableBackground} ${metrics.cellBackground}`
     assert(
       metrics.activeElementMatches &&
-        !/dashed/iu.test(metrics.editableOutlineStyle) &&
-        !/dashed/iu.test(metrics.cellOutlineStyle) &&
-        /rgba?\(/iu.test(borderEvidence) &&
-        borderEvidence !== 'none none' &&
-        borderEvidence.includes('rgba(47, 143, 75, 0.82)') &&
-        backgroundEvidence.includes('rgba(47, 143, 75, 0.08)'),
-      `${scenarioLabel} 编辑焦点边框应统一为合同模板同款实线内描边和浅绿色底色，不能继续用虚线或另一套绿色: ${JSON.stringify(metrics)}`
+        metrics.outlineStyle === 'dashed' &&
+        metrics.outlineColor === 'rgba(47, 143, 75, 0.82)' &&
+        metrics.background === 'rgba(47, 143, 75, 0.08)' &&
+        (!(metrics.wholeCell || metrics.grouped) ||
+          metrics.innerOutlineStyle === 'none') &&
+        Math.abs(metrics.widthChange) < 0.5 &&
+        Math.abs(metrics.heightChange) < 0.5,
+      `${scenarioLabel} 焦点应显示单一绿色虚线框，表格覆盖整格，聚焦不改变纸面尺寸: ${JSON.stringify(metrics)}`
     )
+    const minimum = metrics.wholeCell ? 0.75 : 1.75
+    assert(
+      [metrics.textClearance, metrics.caretClearance].every(
+        (gaps) => !gaps || Object.values(gaps).every((gap) => gap >= minimum)
+      ),
+      `${scenarioLabel} 焦点框不能压住文字或光标，左右和上下均须保留空隙: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.neighboringText.length,
+      0,
+      `${scenarioLabel} 焦点框不能覆盖相邻标签或其他行文字: ${JSON.stringify(metrics)}`
+    )
+    return metrics
   }
   const assertPrintEditableFocusSurvivesSwitch = async (
     page,
@@ -94,17 +169,22 @@ export function createPrintWorkspaceScenarios({
     await second.click()
     await page.waitForTimeout(600)
     const metrics = await second.evaluate((element) => {
-      const style = window.getComputedStyle(element)
+      const frame =
+        element.closest('[data-print-focus-group]') ||
+        (element.parentElement?.matches('td, th')
+          ? element.parentElement
+          : element)
+      const style = window.getComputedStyle(frame)
       return {
         activeElementMatches: document.activeElement === element,
-        boxShadow: style.boxShadow,
+        outlineStyle: style.outlineStyle,
         background: style.backgroundColor,
         text: String(element.textContent || '').trim(),
       }
     })
     assert(
       metrics.activeElementMatches &&
-        /rgba?\(/iu.test(metrics.boxShadow) &&
+        metrics.outlineStyle === 'dashed' &&
         metrics.background !== 'rgba(0, 0, 0, 0)',
       `${scenarioLabel} 从一个编辑框切到另一个编辑框后，前一个 blur 提交不应让新焦点和边框消失: ${JSON.stringify(metrics)}`
     )
@@ -178,6 +258,12 @@ export function createPrintWorkspaceScenarios({
       const stageRect = stage?.getBoundingClientRect()
       const paperRect = paper?.getBoundingClientRect()
       const stageStyle = stage ? window.getComputedStyle(stage) : null
+      const viewBarRect = document
+        .querySelector('.erp-print-shell__view-bar')
+        ?.getBoundingClientRect()
+      const feedbackRect = document
+        .querySelector('.erp-print-shell__feedback')
+        ?.getBoundingClientRect()
 
       return {
         foundToolbar: Boolean(toolbar),
@@ -188,6 +274,8 @@ export function createPrintWorkspaceScenarios({
           toolbarRect && contentRect
             ? contentRect.top - toolbarRect.bottom
             : -1,
+        controlsBottom: feedbackRect?.bottom || viewBarRect?.bottom || 0,
+        stageTop: stageRect?.top || 0,
         contentToStage:
           contentRect && stageRect ? stageRect.top - contentRect.top : -1,
         stageToPaper:
@@ -209,10 +297,11 @@ export function createPrintWorkspaceScenarios({
         metrics.foundStage &&
         metrics.foundPaper &&
         Math.abs(metrics.toolbarToContent - 12) <= 1 &&
-        Math.abs(metrics.contentToStage) <= 1 &&
+        metrics.stageTop >= metrics.controlsBottom &&
+        metrics.stageTop <= metrics.controlsBottom + 20 &&
         Math.abs(metrics.stagePaddingTop - 24) <= 1 &&
         Math.abs(metrics.stageToPaper - 25) <= 1 &&
-        Math.abs(metrics.toolbarToPaper - 37) <= 1 &&
+        Math.abs(metrics.toolbarToPaper - metrics.contentToStage - 37) <= 1 &&
         metrics.paperWidth > 700,
       `${scenarioLabel} 纸面编辑区到顶部工具栏的外层间距应和五套正式模板一致: ${JSON.stringify(metrics)}`
     )
@@ -543,6 +632,12 @@ export function createPrintWorkspaceScenarios({
     )
   }
   return [
+    ...createPrintPolishScenarios({
+      assert,
+      path,
+      outputDir,
+      gotoScenarioPath,
+    }),
     {
       name: 'print-center-desktop',
       path: '/erp/print-center',
@@ -963,7 +1058,7 @@ export function createPrintWorkspaceScenarios({
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectText(page, '采购合同')
-        await expectText(page, '打印内容')
+        await expectText(page, '编辑工具')
         await expectText(page, '使用默认模板')
         await expectText(page, '在线预览 PDF')
         await expectText(page, '选择明细行')
@@ -1035,6 +1130,44 @@ export function createPrintWorkspaceScenarios({
       viewport: { width: 760, height: 900 },
       verify: async (page) => {
         await expectText(page, '采购合同')
+        const paper = page.locator('.erp-material-contract-paper').first()
+        const readPaperSize = () =>
+          paper.evaluate((node) => ({
+            layoutWidth: node.offsetWidth,
+            visibleWidth: node.getBoundingClientRect().width,
+            flexShrink: window.getComputedStyle(node).flexShrink,
+            wrapperWidth: node.parentElement.getBoundingClientRect().width,
+          }))
+        const zoom = page.getByLabel('显示比例')
+        await zoom.selectOption('1')
+        const original = await readPaperSize()
+        assert(
+          Math.abs(original.layoutWidth - (210 * 96) / 25.4) <= 1,
+          '窄视口仍应使用 A4 的固定布局宽度'
+        )
+        await zoom.selectOption('1.5')
+        const enlarged = await readPaperSize()
+        assert.equal(
+          enlarged.layoutWidth,
+          original.layoutWidth,
+          `缩放前后纸面布局应一致: ${JSON.stringify({ original, enlarged })}`
+        )
+        assert(
+          Math.abs(enlarged.visibleWidth / original.visibleWidth - 1.5) < 0.01,
+          '显示比例应只放大纸面视图，不改变纸张布局宽度'
+        )
+        await page.emulateMedia({ media: 'print' })
+        try {
+          const printed = await readPaperSize()
+          assert(
+            Math.abs(printed.visibleWidth - printed.layoutWidth) <= 1,
+            '打印态不应继承屏幕的 150% 缩放'
+          )
+        } finally {
+          await page.emulateMedia({ media: 'screen' })
+        }
+        await zoom.selectOption('fit')
+        await assertNoHorizontalOverflow(page, '采购合同适应宽度')
         await assertMaterialContractPrintMediaIgnoresResponsiveBreakpoints(page)
       },
     },
@@ -1123,7 +1256,7 @@ export function createPrintWorkspaceScenarios({
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectText(page, '加工合同')
-        await expectText(page, '打印内容')
+        await expectText(page, '编辑工具')
         await expectText(page, '使用默认模板')
         await expectText(page, '在线预览 PDF')
         await expectText(page, '下载 PDF')
@@ -1565,6 +1698,99 @@ export function createPrintWorkspaceScenarios({
       },
     },
     {
+      name: 'print-workspace-all-template-edit-focus-clearance',
+      path: '/erp/print-workspace/material-purchase-contract?draft=fresh',
+      auth: 'admin',
+      viewport: { width: 1600, height: 1100 },
+      verify: async (page) => {
+        const selector = '.erp-print-shell__stage [contenteditable="true"]'
+        for (const template of printTemplateCatalog.filter(
+          (entry) => entry.runtime?.workspace
+        )) {
+          await gotoScenarioPath(
+            page,
+            `/erp/print-workspace/${template.key}?draft=fresh&state=focus-clearance`
+          )
+          await page.locator(selector).first().waitFor({ state: 'visible' })
+          await page.evaluate(() => document.fonts.ready)
+          const samples = await page
+            .locator(selector)
+            .evaluateAll((elements) => {
+              const groups = new Set()
+              return elements.flatMap((element, index) => {
+                const parent = element.parentElement
+                const group = `${parent.tagName} ${parent.className} ${element.className}`
+                if (groups.has(group)) return []
+                groups.add(group)
+                return [
+                  {
+                    index,
+                    text: element.textContent,
+                    cell: parent.matches('td, th'),
+                  },
+                ]
+              })
+            })
+          let checks = 0
+          for (const scale of [1, 1.25]) {
+            await page.locator('.erp-print-shell').evaluate((shell, value) => {
+              shell.style.setProperty('--print-view-scale', String(value))
+            }, scale)
+            for (const sample of samples) {
+              await assertPrintEditableFocusBorderStyle(page, {
+                selector,
+                index: sample.index,
+                scenarioLabel: `${template.title} ${scale * 100}% 字段 ${sample.index}`,
+              })
+              checks += 1
+            }
+            const editableSamples = [
+              samples.find((sample) => !sample.cell),
+              samples.find((sample) => sample.cell),
+            ].filter(Boolean)
+            for (const sample of editableSamples) {
+              const editable = page.locator(selector).nth(sample.index)
+              for (const text of [
+                '',
+                '中文编辑留白与长内容换行测试 Mixed English 0123456789',
+              ]) {
+                await editable.fill(text)
+                await assertPrintEditableFocusBorderStyle(page, {
+                  selector,
+                  index: sample.index,
+                  scenarioLabel: `${template.title} ${scale * 100}% ${text ? '长值' : '空值'}`,
+                })
+                checks += 1
+              }
+              await editable.fill(sample.text)
+            }
+          }
+          await page.locator('.erp-print-shell__stage-wrap').screenshot({
+            path: path.join(outputDir, `print-edit-focus-${template.key}.png`),
+          })
+          await page.emulateMedia({ media: 'print' })
+          const printFocus = await page
+            .locator(selector)
+            .evaluateAll((elements) =>
+              elements
+                .flatMap((element) => [element, element.parentElement])
+                .every((element) => {
+                  const style = getComputedStyle(element)
+                  return (
+                    style.outlineStyle !== 'dashed' &&
+                    style.boxShadow === 'none'
+                  )
+                })
+            )
+          assert(printFocus, `${template.title} 打印不能保留编辑虚线或焦点底色`)
+          await page.emulateMedia({ media: 'screen' })
+          console.log(
+            `[print-edit-focus] ${template.key}: ${checks} focus checks and print isolation passed`
+          )
+        }
+      },
+    },
+    {
       name: 'print-workspace-all-template-long-business-values',
       path: '/erp/print-workspace/material-purchase-contract?draft=fresh',
       auth: 'admin',
@@ -1634,6 +1860,37 @@ export function createPrintWorkspaceScenarios({
           selectedRowSelector: '.erp-material-contract-table__row-selected',
           counterLabel: '采购明细行',
         })
+        for (const exitAction of ['button', 'escape']) {
+          await page.getByRole('button', { name: '选择明细行' }).click()
+          await page
+            .locator('.erp-material-contract-table tbody tr')
+            .first()
+            .click()
+          const selection = page.locator('[data-print-edit-mode]')
+          assert.match(
+            await selection.textContent(),
+            /已选择 1 个目标.*第 1 行/su
+          )
+          if (exitAction === 'button') {
+            await page.getByRole('button', { name: '返回编辑' }).click()
+          } else {
+            await page.keyboard.press('Escape')
+          }
+          assert.equal(
+            await selection.getAttribute('data-print-edit-mode'),
+            'edit'
+          )
+          assert.equal(
+            await page
+              .locator('.erp-material-contract-table__row-selected')
+              .count(),
+            0,
+            `${exitAction} 返回编辑后不应残留选中行`
+          )
+          assert(
+            await page.getByRole('button', { name: '上插一行' }).isDisabled()
+          )
+        }
       },
     },
     {

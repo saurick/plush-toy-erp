@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/base64"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -17,6 +18,9 @@ const (
 	maxTemplatePDFEmbeddedTotalBytes = 16 << 20
 	maxTemplatePDFDOMNodeCount       = 20_000
 	maxTemplatePDFCSSBytes           = 4 << 20
+	maxTemplatePDFFontCount          = 128
+	maxTemplatePDFFontBytes          = 256 << 10
+	maxTemplatePDFFontTotalBytes     = 2 << 20
 )
 
 var (
@@ -24,6 +28,7 @@ var (
 	templatePDFCSSURLPattern     = regexp.MustCompile(`(?i)\burl\s*\(`)
 	templatePDFCSSCommentPattern = regexp.MustCompile(`(?s)/\*.*?\*/`)
 	templatePDFDataImagePattern  = regexp.MustCompile(`(?i)^data:image/(png|jpe?g|webp|gif);base64,([a-z0-9+/=]+)$`)
+	templatePDFDataFontPattern   = regexp.MustCompile(`^data:font/woff2;base64,([A-Za-z0-9+/=]+)$`)
 )
 
 var templatePDFAllowedElements = map[string]struct{}{
@@ -60,6 +65,8 @@ type templatePDFHTMLValidationState struct {
 	imageCount int
 	nodeCount  int
 	cssBytes   int
+	fontBytes  int
+	fontCount  int
 }
 
 func validateTemplatePDFHTML(htmlDocument string) error {
@@ -181,11 +188,32 @@ func validateTemplatePDFCSS(cssText string, state *templatePDFHTMLValidationStat
 			if err := validateTemplatePDFDataImage(value, state); err != nil {
 				return err
 			}
+		case strings.HasPrefix(value, "data:font/woff2;base64,"):
+			if err := validateTemplatePDFDataFont(value, state); err != nil {
+				return err
+			}
 		default:
-			return errors.New("html 样式只能引用内嵌图片或文档内部锚点")
+			return errors.New("html 样式只能引用内嵌图片、打印字体或文档内部锚点")
 		}
 		remaining = remaining[valueEnd+1:]
 	}
+	return nil
+}
+
+func validateTemplatePDFDataFont(value string, state *templatePDFHTMLValidationState) error {
+	matches := templatePDFDataFontPattern.FindStringSubmatch(value)
+	if state == nil || len(matches) != 2 || base64.StdEncoding.DecodedLen(len(matches[1])) > maxTemplatePDFFontBytes+2 {
+		return errors.New("打印字体数据无效或超过大小限制")
+	}
+	data, err := base64.StdEncoding.DecodeString(matches[1])
+	if err != nil || len(data) < 48 || string(data[:4]) != "wOF2" || int(binary.BigEndian.Uint32(data[8:12])) != len(data) || binary.BigEndian.Uint32(data[16:20]) > 8<<20 {
+		return errors.New("打印字体必须是有效的 WOFF2")
+	}
+	if len(data) > maxTemplatePDFFontBytes || state.fontCount >= maxTemplatePDFFontCount || state.fontBytes+len(data) > maxTemplatePDFFontTotalBytes {
+		return errors.New("整份打印字体超出大小限制")
+	}
+	state.fontCount++
+	state.fontBytes += len(data)
 	return nil
 }
 

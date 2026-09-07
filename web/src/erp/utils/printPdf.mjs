@@ -1,3 +1,5 @@
+import { assertPrintSnapshotBudget } from './printOutputPreflight.mjs'
+import { preparePrintFonts } from './printFonts.mjs'
 import { AUTH_SCOPE, getToken } from '../../common/auth/auth.js'
 import { getActionErrorMessage } from '../../common/utils/errorMessage.js'
 
@@ -1070,7 +1072,10 @@ async function buildServerPdfSnapshotHTMLFromElement(element, options = {}) {
   }
 
   const doc = element.ownerDocument
-  await flushActiveEditorBeforeOutput(doc)
+  if (!options.preserveEditorFocus) {
+    await flushActiveEditorBeforeOutput(doc)
+  }
+  const fontCSS = await preparePrintFonts(element)
 
   const clonedRoot =
     createMinimalServerPdfSnapshotRoot(element) ||
@@ -1080,12 +1085,20 @@ async function buildServerPdfSnapshotHTMLFromElement(element, options = {}) {
   }
 
   inlineServerPdfStylesheets(clonedRoot, doc)
+  if (fontCSS) {
+    const fontStyle = clonedRoot.ownerDocument.createElement('style')
+    fontStyle.setAttribute('data-server-pdf-fonts', 'true')
+    fontStyle.textContent = fontCSS
+    clonedRoot.querySelector('head').appendChild(fontStyle)
+  }
   normalizeServerPdfSnapshotRuntimeState(clonedRoot)
   if (isolateServerPdfSnapshotToTarget(clonedRoot)) {
     applyServerPdfLayoutOverrides(clonedRoot)
   }
   await optimizeServerPdfSnapshotImages(clonedRoot, options)
-  return `<!doctype html>${clonedRoot.outerHTML}`
+  const html = `<!doctype html>${clonedRoot.outerHTML}`
+  assertPrintSnapshotBudget(clonedRoot, html)
+  return html
 }
 
 function getServerPdfErrorMessage(response) {
@@ -1283,6 +1296,9 @@ export const preloadPdfPreviewFromElement = async (element, options = {}) => {
   return createServerPdfBlobFromElement(element, {
     ...options,
     snapshotMode: SERVER_PDF_PREVIEW_SNAPSHOT_MODE,
+    // Background warmup reads the live paper without ending the user's edit.
+    // Explicit output still commits first and keys its cache by the new HTML.
+    preserveEditorFocus: true,
   })
 }
 

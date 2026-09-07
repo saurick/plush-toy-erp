@@ -2,11 +2,37 @@ package server
 
 import (
 	"encoding/base64"
+	"encoding/binary"
 	"strings"
 	"testing"
 
 	"golang.org/x/net/html"
 )
+
+func TestValidateTemplatePDFFontBudgets(t *testing.T) {
+	data := make([]byte, 64)
+	copy(data, "wOF2")
+	binary.BigEndian.PutUint32(data[8:12], uint32(len(data)))
+	binary.BigEndian.PutUint32(data[16:20], 128)
+	font := "data:font/woff2;base64," + base64.StdEncoding.EncodeToString(data)
+	if err := validateTemplatePDFCSS(`@font-face { font-family: 'Noto'; src: url("`+font+`"); }`, &templatePDFHTMLValidationState{}); err != nil {
+		t.Fatal(err)
+	}
+	for _, state := range []*templatePDFHTMLValidationState{{fontCount: maxTemplatePDFFontCount}, {fontBytes: maxTemplatePDFFontTotalBytes - 1}} {
+		if err := validateTemplatePDFDataFont(font, state); err == nil {
+			t.Fatal("font budget must reject before rendering")
+		}
+	}
+	for _, invalid := range []string{"data:font/ttf;base64,AAAA", "data:font/woff2;base64,AAAA", "https://example.invalid/font.woff2"} {
+		if err := validateTemplatePDFDataFont(invalid, &templatePDFHTMLValidationState{}); err == nil {
+			t.Fatal("invalid font accepted")
+		}
+	}
+	binary.BigEndian.PutUint32(data[16:20], 16<<20)
+	if err := validateTemplatePDFDataFont("data:font/woff2;base64,"+base64.StdEncoding.EncodeToString(data), &templatePDFHTMLValidationState{}); err == nil {
+		t.Fatal("font expansion must be bounded")
+	}
+}
 
 func TestValidateTemplatePDFHTMLAllowsStaticDocumentAndEmbeddedImage(t *testing.T) {
 	t.Parallel()

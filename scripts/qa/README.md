@@ -676,3 +676,24 @@ MOBILE_WORKFLOW_BROWSER_SMOKE_PASSWORD='replace-with-local-demo-password' \
 go test ./internal/data -run 'TestWorkflowRepo_(TaskStatusReasonEventAndCompletionCleanup|CreateAndUpdateTaskStatus|UrgeWorkflowTaskWritesEventAndPayload|.*Idempotency.*)'
 go test ./internal/service -run 'TestJsonrpcDispatcher_WorkflowUrgeTask|TestJsonrpcDispatcher_Workflow(CompleteTaskAction|ControlledTaskActions|.*Idempotency.*)'
 ```
+
+## 打印引擎验证 · PDF Runtime
+
+打印运行时采用“固定、验证后升级”：`server/Dockerfile` 是 Chromium、Debian snapshot 和基础镜像 digest 的唯一版本真源，禁止构建时解析浮动 latest。`pdf-runtime-policy.json` 只保存体积观察基线、允许增长和 Trivy 工具校验值。安全检查阻断有修复版本的 HIGH / CRITICAL 系统包漏洞，同时保留其余发现；上游有新稳定版本时报告需要评审，不自动修改代码或发布。
+
+此门禁的漏洞阻断范围为 Chromium 所在的 Debian 系统包（Trivy `Class=os-pkgs`、`Type=debian`）。Trivy 同时发现的 Go 二进制依赖问题按原分类完整保留，并单独计数；它们由既有 Go 安全检查继续判定调用路径和升级范围。打印运行时通过不代表全镜像无漏洞，也不把暂无修复版本的系统包发现当作已修复。
+
+| 入口                                                                      | 验证与输出                                                                                                                                  |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `node scripts/qa/pdf-runtime.mjs check-source`                            | 检查固定浏览器 / 包源 / base digest 及前端字体精确版本，相关测试进入普通 Node CI                                                            |
+| `bash scripts/qa/pdf-runtime.sh verify IMAGE OUTPUT_DIR [FIXTURE_DIR]`    | 在最终非 root + sandbox 镜像中运行 Go PDF 安全与业务快照测试；核对 A4、中文文本、字体嵌入、系统包、实际浏览器和体积，运行固定校验值的 Trivy |
+| `bash scripts/qa/pdf-runtime.sh monitor IMAGE OUTPUT_DIR`                 | 对固定镜像重新扫描漏洞，并查询 Google Linux stable；不重建镜像、不渲染全套模板                                                              |
+| `web/scripts/printPdfFixtures.mjs STATIC_ROOT OUTPUT_DIR [TEMPLATE_KEYS]` | 用实际生产前端和脱敏模拟数据打开登记模板，采集真实下载请求的纸面 HTML；不维护第二套服务端模板                                               |
+
+`verify` / `monitor` 面向 Linux amd64 Runner。宿主需有 Docker、Go、Node、pnpm；`verify` 另需 Poppler（`pdfinfo`、`pdftotext`、`pdffonts`）与已核验的 Playwright 运行包。Poppler 在 Runner cloud-init 中声明，已有 Runner 由运维按正式流程补齐；Job 不自行安装系统包。CI 沿用已有 Chromium sandbox helper；最终镜像使用正式 Compose 的 seccomp，缺条件明确失败。输出目录每次使用唯一目录；只清理本次容器、测试二进制和本次安装的浏览器 sandbox，不清理外部镜像、缓存或卷。
+
+正式 `release-artifact-bundle.mjs` 在源码镜像构建后复用同一 Server image，默认从该镜像提取前端，验证全部登记模板。结果必须绑定 source commit、image ID 和模板集合，真实 Debian 包清单及结果写入原有 `sbom.cdx.json`，不增加发布资产种类。PDF 样本与诊断保存在 CI artifacts；这是制品验证，目标部署的登录、权限与运行 smoke 仍由现有流程完成。
+
+`.gitlab-ci.yml` 提供独立 `pdf_runtime_monitor` 定时入口：受保护 `main`、pipeline source 为 `schedule`，配置 `PDF_RUNTIME_MONITOR=1` 与已有固定 `PDF_RUNTIME_IMAGE`（本地 image ID 或仓库 digest）。该入口不会触发普通全量质量或发布。仓库配置不自动创建 GitLab Schedule；启用时间与镜像由运维在既有 CI 中设置，缺失镜像 / 安全数据库 / 上游响应不会被当成通过。
+
+传入明确模板子集只证明该子集，不据此宣称所有模板或最终镜像通过。体积使用专用 Runner 上同一 Docker image store 的 `image inspect Size`，不混用压缩 tar、`docker images` 或共享层磁盘数字；当前门限是旧固定制品的回归上限，不能当作本次已实现的瘦身百分比。

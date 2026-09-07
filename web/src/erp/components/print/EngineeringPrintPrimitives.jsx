@@ -5,6 +5,7 @@ import {
   engineeringImageSlots,
 } from '../../data/engineeringPrintTemplates.mjs'
 import { runSilentPrintWorkspaceDraftUpdate } from '../../utils/usePersistentPrintWorkspaceDraft.js'
+import { resolveWorkInstructionAnnotationLayout } from '../../utils/workInstructionImageAnnotations.mjs'
 
 const ATTACHMENT_ACCEPT = 'image/*,.svg'
 
@@ -357,6 +358,12 @@ function EditableText({
       <Component
         ref={editableRef}
         className={`${EDITABLE_CLASS} ${className}`}
+        data-print-empty={
+          !String(value ?? '')
+            .replace(/<[^>]*>/g, '')
+            .replace(/&nbsp;/g, '')
+            .trim()
+        }
         contentEditable
         data-engineering-editable-id={editableID}
         suppressContentEditableWarning
@@ -383,6 +390,12 @@ function EditableText({
     <Component
       ref={editableRef}
       className={`${EDITABLE_CLASS} ${className}`}
+      data-print-empty={
+        !String(value ?? '')
+          .replace(/<[^>]*>/g, '')
+          .replace(/&nbsp;/g, '')
+          .trim()
+      }
       contentEditable
       data-engineering-editable-id={editableID}
       suppressContentEditableWarning
@@ -472,9 +485,10 @@ function ImageSlot({
     : undefined
   const hasAnnotations =
     hasImage && Array.isArray(annotations) && annotations.length > 0
-  const hasCallout =
+  const hasAnnotationSidebar =
     hasAnnotations &&
-    annotations.some((annotation) => annotation?.type === 'callout')
+    resolveWorkInstructionAnnotationLayout({ ...snapshot, annotations }) ===
+      'sidebar'
   return (
     <div
       className={`erp-engineering-print-image-slot${
@@ -484,7 +498,9 @@ function ImageSlot({
       }${hasCrop ? ' erp-engineering-print-image-slot--cropped' : ''}${
         layoutStyle ? ' erp-engineering-print-image-slot--positioned' : ''
       }${hasAnnotations ? ' erp-engineering-print-image-slot--annotated' : ''}${
-        hasCallout ? ' erp-engineering-print-image-slot--with-callout' : ''
+        hasAnnotationSidebar
+          ? ' erp-engineering-print-image-slot--with-callout'
+          : ''
       }`}
       data-image-crop={hasCrop ? 'excel-src-rect' : undefined}
       style={

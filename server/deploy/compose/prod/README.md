@@ -14,10 +14,10 @@
 
 所有精确身份以 [`scripts/deploy/deployment-targets.json`](../../../../scripts/deploy/deployment-targets.json) 为唯一真源，浏览器或命令行不能临时覆盖。
 
-| target | 业务用途 | 公网入口 | Compose project | 数据库 | PostgreSQL / API / Web |
-| --- | --- | --- | --- | --- | --- |
-| `demo-133` | 项目方造数、演练、培训与回归；允许受控重建 | `demo.yoyoosun.net` | `plush-toy-erp-demo-v1` | `plush_erp_demo_v1` | `55436 / 8325 / 5195` |
-| `customer-test-133` | 甲方测试与验收；普通部署保留数据，需要时独立重建 | `test.yoyoosun.net` | `plush-toy-erp-test-v1` | `plush_erp_customer_test_v1` | `55437 / 8335 / 5205` |
+| target              | 业务用途                                         | 公网入口            | Compose project         | 数据库                       | PostgreSQL / API / Web |
+| ------------------- | ------------------------------------------------ | ------------------- | ----------------------- | ---------------------------- | ---------------------- |
+| `demo-133`          | 项目方造数、演练、培训与回归；允许受控重建       | `demo.yoyoosun.net` | `plush-toy-erp-demo-v1` | `plush_erp_demo_v1`          | `55436 / 8325 / 5195`  |
+| `customer-test-133` | 甲方测试与验收；普通部署保留数据，需要时独立重建 | `test.yoyoosun.net` | `plush-toy-erp-test-v1` | `plush_erp_customer_test_v1` | `55437 / 8335 / 5205`  |
 
 两个环境部署同一不可变 release digest，但数据库、上传、Compose project、端口、runtime env、数据目录、migration 锁、备份、回滚点、operation 与 smoke 必须完全独立。demo 造数不能进入 test；test 的普通 promotion 保留数据，显式重建或清理不能影响 demo。
 
@@ -125,7 +125,7 @@ DEPLOYMENT_TARGET_KEY='<demo-133|customer-test-133>' \
 
 ## PDF 与可观测性
 
-- 服务端镜像内置固定 Chromium 与 CJK 字体；浏览器版本、warmup、sandbox、内存与并发由 preflight 和 smoke 守住。
+- 服务端镜像内置固定 Chromium，中文字体由前端静态资源随包交付，并内嵌到每次 PDF 快照；不再重复安装系统 CJK 字体包。最终镜像的版本、业务 PDF、系统包和体积按 [`pdf-runtime`](../../../../scripts/qa/README.md#打印引擎验证--pdf-runtime) 检查，目标 warmup、sandbox、内存与并发继续由 preflight 和 smoke 守住。
 - Jaeger 仅绑定 loopback，不直接暴露到公网或办公网。
 - 应用连接池预算必须与 PostgreSQL `max_connections`、migration、备份和运维保留量一起计算。
 - 日志、回执和 evidence 不保存密码、token、客户正文、原始配置或 PDF 正文。

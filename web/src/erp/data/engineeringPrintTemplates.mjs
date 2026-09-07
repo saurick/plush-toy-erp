@@ -1,4 +1,7 @@
-import { normalizeWorkInstructionImageAnnotations } from '../utils/workInstructionImageAnnotations.mjs'
+import {
+  normalizeWorkInstructionImageAnnotations,
+  resolveWorkInstructionAnnotationLayout,
+} from '../utils/workInstructionImageAnnotations.mjs'
 import { normalizePrintAppendixImages } from '../utils/printAppendixImages.mjs'
 import {
   currentBusinessDate,
@@ -24,21 +27,68 @@ export const WORK_INSTRUCTION_ROW_TYPES = Object.freeze({
 export const WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM = 11.6
 
 export const MATERIAL_DETAIL_COLUMNS = [
-  { key: 'category', label: '材料类别' },
-  { key: 'materialName', label: '物料名称' },
-  { key: 'vendorCode', label: '厂商料号' },
-  { key: 'spec', label: '规格' },
-  { key: 'color', label: '颜色' },
-  { key: 'unit', label: '单位' },
-  { key: 'position', label: '组装部位' },
-  { key: 'pieces', label: '片数' },
-  { key: 'unitUsage', label: '单位用量' },
-  { key: 'lossRate', label: '损耗%' },
-  { key: 'totalUsage', label: '总用量\n含损耗' },
-  { key: 'processBase', label: '加工方式' },
-  { key: 'processMethod', label: '加工方式' },
-  { key: 'remark', label: '备注:共25251#纸样/色卡' },
+  {
+    key: 'category',
+    label: '材料类别',
+    headerLabel: '材料\n类别',
+    widthWeight: 15,
+  },
+  { key: 'materialName', label: '物料名称', widthWeight: 34.6667 },
+  {
+    key: 'vendorCode',
+    label: '厂商料号',
+    headerLabel: '厂商\n料号',
+    widthWeight: 23.1667,
+  },
+  { key: 'spec', label: '规格', widthWeight: 18.5 },
+  { key: 'color', label: '颜色', widthWeight: 8.8333 },
+  { key: 'unit', label: '单位', widthWeight: 8.6667, minWidthPercent: 3.2 },
+  { key: 'position', label: '组装部位', widthWeight: 26.75 },
+  { key: 'pieces', label: '片数', widthWeight: 7 },
+  {
+    key: 'unitUsage',
+    label: '单位用量',
+    headerLabel: '单位\n用量',
+    widthWeight: 16.6667,
+  },
+  { key: 'lossRate', label: '损耗%', headerLabel: '损耗\n%', widthWeight: 9 },
+  { key: 'totalUsage', label: '总用量\n含损耗', widthWeight: 19.25 },
+  {
+    key: 'processBase',
+    label: '加工方式',
+    headerLabel: '加工\n方式',
+    widthWeight: 32.3333,
+  },
+  {
+    key: 'processMethod',
+    label: '加工方式',
+    headerLabel: '加工\n方式',
+    widthWeight: 23.8333,
+  },
+  {
+    key: 'remark',
+    label: '备注:共25251#纸样/色卡',
+    headerLabel: '备注:\n共25251#纸样/色卡',
+    widthWeight: 47.75,
+  },
 ]
+
+// Follow the source worksheet's A:N proportions, with room for a two-character
+// header and common PCS units at the template's A4 print size.
+const materialDetailTotalWeight = MATERIAL_DETAIL_COLUMNS.reduce(
+  (total, column) => total + column.widthWeight,
+  0
+)
+const materialDetailWidths = MATERIAL_DETAIL_COLUMNS.map((column) =>
+  Math.max(
+    column.minWidthPercent || 2.9,
+    (column.widthWeight / materialDetailTotalWeight) * 100
+  )
+)
+const materialDetailTotalWidth = materialDetailWidths.reduce((a, b) => a + b, 0)
+export const MATERIAL_DETAIL_COLUMN_WIDTHS = materialDetailWidths.map(
+  (width) => `${(width / materialDetailTotalWidth) * 100}%`
+)
 
 const DEFAULT_MATERIAL_DETAIL_COLUMN_LABELS = MATERIAL_DETAIL_COLUMNS.map(
   (column) => column.label
@@ -157,6 +207,7 @@ function normalizeImageMap(raw = {}, slots = []) {
           annotations: normalizeWorkInstructionImageAnnotations(
             source.annotations
           ),
+          annotationLayout: resolveWorkInstructionAnnotationLayout(source),
         },
       ]
     })
@@ -188,6 +239,7 @@ function normalizeRuntimeSampleImage(image = {}) {
     crop: normalizeImageCrop(image.crop),
     layout: normalizeImageLayout(image.layout),
     annotations: normalizeWorkInstructionImageAnnotations(image.annotations),
+    annotationLayout: resolveWorkInstructionAnnotationLayout(image),
   }
 }
 
@@ -545,6 +597,7 @@ function normalizeInstructionRow(row = {}, index = 0) {
       crop: normalizeImageCrop(image?.crop),
       layout: normalizeImageLayout(image?.layout),
       annotations: normalizeWorkInstructionImageAnnotations(image?.annotations),
+      annotationLayout: resolveWorkInstructionAnnotationLayout(image),
     })),
   }
 }

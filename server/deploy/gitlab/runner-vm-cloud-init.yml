@@ -39,6 +39,7 @@ packages:
   - libpq-dev
   - lsof
   - make
+  - poppler-utils
   - postgresql-client
   - qemu-guest-agent
   - ripgrep

@@ -19,6 +19,11 @@ const toText = (value) =>
     .trim()
     .slice(0, WORK_INSTRUCTION_IMAGE_ANNOTATION_LIMITS.textLength)
 
+const annotationText = (value) =>
+  String(value ?? '')
+    .replaceAll('\r', '')
+    .slice(0, WORK_INSTRUCTION_IMAGE_ANNOTATION_LIMITS.textLength)
+
 export function clampAnnotationPercent(value, fallback = 0) {
   const numberValue = Number(value)
   const safeValue = Number.isFinite(numberValue) ? numberValue : fallback
@@ -53,7 +58,7 @@ function normalizeCallout(annotation, index) {
   return {
     id: normalizeAnnotationID(annotation.id, index),
     type: WORK_INSTRUCTION_IMAGE_ANNOTATION_TYPES.callout,
-    text: toText(annotation.text),
+    text: annotationText(annotation.text),
     x,
     y,
     width,
@@ -68,7 +73,7 @@ function normalizeMeasurement(annotation, index) {
   return {
     id: normalizeAnnotationID(annotation.id, index),
     type: WORK_INSTRUCTION_IMAGE_ANNOTATION_TYPES.measurement,
-    text: toText(annotation.text),
+    text: annotationText(annotation.text),
     color: normalizeAnnotationColor(annotation.color, '#ef4444'),
     start: normalizePoint(annotation.start, { x: 28, y: 62 }),
     end: normalizePoint(annotation.end, { x: 72, y: 62 }),
@@ -103,6 +108,19 @@ export function normalizeWorkInstructionImageAnnotations(annotations = []) {
     .filter(Boolean)
 }
 
+export function resolveWorkInstructionAnnotationLayout(image = {}) {
+  if (['sidebar', 'overlay'].includes(image?.annotationLayout)) {
+    return image.annotationLayout
+  }
+  const annotations = normalizeWorkInstructionImageAnnotations(
+    image?.annotations
+  )
+  return !annotations.length ||
+    annotations.some((annotation) => annotation.type === 'callout')
+    ? 'sidebar'
+    : 'overlay'
+}
+
 function nextAnnotationID(type) {
   annotationSequence += 1
   return `${type}-${Date.now().toString(36)}-${annotationSequence.toString(36)}`
@@ -127,11 +145,11 @@ export function createWorkInstructionImageAnnotation(type, index = 0) {
       id: nextAnnotationID('callout'),
       type: WORK_INSTRUCTION_IMAGE_ANNOTATION_TYPES.callout,
       text: '',
-      x: index % 2 === 0 ? 64 : 4,
-      y: 8 + (index % 4) * 18,
+      x: 64,
+      y: 3 + (index % 4) * 24,
       width: 30,
-      height: 18,
-      targets: [{ x: 50, y: 50 }],
+      height: 23,
+      targets: [{ x: 31, y: 50 }],
     },
     index
   )
@@ -150,6 +168,22 @@ export function appendWorkInstructionImageAnnotation(annotations, type) {
     type,
     normalized.length
   )
+  if (annotation.type === WORK_INSTRUCTION_IMAGE_ANNOTATION_TYPES.callout) {
+    const callouts = normalized.filter((item) => item.type === annotation.type)
+    const slots = [64, 4, 34].flatMap((x) =>
+      [3, 27, 51, 75].map((y) => ({ x, y }))
+    )
+    const slot = slots.find(({ x, y }) =>
+      callouts.every(
+        (item) =>
+          x + annotation.width <= item.x ||
+          item.x + item.width <= x ||
+          y + annotation.height <= item.y ||
+          item.y + item.height <= y
+      )
+    )
+    if (slot) Object.assign(annotation, slot)
+  }
   return {
     ok: true,
     annotations: [...normalized, annotation],
@@ -157,7 +191,7 @@ export function appendWorkInstructionImageAnnotation(annotations, type) {
     message:
       annotation.type === WORK_INSTRUCTION_IMAGE_ANNOTATION_TYPES.measurement
         ? '已添加距离标注，请拖动两个端点并填写距离。'
-        : '已添加说明框，可继续添加多个指向点。',
+        : '已添加说明框，可直接输入文字。',
   }
 }
 
@@ -199,6 +233,38 @@ export function removeWorkInstructionImageAnnotation(
     return normalized
   }
   return normalized.filter((_, index) => index !== annotationIndex)
+}
+
+export function deleteWorkInstructionImageAnnotations(annotations, ids) {
+  const selected = new Set(ids)
+  const removed = []
+  const remaining = normalizeWorkInstructionImageAnnotations(
+    annotations
+  ).filter((annotation, index) => {
+    if (!selected.has(annotation.id)) return true
+    removed.push({ annotation, index })
+    return false
+  })
+  return { annotations: remaining, removed }
+}
+
+export function restoreWorkInstructionImageAnnotations(annotations, removed) {
+  const current = normalizeWorkInstructionImageAnnotations(annotations)
+  const ids = new Set(current.map((annotation) => annotation.id))
+  const missing = removed.filter(({ annotation }) => !ids.has(annotation.id))
+  if (
+    current.length + missing.length >
+    WORK_INSTRUCTION_IMAGE_ANNOTATION_LIMITS.perImage
+  ) {
+    return { ok: false, annotations: current }
+  }
+  for (const { annotation, index } of missing) {
+    current.splice(Math.min(index, current.length), 0, annotation)
+  }
+  return {
+    ok: true,
+    annotations: normalizeWorkInstructionImageAnnotations(current),
+  }
 }
 
 export function addWorkInstructionCalloutTarget(

@@ -2,10 +2,15 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react'
-import { persistPrintWorkspaceDraftSnapshot } from './printWorkspace.js'
+import { clearInitialPrintWorkspaceDraftCache } from './printWorkspace.js'
+import {
+  createPrintDraftWriter,
+  writePrintDraft,
+} from './printDraftStorage.mjs'
 
 let silentDraftUpdateDepth = 0
 
@@ -23,21 +28,11 @@ function resolveNextDraft(nextDraft, currentDraft) {
 }
 
 function blurActiveContentEditable(documentLike) {
-  const activeElement = documentLike?.activeElement
-  if (!activeElement) {
-    return false
-  }
-
-  const editableElement =
-    activeElement.isContentEditable === true
-      ? activeElement
-      : activeElement.closest?.('[contenteditable="true"]')
-  if (!editableElement || typeof editableElement.blur !== 'function') {
-    return false
-  }
-
-  editableElement.blur()
-  return true
+  const element = documentLike?.activeElement
+  const editable = element?.isContentEditable
+    ? element
+    : element?.closest?.('[contenteditable="true"]')
+  editable?.blur?.()
 }
 
 export function usePersistentPrintWorkspaceDraft(
@@ -49,55 +44,61 @@ export function usePersistentPrintWorkspaceDraft(
     draftStorageKey ? 'saving' : 'unavailable'
   )
   const draftRef = useRef(draft)
-  const activeDraftStorageKeyRef = useRef(draftStorageKey)
+  const activeKey = useRef(draftStorageKey)
+  const writer = useMemo(
+    () =>
+      createPrintDraftWriter({
+        write: async (nextDraft) => {
+          const saved = await writePrintDraft(draftStorageKey, nextDraft)
+          if (saved) clearInitialPrintWorkspaceDraftCache(draftStorageKey)
+          return saved
+        },
+        onStatus: (status) => {
+          if (activeKey.current === draftStorageKey) {
+            setPersistenceStatus(draftStorageKey ? status : 'unavailable')
+          }
+        },
+      }),
+    [draftStorageKey]
+  )
 
   useLayoutEffect(() => {
-    if (activeDraftStorageKeyRef.current === draftStorageKey) {
-      return
-    }
-    const nextInitialDraft = resolveNextDraft(initialDraft, draftRef.current)
-    activeDraftStorageKeyRef.current = draftStorageKey
-    draftRef.current = nextInitialDraft
-    setDraftState(nextInitialDraft)
+    if (activeKey.current === draftStorageKey) return
+    activeKey.current = draftStorageKey
+    draftRef.current = resolveNextDraft(initialDraft, draftRef.current)
+    setDraftState(draftRef.current)
     setPersistenceStatus(draftStorageKey ? 'saving' : 'unavailable')
   }, [draftStorageKey, initialDraft])
 
-  const persistDraft = useCallback(
-    (nextDraft = draftRef.current) => {
-      if (!draftStorageKey || typeof window === 'undefined') {
-        setPersistenceStatus('unavailable')
-        return false
-      }
-      const saved = persistPrintWorkspaceDraftSnapshot(
-        draftStorageKey,
-        nextDraft
-      )
-      setPersistenceStatus(saved ? 'saved' : 'error')
-      return saved
+  useEffect(
+    () => () => {
+      writer.flush()
     },
-    [draftStorageKey]
+    [writer]
   )
 
   const setDraft = useCallback(
     (nextDraft) => {
-      const resolvedDraft = resolveNextDraft(nextDraft, draftRef.current)
-      draftRef.current = resolvedDraft
-      const persisted = persistDraft(resolvedDraft)
-      if (silentDraftUpdateDepth > 0) {
-        return persisted
-      }
-      setDraftState(resolvedDraft)
-      return persisted
+      draftRef.current = resolveNextDraft(nextDraft, draftRef.current)
+      const saved = writer.save(draftRef.current)
+      if (silentDraftUpdateDepth === 0) setDraftState(draftRef.current)
+      return saved
     },
-    [persistDraft]
+    [writer]
   )
 
-  const flushDraft = useCallback(() => {
-    setDraftState((currentDraft) =>
-      currentDraft === draftRef.current ? currentDraft : draftRef.current
-    )
-    return persistDraft(draftRef.current)
-  }, [persistDraft])
+  const flushDraft = useMemo(
+    () =>
+      Object.assign(
+        async () => {
+          setDraftState(draftRef.current)
+          if (writer.unsaved && !writer.pending) writer.save(draftRef.current)
+          return writer.flush()
+        },
+        { hasPending: () => writer.unsaved }
+      ),
+    [writer]
+  )
 
   return [draft, setDraft, flushDraft, draftRef, persistenceStatus]
 }
@@ -107,18 +108,25 @@ export function useFlushPrintWorkspaceDraftOnPageExit(flushDraft) {
     if (typeof window === 'undefined' || typeof flushDraft !== 'function') {
       return undefined
     }
-
-    const handlePageExit = () => {
+    const handlePageExit = (event) => {
+      const unsaved = flushDraft.hasPending?.()
       blurActiveContentEditable(window.document)
+      if (event.type === 'beforeunload' && unsaved) {
+        event.preventDefault()
+        event.returnValue = ''
+      }
       flushDraft()
     }
-
+    const handleVisibility = () => {
+      if (window.document.visibilityState === 'hidden') flushDraft()
+    }
     window.addEventListener('pagehide', handlePageExit, true)
     window.addEventListener('beforeunload', handlePageExit, true)
-
+    window.document.addEventListener('visibilitychange', handleVisibility)
     return () => {
       window.removeEventListener('pagehide', handlePageExit, true)
       window.removeEventListener('beforeunload', handlePageExit, true)
+      window.document.removeEventListener('visibilitychange', handleVisibility)
     }
   }, [flushDraft])
 }

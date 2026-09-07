@@ -1227,7 +1227,7 @@ async function verifyWorkInstructionLastRowImages({
   )
 
   await page
-    .locator('.erp-print-shell__toolbar-group')
+    .locator('.erp-print-shell__panel .erp-print-shell__toolbar-group')
     .first()
     .getByRole('button', { name: '清空当前行图片', exact: true })
     .click()
@@ -1265,7 +1265,7 @@ async function verifyWorkInstructionRichText({ page }) {
   })
 
   await page
-    .locator('.erp-print-shell__toolbar-group')
+    .locator('.erp-print-shell__panel .erp-print-shell__toolbar-group')
     .nth(1)
     .getByRole('button', { name: '文字标红/取消' })
     .click()
@@ -1315,7 +1315,7 @@ async function verifyWorkInstructionRichText({ page }) {
   })
 
   await page
-    .locator('.erp-print-shell__toolbar-group')
+    .locator('.erp-print-shell__panel .erp-print-shell__toolbar-group')
     .nth(1)
     .getByRole('button', { name: '文字标红/取消' })
     .click()
@@ -1460,7 +1460,7 @@ async function verifyWorkInstructionRowInsertion({
   )
 
   await page
-    .locator('.erp-print-shell__toolbar-group')
+    .locator('.erp-print-shell__panel .erp-print-shell__toolbar-group')
     .first()
     .getByRole('button', { name: '移除当前行' })
     .click()

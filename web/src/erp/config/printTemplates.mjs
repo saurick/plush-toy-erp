@@ -27,6 +27,21 @@ const APPENDIX_IMAGE_FIELD_REQUIREMENT = {
 export const printTemplateCatalog = [
   {
     key: 'material-purchase-contract',
+    runtime: {
+      workspace: 'materialContract',
+      family: 'contract',
+      tools: ['rows', 'cells', 'images', 'calculation'],
+      requiredFields: [
+        ['contractNo', '单号'],
+        ['supplierName', '供应方名称'],
+        ['buyerCompany', '订货单位'],
+      ],
+      requiredLineFields: [
+        ['materialName', '材料品名'],
+        ['quantity', '数量'],
+        ['unitPrice', '单价'],
+      ],
+    },
     title: '采购合同',
     shortTitle: '采购合同',
     category: '采购订单 / 材料采购',
@@ -163,10 +178,32 @@ export const printTemplateCatalog = [
   },
   {
     ...processingContractTemplateMeta,
+    runtime: {
+      workspace: 'processingContract',
+      family: 'contract',
+      tools: ['rows', 'cells', 'images', 'calculation'],
+      requiredFields: [
+        ['contractNo', '单号'],
+        ['supplierName', '供应方名称'],
+        ['buyerCompany', '订货单位'],
+      ],
+      requiredLineFields: [
+        ['processingItem', '加工项目'],
+        ['quantity', '数量'],
+        ['unitPrice', '单价'],
+      ],
+    },
     sample: createProcessingContractDraft(),
   },
   {
     key: MATERIAL_DETAIL_TEMPLATE_KEY,
+    runtime: {
+      workspace: 'engineering',
+      family: 'engineering',
+      tools: ['rows', 'cells', 'images', 'text'],
+      requiredFields: [],
+      requiredLineFields: [],
+    },
     title: '物料分析明细表',
     shortTitle: '物料明细',
     category: '工程资料 / 板房发料',
@@ -222,6 +259,13 @@ export const printTemplateCatalog = [
   },
   {
     key: COLOR_CARD_TEMPLATE_KEY,
+    runtime: {
+      workspace: 'engineering',
+      family: 'engineering',
+      tools: ['blocks', 'rows', 'images', 'text'],
+      requiredFields: [],
+      requiredLineFields: [],
+    },
     title: '色卡',
     shortTitle: '色卡',
     category: '工程资料 / 板房发料',
@@ -267,6 +311,13 @@ export const printTemplateCatalog = [
   },
   {
     key: WORK_INSTRUCTION_TEMPLATE_KEY,
+    runtime: {
+      workspace: 'engineering',
+      family: 'engineering',
+      tools: ['rows', 'images', 'text', 'annotations'],
+      requiredFields: [],
+      requiredLineFields: [],
+    },
     title: '作业指导书',
     shortTitle: '作业指导书',
     category: '工程资料 / 生产指导',

@@ -1,14 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useParams, useSearchParams } from 'react-router-dom'
+import { getPrintOutputProblem } from '../utils/printOutputPreflight.mjs'
 import { getPrintWorkspaceDraftScope } from '../utils/printWorkspaceScope.mjs'
 import {
   normalizeInstructionRowTarget,
-  createMainInstructionRowTarget,
-  createContinuationInstructionRowTarget,
   isSameInstructionRowTarget,
   getWorkInstructionRowType,
   isWorkInstructionStepRow,
-  plainTextFromRichHTML,
   richTextHasVisibleText,
   normalizeCalloutCoordinate,
   WorkInstructionPaper,
@@ -58,9 +56,8 @@ import {
   syncPrintPageMarginForPaper,
   watchPrintPageMarginForPaper,
 } from '../utils/printPageMargin.mjs'
-import usePrintWorkspaceWindowSnapshot, {
-  preparePrintWorkspaceSnapshot,
-} from '../utils/usePrintWorkspaceWindowSnapshot.js'
+import usePrintWorkspaceWindowState from '../utils/usePrintWorkspaceWindowState.js'
+import { preparePrintWorkspaceSnapshot } from '../utils/printWorkspaceOutput.mjs'
 import {
   useFlushPrintWorkspaceDraftOnPageExit,
   usePersistentPrintWorkspaceDraft,
@@ -378,7 +375,7 @@ export default function EngineeringPrintWorkspacePage() {
   const [toolbarStatus, setToolbarStatus] = useState(
     businessInput ? '已从业务页带入打印草稿。' : '已加载默认样例。'
   )
-  const [draft, setDraft, flushDraft, , persistenceStatus] =
+  const [draft, setDraft, flushDraft, draftRef, persistenceStatus] =
     usePersistentPrintWorkspaceDraft(
       () =>
         loadDraft({
@@ -463,13 +460,10 @@ export default function EngineeringPrintWorkspacePage() {
     })
   }, [])
 
-  usePrintWorkspaceWindowSnapshot({
+  usePrintWorkspaceWindowState({
     stateID: workspaceStateID,
     templateKey,
     workspaceURL,
-    observeNodeRef: paperRef,
-    suspended: pdfAction !== '',
-    beforeSnapshot: flushDraft,
   })
 
   useEffect(() => {
@@ -930,8 +924,8 @@ export default function EngineeringPrintWorkspacePage() {
     })
   }
 
-  const handleAppendixImagesChange = (images) => {
-    const persisted = setDraft((current) => {
+  const handleAppendixImagesChange = async (images) => {
+    const persisted = await setDraft((current) => {
       const nextDraft = {
         ...current,
         appendixImages: normalizePrintAppendixImages(images),
@@ -1212,6 +1206,7 @@ export default function EngineeringPrintWorkspacePage() {
             annotations: Array.isArray(nextImages[imageIndex]?.annotations)
               ? nextImages[imageIndex].annotations
               : [],
+            annotationLayout: nextImages[imageIndex]?.annotationLayout,
           })
         ),
       }))
@@ -1329,206 +1324,6 @@ export default function EngineeringPrintWorkspacePage() {
       })
     )
   }
-
-  const createDraftFieldRow = ({
-    key,
-    label,
-    multiline = false,
-    rows = undefined,
-  }) => ({
-    key,
-    label,
-    value: plainTextFromRichHTML(draft[key]),
-    multiline,
-    rows,
-    onChange: (value) => updateField(key, value),
-  })
-
-  const materialFieldRows = () => [
-    createDraftFieldRow({ key: 'companyName', label: '公司名称' }),
-    createDraftFieldRow({ key: 'productNo', label: '产品编号' }),
-    createDraftFieldRow({ key: 'orderNo', label: '订单号' }),
-    createDraftFieldRow({ key: 'productName', label: '产品名称' }),
-    createDraftFieldRow({ key: 'quantityText', label: '数量' }),
-    createDraftFieldRow({ key: 'spareText', label: '备品' }),
-    createDraftFieldRow({ key: 'dateText', label: '日期' }),
-    createDraftFieldRow({ key: 'designer', label: '设计师' }),
-    createDraftFieldRow({ key: 'maker', label: '制表' }),
-    createDraftFieldRow({ key: 'auditor', label: '审核' }),
-    createDraftFieldRow({ key: 'hairDirection', label: '毛向' }),
-    createDraftFieldRow({
-      key: 'topRemark',
-      label: '顶部备注',
-      multiline: true,
-      rows: 2,
-    }),
-    ...MATERIAL_DETAIL_COLUMNS.map((column, columnIndex) => ({
-      key: `columnLabels.${columnIndex}`,
-      label: `表头 ${columnIndex + 1} ${column.label.replace(/\n/g, '')}`,
-      value: plainTextFromRichHTML(
-        draft.columnLabels?.[columnIndex] || column.label
-      ),
-      multiline: column.label.includes('\n'),
-      rows: 2,
-      onChange: (value) => updateMaterialColumnLabel(columnIndex, value),
-    })),
-    ...(draft.lines || []).flatMap((line, rowIndex) =>
-      MATERIAL_DETAIL_COLUMNS.map((column) => ({
-        key: `lines.${rowIndex}.${column.key}`,
-        label: `物料行 ${rowIndex + 1} ${column.label.replace(/\n/g, '')}`,
-        value: plainTextFromRichHTML(line[column.key]),
-        multiline: [
-          'materialName',
-          'processBase',
-          'processMethod',
-          'remark',
-        ].includes(column.key),
-        rows: 2,
-        onChange: (value) => updateMaterialLine(rowIndex, column.key, value),
-      }))
-    ),
-  ]
-
-  const colorCardFieldRows = () => [
-    createDraftFieldRow({ key: 'companyName', label: '公司名称' }),
-    createDraftFieldRow({ key: 'productNo', label: '产品编号' }),
-    createDraftFieldRow({ key: 'productName', label: '产品名称' }),
-    createDraftFieldRow({ key: 'maker', label: '制卡' }),
-    createDraftFieldRow({ key: 'dateText', label: '日期' }),
-    createDraftFieldRow({ key: 'auditor', label: '审核' }),
-    createDraftFieldRow({ key: 'reviewer', label: '复核' }),
-    ...(draft.blocks || []).flatMap((block, blockIndex) => [
-      {
-        key: `blocks.${blockIndex}.materialName`,
-        label: `色卡块 ${blockIndex + 1} 物料名称`,
-        value: plainTextFromRichHTML(block.materialName),
-        onChange: (value) =>
-          updateColorBlockField(blockIndex, 'materialName', value),
-      },
-      {
-        key: `blocks.${blockIndex}.vendor`,
-        label: `色卡块 ${blockIndex + 1} 厂商`,
-        value: plainTextFromRichHTML(block.vendor),
-        onChange: (value) => updateColorBlockField(blockIndex, 'vendor', value),
-      },
-      ...(block.lines || []).flatMap((line, lineIndex) => [
-        {
-          key: `blocks.${blockIndex}.lines.${lineIndex}.position`,
-          label: `色卡块 ${blockIndex + 1} 行 ${lineIndex + 1} 部位`,
-          value: plainTextFromRichHTML(line.position),
-          onChange: (value) =>
-            updateColorBlockField(
-              blockIndex,
-              `lines.${lineIndex}.position`,
-              value
-            ),
-        },
-        {
-          key: `blocks.${blockIndex}.lines.${lineIndex}.method`,
-          label: `色卡块 ${blockIndex + 1} 行 ${lineIndex + 1} 做法`,
-          value: plainTextFromRichHTML(line.method),
-          multiline: true,
-          rows: 2,
-          onChange: (value) =>
-            updateColorBlockField(
-              blockIndex,
-              `lines.${lineIndex}.method`,
-              value
-            ),
-        },
-      ]),
-    ]),
-  ]
-
-  const createWorkInstructionRowFieldRows = ({
-    rows = [],
-    pageIndex = null,
-    labelPrefix = '正文行',
-  }) =>
-    rows.flatMap((row, rowIndex) => {
-      const target =
-        pageIndex === null
-          ? createMainInstructionRowTarget(rowIndex)
-          : createContinuationInstructionRowTarget(pageIndex, rowIndex)
-      const rowType = getWorkInstructionRowType(row)
-      const typeLabel =
-        rowType === WORK_INSTRUCTION_ROW_TYPES.title
-          ? '标题行'
-          : rowType === WORK_INSTRUCTION_ROW_TYPES.text
-            ? '文本行'
-            : '编号行'
-      const baseRows = [
-        {
-          key:
-            pageIndex === null
-              ? `rows.${rowIndex}.type`
-              : `continuationPages.${pageIndex}.rows.${rowIndex}.type`,
-          label: `${labelPrefix} ${rowIndex + 1} 类型`,
-          value: typeLabel,
-          readOnly: true,
-        },
-        ...(rowType === WORK_INSTRUCTION_ROW_TYPES.step
-          ? [
-              {
-                key:
-                  pageIndex === null
-                    ? `rows.${rowIndex}.no`
-                    : `continuationPages.${pageIndex}.rows.${rowIndex}.no`,
-                label: `${labelPrefix} ${rowIndex + 1} 行号`,
-                value: row.no ?? '',
-                onChange: (value) =>
-                  updateInstructionRowValue(target, 'no', value),
-              },
-            ]
-          : []),
-        {
-          key:
-            pageIndex === null
-              ? `rows.${rowIndex}.text`
-              : `continuationPages.${pageIndex}.rows.${rowIndex}.text`,
-          label: `${labelPrefix} ${rowIndex + 1} 内容`,
-          value: plainTextFromRichHTML(row.text),
-          multiline: true,
-          rows: 3,
-          onChange: (value) => updateInstructionRowValue(target, 'text', value),
-        },
-      ]
-      return baseRows
-    })
-
-  const workInstructionFieldRows = () => [
-    createDraftFieldRow({ key: 'companyName', label: '公司名称' }),
-    createDraftFieldRow({ key: 'productNo', label: '产品编号' }),
-    createDraftFieldRow({ key: 'versionText', label: '版本/版次' }),
-    createDraftFieldRow({ key: 'processName', label: '本页工序' }),
-    createDraftFieldRow({ key: 'processDateText', label: '工序日期' }),
-    createDraftFieldRow({ key: 'department', label: '发放部门' }),
-    createDraftFieldRow({ key: 'orderNo', label: '订单号' }),
-    createDraftFieldRow({ key: 'productName', label: '产品名称' }),
-    createDraftFieldRow({ key: 'maker', label: '制表' }),
-    createDraftFieldRow({ key: 'designer', label: '设计师' }),
-    createDraftFieldRow({ key: 'auditor', label: '审核' }),
-    ...createWorkInstructionRowFieldRows({
-      rows: draft.rows || [],
-      labelPrefix: '首页正文行',
-    }),
-    ...(Array.isArray(draft.continuationPages)
-      ? draft.continuationPages.flatMap((page, pageIndex) =>
-          createWorkInstructionRowFieldRows({
-            rows: Array.isArray(page.rows) ? page.rows : [],
-            pageIndex,
-            labelPrefix: `续页 ${pageIndex + 1} 正文行`,
-          })
-        )
-      : []),
-  ]
-
-  const fieldRows =
-    templateKey === MATERIAL_DETAIL_TEMPLATE_KEY
-      ? materialFieldRows()
-      : templateKey === COLOR_CARD_TEMPLATE_KEY
-        ? colorCardFieldRows()
-        : workInstructionFieldRows()
 
   const materialImageUploadBar =
     templateKey === MATERIAL_DETAIL_TEMPLATE_KEY ? (
@@ -1669,6 +1464,9 @@ export default function EngineeringPrintWorkspacePage() {
 
   const warmupPreviewPDF = () => {
     if (!paperRef.current || pdfPreviewPreloadRef.current) return
+    if (getPrintOutputProblem(template, draftRef.current, paperRef.current)) {
+      return
+    }
     pdfPreviewPreloadRef.current = schedulePdfPreviewWarmup(
       () =>
         preloadPdfPreviewFromElement(paperRef.current, {
@@ -1681,6 +1479,18 @@ export default function EngineeringPrintWorkspacePage() {
     )
   }
 
+  const checkOutput = () => {
+    const problem = getPrintOutputProblem(
+      template,
+      draftRef.current,
+      paperRef.current
+    )
+    if (!problem) return true
+    setToolbarStatus(problem)
+    message.warning(problem)
+    return false
+  }
+
   const handlePreviewPDF = async () => {
     if (!paperRef.current) return
     try {
@@ -1690,6 +1500,7 @@ export default function EngineeringPrintWorkspacePage() {
         windowLike: window,
         beforeSnapshot: flushDraft,
       })
+      if (!checkOutput()) return
       pdfPreviewPreloadRef.current = null
       syncPrintPageMarginForPaper(paperRef.current, {
         stageWrapElement: stageWrapRef.current,
@@ -1721,6 +1532,7 @@ export default function EngineeringPrintWorkspacePage() {
         windowLike: window,
         beforeSnapshot: flushDraft,
       })
+      if (!checkOutput()) return
       await downloadPdfFromElement(paperRef.current, {
         title: template.title,
         fileName: pdfFileName,
@@ -1737,17 +1549,22 @@ export default function EngineeringPrintWorkspacePage() {
   }
 
   const handlePrint = async () => {
-    await preparePrintWorkspaceSnapshot({
-      windowLike: window,
-      beforeSnapshot: flushDraft,
-    })
-    if (paperRef.current) {
-      syncPrintPageMarginForPaper(paperRef.current, {
-        stageWrapElement: stageWrapRef.current,
-        paperContinuedClass: 'erp-engineering-print-paper--continued',
+    try {
+      await preparePrintWorkspaceSnapshot({
+        windowLike: window,
+        beforeSnapshot: flushDraft,
       })
+      if (!checkOutput()) return
+      if (paperRef.current) {
+        syncPrintPageMarginForPaper(paperRef.current, {
+          stageWrapElement: stageWrapRef.current,
+          paperContinuedClass: 'erp-engineering-print-paper--continued',
+        })
+      }
+      window.print()
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '打印'))
     }
-    window.print()
   }
 
   const applyRichTextCommand = (command) => {
@@ -2102,54 +1919,52 @@ export default function EngineeringPrintWorkspacePage() {
     </div>
   )
 
+  const draftActions = (
+    <div className="erp-print-shell__toolbar-group">
+      <button
+        type="button"
+        className={getToolbarButtonClassName()}
+        onClick={handleResetDraft}
+      >
+        恢复样例
+      </button>
+      <button
+        type="button"
+        className={getToolbarButtonClassName()}
+        onClick={handleBlankDraft}
+      >
+        空白模板
+      </button>
+    </div>
+  )
   const toolbarActions = (
-    <>
-      {templateEditorActions}
-      {richTextToolbarActions}
-      <div className="erp-print-shell__toolbar-group">
-        <button
-          type="button"
-          className={getToolbarButtonClassName()}
-          onClick={handleResetDraft}
-        >
-          恢复样例
-        </button>
-        <button
-          type="button"
-          className={getToolbarButtonClassName()}
-          onClick={handleBlankDraft}
-        >
-          空白模板
-        </button>
-      </div>
-      <div className="erp-print-shell__toolbar-group">
-        <button
-          type="button"
-          className={getToolbarButtonClassName()}
-          onClick={handlePreviewPDF}
-          onFocus={warmupPreviewPDF}
-          onMouseEnter={warmupPreviewPDF}
-          disabled={pdfAction !== ''}
-        >
-          {pdfAction === 'preview' ? '生成中…' : '在线预览 PDF'}
-        </button>
-        <button
-          type="button"
-          className={getToolbarButtonClassName()}
-          onClick={handleDownloadPDF}
-          disabled={pdfAction !== ''}
-        >
-          {pdfAction === 'download' ? '生成中…' : '下载 PDF'}
-        </button>
-        <button
-          type="button"
-          className={getToolbarButtonClassName({ primary: true })}
-          onClick={handlePrint}
-        >
-          打印
-        </button>
-      </div>
-    </>
+    <div className="erp-print-shell__toolbar-group">
+      <button
+        type="button"
+        className={getToolbarButtonClassName()}
+        onClick={handlePreviewPDF}
+        onFocus={warmupPreviewPDF}
+        onMouseEnter={warmupPreviewPDF}
+        disabled={pdfAction !== ''}
+      >
+        {pdfAction === 'preview' ? '生成中…' : '在线预览 PDF'}
+      </button>
+      <button
+        type="button"
+        className={getToolbarButtonClassName()}
+        onClick={handleDownloadPDF}
+        disabled={pdfAction !== ''}
+      >
+        {pdfAction === 'download' ? '生成中…' : '下载 PDF'}
+      </button>
+      <button
+        type="button"
+        className={getToolbarButtonClassName({ primary: true })}
+        onClick={handlePrint}
+      >
+        打印
+      </button>
+    </div>
   )
 
   let paper = null
@@ -2217,17 +2032,52 @@ export default function EngineeringPrintWorkspacePage() {
         title={template.title}
         sourceTag={businessInput ? '业务记录带值' : '使用默认模板'}
         statusText={toolbarStatus}
+        tools={template.runtime.tools}
         persistenceStatus={persistenceStatus}
+        onRetrySave={flushDraft}
         workspaceClassName="erp-engineering-print-workspace-shell"
-        panelTip="左侧维护关键字段；右侧纸面可直接编辑，打印和 PDF 只输出右侧纸面。"
+        panelTip="直接点击纸面填写；图片和行结构在这里调整。"
         panelActions={panelActions}
         toolbarActions={toolbarActions}
-        fieldRows={fieldRows.map((row) => ({
-          ...row,
-          readOnly: false,
-          value: row.value ?? '',
-          onChange: row.onChange,
-        }))}
+        editorActions={templateEditorActions}
+        formatActions={richTextToolbarActions}
+        draftActions={draftActions}
+        selectionMode={
+          materialCellSelectionMode
+            ? '选择单元格'
+            : materialLineSelectionMode ||
+                colorBlockSelectionMode ||
+                colorLineSelectionMode ||
+                instructionRowSelectionMode
+              ? '选择明细行'
+              : ''
+        }
+        selectionCount={
+          materialCellSelectionMode && materialMergeSelection
+            ? (materialMergeSelection.rowEnd -
+                materialMergeSelection.rowStart +
+                1) *
+              (materialMergeSelection.colEnd -
+                materialMergeSelection.colStart +
+                1)
+            : selectedMaterialLineIndex !== null ||
+                selectedColorBlockIndex !== null ||
+                selectedColorLine !== null ||
+                selectedInstructionRowTarget !== null
+              ? 1
+              : 0
+        }
+        onReturnToEdit={resetSelectionForTemplate}
+        selectionBounds={
+          materialCellSelectionMode ? materialMergeSelection : null
+        }
+        selectionSummary={
+          materialLineSelectionMode && selectedMaterialLineIndex !== null
+            ? `第 ${selectedMaterialLineIndex + 1} 行`
+            : colorBlockSelectionMode && selectedColorBlockIndex !== null
+              ? `第 ${selectedColorBlockIndex + 1} 个物料块`
+              : ''
+        }
         prepareSignature={`${templateKey}:${workspaceStateID}:${businessInput}`}
       >
         <div className="erp-print-shell__stage-wrap" ref={stageWrapRef}>

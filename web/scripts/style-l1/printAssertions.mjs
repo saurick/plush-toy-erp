@@ -17,123 +17,89 @@ export function createPrintAssertions({
   expectText,
   isIgnorableDevServerError,
 }) {
-  async function resolveCurrentPrintWorkspaceDraftStorageKeys(page) {
-    const evidence = await page.evaluate(() => {
-      const pathParts = window.location.pathname.split('/').filter(Boolean)
-      const workspaceIndex = pathParts.indexOf('print-workspace')
-      const templateKey =
-        workspaceIndex >= 0 ? pathParts[workspaceIndex + 1] : ''
-      const stateID = new URLSearchParams(window.location.search).get('state')
-      const prefix = '__plush_erp_print_workspace_draft__:v2:'
-      const suffix = `:${encodeURIComponent(templateKey)}:${encodeURIComponent(
-        stateID || 'shared'
-      )}`
-      const storageKeys = Array.from(
-        { length: window.localStorage.length },
-        (_, index) => window.localStorage.key(index)
-      )
-        .filter(
-          (key) =>
-            typeof key === 'string' &&
-            key.startsWith(prefix) &&
-            key.endsWith(suffix)
-        )
-        .sort()
-      const snapshots = storageKeys.map((key) => {
-        try {
-          const payload = JSON.parse(window.localStorage.getItem(key) || '')
-          return {
-            key,
-            version: Number(payload?.version || 0),
-            updatedAt: Number(payload?.updatedAt || 0),
-            hasDraft: Object.prototype.hasOwnProperty.call(payload, 'draft'),
-          }
-        } catch {
-          return { key, version: 0, updatedAt: 0, hasDraft: false }
-        }
+  async function readPrintDraftEntries(page, keys = null) {
+    return page.evaluate(async (requestedKeys) => {
+      const db = await new Promise((resolve, reject) => {
+        const request = indexedDB.open('__plush_erp_print_drafts__')
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => reject(request.error)
       })
-      return {
-        templateKey,
-        stateID: stateID || 'shared',
-        storageKeys,
-        snapshots,
-      }
-    })
-    assert.equal(
-      evidence.storageKeys.length,
-      1,
-      `打印工作区必须解析到唯一当前 v2 草稿 key: ${JSON.stringify(evidence)}`
-    )
-    assert(
-      evidence.snapshots.every(
-        (snapshot) =>
-          snapshot.version === 1 &&
-          Number.isFinite(snapshot.updatedAt) &&
-          snapshot.updatedAt > 0 &&
-          snapshot.hasDraft
-      ),
-      `打印工作区当前草稿必须是有效 v2 快照信封: ${JSON.stringify(evidence)}`
-    )
-    return evidence.storageKeys
-  }
-
-  async function snapshotLocalStorageValues(page, storageKeys) {
-    return page.evaluate((keys) => {
-      return keys.map((key) => ({
-        key,
-        value: window.localStorage.getItem(key),
-      }))
-    }, storageKeys)
-  }
-
-  async function installDraftInjectionOnNextLoad(page, markerKey) {
-    await page.addInitScript((storageMarkerKey) => {
       try {
-        const rawPayload = window.localStorage.getItem(storageMarkerKey)
-        if (!rawPayload) {
-          return
-        }
-        const payload = JSON.parse(rawPayload)
-        const entries = Array.isArray(payload?.entries) ? payload.entries : []
-        entries.forEach((entry) => {
-          const key = String(entry?.key || '')
-          if (!key) return
-          if (typeof entry?.value === 'string') {
-            window.localStorage.setItem(key, entry.value)
-          } else {
-            window.localStorage.removeItem(key)
-          }
+        const store = db.transaction('drafts').objectStore('drafts')
+        const allKeys = await new Promise((resolve, reject) => {
+          const request = store.getAllKeys()
+          request.onsuccess = () => resolve(request.result)
+          request.onerror = () => reject(request.error)
         })
-      } catch {
-        // L1 injection is best-effort; the assertion after reload reports drift.
-      } finally {
-        window.localStorage.removeItem(storageMarkerKey)
-      }
-    }, markerKey)
-  }
-
-  async function reloadWithLocalStorageEntries(page, entries, label) {
-    const markerKey = createDraftInjectionMarkerKey(label)
-    await installDraftInjectionOnNextLoad(page, markerKey)
-    await page.evaluate(
-      ({ resolvedMarkerKey, resolvedEntries }) => {
-        window.localStorage.setItem(
-          resolvedMarkerKey,
-          JSON.stringify({ entries: resolvedEntries })
+        return await Promise.all(
+          (requestedKeys || allKeys).map(
+            (key) =>
+              new Promise((resolve, reject) => {
+                const request = db
+                  .transaction('drafts')
+                  .objectStore('drafts')
+                  .get(key)
+                request.onsuccess = () =>
+                  resolve({ key, value: JSON.stringify(request.result) })
+                request.onerror = () => reject(request.error)
+              })
+          )
         )
-      },
-      {
-        resolvedMarkerKey: markerKey,
-        resolvedEntries: entries,
+      } finally {
+        db.close()
       }
-    )
-    await page.reload({ waitUntil: 'domcontentloaded' })
+    }, keys)
   }
 
-  function createDraftInjectionMarkerKey(label = 'draft') {
-    return `__plush_erp_style_l1_${label}_injection__:${Date.now()}:${Math.random()
-      .toString(36)
-      .slice(2)}`
+  async function resolveCurrentPrintWorkspaceDraftStorageKeys(page) {
+    await page
+      .locator('[data-print-draft-save-status="saved"]')
+      .waitFor({ state: 'visible' })
+    const url = new URL(page.url())
+    const templateKey = url.pathname.split('/print-workspace/')[1]
+    const suffix = `:${encodeURIComponent(templateKey)}:${encodeURIComponent(url.searchParams.get('state') || 'shared')}`
+    const entries = (await readPrintDraftEntries(page)).filter(
+      ({ key }) =>
+        key.startsWith('__plush_erp_print_workspace_draft__:v3:') &&
+        key.endsWith(suffix)
+    )
+    assert.equal(entries.length, 1, '当前窗口必须有唯一的结构化草稿')
+    for (const { value } of entries) {
+      const record = JSON.parse(value)
+      assert.equal(record.version, 1)
+      assert(record.updatedAt > 0 && record.draft, '草稿事务必须保存完整信封')
+    }
+    return entries.map(({ key }) => key)
+  }
+
+  async function reloadWithDraftEntries(page, entries) {
+    await page.evaluate(() => document.activeElement?.blur())
+    await page
+      .locator('[data-print-draft-save-status="saved"]')
+      .waitFor({ state: 'visible' })
+    await page.evaluate(async (values) => {
+      const db = await new Promise((resolve, reject) => {
+        const request = indexedDB.open('__plush_erp_print_drafts__')
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => reject(request.error)
+      })
+      try {
+        await new Promise((resolve, reject) => {
+          const transaction = db.transaction('drafts', 'readwrite')
+          for (const { key, value } of values) {
+            if (typeof value === 'string')
+              transaction.objectStore('drafts').put(JSON.parse(value), key)
+            else transaction.objectStore('drafts').delete(key)
+          }
+          transaction.oncomplete = resolve
+          transaction.onerror = () => reject(transaction.error)
+          transaction.onabort = () => reject(transaction.error)
+        })
+      } finally {
+        db.close()
+      }
+    }, entries)
+    await page.reload({ waitUntil: 'domcontentloaded' })
   }
 
   async function assertPrintPreviewPopup(
@@ -414,6 +380,9 @@ export function createPrintAssertions({
       requirePersistedDraft: false,
     })
 
+    await page
+      .locator('[data-print-draft-save-status="saved"]')
+      .waitFor({ state: 'visible' })
     await page.reload({ waitUntil: 'domcontentloaded' })
     await expectPrintWorkspaceToolbarTitle(page, expectedTitle)
     await page
@@ -632,43 +601,18 @@ export function createPrintAssertions({
     await editableCell.waitFor({ state: 'visible', timeout: 15_000 })
 
     const nextText = normalizeInlineText(await editableCell.textContent())
-    const pageState = await page.evaluate((text) => {
-      const bodyText = document.body?.textContent || ''
-      const persistedMatches = Array.from(
-        { length: localStorage.length },
-        (_, index) => {
-          const key = localStorage.key(index) || ''
-          const value = localStorage.getItem(key) || ''
-          let draftPreview = null
-          if (key.includes('print_workspace_draft')) {
-            try {
-              const parsed = JSON.parse(value)
-              draftPreview = {
-                contractNo: parsed?.lines?.[0]?.contractNo,
-                processingOrderNo: parsed?.rows?.[0]?.orderNo,
-                productNo: parsed?.productNo,
-                firstMaterialName: parsed?.materials?.[0]?.name,
-              }
-            } catch {
-              draftPreview = null
-            }
-          }
-          return {
-            key,
-            hasExpectedText: value.includes(text),
-            valueLength: value.length,
-            draftPreview,
-          }
-        }
-      ).filter(
-        ({ key }) => key.includes('draft') || key.includes('print_window_state')
-      )
-      return {
-        url: location.href,
-        bodyHasExpectedText: bodyText.includes(text),
-        persistedMatches,
-      }
-    }, expectedText)
+    const persistedEntries = await readPrintDraftEntries(page)
+    const pageState = {
+      url: page.url(),
+      bodyHasExpectedText: (await page.locator('body').textContent()).includes(
+        expectedText
+      ),
+      persistedMatches: persistedEntries.map(({ key, value }) => ({
+        key,
+        hasExpectedText: value?.includes(expectedText),
+        valueLength: value?.length,
+      })),
+    }
     assert.equal(
       pageState.bodyHasExpectedText,
       true,
@@ -835,10 +779,12 @@ export function createPrintAssertions({
   }
 
   async function assertProcessingContractPaperRowCount(page) {
+    const [entry] = await readPrintDraftEntries(
+      page,
+      await resolveCurrentPrintWorkspaceDraftStorageKeys(page)
+    )
+    const draftRows = JSON.parse(entry.value).draft.lines.length
     const counts = await page.evaluate(() => {
-      const detailEditorRows = document.querySelectorAll(
-        '.erp-print-shell__detail-table tbody tr'
-      ).length
       const paperRows = document.querySelectorAll(
         '.erp-processing-contract-table tbody tr'
       ).length
@@ -847,7 +793,6 @@ export function createPrintAssertions({
       ).length
 
       return {
-        detailEditorRows,
         paperRows,
         totalRows,
       }
@@ -860,7 +805,7 @@ export function createPrintAssertions({
     )
     assert.equal(
       counts.paperRows,
-      counts.detailEditorRows + counts.totalRows,
+      draftRows + counts.totalRows,
       `加工合同纸面仍存在多余占位空白行: ${JSON.stringify(counts)}`
     )
   }
@@ -970,7 +915,7 @@ export function createPrintAssertions({
     { paperSelector, minimumLineCount = 32, clearMerges = false }
   ) {
     const storageKeys = await resolveCurrentPrintWorkspaceDraftStorageKeys(page)
-    const originalEntries = await snapshotLocalStorageValues(page, storageKeys)
+    const originalEntries = await readPrintDraftEntries(page, storageKeys)
 
     try {
       const injectedEntries = await page.evaluate(
@@ -1030,11 +975,7 @@ export function createPrintAssertions({
         }
       )
 
-      await reloadWithLocalStorageEntries(
-        page,
-        injectedEntries,
-        'continued_page'
-      )
+      await reloadWithDraftEntries(page, injectedEntries, 'continued_page')
       await page.locator(paperSelector).waitFor({
         state: 'visible',
         timeout: 10_000,
@@ -1089,7 +1030,7 @@ export function createPrintAssertions({
         `工作台跨页后未切到统一续页页边距: ${JSON.stringify(metrics)}`
       )
     } finally {
-      await reloadWithLocalStorageEntries(
+      await reloadWithDraftEntries(
         page,
         originalEntries,
         'continued_page_restore'
@@ -1107,7 +1048,7 @@ export function createPrintAssertions({
 
   async function assertMaterialContractMetaAlignment(page) {
     const storageKeys = await resolveCurrentPrintWorkspaceDraftStorageKeys(page)
-    const originalEntries = await snapshotLocalStorageValues(page, storageKeys)
+    const originalEntries = await readPrintDraftEntries(page, storageKeys)
 
     try {
       const injectedEntries = await page.evaluate((resolvedStorageKeys) => {
@@ -1127,7 +1068,7 @@ export function createPrintAssertions({
         })
         return resolvedStorageKeys.map((key) => ({ key, value }))
       }, storageKeys)
-      await reloadWithLocalStorageEntries(
+      await reloadWithDraftEntries(
         page,
         injectedEntries,
         'material_meta_alignment'
@@ -1199,12 +1140,12 @@ export function createPrintAssertions({
         }
       })
     } finally {
-      await reloadWithLocalStorageEntries(
+      await reloadWithDraftEntries(
         page,
         originalEntries,
         'material_meta_alignment_restore'
       )
-      await expectText(page, '打印内容')
+      await expectText(page, '编辑工具')
     }
   }
 
@@ -1348,7 +1289,7 @@ export function createPrintAssertions({
     { scenarioLabel }
   ) {
     const storageKeys = await resolveCurrentPrintWorkspaceDraftStorageKeys(page)
-    const originalEntries = await snapshotLocalStorageValues(page, storageKeys)
+    const originalEntries = await readPrintDraftEntries(page, storageKeys)
 
     try {
       const injectedEntries = await page.evaluate((resolvedStorageKeys) => {
@@ -1385,12 +1326,8 @@ export function createPrintAssertions({
         return resolvedStorageKeys.map((key) => ({ key, value }))
       }, storageKeys)
 
-      await reloadWithLocalStorageEntries(
-        page,
-        injectedEntries,
-        'material_long_line'
-      )
-      await expectText(page, '打印内容')
+      await reloadWithDraftEntries(page, injectedEntries, 'material_long_line')
+      await expectText(page, '编辑工具')
       await expectText(page, 'SIM-YOYOOSUN-BULK-PO-03')
 
       const metrics = await page.evaluate(() => {
@@ -1513,12 +1450,12 @@ export function createPrintAssertions({
         `${scenarioLabel} 表格越过纸面边界: ${JSON.stringify(metrics)}`
       )
     } finally {
-      await reloadWithLocalStorageEntries(
+      await reloadWithDraftEntries(
         page,
         originalEntries,
         'material_long_line_restore'
       )
-      await expectText(page, '打印内容')
+      await expectText(page, '编辑工具')
     }
   }
 
@@ -1954,7 +1891,7 @@ export function createPrintAssertions({
     { templateKind, totalValueSelector, scenarioLabel }
   ) {
     const storageKeys = await resolveCurrentPrintWorkspaceDraftStorageKeys(page)
-    const originalEntries = await snapshotLocalStorageValues(page, storageKeys)
+    const originalEntries = await readPrintDraftEntries(page, storageKeys)
 
     try {
       const injectedEntries = await page.evaluate(
@@ -1996,8 +1933,8 @@ export function createPrintAssertions({
         }
       )
 
-      await reloadWithLocalStorageEntries(page, injectedEntries, 'large_total')
-      await expectText(page, '打印内容')
+      await reloadWithDraftEntries(page, injectedEntries, 'large_total')
+      await expectText(page, '编辑工具')
       await page.waitForFunction(
         (selector) => document.querySelectorAll(selector).length >= 2,
         totalValueSelector,
@@ -2055,12 +1992,8 @@ export function createPrintAssertions({
         )
       })
     } finally {
-      await reloadWithLocalStorageEntries(
-        page,
-        originalEntries,
-        'large_total_restore'
-      )
-      await expectText(page, '打印内容')
+      await reloadWithDraftEntries(page, originalEntries, 'large_total_restore')
+      await expectText(page, '编辑工具')
     }
   }
 

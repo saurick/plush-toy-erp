@@ -6,7 +6,7 @@
   padding: 12mm 10mm;
   background: #fff;
   color: #111827;
-  font-family: 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif;
+  font-family: 'Noto Sans SC Variable', sans-serif;
   font-size: 10.5px;
   line-height: 1.35;
   border-radius: 10px;
@@ -27,12 +27,6 @@
   outline: none;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-}
-
-.erp-engineering-print-editable:focus {
-  background: rgb(47 143 75 / 8%);
-  outline: 0;
-  box-shadow: inset 0 0 0 1.5px rgb(47 143 75 / 82%);
 }
 
 .erp-engineering-print-meta-grid {
@@ -126,6 +120,7 @@
   position: absolute;
   inset: 0;
   display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   place-items: center;
   overflow: hidden;
 }
@@ -155,6 +150,7 @@
   inset: 0;
   z-index: 5;
   pointer-events: none;
+  container-type: inline-size;
 }
 
 .erp-work-instruction-image-annotations__lines {
@@ -180,7 +176,9 @@
   background: #fff;
   color: #111827;
   font: inherit;
-  font-size: 10px;
+  font-family: 'Noto Serif SC Variable', serif;
+  font-size: 3.3cqi;
+  font-weight: 400;
   line-height: 1.35;
   text-align: left;
   white-space: pre-wrap;
@@ -190,7 +188,9 @@
 
 .erp-work-instruction-image-annotations__callout {
   display: block;
-  padding: 1.2mm;
+  padding: 0.8cqi;
+  border-radius: 0.5cqi;
+  overflow: hidden;
 }
 
 .erp-work-instruction-image-annotations__callout--blue-fill {
@@ -214,7 +214,22 @@
 }
 
 .erp-work-instruction-image-annotations--editable
-  .erp-work-instruction-image-annotations__callout,
+  .erp-work-instruction-image-annotations__callout {
+  min-height: 0;
+  resize: none;
+  cursor: text;
+  pointer-events: auto;
+}
+
+.erp-work-instruction-image-annotations__callout::placeholder {
+  color: #64748b;
+  opacity: 1;
+}
+
+.erp-work-instruction-image-annotations__callout--blue-fill::placeholder {
+  color: rgb(255 255 255 / 80%);
+}
+
 .erp-work-instruction-image-annotations--editable
   .erp-work-instruction-image-annotations__measurement-label {
   pointer-events: auto;
@@ -224,6 +239,28 @@
 .erp-work-instruction-image-annotations--editable .is-selected {
   outline: 2px solid #f59e0b;
   outline-offset: 2px;
+}
+
+.erp-work-instruction-image-annotations--editable
+  .erp-work-instruction-image-annotations__callout:focus {
+  outline: 1px dashed rgb(47 143 75 / 82%);
+  outline-offset: 2px;
+}
+
+.erp-work-instruction-image-annotations__move-handle {
+  position: absolute;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid #94a3b8;
+  border-radius: 4px;
+  background: #fff;
+  color: #334155;
+  cursor: move;
+  pointer-events: auto;
 }
 
 .erp-work-instruction-image-annotations__handle {
@@ -250,7 +287,7 @@
 
 .erp-work-instruction-annotation-modal__layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
+  grid-template-columns: minmax(0, 1fr) 304px;
   gap: 16px;
 }
 
@@ -268,18 +305,27 @@
   gap: 8px;
 }
 
-.erp-work-instruction-annotation-modal button,
-.erp-work-instruction-annotation-modal select {
+.erp-work-instruction-annotation-modal
+  :where(button:not([data-annotation-control]), select) {
   min-height: 32px;
   border: 1px solid #cbd5e1;
   border-radius: 6px;
   background: #fff;
   color: #334155;
+  font-size: 13px;
+  line-height: 20px;
 }
 
-.erp-work-instruction-annotation-modal button {
+.erp-work-instruction-annotation-modal
+  :where(button:not([data-annotation-control])) {
   padding: 5px 10px;
   cursor: pointer;
+}
+
+.erp-work-instruction-annotation-modal
+  :where(button, select, input):focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
 }
 
 .erp-work-instruction-annotation-modal :where(button:disabled) {
@@ -296,7 +342,7 @@
 
 .erp-work-instruction-annotation-modal__canvas {
   position: relative;
-  min-height: 500px;
+  aspect-ratio: 86 / 50;
   margin-top: 10px;
   border: 1px solid #94a3b8;
   background: #f8fafc;
@@ -312,9 +358,9 @@
   position: absolute;
   inset: 0;
   display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   place-items: center;
   overflow: hidden;
-  transition: right 160ms ease;
 }
 
 .erp-work-instruction-annotation-modal__canvas.has-callout
@@ -330,27 +376,79 @@
 }
 
 .erp-work-instruction-annotation-modal__panel {
-  max-height: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: clamp(400px, calc(100dvh - 250px), 600px);
   padding: 12px;
   border: 1px solid #e2e8f0;
   background: #f8fafc;
-  overflow: auto;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .erp-work-instruction-annotation-modal__annotation-list {
   display: grid;
-  gap: 6px;
-  margin: 12px 0;
+  gap: 4px;
+  max-height: 148px;
+  margin-top: 8px;
+  overflow: auto;
 }
 
-.erp-work-instruction-annotation-modal__annotation-list button {
-  width: 100%;
+.erp-work-instruction-annotation-modal__list-toolbar,
+.erp-work-instruction-annotation-modal__list-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.erp-work-instruction-annotation-modal__list-row
+  > .erp-work-instruction-annotation-modal__delete {
+  flex-shrink: 0;
+}
+
+.erp-work-instruction-annotation-modal__list-toolbar {
+  justify-content: space-between;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.erp-work-instruction-annotation-modal__list-section {
+  flex-shrink: 0;
+  min-height: 0;
+}
+
+.erp-work-instruction-annotation-modal__add-actions {
+  flex-shrink: 0;
+}
+
+.erp-work-instruction-annotation-modal__list-row > button[aria-pressed] {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  min-width: 0;
   text-align: left;
+}
+
+.erp-work-instruction-annotation-modal__list-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.erp-work-instruction-annotation-modal__list-number {
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
 }
 
 .erp-work-instruction-annotation-modal__form {
   display: grid;
   gap: 12px;
+  min-height: 0;
+  padding: 2px;
+  overflow: auto;
 }
 
 .erp-work-instruction-annotation-modal__form > label {
@@ -369,6 +467,10 @@
 .erp-work-instruction-annotation-modal
   button.erp-work-instruction-annotation-modal__delete {
   border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.erp-work-instruction-annotation-modal__overflow-warning {
   color: #b91c1c;
 }
 
@@ -407,12 +509,8 @@
     grid-template-columns: 1fr;
   }
 
-  .erp-work-instruction-annotation-modal__canvas {
-    min-height: 360px;
-  }
-
   .erp-work-instruction-annotation-modal__panel {
-    max-height: 300px;
+    max-height: 520px;
   }
 }
 
@@ -551,6 +649,17 @@
   overflow-wrap: anywhere;
   white-space: normal;
   word-break: break-word;
+}
+
+.erp-material-detail-table__header {
+  display: block;
+  min-height: 8.7mm;
+  padding: 0.7mm 0.25mm;
+  line-height: 1.35;
+  line-break: auto;
+  overflow-wrap: break-word;
+  align-content: center;
+  word-break: normal;
 }
 
 .erp-material-detail-paper__footer {
@@ -750,8 +859,7 @@
   box-sizing: border-box;
   overflow: visible;
   padding: 3mm;
-  font-family:
-    SimSun, '宋体', 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif;
+  font-family: 'Noto Serif SC Variable', serif;
   font-size: 14.67px;
   line-height: 1.22;
 }
