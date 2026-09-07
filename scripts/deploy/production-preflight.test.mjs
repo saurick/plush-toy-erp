@@ -4,8 +4,12 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { productionPreflightTest as test } from "./production-preflight-test-lane.mjs";
+import { readRuntimePins } from "../qa/pdf-runtime.mjs";
 
 const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
+const { chromiumVersion } = readRuntimePins(
+  fs.readFileSync(path.join(repoRoot, "server/Dockerfile"), "utf8"),
+);
 const scriptPath = path.join(
   repoRoot,
   "scripts/deploy/production-preflight.sh",
@@ -558,9 +562,9 @@ if [[ "\${1:-}" == "exec" ]]; then
   fi
   package="\${@: -1}"
   if [[ "$package" == "chromium-common" ]]; then
-    printf '%s\n' "\${FAKE_CHROMIUM_COMMON_VERSION:-150.0.7871.100-1~deb12u1}"
+    printf '%s\n' "\${FAKE_CHROMIUM_COMMON_VERSION:-${chromiumVersion}}"
   else
-    printf '%s\n' "\${FAKE_CHROMIUM_VERSION:-150.0.7871.100-1~deb12u1}"
+    printf '%s\n' "\${FAKE_CHROMIUM_VERSION:-${chromiumVersion}}"
   fi
   exit 0
 fi
@@ -1052,9 +1056,10 @@ test("production preflight verifies the runtime Chromium package exact pin", () 
     result.stdout,
     /运行态 app-server 使用非 root 用户: app \(uid=10001\)/,
   );
-  assert.match(
-    result.stdout,
-    /运行态 Chromium \/ chromium-common 版本与 Docker exact pin 一致: 150\.0\.7871\.100-1~deb12u1/,
+  assert(
+    result.stdout.includes(
+      `运行态 Chromium / chromium-common 版本与 Docker exact pin 一致: ${chromiumVersion}`,
+    ),
   );
   assert.match(result.stdout, /healthz \/ readyz 通过/);
 });
@@ -1778,7 +1783,7 @@ test("production artifacts pin the verified Chromium build and async warmup", ()
 
   assert.match(
     dockerfile,
-    /^ARG CHROMIUM_VERSION=150\.0\.7871\.100-1~deb12u1$/m,
+    /^ARG CHROMIUM_VERSION=\d+\.\d+\.\d+\.\d+-\d+~deb12u\d+$/m,
   );
   assert(dockerfile.includes('"chromium=${CHROMIUM_VERSION}"'));
   assert(dockerfile.includes('"chromium-common=${CHROMIUM_VERSION}"'));

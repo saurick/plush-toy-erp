@@ -12,11 +12,12 @@ export function unicodeRangeContainsText(range, text) {
   if (!range) return true
   const intervals = range.split(',').map((item) => {
     const value = item.trim().replace(/^U\+/i, '')
-    if (value.includes('?'))
+    if (value.includes('?')) {
       return [
         parseInt(value.replaceAll('?', '0'), 16),
         parseInt(value.replaceAll('?', 'F'), 16),
       ]
+    }
     const [start, end = start] = value.split('-')
     return [parseInt(start, 16), parseInt(end, 16)]
   })
@@ -71,8 +72,9 @@ export async function preparePrintFonts(element) {
       )
     )
   })
-  if (!selected.length || selected.length > PRINT_FONT_LIMITS.count)
+  if (!selected.length || selected.length > PRINT_FONT_LIMITS.count) {
     throw new Error('打印字体尚未就绪，请刷新页面后重试。')
+  }
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 8000)
   try {
@@ -87,8 +89,9 @@ export async function preparePrintFonts(element) {
       if (
         url.origin !== new URL(document.baseURI).origin ||
         !/\.woff2(?:\?|$)/.test(url.href)
-      )
+      ) {
         throw new Error('打印字体来源无效，请刷新页面后重试。')
+      }
       const response = await view.fetch(url.href, {
         signal: controller.signal,
         credentials: 'same-origin',
@@ -97,8 +100,9 @@ export async function preparePrintFonts(element) {
         !response.ok ||
         Number(response.headers.get('content-length')) >
           PRINT_FONT_LIMITS.eachBytes
-      )
+      ) {
         throw new Error('打印字体加载失败，请刷新页面后重试。')
+      }
       const reader = response.body?.getReader()
       let bytes
       if (reader) {
@@ -132,11 +136,13 @@ export async function preparePrintFonts(element) {
         bytes.length > PRINT_FONT_LIMITS.eachBytes ||
         totalBytes > PRINT_FONT_LIMITS.totalBytes ||
         String.fromCharCode(...bytes.slice(0, 4)) !== 'wOF2'
-      )
+      ) {
         throw new Error('打印字体超出单次大小限制，请减少内容后重试。')
+      }
       let binary = ''
-      for (let index = 0; index < bytes.length; index += 8192)
+      for (let index = 0; index < bytes.length; index += 8192) {
         binary += String.fromCharCode(...bytes.subarray(index, index + 8192))
+      }
       chunks.push(
         rule.cssText.replace(
           /url\([^)]*\)/,
@@ -163,8 +169,9 @@ export async function preparePrintFonts(element) {
     ])
     return chunks.join('\n')
   } catch (error) {
-    if (error?.name === 'AbortError')
+    if (error?.name === 'AbortError') {
       throw new Error('打印字体加载超时，请重试。')
+    }
     throw error
   } finally {
     clearTimeout(timeout)

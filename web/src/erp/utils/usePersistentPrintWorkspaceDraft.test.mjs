@@ -1,8 +1,4 @@
 import { IDBFactory } from 'fake-indexeddb'
-import {
-  preparePrintDraftStorage,
-  createPrintDraftWriter,
-} from './printDraftStorage.mjs'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -12,6 +8,10 @@ import { fileURLToPath } from 'node:url'
 import { Window } from 'happy-dom'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
+import {
+  preparePrintDraftStorage,
+  createPrintDraftWriter,
+} from './printDraftStorage.mjs'
 
 import { multiplyNumeric20Scale6Values } from './numeric20Scale6.mjs'
 import {

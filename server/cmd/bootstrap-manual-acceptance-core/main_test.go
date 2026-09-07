@@ -123,7 +123,7 @@ func TestDockerfileBuildsAndCopiesOneShotBinaryWithReleaseVersion(t *testing.T) 
 	}
 	source := string(raw)
 	for _, required := range []string{
-		`-ldflags "-X main.Version=${GIT_SHA}" \
+		`-ldflags "-s -w -X main.Version=${GIT_SHA}" \
       -o ./bin/bootstrap-manual-acceptance-core ./cmd/bootstrap-manual-acceptance-core`,
 		`COPY --from=go-builder /src/bin/bootstrap-manual-acceptance-core /app/bootstrap-manual-acceptance-core`,
 	} {

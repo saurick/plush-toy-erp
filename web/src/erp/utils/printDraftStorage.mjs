@@ -44,8 +44,9 @@ function openDatabase(indexedDBLike) {
       const store = request.result.objectStoreNames.contains(STORE_NAME)
         ? request.transaction.objectStore(STORE_NAME)
         : request.result.createObjectStore(STORE_NAME)
-      if (!store.indexNames.contains('updatedAt'))
+      if (!store.indexNames.contains('updatedAt')) {
         store.createIndex('updatedAt', 'updatedAt')
+      }
     }
     request.onerror = () => finish(null)
     request.onblocked = () => finish(null)
@@ -60,8 +61,9 @@ function openDatabase(indexedDBLike) {
   })
   databases.set(indexedDBLike, promise)
   promise.then((database) => {
-    if (!database && databases.get(indexedDBLike) === promise)
+    if (!database && databases.get(indexedDBLike) === promise) {
       databases.delete(indexedDBLike)
+    }
   })
   return promise
 }
@@ -112,9 +114,9 @@ export async function preparePrintDraftStorage(
       }
       const request = store.get(storageKey)
       request.onsuccess = () => {
-        if (isCurrentPrintDraftRecord(request.result))
+        if (isCurrentPrintDraftRecord(request.result)) {
           preparedDrafts.set(storageKey, request.result)
-        else {
+        } else {
           preparedDrafts.delete(storageKey)
           if (request.result) store.delete(storageKey)
         }
@@ -173,8 +175,9 @@ export function createPrintDraftWriter({
   let lastResult = true
   const flush = () => {
     clearTimeout(timer)
-    if (running)
+    if (running) {
       return running.then(() => (queued === undefined ? lastResult : flush()))
+    }
     if (queued === undefined) return Promise.resolve(lastResult)
     const draft = queued
     queued = undefined

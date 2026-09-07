@@ -80,10 +80,11 @@ test('连续输入合并排队写入，运行中的旧事务不能覆盖新输�
     onStatus: (status) => statuses.push(status),
     write: async (draft) => {
       calls.push(draft)
-      if (calls.length === 1)
+      if (calls.length === 1) {
         await new Promise((resolve) => {
           release = resolve
         })
+      }
       return true
     },
   })
@@ -127,6 +128,7 @@ test('过期、未来时间和错误版本的草稿不恢复', () => {
     { ...record, updatedAt: now + 1 },
     { ...record, updatedAt: now - PRINT_DRAFT_TTL_MS - 1 },
     { ...record, draft: null },
-  ])
+  ]) {
     assert.equal(isCurrentPrintDraftRecord(invalid, now), false)
+  }
 })

@@ -419,7 +419,16 @@ test("formal customer frontend copy uses the current account and business perspe
   const printCenterSource = readRelative(
     "web/src/erp/pages/PrintCenterPage.jsx",
   );
-  assert(printCenterSource.includes("'委托方' : '订货方'"));
+  assert(
+    readRelative(
+      "web/src/erp/components/print/MaterialPurchaseContractPaper.jsx",
+    ).includes("甲方（订货方）："),
+  );
+  assert(
+    readRelative(
+      "web/src/erp/components/print/ProcessingContractPaper.jsx",
+    ).includes("甲方（委托方）："),
+  );
 
   const loginSource = readRelative("web/src/pages/AdminLogin/index.jsx");
   assert(loginSource.includes('label="账号"'));
