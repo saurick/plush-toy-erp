@@ -121,13 +121,16 @@ RUN --mount=type=cache,id=plush-gomod,target=/go/pkg/mod \
     --mount=type=cache,id=plush-gobuild,target=/root/.cache/go-build \
     mkdir -p bin && \
     GOOS=${GO_TARGETOS} GOARCH=${GO_TARGETARCH} go build \
-      -ldflags "-X main.Version=${GIT_SHA}" \
+      -trimpath \
+      -ldflags "-s -w -X main.Version=${GIT_SHA}" \
       -o ./bin/server ./cmd/server && \
     GOOS=${GO_TARGETOS} GOARCH=${GO_TARGETARCH} go build \
-      -ldflags "-X main.Version=${GIT_SHA}" \
+      -trimpath \
+      -ldflags "-s -w -X main.Version=${GIT_SHA}" \
       -o ./bin/bootstrap-manual-acceptance-core ./cmd/bootstrap-manual-acceptance-core && \
     GOOS=${GO_TARGETOS} GOARCH=${GO_TARGETARCH} go build \
-      -ldflags "-X main.Version=${GIT_SHA}" \
+      -trimpath \
+      -ldflags "-s -w -X main.Version=${GIT_SHA}" \
       -o ./bin/rotate-manual-acceptance-passwords ./cmd/rotate-manual-acceptance-passwords
 
 # ======================
